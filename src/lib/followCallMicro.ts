@@ -1,0 +1,317 @@
+/**
+ * ═══ ผลโทรระดับละเอียด (micro) ของงานติดตาม — เจ้าของสั่ง 13 ก.ย. 2569 ═══
+ *
+ * > *"อยากรู้แบบ micro รับสายเท่าไหร่ ไม่รับเท่าไหร่ รับแล้ววาง รับแล้วคุยแต่ไป
+ * >  รับแล้วคุยแต่ไม่ไป อยากรู้ละเอียดระดับนั้น เพื่อทำ Success Rate"*
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * 🔴 **ทำไมต้องมีไฟล์นี้ ทั้งที่ Lumos ส่ง `outcome` มาให้แล้ว**
+ *
+ * เพราะ `outcome` ของเขา **หยาบเกินกว่าจะทำ Success Rate ได้** — วัดจากผลจริง 37 สาย
+ * (11 ก.ย. 2569 · ตาราง `lumos_result_inbox`): `acknowledged` 31 · `declined` 4 ·
+ * `wrong_person` 1 · `unresponsive` 1 · **`confirmed` 0**
+ *
+ * ในกอง `acknowledged` 31 สายนั้นมีทุกอย่างปนกัน ของจริงที่เจอ:
+ *   · *"เตรียมตัวแล้วค่ะ"* · *"on the way"* — ไปจริง
+ *   · *"กำลังอาบน้ำอยู่"* · *"เพิ่งตื่น"* — ยังอยู่บ้าน
+ *   · *"ยังไม่ได้ไป"* · *"ไปหาหมอ"* · *"안 가요"* (เกาหลีแปลว่าไม่ไป) — **ไม่ไป**
+ *   · *"ฮัลโหล"* เฉย ๆ แล้วเงียบจนหมดเวลา — ไม่ได้ตอบอะไรเลย
+ *
+ * ⇒ เอา `acknowledged` ไปนับเป็น "ตอบว่าไป" ตรง ๆ = จอโกหก (วงกลมจะขึ้น 88.6%
+ *   ทั้งที่ไม่มีใคร `confirmed` สักสาย) · ต้องอ่าน **คำที่เขาพูด** กับ **สรุปของ AI** ด้วย
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * ⚠️ **ข้อจำกัดที่ต้องบอกตรง ๆ ห้ามซ่อน**
+ *
+ * นี่คือการเดาจากคำ ไม่ใช่ค่าที่ Lumos ยืนยันมา · ภาษาพูดไทยดิบมาก ถอดเสียงเพี้ยนก็มี
+ * (*"เป็นต่อแล้ว"* ที่ AI สรุปว่า *"เตรียมตัวเรียบร้อยแล้ว"*) ⇒ กติกาที่นี่คือ
+ * **ไม่ชัดต้องเข้าถัง "คุยแล้วแต่ไม่บอกว่าไปหรือไม่ไป" เสมอ ห้ามเดาเข้าข้างฝั่งไหน**
+ *
+ * ทางแก้ถาวรคือขอให้ Lumos ส่งฟิลด์ตัดสินมาเอง (เขามีทั้งเสียงและบริบท เดาแม่นกว่าเรา)
+ * — ระหว่างรอ ใช้ไฟล์นี้ไปก่อน และ **ถังไม่ชัดต้องโชว์บนจอ** เพื่อให้คนรู้ว่ายังต้องไปอ่านเอง
+ */
+
+import type { ToneKey } from '@/lib/designTokens';
+
+/**
+ * ถังผลแบบละเอียด — เรียงตามลำดับที่คนใช้อ่าน (จากโทรไม่ถึงตัว ไปหาคุยจบ)
+ *
+ * 🔴 หนึ่งสายอยู่ได้ถังเดียว · รวมทุกถัง = จำนวนสายที่มีผลกลับมาแล้ว
+ */
+export type FollowMicroOutcome =
+  /** ไม่มีใครรับสาย — ไม่รับ/สายไม่ว่าง/โทรไม่สำเร็จ */
+  | 'no_pickup'
+  /** รับแล้ว แต่ไม่ใช่เจ้าตัว */
+  | 'wrong_person'
+  /** รับแล้วเงียบหรือวางไปเลย — ไม่ได้ตอบคำถาม */
+  | 'picked_silent'
+  /** คุยแล้ว บอกว่าไป / กำลังเดินทาง / ถึงแล้ว */
+  | 'said_going'
+  /** คุยแล้ว บอกว่าไม่ไป / ยังไม่ได้ไป / ยกเลิก */
+  | 'said_not_going'
+  /** คุยแล้ว ยังเตรียมตัวอยู่ที่บ้าน — อาบน้ำ/แต่งตัว/กินข้าว/เพิ่งตื่น */
+  | 'getting_ready'
+  /** คุยแล้ว แต่ไม่บอกว่าไปหรือไม่ไป — **ต้องคนอ่านเอง** */
+  | 'talked_unclear';
+
+export const FOLLOW_MICRO_LABEL: Record<FollowMicroOutcome, string> = {
+  no_pickup: 'ไม่รับสาย',
+  wrong_person: 'ไม่ใช่เจ้าตัว',
+  picked_silent: 'รับแล้วเงียบ/วางสาย',
+  said_going: 'คุยแล้ว บอกว่าไป',
+  said_not_going: 'คุยแล้ว บอกว่าไม่ไป',
+  getting_ready: 'คุยแล้ว ยังเตรียมตัวอยู่',
+  talked_unclear: 'คุยแล้ว แต่ไม่บอกว่าไปหรือไม่ไป',
+};
+
+/**
+ * โทนสีของแต่ละถัง — **ต้องพูดภาษาเดียวกับสีที่ใช้อยู่ทั้งระบบ**
+ * เขียว = จบดี · แดง = จบไม่ดี · เหลือง = ยังไม่จบ ต้องตามต่อ · ส้ม = คนต้องเข้าไปจัดการ
+ * (กติกาเดียวกับ `CALL_OUTCOME_TONE` — ห้ามตั้งสีใหม่ให้เรื่องเดิม)
+ */
+export const FOLLOW_MICRO_TONE: Record<FollowMicroOutcome, ToneKey> = {
+  no_pickup: 'warn',
+  wrong_person: 'orange',
+  picked_silent: 'neutral',
+  said_going: 'success',
+  said_not_going: 'danger',
+  getting_ready: 'warn',
+  talked_unclear: 'neutral',
+};
+
+/** คำอธิบายใต้ป้าย — ถังพวกนี้ชื่อใกล้กัน คนใหม่ต้องมีคำช่วยแยก */
+export const FOLLOW_MICRO_HINT: Record<FollowMicroOutcome, string> = {
+  no_pickup: 'AI โทรแล้วไม่มีใครรับ — ยังไม่ได้คุยกับใครเลย',
+  wrong_person: 'มีคนรับ แต่บอกว่าไม่ใช่คนที่เราตามหา — เบอร์ผิดหรือคนละคน',
+  picked_silent: 'รับสายแต่ไม่ตอบคำถาม หรือวางไปก่อน — ยังไม่รู้คำตอบ',
+  said_going: 'ตอบว่าไป/กำลังเดินทาง/ถึงแล้ว',
+  said_not_going: 'ตอบว่าไม่ไป/ยังไม่ได้ไป/ยกเลิก — ต้องหาคนแทนทันที',
+  getting_ready: 'ยังอยู่บ้าน กำลังเตรียมตัว — ยังไม่ออกเดินทาง ควรตามซ้ำ',
+  talked_unclear: 'คุยกันแล้วแต่คำตอบไม่ชัด — ต้องกดอ่านคำที่เขาพูดเอง',
+};
+
+/**
+ * รหัสผลจาก Lumos ที่ **ตัดสินได้เลย ไม่ต้องอ่านคำพูด**
+ * (ที่เหลือ — โดยเฉพาะ `acknowledged` — ต้องไปอ่านคำ)
+ */
+const DECIDED_BY_CODE: Record<string, FollowMicroOutcome> = {
+  confirmed: 'said_going',
+  declined: 'said_not_going',
+  wrong_person: 'wrong_person',
+  no_answer: 'no_pickup',
+  busy: 'no_pickup',
+  failed: 'no_pickup',
+  reschedule_requested: 'said_not_going',
+};
+
+/**
+ * 🔴 **ตรวจ "ไม่ไป" ก่อน "ไป" เสมอ** — คำว่า "ไม่ไป" มีคำว่า "ไป" อยู่ข้างใน
+ * เรียงผิดลำดับเมื่อไหร่ คนที่บอกว่าไม่ไปจะถูกนับเป็นไปทันที
+ */
+const NOT_GOING_WORDS = [
+  'ไม่ได้ไป',
+  'ไม่ไป',
+  'ยังไม่ได้ไป',
+  'ไม่ทัน',
+  'ยกเลิก',
+  'ขอลา',
+  'ลาป่วย',
+  'ไปหาหมอ',
+  'ไม่สบาย',
+  'ท้องเสีย',
+  'ไม่ได้เดินทาง',
+  'cancel',
+  '안 가요',
+];
+
+/** คำที่แปลว่าออกจากบ้านแล้วหรือพร้อมแล้วจริง ๆ */
+const GOING_WORDS = [
+  'เตรียมตัวแล้ว',
+  'เตรียมตัวเรียบร้อย',
+  'เตรียมแล้ว',
+  'พร้อมแล้ว',
+  'กำลังเดินทาง',
+  'เดินทางอยู่',
+  'เดินทางแล้ว',
+  'ออกจากบ้านแล้ว',
+  'กำลังขับรถ',
+  'ขับรถอยู่',
+  'ขับไปแล้ว',
+  'ถึงแล้ว',
+  'ถึงหน่วยงานแล้ว',
+  'on the way',
+  'ไปแล้ว',
+  'กำลังไป',
+];
+
+/** ยังอยู่บ้าน — ไม่ใช่ปฏิเสธ แต่ก็ยังไม่ได้ออกเดินทาง */
+const GETTING_READY_WORDS = [
+  'อาบน้ำ',
+  'แต่งตัว',
+  'กินข้าว',
+  'ทานข้าว',
+  'เพิ่งตื่น',
+  'ยังนอน',
+  'ยังไม่ตื่น',
+  'ยังไม่ได้เตรียม',
+  'กำลังเตรียมตัว',
+  'เตรียมตัวอยู่',
+];
+
+/**
+ * 🔴 **คำที่ AI บอกเองว่า "ฟังไม่ออก/ไม่ตรงคำถาม"** — ต้องเช็คก่อนคำอื่นทั้งหมด
+ *
+ * เพราะสรุปของเขามักอ้าง **คำถามที่ AI ถาม** ติดมาด้วย เช่น
+ * *"...เมื่อถามว่าเตรียมตัวเรียบร้อยหรือยัง ตอบกลับไม่ชัดเจน"*
+ * ⇒ ถ้าไล่หาคำว่า "เตรียมตัวเรียบร้อย" ก่อน จะนับสายนี้เป็น "บอกว่าไป" ทั้งที่เขาไม่ได้ตอบ
+ * (เคสจริง #14 ของชุด 11 ก.ย. 2569 — ตัวจัดถังรุ่นแรกพลาดตรงนี้)
+ */
+const UNCLEAR_WORDS = [
+  'ไม่ชัดเจน',
+  'ไม่ชัด',
+  'ไม่ตรงคำถาม',
+  'ฟังไม่ออก',
+  'ไม่ได้ตอบ',
+  'ไม่ตอบคำถาม',
+];
+
+/** คำทักทายล้วน ๆ — มีแค่นี้แปลว่ายังไม่ได้ตอบอะไร */
+const GREETING_ONLY = /^(ฮัลโหล|ฮาโหล|hello|hi|สวัสดี|ครับ|ค่ะ|คะ|จ้า|ว่าไง|อยู่|ใช่|yes|[\s.,!?·|-]|[0-9])*$/i;
+
+/**
+ * 🔴🔴 **ตัดท่อนที่เป็น "คำถามของ AI" ออกก่อนอ่าน** — จุดที่พลาดง่ายที่สุดของไฟล์นี้
+ *
+ * สรุปของ Lumos ชอบเล่าคำถามติดมาด้วย: *"...ตอบรับสั้น ๆ ว่า 'ค่ะ'
+ * **ต่อคำถามว่าเตรียมตัวไปทำงานหรือยัง**"* ⇒ ถ้าไม่ตัดทิ้ง เราจะไปเจอคำว่า
+ * "เตรียมตัวไปทำงาน" ที่เป็น**คำถาม** แล้วนับเป็นคำตอบของเขา
+ *
+ * วัดกับผลจริง 37 สาย (11 ก.ย. 2569): ไม่ตัด = จัดถังผิด 4 สาย ทุกสายเอียงไปทางดีเกินจริง
+ * ⚠️ ตัดถึงจุดจบประโยคเท่านั้น (`.` หรือหมดข้อความ) — ตัดเกินจะกินคำตอบจริงที่ตามหลังมา
+ */
+const QUESTION_CLAUSES: readonly RegExp[] = [
+  /เมื่อ(ผู้แจ้งเตือน)?ถาม[^.]*/g,
+  /ต่อคำถาม[^.]*/g,
+  /ระหว่างที่[^.]*/g,
+  /หลัง(ได้รับ)?(การ)?แจ้งเตือน[^.]*/g,
+  /เมื่อได้รับ(การ)?แจ้งเตือน[^.]*/g,
+  /ตามที่แจ้งเตือน[^.]*/g,
+];
+
+export function stripQuestionClauses(text: string): string {
+  let out = text;
+  for (const re of QUESTION_CLAUSES) out = out.replace(re, ' ');
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+const has = (haystack: string, words: readonly string[]): boolean =>
+  words.some((w) => haystack.includes(w.toLowerCase()));
+
+export type FollowMicroInput = {
+  /** รหัสผลจาก Lumos (`call_outcome`) */
+  outcome: string | null | undefined;
+  /** คำที่ผู้รับสายพูดเอง (`call_reply` — ต่อจาก transcript ฝั่ง candidate) */
+  reply: string | null | undefined;
+  /** สรุปของ AI (`call_summary`) — ภาษาไทยเรียบร้อยกว่าคำถอดเสียง จึงเชื่อก่อน */
+  summary: string | null | undefined;
+};
+
+/**
+ * จัดถังหนึ่งสาย — `null` = **ยังไม่มีผล หรือถูกยกเลิก** (ไม่ใช่สายที่เอาไปคิด Success Rate)
+ *
+ * ลำดับการตัดสิน (สำคัญ — เปลี่ยนลำดับ = เปลี่ยนตัวเลข):
+ *   1. ไม่มีผล/ยกเลิก ⇒ null
+ *   2. รหัสที่ชัดอยู่แล้ว (`declined` · `no_answer` · `wrong_person` …)
+ *   3. ที่เหลือ (`acknowledged` · `unresponsive`) อ่าน **สรุปของ AI ก่อน** แล้วค่อยอ่านคำพูดดิบ
+ *      AI บอกว่าฟังไม่ออก → ไม่ไป → ไป → ยังเตรียมตัว → ไม่ชัด
+ */
+export function classifyFollowCall(input: FollowMicroInput): FollowMicroOutcome | null {
+  const code = (input.outcome ?? '').trim().toLowerCase();
+  if (code === '' || code === 'cancelled') return null;
+
+  const decided = DECIDED_BY_CODE[code];
+  if (decided) return decided;
+
+  const rawSummary = (input.summary ?? '').trim().toLowerCase();
+  const summary = stripQuestionClauses(rawSummary);
+  const reply = (input.reply ?? '').trim().toLowerCase();
+  const text = `${summary} ${reply}`.trim();
+
+  // ไม่มีอะไรให้อ่านเลย + รหัสบอกว่าไม่ตอบ ⇒ ไม่ได้คุยกัน
+  if (`${rawSummary} ${reply}`.trim() === '')
+    return code === 'unresponsive' ? 'no_pickup' : 'picked_silent';
+
+  // พูดแต่คำทักทาย/คำรับสั้น ๆ แล้วจบ ⇒ ยังไม่ได้ตอบคำถาม
+  if (rawSummary === '' && GREETING_ONLY.test(reply.replace(/\s+/g, ' '))) return 'picked_silent';
+
+  // AI บอกเองว่าฟังไม่ออก ⇒ ไม่ต้องไปเดาจากคำอื่นในประโยคเดียวกัน
+  if (has(text, UNCLEAR_WORDS)) return 'talked_unclear';
+  if (has(text, NOT_GOING_WORDS)) return 'said_not_going';
+  if (has(text, GOING_WORDS)) return 'said_going';
+  if (has(text, GETTING_READY_WORDS)) return 'getting_ready';
+  return 'talked_unclear';
+}
+
+export type FollowMicroSummary = Record<FollowMicroOutcome, number> & {
+  /** สายที่มีผลกลับแล้วทั้งหมด (ไม่รวมยกเลิก/ยังไม่มีผล) */
+  withResult: number;
+  /** สายที่มีคนรับ — ทุกถังยกเว้น `no_pickup` */
+  pickedUp: number;
+  /** สายที่ได้คุยเรื่องของเราจริง ๆ (ไม่รวมไม่รับ · ไม่ใช่เจ้าตัว · รับแล้วเงียบ) */
+  talked: number;
+};
+
+export function summarizeFollowMicro(
+  calls: readonly FollowMicroInput[],
+): FollowMicroSummary {
+  const s: FollowMicroSummary = {
+    no_pickup: 0,
+    wrong_person: 0,
+    picked_silent: 0,
+    said_going: 0,
+    said_not_going: 0,
+    getting_ready: 0,
+    talked_unclear: 0,
+    withResult: 0,
+    pickedUp: 0,
+    talked: 0,
+  };
+  for (const c of calls) {
+    const k = classifyFollowCall(c);
+    if (!k) continue;
+    s[k] += 1;
+    s.withResult += 1;
+    if (k !== 'no_pickup') s.pickedUp += 1;
+    if (k !== 'no_pickup' && k !== 'wrong_person' && k !== 'picked_silent') s.talked += 1;
+  }
+  return s;
+}
+
+/**
+ * ═══ อัตราสามตัวที่เอาไปใช้ตัดสินใจได้จริง ═══
+ *
+ * 🔴 **ฐานของแต่ละตัวไม่เหมือนกัน ต้องเขียนฐานไว้ข้างตัวเลขบนจอเสมอ**
+ * (บทเรียนเดิม: วงกลม "ตอบว่าไป" ไม่บอกฐาน คนเลยอ่านเป็นอัตราคนมาทำงานจริง)
+ *
+ * · `reachRate`   = มีคนรับ ÷ สายที่มีผลกลับ        — AI โทรถึงตัวได้แค่ไหน
+ * · `talkRate`    = ได้คุยเรื่องของเรา ÷ สายที่มีผลกลับ — คุยรู้เรื่องแค่ไหน
+ * · `successRate` = บอกว่าไป ÷ สายที่ได้คุย          — **Success Rate ที่เจ้าของสั่ง**
+ *
+ * ⚠️ `getting_ready` **ไม่นับเป็นสำเร็จ** — ยังอยู่บ้าน ยังไม่ออกเดินทาง
+ * แต่ก็ไม่นับเป็นล้มเหลว มันอยู่ในฐานหาร (เขาคุยกับเราแล้ว) · จะเปลี่ยนนิยามนี้
+ * ต้องแก้ที่นี่ที่เดียวและอัปเดตเทสต์
+ */
+export type FollowMicroRates = {
+  reachRate: number | null;
+  talkRate: number | null;
+  successRate: number | null;
+};
+
+export function followMicroRates(s: FollowMicroSummary): FollowMicroRates {
+  const pct = (top: number, bottom: number): number | null =>
+    bottom > 0 ? (top / bottom) * 100 : null;
+  return {
+    reachRate: pct(s.pickedUp, s.withResult),
+    talkRate: pct(s.talked, s.withResult),
+    successRate: pct(s.said_going, s.talked),
+  };
+}

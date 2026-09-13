@@ -567,12 +567,12 @@ describe('แผน 20/20 — คำตอบต้องอยู่บนจ�
   it('ยังไม่มีผลเดือนนี้ ⇒ ไม่วาดวงกลม (เดิมดูเหมือนโหลดค้าง)', () => {
     renderCalendar([entry({ id: 'a', call_round: 1 })]);
     expect(screen.getByText('ยังไม่มีผลเดือนนี้')).toBeTruthy();
-    expect(screen.queryByRole('img', { name: 'ตอบว่าไป' })).toBeNull();
+    expect(screen.queryByRole('img', { name: 'บอกว่าไป' })).toBeNull();
   });
 
   it('มีผลแล้ว ⇒ วงกลมกลับมา', () => {
     renderCalendar([entry({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' })]);
-    expect(screen.getByRole('img', { name: 'ตอบว่าไป' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'บอกว่าไป' })).toBeTruthy();
     expect(screen.queryByText('ยังไม่มีผลเดือนนี้')).toBeNull();
   });
 
@@ -610,5 +610,62 @@ describe('ช่องว่างที่เหลือจากรอบว�
   it('ไม่ได้ส่งให้ AI ⇒ ต้องไม่ขึ้นข้อความว่าส่งแล้ว', () => {
     renderCalendar([entry({ id: 'a', call_round: 1, call_status: null, dispatch_state: 'suppressed' })]);
     expect(within(dayRows()[0]).queryByText(/ส่งให้ AI แล้ว/)).toBeNull();
+  });
+});
+
+
+/**
+ * ═══ ผลละเอียด (micro) + Success Rate — เจ้าของสั่ง 13 ก.ย. 2569 ═══
+ * ของเดิมนับ `acknowledged` เป็น "ตอบว่าไป" ทั้งกอง ⇒ วงโกหก
+ */
+describe('ผลละเอียดของเดือน', () => {
+  it('🔴 "รับสายแล้ว" (acknowledged) ที่บอกว่ายังไม่ได้ไป ห้ามนับเป็นบอกว่าไป', () => {
+    renderCalendar([
+      entry({
+        id: 'a',
+        call_round: 1,
+        call_status: 'completed',
+        call_outcome: 'acknowledged',
+        call_summary: 'ผู้รับสายแจ้งว่ายังไม่ได้ไปที่หน่วยงาน One Bangkok',
+      }),
+    ]);
+    const going = screen.getByText('คุยแล้ว บอกว่าไป').closest('div')!;
+    expect(within(going).getByText('0')).toBeTruthy();
+    const notGoing = screen.getByText('คุยแล้ว บอกว่าไม่ไป').closest('div')!;
+    expect(within(notGoing).getByText('1')).toBeTruthy();
+  });
+
+  it('บอกฐานของ Success Rate ติดกับตัวเลขเสมอ', () => {
+    renderCalendar([
+      entry({
+        id: 'a',
+        call_round: 1,
+        call_status: 'completed',
+        call_outcome: 'acknowledged',
+        call_summary: 'ผู้รับสายบอกว่ากำลังเดินทางอยู่',
+      }),
+    ]);
+    expect(screen.getByText(/คิดจาก 1 สายที่ได้คุยเรื่องของเราจริง/)).toBeTruthy();
+  });
+
+  it('มีอัตรารับสายและอัตราได้คุย พร้อมเศษส่วนกำกับ', () => {
+    renderCalendar([
+      entry({
+        id: 'a',
+        call_round: 1,
+        call_status: 'completed',
+        call_outcome: 'acknowledged',
+        call_summary: 'ผู้รับสายบอกว่ากำลังเดินทางอยู่',
+      }),
+    ]);
+    expect(screen.getByText('มีคนรับสาย')).toBeTruthy();
+    expect(screen.getByText('ได้คุยเรื่องของเรา')).toBeTruthy();
+    expect(screen.getAllByText('1/1 สาย').length).toBe(2);
+  });
+
+  it('สายที่ยังไม่มีผลแยกออกมา ไม่ปนกับถังที่เอาไปหาร', () => {
+    renderCalendar([entry({ id: 'a', call_round: 1 })]);
+    const row = screen.getByText('ยังไม่มีผลกลับ').closest('div')!;
+    expect(within(row).getByText('1')).toBeTruthy();
   });
 });

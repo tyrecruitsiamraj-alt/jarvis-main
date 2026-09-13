@@ -31,6 +31,16 @@ import {
   type FollowPlanningRow,
   type FollowRoundFilter,
 } from '@/lib/followPlanning';
+import {
+  classifyFollowCall,
+  followMicroRates,
+  FOLLOW_MICRO_HINT,
+  FOLLOW_MICRO_LABEL,
+  FOLLOW_MICRO_TONE,
+  summarizeFollowMicro,
+  type FollowMicroInput,
+  type FollowMicroOutcome,
+} from '@/lib/followCallMicro';
 import { DASH } from '@/lib/designTokens';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -352,7 +362,35 @@ const FollowPlanningCalendar: React.FC<{
     [monthSource, month],
   );
   const decided = monthSummary.went + monthSummary.notWent;
-  const wentRate = decided > 0 ? (monthSummary.went / decided) * 100 : null;
+
+  /**
+   * ═══ ผลแบบละเอียด + Success Rate (เจ้าของสั่ง 13 ก.ย. 2569) ═══
+   *
+   * > *"อยากรู้แบบ micro รับสายเท่าไหร่ ไม่รับเท่าไหร่ รับแล้ววาง รับแล้วคุยแต่ไป
+   * >  รับแล้วคุยแต่ไม่ไป อยากรู้ละเอียดระดับนั้น เพื่อทำ Success Rate"*
+   *
+   * 🔴 ของเดิมวงกลมเขียนว่า "ตอบว่าไป" แล้วเอา `acknowledged` มานับเป็นไปทั้งกอง
+   * ทั้งที่ในกองนั้นมีทั้ง *"ยังไม่ได้ไป"* *"ไปหาหมอ"* *"กำลังอาบน้ำ"* ปนกัน
+   * ⇒ วัดกับผลจริง 37 สาย วงจะขึ้น 88.6% ทั้งที่ไม่มีใคร `confirmed` สักสาย
+   * นิยามใหม่อยู่ที่ `followCallMicro.ts` ที่เดียว (อ่านคำพูดจริง + สรุปของ AI)
+   */
+  const monthMicro = useMemo(() => {
+    const calls: FollowMicroInput[] = [];
+    for (const r of monthSource) {
+      for (const round of r.rounds) {
+        if (round.ymd?.slice(0, 7) !== month) continue;
+        calls.push({
+          outcome: round.entry.call_outcome,
+          reply: round.entry.call_reply,
+          summary: round.entry.call_summary,
+        });
+      }
+    }
+    return summarizeFollowMicro(calls);
+  }, [monthSource, month]);
+  const microRates = followMicroRates(monthMicro);
+  /** สายของเดือนนี้ที่ยังไม่มีผลกลับเลย — ไม่อยู่ในฐานหารของอัตราไหนทั้งนั้น */
+  const monthNoResult = monthSummary.total - monthMicro.withResult;
 
   const overdueAll = useMemo(() => {
     const out: Array<{ row: FollowPlanningRow; round: FollowPlanningRound }> = [];
@@ -1092,8 +1130,8 @@ const FollowPlanningCalendar: React.FC<{
              * — ของเดิมไม่ใช่บั๊ก (ขึ้น "—" ถูกแล้ว) แต่รูปมันโกหก
              */}
             <div className="mt-3">
-              {decided > 0 ? (
-                <Donut percent={wentRate} caption="ตอบว่าไป" />
+              {monthMicro.talked > 0 ? (
+                <Donut percent={microRates.successRate} caption="บอกว่าไป" />
               ) : (
                 <p
                   className={cn(
@@ -1105,36 +1143,71 @@ const FollowPlanningCalendar: React.FC<{
                   ยังไม่มีผลเดือนนี้
                   {/* บอกตรง ๆ ว่าเป็นเรื่องปกติ — ตาใหม่อ่านกล่องว่างแล้วกลัวว่าระบบเสีย */}
                   <span className="mt-1 block text-[11px] font-normal">
-                    ปกติสำหรับเดือนที่เพิ่งเริ่ม ไม่ใช่ข้อผิดพลาด — พอมีสายที่รู้ผลแล้ว วงสรุปจะขึ้นเอง
+                    ปกติสำหรับเดือนที่เพิ่งเริ่ม ไม่ใช่ข้อผิดพลาด — พอมีสายที่คุยจบแล้ว วงสรุปจะขึ้นเอง
                   </span>
                 </p>
               )}
             </div>
-            <dl className="mt-3 space-y-1.5 border-t border-border/70 pt-3 text-[12px]">
-              <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-muted-foreground">ตอบว่าไป</dt>
-                <dd className={cn('font-semibold tabular-nums', statTone('agreed'))}>
-                  {monthSummary.went}
+
+            {/**
+             * 🔴 **บอกฐานติดกับตัวเลขเสมอ** — Success Rate หารด้วย "สายที่ได้คุย"
+             * ไม่ใช่สายทั้งหมด · ของเดิมวงไม่บอกฐาน คนเลยอ่านเป็นอัตราคนมาทำงานจริง
+             */}
+            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+              {monthMicro.talked > 0
+                ? `คิดจาก ${monthMicro.talked} สายที่ได้คุยเรื่องของเราจริง — ไม่รับสาย/ไม่ใช่เจ้าตัว/รับแล้วเงียบ ไม่ถูกนำมาหาร`
+                : 'เดือนนี้ยังไม่มีสายไหนได้คุยจบ จึงยังคิดสัดส่วนไม่ได้'}
+            </p>
+
+            {/* สองอัตราที่เหลือ — คนละฐานกับวง จึงต้องเขียนฐานกำกับทุกตัว */}
+            <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-border/70 pt-3 text-[12px]">
+              <div className={cn('rounded-xl px-2.5 py-2', TONE.neutral.soft)}>
+                <dt className="text-[11px] text-muted-foreground">มีคนรับสาย</dt>
+                <dd className="font-bold tabular-nums text-foreground">
+                  {microRates.reachRate == null ? '—' : `${microRates.reachRate.toFixed(0)}%`}
+                  <span className="ml-1 text-[10.5px] font-normal text-muted-foreground">
+                    {monthMicro.pickedUp}/{monthMicro.withResult} สาย
+                  </span>
                 </dd>
               </div>
-              <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-muted-foreground">ตอบว่าไม่ไป</dt>
-                <dd className={cn('font-semibold tabular-nums', statTone('lost'))}>
-                  {monthSummary.notWent}
-                </dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-muted-foreground">ยังไม่รู้ผล</dt>
-                <dd className={cn('font-semibold tabular-nums', statTone('overdue'))}>
-                  {monthSummary.unknown}
+              <div className={cn('rounded-xl px-2.5 py-2', TONE.neutral.soft)}>
+                <dt className="text-[11px] text-muted-foreground">ได้คุยเรื่องของเรา</dt>
+                <dd className="font-bold tabular-nums text-foreground">
+                  {microRates.talkRate == null ? '—' : `${microRates.talkRate.toFixed(0)}%`}
+                  <span className="ml-1 text-[10.5px] font-normal text-muted-foreground">
+                    {monthMicro.talked}/{monthMicro.withResult} สาย
+                  </span>
                 </dd>
               </div>
             </dl>
-            {/* 🔴 บอกฐานให้ชัด — ห้ามให้คนเดาว่าเปอร์เซ็นต์คิดจากอะไร */}
+
+            {/* ── ผลละเอียดทุกถัง ── หนึ่งสายอยู่ถังเดียว รวมกัน = สายที่มีผลกลับ */}
+            <dl className="mt-3 space-y-1.5 border-t border-border/70 pt-3 text-[12px]">
+              {(Object.keys(FOLLOW_MICRO_LABEL) as FollowMicroOutcome[]).map((k) => (
+                <div key={k} className="flex items-baseline justify-between gap-2" title={FOLLOW_MICRO_HINT[k]}>
+                  <dt className="flex items-center gap-1.5 text-muted-foreground">
+                    <span
+                      className={cn('h-1.5 w-1.5 shrink-0 rounded-full', TONE[FOLLOW_MICRO_TONE[k]].dot)}
+                      aria-hidden
+                    />
+                    {FOLLOW_MICRO_LABEL[k]}
+                  </dt>
+                  <dd className={cn('font-semibold tabular-nums', TONE[FOLLOW_MICRO_TONE[k]].value)}>
+                    {monthMicro[k]}
+                  </dd>
+                </div>
+              ))}
+              {/* ยังไม่มีผล = ยังไม่เข้าถังไหน ต้องแยกให้ชัดว่าไม่ได้อยู่ในการหาร */}
+              <div className="flex items-baseline justify-between gap-2 border-t border-border/70 pt-1.5">
+                <dt className="text-muted-foreground">ยังไม่มีผลกลับ</dt>
+                <dd className="font-semibold tabular-nums text-muted-foreground">{monthNoResult}</dd>
+              </div>
+            </dl>
+
+            {/* ⚠️ ห้ามซ่อนว่าถังพวกนี้มาจากการอ่านคำ ไม่ใช่ค่าที่ Lumos ยืนยัน */}
             <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-              {decided > 0
-                ? `คิดจาก ${decided} สายที่รู้ผลแล้ว — สายที่ยังไม่รู้ผลไม่ถูกนำมาหาร`
-                : 'เดือนนี้ยังไม่มีสายไหนรู้ผล จึงยังคิดสัดส่วนไม่ได้'}
+              ถังพวกนี้อ่านจากคำที่เขาพูดกับสรุปของ AI — สายที่ฟังไม่ชัดจะอยู่ถัง
+              "ไม่บอกว่าไปหรือไม่ไป" ให้คนกดอ่านเอง ไม่เดาแทน
             </p>
           </Card>
 
