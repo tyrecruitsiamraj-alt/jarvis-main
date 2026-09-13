@@ -153,6 +153,8 @@ describe('resyncFollowPlanWithLumos', () => {
     expect(select).toMatch(/q\.status = 'pending'/);
     expect(select).toMatch(/f\.cancelled_at is null/);
     expect(select).toMatch(/f\.completed_at is null/);
+    // 🔴 รอบที่เลยเวลานัดแล้วห้ามกลับเข้าแผน — ไม่งั้นโดนโทรซ้ำทันที
+    expect(select).toMatch(/f\.scheduled_at > now\(\)/);
   });
 
   it('push ปิดอยู่ ⇒ ไม่ทำอะไร และบอกตรง ๆ', async () => {

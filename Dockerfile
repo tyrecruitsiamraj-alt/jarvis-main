@@ -36,8 +36,9 @@ COPY --from=builder /app/server     ./server
 # บาง API handler แชร์ pure logic จาก src ผ่าน alias @/ (เช่น matching list filter/sort
 # ที่ต้องตรงกับหน้าเว็บเป๊ะ) — tsx resolve @/ → src ตอนรัน จึงต้องมี src ใน production image
 COPY --from=builder /app/src        ./src
-COPY --from=builder /app/scripts/migrate.mjs ./scripts/migrate.mjs
-COPY --from=builder /app/scripts/verify-api-registry.mjs ./scripts/verify-api-registry.mjs
+# ⚠️ เอา scripts ทั้งโฟลเดอร์ — เดิมหยิบมาสองไฟล์ แล้วงานตามเก็บที่ต้องรัน
+# บนเครื่องจริง (คีย์ Lumos อยู่ที่นั่นที่เดียว) หาไฟล์ไม่เจอในคอนเทนเนอร์
+COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/tsconfig*.json ./
 COPY --from=builder /app/package.json   ./

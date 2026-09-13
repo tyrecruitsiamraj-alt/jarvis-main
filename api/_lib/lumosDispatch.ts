@@ -2102,11 +2102,21 @@ export async function resyncFollowPlanWithLumos(
       where q.status = 'pending'
         and f.cancelled_at is null and f.completed_at is null
         and coalesce(q.plan_ref, q.person_ref) = $1
+        -- 🔴 **รอบที่เลยเวลานัดมาแล้ว ห้ามใส่กลับเข้าแผนใหม่**
+        -- Lumos รับแต่เวลา "ตอนนี้หรืออนาคต" ⇒ ใส่เวลาที่ผ่านมาแล้วเข้าไป
+        -- เขาอาจโทรทันที = คนจริงโดนโทรซ้ำรอบที่เพิ่งคุยไป (แถวยัง pending อยู่ได้
+        -- ตั้งสองชั่วโมงเพราะผลกลับช้า — ห้ามใช้สถานะคิวเป็นตัวตัดสินอย่างเดียว)
+        and f.scheduled_at > now()
       order by f.scheduled_at`,
     [oldPlanRef],
   );
   if (members.length === 0) {
-    return { rounds: 0, cancelled: false, pushed: false, reason: 'ไม่มีรอบที่ยังส่งได้ (โทรไปแล้วหรือยกเลิกแล้ว)' };
+    return {
+      rounds: 0,
+      cancelled: false,
+      pushed: false,
+      reason: 'ไม่มีรอบที่ยังส่งได้ (โทรไปแล้ว ยกเลิกแล้ว หรือเลยเวลานัดหมดแล้ว)',
+    };
   }
 
   await ensureCallScriptsFresh();
