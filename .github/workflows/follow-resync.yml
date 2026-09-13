@@ -1,0 +1,39 @@
+name: Resync follow plan to Lumos
+
+# งานตามเก็บด้วยมือ — สั่งจาก Actions เท่านั้น ไม่ผูกกับ push
+#
+# ทำไมต้องผ่าน CI: คีย์ push ของ Lumos อยู่ใน .env บนเครื่องจริงเท่านั้น
+# เครื่อง dev ยิงไม่ได้ · งานนี้จึง ssh เข้าไปรันสคริปต์ในคอนเทนเนอร์ของ server
+#
+# ใช้ตอน: รายการติดตามถูกกด "แก้ไข" ก่อนโค้ด resync ขึ้น (13 ก.ย. 2569)
+# ⇒ Lumos ยังถือเวลาชุดเก่า ต้องยกเลิกของเดิมแล้วส่งแผนใหม่
+on:
+    workflow_dispatch:
+        inputs:
+            ids:
+                description: 'id ของรายการติดตาม คั่นด้วยช่องว่าง'
+                required: true
+                type: string
+            apply:
+                description: 'ลงมือจริง (ไม่ติ๊ก = ดูอย่างเดียว)'
+                required: false
+                default: false
+                type: boolean
+
+jobs:
+    resync:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Run resync on server
+              uses: appleboy/ssh-action@master
+              with:
+                  host: ${{ secrets.SSH_HOST }}
+                  username: ${{ secrets.SSH_USERNAME }}
+                  password: ${{ secrets.SSH_PASSWORD }}
+                  port: ${{ secrets.SSH_PORT || 22 }}
+                  command_timeout: 10m
+                  script: |
+                      set -euo pipefail
+                      cd jarvis-main
+                      docker compose exec -T app npx tsx scripts/resync-follow-plan.mts \
+                        ${{ inputs.apply && '--apply' || '--dry' }} ${{ inputs.ids }}
