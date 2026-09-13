@@ -595,3 +595,20 @@ describe('แผน 20/20 — คำตอบต้องอยู่บนจ�
     expect(screen.queryByText(/อัปเดตล่าสุด/)).toBeNull();
   });
 });
+
+/**
+ * วัดรอบที่มีข้อมูลจริง (13 ก.ย. 2569) ได้ 97/100 — เหลือสองจุดที่เป็นเรื่องของ "คำ"
+ */
+describe('ช่องว่างที่เหลือจากรอบวัดที่มีข้อมูล', () => {
+  it('🔴 "เลยเวลานัด" ต้องบอกด้วยว่า **ส่งให้ AI แล้ว** — คนละเรื่องกับ "ไม่ได้ส่งให้ AI"', () => {
+    renderCalendar([entry({ id: 'a', call_round: 1, call_status: 'delivered' })]);
+    const row = dayRows()[0];
+    expect(within(row).getByText('เลยเวลานัด')).toBeTruthy();
+    expect(within(row).getByText(/ส่งให้ AI แล้ว ยังไม่มีผลกลับ/)).toBeTruthy();
+  });
+
+  it('ไม่ได้ส่งให้ AI ⇒ ต้องไม่ขึ้นข้อความว่าส่งแล้ว', () => {
+    renderCalendar([entry({ id: 'a', call_round: 1, call_status: null, dispatch_state: 'suppressed' })]);
+    expect(within(dayRows()[0]).queryByText(/ส่งให้ AI แล้ว/)).toBeNull();
+  });
+});

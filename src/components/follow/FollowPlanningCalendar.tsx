@@ -781,6 +781,16 @@ const FollowPlanningCalendar: React.FC<{
                                         ) : round.state === 'notSent' &&
                                           !roundDispatchReason(round).startsWith(FOLLOW_CALL_CATEGORY_LABEL.notSent) ? (
                                           <span className="text-[12px] text-muted-foreground">{roundDispatchReason(round)}</span>
+                                        ) : round.state === 'overdue' ? (
+                                          /**
+                                           * 🔴 "เลยเวลานัด" ไม่บอกว่า **ส่งไปแล้วหรือยัง** (ตาใหม่ถาม 13 ก.ย. 2569)
+                                           * สภาพนี้แปลว่า **ส่งให้ AI แล้ว** (มีแถวในคิว) แค่ผลยังไม่กลับ —
+                                           * คนละเรื่องกับ "ไม่ได้ส่งให้ AI" ที่อยู่บรรทัดข้างบน · ต้องเขียนให้ต่างกัน
+                                           * ไม่งั้นคนใหม่ไม่รู้ว่าควรรอ หรือควรโทรเอง
+                                           */
+                                          <span className="text-[12px] text-muted-foreground">
+                                            ส่งให้ AI แล้ว ยังไม่มีผลกลับ · บางสายช้าได้ถึงราว 2 ชั่วโมง
+                                          </span>
                                         ) : (
                                           <span className="text-[12px] text-muted-foreground">—</span>
                                         )}

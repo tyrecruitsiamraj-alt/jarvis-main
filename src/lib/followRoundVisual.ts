@@ -87,7 +87,9 @@ export function roundSignal(counts: RoundCounts, overdueWaiting = 0): RoundSigna
     return {
       level: 'act',
       tone: 'warn',
-      text: `โทรไม่ติด ${counts.unreached.toLocaleString('th-TH')} คน — ส่งโทรรอบถัดไป หรือโทรเองตรง ๆ`,
+      /* 🔴 บอก **ทางเดียวที่กดได้จริง** (13 ก.ย. 2569) — ของเดิมยื่นสองทางเลือกให้
+         แต่บนจอไม่มีปุ่ม "ส่งโทรรอบถัดไป" ⇒ คนใหม่อ่านแล้วไม่รู้ว่าต้องไปกดที่ไหน */
+      text: `โทรไม่ติด ${counts.unreached.toLocaleString('th-TH')} คน — กดปุ่มโทรข้างชื่อเพื่อโทรเอง หรือเพิ่มรอบใหม่ที่ปุ่มดินสอ`,
     };
   }
   if (counts.calling > 0) {
