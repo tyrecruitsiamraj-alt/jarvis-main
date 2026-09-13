@@ -154,6 +154,19 @@ export async function createFollowRounds(
 }
 
 /**
+ * ผลของการ **ส่งแผนใหม่ให้ Lumos หลังแก้** (13 ก.ย. 2569)
+ *
+ * 🔴 ของเดิมแก้แค่คิวฝั่งเรา ⇒ Lumos ยังโทรตามเวลา/บทเดิม · วัดกับงานวันที่ 14 ก.ย.
+ * เจอ 3 ใน 10 คนเพี้ยนเพราะเหตุนี้ · `pushed = false` **ต้องขึ้นบนจอ ห้ามเงียบ**
+ */
+export type FollowLumosResync = {
+  rounds: number;
+  cancelled: boolean;
+  pushed: boolean;
+  reason?: string;
+};
+
+/**
  * แก้ไขรายการติดตาม (096 · เจ้าของสั่ง 17 ส.ค. 2569: *"เพิ่มให้แก้ไขได้"*)
  *
  * ⚠️ `action: 'update'` คือตัวแยกจาก PATCH เดิมที่แปลว่า "ปิดงาน" — ห้ามตัดออก
@@ -163,13 +176,16 @@ export async function createFollowRounds(
 export async function updateFollowEntry(
   id: string,
   input: EditFollowEntry,
-): Promise<FollowEntry & { queue_refreshed?: number }> {
+): Promise<FollowEntry & { queue_refreshed?: number; lumos_resync?: FollowLumosResync }> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ ...input, action: 'update' }),
   });
   if (!r.ok) throw new Error(await readError(r));
-  return (await r.json()) as FollowEntry & { queue_refreshed?: number };
+  return (await r.json()) as FollowEntry & {
+    queue_refreshed?: number;
+    lumos_resync?: FollowLumosResync;
+  };
 }
 
 export async function cancelFollowEntry(id: string): Promise<void> {

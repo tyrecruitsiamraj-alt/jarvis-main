@@ -28,6 +28,7 @@ import {
   enqueueFollowReminder,
   enqueueFollowReminderPlan,
   cancelFollowReminder,
+  resyncFollowPlanWithLumos,
   refreshFollowReminderPayload,
 } from '../_lib/lumosDispatch.js';
 import { isAutoDispatchEnabled } from '../_lib/lumosDispatchMode.js';
@@ -791,15 +792,37 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
     logWarn('follow.update.queueRefreshFailed', { followId: id, error: String(e) });
   }
 
+  /**
+   * 🔴 **แก้แล้วต้องบอก Lumos ด้วย ไม่ใช่แก้แค่คิวฝั่งเรา** (เจ้าของสั่ง 13 ก.ย. 2569)
+   *
+   * ของเดิมแก้แค่ฝั่งเรา ⇒ Lumos ยังถือเวลา/บทพูดชุดก่อนแก้ · วัดกับงานของวันที่ 14 ก.ย.
+   * เจอ 3 ใน 10 คนเพี้ยน (รอบหาย 1 คน · เวลาเพี้ยนไป 20:00 อีก 1 คน · อีกคนโดนโทร
+   * ตามเวลาเดิมไปแล้ว) ทั้งสามรายคือแถวที่ถูกกดแก้ไข ส่วนอีก 7 คนที่ไม่ได้แก้ถูกหมด
+   *
+   * `resyncFollowPlanWithLumos` = ยกเลิกของเดิมที่ Lumos แล้วส่ง **แผนใหม่ทั้งก้อน**
+   * (ทุกรอบที่ยังไม่ถูกโทร) ⚠️ ล้มเหลวห้ามทำให้การแก้ล้ม — แถวถูกแก้ไปแล้ว
+   */
+  let planResync: Awaited<ReturnType<typeof resyncFollowPlanWithLumos>> | null = null;
+  try {
+    planResync = await resyncFollowPlanWithLumos(id, staffNameOfPhone);
+  } catch (e) {
+    logWarn('follow.update.lumosResyncFailed', { followId: id, error: String(e) });
+  }
+
   await auditFromAuthed(req, {
     action: 'follow.update',
     entityType: 'follow_entry',
     entityId: id,
     before: toResponse(before),
-    after: { ...toResponse(updated), queueRefreshed },
+    after: { ...toResponse(updated), queueRefreshed, planResync },
   });
 
-  return res.status(200).json({ ...toResponse(updated), queue_refreshed: queueRefreshed });
+  return res.status(200).json({
+    ...toResponse(updated),
+    queue_refreshed: queueRefreshed,
+    /** ส่งแผนใหม่ให้ Lumos แล้วหรือยัง — จอต้องบอกคนกดได้ ห้ามเงียบ */
+    lumos_resync: planResync,
+  });
 }
 
 /**

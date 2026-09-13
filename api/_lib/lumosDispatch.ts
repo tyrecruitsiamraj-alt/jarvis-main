@@ -2021,6 +2021,193 @@ export async function refreshFollowReminderPayload(entry: FollowEntryInput): Pro
   return rows.length;
 }
 
+/**
+ * ═══ แก้รายการแล้ว **ส่งแผนใหม่ให้ Lumos** (เจ้าของสั่ง 13 ก.ย. 2569) ═══
+ *
+ * ปิดรูที่จดค้างไว้ตั้งแต่ 26 ส.ค. 2569 ว่า *"แก้ตรงนี้อัปเดตแค่คิวฝั่งเรา ⇒ ฝั่ง Lumos
+ * ยังถือบทพูดชุดเก่า"* · วันนี้พิสูจน์แล้วว่ามันกัดจริงกับงานของวันพรุ่งนี้ 3 ใน 10 คน:
+ *
+ * | คน | เวลาในฐานเรา | เวลาที่ Lumos ถืออยู่ |
+ * | --- | --- | --- |
+ * | พัฒนายุทธ | 07:00 , 08:00 | **07:00 เท่านั้น** |
+ * | กันตพงศ์ | 07:00 , 08:00 | 07:00 , **20:00** (เวลาก่อนแก้) |
+ * | ปัญญาพร | 05:50 , 06:50 | **ไม่มีของพรุ่งนี้เลย** (โทรไปแล้ววันนี้ตามเวลาเดิม) |
+ *
+ * ⇒ ทั้งสามรายเป็นแถวที่ถูก **กดแก้ไขหลังส่งไปแล้ว** · อีก 7 คนที่ไม่ได้แก้ ครบถูกต้องหมด
+ *
+ * 🔴 **วิธีที่เลือก: ยกเลิกของเดิมที่ Lumos ก่อน แล้วค่อยส่งแผนใหม่ทั้งก้อน**
+ * ไม่ใช่ push ทับ — เพราะยังไม่มีใครยืนยันว่า Lumos เจอ `client_contact_id` ซ้ำแล้ว
+ * "ทับ" หรือ "สร้างเพิ่ม" · ถ้าสร้างเพิ่ม = คนจริงโดนโทรซ้ำ ซึ่งแย่กว่าบทพูดเก่า
+ * ส่วนเส้น DELETE เรารู้ว่าใช้ได้จริง (ใช้ตอนยกเลิกอยู่แล้ว)
+ *
+ * ⚠️ **Idempotency-Key ต้องเปลี่ยนทุกครั้งที่ส่งใหม่** — ของเดิมใช้ `follow-<id>` คงที่
+ * เพื่อกันยิงซ้ำกลายเป็นสายที่สอง · ถ้าใช้คีย์เดิมหลังยกเลิก Lumos จะตอบด้วยผลเก่า
+ * แล้วแผนใหม่ไม่เข้าระบบเขาเลย ⇒ ต่อท้ายด้วยเวลาที่ส่งใหม่
+ *
+ * ⚠️ **รอบที่โทรไปแล้วหรือยกเลิกแล้ว ห้ามเอากลับเข้าแผนใหม่** — ไม่งั้นคนที่รับสายไปแล้ว
+ * โดนโทรซ้ำเรื่องเดิม · เอาเฉพาะแถวที่ยัง `pending` และยังไม่ถูกยกเลิก/ปิดงาน
+ */
+export type FollowPlanResync = {
+  /** จำนวนรอบที่ประกอบเป็นแผนใหม่ (0 = ไม่มีอะไรต้องส่ง) */
+  rounds: number;
+  /** ยกเลิกของเดิมฝั่ง Lumos ได้ไหม (`false` ทั้งที่มี `rounds` = เสี่ยงของเก่าค้าง) */
+  cancelled: boolean;
+  /** ส่งแผนใหม่ออกไปแล้วหรือยัง */
+  pushed: boolean;
+  /** เหตุผลเมื่อไม่ได้ทำอะไร — ต้องบอกคนกด ไม่ใช่เงียบ */
+  reason?: string;
+};
+
+type FollowPlanRow = {
+  id: string;
+  recipient_name: string;
+  recipient_phone: string;
+  topic: string;
+  note: string | null;
+  staff_phone: string | null;
+  unit_name: string | null;
+  scheduled_at: string | Date;
+  /** เวลาโทรหลายรอบในแถวเดียว (คอลัมน์เป็น text[]) */
+  call_times: string[] | null;
+  call_round: number | null;
+};
+
+export async function resyncFollowPlanWithLumos(
+  entryId: string,
+  resolveStaffName: (phone: string | null) => Promise<string | null>,
+): Promise<FollowPlanResync> {
+  if (!getLumosPushConfig()) return { rounds: 0, cancelled: false, pushed: false, reason: 'push ปิดอยู่' };
+
+  // แถวเดิมที่เคยถูกส่ง — `plan_ref` คือ client_contact_id ที่ Lumos รู้จัก
+  let oldPlanRef = `follow-${entryId}`;
+  try {
+    const { rows } = await dbQuery<{ plan_ref: string | null }>(
+      `select plan_ref from ${queueTable}
+        where channel = 'reminder' and job_ref = 'follow' and person_ref = $1
+        limit 1`,
+      [`follow-${entryId}`],
+    );
+    if (rows[0]?.plan_ref) oldPlanRef = rows[0].plan_ref;
+  } catch (e) {
+    if (!isUndefinedColumnError(e)) throw e;
+  }
+
+  const { rows: members } = await dbQuery<FollowPlanRow>(
+    `select f.id, f.recipient_name, f.recipient_phone, f.topic, f.note,
+            f.staff_phone, f.unit_name, f.scheduled_at, f.call_times, f.call_round
+       from ${followEntriesTable} f
+       join ${queueTable} q
+         on q.channel = 'reminder' and q.job_ref = 'follow'
+        and q.person_ref = 'follow-' || f.id::text
+      where q.status = 'pending'
+        and f.cancelled_at is null and f.completed_at is null
+        and coalesce(q.plan_ref, q.person_ref) = $1
+      order by f.scheduled_at`,
+    [oldPlanRef],
+  );
+  if (members.length === 0) {
+    return { rounds: 0, cancelled: false, pushed: false, reason: 'ไม่มีรอบที่ยังส่งได้ (โทรไปแล้วหรือยกเลิกแล้ว)' };
+  }
+
+  await ensureCallScriptsFresh();
+  const entries: FollowEntryInput[] = [];
+  for (const m of members) {
+    entries.push({
+      id: m.id,
+      recipient_name: m.recipient_name,
+      recipient_phone: m.recipient_phone,
+      topic: m.topic,
+      note: m.note,
+      staffPhone: m.staff_phone,
+      staffName: await resolveStaffName(m.staff_phone),
+      unitName: m.unit_name,
+      scheduled_at: new Date(String(m.scheduled_at)),
+      callTimes: m.call_times,
+      callRound: m.call_round,
+    });
+  }
+
+  const leader = entries[0];
+  const adminPhone =
+    (leader.staffPhone ? toE164Thai(leader.staffPhone) : null) ||
+    (await resolveInterviewAdminPhone(null));
+  const planPayload = buildFollowPlanPayload(entries, adminPhone);
+  const newPlanRef = `follow-${leader.id}`;
+
+  // ① ยกเลิกของเดิมก่อนเสมอ — ห้ามให้มีสองแผนวิ่งอยู่ที่เบอร์เดียวกัน
+  let cancelled = false;
+  try {
+    await cancelPushedReminder(oldPlanRef);
+    cancelled = true;
+  } catch (e) {
+    // 404 = เขาไม่มี record นี้อยู่แล้ว (ยังไม่เคยถึง Lumos) — ถือว่าไม่มีของเก่าค้าง
+    const msg = e instanceof Error ? e.message : String(e);
+    cancelled = /404|not found/i.test(msg);
+    if (!cancelled) logError('lumos.push.follow.resync: ยกเลิกของเดิมไม่สำเร็จ', e, { oldPlanRef });
+  }
+  if (!cancelled) {
+    return {
+      rounds: entries.length,
+      cancelled: false,
+      pushed: false,
+      reason: 'ยกเลิกของเดิมที่ Lumos ไม่สำเร็จ — ยังไม่ส่งใหม่ เพราะจะกลายเป็นโทรซ้ำสองสาย',
+    };
+  }
+
+  // ② เขียน payload/ลำดับใหม่ลงคิวก่อน push (ผลอาจกลับมาเร็วมาก)
+  for (let i = 0; i < entries.length; i += 1) {
+    const e = entries[i];
+    const own = buildFollowReminderPayload(e, adminPhone);
+    const payload = i === 0 ? planPayload : own;
+    await dbQuery(
+      `update ${queueTable}
+          set payload = $2, next_attempt_at = $3, updated_at = now()
+        where channel = 'reminder' and job_ref = 'follow' and person_ref = $1
+          and status = 'pending'`,
+      [`follow-${e.id}`, JSON.stringify(payload), own.steps[0]?.scheduled_at ?? e.scheduled_at.toISOString()],
+    );
+  }
+  await stampPlanSteps(newPlanRef, entries.map((e) => `follow-${e.id}`));
+  try {
+    await dbQuery(
+      `update ${queueTable}
+          set push_event_id = null, push_accepted_at = null
+        where channel = 'reminder' and job_ref = 'follow' and plan_ref = $1`,
+      [newPlanRef],
+    );
+  } catch (e) {
+    if (!isUndefinedColumnError(e)) throw e;
+  }
+
+  // ③ ส่งใหม่ทั้งแผน — คีย์ต้องใหม่ ไม่งั้นโดนกันซ้ำแล้วของใหม่ไม่เข้า
+  let pushed = false;
+  try {
+    const ack = await pushReminders(
+      buildFollowPushRecord(planPayload),
+      `${newPlanRef}:v${Math.floor(Date.now() / 1000)}`,
+    );
+    await recordPushAck(leader.id, ack);
+    await markFollowDispatchState(leader.id, 'queued', 'push_failed');
+    pushed = true;
+    logInfo('lumos.push.follow.resync.ok', {
+      oldPlanRef,
+      newPlanRef,
+      rounds: entries.length,
+      steps: planPayload.steps.length,
+    });
+  } catch (e) {
+    logError('lumos.push.follow.resync: ส่งแผนใหม่ไม่สำเร็จ', e, { newPlanRef });
+    await markFollowDispatchState(leader.id, 'push_failed', 'queued', pushErrorText(e));
+  }
+
+  return {
+    rounds: entries.length,
+    cancelled,
+    pushed,
+    reason: pushed ? undefined : 'ยกเลิกของเดิมแล้วแต่ส่งแผนใหม่ไม่สำเร็จ — ตัวส่งซ้ำจะลองให้เอง',
+  };
+}
+
 // ─── Serve + result (เรียกจาก lumos endpoints) ───────────────────────────────
 
 /**
