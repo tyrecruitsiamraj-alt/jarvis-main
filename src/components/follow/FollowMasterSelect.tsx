@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { TONE } from '@/lib/designTokens';
 
 /**
  * ช่องเลือกค่าจาก **ลิสต์กลางที่แก้เองได้** บนหน้า Follow —

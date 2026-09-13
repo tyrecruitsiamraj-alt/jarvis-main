@@ -227,22 +227,6 @@ const FollowPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [okMessage, setOkMessage] = useState<string | null>(null);
-  /**
-   * ตัวเลขสำหรับกล่อง "ทวนก่อนส่ง" — **ใช้สูตรเดียวกับตอนส่งจริง**
-   * (วันที่ติ๊กไว้ × รอบเวลาที่อ่านออก) ไม่งั้นสิ่งที่ทวนกับสิ่งที่ส่งจะคนละเลข
-   */
-  const sendDaysPreview = useMemo(
-    () => daysInRange(dateFrom, dateTo).filter((d) => !skippedDays.has(d)).length,
-    [dateFrom, dateTo, skippedDays],
-  );
-  const roundTimesPreview = useMemo(
-    () => new Set(roundTimes.filter((t) => /^\d{1,2}:\d{2}$/.test(t))).size,
-    [roundTimes],
-  );
-  const scheduledAtsPreview = useMemo(
-    () => scheduledAts.filter((t) => t.trim()).length,
-    [scheduledAts],
-  );
   /** เวลาที่ดึงรายการสำเร็จล่าสุด — `null` = ยังไม่เคยโหลดจบ */
   const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
 
@@ -488,6 +472,27 @@ const FollowPage: React.FC = () => {
     }
     return out;
   };
+
+  /**
+   * ตัวเลขสำหรับกล่อง "ทวนก่อนส่ง" — **ใช้สูตรเดียวกับตอนส่งจริง**
+   * (วันที่ติ๊กไว้ × รอบเวลาที่อ่านออก) ไม่งั้นสิ่งที่ทวนกับสิ่งที่ส่งจะคนละเลข
+   *
+   * 🔴 **ต้องอยู่ใต้ `daysInRange`** — มันเป็น `const` ในคอมโพเนนต์ ไม่ใช่ฟังก์ชันที่ hoist
+   * วางไว้ข้างบนแล้วจอขาวทั้งหน้า `Cannot access 'daysInRange' before initialization`
+   * (พลาดมาแล้ว 13 ก.ย. 2569 — เทสต์ไม่จับเพราะไม่มีเทสต์ที่ render FollowPage ทั้งหน้า)
+   */
+  const sendDaysPreview = useMemo(
+    () => daysInRange(dateFrom, dateTo).filter((d) => !skippedDays.has(d)).length,
+    [dateFrom, dateTo, skippedDays],
+  );
+  const roundTimesPreview = useMemo(
+    () => new Set(roundTimes.filter((t) => /^\d{1,2}:\d{2}$/.test(t))).size,
+    [roundTimes],
+  );
+  const scheduledAtsPreview = useMemo(
+    () => scheduledAts.filter((t) => t.trim()).length,
+    [scheduledAts],
+  );
 
   /**
    * หนึ่งเวลา = หนึ่งรายการ — API รับเวลาเดียวต่อรายการ และคิวโทรก็ผูกกับรายการ 1:1

@@ -310,3 +310,52 @@ describe('speakablePhoneTh', () => {
     expect(speakablePhoneTh('')).toBe('');
   });
 });
+
+/**
+ * ไม่มีหน่วยงาน = เคสที่เกิดจริงแน่นอน (ขั้น "หน่วยงาน" ในฟอร์มข้ามได้)
+ *
+ * 🔴 ผู้ทดสอบตาใหม่ทัก 13 ก.ย. 2569 · ยืนยันด้วยการรันบทจริงแล้วว่าเป็นจริง:
+ * ปล่อยว่างแล้วคนจริงจะได้ยิน *"เตรียมตัวไปทำงาน หน่วยงาน แล้วใช่ไหมคะ"*
+ * คำว่า "หน่วยงาน" ค้างเติ่งไม่มีชื่อต่อท้าย
+ */
+describe('บทติดตาม — ไม่มีหน่วยงาน', () => {
+  const say = (unitName: string | null, round: 'first' | 'repeat') =>
+    buildFollowMessage(
+      {
+        recipientName: 'สมชาย ใจดี',
+        topic: 'ติดตามเริ่มงาน',
+        note: null,
+        staffPhone: null,
+        staffName: 'ครีม',
+        unitName,
+      },
+      round,
+    );
+
+  it('🔴 หน่วยงานว่าง ⇒ ห้ามมีคำว่า "หน่วยงาน" ค้างเติ่งแล้วต่อด้วยคำถามทันที', () => {
+    for (const round of ['first', 'repeat'] as const) {
+      for (const unit of ['', '   ', null]) {
+        const line = say(unit, round);
+        expect(line).not.toMatch(/หน่วยงาน\s*แล้วใช่ไหม/);
+        expect(line).not.toMatch(/หน่วยงาน\s*เรียบร้อย/);
+        expect(line).toContain('ที่นัดไว้');
+      }
+    }
+  });
+
+  it('มีหน่วยงาน ⇒ บทต้องเหมือนเดิมเป๊ะ (ห้ามเปลี่ยนคำที่เจ้าของเคาะไว้)', () => {
+    expect(say('TMT', 'first')).toContain('เตรียมตัวไปทำงาน หน่วยงาน TMT แล้วใช่ไหมคะ');
+    expect(say('TMT', 'repeat')).toContain('ถึงหน่วยงาน TMT เรียบร้อยแล้วใช่ไหมคะ');
+    // ห้ามมีคำแทนโผล่มาตอนมีชื่อหน่วยงานจริง
+    expect(say('TMT', 'first')).not.toContain('ที่นัดไว้');
+  });
+
+  it('ทั้งสองรอบยังมีครบสามท่อน — ทักทาย · คำถาม · ปิดท้าย', () => {
+    for (const round of ['first', 'repeat'] as const) {
+      const line = say(null, round);
+      expect(line).toContain('สวัสดีค่ะ');
+      expect(line).toMatch(/ใช่ไหมคะ/);
+      expect(line).toContain('รับทราบค่ะ');
+    }
+  });
+});

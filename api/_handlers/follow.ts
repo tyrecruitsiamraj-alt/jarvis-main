@@ -396,13 +396,16 @@ async function createFollowRounds(
   res: ApiRes,
   base: ParsedFollowInput,
   rounds: FollowRoundInput[],
-): Promise<unknown> {
+): Promise<void> {
   const createdRows: FollowRow[] = [];
   for (const r of rounds) {
     const row = await insertFollowRow(req, base, r);
     if (row) createdRows.push(row);
   }
-  if (createdRows.length === 0) return sendError(res, 500, 'Failed to create follow entries');
+  if (createdRows.length === 0) {
+    sendError(res, 500, 'Failed to create follow entries');
+    return;
+  }
 
   let states = new Map<string, FollowDispatchState>();
   if (await isAutoDispatchEnabled('follow_entry')) {
@@ -443,7 +446,7 @@ async function createFollowRounds(
     });
   }
 
-  return res.status(201).json({ items: out.map(toResponse) });
+  res.status(201).json({ items: out.map(toResponse) });
 }
 
 /**
@@ -502,7 +505,10 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
    * จะไปรวมทีหลังไม่ได้ เพราะแผนแรกถูกส่งไปแล้ว
    */
   const rounds = parseFollowRounds(raw, { when, staffPhone, callRound });
-  if (rounds.length > 1) return createFollowRounds(req, res, parsed.value, rounds);
+  if (rounds.length > 1) {
+    await createFollowRounds(req, res, parsed.value, rounds);
+    return;
+  }
 
   let created = await insertFollowRow(req, parsed.value, {
     when,

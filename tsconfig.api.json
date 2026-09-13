@@ -1,8 +1,16 @@
 {
+  // โค้ดฝั่ง API รันบน Node ล้วน — ต้องมี ES2022 ถึงจะรู้จัก Error.cause และ AggregateError
+  // (13 ก.ย. 2569) ของเดิมสืบทอด ES2020 จาก tsconfig.app.json แล้ว typecheck ฟ้องเป็นสิบบรรทัด
+  // ทั้งที่ runtime ใช้ได้ปกติ ⇒ ไม่มีใครกล้ารัน แล้วบั๊กจริงก็เลยหลุดตามไปด้วย
   "extends": "./tsconfig.app.json",
   "compilerOptions": {
     "noEmit": true,
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ]
   },
   "include": [
     "api",
