@@ -21,7 +21,16 @@ RUN npm run build
 # ═══════════════════════════════════════════════════════════
 FROM node:20-alpine AS production
 
-RUN apk add --no-cache nginx supervisor
+# ⚠️ **ลองใหม่ได้ 3 ครั้ง** — deploy ล้มจริง 15 ก.ย. 2569 เพราะโหลดแพ็กเกจจาก mirror
+# ของ Alpine ขาดกลางคัน (`failed to extract python3 …: Connection aborted`) ใช้เวลาไป
+# 389 วินาทีแล้วล้มทั้ง build · เน็ตของเครื่องจริงไปต่างประเทศไม่นิ่ง ไม่ใช่ปัญหาของโค้ด
+# ⇒ กันไว้ที่นี่ ดีกว่าให้คนมานั่งกด re-run ทุกครั้งที่เน็ตสะดุด
+RUN for i in 1 2 3; do \
+      apk add --no-cache nginx supervisor && break; \
+      echo "apk ล้มรอบที่ $i — รอ 10 วินาทีแล้วลองใหม่"; \
+      sleep 10; \
+    done; \
+    apk info -e nginx >/dev/null && apk info -e supervisor >/dev/null
 
 WORKDIR /app
 
