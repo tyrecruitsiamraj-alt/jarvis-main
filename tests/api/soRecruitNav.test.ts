@@ -124,8 +124,15 @@ describe('isVaultActive', () => {
     expect(isVaultActive(vault('candidates'), '/matching/match')).toBe(false);
   });
 
-  it('WL สว่างในหน้าลูกทุกหน้า', () => {
-    expect(isVaultActive(vault('wl'), '/wl/employees/3')).toBe(true);
+  /**
+   * 🔴 **WL ถูกซ่อนจากเมนูชั่วคราว 15 ก.ย. 2569** (เจ้าของสั่ง — หน้ายังทำไม่เสร็จ)
+   * ด่านเดิมที่เช็คว่า "WL สว่างในหน้าลูก" จึงใช้ไม่ได้ ⇒ กลับด้านเป็นเช็คว่า
+   * **ไม่มีทางเข้าจากเมนู** และต้องซ่อนพร้อมกันทั้งเมนูข้างและแถบล่าง
+   * ⚠️ หน้า `/wl` ยังต้องเปิดด้วย URL ได้ (งานที่ค้างอยู่ในนั้นห้ามหาย)
+   */
+  it('🔴 WL ไม่มีในเมนู (ซ่อนชั่วคราวตามคำสั่งเจ้าของ)', () => {
+    expect(CONVEYOR_VAULT.find((v) => v.key === 'wl')).toBeUndefined();
+    expect(CONVEYOR_VAULT.some((v) => v.path.startsWith('/wl'))).toBe(false);
   });
 
   /**

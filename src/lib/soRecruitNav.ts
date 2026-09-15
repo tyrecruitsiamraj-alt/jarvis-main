@@ -170,15 +170,24 @@ export const CONVEYOR_VAULT: VaultItem[] = [
     functionId: 'candidates_read',
     match: ['/matching/candidates', '/matching/our-people'],
   },
-  {
-    key: 'wl',
-    label: 'WL · ปฏิทินกำลังคน',
-    blurb: 'คนที่ทำงานอยู่แล้ววันนี้',
-    path: '/wl',
-    icon: CalendarDays,
-    functionId: 'work_calendar_read',
-    match: ['/wl'],
-  },
+  /**
+   * 🔴 **WL ถูกซ่อนจากเมนูชั่วคราว** (เจ้าของสั่ง 15 ก.ย. 2569: *"หน้า WL · ปฏิทินกำลังคน
+   * ซ่อนออกจากหน้าบนระบบก่อน ยังไม่เสร็จ"*)
+   *
+   * ⚠️ **ซ่อนเฉพาะทางเข้า ไม่ได้ลบหน้า** — `/wl` และหน้าย่อยยังเปิดด้วย URL ตรง ๆ ได้
+   * (ยังมีคนทำงานค้างอยู่ในนั้น ลบเมื่อไหร่คือทำงานเขาหาย) · เอากลับมาให้ปลดคอมเมนต์ก้อนนี้
+   * กับแถวใน `dockNavConfig.tsx` พร้อมกัน — มีเทสต์คุมว่าสองที่ต้องตรงกัน
+   *
+   * {
+   *   key: 'wl',
+   *   label: 'WL · ปฏิทินกำลังคน',
+   *   blurb: 'คนที่ทำงานอยู่แล้ววันนี้',
+   *   path: '/wl',
+   *   icon: CalendarDays,
+   *   functionId: 'work_calendar_read',
+   *   match: ['/wl'],
+   * },
+   */
   {
     key: 'dashboard',
     label: 'Dashboard',

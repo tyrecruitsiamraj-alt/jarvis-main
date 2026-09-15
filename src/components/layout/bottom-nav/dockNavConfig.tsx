@@ -62,7 +62,10 @@ export const DOCK_NAV_ITEMS: DockNavItem[] = [
     icon: STEP['/aftercare'].icon,
     functionId: 'aftercare_read',
   },
-  { path: '/wl', label: 'WL', icon: CalendarDays, functionId: 'work_calendar_read' },
+  // 🔴 WL ซ่อนจากเมนูชั่วคราว (เจ้าของสั่ง 15 ก.ย. 2569 — ยังทำไม่เสร็จ)
+  //    ซ่อนเฉพาะทางเข้า หน้า `/wl` ยังเปิดด้วย URL ตรง ๆ ได้ · เอากลับมาพร้อมกับ
+  //    ก้อนที่คอมเมนต์ไว้ใน `soRecruitNav.ts`
+  // { path: '/wl', label: 'WL', icon: CalendarDays, functionId: 'work_calendar_read' },
   {
     path: '/matching/candidates',
     label: 'คลังคน',
