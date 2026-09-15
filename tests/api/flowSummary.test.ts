@@ -96,3 +96,46 @@ describe('flow-summary ส่งตัวนับจริงมาคู่ก
     expect((src.match(/p\.status in \('contacted', 'reserved', 'placed'\)/g) ?? []).length).toBe(1);
   });
 });
+
+/**
+ * ═══ ยอดคงค้างแยกราย BU (15 ก.ย. 2569) ═══
+ *
+ * เจ้าของกดสลับ BU บนแถบ "ตัวเลขวันนี้" แล้วเห็นการ์ดใบอื่นขยับ แต่การ์ด
+ * "ใบขอที่ยังเปิดรับ" นิ่งอยู่ที่ยอดรวม — *"มันก็ไม่เห็นเปลี่ยนตามเลย ค้าง Lbd อยู่งั้นอะ"*
+ *
+ * 🔴 ด่านที่ห้ามหลุด: **BU ที่ไม่มีใบขอเปิดเลย ต้องได้ 0 ไม่ใช่ยอดรวม**
+ * (ถอยไปใช้ยอดรวมคือจอโกหกว่า BU นั้นมีใบค้างเป็นร้อย)
+ */
+describe('การ์ดใบขอเปิดอยู่ต้องขยับตาม BU', () => {
+  type BuSlice = { open_total: number; urgent: number; sla_at_risk: number; sla_breached: number };
+  const pick = (
+    byBu: Record<string, BuSlice> | undefined,
+    bu: string | null,
+    all: BuSlice,
+  ): BuSlice =>
+    bu ? (byBu?.[bu] ?? { open_total: 0, urgent: 0, sla_at_risk: 0, sla_breached: 0 }) : all;
+
+  const ALL: BuSlice = { open_total: 287, urgent: 194, sla_at_risk: 34, sla_breached: 195 };
+  const BY_BU: Record<string, BuSlice> = {
+    LBD: { open_total: 263, urgent: 180, sla_at_risk: 30, sla_breached: 180 },
+    LML: { open_total: 87, urgent: 10, sla_at_risk: 2, sla_breached: 9 },
+  };
+
+  it('เลือก BU ⇒ ได้ชุดตัวเลขของ BU นั้น ไม่ใช่ยอดรวม', () => {
+    expect(pick(BY_BU, 'LBD', ALL).open_total).toBe(263);
+    expect(pick(BY_BU, 'LML', ALL).urgent).toBe(10);
+  });
+
+  it('ไม่เลือก BU ⇒ ยอดรวมเหมือนเดิม', () => {
+    expect(pick(BY_BU, null, ALL)).toEqual(ALL);
+  });
+
+  it('🔴 BU ที่ไม่มีใบขอเปิดเลย ⇒ 0 ทุกช่อง ห้ามถอยไปใช้ยอดรวม', () => {
+    expect(pick(BY_BU, 'DSL', ALL)).toEqual({
+      open_total: 0,
+      urgent: 0,
+      sla_at_risk: 0,
+      sla_breached: 0,
+    });
+  });
+});

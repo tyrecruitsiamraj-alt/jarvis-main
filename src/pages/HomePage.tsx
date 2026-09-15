@@ -232,6 +232,26 @@ const HomePage: React.FC = () => {
   }, [bu]);
 
   /**
+   * การ์ด "ใบขอที่ยังเปิดรับ" — เลือกชุดตัวเลขตาม BU ที่เลือกอยู่
+   * ⚠️ BU ที่ยังไม่มีใบขอเปิดเลย = ทุกช่องเป็น 0 **ไม่ใช่ถอยไปใช้ยอดรวม**
+   * (ถอยไปใช้ยอดรวมคือจอโกหกว่า BU นี้มีใบค้างอยู่ 287 ใบ)
+   */
+  const standingCard = React.useMemo(() => {
+    if (!flow) return null;
+    const j = flow.jobs;
+    const slice = bu ? (j.open_by_bu?.[bu] ?? { open_total: 0, urgent: 0, sla_at_risk: 0, sla_breached: 0 }) : null;
+    return slice
+      ? buildOpenRequestsCard(slice.open_total, slice.urgent, {
+          breached: slice.sla_breached,
+          atRisk: slice.sla_at_risk,
+        })
+      : buildOpenRequestsCard(j.open_total, j.urgent, {
+          breached: j.sla_breached ?? null,
+          atRisk: j.sla_at_risk ?? null,
+        });
+  }, [flow, bu]);
+
+  /**
    * "ใบขอเข้าใหม่วันนี้" มาจาก **flow-summary (ERP)** ไม่ใช่ `/api/home-kpis`
    * เพราะฝั่ง PostgreSQL ไม่มีวันที่ส่งใบขอ (`job_site_map` เก็บแค่ job_id/site_code)
    * และ `/api/home-kpis` ตั้งใจไม่แตะ MSSQL เพื่อให้หน้าแรกเบา
@@ -472,14 +492,13 @@ const HomePage: React.FC = () => {
             kpis={kpisWithRequests}
             /* ใบขอเปิดอยู่ + ด่วน + สถานะ SLA — ย้ายขึ้นมาจากแถบ funnel ที่ถอดออก
                (24 ส.ค. 2569) · ยังไม่มี flow-summary = ไม่ส่งการ์ดนี้ (ห้ามโชว์ 0 ที่ยังไม่รู้จริง) */
-            standing={
-              flow
-                ? buildOpenRequestsCard(flow.jobs.open_total, flow.jobs.urgent, {
-                    breached: flow.jobs.sla_breached ?? null,
-                    atRisk: flow.jobs.sla_at_risk ?? null,
-                  })
-                : null
-            }
+            /**
+             * 🔴 **ต้องขยับตามปุ่มสลับ BU เหมือนการ์ดใบอื่น** (เจ้าของจับได้ 15 ก.ย. 2569:
+             * *"มันก็ไม่เห็นเปลี่ยนตามเลย ค้าง LBD อยู่งั้นอะ"*)
+             * ใบอื่นมาจาก `/api/home-kpis` ที่รับ BU อยู่แล้ว ส่วนใบนี้มาจาก flow-summary
+             * ซึ่งเดิมส่งมาแต่ยอดรวม ⇒ กดสลับแล้วเห็นบางใบขยับ บางใบนิ่ง
+             */
+            standing={standingCard}
           />
         </HomeSection>
       ) : null}

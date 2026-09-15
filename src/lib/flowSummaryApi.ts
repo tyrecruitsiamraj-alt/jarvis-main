@@ -65,6 +65,14 @@ export type FlowSummary = {
     new_today?: number;
     new_yesterday?: number;
     new_by_bu?: Record<string, { today: number; yesterday: number }>;
+    /**
+     * ยอดคงค้างแยกราย BU — การ์ด "ใบขอที่ยังเปิดรับ" ต้องขยับตามปุ่มสลับ BU
+     * เหมือนการ์ดใบอื่น (เจ้าของจับได้ 15 ก.ย. 2569 ว่ามันนิ่งอยู่ใบเดียว)
+     */
+    open_by_bu?: Record<
+      string,
+      { open_total: number; urgent: number; sla_at_risk: number; sla_breached: number }
+    >;
   };
   lumos: {
     sent_month: number;

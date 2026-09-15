@@ -266,11 +266,34 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const now = new Date();
     let slaAtRisk = 0;
     let slaBreached = 0;
+    /**
+     * 🔴 **แยกราย BU ด้วย** (เจ้าของจับได้ 15 ก.ย. 2569: *"มันก็ไม่เห็นเปลี่ยนตามเลย
+     * ค้าง LBD อยู่งั้นอะ"*)
+     *
+     * การ์ด "ใบขอที่ยังเปิดรับ" บนแถบตัวเลขวันนี้ **ไม่ขยับตามปุ่มสลับ BU** เลย
+     * เพราะมันมาจากเส้นนี้ซึ่งส่งมาแต่ยอดรวม ส่วนการ์ดใบอื่นมาจาก `/api/home-kpis`
+     * ที่รับพารามิเตอร์ BU อยู่แล้ว ⇒ กดสลับแล้วเห็นบางใบขยับ บางใบนิ่ง = อ่านแล้วงง
+     *
+     * ⚠️ นับจาก `site_code` เท่านั้น (BU อยู่ในนั้น ไม่ได้อยู่ในเลขที่ใบขอ)
+     */
+    const openByBu: Record<
+      string,
+      { open_total: number; urgent: number; sla_at_risk: number; sla_breached: number }
+    > = {};
+    const mkBu = () => ({ open_total: 0, urgent: 0, sla_at_risk: 0, sla_breached: 0 });
     for (const j of jobs) {
       const status = resolveRequestControlStatus(positionBreakdownFromJob(j));
       const meta = computeJobSla(j, status, now);
       if (meta.slaStatus === 'at_risk') slaAtRisk += 1;
       else if (meta.slaStatus === 'breached') slaBreached += 1;
+
+      const bu = buFromSiteCode(j.site_code);
+      if (!bu) continue;
+      const slot = (openByBu[bu] ??= mkBu());
+      slot.open_total += 1;
+      if (j.urgency === 'urgent') slot.urgent += 1;
+      if (meta.slaStatus === 'at_risk') slot.sla_at_risk += 1;
+      else if (meta.slaStatus === 'breached') slot.sla_breached += 1;
     }
 
     /**
@@ -463,6 +486,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
         new_today: newReqTotal.today,
         new_yesterday: newReqTotal.yesterday,
         new_by_bu: newReqByBu,
+        /** ยอดคงค้างแยกราย BU — ให้การ์ด "ใบขอที่ยังเปิดรับ" ขยับตามปุ่มสลับ BU ได้ */
+        open_by_bu: openByBu,
       },
       lumos: {
         sent_month: Number(lumosAgg[0]?.sent_month) || 0,

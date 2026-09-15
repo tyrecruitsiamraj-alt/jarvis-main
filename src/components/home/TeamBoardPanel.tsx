@@ -128,18 +128,16 @@ const Row: React.FC<{
       </span>
       <span className={cn('w-8 shrink-0 text-xs', T.faint)}>{value === null ? '' : unit}</span>
       {/*
-       * 🔴 กดได้สองแบบต้องบอกผลต่างกัน (เจ้าของ: "แถวที่กดได้แต่ไม่บอกผล")
-       * `to` = นำทางออกจากหน้านี้ (ลูกศรบอกอยู่แล้วว่าไปที่อื่น) ·
-       * `onPress` = เปิด dialog ค้างอยู่ในหน้านี้เหมือนเดิม (ต้องมีคำกำกับ ไม่งั้นดู
-       * เหมือนนำทางเหมือนกันหมด) — คำเดียวกับปุ่ม "ผลโทรวันนี้ ... เปิดดูรายชื่อ" ท้ายคอลัมน์
-       * Lumos ข้างล่างที่ใช้คำนี้อยู่แล้ว
+       * 🔴 **แถวที่กดได้ใช้ลูกศรตัวเดียวกันหมด** (เจ้าของสั่ง 15 ก.ย. 2569:
+       * *"ทำไมยังมีคำว่ากดดูรายชื่ออะ มันควรเป็นลูกศรแบบเดียวกัน"*)
+       *
+       * เดิมแยกสองแบบ: `to` ใช้ลูกศร · `onPress` ใช้คำว่า "กดดูรายชื่อ" ⇒ สองคอลัมน์
+       * ที่อยู่ติดกันดูเป็นคนละภาษา · ความต่างระหว่าง "เปลี่ยนหน้า" กับ "เปิดป๊อป"
+       * ไปอยู่ในคำอธิบายของแถว (`title`) แล้ว ไม่ต้องบอกซ้ำด้วยคำบนจอ
        */}
-      {onPress ? (
-        <span className={cn('shrink-0 whitespace-nowrap text-xs', T.faint)}>กดดูรายชื่อ</span>
-      ) : null}
-      {to ? (
+      {to || onPress ? (
         <ArrowRight
-          className="h-3 w-3 shrink-0 text-slate-300 transition-colors group-hover/row:text-slate-600 dark:text-slate-700 dark:group-hover/row:text-slate-300"
+          className="h-3 w-3 shrink-0 text-muted-foreground/50 transition-colors group-hover/row:text-foreground"
           aria-hidden
         />
       ) : null}
@@ -567,12 +565,12 @@ const TeamBoardPanel: React.FC<{
            * ยืนยันด้วยข้อมูลจริงบนเครื่องนี้ 6 ก.ย. 2569: total 15 / contacted 4 /
            * uncontacted 11 / untouched 10 (10 จาก 11 คนที่ยังไม่ถูกโทร ซ้อนอยู่ในนี้พอดี)
            */}
-          <li className="-mx-2 px-2 pt-0.5">
-            <p className={cn('text-xs leading-relaxed', T.faint)}>
-              "ค้างเกิน 1 วันไม่มีใครแตะ" นับซ้อนอยู่ใน "ยังไม่มีใครติดต่อ" ข้างบนแล้ว
-              (ไม่ใช่กลุ่มเพิ่ม) — บวกได้แค่ ติดต่อแล้ว + ยังไม่มีใครติดต่อ = ผู้สมัครทั้งหมด
-            </p>
-          </li>
+          {/*
+           * ⚠️ **เคยมีย่อหน้าอธิบายว่า "ค้างเกิน 1 วัน" นับซ้อนอยู่ในแถวบน — เจ้าของสั่งเอาออก
+           * 15 ก.ย. 2569** (*"จะเอาโชว์ไว้ทำไมเอาออก"*)
+           * เรื่องการนับซ้อนยังบอกอยู่สองทางที่ไม่กินที่จอ: ตัวแถวเยื้องเข้าไปพร้อมคำว่า
+           * "└ ในนั้น" และคำอธิบายของแถวตอนชี้เมาส์ · ห้ามเอาย่อหน้ากลับมา
+           */}
           <GroupTitle>นัดสัมภาษณ์</GroupTitle>
           <Row metric="recruit.appts_made" value={teams?.recruit?.appts_made ?? null} />
           <Row metric="recruit.showed" value={teams?.recruit?.attendance.showed ?? null} />
