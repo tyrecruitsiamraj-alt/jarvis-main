@@ -9,6 +9,7 @@
  * 3. อัตรา % ที่ตัวอย่างน้อยกว่า MIN_RATE_SAMPLE ห้ามเอาไปอวด
  * 4. 🔴 BU ต้องมาจาก site_code ไม่ใช่ prefix เลขที่ใบขอ (วัดจริง: prefix ไม่มี LBA/LBD เลย)
  */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   MIN_RATE_SAMPLE,
@@ -277,5 +278,37 @@ describe('ป้ายกำกับ followToday ต้องแยกจาก
       parts: [{ label: 'มาแล้ว', value: 3 }],
     });
     expect(c.sub).not.toContain('เลยเวลานัดแล้ว');
+  });
+});
+
+/**
+ * ═══ BU ของรายการติดตาม — ไซต์ก่อน แล้วค่อยดูคนคีย์ (15 ก.ย. 2569) ═══
+ *
+ * เจ้าของ: *"ต้นเหตุไม่มี BU ถ้ายึดจากคนคีย์หล่ะ ว่าคนคีย์อยู่ BU ไหน ไม่น่ายากนะ"*
+ *
+ * ช่องหน่วยงานในฟอร์มติดตามพิมพ์เอง ⇒ ไม่มี `site_code` เป็นเรื่องปกติ (10 จาก 30 รายการ
+ * ของวันนั้น) แต่เจ้าหน้าที่ทุกคนมีแผนกในระบบอยู่แล้ว
+ *
+ * 🔴 ด่านที่ห้ามหลุด: **ไซต์ต้องมาก่อนคนคีย์เสมอ** — คนแผนก LBD คีย์งานให้ไซต์ LBA ได้
+ * ของจริง (ไซต์) ต้องชนะการเดาจากคนคีย์
+ */
+describe('BU ของรายการติดตาม', () => {
+  const sql = readFileSync('api/_handlers/home-kpis.ts', 'utf8');
+
+  it('🔴 ใช้ coalesce(ไซต์, แผนกของคนคีย์) — เรียงไซต์ก่อน', () => {
+    const m = /const FOLLOW_BU = `coalesce\(\s*([\s\S]*?)\)`/.exec(sql);
+    expect(m, 'ไม่เจอนิยาม FOLLOW_BU — ถ้าย้ายที่ ให้ย้ายเทสต์ตามด้วย').toBeTruthy();
+    const body = m![1];
+    expect(body.indexOf('f.site_code')).toBeGreaterThanOrEqual(0);
+    expect(body.indexOf('department_code')).toBeGreaterThan(body.indexOf('f.site_code'));
+  });
+
+  it('เมตริกของเลนติดตามต้องกรองด้วย buFollow ไม่ใช่ buDirect (ไม่งั้นเลขหายเหมือนเดิม)', () => {
+    expect(sql).not.toMatch(/FOLLOW\} f\s*\n\s*where[^`]*buDirect\('f\.site_code'/);
+    expect(sql).toMatch(/buFollow\(bu\)/);
+  });
+
+  it('ยอด "ยังไม่ระบุ" ต้องนับเฉพาะที่ไม่รู้ทั้งไซต์และคนคีย์', () => {
+    expect(sql).toMatch(/where \$\{FOLLOW_BU\} is null/);
   });
 });

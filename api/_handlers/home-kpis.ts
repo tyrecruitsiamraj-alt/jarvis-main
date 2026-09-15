@@ -72,6 +72,28 @@ function buDirect(siteCol: string, bu: string | null): string {
   return ` and ${SITE_BU(siteCol)} = $1`;
 }
 
+/**
+ * ═══ BU ของรายการติดตาม — ไซต์ก่อน ถ้าไม่มีค่อยดูว่า **ใครเป็นคนคีย์** ═══
+ *
+ * เจ้าของสั่ง 15 ก.ย. 2569: *"ถ้ายึดจากคนคีย์หล่ะ ว่าคนคีย์อยู่ BU ไหน ไม่น่ายากนะ"*
+ *
+ * ช่องหน่วยงานในฟอร์มติดตามเป็นข้อความพิมพ์เอง ⇒ ไม่มี `site_code` เป็นเรื่องปกติ
+ * (วัดจริงวันนั้น 10 จาก 30 รายการของวันนี้) · แต่ **เจ้าหน้าที่ทุกคนมีแผนกในระบบ**
+ * (`users.department_code` — วัดแล้วคนที่คีย์ทั้งสามคนเป็น LBD ทั้งหมด)
+ *
+ * ⇒ ไม่มีไซต์ให้ถอยไปใช้แผนกของคนคีย์ · ยังไม่รู้ทั้งคู่ถึงจะนับว่า "ไม่ระบุ"
+ * ⚠️ **ไซต์ต้องมาก่อนเสมอ** — คนแผนก LBD คีย์งานให้ไซต์ LBA ได้ ของจริงชนะคนคีย์
+ */
+const FOLLOW_BU = `coalesce(
+  ${SITE_BU('f.site_code')},
+  (select u.department_code from ${tableInAppSchema('users')} u where u.id = f.created_by)
+)`;
+
+function buFollow(bu: string | null): string {
+  if (!bu) return '';
+  return ` and ${FOLLOW_BU} = $1`;
+}
+
 type Row = Record<string, unknown>;
 const n = (v: unknown): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
@@ -154,7 +176,7 @@ async function loadKpis(bu: string | null): Promise<Partial<Record<KpiKey, KpiPa
                           and f.outcome_code is not null
                           and f.outcome_code not in ${FOLLOW_SUCCESS})::int as no_show
      from ${FOLLOW} f
-     where f.cancelled_at is null${buDirect('f.site_code', bu)}`,
+     where f.cancelled_at is null${buFollow(bu)}`,
     p,
   );
 
@@ -171,7 +193,7 @@ async function loadKpis(bu: string | null): Promise<Partial<Record<KpiKey, KpiPa
        count(*) filter (where f.completed_at >= ${TODAY}
                           and f.outcome_code in ${FOLLOW_SUCCESS})::int as success_today
      from ${FOLLOW} f
-     where true${buDirect('f.site_code', bu)}`,
+     where true${buFollow(bu)}`,
     p,
   );
 
@@ -240,7 +262,7 @@ async function loadDeskToday(bu: string | null): Promise<
     ),
     one(
       `select count(*)::int c, max(f.completed_at)::text last_at from ${FOLLOW} f
-        where f.completed_at >= ${TODAY} and f.cancelled_at is null${buDirect('f.site_code', bu)}`,
+        where f.completed_at >= ${TODAY} and f.cancelled_at is null${buFollow(bu)}`,
       'ราย',
     ),
     one(
@@ -298,7 +320,7 @@ async function loadNoBuCounts(): Promise<{ apptToday: number; followToday: numbe
        count(*) filter (where f.cancelled_at is null and f.outcome_code is null
                           and f.scheduled_at < ${TODAY} + interval '1 day')::int as follow_today
      from ${FOLLOW} f
-     where ${SITE_BU('f.site_code')} is null`,
+     where ${FOLLOW_BU} is null`,
     [],
   );
   return { apptToday: n(row.appt_today), followToday: n(row.follow_today) };
