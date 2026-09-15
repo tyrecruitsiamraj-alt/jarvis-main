@@ -39,14 +39,29 @@ const NAV = Object.fromEntries(HOME_TEAM_NAV.map((t) => [t.key, t])) as Record<
   (typeof HOME_TEAM_NAV)[number]
 >;
 
-const eyebrow = 'font-mono text-[10px] font-semibold uppercase tracking-[0.22em]';
+/**
+ * ═══ ตัวอักษรบนบอร์ดนี้ (รื้อ 15 ก.ย. 2569) ═══
+ *
+ * > เจ้าของ: *"ทั้งระบบดูเรื่องตัวอักษรหนา บางด้วย มันดูอ่านยาก แล้วดูไม่สวย"*
+ * > และ *"ภาษา AI จ๋า ๆ เลย จัดเรียงก็ไม่สวย"*
+ *
+ * ของเดิมหัวข้อย่อยเป็น `text-xs uppercase tracking-[0.22em]`
+ * ซึ่งพังกับภาษาไทยสามชั้น:
+ *   1. **ไทยไม่มีตัวพิมพ์ใหญ่** — `uppercase` ไม่ทำอะไรเลย ได้แต่ทำให้คนเขียนเผลอใส่
+ *   2. **`tracking` กว้าง ๆ ทำให้สระ/วรรณยุกต์ลอยห่างตัวอักษร** อ่านยากขึ้นจริง
+ *   3. **`font-mono` = Kanit ตัวเดียวกัน** (กติกาบ้าน) ⇒ ได้แค่ชื่อคลาสที่หลอกตา
+ *
+ * ⇒ เหลือสองระดับพอ: **หัวข้อย่อย** กับ **เนื้อ** · ตัวเลขใช้ `tabular-nums` ให้หลักตรงกัน
+ * 🔴 ห้ามกลับไปใช้ `text-xs` — 10px กับ Kanit อ่านไม่ออกบนจอโน้ตบุ๊ก
+ */
+const eyebrow = 'text-xs font-semibold text-muted-foreground';
 
-/** โทนกลาง — คู่ light/dark ทุกตัว (เฉด 300 เดี่ยวจมบนพื้นขาว) */
+/** โทนกลาง — ใช้ตัวแปรธีมของแบรนด์ ไม่ใช่เฉด slate ที่ไม่ผูกกับจานสี */
 const T = {
-  mut: 'text-slate-500 dark:text-slate-500',
-  faint: 'text-slate-400 dark:text-slate-600',
-  num: 'font-mono font-semibold tabular-nums text-slate-900 dark:text-white',
-  line: 'border-slate-900/10 dark:border-white/10',
+  mut: 'text-muted-foreground',
+  faint: 'text-muted-foreground/70',
+  num: 'font-semibold tabular-nums text-foreground',
+  line: 'border-border/70',
   danger: 'text-red-700 dark:text-red-300',
   warn: 'text-amber-700 dark:text-amber-300/90',
 };
@@ -111,7 +126,7 @@ const Row: React.FC<{
       <span className={cn('text-sm', T.num, alert && value ? T.danger : undefined)}>
         {value === null ? '—' : value.toLocaleString()}
       </span>
-      <span className={cn('w-8 shrink-0 text-[10px]', T.faint)}>{value === null ? '' : unit}</span>
+      <span className={cn('w-8 shrink-0 text-xs', T.faint)}>{value === null ? '' : unit}</span>
       {/*
        * 🔴 กดได้สองแบบต้องบอกผลต่างกัน (เจ้าของ: "แถวที่กดได้แต่ไม่บอกผล")
        * `to` = นำทางออกจากหน้านี้ (ลูกศรบอกอยู่แล้วว่าไปที่อื่น) ·
@@ -120,7 +135,7 @@ const Row: React.FC<{
        * Lumos ข้างล่างที่ใช้คำนี้อยู่แล้ว
        */}
       {onPress ? (
-        <span className={cn('shrink-0 whitespace-nowrap text-[10px]', T.faint)}>กดดูรายชื่อ</span>
+        <span className={cn('shrink-0 whitespace-nowrap text-xs', T.faint)}>กดดูรายชื่อ</span>
       ) : null}
       {to ? (
         <ArrowRight
@@ -215,7 +230,7 @@ const TeamColumn: React.FC<{
       <span className={cn('text-sm font-semibold', ACCENT[team])}>
         {team === 'lumos' ? <Term k="lumos">{label}</Term> : label}
       </span>
-      <span className={cn('min-w-0 flex-1 truncate text-[10px]', T.faint)}>{blurb}</span>
+      <span className={cn('min-w-0 flex-1 truncate text-xs', T.faint)}>{blurb}</span>
       {to ? <ArrowRight className={cn('h-3.5 w-3.5 shrink-0', ACCENT[team])} aria-hidden /> : null}
     </span>
   );
@@ -228,7 +243,7 @@ const TeamColumn: React.FC<{
       ) : (
         head
       )}
-      {stuck ? <p className={cn('mt-0.5 text-[11px]', T.danger)}>⚠ {stuck}</p> : null}
+      {stuck ? <p className={cn('mt-0.5 text-xs', T.danger)}>⚠ {stuck}</p> : null}
       {error ? (
         /* Error ไม่เงียบ — ทีมวัดไม่ได้ต้องบอกตรง ๆ ห้ามโชว์ 0 ปลอม */
         <p className={cn('mt-2 text-xs', T.warn)}>วัดไม่ได้ — {error}</p>
@@ -264,12 +279,12 @@ const CallDigestBlock: React.FC<{
       <span className={cn('text-sm', T.num)}>
         {resultToday === null ? '—' : resultToday.toLocaleString('th-TH')}
       </span>
-      <span className={cn('w-8 shrink-0 text-[10px]', T.faint)}>{resultToday === null ? '' : 'สาย'}</span>
+      <span className={cn('w-8 shrink-0 text-xs', T.faint)}>{resultToday === null ? '' : 'สาย'}</span>
     </li>
     <li className="-mx-2 flex items-baseline gap-2 px-2 py-1">
       <span className={cn('min-w-0 flex-1 truncate text-xs', T.mut)}>ผลกลับมาเดือนนี้</span>
       <span className={cn('text-sm', T.num)}>{digest.resultsMonth.toLocaleString('th-TH')}</span>
-      <span className={cn('w-8 shrink-0 text-[10px]', T.faint)}>ราย</span>
+      <span className={cn('w-8 shrink-0 text-xs', T.faint)}>ราย</span>
     </li>
     {/* แยกผลเป็นอะไรบ้าง — อ่านจบในบรรทัดเดียว ไม่ต้องกดเข้าไปนับเอง */}
     <li className="-mx-2 px-2 py-0.5">
@@ -279,7 +294,7 @@ const CallDigestBlock: React.FC<{
             key={b.key}
             title={FOLLOW_UP_TONE[b.tone].hint}
             className={cn(
-              'inline-flex items-baseline gap-1 rounded-full border px-2 py-0.5 text-[10px]',
+              'inline-flex items-baseline gap-1 rounded-full border px-2 py-0.5 text-xs',
               TONE[FOLLOW_UP_TONE[b.tone].tone].soft,
             )}
           >
@@ -297,19 +312,19 @@ const CallDigestBlock: React.FC<{
     </li>
     {digest.interested.length === 0 ? (
       <li className="-mx-2 px-2 py-1">
-        <p className={cn('text-[11px]', T.mut)}>ยังไม่มีใครตอบว่าสนใจ</p>
+        <p className={cn('text-xs', T.mut)}>ยังไม่มีใครตอบว่าสนใจ</p>
       </li>
     ) : (
       digest.interested.map((it) => {
         const line = (
           <>
             <span className="flex items-baseline gap-1.5">
-              <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">
+              <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
                 {it.name || it.person_ref}
               </span>
-              <span className={cn('shrink-0 font-mono text-[10px]', T.faint)}>{it.request_no}</span>
+              <span className={cn('shrink-0 text-xs', T.faint)}>{it.request_no}</span>
             </span>
-            <span className={cn('block truncate text-[10px]', T.mut)}>{interestedJobLine(it)}</span>
+            <span className={cn('block truncate text-xs', T.mut)}>{interestedJobLine(it)}</span>
           </>
         );
         return (
@@ -332,7 +347,7 @@ const CallDigestBlock: React.FC<{
     )}
     {digest.interestedMore > 0 ? (
       <li className="-mx-2 px-2 pt-0.5">
-        <p className={cn('text-[10px]', T.faint)}>
+        <p className={cn('text-xs', T.faint)}>
           …และอีก {digest.interestedMore.toLocaleString('th-TH')} ราย
         </p>
       </li>
@@ -429,7 +444,7 @@ const TeamBoardPanel: React.FC<{
         <span
           className={cn(
             skin === 'plain'
-              ? 'text-[12.5px] font-medium text-primary'
+              ? 'text-sm font-medium text-primary'
               : cn(eyebrow, 'text-rose-900 dark:text-rose-300'),
           )}
         >
@@ -439,7 +454,7 @@ const TeamBoardPanel: React.FC<{
         <span
           className={cn(
             'tabular-nums',
-            skin === 'plain' ? 'text-[12px] text-muted-foreground' : cn('font-mono text-[11px]', T.mut),
+            skin === 'plain' ? 'text-sm text-muted-foreground' : cn('text-xs', T.mut),
           )}
         >
           {team
@@ -553,7 +568,7 @@ const TeamBoardPanel: React.FC<{
            * uncontacted 11 / untouched 10 (10 จาก 11 คนที่ยังไม่ถูกโทร ซ้อนอยู่ในนี้พอดี)
            */}
           <li className="-mx-2 px-2 pt-0.5">
-            <p className={cn('text-[10px] leading-relaxed', T.faint)}>
+            <p className={cn('text-xs leading-relaxed', T.faint)}>
               "ค้างเกิน 1 วันไม่มีใครแตะ" นับซ้อนอยู่ใน "ยังไม่มีใครติดต่อ" ข้างบนแล้ว
               (ไม่ใช่กลุ่มเพิ่ม) — บวกได้แค่ ติดต่อแล้ว + ยังไม่มีใครติดต่อ = ผู้สมัครทั้งหมด
             </p>
@@ -645,14 +660,14 @@ const TeamBoardPanel: React.FC<{
               <span className={cn('text-lg font-bold tabular-nums', ACCENT.lumos)}>
                 {successRate?.pct == null ? '—' : `${successRate.pct}%`}
               </span>
-              <span className={cn('text-[11px]', T.mut)}>
+              <span className={cn('text-xs', T.mut)}>
                 {successRate?.pct == null
                   ? 'ยังไม่มีใครรับสาย'
                   : `จากสายที่ได้คุยจริง ${successRate.connected.toLocaleString('th-TH')} สาย`}
               </span>
             </span>
             {successRateRange ? (
-              <span className={cn('mt-0.5 block text-[10px]', T.faint)}>
+              <span className={cn('mt-0.5 block text-xs', T.faint)}>
                 นับจากสายที่ส่งเข้า {successRateRange}
               </span>
             ) : null}
