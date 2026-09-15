@@ -32,7 +32,18 @@ const { resyncFollowPlanWithLumos } = await import('../../api/_lib/lumosDispatch
 
 const staffName = async () => 'ขวัญ';
 
-/** แถวของแผน: รอบ 07:00 (หัวขบวน) + รอบ 08:00 */
+/**
+ * ⚠️ **เวลาต้องเป็นอนาคตเสมอ ห้ามฝังวันที่ตายตัว** (เจอจริง 15 ก.ย. 2569)
+ * ตัวประกอบ payload ดันเวลาที่ผ่านมาแล้วไปเป็น "ตอนนี้ + 10 นาที" ตามกติกาของ Lumos
+ * ⇒ เทสต์ที่ฝังวันที่ไว้จะพังเองเมื่อวันนั้นผ่านไป โดยที่โค้ดไม่ได้เสีย
+ */
+const inHours = (h: number) => new Date(Date.now() + h * 3_600_000);
+const hhmm = (d: Date) =>
+  d.toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
+const ROUND_1 = inHours(2);
+const ROUND_2 = inHours(3);
+
+/** แถวของแผน: รอบแรก (หัวขบวน) + รอบถัดไปอีกหนึ่งชั่วโมง */
 const members = [
   {
     id: 'r1',
@@ -42,7 +53,7 @@ const members = [
     note: null,
     staff_phone: '+66898888888',
     unit_name: 'สมิติเวช',
-    scheduled_at: '2026-09-14T07:00:00+07:00',
+    scheduled_at: ROUND_1.toISOString(),
     call_times: null,
     call_round: 1,
   },
@@ -54,7 +65,7 @@ const members = [
     note: null,
     staff_phone: '+66898888888',
     unit_name: 'สมิติเวช',
-    scheduled_at: '2026-09-14T08:00:00+07:00',
+    scheduled_at: ROUND_2.toISOString(),
     call_times: null,
     call_round: 2,
   },
@@ -91,7 +102,7 @@ describe('resyncFollowPlanWithLumos', () => {
       steps: Array<{ scheduled_at: string }>;
     };
     expect(sent.steps).toHaveLength(2);
-    expect(sent.steps.map((s) => s.scheduled_at.slice(11, 16))).toEqual(['07:00', '08:00']);
+    expect(sent.steps.map((s) => hhmm(new Date(s.scheduled_at)))).toEqual([hhmm(ROUND_1), hhmm(ROUND_2)]);
   });
 
   it('🔴 ยกเลิกของเดิมต้องเกิด **ก่อน** ส่งใหม่ — ไม่ใช่ยิงทับ', async () => {
