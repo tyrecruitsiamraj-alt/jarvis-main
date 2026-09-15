@@ -143,14 +143,14 @@ export default function FollowTodayPanel() {
             >
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span className={cn('text-xs font-bold', DASH.cellStrong)}>รอบ {r.attempt}</span>
-                <span className={cn('text-[11px]', DASH.muted)}>
+                <span className={cn('text-xs', DASH.muted)}>
                   ส่ง{' '}
                   <span className="font-semibold tabular-nums text-foreground">
                     {r.total.toLocaleString('th-TH')}
                   </span>
                 </span>
                 {parts.map((p) => (
-                  <span key={p.key} className="text-[11px]">
+                  <span key={p.key} className="text-xs">
                     <span className={DASH.muted}>{CALL_BUCKET_LABEL[p.key]} </span>
                     <span className={cn('font-semibold tabular-nums', BUCKET_TONE[p.key].text)}>
                       {p.n.toLocaleString('th-TH')}
@@ -181,13 +181,13 @@ export default function FollowTodayPanel() {
           );
         })}
         {rounds.every((r) => r.total === 0) ? (
-          <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.neutral.soft, DASH.muted)}>
+          <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.neutral.soft, DASH.muted)}>
             ยังไม่มีงาน Follow ที่ส่งให้ AI โทร — เพิ่มรายชื่อที่หน้า Follow แล้วส่งโทร
           </p>
         ) : null}
       </div>
 
-      <p className={cn('mt-2 text-[10px]', DASH.muted)}>
+      <p className={cn('mt-2 text-xs', DASH.muted)}>
         แต่ละรอบ = คนที่ตอนนี้อยู่รอบนั้น (ไม่ใช่ยอดสะสมทุกครั้งที่โทร) · กดที่รอบเพื่อดูรายชื่อ
       </p>
 
@@ -201,7 +201,7 @@ export default function FollowTodayPanel() {
               <DialogTitle className="text-sm font-bold">
                 งาน Follow · รอบ {openRoundData.attempt}
               </DialogTitle>
-              <DialogDescription className="text-[11px]">
+              <DialogDescription className="text-xs">
                 ส่ง {openRoundData.total.toLocaleString('th-TH')} คน
               </DialogDescription>
             </DialogHeader>
@@ -213,7 +213,7 @@ export default function FollowTodayPanel() {
               );
               // 🔴 ยอดกับรายชื่อคนละเส้น — ไม่เท่ากันต้องบอก ไม่ใช่ปล่อยให้คนนับเอง
               return listed < openRoundData.total ? (
-                <p className={cn('mt-2 rounded-lg px-2.5 py-1.5 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
+                <p className={cn('mt-2 rounded-lg px-2.5 py-1.5 text-xs', TONE.warn.soft, TONE.warn.value)}>
                   แสดงชื่อได้ {listed.toLocaleString('th-TH')} จาก{' '}
                   {openRoundData.total.toLocaleString('th-TH')} คน — ที่เหลือเป็นสายที่ไม่มีรายการ
                   ติดตามคู่กันแล้ว (เช่น ถูกลบทิ้ง)
@@ -227,7 +227,7 @@ export default function FollowTodayPanel() {
                 if (list.length === 0) return null;
                 return (
                   <section key={b}>
-                    <p className={cn('mb-1.5 text-[11px] font-bold', BUCKET_TONE[b].text)}>
+                    <p className={cn('mb-1.5 text-xs font-bold', BUCKET_TONE[b].text)}>
                       {CALL_BUCKET_LABEL[b]} ({list.length.toLocaleString('th-TH')})
                     </p>
                     <ul className="space-y-1">
@@ -243,7 +243,7 @@ export default function FollowTodayPanel() {
                             <span className="block truncate text-xs font-medium text-foreground">
                               {p.recipient_name}
                             </span>
-                            <span className={cn('block truncate text-[10px]', DASH.muted)}>
+                            <span className={cn('block truncate text-xs', DASH.muted)}>
                               {p.topic}
                               {p.unit_name ? ` · ${p.unit_name}` : ''}
                             </span>
@@ -252,7 +252,7 @@ export default function FollowTodayPanel() {
                             href={`tel:${p.recipient_phone}`}
                             onClick={(e) => e.stopPropagation()}
                             className={cn(
-                              'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium',
+                              'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium',
                               TONE.info.outline,
                             )}
                           >

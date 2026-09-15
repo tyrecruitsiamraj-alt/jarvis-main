@@ -183,3 +183,35 @@ describe('Success Rate — ต้องเขียนฐานกำกับ�
     }
   });
 });
+
+/**
+ * ═══ ตัวอักษรบนหน้าแรก (รื้อ 15 ก.ย. 2569) ═══
+ *
+ * เจ้าของ: *"ทั้งระบบดูเรื่องตัวอักษรหนา บางด้วย มันดูอ่านยาก แล้วดูไม่สวย"*
+ *
+ * 🔴 ต้นเหตุคือขนาดจิ๋วที่พิมพ์เองรายจุด (`text-[10px]` / `text-[11px]`) กับ `font-mono`
+ * ที่ในบ้านนี้คือ Kanit ตัวเดียวกันอยู่แล้ว — ได้แค่ชื่อคลาสหลอกตา
+ * ปิดประตูไว้ทีละหน้า เริ่มจากหน้าแรก (หน้าอื่นทยอยตาม แล้วเติมชื่อไฟล์ในลิสต์นี้)
+ */
+describe('หน้าแรกต้องไม่มีตัวอักษรจิ๋วที่พิมพ์เองหรือ font-mono', () => {
+  const FILES = [
+    'src/components/home/TeamBoardPanel.tsx',
+    'src/components/home/HomeKpiRow.tsx',
+    'src/components/home/HomeDeckV2.tsx',
+    'src/components/home/HomeSection.tsx',
+    'src/components/home/HomeBuFilter.tsx',
+    'src/components/home/FollowTodayPanel.tsx',
+    'src/components/home/LumosCallHealthPanel.tsx',
+    'src/components/home/HomeDigestPanels.tsx',
+  ];
+
+  it.each(FILES)('%s — ไม่มี text-[10px] / text-[11px]', (f) => {
+    const code = read(f).replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(code).not.toMatch(/text-\[1[01]px\]/);
+  });
+
+  it.each(FILES)('%s — ไม่มี font-mono (ฟอนต์เดียวทั้งระบบคือ Kanit)', (f) => {
+    const code = read(f).replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(code).not.toMatch(/font-mono/);
+  });
+});

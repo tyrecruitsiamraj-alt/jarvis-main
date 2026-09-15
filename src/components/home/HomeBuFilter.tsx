@@ -42,7 +42,7 @@ export const HomeBuFilter: React.FC<HomeBuFilterProps> = ({
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
-      <span className={cn('text-[11px] font-medium', DASH.muted)}>สายธุรกิจ</span>
+      <span className={cn('text-xs font-medium', DASH.muted)}>สายธุรกิจ</span>
       <ToggleGroup
         type="single"
         size="sm"
@@ -62,7 +62,7 @@ export const HomeBuFilter: React.FC<HomeBuFilterProps> = ({
           <ToggleGroupItem key={o.bu} value={o.bu} title={buLabel(o.bu)} className="gap-1.5 text-xs">
             {o.bu}
             {/* จำนวนใบขอของ BU นั้น — ใช้ Badge ของ shadcn แทนชิปที่วาดเอง */}
-            <Badge variant="secondary" className="px-1.5 py-0 text-[10px] tabular-nums">
+            <Badge variant="secondary" className="px-1.5 py-0 text-xs tabular-nums">
               {o.count.toLocaleString('th-TH')}
             </Badge>
           </ToggleGroupItem>

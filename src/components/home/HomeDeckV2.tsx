@@ -108,13 +108,13 @@ const HomeDeckV2: React.FC<{
          */}
         <div className="mx-auto shrink-0 sm:mx-0">
           <div className="flex h-40 w-40 flex-col items-center justify-center rounded-full border border-primary/25 bg-primary/[0.04] text-center sm:h-48 sm:w-48">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               ต้องลงมือ
             </span>
             <span className="mt-1.5 text-[52px] font-semibold leading-none tabular-nums sm:text-[64px]">
               {loading ? '—' : tasks.length}
             </span>
-            <span className="mt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <span className="mt-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               เรื่อง
             </span>
           </div>
@@ -129,7 +129,7 @@ const HomeDeckV2: React.FC<{
         </div>
 
         <div className="min-w-[16rem] flex-1">
-          <p className="text-[12.5px] text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {greeting}
             {userName ? `, ${userName}` : ''}
           </p>
@@ -158,7 +158,7 @@ const HomeDeckV2: React.FC<{
                   </Link>
                 </Button>
                 {rest.length > 0 ? (
-                  <span className="text-[12.5px] text-muted-foreground">
+                  <span className="text-sm text-muted-foreground">
                     +{rest.length} เรื่องรอต่อคิว
                   </span>
                 ) : null}
@@ -210,7 +210,7 @@ const HomeDeckV2: React.FC<{
                       </span>
                       <span
                         className={cn(
-                          'hidden whitespace-nowrap text-[11px] md:block',
+                          'hidden whitespace-nowrap text-xs md:block',
                           nowStep ? 'font-medium text-foreground' : 'text-muted-foreground',
                         )}
                       >
@@ -230,7 +230,7 @@ const HomeDeckV2: React.FC<{
         <>
           <Rule2 />
           <div className="flex items-baseline justify-between px-6 pb-1 pt-4 lg:px-8">
-            <span className="text-[12.5px] font-medium text-foreground">คิวของคุณวันนี้</span>
+            <span className="text-sm font-medium text-foreground">คิวของคุณวันนี้</span>
             <span className="text-[11.5px] tabular-nums text-muted-foreground">
               เหลือ {rest.length}
             </span>

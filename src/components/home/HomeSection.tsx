@@ -37,7 +37,7 @@ const HomeSection: React.FC<{
         <div className="min-w-0">
           {/* ใช้ระดับตัวอักษรชุดเดียวกันทุกแผง — เดิมหัวแผงตัวเล็กใหญ่ไม่เท่ากัน */}
           <p className={cn('text-sm font-bold', DASH.cellStrong)}>{title}</p>
-          {subtitle ? <p className={cn('text-[11px] leading-4', DASH.muted)}>{subtitle}</p> : null}
+          {subtitle ? <p className={cn('text-xs leading-4', DASH.muted)}>{subtitle}</p> : null}
         </div>
         {action ? <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div> : null}
       </CardHeader>

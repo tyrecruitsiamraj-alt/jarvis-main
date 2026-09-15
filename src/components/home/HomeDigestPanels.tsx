@@ -113,7 +113,7 @@ export const HomeDigestPanels: React.FC<HomeDigestPanelsProps> = ({
             {leaders.map((r, i) => (
               <li key={r.id} className="flex items-center gap-2.5">
                 <span
-                  className="w-4 shrink-0 font-mono text-[11px] tabular-nums"
+                  className="w-4 shrink-0 text-xs tabular-nums"
                   style={{ color: HUD_HEX.teal }}
                 >
                   {i + 1}
@@ -122,7 +122,7 @@ export const HomeDigestPanels: React.FC<HomeDigestPanelsProps> = ({
                   <span className="flex items-baseline justify-between gap-2">
                     <span className={cn(HUD.body, 'truncate')}>{r.name}</span>
                     <span className="shrink-0 whitespace-nowrap">
-                      <span className="font-mono text-sm font-semibold tabular-nums text-white">
+                      <span className="text-sm font-semibold tabular-nums text-white">
                         {r.count}
                       </span>
                       <span className={cn('ml-1', HUD.unit)}>{r.unit}</span>
@@ -162,7 +162,7 @@ export const HomeDigestPanels: React.FC<HomeDigestPanelsProps> = ({
                     </span>
                     <span className="shrink-0 whitespace-nowrap">
                       <span
-                        className="font-mono text-sm font-semibold tabular-nums"
+                        className="text-sm font-semibold tabular-nums"
                         style={{ color }}
                       >
                         {Number(v)}

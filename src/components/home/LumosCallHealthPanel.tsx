@@ -75,7 +75,7 @@ export default function LumosCallHealthPanel({
           <PhoneCall className="h-4 w-4 text-primary" />
           ผลโทรจาก AI (Lumos)
         </h2>
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           เดือนนี้ · เฉพาะใบขอที่เปิดอยู่ของแผนกคุณ
         </span>
       </div>
@@ -92,10 +92,10 @@ export default function LumosCallHealthPanel({
         ) : (
           <RefreshCw className={cn('h-4 w-4 shrink-0', TONE[link.tone].value)} />
         )}
-        <span className={cn('text-[12px] font-semibold', TONE[link.tone].value)}>{link.label}</span>
-        <span className="min-w-0 text-[11px] text-muted-foreground">{link.detail}</span>
+        <span className={cn('text-sm font-semibold', TONE[link.tone].value)}>{link.label}</span>
+        <span className="min-w-0 text-xs text-muted-foreground">{link.detail}</span>
         {l.last_result_at ? (
-          <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+          <span className="ml-auto shrink-0 text-xs text-muted-foreground">
             {formatDateTimeTh(l.last_result_at)}
           </span>
         ) : null}
@@ -121,7 +121,7 @@ export default function LumosCallHealthPanel({
             >
               {s.value.toLocaleString('th-TH')}
             </div>
-            <div className="text-[10px] leading-tight text-muted-foreground">{s.label}</div>
+            <div className="text-xs leading-tight text-muted-foreground">{s.label}</div>
           </div>
         ))}
       </div>
@@ -129,17 +129,17 @@ export default function LumosCallHealthPanel({
       {/* 3. ผลออกมาเป็นยังไง — แจกแจงครบทุกแบบที่มีค่า เลขย่อยบวกได้เท่า "ได้ผลกลับ" เสมอ */}
       <div className="space-y-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[11px] font-semibold text-foreground">
+          <span className="text-xs font-semibold text-foreground">
             ผลที่กลับมา {resultTotal.toLocaleString('th-TH')} สาย
           </span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             โทรติด{' '}
             {connect.percent === null ? (
               <b className="text-muted-foreground">—</b>
             ) : (
               <b className={cn('tabular-nums', TONE.primary.value)}>{connect.percent}%</b>
             )}{' '}
-            <span className="text-[10px]">
+            <span className="text-xs">
               (คุยได้ {connect.connected.toLocaleString('th-TH')} · ไม่ติด{' '}
               {connect.unreached.toLocaleString('th-TH')})
             </span>
@@ -170,7 +170,7 @@ export default function LumosCallHealthPanel({
             </div>
           </>
         ) : (
-          <p className="rounded-lg bg-slate-900/[0.03] px-2.5 py-2 text-[11px] text-muted-foreground dark:bg-white/[0.06]">
+          <p className="rounded-lg bg-slate-900/[0.03] px-2.5 py-2 text-xs text-muted-foreground dark:bg-white/[0.06]">
             ยังไม่มีผลโทรกลับมาเดือนนี้ — ส่งคนให้ AI โทรจากหน้า Matching แล้วผลจะมาโชว์ที่นี่
           </p>
         )}

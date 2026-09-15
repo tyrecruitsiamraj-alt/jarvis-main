@@ -38,9 +38,9 @@ import { cn } from '@/lib/utils';
  * พร้อมคู่ `dark:` ทุกตัว) ⇒ เป็นการ์ดคนละใบกับแผงอื่นบนหน้าเดียวกัน
  * เหลือไว้เฉพาะ **ขนาดตัวอักษร** ซึ่งเป็น utility ล้วน ไม่ใช่การปั้นเปลือกการ์ด
  */
-const LABEL = 'block text-[11px] font-medium text-muted-foreground';
+const LABEL = 'block text-xs font-medium text-muted-foreground';
 const FIGURE = 'text-2xl font-semibold tabular-nums';
-const UNIT = 'text-[11px] text-muted-foreground';
+const UNIT = 'text-xs text-muted-foreground';
 
 /** การ์ด KPI ที่กดได้ — Card ของ shadcn ห่อด้วยปุ่มเพื่อให้กดทั้งใบและโฟกัสได้ */
 const KpiCardShell: React.FC<{
@@ -64,13 +64,14 @@ const DeltaChip: React.FC<{ card: KpiCard }> = ({ card }) => {
   const text = deltaText(card.delta, card.isRate ? '%' : card.unit);
   if (!text) {
     // เทียบไม่ได้ — บอกตรง ๆ ว่าไม่มีของเทียบ ไม่ใช่วาดลูกศรศูนย์
-    return <span className={cn(UNIT, 'opacity-70')}>ยังไม่มีของเทียบ</span>;
+    // "ยังไม่มีของเทียบ" อ่านเหมือนภาษาเครื่อง — คนพูดว่า "เมื่อวานไม่มีให้เทียบ"
+    return <span className={cn(UNIT, 'opacity-70')}>เมื่อวานไม่มีให้เทียบ</span>;
   }
   const good = deltaIsGood(card.delta);
   const tone = good === null ? TONE.neutral.value : good ? TONE.success.value : TONE.danger.value;
   const Icon = good === null ? Minus : good ? ArrowUpRight : ArrowDownRight;
   return (
-    <span className={cn('inline-flex items-center gap-1 text-[11px] font-medium', tone)}>
+    <span className={cn('inline-flex items-center gap-1 text-xs font-medium', tone)}>
       <Icon className="h-3 w-3" aria-hidden />
       {text}
     </span>
@@ -110,7 +111,7 @@ export const HomeKpiRow: React.FC<HomeKpiRowProps> = ({ kpis, standing, classNam
           </span>
           <span
             className={cn(
-              'mt-1 block text-[11px] font-medium',
+              'mt-1 block text-xs font-medium',
               standing.alert ? TONE.danger.value : DASH.muted,
             )}
           >
@@ -119,7 +120,7 @@ export const HomeKpiRow: React.FC<HomeKpiRowProps> = ({ kpis, standing, classNam
           {/* 🔴 SLA โชว์คู่กันเสมอ (หลุดแล้ว + ใกล้หลุด) — ตัวเดียวทำให้เข้าใจผิด
               ไม่รู้ตัวเลข = ไม่วาดบรรทัดนี้ ไม่ใช่วาด 0 */}
           {standing.sla ? (
-            <span className={cn('mt-0.5 block text-[11px] font-medium', TONE.danger.value)}>
+            <span className={cn('mt-0.5 block text-xs font-medium', TONE.danger.value)}>
               {standing.sla}
             </span>
           ) : null}
@@ -141,7 +142,7 @@ export const HomeKpiRow: React.FC<HomeKpiRowProps> = ({ kpis, standing, classNam
                   (คนอ่านว่าโทรไม่ติดเลย ทั้งที่จริงคือยังไม่มีสายให้คิด) */}
               {c.quiet ? (
                 <span className={cn('py-1 text-xs font-medium', DASH.cell)}>
-                  {c.isRate ? 'ยังไม่พอตัดสิน' : 'ยังไม่มีวันนี้'}
+                  {c.isRate ? 'สายยังน้อยเกินจะสรุป' : 'วันนี้ยังไม่มี'}
                 </span>
               ) : (
                 <>

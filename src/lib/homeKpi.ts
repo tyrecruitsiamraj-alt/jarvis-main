@@ -90,10 +90,11 @@ const META: Record<KpiKey, { label: string; unit: string; isRate: boolean; href:
   apptToday: { label: 'นัดโทรวันนี้', unit: 'ราย', isRate: false, href: '/follow' },
   followToday: { label: 'ค้างต้องโทร (รวมของเก่า)', unit: 'ราย', isRate: false, href: '/follow' },
   newApplicants: { label: 'ผู้สมัครใหม่วันนี้', unit: 'คน', isRate: false, href: '/recruit/rm' },
-  callResults: { label: 'ผลโทรกลับวันนี้', unit: 'สาย', isRate: false, href: '/recruit/rm?tab=calls' },
+  callResults: { label: 'รู้ผลโทรวันนี้', unit: 'สาย', isRate: false, href: '/recruit/rm?tab=calls' },
   interested: { label: 'ตอบว่าสนใจวันนี้', unit: 'คน', isRate: false, href: '/recruit/rm?bucket=interested' },
   appointments: { label: 'นัดสัมภาษณ์วันนี้', unit: 'นัด', isRate: false, href: '/recruit/rm?tab=appointments' },
-  connectRate: { label: 'อัตราต่อสายติดวันนี้', unit: '%', isRate: true, href: '/follow' },
+  // "อัตราต่อสายติด" เป็นศัพท์ในบ้าน — เขียนเป็นคำที่คนนอกทีมก็อ่านออก
+  connectRate: { label: 'โทรติดวันนี้', unit: '%', isRate: true, href: '/follow' },
 };
 
 /** ปัดอัตราเป็นจำนวนเต็ม — ตัวหารเป็น 0 คืน null (ไม่ใช่ 0%) */
