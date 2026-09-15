@@ -180,9 +180,10 @@ async function loadKpis(bu: string | null): Promise<Partial<Record<KpiKey, KpiPa
     apptToday: {
       today: n(apptDue.today),
       yesterday: n(apptDue.yday),
+      // คำบนจอต้องเป็นคำของงานติดตาม (ไป/ไม่ไป) ไม่ใช่คำของงานสัมภาษณ์ (มา/ไม่มา)
       parts: [
-        { label: 'มาแล้ว', value: n(apptDue.came) },
-        { label: 'ไม่มา', value: n(apptDue.no_show) },
+        { label: 'ไปแล้ว', value: n(apptDue.came) },
+        { label: 'ไม่ไป', value: n(apptDue.no_show) },
       ],
     },
     followToday: {
@@ -278,6 +279,31 @@ async function loadBuOptions(): Promise<Array<{ bu: string; count: number }>> {
   }
 }
 
+/**
+ * 🔴 **รายการติดตามที่ยังไม่ระบุหน่วยงาน — ต้องบอก ไม่ใช่ให้หายเงียบตอนกรอง BU**
+ *
+ * เจ้าของจับได้ 15 ก.ย. 2569: *"ทั้งหมดได้ 30 อยู่ LBD 20 แล้วที่เหลือไปไหน"*
+ * วัดจริงวันนั้น: นัดวันนี้ 30 ราย = LBD 20 + **10 รายที่ `site_code` ว่าง**
+ * ⇒ กดกรอง BU ไหนก็ไม่เจอ 10 รายนั้น เพราะมันไม่ได้อยู่ BU ไหนเลย
+ *
+ * ฟอร์มเพิ่มรายการติดตาม **ข้ามช่องหน่วยงานได้** ⇒ เคสนี้เกิดตลอด ไม่ใช่ของหายาก
+ * ⚠️ ห้ามเดาว่าอยู่ BU ไหน — บอกจำนวนไปตรง ๆ แล้วให้คนไปเติมหน่วยงานเอง
+ */
+async function loadNoBuCounts(): Promise<{ apptToday: number; followToday: number }> {
+  const row = await safeRow(
+    `select
+       count(*) filter (where f.cancelled_at is null
+                          and f.scheduled_at >= ${TODAY}
+                          and f.scheduled_at < ${TODAY} + interval '1 day')::int as appt_today,
+       count(*) filter (where f.cancelled_at is null and f.outcome_code is null
+                          and f.scheduled_at < ${TODAY} + interval '1 day')::int as follow_today
+     from ${FOLLOW} f
+     where ${SITE_BU('f.site_code')} is null`,
+    [],
+  );
+  return { apptToday: n(row.appt_today), followToday: n(row.follow_today) };
+}
+
 let cache: { at: number; key: string; body: unknown } | null = null;
 const CACHE_MS = 20_000;
 
@@ -296,13 +322,19 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return res.status(200).json(cache.body);
     }
 
-    const [kpis, deskToday] = await Promise.all([loadKpis(bu), loadDeskToday(bu)]);
+    const [kpis, deskToday, noBu] = await Promise.all([
+      loadKpis(bu),
+      loadDeskToday(bu),
+      loadNoBuCounts(),
+    ]);
     const body = {
       generated_at: new Date().toISOString(),
       bu,
       bu_options: options,
       kpis,
       desk_today: deskToday,
+      /** จำนวนที่ยังไม่ระบุหน่วยงาน — จอต้องบอกเมื่อกำลังกรอง BU อยู่ */
+      no_bu: noBu,
     };
     cache = { at: now, key, body };
     return res.status(200).json(body);

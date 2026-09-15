@@ -22,6 +22,12 @@ export type HomeKpisResponse = {
   bu_options: Array<{ bu: string; count: number }>;
   kpis: KpiRaw;
   desk_today: Record<string, DeskTodayEntry>;
+  /**
+   * จำนวนรายการติดตามที่ **ยังไม่ระบุหน่วยงาน** จึงไม่อยู่ใน BU ไหนเลย
+   * 🔴 ต้องขึ้นบนจอตอนกรอง BU อยู่ — ไม่งั้นเลขหายไปเงียบ ๆ แล้วคนถามว่า
+   * "ทั้งหมด 30 · LBD 20 ที่เหลือไปไหน" (เกิดจริง 15 ก.ย. 2569)
+   */
+  no_bu?: { apptToday: number; followToday: number };
 };
 
 export async function fetchHomeKpis(bu?: string | null): Promise<HomeKpisResponse> {

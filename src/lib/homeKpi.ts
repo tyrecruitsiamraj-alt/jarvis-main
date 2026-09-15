@@ -78,8 +78,17 @@ export type KpiCard = {
 
 const META: Record<KpiKey, { label: string; unit: string; isRate: boolean; href: string }> = {
   newRequests: { label: 'ใบขอเข้าใหม่วันนี้', unit: 'ใบ', isRate: false, href: '/jobs/list' },
-  apptToday: { label: 'นัดถึงกำหนดวันนี้', unit: 'นัด', isRate: false, href: '/follow' },
-  followToday: { label: 'Follow ต้องโทรวันนี้', unit: 'ราย', isRate: false, href: '/follow' },
+  /**
+   * 🔴 **สองใบนี้เคยชื่อกำกวมจนเจ้าของถามว่าคืออะไร** (15 ก.ย. 2569:
+   * *"นัดถึงกำหนดวันนี้คืออะไร หมายความว่าอะไร ไม่เข้าใจงง"*)
+   *
+   * ต่างกันที่ **ช่วงเวลา** ไม่ใช่เรื่องที่นับ:
+   * · `apptToday` = สายติดตามที่ **นัดไว้ว่าจะโทรวันนี้** (เฉพาะวันนี้)
+   * · `followToday` = สายที่ **ถึงกำหนดแล้วยังไม่มีผล รวมของค้างจากวันก่อน**
+   * ⇒ ชื่อต้องบอกความต่างนั้นตรง ๆ ไม่ใช่ใช้คำว่า "วันนี้" ทั้งคู่แล้วให้คนเดา
+   */
+  apptToday: { label: 'นัดโทรวันนี้', unit: 'ราย', isRate: false, href: '/follow' },
+  followToday: { label: 'ค้างต้องโทร (รวมของเก่า)', unit: 'ราย', isRate: false, href: '/follow' },
   newApplicants: { label: 'ผู้สมัครใหม่วันนี้', unit: 'คน', isRate: false, href: '/recruit/rm' },
   callResults: { label: 'ผลโทรกลับวันนี้', unit: 'สาย', isRate: false, href: '/recruit/rm?tab=calls' },
   interested: { label: 'ตอบว่าสนใจวันนี้', unit: 'คน', isRate: false, href: '/recruit/rm?bucket=interested' },
