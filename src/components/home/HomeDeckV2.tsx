@@ -16,13 +16,12 @@
  * **ต่างจากของเดิมตรงไหน (คือ "การรื้อ"):**
  *   - ผืนขาวเรียบ ไม่มีกริดจุด/เส้นเรือง/มุมวงเล็บ · ไม่มีป้าย mono ช่องไฟกว้าง
  *   - แถบหัวพูดภาษาคน: "งานถัดไปของคุณ" + "อัปเดตล่าสุด HH:MM" (แทน "สถานะสด")
- *   - วงตัวเลขบางลง อยู่ขวามือคู่กับหุ่นยนต์ · หัวข้องานเป็นพระเอกฝั่งซ้าย
+ *   - วงตัวเลขบางลง · หัวข้องานเป็นพระเอกฝั่งซ้าย
  *   - สายพานเป็นแถวเดียวคั่นเส้นบาง ขั้นปัจจุบันเป็นเบอร์กันดี
  */
 import * as React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ListChecks } from 'lucide-react';
-import { useReducedMotion } from 'framer-motion';
 
 import { Button } from '@/components/ui/button';
 import { Sheet2, SheetHead2, Rule2 } from '@/components/shared/ui-v2/Sheet2';
@@ -68,26 +67,10 @@ const DeckStamp: React.FC = () => {
 };
 
 /**
- * หุ่นยนต์ผู้ช่วย — ไฟล์เดียวกับของเดิม (พื้นหลังถูกลบออกจากตัวไฟล์แล้ว)
- *
- * 🔴 **เคารพ "ลดการเคลื่อนไหว" เหมือน v1** (คืนของหาย-4 จาก audit 7 ก.ย. 2569)
- * `/robot-mascot.webp` เป็นภาพ **เคลื่อนไหว** · โฉมใหม่ฝังตรง ๆ ไม่เช็กอะไรเลย
- * ⇒ คนที่ตั้งค่าเครื่องว่า "ลดการเคลื่อนไหว" ยังเห็นมันขยับอยู่ดี
- * ของเดิม (`CommandDeck.tsx`) สลับเป็นภาพนิ่ง `/robot-mascot.png` ให้อยู่แล้ว
- * ⚠️ โฉมใหม่ตั้งใจ **ไม่มีท่าลอยขึ้นลง** อยู่แล้ว (กฎ perf: ห้ามแอนิเมชันวนไม่จบ)
- * ที่คืนคือการสลับไฟล์ภาพ ไม่ใช่คืนท่าลอย
+ * 🔴 **หุ่นยนต์ถูกถอดออกจากหน้าแรก** (เจ้าของสั่ง 15 ก.ย. 2569: *"หน้าแรกเอาหุ่นยนต์ออกให้หน่อย"*)
+ * ไฟล์ภาพ `public/robot-mascot.webp` / `.png` **ยังอยู่** — ถอดเฉพาะการแสดงผล
+ * อยากได้กลับให้ใส่ `<img>` คืน ไม่ต้องไปหาไฟล์ใหม่
  */
-const Mascot: React.FC = () => {
-  const reduceMotion = useReducedMotion();
-  return (
-    <img
-      src={reduceMotion ? '/robot-mascot.png' : '/robot-mascot.webp'}
-      alt=""
-      aria-hidden
-      className="pointer-events-none hidden w-[132px] select-none xl:block"
-    />
-  );
-};
 
 const HomeDeckV2: React.FC<{
   greeting: string;
@@ -111,7 +94,7 @@ const HomeDeckV2: React.FC<{
           แถวหัวจึงอ่านได้ครบเรื่อง: **อยู่ที่ไหน** → **ผืนนี้คือเรื่องอะไร** → **สดแค่ไหน** */}
       <SheetHead2 brand="SO RECRUIT" eyebrow="งานถัดไปของคุณ" stamp={<DeckStamp />} />
 
-      {/* ── หัวเรื่องงาน + วงตัวเลข + หุ่นยนต์ ── */}
+      {/* ── หัวเรื่องงาน + วงตัวเลข ── */}
       <div className="flex flex-wrap items-center gap-8 px-6 pb-7 pt-5 lg:px-8">
         {/*
          * วงตัวเลข "ต้องลงมือ" — บางลง ไม่หมุน ไม่เรือง
@@ -193,7 +176,6 @@ const HomeDeckV2: React.FC<{
           )}
         </div>
 
-        <Mascot />
       </div>
 
       {/* ── แผนที่สายพาน — บอกตำแหน่ง ไม่ใช่แถบความคืบหน้า (กติกาเดิม ห้ามติ๊กถูก) ── */}
