@@ -631,7 +631,9 @@ const TeamBoardPanel: React.FC<{
             onResults={onOpenCallResults}
             onWaiting={onOpenActiveCalls}
           />
-          {/* 🔴 Success Rate — ฐานคือ "คนที่รับสาย" ไม่ใช่สายทั้งหมด (เจ้าของสั่ง 4 ก.ย. 2569)
+          {/* 🔴 Success Rate — ฐานคือ "สายที่ได้คุยจริง" ไม่ใช่สายทั้งหมด (เจ้าของสั่ง 4 ก.ย.
+              2569 · เปลี่ยนตัวตั้ง/ฐาน 15 ก.ย. 2569 ให้ตรงกับหน้าติดตาม: ตัวตั้งคือคนที่
+              **พูดว่าตอบรับจริง** อ่านจากบทสนทนา ไม่ใช่รหัส `confirmed` ของ Lumos)
               ต้องเขียนฐานกำกับ ไม่งั้นอ่านสลับกับ % สำเร็จบนแดชบอร์ดที่ฐานกว้างกว่า
               ⚠️ ไม่มีใครรับสาย = ขีด ห้ามโชว์ 0%
               🔴 เขียน **ช่วงวันที่จริง** ของสายที่นับด้วย (7 ก.ย. 2569) — "7 วันล่าสุด"
@@ -646,7 +648,7 @@ const TeamBoardPanel: React.FC<{
               <span className={cn('text-[11px]', T.mut)}>
                 {successRate?.pct == null
                   ? 'ยังไม่มีใครรับสาย'
-                  : `จากคนที่รับสาย ${successRate.connected.toLocaleString('th-TH')} สาย`}
+                  : `จากสายที่ได้คุยจริง ${successRate.connected.toLocaleString('th-TH')} สาย`}
               </span>
             </span>
             {successRateRange ? (

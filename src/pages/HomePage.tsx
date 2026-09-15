@@ -333,7 +333,9 @@ const HomePage: React.FC = () => {
         const trend = compareCallRate(d.series, 7, bangkokTodayYmd());
         setSuccessRate({
           pct: trend.current.successRatePct,
-          connected: trend.current.connected,
+          // 🔴 ฐานของ Success Rate = **สายที่ได้คุยจริง** ไม่ใช่ "คนที่รับสาย"
+          // (15 ก.ย. 2569 — ต้องตรงกับตัวหารที่ใช้คำนวณจริง ไม่งั้นจอโชว์ฐานผิด)
+          connected: trend.current.talked,
           // ช่วงจริงที่ % นี้นับ — จอเขียนกำกับ ไม่ใช่ให้คนเดาเองว่า "7 วันล่าสุด" คือวันไหน
           fromYmd: trend.current.fromYmd,
           toYmd: trend.current.toYmd,

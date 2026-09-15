@@ -274,7 +274,7 @@ const LumosCallRatePanel: React.FC = () => {
     if (currentWin.confirmedPct !== null) parts.push(`สำเร็จ ${currentWin.confirmedPct}%`);
     // Success Rate = คนที่รับสายแล้วปิดได้กี่ % (ฐานแคบกว่า จึงต้องมีคำกำกับเสมอ)
     if (currentWin.successRatePct !== null)
-      parts.push(`Success Rate ${currentWin.successRatePct}% (จากคนที่รับสาย)`);
+      parts.push(`Success Rate ${currentWin.successRatePct}% (จากสายที่ได้คุยจริง)`);
     if (trend?.volumeDir === 'up') parts.push('ปริมาณโตขึ้น');
     else if (trend?.volumeDir === 'down') parts.push('ปริมาณลดลง');
     // งานค้างต้องโผล่บนหัวแผงด้วย — หุบแผงอยู่ก็ต้องเห็นว่ามีของค้าง (ห้ามเงียบ)
@@ -425,15 +425,18 @@ const LumosCallRatePanel: React.FC = () => {
                   tone="success"
                   sub="ตอบยืนยัน/สนใจ — % จากสายที่มีผลทั้งหมด"
                 />
-                {/* 🔴 **Success Rate — ฐานคือคนที่รับสาย** (เจ้าของสั่ง 4 ก.ย. 2569)
+                {/* 🔴 **Success Rate — ฐานคือสายที่ได้คุยจริง** (เจ้าของสั่ง 4 ก.ย. 2569
+                    · เปลี่ยนตัวตั้ง 15 ก.ย. 2569)
                     ตอบคำถาม *"พอได้คุยกับคนแล้ว ปิดได้กี่ %"* ต่างจากช่อง "สำเร็จ" ข้าง ๆ
-                    ที่ฐานเป็นสายทั้งหมด ⇒ ต้องเขียนฐานกำกับทั้งสองช่อง ไม่งั้นอ่านสลับกัน */}
+                    ที่ฐานเป็นสายทั้งหมด ⇒ ต้องเขียนฐานกำกับทั้งสองช่อง ไม่งั้นอ่านสลับกัน
+                    ⚠️ ตัวตั้งคือ **คนที่พูดว่าตอบรับจริง** (อ่านจากบทสนทนา) ไม่ใช่รหัส
+                    `confirmed` ของ Lumos — รหัสนั้นตกคนที่พูดว่า "ใช่ครับ" หายไปครึ่งหนึ่ง */}
                 <StatBox
                   label="Success Rate"
-                  value={trend.current.confirmed}
+                  value={trend.current.saidYes}
                   pct={trend.current.successRatePct}
                   tone="success"
-                  sub={`% จากคนที่รับสาย ${fmtN(trend.current.connected)} สาย`}
+                  sub={`% จากสายที่ได้คุยจริง ${fmtN(trend.current.talked)} สาย`}
                 />
                 <StatBox
                   label="ปฏิเสธ"

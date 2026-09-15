@@ -18,6 +18,7 @@ import {
   CONNECTED_CALL_OUTCOMES,
   UNREACHED_CALL_OUTCOMES,
 } from '../../src/lib/callOutcomeBuckets.js';
+import { classifyCallMicro, vocabForPersonRef } from '../../src/lib/callMicroOutcome.js';
 import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { listNeedsHumanQueueItems } from '../_lib/callFollowup.js';
@@ -427,6 +428,20 @@ export type CallRateDay = {
   declined: number;
   /** โทรแล้วไม่ถึงตัว (ไม่รับ/ไม่ว่าง/ไม่ตอบ/โทรไม่สำเร็จ) */
   unreached: number;
+  /**
+   * 🔴 **สองช่องนี้มาจากการ "อ่านคำที่เขาพูด" ไม่ใช่รหัสของ Lumos**
+   * (เจ้าของสั่ง 15 ก.ย. 2569 ให้ทุกจอใช้นิยามเดียวกับหน้าติดตาม)
+   *
+   * `confirmed` ข้างบนนับเฉพาะรหัส `confirmed` ⇒ คนที่พูดว่า *"ใช่ครับ เตรียมตัวแล้ว"*
+   * แต่ Lumos ลงรหัสเป็น `acknowledged` **ไม่เคยถูกนับเป็นสำเร็จเลย**
+   * (วัดจริง 15 ก.ย.: หน้าแรกขึ้น ~55% ขณะที่ความจริงคือ 97%)
+   *
+   * ⇒ `saidYes ÷ talked` คือ Success Rate ตัวจริง · นิยามอยู่ที่
+   * `src/lib/callMicroOutcome.ts` **ที่เดียว** ใช้ร่วมกันทุกเลนการโทร
+   */
+  saidYes: number;
+  /** ได้คุยเรื่องของเราจริง (ไม่รวมไม่รับสาย/ไม่ใช่เจ้าตัว/รับแล้วเงียบ) — ฐานของ Success Rate */
+  talked: number;
 };
 
 /**
@@ -499,40 +514,77 @@ async function loadDailySeries(days: number, source: CallFunnelSource): Promise<
   const outcome = queueOutcome('q');
   const cancelled = queueCancelled('q');
   try {
+    /**
+     * 🔴 ดึง **รายแถว** ไม่ใช่ aggregate อย่างเดียว — เพราะ Success Rate ตัวจริง
+     * ต้องอ่านสรุป/บทสนทนาของแต่ละสาย (รหัส `acknowledged` ของ Lumos ปนทั้งไปและไม่ไป)
+     * ปริมาณเล็ก (หลักสิบต่อวัน) จึงจัดถังฝั่ง Node ได้สบาย ไม่ต้องยัดตรรกะลง SQL
+     */
     const { rows } = await dbQuery<{
       day: string;
-      queued: string;
-      cancelled: string;
-      with_result: string;
-      connected: string;
-      confirmed: string;
-      declined: string;
-      unreached: string;
+      person_ref: string | null;
+      outcome: string | null;
+      cancelled: boolean;
+      summary: string | null;
+      reply: string | null;
     }>(
       `select to_char(q.created_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD') as day,
-              count(*)::text as queued,
-              count(*) filter (where ${cancelled})::text as cancelled,
-              count(*) filter (where ${outcome} is not null and not ${cancelled})::text as with_result,
-              count(*) filter (where ${outcome} in ('confirmed','acknowledged','declined','reschedule_requested') and not ${cancelled})::text as connected,
-              count(*) filter (where ${outcome} = 'confirmed' and not ${cancelled})::text as confirmed,
-              count(*) filter (where ${outcome} = 'declined' and not ${cancelled})::text as declined,
-              count(*) filter (where ${outcome} in ('no_answer','busy','unresponsive','failed') and not ${cancelled})::text as unreached
+              q.person_ref,
+              ${outcome} as outcome,
+              ${cancelled} as cancelled,
+              q.result->>'summary' as summary,
+              (select string_agg(btrim(x.t->>'text'), ' · ')
+                 from jsonb_array_elements(coalesce(q.result->'transcript', '[]'::jsonb)) x(t)
+                where x.t->>'role' = 'candidate'
+                  and coalesce(btrim(x.t->>'text'), '') <> '') as reply
          from ${queueTable} q
-        where ${conds.join(' and ')}
-        group by 1
-        order by 1`,
+        where ${conds.join(' and ')}`,
       params,
     );
-    return rows.map((r) => ({
-      day: r.day,
-      queued: Number(r.queued) || 0,
-      cancelled: Number(r.cancelled) || 0,
-      withResult: Number(r.with_result) || 0,
-      connected: Number(r.connected) || 0,
-      confirmed: Number(r.confirmed) || 0,
-      declined: Number(r.declined) || 0,
-      unreached: Number(r.unreached) || 0,
-    }));
+
+    const mk = (day: string): CallRateDay => ({
+      day,
+      queued: 0,
+      cancelled: 0,
+      withResult: 0,
+      connected: 0,
+      confirmed: 0,
+      declined: 0,
+      unreached: 0,
+      saidYes: 0,
+      talked: 0,
+    });
+    const byDay = new Map<string, CallRateDay>();
+    for (const r of rows) {
+      const d = byDay.get(r.day) ?? mk(r.day);
+      byDay.set(r.day, d);
+      d.queued += 1;
+      if (r.cancelled) {
+        d.cancelled += 1;
+        continue;
+      }
+      const oc = (r.outcome ?? '').trim();
+      if (oc === '') continue;
+      d.withResult += 1;
+      if (CONNECTED_OUTCOMES.includes(oc)) d.connected += 1;
+      if (oc === 'confirmed') d.confirmed += 1;
+      if (oc === 'declined') d.declined += 1;
+      if (UNREACHED_OUTCOMES.includes(oc)) d.unreached += 1;
+      // ── ถังที่อ่านจากคำพูดจริง · คลังคำเลือกตามเลนของสายนั้น (follow / ถามความสนใจ) ──
+      const bucket = classifyCallMicro(
+        { outcome: oc, summary: r.summary, reply: r.reply },
+        vocabForPersonRef(r.person_ref),
+      );
+      if (
+        bucket &&
+        bucket !== 'no_pickup' &&
+        bucket !== 'wrong_person' &&
+        bucket !== 'picked_silent'
+      ) {
+        d.talked += 1;
+        if (bucket === 'said_yes') d.saidYes += 1;
+      }
+    }
+    return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
   } catch (e) {
     // ตาราง/คอลัมน์ยังไม่ migrate → ซีรีส์ว่าง แผงโชว์ "ยังไม่มีข้อมูล" ไม่พัง
     if (isPgUndefinedTable(e) || isUndefinedColumn(e)) return [];

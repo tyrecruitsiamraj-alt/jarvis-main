@@ -54,6 +54,8 @@ describe('lumosCallRate — สรุปช่วง', () => {
      * 🔴 **Success Rate ฐานคือคนที่รับสาย** (เจ้าของสั่ง 4 ก.ย. 2569)
      * 2 สำเร็จ จาก 3 คนที่รับสาย = 67% — **คนละตัวกับ `confirmedPct` (5%)**
      * ที่ฐานเป็นสายทั้งหมด · เอาสองตัวนี้สลับกันเมื่อไหร่ เลขบนจอโกหกทันที
+     *
+     * ⚠️ ซีรีส์ชุดนี้เป็นของ **API รุ่นเก่า** (ไม่มี `saidYes`/`talked`) ⇒ ต้องถอยไปสูตรเดิม
      */
     expect(w.successRatePct).toBe(67);
   });
@@ -162,5 +164,57 @@ describe('lumosCallRate — ปฏิทิน', () => {
     expect(ymdAddDays('2026-09-03', -6)).toBe('2026-08-28');
     expect(ymdAddDays('2026-01-01', -1)).toBe('2025-12-31');
     expect(ymdAddDays('2026-08-31', 1)).toBe('2026-09-01');
+  });
+});
+
+
+/**
+ * ═══ Success Rate ต้องใช้ผลที่อ่านจากคำพูด (เจ้าของสั่ง 15 ก.ย. 2569) ═══
+ *
+ * เจ้าของจับได้ว่าหน้าแรกกับหน้าติดตามให้เลขคนละตัว — เพราะหน้าแรกนับเฉพาะรหัส
+ * `confirmed` ส่วน `acknowledged` (ซึ่งมีคนที่พูดว่า "ใช่ครับ เตรียมตัวแล้ว" อยู่เต็ม)
+ * ถูกใส่ไว้ในตัวหารอย่างเดียว ⇒ เลขต่ำปลอม
+ */
+describe('Success Rate — นิยามใหม่จากคำพูดจริง', () => {
+  it('🔴 มี saidYes/talked ⇒ ใช้คู่นั้น ไม่ใช่ confirmed/connected', () => {
+    const w = summarizeCallRateWindow(
+      [
+        day('2026-09-15', {
+          queued: 10,
+          withResult: 10,
+          connected: 9,
+          confirmed: 2, // รหัสจาก Lumos — ต่ำปลอม
+          saidYes: 8, // ของจริงจากบทสนทนา
+          talked: 9,
+        }),
+      ],
+      '2026-09-15',
+      '2026-09-15',
+    );
+    expect(w.successRatePct).toBe(89); // 8/9 ไม่ใช่ 2/9 = 22
+    expect(w.saidYes).toBe(8);
+    expect(w.talked).toBe(9);
+  });
+
+  it('🔴 ซีรีส์ผสม (บางวันเก่า บางวันใหม่) ⇒ ถอยไปสูตรเดิมทั้งก้อน ห้ามผสมสองนิยาม', () => {
+    const w = summarizeCallRateWindow(
+      [
+        day('2026-09-14', { queued: 4, withResult: 4, connected: 4, confirmed: 4 }), // เก่า
+        day('2026-09-15', { queued: 4, withResult: 4, connected: 4, confirmed: 0, saidYes: 4, talked: 4 }),
+      ],
+      '2026-09-14',
+      '2026-09-15',
+    );
+    // confirmed 4 ÷ connected 8 = 50% — ไม่ใช่ 8/4 หรือเลขผสมที่อธิบายไม่ได้
+    expect(w.successRatePct).toBe(50);
+  });
+
+  it('ได้คุย 0 สาย ⇒ null ไม่ใช่ 0%', () => {
+    const w = summarizeCallRateWindow(
+      [day('2026-09-15', { queued: 3, withResult: 3, unreached: 3, saidYes: 0, talked: 0 })],
+      '2026-09-15',
+      '2026-09-15',
+    );
+    expect(w.successRatePct).toBeNull();
   });
 });

@@ -191,7 +191,8 @@ describe('ธงงานค้างของ "รอโทร"', () => {
 describe('Success Rate ต้องบอกช่วงวันที่ของสายที่นับ', () => {
   it('มีช่วงวันที่ ⇒ เขียนกำกับใต้ตัวเลข', () => {
     renderPanel({ successRate: { pct: 42, connected: 12, fromYmd: '2026-09-01', toYmd: '2026-09-07' } });
-    expect(screen.getByText('จากคนที่รับสาย 12 สาย')).toBeTruthy();
+    // 🔴 ฐานเปลี่ยนเป็น "สายที่ได้คุยจริง" 15 ก.ย. 2569 — ตัวหารเดียวกับหน้าติดตาม
+    expect(screen.getByText('จากสายที่ได้คุยจริง 12 สาย')).toBeTruthy();
     expect(screen.getByText(/นับจากสายที่ส่งเข้า .*1 ก\.ย\..*7 ก\.ย\./)).toBeTruthy();
   });
 

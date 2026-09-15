@@ -23,6 +23,14 @@ export type CallRateDay = {
   confirmed: number;
   declined: number;
   unreached: number;
+  /**
+   * 🔴 **ตอบรับจริง ÷ ได้คุยจริง — อ่านจากคำพูด ไม่ใช่รหัสของ Lumos**
+   * (เจ้าของสั่ง 15 ก.ย. 2569) · API รุ่นเก่ายังไม่ส่งสองช่องนี้มา ⇒ เป็น optional
+   * และตัวสรุปจะถอยไปใช้สูตรเดิมให้อัตโนมัติ
+   */
+  saidYes?: number;
+  /** ฐานของ Success Rate ตัวจริง — สายที่ได้คุยเรื่องของเรา */
+  talked?: number;
 };
 
 /**
@@ -79,6 +87,10 @@ export type CallRateWindow = {
   confirmed: number;
   declined: number;
   unreached: number;
+  /** ตอบรับจริง (อ่านจากคำพูด) — ตัวตั้งของ Success Rate */
+  saidYes: number;
+  /** ได้คุยเรื่องของเราจริง — ฐานของ Success Rate */
+  talked: number;
   /** % จากฐานสายที่มีผลจริง — null เมื่อไม่มีฐาน (จอต้องเขียน "ยังไม่มีผล" ไม่ใช่ 0%) */
   connectedPct: number | null;
   confirmedPct: number | null;
@@ -154,14 +166,19 @@ export function summarizeCallRateWindow(
     confirmed: 0,
     declined: 0,
     unreached: 0,
+    saidYes: 0,
+    talked: 0,
     connectedPct: null,
     confirmedPct: null,
     successRatePct: null,
     declinedPct: null,
     unreachedPct: null,
   };
+  /** มีช่องจากการอ่านคำพูดครบไหม — ขาดแม้แถวเดียวถือว่าไม่มี (ห้ามผสมสองนิยาม) */
+  let hasMicro = true;
   for (const d of series) {
     if (d.day < fromYmd || d.day > toYmd) continue;
+    if (d.saidYes == null || d.talked == null) hasMicro = false;
     const sent = Math.max(d.queued - d.cancelled, 0);
     w.sent += sent;
     w.cancelled += d.cancelled;
@@ -171,6 +188,8 @@ export function summarizeCallRateWindow(
     w.confirmed += d.confirmed;
     w.declined += d.declined;
     w.unreached += d.unreached;
+    w.saidYes += d.saidYes ?? 0;
+    w.talked += d.talked ?? 0;
   }
   w.connectedPct = pctOf(w.connected, w.withResult);
   w.confirmedPct = pctOf(w.confirmed, w.withResult);
@@ -184,7 +203,17 @@ export function summarizeCallRateWindow(
    * ส่วนตัวนี้ตัดสายที่ไม่ได้คุยออก เลยตอบว่า *"พอได้คุยกับคนแล้ว ปิดได้กี่ %"*
    * ⇒ เลขนี้จะสูงกว่าเสมอ · **ห้ามเอาสองตัวนี้มาสลับกันใช้** ต้องเขียนฐานกำกับบนจอทุกที่
    */
-  w.successRatePct = pctOf(w.confirmed, w.connected);
+  /**
+   * 🔴 **Success Rate ใช้ผลที่อ่านจากคำพูด ไม่ใช่รหัส `confirmed` เดี่ยว ๆ**
+   * (เจ้าของทัก 15 ก.ย. 2569 ว่าหน้าแรกกับหน้าติดตามให้เลขคนละตัว)
+   *
+   * รหัส `acknowledged` ของ Lumos ปนทั้งคนที่บอกว่าไปและคนที่บอกว่ายังไม่ไป
+   * ⇒ นับเฉพาะ `confirmed` = ต่ำปลอม (วัดจริง 55% ทั้งที่ความจริง 97%)
+   * ⚠️ API รุ่นเก่าไม่มีช่องนี้ ⇒ ถอยไปสูตรเดิมทั้งก้อน **ห้ามผสมสองนิยามในหน้าต่างเดียว**
+   */
+  w.successRatePct = hasMicro
+    ? pctOf(w.saidYes, w.talked)
+    : pctOf(w.confirmed, w.connected);
   w.declinedPct = pctOf(w.declined, w.withResult);
   w.unreachedPct = pctOf(w.unreached, w.withResult);
   return w;
