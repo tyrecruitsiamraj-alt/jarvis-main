@@ -75,13 +75,29 @@ describe('ทุกเลขบนหน้าแรกต้องอธิบ�
     }
   });
 
-  it('metricHelp รวมนิยาม+ขอบเขต+ปลายทางไว้ก้อนเดียว และเตือนเมื่อปลายทางยังไม่มีเลข', () => {
+  /**
+   * 🔴 **เขียนให้เหมือนคนพูด** (เจ้าของสั่ง 15 ก.ย. 2569: *"ไม่เอาภาษา AI"*)
+   * ของเดิมต่อเป็นสามบรรทัดมีหัวข้อกำกับแบบเอกสารระบบ — เปลี่ยนเป็นประโยคเดียว
+   * ขอบเขตอยู่ในวงเล็บ ปลายทางขึ้นบรรทัดใหม่ด้วยลูกศร
+   */
+  it('metricHelp บอกครบทั้งนิยาม ขอบเขต ปลายทาง โดยไม่ต้องมีหัวข้อกำกับ', () => {
     const withScope = metricHelp('online.unreleased');
-    expect(withScope).toContain('ขอบเขต:');
-    expect(withScope).toContain('กดแล้วไปที่:');
-    expect(metricHelp('closing.queue_pending')).toContain('⚠ เลขนี้ยังไม่มีบนหน้าปลายทาง');
+    expect(withScope).toContain('(นับเฉพาะใบขอที่ยังเปิดอยู่)');
+    expect(withScope).toContain('→ ');
+    expect(metricHelp('closing.queue_pending')).toContain('ยังหาเลขนี้ในหน้าปลายทางไม่ได้');
     // แถวอ่านอย่างเดียวไม่มีบรรทัดปลายทาง
-    expect(metricHelp('lumos.cancelled')).not.toContain('กดแล้วไปที่:');
+    expect(metricHelp('lumos.cancelled')).not.toContain('→ ');
+  });
+
+  it('🔴 ห้ามมีภาษาเอกสารระบบหรือสัญลักษณ์คุยกันเองในข้อความที่ผู้ใช้เห็น', () => {
+    for (const key of METRIC_KEYS) {
+      const help = metricHelp(key);
+      for (const bad of ['ขอบเขต:', 'กดแล้วไปที่:', '🔴', '⚠', 'TODO', 'รอเจ้าของเคาะ']) {
+        expect(help, `${key} มีคำว่า "${bad}" ซึ่งเป็นภาษาของทีม ไม่ใช่ของคนใช้งาน`).not.toContain(
+          bad,
+        );
+      }
+    }
   });
 });
 
