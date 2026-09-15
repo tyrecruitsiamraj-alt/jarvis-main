@@ -232,6 +232,24 @@ const HomePage: React.FC = () => {
   }, [bu]);
 
   /**
+   * เลขบนปุ่มสลับ BU — 🔴 **ต้องนับประชากรเดียวกับการ์ดที่มันกรอง**
+   *
+   * ของเดิมนับจากทะเบียนไซต์ทั้งก้อน (ปิด/ยกเลิกแล้วก็นับ) รวม 408 ใบ ขณะที่การ์ด
+   * "ใบขอที่ยังเปิดรับ" นับเฉพาะใบที่ยังเปิด 287 ใบ ⇒ ปุ่มเขียน LBD 263 แล้วกดเข้าไป
+   * เห็นเลขน้อยกว่านั้น คนอ่านสรุปทันทีว่า "เลขมั่ว" (บทเรียนเดิมของพจนานุกรมเมตริก:
+   * เลขไม่ตรงข้ามจุดทำลายความเชื่อถือมากกว่าศัพท์ที่ไม่รู้จัก)
+   *
+   * ⚠️ ยังไม่มี flow-summary = ถอยไปใช้ของเดิมไปก่อน ดีกว่าไม่มีปุ่มให้กด
+   */
+  const buOptions = React.useMemo(() => {
+    const open = flow?.jobs.open_by_bu;
+    if (!open) return hud?.bu_options ?? [];
+    return Object.entries(open)
+      .map(([b, v]) => ({ bu: b, count: v.open_total }))
+      .filter((o) => o.count > 0);
+  }, [flow, hud]);
+
+  /**
    * การ์ด "ใบขอที่ยังเปิดรับ" — เลือกชุดตัวเลขตาม BU ที่เลือกอยู่
    * ⚠️ BU ที่ยังไม่มีใบขอเปิดเลย = ทุกช่องเป็น 0 **ไม่ใช่ถอยไปใช้ยอดรวม**
    * (ถอยไปใช้ยอดรวมคือจอโกหกว่า BU นี้มีใบค้างอยู่ 287 ใบ)
@@ -485,7 +503,7 @@ const HomePage: React.FC = () => {
             </>
           }
           action={
-            <HomeBuFilter options={hud.bu_options} value={bu} onChange={setBu} />
+            <HomeBuFilter options={buOptions} value={bu} onChange={setBu} />
           }
         >
           <HomeKpiRow
