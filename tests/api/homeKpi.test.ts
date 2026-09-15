@@ -295,12 +295,17 @@ describe('ป้ายกำกับ followToday ต้องแยกจาก
 describe('BU ของรายการติดตาม', () => {
   const sql = readFileSync('api/_handlers/home-kpis.ts', 'utf8');
 
-  it('🔴 ใช้ coalesce(ไซต์, แผนกของคนคีย์) — เรียงไซต์ก่อน', () => {
+  /**
+   * 🔴 **เจ้าของตีตกข้อเสนอเดิมของผม** (15 ก.ย. 2569) ที่ให้ไซต์มาก่อน:
+   * *"ไม่ จะไม่ให้คีย์แทนสิ แยกกันไว้แล้วจะคีย์แทนกันทำไม นับจากคนคีย์ไปเลย"*
+   * ⇒ งานติดตามเป็นงานของแผนกที่คีย์ · ไซต์เหลือเป็นทางถอยเมื่อคนคีย์ไม่มีแผนก
+   */
+  it('🔴 ใช้ coalesce(แผนกของคนคีย์, ไซต์) — คนคีย์มาก่อน', () => {
     const m = /const FOLLOW_BU = `coalesce\(\s*([\s\S]*?)\)`/.exec(sql);
     expect(m, 'ไม่เจอนิยาม FOLLOW_BU — ถ้าย้ายที่ ให้ย้ายเทสต์ตามด้วย').toBeTruthy();
     const body = m![1];
-    expect(body.indexOf('f.site_code')).toBeGreaterThanOrEqual(0);
-    expect(body.indexOf('department_code')).toBeGreaterThan(body.indexOf('f.site_code'));
+    expect(body.indexOf('department_code')).toBeGreaterThanOrEqual(0);
+    expect(body.indexOf('f.site_code')).toBeGreaterThan(body.indexOf('department_code'));
   });
 
   it('เมตริกของเลนติดตามต้องกรองด้วย buFollow ไม่ใช่ buDirect (ไม่งั้นเลขหายเหมือนเดิม)', () => {
