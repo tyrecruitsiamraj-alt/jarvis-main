@@ -6,7 +6,21 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# ⚠️ **ลองใหม่ได้ 3 ครั้ง + ยืดเวลา/เพิ่ม retry ของ npm เอง** — เจอ EIDLETIMEOUT จริง 16 ก.ย.
+# 2569 (registry.npmjs.org ค้างกลางทาง ~355 วินาทีแล้วล้มทั้ง build) แพตเทิร์นเดียวกับที่
+# apk ล้มไปแล้วด้านล่าง (เน็ตเครื่องจริงไปต่างประเทศไม่นิ่ง ไม่ใช่ปัญหาของโค้ด/dependency)
+# ค่า default ของ npm (fetch-timeout 300000ms, fetch-retries 2) แคบไปสำหรับเน็ตนี้
+RUN npm config set fetch-timeout 600000 && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000
+RUN ok=0; \
+    for i in 1 2 3; do \
+      if npm ci; then ok=1; break; fi; \
+      echo "npm ci ล้มรอบที่ $i — รอ 15 วินาทีแล้วลองใหม่"; \
+      sleep 15; \
+    done; \
+    [ "$ok" = "1" ]
 
 COPY . .
 
