@@ -6,6 +6,7 @@ import {
 import { azureAuthSuccessRedirect } from './azureAdAuth.js';
 import type { ApiReq, ApiRes } from './http.js';
 import { auditFromAnonymous } from './audit.js';
+import { logLoginEvent } from './monitorClient.js';
 
 export type AuthUserRow = {
   id: string;
@@ -60,6 +61,7 @@ export async function issueAuthSession(
     entityId: row.id,
     after: { role: row.role },
   });
+  logLoginEvent(row, auditAction);
   res.status(200).json({ user: toUserResponse(row) });
 }
 
@@ -87,6 +89,7 @@ export async function issueAuthSessionRedirect(
     entityId: row.id,
     after: { role: row.role },
   });
+  logLoginEvent(row, auditAction);
 
   return azureAuthSuccessRedirect(returnTo);
 }
