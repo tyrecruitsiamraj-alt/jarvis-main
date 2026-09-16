@@ -33,13 +33,17 @@ import {
   queueActive,
   queueCancelled,
   queueHasResult,
+  queueOutcome,
   queuePending,
   queueStalePending,
   queueWaiting,
 } from '../_lib/lumosQueueDefs.js';
+import { classifyCallMicro, vocabForPersonRef } from '../../src/lib/callMicroOutcome.js';
+import { logWarn } from '../_lib/logger.js';
 import type {
   BoardTeams,
   LaneCounts,
+  LaneResults,
   LumosTeamStats,
   OnlineTeamStats,
   RecruitTeamStats,
@@ -66,6 +70,7 @@ const QUEUE_ACTIVE = queueActive('');
 const QUEUE_PENDING = queuePending('');
 const QUEUE_WAITING = queueWaiting('');
 const QUEUE_HAS_RESULT = queueHasResult('');
+const QUEUE_OUTCOME = queueOutcome('q');
 /**
  * "รอโทร" ที่ค้างนานเกินไป — เกณฑ์ 2 วัน **ตัวเดียวกับคิวงานหน้าแรก**
  * (`matching-flow-summary` ใช้ `queueStalePending("'2 days'")` อยู่แล้ว ห้ามตั้งเกณฑ์ที่สอง)
@@ -208,6 +213,7 @@ async function loadLumosTeam(): Promise<LumosTeamStats> {
     waiting: 0,
     done: 0,
     cancelled: 0,
+    results: null,
   });
   const lanes: LumosTeamStats = { public: mk(), match: mk(), follow: mk() };
   for (const r of rows) {
@@ -220,6 +226,71 @@ async function loadLumosTeam(): Promise<LumosTeamStats> {
     lane.done = r.done;
     lane.cancelled = r.cancelled;
   }
+
+  /**
+   * ═══ ผลจริงของสายที่คุยจบแล้ว (เจ้าของสั่ง 16 ก.ย. 2569: *"เอาผลละเอียดมาดี้"*) ═══
+   *
+   * `done` บอกแค่ "รู้ผลแล้ว" ซึ่งเป็นกล่องตัน — ต้องบอกต่อว่า **ผลคืออะไร**
+   * ⚠️ ต้องอ่านคำที่เขาพูด ไม่ใช่รหัสของ Lumos (`acknowledged` ปนทั้งไปและไม่ไป)
+   * ⚠️ ล้มต้องไม่ทำให้ทั้งบอร์ดล้ม — อ่านไม่ได้ก็ปล่อย `results` เป็น null
+   *    แล้วจอจะไม่วาดแถวผล (ห้ามวาด 0 ปลอมให้คนคิดว่าไม่มีใครตอบรับเลย)
+   */
+  try {
+    const { rows: detail } = await dbQuery<{
+      lane: string;
+      person_ref: string;
+      outcome: string | null;
+      summary: string | null;
+      reply: string | null;
+    }>(
+      `select case
+                when q.job_ref = 'follow' or q.person_ref like 'follow-%' then 'follow'
+                when q.person_ref like 'app-%' then 'public'
+                when q.person_ref like 'card-%' or q.person_ref like 'ir-%' then 'match'
+                else 'other'
+              end as lane,
+              q.person_ref,
+              ${QUEUE_OUTCOME} as outcome,
+              q.result->>'summary' as summary,
+              (select string_agg(btrim(x.t->>'text'), ' · ')
+                 from jsonb_array_elements(coalesce(q.result->'transcript', '[]'::jsonb)) x(t)
+                where x.t->>'role' = 'candidate'
+                  and coalesce(btrim(x.t->>'text'), '') <> '') as reply
+         from ${queueTable} q
+        where ${QUEUE_ACTIVE} and ${QUEUE_HAS_RESULT}`,
+    );
+    const mkResults = (): LaneResults => ({
+      yes: 0,
+      no: 0,
+      notYet: 0,
+      unclear: 0,
+      noPickup: 0,
+      wrongPerson: 0,
+      silent: 0,
+    });
+    for (const d of detail) {
+      const lane = lanes[d.lane as keyof LumosTeamStats];
+      if (!lane) continue;
+      const bucket = classifyCallMicro(
+        { outcome: d.outcome, summary: d.summary, reply: d.reply },
+        vocabForPersonRef(d.person_ref),
+      );
+      if (!bucket) continue;
+      lane.results ??= mkResults();
+      if (bucket === 'said_yes') lane.results.yes += 1;
+      else if (bucket === 'said_no') lane.results.no += 1;
+      else if (bucket === 'not_yet') lane.results.notYet += 1;
+      else if (bucket === 'talked_unclear') lane.results.unclear += 1;
+      else if (bucket === 'no_pickup') lane.results.noPickup += 1;
+      else if (bucket === 'wrong_person') lane.results.wrongPerson += 1;
+      else lane.results.silent += 1;
+    }
+  } catch (e) {
+    logWarn('office-team: อ่านผลละเอียดของคิวโทรไม่ได้', {
+      reason: e instanceof Error ? e.message : String(e),
+    });
+  }
+
   return lanes;
 }
 

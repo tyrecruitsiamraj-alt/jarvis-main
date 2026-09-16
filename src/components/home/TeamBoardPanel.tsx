@@ -186,12 +186,37 @@ const GroupTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
  * เป๊ะ ๆ เสมอ (บวกได้ = คนใหม่ตรวจเองได้) · สายที่ยกเลิกแยกไปแถวของตัวเอง ไม่ใช่หายไป
  * เดิมยัดรวมใน "ทั้งหมด" ⇒ เลนหน้าสาธารณะเคยขึ้น "ทั้งหมด 1" โดยที่ทุกช่องย่อยเป็น 0
  */
+/**
+ * ═══ ผลจริงใต้ "รู้ผลแล้ว" (เจ้าของสั่ง 16 ก.ย. 2569: *"เอาผลละเอียดมาดี้"*) ═══
+ *
+ * "รู้ผลแล้ว 48" เป็นกล่องตัน — ตอบคำถามเดิมของเจ้าของไม่ได้ว่า *"รับสายแล้วไงอะ"*
+ * ⇒ กางถังผลจริงเป็นแถวลูก (เยื้องเข้า) ต่อท้าย
+ *
+ * 🔴 **คำของแต่ละเลนไม่เหมือนกัน** — เลนติดตามถามว่า *ไปทำงานไหม* · เลนอื่นถามว่า
+ * *สนใจงานไหม* ⇒ ตัวเลขใช้ชื่อกลางจาก API (`yes`/`no`/`notYet`) แล้วเลือก**คำ**ที่นี่
+ * ⚠️ โชว์เฉพาะถังที่มีของจริง — 0 ทุกวันคือบรรทัดขยะ (กติกาเดียวกับแถว "ยกเลิก")
+ */
+const RESULT_METRIC = {
+  follow: {
+    yes: 'lumos.result.went',
+    no: 'lumos.result.not_went',
+    notYet: 'lumos.result.not_ready',
+  },
+  interest: {
+    yes: 'lumos.result.interested',
+    no: 'lumos.result.not_interested',
+    notYet: 'lumos.result.thinking',
+  },
+} as const;
+
 const LaneRows: React.FC<{
   name: string;
   lane: LaneCounts | null;
+  /** คลังคำของเลนนี้ — ติดตามใช้ ไป/ไม่ไป · เลนอื่นใช้ สนใจ/ไม่สนใจ */
+  words?: keyof typeof RESULT_METRIC;
   onResults?: () => void;
   onWaiting?: () => void;
-}> = ({ name, lane, onResults, onWaiting }) => (
+}> = ({ name, lane, words = 'interest', onResults, onWaiting }) => (
   <>
     <GroupTitle>{name}</GroupTitle>
     <Row metric="lumos.total" value={lane ? lane.total : null} onPress={onResults} />
@@ -205,6 +230,32 @@ const LaneRows: React.FC<{
     ) : null}
     <Row metric="lumos.waiting" value={lane ? lane.waiting : null} alert onPress={onWaiting} />
     <Row metric="lumos.done" value={lane ? lane.done : null} onPress={onResults} />
+    {/* ── ผลจริงของสายที่คุยจบแล้ว — แถวลูกของ "รู้ผลแล้ว" ── */}
+    {lane?.results ? (
+      <>
+        {lane.results.yes > 0 ? (
+          <Row metric={RESULT_METRIC[words].yes} value={lane.results.yes} childOf onPress={onResults} />
+        ) : null}
+        {lane.results.no > 0 ? (
+          <Row metric={RESULT_METRIC[words].no} value={lane.results.no} childOf alert onPress={onResults} />
+        ) : null}
+        {lane.results.notYet > 0 ? (
+          <Row metric={RESULT_METRIC[words].notYet} value={lane.results.notYet} childOf onPress={onResults} />
+        ) : null}
+        {lane.results.unclear > 0 ? (
+          <Row metric="lumos.result.unclear" value={lane.results.unclear} childOf onPress={onResults} />
+        ) : null}
+        {lane.results.noPickup > 0 ? (
+          <Row metric="lumos.result.no_pickup" value={lane.results.noPickup} childOf alert onPress={onResults} />
+        ) : null}
+        {lane.results.wrongPerson > 0 ? (
+          <Row metric="lumos.result.wrong_person" value={lane.results.wrongPerson} childOf onPress={onResults} />
+        ) : null}
+        {lane.results.silent > 0 ? (
+          <Row metric="lumos.result.silent" value={lane.results.silent} childOf onPress={onResults} />
+        ) : null}
+      </>
+    ) : null}
     {/* ยกเลิกแล้ว: โชว์เฉพาะตอนมีจริง — 0 ทุกวันคือบรรทัดขยะ แต่ถ้ามีแล้วซ่อน = เลขหาย */}
     {lane && lane.cancelled > 0 ? (
       <Row metric="lumos.cancelled" value={lane.cancelled} />
@@ -640,6 +691,7 @@ const TeamBoardPanel: React.FC<{
           />
           <LaneRows
             name="จากหน้า Follow"
+            words="follow"
             lane={teams?.lumos?.follow ?? null}
             onResults={onOpenCallResults}
             onWaiting={onOpenActiveCalls}

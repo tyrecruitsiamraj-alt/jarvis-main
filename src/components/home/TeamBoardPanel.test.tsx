@@ -159,6 +159,7 @@ const lane = (over: Partial<LaneCounts> = {}): LaneCounts => ({
   waiting: 0,
   done: 0,
   cancelled: 0,
+  results: null,
   ...over,
 });
 
@@ -199,5 +200,49 @@ describe('Success Rate ต้องบอกช่วงวันที่ขอ
   it('ไม่รู้ช่วง ⇒ ไม่เดาให้ (ไม่มีบรรทัดช่วงวันที่)', () => {
     renderPanel({ successRate: { pct: 42, connected: 12 } });
     expect(screen.queryByText(/นับจากสายที่ส่งเข้า/)).toBeNull();
+  });
+});
+
+/**
+ * ═══ ผลจริงใต้ "รู้ผลแล้ว" (เจ้าของสั่ง 16 ก.ย. 2569: *"เอาผลละเอียดมาดี้"*) ═══
+ *
+ * 🔴 ด่านที่ห้ามหลุด:
+ * 1. เลนติดตามพูดว่า ไป/ไม่ไป · เลนอื่นพูดว่า สนใจ/ไม่สนใจ (คำถามคนละคำถาม)
+ * 2. ถังที่เป็น 0 ห้ามขึ้นบรรทัด (กติกาเดียวกับแถว "ยกเลิก")
+ * 3. ยังไม่มีผลกลับเลย ⇒ ไม่วาดแถวผล ห้ามวาด 0 ปลอม
+ */
+describe('ผลจริงของสายที่คุยจบแล้ว', () => {
+  const results = (over: Partial<NonNullable<LaneCounts['results']>> = {}) => ({
+    yes: 0,
+    no: 0,
+    notYet: 0,
+    unclear: 0,
+    noPickup: 0,
+    wrongPerson: 0,
+    silent: 0,
+    ...over,
+  });
+
+  it('🔴 เลน Follow ใช้คำว่า ไป / ไม่ไป', () => {
+    renderPanel({
+      team: teamWithLanes(lane({ total: 48, done: 48, results: results({ yes: 40, no: 3 }) })),
+    });
+    expect(screen.getByText('บอกว่าไป')).toBeTruthy();
+    expect(screen.getByText('บอกว่าไม่ไป')).toBeTruthy();
+    expect(screen.queryByText('ตอบว่าสนใจ')).toBeNull();
+  });
+
+  it('ถังที่เป็น 0 ไม่ขึ้นบรรทัด', () => {
+    renderPanel({
+      team: teamWithLanes(lane({ total: 10, done: 10, results: results({ yes: 10 }) })),
+    });
+    expect(screen.queryByText('บอกว่าไม่ไป')).toBeNull();
+    expect(screen.queryByText('ยังเตรียมตัวอยู่')).toBeNull();
+  });
+
+  it('🔴 ยังไม่มีผลกลับ ⇒ ไม่วาดแถวผลเลย (ห้าม 0 ปลอม)', () => {
+    renderPanel({ team: teamWithLanes(lane({ total: 5, pending: 5, results: null })) });
+    expect(screen.queryByText('บอกว่าไป')).toBeNull();
+    expect(screen.queryByText('ไม่รับสาย')).toBeNull();
   });
 });
