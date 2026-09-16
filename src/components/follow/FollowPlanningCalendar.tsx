@@ -169,7 +169,7 @@ const StatCard: React.FC<{
         {icon}
       </span>
     </div>
-    <p className={cn('mt-3 text-[40px] font-bold leading-none tabular-nums', TONE[tone].value)}>
+    <p className={cn('mt-3 text-[40px] font-medium leading-none tabular-nums', TONE[tone].value)}>
       {value.toLocaleString('th-TH')}
     </p>
     <p className="mt-4 border-t border-border/70 pt-2.5 text-[11px] leading-snug text-muted-foreground">
@@ -203,7 +203,7 @@ const Donut: React.FC<{ percent: number | null; caption: string }> = ({ percent,
         x="65"
         y="63"
         textAnchor="middle"
-        className="fill-foreground text-[24px] font-bold"
+        className="fill-foreground text-[24px] font-medium"
         style={{ fontVariantNumeric: 'tabular-nums' }}
       >
         {percent == null ? '—' : `${percent.toFixed(1)}%`}
@@ -226,7 +226,7 @@ const Donut: React.FC<{ percent: number | null; caption: string }> = ({ percent,
  */
 const FirstDayCard: React.FC = () => (
   <Card className={cn('rounded-2xl p-5 shadow-sm', TONE.primary.soft)}>
-    <h3 className="text-[14px] font-bold text-foreground">เริ่มใช้งานหน้านี้</h3>
+    <h3 className="text-[14px] font-medium text-foreground">เริ่มใช้งานหน้านี้</h3>
     <ol className="mt-3 space-y-2.5">
       {[
         {
@@ -248,7 +248,7 @@ const FirstDayCard: React.FC = () => (
         <li key={step.n} className="flex items-start gap-2.5">
           <span
             className={cn(
-              'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold',
+              'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-medium',
               TONE.primary.solid,
             )}
             aria-hidden
@@ -256,7 +256,7 @@ const FirstDayCard: React.FC = () => (
             {step.n}
           </span>
           <span className="min-w-0">
-            <span className="block text-[13px] font-semibold leading-snug text-foreground">
+            <span className="block text-[13px] font-medium leading-snug text-foreground">
               {step.title}
             </span>
             <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
@@ -430,7 +430,7 @@ const FollowPlanningCalendar: React.FC<{
       {/* ── หัวเรื่อง + ปุ่มทั้งหมดของหน้า (แบบอ้างอิงวางปุ่มหลักไว้มุมขวาบน) ── */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[20px] font-bold leading-tight text-foreground">ปฏิทินติดตาม</h2>
+          <h2 className="text-[20px] font-medium leading-tight text-foreground">ปฏิทินติดตาม</h2>
           <p className="mt-0.5 text-[12.5px] text-muted-foreground">
             {view === 'day' ? dayHeading(dayYmd) : monthLabel(month)}
           </p>
@@ -508,7 +508,7 @@ const FollowPlanningCalendar: React.FC<{
                   onClick={() => onSelect(today)}
                   disabled={dayYmd === today}
                   className={cn(
-                    'inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-semibold disabled:opacity-50',
+                    'inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-medium disabled:opacity-50',
                     TONE.neutral.outline,
                   )}
                 >
@@ -538,7 +538,7 @@ const FollowPlanningCalendar: React.FC<{
                   onClick={() => onMonthChange(today.slice(0, 7))}
                   disabled={month === today.slice(0, 7)}
                   className={cn(
-                    'inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-semibold disabled:opacity-50',
+                    'inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-medium disabled:opacity-50',
                     TONE.neutral.outline,
                   )}
                 >
@@ -577,7 +577,7 @@ const FollowPlanningCalendar: React.FC<{
                   {daySummary.notSent > 0 ? (
                     <span
                       className={cn(
-                        'ml-auto rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                        'ml-auto rounded-full px-2.5 py-1 text-[11px] font-medium',
                         TONE.orange.chip,
                       )}
                     >
@@ -605,15 +605,15 @@ const FollowPlanningCalendar: React.FC<{
                     <table className="min-w-full border-collapse text-left">
                       <thead>
                         <tr className={cn('border-b border-border', DASH.tableHead)}>
-                          <th className="min-w-[210px] px-4 py-2.5 text-[11px] font-semibold md:px-5">
+                          <th className="min-w-[210px] px-4 py-2.5 text-[11px] font-medium md:px-5">
                             ผู้ที่ต้องติดตาม / ติดต่อ
                           </th>
-                          <th className="hidden min-w-[130px] px-3 py-2.5 text-[11px] font-semibold lg:table-cell">หน่วยงาน</th>
-                          <th className="min-w-[110px] px-3 py-2.5 text-[11px] font-semibold">เวลานัด / รอบ</th>
-                          <th className="min-w-[140px] px-3 py-2.5 text-[11px] font-semibold">สถานะการโทร</th>
-                          <th className="min-w-[220px] px-3 py-2.5 text-[11px] font-semibold">เขาตอบว่าอะไร</th>
-                          <th className="min-w-[150px] px-3 py-2.5 text-[11px] font-semibold">เบอร์ฉุกเฉิน</th>
-                          <th className="px-3 py-2.5 text-right text-[11px] font-semibold md:px-5">จัดการ</th>
+                          <th className="hidden min-w-[130px] px-3 py-2.5 text-[11px] font-medium lg:table-cell">หน่วยงาน</th>
+                          <th className="min-w-[110px] px-3 py-2.5 text-[11px] font-medium">เวลานัด / รอบ</th>
+                          <th className="min-w-[140px] px-3 py-2.5 text-[11px] font-medium">สถานะการโทร</th>
+                          <th className="min-w-[220px] px-3 py-2.5 text-[11px] font-medium">เขาตอบว่าอะไร</th>
+                          <th className="min-w-[150px] px-3 py-2.5 text-[11px] font-medium">เบอร์ฉุกเฉิน</th>
+                          <th className="px-3 py-2.5 text-right text-[11px] font-medium md:px-5">จัดการ</th>
                         </tr>
                       </thead>
                       <tbody data-testid="day-calls">
@@ -647,7 +647,7 @@ const FollowPlanningCalendar: React.FC<{
                                   {/* วงกลมอักษรย่อ — แบบอ้างอิงใช้รูปคน ฐานเราไม่มีรูป */}
                                   <span
                                     className={cn(
-                                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-bold',
+                                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-medium',
                                       TONE[headTone].soft,
                                       TONE[headTone].value,
                                     )}
@@ -658,7 +658,7 @@ const FollowPlanningCalendar: React.FC<{
                                   <span className="min-w-0">
                                     <span
                                       className={cn(
-                                        'block truncate text-[13.5px] font-bold text-foreground',
+                                        'block truncate text-[13.5px] font-medium text-foreground',
                                         allCancelled && 'line-through',
                                       )}
                                     >
@@ -692,7 +692,7 @@ const FollowPlanningCalendar: React.FC<{
                                       <span className="min-w-0">
                                         <span
                                           className={cn(
-                                            'block text-[15px] font-bold leading-none tabular-nums text-foreground',
+                                            'block text-[15px] font-medium leading-none tabular-nums text-foreground',
                                             round.state === 'cancelled' && 'line-through',
                                           )}
                                         >
@@ -743,7 +743,7 @@ const FollowPlanningCalendar: React.FC<{
                                         {/* ป้ายสถานะ = เม็ดยากลม มีจุดสีนำหน้า (ตามแบบอ้างอิง) */}
                                         <span
                                           className={cn(
-                                            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                                            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
                                             TONE[tone].chip,
                                           )}
                                         >
@@ -761,7 +761,7 @@ const FollowPlanningCalendar: React.FC<{
                                         {failed ? (
                                           <span
                                             className={cn(
-                                              'inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold',
+                                              'inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-medium',
                                               TONE.orange.chip,
                                             )}
                                             title={
@@ -901,7 +901,7 @@ const FollowPlanningCalendar: React.FC<{
                                         : 'ดูรายละเอียดและจัดการสายนี้'
                                     }
                                     className={cn(
-                                      'inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-semibold transition-colors',
+                                      'inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-medium transition-colors',
                                       TONE.neutral.outline,
                                     )}
                                   >
@@ -960,7 +960,7 @@ const FollowPlanningCalendar: React.FC<{
                             aria-current={n === page ? 'page' : undefined}
                             onClick={() => setPage(n)}
                             className={cn(
-                              'inline-flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-[11px] font-semibold tabular-nums transition-colors',
+                              'inline-flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-[11px] font-medium tabular-nums transition-colors',
                               n === page ? 'border-primary bg-primary text-primary-foreground' : TONE.neutral.outline,
                             )}
                           >
@@ -1036,14 +1036,14 @@ const FollowPlanningCalendar: React.FC<{
                     return (
                       <tr key={row.group.key} className="border-b border-border/50 last:border-0">
                         <td className="sticky left-0 z-10 max-w-[260px] bg-card px-4 py-2 align-top md:px-5">
-                          <span className="block truncate text-[12px] font-semibold text-foreground">
+                          <span className="block truncate text-[12px] font-medium text-foreground">
                             {row.group.name}
                           </span>
                           <span className="block truncate text-[11px] text-muted-foreground">
                             {row.group.unitName || row.group.phone}
                           </span>
                           <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[10px]">
-                            <span className="font-semibold tabular-nums text-foreground">
+                            <span className="font-medium tabular-nums text-foreground">
                               {s.total} ครั้ง
                             </span>
                             {parts.map(([c, n]) => (
@@ -1084,7 +1084,7 @@ const FollowPlanningCalendar: React.FC<{
                                     >
                                       <span
                                         className={cn(
-                                          'block text-[10px] font-bold tabular-nums',
+                                          'block text-[10px] font-medium tabular-nums',
                                           r.state === 'cancelled' && 'line-through',
                                         )}
                                       >
@@ -1096,7 +1096,7 @@ const FollowPlanningCalendar: React.FC<{
                                     </span>
                                   ))}
                                   {rounds.length > 1 ? (
-                                    <span className="text-[9px] font-semibold text-primary">
+                                    <span className="text-[9px] font-medium text-primary">
                                       +{rounds.length - 1}
                                     </span>
                                   ) : null}
@@ -1119,7 +1119,7 @@ const FollowPlanningCalendar: React.FC<{
         {/* ── แผงข้างขวา ── */}
         <div className="space-y-4">
           <Card className="rounded-2xl p-5 shadow-sm">
-            <h3 className="text-[13px] font-bold text-foreground">ผลของเดือนนี้</h3>
+            <h3 className="text-[13px] font-medium text-foreground">ผลของเดือนนี้</h3>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               {monthLabel(month)}
               {roundFilter !== 'all' ? ` · เฉพาะ${roundTabLabel(roundFilter)}` : ''}
@@ -1163,7 +1163,7 @@ const FollowPlanningCalendar: React.FC<{
             <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-border/70 pt-3 text-[12px]">
               <div className={cn('rounded-xl px-2.5 py-2', TONE.neutral.soft)}>
                 <dt className="text-[11px] text-muted-foreground">มีคนรับสาย</dt>
-                <dd className="font-bold tabular-nums text-foreground">
+                <dd className="font-medium tabular-nums text-foreground">
                   {microRates.reachRate == null ? '—' : `${microRates.reachRate.toFixed(0)}%`}
                   <span className="ml-1 text-[10.5px] font-normal text-muted-foreground">
                     {monthMicro.pickedUp}/{monthMicro.withResult} สาย
@@ -1172,7 +1172,7 @@ const FollowPlanningCalendar: React.FC<{
               </div>
               <div className={cn('rounded-xl px-2.5 py-2', TONE.neutral.soft)}>
                 <dt className="text-[11px] text-muted-foreground">ได้คุยเรื่องของเรา</dt>
-                <dd className="font-bold tabular-nums text-foreground">
+                <dd className="font-medium tabular-nums text-foreground">
                   {microRates.talkRate == null ? '—' : `${microRates.talkRate.toFixed(0)}%`}
                   <span className="ml-1 text-[10.5px] font-normal text-muted-foreground">
                     {monthMicro.talked}/{monthMicro.withResult} สาย
@@ -1192,7 +1192,7 @@ const FollowPlanningCalendar: React.FC<{
                     />
                     {FOLLOW_MICRO_LABEL[k]}
                   </dt>
-                  <dd className={cn('font-semibold tabular-nums', TONE[FOLLOW_MICRO_TONE[k]].value)}>
+                  <dd className={cn('font-medium tabular-nums', TONE[FOLLOW_MICRO_TONE[k]].value)}>
                     {monthMicro[k]}
                   </dd>
                 </div>
@@ -1200,7 +1200,7 @@ const FollowPlanningCalendar: React.FC<{
               {/* ยังไม่มีผล = ยังไม่เข้าถังไหน ต้องแยกให้ชัดว่าไม่ได้อยู่ในการหาร */}
               <div className="flex items-baseline justify-between gap-2 border-t border-border/70 pt-1.5">
                 <dt className="text-muted-foreground">ยังไม่มีผลกลับ</dt>
-                <dd className="font-semibold tabular-nums text-muted-foreground">{monthNoResult}</dd>
+                <dd className="font-medium tabular-nums text-muted-foreground">{monthNoResult}</dd>
               </div>
             </dl>
 
@@ -1214,9 +1214,9 @@ const FollowPlanningCalendar: React.FC<{
           <Card className="overflow-hidden rounded-2xl shadow-sm">
             <div className="flex items-center gap-2 px-4 pt-4">
               <PhoneOff className={cn('h-4 w-4', TONE.warn.value)} aria-hidden />
-              <h3 className="text-[13px] font-bold text-foreground">ต้องตามด่วน</h3>
+              <h3 className="text-[13px] font-medium text-foreground">ต้องตามด่วน</h3>
               <span
-                className={cn('ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold', TONE.warn.chip)}
+                className={cn('ml-auto rounded-full px-2 py-0.5 text-[11px] font-medium', TONE.warn.chip)}
               >
                 {overdueAll.length}
               </span>
@@ -1225,7 +1225,7 @@ const FollowPlanningCalendar: React.FC<{
                 *"ต้องตามด่วน แล้วให้ทำอะไร"*) */}
             <p className="px-4 pb-3 pt-1 text-[11px] leading-snug text-muted-foreground">
               เลยเวลานัดแล้วยังไม่มีผลกลับ — ทั้งเดือน ไม่ใช่เฉพาะวันที่เลือก ·
-              {' '}<span className="font-semibold text-foreground">กดปุ่มโทรข้างชื่อ โทรเองได้เลย</span>
+              {' '}<span className="font-medium text-foreground">กดปุ่มโทรข้างชื่อ โทรเองได้เลย</span>
             </p>
             {overdueAll.length === 0 ? (
               <p
@@ -1247,7 +1247,7 @@ const FollowPlanningCalendar: React.FC<{
                       className="min-w-0 flex-1 text-left"
                       title="กดเพื่อดูรายละเอียดและจัดการสายนี้"
                     >
-                      <span className="block truncate text-[12.5px] font-semibold text-foreground">
+                      <span className="block truncate text-[12.5px] font-medium text-foreground">
                         {row.group.name}
                       </span>
                       <span className={cn('block text-[11px] font-medium', TONE.warn.value)}>

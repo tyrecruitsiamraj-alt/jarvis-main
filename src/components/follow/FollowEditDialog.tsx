@@ -275,7 +275,7 @@ export default function FollowEditDialog({
             {siteCode ? (
               <p className="ml-1 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <Building2 className="h-3 w-3" aria-hidden />
-                รหัสไซต์ <span className="font-mono font-semibold text-foreground">{siteCode}</span>
+                รหัสไซต์ <span className="font-mono font-medium text-foreground">{siteCode}</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -323,7 +323,7 @@ export default function FollowEditDialog({
               โชว์รอบที่มีอยู่แล้วให้เห็นก่อน จะได้ไม่ตั้งซ้อนกันเอง */}
           <div className={cn('space-y-2 rounded-xl border p-3', TONE.neutral.soft)}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
-              <span className="text-xs font-semibold text-foreground">รอบโทรของคนนี้</span>
+              <span className="text-xs font-medium text-foreground">รอบโทรของคนนี้</span>
               <span className="text-[11px] text-muted-foreground">
                 มีอยู่ {(otherRounds.length + 1).toLocaleString('th-TH')} รอบ
                 {rounds.isoTimes.length > 0
@@ -444,7 +444,7 @@ export default function FollowEditDialog({
           <button
             type="submit"
             disabled={busy}
-            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-primary px-5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-primary px-5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {busy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
             {rounds.isoTimes.length > 0

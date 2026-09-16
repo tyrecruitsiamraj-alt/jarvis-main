@@ -238,6 +238,12 @@ describe('หน้าแรกต้องไม่มีตัวหนาเ�
     'src/components/home/HomeDigestPanels.tsx',
     'src/components/shared/StatCard.tsx',
     'src/pages/HomePage.tsx',
+    // หน้าติดตาม — ไล่ตามรอบเดียวกัน 16 ก.ย. 2569
+    'src/pages/follow/FollowPage.tsx',
+    'src/components/follow/FollowPlanningCalendar.tsx',
+    'src/components/follow/FollowCallRoundsPanel.tsx',
+    'src/components/follow/CallFunnelPanel.tsx',
+    'src/components/follow/FollowCompletedPanel.tsx',
   ];
 
   it.each(FILES)('%s — ไม่มี font-bold / font-semibold', (f) => {

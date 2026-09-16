@@ -53,7 +53,7 @@ const FollowCompleteControls: React.FC<{
          * งี้จะเชื่อนายได้ไง"* — สิ่งที่อ่านว่าเป็นสถานะ จริง ๆ คือปุ่มสั่งปิดงานใบนี้)
          * คำว่า "เสร็จสิ้น" ยังอยู่ตามที่เจ้าของสั่งไว้ 18 ส.ค. 2569 แค่เติมกริยานำหน้า
          */
-        className="min-h-9 gap-1 px-3 text-[11px] font-semibold"
+        className="min-h-9 gap-1 px-3 text-[11px] font-medium"
       >
         <CheckCircle2 aria-hidden />
         {busy ? 'กำลังบันทึก…' : 'บันทึกว่าเสร็จสิ้น'}
@@ -63,7 +63,7 @@ const FollowCompleteControls: React.FC<{
 
   return (
     <div className="flex w-full flex-col gap-2 rounded-xl border border-border/70 bg-muted/30 p-2.5">
-      <p className="text-[11px] font-semibold text-foreground">ปิดงานนี้เพราะอะไร</p>
+      <p className="text-[11px] font-medium text-foreground">ปิดงานนี้เพราะอะไร</p>
       <div className="flex flex-wrap gap-1.5">
         {FOLLOW_OUTCOMES.map((o) => (
           <Button

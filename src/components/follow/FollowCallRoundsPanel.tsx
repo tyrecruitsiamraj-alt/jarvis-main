@@ -80,7 +80,7 @@ function PersonRow({ p }: { p: FollowEntry }) {
     <li className={cn('rounded-lg border px-2.5 py-2', TONE.neutral.soft)}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-xs font-semibold text-foreground">{p.recipient_name}</p>
+          <p className="truncate text-xs font-medium text-foreground">{p.recipient_name}</p>
           <p className={cn('truncate text-[11px]', DASH.muted)}>{p.topic}</p>
           {p.unit_name || p.site_code ? (
             <p className={cn('truncate text-[10px]', DASH.muted)}>
@@ -232,7 +232,7 @@ export default function FollowCallRoundsPanel({
       <Dialog open={peopleDialog != null} onOpenChange={(open) => !open && setPeopleDialog(null)}>
         <DialogContent className="flex max-h-[min(88dvh,720px)] w-[min(calc(100vw-1.25rem),34rem)] max-w-none flex-col gap-0 overflow-hidden p-0">
           <DialogHeader className="shrink-0 border-b border-border/50 px-4 pb-3 pt-4 text-left">
-            <DialogTitle className="pr-8 text-sm font-bold leading-snug">
+            <DialogTitle className="pr-8 text-sm font-medium leading-snug">
               {peopleDialog?.title ?? ''}
             </DialogTitle>
             <DialogDescription className={cn('text-[11px]', DASH.muted)}>
@@ -290,7 +290,7 @@ export default function FollowCallRoundsPanel({
         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-4">
             <GitBranch className={cn('h-5 w-5', TONE.primary.value)} aria-hidden />
-            <h2 className="text-[17px] font-bold text-foreground">ขั้นตอนของสาย (Call Pipeline)</h2>
+            <h2 className="text-[17px] font-medium text-foreground">ขั้นตอนของสาย (Call Pipeline)</h2>
             <span className="w-full text-[11.5px] leading-snug text-muted-foreground sm:w-auto sm:flex-1">
               ยังไม่มีสายในระบบ — ตารางนี้จะกางเองเมื่อมีสายแรกเข้ามา
             </span>
@@ -303,7 +303,7 @@ export default function FollowCallRoundsPanel({
         {/* หัวการ์ด: ไอคอน + ชื่อเรื่อง ซ้าย · ตัวเลือกรอบ ขวา (แบบอ้างอิงวางเป้าหมายไว้ขวา) */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-5">
           <GitBranch className={cn('h-5 w-5', TONE.primary.value)} aria-hidden />
-          <h2 className="text-[17px] font-bold text-foreground">ขั้นตอนของสาย (Call Pipeline)</h2>
+          <h2 className="text-[17px] font-medium text-foreground">ขั้นตอนของสาย (Call Pipeline)</h2>
           <span className="flex-1" />
           <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="ตัวกรองรอบ">
             <span className="text-[11px] text-muted-foreground">ดูเฉพาะ</span>
@@ -318,7 +318,7 @@ export default function FollowCallRoundsPanel({
                   onClick={() => pickRound(r)}
                   title={`ตัวกรอง — แสดงเฉพาะ${roundLabelOf(r)} (ไม่ได้สั่งโทร)`}
                   className={cn(
-                    'inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-[11px] font-semibold transition-colors',
+                    'inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-[11px] font-medium transition-colors',
                     active ? 'border-primary bg-primary text-primary-foreground' : TONE.neutral.outline,
                   )}
                 >
@@ -360,14 +360,14 @@ export default function FollowCallRoundsPanel({
                   <span className="text-[11px] font-medium text-muted-foreground">ขั้นที่ {i + 1}</span>
                   <span
                     className={cn(
-                      'flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums',
+                      'flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-medium tabular-nums',
                       tone.chip,
                     )}
                   >
                     {n.toLocaleString('th-TH')}
                   </span>
                 </span>
-                <span className={cn('mt-2 text-[14px] font-bold leading-tight', tone.value)}>
+                <span className={cn('mt-2 text-[14px] font-medium leading-tight', tone.value)}>
                   {FOLLOW_ROUND_BUCKET_LABEL[b]}
                 </span>
                 <span className="mt-0.5 line-clamp-2 text-[10.5px] leading-snug text-muted-foreground">
@@ -386,11 +386,11 @@ export default function FollowCallRoundsPanel({
         {signal.text ? (
           <div className="flex items-center gap-2 border-t border-border/70 px-5 py-2.5">
             <span className={cn('h-2 w-2 shrink-0 rounded-full', TONE[signal.tone].dot)} aria-hidden />
-            <p className={cn('text-[11.5px] font-semibold', TONE[signal.tone].value)}>{signal.text}</p>
+            <p className={cn('text-[11.5px] font-medium', TONE[signal.tone].value)}>{signal.text}</p>
           </div>
         ) : null}
         {aiText ? (
-          <p className={cn('border-t border-border/70 px-5 py-2.5 text-[11.5px] font-semibold', TONE.info.value)}>
+          <p className={cn('border-t border-border/70 px-5 py-2.5 text-[11.5px] font-medium', TONE.info.value)}>
             {aiText}
           </p>
         ) : rowsOfRound.length > 0 ? (
@@ -399,7 +399,7 @@ export default function FollowCallRoundsPanel({
           </p>
         ) : null}
         <p className={cn('border-t border-border/70 px-5 py-3 text-[10.5px]', DASH.muted)}>
-          ตัวเลขชุดนี้คือ <span className="font-semibold">ทุกวัน</span> (ของปฏิทินข้างล่างคือวันที่เลือก) ·
+          ตัวเลขชุดนี้คือ <span className="font-medium">ทุกวัน</span> (ของปฏิทินข้างล่างคือวันที่เลือก) ·
           รอโทร/กำลังโทร/โทรติด/โทรไม่ติด = สถานะของสาย · ไป/ไม่ไป = ผลปิดงานติดตาม —
           คนเดียวอยู่ได้ทั้งสองแกน ช่องจึงไม่ได้บวกกันเป็น "ทั้งหมด"
         </p>
@@ -435,7 +435,7 @@ export default function FollowCallRoundsPanel({
           <div className="flex items-center gap-1.5">
             <h2
               className={cn(
-                v2 ? 'text-[12.5px] font-medium text-primary' : cn('text-sm font-bold', DASH.cellStrong),
+                v2 ? 'text-[12.5px] font-medium text-primary' : cn('text-sm font-medium', DASH.cellStrong),
               )}
             >
               การโทรของงาน Follow
@@ -536,13 +536,13 @@ export default function FollowCallRoundsPanel({
               <span className="flex items-center justify-between gap-2 sm:block">
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
-                  <span className={cn('text-[11px] font-bold sm:truncate', active ? tone.value : DASH.cellStrong)}>
+                  <span className={cn('text-[11px] font-medium sm:truncate', active ? tone.value : DASH.cellStrong)}>
                     {roundLabelOf(slot)}
                   </span>
                 </span>
                 <span
                   className={cn(
-                    'block shrink-0 text-lg font-bold tabular-nums sm:mt-0.5',
+                    'block shrink-0 text-lg font-medium tabular-nums sm:mt-0.5',
                     active ? tone.num : DASH.cellStrong,
                   )}
                 >
@@ -567,7 +567,7 @@ export default function FollowCallRoundsPanel({
                   .map((r) => `${r.label} ${r.count.toLocaleString('th-TH')}`)
                   .join(' · ');
                 return (
-                  <span className={cn('block text-[10px] font-semibold sm:truncate', tone.value)}>
+                  <span className={cn('block text-[10px] font-medium sm:truncate', tone.value)}>
                     {head}
                     {res.length > 2 ? ` +${res.length - 2}` : ''}
                   </span>
@@ -598,7 +598,7 @@ export default function FollowCallRoundsPanel({
                 )}
               >
                 <span className={cn('h-2 w-2 shrink-0 rounded-full', signalTone.dot)} aria-hidden />
-                <p className={cn('text-[11px] font-semibold', signalTone.value)}>{signal.text}</p>
+                <p className={cn('text-[11px] font-medium', signalTone.value)}>{signal.text}</p>
               </div>
             ) : null}
 
@@ -624,7 +624,7 @@ export default function FollowCallRoundsPanel({
               return (
                 <p
                   className={cn(
-                    'text-[11px] font-semibold',
+                    'text-[11px] font-medium',
                     v2
                       ? 'border-t border-border/70 px-4 py-2.5 md:px-5'
                       : cn('rounded-xl border px-3 py-2', TONE.info.soft),
@@ -642,8 +642,8 @@ export default function FollowCallRoundsPanel({
                 "วันที่เลือก" · ผู้ทดสอบตาใหม่ (8 ก.ย. 2569) สับสนว่าทำไมมีตัวเลขสองชุด */}
             {embedded ? (
               <p className={cn('border-t border-border/70 px-4 py-2.5 text-[11px] md:px-5', DASH.muted)}>
-                ขั้นตอนของสาย · <span className="font-semibold">{roundLabelOf(activeRound)}</span> ·{' '}
-                <span className="font-semibold">ทุกวัน</span> — กดกล่องเพื่อดูรายชื่อ
+                ขั้นตอนของสาย · <span className="font-medium">{roundLabelOf(activeRound)}</span> ·{' '}
+                <span className="font-medium">ทุกวัน</span> — กดกล่องเพื่อดูรายชื่อ
               </p>
             ) : null}
             <div
@@ -679,7 +679,7 @@ export default function FollowCallRoundsPanel({
                             vis.muted
                               ? 'cursor-default opacity-70'
                               : vis.actionable
-                                ? cn(tone.soft, tone.softHover, 'font-bold')
+                                ? cn(tone.soft, tone.softHover, 'font-medium')
                                 : 'hover:bg-accent/60',
                           )
                         : cn(
@@ -689,7 +689,7 @@ export default function FollowCallRoundsPanel({
                               ? cn('cursor-default border-border/60 bg-background/40 opacity-75')
                               : cn(tone.soft, tone.softHover, 'hover:brightness-105'),
                             // ช่องที่ต้องลงมือ = กรอบหนา กวาดตาเจอก่อนเพื่อน แม้เลขน้อย
-                            vis.actionable ? 'border-2 font-bold shadow-sm' : '',
+                            vis.actionable ? 'border-2 font-medium shadow-sm' : '',
                           ),
                     )}
                   >
@@ -702,7 +702,7 @@ export default function FollowCallRoundsPanel({
                       />
                       <span
                         className={cn(
-                          'text-[10px] font-semibold sm:truncate',
+                          'text-[10px] font-medium sm:truncate',
                           tone.value,
                           vis.muted && 'opacity-60',
                         )}
@@ -711,7 +711,7 @@ export default function FollowCallRoundsPanel({
                       </span>
                     </span>
                     <span
-                      className={cn('block text-lg font-bold tabular-nums', tone.num, vis.muted && 'opacity-45')}
+                      className={cn('block text-lg font-medium tabular-nums', tone.num, vis.muted && 'opacity-45')}
                     >
                       {n.toLocaleString('th-TH')}
                     </span>

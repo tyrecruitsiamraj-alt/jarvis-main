@@ -157,7 +157,7 @@ export default function FollowMasterManagerDialog<T>({
               onClick={() => void add()}
               disabled={busy || !filled}
               className={cn(
-                'inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 text-xs font-semibold disabled:opacity-50',
+                'inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 text-xs font-medium disabled:opacity-50',
                 TONE.info.outline,
               )}
             >

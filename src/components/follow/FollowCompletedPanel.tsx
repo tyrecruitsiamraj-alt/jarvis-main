@@ -97,7 +97,7 @@ const FollowCompletedPanel: React.FC<{
         <div className="min-w-0">
           {/* 🔴 หัวกล่องต้องไม่โกหก — เดิมเขียน "พร้อมส่งไปดูแลหลังเริ่มงาน" ทั้งก้อน
               ทั้งที่คนที่ AI ได้คำตอบว่า "ไม่ไป" ไม่ต้องส่งต่อ (แก้ 3 ก.ย. 2569) */}
-          <p className={cn('text-sm font-semibold', TONE.success.value)}>
+          <p className={cn('text-sm font-medium', TONE.success.value)}>
             โทรได้คำตอบแล้ว {people.length.toLocaleString('th-TH')} คน
             {readyCount > 0
               ? ` — ส่งไปดูแลหลังเริ่มงานได้ ${readyCount.toLocaleString('th-TH')} คน`
@@ -152,11 +152,11 @@ const FollowCompletedPanel: React.FC<{
               </span>
               {reasonBlocksAftercare(p.reason) ? (
                 /* ไม่ไปแล้ว = ไม่มีอะไรให้ดูแลต่อ · ปิดงานที่ป๊อปของสายนั้นแทน */
-                <span className={cn('shrink-0 rounded-full px-2 py-0.5 font-semibold', TONE.neutral.chip)}>
+                <span className={cn('shrink-0 rounded-full px-2 py-0.5 font-medium', TONE.neutral.chip)}>
                   ไม่ต้องส่งต่อ
                 </span>
               ) : done ? (
-                <span className={cn('shrink-0 rounded-full px-2 py-0.5 font-semibold', TONE.success.chip)}>
+                <span className={cn('shrink-0 rounded-full px-2 py-0.5 font-medium', TONE.success.chip)}>
                   ✓ ย้ายแล้ว
                 </span>
               ) : (
@@ -176,7 +176,7 @@ const FollowCompletedPanel: React.FC<{
                       g.rounds,
                     )
                   }
-                  className={cn('shrink-0 text-xs font-semibold', TONE.primary.value)}
+                  className={cn('shrink-0 text-xs font-medium', TONE.primary.value)}
                 >
                   {movingKey === g.key ? 'กำลังย้าย…' : 'ย้าย + ปิดงานติดตาม'}
                 </Button>

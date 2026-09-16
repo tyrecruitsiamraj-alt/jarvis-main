@@ -74,7 +74,7 @@ const RoundScriptNote: React.FC<{
       >
         <span className={cn('text-[11px]', DASH.muted)}>
           {roundTabLabel(callRound)} · AI ใช้บท{' '}
-          <span className={cn('font-semibold', TONE.info.value)}>{item.label}</span>
+          <span className={cn('font-medium', TONE.info.value)}>{item.label}</span>
         </span>
         <ChevronDown
           className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')}

@@ -72,7 +72,7 @@ export const BoardUnitPickerBody: React.FC<{
                       onClick={() => onPick(u)}
                       className="flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 rounded-xl border border-border/70 bg-card px-3 py-2 text-left text-xs hover:bg-secondary"
                     >
-                      <span className="font-semibold text-foreground">{u.unitName}</span>
+                      <span className="font-medium text-foreground">{u.unitName}</span>
                       <span className="font-mono text-muted-foreground">{u.siteCode}</span>
                       {u.openRequests > 0 ? (
                         <span className="jarvis-chip jarvis-chip-info">

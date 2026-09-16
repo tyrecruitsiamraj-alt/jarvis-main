@@ -33,7 +33,7 @@ export const FollowDispatchBadge: React.FC<FollowDispatchBadgeProps> = ({ entry,
     <span
       title={meta.hint}
       className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold',
+        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
         TONE.warn.chip,
         className,
       )}

@@ -142,7 +142,7 @@ const FollowRoundsDialog: React.FC<{
                     <span
                       title={it.outcome_note || undefined}
                       className={cn(
-                        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
                         TONE.success.chip,
                       )}
                     >
@@ -182,7 +182,7 @@ const FollowRoundsDialog: React.FC<{
                     เดิมกดเสร็จสิ้นแล้วปุ่มหายหมด เลือกผิดคือแก้ไม่ได้เลย */}
                 {it.completed_at && !it.cancelled ? (
                   <>
-                    <p className="mt-2 text-[10px] font-semibold text-muted-foreground">จัดการรอบนี้</p>
+                    <p className="mt-2 text-[10px] font-medium text-muted-foreground">จัดการรอบนี้</p>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       <Button
                         type="button"
@@ -201,7 +201,7 @@ const FollowRoundsDialog: React.FC<{
                 ) : null}
                 {canWork || canCancel ? (
                   <>
-                <p className="mt-2 text-[10px] font-semibold text-muted-foreground">จัดการรอบนี้</p>
+                <p className="mt-2 text-[10px] font-medium text-muted-foreground">จัดการรอบนี้</p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   {canWork ? (
                     <Button

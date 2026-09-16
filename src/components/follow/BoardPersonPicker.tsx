@@ -94,7 +94,7 @@ const BoardPersonPicker: React.FC<BoardPersonPickerProps> = ({ open, onClose, on
                       onClick={() => onPick(p)}
                       className="flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 rounded-xl border border-border/70 bg-card px-3 py-2 text-left text-xs hover:bg-secondary"
                     >
-                      <span className="font-semibold text-foreground">{pickerDisplayName(p)}</span>
+                      <span className="font-medium text-foreground">{pickerDisplayName(p)}</span>
                       {p.nick_name ? (
                         <span className="text-muted-foreground">({p.nick_name})</span>
                       ) : null}

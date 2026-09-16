@@ -1042,7 +1042,7 @@ const FollowPage: React.FC = () => {
                       type="button"
                       title="ตั้งค่ารายการตัวเลือก (ทำครั้งเดียวตอนเริ่มใช้)"
                       className={cn(
-                        'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-semibold',
+                        'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-medium',
                         TONE.neutral.outline,
                       )}
                     >
@@ -1158,7 +1158,7 @@ const FollowPage: React.FC = () => {
             {/* 🔴 บอกทางทั้งเส้นก่อน (12 ก.ย. 2569) — ตาใหม่ปิดฟอร์มทิ้งกลางคันเพราะ
                 ไม่รู้ว่าขั้น 2-3 มีอะไร กลัวกรอกผิดแล้วพัง */}
             <p className="text-[11.5px] leading-snug text-muted-foreground">
-              <span className="font-semibold text-foreground">ขั้นที่ {step} จาก 3</span>
+              <span className="font-medium text-foreground">ขั้นที่ {step} จาก 3</span>
               {' · '}① คนที่จะติดตาม → ② หน่วยงาน (ข้ามได้) → ③ วันเวลาที่ให้ AI โทร
               {step === 1 ? (
                 <>
@@ -1190,7 +1190,7 @@ const FollowPage: React.FC = () => {
                     >
                       <span
                         className={cn(
-                          'text-[10px] font-bold',
+                          'text-[10px] font-medium',
                           current ? 'text-primary' : done ? TONE.success.value : 'text-muted-foreground',
                         )}
                       >
@@ -1213,7 +1213,7 @@ const FollowPage: React.FC = () => {
                 type="button"
                 onClick={() => setPickerOpen(true)}
                 className={cn(
-                  'inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-semibold',
+                  'inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium',
                   TONE.info.outline,
                 )}
               >
@@ -1303,7 +1303,7 @@ const FollowPage: React.FC = () => {
                 type="button"
                 onClick={() => setUnitPickerOpen(true)}
                 className={cn(
-                  'inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-semibold',
+                  'inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium',
                   TONE.info.outline,
                 )}
               >
@@ -1346,7 +1346,7 @@ const FollowPage: React.FC = () => {
               {siteCode ? (
                 <p className="ml-1 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <Building2 className="h-3 w-3" aria-hidden />
-                  รหัสไซต์ <span className="font-mono font-semibold text-foreground">{siteCode}</span>
+                  รหัสไซต์ <span className="font-mono font-medium text-foreground">{siteCode}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -1655,10 +1655,10 @@ const FollowPage: React.FC = () => {
              */}
             {step === 3 ? (
               <div className={cn('rounded-xl px-3 py-2.5 text-[12px] leading-snug', TONE.primary.soft)}>
-                <span className="block font-semibold text-foreground">ทวนก่อนส่ง</span>
+                <span className="block font-medium text-foreground">ทวนก่อนส่ง</span>
                 <span className="mt-0.5 block text-foreground/80">
                   AI จะโทรหา{' '}
-                  <span className="font-semibold">
+                  <span className="font-medium">
                     {composeRecipientName(prefix, firstName, lastName) || '— ยังไม่ได้กรอกชื่อ —'}
                   </span>{' '}
                   เบอร์ <span className="tabular-nums">{phone || '—'}</span>
@@ -1838,7 +1838,7 @@ const FollowPage: React.FC = () => {
                   key={d.iso}
                   className={cn('rounded-lg border px-3 py-2 text-xs', TONE.warn.soft, TONE.warn.value)}
                 >
-                  <span className="font-semibold">{d.existingName}</span>
+                  <span className="font-medium">{d.existingName}</span>
                   {' · '}
                   {new Date(d.iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}
                 </li>

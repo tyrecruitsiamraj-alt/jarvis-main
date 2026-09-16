@@ -80,7 +80,7 @@ export function FlowStage({
       <div className={cn('text-xs font-medium leading-tight', S.label)}>{label}</div>
       <div
         className={cn(
-          'mt-1 text-3xl font-bold leading-none tabular-nums tracking-tight',
+          'mt-1 text-3xl font-medium leading-none tabular-nums tracking-tight',
           S.toneValue(t),
         )}
       >
@@ -235,7 +235,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
     return (
       <span className="whitespace-nowrap">
         {OUTCOME_LABEL[o]}{' '}
-        <span className={cn('font-semibold tabular-nums', S.toneValue(TONE[CALL_OUTCOME_TONE[o]]))}>
+        <span className={cn('font-medium tabular-nums', S.toneValue(TONE[CALL_OUTCOME_TONE[o]]))}>
           {n.toLocaleString('th-TH')}
         </span>
       </span>
@@ -315,12 +315,12 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
             เดิมเป็นการ์ดพื้นอ่อนลอยอยู่คนละก้อนใต้แผงนี้ ต้องกวาดตาสองที่แล้วต่อเรื่องเอง */}
         {leadIn ? (
           <>
-            <p className={cn('mt-3 text-[10px] font-semibold uppercase tracking-wide', S.faint)}>
+            <p className={cn('mt-3 text-[10px] font-medium uppercase tracking-wide', S.faint)}>
               {leadInLabel}
             </p>
             {leadIn}
             <div className={cn('mt-3 flex items-center gap-2 border-t pt-3', S.line)}>
-              <p className={cn('text-[10px] font-semibold uppercase tracking-wide', S.faint)}>
+              <p className={cn('text-[10px] font-medium uppercase tracking-wide', S.faint)}>
                 {callRowLabel}
               </p>
               <p className={cn('text-[10px]', S.faint)}>
@@ -371,7 +371,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
                 funnel.unreached > 0 ? (
                   <span className="whitespace-nowrap">
                     ไม่รับ/ไม่ติด{' '}
-                    <span className={cn('font-semibold tabular-nums', S.toneValue(TONE.warn))}>
+                    <span className={cn('font-medium tabular-nums', S.toneValue(TONE.warn))}>
                       {funnel.unreached.toLocaleString('th-TH')}
                     </span>
                   </span>
@@ -403,7 +403,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
           if (actions.length === 0) return null;
           return (
             <div className={cn('mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3', S.line)}>
-              <span className={cn('text-[10px] font-semibold uppercase tracking-wide', S.faint)}>
+              <span className={cn('text-[10px] font-medium uppercase tracking-wide', S.faint)}>
                 ทำก่อน → หลัง
               </span>
               {actions.map((a, i) => (
@@ -416,7 +416,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
                 >
                   <span
                     className={cn(
-                      'inline-flex h-4 w-4 items-center justify-center rounded-full font-mono text-[10px] font-bold',
+                      'inline-flex h-4 w-4 items-center justify-center rounded-full font-mono text-[10px] font-medium',
                       S.v2 ? 'bg-primary/10 text-primary' : 'bg-white/15 text-white',
                     )}
                   >
@@ -425,7 +425,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
                   {a.label}
                   <span
                     className={cn(
-                      'font-mono font-semibold tabular-nums',
+                      'font-mono font-medium tabular-nums',
                       S.v2 ? 'text-foreground' : 'text-white',
                     )}
                   >
@@ -467,17 +467,17 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
                   เป็น "กำลังโทร" (7 ก.ย. 2569) — จะได้ 84 = ยอดทั้งคิว ซึ่งไม่จริงเลย
                   ⇒ ใช้ field ที่ฝั่ง API นับด้วยนิยามกลาง (`queuePending`) ตรง ๆ */}
               เตรียมไว้{' '}
-              <span className="font-mono font-semibold tabular-nums">
+              <span className="font-mono font-medium tabular-nums">
                 {funnel.pending.toLocaleString('th-TH')}
               </span>
               {' · '}ส่งโทรทั้งหมด{' '}
-              <span className="font-mono font-semibold tabular-nums">{funnel.queued.toLocaleString('th-TH')}</span>
+              <span className="font-mono font-medium tabular-nums">{funnel.queued.toLocaleString('th-TH')}</span>
               {' · '}โทรไปแล้ว{' '}
-              <span className="font-mono font-semibold tabular-nums">{funnel.withResult.toLocaleString('th-TH')}</span>
+              <span className="font-mono font-medium tabular-nums">{funnel.withResult.toLocaleString('th-TH')}</span>
               {' · '}เหลือโทร{' '}
               {/* = `funnel.waiting` (ยังไม่มีผล และยังไม่ถูกยกเลิก) — เดิมคิดเอง
                   `queued − withResult` ซึ่งเอาสายที่ยกเลิกไปแล้วมานับเป็น "เหลือโทร" ด้วย */}
-              <span className={cn('font-mono font-semibold tabular-nums', TONE.warn.value)}>
+              <span className={cn('font-mono font-medium tabular-nums', TONE.warn.value)}>
                 {funnel.waiting.toLocaleString('th-TH')}
               </span>
             </p>
@@ -524,7 +524,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
             onClick={() => setOpenBucket((v) => !v)}
             className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
           >
-            <span className={cn('text-sm font-bold', TONE.danger.value)}>
+            <span className={cn('text-sm font-medium', TONE.danger.value)}>
               🚩 ต้องคนตาม {needsHuman.length.toLocaleString('th-TH')} คน — AI โทรจนสุดมือแล้ว
             </span>
             <ChevronDown
@@ -546,7 +546,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
                     DASH.divider,
                   )}
                 >
-                  <span className={cn('font-semibold', DASH.cellStrong)}>
+                  <span className={cn('font-medium', DASH.cellStrong)}>
                     {item.candidateName || item.personRef}
                   </span>
                   <span className={cn('font-mono text-[11px]', DASH.muted)}>{item.jobRef}</span>
@@ -558,7 +558,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
                     return (
                       <span
                         className={cn(
-                          'rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
+                          'rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
                           days >= 2 ? cn(TONE.danger.soft, TONE.danger.value) : cn(TONE.warn.soft, TONE.warn.value),
                         )}
                       >
@@ -578,7 +578,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
                          รับแล้วต้องมีที่ไปโทร+บันทึกผล ไม่งั้นล็อกค้างจนหมดอายุเอง */
                       <Link
                         to="/"
-                        className={cn('text-[11px] font-bold underline-offset-2 hover:underline', TONE.success.value)}
+                        className={cn('text-[11px] font-medium underline-offset-2 hover:underline', TONE.success.value)}
                       >
                         รับแล้ว → ไปที่ "โทรของฉัน" บนหน้าหลัก
                       </Link>
@@ -588,7 +588,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
                         onClick={() => void take(item)}
                         disabled={takingId === item.id}
                         className={cn(
-                          'rounded-full px-2.5 py-1 text-[11px] font-bold disabled:opacity-50',
+                          'rounded-full px-2.5 py-1 text-[11px] font-medium disabled:opacity-50',
                           TONE.primary.solid,
                         )}
                       >
