@@ -68,7 +68,8 @@ describe('เลนคิวโทรบนกล่องทีม', () => {
 
     const lanes = json.mock.calls[0][0].teams.lumos;
     expect(lanes.follow).toEqual({
-      total: 22,
+      // 🔴 ยอดบน = ทุกสายที่เคยส่ง (22 ที่ยังอยู่ + 2 ที่ยกเลิก) — เปลี่ยนนิยาม 16 ก.ย. 2569
+      total: 24,
       pending: 11,
       stalePending: 11,
       waiting: 0,
@@ -87,13 +88,20 @@ describe('เลนคิวโทรบนกล่องทีม', () => {
     expect(lanes.public.stalePending).toBe(0);
   });
 
-  it('"ส่งเข้าทั้งหมด" = รอโทร + รอผลกลับ + ได้ผลแล้ว เสมอ (คนใหม่บวกเองได้)', async () => {
+  /**
+   * 🔴 **เปลี่ยนนิยามยอดบน 16 ก.ย. 2569** (เจ้าของ: *"ตรงยกเลิกอ่านแล้วงง …
+   * ก็ควรเป็น 82 + 20 เท่าไหร่ แล้วแจกแจงมามันต้องได้ยอดรวมนั้น"*)
+   *
+   * เดิมยอดบนหักยกเลิกออก ⇒ แถวยกเลิกลอยอยู่ข้างล่างบวกกับใครไม่ได้
+   * ตอนนี้ยอดบน = ทุกสายที่เคยส่ง และ **สี่ช่องล่างบวกกันได้ยอดบนเป๊ะ**
+   */
+  it('"ส่งให้ AI ไปแล้ว" = รอโทร + รอผล + รู้ผลแล้ว + ยกเลิก เสมอ (คนใหม่บวกเองได้)', async () => {
     const { res, json } = mockRes();
     await handler({ method: 'GET', user: { sub: 'u2' }, query: {} } as never, res as never);
     const lanes = json.mock.calls[0][0].teams.lumos;
     for (const key of ['follow', 'match', 'public'] as const) {
       const l = lanes[key];
-      expect(l.pending + l.waiting + l.done, key).toBe(l.total);
+      expect(l.pending + l.waiting + l.done + l.cancelled, key).toBe(l.total);
     }
   });
 });

@@ -100,6 +100,7 @@ import matchingFlowSummaryHandler from './matching-flow-summary.js';
 import matchingJobPostingsHandler from './matching-job-postings.js';
 import matchingWorkerStatusHandler from './matching-worker-status.js';
 import homeKpisHandler from './home-kpis.js';
+import homeTodayHandler from './home-today.js';
 import unitSectorHandler from './unit-sector.js';
 import officeFloorHandler from './office-floor.js';
 import officeTeamHandler from './office-team.js';
@@ -179,6 +180,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   // บัญชีห้ามโทร (1 ก.ย. 2569) — GET ดูได้ทุก role · DELETE (ปลดเบอร์) supervisor+
   '/api/call-suppression': callSuppressionHandler as ApiHandler,
   '/api/home-kpis': homeKpisHandler as ApiHandler,
+  '/api/home-today': homeTodayHandler as ApiHandler,
   '/api/unit-sector': unitSectorHandler as ApiHandler,
   // ปล่อย/ดึงลง ใบขอบนหน้าสาธารณะ (เจ้าของเคาะ 22 ส.ค. 2569 — ทุกใบต้องกดปล่อย)
   '/api/job-public-release': jobPublicReleaseHandler as ApiHandler,
