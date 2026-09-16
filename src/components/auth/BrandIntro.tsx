@@ -110,7 +110,7 @@ export const BrandIntro: React.FC = () => {
                   key={`${word}-${ch}-${delay}`}
                   className={cn(
                     'inline-block animate-in fade-in slide-in-from-bottom-6 duration-300 ease-out',
-                    'text-[clamp(28px,6vw,64px)] font-[650] tracking-[-0.01em]',
+                    'text-[clamp(28px,6vw,64px)] font-medium tracking-[-0.01em]',
                   )}
                   style={{
                     animationDelay: `${delay}ms`,

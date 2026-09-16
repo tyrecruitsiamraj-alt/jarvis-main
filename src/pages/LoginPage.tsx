@@ -347,7 +347,7 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
       </p>
 
       <h2
-        className="mt-2.5 text-[clamp(21px,2.3vw,27px)] font-[610] leading-snug"
+        className="mt-2.5 text-[clamp(21px,2.3vw,27px)] font-medium leading-snug"
         style={{ color: LOGIN_SCENE.ink }}
       >
         งานสรรหา ครบ จบ ที่เดียว
@@ -579,11 +579,11 @@ const LoginPage: React.FC = () => {
                 (เจ้าของทัก 5 ก.ย. 2569: *"ตรง Login จัดหน้าดี ๆ มันไม่ค่อยกึ่งกลาง"*)
                 — ของเดิมหัวเรื่องชิดซ้าย แต่ตัวหนังสือท้ายการ์ดกึ่งกลาง ⇒ สองแนวในใบเดียว */}
             <h1
-              className="text-center text-[clamp(24px,2.6vw,30px)] font-[610] leading-tight tracking-[-0.01em]"
+              className="text-center text-[clamp(24px,2.6vw,30px)] font-medium leading-tight tracking-[-0.01em]"
               style={{ color: LOGIN_SCENE.ink }}
             >
               ยินดีต้อนรับ
-              <span className="font-[560]" style={{ color: LOGIN_SCENE.accent }}>
+              <span className="font-medium" style={{ color: LOGIN_SCENE.accent }}>
                 กลับมา
               </span>
             </h1>

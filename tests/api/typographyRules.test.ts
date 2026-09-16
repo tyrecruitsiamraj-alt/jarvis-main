@@ -258,6 +258,30 @@ describe('🔴 ทั้งระบบต้องไม่มีตัวห�
     expect(bad, `ไฟล์ที่ยังมีตัวหนาเกิน medium:\n${bad.join('\n')}`).toEqual([]);
   });
 
+  /**
+   * 🔴 **ช่องโหว่ที่หลุดรอบแรก** (เจอตอนเจ้าของถามว่า "มั่นใจแล้วนะว่าแก้หมดทั้งระบบ")
+   * แทนแค่ `font-bold`/`font-semibold` ไม่พอ — ยังมีอีกสามทางที่ทำให้ตัวหนาโผล่ได้:
+   * `font-extrabold`/`font-black` · น้ำหนักที่พิมพ์เป็นตัวเลขเอง (`font-[650]`) ·
+   * และ `<b>`/`<strong>` ที่เบราว์เซอร์ตั้งให้ 700 เอง (ปิดที่ `index.css`)
+   */
+  it('ไม่มี font-extrabold / font-black / น้ำหนักที่พิมพ์เป็นตัวเลขเกิน 500', () => {
+    const bad = FILES.filter((f) => {
+      const code = read(f).replace(/\/\*[\s\S]*?\*\//g, '');
+      return /font-(extrabold|black)/.test(code) || /font-\[(5[1-9]\d|[6-9]\d\d)\]/.test(code);
+    });
+    expect(bad, `ไฟล์ที่ยังมีน้ำหนักเกิน medium:\n${bad.join('\n')}`).toEqual([]);
+  });
+
+  it('🔴 `<b>` / `<strong>` ต้องถูกตั้งทับเป็น 500 ที่ CSS กลาง (เบราว์เซอร์ตั้ง 700 มาเอง)', () => {
+    const css = read('src/index.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(css).toMatch(/b,\s*strong\s*\{[^}]*font-weight:\s*500/);
+  });
+
+  it('CSS ของแถบเมนูล่างก็ต้องไม่เกิน 500', () => {
+    const css = read('src/components/layout/bottom-nav/bottomDockNav.css');
+    expect(css).not.toMatch(/font-weight:\s*(600|700|800|900)/);
+  });
+
   it('CSS กลางก็ต้องไม่หนาเกิน 500', () => {
     const css = read('src/index.css');
     expect(css).not.toMatch(/font-weight:\s*(600|700|800|900)/);

@@ -284,7 +284,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div>
             <p className={DASH.eyebrow}>รอโทร</p>
-            <p className={cn('font-mono text-3xl font-extrabold tabular-nums', DASH.cellStrong)}>
+            <p className={cn('font-mono text-3xl font-medium tabular-nums', DASH.cellStrong)}>
               {holds.length.toLocaleString('th-TH')}
             </p>
             <p className={cn('text-xs', DASH.muted)}>
