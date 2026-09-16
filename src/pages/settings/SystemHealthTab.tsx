@@ -96,7 +96,7 @@ const SystemHealthTab: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">สถานะระบบ</h2>
+          <h2 className="text-sm font-medium text-foreground">สถานะระบบ</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             ยามเฝ้าตรวจเองทุก 5 นาที · ตรวจล่าสุด {checkedAgo}
           </p>
@@ -106,7 +106,7 @@ const SystemHealthTab: React.FC = () => {
             type="button"
             onClick={() => void reload()}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-secondary disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary disabled:opacity-60"
           >
             <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} /> รีเฟรช
           </button>
@@ -114,7 +114,7 @@ const SystemHealthTab: React.FC = () => {
             type="button"
             onClick={() => void onCheckNow()}
             disabled={checking}
-            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-60"
           >
             {checking ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : null} ตรวจเดี๋ยวนี้
           </button>
@@ -138,7 +138,7 @@ const SystemHealthTab: React.FC = () => {
                 <Icon className="h-4 w-4 shrink-0" aria-hidden />
                 <span className="truncate">{c.label}</span>
               </div>
-              <p className={cn('text-xl font-semibold', tone.text)}>{c.value}</p>
+              <p className={cn('text-xl font-medium', tone.text)}>{c.value}</p>
               <p className={cn('mt-0.5 text-[11px]', tone.text)}>{c.hint}</p>
             </div>
           );
@@ -152,14 +152,14 @@ const SystemHealthTab: React.FC = () => {
 
       {/* สวิตช์ */}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-sm dark:bg-slate-900">
-        <h3 className="mb-2 text-sm font-semibold text-foreground">สวิตช์ที่เปิดอยู่</h3>
+        <h3 className="mb-2 text-sm font-medium text-foreground">สวิตช์ที่เปิดอยู่</h3>
         <ul className="divide-y divide-border">
           {data?.switches.map((s) => (
             <li key={s.key} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
               <span className="min-w-0 flex-1 truncate text-sm text-foreground">{s.label}</span>
               <span
                 className={cn(
-                  'shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+                  'shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium',
                   SWITCH_TONE[s.state] ?? SWITCH_TONE.off,
                 )}
               >
@@ -178,10 +178,10 @@ const SystemHealthTab: React.FC = () => {
 
       {/* ของค้าง */}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-sm dark:bg-slate-900">
-        <h3 className="mb-2 text-sm font-semibold text-foreground">
+        <h3 className="mb-2 text-sm font-medium text-foreground">
           ของค้างที่ยังไม่มีใครรับ
           {data && data.stale.length > 0 ? (
-            <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+            <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
               {data.stale.length.toLocaleString('th-TH')} รายการ
             </span>
           ) : null}
@@ -199,7 +199,7 @@ const SystemHealthTab: React.FC = () => {
                 <div className="flex shrink-0 items-center gap-2">
                   <span
                     className={cn(
-                      'rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+                      'rounded-full px-2.5 py-0.5 text-[11px] font-medium',
                       ageTone(item.ageMinutes, data.confirmedOwnerLimitMinutes),
                     )}
                   >
@@ -208,7 +208,7 @@ const SystemHealthTab: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => navigate(item.link)}
-                    className="rounded-full border border-border px-3 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary"
+                    className="rounded-full border border-border px-3 py-1 text-[11px] font-medium text-foreground hover:bg-secondary"
                   >
                     เปิดดู
                   </button>

@@ -101,7 +101,7 @@ const WlBuSelector: React.FC<WlBuSelectorProps> = ({
             >
               {unassigned ? <HelpCircle className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
             </div>
-            <div className="font-semibold text-foreground text-base">{wlBuViewLabel(bu)}</div>
+            <div className="font-medium text-foreground text-base">{wlBuViewLabel(bu)}</div>
             <div className="text-xs text-muted-foreground mt-1">
               {count != null ? `พนักงาน ${count} คน` : 'เลือก BU นี้'}
               {unassigned && count ? ' · ตั้ง BU ให้ได้ในหน้าพนักงาน' : ''}

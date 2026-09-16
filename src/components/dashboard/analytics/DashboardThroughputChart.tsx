@@ -55,7 +55,7 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
   return (
     <div className={cn(DASH.card, 'p-4 xl:col-span-2')}>
       <div className="mb-3">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+        <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">
           แนวโน้มรายเดือน — เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ
         </h3>
         <p className="text-xs text-slate-600 dark:text-slate-400">

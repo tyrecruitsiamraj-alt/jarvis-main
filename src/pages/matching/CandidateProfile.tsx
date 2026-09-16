@@ -119,7 +119,7 @@ const CandidateProfile: React.FC = () => {
               <User className={cn('w-6 h-6', TONE.primary.value)} />
             </div>
             <div className="flex-1">
-              <div className="font-bold text-foreground">{formatCandidateDisplayName(candidate)}</div>
+              <div className="font-medium text-foreground">{formatCandidateDisplayName(candidate)}</div>
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <Phone className="w-3 h-3" /> {candidate.phone}
               </div>
@@ -209,7 +209,7 @@ const CandidateProfile: React.FC = () => {
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-foreground mb-2">ประวัติสัมภาษณ์</h3>
+          <h3 className="text-sm font-medium text-foreground mb-2">ประวัติสัมภาษณ์</h3>
           <div className="space-y-2">
             {interviews.length === 0 ? (
               <p className="text-sm text-muted-foreground">ไม่มีข้อมูล</p>
@@ -235,7 +235,7 @@ const CandidateProfile: React.FC = () => {
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-foreground mb-2">ประวัติการถูกส่งไปทำงาน</h3>
+          <h3 className="text-sm font-medium text-foreground mb-2">ประวัติการถูกส่งไปทำงาน</h3>
           <div className="space-y-2">
             {workHistory.length === 0 ? (
               <p className="text-sm text-muted-foreground">ไม่มีข้อมูล</p>

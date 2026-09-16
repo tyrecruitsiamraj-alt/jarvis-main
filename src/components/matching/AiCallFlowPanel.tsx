@@ -78,7 +78,7 @@ function CallCell({
       </div>
       <div
         className={cn(
-          'mt-0.5 text-xl font-bold leading-none tabular-nums tracking-tight',
+          'mt-0.5 text-xl font-medium leading-none tabular-nums tracking-tight',
           v2 ? t.value : t.onDark,
         )}
       >
@@ -144,7 +144,7 @@ function CellRow({
   const where = cells.filter((c) => c.group === 'where');
   const result = cells.filter((c) => c.group === 'result');
   const v2 = useUiV2();
-  const groupLabel = cn('mb-1 text-[10px] font-semibold', v2 ? 'text-muted-foreground' : 'text-slate-400');
+  const groupLabel = cn('mb-1 text-[10px] font-medium', v2 ? 'text-muted-foreground' : 'text-slate-400');
   /**
    * ใจความกันบวกผิด ย้ายมาติดหัวกลุ่มตัวเลข (ตำหนิ QA รอบสอง 6 ก.ย. 2569: คำเตือน
    * เดิมอยู่ท้ายแผงไกลตัวเลขเกินไป) — ประโยคเต็มด้านล่างแผงยังคงไว้เหมือนเดิม
@@ -226,7 +226,7 @@ export default function AiCallFlowPanel({
   /** โฉมใหม่: แผงย้ายมาอยู่บนพื้นขาว ⇒ ตัวหนังสือ/เส้นคั่นที่เขียนไว้สำหรับพื้นเข้มต้องสลับ */
   const v2 = useUiV2();
   const rowHead = cn(
-    'mt-3 flex items-center gap-1.5 text-[11px] font-semibold',
+    'mt-3 flex items-center gap-1.5 text-[11px] font-medium',
     v2 ? 'text-foreground' : 'text-slate-300',
   );
 
@@ -249,7 +249,7 @@ export default function AiCallFlowPanel({
                  ⇒ ใช้สีเน้นสีเดียวของโฉมใหม่ (เบอร์กันดี = `primary`) ทั้งขอบ พื้นจาง และตัวหนังสือ */
               className={cn(
                 source === t.id &&
-                  (v2 ? 'border-primary/50 bg-primary/10 font-semibold text-primary' : 'bg-white/25'),
+                  (v2 ? 'border-primary/50 bg-primary/10 font-medium text-primary' : 'bg-white/25'),
               )}
             >
               {t.label}

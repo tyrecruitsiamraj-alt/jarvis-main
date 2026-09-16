@@ -246,7 +246,7 @@ function EmailPasswordForm({
       <Button
         type="submit"
         disabled={submitting}
-        className="mt-1.5 min-h-12 w-full rounded-full border-0 text-[15px] font-semibold hover:brightness-110"
+        className="mt-1.5 min-h-12 w-full rounded-full border-0 text-[15px] font-medium hover:brightness-110"
         style={PRIMARY_BTN}
       >
         {submitting ? (
@@ -340,7 +340,7 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
       {/* ⚠️ ไม่มีจุดเต้นนำหน้าแล้ว — พอบรรทัดนี้ตกบรรทัดบนมือถือ จุดจะลอยเดี่ยว
           อยู่กลางสองบรรทัด (เห็นจริงบนจอ 375px) และตัวจุดเองก็ไม่ได้บอกอะไร */}
       <p
-        className="text-[10.5px] font-semibold uppercase leading-relaxed tracking-[0.18em]"
+        className="text-[10.5px] font-medium uppercase leading-relaxed tracking-[0.18em]"
         style={{ color: LOGIN_SCENE.burgundy }}
       >
         ONE RECRUIT · ONE SOLUTION · ONE STOP
@@ -423,7 +423,7 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
               </span>
               <span className="min-w-0 pt-1">
                 <span
-                  className="block text-[14px] font-semibold leading-snug"
+                  className="block text-[14px] font-medium leading-snug"
                   style={{ color: LOGIN_SCENE.ink }}
                 >
                   {step.label}
@@ -529,7 +529,7 @@ const LoginPage: React.FC = () => {
       >
         <BrandMark size="sm" />
         <span
-          className="text-[13px] font-semibold tracking-[0.015em]"
+          className="text-[13px] font-medium tracking-[0.015em]"
           style={{ color: LOGIN_SCENE.ink, textShadow: TEXT_ON_PHOTO }}
         >
           <BrandTitle />
@@ -664,7 +664,7 @@ const LoginPage: React.FC = () => {
                     </p>
                     <Link
                       to="/apply"
-                      className="mt-1.5 inline-flex items-center gap-1.5 text-[12.5px] font-semibold underline-offset-4 hover:underline"
+                      className="mt-1.5 inline-flex items-center gap-1.5 text-[12.5px] font-medium underline-offset-4 hover:underline"
                       style={{ color: LOGIN_SCENE.burgundy }}
                     >
                       เปิดบอร์ดประกาศรับสมัคร

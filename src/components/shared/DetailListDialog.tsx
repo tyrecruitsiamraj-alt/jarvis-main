@@ -47,7 +47,7 @@ const DetailListDialog: React.FC<DetailListDialogProps> = ({
         )}
       >
         <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-3 pt-5 text-left">
-          <DialogTitle className="pr-8 text-base font-semibold leading-snug text-foreground sm:text-lg break-words">
+          <DialogTitle className="pr-8 text-base font-medium leading-snug text-foreground sm:text-lg break-words">
             {title}
           </DialogTitle>
           <DialogDescription className="sr-only">

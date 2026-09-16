@@ -65,7 +65,7 @@ const DashboardAgeOverview: React.FC<Props> = ({ items, requestTotal, positionTo
                 <span className={cn('h-1.5 w-1.5 rounded-full', solid ? 'bg-white/80' : tone.dot)} aria-hidden />
                 <span
                   className={cn(
-                    'text-xs font-semibold',
+                    'text-xs font-medium',
                     solid ? 'text-white' : 'text-slate-700 dark:text-slate-200',
                   )}
                 >
@@ -74,7 +74,7 @@ const DashboardAgeOverview: React.FC<Props> = ({ items, requestTotal, positionTo
               </div>
               <p
                 className={cn(
-                  'mt-2 text-3xl font-semibold tracking-tight tabular-nums',
+                  'mt-2 text-3xl font-medium tracking-tight tabular-nums',
                   solid ? 'text-white' : tone.num,
                 )}
               >

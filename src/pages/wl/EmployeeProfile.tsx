@@ -134,7 +134,7 @@ const EmployeeProfile: React.FC = () => {
                 <User className="w-6 h-6 text-info" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="font-bold text-foreground">{formatCandidateDisplayName(wlCandidate)}</div>
+                <div className="font-medium text-foreground">{formatCandidateDisplayName(wlCandidate)}</div>
                 <div className="text-sm text-muted-foreground">{wlCandidate.phone}</div>
                 <div className="text-xs text-muted-foreground mt-1">{wlCandidate.address}</div>
               </div>
@@ -177,7 +177,7 @@ const EmployeeProfile: React.FC = () => {
               <User className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <div className="font-bold text-foreground">
+              <div className="font-medium text-foreground">
                 {employee.first_name} {employee.last_name}
                 {displayNick}
               </div>
@@ -225,7 +225,7 @@ const EmployeeProfile: React.FC = () => {
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-foreground mb-2">ประวัติการทำงาน (ล่าสุด)</h3>
+          <h3 className="text-sm font-medium text-foreground mb-2">ประวัติการทำงาน (ล่าสุด)</h3>
           <div className="space-y-2">
             {workHistory.slice(0, 5).map((w) => (
               <div
@@ -245,7 +245,7 @@ const EmployeeProfile: React.FC = () => {
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-foreground mb-2">ประวัติการอบรม</h3>
+          <h3 className="text-sm font-medium text-foreground mb-2">ประวัติการอบรม</h3>
           <div className="space-y-2">
             {trainings.length === 0 ? (
               <p className="text-sm text-muted-foreground">ไม่มีข้อมูลการอบรม</p>

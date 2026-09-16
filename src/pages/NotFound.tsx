@@ -13,8 +13,8 @@ const NotFound = () => {
   return (
     <div className="jarvis-warm-bg flex min-h-screen items-center justify-center p-6">
       <div className="jarvis-frost max-w-md w-full p-8 text-center relative overflow-hidden">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">404</p>
-        <h1 className="mt-2 text-4xl font-bold tracking-tight text-foreground">Page not found</h1>
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">404</p>
+        <h1 className="mt-2 text-4xl font-medium tracking-tight text-foreground">Page not found</h1>
         <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
           ไม่พบหน้าที่คุณต้องการ — อาจถูกย้ายหรือลบออกแล้ว
         </p>

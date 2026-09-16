@@ -1027,7 +1027,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             <p className="text-[12.5px] font-medium text-primary">รับสมัครงาน</p>
             {/* เจ้าของเคาะ 18 ส.ค. 2569: **ยังไม่เอาโลโก้** — หัวข้อข้อความล้วน
                 (ถ้าจะเอากลับ ดู docs/LOGO-SO.md) */}
-            <h1 className="mt-2 max-w-3xl text-[clamp(28px,4.4vw,46px)] font-semibold leading-[1.15] tracking-tight text-foreground">
+            <h1 className="mt-2 max-w-3xl text-[clamp(28px,4.4vw,46px)] font-medium leading-[1.15] tracking-tight text-foreground">
               ค้นหางานที่เหมาะกับคุณ
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
@@ -1041,7 +1041,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             {!loading && filters.visibleCount > 0 ? (
               <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-border/60 pt-5">
                 <span>
-                  <span className="block text-[26px] font-semibold leading-none tabular-nums text-foreground">
+                  <span className="block text-[26px] font-medium leading-none tabular-nums text-foreground">
                     {filters.visibleCount.toLocaleString('th-TH')}
                   </span>
                   <span className="mt-1 block text-[12px] text-muted-foreground">
@@ -1049,7 +1049,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </span>
                 </span>
                 <span>
-                  <span className="block text-[26px] font-semibold leading-none tabular-nums text-foreground">
+                  <span className="block text-[26px] font-medium leading-none tabular-nums text-foreground">
                     {filters.visiblePositions.toLocaleString('th-TH')}
                   </span>
                   <span className="mt-1 block text-[12px] text-muted-foreground">อัตราที่รับ</span>
@@ -1105,7 +1105,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   onClick={() => onViewChange(v.id)}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'px-4 py-2.5 text-sm font-semibold transition-colors',
+                    'px-4 py-2.5 text-sm font-medium transition-colors',
                     active
                       ? cn(TONE.primary.value, 'border-b-2 border-current')
                       : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
@@ -1232,7 +1232,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                        ⚠️ ต้องเขียนบอกไว้ ไม่งั้นคนเห็นเลขสองที่ไม่ตรงแล้วไม่เชื่อทั้งคู่ */
                     title={`ส่งประกาศใบที่ยังต้องหาคนและยังไม่ปล่อย ${Math.min(unreleasedCount, 300)} ใบ ขึ้นหน้าสมัครงานสาธารณะ — เลขนี้น้อยกว่า "ยังไม่ปล่อย" เพราะตัดใบที่มีคนเริ่มงานแล้วออก`}
                     className={cn(
-                      'rounded-lg px-2.5 py-1.5 text-[11px] font-semibold disabled:opacity-50',
+                      'rounded-lg px-2.5 py-1.5 text-[11px] font-medium disabled:opacity-50',
                       TONE.success.outline,
                     )}
                   >
@@ -1263,14 +1263,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   TONE.primary.soft,
                 )}
               >
-                <p className="text-[11px] font-semibold text-foreground">
+                <p className="text-[11px] font-medium text-foreground">
                   กำลังดู: {selectionLabel} — {flowJobs.length.toLocaleString('th-TH')} ใบข้างล่าง
                 </p>
                 <button
                   type="button"
                   onClick={() => setSelection({ lane: null, step: null })}
                   className={cn(
-                    'rounded-lg px-2.5 py-1 text-[11px] font-semibold',
+                    'rounded-lg px-2.5 py-1 text-[11px] font-medium',
                     TONE.neutral.outline,
                   )}
                 >
@@ -1283,7 +1283,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 ⚠️ **ต้องมีช่วงวันที่เสมอ** ใบปิดสะสมย้อนหลังหลายปี ดึงหมดคือรอเป็นนาที */}
             {closedBox ? (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-secondary/40 px-3 py-2 text-xs">
-                <span className="font-semibold text-foreground">ปิดภายใน</span>
+                <span className="font-medium text-foreground">ปิดภายใน</span>
                 <div className="flex flex-wrap items-center gap-1">
                   {CLOSED_RANGE_OPTIONS.map((r) => (
                     <Button
@@ -1433,14 +1433,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     {/* ป้ายใบขอชั่วคราว (17 ส.ค. 2569 · เปลี่ยนคำ 19 ส.ค.) — ต้องรู้ตั้งแต่แรกเห็น
                         ว่ายังไม่ใช่ใบจริง เพราะยังไม่การันตีว่าจะเปิดงาน (หาคนล่วงหน้าได้ แต่อย่าไปสัญญา) */}
                     <PrequestBadge job={job} className="mb-1" />
-                    <h2 className="text-base font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-blue-600 transition-colors">
+                    <h2 className="text-base font-medium leading-snug text-foreground line-clamp-2 group-hover:text-blue-600 transition-colors">
                       {jobBoardCardTitle(job)}
                     </h2>
                     {/* ตำแหน่งงานอยู่ใต้ชื่อไซต์ทันที + ไฮไลต์สี (เจ้าของสั่ง 17 ส.ค. 2569:
                         *"ตำแหน่งงานอยู่ใต้ Site งาน และขอไฮไลสีด้วย"*)
                         เดิมตำแหน่งเป็นชิปเทา ๆ ปนอยู่แถวล่างกับประเภทงาน กวาดตาหาไม่เจอ
                         ทั้งที่เป็นคำที่คนใช้ตัดสินใจมากที่สุดบนการ์ด */}
-                    <p className="mt-1 line-clamp-2 text-sm font-bold leading-snug text-blue-700 dark:text-blue-300">
+                    <p className="mt-1 line-clamp-2 text-sm font-medium leading-snug text-blue-700 dark:text-blue-300">
                       {publicJobPositionLabel(job)}
                     </p>
                     {/* บรรทัดรอง: ตัดตำแหน่งที่ซ้ำกับบรรทัดสีน้ำเงินข้างบนออก (เดิมพิมพ์ซ้ำทุกใบ) */}
@@ -1497,7 +1497,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       ไม่งั้นกดปุ่มแล้วเด้งไปเปิดรายละเอียดแทน */}
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
                     {job.urgency === 'urgent' && (
-                      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-destructive">
+                      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
                         ด่วน
                       </span>
                     )}
@@ -1567,7 +1567,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   {/* ยอดรายเดือน = ค่าแรงหลัก + รายได้มั่นคง (เจ้าของสั่ง 16 ส.ค. 2569)
                       ⚠️ ถอยไป total_income เมื่อคิดไม่ได้ — แต่ตัวนั้นบางใบเป็น**อัตรารายวัน**
                       (410 = ค่าแรง/วัน · 20 จาก 200 ใบ) จึงไม่ติดคำว่า "/เดือน" ให้ */}
-                  <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-foreground font-semibold">
+                  <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-foreground font-medium">
                     <Banknote className="h-3.5 w-3.5 text-success" />
                     {/* breakdown ที่เจ้าหน้าที่ตั้งเองมาก่อนเสมอ — บอกหน่วยตามที่ตั้ง (วัน/เดือน) */}
                     {job.income_display
@@ -1655,7 +1655,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         · 2 ปุ่มคนละสี (ค้นหา = ฟ้า · Gen link = ม่วง) — สีมาจาก TONE ที่เดียว
                         แถวเดียว wrap ได้ · "ผู้สมัคร N คน" ซ้าย · ปุ่ม+ดูรายชื่อ ขวา */}
                     <div className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-                      <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-semibold text-foreground">
+                      <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-medium text-foreground">
                         <Users className={cn('h-3.5 w-3.5', TONE.info.value)} />
                         ผู้สมัคร {countFor(applicantIdx, job.id)} คน
                         {/* Lead = ใบที่ถูกปัดเข้าคลัง ไม่ถูกนับในยอดซ้าย — โชว์เป็นเลขที่สอง
@@ -1730,7 +1730,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         e.stopPropagation();
                         openApply(job);
                       }}
-                      className="flex-1 py-2.5 text-xs font-semibold"
+                      className="flex-1 py-2.5 text-xs font-medium"
                     >
                       สมัครงาน
                       <Send className="opacity-90" />
@@ -1773,7 +1773,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         */}
         {isStaff && postings.some((p) => p.standaloneKind) ? (
           <div className="mt-6">
-            <p className={cn('mb-2 text-[11px] font-bold uppercase tracking-[0.14em]', TONE.warn.value)}>
+            <p className={cn('mb-2 text-[11px] font-medium uppercase tracking-[0.14em]', TONE.warn.value)}>
               กล่องลอย (ไม่ผูกใบขอ)
             </p>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1813,7 +1813,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     <CardHeader className="space-y-3 pb-2">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <h2 className="line-clamp-2 text-base font-semibold leading-snug text-foreground transition-colors group-hover:text-blue-600">
+                          <h2 className="line-clamp-2 text-base font-medium leading-snug text-foreground transition-colors group-hover:text-blue-600">
                             {k.label}
                           </h2>
                           <p className="mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
@@ -1850,13 +1850,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           ประกาศ — กรองรายชื่อ "เฉพาะกล่องลอยประเภทนี้" ยังทำไม่ได้จริง
                           ใส่ไปก็เป็นปุ่มหลอก */}
                       <div className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-                        <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-semibold text-foreground">
+                        <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-medium text-foreground">
                           <Users className={cn('h-3.5 w-3.5', TONE.info.value)} />
                           ผู้สมัคร {s.applicants.toLocaleString('th-TH')} คน
                         </span>
                         <span
                           className={cn(
-                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium',
                             TONE.violet.outline,
                           )}
                         >
@@ -1882,7 +1882,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               <Button size="sm"
                 type="button"
                 onClick={() => openApply(null)}
-                className="mt-5 inline-flex w-full justify-center px-8 py-3.5 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                className="mt-5 inline-flex w-full justify-center px-8 py-3.5 text-sm font-medium transition-transform hover:scale-[1.02] active:scale-[0.98]"
               >
                 กรอกใบสมัครงาน
                 <Send aria-hidden />
@@ -1914,7 +1914,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       >
         <DialogContent className="flex max-h-[min(92dvh,860px)] w-[min(calc(100vw-1.25rem),40rem)] max-w-none flex-col gap-0 overflow-hidden border-border/80 p-0">
           <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-3 pt-5 text-left">
-            <DialogTitle className="text-base font-semibold leading-snug sm:text-lg break-words">
+            <DialogTitle className="text-base font-medium leading-snug sm:text-lg break-words">
               {postingJob ? jobBoardCardTitle(postingJob) : ''}
             </DialogTitle>
             <DialogDescription className="text-xs">

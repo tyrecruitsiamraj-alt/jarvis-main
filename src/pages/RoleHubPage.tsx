@@ -95,7 +95,7 @@ const RoleHubPage: React.FC<{ role: HubRole }> = ({ role }) => {
               >
                 <item.icon className="w-5 h-5" />
               </div>
-              <div className="font-semibold text-foreground text-sm md:text-base">{item.label}</div>
+              <div className="font-medium text-foreground text-sm md:text-base">{item.label}</div>
               <div className="text-xs text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">{item.desc}</div>
               <div className="mt-3 flex items-center gap-1 text-xs font-medium text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
                 เปิด

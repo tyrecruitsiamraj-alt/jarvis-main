@@ -85,7 +85,7 @@ function ScorePercentBadge({
         <TooltipTrigger asChild>
           <span
             className={cn(
-              'shrink-0 cursor-help rounded-full border px-2 py-0.5 text-xs font-bold tabular-nums',
+              'shrink-0 cursor-help rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums',
               scoreColor(percent),
             )}
           >
@@ -93,7 +93,7 @@ function ScorePercentBadge({
           </span>
         </TooltipTrigger>
         <TooltipContent side="left" className="max-w-[260px] space-y-1 p-2.5 text-left">
-          <p className="text-[11px] font-semibold">องค์ประกอบคะแนน</p>
+          <p className="text-[11px] font-medium">องค์ประกอบคะแนน</p>
           <ul className="space-y-0.5 text-[11px] leading-snug">
             {breakdown.map((line) => (
               <li key={line}>• {line}</li>
@@ -133,7 +133,7 @@ export default function ScoredCandidateCard({
   const proposeButtons = onPropose ? (
     <div className="flex flex-wrap items-center gap-1.5">
       {proposalStatus ? (
-        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300">
+        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300">
           <CheckCircle2 className="h-3 w-3" /> {proposalStatusLabel(proposalStatus)}
         </span>
       ) : null}
@@ -149,7 +149,7 @@ export default function ScoredCandidateCard({
         type="button"
         disabled={proposalBusy}
         onClick={() => onPropose(match, 'placed', buildWhy())}
-        className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 dark:border-emerald-800"
+        className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-emerald-700 disabled:opacity-50 dark:border-emerald-800"
       >
         {proposalBusy ? 'บันทึก…' : proposalStatus === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
       </button>
@@ -171,12 +171,12 @@ export default function ScoredCandidateCard({
           <ScorePercentBadge percent={score.percent} breakdown={breakdown} />
         </div>
 
-        <p className="text-sm font-semibold text-foreground">
+        <p className="text-sm font-medium text-foreground">
           {matchTierEmoji(match.tier)} {match.full_name}
         </p>
 
         <div className="rounded-md border border-white/70 bg-white/70 px-2.5 py-2 space-y-1.5 dark:bg-white/5 dark:border-white/10">
-          <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">ทำไมแนะนำคนนี้</p>
+          <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300">ทำไมแนะนำคนนี้</p>
           <ul className="space-y-1 text-[11px]">
             <li className={verdictRowClass(score.gender)}>• เพศ: {verdictText(score.gender)}</li>
             <li className={verdictRowClass(score.age)}>• อายุ: {verdictText(score.age)}</li>
@@ -196,7 +196,7 @@ export default function ScoredCandidateCard({
           {match.phone_number ? (
             <a
               href={`tel:${match.phone_number}`}
-              className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700"
+              className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
             >
               <Phone className="h-3.5 w-3.5" /> โทร {match.phone_number}
             </a>
@@ -227,10 +227,10 @@ export default function ScoredCandidateCard({
   return (
     <div className="rounded-lg border border-white/70 bg-white/70 px-2.5 py-2 space-y-1.5 dark:bg-white/5 dark:border-white/10">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+        <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
           {matchTierEmoji(match.tier)} {match.full_name}
           {proposalStatus ? (
-            <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300">
+            <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 align-middle text-[10px] font-medium text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300">
               <CheckCircle2 className="h-2.5 w-2.5" /> {proposalStatusLabel(proposalStatus)}
             </span>
           ) : null}

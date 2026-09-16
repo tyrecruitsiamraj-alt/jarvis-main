@@ -501,7 +501,7 @@ const JobDetailPage: React.FC = () => {
 
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-foreground">รายชื่อที่ส่ง</h3>
+            <h3 className="text-sm font-medium text-foreground">รายชื่อที่ส่ง</h3>
 
             {hasPermission('supervisor') && (
               <Button size="sm"

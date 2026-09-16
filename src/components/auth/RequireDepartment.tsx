@@ -50,7 +50,7 @@ const RequireDepartment: React.FC<{ children: React.ReactNode }> = ({ children }
         <div className="flex items-center gap-3">
           <BrandMark size="lg" />
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-foreground">
+            <h1 className="text-xl font-medium tracking-tight text-foreground">
               <BrandTitle />
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">เลือกแผนกก่อนใช้งาน</p>

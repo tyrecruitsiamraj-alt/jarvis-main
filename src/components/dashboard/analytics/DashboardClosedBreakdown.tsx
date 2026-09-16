@@ -31,7 +31,7 @@ const DashboardClosedBreakdownCard: React.FC<Props> = ({
         className={cn('w-full rounded-lg px-3 py-2 text-left transition-colors', tone.tile)}
       >
         <p className={cn('text-xs', DASH.sub)}>{label}</p>
-        <p className={cn('text-lg font-semibold tabular-nums', tone.num)}>{value.toLocaleString('th-TH')}</p>
+        <p className={cn('text-lg font-medium tabular-nums', tone.num)}>{value.toLocaleString('th-TH')}</p>
       </button>
     );
   };

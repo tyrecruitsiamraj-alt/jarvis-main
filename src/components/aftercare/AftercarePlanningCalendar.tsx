@@ -73,7 +73,7 @@ const AftercarePlanningCalendar: React.FC<{
     <div className="glass-card rounded-2xl border border-white/70 p-3 dark:border-slate-700/70">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <CalendarDays className="h-4 w-4 text-muted-foreground" aria-hidden />
-        <span className="text-sm font-bold text-foreground">ปฏิทินดูแลหลังเริ่มงาน</span>
+        <span className="text-sm font-medium text-foreground">ปฏิทินดูแลหลังเริ่มงาน</span>
         <span className="text-[11px] text-muted-foreground">
           แถว = คน · คอลัมน์ = วัน · ช่องบอกว่าวันนั้นถึงกำหนดโทรรอบไหน และตั้งสายไว้หรือยัง
         </span>
@@ -86,7 +86,7 @@ const AftercarePlanningCalendar: React.FC<{
           >
             <ChevronLeft className="h-4 w-4" aria-hidden />
           </button>
-          <span className="min-w-[110px] text-center text-sm font-semibold text-foreground">
+          <span className="min-w-[110px] text-center text-sm font-medium text-foreground">
             {monthLabel(month)}
           </span>
           <button
@@ -101,7 +101,7 @@ const AftercarePlanningCalendar: React.FC<{
             type="button"
             onClick={() => onMonthChange(today.slice(0, 7))}
             className={cn(
-              'ml-1 inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-semibold',
+              'ml-1 inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-medium',
               TONE.info.outline,
             )}
           >
@@ -125,7 +125,7 @@ const AftercarePlanningCalendar: React.FC<{
           </span>
         ))}
         {missingStartDate > 0 ? (
-          <span className={cn('rounded-full px-2 py-0.5 font-semibold', TONE.warn.chip)}>
+          <span className={cn('rounded-full px-2 py-0.5 font-medium', TONE.warn.chip)}>
             ยังไม่รู้วันเริ่มงาน {missingStartDate} คน — ขึ้นปฏิทินไม่ได้จนกรอกวัน
           </span>
         ) : null}
@@ -141,7 +141,7 @@ const AftercarePlanningCalendar: React.FC<{
             <thead>
               <tr className="border-b border-border">
                 {/* ชื่อคนตรึงซ้าย — เลื่อนดูวันท้ายเดือนแล้วต้องยังรู้ว่าแถวนี้ใคร */}
-                <th className="sticky left-0 z-10 min-w-[190px] max-w-[260px] bg-card px-3 py-2 text-left text-[11px] font-semibold text-muted-foreground">
+                <th className="sticky left-0 z-10 min-w-[190px] max-w-[260px] bg-card px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">
                   คนที่ดูแลอยู่
                 </th>
                 {cols.map((c) => (
@@ -168,7 +168,7 @@ const AftercarePlanningCalendar: React.FC<{
               {rows.map((row) => (
                 <tr key={row.person.phone_e164} className="border-b border-border/50 last:border-0">
                   <td className="sticky left-0 z-10 max-w-[260px] bg-card px-3 py-1.5 align-middle">
-                    <span className="block truncate text-[11px] font-bold text-foreground">
+                    <span className="block truncate text-[11px] font-medium text-foreground">
                       {row.person.full_name}
                     </span>
                     <span className="block truncate text-[10px] text-muted-foreground">
@@ -195,7 +195,7 @@ const AftercarePlanningCalendar: React.FC<{
                             {cell.round ? (
                               <span
                                 className={cn(
-                                  'block rounded px-0.5 py-0.5 text-[9px] font-bold leading-tight',
+                                  'block rounded px-0.5 py-0.5 text-[9px] font-medium leading-tight',
                                   cell.round.overdue && cell.calls.length === 0
                                     ? TONE.warn.chip
                                     : TONE.neutral.chip,
@@ -210,7 +210,7 @@ const AftercarePlanningCalendar: React.FC<{
                                 key={call.entry.id}
                                 className={cn('block rounded px-0.5 py-0.5 leading-tight', TONE[roundTone(call)].chip)}
                               >
-                                <span className="block text-[9px] font-bold tabular-nums">
+                                <span className="block text-[9px] font-medium tabular-nums">
                                   {call.time ?? '—'}
                                 </span>
                                 <span className="block truncate text-[8px] font-medium leading-tight">
@@ -219,7 +219,7 @@ const AftercarePlanningCalendar: React.FC<{
                               </span>
                             ))}
                             {cell.calls.length > 2 ? (
-                              <span className="text-[9px] font-semibold text-primary">
+                              <span className="text-[9px] font-medium text-primary">
                                 +{cell.calls.length - 2}
                               </span>
                             ) : null}

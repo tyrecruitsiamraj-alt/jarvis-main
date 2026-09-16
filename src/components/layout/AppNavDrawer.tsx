@@ -24,7 +24,7 @@ import {
 } from '@/lib/soRecruitNav';
 
 const groupLabelClass =
-  'px-3 pb-1 pt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground';
+  'px-3 pb-1 pt-3 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground';
 
 type Props = {
   open: boolean;
@@ -124,7 +124,7 @@ const AppNavDrawer: React.FC<Props> = ({
           <SheetTitle asChild>
             <button type="button" onClick={() => go('/')} className="flex min-w-0 items-center gap-2">
               <BrandMark size="sm" />
-              <BrandTitle className="truncate text-base font-bold text-foreground" />
+              <BrandTitle className="truncate text-base font-medium text-foreground" />
             </button>
           </SheetTitle>
           <SheetDescription className="sr-only">เมนูหลักของระบบ</SheetDescription>

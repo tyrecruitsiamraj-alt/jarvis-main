@@ -54,7 +54,7 @@ export const SheetHead2: React.FC<{
   <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-2 px-6 pt-5 lg:px-8', className)}>
     {brand ? (
       <>
-        <span className="text-[13px] font-semibold tracking-tight text-foreground">{brand}</span>
+        <span className="text-[13px] font-medium tracking-tight text-foreground">{brand}</span>
         {/* เส้นคั่นบางแทนจุดไข่ปลา — ภาษาเดียวกับ Rule2 ของผืน */}
         <span className="h-3.5 w-px bg-border" aria-hidden />
       </>
@@ -102,7 +102,7 @@ export const Stat2: React.FC<{
   className?: string;
 }> = ({ value, label, valueClassName, hint, className }) => (
   <div className={cn('px-6 py-4 lg:px-8', className)}>
-    <div className={cn('text-[28px] font-semibold leading-tight tabular-nums', valueClassName)}>
+    <div className={cn('text-[28px] font-medium leading-tight tabular-nums', valueClassName)}>
       {value}
     </div>
     <div className="mt-0.5 text-[12.5px] font-normal text-muted-foreground">{label}</div>

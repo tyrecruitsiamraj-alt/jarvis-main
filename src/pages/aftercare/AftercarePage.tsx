@@ -174,20 +174,20 @@ const AftercarePage: React.FC = () => {
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <div className={cn('rounded-xl border px-3 py-2', TONE.info.soft)}>
             <p className={cn('text-[11px] font-medium', DASH.muted)}>กำลังดูแล</p>
-            <p className={cn('text-xl font-bold tabular-nums', TONE.info.num)}>
+            <p className={cn('text-xl font-medium tabular-nums', TONE.info.num)}>
               {open.length.toLocaleString('th-TH')} คน
             </p>
           </div>
           <div className={cn('rounded-xl border px-3 py-2', needStartDate.length > 0 ? TONE.warn.soft : TONE.neutral.soft)}>
             <p className={cn('text-[11px] font-medium', DASH.muted)}>ยังไม่ระบุวันเริ่มงาน</p>
-            <p className={cn('text-xl font-bold tabular-nums', needStartDate.length > 0 ? TONE.warn.num : TONE.success.value)}>
+            <p className={cn('text-xl font-medium tabular-nums', needStartDate.length > 0 ? TONE.warn.num : TONE.success.value)}>
               {needStartDate.length.toLocaleString('th-TH')} คน
             </p>
             <p className={cn('text-[10px]', DASH.muted)}>ตั้งรอบโทรไม่ได้จนกรอกวัน</p>
           </div>
           <div className={cn('rounded-xl border px-3 py-2', overdueCount > 0 ? TONE.danger.soft : TONE.neutral.soft)}>
             <p className={cn('text-[11px] font-medium', DASH.muted)}>เลยรอบที่ควรโทร</p>
-            <p className={cn('text-xl font-bold tabular-nums', overdueCount > 0 ? TONE.danger.num : TONE.success.value)}>
+            <p className={cn('text-xl font-medium tabular-nums', overdueCount > 0 ? TONE.danger.num : TONE.success.value)}>
               {overdueCount.toLocaleString('th-TH')} คน
             </p>
           </div>
@@ -305,7 +305,7 @@ const AftercarePage: React.FC = () => {
                         <b className={DASH.cellStrong}>{p.full_name}</b>
                         <span className={cn('ml-1.5 font-mono text-[11px]', DASH.muted)}>{p.phone_e164}</span>
                         {p.closed_at ? (
-                          <span className={cn('ml-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold', TONE.neutral.chip)}>
+                          <span className={cn('ml-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium', TONE.neutral.chip)}>
                             ปิดการดูแลแล้ว
                           </span>
                         ) : null}
@@ -336,7 +336,7 @@ const AftercarePage: React.FC = () => {
                               )
                             }
                             className={cn(
-                              'inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-semibold disabled:opacity-40',
+                              'inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium disabled:opacity-40',
                               TONE.primary.outline,
                             )}
                           >
@@ -347,7 +347,7 @@ const AftercarePage: React.FC = () => {
                             disabled={busy}
                             onClick={() => void closeCare(p)}
                             className={cn(
-                              'inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-semibold disabled:opacity-40',
+                              'inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium disabled:opacity-40',
                               TONE.neutral.outline,
                             )}
                           >
@@ -391,7 +391,7 @@ const AftercarePage: React.FC = () => {
                           <span
                             key={r.days}
                             className={cn(
-                              'rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                              'rounded-full border px-2 py-0.5 text-[10px] font-medium',
                               r.overdue ? cn(TONE.danger.soft, TONE.danger.value) : cn(TONE.info.soft, TONE.info.value),
                             )}
                           >

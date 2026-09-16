@@ -276,10 +276,10 @@ export const DASH = {
   /** hero เข้มหัวหน้า Dashboard (mockup rev.3 ข้อ 02) — น้ำเงินหมึก เข้มทั้งสองธีม */
   hero: 'jarvis-hero-card',
   /** ป้ายทอง (brass) บน hero เข้ม — สีเดียวทั้งสองธีมเพราะพื้นเข้มตลอด */
-  heroLabel: 'text-[10px] font-bold uppercase tracking-[0.14em] text-[#c9b184]',
+  heroLabel: 'text-[10px] font-medium uppercase tracking-[0.14em] text-[#c9b184]',
   /** ป้ายหัวข้อกลุ่ม (brass) บนพื้นสว่างของหน้า — ภาษาเดียวกับ eyebrow ใน mockup */
-  eyebrow: 'text-[11px] font-bold uppercase tracking-[0.14em] text-[#8a6c33] dark:text-[#cfae72]',
-  title: 'text-sm font-semibold text-slate-900 dark:text-slate-100',
+  eyebrow: 'text-[11px] font-medium uppercase tracking-[0.14em] text-[#8a6c33] dark:text-[#cfae72]',
+  title: 'text-sm font-medium text-slate-900 dark:text-slate-100',
   label: 'text-xs font-medium text-slate-600 dark:text-slate-300',
   sub: 'text-xs text-slate-500 dark:text-slate-400',
   /** เหมือน sub แต่ไม่กำหนดขนาด — ใช้เมื่อจุดเรียกใช้กำหนดขนาดเอง (twMerge จะทับขนาดถ้าใช้ sub) */
@@ -349,13 +349,13 @@ export const HUD = {
   /** เส้นสแกนวิ่ง — ใส่เป็น div ลูกในแผง (หยุดเองเมื่อ prefers-reduced-motion) */
   scan: 'jarvis-hud-scan',
   /** ป้ายหัวข้อกลุ่มบนแผง — uppercase ระยะห่างกว้าง โทน teal (ภาษาเดียวกับ DASH.eyebrow แต่บนพื้นเข้ม) */
-  eyebrow: 'text-[10px] font-bold uppercase tracking-[0.18em] text-teal-300',
+  eyebrow: 'text-[10px] font-medium uppercase tracking-[0.18em] text-teal-300',
   /** ป้ายกำกับตัวเลข/ช่อง */
   label: 'text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400',
   /** ตัวเลขหลักของแผง — mono + tabular กันความกว้างเด้ง */
-  figure: 'font-mono text-2xl font-semibold tabular-nums text-white',
+  figure: 'font-mono text-2xl font-medium tabular-nums text-white',
   /** ตัวเลขรอง */
-  figureSm: 'font-mono text-lg font-semibold tabular-nums text-white',
+  figureSm: 'font-mono text-lg font-medium tabular-nums text-white',
   /** หน่วย/คำต่อท้ายตัวเลข */
   unit: 'text-[11px] text-slate-400',
   /** ตัวหนังสือเนื้อหาบนแผง */

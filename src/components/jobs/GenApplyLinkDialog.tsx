@@ -60,7 +60,7 @@ function LinkRow({ url, label }: { url: string; label?: string | null }) {
         <button
           type="button"
           onClick={() => void copy()}
-          className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground"
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground"
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
           {copied ? 'คัดลอกแล้ว' : 'คัดลอก'}
@@ -378,7 +378,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                       onClick={() => setFormType(f.code)}
                       className={
                         formType === f.code
-                          ? 'rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs font-semibold text-primary'
+                          ? 'rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs font-medium text-primary'
                           : 'rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-secondary'
                       }
                     >
@@ -403,7 +403,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                   <span className="text-xs font-medium text-muted-foreground">
                     ช่องทางที่จะส่ง{' '}
                     {picked ? (
-                      <span className="font-semibold text-foreground">
+                      <span className="font-medium text-foreground">
                         — {recruitChannelLabel(picked)}
                       </span>
                     ) : (
@@ -435,7 +435,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                 type="button"
                 onClick={() => void submit()}
                 disabled={saving || !title.trim()}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
                 {saving ? 'กำลังสร้าง…' : 'สร้างประกาศ + ลิงก์'}
@@ -457,7 +457,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               <Link2 className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <DialogTitle className="text-base font-semibold leading-tight sm:text-lg">
+              <DialogTitle className="text-base font-medium leading-tight sm:text-lg">
                 สร้างลิงก์รับสมัคร
               </DialogTitle>
               <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug">

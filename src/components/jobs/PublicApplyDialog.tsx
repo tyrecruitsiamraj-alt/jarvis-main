@@ -75,7 +75,7 @@ const SectionLabel: React.FC<{ icon: React.ReactNode; children: React.ReactNode 
   icon,
   children,
 }) => (
-  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-primary/80">
+  <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-primary/80">
     {icon}
     <span>{children}</span>
   </div>
@@ -252,7 +252,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
               <UserRound className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <DialogTitle className="text-base font-semibold leading-tight sm:text-lg">
+              <DialogTitle className="text-base font-medium leading-tight sm:text-lg">
                 {submitted ? 'ส่งใบสมัครแล้ว' : 'กรอกใบสมัครงาน'}
               </DialogTitle>
               <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug sm:text-[13px]">
@@ -280,7 +280,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
               * ⚠️ พูดให้ตรงกับที่ระบบทำจริง: AI โทรก่อน แล้วเจ้าหน้าที่ตามทีหลัง
               */}
             <div className="w-full max-w-xs rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-left dark:border-sky-800 dark:bg-sky-950/40">
-              <p className="flex items-center gap-1.5 text-sm font-semibold text-sky-800 dark:text-sky-200">
+              <p className="flex items-center gap-1.5 text-sm font-medium text-sky-800 dark:text-sky-200">
                 <PhoneCall className="h-4 w-4 shrink-0" aria-hidden />
                 เตรียมรับสายจากเรานะครับ
               </p>
@@ -292,7 +292,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
             <Button size="sm"
               type="button"
               onClick={onClose}
-              className="w-full py-3 text-sm font-semibold"
+              className="w-full py-3 text-sm font-medium"
             >
               ปิดหน้าต่าง
             </Button>
@@ -577,7 +577,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
               <Button size="sm"
                 type="submit"
                 disabled={submitting}
-                className="w-full py-3 text-sm font-semibold"
+                className="w-full py-3 text-sm font-medium"
               >
                 {submitting ? <Loader2 className="animate-spin" /> : <Send aria-hidden />}
                 ส่งใบสมัคร

@@ -289,7 +289,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 type="button"
                 onClick={() => setInfoOpen((v) => !v)}
                 aria-expanded={infoOpen}
-                className="flex min-h-9 w-full items-center gap-1.5 text-left text-sm font-semibold"
+                className="flex min-h-9 w-full items-center gap-1.5 text-left text-sm font-medium"
               >
                 <ExternalLink className={cn("w-4 h-4", TONE.primary.value)} />
                 ข้อมูลใบขอ
@@ -311,7 +311,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                   แต่บรรทัดค่าจ้างหลักโชว์เสมอ (ตัวที่ประกาศเป็นรายได้ให้ผู้สมัคร) */}
               {infoOpen && rateLines.length > 0 ? (
                 <div className="rounded-xl border border-white/70 bg-white/40 p-3">
-                  <div className="text-xs font-semibold text-foreground">อัตราตามใบขอ (ERP)</div>
+                  <div className="text-xs font-medium text-foreground">อัตราตามใบขอ (ERP)</div>
                   <div className="mt-2 overflow-x-auto">
                     <table className="w-full table-fixed text-xs">
                       <thead>
@@ -360,7 +360,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                   ⚠️ คอมเมนต์ JSX ต้องอยู่**นอก** `cond ? (` — วางในนั้นแล้ว TS ฟ้อง ')' expected */}
               {infoOpen ? (
                 <div className="rounded-xl border border-white/70 bg-white/40 p-3 space-y-2">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
                     <UserMinus className={cn('w-3.5 h-3.5', TONE.primary.value)} />
                     คนที่ออก / เปลี่ยนตัว
                   </div>
@@ -397,7 +397,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                           มีงวดข้ามไซต์) — ตอนนี้กรองด้วยไซต์ของใบขอนี้แล้ว
                       (3) เดิมเป็น **ยอดรวมก่อนหัก** ⇒ สูงกว่าที่เขารับจริง
                           เจ้าของเคาะ 27 ส.ค. 2569 ให้ใช้ยอด eSlip (สุทธิ) แทน */}
-                  <div className="text-xs font-semibold text-foreground">
+                  <div className="text-xs font-medium text-foreground">
                     รายได้จริง 3 งวดล่าสุดของงานนี้
                   </div>
                   <p className="mt-0.5 text-[10px] text-muted-foreground">
@@ -435,7 +435,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                             </td>
                           ) : null}
                           {/* สุทธิ = ตัวที่เจ้าของถามหา ทำให้เด่นกว่าช่องอื่น */}
-                          <td className="whitespace-nowrap py-1 text-right font-semibold tabular-nums text-foreground">
+                          <td className="whitespace-nowrap py-1 text-right font-medium tabular-nums text-foreground">
                             {amountText(r.net) ?? '—'}
                           </td>
                         </tr>
@@ -463,7 +463,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
             </section>
 
             <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3">
-              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+              <h3 className="text-sm font-medium flex items-center gap-1.5">
                 <Users className={cn("w-4 h-4", TONE.primary.value)} />
                 ผู้รับผิดชอบ
               </h3>
@@ -610,7 +610,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
             </section>
 
             <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3">
-              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+              <h3 className="text-sm font-medium flex items-center gap-1.5">
                 <StickyNote className={cn("w-4 h-4", TONE.primary.value)} />
                 หมายเหตุ
               </h3>

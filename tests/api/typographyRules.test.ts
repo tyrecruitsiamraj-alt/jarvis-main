@@ -226,29 +226,41 @@ describe('หน้าแรกต้องไม่มีตัวอักษ�
  * ⇒ หน้าแรกเหลือสองระดับ: `font-medium` (500) กับน้ำหนักปกติ (400)
  * ลำดับความสำคัญที่เหลือให้ใช้ **ขนาดกับสี** ไม่ใช่ความหนา
  */
-describe('หน้าแรกต้องไม่มีตัวหนาเกินระดับ medium', () => {
-  const FILES = [
-    'src/components/home/TeamBoardPanel.tsx',
-    'src/components/home/HomeKpiRow.tsx',
-    'src/components/home/HomeDeckV2.tsx',
-    'src/components/home/CommandDeck.tsx',
-    'src/components/home/HomeSection.tsx',
-    'src/components/home/FollowTodayPanel.tsx',
-    'src/components/home/LumosCallHealthPanel.tsx',
-    'src/components/home/HomeDigestPanels.tsx',
-    'src/components/shared/StatCard.tsx',
-    'src/pages/HomePage.tsx',
-    // หน้าติดตาม — ไล่ตามรอบเดียวกัน 16 ก.ย. 2569
-    'src/pages/follow/FollowPage.tsx',
-    'src/components/follow/FollowPlanningCalendar.tsx',
-    'src/components/follow/FollowCallRoundsPanel.tsx',
-    'src/components/follow/CallFunnelPanel.tsx',
-    'src/components/follow/FollowCompletedPanel.tsx',
-  ];
+/** ไล่หาไฟล์ซอร์สทั้งหมดใต้โฟลเดอร์ — ใช้แทนการพิมพ์รายชื่อไฟล์ทีละบรรทัด */
+function listSourceFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) out.push(...listSourceFiles(full));
+    else if (/\.(ts|tsx)$/.test(entry.name)) out.push(full);
+  }
+  return out;
+}
 
-  it.each(FILES)('%s — ไม่มี font-bold / font-semibold', (f) => {
-    const code = read(f).replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(code).not.toMatch(/font-bold/);
-    expect(code).not.toMatch(/font-semibold/);
+describe('🔴 ทั้งระบบต้องไม่มีตัวหนาเกินระดับ medium', () => {
+  /**
+   * เจ้าของสั่ง 16 ก.ย. 2569 หลังเห็นว่ายังหนาอยู่บางจุด:
+   * *"ฉันให้นายเช็คทั้งหมดนะแล้วลดลงตามที่สั่งนะ ไม่ใช่แค่ ขั้นตอนของสาย (Call Pipeline)
+   * หมายถึงทั้งหมดเลย"*
+   *
+   * ⇒ ด่านนี้ **สแกนทั้ง `src/` ไม่ใช่รายชื่อไฟล์** — ไล่ทีละไฟล์แล้วมันงอกกลับที่อื่นเสมอ
+   * ⚠️ รวม `src/components/ui/*` ด้วย (shadcn ฝัง `font-semibold` มาในหัวข้อการ์ด/ป๊อป
+   * ซึ่งเป็นต้นเหตุที่หัวข้อยังหนาแม้แก้ไฟล์หน้าจอหมดแล้ว)
+   */
+  const FILES = listSourceFiles('src').filter((f) => !f.includes('.test.'));
+
+  it('มีไฟล์ให้สแกนจริง (กันเคสหาไฟล์ไม่เจอแล้วผ่านฟรี)', () => {
+    expect(FILES.length).toBeGreaterThan(100);
+  });
+
+  it('ไม่มี font-bold / font-semibold เหลือในซอร์สเลย', () => {
+    const bad = FILES.filter((f) => /font-(bold|semibold)/.test(read(f).replace(/\/\*[\s\S]*?\*\//g, '')));
+    expect(bad, `ไฟล์ที่ยังมีตัวหนาเกิน medium:\n${bad.join('\n')}`).toEqual([]);
+  });
+
+  it('CSS กลางก็ต้องไม่หนาเกิน 500', () => {
+    const css = read('src/index.css');
+    expect(css).not.toMatch(/font-weight:\s*(600|700|800|900)/);
+    expect(css).not.toMatch(/@apply[^;]*font-(bold|semibold)/);
   });
 });

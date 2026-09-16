@@ -119,7 +119,7 @@ const WorkStatusMasterTab: React.FC = () => {
     <div className="space-y-4">
       <div className="glass-card rounded-3xl border border-white/70 p-4 space-y-3">
         <div>
-          <div className="text-sm font-semibold text-foreground">สถานะทำงานของใบขอ</div>
+          <div className="text-sm font-medium text-foreground">สถานะทำงานของใบขอ</div>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             ใช้ในช่อง “สถานะทำงาน” ของใบขอ และเป็นตัวนับบนแดชบอร์ด · สถานะพื้นฐานของระบบลบไม่ได้
             (ปิดใช้งานเพื่อซ่อนจากตัวเลือกได้) · สถานะที่เพิ่มเองลบได้เมื่อยังไม่มีใบขอใช้อยู่
@@ -139,7 +139,7 @@ const WorkStatusMasterTab: React.FC = () => {
 
         {/* เพิ่มสถานะใหม่ */}
         <div className="rounded-xl border border-border p-3 space-y-2">
-          <div className="text-xs font-semibold text-foreground">เพิ่มสถานะใหม่</div>
+          <div className="text-xs font-medium text-foreground">เพิ่มสถานะใหม่</div>
           <div className="grid gap-2 sm:grid-cols-3">
             <label className="space-y-1">
               <span className="block text-[11px] text-muted-foreground">รหัส (a-z, _)</span>

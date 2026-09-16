@@ -347,7 +347,7 @@ const AdminSettings: React.FC = () => {
             <div className="space-y-4 rounded-2xl border border-border/70 bg-card p-3">
               {navGroups.map((g) => (
                 <div key={g.id} className="space-y-1">
-                  <p className="px-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                  <p className="px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     {g.label}
                   </p>
                   {g.tabs.map((t) => {
@@ -363,7 +363,7 @@ const AdminSettings: React.FC = () => {
                         className={cn(
                           'flex w-full items-start gap-2 rounded-xl px-2.5 py-2 text-left transition-colors',
                           active
-                            ? cn(TONE.primary.soft, 'font-semibold')
+                            ? cn(TONE.primary.soft, 'font-medium')
                             : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
                         )}
                       >
@@ -605,7 +605,7 @@ const AdminSettings: React.FC = () => {
               <div key={cat} className="glass-card rounded-3xl p-4 border border-white/70">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-semibold text-foreground text-sm">{cat}</div>
+                    <div className="font-medium text-foreground text-sm">{cat}</div>
                     <div className="text-[11px] text-muted-foreground mt-1">
                       {referenceData[cat].length} รายการ
                     </div>
@@ -624,7 +624,7 @@ const AdminSettings: React.FC = () => {
             {editingCategory && (
               <div className="glass-card rounded-3xl p-4 border border-white/70">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="font-semibold text-foreground">จัดการ: {editingCategory}</div>
+                  <div className="font-medium text-foreground">จัดการ: {editingCategory}</div>
                   <button
                     type="button"
                     onClick={() => setEditingCategory(null)}

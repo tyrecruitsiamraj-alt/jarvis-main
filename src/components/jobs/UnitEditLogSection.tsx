@@ -77,7 +77,7 @@ const UnitEditLogSection: React.FC<{ job: JobRequest | null }> = ({ job }) => {
             return (
               <li key={it.id} className="rounded-xl border border-border/60 bg-secondary/30 px-3 py-2">
                 <p className="text-[11px] text-muted-foreground">
-                  <span className="font-semibold text-foreground">{it.user_name || 'ไม่ทราบชื่อ'}</span>
+                  <span className="font-medium text-foreground">{it.user_name || 'ไม่ทราบชื่อ'}</span>
                   {' · '}
                   {UNIT_EDIT_TITLE[it.entity_type] ?? it.entity_type}
                   {' · '}

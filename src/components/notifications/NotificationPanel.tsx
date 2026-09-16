@@ -42,7 +42,7 @@ const NotificationPanel: React.FC = () => {
         >
           <Bell />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+            <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-primary text-primary-foreground text-[10px] font-medium rounded-full flex items-center justify-center animate-pulse">
               {unreadCount}
             </span>
           )}
@@ -50,7 +50,7 @@ const NotificationPanel: React.FC = () => {
       </PopoverTrigger>
       <PopoverContent className="w-80 md:w-96 p-0" align="end" sideOffset={8}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h3 className="font-semibold text-sm text-foreground">การแจ้งเตือน</h3>
+          <h3 className="font-medium text-sm text-foreground">การแจ้งเตือน</h3>
           {unreadCount > 0 && (
             <button
               type="button"

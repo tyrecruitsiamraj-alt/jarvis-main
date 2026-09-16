@@ -78,7 +78,7 @@ const RecruitFunnelPanel: React.FC = () => {
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div>
           {/* หัวเป็นป้ายทองแบบเดียวกับ section อื่นบนบอร์ด — ภาษาเดียวกันทั้งหน้า */}
-          <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-gold">
+          <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-gold">
             ภาพรวมงานสรรหา
           </h2>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -89,7 +89,7 @@ const RecruitFunnelPanel: React.FC = () => {
           type="button"
           onClick={load}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary disabled:opacity-50"
         >
           <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
           รีเฟรช
@@ -128,10 +128,10 @@ const RecruitFunnelPanel: React.FC = () => {
                     active && 'ring-2 ring-sky-400/80',
                   )}
                 >
-                  <p className="truncate text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                  <p className="truncate text-[11px] font-medium text-slate-600 dark:text-slate-300">
                     {RECRUIT_FUNNEL_STEP_LABEL[s]}
                   </p>
-                  <p className={cn('mt-0.5 text-xl font-bold tabular-nums', tone.num)}>
+                  <p className={cn('mt-0.5 text-xl font-medium tabular-nums', tone.num)}>
                     {counts[primaryKey].toLocaleString('th-TH')}
                   </p>
                   <p className="truncate text-[10px] text-slate-500 dark:text-slate-400">
@@ -154,7 +154,7 @@ const RecruitFunnelPanel: React.FC = () => {
                     <p className="truncate text-[11px] font-medium text-slate-600 dark:text-slate-300">
                       {t.label}
                     </p>
-                    <p className={cn('mt-0.5 text-xl font-bold tabular-nums', tone.num)}>
+                    <p className={cn('mt-0.5 text-xl font-medium tabular-nums', tone.num)}>
                       {value.toLocaleString('th-TH')}
                     </p>
                     {/* แถบสัดส่วน — ไม่มีตัวหารก็ไม่ขึ้นแถบ ไม่ใช่แถบศูนย์ */}

@@ -211,12 +211,12 @@ const JobDashboard: React.FC = () => {
             className="flex-1 glass-card rounded-3xl p-4 border border-white/70 hover:border-blue-300/50 text-center"
           >
             <Briefcase className={cn('w-6 h-6 mx-auto mb-1', TONE.primary.value)} />
-            <div className={cn('text-sm', DASH.cellStrong, 'font-semibold')}>รายการงานทั้งหมด</div>
+            <div className={cn('text-sm', DASH.cellStrong, 'font-medium')}>รายการงานทั้งหมด</div>
           </button>
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-foreground mb-3">
+          <h3 className="text-sm font-medium text-foreground mb-3">
             งานล่าสุด
             {filterSummary ? ` · ${filterSummary}` : ''}
           </h3>
@@ -233,7 +233,7 @@ const JobDashboard: React.FC = () => {
                   className="w-full glass-card rounded-3xl p-4 border border-white/70 text-left hover:border-blue-300/50 transition-all"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className={cn('text-sm', DASH.cellStrong, 'font-semibold')}>
+                    <span className={cn('text-sm', DASH.cellStrong, 'font-medium')}>
                       {j.request_no ? `${unitOneLine(j)} · ${j.request_no}` : unitOneLine(j)}
                     </span>
                     <div className="flex items-center gap-2">

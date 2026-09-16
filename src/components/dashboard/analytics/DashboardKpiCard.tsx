@@ -84,7 +84,7 @@ const DashboardKpiCard: React.FC<Props> = ({
       </p>
       <p
         className={cn(
-          'mt-1.5 text-2xl font-semibold tracking-tight tabular-nums',
+          'mt-1.5 text-2xl font-medium tracking-tight tabular-nums',
           solid ? 'text-white' : (tone?.num ?? NEUTRAL_NUM),
         )}
       >

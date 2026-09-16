@@ -187,7 +187,7 @@ const DashboardShell: React.FC<Props> = ({
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               {/* หัวหลักเป็นไทย + คง EN เดิมเป็นบรรทัดรองตัวเล็กจาง (เจ้าของเคาะ 5 ก.ย. 2569) */}
-              <h1 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-slate-100">ศูนย์ควบคุมใบขอ</h1>
+              <h1 className="text-xl md:text-2xl font-medium text-slate-900 dark:text-slate-100">ศูนย์ควบคุมใบขอ</h1>
               <p className="text-xs font-medium text-slate-400 dark:text-slate-500">Request Control Tower</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:min-w-[420px]">
@@ -267,7 +267,7 @@ const DashboardShell: React.FC<Props> = ({
                     type="button"
                     className={cn(
                       DASH.card,
-                      'flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100',
+                      'flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100',
                     )}
                   >
                     <span className="flex items-center gap-2">

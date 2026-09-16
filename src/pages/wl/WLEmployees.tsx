@@ -192,7 +192,7 @@ const WLEmployees: React.FC = () => {
                 className="w-full glass-card rounded-3xl p-4 border border-white/70 text-left cursor-pointer hover:border-blue-300/50 transition-all"
               >
                 <div className="flex items-center justify-between mb-2 gap-2">
-                  <span className="inline-flex min-w-0 items-center gap-2 font-semibold text-foreground text-sm">
+                  <span className="inline-flex min-w-0 items-center gap-2 font-medium text-foreground text-sm">
                     <NameAvatar name={`${emp.first_name} ${emp.last_name}`} />
                     <span className="truncate">
                       {emp.first_name} {emp.last_name}
@@ -304,7 +304,7 @@ const WLEmployees: React.FC = () => {
                     <td className="px-4 py-3 text-center">
                       <span
                         className={cn(
-                          'font-semibold',
+                          'font-medium',
                           emp.reliability_score >= 80
                             ? 'text-success'
                             : emp.reliability_score >= 60

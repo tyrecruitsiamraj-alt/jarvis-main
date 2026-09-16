@@ -182,7 +182,7 @@ export default function ApplicantContactDialog({
                 }}
                 aria-pressed={mode === 'ok'}
                 className={cn(
-                  'inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-bold transition-colors',
+                  'inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors',
                   TONE.success.outline,
                   mode === 'ok' && 'ring-2 ring-ring',
                 )}
@@ -197,7 +197,7 @@ export default function ApplicantContactDialog({
                 }}
                 aria-pressed={mode === 'fail'}
                 className={cn(
-                  'inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-bold transition-colors',
+                  'inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors',
                   TONE.danger.outline,
                   mode === 'fail' && 'ring-2 ring-ring',
                 )}
@@ -209,7 +209,7 @@ export default function ApplicantContactDialog({
             {/* ฝั่งสำเร็จ: นัดได้ไหม → วัน/ที่/หน่วยงาน */}
             {mode === 'ok' ? (
               <div className={cn('space-y-2 rounded-xl border px-3 py-2.5', TONE.success.soft)}>
-                <p className={cn('text-xs font-semibold', DASH.cellStrong)}>นัดสัมภาษณ์ได้ไหม?</p>
+                <p className={cn('text-xs font-medium', DASH.cellStrong)}>นัดสัมภาษณ์ได้ไหม?</p>
                 <div className="flex gap-1.5">
                   {(
                     [
@@ -223,7 +223,7 @@ export default function ApplicantContactDialog({
                       onClick={() => setCanSchedule(v)}
                       aria-pressed={canSchedule === v}
                       className={cn(
-                        'rounded-full border px-3 py-1 text-xs font-semibold',
+                        'rounded-full border px-3 py-1 text-xs font-medium',
                         TONE.success.outline,
                         canSchedule === v && 'ring-2 ring-ring',
                       )}
@@ -277,7 +277,7 @@ export default function ApplicantContactDialog({
             {/* ฝั่งไม่สำเร็จ: เหตุผลจาก master (ระบบเดิม 67 ตัว — process การติดต่อ × ไม่สำเร็จ) */}
             {mode === 'fail' ? (
               <div className={cn('space-y-2 rounded-xl border px-3 py-2.5', TONE.danger.soft)}>
-                <p className={cn('text-xs font-semibold', DASH.cellStrong)}>เหตุผลที่ติดต่อไม่สำเร็จ *</p>
+                <p className={cn('text-xs font-medium', DASH.cellStrong)}>เหตุผลที่ติดต่อไม่สำเร็จ *</p>
                 <select
                   value={reasonId}
                   onChange={(e) => setReasonId(e.target.value)}
@@ -345,7 +345,7 @@ export default function ApplicantContactDialog({
                 เกณฑ์ส่ง AI โทร/เก็บไปโทรเอง (=== false เพราะ server เก่าไม่ส่ง field) */}
             {a.phone_callable === false ? (
               <div className={cn('space-y-1.5 rounded-xl border px-3 py-2.5 text-xs', TONE.danger.soft)}>
-                <p className={cn('font-semibold', TONE.danger.value)}>
+                <p className={cn('font-medium', TONE.danger.value)}>
                   ⚠️ เบอร์นี้ใช้กับระบบโทรไม่ได้ (ไม่ใช่มือถือ 10 หลัก) — ส่ง AI โทร/เก็บไปโทรไม่ได้
                 </p>
                 <div className="flex items-center gap-2">
@@ -379,7 +379,7 @@ export default function ApplicantContactDialog({
             {/* ประวัติการติดต่อ (log รายครั้ง — ล่าสุดก่อน) */}
             {logs.length > 0 ? (
               <div className="space-y-1">
-                <p className={cn('text-[11px] font-semibold', DASH.muted)}>ประวัติการติดต่อ</p>
+                <p className={cn('text-[11px] font-medium', DASH.muted)}>ประวัติการติดต่อ</p>
                 {logs.map((l) => (
                   <div
                     key={l.id}
@@ -388,7 +388,7 @@ export default function ApplicantContactDialog({
                       l.ok ? TONE.success.soft : TONE.danger.soft,
                     )}
                   >
-                    <span className="font-semibold">{l.ok ? '✓ สำเร็จ' : '✗ ไม่สำเร็จ'}</span>
+                    <span className="font-medium">{l.ok ? '✓ สำเร็จ' : '✗ ไม่สำเร็จ'}</span>
                     {l.reasonLabel ? ` · ${l.reasonLabel}` : ''}
                     {l.appointmentAt
                       ? ` · นัด ${formatDateTimeTh(l.appointmentAt)}${l.appointmentPlace ? ` ที่ ${l.appointmentPlace}` : ''} · ${l.jobLabel ?? 'หาล่วงหน้า'}`

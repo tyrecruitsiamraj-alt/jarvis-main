@@ -130,7 +130,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
   if (months.length === 0) {
     return (
       <div className={cn(DASH.card, 'p-4 xl:col-span-2')}>
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+        <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">
           ประเภทใบขอรายเดือน — เข้ามา / ปิดแล้ว / คงเหลือ
         </h3>
         <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">ยังไม่มีข้อมูลในช่วง {scopeLabel}</p>
@@ -141,7 +141,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
   return (
     <div className={cn(DASH.card, 'p-4 xl:col-span-2 space-y-4')}>
       <div>
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+        <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">
           ประเภทใบขอรายเดือน — เข้ามา / ปิดแล้ว / คงเหลือ
         </h3>
         <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
@@ -180,7 +180,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
               return (
                 <tr key={p.date} className="border-b border-slate-100 dark:border-slate-800">
                   <td className="px-2 py-2 font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">{p.label}</td>
-                  <td className="px-2 py-2 text-right tabular-nums font-semibold">{fmt(requested)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums font-medium">{fmt(requested)}</td>
                   <td className="px-2 py-2 text-right tabular-nums">
                     {fmt(p.filledPositions ?? p.closedPositions ?? 0)}
                   </td>
@@ -194,7 +194,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
                   <td className="px-2 py-2 text-right tabular-nums">{fmt(intake.newSite)}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{fmt(intake.other)}</td>
                   <td
-                    className={`px-2 py-2 text-right tabular-nums font-semibold ${
+                    className={`px-2 py-2 text-right tabular-nums font-medium ${
                       mismatch ? 'text-rose-700' : 'text-emerald-800'
                     }`}
                   >
@@ -204,22 +204,22 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
               );
             })}
             <tr className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
-              <td className="px-2 py-2.5 font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">รวม {scopeLabel}</td>
-              <td className="px-2 py-2.5 text-right tabular-nums font-semibold">{fmt(totals.requested)}</td>
-              <td className="px-2 py-2.5 text-right tabular-nums font-semibold">{fmt(totals.filled)}</td>
-              <td className="px-2 py-2.5 text-right tabular-nums font-semibold">{fmt(totals.cancelled)}</td>
-              <td className="px-2 py-2.5 text-right tabular-nums font-semibold text-amber-900">
+              <td className="px-2 py-2.5 font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">รวม {scopeLabel}</td>
+              <td className="px-2 py-2.5 text-right tabular-nums font-medium">{fmt(totals.requested)}</td>
+              <td className="px-2 py-2.5 text-right tabular-nums font-medium">{fmt(totals.filled)}</td>
+              <td className="px-2 py-2.5 text-right tabular-nums font-medium">{fmt(totals.cancelled)}</td>
+              <td className="px-2 py-2.5 text-right tabular-nums font-medium text-amber-900">
                 {fmt(totals.remaining)}
               </td>
-              <td className="px-2 py-2.5 text-right tabular-nums font-semibold">{fmt(totals.resignation)}</td>
-              <td className="px-2 py-2.5 text-right tabular-nums font-semibold">{fmt(totals.replacement)}</td>
-              <td className="px-2 py-2.5 text-right tabular-nums font-semibold">
+              <td className="px-2 py-2.5 text-right tabular-nums font-medium">{fmt(totals.resignation)}</td>
+              <td className="px-2 py-2.5 text-right tabular-nums font-medium">{fmt(totals.replacement)}</td>
+              <td className="px-2 py-2.5 text-right tabular-nums font-medium">
                 {fmt(totals.increaseHeadcount)}
               </td>
-              <td className="px-2 py-2.5 text-right tabular-nums font-semibold">{fmt(totals.newSite)}</td>
-              <td className="px-2 py-2.5 text-right tabular-nums font-semibold">{fmt(totals.other)}</td>
+              <td className="px-2 py-2.5 text-right tabular-nums font-medium">{fmt(totals.newSite)}</td>
+              <td className="px-2 py-2.5 text-right tabular-nums font-medium">{fmt(totals.other)}</td>
               <td
-                className={`px-2 py-2.5 text-right tabular-nums font-semibold ${
+                className={`px-2 py-2.5 text-right tabular-nums font-medium ${
                   typeGrandTotal !== totals.requested ? 'text-rose-700' : 'text-emerald-800'
                 }`}
               >

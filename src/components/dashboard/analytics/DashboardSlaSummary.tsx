@@ -37,7 +37,7 @@ const DashboardSlaSummaryCard: React.FC<Props> = ({ summary, onBucketClick }) =>
             className={cn('rounded-lg px-3 py-2 text-left transition-colors', tone.tile)}
           >
             <p className={cn('text-[11px]', DASH.muted)}>{b.label}</p>
-            <p className={cn('text-lg font-semibold tabular-nums', tone.num)}>
+            <p className={cn('text-lg font-medium tabular-nums', tone.num)}>
               {value.toLocaleString('th-TH')}
             </p>
           </button>

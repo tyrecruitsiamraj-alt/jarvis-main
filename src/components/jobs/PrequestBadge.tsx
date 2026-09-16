@@ -23,7 +23,7 @@ const PrequestBadge: React.FC<{
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full font-bold whitespace-nowrap',
+        'inline-flex items-center rounded-full font-medium whitespace-nowrap',
         compact ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-0.5 text-[10px]',
         TONE.violet.chip,
         className,

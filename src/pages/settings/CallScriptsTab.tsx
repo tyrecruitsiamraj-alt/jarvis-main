@@ -114,7 +114,7 @@ const CallScriptsTab: React.FC = () => {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-sm font-semibold text-foreground">บทพูดของ AI ตอนโทร</h2>
+        <h2 className="text-sm font-medium text-foreground">บทพูดของ AI ตอนโทร</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">
           แก้แล้วกดบันทึก — <span className="font-medium">มีผลกับสายที่เข้าคิวหลังจากนี้ทันที</span>{' '}
           ไม่ต้องรอใคร deploy · สายที่ค้างคิวอยู่แล้วยังพูดบทเดิมของมัน ·
@@ -133,10 +133,10 @@ const CallScriptsTab: React.FC = () => {
         return (
           <section key={s.key} className={cn('rounded-xl border p-4', DASH.card)}>
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <h3 className="text-sm font-semibold text-foreground">{s.label}</h3>
+              <h3 className="text-sm font-medium text-foreground">{s.label}</h3>
               <p className="text-xs text-muted-foreground">{s.hint}</p>
               {s.overridden ? (
-                <span className={cn('ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold', TONE.info.chip)}>
+                <span className={cn('ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium', TONE.info.chip)}>
                   ใช้ฉบับแก้อยู่{s.updated_by ? ` · แก้ล่าสุดโดย ${s.updated_by}` : ''}
                 </span>
               ) : (
@@ -190,7 +190,7 @@ const CallScriptsTab: React.FC = () => {
                 disabled={busy || !dirty || lines.length === 0}
                 onClick={() => void save(s.key)}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-xs font-semibold disabled:opacity-50',
+                  'inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-xs font-medium disabled:opacity-50',
                   TONE.success.solid,
                 )}
               >
@@ -240,7 +240,7 @@ const CallScriptsTab: React.FC = () => {
       })}
 
       <section className={cn('rounded-xl border p-4', DASH.card)}>
-        <h3 className="text-xs font-semibold text-foreground">ตัวแปรที่ใช้ได้ในบท</h3>
+        <h3 className="text-xs font-medium text-foreground">ตัวแปรที่ใช้ได้ในบท</h3>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
           พิมพ์ในวงเล็บปีกกา ระบบเติมค่าจริงให้ตอนโทร · พิมพ์ชื่อผิดระบบจะไม่ยอมบันทึก
           · ห้ามพิมพ์ตัวเลขเงินเอง — ใช้ {'{รายได้ต่อเดือน}'} ระบบจะเติมเลขที่ถูกต้องของใบขอนั้น

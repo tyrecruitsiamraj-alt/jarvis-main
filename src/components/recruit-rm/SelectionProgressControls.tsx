@@ -178,7 +178,7 @@ const SelectionProgressControls: React.FC<SelectionProgressControlsProps> = ({
   return (
     <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/30 px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor={inputId} className="text-xs font-semibold text-foreground">
+        <label htmlFor={inputId} className="text-xs font-medium text-foreground">
           ขั้นตอนตอนนี้
         </label>
         <select
@@ -197,7 +197,7 @@ const SelectionProgressControls: React.FC<SelectionProgressControlsProps> = ({
         </select>
         {status ? (
           <span
-            className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', SELECTION_STATUS_CLASS[status])}
+            className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', SELECTION_STATUS_CLASS[status])}
           >
             {SELECTION_STATUS_LABEL[status]}
           </span>
@@ -222,7 +222,7 @@ const SelectionProgressControls: React.FC<SelectionProgressControlsProps> = ({
           ⚠️ เลือกจากรายการเท่านั้น (ห้าม free text) · ใช้ Popover ไม่ใช่ Dialog */}
       {units && needsUnitPick(status || null) ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-foreground">หน่วยงานที่พิจารณา</span>
+          <span className="text-xs font-medium text-foreground">หน่วยงานที่พิจารณา</span>
           <Popover open={unitOpen} onOpenChange={setUnitOpen}>
             <PopoverTrigger asChild>
               <Button variant="secondary" size="sm"
@@ -253,7 +253,7 @@ const SelectionProgressControls: React.FC<SelectionProgressControlsProps> = ({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span className="text-xs font-semibold text-foreground">
+        <span className="text-xs font-medium text-foreground">
           เตรียมเข้างาน{' '}
           <span className="font-mono tabular-nums text-muted-foreground">
             {progress.done}/{progress.total}

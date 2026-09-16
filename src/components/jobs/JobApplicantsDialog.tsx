@@ -246,14 +246,14 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-1.5">
-            <p className="truncate text-sm font-semibold text-foreground">{a.full_name}</p>
+            <p className="truncate text-sm font-medium text-foreground">{a.full_name}</p>
             {/* ที่มาของคนนี้ (เจ้าของสั่ง 16 ส.ค.): สมัครใหม่ / AI หาให้ / เจ้าหน้าที่คีย์
                 ⚠️ ไม่รู้ที่มา = ไม่ขึ้นชิป (ห้ามเดาว่า "สมัครใหม่") */}
             {a.origin ? (
               <span
                 title={APPLICATION_ORIGIN_HINT[a.origin]}
                 className={cn(
-                  'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                  'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium',
                   APPLICATION_ORIGIN_CLASS[a.origin],
                 )}
               >
@@ -270,7 +270,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <span
-            className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', APPLICATION_STATUS_CLASS[a.status])}
+            className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', APPLICATION_STATUS_CLASS[a.status])}
           >
             {APPLICATION_STATUS_LABEL[a.status]}
           </span>
@@ -279,7 +279,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               โทรแล้ว · {CALL_OUTCOME_LABEL[a.last_call_outcome]}
             </span>
           ) : a.phone_callable === false ? (
-            <span className={cn('rounded-full border px-1.5 text-[10px] font-semibold', TONE.danger.soft, TONE.danger.value)}>
+            <span className={cn('rounded-full border px-1.5 text-[10px] font-medium', TONE.danger.soft, TONE.danger.value)}>
               เบอร์ใช้โทรไม่ได้
             </span>
           ) : a.claimed ? (
@@ -341,7 +341,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
             href={`tel:${a.phone}`}
             title={`โทร ${a.phone}`}
             className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium',
               TONE.success.outline,
             )}
           >
@@ -353,7 +353,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
             onClick={() => setProcessing(a)}
             title="บันทึกผลติดต่อ / นัดหมาย"
             className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium',
               TONE.violet.outline,
             )}
           >
@@ -366,7 +366,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
             onClick={() => void moveToLead(a)}
             title="เอาออกจากลิสต์ — เก็บเข้าคลังสำรอง (Lead)"
             className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50',
+              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium disabled:opacity-50',
               TONE.neutral.outline,
             )}
           >
@@ -383,7 +383,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               disabled={savingId === a.id}
               onClick={() => void toggleClaim(a)}
               className={cn(
-                'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50',
+                'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-50',
                 a.claimed_by_me
                   ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
                   : 'border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300',
@@ -410,7 +410,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               <Users className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <DialogTitle className="text-base font-semibold leading-tight sm:text-lg">
+              <DialogTitle className="text-base font-medium leading-tight sm:text-lg">
                 ผู้สมัครที่กรอกฟอร์ม
               </DialogTitle>
               <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug sm:text-[13px]">
@@ -426,7 +426,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               type="button"
               disabled={sendBusy || items.length === 0}
               onClick={() => setConfirmSend(true)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {sendBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '🤖'} ส่งให้ AI โทร
               {sendableApprox > 0 ? ` (~${sendableApprox})` : ''}
@@ -436,7 +436,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               type="button"
               onClick={() => setAdding(true)}
               className={cn(
-                'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold',
+                'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium',
                 TONE.success.outline,
               )}
             >
@@ -481,7 +481,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                 type="button"
                 onClick={() => setTab(id)}
                 className={cn(
-                  'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
+                  'rounded-full px-3 py-1 text-xs font-medium transition-colors',
                   tab === id
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-muted-foreground hover:bg-muted/70',
@@ -499,7 +499,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
             <button
               type="button"
               onClick={() => setProcessing(null)}
-              className="mb-3 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              className="mb-3 text-xs font-medium text-muted-foreground hover:text-foreground"
             >
               ← กลับรายชื่อ
             </button>

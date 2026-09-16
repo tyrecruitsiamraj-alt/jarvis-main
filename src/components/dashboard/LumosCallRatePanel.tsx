@@ -113,10 +113,10 @@ const StatBox: React.FC<{
 }> = ({ label, value, pct, tone, sub }) => (
   <div className={cn('rounded-xl border p-3', TONE[tone].soft)}>
     <p className={cn('text-[11px] font-medium leading-tight', DASH.muted)}>{label}</p>
-    <p className={cn('mt-1 text-2xl font-bold leading-none tabular-nums', TONE[tone].value)}>
+    <p className={cn('mt-1 text-2xl font-medium leading-none tabular-nums', TONE[tone].value)}>
       {fmtN(value)}
       {pct !== undefined && pct !== null ? (
-        <span className="ml-1 text-sm font-semibold">({pct}%)</span>
+        <span className="ml-1 text-sm font-medium">({pct}%)</span>
       ) : null}
     </p>
     {sub ? <p className={cn('mt-1 text-[10px] leading-snug', DASH.muted)}>{sub}</p> : null}
@@ -139,8 +139,8 @@ const TrendLine: React.FC<{
   const tone: ToneKey = dir === null ? 'neutral' : dir === 'flat' ? 'neutral' : dir === goodDir ? 'success' : 'danger';
   return (
     <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border px-3 py-2', TONE[tone].soft)}>
-      <span className={cn('text-xs font-semibold', DASH.cellStrong)}>{title}</span>
-      <span className={cn('inline-flex items-center gap-1 text-sm font-bold', TONE[tone].value)}>
+      <span className={cn('text-xs font-medium', DASH.cellStrong)}>{title}</span>
+      <span className={cn('inline-flex items-center gap-1 text-sm font-medium', TONE[tone].value)}>
         <DirIcon dir={dir} />
         {verdict}
       </span>
@@ -160,7 +160,7 @@ const StuckStrip: React.FC<{ stuck: CallStuck | null }> = ({ stuck }) => {
   if (!stuck) {
     return (
       <div className={cn('rounded-xl border px-3 py-2', TONE.neutral.soft)}>
-        <p className={cn('text-xs font-semibold', DASH.cellStrong)}>
+        <p className={cn('text-xs font-medium', DASH.cellStrong)}>
           ติดตรงไหน — <span className={TONE.warn.value}>อ่านสถานะสายค้างไม่ได้</span>
         </p>
         <p className={cn('text-[11px]', DASH.muted)}>
@@ -172,7 +172,7 @@ const StuckStrip: React.FC<{ stuck: CallStuck | null }> = ({ stuck }) => {
   if (level === 'ok') {
     return (
       <div className={cn('rounded-xl border px-3 py-2', TONE.success.soft)}>
-        <p className={cn('text-xs font-semibold', DASH.cellStrong)}>
+        <p className={cn('text-xs font-medium', DASH.cellStrong)}>
           ติดตรงไหน — <span className={TONE.success.value}>ไม่มีสายค้าง</span>
         </p>
         <p className={cn('text-[11px]', DASH.muted)}>ทุกสายที่ส่งไปมีผลกลับครบแล้ว</p>
@@ -183,7 +183,7 @@ const StuckStrip: React.FC<{ stuck: CallStuck | null }> = ({ stuck }) => {
   const total = stuck.notDelivered + stuck.deliveredSilent;
   return (
     <div className={cn('rounded-xl border px-3 py-2.5', TONE[tone].soft)}>
-      <p className={cn('text-xs font-semibold', DASH.cellStrong)}>
+      <p className={cn('text-xs font-medium', DASH.cellStrong)}>
         ติดตรงไหน —{' '}
         <span className={TONE[tone].value}>
           ยังไม่มีผลกลับ {fmtN(total)} สาย
@@ -193,10 +193,10 @@ const StuckStrip: React.FC<{ stuck: CallStuck | null }> = ({ stuck }) => {
       <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
         {stuck.notDelivered > 0 ? (
           <div className="flex flex-wrap items-baseline gap-x-1.5">
-            <span className={cn('text-sm font-bold tabular-nums', TONE[tone].value)}>
+            <span className={cn('text-sm font-medium tabular-nums', TONE[tone].value)}>
               {fmtN(stuck.notDelivered)}
             </span>
-            <span className={cn('text-[11px] font-semibold', DASH.cellStrong)}>ยังไม่ถึงมือ Lumos</span>
+            <span className={cn('text-[11px] font-medium', DASH.cellStrong)}>ยังไม่ถึงมือ Lumos</span>
             <span className={cn('text-[11px]', DASH.muted)}>
               ค้างนานสุด {ageText(stuck.notDeliveredHours)} — สายยังไม่ถูกส่งออกจากระบบเรา (ฝั่งเราต้องดู)
             </span>
@@ -204,10 +204,10 @@ const StuckStrip: React.FC<{ stuck: CallStuck | null }> = ({ stuck }) => {
         ) : null}
         {stuck.deliveredSilent > 0 ? (
           <div className="flex flex-wrap items-baseline gap-x-1.5">
-            <span className={cn('text-sm font-bold tabular-nums', TONE[tone].value)}>
+            <span className={cn('text-sm font-medium tabular-nums', TONE[tone].value)}>
               {fmtN(stuck.deliveredSilent)}
             </span>
-            <span className={cn('text-[11px] font-semibold', DASH.cellStrong)}>Lumos รับไปแล้ว เงียบ</span>
+            <span className={cn('text-[11px] font-medium', DASH.cellStrong)}>Lumos รับไปแล้ว เงียบ</span>
             <span className={cn('text-[11px]', DASH.muted)}>
               ค้างนานสุด {ageText(stuck.deliveredSilentHours)} — ส่งถึงแล้วแต่ยังไม่ส่งผลกลับ (ฝั่ง Lumos ต้องดู)
             </span>
@@ -340,7 +340,7 @@ const LumosCallRatePanel: React.FC = () => {
                 title={t.hint}
                 onClick={() => setSource(t.id)}
                 className={cn(
-                  'rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                  'rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                   source === t.id
                     ? TONE.primary.solid
                     : cn('border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'),
@@ -357,7 +357,7 @@ const LumosCallRatePanel: React.FC = () => {
                 type="button"
                 onClick={() => setWindowDays(d)}
                 className={cn(
-                  'rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                  'rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                   windowDays === d
                     ? TONE.primary.solid
                     : cn('border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'),
@@ -370,7 +370,7 @@ const LumosCallRatePanel: React.FC = () => {
               type="button"
               onClick={load}
               className={cn(
-                'inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
+                'inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
               )}
             >
               <RefreshCw className={cn('h-3 w-3', series === undefined && 'animate-spin')} /> รีเฟรช
@@ -383,11 +383,11 @@ const LumosCallRatePanel: React.FC = () => {
         ) : series === null ? (
           /* พัง = บอกตรง ๆ + ทางไปต่อ — ห้ามโชว์ 0 ตอนพัง (กติกาจอห้ามโกหก) */
           <div className="py-8 text-center">
-            <p className={cn('text-sm font-semibold', TONE.danger.value)}>อ่านตัวเลขการโทรไม่ได้</p>
+            <p className={cn('text-sm font-medium', TONE.danger.value)}>อ่านตัวเลขการโทรไม่ได้</p>
             <button
               type="button"
               onClick={load}
-              className={cn('mt-2 rounded-full px-3 py-1.5 text-xs font-bold', TONE.primary.solid)}
+              className={cn('mt-2 rounded-full px-3 py-1.5 text-xs font-medium', TONE.primary.solid)}
             >
               ลองใหม่
             </button>
@@ -401,7 +401,7 @@ const LumosCallRatePanel: React.FC = () => {
 
             {/* สรุปช่วงนี้ — เลข + % ต่อถัง (ช่วง = N วันล่าสุดจบวันนี้) */}
             <div>
-              <p className={cn('text-[11px] font-semibold', DASH.cellStrong)}>
+              <p className={cn('text-[11px] font-medium', DASH.cellStrong)}>
                 ช่วงนี้ {fmtDay(trend.current.fromYmd)} – {fmtDay(trend.current.toYmd)} ({windowDays} วันล่าสุด)
               </p>
               <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">

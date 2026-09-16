@@ -149,7 +149,7 @@ const AddCandidatePage: React.FC = () => {
 
           {selectionReason ? (
             <div className="rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2.5">
-              <p className="text-xs font-semibold text-sky-900">เหตุผลที่เลือกโทร/เสนอผู้สมัครคนนี้</p>
+              <p className="text-xs font-medium text-sky-900">เหตุผลที่เลือกโทร/เสนอผู้สมัครคนนี้</p>
               <p className="mt-1 whitespace-pre-wrap text-xs text-sky-800 leading-relaxed">{selectionReason}</p>
             </div>
           ) : null}
@@ -225,7 +225,7 @@ const AddCandidatePage: React.FC = () => {
           </div>
 
           <div className="border-t border-border pt-4">
-            <h4 className="text-sm font-semibold text-foreground mb-3">ข้อมูลเพิ่มเติม</h4>
+            <h4 className="text-sm font-medium text-foreground mb-3">ข้อมูลเพิ่มเติม</h4>
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div>
@@ -293,7 +293,7 @@ const AddCandidatePage: React.FC = () => {
           </div>
 
           <div className="border-t border-border pt-4">
-            <h4 className="text-sm font-semibold text-foreground mb-3">ที่อยู่ปัจจุบัน</h4>
+            <h4 className="text-sm font-medium text-foreground mb-3">ที่อยู่ปัจจุบัน</h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>

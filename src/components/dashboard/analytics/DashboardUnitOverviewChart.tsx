@@ -52,7 +52,7 @@ const DashboardUnitOverviewChart: React.FC<Props> = ({ items, periodLabel, onSit
   if (activeUnits.length === 0) {
     return (
       <div className={cn(DASH.card, 'p-4 xl:col-span-2')}>
-        {!hideHeader ? <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">ภาระงานตามรหัสไซต์</h3> : null}
+        {!hideHeader ? <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">ภาระงานตามรหัสไซต์</h3> : null}
         <p className={hideHeader ? 'text-sm text-slate-600 dark:text-slate-400' : 'mt-2 text-sm text-slate-600 dark:text-slate-400'}>
           ยังไม่มีข้อมูลไซต์ในช่วงที่เลือก
         </p>
@@ -64,7 +64,7 @@ const DashboardUnitOverviewChart: React.FC<Props> = ({ items, periodLabel, onSit
     <div className={cn(DASH.card, 'p-4 xl:col-span-2')}>
       {!hideHeader ? (
         <div className="mb-3">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">ภาระงานตามรหัสไซต์</h3>
+          <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">ภาระงานตามรหัสไซต์</h3>
           <p className="text-xs text-slate-600 dark:text-slate-400">
             ตำแหน่งที่รอดำเนินการต่อรหัสไซต์ · {periodLabel}
           </p>

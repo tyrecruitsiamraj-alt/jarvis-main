@@ -20,7 +20,7 @@ function cell(bucket: { positions: number; requests: number }) {
   }
   return (
     <span className="tabular-nums">
-      <span className="font-semibold text-slate-900 dark:text-slate-100">{fmt(bucket.positions)}</span>
+      <span className="font-medium text-slate-900 dark:text-slate-100">{fmt(bucket.positions)}</span>
       <span className="text-[10px] text-slate-600 dark:text-slate-400 ml-1">{fmt(bucket.requests)} ใบ</span>
     </span>
   );
@@ -133,7 +133,7 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
     <div className={cn(DASH.card, 'p-4')}>
       <div className="mb-3 space-y-2">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Life Cycle ตามประเภทใบขอ</h3>
+          <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">Life Cycle ตามประเภทใบขอ</h3>
           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
             มุมวิเคราะห์: เข้ามาเท่าไหร่ → ปิด/ยกเลิกไปแล้วเท่าไหร่ → คงเหลือยังหาอยู่เท่าไหร่ · แยกตามประเภท · {periodLabel}
           </p>

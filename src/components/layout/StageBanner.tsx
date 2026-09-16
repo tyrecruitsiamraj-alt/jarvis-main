@@ -56,14 +56,14 @@ const StageBanner: React.FC<{ className?: string }> = ({ className }) => {
             ในหัวหน้าจอแล้ว (ใส่ทั้งสองที่ = คำเดียวกันขึ้นสองรอบติดกัน) */}
         <Link
           to={returnTo ?? t.path}
-          className="shrink-0 font-semibold text-blue-700 hover:underline dark:text-blue-300"
+          className="shrink-0 font-medium text-blue-700 hover:underline dark:text-blue-300"
         >
           {t.label}
         </Link>
         <span className="text-muted-foreground/50" aria-hidden>
           ›
         </span>
-        <span className="font-semibold text-foreground">ใบนี้</span>
+        <span className="font-medium text-foreground">ใบนี้</span>
         <span className="hidden min-w-0 flex-1 truncate text-muted-foreground sm:block">
           {t.blurb}
         </span>
@@ -92,7 +92,7 @@ const StageBanner: React.FC<{ className?: string }> = ({ className }) => {
           เจ้าของสั่ง 28 ส.ค. 2569: *"ไม่เอาตัวเลข ขอเป็นสัญลักษณ์ที่บ่งบอกถึงข้อนั้น ๆ
           ไม่ต้องแยก ขอเป็นอันเดียวกัน ตอนนี้มันมีขีดคั่นไว้ไม่เอา"* และ
           *"จะมีชื่อคำนี้ทำไม ในเมื่อมันคือใบขอ ก็ใช้ชื่อใบขอสิ"* */}
-      <span className="flex shrink-0 items-center gap-1.5 font-semibold text-foreground">
+      <span className="flex shrink-0 items-center gap-1.5 font-medium text-foreground">
         <step.icon className="h-4 w-4 text-blue-700 dark:text-blue-300" aria-hidden />
         {step.label}
       </span>

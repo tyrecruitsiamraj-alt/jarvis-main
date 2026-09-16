@@ -21,7 +21,7 @@ function Num({
   tone: ToneKey;
   onClick?: () => void;
 }) {
-  const cls = cn('font-bold tabular-nums', TONE[tone].value);
+  const cls = cn('font-medium tabular-nums', TONE[tone].value);
   const text = value.toLocaleString('th-TH');
   return (
     <span className="whitespace-nowrap">
@@ -113,7 +113,7 @@ const DashboardFlowViewCard: React.FC<Props> = ({ flow, summary, onSegmentClick 
           {rates.map((m) => (
             <div key={m.label} className="rounded-lg bg-slate-50 dark:bg-slate-800/50 px-2 py-1.5 text-center">
               <p className={cn('text-[10px]', DASH.muted)}>{m.label}</p>
-              <p className={cn('text-sm font-semibold tabular-nums', DASH.cellStrong)}>{m.value}</p>
+              <p className={cn('text-sm font-medium tabular-nums', DASH.cellStrong)}>{m.value}</p>
             </div>
           ))}
         </div>

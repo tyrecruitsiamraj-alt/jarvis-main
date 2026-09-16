@@ -45,7 +45,7 @@ export function LumosCallBadgeRow({
           onClick={onToggle}
           disabled={!hasDetail}
           className={cn(
-            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
             badge.cls,
             hasDetail ? 'hover:brightness-95' : 'cursor-default',
           )}
@@ -62,7 +62,7 @@ export function LumosCallBadgeRow({
         <div className="mt-1.5 space-y-1.5 rounded-lg border border-slate-200 bg-white/85 dark:border-white/10 dark:bg-white/5 px-2.5 py-1.5">
           {row.summary ? (
             <p className="text-[10px] leading-relaxed text-slate-700 dark:text-slate-200">
-              <span className="font-semibold">สรุปบทสนทนา:</span> {row.summary}
+              <span className="font-medium">สรุปบทสนทนา:</span> {row.summary}
             </p>
           ) : (
             <p className="text-[10px] text-muted-foreground">ยังไม่มีสรุปบทสนทนาจาก AI</p>
@@ -74,7 +74,7 @@ export function LumosCallBadgeRow({
               disabled={cancelling}
               onClick={onCancel}
               className={cn(
-                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold disabled:opacity-60',
+                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium disabled:opacity-60',
                 TONE.danger.outline,
               )}
             >
@@ -140,7 +140,7 @@ export function LumosJobSummaryStats({
         >
           <div
             className={cn(
-              'text-[15px] font-semibold leading-tight tabular-nums tracking-tight',
+              'text-[15px] font-medium leading-tight tabular-nums tracking-tight',
               c.value === 0 ? DASH.muted : TONE[c.tone].value,
             )}
           >
@@ -251,7 +251,7 @@ export function LumosSendBar({
           → กลุ่มไม่ยอมหด ปุ่มขวาสุด ("ส่งทั้งหมดที่แมท") ทะลุขอบแผงจนตัวหนังสือโดนตัด
           (กับดักเดิมของโปรเจกต์: shrink-0 คู่กับ flex ที่พื้นที่ไม่พอ = ทะลุ ไม่ใช่แค่ล้น) */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="min-w-0 text-[11px] font-semibold text-sky-900 dark:text-sky-200">
+        <p className="min-w-0 text-[11px] font-medium text-sky-900 dark:text-sky-200">
           {count > 0 ? `ติ๊กเลือกไว้ ${count} คน` : 'ยังไม่ได้ติ๊กใคร'}
         </p>
         <Button variant="ghost" size="sm" type="button" onClick={onClear} disabled={count === 0} className="shrink-0">
@@ -273,7 +273,7 @@ export function LumosSendBar({
               `ตั้งคิวไว้ก่อน — เข้าคิวจริงอีก ${CALL_BATCH_UNDO_MINUTES} นาที ระหว่างนี้กดยกเลิกได้`
             }
             className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50',
+              'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-medium disabled:opacity-50',
               TONE.warn.outline,
             )}
           >
@@ -289,7 +289,7 @@ export function LumosSendBar({
               'ล็อกคนที่เลือกเข้าถังโทรของคุณ — AI จะไม่โทรทับ · ไปโทร+บันทึกผลที่แท็บ "การโทรของฉัน" บนบอร์ดรับสมัคร'
             }
             className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50',
+              'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-medium disabled:opacity-50',
               TONE.success.outline,
             )}
           >
@@ -302,7 +302,7 @@ export function LumosSendBar({
             onClick={onSend}
             title={act.sendSelected.reason ?? 'ส่งเฉพาะคนที่ติ๊กไว้เข้าคิว AI โทร'}
             className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50',
+              'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-medium disabled:opacity-50',
               TONE.primary.outline,
             )}
           >
@@ -365,7 +365,7 @@ export function CallBatchUndoStrip({
     <div className={cn('space-y-1.5 rounded-xl border px-3 py-2', TONE.warn.soft)}>
       {live.map((b) => (
         <div key={b.id} className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+          <p className="text-[11px] font-medium text-slate-700 dark:text-slate-200">
             ตั้งคิวโทร {activeItemCount(b)} คน ·{' '}
             <span className={TONE.warn.num}>เข้าคิวจริงในอีก {mmss(undoMsLeft(b, now))}</span>{' '}
             <span className="font-medium text-slate-500 dark:text-slate-400">
@@ -377,7 +377,7 @@ export function CallBatchUndoStrip({
             disabled={cancellingId === b.id}
             onClick={() => onCancel(b.id)}
             className={cn(
-              'inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold disabled:opacity-50',
+              'inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-medium disabled:opacity-50',
               TONE.danger.outline,
             )}
           >

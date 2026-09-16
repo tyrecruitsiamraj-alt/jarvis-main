@@ -270,7 +270,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
     <div className="space-y-4">
       {/* PageHeader เดิมถูกถอด — ตอนนี้เป็น section บนหน้าหลัก ใช้หัวเรื่องบรรทัดเดียว */}
       <div className="border-b border-slate-200 pb-1 dark:border-slate-800">
-        <h2 className={cn('text-base font-semibold', DASH.cellStrong)}>
+        <h2 className={cn('text-base font-medium', DASH.cellStrong)}>
           📞 {lane ? CALL_LANE_LABEL[lane] : 'โทรของฉัน'}
         </h2>
         <p className={cn('text-xs', DASH.muted)}>
@@ -297,7 +297,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
             type="button"
             onClick={load}
             className={cn(
-              'ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold',
+              'ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium',
               TONE.neutral.soft,
               TONE.neutral.value,
               TONE.neutral.softHover,
@@ -319,7 +319,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
               <div
                 key={key}
                 className={cn(
-                  'flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border px-3 py-2 text-xs font-semibold',
+                  'flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border px-3 py-2 text-xs font-medium',
                   tone.soft,
                   tone.value,
                 )}
@@ -347,10 +347,10 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
         <p className={cn('px-1 text-sm', DASH.muted)}>กำลังโหลดงานโทร…</p>
       ) : holds.length === 0 ? (
         <div className={cn('rounded-2xl border p-6 text-center', DASH.card)}>
-          <p className={cn('text-sm font-semibold', DASH.cellStrong)}>ยังไม่มีงานโทรที่ถืออยู่</p>
+          <p className={cn('text-sm font-medium', DASH.cellStrong)}>ยังไม่มีงานโทรที่ถืออยู่</p>
           <p className={cn('mt-1 text-xs', DASH.muted)}>
             ไปที่{' '}
-            <Link to="/matching/match" className={cn('font-semibold underline', TONE.primary.value)}>
+            <Link to="/matching/match" className={cn('font-medium underline', TONE.primary.value)}>
               หน้า Matching
             </Link>{' '}
             แล้วกด “รับไปโทรเอง” บนการ์ดผู้สมัคร
@@ -367,7 +367,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                   DASH.tableHead,
                 )}
               >
-                <span className="font-mono text-xs font-bold">
+                <span className="font-mono text-xs font-medium">
                   {group.requestNo || group.jobId}
                 </span>
                 <span className="text-[11px]">
@@ -388,12 +388,12 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                       <NameAvatar name={hold.candidateName || hold.candidateRef} size="sm" />
                       <div className="min-w-0 flex-1">
-                        <p className={cn('text-sm font-semibold', DASH.cellStrong)}>
+                        <p className={cn('text-sm font-medium', DASH.cellStrong)}>
                           {hold.candidateName || `ผู้สมัคร #${hold.candidateRef}`}
                         </p>
                         <p className={cn('text-[11px]', DASH.muted)}>
                           {CALL_HOLD_SOURCE_LABEL[hold.source]} · คายอีก{' '}
-                          <span className={cn('font-semibold', dueSoon ? TONE.warn.value : '')}>
+                          <span className={cn('font-medium', dueSoon ? TONE.warn.value : '')}>
                             {countdown(left)}
                           </span>
                         </p>
@@ -403,7 +403,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                           type="button"
                           onClick={() => openForm(hold)}
                           className={cn(
-                            'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold',
+                            'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium',
                             TONE.primary.solid,
                           )}
                         >
@@ -432,7 +432,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                                   setError(null);
                                 }}
                                 className={cn(
-                                  'rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+                                  'rounded-full border px-2.5 py-1 text-[11px] font-medium',
                                   tone.soft,
                                   tone.value,
                                   outcome === key ? 'ring-2 ring-ring' : tone.softHover,
@@ -466,7 +466,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                                   className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-sky-600"
                                 />
                                 <span>
-                                  <span className={cn('font-semibold', DASH.cellStrong)}>
+                                  <span className={cn('font-medium', DASH.cellStrong)}>
                                     {CONFIRMED_SCOPE_LABEL[value]}
                                   </span>
                                   <span className={cn('ml-1', DASH.muted)}>
@@ -477,7 +477,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                             ))}
                             {scope === 'scheduled' ? (
                               <label className="flex flex-wrap items-center gap-2 pt-1">
-                                <span className={cn('font-semibold', DASH.cellStrong)}>
+                                <span className={cn('font-medium', DASH.cellStrong)}>
                                   วันนัดสัมภาษณ์
                                 </span>
                                 <input
@@ -511,7 +511,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                                   className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-sky-600"
                                 />
                                 <span>
-                                  <span className={cn('font-semibold', DASH.cellStrong)}>{label}</span>
+                                  <span className={cn('font-medium', DASH.cellStrong)}>{label}</span>
                                   <span className={cn('ml-1', DASH.muted)}>— {hint}</span>
                                 </span>
                               </label>
@@ -532,7 +532,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                             onClick={() => void submit(hold)}
                             disabled={busy || !outcome}
                             className={cn(
-                              'rounded-full px-3 py-1 text-[11px] font-bold disabled:opacity-50',
+                              'rounded-full px-3 py-1 text-[11px] font-medium disabled:opacity-50',
                               TONE.primary.solid,
                             )}
                           >
@@ -543,7 +543,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                             onClick={() => void giveBack(hold, 'to_ai')}
                             disabled={busy}
                             className={cn(
-                              'rounded-full border px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50',
+                              'rounded-full border px-2.5 py-1 text-[11px] font-medium disabled:opacity-50',
                               TONE.info.soft,
                               TONE.info.value,
                               TONE.info.softHover,
@@ -556,7 +556,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                             onClick={() => void giveBack(hold, 'manual')}
                             disabled={busy}
                             className={cn(
-                              'rounded-full border px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50',
+                              'rounded-full border px-2.5 py-1 text-[11px] font-medium disabled:opacity-50',
                               TONE.neutral.soft,
                               TONE.neutral.value,
                               TONE.neutral.softHover,
@@ -567,7 +567,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                           <button
                             type="button"
                             onClick={() => setOpenRef(null)}
-                            className={cn('px-2 py-1 text-[11px] font-semibold', DASH.muted)}
+                            className={cn('px-2 py-1 text-[11px] font-medium', DASH.muted)}
                           >
                             ปิด
                           </button>
@@ -601,7 +601,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
               return (
                 <div key={id} className="space-y-1">
                   <p className={cn('text-xs', TONE[CALL_OUTCOME_TONE[key]].value)}>
-                    <span className={cn('font-semibold', DASH.cellStrong)}>
+                    <span className={cn('font-medium', DASH.cellStrong)}>
                       {hold.candidateName || `ผู้สมัคร #${hold.candidateRef}`}
                     </span>{' '}
                     · {CALL_RESULT_LABEL[key]} → {CALL_RESULT_DESTINATION[key]}
@@ -613,7 +613,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                         onClick={() => void bookFromResult(hold)}
                         disabled={action.disabled}
                         className={cn(
-                          'rounded-full px-3 py-1 text-[11px] font-bold disabled:opacity-50',
+                          'rounded-full px-3 py-1 text-[11px] font-medium disabled:opacity-50',
                           TONE.violet.solid,
                         )}
                       >

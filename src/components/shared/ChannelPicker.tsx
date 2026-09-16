@@ -176,7 +176,7 @@ const ChannelPicker: React.FC<{
           >
             <ChevronLeft className="h-3.5 w-3.5" aria-hidden /> ช่องทางหลัก
           </button>
-          <span className="text-xs font-semibold text-foreground">{parent.name}</span>
+          <span className="text-xs font-medium text-foreground">{parent.name}</span>
           <span className="text-[11px] text-muted-foreground">— เลือกช่องทางรอง</span>
         </div>
 

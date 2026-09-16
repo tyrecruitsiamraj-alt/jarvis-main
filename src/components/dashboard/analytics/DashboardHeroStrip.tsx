@@ -131,7 +131,7 @@ const DashboardHeroStrip: React.FC<Props> = ({
                 >
                   <span
                     className={cn(
-                      'block font-bold leading-none tracking-tight tabular-nums',
+                      'block font-medium leading-none tracking-tight tabular-nums',
                       idx === 0 ? 'text-4xl' : 'text-[22px]',
                       S.v2 ? meta.numLight : meta.num,
                     )}

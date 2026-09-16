@@ -99,7 +99,7 @@ function Block({
       <header className="flex items-start gap-2 border-b border-border/50 px-4 py-3">
         <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+          <h2 className="text-sm font-medium text-foreground">{title}</h2>
           {hint ? <p className={cn('mt-0.5 text-[11px]', DASH.muted)}>{hint}</p> : null}
         </div>
       </header>
@@ -321,7 +321,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                   aria-current={on ? 'step' : undefined}
                   title={t.todo}
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition-colors',
+                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-medium transition-colors',
                     on
                       ? cn(TONE.primary.solid, 'border-transparent')
                       : passed
@@ -331,7 +331,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 >
                   <span
                     className={cn(
-                      'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
+                      'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-medium',
                       on ? 'bg-white/25' : passed ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-secondary',
                     )}
                     aria-hidden
@@ -355,7 +355,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
           {released ? (
             <span
               className={cn(
-                'ml-auto rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                'ml-auto rounded-full px-2.5 py-1 text-[11px] font-medium',
                 TONE.success.soft,
                 TONE.success.value,
               )}
@@ -367,7 +367,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
 
         {/* คำสั่งงานของขั้นที่เปิดอยู่ — มาจาก RELEASE_STEP_TEXT ที่เดียว */}
         <div className={cn('rounded-xl border px-3.5 py-2.5', TONE.primary.soft)}>
-          <p className="text-[13px] font-semibold text-foreground">
+          <p className="text-[13px] font-medium text-foreground">
             ขั้น {RELEASE_STEP_TEXT[step].step} — {RELEASE_STEP_TEXT[step].todo}
           </p>
           <p className={cn('mt-0.5 text-[11px]', DASH.muted)}>{RELEASE_STEP_TEXT[step].hint}</p>
@@ -405,7 +405,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                   type="button"
                   onClick={() => setInfoOpen((v) => !v)}
                   aria-expanded={infoOpen}
-                  className="flex min-h-9 w-full items-center gap-1.5 text-left text-[11px] font-semibold text-blue-700 dark:text-blue-300"
+                  className="flex min-h-9 w-full items-center gap-1.5 text-left text-[11px] font-medium text-blue-700 dark:text-blue-300"
                 >
                   {infoOpen ? 'ย่อข้อมูลใบขอ' : 'กางดูข้อมูลใบขอทั้งใบ'}
                   <ChevronDown
@@ -553,7 +553,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                       released ? TONE.success.soft : TONE.warn.soft,
                     )}
                   >
-                    <p className="text-xs font-semibold text-foreground">
+                    <p className="text-xs font-medium text-foreground">
                       {released ? 'ใบนี้อยู่บนหน้าสาธารณะแล้ว' : 'ใบนี้ยังไม่ขึ้นหน้าสาธารณะ'}
                     </p>
                     <p className={cn('mt-0.5 text-[11px]', DASH.muted)}>

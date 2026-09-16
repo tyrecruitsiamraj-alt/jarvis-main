@@ -134,7 +134,7 @@ const MatchPriorityWeightsTab: React.FC<{
             overridden ? TONE.primary.soft : TONE.neutral.soft,
           )}
         >
-          <p className="font-semibold text-foreground">
+          <p className="font-medium text-foreground">
             {overridden ? 'ใบนี้ตั้งน้ำหนักเองไว้' : 'ใบนี้ยังใช้ค่ากลาง'}
           </p>
           <p className="mt-0.5 text-muted-foreground">
@@ -150,7 +150,7 @@ const MatchPriorityWeightsTab: React.FC<{
               type="button"
               onClick={() => void resetToDefault()}
               disabled={saving}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-[11px] font-semibold hover:bg-secondary disabled:opacity-50"
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-[11px] font-medium hover:bg-secondary disabled:opacity-50"
             >
               <RotateCcw className="h-3 w-3" aria-hidden />
               กลับไปใช้ค่ากลาง
@@ -184,7 +184,7 @@ const MatchPriorityWeightsTab: React.FC<{
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <span className="text-sm font-semibold text-foreground">{PRIORITY_LABELS[key]}</span>
+                  <span className="text-sm font-medium text-foreground">{PRIORITY_LABELS[key]}</span>
                   {isHard ? (
                     <span className={cn(TONE.danger.chip, 'ml-2')}>เกณฑ์แข็ง</span>
                   ) : (

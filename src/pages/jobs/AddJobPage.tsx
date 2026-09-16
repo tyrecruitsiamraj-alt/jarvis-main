@@ -432,7 +432,7 @@ const AddJobPage: React.FC = () => {
           </div>
 
           <div className="border-t border-border pt-4">
-            <h4 className="text-sm font-semibold text-foreground mb-3">สถานที่ปฏิบัติงาน</h4>
+            <h4 className="text-sm font-medium text-foreground mb-3">สถานที่ปฏิบัติงาน</h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -553,7 +553,7 @@ const AddJobPage: React.FC = () => {
           </div>
 
           <div className="border-t border-border pt-4">
-            <h4 className="text-sm font-semibold text-foreground mb-3">รายละเอียดเพิ่มเติม</h4>
+            <h4 className="text-sm font-medium text-foreground mb-3">รายละเอียดเพิ่มเติม</h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>

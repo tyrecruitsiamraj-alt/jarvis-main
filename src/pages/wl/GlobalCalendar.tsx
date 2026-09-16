@@ -91,7 +91,7 @@ const GlobalCalendar: React.FC = () => {
                   return (
                     <th key={i} className={cn('px-1 py-2 text-center min-w-[70px]', isToday && 'bg-primary/5')}>
                       <div className="text-muted-foreground">{dayNames[d.getDay()]}</div>
-                      <div className={cn('text-foreground font-semibold', isToday && 'text-primary')}>{d.getDate()}</div>
+                      <div className={cn('text-foreground font-medium', isToday && 'text-primary')}>{d.getDate()}</div>
                     </th>
                   );
                 })}

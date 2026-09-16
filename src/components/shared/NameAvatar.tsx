@@ -14,7 +14,7 @@ const NameAvatar: React.FC<Props> = ({ name, className, size = 'sm' }) => (
   <span
     aria-hidden
     className={cn(
-      'inline-flex shrink-0 items-center justify-center rounded-full font-bold text-white',
+      'inline-flex shrink-0 items-center justify-center rounded-full font-medium text-white',
       size === 'sm' ? 'h-6 w-6 text-[9px]' : 'h-8 w-8 text-[11px]',
       className,
     )}

@@ -192,7 +192,7 @@ const RequestLeadRulesCard: React.FC<{
     <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <Gauge className={cn('h-4 w-4', TONE.primary.value)} />
-        <h2 className="text-sm font-semibold">เกณฑ์ความเร่งของใบนี้</h2>
+        <h2 className="text-sm font-medium">เกณฑ์ความเร่งของใบนี้</h2>
         <span
           className={cn(
             'text-[10px]',
@@ -239,7 +239,7 @@ const RequestLeadRulesCard: React.FC<{
       <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-2 text-xs">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-muted-foreground">ใช้เกณฑ์ชุดนี้แล้ว ใบนี้คือ</span>
-          <span className={cn('font-semibold', TONE[REQUEST_LEAD_KIND_TONE[preview.kind]].value)}>
+          <span className={cn('font-medium', TONE[REQUEST_LEAD_KIND_TONE[preview.kind]].value)}>
             {requestStatusLabel(preview.kind)}
           </span>
           <span className="text-muted-foreground">

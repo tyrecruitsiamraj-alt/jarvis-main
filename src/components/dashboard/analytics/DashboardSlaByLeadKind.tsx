@@ -98,7 +98,7 @@ const DashboardSlaByLeadKind: React.FC<Props> = ({
                 onClick={() => onCellClick?.(row.kind, c, label)}
                 title={`ดูรายการ: ${label} (${num(v)} ใบ)`}
                 className={cn(
-                  'min-w-[3rem] rounded-lg px-2 py-1 text-sm font-semibold tabular-nums transition-colors',
+                  'min-w-[3rem] rounded-lg px-2 py-1 text-sm font-medium tabular-nums transition-colors',
                   TONE[SLA_CELL_TONE[c]].tile,
                   TONE[SLA_CELL_TONE[c]].num,
                 )}
@@ -106,7 +106,7 @@ const DashboardSlaByLeadKind: React.FC<Props> = ({
                 {num(v)}
               </button>
             ) : (
-              <span className={cn('text-sm font-semibold tabular-nums', TONE[SLA_CELL_TONE[c]].value)}>
+              <span className={cn('text-sm font-medium tabular-nums', TONE[SLA_CELL_TONE[c]].value)}>
                 {num(v)}
               </span>
             )}
@@ -125,7 +125,7 @@ const DashboardSlaByLeadKind: React.FC<Props> = ({
         ) : (
           <span
             className={cn(
-              'text-xs font-semibold tabular-nums',
+              'text-xs font-medium tabular-nums',
               row.onTimeRatePercent >= 80
                 ? TONE.success.value
                 : row.onTimeRatePercent >= 50

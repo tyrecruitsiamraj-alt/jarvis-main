@@ -58,7 +58,7 @@ export const HudPanel: React.FC<HudPanelProps> = ({
             <div className="min-w-0">
               {eyebrow ? <div className={HUD.eyebrow}>{eyebrow}</div> : null}
               {title ? (
-                <div className="mt-1 text-sm font-semibold text-white md:text-base">{title}</div>
+                <div className="mt-1 text-sm font-medium text-white md:text-base">{title}</div>
               ) : null}
               {subtitle ? <div className={cn('mt-1', HUD.body)}>{subtitle}</div> : null}
             </div>

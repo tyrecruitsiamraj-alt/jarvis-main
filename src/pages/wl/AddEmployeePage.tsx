@@ -243,7 +243,7 @@ const AddEmployeePage: React.FC = () => {
           </div>
 
           <div className="border-t border-border pt-4">
-            <h4 className="text-sm font-semibold text-foreground mb-3">ที่อยู่ (optional)</h4>
+            <h4 className="text-sm font-medium text-foreground mb-3">ที่อยู่ (optional)</h4>
             <div className="flex gap-1.5 mb-3">
               {(['manual', 'google', 'latlong'] as const).map(mode => (
                 <button

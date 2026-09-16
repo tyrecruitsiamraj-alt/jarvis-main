@@ -136,7 +136,7 @@ const RecruitLaneDialog: React.FC<RecruitLaneDialogProps> = ({ open, job, onClos
         {result ? (
           <div className="space-y-3">
             {result.dispatch ? (
-              <p className="rounded-xl bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+              <p className="rounded-xl bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
                 🤖 {recruitLaneSendSummary(result.dispatch)}
               </p>
             ) : null}
@@ -157,7 +157,7 @@ const RecruitLaneDialog: React.FC<RecruitLaneDialogProps> = ({ open, job, onClos
                       {m.tier === 'green' ? 'เข้าข่ายมาก' : m.tier === 'red' ? 'ห่างไกล' : 'พอได้'}
                     </span>
                     <span className="jarvis-chip jarvis-chip-violet">{m.source_label}</span>
-                    <span className="font-semibold text-foreground">{m.full_name}</span>
+                    <span className="font-medium text-foreground">{m.full_name}</span>
                     <span className="text-muted-foreground">{m.position_text || EM_DASH}</span>
                     {m.location_label ? (
                       <span className="text-muted-foreground">· {m.location_label}</span>
@@ -172,7 +172,7 @@ const RecruitLaneDialog: React.FC<RecruitLaneDialogProps> = ({ open, job, onClos
 
             {result.dispatch && result.dispatch.skipped.length > 0 ? (
               <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                <p className="font-semibold">ส่งไม่ได้ {result.dispatch.skipped.length} คน</p>
+                <p className="font-medium">ส่งไม่ได้ {result.dispatch.skipped.length} คน</p>
                 <ul className="mt-1 space-y-0.5">
                   {result.dispatch.skipped.slice(0, 10).map((s) => (
                     <li key={s.ref}>

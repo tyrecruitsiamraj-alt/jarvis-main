@@ -63,7 +63,7 @@ const LumosDispatchModeTab: React.FC = () => {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className={cn('text-base font-semibold', DASH.cellStrong)}>โหมดส่งงานให้ Lumos</h2>
+        <h2 className={cn('text-base font-medium', DASH.cellStrong)}>โหมดส่งงานให้ Lumos</h2>
         <p className={cn('mt-1 text-xs', DASH.muted)}>
           เลือกว่าแต่ละจุดจะให้ระบบส่งเข้าคิวโทรเองทันที หรือให้คนติ๊กเลือกแล้วกดส่ง —
           เปลี่ยนที่นี่มีผลทันที ไม่ต้อง deploy
@@ -87,7 +87,7 @@ const LumosDispatchModeTab: React.FC = () => {
         <div className="space-y-2.5">
           {LUMOS_DISPATCH_TRIGGERS.map((trigger) => (
             <div key={trigger} className={cn('rounded-xl border p-3', DASH.card)}>
-              <p className={cn('text-sm font-semibold', DASH.cellStrong)}>
+              <p className={cn('text-sm font-medium', DASH.cellStrong)}>
                 {LUMOS_TRIGGER_LABEL[trigger]}
               </p>
               <p className={cn('mt-0.5 text-[11px] leading-relaxed', DASH.muted)}>
@@ -103,7 +103,7 @@ const LumosDispatchModeTab: React.FC = () => {
                       type="button"
                       onClick={() => pick(trigger, mode)}
                       className={cn(
-                        'rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
+                        'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                         tone.soft,
                         tone.value,
                         active ? 'ring-2 ring-ring' : tone.softHover,
@@ -131,7 +131,7 @@ const LumosDispatchModeTab: React.FC = () => {
         onClick={() => void save()}
         disabled={saving || loading}
         className={cn(
-          'inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-60',
+          'inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium disabled:opacity-60',
           TONE.primary.solid,
         )}
       >

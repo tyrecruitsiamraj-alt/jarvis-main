@@ -96,7 +96,7 @@ const QueueRowButton: React.FC<{
         active ? 'border-primary bg-accent' : 'border-transparent hover:bg-accent/50',
       )}
     >
-      <span className="pt-0.5 text-[12px] font-semibold tabular-nums text-primary/70">
+      <span className="pt-0.5 text-[12px] font-medium tabular-nums text-primary/70">
         {String(index + 1).padStart(2, '0')}
       </span>
       <span className="min-w-0 flex-1">
@@ -107,7 +107,7 @@ const QueueRowButton: React.FC<{
       </span>
       <span className="flex shrink-0 items-center gap-3 pt-0.5">
         {typeof count === 'number' ? (
-          <span className="text-[15px] font-semibold tabular-nums text-foreground">
+          <span className="text-[15px] font-medium tabular-nums text-foreground">
             {count.toLocaleString('th-TH')}
           </span>
         ) : null}
@@ -188,13 +188,13 @@ const DetailPane: React.FC<{
     return (
       <div className="px-6 py-6">
         <p className={cn('text-[11.5px] font-medium', TONE_TEXT[t.tone])}>{t.badge}</p>
-        <h2 className="mt-1.5 text-[22px] font-semibold leading-snug tracking-tight">{t.title}</h2>
+        <h2 className="mt-1.5 text-[22px] font-medium leading-snug tracking-tight">{t.title}</h2>
         <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">{t.reason}</p>
 
         <dl className="mt-5 border-t border-border/60 pt-4 text-[13px]">
           <div className="flex items-baseline justify-between py-1.5">
             <dt className="text-muted-foreground">จำนวนที่ค้าง</dt>
-            <dd className="font-semibold tabular-nums">{t.count.toLocaleString('th-TH')}</dd>
+            <dd className="font-medium tabular-nums">{t.count.toLocaleString('th-TH')}</dd>
           </div>
         </dl>
 
@@ -223,7 +223,7 @@ const DetailPane: React.FC<{
   return (
     <div className="px-6 py-6">
       <p className={cn('text-[11.5px] font-medium', TONE_TEXT[meta.tone])}>{meta.badge}</p>
-      <h2 className="mt-1.5 text-[22px] font-semibold leading-snug tracking-tight">
+      <h2 className="mt-1.5 text-[22px] font-medium leading-snug tracking-tight">
         {item.name || item.person_ref}
       </h2>
       <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
@@ -405,7 +405,7 @@ const WorkQueuePage: React.FC = () => {
           <p className="text-[12.5px] font-medium text-primary">คิวงานของคุณ</p>
           {/* 🔴 พาดหัวบอกสองหน่วยแยกกัน — เดิมยุบเป็น "เหลือ N เรื่อง" ซึ่งเอากองงาน
               มาบวกกับจำนวนคน (ถ้อยคำอยู่ที่ `workQueueHeadline` มีเทสต์คุม) */}
-          <h1 className="mt-2 max-w-[24ch] text-[clamp(26px,3.6vw,42px)] font-semibold leading-[1.15] tracking-tight">
+          <h1 className="mt-2 max-w-[24ch] text-[clamp(26px,3.6vw,42px)] font-medium leading-[1.15] tracking-tight">
             {loading ? 'กำลังรวบรวมงานที่ต้องลงมือ…' : workQueueHeadline(queue)}
           </h1>
           <p className="mt-3 max-w-[60ch] text-[13.5px] leading-relaxed text-muted-foreground">

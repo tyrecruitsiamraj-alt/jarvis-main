@@ -530,7 +530,7 @@ const JobListPage: React.FC = () => {
             <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />
             ตัวกรอง
             {activeFilterCount > 0 ? (
-              <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground">
+              <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
                 เลือกอยู่ {activeFilterCount}
               </span>
             ) : (
@@ -803,7 +803,7 @@ const JobListPage: React.FC = () => {
                   className="w-full text-left"
                 >
                   <div className="flex items-center justify-between mb-2 gap-2">
-                    <span className="flex flex-wrap items-center gap-1.5 font-semibold text-foreground text-sm">
+                    <span className="flex flex-wrap items-center gap-1.5 font-medium text-foreground text-sm">
                       {j.request_no || j.unit_name}
                       <PrequestBadge job={j} compact />
                     </span>
@@ -952,7 +952,7 @@ const JobListPage: React.FC = () => {
                           className={cn(
                             'inline-flex items-start gap-0.5 rounded-md py-0.5 text-left transition-colors hover:text-foreground',
                             align === 'center' && 'justify-center',
-                            active ? 'font-bold text-foreground' : '',
+                            active ? 'font-medium text-foreground' : '',
                           )}
                         >
                           {label}

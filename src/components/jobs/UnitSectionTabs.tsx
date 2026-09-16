@@ -32,7 +32,7 @@ const UnitSectionTabs: React.FC<{ active: UnitSectionId }> = ({ active }) => {
           aria-selected={active === t.id}
           onClick={() => active !== t.id && navigate(t.to)}
           className={cn(
-            '-mb-0.5 border-b-2 px-3.5 py-2 text-sm font-semibold transition-colors',
+            '-mb-0.5 border-b-2 px-3.5 py-2 text-sm font-medium transition-colors',
             active === t.id
               ? 'border-primary text-primary'
               : 'border-transparent text-muted-foreground hover:text-foreground',

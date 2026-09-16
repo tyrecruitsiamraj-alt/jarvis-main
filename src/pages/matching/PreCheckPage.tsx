@@ -712,7 +712,7 @@ const PreCheckPage: React.FC = () => {
                 <ClipboardCheck className="w-4 h-4 text-amber-700 dark:text-amber-300" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-foreground">ค้นหาตำแหน่งผู้สมัคร</h3>
+                <h3 className="text-sm font-medium text-foreground">ค้นหาตำแหน่งผู้สมัคร</h3>
                 <p className="text-xs text-muted-foreground">เลือกงานจาก ERP ได้เลย หรือพิมพ์ที่อยู่ผู้สมัครเพื่อเรียงงานใกล้สุดก่อน</p>
               </div>
             </div>
@@ -809,7 +809,7 @@ const PreCheckPage: React.FC = () => {
                 <Navigation className="w-4 h-4 text-blue-600 dark:text-blue-300" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-foreground">แผนที่</h3>
+                <h3 className="text-sm font-medium text-foreground">แผนที่</h3>
                 <p className="text-xs text-muted-foreground">ตำแหน่งที่ใช้ค้นหางานใกล้เคียง</p>
               </div>
             </div>
@@ -853,7 +853,7 @@ const PreCheckPage: React.FC = () => {
           <MapPin className="w-4 h-4 text-blue-600 shrink-0 dark:text-blue-300" />
           <p className="text-sm text-muted-foreground">
             {appliedCenter || appliedTextQuery ? 'งานที่ใกล้/เกี่ยวข้อง' : 'งานเปิดจาก ERP'}{' '}
-            <span className="text-blue-600 font-bold tabular-nums dark:text-blue-300">{filteredRows.length}</span> รายการ
+            <span className="text-blue-600 font-medium tabular-nums dark:text-blue-300">{filteredRows.length}</span> รายการ
             {appliedCenter ? (
               <span className="text-muted-foreground"> · รัศมี {radius} กม.</span>
             ) : null}
@@ -889,7 +889,7 @@ const PreCheckPage: React.FC = () => {
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="font-semibold text-blue-600 text-sm truncate dark:text-blue-300">{unitRequestCardTitle(j)}</div>
+                  <div className="font-medium text-blue-600 text-sm truncate dark:text-blue-300">{unitRequestCardTitle(j)}</div>
                   {unitRequestCardSubtitle(j) ? (
                     <div className="text-[11px] text-muted-foreground truncate">{unitRequestCardSubtitle(j)}</div>
                   ) : null}
@@ -917,7 +917,7 @@ const PreCheckPage: React.FC = () => {
                       <span
                         title="จำนวนผู้สมัครที่ AI แมทจาก iRecruit"
                         className={cn(
-                          'rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                          'rounded-full border px-2 py-0.5 text-[11px] font-medium',
                           jobMatchById[j.id].matches.length > 0
                             ? 'border-emerald-100 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300'
                             : 'border-amber-100 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300',
@@ -936,7 +936,7 @@ const PreCheckPage: React.FC = () => {
                               ? `คะแนนความสำคัญของงาน ${score}/100 — คิดจากความเกี่ยวข้องกับคำค้น + ความด่วน`
                               : `คะแนนความสำคัญของงาน ${score}/100 — คิดจากความด่วนของงาน (${j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'})`
                       }
-                      className="cursor-help rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300"
+                      className="cursor-help rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300"
                     >
                       {score} คะแนน
                     </span>
@@ -993,7 +993,7 @@ const PreCheckPage: React.FC = () => {
                   <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-300" />
-                      <p className="text-sm font-semibold text-foreground">สถานที่ทำงาน</p>
+                      <p className="text-sm font-medium text-foreground">สถานที่ทำงาน</p>
                     </div>
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between gap-3">
@@ -1016,7 +1016,7 @@ const PreCheckPage: React.FC = () => {
                   </div>
                   <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-3 space-y-2 dark:border-blue-900 dark:bg-blue-950/50">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-semibold text-foreground">{unitRequestCardTitle(jobDetail)}</p>
+                          <p className="text-sm font-medium text-foreground">{unitRequestCardTitle(jobDetail)}</p>
                           {jobDetail.request_no ? (
                             <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[11px]', TONE.primary.outline)}>
                               {jobDetail.request_no}
@@ -1064,7 +1064,7 @@ const PreCheckPage: React.FC = () => {
 
                       <div className="mt-3 rounded-xl border border-violet-200/70 bg-violet-50/30 px-3 py-3 space-y-2 dark:border-violet-800/70 dark:bg-violet-950/50">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-violet-900 dark:text-violet-200">แก้ไขใบขอ (บันทึกถาวร)</p>
+                          <p className="text-sm font-medium text-violet-900 dark:text-violet-200">แก้ไขใบขอ (บันทึกถาวร)</p>
                           <button
                             type="button"
                             onClick={toggleEditJob}
@@ -1170,7 +1170,7 @@ const PreCheckPage: React.FC = () => {
                                 type="button"
                                 onClick={() => void saveFieldOverrides()}
                                 disabled={savingEdit}
-                                className="rounded-full bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+                                className="rounded-full bg-violet-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-60"
                               >
                                 {savingEdit ? 'กำลังบันทึก…' : 'บันทึกถาวร'}
                               </button>
@@ -1190,7 +1190,7 @@ const PreCheckPage: React.FC = () => {
                         {branchParseData?.parsed.items?.length ? (
                       <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-foreground">แตกสาขาจากข้อความ ERP</p>
+                          <p className="text-sm font-medium text-foreground">แตกสาขาจากข้อความ ERP</p>
                       <div className="flex items-center gap-1.5">
                       {(() => {
                         const proposedCount = (jobMatchById[jobDetail.id]?.matches ?? []).filter(isProposed).length;
@@ -1285,7 +1285,7 @@ const PreCheckPage: React.FC = () => {
                                     <p className="text-xs text-muted-foreground">ต้นฉบับ: {item.branch_name_raw}</p>
                                   </div>
                                   <div className="text-right">
-                                    <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">ต้องการ {item.requested_qty} คน</p>
+                                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">ต้องการ {item.requested_qty} คน</p>
                                     <p className="text-[11px] text-muted-foreground">มั่นใจ {item.confidence}%</p>
                                   </div>
                                 </div>
@@ -1363,7 +1363,7 @@ const PreCheckPage: React.FC = () => {
                         ) : (
                           <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold text-foreground">
+                              <p className="text-sm font-medium text-foreground">
                                 ผู้สมัครที่แมทกับใบขอนี้
                               </p>
                               {(() => {

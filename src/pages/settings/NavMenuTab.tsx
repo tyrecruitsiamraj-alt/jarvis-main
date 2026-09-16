@@ -76,7 +76,7 @@ const NavMenuTab: React.FC = () => {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-base font-semibold text-foreground">จัดเมนู</h2>
+        <h2 className="text-base font-medium text-foreground">จัดเมนู</h2>
         <p className="text-xs text-muted-foreground">
           ย้ายลำดับ เปลี่ยนชื่อ หรือซ่อนเมนูได้เอง · ซ่อนแล้วยังเข้าหน้านั้นได้ด้วยลิงก์ตรง
           (ถ้าจะตัดสิทธิ์จริงให้ไปที่แท็บ Roles)
@@ -145,7 +145,7 @@ const NavMenuTab: React.FC = () => {
       {/* เมนูที่ถูกซ่อน — ต้องเห็นเสมอ ไม่งั้นซ่อนแล้วหาทางเอากลับไม่เจอ */}
       {baseItems.filter((i) => prefs[i.path]?.hidden).length > 0 ? (
         <div className="space-y-1.5">
-          <p className="text-xs font-semibold text-muted-foreground">ซ่อนอยู่</p>
+          <p className="text-xs font-medium text-muted-foreground">ซ่อนอยู่</p>
           {baseItems
             .filter((i) => prefs[i.path]?.hidden)
             .map((item) => (
@@ -161,7 +161,7 @@ const NavMenuTab: React.FC = () => {
                   disabled={!isAdmin}
                   onClick={() => setPrefs(toggleNavItemHidden(prefs, item.path))}
                   className={cn(
-                    'ml-auto rounded-lg border px-2 py-1 text-xs font-semibold disabled:opacity-30',
+                    'ml-auto rounded-lg border px-2 py-1 text-xs font-medium disabled:opacity-30',
                     TONE.neutral.outline,
                   )}
                 >
@@ -194,7 +194,7 @@ const NavMenuTab: React.FC = () => {
           disabled={!isAdmin || busy || !dirty}
           onClick={() => setPrefs(saved)}
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50',
+            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50',
             TONE.neutral.outline,
           )}
         >
@@ -205,7 +205,7 @@ const NavMenuTab: React.FC = () => {
           disabled={!isAdmin || busy || Object.keys(prefs).length === 0}
           onClick={() => setPrefs({})}
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50',
+            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50',
             TONE.neutral.outline,
           )}
         >

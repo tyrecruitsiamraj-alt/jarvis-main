@@ -49,7 +49,7 @@ const DashboardPriorityQueue: React.FC<Props> = ({ items, onView }) => {
                   <p className={DASH.cellStrong}>{item.requestNo}</p>
                   <p className={cn('max-w-[220px] truncate text-xs', DASH.cellMuted)}>{item.unitName}</p>
                 </td>
-                <td className={cn('px-2 py-2.5 text-right tabular-nums font-semibold whitespace-nowrap', TONE.danger.value)}>
+                <td className={cn('px-2 py-2.5 text-right tabular-nums font-medium whitespace-nowrap', TONE.danger.value)}>
                   {item.remainingPositions}
                   <span className={cn('ml-1 font-normal text-[10px]', DASH.muted)}>เหลือ</span>
                 </td>

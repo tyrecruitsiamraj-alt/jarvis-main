@@ -86,7 +86,7 @@ const JobRecallSuggestions: React.FC<{ jobId: string }> = ({ jobId }) => {
   return (
     <div className={cn('mt-3 space-y-2 rounded-xl border px-3 py-2.5', DASH.card)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={cn('text-xs font-semibold', DASH.cellStrong)}>
+        <p className={cn('text-xs font-medium', DASH.cellStrong)}>
           คนที่เคยปฏิเสธงานอื่น — ให้ AI จับว่าใครเข้ากับใบนี้
         </p>
         <Button variant="secondary" size="sm"
@@ -140,7 +140,7 @@ const JobRecallSuggestions: React.FC<{ jobId: string }> = ({ jobId }) => {
                   onClick={() => setConfirming(true)}
                   disabled={picked.length === 0 || confirming}
                   className={cn(
-                    'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold disabled:opacity-40',
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium disabled:opacity-40',
                     TONE.violet.outline,
                   )}
                 >
@@ -152,7 +152,7 @@ const JobRecallSuggestions: React.FC<{ jobId: string }> = ({ jobId }) => {
               {/* ยืนยันแบบบล็อกในหน้า — ห้ามใช้ Dialog เพราะอยู่ใน Dialog อยู่แล้ว */}
               {confirming ? (
                 <div className={cn('space-y-1.5 rounded-lg border px-2.5 py-2', TONE.warn.soft)}>
-                  <p className={cn('text-[11px] font-semibold', TONE.warn.value)}>
+                  <p className={cn('text-[11px] font-medium', TONE.warn.value)}>
                     ยืนยันให้ AI โทรหา {pickedNames.length} คนนี้จริง ๆ?
                   </p>
                   <p className={cn('text-[11px]', DASH.cell)}>
@@ -200,7 +200,7 @@ const JobRecallSuggestions: React.FC<{ jobId: string }> = ({ jobId }) => {
                         aria-label={`เลือก ${m.full_name}`}
                         className="h-3.5 w-3.5 cursor-pointer accent-sky-600 disabled:cursor-not-allowed"
                       />
-                      <span className={cn('font-semibold', DASH.cellStrong)}>{m.full_name}</span>
+                      <span className={cn('font-medium', DASH.cellStrong)}>{m.full_name}</span>
                       <span className={tierChipClass(m.tier)}>{m.tier === 'green' ? 'เข้าเกณฑ์' : m.tier === 'yellow' ? 'พอได้' : 'ไม่เข้าเกณฑ์'}</span>
                       <span className={cn('min-w-0 flex-1 truncate', DASH.muted)} title={m.reason || undefined}>
                         {m.reason || EM_DASH}

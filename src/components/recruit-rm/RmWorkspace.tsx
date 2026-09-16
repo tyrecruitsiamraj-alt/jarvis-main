@@ -494,7 +494,7 @@ const RmWorkspace: React.FC<{
                 onClick={() => setTab(t)}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'relative px-4 py-2.5 text-sm font-semibold transition-colors',
+                  'relative px-4 py-2.5 text-sm font-medium transition-colors',
                   active
                     ? cn(TONE.primary.value, 'border-b-2 border-current')
                     : cn(DASH.muted, 'border-b-2 border-transparent hover:text-foreground'),
@@ -532,7 +532,7 @@ const RmWorkspace: React.FC<{
                 onClick={() => setListView(v)}
                 aria-pressed={active}
                 className={cn(
-                  'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
+                  'rounded-full px-3 py-1 text-xs font-medium transition-colors',
                   active
                     ? 'bg-primary text-primary-foreground'
                     : cn('bg-muted hover:bg-muted/70', DASH.muted),
@@ -626,7 +626,7 @@ const RmWorkspace: React.FC<{
                   ยอดทั้งระบบจากฐานของเรา · ต่างจากบอร์ดข้างล่างที่นับจากรายการในหน้า */}
               {rmOverview ? (
                 <div className="space-y-1">
-                  <p className="text-[11px] font-semibold text-muted-foreground">
+                  <p className="text-[11px] font-medium text-muted-foreground">
                     นัด → มาไหม (ยอดทั้งระบบ · ย้ายมาจากศูนย์คุมงานสรรหา)
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -654,7 +654,7 @@ const RmWorkspace: React.FC<{
                     ).map(([label, n, toneKey, sub]) => (
                       <div key={label} className={cn('rounded-xl border px-3 py-2', TONE[toneKey].soft)}>
                         <p className="text-[10px] font-medium text-muted-foreground">{label}</p>
-                        <p className={cn('text-xl font-bold tabular-nums', TONE[toneKey].num)}>
+                        <p className={cn('text-xl font-medium tabular-nums', TONE[toneKey].num)}>
                           {n == null ? '—' : n.toLocaleString('th-TH')}
                         </p>
                         {sub ? <p className="text-[10px] text-muted-foreground">{sub}</p> : null}
@@ -680,7 +680,7 @@ const RmWorkspace: React.FC<{
                         TONE.danger.softHover,
                       )}
                     >
-                      <span className={cn('font-semibold', TONE.danger.value)}>
+                      <span className={cn('font-medium', TONE.danger.value)}>
                         เลยวันนัดแล้วยังไม่บันทึกผล {rmOverview.attendance.overdueNoResult} ใบ
                       </span>
                       <span className={cn('ml-1', DASH.muted)}>— กดเพื่อดูรายชื่อและบันทึก มา/ไม่มา</span>
@@ -705,7 +705,7 @@ const RmWorkspace: React.FC<{
                     ).map(([label, n, toneKey]) => (
                       <div key={label} className={cn('rounded-xl border px-3 py-2', TONE[toneKey].soft)}>
                         <p className="text-[10px] font-medium text-muted-foreground">{label}</p>
-                        <p className={cn('text-xl font-bold tabular-nums', TONE[toneKey].num)}>
+                        <p className={cn('text-xl font-medium tabular-nums', TONE[toneKey].num)}>
                           {n.toLocaleString('th-TH')}
                         </p>
                       </div>
@@ -798,7 +798,7 @@ const RmWorkspace: React.FC<{
               {awaitingChoiceRows.length > 0 ? (
                 <div className={cn('space-y-2 rounded-xl border px-3 py-2.5', TONE.warn.soft)}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className={cn('text-xs font-semibold', TONE.warn.value)}>
+                    <p className={cn('text-xs font-medium', TONE.warn.value)}>
                       ต้องเลือกวิธีโทร {awaitingChoiceRows.length.toLocaleString('th-TH')} คน —
                       ถูกถอดจากคนที่เก็บไว้แล้วไม่โทรเกิน 1 วัน
                     </p>
@@ -843,7 +843,7 @@ const RmWorkspace: React.FC<{
                               onClick={() => void keepForSelf([r.id])}
                               className={cn(
                                 // min-h-9 = 36px กดโดนด้วยนิ้วบนมือถือ (เกณฑ์ของ panel เอกสาร)
-                                'inline-flex min-h-9 items-center rounded-full border px-3 font-semibold',
+                                'inline-flex min-h-9 items-center rounded-full border px-3 font-medium',
                                 TONE.primary.outline,
                               )}
                             >
@@ -853,7 +853,7 @@ const RmWorkspace: React.FC<{
                               type="button"
                               onClick={() => askSendAi([r.id])}
                               className={cn(
-                                'inline-flex min-h-9 items-center rounded-full border px-3 font-semibold',
+                                'inline-flex min-h-9 items-center rounded-full border px-3 font-medium',
                                 TONE.violet.outline,
                               )}
                             >

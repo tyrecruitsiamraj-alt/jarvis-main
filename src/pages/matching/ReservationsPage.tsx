@@ -106,7 +106,7 @@ const ReservationsPage: React.FC = () => {
       />
       <div className="px-4 md:px-6 space-y-4 pb-8">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-foreground">คนที่จองอยู่ ({rows.length})</h2>
+          <h2 className="text-sm font-medium text-foreground">คนที่จองอยู่ ({rows.length})</h2>
           <select
             value={sourceFilter}
             onChange={(e) => {
@@ -146,7 +146,7 @@ const ReservationsPage: React.FC = () => {
                     </span>
                     <span className="text-[11px] text-muted-foreground ml-auto">{formatWhen(it.updated_at)}</span>
                   </div>
-                  <h3 className={cn('text-sm', DASH.cellStrong, 'font-semibold')}>
+                  <h3 className={cn('text-sm', DASH.cellStrong, 'font-medium')}>
                     {it.candidate_name || `#${it.candidate_ref}`}
                   </h3>
                   <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
@@ -210,7 +210,7 @@ const ReservationsPage: React.FC = () => {
                           disabled={busy}
                           onClick={() => void cancel(it.id)}
                           className={cn(
-                            'rounded-full border border-transparent px-3 py-1 text-[11px] font-semibold disabled:opacity-60',
+                            'rounded-full border border-transparent px-3 py-1 text-[11px] font-medium disabled:opacity-60',
                             TONE.danger.solid,
                           )}
                         >

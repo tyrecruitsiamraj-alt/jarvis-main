@@ -99,7 +99,7 @@ function LaneTile({
       <span className={cn('whitespace-nowrap text-[11px] font-medium', TONE[tone].value)}>
         {t.label}
       </span>
-      <span className={cn('font-mono text-2xl font-bold leading-none tabular-nums', TONE[tone].num)}>
+      <span className={cn('font-mono text-2xl font-medium leading-none tabular-nums', TONE[tone].num)}>
         {th(count)}
       </span>
     </button>
@@ -159,7 +159,7 @@ function Chip({
       {step ? (
         <span
           className={cn(
-            'flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-bold',
+            'flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-medium',
             quiet ? cn('bg-slate-200/80 dark:bg-slate-700', DASH.cellMuted) : TONE[tone].solid,
           )}
           aria-hidden
@@ -170,13 +170,13 @@ function Chip({
       <span className="min-w-0">
         <span className="flex items-baseline gap-1.5">
           <span
-            className={cn('whitespace-nowrap font-semibold', quiet ? DASH.cellMuted : TONE[tone].value)}
+            className={cn('whitespace-nowrap font-medium', quiet ? DASH.cellMuted : TONE[tone].value)}
           >
             {label}
           </span>
           <span
             className={cn(
-              'whitespace-nowrap font-mono text-sm font-bold tabular-nums',
+              'whitespace-nowrap font-mono text-sm font-medium tabular-nums',
               quiet ? DASH.cellMuted : TONE[tone].num,
             )}
           >
@@ -230,7 +230,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
           )}
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className={cn('text-[11px] font-semibold', broken ? TONE.warn.value : DASH.muted)}>
+            <p className={cn('text-[11px] font-medium', broken ? TONE.warn.value : DASH.muted)}>
               {stateText.title}
             </p>
             {stateText.canRetry && onRetry ? (
@@ -238,7 +238,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
                 type="button"
                 onClick={onRetry}
                 className={cn(
-                  'rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                  'rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-colors',
                   TONE.warn.outline,
                 )}
               >
@@ -255,7 +255,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
                   className="min-w-0 flex-1 rounded-xl border border-border/60 bg-card/60 px-3 py-2"
                 >
                   <p className={cn('text-[11px]', DASH.muted)}>{RELEASE_LANE_TEXT[laneKey].label}</p>
-                  <p className={cn('text-2xl font-bold leading-none', DASH.muted)}>{UNKNOWN_NUMBER}</p>
+                  <p className={cn('text-2xl font-medium leading-none', DASH.muted)}>{UNKNOWN_NUMBER}</p>
                 </div>
               ))}
             </div>
@@ -286,7 +286,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           {/* ⚠️ "ใบขอ" มีคำอธิบายติดตัว — โมเดลที่มาลองเล่นบอกว่าไม่รู้ว่าคืออะไร */}
           <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-foreground">
+            <p className="text-[13px] font-medium text-foreground">
               <Term k="unit_request">ใบขอที่เปิดอยู่</Term> {th(ledger.all)} ใบ
             </p>
             {/* อายุข้อมูล — โชว์เฉพาะตอนที่เก่าพอจะทำให้ตัดสินใจผิด หรือกำลังดูสำเนาเพราะต่อไม่ติด */}
@@ -295,7 +295,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
           {ledger.percent === null ? null : (
             <p className={cn('text-[11px]', DASH.muted)}>
               <Term k="released">ปล่อยประกาศ</Term>ไปแล้ว{' '}
-              <span className="font-semibold text-foreground">{ledger.percent}%</span> —{' '}
+              <span className="font-medium text-foreground">{ledger.percent}%</span> —{' '}
               {th(ledger.released)} จาก {th(ledger.all)} ใบ
             </p>
           )}
@@ -343,7 +343,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
       {lane === null || lane === 'all' || lane === 'unreleased' ? (
         <div className="space-y-1.5 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[11px] font-semibold text-foreground">
+            <p className="text-[11px] font-medium text-foreground">
               ยังไม่ปล่อย {th(ledger.unreleased)} ใบ — ติดขั้นไหน
             </p>
             {action}
@@ -406,7 +406,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
       {/* ── ปล่อยแล้ว: ได้ผลยังไง ── */}
       {lane === 'released' ? (
         <div className="space-y-1.5 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
-          <p className="text-[11px] font-semibold text-foreground">
+          <p className="text-[11px] font-medium text-foreground">
             ที่ปล่อยไปแล้ว {th(ledger.released)} ใบ — ได้ผลยังไง
           </p>
           <div className="flex flex-wrap items-center gap-1.5">

@@ -51,8 +51,8 @@ const PageHeroStrip: React.FC<Props> = ({ eyebrow, title, meta, actions, childre
           {title ? (
             <h1
               className={cn(
-                'mt-1 text-lg font-semibold tracking-tight md:text-xl',
-                v2 ? 'text-foreground' : 'font-bold text-white',
+                'mt-1 text-lg font-medium tracking-tight md:text-xl',
+                v2 ? 'text-foreground' : 'font-medium text-white',
               )}
             >
               {title}

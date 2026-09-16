@@ -42,18 +42,18 @@ const DashboardLeadKindChart: React.FC<DashboardLeadKindChartProps> = ({
     <div className={cn('rounded-2xl border p-4', DASH.card)}>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div>
-          <p className={cn('text-sm font-bold', DASH.cellStrong)}>ใบขอเร่งด่วนแค่ไหน</p>
+          <p className={cn('text-sm font-medium', DASH.cellStrong)}>ใบขอเร่งด่วนแค่ไหน</p>
           <p className={cn('text-[11px]', DASH.muted)}>
             แบ่งตามระยะเวลาที่ให้หา — ตามช่วง {scopeLabel} · เปลี่ยนตามตัวกรองทุกตัว
           </p>
         </div>
         <p className={cn('text-[11px]', DASH.muted)}>
           ทั้งหมด{' '}
-          <span className={cn('text-base font-bold tabular-nums', DASH.cellStrong)}>
+          <span className={cn('text-base font-medium tabular-nums', DASH.cellStrong)}>
             {totalPositions.toLocaleString('th-TH')}
           </span>{' '}
           อัตรา ·{' '}
-          <span className="font-bold tabular-nums">{totalRequests.toLocaleString('th-TH')}</span> ใบขอ
+          <span className="font-medium tabular-nums">{totalRequests.toLocaleString('th-TH')}</span> ใบขอ
         </p>
       </div>
 
@@ -78,10 +78,10 @@ const DashboardLeadKindChart: React.FC<DashboardLeadKindChartProps> = ({
                 <span className="flex flex-wrap items-baseline justify-between gap-x-2">
                   <span className="flex items-center gap-1.5">
                     <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
-                    <span className={cn('text-xs font-bold', tone.value)}>{s.label}</span>
+                    <span className={cn('text-xs font-medium', tone.value)}>{s.label}</span>
                   </span>
                   <span className={cn('text-[11px]', DASH.muted)}>
-                    <span className={cn('text-base font-bold tabular-nums', tone.num)}>
+                    <span className={cn('text-base font-medium tabular-nums', tone.num)}>
                       {s.positions.toLocaleString('th-TH')}
                     </span>{' '}
                     อัตรา · {s.requests.toLocaleString('th-TH')} ใบ ·{' '}

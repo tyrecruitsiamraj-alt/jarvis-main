@@ -133,12 +133,12 @@ export default function CallHoldPanel({
   return (
     <div className={cn('mt-2 space-y-2 rounded-xl border px-3 py-2.5', TONE.primary.soft)}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px]">
-        <span className={cn('font-semibold', TONE.primary.value)}>
+        <span className={cn('font-medium', TONE.primary.value)}>
           คุณถืออยู่ · รับเมื่อ {shortTime(hold.heldAt)}
         </span>
         <span className={DASH.muted}>
           ล็อก 1 วัน · คายอีก{' '}
-          <span className="font-mono font-bold tabular-nums">{formatCountdown(msLeft)}</span>
+          <span className="font-mono font-medium tabular-nums">{formatCountdown(msLeft)}</span>
         </span>
       </div>
 
@@ -146,13 +146,13 @@ export default function CallHoldPanel({
         <div className={cn('flex flex-wrap items-center gap-2 rounded-lg border px-2.5 py-2', TONE.neutral.soft)}>
           <a
             href={`tel:${phone}`}
-            className={cn('flex-1 font-mono text-base font-bold tabular-nums', TONE.primary.value)}
+            className={cn('flex-1 font-mono text-base font-medium tabular-nums', TONE.primary.value)}
           >
             {phone}
           </a>
           <a
             href={`tel:${phone}`}
-            className={cn('rounded-full px-3 py-1 text-[11px] font-bold', TONE.primary.solid)}
+            className={cn('rounded-full px-3 py-1 text-[11px] font-medium', TONE.primary.solid)}
           >
             โทร
           </a>
@@ -160,7 +160,7 @@ export default function CallHoldPanel({
       ) : null}
 
       <div className="space-y-1.5">
-        <p className={cn('text-[10px] font-bold uppercase tracking-wider', DASH.muted)}>
+        <p className={cn('text-[10px] font-medium uppercase tracking-wider', DASH.muted)}>
           โทรเสร็จแล้ว กดผล
         </p>
         <div className="flex flex-wrap gap-1.5">
@@ -173,7 +173,7 @@ export default function CallHoldPanel({
                 type="button"
                 onClick={() => pick(key)}
                 className={cn(
-                  'rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                  'rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                   active ? cn(tone.soft, tone.value, 'ring-2 ring-ring') : cn(tone.soft, tone.value, tone.softHover),
                 )}
               >
@@ -205,7 +205,7 @@ export default function CallHoldPanel({
                     className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-sky-600"
                   />
                   <span>
-                    <span className={cn('font-semibold', DASH.cellStrong)}>{label}</span>
+                    <span className={cn('font-medium', DASH.cellStrong)}>{label}</span>
                     <span className={cn('ml-1', DASH.muted)}>— {hint}</span>
                   </span>
                 </label>
@@ -228,7 +228,7 @@ export default function CallHoldPanel({
                     className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-sky-600"
                   />
                   <span>
-                    <span className={cn('font-semibold', DASH.cellStrong)}>
+                    <span className={cn('font-medium', DASH.cellStrong)}>
                       {CONFIRMED_SCOPE_LABEL[value]}
                     </span>
                     <span className={cn('ml-1', DASH.muted)}>— {CONFIRMED_SCOPE_HINT[value]}</span>
@@ -296,7 +296,7 @@ export default function CallHoldPanel({
           onClick={() => void save()}
           disabled={busy || !outcome}
           className={cn(
-            'rounded-full px-3 py-1 text-[11px] font-bold disabled:opacity-50',
+            'rounded-full px-3 py-1 text-[11px] font-medium disabled:opacity-50',
             TONE.primary.solid,
           )}
         >
@@ -307,7 +307,7 @@ export default function CallHoldPanel({
           onClick={() => void release('manual')}
           disabled={busy}
           className={cn(
-            'rounded-full border px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50',
+            'rounded-full border px-2.5 py-1 text-[11px] font-medium disabled:opacity-50',
             TONE.neutral.soft,
             TONE.neutral.value,
             TONE.neutral.softHover,
@@ -320,7 +320,7 @@ export default function CallHoldPanel({
           onClick={() => void release('to_ai')}
           disabled={busy}
           className={cn(
-            'rounded-full border px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50',
+            'rounded-full border px-2.5 py-1 text-[11px] font-medium disabled:opacity-50',
             TONE.info.soft,
             TONE.info.value,
             TONE.info.softHover,

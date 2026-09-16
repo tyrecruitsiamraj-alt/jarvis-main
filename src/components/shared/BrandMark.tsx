@@ -40,7 +40,7 @@ export const BrandMark: React.FC<{ size?: Size; className?: string }> = ({ size 
 
   return (
     <div className={cn(s.box, 'bg-primary flex items-center justify-center shrink-0', className)}>
-      <span className={cn('text-primary-foreground font-bold', s.text)}>{letter}</span>
+      <span className={cn('text-primary-foreground font-medium', s.text)}>{letter}</span>
     </div>
   );
 };

@@ -40,7 +40,7 @@ const StandalonePickerDialog: React.FC<{
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="w-[calc(100%-1.5rem)] max-w-[26rem] rounded-2xl p-0">
         <DialogHeader className="border-b border-border/50 px-5 py-4 text-left">
-          <DialogTitle className="text-base font-semibold">ประกาศลอย (ไม่ผูกใบขอ)</DialogTitle>
+          <DialogTitle className="text-base font-medium">ประกาศลอย (ไม่ผูกใบขอ)</DialogTitle>
           <DialogDescription className="text-xs">
             เลือกกล่องที่จะให้ผู้สมัครเข้า และ BU ที่รับผิดชอบ
           </DialogDescription>
@@ -74,7 +74,7 @@ const StandalonePickerDialog: React.FC<{
               const label = STANDALONE_POSTING_KINDS.find((k) => k.code === kind)?.label ?? kind;
               onPick({ kind, kindLabel: label, departmentCode: bu });
             }}
-            className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
+            className="w-full rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground"
           >
             ถัดไป — กรอกรายละเอียด
           </button>

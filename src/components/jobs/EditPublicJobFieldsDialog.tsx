@@ -235,7 +235,7 @@ const EditPublicJobFieldsDialog: React.FC<{
         <div className="relative space-y-4">
           {show('place') ? (
           <section className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground">พื้นที่ทำงาน</p>
+            <p className="text-xs font-medium text-muted-foreground">พื้นที่ทำงาน</p>
             <div className="grid gap-2 sm:grid-cols-3">
               <label className="space-y-1">
                 <span className="text-xs text-muted-foreground">จังหวัด</span>
@@ -330,7 +330,7 @@ const EditPublicJobFieldsDialog: React.FC<{
           {show('income') ? (
           <section className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold text-muted-foreground">รายได้ที่จะโชว์บนประกาศ</p>
+              <p className="text-xs font-medium text-muted-foreground">รายได้ที่จะโชว์บนประกาศ</p>
               {/* หน่วยของทั้งชุด — ห้ามปนรายวันกับรายเดือนในรายการเดียว */}
               <div className="flex items-center gap-1">
                 {INCOME_PERIODS.map((pd) => (
@@ -340,7 +340,7 @@ const EditPublicJobFieldsDialog: React.FC<{
                     aria-pressed={incomePeriod === pd}
                     onClick={() => setIncomePeriod(pd)}
                     className={cn(
-                      'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
+                      'rounded-full border px-2.5 py-0.5 text-[11px] font-medium',
                       incomePeriod === pd ? TONE.info.solid : TONE.neutral.outline,
                     )}
                   >
@@ -368,7 +368,7 @@ const EditPublicJobFieldsDialog: React.FC<{
                       }
                     />
                     <input
-                      className={cn(fieldCls, 'w-28 text-right font-semibold tabular-nums')}
+                      className={cn(fieldCls, 'w-28 text-right font-medium tabular-nums')}
                       inputMode="numeric"
                       placeholder="บาท"
                       value={row.amount}
@@ -385,7 +385,7 @@ const EditPublicJobFieldsDialog: React.FC<{
                       aria-label={`ลบรายการ ${row.label || i + 1}`}
                       onClick={() => setIncomeRows((prev) => prev.filter((_, j) => j !== i))}
                       className={cn(
-                        'shrink-0 rounded-lg border px-2 py-1.5 text-xs font-semibold',
+                        'shrink-0 rounded-lg border px-2 py-1.5 text-xs font-medium',
                         TONE.danger.outline,
                       )}
                     >
@@ -408,7 +408,7 @@ const EditPublicJobFieldsDialog: React.FC<{
               <button
                 type="button"
                 onClick={() => setShowRatePicker((v) => !v)}
-                className={cn('rounded-lg border px-2.5 py-1 text-xs font-semibold', TONE.info.outline)}
+                className={cn('rounded-lg border px-2.5 py-1 text-xs font-medium', TONE.info.outline)}
               >
                 + เพิ่มรายการรายได้
               </button>
@@ -437,7 +437,7 @@ const EditPublicJobFieldsDialog: React.FC<{
                   )}
                 >
                   <div className="border-b border-border/70 px-3.5 py-2.5">
-                    <p className="text-sm font-semibold text-foreground">อัตราตามใบขอ (ERP)</p>
+                    <p className="text-sm font-medium text-foreground">อัตราตามใบขอ (ERP)</p>
                     <p className={cn('text-[11px]', DASH.muted)}>
                       ติ๊กอันที่จะเอาไปเป็นรายการรายได้ — ตัวเลขคืออัตราจ่าย อัตราเบิกไม่ขึ้นประกาศ
                     </p>
@@ -478,7 +478,7 @@ const EditPublicJobFieldsDialog: React.FC<{
                                 />
                                 <span className="min-w-0 flex-1 text-xs text-foreground">
                                   {c.isPenalty ? (
-                                    <span className={cn('mr-1 font-semibold', TONE.warn.value)}>⚠</span>
+                                    <span className={cn('mr-1 font-medium', TONE.warn.value)}>⚠</span>
                                   ) : null}
                                   {c.name}
                                   {already ? (
@@ -492,7 +492,7 @@ const EditPublicJobFieldsDialog: React.FC<{
                                     </span>
                                   ) : null}
                                 </span>
-                                <span className="shrink-0 text-xs font-semibold tabular-nums text-foreground">
+                                <span className="shrink-0 text-xs font-medium tabular-nums text-foreground">
                                   {c.amount != null && c.amount > 0
                                     ? c.amount.toLocaleString('th-TH')
                                     : '—'}
@@ -513,7 +513,7 @@ const EditPublicJobFieldsDialog: React.FC<{
                         setPickedKeys([]);
                         setShowRatePicker(false);
                       }}
-                      className="text-[11px] font-semibold text-muted-foreground underline"
+                      className="text-[11px] font-medium text-muted-foreground underline"
                     >
                       พิมพ์เองแทน
                     </button>
@@ -524,7 +524,7 @@ const EditPublicJobFieldsDialog: React.FC<{
                           setPickedKeys([]);
                           setShowRatePicker(false);
                         }}
-                        className="rounded-lg border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground"
+                        className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground"
                       >
                         ยกเลิก
                       </button>
@@ -544,7 +544,7 @@ const EditPublicJobFieldsDialog: React.FC<{
                           setShowRatePicker(false);
                         }}
                         className={cn(
-                          'rounded-lg px-3 py-1 text-xs font-semibold disabled:opacity-40',
+                          'rounded-lg px-3 py-1 text-xs font-medium disabled:opacity-40',
                           TONE.info.solid,
                         )}
                       >
@@ -561,7 +561,7 @@ const EditPublicJobFieldsDialog: React.FC<{
                 {parsedLines.length > 0 ? 'ยอดรวมที่จะโชว์ (ใส่เองได้)' : 'รายได้รวมที่จะโชว์'}
               </span>
               <input
-                className={cn(fieldCls, 'text-center font-semibold tabular-nums')}
+                className={cn(fieldCls, 'text-center font-medium tabular-nums')}
                 inputMode="numeric"
                 value={incomeTotal}
                 placeholder={parsedLines.length > 0 ? `ผลบวก ${linesSum.toLocaleString('th-TH')}` : 'ใช้ค่าจาก ERP'}
@@ -573,7 +573,7 @@ const EditPublicJobFieldsDialog: React.FC<{
                 ยอดรวม > ผลบวก → เติมบรรทัด "อื่น ๆ" · ยอดรวม < ผลบวก → ใช้ผลบวกแทน) */}
             {preview ? (
               <div className={cn('space-y-0.5 rounded-xl px-3 py-2 text-xs', TONE.success.soft)}>
-                <p className="text-[11px] font-semibold text-muted-foreground">
+                <p className="text-[11px] font-medium text-muted-foreground">
                   ผู้สมัครจะเห็น ({INCOME_PERIOD_LABEL[preview.period]})
                 </p>
                 {preview.lines.map((l, i) => (
@@ -584,7 +584,7 @@ const EditPublicJobFieldsDialog: React.FC<{
                     <span className="font-medium tabular-nums">฿{l.amount.toLocaleString('th-TH')}</span>
                   </div>
                 ))}
-                <div className="flex justify-between gap-3 border-t border-border/50 pt-0.5 font-semibold">
+                <div className="flex justify-between gap-3 border-t border-border/50 pt-0.5 font-medium">
                   <span>รวม</span>
                   <span className="tabular-nums">฿{preview.total.toLocaleString('th-TH')}</span>
                 </div>
@@ -616,7 +616,7 @@ const EditPublicJobFieldsDialog: React.FC<{
               *
               * ทุกอันติ๊กไว้ให้ตั้งแต่แรก (ของเดิมขึ้นประกาศเองอยู่แล้ว) — ปลดติ๊ก = ไม่ให้คนนอกเห็น
               */}
-            <p className="text-xs font-semibold text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
               สวัสดิการเพิ่มเติม ({benefitLines.length}/{BENEFIT_LINE_MAX} รายการ)
             </p>
             <textarea
@@ -653,7 +653,7 @@ const EditPublicJobFieldsDialog: React.FC<{
               disabled={saving}
               onClick={() => void save()}
               className={cn(
-                'rounded-lg px-3.5 py-1.5 text-sm font-semibold disabled:opacity-50',
+                'rounded-lg px-3.5 py-1.5 text-sm font-medium disabled:opacity-50',
                 TONE.success.solid,
               )}
             >

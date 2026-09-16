@@ -257,7 +257,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
               {isBar && eyebrow ? (
                 <span
                   className={cn(
-                    'shrink-0 text-[11px] font-bold uppercase tracking-[0.14em]',
+                    'shrink-0 text-[11px] font-medium uppercase tracking-[0.14em]',
                     TONE.warn.value,
                   )}
                 >
@@ -291,7 +291,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
                   <SlidersHorizontal aria-hidden />
                   ตัวกรอง
                   {activeFilterCount > 0 ? (
-                    <span className={cn('ml-1 rounded-full px-1.5 text-[10px] font-bold', TONE.primary.solid)}>
+                    <span className={cn('ml-1 rounded-full px-1.5 text-[10px] font-medium', TONE.primary.solid)}>
                       {activeFilterCount}
                     </span>
                   ) : null}
@@ -312,7 +312,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
                   <SlidersHorizontal aria-hidden />
                   ตัวกรอง
                   {activeFilterCount > 0 ? (
-                    <span className={cn('ml-1 rounded-full px-1.5 text-[10px] font-bold', TONE.primary.solid)}>
+                    <span className={cn('ml-1 rounded-full px-1.5 text-[10px] font-medium', TONE.primary.solid)}>
                       {activeFilterCount}
                     </span>
                   ) : null}
@@ -329,7 +329,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
                 {resultCount != null && !loading ? (
                   <p className="text-xs text-muted-foreground">
                     พบ{' '}
-                    <span className="font-semibold text-foreground">
+                    <span className="font-medium text-foreground">
                       {resultCount.toLocaleString('th-TH')}
                     </span>
                     {totalCount != null && totalCount !== resultCount ? (
@@ -400,7 +400,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
               <Button size="sm"
                 type="button"
                 onClick={() => setSheetOpen(false)}
-                className="justify-center px-6 py-3 text-sm font-semibold"
+                className="justify-center px-6 py-3 text-sm font-medium"
               >
                 แสดงผลลัพธ์
                 {resultCount != null ? ` (${resultCount})` : ''}

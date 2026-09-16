@@ -107,7 +107,7 @@ const RmSearchBar: React.FC<{
             : `ส่ง ${selectedCount} คนให้ AI โทร — มีหน้ายืนยันรายชื่อก่อนโทรจริง`
         }
         className={cn(
-          'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold disabled:opacity-50',
+          'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium disabled:opacity-50',
           TONE.violet.outline,
         )}
       >
@@ -159,7 +159,7 @@ const RmSearchBar: React.FC<{
             type="button"
             onClick={onToggleLeadView}
             className={cn(
-              'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold',
+              'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium',
               leadView ? TONE.violet.solid : cn(TONE.violet.soft, TONE.violet.value, TONE.violet.softHover),
             )}
           >

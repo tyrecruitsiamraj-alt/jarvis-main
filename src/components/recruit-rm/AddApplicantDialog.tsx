@@ -189,7 +189,7 @@ const AddApplicantDialog: React.FC<{
                     onClick={() => setGender(s.code)}
                     className={
                       gender === s.code
-                        ? 'rounded-full border border-primary bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary'
+                        ? 'rounded-full border border-primary bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary'
                         : 'rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary'
                     }
                   >
@@ -351,7 +351,7 @@ const AddApplicantDialog: React.FC<{
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="flex max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[38rem] flex-col gap-0 overflow-hidden rounded-3xl p-0">
         <DialogHeader className="shrink-0 border-b border-border/50 px-5 py-4 text-left">
-          <DialogTitle className="text-base font-semibold">เพิ่มข้อมูลผู้สมัคร</DialogTitle>
+          <DialogTitle className="text-base font-medium">เพิ่มข้อมูลผู้สมัคร</DialogTitle>
           <DialogDescription className="text-xs">
             สำหรับคนที่โทรเข้ามาสมัคร — ใบนี้จะไปอยู่รวมกับใบสมัครจากลิงก์ และมีชื่อผู้บันทึกติดไว้
           </DialogDescription>

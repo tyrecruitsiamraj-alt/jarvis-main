@@ -50,8 +50,8 @@ export default function AiEvaluationStatus({ source }: { source: 'board' | 'irec
         <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-300" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center justify-between gap-1.5">
-            <p className={cn('text-xs font-semibold', TONE.primary.num)}>กำลังรอ AI ประเมิน — ระบบไม่ได้ค้าง</p>
-            <span className={cn('inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 dark:bg-slate-800 text-[10px] font-semibold tabular-nums', TONE.primary.value)}>
+            <p className={cn('text-xs font-medium', TONE.primary.num)}>กำลังรอ AI ประเมิน — ระบบไม่ได้ค้าง</p>
+            <span className={cn('inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 dark:bg-slate-800 text-[10px] font-medium tabular-nums', TONE.primary.value)}>
               <Clock3 className="h-3 w-3" /> {formatElapsed(elapsedSeconds)}
             </span>
           </div>

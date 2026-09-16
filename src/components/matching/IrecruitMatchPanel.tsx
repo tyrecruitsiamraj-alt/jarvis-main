@@ -80,7 +80,7 @@ function CandidateDetailDialog({
 
             {match.reason ? (
               <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2 text-xs text-sky-900">
-                <span className="font-semibold">เหตุผลที่ AI เสนอ:</span> {match.reason}
+                <span className="font-medium">เหตุผลที่ AI เสนอ:</span> {match.reason}
               </div>
             ) : null}
 
@@ -192,7 +192,7 @@ export default function IrecruitMatchPanel({ loading, error, result, onMatch, on
     <div className="rounded-xl border border-sky-200/70 bg-sky-50/30 px-3 py-3 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-sm font-semibold text-sky-900">
+          <div className="flex items-center gap-2 text-sm font-medium text-sky-900">
             <Users className="h-4 w-4" />
             ผู้สมัครใกล้เคียง (iRecruit)
           </div>
@@ -230,7 +230,7 @@ export default function IrecruitMatchPanel({ loading, error, result, onMatch, on
               className={`w-full rounded-lg border px-2.5 py-2 text-left transition hover:brightness-[0.98] ${tierBorderClass(m.tier)}`}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-foreground">
+                <span className="text-sm font-medium text-foreground">
                   {matchTierEmoji(m.tier)} {m.full_name}
                 </span>
                 <span className="flex items-center gap-1">

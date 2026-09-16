@@ -48,7 +48,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
           </button>
         )}
         <div className="min-w-0">
-          <h1 className="text-lg md:text-xl font-bold tracking-tight text-foreground truncate">{title}</h1>
+          <h1 className="text-lg md:text-xl font-medium tracking-tight text-foreground truncate">{title}</h1>
           {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
       </div>

@@ -98,39 +98,39 @@ const RmTable: React.FC<{
                   className="h-3.5 w-3.5 cursor-pointer accent-sky-600"
                 />
               </th>
-              <th className="px-3 py-2 font-semibold">ชื่อ</th>
-              <th className="px-3 py-2 font-semibold">นามสกุล</th>
-              <th className="px-3 py-2 font-semibold">เบอร์โทร</th>
+              <th className="px-3 py-2 font-medium">ชื่อ</th>
+              <th className="px-3 py-2 font-medium">นามสกุล</th>
+              <th className="px-3 py-2 font-medium">เบอร์โทร</th>
               {/* ชุดคอลัมน์ที่เจ้าของสั่งไว้ 17 ส.ค. 2569:
                   ชื่อ · นามสกุล · เบอร์โทร · อายุ · เพศ · ที่อยู่ · หน่วยงาน · ช่องทาง ·
                   วันที่สมัคร · ผ่านมาแล้วกี่วัน (คอลัมน์ "สถานะ" ถูกถอดออกตามลิสต์) */}
-              <th className="px-3 py-2 text-right font-semibold">อายุ</th>
-              <th className="px-3 py-2 font-semibold">เพศ</th>
-              <th className="px-3 py-2 font-semibold">ที่อยู่</th>
+              <th className="px-3 py-2 text-right font-medium">อายุ</th>
+              <th className="px-3 py-2 font-medium">เพศ</th>
+              <th className="px-3 py-2 font-medium">ที่อยู่</th>
               {/* กว้างคงที่ — ชื่อหน่วยงานยาวมาก ถ้าปล่อยให้ auto-layout จัดเอง
                   แถวนั้นจะสูง 2–3 บรรทัดขณะที่แถวข้าง ๆ สูงบรรทัดเดียว */}
-              <th className="w-[20rem] px-3 py-2 font-semibold">หน่วยงาน</th>
-              <th className="px-3 py-2 font-semibold">ช่องทาง</th>
-              <th className="px-3 py-2 font-semibold">วันที่สมัคร</th>
-              <th className="px-3 py-2 text-right font-semibold">ผ่านมาแล้ว</th>
+              <th className="w-[20rem] px-3 py-2 font-medium">หน่วยงาน</th>
+              <th className="px-3 py-2 font-medium">ช่องทาง</th>
+              <th className="px-3 py-2 font-medium">วันที่สมัคร</th>
+              <th className="px-3 py-2 text-right font-medium">ผ่านมาแล้ว</th>
               {/* วันนัดโผล่เฉพาะแท็บติดตามนัดหมาย — แท็บอื่นไม่มีใครถามคำถามนี้
                   (คอลัมน์ที่ว่างทั้งแถวทุกแท็บทำให้ตารางกว้างขึ้นโดยไม่ได้อะไร) */}
               {tab === 'appointments' ? (
                 <>
-                  <th className="px-3 py-2 font-semibold">วันนัด</th>
+                  <th className="px-3 py-2 font-medium">วันนัด</th>
                   {/* "นัดที่ไหน + ลงใบไหน" (ลิสต์ข้อ 9) — มีเฉพาะนัดจากบันทึกผลติดต่อ */}
-                  <th className="px-3 py-2 font-semibold">นัดที่ไหน</th>
+                  <th className="px-3 py-2 font-medium">นัดที่ไหน</th>
                   {/* ผลติดตามนัด มา/ไม่มา (migration 089) — ปุ่มโผล่ตั้งแต่วันนัดเป็นต้นไป */}
-                  <th className="px-3 py-2 font-semibold">มาตามนัด</th>
+                  <th className="px-3 py-2 font-medium">มาตามนัด</th>
                 </>
               ) : null}
               {/* stamp "โทรตอนไหน" — เฉพาะแท็บการติดต่อ (เจ้าของสั่ง 14 ส.ค. 2569:
                   "ปุ่มโทร เพื่อ Stamp ว่าโทรตอนไหน") · กดปุ่มโทร = จับ hold (heldAt =
                   เวลาที่กด) · มีผลแล้ว = last_call_at (เวลาบันทึกผลล่าสุด) */}
               {tab === 'contact' ? (
-                <th className="px-3 py-2 font-semibold">โทรล่าสุด</th>
+                <th className="px-3 py-2 font-medium">โทรล่าสุด</th>
               ) : null}
-              <th className="px-3 py-2 text-right font-semibold">ตัวเลือก</th>
+              <th className="px-3 py-2 text-right font-medium">ตัวเลือก</th>
             </tr>
           </thead>
           <tbody>
@@ -165,7 +165,7 @@ const RmTable: React.FC<{
                           <span
                             title={`ถูกถอดจาก ${r.unclaimed_from_name || 'คนที่เก็บไว้'} เพราะเก็บไว้เกิน 1 วันแล้วยังไม่โทร — ${cd.label}`}
                             className={cn(
-                              'mt-0.5 w-fit rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
+                              'mt-0.5 w-fit rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
                               tone.soft,
                               tone.value,
                             )}
@@ -184,7 +184,7 @@ const RmTable: React.FC<{
                           แก้ได้ที่ปุ่มดูรายละเอียด · เช็ค === false เพราะ server เก่าไม่ส่ง field */}
                       {r.phone_callable === false ? (
                         <span
-                          className={cn('rounded-full border px-1.5 py-0.5 text-[10px] font-semibold', TONE.danger.soft, TONE.danger.value)}
+                          className={cn('rounded-full border px-1.5 py-0.5 text-[10px] font-medium', TONE.danger.soft, TONE.danger.value)}
                           title="เบอร์นี้ใช้กับระบบโทรไม่ได้ (ไม่ใช่มือถือ 10 หลัก) — กดดูรายละเอียดเพื่อแก้เบอร์"
                         >
                           เบอร์ใช้โทรไม่ได้
@@ -271,7 +271,7 @@ const RmTable: React.FC<{
                                 onClick={() => onAttendance?.(r, k)}
                                 title={`บันทึกว่า${ATTENDANCE_LABEL[k]} — กดซ้ำอันอื่นเพื่อแก้ได้`}
                                 className={cn(
-                                  'rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                                  'rounded-full border px-2 py-0.5 text-[11px] font-medium',
                                   tone.soft,
                                   tone.value,
                                   active ? 'ring-2 ring-ring' : 'opacity-75 hover:opacity-100',

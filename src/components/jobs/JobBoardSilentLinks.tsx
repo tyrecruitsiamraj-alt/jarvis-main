@@ -64,7 +64,7 @@ const JobBoardSilentLinks: React.FC<{
                 }}
                 className="flex w-full cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-1.5 py-1 text-left hover:bg-background/60"
               >
-                <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
+                <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
                   {jobBoardCardTitle(row.job)} · {publicJobPositionLabel(row.job)}
                 </span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">

@@ -60,7 +60,7 @@ const ResetPasswordPage: React.FC = () => {
         <div className="flex items-center gap-3">
           <BrandMark size="md" />
           <div>
-            <h1 className="text-lg font-bold text-foreground">
+            <h1 className="text-lg font-medium text-foreground">
               <BrandTitle />
             </h1>
             <p className="text-xs text-muted-foreground">ตั้งรหัสผ่านใหม่</p>

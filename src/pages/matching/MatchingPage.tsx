@@ -390,7 +390,7 @@ function proposalStatusClass(status: ProposalStatus): string {
  * ⇒ มือถือดันเป็น `min-h-9` (36px) · จอ sm ขึ้นไปกลับเป็น 32px ความหนาแน่นเท่าเดิม
  */
 const CANDIDATE_ACTION_BUTTON_CLASS =
-  'inline-flex min-h-9 sm:min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm transition-[transform,box-shadow,background-color,border-color] hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:transform-none';
+  'inline-flex min-h-9 sm:min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-[transform,box-shadow,background-color,border-color] hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:transform-none';
 
 /**
  * ปุ่มเปลี่ยนสถานะผู้สมัคร — สีมาจากโทนของสถานะที่แหล่งกลาง (PROPOSAL_STATUS_TONE)
@@ -482,7 +482,7 @@ function LumosUrgentBadge({ nextAction }: { nextAction: LumosNextAction | null |
   return (
     <span
       title={nextAction.reason || 'AI แนะนำให้โทรกลับหาคนนี้ด่วน'}
-      className="inline-flex items-center gap-0.5 rounded-full border border-red-300 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300"
+      className="inline-flex items-center gap-0.5 rounded-full border border-red-300 bg-red-50 px-1.5 py-0.5 text-[9px] font-medium text-red-700 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300"
     >
       📞 โทรกลับด่วน
     </span>
@@ -2409,12 +2409,12 @@ const MatchingPage: React.FC = () => {
                 aria-pressed={c.active}
                 className={cn(
                   // Wave 2.2: มือถือให้สูงอย่างน้อย 36px (min-h-9) แตะติดง่าย · เดสก์ท็อปเท่าเดิม
-                  'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 sm:min-h-0',
+                  'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 sm:min-h-0',
                   c.active ? cn(t.soft, t.value, 'ring-2 ring-ring') : cn(t.soft, t.value, t.softHover),
                 )}
               >
                 <span>{c.label}</span>
-                <span className={cn('tabular-nums font-bold', t.num)}>
+                <span className={cn('tabular-nums font-medium', t.num)}>
                   {c.count.toLocaleString('th-TH')}
                 </span>
               </button>
@@ -2543,7 +2543,7 @@ const MatchingPage: React.FC = () => {
             <div className="glass-card flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/70 px-6 py-16 text-center">
               <LoaderCircle className="h-8 w-8 animate-spin text-primary" aria-hidden />
               <div>
-                <p className="text-sm font-semibold text-foreground">กำลังโหลดใบขอ…</p>
+                <p className="text-sm font-medium text-foreground">กำลังโหลดใบขอ…</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
                   ดึงใบขอจากระบบ <Term k="erp" /> พร้อมผลที่ AI คิดไว้ · ไม่ต้องกดซ้ำ
                 </p>
@@ -2600,7 +2600,7 @@ const MatchingPage: React.FC = () => {
                         : `ใบขอนี้ค้างมา ${ageDays} วัน · เกณฑ์: ≤7 ยังไม่ด่วน · 8–30 เริ่มด่วน · 31–60 ด่วน · 60+ ด่วนมาก`
                     }
                     className={cn(
-                      'inline-flex min-w-0 items-center gap-1 truncate rounded-full border px-2.5 py-0.5 text-[11px] font-semibold tabular-nums',
+                      'inline-flex min-w-0 items-center gap-1 truncate rounded-full border px-2.5 py-0.5 text-[11px] font-medium tabular-nums',
                       ageMeta.chipCls,
                     )}
                   >
@@ -2652,11 +2652,11 @@ const MatchingPage: React.FC = () => {
                     {/* ชื่อหน่วยงาน + ป้ายผลคัดคน — ของประกอบการตัดสินใจ ไม่ใช่ตัวตัดสินใจเอง
                         nowrap: ชื่อยาวให้ truncate ไม่ใช่ดันป้ายตกบรรทัด */}
                     <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
-                      <span className="truncate text-sm font-semibold text-blue-600 dark:text-blue-300">{unitRequestCardTitle(j)}</span>
+                      <span className="truncate text-sm font-medium text-blue-600 dark:text-blue-300">{unitRequestCardTitle(j)}</span>
                       {matchCount != null ? (
                         <span
                           title="จำนวนที่ AI แนะนำจากคนของเรา — ยังไม่ใช่การยืนยันว่าพร้อมลงงาน"
-                          className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold', TONE.success.soft, TONE.success.value)}
+                          className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium', TONE.success.soft, TONE.success.value)}
                         >
                           AI แนะนำ {matchCount}
                         </span>
@@ -2719,7 +2719,7 @@ const MatchingPage: React.FC = () => {
                         (เจ้าของสั่ง: ข้อมูลไม่เท่ากันก็คงไว้ให้ตรงกัน อย่าให้มันขยับเอง)
                         ยอด ติดต่อ/จอง/ลงงาน ที่เคยแทนที่แถบนี้ ย้ายไปเป็นชิปในแถวบน */}
                     <div className="min-w-0 border-slate-100 dark:border-slate-700/60 sm:border-l sm:pl-2.5">
-                      <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                      <p className="text-[9px] font-medium uppercase tracking-wider text-slate-400">
                         ผลโทรในใบนี้
                       </p>
                       <LumosJobSummaryStats s={serverLumosSummary[j.id]} variant="column" />
@@ -2841,7 +2841,7 @@ const MatchingPage: React.FC = () => {
                       <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-300" />
                     </div>
                     <div className="min-w-0">
-                      <div className="font-bold text-foreground truncate">{unitRequestCardTitle(jobDetail)}</div>
+                      <div className="font-medium text-foreground truncate">{unitRequestCardTitle(jobDetail)}</div>
                       {jobDetail.request_no ? (
                         <div className="text-[11px] text-muted-foreground">{jobDetail.request_no}</div>
                       ) : null}
@@ -2929,7 +2929,7 @@ const MatchingPage: React.FC = () => {
                   <div className="rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-3 dark:border-violet-800 dark:bg-violet-950/50">
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-xs font-semibold text-violet-900 dark:text-violet-200">สาขาที่ระบบแยกได้ ({branches.length})</p>
+                        <p className="text-xs font-medium text-violet-900 dark:text-violet-200">สาขาที่ระบบแยกได้ ({branches.length})</p>
                         <p className="text-[10px] text-violet-700 dark:text-violet-300">กรุณาตรวจสอบ เพราะข้อความต้นทางอาจแยกคลาดเคลื่อนได้</p>
                       </div>
                       <button
@@ -2950,7 +2950,7 @@ const MatchingPage: React.FC = () => {
                           className="flex items-start justify-between gap-3 rounded-lg border border-white/80 bg-white/80 dark:border-white/10 dark:bg-white/5 px-2.5 py-2 text-[11px]"
                         >
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-800 dark:text-slate-200">{branch.branch_name_clean || `สาขา ${index + 1}`}</p>
+                            <p className="font-medium text-slate-800 dark:text-slate-200">{branch.branch_name_clean || `สาขา ${index + 1}`}</p>
                             <p className="text-slate-600 dark:text-slate-300">
                               {[branch.road, branch.subdistrict, branch.district_hint, branch.province_hint]
                                 .filter(Boolean)
@@ -2958,11 +2958,11 @@ const MatchingPage: React.FC = () => {
                             </p>
                           </div>
                           <div className="flex shrink-0 flex-col items-end gap-1">
-                            <span className="rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800 dark:bg-violet-900/40 dark:text-violet-200">
+                            <span className="rounded-full bg-violet-100 px-2 py-0.5 font-medium text-violet-800 dark:bg-violet-900/40 dark:text-violet-200">
                               ต้องการ {branch.requested_qty} คน
                             </span>
                             {boardMatchById[jobDetail.id] ? (
-                              <span className={cn('rounded-full border px-2 py-0.5 font-semibold', TONE.success.soft, TONE.success.value)}>
+                              <span className={cn('rounded-full border px-2 py-0.5 font-medium', TONE.success.soft, TONE.success.value)}>
                                 คนของเราใกล้ {nearbyCounts.get(branch.branch_id || branch.branch_name_clean) || 0} คน
                               </span>
                             ) : (
@@ -2998,7 +2998,7 @@ const MatchingPage: React.FC = () => {
                     <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
                       {cells.map((cell) => (
                         <div key={cell.label} className="rounded-lg bg-white px-1.5 py-1.5 text-center dark:bg-slate-900">
-                          <div className={cn('text-sm font-bold tabular-nums', cell.cls)}>{cell.value}</div>
+                          <div className={cn('text-sm font-medium tabular-nums', cell.cls)}>{cell.value}</div>
                           <div className="text-[9px] leading-tight text-muted-foreground">{cell.label}</div>
                         </div>
                       ))}
@@ -3018,7 +3018,7 @@ const MatchingPage: React.FC = () => {
                   ⚠️ ใช้ "1./2./3./4." ไม่ใช่ "ขั้น N" — แถบการไหลของงานด้านบนของหน้า
                   ใช้คำว่า "ขั้น 1 · ฝั่งงาน / ขั้น 2 · ฝั่งการโทร" อยู่แล้ว ซ้ำกันแล้วสับสน */}
               <div className={cn('flex items-center gap-2 border-t pt-3', DASH.divider)}>
-                <span className={cn('shrink-0 text-[11px] font-bold', TONE.primary.value)}>
+                <span className={cn('shrink-0 text-[11px] font-medium', TONE.primary.value)}>
                   1. คนของเรา — ติ๊กเลือกได้
                 </span>
                 <span className={cn('h-px flex-1', DASH.divider, 'border-t')} aria-hidden />
@@ -3195,7 +3195,7 @@ const MatchingPage: React.FC = () => {
                         type="button"
                         onClick={() => setWeightsDialogOpen(true)}
                         className={cn(
-                          'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                          'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium',
                           TONE.info.outline,
                         )}
                       >
@@ -3277,7 +3277,7 @@ const MatchingPage: React.FC = () => {
                           className="min-w-0 flex-1 text-left"
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-semibold text-foreground">
+                            <span className="text-sm font-medium text-foreground">
                               <TierCriteriaTooltip tier={m.tier}>
                                 <span
                                   tabIndex={0}
@@ -3303,7 +3303,7 @@ const MatchingPage: React.FC = () => {
                                       .map((j) => j.requestNo || j.jobId)
                                       .join(' · ')}`}
                                     className={cn(
-                                      'rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                                      'rounded-full border px-2 py-0.5 text-[10px] font-medium',
                                       TONE.violet.soft,
                                       TONE.violet.value,
                                     )}
@@ -3317,7 +3317,7 @@ const MatchingPage: React.FC = () => {
                                 return colBadge ? (
                                   <span
                                     className={cn(
-                                      'rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                                      'rounded-full border px-2 py-0.5 text-[10px] font-medium',
                                       colBadge.cls,
                                     )}
                                   >
@@ -3328,7 +3328,7 @@ const MatchingPage: React.FC = () => {
                               {proposed ? (
                                 <span
                                   className={cn(
-                                    'inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                                    'inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-medium',
                                     proposalStatusClass(proposed.status),
                                   )}
                                 >
@@ -3336,7 +3336,7 @@ const MatchingPage: React.FC = () => {
                                 </span>
                               ) : null}
                               {activeElsewhere ? (
-                                <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold', TONE.violet.soft, TONE.violet.value)}>
+                                <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', TONE.violet.soft, TONE.violet.value)}>
                                   ติดใบขอ {activeElsewhere.request_no || activeElsewhere.job_id.slice(0, 8)}
                                 </span>
                               ) : null}
@@ -3373,7 +3373,7 @@ const MatchingPage: React.FC = () => {
                               <span
                                 title={branchAssignment?.proximity_reason || undefined}
                                 className={cn(
-                                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
                                   branchProximity.cls,
                                 )}
                               >
@@ -3386,7 +3386,7 @@ const MatchingPage: React.FC = () => {
                             <span
                               title={describePriorityScore(priority, priorityConfig).join('\n')}
                               className={cn(
-                                'cursor-help rounded-full border px-2 py-0.5 text-[10px] font-bold tabular-nums',
+                                'cursor-help rounded-full border px-2 py-0.5 text-[10px] font-medium tabular-nums',
                                 priority.hardFails > 0
                                   ? cn(TONE.danger.soft, TONE.danger.value)
                                   : cn(TONE.neutral.soft, TONE.neutral.value),
@@ -3452,7 +3452,7 @@ const MatchingPage: React.FC = () => {
                 <div className="space-y-2.5">
                   {/* ── ขั้น 3 · คนที่ยังไม่สมัครงานนี้ ───────────────────────────── */}
                   <div className={cn('flex items-center gap-2 border-t pt-3', DASH.divider)}>
-                    <span className={cn('shrink-0 text-[11px] font-bold', TONE.primary.value)}>
+                    <span className={cn('shrink-0 text-[11px] font-medium', TONE.primary.value)}>
                       2. คนที่ยังไม่สมัครงานนี้ — ติ๊กเลือกได้
                     </span>
                     <span className={cn('h-px flex-1', DASH.divider, 'border-t')} aria-hidden />
@@ -3461,7 +3461,7 @@ const MatchingPage: React.FC = () => {
                   <div className="flex items-center justify-between gap-2">
                     {/* เจ้าของสั่ง 13 ส.ค. 2569: เลิกเรียกชื่อระบบ ("iRecruit") มาเป็นคำที่บอก
                         ว่าได้อะไร — คนกลุ่มนี้คือคนในฐานที่ **ยังไม่ได้สมัครใบขอนี้** */}
-                    <p className="text-xs font-semibold text-blue-900 dark:text-blue-200">
+                    <p className="text-xs font-medium text-blue-900 dark:text-blue-200">
                       {irMatchById[jobDetail.id]
                         ? `คนที่ยังไม่สมัคร → แนะนำ ${recommendedCandidateCount(irMatchById[jobDetail.id].matches)}`
                         : 'ไม่พอ? หาคนที่ยังไม่สมัครงานนี้'}
@@ -3530,14 +3530,14 @@ const MatchingPage: React.FC = () => {
                                 >
                                   <div className="flex items-start justify-between gap-3">
                                     <div>
-                                      <p className="text-sm font-semibold text-blue-950 dark:text-blue-200">{row.branch.branch_name_clean}</p>
+                                      <p className="text-sm font-medium text-blue-950 dark:text-blue-200">{row.branch.branch_name_clean}</p>
                                       <p className="mt-0.5 text-[11px] text-blue-700 dark:text-blue-300">
                                         {[row.branch.district_hint, row.branch.province_hint].filter(Boolean).join(' · ') ||
                                           row.branch.branch_name_raw}
                                       </p>
                                     </div>
                                     <div className="shrink-0 text-right">
-                                      <p className="text-xs font-semibold text-blue-800 dark:text-blue-200">
+                                      <p className="text-xs font-medium text-blue-800 dark:text-blue-200">
                                         ต้องการ {row.branch.requested_qty} คน
                                       </p>
                                       <p className="text-[10px] text-blue-600 dark:text-blue-300">พบใกล้สาขา {row.candidateCount} คน</p>
@@ -3567,7 +3567,7 @@ const MatchingPage: React.FC = () => {
                                 )}
                               >
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300">
+                                  <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-300">
                                     <input
                                       type="checkbox"
                                       checked={lumosSelectedIrecruit.includes(m.id)}
@@ -3599,7 +3599,7 @@ const MatchingPage: React.FC = () => {
                                     {proposed ? (
                                       <span
                                         className={cn(
-                                          'inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                                          'inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-medium',
                                           proposalStatusClass(proposed.status),
                                         )}
                                       >
@@ -3607,7 +3607,7 @@ const MatchingPage: React.FC = () => {
                                       </span>
                                     ) : null}
                                     {activeElsewhere ? (
-                                      <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold', TONE.violet.soft, TONE.violet.value)}>
+                                      <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', TONE.violet.soft, TONE.violet.value)}>
                                         ติดใบขอ {activeElsewhere.request_no || activeElsewhere.job_id.slice(0, 8)}
                                       </span>
                                     ) : null}
@@ -3670,7 +3670,7 @@ const MatchingPage: React.FC = () => {
                                 ) : null}
                                 {proposed ? (
                                   <div className="rounded-lg border border-slate-200 bg-white/80 dark:border-white/10 dark:bg-white/5 px-2.5 py-1.5 text-[10px] text-slate-700 dark:text-slate-200">
-                                     <p className="font-semibold">
+                                     <p className="font-medium">
                                        ผู้ดำเนินการ: {proposed.proposedByName || 'ไม่ระบุ'}
                                      </p>
                                      {proposed.branchName ? <p className="mt-0.5 text-blue-700 dark:text-blue-300">สาขา: {proposed.branchName}</p> : null}
@@ -3756,7 +3756,7 @@ const MatchingPage: React.FC = () => {
                   และมีปุ่มส่งคำขอโพสคนละชุดจนไม่รู้ว่าอันไหนใช้ทำอะไร */}
               {boardMatchById[jobDetail.id] ? (
                 <div className={cn('rounded-xl border px-3 py-3 space-y-2.5', TONE.danger.soft)}>
-                  <p className={cn('text-xs font-semibold', TONE.danger.num)}>
+                  <p className={cn('text-xs font-medium', TONE.danger.num)}>
                     3. หาคนไม่พอ — ส่งต่อทีมอื่น
                   </p>
 
@@ -3769,7 +3769,7 @@ const MatchingPage: React.FC = () => {
                     if (!short && !bm.fallback_used) return null;
                     return (
                       <details className="text-[11px]">
-                        <summary className="cursor-pointer list-none font-semibold marker:hidden">
+                        <summary className="cursor-pointer list-none font-medium marker:hidden">
                           {short
                             ? `หาได้ ${got} คน จากเป้า ${bm.recommended_target} คน — กดดูว่าทำอะไรต่อได้`
                             : `หาได้ครบเป้าแล้ว ${got} คน — กดดูรายละเอียด`}
@@ -3834,7 +3834,7 @@ const MatchingPage: React.FC = () => {
                                 disabled={creatingPosting}
                                 onClick={() => void createPosting(jobDetail, 'content')}
                                 className={cn(
-                                  'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60',
+                                  'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium disabled:opacity-60',
                                   TONE.orange.solid,
                                 )}
                               >
@@ -3848,7 +3848,7 @@ const MatchingPage: React.FC = () => {
                                 disabled={creatingPosting}
                                 onClick={() => void createPosting(jobDetail, 'scraping')}
                                 className={cn(
-                                  'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60',
+                                  'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium disabled:opacity-60',
                                   TONE.teal.solid,
                                 )}
                               >
@@ -3885,7 +3885,7 @@ const MatchingPage: React.FC = () => {
 
           <div className="space-y-3">
             <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-3 dark:border-violet-800 dark:bg-violet-950/50">
-              <p className="mb-2 text-xs font-semibold text-violet-900 dark:text-violet-200">เงื่อนไขผู้สมัคร</p>
+              <p className="mb-2 text-xs font-medium text-violet-900 dark:text-violet-200">เงื่อนไขผู้สมัคร</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
                   เพศ
@@ -3928,7 +3928,7 @@ const MatchingPage: React.FC = () => {
 
             <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">สาขาปฏิบัติงาน</p>
+                <p className="text-xs font-medium text-slate-800 dark:text-slate-200">สาขาปฏิบัติงาน</p>
                 <p className="text-[10px] text-muted-foreground">แก้ผลที่ระบบแยกจากข้อความต้นทางได้ทุกช่อง</p>
               </div>
             </div>
@@ -3938,7 +3938,7 @@ const MatchingPage: React.FC = () => {
               return (
                 <div key={branchId} className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-3 dark:border-blue-900 dark:bg-blue-950/50">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-blue-950 dark:text-blue-200">สาขา {index + 1}</p>
+                    <p className="text-sm font-medium text-blue-950 dark:text-blue-200">สาขา {index + 1}</p>
                     {branchDrafts.length > 1 ? (
                       <button
                         type="button"
@@ -4061,12 +4061,12 @@ const MatchingPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => updateBranchDraft(branchId, { geocode_status: 'confirmed' })}
-                            className={cn('rounded-full px-3 py-1.5 font-semibold', TONE.success.solid)}
+                            className={cn('rounded-full px-3 py-1.5 font-medium', TONE.success.solid)}
                           >
                             ยืนยันพิกัดนี้
                           </button>
                         ) : (
-                          <span className={cn('font-semibold', TONE.success.value)}>ยืนยันพิกัดแล้ว</span>
+                          <span className={cn('font-medium', TONE.success.value)}>ยืนยันพิกัดแล้ว</span>
                         )}
                       </>
                     ) : (
@@ -4123,7 +4123,7 @@ const MatchingPage: React.FC = () => {
                 type="button"
                 disabled={branchSaveBusy}
                 onClick={() => void saveBranchDrafts()}
-                className={cn('rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60', TONE.primary.solid)}
+                className={cn('rounded-full px-4 py-2 text-xs font-medium disabled:opacity-60', TONE.primary.solid)}
               >
                 {branchSaveBusy ? 'กำลังบันทึก…' : 'บันทึกเงื่อนไขและสาขา'}
               </button>
@@ -4149,7 +4149,7 @@ const MatchingPage: React.FC = () => {
               </span>
 
               <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2 dark:border-sky-800 dark:bg-sky-950/50">
-                <p className="text-xs font-semibold text-sky-900 dark:text-sky-200">ทำไม AI เลือกคนนี้</p>
+                <p className="text-xs font-medium text-sky-900 dark:text-sky-200">ทำไม AI เลือกคนนี้</p>
                 <p className="mt-1 text-xs text-sky-800 leading-relaxed dark:text-sky-200">
                   {candDetail.reason || 'สกิลตรงกับใบขอ'}
                 </p>
@@ -4214,7 +4214,7 @@ const MatchingPage: React.FC = () => {
               {candDetail.mobile ? (
                 <a
                   href={`tel:${candDetail.mobile}`}
-                  className={cn('inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold', TONE.info.solid)}
+                  className={cn('inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium', TONE.info.solid)}
                 >
                   <Phone className="h-4 w-4" /> โทร {candDetail.mobile}
                 </a>
@@ -4236,10 +4236,10 @@ const MatchingPage: React.FC = () => {
                           เดิมไม่มี proposal = ไม่โชว์ชิปอะไรเลย → คนอ่านปุ่มข้างล่างเป็นสถานะแทน
                           แล้วสรุปผิดว่า "ลงงานแล้ว" (เคสการ์ด #1808 ที่ยังอยู่ถัง To do) */}
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-semibold text-violet-900 dark:text-violet-200">เสนอคนนี้ให้ใบขอ</p>
+                        <p className="text-xs font-medium text-violet-900 dark:text-violet-200">เสนอคนนี้ให้ใบขอ</p>
                         <span
                           className={cn(
-                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
                             current ? proposalStatusClass(current.status) : TONE.neutral.chip,
                           )}
                         >
@@ -4259,7 +4259,7 @@ const MatchingPage: React.FC = () => {
                       ) : null}
                       {current ? (
                         <div className="rounded-lg border border-violet-200 bg-white/80 dark:bg-white/5 px-2.5 py-2 text-[11px] text-slate-700 dark:text-slate-200 dark:border-violet-800">
-                          <p className="font-semibold">ผู้ดำเนินการ: {current.proposedByName || 'ไม่ระบุ'}</p>
+                          <p className="font-medium">ผู้ดำเนินการ: {current.proposedByName || 'ไม่ระบุ'}</p>
                           <p className="mt-0.5 text-slate-600 dark:text-slate-300">เหตุผล: {current.reason || 'ไม่ระบุ'}</p>
                         </div>
                       ) : null}
@@ -4394,7 +4394,7 @@ const MatchingPage: React.FC = () => {
               type="button"
               disabled={proposalFormBusy || !proposalOperatorName.trim() || !proposalDecisionReason.trim()}
               onClick={() => void submitProposalAction()}
-              className={cn('rounded-full px-4 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50', TONE.primary.solid)}
+              className={cn('rounded-full px-4 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50', TONE.primary.solid)}
             >
               {proposalFormBusy ? 'กำลังบันทึก…' : 'ยืนยันและบันทึก'}
             </button>
@@ -4423,7 +4423,7 @@ const MatchingPage: React.FC = () => {
                   type="button"
                   disabled={resolvingConflict}
                   onClick={() => void resolveConflict()}
-                  className={cn('rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60', TONE.danger.solid)}
+                  className={cn('rounded-full px-4 py-2 text-xs font-medium disabled:opacity-60', TONE.danger.solid)}
                 >
                   {resolvingConflict ? 'กำลังยกเลิก…' : 'ยกเลิกใบเดิม แล้วจองใบนี้แทน'}
                 </button>
@@ -4549,7 +4549,7 @@ const MatchingPage: React.FC = () => {
                     const chosen = extraJobsByCard[cardId] ?? [];
                     return (
                       <div key={cardId} className={cn('rounded-xl border p-3', TONE.neutral.soft)}>
-                        <p className="text-sm font-semibold text-foreground">
+                        <p className="text-sm font-medium text-foreground">
                           {person.name}{' '}
                           <span className="text-[11px] font-normal text-muted-foreground">
                             แมทอยู่ {jobs.length} งาน
@@ -4589,7 +4589,7 @@ const MatchingPage: React.FC = () => {
                                   {j.position}
                                   {j.unit ? <span className="text-muted-foreground"> · {j.unit}</span> : null}
                                   {isCurrent ? (
-                                    <span className={cn('ml-1 font-semibold', TONE.info.value)}>(ใบนี้)</span>
+                                    <span className={cn('ml-1 font-medium', TONE.info.value)}>(ใบนี้)</span>
                                   ) : null}
                                 </span>
                               </label>
@@ -4642,7 +4642,7 @@ const MatchingPage: React.FC = () => {
                 <div className="max-h-56 space-y-2 overflow-y-auto">
                   {boardNames.length > 0 ? (
                     <div>
-                      <p className={cn('text-[11px] font-semibold', TONE.success.num)}>
+                      <p className={cn('text-[11px] font-medium', TONE.success.num)}>
                         คนของเรา — แจ้งงาน/โทรตาม ({boardNames.length})
                       </p>
                       <ul className="mt-1 space-y-0.5">
@@ -4656,7 +4656,7 @@ const MatchingPage: React.FC = () => {
                   ) : null}
                   {irNames.length > 0 ? (
                     <div>
-                      <p className={cn('text-[11px] font-semibold', TONE.primary.num)}>
+                      <p className={cn('text-[11px] font-medium', TONE.primary.num)}>
                         ผู้สมัคร iRecruit — AI โทรสัมภาษณ์ ({irNames.length})
                       </p>
                       <ul className="mt-1 space-y-0.5">
@@ -4673,7 +4673,7 @@ const MatchingPage: React.FC = () => {
             })()}
             {lumosSelectedIrecruit.length > 0 ? (
               <div className="rounded-lg border border-blue-200 bg-blue-50/70 px-2.5 py-2 dark:border-blue-800 dark:bg-blue-950/40">
-                <p className="mb-1.5 text-[11px] font-semibold text-blue-800 dark:text-blue-200">
+                <p className="mb-1.5 text-[11px] font-medium text-blue-800 dark:text-blue-200">
                   ระดับความสำคัญ AI สัมภาษณ์
                 </p>
                 <div className="flex gap-2">
@@ -4689,7 +4689,7 @@ const MatchingPage: React.FC = () => {
                       type="button"
                       onClick={() => setLumosInterviewPriority(value)}
                       className={cn(
-                        'rounded-full border px-3 py-0.5 text-[11px] font-semibold transition-all',
+                        'rounded-full border px-3 py-0.5 text-[11px] font-medium transition-all',
                         lumosInterviewPriority === value
                           ? cn(cls, 'ring-2 ring-offset-1')
                           : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400',
@@ -4782,13 +4782,13 @@ const MatchingPage: React.FC = () => {
                             />
                             <span className="min-w-0 flex-1">
                               <span className="flex flex-wrap items-center gap-1.5">
-                                <span className="text-xs font-semibold text-foreground">{c.full_name}</span>
+                                <span className="text-xs font-medium text-foreground">{c.full_name}</span>
                                 {(() => {
                                   const colBadge = boardColumnBadge(c.column_label);
                                   return colBadge ? (
                                     <span
                                       className={cn(
-                                        'rounded-full border px-1.5 py-0.5 text-[9px] font-semibold',
+                                        'rounded-full border px-1.5 py-0.5 text-[9px] font-medium',
                                         colBadge.cls,
                                       )}
                                     >
@@ -4797,12 +4797,12 @@ const MatchingPage: React.FC = () => {
                                   ) : null;
                                 })()}
                                 {c.already_sent ? (
-                                  <span className="rounded-full border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                  <span className="rounded-full border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                                     ส่งไปแล้ว
                                   </span>
                                 ) : null}
                                 {!c.mobile ? (
-                                  <span className={cn('rounded-full border px-1.5 py-0.5 text-[9px] font-semibold', TONE.warn.soft, TONE.warn.num)}>
+                                  <span className={cn('rounded-full border px-1.5 py-0.5 text-[9px] font-medium', TONE.warn.soft, TONE.warn.num)}>
                                     ไม่มีเบอร์
                                   </span>
                                 ) : null}
@@ -4824,7 +4824,7 @@ const MatchingPage: React.FC = () => {
               })()
             )}
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2.5">
-              <p className="text-[11px] font-semibold text-sky-900 dark:text-sky-200">เลือกไว้ {lumosSelectedBoard.length} คน</p>
+              <p className="text-[11px] font-medium text-sky-900 dark:text-sky-200">เลือกไว้ {lumosSelectedBoard.length} คน</p>
               <div className="flex shrink-0 flex-wrap gap-2">
                 <Button variant="ghost" size="sm"
                   type="button"

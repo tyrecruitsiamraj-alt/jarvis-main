@@ -55,7 +55,7 @@ const RolePermissionsTab: React.FC = () => {
           🔴 เขียนไว้ตรง ๆ ว่าเป็นแค่มุมมองจอ — ไม่ได้ลดสิทธิ์จริงฝั่งเซิร์ฟเวอร์ */}
       {realRole === 'admin' ? (
         <div className={cn('rounded-xl border p-3', TONE.info.soft)}>
-          <p className="text-sm font-semibold text-foreground">ลองดูหน้าจอในมุมมองของ role อื่น</p>
+          <p className="text-sm font-medium text-foreground">ลองดูหน้าจอในมุมมองของ role อื่น</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             สลับแล้วเมนูและปุ่มทั้งระบบจะเหลือเท่าที่ role นั้นเห็น — ใช้ตรวจว่าที่เพิ่งแก้สิทธิ์ไปได้ผลจริงไหม
             · <b>เป็นการจำลองหน้าจอเท่านั้น</b> ถ้ากดปุ่ม เซิร์ฟเวอร์ยังทำงานด้วยสิทธิ์ admin ของคุณ
@@ -68,7 +68,7 @@ const RolePermissionsTab: React.FC = () => {
                 onClick={() => setViewAsRole(viewAsRole === r ? null : r)}
                 aria-pressed={viewAsRole === r}
                 className={cn(
-                  'inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-semibold uppercase',
+                  'inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium uppercase',
                   viewAsRole === r
                     ? 'border-transparent bg-primary text-primary-foreground'
                     : TONE.neutral.outline,
@@ -103,7 +103,7 @@ const RolePermissionsTab: React.FC = () => {
       {groups.map((group) => (
         <div key={group} className="glass-card rounded-3xl border border-white/70 overflow-hidden">
           <div className="px-4 py-3 border-b border-border/50 bg-secondary/20">
-            <h3 className="text-sm font-semibold text-foreground">{group}</h3>
+            <h3 className="text-sm font-medium text-foreground">{group}</h3>
           </div>
 
           <div className="overflow-x-auto">
@@ -128,7 +128,7 @@ const RolePermissionsTab: React.FC = () => {
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-foreground">{fn.label}</span>
                         {ROLE_ORDER.every((r) => r === 'admin' || !roleHasFunction(r, fn, matrix)) ? (
-                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
                             ยังไม่เปิดใช้ — เห็นเฉพาะ admin
                           </span>
                         ) : (

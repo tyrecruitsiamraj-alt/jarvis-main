@@ -96,7 +96,7 @@ const ReasonManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = ({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="flex max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[40rem] flex-col gap-0 overflow-hidden rounded-3xl p-0">
         <DialogHeader className="shrink-0 border-b border-border/50 px-5 py-4 text-left">
-          <DialogTitle className="text-base font-semibold">เหตุผล</DialogTitle>
+          <DialogTitle className="text-base font-medium">เหตุผล</DialogTitle>
           <DialogDescription className="text-xs">
             เหตุผลที่เจ้าหน้าที่เลือกตอนบันทึกผล — แยกตามขั้นตอนและผลสำเร็จ/ไม่สำเร็จ
             {rows.length > 0 ? ` · ใช้งานอยู่ ${activeCount} จาก ${rows.length}` : null}
@@ -116,7 +116,7 @@ const ReasonManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = ({
               return (
                 <section key={key} className="space-y-2 rounded-2xl border border-border/70 p-3">
                   <div className="flex items-baseline gap-2">
-                    <h3 className="text-sm font-semibold text-foreground">{g.processLabel}</h3>
+                    <h3 className="text-sm font-medium text-foreground">{g.processLabel}</h3>
                     <span
                       className={
                         g.outcomeCode === 'A'
@@ -182,7 +182,7 @@ const ReasonManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = ({
                       type="button"
                       onClick={() => void add(g.processCode, g.outcomeCode)}
                       disabled={busy || !(draft[key] ?? '').trim()}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-border px-3 text-sm font-semibold disabled:opacity-40"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-border px-3 text-sm font-medium disabled:opacity-40"
                     >
                       <Plus className="h-3.5 w-3.5" /> เพิ่ม
                     </button>

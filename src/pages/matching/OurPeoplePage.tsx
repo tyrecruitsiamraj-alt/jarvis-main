@@ -295,7 +295,7 @@ const OurPeoplePage: React.FC = () => {
                   <div className={cn('truncate text-[11px] font-medium', active ? b.headCls : TONE.neutral.value)}>
                     {b.title}
                   </div>
-                  <div className={cn('mt-0.5 text-2xl font-bold leading-none tabular-nums', active ? b.headCls : TONE.neutral.value)}>
+                  <div className={cn('mt-0.5 text-2xl font-medium leading-none tabular-nums', active ? b.headCls : TONE.neutral.value)}>
                     {b.items.length.toLocaleString('th-TH')}
                   </div>
                   <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
@@ -331,7 +331,7 @@ const OurPeoplePage: React.FC = () => {
                 className={cn('glass-card rounded-3xl border p-3 md:p-4 space-y-2.5', bucket.boxCls)}
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className={cn('text-sm font-semibold', bucket.headCls)}>
+                  <h3 className={cn('text-sm font-medium', bucket.headCls)}>
                     {bucket.title} · {bucket.items.length} คน
                   </h3>
                   <p className="text-[11px] text-muted-foreground">{bucket.desc}</p>
@@ -361,7 +361,7 @@ const OurPeoplePage: React.FC = () => {
                         >
                           <NameAvatar name={p.full_name} size="md" />
                           <div className="min-w-0 flex-1">
-                            <p className={cn('truncate text-sm', DASH.cellStrong, 'font-semibold')}>
+                            <p className={cn('truncate text-sm', DASH.cellStrong, 'font-medium')}>
                               {p.full_name}
                               {p.nick_name ? (
                                 <span className="font-normal text-muted-foreground"> ({p.nick_name})</span>
@@ -377,7 +377,7 @@ const OurPeoplePage: React.FC = () => {
                                 if (d == null) return null;
                                 return (
                                   <span
-                                    className={cn('font-semibold', TONE[appliedAgeTone(d)].value)}
+                                    className={cn('font-medium', TONE[appliedAgeTone(d)].value)}
                                     title={`วันที่สมัคร ${thaiDate(p.application_date) ?? '—'}`}
                                   >
                                     สมัครมา {d.toLocaleString('th-TH')} วัน

@@ -314,7 +314,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
         {tab === 'applicants' ? (
           <>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-secondary/40 px-3.5 py-2.5 text-sm">
-              <span className="inline-flex items-center gap-1.5 font-semibold">
+              <span className="inline-flex items-center gap-1.5 font-medium">
                 <Users className={cn('h-4 w-4', TONE.info.value)} />
                 ผู้สมัคร {summary.total} คน
               </span>
@@ -327,7 +327,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
                 type="button"
                 onClick={() => void reload()}
                 className={cn(
-                  'ml-auto inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold',
+                  'ml-auto inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium',
                   TONE.neutral.outline,
                 )}
               >
@@ -353,7 +353,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
             {groups.map((g) => (
               <section key={g.origin} className="space-y-1.5">
                 <div className="flex flex-wrap items-baseline gap-x-2">
-                  <h2 className="text-sm font-bold text-foreground">{g.label}</h2>
+                  <h2 className="text-sm font-medium text-foreground">{g.label}</h2>
                   <span className="font-mono text-xs tabular-nums text-muted-foreground">
                     {g.items.length} คน
                   </span>
@@ -369,7 +369,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
                         className="grid gap-x-3 gap-y-1 rounded-xl border border-border/70 bg-card px-3 py-2 text-sm sm:grid-cols-[1.4fr_1.2fr_auto] sm:items-center"
                       >
                         <span className="flex flex-wrap items-center gap-1.5">
-                          <b className="font-semibold text-foreground">{a.full_name}</b>
+                          <b className="font-medium text-foreground">{a.full_name}</b>
                           {originLabel ? (
                             <span className="jarvis-chip jarvis-chip-violet">{originLabel}</span>
                           ) : null}
@@ -408,7 +408,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
         {tab === 'ai-match' ? (
           <>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-secondary/40 px-3.5 py-2.5 text-sm">
-              <span className="font-semibold">
+              <span className="font-medium">
                 คนของเราที่ AI แนะนำ {board ? `${board.matches.length} คน` : ''}
               </span>
               <span className="text-xs text-muted-foreground">
@@ -422,7 +422,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
                 onClick={() => setRematchConfirm(true)}
                 title="สั่งให้หลังบ้านคิดใหม่ — ผลเดิมยังแสดงอยู่ระหว่างรอ"
                 className={cn(
-                  'ml-auto inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-50',
+                  'ml-auto inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium disabled:opacity-50',
                   TONE.info.outline,
                 )}
               >
@@ -465,7 +465,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
                           aria-label={`เลือก ${m.full_name}`}
                           className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed"
                         />
-                        <span className="min-w-0 truncate font-semibold text-foreground">
+                        <span className="min-w-0 truncate font-medium text-foreground">
                           {m.full_name}
                         </span>
                       </span>
@@ -477,7 +477,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
                     <span className="min-w-0 truncate text-xs text-muted-foreground">{m.reason}</span>
                     <span
                       className={cn(
-                        'justify-self-start rounded-full px-2.5 py-0.5 text-xs font-semibold sm:justify-self-end',
+                        'justify-self-start rounded-full px-2.5 py-0.5 text-xs font-medium sm:justify-self-end',
                         m.tier === 'green'
                           ? TONE.success.chip
                           : m.tier === 'yellow'
@@ -526,7 +526,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
 
             {/* ── หาผู้สมัครเพิ่ม (เลนสรรหา · คนที่ยังไม่สมัคร) ─────────────── */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-secondary/40 px-3.5 py-2.5 text-sm">
-              <span className="font-semibold">{SEARCH_ALL_POOLS.label}</span>
+              <span className="font-medium">{SEARCH_ALL_POOLS.label}</span>
               <span className="text-xs text-muted-foreground">
                 · ค้นจากฐานคนที่ยังไม่สมัคร (Checklist · ฐานใหม่ · iRecruit) — หน้านี้ดูอย่างเดียว
                 ไม่ส่งเข้าคิวโทร
@@ -536,7 +536,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
                 disabled={aiBusy}
                 onClick={() => void runAiMatch()}
                 className={cn(
-                  'ml-auto inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-50',
+                  'ml-auto inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium disabled:opacity-50',
                   TONE.neutral.outline,
                 )}
               >
@@ -561,7 +561,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
                     className="grid gap-x-3 gap-y-1 rounded-xl border border-border/70 bg-card px-3 py-2 text-sm sm:grid-cols-[1.4fr_1.4fr_auto] sm:items-center"
                   >
                     <span className="flex flex-wrap items-center gap-1.5">
-                      <b className="font-semibold text-foreground">{m.full_name}</b>
+                      <b className="font-medium text-foreground">{m.full_name}</b>
                       <span className="jarvis-chip jarvis-chip-violet">{m.source_label}</span>
                     </span>
                     <span className="text-xs text-muted-foreground">
@@ -591,14 +591,14 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
                 `applicantCallOutcome` ที่เดียว (เทียบผลโทรกับผลติดต่อ อันใหม่กว่าชนะ) */}
             {interestedItems.length > 0 ? (
               <section className={cn('space-y-2 rounded-xl border px-3 py-2.5', TONE.success.soft)}>
-                <p className={cn('text-xs font-semibold', TONE.success.value)}>
+                <p className={cn('text-xs font-medium', TONE.success.value)}>
                   คนที่ตอบว่าสนใจจากการโทร {interestedItems.length} คน — ของทั้งใบขอ (ทุกคนเห็น)
                 </p>
                 <ul className="space-y-1.5">
                   {interestedItems.map((a) => (
                     <li key={a.id} className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm">
                       <span className="flex flex-wrap items-center gap-1.5">
-                        <b className="font-semibold text-foreground">{a.full_name}</b>
+                        <b className="font-medium text-foreground">{a.full_name}</b>
                         <span className="font-mono text-[11px] text-muted-foreground">{a.phone}</span>
                         {unitMatchOriginLabel(a) ? (
                           <span className="jarvis-chip jarvis-chip-violet">{unitMatchOriginLabel(a)}</span>

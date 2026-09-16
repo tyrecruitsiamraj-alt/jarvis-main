@@ -67,7 +67,7 @@ const MonthlyPlanner: React.FC = () => {
         />
         <div className="flex items-center gap-3 mb-4">
           <button onClick={prevMonth} className="p-2 rounded-lg bg-secondary hover:bg-secondary/80"><ChevronLeft className="w-4 h-4" /></button>
-          <span className="font-semibold text-foreground">{monthNames[month]} {year + 543}</span>
+          <span className="font-medium text-foreground">{monthNames[month]} {year + 543}</span>
           <button onClick={nextMonth} className="p-2 rounded-lg bg-secondary hover:bg-secondary/80"><ChevronRight className="w-4 h-4" /></button>
         </div>
 
@@ -131,7 +131,7 @@ const MonthlyPlanner: React.FC = () => {
                               WORK_STATUS_COLORS[entry.status],
                             )}
                           >
-                            <span className="text-[8px] font-bold text-foreground">
+                            <span className="text-[8px] font-medium text-foreground">
                               {entry.client_name?.charAt(0) || ''}
                             </span>
                           </div>

@@ -45,7 +45,7 @@ export const HudTicker: React.FC<HudTickerProps> = ({ items, className }) => {
                 ทำให้เฉพาะคำอังกฤษตะโกนขึ้นมาคำเดียว อ่านเป็นคนละระดับความสำคัญ */}
             <span className={cn(HUD.label, 'normal-case')}>{it.label}</span>
             {it.value !== undefined ? (
-              <span className="font-mono text-xs font-semibold tabular-nums" style={{ color }}>
+              <span className="font-mono text-xs font-medium tabular-nums" style={{ color }}>
                 {it.value}
               </span>
             ) : null}

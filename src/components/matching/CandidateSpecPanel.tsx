@@ -43,13 +43,13 @@ function FullAnalysisBody({ analysis }: { analysis: CandidateSpecAnalysis }) {
         <div className="space-y-1 text-xs text-muted-foreground">
           {analysis.compensation_note ? (
             <p>
-              <span className="font-semibold text-foreground">ค่าตอบแทน:</span>{' '}
+              <span className="font-medium text-foreground">ค่าตอบแทน:</span>{' '}
               {analysis.compensation_note}
             </p>
           ) : null}
           {analysis.compliance_note ? (
             <p>
-              <span className="font-semibold text-foreground">กฎหมาย/Compliance:</span>{' '}
+              <span className="font-medium text-foreground">กฎหมาย/Compliance:</span>{' '}
               {analysis.compliance_note}
             </p>
           ) : null}
@@ -58,7 +58,7 @@ function FullAnalysisBody({ analysis }: { analysis: CandidateSpecAnalysis }) {
 
       {analysis.must_have.length > 0 ? (
         <section className="space-y-1">
-          <h4 className="text-xs font-semibold text-foreground">Must Have</h4>
+          <h4 className="text-xs font-medium text-foreground">Must Have</h4>
           <ul className="list-disc pl-4 text-xs text-muted-foreground space-y-0.5">
             {analysis.must_have.map((item) => (
               <li key={item}>{item}</li>
@@ -69,7 +69,7 @@ function FullAnalysisBody({ analysis }: { analysis: CandidateSpecAnalysis }) {
 
       {analysis.nice_to_have.length > 0 ? (
         <section className="space-y-1">
-          <h4 className="text-xs font-semibold text-foreground">Nice to Have</h4>
+          <h4 className="text-xs font-medium text-foreground">Nice to Have</h4>
           <ul className="list-disc pl-4 text-xs text-muted-foreground space-y-0.5">
             {analysis.nice_to_have.map((item) => (
               <li key={item}>{item}</li>
@@ -80,7 +80,7 @@ function FullAnalysisBody({ analysis }: { analysis: CandidateSpecAnalysis }) {
 
       {analysis.not_applicable.length > 0 ? (
         <section className="space-y-1">
-          <h4 className="text-xs font-semibold text-foreground">ไม่จำเป็นสำหรับตำแหน่งนี้</h4>
+          <h4 className="text-xs font-medium text-foreground">ไม่จำเป็นสำหรับตำแหน่งนี้</h4>
           <ul className="list-disc pl-4 text-xs text-muted-foreground space-y-0.5">
             {analysis.not_applicable.map((item) => (
               <li key={item}>{item}</li>
@@ -91,7 +91,7 @@ function FullAnalysisBody({ analysis }: { analysis: CandidateSpecAnalysis }) {
 
       {analysis.adjacent_positions.length > 0 ? (
         <section className="space-y-1">
-          <h4 className="text-xs font-semibold text-foreground">ตำแหน่งใกล้เคียงที่เปิดรับเพิ่มได้</h4>
+          <h4 className="text-xs font-medium text-foreground">ตำแหน่งใกล้เคียงที่เปิดรับเพิ่มได้</h4>
           <div className="space-y-1">
             {analysis.adjacent_positions.map((row) => (
               <div key={`${row.tier}-${row.title}`} className="text-xs text-muted-foreground">
@@ -107,7 +107,7 @@ function FullAnalysisBody({ analysis }: { analysis: CandidateSpecAnalysis }) {
 
       {analysis.excluded_positions.length > 0 ? (
         <section className="space-y-1">
-          <h4 className="text-xs font-semibold text-foreground">ตำแหน่งที่ดูใกล้เคียงแต่ต้องตัดออก</h4>
+          <h4 className="text-xs font-medium text-foreground">ตำแหน่งที่ดูใกล้เคียงแต่ต้องตัดออก</h4>
           <div className="space-y-1">
             {analysis.excluded_positions.map((row) => (
               <div key={row.title} className="text-xs text-muted-foreground">
@@ -121,7 +121,7 @@ function FullAnalysisBody({ analysis }: { analysis: CandidateSpecAnalysis }) {
 
       {analysis.warnings.length > 0 ? (
         <section className="space-y-1 rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-2 dark:bg-amber-950/50 dark:border-amber-800">
-          <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200">จุดที่ต้องระวัง</h4>
+          <h4 className="text-xs font-medium text-amber-900 dark:text-amber-200">จุดที่ต้องระวัง</h4>
           <ul className="list-disc pl-4 text-xs text-amber-900/90 space-y-0.5 dark:text-amber-200">
             {analysis.warnings.map((item) => (
               <li key={item}>{item}</li>
@@ -132,7 +132,7 @@ function FullAnalysisBody({ analysis }: { analysis: CandidateSpecAnalysis }) {
 
       {analysis.confirm_with_client.length > 0 ? (
         <section className="space-y-1">
-          <h4 className="text-xs font-semibold text-foreground">ควรยืนยันกับหน่วยงาน</h4>
+          <h4 className="text-xs font-medium text-foreground">ควรยืนยันกับหน่วยงาน</h4>
           <ul className="list-disc pl-4 text-xs text-muted-foreground space-y-0.5">
             {analysis.confirm_with_client.map((item) => (
               <li key={item}>{item}</li>
@@ -239,7 +239,7 @@ export default function CandidateSpecPanel({
     <div className="rounded-xl border border-violet-200/70 bg-violet-50/30 px-3 py-3 space-y-3 dark:bg-violet-950/50 dark:border-violet-800">
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-sm font-semibold text-violet-900 dark:text-violet-200">
+          <div className="flex items-center gap-2 text-sm font-medium text-violet-900 dark:text-violet-200">
             <Sparkles className="h-4 w-4" />
             สเปคผู้สมัคร (AI Candidate Spec)
           </div>

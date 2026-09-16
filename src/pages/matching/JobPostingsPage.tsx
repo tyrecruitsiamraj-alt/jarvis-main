@@ -243,7 +243,7 @@ const JobPostingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false })
       )}
       <div className="px-4 md:px-6 space-y-4 pb-8">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-foreground">
+          <h2 className="text-sm font-medium text-foreground">
             คำขอทั้งหมด {filterStatus === 'all' ? `(${items.length})` : ''}
           </h2>
           {/* สลับขอบเขต — ค่าตั้งต้นตรงกับหน้าแรก · บอกด้วยว่าซ่อนไปกี่ใบ ไม่ให้หายเงียบ */}
@@ -302,14 +302,14 @@ const JobPostingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false })
                   <CopyIdButton id={it.id} />
                   <span className="text-[11px] text-muted-foreground ml-auto">{formatWhen(it.created_at)}</span>
                 </div>
-                <h3 className={cn('text-sm', DASH.cellStrong, 'font-semibold')}>
+                <h3 className={cn('text-sm', DASH.cellStrong, 'font-medium')}>
                   {/* 🔴 ชุดทดลองต้องมีป้ายแยก — เดิมปนกับของจริงจนแยกไม่ออก
                       ต้องอ่านเนื้อในถึงจะรู้ (audit มุมพนักงานใหม่ 26 ส.ค. 2569) */}
                   {isDemoRequest(it) ? (
                     <span
                       title="ชุดข้อมูลทดลอง ไม่ใช่ใบขอจริง — ห้ามเอาไปโพสต์หรือติดต่อใคร"
                       className={cn(
-                        'mr-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 align-middle text-[10px] font-bold',
+                        'mr-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 align-middle text-[10px] font-medium',
                         TONE.warn.chip,
                       )}
                     >

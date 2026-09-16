@@ -58,7 +58,7 @@ const UnitRequestTabs: React.FC<UnitRequestTabsProps> = ({ jobId, active, counts
             aria-selected={active === id}
             onClick={() => active !== id && navigate(unitTabPath(jobId, id))}
             className={cn(
-              '-mb-0.5 border-b-2 px-3.5 py-2 text-sm font-semibold transition-colors',
+              '-mb-0.5 border-b-2 px-3.5 py-2 text-sm font-medium transition-colors',
               active === id
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground',

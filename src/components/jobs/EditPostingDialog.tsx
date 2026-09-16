@@ -156,7 +156,7 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-border bg-background py-2.5 text-sm font-semibold text-foreground hover:bg-secondary"
+              className="flex-1 rounded-xl border border-border bg-background py-2.5 text-sm font-medium text-foreground hover:bg-secondary"
             >
               {savedAt ? 'ปิด' : 'ยกเลิก'}
             </button>
@@ -164,7 +164,7 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
               type="button"
               onClick={() => void submit()}
               disabled={saving || !title.trim()}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
               {saving ? 'กำลังบันทึก…' : 'บันทึก'}
@@ -185,7 +185,7 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
               <Pencil className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <DialogTitle className="text-base font-semibold leading-tight sm:text-lg">
+              <DialogTitle className="text-base font-medium leading-tight sm:text-lg">
                 แก้ไขประกาศ
               </DialogTitle>
               <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug">

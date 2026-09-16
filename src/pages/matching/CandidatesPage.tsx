@@ -179,7 +179,7 @@ const CandidatesPage: React.FC = () => {
         {/* สรุปจำนวนตามสถานะ — กดเพื่อกรองรายชื่อด้านล่าง */}
         <div className="glass-card rounded-3xl border border-white/70 p-3 md:p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-foreground">สรุปผู้สมัครตามสถานะ</h3>
+            <h3 className="text-sm font-medium text-foreground">สรุปผู้สมัครตามสถานะ</h3>
             <span className="text-xs text-muted-foreground">รวม {candidates.length} คน</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -198,7 +198,7 @@ const CandidatesPage: React.FC = () => {
                 <div className="text-[11px] font-medium text-muted-foreground leading-snug">
                   {CANDIDATE_STATUS_LABELS[st]}
                 </div>
-                <div className="text-2xl font-bold text-foreground tabular-nums mt-0.5">{statusCounts[st]}</div>
+                <div className="text-2xl font-medium text-foreground tabular-nums mt-0.5">{statusCounts[st]}</div>
                 <div className="text-[10px] text-muted-foreground">คน</div>
               </button>
             ))}
@@ -240,7 +240,7 @@ const CandidatesPage: React.FC = () => {
                 <div className="flex items-center justify-between mb-2">
                   <button
                     onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                    className="font-semibold text-foreground text-sm hover:text-blue-600"
+                    className="font-medium text-foreground text-sm hover:text-blue-600"
                   >
                     {formatCandidateDisplayName(c)}
                   </button>
@@ -325,7 +325,7 @@ const CandidatesPage: React.FC = () => {
                     <td className="px-4 py-3 text-center">
                       <span
                         className={cn(
-                          'font-semibold',
+                          'font-medium',
                           c.risk_percentage <= 20
                             ? 'text-success'
                             : c.risk_percentage <= 50

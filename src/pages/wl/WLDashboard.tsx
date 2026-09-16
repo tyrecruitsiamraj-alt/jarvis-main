@@ -155,7 +155,7 @@ const WLDashboard: React.FC = () => {
       <ProductionDataPlaceholder title="สรุป WL / ปฏิทิน" />
       <div className="px-4 md:px-6 space-y-6">
         <div>
-          <h3 className="text-sm font-semibold text-foreground mb-3">เลือก BU</h3>
+          <h3 className="text-sm font-medium text-foreground mb-3">เลือก BU</h3>
           <WlBuSelector
             selected={selectedBu}
             onChange={setSelectedBu}
@@ -204,7 +204,7 @@ const WLDashboard: React.FC = () => {
               className="jarvis-menu-card rounded-3xl p-4 border border-white/70 text-left touch-manipulation"
             >
               <item.icon className="w-6 h-6 text-blue-600 mb-2" />
-              <div className="font-semibold text-foreground text-sm">{item.label}</div>
+              <div className="font-medium text-foreground text-sm">{item.label}</div>
               <div className="text-xs text-muted-foreground">{item.desc}</div>
             </motion.button>
           ))}

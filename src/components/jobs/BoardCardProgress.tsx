@@ -46,7 +46,7 @@ const BoardCardProgress: React.FC<Props> = ({ progress, className }) => {
               ) : null}
               <span
                 className={cn(
-                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold tabular-nums',
+                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-medium tabular-nums',
                   done
                     ? cn(TONE.success.dot, 'text-white')
                     : current
@@ -67,10 +67,10 @@ const BoardCardProgress: React.FC<Props> = ({ progress, className }) => {
       {/* บรรทัดคำ — บอกว่าอยู่ขั้นไหนและต้องทำอะไร (ป้ายเป็นคำกริยาอยู่แล้วใน RELEASE_STEP_TEXT) */}
       <p className={cn('text-[11px] leading-4', DASH.muted)}>
         {released ? (
-          <span className={cn('font-semibold', TONE.success.value)}>{label}</span>
+          <span className={cn('font-medium', TONE.success.value)}>{label}</span>
         ) : (
           <>
-            <span className="font-semibold">
+            <span className="font-medium">
               ขั้น {currentStep}/{totalSteps}
             </span>
             {' · '}
@@ -87,7 +87,7 @@ const BoardCardProgress: React.FC<Props> = ({ progress, className }) => {
             style={{ width: `${percent}%` }}
           />
         </div>
-        <span className={cn('shrink-0 text-[11px] font-bold tabular-nums', DASH.muted)}>
+        <span className={cn('shrink-0 text-[11px] font-medium tabular-nums', DASH.muted)}>
           {percent}%
         </span>
       </div>

@@ -81,7 +81,7 @@ export default function ContactHistoryStrip({ phone }: { phone: string | null | 
 
   return (
     <div className="space-y-1">
-      <p className={cn('text-xs font-semibold', DASH.cellStrong)}>
+      <p className={cn('text-xs font-medium', DASH.cellStrong)}>
         ประวัติการติดต่อ ({items.length.toLocaleString('th-TH')} ครั้งล่าสุด)
       </p>
       <ul className="space-y-0.5">
@@ -95,7 +95,7 @@ export default function ContactHistoryStrip({ phone }: { phone: string | null | 
                 <PhoneCall className={cn('h-3 w-3 shrink-0', TONE.success.value)} aria-label="คนโทร" />
               )}
               <span className={DASH.muted}>{timeAgoTh(it.at)}</span>
-              <span className={cn('rounded-full border px-1.5 py-0 text-[10px] font-semibold', chip.cls)}>
+              <span className={cn('rounded-full border px-1.5 py-0 text-[10px] font-medium', chip.cls)}>
                 {chip.label}
               </span>
               {it.kind === 'human' && it.byName ? <span className={DASH.muted}>โดย {it.byName}</span> : null}

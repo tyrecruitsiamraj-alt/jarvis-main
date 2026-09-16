@@ -40,7 +40,7 @@ const DashboardDriverOverview: React.FC<Props> = ({
     return (
       <div className={cn(DASH.card, 'p-6 text-sm', DASH.sub)}>
         {!hideHeader ? (
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">ภาระงานตามผู้รับผิดชอบ</h3>
+          <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">ภาระงานตามผู้รับผิดชอบ</h3>
         ) : null}
         ยังไม่มีข้อมูลภาระงานตามผู้รับผิดชอบ
       </div>
@@ -51,7 +51,7 @@ const DashboardDriverOverview: React.FC<Props> = ({
     <div className="space-y-3">
       {!hideHeader ? (
         <div>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">ภาระงานตามผู้รับผิดชอบ</h3>
+          <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">ภาระงานตามผู้รับผิดชอบ</h3>
           <p className="text-xs text-slate-600 dark:text-slate-400">มี · ปิด · คงเหลือ รายบุคคล (สรรหา / คัดสรร)</p>
         </div>
       ) : null}
@@ -75,7 +75,7 @@ const DashboardDriverOverview: React.FC<Props> = ({
           return (
             <div key={role} className="space-y-2">
               <div className="flex items-baseline gap-2">
-                <span className={cn('inline-flex rounded px-1.5 py-0.5 text-[11px] font-semibold', ROLE_BADGE_CLASS[role])}>
+                <span className={cn('inline-flex rounded px-1.5 py-0.5 text-[11px] font-medium', ROLE_BADGE_CLASS[role])}>
                   {ROLE_LABELS[role]}
                 </span>
                 <span className={cn('text-[11px]', DASH.muted)}>
@@ -104,22 +104,22 @@ const DashboardDriverOverview: React.FC<Props> = ({
                       )}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <p className={cn('min-w-0 truncate text-sm font-semibold', DASH.cellStrong)}>{r.name}</p>
+                        <p className={cn('min-w-0 truncate text-sm font-medium', DASH.cellStrong)}>{r.name}</p>
                         <span className={cn('shrink-0 text-xs font-medium', DASH.muted)}>{r.sharePercent}%</span>
                       </div>
                       <div className="mt-2 grid grid-cols-3 gap-2 text-center">
                         <div>
-                          <p className={cn('text-base font-semibold tabular-nums', DASH.cellStrong)}>{r.total}</p>
+                          <p className={cn('text-base font-medium tabular-nums', DASH.cellStrong)}>{r.total}</p>
                           <p className={cn('text-[10px]', DASH.muted)}>มี</p>
                         </div>
                         <div>
                           {closedTotalsAvailable ? (
-                            <p className="text-base font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                            <p className="text-base font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
                               {r.completed}
                             </p>
                           ) : (
                             <p
-                              className="text-base font-semibold tabular-nums text-slate-300 dark:text-slate-600"
+                              className="text-base font-medium tabular-nums text-slate-300 dark:text-slate-600"
                               title="ยังไม่รู้ — เลือกช่วงเวลาเพื่อดูยอดปิด"
                             >
                               —
@@ -130,7 +130,7 @@ const DashboardDriverOverview: React.FC<Props> = ({
                         <div>
                           <p
                             className={cn(
-                              'text-base font-semibold tabular-nums',
+                              'text-base font-medium tabular-nums',
                               r.remaining > 0 ? 'text-amber-600 dark:text-amber-400' : DASH.cellStrong,
                             )}
                           >

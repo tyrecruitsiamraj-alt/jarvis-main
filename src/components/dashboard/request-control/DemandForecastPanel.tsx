@@ -102,7 +102,7 @@ const DemandForecastPanel: React.FC = () => {
           <TrendingUp className="h-4 w-4" />
         </span>
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">พยากรณ์ใบขอเข้าใหม่ตามประเภท</h3>
+          <h3 className="text-sm font-medium text-slate-900">พยากรณ์ใบขอเข้าใหม่ตามประเภท</h3>
           <p className="mt-0.5 text-xs text-slate-500">
             หน่วย: อัตรา (คน) หักยกเลิกแล้ว · คาดจากเดือนเดียวกันของปี {yearsLabel || 'ย้อนหลัง'}
             {' '}(ใช้ค่าปีกลาง กันปีโดดผิดปกติ · ต่ำสุด–สูงสุด = ที่เคยเกิดจริง)
@@ -184,13 +184,13 @@ const DemandForecastPanel: React.FC = () => {
                           {monthLabel(m.month, forecast.currentYear)}
                         </span>
                         {isCurrent ? (
-                          <span className="ml-1.5 rounded bg-blue-600/10 px-1.5 py-0.5 text-[9px] font-semibold text-blue-700">
+                          <span className="ml-1.5 rounded bg-blue-600/10 px-1.5 py-0.5 text-[9px] font-medium text-blue-700">
                             เดือนนี้
                           </span>
                         ) : null}
                       </td>
                       <td className="px-2 py-2 text-right tabular-nums">
-                        <span className={cn('font-semibold', !isPast && 'text-slate-900')}>
+                        <span className={cn('font-medium', !isPast && 'text-slate-900')}>
                           ~{fmt(c.medNet)}
                         </span>
                       </td>
@@ -207,7 +207,7 @@ const DemandForecastPanel: React.FC = () => {
                         {c.actualNet == null ? (
                           <Dash />
                         ) : (
-                          <span className={cn('font-semibold', !isPast && 'text-slate-900')}>
+                          <span className={cn('font-medium', !isPast && 'text-slate-900')}>
                             {fmt(c.actualNet)}
                           </span>
                         )}
@@ -219,7 +219,7 @@ const DemandForecastPanel: React.FC = () => {
                           <span className="whitespace-nowrap">
                             <span
                               className={cn(
-                                'font-semibold',
+                                'font-medium',
                                 isCurrent ? 'text-blue-700' : 'text-slate-700',
                               )}
                             >
@@ -256,7 +256,7 @@ const DemandForecastPanel: React.FC = () => {
 
           {forecast.topResignationUnits.length > 0 ? (
             <div className="rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2.5">
-              <p className="text-xs font-semibold text-slate-800">
+              <p className="text-xs font-medium text-slate-800">
                 หน่วยงานที่มีแนวโน้มลาออก (จากใบขอลาออก 12 เดือนล่าสุด)
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -267,7 +267,7 @@ const DemandForecastPanel: React.FC = () => {
                     title={`${u.requests.toLocaleString('th-TH')} ใบขอ · เกิดขึ้นใน ${u.monthsActive} เดือน`}
                   >
                     {u.unitName}
-                    <span className="ml-1 font-semibold text-amber-800">{fmt(u.positions)} อัตรา</span>
+                    <span className="ml-1 font-medium text-amber-800">{fmt(u.positions)} อัตรา</span>
                     <span className="ml-1 text-slate-400">/{u.monthsActive} เดือน</span>
                   </span>
                 ))}

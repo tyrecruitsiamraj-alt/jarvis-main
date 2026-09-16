@@ -70,7 +70,7 @@ const CallSuppressionTab: React.FC = () => {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-sm font-semibold text-foreground">บัญชีห้ามโทร</h2>
+        <h2 className="text-sm font-medium text-foreground">บัญชีห้ามโทร</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">
           เบอร์ที่ AI จะ <b>ไม่โทรถึงชั่วคราว</b> — ระบบพักให้เองเมื่อผลโทรกลับมาว่า
           &ldquo;เบอร์ผิด&rdquo; (7 วัน) หรือ &ldquo;ไม่หางานแล้ว&rdquo; (30 วัน) ·
@@ -115,7 +115,7 @@ const CallSuppressionTab: React.FC = () => {
                 onClick={() => void release(it.phone)}
                 title="เอาเบอร์นี้ออกจากบัญชีห้ามโทร — AI จะโทรถึงได้อีกครั้ง"
                 className={cn(
-                  'inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-semibold disabled:opacity-50',
+                  'inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-medium disabled:opacity-50',
                   TONE.warn.outline,
                 )}
               >

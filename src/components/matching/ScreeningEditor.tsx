@@ -109,7 +109,7 @@ export default function ScreeningEditor({
   return (
     <div className={cn('space-y-2 rounded-xl border px-3 py-3', TONE.neutral.soft)}>
       <div className="flex items-center justify-between gap-2">
-        <p className={cn('text-xs font-semibold', DASH.cellStrong)}>ผลคัดกรอง</p>
+        <p className={cn('text-xs font-medium', DASH.cellStrong)}>ผลคัดกรอง</p>
         {record?.screenedByName ? (
           <span className={cn('text-[10px]', DASH.muted)}>บันทึกโดย {record.screenedByName}</span>
         ) : null}
@@ -132,7 +132,7 @@ export default function ScreeningEditor({
           onClick={() => void submit()}
           disabled={saving}
           className={cn(
-            'rounded-full px-3 py-1 text-[11px] font-semibold disabled:opacity-60',
+            'rounded-full px-3 py-1 text-[11px] font-medium disabled:opacity-60',
             TONE.primary.solid,
           )}
         >

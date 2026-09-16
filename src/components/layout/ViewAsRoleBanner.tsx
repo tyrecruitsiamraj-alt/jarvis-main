@@ -32,7 +32,7 @@ const ViewAsRoleBanner: React.FC = () => {
         <select
           value={viewAsDepartment ?? ''}
           onChange={(e) => setViewAsDepartment(e.target.value || null)}
-          className="rounded-full border border-amber-500 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900 dark:bg-amber-900 dark:text-amber-100"
+          className="rounded-full border border-amber-500 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:bg-amber-900 dark:text-amber-100"
         >
           <option value="">ทุกแผนก</option>
           {APP_DEPARTMENT_CODES.map((code) => (
@@ -45,7 +45,7 @@ const ViewAsRoleBanner: React.FC = () => {
       <button
         type="button"
         onClick={() => setViewAsRole(null)}
-        className="rounded-full border border-amber-500 px-2.5 py-0.5 text-[11px] font-semibold hover:bg-amber-200 dark:hover:bg-amber-900"
+        className="rounded-full border border-amber-500 px-2.5 py-0.5 text-[11px] font-medium hover:bg-amber-200 dark:hover:bg-amber-900"
       >
         ออกจากมุมมองนี้
       </button>

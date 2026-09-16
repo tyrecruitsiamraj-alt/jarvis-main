@@ -83,7 +83,7 @@ export const HudGauge: React.FC<HudGaugeProps> = ({
           y="50%"
           textAnchor="middle"
           dominantBaseline="central"
-          className="font-mono text-sm font-semibold tabular-nums"
+          className="font-mono text-sm font-medium tabular-nums"
           fill={color}
         >
           {center ?? `${pct}%`}

@@ -141,7 +141,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           {hamburger}
           <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 shrink-0">
             <BrandMark size="md" />
-            <BrandTitle className="text-lg font-bold text-foreground truncate max-w-[220px]" />
+            <BrandTitle className="text-lg font-medium text-foreground truncate max-w-[220px]" />
           </button>
         </div>
         <div className="flex items-center gap-2 xl:gap-3 shrink-0">
@@ -218,7 +218,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           {hamburger}
           <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 text-left min-w-0 touch-manipulation py-1">
             <BrandMark size="sm" />
-            <BrandTitle className="text-base font-bold text-foreground truncate" />
+            <BrandTitle className="text-base font-medium text-foreground truncate" />
           </button>
         </div>
         {/*

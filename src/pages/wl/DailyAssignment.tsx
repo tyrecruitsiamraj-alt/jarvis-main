@@ -70,7 +70,7 @@ const DailyAssignment: React.FC = () => {
 
         {/* Assigned today */}
         <div>
-          <h3 className="text-sm font-semibold text-foreground mb-2">ลงงานแล้ววันนี้ ({todayEntries.length} คน)</h3>
+          <h3 className="text-sm font-medium text-foreground mb-2">ลงงานแล้ววันนี้ ({todayEntries.length} คน)</h3>
           <div className="space-y-2">
             {todayEntries.map(entry => {
               const emp = wlEmployees.find(e => e.id === entry.employee_id);
@@ -92,7 +92,7 @@ const DailyAssignment: React.FC = () => {
 
         {/* Available */}
         <div>
-          <h3 className="text-sm font-semibold text-foreground mb-2">ว่าง ({filteredAvailable.length} คน)</h3>
+          <h3 className="text-sm font-medium text-foreground mb-2">ว่าง ({filteredAvailable.length} คน)</h3>
           <SearchField
             wrapperClassName="mb-2"
             type="text"

@@ -139,7 +139,7 @@ function RosterSection({
   return (
     <div className="glass-card rounded-xl border border-border p-4 space-y-3">
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="font-semibold text-foreground text-sm">{title}</h3>
+        <h3 className="font-medium text-foreground text-sm">{title}</h3>
         <span className="text-xs text-muted-foreground">
           {paged.total.toLocaleString('th-TH')} คน
         </span>
@@ -282,7 +282,7 @@ function PillTabs<T extends string>({
             className={cn(
               'flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm transition-colors',
               active === t.key
-                ? 'bg-white font-semibold text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
+                ? 'bg-white font-medium text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
                 : 'font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
             )}
           >

@@ -198,7 +198,13 @@
 
   h1, h2, h3, h4, h5 {
     letter-spacing: -0.022em; /* หัวข้อแน่นขึ้น = ดูพรีเมียม/คม */
-    font-weight: 600;
+    /**
+     * 🔴 500 ไม่ใช่ 600 (เจ้าของสั่ง 16 ก.ย. 2569: *"ลด Weight … มันหนาเกินไป
+     * ลดความหนาลงมาสัก 2-3 ระดับ"* และย้ำว่า **ทั้งระบบ** ไม่ใช่เฉพาะจุดที่ทัก)
+     * Kanit ที่ 600-700 หนามากบนจอ ยิ่งไทยมีสระบนล่างยิ่งอ่านแน่น
+     * ⇒ ทั้งระบบเหลือสองระดับ: 500 สำหรับของที่ต้องเด่น · 400 สำหรับเนื้อความ
+     */
+    font-weight: 500;
   }
   h1 {
     letter-spacing: -0.03em; /* หัวใหญ่สุดแน่นสุดแบบ Apple display */
@@ -330,7 +336,7 @@
      `@/components/ui/button` ของ shadcn เท่านั้น ห้ามเขียนคลาสปุ่มเองใน CSS อีก */
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-3 rounded-md border border-[#8c8c8c] bg-white px-4 py-3 text-sm font-semibold text-[#5e5e5e] shadow-sm transition-colors;
+    @apply inline-flex items-center justify-center gap-3 rounded-md border border-[#8c8c8c] bg-white px-4 py-3 text-sm font-medium text-[#5e5e5e] shadow-sm transition-colors;
   }
 
   .btn-primary:hover:not(:disabled) {
@@ -429,14 +435,14 @@
     @apply text-[11px] font-medium leading-snug text-muted-foreground;
   }
   .jarvis-stat-value {
-    @apply mt-0.5 text-2xl font-bold tabular-nums;
+    @apply mt-0.5 text-2xl font-medium tabular-nums;
   }
   .jarvis-stat-sub {
     @apply text-[10px] text-muted-foreground;
   }
 
   .jarvis-section-title {
-    @apply text-sm font-semibold uppercase tracking-[0.15em] text-muted-foreground;
+    @apply text-sm font-medium uppercase tracking-[0.15em] text-muted-foreground;
   }
 }
 

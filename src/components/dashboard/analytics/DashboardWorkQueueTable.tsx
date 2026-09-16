@@ -52,7 +52,7 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
     <div className={cn(DASH.card, 'overflow-hidden')}>
       {!hideHeader ? (
         <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">งานที่ต้องติดตาม</h3>
+          <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">งานที่ต้องติดตาม</h3>
           <p className="text-xs text-slate-600 dark:text-slate-400">{items.length} รายการ — เรียงตามความสำคัญ</p>
         </div>
       ) : null}

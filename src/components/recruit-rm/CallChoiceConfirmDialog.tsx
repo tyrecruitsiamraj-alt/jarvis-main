@@ -70,7 +70,7 @@ const CallChoiceConfirmDialog: React.FC<CallChoiceConfirmDialogProps> = ({
     if (!open) return null;
     return (
       <div className={cn('space-y-2 rounded-xl border p-3', DASH.card)}>
-        <p className="text-sm font-semibold">ให้ AI โทรหา {names.length} คนนี้?</p>
+        <p className="text-sm font-medium">ให้ AI โทรหา {names.length} คนนี้?</p>
         <p className={cn('text-xs', DASH.muted)}>
           AI จะโทรออกหาคนในรายชื่อนี้จริง (เว้นช่วง 20:00–08:00 น. ระบบเลื่อนให้เอง) · คนที่มี
           เจ้าหน้าที่ถือไปโทรอยู่ · เบอร์ที่พักไว้ · คนที่เคยปฏิเสธงานใบนี้ ระบบจะข้ามให้เองและรายงานกลับ
@@ -81,7 +81,7 @@ const CallChoiceConfirmDialog: React.FC<CallChoiceConfirmDialogProps> = ({
             type="button"
             disabled={busy}
             onClick={onCancel}
-            className="inline-flex min-h-9 items-center rounded-lg border px-3 text-xs font-semibold disabled:opacity-50"
+            className="inline-flex min-h-9 items-center rounded-lg border px-3 text-xs font-medium disabled:opacity-50"
           >
             ยกเลิก
           </button>
@@ -90,7 +90,7 @@ const CallChoiceConfirmDialog: React.FC<CallChoiceConfirmDialogProps> = ({
             disabled={busy || names.length === 0}
             onClick={onConfirm}
             className={cn(
-              'inline-flex min-h-9 items-center rounded-lg px-3 text-xs font-semibold disabled:opacity-50',
+              'inline-flex min-h-9 items-center rounded-lg px-3 text-xs font-medium disabled:opacity-50',
               TONE.primary.solid,
             )}
           >

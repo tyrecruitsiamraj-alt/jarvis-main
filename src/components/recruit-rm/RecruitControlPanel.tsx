@@ -84,9 +84,9 @@ function StatBox({
         active ? 'ring-2 ring-ring' : '',
       )}
     >
-      <span className={cn('w-full truncate text-[11px] font-semibold', DASH.muted)}>{box.label}</span>
+      <span className={cn('w-full truncate text-[11px] font-medium', DASH.muted)}>{box.label}</span>
       <span className="flex w-full items-baseline gap-1.5">
-        <span className={cn('text-2xl font-bold leading-none tabular-nums', tone.num)}>
+        <span className={cn('text-2xl font-medium leading-none tabular-nums', tone.num)}>
           {box.value === null ? '—' : box.value.toLocaleString('th-TH')}
         </span>
         {percent !== null && box.bucket !== null ? (
@@ -248,7 +248,7 @@ export default function RecruitControlPanel() {
   return (
     <div className={cn('space-y-3 rounded-2xl border px-4 py-3', DASH.card)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={cn('font-bold', DASH.title)}>
+        <p className={cn('font-medium', DASH.title)}>
           ศูนย์คุมงานสรรหา
           <span className={cn('ml-2 text-[11px] font-normal', DASH.muted)}>
             ยอดจากฐานของเรา · กดกล่องเพื่อดูรายชื่อ · กดซ้ำเพื่อล้าง
@@ -271,7 +271,7 @@ export default function RecruitControlPanel() {
               <p className={cn('mb-1.5 flex items-center gap-1.5', DASH.eyebrow)}>
                 <span
                   className={cn(
-                    'inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold',
+                    'inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-medium',
                     'bg-foreground/10 text-foreground/70',
                   )}
                 >
@@ -303,9 +303,9 @@ export default function RecruitControlPanel() {
       {/* แถว 2 — เวลา + ความเสี่ยงค้าง (ตัวจี้งาน) */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className={cn('rounded-xl border px-3 py-2', TONE.neutral.soft)}>
-          <p className={cn('text-[11px] font-semibold', DASH.muted)}>เวลารอโทร (กรอก → โทรครั้งแรก)</p>
+          <p className={cn('text-[11px] font-medium', DASH.muted)}>เวลารอโทร (กรอก → โทรครั้งแรก)</p>
           {waiting ? (
-            <p className={cn('text-sm font-bold', TONE.primary.value)}>
+            <p className={cn('text-sm font-medium', TONE.primary.value)}>
               โดยทั่วไป {waiting.medianHours != null ? formatHours(waiting.medianHours) : '—'}
               <span className={cn('ml-2 text-[10px] font-normal', DASH.muted)}>
                 ช้าสุด 10% เกิน {waiting.p90Hours != null ? formatHours(waiting.p90Hours) : '—'} · จาก{' '}
@@ -328,14 +328,14 @@ export default function RecruitControlPanel() {
             activeBucket === 'over5d' ? 'ring-2 ring-ring' : '',
           )}
         >
-          <p className={cn('text-[11px] font-semibold', DASH.muted)}>
+          <p className={cn('text-[11px] font-medium', DASH.muted)}>
             ค้างยังไม่โทร {agingTotal} ใบ (ทั้งหมดทุกช่วง)
           </p>
-          <p className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+          <p className="flex flex-wrap items-center gap-2 text-[11px] font-medium">
             <span className={TONE.success.value}>≤3 วัน {stale.agingUncalled.d0_3}</span>
             <span className={TONE.warn.value}>4-7 วัน {stale.agingUncalled.d4_7}</span>
             <span className={TONE.danger.value}>&gt;7 วัน {stale.agingUncalled.over7}</span>
-            <span className={cn('ml-auto text-sm font-bold', TONE.danger.num)}>
+            <span className={cn('ml-auto text-sm font-medium', TONE.danger.num)}>
               เกิน 5 วัน {stale.over5DaysUncalled}
             </span>
           </p>
@@ -354,8 +354,8 @@ export default function RecruitControlPanel() {
               title="กดเพื่อดูรายชื่อใบที่ถูกเก็บไปแล้วเงียบ"
               className={cn('text-left', activeBucket === 'claimed_idle' ? 'underline' : '')}
             >
-              <p className={cn('text-[11px] font-semibold', DASH.muted)}>เก็บไปแล้วยังไม่โทร (เกิน 1 วัน)</p>
-              <p className={cn('text-sm font-bold', stale.claimedIdle.total > 0 ? TONE.danger.num : TONE.success.value)}>
+              <p className={cn('text-[11px] font-medium', DASH.muted)}>เก็บไปแล้วยังไม่โทร (เกิน 1 วัน)</p>
+              <p className={cn('text-sm font-medium', stale.claimedIdle.total > 0 ? TONE.danger.num : TONE.success.value)}>
                 {stale.claimedIdle.total} ใบ
               </p>
             </button>
@@ -384,7 +384,7 @@ export default function RecruitControlPanel() {
                 activeBucket === 'awaiting_call_choice' ? 'ring-2 ring-ring' : '',
               )}
             >
-              <span className={cn('font-semibold', TONE.warn.value)}>
+              <span className={cn('font-medium', TONE.warn.value)}>
                 รอเลือกวิธีโทร {stale.awaitingCallChoice.total} ใบ
               </span>
               <span className={cn('ml-1', DASH.muted)}>— ไม่เลือกใน 1 วัน AI รับไปโทรเอง</span>
@@ -396,7 +396,7 @@ export default function RecruitControlPanel() {
               {stale.claimedIdle.byUser.map((u) => (
                 <li key={u.name ?? '?'} className="flex justify-between gap-2">
                   <span className="truncate">{u.name ?? 'ไม่ทราบชื่อ'}</span>
-                  <span className={cn('shrink-0 font-semibold', TONE.danger.value)}>
+                  <span className={cn('shrink-0 font-medium', TONE.danger.value)}>
                     {u.count} ใบ · ค้างสุด {daysSince(u.oldestClaimedAt)} วัน
                   </span>
                 </li>

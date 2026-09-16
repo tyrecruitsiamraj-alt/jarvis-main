@@ -35,7 +35,7 @@ const ShortLinkRedirectPage: React.FC = () => {
     <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-3 px-6 text-center">
       {failed ? (
         <>
-          <p className="text-base font-semibold text-foreground">ลิงก์ไม่ถูกต้องหรือหมดอายุ</p>
+          <p className="text-base font-medium text-foreground">ลิงก์ไม่ถูกต้องหรือหมดอายุ</p>
           <a href="/apply" className="text-sm font-medium text-blue-600 hover:underline">
             ไปที่บอร์ดประกาศรับสมัคร
           </a>
