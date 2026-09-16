@@ -38,8 +38,13 @@ import { cn } from '@/lib/utils';
  * พร้อมคู่ `dark:` ทุกตัว) ⇒ เป็นการ์ดคนละใบกับแผงอื่นบนหน้าเดียวกัน
  * เหลือไว้เฉพาะ **ขนาดตัวอักษร** ซึ่งเป็น utility ล้วน ไม่ใช่การปั้นเปลือกการ์ด
  */
-const LABEL = 'block text-xs font-medium text-muted-foreground';
-const FIGURE = 'text-2xl font-semibold tabular-nums';
+/**
+ * 🔴 **ป้ายเบากว่าตัวเลขเสมอ** (เจ้าของสั่ง 16 ก.ย. 2569: *"ลด Weight ของตัวอักษรลง …
+ * มันหนาเกินไป"*) — หน้าแรกเหลือน้ำหนักสองระดับพอ: `medium` สำหรับของที่ต้องเด่น
+ * (ตัวเลข · หัวข้อ) และ `normal` สำหรับคำอธิบาย · ลำดับความสำคัญที่เหลือใช้ **ขนาดกับสี**
+ */
+const LABEL = 'block text-xs text-muted-foreground';
+const FIGURE = 'text-2xl font-medium tabular-nums';
 const UNIT = 'text-xs text-muted-foreground';
 
 /** การ์ด KPI ที่กดได้ — Card ของ shadcn ห่อด้วยปุ่มเพื่อให้กดทั้งใบและโฟกัสได้ */

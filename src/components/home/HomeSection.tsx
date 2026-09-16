@@ -36,7 +36,7 @@ const HomeSection: React.FC<{
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0 px-4 pb-2 pt-4 md:px-5">
         <div className="min-w-0">
           {/* ใช้ระดับตัวอักษรชุดเดียวกันทุกแผง — เดิมหัวแผงตัวเล็กใหญ่ไม่เท่ากัน */}
-          <p className={cn('text-sm font-bold', DASH.cellStrong)}>{title}</p>
+          <p className={cn('text-sm font-medium', DASH.cellStrong)}>{title}</p>
           {subtitle ? <p className={cn('text-xs leading-4', DASH.muted)}>{subtitle}</p> : null}
         </div>
         {action ? <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div> : null}

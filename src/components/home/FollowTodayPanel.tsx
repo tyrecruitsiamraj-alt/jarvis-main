@@ -95,10 +95,10 @@ export default function FollowTodayPanel() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <PhoneOutgoing className={cn('h-4 w-4', TONE.primary.value)} aria-hidden />
-          <h2 className={cn('text-sm font-bold', DASH.cellStrong)}>งาน Follow</h2>
+          <h2 className={cn('text-sm font-medium', DASH.cellStrong)}>งาน Follow</h2>
           <span className={cn('text-xs', DASH.muted)}>
             วันนี้ส่ง{' '}
-            <span className={cn('font-bold tabular-nums', TONE.primary.value)}>
+            <span className={cn('font-medium tabular-nums', TONE.primary.value)}>
               {sentToday.toLocaleString('th-TH')}
             </span>{' '}
             คน
@@ -142,17 +142,17 @@ export default function FollowTodayPanel() {
               )}
             >
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                <span className={cn('text-xs font-bold', DASH.cellStrong)}>รอบ {r.attempt}</span>
+                <span className={cn('text-xs font-medium', DASH.cellStrong)}>รอบ {r.attempt}</span>
                 <span className={cn('text-xs', DASH.muted)}>
                   ส่ง{' '}
-                  <span className="font-semibold tabular-nums text-foreground">
+                  <span className="font-medium tabular-nums text-foreground">
                     {r.total.toLocaleString('th-TH')}
                   </span>
                 </span>
                 {parts.map((p) => (
                   <span key={p.key} className="text-xs">
                     <span className={DASH.muted}>{CALL_BUCKET_LABEL[p.key]} </span>
-                    <span className={cn('font-semibold tabular-nums', BUCKET_TONE[p.key].text)}>
+                    <span className={cn('font-medium tabular-nums', BUCKET_TONE[p.key].text)}>
                       {p.n.toLocaleString('th-TH')}
                     </span>
                   </span>
@@ -198,7 +198,7 @@ export default function FollowTodayPanel() {
         <Dialog open onOpenChange={(o) => (o ? undefined : setOpenRound(null))}>
           <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-sm font-bold">
+              <DialogTitle className="text-sm font-medium">
                 งาน Follow · รอบ {openRoundData.attempt}
               </DialogTitle>
               <DialogDescription className="text-xs">
@@ -227,7 +227,7 @@ export default function FollowTodayPanel() {
                 if (list.length === 0) return null;
                 return (
                   <section key={b}>
-                    <p className={cn('mb-1.5 text-xs font-bold', BUCKET_TONE[b].text)}>
+                    <p className={cn('mb-1.5 text-xs font-medium', BUCKET_TONE[b].text)}>
                       {CALL_BUCKET_LABEL[b]} ({list.length.toLocaleString('th-TH')})
                     </p>
                     <ul className="space-y-1">

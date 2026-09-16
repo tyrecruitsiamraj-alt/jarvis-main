@@ -71,7 +71,7 @@ export default function LumosCallHealthPanel({
   return (
     <section className="space-y-2.5 rounded-2xl border border-white/70 bg-white/70 p-3.5 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+        <h2 className="flex items-center gap-1.5 text-sm font-medium text-foreground">
           <PhoneCall className="h-4 w-4 text-primary" />
           ผลโทรจาก AI (Lumos)
         </h2>
@@ -92,7 +92,7 @@ export default function LumosCallHealthPanel({
         ) : (
           <RefreshCw className={cn('h-4 w-4 shrink-0', TONE[link.tone].value)} />
         )}
-        <span className={cn('text-sm font-semibold', TONE[link.tone].value)}>{link.label}</span>
+        <span className={cn('text-sm font-medium', TONE[link.tone].value)}>{link.label}</span>
         <span className="min-w-0 text-xs text-muted-foreground">{link.detail}</span>
         {l.last_result_at ? (
           <span className="ml-auto shrink-0 text-xs text-muted-foreground">
@@ -111,7 +111,7 @@ export default function LumosCallHealthPanel({
           >
             <div
               className={cn(
-                'text-[17px] font-semibold leading-tight tabular-nums tracking-tight',
+                'text-[17px] font-medium leading-tight tabular-nums tracking-tight',
                 s.value === 0
                   ? 'text-slate-400 dark:text-slate-500'
                   : s.tone === 'danger'
@@ -129,7 +129,7 @@ export default function LumosCallHealthPanel({
       {/* 3. ผลออกมาเป็นยังไง — แจกแจงครบทุกแบบที่มีค่า เลขย่อยบวกได้เท่า "ได้ผลกลับ" เสมอ */}
       <div className="space-y-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-semibold text-foreground">
+          <span className="text-xs font-medium text-foreground">
             ผลที่กลับมา {resultTotal.toLocaleString('th-TH')} สาย
           </span>
           <span className="text-xs text-muted-foreground">

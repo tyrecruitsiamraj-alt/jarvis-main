@@ -215,3 +215,34 @@ describe('หน้าแรกต้องไม่มีตัวอักษ�
     expect(code).not.toMatch(/font-mono/);
   });
 });
+
+/**
+ * ═══ น้ำหนักตัวอักษรบนหน้าแรก (เจ้าของสั่ง 16 ก.ย. 2569) ═══
+ *
+ * > *"ลด Weight ของตัวอักษรลงมาหน่อย ในส่วนที่ทำเป็นตัวหนาไว้ … มันหนาเกินไป
+ * > ลดความหนาลงมาสัก 2-3 ระดับ เอาให้เหมาะสมอะ"*
+ *
+ * Kanit ที่น้ำหนัก 600-700 หนามากบนจอ โดยเฉพาะภาษาไทยที่มีสระบนล่าง
+ * ⇒ หน้าแรกเหลือสองระดับ: `font-medium` (500) กับน้ำหนักปกติ (400)
+ * ลำดับความสำคัญที่เหลือให้ใช้ **ขนาดกับสี** ไม่ใช่ความหนา
+ */
+describe('หน้าแรกต้องไม่มีตัวหนาเกินระดับ medium', () => {
+  const FILES = [
+    'src/components/home/TeamBoardPanel.tsx',
+    'src/components/home/HomeKpiRow.tsx',
+    'src/components/home/HomeDeckV2.tsx',
+    'src/components/home/CommandDeck.tsx',
+    'src/components/home/HomeSection.tsx',
+    'src/components/home/FollowTodayPanel.tsx',
+    'src/components/home/LumosCallHealthPanel.tsx',
+    'src/components/home/HomeDigestPanels.tsx',
+    'src/components/shared/StatCard.tsx',
+    'src/pages/HomePage.tsx',
+  ];
+
+  it.each(FILES)('%s — ไม่มี font-bold / font-semibold', (f) => {
+    const code = read(f).replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(code).not.toMatch(/font-bold/);
+    expect(code).not.toMatch(/font-semibold/);
+  });
+});

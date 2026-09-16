@@ -54,13 +54,13 @@ const NAV = Object.fromEntries(HOME_TEAM_NAV.map((t) => [t.key, t])) as Record<
  * ⇒ เหลือสองระดับพอ: **หัวข้อย่อย** กับ **เนื้อ** · ตัวเลขใช้ `tabular-nums` ให้หลักตรงกัน
  * 🔴 ห้ามกลับไปใช้ `text-xs` — 10px กับ Kanit อ่านไม่ออกบนจอโน้ตบุ๊ก
  */
-const eyebrow = 'text-xs font-semibold text-muted-foreground';
+const eyebrow = 'text-xs font-medium text-muted-foreground';
 
 /** โทนกลาง — ใช้ตัวแปรธีมของแบรนด์ ไม่ใช่เฉด slate ที่ไม่ผูกกับจานสี */
 const T = {
   mut: 'text-muted-foreground',
   faint: 'text-muted-foreground/70',
-  num: 'font-semibold tabular-nums text-foreground',
+  num: 'font-medium tabular-nums text-foreground',
   line: 'border-border/70',
   danger: 'text-red-700 dark:text-red-300',
   warn: 'text-amber-700 dark:text-amber-300/90',
@@ -276,7 +276,7 @@ const TeamColumn: React.FC<{
   const head = (
     <span className="flex items-baseline gap-2">
       {/* ชื่อทีม Lumos เป็นศัพท์ในบ้าน — ติดคำอธิบายไว้ที่ตัวชื่อเลย */}
-      <span className={cn('text-sm font-semibold', ACCENT[team])}>
+      <span className={cn('text-sm font-medium', ACCENT[team])}>
         {team === 'lumos' ? <Term k="lumos">{label}</Term> : label}
       </span>
       <span className={cn('min-w-0 flex-1 truncate text-xs', T.faint)}>{blurb}</span>
@@ -707,7 +707,7 @@ const TeamBoardPanel: React.FC<{
           <li className="mt-3 list-none">
             <span className={cn(eyebrow, T.faint)}>Success Rate · 7 วันล่าสุด</span>
             <span className="mt-0.5 flex items-baseline gap-1.5">
-              <span className={cn('text-lg font-bold tabular-nums', ACCENT.lumos)}>
+              <span className={cn('text-lg font-medium tabular-nums', ACCENT.lumos)}>
                 {successRate?.pct == null ? '—' : `${successRate.pct}%`}
               </span>
               <span className={cn('text-xs', T.mut)}>

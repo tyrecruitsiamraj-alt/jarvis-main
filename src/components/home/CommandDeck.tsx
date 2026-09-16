@@ -52,7 +52,7 @@ const TONE_TEXT: Record<NextTaskTone | 'ok', string> = {
 };
 
 /** ป้าย mono ตัวพิมพ์ห่าง — ภาษาป้ายเดียวของทั้ง deck */
-const eyebrow = 'font-mono text-[10px] font-semibold uppercase tracking-[0.22em]';
+const eyebrow = 'font-mono text-[10px] font-medium uppercase tracking-[0.22em]';
 
 /* ── ตัวเลข "ต้องลงมือ" — พระเอกของหน้า ────────────────────────────────────
  *
@@ -81,7 +81,7 @@ const Dial: React.FC<{ tasksLeft: number | null; status: { text: string; tone: s
       <div className="absolute inset-6 rounded-full border border-primary/10" aria-hidden />
       <div className="relative flex flex-col items-center text-center">
         <span className={cn(eyebrow, 'text-muted-foreground')}>ต้องลงมือ</span>
-        <span className="mt-1 text-6xl font-semibold leading-none tabular-nums text-foreground">
+        <span className="mt-1 text-6xl font-medium leading-none tabular-nums text-foreground">
           {tasksLeft === null ? '—' : tasksLeft}
         </span>
         <span className={cn(eyebrow, 'mt-1.5 text-muted-foreground')}>เรื่อง</span>
@@ -189,7 +189,7 @@ const CommandDeck: React.FC<{
             </div>
           ) : head ? (
             <>
-              <h1 className="mt-3 text-2xl font-bold leading-snug tracking-tight lg:text-[34px] lg:leading-[1.25]">
+              <h1 className="mt-3 text-2xl font-medium leading-snug tracking-tight lg:text-[34px] lg:leading-[1.25]">
                 {head.title}
               </h1>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
@@ -204,7 +204,7 @@ const CommandDeck: React.FC<{
                   /* 🔴 ใช้ปุ่มมาตรฐานของธีม (สีหลัก = เบอร์กันดี) ไม่ปั้นไล่เฉดเอง
                      — ของเดิมเป็นไล่เฉดฟ้า→เขียวพร้อมเงาสีที่เขียน rgba ดิบในคลาส */
                   size="lg"
-                  className="rounded-xl px-6 text-sm font-semibold"
+                  className="rounded-xl px-6 text-sm font-medium"
                 >
                   <Link to={head.path}>
                     {head.action}
@@ -220,7 +220,7 @@ const CommandDeck: React.FC<{
             </>
           ) : (
             <>
-              <h1 className="mt-3 text-2xl font-bold leading-snug tracking-tight lg:text-[34px]">
+              <h1 className="mt-3 text-2xl font-medium leading-snug tracking-tight lg:text-[34px]">
                 ไม่มีงานค้างที่ต้องลงมือตอนนี้
               </h1>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">

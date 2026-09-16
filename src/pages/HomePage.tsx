@@ -560,7 +560,7 @@ const HomePage: React.FC = () => {
                 const total = callBoxCount(flow, key);
                 return (
                   <div key={key} className={cn('rounded-2xl border p-3', TONE[t.tone].soft)}>
-                    <div className={cn('flex items-center gap-1.5 text-xs font-semibold', TONE[t.tone].num)}>
+                    <div className={cn('flex items-center gap-1.5 text-xs font-medium', TONE[t.tone].num)}>
                       <Icon className="h-3.5 w-3.5" aria-hidden />
                       {label} ({total.toLocaleString('th-TH')})
                     </div>
@@ -654,8 +654,8 @@ const HomePage: React.FC = () => {
               </DialogHeader>
               <div className="space-y-3">
                 <div className={cn('rounded-xl border px-3 py-2.5 space-y-1', TONE.neutral.soft)}>
-                  <p className="text-[11px] font-semibold text-muted-foreground">แมทกับใบขอ</p>
-                  <p className="text-sm font-semibold text-foreground">
+                  <p className="text-[11px] font-medium text-muted-foreground">แมทกับใบขอ</p>
+                  <p className="text-sm font-medium text-foreground">
                     {personDetail.item.job_position || 'ไม่ระบุตำแหน่ง'}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -664,7 +664,7 @@ const HomePage: React.FC = () => {
                   </p>
                 </div>
                 <div className={cn('rounded-xl border px-3 py-2.5 space-y-1', TONE.neutral.soft)}>
-                  <p className="text-[11px] font-semibold text-muted-foreground">ผลการโทรล่าสุด</p>
+                  <p className="text-[11px] font-medium text-muted-foreground">ผลการโทรล่าสุด</p>
                   <p className="text-xs leading-relaxed text-foreground">
                     {personDetail.item.summary || 'ยังไม่มีสรุปบทสนทนา'}
                   </p>
@@ -690,7 +690,7 @@ const HomePage: React.FC = () => {
                       });
                       return (
                         <div className={cn('rounded-xl border px-3 py-2.5 space-y-1.5', TONE.violet.soft)}>
-                          <p className={cn('text-[11px] font-semibold', TONE.violet.num)}>
+                          <p className={cn('text-[11px] font-medium', TONE.violet.num)}>
                             สนใจงานแล้ว — จองตัวไว้เลย
                           </p>
                           <button
@@ -698,7 +698,7 @@ const HomePage: React.FC = () => {
                             onClick={() => void bookFromCallResult(item)}
                             disabled={action.disabled}
                             className={cn(
-                              'w-full rounded-full px-3 py-1.5 text-xs font-bold disabled:opacity-50',
+                              'w-full rounded-full px-3 py-1.5 text-xs font-medium disabled:opacity-50',
                               TONE.violet.solid,
                             )}
                           >

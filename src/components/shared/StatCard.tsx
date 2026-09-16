@@ -105,7 +105,7 @@ const StatCard: React.FC<StatCardProps> = ({
           <p
             className={cn(
               'mt-1 tracking-tight text-foreground',
-              v2 ? 'text-[26px] font-semibold tabular-nums' : 'text-2xl font-bold',
+              v2 ? 'text-[26px] font-medium tabular-nums' : 'text-2xl font-medium',
               /* 🔴 สีของ **ตัวเลข** คือที่ที่ความหมายไปอยู่ในโฉมใหม่ (ดู VARIANT_TONE)
                  การ์ดหลายใบไม่มีไอคอน (เช่น "กำไร/ขาดทุน") ⇒ ถ้าไม่ทาที่เลข สัญญาณหายเกลี้ยง */
               v2 && tone ? TONE[tone].value : '',

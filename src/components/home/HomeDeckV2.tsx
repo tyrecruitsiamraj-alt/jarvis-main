@@ -111,7 +111,7 @@ const HomeDeckV2: React.FC<{
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               ต้องลงมือ
             </span>
-            <span className="mt-1.5 text-[52px] font-semibold leading-none tabular-nums sm:text-[64px]">
+            <span className="mt-1.5 text-[52px] font-medium leading-none tabular-nums sm:text-[64px]">
               {loading ? '—' : tasks.length}
             </span>
             <span className="mt-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -141,7 +141,7 @@ const HomeDeckV2: React.FC<{
             </div>
           ) : head ? (
             <>
-              <h1 className="mt-1.5 text-[26px] font-semibold leading-snug tracking-tight lg:text-[32px]">
+              <h1 className="mt-1.5 text-[26px] font-medium leading-snug tracking-tight lg:text-[32px]">
                 {head.title}
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -166,7 +166,7 @@ const HomeDeckV2: React.FC<{
             </>
           ) : (
             <>
-              <h1 className="mt-1.5 text-[26px] font-semibold leading-snug tracking-tight lg:text-[32px]">
+              <h1 className="mt-1.5 text-[26px] font-medium leading-snug tracking-tight lg:text-[32px]">
                 ไม่มีงานค้างที่ต้องลงมือตอนนี้
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
