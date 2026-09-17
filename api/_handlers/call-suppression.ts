@@ -7,6 +7,7 @@
  *
  * - GET    → รายการที่ **ยังพักอยู่** (หมดอายุแล้วไม่ต้องโชว์ ไม่ได้บล็อกอะไรแล้ว)
  * - DELETE → ปลดเบอร์เดียว (`?phone=`) — ลบแถวทิ้ง ไม่ใช่ตั้งเวลาให้หมดอายุ
+ *            **แล้วพาสายที่เคยถูกปัดทิ้งกลับเข้าคิวให้ด้วย** (17 ก.ย. 2569)
  *
  * สิทธิ์: supervisor ขึ้นไป — ปลดแล้ว AI จะโทรหาเบอร์นั้นได้อีกครั้งจริง ๆ
  */
@@ -14,7 +15,8 @@ import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { withAuth, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { auditFromAuthed } from '../_lib/audit.js';
-import { toE164Thai } from '../_lib/lumosDispatch.js';
+import { requeueSuppressedFollowEntries, toE164Thai } from '../_lib/lumosDispatch.js';
+import { staffNameOfPhone } from '../_lib/followStaffName.js';
 
 const tbl = tableInAppSchema('candidate_call_suppression');
 
@@ -81,7 +83,19 @@ async function handler(req: AuthedReq, res: ApiRes) {
         entityId: phone,
         after: { phone },
       });
-      return res.status(200).json({ ok: true, phone });
+
+      /**
+       * 🔴 ปลดบล็อกเฉย ๆ ไม่พอ — รอบที่ถูกตั้งไว้ระหว่างที่เบอร์โดนพัก **ไม่มีแถวในคิวเลย**
+       * (`dispatch_state = 'suppressed'`) ⇒ ปล่อยไว้ก็เงียบต่อไป ทั้งที่คนสั่งปลดแล้ว
+       * เอากลับเข้าคิวให้ตรงนี้ · ล้มก็ไม่ทำให้การปลดบล็อกล้ม (การปลดสำเร็จไปแล้ว)
+       */
+      let requeued = 0;
+      try {
+        requeued = (await requeueSuppressedFollowEntries(phone, staffNameOfPhone)).requeued;
+      } catch {
+        /* กู้สายไม่สำเร็จ — เบอร์ปลดแล้ว รอบถัดไปที่คนตั้งใหม่จะส่งได้ตามปกติ */
+      }
+      return res.status(200).json({ ok: true, phone, requeued });
     }
 
     return sendError(res, 405, 'Method not allowed', 'GET / DELETE เท่านั้น');

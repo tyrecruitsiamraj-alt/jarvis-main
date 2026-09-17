@@ -23,8 +23,13 @@ import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { logError, logInfo, logWarn, errorSummaryText } from './logger.js';
 import { getLumosPushConfig, pushReminders } from './lumosPushClient.js';
-import { buildFollowPushRecord } from './lumosDispatch.js';
+import {
+  buildFollowPushRecord,
+  listPhonesWithStuckSuppressedFollows,
+  requeueSuppressedFollowEntries,
+} from './lumosDispatch.js';
 import type { LumosReminderPayload } from './lumosDispatch.js';
+import { staffNameOfPhone } from './followStaffName.js';
 import {
   readFollowPushRetryConfig,
   shouldRetryFollowPush,
@@ -47,6 +52,8 @@ export type FollowPushRetryRun = {
   failed: number;
   /** เลยเวลานัดจนเลิกส่งกี่รายการ */
   tooLate: number;
+  /** รอบที่เคยถูกปัดทิ้งเพราะเบอร์โดนพัก แล้วพากลับเข้าคิวได้รอบนี้ */
+  unsuppressed: number;
 };
 
 let lastRun: FollowPushRetryRun | null = null;
@@ -169,6 +176,7 @@ export async function runFollowPushRetryOnce(
     sent: 0,
     failed: 0,
     tooLate: 0,
+    unsuppressed: 0,
   };
 
   // ไม่ได้ตั้งค่า push = ระบบนี้ไม่ได้ใช้โหมด push — ไม่มีอะไรให้ส่งซ้ำ
@@ -222,9 +230,41 @@ export async function runFollowPushRetryOnce(
     }
   }
 
+  run.unsuppressed = await recoverUnsuppressed();
+
   lastRun = run;
-  if (run.found > 0) logInfo('follow.pushRetry.run', { ...run });
+  if (run.found > 0 || run.unsuppressed > 0) logInfo('follow.pushRetry.run', { ...run });
   return run;
+}
+
+/**
+ * ═══ รอบที่โดนปัดทิ้งตอนเบอร์ถูกพัก — เบอร์หายบล็อกแล้วต้องได้โทร (17 ก.ย. 2569) ═══
+ *
+ * แถวพวกนี้ต่างจาก `push_failed` ตรงที่ **ไม่มีแถวในคิวเลย** (โดนกรองออกตั้งแต่ตอนเข้าคิว)
+ * ⇒ ลูปข้างบนตามไม่เจอ · ปล่อยไว้ = สายหายเงียบทั้งที่บล็อกหมดอายุ/ถูกปลดไปแล้ว
+ *
+ * ⚠️ เอาเฉพาะรอบที่ **ยังไม่ถึงเวลานัด** (เงื่อนไขอยู่ในคิวรี) — ห้ามส่งย้อนหลัง
+ */
+async function recoverUnsuppressed(): Promise<number> {
+  let phones: string[];
+  try {
+    phones = await listPhonesWithStuckSuppressedFollows();
+  } catch (e) {
+    logError('follow.pushRetry: หาเบอร์ที่หลุดบล็อกไม่สำเร็จ', e);
+    return 0;
+  }
+  let total = 0;
+  for (const phone of phones) {
+    if (stopped) break;
+    try {
+      const r = await requeueSuppressedFollowEntries(phone, staffNameOfPhone);
+      total += r.requeued;
+      if (r.requeued > 0) logInfo('follow.pushRetry.unsuppressed', { phone, rounds: r.requeued });
+    } catch (e) {
+      logWarn('follow.pushRetry.unsuppressed.failed', { phone, reason: errorSummaryText(e, 200) });
+    }
+  }
+  return total;
 }
 
 function sleepInterruptible(ms: number): Promise<void> {

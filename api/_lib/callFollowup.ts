@@ -213,16 +213,16 @@ export async function applyCallFollowupToQueueRow(input: {
       note: decision.reason,
     });
   }
-  if (decision.action === 'needs_human' && input.outcome === 'wrong_person') {
-    // เบอร์เสีย: พักไว้สั้น ๆ กัน AI วนโทรเบอร์เดิมระหว่างรอคนไปหาเบอร์ใหม่
-    const until = new Date((input.now ?? new Date()).getTime() + 7 * 24 * 60 * 60 * 1000);
-    await suppressPhone({
-      phone: phoneFromPayload(row.payload),
-      until: until.toISOString(),
-      reason: 'wrong_number',
-      note: decision.reason,
-    });
-  }
+  // 🔴 **AI ห้ามบล็อกเบอร์เอง** (เจ้าของสั่ง 17 ก.ย. 2569: *"อย่าพึ่งบล็อคเบอร์"*)
+  //
+  // เดิม `wrong_person` ครั้งเดียวพักเบอร์ 7 วันทันที · เคสจริงที่ทำให้ต้องเลิกกติกานี้:
+  // เบอร์ +6665xxx1768 คุยสำเร็จมาสามวันติด (15, 16, 17 รอบแรก) รอบที่สองของวันที่ 17
+  // ผู้รับสายตอบว่า "ทำงาน แล้ว" ตอนถูกถามว่าใช่เจ้าตัวไหม · Lumos อ่านเป็น "โทรผิดเบอร์"
+  // ⇒ เบอร์ถูกพักถึง 24 ก.ย. และสายของวันที่ 18 **ไม่ถูกส่งเลย** ทั้งที่เป็นเบอร์ที่ถูกต้อง
+  //
+  // ตอนนี้ `wrong_person` ได้แค่ **ติดธง needs_human** (แจ้งเตือน admin ด้านล่าง)
+  // การพักเบอร์เหลือเป็น **การตัดสินใจของคน** เท่านั้น — คนกดจากหน้า "โทรของฉัน"
+  // (`CallHoldPanel` → `applyHumanCallFollowup`) ซึ่งคนนั้นได้ยินเสียงจริงและกรอกเบอร์ใหม่ได้
 
   // แจ้งเตือนคน — เดิมผลกลับมาแล้วจบเงียบ ระบบดีแค่ไหนก็ช้าเท่าคนเปิดหน้าจอ
   // ยิงเฉพาะเหตุการณ์ที่ "คนต้องขยับ": สนใจ (รีบจอง) กับ ต้องคนตาม (AI สุดมือแล้ว)
@@ -248,10 +248,14 @@ export async function applyCallFollowupToQueueRow(input: {
     });
   }
 
-  // Follow ตั้งตาราง + ปฏิเสธ/เบอร์เสีย → ยกเลิกทั้งชุด (ไม่ต้องโทรวันที่เหลือของตาราง)
+  // Follow ตั้งตาราง + **เจ้าตัวบอกว่าไม่เอา** → ยกเลิกทั้งชุด (ไม่ต้องโทรวันที่เหลือ)
   // (เจ้าของเคาะ 16 ส.ค.: "บอกยกเลิก = หยุดทั้งชุด") · confirmed ไม่ยกเลิกชุด — วันถัดไป
   // ยังอาจต้องยืนยันซ้ำตามเดิม (stop_early ของ Lumos หยุดแค่วันนั้น)
-  if (followGroupId && (input.outcome === 'declined' || input.outcome === 'wrong_person')) {
+  //
+  // 🔴 `wrong_person` **ไม่อยู่ในกติกานี้แล้ว** (17 ก.ย. 2569) — คนละเรื่องกับ "บอกยกเลิก"
+  // มันคือ *ระบบเดาว่าคุยผิดคน* ซึ่งเดาพลาดได้ (ดูเคสในคอมเมนต์ด้านบน) และถ้าพลาด
+  // ตารางที่เหลือทั้งชุดหายไปเงียบ ๆ · ให้ติดธง needs_human แล้วรอคนตัดสินแทน
+  if (followGroupId && input.outcome === 'declined') {
     await cancelFollowGroup(followGroupId).catch(() => {});
   }
 
@@ -384,6 +388,8 @@ export async function applyHumanCallFollowup(input: {
       byName: input.byName ?? null,
     });
   }
+  // เส้นนี้คือ **คนกดเอง** จากหน้า "โทรของฉัน" (คนได้ยินเสียงจริง + กรอกเบอร์ใหม่ได้ตรงนั้น)
+  // ⇒ ยังพักเบอร์ได้ตามเดิม · ต่างจากผลที่ AI อ่านเอง ซึ่งห้ามบล็อกแล้ว (17 ก.ย. 2569)
   if (decision.action === 'needs_human' && input.outcome === 'wrong_person') {
     await suppressPhone({
       phone: input.phone,

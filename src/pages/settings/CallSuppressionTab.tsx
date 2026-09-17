@@ -54,11 +54,17 @@ const CallSuppressionTab: React.FC = () => {
       const r = await apiFetch(`/api/call-suppression?phone=${encodeURIComponent(phone)}`, {
         method: 'DELETE',
       });
-      if (!r.ok) {
-        const body = (await r.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(body?.message || 'ปลดเบอร์ไม่สำเร็จ');
-      }
-      setNotice(`ปลด ${phone} แล้ว — สายที่สร้างใหม่หลังจากนี้ส่งให้ AI ได้ (สายเก่าต้องตั้งรอบใหม่)`);
+      const body = (await r.json().catch(() => null)) as
+        | { message?: string; requeued?: number }
+        | null;
+      if (!r.ok) throw new Error(body?.message || 'ปลดเบอร์ไม่สำเร็จ');
+      // รอบที่ถูกปัดทิ้งตอนเบอร์โดนพัก ระบบพากลับเข้าคิวให้แล้ว — บอกจำนวนไปตรง ๆ
+      const back = Number(body?.requeued) || 0;
+      setNotice(
+        back > 0
+          ? `ปลด ${phone} แล้ว — พารอบที่ค้างอยู่ ${back} สายกลับเข้าคิวให้ด้วย`
+          : `ปลด ${phone} แล้ว — ไม่มีรอบที่ค้างอยู่ ตั้งรอบใหม่ได้ตามปกติ`,
+      );
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ปลดเบอร์ไม่สำเร็จ');
@@ -76,9 +82,9 @@ const CallSuppressionTab: React.FC = () => {
           &ldquo;เบอร์ผิด&rdquo; (7 วัน) หรือ &ldquo;ไม่หางานแล้ว&rdquo; (30 วัน) ·
           รายการที่พ้นกำหนดแล้วไม่ต้องปลด ระบบเลิกบล็อกเอง
         </p>
-        <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-          ⚠️ ปลดแล้วมีผลกับสายที่ <b>สร้างใหม่</b> เท่านั้น — สายเก่าที่เคยถูกปฏิเสธไม่เคยเข้าคิว
-          ต้องตั้งรอบโทรใหม่ให้คนนั้นอีกครั้ง
+        <p className="mt-1 text-xs text-muted-foreground">
+          ปลดแล้วระบบจะ <b>พารอบที่ยังไม่ถึงเวลา</b> ของเบอร์นั้นกลับเข้าคิวให้เอง ·
+          รอบที่เลยเวลานัดไปแล้วไม่ส่งย้อนหลัง ต้องตั้งรอบใหม่หรือโทรเอง
         </p>
       </div>
 

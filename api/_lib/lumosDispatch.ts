@@ -16,7 +16,7 @@
  *
  * ทุก enqueue กันซ้ำด้วย unique (channel, job_ref, person_ref) — คนเดิมในใบเดิมส่งครั้งเดียว
  */
-import { dbQuery } from './postgres.js';
+import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { errorSummaryText, logWarn, logInfo, logError } from './logger.js';
 import type { FollowDispatchState } from '@/lib/followDispatchState';
@@ -2216,6 +2216,112 @@ export async function resyncFollowPlanWithLumos(
     pushed,
     reason: pushed ? undefined : 'ยกเลิกของเดิมแล้วแต่ส่งแผนใหม่ไม่สำเร็จ — ตัวส่งซ้ำจะลองให้เอง',
   };
+}
+
+/**
+ * ═══ ปลดบล็อกเบอร์แล้ว **เอาสายที่ถูกทิ้งไปกลับเข้าคิว** (17 ก.ย. 2569) ═══
+ *
+ * เคสจริง: เบอร์หนึ่งถูกพักอัตโนมัติวันที่ 17 · รอบของวันที่ 18 ถูกตั้งไว้แล้วแต่ตอนเข้าคิว
+ * โดนปัดเป็น `dispatch_state = 'suppressed'` **โดยไม่มีแถวในคิวเลย**
+ * ⇒ ปลดบล็อกทีหลังก็ไม่มีอะไรพากลับ · ตัวส่งซ้ำ (`followPushRetryWorker`) ก็ช่วยไม่ได้
+ * เพราะมันตามจากแถวคิวที่มีอยู่แล้วเท่านั้น ⇒ สายหายเงียบทั้งที่คนปลดบล็อกให้แล้ว
+ *
+ * ตัวนี้เติมช่องนั้น: ปลดเบอร์เมื่อไหร่ ให้รอบที่ **ยังไม่ถึงเวลา** ของเบอร์นั้นเข้าคิวใหม่
+ *
+ * 🔴 เอาเฉพาะรอบที่ `scheduled_at > now()` — รอบที่เลยเวลาแล้วห้ามส่ง
+ * (Lumos รับแต่เวลาอนาคต ใส่เวลาที่ผ่านมาแล้วเขาอาจโทรทันที = โทรย้อนหลังใส่คนจริง)
+ */
+/** รอบที่ถูกปัดทิ้งตอนเบอร์โดนพัก และยัง **ไม่มีแถวในคิว** เลย — ตัวตั้งต้นของการกู้ */
+async function listSuppressedFollowRows(): Promise<FollowPlanRow[]> {
+  try {
+    const { rows } = await dbQuery<FollowPlanRow>(
+      `select f.id, f.recipient_name, f.recipient_phone, f.topic, f.note,
+              f.staff_phone, f.unit_name, f.scheduled_at, f.call_times, f.call_round
+         from ${followEntriesTable} f
+        where f.dispatch_state = 'suppressed'
+          and f.cancelled_at is null and f.completed_at is null
+          and f.scheduled_at > now()
+          -- ไม่มีแถวคิวอยู่แล้วเท่านั้น — มีอยู่แล้วแปลว่าส่งไปแล้ว ห้ามซ้อน
+          and not exists (
+            select 1 from ${queueTable} q
+             where q.channel = 'reminder' and q.job_ref = 'follow'
+               and q.person_ref = 'follow-' || f.id::text
+          )
+        order by f.scheduled_at`,
+    );
+    return rows;
+  } catch (e) {
+    // ฐานยังไม่มีคอลัมน์ dispatch_state (ก่อน migration 109) — ไม่มีอะไรให้กู้
+    if (isPgUndefinedTable(e) || isUndefinedColumnError(e)) return [];
+    throw e;
+  }
+}
+
+/**
+ * เบอร์ที่ยัง **ค้างอยู่จริง** และตอนนี้ไม่ได้ถูกพักแล้ว — ใช้โดยตัวกู้อัตโนมัติ
+ * (บล็อกหมดอายุเองก็นับ ไม่ใช่เฉพาะตอนคนกดปลด)
+ */
+export async function listPhonesWithStuckSuppressedFollows(): Promise<string[]> {
+  const rows = await listSuppressedFollowRows();
+  if (rows.length === 0) return [];
+  const blocked = await listSuppressedPhones();
+  const out = new Set<string>();
+  for (const r of rows) {
+    const phone = toE164Thai(r.recipient_phone);
+    if (phone && !blocked.has(phone)) out.add(phone);
+  }
+  return [...out];
+}
+
+export async function requeueSuppressedFollowEntries(
+  phoneE164: string,
+  resolveStaffName: (phone: string | null) => Promise<string | null>,
+): Promise<{ requeued: number; states: Record<string, FollowDispatchState> }> {
+  const out: { requeued: number; states: Record<string, FollowDispatchState> } = {
+    requeued: 0,
+    states: {},
+  };
+  const rows = await listSuppressedFollowRows();
+  const mine = rows.filter((r) => toE164Thai(r.recipient_phone) === phoneE164);
+  if (mine.length === 0) return out;
+
+  const entries: FollowEntryInput[] = [];
+  for (const m of mine) {
+    const phone = toE164Thai(m.recipient_phone);
+    if (!phone) continue;
+    entries.push({
+      id: m.id,
+      recipient_name: m.recipient_name,
+      recipient_phone: phone,
+      topic: m.topic,
+      note: m.note,
+      staffPhone: m.staff_phone,
+      staffName: await resolveStaffName(m.staff_phone),
+      unitName: m.unit_name,
+      scheduled_at: new Date(String(m.scheduled_at)),
+      callTimes: m.call_times,
+      callRound: m.call_round,
+    });
+  }
+  if (entries.length === 0) return out;
+
+  const states = await enqueueFollowReminderPlan(entries);
+  for (const e of entries) {
+    const state = states.get(e.id) ?? 'off';
+    out.states[e.id] = state;
+    if (state === 'queued') out.requeued += 1;
+    try {
+      await dbQuery(
+        `update ${followEntriesTable} set dispatch_state = $2
+          where id = $1 and dispatch_state = 'suppressed'`,
+        [e.id, state],
+      );
+    } catch (e2) {
+      logError('lumos.requeueSuppressed: จด dispatch_state ไม่สำเร็จ', e2, { followId: e.id });
+    }
+  }
+  logInfo('lumos.requeueSuppressed', { phone: phoneE164, found: entries.length, requeued: out.requeued });
+  return out;
 }
 
 // ─── Serve + result (เรียกจาก lumos endpoints) ───────────────────────────────

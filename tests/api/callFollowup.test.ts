@@ -110,7 +110,13 @@ describe('ผลจาก AI → ตั้งคิวโทรซ้ำ / ต�
     expect(paramsOf(1)[2]).toBe('closed');
   });
 
-  it('เบอร์ผิด → needs_human + พักเบอร์ 7 วัน (กัน AI วนโทรเบอร์เดิม)', async () => {
+  /**
+   * 🔴 เจ้าของสั่ง 17 ก.ย. 2569: *"อย่าพึ่งบล็อคเบอร์"*
+   *
+   * เคสจริง: เบอร์ที่คุยสำเร็จมาสามวันติด โดนรอบเดียวที่ Lumos อ่านว่า "โทรผิดเบอร์"
+   * แล้วถูกพัก 7 วัน ⇒ สายวันถัดไปไม่ถูกส่งเลย · สองเทสต์นี้กันไม่ให้กติกาเดิมกลับมา
+   */
+  it('🔴 เบอร์ผิด → needs_human เฉย ๆ **ห้ามพักเบอร์** (AI บล็อกเบอร์เองไม่ได้)', async () => {
     vi.mocked(dbQuery)
       .mockResolvedValueOnce({ rows: [{ id: 3, attempt_count: 1, payload: { recipient_phone: '0812345678' } }] })
       .mockResolvedValueOnce({ rows: [] })
@@ -119,13 +125,25 @@ describe('ผลจาก AI → ตั้งคิวโทรซ้ำ / ต�
     const d = await applyCallFollowupToQueueRow({ queueId: 3, outcome: 'wrong_person' });
 
     expect(d?.action).toBe('needs_human');
-    const insert = allSql().find((q) => q.includes('candidate_call_suppression'));
-    expect(insert).toBeTruthy();
-    const call = vi.mocked(dbQuery).mock.calls.find((c) =>
-      String(c[0]).includes('candidate_call_suppression'),
-    );
-    expect((call?.[1] as unknown[])[0]).toBe('+66812345678');
-    expect((call?.[1] as unknown[])[2]).toBe('wrong_number');
+    expect(allSql().some((q) => q.includes('candidate_call_suppression'))).toBe(false);
+  });
+
+  it('🔴 เบอร์ผิด → **ห้ามยกเลิกทั้งชุดตาราง** (เดาพลาดครั้งเดียวสายที่เหลือหายหมด)', async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 4, attempt_count: 1, payload: {}, person_ref: 'follow-abc', job_ref: 'follow' },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ group_id: 'g1' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await applyCallFollowupToQueueRow({ queueId: 4, outcome: 'wrong_person' });
+
+    // กันเทสต์ผ่านแบบหลอก ๆ — ต้องพิสูจน์ว่าเดินถึงขั้นหา group_id จริง
+    expect(allSql().some((q) => q.includes('group_id'))).toBe(true);
+    expect(allSql().some((q) => q.includes("status = 'cancelled'"))).toBe(false);
   });
 
   it('outcome ที่ไม่รู้จัก → ไม่ทำอะไร ไม่แตะ DB', async () => {
