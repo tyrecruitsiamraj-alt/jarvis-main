@@ -19,9 +19,14 @@ vi.mock('../../api/_lib/lumosPushClient.js', () => ({
   pushReminders: (...a: unknown[]) => pushReminders(...a),
   getLumosPushConfig: () => getLumosPushConfig(),
 }));
+const listStuckPhones = vi.fn(async () => [] as string[]);
+const requeueSuppressed = vi.fn(async () => ({ requeued: 0, states: {} }));
 vi.mock('../../api/_lib/lumosDispatch.js', () => ({
   buildFollowPushRecord: (payload: unknown) => payload,
+  listPhonesWithStuckSuppressedFollows: () => listStuckPhones(),
+  requeueSuppressedFollowEntries: (...a: unknown[]) => requeueSuppressed(...(a as [])),
 }));
+vi.mock('../../api/_lib/followStaffName.js', () => ({ staffNameOfPhone: async () => 'ขวัญ' }));
 
 const { runFollowPushRetryOnce } = await import('../../api/_lib/followPushRetryWorker.js');
 const { FOLLOW_PUSH_RETRY_DEFAULTS } = await import('../../src/lib/followPushRetryPolicy.js');
@@ -48,6 +53,8 @@ const stuck = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   pushReminders.mockReset().mockResolvedValue({ accepted: 1 });
   getLumosPushConfig.mockReturnValue({ baseUrl: 'x', connectionId: 'y', apiKey: 'z' });
+  listStuckPhones.mockReset().mockResolvedValue([]);
+  requeueSuppressed.mockReset().mockResolvedValue({ requeued: 0, states: {} });
 });
 
 describe('runFollowPushRetryOnce', () => {
@@ -120,5 +127,30 @@ describe('runFollowPushRetryOnce', () => {
     const run = await runFollowPushRetryOnce(cfg, NOW);
     expect(run.found).toBe(0);
     expect(run.sent).toBe(0);
+  });
+});
+
+/**
+ * ═══ กู้รอบที่ถูกปัดทิ้งตอนเบอร์โดนพัก (17 ก.ย. 2569) ═══
+ *
+ * แถวพวกนี้ **ไม่มีแถวในคิวเลย** ⇒ ลูปส่งซ้ำปกติตามไม่เจอ · ต้องมีขาที่สองในรอบเดียวกัน
+ */
+describe('กู้สายที่หลุดบล็อก', () => {
+  it('เบอร์ที่ไม่ได้ถูกพักแล้วและยังมีรอบค้าง ⇒ พากลับเข้าคิว', async () => {
+    stubRows([]);
+    listStuckPhones.mockResolvedValueOnce(['+66654691768']);
+    requeueSuppressed.mockResolvedValueOnce({ requeued: 2, states: {} });
+
+    const run = await runFollowPushRetryOnce(cfg, NOW);
+
+    expect(requeueSuppressed).toHaveBeenCalledWith('+66654691768', expect.any(Function));
+    expect(run.unsuppressed).toBe(2);
+  });
+
+  it('ไม่มีเบอร์ไหนหลุดบล็อก ⇒ ไม่เรียกตัวกู้เลย', async () => {
+    stubRows([]);
+    const run = await runFollowPushRetryOnce(cfg, NOW);
+    expect(requeueSuppressed).not.toHaveBeenCalled();
+    expect(run.unsuppressed).toBe(0);
   });
 });
