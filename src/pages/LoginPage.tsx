@@ -467,12 +467,29 @@ const LoginPage: React.FC = () => {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  // โหลด config พร้อม retry — กันหน้า Login ค้าง "กำลังโหลด" ถ้า API ยังไม่พร้อม
+  /**
+   * โหลด config พร้อม retry — กันหน้า Login ค้าง "กำลังโหลด" ถ้า API ยังไม่พร้อม
+   *
+   * 🔴 **จังหวะรอต้องยาวกว่าเวลาที่ API หายไปตอนรีสตาร์ต** (วัดจริง 18 ก.ย. 2569: `tsx watch`
+   * รีสตาร์ตทีนึง API เงียบไป **6.6 วินาที**) · ของเดิมลอง 3 ครั้งใน 4.5 วินาทีแล้วยอมแพ้
+   * ⇒ ทุกครั้งที่มีใครเซฟไฟล์ฝั่ง API คนที่เปิดหน้า Login ค้างอยู่จะเจอ
+   * *"เชื่อมต่อเซิร์ฟเวอร์ไม่ได้"* ทั้งที่อีกวินาทีเดียวก็กลับมาแล้ว
+   *
+   * ตอนนี้ไล่ถอยหลังยาวขึ้น (รวม ~31 วินาที) และ **ขึ้นข้อความแล้วยังลองต่อเองเงียบ ๆ**
+   * ทุก 5 วินาที ⇒ ต่อติดเมื่อไหร่หน้าจอกลับมาเองโดยไม่ต้องกดปุ่ม
+   */
   useEffect(() => {
     let cancelled = false;
     let timer: number | undefined;
+    const wait = (ms: number) =>
+      new Promise((resolve) => {
+        timer = window.setTimeout(resolve, ms);
+      });
+
     (async () => {
-      for (let attempt = 1; attempt <= 3 && !cancelled; attempt++) {
+      // 1+2+4+6+8+10 = 31 วินาที ครอบเวลารีสตาร์ตของ dev server ได้สบาย
+      const backoff = [1000, 2000, 4000, 6000, 8000, 10000];
+      for (let attempt = 0; !cancelled; attempt++) {
         try {
           const r = await apiFetch('/api/auth/config');
           if (cancelled) return;
@@ -487,14 +504,12 @@ const LoginPage: React.FC = () => {
         } catch {
           /* ลองใหม่ */
         }
-        if (attempt < 3) {
-          await new Promise((resolve) => {
-            timer = window.setTimeout(resolve, 1500 * attempt);
-          });
-        }
+        // หมดชุดถอยหลังแล้ว = ขึ้นข้อความให้คนเห็น แต่ยังลองต่อเองทุก 5 วินาที
+        if (attempt >= backoff.length && !cancelled) setConfigError(true);
+        await wait(backoff[attempt] ?? 5000);
       }
-      if (!cancelled) setConfigError(true);
     })();
+
     return () => {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
