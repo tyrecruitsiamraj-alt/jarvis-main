@@ -7,6 +7,8 @@ export type TimeSelect24Props = {
   onChange: (value: string) => void;
   disabled?: boolean;
   className?: string;
+  /** ชื่อช่องสำหรับคนใช้โปรแกรมอ่านหน้าจอ เช่น "รอบที่ 2" — มีหลายช่องในหน้าเดียวต้องแยกให้ออก */
+  label?: string;
 };
 
 function parseTime24(value: string): { hour: number; minute: number } | null {
@@ -26,7 +28,13 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 60 }, (_, i) => i);
 
 /** เลือกเวลาแบบ 24 ชม. (ไม่มี AM/PM) */
-const TimeSelect24: React.FC<TimeSelect24Props> = ({ value, onChange, disabled = false, className }) => {
+const TimeSelect24: React.FC<TimeSelect24Props> = ({
+  value,
+  onChange,
+  disabled = false,
+  className,
+  label,
+}) => {
   const parsed = useMemo(() => parseTime24(value) ?? { hour: 8, minute: 0 }, [value]);
 
   const setHour = (hour: number) => {
@@ -44,7 +52,7 @@ const TimeSelect24: React.FC<TimeSelect24Props> = ({ value, onChange, disabled =
         disabled={disabled}
         onChange={(e) => setHour(Number(e.target.value))}
         className="jarvis-soft-field flex-1 min-w-0"
-        aria-label="ชั่วโมง"
+        aria-label={label ? `${label} — ชั่วโมง` : 'ชั่วโมง'}
       >
         {HOURS.map((h) => (
           <option key={h} value={h}>
@@ -58,7 +66,7 @@ const TimeSelect24: React.FC<TimeSelect24Props> = ({ value, onChange, disabled =
         disabled={disabled}
         onChange={(e) => setMinute(Number(e.target.value))}
         className="jarvis-soft-field flex-1 min-w-0"
-        aria-label="นาที"
+        aria-label={label ? `${label} — นาที` : 'นาที'}
       >
         {MINUTES.map((m) => (
           <option key={m} value={m}>

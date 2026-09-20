@@ -83,6 +83,7 @@ import FollowMasterManagerDialog from '@/components/follow/FollowMasterManagerDi
 import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
+import TimeSelect24 from '@/components/shared/TimeSelect24';
 import { type FollowOutcome } from '@/lib/followOutcome';
 import { buildFollowPlanningRows, type FollowRoundFilter } from '@/lib/followPlanning';
 import { toYmdBangkok } from '@/lib/dateTh';
@@ -1409,12 +1410,20 @@ const FollowPage: React.FC = () => {
                   <span className="ml-1 text-xs font-medium text-muted-foreground">รอบเวลาต่อวัน (สูงสุด 5 รอบ)</span>
                   {roundTimes.map((v, i) => (
                     <div key={i} className="flex items-center gap-2">
-                      <input
-                        type="time"
+                      {/**
+                       * 🔴 **ห้ามกลับไปใช้ `<input type="time">`** (เจ้าของทัก 20 ก.ย. 2569:
+                       * *"หน้าการติดตาม บางคนยังขึ้น am pm อยู่เลย"*)
+                       *
+                       * ช่องเวลาของเบราว์เซอร์แสดงผลตาม **ภาษาของเครื่องคนใช้** ไม่ใช่ของหน้าเว็บ
+                       * ⇒ เครื่องที่ตั้งเป็นอังกฤษ (สหรัฐ) เห็น `05:50 AM` เครื่องไทยเห็น `05:50`
+                       * คนละหน้าจอกันทั้งที่เป็นข้อมูลชุดเดียวกัน · `lang` ของหน้าเว็บสั่งไม่ได้
+                       * (ลองแล้ว Chrome ไม่สนใจ) ⇒ ต้องเลิกใช้ช่องของเบราว์เซอร์
+                       */}
+                      <TimeSelect24
                         value={v}
-                        onChange={(e) => setRoundAt(i, e.target.value)}
-                        aria-label={`รอบที่ ${i + 1}`}
-                        className="jarvis-soft-field min-h-[46px] flex-1"
+                        onChange={(next) => setRoundAt(i, next)}
+                        label={`รอบที่ ${i + 1}`}
+                        className="min-h-[46px] flex-1"
                       />
                       <button
                         type="button"
