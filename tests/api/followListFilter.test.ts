@@ -116,7 +116,11 @@ describe('filterFollowEntries — ทุกเงื่อนไข AND', () => 
 });
 
 describe('countFollowTabs / listFollowOwners', () => {
-  it('นับรอบต่อแท็บครบ ไม่ซ้ำ', () => {
+  /**
+   * 🔴 ป้ายบนแท็บ **นับ "คน" ไม่ใช่ "รอบ"** (แก้ 20 ก.ย. 2569)
+   * ของจริงวันนั้น: แท็บยกเลิกขึ้น 30 แต่ลิสต์ข้างล่างมี 25 แถว — เจ้าของจับได้
+   */
+  it('🔴 คนเดียวหลายรอบในแท็บเดียว = นับ 1 (ให้ตรงกับจำนวนแถวที่โชว์)', () => {
     const rows = [
       entry({}),
       entry({}),
@@ -124,7 +128,16 @@ describe('countFollowTabs / listFollowOwners', () => {
       entry({ completed_at: 'x', outcome_code: 'arrived' }),
       entry({ completed_at: 'x', outcome_code: 'leave' }),
     ];
-    expect(countFollowTabs(rows)).toEqual({ active: 2, success: 1, ended: 1, cancelled: 1 });
+    expect(countFollowTabs(rows)).toEqual({ active: 1, success: 1, ended: 1, cancelled: 1 });
+  });
+
+  it('คนละคน (คนละเบอร์) ในแท็บเดียวกัน = นับแยก', () => {
+    const rows = [
+      entry({ recipient_phone: '0811111111' }),
+      entry({ recipient_phone: '0822222222' }),
+      entry({ recipient_phone: '0833333333', cancelled: true }),
+    ];
+    expect(countFollowTabs(rows)).toMatchObject({ active: 2, cancelled: 1 });
   });
 
   it('รายชื่อเจ้าของงาน distinct + เรียง + ตัดว่าง', () => {

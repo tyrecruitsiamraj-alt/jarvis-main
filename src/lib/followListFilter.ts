@@ -1,4 +1,5 @@
 import type { FollowEntry } from '@/lib/followApi';
+import { followGroupKey } from '@/lib/followGrouping';
 import { FOLLOW_OUTCOME_SUCCESS } from '@/lib/followOutcome';
 
 /**
@@ -116,11 +117,29 @@ export function filterFollowEntries(entries: FollowEntry[], f: FollowFilter): Fo
   });
 }
 
-/** จำนวนรอบในแต่ละแท็บ — ป้ายบนแท็บ ( นับ "รอบ" ไม่ใช่ "คน") */
+/**
+ * ป้ายตัวเลขบนแท็บ — **นับ "คน" ให้ตรงกับลิสต์ข้างล่าง** (แก้ 20 ก.ย. 2569)
+ *
+ * 🔴 ของเดิมนับ "รอบ" ⇒ แท็บยกเลิกขึ้น **30** แต่ลิสต์ข้างล่างมี **25 แถว**
+ * (คนเดียวถูกยกเลิกหลายรอบ) · เจ้าของสั่งให้ตัวเลขทุกตัวบนหน้านี้สอดคล้องกัน
+ *
+ * ⚠️ คนเดียวอยู่ได้หลายแท็บ (บางรอบยกเลิก บางรอบยังตามอยู่) ⇒ ผลรวมทุกแท็บ
+ * **มากกว่าจำนวนคนทั้งหมดได้** — ตรงกับที่ลิสต์โชว์จริง ไม่ใช่ความผิดพลาด
+ */
 export function countFollowTabs(entries: FollowEntry[]): Record<FollowTab, number> {
-  const out: Record<FollowTab, number> = { active: 0, success: 0, ended: 0, cancelled: 0 };
-  for (const e of entries) out[followLifecycleTab(e)] += 1;
-  return out;
+  const seen: Record<FollowTab, Set<string>> = {
+    active: new Set(),
+    success: new Set(),
+    ended: new Set(),
+    cancelled: new Set(),
+  };
+  for (const e of entries) seen[followLifecycleTab(e)].add(followGroupKey(e));
+  return {
+    active: seen.active.size,
+    success: seen.success.size,
+    ended: seen.ended.size,
+    cancelled: seen.cancelled.size,
+  };
 }
 
 /** รายชื่อเจ้าของงานที่มีอยู่จริง (created_by_name) เรียง ก-ฮ — สำหรับ dropdown filter */

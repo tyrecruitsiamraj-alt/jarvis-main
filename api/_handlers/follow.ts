@@ -177,6 +177,8 @@ function toResponse(r: FollowRow) {
 async function listFollow(req: AuthedReq, res: ApiRes) {
   const rawLimit = typeof req.query?.limit === 'string' ? Number(req.query.limit) : NaN;
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 200;
+  const rawOffset = typeof req.query?.offset === 'string' ? Number(req.query.offset) : NaN;
+  const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
 
   const { rows } = await dbQuery<FollowRow>(
     /**
@@ -219,10 +221,29 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
              and q.job_ref = 'follow'
              and q.person_ref = 'follow-' || f.id::text
       order by f.created_at desc
-      limit $1`,
-    [limit],
+      limit $1 offset $2`,
+    [limit, offset],
   );
-  return res.status(200).json({ items: rows.map(toResponse), total: rows.length });
+
+  /**
+   * 🔴 **`total` ต้องเป็นยอดจริงทั้งตาราง ไม่ใช่จำนวนแถวที่เพิ่งส่งไป** (20 ก.ย. 2569)
+   *
+   * ของเดิมส่ง `total: rows.length` ⇒ ฐานมี 257 แถว แต่เส้นส่งไป 200 แล้วบอกว่า
+   * "total 200" · หน้าจอจึงคิดเลขทุกตัว (ป้ายแท็บ · ปฏิทิน · Planning) จากของ
+   * ไม่ครบ **โดยไม่มีอะไรบอกใครเลย** — เจ้าของจับได้ว่าเลขไม่สอดคล้องกัน
+   */
+  const { rows: countRows } = await dbQuery<{ n: string }>(
+    `select count(*)::text as n from ${followTable}`,
+  );
+  const total = Number(countRows[0]?.n ?? rows.length);
+  return res.status(200).json({
+    items: rows.map(toResponse),
+    /** ยอดจริงทั้งตาราง — ฝั่งจอใช้ตัวนี้ตัดสินว่าต้องดึงหน้าต่อไปไหม */
+    total,
+    returned: rows.length,
+    offset,
+    has_more: offset + rows.length < total,
+  });
 }
 
 export type ParsedFollowInput = {

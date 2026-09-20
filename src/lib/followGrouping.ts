@@ -79,11 +79,22 @@ const bangkokDay = (iso: string | null | undefined): string | null => {
 const nameKey = (name: string | null | undefined): string =>
   (name ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 
+/**
+ * คีย์ของ "หนึ่งการ์ด = หนึ่งคน" — **ที่เดียวในระบบ**
+ *
+ * 🔴 export ออกมาเพราะป้ายตัวเลขบนแท็บต้องนับด้วยคีย์ชุดเดียวกับลิสต์ข้างล่าง
+ * (20 ก.ย. 2569: ป้ายนับ "รอบ" แต่ลิสต์โชว์ "คน" ⇒ แท็บยกเลิกขึ้น 30 แต่มี 25 แถว
+ * เจ้าของจับได้ว่าเลขไม่สอดคล้องกัน) — ก๊อปสูตรคีย์ไปไว้อีกที่เมื่อไหร่ = เพี้ยนอีก
+ */
+export function followGroupKey(e: FollowEntry): string {
+  // เบอร์อ่านไม่ออก (สั้นกว่า 9 หลัก) ถอยไปใช้เบอร์ดิบ — ยังจัดกลุ่มของตัวเองได้
+  return `${phoneKey(e.recipient_phone) ?? e.recipient_phone}|${(e.topic || '').trim()}|${nameKey(e.recipient_name)}`;
+}
+
 export function groupFollowEntries(entries: FollowEntry[], now = new Date()): FollowGroup[] {
   const buckets = new Map<string, FollowEntry[]>();
   for (const e of entries) {
-    // เบอร์อ่านไม่ออก (สั้นกว่า 9 หลัก) ถอยไปใช้เบอร์ดิบ — ยังจัดกลุ่มของตัวเองได้
-    const key = `${phoneKey(e.recipient_phone) ?? e.recipient_phone}|${(e.topic || '').trim()}|${nameKey(e.recipient_name)}`;
+    const key = followGroupKey(e);
     const list = buckets.get(key);
     if (list) list.push(e);
     else buckets.set(key, [e]);

@@ -137,11 +137,34 @@ async function readError(r: Response): Promise<string> {
   return data.message || data.error || `ไม่สำเร็จ (HTTP ${r.status})`;
 }
 
+/** หนึ่งหน้าเต็ม ๆ ของเส้น `/api/follow` — ฝั่ง API จำกัดไว้ที่ 500 ต่อครั้ง */
+const FOLLOW_PAGE_SIZE = 500;
+/** กันวนไม่รู้จบถ้าเส้นตอบเพี้ยน — 20 หน้า = 10,000 รอบ มากกว่าของจริงหลายเท่า */
+const FOLLOW_MAX_PAGES = 20;
+
+/**
+ * 🔴 **ต้องดึงให้ครบทุกแถว ห้ามหยุดที่หน้าแรก** (20 ก.ย. 2569)
+ *
+ * เดิมยิงครั้งเดียวไม่ส่ง `limit` ⇒ ได้ 200 แถวแรก · ตอนนั้นฐานมี 257
+ * ⇒ ป้ายแท็บ · ปฏิทิน · ตาราง Planning คิดจากของไม่ครบ **แบบเงียบ ๆ**
+ * (เจ้าของจับได้ว่าเลขบนหน้าไม่สอดคล้องกัน) · ตอนนี้ไล่ดึงจนครบตาม `total`
+ */
 export async function listFollowEntries(): Promise<FollowEntry[]> {
-  const r = await apiFetch('/api/follow');
-  if (!r.ok) throw new Error(await readError(r));
-  const data = (await r.json()) as { items: FollowEntry[] };
-  return data.items ?? [];
+  const all: FollowEntry[] = [];
+  for (let page = 0; page < FOLLOW_MAX_PAGES; page += 1) {
+    const r = await apiFetch(`/api/follow?limit=${FOLLOW_PAGE_SIZE}&offset=${all.length}`);
+    if (!r.ok) throw new Error(await readError(r));
+    const data = (await r.json()) as {
+      items?: FollowEntry[];
+      total?: number;
+      has_more?: boolean;
+    };
+    const items = data.items ?? [];
+    all.push(...items);
+    // เส้นเก่า (ยังไม่มี has_more) หรือหน้าสุดท้าย ⇒ จบ · หน้าว่างก็จบ กันวนซ้ำ
+    if (items.length === 0 || data.has_more !== true) break;
+  }
+  return all;
 }
 
 export async function createFollowEntry(input: NewFollowEntry): Promise<FollowEntry> {
