@@ -112,19 +112,17 @@ describe('หน้าใหม่ + ทางเข้า', () => {
     expect(page).not.toMatch(/dispatchLumos|insertQueue|acquireCallHold/);
   });
 
-  it('กล่อง "โทรครบแล้ว" บนหน้า Follow รับ groups จากหน้าแม่ (ยอด=รายชื่อชุดเดียวกัน)', () => {
-    const panel = stripComments(read('src/components/follow/FollowCompletedPanel.tsx'));
-    expect(panel).toContain('selectCompletedFollowPeople');
-    expect(panel).not.toMatch(/listFollowEntries|fetchFollow/);
-    /**
-     * 🔴 ต้องเป็น `allGroups` (ชุดเต็ม) **ไม่ใช่** `groups` ที่ผ่านตัวกรองแล้ว
-     * (แก้ 3 ก.ย. 2569 — เจ้าของแจ้งว่าแถบส่งไปดูแลหลังเริ่มงานไม่ขึ้น: เดิมแถบกิน
-     * กลุ่มที่กรองด้วยแท็บ/วันที่มาแล้ว เปลี่ยนแท็บทีเดียวแถบหายทั้งแถบ
-     * ทั้งที่งานยังค้างรอส่งต่ออยู่ · แถบนี้คือคิวงานของทั้งระบบ)
-     */
+  /**
+   * 🔴 **กล่อง "โทรครบแล้ว" ถูกถอดออกจากหน้า Follow แล้ว** (เจ้าของสั่ง 20 ก.ย. 2569:
+   * *"เอาออกเลย"*) — มันพูดเรื่องเดียวกับแท็บ "สำเร็จ" ด้วยคำคนละชุด แล้วยอดไม่ตรงกัน
+   *
+   * เทสต์เดิมบังคับว่าต้อง **มี** กล่องนั้นและต้องรับ `allGroups` · กลับด้านเป็น
+   * ห้ามมี เพื่อไม่ให้ใครเผลอเอากลับมาแล้วยอดสองที่เถียงกันอีก
+   */
+  it('🔴 หน้า Follow ต้องไม่มีกล่อง "โทรครบแล้ว" อีก (ยอดซ้ำกับแท็บสำเร็จ)', () => {
     const page = read('src/pages/follow/FollowPage.tsx');
-    expect(page).toMatch(/<FollowCompletedPanel\s+groups=\{allGroups\}/);
-    expect(page).toMatch(/const allGroups = useMemo\(\(\) => groupFollowEntries\(items\)/);
+    expect(page).not.toMatch(/<FollowCompletedPanel/);
+    expect(page).not.toMatch(/import FollowCompletedPanel/);
   });
 });
 

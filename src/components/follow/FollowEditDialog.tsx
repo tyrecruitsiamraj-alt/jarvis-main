@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import StaffContactField from '@/components/follow/StaffContactField';
+import DateTimeField24 from '@/components/shared/DateTimeField24';
 import TopicField from '@/components/follow/TopicField';
 import type { BoardUnitOption } from '@/lib/boardUnitPicker';
 
@@ -306,13 +307,8 @@ export default function FollowEditDialog({
             <label htmlFor="feWhen" className="ml-1 text-xs font-medium text-muted-foreground">
               ให้โทรเมื่อไหร่
             </label>
-            <input
-              id="feWhen"
-              type="datetime-local"
-              value={when}
-              onChange={(e) => setWhen(e.target.value)}
-              className="jarvis-soft-field min-h-[46px] w-full"
-            />
+            {/* 🔴 ห้ามกลับไปใช้ `<input type=datetime-local>` — ขึ้น AM/PM ตามเครื่องคนใช้ */}
+            <DateTimeField24 value={when} onChange={setWhen} label="เวลานัด" className="w-full" />
             {entry.call_status !== 'pending' ? (
               <p className={cn('ml-1 rounded-lg px-2 py-1 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
                 สายนี้ AI รับไปแล้ว — แก้ที่นี่ไม่ทำให้สายที่ออกไปเปลี่ยนตาม
@@ -357,14 +353,13 @@ export default function FollowEditDialog({
 
             {extraWhen.map((v, i) => (
               <div key={i} className="flex items-center gap-2">
-                <input
-                  type="datetime-local"
+                <DateTimeField24
                   value={v}
-                  aria-label={`รอบที่จะเพิ่ม ${i + 1}`}
-                  onChange={(e) =>
-                    setExtraWhen((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))
+                  label={`รอบที่จะเพิ่ม ${i + 1}`}
+                  onChange={(next) =>
+                    setExtraWhen((prev) => prev.map((x, idx) => (idx === i ? next : x)))
                   }
-                  className="jarvis-soft-field min-h-[44px] flex-1"
+                  className="min-h-[44px] flex-1"
                 />
                 <button
                   type="button"

@@ -47,7 +47,6 @@ import {
 import { summarizeDispatchResults } from '@/lib/followDispatchState';
 import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
 import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
-import FollowCompletedPanel from '@/components/follow/FollowCompletedPanel';
 import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
 import { buildBoardUnitOptions, mergeBoardUnitOptions, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
@@ -84,6 +83,7 @@ import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
+import DateTimeField24 from '@/components/shared/DateTimeField24';
 import { type FollowOutcome } from '@/lib/followOutcome';
 import { buildFollowPlanningRows, type FollowRoundFilter } from '@/lib/followPlanning';
 import { toYmdBangkok } from '@/lib/dateTh';
@@ -202,6 +202,15 @@ const FollowPage: React.FC = () => {
    */
   const [skippedDays, setSkippedDays] = useState<Set<string>>(() => new Set());
   /**
+   * วันที่ **เจ้าหน้าที่จะโทรเอง** (121 · เจ้าของสั่ง 20 ก.ย. 2569:
+   * *"วันที่ 1-3 กำหนดเองอะนะว่าจะโทรเองหรือส่ง lumos โทร"*)
+   *
+   * ⚠️ เป็นคนละชุดกับ `skippedDays` โดยตั้งใจ — สามสถานะต่อวัน:
+   * อยู่ใน `skippedDays` = **ไม่โทรเลย** · อยู่ใน `manualDays` = **คนโทรเอง**
+   * ไม่อยู่ที่ไหนเลย = **ส่งให้ AI** (ค่าเดิม ⇒ ของเก่าไม่เปลี่ยนพฤติกรรม)
+   */
+  const [manualDays, setManualDays] = useState<Set<string>>(() => new Set());
+  /**
    * หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (096) — เลือกจากใบขอแล้วเติมให้ทั้งคู่
    * (เจ้าของสั่ง: *"เพิ่มชื่อหน่วยงาน โดยเลือกจากใบงานได้เลย · Code site ถ้าเลือกหน่วยงานก็ให้ขึ้นมาเลย"*)
    */
@@ -241,7 +250,6 @@ const FollowPage: React.FC = () => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedFrom, setPickedFrom] = useState<string | null>(null);
   /** ข้อความยืนยันการย้ายไปดูแลหลังเริ่มงาน (Phase 7.2) — แยกจาก pickedFrom ของฟอร์ม */
-  const [aftercareNotice, setAftercareNotice] = useState<string | null>(null);
   /** ตัวเลือกหน่วยงานจากบอร์ด (18 ส.ค. 2569) — คู่แฝดของ picker ชื่อคน */
   const [unitPickerOpen, setUnitPickerOpen] = useState(false);
   /**
@@ -418,6 +426,7 @@ const FollowPage: React.FC = () => {
     setDateTo('');
     setRoundTimes(['07:00']);
     setSkippedDays(new Set());
+    setManualDays(new Set());
     setUnitName('');
     setSiteCode('');
     setFormError(null);
@@ -585,10 +594,10 @@ const FollowPage: React.FC = () => {
         setFormError('เลือกช่วงวันให้ถูกต้อง (ไม่เกิน 31 วัน · วันเริ่มต้องไม่หลังวันจบ)');
         return;
       }
-      // ส่งเฉพาะวันที่ติ๊กไว้ — ช่วงวันเป็นแค่ตัวกางปฏิทิน ไม่ใช่คำสั่งส่งทุกวัน
+      // เอาเฉพาะวันที่จะโทรจริง — ช่วงวันเป็นแค่ตัวกางปฏิทิน ไม่ใช่คำสั่งโทรทุกวัน
       const days = allDays.filter((d) => !skippedDays.has(d));
       if (days.length === 0) {
-        setFormError('ยังไม่ได้เลือกวันที่จะส่งให้ AI โทรสักวัน — ติ๊กอย่างน้อย 1 วัน');
+        setFormError('ยังไม่ได้เลือกวันที่จะโทรสักวัน — กดที่วันให้เป็น "AI" หรือ "เราโทร" อย่างน้อย 1 วัน');
         return;
       }
       const rounds = [...new Set(roundTimes.filter((t) => /^\d{1,2}:\d{2}$/.test(t)))].sort();
@@ -616,6 +625,8 @@ const FollowPage: React.FC = () => {
               scheduled_at: new Date(`${day}T${rounds[0]}:00+07:00`).toISOString(),
               group_id: groupId,
               call_times: rounds,
+              // วันที่เลือกว่า "เราโทรเอง" → ไม่ส่งเข้าคิว AI (121) แต่ยังเป็นแถวจริงในระบบ
+              call_mode: manualDays.has(day) ? 'manual' : 'ai',
               unit_name: unitName.trim() || undefined,
               site_code: siteCode.trim() || undefined,
             });
@@ -628,7 +639,20 @@ const FollowPage: React.FC = () => {
              คนนั่งรอสายที่ไม่มีวันออก (เกิดจริง 24 ส.ค. 2569) */
           const warn = summarizeDispatchResults(dispatchStates);
           /* 🔴 ย้ำขั้นที่ ② ของการ์ดวันแรก — ตาใหม่กังวลที่สุดว่า "เพิ่มแล้วต้องกดอะไรต่อ" */
-          const okText = `ตั้งตารางโทรแล้ว — ${sendDays.length} วัน วันละ ${rounds.length} รอบ (รวม ${sendDays.length * rounds.length} สาย) · AI จะโทรเองตามเวลา ไม่ต้องกดอะไรอีก`;
+          /* 🔴 ข้อความต้องแยกสองฝั่ง — เดิมเขียนว่า "AI จะโทรเองตามเวลา ไม่ต้องกดอะไรอีก"
+             ทุกกรณี · พอมีวันที่คนโทรเองแล้วประโยคนั้นกลายเป็นคำโกหก */
+          const manualDayCount = sendDays.filter((d) => manualDays.has(d)).length;
+          const aiDayCount = sendDays.length - manualDayCount;
+          const parts = [
+            `ตั้งตารางโทรแล้ว — ${sendDays.length} วัน วันละ ${rounds.length} รอบ (รวม ${sendDays.length * rounds.length} สาย)`,
+          ];
+          if (aiDayCount > 0) {
+            parts.push(`AI โทรให้ ${aiDayCount * rounds.length} สาย — ไม่ต้องกดอะไรอีก`);
+          }
+          if (manualDayCount > 0) {
+            parts.push(`อีก ${manualDayCount * rounds.length} สายรอเราโทรเอง — กดปุ่มโทรข้างชื่อเมื่อถึงเวลา`);
+          }
+          const okText = parts.join(' · ');
           if (warn) {
             setFormError(`${okText}\n${warn.text}`);
           } else {
@@ -862,7 +886,6 @@ const FollowPage: React.FC = () => {
    * แถบก็หายไปทั้งแถบ ทั้งที่งานยังค้างรอส่งต่ออยู่จริง
    * แถบนี้คือ **คิวงานของทั้งระบบ** ไม่ใช่มุมมองของตัวกรอง จึงต้องนับจากชุดเต็มเสมอ
    */
-  const allGroups = useMemo(() => groupFollowEntries(items), [items]);
 
   /**
    * ═══ แถวของตาราง Planning (F3 · เจ้าของสั่ง 1 ก.ย. 2569) ═══
@@ -1461,48 +1484,78 @@ const FollowPage: React.FC = () => {
                       month: 'short',
                     });
                   };
+                  /**
+                   * 🔴 **สามสถานะต่อวัน** (121 · 20 ก.ย. 2569) — กดที่ชิปวนไปทีละสถานะ
+                   * AI โทร → เราโทรเอง → ไม่โทร → AI โทร
+                   *
+                   * ของเดิมมีแค่ ติ๊ก/ไม่ติ๊ก ⇒ วันที่ตั้งใจจะโทรเองไม่เหลือร่องรอยในระบบ
+                   * ไม่มีใครรู้ว่าวันนั้นยังมีงานค้างอยู่ (เจ้าของสั่งให้เลือกเองรายวันได้)
+                   */
+                  const cycleDay = (d: string) => {
+                    const skipped = new Set(skippedDays);
+                    const manual = new Set(manualDays);
+                    if (skipped.has(d)) {
+                      skipped.delete(d); // ไม่โทร → AI โทร
+                    } else if (manual.has(d)) {
+                      manual.delete(d);
+                      skipped.add(d); // เราโทรเอง → ไม่โทร
+                    } else {
+                      manual.add(d); // AI โทร → เราโทรเอง
+                    }
+                    setSkippedDays(skipped);
+                    setManualDays(manual);
+                  };
+                  const setAllDays = (mode: 'ai' | 'manual' | 'off') => {
+                    setSkippedDays(mode === 'off' ? new Set(all) : new Set());
+                    setManualDays(mode === 'manual' ? new Set(all) : new Set());
+                  };
+                  const modeOfDay = (d: string): 'ai' | 'manual' | 'off' =>
+                    skippedDays.has(d) ? 'off' : manualDays.has(d) ? 'manual' : 'ai';
+                  const DAY_CHIP: Record<'ai' | 'manual' | 'off', { cls: string; tail: string }> = {
+                    ai: { cls: 'border-primary bg-primary text-primary-foreground', tail: 'AI' },
+                    manual: {
+                      cls: 'border-amber-500 bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100',
+                      tail: 'เราโทร',
+                    },
+                    off: {
+                      cls: 'border-border bg-background text-muted-foreground hover:bg-secondary',
+                      tail: 'ไม่โทร',
+                    },
+                  };
                   return (
                     <div className="space-y-1.5">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="ml-1 text-xs font-medium text-muted-foreground">
-                          ส่งให้ AI โทรวันไหนบ้าง
+                          แต่ละวันใครโทร — กดที่วันเพื่อสลับ
                         </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSkippedDays((prev) =>
-                              prev.size > 0 ? new Set() : new Set(all),
-                            )
-                          }
-                          className="text-[11px] font-medium text-primary underline"
-                        >
-                          {skippedDays.size > 0 ? 'เลือกทุกวัน' : 'ไม่เลือกสักวัน'}
-                        </button>
+                        <span className="flex items-center gap-2 text-[11px] font-medium">
+                          <button type="button" onClick={() => setAllDays('ai')} className="text-primary underline">
+                            ให้ AI ทุกวัน
+                          </button>
+                          <button type="button" onClick={() => setAllDays('manual')} className="text-amber-700 underline dark:text-amber-300">
+                            เราโทรเองทุกวัน
+                          </button>
+                          <button type="button" onClick={() => setAllDays('off')} className="text-muted-foreground underline">
+                            ไม่โทรสักวัน
+                          </button>
+                        </span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {all.map((d) => {
-                          const on = !skippedDays.has(d);
+                          const mode = modeOfDay(d);
+                          const chip = DAY_CHIP[mode];
                           return (
                             <button
                               key={d}
                               type="button"
-                              aria-pressed={on}
-                              onClick={() =>
-                                setSkippedDays((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(d)) next.delete(d);
-                                  else next.add(d);
-                                  return next;
-                                })
-                              }
+                              aria-label={`${dayLabel(d)} — ${chip.tail} (กดเพื่อเปลี่ยน)`}
+                              onClick={() => cycleDay(d)}
                               className={cn(
                                 'rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
-                                on
-                                  ? 'border-primary bg-primary text-primary-foreground'
-                                  : 'border-border bg-background text-muted-foreground hover:bg-secondary',
+                                chip.cls,
                               )}
                             >
-                              {dayLabel(d)}
+                              {dayLabel(d)} · {chip.tail}
                             </button>
                           );
                         })}
@@ -1540,15 +1593,22 @@ const FollowPage: React.FC = () => {
                   );
                 })()}
                 {(() => {
-                  const days = daysInRange(dateFrom, dateTo).filter((d) => !skippedDays.has(d)).length;
+                  const picked = daysInRange(dateFrom, dateTo).filter((d) => !skippedDays.has(d));
+                  const manual = picked.filter((d) => manualDays.has(d)).length;
+                  const ai = picked.length - manual;
                   const rounds = new Set(roundTimes.filter((t) => /^\d{1,2}:\d{2}$/.test(t))).size;
-                  return days > 0 && rounds > 0 ? (
+                  /* 🔴 แยกยอดสองฝั่งให้เห็นตั้งแต่ก่อนกดบันทึก — "กี่สาย" อย่างเดียวไม่พอ
+                     เพราะสายที่เราโทรเองคือ **งานของคน** ไม่ใช่สายที่ระบบจะจัดการให้ */
+                  return picked.length > 0 && rounds > 0 ? (
                     <p className="ml-1 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] text-primary">
-                      รวม {days} วัน × {rounds} รอบ = {days * rounds} สาย · รับสายยืนยันแล้ววันนั้นหยุด พรุ่งนี้โทรต่อ
+                      รวม {picked.length} วัน × {rounds} รอบ = {picked.length * rounds} สาย
+                      {' — '}
+                      AI โทร {ai * rounds} · เราโทรเอง {manual * rounds}
+                      {' · '}รับสายยืนยันแล้ววันนั้นหยุด พรุ่งนี้โทรต่อ
                     </p>
                   ) : (
                     <p className="ml-1 text-[11px] text-muted-foreground">
-                      เลือกช่วงวัน + ติ๊กวันที่จะส่ง + รอบเวลา แล้วระบบจะสรุปจำนวนสายให้
+                      เลือกช่วงวัน + เลือกว่าแต่ละวันใครโทร + รอบเวลา แล้วระบบจะสรุปจำนวนสายให้
                     </p>
                   );
                 })()}
@@ -1568,12 +1628,13 @@ const FollowPage: React.FC = () => {
                     className="space-y-1.5 rounded-xl border border-white/70 bg-white/40 p-2.5 dark:border-white/15 dark:bg-white/5"
                   >
                     <div className="flex items-center gap-2">
-                      <input
-                        id={`followWhen${i}`}
-                        type="datetime-local"
+                      {/* 🔴 ห้ามกลับไปใช้ `<input type=datetime-local>` — ขึ้น AM/PM
+                          ตามภาษาของเครื่องคนใช้ (ดู `DateTimeField24`) */}
+                      <DateTimeField24
                         value={v}
-                        onChange={(e) => setScheduledAtAt(i, e.target.value)}
-                        className="jarvis-soft-field min-h-[46px] flex-1"
+                        onChange={(next) => setScheduledAtAt(i, next)}
+                        label={`รอบที่ ${i + 1}`}
+                        className="min-h-[46px] flex-1"
                       />
                       <button
                         type="button"
@@ -1768,20 +1829,10 @@ const FollowPage: React.FC = () => {
           </div>
         ) : null}
 
-        {/* กล่อง "โทรครบแล้ว" (Phase 7.1-7.2) — ซ่อนตัวเองเมื่อไม่มีของ
-            🔴 รับ `groups` ชุดเดียวกับตารางข้างบน (ยอดกับรายชื่อต้องมาจากชุดเดียวกัน)
-            🔴 **ย้ายลงมาไว้ท้ายหน้า 1 ก.ย. 2569** — เจ้าของสั่ง *"เปิดมาปุ๊บ เจอ 3 หลัก ๆ"*
-            (ปฏิทิน · ปุ่มเพิ่มคน · Planning) กล่องนี้เคยอยู่บน แล้วดันปฏิทินตกจอไปเลย
-            ยังอยู่นอกแท็บเหมือนเดิม จึงไม่หายเวลาสลับแท็บ */}
-        <FollowCompletedPanel
-          groups={allGroups}
-          onMoved={(name) => setAftercareNotice(`ย้าย ${name} ไปดูแลหลังเริ่มงานแล้ว`)}
-        />
-        {aftercareNotice ? (
-          <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.success.soft, TONE.success.value)}>
-            {aftercareNotice}
-          </p>
-        ) : null}
+        {/* 🔴 กล่อง "โทรได้คำตอบแล้ว … ส่งไปดูแลหลังเริ่มงานได้ …" **ถูกถอดออก 20 ก.ย. 2569**
+            (เจ้าของสั่งสั้น ๆ ว่า *"เอาออกเลย"*) — มันพูดเรื่องเดียวกับแท็บ "สำเร็จ"
+            ด้วยคำคนละชุด แล้วยอดสองที่ไม่ตรงกัน · งานย้ายไปดูแลหลังเริ่มงานทำได้จาก
+            แท็บนั้นอยู่แล้ว **ห้ามเอากล่องนี้กลับมาโดยไม่ได้สั่ง** */}
       </div>
 
       {/* ป๊อปรายละเอียดของช่องปฏิทิน — ปุ่มทำงานทั้งหมดอยู่ในนี้

@@ -67,6 +67,11 @@ type FollowRow = {
    * 1 = สายแรก (บท `follow`) · 2 ขึ้นไป = บท `follow_repeat` · null = แถวเก่า ถือเป็นสายแรก
    */
   call_round: number | null;
+  /**
+   * ใครโทรรอบนี้ (migration 121) — `ai` = ส่งเข้าคิวให้ Lumos · `manual` = เจ้าหน้าที่โทรเอง
+   * แถวเก่า/ฐานที่ยังไม่รัน 121 = null ⇒ อ่านว่า `ai` (พฤติกรรมเดิม)
+   */
+  call_mode: string | null;
   /** หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (migration 096) — snapshot ตอนกรอก ไม่ใช่ FK */
   unit_name: string | null;
   site_code: string | null;
@@ -128,6 +133,8 @@ function toResponse(r: FollowRow) {
     site_code: r.site_code ?? null,
     /** สายที่เท่าไหร่ (113) — null = ไม่ได้ระบุ ฝั่งจออ่านเป็นสายแรก */
     call_round: r.call_round == null ? null : Number(r.call_round),
+    /** ใครโทรรอบนี้ (121) — แถวเก่า/ฐานยังไม่รัน 121 = ai (พฤติกรรมเดิม) */
+    call_mode: r.call_mode === 'manual' ? 'manual' : 'ai',
     /** เบอร์ฉุกเฉินที่ส่งไปกับสายนั้น — null = ไม่เคยเข้าคิว หรือไม่มีเบอร์ให้ส่ง */
     emergency_phone: r.emergency_phone ?? null,
     /** เจ้าของข้อมูล = คนที่กรอกครั้งแรก · ไม่เปลี่ยนแม้มีคนอื่นมาแก้ทีหลัง */
@@ -230,6 +237,11 @@ export type ParsedFollowInput = {
   groupId: string | null;
   /** รอบเวลาของวันนั้น (HH:MM) — payload สร้าง steps ตามนี้ · ว่าง = 1 รอบที่ when */
   callTimes: string[] | null;
+  /**
+   * ใครโทร (121) — `'ai'` ส่งเข้าคิว · `'manual'` เจ้าหน้าที่โทรเอง **ไม่ส่งเข้าคิว**
+   * ไม่ส่งมา = `'ai'` ⇒ ของเดิมที่ยิงมาโดยไม่มีคีย์นี้ไม่เปลี่ยนพฤติกรรม
+   */
+  callMode: 'ai' | 'manual';
   /** หน่วยงานที่ตามเรื่องให้ (096) — เลือกจากใบขอหรือพิมพ์เอง · null = ไม่ได้ระบุ */
   unitName: string | null;
   /** รหัสไซต์ของหน่วยงานนั้น — เติมเองเมื่อเลือกจากใบขอ */
@@ -305,6 +317,17 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
     callTimes = uniq;
   }
 
+  /**
+   * ใครโทร (121) — ตรวจที่นี่แทน CHECK constraint (บ้านนี้โดน CHECK ล็อกมาสองรอบ)
+   * ค่าที่อ่านไม่ออก = ปฏิเสธไปตรง ๆ **ห้ามเดาว่าเป็น ai** เพราะเดาผิด = คนจริงโดนโทร
+   */
+  let callMode: 'ai' | 'manual' = 'ai';
+  const callModeRaw = getString(body.call_mode) || '';
+  if (callModeRaw) {
+    if (callModeRaw !== 'ai' && callModeRaw !== 'manual') return fail('call_mode ต้องเป็น ai หรือ manual');
+    callMode = callModeRaw;
+  }
+
   // หน่วยงาน/รหัสไซต์ (096) — ไม่บังคับ · Follow หลายเคสไม่ได้ผูกกับใบขอใด
   const unitName = getString(body.unit_name) || null;
   const siteCode = getString(body.site_code) || null;
@@ -324,11 +347,18 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
     error: null,
     value: {
       name, phone, topic, note, staffPhone, when, groupId, callTimes, unitName, siteCode, callRound,
+      callMode,
     },
   };
 }
 
-export type FollowRoundInput = { when: Date; staffPhone: string | null; callRound: number | null };
+export type FollowRoundInput = {
+  when: Date;
+  staffPhone: string | null;
+  callRound: number | null;
+  /** ใครโทรรอบนี้ (121) — ไม่ระบุ = ตามค่าของทั้งคำขอ */
+  callMode?: 'ai' | 'manual';
+};
 
 /**
  * อ่านรายการรอบจาก body — `rounds: [{ scheduled_at, staff_phone?, call_round? }, …]`
@@ -352,10 +382,13 @@ export function parseFollowRounds(raw: unknown, primary: FollowRoundInput): Foll
     seen.add(at.getTime());
     const phoneRaw = typeof o.staff_phone === 'string' ? o.staff_phone.trim() : '';
     const roundRaw = Number(o.call_round);
+    const modeRaw = typeof o.call_mode === 'string' ? o.call_mode.trim() : '';
     out.push({
       when: at,
       staffPhone: phoneRaw || primary.staffPhone,
       callRound: Number.isInteger(roundRaw) && roundRaw >= 1 ? roundRaw : null,
+      // อ่านไม่ออก = ไม่ระบุ ⇒ ตามค่าของทั้งคำขอ (ห้ามเดาเป็น ai เองตรงนี้)
+      callMode: modeRaw === 'ai' || modeRaw === 'manual' ? modeRaw : undefined,
     });
   }
   if (out.length === 0) return [primary];
@@ -384,12 +417,20 @@ async function createFollowRounds(
     return;
   }
 
+  /**
+   * 🔴 **รอบที่เจ้าหน้าที่จะโทรเอง ห้ามส่งเข้าคิว** (121 · เจ้าของสั่ง 20 ก.ย. 2569:
+   * *"วันที่ 1-3 กำหนดเองอะนะว่าจะโทรเองหรือส่ง lumos โทร"*)
+   * ⇒ กรองออกก่อนสร้างแผน ไม่ใช่สร้างแล้วค่อยยกเลิก (ยกเลิกทีหลัง = เสี่ยงหลุดไปหาคนจริง)
+   */
+  const modeOf = (i: number): 'ai' | 'manual' => rounds[i]?.callMode ?? base.callMode;
+  const aiIndexes = createdRows.map((_, i) => i).filter((i) => modeOf(i) === 'ai');
+
   let states = new Map<string, FollowDispatchState>();
-  if (await isAutoDispatchEnabled('follow_entry')) {
+  if (aiIndexes.length > 0 && (await isAutoDispatchEnabled('follow_entry'))) {
     const staffName = await staffNameOfPhone(base.staffPhone);
     states = await enqueueFollowReminderPlan(
-      createdRows.map((row, i) => ({
-        id: row.id,
+      aiIndexes.map((i) => ({
+        id: createdRows[i].id,
         recipient_name: base.name,
         recipient_phone: base.phone,
         topic: base.topic,
@@ -397,7 +438,7 @@ async function createFollowRounds(
         staffPhone: rounds[i]?.staffPhone ?? base.staffPhone,
         staffName,
         unitName: base.unitName,
-        scheduled_at: rounds[i]?.when ?? new Date(String(row.scheduled_at)),
+        scheduled_at: rounds[i]?.when ?? new Date(String(createdRows[i].scheduled_at)),
         callTimes: base.callTimes,
         callRound: rounds[i]?.callRound ?? null,
       })),
@@ -405,8 +446,9 @@ async function createFollowRounds(
   }
 
   const out: FollowRow[] = [];
-  for (const row of createdRows) {
-    const state = states.get(row.id) ?? 'off';
+  for (const [i, row] of createdRows.entries()) {
+    const state: FollowDispatchState =
+      modeOf(i) === 'manual' ? 'manual' : (states.get(row.id) ?? 'off');
     try {
       await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1`, [row.id, state]);
       out.push({ ...row, dispatch_state: state });
@@ -435,18 +477,19 @@ async function createFollowRounds(
 async function insertFollowRow(
   req: AuthedReq,
   base: ParsedFollowInput,
-  round: { when: Date; staffPhone: string | null; callRound: number | null },
+  round: FollowRoundInput,
 ): Promise<FollowRow | undefined> {
-  const { name, phone, topic, note, groupId, callTimes, unitName, siteCode } = base;
+  const { name, phone, topic, note, groupId, callTimes, unitName, siteCode, callMode } = base;
   try {
     const { rows } = await dbQuery<FollowRow>(
       `insert into ${followTable}
          (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at,
-          group_id, call_times, unit_name, site_code, call_round, created_by, created_by_name)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          group_id, call_times, unit_name, site_code, call_round, call_mode,
+          created_by, created_by_name)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        returning *`,
       [name, phone, topic, note, round.staffPhone, round.when.toISOString(), groupId, callTimes,
-       unitName, siteCode, round.callRound, req.user.sub, req.user.email],
+       unitName, siteCode, round.callRound, round.callMode ?? callMode, req.user.sub, req.user.email],
     );
     return rows[0];
   } catch (e) {
@@ -504,8 +547,9 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
    *
    * ⚠️ จดผลล้มเหลวห้ามทำให้สร้างรายการล้ม — รายการถูกบันทึกไปแล้ว
    */
-  let dispatchState: FollowDispatchState = 'off';
-  if (await isAutoDispatchEnabled('follow_entry')) {
+  // 🔴 โทรเอง = ไม่ส่งเข้าคิว (121) — ดูเหตุผลที่ `createFollowRounds`
+  let dispatchState: FollowDispatchState = parsed.value.callMode === 'manual' ? 'manual' : 'off';
+  if (parsed.value.callMode === 'ai' && (await isAutoDispatchEnabled('follow_entry'))) {
     dispatchState = await enqueueFollowReminder({
       id: created.id,
       recipient_name: name,

@@ -18,6 +18,13 @@ export const FOLLOW_DISPATCH_STATES = [
   'no_phone',
   'off',
   /**
+   * **ตั้งใจให้คนโทรเอง** (121 · 20 ก.ย. 2569) — ไม่ใช่ความผิดพลาด
+   *
+   * ต่างจาก `off` ตรงที่ `off` คือ "ระบบปิดส่งอัตโนมัติอยู่" (คนไม่ได้เลือก)
+   * ส่วนอันนี้คือ **คนเลือกเองตอนวางแผน** ว่าวันนั้นจะโทรเอง ⇒ ไม่ต้องขึ้นเตือนสีแดง
+   */
+  'manual',
+  /**
    * ส่งเข้าคิวแล้วแต่ **ดันไปหา Lumos ไม่สำเร็จ** (10 ก.ย. 2569)
    *
    * 🔴 เดิมเงียบสนิท: `pushFollowReminderToLumos()` เป็น fire-and-forget ตั้ง
@@ -88,6 +95,12 @@ export const FOLLOW_DISPATCH_META: Record<FollowDispatchState, FollowDispatchMet
     hint: 'ตั้งค่าให้จุดนี้เป็น manual ⇒ ไม่มีสายอัตโนมัติ · กดปุ่มโทรข้างชื่อเพื่อโทรเอง (เปลี่ยนได้ที่หน้าตั้งค่า)',
     needsAction: true,
     retryable: true,
+  },
+  manual: {
+    label: 'เจ้าหน้าที่โทรเอง',
+    hint: 'วันนี้ตั้งใจให้คนโทรเอง ไม่ได้ส่งให้ AI — กดปุ่มโทรข้างชื่อเมื่อถึงเวลา',
+    needsAction: false,
+    retryable: false,
   },
   push_failed: {
     label: 'ส่งไม่ถึง Lumos',

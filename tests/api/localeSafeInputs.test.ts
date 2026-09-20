@@ -27,7 +27,7 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** ไฟล์ที่ยังใช้ `type="date"` อยู่ ณ 20 ก.ย. 2569 — **ห้ามเพิ่มชื่อใหม่เข้ามา** */
+/** ไฟล์ที่ยังใช้ `type="date"` / `type="datetime-local"` อยู่ — **ห้ามเพิ่มชื่อใหม่** */
 const DATE_INPUT_DEBT = [
   'src/components/matching/CallHoldPanel.tsx',
   'src/components/recruit-rm/ApplicantContactDialog.tsx',
@@ -53,6 +53,15 @@ describe('ช่องวันที่/เวลาต้องไม่ขึ
   it('🔴 ห้ามมี <input type="time"> ที่ไหนอีก — ใช้ TimeSelect24 แทน', () => {
     const found = files.filter((f) => /type="time"/.test(codeOf(f))).map(rel);
     expect(found).toEqual([]);
+  });
+
+  it('🔴 หน้าติดตามต้องไม่เหลือ <input type="datetime-local"> — ใช้ DateTimeField24 แทน', () => {
+    const found = files
+      .filter((f) => /type="datetime-local"/.test(codeOf(f)))
+      .map(rel)
+      .sort();
+    // เหลือได้เฉพาะหน้าโทรของฉัน (นอกขอบเขตที่เจ้าของสั่ง 20 ก.ย.) — เพิ่มที่ใหม่ไม่ได้
+    expect(found).toEqual(['src/components/matching/CallHoldPanel.tsx']);
   });
 
   it('🟡 <input type="date"> มีได้เฉพาะไฟล์เดิมที่ค้างอยู่ — ที่ใหม่ต้องใช้ DayCalendarPicker', () => {
