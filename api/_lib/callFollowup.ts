@@ -159,10 +159,11 @@ export async function applyCallFollowupToQueueRow(input: {
   }
   if (!row) return null;
 
-  // Follow ตั้งตาราง (migration 092): person_ref = follow-<id> ที่มี group_id
+  // Follow ตั้งตาราง: person_ref = follow-<id> ที่มี group_id **หรือ** call_round/call_times
   // → **ตารางคือ retry อยู่แล้ว** (หลายรอบ/วัน + วันถัดไปเป็นแถวใหม่) ห้ามให้ policy
   // ตั้ง +24 ชม.retry ทับ ไม่งั้นได้สายนอกตารางเพิ่ม · confirmed = ปิดวันนั้นตามเดิม
-  const followGroupId = await followGroupIdForPersonRef(row.person_ref);
+  const followSchedule = await followScheduleOfPersonRef(row.person_ref);
+  const followGroupId = followSchedule.groupId;
 
   const decision = resolveCallFollowup({
     outcome: input.outcome as CallOutcome,
@@ -175,7 +176,7 @@ export async function applyCallFollowupToQueueRow(input: {
   });
 
   // แถวตั้งตาราง: retry ของ policy → ปิดแทน (ไม่โทรซ้ำนอกตาราง) · ผลอื่นคงเดิม
-  const scheduledFollow = followGroupId !== null;
+  const scheduledFollow = followSchedule.scheduled;
   const effectiveRetry = decision.action === 'retry' && !scheduledFollow;
 
   try {
@@ -264,18 +265,58 @@ export async function applyCallFollowupToQueueRow(input: {
 
 const followTable = tableInAppSchema('follow_entries');
 
-/** person_ref (follow-<id>) → group_id ของตาราง Follow · null = ไม่ใช่ follow/ไม่มีกลุ่ม/ตารางยังไม่ migrate */
-async function followGroupIdForPersonRef(personRef: string): Promise<string | null> {
-  if (typeof personRef !== 'string' || !personRef.startsWith('follow-')) return null;
+/**
+ * แถวนี้เป็น **สายตั้งตาราง** ไหม + กลุ่มของมันคืออะไร
+ *
+ * 🔴 **ห้ามดูแค่ `group_id`** (แก้ 21 ก.ย. 2569) — ของจริงพังเพราะเหตุนี้:
+ * เส้นที่คนใช้สร้างรายการจริงทุกวัน (ตั้งหลายรอบในคำขอเดียว) ไม่เคยส่ง `group_id`
+ * มาเลย ⇒ 287 จาก 295 แถวของ 14 วันล่าสุดมีค่า `null` ⇒ ที่นี่เห็นเป็น "สายเดี่ยว"
+ * ⇒ ผลไม่รับสายเข้าทาง retry ⇒ ดีดแถวกลับเป็น `pending` โดยไม่มีใครดันแผนใหม่
+ * ไป Lumos ⇒ **สายที่ระบบสัญญาว่าจะโทรซ้ำแต่ไม่มีวันโทร** (ค้างจริง 46 แถว)
+ *
+ * `call_round` / `call_times` บอกความเป็นตารางได้เท่ากัน และเส้นสร้างทุกเส้นเขียนไว้
+ * จึงใช้เป็นตัวยืนยันอีกชั้น — `group_id` หายไปอีกเมื่อไหร่ก็ไม่ทำให้ตารางกลายเป็นสายเดี่ยว
+ *
+ * คืน `{ scheduled, groupId }` — `groupId` ยังต้องใช้ตอน `declined` เพื่อยกเลิกทั้งชุด
+ * (ไม่มีกลุ่ม = ยกเลิกทั้งชุดไม่ได้ แต่ยังรู้ว่าเป็นตาราง จึงไม่ถูก retry นอกตาราง)
+ */
+async function followScheduleOfPersonRef(
+  personRef: string,
+): Promise<{ scheduled: boolean; groupId: string | null }> {
+  const none = { scheduled: false, groupId: null };
+  if (typeof personRef !== 'string' || !personRef.startsWith('follow-')) return none;
   const id = personRef.slice('follow-'.length);
   try {
-    const { rows } = await dbQuery<{ group_id: string | null }>(
-      `select group_id from ${followTable} where id = $1 limit 1`,
+    const { rows } = await dbQuery<{
+      group_id: string | null;
+      call_round: number | null;
+      call_times: string[] | null;
+    }>(
+      `select group_id, call_round, call_times from ${followTable} where id = $1 limit 1`,
       [id],
     );
-    return rows[0]?.group_id ?? null;
+    const r = rows[0];
+    if (!r) return none;
+    const scheduled =
+      r.group_id != null ||
+      (r.call_round != null && Number(r.call_round) >= 1) ||
+      (Array.isArray(r.call_times) && r.call_times.length > 0);
+    return { scheduled, groupId: r.group_id ?? null };
   } catch (e) {
-    if (isPgUndefinedTable(e) || isUndefinedColumn(e)) return null; // ยังไม่รัน 092
+    if (isPgUndefinedTable(e) || isUndefinedColumn(e)) {
+      // ยังไม่รัน 092/113 — ถอยไปอ่านเฉพาะ group_id (พฤติกรรมเดิม ไม่พัง)
+      try {
+        const { rows } = await dbQuery<{ group_id: string | null }>(
+          `select group_id from ${followTable} where id = $1 limit 1`,
+          [id],
+        );
+        const gid = rows[0]?.group_id ?? null;
+        return { scheduled: gid != null, groupId: gid };
+      } catch (e2) {
+        if (isPgUndefinedTable(e2) || isUndefinedColumn(e2)) return none;
+        throw e2;
+      }
+    }
     throw e;
   }
 }

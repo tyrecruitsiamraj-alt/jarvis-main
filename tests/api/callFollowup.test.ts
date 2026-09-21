@@ -146,6 +146,80 @@ describe('ผลจาก AI → ตั้งคิวโทรซ้ำ / ต�
     expect(allSql().some((q) => q.includes("status = 'cancelled'"))).toBe(false);
   });
 
+  /**
+   * 🔴 บั๊กจริงที่เจอ 21 ก.ย. 2569 — คิว follow ค้าง 46 แถวเพราะเหตุนี้
+   *
+   * เส้นที่คนใช้สร้างรายการจริง (ตั้งหลายรอบในคำขอเดียว) ไม่ส่ง `group_id` มา
+   * ⇒ แถวตั้งตารางถูกมองเป็นสายเดี่ยว ⇒ ผลไม่รับสายเข้าทาง retry ⇒ ดีดกลับเป็น
+   * `pending` โดยไม่มีใครดันแผนใหม่ไป Lumos = สายที่ไม่มีวันโทร
+   */
+  it('🔴 แถวตั้งตารางที่ไม่มี group_id แต่มี call_round → ห้าม retry นอกตาราง', async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 9, attempt_count: 1, payload: {}, person_ref: 'follow-xyz', job_ref: 'follow' },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ group_id: null, call_round: 1, call_times: null }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const d = await applyCallFollowupToQueueRow({ queueId: 9, outcome: 'no_answer' });
+
+    // นโยบายยังตัดสินว่า retry (ของมันถูก) แต่ปลายทางต้องไม่ดีดแถวกลับเป็น pending
+    expect(d?.action).toBe('retry');
+    expect(allSql().some((q) => q.includes("status = 'pending'"))).toBe(false);
+    expect(allSql().some((q) => q.includes("followup_state = 'retry_scheduled'"))).toBe(false);
+    expect(sqlOf(2)).toContain('last_outcome');
+  });
+
+  it('🔴 ไม่มีทั้ง group_id และ call_round แต่มี call_times → ยังนับเป็นตาราง', async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 10, attempt_count: 1, payload: {}, person_ref: 'follow-xyz', job_ref: 'follow' },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ group_id: null, call_round: null, call_times: ['07:00', '08:00'] }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await applyCallFollowupToQueueRow({ queueId: 10, outcome: 'unresponsive' });
+
+    expect(allSql().some((q) => q.includes("status = 'pending'"))).toBe(false);
+  });
+
+  it('สายเดี่ยวจริง (ไม่ใช่ follow) → ยัง retry ตามเดิม', async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 12, attempt_count: 1, payload: {}, person_ref: 'appl-77', job_ref: 'siamraj-sql:DS1' },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const d = await applyCallFollowupToQueueRow({ queueId: 12, outcome: 'no_answer' });
+
+    expect(d?.action).toBe('retry');
+    expect(sqlOf(1)).toContain("status = 'pending'");
+  });
+
+  it('ตารางยังไม่รัน 113 (ไม่มี call_round/call_times) → ถอยไปดู group_id อย่างเดียว', async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 13, attempt_count: 1, payload: {}, person_ref: 'follow-old', job_ref: 'follow' },
+        ],
+      })
+      .mockImplementationOnce(() => {
+        throw undefinedColumn;
+      })
+      .mockResolvedValueOnce({ rows: [{ group_id: 'g9' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await applyCallFollowupToQueueRow({ queueId: 13, outcome: 'no_answer' });
+
+    expect(allSql().some((q) => q.includes("status = 'pending'"))).toBe(false);
+  });
+
   it('outcome ที่ไม่รู้จัก → ไม่ทำอะไร ไม่แตะ DB', async () => {
     await expect(applyCallFollowupToQueueRow({ queueId: 1, outcome: 'ไม่รู้' })).resolves.toBeNull();
     expect(vi.mocked(dbQuery)).not.toHaveBeenCalled();

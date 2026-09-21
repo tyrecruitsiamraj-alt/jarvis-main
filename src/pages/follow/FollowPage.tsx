@@ -717,6 +717,18 @@ const FollowPage: React.FC = () => {
     const roundByIso = new Map<string, number>();
     times.forEach((t, i) => roundByIso.set(isoTimes[i], roundByLocal.get(t) ?? 1));
     const dupCheck = findScheduleDuplicates(phone, isoTimes, items);
+    /**
+     * 🔴 **ทุกรอบของคนเดียวกันต้องอยู่ `group_id` เดียวกัน** (21 ก.ย. 2569)
+     *
+     * เส้นนี้เคย **ไม่ส่ง `group_id` เลย** ⇒ แถวทั้งหมดที่คนใช้สร้างจริงได้ค่า `null`
+     * (วัดจากฐาน 21 ก.ย.: 287 จาก 295 แถวของ 14 วันล่าสุดไม่มี `group_id`)
+     *
+     * ผลต่อเนื่อง: `applyCallFollowupToQueueRow` ใช้ `group_id` เป็นตัวบอกว่า
+     * "แถวนี้เป็นสายตั้งตาราง ห้ามโทรซ้ำนอกตาราง" พอเป็น null มันจึงเห็นเป็นสายเดี่ยว
+     * แล้วตั้ง retry เอง ⇒ แถวถูกดีดกลับเป็น `pending` โดยไม่มีใครดันแผนใหม่ไป Lumos
+     * = สายที่ระบบสัญญาว่าจะโทรซ้ำแต่ไม่มีวันโทร (ค้างจริง 46 แถวตอนที่เจอ)
+     */
+    const groupId = crypto.randomUUID();
     const runTimes = async (sendIso: string[]) => {
       setSubmitting(true);
       let done = 0;
@@ -736,6 +748,7 @@ const FollowPage: React.FC = () => {
           staff_phone: phoneByIso.get(sendIso[0]) || undefined,
           scheduled_at: sendIso[0],
           call_round: roundByIso.get(sendIso[0]) ?? 1,
+          group_id: groupId,
           unit_name: unitName.trim() || undefined,
           site_code: siteCode.trim() || undefined,
           rounds: sendIso.map((t) => ({
