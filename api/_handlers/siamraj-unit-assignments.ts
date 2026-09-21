@@ -6,6 +6,7 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
+import { clearUnitRequestCache } from '../_lib/unitRequestCache.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import {
   getUnitAssignment,
@@ -109,6 +110,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
         },
       });
 
+      /**
+       * 🔴 **เขียนเสร็จต้องล้างสำเนาลิสต์ทันที** (21 ก.ย. 2569)
+       *
+       * เจ้าของแจ้งอาการ: *"บันทึกได้ แต่กลับออกมาข้อมูลมันหาย หมายเหตุก็เป็น"*
+       * ต้นเหตุ: `/api/siamraj/unit-requests` แคชผลลัพธ์ **หลังแปะผู้รับผิดชอบ/หมายเหตุลงไปแล้ว**
+       * (อายุ 90 วินาที · โหมดตอบของเก่าระหว่างโหลดใหม่ยืดได้ถึง 10 นาที) ⇒ บันทึกลงฐานจริง
+       * แต่กลับไปหน้าลิสต์/กล่องงานยังได้สำเนาเก่าที่ไม่มีค่าที่เพิ่งบันทึก = เห็นว่า "ข้อมูลหาย"
+       */
+      clearUnitRequestCache();
       return res.status(200).json(item);
     } catch (e) {
       return handleApiError(res, e, 'siamraj-unit-assignments POST', { userId: req.user.sub });

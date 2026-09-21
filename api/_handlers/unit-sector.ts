@@ -13,6 +13,7 @@
  * 4. ครอบ `withAuth` เฉย ๆ เหมือน `/api/siamraj-unit-notes` (ข้อมูลระดับหน่วยงาน ไม่ใช่ข้อมูลบุคคล)
  */
 import { sendError, withAuth, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
+import { clearUnitRequestCache } from '../_lib/unitRequestCache.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { normalizeUnitSector } from '@/lib/unitSector';
@@ -57,6 +58,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
         //    aftercare.ts และ selection-progress.ts ที่เก็บ sub + email)
         [siteCode, sector, req.user?.sub ?? null, req.user?.email ?? null],
       );
+      // 🔴 ล้างสำเนาลิสต์ทันที — เหตุผลเต็มอยู่ที่ `siamraj-unit-assignments.ts` (21 ก.ย. 2569)
+      clearUnitRequestCache();
       return res.status(200).json({ site_code: siteCode, sector });
     }
 

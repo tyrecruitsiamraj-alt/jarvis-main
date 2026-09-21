@@ -6,6 +6,7 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
+import { clearUnitRequestCache } from '../_lib/unitRequestCache.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import {
   getUnitWorkStatus,
@@ -89,6 +90,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
         after: item,
       });
 
+      // 🔴 ล้างสำเนาลิสต์ทันที — เหตุผลเต็มอยู่ที่ `siamraj-unit-assignments.ts` (21 ก.ย. 2569)
+      clearUnitRequestCache();
       return res.status(200).json(item);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
