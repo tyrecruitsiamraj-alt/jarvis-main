@@ -13,6 +13,12 @@ export type PublicApplication = {
   last_call_outcome?: string | null;
   last_call_at?: string | null;
   /**
+   * สถานะสายล่าสุดในคิว (21 ก.ย. 2569) — `pending` `delivered` `completed` `failed` `cancelled`
+   * บอกได้ตั้งแต่ยังไม่มีผล (รออยู่ในคิว / AI รับไปโทรแล้ว) ต่างจาก `last_call_outcome`
+   * ที่มีเฉพาะสายที่จบแล้ว · ไม่มีค่า = ไม่เคยถูกส่งเข้าคิวเลย
+   */
+  last_call_status?: string | null;
+  /**
    * ผลติดต่อล่าสุดที่ **เจ้าหน้าที่บันทึกเอง** (086) — false = ติดต่อไม่สำเร็จ/ไม่เอางาน
    * เจ้าของสั่ง 23 ส.ค. 2569: `ok=false` นับเป็น "ไม่สนใจ" ในมุมมองรายชื่อ
    * ⚠️ ต้องอ่านคู่กับ `last_contact_at` เสมอ — เทียบเวลากับผลโทรว่าอันไหนใหม่กว่า

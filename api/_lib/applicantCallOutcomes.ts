@@ -70,6 +70,43 @@ export async function loadLatestCallOutcomeByPhone(
 }
 
 /**
+ * ═══ สถานะสายล่าสุดของ "หลายเบอร์" (21 ก.ย. 2569) ═══
+ *
+ * เจ้าของสั่งให้แท็บ "รายชื่อ" ในกล่องงาน *"บอกสถานะว่า กำลังโทร โทรแล้ว หรืออะไรต่าง ๆ
+ * รายงานแบบหน้าการติดตาม"*
+ *
+ * ต่างจาก `loadLatestCallOutcomeByPhone` ตรงที่ตัวนั้นเอาเฉพาะแถวที่ **มีผลแล้ว**
+ * ⇒ คนที่ยังอยู่ในคิว/AI เพิ่งรับไปโทร จะไม่มีอะไรบอกเลย ซึ่งคือช่องที่เจ้าของทัก
+ *
+ * ⚠️ คีย์เป็นเบอร์ E.164 เหมือนกัน · แถวล่าสุดของเบอร์นั้นชนะ (เทียบ `updated_at`)
+ */
+export type ApplicantCallState = { status: string | null; at: string | null };
+
+export async function loadLatestCallStateByPhone(
+  phones: Array<string | null | undefined>,
+): Promise<Map<string, ApplicantCallState>> {
+  const keys = [...new Set(phones.map((p) => toE164Thai(p || '')).filter((p): p is string => !!p))];
+  const out = new Map<string, ApplicantCallState>();
+  if (keys.length === 0) return out;
+
+  try {
+    const { rows } = await dbQuery<{ phone: string; status: string | null; at: string }>(
+      `select distinct on (${QUEUE_PHONE_EXPR})
+              ${QUEUE_PHONE_EXPR} as phone, status, updated_at as at
+         from lumos_dispatch_queue
+        where ${QUEUE_PHONE_EXPR} = any($1::text[])
+        order by ${QUEUE_PHONE_EXPR}, updated_at desc`,
+      [keys],
+    );
+    for (const r of rows) out.set(r.phone, { status: r.status, at: r.at });
+  } catch (e) {
+    // ตารางยังไม่ migrate = ไม่มีสถานะให้แสดง ไม่ใช่เหตุให้ทั้งลิสต์พัง
+    if (!isPgUndefinedTable(e)) throw e;
+  }
+  return out;
+}
+
+/**
  * วันนัดสัมภาษณ์ล่าสุดของ "หลายเบอร์" — แท็บติดตามนัดหมายใช้ตัวนี้
  *
  * ⚠️ **จงใจไม่อ่านจาก `candidate_interviews`** — ตารางนั้นผูกด้วย `candidate_id`

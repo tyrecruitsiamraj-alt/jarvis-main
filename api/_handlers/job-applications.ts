@@ -33,7 +33,11 @@ import {
   isRmSpecificType,
   normalizeRmPhone,
 } from '../../src/lib/recruitRmMasters.js';
-import { loadAppointmentByPhone, loadLatestCallOutcomeByPhone } from '../_lib/applicantCallOutcomes.js';
+import {
+  loadAppointmentByPhone,
+  loadLatestCallOutcomeByPhone,
+  loadLatestCallStateByPhone,
+} from '../_lib/applicantCallOutcomes.js';
 import { loadContactAppointments, loadLatestContactResults } from '../_lib/applicationContacts.js';
 import { loadLatestAttendanceByApplication } from '../_lib/applicationAttendance.js';
 import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
@@ -1164,6 +1168,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
             (item as Record<string, unknown>).last_call_outcome = hit.outcome;
             (item as Record<string, unknown>).last_call_at = hit.at;
           }
+        }
+      }
+      /**
+       * สถานะสายล่าสุด (21 ก.ย. 2569) — **ต่างจากผลโทรข้างบน**
+       * ผลโทรมีเฉพาะสายที่จบแล้ว · อันนี้บอกได้ตั้งแต่ "รออยู่ในคิว / AI รับไปโทรแล้ว"
+       * ซึ่งเป็นสิ่งที่เจ้าของสั่งให้แท็บ "รายชื่อ" ของกล่องงานรายงานแบบหน้าติดตาม
+       */
+      const stateByPhone = await loadLatestCallStateByPhone(items.map((i) => i.phone));
+      if (stateByPhone.size > 0) {
+        for (const item of items) {
+          const hit = stateByPhone.get(toE164Thai(item.phone || '') || '');
+          if (hit) (item as Record<string, unknown>).last_call_status = hit.status;
         }
       }
       // วันนัดสัมภาษณ์ — มาได้ 2 ทาง (แท็บติดตามนัดหมายโชว์คอลัมน์นี้):

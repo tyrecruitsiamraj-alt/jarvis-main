@@ -19,6 +19,11 @@ import {
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
 import { summarizeCallChoice } from '@/lib/callChoiceSummary';
+import {
+  FOLLOW_STATUS_LABEL,
+  FOLLOW_STATUS_TONE,
+  type FollowCallStatus,
+} from '@/lib/followApi';
 import { cn } from '@/lib/utils';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import { applicantAddressLine, applicantFactLine } from '@/lib/applicantDisplay';
@@ -43,6 +48,14 @@ export type JobApplicantsDialogProps = {
   open: boolean;
   job: JobRequest | null;
   onClose: () => void;
+  /**
+   * ฝังในป๊อปอื่น (21 ก.ย. 2569) — เจ้าของสั่งให้กล่องไล่งานประกาศบนหน้ากล่องงาน
+   * *"ต้องมีรายชื่อคนที่กรอกเข้ามาด้วยสิ พร้อมกับมีช่องแยกว่า สนใจ กับ ไม่สนใจ"*
+   *
+   * 🔴 **ห้ามซ้อน Dialog ใน Dialog** (กติกาโปรเจกต์) ⇒ โหมดนี้คืนเฉพาะเนื้อใน
+   * ไม่มีกรอบ Dialog · แพตเทิร์นเดียวกับ `GenApplyLinkDialog` / `EditPostingDialog`
+   */
+  embedded?: boolean;
 };
 
 /**
@@ -53,7 +66,16 @@ export type JobApplicantsDialogProps = {
  */
 type ApplicantTab = 'all' | 'interested' | 'not_interested';
 
-const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, onClose }) => {
+/** สถานะสายที่รู้จัก — ค่าที่อ่านไม่ออกต้องไม่ขึ้นป้ายมั่ว */
+const isFollowCallStatus = (v: unknown): v is FollowCallStatus =>
+  v === 'pending' || v === 'delivered' || v === 'completed' || v === 'failed' || v === 'cancelled';
+
+const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
+  open,
+  job,
+  onClose,
+  embedded = false,
+}) => {
   const [items, setItems] = useState<PublicApplication[]>([]);
   const [tab, setTab] = useState<ApplicantTab>('all');
   /**
@@ -284,8 +306,24 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
             </span>
           ) : a.claimed ? (
             <span className="text-[10px] text-muted-foreground">🔒 มีคนเก็บแล้ว</span>
+          ) : isFollowCallStatus(a.last_call_status) ? (
+            /**
+             * 🔴 สถานะสายระหว่างทาง (21 ก.ย. 2569) — เจ้าของสั่งให้แท็บรายชื่อ
+             * *"บอกสถานะว่า กำลังโทร โทรแล้ว หรืออะไรต่าง ๆ รายงานแบบหน้าการติดตาม"*
+             * ของเดิมขึ้นว่า "รอโทร" ทุกคนที่ยังไม่มีผล ⇒ แยกไม่ออกว่า
+             * **ยังไม่ได้ส่งให้ AI** กับ **ส่งแล้ว AI กำลังโทรอยู่**
+             * คำ/สีมาจาก `followApi` ชุดเดียวกับหน้าติดตาม ห้ามตั้งคำใหม่ที่นี่
+             */
+            <span
+              className={cn(
+                'rounded-full px-1.5 text-[10px] font-medium',
+                TONE[FOLLOW_STATUS_TONE[a.last_call_status]].chip,
+              )}
+            >
+              {FOLLOW_STATUS_LABEL[a.last_call_status]}
+            </span>
           ) : (
-            <span className="text-[10px] text-muted-foreground">รอโทร</span>
+            <span className="text-[10px] text-muted-foreground">ยังไม่ได้ส่งให้ AI</span>
           )}
           <span className="text-[11px] text-muted-foreground">{dateLabel(a.created_at)}</span>
         </div>
@@ -401,36 +439,60 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
     </li>
   );
 
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex max-h-[92dvh] w-[calc(100%-1.5rem)] max-w-[38rem] flex-col gap-0 overflow-hidden rounded-3xl border-border/70 p-0 lg:max-w-[64rem]">
-        <DialogHeader className="shrink-0 space-y-0 border-b border-border/50 bg-gradient-to-b from-primary/[0.07] to-transparent px-5 py-4 text-left sm:px-6">
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-              <Users className="h-5 w-5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <DialogTitle className="text-base font-medium leading-tight sm:text-lg">
-                ผู้สมัครที่กรอกฟอร์ม
-              </DialogTitle>
-              <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug sm:text-[13px]">
-                {job ? jobBoardCardTitle(job) : ''}
-                {!loading && !error ? ` · ${items.length} คน` : ''}
-              </DialogDescription>
+  /**
+   * หัวกล่อง — โหมดฝังใช้ `h3`/`p` ธรรมดา เพราะ `DialogTitle` ของ Radix
+   * ต้องอยู่ใต้ `Dialog` เท่านั้น เรียกนอกกรอบแล้วพัง
+   */
+  const titleNode = embedded ? (
+    <h3 className="text-sm font-medium leading-tight text-foreground">ผู้สมัครที่กรอกฟอร์ม</h3>
+  ) : (
+    <DialogTitle className="text-base font-medium leading-tight sm:text-lg">
+      ผู้สมัครที่กรอกฟอร์ม
+    </DialogTitle>
+  );
+  const descText = `${job ? jobBoardCardTitle(job) : ''}${!loading && !error ? ` · ${items.length} คน` : ''}`;
+  const descNode = embedded ? (
+    <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">{descText}</p>
+  ) : (
+    <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug sm:text-[13px]">
+      {descText}
+    </DialogDescription>
+  );
+
+  const head = (
+    <>
+          {/**
+           * 🔴 **โหมดฝังไม่มีหัวเรื่องและไม่มีปุ่มส่ง AI โทร** (เจ้าของสั่ง 21 ก.ย. 2569:
+           * *"ผู้สมัครที่กรอกฟอร์ม · 🤖 ส่งให้ AI โทร — เอาออก"*)
+           *
+           * ในกล่องงานมีแท็บ "รายชื่อ" บอกอยู่แล้วว่านี่คือรายชื่อ เขียนซ้ำอีกชั้นคือกินที่
+           * ส่วนปุ่มส่ง AI โทรยังอยู่ในป๊อปรายชื่อเต็ม (ปุ่ม "ดูรายชื่อ" บนการ์ด) เหมือนเดิม
+           */}
+          {embedded ? null : (
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+                <Users className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                {titleNode}
+                {descNode}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* ปุ่มส่ง AI โทร (S8) + ผลตอบกลับ · เส้น auto ส่งตอนกรอกอยู่แล้ว ปุ่มนี้เก็บตกค้าง */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={sendBusy || items.length === 0}
-              onClick={() => setConfirmSend(true)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {sendBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '🤖'} ส่งให้ AI โทร
-              {sendableApprox > 0 ? ` (~${sendableApprox})` : ''}
-            </button>
+          <div className={cn('flex flex-wrap items-center gap-2', !embedded && 'mt-3')}>
+            {embedded ? null : (
+              <button
+                type="button"
+                disabled={sendBusy || items.length === 0}
+                onClick={() => setConfirmSend(true)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {sendBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '🤖'} ส่งให้ AI โทร
+                {sendableApprox > 0 ? ` (~${sendableApprox})` : ''}
+              </button>
+            )}
             {/* คนโทรเข้ามาเอง ไม่ได้กรอกลิงก์ — คีย์เข้าใบนี้ได้เลย (20 ส.ค. 2569) */}
             <button
               type="button"
@@ -468,12 +530,13 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               เดิมจอ ≥lg กางเป็น 2 คอลัมน์คู่กัน ทำให้หน้าเดียวมีสองหน้าตาแล้วคนละที่กัน
               ⚠️ "ที่สนใจ" = คนที่ตอบสนใจ **ตอนโทร** ไม่ใช่สถานะใบสมัคร
               · เห็นทั้งสองแท็บเสมอแม้ยอด 0 — เลข 0 คือคำตอบ ไม่ใช่ช่องว่าง */}
-          <div className="mt-3 flex items-center gap-1">
+          <div className="mt-3 flex flex-wrap items-center gap-1">
             {(
               [
+                /* คำตามที่เจ้าของเขียนมาเอง 21 ก.ย. 2569 — ให้สามช่องอ่านเป็นชุดเดียวกัน */
                 ['all', 'รายชื่อทั้งหมด', shownItems.length],
-                ['interested', 'คนที่สนใจ', interested.length],
-                ['not_interested', 'ไม่สนใจ', notInterested.length],
+                ['interested', 'รายชื่อที่สนใจ', interested.length],
+                ['not_interested', 'รายชื่อที่ไม่สนใจ', notInterested.length],
               ] as Array<[ApplicantTab, string, number]>
             ).map(([id, label, n]) => (
               <button
@@ -491,8 +554,11 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               </button>
             ))}
           </div>
-        </DialogHeader>
+    </>
+  );
 
+  const content = (
+    <>
         {/* มุมมองประมวลผล (ติดต่อ→นัดหมาย) — ฟอร์ม RM ตัวเดิมโหมด embedded */}
         {processing ? (
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
@@ -572,6 +638,26 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
           )}
         </div>
         )}
+    </>
+  );
+
+  // โหมดฝัง — คืนเฉพาะเนื้อใน ไม่มีกรอบ Dialog (ห้าม Dialog ซ้อน Dialog)
+  if (embedded) {
+    return (
+      <div className="space-y-3">
+        <div className="space-y-0">{head}</div>
+        <div className="max-h-[26rem] overflow-y-auto">{content}</div>
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="flex max-h-[92dvh] w-[calc(100%-1.5rem)] max-w-[38rem] flex-col gap-0 overflow-hidden rounded-3xl border-border/70 p-0 lg:max-w-[64rem]">
+        <DialogHeader className="shrink-0 space-y-0 border-b border-border/50 bg-gradient-to-b from-primary/[0.07] to-transparent px-5 py-4 text-left sm:px-6">
+          {head}
+        </DialogHeader>
+        {content}
       </DialogContent>
     </Dialog>
   );

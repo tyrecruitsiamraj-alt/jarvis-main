@@ -41,13 +41,16 @@ import {
   Pencil,
   Send,
   StickyNote,
+  Users,
 } from 'lucide-react';
 
 import PageHeader from '@/components/shared/PageHeader';
 import UnitEditLogSection from '@/components/jobs/UnitEditLogSection';
 import EditPostingDialog from '@/components/jobs/EditPostingDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
+import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
 import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
@@ -159,6 +162,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const canSeeEditLog = hasPermission('admin');
 
   const [job, setJob] = React.useState<JobRequest | null>(null);
+  /** ช่องที่เปิดอยู่ — **เริ่มที่ "ตรวจสอบ" เสมอ** ตามที่เจ้าของสั่ง */
+  const [view, setView] = React.useState<'review' | 'people'>('review');
   const [error, setError] = React.useState<string | null>(null);
   /** ค่าที่เพิ่งแก้ — ทับบนฟอร์มทันทีโดยไม่ต้องโหลดใบใหม่ */
   const [publicPatch, setPublicPatch] = React.useState<Partial<JobRequest>>({});
@@ -295,6 +300,36 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
 
       <div className={cn('space-y-4', chrome ? 'px-4 py-4 md:px-6' : 'py-1')}>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+        {/**
+         * ═══ สองช่องบนสุด: **ตรวจสอบ** กับ **รายชื่อ** (เจ้าของสั่ง 21 ก.ย. 2569) ═══
+         *
+         * > *"เมื่อกดกล่องงาน มีให้เลือก 2 อัน โดย Default ให้โชว์หน้าตรวจสอบไว้ …
+         * >  ส่วนถ้ากดรายชื่อ ก็ขึ้นเป็น รายชื่อทั้งหมด พร้อมบอกสถานะ … รายชื่อที่สนใจ ·
+         * >  รายชื่อที่ไม่สนใจ"* — *"หน้านี้จะบอกว่าก่อนเอาขึ้นต้องตรวจสอบนะ และดูรายชื่อได้"*
+         *
+         * 🔴 **ห้ามเอารายชื่อไปต่อท้ายขั้นตอน** (เคยทำแบบนั้นแล้วเจ้าของตีกลับ)
+         * — ต้องเป็นสองช่องแยกกันที่กดสลับ ไม่ใช่กองต่อกันในหน้าเดียว
+         */}
+        <Tabs value={view} onValueChange={(v) => setView(v as 'review' | 'people')}>
+          <TabsList className="w-full">
+            <TabsTrigger value="review" className="flex-1">
+              <ClipboardCheck aria-hidden /> ตรวจสอบ
+            </TabsTrigger>
+            <TabsTrigger value="people" className="flex-1">
+              <Users aria-hidden /> รายชื่อ
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="people" className="mt-4">
+            {job ? (
+              <JobApplicantsDialog embedded open job={job} onClose={() => undefined} />
+            ) : (
+              <p className={cn('py-6 text-center text-xs', DASH.muted)}>กำลังโหลดใบขอ…</p>
+            )}
+          </TabsContent>
+
+          <TabsContent value="review" className="mt-4 space-y-4">
 
         {/* ── 🔴 แถบขั้น 1-4 — หัวใจของหน้านี้ ──
             บอกสามอย่าง: ขั้นไหนผ่านแล้ว · ใบนี้ค้างขั้นไหน · กำลังเปิดดูขั้นไหน */}
@@ -596,6 +631,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             <ChevronRight aria-hidden />
           </Button>
         ) : null}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

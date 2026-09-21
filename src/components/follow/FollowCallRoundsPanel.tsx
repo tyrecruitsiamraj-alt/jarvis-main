@@ -389,20 +389,13 @@ export default function FollowCallRoundsPanel({
             <p className={cn('text-[11.5px] font-medium', TONE[signal.tone].value)}>{signal.text}</p>
           </div>
         ) : null}
-        {aiText ? (
-          <p className={cn('border-t border-border/70 px-5 py-2.5 text-[11.5px] font-medium', TONE.info.value)}>
-            {aiText}
-          </p>
-        ) : rowsOfRound.length > 0 ? (
-          <p className={cn('border-t border-border/70 px-5 py-2.5 text-[11.5px]', DASH.muted)}>
-            {roundLabelOf(activeRound)} ยังไม่มีผลกลับจาก AI เลย
-          </p>
-        ) : null}
-        <p className={cn('border-t border-border/70 px-5 py-3 text-[10.5px]', DASH.muted)}>
-          ตัวเลขชุดนี้คือ <span className="font-medium">ทุกวัน</span> (ของปฏิทินข้างล่างคือวันที่เลือก) ·
-          รอโทร/กำลังโทร/โทรติด/โทรไม่ติด = สถานะของสาย · ไป/ไม่ไป = ผลปิดงานติดตาม —
-          คนเดียวอยู่ได้ทั้งสองแกน ช่องจึงไม่ได้บวกกันเป็น "ทั้งหมด"
-        </p>
+        {/**
+         * 🔴 **ถอดออก 21 ก.ย. 2569** (เจ้าของสั่ง *"เอาออกมันเกะกะ"*):
+         *   · บรรทัด "AI ได้คำตอบแล้ว N สาย — ยืนยันว่าไป … · เบอร์ผิด …"
+         *   · ย่อหน้าอธิบายว่าตัวเลขชุดนี้คือทุกวัน / ช่องไม่บวกกันเป็นทั้งหมด
+         * ทั้งสองบรรทัดพูดซ้ำกับตัวเลขที่อยู่ในกล่องข้างบนอยู่แล้ว · คำอธิบายฐานยังอยู่ครบ
+         * ใน `title` ของแต่ละกล่อง (`FOLLOW_ROUND_BUCKET_HINT`) กดค้างก็อ่านได้
+         */}
         {entries.length === 0 ? (
           <p className={cn('border-t border-border/70 px-5 py-3 text-[11.5px]', DASH.muted)}>
             ยังไม่มีงาน Follow — เพิ่มรายชื่อข้างล่างแล้วส่งโทร
@@ -749,16 +742,7 @@ export default function FollowCallRoundsPanel({
       ) : null}
       {/* ⚠️ ช่องพวกนี้ **ซ้อนกันได้** — "โทรติด" กับ "ไป" คนละแกน (สถานะสาย vs ผลปิดงาน)
           บวกทุกช่องแล้วมากกว่า "ทั้งหมด" เป็นเรื่องปกติ ไม่ใช่บั๊ก */}
-      <p
-        className={cn(
-          'text-[10px]',
-          v2 && 'border-t border-border/70 px-4 py-3 md:px-5',
-          DASH.muted,
-        )}
-      >
-        รอโทร/กำลังโทร/โทรติด/โทรไม่ติด = สถานะของสาย · ไป/ไม่ไป = ผลปิดงานติดตาม —
-        คนเดียวอยู่ได้ทั้งสองแกน ช่องจึงไม่ได้บวกกันเป็น "ทั้งหมด"
-      </p>
+      {/* 🔴 ย่อหน้าอธิบายท้ายแผงถูกถอดออกพร้อมกัน 21 ก.ย. 2569 — ซ้ำกับข้างบน */}
 
       {peopleDialogEl}
     </div>
