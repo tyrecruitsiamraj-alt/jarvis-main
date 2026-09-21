@@ -372,6 +372,23 @@ export async function getSiamrajUnitRequestById(
     item = rows[0] ? mapSiamrajRow(rows[0]) : null;
   }
 
+  /**
+   * 🔴 **เลขใบขอชั่วคราวที่ส่งมาแบบไม่มี prefix ต้องหาเจอด้วย** (21 ก.ย. 2569)
+   *
+   * เจ้าของแจ้ง: *"งานชั่วคราวมันแอดผู้รับผิดชอบไม่ได้หรอ"*
+   *
+   * ใบขอชั่วคราวอยู่คนละตาราง (`st_prequest_head`) และ `id` ของมันมี prefix
+   * `siamraj-pre:` แต่ **หน้ารายละเอียดส่ง `externalId` ซึ่งเป็นเลขเปล่า ๆ** ไปให้เส้นบันทึก
+   * ⇒ `isPrequestId()` เป็น false ⇒ ไปหาในตารางใบขอจริง ⇒ ไม่เจอ ⇒ ตอบ 404 "ไม่พบใบขอ"
+   * ⇒ **บันทึกผู้รับผิดชอบ/หมายเหตุของใบชั่วคราวไม่ได้เลยสักใบ**
+   *
+   * ⚠️ ถอยมาหาที่ตารางใบชั่วคราว **เฉพาะเมื่อหาในตารางใบจริงไม่เจอ** — ลำดับนี้สำคัญ
+   * เพราะเลขเดียวกันอาจมีทั้งสองที่เมื่อใบชั่วคราวถูกแปลงเป็นใบจริงแล้ว (ของจริงต้องชนะ)
+   */
+  if (!item && source === 'sqlserver' && !isPrequestId(id)) {
+    item = (await getSiamrajSqlServerPrequestById(normalizeLookupId(id))) as never;
+  }
+
   if (!item) return null;
   if (departmentScope && !jobAllowedByDepartmentScope(item, departmentScope)) return null;
   return item;

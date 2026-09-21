@@ -92,6 +92,14 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
   const [rosterRev, setRosterRev] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  /**
+   * 🔴 **บันทึกล้มต้องหน้าตาไม่เหมือนบันทึกสำเร็จ** (21 ก.ย. 2569)
+   *
+   * ของเดิมใช้ข้อความสีเทาตัวเล็กอันเดียวกันทั้งสองกรณี ⇒ คนกดแล้วเห็นตัวหนังสือจาง ๆ
+   * คิดว่าบันทึกแล้ว (ช่องยังโชว์ค่าที่พิมพ์ไว้เพราะเป็น state ในจอ) พอกลับมาอีกทีค่าหาย
+   * — อาการที่เจ้าของแจ้งว่า *"บันทึกได้แล้วหาย"*
+   */
+  const [saveFailed, setSaveFailed] = useState(false);
 
   // โหลดรายชื่อสรรหา/คัดสรรจาก roster + ฟังการเปลี่ยนแปลง
   useEffect(() => {
@@ -180,6 +188,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
     if (!key || saving) return;
     setSaving(true);
     setSaveMsg(null);
+    setSaveFailed(false);
     try {
       await saveSiamrajUnitAssignment(key, {
         recruiter_name: recruiter.trim() || null,
@@ -199,6 +208,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
       await queryClient.invalidateQueries({ queryKey: ['siamraj', 'unit-request', id] });
       setSaveMsg('บันทึกผู้รับผิดชอบแล้ว');
     } catch (e) {
+      setSaveFailed(true);
       setSaveMsg(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
     } finally {
       setSaving(false);
@@ -512,7 +522,17 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                     >
                       {saving ? 'กำลังบันทึก…' : 'บันทึกผู้รับผิดชอบ'}
                     </Button>
-                    {saveMsg && <span className="text-xs text-muted-foreground">{saveMsg}</span>}
+                    {saveMsg ? (
+                      <span
+                        className={cn(
+                          'text-xs font-medium',
+                          saveFailed ? TONE.danger.value : TONE.success.value,
+                        )}
+                      >
+                        {saveFailed ? '🔴 ' : '✓ '}
+                        {saveMsg}
+                      </span>
+                    ) : null}
                     {!requestKey && (
                       <span className="text-xs text-destructive">ใบขอนี้ไม่มีเลขที่ใบขอ จึงบันทึกไม่ได้</span>
                     )}
