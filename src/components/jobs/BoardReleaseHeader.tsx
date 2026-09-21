@@ -151,7 +151,7 @@ function Chip({
           : cn(
               'border-transparent',
               quiet
-                ? 'bg-slate-100/70 hover:bg-slate-200/70 dark:bg-slate-800/60 dark:hover:bg-slate-800'
+                ? TONE.neutral.tile
                 : cn(TONE[tone].soft, TONE[tone].softHover),
             ),
       )}
@@ -160,7 +160,7 @@ function Chip({
         <span
           className={cn(
             'flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-medium',
-            quiet ? cn('bg-slate-200/80 dark:bg-slate-700', DASH.cellMuted) : TONE[tone].solid,
+            quiet ? cn('bg-muted', DASH.cellMuted) : TONE[tone].solid,
           )}
           aria-hidden
         >
@@ -226,7 +226,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
         <div
           className={cn(
             'space-y-2 rounded-2xl border px-3.5 py-3',
-            broken ? 'border-amber-300/70 bg-amber-50/60 dark:border-amber-800/60 dark:bg-amber-950/20' : 'border-border/60 bg-card/50',
+            broken ? TONE.warn.soft : 'border-border/60 bg-card/50',
           )}
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -261,12 +261,12 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
             </div>
           ) : (
             <>
-              <div className="h-1.5 w-full animate-pulse rounded-full bg-slate-200/70 dark:bg-slate-800" />
+              <div className="h-1.5 w-full animate-pulse rounded-full bg-muted" />
               <div className="flex flex-wrap items-stretch gap-2">
                 {[0, 1, 2].map((i) => (
                   <div
                     key={i}
-                    className="h-14 min-w-0 flex-1 animate-pulse rounded-xl bg-slate-100/80 dark:bg-slate-800/60"
+                    className="h-14 min-w-0 flex-1 animate-pulse rounded-xl bg-muted/70"
                   />
                 ))}
               </div>
@@ -303,12 +303,12 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
 
         {ledger.percent === null ? null : (
           <div
-            className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800"
+            className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
             role="img"
             aria-label={`ปล่อยแล้ว ${ledger.percent}%`}
           >
             <div
-              className="h-full rounded-full bg-emerald-500 transition-[width] duration-500 dark:bg-emerald-400"
+              className={cn('h-full rounded-full transition-[width] duration-500', TONE.success.dot)}
               style={{ width: `${ledger.percent}%` }}
             />
           </div>
@@ -353,7 +353,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
               <React.Fragment key={s.key}>
                 {i > 0 ? (
                   <ChevronRight
-                    className="h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-slate-700"
+                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40"
                     aria-hidden
                   />
                 ) : null}

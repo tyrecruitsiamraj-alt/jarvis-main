@@ -931,7 +931,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   }, [isStaff, deepLinkHandled, loading, searchParams, jobs]);
 
   return (
-    <div className="relative bg-gradient-to-b from-blue-100/35 via-blue-50/10 to-transparent">
+    <div className="relative bg-gradient-to-b from-primary/10 via-primary/[0.04] to-transparent">
 
       <div className="relative mx-auto max-w-6xl px-4 md:px-6 pt-8 pb-6 md:pt-12 md:pb-10">
         {/* ฝั่งเจ้าหน้าที่ = hero เข้มตาม mockup rev.3 ข้อ 04 · ฝั่งคนนอกคงหัวสว่างเดิมไว้ (หน้าแบรนด์) */}
@@ -1423,34 +1423,40 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 // flex-col + h-full: grid ยืดกล่องสูงเท่ากันอยู่แล้ว แต่ลูกเรียงชิดบน
                 // พื้นที่เหลือจึงกองใต้ footer → แถบ "ผู้สมัคร N คน" ของแต่ละใบลอยคนละระดับ
                 // (⚠️ ใส่ที่จุดเรียกใช้เท่านั้น ห้ามแก้ ui/card.tsx ซึ่งทั้งแอปใช้ร่วมกัน)
-                'group jarvis-interactive-card flex h-full flex-col overflow-hidden rounded-2xl border-white/70 transition-all duration-300 hover:border-blue-300/40',
+                'group jarvis-interactive-card flex h-full flex-col overflow-hidden rounded-2xl border-white/70 transition-all duration-300 hover:border-primary/30',
                 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
               )}
             >
               <CardHeader className="space-y-3 pb-2">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                  {/**
+                   * 🔴 **จังหวะบรรทัดของหัวการ์ด — คุมที่เดียวด้วย `space-y-1`** (21 ก.ย. 2569)
+                   * เจ้าของสั่ง: *"ช่องไฟการเว้นบรรทัด และระยะห่างมันต้องพอดีกัน เท่ากัน"*
+                   * ของเดิมแต่ละบรรทัดตั้ง `mt-*` เองคนละค่า (mt-1 · mt-0.5 · mt-2)
+                   * ⇒ ระยะห่างไม่เท่ากันและแก้ทีต้องไล่ทุกบรรทัด
+                   */}
+                  <div className="min-w-0 space-y-1">
                     {/* ป้ายใบขอชั่วคราว (17 ส.ค. 2569 · เปลี่ยนคำ 19 ส.ค.) — ต้องรู้ตั้งแต่แรกเห็น
                         ว่ายังไม่ใช่ใบจริง เพราะยังไม่การันตีว่าจะเปิดงาน (หาคนล่วงหน้าได้ แต่อย่าไปสัญญา) */}
-                    <PrequestBadge job={job} className="mb-1" />
-                    <h2 className="text-base font-medium leading-snug text-foreground line-clamp-2 group-hover:text-blue-600 transition-colors">
+                    <PrequestBadge job={job} />
+                    <h2 className="line-clamp-2 text-base font-medium leading-snug text-foreground transition-colors group-hover:text-primary">
                       {jobBoardCardTitle(job)}
                     </h2>
                     {/* ตำแหน่งงานอยู่ใต้ชื่อไซต์ทันที + ไฮไลต์สี (เจ้าของสั่ง 17 ส.ค. 2569:
                         *"ตำแหน่งงานอยู่ใต้ Site งาน และขอไฮไลสีด้วย"*)
                         เดิมตำแหน่งเป็นชิปเทา ๆ ปนอยู่แถวล่างกับประเภทงาน กวาดตาหาไม่เจอ
                         ทั้งที่เป็นคำที่คนใช้ตัดสินใจมากที่สุดบนการ์ด */}
-                    <p className="mt-1 line-clamp-2 text-sm font-medium leading-snug text-blue-700 dark:text-blue-300">
+                    <p className="line-clamp-2 text-sm font-medium leading-snug text-primary">
                       {publicJobPositionLabel(job)}
                     </p>
                     {/* บรรทัดรอง: ตัดตำแหน่งที่ซ้ำกับบรรทัดสีน้ำเงินข้างบนออก (เดิมพิมพ์ซ้ำทุกใบ) */}
-                    <p className="mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
+                    <p className="line-clamp-2 text-xs leading-4 text-muted-foreground">
                       {jobBoardCardSubtitle(job) || EM_DASH}
                     </p>
                     {/* เลขที่ใบขอโชว์เฉพาะเจ้าหน้าที่ (หน้าสมัครสาธารณะไม่ต้องเห็น จึงไม่จองที่)
                         แต่ในฝั่งเจ้าหน้าที่ต้องมีที่ยืนทุกใบ ไม่งั้นแถวล่างเลื่อนไม่ตรงกัน */}
                     {isStaff ? (
-                      <div className="mt-0.5 flex items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2">
                         <p className="font-mono text-[11px] leading-4 text-muted-foreground/80">
                           {dashIfEmpty(job.request_no)}
                         </p>
@@ -1483,7 +1489,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       ? (() => {
                           const progress = releaseProgressOf(job, releaseFacts);
                           return (
-                            <div className="mt-2" title={releaseProgressTitle(progress)}>
+                            <div className="pt-1" title={releaseProgressTitle(progress)}>
                               <BoardCardProgress progress={progress} />
                             </div>
                           );
@@ -1552,7 +1558,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   จึงไม่ทำให้แถบ "ผู้สมัคร N คน" ของแต่ละใบอยู่คนละระดับอีก */}
               <CardContent className="flex-1 space-y-2 pb-4">
                 <p className="flex items-start gap-2 text-xs leading-4 text-muted-foreground line-clamp-2">
-                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600/70" />
+                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" />
                   {/* ข้อความสำรองแบบเดียวกับการ์ดกล่องลอย ('ไม่ได้ระบุจังหวัด') —
                       คำที่ผู้สมัครทั่วไปอ่านรู้เรื่อง เพราะโผล่บนหน้าสมัครสาธารณะด้วย */}
                   {job.location_address?.trim() || 'ไม่ได้ระบุสถานที่'}
@@ -1563,7 +1569,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                  * ⚠️ ข้อมูลห้ามหาย — ทุกฟิลด์ยังอยู่ครบ แค่ไม่ตกลงบรรทัดใหม่บนจอแคบ
                  * จอกว้างขึ้น (`sm:`) กลับไปพับหลายบรรทัดตามเดิม
                  */}
-                <div className="flex flex-nowrap items-center gap-3 overflow-x-auto text-xs sm:flex-wrap sm:overflow-visible">
+                <div className="flex flex-nowrap items-center gap-x-3 gap-y-1.5 overflow-x-auto text-xs sm:flex-wrap sm:overflow-visible">
                   {/* ยอดรายเดือน = ค่าแรงหลัก + รายได้มั่นคง (เจ้าของสั่ง 16 ส.ค. 2569)
                       ⚠️ ถอยไป total_income เมื่อคิดไม่ได้ — แต่ตัวนั้นบางใบเป็น**อัตรารายวัน**
                       (410 = ค่าแรง/วัน · 20 จาก 200 ใบ) จึงไม่ติดคำว่า "/เดือน" ให้ */}
@@ -1597,7 +1603,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     เรียง ERP ก่อนเพราะมีตัวเลขจริงกำกับ น่าเชื่อกว่า */}
                 {[...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)].length > 0 ? (
                   // 🔴 มือถือ: พับเหลือแถวเดียวเลื่อนได้เหมือนแถวเงินเดือนด้านบน (เจ้าของเคาะ 5 ก.ย. 2569)
-                  <div className="flex flex-nowrap items-center gap-1 overflow-x-auto sm:flex-wrap sm:overflow-visible">
+                  <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto sm:flex-wrap sm:overflow-visible">
                     {[...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)].map((b) => (
                       <span key={b} className={cn('shrink-0 whitespace-nowrap', TONE.success.chip)}>
                         {b}
@@ -1654,7 +1660,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     {/* เจ้าของสั่ง 14 ส.ค. 2569: จัดเรียงให้สวย · "สร้างลิงก์" → "Gen link"
                         · 2 ปุ่มคนละสี (ค้นหา = ฟ้า · Gen link = ม่วง) — สีมาจาก TONE ที่เดียว
                         แถวเดียว wrap ได้ · "ผู้สมัคร N คน" ซ้าย · ปุ่ม+ดูรายชื่อ ขวา */}
-                    <div className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+                    <div className="flex w-full flex-wrap items-center justify-between gap-1.5">
                       <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-medium text-foreground">
                         <Users className={cn('h-3.5 w-3.5', TONE.info.value)} />
                         ผู้สมัคร {countFor(applicantIdx, job.id)} คน
@@ -1805,7 +1811,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       // — "กล่องลอยทำให้เหมือนกับประกาศจากใบขอ") · flex-col + h-full
                       // คือตัวที่ทำให้กล่องสูงเท่ากันทั้งแถวและ footer ปักอยู่ล่างสุด
                       // เดิมกล่องลอยไม่มีสองคลาสนี้ แถวจึงสูงไม่เท่ากันและแถบล่างลอยคนละระดับ
-                      'group jarvis-interactive-card flex h-full flex-col overflow-hidden rounded-2xl border-white/70 transition-all duration-300 hover:border-blue-300/40',
+                      'group jarvis-interactive-card flex h-full flex-col overflow-hidden rounded-2xl border-white/70 transition-all duration-300 hover:border-primary/30',
                       'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                       s.postings === 0 && 'opacity-60',
                     )}
@@ -1813,7 +1819,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     <CardHeader className="space-y-3 pb-2">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <h2 className="line-clamp-2 text-base font-medium leading-snug text-foreground transition-colors group-hover:text-blue-600">
+                          <h2 className="line-clamp-2 text-base font-medium leading-snug text-foreground transition-colors group-hover:text-primary">
                             {k.label}
                           </h2>
                           <p className="mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
@@ -1840,7 +1846,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     </CardHeader>
                     <CardContent className="flex-1 space-y-2 pb-4">
                       <p className="flex items-start gap-2 text-xs leading-4 text-muted-foreground line-clamp-2">
-                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600/70" />
+                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" />
                         {s.provinces.length > 0 ? s.provinces.join(' · ') : 'ไม่ได้ระบุจังหวัด'}
                       </p>
                     </CardContent>
@@ -1849,7 +1855,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           ⚠️ ไม่มีปุ่ม "ดูรายชื่อ" เพราะใบสมัครผูกกับ `job_id` ไม่ได้ผูกกับ
                           ประกาศ — กรองรายชื่อ "เฉพาะกล่องลอยประเภทนี้" ยังทำไม่ได้จริง
                           ใส่ไปก็เป็นปุ่มหลอก */}
-                      <div className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+                      <div className="flex w-full flex-wrap items-center justify-between gap-1.5">
                         <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-medium text-foreground">
                           <Users className={cn('h-3.5 w-3.5', TONE.info.value)} />
                           ผู้สมัคร {s.applicants.toLocaleString('th-TH')} คน

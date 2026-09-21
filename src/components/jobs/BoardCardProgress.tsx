@@ -40,7 +40,7 @@ const BoardCardProgress: React.FC<Props> = ({ progress, className }) => {
                 <span
                   className={cn(
                     'h-px flex-1 rounded-full',
-                    no <= doneSteps ? TONE.success.dot : 'bg-slate-200 dark:bg-slate-700',
+                    no <= doneSteps ? TONE.success.dot : 'bg-muted',
                   )}
                 />
               ) : null}
@@ -50,11 +50,9 @@ const BoardCardProgress: React.FC<Props> = ({ progress, className }) => {
                   done
                     ? cn(TONE.success.dot, 'text-white')
                     : current
-                      ? cn(
-                          'bg-white text-blue-800 ring-2 ring-blue-500',
-                          'dark:bg-slate-900 dark:text-blue-300 dark:ring-blue-400',
-                        )
-                      : 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400',
+                      ? /* ขั้นที่ค้างอยู่ — วงแหวนสีหลักของธีม ไม่ตั้งเฉดเอง */
+                        'bg-background text-primary ring-2 ring-primary'
+                      : cn('bg-muted', DASH.muted),
                 )}
               >
                 {no}
@@ -81,7 +79,7 @@ const BoardCardProgress: React.FC<Props> = ({ progress, className }) => {
 
       {/* แถบความคืบหน้า — ปลายทาง 100% คือ "ปล่อยขึ้นหน้าสาธารณะ" ไม่ใช่ "หาคนได้" */}
       <div className="flex items-center gap-2">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
           <div
             className={cn('h-full rounded-full transition-all', TONE.success.dot)}
             style={{ width: `${percent}%` }}

@@ -74,12 +74,12 @@ function countActiveFilters(...values: string[]): number {
 
 function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-blue-200/70 bg-blue-50/90 py-1 pl-2.5 pr-1 text-xs font-medium text-blue-900">
+    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/25 bg-primary/10 py-1 pl-2.5 pr-1 text-xs font-medium text-primary">
       <span className="truncate">{label}</span>
       <button
         type="button"
         onClick={onRemove}
-        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-blue-700/80 transition-colors hover:bg-blue-200/60 hover:text-blue-900"
+        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-primary/80 transition-colors hover:bg-primary/15 hover:text-primary"
         aria-label={`ลบตัวกรอง ${label}`}
       >
         <X className="h-3 w-3" />
@@ -224,9 +224,9 @@ const JobBoardTopFilters: React.FC<Props> = ({
       ) : null}
       {positionFilter ? (
         lockPosition ? (
-          <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/90 py-1 px-2.5 text-xs font-medium text-amber-950">
+          <span className={cn('inline-flex max-w-full items-center gap-1 rounded-full border py-1 px-2.5 text-xs font-medium', TONE.warn.soft, TONE.warn.value)}>
             <span className="truncate">{positionFilter}</span>
-            <span className="text-[10px] text-amber-800/80">ล็อก</span>
+            <span className="text-[10px] opacity-80">ล็อก</span>
           </span>
         ) : (
           <FilterChip label={positionFilter} onRemove={() => onPositionFilterChange('')} />

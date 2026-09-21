@@ -9156,3 +9156,33 @@ Commit & Push · สำคัญต้องคุมด้วย Shadcn ห้�
 และคุมเงื่อนไขต้นเหตุ (สำเนายังเก็บของที่แปะแล้วอยู่จริง)
 
 **ด่านตรวจ:** test 3,245 ผ่าน / 6 skip · tsc = 0 · eslint 0 error
+
+### 21 ก.ย. 2569 (เย็น) — หน้ากล่องงานเข้าธีม + ช่องไฟเท่ากัน
+
+**เจ้าของสั่ง:** *"หน้ากล่องงานทำให้มันเข้ากับธีม โทนหน่อย · ทั้งระบบ Weight ไม่เกิน Semi ·
+ช่องไฟการเว้นบรรทัด และระยะห่างมันต้องพอดีกัน เท่ากัน"*
+
+**1. สี — เลิกหยิบเฉดดิบจากจานสีของ Tailwind**
+
+| ไฟล์ | เดิม | ใหม่ |
+| --- | --- | --- |
+| `JobBoardView.tsx` | `group-hover:text-blue-600` · `text-blue-700 dark:text-blue-300` · `text-blue-600/70` · `hover:border-blue-300/40` · `from-blue-100/35 via-blue-50/10` | `group-hover:text-primary` · `text-primary` · `text-primary/70` · `hover:border-primary/30` · `from-primary/10 via-primary/[0.04]` |
+| `BoardCardProgress.tsx` | `bg-slate-200 dark:bg-slate-700` · `bg-white text-blue-800 ring-blue-500 …` | `bg-muted` · `bg-background text-primary ring-primary` |
+| `BoardReleaseHeader.tsx` | tile/แถบ slate-* · กล่องเตือน amber-* · แถบ emerald-500 | `TONE.neutral.tile` · `TONE.warn.soft` · `TONE.success.dot` · `bg-muted` |
+| `JobBoardTopFilters.tsx` | ชิป blue-* / amber-* | `primary/10` + `TONE.warn.*` |
+
+⇒ เปลี่ยนธีมทั้งระบบทีเดียวได้จริงแล้วสำหรับหน้านี้ (แก้ตัวแปรที่ `src/index.css` ที่เดียว)
+
+**2. ช่องไฟ — วัดบนจอจริง**
+* หัวการ์ดเดิมตั้ง `mt-*` เองรายบรรทัด (`mt-1` · `mt-0.5` · `mt-2`) ⇒ เปลี่ยนเป็น `space-y-1` คุมที่เดียว
+  **วัดหลังแก้: ทุกการ์ดได้ช่องไฟ 5px เท่ากันทุกบรรทัด** (ก่อนหน้านี้ 2/4/8px ปนกัน)
+* แถวชิปในการ์ดเดิมมี 4 ค่า (`gap-1` · `gap-1.5` · `gap-3` · `gap-x-2 gap-y-1.5`) ⇒ ยุบเหลือ `gap-1.5`
+  (คงไว้เฉพาะ `gap-1` ที่เป็นระยะไอคอน-ข้อความ **ภายในชิป** ซึ่งคนละเรื่องกับระยะระหว่างชิป)
+
+**3. น้ำหนักตัวอักษร** — วัดบนจอจริง: มีแค่ **400 กับ 500** (0 จุดที่เกิน 500)
+เพดานของระบบต่ำกว่า semibold อยู่แล้ว มีด่าน `typographyRules` คุม
+
+**ด่านใหม่:** `tests/api/boardThemeTokens.test.ts` — สี่ไฟล์ของหน้ากล่องงานห้ามมีเฉดดิบ
+⚠️ **ที่อื่นยังมีค้าง — วัดวันเดียวกัน 84 ไฟล์ · 930 จุดทั้งระบบ** รอเจ้าของสั่งค่อยไล่เก็บ
+
+**ด่านตรวจ:** test 3,249 ผ่าน / 6 skip · tsc = 0 · eslint 0 error · ดูบนจอจริงแล้ว
