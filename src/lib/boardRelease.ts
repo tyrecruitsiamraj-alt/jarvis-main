@@ -37,7 +37,24 @@ import { openJobBoxOf } from '@/lib/jobBoxGroups';
 import type { JobRequest } from '@/types';
 
 /** ก้อนบนหัวกล่องงาน */
-export type ReleaseLaneKey = 'all' | 'released' | 'unreleased';
+export type ReleaseLaneKey = 'all' | 'released' | 'unreleased' | 'sourcing' | 'started';
+
+/**
+ * 🔴 **สองก้อนย่อยของ "ยังไม่ปล่อย"** (เจ้าของเคาะ 21 ก.ย. 2569)
+ *
+ * ปัญหาที่ทำให้ต้องมี: หัวจอเขียน *"ยังไม่ปล่อย 195 ใบ"* แต่ปุ่มส่งทีเดียวเขียน
+ * *"175 ใบ"* แล้วต่อท้ายด้วยคำแก้ตัวตัวเล็ก ๆ ว่า "ไม่รวม 20 ใบที่มีคนเริ่มงานแล้ว"
+ * ⇒ เลขสองที่บนจอเดียวกันพูดคนละชุด คนอ่านเลยไม่เชื่อทั้งคู่
+ *
+ * เจ้าของสั่ง: *"แยกยอดเป็นสองก้อน … เลขทุกที่บวกกันได้ ไม่ต้องมีคำแก้ตัว"*
+ *   `sourcing` ยังต้องหาคน  = ปุ่มส่งทีเดียวผูกกับก้อนนี้ตรง ๆ
+ *   `started`  มีคนเริ่มงานแล้ว = ERP พาไปเริ่มงานแล้ว ประกาศหาคนไม่มีประโยชน์
+ *   `sourcing + started = unreleased` เป๊ะ (มีเทสต์คุม)
+ *
+ * ⚠️ **ไม่ใช่ก้อนที่สี่ที่เคยถูกสั่งยุบ** — ของเดิมชื่อ "ไม่ต้องปล่อย" และอยู่ระดับ
+ * เดียวกับสามก้อนหลัก · ของใหม่เป็น**ก้อนย่อยใต้ "ยังไม่ปล่อย"** สามก้อนหลักยังเหมือนเดิม
+ */
+export const UNRELEASED_SPLIT_KEYS = ['sourcing', 'started'] as const;
 
 /** ขั้นที่ใบ "ยังไม่ปล่อย" ค้างอยู่ — ตรงกับขั้นตอน 1 2 3 4 ที่เจ้าของเคาะ */
 export type ReleaseStepKey = 'info' | 'place' | 'benefits' | 'publish';
@@ -152,6 +169,14 @@ export const RELEASE_LANE_TEXT: Record<ReleaseLaneKey, { label: string; hint: st
     label: 'ยังไม่ปล่อย',
     hint: 'คนนอกยังไม่เห็นใบนี้ — นี่คือกองงานปล่อยประกาศ',
   },
+  sourcing: {
+    label: 'ยังต้องหาคน',
+    hint: 'ยังไม่ปล่อย และยังต้องหาคนจริง — ปุ่มส่งประกาศทีเดียวส่งชุดนี้',
+  },
+  started: {
+    label: 'มีคนเริ่มงานแล้ว',
+    hint: 'ยังไม่ปล่อย แต่ระบบงานหลักพาไปเริ่มงานแล้ว — ปล่อยประกาศหาคนไปก็ไม่มีประโยชน์',
+  },
 };
 
 /**
@@ -254,6 +279,11 @@ export type ReleaseLedger = {
    * 🔴 ปุ่มปล่อยเป็นชุดต้องใช้เลขนี้ ห้ามใช้ `unreleased` (ดูเหตุผลที่ `stillSourcing`)
    */
   releasable: number;
+  /**
+   * ยังไม่ปล่อย **แต่มีคนเริ่มงานแล้ว** — `releasable + startedAlready = unreleased` เป๊ะ
+   * แยกออกมาเพื่อให้จอพิมพ์สองก้อนได้โดยไม่ต้องคำนวณเองที่หน้าจอ (หนึ่งเมตริกหนึ่งนิยาม)
+   */
+  startedAlready: number;
 };
 
 /**
@@ -315,6 +345,7 @@ export function buildReleaseLedger(
     releasedSilent: released - releasedWithApplicants,
     applicantHeads,
     releasable,
+    startedAlready: unreleased - releasable,
   };
 }
 
@@ -325,6 +356,11 @@ export function filterByReleaseLane(
   lane: ReleaseLaneKey | null,
 ): JobRequest[] {
   if (!lane || lane === 'all') return [...openJobs];
+  // สองก้อนย่อยของ "ยังไม่ปล่อย" — แบ่งด้วยกติกาเดียวกับปุ่มส่งทีเดียว (`stillSourcing`)
+  if (lane === 'sourcing') return releasableJobsOf(openJobs, facts);
+  if (lane === 'started') {
+    return openJobs.filter((j) => !facts.isReleased(j) && !stillSourcing(j));
+  }
   return openJobs.filter((j) => releaseLaneOf(j, facts) === lane);
 }
 

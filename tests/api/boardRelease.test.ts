@@ -178,6 +178,37 @@ describe('buildReleaseLedger — 🔴 เลขต้องกระทบยอ
     expect(led.releasable).toBe(5);
     expect(releasableJobsOf(jobs, facts).map((j) => j.id)).not.toContain('moved');
   });
+
+  /**
+   * 🔴 สองก้อนย่อยของ "ยังไม่ปล่อย" (เจ้าของเคาะ 21 ก.ย. 2569)
+   * เดิมหัวจอโชว์ยอดรวมก้อนเดียว แล้วปุ่มส่งโชว์อีกเลขพร้อมคำแก้ตัวต่อท้าย
+   * ⇒ เลขสองที่บนจอเดียวกันพูดคนละชุด
+   */
+  it('ยังต้องหาคน + มีคนเริ่มงานแล้ว = ยังไม่ปล่อย เป๊ะ', () => {
+    expect(led.releasable + led.startedAlready).toBe(led.unreleased);
+    expect(led.startedAlready).toBe(1);
+  });
+
+  it('กดก้อน "ยังต้องหาคน" ได้ใบชุดเดียวกับที่ปุ่มส่งทีเดียวจะส่ง', () => {
+    const shown = filterByReleaseLane(jobs, facts, 'sourcing').map((j) => j.id).sort();
+    const willSend = releasableJobsOf(jobs, facts).map((j) => j.id).sort();
+    expect(shown).toEqual(willSend);
+    expect(shown).not.toContain('moved');
+  });
+
+  it('กดก้อน "มีคนเริ่มงานแล้ว" ได้เฉพาะใบที่ ERP พาไปต่อแล้ว', () => {
+    const shown = filterByReleaseLane(jobs, facts, 'started').map((j) => j.id);
+    expect(shown).toEqual(['moved']);
+  });
+
+  it('สองก้อนย่อยรวมกันแล้วได้ใบเท่ากับเลน "ยังไม่ปล่อย" ไม่ซ้ำไม่ขาด', () => {
+    const a = filterByReleaseLane(jobs, facts, 'sourcing').map((j) => j.id);
+    const b = filterByReleaseLane(jobs, facts, 'started').map((j) => j.id);
+    const both = [...a, ...b].sort();
+    const unreleased = filterByReleaseLane(jobs, facts, 'unreleased').map((j) => j.id).sort();
+    expect(both).toEqual(unreleased);
+    expect(new Set(both).size).toBe(both.length);
+  });
 });
 
 /**

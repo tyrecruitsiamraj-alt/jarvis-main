@@ -107,6 +107,47 @@ function LaneTile({
 }
 
 /**
+ * ก้อนย่อยใต้ "ยังไม่ปล่อย" — เล็กกว่า `LaneTile` เพื่อบอกสายตาว่าเป็นของที่แตกออกมา
+ * ไม่ใช่ก้อนหลักก้อนที่สี่ (เจ้าของสั่งยุบก้อนที่สี่ไปแล้ว 28 ส.ค. 2569)
+ */
+function SubLaneTile({
+  laneKey,
+  count,
+  active,
+  tone,
+  onClick,
+}: {
+  laneKey: ReleaseLaneKey;
+  count: number;
+  active: boolean;
+  tone: 'warn' | 'success' | 'neutral';
+  onClick: () => void;
+}) {
+  const t = RELEASE_LANE_TEXT[laneKey];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={t.hint}
+      className={cn(
+        'flex min-w-0 items-baseline gap-2 rounded-lg border px-3 py-1.5 text-left transition-colors',
+        active
+          ? 'border-primary bg-primary/10'
+          : cn('border-transparent', TONE[tone].soft, TONE[tone].softHover),
+      )}
+    >
+      <span className={cn('whitespace-nowrap text-[11px] font-medium', TONE[tone].value)}>
+        {t.label}
+      </span>
+      <span className={cn('font-mono text-base font-medium leading-none tabular-nums', TONE[tone].num)}>
+        {th(count)}
+      </span>
+    </button>
+  );
+}
+
+/**
  * ชิปเล็กบนแถวล่าง
  *
  * 🔴 `step` ทำให้ชิป **อ่านออกว่าเป็นขั้นตอน ไม่ใช่ป้ายสถานะ** (แก้ 27 ส.ค. 2569)
@@ -337,10 +378,43 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
             onClick={() => onLaneChange(lane === 'unreleased' ? null : 'unreleased')}
           />
         </div>
+
+        {/**
+         * 🔴 **แตก "ยังไม่ปล่อย" เป็นสองก้อนย่อย** (เจ้าของเคาะ 21 ก.ย. 2569)
+         *
+         * ของเดิม: หัวเขียน "ยังไม่ปล่อย 195" · ปุ่มส่งเขียน "175" แล้วต่อท้ายด้วย
+         * คำแก้ตัวตัวเล็ก ๆ ว่า "ไม่รวม 20 ใบที่มีคนเริ่มงานแล้ว" ⇒ เลขสองที่บนจอเดียวกัน
+         * พูดคนละชุด คนอ่านไม่เชื่อทั้งคู่ (เจ้าของ: *"เลขทุกที่บวกกันได้ ไม่ต้องมีคำแก้ตัว"*)
+         *
+         * 🔴 **ไม่ใช่ก้อนที่สี่ที่เคยถูกสั่งยุบ 28 ส.ค.** — นั่นชื่อ "ไม่ต้องปล่อย" และอยู่
+         * ระดับเดียวกับสามก้อนหลัก · ตัวนี้เป็นก้อนย่อย**ใต้**ยังไม่ปล่อย สามก้อนหลักคงเดิม
+         */}
+        <div className="flex flex-wrap items-stretch gap-2 pl-1">
+          <span className={cn('self-center text-[11px]', DASH.muted)} aria-hidden>
+            ↳
+          </span>
+          <SubLaneTile
+            laneKey="sourcing"
+            count={ledger.releasable}
+            tone="warn"
+            active={lane === 'sourcing'}
+            onClick={() => onLaneChange(lane === 'sourcing' ? null : 'sourcing')}
+          />
+          <SubLaneTile
+            laneKey="started"
+            count={ledger.startedAlready}
+            tone="neutral"
+            active={lane === 'started'}
+            onClick={() => onLaneChange(lane === 'started' ? null : 'started')}
+          />
+          <span className={cn('self-center text-[11px]', DASH.muted)}>
+            บวกกันได้ {th(ledger.unreleased)} ใบพอดี
+          </span>
+        </div>
       </div>
 
       {/* ── ยังไม่ปล่อย: ติดขั้นไหน — 🔴 โชว์ตั้งแต่เปิดหน้า ไม่ต้องกดก้อนก่อน ── */}
-      {lane === null || lane === 'all' || lane === 'unreleased' ? (
+      {lane === null || lane === 'all' || lane === 'unreleased' || lane === 'sourcing' || lane === 'started' ? (
         <div className="space-y-1.5 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-[11px] font-medium text-foreground">

@@ -128,9 +128,11 @@ import { CLOSED_RANGE_OPTIONS } from '@/hooks/useClosedRequestsFeed';
 import { jobPositionUnits, sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import { INCOME_PERIOD_LABEL } from '@/lib/incomeBreakdown';
+import { incomeDisplay } from '@/lib/incomeLabel';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import { compareJobsByAgeDaysDesc, getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { MapPin, Briefcase, Calendar, Banknote, RefreshCw, Send, Users, Link2, Pencil, Search, ClipboardCheck, Flag, EyeOff, LoaderCircle } from 'lucide-react';
 const RecruitLaneDialog = React.lazy(() => import('@/components/jobs/RecruitLaneDialog'));
 import {
@@ -386,8 +388,18 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     return raw === 'closed' || raw === 'cancelled' ? raw : null;
   }, [laneParam, legacyStage]);
 
+  /**
+   * เลนที่กดอยู่ — รวมสองก้อนย่อยของ "ยังไม่ปล่อย" ที่เพิ่ม 21 ก.ย. 2569
+   * (`sourcing` ยังต้องหาคน · `started` มีคนเริ่มงานแล้ว) ⇒ ลิงก์ที่แชร์กันก็พาไปถูกเลน
+   */
   const lane = useMemo<ReleaseLaneKey | null>(
-    () => (laneParam === 'released' || laneParam === 'unreleased' ? laneParam : null),
+    () =>
+      laneParam === 'released' ||
+      laneParam === 'unreleased' ||
+      laneParam === 'sourcing' ||
+      laneParam === 'started'
+        ? laneParam
+        : null,
     [laneParam],
   );
   const step = useMemo<ReleaseStepKey | null>(
@@ -1239,14 +1251,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     {bulkReleaseBusy
                       ? 'กำลังปล่อย…'
                       : `ส่งประกาศทีเดียว ${Math.min(unreleasedCount, 300)} ใบที่ยังต้องหาคน`}
-                    {/* 🔴 ส่วนต่างจาก "ยังไม่ปล่อย" ต้องพิมพ์บนจอ ไม่ใช่ซ่อนใน hover
-                        (Haiku รอบสอง: 156 − 127 = "29 ใบนี้คือใบไหน?" ทั้งที่ title อธิบายแล้ว
-                        — แต่ tooltip ต้องเอาเมาส์จ่อถึงเห็น จอสัมผัส/คนกวาดตาไม่มีวันเจอ) */}
-                    {ledger.unreleased > unreleasedCount ? (
-                      <span className="mt-0.5 block text-[10px] font-normal opacity-80">
-                        ไม่รวม {(ledger.unreleased - unreleasedCount).toLocaleString('th-TH')} ใบที่มีคนเริ่มงานแล้ว
-                      </span>
-                    ) : null}
+                    {/**
+                     * 🔴 **คำแก้ตัวถูกถอดออก 21 ก.ย. 2569** (เจ้าของ: *"เลขทุกที่บวกกันได้
+                     * ไม่ต้องมีคำแก้ตัว"*) — เดิมต้องเขียนต่อท้ายปุ่มว่า "ไม่รวม N ใบที่มี
+                     * คนเริ่มงานแล้ว" เพราะหัวจอโชว์ยอดรวมก้อนเดียวแล้วเลขไม่ตรงกับปุ่ม
+                     *
+                     * ตอนนี้หัวจอแตก "ยังไม่ปล่อย" เป็น **ยังต้องหาคน** + **มีคนเริ่มงานแล้ว**
+                     * ให้เห็นทั้งคู่ตั้งแต่แรก ปุ่มนี้จึงผูกกับก้อน "ยังต้องหาคน" ตรง ๆ
+                     * ⚠️ ห้ามเอาคำแก้ตัวกลับมาโดยไม่ถอดสองก้อนย่อยออกก่อน
+                     */}
                   </button>
                 ) : null
               }
@@ -1573,15 +1586,42 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   {/* ยอดรายเดือน = ค่าแรงหลัก + รายได้มั่นคง (เจ้าของสั่ง 16 ส.ค. 2569)
                       ⚠️ ถอยไป total_income เมื่อคิดไม่ได้ — แต่ตัวนั้นบางใบเป็น**อัตรารายวัน**
                       (410 = ค่าแรง/วัน · 20 จาก 200 ใบ) จึงไม่ติดคำว่า "/เดือน" ให้ */}
-                  <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-foreground font-medium">
-                    <Banknote className="h-3.5 w-3.5 text-success" />
-                    {/* breakdown ที่เจ้าหน้าที่ตั้งเองมาก่อนเสมอ — บอกหน่วยตามที่ตั้ง (วัน/เดือน) */}
-                    {job.income_display
-                      ? `฿${job.income_display.total.toLocaleString('th-TH')} ${INCOME_PERIOD_LABEL[job.income_display.period]}`
-                      : job.monthly_income
-                        ? `฿${job.monthly_income.toLocaleString('th-TH')} / เดือน`
-                        : `฿${job.total_income.toLocaleString('th-TH')}`}
-                  </span>
+                  {/**
+                   * 🔴 **เงินต้องบอกหน่วยเสมอ — และ "ไม่รู้หน่วย" ต้องบอกว่าไม่รู้** (21 ก.ย. 2569)
+                   *
+                   * ของเดิมปั้นสูตรเองตรงนี้ แล้วกรณีสุดท้ายพิมพ์ `฿400` เปล่า ๆ เท่ากับ
+                   * `฿12,000` ทุกประการ ⇒ กวาดตาผ่าน ๆ อ่านเป็น "เงินเดือน 400"
+                   * (เจ้าของทักเอง · ของจริงมี 20 จาก 200 ใบที่เป็นค่าแรง**ต่อวัน**)
+                   *
+                   * เปลี่ยนมาใช้ `incomeDisplay()` ซึ่งเป็นตัวเดียวกับที่หน้าจับคู่ใช้อยู่แล้ว
+                   * ⇒ หนึ่งเมตริกหนึ่งนิยาม · ไม่รู้หน่วย = ขึ้น "บาท" เฉย ๆ + คำเตือนใน tooltip
+                   * ⚠️ คำเตือนเป็นภาษาภายใน (พูดถึง ERP) ⇒ **เฉพาะเจ้าหน้าที่**
+                   * การ์ดใบนี้โผล่บนหน้าสมัครสาธารณะด้วย
+                   */}
+                  {(() => {
+                    const money = job.income_display
+                      ? {
+                          text: `฿${job.income_display.total.toLocaleString('th-TH')} ${INCOME_PERIOD_LABEL[job.income_display.period]}`,
+                          hint: null as string | null,
+                        }
+                      : (() => {
+                          const d = incomeDisplay({
+                            totalIncome: job.total_income,
+                            monthlyIncome: job.monthly_income,
+                          });
+                          return d ? { text: d.text, hint: d.hint } : null;
+                        })();
+                    if (!money) return null;
+                    return (
+                      <span
+                        className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-foreground font-medium"
+                        title={isStaff && money.hint ? money.hint : undefined}
+                      >
+                        <Banknote className="h-3.5 w-3.5 text-success" />
+                        {money.text}
+                      </span>
+                    );
+                  })()}
                   <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5" />
                     ต้องการ {formatYmdDmyBe(job.required_date)}
@@ -1778,10 +1818,25 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           ใส่ปุ่มไปก็เป็นปุ่มหลอก · การกดการ์ด = สร้างลิงก์ของประเภทนั้น ซึ่งทำได้จริง
         */}
         {isStaff && postings.some((p) => p.standaloneKind) ? (
-          <div className="mt-6">
-            <p className={cn('mb-2 text-[11px] font-medium uppercase tracking-[0.14em]', TONE.warn.value)}>
-              กล่องลอย (ไม่ผูกใบขอ)
-            </p>
+          /**
+           * 🔴 **คั่นให้ชัดว่าข้ามเรื่องแล้ว** (เจ้าของเคาะ 21 ก.ย. 2569)
+           *
+           * เจ้าของยืนยันให้**คงไว้ท้ายลิสต์ตามที่สั่งไว้ 13 ส.ค.** (ย้ายขึ้นบนแล้วดันใบขอ
+           * จริงตกจอ) แต่ป้ายเดิมเป็นบรรทัดจาง ๆ ตัวเล็ก 11px บรรทัดเดียว ⇒ คนเลื่อนลงมา
+           * ไม่มีทางรู้ว่ากำลังดูคนละเรื่องกับบอร์ดข้างบน (ผมวัดเองตอนตรวจหน้า 16 ก.ย.)
+           *
+           * เพิ่มเส้นคั่นเต็มความกว้าง + หัวเรื่องขนาดอ่านออก + บรรทัดบอกว่าต่างจากข้างบน
+           * ยังไง — **ไม่ย้ายตำแหน่ง ไม่แตะการ์ดข้างใน**
+           */
+          <div className="mt-10">
+            <Separator className="mb-4" />
+            <div className="mb-3">
+              <h2 className="text-sm font-medium text-foreground">กล่องลอย (ไม่ผูกใบขอ)</h2>
+              <p className={cn('mt-0.5 text-[11px] leading-4', DASH.muted)}>
+                ประกาศที่ไม่ได้มาจากใบขอของหน่วยงาน — ตัวเลขข้างบนทั้งหมดไม่นับส่วนนี้ ·
+                กดที่กล่องเพื่อสร้างลิงก์รับสมัครของประเภทนั้น
+              </p>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {STANDALONE_POSTING_KINDS.map((k) => {
                 const tone = TONE[STANDALONE_KIND_TONE[k.code] ?? 'neutral'];
