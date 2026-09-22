@@ -18,9 +18,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Check, ChevronDown, Copy, Link2, Loader2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Copy, Eye, Link2, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch';
 import { cn } from '@/lib/utils';
+import { TONE } from '@/lib/designTokens';
+import PublicPostingPreview from '@/components/jobs/PublicPostingPreview';
 import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { scrubPublicLocation } from '@/lib/publicLocationText';
@@ -98,6 +100,8 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   const [salaryText, setSalaryText] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  /** เปิด/ปิดตัวอย่างหน้าสมัคร (22 ก.ย. 2569 — ดูก่อน gen link) */
+  const [previewOpen, setPreviewOpen] = useState(false);
   // ── ข้อมูลที่ระบบเดิมเก็บตอนสร้างลิงก์ (เจ้าของสั่ง 11 ส.ค. 2569) ──
   const [positionName, setPositionName] = useState('');
   const [province, setProvince] = useState('');
@@ -442,6 +446,38 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               </div>
 
               {error ? <p className="text-xs text-red-600">{error}</p> : null}
+
+              {/**
+               * 🔴 ดูตัวอย่างหน้าสมัครก่อน gen link (เจ้าของเคาะ 22 ก.ย. 2569 นิยามข้อ 4)
+               * กางในป๊อปเดิม — 🔴 ห้าม Dialog ซ้อน Dialog · ใช้ component ตัวเดียวกับหน้าจริง
+               * ⇒ ตัวอย่างตรงกับที่ผู้สมัครเห็นเป๊ะ (ไม่ก๊อปโครงมาวาดใหม่)
+               */}
+              <button
+                type="button"
+                onClick={() => setPreviewOpen((v) => !v)}
+                className={cn(
+                  'flex w-full items-center justify-center gap-1.5 rounded-xl border py-2 text-sm font-medium',
+                  TONE.neutral.outline,
+                )}
+              >
+                {previewOpen ? <ChevronUp className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {previewOpen ? 'ซ่อนตัวอย่าง' : 'ดูตัวอย่างหน้าสมัคร'}
+              </button>
+              {previewOpen ? (
+                <div className="rounded-2xl bg-muted/40 p-3">
+                  <p className="mb-2 text-[11px] text-muted-foreground">
+                    นี่คือสิ่งที่ผู้สมัครจะเห็นเมื่อเปิดลิงก์ — ยังไม่ได้สร้าง แก้ด้านบนแล้วตัวอย่างเปลี่ยนตาม
+                  </p>
+                  <PublicPostingPreview
+                    data={{ title, detail, locationText, salaryText, contactName, contactPhone }}
+                    footer={
+                      <p className="mt-6 w-full rounded-full bg-night py-3 text-center text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900">
+                        กรอกใบสมัคร
+                      </p>
+                    }
+                  />
+                </div>
+              ) : null}
 
               <button
                 type="button"

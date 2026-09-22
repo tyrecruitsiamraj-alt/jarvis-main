@@ -9505,3 +9505,24 @@ OPL6902010 · OPL6902145)
 **ด่านตรวจ:** test 3,267 ผ่าน / 6 skip · tsc = 0 · eslint 0 error
 **ดูบนจอจริงแล้ว:** เปิดป๊อป LMM6704005 ขั้น 3 → ติ๊ก "ฐานเงินเดือน" ออก ไม่กดปุ่ม →
 2 วิ POST /unit-notes ยิงเอง → ฐานได้ `public_visibility:{income:false}` benefits/total_income ครบ → คืนค่า prod เดิมด้วย id แล้ว
+
+---
+
+## 22 ก.ย. 2569 — กล่องงาน Phase C: ปุ่มดูตัวอย่างหน้าสมัครก่อน gen link
+
+นิยามข้อ 4: *"พอไปโชว์หน้าสาธารณะเป็นไปตามที่ต้องการ"* — เจ้าของเคาะเพิ่มปุ่มดูตัวอย่าง
+
+| ไฟล์ | แก้อะไร |
+| --- | --- |
+| `src/components/jobs/PublicPostingPreview.tsx` | **ใหม่** — การ์ดหน้าสมัคร presentational ล้วน รับ props (title/detail/location/salary/contact) + slot `footer` · ไม่ fetch เอง |
+| `src/pages/public/PublicPostingApplyPage.tsx` | ยกโครงการ์ดเดิมไปใช้ `PublicPostingPreview` (หน้าจริงกับตัวอย่างใช้ตัวเดียวกัน ไม่ก๊อป) |
+| `src/components/jobs/GenApplyLinkDialog.tsx` | ปุ่ม "ดูตัวอย่างหน้าสมัคร" กางในป๊อปเดิม (🔴 ห้าม Dialog ซ้อน) · ป้อนด้วยค่าที่กรอกอยู่ (ยังไม่เซฟ) ⇒ ตัวอย่างตรงกับของจริง |
+
+**เทสต์:** `tests/api/boardPostingPreview.test.ts` (5 ข้อ · presentational ไม่ fetch · หน้าจริงใช้ component นี้ · ป๊อปไม่เปิด Dialog ซ้อน · ป้อนจากค่าที่กรอก)
+**ด่านตรวจ:** test 3,272 ผ่าน / 6 skip · tsc = 0 · eslint 0 error
+**ดูบนจอจริงแล้ว:** ป๊อป LMM6704005 ขั้น 4 → กด "ดูตัวอย่างหน้าสมัคร" → กางในป๊อปเดิม
+(dialogCount=0 ไม่ซ้อน) · หัวเรื่องตัวอย่าง = "คนสวน · KYE" ตรงกับช่องหัวข้อประกาศ
+
+### 🔴 ปิดครบ Phase D1/D2/A/B/C ของกล่องงาน (นิยาม 22 ก.ย. 2569)
+D1 `c9851d3` · D2 `4e4fec7` · A `349ae24` · B `f978429` · C (commit ถัดไป)
+⚠️ **ยังไม่ push** — รอเจ้าของเคาะก่อนขึ้น production
