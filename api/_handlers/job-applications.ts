@@ -45,6 +45,7 @@ import { toE164Thai } from '../_lib/thaiPhone.js';
 import { logError } from '../_lib/logger.js';
 
 const tbl = tableInAppSchema('public_job_applications');
+const queueTbl = tableInAppSchema('lumos_dispatch_queue');
 const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบสมัครของแผนกอื่น';
 
 type ApplicationStatus = 'new' | 'contacted' | 'converted' | 'rejected';
@@ -1122,10 +1123,43 @@ async function handler(req: AuthedReq, res: ApiRes) {
         leadCounts = undefined;
       }
 
+      /**
+       * ยอด "ส่งให้ AI โทรแล้ว x จาก y คน" ต่อใบขอ (เจ้าของเคาะ 22 ก.ย. 2569 นิยามกล่องงานข้อ 6:
+       * *"เข้ามาแล้วถูกส่งไปหา AI เพื่อให้ AI โทรหรือยัง"*)
+       *
+       * sent = ใบสมัครที่มีแถวในคิว Lumos (`person_ref = 'app-<id>'` — ตรงตัว ไม่พึ่งเบอร์
+       * ที่อาจซ้ำข้ามใบ) · total = ใบสมัครที่นับบนการ์ด (job_id not null · not is_lead —
+       * ชุดเดียวกับ `counts` ข้างบน ให้ x/y หารกับเลข "ผู้สมัคร N คน" ได้ตรง)
+       * ⚠️ อ่านไม่ได้ = ไม่ส่งคีย์ (ห้ามส่งศูนย์ — ศูนย์ = "ยังไม่ส่งสักคน" คนละเรื่องกับ "ยังบอกไม่ได้")
+       */
+      let aiCounts: Record<string, { sent: number; total: number }> | undefined;
+      try {
+        const { rows: aiRows } = await dbQuery<{ job_id: string; total: string; sent: string }>(
+          `select a.job_id,
+                  count(*)::text as total,
+                  count(*) filter (where exists (
+                    select 1 from ${queueTbl} q where q.person_ref = 'app-' || a.id::text
+                  ))::text as sent
+             from ${tbl} a
+            where a.job_id is not null and not a.is_lead
+            group by a.job_id`,
+        );
+        aiCounts = {};
+        for (const r of aiRows) {
+          if (scopedJobIds && !scopedJobIds.has(r.job_id)) continue;
+          aiCounts[r.job_id] = { sent: Number(r.sent), total: Number(r.total) };
+        }
+      } catch (e) {
+        // queue table มีจริงเสมอ (คิวเดินอยู่) — จับเฉพาะ schema เก่าที่ยังไม่มีคอลัมน์
+        if (!isUndefinedColumn(e)) throw e;
+        aiCounts = undefined;
+      }
+
       return res.status(200).json({
         counts,
         ...(countsByOrigin ? { countsByOrigin } : {}),
         ...(leadCounts ? { leadCounts } : {}),
+        ...(aiCounts ? { aiCounts } : {}),
       });
     }
 

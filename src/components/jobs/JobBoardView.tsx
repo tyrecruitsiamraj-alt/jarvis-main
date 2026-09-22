@@ -298,6 +298,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   >({});
   /** ยอด Lead แยกต่างหาก — ใบที่ปัดเข้าคลังไม่ถูกนับใน applicantCounts (17 ส.ค. 2569) */
   const [leadCounts, setLeadCounts] = useState<Record<string, number>>({});
+  /** ส่ง AI โทรแล้ว x จาก y คน ต่อใบขอ (22 ก.ย. 2569 · นิยามกล่องงานข้อ 6) */
+  const [aiCounts, setAiCounts] = useState<Record<string, { sent: number; total: number }>>({});
   /**
    * 🔴 **ฟอร์มแก้ข้อมูลประกาศย้ายออกจากหน้านี้แล้ว** (27 ส.ค. 2569)
    * อยู่ที่แท็บ "ประกาศ / ลิงก์สมัคร" ของใบขอ ⇒ ไม่ต้องมี patch ทับการ์ดที่นี่อีก
@@ -926,6 +928,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         setApplicantCounts(b.counts);
         setOriginCounts(b.byOrigin);
         setLeadCounts(b.leadCounts);
+        setAiCounts(b.aiCounts);
       })
       .catch(() => {
         /* badge is optional — ignore */
@@ -1720,6 +1723,29 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                             ({applicantOriginSummary(originIdx.get(job.id))})
                           </span>
                         ) : null}
+                        {/**
+                         * 🔴 "ส่ง AI แล้ว x/y" (เจ้าของเคาะ 22 ก.ย. 2569 นิยามกล่องงานข้อ 6:
+                         * *"เข้ามาแล้วถูกส่งไปหา AI หรือยัง"*)
+                         * y=0 (ยังไม่มีผู้สมัคร) ไม่ขึ้นชิป · ไม่รู้ (server ไม่ส่งคีย์) ไม่ขึ้น ·
+                         * ยังส่งไม่ครบ = เหลือง (มีคนค้างไม่ถูกส่ง) · ส่งครบ = เขียว
+                         */}
+                        {(() => {
+                          const ai = aiCounts[job.id];
+                          if (!ai || ai.total === 0) return null;
+                          const done = ai.sent >= ai.total;
+                          return (
+                            <span
+                              className={cn('shrink-0', done ? TONE.success.chip : TONE.warn.chip)}
+                              title={
+                                done
+                                  ? 'ผู้สมัครทุกคนถูกส่งให้ AI โทรแล้ว'
+                                  : 'ยังมีผู้สมัครที่ยังไม่ถูกส่งให้ AI โทร'
+                              }
+                            >
+                              ส่ง AI แล้ว {ai.sent}/{ai.total}
+                            </span>
+                          );
+                        })()}
                       </span>
                       <div className="flex flex-wrap items-center gap-1.5">
                         {/* 🔴 ใบที่ปิด/ยกเลิกแล้วไม่มีปุ่มลงมือ — หาคนเพิ่ม/ปล่อยลิงก์/แก้ประกาศ

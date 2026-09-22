@@ -352,20 +352,27 @@ export type JobApplicantBreakdown = {
    * โชว์เป็นเลขที่สองข้างยอดผู้สมัคร (เจ้าของเคาะ 17 ส.ค. 2569)
    */
   leadCounts: Record<string, number>;
+  /**
+   * ส่ง AI โทรแล้วกี่คน จากกี่คน ต่อใบขอ (22 ก.ย. 2569) — ไม่มีคีย์ของใบไหน =
+   * server ยังบอกไม่ได้ (ห้ามตีเป็น 0/0)
+   */
+  aiCounts: Record<string, { sent: number; total: number }>;
 };
 
 export async function fetchJobApplicantBreakdown(): Promise<JobApplicantBreakdown> {
   const r = await apiFetch('/api/job-applications?counts=1');
-  if (!r.ok) return { counts: {}, byOrigin: {}, leadCounts: {} };
+  if (!r.ok) return { counts: {}, byOrigin: {}, leadCounts: {}, aiCounts: {} };
   const body = (await r.json()) as {
     counts?: Record<string, number>;
     countsByOrigin?: Record<string, Partial<Record<ApplicationOrigin, number>>>;
     leadCounts?: Record<string, number>;
+    aiCounts?: Record<string, { sent: number; total: number }>;
   };
   return {
     counts: body.counts ?? {},
     byOrigin: body.countsByOrigin ?? {},
     leadCounts: body.leadCounts ?? {},
+    aiCounts: body.aiCounts ?? {},
   };
 }
 

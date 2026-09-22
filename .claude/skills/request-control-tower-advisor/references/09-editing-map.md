@@ -9447,3 +9447,19 @@ OPL6902010 · OPL6902145)
 **ด่านตรวจ:** test 3,245 ผ่าน / 6 skip · tsc = 0 · eslint 0 error
 **ดูบนจอจริงแล้ว:** ปล่อยแล้ว 93 → มีคนสมัคร 0 / ยังไม่มีใครสมัคร 93 (บวกได้ 93 พอดี) ·
 กด "ยังไม่มีใครสมัคร" → `?lane=silent` แถบ "กำลังดู: ยังไม่มีใครสมัคร — 93 ใบ"
+
+---
+
+## 22 ก.ย. 2569 — กล่องงาน Phase D2: การ์ดบอก "ส่ง AI แล้ว x/y คน"
+
+นิยามกล่องงานข้อ 6: *"เข้ามาแล้วถูกส่งไปหา AI เพื่อให้ AI โทรหรือยัง"*
+
+| ไฟล์ | แก้อะไร |
+| --- | --- |
+| `api/_handlers/job-applications.ts` เส้น `?counts=1` | เพิ่ม `aiCounts: { [job_id]: {sent,total} }` · sent = ใบสมัครที่มีแถวคิว `person_ref = 'app-<id>'` (ตรงตัว ไม่พึ่งเบอร์) · total = job_id not null · not is_lead (ชุดเดียวกับ `counts`) · เคารพ scope · อ่านไม่ได้=ไม่ส่งคีย์ |
+| `src/lib/publicApplicationsApi.ts` | `JobApplicantBreakdown.aiCounts` + ส่งต่อ + fallback |
+| `src/components/jobs/JobBoardView.tsx` | state `aiCounts` + ชิปต่อท้าย "ผู้สมัคร N คน": y=0 ไม่ขึ้น · ส่งครบ=เขียว · ยังไม่ครบ=เหลือง · staff เท่านั้น (อยู่ใน footer ฝั่ง isStaff) |
+
+**เทสต์:** `tests/api/boardAiSentCounts.test.ts` (5 ข้อ · pin โครง SQL: person_ref join · not-lead · ไม่ส่งศูนย์ · scope) · SQL จริงวัดกับฐาน production แล้ว (LMM6704005 ส่งครบ 1/1)
+**ด่านตรวจ:** test 3,250 ผ่าน / 6 skip · tsc = 0 · eslint 0 error
+**ดูบนจอจริงแล้ว:** การ์ด LMM6704005 (lane=sourcing) ขึ้นชิป "ส่ง AI แล้ว 1/1" สีเขียว (`jarvis-chip-success`)
