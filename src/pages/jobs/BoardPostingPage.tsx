@@ -431,6 +431,12 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                       label="ต้องการวันที่"
                       value={job.required_date ? formatYmdDmyBe(job.required_date) : null}
                     />
+                    {/* 🔴 **ผู้ติดต่อ + เบอร์ต้องอยู่ในสรุป** (เจ้าของสั่ง 22 ก.ย. 2569:
+                        *"เบอร์จากใบขอไม่มาขึ้นที่กล่องงานเลย"*) — ของเดิมมีเฉพาะตอนกด
+                        "กางดูข้อมูลใบขอทั้งใบ" ซึ่งคนทำประกาศไม่เคยกด · ทั้งสองช่องมาจาก
+                        ใบขอ ERP (`st_request_p1`) ไม่ใช่ค่าที่ใครพิมพ์เองในระบบนี้ */}
+                    <Fact label="ชื่อผู้ติดต่อหน่วยงาน" value={job.contact_name} />
+                    <Fact label="เบอร์ติดต่อ" value={job.contact_phone} />
                   </dl>
                 ) : (
                   <p className={cn('text-xs', DASH.muted)}>กำลังโหลดใบขอ…</p>

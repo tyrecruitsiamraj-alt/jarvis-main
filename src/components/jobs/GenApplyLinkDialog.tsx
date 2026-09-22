@@ -23,6 +23,7 @@ import { apiFetch } from '@/lib/apiFetch';
 import { cn } from '@/lib/utils';
 import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
+import { scrubPublicLocation } from '@/lib/publicLocationText';
 import { RM_FORM_TYPES, RM_SPECIFIC_TYPES } from '@/lib/recruitRmMasters';
 import { createShortLink } from '@/lib/shortLinksApi';
 
@@ -146,7 +147,18 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
           : '',
     );
     setDetail('');
-    setLocationText(job?.location_address ?? '');
+    /**
+     * 🔴 **ตัดชื่อ/เบอร์คนออกก่อนเติม** (เจ้าของสั่ง 22 ก.ย. 2569)
+     *
+     * `location_address` ที่ ERP ส่งมาไม่ใช่ที่อยู่ล้วน — หน่วยงานพิมพ์รวมมาก้อนเดียว
+     * (ชื่อสาขา · รหัส · ทะเบียนรถ · ชื่อผู้จัดการ · เบอร์ · ชื่อผู้ช่วย · เบอร์)
+     * ของเดิมเติมทั้งดุ้น ⇒ **ชื่อกับเบอร์ของคนฝั่งลูกค้าขึ้นหน้าสมัครสาธารณะ**
+     * (เจอจริง 6 จาก 23 ประกาศ · เจ้าของเห็นเองบนหน้า /apply)
+     *
+     * ตัดแค่ตอน**เติมค่าตั้งต้น** — คนกรอกพิมพ์กลับเข้าไปเองได้ถ้าตั้งใจจริง
+     * ⚠️ ตัดแล้วไม่เหลืออะไร = ปล่อยว่าง ให้คนกรอกเอง ดีกว่าโยนเบอร์ขึ้นหน้าสาธารณะ
+     */
+    setLocationText(scrubPublicLocation(job?.location_address));
     setSalaryText('');
     setContactName(job?.contact_name ?? '');
     setContactPhone(job?.contact_phone ?? '');
