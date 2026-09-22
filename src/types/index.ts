@@ -403,6 +403,14 @@ export interface JobRequest {
       lines: Array<{ label: string; amount: number }>;
       total: number | null;
     } | null;
+    /** หน้าสาธารณะเห็นช่องไหน (22 ก.ย. 2569) — `false` = ซ่อน · ไม่มีคีย์ = โชว์ */
+    public_visibility?: {
+      income?: boolean;
+      benefits?: boolean;
+      ot?: boolean;
+      boss_nationality?: boolean;
+      required_date?: boolean;
+    } | null;
   } | null;
 }
 

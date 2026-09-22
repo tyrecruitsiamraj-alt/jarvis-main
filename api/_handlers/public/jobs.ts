@@ -142,6 +142,18 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
     monthly_income: undefined as number | undefined,
     monthly_income_base: undefined as number | undefined,
     monthly_income_items: undefined as MonthlyIncomeItem[] | undefined,
+    /**
+     * 🔴 ส่ง **เฉพาะ `public_visibility`** ผ่านไปหน้าสาธารณะ (22 ก.ย. 2569)
+     * ฝั่งหน้าเว็บ (`publicFieldVisible`) ใช้ตัวนี้ตัดสินว่าซ่อนช่องไหน · ก่อนหน้านี้
+     * `toPublicJob` หยิบเฉพาะฟิลด์ที่ระบุชื่อ ⇒ ไม่มี field_overrides เลย = ติ๊กซ่อน
+     * แล้วหน้าสาธารณะไม่เคยเห็น · ส่งเฉพาะ visibility ไม่ส่งทั้งก้อน (ที่เหลือเป็นข้อมูลภายใน)
+     */
+    field_overrides: (() => {
+      const pv = ((r as Record<string, unknown>).field_overrides as
+        | { public_visibility?: Record<string, boolean> | null }
+        | undefined)?.public_visibility;
+      return pv ? { public_visibility: pv } : undefined;
+    })(),
   };
 }
 

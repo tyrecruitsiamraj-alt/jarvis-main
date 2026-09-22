@@ -174,6 +174,17 @@ export type UnitFieldOverrides = {
   benefits?: string[] | null;
   /** รายได้แบบแยกส่วน — โครง/เพดานอยู่ที่ `src/lib/incomeBreakdown.ts` */
   income?: import('@/lib/incomeBreakdown').IncomeBreakdown | null;
+  /**
+   * หน้าสาธารณะเห็นช่องไหนบ้าง (22 ก.ย. 2569) — `false` = ซ่อนทั้งช่อง
+   * ไม่มีคีย์ = โชว์ · ต้องตรงกับ shape ฝั่ง API (`siamrajUnitNotes.ts`) ไม่งั้น sanitizer ตัดทิ้ง
+   */
+  public_visibility?: {
+    income?: boolean;
+    benefits?: boolean;
+    ot?: boolean;
+    boss_nationality?: boolean;
+    required_date?: boolean;
+  } | null;
 };
 
 export async function saveUnitRequestMeta(

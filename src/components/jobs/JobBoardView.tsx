@@ -129,6 +129,7 @@ import { jobPositionUnits, sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import { INCOME_PERIOD_LABEL } from '@/lib/incomeBreakdown';
 import { incomeDisplay } from '@/lib/incomeLabel';
+import { publicFieldVisible } from '@/lib/publicFieldVisibility';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import { compareJobsByAgeDaysDesc, getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
@@ -1603,7 +1604,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                    * ⚠️ คำเตือนเป็นภาษาภายใน (พูดถึง ERP) ⇒ **เฉพาะเจ้าหน้าที่**
                    * การ์ดใบนี้โผล่บนหน้าสมัครสาธารณะด้วย
                    */}
-                  {(() => {
+                  {(isStaff || publicFieldVisible(job, 'income')) && (() => {
                     const money = job.income_display
                       ? {
                           text: `฿${job.income_display.total.toLocaleString('th-TH')} ${INCOME_PERIOD_LABEL[job.income_display.period]}`,
@@ -1627,14 +1628,16 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       </span>
                     );
                   })()}
-                  <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-muted-foreground">
-                    <Calendar className="h-3.5 w-3.5" />
-                    ต้องการ {formatYmdDmyBe(job.required_date)}
-                  </span>
+                  {isStaff || publicFieldVisible(job, 'required_date') ? (
+                    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-muted-foreground">
+                      <Calendar className="h-3.5 w-3.5" />
+                      ต้องการ {formatYmdDmyBe(job.required_date)}
+                    </span>
+                  ) : null}
                   {/* สัญชาติเจ้านาย (เจ้าของสั่ง 17 ส.ค. 2569 — เอาขึ้นทั้งกล่องงานและหน้าสาธารณะ)
                       ⚠️ ERP กรอกมาแค่ ~40% ของใบขอ · ไม่มีข้อมูล = ไม่ขึ้นบรรทัดนี้
                       ห้ามขึ้นว่า "ไม่ระบุ" — การ์ดนี้โผล่บนหน้าสมัครสาธารณะด้วย */}
-                  {job.boss_nationality?.trim() ? (
+                  {job.boss_nationality?.trim() && (isStaff || publicFieldVisible(job, 'boss_nationality')) ? (
                     <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-muted-foreground">
                       <Flag className="h-3.5 w-3.5" />
                       นายสัญชาติ {job.boss_nationality.trim()}
@@ -1646,7 +1649,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     ⚠️ ไม่มีข้อมูล = ไม่ขึ้นแถวนี้ (ห้ามขึ้นว่า "ไม่มีสวัสดิการ") */}
                 {/* ชิปสวัสดิการ = ของจาก ERP (อัตราจริง) + ของที่เจ้าหน้าที่ติ๊กเพิ่มเอง
                     เรียง ERP ก่อนเพราะมีตัวเลขจริงกำกับ น่าเชื่อกว่า */}
-                {[...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)].length > 0 ? (
+                {(isStaff || publicFieldVisible(job, 'benefits')) &&
+                [...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)].length > 0 ? (
                   // 🔴 มือถือ: พับเหลือแถวเดียวเลื่อนได้เหมือนแถวเงินเดือนด้านบน (เจ้าของเคาะ 5 ก.ย. 2569)
                   <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto sm:flex-wrap sm:overflow-visible">
                     {[...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)].map((b) => (

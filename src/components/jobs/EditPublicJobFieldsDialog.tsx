@@ -35,6 +35,12 @@ import {
   type IncomePeriod,
 } from '@/lib/incomeBreakdown';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  PUBLIC_TOGGLE_FIELDS,
+  PUBLIC_FIELD_LABEL,
+  readPublicVisibility,
+  type PublicToggleField,
+} from '@/lib/publicFieldVisibility';
 import { DASH, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import {
@@ -99,10 +105,15 @@ const EditPublicJobFieldsDialog: React.FC<{
   const [pickedKeys, setPickedKeys] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** หน้าสาธารณะเห็นช่องไหน (22 ก.ย. 2569) — true = โชว์ (ค่าเริ่มทุกช่อง) */
+  const [visibility, setVisibility] = useState<Record<PublicToggleField, boolean>>(() =>
+    readPublicVisibility(null),
+  );
 
   useEffect(() => {
     if (!job) return;
     setError(null);
+    setVisibility(readPublicVisibility(job.field_overrides?.public_visibility));
     setProvince(job.override_province ?? '');
     setDistrict(job.override_district ?? '');
     setSubdistrict(job.override_subdistrict ?? '');
@@ -192,7 +203,18 @@ const EditPublicJobFieldsDialog: React.FC<{
        * เดิมของมัน (ทับเลขเดี่ยว total_income) — คนที่เคยตั้งเลขเดี่ยวไว้ไม่เสียค่า
        */
       const hasBreakdown = parsedLines.length > 0;
+      /**
+       * 🔴 **spread ของเดิมก่อนเสมอ** (22 ก.ย. 2569) — `field_overrides` ถูกเขียนทับ
+       * ทั้งก้อนที่ฝั่ง API (ไม่ merge) ⇒ ถ้าส่งแค่ฟิลด์ของขั้นนี้ ค่าที่ตั้งจากที่อื่น
+       * (lead_rules · age · gender · public_visibility ที่ยังไม่ได้แตะในขั้นนี้) จะหาย
+       * เดิมโค้ดนี้ส่งเฉพาะ place/income/benefits จึง clobber ของพวกนั้นมาตลอด — แก้ด้วย
+       */
+      const existing = (job.field_overrides ?? {}) as Record<string, unknown>;
+      // เก็บเฉพาะช่องที่ถูกติ๊กออก (false) — true/ครบ = ไม่ต้องเก็บ (กัน jsonb บวม)
+      const visPatch: Partial<Record<PublicToggleField, boolean>> = {};
+      for (const f of PUBLIC_TOGGLE_FIELDS) if (!visibility[f]) visPatch[f] = false;
       const patch = {
+        ...existing,
         province: province.trim() || null,
         district: district.trim() || null,
         subdistrict: subdistrict.trim() || null,
@@ -206,6 +228,7 @@ const EditPublicJobFieldsDialog: React.FC<{
         income: hasBreakdown
           ? { period: incomePeriod, lines: parsedLines, total: totalNum }
           : null,
+        public_visibility: Object.keys(visPatch).length > 0 ? visPatch : null,
       };
       await saveUnitRequestMeta(requestNo, { field_overrides: patch });
       onSaved?.({
@@ -215,6 +238,8 @@ const EditPublicJobFieldsDialog: React.FC<{
         ...(patch.total_income != null ? { total_income: patch.total_income } : {}),
         ...(preview ? { income_display: preview } : { income_display: undefined }),
         extra_benefits: patch.benefits,
+        // ส่ง field_overrides ที่รวม visibility กลับ ให้ตัวอย่าง/การ์ดฝั่ง parent อัปเดตทันที
+        field_overrides: patch as JobRequest['field_overrides'],
       });
       onClose();
     } catch (e) {
@@ -635,6 +660,34 @@ const EditPublicJobFieldsDialog: React.FC<{
                 {benefitLines.join(' · ')}
               </p>
             ) : null}
+          </section>
+          ) : null}
+
+          {/**
+           * 🔴 ติ๊กว่าหน้าสาธารณะเห็นช่องไหน (เจ้าของเคาะ 22 ก.ย. 2569 นิยามกล่องงานข้อ 3)
+           * โชว์คู่กับขั้นสวัสดิการ/รายได้ (ขั้น 3) · เอาติ๊กออก = ซ่อนทั้งช่องบนหน้าสมัคร
+           * ไม่ลบค่า · ตัวตัดสินอยู่ที่ `publicFieldVisible()` ที่เดียว
+           */}
+          {show('income') || show('benefits') ? (
+          <section className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">หน้าสมัครสาธารณะให้เห็นอะไรบ้าง</p>
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {PUBLIC_TOGGLE_FIELDS.map((f) => (
+                <label
+                  key={f}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/60 px-2.5 py-1.5 text-sm"
+                >
+                  <Checkbox
+                    checked={visibility[f]}
+                    onCheckedChange={(v) => setVisibility((prev) => ({ ...prev, [f]: v === true }))}
+                  />
+                  <span>{PUBLIC_FIELD_LABEL[f]}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              เอาติ๊กออก = ช่องนั้นไม่ขึ้นบนหน้าสมัคร (ค่าไม่หาย ติ๊กกลับมาโชว์ใหม่ได้)
+            </p>
           </section>
           ) : null}
 

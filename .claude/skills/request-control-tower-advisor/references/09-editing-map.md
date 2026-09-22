@@ -9463,3 +9463,27 @@ OPL6902010 · OPL6902145)
 **เทสต์:** `tests/api/boardAiSentCounts.test.ts` (5 ข้อ · pin โครง SQL: person_ref join · not-lead · ไม่ส่งศูนย์ · scope) · SQL จริงวัดกับฐาน production แล้ว (LMM6704005 ส่งครบ 1/1)
 **ด่านตรวจ:** test 3,250 ผ่าน / 6 skip · tsc = 0 · eslint 0 error
 **ดูบนจอจริงแล้ว:** การ์ด LMM6704005 (lane=sourcing) ขึ้นชิป "ส่ง AI แล้ว 1/1" สีเขียว (`jarvis-chip-success`)
+
+---
+
+## 22 ก.ย. 2569 — กล่องงาน Phase A: ติ๊กว่าหน้าสาธารณะเห็นช่องไหน
+
+นิยามข้อ 3: *"อยากให้ที่ไปหน้าสาธารณะเห็นอะไรบ้าง มีช่องให้ติ๊ก ๆ"* · เจ้าของเคาะ
+"ติ๊กได้ทุกช่องหลัก" (ฐานเงินเดือน · สวัสดิการ · โอที · สัญชาตินาย · วันที่ต้องการ)
+
+| ไฟล์ | แก้อะไร |
+| --- | --- |
+| `src/lib/publicFieldVisibility.ts` | **ใหม่** — ตัวตัดสินที่เดียว: `publicFieldVisible(job,field)` · `readPublicVisibility` · `PUBLIC_TOGGLE_FIELDS` · `PUBLIC_FIELD_LABEL` · **ไม่ตั้ง = โชว์** |
+| `api/_lib/siamrajUnitNotes.ts` | type `UnitFieldOverrides.public_visibility` + sanitizer เก็บเฉพาะคีย์ที่รู้จักและ **เฉพาะ false** (true ไม่เก็บ กัน jsonb บวม) |
+| `src/lib/siamrajUnitRequestsApi.ts` · `src/types/index.ts` | mirror type ฝั่ง client |
+| `src/components/jobs/EditPublicJobFieldsDialog.tsx` | กลุ่ม checkbox "หน้าสมัครสาธารณะให้เห็นอะไรบ้าง" (ขั้น 3) · 🔴 **patch spread ของเดิมก่อนเสมอ** — field_overrides เขียนทับทั้งก้อนที่ API เดิมส่งแค่ place/income/benefits clobber lead_rules/age/gender มาตลอด แก้ให้ merge |
+| `src/components/jobs/JobBoardView.tsx` | การ์ดฝั่ง public gate ทุกช่องด้วย `isStaff \|\| publicFieldVisible(...)` (staff เห็นครบเสมอ) |
+| `api/_handlers/public/jobs.ts` | 🔴 `toPublicJob` ส่ง `field_overrides.public_visibility` ผ่าน — ก่อนหน้านี้ไม่พก field_overrides เลย ⇒ ติ๊กซ่อนแล้วหน้าสาธารณะไม่เคยเห็น (เจอตอนตรวจจอ) · ส่งเฉพาะ visibility ไม่ส่งข้อมูลภายในอื่น |
+
+⚠️ `/apply/p/<code>` ใช้ posting snapshot ที่ทีมกรอกเอง คนละ path — toggle คุมการ์ด `/apply`
+(feed `/api/public/jobs`) · `PublicApplyDialog` เป็นฟอร์มกรอกล้วน ไม่โชว์ฟิลด์งาน
+
+**เทสต์:** `tests/api/publicFieldVisibility.test.ts` (9 ข้อ · helper + sanitizer + ไม่ clobber gender)
+**ด่านตรวจ:** test 3,259 ผ่าน / 6 skip · tsc = 0 · eslint 0 error
+**ดูบนจอจริงแล้ว:** เขียน visibility ทดสอบ income:false ให้ OPL6902010 → การ์ดบน `/apply`
+หายบรรทัด "12,000 บาท/เดือน" ช่องอื่นอยู่ครบ → คืนค่า prod เดิมด้วย id แล้ว (pv=null)

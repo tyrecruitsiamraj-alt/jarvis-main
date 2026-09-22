@@ -60,6 +60,21 @@ export type UnitFieldOverrides = {
    * มีคีย์นี้ = ใบนี้ไม่ใช้ค่ากลาง (แดชบอร์ดดึงเฉพาะใบที่มีคีย์นี้มาคำนวณทับ)
    */
   lead_rules?: RequestLeadRulesOverride | null;
+  /**
+   * 🔴 หน้าสาธารณะเห็นช่องไหนบ้าง (เจ้าของเคาะ 22 ก.ย. 2569 นิยามกล่องงานข้อ 3:
+   * *"อยากให้ที่ไปหน้าสาธารณะเห็นอะไรบ้าง มีช่องให้ติ๊ก ๆ"*)
+   *
+   * `false` = ซ่อนช่องนั้นทั้งช่องบนหน้าสมัคร (ไม่ใช่ล้างค่า — ค่ายังอยู่ในฐาน)
+   * **ไม่มีคีย์ / ไม่มี object = โชว์ทุกช่อง** (ของเดิมทุกใบไม่เปลี่ยนพฤติกรรม)
+   * ⚠️ คุมเฉพาะการแสดงผลหน้าสาธารณะ — ไม่แตะข้อมูลที่ส่งให้ AI โทร
+   */
+  public_visibility?: {
+    income?: boolean;
+    benefits?: boolean;
+    ot?: boolean;
+    boss_nationality?: boolean;
+    required_date?: boolean;
+  } | null;
 };
 
 export type UnitNote = {
@@ -261,6 +276,21 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
         })
         .filter((x): x is UnitBranchOverride => Boolean(x))
         .slice(0, 50);
+    }
+  }
+
+  if ('public_visibility' in o) {
+    const pv = o.public_visibility;
+    if (!pv || typeof pv !== 'object') {
+      out.public_visibility = null;
+    } else {
+      const src = pv as Record<string, unknown>;
+      const vis: NonNullable<UnitFieldOverrides['public_visibility']> = {};
+      // เก็บเฉพาะคีย์ที่รู้จัก และเฉพาะที่เป็น false (true = ค่าเริ่ม ไม่ต้องเก็บ กันบวม)
+      for (const key of ['income', 'benefits', 'ot', 'boss_nationality', 'required_date'] as const) {
+        if (key in src && src[key] === false) vis[key] = false;
+      }
+      out.public_visibility = Object.keys(vis).length > 0 ? vis : null;
     }
   }
 
