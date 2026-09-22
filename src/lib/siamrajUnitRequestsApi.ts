@@ -61,7 +61,14 @@ export async function fetchSiamrajUnitRequests(limit = 200): Promise<JobRequest[
 }
 
 export async function fetchSiamrajUnitRequest(id: string): Promise<JobRequest> {
-  const r = await apiFetch(`/api/siamraj/unit-requests?id=${encodeURIComponent(id)}`);
+  /**
+   * 🔴 `cache: 'no-store'` — ตัวนี้เคยเป็นเส้นเดียวในไฟล์ที่ไม่ได้ใส่ (แก้ 22 ก.ย. 2569)
+   * ⇒ บันทึกเสร็จแล้วเปิดใบเดิมซ้ำ เบราว์เซอร์คืนคำตอบเก่าจากแคชของตัวเอง
+   * = ค่าที่เพิ่งบันทึกไม่โผล่ ทั้งที่ลงฐานครบ ("บันทึกแล้วหาย")
+   */
+  const r = await apiFetch(`/api/siamraj/unit-requests?id=${encodeURIComponent(id)}`, {
+    cache: 'no-store',
+  });
   if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดรายละเอียดใบขอไม่สำเร็จ'));
   return readJsonSafe<JobRequest>(r);
 }
@@ -219,8 +226,29 @@ export async function saveUnitRequestWorkStatus(
   return readJsonSafe<UnitWorkStatusRecord>(r);
 }
 
+/**
+ * คีย์ที่ใช้ผูกของที่เราบันทึกเอง (หมายเหตุ · ผู้รับผิดชอบ · สถานะทำงาน · field overrides)
+ * เข้ากับใบขอของระบบงานหลัก
+ *
+ * 🔴 **`request_no` มาก่อน `externalId`** (แก้ 22 ก.ย. 2569 — เจ้าของแจ้งว่า
+ * *"ใบขอเวลากรอก หรือ แก้ไขต่างๆ มันไม่บันทึก บันทึกแล้วชอบหาย"*)
+ *
+ * ของเดิมเรียง `externalId || request_no` แต่ฝั่งอ่านกลับ (`attachNotes` /
+ * `attachAssignments` ใน `api/_handlers/siamraj-unit-requests.ts`) เรียง
+ * `request_no || externalId` — **สลับกัน**
+ *
+ * ปกติไม่มีใครเห็นปัญหาเพราะสองค่านี้เท่ากัน แต่ ERP บางแถวเก็บ `request_no`
+ * เป็น**ตัวเลขล้วน** (`6907001`) แล้วเราเติม prefix ให้ตอนแสดงผล (`SQ6907001`)
+ * ⇒ `externalId` = `6907001` · `request_no` = `SQ6907001` ⇒ **เขียนคีย์หนึ่ง
+ * อ่านอีกคีย์หนึ่ง** ⇒ ลงฐานครบแต่หน้าจอไม่เห็น = "บันทึกแล้วหาย"
+ *
+ * หลักฐานในฐาน production: ใบเดียวกันมีทั้ง `6907001` และ `SQ6907001`
+ * อยู่ใน `siamraj_unit_notes` / `siamraj_unit_assignments` พร้อมกัน
+ *
+ * ⚠️ ของเก่าที่เขียนด้วยคีย์เลขล้วนยังอ่านได้ — ฝั่งอ่านกลับหาทั้งสองรูป
+ */
 export function unitRequestNoteKey(job: JobRequest): string {
-  return (job.externalId || job.request_no || job.id).trim();
+  return (job.request_no || job.externalId || job.id).trim();
 }
 
 export function isSiamrajJob(job: JobRequest): boolean {

@@ -36,20 +36,51 @@ function getQuery(req: AuthedReq, key: string): string {
 }
 
 /**
+ * คีย์ทุกรูปที่ของชิ้นเดียวกันอาจถูกบันทึกไว้ — ใช้ตอน**อ่านกลับ**เท่านั้น
+ *
+ * 🔴 **ทำไมต้องหาหลายรูป** (แก้ 22 ก.ย. 2569 · เจ้าของแจ้งว่าบันทึกแล้วหาย)
+ * ERP บางแถวเก็บ `request_no` เป็น**ตัวเลขล้วน** (`6907001`) แล้วเราเติม prefix
+ * ให้ตอนแสดงผล (`SQ6907001`) ⇒ ใบเดียวกันมีสองชื่อ และของที่คนบันทึกไว้ก่อนวันนี้
+ * ถูกเขียนด้วย `externalId` (เลขล้วน) ส่วนฝั่งอ่านหาด้วย `request_no` (มี prefix)
+ * ⇒ ลงฐานครบแต่จอไม่เห็น
+ *
+ * หลักฐานในฐาน production: ใบเดียวกันมีทั้ง `6907001` และ `SQ6907001` อยู่จริง
+ * ทั้งใน `siamraj_unit_notes` และ `siamraj_unit_assignments`
+ *
+ * ⚠️ ตัวเขียนใช้คีย์เดียว (`request_no` ก่อน — ดู `unitRequestNoteKey`)
+ * ตัวนี้มีไว้กู้ของเก่าที่เขียนไว้แล้วเท่านั้น ห้ามเอาไปใช้ตอนเขียน
+ */
+function readKeysOf(it: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  for (const raw of [it.request_no, it.externalId, it.id]) {
+    const v = String(raw ?? '').trim();
+    if (v && !out.includes(v)) out.push(v);
+  }
+  return out;
+}
+
+/** ค่าที่แปะได้ของ item นี้ — ลองคีย์ตามลำดับ เจอตัวแรกที่มีของ */
+function pickByKeys<T>(map: Map<string, T>, keys: readonly string[]): T | undefined {
+  for (const k of keys) {
+    const hit = map.get(k);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/**
  * แปะผู้รับผิดชอบ (สรรหา/คัดสรร) จาก PostgreSQL ลงในใบขอที่อ่านมาจาก Siamraj (read-only)
  * เป็นข้อมูลเสริม — ถ้าดึงจาก PG ไม่ได้ ปล่อยผ่านโดยไม่ทำให้ feed ล่ม
  */
 export async function attachAssignments(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
-  const keyOf = (it: Record<string, unknown>) =>
-    String(it.request_no || it.externalId || it.id || '').trim();
   try {
-    const keys = list.map(keyOf).filter(Boolean);
+    const keys = [...new Set(list.flatMap(readKeysOf))];
     if (keys.length === 0) return;
     const map = await getUnitAssignmentsMap(keys);
     if (map.size === 0) return;
     for (const it of list) {
-      const a = map.get(keyOf(it));
+      const a = pickByKeys(map, readKeysOf(it));
       if (!a) continue;
       it.recruiter_name = a.recruiter_name;
       it.screener_name = a.screener_name;
@@ -58,22 +89,28 @@ export async function attachAssignments(items: unknown[]): Promise<void> {
       // (เจอ 18 ส.ค. 2569 ตอนต่อช่องผู้รับผิดชอบทีม online บนหน้ากล่องงาน)
       it.online_name = a.online_name;
     }
-  } catch {
-    /* ผู้รับผิดชอบเป็นข้อมูลเสริม — ไม่ทำให้ feed หลักล่ม */
+  } catch (e) {
+    /**
+     * ผู้รับผิดชอบเป็นข้อมูลเสริม — ไม่ทำให้ feed หลักล่ม
+     * 🔴 **แต่ต้อง log** (แก้ 22 ก.ย. 2569) — ของเดิมกลืนเงียบ ⇒ เวลา PG อ่านไม่ได้
+     * ค่าที่คนบันทึกไว้จะหายจากจอโดยไม่มีใครรู้ว่าเพราะอะไร แยกไม่ออกจาก "ไม่ได้บันทึก"
+     */
+    logWarn('siamraj.attachAssignments.failed', {
+      message: e instanceof Error ? e.message : String(e),
+      items: list.length,
+    });
   }
 }
 
 export async function attachNotes(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
-  const keyOf = (it: Record<string, unknown>) =>
-    String(it.request_no || it.externalId || it.id || '').trim();
   try {
-    const keys = list.map(keyOf).filter(Boolean);
+    const keys = [...new Set(list.flatMap(readKeysOf))];
     if (keys.length === 0) return;
     const map = await getUnitNotesMap(keys);
     if (map.size === 0) return;
     for (const it of list) {
-      const n = map.get(keyOf(it));
+      const n = pickByKeys(map, readKeysOf(it));
       if (!n) continue;
       it.list_note = n.note;
       it.send_replacement = n.send_replacement ?? null;
@@ -114,22 +151,24 @@ export async function attachNotes(items: unknown[]): Promise<void> {
         it.field_overrides = fo;
       }
     }
-  } catch {
-    /* หมายเหตุเป็นข้อมูลเสริม */
+  } catch (e) {
+    /* หมายเหตุเป็นข้อมูลเสริม — แต่ต้อง log เหตุผลเดียวกับ attachAssignments */
+    logWarn('siamraj.attachNotes.failed', {
+      message: e instanceof Error ? e.message : String(e),
+      items: list.length,
+    });
   }
 }
 
 export async function attachWorkStatus(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
-  const keyOf = (it: Record<string, unknown>) =>
-    String(it.request_no || it.externalId || it.id || '').trim();
   try {
-    const keys = list.map(keyOf).filter(Boolean);
+    const keys = [...new Set(list.flatMap(readKeysOf))];
     if (keys.length === 0) return;
     const map = await getUnitWorkStatusMap(keys);
     if (map.size === 0) return;
     for (const it of list) {
-      const w = map.get(keyOf(it));
+      const w = pickByKeys(map, readKeysOf(it));
       if (!w) continue;
       it.work_status = w.status;
       it.work_person_first_name = w.person_first_name;
@@ -137,8 +176,12 @@ export async function attachWorkStatus(items: unknown[]): Promise<void> {
       it.work_status_date = w.status_date;
       it.work_persons = w.persons;
     }
-  } catch {
-    /* สถานะทำงานเป็นข้อมูลเสริม */
+  } catch (e) {
+    /* สถานะทำงานเป็นข้อมูลเสริม — แต่ต้อง log เหตุผลเดียวกับ attachAssignments */
+    logWarn('siamraj.attachWorkStatus.failed', {
+      message: e instanceof Error ? e.message : String(e),
+      items: list.length,
+    });
   }
 }
 
@@ -298,6 +341,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const rateLines = await getSiamrajSqlServerRequestRateLines(
         String((item as { request_no?: string }).request_no || ''),
       );
+      /**
+       * 🔴 **ห้ามให้เบราว์เซอร์เก็บคำตอบนี้** (แก้ 22 ก.ย. 2569)
+       *
+       * เส้นนี้เป็นเส้นเดียวของไฟล์ที่ **ไม่เคยตั้ง `Cache-Control`** (เส้น `?meta=1`
+       * และ `?units=1` ตั้งไว้ตั้งแต่แรก) ⇒ เบราว์เซอร์ heuristic-cache ได้เอง
+       * ⇒ บันทึกหมายเหตุ/ผู้รับผิดชอบเสร็จ กลับมาเปิดใบเดิมแล้วได้คำตอบเก่า
+       * = "บันทึกแล้วหาย" ทั้งที่ของลงฐานครบ
+       *
+       * ⚠️ ฝั่งเรียกก็ไม่ได้ส่ง `cache: 'no-store'` ต่างจากตัวอื่นในไฟล์เดียวกัน
+       * (`src/lib/siamrajUnitRequestsApi.ts` → `fetchSiamrajUnitRequest`) — แก้ทั้งสองฝั่ง
+       */
+      res.setHeader?.('Cache-Control', 'no-store, no-cache, must-revalidate');
       return res.status(200).json({ ...(item as object), rate_lines: rateLines });
     }
 
