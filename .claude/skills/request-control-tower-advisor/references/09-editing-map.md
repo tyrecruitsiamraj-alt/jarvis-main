@@ -9487,3 +9487,21 @@ OPL6902010 · OPL6902145)
 **ด่านตรวจ:** test 3,259 ผ่าน / 6 skip · tsc = 0 · eslint 0 error
 **ดูบนจอจริงแล้ว:** เขียน visibility ทดสอบ income:false ให้ OPL6902010 → การ์ดบน `/apply`
 หายบรรทัด "12,000 บาท/เดือน" ช่องอื่นอยู่ครบ → คืนค่า prod เดิมด้วย id แล้ว (pv=null)
+
+---
+
+## 22 ก.ย. 2569 — กล่องงาน Phase B: Auto-save
+
+นิยามข้อ 4: *"ปรับนั่นปรับนี่ … โดยต้องเซฟดราฟต์เอาไว้เสมอ"* · เจ้าของเคาะ auto-save
+
+| ไฟล์ | แก้อะไร |
+| --- | --- |
+| `src/components/jobs/EditPublicJobFieldsDialog.tsx` | `buildOverridesPatch()` (module-scope · จุดเดียวที่สร้าง patch · spread ของเดิม) · `persist(silent)` แทน `save()` เดิม (silent=auto ไม่ปิดป๊อป · silent=false=ปุ่มปิด) · debounce 1.5 วิ ผ่าน `persistRef` · `handleClose` flush ของค้าง · unmount flush · ป้ายสถานะ กำลังบันทึก/บันทึกแล้ว HH:MM/บันทึกไม่สำเร็จ · ปุ่มเปลี่ยนเป็น "ปิด" + "บันทึกแล้วปิด" |
+| `src/components/jobs/UnitRequestNoteField.tsx` | debounce 1.5 วิ + flush ตอน unmount · ใช้ `persist()` เดิมที่มี guard `lastSaved` กันยิงซ้ำ |
+
+🔴 hydrate guard (`hydratingRef`) กัน debounce ยิงตอนเปิดป๊อป · flush ตอนปิด/สลับขั้น กันของหาย (บทเรียน sirirat)
+
+**เทสต์:** `tests/api/boardAutoSave.test.ts` (8 ข้อ · pin debounce/persist/flush/สถานะ)
+**ด่านตรวจ:** test 3,267 ผ่าน / 6 skip · tsc = 0 · eslint 0 error
+**ดูบนจอจริงแล้ว:** เปิดป๊อป LMM6704005 ขั้น 3 → ติ๊ก "ฐานเงินเดือน" ออก ไม่กดปุ่ม →
+2 วิ POST /unit-notes ยิงเอง → ฐานได้ `public_visibility:{income:false}` benefits/total_income ครบ → คืนค่า prod เดิมด้วย id แล้ว

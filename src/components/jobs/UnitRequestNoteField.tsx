@@ -69,6 +69,27 @@ const UnitRequestNoteEditor: React.FC<BaseProps> = ({
     }
   }, [onSaved, readOnly, requestKey, saving, value]);
 
+  // ให้ตัว flush ตอน unmount เรียก persist ล่าสุดได้เสมอ (closure ใหม่ทุก render)
+  const persistRef = useRef(persist);
+  persistRef.current = persist;
+
+  /**
+   * 🔴 **Auto-save หมายเหตุ** (เจ้าของเคาะ 22 ก.ย. 2569 — "เซฟดราฟต์เอาไว้เสมอ")
+   * หยุดพิมพ์ 1.5 วิ ค่อยยิงบันทึก · กันหายตอนปิด/สลับขั้น (flush ตอน unmount)
+   */
+  useEffect(() => {
+    if (readOnly || !dirty) return;
+    const t = setTimeout(() => void persistRef.current(), 1500);
+    return () => clearTimeout(t);
+  }, [value, dirty, readOnly]);
+
+  useEffect(() => {
+    return () => {
+      // ปิด/สลับขั้นระหว่างมีของยังไม่เซฟ → flush (persist มี guard ไม่ยิงซ้ำถ้าไม่ dirty)
+      void persistRef.current();
+    };
+  }, []);
+
   return (
     <div className="space-y-2">
       <textarea

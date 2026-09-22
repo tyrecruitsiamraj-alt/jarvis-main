@@ -49,6 +49,49 @@ import {
   getSubdistrictOptions,
 } from '@/lib/thaiAddressCascade';
 
+/** state ที่ประกอบเป็น patch — แชร์ระหว่างปุ่มบันทึกกับ auto-save (22 ก.ย. 2569) */
+type OverridesFormState = {
+  job: JobRequest;
+  province: string;
+  district: string;
+  subdistrict: string;
+  incomePeriod: IncomePeriod;
+  incomeRows: { label: string; amount: string }[];
+  incomeTotal: string;
+  benefitText: string;
+  visibility: Record<PublicToggleField, boolean>;
+};
+
+/**
+ * ประกอบ patch ของ field_overrides จาก state ปัจจุบัน — **จุดเดียวที่สร้าง patch**
+ * 🔴 spread ของเดิมก่อนเสมอ (API เขียนทับทั้งก้อน ไม่ merge)
+ */
+function buildOverridesPatch(st: OverridesFormState): NonNullable<JobRequest['field_overrides']> {
+  const parsedLines = st.incomeRows
+    .map((r) => ({ label: r.label.trim(), amount: Math.trunc(Number(r.amount)) }))
+    .filter((r) => r.label !== '' && Number.isFinite(r.amount) && r.amount > 0);
+  const hasBreakdown = parsedLines.length > 0;
+  const totalNum = st.incomeTotal.trim() === '' ? null : Math.trunc(Number(st.incomeTotal) || 0);
+  const benefitLines = cleanBenefitLines(st.benefitText.split('\n'));
+  const existing = (st.job.field_overrides ?? {}) as Record<string, unknown>;
+  const visPatch: Partial<Record<PublicToggleField, boolean>> = {};
+  for (const f of PUBLIC_TOGGLE_FIELDS) if (!st.visibility[f]) visPatch[f] = false;
+  return {
+    ...existing,
+    province: st.province.trim() || null,
+    district: st.district.trim() || null,
+    subdistrict: st.subdistrict.trim() || null,
+    total_income: hasBreakdown
+      ? null
+      : st.incomeTotal.trim() === ''
+        ? null
+        : Math.max(0, Math.trunc(Number(st.incomeTotal) || 0)),
+    benefits: benefitLines.length > 0 ? benefitLines : null,
+    income: hasBreakdown ? { period: st.incomePeriod, lines: parsedLines, total: totalNum } : null,
+    public_visibility: Object.keys(visPatch).length > 0 ? visPatch : null,
+  } as NonNullable<JobRequest['field_overrides']>;
+}
+
 /**
  * แก้ข้อมูลที่จะไปโผล่บน **หน้าประกาศสาธารณะ** — เปิดจากการ์ดในกล่องงาน
  * (เจ้าของสั่ง 17 ส.ค. 2569: *"หน้าสาธารณะก่อนจะไปหน้า เพิ่มให้แก้ไขจากหน้ากล่องงานที"*)
@@ -109,10 +152,21 @@ const EditPublicJobFieldsDialog: React.FC<{
   const [visibility, setVisibility] = useState<Record<PublicToggleField, boolean>>(() =>
     readPublicVisibility(null),
   );
+  /** สถานะ auto-save (22 ก.ย. 2569) — idle/saving/saved(+เวลา)/error */
+  const [autoStatus, setAutoStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  /** true ระหว่าง useEffect เติมค่าเริ่ม — กัน debounce ยิงตอน hydrate */
+  const hydratingRef = React.useRef(false);
+  /** ตัวบันทึกล่าสุด (อัปเดตทุก render) — ให้ debounce hook เรียกได้โดยไม่ผูก closure เก่า */
+  const persistRef = React.useRef<null | ((silent: boolean) => Promise<void>)>(null);
+  const autosaveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!job) return;
+    hydratingRef.current = true;
     setError(null);
+    setAutoStatus('idle');
+    setSavedAt(null);
     setVisibility(readPublicVisibility(job.field_overrides?.public_visibility));
     setProvince(job.override_province ?? '');
     setDistrict(job.override_district ?? '');
@@ -131,6 +185,10 @@ const EditPublicJobFieldsDialog: React.FC<{
     // ค่าเก่าที่ติ๊กเป็นคีย์ → แปลงเป็นคำอ่านให้แก้ต่อได้ (ห้ามหายเงียบ)
     setBenefitText(benefitDisplayLabels(job.extra_benefits).join('\n'));
     setShowRatePicker(false);
+    // เติมค่าเริ่มครบแล้ว — ปลดล็อกให้ debounce ทำงานหลังจากนี้ (รอ 1 tick กัน batch)
+    setTimeout(() => {
+      hydratingRef.current = false;
+    }, 0);
     /**
      * ดึงตารางอัตราของใบนี้ — เส้น "ใบเดียว" เท่านั้นที่มี `rate_lines`
      * ⚠️ ล้มไม่เป็นไร (แค่ไม่มีอะไรให้ติ๊ก ยังพิมพ์เองได้) — ห้ามทำให้ป๊อปเปิดไม่ได้
@@ -161,6 +219,33 @@ const EditPublicJobFieldsDialog: React.FC<{
    * ขึ้นพื้นที่ที่คนหาไม่เจอ และตัวกรองจังหวัดบนบอร์ดก็จับไม่ตรง
    * ใช้ชุดข้อมูลเดียวกับหน้าเพิ่มงาน/หน้าสมัคร (`thaiAddressCascade`) ทั้งระบบจึงสะกดเหมือนกัน
    */
+  /**
+   * 🔴 **Auto-save** (เจ้าของเคาะ 22 ก.ย. 2569 — "เซฟดราฟต์เอาไว้เสมอ")
+   * แก้อะไรแล้วรอ 1.5 วิ ค่อยยิงบันทึกเงียบ ๆ · ยิงผ่าน `persistRef` (อัปเดตทุก render
+   * ให้ได้ค่าล่าสุดเสมอ) · ข้ามระหว่าง hydrate ไม่งั้นยิงตั้งแต่เปิดป๊อป
+   */
+  useEffect(() => {
+    if (!job || hydratingRef.current) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => {
+      void persistRef.current?.(true);
+    }, 1500);
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+    // ทุก field ที่ประกอบเป็น patch — เปลี่ยนเมื่อไหร่ตั้งเวลาบันทึกใหม่
+  }, [job, province, district, subdistrict, incomePeriod, incomeRows, incomeTotal, benefitText, visibility]);
+
+  /** unmount (เช่นสลับขั้นในป๊อปไล่งาน) ระหว่างมี auto-save ค้าง → flush กันของหาย */
+  useEffect(() => {
+    return () => {
+      if (autosaveTimer.current) {
+        clearTimeout(autosaveTimer.current);
+        void persistRef.current?.(true);
+      }
+    };
+  }, []);
+
   const provinceOptions = useMemo(() => getProvinceOptions(), []);
   const districtOptions = useMemo(() => getDistrictOptions(province), [province]);
   const subdistrictOptions = useMemo(
@@ -189,64 +274,74 @@ const EditPublicJobFieldsDialog: React.FC<{
   // ⚠️ ห้ามใช้ useMemo ตรงนี้ — อยู่ใต้ early return ของ `open` แล้ว (rules-of-hooks)
   const mergedBenefitLines = benefitLines;
 
-  const save = async () => {
+  /**
+   * บันทึก field_overrides · `silent=true` = auto-save (ไม่ปิดป๊อป · ตั้งป้ายสถานะ)
+   * `silent=false` = ปุ่มบันทึก (ปิดป๊อปเมื่อสำเร็จ ตามเดิม)
+   */
+  const persist = async (silent: boolean) => {
     const requestNo = siamrajExternalId(job) || job.request_no;
     if (!requestNo) {
       setError('ใบขอนี้ไม่มีเลขที่ใบขอ — แก้ไม่ได้');
       return;
     }
-    setSaving(true);
+    if (silent) setAutoStatus('saving');
+    else setSaving(true);
     setError(null);
     try {
-      /**
-       * มีรายการ = เก็บเป็น breakdown (income) · ไม่มีรายการ = ช่องยอดรวมทำหน้าที่
-       * เดิมของมัน (ทับเลขเดี่ยว total_income) — คนที่เคยตั้งเลขเดี่ยวไว้ไม่เสียค่า
-       */
-      const hasBreakdown = parsedLines.length > 0;
-      /**
-       * 🔴 **spread ของเดิมก่อนเสมอ** (22 ก.ย. 2569) — `field_overrides` ถูกเขียนทับ
-       * ทั้งก้อนที่ฝั่ง API (ไม่ merge) ⇒ ถ้าส่งแค่ฟิลด์ของขั้นนี้ ค่าที่ตั้งจากที่อื่น
-       * (lead_rules · age · gender · public_visibility ที่ยังไม่ได้แตะในขั้นนี้) จะหาย
-       * เดิมโค้ดนี้ส่งเฉพาะ place/income/benefits จึง clobber ของพวกนั้นมาตลอด — แก้ด้วย
-       */
-      const existing = (job.field_overrides ?? {}) as Record<string, unknown>;
-      // เก็บเฉพาะช่องที่ถูกติ๊กออก (false) — true/ครบ = ไม่ต้องเก็บ (กัน jsonb บวม)
-      const visPatch: Partial<Record<PublicToggleField, boolean>> = {};
-      for (const f of PUBLIC_TOGGLE_FIELDS) if (!visibility[f]) visPatch[f] = false;
-      const patch = {
-        ...existing,
-        province: province.trim() || null,
-        district: district.trim() || null,
-        subdistrict: subdistrict.trim() || null,
-        total_income: hasBreakdown
-          ? null
-          : incomeTotal.trim() === ''
-            ? null
-            : Math.max(0, Math.trunc(Number(incomeTotal) || 0)),
-        // ที่ติ๊กจากตารางอัตรา ต่อท้ายของที่พิมพ์เอง — ตัวซ้ำถูกตัดให้แล้ว
-        benefits: mergedBenefitLines.length > 0 ? mergedBenefitLines : null,
-        income: hasBreakdown
-          ? { period: incomePeriod, lines: parsedLines, total: totalNum }
-          : null,
-        public_visibility: Object.keys(visPatch).length > 0 ? visPatch : null,
-      };
+      const patch = buildOverridesPatch({
+        job,
+        province,
+        district,
+        subdistrict,
+        incomePeriod,
+        incomeRows,
+        incomeTotal,
+        benefitText,
+        visibility,
+      });
       await saveUnitRequestMeta(requestNo, { field_overrides: patch });
       onSaved?.({
-        override_province: patch.province,
-        override_district: patch.district,
-        override_subdistrict: patch.subdistrict,
+        override_province: province.trim() || null,
+        override_district: district.trim() || null,
+        override_subdistrict: subdistrict.trim() || null,
         ...(patch.total_income != null ? { total_income: patch.total_income } : {}),
         ...(preview ? { income_display: preview } : { income_display: undefined }),
-        extra_benefits: patch.benefits,
+        extra_benefits: patch.benefits ?? undefined,
         // ส่ง field_overrides ที่รวม visibility กลับ ให้ตัวอย่าง/การ์ดฝั่ง parent อัปเดตทันที
-        field_overrides: patch as JobRequest['field_overrides'],
+        field_overrides: patch,
       });
-      onClose();
+      if (silent) {
+        setAutoStatus('saved');
+        setSavedAt(
+          new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+        );
+      } else {
+        onClose();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+      if (silent) setAutoStatus('error');
     } finally {
-      setSaving(false);
+      if (silent) setSaving(false);
+      else setSaving(false);
     }
+  };
+  // ให้ debounce hook เรียกตัวล่าสุดเสมอ (closure ใหม่ทุก render)
+  persistRef.current = persist;
+
+  const save = () => void persist(false);
+
+  /**
+   * ปิดป๊อป — ถ้ามี auto-save ค้างในคิว flush ก่อนเสมอ (ห้ามหายเงียบ · บทเรียน sirirat)
+   * ไม่ปิดรอผลก็ได้ เพราะ persist(silent) ไม่เด้งปิด — ค่าที่ยิงจะถึงฐานเอง
+   */
+  const handleClose = () => {
+    if (autosaveTimer.current) {
+      clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = null;
+      if (!hydratingRef.current) void persist(true);
+    }
+    onClose();
   };
 
   const fieldCls =
@@ -693,25 +788,39 @@ const EditPublicJobFieldsDialog: React.FC<{
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className={cn('rounded-lg border px-3.5 py-1.5 text-sm font-medium', TONE.neutral.outline)}
-            >
-              ยกเลิก
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void save()}
-              className={cn(
-                'rounded-lg px-3.5 py-1.5 text-sm font-medium disabled:opacity-50',
-                TONE.success.solid,
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            {/* 🔴 ป้ายสถานะ auto-save (22 ก.ย. 2569) — เซฟดราฟต์เองทุกครั้งที่แก้ */}
+            <span className="text-[11px]" aria-live="polite">
+              {autoStatus === 'saving' ? (
+                <span className={DASH.muted}>กำลังบันทึก…</span>
+              ) : autoStatus === 'error' ? (
+                <span className="font-medium text-destructive">🔴 บันทึกไม่สำเร็จ — กดปุ่มลองใหม่</span>
+              ) : autoStatus === 'saved' && savedAt ? (
+                <span className={cn('font-medium', TONE.success.value)}>✓ บันทึกแล้ว {savedAt}</span>
+              ) : (
+                <span className={DASH.muted}>แก้แล้วระบบเซฟให้เอง</span>
               )}
-            >
-              {saving ? 'กำลังบันทึก…' : 'บันทึก'}
-            </button>
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleClose}
+                className={cn('rounded-lg border px-3.5 py-1.5 text-sm font-medium', TONE.neutral.outline)}
+              >
+                ปิด
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void save()}
+                className={cn(
+                  'rounded-lg px-3.5 py-1.5 text-sm font-medium disabled:opacity-50',
+                  TONE.success.solid,
+                )}
+              >
+                {saving ? 'กำลังบันทึก…' : 'บันทึกแล้วปิด'}
+              </button>
+            </div>
           </div>
         </div>
   );
@@ -722,7 +831,7 @@ const EditPublicJobFieldsDialog: React.FC<{
   if (embedded) return body;
 
   return (
-    <Dialog open={Boolean(job)} onOpenChange={(o) => (!o ? onClose() : undefined)}>
+    <Dialog open={Boolean(job)} onOpenChange={(o) => (!o ? handleClose() : undefined)}>
       <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base">แก้ข้อมูลที่จะขึ้นประกาศ</DialogTitle>
