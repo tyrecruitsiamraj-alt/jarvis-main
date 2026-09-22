@@ -397,7 +397,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       laneParam === 'released' ||
       laneParam === 'unreleased' ||
       laneParam === 'sourcing' ||
-      laneParam === 'started'
+      laneParam === 'started' ||
+      laneParam === 'applied' ||
+      laneParam === 'silent'
         ? laneParam
         : null,
     [laneParam],

@@ -37,7 +37,14 @@ import { openJobBoxOf } from '@/lib/jobBoxGroups';
 import type { JobRequest } from '@/types';
 
 /** ก้อนบนหัวกล่องงาน */
-export type ReleaseLaneKey = 'all' | 'released' | 'unreleased' | 'sourcing' | 'started';
+export type ReleaseLaneKey =
+  | 'all'
+  | 'released'
+  | 'unreleased'
+  | 'sourcing'
+  | 'started'
+  | 'applied'
+  | 'silent';
 
 /**
  * 🔴 **สองก้อนย่อยของ "ยังไม่ปล่อย"** (เจ้าของเคาะ 21 ก.ย. 2569)
@@ -55,6 +62,17 @@ export type ReleaseLaneKey = 'all' | 'released' | 'unreleased' | 'sourcing' | 's
  * เดียวกับสามก้อนหลัก · ของใหม่เป็น**ก้อนย่อยใต้ "ยังไม่ปล่อย"** สามก้อนหลักยังเหมือนเดิม
  */
 export const UNRELEASED_SPLIT_KEYS = ['sourcing', 'started'] as const;
+
+/**
+ * 🔴 **สองก้อนย่อยของ "ปล่อยแล้ว"** (เจ้าของเคาะ 22 ก.ย. 2569 — นิยามกล่องงานข้อ 7:
+ * *"ต้องบอกว่า…ไปแล้วมีคนสมัครแล้วกี่ใบ ไม่มีสมัครกี่ใบ ต้องบอกเพื่อจะได้ตามได้"*)
+ *
+ * เลขคู่นี้มีอยู่แล้วใน ledger (`releasedWithApplicants`/`releasedSilent` — บวกกันได้
+ * `released` เป๊ะ มีเทสต์คุม) แต่เดิม**โชว์เฉพาะตอนกดเลน "ปล่อยแล้ว"** เปิดหน้ามาไม่เห็น
+ *   `applied` มีคนสมัครแล้ว = ปล่อยแล้วและมีใบสมัครอย่างน้อย 1 คน — ไปคัดคนต่อ
+ *   `silent`  ยังไม่มีใครสมัคร = ปล่อยแล้วแต่เงียบ — ต้องดันประกาศ/เพิ่มช่องทาง
+ */
+export const RELEASED_SPLIT_KEYS = ['applied', 'silent'] as const;
 
 /** ขั้นที่ใบ "ยังไม่ปล่อย" ค้างอยู่ — ตรงกับขั้นตอน 1 2 3 4 ที่เจ้าของเคาะ */
 export type ReleaseStepKey = 'info' | 'place' | 'benefits' | 'publish';
@@ -176,6 +194,14 @@ export const RELEASE_LANE_TEXT: Record<ReleaseLaneKey, { label: string; hint: st
   started: {
     label: 'มีคนเริ่มงานแล้ว',
     hint: 'ยังไม่ปล่อย แต่ระบบงานหลักพาไปเริ่มงานแล้ว — ปล่อยประกาศหาคนไปก็ไม่มีประโยชน์',
+  },
+  applied: {
+    label: 'มีคนสมัครแล้ว',
+    hint: 'ปล่อยแล้วและมีคนกรอกใบสมัครเข้ามา — กดดูแล้วไปคัดคนต่อได้',
+  },
+  silent: {
+    label: 'ยังไม่มีใครสมัคร',
+    hint: 'ปล่อยแล้วแต่ยังเงียบ — ค้างนานควรดันประกาศหรือเพิ่มช่องทาง',
   },
 };
 
@@ -360,6 +386,13 @@ export function filterByReleaseLane(
   if (lane === 'sourcing') return releasableJobsOf(openJobs, facts);
   if (lane === 'started') {
     return openJobs.filter((j) => !facts.isReleased(j) && !stillSourcing(j));
+  }
+  // สองก้อนย่อยของ "ปล่อยแล้ว" — แบ่งด้วยตัวนับเดียวกับ ledger (`facts.applicants`)
+  if (lane === 'applied') {
+    return openJobs.filter((j) => facts.isReleased(j) && facts.applicants(j) > 0);
+  }
+  if (lane === 'silent') {
+    return openJobs.filter((j) => facts.isReleased(j) && facts.applicants(j) === 0);
   }
   return openJobs.filter((j) => releaseLaneOf(j, facts) === lane);
 }

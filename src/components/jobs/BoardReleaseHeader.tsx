@@ -116,12 +116,15 @@ function SubLaneTile({
   active,
   tone,
   onClick,
+  sub,
 }: {
   laneKey: ReleaseLaneKey;
   count: number;
   active: boolean;
   tone: 'warn' | 'success' | 'neutral';
   onClick: () => void;
+  /** เลขที่สอง (เช่น หัวคนรวม) — โชว์ต่อท้ายเป็นตัวจาง `null` = ไม่มี */
+  sub?: string | null;
 }) {
   const t = RELEASE_LANE_TEXT[laneKey];
   return (
@@ -143,6 +146,7 @@ function SubLaneTile({
       <span className={cn('font-mono text-base font-medium leading-none tabular-nums', TONE[tone].num)}>
         {th(count)}
       </span>
+      {sub ? <span className={cn('whitespace-nowrap text-[10px]', DASH.muted)}>{sub}</span> : null}
     </button>
   );
 }
@@ -477,34 +481,37 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
         </div>
       ) : null}
 
-      {/* ── ปล่อยแล้ว: ได้ผลยังไง ── */}
-      {lane === 'released' ? (
+      {/**
+       * ── ปล่อยแล้ว: มีคนสมัคร/เงียบ — 🔴 โชว์ตั้งแต่เปิดหน้า ไม่ต้องกดก้อนก่อน ──
+       * (เจ้าของเคาะ 22 ก.ย. 2569 นิยามกล่องงานข้อ 7 · แพตเทิร์นเดียวกับก้อนย่อยของ "ยังไม่ปล่อย")
+       * เดิมเป็น Chip โชว์เฉพาะตอนกดเลน "ปล่อยแล้ว" — เปิดหน้ามาไม่เห็น
+       */}
+      {(lane === null || lane === 'all' || lane === 'released' || lane === 'applied' || lane === 'silent') &&
+      ledger.released > 0 ? (
         <div className="space-y-1.5 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
           <p className="text-[11px] font-medium text-foreground">
-            ที่ปล่อยไปแล้ว {th(ledger.released)} ใบ — ได้ผลยังไง
+            ปล่อยแล้ว {th(ledger.released)} ใบ — ได้ผลยังไง
           </p>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Chip
-              label="มีคนสมัครเข้ามาแล้ว"
+          <div className="flex flex-wrap items-stretch gap-2">
+            <SubLaneTile
+              laneKey="applied"
               count={ledger.releasedWithApplicants}
-              sub={ledger.applicantHeads > 0 ? `${th(ledger.applicantHeads)} คน` : null}
-              hint="ปล่อยแล้วมีคนกรอกใบสมัคร — ไปคัดคนต่อได้ (เลขในวงเล็บคือหัวคนรวม)"
               tone="success"
-              active={false}
-              onClick={() => undefined}
+              active={lane === 'applied'}
+              onClick={() => onLaneChange(lane === 'applied' ? null : 'applied')}
+              sub={ledger.applicantHeads > 0 ? `${th(ledger.applicantHeads)} คน` : null}
             />
-            <Chip
-              label="ยังไม่มีใครสมัคร"
+            <SubLaneTile
+              laneKey="silent"
               count={ledger.releasedSilent}
-              hint="ปล่อยแล้วแต่ยังเงียบ — ถ้าค้างนานควรดันประกาศหรือเพิ่มช่องทาง"
               tone="warn"
-              active={false}
-              onClick={() => undefined}
+              active={lane === 'silent'}
+              onClick={() => onLaneChange(lane === 'silent' ? null : 'silent')}
             />
+            <span className={cn('self-center text-[11px]', DASH.muted)}>
+              บวกกันได้ {th(ledger.released)} ใบพอดี
+            </span>
           </div>
-          <p className={cn('text-[11px]', DASH.muted)}>
-            สองก้อนบวกกันได้ {th(ledger.released)} ใบพอดี
-          </p>
         </div>
       ) : null}
 

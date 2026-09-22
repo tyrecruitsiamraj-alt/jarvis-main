@@ -209,6 +209,33 @@ describe('buildReleaseLedger — 🔴 เลขต้องกระทบยอ
     expect(both).toEqual(unreleased);
     expect(new Set(both).size).toBe(both.length);
   });
+
+  /**
+   * 🔴 สองก้อนย่อยของ "ปล่อยแล้ว" (เจ้าของเคาะ 22 ก.ย. 2569 นิยามกล่องงานข้อ 7)
+   * เลขเดียวกับ releasedWithApplicants/releasedSilent — โชว์ตั้งแต่เปิดหน้า
+   */
+  it('มีคนสมัคร + ยังเงียบ = ปล่อยแล้ว เป๊ะ', () => {
+    expect(led.releasedWithApplicants + led.releasedSilent).toBe(led.released);
+  });
+
+  it('กดก้อน "มีคนสมัครแล้ว" ได้เฉพาะใบที่ปล่อยแล้วและมีใบสมัคร', () => {
+    const shown = filterByReleaseLane(jobs, facts, 'applied').map((j) => j.id);
+    expect(shown).toEqual(['r1']);
+  });
+
+  it('กดก้อน "ยังไม่มีใครสมัคร" ได้เฉพาะใบที่ปล่อยแล้วแต่เงียบ', () => {
+    const shown = filterByReleaseLane(jobs, facts, 'silent').map((j) => j.id);
+    expect(shown).toEqual(['r2']);
+  });
+
+  it('สองก้อนย่อยของปล่อยแล้วรวมกัน = เลน "ปล่อยแล้ว" ไม่ซ้ำไม่ขาด', () => {
+    const a = filterByReleaseLane(jobs, facts, 'applied').map((j) => j.id);
+    const b = filterByReleaseLane(jobs, facts, 'silent').map((j) => j.id);
+    const both = [...a, ...b].sort();
+    const released = filterByReleaseLane(jobs, facts, 'released').map((j) => j.id).sort();
+    expect(both).toEqual(released);
+    expect(new Set(both).size).toBe(both.length);
+  });
 });
 
 /**
