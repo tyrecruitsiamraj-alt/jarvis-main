@@ -14,7 +14,11 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { computeJobUrgency, jobUrgencyHint } from '@/lib/jobUrgency';
 import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSelect';
-import { fetchSiamrajUnitRequest, saveSiamrajUnitAssignment } from '@/lib/siamrajUnitRequestsApi';
+import {
+  fetchSiamrajUnitRequest,
+  saveSiamrajUnitAssignment,
+  unitRequestNoteKey,
+} from '@/lib/siamrajUnitRequestsApi';
 import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions } from '@/lib/jobStaffNames';
 import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
@@ -177,7 +181,13 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
   }, [rosterRev]);
 
   const requestNo = data?.request_no;
-  const requestKey = (data?.externalId || data?.request_no)?.trim();
+  /**
+   * 🔴 **ต้องใช้ตัวเดียวกับที่อื่น** (23 ก.ย. 2569) — บรรทัดนี้เคยเรียง
+   * `externalId || request_no` ซึ่ง **สลับกับ `unitRequestNoteKey`** (request_no ก่อน)
+   * คือบั๊ก "บันทึกแล้วหาย" แบบเดียวกับที่แก้ไป 22 ก.ย. ที่ยังค้างอยู่จุดนี้
+   * · และตัวกลางตัวนี้รู้จักใบขอล่วงหน้า (คีย์เป็น id เต็ม เลขที่ใบซ้ำใบจริงได้)
+   */
+  const requestKey = data ? unitRequestNoteKey(data) : undefined;
   const dirty =
     (recruiter.trim() || '') !== (data?.recruiter_name ?? '') ||
     (screener.trim() || '') !== (data?.screener_name ?? '') ||

@@ -20,6 +20,7 @@ import { fetchJobBenefitChipsById } from '../_lib/siamrajJobBenefits.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 import { getSiamrajSqlServerRequestRateLines } from '../_lib/siamrajSqlServerRequests.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
+import { PREQUEST_ID_PREFIX } from '../_lib/siamrajSqlServerPrequests.js';
 import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
 import { getUnitWorkStatusMap } from '../_lib/siamrajUnitWorkStatus.js';
 import { attachUnitSector } from '../_lib/unitSectorStore.js';
@@ -51,6 +52,20 @@ function getQuery(req: AuthedReq, key: string): string {
  * ตัวนี้มีไว้กู้ของเก่าที่เขียนไว้แล้วเท่านั้น ห้ามเอาไปใช้ตอนเขียน
  */
 function readKeysOf(it: Record<string, unknown>): string[] {
+  /**
+   * 🔴 **ใบขอล่วงหน้ามีคีย์เดียว ห้ามถอยไปเลขเปล่า** (23 ก.ย. 2569 — เจ้าของแจ้ง
+   * *"ใบขอที่เลขเหมือนกันทำไมแก้แล้วมันดันซ้ำกัน"*)
+   *
+   * เลขที่ใบของใบล่วงหน้าซ้ำกับใบขอจริงได้ (วัดจริง: `OPL6909001` เป็นทั้งใบจริง
+   * "ลาออก/ยาสกาว่า" และใบล่วงหน้า "เปิดไซด์/คุณอังคาร") ⇒ ถอยไปหาด้วยเลขเปล่าเมื่อไหร่
+   * ใบล่วงหน้าจะไปหยิบของใบจริงมาโชว์ แล้วดูเหมือนแก้ใบหนึ่งขึ้นทั้งสองใบ
+   *
+   * ⚠️ ของเก่าของใบล่วงหน้าที่เคยเขียนด้วยเลขเปล่า **ย้ายคีย์ไปแล้ว** ด้วยสคริปต์
+   * ครั้งเดียว 23 ก.ย. 2569 (ย้าย 20 แถว · คัดลอกให้ใบล่วงหน้าที่เลขชนกับใบจริง 63 แถว
+   * — ดู 09-editing-map.md) ⇒ ที่นี่จึงไม่ต้องมีทางถอย ถอยเมื่อไหร่บั๊กกลับมาทันที
+   */
+  const id = String(it.id ?? '').trim();
+  if (id.startsWith(PREQUEST_ID_PREFIX)) return [id];
   const out: string[] = [];
   for (const raw of [it.request_no, it.externalId, it.id]) {
     const v = String(raw ?? '').trim();
