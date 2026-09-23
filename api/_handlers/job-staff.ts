@@ -123,30 +123,31 @@ async function fetchState(scope: DepartmentScope) {
 }
 
 /**
- * **สมุดเบอร์เจ้าหน้าที่** — ชื่อเล่น + เบอร์ + สายงาน จาก `users` (110 + 114)
+ * **สมุดรายชื่อเจ้าหน้าที่** — ชื่อเล่น + สายงาน + เบอร์ จาก `users` (110 + 114)
  *
- * เจ้าของเคาะ 23 ก.ย. 2569 ว่า **หน้าผู้ใช้งานคือตัวจริง** ของเบอร์เจ้าหน้าที่
+ * เจ้าของเคาะ 23 ก.ย. 2569 ว่า **หน้าผู้ใช้งานคือตัวจริง** แล้วสั่งให้ย้ายมาที่เดียว
+ * **แบบเป็นขั้น** — ระหว่างทาง dropdown ผู้รับผิดชอบบนใบขอ *รวม* ชื่อจากสองที่
+ * (หน้าทีม `job_staff_roster` + ชุดนี้) ของเดิมจึงไม่หายระหว่างทยอยกรอก
  * (ย้ำคำสั่งเดิม 1 ก.ย.: *"กำหนดทั้ง Role คัดสรร ชื่อเล่น และเบอร์โทรทีเดียว"*)
- * ⇒ ช่อง "เจ้าหน้าที่ที่ติดตาม" บนหน้า Follow เลือกชื่อแล้ว **เบอร์ขึ้นเอง** จากชุดนี้
  *
- * 🔴 เอาเฉพาะคนที่ **มีเบอร์จริง** — จุดประสงค์ของลิสต์คือ "เลือกชื่อแล้วได้เบอร์"
- * ชื่อที่ไม่มีเบอร์ใส่มาก็เลือกแล้วไม่ได้อะไร · ยังไม่โผล่ = ไปกรอกที่หน้าผู้ใช้งาน
- * 🔴 เอาเฉพาะสาย **สรรหา/คัดสรร** ตามที่เจ้าของระบุ — ไม่รวม opl/online จนกว่าจะสั่ง
- * ⚠️ ชื่อเล่นว่างให้ตก `full_name` (ชื่ออังกฤษจาก Microsoft) ดีกว่าไม่มีชื่อให้เลือก
+ * 🔴 **ส่งทุกคนที่ตั้งสายงานไว้ แม้ยังไม่มีเบอร์** — ใบขอใช้แค่ชื่อ ไม่ต้องมีเบอร์ก็เลือกได้
+ * ฝั่งที่ต้องการเบอร์ (ช่อง "เจ้าหน้าที่ที่ติดตาม" หน้า Follow) กรองเอาเองที่ปลายทาง
+ * ⇒ ที่นี่เป็น **ชุดเดียว** ห้ามแตกเป็นสองเส้นตามผู้ใช้ ไม่งั้นนิยาม "ใครอยู่สายไหน" เพี้ยนสองที่
+ * ⚠️ ชื่อเล่นว่างให้ตก `full_name` (ชื่ออังกฤษจาก Microsoft) ดีกว่าไม่มีชื่อให้เลือก —
+ *    แต่แปลว่า **ต้องกรอกชื่อเล่นให้ตรงกับหน้าทีม** ไม่งั้นคนเดียวโผล่สองชื่อใน dropdown
  */
 export type StaffDirectoryEntry = { name: string; phone: string; lanes: string[] };
 
 async function fetchStaffDirectory(scope: DepartmentScope): Promise<StaffDirectoryEntry[]> {
   const params: string[] = [];
-  let where = `is_active and phone is not null and trim(phone) <> ''
-       and job_lanes && array['recruiter','screener']::text[]`;
+  let where = `is_active and job_lanes is not null and array_length(job_lanes, 1) >= 1`;
   if (scope.mode === 'code') {
     params.push(scope.code);
     where += ` and (department_code = $1 or department_code is null)`;
   }
-  const { rows } = await dbQuery<{ name: string; phone: string; lanes: string[] | null }>(
+  const { rows } = await dbQuery<{ name: string; phone: string | null; lanes: string[] | null }>(
     `select coalesce(nullif(trim(nickname), ''), full_name, email) as name,
-            trim(phone) as phone, job_lanes as lanes
+            coalesce(trim(phone), '') as phone, job_lanes as lanes
        from ${usersTable}
       where ${where}
       order by 1 asc`,
@@ -160,7 +161,7 @@ async function fetchStaffDirectory(scope: DepartmentScope): Promise<StaffDirecto
     const k = normName(name);
     if (seen.has(k)) continue;
     seen.add(k);
-    out.push({ name, phone: r.phone, lanes: r.lanes ?? [] });
+    out.push({ name, phone: (r.phone || '').trim(), lanes: r.lanes ?? [] });
   }
   return out;
 }

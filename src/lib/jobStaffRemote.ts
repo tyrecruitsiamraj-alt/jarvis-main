@@ -5,14 +5,15 @@ export const JOB_STAFF_ROSTER_CHANGED_EVENT = 'jarvis-job-staff-roster-changed';
 export type RosterBuMode = 'code' | 'all' | 'none';
 
 /**
- * **สมุดเบอร์เจ้าหน้าที่** จากหน้าผู้ใช้งาน (users: ชื่อเล่น + เบอร์ + สายงาน)
- * เจ้าของเคาะ 23 ก.ย. 2569 ว่าหน้าผู้ใช้งานคือตัวจริงของเบอร์ — เลือกชื่อแล้วเบอร์ขึ้นเอง
- * ว่าง = ยังไม่มีใครกรอกเบอร์ในหน้าผู้ใช้งาน (คนละเรื่องกับ "โหลดไม่ได้")
+ * **สมุดรายชื่อเจ้าหน้าที่** จากหน้าผู้ใช้งาน (users: ชื่อเล่น + สายงาน + เบอร์)
+ * เจ้าของเคาะ 23 ก.ย. 2569 ว่าหน้าผู้ใช้งานคือตัวจริง แล้วให้ย้ายมาที่เดียวแบบเป็นขั้น
+ * — ใบขอใช้แค่ชื่อ (`phone` ว่างได้) · หน้า Follow ใช้ชื่อ+เบอร์ จึงกรองเอาเองที่ปลายทาง
+ * ว่างทั้งลิสต์ = ยังไม่มีใครตั้งสายงานในหน้าผู้ใช้งาน (คนละเรื่องกับ "โหลดไม่ได้")
  */
 export type StaffDirectoryEntry = { name: string; phone: string; lanes: string[] };
 
 export type JobStaffApiState = {
-  /** ชื่อ+เบอร์ของเจ้าหน้าที่สรรหา/คัดสรร — มาจากหน้าผู้ใช้งาน */
+  /** ชื่อ + สายงาน (+ เบอร์ ถ้ามี) ของคนที่ตั้งสายงานไว้ในหน้าผู้ใช้งาน */
   directory: StaffDirectoryEntry[];
   recruiters: string[];
   screeners: string[];
@@ -39,7 +40,7 @@ function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
 }
 
-/** แถวสมุดเบอร์ที่ใช้ได้จริง — ไม่มีชื่อหรือไม่มีเบอร์ = ทิ้ง (เลือกแล้วไม่ได้อะไร) */
+/** แถวที่ใช้ได้จริง — ไม่มีชื่อ = ทิ้ง · ไม่มีเบอร์ยังเก็บไว้ (ใบขอไม่ต้องใช้เบอร์) */
 function parseDirectory(v: unknown): StaffDirectoryEntry[] {
   if (!Array.isArray(v)) return [];
   const out: StaffDirectoryEntry[] = [];
@@ -48,7 +49,7 @@ function parseDirectory(v: unknown): StaffDirectoryEntry[] {
     const o = raw as Record<string, unknown>;
     const name = typeof o.name === 'string' ? o.name.trim() : '';
     const phone = typeof o.phone === 'string' ? o.phone.trim() : '';
-    if (!name || !phone) continue;
+    if (!name) continue;
     out.push({ name, phone, lanes: isStringArray(o.lanes) ? o.lanes : [] });
   }
   return out;

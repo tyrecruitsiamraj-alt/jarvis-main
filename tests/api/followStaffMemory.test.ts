@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   directoryPhoneForName,
+  followStaffDirectory,
   isDirectoryName,
   phoneForStaffName,
   rememberedPhoneForName,
@@ -122,5 +123,24 @@ describe('staffNameOptionsAll', () => {
     expect(staffNameOptionsAll([], screeners, contacts)).toEqual(
       staffNameOptions(screeners, contacts),
     );
+  });
+});
+
+describe('followStaffDirectory — ช่อง "เจ้าหน้าที่ที่ติดตาม" กรองอะไรออกบ้าง', () => {
+  /* เส้น API ส่งทุกคนที่ตั้งสายงานไว้ (ใบขอใช้แค่ชื่อ) ช่องนี้จึงต้องกรองเองที่ปลายทาง */
+  const all = [
+    d('ครีม', '0812345678', ['screener']),
+    d('หมิว', '0898887777', ['recruiter']),
+    d('กร', '', ['screener']),
+    d('เจมส์', '0870000000', ['opl']),
+    d('ออย', '0860000000', ['online', 'screener']),
+  ];
+
+  it('เอาเฉพาะ สรรหา/คัดสรร ที่มีเบอร์ — ไม่มีเบอร์ตัดออก (เลือกแล้วไม่ได้อะไร)', () => {
+    expect(followStaffDirectory(all).map((x) => x.name)).toEqual(['ครีม', 'หมิว', 'ออย']);
+  });
+
+  it('สาย opl/online ล้วน ๆ ไม่เข้าช่องนี้ (เจ้าของระบุแค่สรรหา/คัดสรร)', () => {
+    expect(followStaffDirectory(all).some((x) => x.name === 'เจมส์')).toBe(false);
   });
 });

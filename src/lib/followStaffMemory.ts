@@ -133,3 +133,23 @@ export function staffNameOptionsAll(
 ): string[] {
   return staffNameOptions([...directory.map((d) => d.name), ...screenerNames], contacts);
 }
+
+/**
+ * ชุดที่ช่อง "เจ้าหน้าที่ที่ติดตาม" ใช้ได้จริง — กรองจากสมุดรายชื่อเต็ม
+ *
+ * 🔴 **ต้องกรองที่นี่ ไม่ใช่ที่ API** — API ส่งชุดเดียวให้ทั้งระบบ (ใบขอใช้แค่ชื่อ
+ * จึงต้องได้คนที่ยังไม่มีเบอร์ด้วย) ถ้าแตกเป็นสองเส้นตามผู้ใช้ นิยาม "ใครอยู่สายไหน"
+ * จะเพี้ยนสองที่ (บทเรียนเดิม: หนึ่งเมตริกหนึ่งนิยาม)
+ *
+ * - ต้อง **มีเบอร์** — จุดประสงค์ของช่องนี้คือ "เลือกชื่อแล้วได้เบอร์"
+ * - เอาเฉพาะสาย **สรรหา/คัดสรร** ตามที่เจ้าของระบุ (23 ก.ย. 2569) ไม่รวม opl/online
+ */
+export function followStaffDirectory(
+  all: readonly StaffDirectoryEntry[],
+): StaffDirectoryEntry[] {
+  return all.filter(
+    (d) =>
+      d.phone.trim() !== '' &&
+      (d.lanes.includes('recruiter') || d.lanes.includes('screener')),
+  );
+}

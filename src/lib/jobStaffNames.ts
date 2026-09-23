@@ -1,6 +1,32 @@
 import type { JobRequest } from '@/types';
 import { jobPositionUnits, sumJobPositionUnits } from '@/lib/jobPositionUnits';
-import { getJobStaffApiCache } from '@/lib/jobStaffRemote';
+import { getJobStaffApiCache, type StaffDirectoryEntry } from '@/lib/jobStaffRemote';
+
+/**
+ * ═══ ชื่อในลิสต์ผู้รับผิดชอบมาจาก **สองที่** ระหว่างย้าย (เจ้าของสั่ง 23 ก.ย. 2569) ═══
+ *
+ * > *"แล้วต่อไปหน้าใบขอจะเอาชื่อจากไหนมาให้เขาเลือก"* → เคาะว่า **ย้ายมาหน้าผู้ใช้งาน
+ * > ที่เดียว ทำเป็นขั้น**
+ *
+ * ขั้นที่ 1 (ตอนนี้): dropdown **รวม** ชื่อจากทั้งสองที่ — ของเดิมไม่หายระหว่างทยอยกรอก
+ * - หน้าทีมสรรหา/คัดสรร/OPL/Online (`job_staff_roster`) — ที่เดิม
+ * - หน้าผู้ใช้งาน (`users.nickname` + `users.job_lanes`) — ที่ใหม่
+ * - ชื่อที่โผล่บนใบขอจริง (มีอยู่ก่อนแล้ว · วัด 23 ก.ย.: 3 ชื่อไม่อยู่ในหน้าทีม)
+ *
+ * ขั้นต่อไป (รอเจ้าของสั่ง): กรอกชื่อเล่น+สายงานครบ 41 ชื่อ แล้วค่อยปิดหน้าทีม
+ *
+ * 🔴 **ชื่อเล่นในหน้าผู้ใช้งานต้องสะกดตรงกับหน้าทีม** — จับคู่ด้วยชื่อ (ไม่สนตัวพิมพ์)
+ * เท่านั้น ไม่มี id ผูกกัน · สะกดต่าง = คนเดียวโผล่สองชื่อในลิสต์
+ * (migration 114 วัดไว้ 1 ก.ย.: จับคู่อัตโนมัติได้ 0 คู่ เพราะตอนนั้นยังไม่มีชื่อเล่น)
+ * ⚠️ รายชื่อที่แอดมินซ่อนไว้ (`pickerExcluded*`) ต้องกรองชื่อจากหน้าผู้ใช้งานด้วย
+ *    ไม่งั้นชื่อที่ตั้งใจซ่อนจะกลับมาทางประตูหลัง
+ */
+
+/** ชื่อคนที่ตั้งสายงานนี้ไว้ในหน้าผู้ใช้งาน */
+function directoryNames(lane: 'recruiter' | 'screener' | 'opl' | 'online'): string[] {
+  const dir: StaffDirectoryEntry[] = getJobStaffApiCache()?.directory ?? [];
+  return dir.filter((d) => d.lanes.includes(lane)).map((d) => d.name);
+}
 
 /** ค่า filter สำหรับงานที่ยังไม่ได้กำหนดเจ้าหน้าที่ */
 export const STAFF_ASSIGNEE_UNASSIGNED = '__unassigned__';
@@ -28,7 +54,9 @@ export function buildRecruiterNameOptions(extraJobs?: JobRequest[]): string[] {
   const api = getJobStaffApiCache();
   const roster = api?.recruiters ?? [];
   const ex = new Set((api?.pickerExcludedRecruiters ?? []).map((s) => s.toLowerCase()));
-  return uniqueSorted([...roster, ...fromJobs]).filter((n) => !ex.has(n.trim().toLowerCase()));
+  return uniqueSorted([...roster, ...directoryNames('recruiter'), ...fromJobs]).filter(
+    (n) => !ex.has(n.trim().toLowerCase()),
+  );
 }
 
 export function buildScreenerNameOptions(extraJobs?: JobRequest[]): string[] {
@@ -38,7 +66,9 @@ export function buildScreenerNameOptions(extraJobs?: JobRequest[]): string[] {
   const api = getJobStaffApiCache();
   const roster = api?.screeners ?? [];
   const ex = new Set((api?.pickerExcludedScreeners ?? []).map((s) => s.toLowerCase()));
-  return uniqueSorted([...roster, ...fromJobs]).filter((n) => !ex.has(n.trim().toLowerCase()));
+  return uniqueSorted([...roster, ...directoryNames('screener'), ...fromJobs]).filter(
+    (n) => !ex.has(n.trim().toLowerCase()),
+  );
 }
 
 /**
@@ -52,7 +82,9 @@ export function buildOnlineNameOptions(extraJobs?: JobRequest[]): string[] {
   const api = getJobStaffApiCache();
   const roster = api?.onlines ?? [];
   const ex = new Set((api?.pickerExcludedOnlines ?? []).map((s) => s.toLowerCase()));
-  return uniqueSorted([...roster, ...fromJobs]).filter((n) => !ex.has(n.trim().toLowerCase()));
+  return uniqueSorted([...roster, ...directoryNames('online'), ...fromJobs]).filter(
+    (n) => !ex.has(n.trim().toLowerCase()),
+  );
 }
 
 export function buildOplNameOptions(extraJobs?: JobRequest[]): string[] {
@@ -62,7 +94,9 @@ export function buildOplNameOptions(extraJobs?: JobRequest[]): string[] {
   const api = getJobStaffApiCache();
   const roster = api?.opls ?? [];
   const ex = new Set((api?.pickerExcludedOpls ?? []).map((s) => s.toLowerCase()));
-  return uniqueSorted([...roster, ...fromJobs]).filter((n) => !ex.has(n.trim().toLowerCase()));
+  return uniqueSorted([...roster, ...directoryNames('opl'), ...fromJobs]).filter(
+    (n) => !ex.has(n.trim().toLowerCase()),
+  );
 }
 
 export function nameListedInOptions(trimmed: string, options: string[]): boolean {

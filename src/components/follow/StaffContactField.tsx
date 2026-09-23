@@ -11,6 +11,7 @@ import {
 } from '@/lib/jobStaffRemote';
 import { buildScreenerNameOptions } from '@/lib/jobStaffNames';
 import {
+  followStaffDirectory,
   isDirectoryName,
   phoneForStaffName,
   rememberedPhoneForName,
@@ -80,10 +81,14 @@ export default function StaffContactField({
     };
   }, [reloadSignal]);
 
-  /** สมุดเบอร์จากหน้าผู้ใช้งาน — โหลดมากับ roster เส้นเดียวกัน (`/api/job-staff`) */
+  /**
+   * สมุดเบอร์จากหน้าผู้ใช้งาน — โหลดมากับ roster เส้นเดียวกัน (`/api/job-staff`)
+   * กรองเหลือ "สรรหา/คัดสรร ที่มีเบอร์" ตรงนี้ · เส้น API ส่งทุกคนที่ตั้งสายงานไว้
+   * เพราะ dropdown ผู้รับผิดชอบบนใบขอใช้ชุดเดียวกันแต่ไม่ต้องการเบอร์
+   */
   const directory = useMemo(() => {
     void rosterRev;
-    return getJobStaffApiCache()?.directory ?? [];
+    return followStaffDirectory(getJobStaffApiCache()?.directory ?? []);
   }, [rosterRev]);
 
   const nameOptions = useMemo(
