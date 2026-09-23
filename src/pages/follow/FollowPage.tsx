@@ -1574,7 +1574,7 @@ const FollowPage: React.FC = () => {
                     <div className="space-y-1.5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="ml-1 text-xs font-medium text-muted-foreground">
-                          ติ๊ก = AI โทร · ไม่ติ๊ก = คนโทร
+                          เลือกว่าวันไหนให้ AI โทร วันไหนคนโทรเอง
                         </p>
                         <span className="flex items-center gap-2 text-[11px] font-medium">
                           <span className="text-muted-foreground">ทั้งหมด:</span>
@@ -1586,32 +1586,61 @@ const FollowPage: React.FC = () => {
                           </button>
                         </span>
                       </div>
-                      {/* 🔴 สองคอลัมน์ตั้งแต่จอ sm ขึ้นไป — 31 วันเรียงเดี่ยวยาวเกินจอ */}
-                      <div className="grid gap-1 sm:grid-cols-2">
+                      {/**
+                       * 🔴 **หนึ่งวัน = หนึ่งแถว · หลังวันมีสองช่องให้เลือก**
+                       * (เจ้าของสั่ง 23 ก.ย. 2569 รอบสาม: *"ต้องการแบบเลือกว่า Ai โทร
+                       * หรือคนโทร แบบ 2 ช่องให้เลือกอะ แล้วขอเป็นแถว ไม่ใช่ทำมาแบบนี้
+                       * ดูแล้วงง เช่น เลือก 25-30 แบ่งแถว 25-30 มา แล้วหลังวันก็เลือก"*)
+                       *
+                       * ⚠️ **ห้ามกลับไปสองคอลัมน์** — เคยจัด `sm:grid-cols-2` ให้ 31 วันสั้นลง
+                       * เจ้าของอ่านแล้วงงเพราะตาต้องกระโดดซ้าย-ขวา · แถวเดียวยาวกว่าแต่ไล่ตาลงได้
+                       * ⚠️ **ห้ามยุบเหลือช่องติ๊กเดียว** — ติ๊ก/ไม่ติ๊ก บังคับให้คนแปลเองว่า
+                       * "ไม่ติ๊ก" แปลว่าอะไร · สองช่องเขียนคำไว้ทั้งคู่ อ่านแล้วรู้เลย
+                       */}
+                      <div className="space-y-1">
                         {all.map((d) => {
                           const ai = modeOfDay(d) === 'ai';
                           return (
-                            <label
+                            <div
                               key={d}
-                              className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/70 bg-white/40 px-2.5 py-1.5 dark:border-white/15 dark:bg-white/5"
+                              className="flex items-center gap-2 rounded-xl border border-white/70 bg-white/40 px-2.5 py-1.5 dark:border-white/15 dark:bg-white/5"
                             >
-                              <Checkbox
-                                checked={ai}
-                                onCheckedChange={(v) => setDayMode(d, v === true ? 'ai' : 'manual')}
-                                aria-label={`${dayLabel(d)} — ${ai ? 'AI โทร' : 'คนโทร'}`}
-                              />
-                              <span className="text-[11px] font-medium text-foreground">
+                              <span className="flex-1 text-xs font-medium text-foreground">
                                 {dayLabel(d)}
                               </span>
-                              <span
-                                className={cn(
-                                  'ml-auto text-[11px] font-medium',
-                                  ai ? 'text-primary' : 'text-amber-700 dark:text-amber-300',
-                                )}
-                              >
-                                {ai ? 'AI โทร' : 'คนโทร'}
-                              </span>
-                            </label>
+                              {/* สองช่องนี้เลือกได้ทีละอัน — กดช่องที่ติ๊กอยู่แล้วไม่ทำอะไร
+                                  (ปล่อยให้ติ๊กออกได้ = วันนั้นไม่มีคนโทร ซึ่งไม่ใช่สถานะที่มีจริง) */}
+                              <label className="flex cursor-pointer items-center gap-1.5">
+                                <Checkbox
+                                  checked={ai}
+                                  onCheckedChange={() => setDayMode(d, 'ai')}
+                                  aria-label={`${dayLabel(d)} — AI โทร`}
+                                />
+                                <span
+                                  className={cn(
+                                    'text-xs font-medium',
+                                    ai ? 'text-primary' : 'text-muted-foreground',
+                                  )}
+                                >
+                                  AI โทร
+                                </span>
+                              </label>
+                              <label className="flex cursor-pointer items-center gap-1.5">
+                                <Checkbox
+                                  checked={!ai}
+                                  onCheckedChange={() => setDayMode(d, 'manual')}
+                                  aria-label={`${dayLabel(d)} — คนโทร`}
+                                />
+                                <span
+                                  className={cn(
+                                    'text-xs font-medium',
+                                    !ai ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground',
+                                  )}
+                                >
+                                  คนโทร
+                                </span>
+                              </label>
+                            </div>
                           );
                         })}
                       </div>
