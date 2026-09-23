@@ -17,6 +17,11 @@ const saveUnitRequestMeta = vi.fn().mockResolvedValue(undefined);
 vi.mock('@/lib/siamrajUnitRequestsApi', () => ({
   saveUnitRequestMeta: (...args: unknown[]) => saveUnitRequestMeta(...args),
   siamrajExternalId: (job: { request_no?: string }) => job.request_no ?? null,
+  /* ตัวจริงคืน id เต็มให้ใบขอล่วงหน้า (เลขที่ใบซ้ำใบจริงได้) · ใบจริงคืนเลขที่ใบ */
+  unitRequestNoteKey: (job: { id?: string; request_no?: string; externalId?: string }) =>
+    (job.id || '').startsWith('siamraj-pre:')
+      ? job.id
+      : (job.request_no || job.externalId || job.id || '').trim(),
 }));
 
 const { default: RequestLeadRulesCard } = await import('./RequestLeadRulesCard');
@@ -111,5 +116,14 @@ describe('กล่องเกณฑ์ความเร่งของใบ'
     render(<RequestLeadRulesCard job={job()} canEdit={false} />);
     expect(screen.queryByRole('button', { name: 'บันทึกเกณฑ์ของใบนี้' })).toBeNull();
     expect(thresholdInput().disabled).toBe(true);
+  });
+  it('🔴 ใบขอล่วงหน้าต้องบันทึกด้วยคีย์ของตัวเอง — ห้ามไปทับใบขอจริงที่เลขเดียวกัน', async () => {
+    render(<RequestLeadRulesCard job={job({ id: 'siamraj-pre:R-1' } as Partial<JobRequest>)} />);
+    fireEvent.change(thresholdInput(), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึกเกณฑ์ของใบนี้' }));
+
+    await waitFor(() => expect(saveUnitRequestMeta).toHaveBeenCalledTimes(1));
+    const [requestNo] = saveUnitRequestMeta.mock.calls[0] as [string];
+    expect(requestNo).toBe('siamraj-pre:R-1');
   });
 });

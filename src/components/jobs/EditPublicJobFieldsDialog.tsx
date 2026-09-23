@@ -12,6 +12,7 @@ import {
   fetchSiamrajUnitRequest,
   saveUnitRequestMeta,
   siamrajExternalId,
+  unitRequestNoteKey,
 } from '@/lib/siamrajUnitRequestsApi';
 import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
@@ -279,7 +280,14 @@ const EditPublicJobFieldsDialog: React.FC<{
    * `silent=false` = ปุ่มบันทึก (ปิดป๊อปเมื่อสำเร็จ ตามเดิม)
    */
   const persist = async (silent: boolean) => {
-    const requestNo = siamrajExternalId(job) || job.request_no;
+    /**
+     * 🔴 **ต้องใช้ตัวกลางตัวเดียวกับที่อื่น** (23 ก.ย. 2569) — บรรทัดนี้เคยคิดคีย์เอง
+     * แบบ `externalId || request_no` ซึ่งผิดสองชั้น:
+     * ① สลับลำดับกับฝั่งอ่าน (บั๊ก "บันทึกแล้วหาย" ที่แก้ไป 22 ก.ย. แต่ค้างจุดนี้)
+     * ② `siamrajExternalId()` **ถอด prefix ทิ้ง** ⇒ ใบขอล่วงหน้าได้เลขเปล่า
+     *    แล้วไปเขียนทับแถวของ **ใบขอจริงที่เลขเดียวกัน** (ชนกัน 64% ของใบล่วงหน้า)
+     */
+    const requestNo = unitRequestNoteKey(job);
     if (!requestNo) {
       setError('ใบขอนี้ไม่มีเลขที่ใบขอ — แก้ไม่ได้');
       return;

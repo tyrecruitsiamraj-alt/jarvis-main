@@ -23,11 +23,11 @@ describe('diffUnitRequestFeedNotifications', () => {
     const jobs = [job({ id: '1', request_no: 'R001', status: 'open' })];
     const { events, next } = diffUnitRequestFeedNotifications(null, jobs);
     expect(events).toEqual([]);
-    expect(next.get('R001')).toBe('open');
+    expect(next.get('1')).toBe('open');
   });
 
   it('notifies for new request', () => {
-    const prev = new Map([['R001', 'open']]);
+    const prev = new Map([['1', 'open']]);
     const jobs = [
       job({ id: '1', request_no: 'R001', status: 'open' }),
       job({ id: '2', request_no: 'R002', status: 'open' }),
@@ -39,7 +39,7 @@ describe('diffUnitRequestFeedNotifications', () => {
   });
 
   it('notifies when status becomes closed', () => {
-    const prev = new Map([['R001', 'open']]);
+    const prev = new Map([['1', 'open']]);
     const jobs = [job({ id: '1', request_no: 'R001', status: 'closed' })];
     const { events } = diffUnitRequestFeedNotifications(prev, jobs);
     expect(events).toHaveLength(1);
@@ -47,16 +47,44 @@ describe('diffUnitRequestFeedNotifications', () => {
   });
 
   it('does not notify for other status changes', () => {
-    const prev = new Map([['R001', 'closed']]);
+    const prev = new Map([['1', 'closed']]);
     const jobs = [job({ id: '1', request_no: 'R001', status: 'open' })];
     const { events } = diffUnitRequestFeedNotifications(prev, jobs);
     expect(events).toEqual([]);
   });
 
   it('keeps snapshot when feed is temporarily empty', () => {
-    const prev = new Map([['R001', 'open']]);
+    const prev = new Map([['1', 'open']]);
     const { events, next } = diffUnitRequestFeedNotifications(prev, []);
     expect(events).toEqual([]);
     expect(next).toBe(prev);
+  });
+
+  /**
+   * 🔴 ใบขอล่วงหน้ากับใบขอจริง **เลขที่ใบซ้ำกันได้** (ชนกัน 27 จาก 42 ใบ · 23 ก.ย. 2569)
+   * คีย์ด้วยเลขที่ใบเมื่อไหร่ สองใบยุบเป็นคีย์เดียว แล้วแจ้งเตือนของใบที่ถูกทับหายเงียบ ๆ
+   */
+  it('ใบล่วงหน้ากับใบจริงที่เลขเดียวกัน ต้องเป็นคนละคีย์', () => {
+    const jobs = [
+      job({ id: 'siamraj-sql:OPL6909001', request_no: 'OPL6909001', status: 'open' }),
+      job({ id: 'siamraj-pre:OPL6909001', request_no: 'OPL6909001', status: 'open' }),
+    ];
+    const { next } = diffUnitRequestFeedNotifications(null, jobs);
+    expect(next.size).toBe(2);
+  });
+
+  it('ปิดใบจริง ไม่ลากใบล่วงหน้าเลขเดียวกันไปด้วย', () => {
+    const prev = new Map([
+      ['siamraj-sql:OPL6909001', 'open'],
+      ['siamraj-pre:OPL6909001', 'open'],
+    ]);
+    const jobs = [
+      job({ id: 'siamraj-sql:OPL6909001', request_no: 'OPL6909001', status: 'closed' }),
+      job({ id: 'siamraj-pre:OPL6909001', request_no: 'OPL6909001', status: 'open' }),
+    ];
+    const { events } = diffUnitRequestFeedNotifications(prev, jobs);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.type).toBe('job_closed');
+    expect(events[0]?.job.id).toBe('siamraj-sql:OPL6909001');
   });
 });

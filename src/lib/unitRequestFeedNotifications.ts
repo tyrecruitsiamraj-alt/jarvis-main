@@ -4,9 +4,16 @@ export type FeedNotificationEvent =
   | { type: 'new_job'; job: JobRequest }
   | { type: 'job_closed'; job: JobRequest };
 
-/** คีย์คงที่สำหรับเทียบ feed — ใช้เลขที่ใบขอก่อน id */
+/**
+ * คีย์คงที่สำหรับเทียบ feed
+ *
+ * 🔴 **ต้องใช้ `id` ก่อน** (23 ก.ย. 2569) — เดิมใช้เลขที่ใบขอก่อน แต่ **ใบขอล่วงหน้า
+ * กับใบขอจริงเลขที่ใบซ้ำกันได้** (วัดจริง: ชนกัน 27 จาก 42 ใบล่วงหน้า) ⇒ สองใบยุบเป็น
+ * คีย์เดียวใน Map ⇒ ใบหนึ่งทับอีกใบ แล้วแจ้งเตือน "ใบขอใหม่ / ปิดแล้ว" ของใบที่ถูกทับหายไป
+ * `id` พก prefix มาด้วยเสมอ (`siamraj-sql:` / `siamraj-pre:`) จึงไม่ชนกัน
+ */
 export function unitRequestFeedKey(job: JobRequest): string {
-  return String(job.externalId || job.request_no || job.id || '').trim();
+  return String(job.id || job.externalId || job.request_no || '').trim();
 }
 
 /**
