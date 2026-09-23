@@ -412,6 +412,12 @@ const AdminSettings: React.FC = () => {
                     {/* ชื่อเล่น + สายงาน (114 · เจ้าของสั่ง 1 ก.ย. 2569) — ตั้งทุกอย่างของคนคนนี้ในแถวเดียว */}
                     <th className="px-4 py-3 text-left text-muted-foreground font-medium">ชื่อเล่น</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">สายงาน</th>
+                    {/* 🔴 **เบอร์โทรต้องอยู่ติดกับ ชื่อเล่น/สายงาน** (เจ้าของทัก 23 ก.ย. 2569
+                        *"ช่องใส่เบอร์ กับ ชื่อเล่น เล็กมากกกก"*) — สามช่องนี้คือชุดที่ต้องกรอก
+                        ด้วยกัน (ตั้งชื่อเล่น + สายงาน + เบอร์ แล้วชื่อไปโผล่ที่หน้าติดตาม)
+                        ของเดิมเบอร์อยู่คอลัมน์ที่ 8 ถัดจาก Username/Email/Role/แผนก ⇒ บนจอ
+                        1440 ตารางกว้าง 1,574px ในกรอบ 1,000px ต้องเลื่อนขวาไปหาทุกครั้ง */}
+                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">เบอร์โทร</th>
                     {/* 🔴 จอแคบซ่อนสองคอลัมน์นี้ (แก้ 3 ก.ย. 2569) — 10 คอลัมน์ทำให้ตาราง
                         ล้นขอบขวาจนช่องที่ต้องกรอก (ชื่อเล่น/เบอร์) หลุดออกนอกจอ
                         อีเมลไปโชว์ใต้ชื่อแทน ข้อมูลไม่หาย */}
@@ -423,7 +429,6 @@ const AdminSettings: React.FC = () => {
                     </th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">Role</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">แผนก</th>
-                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">เบอร์โทร</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">สถานะ</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">Actions</th>
                   </tr>
@@ -455,8 +460,14 @@ const AdminSettings: React.FC = () => {
                           maxLength={60}
                           title="ชื่อเล่นที่ใช้เรียกกันจริง — อนาคตจะให้ dropdown ทั้งระบบดึงชื่อจากช่องนี้"
                           /* 🔴 ช่องต้องกว้างพออ่านออกว่าพิมพ์ใครไป (เจ้าของทัก 1 ก.ย. 2569:
-                             *"ช่องใส่ชื่อเล่นเล็กจนมองไม่ออกเลยว่าพิมพ์ใครไป เบอร์ด้วย"*) */
-                          className={cn('h-9 w-40 text-sm', savingUserId === u.id && 'opacity-60')}
+                             *"ช่องใส่ชื่อเล่นเล็กจนมองไม่ออกเลยว่าพิมพ์ใครไป เบอร์ด้วย"*)
+
+                             🔴 **ต้องมี `min-w-` ไม่ใช่ `w-` อย่างเดียว** (เจ้าของทักซ้ำ 23 ก.ย. 2569:
+                             *"ช่องใส่เบอร์ กับ ชื่อเล่น เล็กมากกกก"*) — ตารางนี้มี 10 คอลัมน์
+                             กว้างรวม 902px ในกรอบ 669px · table layout แบบ auto **บีบคอลัมน์ที่
+                             บีบได้** ⇒ `w-40` (160px) ถูกย่อเหลือ **38px** จริง ๆ บนจอ
+                             `min-w-` บีบไม่ได้ จึงเป็นตัวเดียวที่กันไว้อยู่ (ตารางเลื่อนแนวนอนได้อยู่แล้ว) */
+                          className={cn('h-9 w-40 min-w-40 text-sm', savingUserId === u.id && 'opacity-60')}
                           onBlur={(e) => {
                             const next = e.target.value.trim();
                             if (next === (u.nickname || '')) return;
@@ -490,6 +501,27 @@ const AdminSettings: React.FC = () => {
                             );
                           })}
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <Input
+                          type="tel"
+                          key={`${u.id}-${u.phone || ''}`}
+                          defaultValue={u.phone || ''}
+                          disabled={savingUserId === u.id}
+                          placeholder="08xxxxxxxx"
+                          title="เบอร์นี้เป็น admin_phone ที่ AI โทรกลับเมื่อโทรหาผู้สมัครไม่สำเร็จ"
+                          /* 🔴 `min-w-` ด้วยเหตุผลเดียวกับช่องชื่อเล่น — `w-40` เฉย ๆ โดนตารางบีบเหลือ 38px */
+                          className={cn(
+                            'h-9 w-40 min-w-40 mx-auto text-center text-sm tabular-nums',
+                            savingUserId === u.id && 'opacity-60',
+                          )}
+                          onBlur={(e) => {
+                            const next = e.target.value.trim();
+                            const cur = u.phone || '';
+                            if (next === cur) return;
+                            void updateUser(u.id, { phone: next || null });
+                          }}
+                        />
                       </td>
                       <td className="hidden px-4 py-3 font-mono text-xs text-muted-foreground xl:table-cell">
                         {u.username}
@@ -539,26 +571,6 @@ const AdminSettings: React.FC = () => {
                             </option>
                           ))}
                         </select>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <Input
-                          type="tel"
-                          key={`${u.id}-${u.phone || ''}`}
-                          defaultValue={u.phone || ''}
-                          disabled={savingUserId === u.id}
-                          placeholder="08xxxxxxxx"
-                          title="เบอร์นี้เป็น admin_phone ที่ AI โทรกลับเมื่อโทรหาผู้สมัครไม่สำเร็จ"
-                          className={cn(
-                            'h-9 w-40 mx-auto text-center text-sm tabular-nums',
-                            savingUserId === u.id && 'opacity-60',
-                          )}
-                          onBlur={(e) => {
-                            const next = e.target.value.trim();
-                            const cur = u.phone || '';
-                            if (next === cur) return;
-                            void updateUser(u.id, { phone: next || null });
-                          }}
-                        />
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button
