@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -214,6 +215,13 @@ const FollowPage: React.FC = () => {
    * เดิมช่วงวันคือ "ส่งทุกวันในช่วง" ไม่มีทางข้ามวัน — เสาร์อาทิตย์/วันหยุดก็ยิงหมด
    * ตอนนี้ช่วงวันเป็นแค่ **ตัวกางปฏิทิน** ส่วนวันที่ติ๊กไว้เท่านั้นที่กลายเป็นสายจริง
    * ⚠️ ติ๊กไม่ครบ = ไม่ใช่ error — ตั้งใจข้ามวันได้
+   *
+   * 🔴 **23 ก.ย. 2569: จอไม่มีทางเลือก "ไม่โทร" แล้ว** (เจ้าของสั่ง: *"ทำเป็น Checkbox
+   * เลือกว่า Ai โทรหรือคนโทร แค่นี้เองทำไรให้มันซับซ้อนทำไม"*) ⇒ ติ๊กออก = **คนโทร**
+   * ไม่ใช่ "ข้ามวัน" · อยากข้ามวันให้ย่นช่วงวันแทน
+   *
+   * ตัวแปรกับตัวกรองตอนส่งยังอยู่ (ค่าเป็นเซ็ตว่างเสมอ) — เอาไว้ให้เติมทางเลือกกลับได้
+   * ทันทีถ้าเจ้าของสั่ง ไม่ต้องรื้อเส้นบันทึกใหม่ · **ห้ามเติมปุ่มกลับเองโดยไม่ได้สั่ง**
    */
   const [skippedDays, setSkippedDays] = useState<Set<string>>(() => new Set());
   /**
@@ -1497,10 +1505,13 @@ const FollowPage: React.FC = () => {
             {scheduleMode ? (
               /* ตารางโทร: ช่วงวัน × รอบเวลา/วัน (เจ้าของสั่ง 16 ส.ค. — เช่น 1-7 วันละ 2 รอบ) */
               <div className="space-y-2.5">
-                {/* 🔴 **สามขั้นมีหัวข้อกำกับ** (เจ้าของสั่ง 23 ก.ย. 2569: *"ทำให้มันเลือกง่าย
-                    กว่านี้หน่อย ตอนนี้มันเลือกยากไป — 1.เลือกว่าวันไหนถึงวันไหน 2.โทรกี่รอบ
-                    3.มีปุ่มติ๊กเลือกเอาว่าวันนี้ให้คนโทร AI โทร"*) ของเดิมเป็นช่องเรียงกันเฉย ๆ
-                    ไม่มีอะไรบอกว่าต้องทำอะไรก่อนหลัง */}
+                {/* 🔴 **สองขั้น มีหัวข้อกำกับ** (เจ้าของสั่ง 23 ก.ย. 2569 · แก้รอบสอง:
+                    *"เลือกช่วงวัน ไอตรงนี้แหละที่เอา แต่ละวันใครโทรอะมาไว้ข้างหลัง
+                    แล้วทำเป็น Checkbox เลือกว่า Ai โทรหรือคนโทร แค่นี้เองทำไรให้มันซับซ้อนทำไม"*)
+
+                    รอบแรกแยกเป็นสามขั้น (ช่วงวัน / รอบ / ใครโทร) — เจ้าของบอกว่ายังซับซ้อน
+                    ⇒ **ยุบ "ใครโทร" เข้าไปอยู่ในขั้นเลือกช่วงวันเลย** เพราะมันคือเรื่องเดียวกัน
+                    (กางช่วงวันเสร็จก็ติ๊กต่อได้ทันที ไม่ต้องเลื่อนไปอีกหัวข้อ) */}
                 <p className="ml-1 text-xs font-medium text-foreground">1 · เลือกช่วงวัน</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
@@ -1511,47 +1522,6 @@ const FollowPage: React.FC = () => {
                     <label htmlFor="followTo" className="ml-1 text-xs font-medium text-muted-foreground">ถึงวันที่</label>
                     <input id="followTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="jarvis-soft-field min-h-[46px] w-full" />
                   </div>
-                </div>
-                <div className="space-y-1.5">
-                  <p className="ml-1 text-xs font-medium text-foreground">2 · วันละกี่รอบ</p>
-                  <span className="ml-1 text-xs font-medium text-muted-foreground">รอบเวลาต่อวัน (สูงสุด 5 รอบ)</span>
-                  {roundTimes.map((v, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      {/**
-                       * 🔴 **ห้ามกลับไปใช้ `<input type="time">`** (เจ้าของทัก 20 ก.ย. 2569:
-                       * *"หน้าการติดตาม บางคนยังขึ้น am pm อยู่เลย"*)
-                       *
-                       * ช่องเวลาของเบราว์เซอร์แสดงผลตาม **ภาษาของเครื่องคนใช้** ไม่ใช่ของหน้าเว็บ
-                       * ⇒ เครื่องที่ตั้งเป็นอังกฤษ (สหรัฐ) เห็น `05:50 AM` เครื่องไทยเห็น `05:50`
-                       * คนละหน้าจอกันทั้งที่เป็นข้อมูลชุดเดียวกัน · `lang` ของหน้าเว็บสั่งไม่ได้
-                       * (ลองแล้ว Chrome ไม่สนใจ) ⇒ ต้องเลิกใช้ช่องของเบราว์เซอร์
-                       */}
-                      <TimeSelect24
-                        value={v}
-                        onChange={(next) => setRoundAt(i, next)}
-                        label={`รอบที่ ${i + 1}`}
-                        className="min-h-[46px] flex-1"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeRound(i)}
-                        disabled={roundTimes.length <= 1}
-                        aria-label={`เอารอบที่ ${i + 1} ออก`}
-                        className="inline-flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/60 text-slate-600 hover:text-foreground disabled:opacity-40 dark:border-white/15 dark:bg-white/10 dark:text-slate-300"
-                      >
-                        <X className="h-4 w-4" aria-hidden />
-                      </button>
-                    </div>
-                  ))}
-                  {roundTimes.length < 5 ? (
-                    <button
-                      type="button"
-                      onClick={addRound}
-                      className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-white/70 bg-white/60 px-4 py-1.5 text-xs font-medium text-slate-600 hover:text-foreground dark:border-white/15 dark:bg-white/10 dark:text-slate-300"
-                    >
-                      <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มรอบต่อวัน
-                    </button>
-                  ) : null}
                 </div>
                 {/* เลือกได้ว่าจะส่งให้ Lumos วันไหนบ้าง (เจ้าของสั่ง 17 ส.ค. 2569)
                     ช่วงวันข้างบนเป็นแค่ตัวกางปฏิทิน · ติ๊กวันไหน วันนั้นถึงกลายเป็นสายจริง
@@ -1600,25 +1570,11 @@ const FollowPage: React.FC = () => {
                   };
                   const modeOfDay = (d: string): 'ai' | 'manual' | 'off' =>
                     skippedDays.has(d) ? 'off' : manualDays.has(d) ? 'manual' : 'ai';
-                  /** ป้าย + สีตอนถูกเลือก — ชุดเดียวกับที่ใช้ทั้งหน้า ห้ามคิดสีใหม่ */
-                  const DAY_MODES: ReadonlyArray<{
-                    key: 'ai' | 'manual' | 'off';
-                    label: string;
-                    on: string;
-                  }> = [
-                    { key: 'ai', label: 'AI โทร', on: 'bg-primary text-primary-foreground' },
-                    {
-                      key: 'manual',
-                      label: 'เราโทร',
-                      on: 'bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100',
-                    },
-                    { key: 'off', label: 'ไม่โทร', on: 'bg-secondary text-foreground' },
-                  ];
                   return (
                     <div className="space-y-1.5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="ml-1 text-xs font-medium text-foreground">
-                          3 · แต่ละวันใครโทร
+                        <p className="ml-1 text-xs font-medium text-muted-foreground">
+                          ติ๊ก = AI โทร · ไม่ติ๊ก = คนโทร
                         </p>
                         <span className="flex items-center gap-2 text-[11px] font-medium">
                           <span className="text-muted-foreground">ทั้งหมด:</span>
@@ -1626,48 +1582,36 @@ const FollowPage: React.FC = () => {
                             AI โทร
                           </button>
                           <button type="button" onClick={() => setAllDays('manual')} className="text-amber-700 underline dark:text-amber-300">
-                            เราโทร
-                          </button>
-                          <button type="button" onClick={() => setAllDays('off')} className="text-muted-foreground underline">
-                            ไม่โทร
+                            คนโทร
                           </button>
                         </span>
                       </div>
                       {/* 🔴 สองคอลัมน์ตั้งแต่จอ sm ขึ้นไป — 31 วันเรียงเดี่ยวยาวเกินจอ */}
-                      <div className="grid gap-1.5 sm:grid-cols-2">
+                      <div className="grid gap-1 sm:grid-cols-2">
                         {all.map((d) => {
-                          const mode = modeOfDay(d);
+                          const ai = modeOfDay(d) === 'ai';
                           return (
-                            <div
+                            <label
                               key={d}
-                              className="flex items-center justify-between gap-2 rounded-xl border border-white/70 bg-white/40 py-1 pl-2.5 pr-1 dark:border-white/15 dark:bg-white/5"
+                              className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/70 bg-white/40 px-2.5 py-1.5 dark:border-white/15 dark:bg-white/5"
                             >
+                              <Checkbox
+                                checked={ai}
+                                onCheckedChange={(v) => setDayMode(d, v === true ? 'ai' : 'manual')}
+                                aria-label={`${dayLabel(d)} — ${ai ? 'AI โทร' : 'คนโทร'}`}
+                              />
                               <span className="text-[11px] font-medium text-foreground">
                                 {dayLabel(d)}
                               </span>
-                              <div
-                                role="group"
-                                aria-label={`${dayLabel(d)} — ใครโทร`}
-                                className="flex shrink-0 overflow-hidden rounded-full border border-border"
+                              <span
+                                className={cn(
+                                  'ml-auto text-[11px] font-medium',
+                                  ai ? 'text-primary' : 'text-amber-700 dark:text-amber-300',
+                                )}
                               >
-                                {DAY_MODES.map((m) => (
-                                  <button
-                                    key={m.key}
-                                    type="button"
-                                    aria-pressed={mode === m.key}
-                                    onClick={() => setDayMode(d, m.key)}
-                                    className={cn(
-                                      'px-2 py-1 text-[11px] font-medium transition-colors',
-                                      mode === m.key
-                                        ? m.on
-                                        : 'bg-background text-muted-foreground hover:bg-secondary',
-                                    )}
-                                  >
-                                    {m.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
+                                {ai ? 'AI โทร' : 'คนโทร'}
+                              </span>
+                            </label>
                           );
                         })}
                       </div>
@@ -1741,6 +1685,47 @@ const FollowPage: React.FC = () => {
                     </div>
                   );
                 })()}
+                <div className="space-y-1.5">
+                  <p className="ml-1 text-xs font-medium text-foreground">2 · วันละกี่รอบ</p>
+                  <span className="ml-1 text-xs font-medium text-muted-foreground">รอบเวลาต่อวัน (สูงสุด 5 รอบ)</span>
+                  {roundTimes.map((v, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      {/**
+                       * 🔴 **ห้ามกลับไปใช้ `<input type="time">`** (เจ้าของทัก 20 ก.ย. 2569:
+                       * *"หน้าการติดตาม บางคนยังขึ้น am pm อยู่เลย"*)
+                       *
+                       * ช่องเวลาของเบราว์เซอร์แสดงผลตาม **ภาษาของเครื่องคนใช้** ไม่ใช่ของหน้าเว็บ
+                       * ⇒ เครื่องที่ตั้งเป็นอังกฤษ (สหรัฐ) เห็น `05:50 AM` เครื่องไทยเห็น `05:50`
+                       * คนละหน้าจอกันทั้งที่เป็นข้อมูลชุดเดียวกัน · `lang` ของหน้าเว็บสั่งไม่ได้
+                       * (ลองแล้ว Chrome ไม่สนใจ) ⇒ ต้องเลิกใช้ช่องของเบราว์เซอร์
+                       */}
+                      <TimeSelect24
+                        value={v}
+                        onChange={(next) => setRoundAt(i, next)}
+                        label={`รอบที่ ${i + 1}`}
+                        className="min-h-[46px] flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeRound(i)}
+                        disabled={roundTimes.length <= 1}
+                        aria-label={`เอารอบที่ ${i + 1} ออก`}
+                        className="inline-flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/60 text-slate-600 hover:text-foreground disabled:opacity-40 dark:border-white/15 dark:bg-white/10 dark:text-slate-300"
+                      >
+                        <X className="h-4 w-4" aria-hidden />
+                      </button>
+                    </div>
+                  ))}
+                  {roundTimes.length < 5 ? (
+                    <button
+                      type="button"
+                      onClick={addRound}
+                      className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-white/70 bg-white/60 px-4 py-1.5 text-xs font-medium text-slate-600 hover:text-foreground dark:border-white/15 dark:bg-white/10 dark:text-slate-300"
+                    >
+                      <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มรอบต่อวัน
+                    </button>
+                  ) : null}
+                </div>
                 {(() => {
                   const picked = daysInRange(dateFrom, dateTo).filter((d) => !skippedDays.has(d));
                   const manual = picked.filter((d) => manualDays.has(d)).length;
@@ -1757,7 +1742,7 @@ const FollowPage: React.FC = () => {
                     </p>
                   ) : (
                     <p className="ml-1 text-[11px] text-muted-foreground">
-                      ① เลือกช่วงวัน → ② วันละกี่รอบ → ③ กดเลือกว่าวันไหนให้ AI โทร / เราโทรเอง
+                      ① เลือกช่วงวัน แล้วติ๊กว่าวันไหนให้ AI โทร → ② วันละกี่รอบ
                       แล้วระบบจะสรุปจำนวนสายให้
                     </p>
                   );
