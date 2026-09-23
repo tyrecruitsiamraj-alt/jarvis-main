@@ -20,6 +20,7 @@ const rosterTable = tableInAppSchema('job_staff_roster');
 const excludedTable = tableInAppSchema('job_staff_picker_excluded');
 const jobsTable = tableInAppSchema('jobs');
 const unitAssignmentsTable = tableInAppSchema('siamraj_unit_assignments');
+const usersTable = tableInAppSchema('users');
 
 type Role = 'recruiter' | 'screener' | 'opl' | 'online';
 
@@ -68,6 +69,7 @@ async function fetchState(scope: DepartmentScope) {
     pickerExcludedScreeners: [] as string[],
     pickerExcludedOpls: [] as string[],
     pickerExcludedOnlines: [] as string[],
+    directory: [] as StaffDirectoryEntry[],
     bu: scope.mode === 'code' ? scope.code : null,
     buMode: scope.mode,
   };
@@ -106,6 +108,7 @@ async function fetchState(scope: DepartmentScope) {
   }
 
   return {
+    directory: await fetchStaffDirectory(scope),
     recruiters: dedupe(recruiters),
     screeners: dedupe(screeners),
     opls: dedupe(opls),
@@ -117,6 +120,49 @@ async function fetchState(scope: DepartmentScope) {
     bu: scope.mode === 'code' ? scope.code : null,
     buMode: scope.mode,
   };
+}
+
+/**
+ * **สมุดเบอร์เจ้าหน้าที่** — ชื่อเล่น + เบอร์ + สายงาน จาก `users` (110 + 114)
+ *
+ * เจ้าของเคาะ 23 ก.ย. 2569 ว่า **หน้าผู้ใช้งานคือตัวจริง** ของเบอร์เจ้าหน้าที่
+ * (ย้ำคำสั่งเดิม 1 ก.ย.: *"กำหนดทั้ง Role คัดสรร ชื่อเล่น และเบอร์โทรทีเดียว"*)
+ * ⇒ ช่อง "เจ้าหน้าที่ที่ติดตาม" บนหน้า Follow เลือกชื่อแล้ว **เบอร์ขึ้นเอง** จากชุดนี้
+ *
+ * 🔴 เอาเฉพาะคนที่ **มีเบอร์จริง** — จุดประสงค์ของลิสต์คือ "เลือกชื่อแล้วได้เบอร์"
+ * ชื่อที่ไม่มีเบอร์ใส่มาก็เลือกแล้วไม่ได้อะไร · ยังไม่โผล่ = ไปกรอกที่หน้าผู้ใช้งาน
+ * 🔴 เอาเฉพาะสาย **สรรหา/คัดสรร** ตามที่เจ้าของระบุ — ไม่รวม opl/online จนกว่าจะสั่ง
+ * ⚠️ ชื่อเล่นว่างให้ตก `full_name` (ชื่ออังกฤษจาก Microsoft) ดีกว่าไม่มีชื่อให้เลือก
+ */
+export type StaffDirectoryEntry = { name: string; phone: string; lanes: string[] };
+
+async function fetchStaffDirectory(scope: DepartmentScope): Promise<StaffDirectoryEntry[]> {
+  const params: string[] = [];
+  let where = `is_active and phone is not null and trim(phone) <> ''
+       and job_lanes && array['recruiter','screener']::text[]`;
+  if (scope.mode === 'code') {
+    params.push(scope.code);
+    where += ` and (department_code = $1 or department_code is null)`;
+  }
+  const { rows } = await dbQuery<{ name: string; phone: string; lanes: string[] | null }>(
+    `select coalesce(nullif(trim(nickname), ''), full_name, email) as name,
+            trim(phone) as phone, job_lanes as lanes
+       from ${usersTable}
+      where ${where}
+      order by 1 asc`,
+    params,
+  );
+  const seen = new Set<string>();
+  const out: StaffDirectoryEntry[] = [];
+  for (const r of rows) {
+    const name = (r.name || '').trim();
+    if (!name) continue;
+    const k = normName(name);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push({ name, phone: r.phone, lanes: r.lanes ?? [] });
+  }
+  return out;
 }
 
 type RosterEntry = { name: string; bu: string | null };

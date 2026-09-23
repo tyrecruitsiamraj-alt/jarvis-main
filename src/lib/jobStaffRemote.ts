@@ -4,7 +4,16 @@ export const JOB_STAFF_ROSTER_CHANGED_EVENT = 'jarvis-job-staff-roster-changed';
 
 export type RosterBuMode = 'code' | 'all' | 'none';
 
+/**
+ * **สมุดเบอร์เจ้าหน้าที่** จากหน้าผู้ใช้งาน (users: ชื่อเล่น + เบอร์ + สายงาน)
+ * เจ้าของเคาะ 23 ก.ย. 2569 ว่าหน้าผู้ใช้งานคือตัวจริงของเบอร์ — เลือกชื่อแล้วเบอร์ขึ้นเอง
+ * ว่าง = ยังไม่มีใครกรอกเบอร์ในหน้าผู้ใช้งาน (คนละเรื่องกับ "โหลดไม่ได้")
+ */
+export type StaffDirectoryEntry = { name: string; phone: string; lanes: string[] };
+
 export type JobStaffApiState = {
+  /** ชื่อ+เบอร์ของเจ้าหน้าที่สรรหา/คัดสรร — มาจากหน้าผู้ใช้งาน */
+  directory: StaffDirectoryEntry[];
   recruiters: string[];
   screeners: string[];
   opls: string[];
@@ -30,6 +39,21 @@ function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
 }
 
+/** แถวสมุดเบอร์ที่ใช้ได้จริง — ไม่มีชื่อหรือไม่มีเบอร์ = ทิ้ง (เลือกแล้วไม่ได้อะไร) */
+function parseDirectory(v: unknown): StaffDirectoryEntry[] {
+  if (!Array.isArray(v)) return [];
+  const out: StaffDirectoryEntry[] = [];
+  for (const raw of v) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const o = raw as Record<string, unknown>;
+    const name = typeof o.name === 'string' ? o.name.trim() : '';
+    const phone = typeof o.phone === 'string' ? o.phone.trim() : '';
+    if (!name || !phone) continue;
+    out.push({ name, phone, lanes: isStringArray(o.lanes) ? o.lanes : [] });
+  }
+  return out;
+}
+
 function parseState(data: unknown): JobStaffApiState | null {
   if (typeof data !== 'object' || data === null) return null;
   const o = data as Record<string, unknown>;
@@ -44,6 +68,7 @@ function parseState(data: unknown): JobStaffApiState | null {
   const buMode: RosterBuMode =
     o.buMode === 'code' || o.buMode === 'all' || o.buMode === 'none' ? o.buMode : 'all';
   return {
+    directory: parseDirectory(o.directory),
     recruiters: o.recruiters,
     screeners: o.screeners,
     opls: isStringArray(o.opls) ? o.opls : [],

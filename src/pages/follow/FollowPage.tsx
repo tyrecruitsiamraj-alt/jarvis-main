@@ -32,7 +32,7 @@ import { TONE } from '@/lib/designTokens';
 import { followScheduleCounts } from '@/lib/followSchedule';
 import { roundTabLabel } from '@/lib/followRoundVisual';
 import { conveyorLabel } from '@/lib/soRecruitNav';
-import { Settings2, Plus, X, LoaderCircle, PhoneForwarded, Users, Building2, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Settings2, Plus, X, LoaderCircle, PhoneForwarded, Users, UserCog, Building2, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import {
   listFollowEntries,
   createFollowEntry,
@@ -72,7 +72,7 @@ import {
   scheduleDayStaffPhone,
   type FollowWizardStep,
 } from '@/lib/followWizard';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { hasFollowPrefill, readFollowPrefill, splitPrefillName } from '@/lib/followPrefill';
 import { fetchSiamrajUnitRequests, fetchAllUnitOptions } from '@/lib/siamrajUnitRequestsApi';
 import type { JobRequest } from '@/types';
@@ -244,10 +244,13 @@ const FollowPage: React.FC = () => {
   const [topicManagerOpen, setTopicManagerOpen] = useState(false);
   const [staffManagerOpen, setStaffManagerOpen] = useState(false);
   const { user } = useAuth();
+  const navigate = useNavigate();
   /** เพิ่มเรื่อง/เจ้าหน้าที่ได้เฉพาะ supervisor ขึ้นไป (เจ้าของสั่ง ค่ำ-5) */
   const canManageMasters = user?.role === 'supervisor' || user?.role === 'admin';
   /** ลบทิ้งจริงได้เฉพาะ admin — ตอนนี้เปิดไว้ให้เจ้าของล้างข้อมูลช่วงทดลอง */
   const canPurge = user?.role === 'admin';
+  /** ตั้งเบอร์ที่หน้าผู้ใช้งานได้ไหม — `/api/app-users` เปิดให้ admin เท่านั้น */
+  const canEditUsers = user?.role === 'admin';
   const [purgingId, setPurgingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -1135,8 +1138,17 @@ const FollowPage: React.FC = () => {
                     <DropdownMenuItem onSelect={() => setTopicManagerOpen(true)}>
                       <Plus aria-hidden /> เพิ่มเรื่องที่ให้โทรติดตาม
                     </DropdownMenuItem>
+                    {/* 🔴 **ตัวจริงของเบอร์เจ้าหน้าที่ = หน้าผู้ใช้งาน** (เจ้าของเคาะ 23 ก.ย. 2569
+                        ย้ำคำสั่งเดิม 1 ก.ย.: *"กำหนดทั้ง Role คัดสรร ชื่อเล่น และเบอร์โทรทีเดียว"*)
+                        ⇒ พาไปที่นั่นเลย · ช่องนี้โผล่เฉพาะ admin เพราะ /api/app-users เป็น admin
+                        เท่านั้น — โชว์ให้ supervisor กดแล้วเจอหน้าโหลดไม่ขึ้นคือพาไปทางตัน */}
+                    {canEditUsers ? (
+                      <DropdownMenuItem onSelect={() => navigate('/settings?tab=users')}>
+                        <UserCog aria-hidden /> ตั้งชื่อเล่น + เบอร์เจ้าหน้าที่ (หน้าผู้ใช้งาน)
+                      </DropdownMenuItem>
+                    ) : null}
                     <DropdownMenuItem onSelect={() => setStaffManagerOpen(true)}>
-                      <Plus aria-hidden /> เพิ่มเจ้าหน้าที่ผู้ติดตาม
+                      <Plus aria-hidden /> เพิ่มเบอร์คนที่ไม่มีบัญชีผู้ใช้
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -2041,8 +2053,8 @@ const FollowPage: React.FC = () => {
       <FollowMasterManagerDialog<FollowStaffContact>
         open={staffManagerOpen}
         onClose={() => setStaffManagerOpen(false)}
-        title="ชื่อ-เบอร์โทรเจ้าหน้าที่ที่ติดตาม"
-        description="ตัวเลือกใน dropdown เจ้าหน้าที่ (หน้าตั้งวันเวลา) — AI บอกเบอร์นี้ให้ผู้สมัครโทรกลับ"
+        title="เบอร์คนที่ไม่มีบัญชีผู้ใช้"
+        description="ตัวจริงของชื่อ-เบอร์เจ้าหน้าที่อยู่ที่ ตั้งค่า → ผู้ใช้งาน (ชื่อเล่น + สายงาน + เบอร์) · ที่นี่ไว้สำหรับคนที่ไม่มีบัญชีในระบบเท่านั้น"
         fields={[
           { key: 'name', placeholder: 'ชื่อเจ้าหน้าที่ เช่น คุณคิว ทีมสรรหา' },
           { key: 'phone', placeholder: 'เบอร์โทร เช่น 021234567 ต่อ 101', inputMode: 'tel' },

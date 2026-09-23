@@ -6,13 +6,16 @@ import {
 } from '@/lib/followStaffContactsApi';
 import {
   refreshJobStaffFromApi,
+  getJobStaffApiCache,
   JOB_STAFF_ROSTER_CHANGED_EVENT,
 } from '@/lib/jobStaffRemote';
 import { buildScreenerNameOptions } from '@/lib/jobStaffNames';
 import {
+  isDirectoryName,
+  phoneForStaffName,
   rememberedPhoneForName,
-  nameForPhone,
-  staffNameOptions,
+  staffNameForPhone,
+  staffNameOptionsAll,
 } from '@/lib/followStaffMemory';
 
 /**
@@ -27,7 +30,12 @@ import {
  *   เบอร์ล่าสุดของชื่อนั้น prefill ให้เอง (แก้ทับได้) · พิมพ์เบอร์เสร็จ (blur) จำคู่ใหม่
  *
  * ⚠️ ชื่อเป็น state ภายในช่อง — รายการ Follow เก็บแค่เบอร์ · เปิดแก้รายการเก่าที่มีแต่เบอร์
- * จะย้อนหาชื่อจากความจำให้ (nameForPhone)
+ * จะย้อนหาชื่อจากความจำให้ (staffNameForPhone)
+ *
+ * 🔴 **23 ก.ย. 2569 — เบอร์ตัวจริงอยู่หน้าผู้ใช้งาน** (เจ้าของเคาะเอง จากคำถาม
+ * *"เจ้าหน้าที่คัดสรร หรือ เจ้าหน้าที่สรรหาอะ แบบถ้าเลือกชื่อแล้วเบอร์ขึ้นมาเลยอะ"*)
+ * ตั้งชื่อเล่น + สายงาน + เบอร์ ที่ **ตั้งค่า → ผู้ใช้งาน** แล้วชื่อนั้นโผล่ที่นี่พร้อมเบอร์
+ * · ชื่อที่ยังไม่ได้ตั้งค่ายังใช้ความจำเดิมไปก่อน (ดู followStaffMemory)
  */
 export default function StaffContactField({
   id,
@@ -72,27 +80,33 @@ export default function StaffContactField({
     };
   }, [reloadSignal]);
 
-  const nameOptions = useMemo(() => {
+  /** สมุดเบอร์จากหน้าผู้ใช้งาน — โหลดมากับ roster เส้นเดียวกัน (`/api/job-staff`) */
+  const directory = useMemo(() => {
     void rosterRev;
-    return staffNameOptions(buildScreenerNameOptions(), contacts);
-  }, [rosterRev, contacts]);
+    return getJobStaffApiCache()?.directory ?? [];
+  }, [rosterRev]);
+
+  const nameOptions = useMemo(
+    () => staffNameOptionsAll(directory, buildScreenerNameOptions(), contacts),
+    [directory, contacts],
+  );
 
   // เปิดแก้รายการเก่าที่มีแต่เบอร์ → ย้อนหาชื่อจากความจำ (ถ้าตรง) มาโชว์ให้
   useEffect(() => {
     if (name || manualName) return;
-    const found = nameForPhone(value, contacts);
+    const found = staffNameForPhone(value, directory, contacts);
     if (found) setName(found);
     // จับเฉพาะตอน contacts มา/value เปลี่ยนจากภายนอก
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contacts, value]);
+  }, [contacts, directory, value]);
 
   const pickName = (next: string) => {
     setName(next);
     setManualName(false);
     if (!next) return;
-    // เลือกชื่อที่เคยใช้ → เบอร์ล่าสุดของชื่อนั้นขึ้นมาเอง (ถ้ามี · ทับเบอร์เดิมในช่อง)
-    const remembered = rememberedPhoneForName(next, contacts);
-    if (remembered) onChange(remembered);
+    // เลือกชื่อ → เบอร์ขึ้นเอง · สมุดเบอร์ (หน้าผู้ใช้งาน) ก่อน แล้วค่อยความจำเดิม
+    const found = phoneForStaffName(next, directory, contacts);
+    if (found) onChange(found);
   };
 
   // จำคู่ ชื่อ+เบอร์ เมื่อพิมพ์เบอร์เสร็จ — createStaffContact ล้างแคชให้เอง
@@ -101,6 +115,8 @@ export default function StaffContactField({
     const n = name.trim();
     const p = value.trim();
     if (!n || !p) return;
+    // ตั้งค่าไว้ในหน้าผู้ใช้งานแล้ว = ที่นั่นคือตัวจริง ห้ามจำทับด้วยค่าที่พิมพ์ในฟอร์ม
+    if (isDirectoryName(n, directory)) return;
     if (rememberedPhoneForName(n, contacts) === p) return; // จำตรงนี้อยู่แล้ว
     void createStaffContact(n, p)
       .then((created) => setContacts((prev) => [...prev, created]))
@@ -154,8 +170,9 @@ export default function StaffContactField({
         />
       </div>
       <p className="ml-1 text-[10px] text-muted-foreground">
-        เลือกชื่อจากคัดสรรแล้วพิมพ์เบอร์ — ครั้งหน้าเลือกชื่อเดิมเบอร์จะขึ้นให้เอง ·
-        AI บอกเบอร์นี้ตอนท้ายสายให้ผู้สมัครโทรกลับ
+        เลือกชื่อแล้วเบอร์ขึ้นเอง — ชื่อ/เบอร์ตั้งที่ <strong>ตั้งค่า → ผู้ใช้งาน</strong>{' '}
+        (ชื่อเล่น + สายงาน สรรหา/คัดสรร + เบอร์) · ชื่อที่ยังไม่ได้ตั้ง พิมพ์เบอร์เองได้
+        แล้วระบบจำไว้ให้ · AI บอกเบอร์นี้ตอนท้ายสายให้ผู้สมัครโทรกลับ
       </p>
     </div>
   );
