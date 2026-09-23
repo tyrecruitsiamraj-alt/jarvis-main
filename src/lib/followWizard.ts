@@ -123,3 +123,41 @@ export const FOLLOW_SUBMIT_GUARD_MS = 800;
 export function isSubmitTooSoonAfterStep3(enteredStep3AtMs: number, nowMs: number): boolean {
   return nowMs - enteredStep3AtMs < FOLLOW_SUBMIT_GUARD_MS;
 }
+
+/**
+ * ═══ โหมดตารางหลายวัน — สองกติกาที่เคยพลาด (เจ้าของทัก 23 ก.ย. 2569 *"ลงหลายวันแล้วรวน"*) ═══
+ */
+
+/**
+ * แถวของวันที่ `dayIndex` (นับจาก 0 ในชุดที่ส่งจริง) คือ **สายที่เท่าไหร่**
+ *
+ * 🔴 ต้องนับต่อข้ามวัน — เส้นสร้างของโหมดตารางเคย **ไม่ส่ง `call_round` เลย**
+ * ⇒ ทุกแถวได้ `null` ⇒ `buildFollowPlanPayload` ตก `baseRound = 1` ให้ทุกวัน
+ * ⇒ วันที่ 2, 3, 4… AI พูด **บทสายแรก** ซ้ำเหมือนไม่เคยโทรหากันมาก่อน
+ * (บทสายแรก = ชุด `follow` · สายที่ 2 ขึ้นไป = `follow_repeat`)
+ *
+ * วันหนึ่งมี `roundsPerDay` สาย ⇒ สายแรกของวันที่ i คือ `i * roundsPerDay + 1`
+ * ส่วน step ในวันเดียวกัน ฝั่ง payload นับต่อเอง
+ */
+export function scheduleDayCallRound(dayIndex: number, roundsPerDay: number): number {
+  const perDay = Number.isInteger(roundsPerDay) && roundsPerDay >= 1 ? roundsPerDay : 1;
+  const i = Number.isInteger(dayIndex) && dayIndex >= 0 ? dayIndex : 0;
+  return i * perDay + 1;
+}
+
+/**
+ * เบอร์เจ้าหน้าที่ของวันนั้น — **ที่เดียวที่ตัดสิน** ว่าจะใช้เบอร์ชุดเดียวหรือเบอร์รายวัน
+ *
+ * ค่าตั้งต้นคือเบอร์เดียวทั้งชุด (`perDay = false`) เพราะของเดิมกางช่องชื่อ+เบอร์
+ * **ทุกวัน** — 31 วัน = ช่องซ้ำ 31 ชุด สูง ~5,100px ในกรอบ 674px หาปุ่มบันทึกไม่เจอ
+ * ⚠️ คำสั่งเดิม 18 ส.ค. 2569 (*"ระบุเจ้าของแผนแต่ละวันได้"*) ยังอยู่ — เปิดสวิตช์แล้วได้เหมือนเดิม
+ * · รายวันที่เว้นว่างไว้ ตกกลับไปใช้เบอร์ชุดเดียว ไม่ใช่ไม่มีเบอร์
+ */
+export function scheduleDayStaffPhone(
+  day: string,
+  opts: { perDay: boolean; byDay: Record<string, string>; shared: string },
+): string {
+  const shared = (opts.shared || '').trim();
+  if (!opts.perDay) return shared;
+  return (opts.byDay[day] || '').trim() || shared;
+}

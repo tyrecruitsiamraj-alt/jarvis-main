@@ -68,6 +68,8 @@ import {
   isSubmitTooSoonAfterStep3,
   nextFollowStep,
   prevFollowStep,
+  scheduleDayCallRound,
+  scheduleDayStaffPhone,
   type FollowWizardStep,
 } from '@/lib/followWizard';
 import { useSearchParams } from 'react-router-dom';
@@ -172,6 +174,19 @@ const FollowPage: React.FC = () => {
    */
   const [staffPhones, setStaffPhones] = useState<string[]>(() => ['']);
   const [staffPhoneByDay, setStaffPhoneByDay] = useState<Record<string, string>>({});
+  /**
+   * 🔴 **โหมดตารางใช้เบอร์เดียวทั้งชุดเป็นค่าตั้งต้น** (เจ้าของทัก 23 ก.ย. 2569:
+   * *"ลงหลายวันแล้วรวน"*)
+   *
+   * ของเดิมกาง `StaffContactField` (ชื่อ+เบอร์+คำอธิบาย) **ทุกวัน** — วัดจริงบนจอ
+   * 5 วัน = เนื้อหา 1,462px ในกรอบ 674px · 31 วัน = 5,135px (~7.6 จอ) ช่องซ้ำ 31 ชุด
+   * ⇒ ตั้งตารางยาว ๆ แล้วเลื่อนหาปุ่มบันทึกไม่เจอ ซึ่งคือ "รวน" ที่เจอ
+   *
+   * ⚠️ คำสั่งเดิม 18 ส.ค. 2569 (*"ระบุเจ้าของแผนแต่ละวันได้"*) **ยังอยู่ครบ** —
+   * ย้ายไปอยู่หลังสวิตช์ `perDayStaff` ไม่ได้ถอดทิ้ง · ปิดอยู่ = ทุกวันใช้ `staffPhoneAll`
+   */
+  const [staffPhoneAll, setStaffPhoneAll] = useState('');
+  const [perDayStaff, setPerDayStaff] = useState(false);
   /** ให้โทรเมื่อไหร่ — หลายรอบได้ เพราะบางเคสต้องโทรมากกว่า 1 ครั้ง (เจ้าของสั่ง 10 ส.ค. 2569) */
   const [scheduledAts, setScheduledAts] = useState<string[]>(() => [nowForInput()]);
   /**
@@ -419,6 +434,8 @@ const FollowPage: React.FC = () => {
     setNote('');
     setStaffPhones(['']);
     setStaffPhoneByDay({});
+    setStaffPhoneAll('');
+    setPerDayStaff(false);
     setPickedFrom(null);
     setScheduledAts([nowForInput()]);
     setCallRounds([1]);
@@ -482,6 +499,18 @@ const FollowPage: React.FC = () => {
     }
     return out;
   };
+
+  /**
+   * เบอร์เจ้าหน้าที่ของวันนั้นในโหมดตาราง — **ที่เดียวที่ตัดสิน** ว่าจะใช้เบอร์ชุดเดียว
+   * หรือเบอร์รายวัน · จอสรุปกับตอนส่งจริงต้องอ่านจากฟังก์ชันนี้เหมือนกัน ไม่งั้น
+   * สิ่งที่ทวนกับสิ่งที่ส่งจะคนละเบอร์
+   */
+  const staffPhoneForDay = (day: string): string =>
+    scheduleDayStaffPhone(day, {
+      perDay: perDayStaff,
+      byDay: staffPhoneByDay,
+      shared: staffPhoneAll,
+    });
 
   /**
    * ตัวเลขสำหรับกล่อง "ทวนก่อนส่ง" — **ใช้สูตรเดียวกับตอนส่งจริง**
@@ -614,17 +643,30 @@ const FollowPage: React.FC = () => {
         // เก็บผล "ส่งให้ AI ได้ไหม" ของทุกรายการ แล้วสรุปทีเดียวตอนจบ
         const dispatchStates: Array<string | null> = [];
         try {
-          for (const day of sendDays) {
+          for (const [dayIndex, day] of sendDays.entries()) {
             const createdEntry = await createFollowEntry({
               recipient_name: recipientName,
               recipient_phone: phone,
               topic,
               note: note || undefined,
-              // เบอร์ของ **วันนั้น** — เจ้าของแผนคนละคนกันได้ในชุดเดียว
-              staff_phone: (staffPhoneByDay[day] || '').trim() || undefined,
+              // เบอร์ของ **วันนั้น** — เจ้าของแผนคนละคนกันได้ในชุดเดียว (เปิดสวิตช์รายวัน)
+              // ปิดอยู่ = เบอร์เดียวทั้งชุด
+              staff_phone: staffPhoneForDay(day) || undefined,
               scheduled_at: new Date(`${day}T${rounds[0]}:00+07:00`).toISOString(),
               group_id: groupId,
               call_times: rounds,
+              /**
+               * 🔴 **สายที่เท่าไหร่ ต้องนับต่อข้ามวัน** (เจ้าของทัก 23 ก.ย. 2569)
+               *
+               * เส้นนี้เคย **ไม่ส่ง `call_round` เลย** ⇒ ทุกแถวได้ `null` ⇒ ฝั่งส่งคิว
+               * (`lumosDispatch.buildFollowPlanPayload`) ตก `baseRound = 1` ให้ทุกวัน
+               * ⇒ **วันที่ 2, 3, 4… AI พูดบทสายแรกซ้ำ** เหมือนไม่เคยโทรหากันมาก่อน
+               * (บทสายแรก = ชุด `follow` · สายที่ 2 ขึ้นไป = `follow_repeat`)
+               *
+               * วันหนึ่งมี `rounds.length` สาย ⇒ สายแรกของวันที่ i คือสายที่
+               * `i * rounds.length + 1` · ตัว payload นับ step ในวันเดียวกันต่อเอง
+               */
+              call_round: scheduleDayCallRound(dayIndex, rounds.length),
               // วันที่เลือกว่า "เราโทรเอง" → ไม่ส่งเข้าคิว AI (121) แต่ยังเป็นแถวจริงในระบบ
               call_mode: manualDays.has(day) ? 'manual' : 'ai',
               unit_name: unitName.trim() || undefined,
@@ -1422,7 +1464,18 @@ const FollowPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setScheduleMode(true)}
+                onClick={() => {
+                  /* 🔴 สลับมาโหมดตารางแล้ว **ต้องมีวันตั้งต้น** (23 ก.ย. 2569) — ของเดิม
+                     ช่องวันว่างทั้งคู่ ⇒ ปฏิทินรายวันไม่ขึ้น สรุปอ่านว่า "0 วัน" ทั้งที่ปุ่ม
+                     "บันทึก + ส่ง AI โทร" ยังอยู่ กดแล้วได้แต่ error · เอาวันจากรอบแรกของ
+                     โหมด "ระบุเวลาเอง" มาตั้งให้ ไม่ใช่ช่วงวันที่คิดขึ้นเอง */
+                  const day = (scheduledAts[0] || '').slice(0, 10);
+                  if (day) {
+                    if (!dateFrom) setDateFrom(day);
+                    if (!dateTo) setDateTo(dateFrom || day);
+                  }
+                  setScheduleMode(true);
+                }}
                 className={cn('flex-1 rounded-full px-3 py-1.5 font-medium', scheduleMode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground')}
               >
                 ตารางหลายวัน
@@ -1576,32 +1629,70 @@ const FollowPage: React.FC = () => {
 
                       {/* เบอร์เจ้าหน้าที่ **ใต้วันที่ที่ติดตาม** (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-2)
                           โชว์เฉพาะวันที่ติ๊กไว้ — วันที่ไม่ส่งไม่มีเจ้าของแผน จะโชว์ก็รกเปล่า ๆ
-                          ⚠️ ช่องนี้แชร์ลิสต์กันผ่านแคชระดับโมดูล (ไม่ยิงเส้นตัวละครั้ง) */}
-                      {all.filter((d) => !skippedDays.has(d)).length > 0 ? (
-                        <div className="mt-1.5 space-y-2">
-                          <span className="ml-1 text-[11px] font-medium text-muted-foreground">
-                            เจ้าของแผนแต่ละวัน
-                          </span>
-                          {all
-                            .filter((d) => !skippedDays.has(d))
-                            .map((d) => (
-                              <div
-                                key={d}
-                                className="rounded-xl border border-white/70 bg-white/40 p-2.5 dark:border-white/15 dark:bg-white/5"
-                              >
+                          ⚠️ ช่องนี้แชร์ลิสต์กันผ่านแคชระดับโมดูล (ไม่ยิงเส้นตัวละครั้ง)
+
+                          🔴 **ค่าตั้งต้นคือชุดเดียว** (23 ก.ย. 2569) — กางทุกวันทำให้ฟอร์ม
+                          ยาว 31 ชุดจนหาปุ่มบันทึกไม่เจอ · อยากระบุรายวันให้เปิดสวิตช์ */}
+                      {(() => {
+                        const sendDays = all.filter((d) => !skippedDays.has(d));
+                        if (sendDays.length === 0) return null;
+                        return (
+                          <div className="mt-1.5 space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="ml-1 text-[11px] font-medium text-muted-foreground">
+                                เจ้าหน้าที่ที่ติดตาม {perDayStaff ? '· ระบุรายวัน' : `· ใช้เบอร์นี้ทั้ง ${sendDays.length} วัน`}
+                              </span>
+                              {sendDays.length > 1 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    // เปิดรายวัน = เติมเบอร์ชุดเดียวลงทุกวันให้ก่อน แล้วค่อยแก้เฉพาะวันที่ต่าง
+                                    if (!perDayStaff && staffPhoneAll.trim()) {
+                                      setStaffPhoneByDay((prev) => {
+                                        const next = { ...prev };
+                                        for (const d of sendDays) if (!next[d]) next[d] = staffPhoneAll.trim();
+                                        return next;
+                                      });
+                                    }
+                                    setPerDayStaff((v) => !v);
+                                  }}
+                                  className="text-[11px] font-medium text-primary underline"
+                                >
+                                  {perDayStaff ? 'ใช้เบอร์เดียวทุกวัน' : 'ระบุเจ้าของแผนรายวัน'}
+                                </button>
+                              ) : null}
+                            </div>
+                            {perDayStaff ? (
+                              sendDays.map((d) => (
+                                <div
+                                  key={d}
+                                  className="rounded-xl border border-white/70 bg-white/40 p-2.5 dark:border-white/15 dark:bg-white/5"
+                                >
+                                  <StaffContactField
+                                    id={`followStaffPhoneDay${d}`}
+                                    label={`เจ้าหน้าที่ที่ติดตาม · ${dayLabel(d)}`}
+                                    value={staffPhoneByDay[d] ?? ''}
+                                    onChange={(next) =>
+                                      setStaffPhoneByDay((prev) => ({ ...prev, [d]: next }))
+                                    }
+                                    reloadSignal={contactsRev}
+                                  />
+                                </div>
+                              ))
+                            ) : (
+                              <div className="rounded-xl border border-white/70 bg-white/40 p-2.5 dark:border-white/15 dark:bg-white/5">
                                 <StaffContactField
-                                  id={`followStaffPhoneDay${d}`}
-                                  label={`เจ้าหน้าที่ที่ติดตาม · ${dayLabel(d)}`}
-                                  value={staffPhoneByDay[d] ?? ''}
-                                  onChange={(next) =>
-                                    setStaffPhoneByDay((prev) => ({ ...prev, [d]: next }))
-                                  }
+                                  id="followStaffPhoneAll"
+                                  label="เจ้าหน้าที่ที่ติดตาม (ถ้ามี)"
+                                  value={staffPhoneAll}
+                                  onChange={setStaffPhoneAll}
                                   reloadSignal={contactsRev}
                                 />
                               </div>
-                            ))}
-                        </div>
-                      ) : null}
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })()}

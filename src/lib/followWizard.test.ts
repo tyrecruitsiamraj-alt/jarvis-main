@@ -7,6 +7,8 @@ import {
   followStepSummary,
   nextFollowStep,
   prevFollowStep,
+  scheduleDayCallRound,
+  scheduleDayStaffPhone,
   type FollowWizardValues,
 } from '@/lib/followWizard';
 
@@ -132,5 +134,51 @@ describe('isSubmitTooSoonAfterStep3 — กันคลิกเร็วซ้�
 
   it('ช่วงกันต้องยาวพอสำหรับดับเบิลคลิกจริง (>= 500ms)', () => {
     expect(FOLLOW_SUBMIT_GUARD_MS).toBeGreaterThanOrEqual(500);
+  });
+});
+
+describe('โหมดตารางหลายวัน — สายที่เท่าไหร่ (call_round)', () => {
+  it('วันแรกรอบแรก = สายที่ 1', () => {
+    expect(scheduleDayCallRound(0, 2)).toBe(1);
+  });
+
+  it('นับต่อข้ามวัน — วันละ 2 รอบ วันที่สองต้องเริ่มที่สายที่ 3 (ไม่ใช่ 1 ซ้ำ)', () => {
+    expect(scheduleDayCallRound(1, 2)).toBe(3);
+    expect(scheduleDayCallRound(2, 2)).toBe(5);
+  });
+
+  it('วันละรอบเดียวก็ยังต้องเพิ่มทุกวัน — ไม่งั้นทุกวันใช้บทสายแรก', () => {
+    expect([0, 1, 2, 3].map((i) => scheduleDayCallRound(i, 1))).toEqual([1, 2, 3, 4]);
+  });
+
+  it('ค่าเพี้ยนต้องไม่ทำให้ได้ 0 หรือติดลบ — ฝั่ง API รับเฉพาะ >= 1', () => {
+    expect(scheduleDayCallRound(-1, 0)).toBe(1);
+    expect(scheduleDayCallRound(0, -3)).toBe(1);
+  });
+});
+
+describe('โหมดตารางหลายวัน — เบอร์เจ้าหน้าที่ของแต่ละวัน', () => {
+  const byDay = { '2569-09-24': '021111111', '2569-09-25': '' };
+
+  it('ปิดสวิตช์รายวัน = ทุกวันใช้เบอร์ชุดเดียว (แม้มีค่ารายวันค้างอยู่)', () => {
+    const opts = { perDay: false, byDay, shared: ' 029999999 ' };
+    expect(scheduleDayStaffPhone('2569-09-24', opts)).toBe('029999999');
+    expect(scheduleDayStaffPhone('2569-09-25', opts)).toBe('029999999');
+  });
+
+  it('เปิดสวิตช์รายวัน = เบอร์ของวันนั้นชนะ', () => {
+    expect(
+      scheduleDayStaffPhone('2569-09-24', { perDay: true, byDay, shared: '029999999' }),
+    ).toBe('021111111');
+  });
+
+  it('เปิดรายวันแต่วันนั้นเว้นว่าง = ตกกลับไปใช้เบอร์ชุดเดียว ไม่ใช่ไม่มีเบอร์', () => {
+    expect(
+      scheduleDayStaffPhone('2569-09-25', { perDay: true, byDay, shared: '029999999' }),
+    ).toBe('029999999');
+  });
+
+  it('ไม่ได้กรอกเบอร์เลย = ว่าง (ฝั่งเรียกแปลงเป็น undefined เอง)', () => {
+    expect(scheduleDayStaffPhone('2569-09-26', { perDay: true, byDay, shared: '  ' })).toBe('');
   });
 });
