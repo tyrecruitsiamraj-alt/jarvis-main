@@ -133,20 +133,25 @@ async function fetchState(scope: DepartmentScope) {
  * 🔴 **ส่งทุกคนที่ตั้งสายงานไว้ แม้ยังไม่มีเบอร์** — ใบขอใช้แค่ชื่อ ไม่ต้องมีเบอร์ก็เลือกได้
  * ฝั่งที่ต้องการเบอร์ (ช่อง "เจ้าหน้าที่ที่ติดตาม" หน้า Follow) กรองเอาเองที่ปลายทาง
  * ⇒ ที่นี่เป็น **ชุดเดียว** ห้ามแตกเป็นสองเส้นตามผู้ใช้ ไม่งั้นนิยาม "ใครอยู่สายไหน" เพี้ยนสองที่
- * ⚠️ ชื่อเล่นว่างให้ตก `full_name` (ชื่ออังกฤษจาก Microsoft) ดีกว่าไม่มีชื่อให้เลือก —
- *    แต่แปลว่า **ต้องกรอกชื่อเล่นให้ตรงกับหน้าทีม** ไม่งั้นคนเดียวโผล่สองชื่อใน dropdown
+ * 🔴 **ชื่อในลิสต์ = ช่อง "ชื่อเล่น" เท่านั้น** (เจ้าของย้ำ 23 ก.ย. 2569: *"ใบขอก็เอาช่อง
+ * ชื่อเล่นมาให้เขาเลือกไง"*) — ยังไม่กรอกชื่อเล่น = **ไม่โผล่ในลิสต์**
+ * เคยตกไปใช้ `full_name` เป็นทางถอย แล้วได้ชื่ออังกฤษจาก Microsoft (Netnapha Yotsanun)
+ * ไปนั่งปนใน dropdown ผู้รับผิดชอบทั้งที่ไม่มีใครเรียกชื่อนั้น และไม่มีทางตรงกับหน้าทีม
+ * ⇒ กติกาชัดตัวเดียว: **กรอกชื่อเล่น = โผล่ · ไม่กรอก = ไม่โผล่**
+ * ⚠️ ชื่อเล่นต้องสะกดตรงกับหน้าทีม — จับคู่สองที่ด้วยชื่อเท่านั้น ไม่มี id ผูกกัน
  */
 export type StaffDirectoryEntry = { name: string; phone: string; lanes: string[] };
 
 async function fetchStaffDirectory(scope: DepartmentScope): Promise<StaffDirectoryEntry[]> {
   const params: string[] = [];
-  let where = `is_active and job_lanes is not null and array_length(job_lanes, 1) >= 1`;
+  let where = `is_active and nickname is not null and trim(nickname) <> ''
+       and job_lanes is not null and array_length(job_lanes, 1) >= 1`;
   if (scope.mode === 'code') {
     params.push(scope.code);
     where += ` and (department_code = $1 or department_code is null)`;
   }
   const { rows } = await dbQuery<{ name: string; phone: string | null; lanes: string[] | null }>(
-    `select coalesce(nullif(trim(nickname), ''), full_name, email) as name,
+    `select trim(nickname) as name,
             coalesce(trim(phone), '') as phone, job_lanes as lanes
        from ${usersTable}
       where ${where}
