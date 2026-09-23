@@ -1497,6 +1497,11 @@ const FollowPage: React.FC = () => {
             {scheduleMode ? (
               /* ตารางโทร: ช่วงวัน × รอบเวลา/วัน (เจ้าของสั่ง 16 ส.ค. — เช่น 1-7 วันละ 2 รอบ) */
               <div className="space-y-2.5">
+                {/* 🔴 **สามขั้นมีหัวข้อกำกับ** (เจ้าของสั่ง 23 ก.ย. 2569: *"ทำให้มันเลือกง่าย
+                    กว่านี้หน่อย ตอนนี้มันเลือกยากไป — 1.เลือกว่าวันไหนถึงวันไหน 2.โทรกี่รอบ
+                    3.มีปุ่มติ๊กเลือกเอาว่าวันนี้ให้คนโทร AI โทร"*) ของเดิมเป็นช่องเรียงกันเฉย ๆ
+                    ไม่มีอะไรบอกว่าต้องทำอะไรก่อนหลัง */}
+                <p className="ml-1 text-xs font-medium text-foreground">1 · เลือกช่วงวัน</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label htmlFor="followFrom" className="ml-1 text-xs font-medium text-muted-foreground">ตั้งแต่วันที่</label>
@@ -1508,6 +1513,7 @@ const FollowPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="space-y-1.5">
+                  <p className="ml-1 text-xs font-medium text-foreground">2 · วันละกี่รอบ</p>
                   <span className="ml-1 text-xs font-medium text-muted-foreground">รอบเวลาต่อวัน (สูงสุด 5 รอบ)</span>
                   {roundTimes.map((v, i) => (
                     <div key={i} className="flex items-center gap-2">
@@ -1563,23 +1569,28 @@ const FollowPage: React.FC = () => {
                     });
                   };
                   /**
-                   * 🔴 **สามสถานะต่อวัน** (121 · 20 ก.ย. 2569) — กดที่ชิปวนไปทีละสถานะ
-                   * AI โทร → เราโทรเอง → ไม่โทร → AI โทร
+                   * 🔴 **สามสถานะต่อวัน** (121 · 20 ก.ย. 2569)
+                   * AI โทร · เราโทรเอง · ไม่โทร
                    *
                    * ของเดิมมีแค่ ติ๊ก/ไม่ติ๊ก ⇒ วันที่ตั้งใจจะโทรเองไม่เหลือร่องรอยในระบบ
                    * ไม่มีใครรู้ว่าวันนั้นยังมีงานค้างอยู่ (เจ้าของสั่งให้เลือกเองรายวันได้)
+                   *
+                   * 🔴 **เลิกใช้ชิปกดวนทีละสถานะ** (เจ้าของสั่ง 23 ก.ย. 2569: *"ทำให้มัน
+                   * เลือกง่ายกว่านี้หน่อย ตอนนี้มันเลือกยากไป … มีปุ่มติ๊กเลือกเอาว่าวันนี้
+                   * ให้คนโทร AI โทร"*)
+                   *
+                   * ชิปวนบังคับให้คนเดาว่ากดอีกกี่ทีถึงจะได้อันที่ต้องการ (อยากได้ "ไม่โทร"
+                   * ต้องกดสองที · เผลอกดเกินหนึ่งทีก็วนกลับไปต้นใหม่) และ**มองไม่เห็นเลยว่า
+                   * มีทางเลือกอะไรบ้าง** จนกว่าจะกดไปเจอ
+                   * ⇒ กางปุ่มทั้งสามให้เห็นพร้อมกันต่อวัน กดอันที่ต้องการตรง ๆ ทีเดียวจบ
                    */
-                  const cycleDay = (d: string) => {
+                  const setDayMode = (d: string, mode: 'ai' | 'manual' | 'off') => {
                     const skipped = new Set(skippedDays);
                     const manual = new Set(manualDays);
-                    if (skipped.has(d)) {
-                      skipped.delete(d); // ไม่โทร → AI โทร
-                    } else if (manual.has(d)) {
-                      manual.delete(d);
-                      skipped.add(d); // เราโทรเอง → ไม่โทร
-                    } else {
-                      manual.add(d); // AI โทร → เราโทรเอง
-                    }
+                    skipped.delete(d);
+                    manual.delete(d);
+                    if (mode === 'off') skipped.add(d);
+                    if (mode === 'manual') manual.add(d);
                     setSkippedDays(skipped);
                     setManualDays(manual);
                   };
@@ -1589,52 +1600,74 @@ const FollowPage: React.FC = () => {
                   };
                   const modeOfDay = (d: string): 'ai' | 'manual' | 'off' =>
                     skippedDays.has(d) ? 'off' : manualDays.has(d) ? 'manual' : 'ai';
-                  const DAY_CHIP: Record<'ai' | 'manual' | 'off', { cls: string; tail: string }> = {
-                    ai: { cls: 'border-primary bg-primary text-primary-foreground', tail: 'AI' },
-                    manual: {
-                      cls: 'border-amber-500 bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100',
-                      tail: 'เราโทร',
+                  /** ป้าย + สีตอนถูกเลือก — ชุดเดียวกับที่ใช้ทั้งหน้า ห้ามคิดสีใหม่ */
+                  const DAY_MODES: ReadonlyArray<{
+                    key: 'ai' | 'manual' | 'off';
+                    label: string;
+                    on: string;
+                  }> = [
+                    { key: 'ai', label: 'AI โทร', on: 'bg-primary text-primary-foreground' },
+                    {
+                      key: 'manual',
+                      label: 'เราโทร',
+                      on: 'bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100',
                     },
-                    off: {
-                      cls: 'border-border bg-background text-muted-foreground hover:bg-secondary',
-                      tail: 'ไม่โทร',
-                    },
-                  };
+                    { key: 'off', label: 'ไม่โทร', on: 'bg-secondary text-foreground' },
+                  ];
                   return (
                     <div className="space-y-1.5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="ml-1 text-xs font-medium text-muted-foreground">
-                          แต่ละวันใครโทร — กดที่วันเพื่อสลับ
-                        </span>
+                        <p className="ml-1 text-xs font-medium text-foreground">
+                          3 · แต่ละวันใครโทร
+                        </p>
                         <span className="flex items-center gap-2 text-[11px] font-medium">
+                          <span className="text-muted-foreground">ทั้งหมด:</span>
                           <button type="button" onClick={() => setAllDays('ai')} className="text-primary underline">
-                            ให้ AI ทุกวัน
+                            AI โทร
                           </button>
                           <button type="button" onClick={() => setAllDays('manual')} className="text-amber-700 underline dark:text-amber-300">
-                            เราโทรเองทุกวัน
+                            เราโทร
                           </button>
                           <button type="button" onClick={() => setAllDays('off')} className="text-muted-foreground underline">
-                            ไม่โทรสักวัน
+                            ไม่โทร
                           </button>
                         </span>
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
+                      {/* 🔴 สองคอลัมน์ตั้งแต่จอ sm ขึ้นไป — 31 วันเรียงเดี่ยวยาวเกินจอ */}
+                      <div className="grid gap-1.5 sm:grid-cols-2">
                         {all.map((d) => {
                           const mode = modeOfDay(d);
-                          const chip = DAY_CHIP[mode];
                           return (
-                            <button
+                            <div
                               key={d}
-                              type="button"
-                              aria-label={`${dayLabel(d)} — ${chip.tail} (กดเพื่อเปลี่ยน)`}
-                              onClick={() => cycleDay(d)}
-                              className={cn(
-                                'rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
-                                chip.cls,
-                              )}
+                              className="flex items-center justify-between gap-2 rounded-xl border border-white/70 bg-white/40 py-1 pl-2.5 pr-1 dark:border-white/15 dark:bg-white/5"
                             >
-                              {dayLabel(d)} · {chip.tail}
-                            </button>
+                              <span className="text-[11px] font-medium text-foreground">
+                                {dayLabel(d)}
+                              </span>
+                              <div
+                                role="group"
+                                aria-label={`${dayLabel(d)} — ใครโทร`}
+                                className="flex shrink-0 overflow-hidden rounded-full border border-border"
+                              >
+                                {DAY_MODES.map((m) => (
+                                  <button
+                                    key={m.key}
+                                    type="button"
+                                    aria-pressed={mode === m.key}
+                                    onClick={() => setDayMode(d, m.key)}
+                                    className={cn(
+                                      'px-2 py-1 text-[11px] font-medium transition-colors',
+                                      mode === m.key
+                                        ? m.on
+                                        : 'bg-background text-muted-foreground hover:bg-secondary',
+                                    )}
+                                  >
+                                    {m.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
                           );
                         })}
                       </div>
@@ -1724,7 +1757,8 @@ const FollowPage: React.FC = () => {
                     </p>
                   ) : (
                     <p className="ml-1 text-[11px] text-muted-foreground">
-                      เลือกช่วงวัน + เลือกว่าแต่ละวันใครโทร + รอบเวลา แล้วระบบจะสรุปจำนวนสายให้
+                      ① เลือกช่วงวัน → ② วันละกี่รอบ → ③ กดเลือกว่าวันไหนให้ AI โทร / เราโทรเอง
+                      แล้วระบบจะสรุปจำนวนสายให้
                     </p>
                   );
                 })()}
