@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
+import { activeInformWhereSql } from './siamrajStaffingOpen.js';
 import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
 import { bulkUpsertOplNames } from './siamrajUnitAssignments.js';
 
@@ -93,7 +94,11 @@ async function fetchOpenRequests(): Promise<Array<{ request_no: string; site_cod
     WHERE A.status = 'A'
       AND A.is_stop = 'N'
       AND (A.stop_no IS NULL OR RTRIM(A.stop_no) = '')
-      AND NOT EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = A.request_no)
+      /* 🔴 ใบแจ้งเข้าที่ถูกยกเลิกไม่นับ — ดู activeInformWhereSql */
+      AND NOT EXISTS (
+        SELECT 1 FROM st_inform_head IH
+         WHERE IH.request_no = A.request_no AND ${activeInformWhereSql('IH')}
+      )
       AND A.site_code IS NOT NULL
       AND RTRIM(A.site_code) <> ''
     ORDER BY A.request_no

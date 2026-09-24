@@ -3,6 +3,7 @@ import { workSiteNameOf } from './siamrajUnitName';
 import { toBangkokYmd } from './businessDate.js';
 import {
   effectiveInformedCount,
+  activeInformWhereSql,
   effectiveInformQtySql,
   isOpenStaffingRowForRemaining,
   requestPositionTotal,
@@ -221,7 +222,11 @@ export async function listSiamrajSqlServerClosedRequests(options: {
       A.stop_no,
       A.stop_date,
       A.cancel_date,
-      CASE WHEN EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = A.request_no) THEN 1 ELSE 0 END AS has_inform,
+      /* 🔴 ใบแจ้งเข้าที่ถูกยกเลิกไม่นับ — ดู activeInformWhereSql */
+      CASE WHEN EXISTS (
+        SELECT 1 FROM st_inform_head IH
+         WHERE IH.request_no = A.request_no AND ${activeInformWhereSql('IH')}
+      ) THEN 1 ELSE 0 END AS has_inform,
       A.request_code AS request_action_code,
       (SELECT z.request_name FROM st_ms_request z WHERE z.request_code = A.request_code) AS request_action_name,
       A.site_code,

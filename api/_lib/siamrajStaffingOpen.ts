@@ -55,7 +55,27 @@ function hasInformDocument(row: StaffingOpenRow): boolean {
   return false;
 }
 
-/** SQL: inform_qty ถ้ามี ไม่งั้นนับจำนวน st_inform_head */
+/**
+ * 🔴 **ใบแจ้งเข้าที่ถูกยกเลิกไม่นับว่าหาคนได้** (แก้ 24 ก.ย. 2569)
+ *
+ * เจ้าของแจ้งว่าใบขอหายจากกล่องงานทั้งที่ยังต้องหาคน (`LAO6909006`) แล้วย้ำว่า
+ * *"ฉันไม่เคยเปลี่ยนกฎ … ฉันบอกเอาทุกใบที่ยังต้องหา แต่ใบไหนยกเลิก หรือ ได้คนแล้วไม่เอา"*
+ *
+ * `st_inform_head.status` มีสองค่า: **`A` = ใช้งานอยู่ (36,306 แถว)** ·
+ * **`C` = ยกเลิก (1,293 แถว)** — ของเดิมนับทุกแถวโดยไม่ดูสถานะ ⇒ ใบขอที่มีใบแจ้งเข้า
+ * ใบเดียวซึ่ง **ถูกยกเลิกไปแล้ว** ถูกตีว่า "หาได้ครบ" แล้วหลุดออกจากกล่องงานเงียบ ๆ
+ * (วัดจริง 24 ก.ย.: โดนไป **9 ใบ** ตั้งแต่ ม.ค. 69 — ทุกใบมีใบแจ้งเข้าใบเดียวและถูกยกเลิก)
+ *
+ * ตรงกับกติกาหลักของโปรเจกต์ที่เขียนไว้ตั้งแต่ต้น: **"ห้ามนับอัตราที่ถูกยกเลิกเป็นอัตราที่หาได้"**
+ *
+ * 🔴 **ที่เดียวที่นิยาม "ใบแจ้งเข้าที่นับได้"** — ทุกเส้นที่แตะ `st_inform_head` ต้องเรียกตัวนี้
+ * (เปิด/ปิด/throughput/นำเข้า OPL) ไม่งั้นสี่ที่จะตอบคนละเลข
+ */
+export function activeInformWhereSql(alias = 'IH'): string {
+  return `${alias}.status = 'A'`;
+}
+
+/** SQL: inform_qty ถ้ามี ไม่งั้นนับ **ใบแจ้งเข้าที่ยังไม่ถูกยกเลิก** */
 export function effectiveInformQtySql(alias = 'A'): string {
   return `(
     CASE
@@ -64,6 +84,7 @@ export function effectiveInformQtySql(alias = 'A'): string {
         SELECT COUNT(*)
         FROM st_inform_head IH
         WHERE IH.request_no = ${alias}.request_no
+          AND ${activeInformWhereSql('IH')}
       )
     END
   )`;
@@ -128,7 +149,10 @@ export function openStaffingRequestWhereSql(alias = 'A'): string {
     AND (${alias}.stop_no IS NULL OR RTRIM(${alias}.stop_no) = '')
     AND ISNULL(${alias}.is_inform_all, 'N') <> 'Y'
     AND (
-      NOT EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = ${alias}.request_no)
+      NOT EXISTS (
+        SELECT 1 FROM st_inform_head IH
+         WHERE IH.request_no = ${alias}.request_no AND ${activeInformWhereSql('IH')}
+      )
       OR (
         ${informed} > 0
         AND ${informed} < ISNULL(NULLIF(${alias}.request_qty, 0), 1)

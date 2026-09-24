@@ -17,6 +17,7 @@ import {
 
 export {
   effectiveInformedCount,
+  activeInformWhereSql,
   effectiveInformQtySql,
   informedPositionCount,
   isOpenStaffingRow,
@@ -292,7 +293,9 @@ export async function listSiamrajSqlServerThroughput(options: {
       SELECT IH.request_no, COUNT_BIG(*) AS inform_cnt
       FROM st_inform_head IH
       INNER JOIN st_request_head A2 ON A2.request_no = IH.request_no
-      WHERE CONVERT(date, A2.request_date) >= @fromDate
+      /* 🔴 ใบแจ้งเข้าที่ถูกยกเลิกไม่นับ — ดู activeInformWhereSql */
+      WHERE ${activeInformWhereSql('IH')}
+        AND CONVERT(date, A2.request_date) >= @fromDate
         AND CONVERT(date, A2.request_date) <= @toDate
       GROUP BY IH.request_no
     ) IH ON IH.request_no = A.request_no

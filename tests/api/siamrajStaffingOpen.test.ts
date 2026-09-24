@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
+  activeInformWhereSql,
+  effectiveInformQtySql,
+  openStaffingRequestWhereSql,
   effectiveInformedCount,
   isOpenStaffingRow,
   remainingOpenPositionsFromRow,
@@ -180,5 +185,42 @@ describe('invariant: request_qty เท่าไหร่ก็ต้องไ�
       // ครบสมการ: ขอมา = หาได้ + ยกเลิก + เหลือหา
       expect(b.filledPositions + b.cancelledPositions + b.remainingPositions).toBe(b.requestPositions);
     }
+  });
+});
+
+/**
+ * 🔴 **ใบแจ้งเข้าที่ถูกยกเลิกห้ามนับว่าหาคนได้** (เจ้าของแจ้ง 24 ก.ย. 2569:
+ * *"ฉันบอกเอาทุกใบที่ยังต้องหา แต่ใบไหนยกเลิก หรือ ได้คนแล้วไม่เอา"*)
+ *
+ * `st_inform_head.status` = `A` ใช้งานอยู่ · `C` ยกเลิก · ของเดิมนับทุกแถว ⇒ ใบขอที่มี
+ * ใบแจ้งเข้าใบเดียวซึ่งถูกยกเลิก ถูกตีว่าหาได้ครบแล้วหลุดจากกล่องงานเงียบ ๆ (โดนจริง 9 ใบ)
+ * ตรงกับกติกาหลัก: **ห้ามนับอัตราที่ถูกยกเลิกเป็นอัตราที่หาได้**
+ */
+describe('ใบแจ้งเข้าที่ยกเลิกแล้วห้ามนับ', () => {
+  it('นิยามอยู่ที่เดียว — คืนเงื่อนไขสถานะใช้งานอยู่', () => {
+    expect(activeInformWhereSql('IH')).toBe("IH.status = 'A'");
+    expect(activeInformWhereSql('X')).toBe("X.status = 'A'");
+  });
+
+  it('ตัวนับ "แจ้งเข้าแล้วกี่คน" ต้องกรองสถานะ', () => {
+    expect(effectiveInformQtySql('A')).toContain("IH.status = 'A'");
+  });
+
+  it('ตัวกรอง "ใบที่ยังต้องหา" ต้องกรองสถานะด้วย', () => {
+    // ไม่งั้นใบที่มีแต่ใบแจ้งเข้าที่ยกเลิก จะตก NOT EXISTS แล้วหายไปเหมือนเดิม
+    expect(openStaffingRequestWhereSql('A')).toContain("IH.status = 'A'");
+  });
+
+  it('🔴 ทุกไฟล์ที่แตะ st_inform_head ต้องใช้ตัวกลางตัวเดียวกัน', () => {
+    const dir = path.join(process.cwd(), 'api', '_lib');
+    const offenders = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith('.ts'))
+      .filter((f) => {
+        const src = fs.readFileSync(path.join(dir, f), 'utf8');
+        if (!src.includes('st_inform_head')) return false;
+        return !src.includes('activeInformWhereSql');
+      });
+    expect(offenders, `ไฟล์ที่นับใบแจ้งเข้าโดยไม่กรองยกเลิก: ${offenders.join(', ')}`).toEqual([]);
   });
 });
