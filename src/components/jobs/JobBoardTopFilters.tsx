@@ -66,6 +66,15 @@ type Props = {
   variant?: 'card' | 'bar';
   /** ป้ายทองหน้าแถบ (โหมด bar) เช่น "ประกาศจากใบขอ" — ยุบแถวป้ายหัวข้อเดิมเข้ามาในแถบเดียว */
   eyebrow?: string;
+  /**
+   * ซ่อนปุ่ม/แผงตัวกรองจังหวัด-ตำแหน่ง-เจ้าหน้าที่ของแถบนี้ (26 ก.ย. 2569)
+   * ใช้ตอนกล่องงานฝั่งเจ้าหน้าที่มีแถบกรองด้านซ้ายแบบ iRecruit แล้ว — ช่องพวกนี้ย้ายไปอยู่
+   * ที่นั่นทั้งหมด (เลือกได้หลายค่า) · ถ้าไม่ซ่อนจะมีตัวกรองจังหวัดสองที่ที่กรองคนละแบบ
+   * ⚠️ หน้าสมัครสาธารณะไม่ส่ง prop นี้ = ทุกอย่างเหมือนเดิมทุกพิกเซล
+   */
+  hideFieldFilters?: boolean;
+  /** ของเสริมท้ายแถบ (โหมด bar) — กล่องงานวางช่วงวันที่ + ปุ่มเรียง + ปุ่มล้างที่นี่ */
+  extra?: React.ReactNode;
 };
 
 function countActiveFilters(...values: string[]): number {
@@ -119,6 +128,8 @@ const JobBoardTopFilters: React.FC<Props> = ({
   hideSearch = false,
   variant = 'card',
   eyebrow,
+  hideFieldFilters = false,
+  extra,
 }) => {
   const [sheetOpen, setSheetOpen] = useState(false);
   /**
@@ -276,6 +287,8 @@ const JobBoardTopFilters: React.FC<Props> = ({
               {/* แถบสลับ ทั้งหมด/ด่วน ถูกถอดทิ้งทั้งฟีเจอร์ (เจ้าของสั่ง 20 ส.ค. 2569:
                   "ไม่ต้องมีก็ได้") — ความด่วนยังเห็นจากป้าย "ด่วน" บนการ์ดเหมือนเดิม */}
               <div className={cn('flex flex-wrap items-center gap-2 lg:shrink-0', hideSearch && 'flex-1')}>
+                {hideFieldFilters ? null : (
+                <>
                 {/* จอเล็ก: เปิดเป็นแผ่นเลื่อนขึ้น (Sheet) เหมือนเดิม */}
                 <Button
                   type="button"
@@ -324,6 +337,8 @@ const JobBoardTopFilters: React.FC<Props> = ({
                     aria-hidden
                   />
                 </Button>
+                </>
+                )}
 
                 {/* ผลลัพธ์อยู่แถวเดียวกับปุ่ม — เดิมกินอีกหนึ่งบรรทัดพร้อมเส้นคั่น */}
                 {resultCount != null && !loading ? (
@@ -346,12 +361,16 @@ const JobBoardTopFilters: React.FC<Props> = ({
               </div>
             </div>
 
+            {/* แถวที่สองของแถบ — ของเสริมจากหน้าแม่ (ช่วงวันที่ + เรียง + ล้าง)
+                ⚠️ ห้ามยัดไว้แถวเดียวกับเลข "พบ … ใบขอ" — ลองแล้วถูกบีบจนเรียงลงเป็นแนวตั้ง */}
+            {extra ? <div className="border-t border-border/60 pt-1.5">{extra}</div> : null}
+
             {/* กางเมื่อกด หรือเมื่อมีตัวกรองเปิดอยู่ (จะได้เห็นว่ากรองอะไรไว้) */}
-            {fieldsOpen || activeFilterCount > 0 ? (
+            {!hideFieldFilters && (fieldsOpen || activeFilterCount > 0) ? (
               <div className="hidden border-t border-white/60 pt-4 lg:block">{filterFields}</div>
             ) : null}
 
-            {activeFilterCount > 0 ? (
+            {!hideFieldFilters && activeFilterCount > 0 ? (
               <div className="flex flex-wrap items-center gap-2 border-t border-white/50 pt-3">
                 <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground shrink-0">
                   กำลังกรอง
@@ -374,7 +393,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
         </div>
       </div>
 
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+      <Sheet open={sheetOpen && !hideFieldFilters} onOpenChange={setSheetOpen}>
         <SheetContent side="top" className="max-h-[88dvh] overflow-y-auto rounded-b-[1.5rem] px-4 pb-6 pt-5 sm:px-6">
           <div className="mx-auto w-full max-w-2xl">
             <SheetHeader className="text-left space-y-1">

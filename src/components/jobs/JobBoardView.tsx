@@ -131,6 +131,27 @@ import { INCOME_PERIOD_LABEL } from '@/lib/incomeBreakdown';
 import { incomeDisplay } from '@/lib/incomeLabel';
 import { publicFieldVisible } from '@/lib/publicFieldVisibility';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
+import {
+  applyBoardFilters,
+  BOARD_SORT_PARAM,
+  buildBoardFacets,
+  clearBoardFacets,
+  countSelectedFacetValues,
+  describeBoardFilters,
+  EMPTY_BOARD_FILTER_STATE,
+  hasAnyBoardFilter,
+  readBoardFilterState,
+  readBoardSort,
+  sortBoardJobs,
+  toggleBoardFacetValue,
+  writeBoardFilterState,
+  type BoardDateField,
+  type BoardFacetFacts,
+  type BoardFacetKey,
+  type BoardFilterState,
+  type BoardSort,
+} from '@/lib/boardFilters';
+import { BoardFilterSidebar, BoardFilterTopTools } from '@/components/jobs/BoardFilterPanel';
 import { compareJobsByAgeDaysDesc, getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -301,6 +322,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const [leadCounts, setLeadCounts] = useState<Record<string, number>>({});
   /** ส่ง AI โทรแล้ว x จาก y คน ต่อใบขอ (22 ก.ย. 2569 · นิยามกล่องงานข้อ 6) */
   const [aiCounts, setAiCounts] = useState<Record<string, { sent: number; total: number }>>({});
+  /**
+   * ยอดผู้สมัคร/Lead/AI มาถึงแล้วหรือยัง (แถบกรอง 26 ก.ย. 2569)
+   * 🔴 ยังไม่มา ≠ ทุกใบมีผู้สมัคร 0 — แถบกรองต้องไม่โชว์หัวข้อที่พึ่งยอดพวกนี้จนกว่าจะมา
+   */
+  const [breakdownLoaded, setBreakdownLoaded] = useState(false);
   /**
    * 🔴 **ฟอร์มแก้ข้อมูลประกาศย้ายออกจากหน้านี้แล้ว** (27 ส.ค. 2569)
    * อยู่ที่แท็บ "ประกาศ / ลิงก์สมัคร" ของใบขอ ⇒ ไม่ต้องมี patch ทับการ์ดที่นี่อีก
@@ -493,75 +519,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   );
   const postingsReady = postings.length > 0;
 
-  const boxCounts = useMemo(() => countOpenBoxes(filters.filtered), [filters.filtered]);
-  /** ชุดใบปิด/ยกเลิกหลังผ่าน**ตัวกรองชุดเดียวกับใบเปิด** (จังหวัด/ตำแหน่ง/คำค้น/…) */
-  const closedFiltered = useMemo(
-    () => (isStaff ? filters.filterRows(closedJobs ?? []) : []),
-    [isStaff, filters, closedJobs],
-  );
-  const closedBoxCounts = useMemo(
-    () => ({
-      closed: filterByClosedBox(closedFiltered, 'closed'),
-      cancelled: filterByClosedBox(closedFiltered, 'cancelled'),
-    }),
-    [closedFiltered],
-  );
-  /**
-   * 🔴 อัตราต่อกล่อง — **หน่วยเดียวกับ Dashboard** (เจ้าของทัก 19 ส.ค. 2569:
-   * *"หน้า Dashboard มีงานทั้งหมด 339 แต่หน้ากล่องงานมีแค่ 291 เอง"*)
-   * ของจริงคือชุดเดียวกัน แต่กล่องงานนับ "ใบ" ส่วน Dashboard นับ "อัตรา"
-   * (วัดจริง 292 ใบ = 340 อัตรา = ขอมา 422 − หาได้แล้ว 82) → โชว์ทั้งสองหน่วยเสมอ
-   */
-  const boxPositions = useMemo(
-    () => countOpenBoxPositions(filters.filtered, jobPositionUnits),
-    [filters.filtered],
-  );
-  const filteredPositions = useMemo(
-    () => sumJobPositionUnits(filters.filtered),
-    [filters.filtered],
-  );
-  /**
-   * การ์ดที่จะโชว์ — กล่องปิดแล้ว/ยกเลิกใช้ชุดใบปิด · กล่องอื่นใช้ชุดใบเปิด
-   * ⚠️ ทั้งสองเส้นผ่านตัวกรองเดียวกันมาแล้ว จึงกรอง "ในหน้าเดิม" ได้เหมือนกันหมด
-   */
-  const boxedJobs = useMemo(
-    () => (closedBox ? closedBoxCounts[closedBox] : filterByOpenBox(filters.filtered, openBoxKey)),
-    [closedBox, closedBoxCounts, filters.filtered, openBoxKey],
-  );
-
-  /**
-   * ── เส้นทางงาน (เจ้าของสั่ง 27 ส.ค. 2569: "ทำให้มันไหลเป็นเส้น") ──
-   * ตรรกะอยู่ lib/boardFlow (มีเทสต์) — ที่นี่แค่ประกอบ facts จาก index ที่โหลดอยู่แล้ว
-   *
-   * 🔴 **เลขบนเส้นนับจาก `boxedJobs` (ก่อนกรองขั้น)** — กดขั้นไหนเลขขั้นอื่นต้องไม่เปลี่ยน
-   * ไม่งั้นกดปุ๊บเลขทุกช่องกลายเป็นของกลุ่มที่กรอง แล้วเทียบข้ามขั้นไม่ได้อีก
-   * ส่วน **การ์ดที่โชว์** ใช้ชุดหลังกรอง (`flowJobs`) — แพตเทิร์นเดียวกับกล่องสถานะ
-   */
-  const stageFacts = useMemo<BoardStageFacts>(
-    () => ({
-      hasLink: (j) => (postingsReady ? postedJobIds.has(j.id) : false),
-      isReleased: (j) => releaseIdx.has(j.id),
-      applicants: (j) => countFor(applicantIdx, j.id),
-    }),
-    [postingsReady, postedJobIds, releaseIdx, applicantIdx],
-  );
-  const stages = useMemo(
-    () =>
-      isStaff
-        ? buildBoardStages(filters.filtered, stageFacts, {
-            closed: closedBoxCounts.closed.length,
-            cancelled: closedBoxCounts.cancelled.length,
-          })
-        : null,
-    [isStaff, filters.filtered, stageFacts, closedBoxCounts],
-  );
-
-  /**
-   * ── เลขบนหัวหน้าจอ (ตรรกะอยู่ `lib/boardRelease` มีเทสต์คุมว่าบวกลงตัว) ──
-   * 🔴 นับจาก `filters.filtered` = ใบเปิดหลังตัวกรองบนจอ **ก่อน**กรองเลน/ขั้น
-   * ไม่งั้นกดเลนปุ๊บเลขเลนอื่นกลายเป็นของกลุ่มที่กรอง แล้วเทียบข้ามเลนไม่ได้อีก
-   */
-  const releaseFacts: ReleaseFacts = stageFacts;
   /**
    * 🔴 **เลขบนหัวเชื่อได้แล้วหรือยัง** (เพิ่ม 27 ส.ค. 2569)
    *
@@ -588,9 +545,191 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     [loading, feedState, postingsState, releasesState],
   );
   const ledgerReady = canShowNumbers(ledgerState);
+
+  /**
+   * ═══ แถบกรองด้านซ้ายแบบ iRecruit (เจ้าของสั่ง 26 ก.ย. 2569) ═══
+   * แผน: `docs/plan-board-irecruit-filter-2569-09-26.md` · ตรรกะทั้งหมดอยู่ `lib/boardFilters`
+   *
+   * 🔴 **เฉพาะเจ้าหน้าที่ + มุมมองกล่องงาน** — หน้าสมัครสาธารณะใช้ component ตัวนี้ด้วย
+   *    (ชื่อเจ้าหน้าที่/ยอดผู้สมัคร/สถานะปล่อย เป็นข้อมูลภายใน ห้ามหลุดออกไป)
+   * 🔴 **กรองก่อนแยกเลน/ขั้น** — ตัวกรองบนแถบบนเดิมก็กรองตรงนี้อยู่แล้ว (หัว 3 ก้อนขยับตาม
+   *    ตัวกรองบนจอเสมอ) ⇒ ตัวกรองใหม่ทำตัวเหมือนกัน · ไม่มีตัวกรอง = ชุดเดิมทุกใบ
+   *    หัว 3 ก้อนจึงเหมือนเดิมเป๊ะ
+   * 🔴 **ไม่แตะฐานข้อมูล** — ทุกอย่างอยู่ใน URL (`f.*` · `df` `dfrom` `dto` · `sort`)
+   */
+  const boardFilterOn = isStaff && view === 'board';
+  const boardFilterState = useMemo<BoardFilterState>(
+    () => (boardFilterOn ? readBoardFilterState(searchParams) : EMPTY_BOARD_FILTER_STATE),
+    [boardFilterOn, searchParams],
+  );
+  const boardSort = useMemo<BoardSort>(
+    () => (boardFilterOn ? readBoardSort(searchParams) : 'age'),
+    [boardFilterOn, searchParams],
+  );
+  const facetFacts = useMemo<BoardFacetFacts>(
+    () => ({
+      countsReady: breakdownLoaded,
+      applicants: (j) => countFor(applicantIdx, j.id),
+      leads: (j) => countFor(leadIdx, j.id),
+      isReleased: ledgerReady ? (j) => releaseIdx.has(j.id) : null,
+      aiSent: breakdownLoaded ? (j) => aiCounts[j.id]?.sent ?? 0 : null,
+    }),
+    [breakdownLoaded, applicantIdx, leadIdx, ledgerReady, releaseIdx, aiCounts],
+  );
+  /** ใบเปิดหลังแถบซ้าย — ตัวแทน `filters.filtered` ของทุกตัวเลขข้างล่าง */
+  const openRows = useMemo(
+    () => (boardFilterOn ? applyBoardFilters(filters.filtered, boardFilterState, facetFacts) : filters.filtered),
+    [boardFilterOn, filters.filtered, boardFilterState, facetFacts],
+  );
+  const boardFacets = useMemo(
+    () => (boardFilterOn ? buildBoardFacets(filters.filtered, boardFilterState, facetFacts) : []),
+    [boardFilterOn, filters.filtered, boardFilterState, facetFacts],
+  );
+  const boardFacetCount = countSelectedFacetValues(boardFilterState);
+  const boardFilterSummary = useMemo(() => describeBoardFilters(boardFilterState), [boardFilterState]);
+  /** เขียนตัวกรองลง URL — ต่อยอด params เดิมเสมอ (ห้ามทำ `view` `lane` `step` หาย) */
+  const commitBoardFilters = React.useCallback(
+    (next: BoardFilterState) => {
+      setSearchParams((prev) => writeBoardFilterState(prev, next), { replace: true });
+    },
+    [setSearchParams],
+  );
+  const setBoardSort = React.useCallback(
+    (next: BoardSort) => {
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (next === 'age') p.delete(BOARD_SORT_PARAM);
+          else p.set(BOARD_SORT_PARAM, next);
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const toggleBoardFacet = React.useCallback(
+    (key: BoardFacetKey, value: string) => {
+      commitBoardFilters(toggleBoardFacetValue(boardFilterState, key, value));
+    },
+    [commitBoardFilters, boardFilterState],
+  );
+  /** "✕ ล้าง" บนหัวแถบซ้าย — ล้างเฉพาะแถบซ้าย ช่วงวันที่บนแถบบนคงไว้ (กติกาในแผน) */
+  const clearBoardFacetsOnly = React.useCallback(() => {
+    commitBoardFilters(clearBoardFacets(boardFilterState));
+  }, [commitBoardFilters, boardFilterState]);
+  const setBoardDates = React.useCallback(
+    (patch: Partial<{ field: BoardDateField; from: string; to: string }>) => {
+      const cur = boardFilterState.dates ?? { field: 'required' as BoardDateField, from: '', to: '' };
+      const next = { ...cur, ...patch };
+      commitBoardFilters({ ...boardFilterState, dates: next.from || next.to ? next : null });
+    },
+    [commitBoardFilters, boardFilterState],
+  );
+  /**
+   * "↻ ล้าง" บนแถบบน = ล้างทุกตัวกรอง (แถบซ้าย + ช่วงวันที่ + คำค้น)
+   * 🔴 เขียน URL **ครั้งเดียว** — เรียก setSearchParams สองครั้งติดกันตัวหลังจะทับตัวแรก
+   */
+  const clearAllBoardFilters = React.useCallback(
+    (opts: { laneStep?: boolean; search?: boolean } = {}) => {
+      if (opts.search) filters.setSearch('');
+      setSearchParams(
+        (prev) => {
+          const p = writeBoardFilterState(prev, EMPTY_BOARD_FILTER_STATE);
+          if (opts.laneStep) {
+            p.delete('lane');
+            p.delete('step');
+            p.delete('stage');
+          }
+          return p;
+        },
+        // เปลี่ยนเลน/ขั้น = เป็นประวัติที่กดย้อนได้เหมือนเดิม · ล้างตัวกรองอย่างเดียว = แทนที่
+        { replace: !opts.laneStep },
+      );
+    },
+    [filters, setSearchParams],
+  );
+
+  const boxCounts = useMemo(() => countOpenBoxes(openRows), [openRows]);
+  /** ชุดใบปิด/ยกเลิกหลังผ่าน**ตัวกรองชุดเดียวกับใบเปิด** (จังหวัด/ตำแหน่ง/คำค้น/…) */
+  const closedFiltered = useMemo(
+    () => {
+      if (!isStaff) return [];
+      const rows = filters.filterRows(closedJobs ?? []);
+      // แถบซ้ายกรองกล่องปิดแล้ว/ยกเลิกด้วย — "กรองในหน้าเดิมเหมือนกันทุกกล่อง" (กติกาเดิม)
+      return boardFilterOn ? applyBoardFilters(rows, boardFilterState, facetFacts) : rows;
+    },
+    [isStaff, filters, closedJobs, boardFilterOn, boardFilterState, facetFacts],
+  );
+  const closedBoxCounts = useMemo(
+    () => ({
+      closed: filterByClosedBox(closedFiltered, 'closed'),
+      cancelled: filterByClosedBox(closedFiltered, 'cancelled'),
+    }),
+    [closedFiltered],
+  );
+  /**
+   * 🔴 อัตราต่อกล่อง — **หน่วยเดียวกับ Dashboard** (เจ้าของทัก 19 ส.ค. 2569:
+   * *"หน้า Dashboard มีงานทั้งหมด 339 แต่หน้ากล่องงานมีแค่ 291 เอง"*)
+   * ของจริงคือชุดเดียวกัน แต่กล่องงานนับ "ใบ" ส่วน Dashboard นับ "อัตรา"
+   * (วัดจริง 292 ใบ = 340 อัตรา = ขอมา 422 − หาได้แล้ว 82) → โชว์ทั้งสองหน่วยเสมอ
+   */
+  const boxPositions = useMemo(
+    () => countOpenBoxPositions(openRows, jobPositionUnits),
+    [openRows],
+  );
+  const filteredPositions = useMemo(
+    () => sumJobPositionUnits(openRows),
+    [openRows],
+  );
+  /**
+   * การ์ดที่จะโชว์ — กล่องปิดแล้ว/ยกเลิกใช้ชุดใบปิด · กล่องอื่นใช้ชุดใบเปิด
+   * ⚠️ ทั้งสองเส้นผ่านตัวกรองเดียวกันมาแล้ว จึงกรอง "ในหน้าเดิม" ได้เหมือนกันหมด
+   */
+  const boxedJobs = useMemo(
+    () => (closedBox ? closedBoxCounts[closedBox] : filterByOpenBox(openRows, openBoxKey)),
+    [closedBox, closedBoxCounts, openRows, openBoxKey],
+  );
+
+  /**
+   * ── เส้นทางงาน (เจ้าของสั่ง 27 ส.ค. 2569: "ทำให้มันไหลเป็นเส้น") ──
+   * ตรรกะอยู่ lib/boardFlow (มีเทสต์) — ที่นี่แค่ประกอบ facts จาก index ที่โหลดอยู่แล้ว
+   *
+   * 🔴 **เลขบนเส้นนับจาก `boxedJobs` (ก่อนกรองขั้น)** — กดขั้นไหนเลขขั้นอื่นต้องไม่เปลี่ยน
+   * ไม่งั้นกดปุ๊บเลขทุกช่องกลายเป็นของกลุ่มที่กรอง แล้วเทียบข้ามขั้นไม่ได้อีก
+   * ส่วน **การ์ดที่โชว์** ใช้ชุดหลังกรอง (`flowJobs`) — แพตเทิร์นเดียวกับกล่องสถานะ
+   */
+  const stageFacts = useMemo<BoardStageFacts>(
+    () => ({
+      hasLink: (j) => (postingsReady ? postedJobIds.has(j.id) : false),
+      isReleased: (j) => releaseIdx.has(j.id),
+      applicants: (j) => countFor(applicantIdx, j.id),
+    }),
+    [postingsReady, postedJobIds, releaseIdx, applicantIdx],
+  );
+  const stages = useMemo(
+    () =>
+      isStaff
+        ? buildBoardStages(openRows, stageFacts, {
+            closed: closedBoxCounts.closed.length,
+            cancelled: closedBoxCounts.cancelled.length,
+          })
+        : null,
+    [isStaff, openRows, stageFacts, closedBoxCounts],
+  );
+
+  /**
+   * ── เลขบนหัวหน้าจอ (ตรรกะอยู่ `lib/boardRelease` มีเทสต์คุมว่าบวกลงตัว) ──
+   * 🔴 นับจาก `filters.filtered` = ใบเปิดหลังตัวกรองบนจอ **ก่อน**กรองเลน/ขั้น
+   * ไม่งั้นกดเลนปุ๊บเลขเลนอื่นกลายเป็นของกลุ่มที่กรอง แล้วเทียบข้ามเลนไม่ได้อีก
+   */
+  const releaseFacts: ReleaseFacts = stageFacts;
+  // `ledgerState` / `ledgerReady` ย้ายขึ้นไปอยู่เหนือ `boxCounts` (26 ก.ย. 2569) —
+  // แถบกรองต้องรู้ว่าทะเบียนปล่อยพร้อมหรือยังก่อนจะกรองชุดใบเปิด
   const ledger = useMemo(
-    () => buildReleaseLedger(filters.filtered, releaseFacts),
-    [filters.filtered, releaseFacts],
+    () => buildReleaseLedger(openRows, releaseFacts),
+    [openRows, releaseFacts],
   );
   /** ปลายเส้น 9 ขั้น — โชว์ใต้เลน "ไม่ต้องปล่อย" (ขั้นพวกนี้คือเจ้าของเลนนั้นจริง ๆ) */
   const movedOnStages = useMemo(
@@ -611,10 +750,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
      */
     if (!ledgerReady) return boxedJobs;
     /** ขั้นมีได้แค่ในเลน "เหลือปล่อย" ⇒ มี `step` ก็พอ ไม่ต้องรอ `lane` (กัน URL พิมพ์มือ) */
-    if (step) return filterByReleaseStep(filters.filtered, releaseFacts, step);
-    if (lane) return filterByReleaseLane(filters.filtered, releaseFacts, lane);
+    if (step) return filterByReleaseStep(openRows, releaseFacts, step);
+    if (lane) return filterByReleaseLane(openRows, releaseFacts, lane);
     return boxedJobs;
-  }, [doneLane, ledgerReady, lane, step, closedBoxCounts, filters.filtered, releaseFacts, boxedJobs]);
+  }, [doneLane, ledgerReady, lane, step, closedBoxCounts, openRows, releaseFacts, boxedJobs]);
 
   const totalPages = getTotalPages(flowJobs.length, pageSize);
   const currentPage = Math.min(page, totalPages);
@@ -639,12 +778,20 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     if (closedBox) return [...flowJobs].sort(compareByClosedDateDesc);
     const today = new Date();
     const hasApplicants = (id: string) => (countFor(applicantIdx, id) > 0 ? 0 : 1);
-    return [...flowJobs].sort((a, b) => {
+    const byDefault = (a: JobRequest, b: JobRequest) => {
       const byAge = compareJobsByAgeDaysDesc(a, b, today);
       if (byAge !== 0) return byAge;
       return hasApplicants(a.id) - hasApplicants(b.id);
-    });
-  }, [flowJobs, applicantIdx, closedBox]);
+    };
+    /**
+     * ปุ่มเรียงของแถบกรอง (26 ก.ย. 2569) — ค่าเดิม (`age`) ยังเป็นตัวเรียงข้างบนตัวเดียว
+     * ส่วนอีกสองแบบใช้ตัวเรียงเดิมเป็นตัวตัดสินรองเมื่อค่าหลักเท่ากัน
+     */
+    if (boardSort !== 'age') {
+      return sortBoardJobs(flowJobs, boardSort, (j) => countFor(applicantIdx, j.id), byDefault);
+    }
+    return [...flowJobs].sort(byDefault);
+  }, [flowJobs, applicantIdx, closedBox, boardSort]);
   const visibleJobs = orderedJobs.slice(pageStart, pageStart + pageSize);
 
   /**
@@ -930,6 +1077,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         setOriginCounts(b.byOrigin);
         setLeadCounts(b.leadCounts);
         setAiCounts(b.aiCounts);
+        setBreakdownLoaded(true);
       })
       .catch(() => {
         /* badge is optional — ignore */
@@ -1194,6 +1342,27 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               ? `${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตรา${closedBox ? '' : 'ที่ยังต้องหา'}`
               : undefined
           }
+          /* แถบกรองแบบ iRecruit (26 ก.ย. 2569) — ช่องจังหวัด/ตำแหน่ง/เจ้าหน้าที่ของแถบนี้ย้ายไปอยู่
+             แถบซ้ายทั้งหมด (เลือกได้หลายค่า) · แถบนี้เหลือ ช่วงวันที่ + เรียง + ล้าง ตามแผนข้อ 7 */
+          hideFieldFilters={boardFilterOn}
+          extra={
+            boardFilterOn ? (
+              <BoardFilterTopTools
+                panel={{
+                  facets: boardFacets,
+                  selectedCount: boardFacetCount,
+                  onToggle: toggleBoardFacet,
+                  onClear: clearBoardFacetsOnly,
+                }}
+                dates={boardFilterState.dates}
+                onDatesChange={setBoardDates}
+                sort={boardSort}
+                onSortChange={setBoardSort}
+                canReset={hasAnyBoardFilter(boardFilterState) || filters.search.trim() !== ''}
+                onReset={() => clearAllBoardFilters({ search: true })}
+              />
+            ) : undefined
+          }
         />
 
         {/* ── หัวหน้าจอ = "ปล่อยไปแล้วเท่าไหร่ เหลืออีกเท่าไหร่" ──
@@ -1275,19 +1444,25 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 โมเดลที่มาลองเล่นสรุปว่า *"กดเลขแล้วมันแค่ขยายบอกความหมาย ไม่ได้เปลี่ยนหน้าไป"*
                 — คือ **ไม่เห็นว่าการ์ดข้างล่างถูกกรอง** เพราะการ์ดอยู่ต่ำกว่าขอบจอ
                 ⇒ ต้องมีแถบสีบอกชัด + ปุ่มล้าง + เลื่อนจอไปที่การ์ดให้เห็นว่ามันเปลี่ยน */}
-            {ledgerReady && selectionLabel ? (
+            {/* 🔴 ต้องสรุปตัวกรองแถบซ้ายด้วย (แผนข้อ 9) — N ใบ = จำนวนการ์ดจริงข้างล่างเสมอ */}
+            {ledgerReady && (selectionLabel || boardFilterSummary) ? (
               <div
                 className={cn(
                   'flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2',
                   TONE.primary.soft,
                 )}
               >
-                <p className="text-[11px] font-medium text-foreground">
-                  กำลังดู: {selectionLabel} — {flowJobs.length.toLocaleString('th-TH')} ใบข้างล่าง
+                <p className="min-w-0 text-[11px] font-medium text-foreground">
+                  กำลังดู: {[selectionLabel, boardFilterSummary].filter(Boolean).join(' · ')} —{' '}
+                  {flowJobs.length.toLocaleString('th-TH')} ใบข้างล่าง
                 </p>
                 <button
                   type="button"
-                  onClick={() => setSelection({ lane: null, step: null })}
+                  onClick={() =>
+                    boardFilterSummary
+                      ? clearAllBoardFilters({ laneStep: Boolean(selectionLabel) })
+                      : setSelection({ lane: null, step: null })
+                  }
                   className={cn(
                     'rounded-lg px-2.5 py-1 text-[11px] font-medium',
                     TONE.neutral.outline,
@@ -1409,7 +1584,37 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
 
         {/* ป้ายทอง "ประกาศจากใบขอ" ย้ายไปอยู่ในแถบสรุป+ตัวกรอง (eyebrow) แล้ว —
             เดิมกินแถวของตัวเอง ~40px (21 ส.ค. 2569) */}
-        <div ref={cardListRef} className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* ═══ แถบกรองด้านซ้าย + การ์ด (26 ก.ย. 2569 · แบบ iRecruit) ═══
+            การ์ดเหมือนเดิมทุกอย่าง — แค่ย้ายไปอยู่คอลัมน์ขวาเมื่อมีแถบซ้าย
+            (จอ lg มีที่เหลือจากแถบ 16rem ให้การ์ดแค่ 2 คอลัมน์ · xl ขึ้นไปกลับเป็น 3 เหมือนเดิม)
+            🔴 เฉพาะเจ้าหน้าที่ + มุมมองกล่องงาน — หน้าสมัครสาธารณะได้กริดเดิมทุกพิกเซล */}
+        <div className={cn('mt-3', boardFilterOn && 'lg:flex lg:items-start lg:gap-4')}>
+        {boardFilterOn ? (
+          <BoardFilterSidebar
+            facets={boardFacets}
+            selectedCount={boardFacetCount}
+            onToggle={toggleBoardFacet}
+            onClear={clearBoardFacetsOnly}
+          />
+        ) : null}
+        <div
+          ref={cardListRef}
+          className={cn(
+            'grid gap-4 sm:grid-cols-2',
+            boardFilterOn ? 'min-w-0 flex-1 xl:grid-cols-3' : 'lg:grid-cols-3',
+          )}
+        >
+          {boardFilterOn && ledgerReady && flowJobs.length === 0 && hasAnyBoardFilter(boardFilterState) ? (
+            <div
+              className={cn(
+                'col-span-full rounded-xl border px-4 py-6 text-center text-sm',
+                TONE.neutral.soft,
+              )}
+            >
+              <p className="font-medium text-foreground">ไม่มีใบขอที่ตรงกับตัวกรองนี้</p>
+              <p className="mt-1 text-xs text-muted-foreground">ลองเอาบางค่าออก หรือกด "ล้าง" ที่แถบด้านซ้าย</p>
+            </div>
+          ) : null}
           {visibleJobs.map((job) => (
             <Card
               key={job.id}
@@ -1712,7 +1917,29 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     <div className="flex w-full flex-wrap items-center justify-between gap-1.5">
                       <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-medium text-foreground">
                         <Users className={cn('h-3.5 w-3.5', TONE.info.value)} />
-                        ผู้สมัคร {countFor(applicantIdx, job.id)} คน
+                        {/* 🔴 เลขผู้สมัครต้องเด่น + ใบที่ยังไม่มีใครสมัครมีป้ายเตือน (แผนแถบกรอง
+                            26 ก.ย. 2569 — เจ้าของอยากเห็นปราดเดียวว่า "งานไหนไม่มีคนเลย")
+                            ⚠️ ป้ายรอยอดโหลดครบก่อน (`breakdownLoaded`) — ยังไม่มา = ห้ามบอกว่า
+                            ไม่มีคนสมัคร ทั้งที่แค่ยังอ่านไม่เสร็จ (บทเรียนเลข 0 ปลอมบนหัวกล่องงาน) */}
+                        {isStaff && breakdownLoaded && countFor(applicantIdx, job.id) === 0 ? (
+                          <span
+                            className={cn(
+                              'rounded-md border px-1.5 py-0.5 text-[11px] font-medium',
+                              TONE.warn.soft,
+                              TONE.warn.value,
+                            )}
+                          >
+                            ยังไม่มีคนสมัคร
+                          </span>
+                        ) : (
+                          <>
+                            ผู้สมัคร{' '}
+                            <span className="text-sm font-medium tabular-nums">
+                              {countFor(applicantIdx, job.id).toLocaleString('th-TH')}
+                            </span>{' '}
+                            คน
+                          </>
+                        )}
                         {/* Lead = ใบที่ถูกปัดเข้าคลัง ไม่ถูกนับในยอดซ้าย — โชว์เป็นเลขที่สอง
                             แทนที่จะยุบรวม (ยุบรวมแล้วเลขบนการ์ดจะไม่ตรงกับที่กดเข้าไปเห็น
                             ซึ่งเป็นเหตุผลที่ตัวนับกรอง Lead ออกตั้งแต่แรก) */}
@@ -1818,6 +2045,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               </CardFooter>
             </Card>
           ))}
+        </div>
         </div>
 
         {/* แถบเลขหน้า — ตัวเดียวกับหน้าหน่วยงาน/ผู้สมัคร เลือกจำนวนต่อหน้าได้ (20/40/60/100) */}
