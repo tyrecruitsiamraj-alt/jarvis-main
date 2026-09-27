@@ -82,7 +82,9 @@ const StaffJobBoardPage: React.FC = () => {
   };
 
   return (
-    <div className="relative -mx-4 sm:-mx-5 md:-mx-6 lg:-mx-8">
+    /* ระยะขอบเท่าหน้าอื่นทั้งระบบ — เดิมดึงขอบออก (-mx-*) เพื่อให้พื้นไล่สีเต็มจอ ซึ่งถอดไปแล้ว
+       27 ก.ย. 2569 (เจ้าของ: "หน้ากล่องงานไม่เข้ากับหน้าอื่นๆเลย" → แบบ A หัว PageHeader ชุดเดียวกัน) */
+    <div className="relative">
       <JobBoardView
         jobs={jobs}
         loading={loading}

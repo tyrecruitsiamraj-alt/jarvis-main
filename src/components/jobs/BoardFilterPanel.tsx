@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, ChevronDown, RotateCcw } from 'lucide-react';
+import { Check, ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,32 +20,20 @@ import {
 import { visibleFacetOptions, type FacetView } from '@/lib/facetEngine';
 
 /**
- * ═══ ตัวกรองแบบ Dropdown (กล่องงาน + แท็บผู้สมัคร) ═══
+ * ═══ ตัวกรองของกล่องงาน + แท็บผู้สมัคร — ปุ่ม "ตัวกรอง" ปุ่มเดียว ═══
  *
- * เจ้าของสั่ง 27 ก.ย. 2569: *"อันไหนเป็น Filter ทำเป็น Dropdown เอา"* · *"ขอหน้าตาแบบ Clean"*
- * ⇒ เลือก **แบบ A** จากแบบร่าง: หัวข้อที่เคยอยู่แถบซ้าย (แบบ iRecruit 26 ก.ย.) ออกมาเป็น
- * Dropdown เรียงในแถบเดียว · การ์ดตัวเลข + ขั้น 1–4 บนหัวกล่องงานยังกดได้เหมือนเดิม
- * (🔴 แถบซ้าย + ปุ่ม "ตัวกรอง" + Sheet มือถือ ถูกถอดทั้งชุด — ห้ามเอากลับโดยไม่ได้สั่งใหม่)
+ * ประวัติ: 26 ก.ย. แถบซ้ายแบบ iRecruit → 27 ก.ย. เช้า Dropdown เรียงเต็มแถว ("อันไหนเป็น Filter ทำเป็น Dropdown")
+ * → **27 ก.ย. บ่าย เจ้าของเลือกแบบ A** (*"หน้ากล่องงานไม่เข้ากับหน้าอื่นๆเลย รกมาก"*):
+ * แถวเดียว `[ตัวกรอง (N)] [เรียง ▾]` แบบหน้าอื่น · กดตัวกรอง = กล่อง Dropdown ที่มีทุกหัวข้อ เปิดได้ทีละหัวข้อ
+ * (🔴 แถบซ้าย / Sheet มือถือ / Dropdown เรียงเต็มแถว ถูกถอดแล้ว — ห้ามเอากลับโดยไม่ได้สั่งใหม่)
  *
  * 🔴 **วาดอย่างเดียว ไม่คิดเอง** — ตัวเลือก/เลขต่อท้าย/หัวข้อไหนซ่อน มาจาก `facetEngine`
  * (`buildBoardFacets` / `buildApplicantFacets`) ทั้งหมด · จอห้ามนับเลขเอง
- *
- * หลักการเดิมของแบบ iRecruit ยังอยู่ครบในกล่อง Dropdown:
- * - เลือกได้หลายค่า อัปเดตทันที ไม่มีปุ่ม "ตกลง"
- * - หัวข้อค่าเยอะมีช่องค้นหา · ค่าที่ติ๊กลอยบนสุด · ยังไม่พิมพ์ = 10 ค่าแรก
- * - เลข 0 จางลงแต่ **ยังกดได้**
- * - หัวข้อลูกอยู่ในกล่องเดียวกับหัวข้อแม่ (อำเภอในจังหวัด · งานย่อยในตำแหน่งงาน)
+ * หลักการเดิมยังอยู่ครบ: เลือกได้หลายค่า อัปเดตทันที · หัวข้อค่าเยอะมีช่องค้นหา · เลข 0 จางแต่ยังกดได้ ·
+ * หัวข้อลูกอยู่ในหัวข้อเดียวกับแม่ (อำเภอในจังหวัด · งานย่อยในตำแหน่งงาน)
  */
-export type FacetDropdownsProps<K extends string> = {
-  facets: FacetView<K>[];
-  /** หัวข้อที่ได้ Dropdown ของตัวเอง ตามลำดับบนแถบ — หัวข้อที่ข้อมูลว่างไม่โชว์ (engine ตัดให้แล้ว) */
-  primary: readonly K[];
-  /** หัวข้อลูก → หัวข้อแม่ — ลูกโผล่ในกล่องเดียวกับแม่ ไม่ได้ปุ่มของตัวเอง */
-  attach?: Partial<Record<K, K>>;
-  onToggle: (key: K, value: string) => void;
-};
 
-/** หน้าตาปุ่มเปิด Dropdown — มีค่าติ๊กอยู่ = กรอบสีฟ้า (ชุดเดียวกับตัวกรองเดิม มีคู่ dark ครบ) */
+/** หน้าตาปุ่มเปิด Dropdown — มีค่าติ๊กอยู่ = กรอบสีฟ้า (มีคู่ dark ครบ) */
 function triggerClass(active: boolean): string {
   return cn('h-9 gap-1.5 rounded-lg px-3 text-xs font-medium', active ? TONE.info.outline : TONE.neutral.outline);
 }
@@ -178,72 +166,78 @@ function groupFacets<K extends string>(
 const groupSelected = <K extends string>(g: FacetGroup<K>) =>
   g.head.selectedCount + g.children.reduce((n, c) => n + c.selectedCount, 0);
 
-/** ชุด Dropdown ของหัวข้อทั้งหมด: หัวข้อหลักคนละปุ่ม + ที่เหลือรวมใน "ตัวกรองอื่น" */
-export function FacetDropdowns<K extends string>({ facets, primary, attach = {}, onToggle }: FacetDropdownsProps<K>) {
-  const groups = groupFacets(facets, attach);
-  const rank = (k: K) => primary.indexOf(k);
-  const main = groups.filter((g) => rank(g.head.key) !== -1).sort((a, b) => rank(a.head.key) - rank(b.head.key));
-  const rest = groups.filter((g) => rank(g.head.key) === -1);
-  const restSelected = rest.reduce((n, g) => n + groupSelected(g), 0);
+/** หัวข้อเพิ่มที่ไม่ได้มาจากเครื่องกรอง (ใบที่จบแล้ว · ช่วงวันที่) — วางในกล่องเดียวกับหัวข้ออื่น */
+export type FilterExtraSection = { key: string; label: string; selected: number; content: React.ReactNode };
 
+/**
+ * ปุ่ม "ตัวกรอง (N)" + กล่องทุกหัวข้อ — หัวข้อหลักขึ้นก่อนตามลำดับ `primary` · ที่เหลือตามลำดับของเครื่องกรอง ·
+ * หัวข้อเพิ่ม (`sections`) ต่อท้าย · เปิดได้ทีละหัวข้อ (กล่องไม่ยาวเกินจอ)
+ */
+export function FilterButton<K extends string>({
+  facets,
+  primary = [],
+  attach = {},
+  onToggle,
+  sections = [],
+}: {
+  facets: FacetView<K>[];
+  primary?: readonly K[];
+  attach?: Partial<Record<K, K>>;
+  onToggle: (key: K, value: string) => void;
+  sections?: FilterExtraSection[];
+}) {
+  const groups = groupFacets(facets, attach);
+  const rank = (k: K) => {
+    const i = primary.indexOf(k);
+    return i === -1 ? primary.length : i;
+  };
+  const ordered = [...groups].sort((a, b) => rank(a.head.key) - rank(b.head.key));
+  const n = groups.reduce((a, g) => a + groupSelected(g), 0) + sections.reduce((a, x) => a + x.selected, 0);
   return (
-    <>
-      {main.map((g) => {
-        const n = groupSelected(g);
-        return (
-          <Popover key={g.head.key}>
-            <PopoverTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className={triggerClass(n > 0)}>
-                {g.head.label}
-                <TriggerCount n={n} />
-                <ChevronDown className="opacity-60" aria-hidden />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="max-h-96 w-72 space-y-4 overflow-y-auto p-3">
-              <FacetSection facet={g.head} onToggle={onToggle} showTitle={g.children.length > 0} />
-              {g.children.map((c) => (
-                <FacetSection key={c.key} facet={c} onToggle={onToggle} showTitle />
-              ))}
-            </PopoverContent>
-          </Popover>
-        );
-      })}
-      {rest.length > 0 ? (
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button type="button" variant="outline" size="sm" className={triggerClass(restSelected > 0)}>
-              ตัวกรองอื่น
-              <TriggerCount n={restSelected} />
-              <ChevronDown className="opacity-60" aria-hidden />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="max-h-96 w-80 overflow-y-auto p-3">
-            {/* เปิดได้ทีละหัวข้อ (หลักการเดิมของแบบ iRecruit) — กล่องไม่ยาวเกินจอ */}
-            <Accordion type="single" collapsible className="w-full">
-              {rest.map((g) => {
-                const n = groupSelected(g);
-                return (
-                  <AccordionItem key={g.head.key} value={g.head.key} className="border-border">
-                    <AccordionTrigger className="py-2 text-xs font-medium hover:no-underline">
-                      <span className="flex items-center gap-2">
-                        {g.head.label}
-                        <TriggerCount n={n} />
-                      </span>
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-4 pb-3">
-                      <FacetBody facet={g.head} onToggle={onToggle} />
-                      {g.children.map((c) => (
-                        <FacetSection key={c.key} facet={c} onToggle={onToggle} showTitle />
-                      ))}
-                    </AccordionContent>
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
-          </PopoverContent>
-        </Popover>
-      ) : null}
-    </>
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className={triggerClass(n > 0)}>
+          <SlidersHorizontal aria-hidden />
+          ตัวกรอง
+          <TriggerCount n={n} />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="max-h-96 w-80 overflow-y-auto p-3">
+        {ordered.length === 0 && sections.length === 0 ? (
+          <p className="px-1 py-2 text-xs text-muted-foreground">ยังไม่มีหัวข้อให้กรอง</p>
+        ) : (
+          <Accordion type="single" collapsible className="w-full">
+            {ordered.map((g) => (
+              <AccordionItem key={g.head.key} value={g.head.key} className="border-border">
+                <AccordionTrigger className="py-2 text-xs font-medium hover:no-underline">
+                  <span className="flex items-center gap-2">
+                    {g.head.label}
+                    <TriggerCount n={groupSelected(g)} />
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-4 pb-3">
+                  <FacetBody facet={g.head} onToggle={onToggle} />
+                  {g.children.map((c) => (
+                    <FacetSection key={c.key} facet={c} onToggle={onToggle} showTitle />
+                  ))}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+            {sections.map((x) => (
+              <AccordionItem key={`extra-${x.key}`} value={`extra-${x.key}`} className="border-border">
+                <AccordionTrigger className="py-2 text-xs font-medium hover:no-underline">
+                  <span className="flex items-center gap-2">
+                    {x.label}
+                    <TriggerCount n={x.selected} />
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="pb-3">{x.content}</AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -300,66 +294,6 @@ export function ChoiceDropdown<V extends string>({
   );
 }
 
-const DATE_FIELD_OPTIONS: readonly { value: BoardDateField; label: string }[] = [
-  { value: 'required', label: 'วันที่ต้องการ' },
-  { value: 'request', label: 'วันที่ขอ' },
-];
-
-type DoneLane = 'closed' | 'cancelled';
-
-/**
- * "ใบที่จบแล้ว ▾" — แทนแถว "ใบที่จบไปแล้ว (30 วันล่าสุด): ปิดแล้ว · ยกเลิก" บนหัวกล่องงาน
- * (เจ้าของสั่งเอาแถวนั้นออก 27 ก.ย. 2569) · เลือกได้ทีละอย่าง กดซ้ำ = กลับไปดูใบเปิด
- */
-function DoneDropdown({
-  closed,
-  cancelled,
-  lane,
-  onChange,
-}: {
-  closed: number;
-  cancelled: number;
-  lane: DoneLane | null;
-  onChange: (lane: DoneLane | null) => void;
-}) {
-  const options: { key: DoneLane; label: string; count: number }[] = [
-    { key: 'closed', label: 'ปิดแล้ว', count: closed },
-    { key: 'cancelled', label: 'ยกเลิก', count: cancelled },
-  ];
-  const picked = options.find((o) => o.key === lane);
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className={triggerClass(Boolean(picked))}>
-          {picked ? `ใบที่จบแล้ว: ${picked.label}` : 'ใบที่จบแล้ว'}
-          <ChevronDown className="opacity-60" aria-hidden />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-60 space-y-1 p-2">
-        <p className="px-2 py-1 text-xs text-muted-foreground">30 วันล่าสุด · กดซ้ำเพื่อกลับไปดูใบเปิด</p>
-        {options.map((o) => (
-          <Button
-            key={o.key}
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-pressed={lane === o.key}
-            onClick={() => {
-              onChange(lane === o.key ? null : o.key);
-              setOpen(false);
-            }}
-            className={cn('h-9 w-full justify-between px-2 text-sm font-normal', lane === o.key && TONE.info.soft)}
-          >
-            <span>{o.label}</span>
-            <span className="tabular-nums text-muted-foreground">{o.count.toLocaleString('th-TH')} ใบ</span>
-          </Button>
-        ))}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 /**
  * "ล้างตัวกรอง" — อยู่ท้ายบรรทัด "แสดง N จาก M ใบขอ" และ**โผล่เฉพาะตอนมีอะไรกรองอยู่**
  * (เดิมเป็นปุ่มจางค้างอยู่ท้ายแถว Dropdown แล้วตกบรรทัดเดี่ยว ๆ — ไม่ Clean)
@@ -373,9 +307,42 @@ export function BoardResetButton({ onReset }: { onReset: () => void }) {
   );
 }
 
+const DATE_FIELD_OPTIONS: readonly { value: BoardDateField; label: string }[] = [
+  { value: 'required', label: 'วันที่ต้องการ' },
+  { value: 'request', label: 'วันที่ขอ' },
+];
+
+type DoneLane = 'closed' | 'cancelled';
+
+/** ปุ่มเลือกค่าเดียวในกล่องตัวกรอง (ใบที่จบแล้ว · ช่องวันที่) — กดซ้ำ = เอาออก */
+function OptionButton({
+  selected,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={cn('h-8 gap-1.5 rounded-full px-3 text-xs', selected ? TONE.info.outline : TONE.neutral.outline)}
+    >
+      {selected ? <Check aria-hidden /> : null}
+      {children}
+    </Button>
+  );
+}
+
 /**
- * แถบตัวกรองของกล่องงาน — Dropdown ทั้งแถว: หัวข้อ · ใบที่จบแล้ว · ช่วงวันที่ · เรียง
- * (ปุ่มล้างอยู่ท้ายบรรทัดจำนวนผลลัพธ์ — `BoardResetButton`)
+ * แถบตัวกรองของกล่องงาน (แบบ A): `[ตัวกรอง (N)] [เรียง ▾]`
+ * ในกล่องตัวกรอง: ทุกหัวข้อของเครื่องกรอง + "ใบที่จบแล้ว" (ปิดแล้ว/ยกเลิก 30 วัน — แทนแถวเดิมบนหัวกล่องงาน)
+ * + "ช่วงวันที่" · ปุ่มล้างอยู่ท้ายบรรทัดจำนวนผลลัพธ์ (`BoardResetButton`)
  */
 export function BoardFilterBar({
   facets,
@@ -395,21 +362,62 @@ export function BoardFilterBar({
   onSortChange: (sort: BoardSort) => void;
 }) {
   const field: BoardDateField = dates?.field ?? 'required';
+  const hasDates = Boolean(dates && (dates.from || dates.to));
+  const sections: FilterExtraSection[] = [
+    {
+      key: 'done',
+      label: 'ใบที่จบแล้ว (30 วันล่าสุด)',
+      selected: done.lane ? 1 : 0,
+      content: (
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              { key: 'closed', label: 'ปิดแล้ว', count: done.closed },
+              { key: 'cancelled', label: 'ยกเลิก', count: done.cancelled },
+            ] as const
+          ).map((o) => (
+            <OptionButton
+              key={o.key}
+              selected={done.lane === o.key}
+              onClick={() => done.onChange(done.lane === o.key ? null : o.key)}
+            >
+              {o.label} <span className="tabular-nums opacity-70">{o.count.toLocaleString('th-TH')}</span>
+            </OptionButton>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: 'dates',
+      label: 'ช่วงวันที่',
+      selected: hasDates ? 1 : 0,
+      content: (
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {DATE_FIELD_OPTIONS.map((o) => (
+              <OptionButton key={o.value} selected={field === o.value} onClick={() => onDatesChange({ field: o.value })}>
+                {o.label}
+              </OptionButton>
+            ))}
+          </div>
+          {/* 🔴 ห้าม <input type="date"> (ภาษาตามเครื่องคนใช้) — ปฏิทินช่วงวันตัวเดียวกับแท็บผู้สมัคร */}
+          <DateRangeCalendarPicker
+            triggerVariant="filter"
+            value={hasDates && dates ? { from: dates.from, to: dates.to } : null}
+            onChange={(next) => onDatesChange({ field, from: next?.from ?? '', to: next?.to ?? '' })}
+          />
+        </div>
+      ),
+    },
+  ];
   return (
-    <div className="flex w-full flex-wrap items-center gap-2">
-      <FacetDropdowns facets={facets} primary={BOARD_PRIMARY_FACETS} attach={BOARD_FACET_ATTACH} onToggle={onToggle} />
-      <DoneDropdown closed={done.closed} cancelled={done.cancelled} lane={done.lane} onChange={done.onChange} />
-      <ChoiceDropdown
-        value={field}
-        options={DATE_FIELD_OPTIONS}
-        onChange={(v) => onDatesChange({ field: v })}
-        ariaLabel="ช่วงวันที่ของช่องไหน"
-      />
-      {/* 🔴 ห้าม <input type="date"> (ภาษาตามเครื่องคนใช้) — ปฏิทินช่วงวันตัวเดียวกับแท็บผู้สมัคร */}
-      <DateRangeCalendarPicker
-        triggerVariant="filter"
-        value={dates && (dates.from || dates.to) ? { from: dates.from, to: dates.to } : null}
-        onChange={(next) => onDatesChange({ field, from: next?.from ?? '', to: next?.to ?? '' })}
+    <div className="flex flex-wrap items-center gap-2">
+      <FilterButton
+        facets={facets}
+        primary={BOARD_PRIMARY_FACETS}
+        attach={BOARD_FACET_ATTACH}
+        onToggle={onToggle}
+        sections={sections}
       />
       <ChoiceDropdown
         value={sort}

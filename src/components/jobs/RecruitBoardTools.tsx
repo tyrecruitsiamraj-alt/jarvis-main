@@ -196,7 +196,9 @@ const RecruitBoardTools: React.FC<{
               onClick={() => onClickKey('link')}
               title="สร้างลิงก์รับสมัครที่ไม่ผูกกับใบขอ"
             >
-              <Plus aria-hidden /> {LABEL.link}
+              {/* จอเล็กตัดคำขยายออก ปุ่มหัวหน้าจะได้อยู่แถวเดียว (แบบ A · 27 ก.ย. 2569) */}
+              <Plus aria-hidden /> {RM_TOOLBAR_LABEL.link}
+              <span className="hidden sm:inline">(ประกาศลอย)</span>
             </Button>
           ) : null}
           <DropdownMenu>

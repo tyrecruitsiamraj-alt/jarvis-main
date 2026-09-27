@@ -22,6 +22,7 @@ import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { resolveApplyPositionPreset } from '@/lib/jobBoardPositionPreset';
 import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
+import BoardJobCard from '@/components/jobs/BoardJobCard';
 import SearchField from '@/components/shared/SearchField';
 import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
@@ -31,7 +32,7 @@ import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
  */
 import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
 import RecruitControlPanel from '@/components/recruit-rm/RecruitControlPanel';
-import PageHeroStrip from '@/components/shared/PageHeroStrip';
+import PageHeader from '@/components/shared/PageHeader';
 import {
   applicantOriginSummary,
   fetchJobApplicantBreakdown,
@@ -289,16 +290,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ⚠️ **ส่งเฉพาะฝั่งเจ้าหน้าที่** — ชื่อเจ้าหน้าที่สรรหาเป็นข้อมูลภายใน
    * ห้ามหลุดออกหน้าสมัครสาธารณะ ซึ่งใช้ component ตัวเดียวกันนี้
    */
-  const staffOnlyFilterProps = isStaff
-    ? {
-        recruiterFilter: filters.recruiterFilter,
-        onRecruiterFilterChange: filters.setRecruiterFilter,
-        recruiterOptions: filters.recruiterOptions,
-        contractTypeFilter: filters.contractTypeFilter,
-        onContractTypeFilterChange: filters.setContractTypeFilter,
-        contractTypeOptions: filters.contractTypeOptions,
-      }
-    : {};
+  // (ตัวกรองเจ้าหน้าที่/ประเภทสัญญาบนแถบเดิมของฝั่งเจ้าหน้าที่ ย้ายเข้าปุ่ม "ตัวกรอง" ของเครื่องกรองแล้ว — 27 ก.ย. 2569)
 
   // จำนวนผู้สมัครต่อใบ (เจ้าหน้าที่) — ประกาศตรงนี้เพราะการเรียงการ์ดข้างล่างต้องใช้
   const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({});
@@ -1097,57 +1089,52 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     if (match) openApply(match);
   }, [isStaff, deepLinkHandled, loading, searchParams, jobs]);
 
-  return (
-    <div className="relative bg-gradient-to-b from-primary/10 via-primary/[0.04] to-transparent">
+  /**
+   * 🔴 หัวหน้าเจ้าหน้าที่ = **หัวแบบเดียวกับหน้าอื่นทั้งระบบ** (`PageHeader` — ลูกศรย้อน + ชื่อ + คำอธิบาย)
+   * เจ้าของสั่ง 27 ก.ย. 2569: *"หน้ากล่องงานไม่เข้ากับหน้าอื่นๆเลย รกมาก"* แล้วเลือกแบบ A จากแบบร่าง
+   * ⇒ ถอดการ์ดกรมท่าทึบ (PageHeroStrip) · ถอดพื้นไล่สี + กรอบกว้าง max-w-6xl ของฝั่งเจ้าหน้าที่
+   * (หน้าสมัครสาธารณะยังเป็นหัวแบบหน้าปกนิตยสารเหมือนเดิม — คนละกลุ่มคนดู)
+   */
+  const staffTitle = BOARD_VIEW_TABS.find((t) => t.id === view)?.label ?? 'กล่องงาน';
+  /* 🔴 ตัวเลขยังบอกไม่ได้ (กำลังโหลด/พัง/ไม่มีสิทธิ์) = **ไม่พิมพ์อะไรเลย** (บทเรียน 31 ส.ค. 2569)
+     บอกหน่วยครบทั้ง "ใบขอ" และ "อัตรา" (บทเรียน "292 ตำแหน่ง") · % ปล่อยประกาศย้ายมาจากแถบบนหัวกล่องงาน */
+  const staffSubtitle =
+    view === 'board' && ledgerReady
+      ? [
+          `${filters.visibleCount.toLocaleString('th-TH')} ใบขอ`,
+          `${filters.visiblePositions.toLocaleString('th-TH')} อัตรา`,
+          ledger.percent === null ? null : `ปล่อยแล้ว ${ledger.percent}%`,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : undefined;
 
-      <div className="relative mx-auto max-w-6xl px-4 md:px-6 pt-8 pb-6 md:pt-12 md:pb-10">
-        {/* ฝั่งเจ้าหน้าที่ = hero เข้มตาม mockup rev.3 ข้อ 04 · ฝั่งคนนอกคงหัวสว่างเดิมไว้ (หน้าแบรนด์) */}
-        {isStaff ? (
-          <PageHeroStrip
-            eyebrow="บอร์ดรับสมัคร · เจ้าหน้าที่"
-            /* 🔴 หน้านี้มีหลายมุมมองต่างกันที่ `?view=` ⇒ ชื่อหัวต้องเปลี่ยนตามมุมมอง
-               ไม่งั้นกดคนละแท็บแล้วเจอหัวเดียวกัน คนใหม่จะไม่แน่ใจว่ามาถูกหน้าหรือเปล่า
-               (audit 26 ส.ค. 2569) · ชื่อมาจาก `BOARD_VIEW_TABS` ชุดเดียวกับแถบแท็บ ห้ามพิมพ์เอง */
-            title={BOARD_VIEW_TABS.find((t) => t.id === view)?.label ?? 'กล่องงาน'}
-            /* 🔴 บอกหน่วยให้ครบทั้ง "ใบขอ" และ "อัตรา" — เดิมเขียน "292 ตำแหน่ง" ทั้งที่ 292
-               คือจำนวน**ใบ** ทำให้เอาไปเทียบกับ Dashboard (340 อัตรา) แล้วสรุปว่าใบขอหาย */
-            /* 🔴 ตัวเลขยังบอกไม่ได้ (กำลังโหลด/พัง/ไม่มีสิทธิ์) = **ไม่พิมพ์อะไรเลย**
-               เดิมเช็คแค่ `loading` ⇒ ตอนเส้นข้อมูลพังจะขึ้น "0 ใบขอ · 0 อัตรา"
-               ซึ่งเป็นเลขปลอมที่ดูเหมือนจริง (31 ส.ค. 2569) */
-            meta={
-              !ledgerReady
-                ? undefined
-                : `· ${filters.visibleCount.toLocaleString('th-TH')} ใบขอ · ${filters.visiblePositions.toLocaleString('th-TH')} อัตรา`
-            }
-            /* 🔴 เหลือแค่ "สร้างลิงก์" กับ "ตั้งค่าบอร์ด" + ปุ่มรีเฟรชแบบไอคอน (เจ้าของสั่ง 27 ก.ย. 2569:
-               "หน้ากล่องงานจะเหลือคำว่า สร้างลิงค์ กับ ตั้งค่าบอร์ด พวกนี้เอาไปจัดวางให้สวยๆ")
-               ช่องค้นหาย้ายขึ้นแถบบนซ้ายกระดิ่งแล้ว — ช่องที่นี่เป็นทางถอยตอนไม่มีแถบบนเท่านั้น */
-            actions={
+  return (
+    <div className={isStaff ? 'relative' : 'relative bg-gradient-to-b from-primary/10 via-primary/[0.04] to-transparent'}>
+      {isStaff ? (
+        <PageHeader
+          title={staffTitle}
+          subtitle={staffSubtitle}
+          backPath="/"
+          actions={
+            view === 'board' ? (
               <>
-                {view === 'board' && !searchInHeader ? (
+                {!searchInHeader ? (
                   <SearchField
                     compact
                     placeholder={searchPlaceholder}
                     value={filters.search}
                     onChange={(e) => setBoardSearch(e.target.value)}
-                    wrapperClassName="w-full min-w-0 sm:w-72 lg:w-80"
+                    wrapperClassName="w-full min-w-0 sm:w-72"
                   />
                 ) : null}
-                {/* งานระดับตั้งค่าของบอร์ด — จัดการช่องทาง + สร้างประกาศลอย + เหตุผล
-                    ⚠️ **เฉพาะมุมมอง "กล่องงาน"** (เจ้าของสั่ง 13 ส.ค. 2569:
-                    "นอกจากหน้ากล่องงาน หน้าอื่นไม่ต้องมี") — ทั้งสามปุ่มทำงานกับ
-                    ประกาศ/ช่องทางรับสมัคร ซึ่งเป็นเรื่องของฝั่งใบขอ ไม่ใช่ของรายชื่อคน */}
-                {view === 'board' ? (
-                  /* 🔴 Pre-Check (ไปหน้า /matching/pre-check = หมวดจับคู่งาน) ถูกถอดจากเมนูนี้ 27 ก.ย. 2569
-                     — เจ้าของสั่งห้ามกดจากกล่องงานแล้วโผล่หน้าจับคู่งาน · หน้า Pre-Check ยังเข้าได้จากหน้า Matching */
-                  <RecruitBoardTools variant="onDark" />
-                ) : null}
-                {/* ปุ่มรีเฟรชนี้โหลด feed **ใบขอ** ใหม่ — แท็บอื่นแสดงรายชื่อคนคนละชุด
-                    และมีปุ่มรีเฟรชของตัวเองใน RmWorkspace อยู่แล้ว */}
-                {onRefresh && view === 'board' ? (
+                {/* เหลือ "สร้างลิงก์" + "ตั้งค่าบอร์ด" + รีเฟรชแบบไอคอน (เจ้าของสั่ง 27 ก.ย. 2569) ·
+                    Pre-Check ถูกถอดจากเมนูนี้ (ห้ามพาไปหมวดจับคู่งาน) */}
+                <RecruitBoardTools />
+                {onRefresh ? (
                   <Button
                     type="button"
-                    variant="hero"
+                    variant="outline"
                     size="icon"
                     onClick={() => void onRefresh()}
                     disabled={loading || refreshing}
@@ -1159,9 +1146,17 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </Button>
                 ) : null}
               </>
-            }
-          />
-        ) : (
+            ) : undefined
+          }
+        />
+      ) : null}
+
+      <div
+        className={
+          isStaff ? 'relative px-4 pb-10 md:px-6' : 'relative mx-auto max-w-6xl px-4 md:px-6 pt-8 pb-6 md:pt-12 md:pb-10'
+        }
+      >
+        {isStaff ? null : (
           /**
            * ═══ หน้าสาธารณะ — หัวเรื่องแบบ "หน้าปกนิตยสาร" (เจ้าของเคาะ 5 ก.ย. 2569) ═══
            *
@@ -1231,7 +1226,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             เดียวกันกับหน้ากล่องงาน") — จึงอยู่ **เหนือ** ภาพรวมงานสรรหา · เดิม funnel
             แทรกก่อน tab bar ทำให้แท็บเลื่อนลงเฉพาะหน้ารายชื่อผู้สมัคร */}
         {isStaff && onViewChange ? (
-          <div className="mt-6 flex flex-wrap items-center gap-1 border-b border-border/60">
+          <div className="flex items-center gap-1 overflow-x-auto border-b border-border/60 sm:flex-wrap sm:overflow-visible">
             {BOARD_VIEW_TABS.map((v) => {
               const active = view === v.id;
               return (
@@ -1241,7 +1236,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   onClick={() => onViewChange(v.id)}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'px-4 py-2.5 text-sm font-medium transition-colors',
+                    'shrink-0 whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors',
                     active
                       ? cn(TONE.primary.value, 'border-b-2 border-current')
                       : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
@@ -1271,93 +1266,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           <div className="mt-4 pb-10">{listContent}</div>
         ) : (
           <>
-        <JobBoardTopFilters
-          search={filters.search}
-          onSearchChange={filters.setSearch}
-          provinceFilter={filters.provinceFilter}
-          onProvinceFilterChange={filters.onProvinceFilterChange}
-          districtFilter={filters.districtFilter}
-          onDistrictFilterChange={filters.setDistrictFilter}
-          positionFilter={filters.positionFilter}
-          onPositionFilterChange={filters.setPositionFilter}
-          lockPosition={filters.lockPosition}
-          subtypeFilter={filters.subtypeFilter}
-          onSubtypeFilterChange={filters.setSubtypeFilter}
-          provinceOptions={filters.provinceOptions}
-          districtOptions={filters.districtOptions}
-          positionOptions={filters.positionOptions}
-          subtypeOptions={filters.subtypeOptions}
-          {...staffOnlyFilterProps}
-          loading={loading}
-          searchPlaceholder={searchPlaceholder}
-          hideSearch={isStaff}
-          /* ฝั่งเจ้าหน้าที่: แถบบรรทัดเดียว + ป้ายทองยุบเข้ามาในแถบ (คืนที่ ~84px ให้การ์ด)
-             /apply ไม่ส่ง prop → การ์ด frost เดิมทุกพิกเซล */
-          variant={isStaff ? 'bar' : 'card'}
-          eyebrow={isStaff ? (closedBox ? JOB_BOX_LABEL[closedBox] : 'ประกาศจากใบขอ') : undefined}
-          /* 🔴 เหตุผลเดียวกับ meta ข้างบน — พังแล้วห้ามขึ้น "พบ 0 ใบขอ" */
-          resultCount={!ledgerReady ? undefined : boxedJobs.length}
-          totalCount={
-            !ledgerReady
-              ? undefined
-              : closedBox
-                ? filterByClosedBox(closedJobs ?? [], closedBox).length
-                : filters.visibleCount
-          }
-          /* เจ้าหน้าที่: เลขนี้คือจำนวน**ใบขอ** + บอกอัตราต่อท้ายให้เทียบกับ Dashboard ได้
-             สาธารณะ: คงคำว่า "ตำแหน่ง" เดิม (คนนอกไม่ได้ดูหน่วยอัตราของ ERP) */
-          countUnitLabel={isStaff ? 'ใบขอ' : undefined}
-          resultAction={
-            boardFilterOn &&
-            (hasAnyBoardFilter(boardFilterState) || filters.search.trim() !== '' || Boolean(selectionLabel)) ? (
-              <BoardResetButton onReset={() => clearAllBoardFilters({ search: true, laneStep: true })} />
-            ) : null
-          }
-          /* 🔴 เจ้าของถาม 27 ก.ย. 2569 ว่า "พบ 316 ใบขอ · 410 อัตราที่ยังต้องหา หมายความว่าไง"
-             ⇒ เปลี่ยนคำเป็น "แสดง N จาก M ใบขอ · ต้องหาคน X อัตรา" (เจ้าของเลือกเอง) */
-          positionsNote={
-            isStaff && ledgerReady
-              ? closedBox
-                ? `${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตรา`
-                : `ต้องหาคน ${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตรา`
-              : undefined
-          }
-          /* แถบกรองแบบ iRecruit (26 ก.ย. 2569) — ช่องจังหวัด/ตำแหน่ง/เจ้าหน้าที่ของแถบนี้ย้ายไปอยู่
-             แถบซ้ายทั้งหมด (เลือกได้หลายค่า) · แถบนี้เหลือ ช่วงวันที่ + เรียง + ล้าง ตามแผนข้อ 7 */
-          hideFieldFilters={boardFilterOn}
-          extra={
-            boardFilterOn ? (
-              /* 🔴 ตัวกรองทั้งแถวเป็น Dropdown (เจ้าของเลือกแบบ A 27 ก.ย. 2569) — แถบซ้ายถูกถอด
-                 "ล้าง" = ล้างทุกอย่างรวมการ์ด/ขั้นที่กดไว้ (แถบ "กำลังดู" ที่มีปุ่มล้างถูกถอดแล้ว) */
-              <BoardFilterBar
-                facets={boardFacets}
-                onToggle={toggleBoardFacet}
-                done={{
-                  closed: closedBoxCounts.closed.length,
-                  cancelled: closedBoxCounts.cancelled.length,
-                  lane: doneLane,
-                  onChange: (next) => setSelection({ lane: next }),
-                }}
-                dates={boardFilterState.dates}
-                onDatesChange={setBoardDates}
-                sort={boardSort}
-                onSortChange={setBoardSort}
-              />
-            ) : undefined
-          }
-        />
-
-        {/* ── หัวหน้าจอ = "ปล่อยไปแล้วเท่าไหร่ เหลืออีกเท่าไหร่" ──
-            เจ้าของสั่งรื้อรอบสี่ 27 ส.ค. 2569: *"ฉันอยากเปิดมาแล้วรู้ว่า อ้อ ตอนนี้มีใบขอ
-            เท่านี้นะ เราปล่อยไปหน้าสาธารณะเท่านี้แล้วนะ เหลืออีกเท่านี้นะ แล้วพอจะปล่อย
-            ก็ไปกดดูแล้วก็ตามขั้นตอน 1 2 3 4 แล้วก็ปล่อยไป"*
-
-            🔴 **เส้น 9 ขั้นไม่ได้ถูกทิ้ง** — ปลายเส้น (คัดเลือก/รอแจ้งเข้า/เริ่มแล้ว)
-            ย้ายไปอยู่ใต้เลน "ไม่ต้องปล่อย" ซึ่งเป็นเจ้าของขั้นพวกนั้นจริง ๆ ·
-            ต้นเส้น (รอตรวจ/รอปล่อย) กลายเป็นขั้น 1-4 ของเลน "เหลือปล่อย"
-            ⚠️ staff เท่านั้น — หน้าสมัครสาธารณะใช้ component ตัวเดียวกันนี้ */}
+        {/* ═══ ฝั่งเจ้าหน้าที่ (แบบ A · 27 ก.ย. 2569): การ์ดตัวเลข 3 ใบ + ติดขั้น → แถว [ตัวกรอง][เรียง] ═══
+            เจ้าของ: *"หน้ากล่องงานไม่เข้ากับหน้าอื่นๆเลย รกมาก"* — เดิมมีกล่องซ้อนกัน 4 ก้อนก่อนถึงการ์ดงาน
+            (ตัวกรอง · ภาพรวม · ติดขั้นไหน · ปล่อยแล้วได้ผลยังไง) ⇒ เหลือการ์ดตัวเลข + แถวเดียว
+            🔴 เลนสามก้อน/ขั้น 1–4 ยังกดกรองได้เหมือนเดิม (เจ้าของสั่งไว้ 27 ส.ค. 2569 — ห้ามถอด)
+            หน้าสมัครสาธารณะใช้แถบตัวกรองแบบการ์ด frost ตัวเดิม (ข้างล่าง) */}
         {isStaff && view === 'board' ? (
-          <div className="mt-3 space-y-2">
+          <div className="mt-4 space-y-4">
             <BoardReleaseHeader
               state={ledgerState}
               ageLabel={dataAgeLabel(dataAgeSeconds)}
@@ -1377,8 +1292,49 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               }
             />
 
-            {/* 🔴 แถบ "กำลังดู: … — N ใบข้างล่าง" ถูกถอด 27 ก.ย. 2569 (เจ้าของสั่ง "เอาออก")
-                จำนวนที่เหลือหลังกรองดูได้จากบรรทัด "แสดง N จาก M ใบขอ" ในแถบตัวกรอง */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <BoardFilterBar
+                facets={boardFacets}
+                onToggle={toggleBoardFacet}
+                done={{
+                  closed: closedBoxCounts.closed.length,
+                  cancelled: closedBoxCounts.cancelled.length,
+                  lane: doneLane,
+                  onChange: (next) => setSelection({ lane: next }),
+                }}
+                dates={boardFilterState.dates}
+                onDatesChange={setBoardDates}
+                sort={boardSort}
+                onSortChange={setBoardSort}
+              />
+              {/* 🔴 "แสดง N จาก M ใบขอ · ต้องหาคน X อัตรา" (เจ้าของเลือกคำเอง 27 ก.ย. 2569) ·
+                  ตัวเลขยังบอกไม่ได้ = ไม่พิมพ์ (ห้ามขึ้น "0 ใบขอ" ปลอม) · ล้างตัวกรองโผล่เฉพาะตอนมีตัวกรอง */}
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                {closedBox ? (
+                  <span className={cn('rounded-full px-2 py-0.5 font-medium', TONE.neutral.chip)}>
+                    {JOB_BOX_LABEL[closedBox]}
+                  </span>
+                ) : null}
+                {ledgerReady ? (
+                  <span>
+                    แสดง <span className="font-medium text-foreground">{boxedJobs.length.toLocaleString('th-TH')}</span>{' '}
+                    จาก{' '}
+                    {(closedBox
+                      ? filterByClosedBox(closedJobs ?? [], closedBox).length
+                      : filters.visibleCount
+                    ).toLocaleString('th-TH')}{' '}
+                    ใบขอ ·{' '}
+                    {closedBox
+                      ? `${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตรา`
+                      : `ต้องหาคน ${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตรา`}
+                  </span>
+                ) : null}
+                {hasAnyBoardFilter(boardFilterState) || filters.search.trim() !== '' || Boolean(selectionLabel) ? (
+                  <BoardResetButton onReset={() => clearAllBoardFilters({ search: true, laneStep: true })} />
+                ) : null}
+              </div>
+            </div>
+
             {/* ช่วงวันที่ของชุดใบปิด/ยกเลิก — โผล่เฉพาะตอนเลือกสองกล่องนั้น
                 ⚠️ **ต้องมีช่วงวันที่เสมอ** ใบปิดสะสมย้อนหลังหลายปี ดึงหมดคือรอเป็นนาที */}
             {closedBox ? (
@@ -1424,7 +1380,29 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               </div>
             ) : null}
           </div>
-        ) : null}
+        ) : (
+          <JobBoardTopFilters
+          search={filters.search}
+          onSearchChange={filters.setSearch}
+          provinceFilter={filters.provinceFilter}
+          onProvinceFilterChange={filters.onProvinceFilterChange}
+          districtFilter={filters.districtFilter}
+          onDistrictFilterChange={filters.setDistrictFilter}
+          positionFilter={filters.positionFilter}
+          onPositionFilterChange={filters.setPositionFilter}
+          lockPosition={filters.lockPosition}
+          subtypeFilter={filters.subtypeFilter}
+          onSubtypeFilterChange={filters.setSubtypeFilter}
+          provinceOptions={filters.provinceOptions}
+          districtOptions={filters.districtOptions}
+          positionOptions={filters.positionOptions}
+          subtypeOptions={filters.subtypeOptions}
+          loading={loading}
+          searchPlaceholder={searchPlaceholder}
+          resultCount={!ledgerReady ? undefined : boxedJobs.length}
+          totalCount={!ledgerReady ? undefined : filters.visibleCount}
+        />
+        )}
 
         {/* 🔴 ปุ่ม Pre-Check ย้ายเข้าเมนู "ตั้งค่าบอร์ด" แล้ว (เจ้าของสั่ง 20 ส.ค. 2569) —
             เดิมลอยเดี่ยวชิดขวาเป็นแถวของตัวเอง กินความสูงและไม่บอกว่าเกี่ยวกับอะไร
@@ -1508,7 +1486,20 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               <p className="mt-1 text-xs text-muted-foreground">ลองเอาบางค่าออก หรือกด "ล้าง" ในแถบตัวกรอง</p>
             </div>
           ) : null}
-          {visibleJobs.map((job) => (
+          {visibleJobs.map((job) =>
+            isStaff ? (
+              /* 🔴 ฝั่งเจ้าหน้าที่ = การ์ดย่อ 5 บรรทัด (แบบ A · 27 ก.ย. 2569) — การ์ดข้างล่างเหลือของหน้าสมัครสาธารณะ */
+              <BoardJobCard
+                key={job.id}
+                job={job}
+                progress={ledgerReady ? releaseProgressOf(job, releaseFacts) : null}
+                applicants={countFor(applicantIdx, job.id)}
+                ai={aiCounts[job.id] ?? null}
+                closed={Boolean(closedBox)}
+                onOpen={setPostingJob}
+                onApplicants={openApplicantsOf}
+              />
+            ) : (
             <Card
               key={job.id}
               /**
@@ -1937,7 +1928,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 )}
               </CardFooter>
             </Card>
-          ))}
+            ),
+          )}
         </div>
         </div>
 
@@ -2134,6 +2126,28 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             <DialogDescription className="text-xs">
               ไล่งานประกาศของใบนี้ทีละขั้น — ปิดกล่องแล้วกลับมาที่กล่องงานเหมือนเดิม
             </DialogDescription>
+            {/* 🔴 ปุ่ม "หาคนทุกถัง + ให้ AI โทร" ย้ายมาจากการ์ด (แบบ A · 27 ก.ย. 2569 — การ์ดย่อเหลือ 5 บรรทัด)
+                ⚠️ ห้ามซ้อน Dialog ใน Dialog ⇒ กดแล้ว**ปิดป๊อปนี้ก่อน** ค่อยเปิดหน้าต่างหาคน (เรียงกัน ไม่ซ้อน)
+                ใบที่ปิด/ยกเลิกแล้วไม่มีปุ่มนี้ (ส่งคนไปงานที่ไม่มีอยู่) */}
+            {postingJob && !closedBox ? (
+              <div className="pt-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  title={SEARCH_ALL_POOLS_AND_CALL.hint}
+                  onClick={() => {
+                    const j = postingJob;
+                    setPostingJob(null);
+                    setLaneJob(j);
+                  }}
+                  className={cn('h-8 gap-1.5 rounded-lg px-2.5 text-xs', TONE.success.outline)}
+                >
+                  <Send aria-hidden />
+                  {SEARCH_ALL_POOLS_AND_CALL.label}
+                </Button>
+              </div>
+            ) : null}
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5">
             {postingJob ? (

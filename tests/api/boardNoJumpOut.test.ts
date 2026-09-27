@@ -16,6 +16,7 @@ const FILES = [
   'src/components/jobs/JobBoardView.tsx',
   'src/components/jobs/BoardReleaseHeader.tsx',
   'src/components/jobs/BoardFilterPanel.tsx',
+  'src/components/jobs/BoardJobCard.tsx',
   'src/components/jobs/JobBoardSilentLinks.tsx',
   'src/components/jobs/BoardCardProgress.tsx',
   'src/pages/jobs/BoardPostingPage.tsx',

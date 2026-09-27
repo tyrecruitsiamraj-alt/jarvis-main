@@ -1,41 +1,28 @@
 /**
- * ═══ หัวหน้ากล่องงาน — "ปล่อยไปแล้วเท่าไหร่ เหลืออีกเท่าไหร่" ═══
+ * ═══ หัวกล่องงาน — "ปล่อยไปแล้วเท่าไหร่ เหลืออีกเท่าไหร่" ═══
  *
  * เจ้าของสั่งรื้อ 27 ส.ค. 2569:
- * > *"หน้ากล่องงาน รื้อได้นะ · ฉันอยากเปิดมาแล้วรู้ว่า อ้อ ตอนนี้มีใบขอเท่านี้นะ
- * >  เราปล่อยไปหน้าสาธารณะเท่านี้แล้วนะ เหลืออีกเท่านี้นะ แล้วพอจะปล่อยก็ไปกดดู
- * >  แล้วก็ตามขั้นตอน 1 2 3 4 แล้วก็ปล่อยไป"*
- * > เคาะเพิ่ม: *"ขอแค่เปิดมารู้ว่า อ้อทำไปแล้วนะ แล้วก็กดดูได้ว่าที่ทำไปเป็นไงบ้าง
- * >  ยังไม่ทำเท่าไหร่"*
+ * > *"ฉันอยากเปิดมาแล้วรู้ว่า อ้อ ตอนนี้มีใบขอเท่านี้นะ เราปล่อยไปหน้าสาธารณะเท่านี้แล้วนะ
+ * >  เหลืออีกเท่านี้นะ แล้วพอจะปล่อยก็ไปกดดู แล้วก็ตามขั้นตอน 1 2 3 4 แล้วก็ปล่อยไป"*
  *
- * 🔴 **โชว์ทีละสองแถวเท่านั้น** — แถวบนคือเลนสามก้อน แถวล่างเปลี่ยนตามเลนที่เลือก
- * (ของเดิมมีแถบกรองซ้อนกัน 4 ชุดจนเจ้าของบอกว่า "เยอะแยะเละเทะไปหมด" — ห้ามกลับไปเป็นแบบนั้น)
+ * 🔴 **รื้อหน้าตารอบ 27 ก.ย. 2569 — แบบ A** (เจ้าของ: *"หน้ากล่องงานไม่เข้ากับหน้าอื่นๆเลย รกมาก"*)
+ * - ตัวเลข 3 ก้อน = **การ์ดตัวเลขทรงเดียวกับหน้าติดตาม** (ป้าย · ตราไอคอนมุมขวา · เลขใหญ่ · บรรทัดท้ายคั่นเส้น)
+ * - ก้อนย่อยของ "ยังไม่ปล่อย" / "ปล่อยแล้ว" ย้ายเข้าบรรทัดท้ายของการ์ดใบนั้น (เดิมเป็นกล่องแยกอีก 2 ก้อน)
+ * - % ปล่อยประกาศย้ายขึ้นคำอธิบายใต้ชื่อหน้า (PageHeader) · แถบ % ถูกถอด
+ * - ติดขั้น 1–4 เหลือบรรทัดเดียว ไม่มีกรอบ
+ * - ⛔ ห้ามเติมประโยคอธิบาย ("ต้องทำ:", "บวกกันได้ … ใบพอดี" ฯลฯ) กลับมาโดยไม่ได้สั่ง
  *
  * 🔴 **ทุกเลขกดได้และกดแล้วการ์ดข้างล่างตรงกับเลขนั้นเป๊ะ** ตรรกะการนับอยู่
- * `src/lib/boardRelease.ts` (มีเทสต์คุมว่าบวกกันลงตัว) ไฟล์นี้แค่วาด
- *
- * 🔴 **หน้าตาแบบ Clean (เจ้าของสั่ง 27 ก.ย. 2569)** — ถอดข้อความอธิบายออกทั้งหมด:
- * กล่อง "ขั้น N … / ต้องทำ: …" · ย่อหน้า "สี่ขั้นนี้คือ…" · "บวกทุกขั้นแล้วได้ … ใบพอดี" ·
- * "บวกกันได้ … ใบพอดี" (สองที่) · แถว "ใบที่จบไปแล้ว (30 วันล่าสุด)" (ย้ายเป็น Dropdown
- * "ใบที่จบแล้ว" ในแถบตัวกรอง) ⇒ **ห้ามเติมคำอธิบายกลับมาโดยไม่ได้สั่ง** · ตัวอักษรขนาดเดียวกันทั้งไฟล์
+ * `src/lib/boardRelease.ts` (มีเทสต์คุมว่าบวกกันลงตัว) ไฟล์นี้แค่วาด · ป้ายทุกคำมาจาก `RELEASE_LANE_TEXT`
  */
 import * as React from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ClipboardList, Hourglass, Megaphone } from 'lucide-react';
 
-import { DASH, TONE } from '@/lib/designTokens';
-import Term from '@/components/shared/Term';
-import {
-  RELEASE_LANE_TEXT,
-  type ReleaseLaneKey,
-  type ReleaseLedger,
-  type ReleaseStepKey,
-} from '@/lib/boardRelease';
+import { Card } from '@/components/ui/card';
+import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
+import { RELEASE_LANE_TEXT, type ReleaseLaneKey, type ReleaseLedger, type ReleaseStepKey } from '@/lib/boardRelease';
 import { cn } from '@/lib/utils';
-import {
-  ledgerStateText,
-  UNKNOWN_NUMBER,
-  type LedgerState,
-} from '@/lib/boardDataState';
+import { ledgerStateText, UNKNOWN_NUMBER, type LedgerState } from '@/lib/boardDataState';
 
 export type BoardReleaseHeaderProps = {
   /**
@@ -63,121 +50,115 @@ export type BoardReleaseHeaderProps = {
 
 const th = (n: number) => n.toLocaleString('th-TH');
 
-/** ลำดับก้อนบนแถวบน — ใช้ทั้งตอนโชว์เลขจริงและตอนโชว์ขีดแทนเลข */
+/** ลำดับการ์ด 3 ใบ — ใช้ทั้งตอนมีเลขจริงและตอนโชว์ขีด/โครงเปล่า */
 const LANE_ORDER = ['all', 'released', 'unreleased'] as const;
 
-/** ก้อนตัวเลขใหญ่บนแถวบน */
-function LaneTile({
+/** ลิงก์เลขย่อยในบรรทัดท้ายการ์ด (ก้อนย่อยเดิม) — กดแล้วกรองการ์ดข้างล่างเหมือนเดิม */
+function FootLink({
   laneKey,
   count,
   active,
-  tone,
   onClick,
+  pill = false,
 }: {
   laneKey: ReleaseLaneKey;
   count: number;
   active: boolean;
-  tone: 'warn' | 'success' | 'neutral';
   onClick: () => void;
+  /** มือถือ: เป็นเม็ดในแถวใต้การ์ด (ในการ์ดแคบเกินจะอ่านออก) */
+  pill?: boolean;
 }) {
-  const t = RELEASE_LANE_TEXT[laneKey];
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      title={t.hint}
+      title={RELEASE_LANE_TEXT[laneKey].hint}
       className={cn(
-        'flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-xl border px-3.5 py-2.5 text-left transition-colors',
+        'text-xs transition-colors hover:bg-secondary hover:text-foreground',
+        pill ? 'shrink-0 whitespace-nowrap rounded-full border px-3 py-1' : 'rounded-md px-1 py-0.5',
         active
-          ? 'border-primary bg-primary/10'
-          : cn('border-transparent', TONE[tone].soft, TONE[tone].softHover),
+          ? cn('bg-primary/10 font-medium text-primary', pill && 'border-primary')
+          : cn('text-muted-foreground', pill && TONE.neutral.outline),
       )}
     >
-      <span className={cn('whitespace-nowrap text-xs font-medium', TONE[tone].value)}>
-        {t.label}
-      </span>
-      <span className={cn('text-2xl font-medium leading-none tabular-nums', TONE[tone].num)}>
-        {th(count)}
-      </span>
+      {RELEASE_LANE_TEXT[laneKey].label} <span className="tabular-nums">{th(count)}</span>
     </button>
   );
 }
 
 /**
- * ก้อนย่อยใต้ "ยังไม่ปล่อย" — เล็กกว่า `LaneTile` เพื่อบอกสายตาว่าเป็นของที่แตกออกมา
- * ไม่ใช่ก้อนหลักก้อนที่สี่ (เจ้าของสั่งยุบก้อนที่สี่ไปแล้ว 28 ส.ค. 2569)
+ * การ์ดตัวเลข — ทรงเดียวกับการ์ดบนหน้าติดตาม (`FollowPlanningCalendar` · StatCard)
+ * ⚠️ บรรทัดท้ายมีปุ่มของตัวเอง ⇒ ตัวการ์ดเป็น div ส่วนที่กดเลือกเลนเป็นปุ่มแยก (ห้ามปุ่มซ้อนปุ่ม)
  */
-function SubLaneTile({
+function KpiCard({
   laneKey,
   count,
-  active,
   tone,
+  icon,
+  active,
   onClick,
-  sub,
+  foot,
 }: {
   laneKey: ReleaseLaneKey;
   count: number;
+  tone: ToneKey;
+  icon: React.ReactNode;
   active: boolean;
-  tone: 'warn' | 'success' | 'neutral';
   onClick: () => void;
-  /** เลขที่สอง (เช่น หัวคนรวม) — โชว์ต่อท้ายเป็นตัวจาง `null` = ไม่มี */
-  sub?: string | null;
+  foot: React.ReactNode;
 }) {
   const t = RELEASE_LANE_TEXT[laneKey];
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      title={t.hint}
+    <Card
       className={cn(
-        'flex min-w-0 items-baseline gap-2 rounded-lg border px-3 py-1.5 text-left transition-colors',
-        active
-          ? 'border-primary bg-primary/10'
-          : cn('border-transparent', TONE[tone].soft, TONE[tone].softHover),
+        'flex flex-col justify-between rounded-2xl p-3 shadow-sm transition-colors sm:p-4',
+        active ? 'border-primary ring-1 ring-primary/30' : 'hover:border-primary/30',
       )}
     >
-      <span className={cn('whitespace-nowrap text-xs font-medium', TONE[tone].value)}>
-        {t.label}
-      </span>
-      <span className={cn('text-base font-medium leading-none tabular-nums', TONE[tone].num)}>
-        {th(count)}
-      </span>
-      {sub ? <span className={cn('whitespace-nowrap text-xs', DASH.muted)}>{sub}</span> : null}
-    </button>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={active}
+        title={t.hint}
+        className="flex w-full items-start justify-between gap-3 text-left"
+      >
+        <span className="min-w-0">
+          <span className="block text-xs font-medium text-muted-foreground sm:text-sm">{t.label}</span>
+          <span className={cn('mt-2 block text-2xl font-medium leading-none tabular-nums sm:text-4xl', TONE[tone].value)}>
+            {th(count)}
+          </span>
+        </span>
+        <span
+          className={cn('hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:flex', TONE[tone].soft, TONE[tone].value)}
+          aria-hidden
+        >
+          {icon}
+        </span>
+      </button>
+      <div className="mt-3 hidden flex-wrap items-center gap-x-1 gap-y-1 border-t border-border/70 pt-2 text-xs text-muted-foreground sm:flex">
+        {foot}
+      </div>
+    </Card>
   );
 }
 
-/**
- * ชิปเล็กบนแถวล่าง
- *
- * 🔴 `step` ทำให้ชิป **อ่านออกว่าเป็นขั้นตอน ไม่ใช่ป้ายสถานะ** (แก้ 27 ส.ค. 2569)
- * ทดสอบกับโมเดลอ่อนสุดสวมบทพนักงานใหม่: ของเดิม `"1. ยังไม่มีใครตรวจ 100"`
- * มันอ่านเป็น "ข้อมูลสถานะ" ⇒ เปลี่ยนเป็นเลขในวงกลม + คำกริยา + จำนวน "N ใบรอ"
- */
-function Chip({
+/** ปุ่มขั้นในบรรทัด "ติดขั้น" — เลขขั้น · ชื่อขั้น · จำนวนใบ (0 ใบ = จาง แต่ยังกดได้) */
+function StepPill({
   step,
   label,
-  state,
   count,
-  unit = 'ใบ',
-  sub,
-  active,
   tone,
+  active,
   onClick,
 }: {
-  step?: number;
+  step: number;
   label: string;
-  state?: string;
   count: number;
-  unit?: string;
-  sub?: string | null;
+  tone: ToneKey;
   active: boolean;
-  tone: 'warn' | 'success' | 'neutral' | 'info';
   onClick: () => void;
 }) {
-  /** มีงานให้ทำแต่เป็น 0 ใบ = ไม่ต้องเตือน */
   const quiet = count === 0;
   return (
     <button
@@ -185,56 +166,13 @@ function Chip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        'inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors',
-        active
-          ? 'border-primary bg-primary/10 text-foreground'
-          : cn(
-              'border-transparent',
-              quiet
-                ? TONE.neutral.tile
-                : cn(TONE[tone].soft, TONE[tone].softHover),
-            ),
+        'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs transition-colors',
+        active ? 'border-primary bg-primary/10 text-foreground' : cn(TONE.neutral.outline, quiet && 'opacity-60'),
       )}
     >
-      {step ? (
-        <span
-          className={cn(
-            'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-medium',
-            quiet ? cn('bg-muted', DASH.cellMuted) : TONE[tone].solid,
-          )}
-          aria-hidden
-        >
-          {step}
-        </span>
-      ) : null}
-      <span className="min-w-0">
-        <span className="flex items-baseline gap-1.5">
-          <span
-            className={cn('whitespace-nowrap font-medium', quiet ? DASH.cellMuted : TONE[tone].value)}
-          >
-            {label}
-          </span>
-          <span
-            className={cn(
-              'whitespace-nowrap text-sm font-medium tabular-nums',
-              quiet ? DASH.cellMuted : TONE[tone].num,
-            )}
-          >
-            {th(count)}
-          </span>
-          <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>
-            {unit}{count > 0 && step ? 'รอ' : ''}
-          </span>
-          {sub ? (
-            <span className="whitespace-nowrap text-xs text-muted-foreground">({sub})</span>
-          ) : null}
-        </span>
-        {state ? (
-          <span className={cn('mt-0.5 block whitespace-nowrap text-xs', DASH.cellMuted)}>
-            {state}
-          </span>
-        ) : null}
-      </span>
+      <span className={cn('font-medium tabular-nums', quiet ? DASH.muted : TONE[tone].value)}>{step}</span>
+      <span>{label}</span>
+      <span className={cn('font-medium tabular-nums', quiet ? DASH.muted : TONE[tone].value)}>{th(count)}</span>
     </button>
   );
 }
@@ -258,221 +196,123 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
   if (stateText) {
     const broken = state.status === 'broken';
     return (
-      <div className={cn('space-y-2', className)}>
-        <div
-          className={cn(
-            'space-y-2 rounded-2xl border px-3.5 py-3',
-            broken ? TONE.warn.soft : 'border-border/60 bg-card/50',
-          )}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className={cn('text-xs font-medium', broken ? TONE.warn.value : DASH.muted)}>
-              {stateText.title}
-            </p>
-            {stateText.canRetry && onRetry ? (
-              <button
-                type="button"
-                onClick={onRetry}
-                className={cn(
-                  'rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
-                  TONE.warn.outline,
-                )}
-              >
-                กดลองใหม่
-              </button>
-            ) : null}
-          </div>
-          <p className={cn('text-xs', DASH.muted)}>{stateText.hint}</p>
-          {broken ? (
-            <div className="flex flex-wrap items-stretch gap-2">
-              {LANE_ORDER.map((laneKey) => (
-                <div
-                  key={laneKey}
-                  className="min-w-0 flex-1 rounded-xl border border-border/60 bg-card/60 px-3 py-2"
-                >
-                  <p className={cn('text-xs', DASH.muted)}>{RELEASE_LANE_TEXT[laneKey].label}</p>
-                  <p className={cn('text-2xl font-medium leading-none', DASH.muted)}>{UNKNOWN_NUMBER}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <>
-              <div className="h-1.5 w-full animate-pulse rounded-full bg-muted" />
-              <div className="flex flex-wrap items-stretch gap-2">
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="h-14 min-w-0 flex-1 animate-pulse rounded-xl bg-muted/70"
-                  />
-                ))}
-              </div>
-            </>
+      <div className={cn('space-y-3', className)}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className={cn('text-xs font-medium', broken ? TONE.warn.value : DASH.muted)}>
+            {stateText.title} · {stateText.hint}
+          </p>
+          {stateText.canRetry && onRetry ? (
+            <button
+              type="button"
+              onClick={onRetry}
+              className={cn('rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors', TONE.warn.outline)}
+            >
+              กดลองใหม่
+            </button>
+          ) : null}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {LANE_ORDER.map((laneKey) =>
+            broken ? (
+              <Card key={laneKey} className="rounded-2xl p-4 shadow-sm">
+                <p className="text-sm font-medium text-muted-foreground">{RELEASE_LANE_TEXT[laneKey].label}</p>
+                <p className={cn('mt-2 text-4xl font-medium leading-none', DASH.muted)}>{UNKNOWN_NUMBER}</p>
+              </Card>
+            ) : (
+              <div key={laneKey} className="h-28 animate-pulse rounded-2xl bg-muted/70" />
+            ),
           )}
         </div>
       </div>
     );
   }
 
+  const showSteps =
+    lane === null || lane === 'all' || lane === 'unreleased' || lane === 'sourcing' || lane === 'started';
+  const toggle = (key: ReleaseLaneKey) => onLaneChange(lane === key ? null : key);
+
   return (
-    <div className={cn('space-y-2', className)}>
-      {/* ── แถวบน: 3 ก้อน (เจ้าของเคาะชื่อเอง 28 ส.ค. 2569) ─────────────────
-          ทั้งหมด · ปล่อยแล้ว · ยังไม่ปล่อย — สองก้อนหลังบวกกันได้ก้อนแรกเป๊ะ
-          🔴 เลขชุดนี้ **ตรงกับหน้าหลัก** (เดิมกล่องงานใช้นิยามของตัวเองแล้วเลขสองหน้าไม่ตรง) */}
-      <div className="space-y-2 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          {/* ⚠️ "ใบขอ" มีคำอธิบายติดตัว — โมเดลที่มาลองเล่นบอกว่าไม่รู้ว่าคืออะไร */}
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground">
-              <Term k="unit_request">ใบขอที่เปิดอยู่</Term> {th(ledger.all)} ใบ
-            </p>
-            {/* อายุข้อมูล — โชว์เฉพาะตอนที่เก่าพอจะทำให้ตัดสินใจผิด หรือกำลังดูสำเนาเพราะต่อไม่ติด */}
-            {ageLabel ? <p className={cn('text-xs', DASH.muted)}>{ageLabel}</p> : null}
-          </div>
-          {ledger.percent === null ? null : (
-            <p className={cn('text-xs', DASH.muted)}>
-              <Term k="released">ปล่อยประกาศ</Term>ไปแล้ว{' '}
-              <span className="font-medium text-foreground">{ledger.percent}%</span> —{' '}
-              {th(ledger.released)} จาก {th(ledger.all)} ใบ
-            </p>
-          )}
-        </div>
+    <div className={cn('space-y-3', className)}>
+      {/* อายุข้อมูล — โชว์เฉพาะตอนเก่าพอจะทำให้ตัดสินใจผิด หรือกำลังดูสำเนาเพราะต่อไม่ติด */}
+      {ageLabel ? <p className={cn('text-xs', DASH.muted)}>{ageLabel}</p> : null}
 
-        {ledger.percent === null ? null : (
-          <div
-            className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-            role="img"
-            aria-label={`ปล่อยแล้ว ${ledger.percent}%`}
-          >
-            <div
-              className={cn('h-full rounded-full transition-[width] duration-500', TONE.success.dot)}
-              style={{ width: `${ledger.percent}%` }}
-            />
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-stretch gap-2">
-          <LaneTile
-            laneKey="all"
-            count={ledger.all}
-            tone="neutral"
-            active={lane === 'all' || lane === null}
-            onClick={() => onLaneChange(null)}
-          />
-          <LaneTile
-            laneKey="released"
-            count={ledger.released}
-            tone="success"
-            active={lane === 'released'}
-            onClick={() => onLaneChange(lane === 'released' ? null : 'released')}
-          />
-          <LaneTile
-            laneKey="unreleased"
-            count={ledger.unreleased}
-            tone="warn"
-            active={lane === 'unreleased'}
-            onClick={() => onLaneChange(lane === 'unreleased' ? null : 'unreleased')}
-          />
-        </div>
-
-        {/**
-         * 🔴 **แตก "ยังไม่ปล่อย" เป็นสองก้อนย่อย** (เจ้าของเคาะ 21 ก.ย. 2569)
-         *
-         * ของเดิม: หัวเขียน "ยังไม่ปล่อย 195" · ปุ่มส่งเขียน "175" แล้วต่อท้ายด้วย
-         * คำแก้ตัวตัวเล็ก ๆ ว่า "ไม่รวม 20 ใบที่มีคนเริ่มงานแล้ว" ⇒ เลขสองที่บนจอเดียวกัน
-         * พูดคนละชุด คนอ่านไม่เชื่อทั้งคู่ (เจ้าของ: *"เลขทุกที่บวกกันได้ ไม่ต้องมีคำแก้ตัว"*)
-         *
-         * 🔴 **ไม่ใช่ก้อนที่สี่ที่เคยถูกสั่งยุบ 28 ส.ค.** — นั่นชื่อ "ไม่ต้องปล่อย" และอยู่
-         * ระดับเดียวกับสามก้อนหลัก · ตัวนี้เป็นก้อนย่อย**ใต้**ยังไม่ปล่อย สามก้อนหลักคงเดิม
-         */}
-        <div className="flex flex-wrap items-stretch gap-2 pl-1">
-          <span className={cn('self-center text-xs', DASH.muted)} aria-hidden>
-            ↳
-          </span>
-          <SubLaneTile
-            laneKey="sourcing"
-            count={ledger.releasable}
-            tone="warn"
-            active={lane === 'sourcing'}
-            onClick={() => onLaneChange(lane === 'sourcing' ? null : 'sourcing')}
-          />
-          <SubLaneTile
-            laneKey="started"
-            count={ledger.startedAlready}
-            tone="neutral"
-            active={lane === 'started'}
-            onClick={() => onLaneChange(lane === 'started' ? null : 'started')}
-          />
-        </div>
+      {/* 🔴 เลขชุดนี้ **ตรงกับหน้าหลัก** · สองใบหลังบวกกันได้ใบแรกเป๊ะ (เจ้าของเคาะชื่อเอง 28 ส.ค. 2569)
+          มือถือยังอยู่แถวเดียว 3 ใบ (ย่อเลข · ซ่อนตราไอคอน) — เรียงลงทีละใบกินจอเกือบครึ่ง */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <KpiCard
+          laneKey="all"
+          count={ledger.all}
+          tone="neutral"
+          icon={<ClipboardList className="h-5 w-5" />}
+          active={lane === null || lane === 'all'}
+          onClick={() => onLaneChange(null)}
+          foot={<span className="px-1 py-0.5">ใบขอที่เปิดอยู่</span>}
+        />
+        <KpiCard
+          laneKey="released"
+          count={ledger.released}
+          tone="success"
+          icon={<Megaphone className="h-5 w-5" />}
+          active={lane === 'released'}
+          onClick={() => toggle('released')}
+          foot={
+            <>
+              <FootLink
+                laneKey="applied"
+                count={ledger.releasedWithApplicants}
+                active={lane === 'applied'}
+                onClick={() => toggle('applied')}
+              />
+              <span aria-hidden>·</span>
+              <FootLink laneKey="silent" count={ledger.releasedSilent} active={lane === 'silent'} onClick={() => toggle('silent')} />
+            </>
+          }
+        />
+        <KpiCard
+          laneKey="unreleased"
+          count={ledger.unreleased}
+          tone="warn"
+          icon={<Hourglass className="h-5 w-5" />}
+          active={lane === 'unreleased'}
+          onClick={() => toggle('unreleased')}
+          foot={
+            <>
+              {/* 🔴 ก้อนย่อยของ "ยังไม่ปล่อย" (เจ้าของเคาะ 21 ก.ย. 2569) — ไม่ใช่ก้อนที่สี่ที่เคยถูกสั่งยุบ */}
+              <FootLink laneKey="sourcing" count={ledger.releasable} active={lane === 'sourcing'} onClick={() => toggle('sourcing')} />
+              <span aria-hidden>·</span>
+              <FootLink laneKey="started" count={ledger.startedAlready} active={lane === 'started'} onClick={() => toggle('started')} />
+            </>
+          }
+        />
       </div>
 
-      {/* ── ยังไม่ปล่อย: ติดขั้นไหน — 🔴 โชว์ตั้งแต่เปิดหน้า ไม่ต้องกดก้อนก่อน ── */}
-      {lane === null || lane === 'all' || lane === 'unreleased' || lane === 'sourcing' || lane === 'started' ? (
-        <div className="space-y-1.5 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-medium text-foreground">
-              ยังไม่ปล่อย {th(ledger.unreleased)} ใบ — ติดขั้นไหน
-            </p>
-            {/* ปุ่ม "ส่งประกาศทีเดียว" ที่เคยอยู่ตรงนี้ถูกถอดแล้ว 26 ก.ย. 2569 (เจ้าของเคาะ) —
-                ปล่อยได้ทางเดียวคือป๊อปไล่งานของใบนั้น ขั้น 4 */}
-          </div>
-          <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5">
-            {ledger.steps.map((s, i) => (
-              <React.Fragment key={s.key}>
-                {i > 0 ? (
-                  <ChevronRight
-                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40"
-                    aria-hidden
-                  />
-                ) : null}
-                <Chip
-                  step={s.step}
-                  label={s.label}
-                  state={s.state}
-                  count={s.count}
-                  tone={s.key === 'publish' ? 'success' : 'warn'}
-                  active={step === s.key}
-                  onClick={() => onStepChange(step === s.key ? null : s.key)}
-                />
-              </React.Fragment>
-            ))}
-          </div>
-          {/* 🔴 กล่อง "ขั้น N … / ต้องทำ: …" · ย่อหน้าอธิบาย 4 ขั้น · "บวกทุกขั้นแล้วได้ … ใบพอดี"
-              ถอดออกหมด 27 ก.ย. 2569 (เจ้าของสั่ง "เอาคำนี้ออก" + "ขอหน้าตาแบบ Clean") */}
+      {/* มือถือ: เลขย่อยของ "ปล่อยแล้ว/ยังไม่ปล่อย" เป็นแถวเม็ดใต้การ์ด (ในการ์ดกว้าง ~100px คำตกบรรทัดกลางคำ)
+          เลื่อนซ้าย-ขวาได้ แถวเดียว · จอ sm ขึ้นไปอยู่บรรทัดท้ายในการ์ดตามเดิม */}
+      <div className="flex gap-2 overflow-x-auto sm:hidden">
+        <FootLink pill laneKey="sourcing" count={ledger.releasable} active={lane === 'sourcing'} onClick={() => toggle('sourcing')} />
+        <FootLink pill laneKey="started" count={ledger.startedAlready} active={lane === 'started'} onClick={() => toggle('started')} />
+        <FootLink pill laneKey="applied" count={ledger.releasedWithApplicants} active={lane === 'applied'} onClick={() => toggle('applied')} />
+        <FootLink pill laneKey="silent" count={ledger.releasedSilent} active={lane === 'silent'} onClick={() => toggle('silent')} />
+      </div>
+
+      {/* ── ติดขั้นไหน — บรรทัดเดียว (🔴 ปุ่ม "ส่งประกาศทีเดียว" ถูกถอดถาวร 26 ก.ย. 2569)
+          มือถือเลื่อนซ้าย-ขวาได้แทนการตกหลายบรรทัด ── */}
+      {showSteps ? (
+        <div className="flex items-center gap-2 overflow-x-auto sm:flex-wrap sm:overflow-visible">
+          <span className={cn('shrink-0 text-xs', DASH.muted)}>ติดขั้น</span>
+          {ledger.steps.map((s) => (
+            <StepPill
+              key={s.key}
+              step={s.step}
+              label={s.label}
+              count={s.count}
+              tone={s.key === 'publish' ? 'success' : 'warn'}
+              active={step === s.key}
+              onClick={() => onStepChange(step === s.key ? null : s.key)}
+            />
+          ))}
         </div>
       ) : null}
-
-      {/**
-       * ── ปล่อยแล้ว: มีคนสมัคร/เงียบ — 🔴 โชว์ตั้งแต่เปิดหน้า ไม่ต้องกดก้อนก่อน ──
-       * (เจ้าของเคาะ 22 ก.ย. 2569 นิยามกล่องงานข้อ 7 · แพตเทิร์นเดียวกับก้อนย่อยของ "ยังไม่ปล่อย")
-       * เดิมเป็น Chip โชว์เฉพาะตอนกดเลน "ปล่อยแล้ว" — เปิดหน้ามาไม่เห็น
-       */}
-      {(lane === null || lane === 'all' || lane === 'released' || lane === 'applied' || lane === 'silent') &&
-      ledger.released > 0 ? (
-        <div className="space-y-1.5 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
-          <p className="text-xs font-medium text-foreground">
-            ปล่อยแล้ว {th(ledger.released)} ใบ — ได้ผลยังไง
-          </p>
-          <div className="flex flex-wrap items-stretch gap-2">
-            <SubLaneTile
-              laneKey="applied"
-              count={ledger.releasedWithApplicants}
-              tone="success"
-              active={lane === 'applied'}
-              onClick={() => onLaneChange(lane === 'applied' ? null : 'applied')}
-              sub={ledger.applicantHeads > 0 ? `${th(ledger.applicantHeads)} คน` : null}
-            />
-            <SubLaneTile
-              laneKey="silent"
-              count={ledger.releasedSilent}
-              tone="warn"
-              active={lane === 'silent'}
-              onClick={() => onLaneChange(lane === 'silent' ? null : 'silent')}
-            />
-          </div>
-        </div>
-      ) : null}
-
-      {/* แถว "ใบที่จบไปแล้ว (30 วันล่าสุด)" ย้ายเป็น Dropdown "ใบที่จบแล้ว" ในแถบตัวกรอง (27 ก.ย. 2569) */}
     </div>
   );
 };

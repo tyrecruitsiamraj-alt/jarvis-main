@@ -54,7 +54,7 @@ import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { canHoldApplication } from '@/lib/recruitRm';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { useAuth } from '@/contexts/AuthContext';
-import { FacetDropdowns } from '@/components/jobs/BoardFilterPanel';
+import { FilterButton } from '@/components/jobs/BoardFilterPanel';
 import {
   APPLICANT_FACET_ATTACH,
   APPLICANT_PRIMARY_FACETS,
@@ -652,17 +652,23 @@ const RmWorkspace: React.FC<{
           ⚠️ ไม่โผล่ในโหมด drill-down (?bucket=) เพราะ server กรองมาแล้ว
           ถ้าให้กรองซ้ำที่นี่ เลขจะไม่ตรงกับกล่องที่กดมา */}
       {!bucket ? (
-        /* 🔴 ตัวกรองเป็น Dropdown ทั้งแถว — แบบเดียวกับกล่องงาน (เจ้าของเลือก 27 ก.ย. 2569:
-           "แท็บผู้สมัคร 3 แท็บด้วย") · แถบซ้าย + Sheet มือถือถูกถอด */
+        /* 🔴 ปุ่ม "ตัวกรอง" ปุ่มเดียว — แบบเดียวกับกล่องงาน (แบบ A · เจ้าของเลือก 27 ก.ย. 2569)
+           วันที่สมัครอยู่ในกล่องตัวกรองด้วย · แถบซ้าย / Sheet / Dropdown เรียงเต็มแถว ถูกถอด */
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <FacetDropdowns
+          <FilterButton
             facets={applicantFacets}
             primary={APPLICANT_PRIMARY_FACETS}
             attach={APPLICANT_FACET_ATTACH}
             onToggle={toggleApplicantFacet}
+            sections={[
+              {
+                key: 'applied',
+                label: 'วันที่สมัคร',
+                selected: dateRange ? 1 : 0,
+                content: <DateRangeCalendarPicker triggerVariant="filter" value={dateRange} onChange={changeDateRange} />,
+              },
+            ]}
           />
-          <span className={cn('text-xs font-medium', DASH.label)}>วันที่สมัคร</span>
-          <DateRangeCalendarPicker triggerVariant="filter" value={dateRange} onChange={changeDateRange} />
           {applicantFacetCount > 0 || dateRange ? (
             <>
               <Button
