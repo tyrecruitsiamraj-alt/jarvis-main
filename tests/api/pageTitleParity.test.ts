@@ -38,9 +38,11 @@ describe('ชื่อหัวหน้าจอ = ชื่อเมนู', (
     expect(src).toContain(`conveyorLabel('${key}')`);
   });
 
-  it('บอร์ดรับสมัครเปลี่ยนหัวตาม ?view= — ขั้น 2 กับ 3 ต้องไม่ได้หัวเดียวกัน', () => {
+  it('บอร์ดรับสมัครเปลี่ยนหัวตาม ?view= · แท็บคำขอโพสต์ถอดแล้ว (27 ก.ย. 2569)', () => {
     const src = read('src/components/jobs/JobBoardView.tsx');
-    expect(src).toContain("conveyorLabel('postings')");
+    // 🔴 แท็บ "คำขอโพสต์งานใหม่" ถอดทั้งแท็บ (เจ้าของสั่ง) — ห้ามมีหัว/แท็บของมันกลับมา
+    expect(src).not.toContain("conveyorLabel('postings')");
+    expect(src).not.toContain("{ id: 'postings'");
     expect(src).toContain("conveyorLabel('applicants')");
     // มุมมองกล่องงาน (ไม่มี ?view=) ใช้ชื่อของตัวเอง — ตรงกับเมนูคลังข้อมูล
     expect(src).toContain("'กล่องงาน'");

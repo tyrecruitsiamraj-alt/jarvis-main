@@ -63,8 +63,8 @@ describe('ทุกเลขบนหน้าแรกต้องอธิบ�
       '/aftercare',
       '/work',
     ];
-    /** `?view=` ที่บอร์ดรับสมัครรองรับจริง (StaffJobBoardPage: RM_VIEWS + EXTRA_VIEWS) */
-    const KNOWN_VIEWS = ['board', 'list', 'contact', 'appointments', 'postings'];
+    /** `?view=` ที่บอร์ดรับสมัครรองรับจริง (StaffJobBoardPage: RM_VIEWS · `postings` ถอดแล้ว 27 ก.ย. 2569) */
+    const KNOWN_VIEWS = ['board', 'list', 'contact', 'appointments'];
     for (const key of METRIC_KEYS) {
       const href = (METRICS[key] as MetricSpec).href;
       if (!href) continue;

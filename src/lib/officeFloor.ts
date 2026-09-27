@@ -400,7 +400,8 @@ function buildContent(r: OfficeFloorRaw['content']): Desk {
       { key: 'inProgress', label: 'กำลังคิดคอนเทนต์', value: nz(r.inProgress), unit: 'ใบ', tone: 'orange' },
       { key: 'scraping', label: 'ส่ง Scraping', value: nz(r.scraping), unit: 'ใบ', tone: 'teal' },
     ],
-    href: '/jobs/board?view=postings',
+    // เลขของโต๊ะนี้คือ "คำขอโพสต์" ⇒ ไปหน้าที่เลขมาจาก (แท็บ ?view=postings ถูกถอดแล้ว 27 ก.ย. 2569)
+    href: '/matching/job-postings',
   };
 }
 

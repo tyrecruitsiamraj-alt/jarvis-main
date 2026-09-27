@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import JobBoardView, { type BoardViewId } from '@/components/jobs/JobBoardView';
 import RmWorkspace from '@/components/recruit-rm/RmWorkspace';
-import JobPostingsPage from '@/pages/matching/JobPostingsPage';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { useClosedRequestsFeed } from '@/hooks/useClosedRequestsFeed';
 import type { JobBoxKey } from '@/lib/jobBoxGroups';
@@ -27,8 +26,13 @@ import type { JobBoxKey } from '@/lib/jobBoxGroups';
 
 const RM_VIEWS = ['list', 'contact', 'appointments'] as const;
 
-/** แท็บที่ไม่ใช่ RmWorkspace — ย้ายมาจากเมนูอื่น (17 ส.ค. 2569) */
-const EXTRA_VIEWS = ['postings'] as const;
+/**
+ * แท็บที่ถูกถอดออกแล้ว — ลิงก์เก่ามาถึงให้เปิดกล่องงานแทน แล้วล้าง `?view=` ทิ้ง
+ * 🔴 `postings` "คำขอโพสต์งานใหม่" ถอดทั้งแท็บ 27 ก.ย. 2569 (เจ้าของสั่ง: *"ถอดแท็บคำขอโพสต์งานใหม่
+ * ออกไปเลย"* — เหตุผลเดิม: *"ดูทีละกล่องแล้วก็เอาขึ้นไปเลย"*) · ห้ามเอากลับมาโดยไม่ได้สั่งใหม่
+ * ⚠️ หน้า `/matching/job-postings` ยังอยู่ (ปุ่มขอโพสต์ในจับคู่งาน/ตัวเลขทีม Online ยังชี้ไปที่นั่น)
+ */
+const RETIRED_VIEWS = ['postings'] as const;
 
 /** ลิงก์เก่าที่เคยเป็นแท็บ → กล่องบนหน้ากล่องงาน (ไม่ทำลิงก์ที่ส่งกันไว้พัง) */
 const LEGACY_BOX_VIEWS: Record<string, JobBoxKey> = {
@@ -50,19 +54,19 @@ const StaffJobBoardPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const raw = searchParams.get('view');
   const legacyBox = raw ? (LEGACY_BOX_VIEWS[raw] ?? null) : null;
-  const view: BoardViewId =
-    (RM_VIEWS as readonly string[]).includes(raw ?? '') ||
-    (EXTRA_VIEWS as readonly string[]).includes(raw ?? '')
-      ? (raw as BoardViewId)
-      : 'board';
+  const view: BoardViewId = (RM_VIEWS as readonly string[]).includes(raw ?? '')
+    ? (raw as BoardViewId)
+    : 'board';
+  const retiredView = (RETIRED_VIEWS as readonly string[]).includes(raw ?? '');
 
-  /** ลิงก์เก่ามาถึงแล้ว = เลือกกล่องให้ แล้วล้าง ?view ทิ้ง (URL ไม่ค้างค่าที่ไม่มีความหมาย) */
+  /** ลิงก์เก่ามาถึงแล้ว = เลือกกล่องให้ (หรือเปิดกล่องงานแทนแท็บที่ถอดแล้ว) แล้วล้าง ?view ทิ้ง
+   *  (URL ไม่ค้างค่าที่ไม่มีความหมาย) */
   useEffect(() => {
-    if (!legacyBox) return;
+    if (!legacyBox && !retiredView) return;
     const params = new URLSearchParams(searchParams);
     params.delete('view');
     setSearchParams(params, { replace: true });
-  }, [legacyBox, searchParams, setSearchParams]);
+  }, [legacyBox, retiredView, searchParams, setSearchParams]);
 
   const setView = (next: BoardViewId) => {
     const params = new URLSearchParams(searchParams);
@@ -102,11 +106,7 @@ const StaffJobBoardPage: React.FC = () => {
         onReloadClosed={closed.reload}
         initialBox={legacyBox}
         listContent={
-          view === 'board' ? null : view === 'postings' ? (
-            /* หน้าเดิมทั้งหน้า ยกมาวางเป็นเนื้อของแท็บ — ไม่ได้ก๊อปโค้ด ใช้ตัวเดียวกัน
-               กับที่ /matching/job-postings เคยเรียก (route เดิมยังอยู่เป็นทางถอย) */
-            <JobPostingsPage embedded />
-          ) : (
+          view === 'board' ? null : (
             <RmWorkspace tab={VIEW_TO_RM_TAB[view as (typeof RM_VIEWS)[number]]} />
           )
         }

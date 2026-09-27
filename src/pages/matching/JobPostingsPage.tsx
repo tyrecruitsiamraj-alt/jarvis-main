@@ -160,12 +160,12 @@ function CopyIdButton({ id }: { id: string }) {
 }
 
 /**
- * `embedded` = ถูกวางเป็น **เนื้อของแท็บบนบอร์ดรับสมัคร** (เจ้าของสั่ง 17 ส.ค. 2569
- * ให้ย้ายมารวมที่บอร์ด) — ซ่อนหัวหน้าและปุ่มย้อนกลับ เพราะบอร์ดมีหัวของตัวเองแล้ว
- * สองหัวซ้อนกันคือสิ่งที่ทำให้แท็บอื่นดูไม่เหมือนกัน
- * route เดิม `/matching/job-postings` ยังอยู่เป็นทางถอย (เปิดตรงได้เหมือนเดิม)
+ * หน้าคำขอโพสหางานใหม่ — `/matching/job-postings`
+ * ⚠️ เคยถูกฝังเป็นแท็บ "คำขอโพสต์งานใหม่" บนกล่องงาน (17 ส.ค. 2569) — **แท็บถูกถอดแล้ว 27 ก.ย. 2569**
+ * (เจ้าของสั่ง) · โหมดฝัง (`embedded`) ถอดตามไปด้วย · หน้านี้ยังเปิดได้จากปุ่มในจับคู่งาน /
+ * หน้า Matching / ตัวเลขทีม Online บนหน้าแรก
  */
-const JobPostingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
+const JobPostingsPage: React.FC = () => {
   const [rawItems, setRawItems] = useState<JobPostingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'all' | JobPostingStatus>('all');
@@ -234,13 +234,11 @@ const JobPostingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false })
 
   return (
     <div>
-      {embedded ? null : (
-        <PageHeader
-          title="คำขอโพสหางานใหม่"
-          subtitle="ใบขอที่หาคนของเราไม่ได้ — ทีมคอนเทนต์/สรรหารับ ID ไปโพสหาคนต่อ"
-          backPath="/matching"
-        />
-      )}
+      <PageHeader
+        title="คำขอโพสหางานใหม่"
+        subtitle="ใบขอที่หาคนของเราไม่ได้ — ทีมคอนเทนต์/สรรหารับ ID ไปโพสหาคนต่อ"
+        backPath="/matching"
+      />
       <div className="px-4 md:px-6 space-y-4 pb-8">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-medium text-foreground">

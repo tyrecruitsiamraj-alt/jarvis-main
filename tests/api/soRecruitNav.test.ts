@@ -39,7 +39,7 @@ describe('โครงลำดับงาน', () => {
     }
   });
 
-  it('ประกาศรับ/ผู้สมัคร ไม่อยู่ในลำดับงานแล้ว (ไปอยู่แท็บในกล่องงาน)', () => {
+  it('ประกาศรับ/ผู้สมัคร ไม่อยู่ในลำดับงานแล้ว (ผู้สมัครอยู่แท็บในกล่องงาน · ประกาศรับถอดทั้งแท็บ 27 ก.ย.)', () => {
     const keys = CONVEYOR_STEPS.map((s) => s.key);
     expect(keys).not.toContain('postings');
     expect(keys).not.toContain('applicants');
@@ -69,7 +69,7 @@ describe('stepForPath — หน้าไหนอยู่ตรงไหนข
 
   /** 🔴 กล่องงานเป็นเจ้าของ `/jobs/board` เต็มตัวแล้ว — ไม่มีหน้าไหนมาแย่ง */
   it('ทุกมุมมองของกล่องงานไม่อยู่ในลำดับงาน', () => {
-    for (const q of ['', '?view=list', '?view=postings', '?lane=toRelease']) {
+    for (const q of ['', '?view=list', '?lane=toRelease']) {
       expect(stepForPath('/jobs/board', q), `/jobs/board${q}`).toBeNull();
     }
   });
@@ -95,7 +95,7 @@ describe('isStepActive — กล่องงานไม่ใช่หน้�
    * เจ้าของสั่งถอดสองหน้านั้นออกจากลำดับ 28 ส.ค. 2569 ⇒ ไม่มีใครมาสว่างที่กล่องงานแล้ว
    */
   it('ทุกมุมมองของกล่องงาน ไม่ทำให้หน้าไหนในลำดับสว่าง', () => {
-    for (const q of ['', '?view=list', '?view=postings']) {
+    for (const q of ['', '?view=list']) {
       for (const st of CONVEYOR_STEPS) {
         expect(isStepActive(st, '/jobs/board', q), `${st.label} @ ${q}`).toBe(false);
       }
@@ -143,13 +143,12 @@ describe('isVaultActive', () => {
     const box = vault('job-boxes');
     expect(isVaultActive(box, '/jobs/board', '')).toBe(true);
     expect(isVaultActive(box, '/jobs/board', '?view=board')).toBe(true);
-    expect(isVaultActive(box, '/jobs/board', '?view=postings')).toBe(false);
     expect(isVaultActive(box, '/jobs/board', '?view=list')).toBe(false);
   });
 
   it('กล่องงานกับขั้นสายพานไม่สว่างพร้อมกันสักกรณี', () => {
     const box = vault('job-boxes');
-    for (const search of ['', '?view=board', '?view=postings', '?view=list']) {
+    for (const search of ['', '?view=board', '?view=list']) {
       const vaultOn = isVaultActive(box, '/jobs/board', search);
       const stepOn = CONVEYOR_STEPS.some((st) => isStepActive(st, '/jobs/board', search));
       expect(vaultOn && stepOn, `ชนกันที่ "${search}"`).toBe(false);
@@ -238,9 +237,14 @@ describe('HOME_TEAM_NAV — ก้อนทีมกดนำทางบนห�
   });
 
   /**
-   * ⚠️ ตั้งแต่ 28 ส.ค. 2569 ก้อนทีมชี้ไปกล่องงานได้ด้วย — "ประกาศรับ/ผู้สมัคร"
-   * ถูกถอดออกจากลำดับงานแล้ว งานสองอย่างนั้นอยู่ในแท็บของกล่องงาน
+   * ⚠️ ตั้งแต่ 28 ส.ค. 2569 ก้อนทีมชี้ไปกล่องงานได้ด้วย — "ผู้สมัคร" อยู่ในแท็บของกล่องงาน
+   * 🔴 แท็บ "คำขอโพสต์งานใหม่" (`?view=postings`) ถูกถอดแล้ว 27 ก.ย. 2569 — ทีม Online ชี้กล่องงาน
    */
+  it('🔴 ไม่มีก้อนไหนชี้แท็บคำขอโพสต์ที่ถอดไปแล้ว · ทีม Online ไปกล่องงาน', () => {
+    for (const t of HOME_TEAM_NAV) expect(t.path ?? '', t.key).not.toContain('view=postings');
+    expect(HOME_TEAM_NAV.find((t) => t.key === 'online')?.path).toBe('/jobs/board');
+  });
+
   it('ทุกปลายทางของก้อนทีมต้องเป็นหน้าที่มีจริง (กันลิงก์ตาย)', () => {
     const stepPaths = new Set([...CONVEYOR_STEPS.map((s) => s.path), '/jobs/board']);
     for (const t of HOME_TEAM_NAV) {

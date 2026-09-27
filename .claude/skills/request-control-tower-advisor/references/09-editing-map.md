@@ -9798,3 +9798,20 @@ AI โทร 5 · เราโทรเอง 2" · ปุ่มลัด "ค�
 ⚠️ แท็บคำขอโพสต์งานใหม่ **ไม่ทำแถบกรอง** (เจ้าของ: "ดูทีละกล่องแล้วเอาขึ้นเลย")
 ตรวจบนจอ: รายชื่อผู้สมัคร 9 หัวข้อ · สนใจ 28 / ไม่สนใจ 3 ตรงกับแท็บย่อย · ติ๊ก สนใจ + ลพบุรี = 26 คน · URL `a.call` `a.province` ·
 อำเภอโผล่หลังเลือกจังหวัด · แท็บนัดหมายมีวันนัด/สถานที่นัด (ผลมา/ไม่มาซ่อนเพราะยังไม่มีใครบันทึก) · ไม่มีคำขอเขียนระหว่างกรอง
+
+### 27 ก.ย. 2569 (ต่อ) — ถอดแท็บ "คำขอโพสต์งานใหม่" ออกจากกล่องงาน (เจ้าของสั่ง: "ถอดแท็บคำขอโพสต์งานใหม่ออกไปเลย")
+
+| ไฟล์ | แก้อะไร |
+| --- | --- |
+| `src/components/jobs/JobBoardView.tsx` | ถอดแท็บ + `BoardViewId` ไม่มี `'postings'` + หัวจอไม่มีกรณีของแท็บนี้ |
+| `src/pages/jobs/StaffJobBoardPage.tsx` | ถอด `EXTRA_VIEWS` + การฝัง `JobPostingsPage` · `RETIRED_VIEWS = ['postings']` — ลิงก์เก่า `?view=postings` เปิดกล่องงานแล้วล้าง `?view=` ทิ้ง (replace) |
+| `src/pages/matching/JobPostingsPage.tsx` | ถอดโหมด `embedded` (มีไว้ให้แท็บนี้อย่างเดียว) · หน้า `/matching/job-postings` ยังอยู่ |
+| `src/lib/soRecruitNav.ts` | ก้อน "ทีม Online" หน้าแรก → `/jobs/board` (เดิมชี้แท็บที่ถอด) |
+| `src/components/home/HomeDigestPanels.tsx` · `src/lib/officeFloor.ts` | โต๊ะคอนเทนต์ → `/matching/job-postings` (เลขของโต๊ะคือคำขอโพสต์ — ไปหน้าที่เลขมาจาก) |
+| `tests/api/soRecruitNav.test.ts` · `pageTitleParity.test.ts` · `metricDictionary.test.ts` | ถอด `?view=postings` จากมุมมองที่รองรับ + เทสต์กันแท็บ/หัวของมันกลับมา + ก้อนทีมห้ามชี้แท็บที่ถอด |
+
+⚠️ ระบบ "คำขอโพสต์" ส่วนอื่น **ยังอยู่** (ยังไม่ได้สั่งถอด): ปุ่มขอโพสต์ในจับคู่งาน (`MatchingPage` →
+`createJobPostingRequest`) · หน้า `/matching/job-postings` · การ์ดในหน้า Matching · ตัวเลขทีม Online 6 ตัว
+(`metricDictionary` online.content.* / online.scraping.*) · โต๊ะคอนเทนต์บนฉากหน้าแรก · API `/api/matching/job-postings`
+⚠️ เจอระหว่างทาง (ของเดิม): หัวจอแท็บรายชื่อผู้สมัคร/การโทรของฉัน/ติดตามนัดหมายว่างเปล่า — `conveyorLabel('applicants')`
+คืน `''` ตั้งแต่ขั้น "ผู้สมัคร" ถูกถอดจากลำดับงาน 28 ส.ค.
