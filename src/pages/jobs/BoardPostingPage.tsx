@@ -77,7 +77,6 @@ import {
 import { buildJobKeyIndex } from '@/lib/jobKeyIndex';
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 import { backLabelFor } from '@/lib/stageOrigin';
-import { unitTabPath } from '@/components/jobs/UnitRequestTabs';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
 import {
   RELEASE_STEP_ORDER,
@@ -251,15 +250,16 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   /**
    * ปุ่ม "ยกเลิก" ในฟอร์มที่ฝังไว้ — ฟอร์มพวกนี้เกิดมาเพื่ออยู่ในป๊อป `onClose` จึงหมายถึง
    * "ปิดกล่อง" · 🔴 ฝังในหน้าแล้วต้องมีปลายทางจริง ไม่งั้นเป็น**ปุ่มตาย**
-   * ⇒ ยกเลิก = กลับไปแท็บรายละเอียดของใบเดิม
+   * ⇒ ยกเลิก = กลับกล่องงาน · 🔴 เดิมพาไปแท็บรายละเอียดของหน้าใบขอ — เจ้าของสั่ง 27 ก.ย. 2569
+   *   ห้ามของในกล่องงานเด้งไปหน้าใบขอ (หน้านี้คือป๊อปไล่งานแบบลิงก์ตรง = ของกล่องงาน)
    */
   const leaveToDetail = React.useCallback(() => {
     if (onDone) {
       onDone();
       return;
     }
-    navigate(unitTabPath(id, 'detail'));
-  }, [onDone, navigate, id]);
+    navigate('/jobs/board');
+  }, [onDone, navigate]);
   /**
    * 🔴 **ประวัติการแก้ไขโชว์เฉพาะ Admin** (เจ้าของสั่ง 28 ส.ค. 2569:
    * *"ใครแก้อะไรไป ซ่อนไว้เห็นแค่ Admin"*)

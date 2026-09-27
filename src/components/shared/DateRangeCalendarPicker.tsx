@@ -5,6 +5,7 @@ import { endOfMonth, startOfMonth, subDays } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { TONE } from '@/lib/designTokens';
 import { formatYmdDmyBe, parseYmd, toYmdLocal } from '@/lib/dateTh';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -15,6 +16,12 @@ export interface DateRangeCalendarPickerProps {
   onChange: (next: DateRangeYmd | null) => void;
   className?: string;
   triggerId?: string;
+  /**
+   * `filter` = ปุ่มหน้าตาเดียวกับ Dropdown ตัวกรอง (สูง h-9 · ตัวเล็ก · กรอบฟ้าเมื่อเลือกแล้ว)
+   * ใช้ในแถบตัวกรองกล่องงาน/แท็บผู้สมัคร (27 ก.ย. 2569 เจ้าของขอ "ระยะ/ขนาดเท่า ๆ กัน")
+   * ไม่ส่ง = ช่องแบบฟอร์มเดิม (`jarvis-soft-field`) ทุกหน้าที่ใช้อยู่เหมือนเดิม
+   */
+  triggerVariant?: 'field' | 'filter';
 }
 
 function ymdToDate(ymd: string): Date | undefined {
@@ -63,7 +70,13 @@ const PRESETS: { id: string; label: string; build: () => DateRangeYmd | null }[]
   },
 ];
 
-const DateRangeCalendarPicker: React.FC<DateRangeCalendarPickerProps> = ({ value, onChange, className, triggerId }) => {
+const DateRangeCalendarPicker: React.FC<DateRangeCalendarPickerProps> = ({
+  value,
+  onChange,
+  className,
+  triggerId,
+  triggerVariant = 'field',
+}) => {
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
 
@@ -96,22 +109,36 @@ const DateRangeCalendarPicker: React.FC<DateRangeCalendarPickerProps> = ({ value
     <div className={className}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button
-            type="button"
-            id={triggerId}
-            className="jarvis-soft-field w-full min-h-10 flex items-center gap-2 text-left text-sm min-w-0 py-2 leading-normal"
-          >
-            <CalendarIcon className="h-4 w-4 text-primary/70 shrink-0" />
-            <span
+          {triggerVariant === 'filter' ? (
+            <button
+              type="button"
+              id={triggerId}
               className={cn(
-                'flex-1 min-w-0 leading-snug',
-                isMobile ? 'whitespace-normal break-words' : 'truncate',
-                !value && 'text-muted-foreground',
+                'inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium',
+                value ? TONE.info.outline : TONE.neutral.outline,
               )}
             >
-              {label}
-            </span>
-          </button>
+              <CalendarIcon className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+              <span className="truncate">{label}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              id={triggerId}
+              className="jarvis-soft-field w-full min-h-10 flex items-center gap-2 text-left text-sm min-w-0 py-2 leading-normal"
+            >
+              <CalendarIcon className="h-4 w-4 text-primary/70 shrink-0" />
+              <span
+                className={cn(
+                  'flex-1 min-w-0 leading-snug',
+                  isMobile ? 'whitespace-normal break-words' : 'truncate',
+                  !value && 'text-muted-foreground',
+                )}
+              >
+                {label}
+              </span>
+            </button>
+          )}
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0 rounded-xl border-border/80 shadow-lg" align="start">
           <div className="flex flex-wrap gap-1.5 p-2.5 border-b border-border/60">

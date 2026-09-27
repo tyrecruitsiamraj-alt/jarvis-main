@@ -52,6 +52,8 @@ type Props = {
   countUnitLabel?: string;
   /** ข้อความหน่วยที่สอง เช่น "340 อัตรา" — ต่อท้ายบรรทัด "พบ …" ให้กระทบยอดกับ Dashboard ได้ */
   positionsNote?: string;
+  /** ปุ่มท้ายบรรทัดจำนวนผลลัพธ์ (เช่น "ล้างตัวกรอง") — โผล่เฉพาะตอนผู้เรียกส่งมา */
+  resultAction?: React.ReactNode;
   /**
    * ซ่อนช่องค้นหาในแถบนี้ — ใช้ตอนหน้าแม่ยกช่องค้นหาขึ้นไปไว้บนสุดเอง
    * (เจ้าของสั่ง 13 ส.ค. 2569: บอร์ดเจ้าหน้าที่ให้ค้นหาอยู่ด้านบนแบบหน้า Dashboard
@@ -125,6 +127,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
   totalCount,
   countUnitLabel = 'ตำแหน่ง',
   positionsNote,
+  resultAction,
   hideSearch = false,
   variant = 'card',
   eyebrow,
@@ -265,15 +268,9 @@ const JobBoardTopFilters: React.FC<Props> = ({
         >
           <div className={isBar ? 'flex flex-col gap-1.5' : 'flex flex-col gap-3'}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              {/* ระยะตัวอักษรปกติ — ป้ายตัวห่าง ๆ แบบ "ป ร ะ ก า ศ" ถูกเลิกทั้งระบบ 27 ก.ย. 2569 (เจ้าของสั่ง) */}
               {isBar && eyebrow ? (
-                <span
-                  className={cn(
-                    'shrink-0 text-[11px] font-medium uppercase tracking-[0.14em]',
-                    TONE.warn.value,
-                  )}
-                >
-                  {eyebrow}
-                </span>
+                <span className={cn('shrink-0 text-xs font-medium', TONE.warn.value)}>{eyebrow}</span>
               ) : null}
               {hideSearch ? null : (
                 <SearchField
@@ -341,13 +338,16 @@ const JobBoardTopFilters: React.FC<Props> = ({
                 )}
 
                 {/* ผลลัพธ์อยู่แถวเดียวกับปุ่ม — เดิมกินอีกหนึ่งบรรทัดพร้อมเส้นคั่น */}
+                {/* 🔴 เจ้าหน้าที่ (bar): "แสดง N จาก M ใบขอ · ต้องหาคน X อัตรา" เสมอ — เจ้าของเลือกคำนี้เอง
+                    27 ก.ย. 2569 (ถาม "พบ 316 ใบขอ · 410 อัตราที่ยังต้องหา หมายความว่าไง")
+                    หน้าสมัครสาธารณะ (card) คงคำเดิม "พบ N ตำแหน่ง" */}
                 {resultCount != null && !loading ? (
                   <p className="text-xs text-muted-foreground">
-                    พบ{' '}
+                    {isBar ? 'แสดง ' : 'พบ '}
                     <span className="font-medium text-foreground">
                       {resultCount.toLocaleString('th-TH')}
                     </span>
-                    {totalCount != null && totalCount !== resultCount ? (
+                    {totalCount != null && (isBar || totalCount !== resultCount) ? (
                       <>
                         {' '}
                         จาก {totalCount.toLocaleString('th-TH')} {countUnitLabel}
@@ -358,6 +358,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
                     {positionsNote ? <> · {positionsNote}</> : null}
                   </p>
                 ) : null}
+                {resultAction}
               </div>
             </div>
 
@@ -372,7 +373,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
 
             {!hideFieldFilters && activeFilterCount > 0 ? (
               <div className="flex flex-wrap items-center gap-2 border-t border-white/50 pt-3">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground shrink-0">
+                <span className="text-[11px] font-medium uppercase text-muted-foreground shrink-0">
                   กำลังกรอง
                 </span>
                 <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">{activeChips}</div>

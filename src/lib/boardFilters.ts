@@ -371,6 +371,16 @@ const FACETS: readonly FacetDef[] = [
 ];
 
 export const BOARD_FACET_KEYS: readonly BoardFacetKey[] = FACETS.map((f) => f.key);
+
+/**
+ * หัวข้อที่ได้ Dropdown ของตัวเองบนแถบตัวกรอง (เจ้าของเลือกแบบร่าง A 27 ก.ย. 2569)
+ * ที่เหลือรวมอยู่ใน "ตัวกรองอื่น" · หัวข้อลูกอยู่ในกล่องเดียวกับหัวข้อแม่ (อำเภอในจังหวัด · งานย่อยในตำแหน่ง)
+ */
+export const BOARD_PRIMARY_FACETS: readonly BoardFacetKey[] = ['position', 'unit', 'province', 'income'];
+export const BOARD_FACET_ATTACH: Partial<Record<BoardFacetKey, BoardFacetKey>> = {
+  subtype: 'position',
+  district: 'province',
+};
 const FACET_BY_KEY = new Map(FACETS.map((f) => [f.key, f]));
 
 export function boardFacetLabel(key: BoardFacetKey): string {

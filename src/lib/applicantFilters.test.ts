@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { PublicApplication } from '@/lib/publicApplicationsApi';
 import {
+  APPLICANT_FACET_ATTACH,
+  APPLICANT_PRIMARY_FACETS,
   applicantCallValue,
   applicantFacetValueLabel,
+  applicantJobLabels,
   applyApplicantFilters,
   buildApplicantFacets,
   describeApplicantFilters,
@@ -164,5 +167,37 @@ describe('URL', () => {
     expect(next.getAll('a.call')).toEqual(['interested', 'none']);
     expect(readApplicantFilterState(next)).toEqual({ selection: { call: ['interested', 'none'], province: ['ลพบุรี'] } });
     expect(writeApplicantFilterState(next, EMPTY_APPLICANT_FILTER_STATE).toString()).toBe('view=list&list=interested&f.unit=A');
+  });
+});
+
+describe('ใบขอที่สมัคร — คีย์ด้วย job_id (ปุ่ม "ดูรายชื่อ" บนกล่องงาน · 27 ก.ย. 2569)', () => {
+  const a1 = app({ job_id: 'siamraj-sql:LMO6909005', job_title: 'ขับรถผู้บริหาร · กรุงศรี' });
+  const a1b = app({ job_id: 'siamraj-sql:LMO6909005', job_title: 'ขับรถผู้บริหาร · กรุงศรี' });
+  const a2 = app({ job_id: 'siamraj-sql:LMO6909006', job_title: 'ขับรถผู้บริหาร · กรุงศรี' });
+  const floating = app({ job_id: undefined, job_title: 'ประกาศลอย · คนสวน' });
+
+  it('🔴 ติ๊ก job_id แล้วได้เฉพาะใบนั้นเป๊ะ — ชื่องานซ้ำกันคนละใบไม่ปนกัน', () => {
+    const got = applyApplicantFilters([a1, a1b, a2, floating], state({ job: ['siamraj-sql:LMO6909005'] }), facts());
+    expect(got).toEqual([a1, a1b]);
+  });
+
+  it('คำบนจอเป็นชื่องาน · ชื่อซ้ำคนละใบต่อท้ายเลขที่ใบขอ · ไม่มี job_id ใช้ชื่องาน', () => {
+    const v = buildApplicantFacets([a1, a1b, a2, floating], EMPTY_APPLICANT_FILTER_STATE, facts()).find(
+      (f) => f.key === 'job',
+    )!;
+    expect(v.options.map((o) => [o.label, o.count])).toEqual([
+      ['ขับรถผู้บริหาร · กรุงศรี · LMO6909005', 2],
+      ['ขับรถผู้บริหาร · กรุงศรี · LMO6909006', 1],
+      ['ประกาศลอย · คนสวน', 1],
+    ]);
+  });
+
+  it('ใบที่ยังไม่มีใครสมัคร (ไม่มีแถว) บอกเลขที่ใบขอแทน ไม่โชว์ id ดิบ', () => {
+    expect(applicantJobLabels([])('siamraj-pre:LBM6908001')).toBe('ใบขอ LBM6908001');
+  });
+
+  it('Dropdown หลัก: นัดหมาย/ผลโทร/ใบขอ/จังหวัด/วันสมัคร · อำเภออยู่ในกล่องจังหวัด', () => {
+    expect(APPLICANT_PRIMARY_FACETS).toEqual(['apptWhen', 'apptPlace', 'attendance', 'call', 'job', 'province', 'days']);
+    expect(APPLICANT_FACET_ATTACH).toEqual({ district: 'province' });
   });
 });

@@ -9843,3 +9843,29 @@ AI โทร 5 · เราโทรเอง 2" · ปุ่มลัด "ค�
 
 ⚠️ **กับดักที่ทำให้บั๊ก throughput หลุด 3 วัน:** รูทีนตรวจรันแค่ `tsconfig.app.json` + root — ไม่มีตัวไหนครอบ `api/`
 แบบเข้ม · **ต้องรัน `npx tsc --noEmit -p tsconfig.api.json` ด้วยทุกครั้ง** (ตัวนี้จับได้ทันที TS2304)
+
+### 27 ก.ย. 2569 (ต่อ) — กล่องงานแบบ Clean (แบบ A) · ช่องค้นหาข้างกระดิ่งทุกหน้า · ห้ามกระโดดออกจากกล่องงาน
+
+คำสั่งเจ้าของ 9 ข้อ + Choice ที่เลือก: **แบบ A** (การ์ดตัวเลข + ขั้น 1–4 กดได้เหมือนเดิม · หัวข้อกรองเป็น Dropdown) ·
+ค้นหา = **"ช่องเปิดค้าง ค้นในหน้านั้น"** · "ดูรายชื่อ" = **ไปแท็บรายชื่อผู้สมัครในหน้าเดิม** · ทำเพิ่มครบ 4 ข้อ
+(แท็บผู้สมัครแบบเดียวกัน · ระยะตัวอักษร/บรรทัดทั้งระบบ · ถอดประโยคคล้ายกัน · เปลี่ยนคำ "พบ 316 ใบขอ…")
+
+| ไฟล์ | แก้อะไร |
+| --- | --- |
+| `src/components/jobs/BoardReleaseHeader.tsx` | ถอดกล่อง "ขั้น N … / ต้องทำ: …" · ย่อหน้า "สี่ขั้นนี้คือ…" · "บวกทุกขั้นแล้วได้ … ใบพอดี" · "บวกกันได้ … ใบพอดี" (2 ที่) · tooltip ต้องทำของชิปขั้น · แถว "ใบที่จบไปแล้ว (30 วันล่าสุด)" (props `done*` หาย) · ตัวอักษรสเกลเดียว ไม่มี font-mono |
+| `src/components/jobs/BoardFilterPanel.tsx` | **เขียนใหม่** — `FacetDropdowns` (หัวข้อหลักคนละปุ่ม + ลูกอยู่กล่องเดียวกับแม่ + ที่เหลือใน "ตัวกรองอื่น") · `ChoiceDropdown` (วันที่ช่องไหน/เรียง) · `DoneDropdown` "ใบที่จบแล้ว" · `BoardFilterBar` · `BoardResetButton` · 🔴 แถบซ้าย/Sheet/`BoardFilterTopTools` ถูกถอด |
+| `src/lib/boardFilters.ts` | `BOARD_PRIMARY_FACETS` (ตำแหน่ง · หน่วยงาน · จังหวัด · รายได้) · `BOARD_FACET_ATTACH` (งานย่อย→ตำแหน่ง · อำเภอ→จังหวัด) |
+| `src/components/jobs/JobBoardView.tsx` | แถบกรองใช้ `BoardFilterBar` · ถอดแถบ "กำลังดู" + แถบซ้าย (การ์ดกลับกริด 3 คอลัมน์) · คำ "แสดง N จาก M ใบขอ · ต้องหาคน X อัตรา" · "ล้างตัวกรอง" ท้ายบรรทัดจำนวน (ล้างรวมเลน/ขั้น/ใบจบ) · หัวหน้าเหลือ สร้างลิงก์ + ตั้งค่าบอร์ด + รีเฟรชแบบไอคอน · ช่องค้นหาขึ้นแถบบน · **"ดูรายชื่อ" → `?view=list&a.job=<job_id ฝั่งใบสมัคร>`** (เดิมไปหน้าใบขอ) · ถอด Pre-Check ในเมนูตั้งค่าบอร์ด · ถอด `openUnit` |
+| `src/components/jobs/JobBoardTopFilters.tsx` | โหมด bar: "แสดง … จาก …" เสมอ · prop `resultAction` · ป้ายไม่ตัวห่าง |
+| `src/pages/jobs/BoardPostingPage.tsx` | ยกเลิกในป๊อปไล่งานแบบลิงก์ตรง → `/jobs/board` (เดิมไปหน้าใบขอ) |
+| `src/lib/applicantFilters.ts` | หัวข้อ "ใบขอที่สมัคร" คีย์ด้วย `job_id` (คำบนจอ = ชื่องาน · ชื่อซ้ำต่อเลขที่ใบขอ) · `APPLICANT_PRIMARY_FACETS` / `APPLICANT_FACET_ATTACH` |
+| `src/components/recruit-rm/RmWorkspace.tsx` | ตัวกรองเป็น Dropdown · ถอดแถบ "กำลังดู" + แถบซ้าย · ปุ่มล้าง · ช่องค้นหาขึ้นแถบบน · **ผลว่างแต่มีคนในแท็บอื่น = บอกพร้อมปุ่มพาไป** (เคสจริง: คนเดียวของใบถูกเก็บไปโทรแล้ว) |
+| `src/components/shared/DateRangeCalendarPicker.tsx` | `triggerVariant="filter"` หน้าตาเดียวกับ Dropdown (ไม่ส่ง = ช่องฟอร์มเดิม) |
+| `src/hooks/useHeaderSearch.ts` · `src/contexts/HeaderSearchContext.tsx` | **ใหม่** — หน้าฝากช่องค้นหา (value/onChange ของหน้าเดิม) ขึ้นแถบบน · ช่องถือ draft เองกันเคอร์เซอร์เด้ง · ถอดเฉพาะของตัวเอง |
+| `src/components/layout/AppLayout.tsx` | `HeaderSearchProvider` · ช่องอยู่ซ้ายกระดิ่ง (จอใหญ่) · แถวที่สองใต้แถบ (ต่ำกว่า lg) |
+| `JobListPage` · `MatchingPage` · `OurPeoplePage` · `DashboardShell` · `WLEmployees` · `DailyAssignment` · `RmSearchBar` | ช่องค้นหาย้ายขึ้นแถบบน (ช่องในหน้าเหลือเป็นทางถอยตอนไม่มีแถบบน) · ⚠️ **ไม่ย้าย**: ช่องกรอกของ Pre-Check · ช่องค้นในป๊อป/ตัวเลือก (เป็นส่วนของฟอร์ม) |
+| `src/lib/designTokens.ts` + 17 ไฟล์ | ถอด `tracking-wide/wider/widest/[…em]` ทั้งระบบ (ป้ายไทยอ่านเป็นตัวห่าง) · `tracking-tight` ของหัวข้อ/ตัวเลขยังใช้ได้ · ไม่แตะ shadcn ui |
+| tests | `boardNoJumpOut` (ใหม่ — กล่องงานห้ามมีทางไปหน้าใบขอ/หมวดจับคู่งาน) · `typographyRules` (+ไฟล์กล่องงาน/แท็บผู้สมัคร ไม่มีตัวจิ๋ว/font-mono/leading ตั้งเอง · ทั้งระบบไม่มีตัวห่าง) · `applicantFilters` (+ใบขอที่สมัครคีย์ job_id) |
+
+⚠️ **กับดักที่เจอ:** `buildFacetViews` ใส่คำบนจอผ่าน `valueLabel(key, value)` ซึ่งไม่เห็นแถว ⇒ หัวข้อที่ค่าเป็น id
+ต้องห่อ valueLabel ใน builder ของหน้า (ดู `applicantJobLabels`) · Select ของโปรเจกต์สูง/ตัวใหญ่กว่าปุ่ม Dropdown — ในแถบกรองใช้ `ChoiceDropdown`

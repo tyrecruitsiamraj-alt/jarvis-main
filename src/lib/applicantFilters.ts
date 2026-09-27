@@ -172,11 +172,17 @@ const FACETS: readonly Def[] = [
     values: (r) => [applicantCallValue(r)],
   },
   {
+    /**
+     * ใบขอที่สมัคร — 🔴 **คีย์ด้วย `job_id` ไม่ใช่ชื่องาน** (27 ก.ย. 2569)
+     * ปุ่ม "ดูรายชื่อ" บนการ์ดกล่องงานพามาแท็บนี้พร้อมติ๊กใบนั้นให้ (เจ้าของสั่งห้ามเด้งไปหน้าใบขอ)
+     * ชื่องานที่ผู้สมัครเห็นตอนสมัครเปลี่ยนตามประกาศได้ ⇒ เทียบด้วยชื่อแล้วหลุด ·
+     * ใบสมัครที่ไม่มี `job_id` (ประกาศลอย) ใช้ชื่องานแทน · คำบนจอ = ชื่องาน (ดู `buildApplicantFacets`)
+     */
     key: 'job',
     label: 'ใบขอที่สมัคร',
     ui: 'check',
     searchable: true,
-    values: (r) => [trimOr(r.job_title || r.unit_name)],
+    values: (r) => [applicantJobValue(r)],
   },
   {
     /** ⚠️ ผู้สมัครพิมพ์เอง — มีคำพิมพ์ผิดปน (เช่น "พยักงานขับรถ") โชว์ตามจริง ไม่เดาแก้ */
@@ -276,13 +282,60 @@ export function applyApplicantFilters(
   return applyFacetDefs(rows, FACETS, state, facts);
 }
 
+/** ค่าของหัวข้อ "ใบขอที่สมัคร" — `job_id` ก่อน · ไม่มีค่อยใช้ชื่องาน */
+export function applicantJobValue(r: PublicApplication): string {
+  const id = (r.job_id ?? '').trim();
+  return id || trimOr(r.job_title || r.unit_name);
+}
+
+/**
+ * คำบนจอของหัวข้อ "ใบขอที่สมัคร" — ค่าเป็น `job_id` จึงต้องแปลงเป็นชื่องานจากแถวจริง
+ * ชื่อซ้ำกันคนละใบ = ต่อท้ายเลขที่ใบขอให้แยกออก · ไม่มีแถวของใบนั้นเลย = บอกเลขที่ใบขอ
+ */
+export function applicantJobLabels(rows: readonly PublicApplication[]): (value: string) => string {
+  const titleById = new Map<string, string>();
+  for (const r of rows) {
+    const id = (r.job_id ?? '').trim();
+    if (id && !titleById.has(id)) titleById.set(id, applicantFacetValueLabel('job', trimOr(r.job_title || r.unit_name)));
+  }
+  const idsPerTitle = new Map<string, number>();
+  for (const t of titleById.values()) idsPerTitle.set(t, (idsPerTitle.get(t) ?? 0) + 1);
+  const requestNo = (id: string) => id.slice(id.lastIndexOf(':') + 1);
+  return (value) => {
+    const title = titleById.get(value);
+    if (title) return (idsPerTitle.get(title) ?? 0) > 1 ? `${title} · ${requestNo(value)}` : title;
+    if (value.includes(':')) return `ใบขอ ${requestNo(value)}`;
+    return applicantFacetValueLabel('job', value);
+  };
+}
+
 export function buildApplicantFacets(
   rows: readonly PublicApplication[],
   state: ApplicantFilterState,
   facts: ApplicantFacetFacts,
 ): FacetView<ApplicantFacetKey>[] {
-  return buildFacetViews(rows, FACETS, state, facts, applicantFacetValueLabel);
+  const jobLabel = applicantJobLabels(rows);
+  return buildFacetViews(rows, FACETS, state, facts, (key, value) =>
+    key === 'job' ? jobLabel(value) : applicantFacetValueLabel(key, value),
+  );
 }
+
+/**
+ * หัวข้อที่ได้ Dropdown ของตัวเองบนแท็บผู้สมัคร (แบบเดียวกับกล่องงาน — เจ้าของเลือก 27 ก.ย. 2569)
+ * หัวข้อนัดหมายมีเฉพาะแท็บติดตามนัดหมาย (engine ตัดให้เองในแท็บอื่น) · ที่เหลืออยู่ใน "ตัวกรองอื่น"
+ */
+export const APPLICANT_PRIMARY_FACETS: readonly ApplicantFacetKey[] = [
+  'apptWhen',
+  'apptPlace',
+  'attendance',
+  'call',
+  'job',
+  'province',
+  'days',
+];
+export const APPLICANT_FACET_ATTACH: Partial<Record<ApplicantFacetKey, ApplicantFacetKey>> = {
+  district: 'province',
+};
 
 export function countSelectedApplicantValues(state: ApplicantFilterState): number {
   return countSelectedValues(state, APPLICANT_FACET_KEYS);

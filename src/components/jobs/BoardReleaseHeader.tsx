@@ -13,6 +13,11 @@
  *
  * 🔴 **ทุกเลขกดได้และกดแล้วการ์ดข้างล่างตรงกับเลขนั้นเป๊ะ** ตรรกะการนับอยู่
  * `src/lib/boardRelease.ts` (มีเทสต์คุมว่าบวกกันลงตัว) ไฟล์นี้แค่วาด
+ *
+ * 🔴 **หน้าตาแบบ Clean (เจ้าของสั่ง 27 ก.ย. 2569)** — ถอดข้อความอธิบายออกทั้งหมด:
+ * กล่อง "ขั้น N … / ต้องทำ: …" · ย่อหน้า "สี่ขั้นนี้คือ…" · "บวกทุกขั้นแล้วได้ … ใบพอดี" ·
+ * "บวกกันได้ … ใบพอดี" (สองที่) · แถว "ใบที่จบไปแล้ว (30 วันล่าสุด)" (ย้ายเป็น Dropdown
+ * "ใบที่จบแล้ว" ในแถบตัวกรอง) ⇒ **ห้ามเติมคำอธิบายกลับมาโดยไม่ได้สั่ง** · ตัวอักษรขนาดเดียวกันทั้งไฟล์
  */
 import * as React from 'react';
 import { ChevronRight } from 'lucide-react';
@@ -21,7 +26,6 @@ import { DASH, TONE } from '@/lib/designTokens';
 import Term from '@/components/shared/Term';
 import {
   RELEASE_LANE_TEXT,
-  RELEASE_STEP_TEXT,
   type ReleaseLaneKey,
   type ReleaseLedger,
   type ReleaseStepKey,
@@ -54,10 +58,6 @@ export type BoardReleaseHeaderProps = {
   /** ขั้นที่เลือก (ใช้ได้เฉพาะเลน "เหลือปล่อย") */
   step: ReleaseStepKey | null;
   onStepChange: (step: ReleaseStepKey | null) => void;
-  /** ใบที่จบไปแล้ว (คนละ feed) */
-  doneCounts: { closed: number; cancelled: number };
-  doneLane: 'closed' | 'cancelled' | null;
-  onDoneLaneChange: (lane: 'closed' | 'cancelled' | null) => void;
   className?: string;
 };
 
@@ -94,10 +94,10 @@ function LaneTile({
           : cn('border-transparent', TONE[tone].soft, TONE[tone].softHover),
       )}
     >
-      <span className={cn('whitespace-nowrap text-[11px] font-medium', TONE[tone].value)}>
+      <span className={cn('whitespace-nowrap text-xs font-medium', TONE[tone].value)}>
         {t.label}
       </span>
-      <span className={cn('font-mono text-2xl font-medium leading-none tabular-nums', TONE[tone].num)}>
+      <span className={cn('text-2xl font-medium leading-none tabular-nums', TONE[tone].num)}>
         {th(count)}
       </span>
     </button>
@@ -138,13 +138,13 @@ function SubLaneTile({
           : cn('border-transparent', TONE[tone].soft, TONE[tone].softHover),
       )}
     >
-      <span className={cn('whitespace-nowrap text-[11px] font-medium', TONE[tone].value)}>
+      <span className={cn('whitespace-nowrap text-xs font-medium', TONE[tone].value)}>
         {t.label}
       </span>
-      <span className={cn('font-mono text-base font-medium leading-none tabular-nums', TONE[tone].num)}>
+      <span className={cn('text-base font-medium leading-none tabular-nums', TONE[tone].num)}>
         {th(count)}
       </span>
-      {sub ? <span className={cn('whitespace-nowrap text-[10px]', DASH.muted)}>{sub}</span> : null}
+      {sub ? <span className={cn('whitespace-nowrap text-xs', DASH.muted)}>{sub}</span> : null}
     </button>
   );
 }
@@ -163,7 +163,6 @@ function Chip({
   count,
   unit = 'ใบ',
   sub,
-  hint,
   active,
   tone,
   onClick,
@@ -174,7 +173,6 @@ function Chip({
   count: number;
   unit?: string;
   sub?: string | null;
-  hint?: string;
   active: boolean;
   tone: 'warn' | 'success' | 'neutral' | 'info';
   onClick: () => void;
@@ -186,9 +184,8 @@ function Chip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      title={hint}
       className={cn(
-        'inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[11px] transition-colors',
+        'inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors',
         active
           ? 'border-primary bg-primary/10 text-foreground'
           : cn(
@@ -202,7 +199,7 @@ function Chip({
       {step ? (
         <span
           className={cn(
-            'flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-medium',
+            'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-medium',
             quiet ? cn('bg-muted', DASH.cellMuted) : TONE[tone].solid,
           )}
           aria-hidden
@@ -219,21 +216,21 @@ function Chip({
           </span>
           <span
             className={cn(
-              'whitespace-nowrap font-mono text-sm font-medium tabular-nums',
+              'whitespace-nowrap text-sm font-medium tabular-nums',
               quiet ? DASH.cellMuted : TONE[tone].num,
             )}
           >
             {th(count)}
           </span>
-          <span className={cn('whitespace-nowrap text-[10px]', DASH.cellMuted)}>
+          <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>
             {unit}{count > 0 && step ? 'รอ' : ''}
           </span>
           {sub ? (
-            <span className="whitespace-nowrap text-[10px] text-muted-foreground">({sub})</span>
+            <span className="whitespace-nowrap text-xs text-muted-foreground">({sub})</span>
           ) : null}
         </span>
         {state ? (
-          <span className={cn('mt-0.5 block whitespace-nowrap text-[10px]', DASH.cellMuted)}>
+          <span className={cn('mt-0.5 block whitespace-nowrap text-xs', DASH.cellMuted)}>
             {state}
           </span>
         ) : null}
@@ -251,9 +248,6 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
   onLaneChange,
   step,
   onStepChange,
-  doneCounts,
-  doneLane,
-  onDoneLaneChange,
   className,
 }) => {
   /**
@@ -272,7 +266,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
           )}
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className={cn('text-[11px] font-medium', broken ? TONE.warn.value : DASH.muted)}>
+            <p className={cn('text-xs font-medium', broken ? TONE.warn.value : DASH.muted)}>
               {stateText.title}
             </p>
             {stateText.canRetry && onRetry ? (
@@ -280,7 +274,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
                 type="button"
                 onClick={onRetry}
                 className={cn(
-                  'rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                  'rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
                   TONE.warn.outline,
                 )}
               >
@@ -288,7 +282,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
               </button>
             ) : null}
           </div>
-          <p className={cn('text-[11px] leading-4', DASH.muted)}>{stateText.hint}</p>
+          <p className={cn('text-xs', DASH.muted)}>{stateText.hint}</p>
           {broken ? (
             <div className="flex flex-wrap items-stretch gap-2">
               {LANE_ORDER.map((laneKey) => (
@@ -296,7 +290,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
                   key={laneKey}
                   className="min-w-0 flex-1 rounded-xl border border-border/60 bg-card/60 px-3 py-2"
                 >
-                  <p className={cn('text-[11px]', DASH.muted)}>{RELEASE_LANE_TEXT[laneKey].label}</p>
+                  <p className={cn('text-xs', DASH.muted)}>{RELEASE_LANE_TEXT[laneKey].label}</p>
                   <p className={cn('text-2xl font-medium leading-none', DASH.muted)}>{UNKNOWN_NUMBER}</p>
                 </div>
               ))}
@@ -328,14 +322,14 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           {/* ⚠️ "ใบขอ" มีคำอธิบายติดตัว — โมเดลที่มาลองเล่นบอกว่าไม่รู้ว่าคืออะไร */}
           <div className="min-w-0">
-            <p className="text-[13px] font-medium text-foreground">
+            <p className="text-sm font-medium text-foreground">
               <Term k="unit_request">ใบขอที่เปิดอยู่</Term> {th(ledger.all)} ใบ
             </p>
             {/* อายุข้อมูล — โชว์เฉพาะตอนที่เก่าพอจะทำให้ตัดสินใจผิด หรือกำลังดูสำเนาเพราะต่อไม่ติด */}
-            {ageLabel ? <p className={cn('text-[11px]', DASH.muted)}>{ageLabel}</p> : null}
+            {ageLabel ? <p className={cn('text-xs', DASH.muted)}>{ageLabel}</p> : null}
           </div>
           {ledger.percent === null ? null : (
-            <p className={cn('text-[11px]', DASH.muted)}>
+            <p className={cn('text-xs', DASH.muted)}>
               <Term k="released">ปล่อยประกาศ</Term>ไปแล้ว{' '}
               <span className="font-medium text-foreground">{ledger.percent}%</span> —{' '}
               {th(ledger.released)} จาก {th(ledger.all)} ใบ
@@ -391,7 +385,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
          * ระดับเดียวกับสามก้อนหลัก · ตัวนี้เป็นก้อนย่อย**ใต้**ยังไม่ปล่อย สามก้อนหลักคงเดิม
          */}
         <div className="flex flex-wrap items-stretch gap-2 pl-1">
-          <span className={cn('self-center text-[11px]', DASH.muted)} aria-hidden>
+          <span className={cn('self-center text-xs', DASH.muted)} aria-hidden>
             ↳
           </span>
           <SubLaneTile
@@ -408,9 +402,6 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
             active={lane === 'started'}
             onClick={() => onLaneChange(lane === 'started' ? null : 'started')}
           />
-          <span className={cn('self-center text-[11px]', DASH.muted)}>
-            บวกกันได้ {th(ledger.unreleased)} ใบพอดี
-          </span>
         </div>
       </div>
 
@@ -418,7 +409,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
       {lane === null || lane === 'all' || lane === 'unreleased' || lane === 'sourcing' || lane === 'started' ? (
         <div className="space-y-1.5 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[11px] font-medium text-foreground">
+            <p className="text-xs font-medium text-foreground">
               ยังไม่ปล่อย {th(ledger.unreleased)} ใบ — ติดขั้นไหน
             </p>
             {/* ปุ่ม "ส่งประกาศทีเดียว" ที่เคยอยู่ตรงนี้ถูกถอดแล้ว 26 ก.ย. 2569 (เจ้าของเคาะ) —
@@ -438,7 +429,6 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
                   label={s.label}
                   state={s.state}
                   count={s.count}
-                  hint={`${s.hint} · ต้องทำ: ${s.todo}`}
                   tone={s.key === 'publish' ? 'success' : 'warn'}
                   active={step === s.key}
                   onClick={() => onStepChange(step === s.key ? null : s.key)}
@@ -446,36 +436,8 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
               </React.Fragment>
             ))}
           </div>
-          {/* 🔴 **"ขั้นนี้ต้องทำอะไร" ต้องพิมพ์บนจอ ไม่ใช่ซ่อนใน hover** (3 ก.ย. 2569)
-              พนักงานใหม่ให้หน้านี้ 5/10 ด้วยคำถาม *"ทำไมต้อง 4 ขั้น แต่ละขั้นทำไร"*
-              — คำตอบอยู่ใน `todo` มาตลอด แต่อยู่ใน `title=` ซึ่งต้องเอาเมาส์จ่อถึงเห็น
-              (บทเรียนเดิมของโปรเจกต์: tooltip = ไม่มีอยู่จริงสำหรับคนส่วนใหญ่) */}
-          {step ? (
-            <p
-              className={cn(
-                'rounded-xl border px-3 py-2 text-[11px] leading-5',
-                TONE.warn.soft,
-                TONE.warn.value,
-              )}
-            >
-              <b>
-                ขั้น {RELEASE_STEP_TEXT[step].step} {RELEASE_STEP_TEXT[step].label}
-              </b>{' '}
-              — {RELEASE_STEP_TEXT[step].hint}
-              <span className="mt-0.5 block">
-                <b>ต้องทำ:</b> {RELEASE_STEP_TEXT[step].todo}
-              </span>
-            </p>
-          ) : (
-            <p className={cn('text-[11px] leading-5', DASH.muted)}>
-              สี่ขั้นนี้คือของที่ต้องมีก่อนประกาศจะขึ้นหน้าสาธารณะ:{' '}
-              <b className="text-foreground">อ่านใบขอ → ใส่สถานที่ทำงาน → เลือกสวัสดิการ → สร้างลิงก์แล้วกดส่ง</b>{' '}
-              · กดขั้นไหนก็เห็นแต่ใบที่ติดขั้นนั้น พร้อมบอกว่าต้องทำอะไร
-            </p>
-          )}
-          <p className={cn('text-[11px]', DASH.muted)}>
-            บวกทุกขั้นแล้วได้ {th(ledger.unreleased)} ใบพอดี — หนึ่งใบติดได้ขั้นเดียว
-          </p>
+          {/* 🔴 กล่อง "ขั้น N … / ต้องทำ: …" · ย่อหน้าอธิบาย 4 ขั้น · "บวกทุกขั้นแล้วได้ … ใบพอดี"
+              ถอดออกหมด 27 ก.ย. 2569 (เจ้าของสั่ง "เอาคำนี้ออก" + "ขอหน้าตาแบบ Clean") */}
         </div>
       ) : null}
 
@@ -487,7 +449,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
       {(lane === null || lane === 'all' || lane === 'released' || lane === 'applied' || lane === 'silent') &&
       ledger.released > 0 ? (
         <div className="space-y-1.5 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
-          <p className="text-[11px] font-medium text-foreground">
+          <p className="text-xs font-medium text-foreground">
             ปล่อยแล้ว {th(ledger.released)} ใบ — ได้ผลยังไง
           </p>
           <div className="flex flex-wrap items-stretch gap-2">
@@ -506,33 +468,11 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
               active={lane === 'silent'}
               onClick={() => onLaneChange(lane === 'silent' ? null : 'silent')}
             />
-            <span className={cn('self-center text-[11px]', DASH.muted)}>
-              บวกกันได้ {th(ledger.released)} ใบพอดี
-            </span>
           </div>
         </div>
       ) : null}
 
-      {/* ── ใบที่จบไปแล้ว — คนละ feed จึงแยกออกมาและทำให้จาง ───────────── */}
-      <div className="flex flex-wrap items-center gap-1.5 px-1">
-        <span className={cn('text-[11px]', DASH.muted)}>ใบที่จบไปแล้ว (30 วันล่าสุด):</span>
-        <Chip
-          label="ปิดแล้ว"
-          count={doneCounts.closed}
-          hint="ใบที่ปิดไปแล้ว ไม่รวมยกเลิก — ดูย้อนหลังได้"
-          tone="neutral"
-          active={doneLane === 'closed'}
-          onClick={() => onDoneLaneChange(doneLane === 'closed' ? null : 'closed')}
-        />
-        <Chip
-          label="ยกเลิก"
-          count={doneCounts.cancelled}
-          hint="ใบที่ถูกยกเลิก — ไม่นับเป็นงานที่ต้องหาคนแล้ว"
-          tone="neutral"
-          active={doneLane === 'cancelled'}
-          onClick={() => onDoneLaneChange(doneLane === 'cancelled' ? null : 'cancelled')}
-        />
-      </div>
+      {/* แถว "ใบที่จบไปแล้ว (30 วันล่าสุด)" ย้ายเป็น Dropdown "ใบที่จบแล้ว" ในแถบตัวกรอง (27 ก.ย. 2569) */}
     </div>
   );
 };

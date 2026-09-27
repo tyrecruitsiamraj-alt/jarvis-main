@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
-import RmSearchBar from '@/components/recruit-rm/RmSearchBar';
+import RmSearchBar, { RM_SEARCH_PLACEHOLDER } from '@/components/recruit-rm/RmSearchBar';
+import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import RmTable from '@/components/recruit-rm/RmTable';
 import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
@@ -53,13 +54,14 @@ import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { canHoldApplication } from '@/lib/recruitRm';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { useAuth } from '@/contexts/AuthContext';
-import { BoardFilterSheetButton, BoardFilterSidebar } from '@/components/jobs/BoardFilterPanel';
+import { FacetDropdowns } from '@/components/jobs/BoardFilterPanel';
 import {
+  APPLICANT_FACET_ATTACH,
+  APPLICANT_PRIMARY_FACETS,
   EMPTY_APPLICANT_FILTER_STATE,
   applyApplicantFilters,
   buildApplicantFacets,
   countSelectedApplicantValues,
-  describeApplicantFilters,
   readApplicantFilterState,
   toggleApplicantFacetValue,
   writeApplicantFilterState,
@@ -67,6 +69,14 @@ import {
   type ApplicantFacetKey,
   type ApplicantFilterState,
 } from '@/lib/applicantFilters';
+
+/** แท็บของพื้นที่นี้ → `?view=` ของบอร์ดรับสมัคร + ชื่อบนแถบแท็บของบอร์ด (ชุดเดียวกับ BOARD_VIEW_TABS) */
+const RM_TAB_BOARD_VIEW: Record<RmTab, string> = { candidates: 'list', contact: 'contact', appointments: 'appointments' };
+const RM_TAB_BOARD_LABEL: Record<RmTab, string> = {
+  candidates: 'รายชื่อผู้สมัคร',
+  contact: 'การโทรของฉัน',
+  appointments: 'ติดตามนัดหมาย',
+};
 
 /**
  * พื้นที่ทำงาน "รายชื่อผู้สมัคร" — เนื้อของหน้างานสรรหา (RM) เดิมทั้งก้อน
@@ -116,6 +126,19 @@ const RmWorkspace: React.FC<{
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [keyword, setKeyword] = useState('');
+  /**
+   * 🔴 ช่องค้นหาของแท็บผู้สมัครอยู่บนแถบบน ซ้ายกระดิ่ง (เจ้าของสั่ง 27 ก.ย. 2569 "ทั้งระบบ")
+   * ค้นเรื่องเดิม (ชื่อ/นามสกุล/เบอร์/ชื่องาน) · กด Enter = กลับหน้าแรกของตาราง เหมือนปุ่ม "ค้นหา" เดิม
+   */
+  const searchInHeader = useHeaderSearch({
+    value: keyword,
+    onChange: (v) => {
+      setKeyword(v);
+      setPage(1);
+    },
+    placeholder: RM_SEARCH_PLACEHOLDER,
+    onSubmit: () => setPage(1),
+  });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSizeOption>(PAGE_SIZE_DEFAULT);
@@ -268,7 +291,6 @@ const RmWorkspace: React.FC<{
     commitApplicantFilters(toggleApplicantFacetValue(applicantFilterState, key, value));
   const clearApplicantFacets = () => commitApplicantFilters(EMPTY_APPLICANT_FILTER_STATE);
   const applicantFacetCount = countSelectedApplicantValues(applicantFilterState);
-  const applicantFilterSummary = describeApplicantFilters(applicantFilterState);
 
   /** ชุดก่อนแถบซ้าย (แท็บ + มุมมองย่อย + วันที่ + คำค้น) — ฐานของเลขต่อท้ายตัวเลือก */
   const baseFiltered = useMemo(() => {
@@ -289,6 +311,30 @@ const RmWorkspace: React.FC<{
     () => (bucket ? [] : buildApplicantFacets(baseFiltered, applicantFilterState, applicantFacts)),
     [bucket, baseFiltered, applicantFilterState, applicantFacts],
   );
+  /**
+   * 🔴 ตัวกรองนี้ได้ 0 คนในแท็บนี้ แต่มีคนในแท็บอื่น — บอกพร้อมปุ่มพาไป (27 ก.ย. 2569)
+   * เจอจริงตอนตรวจ: กด "ดูรายชื่อ" จากการ์ดกล่องงาน → ผู้สมัครคนเดียวของใบนั้นถูก "เก็บไปโทรเอง"
+   * แล้ว จึงอยู่แท็บการโทรของฉัน · แท็บนี้เลยขึ้น 0 คนทั้งที่การ์ดบอก 1 คน (อ่านแล้วนึกว่าพัง)
+   * นับด้วยนิยามแท็บชุดเดียวกับตาราง (`filterApplications` + ตัวกรองชุดเดียวกัน) · โผล่เฉพาะตอนว่าง
+   */
+  const elsewhere = useMemo(() => {
+    if (bucket || applicantFacetCount === 0 || filtered.length > 0) return [];
+    return RM_TABS.filter((t) => t !== tab)
+      .map((t) => {
+        const base = filterApplications(rows, t, rmFilters, keyword);
+        const n = applyApplicantFilters(base, applicantFilterState, { tab: t, now: applicantFacts.now }).length;
+        return { tab: t, n };
+      })
+      .filter((x) => x.n > 0);
+  }, [bucket, applicantFacetCount, filtered.length, tab, rows, rmFilters, keyword, applicantFilterState, applicantFacts.now]);
+  const goToTab = (t: RmTab) =>
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      // บนบอร์ดรับสมัคร แท็บคุมด้วย ?view= · หน้าเดี่ยว (/recruit/rm) คุมด้วย ?tab=
+      if (controlledTab) p.set('view', RM_TAB_BOARD_VIEW[t]);
+      else p.set('tab', t);
+      return p;
+    });
 
   /** บอร์ดสรุปนัดต่อวัน (ข้อ 12 · 20 ส.ค. 2569) — คิดจากชุดเดียวกับตาราง เลขจึงตรงกันเสมอ */
   const appointmentBoard = useMemo(() => buildAppointmentBoard(filtered), [filtered]);
@@ -551,7 +597,7 @@ const RmWorkspace: React.FC<{
                 )}
               >
                 {RM_TAB_LABEL[t]}
-                <span className={cn('ml-1.5 font-mono text-[11px] tabular-nums', active ? '' : DASH.muted)}>
+                <span className={cn('ml-1.5 text-xs tabular-nums', active ? '' : DASH.muted)}>
                   {loading ? '…' : tabCounts[t].toLocaleString('th-TH')}
                 </span>
               </button>
@@ -589,7 +635,7 @@ const RmWorkspace: React.FC<{
                 )}
               >
                 {RM_LIST_VIEW_LABEL[v]}
-                <span className="ml-1.5 font-mono text-[11px] tabular-nums">
+                <span className="ml-1.5 text-xs tabular-nums">
                   {loading ? '…' : listViewCounts[v].toLocaleString('th-TH')}
                 </span>
               </button>
@@ -606,54 +652,47 @@ const RmWorkspace: React.FC<{
           ⚠️ ไม่โผล่ในโหมด drill-down (?bucket=) เพราะ server กรองมาแล้ว
           ถ้าให้กรองซ้ำที่นี่ เลขจะไม่ตรงกับกล่องที่กดมา */}
       {!bucket ? (
+        /* 🔴 ตัวกรองเป็น Dropdown ทั้งแถว — แบบเดียวกับกล่องงาน (เจ้าของเลือก 27 ก.ย. 2569:
+           "แท็บผู้สมัคร 3 แท็บด้วย") · แถบซ้าย + Sheet มือถือถูกถอด */
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {/* มือถือ: แถบซ้ายซ่อน → ปุ่ม "ตัวกรอง (N)" เปิด Sheet (ตัวเดียวกับกล่องงาน) */}
-          <BoardFilterSheetButton
+          <FacetDropdowns
             facets={applicantFacets}
-            selectedCount={applicantFacetCount}
+            primary={APPLICANT_PRIMARY_FACETS}
+            attach={APPLICANT_FACET_ATTACH}
             onToggle={toggleApplicantFacet}
-            onClear={clearApplicantFacets}
           />
           <span className={cn('text-xs font-medium', DASH.label)}>วันที่สมัคร</span>
-          <DateRangeCalendarPicker value={dateRange} onChange={changeDateRange} />
-          {dateRange ? (
-            <span className={cn('text-xs', DASH.sub)}>
-              กรองแล้ว — เหลือ {filtered.length.toLocaleString('th-TH')} รายชื่อ
-            </span>
+          <DateRangeCalendarPicker triggerVariant="filter" value={dateRange} onChange={changeDateRange} />
+          {applicantFacetCount > 0 || dateRange ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5 text-xs"
+                onClick={() => {
+                  clearApplicantFacets();
+                  if (dateRange) changeDateRange(null);
+                }}
+              >
+                <RotateCcw aria-hidden /> ล้าง
+              </Button>
+              <span className={cn('text-xs', DASH.sub)}>
+                เหลือ {filtered.length.toLocaleString('th-TH')} รายชื่อ
+              </span>
+            </>
           ) : null}
         </div>
       ) : null}
-      {/* แถบ "กำลังดู" — บอกว่าแถบซ้ายกรองอะไรอยู่ + เหลือกี่คน (แผนข้อ 9 ของกล่องงาน) */}
-      {!bucket && applicantFilterSummary ? (
-        <div
-          className={cn(
-            'mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2',
-            TONE.primary.soft,
-          )}
-        >
-          <p className="min-w-0 text-[11px] font-medium text-foreground">
-            กำลังดู: {applicantFilterSummary} — {filtered.length.toLocaleString('th-TH')} คนข้างล่าง
-          </p>
-          <Button type="button" variant="outline" size="sm" className="h-7 text-[11px]" onClick={clearApplicantFacets}>
-            ล้างตัวกรอง
-          </Button>
-        </div>
-      ) : null}
-      <div className={cn('mt-4', !bucket && 'lg:flex lg:items-start lg:gap-4')}>
-        {!bucket ? (
-          <BoardFilterSidebar
-            facets={applicantFacets}
-            selectedCount={applicantFacetCount}
-            onToggle={toggleApplicantFacet}
-            onClear={clearApplicantFacets}
-          />
-        ) : null}
-        <div className="min-w-0 flex-1 space-y-3">
+      {/* แถบ "กำลังดู: … — N คนข้างล่าง" ถูกถอด 27 ก.ย. 2569 (เจ้าของเลือกให้ทำแบบเดียวกับกล่องงาน) */}
+      <div className="mt-4">
+        <div className="min-w-0 space-y-3">
           {/* ⚠️ RmToolbar (ช่องทาง/สร้างลิงก์/เหตุผล) ถูกเอาออก (เจ้าของสั่ง 14 ส.ค. 2569:
               "กล่องช่องทาง ฯลฯ มีแค่หน้ากล่องงาน") — เครื่องมือพวกนี้เหลือที่ RecruitBoardTools
               บนกล่องงาน (view=board) เท่านั้น · เหลือแค่ค้นหา + เพิ่มผู้สมัคร + Lead */}
           <div className={cn('rounded-2xl border p-3', DASH.card)}>
             <RmSearchBar
+              hideSearch={searchInHeader}
               keyword={keyword}
               onKeywordChange={(v) => {
                 setKeyword(v);
@@ -681,7 +720,7 @@ const RmWorkspace: React.FC<{
 
           {/* อยู่คลังสำรองต้องบอกให้รู้ตัว ไม่งั้นอ่านว่า "รายชื่อหายไปไหนหมด" */}
           {leadView ? (
-            <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.violet.soft, TONE.violet.value)}>
+            <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.violet.soft, TONE.violet.value)}>
               {LEAD_VIEW_HINT}
             </p>
           ) : null}
@@ -692,7 +731,7 @@ const RmWorkspace: React.FC<{
                 {/* เจ้าของนิยาม 14 ส.ค. 2569: "ติดตามการนัดหมายเป็นแค่หน้าเอาไว้ดูว่านัดที่ไหน
                     วันไหน และกี่คน โหลดเป็น PDF ได้" — สรุปหัว + ปุ่มพิมพ์ (window.print
                     ฝั่งเบราว์เซอร์ — เจ้าของเคาะ ไม่เพิ่ม lib) · print CSS ซ่อนส่วนอื่นของหน้า */}
-                <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.info.soft, TONE.info.value)}>
+                <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.info.soft, TONE.info.value)}>
                   นัดสัมภาษณ์ <b>{filtered.filter((r) => r.appointment_at).length.toLocaleString('th-TH')}</b> คน
                   จากทั้งหมด {filtered.length.toLocaleString('th-TH')} คนที่รับเข้าทำงาน ·
                   วันนัดมาจากผลโทร "สนใจ→นัดได้" หรือบันทึกผลติดต่อ "สำเร็จ→นัดได้"
@@ -706,7 +745,7 @@ const RmWorkspace: React.FC<{
                   ยอดทั้งระบบจากฐานของเรา · ต่างจากบอร์ดข้างล่างที่นับจากรายการในหน้า */}
               {rmOverview ? (
                 <div className="space-y-1">
-                  <p className="text-[11px] font-medium text-muted-foreground">
+                  <p className="text-xs font-medium text-muted-foreground">
                     นัด → มาไหม (ยอดทั้งระบบ · ย้ายมาจากศูนย์คุมงานสรรหา)
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -733,11 +772,11 @@ const RmWorkspace: React.FC<{
                       ] as const
                     ).map(([label, n, toneKey, sub]) => (
                       <div key={label} className={cn('rounded-xl border px-3 py-2', TONE[toneKey].soft)}>
-                        <p className="text-[10px] font-medium text-muted-foreground">{label}</p>
+                        <p className="text-xs font-medium text-muted-foreground">{label}</p>
                         <p className={cn('text-xl font-medium tabular-nums', TONE[toneKey].num)}>
                           {n == null ? '—' : n.toLocaleString('th-TH')}
                         </p>
-                        {sub ? <p className="text-[10px] text-muted-foreground">{sub}</p> : null}
+                        {sub ? <p className="text-xs text-muted-foreground">{sub}</p> : null}
                       </div>
                     ))}
                   </div>
@@ -784,7 +823,7 @@ const RmWorkspace: React.FC<{
                       ] as const
                     ).map(([label, n, toneKey]) => (
                       <div key={label} className={cn('rounded-xl border px-3 py-2', TONE[toneKey].soft)}>
-                        <p className="text-[10px] font-medium text-muted-foreground">{label}</p>
+                        <p className="text-xs font-medium text-muted-foreground">{label}</p>
                         <p className={cn('text-xl font-medium tabular-nums', TONE[toneKey].num)}>
                           {n.toLocaleString('th-TH')}
                         </p>
@@ -831,7 +870,7 @@ const RmWorkspace: React.FC<{
               ⚠️ MyCallsSection ซ่อนตัวเองเมื่อไม่มีงานโทรค้าง (holds=0) — hint จึงบอกไว้เสมอ */}
           {tab === 'contact' ? (
             <>
-              <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.primary.soft, TONE.primary.value)}>
+              <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.primary.soft, TONE.primary.value)}>
                 <b>2 ส่วนที่ทำงานคนละแบบ:</b> ① เก็บไปโทรเอง (จากหน้า Matching — ผูกเบอร์
                 มีเวลาโทร) โผล่ด้านบนตอนมีงานค้าง · ② เก็บไปติดต่อ (ใบที่คุณเก็บ) อยู่ในตารางด้านล่าง
               </p>
@@ -903,7 +942,7 @@ const RmWorkspace: React.FC<{
                       return (
                         <li
                           key={r.id}
-                          className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-1 text-[11px] first:border-0 first:pt-0"
+                          className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-1 text-xs first:border-0 first:pt-0"
                         >
                           <span className="min-w-0">
                             <b className={DASH.cellStrong}>{r.full_name}</b>
@@ -944,7 +983,7 @@ const RmWorkspace: React.FC<{
                       );
                     })}
                     {awaitingChoiceRows.length > AWAITING_ROWS_SHOWN ? (
-                      <li className={cn('pt-1 text-[11px]', DASH.muted)}>
+                      <li className={cn('pt-1 text-xs', DASH.muted)}>
                         และอีก {awaitingChoiceRows.length - AWAITING_ROWS_SHOWN} คน — ใช้ปุ่ม
                         "ทั้งหมด" ด้านบน หรือกดกล่อง "รอเลือกวิธีโทร" บนแดชบอร์ดเพื่อดูครบ
                       </li>
@@ -955,6 +994,23 @@ const RmWorkspace: React.FC<{
 
               {/* rm-print-area: ตอนกด "โหลดเป็น PDF" print CSS จะโชว์เฉพาะก้อนนี้
                   (เฉพาะแท็บนัดหมาย — แท็บอื่นพิมพ์ทั้งหน้าตามปกติ) */}
+              {elsewhere.length > 0 ? (
+                <div className={cn('flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-xs', TONE.info.soft)}>
+                  <span className={TONE.info.value}>ผู้สมัครตามตัวกรองนี้อยู่แท็บ</span>
+                  {elsewhere.map((x) => (
+                    <Button
+                      key={x.tab}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => goToTab(x.tab)}
+                    >
+                      {RM_TAB_BOARD_LABEL[x.tab]} {x.n.toLocaleString('th-TH')} คน
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
               <div className={tab === 'appointments' ? 'rm-print-area' : undefined}>
               <RmTable
                 tab={tab}

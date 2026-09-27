@@ -288,3 +288,53 @@ describe('🔴 ทั้งระบบต้องไม่มีตัวห�
     expect(css).not.toMatch(/@apply[^;]*font-(bold|semibold)/);
   });
 });
+
+/**
+ * ═══ หน้ากล่องงาน + แท็บผู้สมัคร แบบ Clean (เจ้าของสั่ง 27 ก.ย. 2569) ═══
+ *
+ * > *"ระยะห่างของตัวอักษร การเว้นบรรทัด ทำให้เท่าๆกัน ขอหน้าตาแบบ Clean"*
+ * ⇒ ขนาดตัวอักษรเหลือสเกลเดียว (`text-xs` / `text-sm` …) · ไม่มี font-mono · ระยะบรรทัดตามขนาด
+ * (ถอด `leading-4` / `leading-snug` ที่ตั้งเองรายจุด) — ปิดประตูไว้แบบเดียวกับหน้าแรก
+ */
+describe('กล่องงาน + แท็บผู้สมัคร ต้องไม่มีตัวอักษรจิ๋วที่พิมพ์เองหรือ font-mono', () => {
+  const FILES = [
+    'src/components/jobs/JobBoardView.tsx',
+    'src/components/jobs/BoardReleaseHeader.tsx',
+    'src/components/jobs/BoardFilterPanel.tsx',
+    'src/components/jobs/BoardCardProgress.tsx',
+    'src/components/jobs/JobBoardSilentLinks.tsx',
+    'src/components/recruit-rm/RmWorkspace.tsx',
+  ];
+  const codeOf = (f: string) => read(f).replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it.each(FILES)('%s — ไม่มี text-[10px] / text-[11px] / font-mono', (f) => {
+    const code = codeOf(f);
+    expect(code).not.toMatch(/text-\[1[01]px\]/);
+    expect(code).not.toMatch(/font-mono/);
+  });
+
+  it.each(FILES)('%s — ไม่มีระยะบรรทัดที่ตั้งเองรายจุด (leading-4 / leading-5 / leading-snug)', (f) => {
+    expect(codeOf(f)).not.toMatch(/\bleading-(4|5|snug)\b/);
+  });
+});
+
+/**
+ * 🔴 **ทั้งระบบไม่มีตัวห่าง** (เจ้าของสั่ง 27 ก.ย. 2569 — เลือก "ระยะตัวอักษร/บรรทัด ทั้งระบบ")
+ * ป้ายภาษาไทยที่ตั้ง `tracking-wide` / `tracking-[0.14em]` อ่านเป็น "บ อ ร์ ด ร ั บ ส ม ั ค ร"
+ * ⚠️ ไม่นับ `src/components/ui/` (ปุ่มลัดภาษาอังกฤษของ shadcn เช่น ⌘K) · `tracking-tight` ของหัวข้อ/ตัวเลขยังใช้ได้
+ */
+describe('ทั้งระบบไม่มีระยะตัวอักษรแบบห่าง', () => {
+  const walk = (dir: string): string[] =>
+    fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((d) => {
+      const rel = `${dir}/${d.name}`;
+      if (d.isDirectory()) return rel === 'src/components/ui' ? [] : walk(rel);
+      return /\.(tsx?|jsx?)$/.test(d.name) ? [rel] : [];
+    });
+
+  it('ไม่มี tracking-wide / wider / widest / tracking-[…em] นอก shadcn ui', () => {
+    const bad = walk('src').filter((f) =>
+      /tracking-(wide|wider|widest|\[0?\.\d+em\])/.test(read(f).replace(/\/\*[\s\S]*?\*\//g, '')),
+    );
+    expect(bad).toEqual([]);
+  });
+});

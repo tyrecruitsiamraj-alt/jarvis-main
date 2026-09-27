@@ -67,7 +67,7 @@ const JobBoardSilentLinks: React.FC<{
                 <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
                   {jobBoardCardTitle(row.job)} · {publicJobPositionLabel(row.job)}
                 </span>
-                <span className="shrink-0 text-[11px] text-muted-foreground">
+                <span className="shrink-0 text-xs text-muted-foreground">
                   {silentRowFactLine(row)}
                 </span>
                 <Button
@@ -79,7 +79,7 @@ const JobBoardSilentLinks: React.FC<{
                     onOpen(row.job, 'posting');
                   }}
                   className={cn(
-                    'h-7 shrink-0 rounded-lg px-2 text-[11px]',
+                    'h-7 shrink-0 rounded-lg px-2 text-xs',
                     next.action === 'genlink' ? TONE.violet.outline : TONE.neutral.outline,
                   )}
                 >
@@ -98,7 +98,7 @@ const JobBoardSilentLinks: React.FC<{
           variant="link"
           size="sm"
           onClick={() => setExpanded(true)}
-          className="h-auto p-0 text-[11px]"
+          className="h-auto p-0 text-xs"
         >
           ดูอีก {hidden.toLocaleString('th-TH')} ใบ
         </Button>

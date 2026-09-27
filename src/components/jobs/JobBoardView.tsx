@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { trackPublicClick } from '@/lib/publicClickApi';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS } from '@/types';
 import { jobSectorLabel } from '@/lib/unitRequestDisplay';
@@ -88,11 +88,9 @@ import {
   fetchJobReleases,
   type JobRelease,
 } from '@/lib/jobPublicReleaseApi';
-import {
-  boardPostingPath,
-  navigateToUnitRequest,
-  type UnitRequestTabName,
-} from '@/lib/jobNavigation';
+import { boardPostingPath } from '@/lib/jobNavigation';
+import { useHeaderSearch } from '@/hooks/useHeaderSearch';
+import { APPLICANT_FILTER_PARAM_PREFIX } from '@/lib/applicantFilters';
 import { STANDALONE_POSTING_KINDS, type RecruitPosting } from '@/lib/recruitPostings';
 import {
   CLOSED_BOX_KEYS,
@@ -121,9 +119,6 @@ import {
   applyBoardFilters,
   BOARD_SORT_PARAM,
   buildBoardFacets,
-  clearBoardFacets,
-  countSelectedFacetValues,
-  describeBoardFilters,
   EMPTY_BOARD_FILTER_STATE,
   hasAnyBoardFilter,
   readBoardFilterState,
@@ -139,11 +134,11 @@ import {
   type BoardFilterState,
   type BoardSort,
 } from '@/lib/boardFilters';
-import { BoardFilterSidebar, BoardFilterTopTools } from '@/components/jobs/BoardFilterPanel';
+import { BoardFilterBar, BoardResetButton } from '@/components/jobs/BoardFilterPanel';
 import { compareJobsByAgeDaysDesc, getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { MapPin, Briefcase, Calendar, Banknote, RefreshCw, Send, Users, Link2, Pencil, Search, ClipboardCheck, Flag, EyeOff, LoaderCircle } from 'lucide-react';
+import { MapPin, Briefcase, Calendar, Banknote, RefreshCw, Send, Users, Link2, Pencil, Search, Flag, EyeOff, LoaderCircle } from 'lucide-react';
 const RecruitLaneDialog = React.lazy(() => import('@/components/jobs/RecruitLaneDialog'));
 import {
   isUnitRequestWorkStatus,
@@ -265,26 +260,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   onReloadClosed,
   initialBox = null,
 }) => {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   /**
-   * 🔴 **กดอะไรบนบอร์ดก็ "ไปหน้า" ไม่ใช่ "เด้งป๊อป"** (เจ้าของสั่ง 27 ส.ค. 2569:
-   * *"พอกดแล้วก็พาไปดูข้อมูล ไม่เอาแบบ Popup เด้งนะ"*)
-   *
-   * ⚠️ ต้องผ่าน `navigateToUnitRequest` เท่านั้น — ตัวนั้นรู้เรื่อง prefix ของใบขอล่วงหน้า
-   * (ประกอบ URL เองแล้วเปิดผิดบริษัท เคยเกิดจริง 18 ส.ค. 2569)
-   * `returnTo` = หน้าบอร์ดพร้อมขั้นที่กรองอยู่ ⇒ ปุ่มย้อนกลับพากลับมาที่เดิมเป๊ะ
+   * 🔴 **กดอะไรในกล่องงานห้ามเด้งออกไปหน้าจับคู่งานหรือหน้าใบขอ** (เจ้าของสั่ง 27 ก.ย. 2569:
+   * *"หน้ากล่องงาน มีอะไรกดไปโผล่หน้าจับคู่งานหรือใบขอไหม ถ้ามีปิดออกห้ามไป"*)
+   * ⇒ ถอดตัวพาไปหน้าใบขอ (`openUnit`) · "ดูรายชื่อ" สลับแท็บในหน้าเดิม · Pre-Check ออกจากเมนูตั้งค่าบอร์ด
    */
-  const openUnit = React.useCallback(
-    (job: JobRequest, tab?: UnitRequestTabName) => {
-      navigateToUnitRequest(job, navigate, {
-        tab,
-        returnTo: `${window.location.pathname}${window.location.search}`,
-      });
-    },
-    [navigate],
-  );
   const positionPreset = useMemo(
     () => (variant === 'public' ? resolveApplyPositionPreset(searchParams.get('pos')) : null),
     [variant, searchParams],
@@ -512,6 +494,34 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * เคยอ่านได้ 0 ทั้งที่มีคนสมัครจริง · ต้องผ่านตัวเทียบสองคีย์เหมือนกันทุกตัว
    */
   const applicantIdx = useMemo(() => buildCountIndex(applicantCounts), [applicantCounts]);
+  /**
+   * job_id ฝั่งใบสมัครของใบขอนี้ (สายเทียบสองคีย์เดียวกับยอดผู้สมัคร) — ปุ่ม "ดูรายชื่อ" ใช้ติ๊ก
+   * หัวข้อ "ใบขอที่สมัคร" ในแท็บรายชื่อผู้สมัคร · ยังไม่มีใครสมัคร = ใช้ id ของใบขอเอง
+   */
+  const applicationJobKeyIdx = useMemo(
+    () => buildJobKeyIndex(Object.keys(applicantCounts).map((k) => [k, k] as const)),
+    [applicantCounts],
+  );
+  /**
+   * 🔴 "ดูรายชื่อ" = สลับไปแท็บ "รายชื่อผู้สมัคร" **ในหน้าเดิม** พร้อมติ๊กใบนั้นให้
+   * (เจ้าของสั่ง 27 ก.ย. 2569: *"หน้ากล่องงาน มีอะไรกดไปโผล่หน้าจับคู่งานหรือใบขอไหม
+   * ถ้ามีปิดออกห้ามไป"* แล้วเลือก "ให้ไปแท็บรายชื่อผู้สมัคร") · เดิมพาไปแท็บผู้สมัครของหน้าใบขอ
+   * ⚠️ push ไม่ใช่ replace — กดย้อนกลับแล้วกลับมากล่องงานที่เดิม · ตัวกรองแท็บผู้สมัครเดิมล้างทิ้ง
+   */
+  const openApplicantsOf = React.useCallback(
+    (job: JobRequest) => {
+      const key = applicationJobKeyIdx.get(job.id) ?? job.id;
+      const params = new URLSearchParams(searchParams);
+      for (const k of [...params.keys()]) {
+        if (k.startsWith(APPLICANT_FILTER_PARAM_PREFIX)) params.delete(k);
+      }
+      params.set('view', 'list');
+      params.delete('tab');
+      params.append(`${APPLICANT_FILTER_PARAM_PREFIX}job`, key);
+      setSearchParams(params);
+    },
+    [applicationJobKeyIdx, searchParams, setSearchParams],
+  );
   const leadIdx = useMemo(() => buildCountIndex(leadCounts), [leadCounts]);
   const originIdx = useMemo(
     () => buildJobKeyIndex(Object.entries(originCounts)),
@@ -585,8 +595,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     () => (boardFilterOn ? buildBoardFacets(filters.filtered, boardFilterState, facetFacts) : []),
     [boardFilterOn, filters.filtered, boardFilterState, facetFacts],
   );
-  const boardFacetCount = countSelectedFacetValues(boardFilterState);
-  const boardFilterSummary = useMemo(() => describeBoardFilters(boardFilterState), [boardFilterState]);
   /**
    * 🔴 **ช่องค้นหาอยู่ใน URL (`?q=`)** (เจ้าของเคาะ 26 ก.ย. 2569 — ตัวกรองทุกตัวต้องอยู่ในลิงก์)
    * URL เป็นตัวจริง: เปิดลิงก์/กดย้อนกลับ ⇒ ช่องค้นหาตามค่าใน URL · พิมพ์ ⇒ เขียน URL แบบแทนที่
@@ -606,7 +614,16 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     },
     [setFilterSearch, boardFilterOn, setSearchParams],
   );
-  const searchSummary = boardFilterOn && currentSearch.trim() ? `คำค้น "${currentSearch.trim()}"` : '';
+  /**
+   * 🔴 ช่องค้นหาของกล่องงานอยู่บนแถบบน ซ้ายกระดิ่ง (เจ้าของสั่ง 27 ก.ย. 2569 "ทั้งระบบ")
+   * ค้นเรื่องเดิมทุกอย่าง (หน่วยงาน/ตำแหน่ง/ที่อยู่ · เขียน `?q=` เหมือนเดิม) — แค่ย้ายที่วาง
+   * เฉพาะเจ้าหน้าที่ + มุมมองกล่องงาน · แท็บผู้สมัครฝากช่องของตัวเอง (RmWorkspace) · หน้าสาธารณะไม่เกี่ยว
+   */
+  const searchInHeader = useHeaderSearch(
+    isStaff && view === 'board'
+      ? { value: filters.search, onChange: setBoardSearch, placeholder: searchPlaceholder ?? 'ค้นหา…' }
+      : null,
+  );
   /** เขียนตัวกรองลง URL — ต่อยอด params เดิมเสมอ (ห้ามทำ `view` `lane` `step` หาย) */
   const commitBoardFilters = React.useCallback(
     (next: BoardFilterState) => {
@@ -635,10 +652,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     },
     [commitBoardFilters, boardFilterState],
   );
-  /** "✕ ล้าง" บนหัวแถบซ้าย — ล้างเฉพาะแถบซ้าย ช่วงวันที่บนแถบบนคงไว้ (กติกาในแผน) */
-  const clearBoardFacetsOnly = React.useCallback(() => {
-    commitBoardFilters(clearBoardFacets(boardFilterState));
-  }, [commitBoardFilters, boardFilterState]);
   const setBoardDates = React.useCallback(
     (patch: Partial<{ field: BoardDateField; from: string; to: string }>) => {
       const cur = boardFilterState.dates ?? { field: 'required' as BoardDateField, from: '', to: '' };
@@ -1106,14 +1119,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 ? undefined
                 : `· ${filters.visibleCount.toLocaleString('th-TH')} ใบขอ · ${filters.visiblePositions.toLocaleString('th-TH')} อัตรา`
             }
+            /* 🔴 เหลือแค่ "สร้างลิงก์" กับ "ตั้งค่าบอร์ด" + ปุ่มรีเฟรชแบบไอคอน (เจ้าของสั่ง 27 ก.ย. 2569:
+               "หน้ากล่องงานจะเหลือคำว่า สร้างลิงค์ กับ ตั้งค่าบอร์ด พวกนี้เอาไปจัดวางให้สวยๆ")
+               ช่องค้นหาย้ายขึ้นแถบบนซ้ายกระดิ่งแล้ว — ช่องที่นี่เป็นทางถอยตอนไม่มีแถบบนเท่านั้น */
             actions={
               <>
-                {/* ค้นหาอยู่ในแถบหัวเดียวกับชื่อหน้า+ปุ่ม แบบหน้า Dashboard
-                    (เจ้าของสั่ง 13 ส.ค. 2569: "ย้ายไปด้านบนแบบของหน้า Dashboard")
-                    — เดิมอยู่ใต้แผงตัวเลข 9 ช่อง ต้องกวาดตาลงไปหา
-                    ⚠️ เฉพาะมุมมอง "กล่องงาน" — แท็บอื่น (รายชื่อ/ติดต่อ/นัดหมาย) มีช่องค้นหา
-                    ของตัวเองใน RmWorkspace ถ้าโชว์ตัวนี้ด้วยจะมีสองช่องที่ค้นคนละเรื่อง */}
-                {view === 'board' ? (
+                {view === 'board' && !searchInHeader ? (
                   <SearchField
                     compact
                     placeholder={searchPlaceholder}
@@ -1127,18 +1138,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     "นอกจากหน้ากล่องงาน หน้าอื่นไม่ต้องมี") — ทั้งสามปุ่มทำงานกับ
                     ประกาศ/ช่องทางรับสมัคร ซึ่งเป็นเรื่องของฝั่งใบขอ ไม่ใช่ของรายชื่อคน */}
                 {view === 'board' ? (
-                  <RecruitBoardTools
-                    variant="onDark"
-                    /* Pre-Check ย้ายมาอยู่ในเมนูนี้ (20 ส.ค. 2569) — เดิมลอยเดี่ยวกลางหน้า */
-                    extraMenuItems={[
-                      {
-                        key: 'preCheck',
-                        label: 'Pre-Check (ตรวจใบขอก่อนหาคน)',
-                        icon: ClipboardCheck,
-                        onSelect: () => navigate('/matching/pre-check'),
-                      },
-                    ]}
-                  />
+                  /* 🔴 Pre-Check (ไปหน้า /matching/pre-check = หมวดจับคู่งาน) ถูกถอดจากเมนูนี้ 27 ก.ย. 2569
+                     — เจ้าของสั่งห้ามกดจากกล่องงานแล้วโผล่หน้าจับคู่งาน · หน้า Pre-Check ยังเข้าได้จากหน้า Matching */
+                  <RecruitBoardTools variant="onDark" />
                 ) : null}
                 {/* ปุ่มรีเฟรชนี้โหลด feed **ใบขอ** ใหม่ — แท็บอื่นแสดงรายชื่อคนคนละชุด
                     และมีปุ่มรีเฟรชของตัวเองใน RmWorkspace อยู่แล้ว */}
@@ -1146,12 +1148,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   <Button
                     type="button"
                     variant="hero"
-                    size="sm"
+                    size="icon"
                     onClick={() => void onRefresh()}
                     disabled={loading || refreshing}
+                    aria-label="รีเฟรชข้อมูล"
+                    title="รีเฟรชข้อมูล"
+                    className="h-9 w-9"
                   >
                     <RefreshCw className={cn(refreshing && 'animate-spin')} />
-                    รีเฟรชข้อมูล
                   </Button>
                 ) : null}
               </>
@@ -1303,9 +1307,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           /* เจ้าหน้าที่: เลขนี้คือจำนวน**ใบขอ** + บอกอัตราต่อท้ายให้เทียบกับ Dashboard ได้
              สาธารณะ: คงคำว่า "ตำแหน่ง" เดิม (คนนอกไม่ได้ดูหน่วยอัตราของ ERP) */
           countUnitLabel={isStaff ? 'ใบขอ' : undefined}
+          resultAction={
+            boardFilterOn &&
+            (hasAnyBoardFilter(boardFilterState) || filters.search.trim() !== '' || Boolean(selectionLabel)) ? (
+              <BoardResetButton onReset={() => clearAllBoardFilters({ search: true, laneStep: true })} />
+            ) : null
+          }
+          /* 🔴 เจ้าของถาม 27 ก.ย. 2569 ว่า "พบ 316 ใบขอ · 410 อัตราที่ยังต้องหา หมายความว่าไง"
+             ⇒ เปลี่ยนคำเป็น "แสดง N จาก M ใบขอ · ต้องหาคน X อัตรา" (เจ้าของเลือกเอง) */
           positionsNote={
             isStaff && ledgerReady
-              ? `${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตรา${closedBox ? '' : 'ที่ยังต้องหา'}`
+              ? closedBox
+                ? `${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตรา`
+                : `ต้องหาคน ${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตรา`
               : undefined
           }
           /* แถบกรองแบบ iRecruit (26 ก.ย. 2569) — ช่องจังหวัด/ตำแหน่ง/เจ้าหน้าที่ของแถบนี้ย้ายไปอยู่
@@ -1313,19 +1327,21 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           hideFieldFilters={boardFilterOn}
           extra={
             boardFilterOn ? (
-              <BoardFilterTopTools
-                panel={{
-                  facets: boardFacets,
-                  selectedCount: boardFacetCount,
-                  onToggle: toggleBoardFacet,
-                  onClear: clearBoardFacetsOnly,
+              /* 🔴 ตัวกรองทั้งแถวเป็น Dropdown (เจ้าของเลือกแบบ A 27 ก.ย. 2569) — แถบซ้ายถูกถอด
+                 "ล้าง" = ล้างทุกอย่างรวมการ์ด/ขั้นที่กดไว้ (แถบ "กำลังดู" ที่มีปุ่มล้างถูกถอดแล้ว) */
+              <BoardFilterBar
+                facets={boardFacets}
+                onToggle={toggleBoardFacet}
+                done={{
+                  closed: closedBoxCounts.closed.length,
+                  cancelled: closedBoxCounts.cancelled.length,
+                  lane: doneLane,
+                  onChange: (next) => setSelection({ lane: next }),
                 }}
                 dates={boardFilterState.dates}
                 onDatesChange={setBoardDates}
                 sort={boardSort}
                 onSortChange={setBoardSort}
-                canReset={hasAnyBoardFilter(boardFilterState) || filters.search.trim() !== ''}
-                onReset={() => clearAllBoardFilters({ search: true })}
               />
             ) : undefined
           }
@@ -1359,47 +1375,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               onStepChange={(next) =>
                 setSelection(next ? { lane: 'unreleased', step: next } : { lane: null, step: null })
               }
-              doneCounts={{
-                closed: closedBoxCounts.closed.length,
-                cancelled: closedBoxCounts.cancelled.length,
-              }}
-              doneLane={doneLane}
-              onDoneLaneChange={(next) => setSelection({ lane: next })}
             />
 
-            {/* 🔴 **แถบ "กำลังดูอะไรอยู่"** (แก้ 27 ส.ค. 2569)
-                โมเดลที่มาลองเล่นสรุปว่า *"กดเลขแล้วมันแค่ขยายบอกความหมาย ไม่ได้เปลี่ยนหน้าไป"*
-                — คือ **ไม่เห็นว่าการ์ดข้างล่างถูกกรอง** เพราะการ์ดอยู่ต่ำกว่าขอบจอ
-                ⇒ ต้องมีแถบสีบอกชัด + ปุ่มล้าง + เลื่อนจอไปที่การ์ดให้เห็นว่ามันเปลี่ยน */}
-            {/* 🔴 ต้องสรุปตัวกรองแถบซ้ายด้วย (แผนข้อ 9) — N ใบ = จำนวนการ์ดจริงข้างล่างเสมอ */}
-            {ledgerReady && (selectionLabel || boardFilterSummary || searchSummary) ? (
-              <div
-                className={cn(
-                  'flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2',
-                  TONE.primary.soft,
-                )}
-              >
-                <p className="min-w-0 text-[11px] font-medium text-foreground">
-                  กำลังดู: {[selectionLabel, boardFilterSummary, searchSummary].filter(Boolean).join(' · ')} —{' '}
-                  {flowJobs.length.toLocaleString('th-TH')} ใบข้างล่าง
-                </p>
-                <button
-                  type="button"
-                  onClick={() =>
-                    boardFilterSummary || searchSummary
-                      ? clearAllBoardFilters({ laneStep: Boolean(selectionLabel), search: Boolean(searchSummary) })
-                      : setSelection({ lane: null, step: null })
-                  }
-                  className={cn(
-                    'rounded-lg px-2.5 py-1 text-[11px] font-medium',
-                    TONE.neutral.outline,
-                  )}
-                >
-                  ล้างตัวกรอง — ดูทั้งหมด
-                </button>
-              </div>
-            ) : null}
-
+            {/* 🔴 แถบ "กำลังดู: … — N ใบข้างล่าง" ถูกถอด 27 ก.ย. 2569 (เจ้าของสั่ง "เอาออก")
+                จำนวนที่เหลือหลังกรองดูได้จากบรรทัด "แสดง N จาก M ใบขอ" ในแถบตัวกรอง */}
             {/* ช่วงวันที่ของชุดใบปิด/ยกเลิก — โผล่เฉพาะตอนเลือกสองกล่องนั้น
                 ⚠️ **ต้องมีช่วงวันที่เสมอ** ใบปิดสะสมย้อนหลังหลายปี ดึงหมดคือรอเป็นนาที */}
             {closedBox ? (
@@ -1516,22 +1495,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             การ์ดเหมือนเดิมทุกอย่าง — แค่ย้ายไปอยู่คอลัมน์ขวาเมื่อมีแถบซ้าย
             (จอ lg มีที่เหลือจากแถบ 16rem ให้การ์ดแค่ 2 คอลัมน์ · xl ขึ้นไปกลับเป็น 3 เหมือนเดิม)
             🔴 เฉพาะเจ้าหน้าที่ + มุมมองกล่องงาน — หน้าสมัครสาธารณะได้กริดเดิมทุกพิกเซล */}
-        <div className={cn('mt-3', boardFilterOn && 'lg:flex lg:items-start lg:gap-4')}>
-        {boardFilterOn ? (
-          <BoardFilterSidebar
-            facets={boardFacets}
-            selectedCount={boardFacetCount}
-            onToggle={toggleBoardFacet}
-            onClear={clearBoardFacetsOnly}
-          />
-        ) : null}
-        <div
-          ref={cardListRef}
-          className={cn(
-            'grid gap-4 sm:grid-cols-2',
-            boardFilterOn ? 'min-w-0 flex-1 xl:grid-cols-3' : 'lg:grid-cols-3',
-          )}
-        >
+        <div className="mt-3">
+        <div ref={cardListRef} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {boardFilterOn && ledgerReady && flowJobs.length === 0 && hasAnyBoardFilter(boardFilterState) ? (
             <div
               className={cn(
@@ -1540,7 +1505,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               )}
             >
               <p className="font-medium text-foreground">ไม่มีใบขอที่ตรงกับตัวกรองนี้</p>
-              <p className="mt-1 text-xs text-muted-foreground">ลองเอาบางค่าออก หรือกด "ล้าง" ที่แถบด้านซ้าย</p>
+              <p className="mt-1 text-xs text-muted-foreground">ลองเอาบางค่าออก หรือกด "ล้าง" ในแถบตัวกรอง</p>
             </div>
           ) : null}
           {visibleJobs.map((job) => (
@@ -1591,25 +1556,25 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     {/* ป้ายใบขอชั่วคราว (17 ส.ค. 2569 · เปลี่ยนคำ 19 ส.ค.) — ต้องรู้ตั้งแต่แรกเห็น
                         ว่ายังไม่ใช่ใบจริง เพราะยังไม่การันตีว่าจะเปิดงาน (หาคนล่วงหน้าได้ แต่อย่าไปสัญญา) */}
                     <PrequestBadge job={job} />
-                    <h2 className="line-clamp-2 text-base font-medium leading-snug text-foreground transition-colors group-hover:text-primary">
+                    <h2 className="line-clamp-2 text-base font-medium text-foreground transition-colors group-hover:text-primary">
                       {jobBoardCardTitle(job)}
                     </h2>
                     {/* ตำแหน่งงานอยู่ใต้ชื่อไซต์ทันที + ไฮไลต์สี (เจ้าของสั่ง 17 ส.ค. 2569:
                         *"ตำแหน่งงานอยู่ใต้ Site งาน และขอไฮไลสีด้วย"*)
                         เดิมตำแหน่งเป็นชิปเทา ๆ ปนอยู่แถวล่างกับประเภทงาน กวาดตาหาไม่เจอ
                         ทั้งที่เป็นคำที่คนใช้ตัดสินใจมากที่สุดบนการ์ด */}
-                    <p className="line-clamp-2 text-sm font-medium leading-snug text-primary">
+                    <p className="line-clamp-2 text-sm font-medium text-primary">
                       {publicJobPositionLabel(job)}
                     </p>
                     {/* บรรทัดรอง: ตัดตำแหน่งที่ซ้ำกับบรรทัดสีน้ำเงินข้างบนออก (เดิมพิมพ์ซ้ำทุกใบ) */}
-                    <p className="line-clamp-2 text-xs leading-4 text-muted-foreground">
+                    <p className="line-clamp-2 text-xs text-muted-foreground">
                       {jobBoardCardSubtitle(job) || EM_DASH}
                     </p>
                     {/* เลขที่ใบขอโชว์เฉพาะเจ้าหน้าที่ (หน้าสมัครสาธารณะไม่ต้องเห็น จึงไม่จองที่)
                         แต่ในฝั่งเจ้าหน้าที่ต้องมีที่ยืนทุกใบ ไม่งั้นแถวล่างเลื่อนไม่ตรงกัน */}
                     {isStaff ? (
                       <div className="flex items-center justify-between gap-2">
-                        <p className="font-mono text-[11px] leading-4 text-muted-foreground/80">
+                        <p className="text-xs text-muted-foreground/80">
                           {dashIfEmpty(job.request_no)}
                         </p>
                         {/* ชิปอายุ = เหตุผลที่ใบนี้อยู่ลำดับนี้ (บอร์ดเรียงด้วย
@@ -1622,7 +1587,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           return (
                             <span
                               className={cn(
-                                'shrink-0 rounded-md border px-1.5 py-0.5 text-[11px] font-medium',
+                                'shrink-0 rounded-md border px-1.5 py-0.5 text-xs font-medium',
                                 JOB_AGE_CHIP_META[age.level].chipCls,
                               )}
                               title={age.title}
@@ -1655,7 +1620,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       ไม่งั้นกดปุ่มแล้วเด้งไปเปิดรายละเอียดแทน */}
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
                     {job.urgency === 'urgent' && (
-                      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
+                      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-xs font-medium uppercase text-destructive">
                         ด่วน
                       </span>
                     )}
@@ -1681,7 +1646,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           : 'สถานะงานที่เจ้าหน้าที่ตั้งไว้'
                       }
                       className={cn(
-                        'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium',
+                        'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium',
                         isHiddenFromPublicByWorkStatus(job.work_status)
                           ? TONE.warn.chip
                           : 'bg-muted text-muted-foreground',
@@ -1695,11 +1660,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     </span>
                   ) : null}
                   {job.job_description_code_1 && job.job_type ? (
-                    <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                    <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                       {JOB_TYPE_LABELS[job.job_type]}
                     </span>
                   ) : (
-                    <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                    <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                       {jobSectorLabel(job)}
                     </span>
                   )}
@@ -1709,7 +1674,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   ความแปรผันของเนื้อด้านบน (ชิปช่องทางที่หายทั้งบล็อกในบางใบ ฯลฯ)
                   จึงไม่ทำให้แถบ "ผู้สมัคร N คน" ของแต่ละใบอยู่คนละระดับอีก */}
               <CardContent className="flex-1 space-y-2 pb-4">
-                <p className="flex items-start gap-2 text-xs leading-4 text-muted-foreground line-clamp-2">
+                <p className="flex items-start gap-2 text-xs text-muted-foreground line-clamp-2">
                   <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" />
                   {/* ข้อความสำรองแบบเดียวกับการ์ดกล่องลอย ('ไม่ได้ระบุจังหวัด') —
                       คำที่ผู้สมัครทั่วไปอ่านรู้เรื่อง เพราะโผล่บนหน้าสมัครสาธารณะด้วย */}
@@ -1852,7 +1817,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         {isStaff && breakdownLoaded && countFor(applicantIdx, job.id) === 0 ? (
                           <span
                             className={cn(
-                              'rounded-md border px-1.5 py-0.5 text-[11px] font-medium',
+                              'rounded-md border px-1.5 py-0.5 text-xs font-medium',
                               TONE.warn.soft,
                               TONE.warn.value,
                             )}
@@ -1927,7 +1892,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           title={SEARCH_ALL_POOLS_AND_CALL.hint}
                           /* 🔴 ui/button.tsx variant เป็นธีมสว่างล้วน (bg-white/50 ไม่มีคู่ dark)
                              → ทับด้วย TONE.*.outline ที่มีคู่ dark ครบ (กติกาข้อ 4) */
-                          className={cn('min-h-9 sm:min-h-0 h-7 rounded-lg px-2 text-[11px]', TONE.success.outline)}
+                          className={cn('min-h-9 sm:min-h-0 h-7 rounded-lg px-2 text-xs', TONE.success.outline)}
                         >
                           <Send aria-hidden />
                           {SEARCH_ALL_POOLS_AND_CALL.label}
@@ -1936,8 +1901,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         )}
                         {/* ⚠️ **ไม่มีปุ่ม "ประกาศ / ลิงก์" บนการ์ด** — กดตัวการ์ดคือไปหน้านั้นแล้ว
                             (ใส่ปุ๊มซ้ำ = ปุ่มที่ทำงานเหมือนการกดกล่องที่มันอยู่ข้างใน) */}
-                        {/* "ดูรายชื่อ" = **ไปแท็บผู้สมัครของใบขอ** ไม่ใช่ป๊อปอีกแล้ว
-                            (เจ้าของสั่ง 27 ส.ค. 2569) — หน้านั้นมีตัวกรอง/ปุ่มลงมือครบกว่าป๊อป
+                        {/* "ดูรายชื่อ" = **ไปแท็บ "รายชื่อผู้สมัคร" ในหน้านี้** พร้อมติ๊กใบนี้ให้
+                            (27 ก.ย. 2569 — เจ้าของสั่งห้ามเด้งไปหน้าใบขอ · เดิมไปแท็บผู้สมัครของหน้าใบขอ)
                             ⚠️ stopPropagation — ไม่งั้นโดนคลิกของกล่องทับ */}
                         <Button
                           type="button"
@@ -1945,9 +1910,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           variant="outline"
                           onClick={(e) => {
                             e.stopPropagation();
-                            openUnit(job, 'applicants');
+                            openApplicantsOf(job);
                           }}
-                          className={cn('min-h-9 sm:min-h-0 h-7 rounded-lg px-2 text-[11px]', TONE.info.outline)}
+                          className={cn('min-h-9 sm:min-h-0 h-7 rounded-lg px-2 text-xs', TONE.info.outline)}
                         >
                           <Users aria-hidden />
                           ดูรายชื่อ
@@ -2020,7 +1985,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             <Separator className="mb-4" />
             <div className="mb-3">
               <h2 className="text-sm font-medium text-foreground">กล่องลอย (ไม่ผูกใบขอ)</h2>
-              <p className={cn('mt-0.5 text-[11px] leading-4', DASH.muted)}>
+              <p className={cn('mt-0.5 text-xs', DASH.muted)}>
                 ประกาศที่ไม่ได้มาจากใบขอของหน่วยงาน — ตัวเลขข้างบนทั้งหมดไม่นับส่วนนี้ ·
                 กดที่กล่องเพื่อสร้างลิงก์รับสมัครของประเภทนั้น
               </p>
@@ -2062,10 +2027,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     <CardHeader className="space-y-3 pb-2">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <h2 className="line-clamp-2 text-base font-medium leading-snug text-foreground transition-colors group-hover:text-primary">
+                          <h2 className="line-clamp-2 text-base font-medium text-foreground transition-colors group-hover:text-primary">
                             {k.label}
                           </h2>
-                          <p className="mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                             {s.titles.length > 0 ? s.titles.join(' • ') : 'ยังไม่มีประกาศของประเภทนี้'}
                           </p>
                         </div>
@@ -2074,13 +2039,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
-                        <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
+                        <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
                           กล่องลอย
                         </span>
                         {s.bus.map((bu) => (
                           <span
                             key={bu}
-                            className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+                            className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
                           >
                             {bu}
                           </span>
@@ -2088,7 +2053,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       </div>
                     </CardHeader>
                     <CardContent className="flex-1 space-y-2 pb-4">
-                      <p className="flex items-start gap-2 text-xs leading-4 text-muted-foreground line-clamp-2">
+                      <p className="flex items-start gap-2 text-xs text-muted-foreground line-clamp-2">
                         <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" />
                         {s.provinces.length > 0 ? s.provinces.join(' · ') : 'ไม่ได้ระบุจังหวัด'}
                       </p>
@@ -2105,7 +2070,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         </span>
                         <span
                           className={cn(
-                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium',
+                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium',
                             TONE.violet.outline,
                           )}
                         >
@@ -2163,7 +2128,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       >
         <DialogContent className="flex max-h-[min(92dvh,860px)] w-[min(calc(100vw-1.25rem),40rem)] max-w-none flex-col gap-0 overflow-hidden border-border/80 p-0">
           <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-3 pt-5 text-left">
-            <DialogTitle className="text-base font-medium leading-snug sm:text-lg break-words">
+            <DialogTitle className="text-base font-medium sm:text-lg break-words">
               {postingJob ? jobBoardCardTitle(postingJob) : ''}
             </DialogTitle>
             <DialogDescription className="text-xs">
