@@ -30,9 +30,25 @@ import { buildIncomeDisplay } from './incomeBreakdown';
 import { formatYmdDmyBe } from './dateTh';
 import { genderLabel } from './genderRequirement';
 import { isDrivingPositionLabel } from './jobBoardPositionPreset';
+import {
+  UNSPECIFIED,
+  applyFacetDefs,
+  buildFacetViews,
+  countSelectedValues,
+  describeSelection,
+  readSelectionParams,
+  toggleSelection,
+  writeSelectionParams,
+  type FacetDef as EngineFacetDef,
+  type FacetOption,
+  type FacetView,
+} from './facetEngine';
 
-/** คำกลางของ "ไม่มีข้อมูลช่องนี้" — ให้กดกรองได้ (กติกาในแผน: ฟิลด์ไม่มีค่า = มีค่า "ไม่ระบุ") */
-export const UNSPECIFIED = '__none__';
+/**
+ * 🔴 อัลกอริทึมกรอง/นับ/URL อยู่ที่ `facetEngine.ts` (ใช้ร่วมกับแท็บผู้สมัคร — 27 ก.ย. 2569)
+ * ไฟล์นี้เหลือ "หัวข้อของกล่องงาน" + ช่วงวันที่ + ปุ่มเรียง · export เดิมคงไว้ครบ
+ */
+export { UNSPECIFIED, visibleFacetOptions } from './facetEngine';
 
 export type BoardFacetKey =
   | 'applicants'
@@ -81,23 +97,7 @@ export type BoardFilterState = {
 
 export const EMPTY_BOARD_FILTER_STATE: BoardFilterState = { selection: {}, dates: null };
 
-type FacetUi = 'chip' | 'check';
-
-type FacetDef = {
-  key: BoardFacetKey;
-  label: string;
-  ui: FacetUi;
-  /** หัวข้อค่าเยอะ — มีช่องค้นหาในหัวข้อ */
-  searchable?: boolean;
-  /** ลำดับตายตัวของตัวเลือก (หัวข้อ enum) — ไม่มี = เรียงตามจำนวนใบ */
-  order?: readonly string[];
-  /** คำบนจอของค่า — ไม่มี = ใช้ค่านั้นเป็นคำ */
-  labelOf?: (value: string) => string;
-  /** หัวข้อนี้พร้อมโชว์ไหม (ขึ้นกับเส้นข้อมูล) */
-  available?: (facts: BoardFacetFacts) => boolean;
-  /** ใบนี้มีค่าอะไรบ้าง — คืนได้หลายค่า (เช่น "1–4 คน" + "มี Lead") */
-  values: (job: JobRequest, facts: BoardFacetFacts, state: BoardFilterState) => string[];
-};
+type FacetDef = EngineFacetDef<JobRequest, BoardFacetKey, BoardFacetFacts, BoardFilterState>;
 
 const trimOr = (v: unknown): string => {
   const t = typeof v === 'string' ? v.trim() : '';
@@ -394,77 +394,23 @@ function passesDates(job: JobRequest, dates: BoardDateRange | null): boolean {
   return true;
 }
 
-/** ค่าที่ติ๊กจริงของหัวข้อนั้น (กรองของว่างออก) */
-function selectedOf(state: BoardFilterState, key: BoardFacetKey): string[] {
-  return (state.selection[key] ?? []).filter((v) => typeof v === 'string' && v !== '');
-}
-
-/** หัวข้อที่ใช้กรองได้จริงตอนนี้ — หัวข้อที่เส้นข้อมูลยังไม่พร้อมต้องไม่กรอง (ห้ามตัดใบทิ้งเพราะยังไม่รู้) */
-function activeFacets(facts: BoardFacetFacts): FacetDef[] {
-  return FACETS.filter((f) => !f.available || f.available(facts));
-}
-
-type ValueTable = Map<BoardFacetKey, string[][]>;
-
-function buildValueTable(
-  rows: readonly JobRequest[],
-  facets: readonly FacetDef[],
-  facts: BoardFacetFacts,
-  state: BoardFilterState,
-): ValueTable {
-  const table: ValueTable = new Map();
-  for (const f of facets) table.set(f.key, rows.map((job) => f.values(job, facts, state)));
-  return table;
-}
-
-function rowPasses(
-  i: number,
-  table: ValueTable,
-  facets: readonly FacetDef[],
-  state: BoardFilterState,
-  skip: BoardFacetKey | null,
-): boolean {
-  for (const f of facets) {
-    if (f.key === skip) continue;
-    const want = selectedOf(state, f.key);
-    if (want.length === 0) continue;
-    const have = table.get(f.key)?.[i] ?? [];
-    if (!have.some((v) => want.includes(v))) return false;
-  }
-  return true;
-}
-
-/** กรองใบขอตามแถบซ้าย + ช่วงวันที่ — OR ในหัวข้อ · AND ข้ามหัวข้อ */
+/** กรองใบขอตามแถบซ้าย + ช่วงวันที่ — OR ในหัวข้อ · AND ข้ามหัวข้อ (ตัวกลาง `facetEngine`) */
 export function applyBoardFilters(
   rows: readonly JobRequest[],
   state: BoardFilterState,
   facts: BoardFacetFacts,
 ): JobRequest[] {
   const dated = rows.filter((j) => passesDates(j, state.dates));
-  const facets = activeFacets(facts);
-  if (facets.every((f) => selectedOf(state, f.key).length === 0)) return dated;
-  const table = buildValueTable(dated, facets, facts, state);
-  return dated.filter((_, i) => rowPasses(i, table, facets, state, null));
+  return applyFacetDefs(dated, FACETS, state, facts);
 }
 
-export type BoardFacetOption = { value: string; label: string; count: number; selected: boolean };
-export type BoardFacetView = {
-  key: BoardFacetKey;
-  label: string;
-  ui: FacetUi;
-  searchable: boolean;
-  options: BoardFacetOption[];
-  selectedCount: number;
-};
+export type BoardFacetOption = FacetOption;
+export type BoardFacetView = FacetView<BoardFacetKey>;
 
 /**
- * หัวข้อ + ตัวเลือก + เลขต่อท้าย สำหรับวาดแถบซ้าย
- *
+ * หัวข้อ + ตัวเลือก + เลขต่อท้าย สำหรับวาดแถบซ้าย (กติกาทั้งหมดอยู่ที่ `buildFacetViews`)
  * - เลขของแต่ละค่า = ใบที่ผ่าน **ทุกหัวข้อยกเว้นหัวข้อตัวเอง** (+ ช่วงวันที่)
- * - ตัวเลือก = ค่าที่มีจริงในชุด (หลังช่วงวันที่) ∪ ค่าที่ติ๊กอยู่ (ติ๊กแล้วเลขเป็น 0 ก็ยังต้องเห็น)
- *   ∪ **ทุกตัวเลือกของหัวข้อแบบตายตัว** (`order`) — เลข 0 จางแต่ยังเห็น (แผนข้อ 5)
- * - 🔴 **ห้ามปุ่มหลอก**: ซ่อนเฉพาะหัวข้อที่ **ข้อมูลจริงว่างทั้งหมด** (มีแต่ "ไม่ระบุ" หรือไม่มีค่าเลย)
- *   และไม่ได้ติ๊กอะไรอยู่ · อำเภอ/งานย่อยไม่มีค่าจนกว่าจะเลือกหัวข้อแม่ จึงหายไปเองตามแผน
+ * - 🔴 ห้ามปุ่มหลอก: ซ่อนเฉพาะหัวข้อที่ข้อมูลจริงว่างทั้งหมด · หัวข้อตายตัวโชว์ครบ เลข 0 จาง
  *   ⚠️ เดิมซ่อนหัวข้อที่มีค่าเดียวด้วย ⇒ ความเร่งด่วนหายทั้งหัวข้อ (316 ใบเป็น "ล่วงหน้า") — แก้แล้ว
  */
 export function buildBoardFacets(
@@ -473,82 +419,12 @@ export function buildBoardFacets(
   facts: BoardFacetFacts,
 ): BoardFacetView[] {
   const dated = rows.filter((j) => passesDates(j, state.dates));
-  const facets = activeFacets(facts);
-  const table = buildValueTable(dated, facets, facts, state);
-  const out: BoardFacetView[] = [];
-
-  for (const f of facets) {
-    const selected = selectedOf(state, f.key);
-    const universe = new Set<string>();
-    for (const vals of table.get(f.key) ?? []) for (const v of vals) universe.add(v);
-    const hasRealValue = [...universe].some((v) => v !== UNSPECIFIED);
-    if (!hasRealValue && selected.length === 0) continue;
-    if (f.order) for (const v of f.order) universe.add(v);
-    for (const v of selected) universe.add(v);
-
-    const counts = new Map<string, number>();
-    dated.forEach((_, i) => {
-      if (!rowPasses(i, table, facets, state, f.key)) return;
-      for (const v of new Set(table.get(f.key)?.[i] ?? [])) counts.set(v, (counts.get(v) ?? 0) + 1);
-    });
-
-    const options: BoardFacetOption[] = [...universe].map((value) => ({
-      value,
-      label: boardFacetValueLabel(f.key, value),
-      count: counts.get(value) ?? 0,
-      selected: selected.includes(value),
-    }));
-
-    if (f.order) {
-      const rank = (v: string) => {
-        const idx = f.order!.indexOf(v);
-        return idx === -1 ? f.order!.length + (v === UNSPECIFIED ? 1 : 0) : idx;
-      };
-      options.sort((a, b) => rank(a.value) - rank(b.value));
-    } else {
-      // ค่าเยอะ: จำนวนมากก่อน · "ไม่ระบุ" ไปท้ายเสมอ (ไม่ใช่ค่าที่คนตั้งใจหา)
-      options.sort((a, b) => {
-        if (a.value === UNSPECIFIED) return 1;
-        if (b.value === UNSPECIFIED) return -1;
-        return b.count - a.count || a.label.localeCompare(b.label, 'th');
-      });
-    }
-
-    out.push({
-      key: f.key,
-      label: f.label,
-      ui: f.ui,
-      searchable: Boolean(f.searchable),
-      options,
-      selectedCount: selected.length,
-    });
-  }
-  return out;
-}
-
-/**
- * ตัวเลือกที่จะโชว์ในหัวข้อค่าเยอะ (กติกาในแผน ข้อ 4)
- * ค่าที่ติ๊กแล้วลอยขึ้นบนสุด · ยังไม่พิมพ์ค้นหา = โชว์ 10 ค่าแรก · พิมพ์แล้ว = ทุกค่าที่ตรง
- */
-export function visibleFacetOptions(
-  options: readonly BoardFacetOption[],
-  query: string,
-  limit = 10,
-): { shown: BoardFacetOption[]; hiddenCount: number } {
-  const q = query.trim().toLowerCase();
-  const selected = options.filter((o) => o.selected);
-  const rest = options.filter((o) => !o.selected);
-  if (q) {
-    const hits = rest.filter((o) => o.label.toLowerCase().includes(q));
-    return { shown: [...selected, ...hits], hiddenCount: 0 };
-  }
-  const head = rest.slice(0, Math.max(limit - selected.length, 0));
-  return { shown: [...selected, ...head], hiddenCount: rest.length - head.length };
+  return buildFacetViews(dated, FACETS, state, facts, boardFacetValueLabel);
 }
 
 /** นับหัวข้อ/ค่าที่เลือกอยู่ (ปุ่ม "ตัวกรอง (N)" บนมือถือ) — ไม่นับช่วงวันที่ซึ่งอยู่แถบบน */
 export function countSelectedFacetValues(state: BoardFilterState): number {
-  return BOARD_FACET_KEYS.reduce((n, k) => n + selectedOf(state, k).length, 0);
+  return countSelectedValues(state, BOARD_FACET_KEYS);
 }
 
 export function hasAnyBoardFilter(state: BoardFilterState): boolean {
@@ -561,9 +437,8 @@ export function toggleBoardFacetValue(
   key: BoardFacetKey,
   value: string,
 ): BoardFilterState {
-  const cur = selectedOf(state, key);
-  const next = cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value];
-  const selection: BoardFilterState['selection'] = { ...state.selection, [key]: next };
+  const selection: BoardFilterState['selection'] = toggleSelection(state.selection, key, value);
+  const next = selection[key] ?? [];
   if (key === 'province') {
     const provinces = next.filter((p) => p !== UNSPECIFIED);
     const allowed = new Set(provinces.flatMap((p) => [...getDistrictOptionsForProvince(p)]));
@@ -583,14 +458,8 @@ export function clearBoardFacets(state: BoardFilterState): BoardFilterState {
 
 /** สรุปสั้นสำหรับแถบ "กำลังดู" — เช่น `จำนวนผู้สมัคร: ยังไม่มีคนสมัคร · จังหวัด: ชลบุรี, ระยอง` */
 export function describeBoardFilters(state: BoardFilterState): string {
-  const parts: string[] = [];
-  for (const key of BOARD_FACET_KEYS) {
-    const vals = selectedOf(state, key);
-    if (vals.length === 0) continue;
-    const labels = vals.map((v) => boardFacetValueLabel(key, v));
-    const shown = labels.length > 3 ? `${labels.slice(0, 3).join(', ')} +${labels.length - 3}` : labels.join(', ');
-    parts.push(`${boardFacetLabel(key)}: ${shown}`);
-  }
+  const facetText = describeSelection(state, BOARD_FACET_KEYS, boardFacetLabel, boardFacetValueLabel);
+  const parts: string[] = facetText ? [facetText] : [];
   if (state.dates && (state.dates.from || state.dates.to)) {
     const field = state.dates.field === 'request' ? 'วันที่ขอ' : 'วันที่ต้องการ';
     // รูปวันที่เดียวกับทั้งระบบ (1/10/2569) — ห้ามโชว์ 2026-10-01 ดิบ ๆ (เจอตอนตรวจบนจอ)
@@ -611,14 +480,7 @@ const DATE_TO_PARAM = 'dto';
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function readBoardFilterState(params: URLSearchParams): BoardFilterState {
-  const selection: BoardFilterState['selection'] = {};
-  for (const key of BOARD_FACET_KEYS) {
-    const vals = params
-      .getAll(`${BOARD_FILTER_PARAM_PREFIX}${key}`)
-      .map((v) => v.trim())
-      .filter(Boolean);
-    if (vals.length > 0) selection[key] = [...new Set(vals)];
-  }
+  const selection = readSelectionParams(params, BOARD_FILTER_PARAM_PREFIX, BOARD_FACET_KEYS);
   const from = params.get(DATE_FROM_PARAM) ?? '';
   const to = params.get(DATE_TO_PARAM) ?? '';
   const field: BoardDateField = params.get(DATE_FIELD_PARAM) === 'request' ? 'request' : 'required';
@@ -638,16 +500,10 @@ export function writeBoardFilterState(
   params: URLSearchParams,
   state: BoardFilterState,
 ): URLSearchParams {
-  const next = new URLSearchParams(params);
-  for (const k of [...next.keys()]) {
-    if (k.startsWith(BOARD_FILTER_PARAM_PREFIX)) next.delete(k);
-  }
+  const next = writeSelectionParams(params, BOARD_FILTER_PARAM_PREFIX, BOARD_FACET_KEYS, state.selection);
   next.delete(DATE_FIELD_PARAM);
   next.delete(DATE_FROM_PARAM);
   next.delete(DATE_TO_PARAM);
-  for (const key of BOARD_FACET_KEYS) {
-    for (const v of selectedOf(state, key)) next.append(`${BOARD_FILTER_PARAM_PREFIX}${key}`, v);
-  }
   if (state.dates && (state.dates.from || state.dates.to)) {
     if (state.dates.field === 'request') next.set(DATE_FIELD_PARAM, 'request');
     if (state.dates.from) next.set(DATE_FROM_PARAM, state.dates.from);

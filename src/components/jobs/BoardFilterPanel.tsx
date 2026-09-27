@@ -18,13 +18,11 @@ import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import {
   BOARD_SORT_OPTIONS,
-  visibleFacetOptions,
   type BoardDateField,
   type BoardDateRange,
-  type BoardFacetKey,
-  type BoardFacetView,
   type BoardSort,
 } from '@/lib/boardFilters';
+import { visibleFacetOptions, type FacetView } from '@/lib/facetEngine';
 
 /**
  * ═══ แถบกรองด้านซ้ายของกล่องงาน (แบบ iRecruit) ═══
@@ -42,22 +40,25 @@ import {
  * - หัวข้อค่าเยอะมีช่องค้นหา · ค่าที่ติ๊กลอยบนสุด · ยังไม่พิมพ์ = 10 ค่าแรก
  * - เลข 0 จางลงแต่ **ยังกดได้** (อยากดูว่าติ๊กแล้วได้ 0 ใบก็ต้องทำได้)
  * - desktop = แถบด้านซ้าย · มือถือ = ปุ่ม "ตัวกรอง (N)" เปิด Sheet
+ *
+ * 🔴 ใช้ร่วมกับแท็บผู้สมัคร (27 ก.ย. 2569) — component เป็น generic ตามชนิดคีย์หัวข้อ
+ * หน้าไหนก็ส่ง `FacetView` จาก `facetEngine` มาวาดได้ (ห้ามทำแถบกรองชุดที่สอง)
  */
-export type BoardFilterPanelProps = {
-  facets: BoardFacetView[];
+export type BoardFilterPanelProps<K extends string = string> = {
+  facets: FacetView<K>[];
   /** จำนวนค่าที่ติ๊กอยู่ทั้งแถบ — เลขบนปุ่มมือถือ */
   selectedCount: number;
-  onToggle: (key: BoardFacetKey, value: string) => void;
+  onToggle: (key: K, value: string) => void;
   /** ล้างเฉพาะแถบซ้าย (ช่วงวันที่บนแถบบนคงไว้) */
   onClear: () => void;
 };
 
-function FacetBody({
+function FacetBody<K extends string>({
   facet,
   onToggle,
 }: {
-  facet: BoardFacetView;
-  onToggle: BoardFilterPanelProps['onToggle'];
+  facet: FacetView<K>;
+  onToggle: BoardFilterPanelProps<K>['onToggle'];
 }) {
   const [query, setQuery] = useState('');
   const { shown, hiddenCount } = facet.searchable
@@ -132,7 +133,10 @@ function FacetBody({
   );
 }
 
-function PanelContent({ facets, onToggle }: Pick<BoardFilterPanelProps, 'facets' | 'onToggle'>) {
+function PanelContent<K extends string>({
+  facets,
+  onToggle,
+}: Pick<BoardFilterPanelProps<K>, 'facets' | 'onToggle'>) {
   if (facets.length === 0) {
     return <p className="px-1 py-2 text-xs text-muted-foreground">ยังไม่มีหัวข้อให้กรอง</p>;
   }
@@ -159,7 +163,10 @@ function PanelContent({ facets, onToggle }: Pick<BoardFilterPanelProps, 'facets'
   );
 }
 
-function PanelHeader({ selectedCount, onClear }: Pick<BoardFilterPanelProps, 'selectedCount' | 'onClear'>) {
+function PanelHeader({
+  selectedCount,
+  onClear,
+}: Pick<BoardFilterPanelProps, 'selectedCount' | 'onClear'>) {
   return (
     <div className="flex items-center justify-between gap-2">
       <p className="text-sm font-medium text-foreground">ตัวกรองเพิ่มเติม</p>
@@ -178,7 +185,7 @@ function PanelHeader({ selectedCount, onClear }: Pick<BoardFilterPanelProps, 'se
 }
 
 /** แถบด้านซ้าย — โชว์ตั้งแต่จอ lg ขึ้นไป */
-export function BoardFilterSidebar(props: BoardFilterPanelProps) {
+export function BoardFilterSidebar<K extends string>(props: BoardFilterPanelProps<K>) {
   return (
     <aside
       aria-label="ตัวกรองเพิ่มเติม"
@@ -193,7 +200,7 @@ export function BoardFilterSidebar(props: BoardFilterPanelProps) {
 }
 
 /** ปุ่ม "ตัวกรอง (N)" + Sheet — โชว์เฉพาะจอเล็กกว่า lg */
-export function BoardFilterSheetButton(props: BoardFilterPanelProps) {
+export function BoardFilterSheetButton<K extends string>(props: BoardFilterPanelProps<K>) {
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -224,7 +231,7 @@ export function BoardFilterSheetButton(props: BoardFilterPanelProps) {
  * ของบนแถบบน (แผนข้อ 7): ช่วงวันที่ + ปุ่มเรียง + ปุ่ม "↻ ล้าง" (ล้างทุกตัวกรอง)
  * + ปุ่ม "ตัวกรอง (N)" สำหรับมือถือ (แถบซ้ายซ่อนบนจอเล็ก)
  */
-export function BoardFilterTopTools({
+export function BoardFilterTopTools<K extends string>({
   panel,
   dates,
   onDatesChange,
@@ -233,7 +240,7 @@ export function BoardFilterTopTools({
   canReset,
   onReset,
 }: {
-  panel: BoardFilterPanelProps;
+  panel: BoardFilterPanelProps<K>;
   dates: BoardDateRange | null;
   onDatesChange: (patch: Partial<BoardDateRange>) => void;
   sort: BoardSort;

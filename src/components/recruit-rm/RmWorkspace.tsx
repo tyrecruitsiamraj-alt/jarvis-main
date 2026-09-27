@@ -53,6 +53,20 @@ import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { canHoldApplication } from '@/lib/recruitRm';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { useAuth } from '@/contexts/AuthContext';
+import { BoardFilterSheetButton, BoardFilterSidebar } from '@/components/jobs/BoardFilterPanel';
+import {
+  EMPTY_APPLICANT_FILTER_STATE,
+  applyApplicantFilters,
+  buildApplicantFacets,
+  countSelectedApplicantValues,
+  describeApplicantFilters,
+  readApplicantFilterState,
+  toggleApplicantFacetValue,
+  writeApplicantFilterState,
+  type ApplicantFacetFacts,
+  type ApplicantFacetKey,
+  type ApplicantFilterState,
+} from '@/lib/applicantFilters';
 
 /**
  * พื้นที่ทำงาน "รายชื่อผู้สมัคร" — เนื้อของหน้างานสรรหา (RM) เดิมทั้งก้อน
@@ -235,7 +249,29 @@ const RmWorkspace: React.FC<{
     [dateRange],
   );
 
-  const filtered = useMemo(() => {
+  /**
+   * ═══ แถบกรองด้านซ้ายแบบ iRecruit (เจ้าของเคาะแบบร่าง 27 ก.ย. 2569: "เอาตามร่างเลย") ═══
+   * ตรรกะทั้งหมดอยู่ `lib/applicantFilters` + `lib/facetEngine` (ตัวเดียวกับกล่องงาน)
+   * ค่าที่ติ๊กอยู่ใน URL (`a.*`) · 🔴 โหมด drill-down (`?bucket=`) ไม่มีแถบกรอง — เลขต้องเท่ากล่องที่กดมา
+   */
+  const applicantFilterState = useMemo<ApplicantFilterState>(
+    () => (bucket ? EMPTY_APPLICANT_FILTER_STATE : readApplicantFilterState(searchParams)),
+    [bucket, searchParams],
+  );
+  const applicantFacts = useMemo<ApplicantFacetFacts>(() => ({ tab, now: new Date() }), [tab]);
+  const commitApplicantFilters = (next: ApplicantFilterState) => {
+    setSearchParams((prev) => writeApplicantFilterState(prev, next), { replace: true });
+    setPage(1);
+    setSelectedIds([]);
+  };
+  const toggleApplicantFacet = (key: ApplicantFacetKey, value: string) =>
+    commitApplicantFilters(toggleApplicantFacetValue(applicantFilterState, key, value));
+  const clearApplicantFacets = () => commitApplicantFilters(EMPTY_APPLICANT_FILTER_STATE);
+  const applicantFacetCount = countSelectedApplicantValues(applicantFilterState);
+  const applicantFilterSummary = describeApplicantFilters(applicantFilterState);
+
+  /** ชุดก่อนแถบซ้าย (แท็บ + มุมมองย่อย + วันที่ + คำค้น) — ฐานของเลขต่อท้ายตัวเลือก */
+  const baseFiltered = useMemo(() => {
     // โหมด drill-down: server กรองด้วยนิยามเดียวกับกล่องแล้ว — แสดงตามนั้นตรง ๆ
     // (หั่นต่อด้วยแท็บ/ตัวกรอง = เลขไม่ตรงกล่อง)
     if (bucket) return rows;
@@ -244,6 +280,15 @@ const RmWorkspace: React.FC<{
     if (tab !== 'candidates') return base;
     return base.filter((r) => isInRmListView(r, listView));
   }, [rows, tab, keyword, listView, bucket, rmFilters]);
+
+  const filtered = useMemo(
+    () => (bucket ? baseFiltered : applyApplicantFilters(baseFiltered, applicantFilterState, applicantFacts)),
+    [bucket, baseFiltered, applicantFilterState, applicantFacts],
+  );
+  const applicantFacets = useMemo(
+    () => (bucket ? [] : buildApplicantFacets(baseFiltered, applicantFilterState, applicantFacts)),
+    [bucket, baseFiltered, applicantFilterState, applicantFacts],
+  );
 
   /** บอร์ดสรุปนัดต่อวัน (ข้อ 12 · 20 ส.ค. 2569) — คิดจากชุดเดียวกับตาราง เลขจึงตรงกันเสมอ */
   const appointmentBoard = useMemo(() => buildAppointmentBoard(filtered), [filtered]);
@@ -287,11 +332,16 @@ const RmWorkspace: React.FC<{
 
   /** เลขบนปุ่มมุมมองย่อย — นับหลังตัวกรอง/คำค้นเดียวกัน เลขจึงตรงกับที่เห็นเสมอ */
   const listViewCounts = useMemo(() => {
-    const base = filterApplications(rows, 'candidates', rmFilters, keyword);
+    // แถบซ้ายกรองก่อนนับด้วย — เลขบนปุ่มมุมมองย่อยต้องตรงกับที่เห็นเมื่อกดเข้าไป
+    const base = applyApplicantFilters(
+      filterApplications(rows, 'candidates', rmFilters, keyword),
+      applicantFilterState,
+      applicantFacts,
+    );
     const out = {} as Record<RmListView, number>;
     for (const v of RM_LIST_VIEWS) out[v] = base.filter((r) => isInRmListView(r, v)).length;
     return out;
-  }, [rows, keyword, rmFilters]);
+  }, [rows, keyword, rmFilters, applicantFilterState, applicantFacts]);
 
   const setListView = (next: RmListView) => {
     const params = new URLSearchParams(searchParams);
@@ -548,16 +598,22 @@ const RmWorkspace: React.FC<{
         </div>
       ) : null}
 
-      {/* แผงตัวกรองด้านข้าง (ช่องทางสมัคร/จังหวัด/สถานะใบสมัคร) ถูกถอดออกทั้งหมด
-          (เจ้าของสั่ง 17 ส.ค. 2569: "เอาออกจากทุกหน้าไปเลย") — คัดรายชื่อใช้
-          แท็บ + มุมมองย่อย + ช่องค้นหาที่มีอยู่แล้ว
-          🔴 ห้ามเอาสามกลุ่มนั้นกลับมาโดยไม่ได้สั่งใหม่ */}
+      {/* 🔴 แผงตัวกรองด้านข้าง — **กลับมาแล้วในหน้าตาแบบ iRecruit** (เจ้าของเคาะแบบร่าง 27 ก.ย. 2569:
+          "เอาตามร่างเลย") · ของเดิมที่ถูกสั่งถอด 17 ส.ค. ("เอาออกจากทุกหน้าไปเลย") เป็นแถบซ้อนกันหลายชุด
+          รอบนี้เป็นคำสั่งใหม่ (แจ้งเจ้าของแล้ว) · พับเก็บเปิดทีละหัวข้อ · หัวข้อไหนข้อมูลว่างซ่อนเอง */}
 
       {/* ตัวกรองวันที่สมัคร (เจ้าของสั่ง 22 ส.ค. 2569) — ใช้ปฏิทินตัวเดียวกับหน้า Dashboard
           ⚠️ ไม่โผล่ในโหมด drill-down (?bucket=) เพราะ server กรองมาแล้ว
           ถ้าให้กรองซ้ำที่นี่ เลขจะไม่ตรงกับกล่องที่กดมา */}
       {!bucket ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
+          {/* มือถือ: แถบซ้ายซ่อน → ปุ่ม "ตัวกรอง (N)" เปิด Sheet (ตัวเดียวกับกล่องงาน) */}
+          <BoardFilterSheetButton
+            facets={applicantFacets}
+            selectedCount={applicantFacetCount}
+            onToggle={toggleApplicantFacet}
+            onClear={clearApplicantFacets}
+          />
           <span className={cn('text-xs font-medium', DASH.label)}>วันที่สมัคร</span>
           <DateRangeCalendarPicker value={dateRange} onChange={changeDateRange} />
           {dateRange ? (
@@ -567,7 +623,31 @@ const RmWorkspace: React.FC<{
           ) : null}
         </div>
       ) : null}
-      <div className="mt-4">
+      {/* แถบ "กำลังดู" — บอกว่าแถบซ้ายกรองอะไรอยู่ + เหลือกี่คน (แผนข้อ 9 ของกล่องงาน) */}
+      {!bucket && applicantFilterSummary ? (
+        <div
+          className={cn(
+            'mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2',
+            TONE.primary.soft,
+          )}
+        >
+          <p className="min-w-0 text-[11px] font-medium text-foreground">
+            กำลังดู: {applicantFilterSummary} — {filtered.length.toLocaleString('th-TH')} คนข้างล่าง
+          </p>
+          <Button type="button" variant="outline" size="sm" className="h-7 text-[11px]" onClick={clearApplicantFacets}>
+            ล้างตัวกรอง
+          </Button>
+        </div>
+      ) : null}
+      <div className={cn('mt-4', !bucket && 'lg:flex lg:items-start lg:gap-4')}>
+        {!bucket ? (
+          <BoardFilterSidebar
+            facets={applicantFacets}
+            selectedCount={applicantFacetCount}
+            onToggle={toggleApplicantFacet}
+            onClear={clearApplicantFacets}
+          />
+        ) : null}
         <div className="min-w-0 flex-1 space-y-3">
           {/* ⚠️ RmToolbar (ช่องทาง/สร้างลิงก์/เหตุผล) ถูกเอาออก (เจ้าของสั่ง 14 ส.ค. 2569:
               "กล่องช่องทาง ฯลฯ มีแค่หน้ากล่องงาน") — เครื่องมือพวกนี้เหลือที่ RecruitBoardTools
