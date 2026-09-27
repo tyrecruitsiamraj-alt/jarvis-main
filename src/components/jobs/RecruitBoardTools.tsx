@@ -192,7 +192,7 @@ const RecruitBoardTools: React.FC<{
             <Button
               type="button"
               variant={btnVariant('link')}
-              size="sm"
+              size="xs"
               onClick={() => onClickKey('link')}
               title="สร้างลิงก์รับสมัครที่ไม่ผูกกับใบขอ"
             >
@@ -204,7 +204,7 @@ const RecruitBoardTools: React.FC<{
           <DropdownMenu>
             {/* trigger ของเมนูใช้ Button ผ่าน asChild — ทรงเดียวกับปุ่มอื่นในแถบ */}
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant={btnVariant('channels')} size="sm">
+              <Button type="button" variant={btnVariant('channels')} size="xs">
                 <Settings2 aria-hidden /> ตั้งค่าบอร์ด
               </Button>
             </DropdownMenuTrigger>

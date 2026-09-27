@@ -138,8 +138,8 @@ describe('ห้ามหลุด Framework', () => {
 
   it('ทุก size ของ Button กำหนดขนาดไอคอนของตัวเอง', () => {
     const btn = read('src/components/ui/button.tsx');
-    const sizes = btn.slice(btn.indexOf('size: {'), btn.indexOf('size: {') + 400);
-    for (const key of ['default', 'sm', 'lg', 'icon']) {
+    const sizes = btn.slice(btn.indexOf('size: {'), btn.indexOf('size: {') + 900);
+    for (const key of ['default', 'sm', 'lg', 'icon', 'xs', 'iconXs']) {
       expect(sizes, key).toMatch(new RegExp(`${key}: "[^"]*\\[&_svg\\]:size-`));
     }
   });

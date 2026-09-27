@@ -575,7 +575,7 @@ const RmWorkspace: React.FC<{
           ซ้ำกับ tab bar ระดับบอร์ดที่มีชื่อแท็บ+จำนวนอยู่แล้ว · เหลือแค่ปุ่มรีเฟรช */}
       {controlledTab ? (
         <div className="flex items-center justify-end gap-2">
-          <Button variant="secondary" size="sm" type="button" onClick={load} disabled={loading} >
+          <Button variant="secondary" size="xs" type="button" onClick={load} disabled={loading} >
             <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden /> รีเฟรช
           </Button>
         </div>
@@ -674,8 +674,7 @@ const RmWorkspace: React.FC<{
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
-                className="h-9 gap-1.5 text-xs"
+                size="xs"
                 onClick={() => {
                   clearApplicantFacets();
                   if (dateRange) changeDateRange(null);
@@ -742,7 +741,7 @@ const RmWorkspace: React.FC<{
                   จากทั้งหมด {filtered.length.toLocaleString('th-TH')} คนที่รับเข้าทำงาน ·
                   วันนัดมาจากผลโทร "สนใจ→นัดได้" หรือบันทึกผลติดต่อ "สำเร็จ→นัดได้"
                 </p>
-                <Button variant="secondary" size="sm" type="button" onClick={() => window.print()} className="shrink-0">
+                <Button variant="secondary" size="xs" type="button" onClick={() => window.print()} className="shrink-0">
                   🖨 โหลดเป็น PDF
                 </Button>
               </div>

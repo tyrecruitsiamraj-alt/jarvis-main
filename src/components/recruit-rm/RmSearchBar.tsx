@@ -78,7 +78,7 @@ const RmSearchBar: React.FC<{
           placeholder={RM_SEARCH_PLACEHOLDER}
           wrapperClassName="w-full sm:w-[22rem]"
         />
-        <Button size="sm" type="button" onClick={onSearch} className="shrink-0">
+        <Button size="xs" type="button" onClick={onSearch} className="shrink-0">
           ค้นหา
         </Button>
 
@@ -86,12 +86,12 @@ const RmSearchBar: React.FC<{
       </>
     )}
 
-    <Button variant="secondary" size="sm" type="button" onClick={onAddApplicant} className="shrink-0">
+    <Button variant="secondary" size="xs" type="button" onClick={onAddApplicant} className="shrink-0">
       <UserPlus aria-hidden /> เพิ่มข้อมูลผู้สมัคร
     </Button>
 
     {onHoldSelected ? (
-      <Button size="sm"
+      <Button size="xs"
         type="button"
         onClick={onHoldSelected}
         disabled={selectedCount === 0 || holdingSelected}
@@ -136,7 +136,7 @@ const RmSearchBar: React.FC<{
         {/* อยู่คลังสำรองแล้วปุ่ม "เก็บ Lead" ไม่มีความหมาย (ทุกแถวเป็น Lead อยู่แล้ว)
             — ซ่อนไปเลยดีกว่าปุ่มที่กดแล้วไม่เกิดอะไร */}
         {!leadView ? (
-          <Button size="sm"
+          <Button size="xs"
             type="button"
             onClick={onSaveLead}
             disabled={selectedCount === 0 || leadBusy}
@@ -152,7 +152,7 @@ const RmSearchBar: React.FC<{
             {selectedCount > 0 ? ` (${selectedCount})` : ''}
           </Button>
         ) : null}
-        <Button variant="secondary" size="sm"
+        <Button variant="secondary" size="xs"
           type="button"
           onClick={onDeleteLead}
           disabled={selectedCount === 0 || leadBusy}

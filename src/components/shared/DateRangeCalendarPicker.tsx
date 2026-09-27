@@ -114,7 +114,7 @@ const DateRangeCalendarPicker: React.FC<DateRangeCalendarPickerProps> = ({
               type="button"
               id={triggerId}
               className={cn(
-                'inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium',
+                'inline-flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium',
                 value ? TONE.info.outline : TONE.neutral.outline,
               )}
             >

@@ -1135,12 +1135,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   <Button
                     type="button"
                     variant="outline"
-                    size="icon"
+                    size="iconXs"
                     onClick={() => void onRefresh()}
                     disabled={loading || refreshing}
                     aria-label="รีเฟรชข้อมูล"
                     title="รีเฟรชข้อมูล"
-                    className="h-9 w-9"
                   >
                     <RefreshCw className={cn(refreshing && 'animate-spin')} />
                   </Button>
@@ -1236,7 +1235,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   onClick={() => onViewChange(v.id)}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'shrink-0 whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors',
+                    'shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors',
                     active
                       ? cn(TONE.primary.value, 'border-b-2 border-current')
                       : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
@@ -2133,7 +2132,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               <div className="pt-2">
                 <Button
                   type="button"
-                  size="sm"
+                  size="xs"
                   variant="outline"
                   title={SEARCH_ALL_POOLS_AND_CALL.hint}
                   onClick={() => {
@@ -2141,7 +2140,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     setPostingJob(null);
                     setLaneJob(j);
                   }}
-                  className={cn('h-8 gap-1.5 rounded-lg px-2.5 text-xs', TONE.success.outline)}
+                  className={cn('rounded-lg', TONE.success.outline)}
                 >
                   <Send aria-hidden />
                   {SEARCH_ALL_POOLS_AND_CALL.label}

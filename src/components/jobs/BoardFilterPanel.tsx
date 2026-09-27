@@ -35,7 +35,7 @@ import { visibleFacetOptions, type FacetView } from '@/lib/facetEngine';
 
 /** หน้าตาปุ่มเปิด Dropdown — มีค่าติ๊กอยู่ = กรอบสีฟ้า (มีคู่ dark ครบ) */
 function triggerClass(active: boolean): string {
-  return cn('h-9 gap-1.5 rounded-lg px-3 text-xs font-medium', active ? TONE.info.outline : TONE.neutral.outline);
+  return cn('rounded-lg font-medium', active ? TONE.info.outline : TONE.neutral.outline);
 }
 
 function TriggerCount({ n }: { n: number }) {
@@ -62,11 +62,11 @@ function FacetBody<K extends string>({
           <Button
             key={o.value}
             type="button"
-            size="sm"
+            size="xs"
             variant={o.selected ? 'default' : 'outline'}
             aria-pressed={o.selected}
             onClick={() => onToggle(facet.key, o.value)}
-            className={cn('h-8 gap-1.5 rounded-full px-3 text-xs', o.count === 0 && !o.selected && 'opacity-50')}
+            className={cn('rounded-full', o.count === 0 && !o.selected && 'opacity-50')}
           >
             {o.label}
             <span className="tabular-nums opacity-70">{o.count.toLocaleString('th-TH')}</span>
@@ -196,7 +196,7 @@ export function FilterButton<K extends string>({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className={triggerClass(n > 0)}>
+        <Button type="button" variant="outline" size="xs" className={triggerClass(n > 0)}>
           <SlidersHorizontal aria-hidden />
           ตัวกรอง
           <TriggerCount n={n} />
@@ -266,7 +266,7 @@ export function ChoiceDropdown<V extends string>({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="sm" aria-label={ariaLabel} className={triggerClass(active)}>
+        <Button type="button" variant="outline" size="xs" aria-label={ariaLabel} className={triggerClass(active)}>
           {triggerLabel ?? current?.label ?? ''}
           <ChevronDown className="opacity-60" aria-hidden />
         </Button>
@@ -277,13 +277,13 @@ export function ChoiceDropdown<V extends string>({
             key={o.value}
             type="button"
             variant="ghost"
-            size="sm"
+            size="xs"
             aria-pressed={o.value === value}
             onClick={() => {
               onChange(o.value);
               setOpen(false);
             }}
-            className="h-9 w-full justify-between px-2 text-sm font-normal"
+            className="w-full justify-between font-normal"
           >
             <span>{o.label}</span>
             {o.value === value ? <Check aria-hidden /> : null}
@@ -301,7 +301,7 @@ export function ChoiceDropdown<V extends string>({
  */
 export function BoardResetButton({ onReset }: { onReset: () => void }) {
   return (
-    <Button type="button" variant="ghost" size="sm" onClick={onReset} className="h-8 gap-1.5 px-2 text-xs">
+    <Button type="button" variant="ghost" size="xs" onClick={onReset}>
       <RotateCcw aria-hidden /> ล้างตัวกรอง
     </Button>
   );
@@ -328,10 +328,10 @@ function OptionButton({
     <Button
       type="button"
       variant="outline"
-      size="sm"
+      size="xs"
       aria-pressed={selected}
       onClick={onClick}
-      className={cn('h-8 gap-1.5 rounded-full px-3 text-xs', selected ? TONE.info.outline : TONE.neutral.outline)}
+      className={cn('rounded-full', selected ? TONE.info.outline : TONE.neutral.outline)}
     >
       {selected ? <Check aria-hidden /> : null}
       {children}

@@ -179,13 +179,13 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
         {closed ? null : (
           <Button
             type="button"
-            size="sm"
+            size="xs"
             variant="outline"
             onClick={(e) => {
               e.stopPropagation();
               onOpen(job);
             }}
-            className="h-8 gap-1 rounded-lg px-2.5 text-xs"
+            className="rounded-lg"
           >
             {step ? `ทำต่อขั้น ${step}` : 'เปิดดู'}
             <ArrowRight aria-hidden />

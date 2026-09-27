@@ -63,6 +63,12 @@ const buttonVariants = cva(
         sm: "h-9 px-4 text-xs [&_svg]:size-3.5",
         lg: "h-12 px-8 text-base [&_svg]:size-5",
         icon: "h-10 w-10 [&_svg]:size-4",
+        /**
+         * 🔴 ปุ่มเล็กของแถบเครื่องมือ (เจ้าของสั่ง 27 ก.ย. 2569: "ปุ่มยังใหญ่ไป ทำให้เล็กลงอีก")
+         * ใช้ทั้งหน้ากล่องงาน + แท็บผู้สมัคร ให้ปุ่มทุกตัวสูงเท่ากัน (h-7) — ห้ามตั้ง h-/px- เองรายจุด
+         */
+        xs: "h-7 gap-1.5 px-2.5 text-xs [&_svg]:size-3.5",
+        iconXs: "h-7 w-7 [&_svg]:size-3.5",
       },
     },
     defaultVariants: {
