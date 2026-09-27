@@ -14,12 +14,15 @@ description: โคลนวิธีทำงานของคนทำระ�
 `.env.local` ชี้ DB จริง · ทดสอบอะไรที่เขียนข้อมูล **ต้องคืนค่าเดิมเสมอ**
 ทดสอบผลโทรปลอมใส่คิวจริง = ไปขยับสถานะสายของผู้สมัครจริง — อย่าทำ
 
-### 2. เช็ก TypeScript สอง config เสมอ
+### 2. เช็ก TypeScript สาม config เสมอ
 ```bash
 npx tsc --noEmit -p tsconfig.app.json   # ครอบ src/ — ตัวนี้สำคัญกว่า
 npx tsc --noEmit                        # ไม่ครอบ src/
+npx tsc --noEmit -p tsconfig.api.json   # ครอบ api/ แบบเข้ม — ห้ามข้าม
 ```
 เคยลืม import แล้วตัวแรกผ่านเงียบ ๆ เพราะรันแต่ตัวที่สอง
+🔴 27 ก.ย. 2569: ไฟล์ API ใช้ชื่อที่มีแค่ `export { … } from` (ส่งต่อ ไม่ได้ import มาใช้เอง)
+⇒ เส้น Dashboard ตอบ 500 อยู่ 3 วันบน main · สองตัวแรกผ่านหมด **มีแต่ตัวที่สามที่จับได้**
 
 ### 3. ห้ามแก้ class หลายจุดด้วย regex
 เคยพัง 2 ครั้งในวันเดียว — แทรก `${TONE...}` ลงใน string ธรรมดา (กลายเป็นข้อความดิบ)
@@ -102,7 +105,7 @@ hex ดิบ 24 บรรทัด/12 ไฟล์ (รวม `ui/button.tsx` �
 ## ก่อน commit ทุกครั้ง
 
 ```bash
-npx tsc --noEmit -p tsconfig.app.json && npx tsc --noEmit
+npx tsc --noEmit -p tsconfig.app.json && npx tsc --noEmit && npx tsc --noEmit -p tsconfig.api.json
 npm run test        # baseline ปัจจุบัน 567 ผ่าน / 4 skipped
 npx eslint .        # 0 error · 16 warning เดิม
 ```
