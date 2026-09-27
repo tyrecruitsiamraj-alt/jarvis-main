@@ -9,7 +9,10 @@ import {
 } from '../../src/lib/requestLeadKind.js';
 import { getLeadRulesOverrideMap } from './siamrajUnitNotes.js';
 import { toBangkokYmd } from './businessDate.js';
-import { staffingPositionBreakdown } from './siamrajStaffingOpen.js';
+// 🔴 `activeInformWhereSql` ต้อง import เข้ามาใช้เองด้วย — บรรทัด `export { … } from` ข้างล่าง
+//    แค่ส่งต่อให้คนอื่น **ไม่ได้สร้างชื่อไว้ใช้ในไฟล์นี้** (24–27 ก.ย. 2569 เส้น throughput ของ
+//    Dashboard/พยากรณ์ตอบ 500 "activeInformWhereSql is not defined" เพราะลืมบรรทัดนี้)
+import { activeInformWhereSql, staffingPositionBreakdown } from './siamrajStaffingOpen.js';
 import {
   sqlServerDepartmentScopeClause,
   type DepartmentScope,
