@@ -3897,6 +3897,9 @@ const MatchingPage: React.FC = () => {
                     <option value="">ไม่ระบุ</option>
                     <option value="ชาย">ชาย</option>
                     <option value="หญิง">หญิง</option>
+                    {/* ค่าที่ทีม Online เลือกในป๊อปไล่งานขั้น 1 (26 ก.ย. 2569) — ไม่มีตัวเลือกนี้
+                        แล้วเปิดใบที่ตั้ง "ไม่จำกัด" ไว้ ช่องจะโชว์ "ไม่ระบุ" ทั้งที่ค่าจริงไม่ใช่ */}
+                    <option value="ไม่จำกัด">ไม่จำกัด</option>
                   </select>
                 </label>
                 <label className="text-[11px] font-medium text-slate-600 dark:text-slate-300">

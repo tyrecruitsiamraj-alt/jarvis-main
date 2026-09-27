@@ -234,6 +234,11 @@ export interface JobRequest {
   job_description_code_1?: string;
   job_description_code_2?: string;
   gender_requirement?: string;
+  /**
+   * ค่าเพศที่ **ใบขอ ERP เขียนไว้** ก่อนทีม Online เลือกทับ (26 ก.ย. 2569)
+   * มีเฉพาะใบที่ `field_overrides.gender` ตั้งไว้แล้ว · ไม่มี = `gender_requirement` คือค่า ERP
+   */
+  erp_gender_requirement?: string | null;
   request_no?: string;
   resigned_title_prefix?: string;
   resigned_first_name?: string;

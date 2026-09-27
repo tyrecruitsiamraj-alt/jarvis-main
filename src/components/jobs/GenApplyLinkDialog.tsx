@@ -42,6 +42,11 @@ export type GenApplyLinkDialogProps = {
   /** สร้างประกาศลอย (ไม่ผูกใบขอ) — ส่งประเภทกล่อง + BU มาแทน job */
   standalone?: { kind: string; kindLabel: string; departmentCode: string } | null;
   onCreated?: () => void;
+  /**
+   * true = **กางตัวอย่างหน้าสมัครให้เลย** ไม่ต้องกดหา (ป๊อปไล่งานขั้น 4 · เจ้าของเคาะ 26 ก.ย. 2569:
+   * ลำดับ "ตัวอย่าง → สร้างลิงก์ → ส่ง") · ไม่ส่ง = หุบไว้เหมือนเดิม (ที่อื่นที่เรียกไม่เปลี่ยน)
+   */
+  previewFirst?: boolean;
 };
 
 function LinkRow({ url, label }: { url: string; label?: string | null }) {
@@ -89,6 +94,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   standalone = null,
   onCreated,
   embedded = false,
+  previewFirst = false,
 }) => {
   /** ช่องทางของลิงก์นี้ — **1:1** (เจ้าของเคาะ 2 ก.ย. 2569: เลิกติ๊กหลายช่อง) */
   const [picked, setPicked] = useState<RecruitChannelMatch | null>(null);
@@ -100,8 +106,8 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   const [salaryText, setSalaryText] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
-  /** เปิด/ปิดตัวอย่างหน้าสมัคร (22 ก.ย. 2569 — ดูก่อน gen link) */
-  const [previewOpen, setPreviewOpen] = useState(false);
+  /** เปิด/ปิดตัวอย่างหน้าสมัคร (22 ก.ย. 2569 — ดูก่อน gen link) · `previewFirst` = กางไว้ก่อน */
+  const [previewOpen, setPreviewOpen] = useState(previewFirst);
   // ── ข้อมูลที่ระบบเดิมเก็บตอนสร้างลิงก์ (เจ้าของสั่ง 11 ส.ค. 2569) ──
   const [positionName, setPositionName] = useState('');
   const [province, setProvince] = useState('');

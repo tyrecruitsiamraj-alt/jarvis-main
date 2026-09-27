@@ -142,7 +142,15 @@ export async function attachNotes(items: unknown[]): Promise<void> {
         if (fo.lead_rules) it.lead_rules = fo.lead_rules;
         if (fo.age_min !== undefined) it.age_range_min = fo.age_min;
         if (fo.age_max !== undefined) it.age_range_max = fo.age_max;
-        if (fo.gender !== undefined && fo.gender !== null) it.gender_requirement = fo.gender;
+        if (fo.gender !== undefined && fo.gender !== null) {
+          /**
+           * 🔴 เก็บค่าที่ใบขอเขียนไว้ก่อนทับ (26 ก.ย. 2569) — ป๊อปไล่งานต้องโชว์
+           * "ใบขอเขียนว่า … → ทีม Online เลือก …" (เจ้าของ: ใบขออาจมาไม่ถูกแต่แรก
+           * ทีม Online ต้องเห็นทั้งของเดิมและของที่ตัวเองแก้) · ไม่แตะช่องอื่น
+           */
+          it.erp_gender_requirement = it.gender_requirement ?? null;
+          it.gender_requirement = fo.gender;
+        }
         if (fo.branches !== undefined) it.branch_override = fo.branches;
         /**
          * ที่อยู่/รายได้/สวัสดิการที่เจ้าหน้าที่แก้เองจากกล่องงาน (17 ส.ค. 2569)

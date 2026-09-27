@@ -41,6 +41,7 @@ import {
   Pencil,
   Send,
   StickyNote,
+  UserCheck,
   Users,
 } from 'lucide-react';
 
@@ -52,7 +53,18 @@ import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
+import {
+  fetchSiamrajUnitRequest,
+  saveUnitFieldOverridesPatch,
+  unitRequestNoteKey,
+} from '@/lib/siamrajUnitRequestsApi';
+import {
+  GENDER_CHOICES,
+  erpGenderLabel,
+  genderNeedsChoice,
+  onlineGenderChoice,
+  type GenderChoice,
+} from '@/lib/genderRequirement';
 import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
 import type { RecruitPosting } from '@/lib/recruitPostings';
 import {
@@ -75,6 +87,7 @@ import {
 } from '@/lib/boardRelease';
 import { EM_DASH } from '@/lib/displayFallback';
 import UnitRequestInfoFields from '@/components/jobs/UnitRequestInfoFields';
+import { RequestRateLinesBlock, ResignedEmployeeBlock } from '@/components/jobs/UnitRequestPayBlocks';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -108,6 +121,100 @@ function Block({
       </header>
       {children}
     </section>
+  );
+}
+
+/** ใบนี้มีข้อมูลคนเก่าให้ดูไหม — ใบเปิดไซต์ใหม่ไม่มีคนเก่า (ไม่ต้องวาดกล่องที่มีแต่ "—") */
+function hasResignedInfo(job: JobRequest): boolean {
+  return Boolean(
+    job.resigned_employee_name?.trim() ||
+      job.resigned_reason?.trim() ||
+      job.resigned_wage_fee_rate != null ||
+      job.resigned_wage_draw_rate != null ||
+      (job.resigned_income_3m && job.resigned_income_3m.length > 0),
+  );
+}
+
+/**
+ * ═══ ช่องเลือกเพศ — ขั้น 1 ตรวจใบขอ (เจ้าของเคาะ 26 ก.ย. 2569) ═══
+ *
+ * > *"ถ้าขึ้น O ให้เลือกได้ว่าจะใส่ว่าเพศอะไรก่อนขึ้นหน้าสาธารณะ"* → บังคับเลือกก่อนปล่อย
+ *
+ * - บอก **"ใบขอเขียนว่า"** ไว้เสมอ — ใบขออาจมาไม่ถูกแต่แรก ทีม Online ต้องเห็นของเดิมด้วย
+ * - กดแล้วบันทึกทันที (ไม่มีปุ่มบันทึกแยก) · เก็บที่ `field_overrides.gender` ช่องเดิม
+ * - 🔴 เขียนผ่าน `saveUnitFieldOverridesPatch` (อ่านของล่าสุดก่อนต่อ) — ขั้น 2/3 ก็เขียนก้อนเดียวกัน
+ */
+function GenderPicker({
+  job,
+  onSaved,
+}: {
+  job: JobRequest;
+  onSaved: (patch: Partial<JobRequest>) => void;
+}) {
+  const [busy, setBusy] = React.useState<GenderChoice | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const chosen = onlineGenderChoice(job);
+  const erp = erpGenderLabel(job);
+  /** ปุ่มที่กดค้างไว้ = ค่าที่จะขึ้นประกาศตอนนี้ (ทีม Online เลือก หรือใบขอบอก ชาย/หญิง มาแล้ว) */
+  const effective: GenderChoice | null = chosen ?? (erp === 'ชาย' || erp === 'หญิง' ? erp : null);
+  const needs = genderNeedsChoice(job);
+
+  const pick = async (choice: GenderChoice) => {
+    const requestNo = unitRequestNoteKey(job);
+    if (!requestNo) {
+      setError('ใบขอนี้ไม่มีเลขที่ใบขอ — บันทึกไม่ได้');
+      return;
+    }
+    setBusy(choice);
+    setError(null);
+    try {
+      const next = await saveUnitFieldOverridesPatch(requestNo, { gender: choice });
+      const hadChoice = (job.field_overrides?.gender ?? '').trim() !== '';
+      onSaved({
+        field_overrides: next,
+        gender_requirement: choice,
+        // ค่าที่ใบขอเขียนไว้ — เลือกครั้งแรก = ค่าที่เห็นอยู่ · เคยเลือกแล้ว = ค่าที่ API จำไว้
+        erp_gender_requirement: hadChoice ? (job.erp_gender_requirement ?? null) : (job.gender_requirement ?? null),
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกเพศไม่สำเร็จ');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="space-y-2 px-4 py-3">
+      <p className="text-xs text-muted-foreground">
+        ใบขอเขียนว่า <span className="font-medium text-foreground">{erp}</span>
+        {chosen ? (
+          <>
+            {' '}· ทีม Online เลือก <span className="font-medium text-foreground">{chosen}</span>
+          </>
+        ) : null}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {GENDER_CHOICES.map((g) => (
+          <Button
+            key={g}
+            type="button"
+            size="sm"
+            variant={effective === g ? 'default' : 'outline'}
+            aria-pressed={effective === g}
+            disabled={busy !== null}
+            onClick={() => void pick(g)}
+          >
+            {busy === g ? 'กำลังบันทึก…' : g}
+          </Button>
+        ))}
+      </div>
+      {needs ? (
+        <p className={cn('rounded-lg px-2.5 py-1.5 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
+          ใบขอไม่ระบุเพศ — ต้องเลือกก่อนส่งประกาศ (ขั้น 4 จะกดส่งไม่ได้จนกว่าจะเลือก)
+        </p>
+      ) : null}
+      {error ? <p className={cn('text-[11px]', TONE.danger.value)}>{error}</p> : null}
+    </div>
   );
 }
 
@@ -242,6 +349,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   };
 
   const jobWithPatch = job ? ({ ...job, ...publicPatch } as JobRequest) : null;
+  /** 🔴 ใบขอไม่ระบุเพศและยังไม่มีใครเลือก = ส่งประกาศไม่ได้ (เจ้าของเคาะ 26 ก.ย. 2569) */
+  const genderBlocked = jobWithPatch ? genderNeedsChoice(jobWithPatch) : false;
 
   /**
    * 🔴 ใบนี้ค้างอยู่ขั้นไหน — **ตัวเดียวกับที่นับเลขบนหัวกล่องงาน** (`releaseStepOf`)
@@ -442,6 +551,21 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                   <p className={cn('text-xs', DASH.muted)}>กำลังโหลดใบขอ…</p>
                 )}
 
+                {/* ── คนที่ออก / เปลี่ยนตัว + รายได้จริง 3 เดือน — 🔴 **โชว์เลยไม่ต้องกาง** ──
+                    เจ้าของเล่าหลักการ 26 ก.ย. 2569: *"ทีม online ควรดูรายละเอียดใบขอนั้น ๆ ได้แบบ
+                    หน้าใบขอ … คนที่ออกหรือเปลี่ยนตัวมีรายได้ย้อนหลัง 3 เดือนประมาณเท่าไหร่"*
+                    ⇒ ใช้ประกอบการตั้งรายได้ขั้น 3 · component ตัวเดียวกับหน้าใบขอ (ห้ามก๊อปโครง)
+                    ใบเปิดไซต์ใหม่ไม่มีคนเก่า = บอกบรรทัดเดียว ไม่วาดกล่องที่มีแต่ "—" */}
+                {job ? (
+                  hasResignedInfo(job) ? (
+                    <ResignedEmployeeBlock job={job} />
+                  ) : (
+                    <p className={cn('text-[11px]', DASH.muted)}>
+                      ใบนี้ไม่มีข้อมูลคนเก่า (เช่น เปิดไซต์ใหม่) — ไม่มีรายได้ย้อนหลังให้เทียบ
+                    </p>
+                  )
+                ) : null}
+
                 <button
                   type="button"
                   onClick={() => setInfoOpen((v) => !v)}
@@ -456,7 +580,25 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 </button>
 
                 {infoOpen && job ? <UnitRequestInfoFields job={job} /> : null}
+                {/* ตารางอัตราของใบขอ — ชุดเดียวกับหน้าใบขอ (กางแล้วเห็นครบเหมือนกัน) */}
+                {infoOpen && job ? <RequestRateLinesBlock job={job} /> : null}
               </div>
+            </Block>
+
+            {/* ── เพศที่รับ (เจ้าของเคาะ 26 ก.ย. 2569: ช่องอยู่ขั้น 1 · ใบขอไม่ระบุต้องเลือกก่อนส่ง) ── */}
+            <Block
+              icon={UserCheck}
+              title="เพศที่รับ"
+              hint="ใบขอไม่ระบุเพศต้องเลือกก่อนส่งประกาศ · ใบขอมาผิดก็กดแก้ได้"
+            >
+              {jobWithPatch ? (
+                <GenderPicker
+                  job={jobWithPatch}
+                  onSaved={(patch) => setPublicPatch((prev) => ({ ...prev, ...patch }))}
+                />
+              ) : (
+                <p className={cn('px-4 py-3 text-xs', DASH.muted)}>กำลังโหลดใบขอ…</p>
+              )}
             </Block>
 
             <Block
@@ -494,6 +636,18 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             title="สถานที่ปฏิบัติงาน"
             hint="จังหวัด / อำเภอ / ตำบล ที่ผู้สมัครจะเห็นบนประกาศ"
           >
+            {/* 🔴 **ใบขอมีที่อยู่มาให้ = โชว์ให้ดูก่อน** (เจ้าของเล่าหลักการ 26 ก.ย. 2569:
+                *"กดต่อไปเพื่อใส่ที่อยู่ แต่ถ้ามีที่อยู่มาให้ก็ขึ้นมาให้ดู"*) — เดิมที่อยู่เต็ม
+                อยู่แค่ขั้น 1 ต้องย้อนกลับไปดู · ใบขอบางใบเขียนชื่อสาขา/ชื่อคนปนมา ทีม Online
+                ต้องเห็นของจริงแล้วเลือกจังหวัด/อำเภอเอง (ระบบเดาจากข้อความนี้ให้เป็นค่าตั้งต้น) */}
+            {job ? (
+              <div className="border-b border-border/50 px-4 py-3">
+                <p className={cn('text-[11px]', DASH.muted)}>ใบขอเขียนว่า</p>
+                <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-foreground">
+                  {job.location_address?.trim() || 'ใบขอไม่ได้ใส่ที่อยู่มา — เลือกจังหวัด/อำเภอเองข้างล่าง'}
+                </p>
+              </div>
+            ) : null}
             {jobWithPatch ? (
               <React.Suspense
                 fallback={<p className={cn('px-4 py-3 text-xs', DASH.muted)}>กำลังโหลดฟอร์ม…</p>}
@@ -548,15 +702,19 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
         {/* ── ④ สร้างลิงก์ + ส่งประกาศ — 🔴 ปุ่มส่งอยู่ขั้นสุดท้ายเท่านั้น ── */}
         {step === 'publish' ? (
           <>
+            {/* 🔴 **ลำดับขั้นสุดท้าย = ตัวอย่าง → สร้างลิงก์ → ส่ง** (เจ้าของเคาะ 26 ก.ย. 2569
+                ตรงกับนิยามข้อ 4 ของ 22 ก.ย.) · ตัวอย่างหน้าสมัคร**กางให้เอง**ไม่ต้องกดหา ·
+                ปุ่มส่งอยู่ท้ายสุดและกดได้เมื่อมีลิงก์แล้ว + เลือกเพศแล้วเท่านั้น */}
             <Block
               icon={Link2}
-              title="สร้างลิงก์สมัคร"
-              hint="สร้างลิงก์ต่อช่องทาง แล้วเอาไปโพสต์ — ยอดคลิกนับแยกต่อช่องทาง"
+              title="ดูตัวอย่าง แล้วสร้างลิงก์สมัคร"
+              hint="ดูหน้าที่ผู้สมัครจะเห็นก่อน · โอเคแล้วกดสร้างลิงก์ต่อช่องทาง — ยอดคลิกนับแยกต่อช่องทาง"
             >
               {job ? (
                 <GenApplyLinkDialog
                   embedded
                   open
+                  previewFirst
                   job={job}
                   onClose={leaveToDetail}
                   onCreated={() => void loadPostings()}
@@ -602,13 +760,27 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                     <p className={cn('mt-0.5 text-[11px]', DASH.muted)}>
                       {released
                         ? 'คนนอกเห็นและสมัครได้ · AI (Lumos) เห็นใบนี้ด้วย'
-                        : latestPosting
-                          ? 'มีลิงก์สมัครแล้ว — กดส่งประกาศได้เลย'
-                          : 'ยังไม่มีลิงก์สมัคร — สร้างลิงก์ข้างบนก่อนจะดีกว่า'}
+                        : genderBlocked
+                          ? 'ใบขอไม่ระบุเพศ — ต้องเลือกเพศที่ขั้น 1 ก่อนถึงจะส่งได้'
+                          : !latestPosting
+                            ? 'ยังไม่มีลิงก์สมัคร — ดูตัวอย่างข้างบนแล้วกด "สร้างประกาศ + ลิงก์" ก่อน'
+                            : 'มีลิงก์สมัครแล้ว — กดส่งประกาศได้เลย'}
                     </p>
+                    {!released && genderBlocked ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="mt-2"
+                        onClick={() => setOpenStep('info')}
+                      >
+                        ไปขั้น 1 เลือกเพศ
+                      </Button>
+                    ) : null}
                     <Button
                       type="button"
-                      disabled={releaseBusy || !job}
+                      /* 🔴 ดึงลง (ใบที่ปล่อยแล้ว) กดได้เสมอ · ส่งขึ้นต้องผ่านสองด่าน: มีลิงก์ + เลือกเพศ */
+                      disabled={releaseBusy || !job || (!released && (genderBlocked || !latestPosting))}
                       onClick={() => void toggleRelease(!released)}
                       className={cn(
                         'mt-2 w-full rounded-xl py-2.5 text-sm',

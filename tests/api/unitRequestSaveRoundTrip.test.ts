@@ -89,7 +89,15 @@ describe('③ ตัวแปะค่าห้ามกลืน error เง�
     const src = read(HANDLER);
     for (const name of ['attachAssignments', 'attachNotes', 'attachWorkStatus']) {
       const at = src.indexOf(`export async function ${name}`);
-      const block = src.slice(at, at + 4000);
+      /**
+       * ตัดบล็อกให้จบที่ฟังก์ชันถัดไปพอดี (แก้ 26 ก.ย. 2569) — เดิมตัด 4000 ตัวอักษรตายตัว
+       * แล้วหยิบ `} catch` ตัวสุดท้ายในช่วงนั้น ⇒ พอฟังก์ชันก่อนหน้ายาวขึ้น (เพิ่มคอมเมนต์ใน
+       * attachNotes) ช่วง 4000 ตัวของ attachAssignments ไปจบกลาง catch ของ attachNotes
+       * แล้วตัดคำว่า logWarn หลุดขอบ = เทสต์ตกทั้งที่โค้ดถูก
+       */
+      const rest = src.slice(at + 1);
+      const nextFn = rest.search(/\n(?:export )?(?:async )?function /);
+      const block = src.slice(at, nextFn >= 0 ? at + 1 + nextFn : at + 4000);
       const catchAt = block.lastIndexOf('} catch');
       expect(catchAt, `${name} ต้องมี catch`).toBeGreaterThan(-1);
       const tail = block.slice(catchAt, catchAt + 500);

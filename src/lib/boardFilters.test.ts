@@ -9,14 +9,16 @@ import {
   describeBoardFilters,
   EMPTY_BOARD_FILTER_STATE,
   hasAnyBoardFilter,
-  knownMonthlyIncome,
+  onlineIncomeValue,
   readBoardFilterState,
+  readBoardSearch,
   readBoardSort,
   sortBoardJobs,
   toggleBoardFacetValue,
   UNSPECIFIED,
   visibleFacetOptions,
   writeBoardFilterState,
+  writeBoardSearch,
   type BoardFacetFacts,
   type BoardFilterState,
 } from '@/lib/boardFilters';
@@ -28,7 +30,7 @@ import {
  * ด่านที่ห้ามหลุด:
  * 1. OR ในหัวข้อเดียวกัน · AND ข้ามหัวข้อ
  * 2. เลขต่อท้ายนับจากชุดที่ผ่าน **หัวข้ออื่น** — เลือกจังหวัดแล้วจังหวัดอื่นไม่กลายเป็น 0
- * 3. ห้ามปุ่มหลอก — ข้อมูลจริงมีค่าเดียว = ไม่โชว์หัวข้อ (เว้นแต่ติ๊กค้างอยู่)
+ * 3. ห้ามปุ่มหลอก — ข้อมูลจริงว่างทั้งหมด = ไม่โชว์หัวข้อ · หัวข้อชิปตายตัวโชว์ครบ เลข 0 จาง
  * 4. เส้นข้อมูลที่ยังไม่พร้อม (ทะเบียนปล่อย/ยอด AI) ห้ามทั้งโชว์และห้ามตัดใบทิ้ง
  * 5. URL เขียนทับเฉพาะของตัวเอง — `view` `lane` `step` ต้องอยู่ครบ
  */
@@ -165,39 +167,111 @@ describe('buildBoardFacets — เลขต่อท้าย', () => {
   });
 });
 
-describe('🔴 ห้ามปุ่มหลอก', () => {
-  it('ความเร่งด่วนหายไปเมื่อทุกใบเป็น "ล่วงหน้า" (ข้อมูลจริง 26 ก.ย.: 316/316)', () => {
+describe('🔴 ห้ามปุ่มหลอก · หัวข้อตายตัวโชว์ครบ', () => {
+  it('ความเร่งด่วน: ทุกใบ "ล่วงหน้า" (ข้อมูลจริง 26 ก.ย.: 316/316) ก็ยังโชว์ครบ — ด่วน 0 จาง', () => {
     const rows = [job(), job(), job()];
-    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).some((v) => v.key === 'urgency')).toBe(false);
+    const v = buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).find((x) => x.key === 'urgency')!;
+    expect(v.options.map((o) => [o.label, o.count])).toEqual([
+      ['ด่วน', 0],
+      ['ล่วงหน้า', 3],
+    ]);
   });
 
-  it('โผล่กลับมาเองเมื่อมีใบด่วนจริง', () => {
-    const rows = [job(), job({ urgency: 'urgent' })];
-    const v = buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).find((x) => x.key === 'urgency');
-    expect(v?.options.map((o) => o.label)).toEqual(['ด่วน', 'ล่วงหน้า']);
+  it('หัวข้อค่าเยอะที่ข้อมูลว่างทั้งหมด = ไม่โชว์ (ไม่มีอะไรให้กด)', () => {
+    const rows = [job({ recruiter_name: '' }), job({ recruiter_name: '' })];
+    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).some((v) => v.key === 'recruiter')).toBe(false);
   });
 
-  it('ค่าเดียวแต่ติ๊กค้างอยู่ (จากลิงก์เก่า) ยังต้องโชว์ ไม่งั้นล้างไม่ได้', () => {
+  it('หัวข้อค่าเยอะที่มีค่าเดียวก็ยังโชว์ (ไม่ใช่ปุ่มหลอก — บอกว่าทั้งกองเป็นของใคร)', () => {
+    const rows = [job({ recruiter_name: 'คิว' }), job({ recruiter_name: 'คิว' })];
+    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).some((v) => v.key === 'recruiter')).toBe(true);
+  });
+
+  it('ค่าที่ติ๊กค้างอยู่ (จากลิงก์เก่า) ยังต้องโชว์ ไม่งั้นล้างไม่ได้', () => {
+    const rows = [job({ recruiter_name: '' })];
+    expect(buildBoardFacets(rows, state({ recruiter: ['คิว'] }), facts()).some((v) => v.key === 'recruiter')).toBe(true);
+  });
+
+  it('หัวข้อ "ประเภทงาน" ถูกถอดแล้ว (เจ้าของเคาะ 26 ก.ย.)', () => {
+    const rows = [job({ job_type: 'central' }), job({ job_type: 'valet_parking' })];
+    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).some((v) => (v.key as string) === 'jobType')).toBe(false);
+  });
+});
+
+describe('รายได้บนประกาศ — ค่าที่ทีม Online ตั้งเท่านั้น', () => {
+  it('🔴 ยังไม่ตั้ง = "ยังไม่ตั้งรายได้" · ห้ามเอาเลข ERP มาอุด', () => {
+    expect(onlineIncomeValue(job({ total_income: 12000 }))).toBe('unset');
+    expect(onlineIncomeValue(job({ monthly_income: 15500 }))).toBe('unset');
+    expect(boardFacetValueLabel('income', 'unset')).toBe('ยังไม่ตั้งรายได้');
+  });
+
+  it('ตั้งแบบแยกรายการต่อเดือน = จัดช่วงตามยอดรวมที่ผู้สมัครเห็น', () => {
+    const j = job({ field_overrides: { income: { period: 'monthly', lines: [{ label: 'ฐาน', amount: 16000 }], total: null } } });
+    expect(onlineIncomeValue(j)).toBe('15-20k');
+  });
+
+  it('ตั้งเป็นรายวัน = "ตั้งเป็นรายวัน" (ไม่แปลงเอง) · เลขเดี่ยวแบบเก่า = ตั้งแล้วแต่ไม่รู้หน่วย', () => {
+    const daily = job({ field_overrides: { income: { period: 'daily', lines: [{ label: 'ค่าแรง', amount: 450 }], total: null } } });
+    expect(onlineIncomeValue(daily)).toBe('daily');
+    expect(onlineIncomeValue(job({ field_overrides: { total_income: 14000 } }))).toBe(UNSPECIFIED);
+  });
+
+  it('หัวข้อโชว์เสมอแม้ทุกใบยังไม่ตั้ง — ช่วงเงินเป็น 0 จาง ๆ ให้เห็นว่ามีตัวกรองนี้', () => {
     const rows = [job(), job()];
-    expect(buildBoardFacets(rows, state({ urgency: ['urgent'] }), facts()).some((v) => v.key === 'urgency')).toBe(true);
-  });
-
-  it('รายได้: ค่าแรงดิบจาก ERP ไม่รู้หน่วย ⇒ ไม่เอาไปจัดช่วง', () => {
-    expect(knownMonthlyIncome(job({ total_income: 400 }))).toBeNull();
-    expect(knownMonthlyIncome(job({ total_income: 12000 }))).toBeNull();
-    // ฟีดจริงมีแต่ total_income ⇒ ทุกใบ "ไม่ทราบหน่วย" ⇒ หัวข้อรายได้ซ่อนเอง
-    const rows = [job({ total_income: 400 }), job({ total_income: 12000 })];
-    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).some((v) => v.key === 'income')).toBe(false);
-  });
-
-  it('รายได้ที่รู้หน่วยต่อเดือนจริง จัดช่วงได้', () => {
-    expect(knownMonthlyIncome(job({ monthly_income: 15500 }))).toBe(15500);
-    expect(
-      knownMonthlyIncome(job({ income_display: { period: 'monthly', total: 18000, lines: [] } })),
-    ).toBe(18000);
-    const rows = [job({ monthly_income: 11000 }), job({ monthly_income: 21000 })];
     const v = buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).find((x) => x.key === 'income')!;
-    expect(v.options.filter((o) => o.count > 0).map((o) => o.value)).toEqual(['lt12k', '20k+']);
+    expect(v.options.map((o) => o.value)).toEqual(['unset', 'lt12k', '12-15k', '15-20k', '20k+', 'daily']);
+    expect(v.options[0].count).toBe(2);
+  });
+});
+
+describe('เพศที่รับ', () => {
+  it('🔴 รหัส O ขึ้น "ไม่ระบุ" ไม่ใช่ตัว O ดิบ · ตัวเลือกตายตัวโชว์ครบ', () => {
+    const rows = [job({ gender_requirement: 'O' }), job({ gender_requirement: 'ชาย' })];
+    const v = buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).find((x) => x.key === 'gender')!;
+    expect(v.options.map((o) => [o.label, o.count])).toEqual([
+      ['ชาย', 1],
+      ['หญิง', 0],
+      ['ไม่จำกัด', 0],
+      ['ไม่ระบุ', 1],
+    ]);
+  });
+
+  it('ค่าที่ทีม Online เลือก "ไม่จำกัด" กรองได้', () => {
+    const any = job({ gender_requirement: 'ไม่จำกัด' });
+    expect(applyBoardFilters([any, job()], state({ gender: ['ไม่จำกัด'] }), facts())).toEqual([any]);
+  });
+});
+
+describe('ตำแหน่งงาน → งานย่อย (เฉพาะงานขับรถ)', () => {
+  const central = job({ job_description_code_1: 'ขับรถ', job_description_code_2: 'ส่วนกลาง' });
+  const boss = job({ job_description_code_1: 'ขับรถ', job_description_code_2: 'รถผู้บริหารคนไทย' });
+  const valet = job({ job_description_code_1: 'ขับรถ', job_description_code_2: 'Valet Parking' });
+  const other = job({ job_description_code_1: 'ขับรถ', job_description_code_2: 'ชนิดที่ 2' });
+  const garden = job({ job_description_code_1: 'คนสวน', job_description_code_2: '1' });
+  const rows = [central, boss, valet, other, garden];
+
+  it('ยังไม่เลือกตำแหน่ง = ไม่มีหัวข้องานย่อย', () => {
+    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).some((v) => v.key === 'subtype')).toBe(false);
+  });
+
+  it('เลือกตำแหน่งที่ไม่ใช่งานขับรถ = ไม่มีงานย่อย', () => {
+    expect(buildBoardFacets(rows, state({ position: ['คนสวน'] }), facts()).some((v) => v.key === 'subtype')).toBe(false);
+  });
+
+  it('เลือก "ขับรถ" แล้ว งานย่อยโผล่: ส่วนกลาง · นาย · Valet · อื่น ๆ', () => {
+    const v = buildBoardFacets(rows, state({ position: ['ขับรถ'] }), facts()).find((x) => x.key === 'subtype')!;
+    expect(v.options.map((o) => [o.label, o.count])).toEqual([
+      ['ส่วนกลาง', 1],
+      ['นาย (รถผู้บริหาร)', 1],
+      ['Valet', 1],
+      ['อื่น ๆ', 1],
+    ]);
+    expect(applyBoardFilters(rows, state({ position: ['ขับรถ'], subtype: ['boss'] }), facts())).toEqual([boss]);
+  });
+
+  it('เอาตำแหน่งขับรถออก = งานย่อยที่ติ๊กไว้หลุดตาม', () => {
+    const next = toggleBoardFacetValue(state({ position: ['ขับรถ'], subtype: ['valet'] }), 'position', 'ขับรถ');
+    expect(next.selection.subtype).toEqual([]);
   });
 });
 
@@ -257,6 +331,15 @@ describe('จังหวัด → อำเภอ', () => {
     const view = buildBoardFacets([chon, chon2], s, facts()).find((v) => v.key === 'district');
     expect(view?.options.map((o) => o.value)).toContain('บางละมุง');
     expect(applyBoardFilters([chon, chon2], state({ province: ['ชลบุรี'], district: ['บางละมุง'] }), facts())).toEqual([chon]);
+  });
+
+  it('🔴 จังหวัด/อำเภอที่ทีม Online กรอกเองชนะที่อยู่ใบขอ (ไม่เติมจากจังหวัดของไซต์)', () => {
+    const typed = job({ location_address: addrBkk, override_province: 'ลพบุรี', override_district: 'เมืองลพบุรี' });
+    expect(applyBoardFilters([typed], state({ province: ['ลพบุรี'] }), facts())).toEqual([typed]);
+    expect(applyBoardFilters([typed], state({ province: ['กรุงเทพมหานคร'] }), facts())).toEqual([]);
+    expect(
+      applyBoardFilters([typed], state({ province: ['ลพบุรี'], district: ['เมืองลพบุรี'] }), facts()),
+    ).toEqual([typed]);
   });
 
   it('เอาจังหวัดออก = อำเภอของจังหวัดนั้นที่ติ๊กไว้หลุดตาม', () => {
@@ -330,6 +413,14 @@ describe('URL', () => {
 
   it('วันที่รูปแบบเพี้ยนไม่ถูกเอามาใช้', () => {
     expect(readBoardFilterState(new URLSearchParams('dfrom=26/09/2569')).dates).toBeNull();
+  });
+
+  it('คำค้นอยู่ใน URL (?q=) · ล้างแล้วหายจาก URL · params อื่นอยู่ครบ', () => {
+    const base = new URLSearchParams('view=board&lane=unreleased');
+    const withQ = writeBoardSearch(base, 'กรุงศรี');
+    expect(readBoardSearch(withQ)).toBe('กรุงศรี');
+    expect(withQ.get('view')).toBe('board');
+    expect(writeBoardSearch(withQ, '   ').toString()).toBe('view=board&lane=unreleased');
   });
 
   it('ค่าเรียงไม่รู้จัก = ค่าเดิมของบอร์ด', () => {

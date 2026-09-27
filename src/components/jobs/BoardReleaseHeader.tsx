@@ -58,8 +58,6 @@ export type BoardReleaseHeaderProps = {
   doneCounts: { closed: number; cancelled: number };
   doneLane: 'closed' | 'cancelled' | null;
   onDoneLaneChange: (lane: 'closed' | 'cancelled' | null) => void;
-  /** ปุ่มลงมือของเลน "เหลือปล่อย" เช่น "ปล่อยทั้งหน้านี้" */
-  action?: React.ReactNode;
   className?: string;
 };
 
@@ -256,7 +254,6 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
   doneCounts,
   doneLane,
   onDoneLaneChange,
-  action,
   className,
 }) => {
   /**
@@ -424,7 +421,8 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
             <p className="text-[11px] font-medium text-foreground">
               ยังไม่ปล่อย {th(ledger.unreleased)} ใบ — ติดขั้นไหน
             </p>
-            {action}
+            {/* ปุ่ม "ส่งประกาศทีเดียว" ที่เคยอยู่ตรงนี้ถูกถอดแล้ว 26 ก.ย. 2569 (เจ้าของเคาะ) —
+                ปล่อยได้ทางเดียวคือป๊อปไล่งานของใบนั้น ขั้น 4 */}
           </div>
           <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5">
             {ledger.steps.map((s, i) => (

@@ -8,16 +8,6 @@ import { jobSectorLabel } from '@/lib/unitRequestDisplay';
 import { jobBoardCardTitle, jobBoardCardSubtitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import BoardCardProgress from '@/components/jobs/BoardCardProgress';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
   canShowNumbers,
   combineFeedStates,
   dataAgeLabel,
@@ -89,7 +79,6 @@ import {
   releaseProgressTitle,
   filterByReleaseLane,
   filterByReleaseStep,
-  releasableJobsOf,
   type ReleaseFacts,
   type ReleaseLaneKey,
   type ReleaseStepKey,
@@ -98,8 +87,6 @@ import JobBoardSilentLinks from '@/components/jobs/JobBoardSilentLinks';
 import {
   buildReleaseIndex,
   fetchJobReleases,
-  releaseJobsToPublic,
-  unreleaseJobsFromPublic,
   type JobRelease,
 } from '@/lib/jobPublicReleaseApi';
 import {
@@ -141,10 +128,12 @@ import {
   EMPTY_BOARD_FILTER_STATE,
   hasAnyBoardFilter,
   readBoardFilterState,
+  readBoardSearch,
   readBoardSort,
   sortBoardJobs,
   toggleBoardFacetValue,
   writeBoardFilterState,
+  writeBoardSearch,
   type BoardDateField,
   type BoardFacetFacts,
   type BoardFacetKey,
@@ -367,17 +356,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     void loadReleases();
   }, [loadReleases]);
 
-  const [bulkReleaseBusy, setBulkReleaseBusy] = useState(false);
   /**
-   * ป๊อปยืนยันก่อนปล่อยเป็นชุด (แผนแก้จุดงงข้อ 3 · เจ้าของเคาะ 2 ก.ย. 2569)
-   * Haiku ทดสอบแล้วไม่กล้ากดปุ่มนี้เพราะ *"กดแล้วเกิดอะไรขึ้น?"* — กติกาก้อน C:
-   * ปุ่มออกนอกบ้านต้องมีป๊อปยืนยันบอกว่าจะเกิดอะไรกี่ใบ
-   */
-  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
-
-  /**
-   * 🔴 **ปล่อย/ดึงลงทีละใบย้ายไปแท็บ "ประกาศ / ลิงก์สมัคร" ของใบขอแล้ว** (27 ส.ค. 2569)
-   * หน้านี้เหลือเฉพาะ "ปล่อยทั้งหน้านี้" ที่ท้ายแถบเส้นทาง (ทำหลายใบพร้อมกัน)
+   * 🔴 **ปล่อย/ดึงลงมีทางเดียว = ป๊อปไล่งานของใบนั้น** (ขั้น 4: ตัวอย่าง → ลิงก์ → ส่ง)
+   * ปุ่ม "ส่งประกาศทีเดียว / ปล่อยทั้งหน้านี้" **ถูกถอดออกทั้งหมด 26 ก.ย. 2569**
+   * (เจ้าของเคาะ Choice: *"ถอดปุ่มออก"* — ทุกใบต้องผ่านการตรวจ ที่อยู่ รายได้ เพศ ก่อนขึ้น
+   * หน้าสาธารณะ · ปล่อยเป็นชุดข้ามทุกด่าน) — ห้ามเอากลับมาโดยไม่ได้สั่งใหม่
    */
 
   // แบ่งหน้าการ์ดประกาศ — ใช้แถบเลขหน้ากลางของระบบ (เลือกจำนวนต่อหน้าได้เหมือนหน้าอื่น)
@@ -587,6 +570,26 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   );
   const boardFacetCount = countSelectedFacetValues(boardFilterState);
   const boardFilterSummary = useMemo(() => describeBoardFilters(boardFilterState), [boardFilterState]);
+  /**
+   * 🔴 **ช่องค้นหาอยู่ใน URL (`?q=`)** (เจ้าของเคาะ 26 ก.ย. 2569 — ตัวกรองทุกตัวต้องอยู่ในลิงก์)
+   * URL เป็นตัวจริง: เปิดลิงก์/กดย้อนกลับ ⇒ ช่องค้นหาตามค่าใน URL · พิมพ์ ⇒ เขียน URL แบบแทนที่
+   * ⚠️ เฉพาะเจ้าหน้าที่ + มุมมองกล่องงาน — หน้าสมัครสาธารณะค้นแบบเดิม (ไม่แตะ URL ของคนนอก)
+   */
+  const urlSearch = boardFilterOn ? readBoardSearch(searchParams) : null;
+  const { search: currentSearch, setSearch: setFilterSearch } = filters;
+  useEffect(() => {
+    if (urlSearch !== null && urlSearch !== currentSearch) setFilterSearch(urlSearch);
+    // ตามค่า URL อย่างเดียว — ใส่ currentSearch แล้วพิมพ์เร็ว ๆ ค่าจะเด้งกลับเป็นของเก่า
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSearch, setFilterSearch]);
+  const setBoardSearch = React.useCallback(
+    (q: string) => {
+      setFilterSearch(q);
+      if (boardFilterOn) setSearchParams((prev) => writeBoardSearch(prev, q), { replace: true });
+    },
+    [setFilterSearch, boardFilterOn, setSearchParams],
+  );
+  const searchSummary = boardFilterOn && currentSearch.trim() ? `คำค้น "${currentSearch.trim()}"` : '';
   /** เขียนตัวกรองลง URL — ต่อยอด params เดิมเสมอ (ห้ามทำ `view` `lane` `step` หาย) */
   const commitBoardFilters = React.useCallback(
     (next: BoardFilterState) => {
@@ -636,7 +639,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       if (opts.search) filters.setSearch('');
       setSearchParams(
         (prev) => {
-          const p = writeBoardFilterState(prev, EMPTY_BOARD_FILTER_STATE);
+          let p = writeBoardFilterState(prev, EMPTY_BOARD_FILTER_STATE);
+          if (opts.search) p = writeBoardSearch(p, '');
           if (opts.laneStep) {
             p.delete('lane');
             p.delete('step');
@@ -802,19 +806,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     () => boxedJobs.filter((j) => releaseIdx.has(j.id)).length,
     [boxedJobs, releaseIdx],
   );
-  /**
-   * 🔴 **ใบที่ "ปล่อยได้จริง" = เลน "เหลือปล่อย" เท่านั้น** (แก้ 27 ส.ค. 2569 รอบสี่)
-   *
-   * ของเดิมนับ `ใบเปิดทั้งหมด − ที่ปล่อยแล้ว` ⇒ วัดบนจอจริงได้ **127** ทั้งที่
-   * เหลือปล่อยจริง **104** · ส่วนต่าง 23 ใบคือใบที่ ERP พาไปคัดเลือก/เริ่มงานแล้ว
-   * แต่เราไม่เคยกดปล่อย ⇒ ปุ่มเดิมจะไปปล่อยประกาศหาคนของตำแหน่งที่มีคนทำอยู่แล้ว
-   * (เจอตอนต่อหัวหน้าจอใหม่แล้วเลขสองที่ไม่ตรงกัน — นี่คือประโยชน์ของ "เลขต้องกระทบยอด")
-   */
-  const releasableJobs = useMemo(
-    () => releasableJobsOf(boxedJobs, releaseFacts),
-    [boxedJobs, releaseFacts],
-  );
-  const unreleasedCount = releasableJobs.length;
 
   /**
    * 🔴 ตัวนับ "มีผู้สมัครแล้ว / ยังไม่มีใครสมัคร" — เกิดขึ้นเพราะบอร์ดทีมหน้าแรก
@@ -827,26 +818,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     [boxedJobs, applicantIdx],
   );
   const withoutApplicantsCount = boxedJobs.length - withApplicantsCount;
-
-  /**
-   * ปล่อยใบที่ยังไม่ปล่อยในชุดที่กรองอยู่ (เครื่องมือวันเปลี่ยนผ่าน)
-   * ⚠️ เพดาน 300 ใบต่อครั้งตรงกับฝั่ง server — กดซ้ำได้จนหมด
-   */
-  const bulkReleaseVisible = async () => {
-    /** 🔴 ชุดเดียวกับเลขบนปุ่มเป๊ะ — ห้ามคำนวณคนละที่ (เคยเพี้ยน 23 ใบ) */
-    const ids = releasableJobs.map((j) => j.id).slice(0, 300);
-    if (ids.length === 0) return;
-    setBulkConfirmOpen(false);
-    setBulkReleaseBusy(true);
-    try {
-      await releaseJobsToPublic(ids, 'ปล่อยเป็นชุดจากบอร์ดรับสมัคร');
-      await loadReleases();
-    } catch {
-      /* ทะเบียนไม่เปลี่ยน = ตัวเลขบนแถบยังเป็นของเดิม */
-    } finally {
-      setBulkReleaseBusy(false);
-    }
-  };
 
   /** คำบอกว่ากำลังดูอะไรอยู่ — 🔴 ป้ายทุกอันมาจาก lib ห้ามพิมพ์เอง */
   const selectionLabel = useMemo(() => {
@@ -1139,7 +1110,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     compact
                     placeholder={searchPlaceholder}
                     value={filters.search}
-                    onChange={(e) => filters.setSearch(e.target.value)}
+                    onChange={(e) => setBoardSearch(e.target.value)}
                     wrapperClassName="w-full min-w-0 sm:w-72 lg:w-80"
                   />
                 ) : null}
@@ -1399,45 +1370,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               }}
               doneLane={doneLane}
               onDoneLaneChange={(next) => setSelection({ lane: next })}
-              action={
-                /* ปุ่มลงมือของเลน "เหลือปล่อย" — ปล่อยใบที่ยังไม่ปล่อย **ในชุดที่กรองอยู่**
-                   ⚠️ เพดาน 300 ใบต่อครั้งตรงกับฝั่ง server · กดซ้ำได้จนหมด */
-                /**
-                 * 🔴 ตัวเลขยังไม่พร้อม = **ปุ่มต้องหาย** ไม่ใช่โผล่พร้อมเลขที่เดาเอา
-                 * (หนี้ Redteam ข้อ 2 — เดิมทะเบียนโหลดล้มแล้วยังโชว์ปุ่มอยู่)
-                 * ⚠️ ตอนนี้หัวจอ return ก่อนตั้งแต่ยังไม่ ready อยู่แล้ว แต่กันไว้อีกชั้น
-                 * เผื่อวันหน้ามีคนย้ายปุ่มออกไปไว้นอกหัวจอ
-                 */
-                ledgerReady && unreleasedCount > 0 ? (
-                  <button
-                    type="button"
-                    disabled={bulkReleaseBusy}
-                    /* กดแล้ว **ยังไม่ยิง** — เปิดป๊อปยืนยันก่อนเสมอ (ของจริงขึ้นหน้าสาธารณะ) */
-                    onClick={() => setBulkConfirmOpen(true)}
-                    /* 🔴 เลขบนปุ่ม **น้อยกว่า** "ยังไม่ปล่อย" บนหัว เพราะตัดใบที่ ERP
-                       พาไปเริ่มงานแล้วออก — ประกาศหาคนของตำแหน่งที่มีคนทำอยู่ไม่มีประโยชน์
-                       ⚠️ ต้องเขียนบอกไว้ ไม่งั้นคนเห็นเลขสองที่ไม่ตรงแล้วไม่เชื่อทั้งคู่ */
-                    title={`ส่งประกาศใบที่ยังต้องหาคนและยังไม่ปล่อย ${Math.min(unreleasedCount, 300)} ใบ ขึ้นหน้าสมัครงานสาธารณะ — เลขนี้น้อยกว่า "ยังไม่ปล่อย" เพราะตัดใบที่มีคนเริ่มงานแล้วออก`}
-                    className={cn(
-                      'rounded-lg px-2.5 py-1.5 text-[11px] font-medium disabled:opacity-50',
-                      TONE.success.outline,
-                    )}
-                  >
-                    {bulkReleaseBusy
-                      ? 'กำลังปล่อย…'
-                      : `ส่งประกาศทีเดียว ${Math.min(unreleasedCount, 300)} ใบที่ยังต้องหาคน`}
-                    {/**
-                     * 🔴 **คำแก้ตัวถูกถอดออก 21 ก.ย. 2569** (เจ้าของ: *"เลขทุกที่บวกกันได้
-                     * ไม่ต้องมีคำแก้ตัว"*) — เดิมต้องเขียนต่อท้ายปุ่มว่า "ไม่รวม N ใบที่มี
-                     * คนเริ่มงานแล้ว" เพราะหัวจอโชว์ยอดรวมก้อนเดียวแล้วเลขไม่ตรงกับปุ่ม
-                     *
-                     * ตอนนี้หัวจอแตก "ยังไม่ปล่อย" เป็น **ยังต้องหาคน** + **มีคนเริ่มงานแล้ว**
-                     * ให้เห็นทั้งคู่ตั้งแต่แรก ปุ่มนี้จึงผูกกับก้อน "ยังต้องหาคน" ตรง ๆ
-                     * ⚠️ ห้ามเอาคำแก้ตัวกลับมาโดยไม่ถอดสองก้อนย่อยออกก่อน
-                     */}
-                  </button>
-                ) : null
-              }
             />
 
             {/* 🔴 **แถบ "กำลังดูอะไรอยู่"** (แก้ 27 ส.ค. 2569)
@@ -1445,7 +1377,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 — คือ **ไม่เห็นว่าการ์ดข้างล่างถูกกรอง** เพราะการ์ดอยู่ต่ำกว่าขอบจอ
                 ⇒ ต้องมีแถบสีบอกชัด + ปุ่มล้าง + เลื่อนจอไปที่การ์ดให้เห็นว่ามันเปลี่ยน */}
             {/* 🔴 ต้องสรุปตัวกรองแถบซ้ายด้วย (แผนข้อ 9) — N ใบ = จำนวนการ์ดจริงข้างล่างเสมอ */}
-            {ledgerReady && (selectionLabel || boardFilterSummary) ? (
+            {ledgerReady && (selectionLabel || boardFilterSummary || searchSummary) ? (
               <div
                 className={cn(
                   'flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2',
@@ -1453,14 +1385,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 )}
               >
                 <p className="min-w-0 text-[11px] font-medium text-foreground">
-                  กำลังดู: {[selectionLabel, boardFilterSummary].filter(Boolean).join(' · ')} —{' '}
+                  กำลังดู: {[selectionLabel, boardFilterSummary, searchSummary].filter(Boolean).join(' · ')} —{' '}
                   {flowJobs.length.toLocaleString('th-TH')} ใบข้างล่าง
                 </p>
                 <button
                   type="button"
                   onClick={() =>
-                    boardFilterSummary
-                      ? clearAllBoardFilters({ laneStep: Boolean(selectionLabel) })
+                    boardFilterSummary || searchSummary
+                      ? clearAllBoardFilters({ laneStep: Boolean(selectionLabel), search: Boolean(searchSummary) })
                       : setSelection({ lane: null, step: null })
                   }
                   className={cn(
@@ -1563,7 +1495,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             ทั้งสองแถบพูดเลขเดียวกับขั้นบนเส้นทางเป๊ะ ("ปล่อยแล้ว 176" = ขั้นรอคนสมัคร +
             มีคนสมัคร · "มีคนสมัครแล้ว 1" = ขั้นมีคนสมัคร) — เจ้าของสั่งว่าหน้านี้เละ
             และเคยสั่งไว้ตั้งแต่แรกว่า "อันไหนข้อมูลเดียวกันก็ยุบ ๆ รวม ๆ ไป"
-            ⚠️ **ปุ่ม "ปล่อยทั้งหน้านี้" ไม่ได้หายไป** — ย้ายไปอยู่ท้ายแถบเส้นทางแล้ว */}
+            ⚠️ ปุ่ม "ปล่อยทั้งหน้านี้" ที่เคยย้ายไปท้ายแถบเส้นทาง **ถูกถอดทิ้งแล้ว 26 ก.ย. 2569**
+            (เจ้าของเคาะ — ปล่อยได้ทางเดียวคือป๊อปไล่งานของใบนั้น) */}
 
         {/* แถบ "ลิงก์ที่ปล่อยแล้วยังไม่มีใบสมัคร" — ซ่อนตัวเองเมื่อไม่มีของ
             กดแถว = ไปหน้ารายละเอียดใบขอ · กดปุ่ม = ไปแท็บ "ประกาศ / ลิงก์สมัคร"
@@ -2286,37 +2219,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         </React.Suspense>
       ) : null}
 
-      {/* ═══ ป๊อปยืนยันปล่อยเป็นชุด (แผนแก้จุดงงข้อ 3 · 2 ก.ย. 2569) ═══
-          ปุ่ม "ส่งประกาศทีเดียว" คือของออกนอกบ้าน — ต้องบอกก่อนว่าจะเกิดอะไร กี่ใบ
-          ใครเห็น และมีทางถอย (Haiku ทดสอบ: ไม่กล้ากดเพราะไม่รู้ว่ากดแล้วเกิดอะไร) */}
-      <AlertDialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              ปล่อยประกาศ {Math.min(releasableJobs.length, 300).toLocaleString('th-TH')} ใบ ขึ้นหน้าสมัครงานสาธารณะ?
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-1.5 text-left">
-                <p>
-                  ใบขอที่ยังต้องหาคนและยังไม่เคยปล่อย จะขึ้นหน้า /apply ให้
-                  <b>คนนอกเห็นและกดสมัครได้ทันที</b>
-                </p>
-                <p>
-                  เลขนี้น้อยกว่า &ldquo;ยังไม่ปล่อย&rdquo; บนหัว เพราะตัดใบที่มีคนเริ่มงานแล้วออก
-                  {releasableJobs.length > 300 ? ' · เกิน 300 ใบ ระบบปล่อยครั้งละ 300 กดซ้ำได้จนหมด' : ''}
-                </p>
-                <p>ปล่อยแล้วดึงลงรายใบได้ที่การ์ดของใบนั้น</p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>ยังก่อน</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void bulkReleaseVisible()}>
-              ปล่อย {Math.min(releasableJobs.length, 300).toLocaleString('th-TH')} ใบเลย
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

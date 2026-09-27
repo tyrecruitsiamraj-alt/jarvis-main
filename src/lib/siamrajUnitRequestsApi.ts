@@ -204,6 +204,28 @@ export async function saveUnitRequestMeta(
   if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกข้อมูลใบขอไม่สำเร็จ'));
 }
 
+/**
+ * เขียน `field_overrides` **เฉพาะบางคีย์** โดยอ่านก้อนล่าสุดจากฐานก่อนต่อ (26 ก.ย. 2569)
+ *
+ * 🔴 API เขียนทับทั้งก้อน (ไม่ merge) — ป๊อปไล่งานมีหลายขั้นที่เขียนก้อนเดียวกัน
+ * (ขั้น 1 เพศ · ขั้น 2 ที่อยู่ · ขั้น 3 รายได้) ถ้าเอาสำเนาในจอมาต่อแล้วอีกขั้นเพิ่ง
+ * auto-save ไป จะทับของขั้นนั้นหายเงียบ ๆ (อาการ "บันทึกแล้วหาย" ที่เจ้าของเจอมาแล้ว)
+ * @returns ก้อนที่เพิ่งบันทึก — เอาไปแปะในจอต่อได้เลย
+ */
+export async function saveUnitFieldOverridesPatch(
+  requestNo: string,
+  patch: Partial<UnitFieldOverrides>,
+): Promise<UnitFieldOverrides> {
+  const r = await apiFetch(`/api/siamraj/unit-notes?request_no=${encodeURIComponent(requestNo)}`, {
+    cache: 'no-store',
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'อ่านข้อมูลล่าสุดของใบขอไม่สำเร็จ'));
+  const current = (await r.json()) as { field_overrides?: UnitFieldOverrides | null };
+  const next: UnitFieldOverrides = { ...(current.field_overrides ?? {}), ...patch };
+  await saveUnitRequestMeta(requestNo, { field_overrides: next });
+  return next;
+}
+
 export type UnitWorkStatusPersonPayload = {
   first_name: string;
   last_name: string;

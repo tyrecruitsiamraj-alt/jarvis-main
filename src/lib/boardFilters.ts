@@ -9,9 +9,11 @@
  * - ใบไหนผ่าน (`applyBoardFilters`) — **OR ในหัวข้อเดียวกัน · AND ข้ามหัวข้อ**
  * - เลขต่อท้ายแต่ละตัวเลือก (`buildBoardFacets`) — นับจากชุดที่ผ่าน **หัวข้ออื่น** แล้ว
  *   (แบบ iRecruit: เลือกจังหวัดแล้วเลขของจังหวัดอื่นไม่หายไปเป็น 0 ทั้งแถว)
- * - หัวข้อไหนต้องซ่อน — **ห้ามปุ่มหลอก** (กติกาในแผน): ข้อมูลจริงมีค่าเดียวหรือไม่มีเลย
- *   = ไม่โชว์หัวข้อนั้น · วัดจริง 26 ก.ย.: ใบขอ 316 ใบเป็น "ล่วงหน้า" ทั้งหมด ⇒ หัวข้อ
- *   ความเร่งด่วนหายไปเอง และจะกลับมาเองเมื่อมีใบด่วนจริง
+ * - หัวข้อไหนต้องซ่อน — **ห้ามปุ่มหลอก** (กติกาในแผน): ซ่อนเฉพาะหัวข้อที่ **ข้อมูลจริงว่างทั้งหมด**
+ *   · 🔴 หัวข้อชิปแบบตายตัว (จำนวนผู้สมัคร · ความเร่งด่วน · เพศ · ช่วงอายุ · รายได้ ฯลฯ)
+ *   **โชว์ครบทุกตัวเลือกเสมอ เลข 0 จาง** (แผนข้อ 5 · เจ้าของย้ำ 26 ก.ย. 2569) — เดิมผมซ่อน
+ *   หัวข้อที่มีค่าเดียว แล้วหัวข้อความเร่งด่วนหายทั้งหัวข้อเพราะ 316 ใบเป็น "ล่วงหน้า" ทั้งหมด
+ *   ซึ่งผิดแผน (คนไม่รู้ว่ามีตัวกรองนี้อยู่)
  * - อ่าน/เขียน URL (`readBoardFilterState` / `writeBoardFilterState`) — ต่อยอดจาก params เดิม
  *   **ห้ามทำ `?view=` `?lane=` `?step=` หาย**
  *
@@ -19,15 +21,15 @@
  * ทะเบียนปล่อย + ยอดส่ง AI) ผ่าน `BoardFacetFacts`
  */
 import type { JobRequest } from '@/types';
-import { JOB_TYPE_LABELS } from '@/types';
 import { publicJobPositionLabel } from './unitRequestDisplay';
-import { extractJobSubtypeLabel } from './siamrajUnitFilters';
 import { inferProvinceFromAddress } from './parseThaiJobAddress';
 import { districtMatchesFilter } from './districtMatch';
 import { getDistrictOptionsForProvince } from './thaiDistricts';
 import { UNIT_SECTOR_LABEL } from './unitSector';
-import { incomeDisplay } from './incomeLabel';
+import { buildIncomeDisplay } from './incomeBreakdown';
 import { formatYmdDmyBe } from './dateTh';
+import { genderLabel } from './genderRequirement';
+import { isDrivingPositionLabel } from './jobBoardPositionPreset';
 
 /** คำกลางของ "ไม่มีข้อมูลช่องนี้" — ให้กดกรองได้ (กติกาในแผน: ฟิลด์ไม่มีค่า = มีค่า "ไม่ระบุ") */
 export const UNSPECIFIED = '__none__';
@@ -37,7 +39,6 @@ export type BoardFacetKey =
   | 'release'
   | 'urgency'
   | 'ai'
-  | 'jobType'
   | 'position'
   | 'subtype'
   | 'unit'
@@ -107,7 +108,7 @@ const trimOr = (v: unknown): string => {
 function unspecifiedLabel(key: BoardFacetKey): string {
   if (key === 'recruiter') return 'ไม่มีผู้รับผิดชอบ';
   if (key === 'sector') return 'ยังไม่ระบุ';
-  if (key === 'income') return 'ไม่ทราบหน่วย (ดูในใบขอ)';
+  if (key === 'income') return 'ตั้งยอดรวมไว้ (ไม่ระบุหน่วย)';
   return 'ไม่ระบุ';
 }
 
@@ -132,35 +133,68 @@ const INCOME_BANDS: ReadonlyArray<{ id: string; label: string; min: number; max:
   { id: '20k+', label: '20,000 ขึ้นไป', min: 20000, max: Number.MAX_SAFE_INTEGER },
 ];
 
+/** ค่ารายได้ที่ไม่ใช่ช่วงเงิน — ลำดับบนจอ: ยังไม่ตั้ง → ช่วงเงินต่อเดือน → รายวัน */
+const INCOME_SPECIAL_LABEL: Record<string, string> = {
+  unset: 'ยังไม่ตั้งรายได้',
+  daily: 'ตั้งเป็นรายวัน',
+};
+
 /**
- * รายได้ต่อเดือนที่ **รู้หน่วยจริง** — ไม่รู้ = `null`
+ * รายได้ที่ **ทีม Online ตั้งไว้บนประกาศ** อยู่ช่วงไหน (ค่าของหัวข้อ "รายได้บนประกาศ")
  *
- * 🔴 ห้ามจัดช่วงจาก `total_income` ดิบ — ERP ปนค่าแรง **ต่อวัน** (400) กับ **ต่อเดือน** (12,000)
- * ในช่องเดียวกัน (วัด 26 ก.ย.: ฟีดรายการไม่มี `monthly_income` เลยสักใบ) ⇒ จัดช่วงตรง ๆ
- * ใบรายวันจะไปตก "ต่ำกว่า 12,000" ทั้งที่ได้เดือนละหมื่นกว่า · ใช้ `incomeDisplay()`
- * ตัวเดียวกับการ์ด แล้วนับเฉพาะที่มันบอกว่าเป็น "ต่อเดือน"
+ * 🔴 **ยังไม่ตั้ง = `unset`** (เจ้าของเคาะ 26 ก.ย. 2569: *"แปลว่าเจ้าหน้าที่ Online ยังไม่มาทำ
+ * อะไรกับกล่องงานใบนั้นเฉย ๆ"*) — **ห้ามเอาเลข ERP มาอุด** · ตัวกรองนี้มีไว้ไล่งานที่ยังไม่ทำ
+ * ⚠️ ERP ปนค่าแรง **ต่อวัน** (400) กับ **ต่อเดือน** (12,000) ในช่องเดียวกัน — ของเดิมที่เดาจาก
+ *    `total_income` จึงถูกถอดออก (ไม่งั้นเลขที่ไม่มีใครตั้งดูเหมือนตั้งแล้ว)
+ * - ตั้งแบบแยกรายการ (`field_overrides.income`) ต่อเดือน = จัดช่วงตามยอดรวมที่ผู้สมัครเห็น
+ * - ตั้งเป็นรายวัน = `daily` (ไม่แปลงเป็นต่อเดือนเอง — ห้ามเดาจำนวนวันทำงาน)
+ * - ตั้งเลขเดี่ยวแบบเก่า (`field_overrides.total_income`) = ตั้งแล้วแต่ไม่รู้หน่วย
  */
-export function knownMonthlyIncome(job: JobRequest): number | null {
-  if (job.income_display && job.income_display.period === 'monthly' && job.income_display.total > 0) {
-    return job.income_display.total;
+export function onlineIncomeValue(job: JobRequest): string {
+  const fo = job.field_overrides;
+  const display = fo?.income ? buildIncomeDisplay(fo.income) : null;
+  if (display) {
+    if (display.period === 'daily') return 'daily';
+    return INCOME_BANDS.find((b) => display.total >= b.min && display.total <= b.max)?.id ?? UNSPECIFIED;
   }
-  const d = incomeDisplay({ totalIncome: job.total_income, monthlyIncome: job.monthly_income });
-  return d && d.period === 'monthly' ? d.amount : null;
+  if (typeof fo?.total_income === 'number' && fo.total_income > 0) return UNSPECIFIED;
+  return 'unset';
 }
 
 /**
- * เพศจาก ERP — ใช้กติกาเดียวกับ `formatGenderRequirement` ฝั่ง API
- * ⚠️ รหัส `O` (วัด 26 ก.ย.: 177 จาก 316 ใบ) ไม่มีในตารางแปลงเดิม จึงโชว์ตามที่ ERP ส่งมา
- *    **ไม่เดาความหมายเอง** จนกว่าจะรู้ว่า O แปลว่าอะไร
+ * งานย่อยของงานขับรถ (เจ้าของเคาะ 26 ก.ย. 2569: *"ตำแหน่งงานที่สื่อว่า ขับรถนะ แต่งานย่อยของงาน
+ * ขับรถมันมี ส่วนกลาง นาย ไรงี้"*) — ตำแหน่งอื่น **ไม่มีงานย่อย**
+ *
+ * วัดจาก ERP 26 ก.ย. (`hr_ms_job_description_2` ของใบขอขับรถที่เปิดอยู่): ส่วนกลาง 64 ·
+ * รถผู้บริหาร 53 (+คนไทย 3 · ต่างชาติ 2) · Valet Parking 19 · ชนิดที่ 2 5 · ไม่ระบุ 4 · ทดสอบ 2
+ * ⇒ "นาย" = ทุกชื่อที่มีคำว่า "ผู้บริหาร" · ค่าที่ไม่เข้ากลุ่มไหน = "อื่น ๆ" · ว่าง/ไม่ระบุ = ไม่ระบุ
  */
-function genderValue(raw: string | undefined): string {
-  const r = (raw ?? '').trim();
-  if (!r) return UNSPECIFIED;
-  const t = r.toUpperCase();
-  if (t === 'M' || t === 'MALE' || r === 'ชาย') return 'ชาย';
-  if (t === 'F' || t === 'FEMALE' || r === 'หญิง') return 'หญิง';
-  if (t === 'B' || t === 'BOTH' || t === 'ANY' || r === 'ไม่ระบุ') return 'ไม่ระบุ';
-  return r;
+const DRIVING_SUBTYPES: ReadonlyArray<{ id: string; label: string }> = [
+  { id: 'central', label: 'ส่วนกลาง' },
+  { id: 'boss', label: 'นาย (รถผู้บริหาร)' },
+  { id: 'valet', label: 'Valet' },
+  { id: 'other', label: 'อื่น ๆ' },
+];
+
+export function drivingSubtypeOf(job: JobRequest): string {
+  const raw = (job.job_description_code_2 ?? '').trim();
+  if (!raw || raw === 'ไม่ระบุ') return UNSPECIFIED;
+  if (/ส่วนกลาง/.test(raw)) return 'central';
+  if (/ผู้บริหาร|นาย/.test(raw)) return 'boss';
+  if (/valet|แวลเล่|แวลเลต/i.test(raw)) return 'valet';
+  return 'other';
+}
+
+/** ตำแหน่งงานของใบ (คำเดียวกับบรรทัดสีบนการ์ด) */
+const positionOf = (job: JobRequest): string => trimOr(publicJobPositionLabel(job));
+
+/**
+ * จังหวัดของใบ — 🔴 **อ่านค่าที่ทีม Online กรอกก่อน** (เจ้าของเคาะ 26 ก.ย. 2569: ที่อยู่กรอกเอง
+ * ก่อนขึ้นหน้าสาธารณะ) แล้วค่อยเดาจากที่อยู่ใบขอ · ❌ **ไม่เติมจากจังหวัดของไซต์**
+ * (ไซต์ = จังหวัดที่จดสัญญา วัดแล้วผิดที่ทำงานจริง 26% เช่น กรุงศรีสาขาบิ๊กซีลพบุรี แต่ไซต์จดกรุงเทพฯ)
+ */
+export function boardProvinceOf(job: JobRequest): string {
+  return trimOr(job.override_province || inferProvinceFromAddress(job.location_address || ''));
 }
 
 const ymd = (v: string | undefined | null): string => (v ?? '').slice(0, 10);
@@ -212,25 +246,31 @@ const FACETS: readonly FacetDef[] = [
     values: (job, facts) => [(facts.aiSent?.(job) ?? 0) > 0 ? 'sent' : 'not_sent'],
   },
   {
-    key: 'jobType',
-    label: 'ประเภทงาน',
-    ui: 'check',
-    labelOf: (v) => JOB_TYPE_LABELS[v as keyof typeof JOB_TYPE_LABELS] ?? v,
-    values: (job) => [job.job_type ? job.job_type : UNSPECIFIED],
-  },
-  {
+    /**
+     * ตำแหน่งงาน → งานย่อย แบบจังหวัด → อำเภอ (เจ้าของเคาะ 26 ก.ย. 2569)
+     * 🔴 หัวข้อ "ประเภทงาน" ถูกถอดออก — ระบบเดาจากคำ (คนสวนก็ตกเป็น "ส่วนกลาง") ใช้งานย่อยแทน
+     */
     key: 'position',
-    label: 'ตำแหน่ง',
+    label: 'ตำแหน่งงาน',
     ui: 'check',
     searchable: true,
-    values: (job) => [trimOr(publicJobPositionLabel(job))],
+    values: (job) => [positionOf(job)],
   },
   {
+    /**
+     * งานย่อย — **โผล่เมื่อเลือกตำแหน่งงานขับรถแล้วเท่านั้น** (ตำแหน่งอื่นไม่มีงานย่อย)
+     * ⚠️ ตำแหน่ง "ทดแทนงาน" ใน ERP บางใบจริง ๆ เป็นงานขับรถ — ไม่เดาแทน (ข้อมูลฝั่ง ERP)
+     */
     key: 'subtype',
-    label: 'ลักษณะงานย่อย',
+    label: 'งานย่อย',
     ui: 'check',
-    searchable: true,
-    values: (job) => [trimOr(extractJobSubtypeLabel(job))],
+    order: DRIVING_SUBTYPES.map((t) => t.id),
+    labelOf: (v) => DRIVING_SUBTYPES.find((t) => t.id === v)?.label ?? v,
+    values: (job, _facts, state) => {
+      const picked = (state.selection.position ?? []).filter(isDrivingPositionLabel);
+      if (picked.length === 0) return [];
+      return picked.includes(positionOf(job)) ? [drivingSubtypeOf(job)] : [];
+    },
   },
   {
     key: 'unit',
@@ -244,7 +284,7 @@ const FACETS: readonly FacetDef[] = [
     label: 'จังหวัด',
     ui: 'check',
     searchable: true,
-    values: (job) => [trimOr(inferProvinceFromAddress(job.location_address || ''))],
+    values: (job) => [boardProvinceOf(job)],
   },
   {
     /**
@@ -258,9 +298,12 @@ const FACETS: readonly FacetDef[] = [
     values: (job, _facts, state) => {
       const provinces = (state.selection.province ?? []).filter((p) => p !== UNSPECIFIED);
       if (provinces.length === 0) return [];
+      const prov = boardProvinceOf(job);
+      if (prov === UNSPECIFIED || !provinces.includes(prov)) return [];
+      // ทีม Online กรอกอำเภอไว้ = ใช้ค่านั้น (ค่าเดียวกับที่ผู้สมัครเห็น) · ไม่กรอก = เดาจากที่อยู่ใบขอ
+      const typed = (job.override_district ?? '').trim();
+      if (typed) return [typed];
       const addr = job.location_address || '';
-      const prov = inferProvinceFromAddress(addr);
-      if (!prov || !provinces.includes(prov)) return [];
       const hit = getDistrictOptionsForProvince(prov).filter((d) => districtMatchesFilter(addr, d));
       return hit.length > 0 ? [...hit] : [UNSPECIFIED];
     },
@@ -269,14 +312,23 @@ const FACETS: readonly FacetDef[] = [
     key: 'sector',
     label: 'ภาค',
     ui: 'check',
+    order: Object.keys(UNIT_SECTOR_LABEL),
     labelOf: (v) => UNIT_SECTOR_LABEL[v as keyof typeof UNIT_SECTOR_LABEL] ?? v,
     values: (job) => [job.unit_sector ? job.unit_sector : UNSPECIFIED],
   },
   {
+    /**
+     * 🔴 รหัส O ของ ERP (`ms_sex`: O = ไม่ระบุ) ขึ้นเป็น **"ไม่ระบุ"** ไม่ใช่ตัว O ดิบ
+     * (เจ้าของสั่ง 26 ก.ย. 2569) · ค่าที่ทีม Online เลือกในป๊อปขั้น 1 ทับมาให้แล้วที่ feed
+     */
     key: 'gender',
-    label: 'เพศที่ต้องการ',
+    label: 'เพศที่รับ',
     ui: 'check',
-    values: (job) => [genderValue(job.gender_requirement)],
+    order: ['ชาย', 'หญิง', 'ไม่จำกัด'],
+    values: (job) => {
+      const g = genderLabel(job.gender_requirement);
+      return [g === 'ไม่ระบุ' ? UNSPECIFIED : g];
+    },
   },
   {
     /** ใบที่ช่วงอายุ **ทับ** กับช่วงที่เลือก (ใบ 22–40 ติดทั้ง 18–25 · 26–35 · 36–45) */
@@ -295,16 +347,13 @@ const FACETS: readonly FacetDef[] = [
     },
   },
   {
+    /** รายได้ที่ทีม Online ตั้งบนประกาศ — "ยังไม่ตั้งรายได้" คือกองงานที่ยังไม่ได้ทำ (ห้ามอุดด้วยเลข ERP) */
     key: 'income',
-    label: 'รายได้ต่อเดือน',
+    label: 'รายได้บนประกาศ',
     ui: 'chip',
-    order: INCOME_BANDS.map((b) => b.id),
-    labelOf: (v) => INCOME_BANDS.find((b) => b.id === v)?.label ?? v,
-    values: (job) => {
-      const m = knownMonthlyIncome(job);
-      if (m === null) return [UNSPECIFIED];
-      return [INCOME_BANDS.find((b) => m >= b.min && m <= b.max)?.id ?? UNSPECIFIED];
-    },
+    order: ['unset', ...INCOME_BANDS.map((b) => b.id), 'daily'],
+    labelOf: (v) => INCOME_SPECIAL_LABEL[v] ?? INCOME_BANDS.find((b) => b.id === v)?.label ?? v,
+    values: (job) => [onlineIncomeValue(job)],
   },
   {
     key: 'recruiter',
@@ -413,8 +462,10 @@ export type BoardFacetView = {
  *
  * - เลขของแต่ละค่า = ใบที่ผ่าน **ทุกหัวข้อยกเว้นหัวข้อตัวเอง** (+ ช่วงวันที่)
  * - ตัวเลือก = ค่าที่มีจริงในชุด (หลังช่วงวันที่) ∪ ค่าที่ติ๊กอยู่ (ติ๊กแล้วเลขเป็น 0 ก็ยังต้องเห็น)
- * - 🔴 **ห้ามปุ่มหลอก**: ค่าที่มีจริงไม่ถึง 2 ค่า และไม่ได้ติ๊กอะไรอยู่ = ไม่โชว์หัวข้อนั้น
- *   (กดไปก็ได้ชุดเดิม) · อำเภอไม่มีค่าเลยจนกว่าจะเลือกจังหวัด จึงหายไปเองตามแผน
+ *   ∪ **ทุกตัวเลือกของหัวข้อแบบตายตัว** (`order`) — เลข 0 จางแต่ยังเห็น (แผนข้อ 5)
+ * - 🔴 **ห้ามปุ่มหลอก**: ซ่อนเฉพาะหัวข้อที่ **ข้อมูลจริงว่างทั้งหมด** (มีแต่ "ไม่ระบุ" หรือไม่มีค่าเลย)
+ *   และไม่ได้ติ๊กอะไรอยู่ · อำเภอ/งานย่อยไม่มีค่าจนกว่าจะเลือกหัวข้อแม่ จึงหายไปเองตามแผน
+ *   ⚠️ เดิมซ่อนหัวข้อที่มีค่าเดียวด้วย ⇒ ความเร่งด่วนหายทั้งหัวข้อ (316 ใบเป็น "ล่วงหน้า") — แก้แล้ว
  */
 export function buildBoardFacets(
   rows: readonly JobRequest[],
@@ -430,7 +481,9 @@ export function buildBoardFacets(
     const selected = selectedOf(state, f.key);
     const universe = new Set<string>();
     for (const vals of table.get(f.key) ?? []) for (const v of vals) universe.add(v);
-    if (universe.size < 2 && selected.length === 0) continue;
+    const hasRealValue = [...universe].some((v) => v !== UNSPECIFIED);
+    if (!hasRealValue && selected.length === 0) continue;
+    if (f.order) for (const v of f.order) universe.add(v);
     for (const v of selected) universe.add(v);
 
     const counts = new Map<string, number>();
@@ -516,6 +569,10 @@ export function toggleBoardFacetValue(
     const allowed = new Set(provinces.flatMap((p) => [...getDistrictOptionsForProvince(p)]));
     selection.district = (selection.district ?? []).filter((d) => d === UNSPECIFIED ? provinces.length > 0 : allowed.has(d));
   }
+  // งานย่อยมีเฉพาะงานขับรถ — ไม่เหลือตำแหน่งขับรถที่ติ๊กไว้ = งานย่อยที่ติ๊กไว้หลุดตาม
+  if (key === 'position' && !next.some(isDrivingPositionLabel)) {
+    selection.subtype = [];
+  }
   return { ...state, selection };
 }
 
@@ -596,6 +653,23 @@ export function writeBoardFilterState(
     if (state.dates.from) next.set(DATE_FROM_PARAM, state.dates.from);
     if (state.dates.to) next.set(DATE_TO_PARAM, state.dates.to);
   }
+  return next;
+}
+
+/**
+ * ช่องค้นหาของกล่องงานอยู่ใน URL (`?q=`) — เจ้าของเคาะ 26 ก.ย. 2569 (ตัวกรองทุกตัวต้องอยู่ในลิงก์
+ * กดย้อนกลับ/ส่งลิงก์ต่อแล้วไม่หาย) · ค่าว่างไม่เขียน (ลิงก์เดิมที่ไม่มีคำค้นเหมือนเดิมทุกตัวอักษร)
+ */
+export const BOARD_SEARCH_PARAM = 'q';
+
+export function readBoardSearch(params: URLSearchParams): string {
+  return params.get(BOARD_SEARCH_PARAM) ?? '';
+}
+
+export function writeBoardSearch(params: URLSearchParams, q: string): URLSearchParams {
+  const next = new URLSearchParams(params);
+  if (q.trim()) next.set(BOARD_SEARCH_PARAM, q);
+  else next.delete(BOARD_SEARCH_PARAM);
   return next;
 }
 

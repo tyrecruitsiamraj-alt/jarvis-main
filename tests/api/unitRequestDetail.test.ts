@@ -299,6 +299,7 @@ describe('จอบอกที่มาของรายได้จริง'
     resolve(__dirname, '../../src/pages/jobs/SiamrajUnitRequestDetailPage.tsx'),
     'utf8',
   );
+  const popup = readFileSync(resolve(__dirname, '../../src/pages/jobs/BoardPostingPage.tsx'), 'utf8');
 
   it('บอกว่าเป็นยอดเดียวกับ eSlip และชี้เมนู ERP ที่เอาไปทานได้', () => {
     expect(blocks).toContain('ใบแจ้งเงินเดือน (eSlip)');
@@ -317,7 +318,8 @@ describe('จอบอกที่มาของรายได้จริง'
     expect(blocks).toContain('อาจยังไม่ถึงรอบจ่าย');
   });
 
-  it('หน้าใบขอเรียกกล่องกลาง (ห้ามก๊อปโครงกลับมาเขียนซ้ำ)', () => {
+  it('หน้าใบขอและป๊อปไล่งานใช้กล่องเดียวกัน (ห้ามก๊อปโครงไปเขียนซ้ำ)', () => {
     expect(page).toContain('<ResignedEmployeeBlock job={data} />');
+    expect(popup).toContain('<ResignedEmployeeBlock job={job} />');
   });
 });

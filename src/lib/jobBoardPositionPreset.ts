@@ -21,10 +21,17 @@ export function isDrivingPositionPreset(raw: string | null | undefined): boolean
   return /พขร|ขับรถ|driver|chauffeur|valet/i.test(q);
 }
 
+/**
+ * ชื่อตำแหน่งนี้ถือว่างานขับรถไหม — 🔴 นิยามเดียวของ "งานขับรถ" ทั้งระบบ
+ * (ลิงก์แคมเปญ `?pos=` · ตัวกรองแถบซ้ายของกล่องงาน "ตำแหน่งงาน → งานย่อย" ใช้ตัวนี้ร่วมกัน)
+ */
+export function isDrivingPositionLabel(label: string | null | undefined): boolean {
+  return /พขร|ขับรถ|driver|chauffeur|valet/i.test(label ?? '');
+}
+
 /** ตำแหน่งบนการ์ดถือว่างานขับรถไหม */
 export function isDrivingJobPosition(job: JobRequest): boolean {
-  const label = publicJobPositionLabel(job);
-  return /พขร|ขับรถ|driver|chauffeur|valet/i.test(label);
+  return isDrivingPositionLabel(publicJobPositionLabel(job));
 }
 
 /**

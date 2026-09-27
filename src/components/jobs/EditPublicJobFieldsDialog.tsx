@@ -35,6 +35,8 @@ import {
   type IncomePeriod,
 } from '@/lib/incomeBreakdown';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import { resignedMonthlyNetAverage } from '@/lib/resignedIncome';
 import { buildOverridesPatch, formDiffersFromJob, formStateFromJob } from '@/lib/publicFieldsForm';
 import {
   PUBLIC_TOGGLE_FIELDS,
@@ -50,6 +52,11 @@ import {
   getSubdistrictOptions,
 } from '@/lib/thaiAddressCascade';
 
+/**
+ * ป้ายบรรทัดรายได้ตอนกด "ใช้รายได้คนเก่า" — 🔴 **คำนี้ขึ้นหน้าสาธารณะ** ห้ามเขียนคำภายใน
+ * (เช่น "คนเก่า"/"eSlip") ให้ผู้สมัครเห็น · ที่มาของตัวเลขบอกไว้ในป๊อปฝั่งเจ้าหน้าที่แล้ว
+ */
+const RESIGNED_INCOME_LINE_LABEL = 'รายได้โดยประมาณ';
 
 /**
  * แก้ข้อมูลที่จะไปโผล่บน **หน้าประกาศสาธารณะ** — เปิดจากการ์ดในกล่องงาน
@@ -216,6 +223,8 @@ const EditPublicJobFieldsDialog: React.FC<{
   const benefitLines = cleanBenefitLines(benefitText.split('\n'));
   // ⚠️ ห้ามใช้ useMemo ตรงนี้ — อยู่ใต้ early return ของ `open` แล้ว (rules-of-hooks)
   const mergedBenefitLines = benefitLines;
+  /** รายได้คนเก่าเฉลี่ยต่อเดือน (ทางที่ ② ของการตั้งรายได้) — `null` = ไม่มีให้ใช้ */
+  const resignedAvg = resignedMonthlyNetAverage(job.resigned_income_3m, job.lastWorkingDay);
 
   /**
    * บันทึก field_overrides · `silent=true` = auto-save (ไม่ปิดป๊อป · ตั้งป้ายสถานะ)
@@ -477,17 +486,55 @@ const EditPublicJobFieldsDialog: React.FC<{
                 <option key={l} value={l} />
               ))}
             </datalist>
-            {incomeRows.length < INCOME_LINE_MAX ? (
-              <button
+            {/**
+              * ═══ ตั้งรายได้ได้ 3 ทาง (เจ้าของเคาะ 26 ก.ย. 2569) ═══
+              * > *"บน Erp มีอะไรบ้างที่เป็นรายได้ ก็มีปุ่ม checkbox ให้เลือก … หรือ เลือกได้ว่าจะลง
+              * >  รายได้ของคนเก่าที่เฉลี่ยแล้วได้ประมาณไหน หรือ มีช่องให้ใส่รายได้เอง เลือกทำได้"*
+              * ① ติ๊กจาก ERP ("+ เพิ่มรายการรายได้" → แผงอัตราตามใบขอ) · ② **ใช้รายได้คนเก่า** ·
+              * ③ พิมพ์เอง ("พิมพ์เองแทน" ในแผง / ช่องยอดรวมข้างล่าง)
+              * 🔴 ② = ยอดสุทธิ eSlip เฉลี่ยต่อเดือนจาก 3 เดือนจริง · ตัดงวดไม่เต็ม (`resignedIncome.ts`)
+              *    ใบเปิดไซต์ใหม่/ไม่มีงวดเต็ม = กดไม่ได้พร้อมบอกเหตุผล · กดแล้ว**แทนที่**รายการเดิม
+              *    (ยอดสุทธิรวมทุกอย่างแล้ว เอาไปต่อท้ายรายการ ERP = นับซ้ำ)
+              */}
+            <div className="flex flex-wrap items-center gap-2">
+              {incomeRows.length < INCOME_LINE_MAX ? (
+                <button
+                  type="button"
+                  onClick={() => setShowRatePicker((v) => !v)}
+                  className={cn('rounded-lg border px-2.5 py-1 text-xs font-medium', TONE.info.outline)}
+                >
+                  + เพิ่มรายการรายได้
+                </button>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">ครบ {INCOME_LINE_MAX} รายการแล้ว</p>
+              )}
+              <Button
                 type="button"
-                onClick={() => setShowRatePicker((v) => !v)}
-                className={cn('rounded-lg border px-2.5 py-1 text-xs font-medium', TONE.info.outline)}
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                disabled={!resignedAvg}
+                onClick={() => {
+                  if (!resignedAvg) return;
+                  setIncomePeriod('monthly');
+                  setIncomeRows([{ label: RESIGNED_INCOME_LINE_LABEL, amount: String(resignedAvg.amount) }]);
+                  setIncomeTotal('');
+                  setShowRatePicker(false);
+                }}
               >
-                + เพิ่มรายการรายได้
-              </button>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">ครบ {INCOME_LINE_MAX} รายการแล้ว</p>
-            )}
+                ใช้รายได้คนเก่า
+                {resignedAvg ? ` ≈ ฿${resignedAvg.amount.toLocaleString('th-TH')}/เดือน` : ''}
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {resignedAvg
+                ? `รายได้คนเก่า = ยอดสุทธิ eSlip เฉลี่ยจาก ${resignedAvg.fullPeriods} งวดเต็ม (≈ ${resignedAvg.monthsCovered.toLocaleString('th-TH')} เดือน)${
+                    resignedAvg.skipped > 0
+                      ? ` · ตัดงวดไม่เต็ม/ออกกลางงวด ${resignedAvg.skipped} งวด`
+                      : ''
+                  }${incomeRows.length > 0 ? ' · กดแล้วแทนที่รายการที่มีอยู่' : ''}`
+                : 'ใช้รายได้คนเก่าไม่ได้ — ใบนี้ไม่มีงวดจ่ายเต็มงวดของคนเก่าในไซต์นี้ (เช่น เปิดไซต์ใหม่)'}
+            </p>
 
             {/**
               * ═══ กด "เพิ่มรายการรายได้" แล้ว **เด้งป๊อป** ตารางอัตราตามใบขอมาให้ติ๊ก ═══
