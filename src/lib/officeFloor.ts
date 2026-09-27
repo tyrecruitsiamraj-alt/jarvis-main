@@ -21,7 +21,11 @@ import type { ToneKey } from '@/lib/designTokens';
 /** สถานะโต๊ะ — เรียงตามความสำคัญที่คนต้องเห็นก่อน (blocked → idle) */
 export type DeskState = 'blocked' | 'calling' | 'working' | 'idle' | 'off';
 
-export type DeskId = 'intake' | 'aiCalls' | 'selection' | 'follow' | 'content' | 'aftercare';
+/**
+ * 🔴 โต๊ะ "คอนเทนต์ / Scraping" (`content`) ถูกถอด 27 ก.ย. 2569 — เจ้าของเลือก "เอาแค่ปุ่ม"
+ * (ปุ่มส่ง Content/Scraping ในจับคู่งานยังอยู่ · ตัวเลขคำขอทุกจุดรวมโต๊ะนี้ถอด)
+ */
+export type DeskId = 'intake' | 'aiCalls' | 'selection' | 'follow' | 'aftercare';
 
 /** ตัวเลขบนโต๊ะ — `unit` บังคับใส่ (กติกาข้อ 3) */
 export type DeskStat = {
@@ -115,14 +119,6 @@ export type OfficeFloorRaw = {
     upcoming: number;
     oldestDays: number | null;
   };
-  content: {
-    /** รอทีมรับงาน */
-    pending: number;
-    inProgress: number;
-    /** ส่ง Scraping (ทุกสถานะที่ยังไม่จบ) */
-    scraping: number;
-    oldestDays: number | null;
-  };
   /** โต๊ะ "ดูแลหลังเริ่มงาน" — ยังไม่เปิดใช้จนกว่าจะทำ Phase 7 */
   aftercare: { enabled: boolean; count: number };
 };
@@ -140,7 +136,6 @@ export type OfficeFloorCounts = {
   /** ฝั่งถังโทรของคน (pg) เท่านั้น — ส่วนใบขอมาจาก ERP */
   selection: Pick<OfficeFloorRaw['selection'], 'holdsActive' | 'holdsNoResult' | 'oldestDays'>;
   follow: OfficeFloorRaw['follow'];
-  content: OfficeFloorRaw['content'];
   /**
    * โต๊ะ "ดูแลหลังเริ่มงาน" — Phase 7 เปิดหน้าจริงแล้ว (ตาราง `aftercare_people` · 107)
    * `enabled: false` = ฐานยังไม่มีตาราง (ยังไม่รัน migration) ⇒ โต๊ะขึ้นว่า "ยังไม่เปิดใช้"
@@ -172,7 +167,6 @@ export function composeOfficeFloorRaw(
     aiCalls: counts.aiCalls,
     selection: { ...counts.selection, jobsOpen: erp.jobsOpen, jobsWithMatch: erp.jobsWithMatch },
     follow: counts.follow,
-    content: counts.content,
     aftercare: aftercare ?? counts.aftercare ?? { enabled: false, count: 0 },
   };
 }
@@ -376,35 +370,6 @@ function buildFollow(r: OfficeFloorRaw['follow']): Desk {
   };
 }
 
-function buildContent(r: OfficeFloorRaw['content']): Desk {
-  const backlog = nz(r.pending);
-  const state: DeskState =
-    backlog > 0 ? 'blocked' : nz(r.inProgress) + nz(r.scraping) > 0 ? 'working' : 'idle';
-  const doing =
-    backlog > 0
-      ? `มีคำขอรอทีมรับ ${backlog} ใบ${agePhrase(r.oldestDays)}`
-      : nz(r.inProgress) + nz(r.scraping) > 0
-        ? `กำลังทำอยู่ ${nz(r.inProgress) + nz(r.scraping)} ใบ`
-        : 'ไม่มีคำขอค้าง';
-  return {
-    id: 'content',
-    label: 'โต๊ะคอนเทนต์ / Scraping',
-    who: 'ทีมคอนเทนต์',
-    state,
-    doing,
-    backlog,
-    oldestDays: backlog > 0 ? (r.oldestDays ?? null) : null,
-    tone: backlog > 0 ? 'orange' : 'orange',
-    stats: [
-      { key: 'pending', label: 'รอทีมรับงาน', value: nz(r.pending), unit: 'ใบ', tone: 'warn', alert: backlog > 0 },
-      { key: 'inProgress', label: 'กำลังคิดคอนเทนต์', value: nz(r.inProgress), unit: 'ใบ', tone: 'orange' },
-      { key: 'scraping', label: 'ส่ง Scraping', value: nz(r.scraping), unit: 'ใบ', tone: 'teal' },
-    ],
-    // เลขของโต๊ะนี้คือ "คำขอโพสต์" ⇒ ไปหน้าที่เลขมาจาก (แท็บ ?view=postings ถูกถอดแล้ว 27 ก.ย. 2569)
-    href: '/matching/job-postings',
-  };
-}
-
 function buildAftercare(r: OfficeFloorRaw['aftercare']): Desk {
   if (!r.enabled) {
     return {
@@ -442,7 +407,6 @@ export const DESK_ORDER: DeskId[] = [
   'aiCalls',
   'selection',
   'follow',
-  'content',
   'aftercare',
 ];
 
@@ -452,7 +416,6 @@ export function buildOfficeFloor(raw: OfficeFloorRaw): Desk[] {
     aiCalls: buildAiCalls(raw.aiCalls),
     selection: buildSelection(raw.selection),
     follow: buildFollow(raw.follow),
-    content: buildContent(raw.content),
     aftercare: buildAftercare(raw.aftercare),
   };
   return DESK_ORDER.map((id) => byId[id]);
@@ -502,7 +465,6 @@ export const OFFICE_LINKS: readonly OfficeLink[] = [
   { from: 'intake', to: 'aiCalls', label: 'ใบสมัครที่รอ/กำลังให้ AI โทร' },
   { from: 'aiCalls', to: 'selection', label: 'ผลโทรที่กลับมาให้ทีมคัดสรรเลือก' },
   { from: 'selection', to: 'follow', label: 'คนที่ต้องโทรติดตามวันนี้' },
-  { from: 'intake', to: 'content', label: 'ใบที่ส่งให้ทีมคอนเทนต์/Scraping' },
   { from: 'follow', to: 'aftercare', label: 'คนที่ตามครบแล้ว ส่งไปดูแลหลังเริ่มงาน' },
 ];
 
@@ -524,8 +486,6 @@ export function isLinkFlowing(link: OfficeLink, byId: Partial<Record<DeskId, Des
       return deskStatValue(from, 'resultToday') > 0;
     case 'selection->follow':
       return deskStatValue(to, 'today') > 0;
-    case 'intake->content':
-      return (to?.state ?? 'idle') !== 'idle' && (to?.state ?? 'off') !== 'off';
     case 'follow->aftercare':
       return to?.state === 'working';
     default:
@@ -540,7 +500,7 @@ export function isLinkFlowing(link: OfficeLink, byId: Partial<Record<DeskId, Des
  * พิกัดอยู่ในระบบของกระดานพื้น (หน่วย px ของกระดาน ไม่ใช่ของจอ):
  *   `x` = ซ้าย→ขวา · `y` = ไกล→ใกล้กล้อง (0 คือหลังห้อง)
  *
- * เรียงตาม **ทางเดินของงานจริง**: หลังห้อง = สายแยก (คอนเทนต์ · ดูแลหลังเริ่มงาน)
+ * เรียงตาม **ทางเดินของงานจริง**: หลังห้อง = สายแยก (ดูแลหลังเริ่มงาน)
  * หน้าห้อง = สายหลักที่ทีมทำทุกวัน (สรรหา → AI → คัดสรร → ติดตาม)
  * `scale` = ขนาดป้ายตั้ง — ของที่อยู่ไกลเล็กลงเอง (ช่วยเรื่องความลึกอีกชั้น)
  */
@@ -558,7 +518,6 @@ export const OFFICE_CORE = { x: 510, y: 250 } as const;
  */
 export const OFFICE_SLOTS: Record<DeskId, { x: number; y: number; scale: number }> = {
   intake: { x: 226, y: 132, scale: 0.84 },
-  content: { x: 806, y: 128, scale: 0.84 },
   aiCalls: { x: 116, y: 320, scale: 1.02 },
   follow: { x: 908, y: 316, scale: 1.02 },
   selection: { x: 356, y: 440, scale: 1.12 },

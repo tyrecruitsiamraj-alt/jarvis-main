@@ -66,27 +66,8 @@ describe('หน่วยของตัวเลขรายได้', () => {
   });
 });
 
-/**
- * ด่านกันของเก่ากลับมา — รหัสดิบ/วันที่ ค.ศ. บนหน้าคำขอโพสต์
- */
-describe('หน้าคำขอโพสต์ไม่พ่นค่าดิบขึ้นจอ', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'src/pages/matching/JobPostingsPage.tsx'), 'utf8');
-
-  it('เพศแปลเป็นไทย ไม่ใช่รหัส M/F/O', () => {
-    expect(src).toContain('genderText(');
-    expect(src).not.toContain("value: snap.gender ?? null");
-  });
-
-  it('วันที่ต้องการเป็น พ.ศ. เหมือนทั้งระบบ ไม่ใช่ ISO ดิบ', () => {
-    expect(src).toContain('formatYmdDmyBe(snap.required_date)');
-  });
-
-  it('ชุดทดลองมีป้ายแยก และขอบเขตตั้งต้นตรงกับหน้าแรก', () => {
-    expect(src).toContain('isDemoRequest(');
-    expect(src).toContain('useState(true)'); // openOnly ตั้งต้น = เฉพาะใบขอที่ยังเปิด
-    expect(src).toContain('เฉพาะใบขอที่ยังเปิดอยู่');
-  });
-});
+// (ด่าน "หน้าคำขอโพสต์ไม่พ่นค่าดิบขึ้นจอ" ถูกลบพร้อมหน้า JobPostingsPage.tsx 27 ก.ย. 2569
+//  — เจ้าของสั่งถอดหน้ารวมคำขอ เหลือแค่ปุ่มส่ง Content/Scraping ในจับคู่งาน)
 
 /**
  * ด่านกันหน้า Follow กลับไปโหลดรายการเป็นของตัวเอง

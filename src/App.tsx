@@ -36,7 +36,6 @@ const AddCandidatePage = lazy(() => import("@/pages/matching/AddCandidatePage"))
 const MatchingPage = lazy(() => import("@/pages/matching/MatchingPage"));
 const SelectionContactPage = lazy(() => import("@/pages/matching/SelectionContactPage"));
 const PreCheckPage = lazy(() => import("@/pages/matching/PreCheckPage"));
-const JobPostingsPage = lazy(() => import("@/pages/matching/JobPostingsPage"));
 const RecruitRmPage = lazy(() => import("@/pages/recruit/RecruitRmPage"));
 const RecruitChannelsPage = lazy(() => import("@/pages/recruit/RecruitChannelsPage"));
 const ReservationsPage = lazy(() => import("@/pages/matching/ReservationsPage"));
@@ -124,7 +123,9 @@ const ProtectedRoutes = () => {
             <Route path="/matching/candidates/:id" element={<CandidateProfile />} />
             <Route path="/matching/match" element={<MatchingPage />} />
             <Route path="/matching/pre-check" element={<PreCheckPage />} />
-            <Route path="/matching/job-postings" element={<JobPostingsPage />} />
+            {/* 🔴 หน้า "คำขอโพสหางานใหม่" ถอด 27 ก.ย. 2569 — เจ้าของเลือก "เอาแค่ปุ่ม" (ปุ่มส่ง
+                Content/Scraping ในจับคู่งานยังอยู่) · ลิงก์/บุ๊กมาร์กเก่าพาไปกล่องงาน ที่ทีม Online ทำงานจริง */}
+            <Route path="/matching/job-postings" element={<Navigate to="/jobs/board" replace />} />
             {/* งานสรรหา (RM) — หน้าเดียว 3 แท็บ · แท็บอยู่ใน ?tab= เพื่อให้แชร์ลิงก์ได้ */}
             <Route path="/recruit/rm" element={<RecruitRmPage />} />
             <Route path="/recruit/channels" element={<RecruitChannelsPage />} />

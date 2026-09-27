@@ -11,8 +11,8 @@
  * แหล่งข้อมูล (pg ทั้งหมด ยกเว้นลิสต์ใบเปิด):
  * - ใบเปิด: `listSiamrajUnitRequests` **ท่อเดียวกับ flow-summary/หน้า Matching**
  *   (นิยาม "เปิดอยู่" ห้ามมีที่สอง) · จำกัดตาม departmentScope เหมือนเส้นอื่น
- * - ประกาศสาธารณะ: `job_public_releases` · คำขอโพส: `job_posting_requests`
- *   (ขั้น pending/in_progress/posted — นิยามเดียวกับ flow-summary)
+ * - ประกาศสาธารณะ: `job_public_releases`
+ *   (ตัวเลขคำขอโพส `job_posting_requests` ถูกถอด 27 ก.ย. 2569 — เจ้าของเลือก "เอาแค่ปุ่ม" ในจับคู่งาน)
  * - ผู้สมัคร: `public_job_applications` + `application_contact_logs` +
  *   `application_appointment_results` (089)
  * - คิวโทร: `lumos_dispatch_queue` แยก 3 เลนตาม person_ref (นิยาม = `queueLane` ใน lib
@@ -47,11 +47,9 @@ import type {
   LumosTeamStats,
   OnlineTeamStats,
   RecruitTeamStats,
-  StageCounts,
 } from '@/lib/officeTeam';
 
 const releasesTable = tableInAppSchema('job_public_releases');
-const postingsTable = tableInAppSchema('job_posting_requests');
 const appsTable = tableInAppSchema('public_job_applications');
 const contactLogsTable = tableInAppSchema('application_contact_logs');
 const attendanceTable = tableInAppSchema('application_appointment_results');
@@ -88,41 +86,23 @@ type Body = {
 const CACHE_MS = 30_000;
 const cache = new Map<string, { at: number; body: Body }>();
 
-/** ทีม Online — ประกาศหน้าสาธารณะ + คำขอโพส Content/Scraping (scope ที่ใบเปิดเสมอ) */
+/**
+ * ทีม Online — ประกาศหน้าสาธารณะ (scope ที่ใบเปิดเสมอ)
+ * 🔴 ตัวเลขคำขอโพส Content/Scraping ถูกถอด 27 ก.ย. 2569 — เจ้าของเลือก "เอาแค่ปุ่ม"
+ *    (ปุ่มส่งในจับคู่งานยังใช้อยู่ แต่ไม่มีหน้ารวม/ตัวเลขให้ตามแล้ว)
+ */
 async function loadOnlineTeam(openIds: string[], openTotal: number): Promise<OnlineTeamStats> {
-  const emptyStage = (): StageCounts => ({ pending: 0, in_progress: 0, posted: 0 });
-  if (openIds.length === 0) {
-    return { open_total: 0, released: 0, unreleased: 0, content: emptyStage(), scraping: emptyStage() };
-  }
-  const [rel, post] = await Promise.all([
-    dbQuery<{ n: number }>(
-      `select count(distinct job_id)::int as n from ${releasesTable}
-        where released_at is not null and job_id = any($1)`,
-      [openIds],
-    ),
-    dbQuery<{ t: string; status: string; n: number }>(
-      `select case when request_type = 'scraping' then 'scraping' else 'content' end as t,
-              status, count(*)::int as n
-         from ${postingsTable}
-        where status in ('pending', 'in_progress', 'posted') and job_id = any($1)
-        group by 1, 2`,
-      [openIds],
-    ),
-  ]);
-  const stages = { content: emptyStage(), scraping: emptyStage() };
-  for (const r of post.rows) {
-    const side = r.t === 'scraping' ? stages.scraping : stages.content;
-    if (r.status === 'pending') side.pending = r.n;
-    else if (r.status === 'in_progress') side.in_progress = r.n;
-    else if (r.status === 'posted') side.posted = r.n;
-  }
+  if (openIds.length === 0) return { open_total: 0, released: 0, unreleased: 0 };
+  const rel = await dbQuery<{ n: number }>(
+    `select count(distinct job_id)::int as n from ${releasesTable}
+      where released_at is not null and job_id = any($1)`,
+    [openIds],
+  );
   const released = rel.rows[0]?.n ?? 0;
   return {
     open_total: openTotal,
     released,
     unreleased: Math.max(0, openTotal - released),
-    content: stages.content,
-    scraping: stages.scraping,
   };
 }
 

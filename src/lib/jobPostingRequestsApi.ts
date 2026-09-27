@@ -1,7 +1,13 @@
 import { apiFetch } from '@/lib/apiFetch';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 
-/** คำขอ "โพสหางานใหม่" — สร้าง ID ให้ทีมอื่นรับไปทำคอนเทนต์/โพสหาคนต่อ */
+/**
+ * คำขอ "โพสหางานใหม่" — สร้าง ID ให้ทีมอื่นรับไปทำคอนเทนต์/โพสหาคนต่อ
+ *
+ * 🔴 27 ก.ย. 2569 เจ้าของสั่ง "เอาแค่ปุ่ม": เหลือแค่ปุ่ม "ให้สร้าง Content" / "Scraping งาน"
+ * + ชิปสถานะในหน้าจับคู่งาน · หน้ารวม `/matching/job-postings` (ลิสต์ + เปลี่ยนสถานะ)
+ * และตัวเลขคำขอบนหน้าแรกถูกถอด ⇒ ตัวเรียกลิสต์ทั้งหมด/เปลี่ยนสถานะฝั่งหน้าเว็บถูกลบตามไปด้วย
+ */
 export type JobPostingStatus = 'pending' | 'in_progress' | 'posted' | 'completed' | 'filled' | 'cancelled';
 export type JobPostingRequestType = 'content' | 'scraping';
 
@@ -98,14 +104,6 @@ export async function listActiveJobPostingsForJob(jobId: string): Promise<JobPos
   return d.active ?? (d.item ? [d.item] : []);
 }
 
-export async function listJobPostingRequests(status?: JobPostingStatus): Promise<JobPostingRequest[]> {
-  const params = status ? `?status=${encodeURIComponent(status)}` : '';
-  const r = await apiFetch(`/api/matching/job-postings${params}`);
-  if (!r.ok) return [];
-  const d = (await r.json().catch(() => ({}))) as { items?: JobPostingRequest[] };
-  return d.items ?? [];
-}
-
 export async function createJobPostingRequest(input: {
   jobId: string;
   requestNo?: string | null;
@@ -125,18 +123,5 @@ export async function createJobPostingRequest(input: {
     }),
   });
   if (!r.ok) return readError(r, 'สร้างคำขอไม่สำเร็จ');
-  return (await r.json()) as JobPostingRequest;
-}
-
-export async function updateJobPostingStatus(
-  id: string,
-  status: JobPostingStatus,
-  notes?: string | null,
-): Promise<JobPostingRequest> {
-  const r = await apiFetch(`/api/matching/job-postings?id=${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ status, ...(notes !== undefined ? { notes } : {}) }),
-  });
-  if (!r.ok) return readError(r, 'อัปเดตสถานะไม่สำเร็จ');
   return (await r.json()) as JobPostingRequest;
 }

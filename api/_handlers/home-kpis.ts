@@ -28,7 +28,6 @@ const CONTACTS = tableInAppSchema('application_contact_logs');
 const SELECTION = tableInAppSchema('selection_progress');
 const FOLLOW = tableInAppSchema('follow_entries');
 const AFTERCARE = tableInAppSchema('aftercare_people');
-const POSTING_REQ = tableInAppSchema('job_posting_requests');
 
 const QUEUE_OUTCOME = `coalesce(q.last_outcome, q.result->>'outcome')`;
 
@@ -247,7 +246,9 @@ async function loadDeskToday(bu: string | null): Promise<
     return { count: n(r.c), unit, lastAt: (r.last_at as string | null) ?? null };
   };
 
-  const [intake, aiCalls, selection, follow, content, aftercare] = await Promise.all([
+  // 🔴 โต๊ะ "คอนเทนต์ / Scraping" (นับคำขอโพสต์) ถูกถอด 27 ก.ย. 2569 — เจ้าของเลือก "เอาแค่ปุ่ม"
+  //    (เหลือแค่ปุ่มส่ง Content/Scraping ในจับคู่งาน · ตัวเลขคำขอทุกจุดถอด)
+  const [intake, aiCalls, selection, follow, aftercare] = await Promise.all([
     one(
       `select count(*)::int c, max(a.created_at)::text last_at from ${APPS} a
         where a.created_at >= ${TODAY}${buJoin('a.job_id', bu)}`,
@@ -269,18 +270,13 @@ async function loadDeskToday(bu: string | null): Promise<
       'ราย',
     ),
     one(
-      `select count(*)::int c, max(r.created_at)::text last_at from ${POSTING_REQ} r
-        where r.created_at >= ${TODAY}`,
-      'ใบ',
-    ),
-    one(
       `select count(*)::int c, max(p.created_at)::text last_at from ${AFTERCARE} p
         where p.created_at >= ${TODAY}${buDirect('p.site_code', bu)}`,
       'คน',
     ),
   ]);
 
-  return { intake, aiCalls, selection, follow, content, aftercare };
+  return { intake, aiCalls, selection, follow, aftercare };
 }
 
 /**

@@ -33,7 +33,6 @@ const APPS = tableInAppSchema('public_job_applications');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const HOLDS = tableInAppSchema('candidate_call_holds');
 const FOLLOW = tableInAppSchema('follow_entries');
-const POSTING_REQ = tableInAppSchema('job_posting_requests');
 const AFTERCARE = tableInAppSchema('aftercare_people');
 
 /**
@@ -112,15 +111,8 @@ select
            then ${daysSince('f.scheduled_at')} end)::int as oldest_days
 from ${FOLLOW} f`;
 
-const CONTENT_SQL = `
-select
-  count(*) filter (where p.status = 'pending')::int as pending,
-  count(*) filter (where p.request_type = 'content'
-                     and p.status in ('in_progress', 'posted'))::int as in_progress,
-  count(*) filter (where p.request_type = 'scraping'
-                     and p.status in ('in_progress', 'posted'))::int as scraping,
-  max(case when p.status = 'pending' then ${daysSince('p.created_at')} end)::int as oldest_days
-from ${POSTING_REQ} p`;
+// 🔴 CONTENT_SQL (คำขอโพสต์ต่อโต๊ะคอนเทนต์) ถูกถอด 27 ก.ย. 2569 — เจ้าของเลือก "เอาแค่ปุ่ม"
+//    (ปุ่มส่ง Content/Scraping ในจับคู่งานยังอยู่ · ตัวเลขคำขอทุกจุดถอด)
 
 type Row = Record<string, number | null>;
 const n = (v: number | null | undefined): number => (typeof v === 'number' ? v : 0);
@@ -169,12 +161,11 @@ async function loadAftercare(): Promise<{ enabled: boolean; count: number } | un
 }
 
 async function loadCounts(): Promise<OfficeFloorCounts> {
-  const [intake, queue, holds, follow, content, awaitingChoice, aftercare] = await Promise.all([
+  const [intake, queue, holds, follow, awaitingChoice, aftercare] = await Promise.all([
     dbQuery<Row>(INTAKE_SQL),
     dbQuery<Row>(QUEUE_SQL),
     dbQuery<Row>(HOLDS_SQL),
     dbQuery<Row>(FOLLOW_SQL),
-    dbQuery<Row>(CONTENT_SQL),
     loadAwaitingChoice(),
     loadAftercare(),
   ]);
@@ -182,7 +173,6 @@ async function loadCounts(): Promise<OfficeFloorCounts> {
   const q = queue.rows[0] ?? {};
   const h = holds.rows[0] ?? {};
   const f = follow.rows[0] ?? {};
-  const c = content.rows[0] ?? {};
   return {
     intake: {
       newToday: n(i.new_today),
@@ -211,12 +201,6 @@ async function loadCounts(): Promise<OfficeFloorCounts> {
       pastDue: n(f.past_due),
       upcoming: n(f.upcoming),
       oldestDays: orNull(f.oldest_days),
-    },
-    content: {
-      pending: n(c.pending),
-      inProgress: n(c.in_progress),
-      scraping: n(c.scraping),
-      oldestDays: orNull(c.oldest_days),
     },
     aftercare,
   };

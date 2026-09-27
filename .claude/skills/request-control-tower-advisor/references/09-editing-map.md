@@ -9810,8 +9810,36 @@ AI โทร 5 · เราโทรเอง 2" · ปุ่มลัด "ค�
 | `src/components/home/HomeDigestPanels.tsx` · `src/lib/officeFloor.ts` | โต๊ะคอนเทนต์ → `/matching/job-postings` (เลขของโต๊ะคือคำขอโพสต์ — ไปหน้าที่เลขมาจาก) |
 | `tests/api/soRecruitNav.test.ts` · `pageTitleParity.test.ts` · `metricDictionary.test.ts` | ถอด `?view=postings` จากมุมมองที่รองรับ + เทสต์กันแท็บ/หัวของมันกลับมา + ก้อนทีมห้ามชี้แท็บที่ถอด |
 
-⚠️ ระบบ "คำขอโพสต์" ส่วนอื่น **ยังอยู่** (ยังไม่ได้สั่งถอด): ปุ่มขอโพสต์ในจับคู่งาน (`MatchingPage` →
+⚠️ ~~ระบบ "คำขอโพสต์" ส่วนอื่น **ยังอยู่**~~ → **ล้าสมัย: ดูหัวข้อถัดไป ("เอาแค่ปุ่ม")** · ของเดิมตอนนั้น: ปุ่มขอโพสต์ในจับคู่งาน (`MatchingPage` →
 `createJobPostingRequest`) · หน้า `/matching/job-postings` · การ์ดในหน้า Matching · ตัวเลขทีม Online 6 ตัว
 (`metricDictionary` online.content.* / online.scraping.*) · โต๊ะคอนเทนต์บนฉากหน้าแรก · API `/api/matching/job-postings`
-⚠️ เจอระหว่างทาง (ของเดิม): หัวจอแท็บรายชื่อผู้สมัคร/การโทรของฉัน/ติดตามนัดหมายว่างเปล่า — `conveyorLabel('applicants')`
+⚠️ เจอระหว่างทาง (ของเดิม · **แก้แล้วในหัวข้อถัดไป**): หัวจอแท็บรายชื่อผู้สมัคร/การโทรของฉัน/ติดตามนัดหมายว่างเปล่า — `conveyorLabel('applicants')`
 คืน `''` ตั้งแต่ขั้น "ผู้สมัคร" ถูกถอดจากลำดับงาน 28 ส.ค.
+
+### 27 ก.ย. 2569 (ต่อ) — ระบบคำขอโพสต์: "เอาแค่ปุ่ม" + หัวจอแท็บฝั่งผู้สมัคร + บั๊ก throughput
+
+ลำดับคำสั่งเจ้าของ (สำคัญ — อย่าตีความเกิน): Choice แรกตอบ "ถอดทั้งระบบ" → ระหว่างทำสั่งเพิ่ม
+*"สร้าง Content / Scraping งาน 2 ปุ่มนี้ยังเอาไว้ฉันยังใช้"* → Choice ถัดมาเลือก **"เอาแค่ปุ่ม"**
+(รับทราบแล้วว่าไม่มีหน้าให้เปลี่ยนสถานะ ⇒ คำขอใหม่จะค้าง "รอดำเนินการ")
+
+**ที่ยังอยู่ (ห้ามถอด):** ปุ่ม "ให้สร้าง Content" / "Scraping งาน" + ชิปสถานะในกล่อง "3. หาคนไม่พอ" ของ drawer
+จับคู่งาน (`MatchingPage`) · API `/api/matching/job-postings` (GET รายใบ/POST · GET ลิสต์/PATCH ยังอยู่แต่ไม่มีจอเรียก) ·
+`api/_lib/jobPostingRequests.ts` · `src/lib/jobPostingRequestsApi.ts` (เหลือเฉพาะที่ปุ่มใช้) · ตาราง `job_posting_requests` ·
+`urgent_stuck` ใน flow-summary ยังตัดใบที่ส่งคำขอแล้วออก (นิยามเดิม)
+
+| ไฟล์ | แก้อะไร |
+| --- | --- |
+| `src/pages/matching/JobPostingsPage.tsx` | **ลบ** — หน้ารวมคำขอ (ลิสต์ + เปลี่ยนสถานะ) |
+| `src/App.tsx` | `/matching/job-postings` → `<Navigate to="/jobs/board" replace />` (บุ๊กมาร์กเก่าไม่พัง) |
+| `src/pages/matching/MatchingDashboard.tsx` | ถอดการ์ด "คำขอโพสหางานใหม่" (เหลือ Matching · Pre-Check) |
+| `src/pages/matching/MatchingPage.tsx` | ถอดลิงก์ "ดูคำขอทั้งหมด →" อย่างเดียว — ปุ่ม/ชิป/ตัวโหลดเหมือนเดิมทุกบรรทัด |
+| `src/lib/jobPostingRequestsApi.ts` | ลบ `listJobPostingRequests` · `updateJobPostingStatus` (หน้าที่ลบใช้คนเดียว) |
+| `src/lib/officeTeam.ts` · `api/_handlers/office-team.ts` · `src/components/home/TeamBoardPanel.tsx` · `src/lib/metricDictionary.ts` | ถอดตัวเลขคำขอ 6 แถวของทีม Online (`online.content.*` / `online.scraping.*` · type `StageCounts`) — ทีม Online เหลือ ใบเปิด/ประกาศแล้ว/ยังไม่ประกาศ |
+| `src/lib/officeFloor.ts` · `src/lib/homeDigest.ts` · `src/components/home/HomeDigestPanels.tsx` · `api/_handlers/office-floor.ts` · `api/_handlers/home-kpis.ts` | ถอดโต๊ะ `content` ("คอนเทนต์ / Scraping") ทั้งเส้น: `DeskId` · raw/counts · `buildContent` · `DESK_ORDER` · เส้น `intake->content` · `OFFICE_SLOTS.content` · `CONTENT_SQL` · ช่อง content ของ home-kpis desk · ชื่อ/ลิงก์บนแผงสรุป — เหลือ 5 โต๊ะ |
+| `api/_handlers/matching-flow-summary.ts` · `src/lib/flowSummaryApi.ts` · `src/hooks/useConveyorCounts.ts` · `src/lib/soRecruitNav.ts` | ถอด `postings` (ยอด/ขั้นของคำขอ) จาก response + ป้ายเมนู `postings` (`ConveyorBadgeKey` · MEANING · SHORT) ที่ไม่มีขั้นให้แปะแล้ว · คิวรีเหลือ `select distinct job_id` ไว้ให้ `urgent_stuck` |
+| `src/components/jobs/JobBoardView.tsx` | **หัวจอแท็บว่าง** — เพิ่ม `BOARD_VIEW_TABS` ชุดเดียวใช้ทั้งแถบแท็บและหัวจอ (กล่องงาน · รายชื่อผู้สมัคร · การโทรของฉัน · ติดตามนัดหมาย) แทน `conveyorLabel` คีย์ applicants ที่คืน `''` |
+| `api/_lib/siamrajSqlServerThroughput.ts` | 🔴 **บั๊กบน main ตั้งแต่ 24 ก.ย. (`38e2059`)** — ใช้ `activeInformWhereSql` แต่มีแค่ `export { … } from` (ส่งต่อ ไม่ได้ import มาใช้เอง) ⇒ เส้น `?throughput=1` (Dashboard ขอ/ปิด) + `/api/request-control/demand-forecast` ตอบ 500 "activeInformWhereSql is not defined" ทุกครั้ง · แก้: import เข้ามาด้วย |
+| tests | `pageTitleParity` (+ด่าน "ทุก `conveyorLabel('x')` ใน src ต้องได้ชื่อจริง") · `siamrajSqlServerThroughput` (+เรียกตัวดึงจริงด้วย mock SQL — ตกถ้าไม่มี import) · `officeFloor` · `homeDigest` (5 โต๊ะ) · `statusTones` · `glossaryAndIncome` (ลบด่านของหน้าที่ลบ) · `metricDictionary` |
+
+⚠️ **กับดักที่ทำให้บั๊ก throughput หลุด 3 วัน:** รูทีนตรวจรันแค่ `tsconfig.app.json` + root — ไม่มีตัวไหนครอบ `api/`
+แบบเข้ม · **ต้องรัน `npx tsc --noEmit -p tsconfig.api.json` ด้วยทุกครั้ง** (ตัวนี้จับได้ทันที TS2304)

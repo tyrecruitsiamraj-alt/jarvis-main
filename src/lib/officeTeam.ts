@@ -14,9 +14,6 @@
  * แหล่งข้อมูลต่อเมตริก (วัดฐานแล้ว) อยู่ `~/.claude/plans/home-team-board-redesign.md` H2
  */
 
-/** ขั้นของคำขอโพส — นิยามเดียวกับ flow-summary (pending/in_progress/posted) ห้ามมีที่สอง */
-export type StageCounts = { pending: number; in_progress: number; posted: number };
-
 /** ตัวเลขต่อเลนของคิว Lumos */
 export type LaneCounts = {
   total: number;
@@ -64,12 +61,15 @@ export type LaneResults = {
   silent: number;
 };
 
+/**
+ * ทีม Online — ประกาศหน้าสาธารณะ
+ * 🔴 ตัวเลขคำขอโพส Content/Scraping (6 แถว) ถูกถอด 27 ก.ย. 2569 — เจ้าของเลือก "เอาแค่ปุ่ม"
+ * (ปุ่มส่งในจับคู่งานยังใช้อยู่ · ห้ามเอาตัวเลขกลับมาโดยไม่ได้สั่งใหม่)
+ */
 export type OnlineTeamStats = {
   open_total: number;
   released: number;
   unreleased: number;
-  content: StageCounts;
-  scraping: StageCounts;
 };
 
 export type RecruitTeamStats = {

@@ -35,7 +35,6 @@ const empty: OfficeFloorRaw = {
   aiCalls: { pending: 0, waitingResult: 0, staleOverDay: 0, resultToday: 0, oldestDays: null },
   selection: { jobsOpen: null, jobsWithMatch: 0, holdsActive: 0, holdsNoResult: 0, oldestDays: null },
   follow: { today: 0, pastDue: 0, upcoming: 0, oldestDays: null },
-  content: { pending: 0, inProgress: 0, scraping: 0, oldestDays: null },
   aftercare: { enabled: false, count: 0 },
 };
 
@@ -44,7 +43,6 @@ const clone = (patch: Partial<OfficeFloorRaw>): OfficeFloorRaw => ({
   aiCalls: { ...empty.aiCalls, ...(patch.aiCalls ?? {}) },
   selection: { ...empty.selection, ...(patch.selection ?? {}) },
   follow: { ...empty.follow, ...(patch.follow ?? {}) },
-  content: { ...empty.content, ...(patch.content ?? {}) },
   aftercare: { ...empty.aftercare, ...(patch.aftercare ?? {}) },
 });
 
@@ -283,10 +281,11 @@ describe('officeFloor — ผังห้อง 3D', () => {
 
   it('สายหลักอยู่หน้าห้อง สายแยกอยู่หลังห้อง (ความลึกบอกลำดับงาน)', () => {
     // y มาก = ใกล้กล้อง · สายหลักที่ทำทุกวันต้องอยู่ใกล้กว่าสายแยก
-    expect(OFFICE_SLOTS.aiCalls.y).toBeGreaterThan(OFFICE_SLOTS.content.y);
+    // (โต๊ะคอนเทนต์หลังห้องถอด 27 ก.ย. 2569 — ใช้โต๊ะสรรหาที่อยู่หลังห้องแทน)
+    expect(OFFICE_SLOTS.aiCalls.y).toBeGreaterThan(OFFICE_SLOTS.intake.y);
     expect(OFFICE_SLOTS.selection.y).toBeGreaterThan(OFFICE_SLOTS.aftercare.y);
     // ของไกลต้องเล็กกว่าของใกล้
-    expect(OFFICE_SLOTS.content.scale).toBeLessThan(OFFICE_SLOTS.aiCalls.scale);
+    expect(OFFICE_SLOTS.intake.scale).toBeLessThan(OFFICE_SLOTS.aiCalls.scale);
   });
 
   it('pathGeometry คิดความยาว/มุมจากจุดจริง', () => {

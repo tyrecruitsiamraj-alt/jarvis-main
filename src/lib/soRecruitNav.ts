@@ -38,7 +38,6 @@ import type { AppFunctionId } from '@/lib/roleFunctions';
 export type ConveyorBadgeKey =
   | 'today'
   | 'requests'
-  | 'postings'
   | 'applicants'
   | 'matching'
   | 'follow'
@@ -312,7 +311,6 @@ export type ConveyorCounts = Partial<Record<ConveyorBadgeKey, number | null>>;
 export const CONVEYOR_BADGE_MEANING: Record<ConveyorBadgeKey, string> = {
   today: 'จำนวนเรื่องที่ต้องลงมือวันนี้',
   requests: 'ใบขอที่ยังเปิดอยู่ทั้งหมด (ยอดสะสม ไม่ใช่ของที่ต้องทำวันนี้)',
-  postings: 'คำขอโพสต์งานที่ยังไม่จบ — ไม่ใช่จำนวนใบขอที่ประกาศแล้ว',
   applicants: 'ผู้สมัครที่ยังไม่มีใครแตะเกิน 1 วัน (ไม่ใช่ผู้สมัครทั้งหมด)',
   matching: 'ใบขอที่ AI หาคนมาแนะนำให้แล้ว — ไม่ใช่จำนวนสายที่ต้องโทร',
   follow: 'คนที่เลยเวลานัดโทรแล้วยังไม่มีผลกลับ',
@@ -323,7 +321,6 @@ export const CONVEYOR_BADGE_MEANING: Record<ConveyorBadgeKey, string> = {
 export const CONVEYOR_BADGE_SHORT: Record<ConveyorBadgeKey, string> = {
   today: 'ต้องลงมือ',
   requests: 'ใบเปิดอยู่',
-  postings: 'คำขอค้าง',
   applicants: 'รอคัดกรอง',
   matching: 'ใบมีคนแนะนำ',
   follow: 'เลยนัด',

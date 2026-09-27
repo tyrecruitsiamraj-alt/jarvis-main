@@ -21,7 +21,6 @@ export const DESK_NAME: Record<DeskId, string> = {
   aiCalls: 'AI โทร (Lumos)',
   selection: 'คัดสรร / เสนองาน',
   follow: 'โทรติดตาม (Follow)',
-  content: 'คอนเทนต์ / Scraping',
   aftercare: 'ดูแลหลังเริ่มงาน',
 };
 
@@ -38,7 +37,6 @@ const DESK_ORDER: readonly DeskId[] = [
   'aiCalls',
   'selection',
   'follow',
-  'content',
   'aftercare',
 ];
 

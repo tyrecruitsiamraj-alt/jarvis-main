@@ -29,9 +29,7 @@ const DESK_HREF: Record<DeskId, string> = {
   aiCalls: '/recruit/rm?tab=calls',
   selection: '/matching/match',
   follow: '/follow',
-  // โต๊ะนี้นับ "คำขอโพสต์" (รอรับ/กำลังทำ/Scraping) ⇒ ไปหน้าคำขอโพสต์ที่เลขมาจาก
-  // (เดิมชี้แท็บ ?view=postings ในกล่องงาน — แท็บถูกถอดแล้ว 27 ก.ย. 2569)
-  content: '/matching/job-postings',
+  // โต๊ะ "คอนเทนต์ / Scraping" ถอด 27 ก.ย. 2569 — เจ้าของเลือก "เอาแค่ปุ่ม" (ตัวเลขคำขอทุกจุดถอด)
   aftercare: '/aftercare',
 };
 

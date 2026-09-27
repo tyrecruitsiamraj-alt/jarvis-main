@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import { Search, ClipboardCheck, ArrowRight, Megaphone, type LucideIcon } from 'lucide-react';
+import { Search, ClipboardCheck, ArrowRight, type LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { TONE, type ToneKey } from '@/lib/designTokens';
@@ -13,6 +13,8 @@ const MatchingDashboard: React.FC = () => {
    * ⚠️ เคยมีเมนู "รายชื่อคนจอง" (`/matching/reservations`) อยู่ในชุดนี้ — เจ้าของสั่งเอาออก
    * 10 ส.ค. 2569 · **หน้านั้นยังเข้าได้จากหน้าหลัก** (การ์ด "จองตัวอยู่ / ลงงาน") จึงไม่กำพร้า
    * ถ้าวันไหนหน้าหลักเลิกลิงก์ไปด้วย ต้องหาทางเข้าใหม่ก่อน ไม่งั้นหน้าจะเข้าไม่ถึงเลย
+   * 🔴 เมนู "คำขอโพสหางานใหม่" (`/matching/job-postings`) ถูกถอดพร้อมหน้ารวม 27 ก.ย. 2569
+   * (เจ้าของเลือก "เอาแค่ปุ่ม" — ปุ่มส่งในจับคู่งานยังอยู่) · ลิงก์เก่าพาไปกล่องงาน
    */
   const toolMenus: {
     path: string;
@@ -36,20 +38,13 @@ const MatchingDashboard: React.FC = () => {
       icon: ClipboardCheck,
       tone: 'warn' as const,
     },
-    {
-      path: '/matching/job-postings',
-      label: 'คำขอโพสหางานใหม่',
-      desc: 'ใบขอที่หาคนของเราไม่ได้ — ให้ทีมคอนเทนต์รับไปโพสต่อ',
-      icon: Megaphone,
-      tone: 'danger' as const,
-    },
   ];
 
   return (
     <div className="relative">
       <PageHeader title="Matching Module" subtitle="จับคู่กับงาน" />
       <div className="px-4 md:px-6 space-y-6">
-        {/* Matching + Pre-Check + คำขอโพสหางาน */}
+        {/* Matching + Pre-Check */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
           {toolMenus.map((item, i) => (
             <motion.button

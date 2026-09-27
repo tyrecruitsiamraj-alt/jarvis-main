@@ -552,18 +552,8 @@ const TeamBoardPanel: React.FC<{
           <Row metric="online.open_total" value={teams?.online?.open_total ?? null} />
           <Row metric="online.released" value={teams?.online?.released ?? null} />
           <Row metric="online.unreleased" value={teams?.online?.unreleased ?? null} alert />
-          <GroupTitle>
-            ส่งไปดูดประกาศ (<Term k="scraping" />)
-          </GroupTitle>
-          <Row metric="online.scraping.pending" value={teams?.online?.scraping.pending ?? null} />
-          <Row metric="online.scraping.in_progress" value={teams?.online?.scraping.in_progress ?? null} />
-          <Row metric="online.scraping.posted" value={teams?.online?.scraping.posted ?? null} />
-          <GroupTitle>
-            ส่งไปทำสื่อประกาศ (<Term k="content" />)
-          </GroupTitle>
-          <Row metric="online.content.pending" value={teams?.online?.content.pending ?? null} />
-          <Row metric="online.content.in_progress" value={teams?.online?.content.in_progress ?? null} />
-          <Row metric="online.content.posted" value={teams?.online?.content.posted ?? null} />
+          {/* 🔴 6 แถวคำขอโพส (ส่งไปดูดประกาศ Scraping / ส่งไปทำสื่อ Content) ถูกถอด 27 ก.ย. 2569
+              — เจ้าของเลือก "เอาแค่ปุ่ม" (ปุ่มส่งในจับคู่งานยังอยู่ · ตัวเลขคำขอทุกจุดถอด) */}
         </TeamColumn>
 
         {/* ── ทีมสรรหา ── */}

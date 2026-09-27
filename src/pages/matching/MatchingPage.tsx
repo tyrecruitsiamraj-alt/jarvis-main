@@ -3785,7 +3785,10 @@ const MatchingPage: React.FC = () => {
                   })()}
                   {/* คำขอที่ส่งไปแล้ว — โชว์ ID + สถานะ เพื่อให้ตามงานกับทีมคอนเทนต์ได้
                       ⚠️ ส่งประเภทไหนไปแล้วซ่อน**เฉพาะปุ่มนั้น** อีกทางยังส่งเพิ่มได้
-                      (migration 080 เปิดให้ใบเดียวมีทั้ง Content และ Scraping) */}
+                      (migration 080 เปิดให้ใบเดียวมีทั้ง Content และ Scraping)
+                      🔴 27 ก.ย. 2569 เจ้าของสั่ง "เอาแค่ปุ่ม" — สองปุ่มนี้ยังใช้อยู่ แต่หน้ารวม
+                      `/matching/job-postings` ถูกถอด ⇒ ลิงก์ "ดูคำขอทั้งหมด" หายไปด้วย
+                      (ไม่มีหน้าให้เปลี่ยนสถานะแล้ว — เจ้าของรับทราบว่าคำขอจะค้าง "รอดำเนินการ") */}
                   {(() => {
                     const active = jobPostingsByJobId[jobDetail.id] ?? [];
                     const sentContent = active.some((x) => x.request_type !== 'scraping');
@@ -3813,12 +3816,6 @@ const MatchingPage: React.FC = () => {
                                 </span>
                               </span>
                             ))}
-                            <a
-                              href="/matching/job-postings"
-                              className="text-[11px] text-blue-700 hover:underline dark:text-blue-300"
-                            >
-                              ดูคำขอทั้งหมด →
-                            </a>
                           </div>
                         ) : null}
                         {!sentContent || !sentScraping ? (

@@ -25,7 +25,6 @@ import {
   callBoxTruncated,
   type FlowSummary,
   type FlowFollowUpItem,
-  type PostingStages,
 } from '@/lib/flowSummaryApi';
 import {
   buildCallDigest,
@@ -127,11 +126,6 @@ function FollowUpList({
   );
 }
 
-/**
- * บรรทัดสถานะของการ์ด Content/Scraping — "รอดำเนินการ X · กำลังทำ Y · โพสแล้ว Z"
- * (เจ้าของสั่ง 13 ส.ค. 2569: ต้องบอกด้วยว่าไปถึงขั้นไหนแล้ว) · โชว์เฉพาะขั้นที่มีจริง
- * ป้ายใช้ชุดเดียวกับหน้าคำขอโพส (jobPostingStatusLabel) — เห็นคำเดียวกันทุกหน้า
- */
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();

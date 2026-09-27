@@ -7,7 +7,8 @@
  * 2. "ผลงานเด่น" ตัดโต๊ะที่ยังไม่มีผลงานออก · ยอดเท่ากันต้องเรียงคงที่ (ไม่สลับที่ทุกโหลด)
  * 3. แท่งของชุดว่างต้องเป็น 0 ไม่ใช่ NaN
  * 4. ไม่รู้เวลา = ไม่มีข้อความเวลา (ห้ามเดาว่า "เมื่อสักครู่")
- * 5. ชื่อโต๊ะต้องครบทั้ง 6 ตัวและตรงกับชื่อในฉากห้องทำงาน
+ * 5. ชื่อโต๊ะต้องครบทั้ง 5 ตัวและตรงกับชื่อในฉากห้องทำงาน
+ *    (โต๊ะคอนเทนต์ / Scraping ถอด 27 ก.ย. 2569 — เจ้าของเลือก "เอาแค่ปุ่ม" ตัวเลขคำขอทุกจุดถอด)
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -27,27 +28,25 @@ const map = {
   aiCalls: { count: 12, unit: 'สาย', lastAt: T(8) },
   selection: { count: 0, unit: 'คน', lastAt: null },
   follow: { count: 12, unit: 'ราย', lastAt: T(6) },
-  content: { count: 1, unit: 'ใบ', lastAt: T(2) },
   aftercare: { count: 0, unit: 'คน', lastAt: null },
 };
 
 describe('แปลงเป็นแถว', () => {
-  it('ครบ 6 โต๊ะ พร้อมหน่วยทุกแถว', () => {
+  it('ครบ 5 โต๊ะ พร้อมหน่วยทุกแถว', () => {
     const rows = digestRows(map);
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(5);
     expect(rows.every((r) => r.unit.length > 0)).toBe(true);
     expect(rows.map((r) => r.id)).toEqual([
       'intake',
       'aiCalls',
       'selection',
       'follow',
-      'content',
       'aftercare',
     ]);
   });
 
-  it('ชื่อโต๊ะครบทั้ง 6 ตัว ไม่มีตัวว่าง', () => {
-    expect(Object.keys(DESK_NAME)).toHaveLength(6);
+  it('ชื่อโต๊ะครบทั้ง 5 ตัว ไม่มีตัวว่าง', () => {
+    expect(Object.keys(DESK_NAME)).toHaveLength(5);
     expect(Object.values(DESK_NAME).every((v) => v.trim().length > 0)).toBe(true);
   });
 
@@ -71,7 +70,7 @@ describe('แปลงเป็นแถว', () => {
 describe('อัปเดตล่าสุด', () => {
   it('🔴 เอาเฉพาะโต๊ะที่มีเวลา และเรียงใหม่สุดก่อน', () => {
     const got = latestUpdates(digestRows(map));
-    expect(got.map((r) => r.id)).toEqual(['intake', 'aiCalls', 'follow', 'content']);
+    expect(got.map((r) => r.id)).toEqual(['intake', 'aiCalls', 'follow']);
   });
 
   it('ไม่มีโต๊ะไหนขยับ = แผงว่าง', () => {
@@ -86,7 +85,7 @@ describe('อัปเดตล่าสุด', () => {
 describe('ผลงานเด่นประจำวัน', () => {
   it('เรียงมากไปน้อย · ตัดโต๊ะที่ยังไม่มีผลงาน', () => {
     const got = dailyLeaders(digestRows(map));
-    expect(got.map((r) => r.id)).toEqual(['aiCalls', 'follow', 'intake', 'content']);
+    expect(got.map((r) => r.id)).toEqual(['aiCalls', 'follow', 'intake']);
     expect(got.some((r) => r.count === 0)).toBe(false);
   });
 

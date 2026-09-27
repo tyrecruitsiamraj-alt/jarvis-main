@@ -32,7 +32,6 @@ async function load(): Promise<ConveyorCounts> {
   ]);
   return {
     requests: flow ? flow.jobs.open_total : null,
-    postings: flow ? flow.postings.active : null,
     /**
      * ขั้น 3 นับ **ของที่ต้องลงมือ ไม่ใช่ยอดสะสม** — `untouched` = ใบสมัครที่ยังไม่มี
      * ใครแตะเลย · เอา `newToday` มาแทนไม่ได้เพราะวันที่ไม่มีคนสมัครจะขึ้น 0 ทั้งที่

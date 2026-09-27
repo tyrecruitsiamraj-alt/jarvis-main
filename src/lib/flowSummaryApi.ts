@@ -42,9 +42,6 @@ export type FlowCallBoxes = {
  */
 export type FlowCallBoxCounts = { [K in keyof FlowCallBoxes]: number };
 
-/** สถานะคำขอโพสหาคน — ป้ายภาษาไทยใช้ JOB_POSTING_STATUS_LABEL ชุดเดียวกับหน้าคำขอโพส */
-export type PostingStages = { pending: number; in_progress: number; posted: number };
-
 export type FlowSummary = {
   month: string;
   jobs: {
@@ -99,15 +96,8 @@ export type FlowSummary = {
     reserved_active: number;
     placed_month: number;
   };
-  /** คำขอโพสหาคนที่ยังเปิดอยู่ — แยกตามประเภท (content = ให้ทีมคิดคอนเทนต์ · scraping = ให้ไปดูดประกาศ) */
-  postings: {
-    active: number;
-    content?: number;
-    scraping?: number;
-    /** ไปถึงขั้นไหนแล้ว (เจ้าของสั่ง 13 ส.ค. 2569) — นับเป็นรายคำขอ */
-    content_stages?: PostingStages;
-    scraping_stages?: PostingStages;
-  };
+  // 🔴 `postings` (ยอดคำขอโพสต์ Content/Scraping แยกสถานะ) ถูกถอด 27 ก.ย. 2569 — เจ้าของสั่งถอดตัวเลขคำขอ
+  //    ทุกจุด เหลือแค่ปุ่มส่งในหน้าจับคู่งาน (ป้ายเมนูที่อ่านค่านี้ไม่มีขั้นให้แปะมาตั้งแต่ถอดแท็บแล้ว)
   call_boxes: FlowCallBoxes;
   /** ยอดจริงของ 4 กล่องข้างบน (ลิสต์ถูกตัดที่ 50) — อ่านผ่าน `callBoxCount()` เท่านั้น */
   call_box_counts?: FlowCallBoxCounts;

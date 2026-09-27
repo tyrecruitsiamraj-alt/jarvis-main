@@ -58,7 +58,7 @@ describe('ทุกเลขบนหน้าแรกต้องอธิบ�
       '/jobs/list',
       '/jobs/board',
       '/matching/match',
-      '/matching/job-postings',
+      // '/matching/job-postings' ถอดหน้าแล้ว 27 ก.ย. 2569 (เหลือแค่ทางเปลี่ยนเส้นไปกล่องงาน)
       '/follow',
       '/aftercare',
       '/work',

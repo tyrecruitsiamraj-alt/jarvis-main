@@ -92,7 +92,7 @@ describe('ไม่มีตารางสีสถานะซ้ำในห�
   it('หน้าที่เคยมี STATUS_CLASS ของตัวเอง ต้องไม่ประกาศซ้ำแล้ว', () => {
     const files = [
       'src/pages/matching/ReservationsPage.tsx',
-      'src/pages/matching/JobPostingsPage.tsx',
+      // (หน้า JobPostingsPage.tsx ถูกถอด 27 ก.ย. 2569 — เจ้าของสั่ง "เอาแค่ปุ่ม" ในจับคู่งาน)
       'src/pages/matching/MatchingPage.tsx',
     ];
     for (const f of files) {
