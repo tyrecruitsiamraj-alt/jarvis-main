@@ -32,7 +32,7 @@ export function HeaderSearchSlot({
   className,
   containerClassName,
 }: {
-  /** กว้าง/ระยะของช่องเอง */
+  /** กว้าง/การซ่อนตามจอของช่องเอง */
   className?: string;
   /** กล่องครอบ (เช่นระยะขอบแถวที่สองบนมือถือ) — วาดเฉพาะตอนมีช่อง ไม่ทิ้งช่องว่างเปล่า */
   containerClassName?: string;
@@ -44,6 +44,10 @@ export function HeaderSearchSlot({
   return containerClassName ? <div className={containerClassName}>{input}</div> : input;
 }
 
+/**
+ * 🔴 **ขนาดเล็กกว่าช่องค้นหาในหน้า** (เจ้าของสั่ง 27 ก.ย. 2569: "กล่องค้นหาใหญ่เกินไปทำให้เล็กลง")
+ * สูง h-8 เตี้ยกว่าปุ่มไอคอนบนแถบ · ความกว้างกำหนดที่จุดวาง (AppLayout) — ห้ามกลับไปยืดเต็มแถว
+ */
 function HeaderSearchInput({ spec, className }: { spec: HeaderSearchSpec; className?: string }) {
   const [draft, setDraft] = useState(spec.value);
   // หน้าเปลี่ยนคำค้นเอง (ล้าง · เปิดลิงก์ · ย้อนกลับ) ⇒ ช่องตามค่าของหน้า
@@ -61,6 +65,7 @@ function HeaderSearchInput({ spec, className }: { spec: HeaderSearchSpec; classN
       }}
       placeholder={spec.placeholder}
       aria-label={spec.placeholder}
+      className="h-8 min-h-8 py-1"
       wrapperClassName={cn('min-w-0', className)}
     />
   );

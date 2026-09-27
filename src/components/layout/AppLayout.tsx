@@ -148,8 +148,9 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </button>
         </div>
         <div className="flex items-center gap-2 xl:gap-3 shrink-0">
-          {/* 🔴 ช่องค้นหาของหน้านี้ — ซ้ายกระดิ่งเสมอ (หน้าไม่มีการค้นหา = ไม่มีช่อง) */}
-          <HeaderSearchSlot className="w-64 xl:w-80" />
+          {/* 🔴 ช่องค้นหาของหน้านี้ — ซ้ายกระดิ่งเสมอ (หน้าไม่มีการค้นหา = ไม่มีช่อง)
+              ย่อแล้ว 27 ก.ย. 2569 (เจ้าของ: "ใหญ่เกินไป") — ห้ามขยายกลับ */}
+          <HeaderSearchSlot className="w-52 xl:w-60" />
           <NotificationPanel />
           <div className="hidden 2xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 dark:bg-white/10 dark:border-white/15 max-w-[280px]">
             <UserCircle className="w-4 h-4 text-blue-600 shrink-0" />
@@ -218,7 +219,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </header>
 
       {/* หัวแบบย่อ — แท็บเล็ต/มือถือ (ต่ำกว่า lg)
-          ช่องค้นหาของหน้าอยู่แถวที่สองใต้แถบ — ข้างกระดิ่งบนจอเล็กไม่มีที่พอ (ดูคอมเมนต์ข้างล่างเรื่องเบียด) */}
+          ช่องค้นหา: แท็บเล็ต (sm+) อยู่แถวเดียวกัน ซ้ายกระดิ่ง · มือถือจอเล็กอยู่แถวที่สองใต้แถบ
+          (ข้างกระดิ่งบนจอ < 640px ไม่มีที่พอ — ดูคอมเมนต์ข้างล่างเรื่องเบียด) */}
       <header className="lg:hidden border-b border-border bg-background/95 sticky top-0 z-40 safe-area-pt">
       <div className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3">
         <div className="flex items-center gap-1 min-w-0">
@@ -239,6 +241,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           (ออกจากระบบมีอยู่ในเมนูอยู่แล้ว · เปลี่ยนรหัสผ่านเพิ่มเข้าไปคู่กัน)
         */}
         <div className="flex items-center gap-1 shrink-0">
+          <HeaderSearchSlot className="hidden w-44 sm:block md:w-52" />
           <NotificationPanel />
           <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-ink text-white font-medium uppercase">
             {user?.role}
@@ -246,7 +249,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           {themeSwitchCompact}
         </div>
       </div>
-      <HeaderSearchSlot containerClassName="px-4 pb-3 sm:px-5" />
+      <HeaderSearchSlot containerClassName="px-4 pb-3 sm:hidden" />
       </header>
 
       {/*
