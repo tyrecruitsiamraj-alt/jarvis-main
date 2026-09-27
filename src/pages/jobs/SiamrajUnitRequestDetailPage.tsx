@@ -34,14 +34,8 @@ import {
 import type { JobRequest } from '@/types';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { ChevronDown, Database, ExternalLink, Landmark, Users, StickyNote, UserCheck, UserMinus, ClipboardList } from 'lucide-react';
-import {
-  amountText,
-  hasDeductSide,
-  moneyFieldText,
-  resignedIncomeRows,
-  visibleRateLines,
-} from '@/lib/unitRequestDetail';
+import { ChevronDown, Database, ExternalLink, Landmark, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
+import { RequestRateLinesBlock, ResignedEmployeeBlock } from '@/components/jobs/UnitRequestPayBlocks';
 
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 import { backLabelFor } from '@/lib/stageOrigin';
@@ -231,13 +225,6 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
    * จากค่ากลาง ป้ายจะบอก "น้อยกว่า 7 วัน" ทั้งที่ใบนี้ตั้งไว้ 3 วัน = จอโกหก
    */
   const urgencyHint = data ? jobUrgencyHint(data) : undefined;
-  /** อัตราของใบขอ + รายได้จริงของคนเดิม — คิดที่ pure lib ที่เดียว (มีเทสต์คุม) */
-  const rateLines = React.useMemo(() => (data ? visibleRateLines(data) : []), [data]);
-  const incomeRows = React.useMemo(() => (data ? resignedIncomeRows(data) : null), [data]);
-  const showDeduct = React.useMemo(
-    () => (incomeRows ? hasDeductSide(incomeRows) : false),
-    [incomeRows],
-  );
 
   return (
     <div>
@@ -326,159 +313,13 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                   ห้ามก๊อปชุดช่องกลับมาเขียนซ้ำที่นี่ */}
               {infoOpen ? <UnitRequestInfoFields job={data} /> : null}
 
-              {/* ── อัตราของใบขอจาก ERP (เจ้าของสั่ง 25 ส.ค. 2569) ──────────────────
-                  🔴 ใบขอหนึ่งใบมีเฉลี่ย 15 บรรทัด · ตัดแถวที่ทั้งจ่ายและเบิกเป็น 0 ทิ้ง
-                  แต่บรรทัดค่าจ้างหลักโชว์เสมอ (ตัวที่ประกาศเป็นรายได้ให้ผู้สมัคร) */}
-              {infoOpen && rateLines.length > 0 ? (
-                <div className="rounded-xl border border-white/70 bg-white/40 p-3">
-                  <div className="text-xs font-medium text-foreground">อัตราตามใบขอ (ERP)</div>
-                  <div className="mt-2 overflow-x-auto">
-                    <table className="w-full table-fixed text-xs">
-                      <thead>
-                        <tr className="text-left text-[10px] text-muted-foreground">
-                          {/* table-fixed + ความกว้างคงที่ — บนมือถือ 375px ตัวเลขทั้งสองคอลัมน์
-                              ต้องเห็นครบโดยไม่ต้องเลื่อนแนวนอน (ชื่อรายการตัดบรรทัดเอา) */}
-                          <th className="w-1/2 pb-1 pr-2 font-medium">รายการ</th>
-                          <th className="w-1/4 pb-1 pr-2 text-right font-medium">อัตราจ่าย (บาท)</th>
-                          <th className="w-1/4 pb-1 text-right font-medium">อัตราเบิก (บาท)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rateLines.map((l) => (
-                          <tr key={l.seq} className="border-t border-white/60">
-                            <td className="py-1 pr-2 break-words">
-                              {l.fee_name || '—'}
-                              {l.is_wage ? (
-                                <span className="ml-1 text-[10px] text-muted-foreground">
-                                  (ค่าจ้างหลัก)
-                                </span>
-                              ) : null}
-                              {l.remark ? (
-                                <div className="text-[10px] text-muted-foreground">{l.remark}</div>
-                              ) : null}
-                            </td>
-                            {/* 0 ที่มาจากฐานจริงต้องขึ้น 0 — ต่างจากไม่มีค่าที่ขึ้น "—"
-                                หน่วยอยู่บนหัวคอลัมน์แล้ว ตัวเลขจึงไม่ตัดบรรทัดบนมือถือ */}
-                            <td className="whitespace-nowrap py-1 pr-2 text-right tabular-nums">
-                              {amountText(l.payment_rate) ?? '—'}
-                            </td>
-                            <td className="whitespace-nowrap py-1 text-right tabular-nums">
-                              {amountText(l.draw_rate) ?? '—'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : null}
-
-              {/* ── คนที่ออก / เปลี่ยนตัว ── อยู่ในกล่อง "ข้อมูลใบขอ" เดียวกัน
-                  (เจ้าของสั่ง 25 ส.ค. 2569: *"มันต้องไปอยู่รวมกับ [ข้อมูลใบขอ]"*)
-                  ⇒ หุบกล่องนี้แล้วส่วนนี้หายตามไปด้วย เพราะเป็นข้อมูลอ่านอย่างเดียวชุดเดียวกัน
-                  ⚠️ "เบอร์ติดต่อ" ไม่ซ้ำที่นี่แล้ว — กริดข้างบนมีอยู่ช่องเดียว
-                  ⚠️ คอมเมนต์ JSX ต้องอยู่**นอก** `cond ? (` — วางในนั้นแล้ว TS ฟ้อง ')' expected */}
-              {infoOpen ? (
-                <div className="rounded-xl border border-white/70 bg-white/40 p-3 space-y-2">
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-                    <UserMinus className={cn('w-3.5 h-3.5', TONE.primary.value)} />
-                    คนที่ออก / เปลี่ยนตัว
-                  </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Field label="ชื่อ - นามสกุล" value={data.resigned_employee_name} />
-                  <Field label="สาเหตุที่ลาออก" value={data.resigned_reason} />
-                  <Field label="รุ่น/ประเภทรถ" value={data.vehicle_required} />
-                </div>
-
-                {/* อัตราตามเงื่อนไขของคนคนนี้ — คนละเรื่องกับรายได้จริงข้างล่าง
-                    🔴 ใช้คำ ERP ตรง ๆ ("ฝั่งจ่าย"/"ฝั่งเบิก") ไม่ตีความว่าฝั่งไหนเป็นเงินของใคร */}
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <Field
-                    label="อัตราตามเงื่อนไข (ฝั่งจ่าย)"
-                    value={moneyFieldText(data.resigned_wage_fee_rate)}
-                  />
-                  <Field
-                    label="อัตราตามเงื่อนไข (ฝั่งเบิก)"
-                    value={moneyFieldText(data.resigned_wage_draw_rate)}
-                  />
-                  <Field label="อัตรานี้มีผลตั้งแต่" value={data.resigned_wage_effective_date} />
-                </div>
-
-                {/* ── รายได้จริงย้อนหลัง 3 งวด — **แยกรายงวด ไม่ใช่ค่าเฉลี่ย** ──────────
-                    (เจ้าของสั่ง: *"ฉันไม่ได้เอาแบบเฉลี่ย ฉันขอดูแบบย้อนหลัง 3 เดือนเลย"*)
-                    🔴 ต้องมีช่วงวันของทุกงวด — งวดสุดท้ายของคนที่ออกมักไม่เต็มเดือน
-                    ยอดจะดูต่ำผิดปกติถ้าไม่บอกว่าเป็นงวดสั้น */}
-                <div className="rounded-xl border border-white/70 bg-white/40 p-3">
-                  {/* 🔴 **ต้องบอกที่มา** (เจ้าของถาม 27 ส.ค. 2569: "ดึงมาจากไหน
-                      เพราะเหมือนมันไม่ตรง") · สองอย่างที่ทำให้อ่านแล้วเข้าใจผิดมาตลอด:
-                      (1) "งวด" ที่นี่ **ส่วนใหญ่เป็นครึ่งเดือน** ⇒ 3 งวด ~ 1.5 เดือน
-                          ไม่ใช่ 3 เดือน (วัดฐาน: ครึ่งเดือน 71,542 · เต็มเดือน 31,876)
-                      (2) เดิม **ไม่กรองไซต์** ⇒ เอาเงินจากงานอื่นมาปน (59% ของคน
-                          มีงวดข้ามไซต์) — ตอนนี้กรองด้วยไซต์ของใบขอนี้แล้ว
-                      (3) เดิมเป็น **ยอดรวมก่อนหัก** ⇒ สูงกว่าที่เขารับจริง
-                          เจ้าของเคาะ 27 ส.ค. 2569 ให้ใช้ยอด eSlip (สุทธิ) แทน */}
-                  <div className="text-xs font-medium text-foreground">
-                    รายได้จริง 3 งวดล่าสุดของงานนี้
-                  </div>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    ยอดเดียวกับ<span className="font-medium">ใบแจ้งเงินเดือน (eSlip)</span>
-                    ของไซต์นี้เท่านั้น — เมนู ERP <span className="font-mono">PR-4813</span>
-                    · <span className="font-medium">หนึ่งงวดมักเป็นครึ่งเดือน</span>
-                    ดูช่วงวันในตารางก่อนเอาไปเทียบกับเงินเดือน
-                  </p>
-                  {incomeRows ? (
-                    <table className="mt-2 w-full text-xs">
-                      <thead>
-                        <tr className="text-left text-[10px] text-muted-foreground">
-                          {/* 🔴 คอลัมน์ตามใบแจ้งเงินเดือน — **สุทธิ** คือตัวที่เจ้าของถาม
-                              ("ยอดที่เขารับจริง") จึงอยู่ขวาสุดและเป็นตัวหนา
-                              เงินหักโชว์เฉพาะตอนมีจริง (บางงวดหัก 0) */}
-                          <th className="pb-1 pr-2 font-medium">งวด</th>
-                          <th className="pb-1 pr-2 text-right font-medium">เงินได้ (บาท)</th>
-                          {showDeduct ? (
-                            <th className="pb-1 pr-2 text-right font-medium">หัก (บาท)</th>
-                          ) : null}
-                          <th className="pb-1 text-right font-medium">สุทธิ (บาท)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                      {incomeRows.map((r) => (
-                        <tr key={r.key} className="border-t border-white/60">
-                          <td className="py-1 pr-2 break-words">{r.period}</td>
-                          {/* null = งวดนั้นไม่มีบรรทัดฝั่งนี้ ⇒ "—" ห้ามขึ้น 0 */}
-                          <td className="whitespace-nowrap py-1 pr-2 text-right tabular-nums">
-                            {amountText(r.pay) ?? '—'}
-                          </td>
-                          {showDeduct ? (
-                            <td className="whitespace-nowrap py-1 pr-2 text-right tabular-nums text-muted-foreground">
-                              {amountText(r.deduct) ?? '—'}
-                            </td>
-                          ) : null}
-                          {/* สุทธิ = ตัวที่เจ้าของถามหา ทำให้เด่นกว่าช่องอื่น */}
-                          <td className="whitespace-nowrap py-1 text-right font-medium tabular-nums text-foreground">
-                            {amountText(r.net) ?? '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  // ไม่มีของ ต้องบอกว่าไม่มี ห้ามปล่อยว่างให้คนเดาว่าพัง
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {/* 414 ใบเข้าเคสนี้หลังกรองไซต์ (วัดแล้ว) — ต้องบอกว่าทำไมถึงไม่มี
-                        ไม่ใช่แค่ "ไม่พบ" เฉย ๆ ซึ่งอ่านเหมือนระบบพัง */}
-                    ไม่พบงวดจ่ายของคนคนนี้ในไซต์ของใบขอนี้ — อาจยังไม่ถึงรอบจ่าย
-                    หรือเงินที่เคยได้มาจากไซต์อื่น
-                  </p>
-                )}
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    เงินได้ = ค่าแรง · ล่วงเวลา · เบี้ยเลี้ยง รวมกัน · หัก = ภาษี · ประกันสังคม ·
-                    เงินประกัน · หนี้อื่น — งวดแรกหรืองวดสุดท้ายของคนที่เพิ่งเข้า/เพิ่งออก
-                    มักไม่เต็มงวด ยอดจึงดูต่ำ
-                  </p>
-                  </div>
-                </div>
-              ) : null}
+              {/* ── อัตราของใบขอ + คนที่ออก/เปลี่ยนตัว (รายได้จริง 3 เดือน) ──
+                  🔴 ย้ายไปเป็น component กลาง 26 ก.ย. 2569 (`UnitRequestPayBlocks`) — ป๊อปไล่งาน
+                  บนกล่องงานต้องเห็นชุดเดียวกัน (เจ้าของ: *"ทีม online ควรดูรายละเอียดใบขอ
+                  นั้น ๆ ได้แบบหน้าใบขอ"*) · ห้ามก๊อปกลับมาเขียนซ้ำที่นี่
+                  ⇒ หุบกล่อง "ข้อมูลใบขอ" แล้วสองส่วนนี้หายตามไปด้วย (อ่านอย่างเดียวชุดเดียวกัน) */}
+              {infoOpen ? <RequestRateLinesBlock job={data} /> : null}
+              {infoOpen ? <ResignedEmployeeBlock job={data} /> : null}
 
             </section>
 

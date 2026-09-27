@@ -14,6 +14,7 @@ import {
 } from './siamrajJobMapping.js';
 import { toBangkokYmd } from './businessDate.js';
 import type { ResignedIncomeMonth } from '@/types';
+import { lastMonthsOfPay, RESIGNED_INCOME_FETCH_PERIODS } from '../../src/lib/resignedIncome.js';
 import {
   boardStaffingRequestTypeWhereSql,
   excludeInternalReplacementRoleWhereSql,
@@ -87,7 +88,7 @@ type SqlServerRequestRow = {
   resigned_wage_fee_rate: number | null;
   resigned_wage_effective_date: string | Date | null;
   /**
-   * **รายได้จริงของคนที่ออก แยกรายงวด 3 งวดล่าสุด** (เจ้าของสั่ง 25 ส.ค. 2569:
+   * **รายได้จริงของคนที่ออก แยกรายงวด ย้อนหลัง 3 เดือน** (เจ้าของสั่ง 25 ส.ค. 2569:
    * *"ฉันไม่ได้เอาแบบเฉลี่ย ฉันขอดูแบบย้อนหลัง 3 เดือนเลย"*)
    *
    * เป็น **JSON string** จาก `FOR JSON PATH` — คืนรายงวดตรง ๆ ไม่ยุบเป็นยอดรวม
@@ -95,8 +96,9 @@ type SqlServerRequestRow = {
    *
    * 🔴 **เป็นยอดแบบ eSlip (สุทธิที่เขารับจริง)** ไม่ใช่ยอดรวมก่อนหักแบบเดิม
    * เจ้าของเคาะ 27 ส.ค. 2569 — ดูเหตุผลเต็มในคอมเมนต์ของคิวรี PAY3
-   * ⚠️ อาจได้น้อยกว่า 3 งวด (เพิ่งเข้างาน) และงวดแรก/สุดท้าย**มักไม่เต็มงวด**
-   * ⚠️ **หนึ่งงวดส่วนใหญ่เป็นครึ่งเดือน** ⇒ 3 งวด ≈ 1.5 เดือน ไม่ใช่ 3 เดือน
+   * 🔴 **3 เดือนจริง ไม่ใช่ 3 งวด** (เจ้าของเคาะ 26 ก.ย. 2569) — SQL ดึงมา 8 งวด แล้ว
+   * `parseIncomeMonths` ตัดให้เหลือหน้าต่าง 3 เดือนด้วย `lastMonthsOfPay` (ครึ่งเดือน 6 งวด ·
+   * เต็มเดือน 3 งวด) · ⚠️ งวดแรก/สุดท้าย**มักไม่เต็มงวด**
    */
   resigned_income_3m: string | null;
   fee_name: string | null;
@@ -112,6 +114,8 @@ type SqlServerRequestRow = {
  * 🔴 อ่านไม่ออก/ไม่มีของ = `null` **ห้ามคืน `[]`** — ลิสต์ว่างแปลว่า "ไม่มีงวดจ่ายเลย"
  * ซึ่งคนละเรื่องกับ "อ่านค่าไม่ได้" · จอจะได้เลือกคำที่ถูก
  * ⚠️ `pay`/`drw` อาจเป็น null รายงวด (งวดนั้นไม่มีบรรทัดฝั่งนั้น) — คงไว้เป็น null ห้ามแปลงเป็น 0
+ * 🔴 ตัดหน้าต่าง **3 เดือนจริง** ที่นี่ที่เดียว (`lastMonthsOfPay`) — หน้าใบขอกับป๊อปไล่งาน
+ * ได้ชุดเดียวกันเสมอ (หนึ่งเมตริกหนึ่งนิยาม)
  */
 function parseIncomeMonths(raw: unknown): ResignedIncomeMonth[] | null {
   if (typeof raw !== 'string' || !raw.trim()) return null;
@@ -127,7 +131,8 @@ function parseIncomeMonths(raw: unknown): ResignedIncomeMonth[] | null {
         deduct: typeof x.ded === 'number' && Number.isFinite(x.ded) ? x.ded : null,
         net: typeof x.net === 'number' && Number.isFinite(x.net) ? x.net : null,
       }));
-    return out.length > 0 ? out : null;
+    const windowed = lastMonthsOfPay(out);
+    return windowed.length > 0 ? windowed : null;
   } catch {
     return null;
   }
@@ -365,7 +370,7 @@ const BASE_SQL = `
     WCH.wage_draw_rate AS resigned_wage_draw_rate,
     WCH.wage_fee_rate AS resigned_wage_fee_rate,
     WCH.effective_date AS resigned_wage_effective_date,
-    -- รายได้จริง 3 งวดล่าสุด **แยกรายงวด** (25 ส.ค. 2569) — คนละเรื่องกับอัตราข้างบน
+    -- รายได้จริงย้อนหลัง 3 เดือน **แยกรายงวด** (25 ส.ค. / 26 ก.ย. 2569) — คนละเรื่องกับอัตราข้างบน
     PAY3.months AS resigned_income_3m,
     B.work_date,
     B.work_time,
@@ -388,7 +393,7 @@ const BASE_SQL = `
      WHERE ch.staff_id = S.staff_id
      ORDER BY ch.effective_date DESC, ch.runno DESC
   ) WCH
-  /* รายได้จริง 3 งวดล่าสุด **แยกรายงวด** — คืนเป็น JSON เพราะเจ้าของขอเห็นรายงวด
+  /* รายได้จริงย้อนหลัง 3 เดือน **แยกรายงวด** — คืนเป็น JSON เพราะเจ้าของขอเห็นรายงวด
      ไม่ใช่ยอดรวม/ค่าเฉลี่ย
 
      🔴🔴 **ย้ายแหล่งจาก wg2_ppayment_* (เตรียมจ่าย) มา wg2_payment_* (จ่ายจริง)**
@@ -418,13 +423,16 @@ const BASE_SQL = `
 
      ⚠️ **หนึ่งงวดที่นี่ส่วนใหญ่เป็นครึ่งเดือน** (15-16 วัน 71,542 งวด เทียบกับ
         เต็มเดือน 28-31 วัน 31,876 งวด) ⇒ "3 งวด" มักเท่ากับ ~1.5 เดือน ไม่ใช่ 3 เดือน
-        เจ้าของเคาะให้คงเป็น 3 งวดตามเดิม แต่**จอต้องเขียนที่มาให้ชัด**
+     🔴 **เจ้าของเคาะใหม่ 26 ก.ย. 2569: เอา 3 เดือนจริง** (เลิกคง 3 งวดแบบเดิม)
+        ดึงมา RESIGNED_INCOME_FETCH_PERIODS งวด (8) แล้วตัดหน้าต่างใน parseIncomeMonths
+        วัดฐาน 26 ก.ย.: ใบขอที่เปิดอยู่มีงวดในหน้าต่าง 3 เดือนมากสุด 7 งวด ⇒ 8 พอเสมอ
+        (ตัดใน SQL ด้วย MAX(end_date) ก็ได้ แต่ต้องคิดซ้ำทุกแถวอัตรา ~15 แถวต่อใบ — แพงกว่า)
 
      ⚠️ ห้ามใส่ backtick ในคอมเมนต์ตรงนี้ — SQL ก้อนนี้อยู่ใน template literal
         เผลอใส่แล้วสตริงขาดกลางคัน tsc ฟ้อง comma expected (เจอมาแล้ว 25 ส.ค. 2569) */
   OUTER APPLY (
     SELECT (
-      SELECT TOP 3 p.begin_date AS f, p.end_date AS t,
+      SELECT TOP ${RESIGNED_INCOME_FETCH_PERIODS} p.begin_date AS f, p.end_date AS t,
              x.seq_paid                     AS pay,
              x.seq_deduct                   AS ded,
              (x.seq_paid - x.seq_deduct)    AS net

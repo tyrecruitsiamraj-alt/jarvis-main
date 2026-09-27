@@ -287,21 +287,37 @@ describe('แหล่งของรายได้จริง 3 งวด (�
  * ⇒ ถ้าไม่เขียนไว้ คนจะอ่าน 3 งวดเป็น 3 เดือนแล้วสรุปว่าเลขผิด
  */
 describe('จอบอกที่มาของรายได้จริง', () => {
+  /**
+   * 🔴 กล่องนี้ย้ายเป็น component กลาง 26 ก.ย. 2569 (`UnitRequestPayBlocks`) — หน้าใบขอกับ
+   * ป๊อปไล่งานบนกล่องงานเรียกตัวเดียวกัน ⇒ ตรวจที่ component + ตรวจว่าหน้าใบขอยังเรียกใช้อยู่
+   */
+  const blocks = readFileSync(
+    resolve(__dirname, '../../src/components/jobs/UnitRequestPayBlocks.tsx'),
+    'utf8',
+  );
   const page = readFileSync(
     resolve(__dirname, '../../src/pages/jobs/SiamrajUnitRequestDetailPage.tsx'),
     'utf8',
   );
 
   it('บอกว่าเป็นยอดเดียวกับ eSlip และชี้เมนู ERP ที่เอาไปทานได้', () => {
-    expect(page).toContain('ใบแจ้งเงินเดือน (eSlip)');
-    expect(page).toContain('PR-4813');
+    expect(blocks).toContain('ใบแจ้งเงินเดือน (eSlip)');
+    expect(blocks).toContain('PR-4813');
   });
 
-  it('เตือนว่าหนึ่งงวดมักเป็นครึ่งเดือน — กันอ่าน 3 งวดเป็น 3 เดือน', () => {
-    expect(page).toContain('หนึ่งงวดมักเป็นครึ่งเดือน');
+  it('🔴 เป็น "3 เดือนจริง" และบอกว่างวดครึ่งเดือนได้ 6 งวด (เจ้าของเคาะ 26 ก.ย. — เลิกแบบ 3 งวด)', () => {
+    expect(blocks).toContain('รายได้จริงย้อนหลัง 3 เดือน');
+    expect(blocks).toContain('งวดครึ่งเดือนจะมี 6 งวด');
+    // แต่ละแถวติดป้ายชนิดงวด — กันอ่านงวดครึ่งเดือนเป็นเงินเดือนทั้งเดือน
+    expect(blocks).toContain("half: 'ครึ่งเดือน'");
+    expect(blocks).not.toContain('3 งวดล่าสุด');
   });
 
   it('ไม่มีงวดในไซต์นี้ ต้องบอกเหตุผล ไม่ใช่ "ไม่พบ" เฉย ๆ', () => {
-    expect(page).toContain('อาจยังไม่ถึงรอบจ่าย');
+    expect(blocks).toContain('อาจยังไม่ถึงรอบจ่าย');
+  });
+
+  it('หน้าใบขอเรียกกล่องกลาง (ห้ามก๊อปโครงกลับมาเขียนซ้ำ)', () => {
+    expect(page).toContain('<ResignedEmployeeBlock job={data} />');
   });
 });
