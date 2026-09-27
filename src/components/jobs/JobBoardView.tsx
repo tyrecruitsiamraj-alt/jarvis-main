@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { trackPublicClick } from '@/lib/publicClickApi';
-import { conveyorLabel } from '@/lib/soRecruitNav';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS } from '@/types';
@@ -225,6 +224,24 @@ export type JobBoardViewProps = {
  * ลิงก์เก่า `?view=closed` / `?view=cancelled` ถูกแปลงเป็นกล่องที่ `StaffJobBoardPage`
  */
 export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments';
+
+/**
+ * แท็บระดับบอร์ด + ชื่อหัวหน้าจอ — **ชุดเดียวใช้ทั้งแถบแท็บและหัวหน้าจอ**
+ * 🔴 เดิมหัวของ 3 แท็บฝั่งผู้สมัครเรียก `conveyorLabel` ด้วยคีย์ applicants ซึ่งคืน `''` มาตั้งแต่ขั้น
+ * "ผู้สมัคร" ถูกถอดออกจากสายพาน ⇒ หัวหน้าจอว่างเปล่า (เจอ 27 ก.ย. 2569 · เจ้าของสั่ง "แก้เลย")
+ * ⇒ หัวต้องเป็นชื่อแท็บที่กดมา — กดแท็บ "การโทรของฉัน" หัวก็ต้องเขียน "การโทรของฉัน"
+ */
+const BOARD_VIEW_TABS: ReadonlyArray<{ id: BoardViewId; label: string }> = [
+  { id: 'board', label: 'กล่องงาน' },
+  { id: 'list', label: 'รายชื่อผู้สมัคร' },
+  { id: 'contact', label: 'การโทรของฉัน' },
+  { id: 'appointments', label: 'ติดตามนัดหมาย' },
+  // 🔴 แท็บ "คำขอโพสต์งานใหม่" ถูกถอดทั้งแท็บ 27 ก.ย. 2569 (เจ้าของสั่ง — ทีม Online
+  // ดูทีละกล่องแล้วเอาขึ้นเลย ไม่ต้องมีคิวคำขอ) · ลิงก์เก่า ?view=postings เปิดกล่องงานแทน
+  // ⚠️ **ไม่มี "ปิดแล้ว"/"ยกเลิก" บนแท็บแล้ว** (เจ้าของสั่ง 19 ส.ค. 2569:
+  // *"มันมีด้านล่างแล้วไงตรงนี้อะ"*) — เป็นกล่องสถานะข้างล่างที่กดแล้ว
+  // กรองในหน้าเดิม · ลิงก์เก่า ?view=closed/cancelled แปลงเป็นกล่องให้แล้ว
+];
 
 const JobBoardView: React.FC<JobBoardViewProps> = ({
   jobs,
@@ -1075,15 +1092,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         {isStaff ? (
           <PageHeroStrip
             eyebrow="บอร์ดรับสมัคร · เจ้าหน้าที่"
-            /* 🔴 หน้านี้รับสองขั้นของสายพาน (ประกาศรับ / ผู้สมัคร) ต่างกันที่ `?view=`
-               ⇒ ชื่อหัวต้องเปลี่ยนตามมุมมอง ไม่งั้นกดเมนูคนละขั้นแล้วเจอหัวเดียวกัน
-               คนใหม่จะไม่แน่ใจว่ามาถูกหน้าหรือเปล่า (audit 26 ส.ค. 2569)
-               ชื่อมาจาก `conveyorLabel` ที่เดียวกับเมนู ห้ามพิมพ์เอง */
-            title={
-              /* หน้าเดียวสามมุมมอง — หัวต้องตรงกับเมนูที่พามา (กล่องงานมีชื่อ
-                 ของตัวเองในเมนูคลังข้อมูลแล้ว 27 ส.ค. 2569 — เดิมยืมชื่อ "ผู้สมัคร") */
-              view === 'board' ? 'กล่องงาน' : conveyorLabel('applicants')
-            }
+            /* 🔴 หน้านี้มีหลายมุมมองต่างกันที่ `?view=` ⇒ ชื่อหัวต้องเปลี่ยนตามมุมมอง
+               ไม่งั้นกดคนละแท็บแล้วเจอหัวเดียวกัน คนใหม่จะไม่แน่ใจว่ามาถูกหน้าหรือเปล่า
+               (audit 26 ส.ค. 2569) · ชื่อมาจาก `BOARD_VIEW_TABS` ชุดเดียวกับแถบแท็บ ห้ามพิมพ์เอง */
+            title={BOARD_VIEW_TABS.find((t) => t.id === view)?.label ?? 'กล่องงาน'}
             /* 🔴 บอกหน่วยให้ครบทั้ง "ใบขอ" และ "อัตรา" — เดิมเขียน "292 ตำแหน่ง" ทั้งที่ 292
                คือจำนวน**ใบ** ทำให้เอาไปเทียบกับ Dashboard (340 อัตรา) แล้วสรุปว่าใบขอหาย */
             /* 🔴 ตัวเลขยังบอกไม่ได้ (กำลังโหลด/พัง/ไม่มีสิทธิ์) = **ไม่พิมพ์อะไรเลย**
@@ -1216,19 +1228,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             แทรกก่อน tab bar ทำให้แท็บเลื่อนลงเฉพาะหน้ารายชื่อผู้สมัคร */}
         {isStaff && onViewChange ? (
           <div className="mt-6 flex flex-wrap items-center gap-1 border-b border-border/60">
-            {(
-              [
-                { id: 'board', label: 'กล่องงาน' },
-                { id: 'list', label: 'รายชื่อผู้สมัคร' },
-                { id: 'contact', label: 'การโทรของฉัน' },
-                { id: 'appointments', label: 'ติดตามนัดหมาย' },
-                // 🔴 แท็บ "คำขอโพสต์งานใหม่" ถูกถอดทั้งแท็บ 27 ก.ย. 2569 (เจ้าของสั่ง — ทีม Online
-                // ดูทีละกล่องแล้วเอาขึ้นเลย ไม่ต้องมีคิวคำขอ) · ลิงก์เก่า ?view=postings เปิดกล่องงานแทน
-                // ⚠️ **ไม่มี "ปิดแล้ว"/"ยกเลิก" บนแท็บแล้ว** (เจ้าของสั่ง 19 ส.ค. 2569:
-                // *"มันมีด้านล่างแล้วไงตรงนี้อะ"*) — เป็นกล่องสถานะข้างล่างที่กดแล้ว
-                // กรองในหน้าเดิม · ลิงก์เก่า ?view=closed/cancelled แปลงเป็นกล่องให้แล้ว
-              ] as const
-            ).map((v) => {
+            {BOARD_VIEW_TABS.map((v) => {
               const active = view === v.id;
               return (
                 <button

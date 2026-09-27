@@ -43,11 +43,33 @@ describe('ชื่อหัวหน้าจอ = ชื่อเมนู', (
     // 🔴 แท็บ "คำขอโพสต์งานใหม่" ถอดทั้งแท็บ (เจ้าของสั่ง) — ห้ามมีหัว/แท็บของมันกลับมา
     expect(src).not.toContain("conveyorLabel('postings')");
     expect(src).not.toContain("{ id: 'postings'");
-    expect(src).toContain("conveyorLabel('applicants')");
-    // มุมมองกล่องงาน (ไม่มี ?view=) ใช้ชื่อของตัวเอง — ตรงกับเมนูคลังข้อมูล
-    expect(src).toContain("'กล่องงาน'");
+    // 🔴 หัวของแท็บฝั่งผู้สมัครเคยว่างเปล่า เพราะเรียกชื่อขั้น "ผู้สมัคร" ที่ถอดจากสายพานไปแล้ว
+    //    (เจอ 27 ก.ย. 2569) ⇒ หัวต้องมาจากชุดแท็บเดียวกับแถบแท็บ
+    expect(src).not.toContain("conveyorLabel('applicants')");
+    expect(src).toContain('BOARD_VIEW_TABS.find((t) => t.id === view)');
+    expect(src).toContain('BOARD_VIEW_TABS.map(');
+    for (const label of ['กล่องงาน', 'รายชื่อผู้สมัคร', 'การโทรของฉัน', 'ติดตามนัดหมาย']) {
+      expect(src).toContain(`label: '${label}'`);
+    }
     // ชื่อเก่าที่เคยชนกันทั้งสองขั้นต้องหายไป
     expect(src).not.toContain('title="งานสรรหา"');
+  });
+
+  it('🔴 ทุกที่ที่เรียก conveyorLabel ต้องได้ชื่อจริง ไม่ใช่สตริงว่าง (หัวหน้าจอหาย)', () => {
+    const walk = (dir: string): string[] =>
+      fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((d) => {
+        const rel = `${dir}/${d.name}`;
+        if (d.isDirectory()) return walk(rel);
+        return /\.(tsx?|jsx?)$/.test(d.name) ? [rel] : [];
+      });
+    const calls: Array<[string, string]> = [];
+    for (const file of walk('src')) {
+      for (const m of read(file).matchAll(/conveyorLabel\('([^']+)'\)/g)) calls.push([file, m[1]]);
+    }
+    expect(calls.length).toBeGreaterThan(0);
+    for (const [file, key] of calls) {
+      expect(conveyorLabel(key as Parameters<typeof conveyorLabel>[0]), `${file} → '${key}'`).not.toBe('');
+    }
   });
 
   it('ชื่อเก่าที่ทำให้คนใหม่งงต้องไม่หลงเหลือในหัวหน้าจอ', () => {
