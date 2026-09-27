@@ -6,6 +6,9 @@ import { DASH, TONE } from '@/lib/designTokens';
 import SearchField from '@/components/shared/SearchField';
 import { LEAD_VIEW_LABEL } from '@/lib/recruitLead';
 
+/** คำในช่องค้นหาของแท็บผู้สมัคร — ใช้ทั้งแถบบนและทางถอย (คำเดียวกันสองที่) */
+export const RM_SEARCH_PLACEHOLDER = 'ค้นหาจาก ชื่อ นามสกุล เบอร์ หรือชื่องาน';
+
 /**
  * แถวค้นหา + เครื่องมือ — ตาม HTML ของระบบเดิม
  *
@@ -22,6 +25,11 @@ const RmSearchBar: React.FC<{
   keyword: string;
   onKeywordChange: (v: string) => void;
   onSearch: () => void;
+  /**
+   * ช่องค้นหาย้ายไปแถบบนซ้ายกระดิ่งแล้ว (เจ้าของสั่ง 27 ก.ย. 2569 "ทั้งระบบ") — แถวนี้เหลือแต่ปุ่มลงมือ
+   * `false` = ทางถอยตอนไม่มีแถบบน (วาดช่อง + ปุ่ม "ค้นหา" ที่นี่เหมือนเดิม)
+   */
+  hideSearch?: boolean;
   showLeadTools: boolean;
   selectedCount: number;
   onSaveLead: () => void;
@@ -44,6 +52,7 @@ const RmSearchBar: React.FC<{
   keyword,
   onKeywordChange,
   onSearch,
+  hideSearch = false,
   showLeadTools,
   selectedCount,
   onSaveLead,
@@ -57,21 +66,25 @@ const RmSearchBar: React.FC<{
   onToggleLeadView,
 }) => (
   <div className="flex flex-wrap items-center gap-2">
-    <SearchField
-      compact
-      value={keyword}
-      onChange={(e) => onKeywordChange(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onSearch();
-      }}
-      placeholder="ค้นหาจาก ชื่อ นามสกุล เบอร์ หรือชื่องาน"
-      wrapperClassName="w-full sm:w-[22rem]"
-    />
-    <Button size="sm" type="button" onClick={onSearch} className="shrink-0">
-      ค้นหา
-    </Button>
+    {hideSearch ? null : (
+      <>
+        <SearchField
+          compact
+          value={keyword}
+          onChange={(e) => onKeywordChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onSearch();
+          }}
+          placeholder={RM_SEARCH_PLACEHOLDER}
+          wrapperClassName="w-full sm:w-[22rem]"
+        />
+        <Button size="sm" type="button" onClick={onSearch} className="shrink-0">
+          ค้นหา
+        </Button>
 
-    <span className={cn('hidden h-6 border-l sm:block', DASH.divider)} aria-hidden />
+        <span className={cn('hidden h-6 border-l sm:block', DASH.divider)} aria-hidden />
+      </>
+    )}
 
     <Button variant="secondary" size="sm" type="button" onClick={onAddApplicant} className="shrink-0">
       <UserPlus aria-hidden /> เพิ่มข้อมูลผู้สมัคร

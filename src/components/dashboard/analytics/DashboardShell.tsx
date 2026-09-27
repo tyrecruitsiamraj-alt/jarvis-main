@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import type { DashboardData, DashboardFilters, DashboardKpi, DashboardResponsibleRole, DashboardStatusFilter } from '@/lib/dashboard/types';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
@@ -131,6 +132,15 @@ const DashboardShell: React.FC<Props> = ({
   onRecruiterClick,
   extraPanels,
 }) => {
+  /**
+   * 🔴 ช่องค้นหาอยู่บนแถบบน ซ้ายกระดิ่ง (เจ้าของสั่ง 27 ก.ย. 2569 "ทั้งระบบ")
+   * ความหมายเดิมทุกอย่าง: กรอง **เฉพาะไฟล์ CSV** ตัวเลข/กราฟบนหน้าไม่เปลี่ยน — คำในช่องยังบอกไว้
+   */
+  const searchInHeader = useHeaderSearch({
+    value: filters.search,
+    onChange: (v) => onFiltersChange({ search: v }),
+    placeholder: 'กรองไฟล์ CSV (ตัวเลขบนหน้าไม่เปลี่ยน)',
+  });
   const [showControlDetail, setShowControlDetail] = useState(false);
   const [showUnitOverview, setShowUnitOverview] = useState(false);
   const [showRecruiterOverview, setShowRecruiterOverview] = useState(false);
@@ -190,7 +200,8 @@ const DashboardShell: React.FC<Props> = ({
               <h1 className="text-xl md:text-2xl font-medium text-slate-900 dark:text-slate-100">ศูนย์ควบคุมใบขอ</h1>
               <p className="text-xs font-medium text-slate-400 dark:text-slate-500">Request Control Tower</p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:min-w-[420px]">
+            <div className={cn('flex flex-col sm:flex-row gap-2 w-full lg:w-auto', !searchInHeader && 'lg:min-w-[420px]')}>
+              {searchInHeader ? null : (
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                 {/**
@@ -207,6 +218,7 @@ const DashboardShell: React.FC<Props> = ({
                   className="w-full rounded-full border-0 bg-slate-100 dark:bg-slate-800 py-2.5 pl-9 pr-3 text-sm text-slate-900 dark:text-slate-100 shadow-inner placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-ring/40"
                 />
               </div>
+              )}
               <div className="flex gap-2">
                 {onRefresh ? (
                   <button

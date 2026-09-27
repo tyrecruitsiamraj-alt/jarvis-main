@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchField from '@/components/shared/SearchField';
+import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { Phone, LoaderCircle, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
@@ -229,6 +230,12 @@ const OurPeoplePage: React.FC = () => {
     setQuery(q);
     setPageByBucket({});
   };
+  /** ช่องค้นหาอยู่บนแถบบน ซ้ายกระดิ่ง (เจ้าของสั่ง 27 ก.ย. 2569 "ทั้งระบบ") — ค้นเรื่องเดิมของหน้านี้ */
+  const searchInHeader = useHeaderSearch({
+    value: query,
+    onChange: setQueryAndResetPages,
+    placeholder: 'ค้นชื่อ / สกิล / พื้นที่ / เบอร์',
+  });
 
   return (
     <div className="relative">
@@ -237,12 +244,14 @@ const OurPeoplePage: React.FC = () => {
         title="ผู้สมัคร"
         subtitle="คนของเราแยกตามถังบนบอร์ด"
         actions={
-          <SearchField
-            value={query}
-            onChange={(e) => setQueryAndResetPages(e.target.value)}
-            placeholder="ค้นชื่อ / สกิล / พื้นที่ / เบอร์"
-            wrapperClassName="w-full sm:w-[22rem]"
-          />
+          searchInHeader ? undefined : (
+            <SearchField
+              value={query}
+              onChange={(e) => setQueryAndResetPages(e.target.value)}
+              placeholder="ค้นชื่อ / สกิล / พื้นที่ / เบอร์"
+              wrapperClassName="w-full sm:w-[22rem]"
+            />
+          )
         }
       />
       <div className="px-4 md:px-6 space-y-4 pb-8">

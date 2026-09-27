@@ -5,6 +5,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Candidate, Employee, EmployeeStatus } from '@/types';
 import SearchField from '@/components/shared/SearchField';
+import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { WL_BU_CODES, WL_BU_UNASSIGNED, type WlBuCode } from '@/lib/wlBuState';
@@ -32,6 +33,8 @@ const WLEmployees: React.FC = () => {
   const isMobile = useIsMobile();
   const [filter, setFilter] = useState<EmployeeStatus | 'all'>('all');
   const [search, setSearch] = useState('');
+  /** ช่องค้นหาอยู่บนแถบบน ซ้ายกระดิ่ง (เจ้าของสั่ง 27 ก.ย. 2569 "ทั้งระบบ") */
+  const searchInHeader = useHeaderSearch({ value: search, onChange: setSearch, placeholder: 'ค้นหาพนักงาน...' });
   const { selectedBu, setSelectedBu, buLabel } = useWlBu();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -149,12 +152,14 @@ const WLEmployees: React.FC = () => {
         {buSaveError ? <p className="text-xs text-destructive">{buSaveError}</p> : null}
 
         <div className="flex flex-col md:flex-row gap-3">
-          <SearchField
-            type="text"
-            placeholder="ค้นหาพนักงาน..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          {searchInHeader ? null : (
+            <SearchField
+              type="text"
+              placeholder="ค้นหาพนักงาน..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          )}
 
           <div className="flex gap-1.5 overflow-x-auto">
             {statusFilters.map((f) => (

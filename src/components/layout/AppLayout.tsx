@@ -22,6 +22,7 @@ import { Switch } from '@/components/ui/switch';
 import { filterByMinimumRole } from '@/lib/rbac';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import { loadThemeMode, resolveTheme, setThemeMode } from '@/lib/theme';
+import { HeaderSearchProvider, HeaderSearchSlot } from '@/contexts/HeaderSearchContext';
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
@@ -123,6 +124,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 
   return (
+    /* ช่องค้นหาของแต่ละหน้าขึ้นมาอยู่แถบบน ซ้ายกระดิ่ง (เจ้าของสั่ง 27 ก.ย. 2569 · ดู useHeaderSearch) */
+    <HeaderSearchProvider>
     <div
       className={cn(
         'min-h-[100dvh] min-h-screen flex flex-col',
@@ -145,6 +148,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </button>
         </div>
         <div className="flex items-center gap-2 xl:gap-3 shrink-0">
+          {/* 🔴 ช่องค้นหาของหน้านี้ — ซ้ายกระดิ่งเสมอ (หน้าไม่มีการค้นหา = ไม่มีช่อง) */}
+          <HeaderSearchSlot className="w-64 xl:w-80" />
           <NotificationPanel />
           <div className="hidden 2xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 dark:bg-white/10 dark:border-white/15 max-w-[280px]">
             <UserCircle className="w-4 h-4 text-blue-600 shrink-0" />
@@ -212,8 +217,10 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
       </header>
 
-      {/* หัวแบบย่อ — แท็บเล็ต/มือถือ (ต่ำกว่า lg) */}
-      <header className="lg:hidden flex items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-border bg-background/95 sticky top-0 z-40 safe-area-pt">
+      {/* หัวแบบย่อ — แท็บเล็ต/มือถือ (ต่ำกว่า lg)
+          ช่องค้นหาของหน้าอยู่แถวที่สองใต้แถบ — ข้างกระดิ่งบนจอเล็กไม่มีที่พอ (ดูคอมเมนต์ข้างล่างเรื่องเบียด) */}
+      <header className="lg:hidden border-b border-border bg-background/95 sticky top-0 z-40 safe-area-pt">
+      <div className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3">
         <div className="flex items-center gap-1 min-w-0">
           {hamburger}
           <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 text-left min-w-0 touch-manipulation py-1">
@@ -238,6 +245,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </span>
           {themeSwitchCompact}
         </div>
+      </div>
+      <HeaderSearchSlot containerClassName="px-4 pb-3 sm:px-5" />
       </header>
 
       {/*
@@ -263,6 +272,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         onLogout={() => void logout()}
       />
     </div>
+    </HeaderSearchProvider>
   );
 };
 

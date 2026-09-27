@@ -11,6 +11,7 @@ import UnitSectionTabs from '@/components/jobs/UnitSectionTabs';
 import AiCallFlowPanel from '@/components/matching/AiCallFlowPanel';
 import SelectionRecallButton from '@/components/matching/SelectionRecallButton';
 import SearchField from '@/components/shared/SearchField';
+import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -518,6 +519,12 @@ const MatchingPage: React.FC = () => {
   });
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
+  /** ช่องค้นหาอยู่บนแถบบน ซ้ายกระดิ่ง (เจ้าของสั่ง 27 ก.ย. 2569 "ทั้งระบบ") — ค้นเรื่องเดิมของหน้านี้ */
+  const searchInHeader = useHeaderSearch({
+    value: search,
+    onChange: setSearch,
+    placeholder: 'ค้นหา site / หน่วยงาน / ตำแหน่ง / สถานที่',
+  });
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [unitFilter, setUnitFilter] = useState('');
   const [workflowFilter, setWorkflowFilter] = useState<WorkflowFilter>('all');
@@ -2366,12 +2373,14 @@ const MatchingPage: React.FC = () => {
         subtitle=""
         backPath="/matching"
         actions={
-          <SearchField
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหา site / หน่วยงาน / ตำแหน่ง / สถานที่"
-            wrapperClassName="w-full sm:w-[26rem]"
-          />
+          searchInHeader ? undefined : (
+            <SearchField
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหา site / หน่วยงาน / ตำแหน่ง / สถานที่"
+              wrapperClassName="w-full sm:w-[26rem]"
+            />
+          )
         }
       />
       <div className="px-4 md:px-6">
@@ -2719,7 +2728,7 @@ const MatchingPage: React.FC = () => {
                         (เจ้าของสั่ง: ข้อมูลไม่เท่ากันก็คงไว้ให้ตรงกัน อย่าให้มันขยับเอง)
                         ยอด ติดต่อ/จอง/ลงงาน ที่เคยแทนที่แถบนี้ ย้ายไปเป็นชิปในแถวบน */}
                     <div className="min-w-0 border-slate-100 dark:border-slate-700/60 sm:border-l sm:pl-2.5">
-                      <p className="text-[9px] font-medium uppercase tracking-wider text-slate-400">
+                      <p className="text-[9px] font-medium uppercase text-slate-400">
                         ผลโทรในใบนี้
                       </p>
                       <LumosJobSummaryStats s={serverLumosSummary[j.id]} variant="column" />

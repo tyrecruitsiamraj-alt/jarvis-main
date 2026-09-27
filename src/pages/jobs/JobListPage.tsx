@@ -14,6 +14,7 @@ import {
   unitSectorLabel,
 } from '@/lib/unitSector';
 import SearchField from '@/components/shared/SearchField';
+import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { FilterSelect } from '@/components/shared/FilterSelect';
 import { FilterMultiSelect } from '@/components/shared/FilterMultiSelect';
 import { cn } from '@/lib/utils';
@@ -122,6 +123,9 @@ function looksLikeSiamrajRequestNo(value: string): boolean {
   return SIAMRAJ_REQUEST_NO_RE.test(value.trim());
 }
 
+/** คำในช่องค้นหาของหน้าใบขอ — ใช้ทั้งแถบบนและทางถอย */
+const JOB_LIST_SEARCH_PLACEHOLDER = 'เลขที่ใบขอ, หน่วยงาน, ผู้รับผิดชอบ...';
+
 const JobListPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -181,6 +185,12 @@ const JobListPage: React.FC = () => {
     },
     [setSearchParams],
   );
+  /** ช่องค้นหาอยู่บนแถบบน ซ้ายกระดิ่ง (เจ้าของสั่ง 27 ก.ย. 2569 "ทั้งระบบ") — ค้นเรื่องเดิม เขียน URL เหมือนเดิม */
+  const searchInHeader = useHeaderSearch({
+    value: search,
+    onChange: (v) => updateListState({ search: v }),
+    placeholder: JOB_LIST_SEARCH_PLACEHOLDER,
+  });
 
   /**
    * จำนวนตัวกรองที่ถูกเลือกอยู่จริง — ใช้ทั้งป้ายบนหัวและตัดสินว่าจะกางกล่องไหม
@@ -476,20 +486,22 @@ const JobListPage: React.FC = () => {
         actions={
           // ช่องค้นหาอยู่คู่ปุ่มรีเฟรชบนหัวหน้า — ของที่ใช้บ่อยสุดอยู่ใกล้มือ ไม่ต้องเลื่อนหาในกล่องตัวกรอง
           <div className="flex flex-wrap items-center gap-2">
-            {/* จอเล็กหดได้ ไม่ล็อกความกว้างตายตัว (จอ 320px เคยล้นออกไป) · จอใหญ่เท่าเดิม */}
-            <div className="w-full min-w-0 max-w-[200px] sm:max-w-[280px]">
-              <label htmlFor="job-list-search" className="sr-only">
-                ค้นหา
-              </label>
-              <SearchField
-                id="job-list-search"
-                compact
-                type="text"
-                placeholder="เลขที่ใบขอ, หน่วยงาน, ผู้รับผิดชอบ..."
-                value={search}
-                onChange={(e) => updateListState({ search: e.target.value })}
-              />
-            </div>
+            {/* ทางถอยตอนไม่มีแถบบน — ปกติช่องค้นหาอยู่แถบบนซ้ายกระดิ่งแล้ว */}
+            {searchInHeader ? null : (
+              <div className="w-full min-w-0 max-w-[200px] sm:max-w-[280px]">
+                <label htmlFor="job-list-search" className="sr-only">
+                  ค้นหา
+                </label>
+                <SearchField
+                  id="job-list-search"
+                  compact
+                  type="text"
+                  placeholder={JOB_LIST_SEARCH_PLACEHOLDER}
+                  value={search}
+                  onChange={(e) => updateListState({ search: e.target.value })}
+                />
+              </div>
+            )}
             <button
               type="button"
               onClick={() => void refetch()}

@@ -9,6 +9,7 @@ import WlBuSelector from '@/components/wl/WlBuSelector';
 import { useWlBu } from '@/hooks/useWlBu';
 import { countEmployeesByBu, employeeIdsForBu, filterEmployeesByBu } from '@/lib/wlBuFilters';
 import SearchField from '@/components/shared/SearchField';
+import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { Plus } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Employee, WorkCalendarEntry, WORK_STATUS_LABELS } from '@/types';
@@ -23,6 +24,12 @@ const DailyAssignment: React.FC = () => {
   const { selectedBu, setSelectedBu, buLabel } = useWlBu();
   const [selectedDate, setSelectedDate] = useState(() => toYmdLocal(new Date()));
   const [searchTerm, setSearchTerm] = useState('');
+  /** ช่องค้นหาอยู่บนแถบบน ซ้ายกระดิ่ง (เจ้าของสั่ง 27 ก.ย. 2569 "ทั้งระบบ") — กรองรายชื่อ "ว่าง" เหมือนเดิม */
+  const searchInHeader = useHeaderSearch({
+    value: searchTerm,
+    onChange: setSearchTerm,
+    placeholder: 'ค้นหาพนักงาน...',
+  });
   const [assignDialog, setAssignDialog] = useState<{ open: boolean; empId: string; empName: string }>({ open: false, empId: '', empName: '' });
   type WorkCalendarEntryWithEmployee = WorkCalendarEntry & { emp?: Employee };
   const [editDialog, setEditDialog] = useState<{ open: boolean; entry: WorkCalendarEntryWithEmployee | null }>({ open: false, entry: null });
@@ -93,13 +100,15 @@ const DailyAssignment: React.FC = () => {
         {/* Available */}
         <div>
           <h3 className="text-sm font-medium text-foreground mb-2">ว่าง ({filteredAvailable.length} คน)</h3>
-          <SearchField
-            wrapperClassName="mb-2"
-            type="text"
-            placeholder="ค้นหาพนักงาน..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          {searchInHeader ? null : (
+            <SearchField
+              wrapperClassName="mb-2"
+              type="text"
+              placeholder="ค้นหาพนักงาน..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          )}
           <div className="space-y-2">
             {filteredAvailable.map(emp => (
               <div key={emp.id} className="glass-card rounded-lg p-3 border border-border flex items-center justify-between">
