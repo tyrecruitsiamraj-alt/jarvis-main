@@ -347,7 +347,7 @@ const AdminSettings: React.FC = () => {
             <div className="space-y-4 rounded-2xl border border-border/70 bg-card p-3">
               {navGroups.map((g) => (
                 <div key={g.id} className="space-y-1">
-                  <p className="px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="px-2 text-[11px] font-medium uppercase text-muted-foreground">
                     {g.label}
                   </p>
                   {g.tabs.map((t) => {

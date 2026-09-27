@@ -87,7 +87,7 @@ const RmTable: React.FC<{
       {/* ตารางกว้างกว่าจอเล็กเป็นปกติ — เลื่อนในกล่องของตัวเอง ไม่ให้ทั้งหน้าเลื่อน */}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[62rem] text-left text-sm">
-          <thead className={cn('text-[11px] uppercase tracking-wide', DASH.tableHead)}>
+          <thead className={cn('text-[11px] uppercase', DASH.tableHead)}>
             <tr>
               <th className="w-10 px-3 py-2">
                 <input

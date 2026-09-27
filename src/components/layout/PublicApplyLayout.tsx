@@ -36,7 +36,7 @@ const PublicApplyLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             <BrandMark size="sm" className="md:hidden" />
             <BrandMark size="md" className="hidden md:flex" />
             <div className="min-w-0">
-              <p className="text-[10px] md:text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              <p className="text-[10px] md:text-xs font-medium uppercase text-muted-foreground">
                 รับสมัครงาน
               </p>
               <BrandTitle className="truncate text-base md:text-lg font-medium text-foreground tracking-tight" />

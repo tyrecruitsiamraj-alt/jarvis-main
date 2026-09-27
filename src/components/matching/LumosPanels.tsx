@@ -146,7 +146,7 @@ export function LumosJobSummaryStats({
           >
             {c.value}
           </div>
-          <div className={cn('text-[9px] font-medium leading-tight tracking-wide', DASH.muted)}>
+          <div className={cn('text-[9px] font-medium leading-tight', DASH.muted)}>
             {c.label}
           </div>
         </div>

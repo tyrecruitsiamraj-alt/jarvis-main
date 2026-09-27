@@ -108,13 +108,13 @@ const HomeDeckV2: React.FC<{
          */}
         <div className="mx-auto shrink-0 sm:mx-0">
           <div className="flex h-40 w-40 flex-col items-center justify-center rounded-full border border-primary/25 bg-primary/[0.04] text-center sm:h-48 sm:w-48">
-            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <span className="text-xs font-medium uppercase text-muted-foreground">
               ต้องลงมือ
             </span>
             <span className="mt-1.5 text-[52px] font-medium leading-none tabular-nums sm:text-[64px]">
               {loading ? '—' : tasks.length}
             </span>
-            <span className="mt-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <span className="mt-1.5 text-xs font-medium uppercase text-muted-foreground">
               เรื่อง
             </span>
           </div>

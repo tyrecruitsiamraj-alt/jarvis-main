@@ -52,7 +52,7 @@ const TONE_TEXT: Record<NextTaskTone | 'ok', string> = {
 };
 
 /** ป้าย mono ตัวพิมพ์ห่าง — ภาษาป้ายเดียวของทั้ง deck */
-const eyebrow = 'font-mono text-[10px] font-medium uppercase tracking-[0.22em]';
+const eyebrow = 'font-mono text-[10px] font-medium uppercase';
 
 /* ── ตัวเลข "ต้องลงมือ" — พระเอกของหน้า ────────────────────────────────────
  *

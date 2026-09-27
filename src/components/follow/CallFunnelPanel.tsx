@@ -315,12 +315,12 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
             เดิมเป็นการ์ดพื้นอ่อนลอยอยู่คนละก้อนใต้แผงนี้ ต้องกวาดตาสองที่แล้วต่อเรื่องเอง */}
         {leadIn ? (
           <>
-            <p className={cn('mt-3 text-[10px] font-medium uppercase tracking-wide', S.faint)}>
+            <p className={cn('mt-3 text-[10px] font-medium uppercase', S.faint)}>
               {leadInLabel}
             </p>
             {leadIn}
             <div className={cn('mt-3 flex items-center gap-2 border-t pt-3', S.line)}>
-              <p className={cn('text-[10px] font-medium uppercase tracking-wide', S.faint)}>
+              <p className={cn('text-[10px] font-medium uppercase', S.faint)}>
                 {callRowLabel}
               </p>
               <p className={cn('text-[10px]', S.faint)}>
@@ -403,7 +403,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
           if (actions.length === 0) return null;
           return (
             <div className={cn('mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3', S.line)}>
-              <span className={cn('text-[10px] font-medium uppercase tracking-wide', S.faint)}>
+              <span className={cn('text-[10px] font-medium uppercase', S.faint)}>
                 ทำก่อน → หลัง
               </span>
               {actions.map((a, i) => (

@@ -290,7 +290,7 @@ function OrDivider() {
     <div className="my-4 flex items-center gap-3" role="separator">
       <div className="h-px flex-1" style={{ background: HAIRLINE }} />
       <span
-        className="text-[11px] uppercase tracking-[0.08em]"
+        className="text-[11px] uppercase"
         style={{ color: LOGIN_SCENE.muted }}
       >
         หรือ
@@ -340,7 +340,7 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
       {/* ⚠️ ไม่มีจุดเต้นนำหน้าแล้ว — พอบรรทัดนี้ตกบรรทัดบนมือถือ จุดจะลอยเดี่ยว
           อยู่กลางสองบรรทัด (เห็นจริงบนจอ 375px) และตัวจุดเองก็ไม่ได้บอกอะไร */}
       <p
-        className="text-[10.5px] font-medium uppercase leading-relaxed tracking-[0.18em]"
+        className="text-[10.5px] font-medium uppercase leading-relaxed"
         style={{ color: LOGIN_SCENE.burgundy }}
       >
         ONE RECRUIT · ONE SOLUTION · ONE STOP
@@ -544,7 +544,7 @@ const LoginPage: React.FC = () => {
       >
         <BrandMark size="sm" />
         <span
-          className="text-[13px] font-medium tracking-[0.015em]"
+          className="text-[13px] font-medium"
           style={{ color: LOGIN_SCENE.ink, textShadow: TEXT_ON_PHOTO }}
         >
           <BrandTitle />

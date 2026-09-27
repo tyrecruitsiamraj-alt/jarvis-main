@@ -29,7 +29,7 @@ const PublicPostingPreview: React.FC<{
   const contact = [data.contactName, data.contactPhone].filter(Boolean).join(' · ');
   return (
     <div className="rounded-3xl border border-border/70 bg-card p-6 shadow-[0_24px_60px_-28px_rgba(16,24,43,0.35),0_2px_8px_rgba(16,24,43,0.08)] sm:p-7">
-      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-gold">
+      <p className="text-[11px] font-medium uppercase text-gold">
         So Recruit · รับสมัครงาน
       </p>
       <h1 className="mt-2 text-xl font-medium leading-snug text-foreground sm:text-2xl">

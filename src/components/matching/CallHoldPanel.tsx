@@ -160,7 +160,7 @@ export default function CallHoldPanel({
       ) : null}
 
       <div className="space-y-1.5">
-        <p className={cn('text-[10px] font-medium uppercase tracking-wider', DASH.muted)}>
+        <p className={cn('text-[10px] font-medium uppercase', DASH.muted)}>
           โทรเสร็จแล้ว กดผล
         </p>
         <div className="flex flex-wrap gap-1.5">

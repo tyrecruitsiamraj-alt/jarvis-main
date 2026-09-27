@@ -97,7 +97,7 @@ const StatCard: React.FC<StatCardProps> = ({
           <p
             className={cn(
               'truncate text-xs font-medium text-muted-foreground',
-              v2 ? '' : 'uppercase tracking-wide',
+              v2 ? '' : 'uppercase',
             )}
           >
             {title}

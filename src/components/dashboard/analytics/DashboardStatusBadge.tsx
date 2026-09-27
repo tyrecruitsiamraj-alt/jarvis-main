@@ -45,7 +45,7 @@ export function DashboardSlaBadge({ status }: { status: DashboardSlaStatus }) {
     <span
       className={cn(
         TONE[SLA_TONE[status]].chip,
-        'jarvis-chip-sm uppercase tracking-wide whitespace-nowrap',
+        'jarvis-chip-sm uppercase whitespace-nowrap',
       )}
     >
       {SLA_LABELS[status]}

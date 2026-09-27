@@ -75,7 +75,7 @@ const SectionLabel: React.FC<{ icon: React.ReactNode; children: React.ReactNode 
   icon,
   children,
 }) => (
-  <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-primary/80">
+  <div className="flex items-center gap-2 text-[11px] font-medium uppercase text-primary/80">
     {icon}
     <span>{children}</span>
   </div>

@@ -24,7 +24,7 @@ import {
 } from '@/lib/soRecruitNav';
 
 const groupLabelClass =
-  'px-3 pb-1 pt-3 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground';
+  'px-3 pb-1 pt-3 text-[10px] font-medium uppercase text-muted-foreground';
 
 type Props = {
   open: boolean;

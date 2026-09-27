@@ -78,7 +78,7 @@ const RecruitFunnelPanel: React.FC = () => {
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div>
           {/* หัวเป็นป้ายทองแบบเดียวกับ section อื่นบนบอร์ด — ภาษาเดียวกันทั้งหน้า */}
-          <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-gold">
+          <h2 className="text-[11px] font-medium uppercase text-gold">
             ภาพรวมงานสรรหา
           </h2>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
