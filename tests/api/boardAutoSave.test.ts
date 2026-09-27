@@ -9,12 +9,26 @@ import { resolve } from 'node:path';
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf-8');
 const DIALOG = read('src/components/jobs/EditPublicJobFieldsDialog.tsx');
+/** ตัวประกอบ patch + ตัวเทียบ "ฟอร์มต่างจากใบขอไหม" ย้ายมาเป็น lib 27 ก.ย. 2569 (มีเทสต์ของตัวเอง) */
+const FORM_LIB = read('src/lib/publicFieldsForm.ts');
 const NOTE = read('src/components/jobs/UnitRequestNoteField.tsx');
 
 describe('ป๊อปแก้ข้อมูลประกาศ — auto-save', () => {
   it('มี debounce 1500ms ยิง persist(true) แบบเงียบ', () => {
-    expect(DIALOG).toMatch(/setTimeout\(\s*\(\)\s*=>\s*\{?\s*void persistRef\.current\?\.\(true\)/);
+    // นาฬิกาคืนเป็น null ก่อนยิง (แก้ 27 ก.ย. 2569 — ค่าค้างทำให้ flush ตอน unmount ยิงทั้งที่ไม่มีของค้าง)
+    expect(DIALOG).toMatch(
+      /setTimeout\(\s*\(\)\s*=>\s*\{?\s*(?:autosaveTimer\.current = null;\s*)?void persistRef\.current\?\.\(true\)/,
+    );
     expect(DIALOG).toContain('1500');
+  });
+  it('🔴 ยิงเฉพาะตอนฟอร์มต่างจากที่บันทึกไว้จริง (เปิดดูเฉย ๆ ห้ามยิง · ห้ามวน)', () => {
+    // บั๊กจริง 27 ก.ย. 2569: เปิดขั้น 3 ดูเฉย ๆ แล้ววนบันทึกทุก 1.5 วิ (ใบเดียว 44 ครั้ง)
+    expect(DIALOG).toContain('if (!formDiffersFromJob(st)) return;');
+    expect(DIALOG).toContain('if (silent && !formDiffersFromJob(st)) return;');
+    // ห้ามกลับไปใช้ธง "กำลังเติมค่า" ที่แข่งเวลากับ React
+    expect(DIALOG).not.toContain('hydratingRef');
+    // ค่าตั้งต้นมาจากใบขอตั้งแต่ render แรก + ผู้เรียกใส่ key ต่อใบ
+    expect(DIALOG).toContain('formStateFromJob(job)');
   });
   it('persist แยก silent (auto) กับปุ่ม (ปิดป๊อป)', () => {
     expect(DIALOG).toContain('const persist = async (silent: boolean)');
@@ -29,8 +43,10 @@ describe('ป๊อปแก้ข้อมูลประกาศ — auto-sav
     expect(DIALOG).toContain('void persistRef.current?.(true)');
   });
   it('patch สร้างจากตัวกลางตัวเดียว (spread ของเดิม)', () => {
-    expect(DIALOG).toContain('function buildOverridesPatch');
-    expect(DIALOG).toContain('...existing,');
+    expect(FORM_LIB).toContain('export function buildOverridesPatch');
+    expect(FORM_LIB).toContain('...existing,');
+    expect(DIALOG).toContain("from '@/lib/publicFieldsForm'");
+    expect(DIALOG).not.toContain('function buildOverridesPatch');
   });
   it('มีป้ายสถานะ 3 แบบ', () => {
     expect(DIALOG).toContain("autoStatus === 'saving'");

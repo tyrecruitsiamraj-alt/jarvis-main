@@ -500,6 +500,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
               >
                 <div className="px-4 py-3">
                   <EditPublicJobFieldsDialog
+                    key={jobWithPatch.id}
                     embedded
                     sections={['place']}
                     job={jobWithPatch}
@@ -529,6 +530,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
               >
                 <div className="px-4 py-3">
                   <EditPublicJobFieldsDialog
+                    key={jobWithPatch.id}
                     embedded
                     sections={['income', 'benefits']}
                     job={jobWithPatch}

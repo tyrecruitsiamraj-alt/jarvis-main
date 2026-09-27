@@ -16,7 +16,6 @@ import {
 } from '@/lib/siamrajUnitRequestsApi';
 import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
-import { benefitDisplayLabels } from '@/lib/extraBenefits';
 import {
   mergePickedIntoLines,
   rateLineChoices,
@@ -36,6 +35,7 @@ import {
   type IncomePeriod,
 } from '@/lib/incomeBreakdown';
 import { Checkbox } from '@/components/ui/checkbox';
+import { buildOverridesPatch, formDiffersFromJob, formStateFromJob } from '@/lib/publicFieldsForm';
 import {
   PUBLIC_TOGGLE_FIELDS,
   PUBLIC_FIELD_LABEL,
@@ -50,48 +50,6 @@ import {
   getSubdistrictOptions,
 } from '@/lib/thaiAddressCascade';
 
-/** state ที่ประกอบเป็น patch — แชร์ระหว่างปุ่มบันทึกกับ auto-save (22 ก.ย. 2569) */
-type OverridesFormState = {
-  job: JobRequest;
-  province: string;
-  district: string;
-  subdistrict: string;
-  incomePeriod: IncomePeriod;
-  incomeRows: { label: string; amount: string }[];
-  incomeTotal: string;
-  benefitText: string;
-  visibility: Record<PublicToggleField, boolean>;
-};
-
-/**
- * ประกอบ patch ของ field_overrides จาก state ปัจจุบัน — **จุดเดียวที่สร้าง patch**
- * 🔴 spread ของเดิมก่อนเสมอ (API เขียนทับทั้งก้อน ไม่ merge)
- */
-function buildOverridesPatch(st: OverridesFormState): NonNullable<JobRequest['field_overrides']> {
-  const parsedLines = st.incomeRows
-    .map((r) => ({ label: r.label.trim(), amount: Math.trunc(Number(r.amount)) }))
-    .filter((r) => r.label !== '' && Number.isFinite(r.amount) && r.amount > 0);
-  const hasBreakdown = parsedLines.length > 0;
-  const totalNum = st.incomeTotal.trim() === '' ? null : Math.trunc(Number(st.incomeTotal) || 0);
-  const benefitLines = cleanBenefitLines(st.benefitText.split('\n'));
-  const existing = (st.job.field_overrides ?? {}) as Record<string, unknown>;
-  const visPatch: Partial<Record<PublicToggleField, boolean>> = {};
-  for (const f of PUBLIC_TOGGLE_FIELDS) if (!st.visibility[f]) visPatch[f] = false;
-  return {
-    ...existing,
-    province: st.province.trim() || null,
-    district: st.district.trim() || null,
-    subdistrict: st.subdistrict.trim() || null,
-    total_income: hasBreakdown
-      ? null
-      : st.incomeTotal.trim() === ''
-        ? null
-        : Math.max(0, Math.trunc(Number(st.incomeTotal) || 0)),
-    benefits: benefitLines.length > 0 ? benefitLines : null,
-    income: hasBreakdown ? { period: st.incomePeriod, lines: parsedLines, total: totalNum } : null,
-    public_visibility: Object.keys(visPatch).length > 0 ? visPatch : null,
-  } as NonNullable<JobRequest['field_overrides']>;
-}
 
 /**
  * แก้ข้อมูลที่จะไปโผล่บน **หน้าประกาศสาธารณะ** — เปิดจากการ์ดในกล่องงาน
@@ -124,19 +82,25 @@ const EditPublicJobFieldsDialog: React.FC<{
   /** true = คืนเนื้อฟอร์มเปล่า ๆ ไม่ห่อ Dialog (ฝังในแท็บ "แก้ไข" ของป๊อปอัปการ์ด) */
   embedded?: boolean;
 }> = ({ job, sections, onClose, onSaved, embedded = false }) => {
-  const [province, setProvince] = useState('');
-  const [district, setDistrict] = useState('');
-  const [subdistrict, setSubdistrict] = useState('');
+  /**
+   * 🔴 **ค่าตั้งต้นมาจากใบขอตั้งแต่ render แรก** (แก้ 27 ก.ย. 2569) — เดิมเริ่มจากค่าว่างแล้ว
+   * ค่อยเติมใน useEffect ⇒ มีช่วงที่ฟอร์มถือค่าว่าง/ค่าเริ่ม แล้ว auto-save หยิบช่วงนั้นไปเขียนทับ
+   * ⚠️ ผู้เรียกต้องใส่ `key={job.id}` — เปลี่ยนใบ = สร้างฟอร์มใหม่ (ไม่เติมค่าข้ามใบ)
+   */
+  const [init] = useState(() => (job ? formStateFromJob(job) : null));
+  const [province, setProvince] = useState(init?.province ?? '');
+  const [district, setDistrict] = useState(init?.district ?? '');
+  const [subdistrict, setSubdistrict] = useState(init?.subdistrict ?? '');
   /**
    * รายได้แบบแยกส่วน (เจ้าของสั่ง 20 ส.ค. 2569) — แต่ละแถว: ชื่อรายการ + จำนวนเงิน
    * แถวที่ยังกรอกไม่ครบเก็บเป็น string ไว้ก่อน (แปลง/คัดตอนบันทึกด้วย lib กลาง)
    */
-  const [incomePeriod, setIncomePeriod] = useState<IncomePeriod>('monthly');
-  const [incomeRows, setIncomeRows] = useState<{ label: string; amount: string }[]>([]);
-  /** ยอดรวมที่ใส่เอง — ว่าง = ใช้ผลบวกของรายการ */
-  const [incomeTotal, setIncomeTotal] = useState('');
+  const [incomePeriod, setIncomePeriod] = useState<IncomePeriod>(init?.incomePeriod ?? 'monthly');
+  const [incomeRows, setIncomeRows] = useState<{ label: string; amount: string }[]>(init?.incomeRows ?? []);
+  /** ยอดรวมที่ใส่เอง — ว่าง = ใช้ผลบวกของรายการ (ยังไม่มีรายการ = ใช้เลข ERP) */
+  const [incomeTotal, setIncomeTotal] = useState(init?.incomeTotal ?? '');
   /** สวัสดิการ freetext บรรทัดละรายการ (เจ้าของเคาะ: จำกัด 5 รายการ ไม่งั้นเยอะเกิน) */
-  const [benefitText, setBenefitText] = useState('');
+  const [benefitText, setBenefitText] = useState(init?.benefitText ?? '');
   /**
    * ตารางอัตราตามใบขอ (ERP) — เจ้าของชี้ตารางนี้มาเองให้เอามาทำ checklist
    * ⚠️ ตารางนี้มาจากเส้น "ใบเดียว" (`?id=`) ไม่ได้ติดมากับรายการ จึงต้องดึงตอนเปิดป๊อป
@@ -150,55 +114,28 @@ const EditPublicJobFieldsDialog: React.FC<{
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** หน้าสาธารณะเห็นช่องไหน (22 ก.ย. 2569) — true = โชว์ (ค่าเริ่มทุกช่อง) */
-  const [visibility, setVisibility] = useState<Record<PublicToggleField, boolean>>(() =>
-    readPublicVisibility(null),
+  const [visibility, setVisibility] = useState<Record<PublicToggleField, boolean>>(
+    () => init?.visibility ?? readPublicVisibility(null),
   );
   /** สถานะ auto-save (22 ก.ย. 2569) — idle/saving/saved(+เวลา)/error */
   const [autoStatus, setAutoStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [savedAt, setSavedAt] = useState<string | null>(null);
-  /** true ระหว่าง useEffect เติมค่าเริ่ม — กัน debounce ยิงตอน hydrate */
-  const hydratingRef = React.useRef(false);
   /** ตัวบันทึกล่าสุด (อัปเดตทุก render) — ให้ debounce hook เรียกได้โดยไม่ผูก closure เก่า */
   const persistRef = React.useRef<null | ((silent: boolean) => Promise<void>)>(null);
+  /** นาฬิกา auto-save ที่ค้างอยู่ — `null` = ไม่มีของค้าง (🔴 ต้องคืนเป็น null ทุกครั้งที่ยกเลิก) */
   const autosaveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /**
+   * ดึงตารางอัตราของใบนี้ — เส้น "ใบเดียว" เท่านั้นที่มี `rate_lines`
+   * ⚠️ ล้มไม่เป็นไร (แค่ไม่มีอะไรให้ติ๊ก ยังพิมพ์เองได้) — ห้ามทำให้ป๊อปเปิดไม่ได้
+   * ผูกกับเลขใบ (ไม่ใช่ตัวแปร `job` ที่ถูกสร้างใหม่ทุก render ฝั่งแม่) — ดึงครั้งเดียวต่อใบ
+   */
+  const rateKey = job ? siamrajExternalId(job) : null;
   useEffect(() => {
-    if (!job) return;
-    hydratingRef.current = true;
-    setError(null);
-    setAutoStatus('idle');
-    setSavedAt(null);
-    setVisibility(readPublicVisibility(job.field_overrides?.public_visibility));
-    setProvince(job.override_province ?? '');
-    setDistrict(job.override_district ?? '');
-    setSubdistrict(job.override_subdistrict ?? '');
-    const savedIncome = job.field_overrides?.income;
-    if (savedIncome && savedIncome.lines.length > 0) {
-      setIncomePeriod(savedIncome.period);
-      setIncomeRows(savedIncome.lines.map((l) => ({ label: l.label, amount: String(l.amount) })));
-      setIncomeTotal(savedIncome.total != null ? String(savedIncome.total) : '');
-    } else {
-      setIncomePeriod('monthly');
-      setIncomeRows([]);
-      // ยังไม่เคยตั้งรายการ → ช่องยอดรวมทำหน้าที่เดิม (ทับเลขเดี่ยวบนประกาศ)
-      setIncomeTotal(job.total_income != null ? String(job.total_income) : '');
-    }
-    // ค่าเก่าที่ติ๊กเป็นคีย์ → แปลงเป็นคำอ่านให้แก้ต่อได้ (ห้ามหายเงียบ)
-    setBenefitText(benefitDisplayLabels(job.extra_benefits).join('\n'));
-    setShowRatePicker(false);
-    // เติมค่าเริ่มครบแล้ว — ปลดล็อกให้ debounce ทำงานหลังจากนี้ (รอ 1 tick กัน batch)
-    setTimeout(() => {
-      hydratingRef.current = false;
-    }, 0);
-    /**
-     * ดึงตารางอัตราของใบนี้ — เส้น "ใบเดียว" เท่านั้นที่มี `rate_lines`
-     * ⚠️ ล้มไม่เป็นไร (แค่ไม่มีอะไรให้ติ๊ก ยังพิมพ์เองได้) — ห้ามทำให้ป๊อปเปิดไม่ได้
-     */
-    const id = siamrajExternalId(job);
-    if (!id) return;
+    if (!rateKey) return;
     let cancelled = false;
     setRatesLoading(true);
-    void fetchSiamrajUnitRequest(`siamraj-sql:${id}`)
+    void fetchSiamrajUnitRequest(`siamraj-sql:${rateKey}`)
       .then((full) => {
         if (!cancelled) setRateChoices(rateLineChoices(full.rate_lines));
       })
@@ -211,7 +148,7 @@ const EditPublicJobFieldsDialog: React.FC<{
     return () => {
       cancelled = true;
     };
-  }, [job]);
+  }, [rateKey]);
 
   /**
    * ตัวเลือกที่อยู่แบบไล่ระดับ (เจ้าของสั่ง 17 ส.ค. 2569: *"จังหวัด อำเภอ ตำบล ทำเป็น Dropdown"*)
@@ -222,19 +159,23 @@ const EditPublicJobFieldsDialog: React.FC<{
    */
   /**
    * 🔴 **Auto-save** (เจ้าของเคาะ 22 ก.ย. 2569 — "เซฟดราฟต์เอาไว้เสมอ")
-   * แก้อะไรแล้วรอ 1.5 วิ ค่อยยิงบันทึกเงียบ ๆ · ยิงผ่าน `persistRef` (อัปเดตทุก render
-   * ให้ได้ค่าล่าสุดเสมอ) · ข้ามระหว่าง hydrate ไม่งั้นยิงตั้งแต่เปิดป๊อป
+   * แก้อะไรแล้วรอ 1.5 วิ ค่อยยิงบันทึกเงียบ ๆ · ยิงผ่าน `persistRef` (อัปเดตทุก render)
+   * 🔴 **ยิงเฉพาะตอนฟอร์มต่างจากที่บันทึกไว้จริง** (`formDiffersFromJob` — แก้ 27 ก.ย. 2569)
+   * เปิดดูเฉย ๆ / ฝั่งแม่ render ใหม่ / เพิ่งบันทึกเสร็จ = ฟอร์มเท่ากับใบขอ = ไม่ยิง (วนไม่ได้อีก)
    */
   useEffect(() => {
-    if (!job || hydratingRef.current) return;
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    if (autosaveTimer.current) {
+      clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = null;
+    }
+    if (!job) return;
+    const st = { job, province, district, subdistrict, incomePeriod, incomeRows, incomeTotal, benefitText, visibility };
+    if (!formDiffersFromJob(st)) return;
     autosaveTimer.current = setTimeout(() => {
+      autosaveTimer.current = null;
       void persistRef.current?.(true);
     }, 1500);
-    return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    };
-    // ทุก field ที่ประกอบเป็น patch — เปลี่ยนเมื่อไหร่ตั้งเวลาบันทึกใหม่
+    // ทุก field ที่ประกอบเป็น patch + ใบขอ (ของที่บันทึกไว้) — เปลี่ยนเมื่อไหร่เทียบใหม่
   }, [job, province, district, subdistrict, incomePeriod, incomeRows, incomeTotal, benefitText, visibility]);
 
   /** unmount (เช่นสลับขั้นในป๊อปไล่งาน) ระหว่างมี auto-save ค้าง → flush กันของหาย */
@@ -242,6 +183,7 @@ const EditPublicJobFieldsDialog: React.FC<{
     return () => {
       if (autosaveTimer.current) {
         clearTimeout(autosaveTimer.current);
+        autosaveTimer.current = null;
         void persistRef.current?.(true);
       }
     };
@@ -292,6 +234,9 @@ const EditPublicJobFieldsDialog: React.FC<{
       setError('ใบขอนี้ไม่มีเลขที่ใบขอ — แก้ไม่ได้');
       return;
     }
+    const st = { job, province, district, subdistrict, incomePeriod, incomeRows, incomeTotal, benefitText, visibility };
+    // auto-save ที่ไม่มีอะไรเปลี่ยน = ไม่ยิง (ด่านที่สอง เผื่อมีทางเรียกอื่นหลุดมา)
+    if (silent && !formDiffersFromJob(st)) return;
     if (silent) setAutoStatus('saving');
     else setSaving(true);
     setError(null);
@@ -347,7 +292,7 @@ const EditPublicJobFieldsDialog: React.FC<{
     if (autosaveTimer.current) {
       clearTimeout(autosaveTimer.current);
       autosaveTimer.current = null;
-      if (!hydratingRef.current) void persist(true);
+      void persist(true);
     }
     onClose();
   };
