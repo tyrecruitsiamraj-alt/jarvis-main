@@ -76,7 +76,7 @@ function FootLink({
       title={RELEASE_LANE_TEXT[laneKey].hint}
       className={cn(
         'text-xs transition-colors hover:bg-secondary hover:text-foreground',
-        pill ? 'shrink-0 whitespace-nowrap rounded-full border px-3 py-1' : 'rounded-md px-1 py-0.5',
+        pill ? 'shrink-0 whitespace-nowrap rounded-full border px-3 py-1' : 'rounded-md px-1 py-0.5 sm:text-sm',
         active
           ? cn('bg-primary/10 font-medium text-primary', pill && 'border-primary')
           : cn('text-muted-foreground', pill && TONE.neutral.outline),
@@ -136,7 +136,7 @@ function KpiCard({
           {icon}
         </span>
       </button>
-      <div className="mt-3 hidden flex-wrap items-center gap-x-1 gap-y-1 border-t border-border/70 pt-2 text-xs text-muted-foreground sm:flex">
+      <div className="mt-3 hidden flex-wrap items-center gap-x-1 gap-y-1 border-t border-border/70 pt-2 text-sm text-muted-foreground sm:flex">
         {foot}
       </div>
     </Card>

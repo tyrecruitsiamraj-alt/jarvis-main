@@ -21,6 +21,8 @@ import { isUnitRequestWorkStatus, UNIT_REQUEST_WORK_STATUS_LABELS } from '@/lib/
  *
  * เจ้าของ: *"หน้ากล่องงานไม่เข้ากับหน้าอื่นๆเลย รกมาก"* → เลือกแบบ A จากแบบร่าง
  * ⇒ การ์ดเหลือ 5 บรรทัด: ชื่อหน่วยงาน · ตำแหน่ง · อยู่ขั้นไหน · ที่ไหน/เงินเท่าไหร่ · ผู้สมัคร + ปุ่มทำต่อ
+ * 🔴 ตัวอักษร: เจ้าของสั่งขยาย ("ตัวอักษรในการ์ดยังเล็กไป") ⇒ เนื้อความ text-sm · ชื่อ text-lg · ตำแหน่ง text-base
+ *    (ปุ่มยังเป็น xs ตามคำสั่ง "ปุ่มยังใหญ่ไป" — ห้ามขยายปุ่มตาม)
  * ของที่ย้ายออกจากการ์ด: ป้ายสวัสดิการ · ชิปช่องทาง/คลิก · แถบ % · เลขที่ใบขอ · สาเหตุที่ขอ →
  * ดูได้ในป๊อปไล่งาน (กดการ์ด) · ปุ่ม "หาคนทุกถัง + ให้ AI โทร" ย้ายไปหัวป๊อปไล่งาน
  *
@@ -88,17 +90,17 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 space-y-1">
           <PrequestBadge job={job} />
-          <h2 className="line-clamp-2 text-base font-medium text-foreground group-hover:text-primary">
+          <h2 className="line-clamp-2 text-lg font-medium text-foreground group-hover:text-primary">
             {jobBoardCardTitle(job)}
           </h2>
-          <p className="line-clamp-1 text-sm font-medium text-primary">{publicJobPositionLabel(job)}</p>
+          <p className="line-clamp-1 text-base font-medium text-primary">{publicJobPositionLabel(job)}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {job.urgency === 'urgent' ? (
-            <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">ด่วน</span>
+            <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-sm font-medium text-destructive">ด่วน</span>
           ) : null}
           {/* 🔴 ข้อความ/สีอายุจาก getJobAgeChipInfo ที่เดียว (ห้ามสเกลสีอายุชุดที่สอง) */}
-          <span className={cn('rounded-md border px-1.5 py-0.5 text-xs font-medium', JOB_AGE_CHIP_META[age.level].chipCls)} title={age.title}>
+          <span className={cn('rounded-md border px-1.5 py-0.5 text-sm font-medium', JOB_AGE_CHIP_META[age.level].chipCls)} title={age.title}>
             {age.cardText}
           </span>
         </div>
@@ -106,13 +108,13 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
 
       {/* ── อยู่ขั้นไหน (จุด 4 ขั้น · ไม่มีติ๊กถูก) ── */}
       {progress ? (
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 text-sm">
           <span className="flex items-center gap-1" aria-hidden>
             {RELEASE_STEP_ORDER.map((key, i) => (
               <span
                 key={key}
                 className={cn(
-                  'h-2 w-2 rounded-full',
+                  'h-2.5 w-2.5 rounded-full',
                   i + 1 <= progress.doneSteps
                     ? TONE.success.dot
                     : !progress.released && i + 1 === progress.currentStep
@@ -129,8 +131,8 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
       ) : null}
 
       {/* ── ที่ไหน · เงินเท่าไหร่ ── */}
-      <p className={cn('flex min-w-0 items-center gap-1.5 text-xs', DASH.muted)}>
-        <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      <p className={cn('flex min-w-0 items-center gap-1.5 text-sm', DASH.muted)}>
+        <MapPin className="h-4 w-4 shrink-0" aria-hidden />
         <span className="truncate">{shortPlace(job)}</span>
         {money ? (
           <>
@@ -144,8 +146,8 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
 
       {/* สถานะงานที่ทำให้ประกาศไม่ขึ้นหน้าสาธารณะ — ต้องรู้ (เจ้าของสั่ง 17 ส.ค. 2569) */}
       {hidden && isUnitRequestWorkStatus(job.work_status) ? (
-        <p className={cn('inline-flex w-fit items-center gap-1 rounded-md px-2 py-0.5 text-xs', TONE.warn.chip)}>
-          <EyeOff className="h-3 w-3" aria-hidden />
+        <p className={cn('inline-flex w-fit items-center gap-1 rounded-md px-2 py-0.5 text-sm', TONE.warn.chip)}>
+          <EyeOff className="h-3.5 w-3.5" aria-hidden />
           {UNIT_REQUEST_WORK_STATUS_LABELS[job.work_status]} · ไม่ขึ้นประกาศ
         </p>
       ) : null}
@@ -160,9 +162,9 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
               e.stopPropagation();
               onApplicants(job);
             }}
-            className="inline-flex items-center gap-1.5 rounded-md text-xs font-medium text-foreground hover:text-primary hover:underline"
+            className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-foreground hover:text-primary hover:underline"
           >
-            <Users className="h-3.5 w-3.5" aria-hidden />
+            <Users className="h-4 w-4" aria-hidden />
             ผู้สมัคร {applicants.toLocaleString('th-TH')} คน
             {ai && ai.total > 0 ? (
               <span className={cn('font-normal', ai.sent >= ai.total ? TONE.success.value : TONE.warn.value)}>
@@ -171,8 +173,8 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
             ) : null}
           </button>
         ) : (
-          <span className={cn('inline-flex items-center gap-1.5 text-xs', DASH.muted)}>
-            <Users className="h-3.5 w-3.5" aria-hidden />
+          <span className={cn('inline-flex items-center gap-1.5 text-sm', DASH.muted)}>
+            <Users className="h-4 w-4" aria-hidden />
             ยังไม่มีผู้สมัคร
           </span>
         )}
