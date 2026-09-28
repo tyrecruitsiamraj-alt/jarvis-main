@@ -38,7 +38,7 @@ import {
 } from './applicationRotationSql.js';
 import { toE164Thai } from './thaiPhone.js';
 import { bangkokIso } from './bangkokIso.js';
-import { pushQueuedApplications } from './applicationPushTracking.js';
+import { pushQueuedRows } from './lumosPushTracking.js';
 import { ensureCallScriptsFresh } from './callScriptStore.js';
 import { MATCH_RANK_UNKNOWN, matchRankFromTier } from '../../src/lib/matchRank.js';
 import { buildJobBrief, speakableDate } from './lumosJobBrief.js';
@@ -59,13 +59,8 @@ import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
   shiftOutOfQuietHours,
 } from '../../src/lib/callFollowupPolicy.js';
-import {
-  cancelPushedReminder,
-  getLumosPushConfig,
-  pushInterviews,
-  pushReminders,
-} from './lumosPushClient.js';
-import type { LumosPushInterviewRecord, LumosPushReminderRecord } from './lumosPushClient.js';
+import { cancelPushedReminder, getLumosPushConfig, pushReminders } from './lumosPushClient.js';
+import type { LumosPushReminderRecord } from './lumosPushClient.js';
 import { resolveInterviewAdminPhone } from './interviewAdminPhone.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
@@ -382,10 +377,10 @@ export async function enqueueLumosInterviewForApplications(
   if (opts?.autoPush && added.length > 0 && getLumosPushConfig()) {
     /**
      * 🔴 ยิงแบบจดผลทีละแถว (28 ก.ย. 2569) — **Lumos ไม่มาดึงคิวเองแล้ว** ยิงล้มครั้งเดียวเคยทำใบสมัครค้างถาวร
-     * (OPL6909083 3 ใบ 2–4 วัน) · ล้ม = จด `push_failed` ให้ `applicationPushRetryWorker` ส่งซ้ำทุกนาที
+     * (OPL6909083 3 ใบ 2–4 วัน) · ล้ม = จด `push_failed` ให้ `lumosPushRetryWorker` ส่งซ้ำทุกนาที
      * ไม่รอให้จบก่อนตอบ — ผล enqueue ไม่ได้ขึ้นกับ push (retry ในคำขอใช้เวลาได้ ~17 วิ ไม่ควรให้คนรอ)
      */
-    void pushQueuedApplications(jobId, added);
+    void pushQueuedRows('interview', jobId, added);
   }
   return { queued: added.length, duplicated, skipped };
 }
@@ -746,21 +741,9 @@ export async function enqueueLumosReminderForSelected(
     skipped: skipped.length,
   });
   if (opts?.autoPush && added.length > 0 && getLumosPushConfig()) {
-    const pushPayloads = items
-      .filter((i) => addedSet.has(i.personRef))
-      .map((i) => i.payload as unknown as LumosPushReminderRecord);
-    // ไม่รอ push ให้จบก่อนตอบ — ดูคอมเมนต์เดียวกับเลน application ด้านบน
-    void (async () => {
-      try {
-        await pushReminders(pushPayloads);
-        logInfo('lumos.push.reminder.manual.ok', { jobId: result.jobId, pushed: pushPayloads.length });
-      } catch (e) {
-        logError('lumos.push.reminder.manual failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, {
-          jobId: result.jobId,
-          pushed: pushPayloads.length,
-        });
-      }
-    })();
+    // 🔴 ยิงแบบจดผล (28 ก.ย. 2569 · เจ้าของ: "ถ้าอันไหนให้ส่งก็ส่งไปเลยแล้วก็เข้าคิวโทร") — Lumos ไม่ดึงคิวเองแล้ว
+    // ล้ม = จด push_failed ให้ `lumosPushRetryWorker` ส่งซ้ำ · ไม่รอให้จบก่อนตอบ (เหมือนเลนใบสมัคร)
+    void pushQueuedRows('reminder', result.jobId, added);
   }
   return { queued: added.length, duplicated, skipped };
 }
@@ -827,21 +810,8 @@ export async function enqueueLumosInterviewForSelected(
     skipped: skipped.length,
   });
   if (opts?.autoPush && added.length > 0 && getLumosPushConfig()) {
-    const pushPayloads = items
-      .filter((i) => addedSet.has(i.personRef))
-      .map((i) => i.payload as unknown as LumosPushInterviewRecord);
-    // ไม่รอ push ให้จบก่อนตอบ — ดูคอมเมนต์เดียวกับเลน application ด้านบน
-    void (async () => {
-      try {
-        await pushInterviews(pushPayloads);
-        logInfo('lumos.push.interview.manual.ok', { jobId: result.jobId, pushed: pushPayloads.length });
-      } catch (e) {
-        logError('lumos.push.interview.manual failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, {
-          jobId: result.jobId,
-          pushed: pushPayloads.length,
-        });
-      }
-    })();
+    // 🔴 ยิงแบบจดผล (28 ก.ย. 2569) — เหมือนเลน reminder ด้านบน
+    void pushQueuedRows('interview', result.jobId, added);
   }
   return { queued: added.length, duplicated, skipped };
 }

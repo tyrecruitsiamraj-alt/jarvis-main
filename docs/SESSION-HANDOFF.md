@@ -2513,10 +2513,15 @@ supervisor/staff/opl) ไม่ใช่ทีม · ผู้ใช้จริ
     · วางไว้ใน `scripts/.peekN.mts` แล้ว `rm` ทิ้งหลังใช้
 14. 🔴 **Lumos ไม่มาดึงคิวแล้ว (วัด 28 ก.ย. 2569: `delivery_count` = 0 ทุกแถว) — สายไปถึงเขาทาง push เท่านั้น**
     · push ล้ม = ค้าง `pending` ถาวร และแท็บผู้สมัครนับว่า "อยู่ในคิว AI" ⇒ ไม่มีใครโทร
-    · สายใบสมัคร: จด `push_state` ที่แถวคิว (migration 123 · `applicationPushTracking.ts`) + ตัวส่งซ้ำทุกนาที
-      `applicationPushRetryWorker.ts` (ไม่ยิงช่วงห้ามโทร · เกิน 24 ชม. ปิดฝั่ง AI + `needs_human`)
-    · **เส้นใหม่ที่ส่งใบสมัครเข้าคิวต้อง `{ autoPush: true }`** (เทสต์ `applicationPushTracking` คุม) ·
-      ⚠️ เลน Match (`card-`/`ir-`) ยังเป็น push ครั้งเดียวไม่มีตัวส่งซ้ำ
+    · ใบสมัคร (`app-`) + เลน Match ที่เจ้าหน้าที่กดส่ง (`card-`/`ir-`): จด `push_state` ที่แถวคิว (migration 123 ·
+      `lumosPushTracking.ts`) + ตัวส่งซ้ำทุกนาที `lumosPushRetryWorker.ts` (เคารพช่วงห้ามโทรของนโยบาย ·
+      เกิน 24 ชม. ปิดฝั่ง AI + `needs_human`) · งานติดตามใช้ `followPushRetryWorker` ของตัวเอง
+    · **เส้นใหม่ที่ส่งใบสมัครเข้าคิวต้อง `{ autoPush: true }`** (เทสต์ `lumosPushTracking` คุม)
+    · ⚠️ **เส้นที่ยังพึ่ง Lumos ดึงคิว (ตายแล้ว) — ยังไม่ได้แก้ รอเจ้าของเคาะ**: ปล่อยชุดโทรที่อนุมัติแล้ว
+      (`releaseDueCallBatches` ถูกเรียกแค่ในเส้นดึงคิว) · ส่งอัตโนมัติจากผลแมท (`enqueueLumosReminderForBoardMatch` ·
+      `enqueueLumosInterviewForIrecruit`) · เลนสรรหา (`enqueueLumosInterviewForRecruitLane`) · recall — เข้าคิวแล้วไม่ถึง Lumos
+15. 🔴 **ช่วงห้ามโทร = เจ้าของยกเลิกทั้งระบบ 28 ก.ย. 2569** (migration 125 · from = to) — ทุกเส้นอ่านจาก
+    `getCallFollowupPolicy()` ห้าม hard-code · คนกรอกใบสมัครกลางคืน "โทรทันทีเหมือนเดิม" (เจ้าของเลือกเอง)
 
 ### กับดักตอน "ตรวจงาน" (สะสม)
 

@@ -9997,10 +9997,11 @@ B ตาราง · C กระดานตามขั้น) → เลือ
 - BU สองชุดรหัส (แผนก LM ↔ ไซต์ LML) ต้องแปลงเป็นชุดเดียวก่อนรวม — หน้าแรกใช้ **รหัสจากไซต์** (ชุดของตัวกรอง BU)
 - ⚠️ `home-kpis` กรอง BU ของงานติดตามด้วยแผนกคนคีย์ (LM) เทียบกับตัวเลือกที่เป็นรหัสไซต์ (LML) — BU ที่รหัสไม่ตรงกันจะหลุด (ยังไม่ได้แก้ · ไม่อยู่ในรอบนี้)
 
-## 28 ก.ย. 2569 (ค่ำ) — สายใบสมัครที่ส่งไม่ถึง Lumos: จดผลการส่ง + ตัวส่งซ้ำ + กู้ 3 ใบ
+## 28 ก.ย. 2569 (ค่ำ) — สายที่ส่งไม่ถึง Lumos: จดผลการส่ง + ตัวส่งซ้ำ + กู้ 3 ใบ + ยกเลิกช่วงห้ามโทร
 
 เจ้าของ: *"ไล่หาสาเหตุ 3 ใบที่ค้างต่อเลย"* → ไล่แบบอ่านอย่างเดียว → Choice: **ส่ง 3 ใบให้ Lumos โทร 29 ก.ย. 09:00** ·
-**ตัวส่งซ้ำแบบงานติดตาม** (ไม่ส่งช่วง 20:00–08:00 · เกิน 24 ชม. เลิกส่ง AI แล้วขึ้นให้เจ้าหน้าที่ · ปุ่ม "🤖 ส่งให้ AI โทร" ต้องส่งจริง)
+**ตัวส่งซ้ำแบบงานติดตาม** (เกิน 24 ชม. เลิกส่ง AI แล้วขึ้นให้เจ้าหน้าที่ · ปุ่ม "🤖 ส่งให้ AI โทร" ต้องส่งจริง) ·
+คนกรอกกลางคืน **"โทรทันทีเหมือนเดิม"** · **"ยกเลิกช่วงห้ามโทรทั้งระบบ"** · เลน Match: *"ถ้าอันไหนให้ส่งก็ส่งไปเลยแล้วก็เข้าคิวโทร"*
 
 ต้นเหตุ (วัดจริง): Lumos **ไม่ดึงคิวเราเลย** (`delivery_count` 0 · `first_delivered_at` null ทุกแถว ~700) · ใบสมัคร push ครั้งเดียว
 (retry ในคำขอ ~17.5 วิ · ไม่ retry เมื่อได้ 4xx/5xx) แล้วแค่ log · งานติดตามมีตัวส่งซ้ำตั้งแต่ 11 ก.ย. ใบสมัครไม่มี ·
@@ -10010,19 +10011,21 @@ B ตาราง · C กระดานตามขั้น) → เลือ
 | --- | --- |
 | `migrations/123_lumos_push_tracking.sql` | **ใหม่** — คอลัมน์ `push_state` (push_pending/pushed/push_failed/push_skipped/push_gave_up · แถวเก่า NULL) · `push_attempts` · `push_started_at` · `pushed_at` · `push_failed_at` · `push_error` · ไม่มี CHECK |
 | `migrations/124_rescue_application_push_2569_09_28.sql` | **ใหม่** — 3 id นี้เท่านั้น (ยังค้างจริง) → `push_failed` + `next_attempt_at` 29 ก.ย. 09:00 เวลาไทย |
-| `api/_lib/applicationPushTracking.ts` | **ใหม่** — ยิงทีละแถว `Idempotency-Key = interview-<id คิว>` · จด กำลังส่ง/ถึง/ไม่ถึง · ยังไม่ migrate = ยิงเหมือนเดิมไม่จด |
-| `api/_lib/applicationPushRetryWorker.ts` | **ใหม่** — ทุกนาที · หยิบ `push_failed` / `push_pending` ค้าง >10 นาที · เช็คซ้ำก่อนยิง (รับไปแล้ว/บันทึกติดต่อ/Lead/เบอร์พัก/เบอร์มีคนถือ ⇒ ปิดฝั่ง AI `push_skipped`) · อ่านรายการพักเบอร์ไม่ได้ = รอบนี้ไม่ยิง · เลิก = `cancelled` + `followup_state = 'needs_human'` · ปิดด้วย `APPLICATION_PUSH_RETRY_ENABLED=false` · ไม่มีคีย์ push = ไม่ทำอะไร |
-| `src/lib/applicationPushRetryPolicy.ts` | **ใหม่** — ตัดสิน ยิง/รอ/เลิก (เพดานนับจาก `next_attempt_at` → เวลาเข้าคิว) · ช่วงห้ามโทรจากนโยบายกลาง · ยิงล่วงหน้าได้ 60 นาที · นัดโทร = ช้าสุดของนัดเดิม/อีก 10 นาที แล้วเลื่อนพ้นช่วงห้าม |
+| `migrations/125_remove_call_quiet_hours_2569_09_28.sql` | **ใหม่** — `app_call_followup_policy` แถว default: quietFromHour = quietToHour = 0 (ค่าอื่นคงเดิม) |
+| `api/_lib/lumosPushTracking.ts` | **ใหม่** — `pushQueuedRows(ช่อง, ใบขอ, คน)` รอบแรก · `pushQueueRowsTracked` ยิงทีละแถว `Idempotency-Key = <ช่อง>-<id คิว>` (interview → `pushInterviews` · reminder → `pushReminders`) · จด กำลังส่ง/ถึง/ไม่ถึง · 202 แต่ accepted 0 = ไม่ถึง · ยังไม่ migrate = ยิงเหมือนเดิมไม่จด |
+| `api/_lib/lumosPushRetryWorker.ts` | **ใหม่** — ทุกนาที · `app-`/`ir-` (interview) + `card-` (reminder) · ไม่แตะงานติดตาม · หยิบ `push_failed` / `push_pending` ค้าง >10 นาที · เช็คซ้ำก่อนยิง (เบอร์พัก/เบอร์มีคนถือ · ใบสมัคร: รับไปแล้ว/บันทึกติดต่อ/Lead ⇒ ปิดฝั่ง AI `push_skipped`) · อ่านรายการพักเบอร์ไม่ได้ = รอบนี้ไม่ยิง · เลิก = `cancelled` + `followup_state = 'needs_human'` · `withScheduledAt` เลื่อนเวลา (reminder = ใน `steps`) · ปิดด้วย `LUMOS_PUSH_RETRY_ENABLED=false` |
+| `src/lib/lumosPushRetryPolicy.ts` | **ใหม่** — ตัดสิน ยิง/รอ/เลิก (เพดานนับจาก `next_attempt_at` → เวลาเข้าคิว) · ช่วงห้ามโทรจากนโยบายกลาง (ยกเลิกแล้ว = ยิงได้ทุกเวลา) · ยิงล่วงหน้าได้ 60 นาที · นัดโทร = ช้าสุดของนัดเดิม/อีก 10 นาที |
 | `api/_lib/bangkokIso.ts` | **ใหม่** — ย้าย `bangkokIso` ออกจาก `lumosDispatch` (ส่งออกชื่อเดิมต่อ) กัน import วน |
-| `api/_lib/lumosDispatch.ts` | เลนใบสมัคร (`enqueueLumosInterviewForApplications`) ยิงด้วย `pushQueuedApplications` แทน push ครั้งเดียว |
+| `api/_lib/lumosDispatch.ts` | ใบสมัคร + `enqueueLumosReminderForSelected` + `enqueueLumosInterviewForSelected` ยิงด้วย `pushQueuedRows` แทน push ครั้งเดียว |
 | `api/_handlers/application-dispatch.ts` | ปุ่ม "🤖 ส่งให้ AI โทร" ส่ง `{ autoPush: true }` (เดิมแค่เข้าคิว = ค้างถาวรทุกครั้งที่กด) |
-| `server/local-api.ts` | `startApplicationPushRetryWorker()` ถัดจากตัวส่งซ้ำงานติดตาม |
+| `server/local-api.ts` | `startLumosPushRetryWorker()` ถัดจากตัวส่งซ้ำงานติดตาม |
 | `LumosPipelineSection.tsx` | "ค้างนานสุด" โชว์เฉพาะ ≥ 1 ชม. (นัดส่งซ้ำไว้ข้างหน้า = ไม่ใช่งานค้าง) |
-| tests | `applicationPushRetryPolicy.test.ts` (10) · `applicationPushRetryWorker.test.ts` (13) · `applicationPushTracking.test.ts` (9 · รวมด่านทุกเส้นต้อง autoPush) |
+| tests | `lumosPushRetryPolicy.test.ts` (12) · `lumosPushRetryWorker.test.ts` (18) · `lumosPushTracking.test.ts` (13 · ทุกเส้นใบสมัครต้อง autoPush · เลน Match ยิงแบบจดผล · migration 124/125) |
 
 🔴 กับดัก:
 - ในโหมด push แถวที่**ส่งถึงแล้ว**ก็ยัง `pending` จนผลกลับ — ห้ามใช้ `pending` แทน "ส่งไม่ถึง" (ต้องดู `push_state`)
 - แอปรันก่อน migration ทุก deploy (`docker compose up` แล้วค่อย `db:migrate`) ⇒ โค้ดใหม่ต้องทน 42703 เสมอ
-- ⚠️ **ยิงรอบแรกไม่แตะเวลานัด** (พฤติกรรมเดิม) — วัดจริง: สมัคร 02:14 โดน Lumos โทร 02:17 · 23:45 → 23:48 ·
-  ขัดกติกาห้ามโทร 20:00–08:00 **ยังไม่ได้แก้ รอเจ้าของเคาะ** (ตัวส่งซ้ำไม่มีปัญหานี้)
-- เลน Match (`card-`/`ir-`) push ครั้งเดียวเหมือนเดิม ยังไม่มีตัวส่งซ้ำ
+- วัดหลัง deploy `97a044c`: ใบสมัครใหม่ 20:43 / 20:54 จด `pushed` ภายใน 1–2 วิ และได้ผลโทรกลับทั้งคู่ (Lumos รับหัว Idempotency-Key ของ interview)
+- ⚠️ **เส้นที่ยังพึ่ง Lumos ดึงคิว (ตายแล้ว) ยังไม่ได้แก้ — รอเจ้าของเคาะ**: ปล่อยชุดโทรที่อนุมัติ (`releaseDueCallBatches` เรียกแค่ในเส้นดึงคิว) ·
+  ส่งอัตโนมัติจากผลแมท (`enqueueLumosReminderForBoardMatch` · `enqueueLumosInterviewForIrecruit`) · เลนสรรหา · recall
+  — เป็นเส้นที่มีโหมด manual/assist/auto คุม ห้ามเปิด push เองโดยไม่ถาม (อาจข้ามขั้นอนุมัติ)
