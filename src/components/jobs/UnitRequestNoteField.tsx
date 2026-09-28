@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import { cn } from '@/lib/utils';
+import { TONE } from '@/lib/designTokens';
 import {
   fetchUnitNoteHistory,
   saveUnitRequestNote,
@@ -15,23 +16,66 @@ type BaseProps = {
   onSaved?: (note: string) => void;
 };
 
+/**
+ * ═══ ร่างหมายเหตุที่ยังไม่กดบันทึก — จำไว้ **ในเครื่องนี้** เท่านั้น ═══
+ *
+ * เจ้าของสั่ง 28 ก.ย. 2569: *"หมายเหตุเวลากรอกมันบันทึก Auto อะยังพิมพ์ไม่เสร็จเลย เอาเป็นพิมพ์เสร็จแล้ว
+ * กดบันทึกเองดีกว่า"* → Choice "จำร่างไว้ในเครื่อง" (ข้อ "เซฟดราฟต์เอาไว้เสมอ" 22 ก.ย. ยังอยู่ — แค่ไม่ขึ้นฐานเอง)
+ * ⇒ **ขึ้นฐานเฉพาะตอนกดปุ่ม "บันทึกหมายเหตุ"** · ปิดป๊อป/สลับขั้นกลางคัน = ข้อความยังอยู่เมื่อเปิดใบเดิมอีกครั้ง
+ * ⚠️ เก็บใน localStorage ต่อเครื่องต่อใบ — คนอื่น/เครื่องอื่นไม่เห็นร่าง · เครื่องไม่ให้เก็บ = ใช้ต่อได้แค่ไม่จำร่าง
+ */
+const DRAFT_PREFIX = 'jarvis:unit-note-draft:';
+
+function readDraft(key: string): string | null {
+  if (!key.trim()) return null;
+  try {
+    return window.localStorage.getItem(DRAFT_PREFIX + key.trim());
+  } catch {
+    return null;
+  }
+}
+
+/** `null` = ไม่มีร่างค้าง (ลบทิ้ง) */
+function writeDraft(key: string, text: string | null): void {
+  if (!key.trim()) return;
+  try {
+    if (text === null) window.localStorage.removeItem(DRAFT_PREFIX + key.trim());
+    else window.localStorage.setItem(DRAFT_PREFIX + key.trim(), text);
+  } catch {
+    /* เครื่องไม่ให้เก็บ (โหมดส่วนตัว ฯลฯ) — ช่องใช้ต่อได้ แค่ไม่จำร่าง */
+  }
+}
+
+/** ค่าที่ช่องควรโชว์ตอนเปิด: มีร่างค้างที่ต่างจากที่บันทึกไว้ = ร่าง · ไม่งั้น = ที่บันทึกไว้ */
+function openingValue(key: string, saved: string, readOnly: boolean): string {
+  if (readOnly) return saved;
+  const draft = readDraft(key);
+  return draft !== null && draft.trim() !== saved.trim() ? draft : saved;
+}
+
 const UnitRequestNoteEditor: React.FC<BaseProps> = ({
   requestKey,
   initialNote = '',
   readOnly = false,
   onSaved,
 }) => {
-  const [value, setValue] = useState(initialNote);
+  const [value, setValue] = useState(() => openingValue(requestKey, initialNote, readOnly));
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const lastSaved = useRef(initialNote);
+  /** ข้อความล่าสุดในช่อง — กดบันทึกแล้วยังพิมพ์ต่อระหว่างรอ ร่างส่วนที่พิมพ์เพิ่มต้องไม่หาย */
+  const latestValue = useRef(value);
 
   useEffect(() => {
-    setValue(initialNote);
+    const next = openingValue(requestKey, initialNote, readOnly);
+    // ร่างที่เท่ากับของที่บันทึกแล้ว = ไม่ใช่ร่างค้าง → ลบทิ้ง
+    if (next === initialNote) writeDraft(requestKey, null);
+    setValue(next);
+    latestValue.current = next;
     lastSaved.current = initialNote;
-  }, [initialNote, requestKey]);
+  }, [initialNote, requestKey, readOnly]);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +102,9 @@ const UnitRequestNoteEditor: React.FC<BaseProps> = ({
     try {
       await saveUnitRequestNote(requestKey.trim(), trimmed);
       lastSaved.current = trimmed;
+      // บันทึกแล้ว = ไม่มีร่างค้าง · ยกเว้นพิมพ์เพิ่มระหว่างรอ — ส่วนนั้นยังเป็นร่างอยู่
+      const current = latestValue.current;
+      writeDraft(requestKey, current.trim() === trimmed ? null : current);
       onSaved?.(trimmed);
       setSavedMsg('บันทึกหมายเหตุแล้ว');
       const items = await fetchUnitNoteHistory();
@@ -69,38 +116,33 @@ const UnitRequestNoteEditor: React.FC<BaseProps> = ({
     }
   }, [onSaved, readOnly, requestKey, saving, value]);
 
-  // ให้ตัว flush ตอน unmount เรียก persist ล่าสุดได้เสมอ (closure ใหม่ทุก render)
-  const persistRef = useRef(persist);
-  persistRef.current = persist;
+  /** กลับไปเป็นหมายเหตุที่บันทึกไว้ + ทิ้งร่างในเครื่อง */
+  const discardDraft = () => {
+    setValue(lastSaved.current);
+    latestValue.current = lastSaved.current;
+    writeDraft(requestKey, null);
+    setError(null);
+  };
 
-  /**
-   * 🔴 **Auto-save หมายเหตุ** (เจ้าของเคาะ 22 ก.ย. 2569 — "เซฟดราฟต์เอาไว้เสมอ")
-   * หยุดพิมพ์ 1.5 วิ ค่อยยิงบันทึก · กันหายตอนปิด/สลับขั้น (flush ตอน unmount)
+  /*
+   * 🔴 ไม่มี auto-save แล้ว (28 ก.ย. 2569) — เดิมหยุดพิมพ์ 1.5 วิ ยิงบันทึกเอง + ปิดป๊อปแล้ว flush
+   * (22 ก.ย.) และระหว่างบันทึกช่องถูกล็อก ⇒ เจ้าของพิมพ์ยังไม่จบก็โดนบันทึก/พิมพ์ต่อไม่ได้
+   * ⇒ ห้ามเอา timer/flush กลับ — ของค้างเก็บเป็นร่างในเครื่องแทน (มีเทสต์คุม `boardAutoSave`)
    */
-  useEffect(() => {
-    if (readOnly || !dirty) return;
-    const t = setTimeout(() => void persistRef.current(), 1500);
-    return () => clearTimeout(t);
-  }, [value, dirty, readOnly]);
-
-  useEffect(() => {
-    return () => {
-      // ปิด/สลับขั้นระหว่างมีของยังไม่เซฟ → flush (persist มี guard ไม่ยิงซ้ำถ้าไม่ dirty)
-      void persistRef.current();
-    };
-  }, []);
-
   return (
     <div className="space-y-2">
       <textarea
         value={value}
         placeholder={readOnly ? '—' : 'พิมพ์หมายเหตุ…'}
-        disabled={saving || readOnly}
+        disabled={readOnly}
         readOnly={readOnly}
         rows={4}
         onChange={(e) => {
-          setValue(e.target.value);
+          const next = e.target.value;
+          setValue(next);
+          latestValue.current = next;
           setSavedMsg(null);
+          writeDraft(requestKey, next.trim() === lastSaved.current.trim() ? null : next);
         }}
         className={cn(
           'jarvis-soft-field w-full text-sm min-h-[96px] resize-y',
@@ -110,7 +152,7 @@ const UnitRequestNoteEditor: React.FC<BaseProps> = ({
         aria-label="หมายเหตุใบขอ"
       />
       {suggestions.length > 0 ? (
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           หมายเหตุที่เคยใช้: {suggestions.slice(0, 5).join(' · ')}
         </p>
       ) : null}
@@ -124,7 +166,16 @@ const UnitRequestNoteEditor: React.FC<BaseProps> = ({
           >
             {saving ? 'กำลังบันทึก…' : 'บันทึกหมายเหตุ'}
           </Button>
-          {savedMsg ? <span className="text-xs text-muted-foreground">{savedMsg}</span> : null}
+          {/* มีที่พิมพ์ค้าง = บอกให้รู้ว่ายังไม่ขึ้นระบบ (เปิดใบเดิมอีกครั้งร่างยังอยู่) · ยกเลิก = กลับเป็นที่บันทึกไว้ */}
+          {dirty && !saving ? (
+            <>
+              <span className={cn('text-xs font-medium', TONE.warn.value)}>ยังไม่ได้บันทึก</span>
+              <Button type="button" variant="ghost" size="xs" onClick={discardDraft}>
+                ยกเลิกที่แก้
+              </Button>
+            </>
+          ) : null}
+          {savedMsg && !dirty ? <span className="text-xs text-muted-foreground">{savedMsg}</span> : null}
           {error ? <span className="text-xs text-destructive">{error}</span> : null}
         </div>
       ) : (

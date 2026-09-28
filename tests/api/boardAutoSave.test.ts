@@ -1,7 +1,9 @@
 // @vitest-environment node
 /**
- * 🔴 Auto-save ป๊อปแก้ข้อมูลประกาศ + ช่องหมายเหตุ (เจ้าของเคาะ 22 ก.ย. 2569:
- * "เซฟดราฟต์เอาไว้เสมอ") · pin โครงไว้กันย้อนกลับเป็นบันทึกมือล้วน
+ * 🔴 Auto-save ป๊อปแก้ข้อมูลประกาศ (เจ้าของเคาะ 22 ก.ย. 2569: "เซฟดราฟต์เอาไว้เสมอ")
+ * · pin โครงไว้กันย้อนกลับเป็นบันทึกมือล้วน
+ * ⚠️ **ช่องหมายเหตุไม่ใช่ auto-save แล้ว** (28 ก.ย. 2569: *"หมายเหตุเวลากรอกมันบันทึก Auto อะยังพิมพ์ไม่เสร็จเลย
+ * เอาเป็นพิมพ์เสร็จแล้วกดบันทึกเองดีกว่า"* → Choice "จำร่างไว้ในเครื่อง") — ดู describe ท้ายไฟล์
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -55,12 +57,28 @@ describe('ป๊อปแก้ข้อมูลประกาศ — auto-sav
   });
 });
 
-describe('ช่องหมายเหตุ — auto-save', () => {
-  it('debounce 1500ms + flush ตอน unmount', () => {
-    expect(NOTE).toContain('1500');
-    expect(NOTE).toContain('persistRef');
-    // มี effect คืน cleanup ที่เรียก persist ตอน unmount
-    expect(NOTE).toMatch(/return\s*\(\)\s*=>\s*\{\s*\/\/[^\n]*\n\s*void persistRef\.current\(\)/);
+describe('ช่องหมายเหตุ — กดบันทึกเอง + จำร่างไว้ในเครื่อง (28 ก.ย. 2569)', () => {
+  /** ตัดคอมเมนต์ก่อน — ไฟล์เล่าประวัติ auto-save เดิมไว้ด้วยคำพวกนี้โดยตั้งใจ */
+  const code = NOTE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+  it('ไม่มีตัวจับเวลาบันทึกเองระหว่างพิมพ์ และไม่ flush ตอนปิด/สลับขั้น', () => {
+    expect(code).not.toMatch(/setTimeout\(/);
+    expect(code).not.toContain('1500');
+    expect(code).not.toContain('persistRef');
+  });
+  it('ขึ้นฐานเฉพาะตอนกดปุ่ม "บันทึกหมายเหตุ"', () => {
+    expect(code).toContain('onClick={() => void persist()}');
+    expect(code.match(/persist\(\)/g)?.length).toBe(1);
+  });
+  it('พิมพ์ต่อได้ระหว่างกำลังบันทึก (ช่องไม่ล็อกตาม saving)', () => {
+    expect(code).toContain('disabled={readOnly}');
+    expect(code).not.toMatch(/disabled=\{saving \|\| readOnly\}/);
+  });
+  it('ร่างที่ยังไม่บันทึกจำไว้ในเครื่อง (localStorage ต่อใบ) · บันทึกแล้ว/ยกเลิก = ลบร่าง', () => {
+    expect(code).toContain("const DRAFT_PREFIX = 'jarvis:unit-note-draft:'");
+    expect(code).toContain('window.localStorage.setItem(DRAFT_PREFIX');
+    expect(code).toContain('writeDraft(requestKey, null)');
+    expect(code).toContain('ยังไม่ได้บันทึก');
   });
   it('ยังกัน persist ซ้ำเมื่อไม่ dirty (มี guard lastSaved)', () => {
     expect(NOTE).toContain("if (trimmed === lastSaved.current.trim()) return;");
