@@ -667,11 +667,12 @@ const RmWorkspace: React.FC<{
           ถ้าให้กรองซ้ำที่นี่ เลขจะไม่ตรงกับกล่องที่กดมา */}
       {/* 🔴 **แถบกรองด้านซ้ายแบบ iRecruit** (เจ้าของสั่ง 28 ก.ย. 2569: *"หน้าอื่นๆพวก รายชื่อผู้สมัคร
           การโทรของฉัน ฯลฯ ทำแบบ Irecruit เลย"* → Choice "แถบกรองซ้ายตามแบบร่างที่เคาะไว้")
-          · จอ lg ขึ้นไป = แถบซ้าย (`FilterSidebar`) · จอเล็ก = ปุ่ม "ตัวกรอง (N)" เปิดแผง (แถวนี้)
+          · จอ xl (1280px) ขึ้นไป = แถบซ้าย (`FilterSidebar`) · จอเล็กกว่า = ปุ่ม "ตัวกรอง (N)" เปิดแผง (แถวนี้)
+          · ⚠️ ไม่ใช่ lg — จอ 1024–1279 มีแถบซ้ายแล้วตารางไม่พอดีช่อง (เจ้าของสั่ง "ย่อคอลัมน์ตารางให้พอดีจอ")
           · แท็บกล่องงานยังเป็นปุ่มเดียว (แบบ A) — เจ้าของ: "หน้ากล่องงาน … เป็นช่องๆแบบเดิม"
           · วันที่สมัครเป็นหัวข้อหนึ่งในแถบ · โหมด drill-down (?bucket=) ไม่มีแถบกรอง (เลขต้องเท่ากล่องที่กดมา) */}
       {!bucket ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2 lg:hidden">
+        <div className="mt-3 flex flex-wrap items-center gap-2 xl:hidden">
           <FilterSheetButton
             facets={applicantFacets}
             primary={APPLICANT_PRIMARY_FACETS}
@@ -694,7 +695,7 @@ const RmWorkspace: React.FC<{
         </div>
       ) : null}
       {/* แถบ "กำลังดู: … — N คนข้างล่าง" ถูกถอด 27 ก.ย. 2569 (Clean — ไม่มีประโยคอธิบาย) */}
-      <div className={cn('mt-4', !bucket && 'lg:flex lg:items-start lg:gap-4')}>
+      <div className={cn('mt-4', !bucket && 'xl:flex xl:items-start xl:gap-4')}>
         {!bucket ? (
           <FilterSidebar
             facets={applicantFacets}

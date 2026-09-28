@@ -84,12 +84,17 @@ const RmTable: React.FC<{
 
   return (
     <div className={cn('overflow-hidden rounded-xl border', DASH.card)}>
-      {/* ตารางกว้างกว่าจอเล็กเป็นปกติ — เลื่อนในกล่องของตัวเอง ไม่ให้ทั้งหน้าเลื่อน */}
+      {/* 🔴 **ตารางต้องพอดีช่องข้างแถบกรองซ้าย** (เจ้าของสั่ง 28 ก.ย. 2569: "ย่อคอลัมน์ตารางให้พอดีจอเลย")
+          เดิม min-w 62rem + หน่วยงานกว้างคงที่ 20rem ⇒ กว้าง ~1,434px ที่จอ 1280 ต้องเลื่อนขวาหาปุ่ม "ตัวเลือก"
+          ⇒ คอลัมน์ที่เป็นคู่กันรวมเป็นช่องเดียวสองบรรทัด — **ข้อมูลครบชุดเดิมที่เจ้าของสั่ง 17 ส.ค. 2569**
+          (ชื่อ · นามสกุล · เบอร์โทร · อายุ · เพศ · ที่อยู่ · หน่วยงาน · ช่องทาง · วันที่สมัคร · ผ่านมาแล้วกี่วัน)
+          ห้ามถอดข้อมูลตัวไหนออกเพื่อให้แคบลง · ที่อยู่/หน่วยงานตัดด้วย … แต่ชี้แล้วเห็นเต็ม (title)
+          จอเล็ก (ไม่มีแถบซ้าย) ยังเลื่อนในกล่องของตัวเองได้ ไม่ให้ทั้งหน้าเลื่อน */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[62rem] text-left text-sm">
-          <thead className={cn('text-[11px] uppercase', DASH.tableHead)}>
+        <table className="w-full text-left text-sm">
+          <thead className={cn('text-xs', DASH.tableHead)}>
             <tr>
-              <th className="w-10 px-3 py-2">
+              <th className="w-8 px-2 py-2">
                 <input
                   type="checkbox"
                   checked={allChecked}
@@ -98,50 +103,36 @@ const RmTable: React.FC<{
                   className="h-3.5 w-3.5 cursor-pointer accent-sky-600"
                 />
               </th>
-              <th className="px-3 py-2 font-medium">ชื่อ</th>
-              <th className="px-3 py-2 font-medium">นามสกุล</th>
-              <th className="px-3 py-2 font-medium">เบอร์โทร</th>
-              {/* ชุดคอลัมน์ที่เจ้าของสั่งไว้ 17 ส.ค. 2569:
-                  ชื่อ · นามสกุล · เบอร์โทร · อายุ · เพศ · ที่อยู่ · หน่วยงาน · ช่องทาง ·
-                  วันที่สมัคร · ผ่านมาแล้วกี่วัน (คอลัมน์ "สถานะ" ถูกถอดออกตามลิสต์) */}
-              <th className="px-3 py-2 text-right font-medium">อายุ</th>
-              <th className="px-3 py-2 font-medium">เพศ</th>
-              <th className="px-3 py-2 font-medium">ที่อยู่</th>
-              {/* กว้างคงที่ — ชื่อหน่วยงานยาวมาก ถ้าปล่อยให้ auto-layout จัดเอง
-                  แถวนั้นจะสูง 2–3 บรรทัดขณะที่แถวข้าง ๆ สูงบรรทัดเดียว */}
-              <th className="w-[20rem] px-3 py-2 font-medium">หน่วยงาน</th>
-              <th className="px-3 py-2 font-medium">ช่องทาง</th>
-              <th className="px-3 py-2 font-medium">วันที่สมัคร</th>
-              <th className="px-3 py-2 text-right font-medium">ผ่านมาแล้ว</th>
+              <th className="px-2 py-2 font-medium">ผู้สมัคร</th>
+              <th className="px-2 py-2 font-medium">ที่อยู่</th>
+              <th className="px-2 py-2 font-medium">หน่วยงาน</th>
+              <th className="px-2 py-2 font-medium">สมัคร</th>
               {/* วันนัดโผล่เฉพาะแท็บติดตามนัดหมาย — แท็บอื่นไม่มีใครถามคำถามนี้
-                  (คอลัมน์ที่ว่างทั้งแถวทุกแท็บทำให้ตารางกว้างขึ้นโดยไม่ได้อะไร) */}
-              {tab === 'appointments' ? (
-                <>
-                  <th className="px-3 py-2 font-medium">วันนัด</th>
-                  {/* "นัดที่ไหน + ลงใบไหน" (ลิสต์ข้อ 9) — มีเฉพาะนัดจากบันทึกผลติดต่อ */}
-                  <th className="px-3 py-2 font-medium">นัดที่ไหน</th>
-                  {/* ผลติดตามนัด มา/ไม่มา (migration 089) — ปุ่มโผล่ตั้งแต่วันนัดเป็นต้นไป */}
-                  <th className="px-3 py-2 font-medium">มาตามนัด</th>
-                </>
-              ) : null}
+                  (คอลัมน์ที่ว่างทั้งแถวทุกแท็บทำให้ตารางกว้างขึ้นโดยไม่ได้อะไร)
+                  "นัด" = วันนัด + นัดที่ไหน/ลงใบไหน (ลิสต์ข้อ 9) ในช่องเดียว */}
+              {/* ผลติดตามนัด มา/ไม่มา (migration 089) อยู่บรรทัดล่างของช่องเดียวกัน — เดิมเป็นคอลัมน์แยก
+                  (แท็บนี้กว้างเกินช่องข้างแถบกรอง ~180px ที่จอ 1280 · 28 ก.ย. 2569) */}
+              {tab === 'appointments' ? <th className="px-2 py-2 font-medium">นัด · มาตามนัด</th> : null}
               {/* stamp "โทรตอนไหน" — เฉพาะแท็บการติดต่อ (เจ้าของสั่ง 14 ส.ค. 2569:
                   "ปุ่มโทร เพื่อ Stamp ว่าโทรตอนไหน") · กดปุ่มโทร = จับ hold (heldAt =
                   เวลาที่กด) · มีผลแล้ว = last_call_at (เวลาบันทึกผลล่าสุด) */}
               {tab === 'contact' ? (
-                <th className="px-3 py-2 font-medium">โทรล่าสุด</th>
+                <th className="px-2 py-2 font-medium">โทรล่าสุด</th>
               ) : null}
-              <th className="px-3 py-2 text-right font-medium">ตัวเลือก</th>
+              <th className="px-2 py-2 text-right font-medium">ตัวเลือก</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => {
               const checked = selectedIds.includes(r.id);
               const { firstName, lastName } = splitApplicantName(r);
+              const name = [firstName, lastName].map((s) => (s || '').trim()).filter(Boolean).join(' ');
+              const address = applicationAddressLabel(r);
               // align-middle ที่ tr คุมทุกคอลัมน์ในจุดเดียว — default ของ td คือ
               // baseline ซึ่งทำให้แถวที่มีสองบรรทัดดูเหลื่อมกับแถวข้าง ๆ
               return (
                 <tr key={r.id} className={cn('border-t [&>td]:align-middle', DASH.tableRow)}>
-                  <td className="px-3 py-2">
+                  <td className="px-2 py-2">
                     <input
                       type="checkbox"
                       checked={checked}
@@ -150,9 +141,27 @@ const RmTable: React.FC<{
                       className="h-3.5 w-3.5 cursor-pointer accent-sky-600"
                     />
                   </td>
-                  <td className={cn('px-3 py-2', DASH.cellStrong)}>
-                    <span className="flex flex-col leading-tight">
-                      <span>{dashIfEmpty(firstName)}</span>
+                  {/* ผู้สมัคร = ชื่อ นามสกุล / เบอร์โทร · อายุ · เพศ
+                      อายุ/เพศ ไม่ได้กรอกมา = ขีด (ห้ามเดาหรือใส่ 0) */}
+                  <td className="px-2 py-2">
+                    <span className="flex flex-col gap-0.5">
+                      <span className={cn('block max-w-44 truncate font-medium', DASH.cellStrong)} title={r.full_name || undefined}>
+                        {dashIfEmpty(name)}
+                      </span>
+                      <span className={cn('whitespace-nowrap text-xs tabular-nums', DASH.cellMuted)}>
+                        {dashIfEmpty(r.phone)} · {typeof r.age === 'number' ? `${r.age} ปี` : `อายุ ${EM_DASH}`} ·{' '}
+                        {r.gender ? (GENDER_LABEL[r.gender] ?? EM_DASH) : `เพศ ${EM_DASH}`}
+                      </span>
+                      {/* เบอร์แปลง E.164 ไม่ได้ (087) — ส่ง AI/เก็บไปโทร/จับผลโทรไม่ได้
+                          แก้ได้ที่ปุ่มดูรายละเอียด · เช็ค === false เพราะ server เก่าไม่ส่ง field */}
+                      {r.phone_callable === false ? (
+                        <span
+                          className={cn('w-fit rounded-full border px-1.5 py-0.5 text-xs font-medium', TONE.danger.soft, TONE.danger.value)}
+                          title="เบอร์นี้ใช้กับระบบโทรไม่ได้ (ไม่ใช่มือถือ 10 หลัก) — กดดูรายละเอียดเพื่อแก้เบอร์"
+                        >
+                          เบอร์ใช้โทรไม่ได้
+                        </span>
+                      ) : null}
                       {/* ป้ายนับถอยหลังของใบที่รออยู่ในกอง "เลือกวิธีโทร" (Phase 5.9)
                           ⚠️ เวลาต้องคิดจาก choiceCountdown() ที่เดียว — ป้ายบนจอกับนาทีที่
                           worker ลงมือต้องเป็นชุดเดียวกัน (ไม่งั้นอ่านว่าเหลือเวลาแต่ AI โทรไปแล้ว) */}
@@ -165,7 +174,7 @@ const RmTable: React.FC<{
                           <span
                             title={`ถูกถอดจาก ${r.unclaimed_from_name || 'คนที่เก็บไว้'} เพราะเก็บไว้เกิน 1 วันแล้วยังไม่โทร — ${cd.label}`}
                             className={cn(
-                              'mt-0.5 w-fit rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
+                              'w-fit rounded-full border px-1.5 py-0.5 text-xs font-medium',
                               tone.soft,
                               tone.value,
                             )}
@@ -176,38 +185,13 @@ const RmTable: React.FC<{
                       })()}
                     </span>
                   </td>
-                  <td className={cn('px-3 py-2', DASH.cellStrong)}>{dashIfEmpty(lastName)}</td>
-                  <td className={cn('px-3 py-2 font-mono text-[12px] whitespace-nowrap', DASH.cell)}>
-                    <span className="inline-flex items-center gap-1.5">
-                      {dashIfEmpty(r.phone)}
-                      {/* เบอร์แปลง E.164 ไม่ได้ (087) — ส่ง AI/เก็บไปโทร/จับผลโทรไม่ได้
-                          แก้ได้ที่ปุ่มดูรายละเอียด · เช็ค === false เพราะ server เก่าไม่ส่ง field */}
-                      {r.phone_callable === false ? (
-                        <span
-                          className={cn('rounded-full border px-1.5 py-0.5 text-[10px] font-medium', TONE.danger.soft, TONE.danger.value)}
-                          title="เบอร์นี้ใช้กับระบบโทรไม่ได้ (ไม่ใช่มือถือ 10 หลัก) — กดดูรายละเอียดเพื่อแก้เบอร์"
-                        >
-                          เบอร์ใช้โทรไม่ได้
-                        </span>
-                      ) : null}
-                    </span>
-                  </td>
-                  {/* อายุ/เพศ — ไม่ได้กรอกมา = ขีด (ห้ามเดาหรือใส่ 0) */}
-                  <td className={cn('px-3 py-2 text-right tabular-nums whitespace-nowrap', DASH.cell)}>
-                    {typeof r.age === 'number' ? r.age : EM_DASH}
-                  </td>
-                  <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>
-                    {r.gender ? (GENDER_LABEL[r.gender] ?? EM_DASH) : EM_DASH}
-                  </td>
-                  <td className={cn('px-3 py-2', DASH.cell)} title={applicationAddressLabel(r) || undefined}>
-                    <span className="block max-w-[14rem] truncate">
-                      {dashIfEmpty(applicationAddressLabel(r))}
-                    </span>
+                  <td className={cn('px-2 py-2', DASH.cell)} title={address || undefined}>
+                    <span className="block max-w-28 truncate">{dashIfEmpty(address)}</span>
                   </td>
                   {/* ⚠️ truncate ต้องการกล่องที่มีความกว้างแน่นอน — inline-flex เดิมใช้ไม่ได้
                       ใส่ title ไว้ให้อ่านเต็มตอน hover ข้อมูลจึงไม่หายไปกับการตัด */}
-                  <td className={cn('px-3 py-2', DASH.cell)} title={applicationJobLabel(r)}>
-                    <span className="flex max-w-[20rem] items-center gap-1.5">
+                  <td className={cn('px-2 py-2', DASH.cell)} title={applicationJobLabel(r)}>
+                    <span className="flex max-w-36 items-center gap-1.5">
                       <span className="truncate">{dashIfEmpty(applicationUnitLabel(r))}</span>
                       {r.has_document ? (
                         <FileText
@@ -217,90 +201,87 @@ const RmTable: React.FC<{
                       ) : null}
                     </span>
                   </td>
-                  <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cellMuted)}>
-                    {r.referral_source ? REFERRAL_SOURCE_LABEL[r.referral_source] : EM_DASH}
-                  </td>
-                  {/* created_at ที่หายไปทำให้ .slice พังทั้งหน้า — gate ก่อนเสมอ
-                      ⚠️ ห้าม .slice(0,10) ตรง ๆ = วันที่ฝั่ง UTC · ใบกรอกเที่ยงคืน–07:00 น.
-                      ไทยจะถอยไป 1 วัน — ต้องตัดตามปฏิทินกรุงเทพ (แบบเดียวกับคอลัมน์วันนัด) */}
-                  <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>
-                    {r.created_at ? formatYmdDmyBe(toYmdBangkok(new Date(r.created_at))) : EM_DASH}
-                  </td>
-                  {/* ผ่านมาแล้วกี่วัน — นับตามปฏิทินกรุงเทพ ใบเมื่อวานตอนสามทุ่มต้องอ่านว่า
-                      "1 วัน" ตั้งแต่เช้าวันนี้ ไม่ใช่รอครบ 24 ชม. */}
-                  <td className={cn('px-3 py-2 text-right tabular-nums whitespace-nowrap', DASH.cell)}>
-                    {(() => {
-                      const d = daysSinceApplied(r.created_at, now);
-                      if (d === null) return EM_DASH;
-                      return d === 0 ? 'วันนี้' : `${d.toLocaleString('th-TH')} วัน`;
-                    })()}
+                  {/* สมัคร = วันที่สมัคร / ผ่านมาแล้วกี่วัน · ช่องทาง
+                      ⚠️ created_at ที่หายไปทำให้ .slice พังทั้งหน้า — gate ก่อนเสมอ
+                      ห้าม .slice(0,10) ตรง ๆ = วันที่ฝั่ง UTC · ใบกรอกเที่ยงคืน–07:00 น. ไทยจะถอยไป 1 วัน
+                      · ผ่านมาแล้วกี่วันนับตามปฏิทินกรุงเทพ (ใบเมื่อวานสามทุ่ม = "1 วัน" ตั้งแต่เช้านี้) */}
+                  <td className="px-2 py-2 whitespace-nowrap">
+                    <span className="flex flex-col gap-0.5">
+                      <span className={cn('tabular-nums', DASH.cell)}>
+                        {r.created_at ? formatYmdDmyBe(toYmdBangkok(new Date(r.created_at))) : EM_DASH}
+                      </span>
+                      <span className={cn('text-xs tabular-nums', DASH.cellMuted)}>
+                        {(() => {
+                          const d = daysSinceApplied(r.created_at, now);
+                          if (d === null) return EM_DASH;
+                          return d === 0 ? 'วันนี้' : `${d.toLocaleString('th-TH')} วัน`;
+                        })()}
+                        {' · '}
+                        {r.referral_source ? REFERRAL_SOURCE_LABEL[r.referral_source] : EM_DASH}
+                      </span>
+                    </span>
                   </td>
                   {tab === 'appointments' ? (
-                    <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>
+                    <td className="px-2 py-2" title={r.appointment_job || undefined}>
                       {/* วันนัดเก็บเป็น ISO เต็ม (เที่ยงวันไทย) — ตัดเอาเฉพาะวันที่ฝั่งไทย
                           ห้าม .slice(0,10) ตรง ๆ เพราะนั่นคือวันที่ฝั่ง UTC */}
-                      {r.appointment_at
-                        ? formatYmdDmyBe(
-                            new Date(r.appointment_at).toLocaleDateString('en-CA', {
-                              timeZone: 'Asia/Bangkok',
-                            }),
-                          )
-                        : EM_DASH}
-                    </td>
-                  ) : null}
-                  {tab === 'appointments' ? (
-                    <td className={cn('px-3 py-2 text-[11px]', DASH.cellMuted)} title={r.appointment_job || undefined}>
-                      {r.appointment_place || r.appointment_job
-                        ? `${r.appointment_place ?? ''}${r.appointment_place && r.appointment_job ? ' · ' : ''}${r.appointment_job ?? ''}`
-                        : EM_DASH}
-                    </td>
-                  ) : null}
-                  {tab === 'appointments' ? (
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {/* ผลติดตามนัด (089): ปุ่มคู่โผล่ตั้งแต่วันนัด (เวลาไทย) เป็นต้นไป
-                          กดซ้ำเพื่อแก้ได้ (append-only ล่าสุดชนะ) — ปุ่มที่เลือกอยู่ติดสีเต็ม */}
-                      {r.appointment_at && canRecordAttendance(r.appointment_at, new Date()) ? (
-                        <span className="inline-flex items-center gap-1">
-                          {ATTENDANCE_RESULTS.filter((k) => k !== 'rescheduled').map((k) => {
-                            const tone = TONE[ATTENDANCE_TONE[k]];
-                            const active = r.attendance_result === k;
-                            return (
-                              <button
-                                key={k}
-                                type="button"
-                                onClick={() => onAttendance?.(r, k)}
-                                title={`บันทึกว่า${ATTENDANCE_LABEL[k]} — กดซ้ำอันอื่นเพื่อแก้ได้`}
-                                className={cn(
-                                  'rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                                  tone.soft,
-                                  tone.value,
-                                  active ? 'ring-2 ring-ring' : 'opacity-75 hover:opacity-100',
-                                )}
-                              >
-                                {k === 'showed' ? '✓ มาแล้ว' : '✗ ไม่มา'}
-                              </button>
-                            );
-                          })}
+                      <span className="flex flex-col gap-0.5">
+                        <span className={cn('whitespace-nowrap tabular-nums', DASH.cell)}>
+                          {r.appointment_at
+                            ? formatYmdDmyBe(
+                                new Date(r.appointment_at).toLocaleDateString('en-CA', {
+                                  timeZone: 'Asia/Bangkok',
+                                }),
+                              )
+                            : EM_DASH}
                         </span>
-                      ) : (
-                        <span className={DASH.muted} title="บันทึกผลได้ตั้งแต่วันนัดเป็นต้นไป">
-                          {EM_DASH}
+                        <span className={cn('block max-w-32 truncate text-xs', DASH.cellMuted)}>
+                          {r.appointment_place || r.appointment_job
+                            ? `${r.appointment_place ?? ''}${r.appointment_place && r.appointment_job ? ' · ' : ''}${r.appointment_job ?? ''}`
+                            : EM_DASH}
                         </span>
-                      )}
+                        {/* ผลติดตามนัด (089): ปุ่มคู่โผล่ตั้งแต่วันนัด (เวลาไทย) เป็นต้นไป
+                            กดซ้ำเพื่อแก้ได้ (append-only ล่าสุดชนะ) — ปุ่มที่เลือกอยู่ติดสีเต็ม
+                            ยังไม่ถึงวันนัด = ไม่มีบรรทัดนี้ */}
+                        {r.appointment_at && canRecordAttendance(r.appointment_at, new Date()) ? (
+                          <span className="inline-flex items-center gap-1 pt-0.5">
+                            {ATTENDANCE_RESULTS.filter((k) => k !== 'rescheduled').map((k) => {
+                              const tone = TONE[ATTENDANCE_TONE[k]];
+                              const active = r.attendance_result === k;
+                              return (
+                                <button
+                                  key={k}
+                                  type="button"
+                                  onClick={() => onAttendance?.(r, k)}
+                                  title={`บันทึกว่า${ATTENDANCE_LABEL[k]} — กดซ้ำอันอื่นเพื่อแก้ได้`}
+                                  className={cn(
+                                    'whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium',
+                                    tone.soft,
+                                    tone.value,
+                                    active ? 'ring-2 ring-ring' : 'opacity-75 hover:opacity-100',
+                                  )}
+                                >
+                                  {k === 'showed' ? '✓ มาแล้ว' : '✗ ไม่มา'}
+                                </button>
+                              );
+                            })}
+                          </span>
+                        ) : null}
+                      </span>
                     </td>
                   ) : null}
                   {tab === 'contact' ? (
-                    <td className={cn('px-3 py-2 whitespace-nowrap text-[11px]', DASH.cellMuted)}>
+                    <td className={cn('px-2 py-2 text-xs', DASH.cellMuted)}>
                       {/**
                         * ลำดับความจริง: เวลาที่ **กดโทรจริง** (095) > เวลาที่ถือไว้ >
                         * เวลาที่ได้ผลโทร · อันแรกคือสิ่งที่เจ้าหน้าที่ทำเองกับมือ
                         * จึงตรงกับคำถาม "โทรกี่โมง โทรวันไหน" มากที่สุด
                         */}
                       {r.dialed_last_at ? (
-                        <span className="inline-flex flex-col leading-tight">
+                        <span className="inline-flex flex-col gap-0.5">
                           <span>📞 {formatDateTimeTh(r.dialed_last_at)}</span>
                           {(r.dial_count ?? 0) > 1 ? (
-                            <span className="text-[11px] text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               โทรไปแล้ว {r.dial_count} ครั้ง
                             </span>
                           ) : null}
@@ -317,8 +298,8 @@ const RmTable: React.FC<{
                   {/* คอลัมน์ "สถานะ" (ชิปสถานะใบ + ชิปที่มา) ถูกถอดออกตามชุดคอลัมน์ที่
                       เจ้าของสั่ง 17 ส.ค. 2569 — ⚠️ ถอด <th> แล้วต้องถอด <td> ด้วยเสมอ
                       ไม่งั้นทุกแถวเลื่อนไปหนึ่งช่อง (ข้อมูลไปโผล่ใต้หัวคอลัมน์ผิด) */}
-                  <td className="px-3 py-2">
-                    <div className="flex items-center justify-end gap-1">
+                  <td className="px-2 py-2">
+                    <div className="flex items-center justify-end gap-0.5">
                       {actions.map((a) => {
                         const Icon = ACTION_ICON[a];
                         let label: string = RM_ROW_ACTION_LABEL[a];
@@ -347,7 +328,7 @@ const RmTable: React.FC<{
                             title={label}
                             aria-label={`${label} — ${r.full_name}`}
                             className={cn(
-                              'rounded-full border p-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                              'rounded-full border p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40',
                               TONE.primary.outline,
                             )}
                           >

@@ -305,6 +305,7 @@ describe('กล่องงาน + แท็บผู้สมัคร ต้
     'src/components/jobs/BoardCardProgress.tsx',
     'src/components/jobs/JobBoardSilentLinks.tsx',
     'src/components/recruit-rm/RmWorkspace.tsx',
+    'src/components/recruit-rm/RmTable.tsx',
   ];
   const codeOf = (f: string) => read(f).replace(/\/\*[\s\S]*?\*\//g, '');
 

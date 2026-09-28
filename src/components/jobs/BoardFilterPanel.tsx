@@ -35,8 +35,9 @@ import { visibleFacetOptions, type FacetView } from '@/lib/facetEngine';
  * → **28 ก.ย. เจ้าของแยกกัน:** *"หน้ากล่องงาน … เป็นช่องๆแบบเดิม ส่วนหน้าอื่นๆพวก รายชื่อผู้สมัคร การโทรของฉัน ฯลฯ
  *   ทำแบบ Irecruit เลย"* แล้วเลือก Choice "แถบกรองซ้ายตามแบบร่างที่เคาะไว้"
  *   - แท็บกล่องงาน = `BoardFilterBar` → ปุ่ม `[ตัวกรอง (N)] [เรียง ▾]` (แบบ A เหมือนเดิม)
- *   - แท็บรายชื่อผู้สมัคร / การโทรของฉัน / ติดตามนัดหมาย = `FilterSidebar` (จอ lg ขึ้นไป) +
- *     `FilterSheetButton` (จอเล็กกว่า lg เปิดแผงด้านซ้าย)
+ *   - แท็บรายชื่อผู้สมัคร / การโทรของฉัน / ติดตามนัดหมาย = `FilterSidebar` (จอ xl = 1280px ขึ้นไป) +
+ *     `FilterSheetButton` (จอเล็กกว่า xl เปิดแผงด้านซ้าย)
+ *     ⚠️ ไม่ใช่ lg — จอ 1024–1279 มีแถบซ้ายแล้วตารางรายชื่อเหลือช่อง ~660px ไม่พอ (ต้อง ~770px ถึงไม่ถอดข้อมูล)
  *   ทั้งสามแบบวาดด้วย `FilterAccordion` ตัวเดียว — หัวข้อ/ลำดับ/เลขต่อท้ายจึงตรงกันเสมอ
  * (🔴 Dropdown เรียงเต็มแถวยังถูกถอด — ห้ามเอากลับโดยไม่ได้สั่งใหม่)
  *
@@ -297,14 +298,14 @@ function FilterPanelHeader({ selected, onClear, resultText }: { selected: number
 
 /**
  * แถบกรองด้านซ้ายแบบ iRecruit — แท็บรายชื่อผู้สมัคร / การโทรของฉัน / ติดตามนัดหมาย (เจ้าของสั่ง 28 ก.ย. 2569)
- * โชว์ตั้งแต่จอ lg ขึ้นไป · จอเล็กกว่านั้นใช้ `FilterSheetButton` (เนื้อในชุดเดียวกัน)
+ * โชว์ตั้งแต่จอ xl (1280px) ขึ้นไป · จอเล็กกว่านั้นใช้ `FilterSheetButton` (เนื้อในชุดเดียวกัน)
  */
 export function FilterSidebar<K extends string>({ onClear, resultText, ...content }: FilterPanelProps<K>) {
   const n = selectedTotal(content.facets, content.sections);
   return (
     <aside
       aria-label="ตัวกรองเพิ่มเติม"
-      className="hidden w-64 shrink-0 self-start rounded-xl border border-border bg-card p-3 lg:block"
+      className="hidden w-64 shrink-0 self-start rounded-xl border border-border bg-card p-3 xl:block"
     >
       <FilterPanelHeader selected={n} onClear={onClear} resultText={resultText} />
       <div className="mt-2">
@@ -314,13 +315,13 @@ export function FilterSidebar<K extends string>({ onClear, resultText, ...conten
   );
 }
 
-/** ปุ่ม "ตัวกรอง (N)" เปิดแผงด้านซ้าย — เฉพาะจอเล็กกว่า lg (แถบซ้ายซ่อนอยู่) */
+/** ปุ่ม "ตัวกรอง (N)" เปิดแผงด้านซ้าย — เฉพาะจอเล็กกว่า xl (แถบซ้ายซ่อนอยู่) */
 export function FilterSheetButton<K extends string>({ onClear, resultText, ...content }: FilterPanelProps<K>) {
   const n = selectedTotal(content.facets, content.sections);
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button type="button" variant="outline" size="xs" className={cn(triggerClass(n > 0), 'lg:hidden')}>
+        <Button type="button" variant="outline" size="xs" className={cn(triggerClass(n > 0), 'xl:hidden')}>
           <SlidersHorizontal aria-hidden />
           ตัวกรอง
           <TriggerCount n={n} />
