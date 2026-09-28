@@ -32,7 +32,10 @@ const PageHeader: React.FC<PageHeaderProps> = ({
       กระทบทุกหน้าที่ส่ง actions มา ไม่ใช่หน้าเดียว จึงแก้ที่ตัวกลางนี้
     */
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 md:px-6 py-4 md:py-5">
-      <div className="flex items-center gap-3 min-w-0 flex-1">
+      {/* 🔴 ชื่อ+คำอธิบายกว้างไม่ต่ำกว่า min-w-40 — ถ้าต่ำกว่านั้น actions ต้อง "ตกบรรทัด" ไปใต้ชื่อ
+          (เดิม min-w-0 + flex-1 ⇒ ฐานกว้าง 0 แถวเลยไม่เคยตกบรรทัด · 28 ก.ย. 2569 เจอที่กล่องงานบนจอ 375px:
+          ปุ่ม 3 ตัวดันชื่อหน้าหายไป คำอธิบายถูกบีบเหลือคำละบรรทัด) · หน้าที่ปุ่มเล็กยังอยู่แถวเดียวกับชื่อเหมือนเดิม */}
+      <div className="flex min-w-40 flex-1 items-center gap-3">
         {backPath && (
           <button
             type="button"
