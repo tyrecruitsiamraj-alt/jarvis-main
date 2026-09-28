@@ -68,7 +68,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return res.status(200).json({ eligible: 0, queued: 0, duplicated: [], skipped: [] });
     }
 
-    const outcome = await enqueueLumosInterviewForApplications(jobId, eligible);
+    /**
+     * 🔴 ต้อง push ด้วย (28 ก.ย. 2569) — ของเดิมแค่เข้าคิวแล้วรอ Lumos มาดึง ซึ่ง **Lumos ไม่ดึงแล้ว**
+     * กดปุ่มนี้เมื่อไหร่แถวจะค้าง "อยู่ในคิว AI" ถาวรโดยไม่มีสายจริง · ยิงแบบจดผล ล้มแล้วตัวส่งซ้ำตามต่อ
+     */
+    const outcome = await enqueueLumosInterviewForApplications(jobId, eligible, { autoPush: true });
 
     void auditFromAuthed(req, {
       action: 'application-dispatch.send',

@@ -219,7 +219,10 @@ export default function LumosPipelineSection({
                     {NOT_CALLED_PARTS.filter(([k]) => now.notCalled[k] > 0)
                       .map(([k, label]) => `${label} ${fmt(now.notCalled[k])}`)
                       .join(' · ')}
-                    {now.notCalled.oldestHours !== null ? ` · ค้างนานสุด ${ageText(now.notCalled.oldestHours)}` : ''}
+                    {/* นัดโทรไว้ข้างหน้า (เช่น ส่งซ้ำตอนเช้า) อายุค้าง = 0 — ไม่ใช่งานค้าง ไม่ต้องบอก */}
+                    {now.notCalled.oldestHours !== null && now.notCalled.oldestHours >= 1
+                      ? ` · ค้างนานสุด ${ageText(now.notCalled.oldestHours)}`
+                      : ''}
                   </p>
                 ) : null}
               </div>

@@ -37,6 +37,8 @@ import {
   phonesDeclinedThisUnit,
 } from './applicationRotationSql.js';
 import { toE164Thai } from './thaiPhone.js';
+import { bangkokIso } from './bangkokIso.js';
+import { pushQueuedApplications } from './applicationPushTracking.js';
 import { ensureCallScriptsFresh } from './callScriptStore.js';
 import { MATCH_RANK_UNKNOWN, matchRankFromTier } from '../../src/lib/matchRank.js';
 import { buildJobBrief, speakableDate } from './lumosJobBrief.js';
@@ -378,22 +380,12 @@ export async function enqueueLumosInterviewForApplications(
     skipped: skipped.length,
   });
   if (opts?.autoPush && added.length > 0 && getLumosPushConfig()) {
-    const pushPayloads = items
-      .filter((i) => addedSet.has(i.personRef))
-      .map((i) => i.payload as unknown as LumosPushInterviewRecord);
-    // ไม่รอ push ให้จบก่อนตอบ — ผล enqueue ไม่ได้ขึ้นกับ push สำเร็จอยู่แล้ว (แถวเข้าคิว
-    // แล้วเสมอ, retry ใน lumosFetch ใช้เวลาได้ถึงวินาทีกว่า ไม่ควรให้คนกดปุ่มรอ)
-    void (async () => {
-      try {
-        await pushInterviews(pushPayloads);
-        logInfo('lumos.push.application.ok', { jobId, pushed: pushPayloads.length });
-      } catch (e) {
-        logError('lumos.push.application failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, {
-          jobId,
-          pushed: pushPayloads.length,
-        });
-      }
-    })();
+    /**
+     * 🔴 ยิงแบบจดผลทีละแถว (28 ก.ย. 2569) — **Lumos ไม่มาดึงคิวเองแล้ว** ยิงล้มครั้งเดียวเคยทำใบสมัครค้างถาวร
+     * (OPL6909083 3 ใบ 2–4 วัน) · ล้ม = จด `push_failed` ให้ `applicationPushRetryWorker` ส่งซ้ำทุกนาที
+     * ไม่รอให้จบก่อนตอบ — ผล enqueue ไม่ได้ขึ้นกับ push (retry ในคำขอใช้เวลาได้ ~17 วิ ไม่ควรให้คนรอ)
+     */
+    void pushQueuedApplications(jobId, added);
   }
   return { queued: added.length, duplicated, skipped };
 }
@@ -1502,20 +1494,8 @@ export type FollowEntryInput = {
   unitName?: string | null;
 };
 
-/**
- * ISO เวลาไทย `YYYY-MM-DDTHH:mm:ss+07:00` — instant เดียวกับ `toISOString()` แต่เขียน
- * ด้วย offset ไทยแทน `Z` (18 ส.ค. 2569: Lumos ดึงรายการไปแล้วแต่ไม่ขึ้นหน้าแจ้งเตือน
- * — หนึ่งในสามข้อสงสัยคือฝั่งเขาอ่านเวลารูป UTC แล้วปัดทิ้งเงียบ ๆ จึงส่งเป็นเวลาไทยให้ชัด)
- * ตั้งใจไม่ใช้ `Intl` — กติกาโปรเจกต์ห้าม `new Intl.*` นอกระดับโมดูล (เคยทำ API ช้า 4.7 วิ)
- */
-export function bangkokIso(d: Date): string {
-  const t = new Date(d.getTime() + 7 * 3_600_000);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return (
-    `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}` +
-    `T${pad(t.getUTCHours())}:${pad(t.getUTCMinutes())}:${pad(t.getUTCSeconds())}+07:00`
-  );
-}
+/** ISO เวลาไทย `…+07:00` — ย้ายไป `./bangkokIso.ts` แล้ว (ส่งออกชื่อเดิมต่อที่นี่) */
+export { bangkokIso };
 
 /** ประกอบ ISO (เวลาไทย +07:00) ของ "วันเดียวกับ scheduled_at + เวลา HH:MM" */
 function dayAtTime(day: Date, hhmm: string): string {

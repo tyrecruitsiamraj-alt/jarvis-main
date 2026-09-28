@@ -2511,6 +2511,12 @@ supervisor/staff/opl) ไม่ใช่ทีม · ผู้ใช้จริ
     auth: `POST /api/auth/dev-role {"role":"admin"}` (cookie ~30 นาที **หมดบ่อยมาก**)
 13. **สคริปต์ peek ฐานต้อง `import '../server/bootstrap-env.js'` ก่อน** ไม่งั้นไม่มี env ของ DB
     · วางไว้ใน `scripts/.peekN.mts` แล้ว `rm` ทิ้งหลังใช้
+14. 🔴 **Lumos ไม่มาดึงคิวแล้ว (วัด 28 ก.ย. 2569: `delivery_count` = 0 ทุกแถว) — สายไปถึงเขาทาง push เท่านั้น**
+    · push ล้ม = ค้าง `pending` ถาวร และแท็บผู้สมัครนับว่า "อยู่ในคิว AI" ⇒ ไม่มีใครโทร
+    · สายใบสมัคร: จด `push_state` ที่แถวคิว (migration 123 · `applicationPushTracking.ts`) + ตัวส่งซ้ำทุกนาที
+      `applicationPushRetryWorker.ts` (ไม่ยิงช่วงห้ามโทร · เกิน 24 ชม. ปิดฝั่ง AI + `needs_human`)
+    · **เส้นใหม่ที่ส่งใบสมัครเข้าคิวต้อง `{ autoPush: true }`** (เทสต์ `applicationPushTracking` คุม) ·
+      ⚠️ เลน Match (`card-`/`ir-`) ยังเป็น push ครั้งเดียวไม่มีตัวส่งซ้ำ
 
 ### กับดักตอน "ตรวจงาน" (สะสม)
 
