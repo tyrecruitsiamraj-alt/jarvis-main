@@ -152,32 +152,36 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
         </p>
       ) : null}
 
-      {/* ── ผู้สมัคร + ปุ่มทำต่อ — ตรึงก้นการ์ด ── */}
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
-        {applicants > 0 ? (
-          /* กดจำนวนผู้สมัคร = สลับไปแท็บรายชื่อผู้สมัครในหน้านี้ พร้อมติ๊กใบนี้ (ห้ามเด้งไปหน้าใบขอ) */
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onApplicants(job);
-            }}
-            className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-foreground hover:text-primary hover:underline"
-          >
-            <Users className="h-4 w-4" aria-hidden />
-            ผู้สมัคร {applicants.toLocaleString('th-TH')} คน
-            {ai && ai.total > 0 ? (
-              <span className={cn('font-normal', ai.sent >= ai.total ? TONE.success.value : TONE.warn.value)}>
-                · ส่ง AI แล้ว {ai.sent}/{ai.total}
-              </span>
-            ) : null}
-          </button>
-        ) : (
-          <span className={cn('inline-flex items-center gap-1.5 text-sm', DASH.muted)}>
-            <Users className="h-4 w-4" aria-hidden />
-            ยังไม่มีผู้สมัคร
-          </span>
-        )}
+      {/* ── ผู้สมัคร + ปุ่มทำต่อ — ตรึงก้นการ์ด ──
+          🔴 ปุ่มอยู่ขวาแถวเดียวกันเสมอ (ไม่ตกบรรทัด) — "ส่ง AI แล้ว x/y" อยู่บรรทัดใต้จำนวนผู้สมัคร
+          (หลังขยายตัวอักษร 27 ก.ย. 2569 ข้อความยาวขึ้น ปุ่มของบางใบตกบรรทัด การ์ดเลยสูงไม่เท่ากัน) */}
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/70 pt-3">
+        <div className="min-w-0">
+          {applicants > 0 ? (
+            /* กดจำนวนผู้สมัคร = สลับไปแท็บรายชื่อผู้สมัครในหน้านี้ พร้อมติ๊กใบนี้ (ห้ามเด้งไปหน้าใบขอ) */
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onApplicants(job);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-foreground hover:text-primary hover:underline"
+            >
+              <Users className="h-4 w-4 shrink-0" aria-hidden />
+              ผู้สมัคร {applicants.toLocaleString('th-TH')} คน
+            </button>
+          ) : (
+            <span className={cn('inline-flex items-center gap-1.5 text-sm', DASH.muted)}>
+              <Users className="h-4 w-4 shrink-0" aria-hidden />
+              ยังไม่มีผู้สมัคร
+            </span>
+          )}
+          {applicants > 0 && ai && ai.total > 0 ? (
+            <p className={cn('mt-0.5 text-sm', ai.sent >= ai.total ? TONE.success.value : TONE.warn.value)}>
+              ส่ง AI แล้ว {ai.sent}/{ai.total}
+            </p>
+          ) : null}
+        </div>
         {closed ? null : (
           <Button
             type="button"
@@ -187,7 +191,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
               e.stopPropagation();
               onOpen(job);
             }}
-            className="rounded-lg"
+            className="shrink-0 rounded-lg"
           >
             {step ? `ทำต่อขั้น ${step}` : 'เปิดดู'}
             <ArrowRight aria-hidden />
