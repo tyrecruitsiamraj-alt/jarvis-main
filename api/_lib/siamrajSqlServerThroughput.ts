@@ -44,6 +44,11 @@ export type SiamrajThroughputRecord = {
   siteCode?: string;
   /** วันที่ต้องการคน (want_date_from) — ใช้คิดว่าเป็นล่วงหน้าหรือฉุกเฉิน */
   requiredDate?: string | null;
+  /**
+   * วันที่กรอกใบจริง (request_date) — เพิ่ม 28 ก.ย. 2569 ให้ Dashboard แนวโน้มคิด "ขอ → ปล่อยประกาศใช้กี่วัน"
+   * ⚠️ คนละตัวกับ `requestDate` (ตัวนั้นเป็นวันอ้างอิงงวด = วันที่ต้องการคน)
+   */
+  submittedDate?: string | null;
   /** ล่วงหน้า / ฉุกเฉิน / ฉุกเฉิน-ย้อนหลัง — กฎเดียวกับหน้าเว็บ (`requestLeadKind.ts`) */
   leadKind?: RequestLeadKind;
   /** รหัส BU ของไซต์ (ms_site.department_code) — ให้ dashboard กรองตาม BU ที่เลือกได้ */
@@ -80,7 +85,8 @@ type SqlThroughputRow = {
   request_action_name: string | null;
 };
 
-function getSqlFilters() {
+/** ขอบเขต BU/ไซต์จาก env — ส่งออกให้คิวรีใบแจ้งเข้าของ Dashboard แนวโน้มใช้ชุดเดียวกัน (ยอดต้องตรงกัน) */
+export function getSqlFilters() {
   return {
     deptFrom: (process.env.SIAMRAJ_SQL_DEPT_FROM || '_').trim(),
     deptTo: (process.env.SIAMRAJ_SQL_DEPT_TO || 'Z').trim(),
@@ -89,7 +95,7 @@ function getSqlFilters() {
   };
 }
 
-function excludeClsContractTypeWhere(alias = 'SS'): string {
+export function excludeClsContractTypeWhere(alias = 'SS'): string {
   const raw = (process.env.SIAMRAJ_SQL_EXCLUDE_CONTRACT_TYPE_C ?? 'true').trim().toLowerCase();
   if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return '';
   return `AND RTRIM(${alias}.contract_type_code) <> 'C'`;
@@ -160,6 +166,7 @@ function mapThroughputRow(
     unitName,
     siteCode,
     requiredDate,
+    submittedDate: toYmd(row.request_date),
     leadKind,
     departmentCode,
     requestActionName,
