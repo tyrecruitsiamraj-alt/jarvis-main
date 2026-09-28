@@ -12,7 +12,8 @@
  * - ป้ายถังผล = พจนานุกรมเมตริก `lumos.result.*` (คำเดียวกับหน้าแรก)
  *
  * นับแบบ **กลุ่มเดียวกัน (cohort)** — คนที่กรอกในช่วงนี้ ไปถึงขั้นไหนแล้ว (ห้ามเอาคนละกลุ่มมาหาร)
- * ⚠️ ถังผลโทรคือ "อ่านจากคำพูด" ไม่ใช่ค่าที่ Lumos ยืนยัน — ไม่ชัดตกถัง "คุยแล้วตอบไม่ชัด" เสมอ
+ * ⚠️ ถังผลโทร = รหัสผลของ Lumos ก่อน (confirmed → สนใจ · no_answer/busy/failed → ไม่รับสาย …) รหัสที่ไม่ชี้ขาด
+ *    จึงอ่านคำพูดในสาย (`classifyCallMicro`) — ไม่ชัดตกถัง "คุยแล้วแต่ไม่ได้คำตอบ" เสมอ
  */
 import { callAttemptSlot } from '@/lib/callOutcomeBuckets';
 import { addCallMicro, callMicroRates, emptyCallMicroSummary, type CallMicroSummary } from '@/lib/callMicroOutcome';

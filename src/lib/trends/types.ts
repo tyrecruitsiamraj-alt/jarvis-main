@@ -49,7 +49,7 @@ export type FollowTrendRow = {
 export type LumosCallState = 'pending' | 'waiting' | 'called' | 'cancelled';
 
 /**
- * ถังผลโทรจากคำพูดจริง (`callMicroOutcome.ts` · คลังคำ "ถามความสนใจ")
+ * ถังผลโทร (`callMicroOutcome.ts` · คลังคำ "ถามความสนใจ") — รหัสผลของ Lumos ก่อน รหัสที่ไม่ชี้ขาดจึงอ่านคำพูดในสาย
  * ⚠️ จัดถังที่เซิร์ฟเวอร์ — คำพูดในสาย (สรุป/ถอดเสียง) **ไม่ออกจากเซิร์ฟเวอร์**
  */
 export type TrendCallMicro = CallMicroOutcome;
@@ -72,7 +72,7 @@ export type ApplicantLumos = {
   resultAt: string | null;
   /** รหัสผลของ Lumos */
   outcome: string | null;
-  /** ถังผลจากคำพูดจริง · null = ยังไม่มีผล/ยกเลิก */
+  /** ถังผล (รหัสผล Lumos → คำพูดในสาย) · null = ยังไม่มีผล/ยกเลิก */
   micro: TrendCallMicro | null;
 };
 

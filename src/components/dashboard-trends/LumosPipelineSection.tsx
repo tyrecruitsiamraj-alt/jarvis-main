@@ -235,7 +235,7 @@ export default function LumosPipelineSection({
           <Card className="space-y-3 rounded-2xl p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-medium text-foreground">ผลโทรของ Lumos · {fmt(withResult)} สายที่มีผล</h3>
-              <TrendBadge tone="warn">จัดถังจากคำพูดในสาย</TrendBadge>
+              <TrendBadge tone="warn">จัดถังจากรหัสผล Lumos + คำพูดในสาย</TrendBadge>
             </div>
             {withResult > 0 ? (
               <div className="flex h-4 overflow-hidden rounded-full bg-muted">
