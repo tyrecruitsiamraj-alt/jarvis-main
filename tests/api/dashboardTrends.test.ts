@@ -60,8 +60,8 @@ describe('เส้น /api/dashboard-trends — อ่านอย่างเ�
     expect(read('migrations/122_dashboard_trend_snapshots.sql')).toMatch(/create table if not exists dashboard_trend_snapshots/);
   });
 
-  it('BU ฝั่ง SQL แปลรหัสไซต์แบบเดียวกับ homeBu.ts แล้วแปลงเป็นรหัสแผนกชุดเดียว', () => {
-    expect(h).toContain("~ '^[0-9]{2}[A-Za-z]{3}' then upper(substring(${col} from 3 for 3))");
+  it('BU ฝั่ง SQL แปลรหัสไซต์ด้วยตัวกลาง (siteBuSql = แบบเดียวกับ homeBu.ts) แล้วแปลงเป็นรหัสแผนกชุดเดียว', () => {
+    expect(h).toContain("from '../_lib/siteBuSql.js'");
     expect(h).toContain('normalizeTrendBu(');
     // ตัวอย่างเดียวกับที่ SQL จะได้
     expect(buFromSiteCode('66LML0011')).toBe('LML');
@@ -92,7 +92,7 @@ describe('ส่วน รายชื่อ → Lumos → ผลโทร — �
     const board = code('src/components/dashboard-trends/BoardDashboard.tsx');
     expect(board).not.toMatch(/applicantFunnel|fetchCallRateSeries/);
     expect(board).toContain('now={pipeNow}');
-    expect(board).toMatch(/label="ส่งให้ Lumos"[\s\S]*?value=\{applicants\.data \? sentNow : null\}/);
+    expect(board).toMatch(/label="ใบสมัครที่ส่ง Lumos"[\s\S]*?value=\{applicants\.data \? sentNow : null\}/);
   });
 });
 

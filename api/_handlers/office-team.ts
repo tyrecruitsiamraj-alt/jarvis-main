@@ -17,6 +17,7 @@
  *   `application_appointment_results` (089)
  * - คิวโทร: `lumos_dispatch_queue` แยก 3 เลนตาม person_ref (นิยาม = `queueLane` ใน lib
  *   🔴 แก้ SQL ต้องแก้ lib ให้ตรงกัน — มีเทสต์คุมฝั่ง lib)
+ * - ส่งให้ Lumos ทั้งระบบ (หัวคอลัมน์ Lumos · 28 ก.ย. 2569): คิวเดียวกัน นับรายวัน × BU × เส้นทาง × สถานะ
  *
  * cache 30 วิ ต่อ scope (แพตเทิร์นเดียวกับ office-floor)
  * ⚠️ id ที่ใช้ join ฝั่ง pg คือ `item.id` (รูป `siamraj-sql:XXX`) ไม่ใช่ request_no —
@@ -39,11 +40,16 @@ import {
   queueWaiting,
 } from '../_lib/lumosQueueDefs.js';
 import { classifyCallMicro, vocabForPersonRef } from '../../src/lib/callMicroOutcome.js';
+import { siteBuOf } from '../../src/lib/trends/bu.js';
+import { siteBuSql } from '../_lib/siteBuSql.js';
 import { logWarn } from '../_lib/logger.js';
 import type {
   BoardTeams,
   LaneCounts,
   LaneResults,
+  LumosSentRoute,
+  LumosSentRow,
+  LumosSentState,
   LumosTeamStats,
   OnlineTeamStats,
   RecruitTeamStats,
@@ -54,6 +60,9 @@ const appsTable = tableInAppSchema('public_job_applications');
 const contactLogsTable = tableInAppSchema('application_contact_logs');
 const attendanceTable = tableInAppSchema('application_appointment_results');
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
+const mapTable = tableInAppSchema('job_site_map');
+const followTable = tableInAppSchema('follow_entries');
+const usersTable = tableInAppSchema('users');
 
 /**
  * ถังของคิวโทร — 🔴 **มาจาก `_lib/lumosQueueDefs.ts` ห้ามเขียนเงื่อนไขเอง**
@@ -286,6 +295,72 @@ async function loadLumosTeam(): Promise<LumosTeamStats> {
   return lanes;
 }
 
+const SENT_ROUTES: readonly LumosSentRoute[] = ['public', 'match', 'follow', 'other'];
+const SENT_STATES: readonly LumosSentState[] = ['pending', 'waiting', 'done', 'cancelled', 'other'];
+
+/**
+ * ═══ ส่งให้ Lumos ทั้งระบบ — รายวัน × BU × เส้นทาง × สถานะ (เจ้าของสั่ง 28 ก.ย. 2569) ═══
+ *
+ * 🔴 ประชากรเดียวกับ `loadLumosTeam` (ทุกแถวของคิว รวมที่ยกเลิก) ⇒ ยอด "ทั้งหมด" = "ส่งให้ AI ไปแล้ว"
+ * ของสามเลนรวมกันเป๊ะ · เส้นทางใช้ CASE ชุดเดียวกับ `queueLane` · สถานะใช้นิยามกลาง `lumosQueueDefs`
+ * ⚠️ คอลัมน์เส้นทางชื่อ `route` (ไม่ใช่ `lane`) — เทสต์ของเลนจำคิวรีเลนจากคำว่า `as lane`
+ *
+ * BU ต่อสาย (ห้ามเดา — ไม่รู้ = null แล้วจอบอกจำนวน):
+ * - งานติดตาม = แผนกของคนคีย์ → ไซต์ของรายการ (กติกาเดียวกับ `/api/home-kpis` · เจ้าของเคาะ 15 ก.ย. 2569)
+ * - ที่เหลือ = ไซต์ของใบขอ (`job_site_map` ผ่าน job_ref) → แผนกบนใบสมัคร (เฉพาะหน้าสาธารณะ)
+ * รหัสแผนก (LM) แปลงเป็นรหัสจากไซต์ (LML) ฝั่ง Node ด้วย `siteBuOf` ให้ตรงกับตัวกรอง BU หน้าแรก
+ */
+async function loadLumosSent(): Promise<LumosSentRow[]> {
+  const { rows } = await dbQuery<{
+    day: string | null;
+    route: string;
+    bu: string | null;
+    state: string;
+    n: number;
+  }>(
+    `select to_char(timezone('Asia/Bangkok', q.created_at), 'YYYY-MM-DD') as day,
+            case
+              when q.job_ref = 'follow' or q.person_ref like 'follow-%' then 'follow'
+              when q.person_ref like 'app-%' then 'public'
+              when q.person_ref like 'card-%' or q.person_ref like 'ir-%' then 'match'
+              else 'other'
+            end as route,
+            case
+              when q.job_ref = 'follow' or q.person_ref like 'follow-%'
+                then coalesce(nullif(btrim(u.department_code), ''), ${siteBuSql('f.site_code')})
+              else coalesce(${siteBuSql('m.site_code')}, nullif(btrim(a.department_code), ''))
+            end as bu,
+            case
+              when ${queueCancelled('q')} then 'cancelled'
+              when ${queueHasResult('q')} then 'done'
+              when ${queueWaiting('q')} then 'waiting'
+              when ${queuePending('q')} then 'pending'
+              else 'other'
+            end as state,
+            count(*)::int as n
+       from ${queueTable} q
+       left join ${mapTable} m on m.job_id = q.job_ref
+       left join ${appsTable} a on q.person_ref = 'app-' || a.id::text
+       left join ${followTable} f on q.person_ref = 'follow-' || f.id::text
+       left join ${usersTable} u on u.id = f.created_by
+      group by 1, 2, 3, 4`,
+  );
+  // รหัสแผนกกับรหัสไซต์ของ BU เดียวกัน (LM · LML) ต้องรวมเป็นแถวเดียว ⇒ แปลงแล้วรวมซ้ำ
+  const acc = new Map<string, LumosSentRow>();
+  for (const r of rows) {
+    const day = String(r.day ?? '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    const route = (SENT_ROUTES as readonly string[]).includes(r.route) ? (r.route as LumosSentRoute) : 'other';
+    const state = (SENT_STATES as readonly string[]).includes(r.state) ? (r.state as LumosSentState) : 'other';
+    const bu = siteBuOf(r.bu);
+    const key = `${day}|${bu ?? ''}|${route}|${state}`;
+    const row = acc.get(key) ?? { day, bu, route, state, n: 0 };
+    row.n += Number(r.n) || 0;
+    acc.set(key, row);
+  }
+  return [...acc.values()].sort((x, y) => x.day.localeCompare(y.day));
+}
+
 async function handler(req: AuthedReq, res: ApiRes) {
   if ((req.method || 'GET').toUpperCase() !== 'GET') {
     return sendError(res, 405, 'Method not allowed', 'Read-only');
@@ -303,7 +378,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const openIds = open.map((it) => String(it.id || '').trim()).filter(Boolean);
 
     /** ทุกทีมยิงขนานและล้มแยกทีม — ทีมล้มต้องโผล่ใน errors ไม่ใช่หายเงียบ */
-    const [onlineR, recruitR, lumosR] = await Promise.all([
+    const [onlineR, recruitR, lumosR, sentR] = await Promise.all([
       loadOnlineTeam(openIds, open.length).then(
         (v) => ({ ok: true as const, v }),
         (e: Error) => ({ ok: false as const, e }),
@@ -316,17 +391,28 @@ async function handler(req: AuthedReq, res: ApiRes) {
         (v) => ({ ok: true as const, v }),
         (e: Error) => ({ ok: false as const, e }),
       ),
+      loadLumosSent().then(
+        (v) => ({ ok: true as const, v }),
+        (e: Error) => ({ ok: false as const, e }),
+      ),
     ]);
 
     const teams: BoardTeams = {
       online: onlineR.ok ? onlineR.v : null,
       recruit: recruitR.ok ? recruitR.v : null,
       lumos: lumosR.ok ? lumosR.v : null,
+      lumosSent: sentR.ok ? sentR.v : null,
       errors: {},
     };
     if (!onlineR.ok) teams.errors.online = 'อ่านตารางประกาศ/คำขอโพสไม่ได้';
     if (!recruitR.ok) teams.errors.recruit = 'อ่านตารางใบสมัคร/นัดไม่ได้';
     if (!lumosR.ok) teams.errors.lumos = 'อ่านคิวโทรไม่ได้';
+    if (!sentR.ok) {
+      teams.errors.lumosSent = 'อ่านยอดส่ง Lumos ไม่ได้';
+      logWarn('office-team: อ่านยอดส่ง Lumos ทั้งระบบไม่ได้', {
+        reason: sentR.e instanceof Error ? sentR.e.message : String(sentR.e),
+      });
+    }
 
     const body: Body = {
       generated_at: new Date().toISOString(),

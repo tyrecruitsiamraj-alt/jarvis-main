@@ -20,7 +20,7 @@ import { ArrowRight, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { OfficeTeamResponse } from '@/lib/officeTeamApi';
-import type { LaneCounts } from '@/lib/officeTeam';
+import { LUMOS_ROUTE_LABEL, type LaneCounts } from '@/lib/officeTeam';
 import type { OfficeFloorCounts } from '@/lib/officeFloor';
 import { HOME_TEAM_NAV, type HomeTeamNavKey } from '@/lib/soRecruitNav';
 import { METRICS, metricHelp, type MetricKey, type MetricSpec } from '@/lib/metricDictionary';
@@ -29,6 +29,7 @@ import { TONE } from '@/lib/designTokens';
 import type { FlowFollowUpItem } from '@/lib/flowSummaryApi';
 import { FOLLOW_UP_TONE, interestedJobLine, type CallDigest } from '@/lib/homeCallDigest';
 import { callRateRangeText } from '@/lib/lumosCallRate';
+import LumosSentBlock from '@/components/home/LumosSentBlock';
 
 /**
  * ป้าย/คำอธิบาย/ปลายทางหัวคอลัมน์มาจาก HOME_TEAM_NAV ที่เดียว (มีเทสต์คุม
@@ -667,20 +668,27 @@ const TeamBoardPanel: React.FC<{
           blurb={NAV.lumos.blurb}
           error={teams?.errors.lumos}
         >
+          {/* 🔴 ยอดรวมทุกเส้นทาง (เจ้าของสั่ง 28 ก.ย. 2569: *"จะรู้ได้ไงว่าทั้งระบบส่งไปหา Lumos ทั้งหมดเท่าไหร่"*)
+              วันนี้ · เดือนนี้ · ทั้งหมด + เลือกช่วง + แยก BU · ยอดทั้งหมด = สามเส้นทางข้างล่างรวมกัน */}
+          <LumosSentBlock
+            rows={teams ? teams.lumosSent : null}
+            loading={loading}
+            error={teams?.errors.lumosSent}
+          />
           <LaneRows
-            name="จากหน้าสาธารณะ"
+            name={`จาก${LUMOS_ROUTE_LABEL.public}`}
             lane={teams?.lumos?.public ?? null}
             onResults={onOpenCallResults}
             onWaiting={onOpenActiveCalls}
           />
           <LaneRows
-            name="จากหน้า Match"
+            name={`จาก${LUMOS_ROUTE_LABEL.match}`}
             lane={teams?.lumos?.match ?? null}
             onResults={onOpenCallResults}
             onWaiting={onOpenActiveCalls}
           />
           <LaneRows
-            name="จากหน้า Follow"
+            name={`จาก${LUMOS_ROUTE_LABEL.follow}`}
             words="follow"
             lane={teams?.lumos?.follow ?? null}
             onResults={onOpenCallResults}

@@ -36,6 +36,7 @@ import { getSiamrajDbSource, listSiamrajThroughput } from '../_lib/siamrajUnitRe
 import { listSiamrajSqlServerInformDays } from '../_lib/siamrajSqlServerInforms.js';
 import { readThroughSnapshot } from '../_lib/trendSnapshots.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
+import { siteBuSql } from '../_lib/siteBuSql.js';
 import { classifyCallMicro, vocabForPersonRef } from '../../src/lib/callMicroOutcome.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
 import type {
@@ -57,9 +58,8 @@ const APPS = tableInAppSchema('public_job_applications');
 const MAP = tableInAppSchema('job_site_map');
 const RELEASES = tableInAppSchema('job_public_releases');
 
-/** BU จากรหัสไซต์ในฝั่ง SQL — ต้องตรงกับ `buFromSiteCode` (`src/lib/homeBu.ts`) · แปลงเป็นรหัสแผนกต่อฝั่ง Node */
-const SITE_BU = (col: string) =>
-  `case when ${col} ~ '^[0-9]{2}[A-Za-z]{3}' then upper(substring(${col} from 3 for 3)) end`;
+/** BU จากรหัสไซต์ในฝั่ง SQL (ตัวกลาง `siteBuSql`) · แปลงเป็นรหัสแผนกต่อฝั่ง Node */
+const SITE_BU = siteBuSql;
 
 const SECTION_RESOURCE: Record<DashboardTrendSection, ApiResource> = {
   follow: 'follow',

@@ -24,7 +24,10 @@ import type { ApplicantTrendRow, TrendCallMicro } from '@/lib/trends/types';
 import { DeltaChip, TrendBadge, TrendChart, TrendSection, TrendState, TrendTable, type Polarity } from './TrendParts';
 
 /**
- * ═══ ส่วน "รายชื่อ → Lumos → ผลโทร" ของแท็บ Dashboard กล่องงาน (28 ก.ย. 2569) ═══
+ * ═══ ส่วน "ใบสมัคร → Lumos → ผลโทร" ของแท็บ Dashboard กล่องงาน (28 ก.ย. 2569) ═══
+ *
+ * 🔴 เจ้าของ (รอบ 3): *"ในกล่องงานดูแล้วงง"* → Choice "คงไว้ บอกชัดว่าเฉพาะใบสมัคร" — ส่วนนี้นับ **คน** (ใบสมัคร)
+ * ส่วนยอดส่ง Lumos **ทั้งระบบ** (นับสาย · ทุกเส้นทาง) อยู่หัวคอลัมน์ Lumos บนหน้าแรก (`LumosSentBlock`)
  *
  * เจ้าของสั่ง: *"มีรายชื่อเข้ามาเท่าไหร่ ส่งไปหา lumos เท่าไหร่ Lumos โทรหมดไหม โทรแล้วผลเป็นไง หรือ แค่รับสายแล้ววาง
  * ไม่รับเยอะไหม ถ้าบอกช่วงเวลาที่คนกรอกเข้ามาเยอะด้วยยิ่งดีเลย … อยากเห็นหลายๆมิติมากๆ"*
@@ -173,7 +176,10 @@ export default function LumosPipelineSection({
   const withResult = now.micro.withResult;
 
   return (
-    <TrendSection title="รายชื่อ → Lumos → ผลโทร" badge={<TrendBadge>ใบสมัครจากหน้าสมัคร · นับคนที่กรอกในช่วงนี้</TrendBadge>}>
+    <TrendSection
+      title="ใบสมัคร → Lumos → ผลโทร"
+      badge={<TrendBadge>เฉพาะคนที่กรอกใบสมัคร · นับเป็นคน · ยอดส่ง Lumos ทั้งระบบอยู่หน้าแรก</TrendBadge>}
+    >
       <TrendState loading={loading && !rows} error={error} onRetry={onRetry} />
       {rows ? (
         <div className="space-y-4">

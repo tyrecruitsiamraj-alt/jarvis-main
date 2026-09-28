@@ -19,6 +19,7 @@
 import { sendError, withAuth, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
+import { siteBuSql } from '../_lib/siteBuSql.js';
 import type { KpiKey, KpiPair } from '@/lib/homeKpi';
 
 const APPS = tableInAppSchema('public_job_applications');
@@ -50,9 +51,8 @@ const CONNECTED = `('confirmed','acknowledged','declined','reschedule_requested'
 const TODAY = `date_trunc('day', now())`;
 const YDAY = `${TODAY} - interval '1 day'`;
 
-/** BU ของรหัสไซต์ = ตัวอักษร 3 ตัวหลังเลขปี 2 หลัก (ต้องตรงกับ `src/lib/homeBu.ts`) */
-const SITE_BU = (col: string) =>
-  `case when ${col} ~ '^[0-9]{2}[A-Za-z]{3}' then upper(substring(${col} from 3 for 3)) end`;
+/** BU ของรหัสไซต์ = ตัวอักษร 3 ตัวหลังเลขปี 2 หลัก (ตัวกลาง `siteBuSql` · ตรงกับ `src/lib/homeBu.ts`) */
+const SITE_BU = siteBuSql;
 
 /**
  * เงื่อนไขกรอง BU ผ่าน `job_site_map` — คืนสตริงว่างเมื่อไม่กรอง

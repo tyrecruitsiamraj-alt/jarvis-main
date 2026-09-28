@@ -220,7 +220,7 @@ const BoardDashboard: React.FC<{
         <TrendKpiCard label="ปล่อยประกาศ" unit="ใบ" value={releases.data ? relNow.released : null} previous={releases.data ? relPrev.released : null} tone="info" spark={relSeries.map((p) => p.value)} />
         <TrendKpiCard label="รายชื่อเข้ามา" unit="คน" value={applicants.data ? pipeNow.names : null} previous={applicants.data ? pipePrev.names : null} tone="violet" spark={appSeries.map((p) => p.value)} />
         <TrendKpiCard
-          label="ส่งให้ Lumos"
+          label="ใบสมัครที่ส่ง Lumos"
           unit="คน"
           value={applicants.data ? sentNow : null}
           previous={applicants.data ? sentPrev : null}

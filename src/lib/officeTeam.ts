@@ -93,12 +93,46 @@ export type LumosTeamStats = {
   follow: LaneCounts;
 };
 
+/** เส้นทางเข้าของสาย — ตัวเดียวกับ `queueLane` */
+export type LumosSentRoute = ReturnType<typeof queueLane>;
+
+/** ชื่อเส้นทางบนจอ — ตัวเดียวของหัวกลุ่มเลนในคอลัมน์ Lumos และยอดรวมหัวคอลัมน์ */
+export const LUMOS_ROUTE_LABEL: Record<LumosSentRoute, string> = {
+  public: 'หน้าสาธารณะ',
+  match: 'หน้า Match',
+  follow: 'หน้า Follow',
+  other: 'อื่น ๆ',
+};
+
+/** สถานะตอนนี้ของสาย (นิยามกลาง `lumosQueueDefs`) · `other` = ไม่เข้าถังไหน (ต้องบอก ห้ามหาย) */
+export type LumosSentState = 'pending' | 'waiting' | 'done' | 'cancelled' | 'other';
+
+/**
+ * ═══ ส่งให้ Lumos ทั้งระบบ — ยอดรายวัน (เจ้าของสั่ง 28 ก.ย. 2569) ═══
+ * *"จะรู้ได้ไงว่าทั้งระบบส่งไปหา Lumos ทั้งหมดเท่าไหร่ เอาไว้หน้าแรกเลยได้ไหม"* → Choice: ยอดรวมหัวคอลัมน์ Lumos ·
+ * วันนี้/เดือนนี้/ทั้งหมด + เลือกช่วงได้ + แยก BU ได้ · นับเป็นสาย
+ *
+ * หนึ่งแถว = จำนวนสายที่ **ส่งเข้าคิววันนั้น** (ปฏิทินกรุงเทพ) ของ BU · เส้นทาง · สถานะตอนนี้ ชุดหนึ่ง
+ * ⚠️ ไม่มีข้อมูลบุคคล — ตัวนับล้วน
+ */
+export type LumosSentRow = {
+  /** วันที่ส่งเข้าคิว (YYYY-MM-DD เวลาไทย) */
+  day: string;
+  /** BU รหัสจากไซต์ (ชุดเดียวกับตัวกรองหน้าแรก · `siteBuOf`) · null = ไม่รู้ BU */
+  bu: string | null;
+  route: LumosSentRoute;
+  state: LumosSentState;
+  n: number;
+};
+
 export type BoardTeams = {
   online: OnlineTeamStats | null;
   recruit: RecruitTeamStats | null;
   lumos: LumosTeamStats | null;
+  /** ส่งให้ Lumos ทั้งระบบรายวัน · null = อ่านไม่ได้ (ดู `errors.lumosSent`) · ไม่มี field = เซิร์ฟเวอร์รุ่นเก่า */
+  lumosSent?: LumosSentRow[] | null;
   /** ทีมที่วัดไม่ได้ + เหตุผล — จอต้องวาด "วัดไม่ได้" ห้ามหายเงียบ ห้าม 0 ปลอม */
-  errors: Partial<Record<'online' | 'recruit' | 'lumos', string>>;
+  errors: Partial<Record<'online' | 'recruit' | 'lumos' | 'lumosSent', string>>;
 };
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeTrendBu, trendBuFromSiteCode, trendBuLabel } from './bu';
+import { normalizeTrendBu, siteBuOf, trendBuFromSiteCode, trendBuLabel } from './bu';
 import { followDimGetter, followEventYmd, followUnitResolver } from './followTrends';
 import { activityLedger, cohortSeries, releaseStats } from './requestTrends';
 import { staffTable } from './staffTrends';
@@ -21,6 +21,17 @@ describe('BU ชุดเดียว (รหัสแผนก) — ตาร�
     expect(normalizeTrendBu('XYZ')).toBe('XYZ');
     expect(trendBuFromSiteCode('66LML0011')).toBe('LM');
     expect(trendBuFromSiteCode('อ่านไม่ออก')).toBeNull();
+  });
+  it('กลับทิศเป็นรหัสจากไซต์ (ชุดของตัวกรองหน้าแรก) — แผนกกับไซต์ของ BU เดียวกันได้รหัสเดียว', () => {
+    expect(siteBuOf('LM')).toBe('LML');
+    expect(siteBuOf('LML')).toBe('LML');
+    expect(siteBuOf('ds')).toBe('DSL');
+    expect(siteBuOf('SN')).toBe('SNJ');
+    expect(siteBuOf('CR')).toBe('CRS');
+    expect(siteBuOf('LBD')).toBe('LBD');
+    expect(siteBuOf('XYZ')).toBe('XYZ');
+    expect(siteBuOf('')).toBeNull();
+    expect(siteBuOf(null)).toBeNull();
   });
   it('ป้ายใช้ชื่อจาก homeBu ที่เดียว', () => {
     expect(trendBuLabel('LM')).toBe('LM · ดูแลสวน / ภูมิทัศน์');

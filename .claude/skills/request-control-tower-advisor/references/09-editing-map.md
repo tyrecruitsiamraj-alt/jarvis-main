@@ -9973,3 +9973,26 @@ B ตาราง · C กระดานตามขั้น) → เลือ
 - **ใบสมัครที่ไม่ได้เลือกงาน ตัวส่งอัตโนมัติข้ามเงียบ ๆ** (`buildApplicationInterviewPayload` ต้องมี `job_id`) — 30 วันล่าสุด ยังไม่ส่ง 15 ใบ = ไม่ได้เลือกงานทั้ง 15 (30 ส.ค.–10 ก.ย. · หลังจากนั้นไม่มีอีก)
 - ยังไม่ถึงมือ Lumos ค้าง 3 แถว ~4 วัน (วัด 28 ก.ย.) — `status = pending` ไม่ขยับ · ยังไม่ได้ไล่สาเหตุ
 - ชั่วโมงที่ไม่มีสาย = ไม่วาดแท่ง (ห้ามโชว์ 0%) · ป้ายชั่วโมงบอกจำนวนสายคู่ %
+
+### รอบ 3 (วันเดียวกัน) — "ส่งให้ Lumos ทั้งระบบ" บนหัวคอลัมน์ Lumos หน้าแรก
+
+เจ้าของ: *"ในกล่องงานดูแล้วงง แล้วจะรู้ได้ไงว่าทั้งระบบส่งไปหา Lumos ทั้งหมดเท่าไหร่ เอาไว้หน้าแรกเลยได้ไหม"* → Choice:
+ยอดรวมหัวคอลัมน์ Lumos · วันนี้/เดือนนี้/ทั้งหมด + *"เรื่องช่วงดูได้ด้วย แยก bu ดุได้ด้วย"* · **นับสาย** · กล่องงานคงไว้แต่บอกว่าเฉพาะใบสมัคร
+
+| ไฟล์ | หน้าที่ |
+| --- | --- |
+| `api/_handlers/office-team.ts` | + `loadLumosSent()` — คิวทั้งตาราง นับ **รายวัน (เวลาไทย) × BU × เส้นทาง × สถานะ** · เส้นทาง = CASE ชุดเดียวกับเลน (เทสต์เทียบข้อความ) · สถานะ = `queueCancelled/HasResult/Waiting/Pending` · BU: ติดตาม = แผนกคนคีย์ → ไซต์ของรายการ · อื่น = `job_site_map` ผ่าน job_ref → แผนกบนใบสมัคร · ล้ม = `lumosSent: null` + `errors.lumosSent` (บอร์ดส่วนอื่นไม่ล้ม) · คอลัมน์ชื่อ `route` ห้ามเป็น `lane` (เทสต์เลนจำคิวรีจาก `as lane`) |
+| `api/_lib/siteBuSql.ts` | **ใหม่** — นิพจน์ BU จากรหัสไซต์ฝั่ง SQL ตัวเดียว · `home-kpis` · `dashboard-trends` · `office-team` ใช้ร่วม (เดิมเขียนซ้ำทุกเส้น) |
+| `src/lib/officeTeam.ts` | + `LumosSentRow` · `LumosSentRoute` · `LumosSentState` · `LUMOS_ROUTE_LABEL` (ชื่อเส้นทางบนจอตัวเดียว) · `BoardTeams.lumosSent?` |
+| `src/lib/lumosSentSummary.ts` | **ใหม่** — วันนี้/เดือนนี้/ทั้งหมด/ช่วงที่เลือก · แจกสถานะ+เส้นทางของช่วงที่ดู (บวกกันได้ยอดเป๊ะ) · กรอง BU + จำนวนที่ไม่รู้ BU · ตัวเลือก BU จากสายที่มีจริง |
+| `src/lib/trends/bu.ts` | + `siteBuOf()` แผนก → รหัสจากไซต์ (LM→LML) ตารางเดียวกับ `normalizeTrendBu` กลับทิศ |
+| `src/components/home/LumosSentBlock.tsx` | **ใหม่** — ก้อนบนสุดของคอลัมน์ Lumos (`TeamBoardPanel`) · ช่วงวันที่ (`DateRangeCalendarPicker` filter) · BU (`ChoiceDropdown`) · อ่านไม่ได้ = "วัดไม่ได้" · เซิร์ฟเวอร์เก่าไม่มี field = ไม่วาด |
+| `src/components/shared/ChoiceDropdown.tsx` + `src/lib/filterTrigger.ts` | **ใหม่** — ย้าย `ChoiceDropdown` ออกจาก `BoardFilterPanel` (ยังส่งออกชื่อเดิมต่อ) ให้หน้าแรกใช้ได้โดยไม่ลากแผงกรองกล่องงาน · `filterTriggerClass` ตัวเดียว |
+| `src/lib/metricDictionary.ts` | + `lumos.sent_all` "ส่งให้ Lumos ทั้งระบบ" (สาย) |
+| `LumosPipelineSection.tsx` · `BoardDashboard.tsx` | หัวส่วน "ใบสมัคร → Lumos → ผลโทร" + ป้าย "เฉพาะคนที่กรอกใบสมัคร · นับเป็นคน · ยอดส่ง Lumos ทั้งระบบอยู่หน้าแรก" · การ์ด "ใบสมัครที่ส่ง Lumos" |
+| tests | `lumosSentSummary.test.ts` · `LumosSentBlock.test.tsx` · `officeTeamLumosSent.test.ts` · `siteBuSql.test.ts` · `trends.test.ts` (siteBuOf) |
+
+🔴 กับดัก:
+- **สองหน่วยบนสองหน้า**: หน้าแรกนับ **สาย** (ทุกครั้งที่ส่ง รวมยกเลิก · ทุกเส้นทาง) · กล่องงานนับ **คน** (ใบสมัครที่มีแถวคิว) — ป้ายต้องบอกหน่วยเสมอ อย่าเอามาเทียบกันตรง ๆ
+- BU สองชุดรหัส (แผนก LM ↔ ไซต์ LML) ต้องแปลงเป็นชุดเดียวก่อนรวม — หน้าแรกใช้ **รหัสจากไซต์** (ชุดของตัวกรอง BU)
+- ⚠️ `home-kpis` กรอง BU ของงานติดตามด้วยแผนกคนคีย์ (LM) เทียบกับตัวเลือกที่เป็นรหัสไซต์ (LML) — BU ที่รหัสไม่ตรงกันจะหลุด (ยังไม่ได้แก้ · ไม่อยู่ในรอบนี้)

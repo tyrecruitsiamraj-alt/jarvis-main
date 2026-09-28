@@ -32,6 +32,17 @@ export function normalizeTrendBu(code: string | null | undefined): string | null
   return SITE_BU_TO_DEPT[c] ?? c;
 }
 
+/**
+ * รหัส BU ใด ๆ → **รหัส BU จากไซต์** (LBD · LBA · LML · DSL · SNJ · CRS) — ชุดเดียวกับตัวกรอง BU หน้าแรก
+ * ใช้กับของที่ BU มาจากแผนกของคน (งานติดตาม = แผนกของคนคีย์) ให้ไปรวมถังเดียวกับของที่มาจากไซต์
+ * ตารางจับคู่ตัวเดียวกับ `normalizeTrendBu` (กลับทิศ) · ว่าง = null · รหัสนอกตาราง = คืนตามเดิม
+ */
+export function siteBuOf(code: string | null | undefined): string | null {
+  const dept = normalizeTrendBu(code);
+  if (!dept) return null;
+  return DEPT_TO_SITE_BU[dept] ?? dept;
+}
+
 /** BU จากรหัสไซต์ แปลงเป็นรหัสแผนกแล้ว */
 export function trendBuFromSiteCode(siteCode: string | null | undefined): string | null {
   return normalizeTrendBu(buFromSiteCode(siteCode));
