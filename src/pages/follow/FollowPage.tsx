@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
@@ -115,6 +116,12 @@ const NAME_PREFIXES = ['', 'นาย', 'นาง', 'นางสาว'] as co
 function composeRecipientName(prefix: string, first: string, last: string): string {
   return `${prefix}${first.trim()} ${last.trim()}`.trim().replace(/\s+/g, ' ');
 }
+
+/**
+ * แท็บ Dashboard ของหน้าติดตาม (เจ้าของสั่ง 28 ก.ย. 2569 — "ขอคำว่า dashboard") · โหลดเมื่อกดเท่านั้น
+ * (กราฟ + ข้อมูลย้อนหลังไม่ควรถ่วงหน้ารายการที่เปิดทั้งวันและรีเฟรชทุก 25 วิ)
+ */
+const FollowDashboard = lazy(() => import('@/components/dashboard-trends/FollowDashboard'));
 
 const FollowPage: React.FC = () => {
   const [items, setItems] = useState<FollowEntry[]>([]);
@@ -340,6 +347,13 @@ const FollowPage: React.FC = () => {
    * (ไม่ล้าง = กดรีเฟรชแล้วฟอร์มเด้งเปิดใหม่ทุกครั้ง)
    */
   const [searchParams, setSearchParams] = useSearchParams();
+  const followView: 'list' | 'dashboard' = searchParams.get('view') === 'dashboard' ? 'dashboard' : 'list';
+  const setFollowView = (next: 'list' | 'dashboard') => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'dashboard') params.set('view', 'dashboard');
+    else params.delete('view');
+    setSearchParams(params);
+  };
   useEffect(() => {
     const prefill = readFollowPrefill(searchParams);
     if (!hasFollowPrefill(prefill)) return;
@@ -1030,6 +1044,23 @@ const FollowPage: React.FC = () => {
         backPath="/"
       />
 
+      {/* แท็บ "รายชื่อติดตาม | Dashboard" (28 ก.ย. 2569) — ?view=dashboard · กดเปลี่ยน = push (ย้อนกลับแล้วไม่หลุดหน้า) */}
+      <div className="px-4 md:px-6">
+        <Tabs value={followView} onValueChange={(v) => setFollowView(v === 'dashboard' ? 'dashboard' : 'list')}>
+          <TabsList>
+            <TabsTrigger value="list">รายชื่อติดตาม</TabsTrigger>
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {followView === 'dashboard' ? (
+        <div className="px-4 md:px-6 py-4">
+          <Suspense fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิด Dashboard…</p>}>
+            <FollowDashboard />
+          </Suspense>
+        </div>
+      ) : (
       <div className="px-4 md:px-6 py-4 space-y-4">
         {/* funnel การโทร "ของหน้านี้เท่านั้น" + ถัง "ต้องคนตาม"
             เจ้าของสั่ง 10 ส.ค. 2569: หน้านี้เอาแค่ของ Follow พอ ("ตอนนี้มีแค่ 1 พอ")
@@ -1998,6 +2029,7 @@ const FollowPage: React.FC = () => {
             ด้วยคำคนละชุด แล้วยอดสองที่ไม่ตรงกัน · งานย้ายไปดูแลหลังเริ่มงานทำได้จาก
             แท็บนั้นอยู่แล้ว **ห้ามเอากล่องนี้กลับมาโดยไม่ได้สั่ง** */}
       </div>
+      )}
 
       {/* ป๊อปรายละเอียดของช่องปฏิทิน — ปุ่มทำงานทั้งหมดอยู่ในนี้
           🔴 กด "แก้ไข" ต้องปิดป๊อปนี้ก่อน แล้วค่อยเปิดกล่องแก้ไข (ห้ามซ้อน Dialog) */}

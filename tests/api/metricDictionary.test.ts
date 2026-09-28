@@ -64,7 +64,7 @@ describe('ทุกเลขบนหน้าแรกต้องอธิบ�
       '/work',
     ];
     /** `?view=` ที่บอร์ดรับสมัครรองรับจริง (StaffJobBoardPage: RM_VIEWS · `postings` ถอดแล้ว 27 ก.ย. 2569) */
-    const KNOWN_VIEWS = ['board', 'list', 'contact', 'appointments'];
+    const KNOWN_VIEWS = ['board', 'list', 'contact', 'appointments', 'dashboard'];
     for (const key of METRIC_KEYS) {
       const href = (METRICS[key] as MetricSpec).href;
       if (!href) continue;

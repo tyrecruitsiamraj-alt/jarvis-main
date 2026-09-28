@@ -1,10 +1,17 @@
-import React, { useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import JobBoardView, { type BoardViewId } from '@/components/jobs/JobBoardView';
 import RmWorkspace from '@/components/recruit-rm/RmWorkspace';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { useClosedRequestsFeed } from '@/hooks/useClosedRequestsFeed';
 import type { JobBoxKey } from '@/lib/jobBoxGroups';
+import { sumJobPositionUnits } from '@/lib/jobPositionUnits';
+import { PREQUEST_ID_PREFIX } from '@/lib/siamrajUnitRequestsApi';
+
+/**
+ * แท็บ Dashboard (28 ก.ย. 2569) — โหลดเมื่อกดเท่านั้น: กราฟ recharts + ข้อมูลย้อนหลังไม่ควรถ่วงกล่องงานที่คนเปิดทั้งวัน
+ */
+const BoardDashboard = lazy(() => import('@/components/dashboard-trends/BoardDashboard'));
 
 /**
  * บอร์ดรับสมัครฝั่งเจ้าหน้าที่ — สี่มุมมองในหน้าเดียว
@@ -25,6 +32,8 @@ import type { JobBoxKey } from '@/lib/jobBoxGroups';
  */
 
 const RM_VIEWS = ['list', 'contact', 'appointments'] as const;
+/** มุมที่ไม่ใช่กล่องงานและไม่ใช่ RM — แท็บ Dashboard */
+const EXTRA_VIEWS = ['dashboard'] as const;
 
 /**
  * แท็บที่ถูกถอดออกแล้ว — ลิงก์เก่ามาถึงให้เปิดกล่องงานแทน แล้วล้าง `?view=` ทิ้ง
@@ -52,10 +61,16 @@ const StaffJobBoardPage: React.FC = () => {
   const { jobs, loading, refreshing, loadError, feedState, dataAgeSeconds, refetch } =
     useUnitRequestsFeed();
   const closed = useClosedRequestsFeed();
+  /** ยอดเหลือหาของกล่องงาน (ตัวเดียวกับหัวกล่องงาน) — ส่งให้แท็บ Dashboard ใช้ ห้ามนับชุดที่สอง */
+  const boardOpen = useMemo(() => {
+    if (loading || feedState !== 'ready') return null;
+    const pre = jobs.filter((j) => j.id.startsWith(PREQUEST_ID_PREFIX));
+    return { positions: sumJobPositionUnits(jobs), prePositions: sumJobPositionUnits(pre), preCount: pre.length };
+  }, [jobs, loading, feedState]);
   const [searchParams, setSearchParams] = useSearchParams();
   const raw = searchParams.get('view');
   const legacyBox = raw ? (LEGACY_BOX_VIEWS[raw] ?? null) : null;
-  const view: BoardViewId = (RM_VIEWS as readonly string[]).includes(raw ?? '')
+  const view: BoardViewId = [...RM_VIEWS, ...EXTRA_VIEWS].includes((raw ?? '') as never)
     ? (raw as BoardViewId)
     : 'board';
   const retiredView = (RETIRED_VIEWS as readonly string[]).includes(raw ?? '');
@@ -109,7 +124,11 @@ const StaffJobBoardPage: React.FC = () => {
         onReloadClosed={closed.reload}
         initialBox={legacyBox}
         listContent={
-          view === 'board' ? null : (
+          view === 'board' ? null : view === 'dashboard' ? (
+            <Suspense fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิด Dashboard…</p>}>
+              <BoardDashboard boardOpen={boardOpen} />
+            </Suspense>
+          ) : (
             <RmWorkspace tab={VIEW_TO_RM_TAB[view as (typeof RM_VIEWS)[number]]} />
           )
         }

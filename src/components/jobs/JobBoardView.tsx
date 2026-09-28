@@ -219,7 +219,7 @@ export type JobBoardViewProps = {
  * **กล่องบนหน้ากล่องงาน** ที่กดแล้วกรองในหน้าเดิม เหมือนกล่องอื่นทุกกล่อง
  * ลิงก์เก่า `?view=closed` / `?view=cancelled` ถูกแปลงเป็นกล่องที่ `StaffJobBoardPage`
  */
-export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments';
+export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'dashboard';
 
 /**
  * แท็บระดับบอร์ด + ชื่อหัวหน้าจอ — **ชุดเดียวใช้ทั้งแถบแท็บและหัวหน้าจอ**
@@ -232,6 +232,9 @@ const BOARD_VIEW_TABS: ReadonlyArray<{ id: BoardViewId; label: string }> = [
   { id: 'list', label: 'รายชื่อผู้สมัคร' },
   { id: 'contact', label: 'การโทรของฉัน' },
   { id: 'appointments', label: 'ติดตามนัดหมาย' },
+  // 🔴 แท็บ "Dashboard" มุมผู้บริหาร (เจ้าของสั่ง 28 ก.ย. 2569 — Choice "แท็บในสองหน้า" + "ขอคำว่า dashboard")
+  // เนื้อมาจาก StaffJobBoardPage (lazy · ห้าม import ในไฟล์นี้ — หน้าสมัครสาธารณะใช้ไฟล์นี้ร่วม)
+  { id: 'dashboard', label: 'Dashboard' },
   // 🔴 แท็บ "คำขอโพสต์งานใหม่" ถูกถอดทั้งแท็บ 27 ก.ย. 2569 (เจ้าของสั่ง — ทีม Online
   // ดูทีละกล่องแล้วเอาขึ้นเลย ไม่ต้องมีคิวคำขอ) · ลิงก์เก่า ?view=postings เปิดกล่องงานแทน
   // ⚠️ **ไม่มี "ปิดแล้ว"/"ยกเลิก" บนแท็บแล้ว** (เจ้าของสั่ง 19 ส.ค. 2569:
