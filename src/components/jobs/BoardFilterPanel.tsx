@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
-import { Check, ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { Check, ChevronDown, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import DateRangeCalendarPicker from '@/components/shared/DateRangeCalendarPicker';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
@@ -20,12 +28,17 @@ import {
 import { visibleFacetOptions, type FacetView } from '@/lib/facetEngine';
 
 /**
- * ═══ ตัวกรองของกล่องงาน + แท็บผู้สมัคร — ปุ่ม "ตัวกรอง" ปุ่มเดียว ═══
+ * ═══ ตัวกรองของกล่องงาน + แท็บผู้สมัคร — เนื้อในชุดเดียว วางได้สองแบบ ═══
  *
  * ประวัติ: 26 ก.ย. แถบซ้ายแบบ iRecruit → 27 ก.ย. เช้า Dropdown เรียงเต็มแถว ("อันไหนเป็น Filter ทำเป็น Dropdown")
- * → **27 ก.ย. บ่าย เจ้าของเลือกแบบ A** (*"หน้ากล่องงานไม่เข้ากับหน้าอื่นๆเลย รกมาก"*):
- * แถวเดียว `[ตัวกรอง (N)] [เรียง ▾]` แบบหน้าอื่น · กดตัวกรอง = กล่อง Dropdown ที่มีทุกหัวข้อ เปิดได้ทีละหัวข้อ
- * (🔴 แถบซ้าย / Sheet มือถือ / Dropdown เรียงเต็มแถว ถูกถอดแล้ว — ห้ามเอากลับโดยไม่ได้สั่งใหม่)
+ * → 27 ก.ย. บ่าย เจ้าของเลือกแบบ A (*"หน้ากล่องงานไม่เข้ากับหน้าอื่นๆเลย รกมาก"*) = ปุ่มเดียวทั้งสองที่
+ * → **28 ก.ย. เจ้าของแยกกัน:** *"หน้ากล่องงาน … เป็นช่องๆแบบเดิม ส่วนหน้าอื่นๆพวก รายชื่อผู้สมัคร การโทรของฉัน ฯลฯ
+ *   ทำแบบ Irecruit เลย"* แล้วเลือก Choice "แถบกรองซ้ายตามแบบร่างที่เคาะไว้"
+ *   - แท็บกล่องงาน = `BoardFilterBar` → ปุ่ม `[ตัวกรอง (N)] [เรียง ▾]` (แบบ A เหมือนเดิม)
+ *   - แท็บรายชื่อผู้สมัคร / การโทรของฉัน / ติดตามนัดหมาย = `FilterSidebar` (จอ lg ขึ้นไป) +
+ *     `FilterSheetButton` (จอเล็กกว่า lg เปิดแผงด้านซ้าย)
+ *   ทั้งสามแบบวาดด้วย `FilterAccordion` ตัวเดียว — หัวข้อ/ลำดับ/เลขต่อท้ายจึงตรงกันเสมอ
+ * (🔴 Dropdown เรียงเต็มแถวยังถูกถอด — ห้ามเอากลับโดยไม่ได้สั่งใหม่)
  *
  * 🔴 **วาดอย่างเดียว ไม่คิดเอง** — ตัวเลือก/เลขต่อท้าย/หัวข้อไหนซ่อน มาจาก `facetEngine`
  * (`buildBoardFacets` / `buildApplicantFacets`) ทั้งหมด · จอห้ามนับเลขเอง
@@ -169,30 +182,80 @@ const groupSelected = <K extends string>(g: FacetGroup<K>) =>
 /** หัวข้อเพิ่มที่ไม่ได้มาจากเครื่องกรอง (ใบที่จบแล้ว · ช่วงวันที่) — วางในกล่องเดียวกับหัวข้ออื่น */
 export type FilterExtraSection = { key: string; label: string; selected: number; content: React.ReactNode };
 
+/** ของที่ตัวกรองทุกแบบรับเหมือนกัน (ปุ่มเดียว · แถบซ้าย · แผงมือถือ) */
+type FilterContentProps<K extends string> = {
+  facets: FacetView<K>[];
+  /** หัวข้อที่ขึ้นก่อน ตามลำดับนี้ · ที่เหลือตามลำดับของเครื่องกรอง */
+  primary?: readonly K[];
+  /** หัวข้อลูก → หัวข้อแม่ (อำเภอในจังหวัด · งานย่อยในตำแหน่งงาน) */
+  attach?: Partial<Record<K, K>>;
+  onToggle: (key: K, value: string) => void;
+  /** หัวข้อเพิ่ม ต่อท้ายหัวข้อของเครื่องกรอง */
+  sections?: FilterExtraSection[];
+};
+
+/** จำนวนค่าที่ติ๊กอยู่ทั้งชุด — เลขบนปุ่ม (หัวข้อลูกนับรวมอยู่ใน `facets` แล้ว ไม่นับซ้ำ) */
+function selectedTotal<K extends string>(facets: FacetView<K>[], sections: FilterExtraSection[] = []): number {
+  return facets.reduce((a, f) => a + f.selectedCount, 0) + sections.reduce((a, x) => a + x.selected, 0);
+}
+
 /**
- * ปุ่ม "ตัวกรอง (N)" + กล่องทุกหัวข้อ — หัวข้อหลักขึ้นก่อนตามลำดับ `primary` · ที่เหลือตามลำดับของเครื่องกรอง ·
- * หัวข้อเพิ่ม (`sections`) ต่อท้าย · เปิดได้ทีละหัวข้อ (กล่องไม่ยาวเกินจอ)
+ * เนื้อในของตัวกรอง — หัวข้อพับได้ **เปิดได้ทีละหัวข้อ** (แบบ iRecruit) · หัวข้อลูกอยู่ในหัวข้อแม่ ·
+ * หัวข้อเพิ่ม (`sections`) ต่อท้าย · 🔴 ตัวเดียวที่วาดหัวข้อ — ปุ่มเดียว/แถบซ้าย/แผงมือถือ ห้ามวาดเอง
  */
-export function FilterButton<K extends string>({
+function FilterAccordion<K extends string>({
   facets,
   primary = [],
   attach = {},
   onToggle,
   sections = [],
-}: {
-  facets: FacetView<K>[];
-  primary?: readonly K[];
-  attach?: Partial<Record<K, K>>;
-  onToggle: (key: K, value: string) => void;
-  sections?: FilterExtraSection[];
-}) {
-  const groups = groupFacets(facets, attach);
+}: FilterContentProps<K>) {
   const rank = (k: K) => {
     const i = primary.indexOf(k);
     return i === -1 ? primary.length : i;
   };
-  const ordered = [...groups].sort((a, b) => rank(a.head.key) - rank(b.head.key));
-  const n = groups.reduce((a, g) => a + groupSelected(g), 0) + sections.reduce((a, x) => a + x.selected, 0);
+  const ordered = [...groupFacets(facets, attach)].sort((a, b) => rank(a.head.key) - rank(b.head.key));
+  if (ordered.length === 0 && sections.length === 0) {
+    return <p className="px-1 py-2 text-xs text-muted-foreground">ยังไม่มีหัวข้อให้กรอง</p>;
+  }
+  return (
+    <Accordion type="single" collapsible className="w-full">
+      {ordered.map((g) => (
+        <AccordionItem key={g.head.key} value={g.head.key} className="border-border">
+          <AccordionTrigger className="py-2 text-xs font-medium hover:no-underline">
+            <span className="flex items-center gap-2">
+              {g.head.label}
+              <TriggerCount n={groupSelected(g)} />
+            </span>
+          </AccordionTrigger>
+          <AccordionContent className="space-y-4 pb-3">
+            <FacetBody facet={g.head} onToggle={onToggle} />
+            {g.children.map((c) => (
+              <FacetSection key={c.key} facet={c} onToggle={onToggle} showTitle />
+            ))}
+          </AccordionContent>
+        </AccordionItem>
+      ))}
+      {sections.map((x) => (
+        <AccordionItem key={`extra-${x.key}`} value={`extra-${x.key}`} className="border-border">
+          <AccordionTrigger className="py-2 text-xs font-medium hover:no-underline">
+            <span className="flex items-center gap-2">
+              {x.label}
+              <TriggerCount n={x.selected} />
+            </span>
+          </AccordionTrigger>
+          <AccordionContent className="pb-3">{x.content}</AccordionContent>
+        </AccordionItem>
+      ))}
+    </Accordion>
+  );
+}
+
+/**
+ * ปุ่ม "ตัวกรอง (N)" + กล่องทุกหัวข้อ — ของแท็บกล่องงาน (แบบ A) · เปิดได้ทีละหัวข้อ (กล่องไม่ยาวเกินจอ)
+ */
+export function FilterButton<K extends string>(props: FilterContentProps<K>) {
+  const n = selectedTotal(props.facets, props.sections);
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -203,41 +266,80 @@ export function FilterButton<K extends string>({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="max-h-96 w-80 overflow-y-auto p-3">
-        {ordered.length === 0 && sections.length === 0 ? (
-          <p className="px-1 py-2 text-xs text-muted-foreground">ยังไม่มีหัวข้อให้กรอง</p>
-        ) : (
-          <Accordion type="single" collapsible className="w-full">
-            {ordered.map((g) => (
-              <AccordionItem key={g.head.key} value={g.head.key} className="border-border">
-                <AccordionTrigger className="py-2 text-xs font-medium hover:no-underline">
-                  <span className="flex items-center gap-2">
-                    {g.head.label}
-                    <TriggerCount n={groupSelected(g)} />
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="space-y-4 pb-3">
-                  <FacetBody facet={g.head} onToggle={onToggle} />
-                  {g.children.map((c) => (
-                    <FacetSection key={c.key} facet={c} onToggle={onToggle} showTitle />
-                  ))}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-            {sections.map((x) => (
-              <AccordionItem key={`extra-${x.key}`} value={`extra-${x.key}`} className="border-border">
-                <AccordionTrigger className="py-2 text-xs font-medium hover:no-underline">
-                  <span className="flex items-center gap-2">
-                    {x.label}
-                    <TriggerCount n={x.selected} />
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="pb-3">{x.content}</AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        )}
+        <FilterAccordion {...props} />
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** แถบซ้าย/แผงมือถือรับเพิ่ม: ปุ่มล้าง + บรรทัดผลลัพธ์ (โผล่เฉพาะตอนมีอะไรติ๊กอยู่) */
+type FilterPanelProps<K extends string> = FilterContentProps<K> & {
+  /** ล้างทุกอย่างในแถบ — รวมหัวข้อเพิ่ม (เช่น วันที่สมัคร) */
+  onClear: () => void;
+  /** เช่น "เหลือ 26 รายชื่อ" — ไม่ส่ง = ไม่มีบรรทัดนี้ */
+  resultText?: string;
+};
+
+/** หัวแถบ "ตัวกรองเพิ่มเติม  ✕ ล้าง" — ชื่อเดียวกับแบบร่างที่เจ้าของเคาะ */
+function FilterPanelHeader({ selected, onClear, resultText }: { selected: number; onClear: () => void; resultText?: string }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium text-foreground">ตัวกรองเพิ่มเติม</p>
+        <Button type="button" variant="ghost" size="xs" onClick={onClear} disabled={selected === 0}>
+          <X aria-hidden /> ล้าง
+        </Button>
+      </div>
+      {selected > 0 && resultText ? <p className="text-xs text-muted-foreground">{resultText}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * แถบกรองด้านซ้ายแบบ iRecruit — แท็บรายชื่อผู้สมัคร / การโทรของฉัน / ติดตามนัดหมาย (เจ้าของสั่ง 28 ก.ย. 2569)
+ * โชว์ตั้งแต่จอ lg ขึ้นไป · จอเล็กกว่านั้นใช้ `FilterSheetButton` (เนื้อในชุดเดียวกัน)
+ */
+export function FilterSidebar<K extends string>({ onClear, resultText, ...content }: FilterPanelProps<K>) {
+  const n = selectedTotal(content.facets, content.sections);
+  return (
+    <aside
+      aria-label="ตัวกรองเพิ่มเติม"
+      className="hidden w-64 shrink-0 self-start rounded-xl border border-border bg-card p-3 lg:block"
+    >
+      <FilterPanelHeader selected={n} onClear={onClear} resultText={resultText} />
+      <div className="mt-2">
+        <FilterAccordion {...content} />
+      </div>
+    </aside>
+  );
+}
+
+/** ปุ่ม "ตัวกรอง (N)" เปิดแผงด้านซ้าย — เฉพาะจอเล็กกว่า lg (แถบซ้ายซ่อนอยู่) */
+export function FilterSheetButton<K extends string>({ onClear, resultText, ...content }: FilterPanelProps<K>) {
+  const n = selectedTotal(content.facets, content.sections);
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button type="button" variant="outline" size="xs" className={cn(triggerClass(n > 0), 'lg:hidden')}>
+          <SlidersHorizontal aria-hidden />
+          ตัวกรอง
+          <TriggerCount n={n} />
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" className="w-full overflow-y-auto sm:max-w-sm">
+        <SheetHeader className="text-left">
+          <SheetTitle className="sr-only">ตัวกรองเพิ่มเติม</SheetTitle>
+          <SheetDescription className="sr-only">เลือกได้หลายค่า รายชื่อเปลี่ยนทันทีที่ติ๊ก</SheetDescription>
+        </SheetHeader>
+        {/* pr-6 = เว้นที่ให้ปุ่มปิด (X) มุมขวาบนของแผง */}
+        <div className="pr-6">
+          <FilterPanelHeader selected={n} onClear={onClear} resultText={resultText} />
+        </div>
+        <div className="mt-2">
+          <FilterAccordion {...content} />
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 

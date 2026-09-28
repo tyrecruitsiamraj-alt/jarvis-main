@@ -54,7 +54,7 @@ import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { canHoldApplication } from '@/lib/recruitRm';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { useAuth } from '@/contexts/AuthContext';
-import { FilterButton } from '@/components/jobs/BoardFilterPanel';
+import { FilterSheetButton, FilterSidebar, type FilterExtraSection } from '@/components/jobs/BoardFilterPanel';
 import {
   APPLICANT_FACET_ATTACH,
   APPLICANT_PRIMARY_FACETS,
@@ -291,6 +291,20 @@ const RmWorkspace: React.FC<{
     commitApplicantFilters(toggleApplicantFacetValue(applicantFilterState, key, value));
   const clearApplicantFacets = () => commitApplicantFilters(EMPTY_APPLICANT_FILTER_STATE);
   const applicantFacetCount = countSelectedApplicantValues(applicantFilterState);
+  /** ปุ่ม "ล้าง" ของแถบซ้าย = ล้างทุกอย่างในแถบ รวมวันที่สมัคร (อยู่ในแถบเดียวกัน) */
+  const clearApplicantPanel = () => {
+    clearApplicantFacets();
+    if (dateRange) changeDateRange(null);
+  };
+  /** วันที่สมัครเป็นหัวข้อหนึ่งในแถบกรอง (ตามแบบร่าง: "ช่องทาง · วันที่สมัคร" อยู่ในแถบซ้าย) */
+  const applicantPanelSections: FilterExtraSection[] = [
+    {
+      key: 'applied',
+      label: 'วันที่สมัคร',
+      selected: dateRange ? 1 : 0,
+      content: <DateRangeCalendarPicker triggerVariant="filter" value={dateRange} onChange={changeDateRange} />,
+    },
+  ];
 
   /** ชุดก่อนแถบซ้าย (แท็บ + มุมมองย่อย + วันที่ + คำค้น) — ฐานของเลขต่อท้ายตัวเลือก */
   const baseFiltered = useMemo(() => {
@@ -651,35 +665,25 @@ const RmWorkspace: React.FC<{
       {/* ตัวกรองวันที่สมัคร (เจ้าของสั่ง 22 ส.ค. 2569) — ใช้ปฏิทินตัวเดียวกับหน้า Dashboard
           ⚠️ ไม่โผล่ในโหมด drill-down (?bucket=) เพราะ server กรองมาแล้ว
           ถ้าให้กรองซ้ำที่นี่ เลขจะไม่ตรงกับกล่องที่กดมา */}
+      {/* 🔴 **แถบกรองด้านซ้ายแบบ iRecruit** (เจ้าของสั่ง 28 ก.ย. 2569: *"หน้าอื่นๆพวก รายชื่อผู้สมัคร
+          การโทรของฉัน ฯลฯ ทำแบบ Irecruit เลย"* → Choice "แถบกรองซ้ายตามแบบร่างที่เคาะไว้")
+          · จอ lg ขึ้นไป = แถบซ้าย (`FilterSidebar`) · จอเล็ก = ปุ่ม "ตัวกรอง (N)" เปิดแผง (แถวนี้)
+          · แท็บกล่องงานยังเป็นปุ่มเดียว (แบบ A) — เจ้าของ: "หน้ากล่องงาน … เป็นช่องๆแบบเดิม"
+          · วันที่สมัครเป็นหัวข้อหนึ่งในแถบ · โหมด drill-down (?bucket=) ไม่มีแถบกรอง (เลขต้องเท่ากล่องที่กดมา) */}
       {!bucket ? (
-        /* 🔴 ปุ่ม "ตัวกรอง" ปุ่มเดียว — แบบเดียวกับกล่องงาน (แบบ A · เจ้าของเลือก 27 ก.ย. 2569)
-           วันที่สมัครอยู่ในกล่องตัวกรองด้วย · แถบซ้าย / Sheet / Dropdown เรียงเต็มแถว ถูกถอด */
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <FilterButton
+        <div className="mt-3 flex flex-wrap items-center gap-2 lg:hidden">
+          <FilterSheetButton
             facets={applicantFacets}
             primary={APPLICANT_PRIMARY_FACETS}
             attach={APPLICANT_FACET_ATTACH}
             onToggle={toggleApplicantFacet}
-            sections={[
-              {
-                key: 'applied',
-                label: 'วันที่สมัคร',
-                selected: dateRange ? 1 : 0,
-                content: <DateRangeCalendarPicker triggerVariant="filter" value={dateRange} onChange={changeDateRange} />,
-              },
-            ]}
+            sections={applicantPanelSections}
+            onClear={clearApplicantPanel}
+            resultText={`เหลือ ${filtered.length.toLocaleString('th-TH')} รายชื่อ`}
           />
           {applicantFacetCount > 0 || dateRange ? (
             <>
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                onClick={() => {
-                  clearApplicantFacets();
-                  if (dateRange) changeDateRange(null);
-                }}
-              >
+              <Button type="button" variant="outline" size="xs" onClick={clearApplicantPanel}>
                 <RotateCcw aria-hidden /> ล้าง
               </Button>
               <span className={cn('text-xs', DASH.sub)}>
@@ -689,9 +693,20 @@ const RmWorkspace: React.FC<{
           ) : null}
         </div>
       ) : null}
-      {/* แถบ "กำลังดู: … — N คนข้างล่าง" ถูกถอด 27 ก.ย. 2569 (เจ้าของเลือกให้ทำแบบเดียวกับกล่องงาน) */}
-      <div className="mt-4">
-        <div className="min-w-0 space-y-3">
+      {/* แถบ "กำลังดู: … — N คนข้างล่าง" ถูกถอด 27 ก.ย. 2569 (Clean — ไม่มีประโยคอธิบาย) */}
+      <div className={cn('mt-4', !bucket && 'lg:flex lg:items-start lg:gap-4')}>
+        {!bucket ? (
+          <FilterSidebar
+            facets={applicantFacets}
+            primary={APPLICANT_PRIMARY_FACETS}
+            attach={APPLICANT_FACET_ATTACH}
+            onToggle={toggleApplicantFacet}
+            sections={applicantPanelSections}
+            onClear={clearApplicantPanel}
+            resultText={`เหลือ ${filtered.length.toLocaleString('th-TH')} รายชื่อ`}
+          />
+        ) : null}
+        <div className="min-w-0 flex-1 space-y-3">
           {/* ⚠️ RmToolbar (ช่องทาง/สร้างลิงก์/เหตุผล) ถูกเอาออก (เจ้าของสั่ง 14 ส.ค. 2569:
               "กล่องช่องทาง ฯลฯ มีแค่หน้ากล่องงาน") — เครื่องมือพวกนี้เหลือที่ RecruitBoardTools
               บนกล่องงาน (view=board) เท่านั้น · เหลือแค่ค้นหา + เพิ่มผู้สมัคร + Lead */}
