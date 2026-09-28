@@ -310,6 +310,7 @@ describe('กล่องงาน + แท็บผู้สมัคร ต้
     'src/components/dashboard-trends/BoardDashboard.tsx',
     'src/components/dashboard-trends/FollowDashboard.tsx',
     'src/components/dashboard-trends/TrendParts.tsx',
+    'src/components/dashboard-trends/LumosPipelineSection.tsx',
   ];
   const codeOf = (f: string) => read(f).replace(/\/\*[\s\S]*?\*\//g, '');
 

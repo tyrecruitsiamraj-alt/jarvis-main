@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeTrendBu, trendBuFromSiteCode, trendBuLabel } from './bu';
 import { followDimGetter, followEventYmd, followUnitResolver } from './followTrends';
-import { applicantFunnel } from './applicantTrends';
 import { activityLedger, cohortSeries, releaseStats } from './requestTrends';
 import { staffTable } from './staffTrends';
 import { seriesByBucket } from './timeBuckets';
-import type { ApplicantTrendRow, FollowTrendRow, InformTrendRow, ReleaseTrendRow, RequestTrendRow } from './types';
+import type { FollowTrendRow, InformTrendRow, ReleaseTrendRow, RequestTrendRow } from './types';
 
 describe('BU ชุดเดียว (รหัสแผนก) — ตารางจับคู่วัดจากข้อมูลจริง', () => {
   it('BU จากไซต์ → รหัสแผนก', () => {
@@ -110,52 +109,6 @@ describe('ติดตาม — นับตามวันที่ของ�
     expect(round(f({ callRound: 2 }))).toBe('สายที่ 2 ขึ้นไป');
     expect(round(f({ callRound: null }))).toBe('สายแรก');
     expect(mode(f({ callMode: 'manual' }))).toBe('เจ้าหน้าที่โทรเอง');
-  });
-});
-
-const a = (over: Partial<ApplicantTrendRow>): ApplicantTrendRow => ({
-  id: Math.random().toString(36).slice(2),
-  createdAt: '2026-09-24T03:00:00Z',
-  channel: 'facebook',
-  position: 'พนักงานขับรถ',
-  province: 'ลพบุรี',
-  bu: 'LBD',
-  jobId: null,
-  isLead: false,
-  claimed: false,
-  callBucket: null,
-  callOutcome: null,
-  callAt: null,
-  appointmentAt: null,
-  attendance: null,
-  ...over,
-});
-
-describe('ผู้สมัคร — เส้นทางนับกลุ่มเดียวกัน (cohort)', () => {
-  const rows = [
-    a({ callBucket: 'connected', callOutcome: 'confirmed', appointmentAt: '2026-09-26T05:00:00Z', attendance: 'showed' }),
-    a({ callBucket: 'connected', callOutcome: 'declined' }),
-    a({ callBucket: 'unreached', callOutcome: 'no_answer' }),
-    a({ callBucket: 'pending' }),
-    a({}),
-    a({ createdAt: '2026-08-01T03:00:00Z', callBucket: 'connected', callOutcome: 'confirmed' }), // นอกช่วง
-  ];
-  const funnel = applicantFunnel(rows, { from: '2026-09-22', to: '2026-09-28' });
-  it('นับเฉพาะคนที่สมัครในช่วง · แต่ละขั้นไม่เกินขั้นก่อน', () => {
-    expect(funnel.map((s) => [s.key, s.count])).toEqual([
-      ['applied', 5],
-      ['called', 3],
-      ['connected', 2],
-      ['interested', 1],
-      ['appointment', 1],
-      ['showed', 1],
-    ]);
-    for (let i = 1; i < funnel.length; i++) expect(funnel[i].count).toBeLessThanOrEqual(funnel[i - 1].count);
-  });
-  it('% เทียบคนสมัคร และเทียบขั้นก่อน', () => {
-    expect(funnel[1].ofApplied).toBeCloseTo(0.6);
-    expect(funnel[2].ofPrevious).toBeCloseTo(2 / 3);
-    expect(funnel[0].ofPrevious).toBeNull();
   });
 });
 

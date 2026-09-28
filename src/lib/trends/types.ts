@@ -1,3 +1,5 @@
+import type { CallMicroOutcome } from '@/lib/callMicroOutcome';
+
 /**
  * ═══ ชนิดข้อมูลของ Dashboard แนวโน้ม (ใช้ร่วม API ↔ หน้าเว็บ) ═══
  *
@@ -40,7 +42,39 @@ export type FollowTrendRow = {
   bu: string | null;
 };
 
-export type TrendCallBucket = 'connected' | 'unreached' | 'cancelled' | 'pending';
+/**
+ * สถานะคิวโทร Lumos ของใบสมัคร (นิยามกลาง `api/_lib/lumosQueueDefs.ts`)
+ * - `pending` ยังไม่ถึงมือ Lumos · `waiting` Lumos รับไปแล้วยังไม่ส่งผล · `called` มีผลโทรแล้ว · `cancelled` ยกเลิก
+ */
+export type LumosCallState = 'pending' | 'waiting' | 'called' | 'cancelled';
+
+/**
+ * ถังผลโทรจากคำพูดจริง (`callMicroOutcome.ts` · คลังคำ "ถามความสนใจ")
+ * ⚠️ จัดถังที่เซิร์ฟเวอร์ — คำพูดในสาย (สรุป/ถอดเสียง) **ไม่ออกจากเซิร์ฟเวอร์**
+ */
+export type TrendCallMicro = CallMicroOutcome;
+
+/** คิว Lumos แถวล่าสุดของใบสมัคร (`person_ref = 'app-<id>'`) */
+export type ApplicantLumos = {
+  state: LumosCallState;
+  /** ส่งเข้าคิวกี่ครั้ง (แถวคิวทั้งหมดของใบนี้) */
+  sends: number;
+  /** โทรไปกี่รอบแล้ว (attempt_count) */
+  attempt: number | null;
+  /** เข้าคิวเมื่อไหร่ */
+  queuedAt: string | null;
+  /**
+   * นับอายุงานค้างจากตรงนี้ (นิยามเดียวกับ `queueStalePending` / `queueStale`)
+   * ยังไม่ถึงมือ = ถึงเวลาโทรเมื่อไหร่ (`next_attempt_at` → เข้าคิว) · รอผล = ส่งออกเมื่อไหร่ · อื่น ๆ = null
+   */
+  waitingSince: string | null;
+  /** ได้ผลโทรเมื่อไหร่ · null = ยังไม่มีผล */
+  resultAt: string | null;
+  /** รหัสผลของ Lumos */
+  outcome: string | null;
+  /** ถังผลจากคำพูดจริง · null = ยังไม่มีผล/ยกเลิก */
+  micro: TrendCallMicro | null;
+};
 
 /** ใบสมัคร 1 ใบ (public_job_applications) */
 export type ApplicantTrendRow = {
@@ -56,15 +90,14 @@ export type ApplicantTrendRow = {
   isLead: boolean;
   /** มีเจ้าหน้าที่เก็บไปโทรเอง */
   claimed: boolean;
-  /** ถังผลโทรล่าสุด (นิยามกลาง `bucketOfCall`) · null = ยังไม่เคยโทร */
-  callBucket: TrendCallBucket | null;
-  callOutcome: string | null;
-  /** ได้ผลโทรล่าสุดเมื่อไหร่ */
-  callAt: string | null;
   /** วันนัดสัมภาษณ์ (บันทึกผลติดต่อชนะผลโทร — กติกาเดียวกับแท็บติดตามนัดหมาย) */
   appointmentAt: string | null;
   /** ผลติดตามนัดล่าสุด: showed / no_show / rescheduled */
   attendance: string | null;
+  /** เบอร์ใช้กับระบบโทรได้ (แปลงเป็น E.164 ได้) — false = ส่งให้ Lumos ไม่ได้ */
+  phoneOk: boolean;
+  /** คิวโทร Lumos ของใบนี้ · null = ไม่เคยส่งให้ Lumos */
+  lumos: ApplicantLumos | null;
 };
 
 /** การปล่อยประกาศขึ้นหน้าสาธารณะ 1 ครั้ง (job_public_releases) */

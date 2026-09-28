@@ -4,8 +4,6 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { useTrendWindow } from '@/hooks/useTrendWindow';
-import { fetchCallRateSeries } from '@/lib/callFunnelApi';
-import type { CallRateDay } from '@/lib/lumosCallRate';
 import {
   fetchApplicantTrendRows,
   fetchFollowTrendRows,
@@ -16,7 +14,6 @@ import {
   bangkokYmd,
   breakdown,
   seriesByBucket,
-  sumInRange,
 } from '@/lib/trends/timeBuckets';
 import {
   activityLedger,
@@ -26,13 +23,8 @@ import {
   requestDimGetter,
   type RequestDim,
 } from '@/lib/trends/requestTrends';
-import {
-  APPLICANT_DIM_LABEL,
-  applicantDimGetter,
-  applicantFunnel,
-  appliedYmd,
-  type ApplicantDim,
-} from '@/lib/trends/applicantTrends';
+import { appliedYmd } from '@/lib/trends/applicantTrends';
+import { lumosPipeline, pipelineRates } from '@/lib/trends/lumosPipeline';
 import { staffTable } from '@/lib/trends/staffTrends';
 import { formatTrendNumber as fmt, formatTrendPct as pct } from '@/lib/trends/format';
 import type {
@@ -53,6 +45,7 @@ import {
   TrendTable,
   TrendToolbar,
 } from './TrendParts';
+import LumosPipelineSection from './LumosPipelineSection';
 
 /**
  * ═══ แท็บ "Dashboard" ของหน้ากล่องงาน — มุมผู้บริหาร (28 ก.ย. 2569) ═══
@@ -60,6 +53,8 @@ import {
  * เจ้าของสั่ง: *"สวมบทบาทเป็นผู้บริหาร … แต่ละวันทีมมีแนวโน้มเติบโตลดลงยังไง … รายวัน สัปดาห์ เดือน ปี
  * ดูได้ในหลายๆมิติ"* → Choice: แท็บในหน้า (ชื่อ "Dashboard") · ทำครบ 4 ส่วน (ใบขอ+ปล่อยประกาศ ·
  * ผู้สมัคร+AI โทร · เทียบเจ้าหน้าที่ · ติดตามอยู่หน้าติดตาม) · ERP อ่านอย่างเดียว + สำเนาฝั่งเรา
+ * รอบ 2 (เจ้าของสั่งวันเดียวกัน): ส่วนผู้สมัครกลายเป็น "รายชื่อ → Lumos → ผลโทร" (`LumosPipelineSection`)
+ * — เส้นทางคนกลุ่มเดียวกัน · ผลโทรแยกถัง · ช่วงเวลาที่คนกรอก · แยกมิติ
  *
  * 🔴 กติกา:
  * - ทุกตัวเลขมาจาก `src/lib/trends/*` (มีเทสต์) — จอนี้วาดอย่างเดียว ห้ามนับเอง
@@ -74,10 +69,6 @@ function requestDataFrom(today: string): string {
 }
 
 const REQUEST_DIMS = (Object.keys(REQUEST_DIM_LABEL) as RequestDim[]).map((value) => ({ value, label: REQUEST_DIM_LABEL[value] }));
-const APPLICANT_DIMS = (Object.keys(APPLICANT_DIM_LABEL) as ApplicantDim[]).map((value) => ({
-  value,
-  label: APPLICANT_DIM_LABEL[value],
-}));
 
 type Loadable<T> = { data: T | null; loading: boolean; error: string | null };
 const idle = <T,>(): Loadable<T> => ({ data: null, loading: true, error: null });
@@ -97,21 +88,6 @@ function useLoad<T>(key: string, load: () => Promise<T>): Loadable<T> & { reload
     // eslint-disable-next-line react-hooks/exhaustive-deps -- key คือสิ่งที่กำหนดว่าต้องโหลดใหม่ไหม
   }, [key, rev]);
   return { ...state, reload: () => setRev((n) => n + 1) };
-}
-
-/** AI โทรงานสรรหา = ทั้งระบบ − งานติดตาม (รายวัน) · API ย้อนได้ 120 วัน */
-function recruitCallDays(all: CallRateDay[] | null, follow: CallRateDay[] | null): CallRateDay[] {
-  if (!all) return [];
-  const f = new Map((follow ?? []).map((d) => [d.day, d]));
-  return all.map((d) => {
-    const x = f.get(d.day);
-    return {
-      ...d,
-      queued: Math.max(0, d.queued - (x?.queued ?? 0)),
-      connected: Math.max(0, d.connected - (x?.connected ?? 0)),
-      confirmed: Math.max(0, d.confirmed - (x?.confirmed ?? 0)),
-    };
-  });
 }
 
 export type BoardOpenTotals = {
@@ -143,22 +119,15 @@ const BoardDashboard: React.FC<{
   const follow = useLoad<FollowTrendRow[]>(`fol:${win.fetchFrom}:${win.today}`, () =>
     fetchFollowTrendRows(win.fetchFrom, win.today),
   );
-  const calls = useLoad<CallRateDay[]>('calls:120', async () => {
-    const [all, fol] = await Promise.all([fetchCallRateSeries(120, 'all'), fetchCallRateSeries(120, 'follow')]);
-    if (!all) throw new Error('อ่านยอด AI โทรไม่ได้');
-    return recruitCallDays(all.series, fol?.series ?? null);
-  });
 
   const [requestView, setRequestView] = useState<'activity' | 'cohort'>('activity');
   const [requestDim, setRequestDim] = useState<RequestDim>('bu');
-  const [applicantDim, setApplicantDim] = useState<ApplicantDim>('channel');
 
   const reloadAll = () => {
     requests.reload();
     releases.reload();
     applicants.reload();
     follow.reload();
-    calls.reload();
   };
 
   /* ─── ใบขอ ─── */
@@ -194,26 +163,16 @@ const BoardDashboard: React.FC<{
     [rel, range, grain],
   );
 
-  /* ─── ผู้สมัคร + AI โทร ─── */
+  /* ─── รายชื่อ → Lumos → ผลโทร ─── */
   const apps = useMemo(() => applicants.data ?? [], [applicants.data]);
   const appSeries = useMemo(() => seriesByBucket(apps, appliedYmd, range, grain), [apps, range, grain]);
-  const callDays = useMemo(() => calls.data ?? [], [calls.data]);
-  const callQueued = useMemo(
-    () => seriesByBucket(callDays, (d) => d.day, range, grain, (d) => d.queued),
-    [callDays, range, grain],
+  const sentSeries = useMemo(
+    () => seriesByBucket(apps, appliedYmd, range, grain, (r) => (r.lumos ? 1 : 0)),
+    [apps, range, grain],
   );
-  const callConnected = useMemo(
-    () => seriesByBucket(callDays, (d) => d.day, range, grain, (d) => d.connected),
-    [callDays, range, grain],
-  );
-  const funnel = useMemo(() => applicantFunnel(apps, range), [apps, range]);
-  const funnelPrev = useMemo(() => applicantFunnel(apps, previous), [apps, previous]);
-  const appBreakdown = useMemo(
-    () => breakdown(apps, appliedYmd, applicantDimGetter(applicantDim), range, previous),
-    [apps, applicantDim, range, previous],
-  );
-  const callsOldest = callDays.length ? callDays[0].day : null;
-  const callsCoverShort = Boolean(callsOldest && callsOldest > range.from);
+  const pipeNow = useMemo(() => lumosPipeline(apps, range), [apps, range]);
+  const pipePrev = useMemo(() => lumosPipeline(apps, previous), [apps, previous]);
+  const pipeRates = pipelineRates(pipeNow);
 
   /* ─── เจ้าหน้าที่ ─── */
   const staff = useMemo(
@@ -224,10 +183,8 @@ const BoardDashboard: React.FC<{
   const addedNow = sum(ledger, 'added');
   const informedNow = sum(ledger, 'informed');
   const cancelledNow = sum(ledger, 'cancelled');
-  const appsNow = sumInRange(apps, appliedYmd, range);
-  const appsPrev = sumInRange(apps, appliedYmd, previous);
-  const queuedNow = sumInRange(callDays, (d) => d.day, range, (d) => d.queued);
-  const queuedPrev = sumInRange(callDays, (d) => d.day, previous, (d) => d.queued);
+  const sentNow = pipeNow.steps.find((x) => x.key === 'sent')?.count ?? 0;
+  const sentPrev = pipePrev.steps.find((x) => x.key === 'sent')?.count ?? 0;
 
   const reqAge = req ? Math.round(req.ageSeconds / 60) : null;
 
@@ -261,8 +218,16 @@ const BoardDashboard: React.FC<{
           }
         />
         <TrendKpiCard label="ปล่อยประกาศ" unit="ใบ" value={releases.data ? relNow.released : null} previous={releases.data ? relPrev.released : null} tone="info" spark={relSeries.map((p) => p.value)} />
-        <TrendKpiCard label="ผู้สมัครใหม่" unit="คน" value={applicants.data ? appsNow : null} previous={applicants.data ? appsPrev : null} tone="violet" spark={appSeries.map((p) => p.value)} />
-        <TrendKpiCard label="AI โทร (สรรหา)" unit="สาย" value={calls.data ? queuedNow : null} previous={calls.data ? queuedPrev : null} tone="teal" spark={callQueued.map((p) => p.value)} />
+        <TrendKpiCard label="รายชื่อเข้ามา" unit="คน" value={applicants.data ? pipeNow.names : null} previous={applicants.data ? pipePrev.names : null} tone="violet" spark={appSeries.map((p) => p.value)} />
+        <TrendKpiCard
+          label="ส่งให้ Lumos"
+          unit="คน"
+          value={applicants.data ? sentNow : null}
+          previous={applicants.data ? sentPrev : null}
+          tone="primary"
+          spark={sentSeries.map((p) => p.value)}
+          foot={applicants.data && pipeRates.coverage !== null ? `Lumos โทรแล้ว ${pct(pipeRates.coverage)}` : undefined}
+        />
       </div>
 
       {/* ═══ ใบขอ ═══ */}
@@ -359,42 +324,18 @@ const BoardDashboard: React.FC<{
         ) : null}
       </TrendSection>
 
-      {/* ═══ ผู้สมัคร + AI โทร ═══ */}
-      <TrendSection
-        title="ผู้สมัคร + AI โทร"
-        badge={callsCoverShort ? <TrendBadge tone="warn">AI โทรย้อนหลังได้ 120 วัน</TrendBadge> : null}
-      >
-        <TrendState loading={applicants.loading && !applicants.data} error={applicants.error ?? calls.error} onRetry={reloadAll} />
-        {applicants.data ? (
-          <Card className="space-y-4 rounded-2xl p-4">
-            <TrendChart
-              ariaLabel="ผู้สมัครใหม่และสายที่ AI โทรต่องวด"
-              data={appSeries.map((p, i) => ({ label: p.label, applied: p.value, queued: callQueued[i]?.value ?? 0, connected: callConnected[i]?.value ?? 0 }))}
-              series={[
-                { key: 'applied', label: 'ผู้สมัครใหม่', kind: 'bar', tone: 'violet' },
-                { key: 'queued', label: 'AI โทร', kind: 'line', tone: 'teal' },
-                { key: 'connected', label: 'ติดต่อได้', kind: 'line', tone: 'success', dashed: true },
-              ]}
-            />
-            <div className="space-y-2">
-              <p className={cn('text-xs', DASH.sub)}>เส้นทางของคนที่สมัครในช่วงนี้</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                {funnel.map((s, i) => (
-                  <div key={s.key} className={cn('rounded-xl border p-3', DASH.card)}>
-                    <p className={cn('text-xs', DASH.sub)}>{s.label}</p>
-                    <p className={cn('text-xl font-medium tabular-nums', TONE.primary.num)}>{fmt(s.count)}</p>
-                    <div className="flex items-center justify-between gap-1">
-                      <span className={cn('text-xs tabular-nums', DASH.muted)}>{i === 0 ? 'ฐาน' : s.ofApplied === null ? '—' : pct(s.ofApplied)}</span>
-                      <DeltaChip current={s.count} previous={funnelPrev[i]?.count ?? 0} polarity="up-good" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <TrendBreakdown<ApplicantDim> dims={APPLICANT_DIMS} dim={applicantDim} onDimChange={setApplicantDim} rows={appBreakdown} unit="ผู้สมัคร (คน)" tone="violet" />
-          </Card>
-        ) : null}
-      </TrendSection>
+      {/* ═══ รายชื่อ → Lumos → ผลโทร ═══ */}
+      <LumosPipelineSection
+        rows={applicants.data}
+        loading={applicants.loading}
+        error={applicants.error}
+        onRetry={applicants.reload}
+        range={range}
+        previous={previous}
+        grain={grain}
+        now={pipeNow}
+        prev={pipePrev}
+      />
 
       {/* ═══ เทียบเจ้าหน้าที่ ═══ */}
       <TrendSection title="เทียบเจ้าหน้าที่">

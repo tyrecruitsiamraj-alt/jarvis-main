@@ -41,6 +41,20 @@ describe('เส้น /api/dashboard-trends — อ่านอย่างเ�
     }
   });
 
+  it('คิว Lumos ของใบสมัครจับด้วย person_ref ตรงตัว · คำพูดในสายจัดถังในเซิร์ฟเวอร์แล้วทิ้ง ไม่ส่งออก', () => {
+    expect(h).toContain("q.person_ref = 'app-' || a.id::text");
+    expect(h).toMatch(/classifyCallMicro\(/);
+    // สถานะคิวคิดด้วยนิยามกลางเท่านั้น (ห้ามเขียน status/result เอง)
+    for (const def of ['queueCancelled', 'queueHasResult', 'queueWaiting', 'queuePending', 'queueSentAt']) {
+      expect(h).toContain(`\${${def}('q')}`);
+    }
+    const types = code('src/lib/trends/types.ts');
+    const block = types.slice(types.indexOf('export type ApplicantLumos'), types.indexOf('};', types.indexOf('export type ApplicantLumos')));
+    expect(block).not.toMatch(/\b(summary|reply|transcript)\b/);
+    const toLumos = h.slice(h.indexOf('function toApplicantLumos'), h.indexOf('/** ════ ปล่อยประกาศ'));
+    expect(toLumos.slice(toLumos.indexOf('return {'))).not.toMatch(/\b(summary|reply|transcript)\b/);
+  });
+
   it('ใบขอ (ERP) อ่านผ่านสำเนาในฐาน ไม่ถามสดทุกครั้ง', () => {
     expect(h).toContain('readThroughSnapshot(');
     expect(read('migrations/122_dashboard_trend_snapshots.sql')).toMatch(/create table if not exists dashboard_trend_snapshots/);
@@ -67,6 +81,21 @@ describe('คิวรีใบแจ้งเข้า (ERP) — นิยา�
   });
 });
 
+describe('ส่วน รายชื่อ → Lumos → ผลโทร — หนึ่งเมตริกหนึ่งนิยาม', () => {
+  const pipe = code('src/lib/trends/lumosPipeline.ts');
+  it('นับมีคนรับ/ได้คุย/ตอบรับด้วยตัวรวมกลาง ไม่นับเอง · ป้ายจากพจนานุกรมเมตริก', () => {
+    expect(pipe).toContain('addCallMicro(micro, l.micro)');
+    expect(pipe).toContain('callMicroRates(p.micro)');
+    expect(pipe).toContain('METRICS[key].label');
+  });
+  it('หน้า Dashboard ไม่มีเส้นทางผู้สมัครชุดเก่า (สนใจคนละนิยาม) และการ์ดภาพรวมใช้เส้นทางตัวเดียวกับส่วนล่าง', () => {
+    const board = code('src/components/dashboard-trends/BoardDashboard.tsx');
+    expect(board).not.toMatch(/applicantFunnel|fetchCallRateSeries/);
+    expect(board).toContain('now={pipeNow}');
+    expect(board).toMatch(/label="ส่งให้ Lumos"[\s\S]*?value=\{applicants\.data \? sentNow : null\}/);
+  });
+});
+
 describe('แท็บ Dashboard อยู่ในสองหน้า และไม่พาออกไปหน้าอื่น', () => {
   it('กล่องงานมีแท็บชื่อ Dashboard และโหลดแบบ lazy (ไม่ถ่วงหน้าสมัครสาธารณะ)', () => {
     expect(code('src/components/jobs/JobBoardView.tsx')).toContain("{ id: 'dashboard', label: 'Dashboard' }");
@@ -83,6 +112,7 @@ describe('แท็บ Dashboard อยู่ในสองหน้า แล�
     'src/components/dashboard-trends/BoardDashboard.tsx',
     'src/components/dashboard-trends/FollowDashboard.tsx',
     'src/components/dashboard-trends/TrendParts.tsx',
+    'src/components/dashboard-trends/LumosPipelineSection.tsx',
   ])('%s — ไม่มีลิงก์ไปหน้าใบขอ/จับคู่งาน', (f) => {
     const src = code(f);
     expect(src).not.toMatch(/navigateToUnitRequest\(|['"`]\/jobs\/siamraj\/|['"`]\/matching\//);

@@ -19,12 +19,16 @@ import { checkApiAccess, type ApiResource } from '../_lib/rbac.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { loadUserDepartmentScope, type DepartmentScope } from '../_lib/departmentScope.js';
-import { queueOutcome } from '../_lib/lumosQueueDefs.js';
 import {
-  loadAppointmentByPhone,
-  loadLatestCallOutcomeByPhone,
-  loadLatestCallStateByPhone,
-} from '../_lib/applicantCallOutcomes.js';
+  queueCancelled,
+  queueHasResult,
+  queueOutcome,
+  queuePending,
+  queueResultAt,
+  queueSentAt,
+  queueWaiting,
+} from '../_lib/lumosQueueDefs.js';
+import { loadAppointmentByPhone } from '../_lib/applicantCallOutcomes.js';
 import { loadContactAppointments } from '../_lib/applicationContacts.js';
 import { loadLatestAttendanceByApplication } from '../_lib/applicationAttendance.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
@@ -32,11 +36,13 @@ import { getSiamrajDbSource, listSiamrajThroughput } from '../_lib/siamrajUnitRe
 import { listSiamrajSqlServerInformDays } from '../_lib/siamrajSqlServerInforms.js';
 import { readThroughSnapshot } from '../_lib/trendSnapshots.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
-import { bucketOfCall } from '../../src/lib/callOutcomeBuckets.js';
+import { classifyCallMicro, vocabForPersonRef } from '../../src/lib/callMicroOutcome.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
 import type {
+  ApplicantLumos,
   ApplicantTrendRow,
   DashboardTrendSection,
+  LumosCallState,
   FollowTrendRow,
   InformTrendRow,
   ReleaseTrendRow,
@@ -146,14 +152,45 @@ async function loadFollow(from: string, to: string): Promise<FollowTrendRow[]> {
 /** ════ ผู้สมัคร ════ */
 async function loadApplicants(from: string, to: string, scope: DepartmentScope): Promise<ApplicantTrendRow[]> {
   if (scope.mode === 'none') return [];
+  /**
+   * คิวโทร Lumos ของใบสมัคร = แถวที่ `person_ref = 'app-<id>'` (ตรงตัว · ตัวเดียวกับ "ส่ง AI แล้ว x/y" บนการ์ด)
+   * เอาแถวล่าสุด + นับว่าส่งกี่ครั้ง · 🔴 สรุป/ถอดเสียงใช้จัดถังในนี้เท่านั้น ไม่ส่งออก
+   */
+  const outcome = queueOutcome('q');
   const { rows } = await dbQuery<Record<string, unknown>>(
     `select a.id::text as id, a.created_at, a.referral_source,
             coalesce(nullif(btrim(a.position_interest), ''), nullif(btrim(a.job_title), '')) as position,
             a.province, a.job_id, coalesce(a.is_lead, false) as is_lead, (a.claimed_by is not null) as claimed,
             coalesce(${SITE_BU('m.site_code')}, a.department_code) as bu,
-            a.phone
+            a.phone,
+            lq.state as q_state, lq.outcome as q_outcome, lq.attempt_count as q_attempt,
+            lq.created_at as q_created_at, lq.result_at as q_result_at, lq.waiting_since as q_waiting_since,
+            lq.summary as q_summary, lq.reply as q_reply, lq.sends as q_sends
        from ${APPS} a
        left join ${MAP} m on m.job_id = a.job_id
+       left join lateral (
+         select ${outcome} as outcome, q.attempt_count, q.created_at,
+                case when ${outcome} is not null then ${queueResultAt('q')} end as result_at,
+                case when ${queueCancelled('q')} then 'cancelled'
+                     when ${queueHasResult('q')} then 'called'
+                     when ${queueWaiting('q')} then 'waiting'
+                     else 'pending' end as state,
+                case when ${queuePending('q')} then coalesce(q.next_attempt_at, q.created_at)
+                     when ${queueWaiting('q')} then ${queueSentAt('q')} end as waiting_since,
+                q.result->>'summary' as summary,
+                (select string_agg(btrim(x.t->>'text'), ' · ')
+                   from jsonb_array_elements(
+                          case when jsonb_typeof(q.result->'transcript') = 'array'
+                               then q.result->'transcript' else '[]'::jsonb end
+                        ) x(t)
+                  where x.t->>'role' = 'candidate'
+                    and coalesce(btrim(x.t->>'text'), '') <> '') as reply,
+                count(*) over () as sends
+           from ${QUEUE} q
+          where q.person_ref = 'app-' || a.id::text
+          order by q.created_at desc
+          limit 1
+       ) lq on true
       where a.created_at >= $1::date and a.created_at < ($2::date + 1)`,
     [from, to],
   );
@@ -162,19 +199,14 @@ async function loadApplicants(from: string, to: string, scope: DepartmentScope):
     .filter((x) => inScope(scope, x.bu));
   const phones = scoped.map((x) => String(x.r.phone ?? ''));
   const ids = scoped.map((x) => String(x.r.id));
-  // ⚠️ ใช้ตัวอ่านชุดเดียวกับแท็บรายชื่อผู้สมัคร — ผลโทร/นัด/มาตามนัด ต้องตรงกับที่แท็บนั้นโชว์
-  const [outcomes, states, apptByPhone, apptByApp, attendance] = await Promise.all([
-    loadLatestCallOutcomeByPhone(phones),
-    loadLatestCallStateByPhone(phones),
+  // ⚠️ ใช้ตัวอ่านชุดเดียวกับแท็บรายชื่อผู้สมัคร — นัด/มาตามนัด ต้องตรงกับที่แท็บนั้นโชว์
+  const [apptByPhone, apptByApp, attendance] = await Promise.all([
     loadAppointmentByPhone(phones),
     loadContactAppointments(ids),
     loadLatestAttendanceByApplication(ids),
   ]);
   return scoped.map(({ r, bu }) => {
     const e164 = toE164Thai(String(r.phone ?? '')) || '';
-    const out = outcomes.get(e164);
-    const st = states.get(e164);
-    const hasCall = Boolean(out || st);
     const appt = apptByApp.get(String(r.id))?.at ?? apptByPhone.get(e164) ?? null;
     return {
       id: String(r.id),
@@ -186,13 +218,40 @@ async function loadApplicants(from: string, to: string, scope: DepartmentScope):
       jobId: clean(r.job_id),
       isLead: Boolean(r.is_lead),
       claimed: Boolean(r.claimed),
-      callBucket: hasCall ? bucketOfCall(st?.status ?? null, out?.outcome ?? null) : null,
-      callOutcome: out?.outcome ?? null,
-      callAt: out?.at ? iso(out.at) : null,
       appointmentAt: appt ? iso(appt) : null,
       attendance: attendance.get(String(r.id))?.result ?? null,
+      phoneOk: Boolean(e164),
+      lumos: toApplicantLumos(r),
     };
   });
+}
+
+/**
+ * แถวคิวล่าสุด → สถานะ Lumos — สถานะคิดใน SQL ด้วยนิยามกลาง `lumosQueueDefs` (ยกเลิก → มีผล → รอผล → ยังไม่ถึงมือ)
+ * ถังผลจัดด้วยคลังคำ "ถามความสนใจ" (`vocabForPersonRef('app-…')`) ตัวเดียวกับแผง Rate ผลโทร
+ */
+function toApplicantLumos(r: Record<string, unknown>): ApplicantLumos | null {
+  if (r.q_created_at == null && r.q_state == null) return null;
+  const raw = clean(r.q_state);
+  const state: LumosCallState = raw === 'cancelled' || raw === 'called' || raw === 'waiting' ? raw : 'pending';
+  const outcome = clean(r.q_outcome);
+  const micro =
+    state === 'called'
+      ? classifyCallMicro(
+          { outcome, summary: clean(r.q_summary), reply: clean(r.q_reply) },
+          vocabForPersonRef(`app-${String(r.id)}`),
+        )
+      : null;
+  return {
+    state,
+    sends: Number(r.q_sends) || 1,
+    attempt: r.q_attempt == null ? null : Number(r.q_attempt),
+    queuedAt: iso(r.q_created_at),
+    waitingSince: iso(r.q_waiting_since),
+    resultAt: iso(r.q_result_at),
+    outcome,
+    micro,
+  };
 }
 
 /** ════ ปล่อยประกาศ ════ */
