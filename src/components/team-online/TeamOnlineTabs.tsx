@@ -350,7 +350,9 @@ const TeamOnlineTabs: React.FC<{ data: TeamOnlineResponse | null; loading: boole
               ariaLabel={`Lumos ${METRICS[lumosMetric.metric].label} ต่อ BU`}
             />
           ) : null}
+          {/* สีของเลน (ใช้กับตารางข้างล่าง) — คนละชุดกับสีประจำ BU ของกราฟ จึงเขียนกำกับว่า "เลน" */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <span className={DASH.muted}>เลน</span>
             {TEAM_LANES.filter((l) => l.key !== 'other' || (data?.lumos?.lanes.other.sent ?? 0) > 0).map((l) => (
               <span key={l.key} className="inline-flex items-center gap-1.5 text-foreground">
                 <span className={cn('inline-block h-2.5 w-2.5 rounded-full', TONE[LANE_TONE[l.key]].dot)} aria-hidden />

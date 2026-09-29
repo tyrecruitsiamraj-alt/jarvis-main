@@ -5,12 +5,13 @@
 import type { ToneKey } from '@/lib/designTokens';
 import type { TeamLane } from '@/lib/teamOnline';
 
+/** เลือกให้ต่างกันชัดทั้งสองโหมด — โหมดมืด primary (blue-300) กับ info (sky-300) แทบเป็นสีเดียวกัน ⇒ ไม่ใช้คู่กันกับ BU หลัก */
 const BU_TONE: Record<string, ToneKey> = {
   LBD: 'primary',
-  LBA: 'info',
-  LM: 'teal',
+  LBA: 'teal',
+  LM: 'orange',
   DS: 'violet',
-  SN: 'orange',
+  SN: 'info',
   CR: 'neutral',
 };
 
