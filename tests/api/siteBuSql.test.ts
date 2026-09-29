@@ -6,7 +6,8 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { siteBuSql } from '../../api/_lib/siteBuSql';
+import { siteBuSql, trendBuOfSiteSql, trendBuSql } from '../../api/_lib/siteBuSql';
+import { normalizeTrendBu, SITE_BU_TO_DEPT, trendBuFromSiteCode } from '@/lib/trends/bu';
 import { buFromSiteCode } from '@/lib/homeBu';
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -30,12 +31,45 @@ describe('siteBuSql', () => {
     }
   });
 
-  it.each(['api/_handlers/home-kpis.ts', 'api/_handlers/dashboard-trends.ts', 'api/_handlers/office-team.ts'])(
-    '%s ใช้ตัวกลาง ไม่เขียน regex รหัสไซต์เอง',
+  it.each([
+    'api/_handlers/home-kpis.ts',
+    'api/_handlers/dashboard-trends.ts',
+    'api/_handlers/office-team.ts',
+    'api/_handlers/office-floor.ts',
+    'api/_lib/homeBuSql.ts',
+  ])(
+    '%s ใช้ตัวกลาง (siteBuSql ตรง ๆ หรือผ่าน homeBuSql) ไม่เขียน regex รหัสไซต์เอง',
     (f) => {
       const src = code(f);
-      expect(src).toContain("from '../_lib/siteBuSql.js'");
+      expect(src).toMatch(/from '\.\.?\/(_lib\/)?(siteBuSql|homeBuSql)\.js'/);
       expect(src).not.toContain('[0-9]{2}[A-Za-z]{3}');
     },
   );
+});
+
+describe('trendBuSql — BU กลางชุดแผนก ฝั่ง SQL (29 ก.ย. 2569)', () => {
+  /** จำลอง CASE ของ SQL ด้วยคู่ when ที่อ่านจากสตริงจริง (ไม่ได้ก๊อปตาราง) */
+  const simulate = (sql: string) => {
+    const map = new Map([...sql.matchAll(/when '([A-Z]+)' then '([A-Z]+)'/g)].map((m) => [m[1], m[2]]));
+    return (v: string | null) => {
+      const u = String(v ?? '').trim().toUpperCase();
+      return map.get(u) ?? (u || null);
+    };
+  };
+
+  it('แปลงทุกคู่ในตารางกลาง + รหัสแผนกคงเดิม + ว่าง = NULL — ผลตรง normalizeTrendBu ทุกค่า', () => {
+    const run = simulate(trendBuSql('x'));
+    const samples = [...Object.keys(SITE_BU_TO_DEPT), ...Object.values(SITE_BU_TO_DEPT), ' lml ', 'dsl', 'OPL', 'XYZ', '', null];
+    for (const v of samples) expect(run(v), String(v)).toBe(normalizeTrendBu(v));
+    expect(trendBuSql('x')).toContain("else nullif(upper(btrim(x)), '') end");
+  });
+
+  it('จากรหัสไซต์ = ประกอบ siteBuSql + trendBuSql · ผลตรง trendBuFromSiteCode', () => {
+    expect(trendBuOfSiteSql('m.site_code')).toBe(trendBuSql(siteBuSql('m.site_code')));
+    const run = simulate(trendBuSql('x'));
+    const siteSql = (v: string) => (/^[0-9]{2}[A-Za-z]{3}/.test(v) ? v.slice(2, 5).toUpperCase() : null);
+    for (const v of ['65LBDL0143', '66LML0011', '67dsl0003', '69SNJ0002', '68CRS0001', 'LBD', '']) {
+      expect(run(siteSql(v)), v).toBe(trendBuFromSiteCode(v));
+    }
+  });
 });

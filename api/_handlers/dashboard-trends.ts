@@ -32,9 +32,7 @@ import { loadAppointmentByPhone } from '../_lib/applicantCallOutcomes.js';
 import { loadContactAppointments } from '../_lib/applicationContacts.js';
 import { loadLatestAttendanceByApplication } from '../_lib/applicationAttendance.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
-import { getSiamrajDbSource, listSiamrajThroughput } from '../_lib/siamrajUnitRequests.js';
-import { listSiamrajSqlServerInformDays } from '../_lib/siamrajSqlServerInforms.js';
-import { readThroughSnapshot } from '../_lib/trendSnapshots.js';
+import { inTrendScope, loadRequestTrendPayload } from '../_lib/requestTrendRows.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
 import { siteBuSql } from '../_lib/siteBuSql.js';
 import { classifyCallMicro, vocabForPersonRef } from '../../src/lib/callMicroOutcome.js';
@@ -97,11 +95,7 @@ function getQuery(req: AuthedReq, key: string): string {
   return '';
 }
 
-function inScope(scope: DepartmentScope, bu: string | null): boolean {
-  if (scope.mode === 'all') return true;
-  if (scope.mode === 'none') return false;
-  return bu === scope.code;
-}
+const inScope = inTrendScope;
 
 /** ════ ติดตาม ════ */
 async function loadFollow(from: string, to: string): Promise<FollowTrendRow[]> {
@@ -279,58 +273,9 @@ async function loadReleases(from: string, to: string, scope: DepartmentScope): P
     .filter((r) => r.releasedAt && inScope(scope, r.bu));
 }
 
-/** ════ ใบขอ (ERP ผ่านสำเนา) ════ */
-
-/** สำเนาสดพอ 30 นาที · ส่งของเก่าพร้อมดึงใหม่เบื้องหลังได้ถึง 2 วัน (ของเก่าบอกอายุตรง ๆ เสมอ) */
-const REQUEST_TTL_MS = 30 * 60_000;
-const REQUEST_MAX_STALE_MS = 48 * 60 * 60_000;
-
-async function loadRequestSnapshot(from: string, to: string): Promise<{ requests: RequestTrendRow[]; informs: InformTrendRow[] }> {
-  const [records, informs] = await Promise.all([
-    listSiamrajThroughput({ from, to, departmentScope: { mode: 'all' } }),
-    listSiamrajSqlServerInformDays({ from, to }),
-  ]);
-  const requests: RequestTrendRow[] = [];
-  for (const x of records) {
-    if (!x.requestNo || !x.kind || !(x.positionUnits > 0)) continue;
-    requests.push({
-      requestNo: x.requestNo,
-      cohortDate: x.requestDate,
-      submittedDate: x.submittedDate ?? null,
-      closureDate: x.isOpen ? null : x.closureDate,
-      kind: x.kind,
-      positions: x.positionUnits,
-      departmentCode: normalizeTrendBu(x.departmentCode ?? null),
-      siteCode: x.siteCode ?? null,
-      unitName: x.unitName ?? null,
-      lifecycleKind: x.lifecycleKind ?? null,
-      leadKind: x.leadKind ?? null,
-    });
-  }
-  return { requests, informs };
-}
-
-async function loadRequests(from: string, to: string, scope: DepartmentScope): Promise<RequestTrendPayload> {
-  if (getSiamrajDbSource() !== 'sqlserver') {
-    throw Object.assign(new Error('ข้อมูลใบขอไม่ได้ต่อกับ ERP (SQL Server) — ดู Dashboard ใบขอไม่ได้'), { status: 503 });
-  }
-  // 🔴 คีย์ผูกกับวันเริ่มเท่านั้น — ปลายช่วงคือ "วันนี้" เสมอ (ไม่งั้นคีย์เปลี่ยนทุกวันแล้วต้องรอ ERP ใหม่ทุกวัน)
-  const key = `requests:v1:${from}`;
-  const outcome = await readThroughSnapshot(key, () => loadRequestSnapshot(from, to), {
-    ttlMs: REQUEST_TTL_MS,
-    maxStaleMs: REQUEST_MAX_STALE_MS,
-    rowCount: (v) => v.requests.length + v.informs.length,
-  });
-  const { requests, informs } = outcome.value;
-  return {
-    range: { from, to },
-    requests: requests.filter((r) => inScope(scope, r.departmentCode)),
-    informs: informs.filter((r) => inScope(scope, normalizeTrendBu(r.departmentCode))),
-    fetchedAt: new Date(outcome.fetchedAt).toISOString(),
-    ageSeconds: Math.max(0, Math.round((Date.now() - outcome.fetchedAt) / 1000)),
-    source: outcome.source,
-  };
-}
+/** ════ ใบขอ (ERP ผ่านสำเนา) — ย้ายไป `api/_lib/requestTrendRows.ts` 29 ก.ย. 2569 (หน้าหลักใช้สำเนาชุดเดียวกัน) ════ */
+const loadRequests = (from: string, to: string, scope: DepartmentScope): Promise<RequestTrendPayload> =>
+  loadRequestTrendPayload(from, to, (bu) => inScope(scope, bu));
 
 function isSection(v: string): v is DashboardTrendSection {
   return v === 'follow' || v === 'applicants' || v === 'releases' || v === 'requests';

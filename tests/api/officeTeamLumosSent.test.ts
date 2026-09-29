@@ -79,9 +79,11 @@ describe('ส่งให้ Lumos ทั้งระบบ — ข้อมู�
     expect(sql).toContain(`coalesce(q.status = 'cancelled'`); // queueCancelled('q') ที่ปิด NULL แล้ว
     expect(sql).toContain(`q.status = 'delivered'`); // queueWaiting
     expect(sql).toContain(`q.status = 'pending'`); // queuePending
-    expect(sql).toContain('left join job_site_map m on m.job_id = q.job_ref');
+    // BU ต่อสายใช้ตัวกลาง `queueBuSql` (29 ก.ย. 2569) — ตัวเดียวกับตัวกรอง BU ของหน้าหลักโฉม 3 ก้อน
+    expect(sql).toContain('left join job_site_map q_bm on q_bm.job_id = q.job_ref');
     // งานติดตาม = แผนกของคนคีย์ก่อน แล้วค่อยไซต์ของรายการ (กติกาเดียวกับ home-kpis)
-    expect(sql).toMatch(/coalesce\(nullif\(btrim\(u\.department_code\), ''\), case when f\.site_code/);
+    expect(sql).toMatch(/coalesce\(nullif\(btrim\(q_bu\.department_code\), ''\), case when q_bf\.site_code/);
+    expect(sql).toContain("when 'LML' then 'LM'"); // แปลงเป็นชุดแผนกก่อน แล้ว Node แปลงกลับเป็นชุดไซต์ (siteBuOf)
     expect(body.teams.lumosSent).toEqual([
       { day: '2026-09-26', bu: 'LBD', route: 'match', state: 'other', n: 1 },
       { day: '2026-09-27', bu: null, route: 'public', state: 'done', n: 4 },
@@ -113,5 +115,58 @@ describe('ส่งให้ Lumos ทั้งระบบ — ข้อมู�
     expect(body.teams.errors.lumosSent).toBe('อ่านยอดส่ง Lumos ไม่ได้');
     expect(body.teams.lumos).not.toBeNull();
     expect(body.teams.errors.lumos).toBeUndefined();
+  });
+});
+
+/**
+ * ═══ ตัวกรอง BU ของหน้าหลักโฉม 3 ก้อน (29 ก.ย. 2569 · เพิ่มอย่างเดียว) ═══
+ * 🔴 ไม่ส่ง bu = คิวรีเดิม (หน้าเดิมไม่ขยับ) · ส่ง = ใบเปิดตามรหัสไซต์ + ใบสมัคร/คิวของ BU กลางนั้น
+ */
+describe('office-team + bu', () => {
+  const runWith = async (query: Record<string, string>) => {
+    const { res, json } = mockRes();
+    await handler({ method: 'GET', user: { sub: 'u1' }, query } as never, res as never);
+    return json.mock.calls[0][0];
+  };
+  const OPEN = [
+    { id: 'siamraj-sql:A1', site_code: '66LML0011' },
+    { id: 'siamraj-sql:A2', site_code: '65LBDL0143' },
+    { id: 'siamraj-sql:A3', site_code: '' },
+  ];
+
+  it('🔴 ไม่ส่ง bu = ไม่มีเงื่อนไข BU ในคิวรีใด ๆ · ใบเปิดครบทุกใบ', async () => {
+    const { listSiamrajUnitRequests } = await import('../../api/_lib/siamrajUnitRequests.js');
+    vi.mocked(listSiamrajUnitRequests).mockResolvedValueOnce(OPEN as never);
+    vi.mocked(dbQuery).mockImplementation((async () => ({ rows: [] })) as never);
+    const body = await runWith({});
+    expect(body.bu).toBeNull();
+    expect(body.open_total).toBe(3);
+    for (const sql of vi.mocked(dbQuery).mock.calls.map((c) => String(c[0]))) {
+      expect(sql).not.toMatch(/select ab\.id|select qb\.id/);
+    }
+  });
+
+  it('ส่ง bu=lml ⇒ BU กลาง LM · ใบเปิดเฉพาะไซต์ LML · ใบสมัคร/นัด/ผลมาตามนัด/เลนคิว กรองด้วยพารามิเตอร์', async () => {
+    const { listSiamrajUnitRequests } = await import('../../api/_lib/siamrajUnitRequests.js');
+    vi.mocked(listSiamrajUnitRequests).mockResolvedValueOnce(OPEN as never);
+    vi.mocked(dbQuery).mockImplementation((async () => ({ rows: [] })) as never);
+    const body = await runWith({ bu: 'lml' });
+    expect(body.bu).toBe('LM');
+    expect(body.open_total).toBe(1);
+    const calls = vi.mocked(dbQuery).mock.calls.map((c) => ({ sql: String(c[0]), params: c[1] as unknown[] | undefined }));
+    const apps = calls.find((c) => c.sql.includes('as total') && c.sql.includes('as jobs'));
+    expect(apps?.sql).toContain('where id in (select ab.id');
+    expect(apps?.params).toEqual([['siamraj-sql:A1'], 'LM']);
+    for (const col of ['appointment_at is not null', 'group by result']) {
+      const c = calls.find((x) => x.sql.includes(col));
+      expect(c?.sql, col).toContain('application_id in (select ab.id');
+      expect(c?.params, col).toEqual(['LM']);
+    }
+    const lane = calls.find((c) => isLaneSql(c.sql));
+    expect(lane?.sql).toContain('where id in (select qb.id');
+    expect(lane?.params).toEqual(['LM']);
+    // ยอดส่ง Lumos ทั้งระบบยังมาครบ (ก้อนนั้นกรองเองจากแถวรายวัน)
+    const sent = calls.find((c) => isSentSql(c.sql));
+    expect(sent?.sql).not.toContain('select qb.id');
   });
 });

@@ -40,8 +40,8 @@ import {
   queueWaiting,
 } from '../_lib/lumosQueueDefs.js';
 import { classifyCallMicro, vocabForPersonRef } from '../../src/lib/callMicroOutcome.js';
-import { siteBuOf } from '../../src/lib/trends/bu.js';
-import { siteBuSql } from '../_lib/siteBuSql.js';
+import { siteBuOf, trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
+import { appIdsOfBuSql, parseBuParam, queueBuJoins, queueBuSql, queueIdsOfBuSql } from '../_lib/homeBuSql.js';
 import { logWarn } from '../_lib/logger.js';
 import type {
   BoardTeams,
@@ -60,9 +60,6 @@ const appsTable = tableInAppSchema('public_job_applications');
 const contactLogsTable = tableInAppSchema('application_contact_logs');
 const attendanceTable = tableInAppSchema('application_appointment_results');
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
-const mapTable = tableInAppSchema('job_site_map');
-const followTable = tableInAppSchema('follow_entries');
-const usersTable = tableInAppSchema('users');
 
 /**
  * ถังของคิวโทร — 🔴 **มาจาก `_lib/lumosQueueDefs.ts` ห้ามเขียนเงื่อนไขเอง**
@@ -88,6 +85,8 @@ const QUEUE_STALE_PENDING_2D = queueStalePending("'2 days'", '');
 
 type Body = {
   generated_at: string;
+  /** BU กลางที่กรอง (null = ไม่กรอง) */
+  bu: string | null;
   open_total: number;
   teams: BoardTeams;
 };
@@ -119,13 +118,15 @@ async function loadOnlineTeam(openIds: string[], openTotal: number): Promise<Onl
  * ทีมสรรหา — ใบสมัครเทียบใบเปิด + ติดต่อ/นัด/มา-ไม่มา
  * "ติดต่อแล้ว" = โดน AI โทร (คิว 'app-%') **หรือ** มี log โทรมือ — union นับคน
  */
-async function loadRecruitTeam(openIds: string[]): Promise<RecruitTeamStats> {
+export async function loadRecruitTeam(openIds: string[], bu: string | null = null): Promise<RecruitTeamStats> {
+  // กรอง BU (หน้าหลักโฉม 3 ก้อน) — ไม่ส่ง = คิวรีเดิมเป๊ะ · ส่ง = เฉพาะใบสมัครของ BU กลางนั้น (`appIdsOfBuSql`)
+  const inBu = (col: string, param: string) => (bu ? ` ${col} in ${appIdsOfBuSql(param)}` : '');
   const [apps, contacted, appts, att] = await Promise.all([
     dbQuery<{ total: number; jobs: number }>(
       `select count(*)::int as total,
               count(distinct job_id) filter (where job_id = any($1))::int as jobs
-         from ${appsTable}`,
-      [openIds],
+         from ${appsTable}${bu ? `\n        where${inBu('id', '$2')}` : ''}`,
+      bu ? [openIds, bu] : [openIds],
     ),
     /**
      * 🔴 **"โทรแล้ว" ต้องใช้นิยามเดิมของ `OVERVIEW_BUCKETS.called` เท่านั้น**
@@ -135,15 +136,18 @@ async function loadRecruitTeam(openIds: string[]): Promise<RecruitTeamStats> {
      * (audit มุมพนักงานใหม่ 26 ส.ค. 2569 จับได้)
      */
     dbQuery<{ n: number }>(
-      `select count(*)::int as n from ${appsTable} a where ${OVERVIEW_BUCKETS.called}`,
+      `select count(*)::int as n from ${appsTable} a where ${OVERVIEW_BUCKETS.called}${bu ? ` and${inBu('a.id', '$1')}` : ''}`,
+      bu ? [bu] : undefined,
     ),
     dbQuery<{ n: number }>(
       `select count(distinct application_id)::int as n
-         from ${contactLogsTable} where appointment_at is not null`,
+         from ${contactLogsTable} where appointment_at is not null${bu ? ` and${inBu('application_id', '$1')}` : ''}`,
+      bu ? [bu] : undefined,
     ),
     dbQuery<{ result: string; n: number }>(
       `select result, count(distinct application_id)::int as n
-         from ${attendanceTable} group by result`,
+         from ${attendanceTable}${bu ? ` where${inBu('application_id', '$1')}` : ''} group by result`,
+      bu ? [bu] : undefined,
     ),
   ]);
   const attendance = { showed: 0, no_show: 0, rescheduled: 0 };
@@ -170,7 +174,8 @@ async function loadRecruitTeam(openIds: string[]): Promise<RecruitTeamStats> {
  * ทีม Lumos — คิวแยก 3 เลนตามเส้นทางเข้า
  * ⚠️ CASE นี้ต้องแปลผลเหมือน `queueLane` ใน lib เป๊ะ — แก้ฝั่งไหนแก้อีกฝั่งด้วย
  */
-async function loadLumosTeam(): Promise<LumosTeamStats> {
+export async function loadLumosTeam(bu: string | null = null): Promise<LumosTeamStats> {
+  // กรอง BU — ไม่ส่ง = คิวรีเดิมเป๊ะ · ส่ง = เฉพาะแถวคิวของ BU กลางนั้น (`queueIdsOfBuSql` · ไม่แตะเงื่อนไขคิวที่ไม่มี alias)
   const { rows } = await dbQuery<{
     lane: string;
     cancelled: number;
@@ -192,8 +197,9 @@ async function loadLumosTeam(): Promise<LumosTeamStats> {
             count(*) filter (where ${QUEUE_ACTIVE} and ${QUEUE_WAITING})::int as waiting,
             count(*) filter (where ${QUEUE_ACTIVE} and ${QUEUE_HAS_RESULT})::int as done,
             count(*) filter (where ${QUEUE_ACTIVE})::int as n
-       from ${queueTable}
+       from ${queueTable}${bu ? `\n      where id in ${queueIdsOfBuSql('$1')}` : ''}
       group by 1`,
+    bu ? [bu] : undefined,
   );
   const mk = (): LaneCounts => ({
     total: 0,
@@ -258,7 +264,8 @@ async function loadLumosTeam(): Promise<LumosTeamStats> {
                 where x.t->>'role' = 'candidate'
                   and coalesce(btrim(x.t->>'text'), '') <> '') as reply
          from ${queueTable} q
-        where ${QUEUE_ACTIVE} and ${QUEUE_HAS_RESULT}`,
+        where ${QUEUE_ACTIVE} and ${QUEUE_HAS_RESULT}${bu ? ` and q.id in ${queueIdsOfBuSql('$1')}` : ''}`,
+      bu ? [bu] : undefined,
     );
     const mkResults = (): LaneResults => ({
       yes: 0,
@@ -305,12 +312,13 @@ const SENT_STATES: readonly LumosSentState[] = ['pending', 'waiting', 'done', 'c
  * ของสามเลนรวมกันเป๊ะ · เส้นทางใช้ CASE ชุดเดียวกับ `queueLane` · สถานะใช้นิยามกลาง `lumosQueueDefs`
  * ⚠️ คอลัมน์เส้นทางชื่อ `route` (ไม่ใช่ `lane`) — เทสต์ของเลนจำคิวรีเลนจากคำว่า `as lane`
  *
- * BU ต่อสาย (ห้ามเดา — ไม่รู้ = null แล้วจอบอกจำนวน):
+ * BU ต่อสาย (ห้ามเดา — ไม่รู้ = null แล้วจอบอกจำนวน) = `queueBuSql` ตัวกลาง (`api/_lib/homeBuSql.ts` · 29 ก.ย. 2569):
  * - งานติดตาม = แผนกของคนคีย์ → ไซต์ของรายการ (กติกาเดียวกับ `/api/home-kpis` · เจ้าของเคาะ 15 ก.ย. 2569)
  * - ที่เหลือ = ไซต์ของใบขอ (`job_site_map` ผ่าน job_ref) → แผนกบนใบสมัคร (เฉพาะหน้าสาธารณะ)
- * รหัสแผนก (LM) แปลงเป็นรหัสจากไซต์ (LML) ฝั่ง Node ด้วย `siteBuOf` ให้ตรงกับตัวกรอง BU หน้าแรก
+ * ได้ BU กลางชุดแผนก (LM) แล้วแปลงเป็นรหัสจากไซต์ (LML) ฝั่ง Node ด้วย `siteBuOf` ให้ตรงกับตัวกรองของก้อนนี้
  */
-async function loadLumosSent(): Promise<LumosSentRow[]> {
+/** export ไว้ให้ตรวจอ่านอย่างเดียว/เทสต์ */
+export async function loadLumosSent(): Promise<LumosSentRow[]> {
   const { rows } = await dbQuery<{
     day: string | null;
     route: string;
@@ -325,11 +333,7 @@ async function loadLumosSent(): Promise<LumosSentRow[]> {
               when q.person_ref like 'card-%' or q.person_ref like 'ir-%' then 'match'
               else 'other'
             end as route,
-            case
-              when q.job_ref = 'follow' or q.person_ref like 'follow-%'
-                then coalesce(nullif(btrim(u.department_code), ''), ${siteBuSql('f.site_code')})
-              else coalesce(${siteBuSql('m.site_code')}, nullif(btrim(a.department_code), ''))
-            end as bu,
+            ${queueBuSql('q')} as bu,
             case
               when ${queueCancelled('q')} then 'cancelled'
               when ${queueHasResult('q')} then 'done'
@@ -339,10 +343,7 @@ async function loadLumosSent(): Promise<LumosSentRow[]> {
             end as state,
             count(*)::int as n
        from ${queueTable} q
-       left join ${mapTable} m on m.job_id = q.job_ref
-       left join ${appsTable} a on q.person_ref = 'app-' || a.id::text
-       left join ${followTable} f on q.person_ref = 'follow-' || f.id::text
-       left join ${usersTable} u on u.id = f.created_by
+       ${queueBuJoins('q')}
       group by 1, 2, 3, 4`,
   );
   // รหัสแผนกกับรหัสไซต์ของ BU เดียวกัน (LM · LML) ต้องรวมเป็นแถวเดียว ⇒ แปลงแล้วรวมซ้ำ
@@ -367,14 +368,23 @@ async function handler(req: AuthedReq, res: ApiRes) {
   }
   try {
     const departmentScope = await loadMatchingBuScope(req.user);
-    // cache แยกตาม scope — staff ต่างแผนกต้องไม่เห็นเลขของ BU อื่น
-    const cacheKey = JSON.stringify(departmentScope ?? null);
+    /**
+     * ตัวกรอง BU ของหน้าหลักโฉม 3 ก้อน (29 ก.ย. 2569 · เพิ่มอย่างเดียว) — BU กลางชุดแผนก (`parseBuParam`)
+     * ไม่ส่ง = ผลเดิมเป๊ะ · ส่ง = ใบเปิดของ BU นั้น (รหัสไซต์ของใบ) + ใบสมัคร/คิวของ BU นั้น
+     * ⚠️ ยอดส่ง Lumos ทั้งระบบ (`lumosSent`) ยังส่งครบทุก BU — ก้อนนั้นกรองเองจากแถวรายวัน
+     */
+    const bu = parseBuParam(req.query?.bu);
+    // cache แยกตาม scope + BU — staff ต่างแผนกต้องไม่เห็นเลขของ BU อื่น
+    const cacheKey = JSON.stringify([departmentScope ?? null, bu]);
     const hit = cache.get(cacheKey);
     if (hit && Date.now() - hit.at < CACHE_MS) return res.status(200).json(hit.body);
 
-    const open = (await listSiamrajUnitRequests({ limit: 500, departmentScope })) as Array<
+    const openAll = (await listSiamrajUnitRequests({ limit: 500, departmentScope })) as Array<
       Record<string, unknown>
     >;
+    const open = bu
+      ? openAll.filter((it) => trendBuFromSiteCode(String(it.site_code ?? '')) === bu)
+      : openAll;
     const openIds = open.map((it) => String(it.id || '').trim()).filter(Boolean);
 
     /** ทุกทีมยิงขนานและล้มแยกทีม — ทีมล้มต้องโผล่ใน errors ไม่ใช่หายเงียบ */
@@ -383,11 +393,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
         (v) => ({ ok: true as const, v }),
         (e: Error) => ({ ok: false as const, e }),
       ),
-      loadRecruitTeam(openIds).then(
+      loadRecruitTeam(openIds, bu).then(
         (v) => ({ ok: true as const, v }),
         (e: Error) => ({ ok: false as const, e }),
       ),
-      loadLumosTeam().then(
+      loadLumosTeam(bu).then(
         (v) => ({ ok: true as const, v }),
         (e: Error) => ({ ok: false as const, e }),
       ),
@@ -416,6 +426,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     const body: Body = {
       generated_at: new Date().toISOString(),
+      bu,
       open_total: open.length,
       teams,
     };

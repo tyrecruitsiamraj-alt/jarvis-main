@@ -12,7 +12,8 @@
  */
 import { buFromSiteCode, buLabel } from '@/lib/homeBu';
 
-const SITE_BU_TO_DEPT: Record<string, string> = {
+/** ตารางจับคู่ BU ไซต์ → แผนก — ตัวเดียวของทั้งระบบ (ฝั่ง SQL สร้างจากตารางนี้: `trendBuSql` ใน `api/_lib/siteBuSql.ts`) */
+export const SITE_BU_TO_DEPT: Readonly<Record<string, string>> = {
   LBD: 'LBD',
   LBA: 'LBA',
   LML: 'LM',

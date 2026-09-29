@@ -28,6 +28,18 @@ import {
   queueWaiting,
 } from '../_lib/lumosQueueDefs.js';
 import type { OfficeFloorCounts } from '@/lib/officeFloor';
+import {
+  aftercareBuSql,
+  appBuJoin,
+  appBuSql,
+  followBuJoin,
+  followBuSql,
+  holdBuJoin,
+  holdBuSql,
+  parseBuParam,
+  queueBuJoins,
+  queueBuSql,
+} from '../_lib/homeBuSql.js';
 
 const APPS = tableInAppSchema('public_job_applications');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
@@ -46,6 +58,17 @@ const QUEUE_RESULT_AT = queueResultAt('q');
 
 /** จำนวนวันเต็มจากเวลาหนึ่งถึงเดี๋ยวนี้ */
 const daysSince = (expr: string) => `floor(extract(epoch from (now() - ${expr})) / 86400)`;
+
+/**
+ * ═══ กรอง BU (หน้าหลักโฉม 3 ก้อน · 29 ก.ย. 2569) ═══
+ * ไม่ส่ง `bu` = คิวรีเดิมเป๊ะทุกตัวอักษร (หน้าเดิมไม่ขยับ · มีเทสต์คุม) · ส่ง = ต่อ join + where ของ BU กลาง
+ * (`api/_lib/homeBuSql.ts` — กติกา BU ของแต่ละตารางอยู่ที่นั่นที่เดียว) · พารามิเตอร์ `$1` = BU
+ */
+const withBu = (sql: string, from: string, join: string, expr: string, bu: boolean): string => {
+  if (!bu) return sql;
+  if (!sql.endsWith(from)) throw new Error(`office-floor: คิวรีต้องจบด้วย ${from}`);
+  return `${sql}\n       ${join}\n where ${expr} = $1`;
+};
 
 const INTAKE_SQL = `
 select
@@ -123,17 +146,20 @@ const orNull = (v: number | null | undefined): number | null => (typeof v === 'n
  * (ตัวเลขห้องทำงานไม่ต้องเป๊ะระดับวินาที · แถบเวลาบนจอบอกอยู่ว่าอัปเดตเมื่อไหร่)
  */
 const CACHE_MS = 30_000;
-let cache: { at: number; body: { generated_at: string; counts: OfficeFloorCounts } } | null = null;
+/** แยกตาม BU ที่ขอ (`''` = ไม่กรอง = ของเดิม) */
+const cache = new Map<string, { at: number; body: { generated_at: string; bu: string | null; counts: OfficeFloorCounts } }>();
 
 /**
  * "รอเลือกวิธีโทร" (104) — ยิงแยกจาก INTAKE_SQL เพราะฐานที่ยังไม่รัน migration จะได้
  * 42703 แล้วทำให้ **ทุกช่องของโต๊ะสรรหาหายไปทั้งโต๊ะ** ไม่ใช่แค่ช่องนี้
  * อ่านไม่ได้ = คืน undefined (ไม่ใช่ 0) → `buildIntake` ซ่อนช่องนี้ให้เอง
  */
-async function loadAwaitingChoice(): Promise<number | undefined> {
+async function loadAwaitingChoice(bu: string | null): Promise<number | undefined> {
   try {
+    const sql = `select count(*) filter (where ${OVERVIEW_BUCKETS.awaiting_call_choice})::int as n from ${APPS} a`;
     const { rows } = await dbQuery<Row>(
-      `select count(*) filter (where ${OVERVIEW_BUCKETS.awaiting_call_choice})::int as n from ${APPS} a`,
+      withBu(sql, `from ${APPS} a`, appBuJoin('a'), appBuSql('a'), !!bu),
+      bu ? [bu] : undefined,
     );
     return n(rows[0]?.n);
   } catch {
@@ -149,10 +175,13 @@ async function loadAwaitingChoice(): Promise<number | undefined> {
  * (`{ enabled: true, count: 0 }` → โต๊ะขึ้น *ไม่มีคนต้องตามในรอบนี้*) — คนละความหมาย
  * เดิมเส้นนี้ไม่เคยส่งคีย์นี้เลย โต๊ะจึงค้างที่ "กำลังสร้างในเฟสถัดไป" ทั้งที่ Phase 7 เสร็จแล้ว
  */
-async function loadAftercare(): Promise<{ enabled: boolean; count: number } | undefined> {
+async function loadAftercare(bu: string | null): Promise<{ enabled: boolean; count: number } | undefined> {
   try {
     const { rows } = await dbQuery<Row>(
-      `select count(*)::int as n from ${AFTERCARE} where closed_at is null`,
+      bu
+        ? `select count(*)::int as n from ${AFTERCARE} p where p.closed_at is null and ${aftercareBuSql('p')} = $1`
+        : `select count(*)::int as n from ${AFTERCARE} where closed_at is null`,
+      bu ? [bu] : undefined,
     );
     return { enabled: true, count: n(rows[0]?.n) };
   } catch {
@@ -160,14 +189,17 @@ async function loadAftercare(): Promise<{ enabled: boolean; count: number } | un
   }
 }
 
-async function loadCounts(): Promise<OfficeFloorCounts> {
+/** export ไว้ให้เทสต์/ตรวจอ่านอย่างเดียว — `bu` = BU กลาง (`parseBuParam`) · null = ของเดิม */
+export async function loadCounts(bu: string | null = null): Promise<OfficeFloorCounts> {
+  const p = bu ? [bu] : undefined;
+  const on = !!bu;
   const [intake, queue, holds, follow, awaitingChoice, aftercare] = await Promise.all([
-    dbQuery<Row>(INTAKE_SQL),
-    dbQuery<Row>(QUEUE_SQL),
-    dbQuery<Row>(HOLDS_SQL),
-    dbQuery<Row>(FOLLOW_SQL),
-    loadAwaitingChoice(),
-    loadAftercare(),
+    dbQuery<Row>(withBu(INTAKE_SQL, `from ${APPS} a`, appBuJoin('a'), appBuSql('a'), on), p),
+    dbQuery<Row>(withBu(QUEUE_SQL, `from ${QUEUE} q`, queueBuJoins('q'), queueBuSql('q'), on), p),
+    dbQuery<Row>(withBu(HOLDS_SQL, `from ${HOLDS} h`, holdBuJoin('h'), holdBuSql('h'), on), p),
+    dbQuery<Row>(withBu(FOLLOW_SQL, `from ${FOLLOW} f`, followBuJoin('f'), followBuSql('f'), on), p),
+    loadAwaitingChoice(bu),
+    loadAftercare(bu),
   ]);
   const i = intake.rows[0] ?? {};
   const q = queue.rows[0] ?? {};
@@ -211,10 +243,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
   if (method !== 'GET') return sendError(res, 405, 'Method not allowed');
   try {
     const now = Date.now();
-    if (cache && now - cache.at < CACHE_MS) return res.status(200).json(cache.body);
-    const counts = await loadCounts();
-    const body = { generated_at: new Date().toISOString(), counts };
-    cache = { at: now, body };
+    const bu = parseBuParam(req.query?.bu);
+    const hit = cache.get(bu ?? '');
+    if (hit && now - hit.at < CACHE_MS) return res.status(200).json(hit.body);
+    const counts = await loadCounts(bu);
+    const body = { generated_at: new Date().toISOString(), bu, counts };
+    cache.set(bu ?? '', { at: now, body });
     return res.status(200).json(body);
   } catch (err) {
     return handleApiError(res, err, 'office-floor');

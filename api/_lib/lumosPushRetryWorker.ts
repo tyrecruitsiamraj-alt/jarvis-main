@@ -307,7 +307,7 @@ export const retryKeyFor = (channel: LumosPushChannel, id: string, attempt: numb
 
 /**
  * ใบขอที่ยังเปิด — ชุดเดียวกับกล่องงาน (feed เดียวกัน · สำเนาอายุสั้นตัวเดียวกับที่อุ่นตอนบูต)
- * สถานะเปิด = `open` / `in_progress` (ตัวเดียวกับ `isBoardVisibleJob` — ไฟล์นั้นใช้ alias ของหน้าเว็บ import ฝั่ง API ไม่ได้)
+ * สถานะเปิด = `open` / `in_progress` (ตัวเดียวกับ `isBoardVisibleJob` ของกล่องงาน — แพตเทิร์นเดียวกับ `applicationAutoMoveWorker`)
  * 🔴 อ่านไม่ได้ **หรือได้ชุดว่าง** = `null` (ไม่รู้) — ห้ามตีความว่า "ปิดหมดทุกใบ" แล้วปิดโทรซ้ำทิ้งทั้งกอง
  */
 async function loadOpenJobIds(): Promise<Set<string> | null> {

@@ -104,6 +104,7 @@ import dashboardTrendsHandler from './dashboard-trends.js';
 import homeTodayHandler from './home-today.js';
 import unitSectorHandler from './unit-sector.js';
 import officeFloorHandler from './office-floor.js';
+import homeOverviewHandler from './home-overview.js';
 import officeTeamHandler from './office-team.js';
 import callScriptsHandler from './call-scripts.js';
 import callSuppressionHandler from './call-suppression.js';
@@ -175,6 +176,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/matching/worker-status': matchingWorkerStatusHandler as ApiHandler,
   // ฉาก "ห้องทำงาน" บนหน้าแรก — ตัวนับ read-only (ไม่มีข้อมูลบุคคล)
   '/api/office-floor': officeFloorHandler as ApiHandler,
+  '/api/home-overview': homeOverviewHandler as ApiHandler,
   '/api/office-team': officeTeamHandler as ApiHandler,
   // บทพูด AI แก้ได้จากหน้าตั้งค่า (27 ส.ค. 2569) — GET ทุก role · PUT/DELETE supervisor+
   '/api/call-scripts': callScriptsHandler as ApiHandler,

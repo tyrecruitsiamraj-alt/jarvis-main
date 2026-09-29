@@ -33,6 +33,8 @@ import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
 import { computeJobSla } from '@/lib/jobSla';
 import { positionBreakdownFromJob, resolveRequestControlStatus } from '@/lib/requestControl';
 import { buFromSiteCode } from '@/lib/homeBu';
+import { trendBuFromSiteCode } from '@/lib/trends/bu';
+import { parseBuParam } from '../_lib/homeBuSql.js';
 import type { JobRequest } from '@/types';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
@@ -240,7 +242,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     // ── ใบขอเปิดอยู่ (ท่อเดียวกับหน้า Matching — จำกัดตามแผนกเหมือนกัน)
     const raw = (await listSiamrajUnitRequests({ limit: 500, departmentScope })) as unknown[];
-    const jobs = enrichJobsWithUrgency(raw as JobRequest[]);
+    /**
+     * ตัวกรอง BU ของหน้าหลักโฉม 3 ก้อน (29 ก.ย. 2569 · เพิ่มอย่างเดียว) — BU กลางชุดแผนก (`parseBuParam`)
+     * ทุกตัวเลขของเส้นนี้ scope ตามรายการใบเปิดข้างล่างอยู่แล้ว ⇒ กรองรายการที่เดียวครอบทั้งเส้น
+     * ไม่ส่ง = ผลเดิมเป๊ะ
+     */
+    const bu = parseBuParam(req.query?.bu);
+    const jobsAll = enrichJobsWithUrgency(raw as JobRequest[]);
+    const jobs = bu ? jobsAll.filter((j) => trendBuFromSiteCode(j.site_code) === bu) : jobsAll;
     // ⚠️ ทุกตัวเลขบนหน้านี้จำกัดที่ "ใบขอเปิดอยู่ของ BU ตัวเอง" เท่านั้น (คิวโทร/จอง/โพส
     // scope ตามรายการนี้ทั้งหมด) — staff ต่างแผนกเปิดหน้าแรกต้องไม่เห็นเลขของ BU อื่น
     const scopedJobIds = jobs.map((j) => j.id);
@@ -453,6 +462,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json({
       month: new Date().toISOString().slice(0, 7),
+      bu,
       jobs: {
         open_total: jobs.length,
         urgent: jobs.filter((j) => j.urgency === 'urgent').length,

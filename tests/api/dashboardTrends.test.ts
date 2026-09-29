@@ -55,8 +55,9 @@ describe('เส้น /api/dashboard-trends — อ่านอย่างเ�
     expect(toLumos.slice(toLumos.indexOf('return {'))).not.toMatch(/\b(summary|reply|transcript)\b/);
   });
 
-  it('ใบขอ (ERP) อ่านผ่านสำเนาในฐาน ไม่ถามสดทุกครั้ง', () => {
-    expect(h).toContain('readThroughSnapshot(');
+  it('ใบขอ (ERP) อ่านผ่านสำเนาในฐาน ไม่ถามสดทุกครั้ง — ตัวโหลดกลางตัวเดียวกับหน้าหลัก (29 ก.ย. 2569)', () => {
+    expect(h).toContain('loadRequestTrendPayload(');
+    expect(read('api/_lib/requestTrendRows.ts')).toContain('readThroughSnapshot(');
     expect(read('migrations/122_dashboard_trend_snapshots.sql')).toMatch(/create table if not exists dashboard_trend_snapshots/);
   });
 
