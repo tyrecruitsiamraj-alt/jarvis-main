@@ -99,6 +99,8 @@ describe('หน้าหลักโฉม 3 ก้อน', () => {
   it('🔴 หัวหน้า/ผู้บริหาร: ผลงานเดือนนี้ → ของค้าง → วันนี้ · ก้อนผลงานบวกลบลงตัวถึงหัวกล่องงาน', async () => {
     renderAt();
     await screen.findByText('ผลงานเดือนนี้');
+    // หัวก้อนขึ้นก่อนตัวเลข (โครงรอโหลด) — รอเลขมาจริงก่อนตรวจ (เคยแดงตอนรันทั้งชุดเครื่องหนัก)
+    await waitFor(() => expect(screen.getByText('418')).toBeTruthy());
     const [result, stuck, today] = headingOrder(['ผลงานเดือนนี้', 'ของค้างที่ต้องจัดการตอนนี้', 'วันนี้ท่อเดินแค่ไหน']);
     expect(result).toBeGreaterThan(-1);
     expect(result).toBeLessThan(stuck);
