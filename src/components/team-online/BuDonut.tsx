@@ -33,21 +33,38 @@ const share = (v: number, total: number) => (total > 0 ? `${PCT0.format((v / tot
 function Tip({ active, payload, unit, total }: { active?: boolean; payload?: Array<{ payload: DonutSlice }>; unit: string; total: number }) {
   if (!active || !payload?.length) return null;
   const s = payload[0].payload;
-  // 🔴 ป้ายพื้นสว่างตามธีม (`CHART.tooltipLight`) — เจ้าของทักว่าป้ายดำจี้แล้วมืดมองไม่ออก (29 ก.ย. 2569)
+  const lines = s.lines ?? [];
+  // 🔴 ป้ายพื้นสว่างตามธีม (`CHART.tooltipLight`) — เจ้าของทัก 29 ก.ย. 2569: ป้ายดำมืด · แล้วบรรทัดเบียดกัน
+  // ⇒ ให้กว้างพอ (min-w-48) · หัว = จุดสี BU + ชื่อ · ค่าตัวใหญ่ + % มุมขวา · รายละเอียดคั่นเส้น เว้นบรรทัดสบายตา
   return (
-    <div style={CHART.tooltipLight.contentStyle} className="space-y-1 px-3 py-2">
-      <p style={CHART.tooltipLight.itemStyle} className="font-medium">
-        {s.label}
-      </p>
-      <p style={CHART.tooltipLight.labelStyle} className="tabular-nums">
-        {NUM.format(s.value)} {unit} · {share(s.value, total)} ของทั้งหมด
-      </p>
-      {(s.lines ?? []).map((l) => (
-        <p key={l.label} className="flex justify-between gap-4 tabular-nums">
-          <span style={CHART.tooltipLight.labelStyle}>{l.label}</span>
-          <span style={CHART.tooltipLight.itemStyle}>{l.value}</span>
-        </p>
-      ))}
+    <div style={CHART.tooltipLight.contentStyle} className="min-w-48 max-w-xs space-y-2.5 px-4 py-3">
+      <div className="flex items-center gap-2">
+        <span className={cn('inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-current', TONE[s.tone].value)} aria-hidden />
+        <span style={CHART.tooltipLight.itemStyle} className="truncate font-medium">
+          {s.label}
+        </span>
+      </div>
+      <div className="flex items-baseline gap-2">
+        <span style={CHART.tooltipLight.itemStyle} className="text-lg font-medium tabular-nums">
+          {NUM.format(s.value)}
+        </span>
+        <span style={CHART.tooltipLight.labelStyle}>{unit}</span>
+        <span style={CHART.tooltipLight.labelStyle} className="ml-auto tabular-nums">
+          {share(s.value, total)} ของทั้งหมด
+        </span>
+      </div>
+      {lines.length > 0 ? (
+        <div className="space-y-1.5 border-t border-border pt-2.5">
+          {lines.map((l) => (
+            <div key={l.label} className="flex items-center justify-between gap-6">
+              <span style={CHART.tooltipLight.labelStyle}>{l.label}</span>
+              <span style={CHART.tooltipLight.itemStyle} className="tabular-nums">
+                {l.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
