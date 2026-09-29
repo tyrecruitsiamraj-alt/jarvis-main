@@ -118,8 +118,9 @@ export function callBoxTruncated(s: FlowSummary, box: keyof FlowCallBoxes): bool
   return callBoxCount(s, box) > s.call_boxes[box].length;
 }
 
-export async function fetchFlowSummary(): Promise<FlowSummary> {
-  const r = await apiFetch('/api/matching/flow-summary');
+/** `bu` = BU กลางชุดแผนก (หน้าหลักโฉม 3 ก้อน) · ไม่ส่ง = ผลเดิมทุกอย่าง */
+export async function fetchFlowSummary(bu?: string | null): Promise<FlowSummary> {
+  const r = await apiFetch(bu ? `/api/matching/flow-summary?bu=${encodeURIComponent(bu)}` : '/api/matching/flow-summary');
   if (!r.ok) {
     const data = (await r.json().catch(() => ({}))) as { message?: string; error?: string };
     throw new Error(data.message || data.error || `โหลดสรุปการไหลของงานไม่สำเร็จ (HTTP ${r.status})`);

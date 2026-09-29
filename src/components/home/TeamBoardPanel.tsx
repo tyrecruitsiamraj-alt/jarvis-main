@@ -321,8 +321,15 @@ const CallDigestBlock: React.FC<{
   onOpenAll?: () => void;
   /** กดชื่อคน → เปิดรายละเอียดคนโดยตรง ไม่ต้องผ่านป๊อปกลาง */
   onOpenPerson?: (item: FlowFollowUpItem) => void;
-}> = ({ digest, resultToday, onOpenAll, onOpenPerson }) => (
+  /**
+   * หน้าหลักโฉม 3 ก้อน — เหลือแค่รายชื่อคนที่สนใจแล้วรอจองตัว + ปุ่มเปิดป๊อปเดิม
+   * (ผลกลับมาวันนี้/เดือนนี้เคยนับคนละหน่วย สาย/ราย และชิปคนละช่วงเวลา — ผลวันนี้ย้ายไปก้อน "วันนี้" เป็นคน)
+   */
+  waitingListOnly?: boolean;
+}> = ({ digest, resultToday, onOpenAll, onOpenPerson, waitingListOnly = false }) => (
   <>
+    {waitingListOnly ? null : (
+    <>
     <GroupTitle>ผลจากการโทร</GroupTitle>
     <li className="-mx-2 flex items-baseline gap-2 px-2 py-1">
       <span className={cn('min-w-0 flex-1 truncate text-xs', T.mut)}>ผลกลับมาวันนี้</span>
@@ -356,9 +363,11 @@ const CallDigestBlock: React.FC<{
         ))}
       </span>
     </li>
+    </>
+    )}
     {/* คนที่สนใจ = สนใจ "ลงงานอะไร" — ชื่อคน + ตำแหน่ง/หน่วยงานของใบขอที่แมทไป */}
     <li className={cn(eyebrow, 'mt-3 list-none', T.faint)}>
-      สนใจลงงาน · {digest.interestedTotal.toLocaleString('th-TH')} ราย
+      {waitingListOnly ? 'สนใจแล้ว · รอจองตัว' : 'สนใจลงงาน'} · {digest.interestedTotal.toLocaleString('th-TH')} ราย
     </li>
     {digest.interested.length === 0 ? (
       <li className="-mx-2 px-2 py-1">
@@ -456,6 +465,14 @@ const TeamBoardPanel: React.FC<{
    * เปลี่ยนแค่ 2 บรรทัด (คลาสเปลือก + สีป้ายหัว) จึงไม่มีทางทำข้อมูลตกหล่น
    */
   skin?: 'deck' | 'plain';
+  /**
+   * 🔴 **หน้าหลักโฉม 3 ก้อน** (29 ก.ย. 2569 · แผน `docs/plan-home-v3-2569-09-29.md`) — ไม่ส่ง = ของเดิมเป๊ะ
+   * ส่ง = บอร์ดนี้เป็น "รายละเอียด 4 ทีม" ใต้ก้อนบน ⇒ ตัดของที่ก้อนบนบอกแล้ว (เจ้าของ: *"เลขซ้ำตัดออก"*):
+   * ป้ายเตือนหัวคอลัมน์ · ค้างเกิน 1 วัน · เลยเวลานัดแล้ว · เงียบเกิน 1 วัน (ก้อนของค้างใช้เกณฑ์ 2 วัน) ·
+   * ก้อนส่งให้ Lumos ใช้ BU ของหน้า · Success Rate (นับทั้งระบบ) ขึ้นเฉพาะตอนดูทั้งหมด ·
+   * สรุปผลโทรเหลือรายชื่อที่สนใจแล้วรอจองตัว (ผลวันนี้อยู่ก้อน "วันนี้" เป็นคน)
+   */
+  v3?: { bu: string | null } | null;
   className?: string;
 }> = ({
   team,
@@ -468,6 +485,7 @@ const TeamBoardPanel: React.FC<{
   callDigest,
   onOpenPerson,
   skin = 'deck',
+  v3 = null,
   className,
 }) => {
   const teams = team?.teams;
@@ -508,7 +526,9 @@ const TeamBoardPanel: React.FC<{
           )}
         >
           {team
-            ? `ใบเปิด ${team.open_total} · อัปเดต ${timeText(team.generated_at)}`
+            ? v3
+              ? `อัปเดต ${timeText(team.generated_at)}`
+              : `ใบเปิด ${team.open_total} · อัปเดต ${timeText(team.generated_at)}`
             : loading
               ? skin === 'plain'
                 ? 'กำลังโหลดข้อมูล…'
@@ -545,7 +565,7 @@ const TeamBoardPanel: React.FC<{
           to={NAV.online.path ?? undefined}
           error={teams?.errors.online}
           stuck={
-            teams?.online && teams.online.unreleased > 0
+            !v3 && teams?.online && teams.online.unreleased > 0
               ? `ยังไม่ประกาศ ${teams.online.unreleased} ใบ`
               : null
           }
@@ -565,7 +585,7 @@ const TeamBoardPanel: React.FC<{
           to={NAV.recruit.path ?? undefined}
           error={teams?.errors.recruit}
           stuck={
-            floor && floor.intake.untouched > 0
+            !v3 && floor && floor.intake.untouched > 0
               ? `ผู้สมัครค้างไม่มีใครแตะ ${floor.intake.untouched} คน`
               : null
           }
@@ -585,12 +605,14 @@ const TeamBoardPanel: React.FC<{
             value={teams?.recruit?.apps_uncontacted ?? null}
             alert
           />
-          <Row
-            metric="recruit.untouched"
-            value={floor ? floor.intake.untouched : null}
-            alert
-            childOf
-          />
+          {v3 ? null : (
+            <Row
+              metric="recruit.untouched"
+              value={floor ? floor.intake.untouched : null}
+              alert
+              childOf
+            />
+          )}
           {/*
            * 🔴 เชิงอรรถกันบวกผิด (เจ้าของแจ้ง: คนใหม่เอา "ผู้สมัครทั้งหมด" +
            * "ยังไม่มีใครติดต่อ" + "ค้างเกิน 1 วันไม่มีใครแตะ" มาบวกกันแล้วงง)
@@ -627,11 +649,13 @@ const TeamBoardPanel: React.FC<{
           blurb={NAV.closing.blurb}
           to={NAV.closing.path ?? undefined}
           stuck={
-            floor && floor.follow.pastDue > 0
-              ? `เลยนัดโทรติดตาม ${floor.follow.pastDue} ราย`
-              : floor && floor.aiCalls.staleOverDay > 0
-                ? `สายเงียบเกิน 1 วัน ${floor.aiCalls.staleOverDay} สาย`
-                : null
+            v3
+              ? null
+              : floor && floor.follow.pastDue > 0
+                ? `เลยนัดโทรติดตาม ${floor.follow.pastDue} ราย`
+                : floor && floor.aiCalls.staleOverDay > 0
+                  ? `สายเงียบเกิน 1 วัน ${floor.aiCalls.staleOverDay} สาย`
+                  : null
           }
         >
           <Row metric="closing.queue_pending" value={floor ? floor.aiCalls.pending : null} />
@@ -640,17 +664,21 @@ const TeamBoardPanel: React.FC<{
             value={floor ? floor.aiCalls.waitingResult : null}
             onPress={onOpenActiveCalls}
           />
-          <Row
-            metric="closing.queue_stale"
-            value={floor ? floor.aiCalls.staleOverDay : null}
-            alert
-            onPress={onOpenActiveCalls}
-          />
+          {v3 ? null : (
+            <Row
+              metric="closing.queue_stale"
+              value={floor ? floor.aiCalls.staleOverDay : null}
+              alert
+              onPress={onOpenActiveCalls}
+            />
+          )}
           <GroupTitle>
             โทรติดตามคนที่รับปากแล้ว (<Term k="follow">Follow</Term>)
           </GroupTitle>
           <Row metric="closing.follow_today" value={floor ? floor.follow.today : null} />
-          <Row metric="closing.follow_past_due" value={floor ? floor.follow.pastDue : null} alert />
+          {v3 ? null : (
+            <Row metric="closing.follow_past_due" value={floor ? floor.follow.pastDue : null} alert />
+          )}
           <Row metric="closing.follow_upcoming" value={floor ? floor.follow.upcoming : null} />
           <GroupTitle>
             <Term k="aftercare">หลังเริ่มงาน</Term>
@@ -674,6 +702,7 @@ const TeamBoardPanel: React.FC<{
             rows={teams ? teams.lumosSent : null}
             loading={loading}
             error={teams?.errors.lumosSent}
+            pageBu={v3 ? v3.bu : undefined}
           />
           <LaneRows
             name={`จาก${LUMOS_ROUTE_LABEL.public}`}
@@ -702,6 +731,7 @@ const TeamBoardPanel: React.FC<{
               🔴 เขียน **ช่วงวันที่จริง** ของสายที่นับด้วย (7 ก.ย. 2569) — "7 วันล่าสุด"
               ลอย ๆ ตอบไม่ได้ว่า 7 วันไหน · ข้อความช่วงมาจาก `callRateRangeText` ที่เดียว
               (ตัวเดียวกับแผง Rate บนแดชบอร์ด) ⇒ สองหน้าพูดถึงช่วงเดียวกันเสมอ */}
+          {v3?.bu ? null : (
           <li className="mt-3 list-none">
             <span className={cn(eyebrow, T.faint)}>Success Rate · 7 วันล่าสุด</span>
             <span className="mt-0.5 flex items-baseline gap-1.5">
@@ -720,6 +750,7 @@ const TeamBoardPanel: React.FC<{
               </span>
             ) : null}
           </li>
+          )}
           {/* 🔴 ของเดิม (v1) — บรรทัดเดียวที่ต้องกดเข้าไปถึงจะรู้ผล · โฉมใหม่แทนด้วย
               สรุปเต็มข้างล่าง แต่ **ป๊อปเดิมยังเปิดได้จากปุ่มในบล็อกนั้น** ไม่มีอะไรหาย */}
           {callDigest ? (
@@ -728,7 +759,18 @@ const TeamBoardPanel: React.FC<{
               resultToday={floor ? floor.aiCalls.resultToday : null}
               onOpenAll={onOpenCallResults}
               onOpenPerson={onOpenPerson}
+              waitingListOnly={Boolean(v3)}
             />
+          ) : v3 ? (
+            <li className="mt-2 list-none">
+              <button
+                type="button"
+                onClick={onOpenCallResults}
+                className={cn('text-xs hover:underline', ACCENT.lumos)}
+              >
+                เปิดดูรายชื่อผลโทร (มีปุ่มจองตัว) →
+              </button>
+            </li>
           ) : (
             <li className="mt-2 list-none">
               <button

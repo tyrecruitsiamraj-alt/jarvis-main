@@ -203,6 +203,11 @@ describe('หน้าแรกต้องไม่มีตัวอักษ�
     'src/components/home/FollowTodayPanel.tsx',
     'src/components/home/LumosCallHealthPanel.tsx',
     'src/components/home/HomeDigestPanels.tsx',
+    // หน้าหลักโฉม 3 ก้อน (29 ก.ย. 2569)
+    'src/pages/HomeV3Page.tsx',
+    'src/components/home-v3/HomeResultBlock.tsx',
+    'src/components/home-v3/HomeStuckList.tsx',
+    'src/components/home-v3/HomeTodayBlock.tsx',
   ];
 
   it.each(FILES)('%s — ไม่มี text-[10px] / text-[11px]', (f) => {

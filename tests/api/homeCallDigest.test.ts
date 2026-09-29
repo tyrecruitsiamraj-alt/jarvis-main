@@ -129,7 +129,8 @@ describe('interestedJobLine — "สนใจลงงานอะไร" ห้
 });
 
 describe('ป้าย 4 กล่องมีชุดเดียว — บอร์ดทีมกับป๊อปห้ามพิมพ์เอง', () => {
-  const home = read('src/pages/HomePage.tsx');
+  // ป๊อปผลโทรย้ายออกจาก HomePage.tsx 29 ก.ย. 2569 → ตัวกลางที่หน้าหลักทั้งสองโฉมใช้ร่วมกัน
+  const home = read('src/components/home/useHomeCallDialogs.tsx');
   const panel = read('src/components/home/TeamBoardPanel.tsx');
 
   it('ทุกคีย์ใน CALL_BOX_META มีโทนอยู่จริง', () => {
@@ -172,5 +173,24 @@ describe('ของใหม่อยู่หลังสวิตช์ · ข
   it('กล่องทีมโชว์ชื่อคนที่สนใจ + งานที่สนใจ โดยไม่ต้องกดเข้าไป', () => {
     expect(panel).toContain('สนใจลงงาน');
     expect(panel).toContain('onOpenPerson');
+  });
+});
+
+describe('ป๊อปผลโทรตัวกลาง — หน้าหลักทั้งสองโฉมใช้ตัวเดียวกัน (29 ก.ย. 2569)', () => {
+  const dialogs = read('src/components/home/useHomeCallDialogs.tsx');
+  it('🔴 หน้าหลักเดิมกับโฉม 3 ก้อนเรียกตัวกลางเดียวกัน · ปุ่มจองตัวยังอยู่', () => {
+    for (const f of ['src/pages/HomePage.tsx', 'src/pages/HomeV3Page.tsx']) expect(read(f), f).toContain('useHomeCallDialogs(');
+    expect(dialogs).toContain('จองตัวเลย');
+    expect(dialogs).toContain('saveProposal(');
+  });
+  it('🔴 ไม่ซ้อน Dialog ใน Dialog — กดชื่อ = ปิดป๊อปรายชื่อก่อนเปิดรายละเอียดคน · มีปุ่มกลับไปรายชื่อ', () => {
+    const show = dialogs.slice(dialogs.indexOf('const showPerson'), dialogs.indexOf('const bookFromCallResult'));
+    expect(show).toContain('setCallResultsOpen(false)');
+    expect(show).toContain('setActiveCallsOpen(false)');
+    expect(dialogs).toContain('กลับไปรายชื่อ');
+  });
+  it('คำอธิบายป๊อปตรงกับที่นับจริง — สนใจ = ค้างทั้งหมดที่ยังไม่มีใครรับช่วง (ไม่ใช่ของเดือนนี้)', () => {
+    expect(dialogs).not.toContain('สนใจ/ไม่สนใจนับของเดือนนี้');
+    expect(dialogs).toContain('สนใจคือของค้างทั้งหมดที่ยังไม่มีใครรับช่วง');
   });
 });

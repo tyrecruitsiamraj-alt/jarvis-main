@@ -25,6 +25,12 @@ export type HomeBuFilterProps = {
   value: string | null;
   onChange: (bu: string | null) => void;
   className?: string;
+  /**
+   * หน้าหลักโฉม 3 ก้อน (29 ก.ย. 2569) ใช้ BU กลางชุดแผนก (LM ไม่ใช่ LML) ⇒ ส่งตัวแปลงป้าย + ลำดับของตัวเองมา
+   * ไม่ส่ง = ของเดิม (ป้ายชุดไซต์ `buLabel` · เรียง `sortBuOptions`)
+   */
+  labelOf?: (bu: string) => string;
+  keepOrder?: boolean;
 };
 
 /** ค่าที่ ToggleGroup ใช้แทน "ทั้งหมด" — ว่างไม่ได้ ไม่งั้นกดแล้วหลุดเป็น null */
@@ -35,8 +41,10 @@ export const HomeBuFilter: React.FC<HomeBuFilterProps> = ({
   value,
   onChange,
   className,
+  labelOf = buLabel,
+  keepOrder = false,
 }) => {
-  const opts = React.useMemo(() => sortBuOptions(options), [options]);
+  const opts = React.useMemo(() => (keepOrder ? [...options] : sortBuOptions(options)), [options, keepOrder]);
   // ไม่มีตัวเลือก (ฐานยังไม่มีทะเบียนไซต์) = ซ่อนแถบไปเลย ไม่ขึ้นแถบเปล่า
   if (opts.length === 0) return null;
 
@@ -59,7 +67,7 @@ export const HomeBuFilter: React.FC<HomeBuFilterProps> = ({
           ทั้งหมด
         </ToggleGroupItem>
         {opts.map((o) => (
-          <ToggleGroupItem key={o.bu} value={o.bu} title={buLabel(o.bu)} className="gap-1.5 text-xs">
+          <ToggleGroupItem key={o.bu} value={o.bu} title={labelOf(o.bu)} className="gap-1.5 text-xs">
             {o.bu}
             {/* จำนวนใบขอของ BU นั้น — ใช้ Badge ของ shadcn แทนชิปที่วาดเอง */}
             <Badge variant="secondary" className="px-1.5 py-0 text-xs tabular-nums">

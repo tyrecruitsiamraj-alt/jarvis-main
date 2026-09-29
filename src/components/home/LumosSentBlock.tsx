@@ -7,6 +7,7 @@ import { bangkokTodayYmd } from '@/lib/lumosCallRate';
 import { buLabel } from '@/lib/homeBu';
 import { LUMOS_ROUTE_LABEL, type LumosSentRow, type LumosSentState } from '@/lib/officeTeam';
 import { lumosSentBuOptions, summarizeLumosSent } from '@/lib/lumosSentSummary';
+import { siteBuOf } from '@/lib/trends/bu';
 
 /**
  * ═══ หัวคอลัมน์ Lumos บนหน้าแรก — "ส่งให้ Lumos ทั้งระบบ" (เจ้าของสั่ง 28 ก.ย. 2569) ═══
@@ -39,8 +40,16 @@ const LumosSentBlock: React.FC<{
   rows: LumosSentRow[] | null | undefined;
   loading?: boolean;
   error?: string;
-}> = ({ rows, loading, error }) => {
-  const [bu, setBu] = useState<string | null>(null);
+  /**
+   * BU จากตัวกรองของหน้า (หน้าหลักโฉม 3 ก้อน · "BU เดียวคุมทั้งหน้า" — 29 ก.ย. 2569)
+   * `undefined` = ของเดิม (ก้อนนี้มีตัวเลือก BU ของตัวเอง) · ส่งมา (รวม null = ทั้งหมด) = ใช้ BU ของหน้า ไม่มีตัวเลือกของตัวเอง
+   * รับ BU กลางชุดแผนก แล้วแปลงเป็นชุดไซต์ของแถวรายวัน (`siteBuOf`)
+   */
+  pageBu?: string | null;
+}> = ({ rows, loading, error, pageBu }) => {
+  const external = pageBu !== undefined;
+  const [ownBu, setBu] = useState<string | null>(null);
+  const bu = external ? siteBuOf(pageBu) : ownBu;
   const [range, setRange] = useState<DateRangeYmd | null>(null);
   const data = useMemo(() => rows ?? [], [rows]);
   const today = bangkokTodayYmd();
@@ -88,14 +97,16 @@ const LumosSentBlock: React.FC<{
           </dl>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <DateRangeCalendarPicker triggerVariant="filter" value={range} onChange={setRange} />
-            <ChoiceDropdown
-              value={bu ?? ALL_BU}
-              options={buOptions}
-              onChange={(v) => setBu(v === ALL_BU ? null : v)}
-              triggerLabel={bu ?? 'ทุก BU'}
-              ariaLabel="เลือก BU"
-              active={bu !== null}
-            />
+            {external ? null : (
+              <ChoiceDropdown
+                value={bu ?? ALL_BU}
+                options={buOptions}
+                onChange={(v) => setBu(v === ALL_BU ? null : v)}
+                triggerLabel={bu ?? 'ทุก BU'}
+                ariaLabel="เลือก BU"
+                active={bu !== null}
+              />
+            )}
           </div>
           {known ? (
             <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">

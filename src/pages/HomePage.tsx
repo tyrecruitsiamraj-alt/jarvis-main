@@ -1,43 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
+import { useHomeV3 } from '@/lib/homeV3';
 import { fetchCallRateSeries } from '@/lib/callFunnelApi';
 import { bangkokTodayYmd, compareCallRate } from '@/lib/lumosCallRate';
 import HomeSection from '@/components/home/HomeSection';
-import { Button } from '@/components/ui/button';
-import {
-  useNavigate } from 'react-router-dom';
-import {
-  PhoneForwarded,
-  Phone,
-  PhoneCall,
-  AlertTriangle,
-  RefreshCw,
-} from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { BrandTitle } from '@/components/shared/BrandMark';
-import { cn } from '@/lib/utils';
-import { TONE, type ToneKey } from '@/lib/designTokens';
 import {
   fetchFlowSummary,
   confirmedThisMonth,
   callResultsThisMonth,
   callBoxCount,
-  callBoxTruncated,
   type FlowSummary,
-  type FlowFollowUpItem,
 } from '@/lib/flowSummaryApi';
-import {
-  buildCallDigest,
-  CALL_BOX_META,
-  FOLLOW_UP_TONE,
-  type FollowUpTone,
-} from '@/lib/homeCallDigest';
-import {
-  bookingActionFor,
-  bookingTargetFromPersonRef,
-} from '@/lib/callResultBooking';
-import { ProposalConflictError, saveProposal } from '@/lib/candidateProposalsApi';
+import { buildCallDigest } from '@/lib/homeCallDigest';
 import TeamBoardPanel from '@/components/home/TeamBoardPanel';
+import { useHomeCallDialogs } from '@/components/home/useHomeCallDialogs';
 import { fetchOfficeTeam, type OfficeTeamResponse } from '@/lib/officeTeamApi';
 import { fetchOfficeFloor, type OfficeFloorResponse } from '@/lib/officeFloorApi';
 import { buildNextTasks } from '@/lib/nextTask';
@@ -67,67 +44,9 @@ import { lumosConnectRate } from '@/lib/lumosLinkHealth';
  * ก้อนตัวเลข 1 ขั้นใน funnel — กดแล้วพาไปหน้าที่เกี่ยวข้อง
  * สีทั้งแถบหัวการ์ดและตัวเลขมาจาก token กลางตัวเดียว (@/lib/designTokens) ไม่ประกาศ class สีที่นี่
  */
-/**
- * 🔴 โทน/ป้าย/ตัวสร้างสรุปของ 4 กล่องผลโทร **ย้ายไป `@/lib/homeCallDigest`** แล้ว
- * (7 ก.ย. 2569) — บอร์ดทีมกับป๊อปนี้ต้องอ่านชุดเดียวกัน ไม่งั้นเลขบนจอเดียวกันขัดกันเอง
- * ที่เหลือไว้ในไฟล์จอคือ **ไอคอน** อย่างเดียว (component ของ React ไม่ควรอยู่ใน lib ข้อมูล)
- */
-const CALL_BOX_ICON = {
-  confirmed: PhoneCall,
-  retry: PhoneForwarded,
-  needs_human: AlertTriangle,
-  declined: Phone,
-} as const;
+/** ป๊อปผลโทร 3 ตัว (ผลจากการโทร · รอผล · รายละเอียดคน + จองตัว) ย้ายไป `useHomeCallDialogs` 29 ก.ย. 2569 — หน้าหลักโฉม 3 ก้อนใช้ตัวเดียวกัน */
 
-/** รายชื่อคนในกล่องผลโทร — สีของแถวบอกปลายทางเอง กดแล้วเปิดรายละเอียดคน */
-function FollowUpList({
-  items,
-  tone,
-  onOpen,
-  max = 3,
-}: {
-  items: FlowFollowUpItem[];
-  tone: FollowUpTone;
-  onOpen: (item: FlowFollowUpItem) => void;
-  /** จำนวนชื่อที่โชว์ก่อนยุบเป็น "…และอีก N" */
-  max?: number;
-}) {
-  const t = FOLLOW_UP_TONE[tone];
-  if (items.length === 0) {
-    return <p className="mt-1.5 px-1 text-[11px] text-muted-foreground">— ไม่มีรายชื่อ</p>;
-  }
-  return (
-    <div className="mt-1.5 space-y-1">
-      {items.slice(0, max).map((it) => (
-        <button
-          key={`${it.job_ref}:${it.person_ref}`}
-          type="button"
-          onClick={() => onOpen(it)}
-          title={t.hint}
-          className={cn(
-            'w-full rounded-lg border px-2 py-1.5 text-left',
-            TONE[t.tone].soft,
-            TONE[t.tone].softHover,
-          )}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-[11px] font-medium text-foreground">
-              <span aria-hidden>{t.dot}</span> {it.name || it.person_ref}
-            </span>
-            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{it.request_no}</span>
-          </div>
-          {it.summary ? <p className="mt-0.5 line-clamp-1 text-[10px] text-muted-foreground">{it.summary}</p> : null}
-        </button>
-      ))}
-      {items.length > max ? (
-        <p className="text-[10px] text-muted-foreground">…และอีก {items.length - max} รายการ</p>
-      ) : null}
-    </div>
-  );
-}
-
-const HomePage: React.FC = () => {
-  const navigate = useNavigate();
+const HomePageClassic: React.FC = () => {
   const { user, hasPermission } = useAuth();
   /**
    * 🔴 **สวิตช์โฉมใหม่** (5 ก.ย. 2569) — ระบบอยู่บน production แล้ว
@@ -139,20 +58,6 @@ const HomePage: React.FC = () => {
   // สรุปการไหลของงาน — ของหลักของหน้านี้ (เมนูทั้งหมดอยู่ใน burger แล้ว)
   const [flow, setFlow] = useState<FlowSummary | null>(null);
   const [flowLoading, setFlowLoading] = useState(true);
-  // กดชื่อคนในกล่องผลโทร → เปิดรายละเอียดคน + งานที่แมทไป ก่อนตัดสินใจเปิดใบขอ
-  const [personDetail, setPersonDetail] = useState<{ item: FlowFollowUpItem; tone: FollowUpTone } | null>(null);
-  // กดขั้น "ผลจากการโทร" → dialog 4 กล่อง (สนใจ/รอโทรซ้ำ/ต้องเร่งจัดการ/ไม่สนใจ) พร้อมชื่อคน
-  const [callResultsOpen, setCallResultsOpen] = useState(false);
-  // กดขั้น "ส่ง AI โทร" → dialog รายชื่อคนที่ถูกส่งไปแล้วและยังไม่มีผลกลับ
-  const [activeCallsOpen, setActiveCallsOpen] = useState(false);
-  /**
-   * ปุ่ม "จองตัวเลย" ในกล่อง "สนใจงาน" — ปลายทางที่ `CALL_RESULT_DESTINATION.confirmed`
-   * สัญญาไว้ว่า "เข้าเส้นจองตัว" แต่ไม่เคยมีปุ่มรออยู่จริง (ดู src/lib/callResultBooking.ts)
-   * เก็บคีย์ที่จองแล้วไว้เพื่อกันกดซ้ำ — flow-summary จะตัดคนที่จองแล้วออกจากกล่องเองตอนโหลดใหม่
-   */
-  const [bookingBusy, setBookingBusy] = useState(false);
-  const [bookedKeys, setBookedKeys] = useState<Record<string, true>>({});
-  const [bookingError, setBookingError] = useState<string | null>(null);
   /** ฉากห้องทำงาน (เจ้าของสั่ง 22 ส.ค. 2569) — เลขดิบจาก /api/office-floor */
   const [office, setOffice] = useState<OfficeFloorResponse | null>(null);
   /**
@@ -304,45 +209,8 @@ const HomePage: React.FC = () => {
    */
   const callDigest = React.useMemo(() => buildCallDigest(flow), [flow]);
 
-  /** คีย์กันกดซ้ำ — คนเดียวโผล่ได้หลายใบขอ จึงต้องผูกกับใบด้วย ไม่ใช่แค่ตัวคน */
-  const bookingKeyOf = (item: FlowFollowUpItem) => `${item.job_ref}::${item.person_ref}`;
-
-  /**
-   * จองตัวจากผลโทร "สนใจ" — ใช้เส้นเดียวกับปุ่มจองในหน้า Matching (`saveProposal`)
-   * จึงติดกติกาเดิมครบ: 1 คนจองได้ใบเดียว (backend ตอบ 409 พร้อมบอกว่าติดใบไหน)
-   */
-  const bookFromCallResult = async (item: FlowFollowUpItem) => {
-    const target = bookingTargetFromPersonRef(item.person_ref);
-    if (!target || bookingBusy) return;
-    setBookingBusy(true);
-    setBookingError(null);
-    try {
-      await saveProposal({
-        jobId: item.job_ref,
-        requestNo: item.request_no || null,
-        source: target.source,
-        candidateRef: target.candidateRef,
-        candidateName: item.name,
-        candidatePhone: item.phone,
-        // ⚠️ ไม่ส่ง candidatePosition — `job_position` คือตำแหน่งของ **ใบขอ** ไม่ใช่ของผู้สมัคร
-        //    ยัดลงไปจะได้ประวัติการจองที่บอกอาชีพผู้สมัครผิดโดยไม่มีใครทัก
-        operatorName: user?.full_name || user?.username || null,
-        status: 'reserved',
-      });
-      setBookedKeys((prev) => ({ ...prev, [bookingKeyOf(item)]: true }));
-      // กล่อง "สนใจงาน" นับเฉพาะคนที่ยังไม่มีใครรับช่วงต่อ — โหลดใหม่แล้วคนนี้จะหลุดออกเอง
-      void loadFlow();
-    } catch (e) {
-      if (e instanceof ProposalConflictError) {
-        const where = e.conflict.request_no || e.conflict.job_id;
-        setBookingError(`จองไม่ได้ — ติดจองอยู่กับใบขอ ${where} อยู่แล้ว ต้องยกเลิกใบนั้นก่อน`);
-      } else {
-        setBookingError(e instanceof Error ? e.message : 'จองตัวไม่สำเร็จ');
-      }
-    } finally {
-      setBookingBusy(false);
-    }
-  };
+  /** ป๊อปผลโทร + จองตัว — ตัวเดียวกับหน้าหลักโฉม 3 ก้อน (`useHomeCallDialogs`) */
+  const callDialogs = useHomeCallDialogs({ flow, reloadFlow: () => void loadFlow() });
 
   /**
    * **Success Rate ตรง Lumos บนหน้าหลัก** (เจ้าของสั่ง 4 ก.ย. 2569)
@@ -449,16 +317,13 @@ const HomePage: React.FC = () => {
         loading={teamLoading}
         onRefresh={() => void loadTeam()}
         floor={office ? office.counts : null}
-        onOpenCallResults={() => setCallResultsOpen(true)}
-        onOpenActiveCalls={() => setActiveCallsOpen(true)}
+        onOpenCallResults={callDialogs.openCallResults}
+        onOpenActiveCalls={callDialogs.openActiveCalls}
         successRate={successRate}
         /* 🔴 สรุปผลโทรบนกล่องทีม (เจ้าของสั่ง 7 ก.ย. 2569) — **โฉมใหม่เท่านั้น**
            v1 ได้ `null` ⇒ คอลัมน์ Lumos จบที่ปุ่มเดิมเป๊ะ ไม่ขยับ */
         callDigest={uiV2 ? callDigest : null}
-        onOpenPerson={(it) => {
-          setBookingError(null);
-          setPersonDetail({ item: it, tone: 'good' });
-        }}
+        onOpenPerson={(it) => callDialogs.openPerson(it, 'good')}
       />
 
       {/*
@@ -532,210 +397,26 @@ const HomePage: React.FC = () => {
           คอมเมนต์เหนือหัวข้อ "ตัวเลขวันนี้" ข้างบน */}
       {/* เมนูหลักถูกถอดออก — ทุกโมดูลเข้าถึงได้จากปุ่ม ☰ (burger) ที่ header อยู่แล้ว */}
 
-      {/* dialog "ผลจากการโทร" — 4 กล่องปลายทางพร้อมชื่อคน (เจ้าของกำหนดชุดกล่อง 12 ส.ค. 2569)
-          กดชื่อ → เปิด personDetail ต่อ (dialog ซ้อนกัน — ตัวนี้ยังเปิดค้างไว้ให้กดคนถัดไป) */}
-      <Dialog open={callResultsOpen} onOpenChange={setCallResultsOpen}>
-        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">ผลจากการโทร — ใครอยู่ปลายทางไหน</DialogTitle>
-            <DialogDescription>
-              สนใจ/ไม่สนใจนับของเดือนนี้ · รอโทรซ้ำ/ต้องเร่งจัดการคือของค้างตอนนี้ · กดชื่อเพื่อดูรายละเอียด
-            </DialogDescription>
-          </DialogHeader>
-          {flow ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {CALL_BOX_META.map(({ key, label, tone }) => {
-                const Icon = CALL_BOX_ICON[key];
-                const items = flow.call_boxes[key];
-                const t = FOLLOW_UP_TONE[tone];
-                /* 🔴 ยอดจริงจาก `call_box_counts` — เดิมใช้ `items.length` ที่ SQL ตัดไว้ที่ 50
-                   ⇒ ของจริงเกิน 50 เมื่อไหร่ ป๊อปจะบอก "50" ตลอดกาล และขัดกับสรุปบนบอร์ดทีม
-                   (บั๊กตระกูลเดียวกับที่หน้า `/work` แก้ไปแล้ว commit b34ab30) */
-                const total = callBoxCount(flow, key);
-                return (
-                  <div key={key} className={cn('rounded-2xl border p-3', TONE[t.tone].soft)}>
-                    <div className={cn('flex items-center gap-1.5 text-xs font-medium', TONE[t.tone].num)}>
-                      <Icon className="h-3.5 w-3.5" aria-hidden />
-                      {label} ({total.toLocaleString('th-TH')})
-                    </div>
-                    {callBoxTruncated(flow, key) ? (
-                      <p className="mt-0.5 text-[10px] text-muted-foreground">
-                        แสดง {items.length} รายแรกจาก {total.toLocaleString('th-TH')}
-                      </p>
-                    ) : null}
-                    <FollowUpList
-                      items={items}
-                      tone={tone}
-                      max={5}
-                      onOpen={(it) => {
-                        // ล้าง error ของคนก่อนหน้า ไม่งั้นข้อความ "ติดจองใบอื่น" ค้างข้ามคน
-                        setBookingError(null);
-                        setPersonDetail({ item: it, tone });
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      {/* dialog "ส่ง AI โทร" — รายชื่อคนที่ถูกส่งไปแล้วตอนนี้ (ยังไม่มีผลกลับ)
-          แถวที่ค้างเกิน 2 วันขึ้นธงแดงให้เช็คกับทีม Lumos — แทนกล่อง "ติดขัด" เดิม */}
-      <Dialog open={activeCallsOpen} onOpenChange={setActiveCallsOpen}>
-        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
-          <DialogHeader>
-            {/* ยอดจริงมาจากตัวนับในคิว ไม่ใช่ความยาวลิสต์ — ลิสต์ถูกตัดที่ 100 รายการแรก
-                (ใช้ length จะโกหกทันทีที่ของจริงเกิน 100 — เจอจริง: ค้าง 1,484 โชว์ "100") */}
-            <DialogTitle className="text-foreground">
-              ส่ง AI โทร — รายชื่อที่รอผลอยู่ตอนนี้ (
-              {((flow?.lumos.waiting_call ?? 0) + (flow?.lumos.delivered_waiting ?? 0)).toLocaleString('th-TH')})
-            </DialogTitle>
-            <DialogDescription>
-              เรียงคนที่ค้างนานขึ้นก่อน · 🔴 = เกิน 2 วันยังไม่มีผลกลับ ควรเช็คกับทีม Lumos
-              {flow && (flow.lumos.waiting_call + flow.lumos.delivered_waiting) > flow.active_calls.length
-                ? ` · โชว์ ${flow.active_calls.length} รายการแรก`
-                : ''}
-            </DialogDescription>
-          </DialogHeader>
-          {flow ? (
-            flow.active_calls.length === 0 ? (
-              <p className="text-sm text-muted-foreground">ไม่มีสายที่รอผลอยู่ตอนนี้</p>
-            ) : (
-              <div className="space-y-1">
-                {flow.active_calls.map((it) => (
-                  <button
-                    key={`${it.job_ref}:${it.person_ref}`}
-                    type="button"
-                    onClick={() => setPersonDetail({ item: it, tone: it.stale ? 'bad' : 'warn' })}
-                    className={cn(
-                      'w-full rounded-lg border px-2 py-1.5 text-left',
-                      it.stale ? TONE.danger.soft : TONE.primary.soft,
-                      it.stale ? TONE.danger.softHover : TONE.primary.softHover,
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-[11px] font-medium text-foreground">
-                        <span aria-hidden>{it.stale ? '🔴' : '📞'}</span> {it.name || it.person_ref}
-                      </span>
-                      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{it.request_no}</span>
-                    </div>
-                    {it.stale ? (
-                      <p className={cn('mt-0.5 text-[10px] font-medium', TONE.danger.value)}>
-                        เกิน 2 วันยังไม่มีผลกลับ — ควรเช็คกับทีม Lumos
-                      </p>
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-            )
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      {/* กดชื่อคนในกล่องผลโทร → รายละเอียดคน + แมทกับงานอะไรไป ก่อนเปิดใบขอ */}
-      <Dialog open={!!personDetail} onOpenChange={(o) => !o && setPersonDetail(null)}>
-        <DialogContent className="max-w-sm">
-          {personDetail ? (
-            <>
-              <DialogHeader>
-                <DialogTitle className="text-foreground">
-                  <span aria-hidden>{FOLLOW_UP_TONE[personDetail.tone].dot}</span>{' '}
-                  {personDetail.item.name || personDetail.item.person_ref}
-                </DialogTitle>
-                <DialogDescription>{FOLLOW_UP_TONE[personDetail.tone].hint}</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3">
-                <div className={cn('rounded-xl border px-3 py-2.5 space-y-1', TONE.neutral.soft)}>
-                  <p className="text-[11px] font-medium text-muted-foreground">แมทกับใบขอ</p>
-                  <p className="text-sm font-medium text-foreground">
-                    {personDetail.item.job_position || 'ไม่ระบุตำแหน่ง'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {personDetail.item.job_unit || '—'} ·{' '}
-                    <span className="font-mono">{personDetail.item.request_no}</span>
-                  </p>
-                </div>
-                <div className={cn('rounded-xl border px-3 py-2.5 space-y-1', TONE.neutral.soft)}>
-                  <p className="text-[11px] font-medium text-muted-foreground">ผลการโทรล่าสุด</p>
-                  <p className="text-xs leading-relaxed text-foreground">
-                    {personDetail.item.summary || 'ยังไม่มีสรุปบทสนทนา'}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {new Date(personDetail.item.updated_at).toLocaleString('th-TH', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
-                  </p>
-                </div>
-                {/* ปุ่มจอง — เฉพาะกล่อง "สนใจงาน" (tone good) ตามที่เจ้าของกำหนดปลายทางของผลนี้
-                    ปิดปุ่มเมื่อไหร่ต้องมีเหตุผลให้อ่านเสมอ (bookingActionFor · มีเทสต์บังคับ) */}
-                {personDetail.tone === 'good'
-                  ? (() => {
-                      const item = personDetail.item;
-                      const target = bookingTargetFromPersonRef(item.person_ref);
-                      const action = bookingActionFor({
-                        target,
-                        jobId: item.job_ref,
-                        personRef: item.person_ref,
-                        alreadyBooked: bookedKeys[bookingKeyOf(item)] === true,
-                        busy: bookingBusy,
-                      });
-                      return (
-                        <div className={cn('rounded-xl border px-3 py-2.5 space-y-1.5', TONE.violet.soft)}>
-                          <p className={cn('text-[11px] font-medium', TONE.violet.num)}>
-                            สนใจงานแล้ว — จองตัวไว้เลย
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => void bookFromCallResult(item)}
-                            disabled={action.disabled}
-                            className={cn(
-                              'w-full rounded-full px-3 py-1.5 text-xs font-medium disabled:opacity-50',
-                              TONE.violet.solid,
-                            )}
-                          >
-                            {bookedKeys[bookingKeyOf(item)] ? 'จองตัวแล้ว ✓' : 'จองตัวเลย'}
-                          </button>
-                          {action.reason ? (
-                            <p className="text-[10px] text-muted-foreground">{action.reason}</p>
-                          ) : null}
-                          {bookingError ? (
-                            <p className={cn('text-[10px] font-medium', TONE.danger.value)}>{bookingError}</p>
-                          ) : null}
-                        </div>
-                      );
-                    })()
-                  : null}
-                <div className="flex flex-wrap justify-end gap-2">
-                  {/* 🔴 ปุ่มทั้งคู่ใช้ Button ของ shadcn — เลิกใช้คลาส `jarvis-btn-*`
-                      ที่ปั้นปุ่มขึ้นเองใน CSS (ขัดกติกา UI · เจ้าของย้ำ 3 ก.ย. 2569) */}
-                  {personDetail.item.phone ? (
-                    <Button asChild variant="secondary" size="sm">
-                      <a href={`tel:${personDetail.item.phone}`}>
-                        <Phone aria-hidden /> {personDetail.item.phone}
-                      </a>
-                    </Button>
-                  ) : null}
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                      const jobRef = personDetail.item.job_ref;
-                      setPersonDetail(null);
-                      navigate(`/matching/match?jobId=${encodeURIComponent(jobRef)}`);
-                    }}
-                  >
-                    เปิดใบขอนี้ →
-                  </Button>
-                </div>
-              </div>
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      {/* ป๊อปผลโทร 3 ตัว — `useHomeCallDialogs` (ไม่ซ้อน Dialog ใน Dialog) */}
+      {callDialogs.dialogs}
     </div>
+  );
+};
+
+/**
+ * ═══ สวิตช์หน้าหลักโฉม 3 ก้อน (29 ก.ย. 2569 · ชั้นคู่ขนาน) ═══
+ * `?home=v3` เปิด · `?home=classic` กลับหน้าเดิม · **ค่าตั้งต้น = หน้าเดิม (ด้านบน)** จนเจ้าของเคาะ — หน้าเดิมคือทางถอย
+ * แผน: `docs/plan-home-v3-2569-09-29.md`
+ */
+const HomeV3Page = lazy(() => import('@/pages/HomeV3Page'));
+
+const HomePage: React.FC = () => {
+  const v3 = useHomeV3();
+  if (!v3) return <HomePageClassic />;
+  return (
+    <Suspense fallback={null}>
+      <HomeV3Page />
+    </Suspense>
   );
 };
 

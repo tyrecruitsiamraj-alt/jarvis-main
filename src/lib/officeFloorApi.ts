@@ -10,11 +10,14 @@ import type { OfficeFloorCounts } from '@/lib/officeFloor';
 
 export type OfficeFloorResponse = {
   generated_at: string;
+  /** BU กลางที่เส้นกรองให้ (ไม่มี/null = ไม่กรอง) */
+  bu?: string | null;
   counts: OfficeFloorCounts;
 };
 
-export async function fetchOfficeFloor(): Promise<OfficeFloorResponse> {
-  const r = await apiFetch('/api/office-floor');
+/** `bu` = BU กลางชุดแผนก (หน้าหลักโฉม 3 ก้อน) · ไม่ส่ง = ผลเดิมทุกอย่าง */
+export async function fetchOfficeFloor(bu?: string | null): Promise<OfficeFloorResponse> {
+  const r = await apiFetch(bu ? `/api/office-floor?bu=${encodeURIComponent(bu)}` : '/api/office-floor');
   if (!r.ok) {
     const data = (await r.json().catch(() => ({}))) as { message?: string; error?: string };
     throw new Error(data.message || data.error || `โหลดสถานะห้องทำงานไม่สำเร็จ (HTTP ${r.status})`);

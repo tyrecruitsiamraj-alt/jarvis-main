@@ -14,6 +14,10 @@ import path from 'node:path';
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), 'utf8');
 const HOME_FILES = [
   'src/pages/HomePage.tsx',
+  // ป๊อปผลโทรย้ายออกจากหน้าหลัก 29 ก.ย. 2569 (ใช้ร่วมกับหน้าหลักโฉม 3 ก้อน) — ปุ่มตามไปอยู่ที่นี่
+  'src/components/home/useHomeCallDialogs.tsx',
+  'src/components/home/FollowUpList.tsx',
+  'src/pages/HomeV3Page.tsx',
   'src/components/home/HomeSection.tsx',
   'src/components/home/FollowTodayPanel.tsx',
   'src/components/home/LumosCallHealthPanel.tsx',
@@ -59,7 +63,7 @@ describe('ปุ่มบนหน้าหลัก', () => {
   });
 
   it('ไฟล์ที่มีปุ่มต้อง import Button จาก shadcn', () => {
-    for (const f of ['src/pages/HomePage.tsx', 'src/components/home/FollowTodayPanel.tsx']) {
+    for (const f of ['src/components/home/useHomeCallDialogs.tsx', 'src/components/home/FollowTodayPanel.tsx']) {
       expect(read(f), f).toContain("from '@/components/ui/button'");
     }
   });
