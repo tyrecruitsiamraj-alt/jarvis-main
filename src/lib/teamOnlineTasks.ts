@@ -66,7 +66,8 @@ export function onlineTasks(data: TeamOnlineResponse | null): NextTask[] {
       key: 'online-sourcing',
       title: `ปล่อยประกาศใบที่ยังต้องหาคน ${NUM.format(lane.sourcing)} ใบ`,
       reason: 'ยังไม่ขึ้นหน้าสมัครงาน — ค้างสะสม แก้วันนี้ไม่จบ แต่ต้องรู้ว่ากองอยู่เท่าไหร่',
-      badge: 'ยังไม่ปล่อย',
+      // คำเดียวกับชิปย่อยของกล่องงาน — "ยังไม่ปล่อย" บนกล่องงานคือ 320 (รวมใบที่มีคนเริ่มงานแล้ว)
+      badge: 'ยังต้องหาคน',
       count: lane.sourcing,
       tone: 'info',
       path: METRICS['teamOnline.laneSourcing'].href,
