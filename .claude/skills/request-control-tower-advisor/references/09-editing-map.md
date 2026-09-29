@@ -10149,7 +10149,7 @@ Choice **"จัดใหม่ 3 ก้อนตามที่เสนอ"** 
 | `api/_handlers/team-online.ts` (+ `tests/api/teamOnline.test.ts` 9) | **ใหม่** — `GET ?period=&bu=` อ่านอย่างเดียว · `loadMatchingBuScope` (ล็อกแผนก = BU บังคับทุกก้อน) · ก้อนล้มแยก · cache 60 วิ · ลงทะเบียน `registry.ts` แล้ว |
 | `src/lib/teamOnlineApi.ts` | **ใหม่** — ตัวดึงฝั่งหน้าเว็บ |
 | `src/pages/TeamOnlinePage.tsx` (+ `.test.tsx` 6) | **ใหม่** — หน้าตามภาพ: ช่วงเวลา · BU · 5 การ์ด · แถบจับตา + ตรวจคิวโทร (ป๊อปเดิม `useHomeCallDialogs` + ยอดจาก flow-summary ตัวเดียวกับหัวป๊อป) · กราฟ · แผง BU · แท็บ |
-| `src/components/team-online/TeamKpiCard.tsx` · `TeamTrendCard.tsx` · `TeamBuPanel.tsx` · `TeamOnlineTabs.tsx` | **ใหม่** — วาดอย่างเดียว · กราฟใช้ `TrendChart` ของแท็บ Dashboard · ป้าย/นิยามจาก `metricDictionary` (`teamOnline.*`) |
+| `src/components/team-online/TeamKpiCard.tsx` · `TeamBuPanel.tsx` · `TeamOnlineTabs.tsx` | **ใหม่** — วาดอย่างเดียว · ป้าย/นิยามจาก `metricDictionary` (`teamOnline.*`) · (`TeamTrendCard.tsx` ถอดแล้วรอบ 2 — แทนด้วย `BuTrendChart`) |
 | `api/_lib/lumosQueueDefs.ts` | `queueReplySql` · `queueLastResultAt` ยกจากหน้าหลักโฉม 3 ก้อนมาเป็นตัวกลาง (`home-overview` ใช้ตัวนี้แล้ว) |
 | `src/lib/trends/requestTrends.ts` | export `requestAddedYmd` (วันที่ "ขอเข้ามา" ตัวเดียวกับ `activityLedger`) |
 | `src/lib/metricDictionary.ts` | หน่วย `%` + `teamOnline.*` (17) |
@@ -10173,3 +10173,26 @@ Choice **"จัดใหม่ 3 ก้อนตามที่เสนอ"** 
   (วัดบนเว็บจริง: ช่อง "ดูเส้น" กว้าง 763px) ⇒ คุมความกว้างที่ `div` ครอบแทน (แพตเทิร์นเดียวกับจุดอื่นในระบบ)
 - ไม่รับสายต้องไม่ซ้อนกับติดต่อได้ — คนเดียวสมัครสองใบ ติดใบหนึ่ง = ติดต่อได้ (เดิม 51 + 23 = 74 เกินโทรแล้ว 72)
 - ช่วง "วันนี้" ห้ามเอาใบขอเข้าขึ้นแถบจับตา — วันนี้ครึ่งวันเทียบเมื่อวานทั้งวัน (ERP มีแต่วันที่) ลดลงเสมอช่วงกลางวัน
+
+### รอบ 2 (29 ก.ย. 2569 บ่าย) — ปฏิทิน + เทียบ BU + ติดตรงไหน + งานที่ต้องทำต่อ
+
+เจ้าของเปิดดูแล้วสั่ง 4 ข้อ + ให้ช่วยคิดต่อ → Choice: **คนใช้งาน = % ของบัญชีใน BU + แยกบทบาท** (*"แยกบอกด้วยว่า หัวหน้า Opl ฯลฯ
+อย่างละเท่าไหร่"*) · **ใบขอเข้า = อัตรา** · **Lumos = ทุกเลน แยกสีตามเลน** · เพิ่ม **ติดตรงไหน ต่อ BU** + **งานที่ต้องทำต่อของคนเปิด**
+(ไม่เลือก: สรุปสาเหตุอัตโนมัติ · รายชื่อคนไม่เข้าใช้ 7 วัน)
+
+| ไฟล์ | หน้าที่ |
+| --- | --- |
+| `src/lib/teamOnline.ts` (+ `.test.ts` 21) | **เขียนใหม่** — ช่วงเวลา = `timeBuckets` ของ Dashboard (`teamWindow` · ช่วงตั้งต้น 30 วัน/12 สัปดาห์/12 เดือน/8 ไตรมาส/3 ปี · เทียบช่วงก่อน/ปีก่อน) · ทุกเหตุการณ์เป็นวันไทย · `usersSummary` (% ของบัญชี + บทบาท · ฐานไม่มีวันเกิน 100) · `requestsSummary` (อัตรา) · `lumosSummary` + `classifyQueueRow` (ตรงกับ `loadDailySeries` ของ `lumos-call-funnel` = Success Rate ของ Dashboard) · `funnelRows`/`stuckStage` · `trendOf` (least squares · ช่วงย่อยที่ยังไม่จบไม่นับ) |
+| `api/_handlers/team-online.ts` (+ `tests/api/teamOnline.test.ts` 10) | **เขียนใหม่** — `GET ?from=&to=&grain=&compare=&bu=` · บัญชี (`users.department_code` + role) · คิวทุกเลน (`queueLane` ตัวกลาง · กลุ่มตามวันเข้าคิว) · ติดตรงไหน (ใบขอ ERP ในช่วง → ของฝั่งเราด้วย id เต็ม · เลขที่ชนใบล่วงหน้าไม่จับคู่) |
+| `src/components/team-online/BuTrendChart.tsx` · `teamOnlineTones.ts` | **ใหม่** — แท่งเทียบ BU ต่อช่วงย่อย + เส้นประแนวโน้มต่อ BU + ป้าย "แนวโน้มเพิ่มขึ้น/ลดลง/ทรงตัว" · สีประจำ BU/เลนจาก `TONE` (เลี่ยง success/warn/danger) |
+| `src/components/team-online/TeamOnlineTabs.tsx` · `TeamBuPanel.tsx` · `src/pages/TeamOnlinePage.tsx` | **เขียนใหม่** — แถบเวลา = `TrendToolbar` + `useTrendWindow` (เก็บในหน้าแบบ Dashboard · `?period=` ถอดแล้ว) · แท็บ คนใช้งาน/ใบขอเข้า/Lumos/ติดตรงไหน/Success ประกาศ (กราฟ + ตาราง) · งานที่ต้องทำต่อ = `buildNextTasks` + งานของทีม Online (เจ้าหน้าที่เห็นก่อนการ์ด) |
+| `src/components/home-v3/HomeStuckList.tsx` | prop `title` (ไม่ส่ง = ของเดิม) |
+| `src/lib/metricDictionary.ts` | `teamOnline.*` ชุดใหม่ (บัญชี · % คนใช้งาน · อัตราที่ขอเข้า · Lumos ส่งไป/รอโทร/โทรแล้ว/สำเร็จ/ไม่สำเร็จ/Success rate · ติดตรงไหน) · ถอดชุดเลนหน้าสาธารณะแบบนับคนของรอบ 1 |
+
+🔴 กับดักรอบ 2 (วัดจริง 29 ก.ย. 2569):
+- **"มีนัด" ต้องนับนัดที่ Lumos ยืนยัน** (ช่องทาง `interview` ผล `confirmed` = 50 สาย) — นัดที่เจ้าหน้าที่คีย์เองมีแค่ 2 รายการ ⇒ ถ้านับแต่บันทึกติดต่อ ทุก BU จะ "ติดที่นัด" ปลอม ๆ
+- **"มาตามนัด" ยังไม่เคยมีใครบันทึก** (`application_appointment_results` 0 แถว) ⇒ ขั้นนี้เป็น null ("—") และไม่ถูกชี้ว่าติด จนกว่าจะมีการบันทึกจริง
+- แถบจับตาเทียบ **เฉพาะตอนข้อมูลครบทั้งสองช่วง** — เคยขึ้น "Lumos โทรเพิ่ม 1,400%" เพราะคิวเริ่ม 16 ส.ค. กลางช่วงก่อน
+- BU ที่นาน ๆ มีใบทีเดียว (CR · IO) ไม่ต้องขึ้นแถวว่างทุกช่วง — รู้จัก BU จากงานในช่วงนี้/ใบเปิดตอนนี้/บัญชีเท่านั้น
+- ผลจริง 30 วัน: LM ใช้ 0 จาก 4 บัญชี (ช่วงก่อน 100%) · SN ยังไม่มีบัญชี · มีแต่ LBD ที่ส่งงานให้ Lumos · ทุก BU ติดที่ Gen link (LBD 125 ใบ → Gen link 5)
+

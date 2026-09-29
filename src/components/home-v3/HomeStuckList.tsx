@@ -19,8 +19,10 @@ const HomeStuckList: React.FC<{
   tasks: NextTask[];
   loading: boolean;
   buLabel?: string | null;
-}> = ({ tasks, loading, buLabel }) => (
-  <HomeSection title={`ของค้างที่ต้องจัดการตอนนี้${buLabel ? ` · ${buLabel}` : ''}`} subtitle="ตอนนี้ · เรียงตามความเร่ง">
+  /** หัวก้อน — ไม่ส่ง = ของเดิม (หน้าทีม Online ใช้ "งานที่ต้องทำต่อ") */
+  title?: string;
+}> = ({ tasks, loading, buLabel, title = 'ของค้างที่ต้องจัดการตอนนี้' }) => (
+  <HomeSection title={`${title}${buLabel ? ` · ${buLabel}` : ''}`} subtitle="ตอนนี้ · เรียงตามความเร่ง">
     {tasks.length === 0 ? (
       <p className={cn('text-sm', DASH.muted)}>{loading ? 'กำลังอ่านตัวเลข…' : 'ไม่มีของค้างที่ต้องลงมือตอนนี้'}</p>
     ) : (

@@ -211,7 +211,7 @@ describe('หน้าแรกต้องไม่มีตัวอักษ�
     // หน้าทีม Online (29 ก.ย. 2569)
     'src/pages/TeamOnlinePage.tsx',
     'src/components/team-online/TeamKpiCard.tsx',
-    'src/components/team-online/TeamTrendCard.tsx',
+    'src/components/team-online/BuTrendChart.tsx',
     'src/components/team-online/TeamBuPanel.tsx',
     'src/components/team-online/TeamOnlineTabs.tsx',
   ];
