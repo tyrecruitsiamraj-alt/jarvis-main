@@ -20,7 +20,7 @@ import { respondServiceError } from '../_lib/domainErrors.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { loadMatchingBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
-import { listSiamrajUnitRequests } from '../_lib/siamrajUnitRequests.js';
+import { readUnitRequestListThroughCache } from './siamraj-unit-requests.js';
 import { PREQUEST_ID_PREFIX } from '../_lib/siamrajSqlServerPrequests.js';
 import { loadRequestTrendPayload, requestTrendDataFrom } from '../_lib/requestTrendRows.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
@@ -499,7 +499,12 @@ export async function buildTeamOnline(
     settle(loadRequests()),
     settle(loadQueue(w)),
     settle(loadPostings()),
-    settle(listSiamrajUnitRequests({ limit: 500, departmentScope: scope }) as Promise<JobRequest[]>),
+    /**
+     * 🔴 feed ตัวเดียวกับกล่องงาน (สำเนาร่วม + ของแนบ: สถานะทำงาน · หมายเหตุ · ผู้รับผิดชอบ · สวัสดิการ)
+     * เดิมเรียก `listSiamrajUnitRequests` ดิบ ⇒ ไม่มี `work_status` ⇒ ทุกใบเป็น "ยังต้องหาคน" (วัด 320 แทน 221)
+     * และบางครั้งได้ของแนบติดมาจากสำเนาที่กล่องงานแนบไว้แล้ว ⇒ เลขแกว่งตามว่าใครเปิดกล่องงานก่อน (แก้ 29 ก.ย. 2569 รอบ 4)
+     */
+    settle(readUnitRequestListThroughCache({ limit: 500, departmentScope: scope }).then((o) => o.value as JobRequest[])),
     settle(loadFunnelJobs()),
     settle(loadApplicants(w)),
     settle(loadReleases()),

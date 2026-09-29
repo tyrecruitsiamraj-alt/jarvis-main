@@ -18,7 +18,10 @@ vi.mock('../../api/_lib/postgres.js', () => ({ dbQuery: (...a: unknown[]) => dbQ
 vi.mock('../../api/_lib/schema.js', () => ({ tableInAppSchema: (n: string) => n }));
 vi.mock('../../api/_lib/http.js', async (orig) => ({ ...(await orig<typeof import('../../api/_lib/http.js')>()), withAuth: (h: unknown) => h }));
 vi.mock('../../api/_lib/departmentScope.js', () => ({ loadMatchingBuScope: (...a: unknown[]) => loadMatchingBuScope(...a) }));
-vi.mock('../../api/_lib/siamrajUnitRequests.js', () => ({ listSiamrajUnitRequests: (...a: unknown[]) => listSiamrajUnitRequests(...a) }));
+// feed ตัวเดียวกับกล่องงาน (สำเนาร่วม + ของแนบ) — ตัวจริงแนบสถานะทำงาน/หมายเหตุให้แล้ว ที่นี่ส่งแถวของเทสต์ตรง ๆ
+vi.mock('../../api/_handlers/siamraj-unit-requests.js', () => ({
+  readUnitRequestListThroughCache: async (...a: unknown[]) => ({ value: await listSiamrajUnitRequests(...a), fetchedAt: Date.now(), source: 'live' }),
+}));
 vi.mock('../../api/_lib/siamrajSqlServerPrequests.js', () => ({ PREQUEST_ID_PREFIX: 'siamraj-pre:' }));
 vi.mock('../../api/_lib/requestTrendRows.js', () => ({
   loadRequestTrendPayload: (...a: unknown[]) => loadRequestTrendPayload(...a),
@@ -32,6 +35,8 @@ const FEED = [
   { id: 'siamraj-sql:R1', externalId: 'R1', status: 'open', site_code: '65LBDL0143', position_units: 2, request_date: '2026-09-10' },
   { id: 'siamraj-sql:R9', externalId: 'R9', status: 'open', site_code: '66LML0011', position_units: 5, request_date: '2026-05-01' },
   { id: 'siamraj-pre:R2', status: 'open', site_code: '', position_units: 3, request_date: '2026-09-27' },
+  // ERP พาไปเริ่มงานแล้ว (สถานะทำงานที่กล่องงานแนบมา) — ไม่ใช่ "ยังต้องหาคน" · ไม่นับว่ายังไม่มีผู้สมัคร
+  { id: 'siamraj-sql:R5', externalId: 'R5', status: 'open', site_code: '66LML0011', position_units: 1, request_date: '2026-01-01', work_status: 'daily_work' },
   // RM รับทราบแล้ว (feed ส่ง status closed มาด้วย) — ห้ามนับเป็นใบเปิด (กล่องงานก็ไม่โชว์)
   { id: 'siamraj-sql:R7', externalId: 'R7', status: 'closed', site_code: '65LBDL0143', position_units: 9, request_date: '2026-09-01' },
 ];
@@ -223,14 +228,15 @@ describe('ตัวเลขประกอบจากแถวจริง', (
     const body = await run({});
     const lbd = body.byBu.find((r: { bu: string }) => r.bu === 'LBD');
     expect(lbd).toMatchObject({ openNow: 1, remaining: 2 });
-    expect(body.lanes.scope.open).toBe(3);
+    expect(body.lanes.scope.open).toBe(4);
   });
 
   it('เลนกล่องงาน + ใบยังไม่มีผู้สมัครแยกอายุ · ยอดทั้งสิทธิ์ (scope) ไม่ตามตัวกรอง BU · ลิงก์ใบพกรหัส ERP', async () => {
     const body = await run({ bu: 'LBD' });
     // ทั้งสิทธิ์: R1 ปล่อยแล้วมีผู้สมัคร · R9 ยังไม่ปล่อย ไม่มีผู้สมัคร (ค้าง 151 วัน) ·
     // R2 ใบล่วงหน้า = มีผู้สมัคร 1 จากประกาศที่เก็บคีย์ siamraj-sql:R2 (ทางถอยเลขที่ใบ — ตัวเดียวกับเลขบนการ์ดกล่องงาน)
-    expect(body.lanes.scope).toMatchObject({ open: 3, applied: 1, silent: 0, noApplicants: 1, oldestDays: 151 });
+    // R5 เริ่มงานแล้ว (work_status daily_work) = started ไม่ใช่ sourcing · ไม่นับว่ายังไม่มีผู้สมัคร
+    expect(body.lanes.scope).toMatchObject({ open: 4, sourcing: 2, started: 1, applied: 1, silent: 0, noApplicants: 1, oldestDays: 151 });
     expect(body.lanes.scope.aging).toMatchObject({ d0_3: 0, d91: 1 });
     // ตามตัวกรอง BU ของหน้า = LBD อย่างเดียว
     expect(body.lanes.total).toMatchObject({ open: 1, applied: 1, noApplicants: 0 });

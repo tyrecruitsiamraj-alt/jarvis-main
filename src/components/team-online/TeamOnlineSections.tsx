@@ -158,6 +158,58 @@ function BarRow({
   );
 }
 
+/**
+ * ตารางเทียบ BU แบบ "แถว = เรื่อง · คอลัมน์ = BU" — ใช้กับตารางที่มีหลายเรื่อง (ถังผู้สมัคร · อายุใบ)
+ * ตารางแนวเดิม (คอลัมน์ = เรื่อง) หัวคอลัมน์ยาวจนตัดเป็นแท่งสูง 6–7 บรรทัดในแผงด้านขวา (เห็นบนเว็บจริง 29 ก.ย. 2569)
+ * BU มีไม่กี่ตัว ⇒ หัวสั้น · ป้ายเรื่องเต็มคำจากพจนานุกรม/ตัวคิด ไม่ต้องย่อ
+ */
+type MatrixRow = {
+  key: string;
+  label: string;
+  title?: string;
+  strong?: boolean;
+  cell: (bu: string) => React.ReactNode;
+  className?: (bu: string) => string | undefined;
+};
+
+const metricRowLabel = (m: MetricKey) => `${METRICS[m].label} (${METRICS[m].unit})`;
+
+function BuMatrix({ bus, rows }: { bus: ReadonlyArray<{ bu: string; label: string }>; rows: ReadonlyArray<MatrixRow> }) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="text-xs">
+            <span className="sr-only">เรื่อง</span>
+          </TableHead>
+          {bus.map((b) => (
+            <TableHead key={b.bu || 'unknown'} className="whitespace-nowrap text-right text-xs" title={b.label}>
+              <span className="inline-flex items-center gap-1.5">
+                <span className={cn('inline-block h-2 w-2 rounded-full bg-current', b.bu ? TONE[toneOfBu(b.bu)].value : DASH.muted)} aria-hidden />
+                {b.bu || 'ไม่ระบุ BU'}
+              </span>
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((r) => (
+          <TableRow key={r.key}>
+            <TableCell className={cn('text-xs text-foreground', r.strong && 'font-medium')} title={r.title}>
+              {r.label}
+            </TableCell>
+            {bus.map((b) => (
+              <Num key={b.bu || 'unknown'} strong={r.strong} className={r.className?.(b.bu)}>
+                {r.cell(b.bu)}
+              </Num>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
 /** ชั่วโมงรอ → ข้อความสั้น (นาที/ชั่วโมง/วัน) */
 function waitText(hours: number | null): string {
   if (hours === null) return '—';
@@ -297,7 +349,6 @@ export function RequestsSection({ data, loading }: { data: Data | null; loading:
   const w = data?.window ?? null;
   const reqs = pickBu(data, data?.requests?.byBu);
   const openBy = new Map((data?.byBu ?? []).map((r) => [r.bu, r]));
-  const laneBy = new Map((data?.lanes?.byBu ?? []).map((r) => [r.bu, r]));
   const bus = [...new Set([...reqs.map((r) => r.bu), ...pickBu(data, data?.byBu).map((r) => r.bu)])];
   return (
     <Section title="อัตราที่ขอเข้าต่อ BU" buBadge={buBadgeOf(data)} foot={chartFootOf(data)}>
@@ -323,15 +374,12 @@ export function RequestsSection({ data, loading }: { data: Data | null; loading:
               <TableHead className="text-right text-xs">เทียบช่วงก่อน</TableHead>
               <Head metric="teamOnline.openNow" />
               <Head metric="teamOnline.remaining" />
-              <Head metric="teamOnline.laneSourcing" />
-              <Head metric="teamOnline.laneSilent" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {bus.map((b) => {
               const r = reqs.find((x) => x.bu === b);
               const o = openBy.get(b);
-              const l = laneBy.get(b);
               return (
                 <TableRow key={b || 'unknown'}>
                   <BuCell label={r?.label ?? o?.label ?? b} bu={b} />
@@ -340,8 +388,6 @@ export function RequestsSection({ data, loading }: { data: Data | null; loading:
                   <Num className={DASH.muted}>{r ? countDelta(r.positions.cur, r.positions.prev, 'อัตรา').text : '—'}</Num>
                   <Num>{n(o?.openNow)}</Num>
                   <Num>{n(o?.remaining)}</Num>
-                  <Num>{n(l?.sourcing)}</Num>
-                  <Num>{n(l?.silent)}</Num>
                 </TableRow>
               );
             })}
@@ -380,6 +426,7 @@ export function ApplicantsSection({ data, loading }: { data: Data | null; loadin
   const total = a.total.cur;
   const sources = Object.entries(a.sources).sort((x, y) => y[1] - x[1]);
   const byBu = pickBu(data, a.byBu);
+  const byBuOf = (bu: string) => byBu.find((r) => r.bu === bu);
   const backlogTotal = APPLICANT_STAGES.reduce((s, st) => s + a.backlog.stages[st.key], 0);
   // หน้ารายชื่อไม่มีตัวกรอง BU — ปุ่ม › ขึ้นเฉพาะตอนที่เลขบนหน้านี้ = ประชากรของหน้ารายชื่อ (กดแล้วต้องเจอเลขเท่ากัน)
   const linkable = !data?.bu || data.bu === data.forced_bu;
@@ -435,34 +482,29 @@ export function ApplicantsSection({ data, loading }: { data: Data | null; loadin
           href={linkable ? listHref('over5d') : undefined}
         />
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-xs">BU</TableHead>
-            <Head metric="teamOnline.applicantsIn" />
-            {APPLICANT_STAGES.map((st) => (
-              <TableHead key={st.key} className="text-right text-xs">
-                {st.label}
-              </TableHead>
-            ))}
-            <TableHead className="text-right text-xs">ยังไม่ถูกโทรเกิน 5 วัน</TableHead>
-            <TableHead className="text-right text-xs">ได้สายแรก (ค่ากลาง)</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {byBu.map((r) => (
-            <TableRow key={r.bu || 'unknown'}>
-              <BuCell label={r.label} bu={r.bu} />
-              <Num strong>{n(r.total.cur)}</Num>
-              {APPLICANT_STAGES.map((st) => (
-                <Num key={st.key}>{n(r.stages[st.key])}</Num>
-              ))}
-              <Num>{n(r.over5d)}</Num>
-              <Num className={DASH.muted}>{waitText(r.waitMedianHours)}</Num>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-foreground">แต่ละ BU (ผู้สมัครช่วงนี้)</p>
+        <BuMatrix
+          bus={byBu}
+          rows={[
+            {
+              key: 'total',
+              label: metricRowLabel('teamOnline.applicantsIn'),
+              title: metricHelp('teamOnline.applicantsIn'),
+              strong: true,
+              cell: (bu) => n(byBuOf(bu)?.total.cur ?? 0),
+            },
+            ...APPLICANT_STAGES.map((st) => ({ key: st.key, label: st.label, cell: (bu: string) => n(byBuOf(bu)?.stages[st.key] ?? 0) })),
+            { key: 'over5d', label: 'ยังไม่ถูกโทรเกิน 5 วัน', cell: (bu) => n(byBuOf(bu)?.over5d ?? 0) },
+            {
+              key: 'wait',
+              label: 'ได้สายแรกหลังสมัคร (ค่ากลาง)',
+              cell: (bu) => waitText(byBuOf(bu)?.waitMedianHours ?? null),
+              className: () => DASH.muted,
+            },
+          ]}
+        />
+      </div>
     </Section>
   );
 }
@@ -490,6 +532,7 @@ export function NoApplicantsSection({ data, loading, limit = 30 }: { data: Data 
   const t = l.total;
   const needPeople = t.sourcing + t.applied + t.silent;
   const rows = pickBu(data, l.byBu);
+  const rowOf = (bu: string) => rows.find((r) => r.bu === bu);
   return (
     <Section
       title="ใบยังไม่มีผู้สมัคร · เยอะแค่ไหน · ค้างนานแค่ไหน"
@@ -526,42 +569,47 @@ export function NoApplicantsSection({ data, loading, limit = 30 }: { data: Data 
           />
         ))}
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-xs">BU</TableHead>
-            <TableHead className="text-right text-xs">ใบเปิด</TableHead>
-            <Head metric="teamOnline.laneSourcing" />
-            <Head metric="teamOnline.lanePublish" />
-            <Head metric="teamOnline.laneSilent" />
-            <Head metric="teamOnline.noApplicants" />
-            {AGE_BUCKETS.map((b) => (
-              <TableHead key={b.key} className="text-right text-xs">
-                {b.label}
-              </TableHead>
-            ))}
-            <TableHead className="text-right text-xs">นานสุด</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((r) => (
-            <TableRow key={r.bu || 'unknown'}>
-              <BuCell label={r.label} bu={r.bu} />
-              <Num>{n(r.open)}</Num>
-              <Num>{n(r.sourcing)}</Num>
-              <Num>{n(r.publish)}</Num>
-              <Num>{n(r.silent)}</Num>
-              <Num strong>{n(r.noApplicants)}</Num>
-              {AGE_BUCKETS.map((b) => (
-                <Num key={b.key} className={b.max > 30 && (r.aging[b.key] ?? 0) > 0 ? TONE.danger.value : undefined}>
-                  {n(r.aging[b.key] ?? 0)}
-                </Num>
-              ))}
-              <Num className={DASH.muted}>{TH_NUM_DAYS(r.oldestDays)}</Num>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-foreground">แต่ละ BU (ใบเปิดตอนนี้)</p>
+        <BuMatrix
+          bus={rows}
+          rows={[
+            { key: 'open', label: 'ใบเปิด (ใบ)', cell: (bu) => n(rowOf(bu)?.open) },
+            {
+              key: 'sourcing',
+              label: metricRowLabel('teamOnline.laneSourcing'),
+              title: metricHelp('teamOnline.laneSourcing'),
+              cell: (bu) => n(rowOf(bu)?.sourcing),
+            },
+            {
+              key: 'publish',
+              label: metricRowLabel('teamOnline.lanePublish'),
+              title: metricHelp('teamOnline.lanePublish'),
+              cell: (bu) => n(rowOf(bu)?.publish),
+            },
+            {
+              key: 'silent',
+              label: metricRowLabel('teamOnline.laneSilent'),
+              title: metricHelp('teamOnline.laneSilent'),
+              cell: (bu) => n(rowOf(bu)?.silent),
+            },
+            {
+              key: 'none',
+              label: metricRowLabel('teamOnline.noApplicants'),
+              title: metricHelp('teamOnline.noApplicants'),
+              strong: true,
+              cell: (bu) => n(rowOf(bu)?.noApplicants),
+            },
+            ...AGE_BUCKETS.map((b) => ({
+              key: b.key,
+              label: `ค้าง ${b.label}`,
+              cell: (bu: string) => n(rowOf(bu)?.aging[b.key] ?? 0),
+              className: (bu: string) => (b.max > 30 && (rowOf(bu)?.aging[b.key] ?? 0) > 0 ? TONE.danger.value : undefined),
+            })),
+            { key: 'oldest', label: 'ค้างนานสุด', cell: (bu) => TH_NUM_DAYS(rowOf(bu)?.oldestDays ?? null), className: () => DASH.muted },
+          ]}
+        />
+      </div>
       {l.oldest.length > 0 ? (
         <div className="space-y-2">
           <p className="text-xs font-medium text-foreground">ค้างนานสุด {NUM.format(Math.min(limit, l.oldest.length))} ใบแรก — กดเพื่อไปทำใบนั้นต่อ</p>
