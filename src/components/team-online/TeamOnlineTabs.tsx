@@ -58,7 +58,7 @@ function BuCell({ label, bu, indent }: { label: string; bu: string | null; inden
       {bu === null ? (
         <span className="font-medium text-foreground">รวม</span>
       ) : indent ? (
-        <span className={cn('inline-flex items-center gap-1.5 pl-3 text-xs', DASH.muted)}>{indent}</span>
+        <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap pl-3 text-xs', DASH.muted)}>{indent}</span>
       ) : (
         <span className="text-foreground" title={label}>
           {bu || label}

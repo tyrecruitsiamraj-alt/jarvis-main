@@ -82,12 +82,19 @@ function coverageFlags(cov: TeamCoverage): string[] {
   return [];
 }
 
+/**
+ * ช่วงก่อนมีข้อมูลไม่ครบ (ระบบเพิ่งเริ่มเก็บกลางช่วง) = บอกตัวเลขได้ แต่ห้ามลงสีดี/เสีย
+ * (วัดจริง 29 ก.ย.: การ์ด Lumos ขึ้น "เพิ่ม 1,400%" สีเขียว ทั้งที่ช่วงก่อนเก็บได้แค่ครึ่งเดียว)
+ */
+const muteIfPartial = (d: { text: string; tone: DeltaTone }, cov: TeamCoverage) =>
+  cov.prev === 'partial' || cov.cur === 'partial' ? { ...d, tone: 'none' as const } : d;
+
 function countBits(c: TeamCount | null | undefined, cov: TeamCoverage | undefined, unit: string, foot?: string): CardBits {
   if (!c || !cov) return { value: '—', delta: null, foot: null, flags: [] };
   const noPrev = cov.prev === 'none';
   return {
     value: n(c.cur),
-    delta: noPrev ? NO_PREV : countDelta(c.cur, c.prev, unit),
+    delta: noPrev ? NO_PREV : muteIfPartial(countDelta(c.cur, c.prev, unit), cov),
     foot: [foot, noPrev ? null : `ช่วงก่อน ${n(c.prev)} ${unit}`].filter(Boolean).join(' · ') || null,
     flags: coverageFlags(cov),
     series: c.series,
@@ -100,7 +107,7 @@ function rateBits(cur: number | null, prev: number | null, cov: TeamCoverage | u
   return {
     value: fmtPct(cur),
     // ช่วงนี้ยังไม่มีฐาน = ไม่มีอะไรให้เทียบ — ท้ายการ์ดบอก "0 / 0" อยู่แล้ว
-    delta: cur === null ? null : cov.prev === 'none' ? NO_PREV : rateDelta(cur, prev),
+    delta: cur === null ? null : cov.prev === 'none' ? NO_PREV : muteIfPartial(rateDelta(cur, prev), cov),
     foot,
     flags: coverageFlags(cov),
   };

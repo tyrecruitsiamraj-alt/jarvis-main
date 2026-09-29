@@ -84,17 +84,27 @@ const TeamKpiCard: React.FC<TeamKpiCardProps> = ({
           {spark ? (
             <div className="mt-1 h-10 w-full" aria-hidden>
               <ResponsiveContainer width="100%" height="100%">
+                {/* สีเส้นใช้ currentColor + คลาส TONE (มีคู่ dark:) — hex โทน 700 จมพื้นโหมดมืด */}
                 <LineChart data={spark} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
                   <Line
                     type="monotone"
                     dataKey="prev"
-                    stroke={TONE.neutral.hex}
+                    stroke="currentColor"
+                    className={TONE.neutral.value}
                     strokeWidth={1.25}
                     strokeDasharray="4 3"
                     dot={false}
                     isAnimationActive={false}
                   />
-                  <Line type="monotone" dataKey="cur" stroke={TONE[tone].hex} strokeWidth={1.75} dot={false} isAnimationActive={false} />
+                  <Line
+                    type="monotone"
+                    dataKey="cur"
+                    stroke="currentColor"
+                    className={TONE[tone].value}
+                    strokeWidth={1.75}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>

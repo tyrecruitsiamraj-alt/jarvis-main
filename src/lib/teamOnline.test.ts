@@ -207,6 +207,19 @@ describe('ใบขอเข้า = อัตรา', () => {
     expect(s.byBu[0]).toMatchObject({ bu: 'LBD', positions: { cur: 5, prev: 4 }, requests: { cur: 1, prev: 1 } });
     expect(s.byBu[0].series[0]).toBe(5);
   });
+
+  it('BU ที่ไม่มีใบในสองช่วงนี้ไม่ขึ้นแถว (สำเนา ERP มีประวัติหลายปี) · ยกเว้น BU ที่ส่งมาให้แสดง', () => {
+    const s = requestsSummary(
+      w,
+      [
+        { requestNo: 'R1', ymd: '2026-09-01', bu: 'LBD', positions: 1 },
+        { requestNo: 'OLD', ymd: '2025-01-10', bu: 'CR', positions: 3 },
+      ],
+      label,
+      ['SN'],
+    );
+    expect(s.byBu.map((r) => r.bu)).toEqual(['LBD', 'SN']);
+  });
 });
 
 describe('Lumos ทุกเลน — นิยามเดียวกับ Success Rate ของ Dashboard', () => {

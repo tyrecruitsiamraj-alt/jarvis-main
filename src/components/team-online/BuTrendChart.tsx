@@ -5,6 +5,8 @@
  * - แท่ง = ค่าของ BU ในช่วงย่อยนั้น (สีประจำ BU · `toneOfBu`) · เส้นประสีเดียวกัน = แนวโน้ม (`trendOf` · least squares)
  * - ช่วงย่อยสุดท้ายที่ยังไม่จบไม่นับในเส้นแนวโน้ม (ไม่งั้นเส้นดิ่งลงหลอก ๆ ทุกครั้ง)
  * - ช่วงย่อยเดียว = แท่งเทียบ BU เฉย ๆ (ไม่มีเส้น) · ไม่มีข้อมูลเลย = บอกตรง ๆ
+ * - 🔴 สีแท่ง/เส้นใช้ `currentColor` + คลาส `TONE[...].value` (มีคู่ `dark:` ในตัว) — hex ของ TONE เป็นโทน 700
+ *   ตายตัว บนพื้นโหมดมืดกรมท่าจมหายไปกับพื้น (เจอบนเว็บจริง 29 ก.ย.) · ไม่เพิ่ม hex ใหม่
  */
 import React, { useMemo } from 'react';
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -56,11 +58,15 @@ const BuTrendChart: React.FC<{
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
         {series.map((s) => {
           const t = trends.get(s.bu);
+          // ทั้งช่วงเป็น 0/ว่าง = BU นี้ยังไม่มีเรื่องนี้เลย (บอกตรง ๆ ไม่ใช่ "ทรงตัว")
+          const none = !s.values.some((v) => v !== null && v > 0);
           return (
             <span key={s.bu} className={cn('inline-flex items-center gap-1.5', faded(s.bu) ? DASH.muted : 'text-foreground')} title={s.label}>
-              <span className={cn('inline-block h-2.5 w-2.5 rounded-sm', TONE[toneOfBu(s.bu)].dot)} aria-hidden />
+              <span className={cn('inline-block h-2.5 w-2.5 rounded-sm bg-current', TONE[toneOfBu(s.bu)].value)} aria-hidden />
               {s.bu}
-              {multi && t ? (
+              {none ? (
+                <span className={DASH.muted}>ยังไม่มี</span>
+              ) : multi && t ? (
                 <span className={DASH.muted}>
                   {ARROW[t.direction]} {TREND_TEXT[t.direction]}
                 </span>
@@ -74,7 +80,7 @@ const BuTrendChart: React.FC<{
       ) : (
         <div className={cn('w-full', DASH.sub)} style={{ height }} role="img" aria-label={ariaLabel}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+            <ComposedChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }} barCategoryGap="12%" barGap={1}>
               <CartesianGrid vertical={false} stroke={CHART.gridStroke} strokeOpacity={CHART.gridOpacity} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART.axisFill }} tickLine={false} axisLine={false} minTickGap={8} />
               <YAxis
@@ -97,9 +103,10 @@ const BuTrendChart: React.FC<{
                   key={s.bu}
                   dataKey={s.bu}
                   name={s.bu}
-                  fill={TONE[toneOfBu(s.bu)].hex}
-                  fillOpacity={faded(s.bu) ? 0.3 : 1}
-                  maxBarSize={18}
+                  fill="currentColor"
+                  className={TONE[toneOfBu(s.bu)].value}
+                  fillOpacity={faded(s.bu) ? 0.3 : 0.9}
+                  maxBarSize={22}
                   isAnimationActive={false}
                 />
               ))}
@@ -111,7 +118,8 @@ const BuTrendChart: React.FC<{
                         type="linear"
                         dataKey={`${s.bu}__trend`}
                         name={`${s.bu}__trend`}
-                        stroke={TONE[toneOfBu(s.bu)].hex}
+                        stroke="currentColor"
+                        className={TONE[toneOfBu(s.bu)].value}
                         strokeOpacity={faded(s.bu) ? 0.3 : 1}
                         strokeWidth={1.5}
                         strokeDasharray="5 4"

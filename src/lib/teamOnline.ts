@@ -416,7 +416,9 @@ export function requestsSummary(
 ): { positions: TeamCount; requests: TeamPair; byBu: TeamRequestsBu[] } {
   const positions = sumCount(w, rows.map((r) => ({ ymd: r.ymd, n: r.positions })));
   const reqs = distinctCount(w, rows.map((r) => ({ who: r.requestNo, ymd: r.ymd })));
-  const bus = new Set<string>([...rows.map((r) => r.bu ?? ''), ...extraBus]);
+  // สำเนา ERP มีประวัติหลายปี — เอาเฉพาะ BU ที่มีใบในสองช่วงนี้ (BU ที่นาน ๆ มีใบทีเดียวไม่ต้องขึ้นแถวว่าง)
+  const at = makeLocator(w);
+  const bus = new Set<string>([...rows.filter((r) => at(r.ymd)).map((r) => r.bu ?? ''), ...extraBus]);
   const byBu = [...bus].map((bu): TeamRequestsBu => {
     const mine = rows.filter((r) => (r.bu ?? '') === bu);
     const p = sumCount(w, mine.map((r) => ({ ymd: r.ymd, n: r.positions })));
