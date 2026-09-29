@@ -12,6 +12,9 @@ import {
   buildBuRows,
   classifyQueueRow,
   countDelta,
+  countPill,
+  pooledUsage,
+  ratePill,
   coverageOf,
   distinctCount,
   fmtPct,
@@ -348,6 +351,31 @@ describe('ติดตรงไหน ต่อ BU', () => {
     expect(rows[0].counts.showed).toBeNull();
     expect(rows[0].stuckAt).toBeNull();
     expect(stuckStage({ requests: 2, genLink: 2, applicants: 2, aiCalled: 1, interested: 1, appointed: 1, showed: null })).toBe('aiCalled');
+  });
+});
+
+describe('ป้ายเปลี่ยนแปลงมุมการ์ด + % รวมหลาย BU', () => {
+  it('จำนวน: % ที่เปลี่ยน · ดี/เสียตามทิศของเมตริก · ช่วงก่อน 0 = "ใหม่" · ข้อมูลไม่ครบ = ไม่ลงสี', () => {
+    expect(countPill(38, 41, true)).toEqual({ text: '7.3%', dir: 'down', tone: 'bad' });
+    expect(countPill(225, 196, null)).toEqual({ text: '14.8%', dir: 'up', tone: 'neutral' });
+    expect(countPill(600, 40, true, true)).toMatchObject({ dir: 'up', tone: 'neutral' });
+    expect(countPill(3, 0, true)).toMatchObject({ text: 'ใหม่', dir: 'up', tone: 'good' });
+    expect(countPill(5, 5, true)).toEqual({ text: '0%', dir: 'flat', tone: 'neutral' });
+  });
+
+  it('อัตรา: ต่างกันเป็นจุด (ไม่ใช่ % ของ %) · ไม่มีฐาน = ไม่มีป้าย', () => {
+    expect(ratePill(0.853, 0.667, true)).toEqual({ text: '18.6 จุด', dir: 'up', tone: 'good' });
+    expect(ratePill(0.5, null, true)).toBeNull();
+  });
+
+  it('🔴 % รวมหลาย BU = รวมตัวตั้ง ÷ รวมตัวหาร (BU ใหญ่หนักกว่า) ไม่ใช่เฉลี่ย %', () => {
+    // BU ใหญ่ 30/40 (75%) + BU เล็ก 0/4 (0%) = 30/44 ≈ 68% — เฉลี่ยตรง ๆ จะได้ 37.5% ผิด
+    const pooled = pooledUsage([
+      { counts: [30], bases: [40] },
+      { counts: [0], bases: [4] },
+    ], 1);
+    expect(pooled[0]).toBeCloseTo(30 / 44);
+    expect(pooledUsage([{ counts: [0], bases: [0] }], 1)).toEqual([null]);
   });
 });
 

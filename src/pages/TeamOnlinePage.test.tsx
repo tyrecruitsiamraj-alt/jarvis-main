@@ -171,10 +171,11 @@ describe('หน้าทีม Online', () => {
     expect(screen.getByRole('group', { name: 'ดูเป็น' })).toBeTruthy();
   });
 
-  it('การ์ดพูดหน่วยถูก: คนใช้งาน % ของบัญชี · อัตราที่ขอเข้า · Lumos นับสาย · ฐาน Success rate', async () => {
+  it('การ์ดแบบภาพอ้างอิง: เทียบช่วงก่อน + ป้าย % มุมขวา · หน่วยถูก (คน · อัตรา · สาย · ฐาน Success rate)', async () => {
     renderAt();
-    await waitFor(() => expect(text()).toContain('ลด 2 คน (50.0%)'));
-    expect(text()).toContain('50.0% ของ 4 บัญชี');
+    await waitFor(() => expect(text()).toContain('50.0% ของ 4 บัญชี · ช่วงก่อน 4 คน'));
+    expect(screen.getAllByText('เทียบช่วงก่อน').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('50.0%').length).toBeGreaterThan(0);
     expect(text()).toContain('อัตราที่ขอเข้า');
     expect(text()).toContain('2 ใบ · ช่วงก่อน 6 อัตรา');
     expect(text()).toContain('ส่งไป 3 · รอโทร 1');
@@ -200,6 +201,17 @@ describe('หน้าทีม Online', () => {
     await waitFor(() => expect(text()).toContain('ผู้สมัครที่ยังไม่มีใครแตะ 3 คน'));
     expect(text()).toContain('งานที่ต้องทำต่อ');
     expect(text()).toContain('ใบเปิดที่ยังไม่ Gen link 2 ใบ');
+  });
+
+  it('กราฟคนใช้ vs ใบขอเข้า + รายการจัดอันดับ BU ตามอัตราที่ขอเข้า (% ของทั้งหมด)', async () => {
+    renderAt();
+    await waitFor(() => expect(text()).toContain('คนใช้งาน เทียบ อัตราที่ขอเข้า'));
+    expect(text()).toContain('5 อัตรา(71%)');
+    expect(text()).toContain('2 อัตรา(29%)');
+    expect(text()).toContain('คนใช้งาน ยังไม่มีบัญชี');
+    // เรียงตามอัตราที่ขอเข้า มากไปน้อย · ไม่ระบุ BU ท้ายสุด
+    const panel = text().slice(text().indexOf('BU ไหนงานเยอะ'));
+    expect(panel.indexOf('LBD · ป้าย')).toBeLessThan(panel.indexOf('LM · ป้าย'));
   });
 
   it('แท็บคนใช้งานแยกบทบาท (ใช้ / บัญชี) · BU ที่ไม่มีบัญชีขึ้นป้ายบอก', async () => {

@@ -13,7 +13,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { RefreshCw } from 'lucide-react';
+import { ClipboardList, Link2, PhoneCall, RefreshCw, Target, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,6 +22,7 @@ import HomeStuckList from '@/components/home-v3/HomeStuckList';
 import TeamKpiCard from '@/components/team-online/TeamKpiCard';
 import TeamBuPanel, { type TeamBuPanelRow } from '@/components/team-online/TeamBuPanel';
 import TeamOnlineTabs from '@/components/team-online/TeamOnlineTabs';
+import UsageVsRequestsChart from '@/components/team-online/UsageVsRequestsChart';
 import { useHomeCallDialogs } from '@/components/home/useHomeCallDialogs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrendWindow } from '@/hooks/useTrendWindow';
@@ -30,14 +31,15 @@ import { fetchOfficeFloor, type OfficeFloorResponse } from '@/lib/officeFloorApi
 import { buildNextTasks, type NextTask } from '@/lib/nextTask';
 import { fetchTeamOnline } from '@/lib/teamOnlineApi';
 import {
-  countDelta,
+  countPill,
   fmtPct,
-  rateDelta,
+  pooledUsage,
+  ratePill,
   ratio,
   successRate,
   teamWatchItems,
   teamWindowText,
-  type DeltaTone,
+  type DeltaPill,
   type TeamCount,
   type TeamCoverage,
   type TeamOnlineResponse,
@@ -65,14 +67,13 @@ function ageText(seconds: number): string {
 
 type CardBits = {
   value: string;
-  delta: { text: string; tone: DeltaTone } | null;
+  sub: string;
+  pill: DeltaPill | null;
   foot: string | null;
   flags: string[];
-  series?: number[];
-  prevSeries?: number[];
 };
 
-const NO_PREV = { text: 'ช่วงก่อนยังไม่มีข้อมูล', tone: 'none' as const };
+const NO_PREV = 'ช่วงก่อนยังไม่มีข้อมูล';
 
 /** ธงความครอบคลุม — ข้อมูลเริ่มกลางช่วง ต้องบอก (ห้ามให้อ่านเป็น "เพิ่มขึ้น") */
 function coverageFlags(cov: TeamCoverage): string[] {
@@ -83,32 +84,39 @@ function coverageFlags(cov: TeamCoverage): string[] {
 }
 
 /**
- * ช่วงก่อนมีข้อมูลไม่ครบ (ระบบเพิ่งเริ่มเก็บกลางช่วง) = บอกตัวเลขได้ แต่ห้ามลงสีดี/เสีย
+ * ช่วงก่อน/ช่วงนี้มีข้อมูลไม่ครบ (ระบบเพิ่งเริ่มเก็บกลางช่วง) = บอกตัวเลขได้ แต่ห้ามลงสีดี/เสีย
  * (วัดจริง 29 ก.ย.: การ์ด Lumos ขึ้น "เพิ่ม 1,400%" สีเขียว ทั้งที่ช่วงก่อนเก็บได้แค่ครึ่งเดียว)
  */
-const muteIfPartial = (d: { text: string; tone: DeltaTone }, cov: TeamCoverage) =>
-  cov.prev === 'partial' || cov.cur === 'partial' ? { ...d, tone: 'none' as const } : d;
+const partial = (cov: TeamCoverage) => cov.prev === 'partial' || cov.cur === 'partial';
 
-function countBits(c: TeamCount | null | undefined, cov: TeamCoverage | undefined, unit: string, foot?: string): CardBits {
-  if (!c || !cov) return { value: '—', delta: null, foot: null, flags: [] };
+function countBits(
+  c: TeamCount | null | undefined,
+  cov: TeamCoverage | undefined,
+  unit: string,
+  compareText: string,
+  upIsGood: boolean | null,
+  foot?: string,
+): CardBits {
+  if (!c || !cov) return { value: '—', sub: compareText, pill: null, foot: null, flags: [] };
   const noPrev = cov.prev === 'none';
   return {
     value: n(c.cur),
-    delta: noPrev ? NO_PREV : muteIfPartial(countDelta(c.cur, c.prev, unit), cov),
+    sub: noPrev ? NO_PREV : compareText,
+    pill: noPrev ? null : countPill(c.cur, c.prev, upIsGood, partial(cov)),
     foot: [foot, noPrev ? null : `ช่วงก่อน ${n(c.prev)} ${unit}`].filter(Boolean).join(' · ') || null,
     flags: coverageFlags(cov),
-    series: c.series,
-    prevSeries: noPrev ? undefined : c.prevSeries,
   };
 }
 
-function rateBits(cur: number | null, prev: number | null, cov: TeamCoverage | undefined, foot: string): CardBits {
-  if (!cov) return { value: '—', delta: null, foot: null, flags: [] };
+function rateBits(cur: number | null, prev: number | null, cov: TeamCoverage | undefined, compareText: string, foot: string): CardBits {
+  if (!cov) return { value: '—', sub: compareText, pill: null, foot: null, flags: [] };
+  const noPrev = cov.prev === 'none';
   return {
     value: fmtPct(cur),
+    sub: noPrev ? NO_PREV : compareText,
     // ช่วงนี้ยังไม่มีฐาน = ไม่มีอะไรให้เทียบ — ท้ายการ์ดบอก "0 / 0" อยู่แล้ว
-    delta: cur === null ? null : cov.prev === 'none' ? NO_PREV : muteIfPartial(rateDelta(cur, prev), cov),
-    foot,
+    pill: noPrev || cur === null ? null : ratePill(cur, prev, true, partial(cov)),
+    foot: [foot, noPrev || prev === null ? null : `ช่วงก่อน ${fmtPct(prev)}`].filter(Boolean).join(' · '),
     flags: coverageFlags(cov),
   };
 }
@@ -228,17 +236,22 @@ const TeamOnlinePage: React.FC = () => {
   const buText = effectiveBu ? trendBuLabel(effectiveBu) : 'ทุก BU';
   const watch = useMemo(() => (data ? teamWatchItems(data) : []), [data]);
 
+  const compareText = w?.compare === 'lastYear' ? 'เทียบปีก่อน' : 'เทียบช่วงก่อน';
   const accounts = data?.users?.accounts.cur ?? 0;
   const users = countBits(
     data?.users?.total,
     data?.users?.coverage,
     'คน',
+    compareText,
+    true,
     data?.users ? `${fmtPct(ratio(data.users.total.cur, accounts))} ของ ${n(accounts)} บัญชี` : undefined,
   );
   const positions = countBits(
     data?.requests?.positions,
     data?.requests?.coverage,
     'อัตรา',
+    compareText,
+    null,
     data?.requests ? `${n(data.requests.requests.cur)} ใบ` : undefined,
   );
   if (data?.requests?.stale) positions.flags.push(`ข้อมูลใบขอจาก ERP เมื่อ ${ageText(data.requests.ageSeconds)}`);
@@ -247,20 +260,31 @@ const TeamOnlinePage: React.FC = () => {
     lumos?.called,
     lumos?.coverage,
     'สาย',
+    compareText,
+    true,
     lumos ? `ส่งไป ${n(lumos.total.sent)} · รอโทร ${n(lumos.total.waiting)}` : undefined,
   );
   const postRate = rateBits(
     data?.postings ? ratio(data.postings.withApplicants.cur, data.postings.published.cur) : null,
     data?.postings ? ratio(data.postings.withApplicants.prev, data.postings.published.prev) : null,
     data?.postings?.coverage,
+    compareText,
     data?.postings ? `${n(data.postings.withApplicants.cur)} / ${n(data.postings.published.cur)} ใบที่ Gen link` : '',
   );
   const callRate = rateBits(
     lumos ? successRate(lumos.total) : null,
     lumos ? successRate(lumos.prev) : null,
     lumos?.coverage,
+    compareText,
     lumos ? `${n(lumos.total.success)} / ${n(lumos.total.talked)} สายที่ได้คุยจริง` : '',
   );
+
+  /** กราฟคนใช้ vs ใบขอเข้า — ตามตัวกรอง BU (ทุก BU = รวมตัวตั้ง ÷ รวมตัวหาร) */
+  const usage = useMemo(() => {
+    if (!data?.users || !w) return null;
+    const rows = data.users.byBu.filter((r) => (effectiveBu ? r.bu === effectiveBu : true));
+    return pooledUsage(rows, w.buckets.length);
+  }, [data, w, effectiveBu]);
 
   /** แผง BU — รวมสามแหล่งด้วยรหัส BU (คนใช้งาน % · อัตราที่ขอเข้า · Success ประกาศ) */
   const panelRows = useMemo((): TeamBuPanelRow[] | null => {
@@ -291,14 +315,22 @@ const TeamOnlinePage: React.FC = () => {
   const isStaff = user?.role === 'staff';
   const firstLoad = loading && !data;
 
-  const tasksAndPanel = (
+  const tasksBlock = (
+    <HomeStuckList tasks={tasks} loading={!office || !flow} buLabel={effectiveBu ? trendBuLabel(effectiveBu) : null} title="งานที่ต้องทำต่อ" />
+  );
+
+  /** แถวกลางแบบภาพอ้างอิง: กราฟคนใช้ vs ใบขอเข้า (ซ้าย) + รายการจัดอันดับ BU (ขวา · ทุก BU เสมอ) */
+  const chartAndPanel = (
     <div className="grid gap-3 lg:grid-cols-5">
       <div className="min-w-0 lg:col-span-3">
-        <HomeStuckList
-          tasks={tasks}
-          loading={!office || !flow}
-          buLabel={effectiveBu ? trendBuLabel(effectiveBu) : null}
-          title="งานที่ต้องทำต่อ"
+        <UsageVsRequestsChart
+          buckets={w?.buckets ?? []}
+          grain={w?.grain ?? 'day'}
+          usage={usage}
+          positions={data?.requests ? data.requests.positions.series : null}
+          lastOpen={!!w?.lastBucketOpen}
+          buLabel={buText}
+          loading={firstLoad}
         />
       </div>
       <div className="min-w-0 lg:col-span-2">
@@ -373,24 +405,35 @@ const TeamOnlinePage: React.FC = () => {
       {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
 
       {/* เจ้าหน้าที่: งานของตัวเองก่อน (ต้องรู้ว่าต้องทำอะไรต่อ) */}
-      {isStaff ? tasksAndPanel : null}
+      {isStaff ? tasksBlock : null}
 
       {/* 5 การ์ดตามภาพต้นแบบ */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <TeamKpiCard metric="teamOnline.users" labelSuffix=" · ทุก BU" unit="คน" {...users} loading={firstLoad} error={data?.errors.users} />
+        <TeamKpiCard metric="teamOnline.users" labelSuffix=" · ทุก BU" icon={Users} unit="คน" {...users} loading={firstLoad} error={data?.errors.users} />
         <TeamKpiCard
           metric="teamOnline.positionsIn"
+          icon={ClipboardList}
+          tone="info"
           unit="อัตรา"
-          upIsGood={null}
           {...positions}
           loading={firstLoad}
           error={data?.errors.requests}
         />
-        <TeamKpiCard metric="teamOnline.lumosCalled" labelSuffix=" · Lumos" unit="สาย" {...called} loading={firstLoad} error={data?.errors.lumos} />
-        <TeamKpiCard metric="teamOnline.postingSuccess" tone="success" {...postRate} loading={firstLoad} error={data?.errors.postings} />
+        <TeamKpiCard
+          metric="teamOnline.lumosCalled"
+          labelSuffix=" · Lumos"
+          icon={PhoneCall}
+          tone="violet"
+          unit="สาย"
+          {...called}
+          loading={firstLoad}
+          error={data?.errors.lumos}
+        />
+        <TeamKpiCard metric="teamOnline.postingSuccess" icon={Link2} tone="success" {...postRate} loading={firstLoad} error={data?.errors.postings} />
         <TeamKpiCard
           metric="teamOnline.successRate"
           labelSuffix=" · Lumos"
+          icon={Target}
           tone="success"
           {...callRate}
           loading={firstLoad}
@@ -418,8 +461,10 @@ const TeamOnlinePage: React.FC = () => {
         </Button>
       </Card>
 
-      {/* หัวหน้า/ผู้บริหาร: งานที่ต้องทำต่อ + แผง BU หลังภาพรวม */}
-      {isStaff ? null : tasksAndPanel}
+      {chartAndPanel}
+
+      {/* หัวหน้า/ผู้บริหาร: งานที่ต้องทำต่อหลังภาพรวม */}
+      {isStaff ? null : tasksBlock}
 
       <TeamOnlineTabs data={data} loading={loading} />
 

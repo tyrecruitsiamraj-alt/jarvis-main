@@ -287,6 +287,33 @@ export function rateDelta(cur: number | null, prev: number | null): { text: stri
 /** อัตราส่วน — ฐานเป็น 0 = null (ห้ามโชว์ 0%) */
 export const ratio = (num: number, den: number): number | null => (den > 0 ? num / den : null);
 
+/**
+ * ป้ายเปลี่ยนแปลงมุมการ์ด (แบบภาพอ้างอิงที่เจ้าของเลือก 29 ก.ย. 2569: "↑ 4.27%")
+ * - `tone` good/bad ตามทิศที่ดีของเมตริก · ไม่มีดี/เสีย หรือข้อมูลช่วงไหนไม่ครบ = neutral (ห้ามลงสีหลอก)
+ * - จำนวน = % ที่เปลี่ยน · ช่วงก่อนเป็น 0 = "ใหม่" (หาร 0 ไม่ได้) · อัตรา = ต่างกันเป็นจุด (ไม่ใช่ % ของ %)
+ */
+export type DeltaPill = { text: string; dir: 'up' | 'down' | 'flat'; tone: 'good' | 'bad' | 'neutral' };
+
+function pillTone(dir: DeltaPill['dir'], upIsGood: boolean | null, muted: boolean): DeltaPill['tone'] {
+  if (muted || upIsGood === null || dir === 'flat') return 'neutral';
+  return (dir === 'up') === upIsGood ? 'good' : 'bad';
+}
+
+export function countPill(cur: number, prev: number, upIsGood: boolean | null, muted = false): DeltaPill {
+  if (cur === prev) return { text: '0%', dir: 'flat', tone: 'neutral' };
+  const dir = cur > prev ? 'up' : 'down';
+  if (prev === 0) return { text: 'ใหม่', dir, tone: pillTone(dir, upIsGood, muted) };
+  return { text: `${PCT1.format((Math.abs(cur - prev) / prev) * 100)}%`, dir, tone: pillTone(dir, upIsGood, muted) };
+}
+
+export function ratePill(cur: number | null, prev: number | null, upIsGood: boolean | null, muted = false): DeltaPill | null {
+  if (cur === null || prev === null) return null;
+  const d = Math.round((cur - prev) * 1000) / 10;
+  if (d === 0) return { text: '0 จุด', dir: 'flat', tone: 'neutral' };
+  const dir = d > 0 ? 'up' : 'down';
+  return { text: `${PCT1.format(Math.abs(d))} จุด`, dir, tone: pillTone(dir, upIsGood, muted) };
+}
+
 export const fmtPct = (r: number | null): string => (r === null ? '—' : `${PCT1.format(r * 100)}%`);
 
 /** เรียง BU: มากไปน้อยตามค่าที่ให้ · ไม่ระบุ BU อยู่ท้ายเสมอ */
@@ -322,6 +349,9 @@ export type TeamUsersBu = {
   roles: Array<{ role: string; label: string; accounts: number; users: number }>;
   /** % ต่อช่วงย่อย (0–1 · null = ยังไม่มีบัญชีในช่วงย่อยนั้น) */
   series: Array<number | null>;
+  /** ตัวตั้ง/ตัวหารของ `series` ต่อช่วงย่อย — ให้หน้าเว็บรวมหลาย BU เป็น % เดียวได้ถูก (รวมตัวตั้ง ÷ รวมตัวหาร ไม่ใช่เฉลี่ย %) */
+  counts: number[];
+  bases: number[];
 };
 
 /**
@@ -375,11 +405,9 @@ export function usersSummary(
         users: cur.filter((a) => a.role === role && usedCur.has(a.id)).length,
       }))
       .filter((r) => r.accounts > 0);
-    const series = w.buckets.map((b, i) => {
-      const den = mine.filter((a) => eligible(a, b.to, usedBucket[i].has(a.id))).length;
-      const num = mine.filter((a) => usedBucket[i].has(a.id)).length;
-      return ratio(num, den);
-    });
+    const bases = w.buckets.map((b, i) => mine.filter((a) => eligible(a, b.to, usedBucket[i].has(a.id))).length);
+    const counts = w.buckets.map((_, i) => mine.filter((a) => usedBucket[i].has(a.id)).length);
+    const series = w.buckets.map((_, i) => ratio(counts[i], bases[i]));
     return {
       bu,
       label: buLabel(labelOf, bu),
@@ -389,9 +417,21 @@ export function usersSummary(
       prevPct: ratio(prevUsers, prev.length),
       roles,
       series,
+      counts,
+      bases,
     };
   });
   return { total, accounts: { cur: baseCur.length, prev: basePrev.length }, byBu: sortBu(byBu, (r) => r.accounts) };
+}
+
+/** % คนใช้งานต่อช่วงย่อยของหลาย BU รวมกัน — รวมตัวตั้ง ÷ รวมตัวหาร (BU ใหญ่หนักกว่า ไม่ใช่เฉลี่ย % ตรง ๆ) */
+export function pooledUsage(rows: ReadonlyArray<Pick<TeamUsersBu, 'counts' | 'bases'>>, n: number): Array<number | null> {
+  return Array.from({ length: n }, (_, i) =>
+    ratio(
+      rows.reduce((s, r) => s + (r.counts[i] ?? 0), 0),
+      rows.reduce((s, r) => s + (r.bases[i] ?? 0), 0),
+    ),
+  );
 }
 
 /* ─────────────── ใบขอเข้า (อัตรา) ─────────────── */

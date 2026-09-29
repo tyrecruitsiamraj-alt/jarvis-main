@@ -1,18 +1,22 @@
 /**
- * แผง "BU ไหนงานเยอะ แล้วได้ผลแค่ไหน" ของหน้าทีม Online — **แสดงทุก BU เสมอ** (ไม่ตามตัวกรอง) ตามภาพต้นแบบ
- * รอบ 2 (เจ้าของสั่ง 29 ก.ย. 2569): คนใช้งานเป็น % ของบัญชีใน BU · ใบขอเข้าเป็นอัตรา
- * แท่ง = คนใช้งาน (%) · อัตราที่ขอเข้า (เทียบ BU ที่มากสุด) · Success ประกาศ (%)
- * กดชื่อ BU = ตั้งตัวกรอง BU ของทั้งหน้า · แถว "ไม่ระบุ BU" กดไม่ได้ (กรองไม่ได้จริง)
+ * แผง "BU ไหนงานเยอะ แล้วได้ผลแค่ไหน" — **แสดงทุก BU เสมอ** (ไม่ตามตัวกรอง)
+ * รอบ 3 (เจ้าของเลือก 29 ก.ย. 2569 จากภาพอ้างอิง ลิงก์ 2 "Top Spending merchants"): **รายการจัดอันดับ**
+ * BU ละแถว · อัตราที่ขอเข้า + % ของทั้งหมด · แถบสีประจำ BU ตามสัดส่วน · บรรทัดรอง = คนใช้งาน (%) · Success ประกาศ (%)
+ *
+ * กดแถว = ตั้งตัวกรอง BU ของทั้งหน้า (กดซ้ำ = ยกเลิก) · แถว "ไม่ระบุ BU" กดไม่ได้ (กรองไม่ได้จริง)
+ * สีแถบ = `currentColor` + คลาส `TONE[...].value` (มีคู่ dark: — hex โทน 700 จมพื้นโหมดมืด)
  */
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fmtPct } from '@/lib/teamOnline';
+import { fmtPct, ratio } from '@/lib/teamOnline';
 import { DASH, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
+import { toneOfBu } from './teamOnlineTones';
 
 const NUM = new Intl.NumberFormat('th-TH');
+const PCT0 = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 });
 
 export type TeamBuPanelRow = {
   bu: string;
@@ -25,10 +29,28 @@ export type TeamBuPanelRow = {
   postSuccess: number | null;
 };
 
-function Bar({ pct, dot }: { pct: number; dot: string }) {
+function RowBody({ r, share }: { r: TeamBuPanelRow; share: number | null }) {
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-      <div className={cn('h-full rounded-full', dot)} style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+    <div className="flex w-full min-w-0 flex-col gap-1.5 text-left">
+      <div className="flex w-full items-center justify-between gap-3">
+        <span className="inline-flex min-w-0 items-center gap-2">
+          <span className={cn('inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-current', r.bu ? TONE[toneOfBu(r.bu)].value : DASH.muted)} aria-hidden />
+          <span className="truncate text-sm text-foreground">{r.label}</span>
+        </span>
+        <span className="shrink-0 text-sm tabular-nums text-foreground">
+          {r.positionsIn === null ? '—' : `${NUM.format(r.positionsIn)} อัตรา`}
+          {share !== null ? <span className={cn('ml-1 text-xs', DASH.muted)}>({PCT0.format(share * 100)}%)</span> : null}
+        </span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className={cn('h-full rounded-full bg-current', r.bu ? TONE[toneOfBu(r.bu)].value : DASH.muted)}
+          style={{ width: `${Math.max(0, Math.min(100, (share ?? 0) * 100))}%` }}
+        />
+      </div>
+      <span className={cn('text-xs tabular-nums', DASH.muted)}>
+        คนใช้งาน {r.usersPct === null ? 'ยังไม่มีบัญชี' : fmtPct(r.usersPct)} · Success ประกาศ {fmtPct(r.postSuccess)}
+      </span>
     </div>
   );
 }
@@ -40,66 +62,41 @@ const TeamBuPanel: React.FC<{
   loading?: boolean;
   error?: string | null;
 }> = ({ rows, selected, onSelect, loading = false, error }) => {
-  const maxIn = Math.max(1, ...(rows ?? []).map((r) => r.positionsIn ?? 0));
+  const total = (rows ?? []).reduce((s, r) => s + (r.positionsIn ?? 0), 0);
   return (
     <Card className="flex min-w-0 flex-col gap-3 rounded-2xl p-4">
       <div>
         <p className="text-sm font-medium text-foreground">BU ไหนงานเยอะ แล้วได้ผลแค่ไหน</p>
-        <p className={cn('text-xs', DASH.muted)}>แสดงทุก BU เสมอ · กดชื่อเพื่อดูรายละเอียด</p>
-      </div>
-      <div className={cn('grid grid-cols-7 gap-3 text-xs', DASH.muted)}>
-        <span className="col-span-1">BU</span>
-        <span className="col-span-2">คนใช้งาน (%)</span>
-        <span className="col-span-2">อัตราที่ขอเข้า</span>
-        <span className="col-span-2">Success ประกาศ (%)</span>
+        <p className={cn('text-xs', DASH.muted)}>แสดงทุก BU เสมอ · เรียงตามอัตราที่ขอเข้า · กดเพื่อดูเฉพาะ BU</p>
       </div>
       {loading ? (
         <div className="space-y-3">
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-6 w-full" />
+            <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
       ) : error || !rows ? (
         <p className={cn('text-xs', TONE.danger.value)}>{error ?? 'อ่านข้อมูลต่อ BU ไม่ได้'}</p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1">
           {rows.map((r) => {
+            const share = r.positionsIn === null ? null : ratio(r.positionsIn, total);
             const active = selected === r.bu;
-            return (
-              <div key={r.bu || 'unknown'} className="grid grid-cols-7 items-center gap-3">
-                <div className="col-span-1 min-w-0">
-                  {r.bu && onSelect ? (
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant={active ? 'default' : 'ghost'}
-                      className="w-full justify-start"
-                      title={r.label}
-                      aria-pressed={active}
-                      onClick={() => onSelect(active ? null : r.bu)}
-                    >
-                      {r.bu}
-                    </Button>
-                  ) : (
-                    <span className={cn('block truncate px-2 text-xs', DASH.muted)} title={r.label}>
-                      {r.bu || r.label}
-                    </span>
-                  )}
-                </div>
-                <div className="col-span-2 flex items-center gap-2">
-                  <Bar pct={(r.usersPct ?? 0) * 100} dot={TONE.primary.dot} />
-                  <span className="w-12 shrink-0 text-right text-xs tabular-nums text-foreground">{fmtPct(r.usersPct)}</span>
-                </div>
-                <div className="col-span-2 flex items-center gap-2">
-                  <Bar pct={((r.positionsIn ?? 0) / maxIn) * 100} dot={TONE.info.dot} />
-                  <span className="w-12 shrink-0 text-right text-xs tabular-nums text-foreground">
-                    {r.positionsIn === null ? '—' : NUM.format(r.positionsIn)}
-                  </span>
-                </div>
-                <div className="col-span-2 flex items-center gap-2">
-                  <Bar pct={(r.postSuccess ?? 0) * 100} dot={TONE.success.dot} />
-                  <span className="w-12 shrink-0 text-right text-xs tabular-nums text-foreground">{fmtPct(r.postSuccess)}</span>
-                </div>
+            return r.bu && onSelect ? (
+              <Button
+                key={r.bu}
+                type="button"
+                variant="ghost"
+                className={cn('h-auto w-full justify-start rounded-xl px-3 py-2', active && 'bg-muted')}
+                aria-pressed={active}
+                title={active ? 'กดอีกครั้งเพื่อดูทุก BU' : `ดูเฉพาะ ${r.label}`}
+                onClick={() => onSelect(active ? null : r.bu)}
+              >
+                <RowBody r={r} share={share} />
+              </Button>
+            ) : (
+              <div key={r.bu || 'unknown'} className="px-3 py-2">
+                <RowBody r={r} share={share} />
               </div>
             );
           })}
