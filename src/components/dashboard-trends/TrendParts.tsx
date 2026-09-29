@@ -157,11 +157,14 @@ export function TrendChart({
   series,
   height = 240,
   ariaLabel,
+  kindInLegend = true,
 }: {
   data: Array<Record<string, number | string>>;
   series: TrendSeries[];
   height?: number;
   ariaLabel: string;
+  /** ต่อ "(เส้น)" ท้ายป้ายของเส้นในคำอธิบายสี — กราฟที่มีแต่เส้น (หน้าทีม Online) ปิดได้ · ไม่ส่ง = เดิม */
+  kindInLegend?: boolean;
 }) {
   return (
     <div className="space-y-2">
@@ -174,7 +177,7 @@ export function TrendChart({
               aria-hidden
             />
             {s.label}
-            {s.kind === 'line' ? ' (เส้น)' : ''}
+            {kindInLegend && s.kind === 'line' ? ' (เส้น)' : ''}
           </span>
         ))}
       </div>

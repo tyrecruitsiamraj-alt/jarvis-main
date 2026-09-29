@@ -40,6 +40,7 @@ import {
   type TeamPeriod,
 } from '@/lib/teamOnline';
 import { normalizeTrendBu, trendBuLabel } from '@/lib/trends/bu';
+import { METRICS } from '@/lib/metricDictionary';
 import { DASH, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 
@@ -49,6 +50,14 @@ const DATE = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', 
 const ALL = '__all__';
 
 const n = (v: number | null | undefined) => (v === null || v === undefined ? '—' : NUM.format(v));
+
+/** อายุของสำเนา ERP — ภาษาเดียวกับก้อนผลงานหน้าหลักโฉม 3 ก้อน */
+function ageText(seconds: number): string {
+  const m = Math.round(seconds / 60);
+  if (m < 1) return 'เมื่อสักครู่';
+  if (m < 60) return `${NUM.format(m)} นาทีก่อน`;
+  return `${NUM.format(Math.round(m / 60))} ชั่วโมงก่อน`;
+}
 const errText = (e: unknown, fallback: string) => (e instanceof Error && e.message ? e.message : fallback);
 
 type CardBits = {
@@ -96,7 +105,8 @@ function rateBits(
   const prev = ratio(num.prev, den.prev);
   return {
     value: fmtPct(cur),
-    delta: cov.prev === 'none' ? NO_PREV : rateDelta(cur, prev),
+    // ช่วงนี้ยังไม่มีฐาน (เช่น วันนี้ยังไม่มีใบที่ Gen link) = ไม่มีอะไรให้เทียบ — ท้ายการ์ดบอก "0 / 0" อยู่แล้ว
+    delta: cur === null ? null : cov.prev === 'none' ? NO_PREV : rateDelta(cur, prev),
     foot: `${n(num.cur)} / ${n(den.cur)} ${footUnit}`,
     flags: coverageFlags(cov),
   };
@@ -162,8 +172,8 @@ const TeamOnlinePage: React.FC = () => {
   const users = countBits(data?.users ?? null, data?.users?.coverage, 'คน');
   const reqs = countBits(data?.requestsIn ?? null, data?.requestsIn?.coverage, 'ใบ');
   if (data?.requestsIn) {
-    reqs.flags.push(period === 'today' ? 'ระบบงานหลักมีแต่วันที่ · เทียบเมื่อวานทั้งวัน' : 'ระบบงานหลักมีแต่วันที่ · นับถึงสิ้นวัน');
-    if (data.requestsIn.stale) reqs.flags.push('ข้อมูลใบขอยังไม่อัปเดตรอบล่าสุด');
+    reqs.flags.push(period === 'today' ? 'ERP มีแต่วันที่ · เทียบเมื่อวานทั้งวัน' : 'ERP มีแต่วันที่ · นับถึงสิ้นวัน');
+    if (data.requestsIn.stale) reqs.flags.push(`ข้อมูลใบขอจาก ERP เมื่อ ${ageText(data.requestsIn.ageSeconds)}`);
   }
   const called = countBits(data?.lumos?.called ?? null, data?.lumos?.coverage, 'คน');
   const postRate = rateBits(data?.postings?.withApplicants ?? null, data?.postings?.published ?? null, data?.postings?.coverage, 'ใบที่ Gen link');
@@ -194,7 +204,7 @@ const TeamOnlinePage: React.FC = () => {
     },
     {
       key: 'published',
-      label: 'เผยแพร่ (Gen link)',
+      label: METRICS['teamOnline.published'].label,
       count: data?.postings?.published ?? null,
       distinct: false,
       hidePrev: data?.postings?.coverage.prev === 'none',
@@ -235,30 +245,33 @@ const TeamOnlinePage: React.FC = () => {
           ))}
         </ToggleGroup>
         <div className="flex items-center gap-2">
-          <span className={cn('text-xs', DASH.muted)}>รายละเอียด BU</span>
+          <span className={cn('whitespace-nowrap text-xs', DASH.muted)}>รายละเอียด BU</span>
           {data?.scope === 'code' && data.forced_bu ? (
             <span className="text-xs text-foreground">{trendBuLabel(data.forced_bu)}</span>
           ) : (
-            <Select value={effectiveBu ?? ALL} onValueChange={(v) => setParam('bu', v === ALL ? null : v)}>
-              <SelectTrigger className="h-8 w-48 text-xs" aria-label="รายละเอียด BU">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL} className="text-xs">
-                  ทุก BU
-                </SelectItem>
-                {(data?.bu_options ?? []).map((o) => (
-                  <SelectItem key={o.bu} value={o.bu} className="text-xs">
-                    {o.label}
+            /* ช่องเลือกของธีมบังคับกว้างเต็มกล่อง (`jarvis-soft-field`) ⇒ คุมความกว้างที่กล่องครอบ */
+            <div className="w-60">
+              <Select value={effectiveBu ?? ALL} onValueChange={(v) => setParam('bu', v === ALL ? null : v)}>
+                <SelectTrigger className="text-xs" aria-label="รายละเอียด BU">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL} className="text-xs">
+                    ทุก BU
                   </SelectItem>
-                ))}
-                {effectiveBu && !(data?.bu_options ?? []).some((o) => o.bu === effectiveBu) ? (
-                  <SelectItem value={effectiveBu} className="text-xs">
-                    {trendBuLabel(effectiveBu)}
-                  </SelectItem>
-                ) : null}
-              </SelectContent>
-            </Select>
+                  {(data?.bu_options ?? []).map((o) => (
+                    <SelectItem key={o.bu} value={o.bu} className="text-xs">
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                  {effectiveBu && !(data?.bu_options ?? []).some((o) => o.bu === effectiveBu) ? (
+                    <SelectItem value={effectiveBu} className="text-xs">
+                      {trendBuLabel(effectiveBu)}
+                    </SelectItem>
+                  ) : null}
+                </SelectContent>
+              </Select>
+            </div>
           )}
         </div>
         <Button type="button" size="xs" variant="outline" onClick={() => setRev((x) => x + 1)} disabled={loading}>

@@ -8,7 +8,7 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { TrendChart } from '@/components/dashboard-trends/TrendParts';
 import type { TeamCount, TeamGrain, TeamWindow } from '@/lib/teamOnline';
 import { DASH } from '@/lib/designTokens';
@@ -46,18 +46,21 @@ const TeamTrendCard: React.FC<{
     <Card className="flex min-w-0 flex-col gap-3 rounded-2xl p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium text-foreground">{picked?.label ?? ''}</p>
-        <Select value={picked?.key} onValueChange={onChange}>
-          <SelectTrigger className="h-8 w-44 text-xs" aria-label="ดูเส้น">
-            <SelectValue placeholder="ดูเส้น" />
-          </SelectTrigger>
-          <SelectContent>
-            {options.map((o) => (
-              <SelectItem key={o.key} value={o.key} disabled={!!o.unavailable} className="text-xs">
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* ช่องเลือกของธีมบังคับกว้างเต็มกล่อง (`jarvis-soft-field`) ⇒ คุมความกว้างที่กล่องครอบ */}
+        <div className="w-32 shrink-0">
+          <Select value={picked?.key} onValueChange={onChange}>
+            <SelectTrigger className="text-xs" aria-label="ดูเส้น">
+              <span>ดูเส้น</span>
+            </SelectTrigger>
+            <SelectContent>
+              {options.map((o) => (
+                <SelectItem key={o.key} value={o.key} disabled={!!o.unavailable} className="text-xs">
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       {loading ? (
         <Skeleton className="h-60 w-full" />
@@ -75,6 +78,7 @@ const TeamTrendCard: React.FC<{
               ...(picked.hidePrev ? [] : [{ key: 'prev', label: 'ช่วงก่อน', kind: 'line' as const, tone: 'neutral' as const, dashed: true }]),
             ]}
             height={240}
+            kindInLegend={false}
           />
         </div>
       )}

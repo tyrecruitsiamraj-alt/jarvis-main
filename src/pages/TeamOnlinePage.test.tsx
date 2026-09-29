@@ -28,7 +28,7 @@ const DATA: TeamOnlineResponse = {
     { bu: 'LM', label: 'LM · ดูแลสวน / ภูมิทัศน์' },
   ],
   users: { cur: 54, prev: 68, series: flat(W.buckets.length, 3), prevSeries: flat(W.buckets.length, 4), coverage: cov },
-  requestsIn: { cur: 7, prev: 6, series: [], prevSeries: [], dateOnly: true, coverage: cov, stale: false },
+  requestsIn: { cur: 7, prev: 6, series: [], prevSeries: [], dateOnly: true, coverage: cov, stale: true, ageSeconds: 3000 },
   lumos: {
     called: { cur: 11, prev: 0, series: flat(W.buckets.length, 1), prevSeries: flat(W.buckets.length) },
     reached: { cur: 3, prev: 0 },
@@ -103,6 +103,23 @@ describe('หน้าทีม Online', () => {
     expect(text()).toContain('66.7%');
   });
 
+  it('ช่วงนี้ยังไม่มีใบที่ Gen link = การ์ด Success ขึ้น "—" + "0 / 0" ไม่มีบรรทัดเทียบ', async () => {
+    fetchTeamOnline.mockResolvedValue({
+      ...DATA,
+      postings: {
+        ...DATA.postings!,
+        published: { ...DATA.postings!.published, cur: 0 },
+        withApplicants: { cur: 0, prev: 2 },
+      },
+    });
+    renderAt();
+    await screen.findByText('ทีม Online');
+    await waitFor(() => expect(text()).toContain('0 / 0 ใบที่ Gen link'));
+    const label = [...document.querySelectorAll('p')].find((el) => el.textContent === 'Success ประกาศ');
+    // ค่า "—" + ท้ายการ์ด "0 / 0" เท่านั้น — เดิมมีบรรทัดเทียบ "—" ซ้อนอีกบรรทัด
+    expect(label?.parentElement?.textContent).toBe('Success ประกาศ—0 / 0 ใบที่ Gen link');
+  });
+
   it('🔴 ช่วงก่อนยังไม่มีข้อมูล = บอกตรง ๆ ห้ามขึ้น "เพิ่ม 11 คน (ช่วงก่อนไม่มี)"', async () => {
     renderAt();
     await screen.findByText('ทีม Online');
@@ -113,8 +130,12 @@ describe('หน้าทีม Online', () => {
   it('ใบขอเข้า (ERP มีแต่วันที่) ต้องติดธง · แถบจับตาสรุปจากตัวเลข · ปุ่มตรวจคิวโทรใช้ยอดเดียวกับป๊อป', async () => {
     renderAt();
     await screen.findByText('ทีม Online');
-    await waitFor(() => expect(text()).toContain('ระบบงานหลักมีแต่วันที่ · เทียบเมื่อวานทั้งวัน'));
+    await waitFor(() => expect(text()).toContain('ERP มีแต่วันที่ · เทียบเมื่อวานทั้งวัน'));
+    // สำเนา ERP เก่า = บอกอายุตรง ๆ
+    expect(text()).toContain('ข้อมูลใบขอจาก ERP เมื่อ 50 นาทีก่อน');
     expect(text()).toContain('คนใช้งานลด 14 คน (20.6%)');
+    // "วันนี้" ของใบขอเทียบเมื่อวานทั้งวัน — ไม่เอาขึ้นแถบจับตา
+    expect(text()).not.toContain('ใบขอเข้าเพิ่ม');
     expect(text()).toContain('ใบเปิดยังไม่ Gen link 273 ใบ');
     await waitFor(() => expect(text()).toContain('ตรวจคิวโทร 3 สาย'));
     expect(text()).toContain('29 ก.ย. ถึง 12:00 เทียบ 28 ก.ย. ถึง 12:00 · ทุก BU');

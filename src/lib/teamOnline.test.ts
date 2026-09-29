@@ -201,6 +201,18 @@ describe('ตัวประกอบคำตอบ', () => {
     expect(s.noAnswer).toEqual({ cur: 1, prev: 0 });
   });
 
+  it('🔴 ไม่รับสายไม่ซ้อนกับติดต่อได้ — คนเดียวสองใบ ติดใบหนึ่ง = ติดต่อได้ (รวมไม่เกินโทรแล้ว)', () => {
+    const s = callsSummary(w, [
+      call({ who: 'p1', personRef: 'app-1', outcome: 'confirmed' }),
+      call({ who: 'p1', personRef: 'app-9', outcome: 'no_answer' }),
+      call({ who: 'p2', personRef: 'app-2', outcome: 'busy' }),
+    ]);
+    expect(s.called.cur).toBe(2);
+    expect(s.reached.cur).toBe(1);
+    expect(s.noAnswer.cur).toBe(1);
+    expect(s.reached.cur + s.noAnswer.cur).toBeLessThanOrEqual(s.called.cur);
+  });
+
   it('Success ประกาศ: กลุ่มใบตามวัน Gen link ครั้งแรก · มีผู้สมัคร ≥ 1', () => {
     const s = postingsSummary(w, [
       { jobId: 'J1', firstAt: iso('2026-09-28T10:00:00'), bu: 'LBD', applicants: 3 },
@@ -255,5 +267,8 @@ describe('ตัวประกอบคำตอบ', () => {
       'Gen link เกิน 7 วันยังไม่มีผู้สมัคร 1 ใบ',
     ]);
     expect(items.some((i) => i.key === 'called')).toBe(false);
+    // "วันนี้" ของใบขอ = วันนี้ถึงตอนนี้ เทียบเมื่อวานทั้งวัน ⇒ ไม่เอามาเตือน
+    const today = teamWatchItems({ ...r, period: 'today' } as TeamOnlineResponse);
+    expect(today.some((i) => i.key === 'requestsIn')).toBe(false);
   });
 });

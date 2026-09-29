@@ -320,7 +320,7 @@ export type TeamOnlineResponse = {
   /** คนใช้งาน = เจ้าหน้าที่ที่ล็อกอินหรือบันทึกงานในช่วงนั้น — **ทุก BU เสมอ** */
   users: (TeamCount & { coverage: TeamCoverage }) | null;
   /** ใบขอเข้า — ERP บันทึกเป็นวัน (`dateOnly`) ⇒ วันนี้เทียบเมื่อวานทั้งวัน · ไม่มีเส้นรายชั่วโมง */
-  requestsIn: (TeamCount & { dateOnly: true; coverage: TeamCoverage; stale: boolean }) | null;
+  requestsIn: (TeamCount & { dateOnly: true; coverage: TeamCoverage; stale: boolean; ageSeconds: number }) | null;
   /** เลนหน้าสาธารณะ (ผู้สมัครจากประกาศ/ลิงก์) — นับเป็นคน (เบอร์ไม่ซ้ำ) */
   lumos: {
     called: TeamCount;
@@ -391,6 +391,8 @@ const UNREACHED = new Set<string>(UNREACHED_CALL_OUTCOMES);
 /**
  * โทรแล้ว = มีสายในช่วง (ผลแรกหรือผลล่าสุด) · ติดต่อได้/สนใจ/ไม่รับสาย = ผลล่าสุดของแถว ณ เวลาผลล่าสุด
  * (จัดถังด้วย `aiCallSteps` ตัวเดียวกับหน้าหลักโฉม 3 ก้อน — "สนใจ" = `said_yes`)
+ * 🔴 ไม่รับสาย **ไม่ซ้อนกับติดต่อได้** — คนเดียวสมัครสองใบ ติดใบหนึ่งไม่ติดอีกใบ = ติดต่อได้ (วัดจริง 29 ก.ย.:
+ *    ติดต่อได้ 51 + ไม่รับสาย 23 = 74 เกินโทรแล้ว 72 คน อ่านแล้วงง) ⇒ ติดต่อได้ + ไม่รับสาย ≤ โทรแล้วเสมอ
  */
 export function callsSummary(
   w: TeamWindow,
@@ -416,11 +418,12 @@ export function callsSummary(
     if (UNREACHED.has((r.outcome ?? '').trim().toLowerCase())) sets.noAnswer[last].add(r.who);
   }
   const pair = (s: { cur: Set<string>; prev: Set<string> }) => ({ cur: s.cur.size, prev: s.prev.size });
+  const notReached = (side: TeamSide) => [...sets.noAnswer[side]].filter((who) => !sets.reached[side].has(who)).length;
   return {
     called: distinctCount(w, called),
     reached: pair(sets.reached),
     interested: pair(sets.interested),
-    noAnswer: pair(sets.noAnswer),
+    noAnswer: { cur: notReached('cur'), prev: notReached('prev') },
   };
 }
 
@@ -514,7 +517,8 @@ export function teamWatchItems(r: TeamOnlineResponse): TeamWatchItem[] {
     moves.push({ key, label, unit, cur: c.cur, prev: c.prev, upGood });
   };
   push('users', 'คนใช้งาน', 'คน', r.users, r.users?.coverage);
-  push('requestsIn', 'ใบขอเข้า', 'ใบ', r.requestsIn, r.requestsIn?.coverage);
+  // "วันนี้" ของใบขอ = วันนี้ถึงตอนนี้ เทียบเมื่อวานทั้งวัน (ERP มีแต่วันที่) — ลดลงเสมอช่วงกลางวัน ห้ามเอามาเตือน
+  if (r.period !== 'today') push('requestsIn', 'ใบขอเข้า', 'ใบ', r.requestsIn, r.requestsIn?.coverage);
   push('called', 'Lumos โทร', 'คน', r.lumos?.called ?? null, r.lumos?.coverage);
   push('published', 'Gen link ใหม่', 'ใบ', r.postings?.published ?? null, r.postings?.coverage);
   const rel = (m: (typeof moves)[number]) => Math.abs(m.cur - m.prev) / Math.max(1, m.prev);

@@ -176,7 +176,12 @@ async function loadRequests() {
     day: requestAddedYmd(r),
     bu: r.departmentCode ? normalizeTrendBu(r.departmentCode) : null,
   }));
-  return { rows, since: `${payload.range.from}T00:00:00+07:00`, stale: payload.source === 'stale' };
+  return {
+    rows,
+    since: `${payload.range.from}T00:00:00+07:00`,
+    stale: payload.source === 'stale',
+    ageSeconds: payload.ageSeconds,
+  };
 }
 
 async function loadCalls(w: TeamWindow) {
@@ -296,6 +301,7 @@ export async function buildTeamOnline(
       dateOnly: true,
       coverage: coverageOf(w, reqR.v.since),
       stale: reqR.v.stale,
+      ageSeconds: reqR.v.ageSeconds,
     };
   } else body.errors.requestsIn = 'อ่านใบขอจาก ERP ไม่ได้ตอนนี้';
 
