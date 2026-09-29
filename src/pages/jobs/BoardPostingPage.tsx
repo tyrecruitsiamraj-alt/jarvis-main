@@ -497,14 +497,27 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             );
           })}
           {released ? (
-            <span
-              className={cn(
-                'ml-auto rounded-full px-2.5 py-1 text-[11px] font-medium',
-                TONE.success.soft,
-                TONE.success.value,
-              )}
-            >
-              ✓ ปล่อยขึ้นหน้าสาธารณะแล้ว
+            /* 🔴 ปุ่มย้อนกลับอยู่ข้างป้ายเลย ไม่ต้องไล่ไปขั้น 4 (เจ้าของเคาะ 29 ก.ย. 2569: *"ถ้าอันไหนต้องการเอาออกจากหน้า
+               สาธารณะต้องมีปุ่มให้ย้อนกลับมาได้"* → Choice "บนหัวป๊อป ข้างป้าย ปล่อยแล้ว") · ปุ่มเดิมในขั้น 4 ยังอยู่ */
+            <span className="ml-auto flex flex-wrap items-center gap-2">
+              <span
+                className={cn(
+                  'rounded-full px-2.5 py-1 text-[11px] font-medium',
+                  TONE.success.soft,
+                  TONE.success.value,
+                )}
+              >
+                ✓ ปล่อยขึ้นหน้าสาธารณะแล้ว
+              </span>
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                disabled={releaseBusy || !job}
+                onClick={() => void toggleRelease(false)}
+              >
+                {releaseBusy ? 'กำลังบันทึก…' : 'ดึงลงจากหน้าสาธารณะ'}
+              </Button>
             </span>
           ) : null}
         </nav>
