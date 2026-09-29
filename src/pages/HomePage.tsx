@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
-import { useHomeV3 } from '@/lib/homeV3';
+import { useHomeVariant } from '@/lib/homeV3';
 import { fetchCallRateSeries } from '@/lib/callFunnelApi';
 import { bangkokTodayYmd, compareCallRate } from '@/lib/lumosCallRate';
 import HomeSection from '@/components/home/HomeSection';
@@ -409,15 +409,13 @@ const HomePageClassic: React.FC = () => {
  * แผน: `docs/plan-home-v3-2569-09-29.md`
  */
 const HomeV3Page = lazy(() => import('@/pages/HomeV3Page'));
+const TeamOnlinePage = lazy(() => import('@/pages/TeamOnlinePage'));
 
+/** สวิตช์โฉม (`?home=v3|online|classic`) — ค่าตั้งต้น = หน้าเดิม (ทางถอย) · ดู `src/lib/homeV3.ts` */
 const HomePage: React.FC = () => {
-  const v3 = useHomeV3();
-  if (!v3) return <HomePageClassic />;
-  return (
-    <Suspense fallback={null}>
-      <HomeV3Page />
-    </Suspense>
-  );
+  const variant = useHomeVariant();
+  if (variant === 'classic') return <HomePageClassic />;
+  return <Suspense fallback={null}>{variant === 'online' ? <TeamOnlinePage /> : <HomeV3Page />}</Suspense>;
 };
 
 export default HomePage;

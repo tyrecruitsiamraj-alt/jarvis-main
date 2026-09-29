@@ -208,6 +208,12 @@ describe('หน้าแรกต้องไม่มีตัวอักษ�
     'src/components/home-v3/HomeResultBlock.tsx',
     'src/components/home-v3/HomeStuckList.tsx',
     'src/components/home-v3/HomeTodayBlock.tsx',
+    // หน้าทีม Online (29 ก.ย. 2569)
+    'src/pages/TeamOnlinePage.tsx',
+    'src/components/team-online/TeamKpiCard.tsx',
+    'src/components/team-online/TeamTrendCard.tsx',
+    'src/components/team-online/TeamBuPanel.tsx',
+    'src/components/team-online/TeamOnlineTabs.tsx',
   ];
 
   it.each(FILES)('%s — ไม่มี text-[10px] / text-[11px]', (f) => {
