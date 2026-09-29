@@ -23,7 +23,7 @@ import { listSiamrajUnitRequests } from '../_lib/siamrajUnitRequests.js';
 import { PREQUEST_ID_PREFIX } from '../_lib/siamrajSqlServerPrequests.js';
 import { loadRequestTrendPayload, requestTrendDataFrom } from '../_lib/requestTrendRows.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
-import { queueOutcome } from '../_lib/lumosQueueDefs.js';
+import { queueLastResultAt, queueOutcome, queueReplySql } from '../_lib/lumosQueueDefs.js';
 import { appBuJoin, appBuSql, followBuJoin, followBuSql, parseBuParam, queueBuJoins, queueBuSql } from '../_lib/homeBuSql.js';
 import { logWarn } from '../_lib/logger.js';
 import { activityLedger } from '../../src/lib/trends/requestTrends.js';
@@ -91,12 +91,9 @@ export async function loadResult(bu: string | null, feed: readonly JobRequest[])
   );
 }
 
-/** คำตอบของผู้สมัครในสาย — รูปแบบเดียวกับบอร์ดทีม (`office-team`) */
-const REPLY_SQL = `(select string_agg(btrim(x.t->>'text'), ' · ')
-          from jsonb_array_elements(coalesce(q.result->'transcript', '[]'::jsonb)) x(t)
-         where x.t->>'role' = 'candidate' and coalesce(btrim(x.t->>'text'), '') <> '')`;
-/** เวลาของผลล่าสุด — สายโทรซ้ำวันนี้มีผลล่าสุดวันนี้แม้ผลแรกจะหลายวันก่อน */
-const LAST_RESULT_AT = `coalesce(q.last_result_at, q.first_result_at, q.updated_at)`;
+/** คำตอบของผู้สมัครในสาย + เวลาของผลล่าสุด — ตัวกลาง `lumosQueueDefs` */
+const REPLY_SQL = queueReplySql('q');
+const LAST_RESULT_AT = queueLastResultAt('q');
 const bkkDay = (col: string) => `to_char(timezone('Asia/Bangkok', ${col}), 'YYYY-MM-DD')`;
 
 /** export ไว้ให้เทสต์อ่านโครงคิวรี — `bu` true = ต่อ join/where ของ BU กลาง (พารามิเตอร์ตัวสุดท้าย) */

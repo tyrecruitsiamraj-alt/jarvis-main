@@ -125,3 +125,18 @@ export function queuePayloadPhone(payload: unknown): string | null {
   }
   return null;
 }
+
+/**
+ * คำตอบของผู้สมัครในสาย (ต่อข้อความฝั่ง candidate ของ transcript) — ใช้จัดถังผลด้วย `classifyCallMicro`
+ * ยกมาไว้ที่นี่ 29 ก.ย. 2569 (หน้าหลักโฉม 3 ก้อน · หน้าทีม Online) — รูปแบบเดียวกับที่บอร์ดทีม (`office-team`) อ่าน
+ */
+export function queueReplySql(alias = 'q'): string {
+  return `(select string_agg(btrim(x.t->>'text'), ' · ')
+          from jsonb_array_elements(coalesce(${col(alias, 'result')}->'transcript', '[]'::jsonb)) x(t)
+         where x.t->>'role' = 'candidate' and coalesce(btrim(x.t->>'text'), '') <> '')`;
+}
+
+/** เวลาของผลล่าสุด — สายโทรซ้ำวันนี้มีผลล่าสุดวันนี้แม้ผลแรกจะหลายวันก่อน */
+export function queueLastResultAt(alias = 'q'): string {
+  return `coalesce(${col(alias, 'last_result_at')}, ${col(alias, 'first_result_at')}, ${col(alias, 'updated_at')})`;
+}

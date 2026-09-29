@@ -99,8 +99,9 @@ export type ActivityLedger = {
   undatedFilled: number;
 };
 
-/** วันที่ของเหตุการณ์ "ขอเข้ามา" — วันที่กรอก (ไม่มี = ใช้งวดของใบ) */
-const addedYmd = (r: RequestTrendRow) => r.submittedDate ?? r.cohortDate;
+/** วันที่ของเหตุการณ์ "ขอเข้ามา" — วันที่กรอก (ไม่มี = ใช้งวดของใบ) · export ให้หน้าทีม Online นับ "ใบขอเข้า" ด้วยวันเดียวกัน */
+export const requestAddedYmd = (r: RequestTrendRow) => r.submittedDate ?? r.cohortDate;
+const addedYmd = requestAddedYmd;
 
 /**
  * มุม activity + งานค้างตามสมการ
