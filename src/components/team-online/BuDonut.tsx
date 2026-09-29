@@ -33,16 +33,19 @@ const share = (v: number, total: number) => (total > 0 ? `${PCT0.format((v / tot
 function Tip({ active, payload, unit, total }: { active?: boolean; payload?: Array<{ payload: DonutSlice }>; unit: string; total: number }) {
   if (!active || !payload?.length) return null;
   const s = payload[0].payload;
+  // 🔴 ป้ายดำของกราฟ (`CHART.tooltip`) ใช้สีของป้ายเอง — คลาสสีตัวอักษรของหน้า (กรมท่า) จมหายบนพื้นดำ (เห็นบนเว็บจริง)
   return (
-    <div style={CHART.tooltip.contentStyle} className="space-y-1 text-xs">
-      <p className="font-medium text-foreground">{s.label}</p>
-      <p className="tabular-nums text-foreground">
+    <div style={CHART.tooltip.contentStyle} className="space-y-1 px-3 py-2">
+      <p style={CHART.tooltip.itemStyle} className="font-medium">
+        {s.label}
+      </p>
+      <p style={CHART.tooltip.labelStyle} className="tabular-nums">
         {NUM.format(s.value)} {unit} · {share(s.value, total)} ของทั้งหมด
       </p>
       {(s.lines ?? []).map((l) => (
-        <p key={l.label} className={cn('flex justify-between gap-4 tabular-nums', DASH.muted)}>
-          <span>{l.label}</span>
-          <span className="text-foreground">{l.value}</span>
+        <p key={l.label} className="flex justify-between gap-4 tabular-nums">
+          <span style={CHART.tooltip.labelStyle}>{l.label}</span>
+          <span style={CHART.tooltip.itemStyle}>{l.value}</span>
         </p>
       ))}
     </div>
