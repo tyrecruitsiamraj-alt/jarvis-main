@@ -5,6 +5,7 @@ import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
   isCallOutcome,
   isRotatedRetrySlot,
+  isSameRetrySlot,
   normalizeCallFollowupPolicy,
   resolveCallFollowup,
   RETRY_TIME_SLOTS_BKK,
@@ -245,5 +246,13 @@ describe('โทรซ้ำคละช่วงเวลา (ใบสมั�
     expect(isRotatedRetrySlot(bkk('2026-09-29T18:00:00'))).toBe(true);
     expect(isRotatedRetrySlot(bkk('2026-09-29T14:37:00'))).toBe(false);
     expect(isRotatedRetrySlot(bkk('2026-09-29T09:00:00'))).toBe(false);
+  });
+  it('นัดแบบเดิมที่ตกช่องเดียวกับสายที่ไม่ติด (โทร 14:26 ⇒ นัด 14:00) ต้องย้าย · นัดของ rotatedRetryAt ไม่ซ้ำช่องเดิมทุกชั่วโมง', () => {
+    expect(isSameRetrySlot(bkk('2026-09-29T14:00:00'), bkk('2026-09-28T14:26:00'))).toBe(true);
+    expect(isSameRetrySlot(bkk('2026-09-29T18:00:00'), bkk('2026-09-28T14:26:00'))).toBe(false);
+    for (let h = 0; h < 24; h += 1) {
+      const call = bkk(`2026-09-28T${String(h).padStart(2, '0')}:31:00`);
+      expect(isSameRetrySlot(rotatedRetryAt(call), call)).toBe(false);
+    }
   });
 });

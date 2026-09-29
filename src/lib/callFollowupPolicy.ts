@@ -176,6 +176,18 @@ export function isRotatedRetrySlot(at: Date, slots: readonly number[] = RETRY_TI
 }
 
 /**
+ * นัดนี้ตกช่องเดียวกับสายที่ไม่ติดไหม — นัดแบบเดิม (+24 ชม. ชั่วโมงเดิม) ที่บังเอิญตรงช่อง (โทร 14:26 ⇒ นัด 14:00)
+ * คละช่วงเวลาห้ามซ้ำช่องเดิม ⇒ ต้องย้าย · นัดที่ `rotatedRetryAt` ตั้งไม่มีวันเข้าเงื่อนไขนี้ (ช่องถัดไปเสมอ)
+ */
+export function isSameRetrySlot(
+  at: Date,
+  lastCallAt: Date,
+  slots: readonly number[] = RETRY_TIME_SLOTS_BKK,
+): boolean {
+  return nearestSlotIndex(bangkokHour(at), slots) === nearestSlotIndex(bangkokHour(lastCallAt), slots);
+}
+
+/**
  * ได้ผลโทรมาแล้วทำอะไรต่อ
  *
  * `attemptCount` = โทรไปแล้วกี่ครั้งรวมครั้งนี้

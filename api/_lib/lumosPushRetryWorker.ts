@@ -14,6 +14,7 @@
  * 0. ปล่อยชุดโทรที่อนุมัติแล้วและถึงเวลา (`releaseDueCallBatches` — เดิมถูกเรียกแค่ตอนเปิดแผงหรือตอน Lumos ดึงคิว)
  * 1. ส่งซ้ำแถวที่ **push ไม่ถึง** (`push_failed` / `push_pending` ค้าง) — ใบสมัคร `app-` · iRecruit `ir-` · คนของเรา `card-`
  * 2. **โทรซ้ำที่ถึงเวลา** (`followup_state = 'retry_scheduled'`) — ใบสมัคร (คละช่วงเวลา) + งานติดตาม (วันถัดไป)
+ *    ผู้สมัครขอให้โทรกลับตามเวลาที่นัด = โทรตามเวลานั้น (คละช่วงเวลาเฉพาะผล "ยังไม่ติด")
  *    ส่งเป็น **งานใหม่ที่ Lumos** (รหัสรอบต่อท้าย `::r<ครั้งที่>` / `-r<ครั้งที่>` + คีย์กันซ้ำประจำรอบ) — ไม่ทับแผนเดิม
  * 3. ส่งถึงแล้วแต่ **ไม่มีผลกลับเกิน 24 ชม.** ⇒ ขึ้นให้เจ้าหน้าที่ (`needs_human`) — ปิดทาง "ส่งแล้วเงียบ"
  *
@@ -36,9 +37,11 @@ import { pushQueueRowsTracked, type LumosPushChannel } from './lumosPushTracking
 import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
   isRotatedRetrySlot,
+  isSameRetrySlot,
   rotatedRetryAt,
   type CallFollowupPolicy,
 } from '../../src/lib/callFollowupPolicy.js';
+import { UNREACHED_CALL_OUTCOMES } from '../../src/lib/callOutcomeBuckets.js';
 import {
   decideLumosPushRetry,
   isQuietAt,
@@ -54,6 +57,8 @@ const followTable = tableInAppSchema('follow_entries');
 
 /** โทรซ้ำที่เลยเวลามาเกินเท่านี้โดยยังไม่เคยลองส่ง (เครื่องหยุด/งานค้างเก่า) ⇒ นัดช่องเวลาถัดไปใหม่ ไม่โทรทันที */
 const RETRY_REPLAN_AFTER_MINUTES = 30;
+/** ผลที่ "ยังไม่ติด" (นิยามกลาง) — เฉพาะพวกนี้ที่คละช่วงเวลา · ขอให้โทรกลับตามเวลาที่นัดไม่อยู่ในนี้ */
+const UNREACHED = new Set<string>(UNREACHED_CALL_OUTCOMES);
 /** ส่งถึงแล้วแต่เงียบเกินเท่านี้ ⇒ ขึ้นให้เจ้าหน้าที่ (ผลช้าสุดที่วัดได้ 134 นาที) */
 const NO_RESULT_ESCALATE_MINUTES = 24 * 60;
 
@@ -110,6 +115,7 @@ type RetryCandidate = Candidate & {
   attempt_count: number | null;
   push_state: string | null;
   step_position: number | null;
+  last_outcome: string | null;
   last_call_at: string | Date | null;
   follow_exists: boolean;
   follow_closed: boolean;
@@ -143,11 +149,12 @@ export function buildCandidateSql(): string {
 /**
  * 2) โทรซ้ำที่ถึงเวลา (หรือจะถึงภายในช่วงยิงล่วงหน้า) — ใบสมัคร (interview · `app-`) + งานติดตาม (reminder · `follow-`)
  * ⚠️ แถวโทรซ้ำมีผลรอบก่อนอยู่ที่ `last_outcome` (ไม่ใช่ `queuePending`) และ `result` ถูกล้างไว้แล้วตอนตั้งโทรซ้ำ
+ * ⚠️ `last_call_at` ห้ามถอยไปใช้ `updated_at` — การนัดใหม่แตะ `updated_at` ⇒ ช่องของ "สายล่าสุด" จะขยับทุกรอบ
  */
 export function buildRetryDueSql(): string {
   return `select q.id::text as id, q.channel, q.person_ref, q.job_ref, q.payload, q.created_at, q.next_attempt_at,
-                 q.attempt_count, q.push_state, q.step_position,
-                 coalesce(q.last_result_at, q.first_result_at, q.updated_at) as last_call_at,
+                 q.attempt_count, q.push_state, q.step_position, q.last_outcome,
+                 coalesce(q.last_result_at, q.first_result_at) as last_call_at,
                  (a.id is not null) as app_exists,
                  (a.claimed_by is not null) as claimed,
                  coalesce(a.is_lead, false) as is_lead,
@@ -463,15 +470,20 @@ export async function runLumosPushRetryOnce(
       await closeRetry(r.id, 'needs_human', `ส่งโทรซ้ำไม่ถึง Lumos เกิน ${Math.round(cfg.giveUpAfterMinutes / 60)} ชม. — ให้เจ้าหน้าที่โทรเอง`);
       continue;
     }
-    // c) ใบสมัคร: นัดแบบเดิม (+24 ชม. เวลาเดิม) หรือค้างเก่า ⇒ นัดช่องเวลาถัดไปใหม่ (คละช่วงเวลา) แล้วรอ
+    // c) ใบสมัครที่ยังไม่ติด: นัดแบบเดิม (+24 ชม. เวลาเดิม) · ตกช่องเดียวกับสายที่ไม่ติด · ค้างเก่า
+    //    ⇒ นัดช่องเวลาถัดไปใหม่ (คละช่วงเวลา) แล้วรอ
+    //    🔴 ผู้สมัครขอให้โทรกลับตามเวลาที่นัด (`reschedule_requested`) = โทรตามเวลานั้น ห้ามย้ายช่อง
     const isApplication = r.person_ref.startsWith('app-');
+    const lastCall = toDate(r.last_call_at);
     if (
       isApplication &&
       !failedBefore &&
-      (!isRotatedRetrySlot(due) || lateMinutes > RETRY_REPLAN_AFTER_MINUTES)
+      UNREACHED.has(String(r.last_outcome ?? '')) &&
+      (!isRotatedRetrySlot(due) ||
+        (lastCall !== null && isSameRetrySlot(due, lastCall)) ||
+        lateMinutes > RETRY_REPLAN_AFTER_MINUTES)
     ) {
-      const lastCall = toDate(r.last_call_at) ?? due;
-      const at = rotatedRetryAt(lastCall, now);
+      const at = rotatedRetryAt(lastCall ?? due, now);
       run.retriesReplanned += 1;
       await replanRetry(r.id, at);
       continue;

@@ -10041,16 +10041,24 @@ B ตาราง · C กระดานตามขั้น) → เลือ
 
 | ไฟล์ | หน้าที่ |
 | --- | --- |
-| `src/lib/callFollowupPolicy.ts` | + `RETRY_TIME_SLOTS_BKK` [10, 14, 18] · `rotatedRetryAt` (วันถัดไป ช่องถัดจากช่องของสายล่าสุด · ค้างเก่า = เลื่อนจนเป็นอนาคต) · `isRotatedRetrySlot` · `resolveCallFollowup({ retrySlots })` |
+| `src/lib/callFollowupPolicy.ts` | + `RETRY_TIME_SLOTS_BKK` [10, 14, 18] · `rotatedRetryAt` (วันถัดไป ช่องถัดจากช่องของสายล่าสุด · ค้างเก่า = เลื่อนจนเป็นอนาคต) · `isRotatedRetrySlot` · `isSameRetrySlot` · `resolveCallFollowup({ retrySlots })` |
 | `api/_lib/callFollowup.ts` | ส่ง `retrySlots` เฉพาะ `app-` ทั้งสองจุด (ผลจาก Lumos · ผลที่คนบันทึก) · เลนอื่น +24 ชม. เวลาเดิม |
 | `api/_lib/lumosPushRetryWorker.ts` | + ทุกนาที: ปล่อยชุดโทรที่ถึงเวลา · **โทรซ้ำที่ถึงเวลา** (ใบสมัคร interview · งานติดตาม reminder) ส่งเป็นงานใหม่ (`::r<n>` / `-r<n>` + คีย์ `<ช่อง>-<id>-r<n>`) · งานติดตามปิดแล้ว/ใบสมัครมีเจ้าของ/เบอร์พัก = ปิดธง ไม่โทร · นัดแบบเดิม/ค้างเก่า ⇒ นัดช่องเวลาใหม่ · ส่งไม่ถึงเกิน 24 ชม. / **ส่งถึงแล้วเงียบเกิน 24 ชม.** ⇒ `needs_human` |
 | `api/_lib/lumosPushTracking.ts` | `pushQueueRowsTracked(…, keyFor)` คีย์ประจำรอบ |
 | `api/_lib/lumosDispatch.ts` | `applyLumosResult` ถอยไปจับรหัสเดิมเมื่อ reminder ส่ง `-r<n>` มา · เลนสรรหา/ชวนกลับ push หลังเข้าคิว · ส่งอัตโนมัติจากผลแมท/iRecruit ส่ง `{ autoPush: true }` |
 | `api/_lib/callBatchDispatcher.ts` | ปล่อยชุดโทรแล้ว push (`{ autoPush: true }` ทั้งสองช่อง) |
-| tests | `callFollowupPolicy.test.ts` (+6 คละช่วงเวลา) · `lumosPushRetryWorker.test.ts` (26) · `lumosPushTracking.test.ts` (16 · สายไฟทุกเส้น) |
+| tests | `callFollowupPolicy.test.ts` (+7 คละช่วงเวลา) · `lumosPushRetryWorker.test.ts` (29) · `lumosPushTracking.test.ts` (16 · สายไฟทุกเส้น) |
 
 🔴 กับดัก:
 - ผลช่อง interview จับด้วย `client_candidate_id` (ไม่ใช่ `client_interview_id`) ⇒ รอบโทรซ้ำเปลี่ยน `client_interview_id` ได้โดยผลยังเข้าแถวเดิม
 - ช่อง reminder จับด้วย `client_contact_id` ⇒ รอบโทรซ้ำต่อ `-r<n>` แล้ว `applyLumosResult` ต้องถอดก่อนจับซ้ำ (มีเทสต์คุม)
 - ⚠️ ยังไม่เคยเห็นของจริงว่า Lumos รับ "รอบสองของคนเดิม" ถูกทุกกรณี — ถ้าเงียบ ตัวเช็ค 24 ชม. โยนให้เจ้าหน้าที่ (ไม่หายเงียบ)
 - งานติดตามแบบตั้งตาราง (หลายรอบ) ไม่มีโทรซ้ำนอกตาราง — `callFollowup` ปิดแทน retry อยู่แล้ว (ตารางคือ retry) · ยังไม่ได้ถามเจ้าของว่าจะให้เพิ่มไหม
+- 🔴 (ตรวจหลัง deploy 29 ก.ย. เช้า) คละช่วงเวลา **เฉพาะผล "ยังไม่ติด"** (`UNREACHED_CALL_OUTCOMES` นิยามกลาง) —
+  ผู้สมัครขอให้โทรกลับตามเวลาที่นัด (`reschedule_requested`) ก็ได้ `retry_scheduled` เหมือนกัน (ทางเขียนมีแค่ `callFollowup` 2 จุด)
+  ถ้าย้ายช่อง = โทรผิดเวลาที่รับปากไว้ ⇒ ตัวส่งซ้ำอ่าน `last_outcome` ก่อนย้ายเสมอ · เลยนัดแล้วก็โทรเร็วสุด ไม่เลื่อนไปพรุ่งนี้
+- นัดแบบเดิม (+24 ชม. ชั่วโมงเดิม) ที่บังเอิญตรงช่อง (โทร 14:26 ⇒ นัด 14:00) ดูเผิน ๆ เหมือนนัดแบบใหม่ ⇒
+  `isSameRetrySlot` (ช่องเดียวกับสายที่ไม่ติด = ต้องย้าย) · `last_call_at` อ่านจากเวลาได้ผลเท่านั้น
+  **ห้ามถอยไป `updated_at`** — การนัดใหม่แตะ `updated_at` ⇒ ช่องของสายล่าสุดขยับทุกรอบ = ย้ายวนไม่จบ (มีเทสต์คุม)
+- เศษค้างเก่าที่ตัวส่งซ้ำไม่แตะโดยตั้งใจ: `retry_scheduled` สถานะ `delivered` ส.ค. 37 แถว (iRecruit `ir-` 14 · `card-` 23 ·
+  นัด 19–20 ส.ค. · Lumos ดึงไปแล้วไม่เคยส่งผลกลับ) + งานติดตามที่ `cancelled` 1 แถว — ยังนับอยู่ในยอด "ตั้งโทรซ้ำไว้" · รอเจ้าของเคาะ
