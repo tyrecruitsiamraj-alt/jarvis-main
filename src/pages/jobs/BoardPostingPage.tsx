@@ -75,6 +75,9 @@ import {
   type JobRelease,
 } from '@/lib/jobPublicReleaseApi';
 import { buildJobKeyIndex } from '@/lib/jobKeyIndex';
+import { fetchReleaseSkips } from '@/lib/jobReleaseSkipApi';
+import { buildSkipIndex, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
+import ReleaseSkipControl from '@/components/jobs/ReleaseSkipControl';
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 import { backLabelFor } from '@/lib/stageOrigin';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
@@ -278,6 +281,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
   const [releases, setReleases] = React.useState<JobRelease[] | null>(null);
   const [releaseBusy, setReleaseBusy] = React.useState(false);
+  /** ทะเบียน "ไม่ปล่อย + เหตุผล" (29 ก.ย. 2569) — `null` = ยังอ่านไม่ได้ ⇒ ไม่โชว์ปุ่ม (ห้ามเดาว่ายังไม่ได้ตั้ง) */
+  const [skips, setSkips] = React.useState<JobReleaseSkip[] | null>(null);
 
   React.useEffect(() => {
     let alive = true;
@@ -310,10 +315,19 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
     }
   }, []);
 
+  const loadSkips = React.useCallback(async () => {
+    try {
+      setSkips(await fetchReleaseSkips());
+    } catch {
+      setSkips(null);
+    }
+  }, []);
+
   React.useEffect(() => {
     void loadPostings();
     void loadReleases();
-  }, [loadPostings, loadReleases]);
+    void loadSkips();
+  }, [loadPostings, loadReleases, loadSkips]);
 
   /**
    * ประกาศล่าสุดของใบนี้ — 🔴 ต้องหาผ่าน `buildJobKeyIndex` ไม่ใช่ `===`
@@ -333,6 +347,12 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
     if (!releases || !job) return null;
     return buildReleaseIndex(releases).has(job.id);
   }, [releases, job]);
+
+  /** แถว "ไม่ปล่อย" ของใบนี้ — `undefined` = ยังอ่านไม่ได้ · `null` = ยังไม่ได้ตั้ง */
+  const skip = React.useMemo<JobReleaseSkip | null | undefined>(
+    () => (skips && job ? (buildSkipIndex(skips).get(job.id) ?? null) : undefined),
+    [skips, job],
+  );
 
   const toggleRelease = async (next: boolean) => {
     if (!job) return;
@@ -521,6 +541,11 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             </span>
           ) : null}
         </nav>
+
+        {/* ── "ไม่ปล่อย + เหตุผล" (เจ้าของเลือก 29 ก.ย. 2569) — ฟอร์มกางในที่เดิม ไม่ซ้อน Dialog ในป๊อป ── */}
+        {job ? (
+          <ReleaseSkipControl jobId={job.id} skip={skip} released={released} onChanged={() => void loadSkips()} />
+        ) : null}
 
         {/* คำสั่งงานของขั้นที่เปิดอยู่ — มาจาก RELEASE_STEP_TEXT ที่เดียว */}
         <div className={cn('rounded-xl border px-3.5 py-2.5', TONE.primary.soft)}>
@@ -773,7 +798,9 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                     <p className={cn('mt-0.5 text-[11px]', DASH.muted)}>
                       {released
                         ? 'คนนอกเห็นและสมัครได้ · AI (Lumos) เห็นใบนี้ด้วย'
-                        : genderBlocked
+                        : skip
+                          ? 'ใบนี้ตั้ง “ไม่ปล่อย” อยู่ — กด “ยกเลิก ไม่ปล่อย” ด้านบนก่อนถึงจะส่งได้'
+                          : genderBlocked
                           ? 'ใบขอไม่ระบุเพศ — ต้องเลือกเพศที่ขั้น 1 ก่อนถึงจะส่งได้'
                           : !latestPosting
                             ? 'ยังไม่มีลิงก์สมัคร — ดูตัวอย่างข้างบนแล้วกด "สร้างประกาศ + ลิงก์" ก่อน'
@@ -793,7 +820,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                     <Button
                       type="button"
                       /* 🔴 ดึงลง (ใบที่ปล่อยแล้ว) กดได้เสมอ · ส่งขึ้นต้องผ่านสองด่าน: มีลิงก์ + เลือกเพศ */
-                      disabled={releaseBusy || !job || (!released && (genderBlocked || !latestPosting))}
+                      disabled={releaseBusy || !job || (!released && (genderBlocked || !latestPosting || Boolean(skip)))}
                       onClick={() => void toggleRelease(!released)}
                       className={cn(
                         'mt-2 w-full rounded-xl py-2.5 text-sm',

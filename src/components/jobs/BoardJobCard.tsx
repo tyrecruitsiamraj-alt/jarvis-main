@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, EyeOff, MapPin, Users } from 'lucide-react';
+import { ArrowRight, Ban, EyeOff, MapPin, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
@@ -15,6 +15,7 @@ import { INCOME_PERIOD_LABEL } from '@/lib/incomeBreakdown';
 import { incomeDisplay } from '@/lib/incomeLabel';
 import { isHiddenFromPublicByWorkStatus } from '@/lib/publicJobVisibility';
 import { isUnitRequestWorkStatus, UNIT_REQUEST_WORK_STATUS_LABELS } from '@/lib/unitRequestWorkStatus';
+import { releaseSkipText, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
 
 /**
  * ═══ การ์ดใบขอบนกล่องงาน — ฝั่งเจ้าหน้าที่ (แบบ A · 27 ก.ย. 2569) ═══
@@ -42,6 +43,8 @@ export type BoardJobCardProps = {
   closed: boolean;
   onOpen: (job: JobRequest) => void;
   onApplicants: (job: JobRequest) => void;
+  /** ทีม Online ตั้ง "ไม่ปล่อย + เหตุผล" ไว้ (29 ก.ย. 2569) — ใบที่ปล่อยแล้วไม่โชว์ (เซิร์ฟเวอร์ก็ไม่รับ) */
+  skip?: JobReleaseSkip | null;
 };
 
 /** "บางพลี สมุทรปราการ" — อำเภอที่ทีม Online กรอก + จังหวัด · ไม่รู้ = บอกตรง ๆ (ไม่เดาจากจังหวัดไซต์) */
@@ -64,7 +67,7 @@ function moneyOf(job: JobRequest): { text: string; hint: string | null } | null 
   return d ? { text: d.text, hint: d.hint } : null;
 }
 
-const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, ai, closed, onOpen, onApplicants }) => {
+const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, ai, closed, onOpen, onApplicants, skip }) => {
   const age = getJobAgeChipInfo(job);
   const money = moneyOf(job);
   const hidden = isUnitRequestWorkStatus(job.work_status) && isHiddenFromPublicByWorkStatus(job.work_status);
@@ -149,6 +152,14 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
         <p className={cn('inline-flex w-fit items-center gap-1 rounded-md px-2 py-0.5 text-sm', TONE.warn.chip)}>
           <EyeOff className="h-3.5 w-3.5" aria-hidden />
           {UNIT_REQUEST_WORK_STATUS_LABELS[job.work_status]} · ไม่ขึ้นประกาศ
+        </p>
+      ) : null}
+
+      {/* "ไม่ปล่อย + เหตุผล" — ทีมต้องเห็นว่าใบนี้ตัดสินแล้ว (ไม่งั้นมีคนไล่ทำขั้นต่อซ้ำ) */}
+      {skip && !progress?.released ? (
+        <p className={cn('inline-flex w-fit max-w-full items-center gap-1 rounded-md px-2 py-0.5 text-sm', TONE.danger.chip)}>
+          <Ban className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span className="truncate">ไม่ปล่อย · {releaseSkipText(skip)}</span>
         </p>
       ) : null}
 

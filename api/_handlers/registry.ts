@@ -110,6 +110,7 @@ import officeTeamHandler from './office-team.js';
 import callScriptsHandler from './call-scripts.js';
 import callSuppressionHandler from './call-suppression.js';
 import jobPublicReleaseHandler from './job-public-release.js';
+import jobReleaseSkipHandler from './job-release-skip.js';
 import systemHealthHandler from './system-health.js';
 
 export type ApiHandler = (req: ApiReq, res: ApiRes) => Promise<void>;
@@ -191,6 +192,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/unit-sector': unitSectorHandler as ApiHandler,
   // ปล่อย/ดึงลง ใบขอบนหน้าสาธารณะ (เจ้าของเคาะ 22 ส.ค. 2569 — ทุกใบต้องกดปล่อย)
   '/api/job-public-release': jobPublicReleaseHandler as ApiHandler,
+  '/api/job-release-skip': jobReleaseSkipHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
   '/api/match-priority-weights': matchPriorityWeightsHandler as ApiHandler,
   '/api/work-status-master': workStatusMasterHandler as ApiHandler,

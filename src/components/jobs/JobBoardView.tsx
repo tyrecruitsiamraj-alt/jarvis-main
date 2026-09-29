@@ -89,6 +89,8 @@ import {
   fetchJobReleases,
   type JobRelease,
 } from '@/lib/jobPublicReleaseApi';
+import { fetchReleaseSkips } from '@/lib/jobReleaseSkipApi';
+import { buildSkipIndex, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
 import { boardPostingPath } from '@/lib/jobNavigation';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { APPLICANT_FILTER_PARAM_PREFIX } from '@/lib/applicantFilters';
@@ -349,6 +351,24 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   useEffect(() => {
     void loadReleases();
   }, [loadReleases]);
+
+  /**
+   * ทะเบียน "ไม่ปล่อย + เหตุผล" (29 ก.ย. 2569 · migration 129) — ติดชิปบนการ์ดเท่านั้น
+   * 🔴 **ไม่ย้ายเลน/ไม่แตะตัวเลขหัวกล่องงาน** (โครง 3 ก้อนเจ้าของเคาะเอง) · อ่านไม่ได้ = ไม่มีชิป (ไม่เดา)
+   */
+  const [skips, setSkips] = useState<JobReleaseSkip[]>([]);
+  const skipIdx = useMemo(() => buildSkipIndex(skips), [skips]);
+  const loadSkips = React.useCallback(async () => {
+    if (!isStaff) return;
+    try {
+      setSkips(await fetchReleaseSkips());
+    } catch {
+      setSkips([]);
+    }
+  }, [isStaff]);
+  useEffect(() => {
+    void loadSkips();
+  }, [loadSkips]);
 
   /**
    * 🔴 **ปล่อย/ดึงลงมีทางเดียว = ป๊อปไล่งานของใบนั้น** (ขั้น 4: ตัวอย่าง → ลิงก์ → ส่ง)
@@ -1500,6 +1520,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 closed={Boolean(closedBox)}
                 onOpen={setPostingJob}
                 onApplicants={openApplicantsOf}
+                skip={skipIdx.get(job.id) ?? null}
               />
             ) : (
             <Card
@@ -2116,6 +2137,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           if (!o) {
             setPostingJob(null);
             void loadReleases();
+            void loadSkips();
             setPostingsRev((n) => n + 1);
           }
         }}
