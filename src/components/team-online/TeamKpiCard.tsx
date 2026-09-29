@@ -68,7 +68,8 @@ const TeamKpiCard: React.FC<TeamKpiCardProps> = ({
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0">
-        <p className="truncate text-sm text-foreground" title={metricHelp(metric)}>
+        {/* จอแคบ (การ์ด 2 ใบต่อแถว) ชื่อขึ้นได้สองบรรทัด ไม่ตัดจนอ่านไม่ออก */}
+        <p className="line-clamp-2 text-sm text-foreground" title={metricHelp(metric)}>
           {METRICS[metric].label}
           {labelSuffix}
         </p>
@@ -84,7 +85,8 @@ const TeamKpiCard: React.FC<TeamKpiCardProps> = ({
       <p className={cn('text-xs', TONE.danger.value)}>{error}</p>
     ) : (
       <>
-        <div className="flex items-end justify-between gap-2">
+        {/* ที่ไม่พอ (มือถือ) ป้ายตัดลงบรรทัดใหม่เอง — เคยทับตัวเลขบนจอ 375px */}
+        <div className="flex flex-wrap items-end justify-between gap-2">
           <div className="flex min-w-0 items-baseline gap-1.5">
             <span className={cn('text-3xl font-medium tabular-nums', TONE[tone].num)}>{value}</span>
             {unit && value !== '—' ? <span className={cn('text-sm', DASH.sub)}>{unit}</span> : null}

@@ -367,7 +367,7 @@ const TeamOnlinePage: React.FC = () => {
             <span className="text-xs text-foreground">{trendBuLabel(data.forced_bu)}</span>
           ) : (
             /* ช่องเลือกของธีมบังคับกว้างเต็มกล่อง (`jarvis-soft-field`) ⇒ คุมความกว้างที่กล่องครอบ */
-            <div className="w-60">
+            <div className="w-52 sm:w-60">
               <Select value={effectiveBu ?? ALL} onValueChange={(v) => setBu(v === ALL ? null : v)}>
                 <SelectTrigger className="text-xs" aria-label="รายละเอียด BU">
                   <SelectValue />
