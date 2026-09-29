@@ -10,17 +10,22 @@
  * - ตัวกรอง BU ชุดเดียวของทั้งหน้า (`?bu=`) — ยกเว้นการ์ดคนใช้งาน (ทุก BU) กับกราฟ/แผงเทียบ BU (แสดงทุก BU เสมอ)
  * - ตัวเลขทั้งหมดมาจาก `/api/team-online` · งานที่ต้องทำต่อ = ถังเดียวกับหน้าหลัก (`buildNextTasks`) + งานของทีม Online
  * - 🔴 **ชั้นคู่ขนาน**: เปิดด้วย `?home=online` · กลับหน้าเดิม `?home=classic` · หน้าเดิมยังเป็นค่าตั้งต้น (ทางถอย)
+ * รอบ 4 (*"กดไปไม่มีไรเลย"* · *"มีรายชื่อมา มาจากไหน มาแล้วยังไง แล้วใบที่ยังไม่มาเยอะแค่ไหน นานแค่ไหน"*):
+ * การ์ดกดได้ทั้งใบ → แผงด้านขวา (`TeamDetailSheet`) · การ์ดที่ 6 ผู้สมัครใหม่ · งานที่ต้องทำนับจากเลนกล่องงาน/ถังรายชื่อ
+ * (`teamOnlineTasks.ts`) · เจ้าหน้าที่เห็นงานของตัวเองก่อน ส่วนวิเคราะห์พับไว้
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ClipboardList, Link2, PhoneCall, RefreshCw, Target, Users } from 'lucide-react';
+import { ChevronDown, ClipboardList, Link2, PhoneCall, RefreshCw, Target, UserPlus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrendToolbar } from '@/components/dashboard-trends/TrendParts';
 import HomeStuckList from '@/components/home-v3/HomeStuckList';
 import TeamKpiCard from '@/components/team-online/TeamKpiCard';
 import TeamBuPanel, { type TeamBuPanelRow } from '@/components/team-online/TeamBuPanel';
+import TeamDetailSheet, { type TeamDetailKey } from '@/components/team-online/TeamDetailSheet';
 import TeamOnlineTabs from '@/components/team-online/TeamOnlineTabs';
 import UsageVsRequestsChart from '@/components/team-online/UsageVsRequestsChart';
 import { useHomeCallDialogs } from '@/components/home/useHomeCallDialogs';
@@ -30,6 +35,7 @@ import { callBoxCount, fetchFlowSummary, type FlowSummary } from '@/lib/flowSumm
 import { fetchOfficeFloor, type OfficeFloorResponse } from '@/lib/officeFloorApi';
 import { buildNextTasks, type NextTask } from '@/lib/nextTask';
 import { fetchTeamOnline } from '@/lib/teamOnlineApi';
+import { onlineTasks } from '@/lib/teamOnlineTasks';
 import {
   countPill,
   fmtPct,
@@ -119,41 +125,6 @@ function rateBits(cur: number | null, prev: number | null, cov: TeamCoverage | u
     foot: [foot, noPrev || prev === null ? null : `ช่วงก่อน ${fmtPct(prev)}`].filter(Boolean).join(' · '),
     flags: coverageFlags(cov),
   };
-}
-
-/** งานของทีม Online ที่ต้องทำต่อ — ต่อท้ายถังเดียวกับหน้าหลัก (`buildNextTasks`) แล้วเรียงตามความเร่ง */
-function onlineTasks(data: TeamOnlineResponse | null): NextTask[] {
-  const rows = (data?.byBu ?? []).filter((r) => !data?.bu || r.bu === data.bu);
-  const noLink = rows.reduce((s, r) => s + r.openWithoutLink, 0);
-  const stale = rows.reduce((s, r) => s + r.staleNoApplicants, 0);
-  const out: NextTask[] = [];
-  if (stale > 0) {
-    out.push({
-      key: 'online-stale-link',
-      title: `Gen link เกิน 7 วันยังไม่มีผู้สมัคร ${NUM.format(stale)} ใบ`,
-      reason: 'ลิงก์สมัครเปิดมาเกินสัปดาห์แล้วยังไม่มีใครกรอก — ควรดันประกาศหรือเปลี่ยนช่องทาง',
-      badge: 'ประกาศเงียบ',
-      count: stale,
-      tone: 'warn',
-      path: '/jobs/board',
-      action: 'เปิดกล่องงาน',
-      stepKey: 'requests',
-    });
-  }
-  if (noLink > 0) {
-    out.push({
-      key: 'online-no-link',
-      title: `ใบเปิดที่ยังไม่ Gen link ${NUM.format(noLink)} ใบ`,
-      reason: 'ยังไม่มีลิงก์สมัคร — คนนอกยังสมัครใบนี้ผ่านลิงก์ไม่ได้',
-      badge: 'ยังไม่ Gen link',
-      count: noLink,
-      tone: 'info',
-      path: '/jobs/board',
-      action: 'เปิดกล่องงาน',
-      stepKey: 'requests',
-    });
-  }
-  return out;
 }
 
 const TONE_RANK: Record<NextTask['tone'], number> = { danger: 0, warn: 1, info: 2 };
@@ -278,6 +249,24 @@ const TeamOnlinePage: React.FC = () => {
     compareText,
     lumos ? `${n(lumos.total.success)} / ${n(lumos.total.talked)} สายที่ได้คุยจริง` : '',
   );
+
+  const apps = data?.applicants ?? null;
+  const applicants = countBits(
+    apps?.total,
+    apps?.coverage,
+    'ใบ',
+    compareText,
+    true,
+    apps ? `ติดต่อได้ ${n(apps.stages.success_unscheduled + apps.stages.scheduled)} · นัดแล้ว ${n(apps.stages.scheduled)}` : undefined,
+  );
+
+  /** แผงรายละเอียดด้านขวา — ค้างการ์ดล่าสุดไว้ตอนปิด (แผงเลื่อนออกอยู่ครู่หนึ่ง) */
+  const [detail, setDetail] = useState<TeamDetailKey | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const openDetail = (key: TeamDetailKey) => () => {
+    setDetail(key);
+    setDetailOpen(true);
+  };
 
   /** กราฟคนใช้ vs ใบขอเข้า — ตามตัวกรอง BU (ทุก BU = รวมตัวตั้ง ÷ รวมตัวหาร) */
   const usage = useMemo(() => {
@@ -407,9 +396,18 @@ const TeamOnlinePage: React.FC = () => {
       {/* เจ้าหน้าที่: งานของตัวเองก่อน (ต้องรู้ว่าต้องทำอะไรต่อ) */}
       {isStaff ? tasksBlock : null}
 
-      {/* 5 การ์ดตามภาพต้นแบบ */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <TeamKpiCard metric="teamOnline.users" labelSuffix=" · ทุก BU" icon={Users} unit="คน" {...users} loading={firstLoad} error={data?.errors.users} />
+      {/* การ์ดตัวเลข — กดทั้งใบเปิดแผงรายละเอียดด้านขวา */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <TeamKpiCard
+          metric="teamOnline.users"
+          labelSuffix=" · ทุก BU"
+          icon={Users}
+          unit="คน"
+          {...users}
+          loading={firstLoad}
+          error={data?.errors.users}
+          onOpen={openDetail('users')}
+        />
         <TeamKpiCard
           metric="teamOnline.positionsIn"
           icon={ClipboardList}
@@ -418,6 +416,17 @@ const TeamOnlinePage: React.FC = () => {
           {...positions}
           loading={firstLoad}
           error={data?.errors.requests}
+          onOpen={openDetail('positions')}
+        />
+        <TeamKpiCard
+          metric="teamOnline.applicantsIn"
+          icon={UserPlus}
+          tone="info"
+          unit="ใบ"
+          {...applicants}
+          loading={firstLoad}
+          error={data?.errors.applicants}
+          onOpen={openDetail('applicants')}
         />
         <TeamKpiCard
           metric="teamOnline.lumosCalled"
@@ -428,8 +437,17 @@ const TeamOnlinePage: React.FC = () => {
           {...called}
           loading={firstLoad}
           error={data?.errors.lumos}
+          onOpen={openDetail('called')}
         />
-        <TeamKpiCard metric="teamOnline.postingSuccess" icon={Link2} tone="success" {...postRate} loading={firstLoad} error={data?.errors.postings} />
+        <TeamKpiCard
+          metric="teamOnline.postingSuccess"
+          icon={Link2}
+          tone="success"
+          {...postRate}
+          loading={firstLoad}
+          error={data?.errors.postings}
+          onOpen={openDetail('postings')}
+        />
         <TeamKpiCard
           metric="teamOnline.successRate"
           labelSuffix=" · Lumos"
@@ -438,6 +456,7 @@ const TeamOnlinePage: React.FC = () => {
           {...callRate}
           loading={firstLoad}
           error={data?.errors.lumos}
+          onOpen={openDetail('successRate')}
         />
       </div>
 
@@ -461,15 +480,32 @@ const TeamOnlinePage: React.FC = () => {
         </Button>
       </Card>
 
-      {chartAndPanel}
-
-      {/* หัวหน้า/ผู้บริหาร: งานที่ต้องทำต่อหลังภาพรวม */}
-      {isStaff ? null : tasksBlock}
-
-      <TeamOnlineTabs data={data} loading={loading} />
+      {isStaff ? (
+        /* เจ้าหน้าที่: ส่วนวิเคราะห์พับไว้ (เจ้าของเคาะ "งานของฉันเป็นหลัก ย่อส่วนวิเคราะห์") */
+        <Collapsible className="space-y-3">
+          <CollapsibleTrigger asChild>
+            <Button type="button" size="xs" variant="outline" className="group">
+              <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+              ดูภาพรวมทีม (กราฟ · เทียบ BU · ตาราง)
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-5">
+            {chartAndPanel}
+            <TeamOnlineTabs data={data} loading={loading} />
+          </CollapsibleContent>
+        </Collapsible>
+      ) : (
+        <>
+          {chartAndPanel}
+          {/* หัวหน้า/ผู้บริหาร: งานที่ต้องทำต่อหลังภาพรวม */}
+          {tasksBlock}
+          <TeamOnlineTabs data={data} loading={loading} />
+        </>
+      )}
 
       <p className={cn('text-xs', DASH.muted)}>ตัวเลขคนกับใบแยกหน่วย · ค่าไม่มีข้อมูลแสดง “—”</p>
 
+      <TeamDetailSheet detail={detail} open={detailOpen} onOpenChange={setDetailOpen} data={data} loading={loading} />
       {dialogs.dialogs}
     </div>
   );

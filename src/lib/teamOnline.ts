@@ -719,8 +719,8 @@ export function funnelRows(
 
 /* ─────────────── แผงต่อ BU + ใบเปิดตอนนี้ ─────────────── */
 
-/** ใบเปิดตอนนี้ของหนึ่ง BU (จาก feed เดียวกับกล่องงาน) */
-export type RawOpenJob = { id: string; bu: string | null; positions: number; hasLink: boolean; staleNoApplicants: boolean };
+/** ใบเปิดตอนนี้ของหนึ่ง BU (จาก feed เดียวกับกล่องงาน) — เลน/ผู้สมัครของใบอยู่ `RawBoardJob` (ตัวคิดเดียวกับกล่องงาน) */
+export type RawOpenJob = { id: string; bu: string | null; positions: number };
 
 export type TeamBuRow = {
   /** `''` = ไม่ระบุ BU (เช่น ใบล่วงหน้าที่ยังไม่มีไซต์) — แสดงให้ยอดรวมตรงหัวกล่องงาน แต่กดกรองไม่ได้ */
@@ -730,12 +730,9 @@ export type TeamBuRow = {
   published: number;
   withApplicants: number;
   applicants: number;
-  /** ใบขอเปิดอยู่ตอนนี้ · ในนั้นยังไม่มี Gen link · เหลือหา (อัตรา · ตัวเดียวกับหัวกล่องงาน) */
+  /** ใบขอเปิดอยู่ตอนนี้ · เหลือหา (อัตรา · ตัวเดียวกับหัวกล่องงาน) */
   openNow: number;
-  openWithoutLink: number;
   remaining: number;
-  /** Gen link เกิน 7 วันแล้วยังไม่มีผู้สมัคร (ใบเปิดอยู่) */
-  staleNoApplicants: number;
 };
 
 export function buildBuRows(
@@ -762,12 +759,261 @@ export function buildBuRows(
       withApplicants: post.withApplicants.cur,
       applicants: post.applicants.cur,
       openNow: open.length,
-      openWithoutLink: open.filter((j) => !j.hasLink).length,
       remaining: open.reduce((s, j) => s + j.positions, 0),
-      staleNoApplicants: open.filter((j) => j.staleNoApplicants).length,
     };
   });
   return sortBu(rows, (r) => r.openNow);
+}
+
+/* ─────────────── ผู้สมัคร: มาจากไหน · มาแล้วยังไง (ถังเดียวกับศูนย์คุมงานสรรหา) ─────────────── */
+
+/**
+ * ถังของใบสมัคร — **แบ่งแบบเดียวกับ `OVERVIEW_BUCKETS`** (`api/_lib/applicantOverviewSql.ts`) ไม่ทับกัน รวมได้ทั้งหมด
+ * `bucket` = คีย์ของหน้ารายชื่อ (`/jobs/board?view=list&bucket=`) — กดแล้วเจอถังเดียวกัน
+ */
+export type ApplicantStage = 'untouched' | 'held' | 'in_queue' | 'contact_failed' | 'success_unscheduled' | 'scheduled';
+
+export const APPLICANT_STAGES: ReadonlyArray<{ key: ApplicantStage; label: string }> = [
+  { key: 'untouched', label: 'ยังไม่มีใครแตะ' },
+  { key: 'held', label: 'มีคนรับไปแล้ว ยังไม่โทร' },
+  { key: 'in_queue', label: 'อยู่ในคิว AI' },
+  { key: 'contact_failed', label: 'โทรแล้ว ติดต่อไม่ได้' },
+  { key: 'success_unscheduled', label: 'ติดต่อได้ ยังไม่ได้นัด' },
+  { key: 'scheduled', label: 'นัดแล้ว' },
+];
+
+/** ใบสมัครหนึ่งใบ — ข้อเท็จจริงจาก `buildApplicantFactsSql` (ไม่มีชื่อ/เบอร์) */
+export type RawApplicant = {
+  id: string;
+  ymd: string;
+  createdAt: string;
+  lead: boolean;
+  /** คีย์ช่องทางที่ผู้สมัครเลือกเอง ("รู้จักเราจากไหน") — ป้ายแปลงฝั่งหน้าเว็บด้วย `REFERRAL_SOURCE_LABEL` */
+  source: string | null;
+  bu: string | null;
+  jobId: string | null;
+  called: boolean;
+  inQueue: boolean;
+  held: boolean;
+  latestClass: 'success' | 'failed' | null;
+  hasAppointment: boolean;
+  /** กรอกแล้วกี่ชั่วโมงกว่าจะถูกโทรครั้งแรก (null = ยังไม่ถูกโทร) */
+  waitHours: number | null;
+};
+
+/** ถังของใบ — ลำดับตัดสินเดียวกับ `buildOverviewSql` */
+export function applicantStage(r: Pick<RawApplicant, 'called' | 'inQueue' | 'held' | 'latestClass' | 'hasAppointment'>): ApplicantStage {
+  if (r.called) return r.latestClass === 'success' ? (r.hasAppointment ? 'scheduled' : 'success_unscheduled') : 'contact_failed';
+  if (r.inQueue) return 'in_queue';
+  if (r.held) return 'held';
+  return 'untouched';
+}
+
+const emptyStages = (): Record<ApplicantStage, number> =>
+  Object.fromEntries(APPLICANT_STAGES.map((s) => [s.key, 0])) as Record<ApplicantStage, number>;
+
+const median = (xs: number[]): number | null => {
+  if (xs.length === 0) return null;
+  const v = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+};
+
+export type TeamApplicantsBu = {
+  bu: string;
+  label: string;
+  total: TeamPair;
+  stages: Record<ApplicantStage, number>;
+  /** ยังไม่ถูกโทรและกรอกมาเกิน 5 วัน (นิยามเดียวกับ `over5d` ของศูนย์คุมงานสรรหา) */
+  over5d: number;
+  waitMedianHours: number | null;
+  /** ช่องทาง (คีย์ `referral_source` · `''` = ไม่ระบุ) → จำนวนใบในช่วงนี้ */
+  sources: Record<string, number>;
+};
+
+export function applicantsSummary(
+  w: TeamWindow,
+  rows: readonly RawApplicant[],
+  labelOf: (bu: string) => string,
+  extraBus: Iterable<string> = [],
+  nowMs = Date.now(),
+): { total: TeamCount; leads: number; stages: Record<ApplicantStage, number>; over5d: number; waitMedianHours: number | null; sources: Record<string, number>; byBu: TeamApplicantsBu[] } {
+  const at = makeLocator(w);
+  const cutoff5d = nowMs - 5 * 86_400_000;
+  const total = distinctCount(w, rows.map((r) => ({ who: r.id, ymd: r.ymd })));
+  const cur = rows.filter((r) => at(r.ymd)?.side === 'cur');
+  const fold = (list: readonly RawApplicant[]) => {
+    const stages = emptyStages();
+    const sources: Record<string, number> = {};
+    let over5d = 0;
+    for (const r of list) {
+      stages[applicantStage(r)] += 1;
+      const src = r.source ?? '';
+      sources[src] = (sources[src] ?? 0) + 1;
+      if (!r.called && Date.parse(r.createdAt) < cutoff5d) over5d += 1;
+    }
+    const waits = list.map((r) => r.waitHours).filter((v): v is number => v !== null && Number.isFinite(v) && v >= 0);
+    return { stages, sources, over5d, waitMedianHours: median(waits) };
+  };
+  const all = fold(cur);
+  const bus = new Set<string>([...rows.filter((r) => at(r.ymd)).map((r) => r.bu ?? ''), ...extraBus]);
+  const byBu = [...bus].map((bu): TeamApplicantsBu => {
+    const mine = rows.filter((r) => (r.bu ?? '') === bu);
+    const c = distinctCount(w, mine.map((r) => ({ who: r.id, ymd: r.ymd })));
+    const f = fold(mine.filter((r) => at(r.ymd)?.side === 'cur'));
+    return { bu, label: buLabel(labelOf, bu), total: { cur: c.cur, prev: c.prev }, ...f };
+  });
+  return {
+    total,
+    leads: cur.filter((r) => r.lead).length,
+    ...all,
+    byBu: sortBu(byBu, (r) => r.total.cur),
+  };
+}
+
+/**
+ * งานค้างของใบสมัคร **ตอนนี้** (ทุกวันที่สมัคร) — ประชากรเดียวกับหน้ารายชื่อ `/jobs/board?view=list&bucket=`
+ * (หน้ารายชื่อไม่กรองตามช่วงวันที่บนหน้านี้ ⇒ งานที่ต้องทำต้องนับทั้งกอง ไม่งั้นกดไปเจอเลขไม่เท่า)
+ */
+export function applicantBacklog(rows: readonly RawApplicant[], nowMs = Date.now()): { stages: Record<ApplicantStage, number>; over5d: number } {
+  const stages = emptyStages();
+  let over5d = 0;
+  const cutoff5d = nowMs - 5 * 86_400_000;
+  for (const r of rows) {
+    stages[applicantStage(r)] += 1;
+    if (!r.called && Date.parse(r.createdAt) < cutoff5d) over5d += 1;
+  }
+  return { stages, over5d };
+}
+
+/* ─────────────── ใบที่ยังไม่มีผู้สมัคร — เลนเดียวกับกล่องงาน (`buildReleaseLedger`) ─────────────── */
+
+/** ใบเปิดหนึ่งใบในมุมของกล่องงาน (ฝั่ง server ประกอบด้วยตัวคิดเดียวกับกล่องงาน) */
+export type RawBoardJob = {
+  id: string;
+  /** รหัสใบฝั่ง ERP (`JobRequest.externalId`) — หน้าเว็บประกอบลิงก์ด้วย `boardPostingPath` ตัวเดียวกับกล่องงาน */
+  externalId: string | null;
+  requestNo: string;
+  unit: string;
+  bu: string | null;
+  positions: number;
+  /** ค้างมาแล้วกี่วันนับจากวันที่ของใบขอ (`jobRequestDateYmd`) · null = ไม่รู้วันที่ */
+  ageDays: number | null;
+  released: boolean;
+  /** ยังเป็นงานหาคนของเรา (`stillSourcing`) */
+  sourcing: boolean;
+  applicants: number;
+  /** ขั้นที่ติดของใบที่ยังไม่ปล่อย (`releaseStepOf`) · ใบที่ปล่อยแล้ว = null */
+  step: 'info' | 'place' | 'benefits' | 'publish' | null;
+};
+
+/** อายุใบ — แยก "เกิน 90 วัน" ออกมาเพราะเจอใบเปิดค้างถึง 874 วัน (วัดจริง 29 ก.ย. 2569) ควรตรวจว่ายังต้องการคนไหม */
+export const AGE_BUCKETS: ReadonlyArray<{ key: string; label: string; max: number }> = [
+  { key: 'd0_3', label: '0–3 วัน', max: 3 },
+  { key: 'd4_7', label: '4–7 วัน', max: 7 },
+  { key: 'd8_14', label: '8–14 วัน', max: 14 },
+  { key: 'd15_30', label: '15–30 วัน', max: 30 },
+  { key: 'd31_90', label: '31–90 วัน', max: 90 },
+  { key: 'd91', label: 'เกิน 90 วัน', max: Number.POSITIVE_INFINITY },
+];
+
+export const ageBucketOf = (days: number): string => (AGE_BUCKETS.find((b) => days <= b.max) ?? AGE_BUCKETS[AGE_BUCKETS.length - 1]).key;
+
+/**
+ * ใบที่ยังต้องหาคนแต่ **ยังไม่มีผู้สมัครเลย** — ปล่อยแล้วเงียบ (`silent`) หรือยังไม่ปล่อยและยังต้องหาคน (`sourcing`)
+ * ใบที่ ERP พาไปเริ่มงานแล้ว (`started`) ไม่นับ — ไม่ต้องหาคนแล้ว
+ */
+export const isNoApplicantJob = (j: RawBoardJob): boolean => j.applicants === 0 && (j.released || j.sourcing);
+
+export type TeamLaneRow = {
+  bu: string;
+  label: string;
+  /** ใบเปิดทั้งหมดในมุมกล่องงาน */
+  open: number;
+  /** เลนของกล่องงาน — บวกกันได้: sourcing + started = ยังไม่ปล่อย · applied + silent = ปล่อยแล้ว */
+  sourcing: number;
+  started: number;
+  applied: number;
+  silent: number;
+  /** ยังไม่ปล่อย แต่มีลิงก์แล้ว (ขั้น ④ เหลือกดส่งประกาศ) */
+  publish: number;
+  /** ยังต้องหาคนแต่ยังไม่มีผู้สมัครเลย (silent + sourcing ที่ไม่มีผู้สมัคร) · แยกตามอายุใบ */
+  noApplicants: number;
+  aging: Record<string, number>;
+  /** ใบที่ค้างนานสุดกี่วัน (ในกลุ่มไม่มีผู้สมัคร) */
+  oldestDays: number | null;
+};
+
+export function laneRows(jobs: readonly RawBoardJob[], labelOf: (bu: string) => string, extraBus: Iterable<string> = []): TeamLaneRow[] {
+  const bus = new Set<string>([...jobs.map((j) => j.bu ?? ''), ...extraBus]);
+  const rows = [...bus].map((bu): TeamLaneRow => {
+    const mine = jobs.filter((j) => (j.bu ?? '') === bu);
+    const none = mine.filter(isNoApplicantJob);
+    const aging = Object.fromEntries(AGE_BUCKETS.map((b) => [b.key, 0])) as Record<string, number>;
+    for (const j of none) if (j.ageDays !== null) aging[ageBucketOf(j.ageDays)] += 1;
+    const ages = none.map((j) => j.ageDays).filter((d): d is number => d !== null);
+    return {
+      bu,
+      label: buLabel(labelOf, bu),
+      open: mine.length,
+      sourcing: mine.filter((j) => !j.released && j.sourcing).length,
+      started: mine.filter((j) => !j.released && !j.sourcing).length,
+      applied: mine.filter((j) => j.released && j.applicants > 0).length,
+      silent: mine.filter((j) => j.released && j.applicants === 0).length,
+      publish: mine.filter((j) => !j.released && j.step === 'publish').length,
+      noApplicants: none.length,
+      aging,
+      oldestDays: ages.length ? Math.max(...ages) : null,
+    };
+  });
+  return sortBu(rows, (r) => r.noApplicants);
+}
+
+/** ใบไม่มีผู้สมัครที่ค้างนานสุด — ให้เจ้าหน้าที่กดไปทำต่อทีละใบ */
+export type TeamStaleJob = Pick<RawBoardJob, 'id' | 'externalId' | 'requestNo' | 'unit' | 'bu' | 'positions' | 'ageDays' | 'released'>;
+
+export function oldestNoApplicantJobs(jobs: readonly RawBoardJob[], limit = 30): TeamStaleJob[] {
+  return jobs
+    .filter(isNoApplicantJob)
+    .sort((a, b) => (b.ageDays ?? -1) - (a.ageDays ?? -1) || b.positions - a.positions)
+    .slice(0, limit)
+    .map(({ id, externalId, requestNo, unit, bu, positions, ageDays, released }) => ({ id, externalId, requestNo, unit, bu, positions, ageDays, released }));
+}
+
+/* ─────────────── รายชื่อคนใช้งาน (เฉพาะหัวหน้า/admin — เจ้าของเคาะ 29 ก.ย. 2569) ─────────────── */
+
+export type TeamPerson = {
+  id: string;
+  name: string;
+  role: string;
+  bu: string;
+  /** ใช้ระบบกี่วันในช่วงนี้ (0 = ไม่ได้ใช้) */
+  days: number;
+  /** ใช้ล่าสุดวันไหน (ในข้อมูลที่ดึงมา) */
+  lastYmd: string | null;
+};
+
+/** คนที่มีบัญชีในช่วงนี้ + ใช้กี่วัน · เรียง: ไม่ได้ใช้ขึ้นก่อน แล้วใช้น้อยไปมาก */
+export function peopleOf(
+  w: TeamWindow,
+  accounts: ReadonlyArray<RawAccount & { name: string }>,
+  activity: readonly RawActivity[],
+): TeamPerson[] {
+  const days = new Map<string, Set<string>>();
+  const last = new Map<string, string>();
+  for (const e of activity) {
+    if (e.ymd > w.range.to) continue;
+    const prev = last.get(e.uid);
+    if (!prev || e.ymd > prev) last.set(e.uid, e.ymd);
+    if (e.ymd < w.range.from) continue;
+    const set = days.get(e.uid) ?? new Set<string>();
+    set.add(e.ymd);
+    days.set(e.uid, set);
+  }
+  return accounts
+    .filter((a) => eligible(a, w.range.to, days.has(a.id)))
+    .map((a) => ({ id: a.id, name: a.name, role: a.role, bu: a.bu, days: days.get(a.id)?.size ?? 0, lastYmd: last.get(a.id) ?? null }))
+    .sort((a, b) => a.days - b.days || a.bu.localeCompare(b.bu) || a.name.localeCompare(b.name, 'th'));
 }
 
 /* ─────────────── คำตอบของเส้น /api/team-online ─────────────── */
@@ -814,9 +1060,34 @@ export type TeamOnlineResponse = {
   } | null;
   /** ติดตรงไหน ต่อ BU — กลุ่มใบขอที่เข้ามาในช่วงนี้ */
   funnel: TeamFunnelRow[] | null;
+  /** ผู้สมัคร (ใบ) ที่กรอกเข้ามาในช่วงนี้ — มาจากไหน · มาแล้วยังไง (ถังเดียวกับศูนย์คุมงานสรรหา) */
+  applicants: {
+    total: TeamCount;
+    leads: number;
+    stages: Record<ApplicantStage, number>;
+    over5d: number;
+    waitMedianHours: number | null;
+    sources: Record<string, number>;
+    coverage: TeamCoverage;
+    byBu: TeamApplicantsBu[];
+    /** งานค้างตอนนี้ทุกวันที่สมัคร (ตามตัวกรอง BU ของหน้า) — ใช้วิเคราะห์ */
+    backlog: { stages: Record<ApplicantStage, number>; over5d: number };
+    /**
+     * งานค้างตอนนี้ **ทั้งสิทธิ์ของคนเปิด** (ไม่ตามตัวกรอง BU ของหน้า) — ประชากรเดียวกับหน้ารายชื่อ `?bucket=`
+     * 🔴 "งานที่ต้องทำต่อ" ต้องใช้ตัวนี้ — หน้ารายชื่อไม่มีตัวกรอง BU ⇒ ใช้ตัวตามตัวกรองแล้วกดไปเจอเลขไม่เท่า
+     */
+    backlogScope: { stages: Record<ApplicantStage, number>; over5d: number };
+  } | null;
+  /**
+   * ใบเปิดในมุมกล่องงาน (ตอนนี้) — เลน + ใบยังไม่มีผู้สมัครแยกอายุ
+   * `total` = ตามตัวกรอง BU ของหน้า (วิเคราะห์) · `scope` = ทั้งสิทธิ์ของคนเปิด (= กล่องงาน ซึ่งไม่มีตัวกรอง BU — งานที่ต้องทำใช้ตัวนี้)
+   */
+  lanes: { total: TeamLaneRow; scope: TeamLaneRow; byBu: TeamLaneRow[]; oldest: TeamStaleJob[] } | null;
+  /** รายชื่อคนใช้งาน — เฉพาะหัวหน้า/admin (คนอื่นได้ null) */
+  people: TeamPerson[] | null;
   /** แผง BU + ใบเปิดตอนนี้ — ทุก BU เสมอ (ผู้ใช้ถูกล็อกแผนกเห็นแถวเดียว) */
   byBu: TeamBuRow[] | null;
-  errors: Partial<Record<'users' | 'requests' | 'lumos' | 'postings' | 'funnel' | 'byBu', string>>;
+  errors: Partial<Record<'users' | 'requests' | 'lumos' | 'postings' | 'funnel' | 'byBu' | 'applicants' | 'lanes', string>>;
 };
 
 /* ─────────────── แถบ "สิ่งที่ต้องจับตา" ─────────────── */
@@ -856,11 +1127,16 @@ export function teamWatchItems(r: TeamOnlineResponse): TeamWatchItem[] {
       items.push({ key: `nouse-${u.bu}`, text: `${u.bu} ยังไม่มีคนใช้ (0 จาก ${NUM.format(u.accounts)} บัญชี)`, tone: 'danger' });
     }
   }
-  const rows = r.byBu ?? [];
-  const pick = (f: (x: TeamBuRow) => number) => rows.reduce((s, x) => s + (r.bu && x.bu !== r.bu ? 0 : f(x)), 0);
-  const noLink = pick((x) => x.openWithoutLink);
-  const stale = pick((x) => x.staleNoApplicants);
-  if (noLink > 0) items.push({ key: 'noLink', text: `ใบเปิดยังไม่ Gen link ${NUM.format(noLink)} ใบ`, tone: 'warn' });
-  if (stale > 0) items.push({ key: 'stale', text: `Gen link เกิน 7 วันยังไม่มีผู้สมัคร ${NUM.format(stale)} ใบ`, tone: 'danger' });
+  // ผู้สมัครที่มาแล้วติดตรงไหน (งานค้างตอนนี้) + ใบที่ยังไม่มีผู้สมัครนานแล้ว (เลนเดียวกับกล่องงาน)
+  const back = r.applicants?.backlog;
+  if (back && back.stages.success_unscheduled > 0) {
+    items.push({ key: 'unscheduled', text: `ติดต่อได้แล้ว ยังไม่ได้นัด ${NUM.format(back.stages.success_unscheduled)} ใบ`, tone: 'danger' });
+  }
+  if (back && back.over5d > 0) items.push({ key: 'over5d', text: `ใบสมัครยังไม่ถูกโทรเกิน 5 วัน ${NUM.format(back.over5d)} ใบ`, tone: 'warn' });
+  const lane = r.lanes?.total;
+  if (lane) {
+    const old = (lane.aging.d31_90 ?? 0) + (lane.aging.d91 ?? 0);
+    if (old > 0) items.push({ key: 'noapp30', text: `ใบยังไม่มีผู้สมัครเกิน 30 วัน ${NUM.format(old)} ใบ`, tone: 'warn' });
+  }
   return items;
 }

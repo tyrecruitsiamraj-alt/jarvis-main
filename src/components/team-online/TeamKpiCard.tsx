@@ -8,7 +8,8 @@
  * 🔴 ธงคุณภาพข้อมูล (ข้อมูลเริ่มกลางช่วง · สำเนา ERP เก่า) ต้องขึ้นเสมอ ห้ามกลบ
  */
 import React from 'react';
-import { ArrowDownRight, ArrowUpRight, Minus, type LucideIcon } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, ChevronRight, Minus, type LucideIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { METRICS, metricHelp, type MetricKey } from '@/lib/metricDictionary';
@@ -32,6 +33,11 @@ export type TeamKpiCardProps = {
   tone?: ToneKey;
   loading?: boolean;
   error?: string | null;
+  /**
+   * กดทั้งใบ = เปิดรายละเอียด (รอบ 4 · เจ้าของ: *"กดไปไม่มีไรเลย"*) — ปุ่มโปร่งคลุมทั้งการ์ด
+   * (ห้ามเอาการ์ดไปไว้ในปุ่ม: `<button>` ครอบ `<p>/<div>` ผิด HTML + ขนาดไอคอนของปุ่มไปทับไอคอนในการ์ด)
+   */
+  onOpen?: () => void;
 };
 
 const PILL_TONE: Record<DeltaPill['tone'], ToneKey> = { good: 'success', bad: 'danger', neutral: 'neutral' };
@@ -61,8 +67,9 @@ const TeamKpiCard: React.FC<TeamKpiCardProps> = ({
   tone = 'primary',
   loading = false,
   error,
+  onOpen,
 }) => (
-  <Card className="flex min-w-0 flex-col gap-3 rounded-2xl p-4">
+  <Card className={cn('relative flex min-w-0 flex-col gap-3 rounded-2xl p-4', onOpen && 'transition-shadow hover:shadow-md')}>
     <div className="flex items-start gap-3">
       <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', TONE[tone].wash, TONE[tone].value)} aria-hidden>
         <Icon className="h-4 w-4" />
@@ -75,6 +82,7 @@ const TeamKpiCard: React.FC<TeamKpiCardProps> = ({
         </p>
         <p className={cn('truncate text-xs', DASH.muted)}>{sub}</p>
       </div>
+      {onOpen ? <ChevronRight className={cn('ml-auto h-4 w-4 shrink-0', DASH.muted)} aria-hidden /> : null}
     </div>
     {loading ? (
       <div className="space-y-2">
@@ -101,6 +109,20 @@ const TeamKpiCard: React.FC<TeamKpiCardProps> = ({
         ))}
       </>
     )}
+    {onOpen ? (
+      <Button
+        type="button"
+        variant="ghost"
+        className="absolute inset-0 h-auto w-auto rounded-2xl p-0 hover:bg-transparent"
+        title={metricHelp(metric)}
+        onClick={onOpen}
+      >
+        <span className="sr-only">
+          ดูรายละเอียด {METRICS[metric].label}
+          {labelSuffix}
+        </span>
+      </Button>
+    ) : null}
   </Card>
 );
 

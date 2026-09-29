@@ -9,8 +9,16 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  AGE_BUCKETS,
+  ageBucketOf,
+  applicantBacklog,
+  applicantStage,
+  applicantsSummary,
   buildBuRows,
   classifyQueueRow,
+  laneRows,
+  oldestNoApplicantJobs,
+  peopleOf,
   countDelta,
   countPill,
   pooledUsage,
@@ -35,6 +43,8 @@ import {
   trendOf,
   usersSummary,
   type RawAccount,
+  type RawApplicant,
+  type RawBoardJob,
   type RawFunnelRequest,
   type RawQueueRow,
   type TeamOnlineResponse,
@@ -296,13 +306,13 @@ describe('Success ประกาศ + ใบเปิดตอนนี้', ()
       labelOf: label,
       postings: [{ jobId: 'J1', ymd: '2026-09-02', bu: 'LBD', applicants: 2 }],
       openJobs: [
-        { id: 'siamraj-sql:A', bu: 'LBD', positions: 2, hasLink: true, staleNoApplicants: false },
-        { id: 'siamraj-sql:B', bu: 'LBD', positions: 1, hasLink: false, staleNoApplicants: true },
-        { id: 'siamraj-pre:C', bu: null, positions: 3, hasLink: false, staleNoApplicants: false },
+        { id: 'siamraj-sql:A', bu: 'LBD', positions: 2 },
+        { id: 'siamraj-sql:B', bu: 'LBD', positions: 1 },
+        { id: 'siamraj-pre:C', bu: null, positions: 3 },
       ],
     });
     expect(rows.map((r) => r.bu)).toEqual(['LBD', '']);
-    expect(rows[0]).toMatchObject({ published: 1, applicants: 2, openNow: 2, openWithoutLink: 1, remaining: 3, staleNoApplicants: 1 });
+    expect(rows[0]).toMatchObject({ published: 1, applicants: 2, openNow: 2, remaining: 3 });
     expect(rows.reduce((s, r) => s + r.remaining, 0)).toBe(6);
   });
 });
@@ -417,21 +427,185 @@ describe('แถบสิ่งที่ต้องจับตา', () => {
       coverage: { since: '2026-08-16', cur: 'full', prev: 'partial' },
     },
     postings: null,
-    byBu: [{ bu: 'LBD', openWithoutLink: 4, staleNoApplicants: 1 }],
+    applicants: {
+      backlog: { stages: { untouched: 3, held: 0, in_queue: 1, contact_failed: 2, success_unscheduled: 54, scheduled: 0 }, over5d: 15 },
+    },
+    lanes: { total: { aging: { d0_3: 1, d31_90: 100, d91: 84 } } },
   } as unknown as TeamOnlineResponse;
 
-  it('เอาเรื่องที่ขยับมากสุด (ข้อมูลครบสองช่วงเท่านั้น) + BU ที่ยังไม่ใช้ระบบ + งานที่ต้องทำ', () => {
+  it('เอาเรื่องที่ขยับมากสุด (ข้อมูลครบสองช่วงเท่านั้น) + BU ที่ยังไม่ใช้ระบบ + งานค้างของผู้สมัคร/ใบเงียบ', () => {
     expect(teamWatchItems(base).map((i) => i.text)).toEqual([
       'คนใช้งานลด 14 คน (20.6%)',
       'อัตราที่ขอเข้าเพิ่ม 1 อัตรา (16.7%)',
       'LM ยังไม่มีคนใช้ (0 จาก 4 บัญชี)',
       'SN ยังไม่มีบัญชีในระบบ',
-      'ใบเปิดยังไม่ Gen link 4 ใบ',
-      'Gen link เกิน 7 วันยังไม่มีผู้สมัคร 1 ใบ',
+      'ติดต่อได้แล้ว ยังไม่ได้นัด 54 ใบ',
+      'ใบสมัครยังไม่ถูกโทรเกิน 5 วัน 15 ใบ',
+      'ใบยังไม่มีผู้สมัครเกิน 30 วัน 184 ใบ',
     ]);
+  });
+
+  it('ไม่มีงานค้าง = ไม่ขึ้นบรรทัด (0 ไม่ต้องพูดถึง)', () => {
+    const quiet = {
+      ...base,
+      applicants: { backlog: { stages: { untouched: 0, held: 0, in_queue: 0, contact_failed: 0, success_unscheduled: 0, scheduled: 2 }, over5d: 0 } },
+      lanes: { total: { aging: { d0_3: 4 } } },
+    } as unknown as TeamOnlineResponse;
+    const keys = teamWatchItems(quiet).map((i) => i.key);
+    expect(keys).not.toContain('unscheduled');
+    expect(keys).not.toContain('over5d');
+    expect(keys).not.toContain('noapp30');
   });
 
   it('🔴 ช่วงก่อนที่ข้อมูลเริ่มกลางทาง ห้ามเอามาเทียบ (เคยขึ้น "Lumos โทรเพิ่ม 1,400%")', () => {
     expect(teamWatchItems(base).some((i) => i.key === 'called')).toBe(false);
+  });
+});
+
+describe('ผู้สมัคร: มาจากไหน · มาแล้วยังไง (ถังเดียวกับศูนย์คุมงานสรรหา)', () => {
+  const w = teamWindow({ from: '2026-09-01', to: '2026-09-07' }, TODAY);
+  const NOW = Date.parse('2026-09-29T12:00:00+07:00');
+  const app = (over: Partial<RawApplicant>): RawApplicant => ({
+    id: 'A',
+    ymd: '2026-09-02',
+    createdAt: '2026-09-02T10:00:00+07:00',
+    lead: false,
+    source: 'facebook',
+    bu: 'LBD',
+    jobId: 'J1',
+    called: false,
+    inQueue: false,
+    held: false,
+    latestClass: null,
+    hasAppointment: false,
+    waitHours: null,
+    ...over,
+  });
+
+  it('ลำดับตัดสินถังเดียวกับ buildOverviewSql — โทรแล้วมาก่อนคิว · คิวมาก่อนถือ', () => {
+    expect(applicantStage(app({}))).toBe('untouched');
+    expect(applicantStage(app({ held: true }))).toBe('held');
+    expect(applicantStage(app({ held: true, inQueue: true }))).toBe('in_queue');
+    expect(applicantStage(app({ inQueue: true, called: true, latestClass: 'failed' }))).toBe('contact_failed');
+    // โทรแล้วแต่ยังไม่มีผลจัดชั้น = ติดต่อไม่ได้ (coalesce 'failed' แบบฝั่ง SQL)
+    expect(applicantStage(app({ called: true, latestClass: null }))).toBe('contact_failed');
+    expect(applicantStage(app({ called: true, latestClass: 'success' }))).toBe('success_unscheduled');
+    expect(applicantStage(app({ called: true, latestClass: 'success', hasAppointment: true }))).toBe('scheduled');
+  });
+
+  it('นับเฉพาะช่วงนี้ · ช่องทางว่าง = "" · เกิน 5 วันนับเฉพาะที่ยังไม่ถูกโทร · ค่ากลางเวลารอ', () => {
+    const rows = [
+      app({ id: 'A1', source: 'facebook', called: true, latestClass: 'success', waitHours: 1 }),
+      app({ id: 'A2', source: null, called: true, latestClass: 'failed', waitHours: 3 }),
+      app({ id: 'A3', source: 'facebook', waitHours: null }),
+      app({ id: 'A4', source: 'tiktok', lead: true, called: true, latestClass: 'success', hasAppointment: true, waitHours: 5 }),
+      // ช่วงก่อน — ไม่นับในถังของช่วงนี้
+      app({ id: 'P1', ymd: '2026-08-28', createdAt: '2026-08-28T10:00:00+07:00' }),
+    ];
+    const s = applicantsSummary(w, rows, label, [], NOW);
+    expect([s.total.cur, s.total.prev]).toEqual([4, 1]);
+    expect(s.leads).toBe(1);
+    expect(s.sources).toEqual({ facebook: 2, '': 1, tiktok: 1 });
+    expect(s.stages).toEqual({ untouched: 1, held: 0, in_queue: 0, contact_failed: 1, success_unscheduled: 1, scheduled: 1 });
+    expect(s.over5d).toBe(1);
+    expect(s.waitMedianHours).toBe(3);
+    expect(s.byBu.map((r) => [r.bu, r.total.cur])).toEqual([['LBD', 4]]);
+  });
+
+  it('งานค้างตอนนี้ = ทุกวันที่สมัคร (ตรงหน้ารายชื่อ `?bucket=` ที่ไม่กรองวันที่)', () => {
+    const rows = [
+      app({ id: 'OLD', ymd: '2026-01-05', createdAt: '2026-01-05T10:00:00+07:00', called: true, latestClass: 'success' }),
+      app({ id: 'NEW', ymd: '2026-09-28', createdAt: '2026-09-28T10:00:00+07:00' }),
+      app({ id: 'MID', ymd: '2026-09-20', createdAt: '2026-09-20T10:00:00+07:00', held: true }),
+    ];
+    const b = applicantBacklog(rows, NOW);
+    expect(b.stages.success_unscheduled).toBe(1);
+    expect(b.stages.untouched).toBe(1);
+    expect(b.stages.held).toBe(1);
+    // MID ยังไม่ถูกโทรและเกิน 5 วัน · NEW ยังไม่ถึง 5 วัน · OLD โทรแล้ว
+    expect(b.over5d).toBe(1);
+  });
+});
+
+describe('ใบยังไม่มีผู้สมัคร — เลนเดียวกับกล่องงาน + อายุใบ', () => {
+  const job = (over: Partial<RawBoardJob>): RawBoardJob => ({
+    id: 'siamraj-sql:1',
+    externalId: '1',
+    requestNo: 'R1',
+    unit: 'หน่วย',
+    bu: 'LBD',
+    positions: 1,
+    ageDays: 5,
+    released: false,
+    sourcing: true,
+    applicants: 0,
+    step: 'info',
+    ...over,
+  });
+
+  it('ช่วงอายุ: ขอบบนรวมอยู่ในถัง · เกิน 90 วันแยกถัง', () => {
+    expect(ageBucketOf(0)).toBe('d0_3');
+    expect(ageBucketOf(3)).toBe('d0_3');
+    expect(ageBucketOf(4)).toBe('d4_7');
+    expect(ageBucketOf(30)).toBe('d15_30');
+    expect(ageBucketOf(31)).toBe('d31_90');
+    expect(ageBucketOf(874)).toBe('d91');
+    expect(AGE_BUCKETS.map((b) => b.key)).toEqual(['d0_3', 'd4_7', 'd8_14', 'd15_30', 'd31_90', 'd91']);
+  });
+
+  it('เลนบวกกันได้ครบ · ใบที่เริ่มงานแล้ว (started) ไม่นับว่ายังไม่มีผู้สมัคร · ขั้นส่งประกาศนับแยก', () => {
+    const jobs = [
+      job({ id: 'S1', ageDays: 2 }),
+      job({ id: 'S2', ageDays: 40, step: 'publish' }),
+      job({ id: 'S3', ageDays: 120, applicants: 2 }),
+      job({ id: 'ST', sourcing: false, ageDays: 400 }),
+      job({ id: 'R1', released: true, step: null, applicants: 3 }),
+      job({ id: 'R2', released: true, step: null, ageDays: 874 }),
+      job({ id: 'X1', bu: null, ageDays: null }),
+    ];
+    const [lbd, none] = laneRows(jobs, label);
+    expect(lbd).toMatchObject({ bu: 'LBD', open: 6, sourcing: 3, started: 1, applied: 1, silent: 1, publish: 1, noApplicants: 3, oldestDays: 874 });
+    expect(lbd.sourcing + lbd.started + lbd.applied + lbd.silent).toBe(lbd.open);
+    expect(lbd.aging).toMatchObject({ d0_3: 1, d31_90: 1, d91: 1 });
+    // ใบไม่รู้วันที่ = นับว่าไม่มีผู้สมัคร แต่ไม่ลงถังอายุ (ไม่เดาอายุ)
+    expect(none).toMatchObject({ bu: '', noApplicants: 1, oldestDays: null });
+    expect(Object.values(none.aging).reduce((s, v) => s + v, 0)).toBe(0);
+  });
+
+  it('ใบค้างนานสุดเรียงจากเก่าสุด · ตัดตามจำนวน · ไม่มีฟิลด์ภายในหลุดออกไป', () => {
+    const jobs = [job({ id: 'A', ageDays: 10 }), job({ id: 'B', ageDays: 874 }), job({ id: 'C', ageDays: 40, applicants: 1 }), job({ id: 'D', ageDays: null })];
+    const list = oldestNoApplicantJobs(jobs, 2);
+    expect(list.map((j) => j.id)).toEqual(['B', 'A']);
+    expect(Object.keys(list[0]).sort()).toEqual(['ageDays', 'bu', 'externalId', 'id', 'positions', 'released', 'requestNo', 'unit']);
+  });
+});
+
+describe('รายชื่อคนใช้งาน (เฉพาะหัวหน้า/admin)', () => {
+  const w = teamWindow({ from: '2026-09-01', to: '2026-09-07' }, TODAY);
+  const acc = (id: string, over: Partial<RawAccount & { name: string }> = {}) => ({
+    id,
+    bu: 'LBD',
+    role: 'staff',
+    active: true,
+    createdYmd: '2026-01-01',
+    name: `คน ${id}`,
+    ...over,
+  });
+
+  it('ไม่ได้ใช้ขึ้นก่อน · นับวันไม่ซ้ำ · ใช้ล่าสุดไม่นับวันหลังช่วง · บัญชีปิดที่ไม่ได้ใช้ไม่ขึ้น · บัญชีเปิดทีหลังไม่ขึ้น', () => {
+    const people = peopleOf(
+      w,
+      [acc('U1'), acc('U2'), acc('OFF', { active: false }), acc('LATE', { createdYmd: '2026-09-20' })],
+      [
+        { uid: 'U1', ymd: '2026-09-02' },
+        { uid: 'U1', ymd: '2026-09-03' },
+        { uid: 'U1', ymd: '2026-09-20' },
+        { uid: 'U2', ymd: '2026-08-15' },
+      ],
+    );
+    expect(people.map((p) => [p.id, p.days, p.lastYmd])).toEqual([
+      ['U2', 0, '2026-08-15'],
+      ['U1', 2, '2026-09-03'],
+    ]);
   });
 });

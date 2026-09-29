@@ -9,7 +9,6 @@
  *    (เจอจริงตอนตรวจ 23 ส.ค. 2569)
  */
 import { apiFetch, HttpError } from '@/lib/apiFetch';
-import { requestNoOf } from '@/lib/jobKeyIndex';
 
 export type JobRelease = {
   job_id: string;
@@ -52,28 +51,10 @@ export async function unreleaseJobsFromPublic(jobIds: string[]): Promise<number>
 }
 
 /**
- * ใบนี้ปล่อยแล้วไหม — เทียบ **ทั้ง id เต็มและเลขที่ใบขอ**
- *
- * 🔴 เหตุผลเดียวกับฝั่ง server: feed ให้ใบล่วงหน้าเป็น `siamraj-pre:XXX` แต่ของฝั่งเรา
- * บางที่เก็บ `siamraj-sql:XXX` — เทียบ id เต็มอย่างเดียวจะพลาดใบล่วงหน้าทั้งกอง
- * (กับดักเดิมของโปรเจกต์ที่ทำให้ชิป "ปล่อยลิงก์แล้ว" ไม่ติดกับใบล่วงหน้า)
+ * ใบนี้ปล่อยแล้วไหม — ตัวจริงย้ายไป `@/lib/jobReleaseIndex` (29 ก.ย. 2569 · ให้ฝั่ง server ใช้ตัวเดียวกัน)
+ * re-export ไว้ที่นี่ ผู้เรียกเดิมไม่ต้องแก้
  */
-export function buildReleaseIndex(releases: JobRelease[]): {
-  has: (jobId: string) => boolean;
-  count: number;
-} {
-  const ids = new Set<string>();
-  const nos = new Set<string>();
-  for (const r of releases) {
-    ids.add(r.job_id);
-    const no = (r.request_no || requestNoOf(r.job_id)).trim();
-    if (no) nos.add(no);
-  }
-  return {
-    has: (jobId: string) => ids.has(jobId) || nos.has(requestNoOf(jobId)),
-    count: releases.length,
-  };
-}
+export { buildReleaseIndex } from '@/lib/jobReleaseIndex';
 
 /**
  * `siamraj-sql:OPL6908001` → `OPL6908001`

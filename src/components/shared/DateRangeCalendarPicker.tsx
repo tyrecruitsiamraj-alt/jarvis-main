@@ -195,11 +195,8 @@ const DateRangeCalendarPicker: React.FC<DateRangeCalendarPickerProps> = ({
 
 export default DateRangeCalendarPicker;
 
-export function jobRequestDateYmd(job: { request_date?: string; submittedAt?: string; created_at?: string }): string | null {
-  const raw = job.request_date || job.submittedAt || job.created_at;
-  if (!raw || typeof raw !== 'string') return null;
-  return raw.slice(0, 10);
-}
+/** ตัวจริงย้ายไป `@/lib/jobRequestDate` (29 ก.ย. 2569 · ให้ฝั่ง server ใช้ตัวเดียวกัน) — re-export ไว้ ผู้เรียกเดิมไม่ต้องแก้ */
+export { jobRequestDateYmd } from '@/lib/jobRequestDate';
 
 export function isYmdInRange(ymd: string | null, range: DateRangeYmd | null): boolean {
   if (!range) return true;

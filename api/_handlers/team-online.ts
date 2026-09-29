@@ -25,28 +25,40 @@ import { PREQUEST_ID_PREFIX } from '../_lib/siamrajSqlServerPrequests.js';
 import { loadRequestTrendPayload, requestTrendDataFrom } from '../_lib/requestTrendRows.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
 import { queueCancelled, queueOutcome, queueReplySql } from '../_lib/lumosQueueDefs.js';
-import { parseBuParam, queueBuJoins, queueBuSql } from '../_lib/homeBuSql.js';
+import { appBuJoin, appBuSql, parseBuParam, queueBuJoins, queueBuSql } from '../_lib/homeBuSql.js';
+import { HAS_APPOINTMENT_SQL, buildApplicantFactsSql } from '../_lib/applicantOverviewSql.js';
 import { siteBuSql, trendBuSql } from '../_lib/siteBuSql.js';
 import { logWarn } from '../_lib/logger.js';
 import { requestAddedYmd } from '../../src/lib/trends/requestTrends.js';
 import { addDays } from '../../src/lib/trends/timeBuckets.js';
 import { normalizeTrendBu, trendBuFromSiteCode, trendBuLabel } from '../../src/lib/trends/bu.js';
 import { jobPositionUnits } from '../../src/lib/jobPositionUnits.js';
-import { buildJobKeyIndex, requestNoOf } from '../../src/lib/jobKeyIndex.js';
+import { buildCountIndex, buildJobKeyIndex, countFor, requestNoOf } from '../../src/lib/jobKeyIndex.js';
+import { buildReleaseIndex } from '../../src/lib/jobReleaseIndex.js';
+import { jobRequestDateYmd } from '../../src/lib/jobRequestDate.js';
+import { isBoardVisibleJob } from '../../src/lib/jobBoardSearch.js';
+import { releaseStepOf, stillSourcing, type ReleaseFacts } from '../../src/lib/boardRelease.js';
 import { queueLane } from '../../src/lib/officeTeam.js';
 import {
+  applicantBacklog,
+  applicantsSummary,
   buildBuRows,
   classifyQueueRow,
   coverageOf,
   funnelRows,
+  laneRows,
   lumosSummary,
   makeLocator,
+  oldestNoApplicantJobs,
+  peopleOf,
   postingsSummary,
   requestsSummary,
   teamWindow,
   usersSummary,
   type RawAccount,
   type RawActivity,
+  type RawApplicant,
+  type RawBoardJob,
   type RawFunnelRequest,
   type RawOpenJob,
   type RawPostingRow,
@@ -63,14 +75,12 @@ const POSTINGS = tableInAppSchema('recruit_postings');
 const APPS = tableInAppSchema('public_job_applications');
 const CONTACTS = tableInAppSchema('application_contact_logs');
 const ATTEND = tableInAppSchema('application_appointment_results');
+const RELEASES = tableInAppSchema('job_public_releases');
 const MAP = tableInAppSchema('job_site_map');
 const AUDIT = tableInAppSchema('audit_logs');
 
 const CACHE_MS = 60_000;
 const cache = new Map<string, { at: number; body: TeamOnlineResponse }>();
-
-/** Gen link เกินกี่วันแล้วยังไม่มีผู้สมัคร = งานต้องทำ */
-const STALE_POSTING_DAYS = 7;
 
 /**
  * ร่องรอยการใช้งานของเจ้าหน้าที่ — [ตาราง, คอลัมน์ผู้ใช้, คอลัมน์เวลา]
@@ -121,7 +131,8 @@ export function usersSql(): string {
 /** บัญชีทุกบัญชี (ฐานของ % คนใช้งาน) — แผนก · บทบาท · เปิดใช้อยู่ไหม · วันที่สร้าง */
 export function accountsSql(): string {
   return `select u.id::text as id, coalesce(nullif(btrim(u.department_code), ''), '') as dept, u.role,
-                 coalesce(u.is_active, false) as active, ${bkkYmd('u.created_at')} as created_ymd
+                 coalesce(u.is_active, false) as active, ${bkkYmd('u.created_at')} as created_ymd,
+                 coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''), u.email) as display_name
             from ${USERS} u`;
 }
 
@@ -158,12 +169,16 @@ export function postingsSql(): string {
       left join ${MAP} m on m.job_id = fp.job_id`;
 }
 
-/** ติดตรงไหน — ต่อใบ (job_id ฝั่งเรา): มีผู้สมัคร · มีนัด · มาตามนัด (ไม่นับ Lead ทุกขั้น) */
+/**
+ * ติดตรงไหน — ต่อใบ (job_id ฝั่งเรา): มีผู้สมัคร · มีนัด · มาตามนัด (ไม่นับ Lead ทุกขั้น)
+ * 🔴 "มีนัด" = `HAS_APPOINTMENT_SQL` ตัวกลางของศูนย์คุมงานสรรหา (บันทึกติดต่อ/คนถือที่มีวันนัด)
+ *    ผล `confirmed` ของสาย AI ช่องทาง interview **ไม่ใช่นัด** — เป็นผลสัมภาษณ์ทางโทรศัพท์ (มีคะแนน/จุดเด่น/ข้อกังวล)
+ *    (รอบก่อนผมนับรวมเป็นนัด = ผิด · แก้ 29 ก.ย. 2569)
+ */
 export function funnelJobsSql(): string {
   return `select a.job_id,
          count(*)::int as applicants,
-         count(*) filter (where exists (
-           select 1 from ${CONTACTS} c where c.application_id = a.id and c.appointment_at is not null))::int as appointed,
+         count(*) filter (where ${HAS_APPOINTMENT_SQL})::int as appointed,
          count(*) filter (where exists (
            select 1 from ${ATTEND} r where r.application_id = a.id and r.result = 'showed'))::int as showed
     from ${APPS} a
@@ -171,12 +186,9 @@ export function funnelJobsSql(): string {
    group by a.job_id`;
 }
 
-/**
- * ติดตรงไหน — สายของผู้สมัครแต่ละใบ (เลนหน้าสาธารณะ) ให้จัดถัง "AI โทรแล้ว / มีคนสนใจ" ด้วยตัวกลาง
- * + นัดที่ Lumos ยืนยันแล้ว (ช่องทางสัมภาษณ์ ผล `confirmed`) — นัดส่วนใหญ่ของระบบอยู่ตรงนี้ ไม่ใช่บันทึกติดต่อของเจ้าหน้าที่
- */
+/** ติดตรงไหน — สายของผู้สมัครแต่ละใบ (เลนหน้าสาธารณะ) ให้จัดถัง "AI โทรแล้ว / มีคนสนใจ" ด้วยตัวกลาง */
 export function funnelCallsSql(): string {
-  return `select a.job_id, q.person_ref, q.channel, ${queueCancelled('q')} as cancelled, ${queueOutcome('q')} as outcome,
+  return `select a.job_id, q.person_ref, ${queueCancelled('q')} as cancelled, ${queueOutcome('q')} as outcome,
          q.result->>'summary' as summary, ${queueReplySql('q')} as reply
     from ${QUEUE} q
     join ${APPS} a on q.person_ref = 'app-' || a.id::text
@@ -193,17 +205,104 @@ async function sinceYmd(sql: string): Promise<string | null> {
 async function loadActivity(w: TeamWindow) {
   const [act, acc, since] = await Promise.all([
     dbQuery<RawActivity>(usersSql(), [startOf(w.fetchFrom), startOf(addDays(w.fetchTo, 1))]),
-    dbQuery<{ id: string; dept: string; role: string; active: boolean; created_ymd: string | null }>(accountsSql()),
+    dbQuery<{ id: string; dept: string; role: string; active: boolean; created_ymd: string | null; display_name: string | null }>(
+      accountsSql(),
+    ),
     sinceYmd(`select ${bkkYmd('min(created_at)')} as ymd from ${AUDIT}`),
   ]);
-  const accounts: RawAccount[] = acc.rows.map((r) => ({
+  const accounts: Array<RawAccount & { name: string }> = acc.rows.map((r) => ({
     id: r.id,
     bu: r.dept ? (normalizeTrendBu(r.dept) ?? '') : '',
     role: r.role,
     active: !!r.active,
     createdYmd: r.created_ymd,
+    name: r.display_name ?? '—',
   }));
   return { activity: act.rows, accounts, since };
+}
+
+/**
+ * ใบสมัคร **ทุกวันที่สมัคร** — ข้อเท็จจริงรายใบจากนิพจน์กลางของศูนย์คุมงานสรรหา (ไม่มีชื่อ/เบอร์)
+ * ช่วงที่ดูคิดจากวันที่สมัครฝั่งตัวคิด · งานค้างตอนนี้ (`applicantBacklog`) ต้องนับทั้งกองให้ตรงหน้ารายชื่อ
+ */
+async function loadApplicants(w: TeamWindow): Promise<RawApplicant[]> {
+  const { rows } = await dbQuery<{
+    id: string;
+    job_id: string | null;
+    ymd: string;
+    created_at: Date | string;
+    is_lead: boolean;
+    referral_source: string | null;
+    bu: string | null;
+    called: boolean;
+    in_queue: boolean;
+    held_or_claimed: boolean;
+    latest_class: 'success' | 'failed' | null;
+    has_appointment: boolean;
+    wait_hours: number | string | null;
+  }>(buildApplicantFactsSql(appBuSql('a'), appBuJoin('a')), ['2000-01-01T00:00:00+07:00', startOf(addDays(w.today, 1))]);
+  return rows.map((r) => ({
+    id: r.id,
+    jobId: r.job_id,
+    ymd: r.ymd,
+    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+    lead: !!r.is_lead,
+    source: r.referral_source,
+    bu: r.bu ? normalizeTrendBu(r.bu) : null,
+    called: !!r.called,
+    inQueue: !!r.in_queue,
+    held: !!r.held_or_claimed,
+    latestClass: r.latest_class,
+    hasAppointment: !!r.has_appointment,
+    waitHours: r.wait_hours === null ? null : Number(r.wait_hours),
+  }));
+}
+
+/** ทะเบียนปล่อยใบ — ชุดเดียวกับที่กล่องงานใช้แยกเลน "ปล่อยแล้ว / ยังไม่ปล่อย" */
+async function loadReleases() {
+  const { rows } = await dbQuery<{ job_id: string; request_no: string | null }>(
+    `select job_id, request_no from ${RELEASES} where released_at is not null`,
+  );
+  return rows;
+}
+
+/**
+ * ใบเปิดในมุมกล่องงาน — **ตัวคิดเดียวกับกล่องงาน**: ใบที่กล่องงานโชว์ (`isBoardVisibleJob`) ·
+ * ปล่อยแล้ว = ทะเบียนปล่อย (`buildReleaseIndex`) · มีลิงก์ = ประกาศ (`buildJobKeyIndex`) ·
+ * ผู้สมัคร = ใบสมัครไม่นับ Lead (`buildCountIndex` · ตัวเดียวกับเลขบนการ์ด) · ยังต้องหาคน = `stillSourcing` · ขั้น = `releaseStepOf`
+ */
+function boardJobsOf(
+  feed: readonly JobRequest[],
+  releases: ReadonlyArray<{ job_id: string; request_no: string | null }>,
+  postings: readonly RawPostingRow[],
+  applicantCounts: Readonly<Record<string, number>>,
+  today: string,
+): RawBoardJob[] {
+  const released = buildReleaseIndex(releases);
+  const linked = buildJobKeyIndex(postings.map((p) => [p.jobId, true] as const));
+  const counts = buildCountIndex(applicantCounts);
+  const facts: ReleaseFacts = {
+    hasLink: (j) => linked.has(String(j.id)),
+    isReleased: (j) => released.has(String(j.id)),
+    applicants: (j) => countFor(counts, String(j.id)),
+  };
+  return feed.filter(isBoardVisibleJob).map((j) => {
+    const ymd = jobRequestDateYmd(j as { request_date?: string; submittedAt?: string; created_at?: string });
+    const isReleased = facts.isReleased(j);
+    return {
+      id: String(j.id),
+      externalId: j.externalId ? String(j.externalId) : null,
+      requestNo: String(j.request_no ?? requestNoOf(String(j.id))),
+      unit: String(j.unit_name ?? ''),
+      bu: jobBu(j),
+      positions: jobPositionUnits(j),
+      ageDays: ymd ? Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${ymd}T00:00:00Z`)) / 86_400_000)) : null,
+      released: isReleased,
+      sourcing: stillSourcing(j),
+      applicants: facts.applicants(j),
+      step: isReleased ? null : releaseStepOf(j, facts),
+    };
+  });
 }
 
 async function loadRequests() {
@@ -256,7 +355,8 @@ async function loadPostings() {
   return { rows: out, since };
 }
 
-type FunnelJob = { applicants: boolean; aiCalled: boolean; interested: boolean; appointed: boolean; showed: boolean };
+/** ต่อใบ: `count` = ใบสมัครไม่นับ Lead (ตัวเดียวกับเลขบนการ์ดกล่องงาน) · ที่เหลือ = ขั้นที่มีอย่างน้อยหนึ่งคนถึงแล้ว */
+type FunnelJob = { count: number; applicants: boolean; aiCalled: boolean; interested: boolean; appointed: boolean; showed: boolean };
 
 async function loadFunnelJobs(): Promise<{ byJob: Map<string, FunnelJob>; showedRecorded: boolean }> {
   const [jobs, calls, showedAny] = await Promise.all([
@@ -264,7 +364,6 @@ async function loadFunnelJobs(): Promise<{ byJob: Map<string, FunnelJob>; showed
     dbQuery<{
       job_id: string;
       person_ref: string;
-      channel: string | null;
       cancelled: boolean;
       outcome: string | null;
       summary: string | null;
@@ -276,14 +375,15 @@ async function loadFunnelJobs(): Promise<{ byJob: Map<string, FunnelJob>; showed
   const jobOf = (id: string): FunnelJob => {
     let j = byJob.get(id);
     if (!j) {
-      j = { applicants: false, aiCalled: false, interested: false, appointed: false, showed: false };
+      j = { count: 0, applicants: false, aiCalled: false, interested: false, appointed: false, showed: false };
       byJob.set(id, j);
     }
     return j;
   };
   for (const r of jobs.rows) {
     const j = jobOf(r.job_id);
-    j.applicants = Number(r.applicants) > 0;
+    j.count = Number(r.applicants) || 0;
+    j.applicants = j.count > 0;
     j.appointed = Number(r.appointed) > 0;
     j.showed = Number(r.showed) > 0;
   }
@@ -301,7 +401,6 @@ async function loadFunnelJobs(): Promise<{ byJob: Map<string, FunnelJob>; showed
     const j = jobOf(r.job_id);
     if (c.called) j.aiCalled = true;
     if (c.success) j.interested = true;
-    if (!r.cancelled && r.channel === 'interview' && (r.outcome ?? '').trim() === 'confirmed') j.appointed = true;
   }
   // ผล "มาตามนัด" ยังไม่เคยถูกบันทึกเลย (วัด 29 ก.ย. 2569: 0 แถว) = ไม่มีข้อมูล ห้ามอ่านเป็น "ติดตรงนี้"
   return { byJob, showedRecorded: !!showedAny.rows[0]?.has };
@@ -309,20 +408,13 @@ async function loadFunnelJobs(): Promise<{ byJob: Map<string, FunnelJob>; showed
 
 const jobBu = (j: { site_code?: unknown }) => trendBuFromSiteCode(String(j.site_code ?? ''));
 
-/** ใบเปิดตอนนี้ (feed เดียวกับกล่องงาน) + มี Gen link ไหม + Gen link นานแล้วยังไม่มีผู้สมัครไหม */
-function openJobsOf(feed: readonly JobRequest[], postings: readonly RawPostingRow[], today: string): RawOpenJob[] {
-  const idx = buildJobKeyIndex(postings.map((p) => [p.jobId, p] as const));
-  const staleBefore = addDays(today, -STALE_POSTING_DAYS);
-  return feed.map((j) => {
-    const p = idx.get(String(j.id));
-    return {
-      id: String(j.id),
-      bu: jobBu(j),
-      positions: jobPositionUnits(j),
-      hasLink: !!p,
-      staleNoApplicants: !!p && p.applicants === 0 && p.ymd < staleBefore,
-    };
-  });
+/** ใบเปิดตอนนี้ (feed เดียวกับกล่องงาน) — เหลือหาต่อ BU (รวมแล้วเท่าหัวกล่องงาน) */
+/**
+ * ใบเปิดตอนนี้ — **ชุดเดียวกับหัวกล่องงาน** (`isBoardVisibleJob`)
+ * 🔴 feed ส่งใบที่ RM รับทราบแล้วมาด้วย (`status: 'closed'`) — ไม่กรองแล้ว "ใบเปิด/เหลือหา" เกินหัวกล่องงาน (แก้ 29 ก.ย. 2569 รอบ 4)
+ */
+function openJobsOf(feed: readonly JobRequest[]): RawOpenJob[] {
+  return feed.filter(isBoardVisibleJob).map((j) => ({ id: String(j.id), bu: jobBu(j), positions: jobPositionUnits(j) }));
 }
 
 /**
@@ -372,6 +464,8 @@ export async function buildTeamOnline(
   scope: DepartmentScope,
   bu: string | null,
   now = new Date(),
+  /** รายชื่อคนใช้งาน — เฉพาะหัวหน้า/admin (เจ้าของเคาะ 29 ก.ย. 2569) · ตัดสินฝั่ง server เท่านั้น */
+  canSeePeople = false,
 ): Promise<TeamOnlineResponse> {
   const today = toBangkokYmd(now);
   const w = teamWindow(query, today);
@@ -388,22 +482,27 @@ export async function buildTeamOnline(
     lumos: null,
     postings: null,
     funnel: null,
+    applicants: null,
+    lanes: null,
+    people: null,
     byBu: null,
     errors: {},
   };
   if (scope.mode === 'none') {
     const msg = 'บัญชีนี้ยังไม่ได้ผูกแผนก — ยังดูตัวเลขไม่ได้';
-    body.errors = { users: msg, requests: msg, lumos: msg, postings: msg, funnel: msg, byBu: msg };
+    body.errors = { users: msg, requests: msg, lumos: msg, postings: msg, funnel: msg, byBu: msg, applicants: msg, lanes: msg };
     return body;
   }
 
-  const [actR, reqR, queueR, postR, feedR, funnelR] = await Promise.all([
+  const [actR, reqR, queueR, postR, feedR, funnelR, appsR, relR] = await Promise.all([
     settle(loadActivity(w)),
     settle(loadRequests()),
     settle(loadQueue(w)),
     settle(loadPostings()),
     settle(listSiamrajUnitRequests({ limit: 500, departmentScope: scope }) as Promise<JobRequest[]>),
     settle(loadFunnelJobs()),
+    settle(loadApplicants(w)),
+    settle(loadReleases()),
   ]);
 
   // ผู้ใช้ถูกล็อกแผนก = เห็นแค่ BU ตัวเอง ทุกก้อน (ต่อ BU ก็แถวเดียว) · ไม่ล็อก = ทุก BU
@@ -414,7 +513,7 @@ export async function buildTeamOnline(
   const requests = reqR.ok ? reqR.v.rows.filter((r) => inScope(r.bu)) : null;
   const queue = queueR.ok ? queueR.v.rows.filter((r) => inScope(r.bu)) : null;
   const postings = postR.ok ? postR.v.rows.filter((r) => inScope(r.bu)) : null;
-  const openJobs = postR.ok && feedR.ok ? openJobsOf(feedR.v, postR.v.rows, today).filter((j) => inScope(j.bu)) : null;
+  const openJobs = feedR.ok ? openJobsOf(feedR.v).filter((j) => inScope(j.bu)) : null;
 
   /** BU ทั้งหมดที่รู้จักตามสิทธิ์ — BU ที่ยังไม่มีบัญชี/ยังไม่ส่ง Lumos ขึ้นเป็นแถวให้เห็น (ไม่หายเงียบ) */
   const knownBus = new Set<string>();
@@ -484,6 +583,47 @@ export async function buildTeamOnline(
     body.errors.funnel = !reqR.ok ? 'อ่านใบขอจาก ERP ไม่ได้ตอนนี้' : 'อ่านข้อมูลผู้สมัคร/ประกาศไม่ได้';
   }
 
+  // ── ผู้สมัคร: มาจากไหน · มาแล้วยังไง ──
+  if (appsR.ok) {
+    const apps = appsR.v.filter((r) => inScope(r.bu));
+    const pageApps = apps.filter((r) => inPage(r.bu));
+    const page = applicantsSummary(w, pageApps, labelOf, [], now.getTime());
+    const perBu = applicantsSummary(w, apps, labelOf, knownBus, now.getTime());
+    body.applicants = {
+      total: page.total,
+      leads: page.leads,
+      stages: page.stages,
+      over5d: page.over5d,
+      waitMedianHours: page.waitMedianHours,
+      sources: page.sources,
+      coverage: coverageOf(w, apps.reduce<string | null>((m, r) => (!m || r.ymd < m ? r.ymd : m), null)),
+      byBu: perBu.byBu,
+      backlog: applicantBacklog(pageApps, now.getTime()),
+      backlogScope: applicantBacklog(apps, now.getTime()),
+    };
+  } else body.errors.applicants = 'อ่านใบสมัครไม่ได้';
+
+  // ── ใบเปิดในมุมกล่องงาน: เลน + ใบยังไม่มีผู้สมัครแยกอายุ ──
+  if (feedR.ok && postR.ok && relR.ok && funnelR.ok) {
+    const counts: Record<string, number> = {};
+    for (const [jobId, j] of funnelR.v.byJob) counts[jobId] = j.count;
+    const jobs = boardJobsOf(feedR.v, relR.v, postR.v.rows, counts, today).filter((j) => inScope(j.bu));
+    const pageJobs = jobs.filter((j) => inPage(j.bu));
+    const allOf = (list: typeof jobs) => laneRows(list.map((j) => ({ ...j, bu: 'ALL' })), () => 'ทั้งหมด', ['ALL'])[0];
+    body.lanes = {
+      total: allOf(pageJobs),
+      scope: allOf(jobs),
+      byBu: laneRows(jobs, labelOf, knownBus),
+      oldest: oldestNoApplicantJobs(pageJobs),
+    };
+  } else body.errors.lanes = feedR.ok ? 'อ่านทะเบียนปล่อยใบ/ประกาศไม่ได้' : 'อ่านใบขอที่เปิดอยู่ไม่ได้';
+
+  // ── รายชื่อคนใช้งาน (เฉพาะหัวหน้า/admin) ──
+  if (canSeePeople && actR.ok) {
+    const accounts = actR.v.accounts.filter((a) => inScope(a.bu || null) || (!forcedBu && a.bu === ''));
+    body.people = peopleOf(w, accounts, actR.v.activity);
+  }
+
   if (openJobs && postings) {
     body.byBu = buildBuRows(w, { labelOf, postings, openJobs, extraBus: knownBus });
     body.bu_options = body.byBu
@@ -499,6 +639,8 @@ export async function buildTeamOnline(
     ['postings', postR],
     ['feed', feedR],
     ['funnel', funnelR],
+    ['applicants', appsR],
+    ['releases', relR],
   ] as const) {
     if (!r.ok) logWarn(`team-online: ก้อน ${k} อ่านไม่ได้`, { reason: why(r.e) });
   }
@@ -514,11 +656,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const query = { from: q.from, to: q.to, grain: q.grain, compare: q.compare };
     const scope: DepartmentScope = await loadMatchingBuScope(req.user);
     const bu = scope.mode === 'code' ? normalizeTrendBu(scope.code) : parseBuParam(q.bu);
-    const cacheKey = JSON.stringify([scope, query, bu]);
+    const cacheKey = JSON.stringify([scope, query, bu, req.user.role]);
     const hit = cache.get(cacheKey);
     if (hit && Date.now() - hit.at < CACHE_MS) return res.status(200).json(hit.body);
 
-    const body = await buildTeamOnline(query, scope, bu);
+    const canSeePeople = req.user.role === 'admin' || req.user.role === 'supervisor';
+    const body = await buildTeamOnline(query, scope, bu, new Date(), canSeePeople);
     cache.set(cacheKey, { at: Date.now(), body });
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json(body);

@@ -215,6 +215,8 @@ describe('หน้าแรกต้องไม่มีตัวอักษ�
     'src/components/team-online/UsageVsRequestsChart.tsx',
     'src/components/team-online/TeamBuPanel.tsx',
     'src/components/team-online/TeamOnlineTabs.tsx',
+    'src/components/team-online/TeamOnlineSections.tsx',
+    'src/components/team-online/TeamDetailSheet.tsx',
   ];
 
   it.each(FILES)('%s — ไม่มี text-[10px] / text-[11px]', (f) => {

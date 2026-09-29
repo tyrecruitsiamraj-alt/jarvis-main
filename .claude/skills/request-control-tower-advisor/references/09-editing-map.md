@@ -10190,7 +10190,8 @@ Choice **"จัดใหม่ 3 ก้อนตามที่เสนอ"** 
 | `src/lib/metricDictionary.ts` | `teamOnline.*` ชุดใหม่ (บัญชี · % คนใช้งาน · อัตราที่ขอเข้า · Lumos ส่งไป/รอโทร/โทรแล้ว/สำเร็จ/ไม่สำเร็จ/Success rate · ติดตรงไหน) · ถอดชุดเลนหน้าสาธารณะแบบนับคนของรอบ 1 |
 
 🔴 กับดักรอบ 2 (วัดจริง 29 ก.ย. 2569):
-- **"มีนัด" ต้องนับนัดที่ Lumos ยืนยัน** (ช่องทาง `interview` ผล `confirmed` = 50 สาย) — นัดที่เจ้าหน้าที่คีย์เองมีแค่ 2 รายการ ⇒ ถ้านับแต่บันทึกติดต่อ ทุก BU จะ "ติดที่นัด" ปลอม ๆ
+- ~~**"มีนัด" ต้องนับนัดที่ Lumos ยืนยัน** (ช่องทาง `interview` ผล `confirmed` = 50 สาย)~~ — **ผิด แก้แล้วรอบ 4**:
+  `confirmed` ของสายสัมภาษณ์ AI = **ผลสัมภาษณ์ทางโทรศัพท์** (มี ai_score/จุดแข็ง/ข้อกังวล) ไม่ใช่นัด ⇒ "มีนัด" = `HAS_APPOINTMENT_SQL` เท่านั้น
 - **"มาตามนัด" ยังไม่เคยมีใครบันทึก** (`application_appointment_results` 0 แถว) ⇒ ขั้นนี้เป็น null ("—") และไม่ถูกชี้ว่าติด จนกว่าจะมีการบันทึกจริง
 - แถบจับตาเทียบ **เฉพาะตอนข้อมูลครบทั้งสองช่วง** — เคยขึ้น "Lumos โทรเพิ่ม 1,400%" เพราะคิวเริ่ม 16 ส.ค. กลางช่วงก่อน
 - BU ที่นาน ๆ มีใบทีเดียว (CR · IO) ไม่ต้องขึ้นแถวว่างทุกช่วง — รู้จัก BU จากงานในช่วงนี้/ใบเปิดตอนนี้/บัญชีเท่านั้น
@@ -10211,3 +10212,36 @@ Choice **"จัดใหม่ 3 ก้อนตามที่เสนอ"** 
 | `src/lib/teamOnline.ts` | `countPill` · `ratePill` (ข้อมูลไม่ครบ = ไม่ลงสี) · `pooledUsage` (% หลาย BU = รวมตัวตั้ง ÷ รวมตัวหาร) · `TeamUsersBu.counts/bases` |
 
 🔴 กับดัก: % คนใช้งานของ "ทุก BU" ห้ามเฉลี่ย % ของแต่ละ BU ตรง ๆ (BU 4 คนจะหนักเท่า BU 37 คน) — ใช้ `pooledUsage`
+
+
+### รอบ 4 (29 ก.ย. 2569 ค่ำ) — การ์ดกดได้ · ผู้สมัครมาจากไหน/มาแล้วยังไง · ใบยังไม่มีผู้สมัคร · มุมเจ้าหน้าที่
+
+เจ้าของ: *"ถ้านายเป็นผู้บริหาร อ่านแล้วตอบได้หมดไหม ถ้าเป็น User รู้ไหมต้องทำงานอะไร … การ์ดพวก คนใช้งาน · ทุก BU ฉันกดไปไม่มีไรเลย"*
+→ Choice **แผงเลื่อนออกด้านขวา** · **เห็นรายชื่อแยก BU** (เฉพาะหัวหน้า/ผู้บริหาร/admin — เจ้าหน้าที่เห็นแค่ตัวเลข) ·
+ผู้สมัครที่ได้เข้าทำงานจริง = ยังไม่ต้อง · **งานของฉันเป็นหลัก ย่อส่วนวิเคราะห์** · แล้วตามด้วย
+*"มีรายชื่อมา มาจากไหน มาแล้วยังไง แล้วใบที่ยังไม่มาเยอะแค่ไหน นานแค่ไหน แต่ละ bu เป็นยังไง"*
+
+| ไฟล์ | หน้าที่ |
+| --- | --- |
+| `src/components/team-online/TeamOnlineSections.tsx` | **ใหม่** — ตัวส่วนทั้งหมด (คนใช้งาน + รายชื่อ · ใบขอเข้า + เลน · **ผู้สมัคร** มาจากไหน/มาแล้วยังไง/งานค้างตอนนี้ · **ใบยังไม่มีผู้สมัคร** แยกอายุ + ใบค้างนานสุด · Lumos · ติดตรงไหน · Success ประกาศ) ใช้ร่วมกันทั้งแท็บล่างและแผงด้านขวา |
+| `src/components/team-online/TeamDetailSheet.tsx` | **ใหม่** — `Sheet` ด้านขวา (`sm:max-w-3xl`) ตามการ์ดที่กด · ค้างการ์ดล่าสุดไว้ตอนปิด (ไม่ว่างวาบ) · กดย้อนกลับ = ปิด (ผูกใน `ui/sheet.tsx`) |
+| `src/components/team-online/TeamOnlineTabs.tsx` | **เหลือแค่ตัวจัดแท็บ** — เพิ่มแท็บ "ผู้สมัคร" · "ใบยังไม่มีผู้สมัคร" |
+| `src/components/team-online/TeamKpiCard.tsx` | prop `onOpen` — ปุ่มโปร่ง (`Button` ghost `absolute inset-0`) คลุมทั้งการ์ด + › มุมขวา · **ห้ามเอาการ์ดไปไว้ในปุ่ม** (`<button>` ครอบ `<p>` ผิด HTML + `[&_svg]:size-*` ของปุ่มทับไอคอนในการ์ด) |
+| `src/lib/teamOnlineTasks.ts` (+ `.test.ts` 3) | **ใหม่** — งานที่ต้องทำต่อของทีม Online: นัดผู้สมัครที่ติดต่อได้ · ส่งประกาศที่มีลิงก์แล้ว · ดันประกาศเงียบ · ปล่อยใบที่ยังต้องหาคน — **นับจากเลนกล่องงาน/ถังรายชื่อ** ปลายทางจากพจนานุกรม (แทน "ยังไม่ Gen link" ที่นับเองจากตารางประกาศ) |
+| `src/lib/teamOnline.ts` (+ `.test.ts` 33) | `APPLICANT_STAGES`/`applicantStage` (ลำดับตัดสินเดียวกับ `buildOverviewSql`) · `applicantsSummary` · `applicantBacklog` · `RawBoardJob` + `AGE_BUCKETS`/`ageBucketOf` · `laneRows` · `oldestNoApplicantJobs` · `peopleOf` · `TeamBuRow` ถอด openWithoutLink/staleNoApplicants · คำตอบเพิ่ม `applicants` (+`backlog`/`backlogScope`) · `lanes` (`total`/`scope`/`byBu`/`oldest`) · `people` |
+| `api/_lib/applicantOverviewSql.ts` | `buildApplicantFactsSql` — ข้อเท็จจริงรายใบจากนิพจน์กลาง (called/in_queue/held/latest_class/has_appointment/เวลารอสายแรก) · ไม่มีชื่อ/เบอร์ · ทานกับ `buildOverviewSql` ตรงทุกถัง (98 · 16/1/1/80 · 57/23 · 2) |
+| `api/_handlers/team-online.ts` (+ `tests/api/teamOnline.test.ts` 14) | `loadApplicants` (ทุกวันที่สมัคร) · `loadReleases` · `boardJobsOf` (ตัวคิดของกล่องงาน: `isBoardVisibleJob` · `buildReleaseIndex` · `buildJobKeyIndex` · `buildCountIndex` · `stillSourcing` · `releaseStepOf` · `jobRequestDateYmd`) · รายชื่อเฉพาะ `admin`/`supervisor` (ตัดสินฝั่ง server) · `openJobsOf` กรอง `isBoardVisibleJob` · ติดตรงไหน "มีนัด" = `HAS_APPOINTMENT_SQL` |
+| `src/lib/jobReleaseIndex.ts` · `src/lib/jobRequestDate.ts` | **ใหม่** — ย้าย `buildReleaseIndex` / `jobRequestDateYmd` ออกจากไฟล์ที่ import `apiFetch`/component (ฝั่ง server ใช้ตัวเดียวกันได้) · ไฟล์เดิม re-export ไว้ ผู้เรียกเดิมไม่ต้องแก้ |
+| `src/lib/metricDictionary.ts` | `teamOnline.applicantsIn` · `noApplicants` · `laneSourcing` · `lanePublish` · `laneSilent` · `unscheduled` (มี href + landing) · ถอด `openWithoutLink` · `staleNoApplicants` |
+
+🔴 กับดักรอบ 4 (วัดจริง 29 ก.ย. 2569):
+- **`confirmed` ของสายสัมภาษณ์ AI ≠ นัด** — รอบ 2 นับผิด ⇒ ตาราง "ติดตรงไหน" เคยขึ้น LBD "นัด 4" · ของจริง: มีบันทึกนัด 2 ใบทั้งกอง
+- **งานที่ต้องทำต้องนับจากชุดเดียวกับหน้าปลายทาง** — กล่องงาน/หน้ารายชื่อ **ไม่มีตัวกรอง BU** ⇒ ใช้ `lanes.scope` / `applicants.backlogScope`
+  (ทั้งสิทธิ์ของคนเปิด) ไม่ใช่ตัวตามตัวกรอง BU ของหน้า · ลิงก์ถังรายชื่อในแผงผู้สมัคร **ขึ้นเฉพาะตอนดูทุก BU/BU ที่ถูกบังคับ**
+- **หน้ารายชื่อ (`?bucket=`) ไม่กรองวันที่** ⇒ "งานค้างตอนนี้" นับทุกวันที่สมัคร (ช่วง 30 วันมี 54 ใบ "ติดต่อได้ ยังไม่ได้นัด" · ทั้งกอง 55)
+- **ใบล่วงหน้าเลขชนใบจริง** — ยอดผู้สมัครอ่านผ่าน `buildCountIndex` สองคีย์แบบการ์ดกล่องงาน (ถอยไปเลขที่ใบ · เลขชน = ไม่จับ)
+- **ลิงก์เปิดใบต้องผ่าน `boardPostingPath`** — ประกอบ `/jobs/board/${id}/posting` เองจาก id เต็มผิด (ใบปกติใช้เลขฝั่ง ERP · ใบล่วงหน้าพก prefix) ⇒ server ส่ง `externalId` มาให้
+- feed ส่งใบที่ RM รับทราบแล้ว (`status: 'closed'`) มาด้วย ⇒ "ใบเปิด/เหลือหา" ต่อ BU ต้องกรอง `isBoardVisibleJob` (วันนี้ยัง 0 ใบ — กันไว้ก่อน)
+- `over5d` ซ้อนกับถัง "ยังไม่มีใครแตะ" ของหน้าหลัก ⇒ ไม่ใส่ในงานที่ต้องทำ (คนเดียวโผล่สองงาน) — อยู่ในแถบจับตาเท่านั้น
+- ผลจริง 30 วัน: ผู้สมัคร 91 ใบ (Facebook 85 · ไม่ระบุ 6 · ทั้งหมด LBD) · ได้สายแรกค่ากลาง ~4 นาที · ติดต่อได้ 54 **นัดแล้ว 0** ·
+  ใบเปิด 327 ยังไม่มีผู้สมัคร 318 (เกิน 30 วัน 184 · นานสุด 874 วัน LM) · บัญชีที่ไม่ได้ใช้ในช่วง 20 จาก 58

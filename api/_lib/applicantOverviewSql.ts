@@ -350,3 +350,33 @@ export function buildAttendanceSummarySql(): string {
                        and (l.result is null or l.result = 'rescheduled'))::int as upcoming
   from sched s left join latest l on l.application_id = s.id`;
 }
+
+/**
+ * ═══ ข้อเท็จจริงรายใบของใบสมัครในช่วงวันที่สมัคร — หน้าทีม Online (29 ก.ย. 2569) ═══
+ *
+ * เจ้าของ: *"มีรายชื่อมา มาจากไหน มาแล้วยังไง … แต่ละ BU เป็นยังไง"* ⇒ ใช้ **นิพจน์ชุดเดียวกับ `buildOverviewSql`**
+ * (CALLED / IN_QUEUE / HELD_OR_CLAIMED / LATEST_CLASS / HAS_APPOINTMENT / FIRST_CALLED_AT) แต่คืนรายใบ
+ * ให้ตัวคิดของหน้าทีม Online แบ่งถัง/ช่วงย่อย/BU เอง (`applicantStage` ใน `src/lib/teamOnline.ts` แบ่งแบบเดียวกับ SQL ข้างบน)
+ * ไม่คืนชื่อ/เบอร์ — มีแค่ id ภายใน + ช่องทาง + BU
+ *
+ * param: $1 = เริ่ม (timestamptz) · $2 = จบ (ไม่รวม) · `buExpr`/`buJoin` = BU กลางของใบสมัครจากผู้เรียก (`appBuSql`/`appBuJoin`)
+ */
+export function buildApplicantFactsSql(buExpr: string, buJoin: string): string {
+  return `
+  select a.id::text as id,
+         a.job_id,
+         to_char(timezone('Asia/Bangkok', a.created_at), 'YYYY-MM-DD') as ymd,
+         a.created_at,
+         coalesce(a.is_lead, false) as is_lead,
+         nullif(btrim(a.referral_source), '') as referral_source,
+         ${buExpr} as bu,
+         ${CALLED_SQL} as called,
+         ${IN_QUEUE_SQL} as in_queue,
+         ${HELD_OR_CLAIMED_SQL} as held_or_claimed,
+         ${LATEST_CLASS_SQL} as latest_class,
+         ${HAS_APPOINTMENT_SQL} as has_appointment,
+         extract(epoch from (${FIRST_CALLED_AT_SQL} - a.created_at)) / 3600.0 as wait_hours
+    from ${APPS} a
+    ${buJoin}
+   where a.created_at >= $1::timestamptz and a.created_at < $2::timestamptz`;
+}
