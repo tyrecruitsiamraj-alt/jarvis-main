@@ -75,6 +75,8 @@ async function dispatchBatch(batch: CallBatch): Promise<void> {
         job_family_label: stored?.result.job_family_label ?? '',
       },
       selected,
+      // 🔴 ชุดที่อนุมัติแล้วต้องไปถึง Lumos จริง (29 ก.ย. 2569) — เดิมแค่เข้าคิวแล้วรอ Lumos มาดึง ซึ่งไม่ดึงแล้ว
+      { autoPush: true },
     );
     logInfo('call-batch.release.reminder', { batchId: batch.id, ...outcome });
     return;
@@ -100,6 +102,8 @@ async function dispatchBatch(batch: CallBatch): Promise<void> {
       job_name_th: c.job_name_th,
       position_name: c.position_name,
     })),
+    undefined,
+    { autoPush: true },
   );
   logInfo('call-batch.release.interview', { batchId: batch.id, ...outcome });
 }

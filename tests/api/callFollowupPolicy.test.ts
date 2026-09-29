@@ -4,8 +4,11 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
   isCallOutcome,
+  isRotatedRetrySlot,
   normalizeCallFollowupPolicy,
   resolveCallFollowup,
+  RETRY_TIME_SLOTS_BKK,
+  rotatedRetryAt,
   shiftOutOfQuietHours,
   type CallFollowupPolicy,
 } from '../../src/lib/callFollowupPolicy';
@@ -201,3 +204,46 @@ describe('isCallOutcome', () => {
   });
 });
 
+/**
+ * ═══ ใบสมัคร: โทรซ้ำ "คละช่วงเวลา" (เจ้าของเคาะ 29 ก.ย. 2569: *"โทรซ้ำคละช่วงเวลาจนครบ 3 ครั้ง"*) ═══
+ */
+describe('โทรซ้ำคละช่วงเวลา (ใบสมัคร)', () => {
+  const bkk = (s: string) => new Date(`${s}+07:00`);
+  it('ช่องเวลา = สาย 10 · บ่าย 14 · เย็น 18 (เวลาไทย)', () => {
+    expect(RETRY_TIME_SLOTS_BKK).toEqual([10, 14, 18]);
+  });
+  it('โทรบ่าย 14:37 ไม่ติด ⇒ พรุ่งนี้ 18:00 · โทร 18:05 ไม่ติด ⇒ วันถัดไป 10:00 · โทร 10:02 ⇒ 14:00', () => {
+    expect(rotatedRetryAt(bkk('2026-09-28T14:37:00'))).toEqual(bkk('2026-09-29T18:00:00'));
+    expect(rotatedRetryAt(bkk('2026-09-29T18:05:00'))).toEqual(bkk('2026-09-30T10:00:00'));
+    expect(rotatedRetryAt(bkk('2026-09-30T10:02:00'))).toEqual(bkk('2026-10-01T14:00:00'));
+  });
+  it('ครบ 3 ครั้งเดินครบทุกช่วง (ไม่มีช่องซ้ำ)', () => {
+    const first = bkk('2026-09-28T09:40:00');
+    const second = rotatedRetryAt(first);
+    const third = rotatedRetryAt(second);
+    const hours = [first, second, third].map((d) => (d.getUTCHours() + 7) % 24);
+    expect(new Set([10, hours[1], hours[2]])).toEqual(new Set([10, 14, 18]));
+  });
+  it('งานค้าง (เวลาที่ได้ผ่านไปแล้ว) ⇒ เลื่อนไปวันถัดไปที่ช่องเดิมจนเป็นอนาคต', () => {
+    const at = rotatedRetryAt(bkk('2026-09-25T14:10:00'), bkk('2026-09-29T07:40:00'));
+    expect(at).toEqual(bkk('2026-09-29T18:00:00'));
+  });
+  it('resolveCallFollowup ส่ง retrySlots ⇒ นัดตามช่องคละเวลา · ไม่ส่ง = +24 ชม. เวลาเดิม', () => {
+    const now = bkk('2026-09-28T14:37:00');
+    const rotated = resolveCallFollowup({ outcome: 'no_answer', attemptCount: 1, now, retrySlots: RETRY_TIME_SLOTS_BKK });
+    expect(rotated.action).toBe('retry');
+    expect(rotated.nextAttemptAt).toBe(bkk('2026-09-29T18:00:00').toISOString());
+    expect(rotated.reason).toContain('2/3');
+    // แบบเดิม: วันถัดไปชั่วโมงเดิม (ตัวเลื่อนช่วงห้ามโทรปัดลงต้นชั่วโมงเสมอ — พฤติกรรมเดิม)
+    const plain = resolveCallFollowup({ outcome: 'no_answer', attemptCount: 1, now });
+    expect(bkkHour(plain.nextAttemptAt as string)).toBe(14);
+    expect(hoursFrom(now, plain.nextAttemptAt as string)).toBeGreaterThan(23);
+    // ครบเพดานยังส่งให้คนตามเหมือนเดิม
+    expect(resolveCallFollowup({ outcome: 'no_answer', attemptCount: 3, now, retrySlots: RETRY_TIME_SLOTS_BKK }).action).toBe('needs_human');
+  });
+  it('แยกนัดแบบคละช่อง ออกจากนัดแบบเดิมที่ค้างมา', () => {
+    expect(isRotatedRetrySlot(bkk('2026-09-29T18:00:00'))).toBe(true);
+    expect(isRotatedRetrySlot(bkk('2026-09-29T14:37:00'))).toBe(false);
+    expect(isRotatedRetrySlot(bkk('2026-09-29T09:00:00'))).toBe(false);
+  });
+});

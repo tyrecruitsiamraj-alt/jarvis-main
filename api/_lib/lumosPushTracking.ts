@@ -64,11 +64,13 @@ async function pushOne(channel: LumosPushChannel, payload: Record<string, unknow
 /**
  * ยิงทีละแถวและจดผล — คืนจำนวนที่ถึง/ไม่ถึง
  * `patchPayload` = ใช้กับรอบส่งซ้ำ (เลื่อนเวลานัด) · รอบแรกไม่ส่ง = payload เดิมเป๊ะ
+ * `keyFor` = คีย์กันซ้ำของรอบโทรซ้ำ (ครั้งที่ต่างกันต้องคนละคีย์ ไม่งั้น Lumos ตอบผลเดิมแล้วไม่โทร) · ไม่ส่ง = คีย์ประจำแถว
  */
 export async function pushQueueRowsTracked(
   channel: LumosPushChannel,
   rows: readonly LumosPushRow[],
   patchPayload?: (payload: Record<string, unknown>) => Record<string, unknown>,
+  keyFor?: (id: string) => string,
 ): Promise<{ pushed: number; failed: number }> {
   const out = { pushed: 0, failed: 0 };
   if (rows.length === 0 || !getLumosPushConfig()) return out;
@@ -94,7 +96,7 @@ export async function pushQueueRowsTracked(
       'started',
     );
     try {
-      const res = await pushOne(channel, payload, idempotencyKeyForRow(channel, row.id));
+      const res = await pushOne(channel, payload, keyFor ? keyFor(row.id) : idempotencyKeyForRow(channel, row.id));
       // 🔴 ตอบ 202 แต่ไม่รับรายการ (accepted 0 / status failed) = ไม่ถึงเหมือนกัน — ห้ามจดว่าถึง
       if (res && (res.status === 'failed' || (typeof res.accepted === 'number' && res.accepted < 1))) {
         throw new Error(`Lumos ไม่รับรายการ (status ${String(res.status)} · accepted ${String(res.accepted)})`);

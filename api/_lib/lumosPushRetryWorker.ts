@@ -1,22 +1,25 @@
 /**
- * ═══ ส่งซ้ำ "สายที่ส่งไม่ถึง Lumos" — ใบสมัคร + เลน Match (เจ้าของเคาะ 28 ก.ย. 2569) ═══
+ * ═══ ตัวส่งซ้ำ/ตัวตามสายที่ไปไม่ถึง Lumos — ใบสมัคร · เลน Match · โทรซ้ำ (เจ้าของเคาะ 28–29 ก.ย. 2569) ═══
  *
- * ไล่พบ 28 ก.ย.: ใบสมัคร OPL6909083 3 ใบค้าง 2–4 วัน — push ตอนกรอกล้มครั้งเดียว + **Lumos ไม่มาดึงคิวเองแล้ว**
- * ระบบยังนับว่า "อยู่ในคิว AI" จึงไม่มีเจ้าหน้าที่คนไหนโทร · งานติดตามเคยเจอแบบเดียวกัน 11 ก.ย. (`followPushRetryWorker`)
+ * ไล่พบ 28 ก.ย.: **Lumos ไม่มาดึงคิวเราแล้ว** (`delivery_count` 0 ทุกแถว) ทุกอย่างที่เคยพึ่งการดึงคิวจึงตายเงียบ:
+ * push ล้มครั้งเดียว = ค้างถาวร · โทรซ้ำหลังไม่รับสายไม่เคยถูกโทรจริง · ชุดโทรที่อนุมัติไม่ถูกปล่อย
  *
- * Choice ที่เจ้าของเลือก: *"ตัวส่งซ้ำแบบงานติดตาม — จดว่าส่งไม่ถึง แล้วลองใหม่ทุกนาทีจนถึง (รหัสเดิม ไม่เกิดสายซ้อน) ·
- * เกิน 24 ชม. ยังไม่ถึง = เลิกส่ง AI แล้วขึ้นให้เจ้าหน้าที่โทรเอง"* · เลน Match: *"ถ้าอันไหนให้ส่งก็ส่งไปเลยแล้วก็เข้าคิวโทร"* ·
- * ช่วงห้ามโทร: ยกเลิกทั้งระบบ (migration 125) — ตัวนี้อ่านนโยบายกลางทุกรอบ ตั้งกลับเมื่อไหร่ก็เคารพทันที
+ * Choice ที่เจ้าของเลือก:
+ * - *"ตัวส่งซ้ำแบบงานติดตาม — จดว่าส่งไม่ถึง แล้วลองใหม่ทุกนาทีจนถึง (รหัสเดิม ไม่เกิดสายซ้อน) · เกิน 24 ชม. ยังไม่ถึง
+ *   = เลิกส่ง AI แล้วขึ้นให้เจ้าหน้าที่โทรเอง"* · เลน Match: *"ถ้าอันไหนให้ส่งก็ส่งไปเลยแล้วก็เข้าคิวโทร"*
+ * - ช่วงห้ามโทร: **ยกเลิกทั้งระบบ** (migration 125) — ตัวนี้อ่านนโยบายกลางทุกรอบ ตั้งกลับเมื่อไหร่ก็เคารพทันที
+ * - โทรซ้ำงานติดตาม: *"ถ้าโทรไปแล้วไม่รับให้โทรใหม่ในวันถัดไปจนครบ 3 ครั้ง"* · ใบสมัคร: *"โทรซ้ำคละช่วงเวลาจนครบ 3 ครั้ง"*
  *
- * ครอบ: ช่อง interview ของใบสมัคร (`app-`) + iRecruit (`ir-`) · ช่อง reminder ของคนของเรา (`card-`)
- * 🔴 **ไม่แตะงานติดตาม** (`job_ref = 'follow'`) — แผนหลายรอบ มีตัวส่งซ้ำของตัวเองอยู่แล้ว
+ * ทุกนาทีทำ 4 อย่าง:
+ * 0. ปล่อยชุดโทรที่อนุมัติแล้วและถึงเวลา (`releaseDueCallBatches` — เดิมถูกเรียกแค่ตอนเปิดแผงหรือตอน Lumos ดึงคิว)
+ * 1. ส่งซ้ำแถวที่ **push ไม่ถึง** (`push_failed` / `push_pending` ค้าง) — ใบสมัคร `app-` · iRecruit `ir-` · คนของเรา `card-`
+ * 2. **โทรซ้ำที่ถึงเวลา** (`followup_state = 'retry_scheduled'`) — ใบสมัคร (คละช่วงเวลา) + งานติดตาม (วันถัดไป)
+ *    ส่งเป็น **งานใหม่ที่ Lumos** (รหัสรอบต่อท้าย `::r<ครั้งที่>` / `-r<ครั้งที่>` + คีย์กันซ้ำประจำรอบ) — ไม่ทับแผนเดิม
+ * 3. ส่งถึงแล้วแต่ **ไม่มีผลกลับเกิน 24 ชม.** ⇒ ขึ้นให้เจ้าหน้าที่ (`needs_human`) — ปิดทาง "ส่งแล้วเงียบ"
  *
- * ทุกนาที: หยิบแถวที่ `push_failed` (หรือ `push_pending` ค้าง = เครื่องรีสตาร์ตกลางทาง) แล้วตัดสินด้วย
- * `decideLumosPushRetry` (มีเทสต์) — ยิง / รอ / เลิก
- * 🔴 ก่อนยิงเช็คซ้ำทุกครั้ง (ของเปลี่ยนได้ระหว่างรอ): เบอร์ถูกพัก · เบอร์มีคนถืออยู่ · และเฉพาะใบสมัคร: มีคนรับไป/
- *    บันทึกผลติดต่อแล้ว/ย้ายเป็น Lead ⇒ **ไม่ยิง** แล้วปิดฝั่ง AI (fail-safe ไปทางไม่โทร — โทรทับคนที่มีเจ้าของแล้วกู้คืนไม่ได้)
- * 🔴 เลิก = ปิดฝั่ง AI (`cancelled`) + `followup_state = 'needs_human'` ⇒ ขึ้นกล่อง "ต้องเร่งจัดการ" บนหน้าแรก และ
- *    ใบสมัครกลับไปอยู่ถัง "ยังไม่ถูกแตะ" ของแท็บผู้สมัคร (ไม่ถูกนับว่า AI ถืออยู่อีก)
+ * 🔴 ก่อนยิงเช็คซ้ำทุกครั้ง: เบอร์ถูกพัก · เบอร์มีคนถือ · ใบสมัครมีคนรับไป/บันทึกผลติดต่อแล้ว/ย้ายเป็น Lead ·
+ *    งานติดตามถูกปิดแล้ว ⇒ **ไม่โทร** (fail-safe ไปทางไม่โทร — โทรทับคนที่มีเจ้าของแล้วกู้คืนไม่ได้)
+ * 🔴 งานติดตามแบบตั้งตาราง (หลายรอบ) ไม่มีโทรซ้ำนอกตาราง — `callFollowup` ไม่ตั้ง retry ให้อยู่แล้ว (ตารางคือ retry)
  * ปิดได้ด้วย `LUMOS_PUSH_RETRY_ENABLED=false` · ไม่มีคีย์ push (เครื่อง dev) = ไม่ทำอะไร
  */
 import { dbQuery } from './postgres.js';
@@ -28,17 +31,31 @@ import { bangkokIso } from './bangkokIso.js';
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
 import { listSuppressedPhones } from './callFollowup.js';
 import { listHeldPhones } from './candidateCallHolds.js';
+import { releaseDueCallBatches } from './callBatchStore.js';
 import { pushQueueRowsTracked, type LumosPushChannel } from './lumosPushTracking.js';
-import { DEFAULT_CALL_FOLLOWUP_POLICY } from '../../src/lib/callFollowupPolicy.js';
+import {
+  DEFAULT_CALL_FOLLOWUP_POLICY,
+  isRotatedRetrySlot,
+  rotatedRetryAt,
+  type CallFollowupPolicy,
+} from '../../src/lib/callFollowupPolicy.js';
 import {
   decideLumosPushRetry,
+  isQuietAt,
   readLumosPushRetryConfig,
+  retryScheduledAt,
   type LumosPushRetryConfig,
 } from '../../src/lib/lumosPushRetryPolicy.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 const appsTable = tableInAppSchema('public_job_applications');
 const contactsTable = tableInAppSchema('application_contact_logs');
+const followTable = tableInAppSchema('follow_entries');
+
+/** โทรซ้ำที่เลยเวลามาเกินเท่านี้โดยยังไม่เคยลองส่ง (เครื่องหยุด/งานค้างเก่า) ⇒ นัดช่องเวลาถัดไปใหม่ ไม่โทรทันที */
+const RETRY_REPLAN_AFTER_MINUTES = 30;
+/** ส่งถึงแล้วแต่เงียบเกินเท่านี้ ⇒ ขึ้นให้เจ้าหน้าที่ (ผลช้าสุดที่วัดได้ 134 นาที) */
+const NO_RESULT_ESCALATE_MINUTES = 24 * 60;
 
 let running = false;
 let stopped = false;
@@ -53,6 +70,16 @@ export type LumosPushRetryRun = {
   skipped: number;
   /** เลยเพดาน โยนให้เจ้าหน้าที่ */
   gaveUp: number;
+  /** โทรซ้ำ: ส่งรอบใหม่ไปแล้ว */
+  retriesSent: number;
+  /** โทรซ้ำ: ปิดธงเพราะงานปิด/มีเจ้าของแล้ว (ไม่โทร) */
+  retriesClosed: number;
+  /** โทรซ้ำ: นัดช่องเวลาใหม่ (งานค้างเก่า/นัดแบบเดิม) */
+  retriesReplanned: number;
+  /** ส่งถึงแล้วแต่ไม่มีผลเกิน 24 ชม. ⇒ ให้เจ้าหน้าที่ */
+  silentEscalated: number;
+  /** ชุดโทรที่อนุมัติแล้วถูกปล่อยเข้าคิว */
+  batchesReleased: number;
 };
 
 let lastRun: LumosPushRetryRun | null = null;
@@ -78,9 +105,19 @@ type Candidate = {
   contacted: boolean;
 };
 
+type RetryCandidate = Candidate & {
+  job_ref: string;
+  attempt_count: number | null;
+  push_state: string | null;
+  step_position: number | null;
+  last_call_at: string | Date | null;
+  follow_exists: boolean;
+  follow_closed: boolean;
+};
+
 /**
- * แถวที่ยังต้องตาม — ใบสมัคร/iRecruit (interview) · คนของเรา (reminder) · ยังไม่มีผล (นิยามกลาง `queuePending`) ·
- * จดว่าส่งไม่ถึง หรือกำลังส่งค้างนานเกิน · แถวเก่าก่อน migration 123 (`push_state` null) และงานติดตามไม่แตะ
+ * 1) แถวที่ push ไม่ถึง — ใบสมัคร/iRecruit/คนของเรา (interview) · คนของเรา (reminder) · ยังไม่มีผล (นิยามกลาง
+ * `queuePending`) · จดว่าส่งไม่ถึง หรือกำลังส่งค้างนานเกิน · แถวเก่าก่อน migration 123 (`push_state` null) และงานติดตามไม่แตะ
  */
 export function buildCandidateSql(): string {
   return `select q.id::text as id, q.channel, q.person_ref, q.payload, q.created_at, q.next_attempt_at,
@@ -91,7 +128,8 @@ export function buildCandidateSql(): string {
             from ${queueTable} q
             left join ${appsTable} a on q.person_ref = 'app-' || a.id::text
            where q.job_ref <> 'follow'
-             and ((q.channel = 'interview' and (q.person_ref like 'app-%' or q.person_ref like 'ir-%'))
+             and ((q.channel = 'interview'
+                   and (q.person_ref like 'app-%' or q.person_ref like 'ir-%' or q.person_ref like 'card-%'))
                   or (q.channel = 'reminder' and q.person_ref like 'card-%'))
              and ${queuePending('q')}
              and q.result is null
@@ -100,6 +138,49 @@ export function buildCandidateSql(): string {
                       and q.push_started_at < now() - make_interval(mins => $2::int)))
            order by coalesce(q.next_attempt_at, q.created_at) asc
            limit $1`;
+}
+
+/**
+ * 2) โทรซ้ำที่ถึงเวลา (หรือจะถึงภายในช่วงยิงล่วงหน้า) — ใบสมัคร (interview · `app-`) + งานติดตาม (reminder · `follow-`)
+ * ⚠️ แถวโทรซ้ำมีผลรอบก่อนอยู่ที่ `last_outcome` (ไม่ใช่ `queuePending`) และ `result` ถูกล้างไว้แล้วตอนตั้งโทรซ้ำ
+ */
+export function buildRetryDueSql(): string {
+  return `select q.id::text as id, q.channel, q.person_ref, q.job_ref, q.payload, q.created_at, q.next_attempt_at,
+                 q.attempt_count, q.push_state, q.step_position,
+                 coalesce(q.last_result_at, q.first_result_at, q.updated_at) as last_call_at,
+                 (a.id is not null) as app_exists,
+                 (a.claimed_by is not null) as claimed,
+                 coalesce(a.is_lead, false) as is_lead,
+                 exists (select 1 from ${contactsTable} c where c.application_id = a.id) as contacted,
+                 (f.id is not null) as follow_exists,
+                 (f.completed_at is not null or f.cancelled_at is not null) as follow_closed
+            from ${queueTable} q
+            left join ${appsTable} a on q.person_ref = 'app-' || a.id::text
+            left join ${followTable} f on q.person_ref = 'follow-' || f.id::text
+           where q.followup_state = 'retry_scheduled'
+             and q.status = 'pending'
+             and q.result is null
+             and q.next_attempt_at is not null
+             and q.next_attempt_at <= now() + make_interval(mins => $2::int)
+             and ((q.channel = 'interview' and q.person_ref like 'app-%')
+                  or (q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref like 'follow-%'))
+           order by q.next_attempt_at asc
+           limit $1`;
+}
+
+/** 3) ส่งถึงแล้วแต่ไม่มีผลกลับเกินเพดาน ⇒ ขึ้นให้เจ้าหน้าที่ (เฉพาะแถวที่ระบบนี้จด push ไว้ — แถวเก่า/รอบแรกของงานติดตามไม่แตะ) */
+export function buildSilentEscalateSql(): string {
+  return `update ${queueTable} q
+             set followup_state = 'needs_human', push_state = 'push_gave_up',
+                 push_error = 'ส่งถึง Lumos แล้วแต่ไม่มีผลโทรกลับเกิน 24 ชม. — ให้เจ้าหน้าที่โทรเอง',
+                 updated_at = now()
+           where q.push_state = 'pushed'
+             and q.result is null
+             and q.status = 'pending'
+             and q.followup_state is null
+             and greatest(q.push_started_at, coalesce(q.next_attempt_at, q.push_started_at))
+                 < now() - make_interval(mins => $1::int)
+           returning q.id`;
 }
 
 /** ปิดฝั่ง AI ของแถวที่ยังค้างจริงเท่านั้น (ผลโทรเพิ่งกลับมา = ไม่แตะ) */
@@ -115,6 +196,35 @@ async function closeAiSide(id: string, pushState: 'push_skipped' | 'push_gave_up
     );
   } catch (e) {
     logError('lumos.pushRetry: ปิดฝั่ง AI ไม่สำเร็จ', e, { queueId: id, pushState });
+  }
+}
+
+/**
+ * ปิดธงโทรซ้ำ — `closed` = ไม่ต้องโทรแล้ว (งานปิด/มีเจ้าของ) · `needs_human` = ส่งไม่ถึงนานเกิน ให้เจ้าหน้าที่
+ * ⚠️ แตะเฉพาะแถวที่ยังเป็นโทรซ้ำอยู่ (ผลรอบใหม่เพิ่งกลับมา/มีคนแก้ไปแล้ว = ไม่แตะ)
+ */
+async function closeRetry(id: string, state: 'closed' | 'needs_human', reason: string): Promise<void> {
+  try {
+    await dbQuery(
+      `update ${queueTable}
+          set followup_state = $2, next_attempt_at = null, push_error = $3, updated_at = now()
+        where id = $1::bigint and followup_state = 'retry_scheduled' and result is null`,
+      [id, state, reason],
+    );
+  } catch (e) {
+    logError('lumos.pushRetry: ปิดธงโทรซ้ำไม่สำเร็จ', e, { queueId: id, state });
+  }
+}
+
+async function replanRetry(id: string, at: Date): Promise<void> {
+  try {
+    await dbQuery(
+      `update ${queueTable} set next_attempt_at = $2::timestamptz, updated_at = now()
+        where id = $1::bigint and followup_state = 'retry_scheduled' and result is null`,
+      [id, at.toISOString()],
+    );
+  } catch (e) {
+    logError('lumos.pushRetry: นัดโทรซ้ำใหม่ไม่สำเร็จ', e, { queueId: id });
   }
 }
 
@@ -141,50 +251,44 @@ export function withScheduledAt(payload: Record<string, unknown>, iso: string): 
   return out;
 }
 
+/**
+ * payload ของ **รอบโทรซ้ำ** — ส่งเป็นงานใหม่ที่ Lumos ไม่ไปทับแผนเดิม
+ * - interview: `client_interview_id` ต่อท้าย `::r<ครั้งที่>` (ผลจับกลับด้วย `client_candidate_id` เดิม — ไม่เปลี่ยน)
+ * - reminder (งานติดตาม): รอบเดียวของแถวนี้ (แถวหัวขบวนถือทั้งแผน ⇒ เลือก step ของตัวเอง) ·
+ *   `client_contact_id` ต่อท้าย `-r<ครั้งที่>` (`applyLumosResult` ถอยไปจับรหัสเดิมเมื่อไม่เจอ)
+ */
+export function buildRetryPayload(
+  channel: LumosPushChannel,
+  payload: Record<string, unknown>,
+  attempt: number,
+  stepPosition: number | null,
+  iso: string,
+): Record<string, unknown> {
+  if (channel === 'interview') {
+    const base = String(payload.client_interview_id ?? '').replace(/::r\d+$/, '');
+    return { ...payload, client_interview_id: `${base}::r${attempt}`, scheduled_at: iso };
+  }
+  const steps = Array.isArray(payload.steps) ? (payload.steps as unknown[]) : [];
+  const own = steps.length > 0 ? steps[Math.min(Math.max(stepPosition ?? 0, 0), steps.length - 1)] : null;
+  const base = String(payload.client_contact_id ?? '').replace(/-r\d+$/, '');
+  const out: Record<string, unknown> = { ...payload, client_contact_id: `${base}-r${attempt}` };
+  if (own && typeof own === 'object') out.steps = [{ ...(own as Record<string, unknown>), scheduled_at: iso }];
+  if ('scheduled_at' in out) out.scheduled_at = iso;
+  return out;
+}
+
+export const retryKeyFor = (channel: LumosPushChannel, id: string, attempt: number) =>
+  `${channel === 'interview' ? 'interview' : 'follow'}-${id}-r${attempt}`;
+
 const toDate = (v: string | Date | null): Date | null => {
   if (v === null) return null;
   const d = v instanceof Date ? v : new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
-/** เดินหนึ่งรอบ — export ไว้ให้เทสต์ */
-export async function runLumosPushRetryOnce(
-  cfg: LumosPushRetryConfig = getLumosPushRetryConfig(),
-  now: Date = new Date(),
-): Promise<LumosPushRetryRun> {
-  const run: LumosPushRetryRun = {
-    at: now.toISOString(),
-    found: 0,
-    sent: 0,
-    failed: 0,
-    waiting: 0,
-    skipped: 0,
-    gaveUp: 0,
-  };
-  if (!getLumosPushConfig()) {
-    lastRun = run;
-    return run;
-  }
+type Gates = { suppressed: Set<string> | null; held: Set<string>; policy: CallFollowupPolicy };
 
-  let rows: Candidate[];
-  try {
-    ({ rows } = await dbQuery<Candidate>(buildCandidateSql(), [cfg.limit, cfg.stalePendingMinutes]));
-  } catch (e) {
-    // ยังไม่ migrate 123 = ยังไม่มีอะไรให้ตาม (ไม่ต้องดังทุกนาที)
-    if (typeof e === 'object' && e !== null && (e as { code?: string }).code === '42703') {
-      lastRun = run;
-      return run;
-    }
-    logError('lumos.pushRetry: อ่านแถวค้างไม่สำเร็จ', e);
-    lastRun = run;
-    return run;
-  }
-  run.found = rows.length;
-  if (rows.length === 0) {
-    lastRun = run;
-    return run;
-  }
-
+async function loadGates(): Promise<Gates> {
   const policy = await getCallFollowupPolicy().catch(() => DEFAULT_CALL_FOLLOWUP_POLICY);
   // เบอร์ถูกพัก: อ่านไม่ได้ = รอบนี้ไม่ยิงใครเลย (เผลอโทรคนที่บอกเลิกหางานแล้วกู้คืนไม่ได้)
   let suppressed: Set<string> | null;
@@ -200,9 +304,68 @@ export async function runLumosPushRetryOnce(
   } catch {
     held = new Set();
   }
+  return { suppressed, held, policy };
+}
 
+/** เหตุที่ใบสมัครนี้ไม่ควรให้ AI โทร (มีเจ้าของแล้ว) · null = โทรได้ */
+function applicationSkipReason(row: Candidate): string | null {
+  if (!row.person_ref.startsWith('app-')) return null;
+  if (!row.app_exists) return 'ไม่พบใบสมัครแล้ว';
+  if (row.claimed) return 'มีเจ้าหน้าที่รับไปโทรเองแล้ว';
+  if (row.contacted) return 'มีบันทึกผลติดต่อแล้ว';
+  if (row.is_lead) return 'ย้ายไปเป็น Lead แล้ว';
+  return null;
+}
+
+/** เดินหนึ่งรอบ — export ไว้ให้เทสต์ */
+export async function runLumosPushRetryOnce(
+  cfg: LumosPushRetryConfig = getLumosPushRetryConfig(),
+  now: Date = new Date(),
+): Promise<LumosPushRetryRun> {
+  const run: LumosPushRetryRun = {
+    at: now.toISOString(),
+    found: 0,
+    sent: 0,
+    failed: 0,
+    waiting: 0,
+    skipped: 0,
+    gaveUp: 0,
+    retriesSent: 0,
+    retriesClosed: 0,
+    retriesReplanned: 0,
+    silentEscalated: 0,
+    batchesReleased: 0,
+  };
+  if (!getLumosPushConfig()) {
+    lastRun = run;
+    return run;
+  }
+
+  // ── 0) ชุดโทรที่อนุมัติแล้ว — ปล่อยตามเวลา (เดิมรอคนเปิดแผง/รอ Lumos มาดึงคิวซึ่งไม่มาแล้ว) ──
+  try {
+    run.batchesReleased = await releaseDueCallBatches();
+  } catch (e) {
+    logError('lumos.pushRetry: ปล่อยชุดโทรไม่สำเร็จ', e);
+  }
+
+  let gates: Gates | null = null;
+  const gatesOnce = async () => (gates ??= await loadGates());
+
+  // ── 1) push ไม่ถึง ──
+  let rows: Candidate[] = [];
+  try {
+    ({ rows } = await dbQuery<Candidate>(buildCandidateSql(), [cfg.limit, cfg.stalePendingMinutes]));
+  } catch (e) {
+    // ยังไม่ migrate 123 = ยังไม่มีอะไรให้ตาม (ไม่ต้องดังทุกนาที)
+    if (!(typeof e === 'object' && e !== null && (e as { code?: string }).code === '42703')) {
+      logError('lumos.pushRetry: อ่านแถวค้างไม่สำเร็จ', e);
+    }
+    rows = [];
+  }
+  run.found = rows.length;
   for (const row of rows) {
     if (stopped) break;
+    const { suppressed, held, policy } = await gatesOnce();
     const dueAt = toDate(row.next_attempt_at) ?? toDate(row.created_at) ?? now;
     const decision = decideLumosPushRetry(dueAt, cfg, policy, now);
     if (decision.action === 'give_up') {
@@ -219,19 +382,7 @@ export async function runLumosPushRetryOnce(
       run.waiting += 1;
       continue;
     }
-    // ── เช็คซ้ำก่อนยิงทุกครั้ง ──
-    const isApplication = row.person_ref.startsWith('app-');
-    const skipReason = !isApplication
-      ? null
-      : !row.app_exists
-        ? 'ไม่พบใบสมัครแล้ว'
-        : row.claimed
-          ? 'มีเจ้าหน้าที่รับไปโทรเองแล้ว'
-          : row.contacted
-            ? 'มีบันทึกผลติดต่อแล้ว'
-            : row.is_lead
-              ? 'ย้ายไปเป็น Lead แล้ว'
-              : null;
+    const skipReason = applicationSkipReason(row);
     if (skipReason) {
       run.skipped += 1;
       await closeAiSide(row.id, 'push_skipped', skipReason);
@@ -252,7 +403,6 @@ export async function runLumosPushRetryOnce(
       await closeAiSide(row.id, 'push_skipped', 'เบอร์นี้มีเจ้าหน้าที่ถืออยู่');
       continue;
     }
-    // ── ยิงพร้อมเวลานัดใหม่ (พ้นช่วงห้ามโทรถ้านโยบายมีช่วงห้าม) ──
     const scheduledAt = bangkokIso(decision.scheduledAt);
     try {
       const r = await pushQueueRowsTracked(row.channel, [{ id: row.id, payload: row.payload }], (p) =>
@@ -267,9 +417,125 @@ export async function runLumosPushRetryOnce(
     }
   }
 
+  // ── 2) โทรซ้ำที่ถึงเวลา ──
+  let retries: RetryCandidate[] = [];
+  try {
+    ({ rows: retries } = await dbQuery<RetryCandidate>(buildRetryDueSql(), [cfg.limit, cfg.leadMinutes]));
+  } catch (e) {
+    if (!(typeof e === 'object' && e !== null && (e as { code?: string }).code === '42703')) {
+      logError('lumos.pushRetry: อ่านโทรซ้ำไม่สำเร็จ', e);
+    }
+    retries = [];
+  }
+  for (const r of retries) {
+    if (stopped) break;
+    const { suppressed, held, policy } = await gatesOnce();
+    const isFollow = r.job_ref === 'follow' || r.person_ref.startsWith('follow-');
+    // a) ไม่ต้องโทรแล้ว — งานติดตามปิดแล้ว / ใบสมัครมีเจ้าของแล้ว / เบอร์พักหรือมีคนถือ
+    const closeReason = isFollow
+      ? !r.follow_exists
+        ? 'ไม่พบรายการติดตามแล้ว — ไม่โทรซ้ำ'
+        : r.follow_closed
+          ? 'งานติดตามปิดแล้ว — ไม่โทรซ้ำ'
+          : null
+      : applicationSkipReason(r);
+    if (closeReason) {
+      run.retriesClosed += 1;
+      await closeRetry(r.id, 'closed', closeReason);
+      continue;
+    }
+    if (suppressed === null) {
+      run.waiting += 1;
+      continue;
+    }
+    const phone = phoneOf(r.payload);
+    if (phone && (suppressed.has(phone) || held.has(phone))) {
+      run.retriesClosed += 1;
+      await closeRetry(r.id, 'closed', suppressed.has(phone) ? 'เบอร์ถูกพัก — ไม่โทรซ้ำ' : 'เบอร์นี้มีเจ้าหน้าที่ถืออยู่ — ไม่โทรซ้ำ');
+      continue;
+    }
+    const due = toDate(r.next_attempt_at) ?? now;
+    const lateMinutes = (now.getTime() - due.getTime()) / 60_000;
+    const failedBefore = r.push_state === 'push_failed';
+    // b) ส่งไม่ถึงมานานเกินเพดาน ⇒ ให้เจ้าหน้าที่
+    if (failedBefore && lateMinutes > cfg.giveUpAfterMinutes) {
+      run.gaveUp += 1;
+      await closeRetry(r.id, 'needs_human', `ส่งโทรซ้ำไม่ถึง Lumos เกิน ${Math.round(cfg.giveUpAfterMinutes / 60)} ชม. — ให้เจ้าหน้าที่โทรเอง`);
+      continue;
+    }
+    // c) ใบสมัคร: นัดแบบเดิม (+24 ชม. เวลาเดิม) หรือค้างเก่า ⇒ นัดช่องเวลาถัดไปใหม่ (คละช่วงเวลา) แล้วรอ
+    const isApplication = r.person_ref.startsWith('app-');
+    if (
+      isApplication &&
+      !failedBefore &&
+      (!isRotatedRetrySlot(due) || lateMinutes > RETRY_REPLAN_AFTER_MINUTES)
+    ) {
+      const lastCall = toDate(r.last_call_at) ?? due;
+      const at = rotatedRetryAt(lastCall, now);
+      run.retriesReplanned += 1;
+      await replanRetry(r.id, at);
+      continue;
+    }
+    // d) ช่วงห้ามโทร (ถ้ามี) / ยังไกลเวลานัด ⇒ รอ
+    if (isQuietAt(now, policy) || due.getTime() - now.getTime() > cfg.leadMinutes * 60_000) {
+      run.waiting += 1;
+      continue;
+    }
+    // e) ส่งรอบใหม่เป็นงานใหม่ที่ Lumos
+    const attempt = Math.max(2, Number(r.attempt_count) || 2);
+    const iso = bangkokIso(retryScheduledAt(due, now, policy));
+    try {
+      const res = await pushQueueRowsTracked(
+        r.channel,
+        [{ id: r.id, payload: r.payload }],
+        (p) => buildRetryPayload(r.channel, p, attempt, r.step_position, iso),
+        (id) => retryKeyFor(r.channel, id, attempt),
+      );
+      if (res.pushed) {
+        run.retriesSent += 1;
+        // ส่งถึงแล้ว = ไม่ใช่ "รอโทรซ้ำ" อีก (รอผล) · ผลรอบใหม่กลับมาก่อน/มีคนแก้ = ไม่แตะ
+        await dbQuery(
+          `update ${queueTable} set followup_state = null, updated_at = now()
+            where id = $1::bigint and followup_state = 'retry_scheduled' and result is null
+              and abs(extract(epoch from (next_attempt_at - $2::timestamptz))) < 1`,
+          [r.id, due.toISOString()],
+        ).catch((e) => logError('lumos.pushRetry: ปิดธงหลังส่งโทรซ้ำไม่สำเร็จ', e, { queueId: r.id }));
+        logInfo('lumos.pushRetry.retry.ok', { queueId: r.id, channel: r.channel, attempt, scheduledAt: iso });
+      } else {
+        run.failed += res.failed;
+      }
+    } catch (e) {
+      run.failed += 1;
+      logWarn('lumos.pushRetry.retry.failed', { queueId: r.id, reason: errorSummaryText(e, 200) });
+    }
+  }
+
+  // ── 3) ส่งถึงแล้วแต่เงียบเกิน 24 ชม. ⇒ ให้เจ้าหน้าที่ ──
+  try {
+    const { rows: silent } = await dbQuery<{ id: string }>(buildSilentEscalateSql(), [NO_RESULT_ESCALATE_MINUTES]);
+    run.silentEscalated = silent.length;
+    if (silent.length) logWarn('lumos.pushRetry.silent', { rows: silent.length });
+  } catch (e) {
+    if (!(typeof e === 'object' && e !== null && (e as { code?: string }).code === '42703')) {
+      logError('lumos.pushRetry: เช็คสายเงียบไม่สำเร็จ', e);
+    }
+  }
+
   lastRun = run;
-  // รอบที่แค่ "รอ" (ยังไม่ถึงเวลานัด/ช่วงห้ามโทร) ไม่ต้องจด — ไม่งั้นคืนละหลายร้อยบรรทัด
-  if (run.sent || run.failed || run.skipped || run.gaveUp) logInfo('lumos.pushRetry.run', { ...run });
+  // รอบที่แค่ "รอ" ไม่ต้องจด — ไม่งั้นคืนละหลายร้อยบรรทัด
+  if (
+    run.sent ||
+    run.failed ||
+    run.skipped ||
+    run.gaveUp ||
+    run.retriesSent ||
+    run.retriesClosed ||
+    run.retriesReplanned ||
+    run.silentEscalated ||
+    run.batchesReleased
+  ) {
+    logInfo('lumos.pushRetry.run', { ...run });
+  }
   return run;
 }
 

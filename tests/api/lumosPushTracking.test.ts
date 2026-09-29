@@ -131,6 +131,40 @@ describe('สายไฟ — ทุกทางที่ส่งใบสม�
     }
   });
 
+  it('เส้นที่เคยแค่เข้าคิวแล้วรอ Lumos ดึง (ตายแล้ว) — ส่งจริงแล้วทุกเส้น (เจ้าของเคาะ 29 ก.ย. 2569)', () => {
+    const d = code('api/_lib/lumosDispatch.ts');
+    const body = (name: string) => {
+      const fn = d.slice(d.indexOf(`export async function ${name}`));
+      return fn.slice(0, fn.indexOf('\nexport '));
+    };
+    // เลนสรรหา (ปุ่ม "ส่ง") + ชวนกลับ (recall)
+    expect(body('enqueueLumosInterviewForRecruitLane')).toContain("void pushQueuedRows('interview', result.jobId, added)");
+    expect(body('enqueueLumosInterviewForRecall')).toContain("void pushQueuedRows('interview', result.jobId, added)");
+    // ส่งอัตโนมัติ (โหมด auto / ปุ่มหาคนเพิ่ม)
+    expect(body('enqueueLumosReminderForBoardMatch')).toContain('enqueueLumosReminderForSelected(job, result, auto, { autoPush: true })');
+    expect(body('enqueueLumosInterviewForIrecruit')).toContain(
+      'enqueueLumosInterviewForSelected(job, result, eligible, undefined, { autoPush: true })',
+    );
+    // ชุดโทรที่อนุมัติแล้ว
+    const batch = code('api/_lib/callBatchDispatcher.ts');
+    expect((batch.match(/\{ autoPush: true \}/g) ?? []).length).toBe(2);
+    expect(code('api/_lib/lumosPushRetryWorker.ts')).toContain('await releaseDueCallBatches()');
+  });
+
+  it('ผลรอบโทรซ้ำของ reminder (client_contact_id ต่อท้าย -r<n>) ถอยไปจับรหัสเดิมของแถว', () => {
+    const d = code('api/_lib/lumosDispatch.ts');
+    const fn = d.slice(d.indexOf('export async function applyLumosResult'));
+    const body = fn.slice(0, fn.indexOf('\nfunction '));
+    expect(body).toContain("channel === 'reminder' ? clientId.replace(/-r\\d+$/, '') : clientId");
+    expect(body).toContain('if (rows.length === 0 && baseId !== clientId) rows = await applyById(baseId)');
+  });
+
+  it('โทรซ้ำคละช่วงเวลาเฉพาะใบสมัคร (app-) ทั้งสองจุดที่ตัดสินโทรซ้ำ · เลนอื่นวันถัดไปเวลาเดิม', () => {
+    const c = code('api/_lib/callFollowup.ts');
+    expect(c).toContain("retrySlots: String(row.person_ref ?? '').startsWith('app-') ? RETRY_TIME_SLOTS_BKK : null");
+    expect(c).toContain("retrySlots: personRef?.startsWith('app-') ? RETRY_TIME_SLOTS_BKK : null");
+  });
+
   it('ตัวส่งซ้ำเริ่มตอนบูต process API (ตัวเดียวกับที่ supervisord รันบนเครื่องจริง)', () => {
     expect(code('server/local-api.ts')).toContain('startLumosPushRetryWorker();');
   });

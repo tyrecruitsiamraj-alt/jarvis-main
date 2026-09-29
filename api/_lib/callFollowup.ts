@@ -18,6 +18,7 @@ import {
   resolveCallFollowup,
   type CallFollowupDecision,
   type CallOutcome,
+  RETRY_TIME_SLOTS_BKK,
 } from '../../src/lib/callFollowupPolicy.js';
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
 
@@ -173,6 +174,8 @@ export async function applyCallFollowupToQueueRow(input: {
     declinedScope: input.declinedScope ?? null,
     // นโยบายที่เจ้าของตั้งจากหน้า Follow (migration 073) — ตารางยังไม่ migrate = ค่าเดิมในโค้ด
     policy: await getCallFollowupPolicy(),
+    // ใบสมัคร: โทรซ้ำคละช่วงเวลา (เจ้าของเคาะ 29 ก.ย. 2569) · เลนอื่น = วันถัดไปเวลาเดิมตามนโยบาย
+    retrySlots: String(row.person_ref ?? '').startsWith('app-') ? RETRY_TIME_SLOTS_BKK : null,
   });
 
   // แถวตั้งตาราง: retry ของ policy → ปิดแทน (ไม่โทรซ้ำนอกตาราง) · ผลอื่นคงเดิม
@@ -390,6 +393,8 @@ export async function applyHumanCallFollowup(input: {
     requestedCallbackAt: pickRequestedCallbackAt(input.detail),
     declinedScope: input.declinedScope ?? null,
     policy: await getCallFollowupPolicy(),
+    // ใบสมัคร: โทรซ้ำคละช่วงเวลา (เจ้าของเคาะ 29 ก.ย. 2569)
+    retrySlots: personRef?.startsWith('app-') ? RETRY_TIME_SLOTS_BKK : null,
   });
 
   // มีแถวคิว → เขียนสถานะให้ลูปเดินต่อได้ (คนโทรไม่ติด AI รับช่วงโทรซ้ำได้)

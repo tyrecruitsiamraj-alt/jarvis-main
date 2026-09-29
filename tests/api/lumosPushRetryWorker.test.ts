@@ -28,6 +28,8 @@ vi.mock('../../api/_lib/lumosPushClient.js', () => ({
 }));
 vi.mock('../../api/_lib/callFollowup.js', () => ({ listSuppressedPhones: () => listSuppressedPhones() }));
 vi.mock('../../api/_lib/candidateCallHolds.js', () => ({ listHeldPhones: () => listHeldPhones() }));
+const releaseDueCallBatches = vi.fn(async () => 0);
+vi.mock('../../api/_lib/callBatchStore.js', () => ({ releaseDueCallBatches: () => releaseDueCallBatches() }));
 vi.mock('../../api/_lib/callFollowupPolicyStore.js', async () => {
   const { DEFAULT_CALL_FOLLOWUP_POLICY } = await import('../../src/lib/callFollowupPolicy.js');
   return { getCallFollowupPolicy: async () => DEFAULT_CALL_FOLLOWUP_POLICY };
@@ -52,15 +54,20 @@ const cand = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-function stub(rows: unknown[]) {
+/** แยกคิวรีตามชนิด: แถว push ไม่ถึง · โทรซ้ำที่ถึงเวลา · ที่เหลือ (update) ไม่คืนแถว */
+function stub(rows: unknown[], retries: unknown[] = []) {
   dbQuery.mockReset();
-  dbQuery.mockImplementation((sql: string) =>
-    Promise.resolve({ rows: /^\s*select/i.test(sql) ? rows : [] }),
-  );
+  dbQuery.mockImplementation((sql: string) => {
+    const s = String(sql);
+    if (/^\s*select/i.test(s) && s.includes("followup_state = 'retry_scheduled'")) return Promise.resolve({ rows: retries });
+    if (/^\s*select/i.test(s)) return Promise.resolve({ rows });
+    return Promise.resolve({ rows: [] });
+  });
 }
 const updates = () => dbQuery.mock.calls.map((c) => String(c[0])).filter((s) => /^\s*update/i.test(s));
 
 beforeEach(() => {
+  releaseDueCallBatches.mockReset().mockResolvedValue(0);
   pushInterviews.mockReset().mockResolvedValue({ accepted: 1 });
   pushReminders.mockReset().mockResolvedValue({ accepted: 1 });
   getLumosPushConfig.mockReturnValue({ baseUrl: 'x', connectionId: 'y', apiKey: 'z' });
@@ -128,7 +135,8 @@ describe('runLumosPushRetryOnce', () => {
     const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-28T14:05:00'));
     expect(run.waiting).toBe(1);
     expect(pushInterviews).not.toHaveBeenCalled();
-    expect(updates()).toHaveLength(0);
+    // ไม่ปิดฝั่ง AI (รอบหน้าลองใหม่) — update ที่มีได้มีแค่ตัวเช็คสายเงียบประจำรอบ
+    expect(updates().filter((s) => /push_skipped|status = 'cancelled'/.test(s) && !/q\.push_state = 'pushed'/.test(s))).toHaveLength(0);
   });
 
   it('🔴 เกิน 24 ชม. ⇒ เลิกส่ง AI + needs_human (ขึ้นกล่องต้องเร่งจัดการ) · ไม่ยิง', async () => {
@@ -149,12 +157,13 @@ describe('runLumosPushRetryOnce', () => {
     expect(updates().some((s) => /push_state = 'push_failed'/.test(s))).toBe(true);
   });
 
-  it('ไม่มีคีย์ push (เครื่อง dev) ⇒ ไม่แตะฐานเลย', async () => {
+  it('ไม่มีคีย์ push (เครื่อง dev) ⇒ ไม่แตะฐานเลย · ไม่ปล่อยชุดโทร', async () => {
     stub([cand()]);
     getLumosPushConfig.mockReturnValue(null);
     await runLumosPushRetryOnce(CFG, bkk('2026-09-28T14:05:00'));
     expect(dbQuery).not.toHaveBeenCalled();
     expect(pushInterviews).not.toHaveBeenCalled();
+    expect(releaseDueCallBatches).not.toHaveBeenCalled();
   });
 
   it('คิวรีหยิบเฉพาะแถวที่ยังไม่มีผล และจดว่าส่งไม่ถึง/ค้างกลางทาง · 🔴 ไม่แตะงานติดตาม · แถวเก่า push_state null ไม่แตะ', async () => {
@@ -213,6 +222,105 @@ describe('runLumosPushRetryOnce', () => {
     const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-28T23:05:00'));
     expect(run.sent).toBe(1);
     spy.mockRestore();
+  });
+});
+
+const retry = (over: Record<string, unknown> = {}) => ({
+  id: '800',
+  channel: 'interview',
+  person_ref: 'app-5',
+  job_ref: 'siamraj-sql:OPL1',
+  payload: { phone: '+66844444444', client_candidate_id: 'siamraj-sql:OPL1::app-5', client_interview_id: 'siamraj-sql:OPL1::app-5::interview', scheduled_at: 'old' },
+  created_at: bkk('2026-09-27T14:00:00'),
+  next_attempt_at: bkk('2026-09-29T18:00:00'),
+  attempt_count: 2,
+  push_state: 'pushed',
+  step_position: null,
+  last_call_at: bkk('2026-09-28T14:05:00'),
+  app_exists: true,
+  claimed: false,
+  is_lead: false,
+  contacted: false,
+  follow_exists: false,
+  follow_closed: false,
+  ...over,
+});
+
+describe('โทรซ้ำที่ถึงเวลา (ใบสมัคร คละช่วงเวลา · งานติดตาม วันถัดไป)', () => {
+  it('ทุกรอบปล่อยชุดโทรที่อนุมัติแล้วถึงเวลา (เดิมรอคนเปิดแผง)', async () => {
+    stub([]);
+    await runLumosPushRetryOnce(CFG, bkk('2026-09-29T10:00:00'));
+    expect(releaseDueCallBatches).toHaveBeenCalledTimes(1);
+  });
+
+  it('🔴 ใบสมัคร: ถึงช่อง 18:00 ⇒ ส่งเป็นงานใหม่ (::r2 · คีย์ประจำรอบ) · ผลยังจับด้วย client_candidate_id เดิม', async () => {
+    stub([], [retry()]);
+    const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T17:30:00'));
+    expect(run.retriesSent).toBe(1);
+    const [records, key] = pushInterviews.mock.calls[0] as [Array<Record<string, unknown>>, string];
+    expect(key).toBe('interview-800-r2');
+    expect(records[0].client_interview_id).toBe('siamraj-sql:OPL1::app-5::interview::r2');
+    expect(records[0].client_candidate_id).toBe('siamraj-sql:OPL1::app-5');
+    expect(records[0].scheduled_at).toBe('2026-09-29T18:00:00+07:00');
+    // ส่งถึงแล้ว = เลิกเป็น "รอโทรซ้ำ" (รอผลรอบใหม่)
+    expect(updates().some((s) => /followup_state = null/.test(s))).toBe(true);
+  });
+
+  it('ใบสมัคร: นัดแบบเดิม (เวลาเดิม +24 ชม.) หรือค้างเก่า ⇒ นัดช่องเวลาใหม่ ไม่โทรทันที', async () => {
+    stub([], [retry({ next_attempt_at: bkk('2026-09-26T14:05:00'), last_call_at: bkk('2026-09-25T14:05:00') })]);
+    const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T07:45:00'));
+    expect(run.retriesReplanned).toBe(1);
+    expect(pushInterviews).not.toHaveBeenCalled();
+    const call = dbQuery.mock.calls.find((c) => /set next_attempt_at = \$2::timestamptz/.test(String(c[0])));
+    expect(call?.[1]).toEqual(['800', bkk('2026-09-29T18:00:00').toISOString()]);
+  });
+
+  it('ใบสมัคร: มีเจ้าหน้าที่ติดต่อแล้ว ⇒ ปิดธงโทรซ้ำ ไม่โทร', async () => {
+    stub([], [retry({ contacted: true })]);
+    const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T17:30:00'));
+    expect(run.retriesClosed).toBe(1);
+    expect(pushInterviews).not.toHaveBeenCalled();
+    const call = dbQuery.mock.calls.find((c) => /set followup_state = \$2, next_attempt_at = null/.test(String(c[0])));
+    expect(call?.[1]).toEqual(['800', 'closed', 'มีบันทึกผลติดต่อแล้ว']);
+  });
+
+  it('🔴 งานติดตามที่ปิดแล้ว (ไปแล้ว/ถึงแล้ว/ยกเลิก) ⇒ ปิดธง ไม่โทรซ้ำ (49 แถวค้างของเดิม)', async () => {
+    stub([], [retry({ id: '900', channel: 'reminder', person_ref: 'follow-1', job_ref: 'follow', follow_exists: true, follow_closed: true, next_attempt_at: bkk('2026-09-16T08:00:00') })]);
+    const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T08:00:00'));
+    expect(run.retriesClosed).toBe(1);
+    expect(pushReminders).not.toHaveBeenCalled();
+  });
+
+  it('งานติดตามที่ยังเปิด ⇒ วันถัดไปส่งรอบเดียวของแถวนี้ · client_contact_id ต่อ -r2 · คีย์ follow-<id>-r2', async () => {
+    const plan = {
+      client_contact_id: 'follow-900',
+      recipient_phone: '+66855555555',
+      steps: [{ position: 0, scheduled_at: 'a' }, { position: 1, scheduled_at: 'b' }],
+    };
+    stub([], [retry({ id: '900', channel: 'reminder', person_ref: 'follow-900', job_ref: 'follow', follow_exists: true, follow_closed: false, payload: plan, step_position: 0, next_attempt_at: bkk('2026-09-29T10:00:00') })]);
+    const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T09:55:00'));
+    expect(run.retriesSent).toBe(1);
+    const [records, key] = pushReminders.mock.calls[0] as [Array<Record<string, unknown>>, string];
+    expect(key).toBe('follow-900-r2');
+    expect(records[0].client_contact_id).toBe('follow-900-r2');
+    expect(records[0].steps).toEqual([{ position: 0, scheduled_at: '2026-09-29T10:05:00+07:00' }]);
+  });
+
+  it('ส่งโทรซ้ำไม่ถึงเกิน 24 ชม. ⇒ ให้เจ้าหน้าที่ (needs_human)', async () => {
+    stub([], [retry({ push_state: 'push_failed', next_attempt_at: bkk('2026-09-28T10:00:00') })]);
+    const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T10:30:00'));
+    expect(run.gaveUp).toBe(1);
+    const call = dbQuery.mock.calls.find((c) => /set followup_state = \$2, next_attempt_at = null/.test(String(c[0])));
+    expect(call?.[1]?.[1]).toBe('needs_human');
+  });
+
+  it('🔴 ส่งถึงแล้วแต่ไม่มีผลเกิน 24 ชม. ⇒ ขึ้นให้เจ้าหน้าที่ (เฉพาะแถวที่จด push ไว้)', async () => {
+    stub([]);
+    await runLumosPushRetryOnce(CFG, bkk('2026-09-29T10:00:00'));
+    const sql = dbQuery.mock.calls.map((c) => String(c[0])).find((s) => /push_state = 'push_gave_up'/.test(s) && /q\.push_state = 'pushed'/.test(s)) ?? '';
+    expect(sql).toContain("followup_state = 'needs_human'");
+    expect(sql).toContain('q.result is null');
+    expect(sql).toContain('q.followup_state is null');
   });
 });
 

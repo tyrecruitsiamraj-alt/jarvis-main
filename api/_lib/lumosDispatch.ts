@@ -827,7 +827,8 @@ export async function enqueueLumosReminderForBoardMatch(
   try {
     const auto = result.matches.filter((m) => m.tier === 'green' || m.tier === 'yellow');
     if (auto.length === 0) return;
-    const outcome = await enqueueLumosReminderForSelected(job, result, auto);
+    // โหมด auto เท่านั้นที่มาถึงตรงนี้ (ผู้เรียกเช็ค `isAutoDispatchEnabled`) — เข้าคิวแล้วต้อง push จริง (29 ก.ย. 2569)
+    const outcome = await enqueueLumosReminderForSelected(job, result, auto, { autoPush: true });
     if (outcome.queued > 0) {
       logInfo('lumos.dispatch.reminder.auto', {
         jobId: result.jobId,
@@ -871,7 +872,8 @@ export async function enqueueLumosInterviewForIrecruit(
     const cooldownSkipped = auto.length - eligible.length;
     if (eligible.length === 0) return { ...empty, cooldownSkipped };
 
-    const outcome = await enqueueLumosInterviewForSelected(job, result, eligible);
+    // เข้าคิวแล้วต้อง push จริง (29 ก.ย. 2569) — Lumos ไม่ดึงคิวเองแล้ว
+    const outcome = await enqueueLumosInterviewForSelected(job, result, eligible, undefined, { autoPush: true });
     if (outcome.queued > 0) {
       logInfo('lumos.dispatch.interview.auto', {
         jobId: result.jobId,
@@ -1077,6 +1079,10 @@ export async function enqueueLumosInterviewForRecruitLane(
       suppressed: suppressed.length,
     });
 
+    // 🔴 เข้าคิวแล้วต้องส่งถึง Lumos จริง (29 ก.ย. 2569) — Lumos ไม่ดึงคิวเองแล้ว (เดิมเส้นนี้แค่เข้าคิวแล้วค้าง)
+    // ยิงแบบจดผล ล้มแล้ว `lumosPushRetryWorker` ตามต่อ · ไม่รอให้จบก่อนตอบ
+    if (added.length > 0 && getLumosPushConfig()) void pushQueuedRows('interview', result.jobId, added);
+
     return {
       queued: added.length,
       duplicated,
@@ -1183,6 +1189,10 @@ export async function enqueueLumosInterviewForRecall(
       held: held.length,
       suppressed: suppressed.length,
     });
+
+    // 🔴 เข้าคิวแล้วต้องส่งถึง Lumos จริง (29 ก.ย. 2569) — Lumos ไม่ดึงคิวเองแล้ว (เดิมเส้นนี้แค่เข้าคิวแล้วค้าง)
+    // ยิงแบบจดผล ล้มแล้ว `lumosPushRetryWorker` ตามต่อ · ไม่รอให้จบก่อนตอบ
+    if (added.length > 0 && getLumosPushConfig()) void pushQueuedRows('interview', result.jobId, added);
 
     return {
       queued: added.length,
@@ -2585,15 +2595,25 @@ export async function applyLumosResult(
     }
   }
 
-  try {
-    ({ rows } = await dbQuery<{ id: number }>(applySql(true), params));
-  } catch (e) {
-    if (!isUndefinedColumnError(e)) throw e;
-    logError('lumos.result.stamps.missing', {
-      hint: 'ยังไม่ได้รัน migration 088 — ผลถูกบันทึกแต่ไม่มี first_result_at (เวลารอโทรจะไม่แม่น)',
-    });
-    ({ rows } = await dbQuery<{ id: number }>(applySql(false), params));
-  }
+  const applyById = async (id: string): Promise<Array<{ id: number }>> => {
+    const p = [channel, id, status, JSON.stringify(result ?? null)];
+    try {
+      return (await dbQuery<{ id: number }>(applySql(true), p)).rows;
+    } catch (e) {
+      if (!isUndefinedColumnError(e)) throw e;
+      logError('lumos.result.stamps.missing', {
+        hint: 'ยังไม่ได้รัน migration 088 — ผลถูกบันทึกแต่ไม่มี first_result_at (เวลารอโทรจะไม่แม่น)',
+      });
+      return (await dbQuery<{ id: number }>(applySql(false), p)).rows;
+    }
+  };
+  rows = await applyById(clientId);
+  /**
+   * 🔴 รอบโทรซ้ำของช่อง reminder ส่งไปด้วย `client_contact_id` ต่อท้าย `-r<ครั้งที่>` (29 ก.ย. 2569 ·
+   * `lumosPushRetryWorker`) ให้ Lumos นับเป็นงานใหม่ ไม่ไปทับแผนเดิมของคนนั้น ⇒ ผลที่กลับมาต้องถอยไปจับรหัสเดิมของแถว
+   */
+  const baseId = channel === 'reminder' ? clientId.replace(/-r\d+$/, '') : clientId;
+  if (rows.length === 0 && baseId !== clientId) rows = await applyById(baseId);
   if (rows.length === 0) return false;
   await runFollowupForResult(rows[0].id, result, outcomeForFollowup);
   return true;

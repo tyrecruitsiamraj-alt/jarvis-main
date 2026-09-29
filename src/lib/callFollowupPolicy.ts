@@ -136,10 +136,51 @@ export function shiftOutOfQuietHours(at: Date, policy: CallFollowupPolicy): Date
 }
 
 /**
+ * ═══ โทรซ้ำ "คละช่วงเวลา" ของใบสมัคร (เจ้าของเคาะ 29 ก.ย. 2569) ═══
+ * เจ้าของ: *"โทรซ้ำคละช่วงเวลาจนครบ 3 ครั้ง"* — ไม่รับสายตอนบ่าย รอบหน้าลองเช้า/เย็น แทนที่จะโทรเวลาเดิมทุกวัน
+ * ช่วงเวลาไทย 3 ช่อง: สาย · บ่าย · เย็น — ครบ 3 ครั้งพอดีเดินครบทุกช่วง
+ */
+export const RETRY_TIME_SLOTS_BKK: readonly number[] = [10, 14, 18];
+
+/** ช่องเวลาที่ใกล้ชั่วโมงนี้ที่สุด (เวลาไทย) */
+function nearestSlotIndex(hour: number, slots: readonly number[]): number {
+  let best = 0;
+  for (let i = 1; i < slots.length; i += 1) {
+    if (Math.abs(slots[i] - hour) < Math.abs(slots[best] - hour)) best = i;
+  }
+  return best;
+}
+
+/**
+ * เวลาโทรซ้ำรอบถัดไป — **วันถัดไป** (นับจากสายล่าสุด) ที่ **ช่องเวลาถัดจากช่องของสายล่าสุด**
+ * (โทรบ่าย 14 → รอบหน้า 18 → รอบต่อไป 10) · ได้เวลาที่ผ่านไปแล้ว (งานค้าง) ⇒ เลื่อนไปวันถัดไปจนเป็นอนาคต
+ */
+export function rotatedRetryAt(
+  lastCallAt: Date,
+  now: Date = lastCallAt,
+  slots: readonly number[] = RETRY_TIME_SLOTS_BKK,
+): Date {
+  const hour = bangkokHour(lastCallAt);
+  const slot = slots[(nearestSlotIndex(hour, slots) + 1) % slots.length];
+  // วันของสายล่าสุดตามปฏิทินไทย + 1 วัน ที่ slot:00 (+07:00)
+  const bkk = new Date(lastCallAt.getTime() + 7 * 3_600_000);
+  let out = new Date(Date.UTC(bkk.getUTCFullYear(), bkk.getUTCMonth(), bkk.getUTCDate() + 1, slot - 7, 0, 0));
+  const floor = now.getTime() + 10 * 60_000;
+  while (out.getTime() <= floor) out = new Date(out.getTime() + 24 * 3_600_000);
+  return out;
+}
+
+/** เวลานี้ตรงช่องคละเวลาพอดีไหม (HH:00 ในช่อง) — ใช้แยกนัดโทรซ้ำแบบเดิม (+24 ชม. เวลาเดิม) ที่ค้างมาก่อน */
+export function isRotatedRetrySlot(at: Date, slots: readonly number[] = RETRY_TIME_SLOTS_BKK): boolean {
+  return at.getUTCMinutes() === 0 && at.getUTCSeconds() === 0 && slots.includes(bangkokHour(at));
+}
+
+/**
  * ได้ผลโทรมาแล้วทำอะไรต่อ
  *
  * `attemptCount` = โทรไปแล้วกี่ครั้งรวมครั้งนี้
  * `requestedCallbackAt` = เวลาที่ผู้สมัครบอกว่าให้โทรกลับ (ถ้ามี)
+ * `retrySlots` = ให้ไม่รับสาย/ไม่ติดโทรซ้ำแบบ "คละช่วงเวลา" (ใบสมัคร) · ไม่ส่ง = อีก `retryGapHours` เวลาเดิม
  */
 export function resolveCallFollowup(input: {
   outcome: CallOutcome;
@@ -149,6 +190,7 @@ export function resolveCallFollowup(input: {
   /** ไม่สนใจงานนี้ (job) หรือไม่หางานแล้ว (all) — ใช้เฉพาะ outcome = declined */
   declinedScope?: 'job' | 'all' | null;
   policy?: CallFollowupPolicy;
+  retrySlots?: readonly number[] | null;
 }): CallFollowupDecision {
   const policy = input.policy ?? DEFAULT_CALL_FOLLOWUP_POLICY;
   const { outcome, attemptCount, now } = input;
@@ -227,6 +269,15 @@ export function resolveCallFollowup(input: {
           nextAttemptAt: null,
           suppressUntil: null,
           reason: `โทรครบ ${policy.maxAttempts} ครั้งแล้วยังไม่ติด — ต้องให้คนตาม`,
+        };
+      }
+      if (input.retrySlots && input.retrySlots.length > 0) {
+        const at = shiftOutOfQuietHours(rotatedRetryAt(now, now, input.retrySlots), policy);
+        return {
+          action: 'retry',
+          nextAttemptAt: iso(at),
+          suppressUntil: null,
+          reason: `ยังไม่ติด — โทรซ้ำครั้งที่ ${attemptCount + 1}/${policy.maxAttempts} วันถัดไปช่วงเวลาใหม่`,
         };
       }
       return {
