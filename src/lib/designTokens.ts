@@ -319,6 +319,23 @@ export const CHART = {
     labelStyle: { color: 'rgba(255, 255, 255, 0.7)', fontSize: 11, marginBottom: 2 },
     itemStyle: { color: '#ffffff' },
   },
+  /**
+   * tooltip **พื้นสว่างตามธีม** — เจ้าของทัก 29 ก.ย. 2569: *"ตอนเอาเม้าไปจี้มันมืดมากมองไม่ออก เพิ่มความสว่างให้หน่อย"*
+   * ป้ายดำ (`tooltip`) ข้างบนมืดเกินบนหน้าทีม Online ⇒ ใช้พื้น `--popover` (ขาวในธีมสว่าง) + ตัวอักษรของธีม
+   * อ่านค่าจาก CSS variable ของธีม ⇒ สลับสว่าง/มืดเองโดยไม่ต้องมี hook (ห้ามใส่ hex สด)
+   */
+  tooltipLight: {
+    contentStyle: {
+      background: 'hsl(var(--popover))',
+      border: '1px solid hsl(var(--border))',
+      borderRadius: 12,
+      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.12)',
+      fontSize: 12,
+      color: 'hsl(var(--popover-foreground))',
+    },
+    labelStyle: { color: 'hsl(var(--muted-foreground))', fontSize: 11, marginBottom: 2 },
+    itemStyle: { color: 'hsl(var(--popover-foreground))' },
+  },
 } as const;
 
 /**

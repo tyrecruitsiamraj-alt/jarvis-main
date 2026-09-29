@@ -93,9 +93,9 @@ const BuTrendChart: React.FC<{
                 tickFormatter={(v: number) => (asPct ? `${Math.round(v * 100)}%` : format(v))}
               />
               <Tooltip
-                contentStyle={CHART.tooltip.contentStyle}
-                labelStyle={CHART.tooltip.labelStyle}
-                itemStyle={CHART.tooltip.itemStyle}
+                contentStyle={CHART.tooltipLight.contentStyle}
+                labelStyle={CHART.tooltipLight.labelStyle}
+                itemStyle={CHART.tooltipLight.itemStyle}
                 formatter={(v: number | null, name: string) => [v === null ? '—' : format(Number(v)), name]}
               />
               {series.map((s) => (

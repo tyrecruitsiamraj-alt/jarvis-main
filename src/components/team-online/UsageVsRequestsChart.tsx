@@ -97,9 +97,9 @@ const UsageVsRequestsChart: React.FC<{
               {/* สเกลซ่อนของแท่ง — ให้แท่งสูงสุดอยู่ราวหนึ่งในสามล่างของกราฟ (บอกขนาดงาน ไม่ใช่แกนที่สอง) */}
               <YAxis yAxisId="req" hide domain={[0, maxPos * 3]} />
               <Tooltip
-                contentStyle={CHART.tooltip.contentStyle}
-                labelStyle={CHART.tooltip.labelStyle}
-                itemStyle={CHART.tooltip.itemStyle}
+                contentStyle={CHART.tooltipLight.contentStyle}
+                labelStyle={CHART.tooltipLight.labelStyle}
+                itemStyle={CHART.tooltipLight.itemStyle}
                 formatter={(v: number | null, name: string) =>
                   name === 'usage'
                     ? [v === null ? '—' : fmtPct(Number(v)), 'คนใช้งาน']
