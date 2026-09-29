@@ -29,6 +29,8 @@ import { appBuJoin, appBuSql, parseBuParam, queueBuJoins, queueBuSql } from '../
 import { HAS_APPOINTMENT_SQL, buildApplicantFactsSql } from '../_lib/applicantOverviewSql.js';
 import { siteBuSql, trendBuSql } from '../_lib/siteBuSql.js';
 import { logWarn } from '../_lib/logger.js';
+import { listReleaseSkips } from '../_lib/jobReleaseSkips.js';
+import { buildSkipIndex, releaseSkipText, type JobReleaseSkip } from '../../src/lib/jobReleaseSkips.js';
 import { requestAddedYmd } from '../../src/lib/trends/requestTrends.js';
 import { addDays } from '../../src/lib/trends/timeBuckets.js';
 import { normalizeTrendBu, trendBuFromSiteCode, trendBuLabel } from '../../src/lib/trends/bu.js';
@@ -45,6 +47,7 @@ import {
   buildBuRows,
   classifyQueueRow,
   coverageOf,
+  decisionSummary,
   funnelRows,
   laneRows,
   lumosSummary,
@@ -58,7 +61,9 @@ import {
   type RawAccount,
   type RawActivity,
   type RawApplicant,
+  type PendingWait,
   type RawBoardJob,
+  type RawDecisionRequest,
   type RawFunnelRequest,
   type RawOpenJob,
   type RawPostingRow,
@@ -123,16 +128,29 @@ export function usersSql(): string {
   return `with ev as (
        ${union}
      )
-     select distinct ev.uid::text as uid, ${bkkYmd('ev.at')} as ymd
+     select ev.uid::text as uid, ${bkkYmd('ev.at')} as ymd, max(ev.at) as last_at
        from ev
-       join ${USERS} u on u.id = ev.uid`;
+       join ${USERS} u on u.id = ev.uid
+      group by 1, 2`;
+}
+
+/**
+ * ล็อกอินสำเร็จล่าสุดของแต่ละคน **ทุกช่วงเวลา** — "Online ล่าสุด" ของรายชื่อ (รอบ 5)
+ * ⚠️ ล็อกเริ่มเก็บ 1 ก.ค. 2569 ⇒ ไม่มีแถว = "ยังไม่เคยเข้าระบบ" นับตั้งแต่วันนั้น (หน้าเว็บบอกไว้)
+ */
+export function lastLoginSql(): string {
+  return `select user_id::text as uid, max(created_at) as last_at
+            from ${AUDIT}
+           where action = 'auth.login.success' and user_id is not null
+           group by 1`;
 }
 
 /** บัญชีทุกบัญชี (ฐานของ % คนใช้งาน) — แผนก · บทบาท · เปิดใช้อยู่ไหม · วันที่สร้าง */
 export function accountsSql(): string {
   return `select u.id::text as id, coalesce(nullif(btrim(u.department_code), ''), '') as dept, u.role,
                  coalesce(u.is_active, false) as active, ${bkkYmd('u.created_at')} as created_ymd,
-                 coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''), u.email) as display_name
+                 coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''), u.email) as display_name,
+                 coalesce(u.job_lanes, '{}'::text[]) as lanes
             from ${USERS} u`;
 }
 
@@ -202,13 +220,26 @@ async function sinceYmd(sql: string): Promise<string | null> {
   return rows[0]?.ymd ?? null;
 }
 
+const isoOf = (v: Date | string | null | undefined): string | null =>
+  v === null || v === undefined ? null : v instanceof Date ? v.toISOString() : String(v);
+
 async function loadActivity(w: TeamWindow) {
-  const [act, acc, since] = await Promise.all([
-    dbQuery<RawActivity>(usersSql(), [startOf(w.fetchFrom), startOf(addDays(w.fetchTo, 1))]),
-    dbQuery<{ id: string; dept: string; role: string; active: boolean; created_ymd: string | null; display_name: string | null }>(
-      accountsSql(),
-    ),
+  const [act, acc, since, logins] = await Promise.all([
+    dbQuery<{ uid: string; ymd: string; last_at?: Date | string | null }>(usersSql(), [
+      startOf(w.fetchFrom),
+      startOf(addDays(w.fetchTo, 1)),
+    ]),
+    dbQuery<{
+      id: string;
+      dept: string;
+      role: string;
+      active: boolean;
+      created_ymd: string | null;
+      display_name: string | null;
+      lanes?: string[] | null;
+    }>(accountsSql()),
     sinceYmd(`select ${bkkYmd('min(created_at)')} as ymd from ${AUDIT}`),
+    dbQuery<{ uid: string; last_at: Date | string | null }>(lastLoginSql()),
   ]);
   const accounts: Array<RawAccount & { name: string }> = acc.rows.map((r) => ({
     id: r.id,
@@ -216,9 +247,16 @@ async function loadActivity(w: TeamWindow) {
     role: r.role,
     active: !!r.active,
     createdYmd: r.created_ymd,
+    lanes: Array.isArray(r.lanes) ? r.lanes : [],
     name: r.display_name ?? '—',
   }));
-  return { activity: act.rows, accounts, since };
+  const activity: RawActivity[] = act.rows.map((r) => ({ uid: r.uid, ymd: r.ymd, lastAt: isoOf(r.last_at) }));
+  const lastLogin = new Map<string, string>();
+  for (const r of logins.rows) {
+    const at = isoOf(r.last_at);
+    if (at) lastLogin.set(r.uid, at);
+  }
+  return { activity, accounts, since, lastLogin };
 }
 
 /**
@@ -314,6 +352,7 @@ async function loadRequests() {
     ymd: requestAddedYmd(r),
     bu: r.departmentCode ? normalizeTrendBu(r.departmentCode) : null,
     positions: Number(r.positions) || 0,
+    kind: r.kind,
   }));
   return { rows, since: payload.range.from, stale: payload.source === 'stale', ageSeconds: payload.ageSeconds };
 }
@@ -418,6 +457,67 @@ function openJobsOf(feed: readonly JobRequest[]): RawOpenJob[] {
 }
 
 /**
+ * อนุมัติแล้ว · รอดำเนินการ · ไม่อนุมัติ ของใบขอ ERP (รอบ 5) — **หนึ่งแถว ERP หนึ่งแถว** (อัตรารวมต้องเท่าการ์ด "อัตราที่ขอเข้า")
+ * - id ของใบ = `siamraj-sql:<เลขที่>` · เลขที่ชนใบล่วงหน้าที่เปิดอยู่ = จับเฉพาะ id เต็ม (ไม่ถอยไปเลขที่ใบ — กติกาเดียวกับ `funnelRequestsOf`)
+ * - ไม่ปล่อย (และยังไม่ขึ้นหน้าสาธารณะ) → ไม่อนุมัติ · มี Gen link → อนุมัติ · ที่เหลือ → รอ
+ * - รออะไร: อัตราที่ ERP บอกว่าหาได้แล้ว/ยกเลิก → บอกตามนั้น · ยังเหลือ + อยู่ในกล่องงาน → ขั้นที่ติด (`releaseStepOf` ของ `boardJobsOf`)
+ *   หรือ "มีคนเริ่มงานแล้ว" (ไม่ใช่ `stillSourcing`) · ยังเหลือแต่ไม่อยู่ในกล่องงาน → "ไม่อยู่ในกล่องงานแล้ว"
+ */
+export function decisionRequestsOf(
+  requests: readonly RawRequestRow[],
+  src: {
+    postings: readonly RawPostingRow[];
+    releases: ReadonlyArray<{ job_id: string; request_no: string | null }>;
+    skips: readonly JobReleaseSkip[];
+    boardJobs: readonly RawBoardJob[];
+    applicants: (jobId: string) => number;
+    preNos: ReadonlySet<string>;
+  },
+): RawDecisionRequest[] {
+  const linked = new Set(src.postings.map((p) => p.jobId));
+  const skipIdx = buildSkipIndex(src.skips);
+  const skipExact = new Map(src.skips.map((x) => [x.job_id, x]));
+  const releasedIdx = buildReleaseIndex(src.releases);
+  const releasedExact = new Set(src.releases.map((r) => r.job_id));
+  const jobs = new Map(src.boardJobs.map((j) => [j.id, j]));
+  return requests.map((r): RawDecisionRequest => {
+    const id = `siamraj-sql:${r.requestNo}`;
+    const ambiguous = src.preNos.has(r.requestNo);
+    const skip = ambiguous ? skipExact.get(id) : skipIdx.get(id);
+    const released = ambiguous ? releasedExact.has(id) : releasedIdx.has(id);
+    const genLink = !ambiguous && linked.has(id);
+    const decision = skip && !released ? 'rejected' : genLink ? 'approved' : 'pending';
+    let wait: PendingWait | null = null;
+    if (decision === 'pending') {
+      const job = jobs.get(id);
+      wait =
+        r.kind === 'filled'
+          ? 'filled'
+          : r.kind === 'cancelled'
+            ? 'cancelled'
+            : !job
+              ? 'closed'
+              : job.released
+                ? 'publish' // ขึ้นหน้าสาธารณะแล้วแต่ยังไม่มีลิงก์สมัคร = เหลือขั้นสร้างลิงก์
+                : !job.sourcing
+                  ? 'started'
+                  : (job.step ?? 'info');
+    }
+    return {
+      requestNo: r.requestNo,
+      ymd: r.ymd,
+      bu: r.bu,
+      positions: r.positions,
+      decision,
+      wait,
+      reason: decision === 'rejected' && skip ? skip.reason : null,
+      reasonText: decision === 'rejected' && skip ? releaseSkipText(skip) : null,
+      applicants: decision === 'approved' ? src.applicants(id) : 0,
+    };
+  });
+}
+
+/**
  * ติดตรงไหน — ใบขอ ERP ที่เข้ามาในช่วง จับกับของฝั่งเราด้วย id เต็ม `siamraj-sql:<เลขที่>`
  * 🔴 เลขที่ที่ชนกับใบขอล่วงหน้าที่ยังเปิดอยู่ (`siamraj-pre:<เลขที่เดียวกัน>`) = ไม่จับคู่ (ประกาศของใบล่วงหน้าก็เก็บ `siamraj-sql:`)
  *    — กติกาเดียวกับ `buildJobKeyIndex` ของกล่องงาน: ยอมพลาดดีกว่าเอาของอีกใบมาแปะ
@@ -485,16 +585,17 @@ export async function buildTeamOnline(
     applicants: null,
     lanes: null,
     people: null,
+    decisions: null,
     byBu: null,
     errors: {},
   };
   if (scope.mode === 'none') {
     const msg = 'บัญชีนี้ยังไม่ได้ผูกแผนก — ยังดูตัวเลขไม่ได้';
-    body.errors = { users: msg, requests: msg, lumos: msg, postings: msg, funnel: msg, byBu: msg, applicants: msg, lanes: msg };
+    body.errors = { users: msg, requests: msg, lumos: msg, postings: msg, funnel: msg, byBu: msg, applicants: msg, lanes: msg, decisions: msg };
     return body;
   }
 
-  const [actR, reqR, queueR, postR, feedR, funnelR, appsR, relR] = await Promise.all([
+  const [actR, reqR, queueR, postR, feedR, funnelR, appsR, relR, skipR] = await Promise.all([
     settle(loadActivity(w)),
     settle(loadRequests()),
     settle(loadQueue(w)),
@@ -508,6 +609,7 @@ export async function buildTeamOnline(
     settle(loadFunnelJobs()),
     settle(loadApplicants(w)),
     settle(loadReleases()),
+    settle(listReleaseSkips()),
   ]);
 
   // ผู้ใช้ถูกล็อกแผนก = เห็นแค่ BU ตัวเอง ทุกก้อน (ต่อ BU ก็แถวเดียว) · ไม่ล็อก = ทุก BU
@@ -609,10 +711,18 @@ export async function buildTeamOnline(
   } else body.errors.applicants = 'อ่านใบสมัครไม่ได้';
 
   // ── ใบเปิดในมุมกล่องงาน: เลน + ใบยังไม่มีผู้สมัครแยกอายุ ──
-  if (feedR.ok && postR.ok && relR.ok && funnelR.ok) {
-    const counts: Record<string, number> = {};
-    for (const [jobId, j] of funnelR.v.byJob) counts[jobId] = j.count;
-    const jobs = boardJobsOf(feedR.v, relR.v, postR.v.rows, counts, today).filter((j) => inScope(j.bu));
+  const boardJobs =
+    feedR.ok && postR.ok && relR.ok && funnelR.ok
+      ? boardJobsOf(
+          feedR.v,
+          relR.v,
+          postR.v.rows,
+          Object.fromEntries([...funnelR.v.byJob].map(([jobId, j]) => [jobId, j.count])),
+          today,
+        )
+      : null;
+  if (boardJobs) {
+    const jobs = boardJobs.filter((j) => inScope(j.bu));
     const pageJobs = jobs.filter((j) => inPage(j.bu));
     const allOf = (list: typeof jobs) => laneRows(list.map((j) => ({ ...j, bu: 'ALL' })), () => 'ทั้งหมด', ['ALL'])[0];
     body.lanes = {
@@ -623,10 +733,28 @@ export async function buildTeamOnline(
     };
   } else body.errors.lanes = feedR.ok ? 'อ่านทะเบียนปล่อยใบ/ประกาศไม่ได้' : 'อ่านใบขอที่เปิดอยู่ไม่ได้';
 
+  // ── อัตราที่ขอเข้า: อนุมัติแล้ว (Gen link) · รอดำเนินการ · ไม่อนุมัติ (ไม่ปล่อย + เหตุผล) ──
+  if (reqR.ok && requests && postR.ok && relR.ok && funnelR.ok && feedR.ok && boardJobs) {
+    const preNos = new Set(
+      feedR.v.filter((j) => String(j.id).startsWith(PREQUEST_ID_PREFIX)).map((j) => requestNoOf(String(j.id))),
+    );
+    const rows = decisionRequestsOf(requests, {
+      postings: postR.v.rows,
+      releases: relR.v,
+      skips: skipR.ok ? skipR.v : [],
+      boardJobs,
+      applicants: (jobId) => funnelR.v.byJob.get(jobId)?.count ?? 0,
+      preNos,
+    });
+    const page = decisionSummary(w, rows.filter((r) => inPage(r.bu)), labelOf);
+    const perBu = decisionSummary(w, rows, labelOf, knownBus);
+    body.decisions = { total: page.total, byBu: perBu.byBu, skipsReady: skipR.ok };
+  } else body.errors.decisions = !reqR.ok ? 'อ่านใบขอจาก ERP ไม่ได้ตอนนี้' : 'อ่านประกาศ/ทะเบียนปล่อย/กล่องงานไม่ได้';
+
   // ── รายชื่อคนใช้งาน (เฉพาะหัวหน้า/admin) ──
   if (canSeePeople && actR.ok) {
     const accounts = actR.v.accounts.filter((a) => inScope(a.bu || null) || (!forcedBu && a.bu === ''));
-    body.people = peopleOf(w, accounts, actR.v.activity);
+    body.people = peopleOf(w, accounts, actR.v.activity, actR.v.lastLogin);
   }
 
   if (openJobs && postings) {
@@ -646,6 +774,7 @@ export async function buildTeamOnline(
     ['funnel', funnelR],
     ['applicants', appsR],
     ['releases', relR],
+    ['releaseSkips', skipR],
   ] as const) {
     if (!r.ok) logWarn(`team-online: ก้อน ${k} อ่านไม่ได้`, { reason: why(r.e) });
   }

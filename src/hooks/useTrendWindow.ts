@@ -35,13 +35,21 @@ export type TrendWindow = {
  * ช่วงเวลาของแท็บ Dashboard — เปลี่ยนงวด = กลับไปใช้ช่วงตั้งต้นของงวดนั้น (30 วัน · 12 สัปดาห์ · 12 เดือน …)
  * ⚠️ เก็บในหน้า (ไม่ผูก URL) — เป็นมุมมองของคนที่นั่งดู ไม่ใช่ของลิงก์ (แบบเดียวกับช่วงวันที่สมัคร)
  */
-export function useTrendWindow(initialGrain: TrendGrain = 'day'): TrendWindow {
+export function useTrendWindow(
+  initialGrain: TrendGrain = 'day',
+  /**
+   * ความยาวช่วงตั้งต้นต่องวด (ไม่ส่ง = ของแท็บ Dashboard: 30 วัน · 12 สัปดาห์ …)
+   * หน้าทีม Online ส่ง `{ day: 7 }` — เจ้าของสั่ง 29 ก.ย. 2569 *"ค่า Default ย้อนหลัง 7 วัน"*
+   */
+  spans?: Partial<Record<TrendGrain, number>>,
+): TrendWindow {
   const today = bangkokYmd(new Date()) as string;
   const [grain, setGrainState] = useState<TrendGrain>(initialGrain);
   const [custom, setCustom] = useState<{ from: string; to: string } | null>(null);
   const [compare, setCompare] = useState<TrendCompareMode>('previous');
+  const span = spans?.[grain];
   return useMemo(() => {
-    const range = custom ?? defaultRange(grain, today);
+    const range = custom ?? defaultRange(grain, today, span);
     const previous = compare === 'lastYear' ? sameRangeLastYear(range.from, range.to) : previousRange(range.from, range.to);
     return {
       grain,
@@ -58,5 +66,5 @@ export function useTrendWindow(initialGrain: TrendGrain = 'day'): TrendWindow {
       today,
       fetchFrom: previous.from < range.from ? previous.from : range.from,
     };
-  }, [grain, custom, compare, today]);
+  }, [grain, custom, compare, today, span]);
 }

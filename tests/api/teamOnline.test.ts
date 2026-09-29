@@ -60,7 +60,12 @@ const APPS = [
 let showedRecorded = false;
 
 /** ตอบตามคิวรี — แยกด้วยข้อความที่มีแค่คิวรีนั้น */
+/** ทะเบียน "ไม่ปล่อย" — R9 ไม่ปล่อยเพราะหน่วยงานให้รอ · R1 ถูกตั้งไว้แต่ขึ้นหน้าสาธารณะแล้ว (ต้องไม่นับเป็นไม่อนุมัติ) */
+let SKIPS: Array<Record<string, unknown>> = [];
+
 function fakeDb(sql: string) {
+  if (sql.includes('from job_release_skips')) return { rows: SKIPS };
+  if (sql.includes("action = 'auth.login.success'")) return { rows: [{ uid: 'u2', last_at: new Date('2026-09-28T10:00:00Z') }] };
   if (sql.includes('as wait_hours')) return { rows: APPS };
   if (sql.includes('released_at is not null')) return { rows: [{ job_id: 'siamraj-sql:R1', request_no: 'R1' }] };
   if (sql.includes('from audit_logs') && sql.includes('min(created_at)')) return { rows: [{ ymd: '2026-07-01' }] };
@@ -68,18 +73,19 @@ function fakeDb(sql: string) {
   if (sql.includes('with ev as')) {
     return {
       rows: [
-        { uid: 'u1', ymd: '2026-09-20' },
-        { uid: 'u2', ymd: '2026-09-21' },
-        { uid: 'u3', ymd: '2026-08-10' },
+        { uid: 'u1', ymd: '2026-09-20', last_at: new Date('2026-09-20T02:30:00Z') },
+        { uid: 'u2', ymd: '2026-09-21', last_at: new Date('2026-09-21T02:30:00Z') },
+        { uid: 'u3', ymd: '2026-08-10', last_at: new Date('2026-08-10T02:30:00Z') },
       ],
     };
   }
   if (sql.includes('coalesce(u.is_active')) {
     return {
       rows: [
-        { id: 'u1', dept: 'LBD', role: 'staff', active: true, created_ymd: '2026-07-01', display_name: 'หนึ่ง' },
-        { id: 'u2', dept: 'LM', role: 'supervisor', active: true, created_ymd: '2026-07-01', display_name: 'สอง' },
-        { id: 'u3', dept: 'LBD', role: 'opl', active: true, created_ymd: '2026-07-01', display_name: 'สาม' },
+        { id: 'u1', dept: 'LBD', role: 'staff', active: true, created_ymd: '2026-07-01', display_name: 'หนึ่ง', lanes: ['recruiter'] },
+        { id: 'u2', dept: 'LM', role: 'supervisor', active: true, created_ymd: '2026-07-01', display_name: 'สอง', lanes: [] },
+        { id: 'u3', dept: 'LBD', role: 'opl', active: true, created_ymd: '2026-07-01', display_name: 'สาม', lanes: null },
+        { id: 'u4', dept: 'LBD', role: 'staff', active: true, created_ymd: '2026-07-01', display_name: 'สี่', lanes: ['online'] },
       ],
     };
   }
@@ -129,6 +135,10 @@ let tick = 0;
 beforeEach(() => {
   tick += 1;
   showedRecorded = false;
+  SKIPS = [
+    { job_id: 'siamraj-sql:R9', request_no: 'R9', reason: 'unit_hold', note: null, skipped_at: '2026-09-29T01:00:00Z', skipped_by_name: 'a@x.com' },
+    { job_id: 'siamraj-sql:R1', request_no: 'R1', reason: 'filled', note: null, skipped_at: '2026-09-29T01:00:00Z', skipped_by_name: 'a@x.com' },
+  ];
   vi.useFakeTimers({ toFake: ['Date'] });
   // 29 ก.ย. 2569 10:00 ไทย + เลื่อนทีละ 2 นาที (ยังอยู่วันเดียวกัน)
   vi.setSystemTime(new Date(Date.UTC(2026, 8, 29, 3, 0, 0) + tick * 120_000));
@@ -191,7 +201,8 @@ describe('ตัวเลขประกอบจากแถวจริง', (
     const body = await run({});
     expect(body.errors).toEqual({});
     const lbd = body.users.byBu.find((r: { bu: string }) => r.bu === 'LBD');
-    expect(lbd).toMatchObject({ accounts: 2, users: 1, pct: 0.5 });
+    expect(lbd).toMatchObject({ accounts: 3, users: 1 });
+    expect(lbd.pct).toBeCloseTo(1 / 3);
     expect(lbd.roles.map((r: { role: string }) => r.role)).toEqual(['staff', 'opl']);
     expect(body.requests.positions.cur).toBe(8);
     expect(body.requests.requests.cur).toBe(3);
@@ -259,13 +270,55 @@ describe('ตัวเลขประกอบจากแถวจริง', (
 
   it('🔴 รายชื่อคนใช้งาน: หัวหน้า/admin ได้ชื่อ · เจ้าหน้าที่ได้ null (เซิร์ฟเวอร์ตัดสิน)', async () => {
     const admin = await run({});
-    expect(admin.people.map((p: { name: string }) => p.name)).toEqual(expect.arrayContaining(['หนึ่ง', 'สอง', 'สาม']));
-    // ใช้ในช่วงนี้ไม่ได้ (u3 ใช้ล่าสุด ส.ค.) ขึ้นก่อน
-    expect(admin.people[0]).toMatchObject({ id: 'u3', days: 0 });
+    expect(admin.people.map((p: { name: string }) => p.name)).toEqual(expect.arrayContaining(['หนึ่ง', 'สอง', 'สาม', 'สี่']));
+    // เรียงตาม BU → Online ล่าสุดใหม่ก่อน → ยังไม่เคยเข้าระบบท้าย BU
+    expect(admin.people.map((p: { id: string }) => p.id)).toEqual(['u1', 'u3', 'u4', 'u2']);
+    const byId = Object.fromEntries(admin.people.map((p: { id: string }) => [p.id, p]));
+    expect(byId.u4).toMatchObject({ lastAt: null, kind: 'online' });
+    expect(byId.u1).toMatchObject({ kind: 'recruiter', lastAt: '2026-09-20T02:30:00.000Z' });
+    // ล็อกอินล่าสุดทุกช่วงนับด้วย (u2 ใช้งานล่าสุด 21 ก.ย. แต่ล็อกอิน 28 ก.ย.)
+    expect(byId.u2).toMatchObject({ kind: 'supervisor', lastAt: '2026-09-28T10:00:00.000Z' });
     const sup = await run({ grain: 'week' }, 'supervisor');
     expect(sup.people).not.toBeNull();
     const staff = await run({ grain: 'month' }, 'staff');
     expect(staff.people).toBeNull();
+  });
+
+  it('คนใช้งานต่อ BU แยกหัวหน้า/สายงาน (จี้โดนัท) · ตั้งสายงานไม่ครบ = ยังไม่ตั้งสายงาน', async () => {
+    const body = await run({});
+    const lbd = body.users.byBu.find((r: { bu: string }) => r.bu === 'LBD');
+    expect(lbd.kinds.map((k: { key: string; users: number; accounts: number }) => [k.key, k.users, k.accounts])).toEqual([
+      ['recruiter', 1, 1],
+      ['online', 0, 1],
+      ['unset', 0, 1],
+    ]);
+  });
+
+  it('🔴 อัตราที่ขอเข้า: อนุมัติ = Gen link · ไม่อนุมัติ = ไม่ปล่อย (ยกเว้นใบที่ขึ้นหน้าสาธารณะแล้ว) · รออะไร · ยอดรวม = การ์ด', async () => {
+    const body = await run({});
+    const t = body.decisions.total;
+    // R1 มี Gen link (ตั้งไม่ปล่อยไว้แต่ปล่อยขึ้นหน้าสาธารณะแล้ว ⇒ ไม่นับเป็นไม่อนุมัติ) · R2 เลขชนใบล่วงหน้า = รอ · R9 ไม่ปล่อย
+    expect(t.decisions.approved).toMatchObject({ positions: 2, requests: 1 });
+    expect(t.decisions.pending).toMatchObject({ positions: 1, requests: 1 });
+    expect(t.decisions.rejected).toMatchObject({ positions: 5, requests: 1 });
+    expect(t.decisions.approved.positions + t.decisions.pending.positions + t.decisions.rejected.positions).toBe(body.requests.positions.cur);
+    expect(t.approvedApplicants).toEqual({ withApplicants: 1, applicants: 2 });
+    expect(t.reasons.map((r: { text: string }) => r.text)).toEqual(['หน่วยงานให้รอ']);
+    // R2 ของ ERP ไม่อยู่ในกล่องงาน (กล่องงานมีแต่ใบล่วงหน้า siamraj-pre:R2) ⇒ บอกตรง ๆ ไม่เดาขั้น
+    expect(t.waits.closed).toEqual({ positions: 1, requests: 1 });
+    expect(body.decisions.skipsReady).toBe(true);
+    expect(body.decisions.byBu.find((r: { bu: string }) => r.bu === 'LM').decisions.rejected.positions).toBe(5);
+  });
+
+  it('ทะเบียนไม่ปล่อยอ่านไม่ได้ = ไม่อนุมัติเป็น 0 พร้อมธง skipsReady=false (ห้ามทำหน้าล่ม)', async () => {
+    dbQuery.mockImplementation(async (sql: string) => {
+      if (sql.includes('from job_release_skips')) throw new Error('db down');
+      return fakeDb(sql);
+    });
+    const body = await run({ grain: 'week' });
+    expect(body.decisions.skipsReady).toBe(false);
+    expect(body.decisions.total.decisions.rejected.positions).toBe(0);
+    expect(body.users).not.toBeNull();
   });
 
   it('feed ล่ม = ตารางต่อ BU null + บอกเหตุ · การ์ดยังขึ้น', async () => {
@@ -278,6 +331,13 @@ describe('ตัวเลขประกอบจากแถวจริง', (
 });
 
 describe('โครงคิวรี (นิยามกลาง)', () => {
+  it('Online ล่าสุด: ล็อกอินสำเร็จล่าสุดทุกช่วงเวลา · เวลาล่าสุดของแต่ละวันจากร่องรอยงาน', () => {
+    expect(mod.lastLoginSql()).toContain("action = 'auth.login.success'");
+    expect(mod.lastLoginSql()).toContain('max(created_at)');
+    expect(mod.usersSql()).toContain('max(ev.at) as last_at');
+    expect(mod.accountsSql()).toContain('u.job_lanes');
+  });
+
   it('คนใช้งาน: รวมร่องรอยทุกตาราง · ต่อกับตารางผู้ใช้ · ไม่มีคู่ updated_by ของงานติดตาม · วันไทย', () => {
     const sql = mod.usersSql();
     for (const [t] of mod.ACTIVITY_SOURCES) expect(sql).toContain(`from ${t}`);

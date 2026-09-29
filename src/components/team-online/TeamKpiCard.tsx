@@ -38,6 +38,8 @@ export type TeamKpiCardProps = {
    * (ห้ามเอาการ์ดไปไว้ในปุ่ม: `<button>` ครอบ `<p>/<div>` ผิด HTML + ขนาดไอคอนของปุ่มไปทับไอคอนในการ์ด)
    */
   onOpen?: () => void;
+  /** รอบ 5: การ์ดทำตัวเป็นแท็บ — การ์ดที่เลือกอยู่ (ข้อมูลใต้การ์ดเป็นของใบนี้) */
+  selected?: boolean;
 };
 
 const PILL_TONE: Record<DeltaPill['tone'], ToneKey> = { good: 'success', bad: 'danger', neutral: 'neutral' };
@@ -68,8 +70,15 @@ const TeamKpiCard: React.FC<TeamKpiCardProps> = ({
   loading = false,
   error,
   onOpen,
+  selected = false,
 }) => (
-  <Card className={cn('relative flex min-w-0 flex-col gap-3 rounded-2xl p-4', onOpen && 'transition-shadow hover:shadow-md')}>
+  <Card
+    className={cn(
+      'relative flex min-w-0 flex-col gap-3 rounded-2xl p-4',
+      onOpen && 'transition-shadow hover:shadow-md',
+      selected && 'border-primary ring-1 ring-primary',
+    )}
+  >
     <div className="flex items-start gap-3">
       <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', TONE[tone].wash, TONE[tone].value)} aria-hidden>
         <Icon className="h-4 w-4" />
@@ -82,7 +91,12 @@ const TeamKpiCard: React.FC<TeamKpiCardProps> = ({
         </p>
         <p className={cn('truncate text-xs', DASH.muted)}>{sub}</p>
       </div>
-      {onOpen ? <ChevronRight className={cn('ml-auto h-4 w-4 shrink-0', DASH.muted)} aria-hidden /> : null}
+      {onOpen ? (
+        <ChevronRight
+          className={cn('ml-auto h-4 w-4 shrink-0 transition-transform', selected ? cn('rotate-90', TONE.primary.value) : DASH.muted)}
+          aria-hidden
+        />
+      ) : null}
     </div>
     {loading ? (
       <div className="space-y-2">
@@ -115,6 +129,7 @@ const TeamKpiCard: React.FC<TeamKpiCardProps> = ({
         variant="ghost"
         className="absolute inset-0 h-auto w-auto rounded-2xl p-0 hover:bg-transparent"
         title={metricHelp(metric)}
+        aria-pressed={selected}
         onClick={onOpen}
       >
         <span className="sr-only">

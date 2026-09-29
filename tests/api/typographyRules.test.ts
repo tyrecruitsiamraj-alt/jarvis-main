@@ -213,10 +213,11 @@ describe('หน้าแรกต้องไม่มีตัวอักษ�
     'src/components/team-online/TeamKpiCard.tsx',
     'src/components/team-online/BuTrendChart.tsx',
     'src/components/team-online/UsageVsRequestsChart.tsx',
-    'src/components/team-online/TeamBuPanel.tsx',
-    'src/components/team-online/TeamOnlineTabs.tsx',
     'src/components/team-online/TeamOnlineSections.tsx',
-    'src/components/team-online/TeamDetailSheet.tsx',
+    'src/components/team-online/TeamViews.tsx',
+    'src/components/team-online/BuDonut.tsx',
+    'src/components/team-online/TeamTimeFilter.tsx',
+    'src/components/jobs/ReleaseSkipControl.tsx',
   ];
 
   it.each(FILES)('%s — ไม่มี text-[10px] / text-[11px]', (f) => {

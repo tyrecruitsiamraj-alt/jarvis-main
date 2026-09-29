@@ -23,11 +23,9 @@ import {
   APPLICANT_STAGES,
   FUNNEL_STAGES,
   TEAM_LANES,
-  TEAM_ROLES,
   countDelta,
   emptyLumosStats,
   fmtPct,
-  rateDelta,
   ratio,
   successRate,
   type ApplicantStage,
@@ -235,124 +233,25 @@ function chartFootOf(data: Data | null): string | null {
   }`;
 }
 
-/* ─────────────── คนใช้งาน ─────────────── */
-
-const ROLE_LABEL = new Map(TEAM_ROLES.map((r) => [r.key, r.label]));
-const TH_DAY = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' });
-
-export function UsersSection({ data, loading }: { data: Data | null; loading: boolean }) {
-  const w = data?.window ?? null;
-  const users = pickBu(data, data?.users?.byBu);
-  const total = users.reduce((s, r) => ({ accounts: s.accounts + r.accounts, users: s.users + r.users }), { accounts: 0, users: 0 });
-  const people = data?.people ? data.people.filter((p) => !data.bu || p.bu === data.bu) : null;
-  return (
-    <Section title="คนใช้งานต่อ BU · % ของบัญชีใน BU" buBadge={buBadgeOf(data)} foot={chartFootOf(data)}>
-      {w ? (
-        <BuTrendChart
-          buckets={w.buckets}
-          series={chartOf(data?.users?.byBu, (r) => r.series)}
-          lastOpen={w.lastBucketOpen}
-          format={(v) => fmtPct(v)}
-          asPct
-          selected={data?.bu ?? null}
-          ariaLabel="คนใช้งานต่อ BU เป็นเปอร์เซ็นต์ของบัญชี"
-        />
-      ) : null}
-      {!data?.users ? (
-        empty(data?.errors.users ?? (loading ? 'กำลังโหลด…' : '—'))
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs">BU</TableHead>
-              <Head metric="teamOnline.accounts" />
-              <Head metric="teamOnline.users" />
-              <Head metric="teamOnline.usersPct" suffix=" (%)" />
-              <TableHead className="text-right text-xs">เทียบช่วงก่อน</TableHead>
-              <TableHead className="text-xs">แยกบทบาท (ใช้ / บัญชี)</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.map((r) => (
-              <TableRow key={r.bu || 'unknown'}>
-                <BuCell label={r.label} bu={r.bu} />
-                <Num>{n(r.accounts)}</Num>
-                <Num>{n(r.users)}</Num>
-                <Num strong>{r.accounts === 0 ? '—' : fmtPct(r.pct)}</Num>
-                <Num className={DASH.muted}>{r.accounts === 0 ? '—' : rateDelta(r.pct, r.prevPct).text}</Num>
-                <TableCell className={cn('text-xs', DASH.muted)}>
-                  {r.accounts === 0 ? (
-                    <span className={TONE.danger.value}>ยังไม่มีบัญชีในระบบ</span>
-                  ) : (
-                    r.roles.map((x) => `${x.label} ${NUM.format(x.users)}/${NUM.format(x.accounts)}`).join(' · ')
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-            {users.length > 1 ? (
-              <TableRow>
-                <BuCell label="รวม" bu={null} />
-                <Num strong>{n(total.accounts)}</Num>
-                <Num strong>{n(total.users)}</Num>
-                <Num strong>{fmtPct(ratio(total.users, total.accounts))}</Num>
-                <Num>{''}</Num>
-                <TableCell />
-              </TableRow>
-            ) : null}
-          </TableBody>
-        </Table>
-      )}
-      {people ? <PeopleList people={people} /> : null}
-    </Section>
-  );
-}
-
-/** รายชื่อคนใช้งาน (เฉพาะหัวหน้า/admin — เซิร์ฟเวอร์ส่งมาเฉพาะคนที่มีสิทธิ์) · คนที่ยังไม่ใช้ขึ้นก่อน */
-function PeopleList({ people }: { people: NonNullable<Data['people']> }) {
-  const idle = people.filter((p) => p.days === 0).length;
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium text-foreground">
-        รายชื่อ · ยังไม่ได้ใช้ในช่วงนี้ {NUM.format(idle)} จาก {NUM.format(people.length)} คน
-      </p>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-xs">ชื่อ</TableHead>
-            <TableHead className="text-xs">BU</TableHead>
-            <TableHead className="text-xs">บทบาท</TableHead>
-            <TableHead className="text-right text-xs">ใช้กี่วัน</TableHead>
-            <TableHead className="text-right text-xs">ใช้ล่าสุด</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {people.map((p) => (
-            <TableRow key={p.id}>
-              <TableCell className="text-sm text-foreground">{p.name}</TableCell>
-              <TableCell className={cn('text-xs', DASH.muted)}>{p.bu || 'ไม่ระบุ BU'}</TableCell>
-              <TableCell className={cn('text-xs', DASH.muted)}>{ROLE_LABEL.get(p.role) ?? p.role}</TableCell>
-              <Num strong={p.days === 0} className={p.days === 0 ? TONE.danger.value : undefined}>
-                {p.days === 0 ? 'ไม่ได้ใช้' : NUM.format(p.days)}
-              </Num>
-              <Num className={DASH.muted}>{p.lastYmd ? TH_DAY.format(new Date(`${p.lastYmd}T12:00:00+07:00`)) : '—'}</Num>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
 /* ─────────────── ใบขอเข้า (อัตรา) ─────────────── */
 
-export function RequestsSection({ data, loading }: { data: Data | null; loading: boolean }) {
+export function RequestsSection({
+  data,
+  loading,
+  chart = true,
+}: {
+  data: Data | null;
+  loading: boolean;
+  /** false = ตารางอย่างเดียว (มุมการ์ดอัตราที่ขอเข้าวาดกราฟของตัวเองข้างบนแล้ว) */
+  chart?: boolean;
+}) {
   const w = data?.window ?? null;
   const reqs = pickBu(data, data?.requests?.byBu);
   const openBy = new Map((data?.byBu ?? []).map((r) => [r.bu, r]));
   const bus = [...new Set([...reqs.map((r) => r.bu), ...pickBu(data, data?.byBu).map((r) => r.bu)])];
   return (
-    <Section title="อัตราที่ขอเข้าต่อ BU" buBadge={buBadgeOf(data)} foot={chartFootOf(data)}>
-      {w ? (
+    <Section title="อัตราที่ขอเข้าต่อ BU" buBadge={buBadgeOf(data)} foot={chart ? chartFootOf(data) : null}>
+      {w && chart ? (
         <BuTrendChart
           buckets={w.buckets}
           series={chartOf(data?.requests?.byBu, (r) => r.series)}
@@ -707,10 +606,13 @@ export function LumosSection({
   data,
   loading,
   initialMetric = 'sent',
+  chart = true,
 }: {
   data: Data | null;
   loading: boolean;
   initialMetric?: TeamLumosSeriesKey;
+  /** false = ตารางอย่างเดียว (มุมการ์ด Lumos วาดกราฟของตัวเองข้างบนแล้ว) */
+  chart?: boolean;
 }) {
   const [lumosKey, setLumosKey] = useState<TeamLumosSeriesKey>(initialMetric);
   const w = data?.window ?? null;
@@ -722,8 +624,9 @@ export function LumosSection({
     <Section
       title="Lumos ต่อ BU · ทุกเลน"
       buBadge={buBadgeOf(data)}
-      foot={foot ? `${foot} · นับสาย กลุ่มตามวันที่ส่งเข้าคิว` : null}
+      foot={foot ? `${chart ? `${foot} · ` : ''}นับสาย กลุ่มตามวันที่ส่งเข้าคิว` : null}
       right={
+        !chart ? null : (
         <div className="w-40 shrink-0">
           <Select value={lumosKey} onValueChange={(v) => setLumosKey(v as TeamLumosSeriesKey)}>
             <SelectTrigger className="text-xs" aria-label="ดูเรื่อง">
@@ -738,9 +641,10 @@ export function LumosSection({
             </SelectContent>
           </Select>
         </div>
+        )
       }
     >
-      {w ? (
+      {w && chart ? (
         <BuTrendChart
           buckets={w.buckets}
           series={chartOf(data?.lumos?.byBu, (r) => r.series[lumosKey])}

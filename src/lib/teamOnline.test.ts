@@ -16,9 +16,11 @@ import {
   applicantsSummary,
   buildBuRows,
   classifyQueueRow,
+  decisionSummary,
   laneRows,
   oldestNoApplicantJobs,
   peopleOf,
+  personKindOf,
   countDelta,
   countPill,
   pooledUsage,
@@ -45,6 +47,7 @@ import {
   type RawAccount,
   type RawApplicant,
   type RawBoardJob,
+  type RawDecisionRequest,
   type RawFunnelRequest,
   type RawQueueRow,
   type TeamOnlineResponse,
@@ -285,6 +288,10 @@ describe('Lumos ทุกเลน — นิยามเดียวกับ S
     // Success rate ยังไม่มีฐาน = null (ห้าม 0%)
     expect(successRate(s.byBu.find((r) => r.bu === 'LM')!.total)).toBeNull();
     expect(s.called).toMatchObject({ cur: 5, prev: 1 });
+    // ฐานของ rate ต่อช่วงย่อย — หน้าเว็บรวมหลาย BU = รวมสำเร็จ ÷ รวมได้คุยจริง (ห้ามเฉลี่ย %)
+    expect(lbd.series.talked[1]).toBe(3);
+    expect(lbd.series.success[1]).toBe(2);
+    expect(lbd.series.rate[1]).toBeCloseTo(2 / 3);
   });
 });
 
@@ -592,20 +599,139 @@ describe('รายชื่อคนใช้งาน (เฉพาะหั�
     ...over,
   });
 
-  it('ไม่ได้ใช้ขึ้นก่อน · นับวันไม่ซ้ำ · ใช้ล่าสุดไม่นับวันหลังช่วง · บัญชีปิดที่ไม่ได้ใช้ไม่ขึ้น · บัญชีเปิดทีหลังไม่ขึ้น', () => {
+  it('นับวันไม่ซ้ำ · ใช้ล่าสุดไม่นับวันหลังช่วง · บัญชีปิดที่ไม่ได้ใช้ไม่ขึ้น · บัญชีเปิดทีหลังไม่ขึ้น', () => {
     const people = peopleOf(
       w,
       [acc('U1'), acc('U2'), acc('OFF', { active: false }), acc('LATE', { createdYmd: '2026-09-20' })],
       [
-        { uid: 'U1', ymd: '2026-09-02' },
-        { uid: 'U1', ymd: '2026-09-03' },
-        { uid: 'U1', ymd: '2026-09-20' },
-        { uid: 'U2', ymd: '2026-08-15' },
+        { uid: 'U1', ymd: '2026-09-02', lastAt: '2026-09-02T03:00:00Z' },
+        { uid: 'U1', ymd: '2026-09-03', lastAt: '2026-09-03T03:00:00Z' },
+        { uid: 'U1', ymd: '2026-09-20', lastAt: '2026-09-20T03:00:00Z' },
+        { uid: 'U2', ymd: '2026-08-15', lastAt: '2026-08-15T03:00:00Z' },
       ],
     );
     expect(people.map((p) => [p.id, p.days, p.lastYmd])).toEqual([
-      ['U2', 0, '2026-08-15'],
       ['U1', 2, '2026-09-03'],
+      ['U2', 0, '2026-08-15'],
     ]);
+    // Online ล่าสุด = เวลาล่าสุดที่เห็น (ไม่ตัดตามปลายช่วง — เป็นข้อเท็จจริงของตอนนี้)
+    expect(people[0].lastAt).toBe('2026-09-20T03:00:00Z');
+  });
+
+  it('🔴 เรียงตาม BU (ไม่ระบุท้าย) → Online ล่าสุดใหม่ก่อน → ยังไม่เคยเข้าระบบท้าย BU · ล็อกอินล่าสุดทุกช่วงนับด้วย', () => {
+    const people = peopleOf(
+      w,
+      [
+        acc('A', { bu: 'LM' }),
+        acc('B', { bu: 'LBD' }),
+        acc('C', { bu: 'LBD' }),
+        acc('D', { bu: '' }),
+        acc('E', { bu: 'LBD', role: 'supervisor' }),
+      ],
+      [{ uid: 'B', ymd: '2026-09-05', lastAt: '2026-09-05T02:00:00Z' }],
+      new Map([
+        ['C', '2026-09-06T09:00:00Z'],
+        ['A', '2026-07-02T09:00:00Z'],
+      ]),
+    );
+    expect(people.map((p) => [p.bu, p.id, p.lastAt ? 'seen' : 'never'])).toEqual([
+      ['LBD', 'C', 'seen'],
+      ['LBD', 'B', 'seen'],
+      ['LBD', 'E', 'never'],
+      ['LM', 'A', 'seen'],
+      ['', 'D', 'never'],
+    ]);
+    expect(people.find((p) => p.id === 'E')?.kind).toBe('supervisor');
+  });
+
+  it('งานที่ไม่มีเวลากำกับ (ของเก่า) ยังนับว่าเคยเข้า — ห้ามกลายเป็น "ยังไม่เคยเข้าระบบ"', () => {
+    const [p] = peopleOf(w, [acc('X')], [{ uid: 'X', ymd: '2026-09-04' }]);
+    expect(p.lastAt).not.toBeNull();
+  });
+});
+
+describe('ประเภทคน (หัวหน้า + สายงานจากหน้าผู้ใช้งาน)', () => {
+  it('หัวหน้ามาก่อนสายงาน · หลายสายนับสายแรกตามลำดับ · admin ไม่ตั้งสาย = ผู้ดูแลระบบ · ไม่ตั้ง = บอกตรง ๆ', () => {
+    expect(personKindOf({ role: 'supervisor', lanes: ['screener'] })).toBe('supervisor');
+    expect(personKindOf({ role: 'staff', lanes: ['screener', 'recruiter'] })).toBe('recruiter');
+    expect(personKindOf({ role: 'staff', lanes: ['online'] })).toBe('online');
+    expect(personKindOf({ role: 'admin', lanes: [] })).toBe('admin');
+    expect(personKindOf({ role: 'admin', lanes: ['online'] })).toBe('online');
+    expect(personKindOf({ role: 'staff', lanes: null })).toBe('unset');
+    expect(personKindOf({ role: 'opl' })).toBe('unset');
+  });
+
+  it('คนใช้งานต่อ BU แยกประเภท (ใช้ / บัญชี) · เฉพาะประเภทที่มีบัญชี', () => {
+    const w = teamWindow({ from: '2026-09-01', to: '2026-09-07' }, TODAY);
+    const s = usersSummary(
+      w,
+      [
+        { id: 'a', bu: 'LBD', role: 'supervisor', active: true, createdYmd: null, lanes: [] },
+        { id: 'b', bu: 'LBD', role: 'staff', active: true, createdYmd: null, lanes: ['recruiter'] },
+        { id: 'c', bu: 'LBD', role: 'staff', active: true, createdYmd: null, lanes: [] },
+      ],
+      [
+        { uid: 'a', ymd: '2026-09-02' },
+        { uid: 'b', ymd: '2026-09-03' },
+      ],
+      label,
+    );
+    expect(s.byBu[0].kinds).toEqual([
+      { key: 'supervisor', label: 'หัวหน้า', accounts: 1, users: 1 },
+      { key: 'recruiter', label: 'สรรหา', accounts: 1, users: 1 },
+      { key: 'unset', label: 'ยังไม่ตั้งสายงาน', accounts: 1, users: 0 },
+    ]);
+  });
+});
+
+describe('อัตราที่ขอเข้า: อนุมัติแล้ว · รอดำเนินการ · ไม่อนุมัติ', () => {
+  const w = teamWindow({ from: '2026-09-01', to: '2026-09-07' }, TODAY);
+  const row = (over: Partial<RawDecisionRequest>): RawDecisionRequest => ({
+    requestNo: 'R1',
+    ymd: '2026-09-02',
+    bu: 'LBD',
+    positions: 1,
+    decision: 'pending',
+    wait: 'info',
+    reason: null,
+    reasonText: null,
+    applicants: 0,
+    ...over,
+  });
+
+  it('อัตรานับทุกแถว · "ใบ" นับครั้งเดียวต่อเลขที่ใบ (ERP แตกใบเดียวหลายแถว) · นอกช่วงไม่นับ', () => {
+    const s = decisionSummary(
+      w,
+      [
+        row({ requestNo: 'A', decision: 'approved', wait: null, positions: 2, applicants: 3 }),
+        row({ requestNo: 'A', decision: 'approved', wait: null, positions: 1, applicants: 3 }),
+        row({ requestNo: 'B', decision: 'approved', wait: null, positions: 1, applicants: 0, ymd: '2026-09-05' }),
+        row({ requestNo: 'C', wait: 'info', positions: 4 }),
+        row({ requestNo: 'D', wait: 'started', positions: 1 }),
+        row({ requestNo: 'E', decision: 'rejected', wait: null, reason: 'unit_hold', reasonText: 'หน่วยงานให้รอ', positions: 2 }),
+        row({ requestNo: 'F', decision: 'rejected', wait: null, reason: 'other', reasonText: 'ลูกค้ายกเลิกโครงการ', positions: 1 }),
+        row({ requestNo: 'OLD', ymd: '2026-08-20', positions: 9 }),
+      ],
+      label,
+    );
+    const t = s.total;
+    expect(t.decisions.approved).toMatchObject({ positions: 4, requests: 2 });
+    expect(t.decisions.pending).toMatchObject({ positions: 5, requests: 2 });
+    expect(t.decisions.rejected).toMatchObject({ positions: 3, requests: 2 });
+    expect(t.decisions.approved.series).toEqual([0, 3, 0, 0, 1, 0, 0]);
+    // มีคนสมัครมากี่ใบ ใบละกี่คน — ผู้สมัครของใบนับครั้งเดียวแม้ใบแตกหลายแถว
+    expect(t.approvedApplicants).toEqual({ withApplicants: 1, applicants: 3 });
+    expect(t.waits.info).toEqual({ positions: 4, requests: 1 });
+    expect(t.waits.started).toEqual({ positions: 1, requests: 1 });
+    expect(t.reasons.map((r) => [r.text, r.positions])).toEqual([
+      ['หน่วยงานให้รอ', 2],
+      ['ลูกค้ายกเลิกโครงการ', 1],
+    ]);
+  });
+
+  it('ต่อ BU: BU ที่ไม่มีใบในช่วงไม่ขึ้น (เว้นแต่รู้จักจากที่อื่น) · ไม่ระบุ BU ท้าย', () => {
+    const s = decisionSummary(w, [row({ bu: 'LM', positions: 3 }), row({ requestNo: 'X', bu: null, positions: 1 })], label, ['SN']);
+    expect(s.byBu.map((r) => r.bu)).toEqual(['LM', 'SN', '']);
+    expect(s.byBu[0].decisions.pending.positions).toBe(3);
   });
 });

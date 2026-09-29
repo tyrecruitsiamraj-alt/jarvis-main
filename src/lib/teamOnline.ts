@@ -14,7 +14,9 @@
  * ช่วงเวลา = ตัวเดียวกับแท็บ Dashboard (`timeBuckets` · ปฏิทิน + งวด วัน/สัปดาห์/เดือน/ไตรมาส/ปี + เทียบช่วงก่อน/ปีก่อน)
  * ทุกเหตุการณ์นับเป็น **วันที่แบบไทย** (ฝั่ง SQL แปลงเวลาเป็นวันกรุงเทพก่อนส่งมา)
  */
+import { RELEASE_STEP_TEXT } from '@/lib/boardRelease';
 import { classifyCallMicro, vocabForPersonRef } from '@/lib/callMicroOutcome';
+import { JOB_LANES, JOB_LANE_LABEL, type JobLane } from '@/lib/jobLanes';
 import {
   TREND_GRAINS,
   addDays,
@@ -332,10 +334,43 @@ export const TEAM_ROLES: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'admin', label: 'ผู้ดูแลระบบ' },
 ];
 
-/** บัญชีผู้ใช้ — `bu` = BU กลางของแผนกบนบัญชี (`''` = ยังไม่ผูกแผนก) */
-export type RawAccount = { id: string; bu: string; role: string; active: boolean; createdYmd: string | null };
-/** ใช้งานหนึ่งวัน (คนไม่ซ้ำต่อวัน — SQL จัดให้แล้ว) */
-export type RawActivity = { uid: string; ymd: string };
+/**
+ * บัญชีผู้ใช้ — `bu` = BU กลางของแผนกบนบัญชี (`''` = ยังไม่ผูกแผนก)
+ * `lanes` = สายงานจากหน้าผู้ใช้งาน (`users.job_lanes` · migration 114) — ว่าง = ยังไม่ตั้ง
+ */
+export type RawAccount = { id: string; bu: string; role: string; active: boolean; createdYmd: string | null; lanes?: readonly string[] | null };
+/** ใช้งานหนึ่งวัน (คนไม่ซ้ำต่อวัน — SQL จัดให้แล้ว) · `lastAt` = เวลาล่าสุดของวันนั้น (ISO) */
+export type RawActivity = { uid: string; ymd: string; lastAt?: string | null };
+
+/**
+ * ประเภทคนบนโดนัทคนใช้งาน (รอบ 5 · เจ้าของ: *"เป็น หัวหน้า สรรหา ปิดใบขอ online ฯลฯ เท่าไหร่"*)
+ * → Choice **"สายงานจากหน้าผู้ใช้งาน + หัวหน้า"** — หัวหน้า = สิทธิ์ `supervisor` · ที่เหลือ = สายงานที่ติ๊กไว้
+ * ⚠️ คนหนึ่งอยู่ได้หลายสาย — นับสายแรกตามลำดับ `JOB_LANES` (ให้ยอดรวมโดนัทเท่าจำนวนคน)
+ * ⚠️ ยังไม่ตั้งสายงาน = บอกตรง ๆ (วัด 29 ก.ย. 2569: ตั้งแล้ว 20 จาก 58 คน) ห้ามเดาจาก role
+ */
+export type PersonKind = 'supervisor' | JobLane | 'admin' | 'unset';
+
+export const PERSON_KINDS: ReadonlyArray<{ key: PersonKind; label: string }> = [
+  { key: 'supervisor', label: 'หัวหน้า' },
+  { key: 'recruiter', label: JOB_LANE_LABEL.recruiter },
+  { key: 'screener', label: `${JOB_LANE_LABEL.screener} (ปิดใบขอ)` },
+  { key: 'opl', label: JOB_LANE_LABEL.opl },
+  { key: 'online', label: JOB_LANE_LABEL.online },
+  { key: 'admin', label: 'ผู้ดูแลระบบ' },
+  { key: 'unset', label: 'ยังไม่ตั้งสายงาน' },
+];
+
+export const PERSON_KIND_LABEL: Record<PersonKind, string> = Object.fromEntries(
+  PERSON_KINDS.map((k) => [k.key, k.label]),
+) as Record<PersonKind, string>;
+
+export function personKindOf(a: { role: string; lanes?: readonly string[] | null }): PersonKind {
+  if (a.role === 'supervisor') return 'supervisor';
+  const lane = JOB_LANES.find((l) => (a.lanes ?? []).includes(l));
+  if (lane) return lane;
+  if (a.role === 'admin') return 'admin';
+  return 'unset';
+}
 
 export type TeamUsersBu = {
   bu: string;
@@ -347,6 +382,8 @@ export type TeamUsersBu = {
   prevPct: number | null;
   /** แยกบทบาท (เฉพาะบทบาทที่มีบัญชี) */
   roles: Array<{ role: string; label: string; accounts: number; users: number }>;
+  /** แยกประเภทคน (หัวหน้า · สายงาน · ยังไม่ตั้ง) — เฉพาะประเภทที่มีบัญชี · ใช้กับโดนัทตอนจี้ */
+  kinds: Array<{ key: PersonKind; label: string; accounts: number; users: number }>;
   /** % ต่อช่วงย่อย (0–1 · null = ยังไม่มีบัญชีในช่วงย่อยนั้น) */
   series: Array<number | null>;
   /** ตัวตั้ง/ตัวหารของ `series` ต่อช่วงย่อย — ให้หน้าเว็บรวมหลาย BU เป็น % เดียวได้ถูก (รวมตัวตั้ง ÷ รวมตัวหาร ไม่ใช่เฉลี่ย %) */
@@ -405,6 +442,10 @@ export function usersSummary(
         users: cur.filter((a) => a.role === role && usedCur.has(a.id)).length,
       }))
       .filter((r) => r.accounts > 0);
+    const kinds = PERSON_KINDS.map((k) => {
+      const of = cur.filter((a) => personKindOf(a) === k.key);
+      return { key: k.key, label: k.label, accounts: of.length, users: of.filter((a) => usedCur.has(a.id)).length };
+    }).filter((k) => k.accounts > 0);
     const bases = w.buckets.map((b, i) => mine.filter((a) => eligible(a, b.to, usedBucket[i].has(a.id))).length);
     const counts = w.buckets.map((_, i) => mine.filter((a) => usedBucket[i].has(a.id)).length);
     const series = w.buckets.map((_, i) => ratio(counts[i], bases[i]));
@@ -416,6 +457,7 @@ export function usersSummary(
       pct: ratio(users, cur.length),
       prevPct: ratio(prevUsers, prev.length),
       roles,
+      kinds,
       series,
       counts,
       bases,
@@ -436,8 +478,17 @@ export function pooledUsage(rows: ReadonlyArray<Pick<TeamUsersBu, 'counts' | 'ba
 
 /* ─────────────── ใบขอเข้า (อัตรา) ─────────────── */
 
-/** ใบขอหนึ่งแถว (สำเนา ERP ก้อนเดียวกับ Dashboard) — `ymd` = วันที่ขอเข้ามา (`requestAddedYmd`) · `positions` = อัตรา */
-export type RawRequestRow = { requestNo: string; ymd: string | null; bu: string | null; positions: number };
+/**
+ * ใบขอหนึ่งแถว (สำเนา ERP ก้อนเดียวกับ Dashboard) — `ymd` = วันที่ขอเข้ามา (`requestAddedYmd`) · `positions` = อัตรา
+ * `kind` = อัตราก้อนนี้จบยังไง (ERP แตกใบเดียวเป็นหลายแถวตามผล: หาได้แล้ว / ยกเลิก / ยังเหลือ)
+ */
+export type RawRequestRow = {
+  requestNo: string;
+  ymd: string | null;
+  bu: string | null;
+  positions: number;
+  kind?: 'filled' | 'cancelled' | 'remaining';
+};
 
 export type TeamRequestsBu = {
   bu: string;
@@ -550,8 +601,8 @@ export type TeamLumosBu = {
   total: TeamLumosStats;
   prev: TeamLumosStats;
   lanes: Record<TeamLane, TeamLumosStats>;
-  /** ต่อช่วงย่อย — `rate` = Success rate (0–1 · null = ไม่มีฐาน) */
-  series: { sent: number[]; called: number[]; success: number[]; rate: Array<number | null> };
+  /** ต่อช่วงย่อย — `rate` = Success rate (0–1 · null = ไม่มีฐาน) · `talked` = ฐานของ rate (รวมหลาย BU = รวมตัวตั้ง ÷ รวมตัวหาร) */
+  series: { sent: number[]; called: number[]; success: number[]; talked: number[]; rate: Array<number | null> };
 };
 
 const lanesOf = () =>
@@ -621,6 +672,7 @@ export function lumosSummary(
         sent: a.per.map((s) => s.sent),
         called: a.per.map((s) => s.called),
         success: a.per.map((s) => s.success),
+        talked: a.per.map((s) => s.talked),
         rate: a.per.map((s) => successRate(s)),
       },
     }),
@@ -733,6 +785,8 @@ export type TeamBuRow = {
   /** ใบขอเปิดอยู่ตอนนี้ · เหลือหา (อัตรา · ตัวเดียวกับหัวกล่องงาน) */
   openNow: number;
   remaining: number;
+  /** Gen link ครั้งแรกต่อช่วงย่อย (ใบ) — กราฟแท่งของการ์ด Success ประกาศ */
+  series: number[];
 };
 
 export function buildBuRows(
@@ -760,6 +814,7 @@ export function buildBuRows(
       applicants: post.applicants.cur,
       openNow: open.length,
       remaining: open.reduce((s, j) => s + j.positions, 0),
+      series: post.published.series,
     };
   });
   return sortBu(rows, (r) => r.openNow);
@@ -829,6 +884,8 @@ export type TeamApplicantsBu = {
   waitMedianHours: number | null;
   /** ช่องทาง (คีย์ `referral_source` · `''` = ไม่ระบุ) → จำนวนใบในช่วงนี้ */
   sources: Record<string, number>;
+  /** ใบสมัครต่อช่วงย่อย — กราฟแท่งของการ์ดผู้สมัครใหม่ */
+  series: number[];
 };
 
 export function applicantsSummary(
@@ -861,7 +918,7 @@ export function applicantsSummary(
     const mine = rows.filter((r) => (r.bu ?? '') === bu);
     const c = distinctCount(w, mine.map((r) => ({ who: r.id, ymd: r.ymd })));
     const f = fold(mine.filter((r) => at(r.ymd)?.side === 'cur'));
-    return { bu, label: buLabel(labelOf, bu), total: { cur: c.cur, prev: c.prev }, ...f };
+    return { bu, label: buLabel(labelOf, bu), total: { cur: c.cur, prev: c.prev }, series: c.series, ...f };
   });
   return {
     total,
@@ -987,21 +1044,43 @@ export type TeamPerson = {
   name: string;
   role: string;
   bu: string;
+  /** หัวหน้า / สายงาน / ยังไม่ตั้ง — ตัวเดียวกับโดนัท (`personKindOf`) */
+  kind: PersonKind;
   /** ใช้ระบบกี่วันในช่วงนี้ (0 = ไม่ได้ใช้) */
   days: number;
-  /** ใช้ล่าสุดวันไหน (ในข้อมูลที่ดึงมา) */
+  /** ใช้ล่าสุดวันไหน (ในข้อมูลที่ดึงมา ไม่เกินปลายช่วง) */
   lastYmd: string | null;
+  /**
+   * **Online ล่าสุด** (ISO) — เวลาล่าสุดที่เห็นคนนี้ในระบบ: ล็อกอินล่าสุดทั้งหมด (`auth.login.success`) หรืองานที่บันทึกในข้อมูลที่ดึงมา
+   * `null` = ไม่เคยเห็นเลย ⇒ "ยังไม่เคยเข้าระบบ" (นับได้ตั้งแต่ระบบเริ่มเก็บล็อก 1 ก.ค. 2569)
+   */
+  lastAt: string | null;
 };
 
-/** คนที่มีบัญชีในช่วงนี้ + ใช้กี่วัน · เรียง: ไม่ได้ใช้ขึ้นก่อน แล้วใช้น้อยไปมาก */
+const laterIso = (a: string | null | undefined, b: string | null | undefined): string | null => {
+  if (!a) return b ?? null;
+  if (!b) return a;
+  return Date.parse(a) >= Date.parse(b) ? a : b;
+};
+
+/**
+ * รายชื่อคนที่มีบัญชีในช่วงนี้ (รอบ 5 · เจ้าของ: *"รายชื่อที่ทำเป็น Pagination เรียงตาม Bu บอกว่า ใครบ้าง Bu อะไร
+ * Online ล่าสุดเมื่อไหร่ มีใครยังไม่เคยเข้าระบบ"*)
+ * เรียง: BU (ไม่ระบุ BU ท้ายสุด) → Online ล่าสุดใหม่ก่อน → คนที่ยังไม่เคยเข้าระบบท้าย BU
+ */
 export function peopleOf(
   w: TeamWindow,
   accounts: ReadonlyArray<RawAccount & { name: string }>,
   activity: readonly RawActivity[],
+  lastLogin: ReadonlyMap<string, string> = new Map(),
 ): TeamPerson[] {
   const days = new Map<string, Set<string>>();
   const last = new Map<string, string>();
+  const lastAt = new Map<string, string>();
   for (const e of activity) {
+    // SQL ส่งเวลาล่าสุดของวันมาเสมอ · ไม่มี (ของเก่า) = ใช้วันนั้นแทน — ห้ามปล่อยให้คนที่มีร่องรอยกลายเป็น "ยังไม่เคยเข้าระบบ"
+    const seen = laterIso(lastAt.get(e.uid), e.lastAt ?? `${e.ymd}T00:00:00+07:00`);
+    if (seen) lastAt.set(e.uid, seen);
     if (e.ymd > w.range.to) continue;
     const prev = last.get(e.uid);
     if (!prev || e.ymd > prev) last.set(e.uid, e.ymd);
@@ -1010,10 +1089,155 @@ export function peopleOf(
     set.add(e.ymd);
     days.set(e.uid, set);
   }
+  const buOrder = (bu: string) => (bu ? 0 : 1);
   return accounts
     .filter((a) => eligible(a, w.range.to, days.has(a.id)))
-    .map((a) => ({ id: a.id, name: a.name, role: a.role, bu: a.bu, days: days.get(a.id)?.size ?? 0, lastYmd: last.get(a.id) ?? null }))
-    .sort((a, b) => a.days - b.days || a.bu.localeCompare(b.bu) || a.name.localeCompare(b.name, 'th'));
+    .map(
+      (a): TeamPerson => ({
+        id: a.id,
+        name: a.name,
+        role: a.role,
+        bu: a.bu,
+        kind: personKindOf(a),
+        days: days.get(a.id)?.size ?? 0,
+        lastYmd: last.get(a.id) ?? null,
+        lastAt: laterIso(lastLogin.get(a.id), lastAt.get(a.id)),
+      }),
+    )
+    .sort(
+      (a, b) =>
+        buOrder(a.bu) - buOrder(b.bu) ||
+        a.bu.localeCompare(b.bu) ||
+        (b.lastAt ? Date.parse(b.lastAt) : -1) - (a.lastAt ? Date.parse(a.lastAt) : -1) ||
+        a.name.localeCompare(b.name, 'th'),
+    );
+}
+
+/* ─────────────── อัตราที่ขอเข้า: อนุมัติแล้ว · รอดำเนินการ · ไม่อนุมัติ (รอบ 5) ─────────────── */
+
+/**
+ * เจ้าของ: *"อัตราที่ขอเข้ามา มี Visual ให้กด 3 อัน — Approve แล้ว · รอดำเนินการ · ไม่อนุมัติ"* → Choice:
+ * - **อนุมัติแล้ว = Gen link แล้ว** (ตามที่เคาะรอบแรก) — จี้แล้วบอก *"มีคนสมัครมากี่ใบ ใบละกี่คน"*
+ * - **รอดำเนินการ = ยังไม่ Gen link** — จี้แล้วบอก *"รออะไร"* = ขั้นที่ติดบนกล่องงาน (`releaseStepOf`) / มีคนเริ่มงานแล้ว / ปิดแล้ว
+ * - **ไม่อนุมัติ = ทีมตั้ง "ไม่ปล่อย + เหตุผล"** ที่กล่องงาน (migration 129) — จี้แล้วบอก *"ไม่อนุมัติเพราะอะไร"*
+ * ลำดับตัดสิน: ไม่ปล่อย (และยังไม่ขึ้นหน้าสาธารณะ) → Gen link → รอ · กลุ่มใบ = ใบขอที่เข้ามาในช่วงนี้ (ตัวเดียวกับการ์ด) · นับเป็นอัตรา
+ * ⚠️ "อนุมัติ" ตามนิยามนี้ ≠ "ปล่อยแล้ว" ของกล่องงาน (ใบที่มีลิงก์แล้วยังไม่ส่งประกาศนับเป็นอนุมัติ) — เจ้าของเลือกเองโดยรู้ว่าเลขสองหน้าต่างกัน
+ */
+export type RequestDecision = 'approved' | 'pending' | 'rejected';
+
+export const REQUEST_DECISIONS: ReadonlyArray<{ key: RequestDecision; label: string; hint: string }> = [
+  { key: 'approved', label: 'อนุมัติแล้ว', hint: 'Gen link แล้ว' },
+  { key: 'pending', label: 'รอดำเนินการ', hint: 'ยังไม่ Gen link' },
+  { key: 'rejected', label: 'ไม่อนุมัติ', hint: 'ทีมตั้ง “ไม่ปล่อย” พร้อมเหตุผล' },
+];
+
+/**
+ * ใบที่รอดำเนินการ "รออะไร" — ขั้นใช้ป้ายเดียวกับกล่องงาน (`RELEASE_STEP_TEXT`) · "มีคนเริ่มงานแล้ว" คำเดียวกับชิปกล่องงาน
+ * อัตราที่ ERP บอกว่าจบแล้ว (หาได้แล้ว / ยกเลิก) ไม่ได้ "รอ" อะไร แต่ต้องบอกให้เห็น (ไม่งั้นดูเหมือนค้างทั้งกอง)
+ * 🔴 หาได้แล้ว ≠ ปิดครบใบขอ — นับเป็นอัตราของแถวที่ ERP บอกว่า filled เท่านั้น
+ */
+export type PendingWait = 'info' | 'place' | 'benefits' | 'publish' | 'started' | 'filled' | 'cancelled' | 'closed';
+
+export const PENDING_WAITS: ReadonlyArray<{ key: PendingWait; label: string }> = [
+  { key: 'info', label: RELEASE_STEP_TEXT.info.label },
+  { key: 'place', label: RELEASE_STEP_TEXT.place.label },
+  { key: 'benefits', label: RELEASE_STEP_TEXT.benefits.label },
+  { key: 'publish', label: RELEASE_STEP_TEXT.publish.label },
+  { key: 'started', label: 'มีคนเริ่มงานแล้ว' },
+  { key: 'filled', label: 'หาได้แล้ว (ไม่ต้องประกาศ)' },
+  { key: 'cancelled', label: 'ยกเลิกแล้ว' },
+  { key: 'closed', label: 'ไม่อยู่ในกล่องงานแล้ว' },
+];
+
+/** ใบขอหนึ่งใบที่ตัดสินแล้ว (ฝั่ง server ประกอบจาก ERP + ประกาศ + ทะเบียนไม่ปล่อย + กล่องงาน) */
+export type RawDecisionRequest = {
+  requestNo: string;
+  ymd: string | null;
+  bu: string | null;
+  positions: number;
+  decision: RequestDecision;
+  /** รอดำเนินการ: รออะไร */
+  wait: PendingWait | null;
+  /** ไม่อนุมัติ: คีย์เหตุผล + คำอ่าน */
+  reason: string | null;
+  reasonText: string | null;
+  /** อนุมัติแล้ว: ผู้สมัครของใบ (ไม่นับ Lead) */
+  applicants: number;
+};
+
+export type TeamDecisionStat = { positions: number; requests: number; series: number[] };
+
+export type TeamDecisionPart = {
+  decisions: Record<RequestDecision, TeamDecisionStat>;
+  /** ของใบที่อนุมัติแล้ว: มีผู้สมัครกี่ใบ · ผู้สมัครรวมกี่คน */
+  approvedApplicants: { withApplicants: number; applicants: number };
+  waits: Record<PendingWait, { positions: number; requests: number }>;
+  reasons: Array<{ key: string; text: string; positions: number; requests: number }>;
+};
+
+export type TeamDecisionBu = TeamDecisionPart & { bu: string; label: string };
+
+function foldDecisions(w: TeamWindow, rows: readonly RawDecisionRequest[]): TeamDecisionPart {
+  const at = makeLocator(w);
+  const stat = (): TeamDecisionStat => ({ positions: 0, requests: 0, series: w.buckets.map(() => 0) });
+  const decisions: Record<RequestDecision, TeamDecisionStat> = { approved: stat(), pending: stat(), rejected: stat() };
+  const waits = Object.fromEntries(PENDING_WAITS.map((x) => [x.key, { positions: 0, requests: 0 }])) as TeamDecisionPart['waits'];
+  const reasons = new Map<string, { key: string; text: string; positions: number; requests: number }>();
+  const approvedApplicants = { withApplicants: 0, applicants: 0 };
+  // ERP แตกใบเดียวเป็นหลายแถว (ตามผลของอัตรา) ⇒ อัตรานับทุกแถว · "ใบ" นับครั้งเดียวต่อเลขที่ใบ
+  const once = new Set<string>();
+  const first = (group: string, r: RawDecisionRequest) => {
+    const k = `${group}|${r.requestNo}`;
+    if (once.has(k)) return false;
+    once.add(k);
+    return true;
+  };
+  for (const r of rows) {
+    const p = at(r.ymd);
+    if (p?.side !== 'cur') continue;
+    const d = decisions[r.decision];
+    d.positions += r.positions;
+    d.series[p.i] += r.positions;
+    if (first(`d:${r.decision}`, r)) d.requests += 1;
+    if (r.decision === 'approved') {
+      if (first('app', r)) {
+        if (r.applicants > 0) approvedApplicants.withApplicants += 1;
+        approvedApplicants.applicants += r.applicants;
+      }
+    } else if (r.decision === 'pending' && r.wait) {
+      waits[r.wait].positions += r.positions;
+      if (first(`w:${r.wait}`, r)) waits[r.wait].requests += 1;
+    } else if (r.decision === 'rejected') {
+      // "อื่น ๆ" แยกตามข้อความที่พิมพ์ · เหตุผลในรายการรวมตามคีย์
+      const text = r.reasonText ?? 'ไม่ระบุเหตุผล';
+      const key = r.reason === 'other' ? `other:${text}` : (r.reason ?? 'none');
+      const g = reasons.get(key) ?? { key, text, positions: 0, requests: 0 };
+      g.positions += r.positions;
+      if (first(`r:${key}`, r)) g.requests += 1;
+      reasons.set(key, g);
+    }
+  }
+  return {
+    decisions,
+    approvedApplicants,
+    waits,
+    reasons: [...reasons.values()].sort((a, b) => b.positions - a.positions || b.requests - a.requests),
+  };
+}
+
+export function decisionSummary(
+  w: TeamWindow,
+  rows: readonly RawDecisionRequest[],
+  labelOf: (bu: string) => string,
+  extraBus: Iterable<string> = [],
+): { total: TeamDecisionPart; byBu: TeamDecisionBu[] } {
+  const at = makeLocator(w);
+  const bus = new Set<string>([...rows.filter((r) => at(r.ymd)?.side === 'cur').map((r) => r.bu ?? ''), ...extraBus]);
+  const byBu = [...bus].map(
+    (bu): TeamDecisionBu => ({ bu, label: buLabel(labelOf, bu), ...foldDecisions(w, rows.filter((r) => (r.bu ?? '') === bu)) }),
+  );
+  const size = (r: TeamDecisionBu) => r.decisions.approved.positions + r.decisions.pending.positions + r.decisions.rejected.positions;
+  return { total: foldDecisions(w, rows), byBu: sortBu(byBu, size) };
 }
 
 /* ─────────────── คำตอบของเส้น /api/team-online ─────────────── */
@@ -1085,9 +1309,14 @@ export type TeamOnlineResponse = {
   lanes: { total: TeamLaneRow; scope: TeamLaneRow; byBu: TeamLaneRow[]; oldest: TeamStaleJob[] } | null;
   /** รายชื่อคนใช้งาน — เฉพาะหัวหน้า/admin (คนอื่นได้ null) */
   people: TeamPerson[] | null;
+  /**
+   * อัตราที่ขอเข้าในช่วงนี้ แยก อนุมัติแล้ว (Gen link) · รอดำเนินการ · ไม่อนุมัติ (ไม่ปล่อย + เหตุผล) — รอบ 5
+   * `total` = ตามตัวกรอง BU ของหน้า · `byBu` = ทุก BU ตามสิทธิ์ · `skipsReady` = อ่านทะเบียน "ไม่ปล่อย" ได้ (ไม่ได้ = ไม่อนุมัติเป็น 0 เพราะอ่านไม่ได้)
+   */
+  decisions: { total: TeamDecisionPart; byBu: TeamDecisionBu[]; skipsReady: boolean } | null;
   /** แผง BU + ใบเปิดตอนนี้ — ทุก BU เสมอ (ผู้ใช้ถูกล็อกแผนกเห็นแถวเดียว) */
   byBu: TeamBuRow[] | null;
-  errors: Partial<Record<'users' | 'requests' | 'lumos' | 'postings' | 'funnel' | 'byBu' | 'applicants' | 'lanes', string>>;
+  errors: Partial<Record<'users' | 'requests' | 'lumos' | 'postings' | 'funnel' | 'byBu' | 'applicants' | 'lanes' | 'decisions', string>>;
 };
 
 /* ─────────────── แถบ "สิ่งที่ต้องจับตา" ─────────────── */
