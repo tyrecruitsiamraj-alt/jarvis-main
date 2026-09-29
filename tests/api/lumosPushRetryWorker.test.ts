@@ -30,6 +30,12 @@ vi.mock('../../api/_lib/callFollowup.js', () => ({ listSuppressedPhones: () => l
 vi.mock('../../api/_lib/candidateCallHolds.js', () => ({ listHeldPhones: () => listHeldPhones() }));
 const releaseDueCallBatches = vi.fn(async () => 0);
 vi.mock('../../api/_lib/callBatchStore.js', () => ({ releaseDueCallBatches: () => releaseDueCallBatches() }));
+/** feed ใบขอเปิด (ชุดเดียวกับกล่องงาน) — เลน Match ต้องเช็คว่าใบยังเปิดก่อนโทรซ้ำ */
+const OPEN_FEED = [{ id: 'siamraj-sql:OPL1', status: 'open' }];
+const listSiamrajUnitRequests = vi.fn(async (_opts?: unknown): Promise<unknown[]> => OPEN_FEED);
+vi.mock('../../api/_lib/siamrajUnitRequests.js', () => ({
+  listSiamrajUnitRequests: (opts: unknown) => listSiamrajUnitRequests(opts),
+}));
 vi.mock('../../api/_lib/callFollowupPolicyStore.js', async () => {
   const { DEFAULT_CALL_FOLLOWUP_POLICY } = await import('../../src/lib/callFollowupPolicy.js');
   return { getCallFollowupPolicy: async () => DEFAULT_CALL_FOLLOWUP_POLICY };
@@ -68,6 +74,7 @@ const updates = () => dbQuery.mock.calls.map((c) => String(c[0])).filter((s) => 
 
 beforeEach(() => {
   releaseDueCallBatches.mockReset().mockResolvedValue(0);
+  listSiamrajUnitRequests.mockReset().mockResolvedValue(OPEN_FEED);
   pushInterviews.mockReset().mockResolvedValue({ accepted: 1 });
   pushReminders.mockReset().mockResolvedValue({ accepted: 1 });
   getLumosPushConfig.mockReturnValue({ baseUrl: 'x', connectionId: 'y', apiKey: 'z' });
@@ -244,8 +251,28 @@ const retry = (over: Record<string, unknown> = {}) => ({
   contacted: false,
   follow_exists: false,
   follow_closed: false,
+  staff_resulted: false,
   ...over,
 });
+
+/** เลน Match คนของเรา (board Match ⇒ ช่อง reminder แผนรอบเดียว) — โทรไป 14:37 ไม่รับ ⇒ นัดวันถัดไป 14:37 */
+const matchReminder = (over: Record<string, unknown> = {}) =>
+  retry({
+    id: '950',
+    channel: 'reminder',
+    person_ref: 'card-77',
+    job_ref: 'siamraj-sql:OPL1',
+    payload: {
+      client_contact_id: 'siamraj-sql:OPL1::card-77',
+      recipient_phone: '+66866666666',
+      steps: [{ position: 0, scheduled_at: 'old' }],
+    },
+    step_position: null,
+    next_attempt_at: bkk('2026-09-29T14:37:00'),
+    last_call_at: bkk('2026-09-28T14:37:00'),
+    ...over,
+  });
+const closeCall = () => dbQuery.mock.calls.find((c) => /set followup_state = \$2, next_attempt_at = null/.test(String(c[0])));
 
 describe('โทรซ้ำที่ถึงเวลา (ใบสมัคร คละช่วงเวลา · งานติดตาม วันถัดไป)', () => {
   it('ทุกรอบปล่อยชุดโทรที่อนุมัติแล้วถึงเวลา (เดิมรอคนเปิดแผง)', async () => {
@@ -313,8 +340,12 @@ describe('โทรซ้ำที่ถึงเวลา (ใบสมัค�
     expect(sql).toContain('q.last_outcome');
     expect(sql).toContain('coalesce(q.last_result_at, q.first_result_at) as last_call_at');
     expect(sql).not.toMatch(/updated_at\) as last_call_at/);
+    // เลน Match ทั้งสองช่อง + ธง "เจ้าหน้าที่บันทึกผลแล้ว" · เฉพาะแถว pending (ค้างเก่า ส.ค. เป็น delivered ⇒ ไม่หยิบ)
+    expect(sql).toContain("q.channel = 'interview' and (q.person_ref like 'card-%' or q.person_ref like 'ir-%')");
+    expect(sql).toContain("q.channel = 'reminder' and q.person_ref like 'card-%'");
+    expect(sql).toContain('as staff_resulted');
+    expect(sql).toContain("q.status = 'pending'");
   });
-
   it('ใบสมัคร: มีเจ้าหน้าที่ติดต่อแล้ว ⇒ ปิดธงโทรซ้ำ ไม่โทร', async () => {
     stub([], [retry({ contacted: true })]);
     const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T17:30:00'));
@@ -361,6 +392,84 @@ describe('โทรซ้ำที่ถึงเวลา (ใบสมัค�
     expect(sql).toContain("followup_state = 'needs_human'");
     expect(sql).toContain('q.result is null');
     expect(sql).toContain('q.followup_state is null');
+  });
+});
+
+describe('โทรซ้ำเลน Match (เจ้าของสั่ง 29 ก.ย. 2569: "เลน Match ทำโทรซ้ำเหมือนงานติดตามด้วย")', () => {
+  it('🔴 คนของเรา (card-): วันถัดไปเวลาเดิม (ไม่คละช่วงเวลา) · ส่งเป็นงานใหม่ client_contact_id -r2 · คีย์ reminder-<id>-r2', async () => {
+    stub([], [matchReminder()]);
+    const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T14:00:00'));
+    expect(run.retriesSent).toBe(1);
+    expect(run.retriesReplanned).toBe(0);
+    const [records, key] = pushReminders.mock.calls[0] as [Array<Record<string, unknown>>, string];
+    expect(key).toBe('reminder-950-r2');
+    expect(records[0].client_contact_id).toBe('siamraj-sql:OPL1::card-77-r2');
+    expect(records[0].steps).toEqual([{ position: 0, scheduled_at: '2026-09-29T14:37:00+07:00' }]);
+    expect(listSiamrajUnitRequests).toHaveBeenCalledTimes(1);
+  });
+
+  it('iRecruit (ir-) ช่อง interview ⇒ ::r2 · คีย์ interview-<id>-r2 · เวลาเดิมวันถัดไป', async () => {
+    stub([], [
+      retry({
+        id: '960',
+        person_ref: 'ir-5',
+        payload: { phone: '+66877777777', client_candidate_id: 'siamraj-sql:OPL1::ir-5', client_interview_id: 'siamraj-sql:OPL1::ir-5::interview', scheduled_at: 'old' },
+        next_attempt_at: bkk('2026-09-29T14:37:00'),
+        last_call_at: bkk('2026-09-28T14:37:00'),
+      }),
+    ]);
+    const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T14:00:00'));
+    expect(run.retriesSent).toBe(1);
+    expect(run.retriesReplanned).toBe(0);
+    const [records, key] = pushInterviews.mock.calls[0] as [Array<Record<string, unknown>>, string];
+    expect(key).toBe('interview-960-r2');
+    expect(records[0].client_interview_id).toBe('siamraj-sql:OPL1::ir-5::interview::r2');
+    expect(records[0].client_candidate_id).toBe('siamraj-sql:OPL1::ir-5');
+    expect(records[0].scheduled_at).toBe('2026-09-29T14:37:00+07:00');
+  });
+
+  it('🔴 ใบขอปิดแล้ว (ไม่อยู่ในชุดเปิดของกล่องงาน) ⇒ ปิดธง ไม่โทร', async () => {
+    listSiamrajUnitRequests.mockResolvedValue([{ id: 'siamraj-sql:OPL9', status: 'open' }]);
+    stub([], [matchReminder()]);
+    const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T14:00:00'));
+    expect(run.retriesClosed).toBe(1);
+    expect(pushReminders).not.toHaveBeenCalled();
+    expect(closeCall()?.[1]).toEqual(['950', 'closed', 'ใบขอปิดแล้ว — ไม่โทรซ้ำ']);
+  });
+
+  it('🔴 อ่าน feed ใบขอไม่ได้ / ได้ชุดว่าง ⇒ รอบนี้ไม่โทร และไม่ปิดธง (ห้ามตีความว่าปิดหมดทุกใบ)', async () => {
+    for (const feed of [() => Promise.reject(new Error('ERP down')), () => Promise.resolve([])]) {
+      listSiamrajUnitRequests.mockReset().mockImplementation(feed);
+      pushReminders.mockClear();
+      stub([], [matchReminder()]);
+      const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T14:00:00'));
+      expect(run.waiting).toBe(1);
+      expect(run.retriesClosed).toBe(0);
+      expect(pushReminders).not.toHaveBeenCalled();
+      expect(closeCall()).toBeUndefined();
+    }
+  });
+
+  it('เจ้าหน้าที่รับไปโทรแล้วบันทึกผลหลังสายของ AI ⇒ ปิดธง ไม่โทรทับ', async () => {
+    stub([], [matchReminder({ staff_resulted: true })]);
+    const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T14:00:00'));
+    expect(run.retriesClosed).toBe(1);
+    expect(pushReminders).not.toHaveBeenCalled();
+    expect(closeCall()?.[1]).toEqual(['950', 'closed', 'เจ้าหน้าที่โทรบันทึกผลแล้ว — ไม่โทรซ้ำ']);
+  });
+
+  it('เบอร์มีเจ้าหน้าที่ถืออยู่ ⇒ ปิดธง ไม่โทร (กติกาเดียวกับทุกเลน)', async () => {
+    listHeldPhones.mockResolvedValue(new Set(['+66866666666']));
+    stub([], [matchReminder()]);
+    const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T14:00:00'));
+    expect(run.retriesClosed).toBe(1);
+    expect(pushReminders).not.toHaveBeenCalled();
+  });
+
+  it('รอบที่ไม่มีโทรซ้ำเลน Match ⇒ ไม่อ่าน feed ใบขอเลย (ไม่ยิงระบบงานหลักทุกนาที)', async () => {
+    stub([], [retry()]);
+    await runLumosPushRetryOnce(CFG, bkk('2026-09-29T17:30:00'));
+    expect(listSiamrajUnitRequests).not.toHaveBeenCalled();
   });
 });
 

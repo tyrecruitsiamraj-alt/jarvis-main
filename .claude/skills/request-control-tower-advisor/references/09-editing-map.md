@@ -10047,7 +10047,7 @@ B ตาราง · C กระดานตามขั้น) → เลือ
 | `api/_lib/lumosPushTracking.ts` | `pushQueueRowsTracked(…, keyFor)` คีย์ประจำรอบ |
 | `api/_lib/lumosDispatch.ts` | `applyLumosResult` ถอยไปจับรหัสเดิมเมื่อ reminder ส่ง `-r<n>` มา · เลนสรรหา/ชวนกลับ push หลังเข้าคิว · ส่งอัตโนมัติจากผลแมท/iRecruit ส่ง `{ autoPush: true }` |
 | `api/_lib/callBatchDispatcher.ts` | ปล่อยชุดโทรแล้ว push (`{ autoPush: true }` ทั้งสองช่อง) |
-| tests | `callFollowupPolicy.test.ts` (+7 คละช่วงเวลา) · `lumosPushRetryWorker.test.ts` (29) · `lumosPushTracking.test.ts` (16 · สายไฟทุกเส้น) |
+| tests | `callFollowupPolicy.test.ts` (+7 คละช่วงเวลา) · `lumosPushRetryWorker.test.ts` (36 · รวมเลน Match 7) · `lumosPushTracking.test.ts` (16 · สายไฟทุกเส้น) |
 
 🔴 กับดัก:
 - ผลช่อง interview จับด้วย `client_candidate_id` (ไม่ใช่ `client_interview_id`) ⇒ รอบโทรซ้ำเปลี่ยน `client_interview_id` ได้โดยผลยังเข้าแถวเดิม
@@ -10062,3 +10062,21 @@ B ตาราง · C กระดานตามขั้น) → เลือ
   **ห้ามถอยไป `updated_at`** — การนัดใหม่แตะ `updated_at` ⇒ ช่องของสายล่าสุดขยับทุกรอบ = ย้ายวนไม่จบ (มีเทสต์คุม)
 - เศษค้างเก่าที่ตัวส่งซ้ำไม่แตะโดยตั้งใจ: `retry_scheduled` สถานะ `delivered` ส.ค. 37 แถว (iRecruit `ir-` 14 · `card-` 23 ·
   นัด 19–20 ส.ค. · Lumos ดึงไปแล้วไม่เคยส่งผลกลับ) + งานติดตามที่ `cancelled` 1 แถว — ยังนับอยู่ในยอด "ตั้งโทรซ้ำไว้" · รอเจ้าของเคาะ
+
+#### 29 ก.ย. 2569 (สาย) — เลน Match โทรซ้ำเหมือนงานติดตาม
+
+เจ้าของ: *"เลน Match ทำโทรซ้ำเหมือนงานติดตามด้วย"* · เลน Match = `queueLane(...) === 'match'` (`card-` คนของเรา + `ir-` iRecruit ·
+นิยามกลางตัวเดียวกับยอดส่ง Lumos หน้าแรก) ทั้งช่อง interview (เลนสรรหา/ชวนกลับ/iRecruit) และ reminder (board Match คนของเรา)
+
+| ไฟล์ | หน้าที่ |
+| --- | --- |
+| `api/_lib/lumosPushRetryWorker.ts` | `buildRetryDueSql` หยิบเลน Match ด้วย + ธง `staff_resulted` · ก่อนส่ง: เจ้าหน้าที่บันทึกผลแล้ว/เบอร์พัก/มีคนถือ/**ใบขอปิดแล้ว** = ปิดธง ไม่โทร · `retryKeyFor(…, personRef)` reminder ที่ไม่ใช่งานติดตาม = `reminder-<id>-r<n>` |
+
+- เวลา = นโยบายกลาง (วัดจริง: `retryGapHours` 24 · `maxAttempts` 3 · ไม่มีช่วงห้ามโทร) ⇒ **วันถัดไปเวลาเดิม ครบ 3 สาย** — ตั้งนัดที่ `callFollowup` อยู่แล้ว
+  ตัวส่งซ้ำแค่ส่งให้ถึง · **ไม่คละช่วงเวลา** (คละเฉพาะใบสมัคร `app-`)
+- 🔴 ใบขอยังเปิด = อยู่ใน feed ชุดเดียวกับกล่องงาน (`listSiamrajUnitRequests({ limit: 500, departmentScope: all })` · open/in_progress)
+  เทียบ **id เต็มเท่านั้น** (ห้ามถอยไปเลขที่ใบ — ใบขอล่วงหน้าเลขซ้ำใบจริง) · อ่านไม่ได้ **หรือได้ชุดว่าง** = รอบนี้ไม่โทร ไม่ปิดธง
+  (ห้ามตีความว่า "ปิดหมด" แล้วปิดโทรซ้ำทิ้งทั้งกอง) · อ่าน feed เฉพาะรอบที่มีโทรซ้ำเลน Match จริง
+- "เจ้าหน้าที่บันทึกผลแล้ว" = `candidate_call_holds` ใบนี้ เบอร์นี้ มี `result_outcome` **หลัง** สายล่าสุดของ AI — ตัวเดียวกับ "มีบันทึกผลติดต่อ" ของเลนใบสมัคร
+- ผลรอบโทรซ้ำ: interview จับ `client_candidate_id` เดิม · reminder `client_contact_id` ต่อ `-r<n>` แล้ว `applyLumosResult` ถอดกลับ (ของเดิม)
+- วัดของจริงก่อนขึ้น: เลน Match ไม่มีแถวรอโทรซ้ำที่ `pending` เลย (มีแต่ค้าง ส.ค. ที่ `delivered`) ⇒ ขึ้นแล้วไม่มีใครถูกโทรย้อนหลัง
