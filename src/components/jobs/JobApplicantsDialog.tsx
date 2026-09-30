@@ -19,11 +19,7 @@ import {
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
 import { summarizeCallChoice } from '@/lib/callChoiceSummary';
-import {
-  FOLLOW_STATUS_LABEL,
-  FOLLOW_STATUS_TONE,
-  type FollowCallStatus,
-} from '@/lib/followApi';
+import { FOLLOW_STATUS_LABEL, FOLLOW_STATUS_TONE, isFollowCallStatus } from '@/lib/followApi';
 import { cn } from '@/lib/utils';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import { applicantAddressLine, applicantFactLine } from '@/lib/applicantDisplay';
@@ -65,10 +61,6 @@ export type JobApplicantsDialogProps = {
  *   (โทรไม่ติด/ไม่รับ ยังอยู่แค่ "ทั้งหมด" เพราะต้องตามต่อ)
  */
 type ApplicantTab = 'all' | 'interested' | 'not_interested';
-
-/** สถานะสายที่รู้จัก — ค่าที่อ่านไม่ออกต้องไม่ขึ้นป้ายมั่ว */
-const isFollowCallStatus = (v: unknown): v is FollowCallStatus =>
-  v === 'pending' || v === 'delivered' || v === 'completed' || v === 'failed' || v === 'cancelled';
 
 const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
   open,

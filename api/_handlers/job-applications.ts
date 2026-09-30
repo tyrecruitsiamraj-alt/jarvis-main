@@ -35,6 +35,7 @@ import {
 } from '../../src/lib/recruitRmMasters.js';
 import {
   loadAppointmentByPhone,
+  loadLatestAiAnswerByApplication,
   loadLatestCallOutcomeByPhone,
   loadLatestCallStateByPhone,
 } from '../_lib/applicantCallOutcomes.js';
@@ -1215,6 +1216,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
           const hit = stateByPhone.get(toE164Thai(item.phone || '') || '');
           if (hit) (item as Record<string, unknown>).last_call_status = hit.status;
         }
+      }
+      // คำตอบที่ผู้สมัครตอบ AI (ถังผล + เวลา · 30 ก.ย. 2569) — คอลัมน์ "คำตอบกับ AI" ของแท็บผู้สมัคร
+      const answers = await loadLatestAiAnswerByApplication(items.map((i) => i.id));
+      for (const item of items) {
+        const hit = answers.get(item.id);
+        if (hit) (item as Record<string, unknown>).ai_answer = hit;
       }
       // วันนัดสัมภาษณ์ — มาได้ 2 ทาง (แท็บติดตามนัดหมายโชว์คอลัมน์นี้):
       // 1) ตกลงตอนโทร (call hold · migration 085 · คีย์เบอร์)

@@ -1,4 +1,4 @@
-import { toYmdBangkok } from '@/lib/dateTh';
+import { fullDaysSince } from '@/lib/fullDays';
 import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
 /**
  * งานสรรหา (RM) — นิยามกลางของหน้า `/recruit/rm`
@@ -242,19 +242,13 @@ export function applicationAddressLabel(r: PublicApplication): string {
 /**
  * ใบนี้ยื่นมาแล้วกี่วัน (เจ้าของสั่ง 17 ส.ค. 2569 — "ผ่านมาแล้วกี่วัน")
  *
- * นับตาม **ปฏิทินกรุงเทพ** ไม่ใช่ผลต่างมิลลิวินาที — ใบที่กรอกเมื่อวานตอนสามทุ่ม
- * ต้องอ่านว่า "1 วัน" ตั้งแต่เช้าวันนี้ ไม่ใช่รอครบ 24 ชม.
+ * 🔴 **ครบ 24 ชม. ถึงนับเป็น 1 วัน** (เจ้าของเคาะ 30 ก.ย. 2569 — Choice "ครบ 24 ชม. เหมือนภาพรวม") ·
+ * ใบที่กรอกเมื่อวานตอนสามทุ่ม เช้านี้ยังเป็น 0 วัน ("วันนี้") จนกว่าจะครบ 24 ชม.
+ * (เดิมนับตามปฏิทินกรุงเทพ ข้ามเที่ยงคืน = 1 วัน — เลิกแล้ว) · ตัวนับอยู่ `fullDays.ts` ที่เดียว
  * คืน null เมื่อไม่มีวันที่/วันที่เสีย (คนละความหมายกับ 0 = วันนี้)
  */
 export function daysSinceApplied(createdAt: string | null | undefined, now: Date): number | null {
-  const raw = (createdAt || '').trim();
-  if (!raw) return null;
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return null;
-  const start = Date.parse(`${toYmdBangkok(d)}T00:00:00Z`);
-  const today = Date.parse(`${toYmdBangkok(now)}T00:00:00Z`);
-  if (Number.isNaN(start) || Number.isNaN(today)) return null;
-  return Math.round((today - start) / 86400000);
+  return fullDaysSince(createdAt, now);
 }
 
 /**

@@ -1,5 +1,8 @@
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { toE164Thai } from './thaiPhone.js';
+import { tableInAppSchema } from './schema.js';
+import { LATEST_AI_RESULT_LATERAL } from './applicantOverviewSql.js';
+import { INTEREST_VOCAB, classifyCallMicro, type CallMicroOutcome } from '../../src/lib/callMicroOutcome.js';
 
 /**
  * ผลโทรล่าสุดของ "หลายเบอร์" ในคิวรีเดียว — ใช้ทำแท็บ "รายชื่อที่สนใจ" ของกล่องงาน
@@ -149,4 +152,46 @@ function isUndefinedColumn(e: unknown): boolean {
   return (
     typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '42703'
   );
+}
+
+/**
+ * ═══ คำตอบล่าสุดที่ผู้สมัครตอบ AI ต่อใบ — แท็บผู้สมัครคอลัมน์ "คำตอบกับ AI" (เจ้าของสั่ง 30 ก.ย. 2569) ═══
+ *
+ * > *"ตรงรายชื่อ โชว์ … คำตอบที่ตอบกับ Ai มา"* → Choice "ผลสั้น ๆ + วันที่โทร"
+ * 🔴 หลักฐานชุดเดียวกับแผงผลโทรหน้าหลัก (`LATEST_AI_RESULT_LATERAL` — คิวของใบ + เบอร์เดียวกันหลังกรอกใบ) ·
+ *    จัดถังด้วยคลังคำ "ถามความสนใจ" (`classifyCallMicro` + `INTEREST_VOCAB`) ตัวเดียวกัน ⇒ คำบนตารางตรงกับหน้าหลัก
+ * 🔴 สรุป/ถอดเสียงใช้จัดถังในนี้เท่านั้น — ส่งออกแค่ถังกับเวลา
+ * คีย์ = id ใบสมัคร (ไม่ใช่เบอร์ — คำตอบเป็นของใบนี้ ไม่ใช่ของเลนอื่นก่อนกรอกใบ)
+ */
+export type ApplicantAiAnswer = { micro: CallMicroOutcome; at: string | null };
+
+export async function loadLatestAiAnswerByApplication(ids: readonly string[]): Promise<Map<string, ApplicantAiAnswer>> {
+  const out = new Map<string, ApplicantAiAnswer>();
+  const keys = [...new Set(ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id)))];
+  if (keys.length === 0) return out;
+  try {
+    const { rows } = await dbQuery<{
+      id: string;
+      outcome: string | null;
+      summary: string | null;
+      reply: string | null;
+      at: string | Date | null;
+    }>(
+      `select a.id::text as id, air.outcome, air.summary, air.reply, air.at
+         from ${tableInAppSchema('public_job_applications')} a
+         ${LATEST_AI_RESULT_LATERAL}
+        where a.id = any($1::uuid[]) and air.outcome is not null`,
+      [keys],
+    );
+    for (const r of rows) {
+      const micro = classifyCallMicro({ outcome: r.outcome, summary: r.summary, reply: r.reply }, INTEREST_VOCAB);
+      if (!micro) continue; // จัดถังไม่ได้ = ไม่ขึ้นคำตอบ (ห้ามเดา) — ตารางถอยไปบอกสถานะคิว
+      const at = r.at ? new Date(r.at) : null;
+      out.set(r.id, { micro, at: at && !Number.isNaN(at.getTime()) ? at.toISOString() : null });
+    }
+  } catch (e) {
+    // ตารางคิวยังไม่ migrate = ไม่มีคำตอบให้แสดง ไม่ใช่เหตุให้ทั้งลิสต์พัง
+    if (!isPgUndefinedTable(e)) throw e;
+  }
+  return out;
 }

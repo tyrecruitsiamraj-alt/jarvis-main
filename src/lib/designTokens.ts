@@ -290,6 +290,12 @@ export const DASH = {
   cell: 'text-slate-700 dark:text-slate-300',
   cellStrong: 'font-medium text-slate-900 dark:text-slate-100',
   cellMuted: 'text-slate-600 dark:text-slate-400',
+  /**
+   * คอลัมน์ติดซ้ายตอนเลื่อนตารางแนวนอน (ชื่อผู้สมัคร · 30 ก.ย. 2569: *"ชื่อก็ยังดูได้"*) — พื้นต้องทึบ
+   * ไม่งั้นช่องที่เลื่อนผ่านใต้โผล่ทะลุ · สีเดียวกับหัวตาราง / พื้นการ์ด (`card`)
+   */
+  stickyHead: 'bg-slate-50 dark:bg-slate-800',
+  stickyCell: 'bg-white dark:bg-slate-900',
 } as const;
 
 /** key ของ DASH ที่ยกเว้นกฎ "ต้องมีคู่ dark" — การ์ดดำ/hero/ป้ายบน hero เป็นสีเดียวทั้งสองธีมโดยตั้งใจ */

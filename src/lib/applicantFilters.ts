@@ -18,6 +18,7 @@ import type { RmTab } from '@/lib/recruitRm';
 import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
 import { ATTENDANCE_LABEL } from '@/lib/appointmentAttendance';
 import { toYmdBangkok } from '@/lib/dateTh';
+import { fullDaysSince } from '@/lib/fullDays';
 import {
   UNSPECIFIED,
   applyFacetDefs,
@@ -261,10 +262,10 @@ const FACETS: readonly Def[] = [
     ui: 'chip',
     order: DAY_BANDS.map((b) => b.id),
     labelOf: (v) => DAY_BANDS.find((b) => b.id === v)?.label ?? v,
+    /** 🔴 ครบ 24 ชม. = 1 วัน — ตัวนับเดียวกับคอลัมน์ "สมัครมาแล้ว" (`fullDaysSince` · เจ้าของเคาะ 30 ก.ย. 2569) */
     values: (r, facts) => {
-      const d = ymdOf(r.created_at);
-      if (!d) return [UNSPECIFIED];
-      const n = Math.max(0, ymdDiffDays(d, toYmdBangkok(facts.now)));
+      const n = fullDaysSince(r.created_at, facts.now);
+      if (n === null) return [UNSPECIFIED];
       return [DAY_BANDS.find((b) => n <= b.max)?.id ?? UNSPECIFIED];
     },
   },

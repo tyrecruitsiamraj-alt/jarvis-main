@@ -29,6 +29,7 @@ const DASHBOARD = code('src/components/dashboard-trends/BoardDashboard.tsx');
 const WS = code('src/components/recruit-rm/RmWorkspace.tsx');
 const TABLE = code('src/components/recruit-rm/RmTable.tsx');
 const PAGE = code('src/pages/jobs/StaffJobBoardPage.tsx');
+const PANEL_UI = code('src/components/jobs/BoardFilterPanel.tsx');
 
 describe('แท็บ: กล่องงาน > ผู้สมัคร > การติดตาม > ติดตามนัดหมาย > ภาพรวม', () => {
   it('🔴 ลำดับและชื่อตามที่เจ้าของเรียงเอง', () => {
@@ -42,8 +43,8 @@ describe('แท็บ: กล่องงาน > ผู้สมัคร > �
   });
 });
 
-describe('ศูนย์คุมงานสรรหา ย้ายไปแท็บภาพรวม', () => {
-  it('🔴 แท็บผู้สมัครไม่มีแผงนี้แล้ว · ภาพรวมวางไว้บนสุด (ก่อนแถบเลือกช่วงเวลา)', () => {
+describe('ศูนย์คุมงานสรรหา ย้ายไปแท็บภาพรวม (แผงเดิม — ทางถอย ?dash=classic ตั้งแต่ภาพรวมเป็นแบบ iRecruit 30 ก.ย. 2569)', () => {
+  it('🔴 แท็บผู้สมัครไม่มีแผงนี้แล้ว · แผงเดิมของภาพรวมวางไว้บนสุด (ก่อนแถบเลือกช่วงเวลา)', () => {
     expect(BOARD).not.toContain('RecruitControlPanel');
     const at = DASHBOARD.indexOf('<RecruitControlPanel />');
     expect(at).toBeGreaterThan(-1);
@@ -69,13 +70,31 @@ describe('ศูนย์คุมงานสรรหา ย้ายไปแ
 });
 
 describe('แท็บผู้สมัคร: ตัวกรองพับได้ · ดูเป็นคน · เก็บแล้วมีปุ่มพาไป · ชื่อไม่ขาด', () => {
-  it('🔴 แถบซ้ายพับเป็นค่าตั้งต้น (จำต่อเครื่อง) · พับอยู่มีปุ่มกาง · กางอยู่มีปุ่มพับ', () => {
+  it('🔴 แถบกรองอยู่ข้างรายชื่อ: พับเป็นค่าตั้งต้น = แถบแคบ · กดกาง = แถบเต็ม ตารางยังอยู่ข้าง ๆ · กดพับกลับได้', () => {
+    // เจ้าของ 30 ก.ย. 2569: "ไว้ข้าง ๆ รายชื่อ กดแล้วกางออก แต่ชื่อก็ยังดูได้ พอกดก็หุบกลับไป"
     expect(WS).toContain("const FILTER_OPEN_KEY = 'jarvis:applicant-filter-open'");
     expect(WS).toMatch(/getItem\(FILTER_OPEN_KEY\) === '1'/);
     expect(WS).toMatch(/useState<boolean>\(readFilterOpen\)/);
+    expect(WS).toMatch(/!bucket && !filterOpen \? <FilterRail/);
     expect(WS).toMatch(/!bucket && filterOpen \? \(\s*<FilterSidebar/);
     expect(WS).toContain('onCollapse={() => changeFilterOpen(false)}');
-    expect(WS).toMatch(/!filterOpen \? <FilterSidebarToggle/);
+    // แถบกับตารางอยู่แถวเดียวกัน (ไม่ใช่แผงทับหน้า) · ตั้งแต่จอ sm — เจ้าของดูในจอกว้าง ~750px
+    expect(WS).toContain("!bucket && 'sm:flex sm:items-start sm:gap-3'");
+    expect(WS).toContain('mt-3 flex flex-wrap items-center gap-2 sm:hidden');
+    expect(PANEL_UI).toContain('p-3 sm:block');
+  });
+
+  it('🔴 ปุ่มตัวกรองเป็นไอคอนอย่างเดียว ไม่มีคำว่า "ตัวกรอง" (เจ้าของ: "มันดูใหญ่ไป")', () => {
+    // กล่องงานด้วย (Choice "เป็นไอคอนเหมือนกัน" 30 ก.ย. 2569) — ปุ่มตัวกรองทุกแท็บหน้าตาเดียวกัน
+    for (const name of ['FilterRail', 'FilterSheetButton', 'FilterButton']) {
+      const body = PANEL_UI.slice(PANEL_UI.indexOf(`export function ${name}`));
+      const button = body.slice(body.indexOf('<Button'), body.indexOf('</Button>'));
+      expect(button, name).toContain('size="iconXs"');
+      expect(button, name).toContain('<SlidersHorizontal aria-hidden />');
+      expect(button, name).toContain('<IconCount n=');
+      // ไม่มีข้อความบนปุ่ม (ชื่ออยู่ใน aria-label/title ให้โปรแกรมอ่านจอ)
+      expect(button.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, ''), name).not.toMatch(/[ก-๙]/);
+    }
   });
 
   it('หัวข้อเจ้าหน้าที่สรรหามาจากใบขอที่หน้ากล่องงานโหลดไว้ (เปิด + ปิดแล้ว) จับใบด้วย buildJobKeyIndex', () => {
@@ -96,6 +115,12 @@ describe('แท็บผู้สมัคร: ตัวกรองพับ�
   it('🔴 ตารางเลิกตัดข้อความเป็น … บรรทัดเดียว (ชื่อ/ที่อยู่/หน่วยงานขึ้นได้ 2 บรรทัด)', () => {
     expect(TABLE).not.toMatch(/\btruncate\b/);
     expect(TABLE.match(/line-clamp-2/g)?.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('🔴 ชื่อติดซ้ายตอนเลื่อนตารางแนวนอน (กางแถบกรองแล้ว "ชื่อก็ยังดูได้") — หัว + ช่องชื่อทุกแท็บ พื้นทึบจาก token', () => {
+    expect(TABLE).toContain("const STICKY_NAME = 'sticky left-0 z-10';");
+    expect(TABLE.match(/cn\(STICKY_NAME, 'px-1\.5 py-2 font-medium', DASH\.stickyHead\)/g)?.length).toBe(2);
+    expect(TABLE.match(/cn\(STICKY_NAME, 'px-1\.5 py-2', DASH\.stickyCell\)/g)?.length).toBe(2);
   });
 
   it('ช่องทางบนตารางอ่านแบบเดียวกับตัวกรอง (ตารางช่องทางของลิงก์ก่อน)', () => {

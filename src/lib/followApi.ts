@@ -6,6 +6,10 @@ import type { FollowStaffCallOutcome } from '@/lib/followStaffCall';
 
 export type FollowCallStatus = 'pending' | 'delivered' | 'completed' | 'failed' | 'cancelled';
 
+/** สถานะสายที่รู้จัก — ค่าที่อ่านไม่ออกต้องไม่ขึ้นป้ายมั่ว (ใช้ร่วมป๊อปรายชื่อกับตารางแท็บผู้สมัคร) */
+export const isFollowCallStatus = (v: unknown): v is FollowCallStatus =>
+  v === 'pending' || v === 'delivered' || v === 'completed' || v === 'failed' || v === 'cancelled';
+
 export type FollowEntry = {
   id: string;
   recipient_name: string;

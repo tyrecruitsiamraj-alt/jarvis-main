@@ -57,7 +57,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   FilterSheetButton,
   FilterSidebar,
-  FilterSidebarToggle,
+  FilterRail,
   type FilterExtraSection,
 } from '@/components/jobs/BoardFilterPanel';
 import { buildJobKeyIndex } from '@/lib/jobKeyIndex';
@@ -731,15 +731,15 @@ const RmWorkspace: React.FC<{
           ถ้าให้กรองซ้ำที่นี่ เลขจะไม่ตรงกับกล่องที่กดมา */}
       {/* 🔴 **แถบกรองด้านซ้ายแบบ iRecruit** (เจ้าของสั่ง 28 ก.ย. 2569: *"หน้าอื่นๆพวก รายชื่อผู้สมัคร
           การโทรของฉัน ฯลฯ ทำแบบ Irecruit เลย"* → Choice "แถบกรองซ้ายตามแบบร่างที่เคาะไว้")
-          · จอ xl (1280px) ขึ้นไป = แถบซ้าย (`FilterSidebar`) · จอเล็กกว่า = ปุ่ม "ตัวกรอง (N)" เปิดแผง (แถวนี้)
-          · ⚠️ ไม่ใช่ lg — จอ 1024–1279 มีแถบซ้ายแล้วตารางไม่พอดีช่อง (เจ้าของสั่ง "ย่อคอลัมน์ตารางให้พอดีจอ")
+          · จอ sm (640px) ขึ้นไป = แถบซ้าย (`FilterSidebar`) · จอมือถือ = ปุ่มไอคอนเปิดแผง (แถวนี้)
+          · 30 ก.ย. 2569 ย้ายจาก xl ลงมา sm — เจ้าของดูในจอกว้าง ~750px เลยไม่เคยเห็นแถบข้างรายชื่อ ·
+            ค่าตั้งต้นพับ (ตารางได้เต็มกว้าง) · กางแล้วตารางเลื่อนข้างในได้ ชื่ออยู่คอลัมน์ซ้ายสุดจึงยังเห็น
           · แท็บกล่องงานยังเป็นปุ่มเดียว (แบบ A) — เจ้าของ: "หน้ากล่องงาน … เป็นช่องๆแบบเดิม"
           · วันที่สมัครเป็นหัวข้อหนึ่งในแถบ · โหมด drill-down (?bucket=) ไม่มีแถบกรอง (เลขต้องเท่ากล่องที่กดมา) */}
       {!bucket ? (
-        /* จอเล็ก = ปุ่มเปิดแผง (เดิม) · จอ xl = ปุ่มกางแถบซ้ายที่พับอยู่ (30 ก.ย. 2569 · ค่าตั้งต้นพับ ตารางได้เต็มกว้าง)
-           แถบกางอยู่ = แถวนี้ซ่อนที่จอ xl (หัวแถบมีปุ่มล้าง/ผลลัพธ์ของตัวเองแล้ว) */
-        <div className={cn('mt-3 flex flex-wrap items-center gap-2', filterOpen && 'xl:hidden')}>
-          {!filterOpen ? <FilterSidebarToggle selected={panelSelected} onExpand={() => changeFilterOpen(true)} /> : null}
+        /* จอมือถือ = ปุ่มไอคอนเปิดแผง · จอ sm ขึ้นไป = แถวนี้ซ่อน (ปุ่มไอคอนกางแถบอยู่ข้างรายชื่อ
+           · หัวแถบมีปุ่มล้าง/ผลลัพธ์ของตัวเองแล้ว) */
+        <div className="mt-3 flex flex-wrap items-center gap-2 sm:hidden">
           <FilterSheetButton
             facets={applicantFacets}
             primary={APPLICANT_PRIMARY_FACETS}
@@ -762,7 +762,9 @@ const RmWorkspace: React.FC<{
         </div>
       ) : null}
       {/* แถบ "กำลังดู: … — N คนข้างล่าง" ถูกถอด 27 ก.ย. 2569 (Clean — ไม่มีประโยคอธิบาย) */}
-      <div className={cn('mt-4', !bucket && filterOpen && 'xl:flex xl:items-start xl:gap-4')}>
+      {/* จอ sm ขึ้นไป: แถบกรองอยู่ข้างรายชื่อเสมอ — พับ = ปุ่มไอคอน (`FilterRail`) · กาง = แถบเต็ม ตารางยังเห็นข้าง ๆ */}
+      <div className={cn('mt-4', !bucket && 'sm:flex sm:items-start sm:gap-3')}>
+        {!bucket && !filterOpen ? <FilterRail selected={panelSelected} onExpand={() => changeFilterOpen(true)} /> : null}
         {!bucket && filterOpen ? (
           <FilterSidebar
             facets={applicantFacets}
@@ -1122,6 +1124,7 @@ const RmWorkspace: React.FC<{
                 onAction={onRowAction}
                 holdByRef={holdByRef}
                 onAttendance={onAttendance}
+                recruiterOf={recruiterOf}
               />
               </div>
               <ListPaginationBar

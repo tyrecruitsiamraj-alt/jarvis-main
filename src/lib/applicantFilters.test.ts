@@ -129,11 +129,19 @@ describe('จังหวัด → อำเภอ', () => {
 });
 
 describe('หัวข้ออื่นตามแบบร่าง', () => {
-  it('สมัครมาแล้วกี่วัน นับวันตามเวลาไทย', () => {
+  it('สมัครมาแล้วกี่วัน — ช่วงวันตามวันเต็ม', () => {
     const fresh = app({ created_at: '2026-09-26T02:00:00Z' });
     const old = app({ created_at: '2026-08-01T02:00:00Z' });
     expect(applyApplicantFilters([fresh, old], state({ days: ['0-3'] }), facts())).toEqual([fresh]);
     expect(applyApplicantFilters([fresh, old], state({ days: ['30+'] }), facts())).toEqual([old]);
+  });
+
+  it('🔴 สมัครมาแล้ว นับครบ 24 ชม. = 1 วัน ตัวเดียวกับคอลัมน์บนตาราง (เจ้าของเคาะ 30 ก.ย. 2569)', () => {
+    // NOW = 27 ก.ย. 10:00 ไทย · 95 ชม. = 3 วันเต็ม (ยังอยู่ 0–3) · 96 ชม. พอดี = 4 วัน (4–7)
+    const h95 = app({ created_at: '2026-09-23T04:00:00Z' });
+    const h96 = app({ created_at: '2026-09-23T03:00:00Z' });
+    expect(applyApplicantFilters([h95, h96], state({ days: ['0-3'] }), facts())).toEqual([h95]);
+    expect(applyApplicantFilters([h95, h96], state({ days: ['4-7'] }), facts())).toEqual([h96]);
   });
 
   it('ช่องทาง: ตารางช่องทางก่อน ไม่มีค่อยใช้ที่ผู้สมัครเลือก · เพศเป็นภาษาไทย', () => {

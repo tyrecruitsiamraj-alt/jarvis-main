@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
+import { Check, ChevronLeft, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -55,6 +55,16 @@ const triggerClass = filterTriggerClass;
 function TriggerCount({ n }: { n: number }) {
   if (n <= 0) return null;
   return <span className={cn('rounded-full px-1.5 text-xs tabular-nums', TONE.primary.chip)}>{n}</span>;
+}
+
+/** เลขที่ติ๊กอยู่ แปะมุมปุ่มไอคอน (ปุ่มไม่มีคำ — เจ้าของสั่ง 30 ก.ย. 2569) */
+function IconCount({ n }: { n: number }) {
+  if (n <= 0) return null;
+  return (
+    <span className="absolute -right-2 -top-2">
+      <TriggerCount n={n} />
+    </span>
+  );
 }
 
 function FacetBody<K extends string>({
@@ -253,17 +263,25 @@ function FilterAccordion<K extends string>({
 }
 
 /**
- * ปุ่ม "ตัวกรอง (N)" + กล่องทุกหัวข้อ — ของแท็บกล่องงาน (แบบ A) · เปิดได้ทีละหัวข้อ (กล่องไม่ยาวเกินจอ)
+ * ปุ่มตัวกรอง + กล่องทุกหัวข้อ — ของแท็บกล่องงาน (แบบ A) · เปิดได้ทีละหัวข้อ (กล่องไม่ยาวเกินจอ)
+ * 🔴 ไอคอนอย่างเดียว ไม่มีคำ (เจ้าของ 30 ก.ย. 2569: *"ตัวกรองทำเป็นไอค่อน ไม่เอาคำว่าตัวกรอง มันดูใหญ่ไป"* → Choice
+ * "เป็นไอคอนเหมือนกัน" ทุกแท็บ) · ติ๊กอยู่กี่ข้อแปะเลขที่มุม · ชื่อปุ่มอยู่ใน aria-label/title
  */
 export function FilterButton<K extends string>(props: FilterContentProps<K>) {
   const n = selectedTotal(props.facets, props.sections);
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="xs" className={triggerClass(n > 0)}>
+        <Button
+          type="button"
+          variant="outline"
+          size="iconXs"
+          aria-label={n > 0 ? `ตัวกรอง (ติ๊กอยู่ ${n})` : 'ตัวกรอง'}
+          title="ตัวกรอง"
+          className={cn(triggerClass(n > 0), 'relative')}
+        >
           <SlidersHorizontal aria-hidden />
-          ตัวกรอง
-          <TriggerCount n={n} />
+          <IconCount n={n} />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="max-h-96 w-80 overflow-y-auto p-3">
@@ -315,7 +333,9 @@ function FilterPanelHeader({
 
 /**
  * แถบกรองด้านซ้ายแบบ iRecruit — แท็บรายชื่อผู้สมัคร / การโทรของฉัน / ติดตามนัดหมาย (เจ้าของสั่ง 28 ก.ย. 2569)
- * โชว์ตั้งแต่จอ xl (1280px) ขึ้นไป · จอเล็กกว่านั้นใช้ `FilterSheetButton` (เนื้อในชุดเดียวกัน)
+ * โชว์ตั้งแต่จอ sm (640px) ขึ้นไป · จอมือถือใช้ `FilterSheetButton` (เนื้อในชุดเดียวกัน)
+ * ⚠️ เดิมเริ่มที่ xl — แต่เจ้าของดูในจอกว้าง ~750px เลยไม่เคยเห็นแถบข้างรายชื่อ (30 ก.ย. 2569)
+ *    แถบกางแล้วตารางแคบลงได้ (เลื่อนข้างในตาราง) คอลัมน์ชื่ออยู่ซ้ายสุด ชื่อจึงยังเห็นเสมอ
  */
 export function FilterSidebar<K extends string>({
   onClear,
@@ -330,7 +350,7 @@ export function FilterSidebar<K extends string>({
   return (
     <aside
       aria-label="ตัวกรองเพิ่มเติม"
-      className="hidden w-64 shrink-0 self-start rounded-xl border border-border bg-card p-3 xl:block"
+      className="hidden w-56 shrink-0 self-start rounded-xl border border-border bg-card p-3 sm:block"
     >
       <FilterPanelHeader selected={n} onClear={onClear} resultText={resultText} onCollapse={onCollapse} />
       <div className="mt-2">
@@ -341,38 +361,47 @@ export function FilterSidebar<K extends string>({
 }
 
 /**
- * ปุ่มกางแถบซ้ายที่พับอยู่ — "ตัวกรอง (N) ▸" (แท็บฝั่งผู้สมัคร · เจ้าของสั่ง 30 ก.ย. 2569: *"Filter ทำแบบย่อ กางได้"*
- * → Choice "แถบซ้ายพับได้") · เฉพาะจอ xl ขึ้นไป (จอเล็กใช้ `FilterSheetButton` เหมือนเดิม)
+ * ═══ แถบกรองพับ — ปุ่มไอคอนข้างรายชื่อ (แท็บฝั่งผู้สมัคร · เจ้าของสั่ง 30 ก.ย. 2569) ═══
+ * > *"ตัวกรอง ฉันอยากได้แบบไว้ข้าง ๆ รายชื่อ แต่แบบกดแล้วกางออก แต่ชื่อก็ยังดูได้ พอกดก็หุบกลับไป"*
+ * > *"ตัวกรองทำเป็นไอค่อน ไม่เอาคำว่าตัวกรอง มันดูใหญ่ไป"*
+ * พับอยู่ = ปุ่มไอคอนเล็กชิดซ้ายของรายชื่อ (ไม่มีคำ · ติ๊กอยู่กี่ข้อแปะเลขที่มุม) · กด = กางเป็นแถบเต็ม (`FilterSidebar`)
+ * ตารางยังอยู่ข้าง ๆ เห็นชื่อตลอด (ไม่ใช่แผงทับหน้า) · ตั้งแต่จอ sm ขึ้นไป — จอมือถือใช้ `FilterSheetButton`
  * `selected` = จำนวนที่ติ๊กอยู่ทั้งแถบ (รวมหัวข้อเพิ่ม เช่น วันที่สมัคร)
  */
-export function FilterSidebarToggle({ selected, onExpand }: { selected: number; onExpand: () => void }) {
+export function FilterRail({ selected, onExpand }: { selected: number; onExpand: () => void }) {
   return (
     <Button
       type="button"
       variant="outline"
-      size="xs"
+      size="iconXs"
       onClick={onExpand}
-      className={cn(triggerClass(selected > 0), 'hidden xl:inline-flex')}
       aria-expanded={false}
+      aria-label={selected > 0 ? `กางตัวกรอง (ติ๊กอยู่ ${selected})` : 'กางตัวกรอง'}
+      title="กางตัวกรอง"
+      className={cn(triggerClass(selected > 0), 'relative hidden shrink-0 self-start sm:inline-flex')}
     >
       <SlidersHorizontal aria-hidden />
-      ตัวกรอง
-      <TriggerCount n={selected} />
-      <ChevronRight aria-hidden />
+      <IconCount n={selected} />
     </Button>
   );
 }
 
-/** ปุ่ม "ตัวกรอง (N)" เปิดแผงด้านซ้าย — เฉพาะจอเล็กกว่า xl (แถบซ้ายซ่อนอยู่) */
+/** ปุ่มไอคอนเปิดแผงด้านซ้าย — เฉพาะจอมือถือ (เล็กกว่า sm · แถบข้างรายชื่อซ่อนอยู่) · ไม่มีคำเหมือน `FilterRail` */
 export function FilterSheetButton<K extends string>({ onClear, resultText, ...content }: FilterPanelProps<K>) {
   const n = selectedTotal(content.facets, content.sections);
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button type="button" variant="outline" size="xs" className={cn(triggerClass(n > 0), 'xl:hidden')}>
+        <Button
+          type="button"
+          variant="outline"
+          size="iconXs"
+          aria-label={n > 0 ? `ตัวกรอง (ติ๊กอยู่ ${n})` : 'ตัวกรอง'}
+          title="ตัวกรอง"
+          className={cn(triggerClass(n > 0), 'relative sm:hidden')}
+        >
           <SlidersHorizontal aria-hidden />
-          ตัวกรอง
-          <TriggerCount n={n} />
+          <IconCount n={n} />
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-full overflow-y-auto sm:max-w-sm">
