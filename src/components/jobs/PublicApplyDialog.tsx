@@ -104,7 +104,6 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
   const [education, setEducation] = useState('');
   const [referralSource, setReferralSource] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [positionInterest, setPositionInterest] = useState('');
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -125,10 +124,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
     if (!open) return;
     setSubmitted(false);
     setError(null);
-    // เติมช่อง "ตำแหน่งที่สนใจ" ด้วย **ตำแหน่ง** ไม่ใช่ชื่อหน่วยงาน
-    // (เดิมเติมชื่อบริษัท ผู้สมัครส่วนใหญ่ไม่แก้ → ช่องตำแหน่งเก็บชื่อบริษัททั้งระบบ)
-    setPositionInterest(job ? publicJobPositionLabel(job) : '');
-  }, [open, job]);
+  }, [open]);
 
   const resetForm = () => {
     setTitlePrefix('นาย');
@@ -220,7 +216,12 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
           unit_name: job?.unit_name ?? null,
           posting_id: posting?.postingId ?? null,
           link_id: posting?.linkId ?? null,
-          position_interest: positionInterest.trim() || null,
+          /**
+           * 🔴 ช่อง "ตำแหน่งที่สนใจ" ถูกถอดจากฟอร์มแล้ว (เจ้าของสั่ง 30 ก.ย. 2569: *"ไม่ต้องเลือกตำแหน่งแล้ว"*)
+           * ผู้สมัครเลือกใบขอมาแล้วตั้งแต่ก่อนเปิดฟอร์ม ⇒ ส่งตำแหน่งของใบนั้นให้เอง (ค่าเดียวกับที่ช่องเดิมเติมให้)
+           * คอลัมน์/ตัวกรอง "ตำแหน่งที่สนใจ" ในรายชื่อผู้สมัครจึงยังมีค่าเหมือนเดิม
+           */
+          position_interest: (job ? publicJobPositionLabel(job) : posting?.title) || null,
           note: note.trim() || null,
         }),
       });
@@ -540,20 +541,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                     </label>
                   )}
                 </Field>
-              </section>
-
-              {/* ── ตำแหน่ง / หมายเหตุ ── */}
-              <section className="space-y-3">
-                <SectionLabel icon={<Send className="h-3.5 w-3.5" />}>ตำแหน่งที่สนใจ</SectionLabel>
-                <Field label="ตำแหน่งที่สนใจ">
-                  <input
-                    type="text"
-                    value={positionInterest}
-                    onChange={(e) => setPositionInterest(e.target.value)}
-                    placeholder="เช่น พนักงานขับรถ"
-                    className="jarvis-soft-field"
-                  />
-                </Field>
+                {/* ช่อง "ตำแหน่งที่สนใจ" ถอดแล้ว (30 ก.ย. 2569) — ตำแหน่งมาจากใบขอที่เลือก · หมายเหตุย้ายมาอยู่ท้ายก้อนนี้ */}
                 <Field label="ข้อมูลเพิ่มเติม (ถ้ามี)">
                   <textarea
                     value={note}
