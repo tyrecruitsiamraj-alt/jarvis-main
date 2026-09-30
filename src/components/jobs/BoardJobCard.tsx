@@ -127,7 +127,10 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
               />
             ))}
           </span>
+          {/* 🔴 "ติดขั้น N" บนการ์ดทุกใบ (เจ้าของ 30 ก.ย. 2569: *"ติดขั้น เอาไปไว้ในแต่ละกล่อง"* → Choice "การ์ดใบขอแต่ละใบ")
+              — แถวติดขั้นบนหัวกล่องงานถอดแล้ว · นับด้วยตัวเดียวกับหัวข้อกรอง "ติดขั้น" */}
           <span className={cn('min-w-0 truncate', progress.released ? TONE.success.value : 'text-foreground')}>
+            {step ? <span className="font-medium">ติดขั้น {step} </span> : null}
             {progress.label}
           </span>
         </div>

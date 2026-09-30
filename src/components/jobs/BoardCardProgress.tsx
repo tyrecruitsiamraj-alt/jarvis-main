@@ -24,7 +24,7 @@ type Props = {
 };
 
 const BoardCardProgress: React.FC<Props> = ({ progress, className }) => {
-  const { currentStep, doneSteps, totalSteps, released, percent, label } = progress;
+  const { currentStep, doneSteps, released, percent, label } = progress;
 
   return (
     <div className={cn('space-y-1.5', className)}>
@@ -62,17 +62,14 @@ const BoardCardProgress: React.FC<Props> = ({ progress, className }) => {
         })}
       </div>
 
-      {/* บรรทัดคำ — บอกว่าอยู่ขั้นไหนและต้องทำอะไร (ป้ายเป็นคำกริยาอยู่แล้วใน RELEASE_STEP_TEXT) */}
+      {/* บรรทัดคำ — "ติดขั้น N ชื่อขั้น" (เจ้าของสั่ง 30 ก.ย. 2569: *"ติดขั้น เอาไปไว้ในแต่ละกล่อง"* — แถวติดขั้นบนหัวถอดแล้ว
+          จำนวนต่อขั้นดูได้ที่หัวข้อ "ติดขั้น" ในปุ่มตัวกรอง) · ป้ายเป็นคำกริยาอยู่แล้วใน RELEASE_STEP_TEXT */}
       <p className={cn('text-xs', DASH.muted)}>
         {released ? (
           <span className={cn('font-medium', TONE.success.value)}>{label}</span>
         ) : (
           <>
-            <span className="font-medium">
-              ขั้น {currentStep}/{totalSteps}
-            </span>
-            {' · '}
-            <span>{label}</span>
+            <span className="font-medium">ติดขั้น {currentStep}</span> <span>{label}</span>
           </>
         )}
       </p>

@@ -72,15 +72,13 @@ function postingUnitId(job: JobRequest): string {
 import {
   RELEASE_LANE_TEXT,
   RELEASE_STEP_ORDER,
-  RELEASE_STEP_TEXT,
   buildReleaseLedger,
   releaseProgressOf,
   releaseProgressTitle,
+  releaseStepOf,
   filterByReleaseLane,
-  filterByReleaseStep,
   type ReleaseFacts,
   type ReleaseLaneKey,
-  type ReleaseStepKey,
 } from '@/lib/boardRelease';
 import JobBoardSilentLinks from '@/components/jobs/JobBoardSilentLinks';
 import {
@@ -431,28 +429,36 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         : null,
     [laneParam],
   );
-  const step = useMemo<ReleaseStepKey | null>(
-    () =>
-      (RELEASE_STEP_ORDER as readonly string[]).includes(stepParam ?? '')
-        ? (stepParam as ReleaseStepKey)
-        : null,
-    [stepParam],
-  );
+  /**
+   * 🔴 ลิงก์เก่า `?step=` (เช่นลิงก์จากพจนานุกรมเมตริก) → ติ๊กหัวข้อ "ติดขั้น" ในตัวกรองให้ แล้วล้าง `?step=` ทิ้ง
+   * (30 ก.ย. 2569 — แถว "ติดขั้น" บนหัวถูกถอด ย้ายเป็นหัวข้อกรอง) · ค่าที่ไม่รู้จัก = ทิ้งเฉย ๆ
+   */
+  useEffect(() => {
+    if (stepParam === null) return;
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete('step');
+        if (!(RELEASE_STEP_ORDER as readonly string[]).includes(stepParam)) return params;
+        const current = readBoardFilterState(params);
+        return writeBoardFilterState(params, {
+          ...current,
+          selection: { ...current.selection, step: [stepParam] },
+        });
+      },
+      { replace: true },
+    );
+  }, [stepParam, setSearchParams]);
 
-  /** เขียนเลน/ขั้นลง URL — 🔴 เปลี่ยนเลนต้องล้างขั้นทิ้ง ไม่งั้นกรองสองชั้นแล้วได้ 0 ใบ */
+  /** เขียนเลนลง URL (ขั้นย้ายไปเป็นหัวข้อ "ติดขั้น" ในตัวกรองแล้ว — 30 ก.ย. 2569) */
   const setSelection = React.useCallback(
-    (next: { lane?: ReleaseLaneKey | ClosedBoxKey | null; step?: ReleaseStepKey | null }) => {
+    (next: { lane?: ReleaseLaneKey | ClosedBoxKey | null }) => {
       setSearchParams((prev) => {
         const params = new URLSearchParams(prev);
         params.delete('stage'); // ลิงก์เก่าถูกแปลงแล้ว ไม่ต้องค้างไว้
         if ('lane' in next) {
           if (next.lane) params.set('lane', next.lane);
           else params.delete('lane');
-          if (!('step' in next)) params.delete('step');
-        }
-        if ('step' in next) {
-          if (next.step) params.set('step', next.step);
-          else params.delete('step');
         }
         return params;
       });
@@ -592,6 +598,22 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     () => (boardFilterOn ? readBoardSort(searchParams) : 'age'),
     [boardFilterOn, searchParams],
   );
+  /**
+   * ── เส้นทางงาน (เจ้าของสั่ง 27 ส.ค. 2569: "ทำให้มันไหลเป็นเส้น") ──
+   * ตรรกะอยู่ lib/boardFlow (มีเทสต์) — ที่นี่แค่ประกอบ facts จาก index ที่โหลดอยู่แล้ว
+   *
+   * 🔴 **เลขบนเส้นนับจาก `boxedJobs` (ก่อนกรองขั้น)** — กดขั้นไหนเลขขั้นอื่นต้องไม่เปลี่ยน
+   * ไม่งั้นกดปุ๊บเลขทุกช่องกลายเป็นของกลุ่มที่กรอง แล้วเทียบข้ามขั้นไม่ได้อีก
+   * ส่วน **การ์ดที่โชว์** ใช้ชุดหลังกรอง (`flowJobs`) — แพตเทิร์นเดียวกับกล่องสถานะ
+   */
+  const stageFacts = useMemo<BoardStageFacts>(
+    () => ({
+      hasLink: (j) => (postingsReady ? postedJobIds.has(j.id) : false),
+      isReleased: (j) => releaseIdx.has(j.id),
+      applicants: (j) => countFor(applicantIdx, j.id),
+    }),
+    [postingsReady, postedJobIds, releaseIdx, applicantIdx],
+  );
   const facetFacts = useMemo<BoardFacetFacts>(
     () => ({
       countsReady: breakdownLoaded,
@@ -599,8 +621,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       leads: (j) => countFor(leadIdx, j.id),
       isReleased: ledgerReady ? (j) => releaseIdx.has(j.id) : null,
       aiSent: breakdownLoaded ? (j) => aiCounts[j.id]?.sent ?? 0 : null,
+      // ติดขั้น (30 ก.ย. 2569) — ตัวเดียวกับเลขบนการ์ด · ใบที่ปล่อยแล้วไม่ติดขั้นไหน
+      stepOf: ledgerReady ? (j) => (releaseIdx.has(j.id) ? null : releaseStepOf(j, stageFacts)) : null,
     }),
-    [breakdownLoaded, applicantIdx, leadIdx, ledgerReady, releaseIdx, aiCounts],
+    [breakdownLoaded, applicantIdx, leadIdx, ledgerReady, releaseIdx, aiCounts, stageFacts],
   );
   /** ใบเปิดหลังแถบซ้าย — ตัวแทน `filters.filtered` ของทุกตัวเลขข้างล่าง */
   const openRows = useMemo(
@@ -742,22 +766,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     [closedBox, closedBoxCounts, openRows, openBoxKey],
   );
 
-  /**
-   * ── เส้นทางงาน (เจ้าของสั่ง 27 ส.ค. 2569: "ทำให้มันไหลเป็นเส้น") ──
-   * ตรรกะอยู่ lib/boardFlow (มีเทสต์) — ที่นี่แค่ประกอบ facts จาก index ที่โหลดอยู่แล้ว
-   *
-   * 🔴 **เลขบนเส้นนับจาก `boxedJobs` (ก่อนกรองขั้น)** — กดขั้นไหนเลขขั้นอื่นต้องไม่เปลี่ยน
-   * ไม่งั้นกดปุ๊บเลขทุกช่องกลายเป็นของกลุ่มที่กรอง แล้วเทียบข้ามขั้นไม่ได้อีก
-   * ส่วน **การ์ดที่โชว์** ใช้ชุดหลังกรอง (`flowJobs`) — แพตเทิร์นเดียวกับกล่องสถานะ
-   */
-  const stageFacts = useMemo<BoardStageFacts>(
-    () => ({
-      hasLink: (j) => (postingsReady ? postedJobIds.has(j.id) : false),
-      isReleased: (j) => releaseIdx.has(j.id),
-      applicants: (j) => countFor(applicantIdx, j.id),
-    }),
-    [postingsReady, postedJobIds, releaseIdx, applicantIdx],
-  );
   const stages = useMemo(
     () =>
       isStaff
@@ -799,11 +807,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
      * แล้วหัวหน้าจอจะบอกเองว่ากำลังอ่านตัวเลข
      */
     if (!ledgerReady) return boxedJobs;
-    /** ขั้นมีได้แค่ในเลน "เหลือปล่อย" ⇒ มี `step` ก็พอ ไม่ต้องรอ `lane` (กัน URL พิมพ์มือ) */
-    if (step) return filterByReleaseStep(openRows, releaseFacts, step);
+    // ขั้นที่ติดกรองด้วยหัวข้อ "ติดขั้น" ในตัวกรองแล้ว (อยู่ใน `openRows` ตั้งแต่ต้น)
     if (lane) return filterByReleaseLane(openRows, releaseFacts, lane);
     return boxedJobs;
-  }, [doneLane, ledgerReady, lane, step, closedBoxCounts, openRows, releaseFacts, boxedJobs]);
+  }, [doneLane, ledgerReady, lane, closedBoxCounts, openRows, releaseFacts, boxedJobs]);
 
   const totalPages = getTotalPages(flowJobs.length, pageSize);
   const currentPage = Math.min(page, totalPages);
@@ -868,12 +875,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   /** คำบอกว่ากำลังดูอะไรอยู่ — 🔴 ป้ายทุกอันมาจาก lib ห้ามพิมพ์เอง */
   const selectionLabel = useMemo(() => {
     if (doneLane) return JOB_BOX_LABEL[doneLane];
-    if (step) {
-      const st = RELEASE_STEP_TEXT[step];
-      return `${RELEASE_LANE_TEXT.unreleased.label} · ขั้น ${st.step} ${st.label}`;
-    }
     return lane ? RELEASE_LANE_TEXT[lane].label : null;
-  }, [doneLane, lane, step]);
+  }, [doneLane, lane]);
 
   /** จุดยึดของรายการการ์ด — ใช้เลื่อนจอไปให้เห็นว่าการ์ดเปลี่ยนตามที่กด */
   const cardListRef = React.useRef<HTMLDivElement | null>(null);
@@ -898,7 +901,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
-  }, [lane, step, doneLane]);
+  }, [lane, doneLane]);
 
   // เปลี่ยนตัวกรองแล้วจำนวนผลลด — กันค้างอยู่หน้าที่หายไป
   useEffect(() => {
@@ -1299,12 +1302,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               ledger={ledger}
               lane={lane}
               onLaneChange={(next) => setSelection({ lane: next })}
-              step={step}
-              /* 🔴 กดขั้น = เข้าเลน "เหลือปล่อย" ด้วยเสมอ — ขั้นมีอยู่ในเลนนั้นเท่านั้น
-                 (ขั้นโชว์ตั้งแต่เปิดหน้าโดยยังไม่ได้เลือกเลน ถ้าไม่ตั้งเลนให้ กดแล้วจะไม่กรองอะไร) */
-              onStepChange={(next) =>
-                setSelection(next ? { lane: 'unreleased', step: next } : { lane: null, step: null })
-              }
             />
 
             <div className="flex flex-wrap items-center justify-between gap-2">

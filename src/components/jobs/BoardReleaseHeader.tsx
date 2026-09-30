@@ -9,7 +9,8 @@
  * - ตัวเลข 3 ก้อน = **การ์ดตัวเลขทรงเดียวกับหน้าติดตาม** (ป้าย · ตราไอคอนมุมขวา · เลขใหญ่ · บรรทัดท้ายคั่นเส้น)
  * - ก้อนย่อยของ "ยังไม่ปล่อย" / "ปล่อยแล้ว" ย้ายเข้าบรรทัดท้ายของการ์ดใบนั้น (เดิมเป็นกล่องแยกอีก 2 ก้อน)
  * - % ปล่อยประกาศย้ายขึ้นคำอธิบายใต้ชื่อหน้า (PageHeader) · แถบ % ถูกถอด
- * - ติดขั้น 1–4 เหลือบรรทัดเดียว ไม่มีกรอบ
+ * - 🔴 แถว "ติดขั้น 1–4" **ถอดแล้ว 30 ก.ย. 2569** (เจ้าของ: *"ติดขั้น เอาไปไว้ในแต่ละกล่อง แล้วไปทำ Filter"*) —
+ *   การ์ดใบขอแต่ละใบบอก "ติดขั้น N" เอง · จำนวนต่อขั้นอยู่หัวข้อ "ติดขั้น" ในปุ่มตัวกรอง (`boardFilters`)
  * - ⛔ ห้ามเติมประโยคอธิบาย ("ต้องทำ:", "บวกกันได้ … ใบพอดี" ฯลฯ) กลับมาโดยไม่ได้สั่ง
  *
  * 🔴 **ทุกเลขกดได้และกดแล้วการ์ดข้างล่างตรงกับเลขนั้นเป๊ะ** ตรรกะการนับอยู่
@@ -20,7 +21,7 @@ import { ClipboardList, Hourglass, Megaphone } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
-import { RELEASE_LANE_TEXT, type ReleaseLaneKey, type ReleaseLedger, type ReleaseStepKey } from '@/lib/boardRelease';
+import { RELEASE_LANE_TEXT, type ReleaseLaneKey, type ReleaseLedger } from '@/lib/boardRelease';
 import { cn } from '@/lib/utils';
 import { ledgerStateText, UNKNOWN_NUMBER, type LedgerState } from '@/lib/boardDataState';
 
@@ -42,9 +43,6 @@ export type BoardReleaseHeaderProps = {
   /** เลนที่เลือก — `null` = ดูทุกใบเปิด */
   lane: ReleaseLaneKey | null;
   onLaneChange: (lane: ReleaseLaneKey | null) => void;
-  /** ขั้นที่เลือก (ใช้ได้เฉพาะเลน "เหลือปล่อย") */
-  step: ReleaseStepKey | null;
-  onStepChange: (step: ReleaseStepKey | null) => void;
   className?: string;
 };
 
@@ -143,40 +141,6 @@ function KpiCard({
   );
 }
 
-/** ปุ่มขั้นในบรรทัด "ติดขั้น" — เลขขั้น · ชื่อขั้น · จำนวนใบ (0 ใบ = จาง แต่ยังกดได้) */
-function StepPill({
-  step,
-  label,
-  count,
-  tone,
-  active,
-  onClick,
-}: {
-  step: number;
-  label: string;
-  count: number;
-  tone: ToneKey;
-  active: boolean;
-  onClick: () => void;
-}) {
-  const quiet = count === 0;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs transition-colors',
-        active ? 'border-primary bg-primary/10 text-foreground' : cn(TONE.neutral.outline, quiet && 'opacity-60'),
-      )}
-    >
-      <span className={cn('font-medium tabular-nums', quiet ? DASH.muted : TONE[tone].value)}>{step}</span>
-      <span>{label}</span>
-      <span className={cn('font-medium tabular-nums', quiet ? DASH.muted : TONE[tone].value)}>{th(count)}</span>
-    </button>
-  );
-}
-
 const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
   state,
   onRetry,
@@ -184,8 +148,6 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
   ledger,
   lane,
   onLaneChange,
-  step,
-  onStepChange,
   className,
 }) => {
   /**
@@ -227,8 +189,6 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
     );
   }
 
-  const showSteps =
-    lane === null || lane === 'all' || lane === 'unreleased' || lane === 'sourcing' || lane === 'started';
   const toggle = (key: ReleaseLaneKey) => onLaneChange(lane === key ? null : key);
 
   return (
@@ -294,25 +254,6 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
         <FootLink pill laneKey="applied" count={ledger.releasedWithApplicants} active={lane === 'applied'} onClick={() => toggle('applied')} />
         <FootLink pill laneKey="silent" count={ledger.releasedSilent} active={lane === 'silent'} onClick={() => toggle('silent')} />
       </div>
-
-      {/* ── ติดขั้นไหน — บรรทัดเดียว (🔴 ปุ่ม "ส่งประกาศทีเดียว" ถูกถอดถาวร 26 ก.ย. 2569)
-          มือถือเลื่อนซ้าย-ขวาได้แทนการตกหลายบรรทัด ── */}
-      {showSteps ? (
-        <div className="flex items-center gap-2 overflow-x-auto sm:flex-wrap sm:overflow-visible">
-          <span className={cn('shrink-0 text-xs', DASH.muted)}>ติดขั้น</span>
-          {ledger.steps.map((s) => (
-            <StepPill
-              key={s.key}
-              step={s.step}
-              label={s.label}
-              count={s.count}
-              tone={s.key === 'publish' ? 'success' : 'warn'}
-              active={step === s.key}
-              onClick={() => onStepChange(step === s.key ? null : s.key)}
-            />
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 };
