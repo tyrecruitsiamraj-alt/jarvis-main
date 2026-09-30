@@ -8,6 +8,7 @@
     "dev:vite": "vite",
     "dev:local": "npm run dev",
     "api:local": "tsx watch server/local-api.ts",
+    "api:local:safe": "tsx watch server/local-api-safe.ts",
     "dev:api": "vercel dev",
     "db:ping": "node scripts/pg-ping.mjs",
     "db:ping:mssql": "node scripts/mssql-ping.mjs",

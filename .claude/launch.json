@@ -16,7 +16,7 @@
     {
       "name": "api",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "api:local"],
+      "runtimeArgs": ["run", "api:local:safe"],
       "port": 3100,
       "autoPort": false
     }
