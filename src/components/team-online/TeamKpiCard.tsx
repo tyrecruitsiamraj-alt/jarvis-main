@@ -45,7 +45,8 @@ export type TeamKpiCardProps = {
 const PILL_TONE: Record<DeltaPill['tone'], ToneKey> = { good: 'success', bad: 'danger', neutral: 'neutral' };
 const PILL_ICON: Record<DeltaPill['dir'], LucideIcon> = { up: ArrowUpRight, down: ArrowDownRight, flat: Minus };
 
-function Pill({ pill }: { pill: DeltaPill }) {
+/** ชิปขึ้น/ลงเทียบช่วงก่อน — หน้าหลักใช้ตัวเดียวกัน (สีและลูกศรเล่าเรื่องเดียวกันทั้งสองหน้า) */
+export function Pill({ pill }: { pill: DeltaPill }) {
   const Icon = PILL_ICON[pill.dir];
   const tone = TONE[PILL_TONE[pill.tone]];
   return (

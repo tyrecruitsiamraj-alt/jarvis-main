@@ -404,18 +404,24 @@ const HomePageClassic: React.FC = () => {
 };
 
 /**
- * ═══ สวิตช์หน้าหลักโฉม 3 ก้อน (29 ก.ย. 2569 · ชั้นคู่ขนาน) ═══
- * `?home=v3` เปิด · `?home=classic` กลับหน้าเดิม · **ค่าตั้งต้น = หน้าเดิม (ด้านบน)** จนเจ้าของเคาะ — หน้าเดิมคือทางถอย
- * แผน: `docs/plan-home-v3-2569-09-29.md`
+ * ═══ สวิตช์หน้าหลัก (`?home=new|classic|v3|online`) — ชั้นคู่ขนาน · ดู `src/lib/homeV3.ts` ═══
+ *
+ * **ค่าตั้งต้น = หน้าหลักใหม่ "ระบบไปกี่ %"** (`HomeAiSharePage` · เจ้าของเริ่มใหม่ 30 ก.ย. 2569:
+ * *"หน้าหลักเริ่มใหม่เลย โละทิ้ง…ลืมหน้าหลักไปเลยว่าเคยต้องการอะไร"* แล้วสั่งเรื่องแรก AI โทร vs คนโทร)
+ * 🔴 ของเดิม (`HomePageClassic` ด้านบน) **ไม่ลบ** — ยังเรียกได้ที่ `?home=classic` เป็นทางถอย จนเจ้าของเคาะ
  */
+const HomeAiSharePage = lazy(() => import('@/pages/HomeAiSharePage'));
 const HomeV3Page = lazy(() => import('@/pages/HomeV3Page'));
 const TeamOnlinePage = lazy(() => import('@/pages/TeamOnlinePage'));
 
-/** สวิตช์โฉม (`?home=v3|online|classic`) — ค่าตั้งต้น = หน้าเดิม (ทางถอย) · ดู `src/lib/homeV3.ts` */
 const HomePage: React.FC = () => {
   const variant = useHomeVariant();
   if (variant === 'classic') return <HomePageClassic />;
-  return <Suspense fallback={null}>{variant === 'online' ? <TeamOnlinePage /> : <HomeV3Page />}</Suspense>;
+  return (
+    <Suspense fallback={null}>
+      {variant === 'online' ? <TeamOnlinePage /> : variant === 'v3' ? <HomeV3Page /> : <HomeAiSharePage />}
+    </Suspense>
+  );
 };
 
 export default HomePage;

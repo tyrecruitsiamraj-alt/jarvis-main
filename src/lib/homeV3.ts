@@ -1,19 +1,24 @@
 /**
  * ═══ สวิตช์โฉมหน้าหลัก — ชั้นคู่ขนานตามกติกาโปรเจกต์ ═══
  *
+ * - `?home=new` = **หน้าหลักใหม่ "ระบบไปกี่ %"** (เจ้าของเริ่มใหม่ 30 ก.ย. 2569: *"หน้าหลักเริ่มใหม่เลย โละทิ้ง…"*
+ *   แล้วสั่งเรื่องแรก AI โทร vs คนโทร · `src/pages/HomeAiSharePage.tsx`) — **ค่าตั้งต้นตอนนี้**
+ * - `?home=classic` = หน้าเดิม (deck · บอร์ด 4 ทีม · KPI) — โค้ดยังอยู่ครบเป็นทางถอย
  * - `?home=v3` = โฉม 3 ก้อน (29 ก.ย. 2569 · แผน `docs/plan-home-v3-2569-09-29.md`)
  * - `?home=online` = หน้าทีม Online ตามภาพต้นแบบของเจ้าของ (29 ก.ย. 2569 · แผน `docs/plan-team-online-2569-09-29.md`)
- * - `?home=classic` = กลับหน้าเดิม · จำในเครื่อง (`jarvis.home.v3` — ค่า `1` เดิม = v3)
+ * จำเลือกไว้ในเครื่อง (`jarvis.home.v3` — ค่า `1` เดิม = v3)
  *
- * 🔴 **ค่าตั้งต้น = หน้าเดิม** จนเจ้าของเคาะ — หน้าเดิมต้องใช้ได้เสมอ เป็นทางถอย (กติกา safe implementation)
+ * 🔴 **ค่าตั้งต้น = หน้าหลักใหม่** (เปลี่ยนจากหน้าเดิม 30 ก.ย. 2569) — คนที่ไม่เคยกดสวิตช์เห็นหน้าใหม่
+ *    หน้าเดิมยังเรียกได้ที่ `?home=classic` และโค้ดยังอยู่ครบ เป็นทางถอย (กติกา safe implementation)
  */
 import * as React from 'react';
 
 export const HOME_V3_KEY = 'jarvis.home.v3';
 
-export type HomeVariant = 'classic' | 'v3' | 'online';
+export type HomeVariant = 'new' | 'classic' | 'v3' | 'online';
 
-const isVariant = (v: unknown): v is HomeVariant => v === 'classic' || v === 'v3' || v === 'online';
+const isVariant = (v: unknown): v is HomeVariant =>
+  v === 'new' || v === 'classic' || v === 'v3' || v === 'online';
 
 function paramMode(): HomeVariant | null {
   try {
@@ -25,10 +30,11 @@ function paramMode(): HomeVariant | null {
 }
 
 export function homeVariant(): HomeVariant {
-  if (typeof window === 'undefined') return 'classic';
+  if (typeof window === 'undefined') return 'new';
   const forced = paramMode();
   try {
-    if (forced === 'classic') window.localStorage.removeItem(HOME_V3_KEY);
+    // 'new' = ค่าตั้งต้น ⇒ ล้างค่าจำ · โฉมอื่นเก็บชื่อไว้ (v3 เก็บ '1' เดิมเพื่อความเข้ากันได้)
+    if (forced === 'new') window.localStorage.removeItem(HOME_V3_KEY);
     else if (forced) window.localStorage.setItem(HOME_V3_KEY, forced === 'v3' ? '1' : forced);
   } catch {
     /* ปิด storage ก็ปล่อยผ่าน — URL ยังสั่งได้ต่อรอบ */
@@ -36,10 +42,10 @@ export function homeVariant(): HomeVariant {
   if (forced) return forced;
   try {
     const v = window.localStorage.getItem(HOME_V3_KEY);
-    return v === '1' ? 'v3' : v === 'online' ? 'online' : 'classic';
+    return v === '1' || v === 'v3' ? 'v3' : v === 'online' ? 'online' : v === 'classic' ? 'classic' : 'new';
   } catch {
-    // อ่าน storage ไม่ได้ = หน้าเดิม (ค่าปลอดภัย)
-    return 'classic';
+    // อ่าน storage ไม่ได้ = หน้าหลักใหม่ (ค่าตั้งต้น)
+    return 'new';
   }
 }
 

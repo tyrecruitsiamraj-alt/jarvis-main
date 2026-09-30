@@ -106,14 +106,22 @@ export function queueStalePending(interval: string, alias = 'q'): string {
  * (คิวเก็บ payload คนละคีย์ตามต้นทาง: งานติดตามใช้ `recipient_*` · บอร์ดใช้ `candidate_*`)
  * 🔴 ห้าม dump payload ทั้งก้อนออกหน้าจอ — ในนั้นมีบทพูดและเบอร์ฉุกเฉิน
  */
+const PAYLOAD_NAME_KEYS = ['recipient_name', 'candidate_name', 'full_name'] as const;
+
 export function queuePayloadName(payload: unknown): string | null {
   if (typeof payload !== 'object' || payload === null) return null;
   const p = payload as Record<string, unknown>;
-  for (const key of ['recipient_name', 'candidate_name', 'full_name']) {
+  for (const key of PAYLOAD_NAME_KEYS) {
     const v = p[key];
     if (typeof v === 'string' && v.trim()) return v.trim();
   }
   return null;
+}
+
+/** ตัวเดียวกับ `queuePayloadName` ในรูป SQL (คีย์ชุดเดียวกัน ลำดับเดียวกัน · ช่องว่างล้วน = ไม่มีชื่อ) — รายชื่อหน้าหลัก รอบ 17 */
+export function queuePayloadNameSql(alias = 'q'): string {
+  const payload = col(alias, 'payload');
+  return `coalesce(${PAYLOAD_NAME_KEYS.map((k) => `nullif(btrim(${payload}->>'${k}'), '')`).join(', ')})`;
 }
 
 export function queuePayloadPhone(payload: unknown): string | null {

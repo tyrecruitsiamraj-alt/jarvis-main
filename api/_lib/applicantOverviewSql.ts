@@ -12,6 +12,7 @@
  * 5. **ห้ามอ่านจาก status ใบ** — status ขยับจากขั้นที่คนกด (claim ก็ขยับ) ตอบคนละคำถาม
  */
 import { tableInAppSchema } from './schema.js';
+import { queueReplySql } from './lumosQueueDefs.js';
 
 const APPS = tableInAppSchema('public_job_applications');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
@@ -50,18 +51,24 @@ const CALLED_VIA_HOLD_APP = `exists (
 const CALLED_VIA_CONTACT_LOG = `exists (
   select 1 from ${CONTACTS} c where c.application_id = a.id)`;
 
-const CALLED_VIA_PHONE = `(a.phone_e164 is not null and (
-  exists (
+/** E4 ครึ่ง AI — ผลจากคิว Lumos บนเบอร์เดียวกัน (เลนอื่น) หลังเวลากรอกใบ */
+const CALLED_VIA_PHONE_QUEUE = `exists (
     select 1 from ${QUEUE} q
      where ${qcol('q', QUEUE_PHONE)} = a.phone_e164
        and ${qcol('q', QUEUE_OUTCOME)} is not null
        and ${qcol('q', QUEUE_OUTCOME)} <> 'cancelled'
-       and ${qcol('q', QUEUE_EVENT_AT)} >= a.created_at)
-  or exists (
+       and ${qcol('q', QUEUE_EVENT_AT)} >= a.created_at)`;
+
+/** E4 ครึ่งคน — ผลที่เจ้าหน้าที่บันทึก (hold) บนเบอร์เดียวกัน หลังเวลากรอกใบ */
+const CALLED_VIA_PHONE_HOLD = `exists (
     select 1 from ${HOLDS} h
      where h.phone_e164 = a.phone_e164
        and h.result_outcome is not null
-       and ${qcol('h', HOLD_EVENT_AT)} >= a.created_at)
+       and ${qcol('h', HOLD_EVENT_AT)} >= a.created_at)`;
+
+const CALLED_VIA_PHONE = `(a.phone_e164 is not null and (
+  ${CALLED_VIA_PHONE_QUEUE}
+  or ${CALLED_VIA_PHONE_HOLD}
 ))`;
 
 /** เติม alias ให้นิพจน์คอลัมน์เปล่า (payload->>... → q.payload->>...) */
@@ -72,6 +79,62 @@ function qcol(alias: string, expr: string): string {
 }
 
 export const CALLED_SQL = `(${CALLED_VIA_APP_QUEUE} or ${CALLED_VIA_HOLD_APP} or ${CALLED_VIA_CONTACT_LOG} or ${CALLED_VIA_PHONE})`;
+
+/**
+ * ═══ "โทรแล้ว" แยกว่า **ใครโทร** — หน้าหลัก "ระบบไปกี่ %" (เจ้าของเคาะ 30 ก.ย. 2569) ═══
+ *
+ * 🔴 **ไม่ใช่นิยามใหม่** — หลักฐานชุดเดียวกับ `CALLED_SQL` ทุกชิ้น แค่แบ่งกองตามต้นทาง
+ * (AI = ผลจากคิว Lumos · คน = ผลที่เจ้าหน้าที่บันทึก) ⇒ `AI or คน` ≡ `CALLED_SQL` เสมอ
+ * ยอด "โทรแล้ว" ของหน้าหลักจึงเท่ากับของกล่องงานเป๊ะ (เทสต์ `homeAiShare.test.ts` คุมว่าชิ้นครบและไม่ทับกัน)
+ * ⚠️ กดเบอร์อย่างเดียวไม่ลงผล (`dialed_first_at`) **ไม่นับ** — เจ้าของเลือก "โทรจริง มีผลบันทึก"
+ */
+export const CALLED_BY_AI_SQL = `(${CALLED_VIA_APP_QUEUE} or (a.phone_e164 is not null and ${CALLED_VIA_PHONE_QUEUE}))`;
+export const CALLED_BY_STAFF_SQL = `(${CALLED_VIA_HOLD_APP} or ${CALLED_VIA_CONTACT_LOG} or (a.phone_e164 is not null and ${CALLED_VIA_PHONE_HOLD}))`;
+
+/**
+ * ═══ ผลล่าสุดของใบ แยกว่าใครโทร (รอบ 18 · แผง "ผลโทร" ของหน้าหลัก) ═══
+ * หลักฐานชุดเดียวกับ `CALLED_BY_AI_SQL` / `CALLED_BY_STAFF_SQL` (คิวของใบ + ผลบนเบอร์เดียวกันหลังเวลากรอกใบ) เลือกอันล่าสุด
+ * ต่อท้าย `from <apps> a` แบบ lateral · AI คืน `air.outcome/summary/reply/at` (ไว้จัดถังด้วยคำพูด) · คนคืน `str.outcome/at`
+ * (เวลาไว้ตัดสินว่าใครโทรทีหลัง — หนึ่งรายชื่อนับผลล่าสุดผลเดียว)
+ * ⚠️ บันทึกผลติดต่อ (`application_contact_logs` · E3) ไม่มีรหัสผล (มีแค่ สำเร็จ/ไม่สำเร็จ) ⇒ ไม่อยู่ในแผงผลโทร
+ */
+export const LATEST_AI_RESULT_LATERAL = `left join lateral (
+    select ${qcol('q', QUEUE_OUTCOME)} as outcome,
+           q.result->>'summary' as summary,
+           ${queueReplySql('q')} as reply,
+           ${qcol('q', QUEUE_EVENT_AT)} as at
+      from ${QUEUE} q
+     where (q.person_ref = 'app-' || a.id::text
+            or (a.phone_e164 is not null and ${qcol('q', QUEUE_PHONE)} = a.phone_e164
+                and ${qcol('q', QUEUE_EVENT_AT)} >= a.created_at))
+       and ${qcol('q', QUEUE_OUTCOME)} is not null
+       and ${qcol('q', QUEUE_OUTCOME)} <> 'cancelled'
+     order by ${qcol('q', QUEUE_EVENT_AT)} desc nulls last
+     limit 1
+  ) air on true`;
+
+export const LATEST_STAFF_RESULT_LATERAL = `left join lateral (
+    select h.result_outcome as outcome, ${qcol('h', HOLD_EVENT_AT)} as at
+      from ${HOLDS} h
+     where h.result_outcome is not null
+       and ((h.source = 'application' and h.candidate_ref = a.id::text)
+            or (a.phone_e164 is not null and h.phone_e164 = a.phone_e164
+                and ${qcol('h', HOLD_EVENT_AT)} >= a.created_at))
+     order by ${qcol('h', HOLD_EVENT_AT)} desc nulls last
+     limit 1
+  ) str on true`;
+
+/** เวลาเหตุการณ์ผลของ hold (ตัวเดียวกับที่ใช้ตัดสินหลักฐาน) — ให้เส้นอื่นเรียงผลล่าสุดด้วยนิยามเดียวกัน */
+export const holdEventAtSql = (alias = 'h') => qcol(alias, HOLD_EVENT_AT);
+
+/** ชิ้นหลักฐานของ "โทรแล้ว" — ให้เทสต์ตรวจว่าแบ่งสองกองครบทุกชิ้นและไม่ทับกัน */
+export const CALLED_EVIDENCE = {
+  appQueue: CALLED_VIA_APP_QUEUE,
+  phoneQueue: CALLED_VIA_PHONE_QUEUE,
+  holdApp: CALLED_VIA_HOLD_APP,
+  contactLog: CALLED_VIA_CONTACT_LOG,
+  phoneHold: CALLED_VIA_PHONE_HOLD,
+} as const;
 
 /** อยู่ในคิว AI รอผล (pending/delivered ยังไม่มีผล) — เบอร์ตรง หรือแถว app- ของใบ */
 export const IN_QUEUE_SQL = `(

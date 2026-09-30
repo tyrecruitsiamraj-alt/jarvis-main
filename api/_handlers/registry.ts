@@ -106,6 +106,8 @@ import unitSectorHandler from './unit-sector.js';
 import officeFloorHandler from './office-floor.js';
 import homeOverviewHandler from './home-overview.js';
 import teamOnlineHandler from './team-online.js';
+import homeAiShareHandler from './home-ai-share.js';
+import homePresenceHandler from './home-presence.js';
 import officeTeamHandler from './office-team.js';
 import callScriptsHandler from './call-scripts.js';
 import callSuppressionHandler from './call-suppression.js';
@@ -180,6 +182,10 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/office-floor': officeFloorHandler as ApiHandler,
   '/api/home-overview': homeOverviewHandler as ApiHandler,
   '/api/team-online': teamOnlineHandler as ApiHandler,
+  // หน้าหลัก "ระบบไปกี่ %" — AI โทร vs คนโทร (30 ก.ย. 2569 · ตัวนับ read-only ไม่มีข้อมูลบุคคล)
+  '/api/home-ai-share': homeAiShareHandler as ApiHandler,
+  // ใครอยู่ในระบบ ท้ายหน้าหลัก (30 ก.ย. 2569 · ชื่อคนเฉพาะหัวหน้า/ผู้ดูแล)
+  '/api/home-presence': homePresenceHandler as ApiHandler,
   '/api/office-team': officeTeamHandler as ApiHandler,
   // บทพูด AI แก้ได้จากหน้าตั้งค่า (27 ส.ค. 2569) — GET ทุก role · PUT/DELETE supervisor+
   '/api/call-scripts': callScriptsHandler as ApiHandler,
