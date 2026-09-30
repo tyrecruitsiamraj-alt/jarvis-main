@@ -131,13 +131,6 @@ export async function saveSiamrajUnitAssignment(
   if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกผู้รับผิดชอบไม่สำเร็จ'));
 }
 
-export async function fetchUnitNoteHistory(limit = 50): Promise<string[]> {
-  const r = await apiFetch(`/api/siamraj/unit-notes?history=1&limit=${limit}`, { cache: 'no-store' });
-  if (!r.ok) return [];
-  const data = await readJsonSafe<{ items?: string[] }>(r);
-  return Array.isArray(data.items) ? data.items : [];
-}
-
 export async function saveUnitRequestNote(requestNo: string, note: string): Promise<void> {
   await saveUnitRequestMeta(requestNo, { note: note.trim() || null });
 }

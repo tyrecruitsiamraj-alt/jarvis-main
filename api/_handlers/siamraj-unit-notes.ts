@@ -8,38 +8,19 @@ import {
 import { readJsonBody, getString } from '../_lib/body.js';
 import { clearUnitRequestCache } from '../_lib/unitRequestCache.js';
 import { auditFromAuthed } from '../_lib/audit.js';
-import {
-  getUnitNote,
-  upsertUnitNote,
-  listDistinctUnitNoteSuggestions,
-} from '../_lib/siamrajUnitNotes.js';
+import { getUnitNote, upsertUnitNote } from '../_lib/siamrajUnitNotes.js';
 import { checkFunctionAccess } from '../_lib/roleFunctionGrants.js';
-import { isSiamrajRequestInScope, loadScopedRequestNoSet } from '../_lib/siamrajUnitRequests.js';
+import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
 
 const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น';
-
-function getQuery(req: AuthedReq, key: string): string {
-  const v = req.query?.[key];
-  if (typeof v === 'string') return v;
-  if (Array.isArray(v) && typeof v[0] === 'string') return v[0];
-  return '';
-}
 
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
 
   if (method === 'GET') {
     try {
-      if (getQuery(req, 'history') === '1') {
-        const limit = Number(getQuery(req, 'limit') || '50');
-        // จำกัดตาม BU — autocomplete ต้องไม่โชว์หมายเหตุของใบขอแผนกอื่น
-        const items = await listDistinctUnitNoteSuggestions(
-          limit,
-          await loadScopedRequestNoSet(req.user),
-        );
-        return res.status(200).json({ items });
-      }
-
+      /* 🔴 `?history=1` (หมายเหตุที่เคยใช้ของใบอื่น) ถอดแล้ว 30 ก.ย. 2569 — ส่งหมายเหตุทั้งก้อนที่มีชื่อ/เบอร์/อีเมล
+         ผู้สมัครปนอยู่ไปโชว์ในช่องหมายเหตุของทุกใบ · เจ้าของสั่งไม่ให้โชว์ ⇒ ไม่มีจอไหนเรียกแล้ว ห้ามเอากลับ */
       const requestNo = getString(req.query?.request_no);
       if (!requestNo) return sendError(res, 400, 'Bad request', 'request_no query is required');
       if (!(await isSiamrajRequestInScope(req.user, requestNo))) {

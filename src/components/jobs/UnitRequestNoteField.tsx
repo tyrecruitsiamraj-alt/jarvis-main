@@ -3,11 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import {
-  fetchUnitNoteHistory,
-  saveUnitRequestNote,
-  unitRequestNoteKey,
-} from '@/lib/siamrajUnitRequestsApi';
+import { saveUnitRequestNote, unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
 
 type BaseProps = {
   requestKey: string;
@@ -60,7 +56,6 @@ const UnitRequestNoteEditor: React.FC<BaseProps> = ({
   onSaved,
 }) => {
   const [value, setValue] = useState(() => openingValue(requestKey, initialNote, readOnly));
-  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
@@ -76,18 +71,6 @@ const UnitRequestNoteEditor: React.FC<BaseProps> = ({
     latestValue.current = next;
     lastSaved.current = initialNote;
   }, [initialNote, requestKey, readOnly]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      const items = await fetchUnitNoteHistory();
-      if (!cancelled) setSuggestions(items);
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const dirty = value.trim() !== lastSaved.current.trim();
 
@@ -107,8 +90,6 @@ const UnitRequestNoteEditor: React.FC<BaseProps> = ({
       writeDraft(requestKey, current.trim() === trimmed ? null : current);
       onSaved?.(trimmed);
       setSavedMsg('บันทึกหมายเหตุแล้ว');
-      const items = await fetchUnitNoteHistory();
-      setSuggestions(items);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกหมายเหตุไม่สำเร็จ');
     } finally {
@@ -151,11 +132,8 @@ const UnitRequestNoteEditor: React.FC<BaseProps> = ({
         )}
         aria-label="หมายเหตุใบขอ"
       />
-      {suggestions.length > 0 ? (
-        <p className="text-xs text-muted-foreground">
-          หมายเหตุที่เคยใช้: {suggestions.slice(0, 5).join(' · ')}
-        </p>
-      ) : null}
+      {/* 🔴 บรรทัด "หมายเหตุที่เคยใช้" ถอดแล้ว (30 ก.ย. 2569 · เจ้าของ: *"ไม่ต้องโชว์สิ"*) — มันดึงหมายเหตุของใบอื่น
+          มาโชว์ทั้งก้อน ซึ่งมีชื่อ เบอร์ และอีเมลของผู้สมัครปนอยู่ · เส้น `?history=1` ฝั่ง API ถอดตามไปด้วย ห้ามเอากลับ */}
       {!readOnly ? (
         <div className="flex flex-wrap items-center gap-3">
           <Button size="sm"

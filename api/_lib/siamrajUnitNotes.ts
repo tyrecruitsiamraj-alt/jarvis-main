@@ -414,40 +414,6 @@ export async function attachLeadRules(items: unknown[]): Promise<void> {
   }
 }
 
-/**
- * หมายเหตุที่เคยบันทึกไว้ (ไม่ซ้ำ) สำหรับ autocomplete
- * scopedRequestNos = เลขใบขอที่ผู้ใช้เห็นได้ (null = ทุกแผนก) — กันหมายเหตุของแผนกอื่นรั่วมา
- */
-export async function listDistinctUnitNoteSuggestions(
-  limit = 50,
-  scopedRequestNos?: Set<string> | null,
-): Promise<string[]> {
-  const cap = Math.min(Math.max(limit, 1), 100);
-  const scoped = scopedRequestNos ?? null;
-  if (scoped && scoped.size === 0) return [];
-  const params: unknown[] = [cap];
-  let scopeSql = '';
-  if (scoped) {
-    params.push([...scoped]);
-    scopeSql = `and request_no = any($${params.length}::text[])`;
-  }
-  const { rows } = await dbQuery<{ note: string }>(
-    `
-    select note
-    from (
-      select note, max(updated_at) as last_used
-      from ${table}
-      where note is not null and trim(note) <> '' ${scopeSql}
-      group by note
-      order by last_used desc
-      limit $1
-    ) recent
-    `,
-    params,
-  );
-  return rows.map((r) => r.note.trim()).filter(Boolean);
-}
-
 export async function upsertUnitNote(input: {
   requestNo: string;
   note?: unknown;
