@@ -65,7 +65,7 @@ let SKIPS: Array<Record<string, unknown>> = [];
 
 function fakeDb(sql: string) {
   if (sql.includes('from job_release_skips')) return { rows: SKIPS };
-  if (sql.includes("action = 'auth.login.success'")) return { rows: [{ uid: 'u2', last_at: new Date('2026-09-28T10:00:00Z') }] };
+  if (sql.includes("'auth.azure_ad.success'")) return { rows: [{ uid: 'u2', last_at: new Date('2026-09-28T10:00:00Z') }] };
   if (sql.includes('as wait_hours')) return { rows: APPS };
   if (sql.includes('released_at is not null')) return { rows: [{ job_id: 'siamraj-sql:R1', request_no: 'R1' }] };
   if (sql.includes('from audit_logs') && sql.includes('min(created_at)')) return { rows: [{ ymd: '2026-07-01' }] };
@@ -332,7 +332,11 @@ describe('ตัวเลขประกอบจากแถวจริง', (
 
 describe('โครงคิวรี (นิยามกลาง)', () => {
   it('Online ล่าสุด: ล็อกอินสำเร็จล่าสุดทุกช่วงเวลา · เวลาล่าสุดของแต่ละวันจากร่องรอยงาน', () => {
-    expect(mod.lastLoginSql()).toContain("action = 'auth.login.success'");
+    // 🔴 เข้าระบบนับทุกทาง — บริษัทล็อกอินด้วย Microsoft เป็นหลักแล้ว (เดิมนับแต่รหัสผ่าน ⇒ 22 บัญชีขึ้น "ยังไม่เคยเข้าระบบ" ผิด ๆ)
+    for (const a of ['auth.login.success', 'auth.magic_link.success', 'auth.azure_ad.success']) {
+      expect(mod.lastLoginSql()).toContain(`'${a}'`);
+    }
+    expect(mod.lastLoginSql()).not.toContain("'auth.login.failed'");
     expect(mod.lastLoginSql()).toContain('max(created_at)');
     expect(mod.usersSql()).toContain('max(ev.at) as last_at');
     expect(mod.accountsSql()).toContain('u.job_lanes');

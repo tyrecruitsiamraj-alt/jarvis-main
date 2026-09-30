@@ -7,6 +7,7 @@ import { azureAuthSuccessRedirect } from './azureAdAuth.js';
 import type { ApiReq, ApiRes } from './http.js';
 import { auditFromAnonymous } from './audit.js';
 import { logLoginEvent } from './monitorClient.js';
+import type { AuthSessionAuditAction } from './authActions.js';
 
 export type AuthUserRow = {
   id: string;
@@ -36,10 +37,8 @@ export function toUserResponse(row: AuthUserRow) {
   };
 }
 
-export type AuthSessionAuditAction =
-  | 'auth.login.success'
-  | 'auth.magic_link.success'
-  | 'auth.azure_ad.success';
+/** ชื่อเหตุการณ์เข้าระบบสำเร็จ — ชุดเดียวอยู่ `authActions.ts` (หน้าที่นับ "เข้าระบบล่าสุด" อ่านจากชุดเดียวกัน) */
+export type { AuthSessionAuditAction };
 
 export async function issueAuthSession(
   req: ApiReq,

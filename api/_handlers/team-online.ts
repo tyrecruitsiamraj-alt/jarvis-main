@@ -30,6 +30,7 @@ import { HAS_APPOINTMENT_SQL, buildApplicantFactsSql } from '../_lib/applicantOv
 import { siteBuSql, trendBuSql } from '../_lib/siteBuSql.js';
 import { logWarn } from '../_lib/logger.js';
 import { listReleaseSkips } from '../_lib/jobReleaseSkips.js';
+import { ACTIVITY_SOURCES, accountsSql, lastLoginSql } from '../_lib/userActivitySql.js';
 import { buildSkipIndex, releaseSkipText, type JobReleaseSkip } from '../../src/lib/jobReleaseSkips.js';
 import { requestAddedYmd } from '../../src/lib/trends/requestTrends.js';
 import { addDays } from '../../src/lib/trends/timeBuckets.js';
@@ -87,34 +88,8 @@ const AUDIT = tableInAppSchema('audit_logs');
 const CACHE_MS = 60_000;
 const cache = new Map<string, { at: number; body: TeamOnlineResponse }>();
 
-/**
- * ร่องรอยการใช้งานของเจ้าหน้าที่ — [ตาราง, คอลัมน์ผู้ใช้, คอลัมน์เวลา]
- * ระบบไม่มีบันทึก "เปิดดู" ⇒ นับจากล็อกอิน (`audit_logs`) + งานที่บันทึก (ใครทำ · เมื่อไหร่)
- * 🔴 ห้ามใส่คู่ `updated_by`/`updated_at` ของตารางที่ระบบเขียนเองด้วย (เช่น `follow_entries` ที่ผล Lumos
- *    ขยับ `updated_at`) — เวลาจะเป็นของระบบแต่ชื่อเป็นของคนแก้ล่าสุด ⇒ นับคนที่ไม่ได้ใช้งานจริง
- */
-export const ACTIVITY_SOURCES: ReadonlyArray<readonly [table: string, user: string, at: string]> = [
-  ['audit_logs', 'user_id', 'created_at'],
-  ['application_contact_logs', 'created_by', 'created_at'],
-  ['application_appointment_results', 'recorded_by', 'created_at'],
-  ['candidate_call_holds', 'held_by_user_id', 'held_at'],
-  ['candidate_call_holds', 'held_by_user_id', 'result_at'],
-  ['candidate_proposals', 'proposed_by_user_id', 'created_at'],
-  ['candidate_screening', 'screened_by_user_id', 'updated_at'],
-  ['follow_entries', 'created_by', 'created_at'],
-  ['follow_entries', 'completed_by', 'completed_at'],
-  ['job_posting_requests', 'requested_by_user_id', 'created_at'],
-  ['job_public_releases', 'released_by', 'released_at'],
-  ['recruit_postings', 'created_by_user_id', 'created_at'],
-  ['selection_progress', 'updated_by', 'updated_at'],
-  ['short_links', 'created_by', 'created_at'],
-  ['siamraj_unit_assignments', 'updated_by_user_id', 'updated_at'],
-  ['siamraj_unit_notes', 'updated_by_user_id', 'updated_at'],
-  ['siamraj_unit_work_status_history', 'updated_by_user_id', 'created_at'],
-  ['public_job_applications', 'claimed_by', 'claimed_at'],
-  ['public_job_applications', 'lead_by', 'lead_at'],
-  ['lumos_call_batches', 'created_by_user_id', 'created_at'],
-];
+/** ร่องรอยการใช้งาน / บัญชี / เข้าระบบล่าสุด — ย้ายไป `api/_lib/userActivitySql.ts` (ตัวเดียวกับหน้าหลัก) · ส่งต่อชื่อเดิมไว้ */
+export { ACTIVITY_SOURCES, accountsSql, lastLoginSql };
 
 const bkkYmd = (col: string) => `to_char(timezone('Asia/Bangkok', ${col}), 'YYYY-MM-DD')`;
 
@@ -132,26 +107,6 @@ export function usersSql(): string {
        from ev
        join ${USERS} u on u.id = ev.uid
       group by 1, 2`;
-}
-
-/**
- * ล็อกอินสำเร็จล่าสุดของแต่ละคน **ทุกช่วงเวลา** — "Online ล่าสุด" ของรายชื่อ (รอบ 5)
- * ⚠️ ล็อกเริ่มเก็บ 1 ก.ค. 2569 ⇒ ไม่มีแถว = "ยังไม่เคยเข้าระบบ" นับตั้งแต่วันนั้น (หน้าเว็บบอกไว้)
- */
-export function lastLoginSql(): string {
-  return `select user_id::text as uid, max(created_at) as last_at
-            from ${AUDIT}
-           where action = 'auth.login.success' and user_id is not null
-           group by 1`;
-}
-
-/** บัญชีทุกบัญชี (ฐานของ % คนใช้งาน) — แผนก · บทบาท · เปิดใช้อยู่ไหม · วันที่สร้าง */
-export function accountsSql(): string {
-  return `select u.id::text as id, coalesce(nullif(btrim(u.department_code), ''), '') as dept, u.role,
-                 coalesce(u.is_active, false) as active, ${bkkYmd('u.created_at')} as created_ymd,
-                 coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''), u.email) as display_name,
-                 coalesce(u.job_lanes, '{}'::text[]) as lanes
-            from ${USERS} u`;
 }
 
 /** แถวคิวทุกเลนที่เข้าคิวใน [$1, $2) — ผล/ยกเลิก/คำตอบในสาย ตัวกลาง `lumosQueueDefs` · BU ตัวเดียวกับยอดส่ง Lumos */
