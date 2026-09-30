@@ -252,7 +252,8 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   const heading = job ? jobBoardCardTitle(job) : standalone?.kindLabel ?? 'ประกาศรับสมัคร';
 
   const body = (
-        <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-5 py-4">
+        // ฝังในการ์ดของป๊อปไล่งาน (ขั้น 4) = การ์ดให้ขอบ/ระยะแล้ว ไม่ต้องเว้นซ้ำ
+        <div className={embedded ? 'space-y-3.5' : 'min-h-0 flex-1 space-y-3.5 overflow-y-auto px-5 py-4'}>
           {links.length > 0 ? (
             <div className="space-y-3">
               <p className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">

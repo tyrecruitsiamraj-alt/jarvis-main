@@ -83,7 +83,8 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
   };
 
   const body = (
-        <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-5 py-4">
+        // ฝังในการ์ดของป๊อปไล่งาน (ขั้น 4) = การ์ดให้ขอบ/ระยะแล้ว ไม่ต้องเว้นซ้ำ
+        <div className={embedded ? 'space-y-3.5' : 'min-h-0 flex-1 space-y-3.5 overflow-y-auto px-5 py-4'}>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">หัวข้อประกาศ *</label>
             <input className={fieldCls} value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -107,9 +108,7 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
                 dropdown จังหวัด/อำเภอ/ตำบล ในส่วน "ข้อมูลที่จะขึ้นประกาศ" ข้างล่างที่เดียว
                 กันสองช่องขัดกันเอง */}
             <input className={cn(fieldCls, 'opacity-70')} value={locationText} readOnly disabled />
-            <p className="text-[11px] text-muted-foreground">
-              จาก ERP · แก้พื้นที่บนประกาศได้ที่ &quot;พื้นที่ทำงาน&quot; ด้านล่าง
-            </p>
+            <p className="text-xs text-muted-foreground">แก้สถานที่ที่ผู้สมัครเห็นได้ที่ขั้น 2</p>
           </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">ค่าตอบแทน</label>

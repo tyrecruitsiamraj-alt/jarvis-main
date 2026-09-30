@@ -16,33 +16,35 @@ const FORM_LIB = read('src/lib/publicFieldsForm.ts');
 const NOTE = read('src/components/jobs/UnitRequestNoteField.tsx');
 
 describe('ป๊อปแก้ข้อมูลประกาศ — auto-save', () => {
-  it('มี debounce 1500ms ยิง persist(true) แบบเงียบ', () => {
+  it('มี debounce 1500ms ยิง persist แบบเงียบ', () => {
     // นาฬิกาคืนเป็น null ก่อนยิง (แก้ 27 ก.ย. 2569 — ค่าค้างทำให้ flush ตอน unmount ยิงทั้งที่ไม่มีของค้าง)
     expect(DIALOG).toMatch(
-      /setTimeout\(\s*\(\)\s*=>\s*\{?\s*(?:autosaveTimer\.current = null;\s*)?void persistRef\.current\?\.\(true\)/,
+      /setTimeout\(\s*\(\)\s*=>\s*\{?\s*(?:autosaveTimer\.current = null;\s*)?void persistRef\.current\?\.\(\)/,
     );
     expect(DIALOG).toContain('1500');
   });
   it('🔴 ยิงเฉพาะตอนฟอร์มต่างจากที่บันทึกไว้จริง (เปิดดูเฉย ๆ ห้ามยิง · ห้ามวน)', () => {
     // บั๊กจริง 27 ก.ย. 2569: เปิดขั้น 3 ดูเฉย ๆ แล้ววนบันทึกทุก 1.5 วิ (ใบเดียว 44 ครั้ง)
-    expect(DIALOG).toContain('if (!formDiffersFromJob(st)) return;');
-    expect(DIALOG).toContain('if (silent && !formDiffersFromJob(st)) return;');
+    // ด่านสองชั้น: ก่อนตั้งนาฬิกา + ในตัวบันทึกเอง
+    expect(DIALOG.match(/if \(!formDiffersFromJob\(st\)\) return;/g)?.length).toBe(2);
     // ห้ามกลับไปใช้ธง "กำลังเติมค่า" ที่แข่งเวลากับ React
     expect(DIALOG).not.toContain('hydratingRef');
     // ค่าตั้งต้นมาจากใบขอตั้งแต่ render แรก + ผู้เรียกใส่ key ต่อใบ
     expect(DIALOG).toContain('formStateFromJob(job)');
   });
-  it('persist แยก silent (auto) กับปุ่ม (ปิดป๊อป)', () => {
-    expect(DIALOG).toContain('const persist = async (silent: boolean)');
-    expect(DIALOG).toContain('const save = () => void persist(false)');
+  it('🔴 แต่ละขั้นบันทึกเฉพาะช่องของตัวเอง (30 ก.ย. 2569 — สลับขั้นเร็วแล้วขั้นหลังเขียนค่าเก่าทับ)', () => {
+    expect(DIALOG.match(/formStateForSections\(job, own,/g)?.length).toBe(2);
   });
-  it('ปิดป๊อป flush ของค้างก่อน (ห้ามหายเงียบ)', () => {
-    expect(DIALOG).toContain('const handleClose');
-    const at = DIALOG.indexOf('const handleClose');
-    expect(DIALOG.slice(at, at + 300)).toContain('persist(true)');
+  it('🔴 ไม่มีปุ่ม "บันทึกแล้วปิด" / "ปิด" แล้ว (เจ้าของ 30 ก.ย. 2569) — บันทึกไม่ได้มีปุ่มลองอีกครั้ง', () => {
+    // ตัดคอมเมนต์ก่อน — หัวไฟล์ยกคำสั่งเจ้าของที่มีคำนี้ไว้โดยตั้งใจ
+    const code = DIALOG.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(code).not.toContain('บันทึกแล้วปิด');
+    expect(code).not.toContain('const handleClose');
+    expect(code).not.toContain('<Dialog');
+    expect(code).toContain('ลองอีกครั้ง');
   });
-  it('unmount ระหว่างมีของค้าง flush', () => {
-    expect(DIALOG).toContain('void persistRef.current?.(true)');
+  it('unmount (สลับขั้น/ปิดป๊อป) ระหว่างมีของค้าง flush — ห้ามหายเงียบ', () => {
+    expect(DIALOG).toMatch(/useEffect\(\(\) => \{\s*return \(\) => \{[\s\S]{0,200}void persistRef\.current\?\.\(\)/);
   });
   it('patch สร้างจากตัวกลางตัวเดียว (spread ของเดิม)', () => {
     expect(FORM_LIB).toContain('export function buildOverridesPatch');

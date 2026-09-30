@@ -1,143 +1,257 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { unitOneLine } from '@/lib/unitDisplay';
+/**
+ * ═══ ข้อมูลที่จะขึ้นประกาศ — ขั้น 2 (สถานที่) กับขั้น 3 (รายได้ + สวัสดิการ) ของป๊อปไล่งาน ═══
+ *
+ * เดิมเป็นป๊อป "แก้ข้อมูลที่จะขึ้นประกาศ" จากการ์ดกล่องงาน (17 ส.ค. 2569) · ตอนนี้ฝังในป๊อปไล่งานอย่างเดียว
+ * (`BoardPostingSteps`) — ห้ามห่อ Dialog ซ้อนในป๊อปอีก ⇒ **โหมด Dialog ถอดแล้ว 30 ก.ย. 2569** (ไม่มีใครเรียก)
+ *
+ * ═══ โฉมใหม่ 30 ก.ย. 2569 (เจ้าของไล่ทีละหน้า) ═══
+ * - ขั้น 2: *"มันจะมีใบขอเขียนว่า กับ ใส่รายละเอียดเองใช่ไหม ควรมี Checkbox เพื่อให้รู้ว่าจะเอาอันไหน
+ *   ถ้าไม่ได้จะใส่เองก็ซ่อนไว้ แต่ถ้าติ๊กว่าใส่เอง ค่อยโชว์ออกมา"* ⇒ สองกล่องเลือกได้อย่างเดียว
+ *   ใบขอเขียนว่า = ล้างที่ตั้งเอง (ระบบอ่านจากที่อยู่ให้) · ใส่รายละเอียดเอง = จังหวัด/อำเภอ/ตำบล (เลือกที่อ่านได้ไว้ให้ก่อน)
+ * - ขั้น 3 รายได้: *"มียอด Sum มาให้ มียอดคนเก่ารับ และ ยอดให้คีย์เอง และแน่นอน มี Checkbox"*
+ *   → Choice "ติ๊กเลือกได้อย่างเดียว (แนะนำ)" · ตามใบขอ (ติ๊กบรรทัดอัตรา + ยอดรวม) · รายได้คนเก่า · ใส่เอง
+ * - ขั้น 3 สวัสดิการ: *"Checkbox แล้วด้านขวาเป็นชื่อสวัสดิการ · ช่อง Freetext มาจากรายการที่ติ๊ก
+ *   จะเพิ่มไรก็ตรงที่ติ๊กมีให้กดเพื่อใส่รายละเอียดเพิ่มเติม ลดการคีย์มือ"* → Choice "รายการทั่วไป (แนะนำ)"
+ * - ทุกขั้น: *"ไม่ต้องมีคำว่าบันทึกแล้วปิด"* ⇒ ไม่มีปุ่มบันทึก/ปิด เหลือป้ายสถานะ (บันทึกเองเหมือนเดิม)
+ * ตัวแปลงหน้าฟอร์ม ↔ ของที่บันทึก อยู่ `src/lib/publicFieldsForm.ts` ที่เดียว (มีเทสต์ไป-กลับ)
+ *
+ * ⚠️ **ไม่ได้แก้ข้อมูลใน ERP** — เก็บเป็น override ฝั่งเรา (`siamraj_unit_notes.field_overrides`)
+ * ⚠️ รายได้ที่ตั้ง **ทับเฉพาะเลขที่โชว์** ไม่ใช่อัตราจ่ายจริง และไม่ใช่ตัวที่ AI ใช้คิด
+ */
+import React, { useEffect, useId, useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 import type { JobRequest } from '@/types';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   fetchSiamrajUnitRequest,
   saveUnitRequestMeta,
   siamrajExternalId,
   unitRequestNoteKey,
 } from '@/lib/siamrajUnitRequestsApi';
-import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
-import { displayDistrictLine } from '@/lib/displayJobLocation';
+import { rateLineChoices, type BenefitChoice } from '@/lib/jobBenefitPicks';
 import {
-  mergePickedIntoLines,
-  rateLineChoices,
-  type BenefitChoice,
-} from '@/lib/jobBenefitPicks';
-import {
+  BENEFIT_LABEL_MAX,
   BENEFIT_LINE_MAX,
   INCOME_LINE_MAX,
   INCOME_OTHER_LABEL,
   INCOME_PERIOD_LABEL,
   INCOME_PERIODS,
-  SUGGESTED_INCOME_LABELS,
   buildIncomeDisplay,
   cleanBenefitLines,
   sumIncomeLines,
   type IncomeLine,
   type IncomePeriod,
 } from '@/lib/incomeBreakdown';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
+import { EXTRA_BENEFITS } from '@/lib/extraBenefits';
 import { resignedMonthlyNetAverage } from '@/lib/resignedIncome';
-import { buildOverridesPatch, formDiffersFromJob, formStateFromJob } from '@/lib/publicFieldsForm';
+import { publicSafeAddress } from '@/lib/publicJobPrivacy';
+import {
+  RESIGNED_INCOME_LINE_LABEL,
+  benefitDetailMax,
+  benefitEntriesFromText,
+  benefitTextFromEntries,
+  buildOverridesPatch,
+  formDiffersFromJob,
+  formStateForSections,
+  formStateFromJob,
+  incomeDraftFromForm,
+  incomeFormFromDraft,
+  placeGuessForForm,
+  placeModeOf,
+  type BenefitEntry,
+  type IncomeDraft,
+  type IncomeMode,
+  type OverridesFormState,
+  type PlaceMode,
+} from '@/lib/publicFieldsForm';
 import {
   PUBLIC_TOGGLE_FIELDS,
   PUBLIC_FIELD_LABEL,
   readPublicVisibility,
   type PublicToggleField,
 } from '@/lib/publicFieldVisibility';
-import { DASH, TONE } from '@/lib/designTokens';
-import { cn } from '@/lib/utils';
 import {
   getDistrictOptions,
   getProvinceOptions,
   getSubdistrictOptions,
 } from '@/lib/thaiAddressCascade';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { CheckRow, ChoiceBox, StepCard } from '@/components/jobs/postingStepParts';
+import { EVEN_TYPE, TONE } from '@/lib/designTokens';
+import { cn } from '@/lib/utils';
 
 /**
- * ป้ายบรรทัดรายได้ตอนกด "ใช้รายได้คนเก่า" — 🔴 **คำนี้ขึ้นหน้าสาธารณะ** ห้ามเขียนคำภายใน
- * (เช่น "คนเก่า"/"eSlip") ให้ผู้สมัครเห็น · ที่มาของตัวเลขบอกไว้ในป๊อปฝั่งเจ้าหน้าที่แล้ว
- */
-const RESIGNED_INCOME_LINE_LABEL = 'รายได้โดยประมาณ';
-
-/**
- * แก้ข้อมูลที่จะไปโผล่บน **หน้าประกาศสาธารณะ** — เปิดจากการ์ดในกล่องงาน
- * (เจ้าของสั่ง 17 ส.ค. 2569: *"หน้าสาธารณะก่อนจะไปหน้า เพิ่มให้แก้ไขจากหน้ากล่องงานที"*)
- *
- * แก้ได้ 3 อย่าง:
- *   1. จังหวัด / อำเภอ / ตำบล — ที่อยู่ ERP เป็นข้อความก้อนเดียว ตัวถอดเดาผิดได้
- *      ประกาศเลยขึ้นพื้นที่ผิดแล้วคนในพื้นที่หาไม่เจอ
- *   2. รายได้รวม — เพิ่ม/ลดจากเลขที่ ERP ให้มา
- *   3. สวัสดิการเพิ่มเติม — ติ๊กจากรายการใน `src/lib/extraBenefits.ts`
- *
- * ⚠️ **ไม่ได้แก้ข้อมูลใน ERP** — เก็บเป็น override ฝั่งเรา (`siamraj_unit_notes.field_overrides`)
- * ล้างช่องให้ว่าง = กลับไปใช้ค่าจาก ERP ตามเดิม
- * ⚠️ รายได้ที่แก้ **ทับเฉพาะเลขที่โชว์** ไม่ใช่อัตราจ่ายจริง และไม่ใช่ตัวที่ AI ใช้คิด
- */
-/**
- * ส่วนของฟอร์มที่จะโชว์ — 🔴 เพิ่ม 28 ส.ค. 2569 เพราะเจ้าของแยกงานเป็นขั้น:
- * *"กดถัดไปจะเจอช่องให้ใส่สถานที่ปฏิบัติงาน · กดถัดไปจะเจอช่อง Checklist ให้เลือกว่า
- * จากข้อมูลใบขอจะเอาอะไรมาเป็นสวัสดิการบ้าง"*
- * ⇒ ขั้น 2 โชว์ `place` · ขั้น 3 โชว์ `income` + `benefits`
- * ⚠️ ไม่ส่งมา = โชว์ครบทุกส่วนเหมือนเดิม (หน้าอื่นที่เรียกอยู่แล้วไม่ต้องแก้)
+ * ส่วนของฟอร์มที่จะโชว์ — ขั้น 2 = `place` · ขั้น 3 = `income` + `benefits` (+ ช่องที่ให้ผู้สมัครเห็น)
+ * ไม่ส่งมา = โชว์ครบทุกส่วน
  */
 export type PublicFieldSection = 'place' | 'income' | 'benefits';
+
+const NUM = new Intl.NumberFormat('th-TH');
+const TIME = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' });
+const NO_PLACE = { province: '', district: '', subdistrict: '' };
+const NO_INCOME = { incomePeriod: 'monthly' as const, incomeRows: [], incomeTotal: '' };
+const digitsOnly = (v: string) => v.replace(/[^\d]/g, '');
+
+/** แถวรายได้ในฟอร์ม → รายการที่ใช้ได้จริง (ตัดแถวที่ไม่ครบ) — กติกาเดียวกับตัวประกอบ patch */
+function parseIncomeRows(rows: OverridesFormState['incomeRows']): IncomeLine[] {
+  return rows
+    .map((r) => ({ label: r.label.trim(), amount: Math.trunc(Number(r.amount)) }))
+    .filter((r) => r.label !== '' && Number.isFinite(r.amount) && r.amount > 0);
+}
+
+function PeriodToggle({ value, onChange }: { value: IncomePeriod; onChange: (next: IncomePeriod) => void }) {
+  return (
+    <ToggleGroup
+      type="single"
+      size="sm"
+      variant="outline"
+      value={value}
+      onValueChange={(v) => {
+        if (v === 'daily' || v === 'monthly') onChange(v);
+      }}
+      aria-label="หน่วยรายได้"
+    >
+      {INCOME_PERIODS.map((p) => (
+        <ToggleGroupItem
+          key={p}
+          value={p}
+          className="h-8 px-3 text-xs data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+        >
+          {INCOME_PERIOD_LABEL[p]}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  );
+}
+
+function PlaceSelect({
+  id,
+  label,
+  value,
+  options,
+  placeholder,
+  disabled = false,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: readonly string[];
+  placeholder: string;
+  disabled?: boolean;
+  onChange: (next: string) => void;
+}) {
+  /** ค่าเก่าที่พิมพ์เองก่อนเปลี่ยนเป็นรายการ — ใส่ไว้ให้เห็นว่าตั้งอะไรอยู่ (ไม่งั้นช่องว่างเหมือนไม่เคยตั้ง) */
+  const legacy = value !== '' && !options.includes(value);
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-xs font-normal text-muted-foreground">
+        {label}
+      </Label>
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
+        <SelectTrigger id={id} className="h-10 text-sm">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent className={cn('max-h-72', EVEN_TYPE)}>
+          {legacy ? <SelectItem value={value}>{value}</SelectItem> : null}
+          {options.map((o) => (
+            <SelectItem key={o} value={o}>
+              {o}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+/** "ผู้สมัครจะเห็น …" บรรทัดเดียว */
+function SeenLine({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-xs text-muted-foreground">
+      ผู้สมัครจะเห็น <span className="text-foreground">{children}</span>
+    </p>
+  );
+}
 
 const EditPublicJobFieldsDialog: React.FC<{
   job: JobRequest | null;
   sections?: PublicFieldSection[];
-  onClose: () => void;
   onSaved?: (patch: Partial<JobRequest>) => void;
-  /** true = คืนเนื้อฟอร์มเปล่า ๆ ไม่ห่อ Dialog (ฝังในแท็บ "แก้ไข" ของป๊อปอัปการ์ด) */
-  embedded?: boolean;
-}> = ({ job, sections, onClose, onSaved, embedded = false }) => {
+}> = ({ job, sections, onSaved }) => {
+  const uid = useId();
   /**
    * 🔴 **ค่าตั้งต้นมาจากใบขอตั้งแต่ render แรก** (แก้ 27 ก.ย. 2569) — เดิมเริ่มจากค่าว่างแล้ว
-   * ค่อยเติมใน useEffect ⇒ มีช่วงที่ฟอร์มถือค่าว่าง/ค่าเริ่ม แล้ว auto-save หยิบช่วงนั้นไปเขียนทับ
+   * ค่อยเติมใน useEffect ⇒ มีช่วงที่ฟอร์มถือค่าว่าง แล้ว auto-save หยิบช่วงนั้นไปเขียนทับ
    * ⚠️ ผู้เรียกต้องใส่ `key={job.id}` — เปลี่ยนใบ = สร้างฟอร์มใหม่ (ไม่เติมค่าข้ามใบ)
    */
   const [init] = useState(() => (job ? formStateFromJob(job) : null));
+
+  // ── ขั้น 2 สถานที่ ──
+  const [placeMode, setPlaceMode] = useState<PlaceMode>(() => placeModeOf(init ?? NO_PLACE));
   const [province, setProvince] = useState(init?.province ?? '');
   const [district, setDistrict] = useState(init?.district ?? '');
   const [subdistrict, setSubdistrict] = useState(init?.subdistrict ?? '');
+
+  // ── ขั้น 3 รายได้ (เลือกได้ทางเดียว · ค่าของแต่ละทางจำไว้ สลับไปมาไม่หาย) ──
+  const [income, setIncome] = useState<IncomeDraft>(() => incomeDraftFromForm(init ?? NO_INCOME));
+  /** บรรทัดรายได้ตอนเปิด — บรรทัดที่ไม่อยู่ในตารางอัตรา (พิมพ์เองสมัยก่อน) ยังโชว์ให้ติ๊กคืนได้ */
+  const [openedRequestRows] = useState(() => income.requestRows);
   /**
-   * รายได้แบบแยกส่วน (เจ้าของสั่ง 20 ส.ค. 2569) — แต่ละแถว: ชื่อรายการ + จำนวนเงิน
-   * แถวที่ยังกรอกไม่ครบเก็บเป็น string ไว้ก่อน (แปลง/คัดตอนบันทึกด้วย lib กลาง)
-   */
-  const [incomePeriod, setIncomePeriod] = useState<IncomePeriod>(init?.incomePeriod ?? 'monthly');
-  const [incomeRows, setIncomeRows] = useState<{ label: string; amount: string }[]>(init?.incomeRows ?? []);
-  /** ยอดรวมที่ใส่เอง — ว่าง = ใช้ผลบวกของรายการ (ยังไม่มีรายการ = ใช้เลข ERP) */
-  const [incomeTotal, setIncomeTotal] = useState(init?.incomeTotal ?? '');
-  /** สวัสดิการ freetext บรรทัดละรายการ (เจ้าของเคาะ: จำกัด 5 รายการ ไม่งั้นเยอะเกิน) */
-  const [benefitText, setBenefitText] = useState(init?.benefitText ?? '');
-  /**
-   * ตารางอัตราตามใบขอ (ERP) — เจ้าของชี้ตารางนี้มาเองให้เอามาทำ checklist
-   * ⚠️ ตารางนี้มาจากเส้น "ใบเดียว" (`?id=`) ไม่ได้ติดมากับรายการ จึงต้องดึงตอนเปิดป๊อป
+   * ตารางอัตราตามใบขอ (ERP) — มาจากเส้น "ใบเดียว" (`?id=`) เท่านั้น ต้องดึงตอนเปิด
+   * 🔴 **โชว์เฉพาะอัตราจ่าย** (`jobBenefitPicks`) — อัตราเบิกห้ามออกหน้าสาธารณะ
    */
   const [rateChoices, setRateChoices] = useState<BenefitChoice[]>([]);
   const [ratesLoading, setRatesLoading] = useState(false);
-  /** เปิด/ปิดแผงติ๊กจากตารางอัตรา (กดจากปุ่ม "เพิ่มรายการรายได้") */
-  const [showRatePicker, setShowRatePicker] = useState(false);
-  /** บรรทัดที่ติ๊กไว้ — 🔴 ค่าตั้งต้นคือไม่ติ๊กอะไรเลย (เจ้าของเคาะ) */
-  const [pickedKeys, setPickedKeys] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  // ── ขั้น 3 สวัสดิการ (ลำดับตามที่บันทึกไว้เสมอ) ──
+  const [benefits, setBenefits] = useState<BenefitEntry[]>(() => benefitEntriesFromText(init?.benefitText ?? ''));
+  /** รายการทั่วไปที่กด "+ รายละเอียด" แล้ว (ช่องกางอยู่) */
+  const [detailOpen, setDetailOpen] = useState<ReadonlySet<string>>(() => new Set());
+  const customSeq = React.useRef(0);
+
   /** หน้าสาธารณะเห็นช่องไหน (22 ก.ย. 2569) — true = โชว์ (ค่าเริ่มทุกช่อง) */
   const [visibility, setVisibility] = useState<Record<PublicToggleField, boolean>>(
     () => init?.visibility ?? readPublicVisibility(null),
   );
+  const [error, setError] = useState<string | null>(null);
   /** สถานะ auto-save (22 ก.ย. 2569) — idle/saving/saved(+เวลา)/error */
   const [autoStatus, setAutoStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [savedAt, setSavedAt] = useState<string | null>(null);
   /** ตัวบันทึกล่าสุด (อัปเดตทุก render) — ให้ debounce hook เรียกได้โดยไม่ผูก closure เก่า */
-  const persistRef = React.useRef<null | ((silent: boolean) => Promise<void>)>(null);
+  const persistRef = React.useRef<null | (() => Promise<void>)>(null);
   /** นาฬิกา auto-save ที่ค้างอยู่ — `null` = ไม่มีของค้าง (🔴 ต้องคืนเป็น null ทุกครั้งที่ยกเลิก) */
   const autosaveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /** ค่าที่จะบันทึกจริง — เฉพาะทางที่ติ๊กอยู่ (ใบขอเขียนว่า = ไม่ตั้งเอง) */
+  const place = useMemo(
+    () => (placeMode === 'manual' ? { province, district, subdistrict } : NO_PLACE),
+    [placeMode, province, district, subdistrict],
+  );
+  const incomeForm = useMemo(() => incomeFormFromDraft(income), [income]);
+  const { incomePeriod, incomeRows, incomeTotal } = incomeForm;
+  const benefitText = useMemo(() => benefitTextFromEntries(benefits), [benefits]);
+
+  const show = (k: PublicFieldSection) => !sections || sections.includes(k);
+  const showPlace = show('place');
+  const showIncome = show('income');
+  const showBenefits = show('benefits');
+  /** ช่องที่ฟอร์มนี้เป็นเจ้าของ — ช่องของขั้นอื่นเอาจากใบขอล่าสุดเสมอ (`formStateForSections`) */
+  const own = useMemo(
+    () => ({ place: showPlace, income: showIncome, benefits: showBenefits }),
+    [showPlace, showIncome, showBenefits],
+  );
+  const needRates = showIncome;
+
   /**
-   * ดึงตารางอัตราของใบนี้ — เส้น "ใบเดียว" เท่านั้นที่มี `rate_lines`
-   * ⚠️ ล้มไม่เป็นไร (แค่ไม่มีอะไรให้ติ๊ก ยังพิมพ์เองได้) — ห้ามทำให้ป๊อปเปิดไม่ได้
+   * ดึงตารางอัตราของใบนี้ (เฉพาะขั้นที่มีรายได้) — ล้มไม่เป็นไร แค่ไม่มีบรรทัดให้ติ๊ก
    * ผูกกับเลขใบ (ไม่ใช่ตัวแปร `job` ที่ถูกสร้างใหม่ทุก render ฝั่งแม่) — ดึงครั้งเดียวต่อใบ
    */
-  const rateKey = job ? siamrajExternalId(job) : null;
+  const rateKey = job && needRates ? siamrajExternalId(job) : null;
   useEffect(() => {
     if (!rateKey) return;
     let cancelled = false;
@@ -158,13 +272,6 @@ const EditPublicJobFieldsDialog: React.FC<{
   }, [rateKey]);
 
   /**
-   * ตัวเลือกที่อยู่แบบไล่ระดับ (เจ้าของสั่ง 17 ส.ค. 2569: *"จังหวัด อำเภอ ตำบล ทำเป็น Dropdown"*)
-   *
-   * เดิมเป็นช่องพิมพ์เอง — พิมพ์ผิด/สะกดคนละแบบ ("บางรัก" vs "เขตบางรัก") ทำให้ประกาศ
-   * ขึ้นพื้นที่ที่คนหาไม่เจอ และตัวกรองจังหวัดบนบอร์ดก็จับไม่ตรง
-   * ใช้ชุดข้อมูลเดียวกับหน้าเพิ่มงาน/หน้าสมัคร (`thaiAddressCascade`) ทั้งระบบจึงสะกดเหมือนกัน
-   */
-  /**
    * 🔴 **Auto-save** (เจ้าของเคาะ 22 ก.ย. 2569 — "เซฟดราฟต์เอาไว้เสมอ")
    * แก้อะไรแล้วรอ 1.5 วิ ค่อยยิงบันทึกเงียบ ๆ · ยิงผ่าน `persistRef` (อัปเดตทุก render)
    * 🔴 **ยิงเฉพาะตอนฟอร์มต่างจากที่บันทึกไว้จริง** (`formDiffersFromJob` — แก้ 27 ก.ย. 2569)
@@ -176,674 +283,536 @@ const EditPublicJobFieldsDialog: React.FC<{
       autosaveTimer.current = null;
     }
     if (!job) return;
-    const st = { job, province, district, subdistrict, incomePeriod, incomeRows, incomeTotal, benefitText, visibility };
+    const st = formStateForSections(job, own, { ...place, incomePeriod, incomeRows, incomeTotal, benefitText, visibility });
     if (!formDiffersFromJob(st)) return;
     autosaveTimer.current = setTimeout(() => {
       autosaveTimer.current = null;
-      void persistRef.current?.(true);
+      void persistRef.current?.();
     }, 1500);
     // ทุก field ที่ประกอบเป็น patch + ใบขอ (ของที่บันทึกไว้) — เปลี่ยนเมื่อไหร่เทียบใหม่
-  }, [job, province, district, subdistrict, incomePeriod, incomeRows, incomeTotal, benefitText, visibility]);
+  }, [job, own, place, incomePeriod, incomeRows, incomeTotal, benefitText, visibility]);
 
-  /** unmount (เช่นสลับขั้นในป๊อปไล่งาน) ระหว่างมี auto-save ค้าง → flush กันของหาย */
+  /** unmount (สลับขั้น/ปิดป๊อป) ระหว่างมี auto-save ค้าง → flush กันของหาย */
   useEffect(() => {
     return () => {
       if (autosaveTimer.current) {
         clearTimeout(autosaveTimer.current);
         autosaveTimer.current = null;
-        void persistRef.current?.(true);
+        void persistRef.current?.();
       }
     };
   }, []);
 
   const provinceOptions = useMemo(() => getProvinceOptions(), []);
   const districtOptions = useMemo(() => getDistrictOptions(province), [province]);
-  const subdistrictOptions = useMemo(
-    () => getSubdistrictOptions(province, district),
-    [province, district],
-  );
+  const subdistrictOptions = useMemo(() => getSubdistrictOptions(province, district), [province, district]);
 
   if (!job) return null;
 
-  // ค่าที่ระบบเดาได้เอง — โชว์เป็น placeholder ให้รู้ว่าถ้าไม่กรอกจะได้อะไร
-  const guessedProvince = inferProvinceFromAddress(job.location_address || '') || 'ไม่ทราบ';
-  const guessedDistrict = displayDistrictLine(job.location_address || '') || 'ไม่ทราบ';
-  const guessedSubdistrict = inferSubdistrictFromAddress(job.location_address || '') || 'ไม่ทราบ';
-
-  /** แปลงแถวในฟอร์ม → รายการที่ใช้ได้จริง (ตัดแถวที่กรอกไม่ครบ) */
-  const parsedLines: IncomeLine[] = incomeRows
-    .map((r) => ({ label: r.label.trim(), amount: Math.trunc(Number(r.amount)) }))
-    .filter((r) => r.label !== '' && Number.isFinite(r.amount) && r.amount > 0);
-  const linesSum = sumIncomeLines(parsedLines);
-  const totalNum = incomeTotal.trim() === '' ? null : Math.trunc(Number(incomeTotal) || 0);
-  /** ตัวอย่างที่ผู้สมัครจะเห็น — ใช้ตัวคำนวณเดียวกับหน้าสาธารณะเป๊ะ */
-  const preview = buildIncomeDisplay(
-    parsedLines.length > 0 ? { period: incomePeriod, lines: parsedLines, total: totalNum } : null,
-  );
-  const benefitLines = cleanBenefitLines(benefitText.split('\n'));
-  // ⚠️ ห้ามใช้ useMemo ตรงนี้ — อยู่ใต้ early return ของ `open` แล้ว (rules-of-hooks)
-  const mergedBenefitLines = benefitLines;
-  /** รายได้คนเก่าเฉลี่ยต่อเดือน (ทางที่ ② ของการตั้งรายได้) — `null` = ไม่มีให้ใช้ */
-  const resignedAvg = resignedMonthlyNetAverage(job.resigned_income_3m, job.lastWorkingDay);
-
   /**
-   * บันทึก field_overrides · `silent=true` = auto-save (ไม่ปิดป๊อป · ตั้งป้ายสถานะ)
-   * `silent=false` = ปุ่มบันทึก (ปิดป๊อปเมื่อสำเร็จ ตามเดิม)
+   * บันทึก field_overrides — ยิงจาก auto-save / flush ตอนออกจากขั้น / ปุ่ม "ลองอีกครั้ง"
+   * 🔴 คีย์ใบขอผ่าน `unitRequestNoteKey` ตัวกลางเท่านั้น (23 ก.ย. 2569 — คิดคีย์เองเคยเขียนทับใบขอจริง
+   *    ที่เลขชนกับใบขอล่วงหน้า 64%)
    */
-  const persist = async (silent: boolean) => {
-    /**
-     * 🔴 **ต้องใช้ตัวกลางตัวเดียวกับที่อื่น** (23 ก.ย. 2569) — บรรทัดนี้เคยคิดคีย์เอง
-     * แบบ `externalId || request_no` ซึ่งผิดสองชั้น:
-     * ① สลับลำดับกับฝั่งอ่าน (บั๊ก "บันทึกแล้วหาย" ที่แก้ไป 22 ก.ย. แต่ค้างจุดนี้)
-     * ② `siamrajExternalId()` **ถอด prefix ทิ้ง** ⇒ ใบขอล่วงหน้าได้เลขเปล่า
-     *    แล้วไปเขียนทับแถวของ **ใบขอจริงที่เลขเดียวกัน** (ชนกัน 64% ของใบล่วงหน้า)
-     */
+  const persist = async () => {
     const requestNo = unitRequestNoteKey(job);
     if (!requestNo) {
-      setError('ใบขอนี้ไม่มีเลขที่ใบขอ — แก้ไม่ได้');
+      setError('ใบขอนี้ไม่มีเลขที่ใบขอ บันทึกไม่ได้');
       return;
     }
-    const st = { job, province, district, subdistrict, incomePeriod, incomeRows, incomeTotal, benefitText, visibility };
-    // auto-save ที่ไม่มีอะไรเปลี่ยน = ไม่ยิง (ด่านที่สอง เผื่อมีทางเรียกอื่นหลุดมา)
-    if (silent && !formDiffersFromJob(st)) return;
-    if (silent) setAutoStatus('saving');
-    else setSaving(true);
+    const st = formStateForSections(job, own, { ...place, incomePeriod, incomeRows, incomeTotal, benefitText, visibility });
+    // ไม่มีอะไรเปลี่ยน = ไม่ยิง (ด่านที่สอง เผื่อมีทางเรียกอื่นหลุดมา)
+    if (!formDiffersFromJob(st)) return;
+    setAutoStatus('saving');
     setError(null);
     try {
-      const patch = buildOverridesPatch({
-        job,
-        province,
-        district,
-        subdistrict,
-        incomePeriod,
-        incomeRows,
-        incomeTotal,
-        benefitText,
-        visibility,
-      });
+      const patch = buildOverridesPatch(st);
       await saveUnitRequestMeta(requestNo, { field_overrides: patch });
+      const shown = buildIncomeDisplay(patch.income);
       onSaved?.({
-        override_province: province.trim() || null,
-        override_district: district.trim() || null,
-        override_subdistrict: subdistrict.trim() || null,
+        override_province: st.province.trim() || null,
+        override_district: st.district.trim() || null,
+        override_subdistrict: st.subdistrict.trim() || null,
         ...(patch.total_income != null ? { total_income: patch.total_income } : {}),
-        ...(preview ? { income_display: preview } : { income_display: undefined }),
+        income_display: shown ?? undefined,
         extra_benefits: patch.benefits ?? undefined,
-        // ส่ง field_overrides ที่รวม visibility กลับ ให้ตัวอย่าง/การ์ดฝั่ง parent อัปเดตทันที
+        // ส่ง field_overrides ทั้งก้อนกลับ ให้สรุปขั้น 4/การ์ดฝั่งแม่อัปเดตทันที
         field_overrides: patch,
       });
-      if (silent) {
-        setAutoStatus('saved');
-        setSavedAt(
-          new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-        );
-      } else {
-        onClose();
-      }
+      setAutoStatus('saved');
+      setSavedAt(TIME.format(new Date()));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
-      if (silent) setAutoStatus('error');
-    } finally {
-      if (silent) setSaving(false);
-      else setSaving(false);
+      setAutoStatus('error');
     }
   };
   // ให้ debounce hook เรียกตัวล่าสุดเสมอ (closure ใหม่ทุก render)
   persistRef.current = persist;
 
-  const save = () => void persist(false);
-
-  /**
-   * ปิดป๊อป — ถ้ามี auto-save ค้างในคิว flush ก่อนเสมอ (ห้ามหายเงียบ · บทเรียน sirirat)
-   * ไม่ปิดรอผลก็ได้ เพราะ persist(silent) ไม่เด้งปิด — ค่าที่ยิงจะถึงฐานเอง
-   */
-  const handleClose = () => {
-    if (autosaveTimer.current) {
-      clearTimeout(autosaveTimer.current);
-      autosaveTimer.current = null;
-      void persist(true);
+  // ── ขั้น 2 ──
+  const choosePlace = (next: PlaceMode) => {
+    if (next === placeMode) return;
+    setPlaceMode(next);
+    // ติ๊กใส่เองครั้งแรก = เลือกที่ระบบอ่านจากใบขอได้ไว้ให้ก่อน (ถูกแล้วไม่ต้องแตะ)
+    if (next === 'manual' && !province && !district && !subdistrict) {
+      const g = placeGuessForForm(job.location_address);
+      setProvince(g.province);
+      setDistrict(g.district);
+      setSubdistrict(g.subdistrict);
     }
-    onClose();
   };
+  const requestPlaceText = publicSafeAddress({ location_address: job.location_address });
+  const manualPlaceText = publicSafeAddress({
+    location_address: job.location_address,
+    override_province: province,
+    override_district: district,
+    override_subdistrict: subdistrict,
+  });
+  const legacyPlace = [
+    province && !provinceOptions.includes(province) ? `จังหวัด ${province}` : '',
+    district && province && !districtOptions.includes(district) ? `อำเภอ ${district}` : '',
+    subdistrict && district && !subdistrictOptions.includes(subdistrict) ? `ตำบล ${subdistrict}` : '',
+  ].filter(Boolean);
 
-  const fieldCls =
-    'w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary';
-
-  /** โชว์ส่วนนี้ไหม — ไม่ส่ง `sections` มา = โชว์หมด */
-  const show = (k: PublicFieldSection) => !sections || sections.includes(k);
-
-  const body = (
-        // `relative` = ที่ยึดของแผงเด้ง "อัตราตามใบขอ" (absolute inset-0) ข้างล่าง
-        <div className="relative space-y-4">
-          {show('place') ? (
-          <section className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">พื้นที่ทำงาน</p>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <label className="space-y-1">
-                <span className="text-xs text-muted-foreground">จังหวัด</span>
-                <select
-                  className={fieldCls}
-                  value={province}
-                  onChange={(e) => {
-                    // เปลี่ยนจังหวัด = อำเภอ/ตำบลเดิมใช้ไม่ได้แล้ว ต้องล้างทิ้ง
-                    // ไม่ล้าง = ได้คู่ที่ไม่มีอยู่จริง (เช่น กรุงเทพฯ + อ.ศรีราชา)
-                    setProvince(e.target.value);
-                    setDistrict('');
-                    setSubdistrict('');
-                  }}
-                >
-                  <option value="">— ใช้ค่าที่ระบบเดา ({guessedProvince}) —</option>
-                  {provinceOptions.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="space-y-1">
-                <span className="text-xs text-muted-foreground">อำเภอ/เขต</span>
-                <select
-                  className={fieldCls}
-                  value={district}
-                  disabled={!province}
-                  onChange={(e) => {
-                    setDistrict(e.target.value);
-                    setSubdistrict('');
-                  }}
-                >
-                  <option value="">
-                    {province ? `— ใช้ค่าที่ระบบเดา (${guessedDistrict}) —` : '— เลือกจังหวัดก่อน —'}
-                  </option>
-                  {districtOptions.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="space-y-1">
-                <span className="text-xs text-muted-foreground">ตำบล/แขวง</span>
-                <select
-                  className={fieldCls}
-                  value={subdistrict}
-                  disabled={!district}
-                  onChange={(e) => setSubdistrict(e.target.value)}
-                >
-                  <option value="">
-                    {district ? `— ใช้ค่าที่ระบบเดา (${guessedSubdistrict}) —` : '— เลือกอำเภอก่อน —'}
-                  </option>
-                  {subdistrictOptions.map((sd) => (
-                    <option key={sd} value={sd}>
-                      {sd}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              ไม่เลือก = ใช้ค่าที่ระบบเดาจากที่อยู่ ERP · เลือกจังหวัดใหม่แล้วอำเภอ/ตำบลจะถูกล้าง
-            </p>
-            {/* ค่าเดิมที่เคยพิมพ์เองอาจไม่มีในรายการ (ก่อนเปลี่ยนเป็น dropdown)
-                ต้องบอกให้รู้ ไม่ใช่ปล่อยให้ช่องว่างเปล่าแล้วเข้าใจว่าไม่เคยตั้ง */}
-            {[
-              province && !provinceOptions.includes(province) ? `จังหวัด "${province}"` : '',
-              district && province && !districtOptions.includes(district) ? `อำเภอ "${district}"` : '',
-              subdistrict && district && !subdistrictOptions.includes(subdistrict)
-                ? `ตำบล "${subdistrict}"`
-                : '',
-            ].filter(Boolean).length > 0 ? (
-              <p className={cn('rounded-lg px-2.5 py-1.5 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
-                ค่าเดิมที่เคยพิมพ์ไว้ไม่ตรงกับรายการมาตรฐาน (
-                {[
-                  province && !provinceOptions.includes(province) ? `จังหวัด "${province}"` : '',
-                  district && province && !districtOptions.includes(district) ? `อำเภอ "${district}"` : '',
-                  subdistrict && district && !subdistrictOptions.includes(subdistrict)
-                    ? `ตำบล "${subdistrict}"`
-                    : '',
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-                ) — เลือกใหม่จากรายการเพื่อให้ตัวกรองจับได้
-              </p>
-            ) : null}
-          </section>
-          ) : null}
-
-          {show('income') ? (
-          <section className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-medium text-muted-foreground">รายได้ที่จะโชว์บนประกาศ</p>
-              {/* หน่วยของทั้งชุด — ห้ามปนรายวันกับรายเดือนในรายการเดียว */}
-              <div className="flex items-center gap-1">
-                {INCOME_PERIODS.map((pd) => (
-                  <button
-                    key={pd}
-                    type="button"
-                    aria-pressed={incomePeriod === pd}
-                    onClick={() => setIncomePeriod(pd)}
-                    className={cn(
-                      'rounded-full border px-2.5 py-0.5 text-[11px] font-medium',
-                      incomePeriod === pd ? TONE.info.solid : TONE.neutral.outline,
-                    )}
-                  >
-                    {INCOME_PERIOD_LABEL[pd]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* รายการรายได้ — ชื่อพิมพ์เอง/เลือกจากชุดแนะนำ + จำนวนเงิน (เจ้าของสั่ง 20 ส.ค. 2569) */}
-            {incomeRows.length > 0 ? (
-              <div className="space-y-1.5">
-                {incomeRows.map((row, i) => (
-                  <div key={i} className="flex items-center gap-1.5">
-                    <input
-                      className={cn(fieldCls, 'flex-1')}
-                      list="income-label-suggestions"
-                      maxLength={30}
-                      placeholder="เช่น ฐานเงินเดือน"
-                      value={row.label}
-                      onChange={(e) =>
-                        setIncomeRows((prev) =>
-                          prev.map((r, j) => (j === i ? { ...r, label: e.target.value } : r)),
-                        )
-                      }
-                    />
-                    <input
-                      className={cn(fieldCls, 'w-28 text-right font-medium tabular-nums')}
-                      inputMode="numeric"
-                      placeholder="บาท"
-                      value={row.amount}
-                      onChange={(e) =>
-                        setIncomeRows((prev) =>
-                          prev.map((r, j) =>
-                            j === i ? { ...r, amount: e.target.value.replace(/[^\d]/g, '') } : r,
-                          ),
-                        )
-                      }
-                    />
-                    <button
-                      type="button"
-                      aria-label={`ลบรายการ ${row.label || i + 1}`}
-                      onClick={() => setIncomeRows((prev) => prev.filter((_, j) => j !== i))}
-                      className={cn(
-                        'shrink-0 rounded-lg border px-2 py-1.5 text-xs font-medium',
-                        TONE.danger.outline,
-                      )}
-                    >
-                      ลบ
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">
-                ยังไม่มีรายการ — ประกาศจะโชว์รายได้แบบเดิม (เลขจาก ERP หรือยอดรวมที่ใส่ในช่องล่าง)
-              </p>
-            )}
-            <datalist id="income-label-suggestions">
-              {SUGGESTED_INCOME_LABELS.map((l) => (
-                <option key={l} value={l} />
-              ))}
-            </datalist>
-            {/**
-              * ═══ ตั้งรายได้ได้ 3 ทาง (เจ้าของเคาะ 26 ก.ย. 2569) ═══
-              * > *"บน Erp มีอะไรบ้างที่เป็นรายได้ ก็มีปุ่ม checkbox ให้เลือก … หรือ เลือกได้ว่าจะลง
-              * >  รายได้ของคนเก่าที่เฉลี่ยแล้วได้ประมาณไหน หรือ มีช่องให้ใส่รายได้เอง เลือกทำได้"*
-              * ① ติ๊กจาก ERP ("+ เพิ่มรายการรายได้" → แผงอัตราตามใบขอ) · ② **ใช้รายได้คนเก่า** ·
-              * ③ พิมพ์เอง ("พิมพ์เองแทน" ในแผง / ช่องยอดรวมข้างล่าง)
-              * 🔴 ② = ยอดสุทธิ eSlip เฉลี่ยต่อเดือนจาก 3 เดือนจริง · ตัดงวดไม่เต็ม (`resignedIncome.ts`)
-              *    ใบเปิดไซต์ใหม่/ไม่มีงวดเต็ม = กดไม่ได้พร้อมบอกเหตุผล · กดแล้ว**แทนที่**รายการเดิม
-              *    (ยอดสุทธิรวมทุกอย่างแล้ว เอาไปต่อท้ายรายการ ERP = นับซ้ำ)
-              */}
-            <div className="flex flex-wrap items-center gap-2">
-              {incomeRows.length < INCOME_LINE_MAX ? (
-                <button
-                  type="button"
-                  onClick={() => setShowRatePicker((v) => !v)}
-                  className={cn('rounded-lg border px-2.5 py-1 text-xs font-medium', TONE.info.outline)}
-                >
-                  + เพิ่มรายการรายได้
-                </button>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">ครบ {INCOME_LINE_MAX} รายการแล้ว</p>
-              )}
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-7 text-xs"
-                disabled={!resignedAvg}
-                onClick={() => {
-                  if (!resignedAvg) return;
-                  setIncomePeriod('monthly');
-                  setIncomeRows([{ label: RESIGNED_INCOME_LINE_LABEL, amount: String(resignedAvg.amount) }]);
-                  setIncomeTotal('');
-                  setShowRatePicker(false);
-                }}
-              >
-                ใช้รายได้คนเก่า
-                {resignedAvg ? ` ≈ ฿${resignedAvg.amount.toLocaleString('th-TH')}/เดือน` : ''}
-              </Button>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              {resignedAvg
-                ? `รายได้คนเก่า = ยอดสุทธิ eSlip เฉลี่ยจาก ${resignedAvg.fullPeriods} งวดเต็ม (≈ ${resignedAvg.monthsCovered.toLocaleString('th-TH')} เดือน)${
-                    resignedAvg.skipped > 0
-                      ? ` · ตัดงวดไม่เต็ม/ออกกลางงวด ${resignedAvg.skipped} งวด`
-                      : ''
-                  }${incomeRows.length > 0 ? ' · กดแล้วแทนที่รายการที่มีอยู่' : ''}`
-                : 'ใช้รายได้คนเก่าไม่ได้ — ใบนี้ไม่มีงวดจ่ายเต็มงวดของคนเก่าในไซต์นี้ (เช่น เปิดไซต์ใหม่)'}
-            </p>
-
-            {/**
-              * ═══ กด "เพิ่มรายการรายได้" แล้ว **เด้งป๊อป** ตารางอัตราตามใบขอมาให้ติ๊ก ═══
-              *
-              * เจ้าของสั่ง 31 ส.ค. 2569: *"ต้องการกดคำว่า เพิ่มรายการรายได้ แล้วให้ popup
-              * เด้งอัตราตามใบขอ (ERP) ขึ้นมาพร้อมกับกล่อง Checkbox"*
-              *
-              * 🔴 **ไม่ใช้ `Dialog`** — ฟอร์มนี้ถูกฝังอยู่ในป๊อปไล่งานอยู่แล้ว (`embedded`)
-              * ใส่ Dialog ซ้อนเข้าไปคือผิดกติกาบ้านนี้ตรง ๆ ⇒ ทำเป็นแผงคลุมทับ**ในกล่องเดิม**
-              * ได้ความรู้สึกเด้งเหมือนกัน แต่ไม่ซ้อนชั้นป๊อป
-              *
-              * 🔴 ติ๊กหลายอันแล้วกดเพิ่มทีเดียว · ตัวเลขที่ใส่ให้คือ**อัตราจ่าย** เท่านั้น
-              */}
-            {showRatePicker ? (
-              <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-black/25 p-3">
-                <div
-                  className={cn(
-                    'flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-xl border shadow-lg',
-                    'border-border bg-card',
-                  )}
-                >
-                  <div className="border-b border-border/70 px-3.5 py-2.5">
-                    <p className="text-sm font-medium text-foreground">อัตราตามใบขอ (ERP)</p>
-                    <p className={cn('text-[11px]', DASH.muted)}>
-                      ติ๊กอันที่จะเอาไปเป็นรายการรายได้ — ตัวเลขคืออัตราจ่าย อัตราเบิกไม่ขึ้นประกาศ
-                    </p>
-                  </div>
-
-                  <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-2">
-                    {ratesLoading ? (
-                      <p className={cn('py-4 text-center text-xs', DASH.muted)}>
-                        กำลังอ่านตารางอัตราของใบนี้…
-                      </p>
-                    ) : rateChoices.length === 0 ? (
-                      <p className={cn('py-4 text-center text-xs', DASH.muted)}>
-                        ใบนี้ไม่มีตารางอัตราจากระบบงานหลัก — กด "พิมพ์เองแทน" ข้างล่าง
-                      </p>
-                    ) : (
-                      <ul className="divide-y divide-border/60">
-                        {rateChoices.map((c) => {
-                          const already = incomeRows.some((r) => r.label.trim() === c.name);
-                          const on = pickedKeys.includes(c.key);
-                          return (
-                            <li key={c.key}>
-                              <label
-                                className={cn(
-                                  'flex cursor-pointer items-center gap-2.5 py-2',
-                                  already && 'opacity-45',
-                                )}
-                              >
-                                <Checkbox
-                                  checked={on}
-                                  disabled={already}
-                                  onCheckedChange={(v) =>
-                                    setPickedKeys((cur) =>
-                                      v === true
-                                        ? [...cur, c.key]
-                                        : cur.filter((k) => k !== c.key),
-                                    )
-                                  }
-                                />
-                                <span className="min-w-0 flex-1 text-xs text-foreground">
-                                  {c.isPenalty ? (
-                                    <span className={cn('mr-1 font-medium', TONE.warn.value)}>⚠</span>
-                                  ) : null}
-                                  {c.name}
-                                  {already ? (
-                                    <span className={cn('ml-1 text-[11px]', DASH.muted)}>
-                                      (ใส่ไปแล้ว)
-                                    </span>
-                                  ) : null}
-                                  {c.isPenalty ? (
-                                    <span className={cn('block text-[10px]', TONE.warn.value)}>
-                                      บรรทัดค่าปรับ ไม่ใช่รายได้
-                                    </span>
-                                  ) : null}
-                                </span>
-                                <span className="shrink-0 text-xs font-medium tabular-nums text-foreground">
-                                  {c.amount != null && c.amount > 0
-                                    ? c.amount.toLocaleString('th-TH')
-                                    : '—'}
-                                </span>
-                              </label>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 border-t border-border/70 px-3.5 py-2.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIncomeRows((prev) => [...prev, { label: '', amount: '' }]);
-                        setPickedKeys([]);
-                        setShowRatePicker(false);
-                      }}
-                      className="text-[11px] font-medium text-muted-foreground underline"
-                    >
-                      พิมพ์เองแทน
-                    </button>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPickedKeys([]);
-                          setShowRatePicker(false);
-                        }}
-                        className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground"
-                      >
-                        ยกเลิก
-                      </button>
-                      <button
-                        type="button"
-                        disabled={pickedKeys.length === 0}
-                        onClick={() => {
-                          const add = rateChoices
-                            .filter((c) => pickedKeys.includes(c.key))
-                            .slice(0, Math.max(0, INCOME_LINE_MAX - incomeRows.length))
-                            .map((c) => ({
-                              label: c.name,
-                              amount: c.amount != null ? String(c.amount) : '',
-                            }));
-                          setIncomeRows((prev) => [...prev, ...add]);
-                          setPickedKeys([]);
-                          setShowRatePicker(false);
-                        }}
-                        className={cn(
-                          'rounded-lg px-3 py-1 text-xs font-medium disabled:opacity-40',
-                          TONE.info.solid,
-                        )}
-                      >
-                        เพิ่ม {pickedKeys.length} รายการ
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            <label className="flex items-center gap-2 pt-1">
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {parsedLines.length > 0 ? 'ยอดรวมที่จะโชว์ (ใส่เองได้)' : 'รายได้รวมที่จะโชว์'}
-              </span>
-              <input
-                className={cn(fieldCls, 'text-center font-medium tabular-nums')}
-                inputMode="numeric"
-                value={incomeTotal}
-                placeholder={parsedLines.length > 0 ? `ผลบวก ${linesSum.toLocaleString('th-TH')}` : 'ใช้ค่าจาก ERP'}
-                onChange={(e) => setIncomeTotal(e.target.value.replace(/[^\d]/g, ''))}
-              />
-            </label>
-
-            {/* ตัวอย่างที่ผู้สมัครเห็น — คำนวณด้วยตัวเดียวกับหน้าสาธารณะ (เลข balance เสมอ:
-                ยอดรวม > ผลบวก → เติมบรรทัด "อื่น ๆ" · ยอดรวม < ผลบวก → ใช้ผลบวกแทน) */}
-            {preview ? (
-              <div className={cn('space-y-0.5 rounded-xl px-3 py-2 text-xs', TONE.success.soft)}>
-                <p className="text-[11px] font-medium text-muted-foreground">
-                  ผู้สมัครจะเห็น ({INCOME_PERIOD_LABEL[preview.period]})
-                </p>
-                {preview.lines.map((l, i) => (
-                  <div key={`${l.label}-${i}`} className="flex justify-between gap-3">
-                    <span className={l.label === INCOME_OTHER_LABEL ? 'italic' : undefined}>
-                      {l.label}
-                    </span>
-                    <span className="font-medium tabular-nums">฿{l.amount.toLocaleString('th-TH')}</span>
-                  </div>
-                ))}
-                <div className="flex justify-between gap-3 border-t border-border/50 pt-0.5 font-medium">
-                  <span>รวม</span>
-                  <span className="tabular-nums">฿{preview.total.toLocaleString('th-TH')}</span>
-                </div>
-                {totalNum != null && totalNum < linesSum ? (
-                  <p className={cn('pt-0.5 text-[11px]', TONE.warn.value)}>
-                    ยอดรวมที่ใส่ ({totalNum.toLocaleString('th-TH')}) น้อยกว่าผลบวกของรายการ —
-                    ระบบใช้ผลบวกแทน (เลขบนประกาศห้ามน้อยกว่าของที่แจกแจง)
-                  </p>
-                ) : null}
-              </div>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">
-                ล้างช่องให้ว่าง = กลับไปใช้เลขจาก ERP · ตัวเลขทั้งชุดทับเฉพาะที่โชว์บนประกาศ
-              </p>
-            )}
-          </section>
-          ) : null}
-
-          {show('benefits') ? (
-          <section className="space-y-3">
-            {/**
-              * ═══ ติ๊กเลือกจากสวัสดิการจริงของใบนี้ (เจ้าของสั่ง 31 ส.ค. 2569) ═══
-              * *"หน้าเลือกสวัสดิการ เอาจากใบขอขึ้นมาให้เป็น Checklist ได้ไหม
-              *  จะได้ไม่ต้องพิมพ์เอง"* · *"อยากได้แบบกดแล้วมีรายการให้เลือก"*
-              *
-              * 🔴 **คนละชุดกับชิปติ๊กที่ถอดไปเมื่อ 20 ส.ค.** — อันนั้นเป็นรายการสำเร็จรูป
-              * 12 อันเหมือนกันทุกใบ · อันนี้คือ**อัตราจริงของใบนี้จาก ERP** ต่างกันทุกใบ
-              * เจ้าของเคาะเองว่าเอาเฉพาะชุดนี้ ไม่เอารายการสำเร็จรูปกลับมา
-              *
-              * ทุกอันติ๊กไว้ให้ตั้งแต่แรก (ของเดิมขึ้นประกาศเองอยู่แล้ว) — ปลดติ๊ก = ไม่ให้คนนอกเห็น
-              */}
-            <p className="text-xs font-medium text-muted-foreground">
-              สวัสดิการเพิ่มเติม ({benefitLines.length}/{BENEFIT_LINE_MAX} รายการ)
-            </p>
-            <textarea
-              className={cn(fieldCls, 'min-h-[92px]')}
-              value={benefitText}
-              onChange={(e) => setBenefitText(e.target.value)}
-              placeholder={'บรรทัดละ 1 รายการ เช่น\nชุดฟอร์มฟรี\nรถรับส่งจากบีทีเอส'}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              บรรทัดละ 1 รายการ · เก็บสูงสุด {BENEFIT_LINE_MAX} รายการ รายการละไม่เกิน 30 ตัวอักษร
-              (เกินจากนั้นถูกตัดทิ้งตอนบันทึก)
-            </p>
-            {benefitText.split('\n').filter((l) => l.trim()).length > BENEFIT_LINE_MAX ? (
-              <p className={cn('rounded-lg px-2.5 py-1.5 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
-                ใส่เกิน {BENEFIT_LINE_MAX} รายการ — จะเก็บเฉพาะ {BENEFIT_LINE_MAX} รายการแรก:{' '}
-                {benefitLines.join(' · ')}
-              </p>
-            ) : null}
-          </section>
-          ) : null}
-
-          {/**
-           * 🔴 ติ๊กว่าหน้าสาธารณะเห็นช่องไหน (เจ้าของเคาะ 22 ก.ย. 2569 นิยามกล่องงานข้อ 3)
-           * โชว์คู่กับขั้นสวัสดิการ/รายได้ (ขั้น 3) · เอาติ๊กออก = ซ่อนทั้งช่องบนหน้าสมัคร
-           * ไม่ลบค่า · ตัวตัดสินอยู่ที่ `publicFieldVisible()` ที่เดียว
-           */}
-          {show('income') || show('benefits') ? (
-          <section className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">หน้าสมัครสาธารณะให้เห็นอะไรบ้าง</p>
-            <div className="grid gap-1.5 sm:grid-cols-2">
-              {PUBLIC_TOGGLE_FIELDS.map((f) => (
-                <label
-                  key={f}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/60 px-2.5 py-1.5 text-sm"
-                >
-                  <Checkbox
-                    checked={visibility[f]}
-                    onCheckedChange={(v) => setVisibility((prev) => ({ ...prev, [f]: v === true }))}
-                  />
-                  <span>{PUBLIC_FIELD_LABEL[f]}</span>
-                </label>
-              ))}
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              เอาติ๊กออก = ช่องนั้นไม่ขึ้นบนหน้าสมัคร (ค่าไม่หาย ติ๊กกลับมาโชว์ใหม่ได้)
-            </p>
-          </section>
-          ) : null}
-
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-            {/* 🔴 ป้ายสถานะ auto-save (22 ก.ย. 2569) — เซฟดราฟต์เองทุกครั้งที่แก้ */}
-            <span className="text-[11px]" aria-live="polite">
-              {autoStatus === 'saving' ? (
-                <span className={DASH.muted}>กำลังบันทึก…</span>
-              ) : autoStatus === 'error' ? (
-                <span className="font-medium text-destructive">🔴 บันทึกไม่สำเร็จ — กดปุ่มลองใหม่</span>
-              ) : autoStatus === 'saved' && savedAt ? (
-                <span className={cn('font-medium', TONE.success.value)}>✓ บันทึกแล้ว {savedAt}</span>
-              ) : (
-                <span className={DASH.muted}>แก้แล้วระบบเซฟให้เอง</span>
-              )}
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleClose}
-                className={cn('rounded-lg border px-3.5 py-1.5 text-sm font-medium', TONE.neutral.outline)}
-              >
-                ปิด
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void save()}
-                className={cn(
-                  'rounded-lg px-3.5 py-1.5 text-sm font-medium disabled:opacity-50',
-                  TONE.success.solid,
-                )}
-              >
-                {saving ? 'กำลังบันทึก…' : 'บันทึกแล้วปิด'}
-              </button>
-            </div>
-          </div>
-        </div>
+  // ── ขั้น 3 รายได้ ──
+  /** รายได้คนเก่าเฉลี่ยต่อเดือน — `null` = ไม่มีงวดเต็มให้ใช้ (เช่น เปิดไซต์ใหม่) */
+  const resignedAvg = resignedMonthlyNetAverage(job.resigned_income_3m, job.lastWorkingDay);
+  const resignedAmount = income.resignedRows[0] ? Number(income.resignedRows[0].amount) || null : (resignedAvg?.amount ?? null);
+  const chooseIncome = (next: IncomeMode) =>
+    setIncome((d) => {
+      if (d.mode === next) return d;
+      if (next === 'resigned') {
+        const rows =
+          d.resignedRows.length > 0
+            ? d.resignedRows
+            : resignedAvg
+              ? [{ label: RESIGNED_INCOME_LINE_LABEL, amount: String(resignedAvg.amount) }]
+              : [];
+        // ยอดสุทธิเฉลี่ย "ต่อเดือน" เสมอ
+        return { ...d, mode: next, resignedRows: rows, period: 'monthly' };
+      }
+      return { ...d, mode: next };
+    });
+  const requestHas = (label: string) => income.requestRows.some((r) => r.label.trim() === label);
+  const setRequestRow = (row: { label: string; amount: string }, on: boolean) =>
+    setIncome((d) => {
+      const has = d.requestRows.some((r) => r.label.trim() === row.label.trim());
+      if (on) return has ? d : { ...d, requestRows: [...d.requestRows, row] };
+      return { ...d, requestRows: d.requestRows.filter((r) => r.label.trim() !== row.label.trim()) };
+    });
+  const erpNames = new Set(rateChoices.map((c) => c.name));
+  /**
+   * ตารางอัตราบางใบมีชื่อซ้ำหลายบรรทัด (ของจริง: "ค่าล่วงเวลา 1.5 เท่า" สองบรรทัดเลขเดียวกัน) — บรรทัดรายได้
+   * เก็บด้วยชื่อ ติ๊กอันหนึ่งอีกอันก็ติ๊กตาม ⇒ โชว์ชื่อละบรรทัดเดียว (อันแรกตามตาราง)
+   */
+  const rateRows = rateChoices.filter((c, i, all) => all.findIndex((x) => x.name === c.name) === i);
+  /** บรรทัดที่ไม่อยู่ในตารางอัตรา (บันทึกไว้ก่อนหน้า) — ติ๊กคืน/ปลดได้เหมือนบรรทัดอื่น */
+  const extraRows = [...openedRequestRows, ...income.requestRows].filter(
+    (r, i, all) =>
+      r.label.trim() !== '' &&
+      !erpNames.has(r.label.trim()) &&
+      all.findIndex((x) => x.label.trim() === r.label.trim()) === i,
   );
+  const requestLines = parseIncomeRows(income.requestRows);
+  const requestSum = sumIncomeLines(requestLines);
+  const requestTotalNum = income.requestTotal.trim() === '' ? null : Math.trunc(Number(income.requestTotal) || 0);
+  const parsedLines = parseIncomeRows(incomeRows);
+  const totalNum = incomeTotal.trim() === '' ? null : Math.trunc(Number(incomeTotal) || 0);
+  /** ตัวอย่างที่ผู้สมัครจะเห็น — ตัวคำนวณเดียวกับหน้าสาธารณะเป๊ะ (เลข balance เสมอ) */
+  const preview = buildIncomeDisplay(
+    parsedLines.length > 0 ? { period: incomePeriod, lines: parsedLines, total: totalNum } : null,
+  );
+  const rowsFull = income.requestRows.length >= INCOME_LINE_MAX;
 
-  /** ฝังเป็นส่วนหนึ่งของแท็บ "แก้ไข" ในป๊อปอัปการ์ด = คืนเนื้อฟอร์มเปล่า ๆ
-   *  (เจ้าของเคาะ 20 ส.ค. 2569 — ถอดไอคอนดินสอบนการ์ดแล้วย้ายฟอร์มมารวมที่นี่)
-   *  🔴 ห้ามซ้อน Dialog ใน Dialog */
-  if (embedded) return body;
+  // ── ขั้น 3 สวัสดิการ ──
+  const benefitsFull = benefits.length >= BENEFIT_LINE_MAX;
+  const presetEntry = (key: string) =>
+    benefits.find((e): e is Extract<BenefitEntry, { kind: 'preset' }> => e.kind === 'preset' && e.key === key);
+  const togglePreset = (key: string, on: boolean) => {
+    setBenefits((list) => {
+      const has = list.some((e) => e.kind === 'preset' && e.key === key);
+      if (on) return has || list.length >= BENEFIT_LINE_MAX ? list : [...list, { kind: 'preset', key, detail: '' }];
+      return list.filter((e) => !(e.kind === 'preset' && e.key === key));
+    });
+    if (!on) {
+      setDetailOpen((s) => {
+        const next = new Set(s);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+  const setPresetDetail = (key: string, detail: string) =>
+    setBenefits((list) => list.map((e) => (e.kind === 'preset' && e.key === key ? { ...e, detail } : e)));
+  const addCustom = () => {
+    customSeq.current += 1;
+    const id = `new-${customSeq.current}`;
+    setBenefits((list) => (list.length >= BENEFIT_LINE_MAX ? list : [...list, { kind: 'custom', id, text: '' }]));
+  };
+  const setCustomText = (id: string, text: string) =>
+    setBenefits((list) => list.map((e) => (e.kind === 'custom' && e.id === id ? { ...e, text } : e)));
+  const removeCustom = (id: string) => setBenefits((list) => list.filter((e) => !(e.kind === 'custom' && e.id === id)));
+  const customs = benefits.filter((e): e is Extract<BenefitEntry, { kind: 'custom' }> => e.kind === 'custom');
+  const benefitPreview = cleanBenefitLines(benefitText.split('\n'));
 
   return (
-    <Dialog open={Boolean(job)} onOpenChange={(o) => (!o ? handleClose() : undefined)}>
-      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-base">แก้ข้อมูลที่จะขึ้นประกาศ</DialogTitle>
-          <DialogDescription className="text-xs">
-            {job.request_no ? `${job.request_no} · ` : ''}
-            {unitOneLine(job)} — แก้แล้วมีผลเฉพาะหน้าประกาศสาธารณะ ไม่ได้แก้ข้อมูลใน ERP
-          </DialogDescription>
-        </DialogHeader>
+    <div className="space-y-4">
+      {showPlace ? (
+        <StepCard title="สถานที่ปฏิบัติงาน">
+          <div role="group" aria-label="สถานที่ที่ผู้สมัครจะเห็น" className="space-y-3">
+            <ChoiceBox
+              id={`${uid}-place-request`}
+              checked={placeMode === 'request'}
+              onSelect={() => choosePlace('request')}
+              title="ใบขอเขียนว่า"
+            >
+              <p className="whitespace-pre-wrap break-words text-sm text-foreground">
+                {job.location_address?.trim() || 'ใบขอไม่ได้ใส่ที่อยู่มา'}
+              </p>
+              <SeenLine>{requestPlaceText || 'ไม่ระบุจังหวัด'}</SeenLine>
+            </ChoiceBox>
 
-        {body}
-      </DialogContent>
-    </Dialog>
+            <ChoiceBox
+              id={`${uid}-place-manual`}
+              checked={placeMode === 'manual'}
+              onSelect={() => choosePlace('manual')}
+              title="ใส่รายละเอียดเอง"
+            >
+              {placeMode === 'manual' ? (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <PlaceSelect
+                      id={`${uid}-province`}
+                      label="จังหวัด"
+                      value={province}
+                      options={provinceOptions}
+                      placeholder="เลือกจังหวัด"
+                      onChange={(v) => {
+                        // เปลี่ยนจังหวัด = อำเภอ/ตำบลเดิมใช้ไม่ได้แล้ว (ไม่ล้าง = ได้คู่ที่ไม่มีจริง)
+                        setProvince(v);
+                        setDistrict('');
+                        setSubdistrict('');
+                      }}
+                    />
+                    <PlaceSelect
+                      id={`${uid}-district`}
+                      label="อำเภอ/เขต"
+                      value={district}
+                      options={districtOptions}
+                      placeholder={province ? 'เลือกอำเภอ' : 'เลือกจังหวัดก่อน'}
+                      disabled={!province}
+                      onChange={(v) => {
+                        setDistrict(v);
+                        setSubdistrict('');
+                      }}
+                    />
+                    <PlaceSelect
+                      id={`${uid}-subdistrict`}
+                      label="ตำบล/แขวง"
+                      value={subdistrict}
+                      options={subdistrictOptions}
+                      placeholder={district ? 'เลือกตำบล' : 'เลือกอำเภอก่อน'}
+                      disabled={!district}
+                      onChange={setSubdistrict}
+                    />
+                  </div>
+                  {legacyPlace.length > 0 ? (
+                    <p className={cn('rounded-lg border px-3 py-2 text-xs', TONE.warn.soft, TONE.warn.value)}>
+                      ค่าเดิมไม่อยู่ในรายการ {legacyPlace.join(' ')} เลือกใหม่จากรายการให้ตัวกรองหาเจอ
+                    </p>
+                  ) : null}
+                  <SeenLine>{province || district || subdistrict ? manualPlaceText : 'ยังไม่ได้เลือก'}</SeenLine>
+                </>
+              ) : null}
+            </ChoiceBox>
+          </div>
+        </StepCard>
+      ) : null}
+
+      {showIncome ? (
+        <StepCard title="รายได้">
+          <div role="group" aria-label="รายได้ที่จะขึ้นประกาศ" className="space-y-3">
+            <ChoiceBox
+              id={`${uid}-income-request`}
+              checked={income.mode === 'request'}
+              onSelect={() => chooseIncome('request')}
+              title="ตามใบขอ"
+              meta={income.mode === 'request' && requestSum > 0 ? `รวม ${NUM.format(requestSum)}` : undefined}
+            >
+              {income.mode === 'request' ? (
+                <>
+                  {ratesLoading ? (
+                    <p className="text-xs text-muted-foreground">กำลังโหลดอัตราของใบนี้…</p>
+                  ) : rateChoices.length === 0 && extraRows.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">ใบนี้ไม่มีตารางอัตรา เลือกทางอื่นแทน</p>
+                  ) : (
+                    <div className="divide-y divide-border/60">
+                      {rateRows.map((c) => {
+                        const on = requestHas(c.name);
+                        const noAmount = !(c.amount != null && c.amount > 0);
+                        return (
+                          <CheckRow
+                            key={c.key}
+                            id={`${uid}-rate-${c.key}`}
+                            checked={on}
+                            disabled={noAmount || (!on && rowsFull)}
+                            onCheckedChange={(v) =>
+                              setRequestRow({ label: c.name, amount: c.amount != null ? String(c.amount) : '' }, v)
+                            }
+                            label={
+                              <>
+                                {c.name}
+                                {c.isPenalty ? (
+                                  <span className={cn('ml-2 text-xs', TONE.warn.value)}>ค่าปรับ ไม่ใช่รายได้</span>
+                                ) : null}
+                              </>
+                            }
+                            meta={noAmount ? '—' : NUM.format(c.amount ?? 0)}
+                          />
+                        );
+                      })}
+                      {extraRows.map((r) => (
+                        <CheckRow
+                          key={`extra-${r.label}`}
+                          id={`${uid}-extra-${r.label}`}
+                          checked={requestHas(r.label.trim())}
+                          disabled={!requestHas(r.label.trim()) && rowsFull}
+                          onCheckedChange={(v) => setRequestRow(r, v)}
+                          label={r.label}
+                          meta={NUM.format(Math.trunc(Number(r.amount)) || 0)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <PeriodToggle value={income.period} onChange={(p) => setIncome((d) => ({ ...d, period: p }))} />
+                    <Label htmlFor={`${uid}-request-total`} className="text-xs font-normal text-muted-foreground">
+                      ปรับยอดรวม
+                    </Label>
+                    {/* กว้างคุมที่กล่องครอบ — ช่องกรอกของแอป (`jarvis-soft-field`) บังคับเต็มความกว้างเสมอ */}
+                    <div className="w-32">
+                      <Input
+                        id={`${uid}-request-total`}
+                        className="text-right tabular-nums"
+                        inputMode="numeric"
+                        value={income.requestTotal}
+                        placeholder={requestSum > 0 ? NUM.format(requestSum) : 'บาท'}
+                        onChange={(e) => setIncome((d) => ({ ...d, requestTotal: digitsOnly(e.target.value) }))}
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </ChoiceBox>
+
+            <ChoiceBox
+              id={`${uid}-income-resigned`}
+              checked={income.mode === 'resigned'}
+              disabled={!resignedAmount}
+              onSelect={() => chooseIncome('resigned')}
+              title="รายได้คนเก่า"
+              meta={resignedAmount ? `≈ ${NUM.format(resignedAmount)} ต่อเดือน` : 'ไม่มีข้อมูล'}
+            >
+              {income.mode === 'resigned' && resignedAvg ? (
+                <p className="text-xs text-muted-foreground">
+                  เฉลี่ยจากใบแจ้งเงินเดือน {NUM.format(resignedAvg.fullPeriods)} งวดเต็ม
+                </p>
+              ) : null}
+            </ChoiceBox>
+
+            <ChoiceBox
+              id={`${uid}-income-manual`}
+              checked={income.mode === 'manual'}
+              onSelect={() => chooseIncome('manual')}
+              title="ใส่เอง"
+            >
+              {income.mode === 'manual' ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="w-36">
+                    <Input
+                      aria-label="ยอดรายได้"
+                      className="text-right tabular-nums"
+                      inputMode="numeric"
+                      placeholder="บาท"
+                      value={income.manualAmount}
+                      onChange={(e) =>
+                        setIncome((d) => ({ ...d, manualAmount: digitsOnly(e.target.value), manualLegacy: false }))
+                      }
+                    />
+                  </div>
+                  <PeriodToggle
+                    value={income.period}
+                    onChange={(p) => setIncome((d) => ({ ...d, period: p, manualLegacy: false }))}
+                  />
+                </div>
+              ) : null}
+            </ChoiceBox>
+          </div>
+
+          {/* ผู้สมัครจะเห็น — ตัวคำนวณเดียวกับหน้าสาธารณะ (ยอดรวม > ผลบวก เติม "อื่น ๆ" · น้อยกว่า ใช้ผลบวก) */}
+          <div className={cn('space-y-1 rounded-xl border px-3 py-2 text-sm', TONE.success.soft)}>
+            <p className="text-xs text-muted-foreground">
+              ผู้สมัครจะเห็น{preview ? ` ${INCOME_PERIOD_LABEL[preview.period]}` : ''}
+            </p>
+            {preview ? (
+              <>
+                {preview.lines.map((l, i) => (
+                  <div key={`${l.label}-${i}`} className="flex justify-between gap-3">
+                    <span className={l.label === INCOME_OTHER_LABEL ? 'text-muted-foreground' : undefined}>{l.label}</span>
+                    <span className="tabular-nums">{NUM.format(l.amount)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between gap-3 border-t border-border/60 pt-1 font-medium">
+                  <span>รวม</span>
+                  <span className="tabular-nums">{NUM.format(preview.total)} บาท</span>
+                </div>
+              </>
+            ) : totalNum != null ? (
+              <p className="font-medium tabular-nums">{NUM.format(totalNum)} บาท ต่อเดือน</p>
+            ) : (
+              <p className="text-muted-foreground">ยังไม่ได้ตั้งรายได้</p>
+            )}
+            {income.mode === 'request' && requestTotalNum != null && requestTotalNum < requestSum ? (
+              <p className={cn('text-xs', TONE.warn.value)}>ยอดที่ใส่น้อยกว่ารวมของรายการ ประกาศใช้ยอดรวมของรายการแทน</p>
+            ) : null}
+          </div>
+        </StepCard>
+      ) : null}
+
+      {showBenefits ? (
+        <StepCard
+          title="สวัสดิการ"
+          aside={
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {NUM.format(benefits.length)}/{NUM.format(BENEFIT_LINE_MAX)}
+            </span>
+          }
+        >
+          <div className="grid gap-x-6 sm:grid-cols-2">
+            {EXTRA_BENEFITS.map((b) => {
+              const entry = presetEntry(b.key);
+              const on = Boolean(entry);
+              const detailShown = Boolean(entry) && (detailOpen.has(b.key) || (entry?.detail.trim() ?? '') !== '');
+              return (
+                <CheckRow
+                  key={b.key}
+                  id={`${uid}-benefit-${b.key}`}
+                  checked={on}
+                  disabled={!on && benefitsFull}
+                  onCheckedChange={(v) => togglePreset(b.key, v)}
+                  label={b.label}
+                  action={
+                    on && !detailShown ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => setDetailOpen((s) => new Set(s).add(b.key))}
+                      >
+                        <Plus aria-hidden />
+                        รายละเอียด
+                      </Button>
+                    ) : null
+                  }
+                >
+                  {entry && detailShown ? (
+                    <Input
+                      aria-label={`รายละเอียด ${b.label}`}
+                      value={entry.detail}
+                      maxLength={benefitDetailMax(b.key)}
+                      placeholder="ใส่รายละเอียด"
+                      onChange={(e) => setPresetDetail(b.key, e.target.value)}
+                    />
+                  ) : null}
+                </CheckRow>
+              );
+            })}
+          </div>
+
+          {customs.length > 0 ? (
+            <div className="space-y-2">
+              {customs.map((e) => (
+                <div key={e.id} className="flex items-center gap-3">
+                  <Checkbox
+                    checked
+                    aria-label={`เอา ${e.text.trim() || 'รายการนี้'} ออก`}
+                    onCheckedChange={(v) => {
+                      if (v !== true) removeCustom(e.id);
+                    }}
+                  />
+                  <Input
+                    aria-label="สวัสดิการที่เพิ่มเอง"
+                    className="flex-1"
+                    value={e.text}
+                    maxLength={BENEFIT_LABEL_MAX}
+                    placeholder="พิมพ์สวัสดิการ"
+                    onChange={(ev) => setCustomText(e.id, ev.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <Button type="button" variant="outline" size="xs" disabled={benefitsFull} onClick={addCustom}>
+            <Plus aria-hidden />
+            เพิ่มรายการเอง
+          </Button>
+
+          <div className={cn('space-y-1 rounded-xl border px-3 py-2 text-sm', TONE.success.soft)}>
+            <p className="text-xs text-muted-foreground">ผู้สมัครจะเห็น</p>
+            {benefitPreview.length > 0 ? (
+              <ul className="list-disc space-y-0.5 pl-5">
+                {benefitPreview.map((l) => (
+                  <li key={l}>{l}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground">ยังไม่ได้เลือก</p>
+            )}
+          </div>
+        </StepCard>
+      ) : null}
+
+      {/**
+       * 🔴 ติ๊กว่าหน้าสาธารณะเห็นช่องไหน (เจ้าของเคาะ 22 ก.ย. 2569 นิยามกล่องงานข้อ 3)
+       * อยู่คู่ขั้น 3 · เอาติ๊กออก = ซ่อนทั้งช่องบนหน้าสมัคร ไม่ลบค่า · ตัวตัดสินอยู่ที่ `publicFieldVisible()`
+       */}
+      {showIncome || showBenefits ? (
+        <StepCard title="ให้ผู้สมัครเห็นอะไรบ้าง">
+          <div className="grid gap-x-6 sm:grid-cols-2">
+            {PUBLIC_TOGGLE_FIELDS.map((f) => (
+              <CheckRow
+                key={f}
+                id={`${uid}-visible-${f}`}
+                checked={visibility[f]}
+                onCheckedChange={(v) => setVisibility((prev) => ({ ...prev, [f]: v }))}
+                label={PUBLIC_FIELD_LABEL[f]}
+              />
+            ))}
+          </div>
+        </StepCard>
+      ) : null}
+
+      {/* 🔴 ป้ายสถานะ auto-save — ไม่มีปุ่มบันทึก/ปิดแล้ว (เจ้าของ 30 ก.ย. 2569: "ไม่ต้องมีคำว่าบันทึกแล้วปิด") */}
+      <div className="flex flex-wrap items-center justify-end gap-2 text-xs" aria-live="polite">
+        {autoStatus === 'saving' ? (
+          <span className="text-muted-foreground">กำลังบันทึก…</span>
+        ) : autoStatus === 'error' ? (
+          <>
+            <span className="text-destructive">{error ?? 'บันทึกไม่สำเร็จ'}</span>
+            <Button type="button" variant="outline" size="xs" onClick={() => void persist()}>
+              ลองอีกครั้ง
+            </Button>
+          </>
+        ) : autoStatus === 'saved' && savedAt ? (
+          <span className={TONE.success.value}>บันทึกแล้ว {savedAt}</span>
+        ) : error ? (
+          <span className="text-destructive">{error}</span>
+        ) : (
+          <span className="text-muted-foreground">แก้แล้วบันทึกให้เอง</span>
+        )}
+      </div>
+    </div>
   );
 };
 

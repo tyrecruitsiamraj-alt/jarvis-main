@@ -1,7 +1,9 @@
 /**
- * ป๊อปไล่งานบนกล่องงาน — ปุ่ม "ดึงลงจากหน้าสาธารณะ" บนหัวป๊อป (เจ้าของเคาะ 29 ก.ย. 2569)
- * *"ถ้าอันไหนต้องการเอาออกจากหน้าสาธารณะต้องมีปุ่มให้ย้อนกลับมาได้"* → Choice "บนหัวป๊อป ข้างป้าย ปล่อยแล้ว"
- * 🔴 ด่าน: ใบที่ปล่อยแล้วเห็นปุ่มทันทีที่เปิด (ไม่ต้องไล่ไปขั้น 4) · กดแล้วดึงลงใบนั้นใบเดียว · ใบที่ยังไม่ปล่อยไม่มีปุ่มนี้
+ * ป๊อปไล่งานบนกล่องงาน
+ * - ปุ่ม "ดึงลงจากหน้าสาธารณะ" บนหัวป๊อป (เจ้าของเคาะ 29 ก.ย. 2569)
+ *   🔴 ใบที่ปล่อยแล้วเห็นปุ่มทันทีที่เปิด (ไม่ต้องไล่ไปขั้น 4) · กดแล้วดึงลงใบนั้นใบเดียว · ใบที่ยังไม่ปล่อยไม่มีปุ่มนี้
+ * - โฉมใหม่ 30 ก.ย. 2569: ขั้น 1 ไม่มี "ติดอะไรไหม"/"ใครแก้อะไรไป" · "ไม่ปล่อยใบนี้" อยู่ล่างสุด ·
+ *   ขั้น 4 สรุป + ส่งได้เลยโดยไม่ต้องมีลิงก์ (ยังต้องเลือกเพศ) · บันทึกแบบร่าง = ปิดป๊อปไม่ส่ง
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -21,13 +23,15 @@ const JOB = {
   location_address: 'กรุงเทพมหานคร',
 } as unknown as JobRequest;
 
+/** ใบที่เส้นใบเดียวตอบ — เทสต์เปลี่ยนได้ (เช่น ใบที่ใบขอบอกเพศมาแล้ว) */
+let currentJob: JobRequest = JOB;
 const fetchJobReleases = vi.fn();
 const unreleaseJobsFromPublic = vi.fn(async (_ids: string[]) => 1);
 const releaseJobsToPublic = vi.fn(async (_ids: string[]) => 1);
 
 vi.mock('@/lib/siamrajUnitRequestsApi', async (orig) => ({
   ...(await orig<typeof import('@/lib/siamrajUnitRequestsApi')>()),
-  fetchSiamrajUnitRequest: vi.fn(async () => JOB),
+  fetchSiamrajUnitRequest: vi.fn(async () => currentJob),
 }));
 vi.mock('@/lib/recruitPostingsApi', async (orig) => ({
   ...(await orig<typeof import('@/lib/recruitPostingsApi')>()),
@@ -51,14 +55,15 @@ const { BoardPostingSteps } = await import('./BoardPostingPage');
 
 const released = [{ job_id: JOB_ID, request_no: 'OPL6909999', released_at: '2026-08-25T03:30:00Z', released_by_name: null, note: null }];
 
-const renderSteps = () =>
+const renderSteps = (onDone: () => void = () => {}) =>
   render(
     <MemoryRouter>
-      <BoardPostingSteps id={JOB_ID} chrome={false} onDone={() => {}} />
+      <BoardPostingSteps id={JOB_ID} chrome={false} onDone={onDone} />
     </MemoryRouter>,
   );
 
 beforeEach(() => {
+  currentJob = JOB;
   fetchJobReleases.mockReset();
   unreleaseJobsFromPublic.mockClear();
   releaseJobsToPublic.mockClear();
@@ -85,5 +90,58 @@ describe('ป๊อปไล่งาน — ดึงลงจากหน้�
     await screen.findByRole('navigation', { name: 'ขั้นตอนของงานประกาศ' });
     await waitFor(() => expect(fetchJobReleases).toHaveBeenCalled());
     expect(screen.queryByRole('button', { name: 'ดึงลงจากหน้าสาธารณะ' })).toBeNull();
+  });
+});
+
+describe('ป๊อปไล่งานโฉมใหม่ (30 ก.ย. 2569)', () => {
+  it('ขั้น 1: แยกการ์ดชัด · ไม่มี "ติดอะไรไหม"/"ใครแก้อะไรไป" · "ไม่ปล่อยใบนี้" อยู่ล่างสุดใต้ปุ่มถัดไป', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    renderSteps();
+    const skipButton = await screen.findByRole('button', { name: /ไม่ปล่อยใบนี้/ });
+    expect(screen.getByRole('heading', { name: 'ข้อมูลใบขอ' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'เพศที่รับ' })).toBeTruthy();
+    expect(screen.queryByText('ติดอะไรไหม')).toBeNull();
+    expect(screen.queryByText('ใครแก้อะไรไป')).toBeNull();
+    expect(screen.queryByLabelText('หมายเหตุใบขอ')).toBeNull();
+    const next = screen.getByRole('button', { name: /ถัดไป ขั้น 2/ });
+    // ปุ่มไม่ปล่อยอยู่หลังปุ่มถัดไปในหน้า (ล่างสุด)
+    expect(next.compareDocumentPosition(skipButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('🔴 ขั้น 4: ส่งได้เลยไม่ต้องมีลิงก์ (ใบขอบอกเพศมาแล้ว) · ส่งแล้วปิดป๊อป', async () => {
+    currentJob = { ...JOB, gender_requirement: 'ชาย' } as JobRequest;
+    fetchJobReleases.mockResolvedValue([]);
+    const onDone = vi.fn();
+    renderSteps(onDone);
+    fireEvent.click(await screen.findByRole('button', { name: /สรุป \+ ส่งประกาศ/ }));
+    expect(screen.getByRole('heading', { name: 'สรุปก่อนส่ง' })).toBeTruthy();
+    expect(await screen.findByText('ยังไม่มีลิงก์')).toBeTruthy();
+    const send = screen.getByRole('button', { name: 'ส่งประกาศ' });
+    await waitFor(() => expect(send.hasAttribute('disabled')).toBe(false));
+    fetchJobReleases.mockResolvedValue(released);
+    fireEvent.click(send);
+    await waitFor(() => expect(releaseJobsToPublic).toHaveBeenCalledWith([JOB_ID]));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+  });
+
+  it('ขั้น 4: ใบขอไม่ระบุเพศ = ส่งไม่ได้ + มีปุ่มพาไปเลือก · บันทึกแบบร่าง = ปิดป๊อปโดยไม่ส่ง', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    const onDone = vi.fn();
+    renderSteps(onDone);
+    fireEvent.click(await screen.findByRole('button', { name: /สรุป \+ ส่งประกาศ/ }));
+    expect((await screen.findByRole('button', { name: 'ส่งประกาศ' })).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'ไปขั้น 1 เลือกเพศ' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึกแบบร่าง' }));
+    expect(onDone).toHaveBeenCalled();
+    expect(releaseJobsToPublic).not.toHaveBeenCalled();
+  });
+
+  it('ขั้น 4: ติ๊ก "สร้างลิงก์" ถึงกางฟอร์มสร้างลิงก์', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    renderSteps();
+    fireEvent.click(await screen.findByRole('button', { name: /สรุป \+ ส่งประกาศ/ }));
+    expect(screen.queryByRole('button', { name: 'สร้างประกาศ + ลิงก์' })).toBeNull();
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'สร้างลิงก์' }));
+    expect(await screen.findByRole('button', { name: 'สร้างประกาศ + ลิงก์' })).toBeTruthy();
   });
 });

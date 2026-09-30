@@ -113,7 +113,7 @@ import {
 } from '@/lib/jobBoxGroups';
 import { CLOSED_RANGE_OPTIONS } from '@/hooks/useClosedRequestsFeed';
 import { jobPositionUnits, sumJobPositionUnits } from '@/lib/jobPositionUnits';
-import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
+import { DASH, EVEN_TYPE, TONE, type ToneKey } from '@/lib/designTokens';
 import { INCOME_PERIOD_LABEL } from '@/lib/incomeBreakdown';
 import { incomeDisplay } from '@/lib/incomeLabel';
 import { publicFieldVisible } from '@/lib/publicFieldVisibility';
@@ -2142,14 +2142,20 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           }
         }}
       >
-        <DialogContent className="flex max-h-[min(92dvh,860px)] w-[min(calc(100vw-1.25rem),40rem)] max-w-none flex-col gap-0 overflow-hidden border-border/80 p-0">
+        <DialogContent
+          className={cn(
+            'flex max-h-[min(92dvh,860px)] w-[min(calc(100vw-1.25rem),40rem)] max-w-none flex-col gap-0 overflow-hidden border-border/80 p-0',
+            // พื้นทึบใต้ไล่เฉดของ jarvis-frost — เดิมโปร่ง ~5% ตัวหนังสือการ์ดกล่องงานข้างหลังลอยทะลุช่องว่างระหว่างการ์ด
+            '!bg-background',
+            EVEN_TYPE,
+          )}
+        >
           <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-3 pt-5 text-left">
             <DialogTitle className="text-base font-medium sm:text-lg break-words">
               {postingJob ? jobBoardCardTitle(postingJob) : ''}
             </DialogTitle>
-            <DialogDescription className="text-xs">
-              ไล่งานประกาศของใบนี้ทีละขั้น — ปิดกล่องแล้วกลับมาที่กล่องงานเหมือนเดิม
-            </DialogDescription>
+            {/* คำอธิบายเหลือไว้ให้โปรแกรมอ่านจอ — บนจอตัดออก (เจ้าของ 30 ก.ย. 2569: "คำอธิบายอันไหนไม่จำเป็นก็ตัด") */}
+            <DialogDescription className="sr-only">ไล่งานประกาศของใบนี้ทีละขั้น</DialogDescription>
             {/* 🔴 ปุ่ม "หาคนทุกถัง + ให้ AI โทร" ย้ายมาจากการ์ด (แบบ A · 27 ก.ย. 2569 — การ์ดย่อเหลือ 5 บรรทัด)
                 ⚠️ ห้ามซ้อน Dialog ใน Dialog ⇒ กดแล้ว**ปิดป๊อปนี้ก่อน** ค่อยเปิดหน้าต่างหาคน (เรียงกัน ไม่ซ้อน)
                 ใบที่ปิด/ยกเลิกแล้วไม่มีปุ่มนี้ (ส่งคนไปงานที่ไม่มีอยู่) */}
@@ -2184,6 +2190,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   onDone={() => {
                     setPostingJob(null);
                     void loadReleases();
+                    void loadSkips();
                     setPostingsRev((n) => n + 1);
                   }}
                 />

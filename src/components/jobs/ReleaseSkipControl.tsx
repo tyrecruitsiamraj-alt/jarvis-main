@@ -84,9 +84,7 @@ const ReleaseSkipControl: React.FC<{
       <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2.5', TONE.danger.soft)}>
         <div className="min-w-0">
           <p className={cn('text-sm font-medium', TONE.danger.value)}>ไม่ปล่อยใบนี้ · {releaseSkipText(skip)}</p>
-          <p className={cn('text-xs', DASH.muted)}>
-            ตั้งเมื่อ {formatYmdDmyBe(BKK_YMD.format(new Date(skip.skipped_at)))} · หน้าทีม Online นับเป็น “ไม่อนุมัติ”
-          </p>
+          <p className={cn('text-xs', DASH.muted)}>ตั้งเมื่อ {formatYmdDmyBe(BKK_YMD.format(new Date(skip.skipped_at)))}</p>
           {error ? <p className={cn('text-xs', TONE.danger.value)}>{error}</p> : null}
         </div>
         <Button type="button" size="xs" variant="outline" disabled={busy} onClick={() => void clear()}>
@@ -109,10 +107,7 @@ const ReleaseSkipControl: React.FC<{
 
   return (
     <section className="space-y-3 rounded-2xl border border-border/60 bg-card/60 p-4" aria-label="ไม่ปล่อยใบนี้">
-      <div>
-        <p className="text-sm font-medium text-foreground">ไม่ปล่อยใบนี้ — เพราะอะไร</p>
-        <p className={cn('text-xs', DASH.muted)}>หน้าทีม Online นับใบนี้เป็น “ไม่อนุมัติ” พร้อมเหตุผลที่เลือก · ยกเลิกได้ภายหลัง</p>
-      </div>
+      <p className="text-sm font-medium text-foreground">ไม่ปล่อยใบนี้ เพราะอะไร</p>
       <RadioGroup value={reason} onValueChange={(v) => setReason(v as ReleaseSkipReason)} className="gap-2">
         {RELEASE_SKIP_REASONS.map((r) => (
           <div key={r.key} className="flex items-center gap-2">

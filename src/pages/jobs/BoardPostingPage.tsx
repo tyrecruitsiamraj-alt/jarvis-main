@@ -1,58 +1,41 @@
 /**
- * ═══ ไล่งานของใบขอหนึ่งใบ — **ขั้น 1 → 2 → 3 → 4 จบที่ปุ่มปล่อย** ═══
+ * ═══ ไล่งานของใบขอหนึ่งใบ — **ขั้น 1 → 2 → 3 → 4** ═══
  *
  * 🔴 **หน้านี้เป็นของกล่องงาน ไม่ใช่ของใบงาน** (เจ้าของสั่ง 27 ส.ค. 2569)
  * > *"หน้าใบงานกดเข้าไปต้องเจอแค่ รายละเอียดงาน ผู้สมัคร AI match การติดต่อ ·
  * >  ประกาศ/ลิงก์สมัคร ต้องอยู่กล่องงานสิ ทำไมไม่เข้าใจ"*
  *
- * ═══ 🔴🔴 ทำไมเป็น "ขั้นตอน" ไม่ใช่ "กองบล็อก" ═══
+ * 🔴🔴 **เป็น "ขั้นตอน" ไม่ใช่ "กองบล็อก"** — เจ้าของพูดไว้สามรอบ (*"พอจะปล่อยก็ไปกดดู แล้วก็ตามขั้นตอน
+ * 1 2 3 4 แล้วก็ปล่อยไป"*) · แถบขั้นอยู่บนสุด โชว์เนื้อทีละขั้น ท้ายขั้นมีปุ่ม "ถัดไป" · ขั้น 4 คือส่งประกาศ
+ * ขั้นที่ใบนี้ค้าง (ป้าย "ค้างที่นี่") มาจาก `releaseStepOf()` ที่เดียว — ตัวเดียวกับเลขบนหัวกล่องงาน
  *
- * เจ้าของพูดเรื่องนี้ไว้ **สามรอบ** แต่ผมทำหลุดสองรอบแรก:
- * 1. *"พอจะปล่อยก็ไปกดดู แล้วก็**ตามขั้นตอน 1 2 3 4** แล้วก็ปล่อยไป"*
- * 2. *"กดงานที่หน้ากล่องงานเด้งไปหน้าใบขออยู่เลย งงไรเนี่ย"*
- * 3. *"ยิ่งแก้ยิ่งแย่ ลองไล่ย้อนที่เคยคุยดิ · บอกกดหน้ากล่องงานเจอกล่องงาน
- *     **พอกดไปก็ไล่งานที่ต้องทำไป** นี่อะไรไม่รู้เละเทะ"*
- *
- * รุ่นที่ผิด: กองบล็อก 5 ก้อนเรียงกันลงมา **ปุ่มปล่อยอยู่ก้อนแรกสุด** ทั้งที่มันคือขั้น 4
- * ⇒ ปล่อยได้ก่อนเขียนประกาศ · ไม่มีอะไรบอกว่าใบนี้ค้างขั้นไหน · ไล่ทีละขั้นไม่ได้
- *
- * รุ่นนี้: **แถบขั้น 1-4 อยู่บนสุด** บอกว่าใบนี้อยู่ขั้นไหน ขั้นไหนผ่านแล้ว
- * โชว์เนื้อของขั้นที่เลือกทีละขั้น · ท้ายขั้นมีปุ่ม "ถัดไป" · ขั้น 4 คือปุ่มปล่อย
- *
- * 🔴 **ขั้นที่ใบนี้ค้างอยู่มาจาก `releaseStepOf()` ที่เดียว** — ตัวเดียวกับที่นับเลข
- * บนหัวกล่องงาน ⇒ กดขั้น 3 จากหน้ากล่องงานแล้วเข้ามา ต้องมาโผล่ที่ขั้น 3 ตรงกันเสมอ
- *
- * ของแต่ละขั้น (ทั้งหมดย้ายมาจากป๊อปอัป 3 ขั้นบนการ์ดที่ถูกถอดไปแล้ว):
- *   ① ตรวจใบขอ         — ข้อมูลใบขอ + ช่องหมายเหตุ "ติดอะไร" + ใครแก้อะไรไป
- *   ② แก้ข้อมูลประกาศ  — จังหวัด/รายได้/สวัสดิการ (`EditPublicJobFieldsDialog`)
- *   ③ สร้างลิงก์สมัคร  — `GenApplyLinkDialog` + แก้ข้อความประกาศถ้ามีแล้ว
- *   ④ ปล่อย            — ปล่อย/ดึงลงหน้าสมัครสาธารณะ
+ * ═══ โฉมใหม่ 30 ก.ย. 2569 (เจ้าของไล่ทีละหน้า) ═══
+ *   ① ตรวจใบขอ — การ์ดแยก: ข้อมูลใบขอ · คนที่ออก · เพศที่รับ · **"ไม่ปล่อยใบนี้" ย้ายลงล่างสุด**
+ *      ถอด "ใครแก้อะไรไป" (*"ซ่อนไว้แค่เก็บ Log หลังบ้าน"* — ระบบยังบันทึกประวัติเหมือนเดิม) ·
+ *      ถอด "ติดอะไรไหม" ทั้งกล่อง (Choice "ถอดทั้งกล่อง" — หมายเหตุยังเขียนได้ที่หน้าใบขอ)
+ *   ② สถานที่ปฏิบัติงาน · ③ รายได้ + สวัสดิการ — ฟอร์มฝัง (`EditPublicJobFieldsDialog`) ไม่มีปุ่มบันทึกแล้วปิด
+ *   ④ สรุป + ส่งประกาศ — Choice "ส่งได้เลย ลิงก์ไม่บังคับ (แนะนำ)": สรุปของที่จะขึ้นประกาศ ·
+ *      ติ๊ก "สร้างลิงก์" ถึงกางฟอร์มสร้างลิงก์ · ปุ่ม "บันทึกแบบร่าง" (ปิดป๊อป ยังไม่ขึ้นหน้าสาธารณะ) / "ส่งประกาศ"
+ *   ทั้งป๊อป: ตัดคำอธิบายที่ไม่จำเป็น · ระยะตัวอักษร/บรรทัดเท่ากัน (`EVEN_TYPE`) · Kanit ตัวเดียว
  *
  * 🔴 **ฟอร์มทุกตัวฝังในหน้า ไม่ห่อ Dialog** (เจ้าของสั่ง: *"ไม่เอาแบบ Popup เด้งนะ"*)
  */
 import React from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import {
-  ChevronRight,
-  ChevronDown,
-  ClipboardCheck,
-  History,
-  Link2,
-  Pencil,
-  Send,
-  StickyNote,
-  UserCheck,
-  Users,
-} from 'lucide-react';
+import { ChevronDown, ChevronRight, ClipboardCheck, Users } from 'lucide-react';
 
 import PageHeader from '@/components/shared/PageHeader';
-import UnitEditLogSection from '@/components/jobs/UnitEditLogSection';
 import EditPostingDialog from '@/components/jobs/EditPostingDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
+import ReleaseSkipControl from '@/components/jobs/ReleaseSkipControl';
+import UnitRequestInfoFields from '@/components/jobs/UnitRequestInfoFields';
+import { RequestRateLinesBlock, ResignedEmployeeBlock } from '@/components/jobs/UnitRequestPayBlocks';
+import { StepCard } from '@/components/jobs/postingStepParts';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAuth } from '@/contexts/AuthContext';
 import {
   fetchSiamrajUnitRequest,
   saveUnitFieldOverridesPatch,
@@ -76,11 +59,9 @@ import {
 } from '@/lib/jobPublicReleaseApi';
 import { buildJobKeyIndex } from '@/lib/jobKeyIndex';
 import { fetchReleaseSkips } from '@/lib/jobReleaseSkipApi';
-import { buildSkipIndex, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
-import ReleaseSkipControl from '@/components/jobs/ReleaseSkipControl';
+import { buildSkipIndex, releaseSkipText, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 import { backLabelFor } from '@/lib/stageOrigin';
-import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
 import {
   RELEASE_STEP_ORDER,
   RELEASE_STEP_TEXT,
@@ -88,11 +69,12 @@ import {
   type ReleaseStepKey,
 } from '@/lib/boardRelease';
 import { EM_DASH } from '@/lib/displayFallback';
-import UnitRequestInfoFields from '@/components/jobs/UnitRequestInfoFields';
-import { RequestRateLinesBlock, ResignedEmployeeBlock } from '@/components/jobs/UnitRequestPayBlocks';
 import { formatYmdDmyBe } from '@/lib/dateTh';
-import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
-import { DASH, TONE } from '@/lib/designTokens';
+import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import { publicSafeAddress } from '@/lib/publicJobPrivacy';
+import { INCOME_PERIOD_LABEL, buildIncomeDisplay } from '@/lib/incomeBreakdown';
+import { benefitDisplayLabels } from '@/lib/extraBenefits';
+import { EVEN_TYPE, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import type { JobRequest } from '@/types';
 
@@ -100,31 +82,7 @@ const EditPublicJobFieldsDialog = React.lazy(
   () => import('@/components/jobs/EditPublicJobFieldsDialog'),
 );
 
-/** หัวข้อของแต่ละบล็อกในหน้า — ทรงเดียวกันทั้งหน้า */
-function Block({
-  icon: Icon,
-  title,
-  hint,
-  children,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border/60 bg-card/60">
-      <header className="flex items-start gap-2 border-b border-border/50 px-4 py-3">
-        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-        <div className="min-w-0">
-          <h2 className="text-sm font-medium text-foreground">{title}</h2>
-          {hint ? <p className={cn('mt-0.5 text-[11px]', DASH.muted)}>{hint}</p> : null}
-        </div>
-      </header>
-      {children}
-    </section>
-  );
-}
+const NUM = new Intl.NumberFormat('th-TH');
 
 /** ใบนี้มีข้อมูลคนเก่าให้ดูไหม — ใบเปิดไซต์ใหม่ไม่มีคนเก่า (ไม่ต้องวาดกล่องที่มีแต่ "—") */
 function hasResignedInfo(job: JobRequest): boolean {
@@ -137,10 +95,24 @@ function hasResignedInfo(job: JobRequest): boolean {
   );
 }
 
+/** รายได้ที่ผู้สมัครจะเห็น (จากที่ทีม Online ตั้ง) — `null` = ยังไม่ได้ตั้ง */
+function incomeSummaryText(job: JobRequest): string | null {
+  const fo = job.field_overrides;
+  const shown = buildIncomeDisplay(fo?.income ?? null);
+  if (shown) return `${NUM.format(shown.total)} บาท ${INCOME_PERIOD_LABEL[shown.period]}`;
+  // ยอดรวมแบบเดิม (ไม่มีหน่วย) — หน้าสาธารณะนับเป็นต่อเดือน
+  if (typeof fo?.total_income === 'number') return `${NUM.format(fo.total_income)} บาท ต่อเดือน`;
+  return null;
+}
+
+function Loading({ text = 'กำลังโหลดใบขอ…' }: { text?: string }) {
+  return <p className="text-xs text-muted-foreground">{text}</p>;
+}
+
 /**
  * ═══ ช่องเลือกเพศ — ขั้น 1 ตรวจใบขอ (เจ้าของเคาะ 26 ก.ย. 2569) ═══
  *
- * > *"ถ้าขึ้น O ให้เลือกได้ว่าจะใส่ว่าเพศอะไรก่อนขึ้นหน้าสาธารณะ"* → บังคับเลือกก่อนปล่อย
+ * > *"ถ้าขึ้น O ให้เลือกได้ว่าจะใส่ว่าเพศอะไรก่อนขึ้นหน้าสาธารณะ"* → บังคับเลือกก่อนส่ง
  *
  * - บอก **"ใบขอเขียนว่า"** ไว้เสมอ — ใบขออาจมาไม่ถูกแต่แรก ทีม Online ต้องเห็นของเดิมด้วย
  * - กดแล้วบันทึกทันที (ไม่มีปุ่มบันทึกแยก) · เก็บที่ `field_overrides.gender` ช่องเดิม
@@ -164,7 +136,7 @@ function GenderPicker({
   const pick = async (choice: GenderChoice) => {
     const requestNo = unitRequestNoteKey(job);
     if (!requestNo) {
-      setError('ใบขอนี้ไม่มีเลขที่ใบขอ — บันทึกไม่ได้');
+      setError('ใบขอนี้ไม่มีเลขที่ใบขอ บันทึกไม่ได้');
       return;
     }
     setBusy(choice);
@@ -186,15 +158,17 @@ function GenderPicker({
   };
 
   return (
-    <div className="space-y-2 px-4 py-3">
-      <p className="text-xs text-muted-foreground">
-        ใบขอเขียนว่า <span className="font-medium text-foreground">{erp}</span>
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+        <span>
+          ใบขอเขียนว่า <span className="text-foreground">{erp}</span>
+        </span>
         {chosen ? (
-          <>
-            {' '}· ทีม Online เลือก <span className="font-medium text-foreground">{chosen}</span>
-          </>
+          <span>
+            ทีม Online เลือก <span className="text-foreground">{chosen}</span>
+          </span>
         ) : null}
-      </p>
+      </div>
       <div className="flex flex-wrap gap-2">
         {GENDER_CHOICES.map((g) => (
           <Button
@@ -211,11 +185,50 @@ function GenderPicker({
         ))}
       </div>
       {needs ? (
-        <p className={cn('rounded-lg px-2.5 py-1.5 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
-          ใบขอไม่ระบุเพศ — ต้องเลือกก่อนส่งประกาศ (ขั้น 4 จะกดส่งไม่ได้จนกว่าจะเลือก)
+        <p className={cn('rounded-lg border px-3 py-2 text-xs', TONE.warn.soft, TONE.warn.value)}>
+          ใบขอไม่ระบุเพศ ต้องเลือกก่อนส่งประกาศ
         </p>
       ) : null}
-      {error ? <p className={cn('text-[11px]', TONE.danger.value)}>{error}</p> : null}
+      {error ? <p className={cn('text-xs', TONE.danger.value)}>{error}</p> : null}
+    </div>
+  );
+}
+
+/** ข้อเท็จจริงหนึ่งช่องในการ์ดข้อมูลใบขอ */
+function Fact({ label, value, wide = false }: { label: string; value?: string | number | null; wide?: boolean }) {
+  return (
+    <div className={cn('min-w-0', wide && 'sm:col-span-2')}>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="break-words text-sm text-foreground">
+        {value === undefined || value === null || value === '' ? EM_DASH : value}
+      </dd>
+    </div>
+  );
+}
+
+/** หนึ่งแถวในสรุปขั้น 4 — ปุ่ม "แก้" พากลับไปขั้นของช่องนั้น */
+function SummaryRow({
+  label,
+  children,
+  warn = false,
+  onEdit,
+}: {
+  label: string;
+  children: React.ReactNode;
+  warn?: boolean;
+  onEdit?: () => void;
+}) {
+  return (
+    <div className="flex items-start gap-3 py-2">
+      <dt className="w-24 shrink-0 pt-1 text-xs text-muted-foreground">{label}</dt>
+      <dd className={cn('min-w-0 flex-1 break-words pt-0.5 text-sm', warn ? TONE.warn.value : 'text-foreground')}>
+        {children}
+      </dd>
+      {onEdit ? (
+        <Button type="button" variant="ghost" size="xs" onClick={onEdit} aria-label={`แก้${label}`}>
+          แก้
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -251,25 +264,16 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
       search: location.search,
     });
   /**
-   * ปุ่ม "ยกเลิก" ในฟอร์มที่ฝังไว้ — ฟอร์มพวกนี้เกิดมาเพื่ออยู่ในป๊อป `onClose` จึงหมายถึง
-   * "ปิดกล่อง" · 🔴 ฝังในหน้าแล้วต้องมีปลายทางจริง ไม่งั้นเป็น**ปุ่มตาย**
-   * ⇒ ยกเลิก = กลับกล่องงาน · 🔴 เดิมพาไปแท็บรายละเอียดของหน้าใบขอ — เจ้าของสั่ง 27 ก.ย. 2569
-   *   ห้ามของในกล่องงานเด้งไปหน้าใบขอ (หน้านี้คือป๊อปไล่งานแบบลิงก์ตรง = ของกล่องงาน)
+   * จบงานในป๊อป (บันทึกแบบร่าง / ส่งประกาศ / ปิด) = กลับกล่องงาน
+   * 🔴 ห้ามพาไปหน้าใบขอ — เจ้าของสั่ง 27 ก.ย. 2569 ของในกล่องงานห้ามเด้งออกไปหน้าอื่น
    */
-  const leaveToDetail = React.useCallback(() => {
+  const leaveToBoard = React.useCallback(() => {
     if (onDone) {
       onDone();
       return;
     }
     navigate('/jobs/board');
   }, [onDone, navigate]);
-  /**
-   * 🔴 **ประวัติการแก้ไขโชว์เฉพาะ Admin** (เจ้าของสั่ง 28 ส.ค. 2569:
-   * *"ใครแก้อะไรไป ซ่อนไว้เห็นแค่ Admin"*)
-   * เดิมกั้นที่ `staff` ⇒ สรรหา/คัดสรรเห็นชื่อกันหมด ซึ่งไม่ใช่เรื่องของพวกเขา
-   */
-  const { hasPermission } = useAuth();
-  const canSeeEditLog = hasPermission('admin');
 
   const [job, setJob] = React.useState<JobRequest | null>(null);
   /** ช่องที่เปิดอยู่ — **เริ่มที่ "ตรวจสอบ" เสมอ** ตามที่เจ้าของสั่ง */
@@ -281,6 +285,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
   const [releases, setReleases] = React.useState<JobRelease[] | null>(null);
   const [releaseBusy, setReleaseBusy] = React.useState(false);
+  const [sendError, setSendError] = React.useState<string | null>(null);
   /** ทะเบียน "ไม่ปล่อย + เหตุผล" (29 ก.ย. 2569) — `null` = ยังอ่านไม่ได้ ⇒ ไม่โชว์ปุ่ม (ห้ามเดาว่ายังไม่ได้ตั้ง) */
   const [skips, setSkips] = React.useState<JobReleaseSkip[] | null>(null);
 
@@ -330,18 +335,23 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   }, [loadPostings, loadReleases, loadSkips]);
 
   /**
-   * ประกาศล่าสุดของใบนี้ — 🔴 ต้องหาผ่าน `buildJobKeyIndex` ไม่ใช่ `===`
+   * ประกาศทั้งหมดของใบนี้ (ใหม่ → เก่า) — 🔴 ต้องหาผ่าน `buildJobKeyIndex` ไม่ใช่ `===`
    * (id ใบขอมี 3 รูป · URL พาเลขที่ใบเปล่ามาก็ได้ — ดู `jobKeyIndex.ts`)
    */
-  const latestPosting = React.useMemo(() => {
+  const jobPostings = React.useMemo<RecruitPosting[] | null>(() => {
     if (!postings) return null;
-    // API เรียง created_at DESC มาแล้ว → ตัวแรกที่เจอคือล่าสุด
-    const idx = buildJobKeyIndex(
-      postings.map((p) => [p.jobId, p] as const),
-      (existing) => existing,
+    // API เรียง created_at DESC มาแล้ว → ต่อท้ายตามลำดับ ตัวแรกคือล่าสุด
+    const idx = buildJobKeyIndex<RecruitPosting[]>(
+      postings.map((p) => [p.jobId, [p]] as const),
+      (existing, incoming) => [...existing, ...incoming],
     );
-    return (job ? idx.get(job.id) : null) ?? idx.get(id) ?? null;
+    return (job ? idx.get(job.id) : undefined) ?? idx.get(id) ?? [];
   }, [postings, job, id]);
+  const latestPosting = jobPostings?.[0] ?? null;
+  /** ลิงก์สมัครที่ยังใช้ได้ (ประกาศที่ยังเปิด) */
+  const linkCount = jobPostings
+    ? jobPostings.filter((p) => p.status === 'open').reduce((sum, p) => sum + p.links.length, 0)
+    : null;
 
   const released = React.useMemo(() => {
     if (!releases || !job) return null;
@@ -368,6 +378,22 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
     }
   };
 
+  /** ขั้น 4 "ส่งประกาศ" — ส่งสำเร็จแล้วปิดป๊อปกลับกล่องงาน · ไม่สำเร็จบอกในป๊อป (ห้ามเงียบ) */
+  const sendPost = async () => {
+    if (!job) return;
+    setReleaseBusy(true);
+    setSendError(null);
+    try {
+      await releaseJobsToPublic([job.id]);
+      await loadReleases();
+      leaveToBoard();
+    } catch (e) {
+      setSendError(e instanceof Error && e.message ? e.message : 'ส่งประกาศไม่สำเร็จ ลองอีกครั้ง');
+    } finally {
+      setReleaseBusy(false);
+    }
+  };
+
   const jobWithPatch = job ? ({ ...job, ...publicPatch } as JobRequest) : null;
   /** 🔴 ใบขอไม่ระบุเพศและยังไม่มีใครเลือก = ส่งประกาศไม่ได้ (เจ้าของเคาะ 26 ก.ย. 2569) */
   const genderBlocked = jobWithPatch ? genderNeedsChoice(jobWithPatch) : false;
@@ -389,18 +415,19 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   /**
    * ขั้นที่กำลังเปิดดู — 🔴 **เริ่มที่ขั้น 1 เสมอ** (เจ้าของสั่ง 28 ส.ค. 2569:
    * *"พอกดเข้าไปทำไมไปโผล่ กดปล่อย เลยอะ ไม่ไล่ไปจาก 1.ตรวจใบขอ ไล่ไปอะ"*)
-   * ⚠️ ผมเคยทำให้เด้งไปขั้นที่ใบนั้นค้างอยู่ ซึ่งข้ามขั้นตรวจใบขอไปเลย — ผิด
-   * `currentStep` ยังใช้อยู่ แต่ใช้แค่ติดป้าย "ค้างที่นี่" ไม่ได้ใช้เลือกขั้นเริ่ม
+   * `currentStep` ใช้แค่ติดป้าย "ค้างที่นี่" ไม่ได้ใช้เลือกขั้นเริ่ม
    */
   const [openStep, setOpenStep] = React.useState<ReleaseStepKey>('info');
-  /** กล่อง "ข้อมูลใบขอ" กาง/หุบ — 🔴 หุบเป็นค่าตั้งต้น (เหมือนหน้าใบขอ) */
+  /** "ดูใบขอทั้งใบ" — หุบเป็นค่าตั้งต้น */
   const [infoOpen, setInfoOpen] = React.useState(false);
+  /** ขั้น 4: ติ๊ก "สร้างลิงก์" ถึงกางฟอร์ม (ลิงก์ไม่บังคับ — Choice 30 ก.ย. 2569) */
+  const [wantLink, setWantLink] = React.useState(false);
+  const [editPostingOpen, setEditPostingOpen] = React.useState(false);
   const step: ReleaseStepKey = openStep;
 
   /**
-   * ขั้นนี้ทำไปแล้วหรือยัง — ใช้กับติ๊กถูกบนแถบ
-   * 🔴 อ่านจากร่องรอยจริงเท่านั้น (หมายเหตุ · การแก้ข้อมูล · มีลิงก์ · อยู่ในทะเบียนปล่อย)
-   * **ห้ามติ๊กถูกให้ขั้นที่ไม่มีหลักฐาน** — บทเรียน "แถบติ๊กถูกที่โกหก" (25 ส.ค. 2569)
+   * ขั้นนี้ผ่านแล้วหรือยัง — ใช้ระบายสีบนแถบ
+   * 🔴 อ่านจากร่องรอยจริงเท่านั้น **ห้ามอ้างว่าผ่านโดยไม่มีหลักฐาน** — บทเรียน "แถบติ๊กถูกที่โกหก" (25 ส.ค. 2569)
    */
   const doneStep = React.useCallback(
     (k: ReleaseStepKey): boolean => {
@@ -415,9 +442,17 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
 
   const stepIdx = RELEASE_STEP_ORDER.indexOf(step);
   const nextStep = stepIdx >= 0 ? RELEASE_STEP_ORDER[stepIdx + 1] : undefined;
+  const onFieldsSaved = (patch: Partial<JobRequest>) => setPublicPatch((prev) => ({ ...prev, ...patch }));
+
+  // ── สรุปขั้น 4 ──
+  const genderChosen = jobWithPatch ? onlineGenderChoice(jobWithPatch) : null;
+  const genderErp = jobWithPatch ? erpGenderLabel(jobWithPatch) : null;
+  const genderText = genderChosen ?? (genderErp === 'ชาย' || genderErp === 'หญิง' ? genderErp : null);
+  const incomeText = jobWithPatch ? incomeSummaryText(jobWithPatch) : null;
+  const benefitLines = jobWithPatch ? benefitDisplayLabels(jobWithPatch.extra_benefits) : [];
 
   return (
-    <div className="relative">
+    <div className={cn('relative', EVEN_TYPE)}>
       {chrome ? (
         <PageHeader
           title="ไล่งานของใบนี้"
@@ -432,13 +467,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
 
         {/**
          * ═══ สองช่องบนสุด: **ตรวจสอบ** กับ **รายชื่อ** (เจ้าของสั่ง 21 ก.ย. 2569) ═══
-         *
-         * > *"เมื่อกดกล่องงาน มีให้เลือก 2 อัน โดย Default ให้โชว์หน้าตรวจสอบไว้ …
-         * >  ส่วนถ้ากดรายชื่อ ก็ขึ้นเป็น รายชื่อทั้งหมด พร้อมบอกสถานะ … รายชื่อที่สนใจ ·
-         * >  รายชื่อที่ไม่สนใจ"* — *"หน้านี้จะบอกว่าก่อนเอาขึ้นต้องตรวจสอบนะ และดูรายชื่อได้"*
-         *
-         * 🔴 **ห้ามเอารายชื่อไปต่อท้ายขั้นตอน** (เคยทำแบบนั้นแล้วเจ้าของตีกลับ)
-         * — ต้องเป็นสองช่องแยกกันที่กดสลับ ไม่ใช่กองต่อกันในหน้าเดียว
+         * 🔴 **ห้ามเอารายชื่อไปต่อท้ายขั้นตอน** (เคยทำแบบนั้นแล้วเจ้าของตีกลับ) — สองช่องแยกกันที่กดสลับ
          */}
         <Tabs value={view} onValueChange={(v) => setView(v as 'review' | 'people')}>
           <TabsList className="w-full">
@@ -451,424 +480,301 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
           </TabsList>
 
           <TabsContent value="people" className="mt-4">
-            {job ? (
-              <JobApplicantsDialog embedded open job={job} onClose={() => undefined} />
-            ) : (
-              <p className={cn('py-6 text-center text-xs', DASH.muted)}>กำลังโหลดใบขอ…</p>
-            )}
+            {job ? <JobApplicantsDialog embedded open job={job} onClose={() => undefined} /> : <Loading />}
           </TabsContent>
 
           <TabsContent value="review" className="mt-4 space-y-4">
-
-        {/* ── 🔴 แถบขั้น 1-4 — หัวใจของหน้านี้ ──
-            บอกสามอย่าง: ขั้นไหนผ่านแล้ว · ใบนี้ค้างขั้นไหน · กำลังเปิดดูขั้นไหน */}
-        <nav
-          className="flex flex-wrap items-center gap-x-1 gap-y-2 rounded-2xl border border-border/60 bg-card/60 px-3 py-2.5"
-          aria-label="ขั้นตอนของงานประกาศ"
-        >
-          {RELEASE_STEP_ORDER.map((k, i) => {
-            const t = RELEASE_STEP_TEXT[k];
-            const on = step === k;
-            const passed = doneStep(k);
-            const here = currentStep === k;
-            return (
-              <React.Fragment key={k}>
-                {i > 0 ? (
-                  <ChevronRight
-                    className="h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-slate-700"
-                    aria-hidden
-                  />
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => setOpenStep(k)}
-                  aria-current={on ? 'step' : undefined}
-                  title={t.todo}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-medium transition-colors',
-                    on
-                      ? cn(TONE.primary.solid, 'border-transparent')
-                      : passed
-                        ? cn(TONE.success.value, 'border-emerald-300/60 bg-background hover:bg-secondary')
-                        : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground',
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-medium',
-                      on ? 'bg-white/25' : passed ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-secondary',
-                    )}
-                    aria-hidden
-                  >
-                    {/* 🔴 **ห้ามใส่เครื่องหมายถูก** (เจ้าของสั่ง 28 ส.ค. 2569: *"เครื่องหมายถูก เอาออก"*)
-                        บทเรียนเดิมของบ้านนี้: ติ๊กถูกบนแถบขั้น = อ้างว่า "ทำเสร็จแล้ว"
-                        ทั้งที่ระบบไม่มีเหตุการณ์ยืนยันว่าใครทำขั้นนั้นจริง (เคยถอดออกจาก
-                        หน้าแรกไปแล้วรอบหนึ่ง 26 ส.ค. 2569) ⇒ โชว์เลขขั้นเสมอ */}
-                    {t.step}
-                  </span>
-                  <span className="whitespace-nowrap">{t.label}</span>
-                  {here ? (
-                    <span className={cn('whitespace-nowrap text-[10px] font-normal', on ? 'text-white/80' : DASH.cellMuted)}>
-                      · ค้างที่นี่
-                    </span>
-                  ) : null}
-                </button>
-              </React.Fragment>
-            );
-          })}
-          {released ? (
-            /* 🔴 ปุ่มย้อนกลับอยู่ข้างป้ายเลย ไม่ต้องไล่ไปขั้น 4 (เจ้าของเคาะ 29 ก.ย. 2569: *"ถ้าอันไหนต้องการเอาออกจากหน้า
-               สาธารณะต้องมีปุ่มให้ย้อนกลับมาได้"* → Choice "บนหัวป๊อป ข้างป้าย ปล่อยแล้ว") · ปุ่มเดิมในขั้น 4 ยังอยู่ */
-            <span className="ml-auto flex flex-wrap items-center gap-2">
-              <span
-                className={cn(
-                  'rounded-full px-2.5 py-1 text-[11px] font-medium',
-                  TONE.success.soft,
-                  TONE.success.value,
-                )}
-              >
-                ✓ ปล่อยขึ้นหน้าสาธารณะแล้ว
-              </span>
-              <Button
-                type="button"
-                size="xs"
-                variant="outline"
-                disabled={releaseBusy || !job}
-                onClick={() => void toggleRelease(false)}
-              >
-                {releaseBusy ? 'กำลังบันทึก…' : 'ดึงลงจากหน้าสาธารณะ'}
-              </Button>
-            </span>
-          ) : null}
-        </nav>
-
-        {/* ── "ไม่ปล่อย + เหตุผล" (เจ้าของเลือก 29 ก.ย. 2569) — ฟอร์มกางในที่เดิม ไม่ซ้อน Dialog ในป๊อป ── */}
-        {job ? (
-          <ReleaseSkipControl jobId={job.id} skip={skip} released={released} onChanged={() => void loadSkips()} />
-        ) : null}
-
-        {/* คำสั่งงานของขั้นที่เปิดอยู่ — มาจาก RELEASE_STEP_TEXT ที่เดียว */}
-        <div className={cn('rounded-xl border px-3.5 py-2.5', TONE.primary.soft)}>
-          <p className="text-[13px] font-medium text-foreground">
-            ขั้น {RELEASE_STEP_TEXT[step].step} — {RELEASE_STEP_TEXT[step].todo}
-          </p>
-          <p className={cn('mt-0.5 text-[11px]', DASH.muted)}>{RELEASE_STEP_TEXT[step].hint}</p>
-        </div>
-
-        {/* ── ① ตรวจใบขอ ── */}
-        {step === 'info' ? (
-          <>
-            {/* ── ① ข้อมูลใบขอ — 🔴 **หุบไว้ กดลูกศรกางในกล่องเลย** ──
-                เจ้าของสั่ง 28 ส.ค. 2569: *"เปิดใบขอเต็ม ๆ ก็ไม่ต้องเด้งไปหน้าใบงานสิ
-                กดแล้วก็ขยายให้ดูเลยสิ"* ⇒ ถอดลิงก์ "เปิดใบขอเต็ม ๆ →" ที่พาออกไปหน้าอื่น
-                แล้วกางชุดช่องเดียวกับหน้าใบขอ (`UnitRequestInfoFields`) ในที่เดิม
-                ⚠️ สรุปสั้น 4 ช่องยังอยู่ข้างบน — คนไม่ต้องกางก็เห็นของสำคัญแล้ว */}
-            <Block
-              icon={ClipboardCheck}
-              title="ข้อมูลใบขอ"
-              hint="ดูสรุปได้ทันที · กดกางเพื่อดูครบทุกช่องแบบเดียวกับหน้าใบขอ"
-            >
-              <div className="space-y-3 px-4 py-3">
-                {job ? (
-                  <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
-                    <Fact label="เลขที่ใบขอ" value={job.request_no} />
-                    <Fact label="ตำแหน่ง" value={job.job_description_code_1} />
-                    <Fact label="สถานที่" value={job.location_address} />
-                    <Fact
-                      label="ต้องการวันที่"
-                      value={job.required_date ? formatYmdDmyBe(job.required_date) : null}
-                    />
-                    {/* 🔴 **ผู้ติดต่อ + เบอร์ต้องอยู่ในสรุป** (เจ้าของสั่ง 22 ก.ย. 2569:
-                        *"เบอร์จากใบขอไม่มาขึ้นที่กล่องงานเลย"*) — ของเดิมมีเฉพาะตอนกด
-                        "กางดูข้อมูลใบขอทั้งใบ" ซึ่งคนทำประกาศไม่เคยกด · ทั้งสองช่องมาจาก
-                        ใบขอ ERP (`st_request_p1`) ไม่ใช่ค่าที่ใครพิมพ์เองในระบบนี้ */}
-                    <Fact label="ชื่อผู้ติดต่อหน่วยงาน" value={job.contact_name} />
-                    <Fact label="เบอร์ติดต่อ" value={job.contact_phone} />
-                  </dl>
-                ) : (
-                  <p className={cn('text-xs', DASH.muted)}>กำลังโหลดใบขอ…</p>
-                )}
-
-                {/* ── คนที่ออก / เปลี่ยนตัว + รายได้จริง 3 เดือน — 🔴 **โชว์เลยไม่ต้องกาง** ──
-                    เจ้าของเล่าหลักการ 26 ก.ย. 2569: *"ทีม online ควรดูรายละเอียดใบขอนั้น ๆ ได้แบบ
-                    หน้าใบขอ … คนที่ออกหรือเปลี่ยนตัวมีรายได้ย้อนหลัง 3 เดือนประมาณเท่าไหร่"*
-                    ⇒ ใช้ประกอบการตั้งรายได้ขั้น 3 · component ตัวเดียวกับหน้าใบขอ (ห้ามก๊อปโครง)
-                    ใบเปิดไซต์ใหม่ไม่มีคนเก่า = บอกบรรทัดเดียว ไม่วาดกล่องที่มีแต่ "—" */}
-                {job ? (
-                  hasResignedInfo(job) ? (
-                    <ResignedEmployeeBlock job={job} />
-                  ) : (
-                    <p className={cn('text-[11px]', DASH.muted)}>
-                      ใบนี้ไม่มีข้อมูลคนเก่า (เช่น เปิดไซต์ใหม่) — ไม่มีรายได้ย้อนหลังให้เทียบ
-                    </p>
-                  )
-                ) : null}
-
-                <button
-                  type="button"
-                  onClick={() => setInfoOpen((v) => !v)}
-                  aria-expanded={infoOpen}
-                  className="flex min-h-9 w-full items-center gap-1.5 text-left text-[11px] font-medium text-blue-700 dark:text-blue-300"
-                >
-                  {infoOpen ? 'ย่อข้อมูลใบขอ' : 'กางดูข้อมูลใบขอทั้งใบ'}
-                  <ChevronDown
-                    className={cn('h-3.5 w-3.5 transition-transform', infoOpen && 'rotate-180')}
-                    aria-hidden
-                  />
-                </button>
-
-                {infoOpen && job ? <UnitRequestInfoFields job={job} /> : null}
-                {/* ตารางอัตราของใบขอ — ชุดเดียวกับหน้าใบขอ (กางแล้วเห็นครบเหมือนกัน) */}
-                {infoOpen && job ? <RequestRateLinesBlock job={job} /> : null}
-              </div>
-            </Block>
-
-            {/* ── เพศที่รับ (เจ้าของเคาะ 26 ก.ย. 2569: ช่องอยู่ขั้น 1 · ใบขอไม่ระบุต้องเลือกก่อนส่ง) ── */}
-            <Block
-              icon={UserCheck}
-              title="เพศที่รับ"
-              hint="ใบขอไม่ระบุเพศต้องเลือกก่อนส่งประกาศ · ใบขอมาผิดก็กดแก้ได้"
-            >
-              {jobWithPatch ? (
-                <GenderPicker
-                  job={jobWithPatch}
-                  onSaved={(patch) => setPublicPatch((prev) => ({ ...prev, ...patch }))}
-                />
-              ) : (
-                <p className={cn('px-4 py-3 text-xs', DASH.muted)}>กำลังโหลดใบขอ…</p>
-              )}
-            </Block>
-
-            <Block
-              icon={StickyNote}
-              title="ติดอะไรไหม"
-              hint="ไม่มีอะไรก็ไปขั้นต่อไปได้เลย — ติดอะไรให้จดไว้ให้คนอื่นเห็น"
-            >
-              <div className="px-4 py-3">
-                {job ? (
-                  <UnitRequestNoteDetail job={job} />
-                ) : (
-                  <p className={cn('text-xs', DASH.muted)}>กำลังโหลด…</p>
-                )}
-              </div>
-            </Block>
-
-            {canSeeEditLog ? (
-              <Block
-                icon={History}
-                title="ใครแก้อะไรไป"
-                hint="เฉพาะการแก้ที่เกิดในระบบ Jarvis · ของที่มาจากระบบงานหลักไม่ถูกนับ"
-              >
-                <div className="px-4 py-3">
-                  <UnitEditLogSection job={job} />
-                </div>
-              </Block>
-            ) : null}
-          </>
-        ) : null}
-
-        {/* ── ② สถานที่ปฏิบัติงาน (เจ้าของเคาะขั้นนี้เอง) ── */}
-        {step === 'place' ? (
-          <Block
-            icon={Pencil}
-            title="สถานที่ปฏิบัติงาน"
-            hint="จังหวัด / อำเภอ / ตำบล ที่ผู้สมัครจะเห็นบนประกาศ"
-          >
-            {/* 🔴 **ใบขอมีที่อยู่มาให้ = โชว์ให้ดูก่อน** (เจ้าของเล่าหลักการ 26 ก.ย. 2569:
-                *"กดต่อไปเพื่อใส่ที่อยู่ แต่ถ้ามีที่อยู่มาให้ก็ขึ้นมาให้ดู"*) — เดิมที่อยู่เต็ม
-                อยู่แค่ขั้น 1 ต้องย้อนกลับไปดู · ใบขอบางใบเขียนชื่อสาขา/ชื่อคนปนมา ทีม Online
-                ต้องเห็นของจริงแล้วเลือกจังหวัด/อำเภอเอง (ระบบเดาจากข้อความนี้ให้เป็นค่าตั้งต้น) */}
-            {job ? (
-              <div className="border-b border-border/50 px-4 py-3">
-                <p className={cn('text-[11px]', DASH.muted)}>ใบขอเขียนว่า</p>
-                <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-foreground">
-                  {job.location_address?.trim() || 'ใบขอไม่ได้ใส่ที่อยู่มา — เลือกจังหวัด/อำเภอเองข้างล่าง'}
-                </p>
-              </div>
-            ) : null}
-            {jobWithPatch ? (
-              <React.Suspense
-                fallback={<p className={cn('px-4 py-3 text-xs', DASH.muted)}>กำลังโหลดฟอร์ม…</p>}
-              >
-                <div className="px-4 py-3">
-                  <EditPublicJobFieldsDialog
-                    key={jobWithPatch.id}
-                    embedded
-                    sections={['place']}
-                    job={jobWithPatch}
-                    onClose={leaveToDetail}
-                    onSaved={(patch) => setPublicPatch((prev) => ({ ...prev, ...patch }))}
-                  />
-                </div>
-              </React.Suspense>
-            ) : (
-              <p className={cn('px-4 py-3 text-xs', DASH.muted)}>กำลังโหลดใบขอ…</p>
-            )}
-          </Block>
-        ) : null}
-
-        {/* ── ③ Checklist สวัสดิการ (เจ้าของเคาะขั้นนี้เอง) ──
-            *"ให้เลือกว่าจากข้อมูลใบขอจะเอาอะไรมาเป็นสวัสดิการบ้าง เช่น ถ้าติ๊กเลือก
-             เบี้ยขยัน ในช่องสวัสดิการก็จะบอกว่าเบี้ยขยันเท่าไหร่"* */}
-        {step === 'benefits' ? (
-          <Block
-            icon={ClipboardCheck}
-            title="รายได้ + สวัสดิการที่จะขึ้นประกาศ"
-            hint="เลือกจากข้อมูลใบขอว่าจะเอาอะไรขึ้นให้ผู้สมัครเห็น"
-          >
-            {jobWithPatch ? (
-              <React.Suspense
-                fallback={<p className={cn('px-4 py-3 text-xs', DASH.muted)}>กำลังโหลดฟอร์ม…</p>}
-              >
-                <div className="px-4 py-3">
-                  <EditPublicJobFieldsDialog
-                    key={jobWithPatch.id}
-                    embedded
-                    sections={['income', 'benefits']}
-                    job={jobWithPatch}
-                    onClose={leaveToDetail}
-                    onSaved={(patch) => setPublicPatch((prev) => ({ ...prev, ...patch }))}
-                  />
-                </div>
-              </React.Suspense>
-            ) : (
-              <p className={cn('px-4 py-3 text-xs', DASH.muted)}>กำลังโหลดใบขอ…</p>
-            )}
-          </Block>
-        ) : null}
-
-        {/* ── ④ สร้างลิงก์ + ส่งประกาศ — 🔴 ปุ่มส่งอยู่ขั้นสุดท้ายเท่านั้น ── */}
-        {step === 'publish' ? (
-          <>
-            {/* 🔴 **ลำดับขั้นสุดท้าย = ตัวอย่าง → สร้างลิงก์ → ส่ง** (เจ้าของเคาะ 26 ก.ย. 2569
-                ตรงกับนิยามข้อ 4 ของ 22 ก.ย.) · ตัวอย่างหน้าสมัคร**กางให้เอง**ไม่ต้องกดหา ·
-                ปุ่มส่งอยู่ท้ายสุดและกดได้เมื่อมีลิงก์แล้ว + เลือกเพศแล้วเท่านั้น */}
-            <Block
-              icon={Link2}
-              title="ดูตัวอย่าง แล้วสร้างลิงก์สมัคร"
-              hint="ดูหน้าที่ผู้สมัครจะเห็นก่อน · โอเคแล้วกดสร้างลิงก์ต่อช่องทาง — ยอดคลิกนับแยกต่อช่องทาง"
-            >
-              {job ? (
-                <GenApplyLinkDialog
-                  embedded
-                  open
-                  previewFirst
-                  job={job}
-                  onClose={leaveToDetail}
-                  onCreated={() => void loadPostings()}
-                />
-              ) : (
-                <p className={cn('px-4 py-3 text-xs', DASH.muted)}>กำลังโหลดใบขอ…</p>
-              )}
-            </Block>
-
-            {latestPosting ? (
-              <Block
-                icon={Pencil}
-                title="ข้อความประกาศที่มีอยู่แล้ว"
-                hint="แก้แล้วคนที่เปิดลิงก์เห็นข้อความใหม่ทันที"
-              >
-                <EditPostingDialog
-                  embedded
-                  posting={latestPosting}
-                  onClose={leaveToDetail}
-                  onSaved={() => void loadPostings()}
-                />
-              </Block>
-            ) : null}
-
-            <Block
-              icon={Send}
-              title="ส่งประกาศขึ้นหน้าสมัครสาธารณะ"
-              hint="ส่งแล้วคนนอกเห็นและสมัครได้ · AI (Lumos) ก็เห็นใบนี้ด้วย"
-            >
-              <div className="px-4 py-3">
-                {released === null ? (
-                  <p className={cn('text-xs', DASH.muted)}>กำลังอ่านทะเบียนการปล่อย…</p>
-                ) : (
-                  <div
-                    className={cn(
-                      'rounded-xl border px-3 py-2.5',
-                      released ? TONE.success.soft : TONE.warn.soft,
-                    )}
-                  >
-                    <p className="text-xs font-medium text-foreground">
-                      {released ? 'ใบนี้อยู่บนหน้าสาธารณะแล้ว' : 'ใบนี้ยังไม่ขึ้นหน้าสาธารณะ'}
-                    </p>
-                    <p className={cn('mt-0.5 text-[11px]', DASH.muted)}>
-                      {released
-                        ? 'คนนอกเห็นและสมัครได้ · AI (Lumos) เห็นใบนี้ด้วย'
-                        : skip
-                          ? 'ใบนี้ตั้ง “ไม่ปล่อย” อยู่ — กด “ยกเลิก ไม่ปล่อย” ด้านบนก่อนถึงจะส่งได้'
-                          : genderBlocked
-                          ? 'ใบขอไม่ระบุเพศ — ต้องเลือกเพศที่ขั้น 1 ก่อนถึงจะส่งได้'
-                          : !latestPosting
-                            ? 'ยังไม่มีลิงก์สมัคร — ดูตัวอย่างข้างบนแล้วกด "สร้างประกาศ + ลิงก์" ก่อน'
-                            : 'มีลิงก์สมัครแล้ว — กดส่งประกาศได้เลย'}
-                    </p>
-                    {!released && genderBlocked ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="mt-2"
-                        onClick={() => setOpenStep('info')}
-                      >
-                        ไปขั้น 1 เลือกเพศ
-                      </Button>
-                    ) : null}
+            {/* ── แถบขั้น 1-4 — บอกสามอย่าง: ขั้นไหนผ่านแล้ว · ใบนี้ค้างขั้นไหน · กำลังเปิดดูขั้นไหน ── */}
+            <nav className="flex flex-wrap items-center gap-1" aria-label="ขั้นตอนของงานประกาศ">
+              {RELEASE_STEP_ORDER.map((k, i) => {
+                const t = RELEASE_STEP_TEXT[k];
+                const on = step === k;
+                const passed = doneStep(k);
+                const here = currentStep === k;
+                return (
+                  <React.Fragment key={k}>
+                    {i > 0 ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" aria-hidden /> : null}
                     <Button
                       type="button"
-                      /* 🔴 ดึงลง (ใบที่ปล่อยแล้ว) กดได้เสมอ · ส่งขึ้นต้องผ่านสองด่าน: มีลิงก์ + เลือกเพศ */
-                      disabled={releaseBusy || !job || (!released && (genderBlocked || !latestPosting || Boolean(skip)))}
-                      onClick={() => void toggleRelease(!released)}
-                      className={cn(
-                        'mt-2 w-full rounded-xl py-2.5 text-sm',
-                        released ? TONE.neutral.outline : TONE.success.solid,
-                      )}
+                      size="xs"
+                      variant={on ? 'default' : 'outline'}
+                      aria-current={on ? 'step' : undefined}
+                      title={t.todo}
+                      onClick={() => setOpenStep(k)}
+                      className={cn(!on && passed && TONE.success.value)}
                     >
-                      {releaseBusy
-                        ? 'กำลังบันทึก…'
-                        : released
-                          ? 'ดึงประกาศลงจากหน้าสาธารณะ'
-                          : 'ส่งประกาศขึ้นหน้าสาธารณะ'}
+                      {/* 🔴 **ห้ามใส่เครื่องหมายถูก** (เจ้าของสั่ง 28 ส.ค. 2569) — โชว์เลขขั้นเสมอ */}
+                      <span
+                        className={cn(
+                          'flex h-4 w-4 items-center justify-center rounded-full text-xs tabular-nums',
+                          on ? 'bg-primary-foreground/20' : 'bg-secondary',
+                        )}
+                        aria-hidden
+                      >
+                        {t.step}
+                      </span>
+                      {t.label}
+                      {here ? (
+                        <span className={cn('font-normal', on ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+                          ค้างที่นี่
+                        </span>
+                      ) : null}
+                    </Button>
+                  </React.Fragment>
+                );
+              })}
+            </nav>
+
+            {released ? (
+              /* 🔴 ปุ่มย้อนกลับอยู่ข้างป้ายเลย ไม่ต้องไล่ไปขั้น 4 (เจ้าของเคาะ 29 ก.ย. 2569: *"ถ้าอันไหนต้องการเอาออกจากหน้า
+                 สาธารณะต้องมีปุ่มให้ย้อนกลับมาได้"* → Choice "บนหัวป๊อป ข้างป้าย ปล่อยแล้ว") · ปุ่มเดิมในขั้น 4 ยังอยู่ */
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={cn('rounded-full border px-3 py-1 text-xs', TONE.success.soft, TONE.success.value)}>
+                  ✓ ปล่อยขึ้นหน้าสาธารณะแล้ว
+                </span>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  disabled={releaseBusy || !job}
+                  onClick={() => void toggleRelease(false)}
+                >
+                  {releaseBusy ? 'กำลังบันทึก…' : 'ดึงลงจากหน้าสาธารณะ'}
+                </Button>
+              </div>
+            ) : skip ? (
+              <p className={cn('w-fit rounded-full border px-3 py-1 text-xs', TONE.danger.soft, TONE.danger.value)}>
+                ตั้งไม่ปล่อยไว้ · {releaseSkipText(skip)}
+              </p>
+            ) : null}
+
+            {/* ── ① ตรวจใบขอ ── */}
+            {step === 'info' ? (
+              <>
+                <StepCard title="ข้อมูลใบขอ">
+                  {job ? (
+                    <dl className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                      <Fact label="เลขที่ใบขอ" value={job.request_no} />
+                      <Fact label="ตำแหน่ง" value={job.job_description_code_1} />
+                      <Fact label="ต้องการวันที่" value={job.required_date ? formatYmdDmyBe(job.required_date) : null} />
+                      {/* 🔴 ผู้ติดต่อ + เบอร์ต้องอยู่ในสรุป (เจ้าของสั่ง 22 ก.ย. 2569) — มาจากใบขอ ERP */}
+                      <Fact label="ผู้ติดต่อหน่วยงาน" value={job.contact_name} />
+                      <Fact label="เบอร์ติดต่อ" value={job.contact_phone} />
+                      <Fact label="สถานที่" value={job.location_address} wide />
+                    </dl>
+                  ) : (
+                    <Loading />
+                  )}
+                  {/* ใบเปิดไซต์ใหม่ไม่มีคนเก่า = บอกบรรทัดเดียวในการ์ดนี้ (ไม่วาดการ์ดที่มีแต่ "—") */}
+                  {job && !hasResignedInfo(job) ? (
+                    <p className="text-xs text-muted-foreground">ใบนี้ไม่มีข้อมูลคนเก่า</p>
+                  ) : null}
+                  {/* ดูใบขอทั้งใบในที่เดิม (เจ้าของสั่ง 28 ส.ค. 2569: ไม่ต้องเด้งไปหน้าใบงาน กดแล้วขยายให้ดูเลย) */}
+                  <Collapsible open={infoOpen} onOpenChange={setInfoOpen}>
+                    <CollapsibleTrigger asChild>
+                      <Button type="button" variant="ghost" size="xs">
+                        {infoOpen ? 'ย่อใบขอ' : 'ดูใบขอทั้งใบ'}
+                        <ChevronDown className={cn('transition-transform', infoOpen && 'rotate-180')} aria-hidden />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3 pt-3">
+                      {job ? (
+                        <>
+                          <UnitRequestInfoFields job={job} />
+                          <RequestRateLinesBlock job={job} />
+                        </>
+                      ) : null}
+                    </CollapsibleContent>
+                  </Collapsible>
+                </StepCard>
+
+                {/* คนที่ออก + รายได้จริง 3 เดือน — ใช้ตั้งรายได้ขั้น 3 · component ตัวเดียวกับหน้าใบขอ (ห้ามก๊อปโครง) */}
+                {job && hasResignedInfo(job) ? (
+                  <StepCard>
+                    <ResignedEmployeeBlock job={job} />
+                  </StepCard>
+                ) : null}
+
+                <StepCard title="เพศที่รับ">
+                  {jobWithPatch ? <GenderPicker job={jobWithPatch} onSaved={onFieldsSaved} /> : <Loading />}
+                </StepCard>
+              </>
+            ) : null}
+
+            {/* ── ② สถานที่ปฏิบัติงาน · ③ รายได้ + สวัสดิการ — ฟอร์มฝัง (บันทึกเอง ไม่มีปุ่มบันทึกแล้วปิด) ── */}
+            {step === 'place' || step === 'benefits' ? (
+              jobWithPatch ? (
+                <React.Suspense fallback={<Loading text="กำลังโหลดฟอร์ม…" />}>
+                  <EditPublicJobFieldsDialog
+                    key={`${jobWithPatch.id}-${step}`}
+                    sections={step === 'place' ? ['place'] : ['income', 'benefits']}
+                    job={jobWithPatch}
+                    onSaved={onFieldsSaved}
+                  />
+                </React.Suspense>
+              ) : (
+                <Loading />
+              )
+            ) : null}
+
+            {/* ── ④ สรุป + ส่งประกาศ ── */}
+            {step === 'publish' ? (
+              <>
+                <StepCard title="สรุปก่อนส่ง">
+                  {jobWithPatch ? (
+                    <dl className="divide-y divide-border/60">
+                      <SummaryRow label="ตำแหน่ง">{publicJobPositionLabel(jobWithPatch)}</SummaryRow>
+                      <SummaryRow label="สถานที่" onEdit={() => setOpenStep('place')}>
+                        {publicSafeAddress(jobWithPatch) || 'ไม่ระบุจังหวัด'}
+                      </SummaryRow>
+                      <SummaryRow label="รายได้" onEdit={() => setOpenStep('benefits')}>
+                        {incomeText ?? <span className="text-muted-foreground">ยังไม่ได้ตั้ง</span>}
+                      </SummaryRow>
+                      <SummaryRow label="สวัสดิการ" onEdit={() => setOpenStep('benefits')}>
+                        {benefitLines.length > 0 ? (
+                          <span className="flex flex-col">
+                            {benefitLines.map((b) => (
+                              <span key={b}>{b}</span>
+                            ))}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">ยังไม่ได้เลือก</span>
+                        )}
+                      </SummaryRow>
+                      <SummaryRow label="เพศที่รับ" warn={genderBlocked} onEdit={() => setOpenStep('info')}>
+                        {genderText ?? 'ยังไม่ได้เลือก'}
+                      </SummaryRow>
+                    </dl>
+                  ) : (
+                    <Loading />
+                  )}
+                </StepCard>
+
+                <StepCard title="ลิงก์สมัคร" aside={<span className="text-xs text-muted-foreground">ไม่บังคับ</span>}>
+                  <p className="text-sm text-foreground">
+                    {linkCount === null
+                      ? 'กำลังโหลด…'
+                      : linkCount > 0
+                        ? `มีแล้ว ${NUM.format(linkCount)} ลิงก์`
+                        : 'ยังไม่มีลิงก์'}
+                  </p>
+                  <label htmlFor="posting-want-link" className="flex w-fit cursor-pointer items-center gap-3">
+                    <Checkbox
+                      id="posting-want-link"
+                      checked={wantLink}
+                      onCheckedChange={(v) => setWantLink(v === true)}
+                    />
+                    <span className="text-sm text-foreground">{linkCount ? 'สร้างลิงก์เพิ่ม' : 'สร้างลิงก์'}</span>
+                  </label>
+                  {wantLink && job ? (
+                    <GenApplyLinkDialog
+                      embedded
+                      open
+                      previewFirst
+                      job={job}
+                      onClose={() => setWantLink(false)}
+                      onCreated={() => void loadPostings()}
+                    />
+                  ) : null}
+                  {latestPosting ? (
+                    <Collapsible open={editPostingOpen} onOpenChange={setEditPostingOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button type="button" variant="ghost" size="xs">
+                          แก้ข้อความประกาศ
+                          <ChevronDown className={cn('transition-transform', editPostingOpen && 'rotate-180')} aria-hidden />
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pt-3">
+                        <EditPostingDialog
+                          embedded
+                          posting={latestPosting}
+                          onClose={() => setEditPostingOpen(false)}
+                          onSaved={() => void loadPostings()}
+                        />
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ) : null}
+                </StepCard>
+
+                {!released && skip ? (
+                  <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.danger.soft)}>
+                    <p className={cn('text-sm', TONE.danger.value)}>ใบนี้ตั้งไม่ปล่อยไว้ ยกเลิกที่ขั้น 1 ก่อนถึงจะส่งได้</p>
+                    <Button type="button" size="xs" variant="outline" onClick={() => setOpenStep('info')}>
+                      ไปขั้น 1
+                    </Button>
+                  </div>
+                ) : null}
+                {!released && genderBlocked ? (
+                  <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.warn.soft)}>
+                    <p className={cn('text-sm', TONE.warn.value)}>ใบขอไม่ระบุเพศ เลือกเพศก่อนถึงจะส่งได้</p>
+                    <Button type="button" size="xs" variant="outline" onClick={() => setOpenStep('info')}>
+                      ไปขั้น 1 เลือกเพศ
+                    </Button>
+                  </div>
+                ) : null}
+
+                {released === null ? (
+                  <Loading text="กำลังอ่านทะเบียนการปล่อย…" />
+                ) : released ? (
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <p className={cn('mr-auto text-sm', TONE.success.value)}>ใบนี้อยู่บนหน้าสาธารณะแล้ว</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={releaseBusy || !job}
+                      onClick={() => void toggleRelease(false)}
+                    >
+                      {releaseBusy ? 'กำลังบันทึก…' : 'ดึงประกาศลงจากหน้าสาธารณะ'}
+                    </Button>
+                    <Button type="button" onClick={leaveToBoard}>
+                      ปิด
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {sendError ? <p className="mr-auto text-xs text-destructive">{sendError}</p> : null}
+                    {/* ร่าง = ของที่ทำไว้บันทึกแล้วทุกขั้น ยังไม่ขึ้นหน้าสาธารณะ ⇒ ปิดป๊อปกลับกล่องงาน */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={releaseBusy}
+                      title="เก็บที่ทำไว้ ยังไม่ขึ้นหน้าสาธารณะ"
+                      onClick={leaveToBoard}
+                    >
+                      บันทึกแบบร่าง
+                    </Button>
+                    <Button
+                      type="button"
+                      /* 🔴 ส่งได้เลย ลิงก์ไม่บังคับ (Choice 30 ก.ย. 2569) · ยังต้องผ่านสองด่าน: เลือกเพศแล้ว + ไม่ได้ตั้งไม่ปล่อย */
+                      disabled={releaseBusy || !job || genderBlocked || Boolean(skip)}
+                      onClick={() => void sendPost()}
+                    >
+                      {releaseBusy ? 'กำลังส่ง…' : 'ส่งประกาศ'}
                     </Button>
                   </div>
                 )}
-              </div>
-            </Block>
-          </>
-        ) : null}
+              </>
+            ) : null}
 
-        {/* ── ปุ่มไปขั้นต่อไป — ขั้น 4 ไม่มี เพราะปุ่มลงมือคือ "ปล่อย" ในขั้นนั้นเอง ── */}
-        {nextStep ? (
-          <Button
-            type="button"
-            onClick={() => setOpenStep(nextStep)}
-            className="w-full rounded-xl py-2.5 text-sm"
-          >
-            ถัดไป — ขั้น {RELEASE_STEP_TEXT[nextStep].step} {RELEASE_STEP_TEXT[nextStep].label}
-            <ChevronRight aria-hidden />
-          </Button>
-        ) : null}
+            {/* ── ปุ่มไปขั้นต่อไป — ขั้น 4 ไม่มี เพราะปุ่มลงมือคือ "ส่งประกาศ" ในขั้นนั้นเอง ── */}
+            {nextStep ? (
+              <Button type="button" className="w-full" onClick={() => setOpenStep(nextStep)}>
+                ถัดไป ขั้น {RELEASE_STEP_TEXT[nextStep].step} {RELEASE_STEP_TEXT[nextStep].label}
+                <ChevronRight aria-hidden />
+              </Button>
+            ) : null}
+
+            {/* ── "ไม่ปล่อย + เหตุผล" — ล่างสุดของขั้น 1 (เจ้าของสั่ง 30 ก.ย. 2569: "ไม่ปล่อยใบนี้ ย้ายไปไว้ข้างล่าง")
+                ฟอร์มกางในที่เดิม ไม่ซ้อน Dialog ในป๊อป ── */}
+            {step === 'info' && job ? (
+              <ReleaseSkipControl jobId={job.id} skip={skip} released={released} onChanged={() => void loadSkips()} />
+            ) : null}
           </TabsContent>
         </Tabs>
       </div>
     </div>
   );
 };
-
-/** ข้อเท็จจริงหนึ่งบรรทัดในขั้นตรวจ */
-function Fact({ label, value }: { label: string; value?: string | number | null }) {
-  return (
-    <div>
-      <dt className="text-[10px] text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 break-words text-xs text-foreground">
-        {value === undefined || value === null || value === '' ? EM_DASH : value}
-      </dd>
-    </div>
-  );
-}
 
 /**
  * หน้า deep-link `/jobs/board/:id/posting` — เก็บไว้ให้ลิงก์ที่ใครบันทึกไว้ยังเปิดได้
