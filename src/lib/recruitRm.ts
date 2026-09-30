@@ -38,9 +38,13 @@ import type {
 export const RM_TABS = ['candidates', 'contact', 'appointments'] as const;
 export type RmTab = (typeof RM_TABS)[number];
 
+/**
+ * ชื่อแท็บ — 🔴 ชุดเดียวกับแถบแท็บของกล่องงาน (`BOARD_VIEW_TABS` ใน JobBoardView · มีเทสต์คุมให้ตรงกัน)
+ * เจ้าของเรียงเอง 30 ก.ย. 2569 ตามแบบ iRecruit: *"กล่องงาน > ผู้สมัคร > การติดตาม > ติดตามนัดหมาย > ภาพรวม"*
+ */
 export const RM_TAB_LABEL: Record<RmTab, string> = {
-  candidates: 'ข้อมูลผู้สมัคร',
-  contact: 'การโทรของฉัน',
+  candidates: 'ผู้สมัคร',
+  contact: 'การติดตาม',
   appointments: 'ติดตามนัดหมาย',
 };
 

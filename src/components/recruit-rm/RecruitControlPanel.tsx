@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
@@ -10,11 +9,16 @@ import {
 } from '@/lib/recruitRmOverviewApi';
 
 /**
- * Dashboard "ศูนย์คุมงานสรรหา" — visual control บนหน้ารายชื่อผู้สมัคร
+ * Dashboard "ศูนย์คุมงานสรรหา" — กล่อง 4 ขั้นของคนหนึ่งคน (เข้ามา → โทร → ติดต่อ → เก็บใบสมัคร)
  * (เจ้าของสั่ง 15 ส.ค. 2569: "อยากรู้หมด กันคนเก็บไปเฉย ๆ แต่คนทำงานต้องทำงานง่าย")
  *
+ * 🔴 **30 ก.ย. 2569 ย้ายจากแท็บผู้สมัครมาอยู่บนสุดของแท็บภาพรวม** (เจ้าของ: *"ศูนย์คุมงานสรรหา ย้ายไปหน้า
+ * dashboard · ภาพรวมของ iRecruit ก็คือ dashboard ของฉัน"* → Choice "ย้ายไปก่อน ส่วนอื่นค่อยทำ")
+ * - ถอดบรรทัด "ยอดจากฐานของเรา · กดกล่องเพื่อดูรายชื่อ · กดซ้ำเพื่อล้าง" และการ์ดแถวล่าง 3 ใบ
+ *   (เวลารอโทร · ค้างยังไม่โทร · เก็บไปแล้วยังไม่โทร) — เจ้าของ: *"การ์ดพวกนี้เอาออก ดูยาก แล้วชวนรกมาก"*
  * - ตัวเลขทุกช่องมาจาก /api/recruit-rm-overview (นิยามที่ applicantOverviewSql ที่เดียว)
- * - กดกล่อง = ตั้ง `?bucket=` → ตารางล่างกรองด้วย**เงื่อนไขเดียวกับตัวนับ** (parity)
+ * - กดกล่อง = **พาไปแท็บผู้สมัคร** พร้อม `?bucket=` → ตารางกรองด้วย**เงื่อนไขเดียวกับตัวนับ** (parity) ·
+ *   ล้างได้ที่แถบ "กำลังดูจากกล่อง" บนแท็บผู้สมัคร
  * - แผงเดิม (RecruitFunnelPanel) เป็นทางถอย: endpoint พัง/ยังไม่ deploy → render แทน
  *   พร้อมป้าย "โหมดสำรอง" · บังคับมือได้ด้วย `?panel=classic`
  * - อ่านไม่ได้ = ขีด + ป้ายเหตุผล **ไม่ใช่ 0** (attendance ก่อนรัน 089)
@@ -52,12 +56,10 @@ type StageKey = (typeof STAGES)[number]['key'];
 
 function StatBox({
   box,
-  active,
   onClick,
   total,
 }: {
   box: BoxDef;
-  active: boolean;
   onClick: (bucket: string | null) => void;
   /** ยอด "กรอกมาทั้งหมด" — ใช้วาดแถบสัดส่วน · null/0 = ไม่วาด */
   total: number | null;
@@ -76,12 +78,11 @@ function StatBox({
       type="button"
       disabled={!clickable}
       onClick={() => onClick(box.bucket)}
-      title={box.title || (clickable ? 'กดเพื่อดูรายชื่อในกล่องนี้' : undefined)}
+      title={box.title || (clickable ? 'กดเพื่อดูรายชื่อในแท็บผู้สมัคร' : undefined)}
       className={cn(
         'flex min-w-0 flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-colors',
         tone.soft,
         clickable ? tone.softHover : 'cursor-default',
-        active ? 'ring-2 ring-ring' : '',
       )}
     >
       <span className={cn('w-full truncate text-[11px] font-medium', DASH.muted)}>{box.label}</span>
@@ -117,7 +118,6 @@ export default function RecruitControlPanel() {
   const [data, setData] = useState<RecruitRmOverview | null>(null);
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showIdleUsers, setShowIdleUsers] = useState(false);
 
   const classic = searchParams.get('panel') === 'classic';
 
@@ -162,19 +162,23 @@ export default function RecruitControlPanel() {
     );
   }
 
-  const activeBucket = searchParams.get('bucket');
-  const setBucket = (bucket: string | null) => {
+  /** กดกล่อง = ไปแท็บผู้สมัครที่กรองตามกล่องนั้น (แผงนี้อยู่แท็บภาพรวมแล้ว) */
+  const openBucket = (bucket: string | null) => {
     if (!bucket) return;
-    const params = new URLSearchParams(searchParams);
-    if (params.get('bucket') === bucket) params.delete('bucket');
-    else params.set('bucket', bucket);
     // 🔴 **push ไม่ใช่ replace** (5 ก.ย. 2569) — นี่คือ "คนกดเปลี่ยนมุมมองเอง"
     // ถ้า replace ประวัติจะถูกทับ ⇒ กดย้อนกลับแล้ว **หลุดออกจากหน้านี้ไปเลย**
     // (เจ้าของทดสอบเจอเอง: อยู่กล่องงาน → กดแท็บรายชื่อผู้สมัคร → ย้อนกลับ → เด้งไปหน้าแรก)
+    // ⇒ กดย้อนกลับจากแท็บผู้สมัครแล้วกลับมาภาพรวม
+    const params = new URLSearchParams(searchParams);
+    params.set('view', 'list');
+    params.delete('tab');
+    params.set('bucket', bucket);
     setSearchParams(params);
   };
 
-  const { intake, calling, contact, waiting, stale, meta, recruit } = data;
+  const { intake, calling, contact, meta, recruit } = data;
+  /** ธงที่ยังเกี่ยวกับกล่องที่เหลือ (โทรแล้ว · เก็บใบสมัคร) — ธงของการ์ดที่ถอดไปไม่ต้องโชว์ */
+  const flags = meta.flags.filter((f) => f.metric === 'called' || f.metric === 'recruit');
 
   const row1: BoxDef[] = [
     {
@@ -243,17 +247,10 @@ export default function RecruitControlPanel() {
   /** ตัวหารของแถบสัดส่วนทุกกล่อง — ยอดใบที่กรอกเข้ามาทั้งหมด */
   const intakeTotal = intake.total;
 
-  const agingTotal = stale.agingUncalled.d0_3 + stale.agingUncalled.d4_7 + stale.agingUncalled.over7;
-
   return (
     <div className={cn('space-y-3 rounded-2xl border px-4 py-3', DASH.card)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={cn('font-medium', DASH.title)}>
-          ศูนย์คุมงานสรรหา
-          <span className={cn('ml-2 text-[11px] font-normal', DASH.muted)}>
-            ยอดจากฐานของเรา · กดกล่องเพื่อดูรายชื่อ · กดซ้ำเพื่อล้าง
-          </span>
-        </p>
+        <p className={cn('font-medium', DASH.title)}>ศูนย์คุมงานสรรหา</p>
         {data.scope.departmentLimited ? (
           <span className={cn('text-[10px]', DASH.muted)}>เฉพาะแผนกของคุณ</span>
         ) : null}
@@ -286,13 +283,7 @@ export default function RecruitControlPanel() {
                 )}
               >
                 {boxes.map((b) => (
-                  <StatBox
-                    key={b.label}
-                    box={b}
-                    total={intakeTotal}
-                    active={activeBucket === b.bucket && b.bucket !== null}
-                    onClick={setBucket}
-                  />
+                  <StatBox key={b.label} box={b} total={intakeTotal} onClick={openBucket} />
                 ))}
               </div>
             </div>
@@ -300,129 +291,9 @@ export default function RecruitControlPanel() {
         })}
       </div>
 
-      {/* แถว 2 — เวลา + ความเสี่ยงค้าง (ตัวจี้งาน) */}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <div className={cn('rounded-xl border px-3 py-2', TONE.neutral.soft)}>
-          <p className={cn('text-[11px] font-medium', DASH.muted)}>เวลารอโทร (กรอก → โทรครั้งแรก)</p>
-          {waiting ? (
-            <p className={cn('text-sm font-medium', TONE.primary.value)}>
-              โดยทั่วไป {waiting.medianHours != null ? formatHours(waiting.medianHours) : '—'}
-              <span className={cn('ml-2 text-[10px] font-normal', DASH.muted)}>
-                ช้าสุด 10% เกิน {waiting.p90Hours != null ? formatHours(waiting.p90Hours) : '—'} · จาก{' '}
-                {waiting.sampleSize} ใบ
-              </span>
-            </p>
-          ) : (
-            <p className={cn('text-sm', DASH.muted)}>ยังไม่มีใบที่ถูกโทร</p>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setBucket('over5d')}
-          title="กดเพื่อดูรายชื่อที่ค้างเกิน 5 วัน"
-          className={cn(
-            'rounded-xl border px-3 py-2 text-left',
-            TONE.warn.soft,
-            TONE.warn.softHover,
-            activeBucket === 'over5d' ? 'ring-2 ring-ring' : '',
-          )}
-        >
-          <p className={cn('text-[11px] font-medium', DASH.muted)}>
-            ค้างยังไม่โทร {agingTotal} ใบ (ทั้งหมดทุกช่วง)
-          </p>
-          <p className="flex flex-wrap items-center gap-2 text-[11px] font-medium">
-            <span className={TONE.success.value}>≤3 วัน {stale.agingUncalled.d0_3}</span>
-            <span className={TONE.warn.value}>4-7 วัน {stale.agingUncalled.d4_7}</span>
-            <span className={TONE.danger.value}>&gt;7 วัน {stale.agingUncalled.over7}</span>
-            <span className={cn('ml-auto text-sm font-medium', TONE.danger.num)}>
-              เกิน 5 วัน {stale.over5DaysUncalled}
-            </span>
-          </p>
-        </button>
-
-        <div
-          className={cn(
-            'rounded-xl border px-3 py-2',
-            stale.claimedIdle.total > 0 ? TONE.danger.soft : TONE.neutral.soft,
-          )}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => setBucket('claimed_idle')}
-              title="กดเพื่อดูรายชื่อใบที่ถูกเก็บไปแล้วเงียบ"
-              className={cn('text-left', activeBucket === 'claimed_idle' ? 'underline' : '')}
-            >
-              <p className={cn('text-[11px] font-medium', DASH.muted)}>เก็บไปแล้วยังไม่โทร (เกิน 1 วัน)</p>
-              <p className={cn('text-sm font-medium', stale.claimedIdle.total > 0 ? TONE.danger.num : TONE.success.value)}>
-                {stale.claimedIdle.total} ใบ
-              </p>
-            </button>
-            {stale.claimedIdle.byUser.length > 0 ? (
-              <Button variant="ghost" size="sm"
-                type="button"
-                onClick={() => setShowIdleUsers((v) => !v)}
-                className="shrink-0 text-[11px]"
-              >
-                {showIdleUsers ? 'ซ่อนรายคน' : 'ดูรายคน'}
-              </Button>
-            ) : null}
-          </div>
-          {/* กอง "รอเลือกวิธีโทร" (Phase 5.9) — ต่อท้ายกล่องเดียวกันเพราะเป็นขั้นถัดไปของ
-              เรื่องเดียวกัน (ดองเกิน 1 วัน → ถูกถอด → รอเลือก) · null = ยังไม่รัน 104 = ซ่อน
-              🔴 ห้ามเพิ่มกล่องใบใหม่ (เจ้าของ: "เยอะไปอะดูรก") */}
-          {stale.awaitingCallChoice && stale.awaitingCallChoice.total > 0 ? (
-            <button
-              type="button"
-              onClick={() => setBucket('awaiting_call_choice')}
-              title="กดเพื่อดูรายชื่อที่รอเลือกวิธีโทร — ไม่เลือกใน 1 วัน AI จะรับไปโทรเอง"
-              className={cn(
-                'mt-1 block w-full rounded-lg border px-2 py-1 text-left text-[11px]',
-                TONE.warn.soft,
-                TONE.warn.softHover,
-                activeBucket === 'awaiting_call_choice' ? 'ring-2 ring-ring' : '',
-              )}
-            >
-              <span className={cn('font-medium', TONE.warn.value)}>
-                รอเลือกวิธีโทร {stale.awaitingCallChoice.total} ใบ
-              </span>
-              <span className={cn('ml-1', DASH.muted)}>— ไม่เลือกใน 1 วัน AI รับไปโทรเอง</span>
-            </button>
-          ) : null}
-          {/* เจ้าของเคาะ 15 ส.ค.: โชว์ชื่อคนเก็บบน dashboard ให้ทุกคนเห็น (ยอดรวมต่อคน) */}
-          {showIdleUsers ? (
-            <ul className="mt-1 space-y-0.5 text-[11px]">
-              {stale.claimedIdle.byUser.map((u) => (
-                <li key={u.name ?? '?'} className="flex justify-between gap-2">
-                  <span className="truncate">{u.name ?? 'ไม่ทราบชื่อ'}</span>
-                  <span className={cn('shrink-0 font-medium', TONE.danger.value)}>
-                    {u.count} ใบ · ค้างสุด {daysSince(u.oldestClaimedAt)} วัน
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      </div>
-
-      {meta.flags.length > 0 ? (
-        <p className={cn('text-[10px]', DASH.muted)}>
-          {meta.flags.map((f) => `⚠️ ${f.note}`).join(' · ')}
-        </p>
+      {flags.length > 0 ? (
+        <p className={cn('text-xs', DASH.muted)}>{flags.map((f) => `⚠️ ${f.note}`).join(' · ')}</p>
       ) : null}
     </div>
   );
-}
-
-function formatHours(h: number): string {
-  if (h < 1) return `${Math.round(h * 60)} นาที`;
-  if (h < 48) return `${Math.round(h * 10) / 10} ชม.`;
-  return `${Math.round((h / 24) * 10) / 10} วัน`;
-}
-
-function daysSince(iso: string): number {
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return 0;
-  return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
 }

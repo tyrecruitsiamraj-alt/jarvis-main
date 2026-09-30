@@ -46,6 +46,7 @@ import {
   TrendToolbar,
 } from './TrendParts';
 import LumosPipelineSection from './LumosPipelineSection';
+import RecruitControlPanel from '@/components/recruit-rm/RecruitControlPanel';
 
 /**
  * ═══ แท็บ "Dashboard" ของหน้ากล่องงาน — มุมผู้บริหาร (28 ก.ย. 2569) ═══
@@ -190,6 +191,11 @@ const BoardDashboard: React.FC<{
 
   return (
     <div className="space-y-6">
+      {/* 🔴 ศูนย์คุมงานสรรหา ย้ายมาบนสุดของภาพรวม (เจ้าของ 30 ก.ย. 2569: *"ภาพรวมของ iRecruit ก็คือ dashboard
+          ของฉัน"* → Choice "ย้ายไปก่อน ส่วนอื่นค่อยทำ") · ตัวเลขเป็น "ตอนนี้" ไม่ขึ้นกับช่วงเวลาของแถบข้างล่าง ·
+          กดกล่อง = ไปแท็บผู้สมัครที่กรองตามกล่อง */}
+      <RecruitControlPanel />
+
       <TrendToolbar
         win={win}
         note={

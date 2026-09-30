@@ -31,7 +31,6 @@ import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
  * กล่องผลค้น (+ ตัวเรียก API หลังบ้าน) ต้องไม่ถูกลากเข้า bundle ฝั่ง public
  */
 import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
-import RecruitControlPanel from '@/components/recruit-rm/RecruitControlPanel';
 import PageHeader from '@/components/shared/PageHeader';
 import {
   applicantOriginSummary,
@@ -231,12 +230,14 @@ export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'dashb
  */
 const BOARD_VIEW_TABS: ReadonlyArray<{ id: BoardViewId; label: string }> = [
   { id: 'board', label: 'กล่องงาน' },
-  { id: 'list', label: 'รายชื่อผู้สมัคร' },
-  { id: 'contact', label: 'การโทรของฉัน' },
+  // 🔴 ชื่อ + ลำดับแท็บตามที่เจ้าของเรียงเอง 30 ก.ย. 2569 (แบบ iRecruit): *"กล่องงาน > ผู้สมัคร > การติดตาม >
+  // ติดตามนัดหมาย > ภาพรวม"* · สามแท็บกลางต้องตรงกับ `RM_TAB_LABEL` (lib/recruitRm — เทสต์คุม)
+  { id: 'list', label: 'ผู้สมัคร' },
+  { id: 'contact', label: 'การติดตาม' },
   { id: 'appointments', label: 'ติดตามนัดหมาย' },
-  // 🔴 แท็บ "Dashboard" มุมผู้บริหาร (เจ้าของสั่ง 28 ก.ย. 2569 — Choice "แท็บในสองหน้า" + "ขอคำว่า dashboard")
+  // แท็บภาพรวม = มุมผู้บริหาร (28 ก.ย. 2569 ชื่อ "Dashboard" → เจ้าของเปลี่ยนเป็น "ภาพรวม" 30 ก.ย.) · `?view=dashboard` คงเดิม
   // เนื้อมาจาก StaffJobBoardPage (lazy · ห้าม import ในไฟล์นี้ — หน้าสมัครสาธารณะใช้ไฟล์นี้ร่วม)
-  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'dashboard', label: 'ภาพรวม' },
   // 🔴 แท็บ "คำขอโพสต์งานใหม่" ถูกถอดทั้งแท็บ 27 ก.ย. 2569 (เจ้าของสั่ง — ทีม Online
   // ดูทีละกล่องแล้วเอาขึ้นเลย ไม่ต้องมีคิวคำขอ) · ลิงก์เก่า ?view=postings เปิดกล่องงานแทน
   // ⚠️ **ไม่มี "ปิดแล้ว"/"ยกเลิก" บนแท็บแล้ว** (เจ้าของสั่ง 19 ส.ค. 2569:
@@ -1271,16 +1272,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         ) : null}
 
-        {/* ภาพรวมงานสรรหา — เฉพาะแท็บรายชื่อผู้สมัคร · อยู่ **ใต้** tab bar (เจ้าของสั่ง
-            14 ส.ค. 2569) เพื่อให้ tab bar อยู่ position เดียวกับหน้ากล่องงาน
-            "ภาพรวมงานสรรหา อยู่แค่หน้ารายชื่อผู้สมัครก็พอ" (13 ส.ค.) — คงเงื่อนไข view==='list' */}
-        {isStaff && view === 'list' ? (
-          <div className="mt-4">
-            {/* Dashboard ศูนย์คุมงานสรรหา (S6 · 15 ส.ค. 2569) — แทนแผงภาพรวมเดิม
-                แผงเดิมยังเป็นทางถอยข้างใน (?panel=classic หรือ endpoint พัง) */}
-            <RecruitControlPanel />
-          </div>
-        ) : null}
+        {/* 🔴 ศูนย์คุมงานสรรหา **ย้ายไปแท็บภาพรวมแล้ว** (30 ก.ย. 2569 · `BoardDashboard`) — แท็บผู้สมัครเหลือแค่
+            รายชื่อแบบ iRecruit · ไม่ import ในไฟล์นี้อีก (ไฟล์นี้ใช้ร่วมหน้าสมัครสาธารณะ ของภายในไม่ควรติดไป) */}
 
         {/* มุมมองฝั่ง RM (รายชื่อผู้สมัคร/การติดต่อ/ติดตามนัดหมาย) — แทนที่ก้อน
             กล่องลอย+ตัวกรอง+การ์ดทั้งหมด · hero + แผงภาพรวมข้างบนคงอยู่ทุกมุมมอง */}
