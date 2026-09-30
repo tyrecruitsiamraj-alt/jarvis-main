@@ -39,6 +39,7 @@ import {
   isFollowOutcome,
   requiresNote,
 } from '../../src/lib/followOutcome.js';
+import { validateFollowStaffCall } from '../../src/lib/followStaffCall.js';
 
 const followTable = tableInAppSchema('follow_entries');
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
@@ -85,6 +86,14 @@ type FollowRow = {
   outcome_code: string | null;
   outcome_note: string | null;
   completed_by_name: string | null;
+  /**
+   * ผลที่เจ้าหน้าที่ลงเองของรอบคนโทร (migration 130 · 30 ก.ย. 2569)
+   * `undefined` = ฐานยังไม่รัน 130 (`select *` ไม่มีคีย์นี้) · `null` = ยังไม่ได้ลงผล
+   */
+  staff_call_outcome?: string | null;
+  staff_call_note?: string | null;
+  staff_called_at?: string | Date | null;
+  staff_called_by_name?: string | null;
   created_at: string | Date;
   /**
    * ผลตอนพยายามส่งเข้าคิว AI ตอนสร้าง (migration 109)
@@ -154,6 +163,14 @@ function toResponse(r: FollowRow) {
     outcome_code: r.outcome_code ?? null,
     outcome_note: r.outcome_note ?? null,
     completed_by_name: r.completed_by_name ?? null,
+    /**
+     * ผลที่เจ้าหน้าที่ลงเองของรอบคนโทร (130) — **คนละช่องกับ `call_outcome`** (ผลจาก AI)
+     * ฝั่งจอรวมสองแหล่งด้วย `effectiveCallOutcome()` ที่เดียว · ฐานยังไม่รัน 130 = null
+     */
+    staff_call_outcome: r.staff_call_outcome ?? null,
+    staff_call_note: r.staff_call_note ?? null,
+    staff_called_at: iso(r.staff_called_at ?? null),
+    staff_called_by_name: r.staff_called_by_name ?? null,
     /** สถานะจากคิว Lumos: pending=รอโทร, delivered=Lumos รับไปแล้ว, completed/failed/cancelled */
     /**
      * 🔴 **ห้ามเดา `'pending'` เมื่อไม่มีแถวในคิว** (แก้ 25 ส.ค. 2569)
@@ -923,6 +940,100 @@ async function reopenFollow(req: AuthedReq, res: ApiRes) {
   return res.status(200).json(toResponse(done));
 }
 
+/** ฐานยังไม่รัน migration 130 — บอกตรง ๆ แทนจะปล่อย error ดิบของ Postgres */
+const STAFF_CALL_NOT_READY =
+  'ยังลงผลโทรไม่ได้ ต้องรออัปเดตระบบก่อน';
+
+/** `select *` ไม่มีคีย์นี้ = ฐานยังไม่รัน 130 (อ่านจากแถวจริง ไม่ต้องเดาจาก error) */
+const hasStaffCallColumns = (r: FollowRow) => Object.prototype.hasOwnProperty.call(r, 'staff_called_at');
+
+/**
+ * **ลงผลโทรของรอบคนโทร** (130 · เจ้าของเคาะ 30 ก.ย. 2569) — PATCH /api/follow?id=<uuid>
+ * body `{ action: 'staff_call', outcome, note? }` · ลงซ้ำ = แก้ผลเดิม (เวลา/คนลงเปลี่ยนตาม)
+ *
+ * 🔴 **เฉพาะรอบที่ตั้งเป็นคนโทร** — รอบของ AI มีผลจาก Lumos อยู่แล้ว ลงซ้อนไม่ได้
+ * (หน้าหลักนับ "คนโทร" จากช่องนี้ · ปล่อยให้ลงทับรอบ AI = นับสายเดียวสองฝั่ง)
+ * ⚠️ ไม่แตะคิวโทร ไม่แตะการปิดงาน — เป็นบันทึกของสายนั้นอย่างเดียว
+ */
+async function recordStaffCall(req: AuthedReq, res: ApiRes, body: Record<string, unknown>) {
+  const id = typeof req.query?.id === 'string' ? req.query.id.trim() : '';
+  if (!UUID_RE.test(id)) return sendError(res, 400, 'Bad request', 'ต้องระบุ id ของรายการติดตาม');
+  const v = validateFollowStaffCall({ outcome: body.outcome, note: body.note });
+  if (v.ok === false) return sendError(res, 400, 'Bad request', v.error);
+
+  const { rows: beforeRows } = await dbQuery<FollowRow>(
+    `select * from ${followTable} where id = $1 limit 1`,
+    [id],
+  );
+  const before = beforeRows[0];
+  if (!before) return sendError(res, 404, 'Not found', 'ไม่พบรายการ');
+  if (!hasStaffCallColumns(before)) return sendError(res, 503, 'Service unavailable', STAFF_CALL_NOT_READY);
+  if (before.cancelled_at) return sendError(res, 400, 'Bad request', 'รายการนี้ยกเลิกไปแล้ว ลงผลไม่ได้');
+  if (before.call_mode !== 'manual') {
+    return sendError(res, 400, 'Bad request', 'รอบนี้ให้ AI โทร ลงผลเองได้เฉพาะรอบที่ตั้งให้คนโทร');
+  }
+
+  const { rows } = await dbQuery<FollowRow>(
+    `update ${followTable}
+        set staff_call_outcome = $2, staff_call_note = $3, staff_called_at = now(),
+            staff_called_by = $4, staff_called_by_name = $5
+      where id = $1 and cancelled_at is null and call_mode = 'manual'
+      returning *`,
+    [id, v.value.outcome, v.value.note, req.user.sub, req.user.email ?? null],
+  );
+  const done = rows[0];
+  if (!done) return sendError(res, 404, 'Not found', 'ไม่พบรายการนี้ หรือยกเลิกไปแล้ว');
+
+  await auditFromAuthed(req, {
+    action: 'follow.staff_call',
+    entityType: 'follow_entry',
+    entityId: id,
+    before: { staff_call_outcome: before.staff_call_outcome ?? null, staff_call_note: before.staff_call_note ?? null },
+    after: { staff_call_outcome: v.value.outcome, staff_call_note: v.value.note },
+  });
+
+  return res.status(200).json(toResponse(done));
+}
+
+/**
+ * **ล้างผลโทรของคนโทร** — กดผิดแล้วย้อนได้ (บทเรียนเดียวกับย้อนสถานะปิดงาน 2 ก.ย. 2569)
+ * PATCH body `{ action: 'staff_call_clear' }` · ประวัติอยู่ใน audit `follow.staff_call*`
+ */
+async function clearStaffCall(req: AuthedReq, res: ApiRes) {
+  const id = typeof req.query?.id === 'string' ? req.query.id.trim() : '';
+  if (!UUID_RE.test(id)) return sendError(res, 400, 'Bad request', 'ต้องระบุ id ของรายการติดตาม');
+
+  const { rows: beforeRows } = await dbQuery<FollowRow>(
+    `select * from ${followTable} where id = $1 limit 1`,
+    [id],
+  );
+  const before = beforeRows[0];
+  if (!before) return sendError(res, 404, 'Not found', 'ไม่พบรายการ');
+  if (!hasStaffCallColumns(before)) return sendError(res, 503, 'Service unavailable', STAFF_CALL_NOT_READY);
+  if (!before.staff_called_at) return sendError(res, 400, 'Bad request', 'สายนี้ยังไม่ได้ลงผล');
+
+  const { rows } = await dbQuery<FollowRow>(
+    `update ${followTable}
+        set staff_call_outcome = null, staff_call_note = null, staff_called_at = null,
+            staff_called_by = null, staff_called_by_name = null
+      where id = $1
+      returning *`,
+    [id],
+  );
+  const done = rows[0];
+  if (!done) return sendError(res, 404, 'Not found', 'ล้างผลไม่ได้ ลองอีกครั้ง');
+
+  await auditFromAuthed(req, {
+    action: 'follow.staff_call_clear',
+    entityType: 'follow_entry',
+    entityId: id,
+    before: { staff_call_outcome: before.staff_call_outcome ?? null, staff_call_note: before.staff_call_note ?? null },
+    after: { staff_call_outcome: null },
+  });
+
+  return res.status(200).json(toResponse(done));
+}
+
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   try {
@@ -930,11 +1041,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (method === 'POST') return await createFollow(req, res);
     if (method === 'PATCH') {
       // action='update' = แก้ไข · action='reopen' = ย้อนสถานะปิดงาน
+      // action='staff_call' / 'staff_call_clear' = ลง/ล้างผลโทรของรอบคนโทร (130)
       // ไม่ใส่ = ปิดงาน (พฤติกรรมเดิม ห้ามเปลี่ยน)
       const body = ((await readJsonBody(req)) ?? {}) as Record<string, unknown>;
       const action = getString(body.action);
       if (action === 'update') return await updateFollow(req, res, body);
       if (action === 'reopen') return await reopenFollow(req, res);
+      if (action === 'staff_call') return await recordStaffCall(req, res, body);
+      if (action === 'staff_call_clear') return await clearStaffCall(req, res);
       return await completeFollow(req, res, body);
     }
     if (method === 'DELETE') {

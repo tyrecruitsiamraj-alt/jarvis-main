@@ -2,6 +2,7 @@ import { apiFetch } from '@/lib/apiFetch';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import type { LumosNextAction } from '@/lib/lumosDispatchApi';
 import type { FollowOutcome } from '@/lib/followOutcome';
+import type { FollowStaffCallOutcome } from '@/lib/followStaffCall';
 
 export type FollowCallStatus = 'pending' | 'delivered' | 'completed' | 'failed' | 'cancelled';
 
@@ -59,6 +60,14 @@ export type FollowEntry = {
   outcome_code?: string | null;
   outcome_note?: string | null;
   completed_by_name?: string | null;
+  /**
+   * **ผลที่เจ้าหน้าที่ลงเอง** ของรอบคนโทร (130 · 30 ก.ย. 2569) — คนละช่องกับ `call_outcome` (ผลจาก AI)
+   * สภาพ/สีของรอบรวมสองแหล่งด้วย `effectiveCallOutcome()` (`src/lib/followStaffCall.ts`) ที่เดียว
+   */
+  staff_call_outcome?: string | null;
+  staff_call_note?: string | null;
+  staff_called_at?: string | null;
+  staff_called_by_name?: string | null;
   /**
    * สถานะในคิว AI — 🔴 **`null` ได้** เมื่อรายการนี้ไม่เคยเข้าคิวเลย
    * (SQL เป็น LEFT JOIN) · เดิมประกาศเป็น non-null ⇒ จอวาดป้ายว่างเปล่า
@@ -319,6 +328,33 @@ export async function reopenFollowEntry(id: string): Promise<FollowEntry> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ action: 'reopen' }),
+  });
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as FollowEntry;
+}
+
+/**
+ * **ลงผลโทรของรอบคนโทร** (130 · เจ้าของเคาะ 30 ก.ย. 2569) — ลงซ้ำ = แก้ผลเดิม
+ * ⚠️ เฉพาะรอบที่ตั้งเป็นคนโทร (server ปฏิเสธรอบของ AI) · ไม่แตะคิวโทร ไม่แตะการปิดงาน
+ */
+export async function recordFollowStaffCall(
+  id: string,
+  outcome: FollowStaffCallOutcome,
+  note?: string,
+): Promise<FollowEntry> {
+  const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'staff_call', outcome, note: note?.trim() || undefined }),
+  });
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as FollowEntry;
+}
+
+/** ล้างผลโทรของคนโทร — กดผิดแล้วย้อนได้ */
+export async function clearFollowStaffCall(id: string): Promise<FollowEntry> {
+  const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'staff_call_clear' }),
   });
   if (!r.ok) throw new Error(await readError(r));
   return (await r.json()) as FollowEntry;

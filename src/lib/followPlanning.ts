@@ -3,6 +3,7 @@ import type { FollowGroup } from '@/lib/followGrouping';
 import { CALL_OUTCOME_TONE, followCallOutcomeText } from '@/lib/callOutcomeTone';
 import { followDispatchLabel } from '@/lib/followDispatchState';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
+import { effectiveCallOutcome } from '@/lib/followStaffCall';
 import type { ToneKey } from '@/lib/designTokens';
 import {
   FOLLOW_OUTCOME_LABEL,
@@ -73,7 +74,11 @@ const ms = (iso: string | null | undefined): number | null => {
 export function followRoundState(entry: FollowEntry, now: Date = new Date()): FollowRoundState {
   if (entry.cancelled) return 'cancelled';
   if (entry.completed_at) return 'closed';
-  if (entry.call_outcome) return 'result';
+  /**
+   * ผลจาก AI **หรือ** ผลที่คนลงเองของรอบคนโทร (130 · 30 ก.ย. 2569) — ลงผลแล้วช่องต้องเปลี่ยนทันที
+   * ไม่งั้นรอบคนโทรที่โทรจบแล้วยังขึ้นสีส้ม "ไม่ได้ส่ง — ต้องคนจัดการ" ตลอดไป
+   */
+  if (effectiveCallOutcome(entry)) return 'result';
   /**
    * 🔴 ไม่เคยเข้าคิวเลย = **ไม่ได้ส่ง** ไม่ใช่ "เลยเวลา/รอโทร"
    * (`call_status` เป็น null เมื่อไม่มีแถวในคิว — เหตุผลอยู่ที่ `dispatch_state`)
@@ -266,8 +271,10 @@ export function roundResultLabel(round: FollowPlanningRound): string {
       return e.outcome_code
         ? (FOLLOW_OUTCOME_LABEL[e.outcome_code as FollowOutcomeAny] ?? e.outcome_code)
         : 'ปิดงาน';
-    case 'result':
-      return e.call_outcome ? followCallOutcomeText(e.call_outcome) : 'มีผลแล้ว';
+    case 'result': {
+      const code = effectiveCallOutcome(e);
+      return code ? followCallOutcomeText(code) : 'มีผลแล้ว';
+    }
     case 'notSent':
       // 🔴 ไม่มีสายไหนกำลังจะเกิด — บอกให้รู้ตัว ไม่ใช่ปล่อยให้นั่งรอผลที่ไม่มีวันมา
       return 'ไม่ได้ส่ง';
@@ -304,7 +311,7 @@ export function roundTone(round: FollowPlanningRound): ToneKey {
       if (isLostOutcome(e.outcome_code)) return 'danger';
       return 'warn'; // ลา/เลื่อน — ยังไม่จบจริง
     case 'result':
-      return CALL_OUTCOME_TONE[(e.call_outcome ?? '') as keyof typeof CALL_OUTCOME_TONE] ?? 'warn';
+      return CALL_OUTCOME_TONE[(effectiveCallOutcome(e) ?? '') as keyof typeof CALL_OUTCOME_TONE] ?? 'warn';
     case 'notSent':
       return 'orange';
     case 'overdue':
@@ -543,7 +550,7 @@ export function callCategory(round: FollowPlanningRound): FollowCallCategory {
       if (isLostOutcome(e.outcome_code)) return 'lost';
       return 'other';
     case 'result': {
-      const tone = CALL_OUTCOME_TONE[(e.call_outcome ?? '') as keyof typeof CALL_OUTCOME_TONE];
+      const tone = CALL_OUTCOME_TONE[(effectiveCallOutcome(e) ?? '') as keyof typeof CALL_OUTCOME_TONE];
       if (tone === 'success') return 'agreed';
       if (tone === 'danger') return 'lost';
       if (tone === 'neutral') return 'cancelled';

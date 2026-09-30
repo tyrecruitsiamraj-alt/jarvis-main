@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/dialog';
 import FollowDispatchBadge from '@/components/follow/FollowDispatchBadge';
 import FollowCompleteControls from '@/components/follow/FollowCompleteControls';
+import FollowStaffCallControls from '@/components/follow/FollowStaffCallControls';
+import { canRecordStaffCall, type FollowStaffCallOutcome } from '@/lib/followStaffCall';
 import { FOLLOW_OUTCOME_LABEL, type FollowOutcome, type FollowOutcomeAny } from '@/lib/followOutcome';
 import { followCallOutcomeText } from '@/lib/callOutcomeTone';
 import type { FollowEntry } from '@/lib/followApi';
@@ -54,6 +56,9 @@ const FollowRoundsDialog: React.FC<{
    */
   onReopen: (id: string) => void | Promise<void>;
   onComplete: (id: string, outcome: FollowOutcome, note?: string) => void | Promise<void>;
+  /** ลง/ล้างผลโทรของรอบคนโทร (130 · 30 ก.ย. 2569) — โชว์เฉพาะรอบที่ตั้งเป็นคนโทร */
+  onStaffCall: (id: string, outcome: FollowStaffCallOutcome, note?: string) => void | Promise<void>;
+  onStaffCallClear: (id: string) => void | Promise<void>;
   /**
    * ลบทิ้งจริง — โชว์เฉพาะ admin (เจ้าของสั่ง 3 ก.ย. 2569: *"ทำให้ฉันลบได้หน่อย
    * เฉพาะฉันนะ เพราะตอนนี้ทดสอบอยู่"*) · `null` = ไม่มีสิทธิ์ ไม่ต้องขึ้นปุ่ม
@@ -75,6 +80,8 @@ const FollowRoundsDialog: React.FC<{
   onEdit,
   onComplete,
   onReopen,
+  onStaffCall,
+  onStaffCallClear,
   onPurge,
   purgingId,
   onAskPurge,
@@ -171,6 +178,20 @@ const FollowRoundsDialog: React.FC<{
                     ผลการโทร{it.call_outcome ? ` — ${followCallOutcomeText(it.call_outcome)}` : ''}
                     {it.call_summary ? `: ${it.call_summary}` : ''}
                   </p>
+                ) : null}
+
+                {/* 🔴 รอบคนโทร: ที่ลงผลของสายนี้ (130 · เจ้าของเคาะ 30 ก.ย. 2569) — หน้าหลักนับ "คนโทร" จากตรงนี้
+                    แยกจากปุ่มปิดงานโดยตั้งใจ: ปิดงาน = ทั้งเรื่องจบ · ผลโทร = สายนี้โทรแล้วได้อะไร */}
+                {canRecordStaffCall(it) ? (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground">ผลโทรของสายนี้</p>
+                    <FollowStaffCallControls
+                      entry={it}
+                      busy={busy}
+                      onRecord={(o, n) => onStaffCall(it.id, o, n)}
+                      onClear={() => onStaffCallClear(it.id)}
+                    />
+                  </div>
                 ) : null}
 
                 {/* 🔴 **ปุ่มต้องอ่านออกว่าเป็นปุ่ม ไม่ใช่ป้ายสถานะ** (เจ้าของทัก 1 ก.ย. 2569:

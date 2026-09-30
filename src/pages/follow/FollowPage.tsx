@@ -43,9 +43,12 @@ import {
   purgeFollowEntry,
   completeFollowEntry,
   reopenFollowEntry,
+  recordFollowStaffCall,
+  clearFollowStaffCall,
   type FollowEntry,
   updateFollowEntry,
 } from '@/lib/followApi';
+import type { FollowStaffCallOutcome } from '@/lib/followStaffCall';
 import { summarizeDispatchResults } from '@/lib/followDispatchState';
 import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
 import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
@@ -934,6 +937,36 @@ const FollowPage: React.FC = () => {
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ย้อนสถานะไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /**
+   * ลง/ล้างผลโทรของรอบคนโทร (130 · เจ้าของเคาะ 30 ก.ย. 2569) — โหลดใหม่ให้ช่องปฏิทินเปลี่ยนสีทันที
+   * ⚠️ ไม่แตะคิวโทร ไม่แตะการปิดงาน
+   */
+  const doStaffCall = async (id: string, outcome: FollowStaffCallOutcome, note?: string) => {
+    setBusyId(id);
+    setError(null);
+    try {
+      await recordFollowStaffCall(id, outcome, note);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ลงผลโทรไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const doStaffCallClear = async (id: string) => {
+    setBusyId(id);
+    setError(null);
+    try {
+      await clearFollowStaffCall(id);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ล้างผลโทรไม่สำเร็จ');
     } finally {
       setBusyId(null);
     }
@@ -2050,6 +2083,8 @@ const FollowPage: React.FC = () => {
         }}
         onComplete={doComplete}
         onReopen={(id) => void doReopen(id)}
+        onStaffCall={doStaffCall}
+        onStaffCallClear={doStaffCallClear}
         onPurge={canPurge ? (id) => void doPurge(id) : null}
         purgingId={purgingId}
         onAskPurge={setPurgingId}

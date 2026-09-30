@@ -1,5 +1,6 @@
 import { bucketOfCall, callAttemptSlot } from '@/lib/callOutcomeBuckets';
 import { isFollowOutcome, isLostOutcome, isSuccessOutcome } from '@/lib/followOutcome';
+import { effectiveCallOutcome } from '@/lib/followStaffCall';
 
 /**
  * ช่องของแต่ละรอบโทรบนหน้า Follow (เจ้าของสั่ง 18 ส.ค. 2569)
@@ -75,6 +76,8 @@ export const FOLLOW_ROUND_BUCKET_HINT: Record<FollowRoundBucket, string> = {
 export type FollowRoundRow = {
   call_status?: string | null;
   call_outcome?: string | null;
+  /** ผลที่คนลงเองของรอบคนโทร (130) — สายที่คนโทรจบแล้วต้องออกจาก "รอโทร" เหมือนสายของ AI */
+  staff_call_outcome?: string | null;
   cancelled?: boolean;
   /** ผลปิดงานติดตาม (095) */
   outcome_code?: string | null;
@@ -97,7 +100,7 @@ export function inFollowRoundBucket(row: FollowRoundRow, bucket: FollowRoundBuck
     return isSuccessOutcome(code);
   }
 
-  const call = bucketOfCall(row.cancelled ? 'cancelled' : row.call_status, row.call_outcome);
+  const call = bucketOfCall(row.cancelled ? 'cancelled' : row.call_status, effectiveCallOutcome(row));
   if (bucket === 'connected') return call === 'connected';
   if (bucket === 'unreached') return call === 'unreached';
 
