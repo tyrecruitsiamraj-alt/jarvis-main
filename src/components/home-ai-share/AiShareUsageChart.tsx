@@ -16,7 +16,8 @@
  *   เหมือนแจกไพ่ · จังหวะอยู่ `useFlipSwap` · เลขอยู่ในรูปทรงของแท่งเอง (ไม่ใช่ LabelList) ⇒ พลิกไปพร้อมแท่ง
  * - วันที่มากสุดเข้ม วันอื่นจางลงนิด (80%) · มากสุด + เฉลี่ย (ปัดเป็นจำนวนเต็ม · รอบ 7) บอกบนหัวกราฟ
  *   (เส้นประเฉลี่ยของรอบ 4 ถอดแล้ว — เจ้าของถามว่าเส้นปะคืออะไร แล้วสั่ง *"เอาออก"*)
- * - กดตรงไหนของคอลัมน์ก็ได้ ⇒ `onPick(index)` ให้หน้าเปิดแผงเลื่อนข้าง · แท่งว่างกดแล้วไม่มีอะไรเกิดขึ้น
+ * - กดตรงไหนของคอลัมน์ก็ได้ ⇒ `onPick(index)` ให้หน้าลงไปดูข้างในแท่งนั้น (รอบ 18) · แท่งว่างกดแล้วไม่มีอะไรเกิดขึ้น ·
+ *   ไม่ส่ง `onPick` (แท่งรายวัน — แผงเลื่อนข้างถอดแล้ว 30 ก.ย.) = กราฟกดไม่ได้ ไม่ขึ้นมือชี้
  * 🔴 สีแท่ง = `currentColor` + คลาส `TONE[...].value` (มีคู่ `dark:`) · จุดหน้าป้ายใช้สีเดียวกับแท่ง · ไม่มี hex ใหม่
  */
 import React, { useMemo } from 'react';
@@ -138,7 +139,8 @@ const AiShareUsageChart: React.FC<{
   unit: string;
   today: string;
   ariaLabel: string;
-  onPick: (index: number) => void;
+  /** กดแท่งแล้วลงไปดูข้างใน · ไม่ส่ง = กดไม่ได้ */
+  onPick?: (index: number) => void;
   /** บรรทัดท้ายตอนจี้แท่ง — บอกว่ากดแล้วได้อะไร (รายวัน = แยก BU · หน่วยใหญ่ = ลงไปดูข้างใน) */
   pickHint?: string | null;
   /** ตอนจี้ซ่อนชั้นที่เป็น 0 ของวันนั้น (โหมด BU — BU ที่วันนั้นไม่มีงานไม่ต้องขึ้น) */
@@ -261,7 +263,7 @@ const AiShareUsageChart: React.FC<{
           ) : null}
         </div>
       </div>
-      <div className="w-full cursor-pointer text-muted-foreground" style={{ height }} role="img" aria-label={ariaLabel}>
+      <div className={cn('w-full text-muted-foreground', onPick && 'cursor-pointer')} style={{ height }} role="img" aria-label={ariaLabel}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
@@ -270,7 +272,7 @@ const AiShareUsageChart: React.FC<{
             maxBarSize={MAX_BAR}
             onClick={(state) => {
               const i = state?.activeTooltipIndex;
-              if (typeof i === 'number' && (totals[i] ?? 0) > 0) onPick(i);
+              if (onPick && typeof i === 'number' && (totals[i] ?? 0) > 0) onPick(i);
             }}
           >
             <CartesianGrid vertical={false} stroke={CHART.gridStroke} strokeOpacity={CHART.gridOpacity} />

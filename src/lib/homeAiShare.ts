@@ -357,14 +357,13 @@ export type AiShareListResponse = {
 };
 
 /*
- * ─────────────── กราฟยอดใช้งาน + แผงเลื่อน "มาจาก BU ไหน" (รอบ 3 → รอบ 5 · 30 ก.ย. 2569) ───────────────
- * รอบ 5 เจ้าของ: *"กราฟโชว์ว่ายอดใช้งานของแต่ละวัน แต่ละเดือนเท่าไหร่ · กดดูกราฟไหนก็โชว์แบบ Slide มาทางขวาว่า
- * ยอดใช้งาน 800 เกิดจาก BU ไหนบ้าง แล้วแต่ละ BU ใช้คนหรือ AI อย่างละเท่าไหร่"*
- * ⇒ แท่งซ้อน 4 ก้อน (`detailSegments`) · กดแท่ง = แถวของช่วงนั้น (`rowsInRange`) → ต่อ BU (`detailBreakdown`)
- * ทุกตัวอ่านแถววัน×BU ชุดเดียวกัน ⇒ รวมทุก BU = ยอดของแท่ง · รวมทุกแท่ง = ยอดของการ์ดเสมอ
+ * ─────────────── กราฟยอดใช้งาน (รอบ 3 → รอบ 18 · 30 ก.ย. 2569) ───────────────
+ * รอบ 5 เจ้าของ: *"กราฟโชว์ว่ายอดใช้งานของแต่ละวัน แต่ละเดือนเท่าไหร่"* ⇒ แท่งซ้อน 4 ก้อน (`detailSegments`) หรือแยก BU
+ * (`detailBuSeries`) · ทุกตัวอ่านแถววัน×BU ชุดเดียวกัน ⇒ รวมทุก BU = ยอดของแท่ง · รวมทุกแท่ง = ยอดของการ์ดเสมอ
+ * ⚠️ แผงเลื่อน "มาจาก BU ไหน" ตอนกดแท่ง (รอบ 5–16) ถอดแล้ว 30 ก.ย. 2569 ตามที่เจ้าของสั่ง — ตัวคิดของแผงถอดตามไปด้วย
  */
 
-/** BU ทั้งหมดของบริษัท (ชุดแผนก) — ตารางโชว์ครบทุก BU รวมที่เป็น 0 (ทีมที่ยังไม่ใช้ต้องเห็น ห้ามหายเงียบ) */
+/** BU ทั้งหมดของบริษัท (ชุดแผนก) — ป้ายสีโหมดแยก BU ขึ้นครบทุก BU รวมที่เป็น 0 (ทีมที่ยังไม่ใช้ต้องเห็น ห้ามหายเงียบ) */
 export const AI_SHARE_BUS: readonly string[] = [...new Set(Object.values(SITE_BU_TO_DEPT))];
 
 /** แถวที่ไม่รู้ BU — ห้ามยัดเข้า BU ไหน */
@@ -458,14 +457,14 @@ export function detailBuckets(
 
 /**
  * กดแท่งของหน่วยใหญ่ = ลงไปดูข้างใน (รอบ 18 · เจ้าของ: *"ถ้ากดเข้าไปก็แสดงเป็นกราฟแท่งวันของเดือนนั้น"*)
- * สัปดาห์/เดือน → รายวันของหน่วยนั้น · ปี → รายเดือนของปีนั้น · แท่งรายวัน = ไม่มีข้างใน (`null` · หน้าเปิดแผงเลื่อนแทน)
+ * สัปดาห์/เดือน → รายวันของหน่วยนั้น · ปี → รายเดือนของปีนั้น · แท่งรายวัน = ไม่มีข้างใน (`null` · กดไม่ได้)
  */
 export function drillWindow(b: AiShareBucket, grain: AiShareGrain): AiShareWindow | null {
   if (grain === 'day') return null;
   return { from: b.from, to: b.to, unit: grain === 'year' ? 'month' : 'day' };
 }
 
-/** แถวของช่วงย่อยเดียว (หรือทั้งช่วง) — ฐานของแผงเลื่อน "มาจาก BU ไหน" */
+/** แถวของช่วงย่อยเดียว (หรือทั้งช่วง) — ชั้นที่กดลงไปดูของกราฟ */
 export function rowsInRange(rows: ReadonlyArray<AiShareDetailRow>, from: string, to: string): AiShareDetailRow[] {
   return rows.filter((r) => r.day >= from && r.day <= to);
 }
@@ -491,7 +490,7 @@ export function segmentTotals(segments: Record<AiShareSegment, readonly number[]
 }
 
 /**
- * ชื่อช่วงย่อยแบบคนอ่าน — รายวัน "ศ. 25 ก.ย." (`long` = "วันศุกร์ 25 ก.ย." หัวแผงเลื่อน) · รายเดือน "กันยายน 2569"
+ * ชื่อช่วงย่อยแบบคนอ่าน — รายวัน "ศ. 25 ก.ย." (`long` = "วันศุกร์ 25 ก.ย.") · รายเดือน "กันยายน 2569"
  * เดือนแรก/สุดท้ายที่ถูกตัดขอบ = บอกช่วงวันจริง ไม่ให้อ่านว่าได้ทั้งเดือน
  * รอบ 18: รายสัปดาห์ = ช่วงวันจริง "14–20 ก.ย. 2569" (`long` นำหน้า "สัปดาห์") · รายปี "ปี 2569" (ตัดขอบ = ช่วงวันจริง)
  */
@@ -525,34 +524,6 @@ function buOrder(withWork: ReadonlySet<string>, base: readonly string[] = AI_SHA
 
 const buLabelOf = (bu: string) => (bu === UNKNOWN_BU ? UNKNOWN_BU : trendBuLabel(bu));
 
-export type AiShareBuRow = AiShareCounts & { bu: string; label: string };
-
-/** ตารางต่อ BU — ครบทุก BU (0 ก็ขึ้น) + รหัสอื่น/ไม่รู้ BU เมื่อมีจริง · แถวรวมเท่ากับยอดของการ์ดเสมอ */
-export function detailTable(rows: ReadonlyArray<AiShareDetailRow>): { rows: AiShareBuRow[]; total: AiShareCounts } {
-  const zero = (): AiShareCounts => ({ total: 0, ai: 0, staff: 0, both: 0, notCalled: 0 });
-  const add = (a: AiShareCounts, r: AiShareCounts) => {
-    a.total += r.total;
-    a.ai += r.ai;
-    a.staff += r.staff;
-    a.both += r.both;
-    a.notCalled += r.notCalled;
-  };
-  const by = new Map<string, AiShareCounts>();
-  const total = zero();
-  for (const r of rows) {
-    const k = buKey(r.bu);
-    const cur = by.get(k) ?? zero();
-    add(cur, r);
-    by.set(k, cur);
-    add(total, r);
-  }
-  const withWork = new Set([...by].filter(([, c]) => c.total > 0).map(([bu]) => bu));
-  return {
-    rows: buOrder(withWork).map((bu) => ({ bu, label: buLabelOf(bu), ...(by.get(bu) ?? zero()) })),
-    total,
-  };
-}
-
 /**
  * แท่งซ้อนตาม BU (สวิตช์ "แยก BU" ของกราฟ · รอบ 7 · เจ้าของ: *"กด Switch เป็น BU ละเท่าไหร่"*)
  * รอบ 17 เจ้าของ: *"การ์ดแท่งฝั่ง BU ทำสีของทุก BU อธิบายรอไว้เลย"* ⇒ **ครบทุก BU ของ `base` เสมอ** (ไม่มีงานก็อยู่
@@ -575,33 +546,6 @@ export function detailBuSeries(
       ),
     }))
     .filter((x) => base.includes(x.bu) || x.values.some((v) => v > 0));
-}
-
-/**
- * แท่งที่สูงสุดของกราฟเปรียบเทียบในแผงเลื่อน (รอบ 13 · เจ้าของ: *"กราฟแท่งเปรียบเทียบเลยว่า AI คน ไม่โทร แท่งไหนสูงสุด
- * พอเป็นฝั่ง BU ก็บอกว่า BU ไหนเยอะสุด"*) — คืนทุกตัวที่เท่ากับค่ามากสุด (เท่ากันก็ติดป้ายทุกแท่ง ไม่เลือกให้เอง) ·
- * ทุกตัวเป็น 0 = ไม่มีแท่งสูงสุด
- */
-export function topKeys(items: ReadonlyArray<{ key: string; value: number }>): string[] {
-  const max = items.reduce((m, x) => Math.max(m, x.value), 0);
-  return max > 0 ? items.filter((x) => x.value === max).map((x) => x.key) : [];
-}
-
-/**
- * แผงเลื่อน "ยอดใช้งานนี้มาจาก BU ไหน" — เฉพาะ BU ที่มีงาน เรียงมากไปน้อย (เท่ากันเรียงตามลำดับ BU เดิม) ·
- * BU ที่ยังไม่มีงานรวมเป็นบรรทัดเดียว (ห้ามหายเงียบ) · `total` = ยอดของแท่งนั้นเสมอ
- */
-export function detailBreakdown(rows: ReadonlyArray<AiShareDetailRow>): {
-  total: AiShareCounts;
-  used: AiShareBuRow[];
-  quiet: string[];
-} {
-  const t = detailTable(rows);
-  const used = t.rows.filter((r) => r.total > 0);
-  const order = new Map(t.rows.map((r, i) => [r.bu, i]));
-  used.sort((a, b) => b.total - a.total || (order.get(a.bu) ?? 0) - (order.get(b.bu) ?? 0));
-  const quiet = t.rows.filter((r) => r.total === 0 && r.bu !== UNKNOWN_BU).map((r) => r.bu);
-  return { total: t.total, used, quiet };
 }
 
 /**

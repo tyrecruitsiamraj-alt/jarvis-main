@@ -4,7 +4,8 @@
  *    ตัวเลือกบอก AI % ของทุกหัวข้อ · จำหัวข้อไว้ในเครื่อง · ช่วงเริ่มที่ 7 วันล่าสุด ·
  *    เลขตัวใหญ่ = AI ÷ ที่โทรแล้ว · ยังไม่มีที่โทรแล้ว = "AI —" (ห้าม 0% ปลอม) ·
  *    ฐานยังไม่มีช่องลงผลของคนโทร = บอกบนจอ · หัวข้อที่ล้มบอกเหตุ ห้ามขึ้น 0 ·
- *    กดแท่ง = แผงเลื่อนจากขวาบอกว่ามาจาก BU ไหน · ท้ายหน้ามีใครอยู่ในระบบ ปิดไว้ กดแล้วกาง · BU เป็น dropdown ·
+ *    ท้ายหน้ามีใครอยู่ในระบบ ปิดไว้ กดแล้วกาง · BU เป็น dropdown ·
+ *    แผงเลื่อนตอนกดแท่ง + ปุ่ม "ดูทั้งหมด" ถอดแล้ว (เจ้าของสั่ง 30 ก.ย.) — แท่งรายวันกดไม่ได้ ·
  *    กดสวิตช์แยก BU แล้วแท่งกราฟพลิกไพ่ (รอบ 12 · กล่องยอดไม่พลิกแล้ว) ·
  *    รอบ 17: กล่องเรียง ทั้งหมด → AI โทร → คนโทร → ยังไม่โทร · กดกล่อง = Popup รายชื่อ (กล่อง 0 กดไม่ได้) ·
  *    ปฏิทิน + dropdown อยู่ฝั่งซ้ายต่อจากชื่อหน้า · แยก BU ขึ้นครบทุก BU · หัวกราฟบอกเดือน + ช่วงวัน ·
@@ -42,7 +43,7 @@ vi.mock('@/lib/homePresenceApi', () => ({
   fetchHomePresence: (...a: unknown[]) => fetchHomePresence(...a),
 }));
 // กราฟ recharts วัดขนาดจอไม่ได้ใน jsdom — แทนด้วยปุ่มหนึ่งปุ่มต่อแท่ง (กดแล้วเรียก onPick เหมือนกดแท่งจริง)
-// ชั้นในแท่งติดไว้ที่ data-stacks · ตัวจุดพลิกไพ่ที่ data-flip ⇒ เทสต์สวิตช์ "แยก BU" ได้ว่าแท่งเปลี่ยนและพลิกจริง
+// ชั้นในแท่งติดไว้ที่ data-stacks · ตัวจุดพลิกไพ่ที่ data-flip · กดได้ไหมที่ data-clickable ⇒ เทสต์สวิตช์/การกดลงไปดูได้
 vi.mock('@/components/home-ai-share/AiShareUsageChart', () => ({
   default: ({
     ariaLabel,
@@ -55,11 +56,17 @@ vi.mock('@/components/home-ai-share/AiShareUsageChart', () => ({
     buckets: Array<{ key: string }>;
     stacks: Array<{ label: string }>;
     flipKey: string;
-    onPick: (i: number) => void;
+    onPick?: (i: number) => void;
   }) => (
-    <div role="img" aria-label={ariaLabel} data-stacks={stacks.map((x) => x.label).join('|')} data-flip={flipKey}>
+    <div
+      role="img"
+      aria-label={ariaLabel}
+      data-stacks={stacks.map((x) => x.label).join('|')}
+      data-flip={flipKey}
+      data-clickable={onPick ? 'yes' : 'no'}
+    >
       {buckets.map((b, i) => (
-        <button key={b.key} type="button" onClick={() => onPick(i)}>
+        <button key={b.key} type="button" onClick={() => onPick?.(i)}>
           แท่ง {b.key}
         </button>
       ))}
@@ -322,48 +329,13 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(screen.getByRole('option', { name: /ติดตาม/ }).textContent).toContain('AI 100%');
   });
 
-  it('กดแท่ง = แผงเลื่อนจากขวา: ยอดของวันนั้น + ตอบทั้ง BU ไหนใช้เยอะสุด และ AI หรือคนโทรเยอะกว่า (รอบ 15)', async () => {
+  it('🔴 แผงเลื่อน + ปุ่ม "ดูทั้งหมด" ถอดแล้ว (เจ้าของสั่ง 30 ก.ย.) — กดแท่งรายวันไม่มีอะไรเด้ง', async () => {
     render(<HomeAiSharePage />);
-    fireEvent.click(await screen.findByRole('button', { name: `แท่ง ${win.to}` }));
-    const sheet = await screen.findByRole('dialog');
-    expect(within(sheet).getByText('ติดตาม')).toBeTruthy();
-    expect(within(sheet).getByText(/^วัน\S+ \d+ \S+$/)).toBeTruthy();
-    const total = within(sheet).getByText('ยอดใช้งาน').closest('div')?.textContent ?? '';
-    expect(total.replace(/\s+/g, ' ')).toContain('205 รายชื่อ');
-    // กล่องที่ 1: BU ไหนใช้เยอะสุด (รอบ 16 ไม่มีหัวข้อ/ประโยคบนจอ · ชื่อกล่องอยู่ใน aria-label)
-    const bu = within(sheet).getByRole('region', { name: 'BU ไหนใช้เยอะสุด' });
-    expect(within(bu).getByRole('img', { name: 'ติดตาม เปรียบเทียบแต่ละ BU' })).toBeTruthy();
-    expect(within(sheet).queryByText('BU ไหนใช้เยอะสุด')).toBeNull();
-    expect(within(sheet).queryByText(/^เยอะสุด /)).toBeNull();
-    // BU ที่ยังไม่มีงานบอกเป็นบรรทัดเดียว ไม่หายเงียบ
-    const quiet = AI_SHARE_BUS.filter((b) => b !== 'LBD' && b !== 'LBA').join(' ');
-    expect(within(bu).getByText(`ยังไม่มีงาน ${quiet}`)).toBeTruthy();
-    // กล่องที่ 2: AI หรือคนโทรเยอะกว่า (รอบ 16 ไม่มีหัวข้อ/ประโยคบนจอ)
-    const who = within(sheet).getByRole('region', { name: 'AI หรือคนโทรเยอะกว่า' });
-    expect(within(who).getByRole('img', { name: 'ติดตาม เปรียบเทียบ AI โทร คนโทร ยังไม่โทร' })).toBeTruthy();
-    expect(within(sheet).queryByText('AI หรือคนโทรเยอะกว่า')).toBeNull();
-    // ประโยคคำตอบเดิม "AI โทรเยอะกว่าคน 195 ต่อ 10 สาย" ต้องไม่มี (คำอธิบายสำหรับโปรแกรมอ่านจอยังอยู่ได้)
-    expect(within(sheet).queryByText(/โทรเยอะกว่า(คน| AI) \d/)).toBeNull();
-    // รายการ "มาจาก BU ไหนบ้าง" ถอดแล้ว (รอบ 14)
-    expect(within(sheet).queryByText('มาจาก BU ไหนบ้าง')).toBeNull();
-  });
-
-  it('รอบ 15: แผงเลื่อนมีสองกล่องเหมือนกัน ไม่ว่าสวิตช์แยก BU เปิดหรือปิด', async () => {
-    render(<HomeAiSharePage />);
-    await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน' });
-    fireEvent.click(screen.getByRole('switch', { name: 'แยก BU' }));
-    fireEvent.click(await screen.findByRole('button', { name: `แท่ง ${win.to}` }));
-    const sheet = await screen.findByRole('dialog');
-    expect(within(sheet).getByRole('region', { name: 'BU ไหนใช้เยอะสุด' })).toBeTruthy();
-    expect(within(sheet).getByRole('region', { name: 'AI หรือคนโทรเยอะกว่า' })).toBeTruthy();
-  });
-
-  it('ปุ่ม "ดูทั้งหมด" = แผงเลื่อนของทั้งช่วงที่เลือก (รอบ 7 เปลี่ยนคำจาก "ดูแยก BU ทั้งช่วง")', async () => {
-    render(<HomeAiSharePage />);
-    await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน' });
-    fireEvent.click(screen.getByRole('button', { name: 'ดูทั้งหมด' }));
-    const sheet = await screen.findByRole('dialog');
-    expect(within(sheet).getByText('7 วันล่าสุด')).toBeTruthy();
+    const chart = await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน' });
+    expect(chart.getAttribute('data-clickable')).toBe('no');
+    fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'ดูทั้งหมด' })).toBeNull();
   });
 
   it('สวิตช์ "แยก BU": ค่าตั้งต้นแท่งแบ่ง AI/คน/ยังไม่โทร · กดแล้วเป็นแต่ละ BU · กดอีกทีกลับ', async () => {
@@ -482,9 +454,10 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ยืนยัน' }));
     await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith({ from: '2026-08-01', to: '2026-09-30', unit: 'month' }));
     const monthly = await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายเดือน' });
+    expect(monthly.getAttribute('data-clickable')).toBe('yes');
     expect(within(monthly).getAllByRole('button').map((b) => b.textContent)).toEqual(['แท่ง 2026-08-01', 'แท่ง 2026-09-01']);
     expect(screen.getByText(rangeTextFull('2026-08-01', '2026-09-30'))).toBeTruthy();
-    // กดแท่งกันยายน = ลงไปดูรายวันของกันยายน (ไม่ใช่แผงเลื่อน)
+    // กดแท่งกันยายน = ลงไปดูรายวันของกันยายน
     fireEvent.click(within(monthly).getByRole('button', { name: 'แท่ง 2026-09-01' }));
     const daily = await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน' });
     expect(within(daily).getAllByRole('button')).toHaveLength(30);

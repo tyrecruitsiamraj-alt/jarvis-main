@@ -47,7 +47,6 @@ import {
   aiShareBounds,
   bucketText,
   detailAverage,
-  detailBreakdown,
   detailBuSeries,
   detailPeak,
   previousBounds,
@@ -55,7 +54,6 @@ import {
   defaultAiShareWindow,
   detailBuckets,
   detailSegments,
-  detailTable,
   drillWindow,
   isAiShareListKey,
   isBalanced,
@@ -64,7 +62,6 @@ import {
   roundToHundred,
   rowsInRange,
   segmentTotals,
-  topKeys,
   segmentsOfTotal,
   sharesOfCalled,
   type AiShareDetailRow,
@@ -359,7 +356,7 @@ describe('รายชื่อหลังเลขในกล่อง (ร�
   });
 });
 
-describe('กราฟยอดใช้งาน + แผงเลื่อนแยก BU (รอบ 3 → รอบ 5)', () => {
+describe('กราฟยอดใช้งาน (รอบ 3 → รอบ 18 · แผงเลื่อนถอดแล้ว)', () => {
   const row = (day: string, bu: string | null, total: number, ai = total): AiShareDetailRow => ({
     day,
     bu,
@@ -470,7 +467,7 @@ describe('กราฟยอดใช้งาน + แผงเลื่อน�
     expect(segs).toEqual({ ai: [3, 3, 0], staff: [1, 0, 0], both: [0, 2, 0], notCalled: [1, 1, 0] });
     const totals = segmentTotals(segs, buckets.length);
     expect(totals).toEqual([5, 6, 0]);
-    expect(totals.reduce((s, v) => s + v, 0)).toBe(detailTable(rows).total.total);
+    expect(totals.reduce((s, v) => s + v, 0)).toBe(rows.reduce((s, r) => s + r.total, 0));
   });
 
   it('สวิตช์ "แยก BU" (รอบ 7 → 17): ครบทุก BU ของบริษัทเสมอ · ลำดับชุดแผนก → รหัสอื่น → ไม่รู้ BU · รวมทุก BU = ยอดของแท่ง', () => {
@@ -499,42 +496,11 @@ describe('กราฟยอดใช้งาน + แผงเลื่อน�
     expect(detailBuSeries([], buckets, ['LM'])).toEqual([{ bu: 'LM', label: expect.any(String), values: [0] }]);
   });
 
-  it('🔴 รหัส BU นอกชุดแผนกต้องไม่หายจากตาราง/แผงเลื่อน — รวมทุกแถว = ยอดทั้งหมด', () => {
-    const rows = [row('2026-09-30', 'LBD', 3), row('2026-09-30', 'HQ', 2)];
-    const t = detailTable(rows);
-    expect(t.rows.map((r) => r.bu)).toEqual([...AI_SHARE_BUS, 'HQ']);
-    expect(t.rows.reduce((s, r) => s + r.total, 0)).toBe(t.total.total);
-    expect(detailBreakdown(rows).used.map((r) => r.bu)).toEqual(['LBD', 'HQ']);
-  });
-
-  it('กราฟเปรียบเทียบในแผงเลื่อน (รอบ 13): แท่งสูงสุด · เท่ากันติดทุกแท่ง · ทุกตัว 0 = ไม่มี', () => {
-    expect(topKeys([{ key: 'ai', value: 52 }, { key: 'staff', value: 3 }, { key: 'notCalled', value: 0 }])).toEqual(['ai']);
-    expect(topKeys([{ key: 'LBD', value: 4 }, { key: 'LBA', value: 4 }, { key: 'LM', value: 1 }])).toEqual(['LBD', 'LBA']);
-    expect(topKeys([{ key: 'ai', value: 0 }, { key: 'staff', value: 0 }])).toEqual([]);
-    expect(topKeys([])).toEqual([]);
-  });
-
-  it('กดแท่ง = แถวของช่วงนั้นเท่านั้น · ทั้งช่วง = ทุกแถว', () => {
+  it('ลงไปดูในแท่ง = แถวของช่วงนั้นเท่านั้น · ทั้งช่วง = ทุกแถว', () => {
     const rows = [row('2026-09-28', 'LBD', 1), row('2026-09-29', 'LBA', 2), row('2026-09-30', 'LBD', 3)];
     expect(rowsInRange(rows, '2026-09-29', '2026-09-29').map((r) => r.total)).toEqual([2]);
     expect(rowsInRange(rows, '2026-09-28', '2026-09-30')).toHaveLength(3);
     expect(rowsInRange(rows, '2026-10-01', '2026-10-31')).toEqual([]);
-  });
-
-  it('แผงเลื่อน: BU ที่มีงานเรียงมากไปน้อย · BU ที่ยังไม่มีงานบอกเป็นบรรทัดเดียว · รวม = ยอดของแท่ง', () => {
-    const rows: AiShareDetailRow[] = [
-      { day: '2026-09-30', bu: 'LBA', total: 3, ai: 3, staff: 0, both: 0, notCalled: 0 },
-      { day: '2026-09-30', bu: 'LBD', total: 8, ai: 5, staff: 2, both: 0, notCalled: 1 },
-      { day: '2026-09-30', bu: 'LM', total: 3, ai: 0, staff: 3, both: 0, notCalled: 0 },
-      { day: '2026-09-30', bu: null, total: 1, ai: 1, staff: 0, both: 0, notCalled: 0 },
-    ];
-    const b = detailBreakdown(rows);
-    // เท่ากัน (LBA 3 · LM 3) = ตามลำดับ BU เดิมของบริษัท
-    expect(b.used.map((r) => r.bu)).toEqual(['LBD', 'LBA', 'LM', UNKNOWN_BU]);
-    expect(b.used[0]).toMatchObject({ total: 8, ai: 5, staff: 2, notCalled: 1 });
-    expect(b.quiet).toEqual(AI_SHARE_BUS.filter((x) => !['LBD', 'LBA', 'LM'].includes(x)));
-    expect(b.total).toEqual({ total: 15, ai: 9, staff: 5, both: 0, notCalled: 1 });
-    expect(b.used.reduce((s, r) => s + r.total, 0)).toBe(b.total.total);
   });
 
   it('ชื่อช่วงย่อยแบบคนอ่าน — รายวันบอกวัน · รายเดือนเต็มบอกชื่อเดือน · เดือนที่ถูกตัดบอกช่วงวันจริง', () => {
@@ -548,14 +514,6 @@ describe('กราฟยอดใช้งาน + แผงเลื่อน�
     expect(bucketText(wk, 'week')).toBe('14–20 ก.ย. 2569');
     expect(bucketText(wk, 'week', 'long')).toBe('สัปดาห์ 14–20 ก.ย. 2569');
     expect(bucketText({ key: '2026-01-01', label: '2569', from: '2026-01-01', to: '2026-12-31' }, 'year')).toBe('ปี 2569');
-  });
-
-  it('ตาราง BU ครบทุกตัว · แถวรวม = ผลรวม (เท่ายอดบนการ์ด)', () => {
-    const rows = [row('2026-09-29', 'LBD', 3, 2), row('2026-09-30', 'LBA', 2, 2)];
-    const t = detailTable(rows);
-    expect(t.rows.map((r) => r.bu)).toEqual([...AI_SHARE_BUS]);
-    expect(t.rows.find((r) => r.bu === 'LBD')).toMatchObject({ total: 3, ai: 2, notCalled: 1 });
-    expect(t.total).toEqual({ total: 5, ai: 4, staff: 0, both: 0, notCalled: 1 });
   });
 
   it('SQL แยกวัน × BU ใช้ CTE ตัวเดียวกับยอดของการ์ด', () => {
