@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
-import { RefreshCw, RotateCcw } from 'lucide-react';
+import { ChevronRight, RefreshCw, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
@@ -54,7 +54,14 @@ import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { canHoldApplication } from '@/lib/recruitRm';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { useAuth } from '@/contexts/AuthContext';
-import { FilterSheetButton, FilterSidebar, type FilterExtraSection } from '@/components/jobs/BoardFilterPanel';
+import {
+  FilterSheetButton,
+  FilterSidebar,
+  FilterSidebarToggle,
+  type FilterExtraSection,
+} from '@/components/jobs/BoardFilterPanel';
+import { buildJobKeyIndex } from '@/lib/jobKeyIndex';
+import type { JobRequest } from '@/types';
 import {
   APPLICANT_FACET_ATTACH,
   APPLICANT_PRIMARY_FACETS,
@@ -70,13 +77,28 @@ import {
   type ApplicantFilterState,
 } from '@/lib/applicantFilters';
 
-/** แท็บของพื้นที่นี้ → `?view=` ของบอร์ดรับสมัคร + ชื่อบนแถบแท็บของบอร์ด (ชุดเดียวกับ BOARD_VIEW_TABS) */
+/** แท็บของพื้นที่นี้ → `?view=` ของบอร์ดรับสมัคร · ชื่อแท็บใช้ `RM_TAB_LABEL` ชุดเดียวกับแถบแท็บของบอร์ด */
 const RM_TAB_BOARD_VIEW: Record<RmTab, string> = { candidates: 'list', contact: 'contact', appointments: 'appointments' };
-const RM_TAB_BOARD_LABEL: Record<RmTab, string> = {
-  candidates: 'รายชื่อผู้สมัคร',
-  contact: 'การโทรของฉัน',
-  appointments: 'ติดตามนัดหมาย',
-};
+
+/**
+ * แถบกรองซ้ายพับ/กาง — จำต่อเครื่อง (เจ้าของสั่ง 30 ก.ย. 2569: *"Filter ทำแบบย่อ กางได้"* → Choice "แถบซ้ายพับได้")
+ * ค่าตั้งต้น = พับ (ตารางได้เต็มความกว้าง) · เครื่องไม่ให้เก็บ = พับทุกครั้งที่เปิด ใช้ต่อได้ปกติ
+ */
+const FILTER_OPEN_KEY = 'jarvis:applicant-filter-open';
+function readFilterOpen(): boolean {
+  try {
+    return window.localStorage.getItem(FILTER_OPEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function writeFilterOpen(open: boolean): void {
+  try {
+    window.localStorage.setItem(FILTER_OPEN_KEY, open ? '1' : '0');
+  } catch {
+    /* เครื่องไม่ให้เก็บ — ใช้ต่อได้ แค่ไม่จำ */
+  }
+}
 
 /**
  * พื้นที่ทำงาน "รายชื่อผู้สมัคร" — เนื้อของหน้างานสรรหา (RM) เดิมทั้งก้อน
@@ -111,7 +133,12 @@ const RmWorkspace: React.FC<{
    * ไม่ส่ง = พฤติกรรมเดิม (อ่านจาก ?tab= · มีแถบแท็บของตัวเอง)
    */
   tab?: RmTab;
-}> = ({ tab: controlledTab }) => {
+  /**
+   * ใบขอที่หน้ากล่องงานโหลดไว้ (เปิดอยู่ + ปิดแล้ว) — ใช้บอก "เจ้าหน้าที่สรรหาของใบขอ" ให้หัวข้อกรองดูเป็นคน
+   * (เจ้าของสั่ง 30 ก.ย. 2569) · ไม่ส่ง/ยังโหลดไม่ขึ้น = ไม่มีหัวข้อนี้
+   */
+  jobs?: readonly JobRequest[];
+}> = ({ tab: controlledTab, jobs }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const tab: RmTab = controlledTab ?? (isRmTab(tabParam) ? tabParam : 'candidates');
@@ -144,6 +171,26 @@ const RmWorkspace: React.FC<{
   const [pageSize, setPageSize] = useState<PageSizeOption>(PAGE_SIZE_DEFAULT);
   /** ข้อความบอกว่ายังไม่ได้ต่อของจริง — ดีกว่าปุ่มที่กดแล้วเงียบ */
   const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * ข้อความแจ้งหลังกด "เก็บไปโทรเอง" มีปุ่มพาไปแท็บการติดตาม (เจ้าของสั่ง 30 ก.ย. 2569: *"พอเก็บแล้วเข้าไปหน้า
+   * การโทรของฉัน"* → Choice "อยู่หน้าเดิม มีปุ่มพาไป") · ข้อความอื่นไม่มีปุ่ม
+   */
+  const [noticeGoContact, setNoticeGoContact] = useState(false);
+  /** ตั้งข้อความแจ้ง — ทุกทางผ่านตัวนี้ (ปุ่มพาไปการติดตามโผล่เฉพาะที่สั่งให้โผล่) */
+  const say = (text: string | null, goContact = false) => {
+    setNotice(text);
+    setNoticeGoContact(goContact);
+  };
+  // ย้ายแท็บแล้ว ปุ่ม "ไปการติดตาม" ไม่มีความหมาย (ข้อความยังอยู่ให้อ่าน)
+  useEffect(() => {
+    setNoticeGoContact(false);
+  }, [tab]);
+  /** แถบกรองซ้าย (จอ xl) กางอยู่ไหม — ค่าตั้งต้นพับ */
+  const [filterOpen, setFilterOpen] = useState<boolean>(readFilterOpen);
+  const changeFilterOpen = (open: boolean) => {
+    setFilterOpen(open);
+    writeFilterOpen(open);
+  };
   const [addOpen, setAddOpen] = useState(false);
   /** dialog รายละเอียด+บันทึกผลติดต่อ (ลิสต์ข้อ 7) — เปิดจากปุ่ม "ดูรายละเอียด"/"บันทึกผลนัดหมาย" */
   const [contactApp, setContactApp] = useState<PublicApplication | null>(null);
@@ -195,7 +242,7 @@ const RmWorkspace: React.FC<{
     setSearchParams(next);
     setSelectedIds([]);
     setPage(1);
-    setNotice(null);
+    say(null);
   };
 
   /**
@@ -205,7 +252,7 @@ const RmWorkspace: React.FC<{
   const applyLead = async (lead: boolean) => {
     if (selectedIds.length === 0 || leadBusy) return;
     setLeadBusy(true);
-    setNotice(null);
+    say(null);
     const results: LeadUpdateResult[] = await Promise.all(
       selectedIds.map((id) =>
         setJobApplicationLead(id, lead)
@@ -218,7 +265,7 @@ const RmWorkspace: React.FC<{
           ),
       ),
     );
-    setNotice(summarizeLeadUpdate(results, lead).message);
+    say(summarizeLeadUpdate(results, lead).message);
     setSelectedIds([]);
     setLeadBusy(false);
     load();
@@ -230,17 +277,17 @@ const RmWorkspace: React.FC<{
    */
   const onAttendance = (row: PublicApplication, result: AttendanceResult) => {
     if (!row.appointment_at) return;
-    setNotice(null);
+    say(null);
     void recordAppointmentAttendance({
       applicationId: row.id,
       appointmentAt: row.appointment_at,
       result,
     })
       .then(() => {
-        setNotice(`บันทึกผลนัดของ ${row.full_name}: ${ATTENDANCE_LABEL[result]} แล้ว`);
+        say(`บันทึกผลนัดของ ${row.full_name}: ${ATTENDANCE_LABEL[result]} แล้ว`);
         load();
       })
-      .catch((e) => setNotice(e instanceof Error ? e.message : 'บันทึกผลนัดไม่สำเร็จ'));
+      .catch((e) => say(e instanceof Error ? e.message : 'บันทึกผลนัดไม่สำเร็จ'));
   };
 
   /**
@@ -281,7 +328,22 @@ const RmWorkspace: React.FC<{
     () => (bucket ? EMPTY_APPLICANT_FILTER_STATE : readApplicantFilterState(searchParams)),
     [bucket, searchParams],
   );
-  const applicantFacts = useMemo<ApplicantFacetFacts>(() => ({ tab, now: new Date() }), [tab]);
+  /**
+   * เจ้าหน้าที่สรรหาของใบขอที่คนนี้สมัคร — จากช่องผู้รับผิดชอบของใบขอ (ชุดเดียวกับการ์ดกล่องงาน)
+   * 🔴 จับใบด้วย `buildJobKeyIndex` (id ใบขอมี 3 รูป) · ใบที่ไม่อยู่ในชุดที่โหลด = ไม่ระบุ
+   */
+  const recruiterOf = useMemo(() => {
+    if (!jobs || jobs.length === 0) return undefined;
+    const idx = buildJobKeyIndex(
+      jobs.map((j) => [j.id, (j.recruiter_name ?? '').trim() || null] as const),
+      (existing) => existing,
+    );
+    return (r: PublicApplication) => (r.job_id ? (idx.get(r.job_id) ?? null) : null);
+  }, [jobs]);
+  const applicantFacts = useMemo<ApplicantFacetFacts>(
+    () => ({ tab, now: new Date(), recruiterOf }),
+    [tab, recruiterOf],
+  );
   const commitApplicantFilters = (next: ApplicantFilterState) => {
     setSearchParams((prev) => writeApplicantFilterState(prev, next), { replace: true });
     setPage(1);
@@ -291,6 +353,8 @@ const RmWorkspace: React.FC<{
     commitApplicantFilters(toggleApplicantFacetValue(applicantFilterState, key, value));
   const clearApplicantFacets = () => commitApplicantFilters(EMPTY_APPLICANT_FILTER_STATE);
   const applicantFacetCount = countSelectedApplicantValues(applicantFilterState);
+  /** จำนวนที่ติ๊กทั้งแถบ (รวมวันที่สมัคร) — เลขบนปุ่มกางแถบ */
+  const panelSelected = applicantFacetCount + (dateRange ? 1 : 0);
   /** ปุ่ม "ล้าง" ของแถบซ้าย = ล้างทุกอย่างในแถบ รวมวันที่สมัคร (อยู่ในแถบเดียวกัน) */
   const clearApplicantPanel = () => {
     clearApplicantFacets();
@@ -336,11 +400,11 @@ const RmWorkspace: React.FC<{
     return RM_TABS.filter((t) => t !== tab)
       .map((t) => {
         const base = filterApplications(rows, t, rmFilters, keyword);
-        const n = applyApplicantFilters(base, applicantFilterState, { tab: t, now: applicantFacts.now }).length;
+        const n = applyApplicantFilters(base, applicantFilterState, { ...applicantFacts, tab: t }).length;
         return { tab: t, n };
       })
       .filter((x) => x.n > 0);
-  }, [bucket, applicantFacetCount, filtered.length, tab, rows, rmFilters, keyword, applicantFilterState, applicantFacts.now]);
+  }, [bucket, applicantFacetCount, filtered.length, tab, rows, rmFilters, keyword, applicantFilterState, applicantFacts]);
   const goToTab = (t: RmTab) =>
     setSearchParams((prev) => {
       const p = new URLSearchParams(prev);
@@ -454,12 +518,12 @@ const RmWorkspace: React.FC<{
     setSearchParams(params);
     // ล้างที่ติ๊กไว้ตอนสลับแท็บ — ปุ่ม action คนละชุด ติ๊กค้างข้ามแท็บแล้วสับสน
     setSelectedIds([]);
-    setNotice(null);
+    say(null);
     setPage(1);
   };
 
   /** ปุ่มแถวที่ยังไม่ต่อของจริง — ขึ้นข้อความ ดีกว่ากดแล้วเงียบ */
-  const todo = (what: string) => setNotice(`${what} — ยังไม่ได้ต่อกับระบบจริง`);
+  const todo = (what: string) => say(`${what} — ยังไม่ได้ต่อกับระบบจริง`);
 
   /**
    * "เก็บไปโทรเอง" — ปุ่มเดียวที่รวม claim + ล็อกเบอร์ (เจ้าของเคาะ 22 ส.ค. 2569)
@@ -470,13 +534,13 @@ const RmWorkspace: React.FC<{
    */
   const keepForSelf = async (ids: string[]) => {
     if (ids.length === 0) return;
-    setNotice(null);
+    say(null);
     try {
       const outcome = await chooseApplicationCall(ids, 'manual');
-      setNotice(`${summarizeCallChoice(outcome)} — ไปโทร+บันทึกผลที่แท็บ "การโทรของฉัน"`);
+      say(summarizeCallChoice(outcome), tab !== 'contact');
       load(); // ใบย้ายแท็บ (claimed_by_me) + ป้ายล็อกเปลี่ยน ต้องเห็นทันที
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : 'เก็บไปโทรเองไม่สำเร็จ');
+      say(e instanceof Error ? e.message : 'เก็บไปโทรเองไม่สำเร็จ');
     }
   };
 
@@ -488,7 +552,7 @@ const RmWorkspace: React.FC<{
   const [aiSending, setAiSending] = useState(false);
   const askSendAi = (ids: string[]) => {
     if (ids.length === 0) return;
-    setNotice(null);
+    say(null);
     setAiConfirmIds(ids);
   };
   const confirmSendAi = async () => {
@@ -496,12 +560,12 @@ const RmWorkspace: React.FC<{
     setAiSending(true);
     try {
       const outcome: CallChoiceOutcome = await chooseApplicationCall(aiConfirmIds, 'ai');
-      setNotice(summarizeCallChoice(outcome));
+      say(summarizeCallChoice(outcome));
       setAiConfirmIds(null);
       setSelectedIds([]);
       load();
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : 'ส่ง AI โทรไม่สำเร็จ');
+      say(e instanceof Error ? e.message : 'ส่ง AI โทรไม่สำเร็จ');
       setAiConfirmIds(null);
     } finally {
       setAiSending(false);
@@ -529,7 +593,7 @@ const RmWorkspace: React.FC<{
      * ⚠️ ล้มแล้วต้องบอก — ถ้าเงียบ คนจะคิดว่าจดแล้วทั้งที่ไม่ได้จด
      */
     if (action === 'dial') {
-      setNotice(null);
+      say(null);
       void markApplicationDialed(row.id)
         .then((r) => {
           setRows((prev) =>
@@ -544,10 +608,10 @@ const RmWorkspace: React.FC<{
                 : x,
             ),
           );
-          setNotice(`จดเวลาโทรของ ${row.full_name} แล้ว`);
+          say(`จดเวลาโทรของ ${row.full_name} แล้ว`);
         })
         .catch((e: unknown) => {
-          setNotice(e instanceof Error ? e.message : 'จดเวลาโทรไม่สำเร็จ');
+          say(e instanceof Error ? e.message : 'จดเวลาโทรไม่สำเร็จ');
         });
       return;
     }
@@ -672,7 +736,10 @@ const RmWorkspace: React.FC<{
           · แท็บกล่องงานยังเป็นปุ่มเดียว (แบบ A) — เจ้าของ: "หน้ากล่องงาน … เป็นช่องๆแบบเดิม"
           · วันที่สมัครเป็นหัวข้อหนึ่งในแถบ · โหมด drill-down (?bucket=) ไม่มีแถบกรอง (เลขต้องเท่ากล่องที่กดมา) */}
       {!bucket ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2 xl:hidden">
+        /* จอเล็ก = ปุ่มเปิดแผง (เดิม) · จอ xl = ปุ่มกางแถบซ้ายที่พับอยู่ (30 ก.ย. 2569 · ค่าตั้งต้นพับ ตารางได้เต็มกว้าง)
+           แถบกางอยู่ = แถวนี้ซ่อนที่จอ xl (หัวแถบมีปุ่มล้าง/ผลลัพธ์ของตัวเองแล้ว) */
+        <div className={cn('mt-3 flex flex-wrap items-center gap-2', filterOpen && 'xl:hidden')}>
+          {!filterOpen ? <FilterSidebarToggle selected={panelSelected} onExpand={() => changeFilterOpen(true)} /> : null}
           <FilterSheetButton
             facets={applicantFacets}
             primary={APPLICANT_PRIMARY_FACETS}
@@ -695,8 +762,8 @@ const RmWorkspace: React.FC<{
         </div>
       ) : null}
       {/* แถบ "กำลังดู: … — N คนข้างล่าง" ถูกถอด 27 ก.ย. 2569 (Clean — ไม่มีประโยคอธิบาย) */}
-      <div className={cn('mt-4', !bucket && 'xl:flex xl:items-start xl:gap-4')}>
-        {!bucket ? (
+      <div className={cn('mt-4', !bucket && filterOpen && 'xl:flex xl:items-start xl:gap-4')}>
+        {!bucket && filterOpen ? (
           <FilterSidebar
             facets={applicantFacets}
             primary={APPLICANT_PRIMARY_FACETS}
@@ -705,6 +772,7 @@ const RmWorkspace: React.FC<{
             sections={applicantPanelSections}
             onClear={clearApplicantPanel}
             resultText={`เหลือ ${filtered.length.toLocaleString('th-TH')} รายชื่อ`}
+            onCollapse={() => changeFilterOpen(false)}
           />
         ) : null}
         <div className="min-w-0 flex-1 space-y-3">
@@ -734,9 +802,21 @@ const RmWorkspace: React.FC<{
           </div>
 
           {notice ? (
-            <p className={cn('rounded-xl border px-3 py-2 text-[12px]', TONE.warn.soft, TONE.warn.value)}>
-              {notice}
-            </p>
+            <div
+              className={cn(
+                'flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs',
+                TONE.warn.soft,
+                TONE.warn.value,
+              )}
+            >
+              <span>{notice}</span>
+              {noticeGoContact ? (
+                <Button type="button" size="xs" variant="outline" onClick={() => goToTab('contact')}>
+                  ไป{RM_TAB_LABEL.contact}
+                  <ChevronRight aria-hidden />
+                </Button>
+              ) : null}
+            </div>
           ) : null}
 
           {/* อยู่คลังสำรองต้องบอกให้รู้ตัว ไม่งั้นอ่านว่า "รายชื่อหายไปไหนหมด" */}
@@ -1027,7 +1107,7 @@ const RmWorkspace: React.FC<{
                       className="h-8 text-xs"
                       onClick={() => goToTab(x.tab)}
                     >
-                      {RM_TAB_BOARD_LABEL[x.tab]} {x.n.toLocaleString('th-TH')} คน
+                      {RM_TAB_LABEL[x.tab]} {x.n.toLocaleString('th-TH')} คน
                     </Button>
                   ))}
                 </div>
@@ -1066,7 +1146,7 @@ const RmWorkspace: React.FC<{
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onSaved={() => {
-          setNotice('บันทึกผู้สมัครแล้ว');
+          say('บันทึกผู้สมัครแล้ว');
           load(); // ใบใหม่ต้องโผล่ในตารางทันที ไม่ต้องให้กดรีเฟรชเอง
         }}
       />
@@ -1085,7 +1165,7 @@ const RmWorkspace: React.FC<{
         application={contactApp}
         onClose={() => setContactApp(null)}
         onSaved={() => {
-          setNotice('บันทึกผลติดต่อแล้ว');
+          say('บันทึกผลติดต่อแล้ว');
           load(); // สถานะใบเปลี่ยน (นัดได้ = converted) แถวอาจย้ายแท็บ — โหลดใหม่ให้เห็นทันที
         }}
       />

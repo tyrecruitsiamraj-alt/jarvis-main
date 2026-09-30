@@ -196,8 +196,48 @@ describe('ใบขอที่สมัคร — คีย์ด้วย job_
     expect(applicantJobLabels([])('siamraj-pre:LBM6908001')).toBe('ใบขอ LBM6908001');
   });
 
-  it('Dropdown หลัก: นัดหมาย/ผลโทร/ใบขอ/จังหวัด/วันสมัคร · อำเภออยู่ในกล่องจังหวัด', () => {
-    expect(APPLICANT_PRIMARY_FACETS).toEqual(['apptWhen', 'apptPlace', 'attendance', 'call', 'job', 'province', 'days']);
+  it('หัวข้อหลัก: นัดหมาย/เจ้าหน้าที่สรรหา/ผลโทร/ใบขอ/จังหวัด/วันสมัคร · อำเภออยู่ในกล่องจังหวัด', () => {
+    // เจ้าหน้าที่สรรหาเพิ่ม 30 ก.ย. 2569 (ดูเป็นคน)
+    expect(APPLICANT_PRIMARY_FACETS).toEqual(['apptWhen', 'apptPlace', 'attendance', 'recruiter', 'call', 'job', 'province', 'days']);
     expect(APPLICANT_FACET_ATTACH).toEqual({ district: 'province' });
+  });
+});
+
+describe('🔴 เจ้าหน้าที่สรรหา — ดูเป็นคน (เจ้าของสั่ง 30 ก.ย. 2569: "เลือก แบงค์ ก็ขึ้นชื่อคนที่สนใจของแบงค์มา")', () => {
+  // ใบขอ → เจ้าหน้าที่สรรหาที่ตั้งไว้บนใบขอ (หน้ารู้จากชุดใบขอที่โหลดไว้)
+  const byJob: Record<string, string | null> = { 'siamraj-sql:J1': 'แบงค์', 'siamraj-sql:J2': 'คิว', 'siamraj-sql:J3': null };
+  const recruiterOf = (r: PublicApplication) => (r.job_id ? (byJob[r.job_id] ?? null) : null);
+  const bank1 = app({ job_id: 'siamraj-sql:J1', last_call_outcome: 'confirmed', last_call_at: '2026-09-26T05:00:00Z' });
+  const bank2 = app({ job_id: 'siamraj-sql:J1' });
+  const q = app({ job_id: 'siamraj-sql:J2', last_call_outcome: 'confirmed', last_call_at: '2026-09-26T05:00:00Z' });
+  const none = app({ job_id: 'siamraj-sql:J3' });
+  const rows = [bank1, bank2, q, none];
+
+  it('เลือกแบงค์ = เฉพาะผู้สมัครของใบขอที่แบงค์ถือ · ต่อด้วยผลโทร "สนใจ" = คนที่สนใจของแบงค์', () => {
+    const f = facts({ recruiterOf });
+    expect(applyApplicantFilters(rows, state({ recruiter: ['แบงค์'] }), f).map((r) => r.id)).toEqual([bank1.id, bank2.id]);
+    expect(
+      applyApplicantFilters(rows, state({ recruiter: ['แบงค์'], call: ['interested'] }), f).map((r) => r.id),
+    ).toEqual([bank1.id]);
+  });
+
+  it('ตัวเลือกบอกจำนวนต่อคน · ใบขอที่ยังไม่ตั้งเจ้าหน้าที่ = "ไม่ระบุเจ้าหน้าที่"', () => {
+    const facet = buildApplicantFacets(rows, EMPTY_APPLICANT_FILTER_STATE, facts({ recruiterOf })).find((x) => x.key === 'recruiter');
+    expect(facet?.label).toBe('เจ้าหน้าที่สรรหา');
+    const counts = Object.fromEntries((facet?.options ?? []).map((o) => [o.label, o.count]));
+    expect(counts).toMatchObject({ แบงค์: 2, คิว: 1, ไม่ระบุเจ้าหน้าที่: 1 });
+    expect(applicantFacetValueLabel('recruiter', UNSPECIFIED)).toBe('ไม่ระบุเจ้าหน้าที่');
+  });
+
+  it('ใบขอยังโหลดไม่ขึ้น (ไม่มีตัวบอก) = ไม่มีหัวข้อนี้ และค่าที่ค้างใน URL ต้องไม่ตัดแถวทิ้ง', () => {
+    expect(buildApplicantFacets(rows, EMPTY_APPLICANT_FILTER_STATE, facts()).some((x) => x.key === 'recruiter')).toBe(false);
+    expect(applyApplicantFilters(rows, state({ recruiter: ['แบงค์'] }), facts())).toHaveLength(rows.length);
+  });
+
+  it('อยู่ในหัวข้อหลัก (ขึ้นก่อนผลโทร) และค่าที่เลือกอยู่ใน URL a.recruiter', () => {
+    expect(APPLICANT_PRIMARY_FACETS.indexOf('recruiter')).toBeLessThan(APPLICANT_PRIMARY_FACETS.indexOf('call'));
+    const params = writeApplicantFilterState(new URLSearchParams('view=list'), state({ recruiter: ['แบงค์'] }));
+    expect(params.get('view')).toBe('list');
+    expect(readApplicantFilterState(params).selection.recruiter).toEqual(['แบงค์']);
   });
 });

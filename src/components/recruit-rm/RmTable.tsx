@@ -88,8 +88,10 @@ const RmTable: React.FC<{
           เดิม min-w 62rem + หน่วยงานกว้างคงที่ 20rem ⇒ กว้าง ~1,434px ที่จอ 1280 ต้องเลื่อนขวาหาปุ่ม "ตัวเลือก"
           ⇒ คอลัมน์ที่เป็นคู่กันรวมเป็นช่องเดียวสองบรรทัด — **ข้อมูลครบชุดเดิมที่เจ้าของสั่ง 17 ส.ค. 2569**
           (ชื่อ · นามสกุล · เบอร์โทร · อายุ · เพศ · ที่อยู่ · หน่วยงาน · ช่องทาง · วันที่สมัคร · ผ่านมาแล้วกี่วัน)
-          ห้ามถอดข้อมูลตัวไหนออกเพื่อให้แคบลง · ที่อยู่/หน่วยงานตัดด้วย … แต่ชี้แล้วเห็นเต็ม (title)
-          จอเล็ก (ไม่มีแถบซ้าย) ยังเลื่อนในกล่องของตัวเองได้ ไม่ให้ทั้งหน้าเลื่อน */}
+          ห้ามถอดข้อมูลตัวไหนออกเพื่อให้แคบลง · จอเล็ก (ไม่มีแถบซ้าย) ยังเลื่อนในกล่องของตัวเองได้ ไม่ให้ทั้งหน้าเลื่อน
+          🔴 **30 ก.ย. 2569 เลิกตัดข้อความเป็น … บรรทัดเดียว** (เจ้าของ: *"ตรงรายชื่อก็ขาดๆหายๆ"*) — ชื่อ/ที่อยู่/หน่วยงาน
+          ขึ้นได้ 2 บรรทัด มีความกว้างขั้นต่ำกันช่องแคบ · แถบกรองซ้ายพับเป็นค่าตั้งต้นแล้ว ตารางจึงมีที่พอ ·
+          เกิน 2 บรรทัดค่อยตัด (ชี้แล้วเห็นเต็มจาก title) */}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className={cn('text-xs', DASH.tableHead)}>
@@ -145,7 +147,7 @@ const RmTable: React.FC<{
                       อายุ/เพศ ไม่ได้กรอกมา = ขีด (ห้ามเดาหรือใส่ 0) */}
                   <td className="px-2 py-2">
                     <span className="flex flex-col gap-0.5">
-                      <span className={cn('block max-w-44 truncate font-medium', DASH.cellStrong)} title={r.full_name || undefined}>
+                      <span className={cn('line-clamp-2 min-w-32 break-words font-medium', DASH.cellStrong)} title={r.full_name || undefined}>
                         {dashIfEmpty(name)}
                       </span>
                       <span className={cn('whitespace-nowrap text-xs tabular-nums', DASH.cellMuted)}>
@@ -186,13 +188,12 @@ const RmTable: React.FC<{
                     </span>
                   </td>
                   <td className={cn('px-2 py-2', DASH.cell)} title={address || undefined}>
-                    <span className="block max-w-28 truncate">{dashIfEmpty(address)}</span>
+                    <span className="line-clamp-2 min-w-36 break-words">{dashIfEmpty(address)}</span>
                   </td>
-                  {/* ⚠️ truncate ต้องการกล่องที่มีความกว้างแน่นอน — inline-flex เดิมใช้ไม่ได้
-                      ใส่ title ไว้ให้อ่านเต็มตอน hover ข้อมูลจึงไม่หายไปกับการตัด */}
+                  {/* ใส่ title ไว้ให้อ่านเต็มตอน hover — ข้อความยาวเกิน 2 บรรทัดถูกตัด แต่ข้อมูลไม่หาย */}
                   <td className={cn('px-2 py-2', DASH.cell)} title={applicationJobLabel(r)}>
-                    <span className="flex max-w-36 items-center gap-1.5">
-                      <span className="truncate">{dashIfEmpty(applicationUnitLabel(r))}</span>
+                    <span className="flex min-w-44 items-start gap-1.5">
+                      <span className="line-clamp-2 break-words">{dashIfEmpty(applicationUnitLabel(r))}</span>
                       {r.has_document ? (
                         <FileText
                           className={cn('h-3.5 w-3.5 shrink-0', DASH.muted)}
@@ -217,7 +218,8 @@ const RmTable: React.FC<{
                           return d === 0 ? 'วันนี้' : `${d.toLocaleString('th-TH')} วัน`;
                         })()}
                         {' · '}
-                        {r.referral_source ? REFERRAL_SOURCE_LABEL[r.referral_source] : EM_DASH}
+                        {/* ช่องทางอ่านแบบเดียวกับตัวกรอง "ช่องทาง" — ตารางช่องทางของลิงก์ก่อน · ไม่มีค่อยใช้ที่ผู้สมัครเลือกเอง */}
+                        {r.channel_label?.trim() || (r.referral_source ? REFERRAL_SOURCE_LABEL[r.referral_source] : EM_DASH)}
                       </span>
                     </span>
                   </td>
@@ -235,7 +237,7 @@ const RmTable: React.FC<{
                               )
                             : EM_DASH}
                         </span>
-                        <span className={cn('block max-w-32 truncate text-xs', DASH.cellMuted)}>
+                        <span className={cn('line-clamp-2 min-w-32 break-words text-xs', DASH.cellMuted)}>
                           {r.appointment_place || r.appointment_job
                             ? `${r.appointment_place ?? ''}${r.appointment_place && r.appointment_job ? ' · ' : ''}${r.appointment_job ?? ''}`
                             : EM_DASH}

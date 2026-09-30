@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -281,15 +281,32 @@ type FilterPanelProps<K extends string> = FilterContentProps<K> & {
   resultText?: string;
 };
 
-/** หัวแถบ "ตัวกรองเพิ่มเติม  ✕ ล้าง" — ชื่อเดียวกับแบบร่างที่เจ้าของเคาะ */
-function FilterPanelHeader({ selected, onClear, resultText }: { selected: number; onClear: () => void; resultText?: string }) {
+/** หัวแถบ "ตัวกรองเพิ่มเติม  ✕ ล้าง" — ชื่อเดียวกับแบบร่างที่เจ้าของเคาะ · ส่ง `onCollapse` มา = มีปุ่มพับแถบ */
+function FilterPanelHeader({
+  selected,
+  onClear,
+  resultText,
+  onCollapse,
+}: {
+  selected: number;
+  onClear: () => void;
+  resultText?: string;
+  onCollapse?: () => void;
+}) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium text-foreground">ตัวกรองเพิ่มเติม</p>
-        <Button type="button" variant="ghost" size="xs" onClick={onClear} disabled={selected === 0}>
-          <X aria-hidden /> ล้าง
-        </Button>
+        <span className="flex items-center gap-1">
+          <Button type="button" variant="ghost" size="xs" onClick={onClear} disabled={selected === 0}>
+            <X aria-hidden /> ล้าง
+          </Button>
+          {onCollapse ? (
+            <Button type="button" variant="ghost" size="iconXs" onClick={onCollapse} aria-label="พับตัวกรอง" title="พับตัวกรอง">
+              <ChevronLeft aria-hidden />
+            </Button>
+          ) : null}
+        </span>
       </div>
       {selected > 0 && resultText ? <p className="text-xs text-muted-foreground">{resultText}</p> : null}
     </div>
@@ -300,18 +317,49 @@ function FilterPanelHeader({ selected, onClear, resultText }: { selected: number
  * แถบกรองด้านซ้ายแบบ iRecruit — แท็บรายชื่อผู้สมัคร / การโทรของฉัน / ติดตามนัดหมาย (เจ้าของสั่ง 28 ก.ย. 2569)
  * โชว์ตั้งแต่จอ xl (1280px) ขึ้นไป · จอเล็กกว่านั้นใช้ `FilterSheetButton` (เนื้อในชุดเดียวกัน)
  */
-export function FilterSidebar<K extends string>({ onClear, resultText, ...content }: FilterPanelProps<K>) {
+export function FilterSidebar<K extends string>({
+  onClear,
+  resultText,
+  onCollapse,
+  ...content
+}: FilterPanelProps<K> & {
+  /** พับแถบเก็บ (แท็บฝั่งผู้สมัคร · 30 ก.ย. 2569) — ไม่ส่ง = แถบกางถาวรแบบเดิม */
+  onCollapse?: () => void;
+}) {
   const n = selectedTotal(content.facets, content.sections);
   return (
     <aside
       aria-label="ตัวกรองเพิ่มเติม"
       className="hidden w-64 shrink-0 self-start rounded-xl border border-border bg-card p-3 xl:block"
     >
-      <FilterPanelHeader selected={n} onClear={onClear} resultText={resultText} />
+      <FilterPanelHeader selected={n} onClear={onClear} resultText={resultText} onCollapse={onCollapse} />
       <div className="mt-2">
         <FilterAccordion {...content} />
       </div>
     </aside>
+  );
+}
+
+/**
+ * ปุ่มกางแถบซ้ายที่พับอยู่ — "ตัวกรอง (N) ▸" (แท็บฝั่งผู้สมัคร · เจ้าของสั่ง 30 ก.ย. 2569: *"Filter ทำแบบย่อ กางได้"*
+ * → Choice "แถบซ้ายพับได้") · เฉพาะจอ xl ขึ้นไป (จอเล็กใช้ `FilterSheetButton` เหมือนเดิม)
+ * `selected` = จำนวนที่ติ๊กอยู่ทั้งแถบ (รวมหัวข้อเพิ่ม เช่น วันที่สมัคร)
+ */
+export function FilterSidebarToggle({ selected, onExpand }: { selected: number; onExpand: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="xs"
+      onClick={onExpand}
+      className={cn(triggerClass(selected > 0), 'hidden xl:inline-flex')}
+      aria-expanded={false}
+    >
+      <SlidersHorizontal aria-hidden />
+      ตัวกรอง
+      <TriggerCount n={selected} />
+      <ChevronRight aria-hidden />
+    </Button>
   );
 }
 

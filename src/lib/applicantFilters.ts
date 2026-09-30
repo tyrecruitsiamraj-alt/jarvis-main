@@ -36,6 +36,7 @@ export type ApplicantFacetKey =
   | 'apptWhen'
   | 'apptPlace'
   | 'attendance'
+  | 'recruiter'
   | 'call'
   | 'job'
   | 'position'
@@ -47,8 +48,15 @@ export type ApplicantFacetKey =
   | 'channel'
   | 'gender';
 
-/** ของที่ต้องรู้ตอนคิดค่า — แท็บ (หัวข้อนัดหมายโผล่เฉพาะแท็บนัด) + เวลาปัจจุบัน (ส่งเข้ามาให้เทสต์ได้) */
-export type ApplicantFacetFacts = { tab: RmTab; now: Date };
+/**
+ * ของที่ต้องรู้ตอนคิดค่า — แท็บ (หัวข้อนัดหมายโผล่เฉพาะแท็บนัด) + เวลาปัจจุบัน (ส่งเข้ามาให้เทสต์ได้) +
+ * ตัวบอก "เจ้าหน้าที่สรรหาของใบขอที่คนนี้สมัคร" (หน้ารู้จากชุดใบขอที่โหลดไว้ · ไม่ส่ง = ไม่มีหัวข้อนี้)
+ */
+export type ApplicantFacetFacts = {
+  tab: RmTab;
+  now: Date;
+  recruiterOf?: (r: PublicApplication) => string | null;
+};
 
 export type ApplicantFilterState = FacetState<ApplicantFacetKey>;
 export const EMPTY_APPLICANT_FILTER_STATE: ApplicantFilterState = { selection: {} };
@@ -122,6 +130,7 @@ function unspecifiedLabel(key: ApplicantFacetKey): string {
   if (key === 'apptWhen') return 'ยังไม่มีนัด';
   if (key === 'attendance') return 'ยังไม่บันทึก';
   if (key === 'job') return 'ไม่ระบุใบขอ';
+  if (key === 'recruiter') return 'ไม่ระบุเจ้าหน้าที่';
   return 'ไม่ระบุ';
 }
 
@@ -162,6 +171,23 @@ const FACETS: readonly Def[] = [
     labelOf: (v) => ATTENDANCE_LABEL[v as keyof typeof ATTENDANCE_LABEL] ?? v,
     available: onlyAppointments,
     values: (r) => [r.attendance_result && r.attendance_result in ATTENDANCE_LABEL ? r.attendance_result : UNSPECIFIED],
+  },
+  {
+    /**
+     * ═══ เจ้าหน้าที่สรรหา — ดูเป็นคน (เจ้าของสั่ง 30 ก.ย. 2569) ═══
+     * > *"Filter ต้องดูเป็นคนได้ เลือกชื่อเจ้าหน้าที่สรรหา แล้วขึ้นมาเฉพาะรายชื่อของเขา เช่น เลือก แบงค์
+     * >  ก็ขึ้นชื่อคนที่สนใจของแบงค์มา"*
+     * "ของแบงค์" = ใบขอที่คนนี้สมัคร **ตั้งแบงค์เป็นเจ้าหน้าที่สรรหาไว้** (ช่องผู้รับผิดชอบของใบขอ ·
+     * `siamraj_unit_assignments.recruiter_name`) — วัดจริง 30 ก.ย.: แบงค์ถือ 190 ใบขอ มีผู้สมัคร 7 คน ·
+     * ไม่ใช่คนที่กดเก็บ (เก็บแล้วไปอยู่แท็บการติดตามของคนเก็บเอง) และไม่ใช่ผู้รับผิดชอบลิงก์ (ทีม Online)
+     * ใบขอยังโหลดไม่ขึ้น = ไม่มีหัวข้อนี้ (ห้ามตัดแถวทิ้ง — engine กันให้)
+     */
+    key: 'recruiter',
+    label: 'เจ้าหน้าที่สรรหา',
+    ui: 'check',
+    searchable: true,
+    available: (facts) => Boolean(facts.recruiterOf),
+    values: (r, facts) => [trimOr(facts.recruiterOf?.(r))],
   },
   {
     key: 'call',
@@ -328,6 +354,7 @@ export const APPLICANT_PRIMARY_FACETS: readonly ApplicantFacetKey[] = [
   'apptWhen',
   'apptPlace',
   'attendance',
+  'recruiter',
   'call',
   'job',
   'province',

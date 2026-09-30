@@ -67,6 +67,11 @@ const StaffJobBoardPage: React.FC = () => {
     const pre = jobs.filter((j) => j.id.startsWith(PREQUEST_ID_PREFIX));
     return { positions: sumJobPositionUnits(jobs), prePositions: sumJobPositionUnits(pre), preCount: pre.length };
   }, [jobs, loading, feedState]);
+  /**
+   * ใบขอทั้งหมดที่หน้านี้โหลดไว้ (เปิดอยู่ + ปิดแล้ว) — แท็บผู้สมัครใช้บอก "เจ้าหน้าที่สรรหาของใบขอ"
+   * ให้ตัวกรองดูเป็นคน (30 ก.ย. 2569) · ใช้ชุดเดิม ไม่ยิงเส้นใหม่
+   */
+  const allJobs = useMemo(() => [...jobs, ...closed.rows], [jobs, closed.rows]);
   const [searchParams, setSearchParams] = useSearchParams();
   const raw = searchParams.get('view');
   const legacyBox = raw ? (LEGACY_BOX_VIEWS[raw] ?? null) : null;
@@ -129,7 +134,7 @@ const StaffJobBoardPage: React.FC = () => {
               <BoardDashboard boardOpen={boardOpen} />
             </Suspense>
           ) : (
-            <RmWorkspace tab={VIEW_TO_RM_TAB[view as (typeof RM_VIEWS)[number]]} />
+            <RmWorkspace tab={VIEW_TO_RM_TAB[view as (typeof RM_VIEWS)[number]]} jobs={allJobs} />
           )
         }
       />
