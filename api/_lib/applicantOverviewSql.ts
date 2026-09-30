@@ -30,7 +30,7 @@ const QUEUE_EVENT_AT = `coalesce(first_result_at, updated_at)`;
 const HOLD_EVENT_AT = `coalesce(result_at, updated_at, released_at, held_at)`;
 
 /** ผลที่นับว่า "คุยถึงตัว" (ติดต่อสำเร็จ — รวม declined เพราะติดต่อถึงตัวแล้ว ต้องเขียนอธิบายบนจอ) */
-const CONNECTED_OUTCOMES = `('confirmed','acknowledged','declined','reschedule_requested')`;
+export const CONNECTED_OUTCOMES = `('confirmed','acknowledged','declined','reschedule_requested')`;
 
 /**
  * หลักฐาน "ใบ a ถูกโทรแล้ว" — E1 คิวของใบตรง ๆ (app-<id> · เส้น S8) · E2 hold ของใบ
@@ -98,17 +98,27 @@ export const CALLED_BY_STAFF_SQL = `(${CALLED_VIA_HOLD_APP} or ${CALLED_VIA_CONT
  * (เวลาไว้ตัดสินว่าใครโทรทีหลัง — หนึ่งรายชื่อนับผลล่าสุดผลเดียว)
  * ⚠️ บันทึกผลติดต่อ (`application_contact_logs` · E3) ไม่มีรหัสผล (มีแค่ สำเร็จ/ไม่สำเร็จ) ⇒ ไม่อยู่ในแผงผลโทร
  */
+/**
+ * แถวคิว `q` ที่เป็น "ผลโทรของ AI" ของใบ `a` — คิวของใบตรง ๆ หรือผลบนเบอร์เดียวกันหลังเวลากรอกใบ (ไม่นับยกเลิก)
+ * 🔴 ตัวเดียวของ `LATEST_AI_RESULT_LATERAL` กับตารางผลงานของหน้าภาพรวม (แถว AI) — หลักฐานชุดเดียวกับ `CALLED_BY_AI_SQL`
+ */
+export const AI_RESULT_OF_APP_SQL = `(q.person_ref = 'app-' || a.id::text
+            or (a.phone_e164 is not null and ${qcol('q', QUEUE_PHONE)} = a.phone_e164
+                and ${qcol('q', QUEUE_EVENT_AT)} >= a.created_at))
+       and ${qcol('q', QUEUE_OUTCOME)} is not null
+       and ${qcol('q', QUEUE_OUTCOME)} <> 'cancelled'`;
+
+/** รหัสผล / เวลาเหตุการณ์ของแถวคิว `q` (ตัวเดียวกับที่ใช้ตัดสินหลักฐาน) */
+export const AI_RESULT_OUTCOME_SQL = qcol('q', QUEUE_OUTCOME);
+export const AI_RESULT_AT_SQL = qcol('q', QUEUE_EVENT_AT);
+
 export const LATEST_AI_RESULT_LATERAL = `left join lateral (
     select ${qcol('q', QUEUE_OUTCOME)} as outcome,
            q.result->>'summary' as summary,
            ${queueReplySql('q')} as reply,
            ${qcol('q', QUEUE_EVENT_AT)} as at
       from ${QUEUE} q
-     where (q.person_ref = 'app-' || a.id::text
-            or (a.phone_e164 is not null and ${qcol('q', QUEUE_PHONE)} = a.phone_e164
-                and ${qcol('q', QUEUE_EVENT_AT)} >= a.created_at))
-       and ${qcol('q', QUEUE_OUTCOME)} is not null
-       and ${qcol('q', QUEUE_OUTCOME)} <> 'cancelled'
+     where ${AI_RESULT_OF_APP_SQL}
      order by ${qcol('q', QUEUE_EVENT_AT)} desc nulls last
      limit 1
   ) air on true`;
@@ -154,31 +164,51 @@ export const HELD_OR_CLAIMED_SQL = `(
         where h.phone_e164 = a.phone_e164 and h.released_at is null))
 )`;
 
-/** ผลล่าสุดต่อใบ (เทียบเวลาข้ามแหล่ง: log ใบ vs ผลบนเบอร์) → 'success' | 'failed' | null */
-const LATEST_CLASS_SQL = `(
-  select cls from (
-    select case when c.ok then 'success' else 'failed' end as cls, c.created_at as at
+/**
+ * เหตุการณ์ที่ตัดสิน "ผลติดต่อล่าสุด" ของใบ — **ชุดเดียว** ของ `LATEST_CLASS_SQL` กับ `LATEST_CONTACT_LATERAL`
+ * (log ใบ = คน · ผลคิวบนเบอร์หลังกรอกใบ = AI · ผล hold = คน) · `withSource` แถมคอลัมน์ `src` ว่าเป็นผลของ AI หรือคน
+ */
+function latestClassEvents(withSource: boolean): string {
+  const src = (who: 'ai' | 'staff', first = false) => (withSource ? `, '${who}'::text${first ? ' as src' : ''}` : '');
+  return `
+    select case when c.ok then 'success' else 'failed' end as cls${src('staff', true)}, c.created_at as at
       from ${CONTACTS} c where c.application_id = a.id
     union all
-    select case when ${qcol('q', QUEUE_OUTCOME)} in ${CONNECTED_OUTCOMES} then 'success' else 'failed' end,
+    select case when ${qcol('q', QUEUE_OUTCOME)} in ${CONNECTED_OUTCOMES} then 'success' else 'failed' end${src('ai')},
            ${qcol('q', QUEUE_EVENT_AT)}
       from ${QUEUE} q
      where a.phone_e164 is not null and ${qcol('q', QUEUE_PHONE)} = a.phone_e164
        and ${qcol('q', QUEUE_OUTCOME)} is not null and ${qcol('q', QUEUE_OUTCOME)} <> 'cancelled'
        and ${qcol('q', QUEUE_EVENT_AT)} >= a.created_at
     union all
-    select case when h.result_outcome in ${CONNECTED_OUTCOMES} then 'success' else 'failed' end,
+    select case when h.result_outcome in ${CONNECTED_OUTCOMES} then 'success' else 'failed' end${src('staff')},
            ${qcol('h', HOLD_EVENT_AT)}
       from ${HOLDS} h
      where ((h.source = 'application' and h.candidate_ref = a.id::text)
             or (a.phone_e164 is not null and h.phone_e164 = a.phone_e164
                 and ${qcol('h', HOLD_EVENT_AT)} >= a.created_at))
-       and h.result_outcome is not null
+       and h.result_outcome is not null`;
+}
+
+/** ผลล่าสุดต่อใบ (เทียบเวลาข้ามแหล่ง: log ใบ vs ผลบนเบอร์) → 'success' | 'failed' | null */
+export const LATEST_CLASS_SQL = `(
+  select cls from (${latestClassEvents(false)}
   ) ev order by ev.at desc limit 1
 )`;
 
+/**
+ * ═══ ผลติดต่อล่าสุด + ใครได้ผลนั้น (AI/คน) — หน้าภาพรวมงานสรรหา (30 ก.ย. 2569) ═══
+ * เหตุการณ์ชุดเดียวกับ `LATEST_CLASS_SQL` (ฟังก์ชันเดียวกัน) เลือกแถวล่าสุดแถวเดียว ⇒ `lc.cls` = ค่าเดียวกับ `LATEST_CLASS_SQL`
+ * · `lc.src` = 'ai' | 'staff' ของแถวนั้น — การ์ด "ติดต่อสำเร็จ" แยก AI/คน ได้โดยรวมกันเท่ายอดพอดี
+ * ต่อท้าย `from <apps> a` แบบ lateral
+ */
+export const LATEST_CONTACT_LATERAL = `left join lateral (
+    select ev.cls, ev.src from (${latestClassEvents(true)}
+    ) ev order by ev.at desc limit 1
+  ) lc on true`;
+
 /** เวลาโทรครั้งแรกของใบ (คำนวณตอนอ่าน — ไม่ stamp บนใบ ดูเหตุผลในหัวไฟล์) */
-const FIRST_CALLED_AT_SQL = `(
+export const FIRST_CALLED_AT_SQL = `(
   select min(at) from (
     select c.created_at as at from ${CONTACTS} c where c.application_id = a.id
     union all
@@ -207,7 +237,7 @@ export const HAS_APPOINTMENT_SQL = `(
 )`;
 
 /** วันนัดล่าสุดของใบ (contact log ชนะ hold — กติกาเดียวกับ HAS_APPOINTMENT_SQL) */
-const APPOINTMENT_AT_SQL = `coalesce(
+export const APPOINTMENT_AT_SQL = `coalesce(
   (select c.appointment_at from ${CONTACTS} c
     where c.application_id = a.id and c.ok and c.appointment_at is not null
     order by c.created_at desc limit 1),
@@ -225,13 +255,42 @@ const APPOINTMENT_AT_SQL = `coalesce(
  * เพื่อให้ตัวนับกับ drill-down ใช้เงื่อนไขเดียวกัน (เทสต์ bucket-parity ครอบให้เอง)
  * ⚠️ `rescheduled` นับเป็น "ยังไม่มีผล" เหมือนเดิม (เลื่อนนัด = ยังไม่รู้ว่ามาหรือไม่มา)
  */
-const OVERDUE_NO_RESULT_SQL = `(
-  ${APPOINTMENT_AT_SQL} < now()
-  and coalesce((
+/** ผลมา/ไม่มา/เลื่อนนัด ล่าสุดของใบ (089) — ตัวเดียวของถังเลยนัด/นัดข้างหน้า และหน้าภาพรวม */
+export const LATEST_ATTENDANCE_SQL = `(
     select r.result from ${ATTENDANCE} r
      where r.application_id = a.id
      order by r.appointment_at desc nulls last, r.created_at desc limit 1
-  ), 'rescheduled') = 'rescheduled'
+  )`;
+
+const OVERDUE_NO_RESULT_SQL = `(
+  ${APPOINTMENT_AT_SQL} < now()
+  and coalesce(${LATEST_ATTENDANCE_SQL}, 'rescheduled') = 'rescheduled'
+)`;
+
+/**
+ * นัดใน 7 วันข้างหน้าที่ยังไม่มีผล — คู่กับ `OVERDUE_NO_RESULT_SQL` (กติกา "ยังไม่มีผล" ชุดเดียวกัน · หน้าภาพรวม 30 ก.ย. 2569)
+ * ⚠️ 7 วัน = 7 × 24 ชม. นับจากตอนนี้ (กติกาเจ้าของ: ครบ 24 ชม. ถึงนับเป็นวัน)
+ */
+export const UPCOMING_7D_NO_RESULT_SQL = `(
+  ${APPOINTMENT_AT_SQL} >= now()
+  and ${APPOINTMENT_AT_SQL} < now() + interval '7 days'
+  and coalesce(${LATEST_ATTENDANCE_SQL}, 'rescheduled') = 'rescheduled'
+)`;
+
+/**
+ * เวลาล่าสุดที่เจ้าหน้าที่ลงมือกับใบนี้ — ลงผลโทร (hold) หรือบันทึกผลติดต่อ (log) · หลักฐานชุดเดียวกับ `CALLED_BY_STAFF_SQL`
+ * หน้าภาพรวมใช้ตัดสิน "ตอบ AI ว่าสนใจแล้ว คนโทรต่อหรือยัง" (เวลาคน ≥ เวลาที่ AI ได้คำตอบ)
+ */
+export const STAFF_LAST_AT_SQL = `(
+  select max(at) from (
+    select c.created_at as at from ${CONTACTS} c where c.application_id = a.id
+    union all
+    select ${qcol('h', HOLD_EVENT_AT)} from ${HOLDS} h
+     where ((h.source = 'application' and h.candidate_ref = a.id::text)
+            or (a.phone_e164 is not null and h.phone_e164 = a.phone_e164
+                and ${qcol('h', HOLD_EVENT_AT)} >= a.created_at))
+       and h.result_outcome is not null
+  ) t
 )`;
 
 /**

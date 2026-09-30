@@ -45,6 +45,7 @@ import jobApplicationsHandler from './job-applications.js';
 import applicationContactsHandler from './application-contacts.js';
 import applicationAttendanceHandler from './application-attendance.js';
 import recruitRmOverviewHandler from './recruit-rm-overview.js';
+import recruitOverviewHandler from './recruit-overview.js';
 import applicationDispatchHandler from './application-dispatch.js';
 import applicationCallChoiceHandler from './application-call-choice.js';
 import selectionProgressHandler from './selection-progress.js';
@@ -217,6 +218,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/application-contacts': applicationContactsHandler as ApiHandler,
   '/api/application-attendance': applicationAttendanceHandler as ApiHandler,
   '/api/recruit-rm-overview': recruitRmOverviewHandler as ApiHandler,
+  '/api/recruit-overview': recruitOverviewHandler as ApiHandler,
   '/api/application-dispatch': applicationDispatchHandler as ApiHandler,
   // "ใครจะโทรหาคนนี้" — ปุ่มเก็บไปโทรเอง (claim+ล็อกเบอร์) / ส่ง AI โทร · กอง "เลือกวิธีโทร"
   '/api/application-call-choice': applicationCallChoiceHandler as ApiHandler,

@@ -326,6 +326,9 @@ describe('กล่องงาน + แท็บผู้สมัคร ต้
     'src/components/dashboard-trends/FollowDashboard.tsx',
     'src/components/dashboard-trends/TrendParts.tsx',
     'src/components/dashboard-trends/LumosPipelineSection.tsx',
+    // แท็บภาพรวมแบบ iRecruit (30 ก.ย. 2569)
+    'src/components/dashboard-trends/RecruitOverview.tsx',
+    'src/components/dashboard-trends/RecruitOverviewParts.tsx',
   ];
   const codeOf = (f: string) => read(f).replace(/\/\*[\s\S]*?\*\//g, '');
 

@@ -123,4 +123,18 @@ describe('แท็บ Dashboard อยู่ในสองหน้า แล�
     expect(page).toContain('sumJobPositionUnits(jobs)');
     expect(page).toContain('<BoardDashboard boardOpen={boardOpen} />');
   });
+  it('🔴 แท็บภาพรวม = ภาพรวมงานสรรหาแบบ iRecruit (30 ก.ย. 2569) · แผงเดิมเป็นทางถอยที่ ?dash=classic (lazy ทั้งคู่)', () => {
+    const page = code('src/pages/jobs/StaffJobBoardPage.tsx');
+    expect(page).toContain("lazy(() => import('@/components/dashboard-trends/RecruitOverview'))");
+    expect(page).toContain("const classicDashboard = searchParams.get('dash') === 'classic';");
+    expect(page).toContain('{classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview />}');
+  });
+  it.each([
+    'src/components/dashboard-trends/RecruitOverview.tsx',
+    'src/components/dashboard-trends/RecruitOverviewParts.tsx',
+  ])('%s — ไม่มีลิงก์ไปหน้าใบขอ/จับคู่งาน · ไม่นับเลขเอง (ตัวคิดอยู่ที่ recruitOverview.ts)', (f) => {
+    const src = code(f);
+    expect(src).not.toMatch(/navigateToUnitRequest\(|['"`]\/jobs\/siamraj\/|['"`]\/matching\//);
+    expect(src).not.toMatch(/classifyCallMicro|\.filter\(\(f\) => f\.(calledByAi|aiAnswer)/);
+  });
 });

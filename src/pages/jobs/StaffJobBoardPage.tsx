@@ -10,8 +10,11 @@ import { PREQUEST_ID_PREFIX } from '@/lib/siamrajUnitRequestsApi';
 
 /**
  * แท็บ Dashboard (28 ก.ย. 2569) — โหลดเมื่อกดเท่านั้น: กราฟ recharts + ข้อมูลย้อนหลังไม่ควรถ่วงกล่องงานที่คนเปิดทั้งวัน
+ * 🔴 30 ก.ย. 2569 แท็บภาพรวม = **ภาพรวมงานสรรหาแบบ iRecruit** (`RecruitOverview` · เจ้าของ Choice "ทั้งหน้าเป็น iRecruit")
+ * แผงเดิม (`BoardDashboard`) เก็บไว้เป็นทางถอยที่ `?dash=classic` — ห้ามลบจนกว่าเจ้าของจะสั่ง
  */
 const BoardDashboard = lazy(() => import('@/components/dashboard-trends/BoardDashboard'));
+const RecruitOverview = lazy(() => import('@/components/dashboard-trends/RecruitOverview'));
 
 /**
  * บอร์ดรับสมัครฝั่งเจ้าหน้าที่ — สี่มุมมองในหน้าเดียว
@@ -79,6 +82,8 @@ const StaffJobBoardPage: React.FC = () => {
     ? (raw as BoardViewId)
     : 'board';
   const retiredView = (RETIRED_VIEWS as readonly string[]).includes(raw ?? '');
+  /** ทางถอยของแท็บภาพรวม — แผง Dashboard เดิม (28 ก.ย.) ยังเปิดได้ที่ `?view=dashboard&dash=classic` */
+  const classicDashboard = searchParams.get('dash') === 'classic';
 
   /** ลิงก์เก่ามาถึงแล้ว = เลือกกล่องให้ (หรือเปิดกล่องงานแทนแท็บที่ถอดแล้ว) แล้วล้าง ?view ทิ้ง
    *  (URL ไม่ค้างค่าที่ไม่มีความหมาย) */
@@ -130,8 +135,8 @@ const StaffJobBoardPage: React.FC = () => {
         initialBox={legacyBox}
         listContent={
           view === 'board' ? null : view === 'dashboard' ? (
-            <Suspense fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิด Dashboard…</p>}>
-              <BoardDashboard boardOpen={boardOpen} />
+            <Suspense fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิดภาพรวม…</p>}>
+              {classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview />}
             </Suspense>
           ) : (
             <RmWorkspace tab={VIEW_TO_RM_TAB[view as (typeof RM_VIEWS)[number]]} jobs={allJobs} />
