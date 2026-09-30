@@ -21,6 +21,9 @@ import CallSuppressionTab from '@/pages/settings/CallSuppressionTab';
 import ApplicationAutoMoveTab from '@/pages/settings/ApplicationAutoMoveTab';
 import SystemHealthTab from '@/pages/settings/SystemHealthTab';
 import NavMenuTab from '@/pages/settings/NavMenuTab';
+import { PresenceFilterChips, PresenceLine } from '@/pages/settings/UserPresence';
+import { useUserPresence } from '@/pages/settings/useUserPresence';
+import { matchesPresence, sortByPresence, type PresenceFilter } from '@/lib/homePresence';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
@@ -133,6 +136,19 @@ const AdminSettings: React.FC = () => {
   const [userPageSize, setUserPageSize] = useState<PageSizeOption>(10);
   const [auditPage, setAuditPage] = useState(1);
   const [auditPageSize, setAuditPageSize] = useState<PageSizeOption>(20);
+  /**
+   * ใครอยู่ในระบบ (ย้ายมาจากท้ายหน้าหลัก 30 ก.ย. 2569 · เจ้าของเลือก "รวมเข้าตารางผู้ใช้งาน") — Online ขึ้นก่อน ·
+   * ใต้ชื่อบอกสถานะ · ปุ่มกรองเหนือตาราง · ดึงใหม่ทุก 1 นาทีตอนเปิดแท็บนี้
+   */
+  const presence = useUserPresence(canAdmin && activeTab === 'users');
+  const [presenceFilter, setPresenceFilter] = useState<PresenceFilter>('all');
+  const presencePeople = presence.data?.people ?? null;
+  const presenceById = React.useMemo(() => new Map((presencePeople ?? []).map((p) => [p.id, p])), [presencePeople]);
+  const presenceNow = presence.data ? new Date(presence.data.generated_at) : new Date();
+  const shownUsers = React.useMemo(
+    () => sortByPresence(apiUsers, presencePeople ?? []).filter((u) => matchesPresence(presenceById.get(u.id), presenceFilter)),
+    [apiUsers, presencePeople, presenceById, presenceFilter],
+  );
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [userActionError, setUserActionError] = useState('');
   const [userActionOk, setUserActionOk] = useState('');
@@ -170,11 +186,11 @@ const AdminSettings: React.FC = () => {
     setUserActionOk('');
   }, [activeTab]);
 
-  // แบ่งหน้าผู้ใช้ + กันค้างอยู่หน้าที่หายไปเมื่อจำนวนคนหรือจำนวนต่อหน้าเปลี่ยน
-  const userTotalPages = getTotalPages(apiUsers.length, userPageSize);
+  // แบ่งหน้าผู้ใช้ + กันค้างอยู่หน้าที่หายไปเมื่อจำนวนคนหรือจำนวนต่อหน้าเปลี่ยน (นับจากรายชื่อที่เรียง/กรองสถานะแล้ว)
+  const userTotalPages = getTotalPages(shownUsers.length, userPageSize);
   const currentUserPage = Math.min(userPage, userTotalPages);
   const userPageStart = (currentUserPage - 1) * userPageSize;
-  const visibleUsers = apiUsers.slice(userPageStart, userPageStart + userPageSize);
+  const visibleUsers = shownUsers.slice(userPageStart, userPageStart + userPageSize);
   useEffect(() => {
     if (userPage > userTotalPages) setUserPage(userTotalPages);
   }, [userPage, userTotalPages]);
@@ -183,9 +199,9 @@ const AdminSettings: React.FC = () => {
     <ListPaginationBar
       page={currentUserPage}
       pageSize={userPageSize}
-      totalItems={apiUsers.length}
+      totalItems={shownUsers.length}
       totalPages={userTotalPages}
-      pageFrom={apiUsers.length === 0 ? 0 : userPageStart + 1}
+      pageFrom={shownUsers.length === 0 ? 0 : userPageStart + 1}
       pageTo={userPageStart + visibleUsers.length}
       onPageChange={setUserPage}
       onPageSizeChange={(size) => {
@@ -395,6 +411,22 @@ const AdminSettings: React.FC = () => {
             <p className="text-sm text-muted-foreground p-4">กำลังโหลดรายชื่อผู้ใช้…</p>
           ) : (
             <div className="glass-card rounded-xl border border-border overflow-x-auto">
+              {presence.data?.counts && presencePeople ? (
+                <div className="px-4 pt-4">
+                  <PresenceFilterChips
+                    counts={presence.data.counts}
+                    total={apiUsers.length}
+                    value={presenceFilter}
+                    onChange={(f) => {
+                      setPresenceFilter(f);
+                      setUserPage(1);
+                    }}
+                    updatedAt={presence.data.generated_at}
+                  />
+                </div>
+              ) : presence.error ? (
+                <p className={cn('px-4 pt-4 text-xs', TONE.danger.value)}>{presence.error}</p>
+              ) : null}
               {userActionError ? (
                 <div className="mx-4 mt-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {userActionError}
@@ -434,17 +466,25 @@ const AdminSettings: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {apiUsers.length === 0 && (
+                  {apiUsers.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="px-4 py-6 text-center text-muted-foreground">
                         ยังไม่มีผู้ใช้ (หรือโหลดไม่สำเร็จ)
                       </td>
                     </tr>
-                  )}
+                  ) : shownUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="px-4 py-6 text-center text-muted-foreground">
+                        ไม่มีใครในกลุ่มนี้
+                      </td>
+                    </tr>
+                  ) : null}
                   {visibleUsers.map((u) => (
                     <tr key={u.id} className="border-b border-border/50 hover:bg-secondary/20">
                       <td className="px-4 py-3 font-medium text-foreground">
                         {u.full_name}
+                        {/* ใครอยู่ในระบบ (ย้ายมาจากหน้าหลัก 30 ก.ย. 2569) — Online / Offline / ยังไม่เข้าระบบ ใต้ชื่อ */}
+                        <PresenceLine person={presenceById.get(u.id)} now={presenceNow} />
                         {/* จอแคบ: อีเมลมาอยู่ใต้ชื่อ (คอลัมน์ Email ถูกซ่อน) */}
                         <span className="block text-[11px] font-normal text-muted-foreground lg:hidden">
                           {u.email}

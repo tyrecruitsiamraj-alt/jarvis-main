@@ -1,4 +1,4 @@
-/** ตัวดึง `/api/home-presence` — ใครอยู่ในระบบ ท้ายหน้าหลัก (30 ก.ย. 2569) */
+/** ตัวดึง `/api/home-presence` — ใครอยู่ในระบบ (30 ก.ย. 2569 · ตอนนี้ใช้ที่ ตั้งค่า › ผู้ใช้งาน) */
 import { apiFetch } from '@/lib/apiFetch';
 import type { HomePresenceResponse } from '@/lib/homePresence';
 

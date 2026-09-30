@@ -22,6 +22,8 @@ import {
   presenceStatus,
   sortPresence,
   type PresencePerson,
+  matchesPresence,
+  sortByPresence,
 } from '../../src/lib/homePresence.js';
 
 const NOW = new Date('2026-09-30T05:00:00Z'); // 12:00 น. เวลาไทย
@@ -157,5 +159,44 @@ describe('คิวรี', () => {
     expect(body.people).toBeNull();
     expect(body.counts).toBeNull();
     expect(body.by_bu).toBeNull();
+  });
+});
+
+describe('ตาราง ตั้งค่า › ผู้ใช้งาน (ย้ายมาจากหน้าหลัก 30 ก.ย. 2569 · เจ้าของเลือก "รวมเข้าตารางผู้ใช้งาน")', () => {
+  const p = (id: string, status: PresencePerson['status'], lastActiveAt: string | null, lastLoginAt: string | null): PresencePerson => ({
+    id,
+    name: id,
+    bu: 'LBD',
+    role: 'staff',
+    status,
+    lastActiveAt,
+    lastLoginAt,
+  });
+  const people = [
+    p('off-old', 'offline', null, '2026-09-20T02:00:00Z'),
+    p('on-late', 'online', '2026-09-30T04:59:00Z', '2026-09-30T01:00:00Z'),
+    p('never', 'never', null, null),
+    p('off-new', 'offline', null, '2026-09-29T02:00:00Z'),
+    p('on-early', 'online', '2026-09-30T04:40:00Z', '2026-09-30T01:00:00Z'),
+  ];
+
+  it('🔴 เรียง Online (ใช้ล่าสุดก่อน) → Offline (เข้าล่าสุดก่อน) → ยังไม่เข้าระบบ → บัญชีไม่มีสถานะไว้ท้ายตามลำดับเดิม', () => {
+    const users = ['inactive-a', 'never', 'off-old', 'on-early', 'inactive-b', 'off-new', 'on-late'].map((id) => ({ id }));
+    expect(sortByPresence(users, people).map((u) => u.id)).toEqual([
+      'on-late',
+      'on-early',
+      'off-new',
+      'off-old',
+      'never',
+      'inactive-a',
+      'inactive-b',
+    ]);
+  });
+
+  it('ตัวกรอง: ทั้งหมดผ่านทุกบัญชี (รวมไม่มีสถานะ) · สถานะอื่นผ่านเฉพาะตรงสถานะ', () => {
+    expect(matchesPresence(undefined, 'all')).toBe(true);
+    expect(matchesPresence(undefined, 'online')).toBe(false);
+    expect(matchesPresence(people[1], 'online')).toBe(true);
+    expect(matchesPresence(people[1], 'offline')).toBe(false);
   });
 });

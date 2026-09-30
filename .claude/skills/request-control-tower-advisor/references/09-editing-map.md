@@ -10655,3 +10655,16 @@ AI คน ไม่โทร แท่งไหนสูงสุด พอเ�
 > ลบ `AiShareBuSheet.tsx` · `AiShareCompareChart.tsx` · ตัวคิด `detailTable` / `detailBreakdown` / `topKeys` (+ เทสต์) ·
 > แท่งรายวันกดไม่ได้ (`AiShareUsageChart` ไม่ได้ `onPick` = ไม่มีมือชี้) · แท่งหน่วยใหญ่ยังกดลงไปดูได้ ·
 > `Sheet surface="glass"` ใน `ui/sheet.tsx` ยังอยู่ (เป็น variant ของระบบ ไม่มีจอไหนใช้ตอนนี้)
+
+### รอบ 19 (30 ก.ย. 2569) — "ใครอยู่ในระบบ" ย้ายจากหน้าหลักไป ตั้งค่า › ผู้ใช้งาน
+
+เจ้าของ: *"ใครอยู่ในระบบ ย้ายไปหน้าอื่น หน้าตั้งค่าก็ได้ เรียงไอผู้ใช้งานใหม่ ก็บอกเลยใคร online อะไรยังไง"* → Choice **"รวมเข้าตารางผู้ใช้งาน"**
+
+| ไฟล์ | หน้าที่ |
+| --- | --- |
+| `src/pages/settings/UserPresence.tsx` (ใหม่) + `UserPresence.test.tsx` (ใหม่) | `PresenceFilterChips` ปุ่มกรอง ทั้งหมด/Online/Offline/ยังไม่เข้าระบบ (บอกจำนวน + เวลาอัปเดต) · `PresenceLine` บรรทัดใต้ชื่อ (บรรทัดเดียวเสมอ) |
+| `src/pages/settings/useUserPresence.ts` (ใหม่) | ดึง `/api/home-presence` ทุก 1 นาทีตอนเปิดแท็บผู้ใช้งาน |
+| `src/pages/settings/AdminSettings.tsx` | แท็บผู้ใช้งาน: เรียงด้วย `sortByPresence` (Online ใช้ล่าสุดก่อน → Offline เข้าล่าสุดก่อน → ยังไม่เข้าระบบ → บัญชีปิดใช้งานท้าย) · กรองด้วย `matchesPresence` · แบ่งหน้านับจากรายชื่อที่เรียง/กรองแล้ว |
+| `src/lib/homePresence.ts` (+ เทสต์) | `PresenceFilter` · `sortByPresence` · `matchesPresence` |
+| `src/components/home-ai-share/HomePresencePanel.tsx` | **ลบแล้ว** — หน้าหลักไม่มีแผงนี้ (แผงผลโทรเป็นแผงสุดท้าย) |
+| `api/_handlers/home-presence.ts` | ชื่อเส้นคงเดิม · ตอนนี้ใช้ที่หน้าตั้งค่า (admin ได้รายชื่อเสมอ) |

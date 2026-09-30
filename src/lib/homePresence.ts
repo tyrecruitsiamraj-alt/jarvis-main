@@ -1,5 +1,9 @@
 /**
- * ═══ ใครอยู่ในระบบ — ท้ายหน้าหลัก (เจ้าของสั่ง 30 ก.ย. 2569) ═══
+ * ═══ ใครอยู่ในระบบ (เจ้าของสั่ง 30 ก.ย. 2569) ═══
+ *
+ * 🔴 ย้ายแล้ว: เดิมเป็นแผงท้ายหน้าหลัก → ตอนนี้อยู่ใน **ตั้งค่า › ผู้ใช้งาน** (เจ้าของ: *"ใครอยู่ในระบบ ย้ายไปหน้าอื่น
+ *    หน้าตั้งค่าก็ได้ เรียงผู้ใช้งานใหม่ บอกเลยใคร online"* → Choice "รวมเข้าตารางผู้ใช้งาน") · ใต้ชื่อบอกสถานะ ·
+ *    Online ขึ้นก่อน (`sortByPresence`) · ปุ่มกรองสถานะเหนือตาราง (`matchesPresence`)
  *
  * เจ้าของ: *"หน้านี้ด้านล่างเพิ่ม ใครกำลัง Online ใคร offline ใครยังไม่เข้าระบบ เข้าระบบล่าสุดวันไหน"*
  * → Choice **"ดูจากการใช้งานล่าสุด"** (ระบบไม่มีบันทึกการเปิดดู) · **หัวหน้ากับผู้ดูแลเห็นชื่อ** คนอื่นเห็นแค่ยอด
@@ -127,6 +131,26 @@ export function sortPresence(people: readonly PresencePerson[]): PresencePerson[
       (a.bu || '~').localeCompare(b.bu || '~') ||
       a.name.localeCompare(b.name, 'th'),
   );
+}
+
+/** ตัวกรองสถานะของตารางผู้ใช้งาน — ทั้งหมด หรือสถานะใดสถานะหนึ่ง */
+export type PresenceFilter = 'all' | PresenceStatus;
+
+/**
+ * เรียงบัญชีในตารางผู้ใช้งานตามสถานะ — ลำดับเดียวกับ `sortPresence` (Online ใช้ล่าสุดก่อน → Offline เข้าล่าสุดก่อน →
+ * ยังไม่เข้าระบบ) · บัญชีที่ไม่มีสถานะ (ปิดใช้งาน · นอก BU ที่เห็นได้) ไว้ท้ายสุดตามลำดับเดิม
+ */
+export function sortByPresence<T extends { id: string }>(items: readonly T[], people: readonly PresencePerson[]): T[] {
+  const rank = new Map(sortPresence(people).map((p, i) => [p.id, i]));
+  return items
+    .map((item, i) => ({ item, i, r: rank.get(item.id) ?? Number.MAX_SAFE_INTEGER }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map((x) => x.item);
+}
+
+/** บัญชีนี้ผ่านตัวกรองไหม — "ทั้งหมด" ผ่านทุกบัญชี (รวมบัญชีที่ไม่มีสถานะ) */
+export function matchesPresence(person: PresencePerson | undefined, filter: PresenceFilter): boolean {
+  return filter === 'all' || person?.status === filter;
 }
 
 export function countPresence(people: readonly PresencePerson[]): PresenceCounts {

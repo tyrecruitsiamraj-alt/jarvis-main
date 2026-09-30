@@ -6,7 +6,7 @@
  * รอบ 1: ติดตาม + ผู้สมัครในกล่องงาน เรียงบนล่างตามภาพที่เลือก
  * รอบ 2: *"เอาหน้าติดตามหลังเริ่มงานมาด้วย จับคู่งานด้วยเพิ่มมา · ช่วงฉันขอเป็น calendar"* ⇒ 4 หัวข้อ
  *        (ติดตาม → ดูแลหลังเริ่มงาน → ผู้สมัคร → จับคู่งาน) · คำบนจอเขียนแบบคนพูด ไม่ใช่ภาษา AI
- * รอบ 3: *"ด้านล่างเพิ่ม ใครกำลัง Online ใคร offline ใครยังไม่เข้าระบบ"* (`HomePresencePanel`) ·
+ * รอบ 3: *"ด้านล่างเพิ่ม ใครกำลัง Online ใคร offline ใครยังไม่เข้าระบบ"* (แผงนี้ย้ายไป ตั้งค่า › ผู้ใช้งาน แล้ว รอบ 19) ·
  *        *"calendar มันดูยาก"* ⇒ `PeriodPicker` วันเดียว / ทั้งสัปดาห์ / ทั้งเดือน / ช่วงวัน · ค่าตั้งต้น **7 วันล่าสุด**
  * รอบ 4 (แบบอ้างอิง Dribbble 3 ลิงก์ เจ้าของเลือกเอง): เทียบกับช่วงก่อน · ป้ายหนักไปทางไหน · เกจครึ่งวง ·
  *        กราฟบอกวันที่มากสุด + เส้นเฉลี่ยต่อวัน
@@ -22,7 +22,9 @@
  *        ปฏิทิน + dropdown ย้ายมาฝั่งซ้าย (ต่อจากชื่อหน้า) · ปฏิทินเหลือ "ช่วง" (เดือน/ทั้งปี + ปี) กับ "วันเดียว" ·
  *        แท่ง BU ขึ้นป้ายสีครบทุก BU · ในแท่งเหลือเลข + % · แกนล่างเหลือเลขวัน หัวกราฟบอกเดือน + ช่วงวัน
  * รอบ 18: ปฏิทิน วัน/สัปดาห์/เดือน/ปี กดสองครั้งเป็นช่วง + ปุ่มยืนยัน · เลือกหลายเดือน/ปี/สัปดาห์ = หนึ่งแท่งต่อหน่วย
- *        กดแท่งลงไปดูข้างใน · แผง "ผลโทร" ซ่อนไว้ก่อนใครอยู่ในระบบ · แท่งแคบลง · ช่องไฟ/ระยะบรรทัดเท่ากันทั้งหน้า (`EVEN_TYPE`)
+ *        กดแท่งลงไปดูข้างใน · แผง "ผลโทร" ซ่อนไว้ · แท่งแคบลง · ช่องไฟ/ระยะบรรทัดเท่ากันทั้งหน้า (`EVEN_TYPE`)
+ * รอบ 19: เจ้าของ *"ใครอยู่ในระบบ ย้ายไปหน้าอื่น หน้าตั้งค่าก็ได้"* → Choice "รวมเข้าตารางผู้ใช้งาน" ⇒ แผงท้ายหน้าถอดแล้ว
+ *        ย้ายไป ตั้งค่า › ผู้ใช้งาน (`src/pages/settings/UserPresence.tsx`)
  *
  * นิยามอยู่ `src/lib/homeAiShare.ts` · ตัวเลขมาจาก `/api/home-ai-share` เส้นเดียว
  * 🔴 ชั้นคู่ขนาน: หน้านี้คือค่าตั้งต้นของ `/` (`?home=new`) · หน้าเดิมยังเรียกได้ที่ `?home=classic` (ทางถอย)
@@ -34,7 +36,6 @@ import AiShareCard, { type AiShareCardProps } from '@/components/home-ai-share/A
 import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
 import HomeCallResultsPanel from '@/components/home-ai-share/HomeCallResultsPanel';
-import HomePresencePanel from '@/components/home-ai-share/HomePresencePanel';
 import PeriodPicker from '@/components/shared/PeriodPicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -340,10 +341,8 @@ const HomeAiSharePage: React.FC = () => {
         count={counts ? counts[listKey] : null}
       />
 
-      {/* ผลโทร ซ่อนไว้ กดแล้วกาง · อยู่ก่อน "ใครอยู่ในระบบ" (รอบ 18) */}
+      {/* ผลโทร ซ่อนไว้ กดแล้วกาง (รอบ 18) · "ใครอยู่ในระบบ" ย้ายไป ตั้งค่า › ผู้ใช้งาน แล้ว (รอบ 19) */}
       <HomeCallResultsPanel block={meta.key} blockTitle={meta.title} win={win} />
-
-      <HomePresencePanel />
     </div>
   );
 };

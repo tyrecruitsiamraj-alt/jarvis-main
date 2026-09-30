@@ -4,13 +4,13 @@
  *    ตัวเลือกบอก AI % ของทุกหัวข้อ · จำหัวข้อไว้ในเครื่อง · ช่วงเริ่มที่ 7 วันล่าสุด ·
  *    เลขตัวใหญ่ = AI ÷ ที่โทรแล้ว · ยังไม่มีที่โทรแล้ว = "AI —" (ห้าม 0% ปลอม) ·
  *    ฐานยังไม่มีช่องลงผลของคนโทร = บอกบนจอ · หัวข้อที่ล้มบอกเหตุ ห้ามขึ้น 0 ·
- *    ท้ายหน้ามีใครอยู่ในระบบ ปิดไว้ กดแล้วกาง · BU เป็น dropdown ·
+ *    "ใครอยู่ในระบบ" ย้ายไป ตั้งค่า › ผู้ใช้งาน แล้ว (รอบ 19 · เทสต์อยู่ `src/pages/settings/UserPresence.test.tsx`) ·
  *    แผงเลื่อนตอนกดแท่ง + ปุ่ม "ดูทั้งหมด" ถอดแล้ว (เจ้าของสั่ง 30 ก.ย.) — แท่งรายวันกดไม่ได้ ·
  *    กดสวิตช์แยก BU แล้วแท่งกราฟพลิกไพ่ (รอบ 12 · กล่องยอดไม่พลิกแล้ว) ·
  *    รอบ 17: กล่องเรียง ทั้งหมด → AI โทร → คนโทร → ยังไม่โทร · กดกล่อง = Popup รายชื่อ (กล่อง 0 กดไม่ได้) ·
  *    ปฏิทิน + dropdown อยู่ฝั่งซ้ายต่อจากชื่อหน้า · แยก BU ขึ้นครบทุก BU · หัวกราฟบอกเดือน + ช่วงวัน ·
  *    รอบ 18: เลือกหลายเดือนบนปฏิทิน (กดยืนยันก่อน) = หนึ่งแท่งต่อเดือน กดแท่งลงไปดูรายวัน มีปุ่มกลับ ·
- *    แผง "ผลโทร" ซ่อนไว้ก่อน "ใครอยู่ในระบบ" · ช่องไฟ/ระยะบรรทัดเท่ากันทั้งหน้า (`EVEN_TYPE`) ·
+ *    แผง "ผลโทร" ซ่อนไว้ · ช่องไฟ/ระยะบรรทัดเท่ากันทั้งหน้า (`EVEN_TYPE`) ·
  *    หน่วยบนจอเป็น "รายชื่อ" ทุกหัวข้อ (เจ้าของ: "เรานับจากรายชื่อ ต้องเป็นรายชื่อหมดเลย")
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -23,7 +23,6 @@ import {
   type AiShareListResponse,
   type AiShareResponse,
 } from '@/lib/homeAiShare';
-import type { HomePresenceResponse } from '@/lib/homePresence';
 import { emptyCallResultCounts, type AiShareResultsResponse } from '@/lib/homeCallResults';
 import { EVEN_TYPE } from '@/lib/designTokens';
 import { rangeTextFull } from '@/lib/periodPick';
@@ -37,10 +36,6 @@ vi.mock('@/lib/homeAiShareApi', () => ({
   fetchHomeAiShareDetail: (...a: unknown[]) => fetchHomeAiShareDetail(...a),
   fetchHomeAiShareList: (...a: unknown[]) => fetchHomeAiShareList(...a),
   fetchHomeAiShareResults: (...a: unknown[]) => fetchHomeAiShareResults(...a),
-}));
-const fetchHomePresence = vi.fn();
-vi.mock('@/lib/homePresenceApi', () => ({
-  fetchHomePresence: (...a: unknown[]) => fetchHomePresence(...a),
 }));
 // กราฟ recharts วัดขนาดจอไม่ได้ใน jsdom — แทนด้วยปุ่มหนึ่งปุ่มต่อแท่ง (กดแล้วเรียก onPick เหมือนกดแท่งจริง)
 // ชั้นในแท่งติดไว้ที่ data-stacks · ตัวจุดพลิกไพ่ที่ data-flip · กดได้ไหมที่ data-clickable ⇒ เทสต์สวิตช์/การกดลงไปดูได้
@@ -156,24 +151,6 @@ function results(block: AiShareResultsResponse['block'], w: { from: string | nul
   };
 }
 
-const presence: HomePresenceResponse = {
-  generated_at: '2026-09-30T05:00:00.000Z',
-  online_minutes: 30,
-  bu: null,
-  counts: { total: 3, online: 1, offline: 1, never: 1 },
-  by_bu: [
-    { bu: 'LBD', counts: { total: 1, online: 1, offline: 0, never: 0 } },
-    { bu: 'LBA', counts: { total: 1, online: 0, offline: 1, never: 0 } },
-    { bu: 'LM', counts: { total: 1, online: 0, offline: 0, never: 1 } },
-  ],
-  people: [
-    { id: 'a', name: 'คนหนึ่ง', bu: 'LBD', role: 'staff', status: 'online', lastLoginAt: '2026-09-30T04:00:00.000Z', lastActiveAt: '2026-09-30T04:55:00.000Z' },
-    { id: 'b', name: 'คนสอง', bu: 'LBA', role: 'staff', status: 'offline', lastLoginAt: '2026-09-29T04:00:00.000Z', lastActiveAt: null },
-    { id: 'c', name: 'คนสาม', bu: 'LM', role: 'staff', status: 'never', lastLoginAt: null, lastActiveAt: null },
-  ],
-  can_see_people: true,
-  error: null,
-};
 
 /** กล่องหนึ่งก้อน (Visual Control รอบ 8 · รอบ 17 เป็นปุ่ม ชื่อปุ่ม = ป้าย + เลข เช่น "AI โทร 205") */
 const tileOf = (label: string) => screen.getByRole('button', { name: new RegExp(`^${label} [\\d,]+( \\S+)?$`) });
@@ -205,7 +182,6 @@ beforeEach(() => {
   fetchHomeAiShareResults
     .mockReset()
     .mockImplementation((block: AiShareResultsResponse['block'], w: { from: string | null; to: string | null }) => Promise.resolve(results(block, w)));
-  fetchHomePresence.mockReset().mockResolvedValue(presence);
 });
 afterEach(() => cleanup());
 
@@ -468,14 +444,14 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(screen.queryByRole('button', { name: 'กลับ' })).toBeNull();
   });
 
-  it('รอบ 18: แผง "ผลโทร" ปิดไว้เป็นค่าตั้งต้น อยู่ก่อน "ใครอยู่ในระบบ" · แถบหัวบอกมีผลกี่สาย · กดแล้วกางเห็นผลแต่ละแบบ', async () => {
+  it('รอบ 18: แผง "ผลโทร" ปิดไว้เป็นค่าตั้งต้น · แถบหัวบอกมีผลกี่รายชื่อ · กดแล้วกางเห็นผลแต่ละแบบ', async () => {
     render(<HomeAiSharePage />);
     const bar = await screen.findByRole('button', { name: /^ผลโทร/ });
     expect(bar.getAttribute('aria-expanded')).toBe('false');
     await waitFor(() => expect(bar.textContent).toContain('ติดตาม · มีผล 207 รายชื่อ'));
     expect(fetchHomeAiShareResults).toHaveBeenCalledWith('follow', win);
-    const presenceHead = screen.getByRole('button', { name: /^ใครอยู่ในระบบ/ });
-    expect(bar.compareDocumentPosition(presenceHead) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // รอบ 19: "ใครอยู่ในระบบ" ย้ายไป ตั้งค่า › ผู้ใช้งาน แล้ว — หน้าหลักไม่มีแผงนี้
+    expect(screen.queryByRole('button', { name: /^ใครอยู่ในระบบ/ })).toBeNull();
     expect(screen.queryByRole('list', { name: 'ผลโทร ติดตาม' })).toBeNull();
     fireEvent.click(bar);
     const list = screen.getByRole('list', { name: 'ผลโทร ติดตาม' });
@@ -510,65 +486,5 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     for (const c of EVEN_TYPE.split(' ')) expect(dlg.classList.contains(c)).toBe(true);
   });
 
-  /** แถบหัวของ "ใครอยู่ในระบบ" — ปิดไว้เป็นค่าตั้งต้น กดแล้วกาง (รอบ 6) */
-  const presenceBar = () => screen.findByRole('button', { name: /^ใครอยู่ในระบบ/ });
 
-  it('ใครอยู่ในระบบปิดไว้เป็นค่าตั้งต้น · แถบหัวบอก Online กี่คน · กดแล้วกาง กรอง Online ได้ · กดอีกทีซ่อน', async () => {
-    render(<HomeAiSharePage />);
-    const bar = await presenceBar();
-    expect(bar.getAttribute('aria-expanded')).toBe('false');
-    await waitFor(() => expect(bar.textContent).toContain('Online 1 จาก 3'));
-    expect(screen.queryByText('คนหนึ่ง')).toBeNull();
-    fireEvent.click(bar);
-    expect(bar.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByText('คนหนึ่ง')).toBeTruthy();
-    expect(screen.getByText('คนสาม')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /^Online 1/ }));
-    expect(screen.queryByText('คนสาม')).toBeNull();
-    expect(screen.getByText('คนหนึ่ง')).toBeTruthy();
-    fireEvent.click(bar);
-    expect(screen.queryByText('คนหนึ่ง')).toBeNull();
-  });
-
-  it('แยก BU ด้วย dropdown: เลือก BU แล้วเหลือแค่คนของ BU นั้น ปุ่มสถานะนับตาม BU นั้น', async () => {
-    render(<HomeAiSharePage />);
-    fireEvent.click(await presenceBar());
-    await screen.findByText('คนสอง');
-    const picker = () => screen.getByRole('combobox', { name: 'เลือก BU' });
-    expect(picker().textContent).toContain('ทุก BU');
-    fireEvent.click(picker());
-    expect((await screen.findByRole('option', { name: /ทุก BU/ })).textContent).toContain('Online 1 จาก 3');
-    expect(screen.getByRole('option', { name: /^LBD/ }).textContent).toContain('Online 1 จาก 1');
-    fireEvent.click(screen.getByRole('option', { name: /^LBA/ }));
-    expect(picker().textContent).toContain('LBA');
-    expect(screen.getByText('คนสอง')).toBeTruthy();
-    expect(screen.queryByText('คนหนึ่ง')).toBeNull();
-    expect(screen.getByRole('button', { name: 'ทั้งหมด 1' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /^Offline 1/ })).toBeTruthy();
-    fireEvent.click(picker());
-    fireEvent.click(await screen.findByRole('option', { name: /ทุก BU/ }));
-    expect(screen.getByText('คนหนึ่ง')).toBeTruthy();
-  });
-
-  it('บัญชีที่ล็อกแผนก (เห็น BU เดียว) ไม่มี dropdown BU', async () => {
-    const lbd = presence.by_bu![0];
-    fetchHomePresence.mockResolvedValue({ ...presence, bu: 'LBD', counts: lbd.counts, by_bu: [lbd], people: [presence.people![0]] });
-    render(<HomeAiSharePage />);
-    fireEvent.click(await presenceBar());
-    expect(await screen.findByText('คนหนึ่ง')).toBeTruthy();
-    expect(screen.queryByRole('combobox', { name: 'เลือก BU' })).toBeNull();
-  });
-
-  it('คนที่ไม่มีสิทธิ์เห็นชื่อ = เห็นแค่ยอด แต่ยังแยก BU ได้', async () => {
-    fetchHomePresence.mockResolvedValue({ ...presence, people: null, can_see_people: false });
-    render(<HomeAiSharePage />);
-    fireEvent.click(await presenceBar());
-    expect(await screen.findByText('รายชื่อเปิดให้หัวหน้ากับผู้ดูแลเห็น')).toBeTruthy();
-    expect(screen.getByText('Online 1')).toBeTruthy();
-    expect(screen.queryByText('คนหนึ่ง')).toBeNull();
-    fireEvent.click(screen.getByRole('combobox', { name: 'เลือก BU' }));
-    fireEvent.click(await screen.findByRole('option', { name: /^LM/ }));
-    expect(screen.getByText('Online 0')).toBeTruthy();
-    expect(screen.getByText('ยังไม่เข้าระบบ 1')).toBeTruthy();
-  });
 });
