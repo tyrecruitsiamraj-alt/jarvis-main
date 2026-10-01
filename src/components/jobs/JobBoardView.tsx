@@ -2165,28 +2165,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             </DialogTitle>
             {/* คำอธิบายเหลือไว้ให้โปรแกรมอ่านจอ — บนจอตัดออก (เจ้าของ 30 ก.ย. 2569: "คำอธิบายอันไหนไม่จำเป็นก็ตัด") */}
             <DialogDescription className="sr-only">ไล่งานประกาศของใบนี้ทีละขั้น</DialogDescription>
-            {/* 🔴 ปุ่ม "หาคนทุกถัง + ให้ AI โทร" ย้ายมาจากการ์ด (แบบ A · 27 ก.ย. 2569 — การ์ดย่อเหลือ 5 บรรทัด)
-                ⚠️ ห้ามซ้อน Dialog ใน Dialog ⇒ กดแล้ว**ปิดป๊อปนี้ก่อน** ค่อยเปิดหน้าต่างหาคน (เรียงกัน ไม่ซ้อน)
-                ใบที่ปิด/ยกเลิกแล้วไม่มีปุ่มนี้ (ส่งคนไปงานที่ไม่มีอยู่) */}
-            {postingJob && !closedBox ? (
-              <div className="pt-2">
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="outline"
-                  title={SEARCH_ALL_POOLS_AND_CALL.hint}
-                  onClick={() => {
-                    const j = postingJob;
-                    setPostingJob(null);
-                    setLaneJob(j);
-                  }}
-                  className={cn('rounded-lg', TONE.success.outline)}
-                >
-                  <Send aria-hidden />
-                  {SEARCH_ALL_POOLS_AND_CALL.label}
-                </Button>
-              </div>
-            ) : null}
+            {/* 🔴 ปุ่ม "หาคนทุกกอง + ให้ AI โทร" ย้ายไปอยู่บนแท็บ **รายชื่อ** ในป๊อป (เจ้าของ Choice 1 ต.ค. 2569
+                "4 ขั้นเดิม แต่ตัดของรก") — ส่ง `onSearchAllPools` ลงไป · ⚠️ ห้ามซ้อน Dialog ⇒ กดแล้วปิดป๊อปนี้ก่อน
+                ค่อยเปิดหน้าต่างหาคน · ใบที่ปิด/ยกเลิกแล้วไม่มีปุ่มนี้ (ส่งคนไปงานที่ไม่มีอยู่) */}
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5">
             {postingJob ? (
@@ -2196,6 +2177,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 <BoardPostingSteps
                   id={postingUnitId(postingJob)}
                   chrome={false}
+                  onSearchAllPools={
+                    closedBox
+                      ? undefined
+                      : () => {
+                          const j = postingJob;
+                          setPostingJob(null);
+                          setLaneJob(j);
+                        }
+                  }
                   onDone={() => {
                     setPostingJob(null);
                     void loadReleases();

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import ApplicantInfoPanel from '@/components/recruit-rm/ApplicantInfoPanel';
+import ApplicantPhoneFix from '@/components/recruit-rm/ApplicantPhoneFix';
 import {
   AppointmentsTable,
   AttendanceTable,
@@ -27,7 +28,6 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
   fetchApplicantDetailExtras,
   fetchAttendanceLogs,
-  fixApplicationPhone,
   recordAppointmentAttendance,
   updateApplicationProfile,
   type ApplicantDetailExtras,
@@ -138,11 +138,6 @@ export default function ApplicantContactDialog({
   const [extras, setExtras] = useState<ApplicantDetailExtras>(EMPTY_EXTRAS);
   const [attendance, setAttendance] = useState<AttendanceLogItem[]>([]);
 
-  /** แก้เบอร์ (ใบที่ติดธง "เบอร์ใช้โทรไม่ได้" — migration 087) */
-  const [phoneDraft, setPhoneDraft] = useState('');
-  const [phoneBusy, setPhoneBusy] = useState(false);
-  const [phoneError, setPhoneError] = useState<string | null>(null);
-
   // เปิดคนใหม่ = เริ่มใหม่ทั้งหมด + โหลดของประกอบ · กัน race (`cancelled`) — กดไล่แถวเร็ว ๆ
   // แล้ว response ที่มาช้าต้องไม่ทับของคนที่เปิดอยู่ (ทุกตัวกลืน error เป็นรายการว่าง)
   useEffect(() => {
@@ -163,9 +158,6 @@ export default function ApplicantContactDialog({
     setLogs([]);
     setExtras(EMPTY_EXTRAS);
     setAttendance([]);
-    setPhoneDraft('');
-    setPhoneBusy(false);
-    setPhoneError(null);
     void fetchContactLogs(application.id).then((v) => !cancelled && setLogs(v));
     void fetchApplicantDetailExtras(application.id).then((v) => !cancelled && setExtras(v));
     void fetchAttendanceLogs(application.id).then((v) => !cancelled && setAttendance(v));
@@ -255,37 +247,7 @@ export default function ApplicantContactDialog({
   };
 
   const phoneFixSlot =
-    a.phone_callable === false ? (
-      <div className="mt-1.5 space-y-1">
-        <p className={cn('text-xs font-medium', TONE.danger.value)}>เบอร์นี้ใช้กับระบบโทรไม่ได้</p>
-        <div className="flex items-center gap-1.5">
-          <Input
-            value={phoneDraft}
-            onChange={(e) => setPhoneDraft(e.target.value)}
-            placeholder="มือถือ 10 หลัก"
-            inputMode="tel"
-            aria-label="เบอร์มือถือใหม่"
-            className="h-8 text-xs tabular-nums"
-          />
-          <Button
-            type="button"
-            size="xs"
-            disabled={phoneBusy || phoneDraft.replace(/\D/g, '').length < 10}
-            onClick={() => {
-              setPhoneBusy(true);
-              setPhoneError(null);
-              fixApplicationPhone(a.id, phoneDraft)
-                .then(() => onSaved())
-                .catch((e) => setPhoneError(e instanceof Error ? e.message : 'แก้เบอร์ไม่สำเร็จ'))
-                .finally(() => setPhoneBusy(false));
-            }}
-          >
-            {phoneBusy ? <Loader2 className="animate-spin" /> : null} แก้เบอร์
-          </Button>
-        </div>
-        {phoneError ? <p className={cn('text-xs', TONE.danger.value)}>{phoneError}</p> : null}
-      </div>
-    ) : null;
+    a.phone_callable === false ? <ApplicantPhoneFix applicationId={a.id} onFixed={onSaved} /> : null;
 
   const body = (
     <div className="space-y-4">

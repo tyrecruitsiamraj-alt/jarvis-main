@@ -112,16 +112,28 @@ export function RequestRateLinesBlock({ job }: { job: JobRequest }) {
  * ยอด eSlip สุทธิของไซต์นี้เท่านั้น (เมนู ERP PR-4813) · งวดส่วนใหญ่เป็นครึ่งเดือน
  * ⇒ แต่ละแถวติดป้ายชนิดงวด (ครึ่งเดือน/เต็มเดือน/ไม่เต็มงวด) ให้เทียบกับเงินเดือนได้ถูก
  */
-export function ResignedEmployeeBlock({ job }: { job: JobRequest }) {
+export function ResignedEmployeeBlock({
+  job,
+  compact = false,
+}: {
+  job: JobRequest;
+  /**
+   * ป๊อปกล่องงาน (เจ้าของ Choice 1 ต.ค. 2569 "4 ขั้นเดิม แต่ตัดของรก"): ไม่ต้องมีหัวกล่อง (ปุ่มพับเป็นหัวแทน)
+   * + ถอดประโยคอธิบายยาว เหลือที่มาสั้น ๆ · หน้าใบขอยังเต็มเหมือนเดิม
+   */
+  compact?: boolean;
+}) {
   const incomeRows = resignedIncomeRows(job);
   const showDeduct = incomeRows ? hasDeductSide(incomeRows) : false;
   const months = job.resigned_income_3m ?? [];
   return (
     <div className={cn(boxCls, 'space-y-2')}>
-      <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-        <UserMinus className={cn('h-3.5 w-3.5', TONE.primary.value)} aria-hidden />
-        คนที่ออก / เปลี่ยนตัว
-      </div>
+      {compact ? null : (
+        <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+          <UserMinus className={cn('h-3.5 w-3.5', TONE.primary.value)} aria-hidden />
+          คนที่ออก / เปลี่ยนตัว
+        </div>
+      )}
       <div className="grid gap-2 sm:grid-cols-2">
         <Field label="ชื่อ - นามสกุล" value={job.resigned_employee_name} />
         <Field label="สาเหตุที่ลาออก" value={job.resigned_reason} />
@@ -144,12 +156,17 @@ export function ResignedEmployeeBlock({ job }: { job: JobRequest }) {
 
       {/* ── รายได้จริงย้อนหลัง 3 เดือน — **แยกรายงวด ไม่ใช่ค่าเฉลี่ย** ── */}
       <div className={boxCls}>
-        <div className="text-xs font-medium text-foreground">รายได้จริงย้อนหลัง 3 เดือนของงานนี้</div>
-        <p className="mt-0.5 text-[10px] text-muted-foreground">
-          ยอดเดียวกับ<span className="font-medium">ใบแจ้งเงินเดือน (eSlip)</span>
-          ของไซต์นี้เท่านั้น — เมนู ERP <span className="font-mono">PR-4813</span> · นับ 3 เดือนย้อนจากงวดล่าสุด
-          (งวดครึ่งเดือนจะมี 6 งวด · งวดเต็มเดือนมี 3 งวด)
-        </p>
+        <div className="text-xs font-medium text-foreground">
+          รายได้จริงย้อนหลัง 3 เดือนของงานนี้
+          {compact ? <span className="ml-1 font-normal text-muted-foreground">จาก eSlip ของไซต์นี้</span> : null}
+        </div>
+        {compact ? null : (
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            ยอดเดียวกับ<span className="font-medium">ใบแจ้งเงินเดือน (eSlip)</span>
+            ของไซต์นี้เท่านั้น — เมนู ERP <span className="font-mono">PR-4813</span> · นับ 3 เดือนย้อนจากงวดล่าสุด
+            (งวดครึ่งเดือนจะมี 6 งวด · งวดเต็มเดือนมี 3 งวด)
+          </p>
+        )}
         {incomeRows ? (
           <table className="mt-2 w-full text-xs">
             <thead>
@@ -197,14 +214,17 @@ export function ResignedEmployeeBlock({ job }: { job: JobRequest }) {
         ) : (
           // ไม่มีของ ต้องบอกว่าไม่มี ห้ามปล่อยว่างให้คนเดาว่าพัง (414 ใบเข้าเคสนี้หลังกรองไซต์)
           <p className="mt-1 text-xs text-muted-foreground">
-            ไม่พบงวดจ่ายของคนคนนี้ในไซต์ของใบขอนี้ — อาจยังไม่ถึงรอบจ่าย เปิดไซต์ใหม่ (ไม่มีคนเก่า)
-            หรือเงินที่เคยได้มาจากไซต์อื่น
+            {compact
+              ? 'ไม่พบงวดจ่ายในไซต์นี้'
+              : 'ไม่พบงวดจ่ายของคนคนนี้ในไซต์ของใบขอนี้ — อาจยังไม่ถึงรอบจ่าย เปิดไซต์ใหม่ (ไม่มีคนเก่า) หรือเงินที่เคยได้มาจากไซต์อื่น'}
           </p>
         )}
-        <p className="mt-1 text-[10px] text-muted-foreground">
-          เงินได้ = ค่าแรง · ล่วงเวลา · เบี้ยเลี้ยง รวมกัน · หัก = ภาษี · ประกันสังคม · เงินประกัน · หนี้อื่น —
-          งวดแรกหรืองวดสุดท้ายของคนที่เพิ่งเข้า/เพิ่งออกมักไม่เต็มงวด ยอดจึงดูต่ำ
-        </p>
+        {compact ? null : (
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            เงินได้ = ค่าแรง · ล่วงเวลา · เบี้ยเลี้ยง รวมกัน · หัก = ภาษี · ประกันสังคม · เงินประกัน · หนี้อื่น —
+            งวดแรกหรืองวดสุดท้ายของคนที่เพิ่งเข้า/เพิ่งออกมักไม่เต็มงวด ยอดจึงดูต่ำ
+          </p>
+        )}
       </div>
     </div>
   );

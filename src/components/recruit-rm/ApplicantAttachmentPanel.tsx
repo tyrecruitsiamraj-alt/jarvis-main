@@ -11,7 +11,7 @@
  * - `blob:` ไม่ใช่ `data:` (เบราว์เซอร์บล็อก data: URL ในแท็บใหม่/iframe)
  * - เส้น API เป็น GET อ่านอย่างเดียว + RBAC + จำกัด BU ของเดิม — ไม่แตะ ไม่เปิด public
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -32,18 +32,27 @@ export default function ApplicantAttachmentPanel({
   hasDocument,
   filename,
   mime,
+  autoLoad = false,
 }: {
   applicationId: string;
   /** จาก `/api/job-applications` (`document_bytes is not null`) — `false`/ไม่มี = ไม่วาดอะไรเลย */
   hasDocument?: boolean;
   filename?: string;
   mime?: string;
+  /**
+   * เปิดไฟล์ให้เลยตอนวาด — ใบประวัติแท็บผู้สมัคร (เจ้าของ Choice 1 ต.ค. 2569 "ใบประวัติเต็มหน้า":
+   * ไฟล์ที่แนบมาเปิดดูในป๊อปเลย) · ป๊อปอื่นยังโหลดเมื่อกดเหมือนเดิม
+   */
+  autoLoad?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [doc, setDoc] = useState<Loaded | null>(null);
   /** เก็บ URL ไว้คืนหน่วยความจำ — ไม่ revoke = ไฟล์ค้างในแท็บจนกว่าจะรีเฟรช */
   const urlRef = useRef<string | null>(null);
+  /** คนที่เปิดอยู่ตอนนี้ — ไฟล์ของคนก่อนที่โหลดเสร็จช้าต้องไม่มาทับ (กดไล่คนเร็ว ๆ) */
+  const currentId = useRef(applicationId);
+  currentId.current = applicationId;
 
   const release = () => {
     if (urlRef.current) {
@@ -61,16 +70,13 @@ export default function ApplicantAttachmentPanel({
     return release;
   }, [applicationId]);
 
-  if (hasDocument !== true) return null;
-
-  const shownName = attachmentFilename(filename);
-
-  const load = async () => {
-    if (busy) return;
+  const load = useCallback(async () => {
+    const id = applicationId;
     setBusy(true);
     setError(null);
     try {
-      const d = await fetchApplicationDocument(applicationId);
+      const d = await fetchApplicationDocument(id);
+      if (currentId.current !== id) return;
       release();
       const blob = base64ToBlob(d.dataBase64, d.mime);
       const url = URL.createObjectURL(blob);
@@ -82,11 +88,19 @@ export default function ApplicantAttachmentPanel({
         kind: attachmentKind(d.mime, d.filename),
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'เปิดไฟล์แนบไม่สำเร็จ');
+      if (currentId.current === id) setError(e instanceof Error ? e.message : 'เปิดไฟล์แนบไม่สำเร็จ');
     } finally {
-      setBusy(false);
+      if (currentId.current === id) setBusy(false);
     }
-  };
+  }, [applicationId]);
+
+  useEffect(() => {
+    if (autoLoad && hasDocument === true) void load();
+  }, [autoLoad, hasDocument, load]);
+
+  if (hasDocument !== true) return null;
+
+  const shownName = attachmentFilename(filename);
 
   return (
     <div className={cn('space-y-2 rounded-xl border px-3 py-2.5 text-xs', TONE.neutral.soft)}>
@@ -147,7 +161,9 @@ export default function ApplicantAttachmentPanel({
           size="sm"
           type="button"
           variant="outline"
-          onClick={() => void load()}
+          onClick={() => {
+            if (!busy) void load();
+          }}
           disabled={busy}
           className="justify-center"
         >

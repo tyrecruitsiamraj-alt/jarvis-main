@@ -33,6 +33,16 @@ export function parseJobLocationAddress(address: string): {
   return { province: parts.province, district: parts.district };
 }
 
+/**
+ * คำต่อท้ายชื่อ (คำที่ 2–4 ของชื่อตำบล/อำเภอ) ต้อง**ไม่ใช่ป้ายของส่วนถัดไป** — 🔴 แก้ 1 ต.ค. 2569
+ * เดิมตัวอักษรรับ "." ด้วย ⇒ "ต.ป่ายุบใน อ.ป่าวังจันทร์ จ.ระยอง" ได้ตำบลชื่อ "ป่ายุบใน อ.ป่าวังจันทร์ จ.ระยอง"
+ * แล้วหน้าสาธารณะขึ้นอำเภอ/จังหวัดซ้ำสองรอบ (ใบเปิดอยู่ 20 ใบ)
+ */
+const NEXT_LABEL =
+  '(?:ตำบล|ต\\.|แขวง|อำเภอ|อ\\.|เขต|จังหวัด|จ\\.|ถนน|ถ\\.|ซอย|ซ\\.|หมู่|ม\\.|เลขที่|รหัสไปรษณีย์|อาคาร|กรุงเทพ|กทม)';
+/** คำต่อท้ายชื่อหนึ่งคำ (ไม่ขึ้นต้นด้วยป้าย) */
+const NAME_TAIL = `\\s+(?!${NEXT_LABEL})[ก-๙A-Za-z.]+`;
+
 /** แยก จังหวัด / อำเภอ·เขต / ตำบล·แขวง จากข้อความที่อยู่ (รองรับ ERP ฟรีเท็กซ์) */
 export function parseThaiAddressParts(address: string): ThaiAddressParts {
   const s = normalizeJobLocationText(address);
@@ -92,7 +102,10 @@ function extractDistrict(s: string, province: string | null): string | null {
   }
 
   const khet = s.match(
-    /(?:^|[\s,，])เขต\s*([ก-๙A-Za-z.]+(?:\s+[ก-๙A-Za-z.]+){0,2})(?=\s+(?:แขวง|ตำบล|ต\.|จังหวัด|จ\.|ถนน|เลขที่|รหัสไปรษณีย์|อาคาร)|$|[\s,，])/u,
+    new RegExp(
+      `(?:^|[\\s,，])เขต\\s*([ก-๙A-Za-z.]+(?:${NAME_TAIL}){0,2})(?=\\s+(?:แขวง|ตำบล|ต\\.|จังหวัด|จ\\.|ถนน|เลขที่|รหัสไปรษณีย์|อาคาร)|$|[\\s,，])`,
+      'u',
+    ),
   );
   if (khet?.[1]) {
     const d = cleanDistrictToken(khet[1]);
@@ -100,7 +113,10 @@ function extractDistrict(s: string, province: string | null): string | null {
   }
 
   const amphoe = s.match(
-    /(?:^|[\s,，])(?:อ\.|อำเภอ(?!\/))\s*([ก-๙A-Za-z.]+(?:\s+[ก-๙A-Za-z.]+){0,3})(?=\s+(?:จังหวัด|จ\.|ตำบล|ต\.|อำเภอ\/เขต|รหัสไปรษณีย์)|$|[\s,，])/u,
+    new RegExp(
+      `(?:^|[\\s,，])(?:อ\\.|อำเภอ(?!\\/))\\s*([ก-๙A-Za-z.]+(?:${NAME_TAIL}){0,3})(?=\\s+(?:จังหวัด|จ\\.|ตำบล|ต\\.|อำเภอ\\/เขต|รหัสไปรษณีย์)|$|[\\s,，])`,
+      'u',
+    ),
   );
   if (amphoe?.[1]) {
     const d = cleanDistrictToken(amphoe[1]);
@@ -117,7 +133,10 @@ function extractDistrict(s: string, province: string | null): string | null {
 
 function extractSubdistrict(s: string): string | null {
   const kwaeng = s.match(
-    /(?:^|[\s,，])แขวง\s*([ก-๙A-Za-z.]+(?:\s+[ก-๙A-Za-z.]+){0,2})(?=\s+(?:อำเภอ|อ\.|เขต|จังหวัด|จ\.|ถนน|เลขที่|รหัสไปรษณีย์)|$|[\s,，])/u,
+    new RegExp(
+      `(?:^|[\\s,，])แขวง\\s*([ก-๙A-Za-z.]+(?:${NAME_TAIL}){0,2})(?=\\s+(?:อำเภอ|อ\\.|เขต|จังหวัด|จ\\.|ถนน|เลขที่|รหัสไปรษณีย์)|$|[\\s,，])`,
+      'u',
+    ),
   );
   if (kwaeng?.[1]) {
     const name = kwaeng[1].trim().replace(/^แขวง\s*/u, '');
@@ -125,7 +144,10 @@ function extractSubdistrict(s: string): string | null {
   }
 
   const tambon = s.match(
-    /(?:^|[\s,，])(?:ตำบล|ต\.)\s*([ก-๙A-Za-z.]+(?:\s+[ก-๙A-Za-z.]+){0,2})(?=\s+(?:อำเภอ|อ\.|เขต|จังหวัด|จ\.|ถนน|เลขที่|รหัสไปรษณีย์)|$|[\s,，])/u,
+    new RegExp(
+      `(?:^|[\\s,，])(?:ตำบล|ต\\.)\\s*([ก-๙A-Za-z.]+(?:${NAME_TAIL}){0,2})(?=\\s+(?:อำเภอ|อ\\.|เขต|จังหวัด|จ\\.|ถนน|เลขที่|รหัสไปรษณีย์)|$|[\\s,，])`,
+      'u',
+    ),
   );
   if (tambon?.[1]) {
     const name = tambon[1].trim().replace(/^(ตำบล|ต\.)\s*/u, '');

@@ -55,10 +55,10 @@ const { BoardPostingSteps } = await import('./BoardPostingPage');
 
 const released = [{ job_id: JOB_ID, request_no: 'OPL6909999', released_at: '2026-08-25T03:30:00Z', released_by_name: null, note: null }];
 
-const renderSteps = (onDone: () => void = () => {}) =>
+const renderSteps = (onDone: () => void = () => {}, onSearchAllPools?: () => void) =>
   render(
     <MemoryRouter>
-      <BoardPostingSteps id={JOB_ID} chrome={false} onDone={onDone} />
+      <BoardPostingSteps id={JOB_ID} chrome={false} onDone={onDone} onSearchAllPools={onSearchAllPools} />
     </MemoryRouter>,
   );
 
@@ -143,5 +143,48 @@ describe('ป๊อปไล่งานโฉมใหม่ (30 ก.ย. 2569)
     expect(screen.queryByRole('button', { name: 'สร้างประกาศ + ลิงก์' })).toBeNull();
     fireEvent.click(await screen.findByRole('checkbox', { name: 'สร้างลิงก์' }));
     expect(await screen.findByRole('button', { name: 'สร้างประกาศ + ลิงก์' })).toBeTruthy();
+  });
+});
+
+/** 🔴 เจ้าของ Choice 1 ต.ค. 2569 "4 ขั้นเดิม แต่ตัดของรก" — ขั้นเท่าเดิม ของรกพับ/ย้าย/ถอด */
+describe('ป๊อปไล่งาน — ตัดของรก (1 ต.ค. 2569)', () => {
+  const WITH_RESIGNED = {
+    ...JOB,
+    resigned_employee_name: 'คนเก่า สมมุติ',
+    resigned_reason: 'ย้ายบ้าน',
+    resigned_wage_fee_rate: 400,
+  } as unknown as JobRequest;
+
+  it('คนเก่า + รายได้ย้อนหลัง พับไว้เป็นค่าตั้งต้น · กดกางได้ · ไม่มีประโยคอธิบายยาวของ eSlip', async () => {
+    currentJob = WITH_RESIGNED;
+    fetchJobReleases.mockResolvedValue([]);
+    renderSteps();
+    const toggle = await screen.findByRole('button', { name: /คนเก่า \+ รายได้ย้อนหลัง/ });
+    expect(screen.queryByText('สาเหตุที่ลาออก')).toBeNull();
+    fireEvent.click(toggle);
+    expect(await screen.findByText('สาเหตุที่ลาออก')).toBeTruthy();
+    expect(screen.getByText('จาก eSlip ของไซต์นี้')).toBeTruthy();
+    expect(screen.queryByText(/PR-4813/)).toBeNull();
+    expect(screen.queryByText(/เงินได้ = ค่าแรง/)).toBeNull();
+  });
+
+  it('ปุ่ม "หาคนทุกกอง + ให้ AI โทร" อยู่แท็บรายชื่อ ไม่อยู่ในหน้าตรวจสอบ · กดแล้วเรียกตัวจัดการ', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    const onSearch = vi.fn();
+    renderSteps(() => {}, onSearch);
+    await screen.findByRole('navigation', { name: 'ขั้นตอนของงานประกาศ' });
+    expect(screen.queryByRole('button', { name: /หาคนทุกกอง/ })).toBeNull();
+    // Radix Tabs สลับด้วย mousedown
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /รายชื่อ/ }), { button: 0 });
+    fireEvent.click(await screen.findByRole('button', { name: /หาคนทุกกอง/ }));
+    expect(onSearch).toHaveBeenCalled();
+  });
+
+  it('ใบปิด/ยกเลิก (ไม่ส่งตัวจัดการ) ⇒ แท็บรายชื่อไม่มีปุ่มหาคน', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    renderSteps();
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: /รายชื่อ/ }), { button: 0 });
+    await waitFor(() => expect(screen.getByRole('tab', { name: /รายชื่อ/ }).getAttribute('aria-selected')).toBe('true'));
+    expect(screen.queryByRole('button', { name: /หาคนทุกกอง/ })).toBeNull();
   });
 });

@@ -34,6 +34,16 @@ describe('parseThaiJobAddress cleaning', () => {
     expect(inferProvinceFromAddress('จังหวัด : สงขลา ชื่อสาขา : หาดใหญ่')).toBe('สงขลา');
   });
 
+  it('🔴 ชื่อตำบล/อำเภอห้ามกวาด "อ." "จ." ที่ตามมาเข้าไปรวม (1 ต.ค. 2569 · ใบเปิดอยู่ 20 ใบขึ้นอำเภอ/จังหวัดซ้ำ)', () => {
+    const parts = parseThaiAddressParts('ศูนย์เรียนรู้ป่าวังจันทร์ 222 หมู่ 1 ต.ป่ายุบใน อ.ป่าวังจันทร์ จ.ระยอง');
+    expect(parts.subdistrict).toBe('ตำบลป่ายุบใน');
+    expect(parts.province).toBe('ระยอง');
+    expect(parts.district).toMatch(/วังจันทร์$/);
+    expect(parseThaiAddressParts('ต.มาบข่า อ.นิคมพัฒนา จ.ระยอง').subdistrict).toBe('ตำบลมาบข่า');
+    // ชื่อสองคำที่ไม่มีป้ายคั่นยังอ่านได้เหมือนเดิม
+    expect(parseThaiAddressParts('ตำบลบ้าน ใหม่ อำเภอเมือง จังหวัดระยอง').subdistrict).toBe('ตำบลบ้าน ใหม่');
+  });
+
   it('matches district filter against official names', () => {
     const addr = '500/103 หมู่ 3 ตำบลตาสิทธิ์ อำเภอปลวกแดง จังหวัดระยอง 21140';
     expect(districtMatchesFilter(addr, 'ปลวกแดง')).toBe(true);

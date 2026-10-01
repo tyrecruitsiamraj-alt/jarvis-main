@@ -22,7 +22,7 @@
  */
 import React from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ChevronDown, ChevronRight, ClipboardCheck, Users } from 'lucide-react';
+import { ChevronDown, ChevronRight, ClipboardCheck, Send, UserMinus, Users } from 'lucide-react';
 
 import PageHeader from '@/components/shared/PageHeader';
 import EditPostingDialog from '@/components/jobs/EditPostingDialog';
@@ -76,6 +76,7 @@ import { INCOME_PERIOD_LABEL, buildIncomeDisplay } from '@/lib/incomeBreakdown';
 import { benefitDisplayLabels } from '@/lib/extraBenefits';
 import { EVEN_TYPE, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
+import { SEARCH_ALL_POOLS_AND_CALL } from '@/lib/candidateSearchLabels';
 import type { JobRequest } from '@/types';
 
 const EditPublicJobFieldsDialog = React.lazy(
@@ -242,6 +243,11 @@ export type BoardPostingStepsProps = {
   onDone?: () => void;
   /** โหมด popup ไม่ต้องมีหัวหน้าจอของตัวเอง */
   chrome?: boolean;
+  /**
+   * ปุ่ม "หาคนทุกกอง + ให้ AI โทร" — อยู่บนแท็บ **รายชื่อ** (เจ้าของ Choice 1 ต.ค. 2569 "4 ขั้นเดิม แต่ตัดของรก":
+   * ย้ายจากหัวป๊อปที่วางทับแถบขั้นประกาศ) · ไม่ส่ง = ไม่มีปุ่ม (ใบปิด/ยกเลิก · หน้า deep-link)
+   */
+  onSearchAllPools?: () => void;
 };
 
 /**
@@ -253,6 +259,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   backPath: backPathProp,
   onDone,
   chrome = true,
+  onSearchAllPools,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -420,6 +427,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const [openStep, setOpenStep] = React.useState<ReleaseStepKey>('info');
   /** "ดูใบขอทั้งใบ" — หุบเป็นค่าตั้งต้น */
   const [infoOpen, setInfoOpen] = React.useState(false);
+  /** "คนเก่า + รายได้ย้อนหลัง" — หุบเป็นค่าตั้งต้น (เจ้าของ Choice 1 ต.ค. 2569 "4 ขั้นเดิม แต่ตัดของรก") */
+  const [resignedOpen, setResignedOpen] = React.useState(false);
   /** ขั้น 4: ติ๊ก "สร้างลิงก์" ถึงกางฟอร์ม (ลิงก์ไม่บังคับ — Choice 30 ก.ย. 2569) */
   const [wantLink, setWantLink] = React.useState(false);
   const [editPostingOpen, setEditPostingOpen] = React.useState(false);
@@ -479,7 +488,20 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="people" className="mt-4">
+          <TabsContent value="people" className="mt-4 space-y-3">
+            {onSearchAllPools ? (
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                title={SEARCH_ALL_POOLS_AND_CALL.hint}
+                onClick={onSearchAllPools}
+                className={TONE.success.outline}
+              >
+                <Send aria-hidden />
+                {SEARCH_ALL_POOLS_AND_CALL.label}
+              </Button>
+            ) : null}
             {job ? <JobApplicantsDialog embedded open job={job} onClose={() => undefined} /> : <Loading />}
           </TabsContent>
 
@@ -588,10 +610,22 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                   </Collapsible>
                 </StepCard>
 
-                {/* คนที่ออก + รายได้จริง 3 เดือน — ใช้ตั้งรายได้ขั้น 3 · component ตัวเดียวกับหน้าใบขอ (ห้ามก๊อปโครง) */}
+                {/* คนที่ออก + รายได้จริง 3 เดือน — ใช้ตั้งรายได้ขั้น 3 · component ตัวเดียวกับหน้าใบขอ (ห้ามก๊อปโครง)
+                    🔴 พับไว้เป็นค่าตั้งต้น + ไม่มีประโยคอธิบายยาว (เจ้าของ Choice 1 ต.ค. 2569 "4 ขั้นเดิม แต่ตัดของรก") */}
                 {job && hasResignedInfo(job) ? (
                   <StepCard>
-                    <ResignedEmployeeBlock job={job} />
+                    <Collapsible open={resignedOpen} onOpenChange={setResignedOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button type="button" variant="ghost" size="xs" className="-ml-2">
+                          <UserMinus aria-hidden />
+                          คนเก่า + รายได้ย้อนหลัง
+                          <ChevronDown className={cn('transition-transform', resignedOpen && 'rotate-180')} aria-hidden />
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pt-3">
+                        <ResignedEmployeeBlock job={job} compact />
+                      </CollapsibleContent>
+                    </Collapsible>
                   </StepCard>
                 ) : null}
 

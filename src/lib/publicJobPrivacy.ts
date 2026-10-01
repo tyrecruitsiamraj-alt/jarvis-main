@@ -61,10 +61,17 @@ export function publicSafeAddressParts(src: PublicLocationSource): ThaiAddressPa
  */
 export function publicSafeAddress(src: PublicLocationSource): string {
   const p = publicSafeAddressParts(src);
+  /**
+   * 🔴 ตัดป้ายเดิมก่อนเติมป้ายของเรา (แก้ 1 ต.ค. 2569) — ตัวถอดที่อยู่คืน "ตำบลมาบข่า"/"แขวงยานนาวา"/"เขตสาทร" มาเลย
+   * เดิมเติม "ต."/"อ." ซ้อนเป็น "ต.ตำบลมาบข่า" "อ.เขตสาทร" (ใบเปิดอยู่ 71 ใบ) · กรุงเทพฯ ใช้ แขวง/เขต ตามที่คนเขียนจริง
+   */
+  const bkk = p.province === 'กรุงเทพมหานคร';
+  const sub = p.subdistrict?.replace(/^(?:ตำบล|ต\.|แขวง)\s*/u, '').trim();
+  const dist = p.district?.replace(/^(?:อำเภอ|อ\.|เขต)\s*/u, '').trim();
   const bits: string[] = [];
-  if (p.subdistrict) bits.push(`ต.${p.subdistrict}`);
-  if (p.district) bits.push(`อ.${p.district}`);
-  if (p.province) bits.push(`จ.${p.province}`);
+  if (sub) bits.push(`${bkk ? 'แขวง' : 'ต.'}${sub}`);
+  if (dist) bits.push(`${bkk ? 'เขต' : 'อ.'}${dist}`);
+  if (p.province) bits.push(bkk ? p.province : `จ.${p.province}`);
   return bits.join(' ');
 }
 

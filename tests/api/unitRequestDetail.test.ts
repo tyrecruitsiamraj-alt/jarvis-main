@@ -320,6 +320,8 @@ describe('จอบอกที่มาของรายได้จริง'
 
   it('หน้าใบขอและป๊อปไล่งานใช้กล่องเดียวกัน (ห้ามก๊อปโครงไปเขียนซ้ำ)', () => {
     expect(page).toContain('<ResignedEmployeeBlock job={data} />');
-    expect(popup).toContain('<ResignedEmployeeBlock job={job} />');
+    // ป๊อปใช้กล่องเดิมแบบย่อ — พับไว้ + ไม่มีประโยคอธิบายยาว (เจ้าของ Choice 1 ต.ค. 2569 "4 ขั้นเดิม แต่ตัดของรก")
+    expect(popup).toContain('<ResignedEmployeeBlock job={job} compact />');
+    expect(popup).toMatch(/<Collapsible open=\{resignedOpen\}/);
   });
 });

@@ -14,6 +14,7 @@ import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
 import ImportApplicantsDialog from '@/components/recruit-rm/ImportApplicantsDialog';
 import ApplicantContactDialog from '@/components/recruit-rm/ApplicantContactDialog';
+import ApplicantProfileDialog from '@/components/recruit-rm/ApplicantProfileDialog';
 import {
   EMPTY_RM_FILTERS,
   RM_ROW_ACTION_LABEL,
@@ -197,6 +198,8 @@ const RmWorkspace: React.FC<{
   const [importOpen, setImportOpen] = useState(false);
   /** dialog รายละเอียด+บันทึกผลติดต่อ (ลิสต์ข้อ 7) — เปิดจากปุ่ม "ดูรายละเอียด"/"บันทึกผลนัดหมาย" */
   const [contactApp, setContactApp] = useState<PublicApplication | null>(null);
+  /** ใบประวัติ (แท็บผู้สมัคร) — คนละป๊อปกับ `contactApp` ของแท็บการติดตาม */
+  const [profileApp, setProfileApp] = useState<PublicApplication | null>(null);
   const { user } = useAuth();
   /** ล็อกโทรของแถวในหน้า (คีย์ = application id) — โชว์ 🔒 + กันกดซ้ำ */
   const [holdByRef, setHoldByRef] = useState<Record<string, CallHold>>({});
@@ -618,7 +621,14 @@ const RmWorkspace: React.FC<{
         });
       return;
     }
-    // ดูรายละเอียด/บันทึกผล → dialog ติดต่อสำเร็จ-ไม่สำเร็จ (ลิสต์ข้อ 7 · 14 ส.ค. 2569)
+    /**
+     * ดูรายละเอียด — 🔴 แท็บผู้สมัครเปิด **ใบประวัติ** (เจ้าของ Choice 1 ต.ค. 2569 "ใบประวัติเต็มหน้า":
+     * *"กดไปก็ต้องขึ้นประวัติเข้าเลย"*) · แท็บการติดตาม/ติดตามนัดหมายยังเป็นป๊อปติดต่อ-นัดหมายเดิม (ลิสต์ข้อ 7 · 14 ส.ค. 2569)
+     */
+    if (action === 'view' && tab === 'candidates') {
+      setProfileApp(row);
+      return;
+    }
     if (action === 'view' || action === 'rule') {
       setContactApp(row);
       return;
@@ -1188,6 +1198,16 @@ const RmWorkspace: React.FC<{
         busy={aiSending}
         onCancel={() => setAiConfirmIds(null)}
         onConfirm={() => void confirmSendAi()}
+      />
+
+      {/* ใบประวัติผู้สมัคร — ปุ่มดูรายละเอียดของแท็บผู้สมัคร (1 ต.ค. 2569) */}
+      <ApplicantProfileDialog
+        application={profileApp}
+        onClose={() => setProfileApp(null)}
+        onSaved={() => {
+          say('บันทึกข้อมูลผู้สมัครแล้ว');
+          load();
+        }}
       />
 
       {/* dialog รายละเอียด + ติดต่อสำเร็จ/ไม่สำเร็จ + นัด (ลิสต์ข้อ 7 · 14 ส.ค. 2569) */}
