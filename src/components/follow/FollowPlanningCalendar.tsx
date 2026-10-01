@@ -344,8 +344,6 @@ const FollowPlanningCalendar: React.FC<{
     return summarizeFollowMicro(calls);
   }, [monthSource, month]);
   const microRates = followMicroRates(monthMicro);
-  /** สายของเดือนนี้ที่ยังไม่มีผลกลับเลย — ไม่อยู่ในฐานหารของอัตราไหนทั้งนั้น */
-  const monthNoResult = monthSummary.total - monthMicro.withResult;
 
   const overdueAll = useMemo(() => {
     const out: Array<{ row: FollowPlanningRow; round: FollowPlanningRound }> = [];
@@ -1153,18 +1151,9 @@ const FollowPlanningCalendar: React.FC<{
                   </dd>
                 </div>
               ))}
-              {/* ยังไม่มีผล = ยังไม่เข้าถังไหน ต้องแยกให้ชัดว่าไม่ได้อยู่ในการหาร */}
-              <div className="flex items-baseline justify-between gap-2 border-t border-border/70 pt-1.5">
-                <dt className="text-muted-foreground">ยังไม่มีผลกลับ</dt>
-                <dd className="font-medium tabular-nums text-muted-foreground">{monthNoResult}</dd>
-              </div>
+              {/* 🔴 แถว "ยังไม่มีผลกลับ" + ประโยคใต้ถัง ("ถังพวกนี้อ่านจากคำที่เขาพูด…") ถอดแล้ว —
+                  เจ้าของสั่ง 1 ต.ค. 2569 (Choice "เอาออกทั้งสองอย่าง") · ห้ามเติมกลับ */}
             </dl>
-
-            {/* ⚠️ ห้ามซ่อนว่าถังพวกนี้มาจากการอ่านคำ ไม่ใช่ค่าที่ Lumos ยืนยัน */}
-            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-              ถังพวกนี้อ่านจากคำที่เขาพูดกับสรุปของ AI — สายที่ฟังไม่ชัดจะอยู่ถัง
-              "ไม่บอกว่าไปหรือไม่ไป" ให้คนกดอ่านเอง ไม่เดาแทน
-            </p>
           </Card>
 
           <Card className="overflow-hidden rounded-2xl shadow-sm">

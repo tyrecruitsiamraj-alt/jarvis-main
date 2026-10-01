@@ -65,6 +65,12 @@ export type ConveyorStep = {
    * ขั้นของหน้าปัจจุบัน · ต้องเรียงจากเจาะจงไปกว้าง (ดู `stepForPath`)
    */
   match: string[];
+  /**
+   * แถบบนหน้า (`StageBanner`) เหลือแค่ชื่อหน้า + "ต่อไป: …" — ไม่มีไอคอน ไม่มีประโยคอธิบาย
+   * 🔴 หน้าติดตาม (เจ้าของสั่ง 1 ต.ค. 2569: *"เอาอิโมจิตรง ติดตาม … ออก คำนี้ก็เอาออก"* → Choice "เฉพาะหน้าติดตาม")
+   * · `blurb` ยังเก็บไว้ (หน้า Login/บอร์ดทีมใช้) — ซ่อนเฉพาะบนแถบ
+   */
+  bannerPlain?: boolean;
 };
 
 /**
@@ -132,6 +138,7 @@ export const CONVEYOR_STEPS: ConveyorStep[] = [
     path: '/follow',
     icon: PhoneForwarded,
     match: ['/follow'],
+    bannerPlain: true,
   },
   {
     key: 'aftercare',

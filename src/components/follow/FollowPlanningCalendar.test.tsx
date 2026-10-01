@@ -669,9 +669,10 @@ describe('ผลละเอียดของเดือน', () => {
     expect(screen.getAllByText('1/1 สาย').length).toBe(2);
   });
 
-  it('สายที่ยังไม่มีผลแยกออกมา ไม่ปนกับถังที่เอาไปหาร', () => {
+  /** 🔴 เจ้าของสั่ง 1 ต.ค. 2569 (Choice "เอาออกทั้งสองอย่าง") — แถว "ยังไม่มีผลกลับ" + ประโยคใต้ถังถอดแล้ว */
+  it('🔴 การ์ดผลของเดือนไม่มีแถว "ยังไม่มีผลกลับ" และไม่มีประโยค "ถังพวกนี้อ่านจาก…"', () => {
     renderCalendar([entry({ id: 'a', call_round: 1 })]);
-    const row = screen.getByText('ยังไม่มีผลกลับ').closest('div')!;
-    expect(within(row).getByText('1')).toBeTruthy();
+    expect(screen.queryByText('ยังไม่มีผลกลับ')).toBeNull();
+    expect(screen.queryByText(/ถังพวกนี้อ่านจากคำที่เขาพูด/)).toBeNull();
   });
 });

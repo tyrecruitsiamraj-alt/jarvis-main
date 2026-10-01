@@ -92,13 +92,19 @@ const StageBanner: React.FC<{ className?: string }> = ({ className }) => {
           เจ้าของสั่ง 28 ส.ค. 2569: *"ไม่เอาตัวเลข ขอเป็นสัญลักษณ์ที่บ่งบอกถึงข้อนั้น ๆ
           ไม่ต้องแยก ขอเป็นอันเดียวกัน ตอนนี้มันมีขีดคั่นไว้ไม่เอา"* และ
           *"จะมีชื่อคำนี้ทำไม ในเมื่อมันคือใบขอ ก็ใช้ชื่อใบขอสิ"* */}
+      {/* 🔴 `bannerPlain` (หน้าติดตาม · เจ้าของสั่ง 1 ต.ค. 2569) = ชื่อหน้าอย่างเดียว ไม่มีไอคอน/ประโยคอธิบาย
+          ตัวเว้นช่องยังอยู่ ⇒ "ต่อไป: …" ชิดขวาเหมือนหน้าอื่น */}
       <span className="flex shrink-0 items-center gap-1.5 font-medium text-foreground">
-        <step.icon className="h-4 w-4 text-blue-700 dark:text-blue-300" aria-hidden />
+        {step.bannerPlain ? null : <step.icon className="h-4 w-4 text-blue-700 dark:text-blue-300" aria-hidden />}
         {step.label}
       </span>
-      <span className="hidden min-w-0 flex-1 truncate text-muted-foreground sm:block">
-        {step.blurb}
-      </span>
+      {step.bannerPlain ? (
+        <span className="hidden min-w-0 flex-1 sm:block" aria-hidden />
+      ) : (
+        <span className="hidden min-w-0 flex-1 truncate text-muted-foreground sm:block">
+          {step.blurb}
+        </span>
+      )}
       {next ? (
         <Link
           to={next.path}

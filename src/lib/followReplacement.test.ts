@@ -90,6 +90,11 @@ describe('หน้าการติดตาม: ดูเฉพาะ + ง�
     expect(page).not.toMatch(/FOLLOW_TABS\.map\(\(t\) => \(\s*<button/);
   });
 
+  it('🔴 ไม่มีประโยคใต้ชื่อหน้า "ลงรายชื่อคนที่ต้องติดตาม แล้ว AI จะโทรตามให้" (เจ้าของสั่งเอาออก 1 ต.ค. 2569)', () => {
+    expect(page).not.toContain('subtitle="ลงรายชื่อคนที่ต้องติดตาม');
+    expect(page).not.toMatch(/<PageHeader[^>]*subtitle=/);
+  });
+
   it('🔴 สลับแท็บทีม = ตัวกรองกลับค่าเริ่มต้น (กัน "ดูเฉพาะ" ค้างตอนแท็บว่างหุบหัวการ์ด)', () => {
     expect(page).toMatch(/if \(filterScope !== replaceView\) \{\s*setFilterScope\(replaceView\);\s*setActiveRound\('all'\);\s*setTab\('active'\);/);
   });
