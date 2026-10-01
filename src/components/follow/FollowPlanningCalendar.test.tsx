@@ -676,3 +676,13 @@ describe('ผลละเอียดของเดือน', () => {
     expect(screen.queryByText(/ถังพวกนี้อ่านจากคำที่เขาพูด/)).toBeNull();
   });
 });
+
+/** 🔴 เจ้าของ Choice 1 ต.ค. 2569 — ใต้เวลาของแต่ละสายโชว์เลขรอบจริง ไม่ใช่กองที่ 3 */
+describe('เลขรอบของสายเดียว = เลขจริง', () => {
+  it('สายรอบที่ 5 ขึ้นว่า "รอบโทรที่ 5" (ไม่ใช่รอบโทรที่ 3) · ข้อความตัวกรองกอง 3 = "รอบโทรที่ 3 ขึ้นไป"', () => {
+    renderCalendar([entry({ id: 'r5', call_round: 5 })], { roundFilter: 3 });
+    expect(screen.getByText('รอบโทรที่ 5')).toBeTruthy();
+    expect(screen.queryByText('รอบโทรที่ 3')).toBeNull();
+    expect(screen.getAllByText(/รอบโทรที่ 3 ขึ้นไป/).length).toBeGreaterThan(0);
+  });
+});

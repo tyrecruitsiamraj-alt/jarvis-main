@@ -1918,25 +1918,75 @@ async function markFollowDispatchState(
  * ตั้งแต่ตอนสร้างแล้ว ยกเลิกแค่คิวฝั่งเรา = AI ยังโทรหาคนจริงเรื่องงานที่ยกเลิกไปแล้ว
  * (กู้คืนไม่ได้) · best-effort เหมือนตอน push: แจ้งไม่สำเร็จแค่ log ไม่ทำให้การยกเลิกล้ม
  * และยิงแม้คิวฝั่งเราไม่มีแถว pending (Lumos อาจถือ record อยู่โดยที่ฝั่งเราปิดไปแล้ว)
+ *
+ * 🔴 **รอบที่อยู่ในแผนเดียวกับรอบอื่น ต้องส่งแผนใหม่ — ห้ามยกเลิกด้วยรหัสของรอบเอง**
+ * (ไล่ทดสอบ 1 ต.ค. 2569 · เจ้าของ Choice "กดยกเลิกรอบแล้ว AI ยังโทร → แก้")
+ * Lumos รู้จักแผนหลายรอบด้วยรหัสของหัวขบวน (`plan_ref`) เท่านั้น ของเดิมยกเลิกด้วย `follow-<id>` ของรอบ:
+ * · รอบหลังของชุด → Lumos ไม่มีรหัสนั้น (404) ขั้นยังอยู่ในแผน **AI โทรตามเวลาเดิม** (เจอจริง 3 สายที่ถูกยกเลิกไปแล้ว)
+ * · หัวขบวน → ยกเลิกทั้งแผน รอบที่เหลือหายเงียบทั้งที่จอยังขึ้นว่ารอโทร
+ * ⇒ แถวที่มีรอบอื่นอยู่แผนเดียวกัน: ยกเลิกแถวนี้แล้ว `resyncFollowPlanWithLumos` (ยกเลิกแผนเดิมก่อน + ส่งรอบที่เหลือเป็นแผนใหม่)
+ *   ไม่เหลือรอบที่ส่งได้ = ยกเลิกแผนเดิมทิ้งทั้งก้อน · ต้องส่ง `resolveStaffName` มา (ประกอบบทของแผนใหม่)
+ * ⚠️ ผู้เรียกต้องติดธง `cancelled_at` ของแถวนี้ก่อนเรียก — ไม่งั้นแผนใหม่ดึงแถวนี้กลับเข้าไป
  */
-export async function cancelFollowReminder(followId: string): Promise<boolean> {
+export async function cancelFollowReminder(
+  followId: string,
+  resolveStaffName?: (phone: string | null) => Promise<string | null>,
+): Promise<boolean> {
+  const ownRef = `follow-${followId}`;
+  /** แผนที่แถวนี้อยู่ + มีรอบอื่นอยู่แผนเดียวกันไหม — อ่านก่อนเปลี่ยนสถานะคิว */
+  let planRef: string | null = null;
+  let sharedPlan = false;
+  try {
+    const { rows: planRows } = await dbQuery<{ plan_ref: string | null; others: string | null }>(
+      `select q.plan_ref,
+              (select count(*) from ${queueTable} o
+                where o.channel = 'reminder' and o.job_ref = 'follow'
+                  and o.plan_ref = q.plan_ref and o.person_ref <> q.person_ref)::text as others
+         from ${queueTable} q
+        where q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref = $1
+        limit 1`,
+      [ownRef],
+    );
+    planRef = planRows[0]?.plan_ref ?? null;
+    sharedPlan = planRef != null && Number(planRows[0]?.others ?? 0) > 0;
+  } catch (e) {
+    // ยังไม่รัน 117 (ไม่มี plan_ref) = ไม่มีแผนหลายรอบ ⇒ ยกเลิกด้วยรหัสของรอบเหมือนเดิม
+    if (!isUndefinedColumnError(e)) throw e;
+  }
+
   const { rows } = await dbQuery<{ id: number }>(
     `update ${queueTable}
         set status = 'cancelled', updated_at = now()
       where channel = 'reminder' and job_ref = 'follow'
         and person_ref = $1 and status = 'pending'
       returning id`,
-    [`follow-${followId}`],
+    [ownRef],
   );
   if (getLumosPushConfig()) {
     try {
-      await cancelPushedReminder(`follow-${followId}`);
-      logInfo('lumos.push.follow.cancel.ok', { followId });
+      if (sharedPlan && planRef && resolveStaffName) {
+        const resync = await resyncFollowPlanWithLumos(followId, resolveStaffName);
+        if (resync.rounds === 0) await cancelPushedReminderIgnoringMissing(planRef);
+        logInfo('lumos.push.follow.cancel.plan', { followId, planRef, ...resync });
+      } else {
+        await cancelPushedReminder(planRef ?? ownRef);
+        logInfo('lumos.push.follow.cancel.ok', { followId });
+      }
     } catch (e) {
       logError('lumos.push.follow.cancel failed (คิวฝั่งเรายกเลิกแล้ว)', e, { followId });
     }
   }
   return rows.length > 0;
+}
+
+/** ยกเลิก record ที่ Lumos — 404 (เขาไม่มี record นี้แล้ว/ไม่เคยถึง) ถือว่าสำเร็จ · error อื่นโยนต่อ */
+export async function cancelPushedReminderIgnoringMissing(clientContactId: string): Promise<void> {
+  try {
+    await cancelPushedReminder(clientContactId);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/404|not found/i.test(msg)) throw e;
+  }
 }
 
 /**
@@ -2175,6 +2225,251 @@ export async function resyncFollowPlanWithLumos(
     cancelled,
     pushed,
     reason: pushed ? undefined : 'ยกเลิกของเดิมแล้วแต่ส่งแผนใหม่ไม่สำเร็จ — ตัวส่งซ้ำจะลองให้เอง',
+  };
+}
+
+/** วันที่ (ปฏิทินไทย) ของสายติดตาม — ใช้แบ่ง "แผนละวัน" · ประกาศระดับโมดูล (กติกา `new Intl.*`) */
+const FOLLOW_PLAN_DAY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Bangkok',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+export type FollowSetReplan = {
+  /** สายของ AI ที่อยู่ในแผนใหม่ (รอโทรอยู่จริงในคิว) */
+  rounds: number;
+  /** จำนวนแผนที่ต้องส่ง (แผนละวัน) */
+  plans: number;
+  /** ยกเลิกแผนเดิมที่ Lumos สำเร็จหมดไหม (ไม่สำเร็จ = ไม่ส่งใหม่) */
+  cancelledOld: boolean;
+  /** แผนที่ส่งออกไปแล้ว */
+  pushedPlans: number;
+  /** สถานะการส่งของสายที่เพิ่งเข้าคิวรอบนี้ (สายใหม่ / สลับจากคนโทรมาเป็น AI) */
+  states: Record<string, FollowDispatchState>;
+  /** เหตุผลเมื่อไม่ครบ — ต้องบอกคนกด ไม่ใช่เงียบ */
+  reason?: string;
+};
+
+/**
+ * ═══ แก้ตารางทั้งชุดแล้ว **ส่งแผนใหม่ให้ Lumos** (เจ้าของ Choice 1 ต.ค. 2569 "แก้ตารางหลังบันทึกไม่ได้ → แก้") ═══
+ *
+ * ผู้เรียก (`PATCH /api/follow` action `replace_schedule`) แก้แถวในฐานเสร็จก่อนแล้ว — ยกเลิกสายที่เอาออก ·
+ * ย้ายเวลา/สลับคนโทร · เพิ่มสายใหม่ · ตัวนี้ทำให้ Lumos ถือชุดเดียวกับในฐาน:
+ * ① รหัสแผนเดิมทุกตัวที่เกี่ยว (แถวที่ยังอยู่ + แถวที่เพิ่งยกเลิก) → **ยกเลิกที่ Lumos ก่อนเสมอ** (404 = ไม่มีของค้าง)
+ *    ยกเลิกไม่สำเร็จ ⇒ **ห้ามส่งใหม่** (สองแผนที่เบอร์เดียว = คนจริงโดนโทรซ้ำ) — กติกาเดียวกับ `resyncFollowPlanWithLumos`
+ * ② แถวในแผนใหม่ = แถวที่ส่งมา + แถวอนาคตที่ยังรอโทรในแผนเดิม (ยกเลิกแผนเดิมทั้งก้อนแล้วขั้นอื่นต้องไม่หายไปด้วย)
+ *    เฉพาะ AI · ยังไม่ยกเลิก/ปิด · **เวลาอนาคตเท่านั้น** (Lumos รับแต่เวลาอนาคต · ใส่เวลาที่ผ่านแล้ว = โทรทันที)
+ * ③ แถวที่ยังไม่มีคิว (สายใหม่) → `insertQueueItems` (คอขวดเดียว: พักเบอร์/บล็อก/กันไว้ ครบ) + จดสถานะก่อน push
+ * ④ ส่ง **แผนละวัน** (รูปเดียวกับตอนสร้าง · แผนที่ Lumos รับจริงมาตลอดยาวสุดวันเดียว) · คีย์ใหม่ทุกครั้ง
+ * ⚠️ ผู้เรียกต้องเช็ค `isAutoDispatchEnabled('follow_entry')` ก่อน (เหมือนทางสร้าง)
+ */
+export async function replanFollowSetWithLumos(input: {
+  memberIds: readonly string[];
+  cancelledIds: readonly string[];
+  resolveStaffName: (phone: string | null) => Promise<string | null>;
+}): Promise<FollowSetReplan> {
+  const states: Record<string, FollowDispatchState> = {};
+  const touchedRefs = [...input.memberIds, ...input.cancelledIds].map((id) => `follow-${id}`);
+
+  // ① รหัสแผนเดิมที่ Lumos รู้จัก
+  let oldRefs: string[] = [];
+  if (touchedRefs.length > 0) {
+    try {
+      const { rows } = await dbQuery<{ ref: string | null }>(
+        `select distinct coalesce(plan_ref, person_ref) as ref from ${queueTable}
+          where channel = 'reminder' and job_ref = 'follow' and person_ref = any($1::text[])`,
+        [touchedRefs],
+      );
+      oldRefs = rows.map((r) => r.ref ?? '').filter(Boolean);
+    } catch (e) {
+      // ยังไม่รัน 117 (ไม่มี plan_ref) — ทุกแถวเป็นแผนของตัวเอง
+      if (!isUndefinedColumnError(e)) throw e;
+      const { rows } = await dbQuery<{ ref: string }>(
+        `select distinct person_ref as ref from ${queueTable}
+          where channel = 'reminder' and job_ref = 'follow' and person_ref = any($1::text[])`,
+        [touchedRefs],
+      );
+      oldRefs = rows.map((r) => r.ref).filter(Boolean);
+    }
+  }
+
+  // ② แถวที่ต้องอยู่ในแผนใหม่
+  const { rows: members } = await dbQuery<FollowPlanRow>(
+    `select f.id, f.recipient_name, f.recipient_phone, f.topic, f.note,
+            f.staff_phone, f.unit_name, f.scheduled_at, f.call_times, f.call_round
+       from ${followEntriesTable} f
+      where f.cancelled_at is null and f.completed_at is null
+        and f.scheduled_at > now()
+        and coalesce(f.call_mode, 'ai') = 'ai'
+        and (
+          f.id = any($1::uuid[])
+          or exists (
+            select 1 from ${queueTable} q
+             where q.channel = 'reminder' and q.job_ref = 'follow'
+               and q.person_ref = 'follow-' || f.id::text and q.status = 'pending'
+               and coalesce(q.plan_ref, q.person_ref) = any($2::text[])
+          )
+        )
+      order by f.scheduled_at`,
+    [[...input.memberIds], oldRefs],
+  );
+  const entries: FollowEntryInput[] = [];
+  for (const m of members) {
+    entries.push({
+      id: m.id,
+      recipient_name: m.recipient_name,
+      recipient_phone: m.recipient_phone,
+      topic: m.topic,
+      note: m.note,
+      staffPhone: m.staff_phone,
+      staffName: await input.resolveStaffName(m.staff_phone),
+      unitName: m.unit_name,
+      scheduled_at: new Date(String(m.scheduled_at)),
+      callTimes: m.call_times,
+      callRound: m.call_round,
+    });
+  }
+
+  // ③ สายที่ยังไม่มีคิว → เข้าคิวด้วยบทของตัวเอง (คอขวดเดียวของทุกเส้น)
+  const refsOf = (list: readonly FollowEntryInput[]) => list.map((e) => `follow-${e.id}`);
+  if (entries.length > 0) {
+    const { rows: existing } = await dbQuery<{ person_ref: string }>(
+      `select person_ref from ${queueTable}
+        where channel = 'reminder' and job_ref = 'follow' and person_ref = any($1::text[])`,
+      [refsOf(entries)],
+    );
+    const inQueue = new Set(existing.map((r) => r.person_ref));
+    const fresh = entries.filter((e) => !inQueue.has(`follow-${e.id}`));
+    if (fresh.length > 0) {
+      await ensureCallScriptsFresh();
+      const items: Array<{ personRef: string; payload: unknown; scheduledFor: string }> = [];
+      for (const e of fresh) {
+        const adminPhone = (e.staffPhone ? toE164Thai(e.staffPhone) : null) || (await resolveInterviewAdminPhone(null));
+        const own = buildFollowReminderPayload(e, adminPhone);
+        items.push({
+          personRef: `follow-${e.id}`,
+          payload: own,
+          scheduledFor: own.steps[0]?.scheduled_at ?? e.scheduled_at.toISOString(),
+        });
+      }
+      const { held, suppressed, guarded } = await insertQueueItems('reminder', 'follow', items);
+      for (const e of fresh) {
+        const ref = `follow-${e.id}`;
+        const state: FollowDispatchState = held.includes(ref)
+          ? 'held'
+          : suppressed.includes(ref)
+            ? 'suppressed'
+            : guarded.includes(ref)
+              ? 'guarded'
+              : 'queued';
+        states[e.id] = state;
+        // จดก่อน push — ถ้า push ล้ม `markFollowDispatchState` จะเปลี่ยน queued → push_failed ได้ถูกแถว
+        try {
+          await dbQuery(`update ${followEntriesTable} set dispatch_state = $2 where id = $1`, [e.id, state]);
+        } catch (err) {
+          if (!isUndefinedColumnError(err)) throw err;
+        }
+      }
+    }
+  }
+
+  // เฉพาะสายที่รอโทรอยู่จริงในคิว (โดนพักเบอร์/กันไว้ = ไม่อยู่ในแผน)
+  let live: FollowEntryInput[] = [];
+  if (entries.length > 0) {
+    const { rows: pending } = await dbQuery<{ person_ref: string }>(
+      `select person_ref from ${queueTable}
+        where channel = 'reminder' and job_ref = 'follow' and status = 'pending'
+          and person_ref = any($1::text[])`,
+      [refsOf(entries)],
+    );
+    const pendingSet = new Set(pending.map((r) => r.person_ref));
+    live = entries.filter((e) => pendingSet.has(`follow-${e.id}`));
+  }
+  const byDay = new Map<string, FollowEntryInput[]>();
+  for (const e of live) {
+    const day = FOLLOW_PLAN_DAY.format(e.scheduled_at);
+    byDay.set(day, [...(byDay.get(day) ?? []), e]);
+  }
+  const dayPlans = [...byDay.keys()].sort().map((d) => byDay.get(d) ?? []);
+
+  if (!getLumosPushConfig()) {
+    return { rounds: live.length, plans: dayPlans.length, cancelledOld: false, pushedPlans: 0, states, reason: 'push ปิดอยู่' };
+  }
+
+  // ④-ก ยกเลิกแผนเดิมทุกตัวก่อน — ไม่สำเร็จแม้ตัวเดียว = ไม่ส่งใหม่
+  for (const ref of oldRefs) {
+    try {
+      await cancelPushedReminderIgnoringMissing(ref);
+    } catch (e) {
+      logError('lumos.push.follow.replan: ยกเลิกแผนเดิมไม่สำเร็จ', e, { ref });
+      return {
+        rounds: live.length,
+        plans: dayPlans.length,
+        cancelledOld: false,
+        pushedPlans: 0,
+        states,
+        reason: 'ยกเลิกแผนเดิมที่ Lumos ไม่สำเร็จ — ยังไม่ส่งใหม่ เพราะจะกลายเป็นโทรซ้ำสองสาย',
+      };
+    }
+  }
+
+  // ④-ข ส่งแผนละวัน
+  let pushedPlans = 0;
+  for (const dayEntries of dayPlans) {
+    const leader = dayEntries[0];
+    const adminPhone =
+      (leader.staffPhone ? toE164Thai(leader.staffPhone) : null) || (await resolveInterviewAdminPhone(null));
+    const planPayload = buildFollowPlanPayload(dayEntries, adminPhone);
+    const planRef = `follow-${leader.id}`;
+    for (let i = 0; i < dayEntries.length; i += 1) {
+      const e = dayEntries[i];
+      const own = buildFollowReminderPayload(e, adminPhone);
+      await dbQuery(
+        `update ${queueTable}
+            set payload = $2, next_attempt_at = $3, updated_at = now()
+          where channel = 'reminder' and job_ref = 'follow' and person_ref = $1
+            and status = 'pending'`,
+        [`follow-${e.id}`, JSON.stringify(i === 0 ? planPayload : own), own.steps[0]?.scheduled_at ?? e.scheduled_at.toISOString()],
+      );
+    }
+    await stampPlanSteps(planRef, refsOf(dayEntries));
+    try {
+      await dbQuery(
+        `update ${queueTable}
+            set push_event_id = null, push_accepted_at = null
+          where channel = 'reminder' and job_ref = 'follow' and plan_ref = $1`,
+        [planRef],
+      );
+    } catch (e) {
+      if (!isUndefinedColumnError(e)) throw e;
+    }
+    try {
+      const ack = await pushReminders(
+        buildFollowPushRecord(planPayload),
+        `${planRef}:v${Math.floor(Date.now() / 1000)}`,
+      );
+      await recordPushAck(leader.id, ack);
+      await markFollowDispatchState(leader.id, 'queued', 'push_failed');
+      pushedPlans += 1;
+    } catch (e) {
+      logError('lumos.push.follow.replan: ส่งแผนใหม่ไม่สำเร็จ', e, { planRef });
+      await markFollowDispatchState(leader.id, 'push_failed', 'queued', pushErrorText(e));
+    }
+  }
+  logInfo('lumos.push.follow.replan', {
+    oldRefs: oldRefs.length,
+    rounds: live.length,
+    plans: dayPlans.length,
+    pushedPlans,
+  });
+  return {
+    rounds: live.length,
+    plans: dayPlans.length,
+    cancelledOld: true,
+    pushedPlans,
+    states,
+    reason: pushedPlans === dayPlans.length ? undefined : 'ส่งแผนใหม่บางวันไม่สำเร็จ — ตัวส่งซ้ำจะลองให้เอง',
   };
 }
 

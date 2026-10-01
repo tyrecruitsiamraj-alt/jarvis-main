@@ -6,6 +6,7 @@
  * DELETE /api/follow?id=<uuid>  → ยกเลิก (soft cancel + ยกเลิกในคิวถ้ายังไม่ถูกดึง)
  * DELETE /api/follow?id=<uuid>&purge=1 → **ลบทิ้งจริง** (admin เท่านั้น · ล้างข้อมูลทดสอบ)
  */
+import { randomUUID } from 'node:crypto';
 import { dbQuery } from '../_lib/postgres.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 
@@ -31,6 +32,7 @@ import {
   enqueueFollowReminderPlan,
   cancelFollowReminder,
   resyncFollowPlanWithLumos,
+  replanFollowSetWithLumos,
   refreshFollowReminderPayload,
 } from '../_lib/lumosDispatch.js';
 import { isAutoDispatchEnabled } from '../_lib/lumosDispatchMode.js';
@@ -62,6 +64,8 @@ type FollowRow = {
   /** เบอร์เจ้าหน้าที่ผู้ติดตาม — AI บอกผู้สมัครไว้โทรกลับ (migration 081) */
   staff_phone: string | null;
   scheduled_at: string | Date;
+  /** ชุดตาราง (092) — แถวของคนเดียวกันที่ตั้งพร้อมกัน · null = แถวเก่า/รอบเดี่ยว */
+  group_id?: string | null;
   /** รอบเวลาของวันนั้น (092) — ต้องพกไปด้วยตอนสร้าง payload ใหม่ ไม่งั้นตารางหลายรอบหาย */
   call_times: string[] | null;
   /**
@@ -155,6 +159,8 @@ function toResponse(r: FollowRow) {
      * ซึ่งอ่านจากช่องนี้ช่องเดียว · ก่อนหน้านี้เก็บในฐานแต่ไม่เคยส่งออกมาเลย
      */
     call_times: Array.isArray(r.call_times) ? r.call_times : null,
+    /** ชุดตาราง (092) — จอ "แก้ตารางทั้งชุด" ใช้เลือกสายของชุดเดียวกัน (1 ต.ค. 2569) · null = แถวเก่า/รอบเดี่ยว */
+    group_id: r.group_id ?? null,
     /** เบอร์ฉุกเฉินที่ส่งไปกับสายนั้น — null = ไม่เคยเข้าคิว หรือไม่มีเบอร์ให้ส่ง */
     emergency_phone: r.emergency_phone ?? null,
     /** เจ้าของข้อมูล = คนที่กรอกครั้งแรก · ไม่เปลี่ยนแม้มีคนอื่นมาแก้ทีหลัง */
@@ -689,7 +695,8 @@ async function cancelFollow(req: AuthedReq, res: ApiRes) {
   const cancelled = rows[0];
   if (!cancelled) return sendError(res, 404, 'Not found', 'ไม่พบรายการ หรือยกเลิกไปแล้ว');
 
-  const removedFromQueue = await cancelFollowReminder(id);
+  // รอบในแผนหลายรอบ = ส่งรอบที่เหลือเป็นแผนใหม่ (ต้องรู้ชื่อเจ้าหน้าที่เพื่อประกอบบท) — ดู `cancelFollowReminder`
+  const removedFromQueue = await cancelFollowReminder(id, staffNameOfPhone);
 
   await auditFromAuthed(req, {
     action: 'follow.cancel',
@@ -937,6 +944,263 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
 }
 
 /**
+ * ═══ แก้ตารางทั้งชุด — `PATCH /api/follow?id=<แถวที่เปิดแก้>` body `action: 'replace_schedule'` ═══
+ *
+ * เจ้าของ Choice 1 ต.ค. 2569 "แก้ตารางหลังบันทึกไม่ได้ → แก้" (เดิมต้องยกเลิกทั้งชุดแล้วตั้งใหม่)
+ * body: `replace_ids` = สายที่จอเปิดให้แก้ (อนาคต · ยังไม่ถูกโทร) · `rounds` = ตารางใหม่ของสายพวกนั้น
+ *   `[{ id?, scheduled_at, call_mode }]` — มี `id` = สายเดิม (ย้ายเวลา/สลับคนโทรได้) · ไม่มี `id` = สายใหม่
+ *   สายใน `replace_ids` ที่ไม่อยู่ใน `rounds` = เอาออก (ยกเลิก)
+ * 🔴 สายที่โทรไปแล้ว/เลยเวลาแล้วไม่อยู่ในชุดที่แก้ (ประวัติ ห้ามแตะ) · เวลาใหม่ต้องเป็นอนาคตเท่านั้น
+ */
+export type FollowScheduleReplace = {
+  replaceIds: string[];
+  rounds: Array<{ id: string | null; when: Date; callMode: 'ai' | 'manual' }>;
+};
+
+const MAX_SCHEDULE_ROUNDS = 160;
+
+export function parseFollowScheduleReplace(
+  raw: unknown,
+  now = new Date(),
+): { error: string | null; value: FollowScheduleReplace | null } {
+  const fail = (message: string) => ({ error: message, value: null });
+  const body = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const idsRaw = Array.isArray(body.replace_ids) ? body.replace_ids : [];
+  const replaceIds = [...new Set(idsRaw.map((x) => (typeof x === 'string' ? x.trim() : '')))];
+  if (replaceIds.some((id) => !UUID_RE.test(id))) return fail('replace_ids ต้องเป็นรหัสรายการ');
+  if (replaceIds.length > MAX_SCHEDULE_ROUNDS) return fail('สายในชุดเยอะเกินไป');
+  if (!Array.isArray(body.rounds)) return fail('rounds ต้องเป็นรายการ');
+  if (body.rounds.length > MAX_SCHEDULE_ROUNDS) return fail('สายในตารางเยอะเกินไป');
+  const allowed = new Set(replaceIds);
+  const seenIds = new Set<string>();
+  const seenMinutes = new Set<number>();
+  const rounds: FollowScheduleReplace['rounds'] = [];
+  for (const item of body.rounds) {
+    if (!item || typeof item !== 'object') return fail('ข้อมูลสายไม่ถูกต้อง');
+    const o = item as Record<string, unknown>;
+    const id = typeof o.id === 'string' && o.id.trim() ? o.id.trim() : null;
+    if (id && !allowed.has(id)) return fail('มีสายที่ไม่ได้อยู่ในชุดที่แก้');
+    if (id && seenIds.has(id)) return fail('สายเดียวกันซ้ำสองครั้ง');
+    const when = typeof o.scheduled_at === 'string' ? new Date(o.scheduled_at) : null;
+    if (!when || Number.isNaN(when.getTime())) return fail('เวลาโทรไม่ถูกต้อง');
+    // Lumos รับแต่เวลาอนาคต — เวลาที่ผ่านแล้ว = โทรทันที (ให้เวลาเหลือ 1 นาที กันคนกดตรงนาทีนั้นพอดี)
+    if (when.getTime() < now.getTime() + 60_000) return fail('เวลาที่ผ่านมาแล้วตั้งไม่ได้ — เลือกเวลาอนาคต');
+    const minute = Math.floor(when.getTime() / 60_000);
+    if (seenMinutes.has(minute)) return fail('มีสองสายเวลาเดียวกัน — ตั้งเวลาให้ต่างกัน');
+    const modeRaw = typeof o.call_mode === 'string' ? o.call_mode.trim() : 'ai';
+    if (modeRaw !== 'ai' && modeRaw !== 'manual') return fail('call_mode ต้องเป็น ai หรือ manual');
+    if (id) seenIds.add(id);
+    seenMinutes.add(minute);
+    rounds.push({ id, when, callMode: modeRaw });
+  }
+  if (replaceIds.length === 0 && rounds.length === 0) return fail('ไม่มีอะไรให้แก้');
+  rounds.sort((a, b) => a.when.getTime() - b.when.getTime());
+  return { error: null, value: { replaceIds, rounds } };
+}
+
+const phoneDigits = (p: string | null | undefined) => (toE164Thai(p ?? '') ?? String(p ?? '')).replace(/\D/g, '');
+
+async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<string, unknown>) {
+  const anchorId = typeof req.query?.id === 'string' ? req.query.id.trim() : '';
+  if (!UUID_RE.test(anchorId)) return sendError(res, 400, 'Bad request', 'ต้องระบุ id ของรายการติดตาม');
+  const parsed = parseFollowScheduleReplace(body);
+  if (parsed.error || !parsed.value) return sendError(res, 400, 'Bad request', parsed.error || 'ข้อมูลไม่ถูกต้อง');
+  const { replaceIds, rounds } = parsed.value;
+
+  const { rows: anchorRows } = await dbQuery<FollowRow>(`select * from ${followTable} where id = $1`, [anchorId]);
+  const anchor = anchorRows[0];
+  if (!anchor) return sendError(res, 404, 'Not found', 'ไม่พบรายการติดตาม');
+  if (anchor.cancelled_at != null) return sendError(res, 409, 'Conflict', 'รายการนี้ยกเลิกไปแล้ว แก้ตารางไม่ได้');
+
+  // สายที่จะแก้ต้องยังแก้ได้จริง — คนเดียวกัน ชุดเดียวกัน อนาคต ยังไม่ถูกโทร (คนอื่นอาจแก้/สายอาจออกไประหว่างเปิดจอ)
+  type ReplaceRow = FollowRow & { q_status: string | null; q_result_at: string | Date | null };
+  let targets: ReplaceRow[] = [];
+  if (replaceIds.length > 0) {
+    ({ rows: targets } = await dbQuery<ReplaceRow>(
+      `select f.*, q.status as q_status, q.first_result_at as q_result_at
+         from ${followTable} f
+         left join ${queueTable} q
+           on q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref = 'follow-' || f.id::text
+        where f.id = any($1::uuid[])`,
+      [replaceIds],
+    ));
+  }
+  const now = Date.now();
+  const stale = replaceIds.length !== targets.length || targets.some((t) =>
+    t.cancelled_at != null ||
+    t.completed_at != null ||
+    new Date(String(t.scheduled_at)).getTime() <= now ||
+    phoneDigits(t.recipient_phone) !== phoneDigits(anchor.recipient_phone) ||
+    (anchor.group_id != null && t.group_id !== anchor.group_id) ||
+    (t.q_status != null && (t.q_status !== 'pending' || t.q_result_at != null)),
+  );
+  if (stale) {
+    return sendError(res, 409, 'Conflict', 'บางสายโทรไปแล้วหรือถูกแก้ไปแล้ว — ปิดแล้วเปิดแก้ใหม่อีกครั้ง');
+  }
+
+  const groupId = anchor.group_id ?? randomUUID();
+  const keepIds = new Set(rounds.filter((r) => r.id).map((r) => r.id as string));
+  const cancelIds = replaceIds.filter((id) => !keepIds.has(id));
+  const byId = new Map(targets.map((t) => [t.id, t]));
+  const actor = [req.user.sub, req.user.email ?? null] as const;
+
+  // ① เอาออก = ยกเลิก (ฐาน + คิวฝั่งเรา) · ฝั่ง Lumos ยกเลิกรวดเดียวตอนส่งแผนใหม่ (`replanFollowSetWithLumos`)
+  if (cancelIds.length > 0) {
+    await dbQuery(
+      `update ${followTable}
+          set cancelled_at = now(), updated_at = now(), updated_by = $2, updated_by_name = $3
+        where id = any($1::uuid[]) and cancelled_at is null`,
+      [cancelIds, ...actor],
+    );
+    await dbQuery(
+      `update ${queueTable} set status = 'cancelled', updated_at = now()
+        where channel = 'reminder' and job_ref = 'follow' and status = 'pending'
+          and person_ref = any($1::text[])`,
+      [cancelIds.map((id) => `follow-${id}`)],
+    );
+  }
+
+  // ② สายเดิมที่อยู่ต่อ: ย้ายเวลา/สลับคนโทร (+ ผูกชุดถ้าเดิมยังไม่มี)
+  const toManual: string[] = [];
+  for (const r of rounds) {
+    if (!r.id) continue;
+    const before = byId.get(r.id);
+    if (!before) continue;
+    const beforeMode = before.call_mode === 'manual' ? 'manual' : 'ai';
+    const moved = new Date(String(before.scheduled_at)).getTime() !== r.when.getTime();
+    if (!moved && beforeMode === r.callMode && before.group_id === groupId) continue;
+    await dbQuery(
+      `update ${followTable}
+          set scheduled_at = $2, call_mode = $3, group_id = $4,
+              updated_at = now(), updated_by = $5, updated_by_name = $6
+        where id = $1 and cancelled_at is null and completed_at is null`,
+      [r.id, r.when.toISOString(), r.callMode, groupId, ...actor],
+    );
+    if (r.callMode === 'manual' && beforeMode === 'ai') toManual.push(r.id);
+  }
+  if (toManual.length > 0) {
+    // AI → คนโทร = ถอนออกจากคิว (ฝั่ง Lumos ถูกยกเลิกพร้อมแผนเดิมตอนส่งแผนใหม่)
+    await dbQuery(
+      `update ${queueTable} set status = 'cancelled', updated_at = now()
+        where channel = 'reminder' and job_ref = 'follow' and status = 'pending'
+          and person_ref = any($1::text[])`,
+      [toManual.map((id) => `follow-${id}`)],
+    );
+    try {
+      await dbQuery(`update ${followTable} set dispatch_state = 'manual' where id = any($1::uuid[])`, [toManual]);
+    } catch (e) {
+      if (!isUndefinedColumn(e)) throw e;
+    }
+  }
+  if (anchor.group_id == null && !cancelIds.includes(anchor.id)) {
+    await dbQuery(`update ${followTable} set group_id = $2 where id = $1 and group_id is null`, [anchor.id, groupId]);
+  }
+
+  // ③ สายใหม่ — ลอกคน/เรื่อง/หน่วยงาน/ทีม/เบอร์เจ้าหน้าที่จากแถวที่เปิดแก้ (คนเพิ่มคือคนแก้ · เจ้าของเดิมไม่เปลี่ยน)
+  const base: ParsedFollowInput = {
+    name: anchor.recipient_name,
+    phone: anchor.recipient_phone,
+    topic: anchor.topic,
+    note: anchor.note,
+    staffPhone: anchor.staff_phone ?? null,
+    when: rounds[0]?.when ?? new Date(),
+    groupId,
+    callTimes: null,
+    callMode: 'ai',
+    unitName: anchor.unit_name ?? null,
+    siteCode: anchor.site_code ?? null,
+    callRound: null,
+    team: anchor.follow_team === FOLLOW_TEAM_REPLACEMENT ? FOLLOW_TEAM_REPLACEMENT : null,
+  };
+  const createdIds: string[] = [];
+  for (const r of rounds) {
+    if (r.id) continue;
+    const row = await insertFollowRow(req, base, {
+      when: r.when,
+      staffPhone: base.staffPhone,
+      callRound: null,
+      callMode: r.callMode,
+    });
+    if (!row) continue;
+    createdIds.push(row.id);
+    r.id = row.id;
+    if (r.callMode === 'manual') {
+      try {
+        await dbQuery(`update ${followTable} set dispatch_state = 'manual' where id = $1`, [row.id]);
+      } catch (e) {
+        if (!isUndefinedColumn(e)) throw e;
+      }
+    }
+  }
+
+  // ④ เลขรอบ: สายที่โทรไปแล้วของชุดคงเลขเดิม · สายในตารางใหม่นับต่อตามเวลา (บทสายแรก/รอบถัดไปถูกเสมอ)
+  const { rows: locked } = await dbQuery<{ max_round: number | null; n: string }>(
+    `select max(call_round) as max_round, count(*)::text as n from ${followTable}
+      where group_id = $1 and cancelled_at is null and not (id = any($2::uuid[]))`,
+    [groupId, rounds.map((r) => r.id).filter(Boolean)],
+  );
+  let next = Math.max(Number(locked[0]?.max_round ?? 0), Number(locked[0]?.n ?? 0)) + 1;
+  for (const r of rounds) {
+    if (!r.id) continue;
+    await dbQuery(`update ${followTable} set call_round = $2 where id = $1`, [r.id, next]);
+    next += 1;
+  }
+
+  // ⑤ ให้ Lumos ถือชุดเดียวกับในฐาน (ยกเลิกแผนเดิมก่อน → ส่งแผนละวัน) — ล้มห้ามทำให้การแก้ล้ม (ฐานแก้ไปแล้ว)
+  const aiIds = rounds.filter((r) => r.id && r.callMode === 'ai').map((r) => r.id as string);
+  let replan: Awaited<ReturnType<typeof replanFollowSetWithLumos>> | null = null;
+  let replanNote: string | null = null;
+  try {
+    if (await isAutoDispatchEnabled('follow_entry')) {
+      replan = await replanFollowSetWithLumos({ memberIds: aiIds, cancelledIds: [...cancelIds, ...toManual], resolveStaffName: staffNameOfPhone });
+    } else {
+      replanNote = 'ปิดการส่งให้ AI อยู่ — สายใหม่ยังไม่ถูกส่ง';
+      if (createdIds.length > 0) {
+        try {
+          await dbQuery(
+            `update ${followTable} set dispatch_state = 'off'
+              where id = any($1::uuid[]) and dispatch_state is distinct from 'manual'`,
+            [createdIds],
+          );
+        } catch (e) {
+          if (!isUndefinedColumn(e)) throw e;
+        }
+      }
+    }
+  } catch (e) {
+    logWarn('follow.schedule.replanFailed', { followId: anchorId, error: String(e) });
+    replanNote = 'ส่งตารางใหม่ให้ AI ไม่สำเร็จ — ลองกดบันทึกอีกครั้ง';
+  }
+
+  await auditFromAuthed(req, {
+    action: 'follow.schedule.replace',
+    entityType: 'follow_entry',
+    entityId: anchorId,
+    before: { replaceIds },
+    after: {
+      groupId,
+      kept: [...keepIds],
+      cancelled: cancelIds,
+      created: createdIds,
+      toManual,
+      replan,
+      replanNote,
+    },
+  });
+
+  return res.status(200).json({
+    group_id: groupId,
+    kept: keepIds.size,
+    cancelled: cancelIds.length,
+    created: createdIds.length,
+    /** ให้ AI ถือตารางใหม่แล้วหรือยัง — จอต้องบอกคนกดได้ ห้ามเงียบ */
+    lumos: replan
+      ? { pushed: replan.pushedPlans === replan.plans, plans: replan.plans, rounds: replan.rounds, reason: replan.reason ?? null }
+      : { pushed: false, plans: 0, rounds: 0, reason: replanNote },
+  });
+}
+
+/**
  * **ย้อนสถานะปิดงาน** (feedback 2 ก.ย. 2569:
  * *"กรณีแก้ไขสถานะเสร็จแล้ว อยากให้ทำได้ต่อเนื่อง (ย้อนกลับ) ไม่ต้องเริ่มใหม่ทุกครั้ง"*)
  *
@@ -1100,6 +1364,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const body = ((await readJsonBody(req)) ?? {}) as Record<string, unknown>;
       const action = getString(body.action);
       if (action === 'update') return await updateFollow(req, res, body);
+      if (action === 'replace_schedule') return await replaceFollowSchedule(req, res, body);
       if (action === 'reopen') return await reopenFollow(req, res);
       if (action === 'staff_call') return await recordStaffCall(req, res, body);
       if (action === 'staff_call_clear') return await clearStaffCall(req, res);

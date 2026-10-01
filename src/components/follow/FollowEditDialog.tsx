@@ -16,6 +16,8 @@ import {
 import StaffContactField from '@/components/follow/StaffContactField';
 import DateTimeField24 from '@/components/shared/DateTimeField24';
 import TopicField from '@/components/follow/TopicField';
+import FollowScheduleEditor from '@/components/follow/FollowScheduleEditor';
+import { followSetRows, isEditableFollowRound } from '@/lib/followScheduleEdit';
 import type { BoardUnitOption } from '@/lib/boardUnitPicker';
 
 /**
@@ -69,6 +71,11 @@ export default function FollowEditDialog({
   const [extraWhen, setExtraWhen] = useState<string[]>([]);
   /** ตัวเลือกหน่วยงานจากบอร์ด — ชุดเดียวกับฟอร์มเพิ่ม (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ) */
   const [unitPickerOpen, setUnitPickerOpen] = useState(false);
+  /**
+   * 🔴 **แก้ตารางทั้งชุด** (เจ้าของ Choice 1 ต.ค. 2569 "แก้ตารางหลังบันทึกไม่ได้ → แก้") — สลับเนื้อในกล่องนี้
+   * เป็นตัวแก้ตาราง (ไม่เปิด Dialog ซ้อน) · ปิดกล่อง/เปลี่ยนรายการ = กลับหน้าฟอร์มเสมอ
+   */
+  const [scheduleEditing, setScheduleEditing] = useState(false);
 
   useEffect(() => {
     if (!entry) return;
@@ -91,6 +98,7 @@ export default function FollowEditDialog({
     }
     setError(null);
     setExtraWhen([]);
+    setScheduleEditing(false);
   }, [entry]);
 
   /**
@@ -116,6 +124,9 @@ export default function FollowEditDialog({
   if (!entry) return null;
 
   const otherRounds = siblings.filter((s) => s.id !== entry.id && !s.cancelled);
+  /** สายของชุดนี้ (ชุดเดียวกันเท่านั้น) + ยังมีสายที่แก้ได้ไหม — ไม่มีเลย = ไม่ต้องโชว์ปุ่มแก้ตาราง */
+  const setRows = followSetRows(entry, siblings);
+  const canEditSchedule = setRows.some((r) => isEditableFollowRound(r, new Date()));
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,7 +200,7 @@ export default function FollowEditDialog({
     <Dialog open onOpenChange={(o) => (o ? undefined : onClose())}>
       <DialogContent className="max-h-[92vh] max-w-lg overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base">แก้ไขรายการติดตาม</DialogTitle>
+          <DialogTitle className="text-base">{scheduleEditing ? 'แก้ตารางทั้งชุด' : 'แก้ไขรายการติดตาม'}</DialogTitle>
           <DialogDescription className="text-[11px]">
             เจ้าของข้อมูล{' '}
             <span className="font-medium text-foreground">
@@ -198,6 +209,17 @@ export default function FollowEditDialog({
             — แก้ไม่ได้ ใครกรอกคนนั้นเป็นเจ้าของ
           </DialogDescription>
         </DialogHeader>
+        {scheduleEditing ? (
+          <FollowScheduleEditor
+            anchor={entry}
+            setRows={setRows}
+            onBack={() => setScheduleEditing(false)}
+            onSaved={(msg) => {
+              onSaved(msg);
+              onClose();
+            }}
+          />
+        ) : (
         <form onSubmit={save}>
 
         <div className="mt-4 space-y-3">
@@ -329,6 +351,11 @@ export default function FollowEditDialog({
                   : ''}
               </span>
             </div>
+            {canEditSchedule ? (
+              <Button type="button" variant="outline" size="xs" onClick={() => setScheduleEditing(true)}>
+                แก้ตารางทั้งชุด
+              </Button>
+            ) : null}
 
             {otherRounds.length > 0 ? (
               <ul className="space-y-1">
@@ -450,6 +477,7 @@ export default function FollowEditDialog({
           </button>
         </div>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

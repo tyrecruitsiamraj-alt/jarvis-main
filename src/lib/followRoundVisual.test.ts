@@ -4,6 +4,7 @@ import {
   actionableBuckets,
   actionableSummary,
   bucketVisual,
+  roundFilterLabel,
   roundSignal,
   roundTabLabel,
   type RoundCounts,
@@ -128,5 +129,14 @@ describe('roundTabLabel', () => {
   it('คำเต็มตามที่เจ้าของสั่ง ไม่ใช่ "รอบ N"', () => {
     expect(roundTabLabel(1)).toBe('รอบโทรที่ 1');
     expect(roundTabLabel(3)).toBe('รอบโทรที่ 3');
+  });
+});
+
+/** 🔴 เจ้าของ Choice 1 ต.ค. 2569 — กองที่ 3 ของตัวกรองรวมรอบ 4, 5, 6… ป้ายต้องบอกว่า "ขึ้นไป" */
+describe('roundFilterLabel', () => {
+  it('กอง 1-2 = เลขตรง ๆ · กอง 3 = รอบโทรที่ 3 ขึ้นไป', () => {
+    expect(roundFilterLabel(1)).toBe('รอบโทรที่ 1');
+    expect(roundFilterLabel(2)).toBe('รอบโทรที่ 2');
+    expect(roundFilterLabel(3)).toBe('รอบโทรที่ 3 ขึ้นไป');
   });
 });

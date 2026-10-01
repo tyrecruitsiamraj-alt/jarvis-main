@@ -9,7 +9,11 @@ import {
   prevFollowStep,
   scheduleDayCallRound,
   scheduleDayStaffPhone,
+  buildScheduleCalls,
+  scheduleCallsByDay,
+  validScheduleTimes,
   type FollowWizardValues,
+  type ScheduleDayMode,
 } from '@/lib/followWizard';
 
 const values = (over: Partial<FollowWizardValues> = {}): FollowWizardValues => ({
@@ -180,5 +184,87 @@ describe('โหมดตารางหลายวัน — เบอร์�
 
   it('ไม่ได้กรอกเบอร์เลย = ว่าง (ฝั่งเรียกแปลงเป็น undefined เอง)', () => {
     expect(scheduleDayStaffPhone('2569-09-26', { perDay: true, byDay, shared: '  ' })).toBe('');
+  });
+});
+
+/**
+ * ═══ ตารางหลายวัน: หนึ่งสาย = หนึ่งแถว · เวลารายวัน · ข้ามวัน (เจ้าของ Choice 1 ต.ค. 2569) ═══
+ */
+describe('validScheduleTimes', () => {
+  it('รับแค่ HH:MM ที่เป็นเวลาจริง · ตัดซ้ำ · เรียงเช้าไปเย็น · เติมศูนย์', () => {
+    expect(validScheduleTimes(['08:25', '7:00', '07:00', 'เช้า', '25:00', '', '09:60'])).toEqual(['07:00', '08:25']);
+  });
+});
+
+describe('buildScheduleCalls', () => {
+  const days = ['2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05'];
+  const modes: Record<string, ScheduleDayMode> = {
+    '2026-10-02': 'ai',
+    '2026-10-03': 'off',
+    '2026-10-04': 'manual',
+    '2026-10-05': 'ai',
+  };
+  const times: Record<string, string[]> = {
+    '2026-10-02': ['08:25', '07:25'],
+    '2026-10-03': ['07:00'],
+    '2026-10-04': ['09:00'],
+    '2026-10-05': ['13:00', '17:00', '13:00'],
+  };
+  const calls = buildScheduleCalls({
+    days,
+    modeOfDay: (d) => modes[d],
+    timesOfDay: (d) => times[d],
+    staffPhoneOfDay: (d) => (d === '2026-10-04' ? '0899999999' : ' 0811111111 '),
+  });
+
+  it('🔴 หนึ่งสาย = หนึ่งแถว · วันที่ "ไม่โทร" ไม่มีสาย · เวลาต่างกันรายวันได้', () => {
+    expect(calls.map((c) => `${c.day} ${c.time} ${c.callMode}`)).toEqual([
+      '2026-10-02 07:25 ai',
+      '2026-10-02 08:25 ai',
+      '2026-10-04 09:00 manual',
+      '2026-10-05 13:00 ai',
+      '2026-10-05 17:00 ai',
+    ]);
+  });
+
+  it('🔴 เลขรอบนับต่อทั้งชุด (จำนวนรอบต่อวันไม่เท่ากันก็นับถูก) — สายแรกเท่านั้นที่ได้บทสายแรก', () => {
+    expect(calls.map((c) => c.callRound)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('เวลาเป็นเขตเวลาไทย · เบอร์เจ้าหน้าที่ของวันนั้นตัดช่องว่างแล้ว', () => {
+    expect(calls[0].scheduledAt).toBe('2026-10-02T00:25:00.000Z');
+    expect(calls[0].staffPhone).toBe('0811111111');
+    expect(calls[2].staffPhone).toBe('0899999999');
+  });
+
+  it('เริ่มนับรอบต่อจากรอบที่โทรไปแล้วได้ (ใช้ตอนแก้ตาราง)', () => {
+    const more = buildScheduleCalls({
+      days: ['2026-10-02'],
+      modeOfDay: () => 'ai',
+      timesOfDay: () => ['07:00'],
+      staffPhoneOfDay: () => '',
+      startRound: 4,
+    });
+    expect(more[0].callRound).toBe(4);
+  });
+
+  it('แยกตามวันสำหรับส่ง AI แผนละวัน', () => {
+    expect(scheduleCallsByDay(calls).map((g) => `${g.day}:${g.calls.length}`)).toEqual([
+      '2026-10-02:2',
+      '2026-10-04:1',
+      '2026-10-05:2',
+    ]);
+  });
+});
+
+describe('ขั้นที่ 3 — เวลารายวัน', () => {
+  const sched = (o: Partial<FollowWizardValues>) => values({ scheduleMode: true, scheduleDays: ['2026-10-02', '2026-10-03'], ...o });
+  it('เปิดเวลารายวัน: ทุกวันที่จะโทรต้องมีเวลาอย่างน้อย 1 รอบ · บอกว่าวันไหนขาด', () => {
+    expect(followStepError(3, sched({ timesByDay: { '2026-10-02': ['07:00'], '2026-10-03': ['09:00'] } }))).toBeNull();
+    expect(followStepError(3, sched({ timesByDay: { '2026-10-02': ['07:00'], '2026-10-03': [] } }))).toMatch(/3 ต\.ค\./);
+  });
+  it('ปิดเวลารายวัน: ใช้ชุดเดียวทุกวันเหมือนเดิม', () => {
+    expect(followStepError(3, sched({ timesByDay: null, roundTimes: ['07:00'] }))).toBeNull();
+    expect(followStepError(3, sched({ timesByDay: null, roundTimes: [] }))).toMatch(/รอบเวลา/);
   });
 });

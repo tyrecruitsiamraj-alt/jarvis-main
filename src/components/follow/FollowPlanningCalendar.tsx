@@ -3,7 +3,7 @@ import { Check, ChevronLeft, ChevronRight, Clock, Pencil, Phone, PhoneOff, X } f
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { shiftMonth } from '@/lib/followCallCalendar';
-import { roundTabLabel } from '@/lib/followRoundVisual';
+import { roundFilterLabel, roundTabLabel } from '@/lib/followRoundVisual';
 import { toYmdBangkok, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   buildFollowDayCalls,
@@ -525,7 +525,7 @@ const FollowPlanningCalendar: React.FC<{
                 <div className="flex flex-wrap items-center gap-2 border-b border-border/70 px-4 py-2.5 md:px-5">
                   {roundFilter !== 'all' && !daySlots.includes(roundFilter) ? (
                     <span className="text-[11px] text-muted-foreground">
-                      วันนี้ไม่มี{roundTabLabel(roundFilter)} — กด "ทุกสาย" ข้างบนเพื่อดูสายอื่น
+                      วันนี้ไม่มี{roundFilterLabel(roundFilter)} — กด "ทุกสาย" ข้างบนเพื่อดูสายอื่น
                     </span>
                   ) : null}
                   {daySummary.notSent > 0 ? (
@@ -544,7 +544,7 @@ const FollowPlanningCalendar: React.FC<{
               {dayCalls.length === 0 ? (
                 <p className="px-5 py-10 text-center text-sm text-muted-foreground">
                   วันที่เลือกไม่มีสายที่ต้องตาม
-                  {roundFilter !== 'all' ? ` ใน${roundTabLabel(roundFilter)}` : ''} — เลื่อนดูวันอื่นด้วยลูกศร
+                  {roundFilter !== 'all' ? ` ใน${roundFilterLabel(roundFilter)}` : ''} — เลื่อนดูวันอื่นด้วยลูกศร
                   หรือกดปฏิทินเลือกวัน
                 </p>
               ) : (
@@ -653,7 +653,8 @@ const FollowPlanningCalendar: React.FC<{
                                           {round.time ?? '—'}
                                         </span>
                                         <span className="mt-0.5 block text-[10.5px] text-muted-foreground">
-                                          {slot ? roundTabLabel(slot) : 'ยังไม่อยู่รอบไหน'}
+                                          {/* เลขรอบจริงของสายนี้ (รอบ 5 = "รอบโทรที่ 5" ไม่ใช่กองที่ 3) */}
+                                          {round.entry.call_round ? roundTabLabel(round.entry.call_round) : slot ? roundTabLabel(slot) : 'ยังไม่อยู่รอบไหน'}
                                         </span>
                                       </span>
                                       {/* ดินสอติดกับ **รอบนั้น** — แก้เวลาได้ทีละสายโดยไม่ต้องเข้าป๊อป */}
@@ -664,7 +665,7 @@ const FollowPlanningCalendar: React.FC<{
                                           size="icon"
                                           onClick={() => onEditRound(round)}
                                           title={`แก้ไขวัน/เวลาของสายนี้ · ${row.group.name}`}
-                                          aria-label={`แก้ไขวันเวลาของ ${row.group.name} ${slot ? roundTabLabel(slot) : ''}`}
+                                          aria-label={`แก้ไขวันเวลาของ ${row.group.name} ${round.entry.call_round ? roundTabLabel(round.entry.call_round) : slot ? roundTabLabel(slot) : ''}`}
                                           className="h-7 w-7 shrink-0 rounded-full"
                                         >
                                           <Pencil aria-hidden />
@@ -1076,7 +1077,7 @@ const FollowPlanningCalendar: React.FC<{
             <h3 className="text-[13px] font-medium text-foreground">ผลของเดือนนี้</h3>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               {monthLabel(month)}
-              {roundFilter !== 'all' ? ` · เฉพาะ${roundTabLabel(roundFilter)}` : ''}
+              {roundFilter !== 'all' ? ` · เฉพาะ${roundFilterLabel(roundFilter)}` : ''}
             </p>
             {/**
              * 🔴 ไม่มีผลเลย ⇒ **ไม่วาดวงกลม** (12 ก.ย. 2569)

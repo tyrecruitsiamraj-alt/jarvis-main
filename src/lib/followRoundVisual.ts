@@ -137,6 +137,16 @@ export function roundTabLabel(slot: number): string {
   return `รอบโทรที่ ${slot}`;
 }
 
+/**
+ * ป้ายของ **ตัวกรอง/กองรอบ** (ดูเฉพาะ · แท็บรอบ · ข้อความที่อ้างถึงตัวกรอง) — กองที่ 3 = รอบ 3 ขึ้นไป
+ * 🔴 เจ้าของ Choice 1 ต.ค. 2569 ("ดูเฉพาะ: รอบ 4 ขึ้นไปไปปนกับรอบ 3 → แก้"): ตารางหลายวันมีรอบเกิน 3 เสมอ
+ *    (`followRoundSlot` ปัดรอบ 4, 5, 6… ลงกองที่ 3 อยู่แล้ว) แต่ป้ายเขียนว่า "รอบโทรที่ 3" เฉย ๆ ⇒ อ่านผิด
+ * · ป้ายของ **สายเดียว** ยังเป็นเลขจริงผ่าน `roundTabLabel(call_round)` (เช่น รอบโทรที่ 5)
+ */
+export function roundFilterLabel(slot: 1 | 2 | 3): string {
+  return slot >= 3 ? `${roundTabLabel(3)} ขึ้นไป` : roundTabLabel(slot);
+}
+
 /** ช่องที่ต้องลงมือของรอบนี้ (เรียงตามลำดับที่โชว์บนจอ) — ใช้เน้นและทำสรุป */
 export function actionableBuckets(counts: RoundCounts): FollowRoundBucket[] {
   return FOLLOW_ROUND_BUCKETS.filter((b) => bucketVisual(b, counts[b]).actionable);

@@ -21,6 +21,8 @@ import {
   RETRY_TIME_SLOTS_BKK,
 } from '../../src/lib/callFollowupPolicy.js';
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
+import { cancelPushedReminder, getLumosPushConfig } from './lumosPushClient.js';
+import { logError, logInfo } from './logger.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 const suppressionTable = tableInAppSchema('candidate_call_suppression');
@@ -259,8 +261,10 @@ export async function applyCallFollowupToQueueRow(input: {
   // 🔴 `wrong_person` **ไม่อยู่ในกติกานี้แล้ว** (17 ก.ย. 2569) — คนละเรื่องกับ "บอกยกเลิก"
   // มันคือ *ระบบเดาว่าคุยผิดคน* ซึ่งเดาพลาดได้ (ดูเคสในคอมเมนต์ด้านบน) และถ้าพลาด
   // ตารางที่เหลือทั้งชุดหายไปเงียบ ๆ · ให้ติดธง needs_human แล้วรอคนตัดสินแทน
-  if (followGroupId && input.outcome === 'declined') {
-    await cancelFollowGroup(followGroupId).catch(() => {});
+  //
+  // 🔴 ต้องหยุด **ที่ Lumos ด้วย** ไม่ใช่แค่คิวฝั่งเรา (1 ต.ค. 2569) — ดู `cancelFollowSetAfterDecline`
+  if (input.outcome === 'declined' && (followGroupId || followSchedule.scheduled)) {
+    await cancelFollowSetAfterDecline(String(row.person_ref ?? ''), followGroupId).catch(() => {});
   }
 
   return decision;
@@ -322,6 +326,62 @@ async function followScheduleOfPersonRef(
     }
     throw e;
   }
+}
+
+/**
+ * ═══ ตอบว่า "ไม่ไป" → หยุดรอบที่เหลือของชุด ทั้งคิวฝั่งเรา **และที่ Lumos** ═══
+ *
+ * 🔴 ไล่ทดสอบ 1 ต.ค. 2569 (เจ้าของ Choice "ตอบว่าไม่ไป แต่ยังโดนโทรรอบต่อไป → แก้"):
+ * ของเดิม (`cancelFollowGroup`) ยกเลิกแค่แถวคิวฝั่งเรา — แผนที่ส่งไปตั้งแต่ตอนสร้างยังอยู่ที่ Lumos
+ * ⇒ วัดจริง: ชุดหลายรอบที่มีคนตอบว่าไม่ไป 6 ชุด · รอบที่ยังเหลือ 3 รอบ **ถูกโทรต่อครบทั้ง 3**
+ *
+ * พี่น้องของแถวที่ตอบ = แถวที่ยังรอโทร (pending) ของ **ชุดเดียวกัน** (`group_id`) หรือ **แผนเดียวกัน**
+ * (`plan_ref` — ชุดหลายรอบก่อน 21 ก.ย. ไม่มี group_id) · ยกเลิกในคิวแล้วยกเลิก record ที่ Lumos
+ * ตามรหัสที่ Lumos รู้จัก (`plan_ref` ของแผน หรือรหัสของแถวเองถ้าเป็นแผนเดี่ยว) · 404 = ไม่มีของค้างแล้ว
+ * · แจ้ง Lumos ไม่สำเร็จแค่ log (คิวฝั่งเรายกเลิกไปแล้ว ห้ามทำให้การรับผลล้ม)
+ */
+export async function cancelFollowSetAfterDecline(personRef: string, groupId: string | null): Promise<number> {
+  if (!personRef.startsWith('follow-')) return 0;
+  let cancelled: Array<{ person_ref: string; plan_ref: string | null }> = [];
+  try {
+    ({ rows: cancelled } = await dbQuery<{ person_ref: string; plan_ref: string | null }>(
+      `update ${queueTable} q
+          set status = 'cancelled', updated_at = now()
+        where q.channel = 'reminder' and q.job_ref = 'follow' and q.status = 'pending'
+          and q.person_ref <> $1
+          and (
+            ($2::uuid is not null
+              and q.person_ref in (select 'follow-' || f.id::text from ${followTable} f where f.group_id = $2::uuid))
+            or q.plan_ref = (
+              select me.plan_ref from ${queueTable} me
+               where me.channel = 'reminder' and me.job_ref = 'follow' and me.person_ref = $1
+               limit 1
+            )
+          )
+        returning q.person_ref, q.plan_ref`,
+      [personRef, groupId],
+    ));
+  } catch (e) {
+    // ยังไม่รัน 117 (ไม่มี plan_ref) — ถอยไปยกเลิกตามชุดอย่างเดียวแบบเดิม
+    if (!isUndefinedColumn(e)) throw e;
+    if (groupId) await cancelFollowGroup(groupId);
+    return 0;
+  }
+  if (cancelled.length > 0 && getLumosPushConfig()) {
+    const refs = [...new Set(cancelled.map((r) => r.plan_ref ?? r.person_ref))];
+    for (const ref of refs) {
+      try {
+        await cancelPushedReminder(ref);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!/404|not found/i.test(msg)) {
+          logError('lumos.push.follow.decline.cancel failed (คิวฝั่งเรายกเลิกแล้ว)', e, { personRef, ref });
+        }
+      }
+    }
+    logInfo('lumos.push.follow.decline.cancel', { personRef, rounds: cancelled.length, refs: refs.length });
+  }
+  return cancelled.length;
 }
 
 /**

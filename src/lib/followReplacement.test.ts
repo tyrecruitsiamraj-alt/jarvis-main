@@ -61,7 +61,9 @@ describe('หน้าการติดตาม: สองแท็บเห�
     expect(page).toContain("followScopeEntries(items, replaceView ? 'replacement' : 'main')");
     expect(page).toContain('filterFollowEntries(scopeItems,');
     expect(page).toContain('entries={scopeItems}');
-    expect(page).toContain('findScheduleDuplicates(phone, dayIsos, items)');
+    // ตัวกันนัดซ้ำทั้งสองโหมดเทียบกับ `items` ทั้งก้อน (ทุกทีม) — โหมดตารางเทียบทุกสาย ไม่ใช่แค่สายแรกของวัน
+    expect(page).toMatch(/findScheduleDuplicates\(\s*phone,\s*calls\.map\(\(c\) => c\.scheduledAt\),\s*items,?\s*\)/);
+    expect(page).toContain('findScheduleDuplicates(phone, isoTimes, items)');
     expect(page.match(/follow_team: followTeam,/g)?.length).toBe(2);
     expect(edit).toContain("follow_team: entry.follow_team === 'replacement' ? 'replacement' : undefined,");
   });

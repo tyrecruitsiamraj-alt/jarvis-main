@@ -23,7 +23,7 @@ import {
   actionableSummary,
   bucketVisual,
   roundSignal,
-  roundTabLabel,
+  roundFilterLabel,
 } from '@/lib/followRoundVisual';
 import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
 import {
@@ -220,7 +220,7 @@ export default function FollowCallRoundsPanel({
     [roundRows, activeRound],
   );
   const countsOfRound = useMemo(() => countFollowRoundBuckets(rowsOfRound), [rowsOfRound]);
-  const roundLabelOf = (r: FollowRoundFilter) => (r === 'all' ? 'ทุกสาย' : roundTabLabel(r));
+  const roundLabelOf = (r: FollowRoundFilter) => (r === 'all' ? 'ทุกสาย' : roundFilterLabel(r));
 
   const openBucketDialog = (slot: FollowRoundFilter, b: FollowRoundBucket) => {
     const rows = slot === 'all' ? rowsOfRound : (roundRows.get(slot) ?? []);

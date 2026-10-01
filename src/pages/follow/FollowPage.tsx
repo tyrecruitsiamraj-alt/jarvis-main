@@ -38,7 +38,6 @@ import { conveyorLabel } from '@/lib/soRecruitNav';
 import { Settings2, Plus, X, LoaderCircle, PhoneForwarded, Users, UserCog, Building2, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import {
   listFollowEntries,
-  createFollowEntry,
   createFollowRounds,
   cancelFollowEntry,
   purgeFollowEntry,
@@ -75,9 +74,12 @@ import {
   isSubmitTooSoonAfterStep3,
   nextFollowStep,
   prevFollowStep,
-  scheduleDayCallRound,
   scheduleDayStaffPhone,
+  buildScheduleCalls,
+  scheduleCallsByDay,
   type FollowWizardStep,
+  type ScheduleCall,
+  type ScheduleDayMode,
 } from '@/lib/followWizard';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { hasFollowPrefill, readFollowPrefill, splitPrefillName } from '@/lib/followPrefill';
@@ -116,6 +118,15 @@ function nowForInput(): string {
  * ค่าว่าง = ไม่ระบุ (บางเคสมีแค่ชื่อเล่น/ชื่อที่คนแนะนำมา)
  */
 const NAME_PREFIXES = ['', 'นาย', 'นาง', 'นางสาว'] as const;
+
+/** ป้ายวันแบบสั้น (พฤ. 2 ต.ค.) ของตารางหลายวัน — ประกาศระดับโมดูล (กติกา `new Intl.*`) */
+const SCHEDULE_DAY_FMT = new Intl.DateTimeFormat('th-TH', {
+  timeZone: 'Asia/Bangkok',
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+});
+const scheduleDayLabel = (ymd: string): string => SCHEDULE_DAY_FMT.format(new Date(`${ymd}T00:00:00+07:00`));
 
 /** ประกอบชื่อที่จะส่งให้ API — API รับ `recipient_name` ก้อนเดียว */
 function composeRecipientName(prefix: string, first: string, last: string): string {
@@ -213,8 +224,9 @@ const FollowPage: React.FC = () => {
   const [callRounds, setCallRounds] = useState<number[]>(() => [1]);
   /**
    * โหมดตารางโทร (16 ส.ค. · migration 092): ช่วงวัน × รอบเวลา/วัน
-   * เช่น 1-7 ส.ค. วันละ 2 รอบ 07:00/08:00 → ระบบยิง 1 แถว/วัน ผูก group เดียว
-   * รับสายยืนยันแล้ว Lumos หยุดรอบที่เหลือของวันนั้น (stop_early) พรุ่งนี้โทรต่อ
+   * เช่น 1-7 ส.ค. วันละ 2 รอบ 07:00/08:00 → **หนึ่งสาย = หนึ่งแถว** ผูก group เดียว (1 ต.ค. 2569 · เดิม 1 แถว/วัน)
+   * ⚠️ ของจริง Lumos โทรครบทุกสายในแผน แม้รอบก่อนรับสายยืนยันแล้ว (วัด 1 ต.ค.: 51 จาก 51) — ที่เคยเขียนว่า
+   *    "ยืนยันแล้ววันนั้นหยุด (stop_early)" ไม่ตรงของจริง · หยุดก่อนได้ทางเดียวคือตอบว่าไม่ไป/กดยกเลิก
    */
   const [scheduleMode, setScheduleMode] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
@@ -228,12 +240,9 @@ const FollowPage: React.FC = () => {
    * ตอนนี้ช่วงวันเป็นแค่ **ตัวกางปฏิทิน** ส่วนวันที่ติ๊กไว้เท่านั้นที่กลายเป็นสายจริง
    * ⚠️ ติ๊กไม่ครบ = ไม่ใช่ error — ตั้งใจข้ามวันได้
    *
-   * 🔴 **23 ก.ย. 2569: จอไม่มีทางเลือก "ไม่โทร" แล้ว** (เจ้าของสั่ง: *"ทำเป็น Checkbox
-   * เลือกว่า Ai โทรหรือคนโทร แค่นี้เองทำไรให้มันซับซ้อนทำไม"*) ⇒ ติ๊กออก = **คนโทร**
-   * ไม่ใช่ "ข้ามวัน" · อยากข้ามวันให้ย่นช่วงวันแทน
-   *
-   * ตัวแปรกับตัวกรองตอนส่งยังอยู่ (ค่าเป็นเซ็ตว่างเสมอ) — เอาไว้ให้เติมทางเลือกกลับได้
-   * ทันทีถ้าเจ้าของสั่ง ไม่ต้องรื้อเส้นบันทึกใหม่ · **ห้ามเติมปุ่มกลับเองโดยไม่ได้สั่ง**
+   * 23 ก.ย. 2569 จอเคยเหลือแค่ AI โทร/คนโทร (เจ้าของสั่ง: *"ทำเป็น Checkbox เลือกว่า Ai โทรหรือคนโทร"*)
+   * 🔴 **1 ต.ค. 2569 เจ้าของสั่งเติม "ไม่โทร" กลับ** (Choice "ข้ามวันไม่ได้ → แก้") — ช่องที่สามต่อวัน
+   *    ติ๊กแล้ววันนั้นไม่มีสาย (ข้ามเสาร์-อาทิตย์/วันหยุดได้โดยไม่ต้องย่นช่วงวัน)
    */
   const [skippedDays, setSkippedDays] = useState<Set<string>>(() => new Set());
   /**
@@ -245,6 +254,13 @@ const FollowPage: React.FC = () => {
    * ไม่อยู่ที่ไหนเลย = **ส่งให้ AI** (ค่าเดิม ⇒ ของเก่าไม่เปลี่ยนพฤติกรรม)
    */
   const [manualDays, setManualDays] = useState<Set<string>>(() => new Set());
+  /**
+   * 🔴 **ตั้งเวลารายวัน** (เจ้าของ Choice 1 ต.ค. 2569 "ทุกวันต้องใช้เวลาเดียวกัน → แก้")
+   * ปิดอยู่ = ทุกวันใช้ `roundTimes` เหมือนเดิม · เปิด = แต่ละวันมีเวลาของตัวเอง (`roundTimesByDay`)
+   * เปิดครั้งแรกลอกเวลาชุดเดียวลงทุกวันให้ก่อน แล้วค่อยแก้เฉพาะวันที่ต่าง (แพตเทิร์นเดียวกับเบอร์รายวัน)
+   */
+  const [perDayTimes, setPerDayTimes] = useState(false);
+  const [roundTimesByDay, setRoundTimesByDay] = useState<Record<string, string[]>>({});
   /**
    * หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (096) — เลือกจากใบขอแล้วเติมให้ทั้งคู่
    * (เจ้าของสั่ง: *"เพิ่มชื่อหน่วยงาน โดยเลือกจากใบงานได้เลย · Code site ถ้าเลือกหน่วยงานก็ให้ขึ้นมาเลย"*)
@@ -494,6 +510,8 @@ const FollowPage: React.FC = () => {
     setRoundTimes(['07:00']);
     setSkippedDays(new Set());
     setManualDays(new Set());
+    setPerDayTimes(false);
+    setRoundTimesByDay({});
     setUnitName('');
     setSiteCode('');
     setFormError(null);
@@ -561,6 +579,36 @@ const FollowPage: React.FC = () => {
       byDay: staffPhoneByDay,
       shared: staffPhoneAll,
     });
+  /** วันนี้ใครโทร (AI · คนโทร · ไม่โทร) — ตัวเดียวที่ตัดสินทั้งจอและตอนส่ง */
+  const modeOfScheduleDay = (day: string): ScheduleDayMode =>
+    skippedDays.has(day) ? 'off' : manualDays.has(day) ? 'manual' : 'ai';
+  /** เวลาของวันนั้น — ตัวเดียวที่ตัดสิน (สรุปบนจอกับตอนส่งอ่านจากที่นี่ ไม่งั้นทวนกับส่งคนละเวลา) */
+  const timesOfScheduleDay = (day: string): string[] =>
+    perDayTimes ? (roundTimesByDay[day] ?? roundTimes) : roundTimes;
+  /** สายทั้งชุดของโหมดตาราง (หนึ่งสาย = หนึ่งแถว) — สรุปบนจอกับตอนส่งใช้ตัวเดียวกัน */
+  const scheduleCalls = (): ScheduleCall[] =>
+    buildScheduleCalls({
+      days: daysInRange(dateFrom, dateTo),
+      modeOfDay: modeOfScheduleDay,
+      timesOfDay: timesOfScheduleDay,
+      staffPhoneOfDay: staffPhoneForDay,
+    });
+  const setDayTimeAt = (day: string, i: number, v: string) =>
+    setRoundTimesByDay((prev) => {
+      const list = [...(prev[day] ?? roundTimes)];
+      list[i] = v;
+      return { ...prev, [day]: list };
+    });
+  const addDayTime = (day: string) =>
+    setRoundTimesByDay((prev) => {
+      const list = prev[day] ?? roundTimes;
+      return list.length >= 5 ? prev : { ...prev, [day]: [...list, '08:00'] };
+    });
+  const removeDayTime = (day: string, i: number) =>
+    setRoundTimesByDay((prev) => {
+      const list = prev[day] ?? roundTimes;
+      return list.length <= 1 ? prev : { ...prev, [day]: list.filter((_, idx) => idx !== i) };
+    });
 
   /**
    * ตัวเลขสำหรับกล่อง "ทวนก่อนส่ง" — **ใช้สูตรเดียวกับตอนส่งจริง**
@@ -574,10 +622,9 @@ const FollowPage: React.FC = () => {
     () => daysInRange(dateFrom, dateTo).filter((d) => !skippedDays.has(d)).length,
     [dateFrom, dateTo, skippedDays],
   );
-  const roundTimesPreview = useMemo(
-    () => new Set(roundTimes.filter((t) => /^\d{1,2}:\d{2}$/.test(t))).size,
-    [roundTimes],
-  );
+  /** จำนวนสายของโหมดตาราง — สูตรเดียวกับตอนส่ง (`scheduleCalls`) */
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- scheduleCalls อ่านจาก state ชุดนี้ทั้งหมด
+  const scheduleCallsPreview = useMemo(() => scheduleCalls().length, [dateFrom, dateTo, skippedDays, manualDays, roundTimes, perDayTimes, roundTimesByDay]);
   const scheduledAtsPreview = useMemo(
     () => scheduledAts.filter((t) => t.trim()).length,
     [scheduledAts],
@@ -600,8 +647,15 @@ const FollowPage: React.FC = () => {
       scheduledAts,
       scheduleDays: daysInRange(dateFrom, dateTo).filter((d) => !skippedDays.has(d)),
       roundTimes,
+      timesByDay: perDayTimes
+        ? Object.fromEntries(
+            daysInRange(dateFrom, dateTo)
+              .filter((d) => !skippedDays.has(d))
+              .map((d) => [d, roundTimesByDay[d] ?? roundTimes]),
+          )
+        : null,
     }),
-    [firstName, phone, topic, scheduleMode, scheduledAts, dateFrom, dateTo, skippedDays, roundTimes],
+    [firstName, phone, topic, scheduleMode, scheduledAts, dateFrom, dateTo, skippedDays, roundTimes, perDayTimes, roundTimesByDay],
   );
 
   const stepError = followStepError(step, wizardValues);
@@ -665,86 +719,78 @@ const FollowPage: React.FC = () => {
     }
     const recipientName = composeRecipientName(prefix, firstName, lastName);
 
-    // โหมดตาราง: ช่วงวัน × รอบเวลา/วัน → 1 แถว/วัน ผูก group เดียว (Lumos หยุดรอบที่เหลือ
-    // ของวันเมื่อยืนยัน · declined ยกเลิกทั้งชุด — server จัดการ)
+    /**
+     * โหมดตาราง: ช่วงวัน × เวลา → **หนึ่งสาย = หนึ่งแถว** ผูก group เดียว (เจ้าของ Choice 1 ต.ค. 2569)
+     * เวลารายวันได้ · วันที่ "ไม่โทร" ข้าม · เลขรอบนับต่อทั้งชุด (`buildScheduleCalls`) · ตอบไม่ไป = หยุดทั้งชุด (server)
+     */
     if (scheduleMode) {
-      const allDays = daysInRange(dateFrom, dateTo);
-      if (allDays.length === 0) {
+      if (daysInRange(dateFrom, dateTo).length === 0) {
         setFormError('เลือกช่วงวันให้ถูกต้อง (ไม่เกิน 31 วัน · วันเริ่มต้องไม่หลังวันจบ)');
         return;
       }
-      // เอาเฉพาะวันที่จะโทรจริง — ช่วงวันเป็นแค่ตัวกางปฏิทิน ไม่ใช่คำสั่งโทรทุกวัน
-      const days = allDays.filter((d) => !skippedDays.has(d));
-      if (days.length === 0) {
-        setFormError('ยังไม่ได้เลือกวันที่จะโทรสักวัน — กดที่วันให้เป็น "AI" หรือ "เราโทร" อย่างน้อย 1 วัน');
-        return;
-      }
-      const rounds = [...new Set(roundTimes.filter((t) => /^\d{1,2}:\d{2}$/.test(t)))].sort();
-      if (rounds.length === 0) {
-        setFormError('ระบุรอบเวลาอย่างน้อย 1 รอบ (เช่น 07:00)');
+      const calls = scheduleCalls();
+      if (calls.length === 0) {
+        setFormError('ยังไม่มีสายให้โทร — เลือกวันที่จะโทร แล้วตั้งเวลาอย่างน้อย 1 รอบ');
         return;
       }
       const groupId = crypto.randomUUID();
-      const dayIsos = days.map((day) => new Date(`${day}T${rounds[0]}:00+07:00`).toISOString());
-      const dupCheck = findScheduleDuplicates(phone, dayIsos, items);
-      const runSchedule = async (sendDays: string[]) => {
+      const dupCheck = findScheduleDuplicates(
+        phone,
+        calls.map((c) => c.scheduledAt),
+        items,
+      );
+      const runSchedule = async (sendCalls: ScheduleCall[]) => {
         setSubmitting(true);
         let done = 0;
         // เก็บผล "ส่งให้ AI ได้ไหม" ของทุกรายการ แล้วสรุปทีเดียวตอนจบ
         const dispatchStates: Array<string | null> = [];
         try {
-          for (const [dayIndex, day] of sendDays.entries()) {
-            const createdEntry = await createFollowEntry({
+          /**
+           * 🔴 ส่ง AI **แผนละวัน** — หนึ่งคำขอต่อวัน มีทุกสายของวันนั้น (รอบในวันเดียวกัน = แผนเดียว ตามคำสั่ง 11 ก.ย.)
+           * ไม่รวมทั้งชุดเป็นแผนเดียว: แผนที่ Lumos รับจริงมาตลอดยาวสุดวันเดียว ≤ 2 สาย (วัด 1 ต.ค. 2569)
+           * และแผนแยกของเบอร์เดียวกันไม่ทับกันแล้ว (หลัง 12 ก.ย.: 35 จาก 35 สายได้โทร)
+           */
+          for (const { calls: dayCalls } of scheduleCallsByDay(sendCalls)) {
+            const first = dayCalls[0];
+            const createdEntries = await createFollowRounds({
               recipient_name: recipientName,
               recipient_phone: phone,
               topic,
               follow_team: followTeam,
               note: note || undefined,
-              // เบอร์ของ **วันนั้น** — เจ้าของแผนคนละคนกันได้ในชุดเดียว (เปิดสวิตช์รายวัน)
-              // ปิดอยู่ = เบอร์เดียวทั้งชุด
-              staff_phone: staffPhoneForDay(day) || undefined,
-              scheduled_at: new Date(`${day}T${rounds[0]}:00+07:00`).toISOString(),
+              // ค่าบนสุด = สายแรกของวัน (วันที่มีสายเดียว เส้น API อ่านจากตรงนี้)
+              staff_phone: first.staffPhone || undefined,
+              scheduled_at: first.scheduledAt,
+              call_round: first.callRound,
+              // วันที่เลือกว่า "คนโทร" → ไม่ส่งเข้าคิว AI (121) แต่ยังเป็นแถวจริงในระบบ
+              call_mode: first.callMode,
               group_id: groupId,
-              call_times: rounds,
-              /**
-               * 🔴 **สายที่เท่าไหร่ ต้องนับต่อข้ามวัน** (เจ้าของทัก 23 ก.ย. 2569)
-               *
-               * เส้นนี้เคย **ไม่ส่ง `call_round` เลย** ⇒ ทุกแถวได้ `null` ⇒ ฝั่งส่งคิว
-               * (`lumosDispatch.buildFollowPlanPayload`) ตก `baseRound = 1` ให้ทุกวัน
-               * ⇒ **วันที่ 2, 3, 4… AI พูดบทสายแรกซ้ำ** เหมือนไม่เคยโทรหากันมาก่อน
-               * (บทสายแรก = ชุด `follow` · สายที่ 2 ขึ้นไป = `follow_repeat`)
-               *
-               * วันหนึ่งมี `rounds.length` สาย ⇒ สายแรกของวันที่ i คือสายที่
-               * `i * rounds.length + 1` · ตัว payload นับ step ในวันเดียวกันต่อเอง
-               */
-              call_round: scheduleDayCallRound(dayIndex, rounds.length),
-              // วันที่เลือกว่า "เราโทรเอง" → ไม่ส่งเข้าคิว AI (121) แต่ยังเป็นแถวจริงในระบบ
-              call_mode: manualDays.has(day) ? 'manual' : 'ai',
               unit_name: unitName.trim() || undefined,
               site_code: siteCode.trim() || undefined,
+              rounds: dayCalls.map((c) => ({
+                scheduled_at: c.scheduledAt,
+                staff_phone: c.staffPhone || undefined,
+                call_round: c.callRound,
+                call_mode: c.callMode,
+              })),
             });
-            dispatchStates.push(createdEntry.dispatch_state ?? null);
-            done += 1;
+            for (const createdEntry of createdEntries) {
+              dispatchStates.push(createdEntry.dispatch_state ?? null);
+              done += 1;
+            }
           }
           resetForm();
           setFormOpen(false);
           /* 🔴 บอกทันทีถ้ามีรายการที่ "ไม่ได้ส่งให้ AI" — เดิมขึ้นว่าสำเร็จอย่างเดียว
              คนนั่งรอสายที่ไม่มีวันออก (เกิดจริง 24 ส.ค. 2569) */
           const warn = summarizeDispatchResults(dispatchStates);
-          /* 🔴 ย้ำขั้นที่ ② ของการ์ดวันแรก — ตาใหม่กังวลที่สุดว่า "เพิ่มแล้วต้องกดอะไรต่อ" */
-          /* 🔴 ข้อความต้องแยกสองฝั่ง — เดิมเขียนว่า "AI จะโทรเองตามเวลา ไม่ต้องกดอะไรอีก"
-             ทุกกรณี · พอมีวันที่คนโทรเองแล้วประโยคนั้นกลายเป็นคำโกหก */
-          const manualDayCount = sendDays.filter((d) => manualDays.has(d)).length;
-          const aiDayCount = sendDays.length - manualDayCount;
-          const parts = [
-            `ตั้งตารางโทรแล้ว — ${sendDays.length} วัน วันละ ${rounds.length} รอบ (รวม ${sendDays.length * rounds.length} สาย)`,
-          ];
-          if (aiDayCount > 0) {
-            parts.push(`AI โทรให้ ${aiDayCount * rounds.length} สาย — ไม่ต้องกดอะไรอีก`);
-          }
-          if (manualDayCount > 0) {
-            parts.push(`อีก ${manualDayCount * rounds.length} สายรอเราโทรเอง — กดปุ่มโทรข้างชื่อเมื่อถึงเวลา`);
-          }
+          /* 🔴 ข้อความต้องแยกสองฝั่ง — พอมีวันที่คนโทรเองแล้ว "AI จะโทรเองทั้งหมด" กลายเป็นคำโกหก */
+          const dayCount = new Set(sendCalls.map((c) => c.day)).size;
+          const aiCalls = sendCalls.filter((c) => c.callMode === 'ai').length;
+          const manualCalls = sendCalls.length - aiCalls;
+          const parts = [`ตั้งตารางโทรแล้ว — ${dayCount} วัน รวม ${sendCalls.length} สาย`];
+          if (aiCalls > 0) parts.push(`AI โทรให้ ${aiCalls} สาย — ไม่ต้องกดอะไรอีก`);
+          if (manualCalls > 0) parts.push(`อีก ${manualCalls} สายรอเราโทรเอง — กดปุ่มโทรข้างชื่อเมื่อถึงเวลา`);
           const okText = parts.join(' · ');
           if (warn) {
             setFormError(`${okText}\n${warn.text}`);
@@ -755,24 +801,23 @@ const FollowPage: React.FC = () => {
           await reload();
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'ตั้งตารางไม่สำเร็จ';
-          setFormError(done > 0 ? `${msg} — ตั้งไปแล้ว ${done} จาก ${sendDays.length} วัน อย่ากดซ้ำทั้งชุด` : msg);
+          setFormError(done > 0 ? `${msg} — ตั้งไปแล้ว ${done} จาก ${sendCalls.length} สาย อย่ากดซ้ำทั้งชุด` : msg);
           if (done > 0) await reload();
         } finally {
           setSubmitting(false);
         }
       };
       if (dupCheck.duplicates.length > 0) {
-        // วันที่ไม่ซ้ำ = วันที่รอบแรกของวันนั้นอยู่ในกอง fresh
-        const freshSet = new Set(dupCheck.freshIso);
-        const freshDays = days.filter((day, i) => freshSet.has(dupCheck.freshIso.find((x) => x === dayIsos[i]) ?? ''));
+        // สายที่ไม่ซ้ำ = เวลาที่อยู่ในกอง fresh (คีย์ระดับนาทีรูปเดียวกับ `scheduledAt`)
+        const fresh = new Set(dupCheck.freshIso);
         setDupWarning({
           duplicates: dupCheck.duplicates,
           freshIso: dupCheck.freshIso,
-          proceed: () => runSchedule(freshDays),
+          proceed: () => runSchedule(calls.filter((c) => fresh.has(c.scheduledAt))),
         });
         return;
       }
-      await runSchedule(days);
+      await runSchedule(calls);
       return;
     }
 
@@ -1684,47 +1729,46 @@ const FollowPage: React.FC = () => {
                        */}
                       <div className="space-y-1">
                         {all.map((d) => {
-                          const ai = modeOfDay(d) === 'ai';
+                          const mode = modeOfDay(d);
+                          /**
+                           * 🔴 สามช่องต่อวัน: AI โทร · คนโทร · **ไม่โทร** (เจ้าของ Choice 1 ต.ค. 2569 "ข้ามวันไม่ได้ → แก้")
+                           * เลือกได้ทีละช่อง · กดช่องที่ติ๊กอยู่แล้วไม่ทำอะไร (ทุกวันต้องมีสถานะเสมอ)
+                           */
+                          const choices: ReadonlyArray<{ value: ScheduleDayMode; label: string; on: string }> = [
+                            { value: 'ai', label: 'AI โทร', on: 'text-primary' },
+                            { value: 'manual', label: 'คนโทร', on: 'text-amber-700 dark:text-amber-300' },
+                            { value: 'off', label: 'ไม่โทร', on: 'text-foreground' },
+                          ];
                           return (
                             <div
                               key={d}
-                              className="flex items-center gap-2 rounded-xl border border-white/70 bg-white/40 px-2.5 py-1.5 dark:border-white/15 dark:bg-white/5"
+                              className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-white/70 bg-white/40 px-2.5 py-1.5 dark:border-white/15 dark:bg-white/5"
                             >
-                              <span className="flex-1 text-xs font-medium text-foreground">
+                              <span
+                                className={cn(
+                                  'flex-1 text-xs font-medium',
+                                  mode === 'off' ? 'text-muted-foreground line-through' : 'text-foreground',
+                                )}
+                              >
                                 {dayLabel(d)}
                               </span>
-                              {/* สองช่องนี้เลือกได้ทีละอัน — กดช่องที่ติ๊กอยู่แล้วไม่ทำอะไร
-                                  (ปล่อยให้ติ๊กออกได้ = วันนั้นไม่มีคนโทร ซึ่งไม่ใช่สถานะที่มีจริง) */}
-                              <label className="flex cursor-pointer items-center gap-1.5">
-                                <Checkbox
-                                  checked={ai}
-                                  onCheckedChange={() => setDayMode(d, 'ai')}
-                                  aria-label={`${dayLabel(d)} — AI โทร`}
-                                />
-                                <span
-                                  className={cn(
-                                    'text-xs font-medium',
-                                    ai ? 'text-primary' : 'text-muted-foreground',
-                                  )}
-                                >
-                                  AI โทร
-                                </span>
-                              </label>
-                              <label className="flex cursor-pointer items-center gap-1.5">
-                                <Checkbox
-                                  checked={!ai}
-                                  onCheckedChange={() => setDayMode(d, 'manual')}
-                                  aria-label={`${dayLabel(d)} — คนโทร`}
-                                />
-                                <span
-                                  className={cn(
-                                    'text-xs font-medium',
-                                    !ai ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground',
-                                  )}
-                                >
-                                  คนโทร
-                                </span>
-                              </label>
+                              {choices.map((c) => (
+                                <label key={c.value} className="flex cursor-pointer items-center gap-1.5">
+                                  <Checkbox
+                                    checked={mode === c.value}
+                                    onCheckedChange={() => setDayMode(d, c.value)}
+                                    aria-label={`${dayLabel(d)} — ${c.label}`}
+                                  />
+                                  <span
+                                    className={cn(
+                                      'text-xs font-medium',
+                                      mode === c.value ? c.on : 'text-muted-foreground',
+                                    )}
+                                  >
+                                    {c.label}
+                                  </span>
+                                </label>
+                              ))}
                             </div>
                           );
                         })}
@@ -1801,7 +1845,71 @@ const FollowPage: React.FC = () => {
                 })()}
                 <div className="space-y-1.5">
                   <p className="ml-1 text-xs font-medium text-foreground">2 · วันละกี่รอบ</p>
-                  <span className="ml-1 text-xs font-medium text-muted-foreground">รอบเวลาต่อวัน (สูงสุด 5 รอบ)</span>
+                  {/* 🔴 ตั้งเวลารายวันได้ (เจ้าของ Choice 1 ต.ค. 2569 "ทุกวันต้องใช้เวลาเดียวกัน → แก้") —
+                      ปิดอยู่ = ชุดเดียวทุกวันเหมือนเดิม · เปิดครั้งแรกลอกชุดเดียวลงทุกวันให้ก่อน */}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="ml-1 text-xs font-medium text-muted-foreground">
+                      {perDayTimes ? 'เวลารายวัน (วันละไม่เกิน 5 รอบ)' : 'รอบเวลาต่อวัน (สูงสุด 5 รอบ)'}
+                    </span>
+                    {sendDaysPreview > 1 ? (
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="xs"
+                        onClick={() => {
+                          if (!perDayTimes) {
+                            setRoundTimesByDay((prev) => {
+                              const next = { ...prev };
+                              for (const d of daysInRange(dateFrom, dateTo)) if (!next[d]) next[d] = [...roundTimes];
+                              return next;
+                            });
+                          }
+                          setPerDayTimes((v) => !v);
+                        }}
+                      >
+                        {perDayTimes ? 'ใช้เวลาเดียวกันทุกวัน' : 'ตั้งเวลารายวัน'}
+                      </Button>
+                    ) : null}
+                  </div>
+                  {perDayTimes ? (
+                    daysInRange(dateFrom, dateTo)
+                      .filter((d) => modeOfScheduleDay(d) !== 'off')
+                      .map((d) => {
+                        const list = timesOfScheduleDay(d);
+                        const label = scheduleDayLabel(d);
+                        return (
+                          <div key={d} className="space-y-1.5 rounded-xl border border-border/70 p-2.5">
+                            <p className="text-xs font-medium text-foreground">{label}</p>
+                            {list.map((v, i) => (
+                              <div key={i} className="flex items-center gap-2">
+                                <TimeSelect24
+                                  value={v}
+                                  onChange={(next) => setDayTimeAt(d, i, next)}
+                                  label={`${label} รอบที่ ${i + 1}`}
+                                  className="min-h-[46px] flex-1"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => removeDayTime(d, i)}
+                                  disabled={list.length <= 1}
+                                  aria-label={`เอารอบที่ ${i + 1} ของ${label}ออก`}
+                                >
+                                  <X aria-hidden />
+                                </Button>
+                              </div>
+                            ))}
+                            {list.length < 5 ? (
+                              <Button type="button" variant="outline" size="xs" onClick={() => addDayTime(d)}>
+                                <Plus aria-hidden /> เพิ่มรอบของวันนี้
+                              </Button>
+                            ) : null}
+                          </div>
+                        );
+                      })
+                  ) : (
+                    <>
                   {roundTimes.map((v, i) => (
                     <div key={i} className="flex items-center gap-2">
                       {/**
@@ -1839,24 +1947,24 @@ const FollowPage: React.FC = () => {
                       <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มรอบต่อวัน
                     </button>
                   ) : null}
+                    </>
+                  )}
                 </div>
                 {(() => {
-                  const picked = daysInRange(dateFrom, dateTo).filter((d) => !skippedDays.has(d));
-                  const manual = picked.filter((d) => manualDays.has(d)).length;
-                  const ai = picked.length - manual;
-                  const rounds = new Set(roundTimes.filter((t) => /^\d{1,2}:\d{2}$/.test(t))).size;
                   /* 🔴 แยกยอดสองฝั่งให้เห็นตั้งแต่ก่อนกดบันทึก — "กี่สาย" อย่างเดียวไม่พอ
-                     เพราะสายที่เราโทรเองคือ **งานของคน** ไม่ใช่สายที่ระบบจะจัดการให้ */
-                  return picked.length > 0 && rounds > 0 ? (
+                     เพราะสายที่เราโทรเองคือ **งานของคน** ไม่ใช่สายที่ระบบจะจัดการให้
+                     · นับจาก `scheduleCalls` ตัวเดียวกับตอนส่ง (เวลารายวัน + วันที่ไม่โทร)
+                     · ถอดท้ายประโยค "รับสายยืนยันแล้ววันนั้นหยุด พรุ่งนี้โทรต่อ" (1 ต.ค. 2569) — ของจริง AI โทรครบทุกสาย */
+                  const calls = scheduleCalls();
+                  const ai = calls.filter((c) => c.callMode === 'ai').length;
+                  const days = new Set(calls.map((c) => c.day)).size;
+                  return calls.length > 0 ? (
                     <p className="ml-1 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] text-primary">
-                      รวม {picked.length} วัน × {rounds} รอบ = {picked.length * rounds} สาย
-                      {' — '}
-                      AI โทร {ai * rounds} · เราโทรเอง {manual * rounds}
-                      {' · '}รับสายยืนยันแล้ววันนั้นหยุด พรุ่งนี้โทรต่อ
+                      รวม {days} วัน {calls.length} สาย — AI โทร {ai} · เราโทรเอง {calls.length - ai}
                     </p>
                   ) : (
                     <p className="ml-1 text-[11px] text-muted-foreground">
-                      ① เลือกช่วงวัน แล้วติ๊กว่าวันไหนให้ AI โทร → ② วันละกี่รอบ
+                      ① เลือกช่วงวัน แล้วเลือกว่าวันไหนใครโทร → ② วันละกี่รอบ
                       แล้วระบบจะสรุปจำนวนสายให้
                     </p>
                   );
@@ -1986,7 +2094,7 @@ const FollowPage: React.FC = () => {
                 </span>
                 <span className="mt-0.5 block text-muted-foreground">
                   {scheduleMode
-                    ? `ตารางหลายวัน — ${sendDaysPreview} วัน วันละ ${roundTimesPreview} รอบ`
+                    ? `ตารางหลายวัน — ${sendDaysPreview} วัน รวม ${scheduleCallsPreview} สาย`
                     : `ตั้งไว้ ${scheduledAtsPreview} รอบ`}
                   {' · '}กดแล้วไม่ต้องทำอะไรต่อ AI โทรเองตามเวลา
                 </span>

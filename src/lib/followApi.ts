@@ -44,6 +44,8 @@ export type FollowEntry = {
    * `null`/ไม่มี = รอบเดียวตามเวลาใน `scheduled_at`
    */
   call_times?: string[] | null;
+  /** ชุดตาราง (092) — สายของคนเดียวกันที่ตั้ง/แก้พร้อมกัน · null = แถวเก่า/รอบเดี่ยว */
+  group_id?: string | null;
   /**
    * เบอร์ฉุกเฉินที่ส่งไปกับสายนั้น — เบอร์ที่ **AI โทรหา** เมื่อติดต่อผู้รับไม่ได้
    * ⚠️ บอกได้แค่ว่า **ส่งเบอร์ไปแล้ว** · Lumos ยังไม่ส่งกลับมาว่าโทรเบอร์นี้หรือยัง
@@ -215,6 +217,32 @@ export async function createFollowRounds(
   return Array.isArray((data as { items?: FollowEntry[] }).items)
     ? ((data as { items: FollowEntry[] }).items)
     : [data as FollowEntry];
+}
+
+/** ผลของการแก้ตารางทั้งชุด (1 ต.ค. 2569) — `lumos.pushed = false` ต้องขึ้นบนจอ ห้ามเงียบ */
+export type FollowScheduleReplaceResult = {
+  group_id: string;
+  kept: number;
+  cancelled: number;
+  created: number;
+  lumos: { pushed: boolean; plans: number; rounds: number; reason: string | null };
+};
+
+/**
+ * **แก้ตารางทั้งชุด** (เจ้าของ Choice 1 ต.ค. 2569 "แก้ตารางหลังบันทึกไม่ได้ → แก้")
+ * `replace_ids` = สายที่จอเปิดให้แก้ทั้งหมด · `rounds` = ตารางใหม่ (มี id = สายเดิม · ไม่มี = สายใหม่ · ที่หายไป = เอาออก)
+ * 409 = มีสายโทรไปแล้ว/ถูกแก้ระหว่างเปิดจอ (ปิดแล้วเปิดใหม่)
+ */
+export async function replaceFollowSchedule(
+  anchorId: string,
+  body: { replace_ids: string[]; rounds: Array<{ id?: string; scheduled_at: string; call_mode: 'ai' | 'manual' }> },
+): Promise<FollowScheduleReplaceResult> {
+  const r = await apiFetch(`/api/follow?id=${encodeURIComponent(anchorId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'replace_schedule', ...body }),
+  });
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as FollowScheduleReplaceResult;
 }
 
 /**

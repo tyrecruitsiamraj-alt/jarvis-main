@@ -33,8 +33,13 @@ export type FollowWizardValues = {
   scheduledAts: string[];
   /** โหมดตาราง — วันที่จะส่งจริง (กางช่วงแล้วหักวันที่ติ๊กออกแล้ว) */
   scheduleDays: string[];
-  /** โหมดตาราง — รอบเวลาต่อวัน */
+  /** โหมดตาราง — รอบเวลาต่อวัน (ชุดเดียวทุกวัน) */
   roundTimes: string[];
+  /**
+   * โหมดตาราง — **เวลารายวัน** (เจ้าของ Choice 1 ต.ค. 2569 "ทุกวันต้องใช้เวลาเดียวกัน → แก้")
+   * ส่งมาเมื่อเปิดสวิตช์ตั้งเวลารายวัน · `null`/ไม่ส่ง = ทุกวันใช้ `roundTimes`
+   */
+  timesByDay?: Record<string, string[]> | null;
 };
 
 /** เบอร์มือถือไทย 10 หลักขึ้นต้น 0 — ตัวเว้นวรรค/ขีดตัดออกก่อนตรวจ */
@@ -60,9 +65,13 @@ export function followStepError(step: FollowWizardStep, v: FollowWizardValues): 
   if (step === 2) return null;
 
   if (v.scheduleMode) {
-    if (v.scheduleDays.length === 0) return 'เลือกช่วงวัน แล้วติ๊กวันที่จะให้ AI โทรอย่างน้อย 1 วัน';
-    const rounds = new Set(v.roundTimes.filter((t) => /^\d{1,2}:\d{2}$/.test(t)));
-    if (rounds.size === 0) return 'ระบุรอบเวลาอย่างน้อย 1 รอบ (เช่น 07:00)';
+    if (v.scheduleDays.length === 0) return 'เลือกช่วงวัน แล้วเลือกวันที่จะโทรอย่างน้อย 1 วัน';
+    if (v.timesByDay) {
+      const empty = v.scheduleDays.find((d) => validScheduleTimes(v.timesByDay?.[d] ?? []).length === 0);
+      if (empty) return `ระบุเวลาของวัน${SCHEDULE_DAY_LABEL.format(new Date(`${empty}T00:00:00+07:00`))} อย่างน้อย 1 รอบ`;
+      return null;
+    }
+    if (validScheduleTimes(v.roundTimes).length === 0) return 'ระบุรอบเวลาอย่างน้อย 1 รอบ (เช่น 07:00)';
     return null;
   }
 
@@ -127,6 +136,86 @@ export function isSubmitTooSoonAfterStep3(enteredStep3AtMs: number, nowMs: numbe
 /**
  * ═══ โหมดตารางหลายวัน — สองกติกาที่เคยพลาด (เจ้าของทัก 23 ก.ย. 2569 *"ลงหลายวันแล้วรวน"*) ═══
  */
+
+/** ป้ายวันแบบสั้นในข้อความเตือน — ประกาศระดับโมดูล (กติกา `new Intl.*`) */
+const SCHEDULE_DAY_LABEL = new Intl.DateTimeFormat('th-TH', {
+  timeZone: 'Asia/Bangkok',
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+});
+
+/** เวลาที่ใช้ได้ของวันหนึ่ง — รูป HH:MM เท่านั้น · ตัดซ้ำ · เรียงจากเช้าไปเย็น · เติมศูนย์หน้าชั่วโมง */
+export function validScheduleTimes(times: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const raw of times) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec((raw || '').trim());
+    if (!m) continue;
+    const h = Number(m[1]);
+    const min = Number(m[2]);
+    if (h > 23 || min > 59) continue;
+    out.add(`${String(h).padStart(2, '0')}:${m[2]}`);
+  }
+  return [...out].sort();
+}
+
+/** วันในตาราง: ให้ AI โทร · คนโทรเอง · ไม่โทร (ข้ามวัน) */
+export type ScheduleDayMode = 'ai' | 'manual' | 'off';
+
+/** หนึ่งสายของตารางหลายวัน = **หนึ่งแถว** ในระบบ */
+export type ScheduleCall = {
+  day: string;
+  time: string;
+  /** เวลาโทร (ISO · เขตเวลาไทย) */
+  scheduledAt: string;
+  callMode: 'ai' | 'manual';
+  staffPhone: string;
+  /** สายที่เท่าไหร่ของทั้งชุด — นับต่อข้ามวัน (1 = บทสายแรก · 2 ขึ้นไป = บทรอบถัดไป) */
+  callRound: number;
+};
+
+/**
+ * ═══ ตารางหลายวัน → รายการสายทีละสาย (ไล่ทดสอบ + เจ้าของ Choice 1 ต.ค. 2569) ═══
+ *
+ * 🔴 **หนึ่งสาย = หนึ่งแถว** — ของเดิมหนึ่งวัน = หนึ่งแถวที่ถือหลายเวลา (`call_times`) ⇒ ปฏิทิน/รายการเห็นแค่เวลาแรก
+ *    ของวัน รอบที่สองไม่มีช่อง ผลทับกัน (Choice "ตารางหลายวัน: ทุกสายขึ้นปฏิทิน")
+ * · เวลารายวันได้ (`timesOfDay`) · วัน `off` = ข้าม (Choice "ทุกวันต้องใช้เวลาเดียวกัน" + "ข้ามวันไม่ได้")
+ * · เลขรอบนับต่อทั้งชุดตามลำดับเวลา (กติกาเดียวกับ `scheduleDayCallRound` แต่จำนวนรอบต่อวันไม่ต้องเท่ากัน)
+ */
+export function buildScheduleCalls(input: {
+  days: readonly string[];
+  modeOfDay: (day: string) => ScheduleDayMode;
+  timesOfDay: (day: string) => readonly string[];
+  staffPhoneOfDay: (day: string) => string;
+  /** เลขรอบแรกของชุด (ค่าตั้งต้น 1) */
+  startRound?: number;
+}): ScheduleCall[] {
+  const out: ScheduleCall[] = [];
+  let round = Number.isInteger(input.startRound) && (input.startRound ?? 0) >= 1 ? (input.startRound as number) : 1;
+  for (const day of [...new Set(input.days)].sort()) {
+    const mode = input.modeOfDay(day);
+    if (mode === 'off') continue;
+    for (const time of validScheduleTimes(input.timesOfDay(day))) {
+      out.push({
+        day,
+        time,
+        scheduledAt: new Date(`${day}T${time}:00+07:00`).toISOString(),
+        callMode: mode,
+        staffPhone: (input.staffPhoneOfDay(day) || '').trim(),
+        callRound: round,
+      });
+      round += 1;
+    }
+  }
+  return out;
+}
+
+/** สายของตารางแยกตามวัน (เรียงวัน) — ส่งให้ AI **แผนละวัน** (รูปแผนที่ Lumos รับจริงมาตลอด ≤ 5 สายในวันเดียว) */
+export function scheduleCallsByDay(calls: readonly ScheduleCall[]): Array<{ day: string; calls: ScheduleCall[] }> {
+  const by = new Map<string, ScheduleCall[]>();
+  for (const c of calls) by.set(c.day, [...(by.get(c.day) ?? []), c]);
+  return [...by.keys()].sort().map((day) => ({ day, calls: by.get(day) ?? [] }));
+}
 
 /**
  * แถวของวันที่ `dayIndex` (นับจาก 0 ในชุดที่ส่งจริง) คือ **สายที่เท่าไหร่**
