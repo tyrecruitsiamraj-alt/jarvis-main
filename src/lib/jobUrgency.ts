@@ -12,7 +12,7 @@ import {
   type RequestLeadRules,
 } from '@/lib/requestLeadKind';
 import type { ToneKey } from '@/lib/designTokens';
-import { countWorkingDays, parseWorkWeekdays, publicHolidays, workWeekdaysShortLabel } from '@/lib/siteWorkdays';
+import { countWorkingDays, parseWorkWeekdays, workWeekdaysShortLabel } from '@/lib/siteWorkdays';
 
 export { URGENCY_LEAD_DAYS };
 
@@ -193,16 +193,11 @@ export function isBeforeRequiredForAge(job: JobRequest, today = new Date()): boo
 /**
  * **วันทำงาน**ของหน่วยงานระหว่างวัน `from` ถึง `to` (ไม่นับวันต้น) — แทน `differenceInCalendarDays`
  * 🔴 เจ้าของสั่ง 1 ต.ค. 2569: *"ผ่านมา ให้คำนวณ จากวันที่ต้องทำงาน วันหยุดของ Site นั้นๆไม่นับ"*
- * วันทำงานอ่านจาก `work_schedule` ของใบ (อ่านไม่ออก = ทุกวัน = ค่าเดิมเป๊ะ) · วันหยุดนักขัตฤกษ์จาก `publicHolidays()`
+ * วันทำงานอ่านจาก `work_schedule` ของใบ (อ่านไม่ออก = ทุกวัน = ค่าเดิมเป๊ะ) · ไม่หักวันหยุดนักขัตฤกษ์ (เจ้าของเคาะ)
  * ⚠️ วันที่สองฝั่งเป็นเที่ยงคืนตามเวลาเครื่องของวันในปฏิทิน (ชุดเดียวกับ `differenceInCalendarDays` เดิม)
  */
 function workingDaysBetween(job: JobRequest, from: Date, to: Date): number {
-  return countWorkingDays(
-    format(from, 'yyyy-MM-dd'),
-    format(to, 'yyyy-MM-dd'),
-    parseWorkWeekdays(job.work_schedule),
-    publicHolidays(),
-  );
+  return countWorkingDays(format(from, 'yyyy-MM-dd'), format(to, 'yyyy-MM-dd'), parseWorkWeekdays(job.work_schedule));
 }
 
 /**

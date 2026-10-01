@@ -4,12 +4,7 @@
  *    ใบที่ทำทุกวัน/อ่านไม่ออก ได้เลขเดิมเป๊ะ · วันหยุดนักขัตฤกษ์ที่ตรงวันหยุดประจำสัปดาห์ไม่หักซ้ำ
  */
 import { describe, expect, it } from 'vitest';
-import {
-  countWorkingDays,
-  parseWorkWeekdays,
-  setPublicHolidays,
-  workWeekdaysShortLabel,
-} from '@/lib/siteWorkdays';
+import { countWorkingDays, parseWorkWeekdays, workWeekdaysShortLabel } from '@/lib/siteWorkdays';
 import { getJobAgeChipInfo, getJobRequestAgeDays } from '@/lib/jobUrgency';
 import type { JobRequest } from '@/types';
 
@@ -141,14 +136,10 @@ describe('🔴 คอลัมน์ "ผ่านมา" ของใบขอ'
     expect(getJobRequestAgeDays(job({}), TODAY)).toBe(16);
   });
 
-  it('วันหยุดนักขัตฤกษ์ที่ตั้งไว้ถูกหักด้วย · tooltip บอกฐานวันทำงาน', () => {
-    setPublicHolidays(['2026-09-28']);
-    try {
-      const j = job({ work_schedule: 'จันทร์-ศุกร์' });
-      expect(getJobRequestAgeDays(j, TODAY)).toBe(11);
-      expect(getJobAgeChipInfo(j, TODAY).title).toMatch(/นับวันทำงาน จ\.–ศ\./);
-    } finally {
-      setPublicHolidays([]);
-    }
+  it('🔴 ไม่หักวันหยุดนักขัตฤกษ์ (เจ้าของเคาะ) · tooltip บอกฐานวันทำงาน', () => {
+    // 28 ก.ย. เป็นวันจันทร์ — ยังนับเป็นวันทำงาน
+    const j = job({ work_schedule: 'จันทร์-ศุกร์' });
+    expect(getJobRequestAgeDays(j, TODAY)).toBe(12);
+    expect(getJobAgeChipInfo(j, TODAY).title).toMatch(/นับวันทำงาน จ\.–ศ\./);
   });
 });
