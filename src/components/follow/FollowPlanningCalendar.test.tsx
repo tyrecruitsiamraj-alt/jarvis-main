@@ -18,6 +18,7 @@ import { render, screen, cleanup, within, fireEvent } from '@testing-library/rea
 import FollowPlanningCalendar from './FollowPlanningCalendar';
 import { groupFollowEntries } from '@/lib/followGrouping';
 import { buildFollowPlanningRows } from '@/lib/followPlanning';
+import { withFollowDayCalls } from '@/lib/followDayCall';
 import type { FollowEntry } from '@/lib/followApi';
 import type { FollowRoundFilter } from '@/lib/followPlanning';
 import { TONE } from '@/lib/designTokens';
@@ -60,6 +61,9 @@ function renderCalendar(
     roundsSlot?: React.ReactNode;
     onEditRound?: (round: { entry: FollowEntry }) => void;
     lastLoadedAt?: Date | null;
+    onSelect?: (ymd: string) => void;
+    onStaffResult?: (round: { entry: FollowEntry }, outcome: string) => void;
+    onCancelRound?: (round: { entry: FollowEntry }) => void;
   } = {},
 ) {
   const rows = buildFollowPlanningRows(groupFollowEntries(entries, NOW), NOW);
@@ -69,12 +73,14 @@ function renderCalendar(
       month="2026-09"
       onMonthChange={() => {}}
       selectedYmd={opts.selectedYmd ?? TODAY}
-      onSelect={() => {}}
+      onSelect={opts.onSelect ?? (() => {})}
       onOpenCell={opts.onOpenCell ?? (() => {})}
       roundFilter={opts.roundFilter ?? 'all'}
       roundsSlot={opts.roundsSlot}
       onEditRound={opts.onEditRound}
       lastLoadedAt={opts.lastLoadedAt ?? null}
+      onStaffResult={opts.onStaffResult}
+      onCancelRound={opts.onCancelRound}
     />,
   );
   return rows;
@@ -126,8 +132,8 @@ describe('หน้ารายวัน — สายที่ต้องต�
     const items = dayRows();
     expect(items).toHaveLength(1);
     const cells = items[0].querySelectorAll('td');
-    expect(within(items[0]).getByText('รอบโทรที่ 1')).toBeTruthy();
-    expect(within(items[0]).getByText('รอบโทรที่ 2')).toBeTruthy();
+    expect(within(items[0]).getByText('สายที่ 1')).toBeTruthy();
+    expect(within(items[0]).getByText('สายที่ 2')).toBeTruthy();
     // 🔴 ผลของสาย 1 ต้องไม่ลามไปทับสาย 2 — ช่องคำตอบมีข้อความของสาย 1 ช่องเดียว
     expect(within(items[0]).getByText('ตอบว่าไป')).toBeTruthy();
     expect(within(items[0]).getByText('เลยเวลานัด')).toBeTruthy();
@@ -159,14 +165,14 @@ describe('หน้ารายวัน — สายที่ต้องต�
     renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'confirmed' }), { roundFilter: 2 });
     const items = dayRows();
     expect(items).toHaveLength(1);
-    expect(within(items[0]).getByText('รอบโทรที่ 2')).toBeTruthy();
+    expect(within(items[0]).getByText('สายที่ 2')).toBeTruthy();
     expect(statValue('สายที่ต้องตาม')).toBe('1');
     expect(statValue('ตอบว่าไป')).toBe('0');
   });
 
   it('เลือกสายที่วันนั้นไม่มี ⇒ บอกให้กลับไปกด "ทุกสาย" ไม่ใช่ปล่อยจอว่าง', () => {
     renderCalendar([entry({ id: 'r1', call_round: 1 })], { roundFilter: 2 });
-    expect(screen.getByText(/วันนี้ไม่มีรอบโทรที่ 2/)).toBeTruthy();
+    expect(screen.getByText(/วันนี้ไม่มีสายที่ 2/)).toBeTruthy();
   });
 
   it('🔴 แผงรอบโทรที่หน้าแม่ส่งมา ต้องอยู่ในผืนเดียวกัน (ยุบสองการ์ดเป็นหนึ่ง)', () => {
@@ -450,7 +456,7 @@ describe('ตำหนิ 11 ก.ย. 2569 — รวมสายของคน
     renderCalendar(threeRounds());
     const row = dayRows()[0];
     for (const t of ['15:23', '15:30', '16:30']) expect(within(row).getByText(t)).toBeTruthy();
-    for (const n of [1, 2, 3]) expect(within(row).getByText(`รอบโทรที่ ${n}`)).toBeTruthy();
+    for (const n of [1, 2, 3]) expect(within(row).getByText(`สายที่ ${n}`)).toBeTruthy();
   });
 
   it('บอกใต้ชื่อว่าวันนี้กี่สาย — กันคนอ่านว่าแถวนี้มีสายเดียว', () => {
@@ -507,8 +513,8 @@ describe('ตำหนิ 11 ก.ย. 2569 — รวมสายของคน
     renderCalendar(threeRounds(), { roundFilter: 2 });
     const row = dayRows()[0];
     expect(row.getAttribute('data-rounds')).toBe('1');
-    expect(within(row).getByText('รอบโทรที่ 2')).toBeTruthy();
-    expect(within(row).queryByText('รอบโทรที่ 1')).toBeNull();
+    expect(within(row).getByText('สายที่ 2')).toBeTruthy();
+    expect(within(row).queryByText('สายที่ 1')).toBeNull();
   });
 });
 
@@ -690,12 +696,118 @@ describe('ผลละเอียดของเดือน', () => {
   });
 });
 
-/** 🔴 เจ้าของ Choice 1 ต.ค. 2569 — ใต้เวลาของแต่ละสายโชว์เลขรอบจริง ไม่ใช่กองที่ 3 */
-describe('เลขรอบของสายเดียว = เลขจริง', () => {
-  it('สายรอบที่ 5 ขึ้นว่า "รอบโทรที่ 5" (ไม่ใช่รอบโทรที่ 3) · ข้อความตัวกรองกอง 3 = "รอบโทรที่ 3 ขึ้นไป"', () => {
+/** 🔴 เจ้าของ Choice 1 ต.ค. 2569 — ใต้เวลาของแต่ละสายโชว์เลขจริง ไม่ใช่กองที่ 3 */
+describe('เลขของสายเดียว = เลขจริง', () => {
+  it('แถวเก่าไม่มีชุด สายที่ 5 ขึ้นว่า "สายที่ 5" (ไม่ใช่สายที่ 3) · ข้อความตัวกรองกอง 3 = "สายที่ 3 ขึ้นไป"', () => {
     renderCalendar([entry({ id: 'r5', call_round: 5 })], { roundFilter: 3 });
-    expect(screen.getByText('รอบโทรที่ 5')).toBeTruthy();
-    expect(screen.queryByText('รอบโทรที่ 3')).toBeNull();
-    expect(screen.getAllByText(/รอบโทรที่ 3 ขึ้นไป/).length).toBeGreaterThan(0);
+    expect(screen.getByText('สายที่ 5')).toBeTruthy();
+    expect(screen.queryByText('สายที่ 3')).toBeNull();
+    expect(screen.getAllByText(/สายที่ 3 ขึ้นไป/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/รอบโทรที่/)).toBeNull();
+  });
+});
+
+/**
+ * 🔴 เจ้าของสั่ง 1 ต.ค. 2569: *"ตัวเลขที่ลงยาวอะมันต้อง วันที่ 1 สายที่ 1 2 วันที่ 2 สายที่ 1 2 ไม่ใช่ 1 2 3 4 5 6"*
+ * ตารางหลายวันนับ call_round ต่อทั้งชุด (บทของ AI) — จอต้องนับใหม่ทุกวัน · แท็บ "สายที่ 1" = สายแรกของวันนั้น
+ */
+describe('ตารางหลายวัน — "วันที่ D · สายที่ N"', () => {
+  const twoDays = () =>
+    withFollowDayCalls([
+      entry({ id: 'd1a', group_id: 'g', call_round: 1, scheduled_at: '2026-09-06T02:00:00Z' }),
+      entry({ id: 'd1b', group_id: 'g', call_round: 2, scheduled_at: '2026-09-06T08:00:00Z' }),
+      entry({ id: 'd2a', group_id: 'g', call_round: 3, scheduled_at: '2026-09-07T02:00:00Z' }),
+      entry({ id: 'd2b', group_id: 'g', call_round: 4, scheduled_at: '2026-09-07T08:00:00Z' }),
+    ]);
+
+  it('วันที่ 2 ของชุด ⇒ "วันที่ 2 · สายที่ 1" "วันที่ 2 · สายที่ 2" — ไม่ใช่ 3 กับ 4', () => {
+    renderCalendar(twoDays());
+    const row = dayRows()[0];
+    expect(within(row).getByText('วันที่ 2 · สายที่ 1')).toBeTruthy();
+    expect(within(row).getByText('วันที่ 2 · สายที่ 2')).toBeTruthy();
+    expect(within(row).queryByText(/สายที่ [34]/)).toBeNull();
+  });
+
+  it('🔴 แท็บ "สายที่ 1" ⇒ สายแรกของวันที่ 2 (เดิมทั้งวันไปกอง "3 ขึ้นไป" แล้วแท็บ 1 ว่าง)', () => {
+    renderCalendar(twoDays(), { roundFilter: 1 });
+    const row = dayRows()[0];
+    expect(row.getAttribute('data-rounds')).toBe('1');
+    expect(within(row).getByText('วันที่ 2 · สายที่ 1')).toBeTruthy();
+  });
+});
+
+/** 🔴 เจ้าของสั่ง 1 ต.ค. 2569: *"มันต้องโชว์วันนั้นๆไม่ใช่โชว์แค่คำว่า วันนี้"* */
+describe('ปุ่มวันที่ของมุมมองรายวัน', () => {
+  it('ปุ่มโชว์วันที่เลือกอยู่ (ไม่ใช่คำว่า "วันนี้") · กดแล้วเลือกจากปฏิทินได้ · "วันนี้" อยู่ในปฏิทิน', async () => {
+    const onSelect = vi.fn();
+    renderCalendar(twoRounds(), { selectedYmd: '2026-09-08', onSelect });
+    const pill = screen.getByTestId('day-pill');
+    expect(pill.textContent).toMatch(/8 ก\.ย\. 2569/);
+    expect(screen.queryByRole('button', { name: 'วันนี้' })).toBeNull();
+    fireEvent.click(pill);
+    fireEvent.click(await screen.findByRole('button', { name: 'วันนี้' }));
+    expect(onSelect).toHaveBeenCalledWith(TODAY);
+  });
+
+  it('วันนี้อยู่แล้ว ⇒ ปุ่มยังโชว์วันที่ของวันนี้ · ทางลัด "วันนี้" ในปฏิทินกดไม่ได้', async () => {
+    renderCalendar(twoRounds());
+    const pill = screen.getByTestId('day-pill');
+    expect(pill.textContent).toMatch(/7 ก\.ย\. 2569/);
+    fireEvent.click(pill);
+    expect(((await screen.findByRole('button', { name: 'วันนี้' })) as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+/** 🔴 เจ้าของ Choice 1 ต.ค. 2569 — "ติดต่อสำเร็จ / ไม่สำเร็จ / ยกเลิก" บนแถว ไม่ต้องเปิดป๊อป */
+describe('ปุ่มลงผลของสายที่คนโทร (บนแถว)', () => {
+  const manual = (over: Partial<FollowEntry> = {}) =>
+    entry({ id: 'm1', call_round: 1, call_mode: 'manual', call_status: null, dispatch_state: 'manual', ...over });
+
+  it('สายคนโทรที่ยังไม่ลงผล ⇒ มีสามปุ่ม · กดติดต่อสำเร็จ/ไม่สำเร็จ = ส่งรหัสของปุ่ม', () => {
+    const onStaffResult = vi.fn();
+    renderCalendar([manual()], { onStaffResult, onCancelRound: vi.fn() });
+    const row = dayRows()[0];
+    fireEvent.click(within(row).getByRole('button', { name: 'ติดต่อสำเร็จ' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'ไม่สำเร็จ' }));
+    expect(onStaffResult.mock.calls.map((c) => [(c[0] as { entry: FollowEntry }).entry.id, c[1]])).toEqual([
+      ['m1', 'acknowledged'],
+      ['m1', 'no_answer'],
+    ]);
+  });
+
+  it('🔴 ยกเลิก ต้องยืนยันในที่เดิมก่อน (ย้อนไม่ได้)', () => {
+    const onCancelRound = vi.fn();
+    renderCalendar([manual()], { onStaffResult: vi.fn(), onCancelRound });
+    const row = dayRows()[0];
+    fireEvent.click(within(row).getByRole('button', { name: 'ยกเลิก' }));
+    expect(onCancelRound).not.toHaveBeenCalled();
+    expect(within(row).getByText('ยกเลิกสายนี้ไหม')).toBeTruthy();
+    fireEvent.click(within(row).getByRole('button', { name: 'ยกเลิกเลย' }));
+    expect((onCancelRound.mock.calls[0][0] as { entry: FollowEntry }).entry.id).toBe('m1');
+  });
+
+  it('สายของ AI ไม่มีปุ่ม · ลงผลแล้วขึ้นคำของปุ่ม ("คนโทร: ติดต่อสำเร็จ") และปุ่มหาย', () => {
+    renderCalendar(
+      [
+        entry({ id: 'ai1', call_round: 1 }),
+        manual({
+          id: 'm2',
+          recipient_phone: '0899999999',
+          recipient_name: 'คนที่สอง',
+          staff_call_outcome: 'acknowledged',
+          staff_called_at: '2026-09-07T08:40:00Z',
+          staff_called_by_name: 'staff@example.com',
+        }),
+      ],
+      { onStaffResult: vi.fn(), onCancelRound: vi.fn() },
+    );
+    expect(screen.queryByTestId('staff-quick')).toBeNull();
+    expect(screen.getByText('คนโทร: ติดต่อสำเร็จ')).toBeTruthy();
+    expect(screen.getByText(/staff@example\.com · 15:40 น\./)).toBeTruthy();
+  });
+
+  it('ไม่ได้ส่งตัวจัดการมา (จออ่านอย่างเดียว) ⇒ ไม่มีปุ่ม', () => {
+    renderCalendar([manual()]);
+    expect(screen.queryByTestId('staff-quick')).toBeNull();
   });
 });

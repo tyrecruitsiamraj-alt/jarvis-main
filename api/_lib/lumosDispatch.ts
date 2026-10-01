@@ -2334,9 +2334,15 @@ export async function replanFollowSetWithLumos(input: {
   // ③ สายที่ยังไม่มีคิว → เข้าคิวด้วยบทของตัวเอง (คอขวดเดียวของทุกเส้น)
   const refsOf = (list: readonly FollowEntryInput[]) => list.map((e) => `follow-${e.id}`);
   if (entries.length > 0) {
+    /**
+     * 🔴 แถวคิวที่ **ยกเลิกไปแล้ว** ไม่นับว่า "มีคิว" (1 ต.ค. 2569 — สลับ AI → คนโทร → AI กลับ):
+     * ตอนสลับเป็นคนโทร แถวคิวถูกตั้ง `cancelled` · สลับกลับเป็น AI แล้วถ้านับว่ามีคิว ⇒ ไม่เข้าคิวใหม่ ·
+     * ไม่อยู่ใน `live` ⇒ **ไม่อยู่ในแผน AI ไม่โทร เงียบ ๆ** · ให้ไปผ่าน `insertQueueItems` (revive แถวที่ยกเลิก + ด่านครบ)
+     */
     const { rows: existing } = await dbQuery<{ person_ref: string }>(
       `select person_ref from ${queueTable}
-        where channel = 'reminder' and job_ref = 'follow' and person_ref = any($1::text[])`,
+        where channel = 'reminder' and job_ref = 'follow' and person_ref = any($1::text[])
+          and status <> 'cancelled'`,
       [refsOf(entries)],
     );
     const inQueue = new Set(existing.map((r) => r.person_ref));

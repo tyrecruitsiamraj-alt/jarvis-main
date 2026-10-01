@@ -12,7 +12,8 @@ const replan = vi.fn();
 vi.mock('../../api/_lib/postgres.js', () => ({ dbQuery: (...a: unknown[]) => dbQuery(...a), isPgUndefinedTable: () => false }));
 vi.mock('../../api/_lib/audit.js', () => ({ auditFromAuthed: vi.fn(async () => undefined) }));
 vi.mock('../../api/_lib/followStaffName.js', () => ({ staffNameOfPhone: vi.fn(async () => null) }));
-vi.mock('../../api/_lib/lumosDispatchMode.js', () => ({ isAutoDispatchEnabled: vi.fn(async () => true) }));
+const autoDispatch = vi.fn(async () => true);
+vi.mock('../../api/_lib/lumosDispatchMode.js', () => ({ isAutoDispatchEnabled: () => autoDispatch() }));
 vi.mock('../../api/_lib/lumosDispatch.js', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../../api/_lib/lumosDispatch.js')>();
   return { ...mod, replanFollowSetWithLumos: (...a: unknown[]) => replan(...a) };
@@ -78,6 +79,7 @@ beforeEach(() => {
   process.env.NODE_ENV = 'development';
   delete process.env.VERCEL_ENV;
   replan.mockReset().mockResolvedValue({ rounds: 2, plans: 1, cancelledOld: true, pushedPlans: 1, states: {} });
+  autoDispatch.mockReset().mockResolvedValue(true);
 });
 
 describe('replace_schedule', () => {
@@ -145,6 +147,39 @@ describe('replace_schedule', () => {
     expect(status).toHaveBeenCalledWith(200);
     expect(calls(/set dispatch_state = 'manual' where id = any/i)[0][1][0]).toEqual([A]);
     expect(replan).toHaveBeenCalledWith(expect.objectContaining({ memberIds: [], cancelledIds: [A] }));
+  });
+
+  it('🔴 ยกเลิกแผนเดิมที่ Lumos ไม่สำเร็จ ⇒ ตอบว่ายังไม่ปลอดภัย (pushed=false) แม้ไม่เหลือแผนให้ส่ง', async () => {
+    replan.mockResolvedValue({ rounds: 0, plans: 0, cancelledOld: false, pushedPlans: 0, states: {}, reason: 'ยกเลิกแผนเดิมที่ Lumos ไม่สำเร็จ' });
+    stub(targets);
+    const { res, json } = mockRes();
+    await followHandler(
+      req({ replace_ids: [A, B], rounds: [{ id: A, scheduled_at: anchor.scheduled_at, call_mode: 'manual' }, { id: B, scheduled_at: targets[1].scheduled_at, call_mode: 'manual' }] }),
+      res,
+    );
+    expect(json.mock.calls[0][0].lumos).toMatchObject({ pushed: false, reason: 'ยกเลิกแผนเดิมที่ Lumos ไม่สำเร็จ' });
+  });
+
+  it('🔴 ปิดส่งอัตโนมัติอยู่ + สลับเป็นคนโทร ⇒ ยังยกเลิกแผนเดิมที่ Lumos (ไม่ส่งสายใหม่) · ไม่มีสาย AI = ไม่มีคำเตือนปิดส่ง', async () => {
+    autoDispatch.mockResolvedValue(false);
+    replan.mockResolvedValue({ rounds: 0, plans: 0, cancelledOld: true, pushedPlans: 0, states: {} });
+    stub(targets);
+    const { res, json } = mockRes();
+    await followHandler(
+      req({ replace_ids: [A, B], rounds: [{ id: A, scheduled_at: anchor.scheduled_at, call_mode: 'manual' }, { id: B, scheduled_at: targets[1].scheduled_at, call_mode: 'manual' }] }),
+      res,
+    );
+    expect(replan).toHaveBeenCalledWith(expect.objectContaining({ memberIds: [], cancelledIds: [A] }));
+    expect(json.mock.calls[0][0].lumos).toMatchObject({ pushed: true, reason: null });
+  });
+
+  it('ปิดส่งอัตโนมัติอยู่ + มีสาย AI ⇒ บอกว่าสายใหม่ยังไม่ถูกส่ง', async () => {
+    autoDispatch.mockResolvedValue(false);
+    stub([targets[0]]);
+    const { res, json } = mockRes();
+    await followHandler(req({ replace_ids: [A], rounds: [{ id: A, scheduled_at: inHours(6), call_mode: 'ai' }] }), res);
+    expect(replan).not.toHaveBeenCalled();
+    expect(json.mock.calls[0][0].lumos).toMatchObject({ pushed: false, reason: 'ปิดการส่งให้ AI อยู่ — สายใหม่ยังไม่ถูกส่ง' });
   });
 
   it('เวลาที่ผ่านมาแล้ว ⇒ 400 ก่อนแตะฐาน', async () => {

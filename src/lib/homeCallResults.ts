@@ -15,7 +15,7 @@
  *
  * ไฟล์นี้ pure — เทสต์ที่ `tests/api/homeCallResults.test.ts`
  */
-import { FOLLOW_VOCAB, INTEREST_VOCAB, classifyCallMicro, type CallMicroOutcome } from '@/lib/callMicroOutcome';
+import { FOLLOW_VOCAB, INTEREST_VOCAB, classifyCallMicro, type CallMicroOutcome, type CallMicroVocab } from '@/lib/callMicroOutcome';
 import { METRICS, type MetricKey } from '@/lib/metricDictionary';
 import { roundToHundred, type AiShareBlockKey } from '@/lib/homeAiShare';
 
@@ -95,6 +95,16 @@ const timeOf = (v: Date | string | null) => {
 };
 
 /**
+ * ถังของผลที่ **คนลงเอง** — มีแต่รหัส ไม่มีคำพูด
+ * 🔴 "ติดต่อสำเร็จ" ของคนโทร (`acknowledged` · 1 ต.ค. 2569) = คุยได้แต่ไม่ได้บอกว่าไปหรือไม่ไป ⇒ `talked_unclear`
+ *    (ปล่อยเข้าเครื่องอ่านคำพูด = ไม่มีคำ ⇒ ตก "รับแล้วเงียบ" ซึ่งผิด — คนโทรบอกเองว่าคุยได้)
+ */
+export function classifyStaffCallResult(outcome: string | null, words: CallMicroVocab): CallMicroOutcome | null {
+  if ((outcome ?? '').trim() === 'acknowledged') return 'talked_unclear';
+  return classifyCallMicro({ outcome, summary: null, reply: null }, words);
+}
+
+/**
  * นับผลโทรแบบ **หนึ่งรายชื่อหนึ่งผล** — เลือกผลล่าสุดระหว่างฝั่ง AI กับคน แล้วจัดถังด้วย `classifyCallMicro`
  * (ผลของ AI อ่านรหัสก่อนแล้วค่อยอ่านคำพูด · ผลของคนมีแต่รหัส) · คลังคำตามหัวข้อ
  */
@@ -110,7 +120,7 @@ export function tallyCallResults(
     const hasStaff = !!r.staff_outcome;
     const byStaff = hasStaff && (!hasAi || timeOf(r.staff_at) >= timeOf(r.ai_at));
     if (byStaff) {
-      const k = classifyCallMicro({ outcome: r.staff_outcome, summary: null, reply: null }, words);
+      const k = classifyStaffCallResult(r.staff_outcome, words);
       if (k) staff[k] += 1;
     } else if (hasAi) {
       const k = classifyCallMicro({ outcome: r.ai_outcome, summary: r.ai_summary, reply: r.ai_reply }, words);

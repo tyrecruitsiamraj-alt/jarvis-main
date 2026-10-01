@@ -1154,7 +1154,14 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
     if (await isAutoDispatchEnabled('follow_entry')) {
       replan = await replanFollowSetWithLumos({ memberIds: aiIds, cancelledIds: [...cancelIds, ...toManual], resolveStaffName: staffNameOfPhone });
     } else {
-      replanNote = 'ปิดการส่งให้ AI อยู่ — สายใหม่ยังไม่ถูกส่ง';
+      /**
+       * 🔴 ปิดส่งอัตโนมัติ ≠ ปล่อยสายที่เอาออก/สลับเป็นคนโทรค้างที่ Lumos (1 ต.ค. 2569) — ยกเลิกแผนเดิมเหมือนปุ่มยกเลิก
+       * (`cancelFollowReminder` ไม่ดูสวิตช์) · สายที่ยังอยู่ในแผนเดิมถูกส่งคืนตามเดิม · ไม่ส่งสายใหม่
+       */
+      if (cancelIds.length + toManual.length > 0) {
+        replan = await replanFollowSetWithLumos({ memberIds: [], cancelledIds: [...cancelIds, ...toManual], resolveStaffName: staffNameOfPhone });
+      }
+      if (aiIds.length > 0) replanNote = 'ปิดการส่งให้ AI อยู่ — สายใหม่ยังไม่ถูกส่ง';
       if (createdIds.length > 0) {
         try {
           await dbQuery(
@@ -1194,8 +1201,17 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
     cancelled: cancelIds.length,
     created: createdIds.length,
     /** ให้ AI ถือตารางใหม่แล้วหรือยัง — จอต้องบอกคนกดได้ ห้ามเงียบ */
+    /**
+     * 🔴 ยกเลิกแผนเดิมไม่สำเร็จ = **ยังไม่ปลอดภัย** แม้ไม่เหลือแผนให้ส่ง (0 = 0) — เดิมรายงานว่าส่งแล้ว
+     * ทั้งที่ Lumos อาจยังถือสายที่เพิ่งเอาออก/สลับเป็นคนโทร
+     */
     lumos: replan
-      ? { pushed: replan.pushedPlans === replan.plans, plans: replan.plans, rounds: replan.rounds, reason: replan.reason ?? null }
+      ? {
+          pushed: replan.cancelledOld && replan.pushedPlans === replan.plans && !replanNote,
+          plans: replan.plans,
+          rounds: replan.rounds,
+          reason: replan.reason ?? replanNote ?? null,
+        }
       : { pushed: false, plans: 0, rounds: 0, reason: replanNote },
   });
 }

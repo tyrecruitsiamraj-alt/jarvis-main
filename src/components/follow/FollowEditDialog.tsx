@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Building2, LoaderCircle, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { createFollowEntry, updateFollowEntry, type FollowEntry } from '@/lib/followApi';
+import { createFollowEntry, replaceFollowSchedule, updateFollowEntry, type FollowEntry } from '@/lib/followApi';
 import { buildExtraRounds, extraRoundsNote } from '@/lib/followExtraRounds';
 import { BoardUnitPickerBody } from '@/components/follow/BoardUnitPicker';
 import {
@@ -13,11 +13,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import StaffContactField from '@/components/follow/StaffContactField';
 import DateTimeField24 from '@/components/shared/DateTimeField24';
 import TopicField from '@/components/follow/TopicField';
 import FollowScheduleEditor from '@/components/follow/FollowScheduleEditor';
-import { followSetRows, isEditableFollowRound } from '@/lib/followScheduleEdit';
+import {
+  draftFromRows,
+  followSetRows,
+  isEditableFollowRound,
+  isoToBangkokInput,
+  scheduleReplaceBody,
+  validateScheduleDraft,
+} from '@/lib/followScheduleEdit';
 import type { BoardUnitOption } from '@/lib/boardUnitPicker';
 
 /**
@@ -76,6 +84,12 @@ export default function FollowEditDialog({
    * เป็นตัวแก้ตาราง (ไม่เปิด Dialog ซ้อน) · ปิดกล่อง/เปลี่ยนรายการ = กลับหน้าฟอร์มเสมอ
    */
   const [scheduleEditing, setScheduleEditing] = useState(false);
+  /**
+   * 🔴 **ใครโทรสายนี้ — เปลี่ยนใจได้** (เจ้าของสั่ง 1 ต.ค. 2569: *"แก้ไขมันต้องแก้ไขได้ว่าแบบเผื่อเปลี่ยนใจ
+   * ไม่ใช่ Ai โทรและ หรือ จะเปลี่ยนจากคนเป็น Ai"*) · สลับได้เฉพาะสายที่ยังไม่ถึงเวลาและยังไม่ถูกโทร
+   * บันทึกผ่านเส้นแก้ตารางทั้งชุด (ถอน/ส่งคิว + ส่งแผนใหม่ให้ Lumos ครบในที่เดียว)
+   */
+  const [mode, setMode] = useState<'ai' | 'manual'>('ai');
 
   useEffect(() => {
     if (!entry) return;
@@ -96,6 +110,7 @@ export default function FollowEditDialog({
         );
       }
     }
+    setMode(entry.call_mode === 'manual' ? 'manual' : 'ai');
     setError(null);
     setExtraWhen([]);
     setScheduleEditing(false);
@@ -127,12 +142,48 @@ export default function FollowEditDialog({
   /** สายของชุดนี้ (ชุดเดียวกันเท่านั้น) + ยังมีสายที่แก้ได้ไหม — ไม่มีเลย = ไม่ต้องโชว์ปุ่มแก้ตาราง */
   const setRows = followSetRows(entry, siblings);
   const canEditSchedule = setRows.some((r) => isEditableFollowRound(r, new Date()));
+  const modeEditable = isEditableFollowRound(entry, new Date());
+  const beforeMode: 'ai' | 'manual' = entry.call_mode === 'manual' ? 'manual' : 'ai';
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    const now = new Date();
+    const newIso = when ? new Date(when).toISOString() : entry.scheduled_at;
+    const minuteOf = (iso: string | null | undefined) => Math.floor(Date.parse(iso ?? '') / 60_000);
+    const modeChanged = modeEditable && mode !== beforeMode;
+    const fieldsChanged =
+      name !== (entry.recipient_name ?? '') ||
+      phone !== (entry.recipient_phone ?? '') ||
+      topic !== (entry.topic ?? '') ||
+      note !== (entry.note ?? '') ||
+      staffPhone !== (entry.staff_phone ?? '') ||
+      unitName !== (entry.unit_name ?? '') ||
+      siteCode !== (entry.site_code ?? '') ||
+      minuteOf(newIso) !== minuteOf(entry.scheduled_at);
+    /**
+     * สลับคนโทร = ส่ง **ทุกสายที่ยังแก้ได้ของชุด** ไปทีเดียว (เปลี่ยนแค่สายนี้) — ฝั่ง API ยกเลิกแผนเดิมแล้วส่งแผนใหม่
+     * ทั้งชุด · ตรวจเวลาก่อนเขียนอะไร (เส้นนี้รับแต่เวลาอนาคต) จะได้ไม่แก้ข้อมูลไปครึ่งเดียว
+     */
+    const editable = setRows.filter((r) => isEditableFollowRound(r, now));
+    const draft = draftFromRows(editable).map((d) =>
+      d.id === entry.id ? { ...d, mode, when: isoToBangkokInput(newIso) } : d,
+    );
+    if (modeChanged) {
+      const check = validateScheduleDraft(draft, now);
+      if (!check.ok) {
+        setError(Object.values(check.errors)[0] ?? 'ตั้งวันและเวลาให้ถูกก่อน');
+        return;
+      }
+    }
     setBusy(true);
     try {
+      if (modeChanged && !fieldsChanged && rounds.isoTimes.length === 0) {
+        const out = await replaceFollowSchedule(entry.id, scheduleReplaceBody(editable, draft));
+        onSaved(modeChangedMessage(mode, out.lumos));
+        onClose();
+        return;
+      }
       const saved = await updateFollowEntry(entry.id, {
         recipient_name: name,
         recipient_phone: phone,
@@ -172,6 +223,15 @@ export default function FollowEditDialog({
        * 3 ใน 10 คนที่ถูกกดแก้ Lumos ยังถือเวลาเดิม (รอบหาย · เวลาเป็น 20:00 ·
        * โดนโทรตามเวลาเดิมไปแล้ว) ⇒ ส่งใหม่ไม่สำเร็จต้องขึ้นบนจอ ห้ามเงียบ
        */
+      if (modeChanged) {
+        const out = await replaceFollowSchedule(entry.id, scheduleReplaceBody(editable, draft));
+        const parts = ['แก้ไขแล้ว', modeChangedMessage(mode, out.lumos)];
+        if (added > 0) parts.push(`เพิ่มอีก ${added} รอบ`);
+        onSaved(parts.join(' · '));
+        onClose();
+        return;
+      }
+
       const resync = saved.lumos_resync;
       const queueMsg = resync?.pushed
         ? `แก้ไขแล้ว — ส่งแผนใหม่ให้ AI แล้ว ${resync.rounds} รอบ จะโทรตามเวลาใหม่`
@@ -213,6 +273,9 @@ export default function FollowEditDialog({
           <FollowScheduleEditor
             anchor={entry}
             setRows={setRows}
+            cancelledRows={siblings.filter(
+              (s) => s.cancelled && (entry.group_id ? s.group_id === entry.group_id : !s.group_id),
+            )}
             onBack={() => setScheduleEditing(false)}
             onSaved={(msg) => {
               onSaved(msg);
@@ -333,12 +396,32 @@ export default function FollowEditDialog({
             </label>
             {/* 🔴 ห้ามกลับไปใช้ `<input type=datetime-local>` — ขึ้น AM/PM ตามเครื่องคนใช้ */}
             <DateTimeField24 value={when} onChange={setWhen} label="เวลานัด" className="w-full" />
-            {entry.call_status !== 'pending' ? (
+            {/* สายคนโทรไม่เคยเข้าคิว (call_status = null) — เดิมขึ้นคำเตือนนี้ผิด ๆ ทุกครั้ง */}
+            {entry.call_status && entry.call_status !== 'pending' ? (
               <p className={cn('ml-1 rounded-lg px-2 py-1 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
                 สายนี้ AI รับไปแล้ว — แก้ที่นี่ไม่ทำให้สายที่ออกไปเปลี่ยนตาม
               </p>
             ) : null}
           </div>
+          {modeEditable ? (
+            <div className="space-y-1.5">
+              <p className="ml-1 text-xs font-medium text-muted-foreground">ใครโทรสายนี้</p>
+              <div className="ml-1 flex flex-wrap items-center gap-3">
+                {(['ai', 'manual'] as const).map((m) => (
+                  <label key={m} className="flex cursor-pointer items-center gap-1.5">
+                    <Checkbox
+                      checked={mode === m}
+                      onCheckedChange={() => setMode(m)}
+                      aria-label={`ใครโทรสายนี้ — ${m === 'ai' ? 'AI โทร' : 'คนโทร'}`}
+                    />
+                    <span className={cn('text-xs font-medium', mode === m ? 'text-foreground' : 'text-muted-foreground')}>
+                      {m === 'ai' ? 'AI โทร' : 'คนโทร'}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {/* เพิ่มรอบโทร (เจ้าของสั่ง 18 ส.ค. 2569) — รอบใหม่ = รายการใหม่ที่ลอกข้อมูลนี้ไป
               โชว์รอบที่มีอยู่แล้วให้เห็นก่อน จะได้ไม่ตั้งซ้อนกันเอง */}
           <div className={cn('space-y-2 rounded-xl border p-3', TONE.neutral.soft)}>
@@ -373,7 +456,7 @@ export default function FollowEditDialog({
                         : '—'}
                     </span>
                     <span className="text-muted-foreground">
-                      {s.call_status === 'pending' ? 'รอโทร' : 'ส่ง AI แล้ว'}
+                      {s.call_mode === 'manual' ? 'คนโทร' : s.call_status === 'pending' ? 'รอโทร' : 'ส่ง AI แล้ว'}
                     </span>
                   </li>
                 ))}
@@ -481,4 +564,19 @@ export default function FollowEditDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+/** ข้อความหลังสลับคนโทร — บอกผลกับ AI ตรง ๆ ห้ามเงียบ (ส่งไม่สำเร็จ = AI อาจยังถือแผนเดิม) */
+function modeChangedMessage(
+  mode: 'ai' | 'manual',
+  lumos: { pushed: boolean; reason?: string | null },
+): string {
+  if (mode === 'manual') {
+    return lumos.pushed
+      ? 'เปลี่ยนเป็นคนโทรแล้ว — AI ไม่โทรสายนี้'
+      : `เปลี่ยนเป็นคนโทรแล้ว — แต่ถอนสายออกจาก AI ไม่สำเร็จ (${lumos.reason ?? 'ไม่ทราบเหตุ'})`;
+  }
+  return lumos.pushed
+    ? 'เปลี่ยนเป็น AI โทรแล้ว — AI โทรตามเวลา'
+    : `เปลี่ยนเป็น AI โทรแล้ว — แต่ยังส่งให้ AI ไม่สำเร็จ (${lumos.reason ?? 'ไม่ทราบเหตุ'})`;
 }

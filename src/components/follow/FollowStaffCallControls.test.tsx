@@ -46,10 +46,10 @@ describe('ปุ่มลงผลโทร', () => {
     await waitFor(() => expect(onRecord).toHaveBeenCalledWith('confirmed', 'ยืนยันเริ่มพรุ่งนี้'));
   });
 
-  it('มีครบ 5 ผล ชุดเดียวกับกล่องงาน (คำของงานติดตาม)', () => {
+  it('มีครบ 6 ผล = ชุดของกล่องงาน + ติดต่อสำเร็จ (คำของงานติดตาม · คำเดียวกับปุ่มบนแถว)', () => {
     render(<FollowStaffCallControls entry={entry()} onRecord={vi.fn()} onClear={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /ลงผลโทร/ }));
-    for (const label of ['ยืนยันว่าไป', 'ยกเลิก — ไม่ไปแล้ว', 'ขอเลื่อน', 'ไม่รับสาย', 'เบอร์ผิด']) {
+    for (const label of ['ยืนยันว่าไป', 'ยกเลิก — ไม่ไปแล้ว', 'ขอเลื่อน', 'ติดต่อสำเร็จ', 'ติดต่อไม่สำเร็จ', 'เบอร์ผิด']) {
       expect(screen.getByRole('button', { name: label })).toBeTruthy();
     }
   });
@@ -67,7 +67,7 @@ describe('ปุ่มลงผลโทร', () => {
         onClear={onClear}
       />,
     );
-    expect(screen.getByText('คนโทร: ไม่รับสาย')).toBeTruthy();
+    expect(screen.getByText('คนโทร: ติดต่อไม่สำเร็จ')).toBeTruthy();
     expect(screen.getByText(/staff@example\.com/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'ล้างผล' }));
     expect(onClear).not.toHaveBeenCalled();

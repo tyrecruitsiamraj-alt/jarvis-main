@@ -168,6 +168,17 @@ describe('replanFollowSetWithLumos', () => {
     expect(out).toMatchObject({ rounds: 2, plans: 1 });
   });
 
+  it('🔴 สลับคนโทร → AI กลับ: แถวคิวที่ยกเลิกไว้ไม่นับว่ามีคิว ⇒ ผ่าน insertQueueItems (revive) แล้วอยู่ในแผน', async () => {
+    // คิวของ m1 ถูกยกเลิกตอนสลับเป็นคนโทร ⇒ query "มีคิวแล้ว" ต้องไม่คืน m1 (กรอง cancelled ใน SQL)
+    stub({ oldRefs: [], members: [members[0]], queued: [], pending: ['follow-m1'] });
+    const out = await replanFollowSetWithLumos({ memberIds: ['m1'], cancelledIds: [], resolveStaffName: async () => null });
+    const sqls = dbQuery.mock.calls.map((c) => String(c[0]));
+    const existing = sqls.find((q) => /select person_ref from .*lumos_dispatch_queue/i.test(q) && !/status = 'pending'/i.test(q));
+    expect(existing).toMatch(/status <> 'cancelled'/);
+    expect(sqls.some((q) => /insert into .*lumos_dispatch_queue/i.test(q))).toBe(true);
+    expect(out).toMatchObject({ rounds: 1, plans: 1, pushedPlans: 1 });
+  });
+
   it('ปิด push อยู่: ไม่แตะ Lumos', async () => {
     getLumosPushConfig.mockReturnValue(null);
     stub({ oldRefs: ['follow-old1'], members, queued: refs, pending: refs });

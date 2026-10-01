@@ -1196,6 +1196,11 @@ const FollowPage: React.FC = () => {
              เพราะของเดิมซ่อนอยู่ในป๊อป "จัดการ" อีกชั้น) · ไม่ต้องจำ cellToReopen
              เพราะไม่ได้เปิดมาจากป๊อป จึงไม่มีป๊อปให้กลับไป */
           onEditRound={(round) => setEditing(round.entry)}
+          /* ปุ่มบนแถวของสายที่คนโทร (เจ้าของ Choice 1 ต.ค. 2569 "ติดต่อสำเร็จ / ไม่สำเร็จ / ยกเลิก") —
+             เส้นเดียวกับปุ่มลงผล/ยกเลิกในป๊อปจัดการ */
+          onStaffResult={(round, outcome) => doStaffCall(round.entry.id, outcome)}
+          onCancelRound={(round) => doCancel(round.entry.id)}
+          busyId={busyId}
           lastLoadedAt={lastLoadedAt}
           roundFilter={activeRound}
           roundsSlot={

@@ -13,8 +13,9 @@ import DateTimeField24 from '@/components/shared/DateTimeField24';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { replaceFollowSchedule, type FollowEntry } from '@/lib/followApi';
-import { roundTabLabel } from '@/lib/followRoundVisual';
+import { scheduleDraftDayCallLabels } from '@/lib/followDayCall';
 import {
+  bangkokInputToIso,
   draftFromRows,
   isEditableFollowRound,
   nextDraftRow,
@@ -38,6 +39,7 @@ const byTime = (a: FollowEntry, b: FollowEntry) => Date.parse(a.scheduled_at ?? 
 export default function FollowScheduleEditor({
   anchor,
   setRows,
+  cancelledRows = [],
   onBack,
   onSaved,
 }: {
@@ -45,6 +47,8 @@ export default function FollowScheduleEditor({
   anchor: FollowEntry;
   /** ทุกสายของชุดนี้ที่ยังไม่ยกเลิก (`followSetRows`) */
   setRows: readonly FollowEntry[];
+  /** สายที่ยกเลิกแล้วของชุดเดียวกัน — ไม่โชว์ ใช้นับ "วันที่" ให้ตรงกับตารางรายวัน */
+  cancelledRows?: readonly FollowEntry[];
   onBack: () => void;
   onSaved: (message: string) => void;
 }) {
@@ -62,6 +66,16 @@ export default function FollowScheduleEditor({
   const keptIds = new Set(draft.map((d) => d.id).filter(Boolean));
   const removed = editable.filter((e) => !keptIds.has(e.id)).length;
   const aiCount = draft.filter((d) => d.mode === 'ai').length;
+  /**
+   * ป้าย "วันที่ D · สายที่ N" (เจ้าของสั่ง 1 ต.ค. 2569: *"วันที่ 1 สายที่ 1 2 วันที่ 2 สายที่ 1 2 ไม่ใช่ 1 2 3 4 5 6"*)
+   * คิดจากเวลาในช่องตอนนี้ร่วมกับสายที่โทรไปแล้วของชุด — แก้เวลาแล้วป้ายเปลี่ยนตาม (แถวไม่กระโดดที่)
+   */
+  const dayLabels = scheduleDraftDayCallLabels([
+    ...cancelledRows.map((r) => ({ key: `x-${r.id}`, iso: r.scheduled_at, cancelled: true })),
+    ...locked.map((r) => ({ key: r.id, iso: r.scheduled_at })),
+    ...draft.map((d) => ({ key: d.key, iso: bangkokInputToIso(d.when) })),
+  ]);
+  const labelOf = (key: string, fallback: string) => dayLabels.get(key) ?? fallback;
 
   const patch = (key: string, next: Partial<ScheduleDraftRow>) =>
     setDraft((prev) => prev.map((d) => (d.key === key ? { ...d, ...next } : d)));
@@ -96,7 +110,7 @@ export default function FollowScheduleEditor({
                 className="flex items-center justify-between gap-2 rounded-lg bg-secondary/40 px-2.5 py-1 text-[11px] text-muted-foreground"
               >
                 <span className="tabular-nums">{r.scheduled_at ? WHEN_FMT.format(new Date(r.scheduled_at)) : '—'}</span>
-                <span>{r.call_round ? roundTabLabel(r.call_round) : ''}</span>
+                <span>{labelOf(r.id, '')}</span>
               </li>
             ))}
           </ul>
@@ -114,7 +128,7 @@ export default function FollowScheduleEditor({
               <DateTimeField24
                 value={d.when}
                 onChange={(next) => patch(d.key, { when: next })}
-                label={`สายที่ ${i + 1}`}
+                label={labelOf(d.key, `สายที่ ${i + 1}`)}
                 className="min-h-[44px] flex-1"
               />
               <Button
@@ -122,7 +136,7 @@ export default function FollowScheduleEditor({
                 variant="outline"
                 size="icon"
                 onClick={() => setDraft((prev) => prev.filter((x) => x.key !== d.key))}
-                aria-label={`เอาสายที่ ${i + 1} ออก`}
+                aria-label={`เอา${labelOf(d.key, `สายที่ ${i + 1}`)} ออก`}
               >
                 <X aria-hidden />
               </Button>
@@ -133,7 +147,7 @@ export default function FollowScheduleEditor({
                   <Checkbox
                     checked={d.mode === mode}
                     onCheckedChange={() => patch(d.key, { mode })}
-                    aria-label={`สายที่ ${i + 1} — ${mode === 'ai' ? 'AI โทร' : 'คนโทร'}`}
+                    aria-label={`${labelOf(d.key, `สายที่ ${i + 1}`)} — ${mode === 'ai' ? 'AI โทร' : 'คนโทร'}`}
                   />
                   <span className={cn('text-xs font-medium', d.mode === mode ? 'text-foreground' : 'text-muted-foreground')}>
                     {mode === 'ai' ? 'AI โทร' : 'คนโทร'}

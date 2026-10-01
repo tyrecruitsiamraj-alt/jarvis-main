@@ -32,6 +32,7 @@ type RoundInput = {
   completed_at?: string | null;
   outcome_code?: string | null;
   call_outcome?: string | null;
+  staff_call_outcome?: string | null;
   followup_state?: string | null;
 };
 
@@ -182,6 +183,23 @@ describe('เลือกคนที่โทรครบแล้ว', () => {
       group('จบดี', [round({ completed_at: 'x', outcome_code: 'arrived' })]),
     ]);
     expect(people.map((p) => p.reason)).toEqual(['closed_success', 'needs_human']);
+  });
+});
+
+describe('🔴 สายที่คนโทรลงผลเอง (130) นับเหมือนผลของ AI (1 ต.ค. 2569 · ปุ่มบนแถว)', () => {
+  it('ลงผลแล้ว = เดินจบ · ชุดที่คนโทรทั้งชุดเข้ากองได้ (เดิมไม่มีวันเข้า)', () => {
+    expect(isRoundSettled(round({ staff_call_outcome: 'no_answer' }))).toBe(true);
+    const [p] = selectCompletedFollowPeople([
+      group('คนโทร', [round({ staff_call_outcome: 'acknowledged' }), round({ staff_call_outcome: 'confirmed' })]),
+    ]);
+    expect(p?.reason).toBe('ai_going');
+  });
+
+  it('คนลง "ยกเลิก — ไม่ไปแล้ว" ⇒ บอกว่าไม่ไป (ปุ่มย้ายไม่ขึ้น) · "ติดต่อสำเร็จ" อย่างเดียว = ยังไม่ได้คำตอบว่าไปไหม', () => {
+    const [notGoing] = selectCompletedFollowPeople([group('ไม่ไป', [round({ staff_call_outcome: 'declined' })])]);
+    expect(notGoing?.reason).toBe('ai_not_going');
+    const [reached] = selectCompletedFollowPeople([group('ติดต่อได้', [round({ staff_call_outcome: 'acknowledged' })])]);
+    expect(reached?.reason).toBe('called_no_close');
   });
 });
 

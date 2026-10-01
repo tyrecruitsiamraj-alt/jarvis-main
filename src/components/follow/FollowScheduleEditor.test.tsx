@@ -1,7 +1,7 @@
 /**
  * ตัวแก้ตารางทั้งชุด (เจ้าของ Choice 1 ต.ค. 2569) — ฝังในกล่องแก้ไข ไม่ซ้อน Dialog
  * 🔴 ด่าน: สายที่โทรไปแล้วอ่านอย่างเดียว · ลบ/เพิ่ม/สลับคนโทรแล้วยิงคำขอเดียวที่ถูก · ไม่เปลี่ยนอะไร = กดบันทึกไม่ได้ ·
- *    AI ยังไม่ได้ตารางใหม่ต้องบอกบนจอ
+ *    AI ยังไม่ได้ตารางใหม่ต้องบอกบนจอ · ป้ายเป็น "วันที่ D · สายที่ N" ไม่ใช่เลขต่อทั้งชุด (เจ้าของสั่ง 1 ต.ค. 2569)
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
@@ -53,8 +53,10 @@ describe('FollowScheduleEditor', () => {
   it('🔴 สายที่โทรไปแล้วอยู่ในรายการอ่านอย่างเดียว · สายที่ยังไม่ถึงเวลาแก้ได้ · ยังไม่เปลี่ยน = บันทึกไม่ได้', () => {
     render(<FollowScheduleEditor anchor={setRows[1]} setRows={setRows} onBack={() => {}} onSaved={() => {}} />);
     expect(screen.getByText('โทรไปแล้ว / เลยเวลา')).toBeTruthy();
-    expect(screen.getByText('รอบโทรที่ 1')).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: /เอาสายที่ \d ออก/ })).toHaveLength(2);
+    // ชุดนี้: เมื่อวาน (โทรแล้ว) · พรุ่งนี้ · มะรืน ⇒ วันที่ 1 / 3 / 4 นับวันตามปฏิทินจากวันแรกของชุด
+    expect(screen.getByText('วันที่ 1 · สายที่ 1')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /^เอาวันที่ \d · สายที่ 1 ออก$/ })).toHaveLength(2);
+    expect(screen.queryByText(/รอบโทรที่/)).toBeNull();
     expect((screen.getByRole('button', { name: 'บันทึกตาราง' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -68,7 +70,7 @@ describe('FollowScheduleEditor', () => {
     });
     const onSaved = vi.fn();
     render(<FollowScheduleEditor anchor={setRows[1]} setRows={setRows} onBack={() => {}} onSaved={onSaved} />);
-    fireEvent.click(screen.getByRole('button', { name: 'เอาสายที่ 2 ออก' }));
+    fireEvent.click(screen.getByRole('button', { name: 'เอาวันที่ 4 · สายที่ 1 ออก' }));
     fireEvent.click(screen.getByRole('button', { name: /เพิ่มสาย/ }));
     fireEvent.click(screen.getByRole('button', { name: 'บันทึกตาราง' }));
     await waitFor(() => expect(replaceFollowSchedule).toHaveBeenCalledTimes(1));
@@ -87,11 +89,41 @@ describe('FollowScheduleEditor', () => {
   it('สลับเป็นคนโทร = เปลี่ยนแล้ว บันทึกได้ · ส่ง call_mode manual', async () => {
     replaceFollowSchedule.mockResolvedValue({ group_id: 'g1', kept: 2, cancelled: 0, created: 0, lumos: { pushed: true, plans: 1, rounds: 1, reason: null } });
     render(<FollowScheduleEditor anchor={setRows[1]} setRows={setRows} onBack={() => {}} onSaved={() => {}} />);
-    fireEvent.click(screen.getByRole('checkbox', { name: 'สายที่ 2 — คนโทร' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'วันที่ 4 · สายที่ 1 — คนโทร' }));
     fireEvent.click(screen.getByRole('button', { name: 'บันทึกตาราง' }));
     await waitFor(() => expect(replaceFollowSchedule).toHaveBeenCalled());
     const body = replaceFollowSchedule.mock.calls[0][1] as { rounds: Array<{ id?: string; call_mode: string }> };
     expect(body.rounds.find((r) => r.id === 'b')?.call_mode).toBe('manual');
+  });
+
+  it('🔴 สองสายวันเดียวกัน = "สายที่ 1" "สายที่ 2" ของวันนั้น · ย้ายเวลาข้ามวันแล้วป้ายเปลี่ยนตาม', () => {
+    const rows = [
+      row({ id: 'p', scheduled_at: inDays(1, 9), call_round: 1 }),
+      row({ id: 'q', scheduled_at: inDays(1, 15), call_round: 2 }),
+      row({ id: 'r2', scheduled_at: inDays(2, 9), call_round: 3 }),
+      row({ id: 's', scheduled_at: inDays(2, 15), call_round: 4 }),
+    ];
+    render(<FollowScheduleEditor anchor={rows[0]} setRows={rows} onBack={() => {}} onSaved={() => {}} />);
+    const names = screen
+      .getAllByRole('button', { name: /^เอา.* ออก$/ })
+      .map((b) => b.getAttribute('aria-label'));
+    expect(names).toEqual([
+      'เอาวันที่ 1 · สายที่ 1 ออก',
+      'เอาวันที่ 1 · สายที่ 2 ออก',
+      'เอาวันที่ 2 · สายที่ 1 ออก',
+      'เอาวันที่ 2 · สายที่ 2 ออก',
+    ]);
+  });
+
+  it('🔴 วันที่ยกเลิกไปแล้วยังนับเป็นวันของชุด — ป้ายตรงกับตารางรายวัน (สายที่เหลือวันแรก = "วันที่ 1")', () => {
+    const live = [row({ id: 'p', scheduled_at: inDays(1, 9), call_round: 1 }), row({ id: 'q', scheduled_at: inDays(1, 15), call_round: 2 })];
+    const gone = [row({ id: 'z', scheduled_at: inDays(4, 9), call_round: 3, cancelled: true })];
+    render(<FollowScheduleEditor anchor={live[0]} setRows={live} cancelledRows={gone} onBack={() => {}} onSaved={() => {}} />);
+    expect(screen.getByRole('button', { name: 'เอาวันที่ 1 · สายที่ 2 ออก' })).toBeTruthy();
+    cleanup();
+    // ไม่มีวันอื่นเลย = ชุดวันเดียว ไม่มีเลขวัน
+    render(<FollowScheduleEditor anchor={live[0]} setRows={live} onBack={() => {}} onSaved={() => {}} />);
+    expect(screen.getByRole('button', { name: 'เอาสายที่ 2 ออก' })).toBeTruthy();
   });
 
   it('ฝังในกล่องแก้ไข — ไม่มี Dialog ซ้อน · มีปุ่มเปิดในกล่อง "รอบโทรของคนนี้"', () => {

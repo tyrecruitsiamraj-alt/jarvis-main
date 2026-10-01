@@ -14,15 +14,36 @@
  */
 import { followCallOutcomeText } from '@/lib/callOutcomeTone';
 
-/** เรียงตามที่ต้องเห็นก่อน — ตอบแล้ว (ไป/ไม่ไป/ขอเลื่อน) ก่อน ยกหูไม่ได้ทีหลัง */
+/**
+ * เรียงตามที่ต้องเห็นก่อน — ตอบแล้ว (ไป/ไม่ไป/ขอเลื่อน) ก่อน ยกหูไม่ได้ทีหลัง
+ * 🔴 `acknowledged` (1 ต.ค. 2569) = **"ติดต่อสำเร็จ"** ของปุ่มบนแถวตารางรายวัน — เจ้าของ Choice
+ *    *"ติดต่อสำเร็จ / ไม่สำเร็จ / ยกเลิก"* (สำเร็จ = คุยได้ · ไม่บอกว่าไปหรือไม่ไป) · เป็นรหัสของ Lumos อยู่แล้ว
+ *    (AI = "รับสายแล้ว") ⇒ สี/หมวด/ถังอ่านด้วยตารางเดิมได้ ไม่ต้องประดิษฐ์รหัสใหม่ · ที่เหลือชุดเดียวกับกล่องงาน
+ */
 export const FOLLOW_STAFF_CALL_OUTCOMES = [
   'confirmed',
   'declined',
   'reschedule_requested',
+  'acknowledged',
   'no_answer',
   'wrong_person',
 ] as const;
 export type FollowStaffCallOutcome = (typeof FOLLOW_STAFF_CALL_OUTCOMES)[number];
+
+/**
+ * ปุ่มลงผลบนแถวตารางรายวัน (เจ้าของ Choice 1 ต.ค. 2569 — *"ติดต่อสำเร็จ / ไม่สำเร็จ / ยกเลิก"* ·
+ * ปุ่มอยู่บนแถว ไม่ต้องเปิดป๊อป) · "ยกเลิก" = ยกเลิกสายนี้ (เส้นยกเลิกเดิม) ไม่ใช่ผลโทร
+ */
+export const FOLLOW_STAFF_QUICK_RESULTS: ReadonlyArray<{ outcome: FollowStaffCallOutcome; label: string }> = [
+  { outcome: 'acknowledged', label: 'ติดต่อสำเร็จ' },
+  { outcome: 'no_answer', label: 'ไม่สำเร็จ' },
+];
+
+/** คำของผลที่ **คนลงเอง** ที่ต่างจากคำของ AI — ชุดเดียวกับปุ่มบนแถว (ป๊อป/ชิปอ่านตรงกัน) */
+const STAFF_WORDS: Partial<Record<FollowStaffCallOutcome, string>> = {
+  acknowledged: 'ติดต่อสำเร็จ',
+  no_answer: 'ติดต่อไม่สำเร็จ',
+};
 
 export const FOLLOW_STAFF_CALL_NOTE_MAX = 300;
 
@@ -30,9 +51,14 @@ export function isFollowStaffCallOutcome(v: unknown): v is FollowStaffCallOutcom
   return typeof v === 'string' && (FOLLOW_STAFF_CALL_OUTCOMES as readonly string[]).includes(v);
 }
 
-/** คำของผลบนปุ่ม/ชิป — คำของงานติดตาม (ชุดเดียวกับผลของ AI ในปฏิทิน) */
+/** คำของผลบนปุ่ม/ชิป — คำของงานติดตาม · ผลที่คนลงเองใช้คำของปุ่ม ("ติดต่อสำเร็จ" ไม่ใช่ "รับสายแล้ว" ของ AI) */
 export function followStaffCallText(code: string): string {
-  return followCallOutcomeText(code);
+  return STAFF_WORDS[code as FollowStaffCallOutcome] ?? followCallOutcomeText(code);
+}
+
+/** ผลของรอบนี้มาจากคนโทร (ไม่มีผลจาก AI) — ใช้เลือกคำบนจอ */
+export function isStaffCallResult(entry: { call_outcome?: string | null; staff_call_outcome?: string | null }): boolean {
+  return !(entry.call_outcome ?? '').trim() && Boolean((entry.staff_call_outcome ?? '').trim());
 }
 
 export type FollowStaffCallInput = { outcome: FollowStaffCallOutcome; note: string | null };

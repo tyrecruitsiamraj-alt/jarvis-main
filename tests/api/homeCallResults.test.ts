@@ -26,6 +26,7 @@ import {
   CALL_RESULT_ORDER,
   callResultLabel,
   callResultRows,
+  classifyStaffCallResult,
   emptyCallResultCounts,
   tallyCallResults,
   vocabOfBlock,
@@ -170,6 +171,16 @@ describe('🔴 หนึ่งรายชื่อ = หนึ่งผล (ร
     );
     expect(ai.said_yes).toBe(1);
     expect(staff.no_pickup).toBe(1);
+  });
+
+  it('🔴 "ติดต่อสำเร็จ" ของคนโทร (acknowledged · 1 ต.ค. 2569) = คุยแล้ว ไม่บอกว่าไปหรือไม่ไป — ไม่ใช่ "รับแล้วเงียบ"', () => {
+    expect(classifyStaffCallResult('acknowledged', FOLLOW_VOCAB)).toBe('talked_unclear');
+    const { ai, staff } = tallyCallResults([row({ staff_outcome: 'acknowledged' })], 'follow');
+    expect(staff.talked_unclear).toBe(1);
+    expect(staff.picked_silent).toBe(0);
+    // AI ส่ง acknowledged มาโดยไม่มีคำพูด ยังเป็น "รับแล้วเงียบ" เหมือนเดิม (อ่านคำพูดไม่ได้)
+    expect(tallyCallResults([row({ ai_outcome: 'acknowledged' })], 'follow').ai.picked_silent).toBe(1);
+    expect(ai.picked_silent).toBe(0);
   });
 });
 

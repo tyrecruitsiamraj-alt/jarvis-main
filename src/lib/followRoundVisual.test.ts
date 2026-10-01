@@ -1,6 +1,7 @@
 import { FOLLOW_ROUND_BUCKET_LABEL } from '@/lib/followRoundBuckets';
 import { describe, expect, it } from 'vitest';
 import {
+  dayCallTabLabel,
   actionableBuckets,
   actionableSummary,
   bucketVisual,
@@ -132,11 +133,15 @@ describe('roundTabLabel', () => {
   });
 });
 
-/** 🔴 เจ้าของ Choice 1 ต.ค. 2569 — กองที่ 3 ของตัวกรองรวมรอบ 4, 5, 6… ป้ายต้องบอกว่า "ขึ้นไป" */
-describe('roundFilterLabel', () => {
-  it('กอง 1-2 = เลขตรง ๆ · กอง 3 = รอบโทรที่ 3 ขึ้นไป', () => {
-    expect(roundFilterLabel(1)).toBe('รอบโทรที่ 1');
-    expect(roundFilterLabel(2)).toBe('รอบโทรที่ 2');
-    expect(roundFilterLabel(3)).toBe('รอบโทรที่ 3 ขึ้นไป');
+/**
+ * 🔴 เจ้าของ Choice 1 ต.ค. 2569 — กองที่ 3 ของตัวกรองรวมสาย 4, 5, 6… ป้ายต้องบอกว่า "ขึ้นไป"
+ * 🔴 1 ต.ค. 2569 (ค่ำ): กองนับลำดับสายในวัน ⇒ คำเป็น "สายที่" ชุดเดียวกับแถวปฏิทิน ("วันที่ 2 · สายที่ 1")
+ */
+describe('roundFilterLabel / dayCallTabLabel', () => {
+  it('กอง 1-2 = เลขตรง ๆ · กอง 3 = สายที่ 3 ขึ้นไป · ไม่ใช้คำ "รอบโทรที่" (เลขทั้งชุดของบท AI)', () => {
+    expect(roundFilterLabel(1)).toBe('สายที่ 1');
+    expect(roundFilterLabel(2)).toBe('สายที่ 2');
+    expect(roundFilterLabel(3)).toBe('สายที่ 3 ขึ้นไป');
+    expect(dayCallTabLabel(2)).toBe('สายที่ 2');
   });
 });

@@ -9,6 +9,8 @@
  * 2. ค่าที่อ่านไม่ออก = ปฏิเสธ ห้ามเดาเป็นผลใดผลหนึ่ง
  * 3. ลงผลได้เฉพาะรอบคนโทร — รอบของ AI ลงซ้อนไม่ได้ (นับสายเดียวสองฝั่ง)
  * 4. ลงผลแล้วช่องปฏิทิน/กล่องนับต้องเปลี่ยนตาม — ไม่งั้นรอบที่โทรจบแล้วยังขึ้น "ไม่ได้ส่ง" ตลอดไป
+ * 5. (1 ต.ค. 2569) ปุ่มบนแถว "ติดต่อสำเร็จ / ไม่สำเร็จ" ใช้รหัสของ Lumos ที่มีอยู่แล้ว (`acknowledged` / `no_answer`)
+ *    แต่คำบนจอเป็นคำของปุ่ม — ไม่ใช่ "รับสายแล้ว" ของ AI
  */
 import { describe, expect, it } from 'vitest';
 import { CALL_RESULT_OUTCOMES as SERVER_HOLD_OUTCOMES } from '../../api/_lib/candidateCallHolds.js';
@@ -17,6 +19,7 @@ import type { FollowEntry } from '../../src/lib/followApi.js';
 import {
   FOLLOW_STAFF_CALL_NOTE_MAX,
   FOLLOW_STAFF_CALL_OUTCOMES,
+  FOLLOW_STAFF_QUICK_RESULTS,
   canRecordStaffCall,
   effectiveCallOutcome,
   followStaffCallText,
@@ -24,6 +27,7 @@ import {
 } from '../../src/lib/followStaffCall.js';
 import { callCategory, followRoundState, roundResultLabel, roundTone } from '../../src/lib/followPlanning.js';
 import { inFollowRoundBucket } from '../../src/lib/followRoundBuckets.js';
+import { CALL_OUTCOME_TONE } from '../../src/lib/callOutcomeTone.js';
 
 const NOW = new Date('2026-09-30T05:00:00Z'); // 12:00 น. เวลาไทย
 
@@ -51,16 +55,31 @@ function entry(over: Partial<FollowEntry> = {}): FollowEntry {
 
 const round = (e: FollowEntry) => ({ entry: e, state: followRoundState(e, NOW), time: '09:00', ymd: '2026-09-30' });
 
-describe('ศัพท์ผลชุดเดียวกับผลที่เจ้าหน้าที่ลงในกล่องงาน', () => {
-  it('ตรงกับชุดของ server และของหน้าเว็บทุกตัว เรียงเหมือนกัน', () => {
-    expect([...FOLLOW_STAFF_CALL_OUTCOMES]).toEqual([...SERVER_HOLD_OUTCOMES]);
-    expect([...FOLLOW_STAFF_CALL_OUTCOMES]).toEqual([...CLIENT_HOLD_OUTCOMES]);
+describe('ศัพท์ผลชุดเดียวกับผลที่เจ้าหน้าที่ลงในกล่องงาน (+ ติดต่อสำเร็จ ของงานติดตาม)', () => {
+  it('ชุดของกล่องงานอยู่ครบ เรียงเหมือนกัน · เพิ่มแค่ acknowledged (ติดต่อสำเร็จ)', () => {
+    const shared = FOLLOW_STAFF_CALL_OUTCOMES.filter((o) => o !== 'acknowledged');
+    expect(shared).toEqual([...SERVER_HOLD_OUTCOMES]);
+    expect(shared).toEqual([...CLIENT_HOLD_OUTCOMES]);
+    expect(FOLLOW_STAFF_CALL_OUTCOMES).toContain('acknowledged');
   });
 
-  it('ใช้คำของงานติดตาม ไม่ใช่คำของงานหาคน', () => {
+  it('🔴 ทุกรหัสเป็นรหัสที่ตารางสี/หมวดรู้จักอยู่แล้ว (ไม่ประดิษฐ์รหัสใหม่)', () => {
+    for (const o of FOLLOW_STAFF_CALL_OUTCOMES) expect(CALL_OUTCOME_TONE[o], o).toBeTruthy();
+  });
+
+  it('ใช้คำของงานติดตาม ไม่ใช่คำของงานหาคน · ผลของคนใช้คำของปุ่ม', () => {
     expect(followStaffCallText('confirmed')).toBe('ยืนยันว่าไป');
     expect(followStaffCallText('declined')).toBe('ยกเลิก — ไม่ไปแล้ว');
-    expect(followStaffCallText('no_answer')).toBe('ไม่รับสาย');
+    expect(followStaffCallText('acknowledged')).toBe('ติดต่อสำเร็จ');
+    expect(followStaffCallText('no_answer')).toBe('ติดต่อไม่สำเร็จ');
+  });
+
+  it('ปุ่มบนแถว = ติดต่อสำเร็จ / ไม่สำเร็จ (ยกเลิก = ยกเลิกสาย ไม่ใช่ผลโทร) · รหัสผ่านตัวตรวจของ server', () => {
+    expect(FOLLOW_STAFF_QUICK_RESULTS).toEqual([
+      { outcome: 'acknowledged', label: 'ติดต่อสำเร็จ' },
+      { outcome: 'no_answer', label: 'ไม่สำเร็จ' },
+    ]);
+    for (const q of FOLLOW_STAFF_QUICK_RESULTS) expect(validateFollowStaffCall({ outcome: q.outcome }).ok).toBe(true);
   });
 });
 
@@ -128,9 +147,23 @@ describe('ปฏิทิน: ลงผลแล้วช่องต้อง�
     expect(callCategory(r)).toBe('agreed');
   });
 
-  it('ลงผล "ไม่รับสาย" = หมวดไม่ได้คำตอบ', () => {
+  it('ลงผล "ติดต่อไม่สำเร็จ" = หมวดไม่ได้คำตอบ · คำบนจอเป็นคำของปุ่ม', () => {
     const r = round(entry({ staff_call_outcome: 'no_answer', staff_called_at: '2026-09-30T03:00:00Z' }));
     expect(callCategory(r)).toBe('unreachable');
+    expect(roundResultLabel(r)).toBe('ติดต่อไม่สำเร็จ');
+  });
+
+  it('ลงผล "ติดต่อสำเร็จ" = เขียว (ชุดเดียวกับ "รับสายแล้ว" ของ AI) · คำบนจอ "ติดต่อสำเร็จ"', () => {
+    const r = round(entry({ staff_call_outcome: 'acknowledged', staff_called_at: '2026-09-30T03:00:00Z' }));
+    expect(r.state).toBe('result');
+    expect(roundTone(r)).toBe('success');
+    expect(roundResultLabel(r)).toBe('ติดต่อสำเร็จ');
+    expect(inFollowRoundBucket(r.entry, 'connected')).toBe(true);
+  });
+
+  it('ผลของ AI ยังใช้คำของ AI', () => {
+    const r = round(entry({ call_mode: 'ai', call_status: 'completed', call_outcome: 'acknowledged' }));
+    expect(roundResultLabel(r)).toBe('รับสายแล้ว');
   });
 
   it('ปิดงานแล้วยังชนะผลโทร (ลำดับเดิมไม่เปลี่ยน)', () => {

@@ -1,0 +1,111 @@
+/**
+ * เลข "วันที่ D · สายที่ N" (เจ้าของสั่ง 1 ต.ค. 2569: *"วันที่ 1 สายที่ 1 2 วันที่ 2 สายที่ 1 2 ไม่ใช่ 1 2 3 4 5 6"*)
+ * 🔴 ด่าน: นับใหม่ทุกวัน · วัน "ไม่โทร" ไม่ทำให้เลขวันเลื่อน · สายที่ยกเลิกไม่กินเลขของสายที่ยังอยู่ ·
+ *    แถวเก่าไม่มีชุดใช้ `call_round` เดิม · `call_round` ที่เก็บไม่ถูกแตะ · แท็บ "สายที่ 1" = สายแรกของทุกวัน
+ */
+import { describe, expect, it } from 'vitest';
+import type { FollowEntry } from '@/lib/followApi';
+import {
+  followDayCallLabel,
+  followDayCallPositions,
+  scheduleDraftDayCallLabels,
+  withFollowDayCalls,
+} from '@/lib/followDayCall';
+import { followRoundSlot } from '@/lib/followRoundBuckets';
+
+/** เวลาไทยของวันที่ d ต.ค. 2569 */
+const at = (d: number, hh: number, mm = 0) =>
+  new Date(`2026-10-${String(d).padStart(2, '0')}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00+07:00`).toISOString();
+
+const row = (over: Partial<FollowEntry>): FollowEntry =>
+  ({ id: 'x', group_id: 'g', scheduled_at: at(1, 9), call_round: null, cancelled: false, ...over }) as FollowEntry;
+
+describe('followDayCallPositions', () => {
+  it('🔴 ตาราง 3 วัน × 2 สาย (call_round 1–6) ⇒ วันที่ 1–3 · สายที่ 1 2 ทุกวัน · call_round เดิมไม่ถูกแตะ', () => {
+    const rows = [1, 2, 3].flatMap((d, i) => [
+      row({ id: `d${d}a`, scheduled_at: at(d, 9), call_round: i * 2 + 1 }),
+      row({ id: `d${d}b`, scheduled_at: at(d, 15), call_round: i * 2 + 2 }),
+    ]);
+    const enriched = withFollowDayCalls(rows);
+    expect(enriched.map((e) => followDayCallLabel({ day: e.call_day, call: e.call_of_day }))).toEqual([
+      'วันที่ 1 · สายที่ 1',
+      'วันที่ 1 · สายที่ 2',
+      'วันที่ 2 · สายที่ 1',
+      'วันที่ 2 · สายที่ 2',
+      'วันที่ 3 · สายที่ 1',
+      'วันที่ 3 · สายที่ 2',
+    ]);
+    expect(enriched.map((e) => e.call_round)).toEqual([1, 2, 3, 4, 5, 6]);
+    // แท็บ "สายที่ 1" = สายแรกของทุกวัน (เดิมวันที่ 2–3 ทั้งหมดไปกอง "3 ขึ้นไป")
+    expect(enriched.map((e) => followRoundSlot(e))).toEqual([1, 2, 1, 2, 1, 2]);
+  });
+
+  it('🔴 วันที่ "ไม่โทร" ไม่ทำให้เลขวันเลื่อน — นับวันตามปฏิทินจากวันแรกของชุด', () => {
+    const pos = followDayCallPositions([
+      row({ id: 'a', scheduled_at: at(1, 9), call_round: 1 }),
+      row({ id: 'b', scheduled_at: at(4, 9), call_round: 2 }),
+    ]);
+    expect(pos.get('b')).toEqual({ day: 4, call: 1 });
+  });
+
+  it('ชุดวันเดียว ⇒ ไม่มีเลขวัน · เรียงตาม call_round ก่อนเวลา (ตั้งสาย 2 ไว้ก่อนสาย 1 ได้ เห็นได้ ไม่ถูกกลบ)', () => {
+    const pos = followDayCallPositions([
+      row({ id: 'r2', scheduled_at: at(1, 16, 30), call_round: 2 }),
+      row({ id: 'r1', scheduled_at: at(1, 16, 35), call_round: 1 }),
+    ]);
+    expect(pos.get('r1')).toEqual({ day: null, call: 1 });
+    expect(pos.get('r2')).toEqual({ day: null, call: 2 });
+    expect(followDayCallLabel(pos.get('r2')!)).toBe('สายที่ 2');
+  });
+
+  it('🔴 ยกเลิกสายเช้า ⇒ สายบ่ายเป็นสายที่ 1 ของวันนั้น · ตัวที่ยกเลิกใช้ลำดับเดิมของมัน · วันแรกที่ยกเลิกยังนับเป็นวันที่ 1', () => {
+    const pos = followDayCallPositions([
+      row({ id: 'day1', scheduled_at: at(1, 9), call_round: 1, cancelled: true }),
+      row({ id: 'am', scheduled_at: at(2, 9), call_round: 2, cancelled: true }),
+      row({ id: 'pm', scheduled_at: at(2, 15), call_round: 3 }),
+    ]);
+    expect(pos.get('pm')).toEqual({ day: 2, call: 1 });
+    expect(pos.get('am')).toEqual({ day: 2, call: 1 });
+    expect(pos.get('day1')).toEqual({ day: 1, call: 1 });
+  });
+
+  it('แถวเก่าไม่มีชุด ⇒ ใช้ call_round ที่คนเลือกไว้ · ไม่มี call_round ⇒ null (ถอยไป attempt เหมือนเดิม)', () => {
+    const pos = followDayCallPositions([
+      row({ id: 'old5', group_id: null, call_round: 5 }),
+      row({ id: 'old', group_id: null, call_round: null }),
+    ]);
+    expect(pos.get('old5')).toEqual({ day: null, call: 5 });
+    expect(followDayCallLabel(pos.get('old5')!)).toBe('สายที่ 5');
+    expect(pos.get('old')).toEqual({ day: null, call: null });
+    expect(followDayCallLabel(pos.get('old')!)).toBeNull();
+    const [e] = withFollowDayCalls([row({ id: 'old', group_id: null, call_round: null, call_attempt: 2, call_status: 'completed' })]);
+    expect(followRoundSlot(e)).toBe(2);
+  });
+
+  it('สองชุดของคนเดียวกันนับแยกกัน · สายตอนตีหนึ่งไทยเป็นวันของไทย ไม่ใช่วันของ UTC', () => {
+    const pos = followDayCallPositions([
+      row({ id: 'g1a', group_id: 'g1', scheduled_at: at(1, 9) }),
+      row({ id: 'g1b', group_id: 'g1', scheduled_at: at(2, 1) }),
+      row({ id: 'g2a', group_id: 'g2', scheduled_at: at(2, 9) }),
+    ]);
+    expect(pos.get('g1b')).toEqual({ day: 2, call: 1 });
+    expect(pos.get('g2a')).toEqual({ day: null, call: 1 });
+  });
+});
+
+describe('scheduleDraftDayCallLabels (ตัวแก้ตาราง)', () => {
+  it('คิดจากเวลาในช่องตอนนี้ · ย้ายสายไปอีกวันแล้วป้ายเปลี่ยนตาม · เวลาอ่านไม่ออก = null', () => {
+    const labels = scheduleDraftDayCallLabels([
+      { key: 'done', iso: at(1, 9) },
+      { key: 'a', iso: at(1, 15) },
+      { key: 'b', iso: at(3, 9) },
+      { key: 'bad', iso: null },
+    ]);
+    expect([...labels.entries()]).toEqual([
+      ['done', 'วันที่ 1 · สายที่ 1'],
+      ['a', 'วันที่ 1 · สายที่ 2'],
+      ['b', 'วันที่ 3 · สายที่ 1'],
+      ['bad', null],
+    ]);
+  });
+});

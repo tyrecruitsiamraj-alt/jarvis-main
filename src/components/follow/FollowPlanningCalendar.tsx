@@ -1,10 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Clock, Pencil, Phone, PhoneOff, X } from 'lucide-react';
+import { CalendarIcon, Check, ChevronLeft, ChevronRight, Clock, Pencil, Phone, PhoneOff, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { shiftMonth } from '@/lib/followCallCalendar';
-import { roundFilterLabel, roundTabLabel } from '@/lib/followRoundVisual';
-import { toYmdBangkok, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
+import { dayCallTabLabel, roundFilterLabel } from '@/lib/followRoundVisual';
+import { followDayCallLabel } from '@/lib/followDayCall';
+import {
+  FOLLOW_STAFF_QUICK_RESULTS,
+  followStaffCallText,
+  isStaffCallResult,
+  type FollowStaffCallOutcome,
+} from '@/lib/followStaffCall';
+import { toYmdBangkok, toYmdLocal, parseYmd, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   buildFollowDayCalls,
   buildFollowDayPeople,
@@ -43,7 +50,9 @@ import {
 } from '@/lib/followCallMicro';
 import { DASH } from '@/lib/designTokens';
 import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 /**
@@ -98,6 +107,90 @@ function dayHeading(ymd: string): string {
   return `วัน${THAI_WEEKDAY_FULL[dow]}ที่ ${formatYmdDmyBe(ymd)}`;
 }
 
+/** ป้ายวันบนปุ่มเลือกวัน ("พฤ. 1 ต.ค. 2569") — 🔴 `Intl` ระดับโมดูล · คีย์วันเป็นสตริง จึงคิดเป็น UTC ล้วน */
+const DAY_PILL = new Intl.DateTimeFormat('th-TH', {
+  timeZone: 'UTC',
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
+function dayPillLabel(ymd: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) return ymd;
+  return DAY_PILL.format(new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))));
+}
+
+/**
+ * ═══ ปุ่มวันที่ของมุมมองรายวัน (เจ้าของสั่ง 1 ต.ค. 2569) ═══
+ * เจ้าของ: *"มันต้องโชว์วันนั้นๆไม่ใช่โชว์แค่คำว่า วันนี้"* — ปุ่มโชว์วันที่เลือกอยู่เสมอ กดแล้วเลือกวันจากปฏิทิน
+ * · "วันนี้" ย้ายไปเป็นทางลัดในปฏิทิน · ค่าที่คุยกันเป็น `YYYY-MM-DD` (แบบเดียวกับ `DayCalendarPicker`)
+ */
+const DayPickerPill: React.FC<{ value: string; today: string; onPick: (ymd: string) => void }> = ({
+  value,
+  today,
+  onPick,
+}) => {
+  const [open, setOpen] = useState(false);
+  const p = parseYmd(value);
+  const selected = p ? new Date(p.y, p.m - 1, p.d) : undefined;
+  const thisYear = new Date().getFullYear();
+  const pick = (ymd: string) => {
+    onPick(ymd);
+    setOpen(false);
+  };
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          className="rounded-full tabular-nums"
+          aria-label={`เลือกวัน · ${dayPillLabel(value)}`}
+          data-testid="day-pill"
+        >
+          <CalendarIcon aria-hidden />
+          {dayPillLabel(value)}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="end">
+        <Calendar
+          mode="single"
+          selected={selected}
+          defaultMonth={selected}
+          onSelect={(d) => {
+            if (d) pick(toYmdLocal(d));
+          }}
+          captionLayout="dropdown-buttons"
+          fromYear={thisYear - 2}
+          toYear={thisYear + 2}
+          /* ⚠️ โหมด dropdown วาดป้ายเดือน/ปีซ้ำอีกชุด — ซ่อนแบบเดียวกับ `DayCalendarPicker` */
+          classNames={{
+            caption_label: 'sr-only',
+            vhidden: 'sr-only',
+            caption_dropdowns: 'flex items-center gap-1.5',
+            dropdown: 'rounded-lg border border-border bg-background px-2 py-1 text-xs font-medium text-foreground',
+          }}
+          initialFocus
+        />
+        <div className="border-t p-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full"
+            disabled={value === today}
+            onClick={() => pick(today)}
+          >
+            วันนี้
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 /** อักษรย่อในวงกลมหน้าแถว — แบบอ้างอิงใช้รูปคน ฐานเราไม่มีรูป จึงใช้อักษรแรกของชื่อ */
 function initials(name: string): string {
   return name.replace(/^["']|["']$/g, '').trim().slice(0, 1) || '?';
@@ -127,6 +220,21 @@ function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): st
     .join('\n');
   return `${name} · ${formatYmdDmyBe(ymd)}\n${detail}\n(กดเพื่อดูรายละเอียดและจัดการรอบนี้)`;
 }
+
+/**
+ * ป้ายของสายเดียว — "วันที่ 2 · สายที่ 1" (ตารางหลายวัน) / "สายที่ 2" (เจ้าของสั่ง 1 ต.ค. 2569:
+ * *"วันที่ 1 สายที่ 1 2 วันที่ 2 สายที่ 1 2 ไม่ใช่ 1 2 3 4 5 6"*) · แถวที่ไม่ได้ผ่าน `listFollowEntries` ถอยไปใช้ `call_round`
+ */
+function callLabelOf(round: FollowPlanningRound, slot: 1 | 2 | 3 | null): string {
+  const e = round.entry;
+  return (
+    followDayCallLabel({ day: e.call_day ?? null, call: e.call_of_day ?? e.call_round ?? null }) ??
+    (slot ? dayCallTabLabel(slot) : 'ยังไม่อยู่รอบไหน')
+  );
+}
+
+/** เวลาที่คนลงผล (HH:MM ไทย) — 🔴 `Intl` ระดับโมดูล */
+const STAFF_AT = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
 
 /**
  * คำอธิบายสี — ชุดเดียวใช้ทั้งสองมุมมอง (คำของเจ้าของ ปรับให้ตรงแผงข้างบน 8 ก.ย. 2569)
@@ -243,6 +351,14 @@ const FollowPlanningCalendar: React.FC<{
   headerAction?: React.ReactNode;
   /** เวลาที่ดึงข้อมูลสำเร็จล่าสุด — ไว้บอกคนว่าหน้าไม่ได้ค้าง (`null` = ยังไม่เคยโหลดจบ) */
   lastLoadedAt?: Date | null;
+  /**
+   * ปุ่มบนแถวของ **สายที่คนโทร** (เจ้าของ Choice 1 ต.ค. 2569 "ติดต่อสำเร็จ / ไม่สำเร็จ / ยกเลิก")
+   * ไม่ส่ง = ไม่มีปุ่ม (เช่นจอที่อ่านอย่างเดียว)
+   */
+  onStaffResult?: (round: FollowPlanningRound, outcome: FollowStaffCallOutcome) => void | Promise<void>;
+  onCancelRound?: (round: FollowPlanningRound) => void | Promise<void>;
+  /** รายการที่กำลังบันทึกอยู่ — ปุ่มของแถวนั้นกดซ้ำไม่ได้ */
+  busyId?: string | null;
 }> = ({
   rows,
   month,
@@ -255,8 +371,13 @@ const FollowPlanningCalendar: React.FC<{
   roundsSlot,
   headerAction,
   lastLoadedAt,
+  onStaffResult,
+  onCancelRound,
+  busyId = null,
 }) => {
   const [view, setView] = useState<View>('day');
+  /** สายที่กด "ยกเลิก" บนแถวแล้วรอยืนยัน (ยืนยันในที่เดิม ไม่เปิดป๊อป) */
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const today = toYmdBangkok(new Date());
   const dayYmd = selectedYmd || today;
 
@@ -453,17 +574,7 @@ const FollowPlanningCalendar: React.FC<{
                 >
                   <ChevronLeft className="h-4 w-4" aria-hidden />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onSelect(today)}
-                  disabled={dayYmd === today}
-                  className={cn(
-                    'inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-medium disabled:opacity-50',
-                    TONE.neutral.outline,
-                  )}
-                >
-                  วันนี้
-                </button>
+                <DayPickerPill value={dayYmd} today={today} onPick={onSelect} />
                 <button
                   type="button"
                   aria-label="วันถัดไป"
@@ -653,9 +764,9 @@ const FollowPlanningCalendar: React.FC<{
                                         >
                                           {round.time ?? '—'}
                                         </span>
-                                        <span className="mt-0.5 block text-[10.5px] text-muted-foreground">
-                                          {/* เลขรอบจริงของสายนี้ (รอบ 5 = "รอบโทรที่ 5" ไม่ใช่กองที่ 3) */}
-                                          {round.entry.call_round ? roundTabLabel(round.entry.call_round) : slot ? roundTabLabel(slot) : 'ยังไม่อยู่รอบไหน'}
+                                        <span className="mt-0.5 block whitespace-nowrap text-[10.5px] text-muted-foreground">
+                                          {/* "วันที่ 2 · สายที่ 1" — ลำดับในวัน ไม่ใช่เลขทั้งชุด (1 ต.ค. 2569) */}
+                                          {callLabelOf(round, slot)}
                                         </span>
                                       </span>
                                       {/* ดินสอติดกับ **รอบนั้น** — แก้เวลาได้ทีละสายโดยไม่ต้องเข้าป๊อป */}
@@ -666,7 +777,7 @@ const FollowPlanningCalendar: React.FC<{
                                           size="icon"
                                           onClick={() => onEditRound(round)}
                                           title={`แก้ไขวัน/เวลาของสายนี้ · ${row.group.name}`}
-                                          aria-label={`แก้ไขวันเวลาของ ${row.group.name} ${round.entry.call_round ? roundTabLabel(round.entry.call_round) : slot ? roundTabLabel(slot) : ''}`}
+                                          aria-label={`แก้ไขวันเวลาของ ${row.group.name} ${callLabelOf(round, slot)}`}
                                           className="h-7 w-7 shrink-0 rounded-full"
                                         >
                                           <Pencil aria-hidden />
@@ -691,6 +802,16 @@ const FollowPlanningCalendar: React.FC<{
                                      * ⇒ ข้อความต้องชี้ไปที่ปุ่มโทรที่มีจริงในแถว ห้ามบอกให้ "กดส่งใหม่"
                                      */
                                     const failed = roundPushFailed(round);
+                                    /* ผลที่คนลงเอง = คำของปุ่มที่เขากด ("คนโทร: ติดต่อสำเร็จ") — ไม่ใช่หัวหมวดของ AI */
+                                    const chipText =
+                                      round.state === 'result' && isStaffCallResult(round.entry)
+                                        ? `คนโทร: ${roundResultLabel(round)}`
+                                        : `${FOLLOW_CALL_CATEGORY_LABEL[category]}${
+                                            round.state === 'result' &&
+                                            (category === 'unreachable' || round.entry.call_outcome === 'acknowledged')
+                                              ? ` — ${roundResultLabel(round)}`
+                                              : ''
+                                          }`;
                                     return (
                                       <span
                                         key={round.entry.id}
@@ -708,11 +829,7 @@ const FollowPlanningCalendar: React.FC<{
                                           ) : (
                                             <span className={cn('h-1.5 w-1.5 rounded-full', TONE[tone].dot)} aria-hidden />
                                           )}
-                                          {FOLLOW_CALL_CATEGORY_LABEL[category]}
-                                          {round.state === 'result' &&
-                                          (category === 'unreachable' || round.entry.call_outcome === 'acknowledged')
-                                            ? ` — ${roundResultLabel(round)}`
-                                            : ''}
+                                          {chipText}
                                         </span>
                                         {failed ? (
                                           <span
@@ -740,11 +857,84 @@ const FollowPlanningCalendar: React.FC<{
                                     const ai = roundAiSummary(round);
                                     const reply = roundReplyText(round);
                                     const pushErr = roundPushFailed(round) ? roundPushError(round) : null;
+                                    const e = round.entry;
+                                    /**
+                                     * 🔴 **สายที่คนโทร ลงผลบนแถวได้เลย** (เจ้าของสั่ง 1 ต.ค. 2569: *"ต้องอัพเดทสถานะได้
+                                     * แบบติดต่อสำเร็จหรือไม่ ยกเลิกอะ ตอนนี้พอคนโทรเองมันไม่มี"* · Choice
+                                     * "ติดต่อสำเร็จ / ไม่สำเร็จ / ยกเลิก") — ยกเลิกต้องยืนยันในที่เดิมก่อน (ย้อนไม่ได้)
+                                     * ลงผลแล้วแก้/ล้างได้ที่ปุ่ม "จัดการ" (ป๊อปเดิม)
+                                     */
+                                    const canQuick =
+                                      Boolean(onStaffResult && onCancelRound) &&
+                                      e.call_mode === 'manual' &&
+                                      round.state !== 'cancelled' &&
+                                      round.state !== 'closed' &&
+                                      !e.staff_call_outcome;
+                                    const busy = busyId === e.id;
                                     return (
                                       <span key={round.entry.id} className="flex min-h-[34px] flex-col justify-center">
                                         {/* 🔴 คำพูดของเขามาก่อนเสมอ — หัวคอลัมน์ถามว่า "เขาตอบว่าอะไร"
                                             สรุปของ AI เป็นคำบรรยายบุคคลที่สาม ใช้เป็นตัวรอง */}
-                                        {pushErr ? (
+                                        {/* 🔴 ปุ่มอยู่บรรทัดเดียวเสมอ (ตัดบรรทัด = บรรทัดของคอลัมน์นี้ไม่ตรงกับเวลาของสายนั้น) — แคบก็เลื่อนตารางแนวนอน */}
+                                        {canQuick && confirmCancelId === e.id ? (
+                                          <span className="flex flex-nowrap items-center gap-1 whitespace-nowrap">
+                                            <span className="text-[11px] text-muted-foreground">ยกเลิกสายนี้ไหม</span>
+                                            <Button
+                                              type="button"
+                                              variant="destructive"
+                                              size="xs"
+                                              disabled={busy}
+                                              onClick={() => {
+                                                setConfirmCancelId(null);
+                                                void onCancelRound?.(round);
+                                              }}
+                                            >
+                                              ยกเลิกเลย
+                                            </Button>
+                                            <Button type="button" variant="outline" size="xs" onClick={() => setConfirmCancelId(null)}>
+                                              ไม่
+                                            </Button>
+                                          </span>
+                                        ) : canQuick ? (
+                                          <span className="flex flex-nowrap items-center gap-1 whitespace-nowrap" data-testid="staff-quick">
+                                            {FOLLOW_STAFF_QUICK_RESULTS.map((q) => (
+                                              <Button
+                                                key={q.outcome}
+                                                type="button"
+                                                variant="outline"
+                                                size="xs"
+                                                disabled={busy}
+                                                onClick={() => void onStaffResult?.(round, q.outcome)}
+                                                className={
+                                                  TONE[q.outcome === 'acknowledged' ? 'success' : 'warn'].value
+                                                }
+                                              >
+                                                {q.label}
+                                              </Button>
+                                            ))}
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="xs"
+                                              disabled={busy}
+                                              onClick={() => setConfirmCancelId(e.id)}
+                                            >
+                                              ยกเลิก
+                                            </Button>
+                                          </span>
+                                        ) : round.state === 'result' && isStaffCallResult(e) ? (
+                                          /* ผลที่คนลงเอง — หมายเหตุของเขา ไม่มีก็บอกว่าใครลงเมื่อไหร่ */
+                                          <span className="text-[12px] leading-snug text-muted-foreground">
+                                            {e.staff_call_note ||
+                                              [
+                                                e.staff_called_by_name,
+                                                e.staff_called_at ? `${STAFF_AT.format(new Date(e.staff_called_at))} น.` : null,
+                                              ]
+                                                .filter(Boolean)
+                                                .join(' · ') ||
+                                              followStaffCallText(e.staff_call_outcome ?? '')}
+                                          </span>
+                                        ) : pushErr ? (
                                           /* เหตุจริงจาก Lumos — มีค่ากว่าขีดกลางว่าง ๆ */
                                           <span className={cn('text-[11.5px] leading-snug', TONE.orange.value)} title={pushErr}>
                                             ส่งไม่สำเร็จ: <span className="line-clamp-2">{pushErr}</span>

@@ -3,7 +3,7 @@ import type { FollowGroup } from '@/lib/followGrouping';
 import { CALL_OUTCOME_TONE, followCallOutcomeText } from '@/lib/callOutcomeTone';
 import { followDispatchLabel } from '@/lib/followDispatchState';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
-import { effectiveCallOutcome } from '@/lib/followStaffCall';
+import { effectiveCallOutcome, followStaffCallText, isStaffCallResult } from '@/lib/followStaffCall';
 import type { ToneKey } from '@/lib/designTokens';
 import {
   FOLLOW_OUTCOME_LABEL,
@@ -273,6 +273,8 @@ export function roundResultLabel(round: FollowPlanningRound): string {
         : 'ปิดงาน';
     case 'result': {
       const code = effectiveCallOutcome(e);
+      // ผลที่คนลงเองใช้คำของปุ่มที่เขากด ("ติดต่อสำเร็จ") — ไม่ใช่คำของ AI ("รับสายแล้ว")
+      if (code && isStaffCallResult(e)) return followStaffCallText(code);
       return code ? followCallOutcomeText(code) : 'มีผลแล้ว';
     }
     case 'notSent':

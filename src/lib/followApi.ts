@@ -3,6 +3,7 @@ import { TONE, type ToneKey } from '@/lib/designTokens';
 import type { LumosNextAction } from '@/lib/lumosDispatchApi';
 import type { FollowOutcome } from '@/lib/followOutcome';
 import type { FollowStaffCallOutcome } from '@/lib/followStaffCall';
+import { withFollowDayCalls } from '@/lib/followDayCall';
 
 export type FollowCallStatus = 'pending' | 'delivered' | 'completed' | 'failed' | 'cancelled';
 
@@ -32,8 +33,15 @@ export type FollowEntry = {
   /** หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (096) — null = ไม่ได้ระบุ */
   unit_name?: string | null;
   site_code?: string | null;
-  /** สายที่เท่าไหร่ (113) — null = แถวเก่า/ไม่ได้ระบุ ⇒ ถือเป็นสายแรก */
+  /** สายที่เท่าไหร่ (113) — null = แถวเก่า/ไม่ได้ระบุ ⇒ ถือเป็นสายแรก · ตารางหลายวันนับต่อทั้งชุด (เลือกบทของ AI) */
   call_round?: number | null;
+  /**
+   * **"วันที่ D · สายที่ N" ที่คนอ่านบนจอ** (1 ต.ค. 2569 · คิดฝั่งหน้าเว็บตอนโหลด `withFollowDayCalls`)
+   * `call_day` = วันที่เท่าไหร่ของชุด (null = ชุดวันเดียว) · `call_of_day` = สายที่เท่าไหร่ของวันนั้น
+   * ไม่มีคีย์ (แถวที่ไม่ได้ผ่าน `listFollowEntries`) = ถอยไปใช้ `call_round`
+   */
+  call_day?: number | null;
+  call_of_day?: number | null;
   /**
    * ใครโทรรอบนี้ (121) — `'ai'` ส่งให้ Lumos · `'manual'` เจ้าหน้าที่โทรเอง
    * แถวเก่าที่ไม่มีค่านี้ = `'ai'` (เส้นหลังบ้านเติมให้แล้ว ฝั่งจอไม่ต้องเดา)
@@ -191,7 +199,8 @@ export async function listFollowEntries(): Promise<FollowEntry[]> {
     // เส้นเก่า (ยังไม่มี has_more) หรือหน้าสุดท้าย ⇒ จบ · หน้าว่างก็จบ กันวนซ้ำ
     if (items.length === 0 || data.has_more !== true) break;
   }
-  return all;
+  // เลข "วันที่ · สายที่" ต้องคิดจากทั้งชุด — ที่เดียวตอนโหลด ทุกจอที่อ่านรายการนี้เห็นเลขเดียวกัน
+  return withFollowDayCalls(all);
 }
 
 export async function createFollowEntry(input: NewFollowEntry): Promise<FollowEntry> {

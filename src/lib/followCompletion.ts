@@ -31,6 +31,7 @@ import type { FollowEntry } from '@/lib/followApi';
 import type { FollowGroup } from '@/lib/followGrouping';
 import { isLostOutcome, isSuccessOutcome } from '@/lib/followOutcome';
 import { CONNECTED_CALL_OUTCOMES, UNREACHED_CALL_OUTCOMES } from '@/lib/callOutcomeBuckets';
+import { effectiveCallOutcome } from '@/lib/followStaffCall';
 
 /** สถานะ followup ของคิวที่แปลว่า "AI เอาไม่อยู่ ต้องคนตาม" (migration 070) */
 export const NEEDS_HUMAN_STATE = 'needs_human';
@@ -38,7 +39,12 @@ export const NEEDS_HUMAN_STATE = 'needs_human';
 export type FollowRoundLike = Pick<
   FollowEntry,
   'cancelled' | 'completed_at' | 'outcome_code' | 'call_outcome'
-> & {
+> &
+  /**
+   * ผลที่คนลงเองของรอบคนโทร (130) — 🔴 แก้ 1 ต.ค. 2569 (ปุ่ม "ติดต่อสำเร็จ / ไม่สำเร็จ" บนแถว):
+   * เดิมอ่านแต่ผลของ AI ⇒ ชุดที่คนโทรเองทั้งชุดไม่มีวัน "ตามครบ" ไม่เข้ากองรอตัดสินเลย
+   */
+  Partial<Pick<FollowEntry, 'staff_call_outcome'>> & {
   /** สถานะ followup จากคิว Lumos — 'needs_human' = ต้องคนตาม */
   followup_state?: string | null;
 };
@@ -47,7 +53,7 @@ export type FollowRoundLike = Pick<
 export function isRoundSettled(r: FollowRoundLike): boolean {
   if (r.cancelled) return true;
   if (r.completed_at && r.outcome_code) return true;
-  if (r.call_outcome) return true;
+  if (effectiveCallOutcome(r)) return true;
   return r.followup_state === NEEDS_HUMAN_STATE;
 }
 
@@ -62,7 +68,8 @@ const DECISIVE_OUTCOMES: readonly string[] = [
 
 /** รอบนี้ได้คำตอบจากการโทรแล้วหรือยัง */
 export function hasCallAnswer(r: FollowRoundLike): boolean {
-  return Boolean(r.call_outcome && DECISIVE_OUTCOMES.includes(r.call_outcome));
+  const code = effectiveCallOutcome(r);
+  return Boolean(code && DECISIVE_OUTCOMES.includes(code));
 }
 
 export type CompletionReason =
@@ -108,10 +115,12 @@ function reasonOf(rounds: FollowRoundLike[]): CompletionReason | null {
    * ตารางหลายวันโทรครบทุกรอบแม้ยืนยันแล้ว (วัดได้ 51/51) ⇒ วันแรกบอกว่าไป วันถัดไปไม่รับ
    * เดิมขึ้น "ยังไม่ได้คำตอบ" ทั้งที่เขาตอบไปแล้ว
    */
-  const said = active.filter((r) => r.call_outcome === 'confirmed' || r.call_outcome === 'declined');
+  const said = active
+    .map((r) => effectiveCallOutcome(r))
+    .filter((code) => code === 'confirmed' || code === 'declined');
   const last = said[said.length - 1];
-  if (last?.call_outcome === 'declined') return 'ai_not_going';
-  if (last?.call_outcome === 'confirmed') return 'ai_going';
+  if (last === 'declined') return 'ai_not_going';
+  if (last === 'confirmed') return 'ai_going';
   return 'called_no_close';
 }
 
