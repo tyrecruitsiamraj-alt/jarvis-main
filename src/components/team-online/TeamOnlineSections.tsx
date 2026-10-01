@@ -739,9 +739,8 @@ export function FunnelSection({ data, loading }: { data: Data | null; loading: b
     >
       {!data?.funnel ? (
         empty(data?.errors.funnel ?? (loading ? 'กำลังโหลด…' : '—'))
-      ) : funnel.length === 0 ? (
-        empty('ยังไม่มีใบขอเข้าในช่วงนี้')
       ) : (
+        /* 🔴 ช่วงที่ยังไม่มีใบขอ = หัวตารางยังอยู่ + แถวเดียวบอกว่าไม่มี (เจ้าของสั่ง 1 ต.ค. 2569 — สลับช่วงแล้วการ์ดห้ามเปลี่ยนทรง) */
         <Table>
           <TableHeader>
             <TableRow>
@@ -755,6 +754,13 @@ export function FunnelSection({ data, loading }: { data: Data | null; loading: b
             </TableRow>
           </TableHeader>
           <TableBody>
+            {funnel.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={FUNNEL_STAGES.length + 2} className={cn('py-6 text-center text-xs', DASH.muted)}>
+                  ยังไม่มีใบขอเข้าในช่วงนี้
+                </TableCell>
+              </TableRow>
+            ) : null}
             {funnel.map((r) => (
               <TableRow key={r.bu || 'unknown'}>
                 <BuCell label={r.label} bu={r.bu} />

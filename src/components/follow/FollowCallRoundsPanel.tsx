@@ -283,29 +283,11 @@ export default function FollowCallRoundsPanel({
     const signal = roundSignal(countsOfRound, overdueWaitingCount(rowsOfRound));
     const aiText = followCallResultSummary(rowsOfRound);
     /**
-     * 🔴 **ไม่มีงานสักสายเลย ⇒ หุบเหลือหัวการ์ด** (12 ก.ย. 2569)
-     *
-     * ผู้ทดสอบตาใหม่เจอ 7 กล่องเลขศูนย์ตั้งแต่ยังไม่ได้ทำอะไร แล้วบอกว่า
-     * *"งง จนไม่อยากกด"* — กำแพงคำศัพท์ตั้งแต่ยังไม่มีบริบทคือสิ่งที่ทำให้คนใหม่ถอย
-     *
-     * ⚠️ **ไม่ได้ลบหรือลดขั้น** (ดีไซน์ Stitch ที่เจ้าของเคาะ ห้ามรื้อ) — แค่หุบเมื่อว่างเปล่า
-     * และกางเองทันทีที่มีงานเข้ามาสายแรก
+     * 🔴 **ไม่หุบแล้ว — ไม่มีงานก็โชว์ครบ 7 ขั้นเป็นเลข 0** (เจ้าของสั่ง 1 ต.ค. 2569: *"สลับไปสลับมาแล้วมันหาย
+     *    มันต้องคงไว้แต่ถ้าไม่มีข้อมูลก็เป็น 0 ไป … หน้าย่อขยายเองไม่คงไว้มันดูไม่เรียบร้อย"*)
+     * ของเดิม (12 ก.ย.) หุบเหลือหัวการ์ดตอนยังไม่มีสาย ⇒ สลับแท็บรายชื่อติดตาม ↔ ติดตามส่งคนแทน แล้วการ์ดยุบ/กางเอง
+     * ห้ามกลับไปหุบ/ซ่อนตามจำนวนข้อมูล
      */
-    const allEmpty = entries.length === 0;
-    if (allEmpty) {
-      return (
-        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-4">
-            <GitBranch className={cn('h-5 w-5', TONE.primary.value)} aria-hidden />
-            <h2 className="text-[17px] font-medium text-foreground">ขั้นตอนของสาย (Call Pipeline)</h2>
-            <span className="w-full text-[11.5px] leading-snug text-muted-foreground sm:w-auto sm:flex-1">
-              ยังไม่มีสายในระบบ — ตารางนี้จะกางเองเมื่อมีสายแรกเข้ามา
-            </span>
-            {filtersSlot ? <div className="flex flex-wrap items-center gap-2">{filtersSlot}</div> : null}
-          </div>
-        </div>
-      );
-    }
     return (
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         {/* หัวการ์ด: ไอคอน + ชื่อเรื่อง ซ้าย · ตัวเลือกรอบ ขวา (แบบอ้างอิงวางเป้าหมายไว้ขวา) */}
@@ -381,12 +363,20 @@ export default function FollowCallRoundsPanel({
         </div>
 
         {/* สัญญาณ + ผลจาก AI ของรอบที่เลือก (ของเดิม ย้ายมาเป็นบรรทัดท้ายการ์ด) */}
-        {signal.text ? (
-          <div className="flex items-center gap-2 border-t border-border/70 px-5 py-2.5">
-            <span className={cn('h-2 w-2 shrink-0 rounded-full', TONE[signal.tone].dot)} aria-hidden />
-            <p className={cn('text-[11.5px] font-medium', TONE[signal.tone].value)}>{signal.text}</p>
-          </div>
-        ) : null}
+        {/* 🔴 แถวสัญญาณ **จองที่ไว้เสมอ** (เจ้าของสั่ง 1 ต.ค. 2569 — สลับแท็บแล้วการ์ดห้ามสูง/เตี้ยเอง)
+            ไม่มีอะไรต้องบอก = แถวว่างความสูงเท่าเดิม (ไม่ใส่ข้อความ — เจ้าของเคยสั่งเอา "ยังไม่มีใครอยู่รอบนี้" ออก 18 ส.ค.) */}
+        <div className="flex items-center gap-2 border-t border-border/70 px-5 py-2.5">
+          {signal.text ? (
+            <>
+              <span className={cn('h-2 w-2 shrink-0 rounded-full', TONE[signal.tone].dot)} aria-hidden />
+              <p className={cn('text-[11.5px] font-medium', TONE[signal.tone].value)}>{signal.text}</p>
+            </>
+          ) : (
+            <p className="invisible text-[11.5px] font-medium" aria-hidden>
+              —
+            </p>
+          )}
+        </div>
         {/**
          * 🔴 **ถอดออก 21 ก.ย. 2569** (เจ้าของสั่ง *"เอาออกมันเกะกะ"*):
          *   · บรรทัด "AI ได้คำตอบแล้ว N สาย — ยืนยันว่าไป … · เบอร์ผิด …"
@@ -394,11 +384,7 @@ export default function FollowCallRoundsPanel({
          * ทั้งสองบรรทัดพูดซ้ำกับตัวเลขที่อยู่ในกล่องข้างบนอยู่แล้ว · คำอธิบายฐานยังอยู่ครบ
          * ใน `title` ของแต่ละกล่อง (`FOLLOW_ROUND_BUCKET_HINT`) กดค้างก็อ่านได้
          */}
-        {entries.length === 0 ? (
-          <p className={cn('border-t border-border/70 px-5 py-3 text-[11.5px]', DASH.muted)}>
-            ยังไม่มีงาน Follow — เพิ่มรายชื่อข้างล่างแล้วส่งโทร
-          </p>
-        ) : null}
+        {/* บรรทัด "ยังไม่มีงาน Follow …" ถอดแล้ว (1 ต.ค. 2569) — ขึ้นเฉพาะตอนว่าง ทำให้การ์ดสูงไม่เท่ากันเวลาสลับแท็บ */}
         {peopleDialogEl}
       </div>
     );

@@ -293,7 +293,8 @@ const RecruitOverview: React.FC<{
           sub="รายชื่อที่เข้ามาเดือนนี้ ไปถึงขั้นไหนแล้ว"
           className="lg:col-span-2"
         >
-          {apps && cur.names > 0 ? <FunnelList steps={view.steps} /> : <EmptyNote>ยังไม่มีรายชื่อในเดือนนี้</EmptyNote>}
+          {/* 🔴 เดือนที่ยังไม่มีรายชื่อ = ขั้นครบเป็น 0 (เจ้าของสั่ง 1 ต.ค. 2569 — สลับเดือนแล้วการ์ดห้ามย่อ/ขยายเอง) */}
+          {apps ? <FunnelList steps={view.steps} /> : <EmptyNote>ยังไม่มีรายชื่อในเดือนนี้</EmptyNote>}
           {data.errors.board ? <p className={cn('text-xs', TONE.warn.value)}>{data.errors.board}</p> : null}
         </OverviewCard>
         <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="สถานะวันนี้ ไม่ขึ้นกับเดือนที่เลือก">
@@ -304,7 +305,7 @@ const RecruitOverview: React.FC<{
       {/* ─── กรอกแล้วโทรวันไหน + รายวัน ─── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <OverviewCard icon={Timer} title="กรอกแล้วโทรวันไหน" sub="นับครบ 24 ชม. เป็น 1 วัน">
-          {apps && cur.names > 0 ? <DelayList rows={view.delay} /> : <EmptyNote>ยังไม่มีรายชื่อในเดือนนี้</EmptyNote>}
+          {apps ? <DelayList rows={view.delay} /> : <EmptyNote>ยังไม่มีรายชื่อในเดือนนี้</EmptyNote>}
         </OverviewCard>
         <div className="min-w-0 lg:col-span-2">
           <DailyCard rows={view.daily} icon={BarChart3} />

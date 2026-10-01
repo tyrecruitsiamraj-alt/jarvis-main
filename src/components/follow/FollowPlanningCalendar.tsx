@@ -541,13 +541,7 @@ const FollowPlanningCalendar: React.FC<{
                 </div>
               ) : null}
 
-              {dayCalls.length === 0 ? (
-                <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-                  วันที่เลือกไม่มีสายที่ต้องตาม
-                  {roundFilter !== 'all' ? ` ใน${roundFilterLabel(roundFilter)}` : ''} — เลื่อนดูวันอื่นด้วยลูกศร
-                  หรือกดปฏิทินเลือกวัน
-                </p>
-              ) : (
+              {/* 🔴 ตาราง + แถบแบ่งหน้าอยู่เสมอ ว่างก็เป็นแถว "ไม่มีสาย" + เลข 0 (เจ้าของสั่ง 1 ต.ค. 2569 — สลับแท็บแล้วหน้าห้ามย่อ/ขยายเอง) */}
                 <>
                   {/**
                    * 🔴 **ตารางมีหัวคอลัมน์** ตามแบบอ้างอิง (แก้ 8 ก.ย. 2569 — เจ้าของทักว่า
@@ -571,6 +565,13 @@ const FollowPlanningCalendar: React.FC<{
                         </tr>
                       </thead>
                       <tbody data-testid="day-calls">
+                        {pagePeople.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="px-5 py-10 text-center text-sm text-muted-foreground">
+                              ไม่มีสายที่ต้องตาม{roundFilter !== 'all' ? `ใน${roundFilterLabel(roundFilter)}` : ''}
+                            </td>
+                          </tr>
+                        ) : null}
                         {pagePeople.map(({ row, calls, headline }) => {
                           const washTone = callCategoryWashTone(headline);
                           /* ทุกสายของคนนี้ยกเลิกหมด = ทั้งแถวจาง (เดิมตัดสินรายสาย) */
@@ -874,7 +875,7 @@ const FollowPlanningCalendar: React.FC<{
                   {/* แถบแบ่งหน้า — แบบอ้างอิงมี "แสดง 1 ถึง 4 จากทั้งหมด 48 รายการติดตาม" */}
                   <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-4 py-3 md:px-5">
                     <span className="text-[11.5px] text-muted-foreground">
-                      แสดง {firstIndex + 1} ถึง {lastIndex} จากทั้งหมด{' '}
+                      แสดง {dayPeople.length === 0 ? 0 : firstIndex + 1} ถึง {lastIndex} จากทั้งหมด{' '}
                       {dayPeople.length.toLocaleString('th-TH')} คน ·{' '}
                       {dayCalls.length.toLocaleString('th-TH')} สาย
                       {/**
@@ -935,12 +936,7 @@ const FollowPlanningCalendar: React.FC<{
                     ) : null}
                   </div>
                 </>
-              )}
             </>
-          ) : monthRows.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-              เดือนนี้ไม่มีนัดโทรของใครเลย
-            </p>
           ) : (
             <div ref={scrollRef} className="overflow-x-auto">
               <table className="min-w-full border-collapse text-xs">
@@ -979,6 +975,14 @@ const FollowPlanningCalendar: React.FC<{
                   </tr>
                 </thead>
                 <tbody>
+                  {/* ว่างทั้งเดือน = หัวตาราง (วันทั้งเดือน) ยังอยู่ + แถวเดียวบอกว่าไม่มีนัด — ไม่สลับไปเป็นย่อหน้า */}
+                  {monthRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={cols.length + 1} className="px-5 py-10 text-center text-sm text-muted-foreground">
+                        ไม่มีนัดโทรเดือนนี้
+                      </td>
+                    </tr>
+                  ) : null}
                   {monthRows.map(({ row, byDay }) => {
                     const s = personMonthSummary(row, month);
                     const parts: Array<[FollowCallCategory, number]> = (
@@ -1080,28 +1084,11 @@ const FollowPlanningCalendar: React.FC<{
               {roundFilter !== 'all' ? ` · เฉพาะ${roundFilterLabel(roundFilter)}` : ''}
             </p>
             {/**
-             * 🔴 ไม่มีผลเลย ⇒ **ไม่วาดวงกลม** (12 ก.ย. 2569)
-             * ผู้ทดสอบตาใหม่อ่านวงแหวนเทาเปล่า ๆ ว่า "กำลังโหลดค้าง" แล้วนั่งรอ
-             * — ของเดิมไม่ใช่บั๊ก (ขึ้น "—" ถูกแล้ว) แต่รูปมันโกหก
+             * 🔴 **วงกลมอยู่เสมอ ไม่มีผลก็ 0%** (เจ้าของสั่ง 1 ต.ค. 2569 — "ถ้าไม่มีข้อมูลก็เป็น 0 ไป" · สลับแท็บแล้วการ์ดห้ามเปลี่ยนทรง)
+             * แทนของ 12 ก.ย. ที่สลับวงกลมไปเป็นกล่องข้อความ + ประโยคอธิบาย (สูงไม่เท่าวงกลม)
              */}
             <div className="mt-3">
-              {monthMicro.talked > 0 ? (
-                <Donut percent={microRates.successRate} caption="บอกว่าไป" />
-              ) : (
-                <p
-                  className={cn(
-                    'rounded-xl px-3 py-6 text-center text-[12.5px] font-medium',
-                    TONE.neutral.soft,
-                    TONE.neutral.value,
-                  )}
-                >
-                  ยังไม่มีผลเดือนนี้
-                  {/* บอกตรง ๆ ว่าเป็นเรื่องปกติ — ตาใหม่อ่านกล่องว่างแล้วกลัวว่าระบบเสีย */}
-                  <span className="mt-1 block text-[11px] font-normal">
-                    ปกติสำหรับเดือนที่เพิ่งเริ่ม ไม่ใช่ข้อผิดพลาด — พอมีสายที่คุยจบแล้ว วงสรุปจะขึ้นเอง
-                  </span>
-                </p>
-              )}
+              <Donut percent={microRates.successRate ?? 0} caption="บอกว่าไป" />
             </div>
 
             {/**
@@ -1109,9 +1096,7 @@ const FollowPlanningCalendar: React.FC<{
              * ไม่ใช่สายทั้งหมด · ของเดิมวงไม่บอกฐาน คนเลยอ่านเป็นอัตราคนมาทำงานจริง
              */}
             <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-              {monthMicro.talked > 0
-                ? `คิดจาก ${monthMicro.talked} สายที่ได้คุยเรื่องของเราจริง — ไม่รับสาย/ไม่ใช่เจ้าตัว/รับแล้วเงียบ ไม่ถูกนำมาหาร`
-                : 'เดือนนี้ยังไม่มีสายไหนได้คุยจบ จึงยังคิดสัดส่วนไม่ได้'}
+              {`คิดจาก ${monthMicro.talked} สายที่ได้คุยเรื่องของเราจริง — ไม่รับสาย/ไม่ใช่เจ้าตัว/รับแล้วเงียบ ไม่ถูกนำมาหาร`}
             </p>
 
             {/* สองอัตราที่เหลือ — คนละฐานกับวง จึงต้องเขียนฐานกำกับทุกตัว */}
@@ -1119,7 +1104,7 @@ const FollowPlanningCalendar: React.FC<{
               <div className={cn('rounded-xl px-2.5 py-2', TONE.neutral.soft)}>
                 <dt className="text-[11px] text-muted-foreground">มีคนรับสาย</dt>
                 <dd className="font-medium tabular-nums text-foreground">
-                  {microRates.reachRate == null ? '—' : `${microRates.reachRate.toFixed(0)}%`}
+                  {`${(microRates.reachRate ?? 0).toFixed(0)}%`}
                   <span className="ml-1 text-[10.5px] font-normal text-muted-foreground">
                     {monthMicro.pickedUp}/{monthMicro.withResult} สาย
                   </span>
@@ -1128,7 +1113,7 @@ const FollowPlanningCalendar: React.FC<{
               <div className={cn('rounded-xl px-2.5 py-2', TONE.neutral.soft)}>
                 <dt className="text-[11px] text-muted-foreground">ได้คุยเรื่องของเรา</dt>
                 <dd className="font-medium tabular-nums text-foreground">
-                  {microRates.talkRate == null ? '—' : `${microRates.talkRate.toFixed(0)}%`}
+                  {`${(microRates.talkRate ?? 0).toFixed(0)}%`}
                   <span className="ml-1 text-[10.5px] font-normal text-muted-foreground">
                     {monthMicro.talked}/{monthMicro.withResult} สาย
                   </span>

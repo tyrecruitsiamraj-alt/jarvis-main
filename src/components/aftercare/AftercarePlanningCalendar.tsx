@@ -131,11 +131,8 @@ const AftercarePlanningCalendar: React.FC<{
         ) : null}
       </div>
 
-      {rows.length === 0 ? (
-        <p className={cn('rounded-xl border px-3 py-4 text-center text-xs text-muted-foreground', TONE.neutral.soft)}>
-          เดือนนี้ไม่มีใครถึงกำหนดโทรเลย
-        </p>
-      ) : (
+      {/* 🔴 เดือนที่ไม่มีใครถึงกำหนด = หัวตาราง (วันทั้งเดือน) ยังอยู่ + แถวเดียวบอกว่าไม่มี
+          (เจ้าของสั่ง 1 ต.ค. 2569 — เลื่อนเดือนแล้วการ์ดห้ามย่อ/ขยายเอง) */}
         <div ref={scrollRef} className="overflow-x-auto rounded-xl border border-border">
           <table className="min-w-full border-collapse text-xs">
             <thead>
@@ -165,6 +162,13 @@ const AftercarePlanningCalendar: React.FC<{
               </tr>
             </thead>
             <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={cols.length + 1} className="px-3 py-6 text-center text-xs text-muted-foreground">
+                    เดือนนี้ไม่มีใครถึงกำหนดโทร
+                  </td>
+                </tr>
+              ) : null}
               {rows.map((row) => (
                 <tr key={row.person.phone_e164} className="border-b border-border/50 last:border-0">
                   <td className="sticky left-0 z-10 max-w-[260px] bg-card px-3 py-1.5 align-middle">
@@ -250,7 +254,6 @@ const AftercarePlanningCalendar: React.FC<{
             </tbody>
           </table>
         </div>
-      )}
     </div>
   );
 };

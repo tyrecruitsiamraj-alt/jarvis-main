@@ -594,11 +594,15 @@ const SupervisorDashboard: React.FC = () => {
    * เลขกับรายการจึงเท่ากันทุกโหมด · ใบที่รู้ id เต็มกดเปิดได้ · อัตราที่ระบุใบไม่ได้
    * ขึ้นบอกบนหัวกล่อง ไม่หายเงียบ
    */
-  /** กราฟ ทั้งหมด/ฉุกเฉิน/ล่วงหน้า — null เมื่อยังไม่มี records (ไม่โชว์กราฟเปล่า) */
+  /**
+   * กราฟ ทั้งหมด/ฉุกเฉิน/ล่วงหน้า — null เฉพาะตอนข้อมูลยังไม่มา (ไม่โชว์กราฟเปล่าระหว่างโหลด)
+   * 🔴 ตัวกรองแล้วไม่เหลือใบ = กราฟยังอยู่เป็น 0 (เจ้าของสั่ง 1 ต.ค. 2569 — สลับตัวกรองแล้วหน้าห้ามย่อ/ขยายเอง ·
+   *    เดิมเช็ค `cohortScope.records` ที่กรองแล้ว ⇒ เลือก BU/คนที่ไม่มีใบ กราฟหายทั้งก้อน)
+   */
   const leadKindBreakdown = useMemo(() => {
-    if (DEMO_MODE || cohortScope.records.length === 0) return null;
+    if (DEMO_MODE || throughputRecords.length === 0) return null;
     return buildLeadKindBreakdown(cohortScope.records, cohortScope.from, cohortScope.to);
-  }, [cohortScope]);
+  }, [cohortScope, throughputRecords.length]);
 
   /** เทียบกราฟกับการ์ด「เข้ามา」ทุกครั้ง — ไม่ตรงเมื่อไหร่ให้หน้าจอบอกเอง */
   const leadKindMismatch = useMemo(() => {

@@ -81,38 +81,43 @@ const BuDonut: React.FC<{
   const total = useMemo(() => slices.reduce((s, x) => s + Math.max(0, x.value), 0), [slices]);
   const drawn = slices.filter((s) => s.value > 0);
   const faded = (key: string) => !!selected && key !== selected;
+  /**
+   * 🔴 ว่างก็ยังวาดวง (วงเทาเต็มวง · กลางวงเป็น 0) — เจ้าของสั่ง 1 ต.ค. 2569: *"ถ้าไม่มีข้อมูลก็เป็น 0 ไป"* ·
+   * ของเดิมสลับเป็นย่อหน้าสั้นกว่าวง ⇒ สลับแท็บ/ช่วงวันแล้วการ์ดเตี้ยลงเอง
+   */
+  const emptyRing = total <= 0;
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <p className="text-sm font-medium text-foreground">{title}</p>
-      {total <= 0 ? (
-        <p className={cn('py-10 text-center text-sm', DASH.muted)}>{empty}</p>
-      ) : (
-        <div className="relative h-48 w-full" role="img" aria-label={ariaLabel}>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={drawn as DonutSlice[]}
-                dataKey="value"
-                nameKey="label"
-                innerRadius="58%"
-                outerRadius="92%"
-                paddingAngle={drawn.length > 1 ? 1 : 0}
-                stroke="none"
-                isAnimationActive={false}
-              >
-                {drawn.map((s) => (
+      <div className="relative h-48 w-full" role="img" aria-label={emptyRing ? `${ariaLabel ?? title} · ${empty}` : ariaLabel}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={emptyRing ? [{ key: 'empty', label: empty, value: 1 }] : (drawn as DonutSlice[])}
+              dataKey="value"
+              nameKey="label"
+              innerRadius="58%"
+              outerRadius="92%"
+              paddingAngle={!emptyRing && drawn.length > 1 ? 1 : 0}
+              stroke="none"
+              isAnimationActive={false}
+            >
+              {emptyRing ? (
+                <Cell key="empty" fill="currentColor" className={TONE.neutral.value} fillOpacity={0.15} />
+              ) : (
+                drawn.map((s) => (
                   <Cell key={s.key} fill="currentColor" className={TONE[s.tone].value} fillOpacity={faded(s.key) ? 0.25 : 1} />
-                ))}
-              </Pie>
-              <Tooltip content={<Tip unit={unit} total={total} />} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-xl font-medium tabular-nums text-foreground">{NUM.format(total)}</span>
-            <span className={cn('text-xs', DASH.muted)}>{unit}</span>
-          </div>
+                ))
+              )}
+            </Pie>
+            {emptyRing ? null : <Tooltip content={<Tip unit={unit} total={total} />} />}
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-xl font-medium tabular-nums text-foreground">{NUM.format(total)}</span>
+          <span className={cn('text-xs', DASH.muted)}>{unit}</span>
         </div>
-      )}
+      </div>
       <ul className="space-y-1.5">
         {slices.map((s) => (
           <li

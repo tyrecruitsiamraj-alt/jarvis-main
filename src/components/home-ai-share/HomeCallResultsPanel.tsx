@@ -86,9 +86,9 @@ const HomeCallResultsPanel: React.FC<{
             </div>
           ) : failed && !table ? (
             <p className={cn('text-sm', TONE.danger.value)}>{failed}</p>
-          ) : table && table.total === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">ช่วงนี้ยังไม่มีผลโทร</p>
           ) : table ? (
+            /* 🔴 ไม่มีผลโทรในช่วงนี้ = แถวครบทุกผลเป็น 0 ไม่สลับไปเป็นข้อความ (เจ้าของสั่ง 1 ต.ค. 2569 —
+               สลับช่วงวัน/หัวข้อแล้วแผงห้ามย่อ/ขยายเอง "ถ้าไม่มีข้อมูลก็เป็น 0 ไป") */
             <>
               <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-foreground" aria-label="สีในแถบ">
                 {(['ai', 'staff'] as const).map((k) => (
@@ -110,11 +110,11 @@ const HomeCallResultsPanel: React.FC<{
                     <span className="flex h-2.5 flex-1 overflow-hidden rounded-full bg-muted" aria-hidden>
                       <span
                         className={cn('h-full bg-current', segmentFillClass('ai'))}
-                        style={{ width: `${(r.ai / table.total) * 100}%` }}
+                        style={{ width: `${table.total > 0 ? (r.ai / table.total) * 100 : 0}%` }}
                       />
                       <span
                         className={cn('h-full bg-current', segmentFillClass('staff'))}
-                        style={{ width: `${(r.staff / table.total) * 100}%` }}
+                        style={{ width: `${table.total > 0 ? (r.staff / table.total) * 100 : 0}%` }}
                       />
                     </span>
                     <span className="w-12 shrink-0 text-right text-sm tabular-nums text-foreground">{NUM.format(r.total)}</span>

@@ -82,7 +82,10 @@ describe('หน้าการติดตาม: ดูเฉพาะ + ง�
     expect(panel).toContain('<ChoiceDropdown');
     expect(panel).toContain('ariaLabel="ดูเฉพาะสายที่"');
     expect(panel).not.toContain('aria-label="ตัวกรองรอบ"');
-    expect(panel.match(/\{filtersSlot\}/g)?.length).toBe(2);
+    expect(panel.match(/\{filtersSlot\}/g)?.length).toBe(1);
+    // 🔴 ไม่หุบการ์ดตอนว่างแล้ว (เจ้าของสั่ง 1 ต.ค. 2569 "ถ้าไม่มีข้อมูลก็เป็น 0 ไป") — ห้ามกลับไปหุบ
+    expect(panel).not.toContain('const allEmpty');
+    expect(panel).not.toContain('ยังไม่มีสายในระบบ');
   });
 
   it('งานจบหรือยัง = ChoiceDropdown ที่ส่งเข้า filtersSlot · แถวชิปเดิมด้านล่างหายแล้ว', () => {

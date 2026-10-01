@@ -570,10 +570,19 @@ describe('แผน 20/20 — คำตอบต้องอยู่บนจ�
     expect(screen.queryByText(/ผลกลับช้าได้ถึงราว 2 ชั่วโมง/)).toBeNull();
   });
 
-  it('ยังไม่มีผลเดือนนี้ ⇒ ไม่วาดวงกลม (เดิมดูเหมือนโหลดค้าง)', () => {
+  /** 🔴 เจ้าของสั่ง 1 ต.ค. 2569: "ถ้าไม่มีข้อมูลก็เป็น 0 ไป" — การ์ดห้ามเปลี่ยนทรงตอนสลับแท็บ (แทนกติกา 12 ก.ย. ที่ซ่อนวงกลม) */
+  it('🔴 ยังไม่มีผลเดือนนี้ ⇒ วงกลมยังอยู่ ขึ้น 0% · ไม่มีกล่อง "ยังไม่มีผลเดือนนี้"', () => {
     renderCalendar([entry({ id: 'a', call_round: 1 })]);
-    expect(screen.getByText('ยังไม่มีผลเดือนนี้')).toBeTruthy();
-    expect(screen.queryByRole('img', { name: 'บอกว่าไป' })).toBeNull();
+    expect(screen.queryByText('ยังไม่มีผลเดือนนี้')).toBeNull();
+    expect(screen.getByRole('img', { name: 'บอกว่าไป' })).toBeTruthy();
+    expect(screen.getByText('0.0%')).toBeTruthy();
+  });
+
+  it('🔴 ไม่มีสายเลย ⇒ ตารางรายวันยังมีหัวคอลัมน์ + แถว "ไม่มีสายที่ต้องตาม" + แถบแบ่งหน้าเป็น 0', () => {
+    renderCalendar([]);
+    expect(screen.getByText('ผู้ที่ต้องติดตาม / ติดต่อ')).toBeTruthy();
+    expect(screen.getByText('ไม่มีสายที่ต้องตาม')).toBeTruthy();
+    expect(screen.getByText(/แสดง 0 ถึง 0 จากทั้งหมด/)).toBeTruthy();
   });
 
   it('มีผลแล้ว ⇒ วงกลมกลับมา', () => {

@@ -341,9 +341,8 @@ export function DailyCard({ rows, icon }: { rows: readonly DailyRow[]; icon: Luc
       }
     >
       {asTable ? (
-        withNames.length === 0 ? (
-          <EmptyNote>ยังไม่มีรายชื่อในเดือนนี้</EmptyNote>
-        ) : (
+        /* 🔴 เดือนที่ยังไม่มีรายชื่อ = หัวตารางยังอยู่ + แถวเดียวบอกว่าไม่มี (เจ้าของสั่ง 1 ต.ค. 2569 — สลับเดือนแล้วการ์ดห้ามเปลี่ยนทรง) */
+        (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className={cn('text-xs', DASH.tableHead)}>
@@ -356,6 +355,13 @@ export function DailyCard({ rows, icon }: { rows: readonly DailyRow[]; icon: Luc
                 </tr>
               </thead>
               <tbody>
+                {withNames.length === 0 ? (
+                  <tr className={cn('border-t', DASH.tableRow)}>
+                    <td colSpan={8} className={cn('px-2 py-4 text-center text-xs', DASH.sub)}>
+                      ยังไม่มีรายชื่อในเดือนนี้
+                    </td>
+                  </tr>
+                ) : null}
                 {withNames.map((r) => (
                   <tr key={r.ymd} className={cn('border-t', DASH.tableRow)}>
                     <td className={cn('px-2 py-2', DASH.cellStrong)}>{dayMonthText(r.ymd)}</td>
@@ -417,7 +423,7 @@ export function DailyCard({ rows, icon }: { rows: readonly DailyRow[]; icon: Luc
 /* ─────────── ช่องทาง · ตำแหน่ง ─────────── */
 
 export function ChannelTable({ rows, total }: { rows: readonly ChannelRow[]; total: ChannelRow }) {
-  if (rows.length === 0) return <EmptyNote>ยังไม่มีรายชื่อในเดือนนี้</EmptyNote>;
+  // 🔴 ไม่มีรายชื่อ = ตารางยังอยู่ (หัว + แถวรวม 0) ไม่สลับเป็นข้อความ (เจ้าของสั่ง 1 ต.ค. 2569)
   const max = Math.max(...rows.map((r) => r.names), 1);
   const head = ['ช่องทาง', 'รายชื่อ', 'โทรแล้ว', 'ตอบ AI ว่าสนใจ', 'ได้ใบสมัคร', 'อัตราสนใจ'];
   const cells = (r: ChannelRow) => [num(r.called), num(r.aiSaidYes), num(r.onBoard), pctText(r.interestRate)];
