@@ -219,59 +219,10 @@ const Donut: React.FC<{ percent: number | null; caption: string }> = ({ percent,
   );
 };
 
-/**
- * ═══ การ์ดวันแรก — โชว์เฉพาะตอน **ยังไม่มีข้อมูลสักแถวในระบบ** ═══
- *
- * 🔴 ผู้ทดสอบตาใหม่ (12 ก.ย. 2569) ให้หน้านี้ 62/100 · ความกังวลอันดับหนึ่งของเขาคือ
- * *"เพิ่มคนแล้วต้องกดอะไรต่อ ใครโทร"* — ของเดิมไม่มีที่ไหนบนจอตอบเลย
- *
- * ⚠️ เงื่อนไขคือ `rows.length === 0` (ทั้งระบบว่าง) **ไม่ใช่ "วันนี้ไม่มีสาย"** —
- * วันที่ไม่มีนัดเป็นเรื่องปกติ ขึ้นการ์ดสอนทุกวันว่างคือรบกวนคนที่ใช้เป็นแล้ว
+/*
+ * 🔴 การ์ด "เริ่มใช้งานหน้านี้" (การ์ดวันแรก 3 ขั้น · 12 ก.ย. 2569) ถอดออกแล้ว — เจ้าของสั่ง 1 ต.ค. 2569: *"เอาออกไปสิ"*
+ *    (โผล่ทุกครั้งที่แท็บยังไม่มีรายชื่อ เช่น แท็บติดตามส่งคนแทน) · ห้ามเอากลับโดยไม่ได้สั่งใหม่
  */
-const FirstDayCard: React.FC = () => (
-  <Card className={cn('rounded-2xl p-5 shadow-sm', TONE.primary.soft)}>
-    <h3 className="text-[14px] font-medium text-foreground">เริ่มใช้งานหน้านี้</h3>
-    <ol className="mt-3 space-y-2.5">
-      {[
-        {
-          n: '1',
-          title: 'ลงชื่อคนที่รับปากแล้ว + ตั้งวันเวลาที่จะโทร',
-          hint: 'กดปุ่ม “เพิ่มคนที่ต้องการติดตาม” มุมขวาบน',
-        },
-        {
-          n: '2',
-          title: 'จบแค่นั้น — AI โทรเองตามเวลา',
-          hint: 'ไม่ต้องกดสั่งโทร ไม่ต้องยืนยันอะไรอีก',
-        },
-        {
-          n: '3',
-          title: 'ผลขึ้นเองในตารางข้างล่าง',
-          hint: 'บางสายผลกลับช้าได้ถึงราว 2 ชั่วโมง — ยังไม่เห็นผลไม่ได้แปลว่าสายหาย',
-        },
-      ].map((step) => (
-        <li key={step.n} className="flex items-start gap-2.5">
-          <span
-            className={cn(
-              'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-medium',
-              TONE.primary.solid,
-            )}
-            aria-hidden
-          >
-            {step.n}
-          </span>
-          <span className="min-w-0">
-            <span className="block text-[13px] font-medium leading-snug text-foreground">
-              {step.title}
-            </span>
-            <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
-              {step.hint}
-            </span>
-          </span>
-        </li>
-      ))}
-    </ol>
-  </Card>
-);
 
 const FollowPlanningCalendar: React.FC<{
   /** ทุกแถว **ไม่กรองรอบ** — ตัวกรองรอบอยู่ใน `roundsSlot` ที่เดียวทั้งหน้า */
@@ -441,9 +392,6 @@ const FollowPlanningCalendar: React.FC<{
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2">{headerAction}</div>
       </div>
-
-      {/* ยังไม่มีข้อมูลสักแถว = วันแรกของการใช้งาน — บอกทางให้ครบสามขั้น */}
-      {rows.length === 0 ? <FirstDayCard /> : null}
 
       {/* ── 1. การ์ดตัวเลข 4 ใบ ── */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
