@@ -596,13 +596,15 @@ describe('แผน 20/20 — คำตอบต้องอยู่บนจ�
     expect(screen.getByText(/กดปุ่มโทรข้างชื่อ โทรเองได้เลย/)).toBeTruthy();
   });
 
-  it('ท้ายตารางบอกเวลาอัปเดต + ว่าหน้าดึงเอง + ว่าผลช้าได้', () => {
+  /** 🔴 เจ้าของสั่ง 1 ต.ค. 2569 (Choice "เอาออกทั้ง 2 จุด") — บรรทัดอัปเดตเหลือแค่เวลา */
+  it('🔴 ท้ายตารางเหลือแค่เวลาอัปเดต ไม่มีประโยคอธิบาย', () => {
     renderCalendar([entry({ id: 'a', call_round: 1 })], {
       lastLoadedAt: new Date('2026-09-07T09:05:00Z'),
     });
     const foot = screen.getByText(/อัปเดตล่าสุด/);
-    expect(foot.textContent).toContain('หน้าจะดึงผลใหม่ให้เอง');
-    expect(foot.textContent).toContain('2 ชั่วโมง');
+    expect(foot.textContent?.replace(/\s+/g, ' ').trim()).toBe('อัปเดตล่าสุด 16:05 น.');
+    expect(foot.textContent).not.toContain('รีเฟรช');
+    expect(foot.textContent).not.toContain('ชั่วโมง');
   });
 
   it('ไม่รู้เวลาอัปเดต ⇒ ไม่แต่งเวลาขึ้นเอง', () => {
@@ -620,6 +622,8 @@ describe('ช่องว่างที่เหลือจากรอบว�
     const row = dayRows()[0];
     expect(within(row).getByText('เลยเวลานัด')).toBeTruthy();
     expect(within(row).getByText(/ส่งให้ AI แล้ว ยังไม่มีผลกลับ/)).toBeTruthy();
+    // 🔴 1 ต.ค. 2569: ถอดท่อนผลกลับช้าออกแล้ว — เหลือแค่ข้อเท็จจริงว่าส่งแล้ว
+    expect(row.textContent).not.toContain('ชั่วโมง');
   });
 
   it('ไม่ได้ส่งให้ AI ⇒ ต้องไม่ขึ้นข้อความว่าส่งแล้ว', () => {

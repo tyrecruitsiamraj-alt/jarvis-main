@@ -786,7 +786,7 @@ const FollowPlanningCalendar: React.FC<{
                                            * ไม่งั้นคนใหม่ไม่รู้ว่าควรรอ หรือควรโทรเอง
                                            */
                                           <span className="text-[12px] text-muted-foreground">
-                                            ส่งให้ AI แล้ว ยังไม่มีผลกลับ · บางสายช้าได้ถึงราว 2 ชั่วโมง
+                                            ส่งให้ AI แล้ว ยังไม่มีผลกลับ
                                           </span>
                                         ) : (
                                           <span className="text-[12px] text-muted-foreground">—</span>
@@ -879,10 +879,9 @@ const FollowPlanningCalendar: React.FC<{
                       {dayPeople.length.toLocaleString('th-TH')} คน ·{' '}
                       {dayCalls.length.toLocaleString('th-TH')} สาย
                       {/**
-                       * 🔴 หน้ามี auto-reload ทุก 25 วิอยู่แล้ว **แต่ไม่เคยบอกคน**
-                       * ตาใหม่ (12 ก.ย. 2569) ถามว่า "มีข้อมูลแล้วจะโผล่ตรงไหน ต้องรีเฟรชไหม"
-                       * และผลจาก Lumos ช้าได้จริงถึง ~2 ชม. (วัด 11 ก.ย.) ต้องบอกไว้ตรงนี้
-                       * ไม่งั้นคนจะคิดว่าสายหาย
+                       * 🔴 เหลือแค่เวลาอัปเดต (เจ้าของสั่ง 1 ต.ค. 2569 · Choice "เอาออกทั้ง 2 จุด")
+                       * ประโยคอธิบายเรื่องหน้าดึงเอง/ผลกลับช้าถูกถอดทั้งคู่ — ห้ามเติมกลับ
+                       * (หน้ายัง auto-reload ทุก 25 วิเหมือนเดิม)
                        */}
                       {lastLoadedAt ? (
                         <span className="block text-[11px] text-muted-foreground">
@@ -894,7 +893,7 @@ const FollowPlanningCalendar: React.FC<{
                               minute: '2-digit',
                             })}
                           </span>{' '}
-                          น. · หน้าจะดึงผลใหม่ให้เอง ไม่ต้องกดรีเฟรช · บางสายผลกลับช้าได้ถึงราว 2 ชั่วโมง
+                          น.
                         </span>
                       ) : null}
                     </span>
