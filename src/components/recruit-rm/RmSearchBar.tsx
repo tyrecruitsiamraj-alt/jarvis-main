@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { UserPlus, BookmarkPlus, PhoneCall, Trash2, Archive, Bot } from 'lucide-react';
+import { UserPlus, BookmarkPlus, PhoneCall, Trash2, Archive, Bot, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import SearchField from '@/components/shared/SearchField';
@@ -35,6 +35,8 @@ const RmSearchBar: React.FC<{
   onSaveLead: () => void;
   onDeleteLead: () => void;
   onAddApplicant: () => void;
+  /** นำเข้าผู้สมัครจาก Excel (1 ต.ค. 2569) — ไม่ส่ง = ไม่มีปุ่ม */
+  onImportApplicants?: () => void;
   /**
    * "เก็บไปโทรเอง" ทีละหลายคน — **ปุ่มรวม** ของเดิมสองปุ่ม (เจ้าของเคาะ 22 ส.ค. 2569)
    * กดทีเดียว = จองใบ (claim) + ล็อกเบอร์กัน AI โทรทับ (call hold)
@@ -58,6 +60,7 @@ const RmSearchBar: React.FC<{
   onSaveLead,
   onDeleteLead,
   onAddApplicant,
+  onImportApplicants,
   onHoldSelected,
   holdingSelected = false,
   onSendAiSelected,
@@ -89,6 +92,12 @@ const RmSearchBar: React.FC<{
     <Button variant="secondary" size="xs" type="button" onClick={onAddApplicant} className="shrink-0">
       <UserPlus aria-hidden /> เพิ่มข้อมูลผู้สมัคร
     </Button>
+
+    {onImportApplicants ? (
+      <Button variant="secondary" size="xs" type="button" onClick={onImportApplicants} className="shrink-0">
+        <FileSpreadsheet aria-hidden /> นำเข้า Excel
+      </Button>
+    ) : null}
 
     {onHoldSelected ? (
       <Button size="xs"

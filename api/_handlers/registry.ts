@@ -42,6 +42,7 @@ import recruitReasonsHandler from './recruit-reasons.js';
 import recruitJobTitlesHandler from './recruit-job-titles.js';
 import recruitFunnelHandler from './recruit-funnel.js';
 import jobApplicationsHandler from './job-applications.js';
+import jobApplicationsImportHandler from './job-applications-import.js';
 import applicationContactsHandler from './application-contacts.js';
 import applicationAttendanceHandler from './application-attendance.js';
 import recruitRmOverviewHandler from './recruit-rm-overview.js';
@@ -215,6 +216,8 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/recruit/job-titles': recruitJobTitlesHandler as ApiHandler,
   '/api/recruit/funnel': recruitFunnelHandler as ApiHandler,
   '/api/job-applications': jobApplicationsHandler as ApiHandler,
+  // นำเข้าผู้สมัครจาก Excel (1 ต.ค. 2569) — ไฟล์ตัวอย่าง + ตัวอย่างก่อนบันทึก + บันทึก
+  '/api/job-applications-import': jobApplicationsImportHandler as ApiHandler,
   '/api/application-contacts': applicationContactsHandler as ApiHandler,
   '/api/application-attendance': applicationAttendanceHandler as ApiHandler,
   '/api/recruit-rm-overview': recruitRmOverviewHandler as ApiHandler,

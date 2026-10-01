@@ -12,6 +12,7 @@ import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import RmTable from '@/components/recruit-rm/RmTable';
 import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
+import ImportApplicantsDialog from '@/components/recruit-rm/ImportApplicantsDialog';
 import ApplicantContactDialog from '@/components/recruit-rm/ApplicantContactDialog';
 import {
   EMPTY_RM_FILTERS,
@@ -192,6 +193,8 @@ const RmWorkspace: React.FC<{
     writeFilterOpen(open);
   };
   const [addOpen, setAddOpen] = useState(false);
+  /** นำเข้าผู้สมัครจาก Excel (1 ต.ค. 2569) */
+  const [importOpen, setImportOpen] = useState(false);
   /** dialog รายละเอียด+บันทึกผลติดต่อ (ลิสต์ข้อ 7) — เปิดจากปุ่ม "ดูรายละเอียด"/"บันทึกผลนัดหมาย" */
   const [contactApp, setContactApp] = useState<PublicApplication | null>(null);
   const { user } = useAuth();
@@ -811,6 +814,7 @@ const RmWorkspace: React.FC<{
               leadBusy={leadBusy}
               leadView={leadView}
               onAddApplicant={() => setAddOpen(true)}
+              onImportApplicants={() => setImportOpen(true)}
               onHoldSelected={() => void keepSelectedForSelf()}
               holdingSelected={holdingSelected}
               onSendAiSelected={() => askSendAi(selectedIds)}
@@ -1165,6 +1169,15 @@ const RmWorkspace: React.FC<{
         onSaved={() => {
           say('บันทึกผู้สมัครแล้ว');
           load(); // ใบใหม่ต้องโผล่ในตารางทันที ไม่ต้องให้กดรีเฟรชเอง
+        }}
+      />
+
+      <ImportApplicantsDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onSaved={(inserted) => {
+          say(`นำเข้าผู้สมัครแล้ว ${inserted} คน`);
+          load();
         }}
       />
 

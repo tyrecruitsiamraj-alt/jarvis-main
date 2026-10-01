@@ -16,6 +16,8 @@ const required = [
   '/api/matching/suggestions',
   '/api/matching/parse-branch-demand-job',
   '/api/recruit-registrations',
+  // นำเข้าผู้สมัครจาก Excel (1 ต.ค. 2569)
+  '/api/job-applications-import',
   // ผลคัดกรองผู้สมัคร (เกณฑ์เรียงผู้สมัครใช้)
   '/api/matching/candidate-screening',
   // "รับไปโทรเอง" — ล็อกสิทธิ์โทร กันเจ้าหน้าที่โทรชนกัน
