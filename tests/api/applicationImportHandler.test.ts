@@ -1,13 +1,13 @@
 // @vitest-environment node
 /**
  * เส้น `/api/job-applications-import` (1 ต.ค. 2569)
- * 🔴 ด่าน: ไฟล์ตัวอย่างอ่านกลับได้หัวเดิม · dry run ไม่เขียนอะไร · เบอร์ที่มีในระบบโชว์ว่าข้าม ·
- *    บันทึกในธุรกรรมเดียว + savepoint ต่อแถว (ชนเบอร์ซ้ำตอนแข่ง = ข้ามแถวนั้น ที่เหลือบันทึก) ·
+ * 🔴 ด่าน: ไฟล์ตัวอย่างอ่านกลับได้หัวเดิม · dry run ไม่เขียนอะไร · เบอร์ที่สมัครภายใน 14 วันโชว์ว่าข้าม + วันที่ได้ ·
+ *    บันทึกในธุรกรรมเดียว ล็อกเบอร์ทีละแถวเรียงตามเบอร์ (มีคนสมัครเข้ามาระหว่างดูตัวอย่าง = ข้ามแถวนั้น ที่เหลือบันทึก) ·
  *    ผู้ใช้ที่ถูกล็อก BU นำเข้าไม่ได้ · ขาดคอลัมน์ที่ต้องมี = 400 บอกชื่อคอลัมน์ · AI ไม่ถูกเรียก
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as XLSX from 'xlsx';
-import { PHONE_ONCE_INDEX } from '../../src/lib/applicationPhoneOnce.js';
+import { repeatImportReason } from '../../src/lib/applicationRepeat.js';
 
 const dbQuery = vi.fn();
 const txQuery = vi.fn();
@@ -51,6 +51,7 @@ function xlsxBase64(rows: unknown[][]): string {
 }
 const H = importTemplateHeaders();
 const person = (first: string, phone: string | number) => [first, 'ใจดี', phone, 33, 'ชาย', '', '', '', '', '', '', ''];
+const LAST = new Date('2026-09-25T02:00:00Z'); // 25 ก.ย. 2569 ไทย → นำเข้าได้ 9 ต.ค.
 
 beforeEach(() => {
   process.env.AUTH_JWT_SECRET = 'test-secret-key-at-least-32-characters-long';
@@ -76,46 +77,61 @@ describe('GET — ไฟล์ตัวอย่าง', () => {
 });
 
 describe('POST — ตัวอย่างก่อนบันทึก / บันทึก', () => {
-  it('🔴 dry run: ไม่เขียนอะไร · เบอร์ที่มีในระบบแล้ว = ข้าม · เบอร์ที่ Excel ตัด 0 ถูกเติมคืน', async () => {
-    dbQuery.mockImplementation((sql: string) =>
-      /select distinct phone_e164/i.test(sql) ? Promise.resolve({ rows: [{ phone_e164: '+66822222222' }] }) : Promise.resolve({ rows: [] }),
+  it('🔴 dry run: ไม่เขียนอะไร · เบอร์ที่สมัครภายใน 14 วัน = ข้าม + บอกวันที่ได้ · เบอร์ที่ Excel ตัด 0 ถูกเติมคืน', async () => {
+    dbQuery.mockImplementation((sql: string, params?: unknown[]) =>
+      /max\(created_at\) as last_at[\s\S]*group by phone_e164/i.test(sql)
+        ? Promise.resolve({ rows: [{ phone_e164: '+66822222222', last_at: LAST, params }] })
+        : Promise.resolve({ rows: [] }),
     );
     const file = xlsxBase64([H, person('สมชาย', 812345678), person('สมหญิง', '0822222222')]);
     const { res, json } = mockRes();
     await handler(req('POST', { file_base64: file, dry_run: true }) as never, res as never);
+    expect(repeatImportReason(LAST)).toBe('สมัครเข้ามาแล้วภายใน 14 วัน (ได้ตั้งแต่ 9/10/2569)');
     expect(json.mock.calls[0][0]).toEqual({
       dryRun: true,
       rows: [
         { row: 2, name: 'สมชาย ใจดี', phone: '0812345678', ok: true, reason: null },
-        { row: 3, name: 'สมหญิง ใจดี', phone: '0822222222', ok: false, reason: 'เบอร์นี้มีในระบบแล้ว' },
+        { row: 3, name: 'สมหญิง ใจดี', phone: '0822222222', ok: false, reason: repeatImportReason(LAST) },
       ],
       ready: 1,
       skipped: 1,
     });
+    const check = dbQuery.mock.calls.find((c) => /group by phone_e164/i.test(String(c[0])));
+    expect(String(check?.[0])).toMatch(/at time zone 'Asia\/Bangkok'\)::date - 13\)/);
+    expect(check?.[1]).toEqual([['0812345678', '0822222222']]);
     expect(txQuery).not.toHaveBeenCalled();
     expect(dbQuery.mock.calls.some((c) => /^\s*(insert|update|delete)/i.test(String(c[0])))).toBe(false);
     expect(audit).not.toHaveBeenCalled();
   });
 
-  it('🔴 บันทึก: savepoint ต่อแถว · ชนเบอร์ซ้ำตอนแข่ง = ข้ามแถวนั้น ที่เหลือบันทึก · จด log จำนวน', async () => {
+  it('🔴 บันทึก: ล็อกเบอร์ทีละแถวเรียงตามเบอร์ · มีคนสมัครเข้ามาระหว่างดูตัวอย่าง = ข้ามแถวนั้น ที่เหลือบันทึก · จด log จำนวน', async () => {
     let n = 0;
-    txQuery.mockImplementation((sql: string) => {
+    txQuery.mockImplementation((sql: string, params?: unknown[]) => {
+      if (/pg_advisory_xact_lock/.test(sql)) return Promise.resolve({ rows: [] });
+      if (/where phone_e164 = jarvis_phone_e164_thai\(\$1\)/.test(sql)) {
+        return Promise.resolve({ rows: [{ last_at: (params as unknown[])[0] === '0822222222' ? LAST : null }] });
+      }
       if (/^insert into/i.test(sql)) {
         n += 1;
-        if (n === 2) return Promise.reject(Object.assign(new Error('dup'), { code: '23505', constraint: PHONE_ONCE_INDEX }));
         return Promise.resolve({ rows: [{ id: `new-${n}` }] });
       }
       return Promise.resolve({ rows: [] });
     });
-    const file = xlsxBase64([H, person('ก', '0811111111'), person('ข', '0822222222'), person('ค', '0833333333')]);
+    // ลำดับในไฟล์ ค → ข → ก แต่ล็อกต้องเรียงเบอร์ (คนนำเข้าพร้อมกันสองไฟล์ไม่ deadlock)
+    const file = xlsxBase64([H, person('ค', '0833333333'), person('ข', '0822222222'), person('ก', '0811111111')]);
     const { res, json } = mockRes();
     await handler(req('POST', { file_base64: file, dry_run: false, responsible_name: 'เจ้าหน้าที่ ก' }) as never, res as never);
     const body = json.mock.calls[0][0];
     expect(body.inserted).toBe(2);
-    expect(body.rows.map((r: { ok: boolean; reason: string | null }) => r.reason)).toEqual([null, 'เบอร์นี้มีในระบบแล้ว', null]);
-    const sqls = txQuery.mock.calls.map((c) => String(c[0]));
-    expect(sqls.filter((s) => s === 'savepoint import_row')).toHaveLength(3);
-    expect(sqls.filter((s) => s === 'rollback to savepoint import_row')).toHaveLength(1);
+    expect(body.rows.map((r: { row: number; reason: string | null }) => [r.row, r.reason])).toEqual([
+      [2, null],
+      [3, repeatImportReason(LAST)],
+      [4, null],
+    ]);
+    const locks = txQuery.mock.calls
+      .filter((c) => /pg_advisory_xact_lock/.test(String(c[0])))
+      .map((c) => String((c[1] as unknown[])[0]));
+    expect(locks).toEqual(['apply-phone:+66811111111', 'apply-phone:+66822222222', 'apply-phone:+66833333333']);
     const insert = txQuery.mock.calls.find((c) => /^insert into/i.test(String(c[0])));
     expect(String(insert?.[0])).toMatch(/values \(\$1,.*'new',\$18,\$19,\$20\) returning id/);
     expect((insert?.[1] as unknown[])[12]).toBe('เจ้าหน้าที่ ก');

@@ -32,7 +32,7 @@ const preview = {
   dryRun: true,
   rows: [
     { row: 2, name: 'สมชาย ใจดี', phone: '0812345678', ok: true, reason: null },
-    { row: 3, name: 'สมหญิง ใจดี', phone: '0822222222', ok: false, reason: 'เบอร์นี้มีในระบบแล้ว' },
+    { row: 3, name: 'สมหญิง ใจดี', phone: '0822222222', ok: false, reason: 'สมัครเข้ามาแล้วภายใน 14 วัน (ได้ตั้งแต่ 9/10/2569)' },
   ],
   ready: 1,
   skipped: 1,
@@ -64,7 +64,7 @@ describe('ImportApplicantsDialog', () => {
     const input = screen.getByLabelText('ไฟล์ Excel') as HTMLInputElement;
     fireEvent.change(input, { target: { files: [new File(['x'], 'list.xlsx')] } });
 
-    expect(await screen.findByText('เบอร์นี้มีในระบบแล้ว')).toBeTruthy();
+    expect(await screen.findByText('สมัครเข้ามาแล้วภายใน 14 วัน (ได้ตั้งแต่ 9/10/2569)')).toBeTruthy();
     expect(runApplicationImport.mock.calls[0][0]).toMatchObject({ fileBase64: 'BASE64', dryRun: true, responsibleName: null });
     const save = screen.getByRole('button', { name: /นำเข้า 1 คน/ });
     fireEvent.click(save);

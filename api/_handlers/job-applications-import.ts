@@ -6,8 +6,8 @@
  *      dry_run = ตัวอย่างก่อนบันทึก (ไม่เขียนอะไร) · ไม่ใช่ dry_run = บันทึกแถวที่ผ่าน
  *
  * 🔴 กติกาต่อแถว = ปุ่ม "เพิ่มข้อมูลผู้สมัคร" ทุกตัวอักษร (`parseStaffApplication` + insert ชุดเดียวกัน)
- * 🔴 เบอร์ที่มีในระบบแล้วข้าม (กติกาเบอร์เดียว 132) — ตรวจก่อนเพื่อโชว์ในตัวอย่าง + **DB ตัดสินอีกชั้น**
- *    ตอนบันทึก (savepoint ต่อแถว: ชน unique = ข้ามแถวนั้น ที่เหลือบันทึกต่อ · error อื่น = ไม่บันทึกทั้งไฟล์)
+ * 🔴 เบอร์ที่สมัครเข้ามาภายใน 14 วันข้าม (กติกาสมัครซ้ำ) — ตรวจก่อนเพื่อโชว์ในตัวอย่าง + **ตัดสินอีกชั้นตอนบันทึก**
+ *    ในธุรกรรมเดียว ล็อกเบอร์ทีละแถว (เรียงเบอร์ กัน deadlock) · ติดกติกา = ข้ามแถวนั้น · error อื่น = ไม่บันทึกทั้งไฟล์
  * 🔴 นำเข้าแล้ว **AI ยังไม่โทร** — ส่งเองจากแท็บผู้สมัคร (ปุ่มที่ยิงสายต้องมีป๊อปยืนยันรายชื่อ)
  * ⚠️ ใบที่นำเข้าไม่ผูกใบขอ (เหมือนปุ่มเพิ่มข้อมูลผู้สมัครในแท็บผู้สมัคร) ⇒ ผู้ใช้ที่ถูกล็อก BU นำเข้าไม่ได้
  *    (คีย์แล้วจะมองไม่เห็นใบของตัวเอง — กติกาเดียวกับ createByStaff)
@@ -29,7 +29,7 @@ import {
   importTemplateHeaders,
   importValuesSheet,
   mapImportHeader,
-  markExistingPhones,
+  markBlockedPhones,
   planImportRows,
   toPreviewRows,
   type ImportRowPlan,
@@ -39,7 +39,8 @@ import {
   STAFF_INSERT_VALUES,
   staffInsertParams,
 } from '../../src/lib/staffApplicationInput.js';
-import { PHONE_ONCE_IMPORT_REASON, isPhoneOnceViolation } from '../../src/lib/applicationPhoneOnce.js';
+import { repeatImportReason } from '../../src/lib/applicationRepeat.js';
+import { lockAndFindRepeat, recentPhoneApplications } from '../_lib/applicationRepeatGuard.js';
 
 const tbl = tableInAppSchema('public_job_applications');
 /** ~1.5 MB ไฟล์จริง — รายชื่อ 500 แถวใช้ไม่ถึง 100 KB */
@@ -120,15 +121,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
     };
     let plans: ImportRowPlan[] = planImportRows(data, index, shared);
 
-    // เบอร์ที่มีในระบบแล้ว (ทุกใบ รวมใบซ้ำเก่า) — โชว์ในตัวอย่างว่าจะข้าม
-    const keys = [...new Set(plans.flatMap((p) => (p.ok ? [toE164Thai(p.value.phone)] : [])).filter(Boolean))];
-    if (keys.length > 0) {
-      const { rows: hit } = await dbQuery<{ phone_e164: string }>(
-        `select distinct phone_e164 from ${tbl} where phone_e164 = any($1::text[])`,
-        [keys],
-      );
-      plans = markExistingPhones(plans, new Set(hit.map((r) => r.phone_e164)), toE164Thai, PHONE_ONCE_IMPORT_REASON);
-    }
+    // เบอร์ที่สมัครเข้ามาภายใน 14 วัน — โชว์ในตัวอย่างว่าจะข้าม พร้อมวันที่นำเข้าได้
+    const phones = [...new Set(plans.flatMap((p) => ('value' in p ? [p.value.phone] : [])))];
+    const recent = await recentPhoneApplications((sql, params) => dbQuery(sql, params), phones);
+    const blocked = new Map([...recent].map(([key, lastAt]) => [key, repeatImportReason(lastAt)]));
+    plans = markBlockedPhones(plans, blocked, toE164Thai);
 
     if (dryRun) {
       const preview = toPreviewRows(plans);
@@ -140,30 +137,28 @@ async function handler(req: AuthedReq, res: ApiRes) {
       });
     }
 
-    // บันทึก — ทั้งไฟล์ในธุรกรรมเดียว · savepoint ต่อแถว: ชนเบอร์ซ้ำ (แข่งกันกับคนอื่น) = ข้ามแถวนั้น
+    // บันทึก — ทั้งไฟล์ในธุรกรรมเดียว · ล็อกเบอร์ทีละแถว **เรียงตามเบอร์** (คนนำเข้าพร้อมกันสองไฟล์ไม่ deadlock)
+    // แล้วเช็คกติกาสมัครซ้ำอีกรอบ (มีคนสมัครเข้ามาระหว่างดูตัวอย่าง = ข้ามแถวนั้น)
     const staffName = req.user.email || null;
     const insertedIds: string[] = [];
     plans = await dbTransaction(async (client) => {
-      const out: ImportRowPlan[] = [];
-      for (const p of plans) {
-        if (!p.ok) {
-          out.push(p);
+      const out = [...plans];
+      const order = out
+        .map((p, i) => ({ p, i }))
+        .filter((x) => 'value' in x.p)
+        .sort((a, b) => ('value' in a.p && 'value' in b.p ? a.p.value.phone.localeCompare(b.p.value.phone) : 0));
+      for (const { p, i } of order) {
+        if (!('value' in p)) continue;
+        const hit = await lockAndFindRepeat(client, { phone: p.value.phone });
+        if (hit) {
+          out[i] = { row: p.row, ok: false, reason: repeatImportReason(hit.lastAt), name: p.value.full_name, phone: p.value.phone };
           continue;
         }
-        await client.query('savepoint import_row');
-        try {
-          const { rows: ins } = await client.query<{ id: string }>(
-            `insert into ${tbl} (${STAFF_INSERT_COLUMNS}) values (${STAFF_INSERT_VALUES}) returning id`,
-            staffInsertParams(p.value, staffName),
-          );
-          await client.query('release savepoint import_row');
-          if (ins[0]?.id) insertedIds.push(ins[0].id);
-          out.push(p);
-        } catch (e) {
-          await client.query('rollback to savepoint import_row');
-          if (!isPhoneOnceViolation(e)) throw e;
-          out.push({ row: p.row, ok: false, reason: PHONE_ONCE_IMPORT_REASON, name: p.value.full_name, phone: p.value.phone });
-        }
+        const { rows: ins } = await client.query<{ id: string }>(
+          `insert into ${tbl} (${STAFF_INSERT_COLUMNS}) values (${STAFF_INSERT_VALUES}) returning id`,
+          staffInsertParams(p.value, staffName),
+        );
+        if (ins[0]?.id) insertedIds.push(ins[0].id);
       }
       return out;
     });

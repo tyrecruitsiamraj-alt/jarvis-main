@@ -6,7 +6,7 @@
  * - หัวคอลัมน์ไฟล์ตัวอย่าง = ช่องของฟอร์มเพิ่มผู้สมัคร (ต้องกรอกมี *) · อ่านหัวแบบทนช่องว่าง/ดอกจัน
  * - Excel ตัดเลข 0 หน้าเบอร์ทิ้ง (812345678) ต้องเติมคืน
  * - กติกาต่อแถว = ปุ่มเพิ่มผู้สมัคร (ข้อความเดิม) · ประเภทเจาะจง/ใบขับขี่นอกรายการ = บอกแถว ไม่ทิ้งเงียบ
- * - เบอร์ซ้ำในไฟล์ = แถวแรกได้ · เบอร์ที่มีในระบบแล้ว = ข้าม (กติกาเบอร์เดียว)
+ * - เบอร์ซ้ำในไฟล์ = แถวแรกได้ · เบอร์ที่สมัครเข้ามาภายใน 14 วัน = ข้าม + เหตุผลที่ API ส่งมา (กติกาสมัครซ้ำ)
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -14,7 +14,7 @@ import {
   importTemplateHeaders,
   importValuesSheet,
   mapImportHeader,
-  markExistingPhones,
+  markBlockedPhones,
   normalizeImportGender,
   normalizeImportPhone,
   planImportRows,
@@ -131,22 +131,21 @@ describe('แผนต่อแถว', () => {
     ]);
   });
 
-  it('🔴 เบอร์ซ้ำในไฟล์ ⇒ แถวแรกได้ แถวหลังข้าม · เบอร์ที่มีในระบบแล้ว ⇒ ข้าม', () => {
+  it('🔴 เบอร์ซ้ำในไฟล์ ⇒ แถวแรกได้ แถวหลังข้าม · เบอร์ที่สมัครภายใน 14 วัน ⇒ ข้ามด้วยเหตุผลที่ส่งมา', () => {
     const plans = planImportRows(
       [row(ok), row({ ...ok, first_name: 'สมหญิง' }), row({ ...ok, phone: '0822222222' })],
       index,
     );
     expect(plans.map((p) => ('reason' in p ? p.reason : 'ok'))).toEqual(['ok', 'เบอร์ซ้ำกับแถว 2 ในไฟล์', 'ok']);
-    const marked = markExistingPhones(
+    const marked = markBlockedPhones(
       plans,
-      new Set(['+66822222222']),
+      new Map([['+66822222222', 'สมัครเข้ามาแล้วภายใน 14 วัน (ได้ตั้งแต่ 9/10/2569)']]),
       (p) => `+66${p.slice(1)}`,
-      'เบอร์นี้มีในระบบแล้ว',
     );
     expect(toPreviewRows(marked)).toEqual([
       { row: 2, name: 'สมชาย ใจดี', phone: '0812345678', ok: true, reason: null },
       { row: 3, name: 'สมหญิง ใจดี', phone: '0812345678', ok: false, reason: 'เบอร์ซ้ำกับแถว 2 ในไฟล์' },
-      { row: 4, name: 'สมชาย ใจดี', phone: '0822222222', ok: false, reason: 'เบอร์นี้มีในระบบแล้ว' },
+      { row: 4, name: 'สมชาย ใจดี', phone: '0822222222', ok: false, reason: 'สมัครเข้ามาแล้วภายใน 14 วัน (ได้ตั้งแต่ 9/10/2569)' },
     ]);
   });
 });

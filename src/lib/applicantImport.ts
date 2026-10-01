@@ -2,7 +2,7 @@
  * ═══ นำเข้าผู้สมัครจาก Excel (เจ้าของสั่ง 1 ต.ค. 2569) ═══
  *
  * เจ้าของ (Choice): *"ทำ Excel ตัวอย่าง + อัปโหลด"* — ดาวน์โหลดไฟล์ตัวอย่าง (ช่องเดียวกับ "เพิ่มข้อมูลผู้สมัคร")
- * → กรอก → อัปโหลด → ดูตัวอย่างก่อนบันทึก · เบอร์ที่มีในระบบแล้วข้าม (กติกาเบอร์เดียว 132) ·
+ * → กรอก → อัปโหลด → ดูตัวอย่างก่อนบันทึก · เบอร์ที่สมัครเข้ามาภายใน 14 วันข้าม (กติกาสมัครซ้ำ) ·
  * นำเข้าแล้ว **AI ยังไม่โทร** (เลือกส่งเองจากแท็บผู้สมัคร — fail-safe ไปทางไม่ส่ง)
  *
  * ตรรกะล้วน (ไม่อ่านไฟล์/DB เอง) — API แปลงไฟล์เป็นแถวด้วย SheetJS แล้วส่งเข้ามาที่นี่
@@ -130,7 +130,7 @@ export type ImportShared = {
 /**
  * แถวข้อมูล (ไม่รวมหัว) → แผนต่อแถว · `row` = เลขแถวบน Excel (หัว = แถว 1)
  * แถวว่างทั้งแถวข้ามเงียบ ๆ (คนชอบเว้นบรรทัด) · เบอร์ซ้ำในไฟล์ = ใช้แถวแรก แถวหลังข้าม
- * ⚠️ ยังไม่รู้ว่าเบอร์มีในระบบแล้วไหม — API เช็คกับ DB ต่อเอง (`markExistingPhones`)
+ * ⚠️ ยังไม่รู้ว่าเบอร์สมัครเข้ามาภายใน 14 วันไหม — API เช็คกับ DB ต่อเอง (`markBlockedPhones`)
  */
 export function planImportRows(
   rows: ReadonlyArray<readonly unknown[]>,
@@ -182,19 +182,20 @@ export function planImportRows(
   return out;
 }
 
-/** แถวที่เบอร์มีในระบบแล้ว → ข้าม (กติกาเบอร์เดียว) · `toKey` = ตัวแปลงเบอร์เป็นคีย์เดียวกับ DB (E.164) */
-export function markExistingPhones(
+/**
+ * แถวที่เบอร์ติดกติกาสมัครซ้ำ (สมัครเข้ามาภายใน 14 วัน) → ข้าม พร้อมเหตุผลของเบอร์นั้น
+ * `blocked` = คีย์เบอร์แบบเดียวกับ DB (E.164) → เหตุผล · `toKey` = ตัวแปลงเบอร์เป็นคีย์นั้น
+ */
+export function markBlockedPhones(
   plans: ImportRowPlan[],
-  existingKeys: ReadonlySet<string>,
+  blocked: ReadonlyMap<string, string>,
   toKey: (phone: string) => string | null,
-  reason: string,
 ): ImportRowPlan[] {
   return plans.map((p) => {
     if (!('value' in p)) return p;
     const key = toKey(p.value.phone);
-    if (key && existingKeys.has(key)) {
-      return { row: p.row, ok: false, reason, name: p.value.full_name, phone: p.value.phone };
-    }
+    const reason = key ? blocked.get(key) : undefined;
+    if (reason) return { row: p.row, ok: false, reason, name: p.value.full_name, phone: p.value.phone };
     return p;
   });
 }

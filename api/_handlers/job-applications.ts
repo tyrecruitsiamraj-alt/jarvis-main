@@ -1,4 +1,4 @@
-import { dbQuery } from '../_lib/postgres.js';
+import { dbQuery, dbTransaction } from '../_lib/postgres.js';
 import {
   withRbac,
   sendError,
@@ -33,7 +33,8 @@ import {
   parseStaffApplication,
   staffInsertParams,
 } from '../../src/lib/staffApplicationInput.js';
-import { PHONE_ONCE_STAFF_MESSAGE, isPhoneOnceViolation } from '../../src/lib/applicationPhoneOnce.js';
+import { repeatStaffMessage } from '../../src/lib/applicationRepeat.js';
+import { lockAndFindRepeat } from '../_lib/applicationRepeatGuard.js';
 import {
   PROFILE_KEYS,
   changedProfilePatch,
@@ -543,19 +544,27 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
   const staffName = req.user.email || null;
 
   let rows: Row[];
+  let repeat: Date | null = null;
   try {
-    ({ rows } = await dbQuery<Row>(
-      // 🔴 ต้องมี alias `a` — LIST_COLUMNS มีคอลัมน์ derived (origin) ที่อ้าง a.*
-      // เดิมไม่มี alias → POST ตาย 500 'missing FROM-clause entry for table a'
-      // ตั้งแต่เพิ่มคอลัมน์ origin 16 ส.ค. (บั๊กตระกูลเดียวกับที่เคยหลุดใน PATCH)
-      `insert into ${tbl} as a (${STAFF_INSERT_COLUMNS})
-     values (${STAFF_INSERT_VALUES})
-     returning ${LIST_COLUMNS}`,
-      staffInsertParams(v, staffName),
-    ));
+    // 🔴 สมัครซ้ำต้องรอ 14 วัน (เจ้าของสั่ง 1 ต.ค. 2569 · ทุกทางเข้า) — ล็อกเบอร์ + เช็คในธุรกรรมเดียวกับ insert
+    rows = await dbTransaction(async (client) => {
+      const hit = await lockAndFindRepeat(client, { phone: v.phone });
+      if (hit) {
+        repeat = hit.lastAt;
+        return [];
+      }
+      const { rows: inserted } = await client.query<Row>(
+        // 🔴 ต้องมี alias `a` — LIST_COLUMNS มีคอลัมน์ derived (origin) ที่อ้าง a.*
+        // เดิมไม่มี alias → POST ตาย 500 'missing FROM-clause entry for table a'
+        // ตั้งแต่เพิ่มคอลัมน์ origin 16 ส.ค. (บั๊กตระกูลเดียวกับที่เคยหลุดใน PATCH)
+        `insert into ${tbl} as a (${STAFF_INSERT_COLUMNS})
+       values (${STAFF_INSERT_VALUES})
+       returning ${LIST_COLUMNS}`,
+        staffInsertParams(v, staffName),
+      );
+      return inserted;
+    });
   } catch (e) {
-    // 🔴 เบอร์เดียวเข้าระบบได้ครั้งเดียว (132 · เจ้าของสั่ง 1 ต.ค. 2569) — DB เป็นคนตัดสิน
-    if (isPhoneOnceViolation(e)) return sendError(res, 409, 'Conflict', PHONE_ONCE_STAFF_MESSAGE);
     // ⚠️ ยังไม่รัน migration 074 → **ไม่บันทึกแบบทิ้งฟิลด์** เพราะเจ้าหน้าที่จะคิดว่า
     // เก็บ LINE ID/ใบขับขี่ไว้แล้วทั้งที่หาย · บอกตรง ๆ ว่าต้องรัน migration ก่อน
     if (isUndefinedColumn(e)) {
@@ -568,6 +577,7 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
     }
     throw e;
   }
+  if (repeat) return sendError(res, 409, 'Conflict', repeatStaffMessage(repeat));
   const row = rows[0];
   if (!row) return sendError(res, 500, 'Server error', 'บันทึกไม่สำเร็จ');
 
@@ -838,13 +848,14 @@ async function patchPhone(req: AuthedReq, res: ApiRes, id: string, rawPhone: str
     return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
   }
 
-  try {
-    await dbQuery(`update ${tbl} set phone = $2, updated_at = now() where id = $1`, [id, normalized]);
-  } catch (e) {
-    // 🔴 แก้เป็นเบอร์ที่มีใบอยู่แล้ว = ชนกติกาเบอร์เดียว (132) — บอกเจ้าหน้าที่ ไม่ตาย 500
-    if (isPhoneOnceViolation(e)) return sendError(res, 409, 'Conflict', PHONE_ONCE_STAFF_MESSAGE);
-    throw e;
-  }
+  // 🔴 แก้เป็นเบอร์ที่สมัครเข้ามาภายใน 14 วัน (ใบอื่น) = ติดกติกาสมัครซ้ำ — บอกเจ้าหน้าที่ ไม่บันทึก
+  const repeat = await dbTransaction(async (client) => {
+    const hit = await lockAndFindRepeat(client, { phone: normalized, excludeId: id });
+    if (hit) return hit.lastAt;
+    await client.query(`update ${tbl} set phone = $2, updated_at = now() where id = $1`, [id, normalized]);
+    return null;
+  });
+  if (repeat) return sendError(res, 409, 'Conflict', repeatStaffMessage(repeat));
 
   // เบอร์คือกุญแจจับคู่ผลโทร/ล็อกทั้งระบบ — ต้องมีร่องรอยว่าใครแก้จากอะไรเป็นอะไร
   await auditFromAuthed(req, {

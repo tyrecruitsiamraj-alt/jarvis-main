@@ -1,4 +1,4 @@
-import { dbQuery } from '../../_lib/postgres.js';
+import { dbTransaction } from '../../_lib/postgres.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { readJsonBody } from '../../_lib/body.js';
 import { tableInAppSchema } from '../../_lib/schema.js';
@@ -8,7 +8,8 @@ import { resolveApplicationDepartment } from '../../_lib/applicationDepartment.j
 import { enqueueLumosInterviewForApplications } from '../../_lib/lumosDispatch.js';
 import { logError } from '../../_lib/logger.js';
 import { auditFromAnonymous } from '../../_lib/audit.js';
-import { PHONE_ONCE_PUBLIC_MESSAGE, isPhoneOnceViolation } from '../../../src/lib/applicationPhoneOnce.js';
+import { applicantClientIp, lockAndFindRepeat } from '../../_lib/applicationRepeatGuard.js';
+import { repeatPublicMessage } from '../../../src/lib/applicationRepeat.js';
 
 /** คอลัมน์ที่ยังไม่ถูก migrate — pg ตอบ 42703 */
 function isUndefinedColumn(e: unknown): boolean {
@@ -19,20 +20,21 @@ const tbl = tableInAppSchema('public_job_applications');
 
 /**
  * จด log ของการกดส่งจากหน้าสมัคร — **IP + เบราว์เซอร์มาจากบริบทของ audit เอง** (เจ้าของ Choice 1 ต.ค. 2569:
- * "เก็บ Log พอไม่ต้องเอามาโชว์") · ไม่มีจอไหนอ่าน · ไม่ใช้บล็อก (เน็ตมือถือ/ออฟฟิศใช้ IP ร่วมกันหลายคน)
+ * "เก็บ Log พอไม่ต้องเอามาโชว์") · ไม่มีจอไหนอ่าน
  * ⚠️ ไม่จดชื่อ/เบอร์ลง log (มีอยู่ในใบแล้ว) · ล้มห้ามทำให้การส่งใบล้ม (createAuditEvent กลืน error เอง)
  */
 function logPublicApply(
   req: ApiReq,
-  action: 'public_application.submit' | 'public_application.duplicate_rejected',
+  action: 'public_application.submit' | 'public_application.repeat_rejected',
   entityId: string,
   v: { jobId: string | null; postingId: string | null },
+  extra: Record<string, unknown> = {},
 ): void {
   void auditFromAnonymous(req, { userName: 'หน้าสมัครงาน' }, {
     action,
     entityType: 'job_application',
     entityId,
-    after: { job_id: v.jobId, posting_id: v.postingId },
+    after: { job_id: v.jobId, posting_id: v.postingId, ...extra },
   }).catch(() => {});
 }
 
@@ -91,38 +93,45 @@ export default async function handler(req: ApiReq, res: ApiRes) {
          posting_id, link_id`;
     const placeholders = (n: number) => Array.from({ length: n }, (_, i) => `$${i + 1}`).join(', ');
 
-    // ⚠️ **เส้นนี้เป็นสาธารณะ — ห้ามพังเพราะ schema ยังไม่อัปเดต**
-    // ถ้า `department_code` (082) ยังไม่มีในฐานของ env นั้น ให้ถอยไป insert ชุดเดิม
-    // ใบสมัครของคนจริงต้องถูกบันทึกเสมอ · ที่เสียไปคือ "รู้แผนก" ซึ่งฝั่งอ่านถอยไป
-    // เทียบ job_id ได้อยู่แล้ว (ต่างจากฟอร์มที่เจ้าหน้าที่คีย์เอง ซึ่งจงใจคืน 503)
-    let rows: Array<{ id: string }>;
-    try {
-      try {
-        ({ rows } = await dbQuery<{ id: string }>(
-          `insert into ${tbl} (${BASE_COLS}, department_code)
-           values (${placeholders(VALUES.length + 1)}) returning id`,
-          [...VALUES, departmentCode],
-        ));
-      } catch (e) {
-        if (!isUndefinedColumn(e)) throw e;
-        ({ rows } = await dbQuery<{ id: string }>(
-          `insert into ${tbl} (${BASE_COLS}) values (${placeholders(VALUES.length)}) returning id`,
-          VALUES,
-        ));
+    /**
+     * 🔴 สมัครซ้ำต้องรอ 14 วัน (เจ้าของสั่ง 1 ต.ค. 2569) — เบอร์เดิม (ไม่ว่างานไหน) **หรือ** IP เดิม (Choice "IP ละ 1 ใบใน 14 วัน")
+     * ตัดสินในธุรกรรมเดียวกับ insert + ล็อกเบอร์/IP (`lockAndFindRepeat`) — กดส่งรัว ๆ ก็เข้าได้ใบเดียว
+     * ข้อความไม่บอกรายละเอียดใบเดิม (หน้าสาธารณะ ใครพิมพ์เบอร์ใครก็ได้) · บอกวันที่สมัครใหม่ได้
+     *
+     * ⚠️ **เส้นนี้เป็นสาธารณะ — ห้ามพังเพราะ schema ยังไม่อัปเดต**: ลองชุดเต็มก่อน แล้วถอยทีละชั้น
+     * (`client_ip` 132 · `department_code` 082) — ใบสมัครของคนจริงต้องถูกบันทึกเสมอ
+     * (ต่างจากฟอร์มที่เจ้าหน้าที่คีย์เอง ซึ่งจงใจคืน 503)
+     */
+    const ip = applicantClientIp(req);
+    const outcome = await dbTransaction(async (client) => {
+      const hit = await lockAndFindRepeat(client, { phone: v.phone, ip });
+      if (hit) return { hit };
+      const attempts: Array<{ cols: string; values: unknown[] }> = [
+        { cols: `${BASE_COLS}, department_code, client_ip`, values: [...VALUES, departmentCode, ip] },
+        { cols: `${BASE_COLS}, department_code`, values: [...VALUES, departmentCode] },
+        { cols: BASE_COLS, values: VALUES },
+      ];
+      for (const a of attempts) {
+        await client.query('savepoint apply_insert');
+        try {
+          const { rows } = await client.query<{ id: string }>(
+            `insert into ${tbl} (${a.cols}) values (${placeholders(a.values.length)}) returning id`,
+            a.values,
+          );
+          await client.query('release savepoint apply_insert');
+          return { id: rows[0]?.id ?? null };
+        } catch (e) {
+          await client.query('rollback to savepoint apply_insert');
+          if (!isUndefinedColumn(e)) throw e;
+        }
       }
-    } catch (e) {
-      /**
-       * 🔴 เบอร์เดียวเข้าระบบได้ครั้งเดียว (132 · เจ้าของสั่ง 1 ต.ค. 2569: "แจ้งเลยว่าเคยสมัครไปแล้ว
-       * ไม่เอาเบอร์ซ้ำเข้าระบบ" · ขอบเขต "เบอร์เดิม ไม่ว่างานไหน") — DB ตัดสิน ไม่ใช่เช็คก่อน insert
-       * ข้อความไม่บอกรายละเอียดใบเดิม (หน้าสาธารณะ ใครพิมพ์เบอร์ใครก็ได้)
-       */
-      if (isPhoneOnceViolation(e)) {
-        logPublicApply(req, 'public_application.duplicate_rejected', 'duplicate', v);
-        return sendError(res, 409, 'Conflict', PHONE_ONCE_PUBLIC_MESSAGE);
-      }
-      throw e;
+      return { id: null };
+    });
+    if ('hit' in outcome && outcome.hit) {
+      logPublicApply(req, 'public_application.repeat_rejected', 'repeat', v, { kind: outcome.hit.kind });
+      return sendError(res, 409, 'Conflict', repeatPublicMessage(outcome.hit.kind, outcome.hit.lastAt));
     }
-    const id = rows[0]?.id;
+    const id = 'id' in outcome ? outcome.id : null;
     if (!id) return sendError(res, 500, 'Failed to submit application');
     logPublicApply(req, 'public_application.submit', id, v);
 
