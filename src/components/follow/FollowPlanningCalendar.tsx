@@ -128,14 +128,18 @@ function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): st
   return `${name} · ${formatYmdDmyBe(ymd)}\n${detail}\n(กดเพื่อดูรายละเอียดและจัดการรอบนี้)`;
 }
 
-/** คำอธิบายสี — ชุดเดียวใช้ทั้งสองมุมมอง (คำของเจ้าของ ปรับให้ตรงแผงข้างบน 8 ก.ย. 2569) */
+/**
+ * คำอธิบายสี — ชุดเดียวใช้ทั้งสองมุมมอง (คำของเจ้าของ ปรับให้ตรงแผงข้างบน 8 ก.ย. 2569)
+ * 🔴 เหลือแค่จุดสี + คำตอบ (เจ้าของสั่ง 1 ต.ค. 2569: *"พวกอักษรที่เขียนว่า เขียว แดง ฯลฯ เอาออก เหลือแค่สีกับคำตอบก็พอ มันรก"*)
+ *    ห้ามเติมชื่อสี/วงเล็บอธิบายกลับ
+ */
 const DAY_LEGEND: ReadonlyArray<[keyof typeof TONE, string]> = [
-  ['success', 'เขียว = ตอบว่าไป'],
-  ['danger', 'แดง = ตอบว่าไม่ไป'],
-  ['warn', 'เหลือง = ยังไม่รู้ผล (ไม่ได้คำตอบ · เลยเวลานัด)'],
-  ['primary', 'น้ำเงิน = ยังไม่ถึงเวลา'],
-  ['orange', 'ส้ม = ไม่ได้ส่งให้ AI'],
-  ['neutral', 'เทา = ยกเลิก (ขีดฆ่า)'],
+  ['success', 'ตอบว่าไป'],
+  ['danger', 'ตอบว่าไม่ไป'],
+  ['warn', 'ยังไม่รู้ผล'],
+  ['primary', 'ยังไม่ถึงเวลา'],
+  ['orange', 'ไม่ได้ส่งให้ AI'],
+  ['neutral', 'ยกเลิก'],
 ];
 
 const NAV_BTN = cn(
@@ -556,7 +560,11 @@ const FollowPlanningCalendar: React.FC<{
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border/70 px-4 py-2 text-[11px] text-muted-foreground md:px-5">
+          <div
+            role="group"
+            aria-label="ความหมายของสี"
+            className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border/70 px-4 py-2 text-[11px] text-muted-foreground md:px-5"
+          >
             {DAY_LEGEND.map(([tone, label]) => (
               <span key={tone} className="flex items-center gap-1.5">
                 <span className={cn('h-2.5 w-2.5 shrink-0 rounded-sm', TONE[tone].dot)} aria-hidden />

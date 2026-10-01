@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import { Rule2 } from '@/components/shared/ui-v2/Sheet2';
 import { useUiV2 } from '@/lib/uiV2';
 import { GitBranch, HelpCircle, Phone, RefreshCw } from 'lucide-react';
@@ -130,6 +131,7 @@ export default function FollowCallRoundsPanel({
   round,
   onRoundChange,
   embedded = false,
+  filtersSlot,
 }: {
   /**
    * ปุ่มเสริมข้างไอคอนปฏิทิน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-5: ปุ่ม "เพิ่มเรื่อง" /
@@ -159,6 +161,11 @@ export default function FollowCallRoundsPanel({
    * (แพตเทิร์นเดียวกับ `embedded` ของ dialog ตามกติกา CLAUDE.md)
    */
   embedded?: boolean;
+  /**
+   * ตัวกรองเพิ่มที่วางข้าง "ดูเฉพาะ" บนหัวการ์ด (เจ้าของ 1 ต.ค. 2569: *"งานจบหรือยัง ทำเป็น Dropdown แล้วย้ายไปไว้
+   * กับตรง ดูเฉพาะ"*) — หน้าแม่เป็นเจ้าของ state ของมัน · ไม่ส่ง = ไม่มี
+   */
+  filtersSlot?: React.ReactNode;
 }) {
   /** โฉมใหม่อยู่ไหม — เปลี่ยนแค่คลาสสี/ระยะ โครง JSX และข้อมูลเส้นเดียวกันทั้งสองโฉม */
   const v2 = useUiV2();
@@ -294,6 +301,7 @@ export default function FollowCallRoundsPanel({
             <span className="w-full text-[11.5px] leading-snug text-muted-foreground sm:w-auto sm:flex-1">
               ยังไม่มีสายในระบบ — ตารางนี้จะกางเองเมื่อมีสายแรกเข้ามา
             </span>
+            {filtersSlot ? <div className="flex flex-wrap items-center gap-2">{filtersSlot}</div> : null}
           </div>
         </div>
       );
@@ -305,30 +313,20 @@ export default function FollowCallRoundsPanel({
           <GitBranch className={cn('h-5 w-5', TONE.primary.value)} aria-hidden />
           <h2 className="text-[17px] font-medium text-foreground">ขั้นตอนของสาย (Call Pipeline)</h2>
           <span className="flex-1" />
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="ตัวกรองรอบ">
-            <span className="text-[11px] text-muted-foreground">ดูเฉพาะ</span>
-            {(['all', 1, 2, 3] as FollowRoundFilter[]).map((r) => {
-              const rows = r === 'all' ? [...roundRows.values()].flat() : (roundRows.get(r) ?? []);
-              const active = r === activeRound;
-              return (
-                <button
-                  key={String(r)}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => pickRound(r)}
-                  title={`ตัวกรอง — แสดงเฉพาะ${roundLabelOf(r)} (ไม่ได้สั่งโทร)`}
-                  className={cn(
-                    'inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-[11px] font-medium transition-colors',
-                    active ? 'border-primary bg-primary text-primary-foreground' : TONE.neutral.outline,
-                  )}
-                >
-                  {roundLabelOf(r)}
-                  <span className={cn('tabular-nums', active ? 'opacity-90' : 'text-muted-foreground')}>
-                    {rows.length.toLocaleString('th-TH')}
-                  </span>
-                </button>
-              );
-            })}
+          {/* 🔴 "ดูเฉพาะ" + "งานจบหรือยัง" เป็น dropdown คู่กันบนหัวการ์ด (เจ้าของสั่ง 1 ต.ค. 2569) — เดิมเป็นแถวชิป */}
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="ตัวกรอง">
+            <span className="text-xs text-muted-foreground">ดูเฉพาะ</span>
+            <ChoiceDropdown
+              value={String(activeRound)}
+              options={(['all', 1, 2, 3] as FollowRoundFilter[]).map((r) => {
+                const rows = r === 'all' ? [...roundRows.values()].flat() : (roundRows.get(r) ?? []);
+                return { value: String(r), label: `${roundLabelOf(r)} · ${rows.length.toLocaleString('th-TH')}` };
+              })}
+              onChange={(v) => pickRound(v === 'all' ? 'all' : (Number(v) as 1 | 2 | 3))}
+              ariaLabel="ดูเฉพาะสายที่"
+              active={activeRound !== 'all'}
+            />
+            {filtersSlot}
           </div>
         </div>
 

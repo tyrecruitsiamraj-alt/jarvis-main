@@ -254,9 +254,22 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
   it('คำอธิบายสีเป็นชุดเดียวกับหน้ารายวัน — เขียวไป เหลืองยังไม่รู้ผล แดงไม่ไป', () => {
     renderCalendar(twoRounds());
     showMonthView();
-    expect(screen.getByText('เขียว = ตอบว่าไป')).toBeTruthy();
-    expect(screen.getByText(/เหลือง = ยังไม่รู้ผล/)).toBeTruthy();
-    expect(screen.getByText('แดง = ตอบว่าไม่ไป')).toBeTruthy();
+    const legend = within(screen.getByRole('group', { name: 'ความหมายของสี' }));
+    expect(legend.getByText('ตอบว่าไป')).toBeTruthy();
+    expect(legend.getByText('ยังไม่รู้ผล')).toBeTruthy();
+    expect(legend.getByText('ตอบว่าไม่ไป')).toBeTruthy();
+  });
+
+  /** 🔴 เจ้าของสั่ง 1 ต.ค. 2569: *"พวกอักษรที่เขียนว่า เขียว แดง ฯลฯ เอาออก เหลือแค่สีกับคำตอบก็พอ มันรก"* */
+  it('🔴 คำอธิบายสีเหลือแค่จุดสี + คำตอบ — ไม่มีชื่อสี ไม่มีวงเล็บ', () => {
+    renderCalendar(twoRounds());
+    showMonthView();
+    const legend = screen.getByRole('group', { name: 'ความหมายของสี' });
+    const text = legend.textContent ?? '';
+    for (const word of ['เขียว', 'แดง', 'เหลือง', 'น้ำเงิน', 'ส้ม', 'เทา', '=', '(']) {
+      expect(text).not.toContain(word);
+    }
+    expect(within(legend).getAllByText(/./).length).toBe(6);
   });
 });
 

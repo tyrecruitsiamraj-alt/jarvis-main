@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
@@ -56,7 +57,7 @@ import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
 import { buildBoardUnitOptions, mergeBoardUnitOptions, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
 import { groupFollowEntries } from '@/lib/followGrouping';
-import { REPLACEMENT_TOPIC, followScopeEntries } from '@/lib/followReplacement';
+import { followScopeEntries, followTeamForScope } from '@/lib/followReplacement';
 import {
   filterFollowEntries,
   countFollowTabs,
@@ -353,7 +354,7 @@ const FollowPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   /**
    * แท็บของหน้า — รายชื่อติดตาม (ค่าตั้งต้น) · **ติดตามส่งคนแทน** (`?view=replace` · เจ้าของสั่ง 1 ต.ค. 2569) · Dashboard
-   * 🔴 ส่งคนแทนคือรายการ Follow เดิมที่หัวข้อ `REPLACEMENT_TOPIC` (`lib/followReplacement`) — สองแท็บแรกแยกรายการกัน
+   * 🔴 สองแท็บแรก **เหมือนกันทุกอย่าง** (*"ทำงานเหมือนกันแค่คนละทีม"*) — แยกกองด้วยทีม `follow_team` (`lib/followReplacement`)
    */
   const viewParam = searchParams.get('view');
   const followView: 'list' | 'replace' | 'dashboard' =
@@ -365,8 +366,19 @@ const FollowPage: React.FC = () => {
     setSearchParams(params);
   };
   const replaceView = followView === 'replace';
-  /** หัวข้อที่บันทึกจริง — แท็บส่งคนแทนล็อกเป็น `REPLACEMENT_TOPIC` (ไม่ต้องเลือกเรื่อง) */
-  const effectiveTopic = replaceView ? REPLACEMENT_TOPIC : topic;
+  /** ทีมที่บันทึกตอนกดเพิ่มจากแท็บนี้ — รายชื่อติดตามไม่ส่งคีย์ (เหมือนเดิมทุกตัวอักษร) */
+  const followTeam = followTeamForScope(replaceView ? 'replacement' : 'main');
+  /**
+   * สลับแท็บรายชื่อติดตาม ↔ ติดตามส่งคนแทน = ตัวกรองกลับค่าเริ่มต้น (ทุกสาย · กำลังตาม)
+   * 🔴 กันตัวกรองค้างที่มองไม่เห็น — แท็บที่ยังไม่มีสายหุบหัวการ์ด "ดูเฉพาะ" ทิ้ง แต่ค่าที่เลือกไว้จากอีกแท็บยังกรองอยู่
+   *    (ตรวจในเบราว์เซอร์ 1 ต.ค. 2569: เลือกรอบโทรที่ 1 แล้วสลับแท็บ ⇒ ปฏิทินบอก "ไม่มีสายในรอบโทรที่ 1" ทั้งที่ไม่มีที่ให้กดคืน)
+   */
+  const [filterScope, setFilterScope] = useState(replaceView);
+  if (filterScope !== replaceView) {
+    setFilterScope(replaceView);
+    setActiveRound('all');
+    setTab('active');
+  }
   useEffect(() => {
     const prefill = readFollowPrefill(searchParams);
     if (!hasFollowPrefill(prefill)) return;
@@ -583,13 +595,13 @@ const FollowPage: React.FC = () => {
     () => ({
       firstName,
       phone,
-      topic: effectiveTopic,
+      topic,
       scheduleMode,
       scheduledAts,
       scheduleDays: daysInRange(dateFrom, dateTo).filter((d) => !skippedDays.has(d)),
       roundTimes,
     }),
-    [firstName, phone, effectiveTopic, scheduleMode, scheduledAts, dateFrom, dateTo, skippedDays, roundTimes],
+    [firstName, phone, topic, scheduleMode, scheduledAts, dateFrom, dateTo, skippedDays, roundTimes],
   );
 
   const stepError = followStepError(step, wizardValues);
@@ -685,7 +697,8 @@ const FollowPage: React.FC = () => {
             const createdEntry = await createFollowEntry({
               recipient_name: recipientName,
               recipient_phone: phone,
-              topic: effectiveTopic,
+              topic,
+              follow_team: followTeam,
               note: note || undefined,
               // เบอร์ของ **วันนั้น** — เจ้าของแผนคนละคนกันได้ในชุดเดียว (เปิดสวิตช์รายวัน)
               // ปิดอยู่ = เบอร์เดียวทั้งชุด
@@ -823,7 +836,8 @@ const FollowPage: React.FC = () => {
         const createdEntries = await createFollowRounds({
           recipient_name: recipientName,
           recipient_phone: phone,
-          topic: effectiveTopic,
+          topic,
+          follow_team: followTeam,
           note: note || undefined,
           staff_phone: phoneByIso.get(sendIso[0]) || undefined,
           scheduled_at: sendIso[0],
@@ -1154,6 +1168,21 @@ const FollowPage: React.FC = () => {
               onReload={() => void reload()}
               round={activeRound}
               onRoundChange={setActiveRound}
+              filtersSlot={
+                <>
+                  <span className="text-xs text-muted-foreground">งานจบหรือยัง</span>
+                  <ChoiceDropdown
+                    value={tab}
+                    options={FOLLOW_TABS.map((t) => ({
+                      value: t,
+                      label: `${FOLLOW_TAB_LABEL[t]} · ${tabCounts[t].toLocaleString('th-TH')}`,
+                    }))}
+                    onChange={(v) => setTab(v)}
+                    ariaLabel="งานจบหรือยัง"
+                    active={tab !== 'active'}
+                  />
+                </>
+              }
             />
           }
           headerAction={
@@ -1170,7 +1199,7 @@ const FollowPage: React.FC = () => {
                 }}
                 className="inline-flex h-8 items-center gap-1 px-3 text-[11px] touch-manipulation"
               >
-                <Plus aria-hidden /> {replaceView ? 'เพิ่มคนที่จะไปแทนงาน' : 'เพิ่มคนที่ต้องการติดตาม'}
+                <Plus aria-hidden /> เพิ่มคนที่ต้องการติดตาม
               </Button>
               {/* ═══ ตัวกรองทั้งหมดอยู่ในกล่องเดียว ข้าง ๆ ปุ่มเพิ่มคน (เจ้าของสั่ง 1 ก.ย. 2569) ═══
                   *"ย้ายทุกช่วงเวลาเข้าไปไว้กับเลือกวัน · แล้วย้ายเลือกวันไปไว้ข้าง ๆ เพิ่มคน"*
@@ -1268,37 +1297,7 @@ const FollowPage: React.FC = () => {
 
         {/* แท็บสถานะ + ปุ่ม Filter (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-6) — แยกหน้าตามสถานะ
             เพื่อดูง่าย · ปุ่ม Filter เช็คสถานะประจำวัน (วันที่/ช่วงเวลา/เจ้าของงาน) */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* ยอดชุดที่สาม = "งานจบหรือยัง" — ติดป้ายกำกับเหมือนอีกสองชุด
-              ทั้งสามชุดนับจากรายการก้อนเดียวกันแล้ว ต่างกันแค่คำถามที่ตอบ */}
-          <span className="text-xs text-foreground/70">งานจบหรือยัง ·</span>
-          <div className="flex flex-wrap items-center gap-1 rounded-full border border-border p-0.5 text-xs">
-            {FOLLOW_TABS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => {
-                  setTab(t);
-                }}
-                aria-pressed={tab === t}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-medium transition-colors',
-                  tab === t ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary',
-                )}
-              >
-                {FOLLOW_TAB_LABEL[t]}
-                <span
-                  className={cn(
-                    'tabular-nums',
-                    tab === t ? 'text-primary-foreground/80' : 'text-muted-foreground/70',
-                  )}
-                >
-                  {tabCounts[t].toLocaleString('th-TH')}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* แถวชิป "งานจบหรือยัง" ย้ายขึ้นไปเป็น dropdown ข้าง "ดูเฉพาะ" บนหัวการ์ดขั้นตอนของสาย (เจ้าของสั่ง 1 ต.ค. 2569) */}
 
         {okMessage ? (
           <p className={cn('rounded-xl border px-3.5 py-2.5 text-xs font-medium', TONE.success.soft, TONE.success.value)}>
@@ -1322,7 +1321,7 @@ const FollowPage: React.FC = () => {
         <Dialog open={formOpen} onOpenChange={(o) => (o ? undefined : setFormOpen(false))}>
           <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto p-0">
             <DialogHeader className="px-4 pt-4 sm:px-5">
-              <DialogTitle>{replaceView ? 'เพิ่มคนที่จะไปแทนงาน' : 'เพิ่มคนที่ต้องการติดตาม'}</DialogTitle>
+              <DialogTitle>เพิ่มคนที่ต้องการติดตาม</DialogTitle>
               <DialogDescription>ทำทีละขั้น — ใครก่อน แล้วหน่วยงาน แล้วค่อยตั้งวันเวลาที่จะโทร</DialogDescription>
             </DialogHeader>
           <form
@@ -1475,14 +1474,7 @@ const FollowPage: React.FC = () => {
             </div>
             {/* เรื่องที่จะให้โทรติดตาม (100 · เจ้าของสั่ง 18 ส.ค. 2569) — dropdown จากลิสต์กลาง
                 ที่ supervisor เพิ่มเองได้ · ยังพิมพ์เรื่องใหม่เองได้ถ้าไม่มีในลิสต์ */}
-            {replaceView ? (
-              /* แท็บส่งคนแทน = หัวข้อล็อก (ไม่ต้องเลือกเรื่อง) — บันทึกเป็น REPLACEMENT_TOPIC */
-              <p className="ml-1 text-xs text-muted-foreground">
-                เรื่อง · <span className="font-medium text-foreground">{REPLACEMENT_TOPIC}</span>
-              </p>
-            ) : (
-              <TopicField id="followTopic" value={topic} onChange={setTopic} reloadSignal={topicsRev} />
-            )}
+            <TopicField id="followTopic" value={topic} onChange={setTopic} reloadSignal={topicsRev} />
             </>
             ) : null}
 
@@ -2081,12 +2073,8 @@ const FollowPage: React.FC = () => {
         {!loading && scopeItems.length === 0 ? (
           <div className="glass-card rounded-2xl border border-white/70 p-8 text-center text-muted-foreground">
             <PhoneForwarded className="mx-auto mb-2 h-8 w-8 text-blue-400/60" aria-hidden />
-            <p className="text-sm font-medium text-foreground">
-              {replaceView ? 'ยังไม่มีคนที่ส่งไปแทนงาน' : 'ยังไม่มีรายชื่อที่ต้องติดตาม'}
-            </p>
-            <p className="mt-1 text-xs">
-              {replaceView ? 'กด “เพิ่มคนที่จะไปแทนงาน” เพื่อให้ AI โทรตามให้' : 'กด “เพิ่มคนที่ต้องการติดตาม” เพื่อให้ AI โทรตามให้'}
-            </p>
+            <p className="text-sm font-medium text-foreground">ยังไม่มีรายชื่อที่ต้องติดตาม</p>
+            <p className="mt-1 text-xs">กด “เพิ่มคนที่ต้องการติดตาม” เพื่อให้ AI โทรตามให้</p>
           </div>
         ) : null}
 

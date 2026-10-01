@@ -49,6 +49,11 @@ export type FollowEntry = {
    * ⚠️ บอกได้แค่ว่า **ส่งเบอร์ไปแล้ว** · Lumos ยังไม่ส่งกลับมาว่าโทรเบอร์นี้หรือยัง
    */
   emergency_phone?: string | null;
+  /**
+   * ทีมของรายการ (131 · 1 ต.ค. 2569) — null = ทีมติดตาม (แท็บรายชื่อติดตาม) · `'replacement'` = ทีมส่งคนแทน
+   * ฐานยังไม่รัน 131 = ไม่มีคีย์ ⇒ อ่านเป็นทีมติดตาม (ของเดิม)
+   */
+  follow_team?: 'replacement' | null;
   /** 🔴 เจ้าของข้อมูล = **คนที่กรอกครั้งแรก** ไม่เปลี่ยนแม้มีคนอื่นมาแก้ทีหลัง */
   created_by_name: string | null;
   created_at: string | null;
@@ -102,6 +107,8 @@ export type NewFollowEntry = {
   recipient_name: string;
   recipient_phone: string;
   topic: string;
+  /** ทีม (131) — ส่งเฉพาะเมื่อกดเพิ่มจากแท็บติดตามส่งคนแทน · ไม่ส่ง = ทีมติดตาม (ของเดิม) */
+  follow_team?: 'replacement';
   note?: string;
   staff_phone?: string;
   scheduled_at?: string;

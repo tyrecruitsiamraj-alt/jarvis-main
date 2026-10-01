@@ -1,26 +1,28 @@
 /**
- * แท็บ "ติดตามส่งคนแทน" (เจ้าของสั่ง 1 ต.ค. 2569) — 🔴 ด่าน: หัวข้อเดียวทั้งระบบ · สองแท็บแยกรายการกันไม่ทับ ไม่หาย
+ * แท็บ "ติดตามส่งคนแทน" (เจ้าของสั่ง 1 ต.ค. 2569: *"ทำงานเหมือนกันแค่คนละทีม · ต้องเหมือนกันนะ"*)
+ * 🔴 ด่าน: แยกกองด้วยทีม (follow_team) ไม่ใช่เรื่อง · สองแท็บไม่ทับ ไม่หาย · หน้าตา/ฟอร์มเหมือนกันทุกอย่าง ·
+ *    แท็บรายชื่อติดตามไม่ส่งคีย์ทีม (พฤติกรรมเดิม) · รอบที่เพิ่มในกล่องแก้ไขตามทีมเดิม
  */
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { REPLACEMENT_TOPIC, followScopeEntries, isReplacementFollow } from './followReplacement';
+import { FOLLOW_TEAM_REPLACEMENT, followScopeEntries, followTeamForScope, isReplacementFollow } from './followReplacement';
 
-describe('รายการส่งคนแทน = หัวข้อ ติดตามส่งคนแทน', () => {
-  it('หัวข้อตรงชื่อแท็บที่เจ้าของตั้ง · เว้นวรรคเกินไม่ทำให้หลุด · เรื่องอื่นไม่ใช่', () => {
-    expect(REPLACEMENT_TOPIC).toBe('ติดตามส่งคนแทน');
-    expect(isReplacementFollow({ topic: 'ติดตามส่งคนแทน' })).toBe(true);
-    expect(isReplacementFollow({ topic: '  ติดตามส่งคนแทน ' })).toBe(true);
-    expect(isReplacementFollow({ topic: 'ติดตามเริ่มงาน' })).toBe(false);
-    expect(isReplacementFollow({ topic: null })).toBe(false);
+describe('ทีมส่งคนแทน = follow_team replacement', () => {
+  it('ค่าตัวเดียว · ไม่มีคีย์/ค่าอื่น = ทีมติดตาม (ของเดิมทุกแถว)', () => {
+    expect(FOLLOW_TEAM_REPLACEMENT).toBe('replacement');
+    expect(isReplacementFollow({ follow_team: 'replacement' })).toBe(true);
+    expect(isReplacementFollow({ follow_team: null })).toBe(false);
+    expect(isReplacementFollow({})).toBe(false);
+    expect(isReplacementFollow({ follow_team: 'other' })).toBe(false);
   });
 
-  it('🔴 สองแท็บแยกกันพอดี: ไม่มีรายการไหนอยู่สองที่ และรวมกันได้ครบทุกรายการ', () => {
+  it('🔴 สองแท็บแยกกันพอดี: ไม่มีรายการไหนอยู่สองที่ และรวมกันได้ครบ · เรื่องไม่เกี่ยว', () => {
     const items = [
-      { id: 'a', topic: 'ติดตามเริ่มงาน' },
-      { id: 'b', topic: 'ติดตามส่งคนแทน' },
+      { id: 'a', topic: 'ติดตามเริ่มงาน', follow_team: null },
+      { id: 'b', topic: 'ติดตามเริ่มงาน', follow_team: 'replacement' as const },
       { id: 'c', topic: 'ติดตามเบิกเบี้ยเลี้ยง' },
-      { id: 'd', topic: 'ติดตามส่งคนแทน' },
+      { id: 'd', topic: 'ติดตามเบิกเบี้ยเลี้ยง', follow_team: 'replacement' as const },
     ];
     const main = followScopeEntries(items, 'main').map((x) => x.id);
     const repl = followScopeEntries(items, 'replacement').map((x) => x.id);
@@ -28,22 +30,67 @@ describe('รายการส่งคนแทน = หัวข้อ ติ
     expect(repl).toEqual(['b', 'd']);
     expect([...main, ...repl].sort()).toEqual(['a', 'b', 'c', 'd']);
   });
+
+  it('กดเพิ่มจากแท็บไหน = ทีมของแท็บนั้น · แท็บรายชื่อติดตามไม่ส่งคีย์', () => {
+    expect(followTeamForScope('replacement')).toBe('replacement');
+    expect(followTeamForScope('main')).toBeUndefined();
+  });
 });
 
-describe('หน้าการติดตามใช้ชุดตามแท็บ', () => {
-  const page = fs.readFileSync(path.resolve(__dirname, '../pages/follow/FollowPage.tsx'), 'utf8');
+describe('หน้าการติดตาม: สองแท็บเหมือนกันทุกอย่าง แค่คนละทีม', () => {
+  const read = (rel: string) => fs.readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
+  const page = read('pages/follow/FollowPage.tsx');
+  const edit = read('components/follow/FollowEditDialog.tsx');
+
   it('มีแท็บ ติดตามส่งคนแทน คั่นระหว่างรายชื่อติดตามกับ Dashboard', () => {
     const order = ['<TabsTrigger value="list">รายชื่อติดตาม</TabsTrigger>', '<TabsTrigger value="replace">ติดตามส่งคนแทน</TabsTrigger>', '<TabsTrigger value="dashboard">Dashboard</TabsTrigger>'].map((t) => page.indexOf(t));
     expect(order.every((i) => i > 0)).toBe(true);
     expect(order).toEqual([...order].sort((x, y) => x - y));
   });
-  it('🔴 จอทั้งหมดอ่านจากชุดของแท็บ · ตัวกันนัดซ้ำยังเทียบทั้งก้อน · แท็บส่งคนแทนล็อกหัวข้อ', () => {
+
+  it('🔴 ไม่มีป้าย/ฟอร์มเฉพาะแท็บ — ปุ่ม หัวป๊อป ช่องเรื่อง หน้าว่าง ชุดเดียวกัน (แท็บบอกแค่ "กองไหน" กับ "ทีมไหน")', () => {
+    for (const gone of ['เพิ่มคนที่จะไปแทนงาน', 'ยังไม่มีคนที่ส่งไปแทนงาน', 'REPLACEMENT_TOPIC', 'effectiveTopic']) {
+      expect(page, gone).not.toContain(gone);
+    }
+    expect(page.match(/replaceView \?/g)?.length).toBe(2);
+    expect(page).toContain("followTeamForScope(replaceView ? 'replacement' : 'main')");
+    expect(page).toContain('<TopicField id="followTopic" value={topic} onChange={setTopic} reloadSignal={topicsRev} />');
+  });
+
+  it('🔴 จออ่านจากชุดของแท็บ · ตัวกันนัดซ้ำเทียบทั้งก้อน · สร้างทุกทางส่งทีมของแท็บ · รอบเพิ่มทีหลังตามทีมเดิม', () => {
     expect(page).toContain("followScopeEntries(items, replaceView ? 'replacement' : 'main')");
     expect(page).toContain('filterFollowEntries(scopeItems,');
-    expect(page).toContain('countFollowTabs(scopeItems)');
     expect(page).toContain('entries={scopeItems}');
     expect(page).toContain('findScheduleDuplicates(phone, dayIsos, items)');
-    expect(page).toContain('const effectiveTopic = replaceView ? REPLACEMENT_TOPIC : topic;');
-    expect(page.match(/topic: effectiveTopic,/g)?.length).toBe(3);
+    expect(page.match(/follow_team: followTeam,/g)?.length).toBe(2);
+    expect(edit).toContain("follow_team: entry.follow_team === 'replacement' ? 'replacement' : undefined,");
+  });
+});
+
+/**
+ * 🔴 เจ้าของสั่ง 1 ต.ค. 2569: *"งานจบหรือยัง ทำเป็น Dropdown แล้วย้ายไปไว้ กับตรง ดูเฉพาะ แล้ว ดูเฉพาะก็ทำเป็น Dropdown"*
+ * ทั้งสองตัวอยู่บนหัวการ์ด "ขั้นตอนของสาย" คู่กัน · แถวชิปด้านล่างถอดแล้ว · ใช้ทั้งสองแท็บ (โค้ดชุดเดียว)
+ */
+describe('หน้าการติดตาม: ดูเฉพาะ + งานจบหรือยัง เป็น dropdown คู่กัน', () => {
+  const read = (rel: string) => fs.readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
+  const page = read('pages/follow/FollowPage.tsx');
+  const panel = read('components/follow/FollowCallRoundsPanel.tsx');
+
+  it('ดูเฉพาะ = ChoiceDropdown บนหัวการ์ด ไม่ใช่ชิปรอบ · วางตัวกรองของหน้าแม่ไว้ข้างกัน', () => {
+    expect(panel).toContain('<ChoiceDropdown');
+    expect(panel).toContain('ariaLabel="ดูเฉพาะสายที่"');
+    expect(panel).not.toContain('aria-label="ตัวกรองรอบ"');
+    expect(panel.match(/\{filtersSlot\}/g)?.length).toBe(2);
+  });
+
+  it('งานจบหรือยัง = ChoiceDropdown ที่ส่งเข้า filtersSlot · แถวชิปเดิมด้านล่างหายแล้ว', () => {
+    expect(page).toContain('filtersSlot={');
+    expect(page).toContain('ariaLabel="งานจบหรือยัง"');
+    expect(page).not.toContain('>งานจบหรือยัง ·<');
+    expect(page).not.toMatch(/FOLLOW_TABS\.map\(\(t\) => \(\s*<button/);
+  });
+
+  it('🔴 สลับแท็บทีม = ตัวกรองกลับค่าเริ่มต้น (กัน "ดูเฉพาะ" ค้างตอนแท็บว่างหุบหัวการ์ด)', () => {
+    expect(page).toMatch(/if \(filterScope !== replaceView\) \{\s*setFilterScope\(replaceView\);\s*setActiveRound\('all'\);\s*setTab\('active'\);/);
   });
 });

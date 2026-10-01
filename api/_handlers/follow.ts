@@ -7,6 +7,7 @@
  * DELETE /api/follow?id=<uuid>&purge=1 → **ลบทิ้งจริง** (admin เท่านั้น · ล้างข้อมูลทดสอบ)
  */
 import { dbQuery } from '../_lib/postgres.js';
+import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 
 /** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 092 (group_id/call_times) */
 function isUndefinedColumn(e: unknown): boolean {
@@ -122,6 +123,8 @@ type FollowRow = {
    * ยังไม่มีช่องบอกว่าโทรเบอร์ฉุกเฉินหรือยัง (ตรวจครบทุกช่อง 2 ก.ย. 2569)
    */
   emergency_phone: string | null;
+  /** ทีมของรายการ (131 · 1 ต.ค. 2569) — null = ทีมติดตาม · 'replacement' = ทีมส่งคนแทน · ฐานยังไม่รัน 131 = ไม่มีคีย์ */
+  follow_team?: string | null;
 };
 
 const iso = (v: string | Date | null): string | null =>
@@ -144,6 +147,8 @@ function toResponse(r: FollowRow) {
     call_round: r.call_round == null ? null : Number(r.call_round),
     /** ใครโทรรอบนี้ (121) — แถวเก่า/ฐานยังไม่รัน 121 = ai (พฤติกรรมเดิม) */
     call_mode: r.call_mode === 'manual' ? 'manual' : 'ai',
+    /** ทีมของรายการ (131) — แท็บ "ติดตามส่งคนแทน" อ่านช่องนี้ · ค่าอื่น/ไม่มี = ทีมติดตาม */
+    follow_team: r.follow_team === FOLLOW_TEAM_REPLACEMENT ? FOLLOW_TEAM_REPLACEMENT : null,
     /**
      * รอบเวลาของวันนั้น (092) — **ต้องส่งออกมาด้วย** (21 ก.ย. 2569)
      * ตาราง Planning รายเดือนต้องบอกให้ได้ว่า "วันนี้กี่รอบ รอบไหนกี่โมง"
@@ -295,6 +300,11 @@ export type ParsedFollowInput = {
    * null = ไม่ได้ระบุ ⇒ ถือเป็นสายแรก (ของเดิมที่ยิงมาโดยไม่มีคีย์นี้จึงไม่พัง)
    */
   callRound: number | null;
+  /**
+   * ทีมของรายการ (131 · เจ้าของสั่ง 1 ต.ค. 2569: *"ทำงานเหมือนกันแค่คนละทีม"*) — แท็บที่กดเพิ่มเป็นคนบอก
+   * null = ทีมติดตาม (ของเดิม · ไม่ส่งคีย์มา) · 'replacement' = ทีมส่งคนแทน
+   */
+  team: typeof FOLLOW_TEAM_REPLACEMENT | null;
 };
 
 const HHMM_RE = /^\d{1,2}:\d{2}$/;
@@ -387,13 +397,28 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
     callRound = n;
   }
 
+  /** ทีม (131) — ตรวจที่นี่แทน CHECK constraint · ค่าที่อ่านไม่ออก = ปฏิเสธ (ห้ามเดาว่าเป็นทีมไหน — รายการจะไปโผล่ผิดแท็บ) */
+  let team: typeof FOLLOW_TEAM_REPLACEMENT | null = null;
+  const teamRaw = getString(body.follow_team) || '';
+  if (teamRaw) {
+    if (teamRaw !== FOLLOW_TEAM_REPLACEMENT) return fail('follow_team ต้องเป็น replacement หรือไม่ส่งมา');
+    team = FOLLOW_TEAM_REPLACEMENT;
+  }
+
   return {
     error: null,
     value: {
       name, phone, topic, note, staffPhone, when, groupId, callTimes, unitName, siteCode, callRound,
-      callMode,
+      callMode, team,
     },
   };
+}
+
+/** ฐานยังไม่รัน 131 แต่มีคนกดเพิ่มจากแท็บส่งคนแทน — ห้ามบันทึกแบบไม่มีทีม (รายการจะไปโผล่แท็บรายชื่อติดตาม) */
+export class FollowTeamNotReady extends Error {
+  constructor() {
+    super('ยังบันทึกทีมส่งคนแทนไม่ได้ตอนนี้ — ระบบกำลังอัปเดต ลองใหม่อีกครั้งในอีกสักครู่');
+  }
 }
 
 export type FollowRoundInput = {
@@ -523,7 +548,29 @@ async function insertFollowRow(
   base: ParsedFollowInput,
   round: FollowRoundInput,
 ): Promise<FollowRow | undefined> {
-  const { name, phone, topic, note, groupId, callTimes, unitName, siteCode, callMode } = base;
+  const { name, phone, topic, note, groupId, callTimes, unitName, siteCode, callMode, team } = base;
+  /**
+   * ทีมส่งคนแทน (131) — insert ที่มีช่องทีม · ฐานยังไม่รัน 131 = แจ้งให้ลองใหม่ **ห้ามถอยไปบันทึกแบบไม่มีทีม**
+   * ทีมติดตาม (null) ใช้ insert เดิมทุกตัวอักษร ⇒ ของเดิมไม่ขึ้นกับ migration ใหม่
+   */
+  if (team) {
+    try {
+      const { rows } = await dbQuery<FollowRow>(
+        `insert into ${followTable}
+           (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at,
+            group_id, call_times, unit_name, site_code, call_round, call_mode,
+            created_by, created_by_name, follow_team)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         returning *`,
+        [name, phone, topic, note, round.staffPhone, round.when.toISOString(), groupId, callTimes,
+         unitName, siteCode, round.callRound, round.callMode ?? callMode, req.user.sub, req.user.email, team],
+      );
+      return rows[0];
+    } catch (e) {
+      if (isUndefinedColumn(e)) throw new FollowTeamNotReady();
+      throw e;
+    }
+  }
   try {
     const { rows } = await dbQuery<FollowRow>(
       `insert into ${followTable}
@@ -1038,7 +1085,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   try {
     if (method === 'GET') return await listFollow(req, res);
-    if (method === 'POST') return await createFollow(req, res);
+    if (method === 'POST') {
+      try {
+        return await createFollow(req, res);
+      } catch (e) {
+        if (e instanceof FollowTeamNotReady) return sendError(res, 503, 'Service unavailable', e.message);
+        throw e;
+      }
+    }
     if (method === 'PATCH') {
       // action='update' = แก้ไข · action='reopen' = ย้อนสถานะปิดงาน
       // action='staff_call' / 'staff_call_clear' = ลง/ล้างผลโทรของรอบคนโทร (130)

@@ -142,6 +142,8 @@ export default function FollowEditDialog({
           recipient_name: name,
           recipient_phone: phone,
           topic,
+          // รอบที่เพิ่มทีหลังอยู่ทีมเดียวกับรายการเดิม (1 ต.ค. 2569) — ไม่งั้นรอบใหม่ของคนส่งแทนไปโผล่แท็บรายชื่อติดตาม
+          follow_team: entry.follow_team === 'replacement' ? 'replacement' : undefined,
           note: note || undefined,
           staff_phone: staffPhone || undefined,
           scheduled_at: iso,

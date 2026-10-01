@@ -75,3 +75,21 @@ describe('สถานะ "เจ้าหน้าที่โทรเอง" 
     expect(FOLLOW_DISPATCH_META.off.needsAction).toBe(true);
   });
 });
+
+/**
+ * ทีมของรายการ (131 · เจ้าของสั่ง 1 ต.ค. 2569: *"ทำงานเหมือนกันแค่คนละทีม"*)
+ * 🔴 ไม่ส่งมา = ทีมติดตาม (ของเดิม) · ค่าที่อ่านไม่ออก = ปฏิเสธ (เดาผิด = รายการไปโผล่ผิดแท็บ)
+ */
+describe('อ่าน follow_team จากคำขอ', () => {
+  it('ไม่ส่งมา ⇒ null (ทีมติดตาม · ของเดิมไม่เปลี่ยน)', () => {
+    expect(parseFollowInput(base).value?.team).toBeNull();
+  });
+  it('ส่ง replacement ⇒ ทีมส่งคนแทน', () => {
+    expect(parseFollowInput({ ...base, follow_team: 'replacement' }).value?.team).toBe('replacement');
+  });
+  it('🔴 ค่าอื่น ⇒ ปฏิเสธ', () => {
+    const p = parseFollowInput({ ...base, follow_team: 'online' });
+    expect(p.error).toMatch(/follow_team/);
+    expect(p.value).toBeFalsy();
+  });
+});
