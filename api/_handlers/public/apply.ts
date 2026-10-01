@@ -7,6 +7,8 @@ import { validatePublicApplication } from '../../_lib/publicApplications.js';
 import { resolveApplicationDepartment } from '../../_lib/applicationDepartment.js';
 import { enqueueLumosInterviewForApplications } from '../../_lib/lumosDispatch.js';
 import { logError } from '../../_lib/logger.js';
+import { auditFromAnonymous } from '../../_lib/audit.js';
+import { PHONE_ONCE_PUBLIC_MESSAGE, isPhoneOnceViolation } from '../../../src/lib/applicationPhoneOnce.js';
 
 /** คอลัมน์ที่ยังไม่ถูก migrate — pg ตอบ 42703 */
 function isUndefinedColumn(e: unknown): boolean {
@@ -14,6 +16,25 @@ function isUndefinedColumn(e: unknown): boolean {
 }
 
 const tbl = tableInAppSchema('public_job_applications');
+
+/**
+ * จด log ของการกดส่งจากหน้าสมัคร — **IP + เบราว์เซอร์มาจากบริบทของ audit เอง** (เจ้าของ Choice 1 ต.ค. 2569:
+ * "เก็บ Log พอไม่ต้องเอามาโชว์") · ไม่มีจอไหนอ่าน · ไม่ใช้บล็อก (เน็ตมือถือ/ออฟฟิศใช้ IP ร่วมกันหลายคน)
+ * ⚠️ ไม่จดชื่อ/เบอร์ลง log (มีอยู่ในใบแล้ว) · ล้มห้ามทำให้การส่งใบล้ม (createAuditEvent กลืน error เอง)
+ */
+function logPublicApply(
+  req: ApiReq,
+  action: 'public_application.submit' | 'public_application.duplicate_rejected',
+  entityId: string,
+  v: { jobId: string | null; postingId: string | null },
+): void {
+  void auditFromAnonymous(req, { userName: 'หน้าสมัครงาน' }, {
+    action,
+    entityType: 'job_application',
+    entityId,
+    after: { job_id: v.jobId, posting_id: v.postingId },
+  }).catch(() => {});
+}
 
 /** POST /api/public/apply — รับใบสมัครจากหน้า /apply โดยไม่ต้องล็อกอิน */
 export default async function handler(req: ApiReq, res: ApiRes) {
@@ -76,20 +97,34 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     // เทียบ job_id ได้อยู่แล้ว (ต่างจากฟอร์มที่เจ้าหน้าที่คีย์เอง ซึ่งจงใจคืน 503)
     let rows: Array<{ id: string }>;
     try {
-      ({ rows } = await dbQuery<{ id: string }>(
-        `insert into ${tbl} (${BASE_COLS}, department_code)
-         values (${placeholders(VALUES.length + 1)}) returning id`,
-        [...VALUES, departmentCode],
-      ));
+      try {
+        ({ rows } = await dbQuery<{ id: string }>(
+          `insert into ${tbl} (${BASE_COLS}, department_code)
+           values (${placeholders(VALUES.length + 1)}) returning id`,
+          [...VALUES, departmentCode],
+        ));
+      } catch (e) {
+        if (!isUndefinedColumn(e)) throw e;
+        ({ rows } = await dbQuery<{ id: string }>(
+          `insert into ${tbl} (${BASE_COLS}) values (${placeholders(VALUES.length)}) returning id`,
+          VALUES,
+        ));
+      }
     } catch (e) {
-      if (!isUndefinedColumn(e)) throw e;
-      ({ rows } = await dbQuery<{ id: string }>(
-        `insert into ${tbl} (${BASE_COLS}) values (${placeholders(VALUES.length)}) returning id`,
-        VALUES,
-      ));
+      /**
+       * 🔴 เบอร์เดียวเข้าระบบได้ครั้งเดียว (132 · เจ้าของสั่ง 1 ต.ค. 2569: "แจ้งเลยว่าเคยสมัครไปแล้ว
+       * ไม่เอาเบอร์ซ้ำเข้าระบบ" · ขอบเขต "เบอร์เดิม ไม่ว่างานไหน") — DB ตัดสิน ไม่ใช่เช็คก่อน insert
+       * ข้อความไม่บอกรายละเอียดใบเดิม (หน้าสาธารณะ ใครพิมพ์เบอร์ใครก็ได้)
+       */
+      if (isPhoneOnceViolation(e)) {
+        logPublicApply(req, 'public_application.duplicate_rejected', 'duplicate', v);
+        return sendError(res, 409, 'Conflict', PHONE_ONCE_PUBLIC_MESSAGE);
+      }
+      throw e;
     }
     const id = rows[0]?.id;
     if (!id) return sendError(res, 500, 'Failed to submit application');
+    logPublicApply(req, 'public_application.submit', id, v);
 
     /**
      * ส่งเข้าคิว AI โทร **อัตโนมัติทันทีที่กรอก** (เจ้าของเคาะ 15 ส.ค. 2569)

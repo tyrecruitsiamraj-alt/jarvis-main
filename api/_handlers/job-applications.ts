@@ -28,6 +28,13 @@ import {
 } from '../../src/lib/selectionProgress.js';
 import { isCallChoice } from '../../src/lib/callChoiceGuard.js';
 import {
+  STAFF_INSERT_COLUMNS,
+  STAFF_INSERT_VALUES,
+  parseStaffApplication,
+  staffInsertParams,
+} from '../../src/lib/staffApplicationInput.js';
+import { PHONE_ONCE_STAFF_MESSAGE, isPhoneOnceViolation } from '../../src/lib/applicationPhoneOnce.js';
+import {
   PROFILE_KEYS,
   changedProfilePatch,
   parseProfilePatch,
@@ -515,29 +522,13 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
   }
   const b = raw as Record<string, unknown>;
 
-  const firstName = (getString(b.first_name) || '').trim().slice(0, 120);
-  const lastName = (getString(b.last_name) || '').trim().slice(0, 120);
-  if (!firstName) return sendError(res, 400, 'Bad request', 'กรุณากรอกชื่อ');
-  if (!lastName) return sendError(res, 400, 'Bad request', 'กรุณากรอกนามสกุล');
+  // กติกาชุดเดียวกับนำเข้า Excel (`staffApplicationInput.ts` · ข้อความ error เดิมทุกคำ)
+  const parsed = parseStaffApplication(b);
+  if (!parsed.ok) return sendError(res, 400, 'Bad request', parsed.message);
+  const v = parsed.value;
 
-  const phone = normalizeRmPhone(b.phone);
-  if (!phone) return sendError(res, 400, 'Bad request', 'กรุณากรอกเบอร์โทรให้ครบ 10 หลัก');
-
-  const gender = b.gender === 'male' || b.gender === 'female' ? b.gender : null;
-  if (!gender) return sendError(res, 400, 'Bad request', 'กรุณาเลือกเพศ');
-
-  const ageNum = Number(b.age);
-  // อายุนอกช่วงนี้แปลว่าคีย์ผิด (พิมพ์ปีเกิดลงช่องอายุเป็นอาการที่เจอบ่อย)
-  const age = Number.isFinite(ageNum) && ageNum >= 15 && ageNum <= 80 ? Math.trunc(ageNum) : null;
-  if (age === null) return sendError(res, 400, 'Bad request', 'อายุต้องอยู่ระหว่าง 15–80 ปี');
-
-  const text = (v: unknown, max = 200): string | null => {
-    const t = (getString(v) || '').trim();
-    return t ? t.slice(0, max) : null;
-  };
-  const jobId = text(b.job_id, 120);
   const scopedJobIds = await loadScopedJobIdSet(req.user);
-  if (scopedJobIds && !jobId) {
+  if (scopedJobIds && !v.job_id) {
     return sendError(
       res,
       403,
@@ -545,12 +536,10 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
       'ใบที่คีย์เองยังไม่ผูกใบขอ ผู้ใช้ที่ถูกล็อก BU จะมองไม่เห็นใบของตัวเอง — ให้แอดมินคีย์แทน',
     );
   }
-  if (scopedJobIds && jobId && !scopedJobIds.has(jobId)) {
+  if (scopedJobIds && v.job_id && !scopedJobIds.has(v.job_id)) {
     return sendError(res, 403, 'Forbidden', 'ใบขอนี้อยู่นอกแผนกของคุณ');
   }
 
-  const specificType = isRmSpecificType(getString(b.specific_type)) ? getString(b.specific_type) : null;
-  const licenses = cleanRmLicenseTypes(b.license_types);
   const staffName = req.user.email || null;
 
   let rows: Row[];
@@ -559,39 +548,14 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
       // 🔴 ต้องมี alias `a` — LIST_COLUMNS มีคอลัมน์ derived (origin) ที่อ้าง a.*
       // เดิมไม่มี alias → POST ตาย 500 'missing FROM-clause entry for table a'
       // ตั้งแต่เพิ่มคอลัมน์ origin 16 ส.ค. (บั๊กตระกูลเดียวกับที่เคยหลุดใน PATCH)
-      `insert into ${tbl} as a
-       (full_name, first_name, last_name, phone, age, gender,
-        province, district, education, position_interest,
-        line_id, specific_type, responsible_name, channel_id, channel_label,
-        license_types, created_by_name, status,
-        job_id, job_title, unit_name)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'new',
-        $18,$19,$20)
+      `insert into ${tbl} as a (${STAFF_INSERT_COLUMNS})
+     values (${STAFF_INSERT_VALUES})
      returning ${LIST_COLUMNS}`,
-      [
-      `${firstName} ${lastName}`.trim(),
-      firstName,
-      lastName,
-      phone,
-      age,
-      gender,
-      text(b.province, 128),
-      text(b.district, 128),
-      text(b.education, 128),
-      text(b.position_interest),
-      text(b.line_id, 128),
-      specificType,
-      text(b.responsible_name),
-      text(b.channel_id, 64),
-      text(b.channel_label),
-        licenses.length > 0 ? licenses : null,
-        staffName,
-        jobId,
-        text(b.job_title),
-        text(b.unit_name),
-      ],
+      staffInsertParams(v, staffName),
     ));
   } catch (e) {
+    // 🔴 เบอร์เดียวเข้าระบบได้ครั้งเดียว (132 · เจ้าของสั่ง 1 ต.ค. 2569) — DB เป็นคนตัดสิน
+    if (isPhoneOnceViolation(e)) return sendError(res, 409, 'Conflict', PHONE_ONCE_STAFF_MESSAGE);
     // ⚠️ ยังไม่รัน migration 074 → **ไม่บันทึกแบบทิ้งฟิลด์** เพราะเจ้าหน้าที่จะคิดว่า
     // เก็บ LINE ID/ใบขับขี่ไว้แล้วทั้งที่หาย · บอกตรง ๆ ว่าต้องรัน migration ก่อน
     if (isUndefinedColumn(e)) {
@@ -611,7 +575,7 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
     action: 'job_application.create_by_staff',
     entityType: 'job_application',
     entityId: row.id,
-    after: { phone, specific_type: specificType, license_types: licenses },
+    after: { phone: v.phone, specific_type: v.specific_type, license_types: v.license_types },
   });
 
   return res.status(201).json({ item: toApplication(row, req.user.sub) });
@@ -874,7 +838,13 @@ async function patchPhone(req: AuthedReq, res: ApiRes, id: string, rawPhone: str
     return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
   }
 
-  await dbQuery(`update ${tbl} set phone = $2, updated_at = now() where id = $1`, [id, normalized]);
+  try {
+    await dbQuery(`update ${tbl} set phone = $2, updated_at = now() where id = $1`, [id, normalized]);
+  } catch (e) {
+    // 🔴 แก้เป็นเบอร์ที่มีใบอยู่แล้ว = ชนกติกาเบอร์เดียว (132) — บอกเจ้าหน้าที่ ไม่ตาย 500
+    if (isPhoneOnceViolation(e)) return sendError(res, 409, 'Conflict', PHONE_ONCE_STAFF_MESSAGE);
+    throw e;
+  }
 
   // เบอร์คือกุญแจจับคู่ผลโทร/ล็อกทั้งระบบ — ต้องมีร่องรอยว่าใครแก้จากอะไรเป็นอะไร
   await auditFromAuthed(req, {
