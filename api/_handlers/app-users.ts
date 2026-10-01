@@ -1,4 +1,4 @@
-import { dbQuery } from '../_lib/postgres.js';
+import { dbQuery, isPgForeignKeyViolation } from '../_lib/postgres.js';
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { tableInAppSchema } from '../_lib/schema.js';
@@ -59,13 +59,86 @@ function toUserJson(u: UserRow) {
   };
 }
 
+/**
+ * 🔴 ลบบัญชีจริง (เจ้าของ 1 ต.ค. 2569: *"หน้า ผู้ใช้งานทำให้ฉันลบบัญชีได้หน่อย"* → Choice **"ลบจริง"**)
+ *
+ * - `?id=` (แบบเดียวกับเส้น DELETE อื่นของบ้าน) · admin เท่านั้น (rbac `app-users`)
+ * - **ลบตัวเองไม่ได้** · **ลบ admin คนสุดท้ายที่ยังใช้งานอยู่ไม่ได้** — เช็กสองชั้น: อ่านก่อนเพื่อบอกเหตุผล
+ *   + เงื่อนไขใน `delete` เอง (กันช่องว่างระหว่างอ่านกับลบ)
+ * - ประวัติงานเก่าเก็บชื่อ/อีเมลคนทำไว้ในแถวงานเอง (`created_by_name` ฯลฯ) ⇒ ยังอ่านออกหลังลบ ·
+ *   FK ที่ผูกกับ users: โทเคนรีเซ็ต/ลิงก์อีเมล = ลบตาม (cascade) · คนแก้สิทธิ์/รถ = ว่าง (set null) ·
+ *   **app_feedback ห้ามลบ** ⇒ ชน FK ตอบ 409 ให้ใช้ Inactive แทน (ไม่ไปลบ/แก้ของคนอื่นให้)
+ * - ⚠️ คนที่ถูกลบล็อกอิน Microsoft อีก = ระบบเปิดบัญชีใหม่ให้เอง (staff ไม่มี BU · `azure-ad-callback`)
+ *   เจ้าของรู้ข้อนี้ตอนเลือก — อยากกันไม่ให้เข้าใช้ Inactive (ของเดิม)
+ * - เซสชันของคนที่ถูกลบหลุดเองตอน `/api/auth/me` เช็กรอบถัดไป (หาบัญชีไม่เจอ = 401) เหมือน Inactive
+ */
+async function deleteUser(req: AuthedReq, res: ApiRes) {
+  const id = getString(req.query?.id);
+  if (!id) return sendError(res, 400, 'Bad request', 'id is required');
+  if (id === req.user.sub) return sendError(res, 400, 'Bad request', 'ลบบัญชีตัวเองไม่ได้');
+
+  const { rows: targetRows } = await dbQuery<UserRow>(
+    `select id, email, role, full_name, is_active, created_at, department_code, phone, nickname, job_lanes
+       from ${usersTable} where id = $1 limit 1`,
+    [id],
+  );
+  const target = targetRows[0];
+  if (!target) return sendError(res, 404, 'Not found', 'User not found');
+
+  const lastAdminMessage = 'ลบ admin คนสุดท้ายที่ยังใช้งานอยู่ไม่ได้';
+  if (target.role === 'admin' && target.is_active) {
+    const { rows: adminRows } = await dbQuery<{ count: string }>(
+      `select count(*)::text as count from ${usersTable} where role = 'admin' and is_active = true`,
+    );
+    if (Number(adminRows[0]?.count || '0') <= 1) return sendError(res, 400, 'Bad request', lastAdminMessage);
+  }
+
+  let deletedId: string | undefined;
+  try {
+    const { rows } = await dbQuery<{ id: string }>(
+      `delete from ${usersTable} u
+        where u.id = $1
+          and not (
+            u.role = 'admin' and u.is_active = true
+            and (select count(*) from ${usersTable} a where a.role = 'admin' and a.is_active = true) <= 1
+          )
+        returning u.id`,
+      [id],
+    );
+    deletedId = rows[0]?.id;
+  } catch (e) {
+    if (isPgForeignKeyViolation(e)) {
+      return sendError(res, 409, 'Conflict', 'บัญชีนี้มีข้อมูลผูกอยู่ ลบไม่ได้ — ใช้ Inactive แทน');
+    }
+    throw e;
+  }
+  if (!deletedId) return sendError(res, 400, 'Bad request', lastAdminMessage);
+
+  await auditFromAuthed(req, {
+    action: 'user.delete',
+    entityType: 'user',
+    entityId: target.id,
+    before: {
+      email: target.email,
+      full_name: target.full_name,
+      role: target.role,
+      is_active: target.is_active,
+      department_code: target.department_code,
+      nickname: target.nickname,
+    },
+  });
+  return res.status(200).json({ ok: true, id: deletedId });
+}
+
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
-  if (method !== 'GET' && method !== 'PATCH') {
+  if (method !== 'GET' && method !== 'PATCH' && method !== 'DELETE') {
     return sendError(res, 405, 'Method not allowed');
   }
 
   try {
+    if (method === 'DELETE') return await deleteUser(req, res);
+
     if (method === 'PATCH') {
       const raw = await readJsonBody(req);
       if (!raw || typeof raw !== 'object') return sendError(res, 400, 'Bad request', 'Invalid JSON body');

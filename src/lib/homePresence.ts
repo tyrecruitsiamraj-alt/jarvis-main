@@ -162,6 +162,15 @@ export function countPresence(people: readonly PresencePerson[]): PresenceCounts
 const BU_ORDER: readonly string[] = [...new Set(Object.values(SITE_BU_TO_DEPT))];
 
 /**
+ * เรียง BU: ชุดแผนก → BU อื่นตามตัวอักษร → '' (ไม่ระบุ BU) ท้ายสุด
+ * ตัวเดียวทั้งระบบ — ยอดแยก BU ของสถานะ Online + ปุ่ม BU ของตั้งค่า › ผู้ใช้งาน (`userBuFilter`) ใช้ร่วมกัน
+ */
+export function compareBu(a: string, b: string): number {
+  const rank = (bu: string) => (bu === '' ? Number.MAX_SAFE_INTEGER : BU_ORDER.includes(bu) ? BU_ORDER.indexOf(bu) : BU_ORDER.length);
+  return rank(a) - rank(b) || a.localeCompare(b);
+}
+
+/**
  * ยอดแยก BU — เฉพาะ BU ที่มีคนจริง · เรียงตามชุดแผนก → BU อื่นตามตัวอักษร → ไม่ระบุ BU ท้ายสุด
  * รวมทุก BU = `countPresence` ของทั้งหมดเสมอ (ไม่มีคนหล่นหาย)
  */
@@ -171,10 +180,7 @@ export function countPresenceByBu(people: readonly PresencePerson[]): PresenceBu
     const k = p.bu || '';
     by.set(k, [...(by.get(k) ?? []), p]);
   }
-  const rank = (bu: string) => (bu === '' ? Number.MAX_SAFE_INTEGER : BU_ORDER.includes(bu) ? BU_ORDER.indexOf(bu) : BU_ORDER.length);
-  return [...by.keys()]
-    .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
-    .map((bu) => ({ bu, counts: countPresence(by.get(bu) ?? []) }));
+  return [...by.keys()].sort(compareBu).map((bu) => ({ bu, counts: countPresence(by.get(bu) ?? []) }));
 }
 
 const TIME = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' });

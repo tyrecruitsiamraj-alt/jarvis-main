@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +8,7 @@ import type { User, AuditLog } from '@/types';
 import { Users, Shield, Database, FileText, Palette, UserCog, ListChecks, ListOrdered, SlidersHorizontal, PhoneForwarded, MoveRight, Activity,
   MessageSquareText,
   PhoneOff,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
@@ -22,8 +23,16 @@ import ApplicationAutoMoveTab from '@/pages/settings/ApplicationAutoMoveTab';
 import SystemHealthTab from '@/pages/settings/SystemHealthTab';
 import NavMenuTab from '@/pages/settings/NavMenuTab';
 import { PresenceFilterChips, PresenceLine } from '@/pages/settings/UserPresence';
+import { UserBuFilterChips } from '@/pages/settings/UserBuFilter';
 import { useUserPresence } from '@/pages/settings/useUserPresence';
-import { matchesPresence, sortByPresence, type PresenceFilter } from '@/lib/homePresence';
+import {
+  countPresence,
+  matchesPresence,
+  sortByPresence,
+  type PresenceFilter,
+  type PresencePerson,
+} from '@/lib/homePresence';
+import { USER_BU_ALL, USER_NO_BU_LABEL, matchesUserBu, userBuChips, userBuOf, type UserBuFilter } from '@/lib/userBuFilter';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
@@ -46,6 +55,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 /** ⚠️ ชนิด + ป้ายชื่อ + การจัดกลุ่ม อยู่ที่ `src/lib/settingsNav.ts` ที่เดียว (มีเทสต์คุม) */
 type SettingsTab = SettingsTabId;
@@ -145,10 +164,37 @@ const AdminSettings: React.FC = () => {
   const presencePeople = presence.data?.people ?? null;
   const presenceById = React.useMemo(() => new Map((presencePeople ?? []).map((p) => [p.id, p])), [presencePeople]);
   const presenceNow = presence.data ? new Date(presence.data.generated_at) : new Date();
-  const shownUsers = React.useMemo(
-    () => sortByPresence(apiUsers, presencePeople ?? []).filter((u) => matchesPresence(presenceById.get(u.id), presenceFilter)),
-    [apiUsers, presencePeople, presenceById, presenceFilter],
+  /**
+   * แยก BU (เจ้าของสั่ง 1 ต.ค. 2569 · Choice "ปุ่มเลือก BU") — กรองร่วมกับปุ่มสถานะ ·
+   * 🔴 ยอดสองแถวนับข้ามกัน: ปุ่ม BU นับจากคนที่ผ่านตัวกรองสถานะ · ปุ่มสถานะนับจากคนใน BU ที่เลือก
+   *    ⇒ ตัวเลขบนปุ่มที่กด = จำนวนแถวในตารางเสมอ
+   */
+  const [buFilter, setBuFilter] = useState<UserBuFilter>(USER_BU_ALL);
+  const presenceMatched = React.useMemo(
+    () => apiUsers.filter((u) => matchesPresence(presenceById.get(u.id), presenceFilter)),
+    [apiUsers, presenceById, presenceFilter],
   );
+  const buChips = React.useMemo(() => userBuChips(presenceMatched, buFilter), [presenceMatched, buFilter]);
+  const buMatched = React.useMemo(() => apiUsers.filter((u) => matchesUserBu(u, buFilter)), [apiUsers, buFilter]);
+  const presenceCountsInBu = React.useMemo(
+    () => countPresence(buMatched.map((u) => presenceById.get(u.id)).filter((p): p is PresencePerson => !!p)),
+    [buMatched, presenceById],
+  );
+  const shownUsers = React.useMemo(
+    () =>
+      sortByPresence(apiUsers, presencePeople ?? []).filter(
+        (u) => matchesPresence(presenceById.get(u.id), presenceFilter) && matchesUserBu(u, buFilter),
+      ),
+    [apiUsers, presencePeople, presenceById, presenceFilter, buFilter],
+  );
+  /**
+   * ลบบัญชี (เจ้าของสั่ง 1 ต.ค. 2569 · Choice "ลบจริง") — กดถังขยะ → ป๊อปยืนยัน → `DELETE /api/app-users?id=`
+   * เส้นกันเอง: ลบตัวเองไม่ได้ · ลบ admin คนสุดท้ายไม่ได้ · มีข้อมูลผูกอยู่ = 409 (ให้ใช้ Inactive)
+   * ลบไม่ผ่าน = ป๊อปยังเปิด บอกเหตุผลในป๊อป (แถบแจ้งเหนือตารางอาจอยู่นอกจอ)
+   */
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [userActionError, setUserActionError] = useState('');
   const [userActionOk, setUserActionOk] = useState('');
@@ -261,6 +307,30 @@ const AdminSettings: React.FC = () => {
       setUserActionError('เกิดข้อผิดพลาดระหว่างอัปเดตสิทธิ์ผู้ใช้');
     } finally {
       setSavingUserId(null);
+    }
+  };
+
+  const deleteAccount = async (target: User) => {
+    setDeleting(true);
+    setDeleteError('');
+    setUserActionError('');
+    setUserActionOk('');
+    try {
+      const r = await apiFetch(`/api/app-users?id=${encodeURIComponent(target.id)}`, { method: 'DELETE' });
+      const body = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!r.ok) {
+        setDeleteError(
+          typeof body.message === 'string' ? body.message : typeof body.error === 'string' ? body.error : 'ลบบัญชีไม่สำเร็จ',
+        );
+        return;
+      }
+      setApiUsers((prev) => prev.filter((u) => u.id !== target.id));
+      setUserActionOk(`ลบบัญชี ${target.full_name} แล้ว`);
+      setDeleteTarget(null);
+    } catch {
+      setDeleteError('ลบบัญชีไม่สำเร็จ — ลองใหม่อีกครั้ง');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -411,11 +481,21 @@ const AdminSettings: React.FC = () => {
             <p className="text-sm text-muted-foreground p-4">กำลังโหลดรายชื่อผู้ใช้…</p>
           ) : (
             <div className="glass-card rounded-xl border border-border overflow-x-auto">
-              {presence.data?.counts && presencePeople ? (
-                <div className="px-4 pt-4">
+              <div className="space-y-2 px-4 pt-4">
+                {apiUsers.length > 0 ? (
+                  <UserBuFilterChips
+                    chips={buChips}
+                    value={buFilter}
+                    onChange={(f) => {
+                      setBuFilter(f);
+                      setUserPage(1);
+                    }}
+                  />
+                ) : null}
+                {presence.data?.counts && presencePeople ? (
                   <PresenceFilterChips
-                    counts={presence.data.counts}
-                    total={apiUsers.length}
+                    counts={presenceCountsInBu}
+                    total={buMatched.length}
                     value={presenceFilter}
                     onChange={(f) => {
                       setPresenceFilter(f);
@@ -423,10 +503,10 @@ const AdminSettings: React.FC = () => {
                     }}
                     updatedAt={presence.data.generated_at}
                   />
-                </div>
-              ) : presence.error ? (
-                <p className={cn('px-4 pt-4 text-xs', TONE.danger.value)}>{presence.error}</p>
-              ) : null}
+                ) : presence.error ? (
+                  <p className={cn('text-xs', TONE.danger.value)}>{presence.error}</p>
+                ) : null}
+              </div>
               {userActionError ? (
                 <div className="mx-4 mt-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {userActionError}
@@ -637,13 +717,77 @@ const AdminSettings: React.FC = () => {
                         </button>
                       </td>
                       <td className="px-4 py-3 text-center text-[11px] text-muted-foreground">
-                        {user?.id === u.id ? 'คุณ' : savingUserId === u.id ? 'saving…' : '-'}
+                        {user?.id === u.id ? (
+                          'คุณ'
+                        ) : savingUserId === u.id ? (
+                          'saving…'
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="iconXs"
+                            aria-label={`ลบบัญชี ${u.full_name}`}
+                            title="ลบบัญชี"
+                            className={TONE.danger.value}
+                            onClick={() => {
+                              setDeleteError('');
+                              setDeleteTarget(u);
+                            }}
+                          >
+                            <Trash2 aria-hidden />
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <div className="px-4 pb-4">{userPaginationBar}</div>
+              {/* ป๊อปยืนยันลบบัญชี — AlertDialog (กดข้างนอกแล้วไม่ปิดเอง) · ระหว่างลบปิดไม่ได้ */}
+              <AlertDialog
+                open={!!deleteTarget}
+                onOpenChange={(o) => {
+                  if (!o && !deleting) setDeleteTarget(null);
+                }}
+              >
+                <AlertDialogContent className="max-w-md">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-base">ลบบัญชีนี้?</AlertDialogTitle>
+                    <AlertDialogDescription className="text-xs">
+                      ลบแล้วกู้คืนไม่ได้ · ถ้าคนนี้ล็อกอิน Microsoft อีก ระบบจะเปิดบัญชีใหม่ให้ (staff ไม่มี BU) — อยากกันไม่ให้เข้า ใช้ Inactive แทน
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  {deleteTarget ? (
+                    <div className="rounded-lg border border-border px-3 py-2">
+                      <p className="text-sm font-medium text-foreground">
+                        {deleteTarget.full_name}
+                        {deleteTarget.nickname ? ` (${deleteTarget.nickname})` : ''}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {deleteTarget.email} · {deleteTarget.role} · {userBuOf(deleteTarget) || USER_NO_BU_LABEL}
+                      </p>
+                    </div>
+                  ) : null}
+                  {deleteError ? (
+                    <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                      {deleteError}
+                    </p>
+                  ) : null}
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deleting}>ยกเลิก</AlertDialogCancel>
+                    <AlertDialogAction
+                      className={buttonVariants({ variant: 'destructive' })}
+                      disabled={deleting}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (deleteTarget) void deleteAccount(deleteTarget);
+                      }}
+                    >
+                      {deleting ? 'กำลังลบ…' : 'ลบบัญชี'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           ))}
 
