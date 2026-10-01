@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useMemo } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import JobBoardView, { type BoardViewId } from '@/components/jobs/JobBoardView';
 import RmWorkspace from '@/components/recruit-rm/RmWorkspace';
@@ -7,6 +7,7 @@ import { useClosedRequestsFeed } from '@/hooks/useClosedRequestsFeed';
 import type { JobBoxKey } from '@/lib/jobBoxGroups';
 import { sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { PREQUEST_ID_PREFIX } from '@/lib/siamrajUnitRequestsApi';
+import type { BoardPublishedTotals } from '@/lib/boardRelease';
 
 /**
  * แท็บ Dashboard (28 ก.ย. 2569) — โหลดเมื่อกดเท่านั้น: กราฟ recharts + ข้อมูลย้อนหลังไม่ควรถ่วงกล่องงานที่คนเปิดทั้งวัน
@@ -84,6 +85,11 @@ const StaffJobBoardPage: React.FC = () => {
   const retiredView = (RETIRED_VIEWS as readonly string[]).includes(raw ?? '');
   /** ทางถอยของแท็บภาพรวม — แผง Dashboard เดิม (28 ก.ย.) ยังเปิดได้ที่ `?view=dashboard&dash=classic` */
   const classicDashboard = searchParams.get('dash') === 'classic';
+  /**
+   * 🔴 ยอด "ประกาศ" ของภาพรวม = ตัวเลขของหัวกล่องงาน (เจ้าของ 1 ต.ค. 2569: *"เปลี่ยนเป็น 7 เหมือนหัวกล่องงาน"*)
+   * กล่องงานคิดแล้วส่งขึ้นมา (feed · ทะเบียนประกาศ · ยอดผู้สมัครชุดเดียวกับหัว) — ห้ามนับซ้ำที่อื่น
+   */
+  const [boardPublished, setBoardPublished] = useState<BoardPublishedTotals | null>(null);
 
   /** ลิงก์เก่ามาถึงแล้ว = เลือกกล่องให้ (หรือเปิดกล่องงานแทนแท็บที่ถอดแล้ว) แล้วล้าง ?view ทิ้ง
    *  (URL ไม่ค้างค่าที่ไม่มีความหมาย) */
@@ -133,10 +139,11 @@ const StaffJobBoardPage: React.FC = () => {
         onClosedDaysChange={closed.setDays}
         onReloadClosed={closed.reload}
         initialBox={legacyBox}
+        onPublishedTotals={setBoardPublished}
         listContent={
           view === 'board' ? null : view === 'dashboard' ? (
             <Suspense fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิดภาพรวม…</p>}>
-              {classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview />}
+              {classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview published={boardPublished} />}
             </Suspense>
           ) : (
             <RmWorkspace tab={VIEW_TO_RM_TAB[view as (typeof RM_VIEWS)[number]]} jobs={allJobs} />

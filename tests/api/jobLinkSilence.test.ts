@@ -106,9 +106,9 @@ describe('selectSilentLinkRows', () => {
 
   it('ข้อความ "ทำไปแล้ว" ตรงกับเหตุผล และมีเลขรองรับทุกคำ', () => {
     const zero = selectSilentLinkRows(input(), TODAY)[0];
-    expect(silentRowFactLine(zero)).toBe('ปล่อยลิงก์ 5 วันก่อน · ยังไม่มีใครเห็นลิงก์ (คลิก 0)');
+    expect(silentRowFactLine(zero)).toBe('สร้างลิงก์ 5 วันก่อน · ยังไม่มีใครเห็นลิงก์ (คลิก 0)');
     const viewed = selectSilentLinkRows(input({ clicksByJob: new Map([['a', 12]]) }), TODAY)[0];
-    expect(silentRowFactLine(viewed)).toBe('ปล่อยลิงก์ 5 วันก่อน · มีคนกดดู 12 ครั้ง แต่ยังไม่มีใครกรอก');
+    expect(silentRowFactLine(viewed)).toBe('สร้างลิงก์ 5 วันก่อน · มีคนกดดู 12 ครั้ง แต่ยังไม่มีใครกรอก');
   });
 
   it('🔴 ปุ่มขั้นถัดไปต้องพาไปแท็บที่ถูกในป๊อปเดิม (ห้ามเปิด Dialog ใหม่)', () => {

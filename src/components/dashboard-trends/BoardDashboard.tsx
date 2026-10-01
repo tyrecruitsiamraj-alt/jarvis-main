@@ -223,7 +223,7 @@ const BoardDashboard: React.FC<{
               : undefined
           }
         />
-        <TrendKpiCard label="ปล่อยประกาศ" unit="ใบ" value={releases.data ? relNow.released : null} previous={releases.data ? relPrev.released : null} tone="info" spark={relSeries.map((p) => p.value)} />
+        <TrendKpiCard label="ประกาศ" unit="ใบ" value={releases.data ? relNow.released : null} previous={releases.data ? relPrev.released : null} tone="info" spark={relSeries.map((p) => p.value)} />
         <TrendKpiCard label="รายชื่อเข้ามา" unit="คน" value={applicants.data ? pipeNow.names : null} previous={applicants.data ? pipePrev.names : null} tone="violet" spark={appSeries.map((p) => p.value)} />
         <TrendKpiCard
           label="ใบสมัครที่ส่ง Lumos"
@@ -305,13 +305,13 @@ const BoardDashboard: React.FC<{
 
       {/* ═══ ปล่อยประกาศ ═══ */}
       <TrendSection
-        title="ปล่อยประกาศ"
+        title="ประกาศ"
         badge={
           <>
-            <TrendBadge>นับใบที่ยังปล่อยอยู่ · ถอนแล้วไม่มีประวัติ</TrendBadge>
+            <TrendBadge>นับใบที่ยังประกาศอยู่ · ถอนแล้วไม่มีประวัติ</TrendBadge>
             {[...relNow.batches, ...relPrev.batches].map((b) => (
               <TrendBadge key={`${b.day}-${b.staffName}`} tone="warn">
-                ปล่อยรวดเดียว {fmt(b.count)} ใบ · {b.day} · {b.staffName}
+                ประกาศรวดเดียว {fmt(b.count)} ใบ · {b.day} · {b.staffName}
               </TrendBadge>
             ))}
           </>
@@ -321,11 +321,11 @@ const BoardDashboard: React.FC<{
         {releases.data ? (
           <Card className="space-y-4 rounded-2xl p-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <TrendKpiCard label="ปล่อยในช่วงนี้" unit="ใบ" value={relNow.released} previous={relPrev.released} tone="info" />
-              <TrendKpiCard label="ขอ → ปล่อย (มัธยฐาน)" unit="วัน" value={relNow.medianDaysToRelease} previous={relPrev.medianDaysToRelease} polarity="down-good" tone="primary" />
-              <TrendKpiCard label="ปล่อยภายใน 3 วัน" value={relNow.within3Days} previous={relPrev.within3Days} asRate tone="success" />
+              <TrendKpiCard label="ประกาศในช่วงนี้" unit="ใบ" value={relNow.released} previous={relPrev.released} tone="info" />
+              <TrendKpiCard label="ขอ → ประกาศ (มัธยฐาน)" unit="วัน" value={relNow.medianDaysToRelease} previous={relPrev.medianDaysToRelease} polarity="down-good" tone="primary" />
+              <TrendKpiCard label="ประกาศภายใน 3 วัน" value={relNow.within3Days} previous={relPrev.within3Days} asRate tone="success" />
             </div>
-            <TrendChart ariaLabel="จำนวนใบที่ปล่อยประกาศต่องวด" data={relSeries.map((p) => ({ label: p.label, released: p.value }))} series={[{ key: 'released', label: 'ปล่อยประกาศ', kind: 'bar', tone: 'info' }]} height={200} />
+            <TrendChart ariaLabel="จำนวนใบที่ประกาศต่องวด" data={relSeries.map((p) => ({ label: p.label, released: p.value }))} series={[{ key: 'released', label: 'ประกาศ', kind: 'bar', tone: 'info' }]} height={200} />
           </Card>
         ) : null}
       </TrendSection>
@@ -351,7 +351,7 @@ const BoardDashboard: React.FC<{
             <TrendTable
               columns={[
                 { key: 'name', label: 'เจ้าหน้าที่' },
-                { key: 'released', label: 'ปล่อยประกาศ', align: 'right' },
+                { key: 'released', label: 'ประกาศ', align: 'right' },
                 { key: 'registered', label: 'ลงติดตาม', align: 'right' },
                 { key: 'success', label: 'ไปถึงแล้ว', align: 'right' },
                 { key: 'rate', label: 'อัตราไปถึง', align: 'right' },

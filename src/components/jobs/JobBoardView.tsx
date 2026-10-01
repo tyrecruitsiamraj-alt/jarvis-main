@@ -79,6 +79,7 @@ import {
   filterByReleaseLane,
   type ReleaseFacts,
   type ReleaseLaneKey,
+  type BoardPublishedTotals,
 } from '@/lib/boardRelease';
 import JobBoardSilentLinks from '@/components/jobs/JobBoardSilentLinks';
 import {
@@ -210,6 +211,11 @@ export type JobBoardViewProps = {
   onReloadClosed?: () => void;
   /** กล่องที่ให้เลือกไว้ตั้งแต่เปิดหน้า — รองรับลิงก์เก่า `?view=closed` / `?view=cancelled` */
   initialBox?: JobBoxKey | null;
+  /**
+   * ส่งยอด "ประกาศ" ของกล่องงานทั้งก้อนให้หน้าแม่ (แท็บภาพรวมใช้เลขเดียวกับหัว · 1 ต.ค. 2569)
+   * `null` = ตัวเลขยังบอกไม่ได้ (ทะเบียนยังโหลดไม่ครบ/พัง) — ห้ามแปลงเป็น 0
+   */
+  onPublishedTotals?: (totals: BoardPublishedTotals | null) => void;
 };
 
 /**
@@ -264,6 +270,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   onClosedDaysChange,
   onReloadClosed,
   initialBox = null,
+  onPublishedTotals,
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -789,6 +796,18 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     () => buildReleaseLedger(openRows, releaseFacts),
     [openRows, releaseFacts],
   );
+  /**
+   * ยอด "ประกาศ" ของใบเปิดทั้งกล่องงาน **ก่อนตัวกรอง/คำค้น** — ตัวคิดเดียวกับหัว (เลขเท่าหัวตอนไม่ได้กรอง)
+   * ส่งให้แท็บภาพรวม (เจ้าของ 1 ต.ค. 2569: *"เปลี่ยนเป็น 7 เหมือนหัวกล่องงาน"*) · ทะเบียนยังไม่พร้อม = null
+   */
+  const publishedTotals = useMemo<BoardPublishedTotals | null>(() => {
+    if (!isStaff || !ledgerReady) return null;
+    const all = buildReleaseLedger(filters.visible, releaseFacts);
+    return { published: all.released, withApplicants: all.releasedWithApplicants };
+  }, [isStaff, ledgerReady, filters.visible, releaseFacts]);
+  useEffect(() => {
+    onPublishedTotals?.(publishedTotals);
+  }, [onPublishedTotals, publishedTotals]);
   /** ปลายเส้น 9 ขั้น — โชว์ใต้เลน "ไม่ต้องปล่อย" (ขั้นพวกนี้คือเจ้าของเลนนั้นจริง ๆ) */
   const movedOnStages = useMemo(
     () => (stages ?? []).filter((st) => MOVED_ON_STAGE_KEYS.includes(st.key)),
@@ -1130,7 +1149,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       ? [
           `${filters.visibleCount.toLocaleString('th-TH')} ใบขอ`,
           `${filters.visiblePositions.toLocaleString('th-TH')} อัตรา`,
-          ledger.percent === null ? null : `ปล่อยแล้ว ${ledger.percent}%`,
+          ledger.percent === null ? null : `ประกาศ ${ledger.percent}%`,
         ]
           .filter(Boolean)
           .join(' · ')
@@ -1777,7 +1796,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       * ⚠️ รอ `postingsReady` ก่อน ไม่งั้นแวบแรกไม่มีใบไหนติดเขียวเลย
                       */}
                     {postingsReady && postedJobIds.has(job.id) ? (
-                      <span className={cn('self-start', TONE.success.chip)}>✓ ปล่อยลิงก์แล้ว</span>
+                      <span className={cn('self-start', TONE.success.chip)}>✓ สร้างลิงก์แล้ว</span>
                     ) : null}
                     {/* ยอดคลิกบนหน้าสมัครสาธารณะ 30 วัน — ขึ้นเฉพาะใบที่มีคนกดจริง
                         (ใบที่ยังไม่มีใครกดไม่ต้องขึ้นชิป 0 · ชิปที่ขึ้นทุกใบไม่ใช่สัญญาณ) */}

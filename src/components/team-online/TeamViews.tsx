@@ -363,10 +363,10 @@ function RequestsView({ data, loading }: ViewProps) {
             <p className={cn('text-xs', DASH.muted)}>{lines.map((l) => `${l.label} ${l.value}`).join(' · ')}</p>
           ) : null}
           {decision === 'rejected' && !d.skipsReady ? (
-            <p className={cn('text-xs', TONE.warn.value)}>ยังอ่านทะเบียน “ไม่ปล่อย” ไม่ได้ตอนนี้ — ก้อนนี้เป็น 0 เพราะอ่านไม่ได้</p>
+            <p className={cn('text-xs', TONE.warn.value)}>ยังอ่านทะเบียน “ไม่ประกาศ” ไม่ได้ตอนนี้ — ก้อนนี้เป็น 0 เพราะอ่านไม่ได้</p>
           ) : decision === 'rejected' && t.decisions.rejected.requests === 0 ? (
             <p className={cn('text-xs', DASH.muted)}>
-              ยังไม่มีใบที่ตั้ง “ไม่ปล่อย” — ทีม Online กดได้ในป๊อปไล่งานของกล่องงาน (เริ่มนับ 29 ก.ย. 2569)
+              ยังไม่มีใบที่ตั้ง “ไม่ประกาศ” — ทีม Online กดได้ในป๊อปไล่งานของกล่องงาน (เริ่มนับ 29 ก.ย. 2569)
             </p>
           ) : null}
         </div>

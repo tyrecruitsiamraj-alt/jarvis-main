@@ -188,7 +188,7 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
                 แก้ไขประกาศ
               </DialogTitle>
               <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug">
-                แก้รายละเอียดที่ผู้สมัครเห็น · ลิงก์ที่ปล่อยไปแล้วยังใช้ได้ทุกอัน
+                แก้รายละเอียดที่ผู้สมัครเห็น · ลิงก์ที่สร้างไปแล้วยังใช้ได้ทุกอัน
               </DialogDescription>
             </div>
           </div>

@@ -23,19 +23,19 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
-describe('ไม่ปล่อย + เหตุผล', () => {
+describe('ไม่ประกาศ + เหตุผล (เดิมชื่อ ไม่ปล่อย — เปลี่ยนคำทั้งระบบ 1 ต.ค. 2569)', () => {
   it('ยังไม่ตั้ง → กดแล้วฟอร์มกางในที่เดิม · อื่น ๆ ต้องพิมพ์เหตุผล · บันทึกด้วย id เต็ม', async () => {
     const onChanged = vi.fn();
     render(<ReleaseSkipControl jobId={JOB} skip={null} released={false} onChanged={onChanged} />);
-    fireEvent.click(screen.getByRole('button', { name: /ไม่ปล่อยใบนี้/ }));
+    fireEvent.click(screen.getByRole('button', { name: /ไม่ประกาศใบนี้/ }));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('button', { name: 'บันทึก ไม่ปล่อย' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'บันทึก ไม่ประกาศ' }).hasAttribute('disabled')).toBe(true);
     fireEvent.click(screen.getByRole('radio', { name: 'อื่น ๆ' }));
-    fireEvent.click(screen.getByRole('button', { name: 'บันทึก ไม่ปล่อย' }));
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึก ไม่ประกาศ' }));
     expect(await screen.findByText('เลือก “อื่น ๆ” ต้องพิมพ์เหตุผลด้วย')).toBeTruthy();
     expect(markReleaseSkip).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText('เหตุผลเพิ่มเติม'), { target: { value: 'ลูกค้าเลื่อนโครงการ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'บันทึก ไม่ปล่อย' }));
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึก ไม่ประกาศ' }));
     await waitFor(() => expect(markReleaseSkip).toHaveBeenCalledWith(JOB, 'other', 'ลูกค้าเลื่อนโครงการ'));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
@@ -50,8 +50,8 @@ describe('ไม่ปล่อย + เหตุผล', () => {
         onChanged={onChanged}
       />,
     );
-    expect(screen.getByText(/ไม่ปล่อยใบนี้ · หน่วยงานให้รอ/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'ยกเลิก ไม่ปล่อย' }));
+    expect(screen.getByText(/ไม่ประกาศใบนี้ · หน่วยงานให้รอ/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'ยกเลิก ไม่ประกาศ' }));
     await waitFor(() => expect(clearReleaseSkip).toHaveBeenCalledWith(JOB));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });

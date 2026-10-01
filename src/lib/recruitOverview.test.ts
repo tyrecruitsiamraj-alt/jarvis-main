@@ -141,7 +141,7 @@ describe('ยอดของเดือน — รายชื่อที่�
       fact({ calledByStaff: true, contact: 'failed', contactBy: 'staff' }),
       fact(),
     ];
-    const t = totalsOf(apps, [], '2026-09-01', '2026-09-30');
+    const t = totalsOf(apps, '2026-09-01', '2026-09-30');
     expect([t.names, t.called, t.calledByAi, t.calledByStaff]).toEqual([4, 3, 2, 2]);
     expect([t.reached, t.reachedByAi, t.reachedByStaff]).toEqual([2, 1, 1]);
     expect(t.reachedByAi + t.reachedByStaff).toBe(t.reached);
@@ -155,19 +155,13 @@ describe('ยอดของเดือน — รายชื่อที่�
     expect(isStaffFollowed(fact({ aiAnswer: 'said_no', aiAnswerAt: yes.aiAnswerAt, staffLastAt: '2026-09-11T00:00:00.000Z' }))).toBe(false);
   });
 
-  it('ใบที่ประกาศนับตามวันที่ปล่อยขึ้นหน้ารวมงานในช่วง (เจ้าของเลือก ไม่ใช่ Gen link) · มีคนสมัครแล้ว = ผู้สมัคร ≥ 1 · อ่านไม่ได้ = null', () => {
-    const t = totalsOf([], [{ ymd: '2026-09-02', applicants: 3 }, { ymd: '2026-09-20', applicants: 0 }, { ymd: '2026-08-31', applicants: 5 }], '2026-09-01', '2026-09-30');
-    expect([t.releases, t.releasesWithApps]).toEqual([2, 1]);
-    expect(totalsOf([], null, '2026-09-01', '2026-09-30').releases).toBeNull();
-  });
-
   it('ได้ใบสมัคร: อ่านบอร์ด ERP ไม่ได้ (null) = ยอดเป็น null ไม่ใช่ 0', () => {
-    expect(totalsOf([fact({ onBoard: true }), fact({ onBoard: null })], [], '2026-09-01', '2026-09-30').onBoard).toBeNull();
-    expect(totalsOf([fact({ onBoard: true }), fact({ onBoard: false })], [], '2026-09-01', '2026-09-30').onBoard).toBe(1);
+    expect(totalsOf([fact({ onBoard: true }), fact({ onBoard: null })], '2026-09-01', '2026-09-30').onBoard).toBeNull();
+    expect(totalsOf([fact({ onBoard: true }), fact({ onBoard: false })], '2026-09-01', '2026-09-30').onBoard).toBe(1);
   });
 
   it('ใบขอ = ใบไม่ซ้ำที่มีรายชื่อเข้ามา (ใบสมัครไม่ผูกใบขอไม่นับ)', () => {
-    const t = totalsOf([fact(), fact(), fact({ jobId: 'siamraj-sql:R2' }), fact({ jobId: null })], [], '2026-09-01', '2026-09-30');
+    const t = totalsOf([fact(), fact(), fact({ jobId: 'siamraj-sql:R2' }), fact({ jobId: null })], '2026-09-01', '2026-09-30');
     expect(t.jobs).toBe(2);
   });
 });
@@ -180,7 +174,6 @@ describe('เส้นทางของรายชื่อ', () => {
       fact({ calledByAi: true, aiAnswer: 'no_pickup', aiAnswerAt: '2026-09-10T04:00:00.000Z' }),
       fact(),
     ],
-    [],
     '2026-09-01',
     '2026-09-30',
   );

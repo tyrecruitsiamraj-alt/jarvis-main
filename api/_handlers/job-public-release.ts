@@ -61,7 +61,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
       // เพดานกันกดพลาดทั้งฐาน — bulk release ของวันเปลี่ยนผ่านทำเป็นชุดก็พอ
       if (jobIds.length > 300) {
-        return sendError(res, 400, 'ปล่อย/ดึงลงได้ไม่เกิน 300 ใบต่อครั้ง');
+        return sendError(res, 400, 'ประกาศ/ดึงลงได้ไม่เกิน 300 ใบต่อครั้ง');
       }
 
       if (method === 'DELETE') {

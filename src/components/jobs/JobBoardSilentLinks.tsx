@@ -42,7 +42,7 @@ const JobBoardSilentLinks: React.FC<{
   return (
     <div className={cn('mt-3 space-y-1.5 rounded-xl border border-border/60 px-3 py-2', TONE.info.soft)}>
       <p className={DASH.eyebrow}>
-        ลิงก์ที่ปล่อยแล้วยังไม่มีใบสมัคร — {rows.length.toLocaleString('th-TH')} ใบ
+        ลิงก์ที่สร้างแล้วยังไม่มีใบสมัคร — {rows.length.toLocaleString('th-TH')} ใบ
       </p>
 
       <ul className="space-y-1">

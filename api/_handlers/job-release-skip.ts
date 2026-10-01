@@ -50,7 +50,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (v.ok === false) return sendError(res, 400, 'Bad request', v.message);
 
     if (isReleased(await loadReleasedJobKeys(), jobId)) {
-      return sendError(res, 409, 'Conflict', 'ใบนี้อยู่บนหน้าสาธารณะแล้ว — ดึงลงก่อนถึงจะตั้ง “ไม่ปล่อย” ได้');
+      return sendError(res, 409, 'Conflict', 'ใบนี้อยู่บนหน้าสาธารณะแล้ว — ดึงลงก่อนถึงจะตั้ง “ไม่ประกาศ” ได้');
     }
 
     const skip = await markReleaseSkip(jobId, v.reason, v.note, {

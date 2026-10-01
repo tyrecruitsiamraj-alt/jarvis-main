@@ -252,7 +252,7 @@ const FACETS: readonly FacetDef[] = [
     label: 'สถานะประกาศ',
     ui: 'check',
     order: ['released', 'unreleased'],
-    labelOf: (v) => (v === 'released' ? 'ปล่อยแล้ว' : 'ยังไม่ปล่อย'),
+    labelOf: (v) => (v === 'released' ? 'ประกาศ' : 'ยังไม่ประกาศ'),
     available: (facts) => facts.isReleased !== null,
     values: (job, facts) => [facts.isReleased?.(job) ? 'released' : 'unreleased'],
   },

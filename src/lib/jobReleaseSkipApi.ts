@@ -13,7 +13,7 @@ async function readError(r: Response, fallback: string): Promise<never> {
 
 export async function fetchReleaseSkips(): Promise<JobReleaseSkip[]> {
   const r = await apiFetch('/api/job-release-skip');
-  if (!r.ok) await readError(r, 'โหลดรายการใบที่ไม่ปล่อยไม่สำเร็จ');
+  if (!r.ok) await readError(r, 'โหลดรายการใบที่ไม่ประกาศไม่สำเร็จ');
   const data = (await r.json()) as { skips?: JobReleaseSkip[] };
   return data.skips ?? [];
 }
@@ -24,14 +24,14 @@ export async function markReleaseSkip(jobId: string, reason: ReleaseSkipReason, 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jobId, reason, note }),
   });
-  if (!r.ok) await readError(r, 'บันทึก “ไม่ปล่อย” ไม่สำเร็จ');
+  if (!r.ok) await readError(r, 'บันทึก “ไม่ประกาศ” ไม่สำเร็จ');
   const data = (await r.json()) as { skip: JobReleaseSkip };
   return data.skip;
 }
 
 export async function clearReleaseSkip(jobId: string): Promise<number> {
   const r = await apiFetch(`/api/job-release-skip?jobId=${encodeURIComponent(jobId)}`, { method: 'DELETE' });
-  if (!r.ok) await readError(r, 'ยกเลิก “ไม่ปล่อย” ไม่สำเร็จ');
+  if (!r.ok) await readError(r, 'ยกเลิก “ไม่ประกาศ” ไม่สำเร็จ');
   const data = (await r.json()) as { count?: number };
   return data.count ?? 0;
 }

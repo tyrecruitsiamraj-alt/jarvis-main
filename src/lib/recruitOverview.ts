@@ -7,8 +7,8 @@
  *
  * 🔴 กติกา (ไฟล์นี้ pure · หน้าจอวาดอย่างเดียว ห้ามนับเอง):
  * - ทุกตัวเลขของเดือน = **รายชื่อที่กรอกเข้ามาในเดือนนั้น** (วันไทย) แล้วดูว่าตอนนี้ไปถึงขั้นไหน — ยกเว้น
- *   "ใบที่ประกาศ" (วันที่ปล่อยขึ้นหน้ารวมงาน — เจ้าของเลือก ไม่ใช่ Gen link) · "งานค้างตอนนี้" (สถานะวันนี้) ·
- *   "ผลงานรายคน" (งานที่ลงผลในเดือน)
+ *   "งานค้างตอนนี้" (สถานะวันนี้) · "ผลงานรายคน" (งานที่ลงผลในเดือน) · "ใบที่ประกาศ" ไม่ได้คิดที่นี่
+ *   (เลขเดียวกับหัวกล่องงาน — กล่องงานส่งมา `BoardPublishedTotals` · เจ้าของสั่ง 1 ต.ค. 2569)
  * - หน่วย = รายชื่อ (ใบสมัครที่ไม่ใช่ Lead — ตัวเดียวกับหน้าหลัก "ระบบไปกี่ %")
  * - **วัน = ครบ 24 ชม.** (`fullDaysBetween`) — กรอก 21:00 โทร 08:00 วันถัดไป = ภายใน 24 ชม. ไม่ใช่ "1 วัน"
  * - โทรแล้ว/ติดต่อสำเร็จ นับ AI + คน · แยกบรรทัดล่างว่า AI กี่รายชื่อ คนกี่รายชื่อ (Choice "นับแบบ 1")
@@ -24,7 +24,6 @@ import { DAY_MS, fullDaysBetween } from '@/lib/fullDays';
 import type {
   RecruitAiRow,
   RecruitAppFact,
-  RecruitRelease,
   RecruitStaffRow,
 } from '@/lib/recruitOverviewTypes';
 
@@ -58,10 +57,6 @@ export function channelOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referralSour
 export const positionOf = (f: Pick<RecruitAppFact, 'position'>) => f.position?.trim() || 'ไม่ระบุ';
 
 export type RecruitTotals = {
-  /** ใบที่ปล่อยขึ้นหน้ารวมงานในช่วง (null = อ่านไม่ได้) */
-  releases: number | null;
-  /** ในนั้นมีคนสมัครแล้ว */
-  releasesWithApps: number | null;
   names: number;
   /** ใบขอที่มีรายชื่อเข้ามา (ไม่นับใบสมัครที่ไม่ผูกใบขอ) */
   jobs: number;
@@ -79,18 +74,10 @@ export type RecruitTotals = {
   onBoard: number | null;
 };
 
-export function totalsOf(
-  apps: readonly RecruitAppFact[],
-  releases: readonly RecruitRelease[] | null,
-  from: string,
-  to: string,
-): RecruitTotals {
+export function totalsOf(apps: readonly RecruitAppFact[], from: string, to: string): RecruitTotals {
   const c = cohortOf(apps, from, to);
   const count = (p: (f: RecruitAppFact) => boolean) => c.filter(p).length;
-  const inRange = releases ? releases.filter((p) => p.ymd >= from && p.ymd <= to) : null;
   return {
-    releases: inRange ? inRange.length : null,
-    releasesWithApps: inRange ? inRange.filter((p) => p.applicants > 0).length : null,
     names: c.length,
     jobs: new Set(c.map((f) => f.jobId).filter((j): j is string => !!j)).size,
     called: count(isCalled),

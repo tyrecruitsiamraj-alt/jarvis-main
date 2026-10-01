@@ -535,7 +535,7 @@ export function NoApplicantsSection({ data, loading, limit = 30 }: { data: Data 
                   <Num>{n(j.positions)}</Num>
                   <Num className={(j.ageDays ?? 0) > 30 ? TONE.danger.value : undefined}>{TH_NUM_DAYS(j.ageDays)}</Num>
                   <TableCell className={cn('whitespace-nowrap text-xs', DASH.muted)}>
-                    {j.released ? 'ปล่อยแล้ว ยังเงียบ' : 'ยังไม่ปล่อย'}
+                    {j.released ? 'ประกาศแล้ว ยังเงียบ' : 'ยังไม่ประกาศ'}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button asChild size="xs" variant="outline">

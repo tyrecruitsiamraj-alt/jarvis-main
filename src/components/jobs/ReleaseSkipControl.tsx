@@ -83,12 +83,12 @@ const ReleaseSkipControl: React.FC<{
     return (
       <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2.5', TONE.danger.soft)}>
         <div className="min-w-0">
-          <p className={cn('text-sm font-medium', TONE.danger.value)}>ไม่ปล่อยใบนี้ · {releaseSkipText(skip)}</p>
+          <p className={cn('text-sm font-medium', TONE.danger.value)}>ไม่ประกาศใบนี้ · {releaseSkipText(skip)}</p>
           <p className={cn('text-xs', DASH.muted)}>ตั้งเมื่อ {formatYmdDmyBe(BKK_YMD.format(new Date(skip.skipped_at)))}</p>
           {error ? <p className={cn('text-xs', TONE.danger.value)}>{error}</p> : null}
         </div>
         <Button type="button" size="xs" variant="outline" disabled={busy} onClick={() => void clear()}>
-          {busy ? 'กำลังบันทึก…' : 'ยกเลิก ไม่ปล่อย'}
+          {busy ? 'กำลังบันทึก…' : 'ยกเลิก ไม่ประกาศ'}
         </Button>
       </div>
     );
@@ -99,15 +99,15 @@ const ReleaseSkipControl: React.FC<{
       <div className="flex justify-end">
         <Button type="button" size="xs" variant="outline" onClick={() => setOpen(true)}>
           <Ban aria-hidden />
-          ไม่ปล่อยใบนี้
+          ไม่ประกาศใบนี้
         </Button>
       </div>
     );
   }
 
   return (
-    <section className="space-y-3 rounded-2xl border border-border/60 bg-card/60 p-4" aria-label="ไม่ปล่อยใบนี้">
-      <p className="text-sm font-medium text-foreground">ไม่ปล่อยใบนี้ เพราะอะไร</p>
+    <section className="space-y-3 rounded-2xl border border-border/60 bg-card/60 p-4" aria-label="ไม่ประกาศใบนี้">
+      <p className="text-sm font-medium text-foreground">ไม่ประกาศใบนี้ เพราะอะไร</p>
       <RadioGroup value={reason} onValueChange={(v) => setReason(v as ReleaseSkipReason)} className="gap-2">
         {RELEASE_SKIP_REASONS.map((r) => (
           <div key={r.key} className="flex items-center gap-2">
@@ -142,7 +142,7 @@ const ReleaseSkipControl: React.FC<{
           ยกเลิก
         </Button>
         <Button type="button" size="xs" disabled={busy || !reason} onClick={() => void save()}>
-          {busy ? 'กำลังบันทึก…' : 'บันทึก ไม่ปล่อย'}
+          {busy ? 'กำลังบันทึก…' : 'บันทึก ไม่ประกาศ'}
         </Button>
       </div>
     </section>

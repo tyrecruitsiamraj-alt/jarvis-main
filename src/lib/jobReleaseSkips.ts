@@ -57,7 +57,7 @@ export function validateReleaseSkip(input: {
   reason: unknown;
   note: unknown;
 }): { ok: true; reason: ReleaseSkipReason; note: string | null } | { ok: false; message: string } {
-  if (!isReleaseSkipReason(input.reason)) return { ok: false, message: 'เลือกเหตุผลที่ไม่ปล่อยก่อน' };
+  if (!isReleaseSkipReason(input.reason)) return { ok: false, message: 'เลือกเหตุผลที่ไม่ประกาศก่อน' };
   const note = typeof input.note === 'string' ? input.note.trim() : '';
   if (note.length > RELEASE_SKIP_NOTE_MAX) {
     return { ok: false, message: `เหตุผลยาวได้ไม่เกิน ${RELEASE_SKIP_NOTE_MAX} ตัวอักษร` };

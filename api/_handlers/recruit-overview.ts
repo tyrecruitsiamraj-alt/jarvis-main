@@ -11,8 +11,8 @@
  *    ผู้ใช้ผูกแผนก = BU ของตัวเองเสมอ (`loadMatchingBuScope`)
  * 3. **ไม่คืนชื่อ/เบอร์ผู้สมัคร** — ต่อใบมีแต่ข้อเท็จจริง · ชื่อเจ้าหน้าที่มีแค่ยอดรวมรายคน (อนุญาตบน Dashboard 15 ส.ค. 2569)
  * 4. ก้อนล้มแยกกัน — อ่านไม่ได้ = null + เหตุใน `errors` (ห้ามโชว์ 0 แทน)
- * 5. ใบที่ประกาศ = ใบที่ปล่อยขึ้นหน้ารวมงานสาธารณะ (`job_public_releases`) — เจ้าของเลือกเอง 30 ก.ย. 2569
- *    (Choice "นับที่ปล่อยขึ้นหน้ารวมงาน" · ตรงกับ 100% บนการ์ดกล่องงาน) **ไม่ใช่ Gen link** ของหน้าทีม Online
+ * 5. "ใบที่ประกาศ" ไม่ได้คิดที่เส้นนี้ — หน้าเว็บใช้เลขของหัวกล่องงานตรง ๆ (เจ้าของสั่ง 1 ต.ค. 2569:
+ *    *"เปลี่ยนเป็น 7 เหมือนหัวกล่องงาน"*) · เดิมนับใบที่ประกาศในเดือนจาก `job_public_releases` — ถอดแล้ว
  */
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
@@ -40,7 +40,6 @@ import {
   holdEventAtSql,
 } from '../_lib/applicantOverviewSql.js';
 import { queueReplySql } from '../_lib/lumosQueueDefs.js';
-import { trendBuOfSiteSql } from '../_lib/siteBuSql.js';
 import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
 import { logError } from '../_lib/logger.js';
@@ -55,7 +54,6 @@ import type {
   RecruitAttendance,
   RecruitBacklog,
   RecruitOverviewResponse,
-  RecruitRelease,
   RecruitStaffRow,
 } from '../../src/lib/recruitOverviewTypes.js';
 
@@ -64,8 +62,6 @@ const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const HOLDS = tableInAppSchema('candidate_call_holds');
 const CONTACTS = tableInAppSchema('application_contact_logs');
 const ATTEND = tableInAppSchema('application_appointment_results');
-const RELEASES = tableInAppSchema('job_public_releases');
-const MAP = tableInAppSchema('job_site_map');
 
 /** จุดเริ่มของวันไทย (รวม) / วันถัดไป (ไม่รวม) */
 const startOfBkk = (ymd: string) => `${ymd}T00:00:00+07:00`;
@@ -127,21 +123,6 @@ export function appointmentBacklogSql(): string {
     from ${APPS} a
     ${appBuJoin('a')}
    where ${scopeWhere('$1')}`;
-}
-
-/**
- * ใบที่ประกาศ = ใบที่ปล่อยขึ้นหน้ารวมงานในช่วง [$1, $2) · $3 = BU (ไซต์ของใบขอ) — หนึ่งใบหนึ่งแถว (`job_id` เป็นคีย์)
- * ⚠️ ถอนประกาศแล้วแถวหาย (ไม่มีประวัติ) ⇒ นับเฉพาะใบที่ยังปล่อยอยู่ ตามวันที่ปล่อย · ผู้สมัคร = ไม่นับ Lead (ตัวเดียวกับการ์ดกล่องงาน)
- */
-export function releasesSql(): string {
-  return `
-  select r.job_id, to_char(timezone('Asia/Bangkok', r.released_at), 'YYYY-MM-DD') as ymd,
-         (select count(*)::int from ${APPS} a
-           where a.job_id = r.job_id and not coalesce(a.is_lead, false)) as applicants
-    from ${RELEASES} r
-    left join ${MAP} m on m.job_id = r.job_id
-   where r.released_at >= $1::timestamptz and r.released_at < $2::timestamptz
-     and ($3::text is null or ${trendBuOfSiteSql('m.site_code')} = $3::text)`;
 }
 
 /** ผลงานรายคนของเดือน [$1, $2) · $3 = BU — คืนแถวดิบ (ใบ × คน) ให้นับรายชื่อไม่ซ้ำฝั่ง Node */
@@ -373,7 +354,6 @@ export async function buildRecruitOverview(
     bu,
     firstDay: null,
     apps: [],
-    releases: [],
     backlog: null,
     staff: [],
     ai: { called: 0, reached: 0, saidYes: 0 },
@@ -386,10 +366,9 @@ export async function buildRecruitOverview(
   const monthRange = [startOfBkk(window.from), startOfBkk(addDays(window.to, 1)), bu];
   const nowMs = now.getTime();
 
-  const [boardR, factsR, releasesR, backlogR, apptR, staffR, showedR, aiR, firstR, everR] = await Promise.all([
+  const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR] = await Promise.all([
     settle('รายชื่อบนบอร์ด', loadBoardPhoneSet),
     settle('ใบสมัคร', () => loadFacts(bothRange)),
-    settle('ใบที่ประกาศ', async () => (await dbQuery<Row>(releasesSql(), bothRange)).rows),
     settle('งานค้าง', async () => (await dbQuery<Row>(backlogSql(), [bu])).rows),
     settle('นัดที่รอผล', async () => {
       try {
@@ -429,13 +408,6 @@ export async function buildRecruitOverview(
   else {
     body.apps = null;
     body.errors.apps = factsR.error;
-  }
-
-  if (releasesR.ok) {
-    body.releases = releasesR.value.map((r): RecruitRelease => ({ ymd: text(r.ymd) ?? '', applicants: Number(r.applicants ?? 0) }));
-  } else {
-    body.releases = null;
-    body.errors.releases = releasesR.error;
   }
 
   if (backlogR.ok && apptR.ok) body.backlog = toBacklog(backlogR.value, apptR.value, nowMs);

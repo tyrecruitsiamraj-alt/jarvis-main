@@ -162,7 +162,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
       {skip && !progress?.released ? (
         <p className={cn('inline-flex w-fit max-w-full items-center gap-1 rounded-md px-2 py-0.5 text-sm', TONE.danger.chip)}>
           <Ban className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          <span className="truncate">ไม่ปล่อย · {releaseSkipText(skip)}</span>
+          <span className="truncate">ไม่ประกาศ · {releaseSkipText(skip)}</span>
         </p>
       ) : null}
 

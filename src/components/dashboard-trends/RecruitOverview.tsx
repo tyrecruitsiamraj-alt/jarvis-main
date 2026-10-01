@@ -41,6 +41,7 @@ import {
   totalsOf,
 } from '@/lib/recruitOverview';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
+import type { BoardPublishedTotals } from '@/lib/boardRelease';
 import {
   BacklogBody,
   ChannelTable,
@@ -82,7 +83,7 @@ function HowToRead() {
       <PopoverContent align="end" className="w-80 space-y-3 p-4 text-xs">
         <ul className={cn('list-disc space-y-1.5 pl-4', DASH.muted)}>
           <li>ตัวเลขเป็นของรายชื่อที่กรอกเข้ามาในเดือนที่เลือก ว่าตอนนี้ไปถึงขั้นไหนแล้ว</li>
-          <li>ยกเว้น "งานค้างตอนนี้" เป็นสถานะวันนี้ · "ใบที่ประกาศ" นับวันที่ปล่อยขึ้นหน้ารวมงาน (ถอนแล้วไม่นับ) · "ผลงานรายคน" นับงานที่ลงผลในเดือน</li>
+          <li>ยกเว้น "ใบที่ประกาศ" กับ "งานค้างตอนนี้" เป็นสถานะวันนี้ (ใบที่ประกาศ = เลขเดียวกับหัวกล่องงาน) · "ผลงานรายคน" นับงานที่ลงผลในเดือน</li>
           <li>เขียวเพิ่ม แดงลด เทียบเดือนก่อนช่วงวันเดียวกัน</li>
           <li>นับวันแบบครบ 24 ชม. ถึงเป็น 1 วัน</li>
         </ul>
@@ -106,7 +107,13 @@ function HowToRead() {
   );
 }
 
-const RecruitOverview: React.FC = () => {
+const RecruitOverview: React.FC<{
+  /**
+   * 🔴 ยอด "ประกาศ" จากหัวกล่องงาน (เจ้าของ 1 ต.ค. 2569: *"เปลี่ยนเป็น 7 เหมือนหัวกล่องงาน"*) — หน้าแม่ส่งมา
+   * สถานะตอนนี้ ไม่ขึ้นกับเดือน · `null`/ไม่ส่ง = ยังบอกไม่ได้ ("—")
+   */
+  published?: BoardPublishedTotals | null;
+}> = ({ published = null }) => {
   /** null = เดือนนี้ (ให้เส้นตัดสินจากวันไทยของ server) */
   const [month, setMonth] = useState<string | null>(null);
   const [rev, setRev] = useState(0);
@@ -130,13 +137,13 @@ const RecruitOverview: React.FC = () => {
   const view = useMemo(() => {
     if (!data || !win) return null;
     const list = apps ?? [];
-    const cur = totalsOf(list, data.releases, win.from, win.to);
+    const cur = totalsOf(list, win.from, win.to);
     /**
      * 🔴 เทียบเดือนก่อน **เฉพาะตอนข้อมูลมีครบทั้งช่วงก่อน** (กับดักเดียวกับหน้าทีม Online: เคยขึ้น "เพิ่ม 1,400%"
      * เพราะข้อมูลเพิ่งเริ่มกลางช่วงก่อน) — ข้อมูลเริ่มกลางเดือนก่อน/ยังไม่มีเลย = ไม่เทียบ แล้วบอกเหตุบนหัว
      */
     const prevFull = !!data.firstDay && data.firstDay <= win.prevFrom;
-    const prev = prevFull ? totalsOf(list, data.releases, win.prevFrom, win.prevTo) : null;
+    const prev = prevFull ? totalsOf(list, win.prevFrom, win.prevTo) : null;
     const cohort = cohortOf(list, win.from, win.to);
     return {
       cur,
@@ -237,9 +244,9 @@ const RecruitOverview: React.FC = () => {
         <OverviewKpi
           icon={Link2}
           label="ใบที่ประกาศ"
-          value={cur.releases}
-          previous={prev?.releases ?? null}
-          foot={cur.releasesWithApps === null ? null : `มีคนสมัคร ${fmt(cur.releasesWithApps)} ใบ`}
+          value={published ? published.published : null}
+          previous={null}
+          foot={published ? `ตอนนี้ · มีคนสมัครแล้ว ${fmt(published.withApplicants)} ใบ` : null}
         />
         <OverviewKpi
           icon={UserPlus}
@@ -283,7 +290,7 @@ const RecruitOverview: React.FC = () => {
         <OverviewCard
           icon={Filter}
           title="เส้นทางของรายชื่อ"
-          sub={cur.releases === null ? 'รายชื่อที่เข้ามาเดือนนี้ ไปถึงขั้นไหนแล้ว' : `ประกาศ ${fmt(cur.releases)} ใบ · รายชื่อที่เข้ามาเดือนนี้ ไปถึงขั้นไหนแล้ว`}
+          sub="รายชื่อที่เข้ามาเดือนนี้ ไปถึงขั้นไหนแล้ว"
           className="lg:col-span-2"
         >
           {apps && cur.names > 0 ? <FunnelList steps={view.steps} /> : <EmptyNote>ยังไม่มีรายชื่อในเดือนนี้</EmptyNote>}

@@ -75,7 +75,7 @@ describe('ป๊อปไล่งาน — ดึงลงจากหน้�
     fetchJobReleases.mockResolvedValue(released);
     renderSteps();
     const button = await screen.findByRole('button', { name: 'ดึงลงจากหน้าสาธารณะ' });
-    expect(screen.getByText('✓ ปล่อยขึ้นหน้าสาธารณะแล้ว')).toBeTruthy();
+    expect(screen.getByText('✓ ประกาศขึ้นหน้าสาธารณะแล้ว')).toBeTruthy();
     fetchJobReleases.mockResolvedValue([]);
     fireEvent.click(button);
     await waitFor(() => expect(unreleaseJobsFromPublic).toHaveBeenCalledWith([JOB_ID]));
@@ -97,7 +97,7 @@ describe('ป๊อปไล่งานโฉมใหม่ (30 ก.ย. 2569)
   it('ขั้น 1: แยกการ์ดชัด · ไม่มี "ติดอะไรไหม"/"ใครแก้อะไรไป" · "ไม่ปล่อยใบนี้" อยู่ล่างสุดใต้ปุ่มถัดไป', async () => {
     fetchJobReleases.mockResolvedValue([]);
     renderSteps();
-    const skipButton = await screen.findByRole('button', { name: /ไม่ปล่อยใบนี้/ });
+    const skipButton = await screen.findByRole('button', { name: /ไม่ประกาศใบนี้/ });
     expect(screen.getByRole('heading', { name: 'ข้อมูลใบขอ' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'เพศที่รับ' })).toBeTruthy();
     expect(screen.queryByText('ติดอะไรไหม')).toBeNull();

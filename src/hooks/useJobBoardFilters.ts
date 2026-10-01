@@ -193,6 +193,8 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
     filtered,
     usedRelatedFallback,
     filterRows,
+    /** ใบเปิดที่กล่องงานโชว์ (ก่อนตัวกรอง/คำค้นทุกตัว) — แท็บภาพรวมนับ "ประกาศ" จากชุดนี้ (1 ต.ค. 2569) */
+    visible,
     visibleCount: visible.length,
     /** อัตรารวมของชุดที่มองเห็น (ก่อนกรอง) — หน่วยเดียวกับ Dashboard ที่นับ "อัตรา" */
     visiblePositions: sumJobPositionUnits(visible),

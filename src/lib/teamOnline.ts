@@ -1128,7 +1128,7 @@ export type RequestDecision = 'approved' | 'pending' | 'rejected';
 export const REQUEST_DECISIONS: ReadonlyArray<{ key: RequestDecision; label: string; hint: string }> = [
   { key: 'approved', label: 'อนุมัติแล้ว', hint: 'Gen link แล้ว' },
   { key: 'pending', label: 'รอดำเนินการ', hint: 'ยังไม่ Gen link' },
-  { key: 'rejected', label: 'ไม่อนุมัติ', hint: 'ทีมตั้ง “ไม่ปล่อย” พร้อมเหตุผล' },
+  { key: 'rejected', label: 'ไม่อนุมัติ', hint: 'ทีมตั้ง “ไม่ประกาศ” พร้อมเหตุผล' },
 ];
 
 /**

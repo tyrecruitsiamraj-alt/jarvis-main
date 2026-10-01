@@ -59,8 +59,7 @@ let facts: Rows;
 let backlog: Rows;
 let staffEvents: Rows;
 let aiEvents: Rows;
-let releases: Rows;
-let failReleases = false;
+let failBacklog = false;
 let noAttendanceTable = false;
 
 function route(text: string, params?: unknown[]) {
@@ -70,11 +69,10 @@ function route(text: string, params?: unknown[]) {
   if (text.includes("'claim'::text as kind")) return { rows: staffEvents };
   if (text.includes("r.result = 'showed'")) return { rows: [] };
   if (text.includes('as reached') && text.includes('join lumos_dispatch_queue q on')) return { rows: aiEvents };
-  if (text.includes('from job_public_releases r')) {
-    if (failReleases) throw new Error('boom');
-    return { rows: releases };
+  if (text.includes('as bad_phone')) {
+    if (failBacklog) throw new Error('boom');
+    return { rows: backlog };
   }
-  if (text.includes('as bad_phone')) return { rows: backlog };
   if (text.includes('as first_called_at')) {
     if (noAttendanceTable && text.includes('application_appointment_results')) throw Object.assign(new Error('no table'), { code: '42P01' });
     return { rows: facts, params };
@@ -93,11 +91,7 @@ beforeEach(() => {
   backlog = [];
   staffEvents = [];
   aiEvents = [];
-  releases = [
-    { job_id: 'siamraj-sql:R1', ymd: '2026-09-02', applicants: 2 },
-    { job_id: 'siamraj-sql:R2', ymd: '2026-09-15', applicants: 0 },
-  ];
-  failReleases = false;
+  failBacklog = false;
   noAttendanceTable = false;
 });
 
@@ -111,7 +105,7 @@ describe('เส้นอ่านอย่างเดียว + ขอบเ�
     expect(dbQuery).not.toHaveBeenCalled();
   });
 
-  it('🔴 ผู้ใช้ผูกแผนก = ส่ง BU ของตัวเองทุกคิวรี (รวมใบที่ประกาศ)', async () => {
+  it('🔴 ผู้ใช้ผูกแผนก = ส่ง BU ของตัวเองทุกคิวรี', async () => {
     loadMatchingBuScope.mockResolvedValue({ mode: 'code', code: 'LBD' });
     const json = vi.fn();
     await handler({ method: 'GET', user: { sub: 'u1', role: 'staff' }, query: { month: '2026-09' } }, { status: () => ({ json }), setHeader: vi.fn() });
@@ -121,17 +115,15 @@ describe('เส้นอ่านอย่างเดียว + ขอบเ�
       if (text.includes('any_row')) continue;
       expect(params?.[params.length - 1], text.slice(0, 60)).toBe('LBD');
     }
-    expect(body.releases).toEqual([{ ymd: '2026-09-02', applicants: 2 }, { ymd: '2026-09-15', applicants: 0 }]);
   });
 
-  it('🔴 ใบที่ประกาศ = ปล่อยขึ้นหน้ารวมงาน (เจ้าของเลือก 30 ก.ย. 2569) ไม่ใช่ Gen link · ช่วงเดียวกับข้อเท็จจริง · ไม่นับ Lead', async () => {
-    const text = mod.releasesSql();
-    expect(text).toContain('from job_public_releases r');
-    expect(text).not.toContain('recruit_postings');
-    expect(text).toContain('not coalesce(a.is_lead, false)');
-    await build('2026-09');
-    const call = (dbQuery.mock.calls as [string, unknown[]][]).find(([t]) => t.includes('from job_public_releases r'))!;
-    expect(call[1]).toEqual(['2026-08-01T00:00:00+07:00', '2026-10-01T00:00:00+07:00', null]);
+  it('🔴 "ใบที่ประกาศ" ไม่ได้นับที่เส้นนี้ — หน้าเว็บใช้เลขของหัวกล่องงานตรง ๆ (เจ้าของสั่ง 1 ต.ค. 2569)', async () => {
+    const body = await build('2026-09');
+    expect(body).not.toHaveProperty('releases');
+    for (const [text] of dbQuery.mock.calls as [string][]) {
+      expect(text).not.toContain('job_public_releases');
+      expect(text).not.toContain('recruit_postings');
+    }
   });
 
   it('ไม่มีสิทธิ์ BU ไหนเลย (none) = ไม่ยิงคิวรี คืนก้อนว่าง', async () => {
@@ -185,11 +177,11 @@ describe('ข้อเท็จจริงต่อใบ — ไม่มี�
     expect(body.errors.apps).toBeUndefined();
   });
 
-  it('🔴 ก้อนล้มแยกกัน — ใบที่ประกาศอ่านไม่ได้ = null + เหตุ ก้อนอื่นยังมา', async () => {
-    failReleases = true;
+  it('🔴 ก้อนล้มแยกกัน — งานค้างอ่านไม่ได้ = null + เหตุ ก้อนอื่นยังมา', async () => {
+    failBacklog = true;
     const body = await build('2026-09');
-    expect(body.releases).toBeNull();
-    expect(body.errors.releases).toBeTruthy();
+    expect(body.backlog).toBeNull();
+    expect(body.errors.backlog).toBeTruthy();
     expect(body.apps).toHaveLength(2);
   });
 });

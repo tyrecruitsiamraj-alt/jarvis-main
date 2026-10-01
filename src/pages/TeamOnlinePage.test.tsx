@@ -288,8 +288,8 @@ describe('หน้าทีม Online', () => {
     renderAt();
     await waitFor(() => expect(text()).toContain('นัดผู้สมัครที่ติดต่อได้แล้ว 2 ใบ'));
     expect(text()).toContain('ส่งประกาศที่มีลิงก์แล้ว 1 ใบ');
-    expect(text()).toContain('ดันประกาศที่ปล่อยแล้วยังไม่มีคนสมัคร 1 ใบ');
-    expect(text()).toContain('ปล่อยประกาศใบที่ยังต้องหาคน 2 ใบ');
+    expect(text()).toContain('ดันใบที่ประกาศแล้วยังไม่มีคนสมัคร 1 ใบ');
+    expect(text()).toContain('ประกาศใบที่ยังต้องหาคน 2 ใบ');
     const hrefs = Array.from(document.querySelectorAll('a')).map((a) => a.getAttribute('href'));
     expect(hrefs).toContain('/jobs/board?view=list&bucket=success_unscheduled');
     expect(hrefs).toContain('/jobs/board?lane=unreleased&step=publish');

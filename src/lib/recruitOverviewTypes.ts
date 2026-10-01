@@ -52,9 +52,6 @@ export type RecruitAppFact = {
   onBoard: boolean | null;
 };
 
-/** ใบที่ปล่อยขึ้นหน้ารวมงาน (วันไทยที่ปล่อย) + ผู้สมัครของใบ (ไม่นับ Lead) — เจ้าของเลือก 30 ก.ย. 2569 ไม่ใช่ Gen link */
-export type RecruitRelease = { ymd: string; applicants: number };
-
 /** งานค้างตอนนี้ — สถานะวันนี้ ไม่ขึ้นกับเดือนที่เลือก · อายุนับเป็นวันเต็ม (ครบ 24 ชม. = 1 วัน) */
 export type RecruitBacklog = {
   /** ยังไม่มีใครโทร — แยกอายุใบ · ในนั้นรอ AI โทรอยู่ / เบอร์ใช้โทรไม่ได้ */
@@ -106,12 +103,11 @@ export type RecruitOverviewResponse = {
   firstDay: string | null;
   /** ข้อเท็จจริงต่อใบของทั้งสองช่วง (เดือนที่เลือก + ช่วงที่เทียบ) */
   apps: RecruitAppFact[] | null;
-  releases: RecruitRelease[] | null;
   backlog: RecruitBacklog | null;
   staff: RecruitStaffRow[] | null;
   ai: RecruitAiRow | null;
   /** เคยมีใครบันทึกผลมา/ไม่มาไหม — ยังไม่เคย = ขั้นมาตามนัดขึ้น "—" (ห้ามโชว์ 0 ที่แปลว่ายังไม่เคยบันทึก) */
   attendanceEverRecorded: boolean;
   /** ก้อนที่อ่านไม่ได้ + เหตุ (ก้อนล้มแยกกัน — ห้ามโชว์ 0 แทน) */
-  errors: Partial<Record<'apps' | 'releases' | 'backlog' | 'staff' | 'board', string>>;
+  errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board', string>>;
 };

@@ -530,7 +530,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                  สาธารณะต้องมีปุ่มให้ย้อนกลับมาได้"* → Choice "บนหัวป๊อป ข้างป้าย ปล่อยแล้ว") · ปุ่มเดิมในขั้น 4 ยังอยู่ */
               <div className="flex flex-wrap items-center gap-2">
                 <span className={cn('rounded-full border px-3 py-1 text-xs', TONE.success.soft, TONE.success.value)}>
-                  ✓ ปล่อยขึ้นหน้าสาธารณะแล้ว
+                  ✓ ประกาศขึ้นหน้าสาธารณะแล้ว
                 </span>
                 <Button
                   type="button"
@@ -544,7 +544,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
               </div>
             ) : skip ? (
               <p className={cn('w-fit rounded-full border px-3 py-1 text-xs', TONE.danger.soft, TONE.danger.value)}>
-                ตั้งไม่ปล่อยไว้ · {releaseSkipText(skip)}
+                ตั้งไม่ประกาศไว้ · {releaseSkipText(skip)}
               </p>
             ) : null}
 
@@ -698,7 +698,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
 
                 {!released && skip ? (
                   <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.danger.soft)}>
-                    <p className={cn('text-sm', TONE.danger.value)}>ใบนี้ตั้งไม่ปล่อยไว้ ยกเลิกที่ขั้น 1 ก่อนถึงจะส่งได้</p>
+                    <p className={cn('text-sm', TONE.danger.value)}>ใบนี้ตั้งไม่ประกาศไว้ ยกเลิกที่ขั้น 1 ก่อนถึงจะส่งได้</p>
                     <Button type="button" size="xs" variant="outline" onClick={() => setOpenStep('info')}>
                       ไปขั้น 1
                     </Button>
@@ -714,7 +714,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 ) : null}
 
                 {released === null ? (
-                  <Loading text="กำลังอ่านทะเบียนการปล่อย…" />
+                  <Loading text="กำลังอ่านทะเบียนการประกาศ…" />
                 ) : released ? (
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     <p className={cn('mr-auto text-sm', TONE.success.value)}>ใบนี้อยู่บนหน้าสาธารณะแล้ว</p>

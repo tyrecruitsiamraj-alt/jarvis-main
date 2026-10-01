@@ -60,7 +60,7 @@ export const LEDGER_STATE_TEXT: Record<
   { title: string; hint: string; canRetry: boolean }
 > = {
   loading: {
-    title: 'กำลังอ่านตัวเลขของงานปล่อยประกาศ…',
+    title: 'กำลังอ่านตัวเลขของงานประกาศ…',
     hint: 'ระบบงานหลักตอบช้าได้ถึงหนึ่งนาที',
     canRetry: false,
   },
@@ -70,7 +70,7 @@ export const LEDGER_STATE_TEXT: Record<
     canRetry: true,
   },
   forbidden: {
-    title: 'บัญชีนี้ไม่มีสิทธิ์เห็นตัวเลขงานปล่อยประกาศ',
+    title: 'บัญชีนี้ไม่มีสิทธิ์เห็นตัวเลขงานประกาศ',
     hint: 'กดลองใหม่ก็ไม่ช่วย — ต้องให้แอดมินเปิดสิทธิ์ให้บทบาทของคุณก่อน',
     canRetry: false,
   },

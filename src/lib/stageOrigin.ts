@@ -24,7 +24,7 @@ export const ORIGIN_LABELS: Record<
   board: {
     label: 'กล่องงาน',
     path: '/jobs/board',
-    blurb: 'ทำงานปล่อยประกาศอยู่ — กดกลับไปได้ ขั้นที่กรองไว้ยังอยู่',
+    blurb: 'ทำงานประกาศอยู่ — กดกลับไปได้ ขั้นที่กรองไว้ยังอยู่',
   },
   applyPublic: {
     label: 'หน้าสมัครงาน',

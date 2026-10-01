@@ -26,7 +26,7 @@ async function readError(r: Response, fallback: string): Promise<never> {
 
 export async function fetchJobReleases(): Promise<JobRelease[]> {
   const r = await apiFetch('/api/job-public-release');
-  if (!r.ok) await readError(r, 'โหลดรายการใบที่ปล่อยแล้วไม่สำเร็จ');
+  if (!r.ok) await readError(r, 'โหลดรายการใบที่ประกาศแล้วไม่สำเร็จ');
   const data = (await r.json()) as { releases?: JobRelease[] };
   return data.releases ?? [];
 }
@@ -37,7 +37,7 @@ export async function releaseJobsToPublic(jobIds: string[], note?: string): Prom
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jobIds, note }),
   });
-  if (!r.ok) await readError(r, 'ปล่อยใบขอไม่สำเร็จ');
+  if (!r.ok) await readError(r, 'ประกาศใบขอไม่สำเร็จ');
   const data = (await r.json()) as { count?: number };
   return data.count ?? 0;
 }

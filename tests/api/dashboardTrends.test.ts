@@ -127,7 +127,19 @@ describe('แท็บ Dashboard อยู่ในสองหน้า แล�
     const page = code('src/pages/jobs/StaffJobBoardPage.tsx');
     expect(page).toContain("lazy(() => import('@/components/dashboard-trends/RecruitOverview'))");
     expect(page).toContain("const classicDashboard = searchParams.get('dash') === 'classic';");
-    expect(page).toContain('{classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview />}');
+    expect(page).toContain('{classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview published={boardPublished} />}');
+  });
+  it('🔴 ใบที่ประกาศบนภาพรวม = เลขของหัวกล่องงาน (เจ้าของ 1 ต.ค. 2569: "เปลี่ยนเป็น 7 เหมือนหัวกล่องงาน")', () => {
+    const board = code('src/components/jobs/JobBoardView.tsx');
+    // กล่องงานคิดด้วยตัวเดียวกับหัว (buildReleaseLedger) บนใบเปิดที่กล่องงานโชว์ ก่อนตัวกรอง แล้วส่งขึ้นหน้าแม่
+    expect(board).toContain('const all = buildReleaseLedger(filters.visible, releaseFacts);');
+    expect(board).toContain('return { published: all.released, withApplicants: all.releasedWithApplicants };');
+    expect(board).toContain('onPublishedTotals?.(publishedTotals);');
+    const page = code('src/pages/jobs/StaffJobBoardPage.tsx');
+    expect(page).toContain('onPublishedTotals={setBoardPublished}');
+    expect(page).toContain('<RecruitOverview published={boardPublished} />');
+    const overview = code('src/components/dashboard-trends/RecruitOverview.tsx');
+    expect(overview).toContain('value={published ? published.published : null}');
   });
   it.each([
     'src/components/dashboard-trends/RecruitOverview.tsx',

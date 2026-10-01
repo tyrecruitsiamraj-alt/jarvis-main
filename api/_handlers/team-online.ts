@@ -686,7 +686,7 @@ export async function buildTeamOnline(
       byBu: laneRows(jobs, labelOf, knownBus),
       oldest: oldestNoApplicantJobs(pageJobs),
     };
-  } else body.errors.lanes = feedR.ok ? 'อ่านทะเบียนปล่อยใบ/ประกาศไม่ได้' : 'อ่านใบขอที่เปิดอยู่ไม่ได้';
+  } else body.errors.lanes = feedR.ok ? 'อ่านทะเบียนประกาศ/Gen link ไม่ได้' : 'อ่านใบขอที่เปิดอยู่ไม่ได้';
 
   // ── อัตราที่ขอเข้า: อนุมัติแล้ว (Gen link) · รอดำเนินการ · ไม่อนุมัติ (ไม่ปล่อย + เหตุผล) ──
   if (reqR.ok && requests && postR.ok && relR.ok && funnelR.ok && feedR.ok && boardJobs) {
@@ -704,7 +704,7 @@ export async function buildTeamOnline(
     const page = decisionSummary(w, rows.filter((r) => inPage(r.bu)), labelOf);
     const perBu = decisionSummary(w, rows, labelOf, knownBus);
     body.decisions = { total: page.total, byBu: perBu.byBu, skipsReady: skipR.ok };
-  } else body.errors.decisions = !reqR.ok ? 'อ่านใบขอจาก ERP ไม่ได้ตอนนี้' : 'อ่านประกาศ/ทะเบียนปล่อย/กล่องงานไม่ได้';
+  } else body.errors.decisions = !reqR.ok ? 'อ่านใบขอจาก ERP ไม่ได้ตอนนี้' : 'อ่าน Gen link/ทะเบียนประกาศ/กล่องงานไม่ได้';
 
   // ── รายชื่อคนใช้งาน (เฉพาะหัวหน้า/admin) ──
   if (canSeePeople && actR.ok) {

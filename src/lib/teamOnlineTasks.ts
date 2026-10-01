@@ -51,7 +51,7 @@ export function onlineTasks(data: TeamOnlineResponse | null): NextTask[] {
   if (lane && lane.silent > 0) {
     out.push({
       key: 'online-silent',
-      title: `ดันประกาศที่ปล่อยแล้วยังไม่มีคนสมัคร ${NUM.format(lane.silent)} ใบ`,
+      title: `ดันใบที่ประกาศแล้วยังไม่มีคนสมัคร ${NUM.format(lane.silent)} ใบ`,
       reason: 'ขึ้นหน้าสมัครงานแล้วแต่ยังไม่มีใครกรอก — ลองเพิ่มช่องทางหรือปรับประกาศ',
       badge: 'ประกาศเงียบ',
       count: lane.silent,
@@ -64,7 +64,7 @@ export function onlineTasks(data: TeamOnlineResponse | null): NextTask[] {
   if (lane && lane.sourcing > 0) {
     out.push({
       key: 'online-sourcing',
-      title: `ปล่อยประกาศใบที่ยังต้องหาคน ${NUM.format(lane.sourcing)} ใบ`,
+      title: `ประกาศใบที่ยังต้องหาคน ${NUM.format(lane.sourcing)} ใบ`,
       reason: 'ยังไม่ขึ้นหน้าสมัครงาน — ค้างสะสม แก้วันนี้ไม่จบ แต่ต้องรู้ว่ากองอยู่เท่าไหร่',
       // คำเดียวกับชิปย่อยของกล่องงาน — "ยังไม่ปล่อย" บนกล่องงานคือ 320 (รวมใบที่มีคนเริ่มงานแล้ว)
       badge: 'ยังต้องหาคน',
