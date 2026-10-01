@@ -26,14 +26,19 @@ import {
  */
 const FollowCompleteControls: React.FC<{
   busy?: boolean;
+  /**
+   * กาง 5 คำไว้ตั้งแต่แรก + ไม่มีปุ่มพับ — ใช้ในป๊อป "ไม่ย้าย" ของการ์ดติดตามครบ
+   * (1 ต.ค. 2569 · ป๊อปมีปุ่มปิดของตัวเองอยู่แล้ว)
+   */
+  alwaysOpen?: boolean;
   onComplete: (outcome: FollowOutcome, note?: string) => void | Promise<void>;
-}> = ({ busy = false, onComplete }) => {
-  const [open, setOpen] = useState(false);
+}> = ({ busy = false, alwaysOpen = false, onComplete }) => {
+  const [open, setOpen] = useState(alwaysOpen);
   const [note, setNote] = useState('');
 
   const submit = async (outcome: FollowOutcome) => {
     await onComplete(outcome, note.trim() || undefined);
-    setOpen(false);
+    if (!alwaysOpen) setOpen(false);
     setNote('');
   };
 
@@ -89,18 +94,20 @@ const FollowCompleteControls: React.FC<{
         placeholder="หมายเหตุ (ถ้ามี) — พิมพ์ก่อนกดคำด้านบน"
         className="min-h-[36px] rounded-lg border border-border bg-background px-2.5 text-[12px]"
       />
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => {
-          setOpen(false);
-          setNote('');
-        }}
-        className="min-h-8 w-fit px-3 text-[11px]"
-      >
-        ปิด
-      </Button>
+      {alwaysOpen ? null : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setOpen(false);
+            setNote('');
+          }}
+          className="min-h-8 w-fit px-3 text-[11px]"
+        >
+          ปิด
+        </Button>
+      )}
     </div>
   );
 };

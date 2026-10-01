@@ -92,6 +92,7 @@ import TopicField from '@/components/follow/TopicField';
 import FollowMasterManagerDialog from '@/components/follow/FollowMasterManagerDialog';
 import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
+import FollowCompletedCard from '@/components/follow/FollowCompletedCard';
 import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
 import DateTimeField24 from '@/components/shared/DateTimeField24';
@@ -303,7 +304,6 @@ const FollowPage: React.FC = () => {
    */
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedFrom, setPickedFrom] = useState<string | null>(null);
-  /** ข้อความยืนยันการย้ายไปดูแลหลังเริ่มงาน (Phase 7.2) — แยกจาก pickedFrom ของฟอร์ม */
   /** ตัวเลือกหน่วยงานจากบอร์ด (18 ส.ค. 2569) — คู่แฝดของ picker ชื่อคน */
   const [unitPickerOpen, setUnitPickerOpen] = useState(false);
   /**
@@ -1069,12 +1069,9 @@ const FollowPage: React.FC = () => {
   const groups = useMemo(() => groupFollowEntries(filtered), [filtered]);
 
   /**
-   * กลุ่ม **ทั้งชุด ไม่ผ่านตัวกรอง** — ใช้กับแถบ "โทรได้คำตอบแล้ว / ส่งไปดูแลหลังเริ่มงาน"
-   *
-   * 🔴 แก้ 3 ก.ย. 2569 (เจ้าของแจ้งว่าแถบส่งต่อไม่ขึ้น) — เดิมแถบนั้นกินกลุ่มที่
-   * **ผ่านตัวกรองแท็บ/วันที่/ช่วงเวลา** มาแล้ว ⇒ พอเปิดแท็บอื่นหรือเลือกวัน
-   * แถบก็หายไปทั้งแถบ ทั้งที่งานยังค้างรอส่งต่ออยู่จริง
-   * แถบนี้คือ **คิวงานของทั้งระบบ** ไม่ใช่มุมมองของตัวกรอง จึงต้องนับจากชุดเต็มเสมอ
+   * 🔴 การ์ด "ติดตามครบ" กิน `scopeGroups` (ชุดเต็มของแท็บ · ประกาศข้างล่าง) **ไม่ใช่ `groups`**
+   * บทเรียน 3 ก.ย. 2569: แถบส่งต่อเดิมกินกลุ่มที่ผ่านตัวกรองแท็บ/วันที่แล้ว ⇒ เลือกวันอื่นแถบหายทั้งแถบ
+   * ทั้งที่งานยังค้างจริง · กองนี้คือ **คิวงาน** ไม่ใช่มุมมองของตัวกรอง จึงนับจากชุดเต็มเสมอ
    */
 
   /**
@@ -1102,10 +1099,8 @@ const FollowPage: React.FC = () => {
    * ส่วน Lumos โชว์ 3 · **ป๊อปคือที่ที่คนมาถามว่า "ตกลงเกิดอะไรขึ้น"** จึงต้องเล่าครบเสมอ
    * (ปฏิทิน/เลขบนแท็บยังเคารพตัวกรองเหมือนเดิม ไม่งั้นเลขกับจอจะเถียงกันเอง)
    */
-  const allRows = useMemo(
-    () => buildFollowPlanningRows(groupFollowEntries(scopeItems)),
-    [scopeItems],
-  );
+  const scopeGroups = useMemo(() => groupFollowEntries(scopeItems), [scopeItems]);
+  const allRows = useMemo(() => buildFollowPlanningRows(scopeGroups), [scopeGroups]);
 
   /**
    * รายละเอียดของช่องที่กดในปฏิทิน — **อ่านจากชุดเต็ม**
@@ -2177,10 +2172,15 @@ const FollowPage: React.FC = () => {
         {/* 🔴 กล่อง "ยังไม่มีรายชื่อที่ต้องติดตาม" ท้ายหน้าถอดแล้ว (เจ้าของสั่ง 1 ต.ค. 2569) — ขึ้นเฉพาะแท็บที่ว่าง
             ⇒ สลับแท็บแล้วหน้ายืด/หด · ว่างก็ดูจากเลข 0 บนการ์ดและตารางที่อยู่ครบแล้ว */}
 
-        {/* 🔴 กล่อง "โทรได้คำตอบแล้ว … ส่งไปดูแลหลังเริ่มงานได้ …" **ถูกถอดออก 20 ก.ย. 2569**
-            (เจ้าของสั่งสั้น ๆ ว่า *"เอาออกเลย"*) — มันพูดเรื่องเดียวกับแท็บ "สำเร็จ"
-            ด้วยคำคนละชุด แล้วยอดสองที่ไม่ตรงกัน · งานย้ายไปดูแลหลังเริ่มงานทำได้จาก
-            แท็บนั้นอยู่แล้ว **ห้ามเอากล่องนี้กลับมาโดยไม่ได้สั่ง** */}
+        {/* การ์ด "ติดตามครบ" (เจ้าของสั่ง 1 ต.ค. 2569 · Choice "การ์ดแยกบนหน้า") — ตามครบรอบแล้ว
+            กองรอคนกดว่าจะย้ายไปดูแลหลังเริ่มงานไหม · รับชุดของแท็บที่เปิด (ไม่ผ่านตัวกรองงานจบหรือยัง/วันที่)
+            ⚠️ กล่องเดิม "โทรได้คำตอบแล้ว…" (ถอด 20 ก.ย.) ห้ามคืน — การ์ดนี้นับเฉพาะคนที่ยังไม่มีใครตัดสิน
+            จึงไม่ซ้ำกับเลขแท็บสำเร็จ (ย้าย/ไม่ย้าย = ปิดงานแล้ว ออกจากกองทันที) */}
+        <FollowCompletedCard
+          groups={scopeGroups}
+          followTeam={followTeam}
+          onChanged={() => void reload(true)}
+        />
       </div>
       )}
 

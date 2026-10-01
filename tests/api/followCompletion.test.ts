@@ -17,9 +17,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   COMPLETION_REASON_LABEL,
+  COMPLETION_REASON_SHORT,
+  COMPLETION_REASON_TONE,
   completedFollowSummary,
   isRoundSettled,
   reasonBlocksAftercare,
+  selectAwaitingDecision,
   selectCompletedFollowPeople,
 } from '../../src/lib/followCompletion.js';
 import type { FollowGroup } from '../../src/lib/followGrouping.js';
@@ -195,5 +198,71 @@ describe('สรุปใต้หัวกล่อง', () => {
     const summary = completedFollowSummary(people) ?? '';
     expect(summary).toContain(COMPLETION_REASON_LABEL.closed_success);
     expect(summary).toContain(COMPLETION_REASON_LABEL.needs_human);
+  });
+});
+
+/**
+ * ═══ การ์ด "ติดตามครบ" (เจ้าของสั่ง 1 ต.ค. 2569) ═══
+ * กอง = ตามครบรอบแล้ว + **ยังไม่มีใครตัดสิน** (ยังมีรอบที่เปิดอยู่)
+ * 🔴 บั๊กของกล่องเดิม: ย้ายแล้ว (ปิดเป็น "ไปแล้ว") รีเฟรชแล้วโผล่กลับมาให้กดซ้ำ
+ */
+describe('การ์ดติดตามครบ — เฉพาะคนที่ยังไม่มีใครตัดสิน', () => {
+  it('ตามครบ + ยังไม่ปิดงานสักรอบ ⇒ อยู่ในกอง', () => {
+    const people = selectAwaitingDecision([
+      group('a', [round({ call_outcome: 'no_answer' }), round({ call_outcome: 'confirmed' })]),
+    ]);
+    expect(people.map((p) => p.group.name)).toEqual(['a']);
+    expect(people[0].reason).toBe('ai_going');
+  });
+
+  it('🔴 บอกว่าไปแล้ว รอบหลังไม่รับสาย ⇒ ยังนับว่าบอกว่าไป (สายที่ไม่ได้คุยไม่ลบคำตอบเก่า)', () => {
+    const going = selectAwaitingDecision([
+      group('g', [round({ call_outcome: 'confirmed' }), round({ call_outcome: 'no_answer' })]),
+    ]);
+    expect(going[0].reason).toBe('ai_going');
+    const notGoing = selectAwaitingDecision([
+      group('n', [round({ call_outcome: 'declined' }), round({ call_outcome: 'busy' })]),
+    ]);
+    expect(notGoing[0].reason).toBe('ai_not_going');
+    const none = selectAwaitingDecision([group('x', [round({ call_outcome: 'no_answer' })])]);
+    expect(none[0].reason).toBe('called_no_close');
+  });
+
+  it('🔴 ย้าย/ไม่ย้ายแล้ว (ปิดงานครบทุกรอบที่ไม่ยกเลิก) ⇒ ออกจากกองทันที ไม่โผล่ซ้ำหลังรีเฟรช', () => {
+    const decided = group('done', [
+      round({ call_outcome: 'confirmed', completed_at: 'x', outcome_code: 'went' }),
+      round({ cancelled: true }),
+    ]);
+    expect(selectCompletedFollowPeople([decided])).toHaveLength(1); // กองเดิมยังนับ (closed_success)
+    expect(selectAwaitingDecision([decided])).toEqual([]);
+  });
+
+  it('ปิดไปบางรอบ แต่ยังมีรอบเปิด ⇒ ยังรอตัดสิน', () => {
+    const people = selectAwaitingDecision([
+      group('half', [round({ completed_at: 'x', outcome_code: 'went' }), round({ call_outcome: 'confirmed' })]),
+    ]);
+    expect(people).toHaveLength(1);
+    expect(people[0].reason).toBe('closed_success');
+  });
+
+  it('ยังมีนัดข้างหน้า ⇒ ยังไม่ครบ ไม่เข้าการ์ด', () => {
+    expect(
+      selectAwaitingDecision([group('later', [round({ call_outcome: 'confirmed' })], round())]),
+    ).toEqual([]);
+  });
+
+  it('บอกว่าไม่ไป ⇒ อยู่ในกองได้ แต่ปุ่มย้ายต้องไม่ขึ้น (เหลือแต่ไม่ย้าย)', () => {
+    const people = selectAwaitingDecision([group('no', [round({ call_outcome: 'declined' })])]);
+    expect(people[0].reason).toBe('ai_not_going');
+    expect(reasonBlocksAftercare(people[0].reason)).toBe(true);
+  });
+
+  it('ป้ายสั้นใช้คำชุดเดียวกับถังผลโทร + มีสีครบทุกเหตุผล', () => {
+    expect(COMPLETION_REASON_SHORT.ai_going).toBe('บอกว่าไป');
+    expect(COMPLETION_REASON_SHORT.ai_not_going).toBe('บอกว่าไม่ไป');
+    for (const k of Object.keys(COMPLETION_REASON_LABEL)) {
+      expect(COMPLETION_REASON_SHORT[k as keyof typeof COMPLETION_REASON_SHORT]).toBeTruthy();
+      expect(COMPLETION_REASON_TONE[k as keyof typeof COMPLETION_REASON_TONE]).toBeTruthy();
+    }
   });
 });

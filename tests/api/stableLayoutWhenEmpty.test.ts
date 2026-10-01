@@ -22,6 +22,10 @@ describe('ทั้งระบบ: ว่างแล้วทรงเดิ�
     expect(cal).not.toContain('monthRows.length === 0 ? (\n            <p');
     expect(cal).toContain('<Donut percent={microRates.successRate ?? 0}');
     expect(read('src/pages/follow/FollowPage.tsx')).not.toContain('>ยังไม่มีรายชื่อที่ต้องติดตาม<');
+    // การ์ดติดตามครบ (1 ต.ค. 2569) — ไม่มีคนก็ยังอยู่: หัว 0 คน + แถว "ไม่มี…" (กล่องเดิมซ่อนตัวเอง = ผิดกติกา)
+    const card = read('src/components/follow/FollowCompletedCard.tsx');
+    expect(card).not.toMatch(/if \(people\.length === 0\) return null/);
+    expect(card).toContain('ไม่มีคนที่ติดตามครบ');
   });
 
   it('หน้าหลัก — แผงผลโทรไม่สลับเป็น "ช่วงนี้ยังไม่มีผลโทร" · แถบไม่หารศูนย์', () => {

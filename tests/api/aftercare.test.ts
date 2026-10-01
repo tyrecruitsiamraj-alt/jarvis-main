@@ -124,6 +124,25 @@ describe('หน้าใหม่ + ทางเข้า', () => {
     expect(page).not.toMatch(/<FollowCompletedPanel/);
     expect(page).not.toMatch(/import FollowCompletedPanel/);
   });
+
+  /**
+   * 🔴 การ์ด "ติดตามครบ" (เจ้าของสั่ง 1 ต.ค. 2569 · Choice "การ์ดแยกบนหน้า") — มาแทนทางส่งต่อ
+   * นับเฉพาะคนที่ **ยังไม่มีใครตัดสิน** (ย้าย/ไม่ย้าย = ปิดงานแล้ว ออกจากกอง) จึงไม่ซ้ำเลขแท็บสำเร็จ
+   * ต้องรับชุดเต็มของแท็บ (`scopeGroups`) ไม่ใช่ `groups` ที่ผ่านตัวกรองแล้ว (บทเรียน 3 ก.ย.)
+   */
+  it('🔴 หน้า Follow มีการ์ดติดตามครบ + กินชุดเต็มของแท็บ + ส่งทีมของแท็บต่อ', () => {
+    const page = stripComments(read('src/pages/follow/FollowPage.tsx'));
+    expect(page).toMatch(/import FollowCompletedCard from '@\/components\/follow\/FollowCompletedCard'/);
+    expect(page).toMatch(/<FollowCompletedCard\s+groups=\{scopeGroups\}\s+followTeam=\{followTeam\}/);
+  });
+
+  it('🔴 การ์ดติดตามครบตั้งรอบด้วยหัวข้อถามความเป็นอยู่ + ไม่ยิงคิว/ล็อกเบอร์เอง', () => {
+    const card = stripComments(read('src/components/follow/FollowCompletedCard.tsx'));
+    expect(card).toContain('AFTERCARE_TOPIC');
+    expect(card).toContain('createFollowRounds');
+    expect(card).toContain('scheduleCallsByDay');
+    expect(card).not.toMatch(/dispatchLumos|insertQueue|acquireCallHold/);
+  });
 });
 
 describe('ถัง "เลยนัดยังไม่บันทึกผล" (7.6)', () => {

@@ -101,11 +101,15 @@ function reasonOf(rounds: FollowRoundLike[]): CompletionReason | null {
   if (active.some((r) => isSuccessOutcome(r.outcome_code))) return 'closed_success';
   if (active.some((r) => r.followup_state === NEEDS_HUMAN_STATE)) return 'needs_human';
   /**
-   * ผลจาก AI — ดู **รอบล่าสุดที่ได้คำตอบ** ไม่ใช่รอบไหนก็ได้
+   * ผลจาก AI — ดู **รอบล่าสุดที่เขาบอกว่าไป/ไม่ไป** ไม่ใช่รอบไหนก็ได้
    * (คนหนึ่งอาจสายแรก "รับสายแล้ว" สายสองบอก "ไม่ไป" ⇒ คำตอบล่าสุดชนะ)
+   *
+   * 🔴 แก้ 1 ต.ค. 2569 (การ์ดติดตามครบ): สายที่ไม่ได้คุยกัน (ไม่รับสาย) **ไม่ลบคำตอบเก่า**
+   * ตารางหลายวันโทรครบทุกรอบแม้ยืนยันแล้ว (วัดได้ 51/51) ⇒ วันแรกบอกว่าไป วันถัดไปไม่รับ
+   * เดิมขึ้น "ยังไม่ได้คำตอบ" ทั้งที่เขาตอบไปแล้ว
    */
-  const answered = active.filter(hasCallAnswer);
-  const last = answered[answered.length - 1];
+  const said = active.filter((r) => r.call_outcome === 'confirmed' || r.call_outcome === 'declined');
+  const last = said[said.length - 1];
   if (last?.call_outcome === 'declined') return 'ai_not_going';
   if (last?.call_outcome === 'confirmed') return 'ai_going';
   return 'called_no_close';
@@ -147,6 +151,42 @@ export function selectCompletedFollowPeople(groups: FollowGroup[]): CompletedFol
   };
   return out.sort((a, b) => order[a.reason] - order[b.reason] || a.group.name.localeCompare(b.group.name, 'th'));
 }
+
+/**
+ * ═══ การ์ด "ติดตามครบ" (เจ้าของสั่ง 1 ต.ค. 2569 · Choice "การ์ดแยกบนหน้า") ═══
+ *
+ * กอง = คนที่ **ตามครบรอบแล้ว + ยังไม่มีใครตัดสิน** ว่าจะย้ายไปดูแลหลังเริ่มงานไหม
+ * "ยังไม่ตัดสิน" = ยังมีรอบที่เปิดอยู่ (ไม่ยกเลิก · ยังไม่ปิดงาน)
+ *   · กด "ย้าย" → ปิดทุกรอบที่เปิดเป็น "ไปแล้ว" ⇒ ออกจากกอง
+ *   · กด "ไม่ย้าย" → ปิดทุกรอบที่เปิดด้วยผลที่เลือก ⇒ ออกจากกอง
+ *   · ใครปิดงานครบทุกรอบจากป๊อปเดิมไปแล้ว ⇒ ตัดสินไปแล้ว ไม่ต้องมาคาที่กอง
+ *
+ * 🔴 แก้บั๊กของกล่องเดิม (ถอดไป 20 ก.ย.): กล่องเดิมจำคนที่ย้ายแล้วไว้ใน state ของหน้า
+ * พอรีเฟรช คนที่ย้ายไปแล้ว (ปิดงานเป็น "ไปแล้ว") โผล่กลับมาให้กดย้ายซ้ำ
+ */
+export function selectAwaitingDecision(groups: FollowGroup[]): CompletedFollowPerson[] {
+  return selectCompletedFollowPeople(groups).filter((p) =>
+    (p.group.rounds as FollowRoundLike[]).some((r) => !r.cancelled && !r.completed_at),
+  );
+}
+
+/** ป้ายสั้นบนแถวของการ์ด — คำชุดเดียวกับถังผลโทร (บอกว่าไป / บอกว่าไม่ไป) */
+export const COMPLETION_REASON_SHORT: Record<CompletionReason, string> = {
+  closed_success: 'ปิดงานว่าไปแล้ว',
+  ai_going: 'บอกว่าไป',
+  ai_not_going: 'บอกว่าไม่ไป',
+  needs_human: 'ต้องคนตาม',
+  called_no_close: 'ยังไม่ได้คำตอบ',
+};
+
+/** สีของป้าย — เขียว = จบดี · แดง = จบไม่ดี · ส้ม = คนต้องเข้าไปจัดการ · เหลือง = ยังไม่จบ */
+export const COMPLETION_REASON_TONE: Record<CompletionReason, 'success' | 'danger' | 'orange' | 'warn'> = {
+  closed_success: 'success',
+  ai_going: 'success',
+  ai_not_going: 'danger',
+  needs_human: 'orange',
+  called_no_close: 'warn',
+};
 
 /** สรุปสั้น ๆ ใต้หัวกล่อง — ไม่มีของ = null (กล่องซ่อนตัวเอง) */
 export function completedFollowSummary(people: CompletedFollowPerson[]): string | null {
