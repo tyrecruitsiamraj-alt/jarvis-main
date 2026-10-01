@@ -124,7 +124,7 @@ function looksLikeSiamrajRequestNo(value: string): boolean {
 }
 
 /** คำในช่องค้นหาของหน้าใบขอ — ใช้ทั้งแถบบนและทางถอย */
-const JOB_LIST_SEARCH_PLACEHOLDER = 'เลขที่ใบขอ, หน่วยงาน, ผู้รับผิดชอบ...';
+const JOB_LIST_SEARCH_PLACEHOLDER = 'เลขที่ใบขอ, Code site, หน่วยงาน...';
 
 const JobListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -423,7 +423,8 @@ const JobListPage: React.FC = () => {
       })
       .filter((j) => {
         if (requestNoMatchesSearch(q, j.request_no)) return true;
-        return `${j.unit_name} ${j.work_site_name || ''} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${j.job_description_code_1 || ''} ${j.job_description_code_2 || ''} ${j.list_note || ''} ${JOB_TYPE_LABELS[j.job_type]} ${jobSectorLabel(j)} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''} ${j.opl_name || ''}`
+        // 🔴 ค้นด้วย Code site ได้ (เจ้าของสั่ง 1 ต.ค. 2569: *"หน้าใบขอ ทำให้ ตอนค้นหา ค้นด้วย Code site ได้หน่อย"*)
+        return `${j.unit_name} ${j.site_code || ''} ${j.work_site_name || ''} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${j.job_description_code_1 || ''} ${j.job_description_code_2 || ''} ${j.list_note || ''} ${JOB_TYPE_LABELS[j.job_type]} ${jobSectorLabel(j)} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''} ${j.opl_name || ''}`
           .toLowerCase()
           .includes(q);
       })
