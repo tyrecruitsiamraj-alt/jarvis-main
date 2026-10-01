@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import type { JobRequest, JobUrgency } from '@/types';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { toYmdBangkok } from '@/lib/dateTh';
@@ -12,6 +12,7 @@ import {
   type RequestLeadRules,
 } from '@/lib/requestLeadKind';
 import type { ToneKey } from '@/lib/designTokens';
+import { countWorkingDays, parseWorkWeekdays, publicHolidays, workWeekdaysShortLabel } from '@/lib/siteWorkdays';
 
 export { URGENCY_LEAD_DAYS };
 
@@ -190,10 +191,26 @@ export function isBeforeRequiredForAge(job: JobRequest, today = new Date()): boo
 }
 
 /**
- * วันผ่านมาสำหรับคอลัมน์「ผ่านมา」
+ * **วันทำงาน**ของหน่วยงานระหว่างวัน `from` ถึง `to` (ไม่นับวันต้น) — แทน `differenceInCalendarDays`
+ * 🔴 เจ้าของสั่ง 1 ต.ค. 2569: *"ผ่านมา ให้คำนวณ จากวันที่ต้องทำงาน วันหยุดของ Site นั้นๆไม่นับ"*
+ * วันทำงานอ่านจาก `work_schedule` ของใบ (อ่านไม่ออก = ทุกวัน = ค่าเดิมเป๊ะ) · วันหยุดนักขัตฤกษ์จาก `publicHolidays()`
+ * ⚠️ วันที่สองฝั่งเป็นเที่ยงคืนตามเวลาเครื่องของวันในปฏิทิน (ชุดเดียวกับ `differenceInCalendarDays` เดิม)
+ */
+function workingDaysBetween(job: JobRequest, from: Date, to: Date): number {
+  return countWorkingDays(
+    format(from, 'yyyy-MM-dd'),
+    format(to, 'yyyy-MM-dd'),
+    parseWorkWeekdays(job.work_schedule),
+    publicHolidays(),
+  );
+}
+
+/**
+ * วันผ่านมาสำหรับคอลัมน์「ผ่านมา」— **นับเฉพาะวันทำงานของหน่วยงาน** (1 ต.ค. 2569 · `workingDaysBetween`)
  * - ล่วงหน้า (ยังไม่ถึงวันที่ต้องการ): นับจากวันที่กรอก
  * - ล่วงหน้า + ฉุกเฉิน (ถึง/เลยวันที่ต้องการแล้ว): วันนี้ − วันที่ต้องการ
  * - ฉุกเฉิน/ย้อนหลัง: วันนี้ − วันที่กรอก
+ * ⚠️ ความเป็น ล่วงหน้า/ฉุกเฉิน/ย้อนหลัง (`computeJobUrgency`) ยังเป็นวันตามปฏิทิน — คนละคำถามกัน
  */
 export function getJobRequestAgeDays(job: JobRequest, today = new Date()): number | null {
   const meta = computeJobUrgency(job, today);
@@ -202,18 +219,23 @@ export function getJobRequestAgeDays(job: JobRequest, today = new Date()): numbe
   if (isAdvanceBeforeRequiredDate(job, today)) {
     const submitted = submittedDate(job);
     if (!submitted) return null;
-    return Math.max(0, differenceInCalendarDays(today0, submitted));
+    return Math.max(0, workingDaysBetween(job, submitted, today0));
   }
 
   if (meta.kind === 'retroactive') {
     const submitted = submittedDate(job);
     if (!submitted) return null;
-    return differenceInCalendarDays(today0, submitted);
+    return workingDaysBetween(job, submitted, today0);
   }
 
   const required = parseJobDate(job.required_date);
   if (!required) return null;
-  return Math.max(0, differenceInCalendarDays(today0, required));
+  return Math.max(0, workingDaysBetween(job, required, today0));
+}
+
+/** ป้ายวันทำงานที่ใช้นับ "ผ่านมา" ของใบนี้ ("จ.–ศ.") — null = นับทุกวัน */
+export function jobWorkdaysLabel(job: JobRequest): string | null {
+  return workWeekdaysShortLabel(parseWorkWeekdays(job.work_schedule));
 }
 
 export function getJobRequestSubmittedDate(job: JobRequest): Date | null {
@@ -611,10 +633,12 @@ export function getJobAgeChipInfo(job: JobRequest, today = new Date()): JobAgeCh
     return { level: 'unknown', text, cardText: text, title: JOB_AGE_CHIP_META.unknown.label };
   }
   const level = ageUrgencyLevelFromDays(days);
+  const workdays = jobWorkdaysLabel(job);
   return {
     level,
     text,
     cardText: `ผ่านมา ${text}`,
-    title: `${JOB_AGE_CHIP_META[level].label} · ผ่านมา ${text}`,
+    // บอกฐานของเลขไว้ใน tooltip — นับเฉพาะวันทำงานของใบนี้ (ไม่ใช่ทุกวัน)
+    title: `${JOB_AGE_CHIP_META[level].label} · ผ่านมา ${text}${workdays ? ` (นับวันทำงาน ${workdays})` : ''}`,
   };
 }
