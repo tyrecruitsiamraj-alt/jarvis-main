@@ -1,5 +1,5 @@
 /**
- * POST /api/application-call-choice { ids: string[], choice: 'manual' | 'ai' }
+ * POST /api/application-call-choice { ids: string[], choice: 'manual' | 'ai' | 'release' }
  *
  * เส้นเดียวของ **"ใครจะโทรหาคนนี้"** — ใช้สองที่ที่เจ้าของเคาะให้เป็นเรื่องเดียวกัน:
  *
@@ -20,6 +20,13 @@
  *   (คอขวดเดียวที่มีด่าน held/suppressed/declined/quiet-hours ครบ)
  * - เลือกแล้วต้องออกจากกองรอ (`call_choice` ไม่เป็น null) ไม่งั้น worker ส่ง AI ทับคนที่
  *   เพิ่งกดเก็บไปโทรเอง
+ *
+ * 3. **ปุ่ม "ลบออก" ในแท็บการติดตาม** (`choice: 'release'` · เจ้าของสั่ง 1 ต.ค. 2569)
+ *    ส่งใบกลับแท็บผู้สมัครเป็น **ใบว่าง ใครก็เก็บได้** (Choice ของเจ้าของ) = ปลดจอง + ถอด Lead
+ *    + คืนล็อกเบอร์ที่ตัวเองถือ — **ยิงเส้นเดียว server ทำครบ** (บทเรียนเดียวกับข้อ 1: หน้าเว็บ
+ *    ยิงหลายเส้นเองแล้วได้สภาพครึ่ง ๆ) · 🔴 **AI ไม่โทรเอง**: ไม่ล้าง `call_choice` และไม่ตั้ง
+ *    `unclaimed_at` ⇒ ใบไม่เข้ากอง "เลือกวิธีโทร" ที่ worker ส่ง AI เองเมื่อครบ 1 วัน (fail-safe)
+ *    · สถานะใบไม่ย้อนกลับเอง (กติกาเดียวกับคืนใบของ patchClaim — ไม่เดาแทนคน)
  */
 import {
   withRbac,
@@ -32,7 +39,7 @@ import { readJsonBody } from '../_lib/body.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { isApplicationInWriteScope } from '../_lib/applicationScope.js';
-import { acquireCallHold } from '../_lib/candidateCallHolds.js';
+import { acquireCallHold, releaseApplicationCallHolds } from '../_lib/candidateCallHolds.js';
 import { enqueueLumosInterviewForApplications } from '../_lib/lumosDispatch.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { logError } from '../_lib/logger.js';
@@ -56,7 +63,7 @@ type Row = {
 };
 
 export type CallChoiceResult = {
-  choice: 'manual' | 'ai';
+  choice: 'manual' | 'ai' | 'release';
   /** สำเร็จตามที่เลือก */
   done: number;
   /** ทำไม่ได้ + เหตุผลรายคน (ต้องเห็นบนจอ ไม่ใช่หายเงียบ) */
@@ -151,6 +158,40 @@ async function chooseManual(req: AuthedReq, rows: Row[]): Promise<CallChoiceResu
   return { choice: 'manual', done: okIds.length, skipped };
 }
 
+/**
+ * ลบออกจากแท็บการติดตาม = ส่งกลับเป็นใบว่าง (ดูข้อ 3 ที่หัวไฟล์)
+ *
+ * ⚠️ ใบที่คนอื่นจองไว้ห้ามแตะ — DB ตัดสินอีกชั้นด้วยเงื่อนไขใน WHERE (ไม่ใช่ลำดับโค้ด)
+ * ⚠️ Lead เป็นสถานะระดับระบบ (ใครปัดก็หายจากทุกคน · ดู patchLead) จึงถอดได้แม้ไม่ได้จอง
+ */
+async function chooseRelease(req: AuthedReq, rows: Row[]): Promise<CallChoiceResult> {
+  const skipped: CallChoiceResult['skipped'] = [];
+  let done = 0;
+  for (const r of rows) {
+    if (r.claimed_by && r.claimed_by !== req.user.sub) {
+      skipped.push({ name: r.full_name, reason: 'มีเจ้าหน้าที่คนอื่นเก็บไว้ — ลบออกได้เฉพาะใบที่ตัวเองเก็บ' });
+      continue;
+    }
+    const { rows: released } = await dbQuery<{ id: string }>(
+      `update ${tbl}
+          set claimed_by = null, claimed_by_name = null, claimed_at = null,
+              is_lead = false, lead_by = null, lead_by_name = null, lead_at = null,
+              updated_at = now()
+        where id = $1 and (claimed_by is null or claimed_by = $2)
+        returning id`,
+      [r.id, req.user.sub],
+    );
+    if (released.length === 0) {
+      skipped.push({ name: r.full_name, reason: 'มีเจ้าหน้าที่คนอื่นเก็บไปก่อน' });
+      continue;
+    }
+    // คืนล็อกเบอร์ที่ตัวเองถือไว้ให้ใบนี้ — ไม่คืน = คนอื่นเก็บไปโทรแล้วล็อกไม่ได้
+    await releaseApplicationCallHolds(r.id, req.user.sub);
+    done += 1;
+  }
+  return { choice: 'release', done, skipped };
+}
+
 /** ส่ง AI = ปั๊มก่อนแล้วเข้าคิวผ่านคอขวดเดิม (ด่านกันซ้ำ/กันเบอร์ที่คนถือทำงานครบ) */
 async function chooseAi(req: AuthedReq, rows: Row[]): Promise<CallChoiceResult> {
   const skipped: CallChoiceResult['skipped'] = [];
@@ -195,8 +236,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
   try {
     const raw = (await readJsonBody(req)) as Record<string, unknown> | null;
     const choice = raw?.choice;
-    if (choice !== 'manual' && choice !== 'ai') {
-      return sendError(res, 400, 'Bad request', 'choice ต้องเป็น manual หรือ ai');
+    if (choice !== 'manual' && choice !== 'ai' && choice !== 'release') {
+      return sendError(res, 400, 'Bad request', 'choice ต้องเป็น manual ai หรือ release');
     }
     const ids = Array.isArray(raw?.ids)
       ? [...new Set(raw.ids.filter((v): v is string => typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v)))]
@@ -226,7 +267,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return sendError(res, 403, 'Forbidden', 'ใบสมัครที่เลือกอยู่นอกแผนกของคุณ');
     }
 
-    const result = choice === 'manual' ? await chooseManual(req, allowed) : await chooseAi(req, allowed);
+    const result =
+      choice === 'manual'
+        ? await chooseManual(req, allowed)
+        : choice === 'release'
+          ? await chooseRelease(req, allowed)
+          : await chooseAi(req, allowed);
     result.skipped = [...skippedScope, ...result.skipped];
 
     void auditFromAuthed(req, {

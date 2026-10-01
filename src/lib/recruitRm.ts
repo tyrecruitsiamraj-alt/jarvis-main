@@ -307,7 +307,7 @@ export const RM_TOOLBAR_LABEL: Record<RmToolbarKey, string> = {
 };
 
 /** ปุ่ม action ต่อแถว — จุดเดียวที่ระบบเดิมให้แต่ละแท็บต่างกัน */
-export type RmRowAction = 'bookmark' | 'call' | 'dial' | 'view' | 'rule' | 'remove';
+export type RmRowAction = 'bookmark' | 'call' | 'dial' | 'view' | 'rule' | 'remove' | 'release';
 
 /**
  * ⚠️ `call` กับ `dial` เป็นคนละเรื่อง — สับสนเมื่อไหร่ตัวเลขเวลารอโทรเพี้ยนทันที
@@ -317,7 +317,12 @@ export type RmRowAction = 'bookmark' | 'call' | 'dial' | 'view' | 'rule' | 'remo
  */
 export const RM_ROW_ACTIONS: Record<RmTab, RmRowAction[]> = {
   candidates: ['bookmark', 'call', 'view'],
-  contact: ['bookmark', 'call', 'dial', 'view'],
+  /**
+   * 🔴 แท็บการติดตามเหลือ 3 ปุ่ม (เจ้าของสั่ง 1 ต.ค. 2569):
+   * *"ต้องมีแค่ ปุ่มโทรเพื่อ Stamp เวลา ปุ่มดูรายละเอียด และลบออกเพื่อส่งกลับไปหน้าผู้สมัคร"*
+   * ใบในแท็บนี้เก็บมาแล้วทั้งนั้น ⇒ ปุ่มเก็บ Lead/เก็บไปโทรเองไม่มีความหมายที่นี่
+   */
+  contact: ['dial', 'view', 'release'],
   appointments: ['call', 'rule', 'remove'],
 };
 
@@ -333,6 +338,8 @@ export const RM_ROW_ACTION_LABEL: Record<RmRowAction, string> = {
   view: 'ดูรายละเอียด',
   rule: 'บันทึกผลนัดหมาย',
   remove: 'เอาออกจากรายการ',
+  /** ส่งกลับเป็นใบว่าง ใครก็เก็บได้ — ปลดจอง + ถอด Lead + คืนล็อกเบอร์ · AI ไม่โทรเอง (Choice 1 ต.ค. 2569) */
+  release: 'ลบออก — ส่งกลับแท็บผู้สมัคร',
 };
 
 /**

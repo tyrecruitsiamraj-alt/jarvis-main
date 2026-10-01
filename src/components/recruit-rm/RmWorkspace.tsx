@@ -620,6 +620,20 @@ const RmWorkspace: React.FC<{
       setContactApp(row);
       return;
     }
+    /**
+     * "ลบออก" ในแท็บการติดตาม (เจ้าของสั่ง 1 ต.ค. 2569) — ส่งกลับแท็บผู้สมัครเป็นใบว่าง
+     * 🔴 ยิงเส้นเดียว server ทำครบ (ปลดจอง + ถอด Lead + คืนล็อกเบอร์) — ห้ามยิงหลายเส้นเอง
+     */
+    if (action === 'release') {
+      say(null);
+      void chooseApplicationCall([row.id], 'release')
+        .then((outcome) => {
+          say(summarizeCallChoice(outcome));
+          load(); // ใบย้ายกลับแท็บผู้สมัคร + ป้ายล็อกหาย ต้องเห็นทันที
+        })
+        .catch((e: unknown) => say(e instanceof Error ? e.message : 'ลบออกไม่สำเร็จ'));
+      return;
+    }
     todo(`"${RM_ROW_ACTION_LABEL[action]}" ของ ${row.full_name}`);
   };
 

@@ -67,8 +67,11 @@ describe('ป๊อป "ดูรายละเอียด" ต้องมี
   const panel = read('src/components/recruit-rm/ApplicantAttachmentPanel.tsx');
 
   it('🔴 ป๊อปรายละเอียดวาดแผงไฟล์แนบ (บั๊กเดิมคือไม่มีเลย)', () => {
-    expect(dialog).toContain('ApplicantAttachmentPanel');
-    expect(dialog).toContain('hasDocument={a.has_document}');
+    // โฉม iRecruit (1 ต.ค. 2569): ไฟล์แนบอยู่ในแท็บ "ข้อมูลผู้สมัคร" → ป๊อปต้องวาดแท็บนั้นเสมอ
+    const info = read('src/components/recruit-rm/ApplicantInfoPanel.tsx');
+    expect(dialog).toContain('<ApplicantInfoPanel');
+    expect(info).toContain('ApplicantAttachmentPanel');
+    expect(info).toContain('hasDocument={a.has_document}');
   });
 
   it('🔴 ห้ามซ้อน Dialog ใน Dialog — แผงไฟล์แนบต้องไม่เปิด Dialog ของตัวเอง', () => {

@@ -446,6 +446,102 @@ export async function recordAppointmentAttendance(input: {
 }
 
 /**
+ * แก้ข้อมูลผู้สมัครจากป๊อปรายละเอียด (เจ้าของสั่ง 1 ต.ค. 2569)
+ * ส่ง **เฉพาะช่องที่เปลี่ยน** (`profilePatchFromDraft`) · server ตรวจซ้ำ + จด log ว่าใครแก้ (ไม่โชว์บนจอ)
+ * ⚠️ เบอร์ไม่อยู่ในนี้ — ใช้ `fixApplicationPhone`
+ */
+export async function updateApplicationProfile(
+  id: string,
+  profile: import('@/lib/applicantProfileEdit').ProfilePatch,
+): Promise<PublicApplication> {
+  const r = await apiFetch('/api/job-applications', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, profile }),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message || 'บันทึกข้อมูลผู้สมัครไม่สำเร็จ');
+  }
+  return ((await r.json()) as { item: PublicApplication }).item;
+}
+
+/** แท็บ "ประวัติการสมัคร" — ใบอื่นของเบอร์เดียวกัน (เฉพาะที่ผู้ใช้มีสิทธิ์เห็น) */
+export type ApplicantHistoryItem = {
+  id: string;
+  created_at: string;
+  job_title: string | null;
+  unit_name: string | null;
+  position_interest: string | null;
+  status: string;
+  channel_label: string | null;
+};
+
+/** แท็บ "การโทร" — สายจาก AI ของใบนี้ */
+export type ApplicantAiCall = {
+  id: number;
+  status: string;
+  created_at: string;
+  result_at: string | null;
+  outcome: string | null;
+  attempts: number;
+  next_attempt_at: string | null;
+};
+
+/** แท็บ "การโทร" — สายที่เจ้าหน้าที่ถือไปโทร + ผลที่บันทึก */
+export type ApplicantStaffCall = {
+  id: string;
+  held_at: string;
+  held_by_name: string | null;
+  released_at: string | null;
+  release_reason: string | null;
+  outcome: string | null;
+  note: string | null;
+};
+
+export type ApplicantDetailExtras = {
+  history: ApplicantHistoryItem[];
+  aiCalls: ApplicantAiCall[];
+  staffCalls: ApplicantStaffCall[];
+};
+
+/** ของประกอบป๊อปรายละเอียด (อ่านอย่างเดียว) — ล้ม = รายการว่าง (ป๊อปยังเปิดได้ ไม่พังทั้งป๊อป) */
+export async function fetchApplicantDetailExtras(id: string): Promise<ApplicantDetailExtras> {
+  const empty: ApplicantDetailExtras = { history: [], aiCalls: [], staffCalls: [] };
+  try {
+    const r = await apiFetch(`/api/job-applications?detail_of=${encodeURIComponent(id)}`);
+    if (!r.ok) return empty;
+    const body = (await r.json()) as Partial<ApplicantDetailExtras>;
+    return {
+      history: body.history ?? [],
+      aiCalls: body.aiCalls ?? [],
+      staffCalls: body.staffCalls ?? [],
+    };
+  } catch {
+    return empty;
+  }
+}
+
+/** แท็บ "ติดตามนัดหมาย" — ผลติดตามนัดทุกครั้ง (ล่าสุดก่อน) */
+export type AttendanceLogItem = {
+  id: string;
+  appointmentAt: string;
+  result: 'showed' | 'no_show' | 'rescheduled';
+  note: string | null;
+  recordedByName: string | null;
+  createdAt: string;
+};
+
+export async function fetchAttendanceLogs(applicationId: string): Promise<AttendanceLogItem[]> {
+  try {
+    const r = await apiFetch(`/api/application-attendance?applicationId=${encodeURIComponent(applicationId)}`);
+    if (!r.ok) return [];
+    return ((await r.json()) as { items?: AttendanceLogItem[] }).items ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * แก้เบอร์โทรของใบสมัคร (ใบที่ติดธง "เบอร์ใช้โทรไม่ได้" — migration 087)
  * server บังคับให้เบอร์ใหม่เป็นมือถือที่แปลง E.164 ได้ (400 ถ้าไม่ผ่าน) + audit ให้
  */
@@ -488,14 +584,15 @@ export async function claimJobApplication(id: string, claim: boolean): Promise<P
  * ซึ่งแปลว่า AI ยังโทรทับได้ · กลืนทิ้ง = คนเข้าใจผิดว่าปลอดภัยแล้ว
  */
 export type CallChoiceOutcome = {
-  choice: 'manual' | 'ai';
+  choice: 'manual' | 'ai' | 'release';
   done: number;
   skipped: Array<{ name: string; reason: string }>;
 };
 
 export async function chooseApplicationCall(
   ids: string[],
-  choice: 'manual' | 'ai',
+  /** `release` = ปุ่ม "ลบออก" ในแท็บการติดตาม — ส่งกลับเป็นใบว่าง (ปลดจอง + ถอด Lead + คืนล็อกเบอร์ · 1 ต.ค. 2569) */
+  choice: 'manual' | 'ai' | 'release',
 ): Promise<CallChoiceOutcome> {
   const r = await apiFetch('/api/application-call-choice', {
     method: 'POST',
@@ -503,9 +600,9 @@ export async function chooseApplicationCall(
   });
   if (!r.ok) {
     const body = (await r.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(
-      body?.message || (choice === 'manual' ? 'เก็บไปโทรเองไม่สำเร็จ' : 'ส่ง AI โทรไม่สำเร็จ'),
-    );
+    const fallback =
+      choice === 'manual' ? 'เก็บไปโทรเองไม่สำเร็จ' : choice === 'release' ? 'ลบออกไม่สำเร็จ' : 'ส่ง AI โทรไม่สำเร็จ';
+    throw new Error(body?.message || fallback);
   }
   return (await r.json()) as CallChoiceOutcome;
 }

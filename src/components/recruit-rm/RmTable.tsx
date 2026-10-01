@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookmarkPlus, Phone, PhoneCall, Eye, ClipboardCheck, UserMinus, FileText } from 'lucide-react';
+import { BookmarkPlus, Phone, PhoneCall, Eye, ClipboardCheck, UserMinus, Undo2, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 // ⚠️ DASH = token พื้นผิว dashboard · ขีดกลางคือ EM_DASH คนละตัว อย่าสับสน
 import { DASH, TONE } from '@/lib/designTokens';
@@ -128,6 +128,7 @@ const ACTION_ICON: Record<RmRowAction, typeof Phone> = {
   view: Eye,
   rule: ClipboardCheck,
   remove: UserMinus,
+  release: Undo2,
 };
 
 const RmTable: React.FC<{

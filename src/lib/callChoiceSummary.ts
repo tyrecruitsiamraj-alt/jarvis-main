@@ -8,7 +8,8 @@
 import { CALL_CHOICE_LABEL, type CallChoice } from '@/lib/callChoiceGuard';
 
 export type CallChoiceLike = {
-  choice: Extract<CallChoice, 'manual' | 'ai'>;
+  /** `release` = ปุ่ม "ลบออก" ในแท็บการติดตาม (1 ต.ค. 2569) — เป็นการกระทำ ไม่ใช่ค่าที่เก็บใน `call_choice` */
+  choice: Extract<CallChoice, 'manual' | 'ai'> | 'release';
   done: number;
   skipped: Array<{ name: string; reason: string }>;
 };
@@ -17,12 +18,19 @@ export type CallChoiceLike = {
 const NAMES_SHOWN = 3;
 
 export function summarizeCallChoice(outcome: CallChoiceLike): string {
-  const verb = outcome.choice === 'manual' ? CALL_CHOICE_LABEL.manual : CALL_CHOICE_LABEL.ai;
+  const verb =
+    outcome.choice === 'release'
+      ? 'ส่งกลับแท็บผู้สมัคร'
+      : outcome.choice === 'manual'
+        ? CALL_CHOICE_LABEL.manual
+        : CALL_CHOICE_LABEL.ai;
   const head =
     outcome.done > 0
       ? outcome.choice === 'manual'
         ? `${verb} ${outcome.done} คน — จองใบ + ล็อกเบอร์กัน AI โทรทับแล้ว`
-        : `${verb} ${outcome.done} คน — เข้าคิวแล้ว`
+        : outcome.choice === 'release'
+          ? `${verb} ${outcome.done} คนแล้ว`
+          : `${verb} ${outcome.done} คน — เข้าคิวแล้ว`
       : `ยัง${verb}ไม่ได้เลย`;
   if (outcome.skipped.length === 0) return head;
 

@@ -301,6 +301,31 @@ export async function releaseCallHold(
   return rows[0] ? mapRow(rows[0]) : null;
 }
 
+/**
+ * คืนล็อกของใบสมัครใบนี้ **ที่คนกดถืออยู่เอง** — ปุ่ม "ลบออก" ในแท็บการติดตาม (เจ้าของสั่ง 1 ต.ค. 2569)
+ *
+ * ⚠️ ปล่อยเฉพาะ `source = 'application'` + `candidate_ref` ตรง + `held_by_user_id` = คนกด
+ * ล็อกเบอร์เดียวกันที่คนอื่นถือ (มาจากหน้าอื่น/ใบอื่น) ห้ามแตะ · คืนจำนวนที่ปล่อย
+ */
+export async function releaseApplicationCallHolds(applicationId: string, userId: string): Promise<number> {
+  try {
+    const { rows } = await dbQuery<{ id: string }>(
+      `update ${table}
+          set released_at = now(), release_reason = 'manual', updated_at = now()
+        where released_at is null
+          and source = 'application'
+          and candidate_ref = $1
+          and held_by_user_id = $2
+        returning id`,
+      [applicationId, userId],
+    );
+    return rows.length;
+  } catch (e) {
+    if (isPgUndefinedTable(e)) return 0;
+    throw e;
+  }
+}
+
 export type RecordResultInput = {
   holdId: string;
   outcome: CallResultOutcome;

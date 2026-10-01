@@ -30,7 +30,7 @@ function walk(dir: string, out: string[] = []): string[] {
 /** ไฟล์ที่ยังใช้ `type="date"` / `type="datetime-local"` อยู่ — **ห้ามเพิ่มชื่อใหม่** */
 const DATE_INPUT_DEBT = [
   'src/components/matching/CallHoldPanel.tsx',
-  'src/components/recruit-rm/ApplicantContactDialog.tsx',
+  // ApplicantContactDialog.tsx ปลดหนี้แล้ว 1 ต.ค. 2569 (ป๊อปรายละเอียดโฉม iRecruit ใช้ DateSelectDmyBe)
   'src/pages/aftercare/AftercarePage.tsx',
   'src/pages/follow/FollowPage.tsx',
   'src/pages/matching/MyCallsPage.tsx',

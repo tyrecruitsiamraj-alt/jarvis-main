@@ -27,6 +27,14 @@ import {
   type SelectionStatus,
 } from '../../src/lib/selectionProgress.js';
 import { isCallChoice } from '../../src/lib/callChoiceGuard.js';
+import {
+  PROFILE_KEYS,
+  changedProfilePatch,
+  parseProfilePatch,
+  profileDraftOf,
+  profileFullName,
+  type ProfilePatch,
+} from '../../src/lib/applicantProfileEdit.js';
 import { loadProgressByJob, saveProgress } from '../_lib/selectionProgressStore.js';
 import {
   cleanRmLicenseTypes,
@@ -946,6 +954,238 @@ async function patchDial(req: AuthedReq, res: ApiRes, id: string) {
   }
 }
 
+/**
+ * GET `?detail_of=<id>` — ของประกอบป๊อปรายละเอียดผู้สมัคร (เจ้าของสั่ง 1 ต.ค. 2569 · แบบรูป iRecruit)
+ *
+ * - `history`  = ใบสมัครอื่นของเบอร์เดียวกัน (แท็บ "ประวัติการสมัคร") — กรองสิทธิ์ BU รายใบ
+ * - `aiCalls`  = สายจาก AI ของใบนี้ (`lumos_dispatch_queue` person_ref `app-<id>`)
+ * - `staffCalls` = สายที่คนถือไปโทร (`candidate_call_holds` ของใบนี้) + ผลที่บันทึก
+ *
+ * 🔴 อ่านอย่างเดียว ไม่เขียนอะไรเลย · ตาราง/คอลัมน์ยังไม่ migrate ⇒ ส่วนนั้นเป็นรายการว่าง ไม่ใช่ 500
+ * ⚠️ คีย์เทียบเบอร์ = `phone_e164` (คนเดียวมีหลายใบ แต่เบอร์มีเบอร์เดียว — กติกาเดียวกับล็อกโทร)
+ */
+async function getApplicationDetailExtras(req: AuthedReq, res: ApiRes, id: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return sendError(res, 400, 'Bad request', 'id ไม่ถูกต้อง');
+  const { rows: baseRows } = await dbQuery<{
+    id: string;
+    phone_e164: string | null;
+    job_id: string | null;
+    department_code: string | null;
+  }>(`select id, phone_e164, job_id, department_code from ${tbl} where id = $1 limit 1`, [id]);
+  const base = baseRows[0];
+  if (!base) return sendError(res, 404, 'Not found');
+  if (!(await isApplicationInWriteScope(req.user, base))) {
+    return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+  }
+
+  const soft = async <T,>(run: () => Promise<T[]>): Promise<T[]> => {
+    try {
+      return await run();
+    } catch (e) {
+      const code = typeof e === 'object' && e !== null && 'code' in e ? (e as { code: string }).code : '';
+      if (code === '42P01' || code === '42703') return [];
+      throw e;
+    }
+  };
+
+  const history = await soft(async () => {
+    if (!base.phone_e164) return [];
+    const { rows } = await dbQuery<{
+      id: string;
+      created_at: string | Date;
+      job_id: string | null;
+      department_code: string | null;
+      job_title: string | null;
+      unit_name: string | null;
+      position_interest: string | null;
+      status: string;
+      channel_label: string | null;
+    }>(
+      `select id, created_at, job_id, department_code, job_title, unit_name, position_interest,
+              status, channel_label
+         from ${tbl}
+        where phone_e164 = $1 and id <> $2
+        order by created_at desc
+        limit 50`,
+      [base.phone_e164, id],
+    );
+    const visible = [];
+    for (const r of rows) {
+      if (await isApplicationInWriteScope(req.user, r)) {
+        visible.push({
+          id: r.id,
+          created_at: toIso(r.created_at),
+          job_title: r.job_title,
+          unit_name: r.unit_name,
+          position_interest: r.position_interest,
+          status: r.status,
+          channel_label: r.channel_label,
+        });
+      }
+    }
+    return visible;
+  });
+
+  const aiCalls = await soft(async () => {
+    const { rows } = await dbQuery<{
+      id: number;
+      status: string;
+      created_at: string | Date;
+      first_result_at: string | Date | null;
+      last_result_at: string | Date | null;
+      last_outcome: string | null;
+      attempt_count: number | null;
+      next_attempt_at: string | Date | null;
+    }>(
+      `select id, status, created_at, first_result_at, last_result_at, last_outcome, attempt_count, next_attempt_at
+         from ${queueTbl}
+        where person_ref = $1
+        order by created_at desc
+        limit 50`,
+      [`app-${id}`],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      status: r.status,
+      created_at: toIso(r.created_at),
+      result_at: r.last_result_at ? toIso(r.last_result_at) : r.first_result_at ? toIso(r.first_result_at) : null,
+      outcome: r.last_outcome,
+      attempts: r.attempt_count ?? 1,
+      next_attempt_at: r.next_attempt_at ? toIso(r.next_attempt_at) : null,
+    }));
+  });
+
+  const staffCalls = await soft(async () => {
+    const { rows } = await dbQuery<{
+      id: string;
+      held_at: string | Date;
+      held_by_name: string | null;
+      released_at: string | Date | null;
+      release_reason: string | null;
+      result_outcome: string | null;
+      result_note: string | null;
+    }>(
+      `select id, held_at, held_by_name, released_at, release_reason, result_outcome, result_note
+         from ${tableInAppSchema('candidate_call_holds')}
+        where candidate_ref = $1 and source = 'application'
+        order by held_at desc
+        limit 50`,
+      [id],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      held_at: toIso(r.held_at),
+      held_by_name: r.held_by_name,
+      released_at: r.released_at ? toIso(r.released_at) : null,
+      release_reason: r.release_reason,
+      outcome: r.result_outcome,
+      note: r.result_note,
+    }));
+  });
+
+  return res.status(200).json({ history, aiCalls, staffCalls });
+}
+
+/**
+ * PATCH `{ id, profile: {...} }` — แก้ข้อมูลผู้สมัครจากป๊อปรายละเอียด (เจ้าของสั่ง 1 ต.ค. 2569)
+ *
+ * เจ้าของ: *"แก้ไขได้แต่ถ้าบันทึกก็เก็บ Log ด้วยว่าใครแก้ไข แต่ไม่ต้องโชว์ Log"*
+ * ⇒ จด audit `job_application.profile_edit` (ค่าก่อน/หลังเฉพาะช่องที่เปลี่ยน + คนแก้จาก token)
+ *   ไม่มีจอไหนอ่าน log นี้ · ไม่มีอะไรเปลี่ยน = ไม่เขียนและไม่จด
+ *
+ * ⚠️ ตรวจด้วยตัวเดียวกับหน้าเว็บ (`parseProfilePatch`) · SQL ประกอบจาก `PROFILE_KEYS` (whitelist) เท่านั้น
+ * ⚠️ เบอร์ไม่อยู่ในนี้ (คีย์ของล็อกโทร/คิว) · ไม่แตะ `status` · ชื่อเปลี่ยน ⇒ คำนวณ `full_name` ใหม่
+ *    แบบฟอร์มสมัครสาธารณะ (คำนำหน้าติดชื่อ)
+ */
+async function patchProfile(req: AuthedReq, res: ApiRes, id: string, raw: unknown) {
+  type Before = {
+    title_prefix: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    full_name: string | null;
+    gender: string | null;
+    age: number | null;
+    line_id: string | null;
+    province: string | null;
+    district: string | null;
+    education: string | null;
+    license_types: string[] | null;
+    weight_kg: string | number | null;
+    height_cm: string | number | null;
+    note: string | null;
+    job_id: string | null;
+    department_code: string | null;
+  };
+  const { rows: beforeRows } = await dbQuery<Before>(
+    `select title_prefix, first_name, last_name, full_name, gender, age, line_id, province, district,
+            education, license_types, weight_kg, height_cm, note, job_id, department_code
+       from ${tbl} where id = $1 limit 1`,
+    [id],
+  );
+  const before = beforeRows[0];
+  if (!before) return sendError(res, 404, 'Not found');
+  // จำกัดตาม BU ก่อนเสมอ — กันแก้ใบของแผนกอื่นด้วยการเดา id (กติกาเดียวกับ patchStatus)
+  if (!(await isApplicationInWriteScope(req.user, before))) {
+    return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+  }
+
+  const parsed = parseProfilePatch(raw, before.license_types ?? []);
+  if (!parsed.ok) return sendError(res, 400, 'Bad request', parsed.message);
+  const changes: ProfilePatch = changedProfilePatch(before, parsed.patch);
+  const keys = PROFILE_KEYS.filter((k) => k in changes);
+
+  if (keys.length > 0) {
+    const sets: string[] = [];
+    const params: unknown[] = [id];
+    for (const key of keys) {
+      let v = (changes as Record<string, unknown>)[key];
+      // ใบขับขี่ว่าง = null (แบบเดียวกับตอนคีย์ใบใหม่) ไม่ใช่ array ว่าง
+      if (key === 'license_types') v = Array.isArray(v) && v.length > 0 ? v : null;
+      params.push(v);
+      sets.push(`${key} = $${params.length}`);
+    }
+    const nameChanged = keys.some((k) => k === 'title_prefix' || k === 'first_name' || k === 'last_name');
+    let fullName: string | null = null;
+    if (nameChanged) {
+      // ใบเก่าที่ไม่มีชื่อ/นามสกุลแยก ⇒ ใช้ส่วนที่แตกจากชื่อเต็มเป็นค่าตั้ง (ไม่ทำชื่อหาย)
+      const base = profileDraftOf(before);
+      fullName = profileFullName(
+        'title_prefix' in changes ? changes.title_prefix : before.title_prefix,
+        changes.first_name ?? base.first_name,
+        changes.last_name ?? base.last_name,
+      );
+      params.push(fullName);
+      sets.push(`full_name = $${params.length}`);
+    }
+    await dbQuery(
+      `update ${tbl} set ${sets.join(', ')}, updated_at = now() where id = $1 returning id`,
+      params,
+    );
+
+    const beforeLog: Record<string, unknown> = {};
+    const afterLog: Record<string, unknown> = {};
+    for (const key of keys) {
+      beforeLog[key] = (before as Record<string, unknown>)[key] ?? null;
+      afterLog[key] = (changes as Record<string, unknown>)[key] ?? null;
+    }
+    if (fullName !== null) {
+      beforeLog.full_name = before.full_name;
+      afterLog.full_name = fullName;
+    }
+    await auditFromAuthed(req, {
+      action: 'job_application.profile_edit',
+      entityType: 'job_application',
+      entityId: id,
+      before: beforeLog,
+      after: afterLog,
+    });
+  }
+
+  const rows = await queryWithLegacyFallback(`select {{cols}} from ${tbl} a where a.id = $1`, [id]);
+  if (!rows[0]) return sendError(res, 404, 'Not found');
+  return res.status(200).json({ item: toApplication(rows[0], req.user.sub), changed: keys });
+}
+
 async function patchStatus(req: AuthedReq, res: ApiRes) {
   const raw = await readJsonBody(req);
   if (typeof raw !== 'object' || raw === null) {
@@ -967,6 +1207,8 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
   }
   // "กดโทร" — จดเวลาที่หยิบสายโทรออก (095)
   if (b.dial === true) return patchDial(req, res, id);
+  // แก้ข้อมูลผู้สมัครจากป๊อปรายละเอียด (1 ต.ค. 2569) — เก็บ log ว่าใครแก้ ไม่โชว์บนจอ
+  if (b.profile !== undefined) return patchProfile(req, res, id, b.profile);
 
   const hasStatus = b.status !== undefined;
   const hasNote = b.admin_note !== undefined;
@@ -1053,6 +1295,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // จำกัดตาม BU — ใบสมัครผูกกับ job_id ('siamraj-sql:<เลขใบขอ>') จึงกรองจากใบขอที่ผู้ใช้เห็นได้
     // (null = admin เห็นทุกแผนก) · ใบสมัครที่ไม่ระบุงาน (job_id null) ผูก BU ไม่ได้ → staff ไม่เห็น
     const scopedJobIds = await loadScopedJobIdSet(req.user);
+
+    // ป๊อปรายละเอียดผู้สมัคร แท็บ "ประวัติการสมัคร" + "การโทร" (1 ต.ค. 2569) — อ่านอย่างเดียว
+    const detailOf = getString(req.query?.detail_of);
+    if (detailOf) return await getApplicationDetailExtras(req, res, detailOf);
 
     if (getString(req.query?.counts) === '1') {
       // ⚠️ ต้องกรอง `not is_lead` ให้ตรงกับ dialog กล่องงาน (?job_id= ใช้ leadWhere='not is_lead')
