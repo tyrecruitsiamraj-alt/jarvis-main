@@ -16,6 +16,8 @@ Object.assign(process.env, {
   CLAIM_GUARD_ENABLED: 'false',
   FOLLOW_PUSH_RETRY_ENABLED: 'false',
   LUMOS_PUSH_RETRY_ENABLED: 'false',
+  // ดึงส่งคนแทนจาก iRecruit ทุกเช้า (2 ต.ค. 2569) — บนเครื่อง dev ห้ามวิ่งซ้ำกับเซิร์ฟเวอร์ (สร้างสาย + ส่ง AI ลงฐานจริง)
+  IRECRUIT_REPLACE_SYNC_ENABLED: 'false',
   SYSTEM_HEALTH_WATCH_ENABLED: 'false',
 });
 

@@ -18,6 +18,7 @@ import { startApplicationAutoMoveWorker } from '../api/_lib/applicationAutoMoveW
 import { startSystemHealthWorker } from '../api/_lib/systemHealthWorker.ts';
 import { startClaimGuardWorker } from '../api/_lib/callChoiceWorker.ts';
 import { startFollowPushRetryWorker } from '../api/_lib/followPushRetryWorker.ts';
+import { startIrecruitReplaceSyncWorker } from '../api/_lib/irecruitReplaceSyncWorker.ts';
 import { startLumosPushRetryWorker } from '../api/_lib/lumosPushRetryWorker.ts';
 import { preferIpv4 } from '../api/_lib/netPreferIpv4.ts';
 import { warmUnitRequestListCache } from '../api/_handlers/siamraj-unit-requests.ts';
@@ -205,6 +206,11 @@ server.listen(port, '127.0.0.1', () => {
    * แค่ทำสิ่งที่คนสั่งไว้แล้วให้สำเร็จ · ปิดด้วย FOLLOW_PUSH_RETRY_ENABLED=false
    */
   startFollowPushRetryWorker();
+  /**
+   * ดึงรายชื่อส่งคนแทนจาก iRecruit ทุกเช้า (เจ้าของเคาะ 2 ต.ค. 2569 "ดึงเองทุกเช้า") · **เปิดโดยดีฟอลต์** ·
+   * ปิดด้วย IRECRUIT_REPLACE_SYNC_ENABLED=false · ส่ง AI ตามสวิตช์ follow_entry เดิม · กันซ้ำที่ฐาน (source_ref)
+   */
+  startIrecruitReplaceSyncWorker();
   /**
    * ส่งซ้ำสายที่ส่งไม่ถึง Lumos — ใบสมัคร + เลน Match (เจ้าของเคาะ 28 ก.ย. 2569) · **เปิดโดยดีฟอลต์** ปิดด้วย
    * LUMOS_PUSH_RETRY_ENABLED=false · เคารพช่วงห้ามโทรของนโยบายกลาง · เกิน 24 ชม. โยนให้เจ้าหน้าที่ · ไม่มีคีย์ push = ไม่ทำอะไร

@@ -91,6 +91,7 @@ import StaffContactField from '@/components/follow/StaffContactField';
 import TopicField from '@/components/follow/TopicField';
 import FollowMasterManagerDialog from '@/components/follow/FollowMasterManagerDialog';
 import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
+import IrecruitReplaceSyncBar from '@/components/follow/IrecruitReplaceSyncBar';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import FollowCompletedCard from '@/components/follow/FollowCompletedCard';
 import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
@@ -1185,6 +1186,9 @@ const FollowPage: React.FC = () => {
             ผู้ทดสอบตาใหม่ถามว่า *"สองอันนี้บอกเรื่องเดียวกันหรือคนละเรื่อง งงว่าทำไมมีสองที่"*
             ⇒ ยุบเป็นผืนเดียว · ตัวเลือกรอบมีที่เดียว (`activeRound`) · ตัวเลือกวันมีที่เดียว (`fDate`)
             🔴 ของเดิมอยู่ครบทุกชิ้น: แท็บรอบ + 7 กล่องสถานะสาย + ป๊อปรายชื่อ + ปุ่มทุกปุ่ม */}
+        {/* แถบดึงจาก iRecruit — แท็บส่งคนแทนอย่างเดียว (เจ้าของสั่ง 2 ต.ค. 2569 · ข้อยกเว้นเดียวของ "สองแท็บเหมือนกัน")
+            ดึงเองทุกเช้า · ปุ่มดึงตอนนี้/แก้เวลาโทร หัวหน้างานขึ้นไป · ดึงได้สายใหม่ = โหลดรายการใหม่ */}
+        {replaceView ? <IrecruitReplaceSyncBar canManage={canManageMasters} onSynced={() => void reload(true)} /> : null}
         <FollowPlanningCalendar
           rows={planningRowsAllRounds}
           month={calMonth}

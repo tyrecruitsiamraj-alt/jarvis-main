@@ -52,7 +52,9 @@ describe('หน้าการติดตาม: สองแท็บเห�
     for (const gone of ['เพิ่มคนที่จะไปแทนงาน', 'ยังไม่มีคนที่ส่งไปแทนงาน', 'REPLACEMENT_TOPIC', 'effectiveTopic']) {
       expect(page, gone).not.toContain(gone);
     }
-    expect(page.match(/replaceView \?/g)?.length).toBe(2);
+    // 3 = ทีม · กอง · แถบดึงจาก iRecruit (เจ้าของสั่ง 2 ต.ค. 2569 — ข้อยกเว้นเดียวของกติกานี้ ห้ามเติมอย่างอื่น)
+    expect(page.match(/replaceView \?/g)?.length).toBe(3);
+    expect(page).toContain('{replaceView ? <IrecruitReplaceSyncBar canManage={canManageMasters} onSynced={() => void reload(true)} /> : null}');
     expect(page).toContain("followTeamForScope(replaceView ? 'replacement' : 'main')");
     expect(page).toContain('<TopicField id="followTopic" value={topic} onChange={setTopic} reloadSignal={topicsRev} />');
   });

@@ -11092,3 +11092,27 @@ Choice ของเจ้าของ: การ์ดแยกบนหน้�
   `/api/siamraj/unit-requests` เดิมไม่มี `monthly_income` (0/343) ทั้งที่ `/api/public/jobs` คิดจากอัตรา ERP ให้ ⇒ ชิป "ขาดรายได้" เตือนผิด 225 ใบตอนวัดครั้งแรก ·
   ตอนนี้แนบ `monthly_income`/`_base`/`_items` จากคำถาม ERP เดียวกับชิปสวัสดิการ (ไม่ทับ `total_income` · ของที่ทีม Online ตั้งเองชนะที่ฝั่งจอ `publicIncomeOf`) ·
   การ์ดกล่องงานเปลี่ยนมาใช้ `publicIncomeOf` ตัวเดียว (เลิก `moneyOf` ของตัวเอง) — เลขเงินบนการ์ด ป๊อป และหน้าสาธารณะเป็นตัวเดียวกัน
+
+### 2 ต.ค. 2569 (ต่อ) — ดึงรายชื่อ "ส่งคนแทน" จาก iRecruit เข้าแท็บติดตามส่งคนแทน ทุกเช้า
+
+เจ้าของส่ง SQL ของหน้า "จัดเวรติดตาม" (iRecruit) มาเอง: `ir_job_header` (`job_type='2'` · สถานะ `WS`) → คนไปแทน = `ir_job_request` แถวล่าสุด →
+ชื่อ/เบอร์จาก `z_hr_recruitment_header` แถวล่าสุด (ตัดสถานะ C) · `want_date` = วันเวลาเข้างาน · เคาะ Choice: **ดึงเองทุกเช้า · เวลาโทรตั้งได้
+(ค่าเริ่ม 18:00 ของวันก่อนเข้างาน) · AI โทรเลย** — ปลดงานที่พักไว้ 1 ต.ค. (เบอร์มาจาก `z_hr_recruitment_header.mobile` ไม่ใช่ `hr_staff`)
+
+วัดจริง (อ่านอย่างเดียว · ก.ย.–ต.ค. 2569): WS ที่ไม่ใช่ C 865 ใบ (ก.ย. 806 · ต.ค. 59) · มีเบอร์ 10 หลัก 841 · ไม่มีเบอร์ 24 ·
+865 ใบ = 239 เบอร์ (คนเดียวหลายใบ) · `want_date` มีเวลาทุกใบ (05:00 / 07:30 / 08:00) · ที่ยังไม่ถึงวัน 50 ใบ
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/irecruitReplaceSync.ts` (ใหม่) | ตรรกะล้วน: `wantWallFromSqlDate` (mssql คืนนาฬิกาไทยเป็น Date ที่ถือเป็น UTC ⇒ อ่าน `getUTC*`) · `planReplaceCall` (วันเข้างาน + dayOffset ที่ HH:MM ไทย · ผ่านแล้วแต่ยังไม่เข้างาน = +10 นาที · เลยเวลาเข้างาน = ไม่สร้าง) · `normalizeReplaceCallRule` / `replaceCallRuleText` · `replaceSourceRef` (`irecruit-replace:<job_id>`) · `readReplaceSyncConfig` (env) · `replaceSyncDueNow` |
+| `api/_lib/irecruitReplaceSync.ts` (ใหม่) | `runIrecruitReplaceSync`: สวิตช์ iRecruit → ตาราง 133 → SQL ของเจ้าของ (วันนี้→+31 วัน) → ตัดซ้ำด้วย `source_ref` (ถามฐานทีเดียว) → ไม่มีเบอร์/เลยเวลา → **คนเดียวหลายใบ = ชุดเดียว** (`group_id` เดียว · ทุกสาย `call_round` 1 · `call_mode` 'ai' · ทีม `replacement` · เรื่อง "ติดตามส่งคนแทน" · หมายเหตุ "เข้างาน HH:MM น." · `unit_name` = site_name) → `enqueueFollowReminderPlan` ต่อชุด **เฉพาะเมื่อ `follow_entry` เป็น auto** → จด `dispatch_state` + `lastRun` ลง `app_irecruit_replace_sync` · unique violation = นับว่ามีแล้ว · 42703/42P01 = บอก "ฐานยังไม่รัน 133" ไม่สร้างสาย |
+| `api/_lib/irecruitReplaceSyncWorker.ts` (ใหม่) | เดินทุก 5 นาที · ถึงชั่วโมงที่ตั้ง (`IRECRUIT_REPLACE_SYNC_HOUR` ค่าเริ่ม 06:00 ไทย) และวันนี้ยังไม่ได้ดึง → หนึ่งรอบ · ล้มแล้วรอ 1 ชม. · **เปิดโดยดีฟอลต์** ปิดด้วย `IRECRUIT_REPLACE_SYNC_ENABLED=false` · เริ่มที่ `server/local-api.ts` |
+| `api/_handlers/irecruit-replace-sync.ts` (ใหม่) · `registry.ts` · `rbac.ts` | `/api/irecruit-replace-sync` GET สภาพ (staff) · POST ดึงตอนนี้ · PATCH กติกาเวลาโทร (supervisor+) · resource `irecruit-replace-sync` |
+| `migrations/133_follow_source_ref_replace_sync.sql` (ใหม่) | `follow_entries.source_ref` + unique partial index (ฐานกันซ้ำ) · ตาราง `app_irecruit_replace_sync` (payload: rule · lastRun) |
+| `src/components/follow/IrecruitReplaceSyncBar.tsx` (ใหม่) · `src/lib/irecruitReplaceSyncApi.ts` (ใหม่) | แถบบรรทัดเดียวบนแท็บส่งคนแทน: ดึงล่าสุด/เพิ่ม/มีแล้ว/ไม่มีเบอร์/ส่ง AI · โทรเวลาไหน · ดึงเองทุกวันกี่โมง · ปัญหา (iRecruit ปิด / ฐานยังไม่พร้อม) · ปุ่ม **แก้เวลาโทร** (Popover) / **ดึงตอนนี้** หัวหน้างานขึ้นไป · ว่าง = "ยังไม่เคยดึง" |
+| `src/pages/follow/FollowPage.tsx` · `src/lib/followReplacement.test.ts` | `{replaceView ? <IrecruitReplaceSyncBar …/> : null}` เหนือปฏิทิน — **ข้อยกเว้นเดียว**ของกติกา "สองแท็บเหมือนกัน" (เทสต์นับ `replaceView ?` = 3) |
+| เทสต์ | `src/lib/irecruitReplaceSync.test.ts` (11) · `tests/api/irecruitReplaceSync.test.ts` (6 · mock ฐาน/iRecruit/Lumos: ชุดเดียวต่อคน · ตัดซ้ำ · unique violation · 133 ไม่พร้อม · iRecruit ปิด/ล่ม · สวิตช์ AI ปิด) |
+
+- ⚠️ ทดสอบจริงบนเครื่อง**ทำไม่ได้**: ฐาน local = production และ migration 133 ยังไม่รัน (เส้น GET บอก "ฐานยังไม่พร้อม") · กดดึงตอนนี้ = สร้างสายจริง + ถ้าสวิตช์ AI เปิด = โทรคนจริง ⇒ ไม่กด · พฤติกรรมคุมด้วยเทสต์ mock
+- 🔴 สายที่ดึงมาใช้บทเดิมของงานติดตาม (`follow`) — เพราะทุกสายเป็น "สายแรก" ของคนละวัน/คนละหน่วย ไม่ใช่โทรซ้ำ · บท AI พูด `unit_name` (ชื่อไซต์) + หมายเหตุ "เข้างาน HH:MM น." · อยากให้พูดต่างต้องเพิ่มบท
+- iRecruit เปลี่ยนสถานะใบ (ยกเลิก/จัดคนใหม่) หลังดึงแล้ว **ไม่ย้อนแก้สาย** — ยกเลิกเองในหน้าติดตามเหมือนสายปกติ (ถ้าเจ้าของอยากให้ตามสถานะ iRecruit ต้องเคาะเพิ่ม)
