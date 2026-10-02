@@ -171,7 +171,7 @@ export const RELEASE_STEP_TEXT: Record<
     // 30 ก.ย. 2569: ขั้น 4 เป็นสรุป + ส่ง · ลิงก์ไม่บังคับแล้ว (Choice "ส่งได้เลย ลิงก์ไม่บังคับ")
     label: 'สรุป + ส่งประกาศ',
     state: 'มีลิงก์แล้ว รอกดส่ง',
-    hint: 'มีลิงก์สมัครแล้ว เหลือกดส่งประกาศขึ้นหน้าสาธารณะ — คนนอกกับ AI จะเห็นทันที',
+    hint: 'มีลิงก์สมัครแล้ว เหลือกดส่งประกาศ — คนนอกกับ AI จะเห็นทันที',
     todo: 'ดูสรุป จะสร้างลิงก์เพิ่มก็ได้ แล้วกดส่งประกาศ หรือเก็บเป็นร่าง',
   },
 };
@@ -184,7 +184,7 @@ export const RELEASE_LANE_TEXT: Record<ReleaseLaneKey, { label: string; hint: st
   },
   released: {
     label: 'ประกาศ',
-    hint: 'ประกาศขึ้นหน้าสมัครสาธารณะแล้ว คนนอกและ AI เห็นใบนี้ — กดดูว่ามีคนสมัครเข้ามาไหม',
+    hint: 'ประกาศแล้ว คนนอกและ AI เห็นใบนี้ — กดดูว่ามีคนสมัครเข้ามาไหม',
   },
   unreleased: {
     label: 'ยังไม่ประกาศ',
@@ -273,8 +273,8 @@ export function releaseProgressOf(job: JobRequest, facts: ReleaseFacts): Release
  * (ไม่งั้นคนอ่านผิดว่าใบนี้จบงานแล้ว — คนละเรื่องกับการปิดใบขอ)
  */
 export function releaseProgressTitle(progress: ReleaseProgress): string {
-  const end = 'ครบ 100% = ส่งประกาศขึ้นหน้าสมัครงานสาธารณะแล้ว (ไม่ใช่ว่าหาคนได้ครบ)';
-  if (progress.released) return `ประกาศขึ้นหน้าสาธารณะแล้ว · ${end}`;
+  const end = 'ครบ 100% = ประกาศแล้ว (ไม่ใช่ว่าหาคนได้ครบ)';
+  if (progress.released) return `ประกาศแล้ว · ${end}`;
   const key = RELEASE_STEP_ORDER[(progress.currentStep ?? 1) - 1];
   return `ต้องทำ: ${RELEASE_STEP_TEXT[key].todo} · ${end}`;
 }

@@ -552,7 +552,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                  สาธารณะต้องมีปุ่มให้ย้อนกลับมาได้"* → Choice "บนหัวป๊อป ข้างป้าย ปล่อยแล้ว") · ปุ่มเดิมในขั้น 4 ยังอยู่ */
               <div className="flex flex-wrap items-center gap-2">
                 <span className={cn('rounded-full border px-3 py-1 text-xs', TONE.success.soft, TONE.success.value)}>
-                  ✓ ประกาศขึ้นหน้าสาธารณะแล้ว
+                  ✓ ประกาศแล้ว
                 </span>
                 <Button
                   type="button"
@@ -561,7 +561,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                   disabled={releaseBusy || !job}
                   onClick={() => void toggleRelease(false)}
                 >
-                  {releaseBusy ? 'กำลังบันทึก…' : 'ดึงลงจากหน้าสาธารณะ'}
+                  {releaseBusy ? 'กำลังบันทึก…' : 'ดึงประกาศลง'}
                 </Button>
               </div>
             ) : skip ? (
@@ -751,14 +751,14 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                   <Loading text="กำลังอ่านทะเบียนการประกาศ…" />
                 ) : released ? (
                   <div className="flex flex-wrap items-center justify-end gap-2">
-                    <p className={cn('mr-auto text-sm', TONE.success.value)}>ใบนี้อยู่บนหน้าสาธารณะแล้ว</p>
+                    <p className={cn('mr-auto text-sm', TONE.success.value)}>ใบนี้ประกาศแล้ว</p>
                     <Button
                       type="button"
                       variant="outline"
                       disabled={releaseBusy || !job}
                       onClick={() => void toggleRelease(false)}
                     >
-                      {releaseBusy ? 'กำลังบันทึก…' : 'ดึงประกาศลงจากหน้าสาธารณะ'}
+                      {releaseBusy ? 'กำลังบันทึก…' : 'ดึงประกาศลง'}
                     </Button>
                     <Button type="button" onClick={leaveToBoard}>
                       ปิด
@@ -772,7 +772,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                       type="button"
                       variant="outline"
                       disabled={releaseBusy}
-                      title="เก็บที่ทำไว้ ยังไม่ขึ้นหน้าสาธารณะ"
+                      title="เก็บที่ทำไว้ ยังไม่ประกาศ"
                       onClick={leaveToBoard}
                     >
                       บันทึกแบบร่าง

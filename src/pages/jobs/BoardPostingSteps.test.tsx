@@ -1,6 +1,6 @@
 /**
  * ป๊อปไล่งานบนกล่องงาน
- * - ปุ่ม "ดึงลงจากหน้าสาธารณะ" บนหัวป๊อป (เจ้าของเคาะ 29 ก.ย. 2569)
+ * - ปุ่ม "ดึงประกาศลง" บนหัวป๊อป (เจ้าของเคาะ 29 ก.ย. 2569 · คำ 2 ต.ค. 2569: "หน้าสาธารณะ" → "ประกาศ")
  *   🔴 ใบที่ปล่อยแล้วเห็นปุ่มทันทีที่เปิด (ไม่ต้องไล่ไปขั้น 4) · กดแล้วดึงลงใบนั้นใบเดียว · ใบที่ยังไม่ปล่อยไม่มีปุ่มนี้
  * - โฉมใหม่ 30 ก.ย. 2569: ขั้น 1 ไม่มี "ติดอะไรไหม"/"ใครแก้อะไรไป" · "ไม่ปล่อยใบนี้" อยู่ล่างสุด ·
  *   ขั้น 4 สรุป + ส่งได้เลยโดยไม่ต้องมีลิงก์ (ยังต้องเลือกเพศ) · บันทึกแบบร่าง = ปิดป๊อปไม่ส่ง
@@ -70,18 +70,18 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
-describe('ป๊อปไล่งาน — ดึงลงจากหน้าสาธารณะบนหัวป๊อป', () => {
+describe('ป๊อปไล่งาน — ดึงประกาศลงบนหัวป๊อป', () => {
   it('🔴 ใบที่ปล่อยแล้ว: เปิดมาเห็นปุ่มข้างป้ายเลย · กดแล้วดึงลงใบนี้ใบเดียว (ไม่ปล่อยซ้ำ)', async () => {
     fetchJobReleases.mockResolvedValue(released);
     renderSteps();
-    const button = await screen.findByRole('button', { name: 'ดึงลงจากหน้าสาธารณะ' });
-    expect(screen.getByText('✓ ประกาศขึ้นหน้าสาธารณะแล้ว')).toBeTruthy();
+    const button = await screen.findByRole('button', { name: 'ดึงประกาศลง' });
+    expect(screen.getByText('✓ ประกาศแล้ว')).toBeTruthy();
     fetchJobReleases.mockResolvedValue([]);
     fireEvent.click(button);
     await waitFor(() => expect(unreleaseJobsFromPublic).toHaveBeenCalledWith([JOB_ID]));
     expect(releaseJobsToPublic).not.toHaveBeenCalled();
     // ทะเบียนโหลดใหม่แล้วไม่มีใบนี้ ⇒ ป้าย + ปุ่มหายไปเอง
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'ดึงลงจากหน้าสาธารณะ' })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'ดึงประกาศลง' })).toBeNull());
   });
 
   it('ใบที่ยังไม่ปล่อย: ไม่มีปุ่มดึงลงบนหัวป๊อป', async () => {
@@ -89,7 +89,7 @@ describe('ป๊อปไล่งาน — ดึงลงจากหน้�
     renderSteps();
     await screen.findByRole('navigation', { name: 'ขั้นตอนของงานประกาศ' });
     await waitFor(() => expect(fetchJobReleases).toHaveBeenCalled());
-    expect(screen.queryByRole('button', { name: 'ดึงลงจากหน้าสาธารณะ' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'ดึงประกาศลง' })).toBeNull();
   });
 });
 

@@ -1665,7 +1665,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     <span
                       title={
                         isHiddenFromPublicByWorkStatus(job.work_status)
-                          ? 'สถานะนี้แปลว่าได้ตัวคนแล้ว — ประกาศจึงไม่ขึ้นหน้าสาธารณะ (เปลี่ยนสถานะแล้วประกาศกลับมาเอง)'
+                          ? 'สถานะนี้แปลว่าได้ตัวคนแล้ว — ประกาศจึงไม่ขึ้น (เปลี่ยนสถานะแล้วประกาศกลับมาเอง)'
                           : 'สถานะงานที่เจ้าหน้าที่ตั้งไว้'
                       }
                       className={cn(
@@ -1806,7 +1806,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       return (
                         <span
                           className={cn('self-start', TONE.info.chip)}
-                          title="นับจากหน้าสมัครงานสาธารณะ 30 วันล่าสุด — กดปุ่มสมัคร / ส่งใบสมัครจริง"
+                          title="นับจากประกาศ 30 วันล่าสุด — กดปุ่มสมัคร / ส่งใบสมัครจริง"
                         >
                           กดสมัคร {c.apply.toLocaleString('th-TH')}
                           {c.submit > 0 ? ` · ส่งจริง ${c.submit.toLocaleString('th-TH')}` : ''}
