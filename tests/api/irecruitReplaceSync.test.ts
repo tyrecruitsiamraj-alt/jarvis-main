@@ -23,9 +23,18 @@ vi.mock('../../api/_lib/postgres.js', () => ({
   isPgUniqueViolation: (e: unknown) => (e as { code?: string })?.code === '23505',
 }));
 vi.mock('../../api/_lib/lumosDispatchMode.js', () => ({ isAutoDispatchEnabled: () => autoDispatch() }));
-vi.mock('../../api/_lib/lumosDispatch.js', () => ({ enqueueFollowReminderPlan: (...a: unknown[]) => enqueuePlan(...a) }));
+const cancelFollow = vi.fn(async () => true);
+const cancelPushed = vi.fn(async () => undefined);
+let pushConfig: unknown = { baseUrl: 'x' };
+vi.mock('../../api/_lib/lumosDispatch.js', () => ({
+  enqueueFollowReminderPlan: (...a: unknown[]) => enqueuePlan(...a),
+  cancelFollowReminder: (...a: unknown[]) => cancelFollow(...a),
+  cancelPushedReminderIgnoringMissing: (...a: unknown[]) => cancelPushed(...a),
+}));
+vi.mock('../../api/_lib/lumosPushClient.js', () => ({ getLumosPushConfig: () => pushConfig }));
+vi.mock('../../api/_lib/followStaffName.js', () => ({ staffNameOfPhone: async () => null }));
 
-import { MIGRATION_133_NOT_READY, runIrecruitReplaceSync } from '../../api/_lib/irecruitReplaceSync.js';
+import { enforceReplaceAiFrom, MIGRATION_133_NOT_READY, runIrecruitReplaceSync } from '../../api/_lib/irecruitReplaceSync.js';
 import { REPLACE_FOLLOW_TOPIC } from '../../src/lib/irecruitReplaceSync.js';
 
 type Call = { sql: string; params: unknown[] };
@@ -90,6 +99,9 @@ beforeEach(() => {
   autoDispatch.mockReset();
   autoDispatch.mockResolvedValue(true);
   enqueuePlan.mockReset();
+  cancelFollow.mockClear();
+  cancelPushed.mockClear();
+  pushConfig = { baseUrl: 'x' };
   enqueuePlan.mockImplementation(async (entries: Array<{ id: string }>) => new Map(entries.map((e) => [e.id, 'queued'])));
 });
 
@@ -129,7 +141,7 @@ describe('runIrecruitReplaceSync', () => {
     // ทีมส่งคนแทน · เรื่อง · เบอร์ E.164 · หน่วยงาน · โทร 18:00 วันก่อนเข้างาน (11:00Z) · ชื่อคนสร้าง
     expect(byRef['irecruit-replace:A']).toEqual([
       'ทดสอบ ระบบ', '+66812345678', REPLACE_FOLLOW_TOPIC, 'เข้างาน 07:30 น.', '2026-10-02T11:00:00.000Z',
-      expect.any(String), 'ไซต์ทดสอบ', 'S001', 'ดึงจาก iRecruit', 'replacement', 'irecruit-replace:A',
+      expect.any(String), 'ไซต์ทดสอบ', 'S001', 'ดึงจาก iRecruit', 'replacement', 'irecruit-replace:A', 'ai',
     ]);
     expect(byRef['irecruit-replace:B']?.[4]).toBe('2026-10-03T11:00:00.000Z');
     // A กับ B คนเดียวกัน = group_id เดียว · C คนละชุด
@@ -137,7 +149,10 @@ describe('runIrecruitReplaceSync', () => {
     expect(byRef['irecruit-replace:C']?.[5]).not.toBe(byRef['irecruit-replace:A']?.[5]);
     // G โทรเร็วที่สุด = ตอนนี้ + 10 นาที
     expect(byRef['irecruit-replace:G']?.[4]).toBe(new Date(NOW.getTime() + 10 * 60_000).toISOString());
-    for (const c of ins) expect(c.sql).toMatch(/1, 'ai', null/); // ทุกสายเป็นสายแรก · AI โทร
+    for (const c of ins) {
+      expect(c.sql).toMatch(/1, \$12, null/); // ทุกสายเป็นสายแรก
+      expect(c.params[11]).toBe('ai'); // ไม่ได้ตั้ง aiFrom = AI โทร
+    }
     expect(ins.some((c) => String(c.params[10]) === 'irecruit-replace:D' || String(c.params[10]) === 'irecruit-replace:E' || String(c.params[10]) === 'irecruit-replace:F')).toBe(false);
 
     // แผนเดียวต่อชุด: ชุด A+B (เรียงตามเวลา) · ชุด C · ชุด G
@@ -197,5 +212,55 @@ describe('runIrecruitReplaceSync', () => {
     expect(s.error).toMatch(/ต่อ iRecruit ไม่ได้/);
     expect(inserts()).toHaveLength(0);
     expect(persisted().at(-1)?.lastRun?.error).toMatch(/ต่อ iRecruit ไม่ได้/);
+  });
+});
+
+describe('🔴 AI เริ่มโทรตั้งแต่ (เจ้าของสั่ง 2 ต.ค. 2569 "ถึงวันจันทร์เปลี่ยนเป็นคนโทรก่อนให้หมด")', () => {
+  it('ดึงใหม่: สายที่นัดก่อน aiFrom สร้างเป็นคนโทร ไม่ส่ง Lumos · หลังจากนั้นยัง AI', async () => {
+    settingsRows = [{ payload: { rule: { dayOffset: -1, time: '18:00', aiFrom: '2026-10-04' } }, updated_at: null, updated_by_name: null }];
+    irecruitSqlQuery.mockResolvedValue([
+      row('A'), // โทร 2 ต.ค. 18:00 → คนโทร
+      row('B', { mobile: '0899999999', want_date: wall('2026-10-06T08:00:00Z') }), // โทร 5 ต.ค. → AI
+    ]);
+    const s = await runIrecruitReplaceSync({ now: NOW });
+    const byRef = Object.fromEntries(inserts().map((c) => [String(c.params[10]), c.params[11]]));
+    expect(byRef).toEqual({ 'irecruit-replace:A': 'manual', 'irecruit-replace:B': 'ai' });
+    expect(enqueuePlan).toHaveBeenCalledTimes(1);
+    expect((enqueuePlan.mock.calls[0] as [Array<{ id: string }>])[0]).toHaveLength(1);
+    expect(s).toMatchObject({ added: 2, queued: 1, notSent: 0 });
+  });
+
+  it('สายเดิม: แผนล้วน = ยกเลิกทั้งแผนด้วยรหัสหัวขบวน · แผนที่มีสายหลังวันนั้น = ยกเลิกเฉพาะสาย · แล้วเปลี่ยนเป็นคนโทร', async () => {
+    dbQuery.mockImplementation(async (sql: string, params?: unknown[]) => {
+      calls.push({ sql, params: params ?? [] });
+      if (/select id from .*follow_entries/.test(sql)) return { rows: [{ id: 'a1' }, { id: 'a2' }, { id: 'b1' }] };
+      if (/select person_ref, plan_ref from/.test(sql))
+        return {
+          rows: [
+            { person_ref: 'follow-a1', plan_ref: 'follow-a1' },
+            { person_ref: 'follow-a2', plan_ref: 'follow-a1' },
+            { person_ref: 'follow-b1', plan_ref: 'follow-b1' },
+            { person_ref: 'follow-later', plan_ref: 'follow-b1' },
+          ],
+        };
+      if (/update .*lumos_dispatch_queue/.test(sql)) return { rows: [] };
+      if (/update .*follow_entries set call_mode = 'manual'/.test(sql)) return { rows: (params?.[0] as string[]).map((id) => ({ id })) };
+      throw new Error(`unexpected sql: ${sql.slice(0, 60)}`);
+    });
+    const r = await enforceReplaceAiFrom('2026-10-06');
+    expect(cancelPushed).toHaveBeenCalledWith('follow-a1');
+    expect(cancelPushed).toHaveBeenCalledTimes(1);
+    expect(cancelFollow).toHaveBeenCalledWith('b1', expect.any(Function));
+    expect(cancelFollow).toHaveBeenCalledTimes(1);
+    expect(r).toEqual({ converted: 3, plansCancelled: 1, errors: 0 });
+    expect(calls.find((c) => /select id from/.test(c.sql))?.params).toEqual(['replacement', '2026-10-05T17:00:00.000Z']);
+  });
+
+  it('🔴 ไม่มีคีย์ push = ไม่แตะอะไร (ห้ามเปลี่ยนเป็นคนโทรทั้งที่ Lumos ยังจะโทร) · ไม่ตั้ง aiFrom = ไม่ทำอะไร', async () => {
+    pushConfig = null;
+    expect(await enforceReplaceAiFrom('2026-10-06')).toEqual({ converted: 0, plansCancelled: 0, errors: 0 });
+    pushConfig = { baseUrl: 'x' };
+    expect(await enforceReplaceAiFrom(null)).toEqual({ converted: 0, plansCancelled: 0, errors: 0 });
+    expect(calls).toHaveLength(0);
   });
 });

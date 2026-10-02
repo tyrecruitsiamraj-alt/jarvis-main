@@ -13,6 +13,7 @@ import {
   REPLACE_SYNC_DEFAULTS,
   replaceCallNote,
   replaceCallRuleText,
+  replaceCallModeFor,
   replaceSourceRef,
   replaceSyncDueNow,
   wantInstant,
@@ -32,18 +33,28 @@ describe('นาฬิกาไทยจาก mssql', () => {
 
 describe('กติกาเวลาโทร', () => {
   it('ค่าเริ่มต้น 18:00 ของวันก่อนเข้างาน · คำบนจอ', () => {
-    expect(DEFAULT_REPLACE_CALL_RULE).toEqual({ dayOffset: -1, time: '18:00' });
+    expect(DEFAULT_REPLACE_CALL_RULE).toEqual({ dayOffset: -1, time: '18:00', aiFrom: null });
     expect(replaceCallRuleText(DEFAULT_REPLACE_CALL_RULE)).toBe('18:00 ของวันก่อนเข้างาน');
     expect(replaceCallRuleText({ dayOffset: 0, time: '06:00' })).toBe('06:00 ของวันเข้างาน');
     expect(replaceCallRuleText({ dayOffset: -2, time: '09:30' })).toBe('09:30 ของสองวันก่อนเข้างาน');
   });
 
   it('อ่านค่าที่เก็บ: ถูกต้องผ่าน · เพี้ยนถอยไปค่าเริ่มต้นทีละช่อง · ไม่ throw', () => {
-    expect(normalizeReplaceCallRule({ dayOffset: 0, time: '7:05' })).toEqual({ dayOffset: 0, time: '07:05' });
-    expect(normalizeReplaceCallRule({ dayOffset: -2, time: '23:59' })).toEqual({ dayOffset: -2, time: '23:59' });
+    expect(normalizeReplaceCallRule({ dayOffset: 0, time: '7:05' })).toEqual({ dayOffset: 0, time: '07:05', aiFrom: null });
+    expect(normalizeReplaceCallRule({ dayOffset: -2, time: '23:59', aiFrom: '2026-10-06' })).toEqual({ dayOffset: -2, time: '23:59', aiFrom: '2026-10-06' });
+    expect(normalizeReplaceCallRule({ aiFrom: '6/10/2026' }).aiFrom).toBeNull();
     expect(normalizeReplaceCallRule({ dayOffset: -5, time: '25:00' })).toEqual(DEFAULT_REPLACE_CALL_RULE);
     expect(normalizeReplaceCallRule(null)).toEqual(DEFAULT_REPLACE_CALL_RULE);
     expect(normalizeReplaceCallRule('x')).toEqual(DEFAULT_REPLACE_CALL_RULE);
+  });
+});
+
+describe('AI เริ่มโทรตั้งแต่ (aiFrom)', () => {
+  it('🔴 สายที่นัดก่อนเที่ยงคืนไทยของวัน aiFrom = คนโทร · ตั้งแต่วันนั้น = AI · ไม่ตั้ง = AI ทุกสาย', () => {
+    expect(replaceCallModeFor(new Date('2026-10-05T18:00:00+07:00'), '2026-10-06')).toBe('manual');
+    expect(replaceCallModeFor(new Date('2026-10-05T23:59:00+07:00'), '2026-10-06')).toBe('manual');
+    expect(replaceCallModeFor(new Date('2026-10-06T00:00:00+07:00'), '2026-10-06')).toBe('ai');
+    expect(replaceCallModeFor(new Date('2026-10-02T18:00:00+07:00'), null)).toBe('ai');
   });
 });
 

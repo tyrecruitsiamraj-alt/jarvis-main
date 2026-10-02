@@ -35,7 +35,8 @@ export async function runReplaceSyncNow(): Promise<ReplaceSyncStatus & { summary
   return (await r.json()) as ReplaceSyncStatus & { summary: ReplaceSyncSummary };
 }
 
-export async function saveReplaceCallRule(rule: ReplaceCallRule): Promise<ReplaceSyncStatus> {
+/** ส่งเฉพาะช่องที่แก้ — ช่องที่ไม่ส่ง (เช่น aiFrom) ฝั่ง server คงค่าเดิม */
+export async function saveReplaceCallRule(rule: Partial<ReplaceCallRule>): Promise<ReplaceSyncStatus> {
   const r = await apiFetch('/api/irecruit-replace-sync', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

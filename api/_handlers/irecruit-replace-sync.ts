@@ -72,7 +72,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!before.tableReady) {
         return sendError(res, 503, 'Service unavailable', 'ฐานยังไม่รัน migration 133 — ยังตั้งค่าไม่ได้');
       }
-      const rule = normalizeReplaceCallRule(body.rule);
+      // ส่งมาเฉพาะบางช่องได้ (ป๊อปแก้เวลาโทรไม่ส่ง aiFrom) — ช่องที่ไม่ส่งคงค่าเดิม ห้ามล้างทิ้ง
+      const rule = normalizeReplaceCallRule({ ...before.rule, ...(typeof body.rule === 'object' && body.rule ? body.rule : {}) });
       await saveReplaceSyncSettings({ rule }, req.user.email || req.user.sub);
       await auditFromAuthed(req, {
         action: 'irecruit_replace_sync.rule',

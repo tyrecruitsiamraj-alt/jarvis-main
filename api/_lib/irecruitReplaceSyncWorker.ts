@@ -11,7 +11,7 @@
  */
 import { bangkokBusinessDateYmd } from './businessDate.js';
 import { logError, logInfo, logWarn } from './logger.js';
-import { getReplaceSyncSettings, runIrecruitReplaceSync } from './irecruitReplaceSync.js';
+import { enforceReplaceAiFrom, getReplaceSyncSettings, runIrecruitReplaceSync } from './irecruitReplaceSync.js';
 import {
   readReplaceSyncConfig,
   REPLACE_SYNC_ACTOR_NAME,
@@ -51,6 +51,14 @@ export async function runReplaceSyncIfDue(
 ): Promise<ReplaceSyncSummary | null> {
   const ymd = bangkokBusinessDateYmd(now);
   const settings = await getReplaceSyncSettings();
+  // "AI เริ่มโทรตั้งแต่" — บังคับทุกรอบ ไม่รอรอบดึงประจำวัน (เจ้าของสั่ง 2 ต.ค. 2569)
+  if (settings.rule.aiFrom) {
+    try {
+      await enforceReplaceAiFrom(settings.rule.aiFrom);
+    } catch (e) {
+      logError('irecruit.replaceSync.aiFrom: รอบนี้ล้ม', e);
+    }
+  }
   const last = settings.lastRun ?? lastRunInMemory;
   // รอบที่ดึงสำเร็จแล้ววันนี้ = พอ · รอบที่ล้ม = รอ 1 ชั่วโมงแล้วลองใหม่
   const lastOkYmd = last && !last.error ? bangkokBusinessDateYmd(new Date(last.at)) : null;

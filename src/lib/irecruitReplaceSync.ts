@@ -29,9 +29,23 @@ export type ReplaceCallRule = {
   dayOffset: 0 | -1 | -2;
   /** เวลาไทย HH:MM */
   time: string;
+  /**
+   * AI เริ่มโทรตั้งแต่วันไหน (YYYY-MM-DD ไทย) — สายที่นัด **ก่อน** วันนี้ = คนโทร · `null` = AI โทรทุกสาย
+   * เจ้าของสั่ง 2 ต.ค. 2569: *"ของวันนี้ ไปจนถึงวันจันทร์ เปลี่ยนเป็นคนโทรก่อนให้หมดเลย เพราะจะเริ่มใช้จริงวันจันทร์"*
+   * 🔴 server บังคับทุก 5 นาที (`enforceReplaceAiFrom`) — สาย AI ที่นัดก่อนวันนี้ถูกเปลี่ยนเป็นคนโทร + ยกเลิกแผนที่ Lumos
+   */
+  aiFrom: string | null;
 };
 
-export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = { dayOffset: -1, time: '18:00' };
+export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = { dayOffset: -1, time: '18:00', aiFrom: null };
+
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** สายที่นัดเวลานี้ใครโทร — ก่อนวัน `aiFrom` (เที่ยงคืนไทย) = คนโทร */
+export function replaceCallModeFor(at: Date, aiFrom: string | null): 'ai' | 'manual' {
+  if (!aiFrom) return 'ai';
+  return at.getTime() < new Date(`${aiFrom}T00:00:00+07:00`).getTime() ? 'manual' : 'ai';
+}
 
 const HHMM_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 
@@ -43,11 +57,13 @@ export function normalizeReplaceCallRule(raw: unknown): ReplaceCallRule {
   const t = typeof r.time === 'string' ? r.time.trim() : '';
   const m = HHMM_RE.exec(t);
   const time = m ? `${String(Number(m[1])).padStart(2, '0')}:${m[2]}` : DEFAULT_REPLACE_CALL_RULE.time;
-  return { dayOffset, time };
+  const af = typeof r.aiFrom === 'string' ? r.aiFrom.trim() : '';
+  const aiFrom = YMD_RE.test(af) && !Number.isNaN(new Date(`${af}T00:00:00+07:00`).getTime()) ? af : null;
+  return { dayOffset, time, aiFrom };
 }
 
 /** "18:00 ของวันก่อนเข้างาน" — คำบนจอ ที่เดียว */
-export function replaceCallRuleText(rule: ReplaceCallRule): string {
+export function replaceCallRuleText(rule: Pick<ReplaceCallRule, 'dayOffset' | 'time'>): string {
   const when = rule.dayOffset === 0 ? 'วันเข้างาน' : rule.dayOffset === -1 ? 'วันก่อนเข้างาน' : 'สองวันก่อนเข้างาน';
   return `${rule.time} ของ${when}`;
 }
@@ -92,7 +108,11 @@ export const REPLACE_ASAP_MINUTES = 10;
  * สายของใบงานนี้ควรโทรเมื่อไหร่ — `null` = ไม่ต้องสร้าง (เลยเวลาเข้างานไปแล้ว)
  * ⚠️ ไม่มีช่วงห้ามโทรแล้ว (เจ้าของยกเลิก 28 ก.ย. 2569) — เวลาที่ตั้งคือเวลาที่โทร
  */
-export function planReplaceCall(wall: ReplaceWantWall, rule: ReplaceCallRule, now: Date): ReplaceCallPlan | null {
+export function planReplaceCall(
+  wall: ReplaceWantWall,
+  rule: Pick<ReplaceCallRule, 'dayOffset' | 'time'>,
+  now: Date,
+): ReplaceCallPlan | null {
   const start = wantInstant(wall);
   if (Number.isNaN(start.getTime()) || start.getTime() <= now.getTime()) return null;
   const at = new Date(`${shiftYmd(wall.ymd, rule.dayOffset)}T${rule.time}:00+07:00`);

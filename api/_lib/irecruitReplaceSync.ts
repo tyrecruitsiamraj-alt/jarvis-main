@@ -22,7 +22,14 @@ import { tableInAppSchema } from './schema.js';
 import { irecruitSqlQuery, irecruitUnavailableReason } from './irecruitSqlServer.js';
 import { toE164Thai } from './thaiPhone.js';
 import { isAutoDispatchEnabled } from './lumosDispatchMode.js';
-import { enqueueFollowReminderPlan, type FollowEntryInput } from './lumosDispatch.js';
+import {
+  cancelFollowReminder,
+  cancelPushedReminderIgnoringMissing,
+  enqueueFollowReminderPlan,
+  type FollowEntryInput,
+} from './lumosDispatch.js';
+import { getLumosPushConfig } from './lumosPushClient.js';
+import { staffNameOfPhone } from './followStaffName.js';
 import { bangkokBusinessDateYmd } from './businessDate.js';
 import { logError, logInfo, logWarn, errorSummaryText } from './logger.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
@@ -34,6 +41,7 @@ import {
   REPLACE_FOLLOW_TOPIC,
   REPLACE_SYNC_ACTOR_NAME,
   REPLACE_SYNC_DEFAULTS,
+  replaceCallModeFor,
   replaceCallNote,
   replaceSourceRef,
   wantWallFromSqlDate,
@@ -157,6 +165,7 @@ export async function saveReplaceSyncSettings(
 }
 
 type Candidate = {
+  mode: 'ai' | 'manual';
   ref: string;
   name: string;
   phone: string;
@@ -265,7 +274,7 @@ export async function runIrecruitReplaceSync(
       if (plan.asap) summary.asap += 1;
       const name = `${(r.fname ?? '').trim()} ${(r.lname ?? '').trim()}`.trim() || 'คนไปแทนงาน';
       const list = groups.get(phone) ?? [];
-      list.push({ ref, name, phone, wall, plan, siteName: r.site_name?.trim() || null, siteCode: r.site_code?.trim() || null });
+      list.push({ mode: replaceCallModeFor(plan.at, settings.rule.aiFrom), ref, name, phone, wall, plan, siteName: r.site_name?.trim() || null, siteCode: r.site_code?.trim() || null });
       groups.set(phone, list);
     }
 
@@ -282,10 +291,10 @@ export async function runIrecruitReplaceSync(
                (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at,
                 group_id, call_times, unit_name, site_code, call_round, call_mode,
                 created_by, created_by_name, follow_team, source_ref)
-             values ($1, $2, $3, $4, null, $5, $6, null, $7, $8, 1, 'ai', null, $9, $10, $11)
+             values ($1, $2, $3, $4, null, $5, $6, null, $7, $8, 1, $12, null, $9, $10, $11)
              returning id`,
             [c.name, c.phone, REPLACE_FOLLOW_TOPIC, replaceCallNote(c.wall), c.plan.at.toISOString(), groupId,
-             c.siteName, c.siteCode, actorName, FOLLOW_TEAM_REPLACEMENT, c.ref],
+             c.siteName, c.siteCode, actorName, FOLLOW_TEAM_REPLACEMENT, c.ref, c.mode],
           );
           if (ins[0]) inserted.push({ id: ins[0].id, cand: c });
         } catch (e) {
@@ -307,8 +316,9 @@ export async function runIrecruitReplaceSync(
 
       // ส่งให้ AI เฉพาะเมื่อสวิตช์ส่งอัตโนมัติของงานติดตามเปิดอยู่ (เจ้าของคุมที่หน้าตั้งค่า)
       let states = new Map<string, FollowDispatchState>();
-      if (autoAi) {
-        const inputs: FollowEntryInput[] = inserted.map(({ id, cand }) => ({
+      const aiInserted = inserted.filter(({ cand }) => cand.mode === 'ai');
+      if (autoAi && aiInserted.length > 0) {
+        const inputs: FollowEntryInput[] = aiInserted.map(({ id, cand }) => ({
           id,
           recipient_name: cand.name,
           recipient_phone: cand.phone,
@@ -328,10 +338,10 @@ export async function runIrecruitReplaceSync(
           states = new Map();
         }
       }
-      for (const { id } of inserted) {
-        const state: FollowDispatchState = states.get(id) ?? 'off';
+      for (const { id, cand } of inserted) {
+        const state: FollowDispatchState = cand.mode === 'manual' ? 'manual' : (states.get(id) ?? 'off');
         if (state === 'queued') summary.queued += 1;
-        else summary.notSent += 1;
+        else if (state !== 'manual') summary.notSent += 1;
         try {
           await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1`, [id, state]);
         } catch (e) {
@@ -365,4 +375,85 @@ async function persistLastRun(summary: ReplaceSyncSummary, actorName: string): P
     if (isPgUndefinedTable(e)) return; // ตาราง 133 ยังไม่มี — worker ถือผลไว้ในหน่วยความจำ
     logWarn('irecruit.replaceSync: จดผลรอบล่าสุดไม่สำเร็จ', { error: errorSummaryText(e) });
   }
+}
+
+/**
+ * ═══ บังคับ "AI เริ่มโทรตั้งแต่" กับสายที่มีอยู่แล้ว (เจ้าของสั่ง 2 ต.ค. 2569) ═══
+ * > *"ของวันนี้ ไปจนถึงวันจันทร์ เปลี่ยนเป็นคนโทรก่อนให้หมดเลย เพราะจะเริ่มใช้จริงวันจันทร์"*
+ *
+ * สายทีมส่งคนแทนที่ยังเป็น AI · ยังไม่ยกเลิก/ปิด · นัดก่อนวัน `aiFrom` → คนโทร + ยกเลิกแผนที่ Lumos
+ * - แผนที่มีแต่สายในกลุ่มนี้ = ยกเลิกทั้งแผนด้วยรหัสหัวขบวน (`plan_ref`) ครั้งเดียว (ไม่ส่งแผนใหม่ไปกวน Lumos ทีละสาย)
+ * - แผนที่มีสายหลังวันนั้นปนอยู่ = ยกเลิกเฉพาะสายในกลุ่ม (`cancelFollowReminder` ส่งสายที่เหลือเป็นแผนใหม่)
+ * 🔴 ไม่มีคีย์ push (เครื่อง dev) = ไม่ทำอะไร — ห้ามเปลี่ยนแถวเป็นคนโทรทั้งที่แผนที่ Lumos ยังจะโทรอยู่
+ * เรียกจาก worker ทุกรอบ (5 นาที) — ไม่มีแถวเข้าเงื่อนไขก็จบที่คำถามเดียว
+ */
+export async function enforceReplaceAiFrom(aiFrom: string | null): Promise<{ converted: number; plansCancelled: number; errors: number }> {
+  const out = { converted: 0, plansCancelled: 0, errors: 0 };
+  if (!aiFrom || !getLumosPushConfig()) return out;
+  const cut = new Date(`${aiFrom}T00:00:00+07:00`);
+  if (Number.isNaN(cut.getTime())) return out;
+  const queueTable = tableInAppSchema('lumos_dispatch_queue');
+  const { rows: aff } = await dbQuery<{ id: string }>(
+    `select id from ${followTable}
+      where follow_team = $1 and cancelled_at is null and completed_at is null
+        and coalesce(call_mode, 'ai') = 'ai' and scheduled_at < $2`,
+    [FOLLOW_TEAM_REPLACEMENT, cut.toISOString()],
+  );
+  if (aff.length === 0) return out;
+  const ids = new Set(aff.map((r) => r.id));
+  const { rows: qrows } = await dbQuery<{ person_ref: string; plan_ref: string | null }>(
+    `select person_ref, plan_ref from ${queueTable}
+      where channel = 'reminder' and job_ref = 'follow' and status = 'pending' and plan_ref in (
+        select plan_ref from ${queueTable}
+         where channel = 'reminder' and job_ref = 'follow' and person_ref = any($1::text[]))`,
+    [[...ids].map((id) => `follow-${id}`)],
+  );
+  const plans = new Map<string, { inside: string[]; outside: number }>();
+  const inPlan = new Set<string>();
+  for (const r of qrows) {
+    if (!r.plan_ref) continue;
+    const id = r.person_ref.slice('follow-'.length);
+    const p = plans.get(r.plan_ref) ?? { inside: [], outside: 0 };
+    if (ids.has(id)) {
+      p.inside.push(id);
+      inPlan.add(id);
+    } else p.outside += 1;
+    plans.set(r.plan_ref, p);
+  }
+  for (const [planRef, p] of plans) {
+    try {
+      if (p.outside === 0) {
+        await dbQuery(
+          `update ${queueTable} set status = 'cancelled', updated_at = now()
+            where channel = 'reminder' and job_ref = 'follow' and plan_ref = $1 and status = 'pending'`,
+          [planRef],
+        );
+        await cancelPushedReminderIgnoringMissing(planRef);
+        out.plansCancelled += 1;
+      } else {
+        for (const id of p.inside) await cancelFollowReminder(id, staffNameOfPhone);
+      }
+    } catch (e) {
+      out.errors += 1;
+      logError('irecruit.replaceSync.aiFrom: ยกเลิกแผนไม่สำเร็จ', e, { planRef });
+    }
+  }
+  // แถวที่ไม่มีแผนในคิว (ยังไม่เคยส่ง) — ยกเลิกแถวคิวเดี่ยว ๆ ของมันถ้ามี
+  for (const id of ids) {
+    if (inPlan.has(id)) continue;
+    try {
+      await cancelFollowReminder(id, staffNameOfPhone);
+    } catch (e) {
+      out.errors += 1;
+      logError('irecruit.replaceSync.aiFrom: ยกเลิกคิวไม่สำเร็จ', e, { id });
+    }
+  }
+  const upd = await dbQuery<{ id: string }>(
+    `update ${followTable} set call_mode = 'manual', dispatch_state = 'manual'
+      where id = any($1::uuid[]) and coalesce(call_mode, 'ai') = 'ai' returning id`,
+    [[...ids]],
+  );
+  out.converted = upd.rows.length;
+  logInfo('irecruit.replaceSync.aiFrom.done', { aiFrom, ...out });
+  return out;
 }

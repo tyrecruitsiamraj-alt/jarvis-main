@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DASH, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import { normalizeReplaceCallRule, type ReplaceCallRule } from '@/lib/irecruitReplaceSync';
+import { formatYmdDmyBe } from '@/lib/dateTh';
 import { fetchReplaceSyncStatus, runReplaceSyncNow, saveReplaceCallRule, type ReplaceSyncStatus } from '@/lib/irecruitReplaceSyncApi';
 
 /**
@@ -51,7 +52,9 @@ function RuleEditor({ rule, onSaved }: { rule: ReplaceCallRule; onSaved: (s: Rep
     setBusy(true);
     setError(null);
     try {
-      onSaved(await saveReplaceCallRule(normalizeReplaceCallRule({ dayOffset: Number(dayOffset), time })));
+      // ส่งแค่วัน+เวลา — "AI เริ่มโทรตั้งแต่" คงค่าเดิมที่ server
+      const { dayOffset: d, time: t } = normalizeReplaceCallRule({ dayOffset: Number(dayOffset), time });
+      onSaved(await saveReplaceCallRule({ dayOffset: d, time: t }));
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
@@ -156,6 +159,12 @@ export default function IrecruitReplaceSyncBar({ canManage, onSynced }: { canMan
         <span className={DASH.muted}>
           · โทร <span className="text-foreground">{status.ruleText}</span>
           {status.enabled ? ` · ดึงเองทุกวัน ${String(status.hour).padStart(2, '0')}:00` : ' · ปิดดึงอัตโนมัติอยู่'}
+          {status.rule.aiFrom ? (
+            <>
+              {' · '}
+              <span className="text-foreground">AI เริ่มโทร {formatYmdDmyBe(status.rule.aiFrom)}</span> (ก่อนหน้านั้นคนโทร)
+            </>
+          ) : null}
         </span>
       ) : null}
       {problem ? <span className={cn('text-xs', TONE.warn.value)}>· {problem}</span> : null}
