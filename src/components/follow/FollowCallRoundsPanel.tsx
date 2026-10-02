@@ -6,7 +6,7 @@ import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
 
 import {
   countFollowRoundBuckets,
-  FOLLOW_ROUND_BUCKETS,
+  FOLLOW_PIPELINE_SHOWN_BUCKETS,
   FOLLOW_ROUND_BUCKET_HINT,
   FOLLOW_ROUND_BUCKET_LABEL,
   followRoundSlot,
@@ -313,8 +313,8 @@ export default function FollowCallRoundsPanel({
         </div>
 
         {/* การ์ดขั้นตอนย่อย — ทรงเดียวกับ Pipeline Stages ของแบบอ้างอิง */}
-        <div className="grid grid-cols-2 gap-3 px-5 pb-4 pt-4 md:grid-cols-4 xl:grid-cols-7">
-          {FOLLOW_ROUND_BUCKETS.map((b, i) => {
+        <div className="grid grid-cols-3 gap-3 px-5 pb-4 pt-4">
+          {FOLLOW_PIPELINE_SHOWN_BUCKETS.map((b, i) => {
             const n = countsOfRound[b];
             const vis = bucketVisual(b, n);
             const tone = TONE[vis.tone];
@@ -628,14 +628,13 @@ export default function FollowCallRoundsPanel({
               className={cn(
                 v2
                   ? cn(
-                      'grid grid-cols-2 border-t border-border/70 sm:grid-cols-7',
+                      'grid grid-cols-3 border-t border-border/70',
                       '[&>*]:border-border/50 [&>*:not(:first-child)]:border-l',
-                      'max-sm:[&>*:nth-child(odd)]:border-l-0 max-sm:[&>*:nth-child(n+3)]:border-t',
-                    )
-                  : 'grid grid-cols-2 gap-1.5 sm:grid-cols-7',
+                                          )
+                  : 'grid grid-cols-3 gap-1.5',
               )}
             >
-              {FOLLOW_ROUND_BUCKETS.map((b) => {
+              {FOLLOW_PIPELINE_SHOWN_BUCKETS.map((b) => {
                 const n = counts[b];
                 const vis = bucketVisual(b, n);
                 const tone = TONE[vis.tone];

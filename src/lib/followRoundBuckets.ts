@@ -41,6 +41,13 @@ export const FOLLOW_ROUND_BUCKETS: readonly FollowRoundBucket[] = [
 ];
 
 /**
+ * กล่องที่โชว์บนการ์ด "ขั้นตอนของสาย (Call Pipeline)" — 🔴 เจ้าของสั่งเอากล่องขั้นที่ 3–6 ออก (2 ต.ค. 2569 · Choice
+ * "เอากล่อง ขั้นที่ 3–6 ออก": กำลังโทร · โทรติด · โทรไม่ติด · ปิดงาน: ไป) · ตัวนับยังคิดครบ 7 ถัง (`FOLLOW_ROUND_BUCKETS`) ที่เดิม
+ * ห้ามเอากล่องที่ถอดกลับมาโดยไม่ได้สั่ง
+ */
+export const FOLLOW_PIPELINE_SHOWN_BUCKETS: readonly FollowRoundBucket[] = ['all', 'waiting', 'not_went'];
+
+/**
  * 🔴 **`went`/`not_went` ต้องขึ้นต้นด้วย "ปิดงาน:" เสมอ** (12 ก.ย. 2569)
  *
  * ผู้ทดสอบตาใหม่อ่าน "ไป" ในช่องนี้ เทียบกับ "ตอบว่าไป" บนการ์ดตัวเลข แล้วแยกไม่ออก
