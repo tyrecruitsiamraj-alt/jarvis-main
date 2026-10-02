@@ -172,7 +172,7 @@ describe('หน้ารายวัน — สายที่ต้องต�
 
   it('เลือกสายที่วันนั้นไม่มี ⇒ บอกให้กลับไปกด "ทุกสาย" ไม่ใช่ปล่อยจอว่าง', () => {
     renderCalendar([entry({ id: 'r1', call_round: 1 })], { roundFilter: 2 });
-    expect(screen.getByText(/วันนี้ไม่มีสายที่ 2/)).toBeTruthy();
+    expect(screen.getByText(/วันที่ .+ ไม่มีสายที่ 2/)).toBeTruthy();
   });
 
   it('🔴 แผงรอบโทรที่หน้าแม่ส่งมา ต้องอยู่ในผืนเดียวกัน (ยุบสองการ์ดเป็นหนึ่ง)', () => {
@@ -461,11 +461,11 @@ describe('ตำหนิ 11 ก.ย. 2569 — รวมสายของคน
 
   it('บอกใต้ชื่อว่าวันนี้กี่สาย — กันคนอ่านว่าแถวนี้มีสายเดียว', () => {
     renderCalendar(threeRounds());
-    expect(within(dayRows()[0]).getByText('วันนี้ 3 สาย')).toBeTruthy();
+    expect(within(dayRows()[0]).getByText('3 สาย')).toBeTruthy();
     // มีสายเดียวไม่ต้องบอก (รกเปล่า ๆ)
     cleanup();
     renderCalendar([entry({ id: 'r1', call_round: 1 })]);
-    expect(within(dayRows()[0]).queryByText(/วันนี้ .* สาย/)).toBeNull();
+    expect(within(dayRows()[0]).queryByText(/^\d+ สาย$/)).toBeNull();
   });
 
   it('🔴 ตัวเลขบนการ์ดยังนับเป็น "สาย" เหมือนเดิม — รวมแถวห้ามทำเลขเปลี่ยน', () => {

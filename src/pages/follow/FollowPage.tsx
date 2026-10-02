@@ -35,7 +35,7 @@ import { TONE } from '@/lib/designTokens';
 import { followScheduleCounts } from '@/lib/followSchedule';
 import { roundTabLabel } from '@/lib/followRoundVisual';
 import { conveyorLabel } from '@/lib/soRecruitNav';
-import { Settings2, Plus, X, LoaderCircle, PhoneForwarded, Users, UserCog, Building2, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Settings2, Plus, X, LoaderCircle, PhoneForwarded, Users, UserCog, Building2, ChevronLeft, ChevronRight, RefreshCw, ClipboardList } from 'lucide-react';
 import {
   listFollowEntries,
   createFollowRounds,
@@ -60,6 +60,10 @@ import { followScopeEntries, followTeamForScope } from '@/lib/followReplacement'
 import {
   filterFollowEntries,
   countFollowTabs,
+  countFollowCallers,
+  FOLLOW_CALLERS,
+  FOLLOW_CALLER_LABEL,
+  type FollowCaller,
   FOLLOW_TABS,
   FOLLOW_TAB_LABEL,
   TIME_BAND_LABEL,
@@ -92,6 +96,7 @@ import TopicField from '@/components/follow/TopicField';
 import FollowMasterManagerDialog from '@/components/follow/FollowMasterManagerDialog';
 import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
 import IrecruitReplaceSyncBar from '@/components/follow/IrecruitReplaceSyncBar';
+import FollowDayReportDialog from '@/components/follow/FollowDayReportDialog';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import FollowCompletedCard from '@/components/follow/FollowCompletedCard';
 import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
@@ -150,6 +155,10 @@ const FollowPage: React.FC = () => {
    * + filter ประจำวัน (วันที่/ช่วงเวลา/เจ้าของงาน) · ตรรกะที่ followListFilter.ts
    */
   const [tab, setTab] = useState<FollowTab>('active');
+  /** ใครโทร (เจ้าของสั่ง 2 ต.ค. 2569) — 'manual' = เหลือเฉพาะสายที่เจ้าหน้าที่ต้องโทรเอง */
+  const [caller, setCaller] = useState<FollowCaller>('all');
+  /** ป๊อปสรุปแผนทั้งวัน (เจ้าของสั่ง 2 ต.ค. 2569) — วัน = วันที่เลือกดูอยู่ (ไม่เลือก = วันนี้) */
+  const [reportOpen, setReportOpen] = useState(false);
   const [fDate, setFDate] = useState('');
   const [fBand, setFBand] = useState<TimeBand>('');
   /** เดือนที่ปฏิทิน Planning กางอยู่ (YYYY-MM) — เริ่มที่เดือนนี้ตามปฏิทินไทย */
@@ -224,6 +233,17 @@ const FollowPage: React.FC = () => {
    * ค่านี้ถูกส่งขึ้นไปจริง (`call_round`) และเป็นตัวตัดสินว่า AI พูดบทไหน
    */
   const [callRounds, setCallRounds] = useState<number[]>(() => [1]);
+  /**
+   * ใครโทรรอบนี้ — โหมด "ระบุเวลาเอง" (เจ้าของสั่ง 2 ต.ค. 2569: *"เพิ่มปุ่มเลือก คนโทร / AI โทร ในระบุเวลาเอง"*)
+   * 🔴 ขยับคู่กับ `scheduledAts` เสมอ (กับดักเดียวกับอาร์เรย์เบอร์/เลขสาย) · ค่าเริ่ม = AI โทร (พฤติกรรมเดิม)
+   */
+  const [callModes, setCallModes] = useState<Array<'ai' | 'manual'>>(() => ['ai']);
+  /**
+   * บันทึกเสร็จแล้ว = ป๊อปเปลี่ยนเป็นหน้า "เสร็จสิ้น" (เจ้าของสั่ง 2 ต.ค. 2569: *"บันทึกแล้วไม่เด้งเสร็จสิ้น"*)
+   * 🔴 เดิมปิดป๊อปทันทีแล้วบอกผลที่แถบบนหน้า (เลื่อนจอแล้วมองไม่เห็น) · ถ้ามีสายที่ไม่ได้ส่ง AI
+   *    ข้อความไปลงช่อง error **ในป๊อปที่ปิดไปแล้ว** = ไม่มีใครเห็นเลย
+   */
+  const [doneInfo, setDoneInfo] = useState<{ lines: string[]; warn: string | null } | null>(null);
   /**
    * โหมดตารางโทร (16 ส.ค. · migration 092): ช่วงวัน × รอบเวลา/วัน
    * เช่น 1-7 ส.ค. วันละ 2 รอบ 07:00/08:00 → **หนึ่งสาย = หนึ่งแถว** ผูก group เดียว (1 ต.ค. 2569 · เดิม 1 แถว/วัน)
@@ -395,6 +415,7 @@ const FollowPage: React.FC = () => {
     setFilterScope(replaceView);
     setActiveRound('all');
     setTab('active');
+    setCaller('all');
   }
   useEffect(() => {
     const prefill = readFollowPrefill(searchParams);
@@ -506,6 +527,7 @@ const FollowPage: React.FC = () => {
     setPickedFrom(null);
     setScheduledAts([nowForInput()]);
     setCallRounds([1]);
+    setCallModes(['ai']);
     setDateFrom('');
     setDateTo('');
     setRoundTimes(['07:00']);
@@ -531,12 +553,21 @@ const FollowPage: React.FC = () => {
     setStaffPhones((prev) => [...prev, prev[prev.length - 1] ?? '']);
     // รอบใหม่เดาให้ว่าเป็นสายถัดไป — เปลี่ยนเองได้จาก dropdown
     setCallRounds((prev) => [...prev, (prev[prev.length - 1] ?? prev.length) + 1]);
+    // ใครโทร: ลอกจากรอบสุดท้าย (ปกติทั้งชุดคนเดียวกันโทร)
+    setCallModes((prev) => [...prev, prev[prev.length - 1] ?? 'ai']);
   };
   const removeScheduledAt = (i: number) => {
     setScheduledAts((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
     setStaffPhones((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
     setCallRounds((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
+    setCallModes((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
   };
+  const setCallModeAt = (i: number, v: 'ai' | 'manual') =>
+    setCallModes((prev) => {
+      const next = prev.length >= i + 1 ? [...prev] : [...prev, ...Array<'ai' | 'manual'>(i + 1 - prev.length).fill('ai')];
+      next[i] = v;
+      return next;
+    });
   const setCallRoundAt = (i: number, v: number) =>
     setCallRounds((prev) => {
       const next = prev.length >= i + 1 ? [...prev] : [...prev, ...Array(i + 1 - prev.length).fill(1)];
@@ -629,6 +660,11 @@ const FollowPage: React.FC = () => {
   const scheduledAtsPreview = useMemo(
     () => scheduledAts.filter((t) => t.trim()).length,
     [scheduledAts],
+  );
+  /** รอบที่ตั้งให้คนโทร (โหมดระบุเวลาเอง) — ทวนก่อนส่ง/ปุ่มบันทึกพูดตามจริง */
+  const manualTimesPreview = useMemo(
+    () => scheduledAts.filter((t, i) => t.trim() && (callModes[i] ?? 'ai') === 'manual').length,
+    [scheduledAts, callModes],
   );
 
   /**
@@ -781,24 +817,17 @@ const FollowPage: React.FC = () => {
             }
           }
           resetForm();
-          setFormOpen(false);
           /* 🔴 บอกทันทีถ้ามีรายการที่ "ไม่ได้ส่งให้ AI" — เดิมขึ้นว่าสำเร็จอย่างเดียว
              คนนั่งรอสายที่ไม่มีวันออก (เกิดจริง 24 ส.ค. 2569) */
-          const warn = summarizeDispatchResults(dispatchStates);
+          const warn = summarizeDispatchResults(dispatchStates.filter((st) => st !== 'manual'));
           /* 🔴 ข้อความต้องแยกสองฝั่ง — พอมีวันที่คนโทรเองแล้ว "AI จะโทรเองทั้งหมด" กลายเป็นคำโกหก */
           const dayCount = new Set(sendCalls.map((c) => c.day)).size;
           const aiCalls = sendCalls.filter((c) => c.callMode === 'ai').length;
           const manualCalls = sendCalls.length - aiCalls;
-          const parts = [`ตั้งตารางโทรแล้ว — ${dayCount} วัน รวม ${sendCalls.length} สาย`];
-          if (aiCalls > 0) parts.push(`AI โทรให้ ${aiCalls} สาย — ไม่ต้องกดอะไรอีก`);
-          if (manualCalls > 0) parts.push(`อีก ${manualCalls} สายรอเราโทรเอง — กดปุ่มโทรข้างชื่อเมื่อถึงเวลา`);
-          const okText = parts.join(' · ');
-          if (warn) {
-            setFormError(`${okText}\n${warn.text}`);
-          } else {
-            setOkMessage(okText);
-            window.setTimeout(() => setOkMessage(null), 6000);
-          }
+          const lines = [`${recipientName} · ${dayCount} วัน รวม ${sendCalls.length} สาย`];
+          if (aiCalls > 0) lines.push(`AI โทร ${aiCalls} สาย`);
+          if (manualCalls > 0) lines.push(`คนโทร ${manualCalls} สาย`);
+          setDoneInfo({ lines, warn: warn?.text ?? null });
           await reload();
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'ตั้งตารางไม่สำเร็จ';
@@ -855,6 +884,13 @@ const FollowPage: React.FC = () => {
     });
     const roundByIso = new Map<string, number>();
     times.forEach((t, i) => roundByIso.set(isoTimes[i], roundByLocal.get(t) ?? 1));
+    /** แมป **เวลา → ใครโทร** แบบเดียวกับเบอร์/เลขสาย (ห้ามใช้ index ของ `times`) */
+    const modeByLocal = new Map<string, 'ai' | 'manual'>();
+    scheduledAts.forEach((v, i) => {
+      if (v && !modeByLocal.has(v)) modeByLocal.set(v, callModes[i] ?? 'ai');
+    });
+    const modeByIso = new Map<string, 'ai' | 'manual'>();
+    times.forEach((t, i) => modeByIso.set(isoTimes[i], modeByLocal.get(t) ?? 'ai'));
     const dupCheck = findScheduleDuplicates(phone, isoTimes, items);
     /**
      * 🔴 **ทุกรอบของคนเดียวกันต้องอยู่ `group_id` เดียวกัน** (21 ก.ย. 2569)
@@ -888,6 +924,8 @@ const FollowPage: React.FC = () => {
           staff_phone: phoneByIso.get(sendIso[0]) || undefined,
           scheduled_at: sendIso[0],
           call_round: roundByIso.get(sendIso[0]) ?? 1,
+          // ใครโทร (121) — ค่าบนสุด = ของสายแรก (สายเดียวเส้น API อ่านจากตรงนี้) · หลายสายอ่านจาก rounds[]
+          call_mode: modeByIso.get(sendIso[0]) ?? 'ai',
           group_id: groupId,
           unit_name: unitName.trim() || undefined,
           site_code: siteCode.trim() || undefined,
@@ -895,6 +933,7 @@ const FollowPage: React.FC = () => {
             scheduled_at: t,
             staff_phone: phoneByIso.get(t) || undefined,
             call_round: roundByIso.get(t) ?? 1,
+            call_mode: modeByIso.get(t) ?? 'ai',
           })),
         });
         for (const createdEntry of createdEntries) {
@@ -902,18 +941,14 @@ const FollowPage: React.FC = () => {
           done += 1;
         }
         resetForm();
-        setFormOpen(false);
-        const warn = summarizeDispatchResults(dispatchStates);
-        /* 🔴 ย้ำขั้นที่ ② ของการ์ดวันแรก — ตาใหม่กังวลที่สุดว่า "เพิ่มแล้วต้องกดอะไรต่อ" */
-        const okText =
-          (sendIso.length > 1 ? `เพิ่มรายชื่อแล้ว — ตั้งให้โทร ${sendIso.length} รอบ` : 'เพิ่มรายชื่อแล้ว') +
-          ' · AI จะโทรเองตามเวลา ไม่ต้องกดอะไรอีก';
-        if (warn) {
-          setFormError(`${okText}\n${warn.text}`);
-        } else {
-          setOkMessage(okText);
-          window.setTimeout(() => setOkMessage(null), 5000);
-        }
+        // สายที่ตั้งให้คนโทร = ตั้งใจไม่ส่ง AI ⇒ ไม่นับเป็นปัญหา
+        const warn = summarizeDispatchResults(dispatchStates.filter((st) => st !== 'manual'));
+        const aiCalls = sendIso.filter((t) => (modeByIso.get(t) ?? 'ai') === 'ai').length;
+        const manualCalls = sendIso.length - aiCalls;
+        const lines = [`${recipientName} · ${sendIso.length} สาย`];
+        if (aiCalls > 0) lines.push(`AI โทร ${aiCalls} สาย`);
+        if (manualCalls > 0) lines.push(`คนโทร ${manualCalls} สาย`);
+        setDoneInfo({ lines, warn: warn?.text ?? null });
         await reload();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'เพิ่มรายชื่อไม่สำเร็จ';
@@ -1057,10 +1092,11 @@ const FollowPage: React.FC = () => {
     [items, replaceView],
   );
   const filtered = useMemo(
-    () => filterFollowEntries(scopeItems, { tab, date: fDate, band: fBand }),
-    [scopeItems, tab, fDate, fBand],
+    () => filterFollowEntries(scopeItems, { tab, date: fDate, band: fBand, caller }),
+    [scopeItems, tab, fDate, fBand, caller],
   );
   const tabCounts = useMemo(() => countFollowTabs(scopeItems), [scopeItems]);
+  const callerCounts = useMemo(() => countFollowCallers(scopeItems, tab), [scopeItems, tab]);
   const hasActiveFilter = Boolean(fDate || fBand);
 
   /**
@@ -1230,6 +1266,17 @@ const FollowPage: React.FC = () => {
                     ariaLabel="งานจบหรือยัง"
                     active={tab !== 'active'}
                   />
+                  <span className="text-xs text-muted-foreground">ใครโทร</span>
+                  <ChoiceDropdown
+                    value={caller}
+                    options={FOLLOW_CALLERS.map((c) => ({
+                      value: c,
+                      label: `${FOLLOW_CALLER_LABEL[c]} · ${callerCounts[c].toLocaleString('th-TH')}`,
+                    }))}
+                    onChange={(v) => setCaller(v)}
+                    ariaLabel="ใครโทร"
+                    active={caller !== 'all'}
+                  />
                 </>
               }
             />
@@ -1249,6 +1296,16 @@ const FollowPage: React.FC = () => {
                 className="inline-flex h-8 items-center gap-1 px-3 text-[11px] touch-manipulation"
               >
                 <Plus aria-hidden /> เพิ่มคนที่ต้องการติดตาม
+              </Button>
+              {/* สรุปแผนทั้งวันของวันที่ดูอยู่ (เจ้าของสั่ง 2 ต.ค. 2569 · Choice "หน้าสรุปบนจอ") */}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setReportOpen(true)}
+                className="inline-flex h-8 items-center gap-1 px-3 text-[11px]"
+              >
+                <ClipboardList aria-hidden /> สรุปแผนทั้งวัน
               </Button>
               {/* ═══ ตัวกรองทั้งหมดอยู่ในกล่องเดียว ข้าง ๆ ปุ่มเพิ่มคน (เจ้าของสั่ง 1 ก.ย. 2569) ═══
                   *"ย้ายทุกช่วงเวลาเข้าไปไว้กับเลือกวัน · แล้วย้ายเลือกวันไปไว้ข้าง ๆ เพิ่มคน"*
@@ -1367,8 +1424,54 @@ const FollowPage: React.FC = () => {
           * ⚠️ ปิดป๊อปด้วยการกดนอกกล่อง/Esc = **ไม่ล้างของที่กรอกค้างไว้** ตั้งใจให้เปิดกลับมา
           * ทำต่อได้ (ฟอร์มสามขั้นกรอกยาว หลุดแล้วต้องเริ่มใหม่คือเจ็บ) · ล้างตอนบันทึกสำเร็จเท่านั้น
           */}
-        <Dialog open={formOpen} onOpenChange={(o) => (o ? undefined : setFormOpen(false))}>
+        <Dialog
+          open={formOpen}
+          onOpenChange={(o) => {
+            if (o) return;
+            setFormOpen(false);
+            setDoneInfo(null);
+          }}
+        >
           <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto p-0">
+            {doneInfo ? (
+              /* ═══ เสร็จสิ้น (เจ้าของสั่ง 2 ต.ค. 2569) — ป๊อปเดิมเปลี่ยนหน้า ไม่ซ้อน Dialog ═══ */
+              <div className="jarvis-frost space-y-4 p-4 sm:p-5" data-testid="follow-add-done">
+                <DialogHeader className="space-y-2 text-left">
+                  <span className={cn('flex h-10 w-10 items-center justify-center rounded-full', TONE.success.soft, TONE.success.value)} aria-hidden>
+                    <PhoneForwarded className="h-5 w-5" />
+                  </span>
+                  <DialogTitle>เสร็จสิ้น</DialogTitle>
+                  <DialogDescription className="space-y-0.5 text-sm text-foreground">
+                    {doneInfo.lines.map((l) => (
+                      <span key={l} className="block">
+                        {l}
+                      </span>
+                    ))}
+                  </DialogDescription>
+                </DialogHeader>
+                {doneInfo.warn ? (
+                  <p role="alert" className={cn('rounded-xl border px-3 py-2 text-xs font-medium', TONE.danger.soft, TONE.danger.value)}>
+                    {doneInfo.warn}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setDoneInfo(null)}>
+                    <Plus aria-hidden /> เพิ่มคนต่อ
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      setFormOpen(false);
+                      setDoneInfo(null);
+                    }}
+                  >
+                    ปิด
+                  </Button>
+                </div>
+              </div>
+            ) : (
+            <>
             <DialogHeader className="px-4 pt-4 sm:px-5">
               <DialogTitle>เพิ่มคนที่ต้องการติดตาม</DialogTitle>
               <DialogDescription>ทำทีละขั้น — ใครก่อน แล้วหน่วยงาน แล้วค่อยตั้งวันเวลาที่จะโทร</DialogDescription>
@@ -1906,7 +2009,7 @@ const FollowPage: React.FC = () => {
                             ))}
                             {list.length < 5 ? (
                               <Button type="button" variant="outline" size="xs" onClick={() => addDayTime(d)}>
-                                <Plus aria-hidden /> เพิ่มรอบของวันนี้
+                                <Plus aria-hidden /> เพิ่มรอบของวันนั้น
                               </Button>
                             ) : null}
                           </div>
@@ -2013,6 +2116,26 @@ const FollowPage: React.FC = () => {
                         <X className="h-4 w-4" aria-hidden />
                       </button>
                     </div>
+                    {/* ใครโทรรอบนี้ (เจ้าของสั่ง 2 ต.ค. 2569) — แบบเดียวกับช่องต่อวันของโหมดตาราง */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1" role="group" aria-label={`ใครโทรรอบที่ ${i + 1}`}>
+                      {(
+                        [
+                          { value: 'ai', label: 'AI โทร', on: 'text-primary' },
+                          { value: 'manual', label: 'คนโทร', on: TONE.warn.value },
+                        ] as const
+                      ).map((c) => (
+                        <label key={c.value} className="flex cursor-pointer items-center gap-1.5">
+                          <Checkbox
+                            checked={(callModes[i] ?? 'ai') === c.value}
+                            onCheckedChange={() => setCallModeAt(i, c.value)}
+                            aria-label={`รอบที่ ${i + 1} — ${c.label}`}
+                          />
+                          <span className={cn('text-xs font-medium', (callModes[i] ?? 'ai') === c.value ? c.on : 'text-muted-foreground')}>
+                            {c.label}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                     <StaffContactField
                       id={`followStaffPhone${i}`}
                       label={`เจ้าหน้าที่ที่ติดตามรอบที่ ${i + 1}`}
@@ -2088,7 +2211,7 @@ const FollowPage: React.FC = () => {
               <div className={cn('rounded-xl px-3 py-2.5 text-[12px] leading-snug', TONE.primary.soft)}>
                 <span className="block font-medium text-foreground">ทวนก่อนส่ง</span>
                 <span className="mt-0.5 block text-foreground/80">
-                  AI จะโทรหา{' '}
+                  โทรหา{' '}
                   <span className="font-medium">
                     {composeRecipientName(prefix, firstName, lastName) || '— ยังไม่ได้กรอกชื่อ —'}
                   </span>{' '}
@@ -2100,7 +2223,9 @@ const FollowPage: React.FC = () => {
                   {scheduleMode
                     ? `ตารางหลายวัน — ${sendDaysPreview} วัน รวม ${scheduleCallsPreview} สาย`
                     : `ตั้งไว้ ${scheduledAtsPreview} รอบ`}
-                  {' · '}กดแล้วไม่ต้องทำอะไรต่อ AI โทรเองตามเวลา
+                  {!scheduleMode && manualTimesPreview > 0
+                    ? ` · คนโทร ${manualTimesPreview} รอบ · AI โทร ${scheduledAtsPreview - manualTimesPreview} รอบ`
+                    : ' · กดแล้วไม่ต้องทำอะไรต่อ AI โทรเองตามเวลา'}
                 </span>
               </div>
             ) : null}
@@ -2143,7 +2268,7 @@ const FollowPage: React.FC = () => {
                   ) : (
                     <PhoneForwarded aria-hidden />
                   )}
-                  {submitting ? 'กำลังบันทึก…' : 'บันทึก + ส่ง AI โทร'}
+                  {submitting ? 'กำลังบันทึก…' : !scheduleMode && manualTimesPreview >= scheduledAtsPreview ? 'บันทึก' : 'บันทึก + ส่ง AI โทร'}
                 </Button>
               )}
               <button
@@ -2161,6 +2286,8 @@ const FollowPage: React.FC = () => {
               </button>
             </div>
           </form>
+            </>
+            )}
           </DialogContent>
         </Dialog>
 
@@ -2217,6 +2344,13 @@ const FollowPage: React.FC = () => {
         onPurge={canPurge ? (id) => void doPurge(id) : null}
         purgingId={purgingId}
         onAskPurge={setPurgingId}
+      />
+
+      <FollowDayReportDialog
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        ymd={fDate || toYmdBangkok(new Date())}
+        entries={scopeItems}
       />
 
       <BoardPersonPicker

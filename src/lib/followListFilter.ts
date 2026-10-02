@@ -104,7 +104,29 @@ export type FollowFilter = {
    * ไอคอนปฏิทิน + ช่วงเวลา) — ตรรกะยังอยู่เผื่อเอากลับ และ `listFollowOwners()` ยังใช้ได้
    */
   owner?: string;
+  /** ใครโทร (เจ้าของสั่ง 2 ต.ค. 2569 "เพิ่ม filter ดึงรายชื่อเจ้าหน้าที่โทรเอง") · ไม่ส่ง/'all' = ทั้งหมด */
+  caller?: FollowCaller;
 };
+
+/** ตัวกรอง "ใครโทร" — แถวเก่าที่ไม่มี call_mode = AI โทร (ค่าเดียวกับที่เส้นหลังบ้านเติม) */
+export type FollowCaller = 'all' | 'ai' | 'manual';
+export const FOLLOW_CALLERS: readonly FollowCaller[] = ['all', 'ai', 'manual'];
+export const FOLLOW_CALLER_LABEL: Record<FollowCaller, string> = { all: 'ทั้งหมด', ai: 'AI โทร', manual: 'คนโทร' };
+
+export function followCallerOf(e: Pick<FollowEntry, 'call_mode'>): Exclude<FollowCaller, 'all'> {
+  return e.call_mode === 'manual' ? 'manual' : 'ai';
+}
+
+/** จำนวน **สาย** ต่อ "ใครโทร" ในแท็บที่เปิดอยู่ (ป้ายบนตัวเลือก) */
+export function countFollowCallers(entries: FollowEntry[], tab: FollowTab): Record<FollowCaller, number> {
+  const out: Record<FollowCaller, number> = { all: 0, ai: 0, manual: 0 };
+  for (const e of entries) {
+    if (followLifecycleTab(e) !== tab) continue;
+    out.all += 1;
+    out[followCallerOf(e)] += 1;
+  }
+  return out;
+}
 
 /** กรองรอบด้วยแท็บ + วันที่ + ช่วงเวลา + เจ้าของงาน (ทุกเงื่อนไข AND กัน) */
 export function filterFollowEntries(entries: FollowEntry[], f: FollowFilter): FollowEntry[] {
@@ -113,6 +135,7 @@ export function filterFollowEntries(entries: FollowEntry[], f: FollowFilter): Fo
     if (f.date && bangkokDay(e.scheduled_at) !== f.date) return false;
     if (f.band && !inTimeBand(e.scheduled_at, f.band)) return false;
     if (f.owner && (e.created_by_name ?? '') !== f.owner) return false;
+    if (f.caller && f.caller !== 'all' && followCallerOf(e) !== f.caller) return false;
     return true;
   });
 }

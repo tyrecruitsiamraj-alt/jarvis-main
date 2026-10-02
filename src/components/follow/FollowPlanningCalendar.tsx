@@ -636,7 +636,7 @@ const FollowPlanningCalendar: React.FC<{
                 <div className="flex flex-wrap items-center gap-2 border-b border-border/70 px-4 py-2.5 md:px-5">
                   {roundFilter !== 'all' && !daySlots.includes(roundFilter) ? (
                     <span className="text-[11px] text-muted-foreground">
-                      วันนี้ไม่มี{roundFilterLabel(roundFilter)} — กด "ทุกสาย" ข้างบนเพื่อดูสายอื่น
+                      วันที่ {formatYmdDmyBe(dayYmd)} ไม่มี{roundFilterLabel(roundFilter)} — กด "ทุกสาย" ข้างบนเพื่อดูสายอื่น
                     </span>
                   ) : null}
                   {daySummary.notSent > 0 ? (
@@ -736,7 +736,7 @@ const FollowPlanningCalendar: React.FC<{
                                     {/* บอกจำนวนสายไว้ใต้ชื่อ — กันคนอ่านว่าแถวนี้มีสายเดียว */}
                                     {calls.length > 1 ? (
                                       <span className="mt-0.5 block text-[10.5px] text-muted-foreground">
-                                        วันนี้ {calls.length} สาย
+                                        {calls.length} สาย
                                       </span>
                                     ) : null}
                                   </span>

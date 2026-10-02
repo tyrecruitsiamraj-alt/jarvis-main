@@ -3,6 +3,7 @@ import {
   followLifecycleTab,
   filterFollowEntries,
   countFollowTabs,
+  countFollowCallers,
   listFollowOwners,
   inTimeBand,
   type FollowFilter,
@@ -149,5 +150,27 @@ describe('countFollowTabs / listFollowOwners', () => {
       entry({ created_by_name: null }),
     ];
     expect(listFollowOwners(rows)).toEqual(['คิว', 'บี']);
+  });
+});
+
+/** 🔴 ตัวกรอง "ใครโทร" (เจ้าของสั่ง 2 ต.ค. 2569: "เพิ่ม filter ดึงรายชื่อเจ้าหน้าที่โทรเอง" · Choice AI / คน) */
+describe('ใครโทร — AI โทร / คนโทร', () => {
+  const ai = entry({ call_mode: 'ai' });
+  const old = entry({}); // แถวเก่าไม่มี call_mode = AI โทร
+  const manual = entry({ call_mode: 'manual' });
+  const manualDone = entry({ call_mode: 'manual', cancelled: true });
+  const base: FollowFilter = { tab: 'active', date: '', band: '' };
+
+  it('คนโทร = เหลือเฉพาะสายที่เจ้าหน้าที่โทรเอง · AI โทร รวมแถวเก่า · ไม่ส่ง/ทั้งหมด = ไม่กรอง', () => {
+    const all = [ai, old, manual, manualDone];
+    expect(filterFollowEntries(all, { ...base, caller: 'manual' })).toEqual([manual]);
+    expect(filterFollowEntries(all, { ...base, caller: 'ai' })).toEqual([ai, old]);
+    expect(filterFollowEntries(all, { ...base, caller: 'all' })).toEqual([ai, old, manual]);
+    expect(filterFollowEntries(all, base)).toEqual([ai, old, manual]);
+  });
+
+  it('เลขบนตัวเลือกนับสายในแท็บที่เปิดอยู่', () => {
+    expect(countFollowCallers([ai, old, manual, manualDone], 'active')).toEqual({ all: 3, ai: 2, manual: 1 });
+    expect(countFollowCallers([ai, old, manual, manualDone], 'cancelled')).toEqual({ all: 1, ai: 0, manual: 1 });
   });
 });
