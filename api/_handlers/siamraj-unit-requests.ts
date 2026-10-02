@@ -16,7 +16,7 @@ import {
   getSiamrajUnitRequestById,
 } from '../_lib/siamrajUnitRequests.js';
 import { ageSeconds, readThroughCache } from '../_lib/unitRequestCache.js';
-import { fetchJobBenefitChipsById } from '../_lib/siamrajJobBenefits.js';
+import { fetchJobBenefitChipsAndIncomesById } from '../_lib/siamrajJobBenefits.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 import { getSiamrajSqlServerRequestRateLines } from '../_lib/siamrajSqlServerRequests.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
@@ -216,11 +216,25 @@ export async function attachWorkStatus(items: unknown[]): Promise<void> {
 async function attachErpBenefits(items: Array<Record<string, unknown>>): Promise<void> {
   const ids = items.map((it) => String(it.id || '')).filter(Boolean);
   if (ids.length === 0) return;
-  const chips = await fetchJobBenefitChipsById(ids);
-  if (chips.size === 0) return;
+  // ถาม ERP ครั้งเดียว ได้ทั้งชิปสวัสดิการและรายได้ต่อเดือน (2 ต.ค. 2569)
+  const { chips, incomes } = await fetchJobBenefitChipsAndIncomesById(ids);
+  if (chips.size === 0 && incomes.size === 0) return;
   for (const it of items) {
-    const found = chips.get(String(it.id || ''));
+    const key = String(it.id || '');
+    const found = chips.get(key);
     if (found && found.length > 0) it.benefits = found;
+    /**
+     * รายได้ต่อเดือนจากอัตรา ERP — **ตัวเดียวกับหน้าสาธารณะ** (`api/_handlers/public/jobs.ts` · `fetchMonthlyIncomesById`)
+     * 🔴 เดิม feed นี้ไม่มี ⇒ กล่องงานเห็นแค่เลขดิบไม่รู้หน่วย ทั้งที่คนนอกเห็น "บาท/เดือน" — ชิป "ขาดรายได้" เตือนผิด 225 ใบ (วัด 2 ต.ค. 2569)
+     * ⚠️ ไม่ทับ `total_income` (ฟิลด์เดิมมีคนใช้ทั้งระบบ) · ของที่ทีม Online ตั้งเอง (income_display / total_income ใน field_overrides)
+     *    ชนะที่ฝั่งจอ (`publicIncomeOf`) — ที่นี่แนบของ ERP อย่างเดียว เพราะ `attachNotes` วิ่งขนานกัน
+     */
+    const income = incomes.get(key);
+    if (income) {
+      it.monthly_income = income.total;
+      it.monthly_income_base = income.base;
+      it.monthly_income_items = income.items;
+    }
   }
 }
 

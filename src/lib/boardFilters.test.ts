@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { PublishReadiness } from '@/lib/publishReadiness';
 import type { JobRequest } from '@/types';
 import {
   applyBoardFilters,
@@ -467,46 +468,51 @@ describe('ปุ่มเรียงการ์ด', () => {
   });
 });
 
-describe('🔴 ติดขั้น — ย้ายจากแถวบนหัวมาเป็นหัวข้อกรอง (เจ้าของสั่ง 30 ก.ย. 2569)', () => {
+describe('🔴 พร้อมประกาศไหม — แทนหัวข้อ "ติดขั้น" (เจ้าของเลือก B 2 ต.ค. 2569)', () => {
   const a = job();
   const b = job();
   const c = job();
   const released = job();
-  const stepById: Record<string, 'info' | 'place' | 'benefits' | 'publish' | null> = {
-    [a.id]: 'info',
-    [b.id]: 'info',
-    [c.id]: 'benefits',
-    [released.id]: null, // ปล่อยแล้ว = ไม่ติดขั้นไหน
+  const readinessById: Record<string, PublishReadiness> = {
+    [a.id]: { kind: 'gaps', gaps: ['place', 'gender'] },
+    [b.id]: { kind: 'ready' },
+    [c.id]: { kind: 'moved', box: 'waiting' },
+    [released.id]: { kind: 'released' }, // ประกาศแล้ว = ไม่อยู่ในหัวข้อนี้
   };
   const rows = [a, b, c, released];
-  const withSteps = (): BoardFacetFacts => ({ ...facts(), stepOf: (j) => stepById[j.id] ?? null });
+  const withReadiness = (): BoardFacetFacts => ({ ...facts(), readinessOf: (j) => readinessById[j.id] ?? { kind: 'ready' } });
 
-  it('บอกจำนวนต่อขั้นครบ 4 ขั้นตามลำดับ (0 ก็โชว์) · ป้าย = เลขขั้น + ชื่อขั้น · ใบที่ปล่อยแล้วไม่ถูกนับ', () => {
-    const facet = buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, withSteps()).find((f) => f.key === 'step');
-    expect(facet?.label).toBe('ติดขั้น');
+  it('บอกจำนวนครบทุกค่าตามลำดับ (0 ก็โชว์) · ใบที่ขาดหลายช่องนับทุกช่อง · ใบที่ประกาศแล้วไม่ถูกนับ', () => {
+    const facet = buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, withReadiness()).find((f) => f.key === 'ready');
+    expect(facet?.label).toBe('พร้อมประกาศไหม');
     expect(facet?.options.map((o) => [o.label, o.count])).toEqual([
-      ['1 ตรวจใบขอ', 2],
-      ['2 ใส่สถานที่ปฏิบัติงาน', 0],
-      ['3 เลือกสวัสดิการ', 1],
-      ['4 สรุป + ส่งประกาศ', 0],
+      ['พร้อมประกาศ', 1],
+      ['ขาดสถานที่', 1],
+      ['ขาดรายได้', 0],
+      ['ขาดเพศ', 1],
+      ['มีคนเริ่มงานแล้ว', 1],
+      ['ตั้งไม่ประกาศไว้', 0],
     ]);
   });
 
-  it('ติ๊กขั้น 1 = เหลือแต่ใบที่ติดขั้น 1 · ใบที่ปล่อยแล้วหลุด', () => {
-    const st = toggleBoardFacetValue(EMPTY_BOARD_FILTER_STATE, 'step', 'info');
-    expect(applyBoardFilters(rows, st, withSteps()).map((j) => j.id)).toEqual([a.id, b.id]);
+  it('ติ๊ก "ขาดสถานที่" = เหลือแต่ใบที่ขาดสถานที่ · ใบที่ประกาศแล้วหลุด', () => {
+    const st = toggleBoardFacetValue(EMPTY_BOARD_FILTER_STATE, 'ready', 'gap_place');
+    expect(applyBoardFilters(rows, st, withReadiness()).map((j) => j.id)).toEqual([a.id]);
   });
 
-  it('ทะเบียนลิงก์/การปล่อยยังไม่พร้อม = ไม่มีหัวข้อนี้ และค่าที่ค้างใน URL ต้องไม่ตัดใบทิ้ง', () => {
-    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).some((f) => f.key === 'step')).toBe(false);
-    const st = toggleBoardFacetValue(EMPTY_BOARD_FILTER_STATE, 'step', 'info');
-    expect(applyBoardFilters(rows, st, { ...facts(), stepOf: null })).toHaveLength(rows.length);
+  it('ทะเบียนการประกาศยังไม่พร้อม = ไม่มีหัวข้อนี้ และค่าที่ค้างใน URL ต้องไม่ตัดใบทิ้ง', () => {
+    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).some((f) => f.key === 'ready')).toBe(false);
+    const st = toggleBoardFacetValue(EMPTY_BOARD_FILTER_STATE, 'ready', 'ready');
+    expect(applyBoardFilters(rows, st, { ...facts(), readinessOf: null })).toHaveLength(rows.length);
   });
 
-  it('อยู่ใน URL เป็น f.step และขึ้นก่อนหัวข้ออื่น', () => {
-    const p = writeBoardFilterState(new URLSearchParams('view=board&lane=unreleased'), toggleBoardFacetValue(EMPTY_BOARD_FILTER_STATE, 'step', 'publish'));
-    expect(p.getAll('f.step')).toEqual(['publish']);
+  it('อยู่ใน URL เป็น f.ready และขึ้นก่อนหัวข้ออื่น', () => {
+    const p = writeBoardFilterState(
+      new URLSearchParams('view=board&lane=unreleased'),
+      toggleBoardFacetValue(EMPTY_BOARD_FILTER_STATE, 'ready', 'ready'),
+    );
+    expect(p.getAll('f.ready')).toEqual(['ready']);
     expect(p.get('lane')).toBe('unreleased');
-    expect(readBoardFilterState(p).selection.step).toEqual(['publish']);
+    expect(readBoardFilterState(p).selection.ready).toEqual(['ready']);
   });
 });

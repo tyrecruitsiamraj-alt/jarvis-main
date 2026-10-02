@@ -275,7 +275,13 @@ export function benefitDetailMax(key: string): number {
 }
 
 /** ฟอร์มนี้โชว์ส่วนไหน (= เป็นเจ้าของค่าส่วนไหน) — ขั้น 2 = สถานที่ · ขั้น 3 = รายได้ + สวัสดิการ */
-export type FormSectionsOwned = { place: boolean; income: boolean; benefits: boolean };
+export type FormSectionsOwned = {
+  place: boolean;
+  income: boolean;
+  benefits: boolean;
+  /** กล่อง "ให้ผู้สมัครเห็นอะไรบ้าง" — ไม่ส่ง = ติดมากับรายได้/สวัสดิการแบบเดิม (2 ต.ค. 2569: ป๊อปหน้าเดียวแยกเป็นแถวของตัวเอง) */
+  visibility?: boolean;
+};
 
 /**
  * state ที่จะบันทึกของฟอร์มที่โชว์บางส่วน — **ส่วนที่ไม่ได้โชว์เอาจากใบขอล่าสุดเสมอ**
@@ -299,7 +305,7 @@ export function formStateForSections(
     incomeRows: own.income ? values.incomeRows : saved.incomeRows,
     incomeTotal: own.income ? values.incomeTotal : saved.incomeTotal,
     benefitText: own.benefits ? values.benefitText : saved.benefitText,
-    // ช่อง "ให้ผู้สมัครเห็นอะไรบ้าง" อยู่คู่ขั้น 3
-    visibility: own.income || own.benefits ? values.visibility : saved.visibility,
+    // ช่อง "ให้ผู้สมัครเห็นอะไรบ้าง" อยู่คู่ขั้น 3 — เว้นแต่ผู้เรียกบอกเองว่าถือ/ไม่ถือช่องนี้ (ป๊อปหน้าเดียว)
+    visibility: (own.visibility ?? (own.income || own.benefits)) ? values.visibility : saved.visibility,
   };
 }

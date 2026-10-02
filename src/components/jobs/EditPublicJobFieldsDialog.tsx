@@ -87,8 +87,9 @@ import { cn } from '@/lib/utils';
 /**
  * ส่วนของฟอร์มที่จะโชว์ — ขั้น 2 = `place` · ขั้น 3 = `income` + `benefits` (+ ช่องที่ให้ผู้สมัครเห็น)
  * ไม่ส่งมา = โชว์ครบทุกส่วน
+ * `visibility` (2 ต.ค. 2569) = เฉพาะกล่อง "ให้ผู้สมัครเห็นอะไรบ้าง" — ป๊อปประกาศหน้าเดียวแยกเป็นแถวของตัวเอง
  */
-export type PublicFieldSection = 'place' | 'income' | 'benefits';
+export type PublicFieldSection = 'place' | 'income' | 'benefits' | 'visibility';
 
 const NUM = new Intl.NumberFormat('th-TH');
 const TIME = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' });
@@ -181,8 +182,13 @@ function SeenLine({ children }: { children: React.ReactNode }) {
 const EditPublicJobFieldsDialog: React.FC<{
   job: JobRequest | null;
   sections?: PublicFieldSection[];
+  /**
+   * ไม่วาดกล่อง "ให้ผู้สมัครเห็นอะไรบ้าง" ที่ปกติติดมากับรายได้/สวัสดิการ (2 ต.ค. 2569) — ป๊อปประกาศหน้าเดียว
+   * วาดกล่องนั้นเป็นแถวแยก (`sections={['visibility']}`) ⇒ ฟอร์มนี้ต้องไม่ถือช่องนั้นด้วย ไม่งั้นเขียนทับกัน
+   */
+  hideVisibility?: boolean;
   onSaved?: (patch: Partial<JobRequest>) => void;
-}> = ({ job, sections, onSaved }) => {
+}> = ({ job, sections, hideVisibility = false, onSaved }) => {
   const uid = useId();
   /**
    * 🔴 **ค่าตั้งต้นมาจากใบขอตั้งแต่ render แรก** (แก้ 27 ก.ย. 2569) — เดิมเริ่มจากค่าว่างแล้ว
@@ -240,10 +246,14 @@ const EditPublicJobFieldsDialog: React.FC<{
   const showPlace = show('place');
   const showIncome = show('income');
   const showBenefits = show('benefits');
+  /** กล่อง "ให้ผู้สมัครเห็นอะไรบ้าง" — ติดมากับขั้น 3 แบบเดิม หรือขอแยกมาเฉพาะกล่องนี้ (`visibility`) */
+  const showVisibility = sections
+    ? sections.includes('visibility') || (!hideVisibility && (showIncome || showBenefits))
+    : true;
   /** ช่องที่ฟอร์มนี้เป็นเจ้าของ — ช่องของขั้นอื่นเอาจากใบขอล่าสุดเสมอ (`formStateForSections`) */
   const own = useMemo(
-    () => ({ place: showPlace, income: showIncome, benefits: showBenefits }),
-    [showPlace, showIncome, showBenefits],
+    () => ({ place: showPlace, income: showIncome, benefits: showBenefits, visibility: showVisibility }),
+    [showPlace, showIncome, showBenefits, showVisibility],
   );
   const needRates = showIncome;
 
@@ -777,7 +787,7 @@ const EditPublicJobFieldsDialog: React.FC<{
        * 🔴 ติ๊กว่าหน้าสาธารณะเห็นช่องไหน (เจ้าของเคาะ 22 ก.ย. 2569 นิยามกล่องงานข้อ 3)
        * อยู่คู่ขั้น 3 · เอาติ๊กออก = ซ่อนทั้งช่องบนหน้าสมัคร ไม่ลบค่า · ตัวตัดสินอยู่ที่ `publicFieldVisible()`
        */}
-      {showIncome || showBenefits ? (
+      {showVisibility ? (
         <StepCard title="ให้ผู้สมัครเห็นอะไรบ้าง">
           <div className="grid gap-x-6 sm:grid-cols-2">
             {PUBLIC_TOGGLE_FIELDS.map((f) => (

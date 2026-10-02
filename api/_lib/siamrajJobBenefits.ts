@@ -417,3 +417,26 @@ export async function fetchMonthlyIncomesById(jobIds: string[]): Promise<Map<str
   }
   return out;
 }
+
+/**
+ * ชิปสวัสดิการ + รายได้ต่อเดือน จากการถาม ERP **ครั้งเดียว** (2 ต.ค. 2569)
+ * feed กล่องงาน (`/api/siamraj/unit-requests`) ต้องรู้หน่วยรายได้เหมือนหน้าสาธารณะ — เดิมถามเฉพาะชิป
+ * ERP ล่ม = ว่างทั้งคู่ (fail-safe เหมือนสองตัวข้างบน)
+ */
+export async function fetchJobBenefitChipsAndIncomesById(
+  jobIds: string[],
+): Promise<{ chips: Map<string, string[]>; incomes: Map<string, MonthlyIncome> }> {
+  const chips = new Map<string, string[]>();
+  const incomes = new Map<string, MonthlyIncome>();
+  try {
+    for (const [id, list] of await fetchBenefitRatesByJobId(jobIds)) {
+      const c = speakableBenefitChips(list);
+      if (c.length > 0) chips.set(id, c);
+      const income = monthlyGuaranteedIncome(list);
+      if (income.total > 0) incomes.set(id, income);
+    }
+  } catch {
+    return { chips, incomes };
+  }
+  return { chips, incomes };
+}

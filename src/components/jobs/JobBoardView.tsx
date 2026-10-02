@@ -58,6 +58,8 @@ import {
 const BoardPostingSteps = React.lazy(() =>
   import('@/pages/jobs/BoardPostingPage').then((m) => ({ default: m.BoardPostingSteps })),
 );
+/** ป๊อปประกาศหน้าเดียว (เจ้าของเลือก B 2 ต.ค. 2569) — ป๊อป 4 ขั้นเดิมข้างบนยังเรียกได้ที่ `?popup=steps` (ทางถอย) */
+const BoardPublishSheet = React.lazy(() => import('@/components/jobs/BoardPublishSheet'));
 
 /**
  * id ที่หน้าไล่งานต้องใช้ — 🔴 ต้องเป็นรูปเดียวกับที่ URL ของใบขอใช้
@@ -71,11 +73,9 @@ function postingUnitId(job: JobRequest): string {
 }
 import {
   RELEASE_LANE_TEXT,
-  RELEASE_STEP_ORDER,
   buildReleaseLedger,
   releaseProgressOf,
   releaseProgressTitle,
-  releaseStepOf,
   filterByReleaseLane,
   type ReleaseFacts,
   type ReleaseLaneKey,
@@ -88,6 +88,7 @@ import {
   type JobRelease,
 } from '@/lib/jobPublicReleaseApi';
 import { fetchReleaseSkips } from '@/lib/jobReleaseSkipApi';
+import { publishReadinessOf, type PublishReadinessFacts } from '@/lib/publishReadiness';
 import { buildSkipIndex, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
 import { boardPostingPath } from '@/lib/jobNavigation';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
@@ -413,6 +414,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    */
   const laneParam = searchParams.get('lane');
   const stepParam = searchParams.get('step');
+  /** ทางถอย: `?popup=steps` = ป๊อปไล่งาน 4 ขั้นเดิม · ค่าเริ่ม = ป๊อปประกาศหน้าเดียว (2 ต.ค. 2569) */
+  const stepsPopup = searchParams.get('popup') === 'steps';
   const legacyStage = searchParams.get('stage');
 
   const doneLane = useMemo<ClosedBoxKey | null>(() => {
@@ -437,8 +440,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     [laneParam],
   );
   /**
-   * 🔴 ลิงก์เก่า `?step=` (เช่นลิงก์จากพจนานุกรมเมตริก) → ติ๊กหัวข้อ "ติดขั้น" ในตัวกรองให้ แล้วล้าง `?step=` ทิ้ง
-   * (30 ก.ย. 2569 — แถว "ติดขั้น" บนหัวถูกถอด ย้ายเป็นหัวข้อกรอง) · ค่าที่ไม่รู้จัก = ทิ้งเฉย ๆ
+   * 🔴 ลิงก์เก่า `?step=` → ล้างทิ้งเฉย ๆ (2 ต.ค. 2569 — "ติดขั้น" ถูกแทนด้วย "พร้อมประกาศไหม" ซึ่งไม่มีขั้นให้แปลง)
+   * ไม่ throw ใส่คนที่แก้ URL เล่น · replace = ไม่เพิ่มประวัติ
    */
   useEffect(() => {
     if (stepParam === null) return;
@@ -446,12 +449,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       (prev) => {
         const params = new URLSearchParams(prev);
         params.delete('step');
-        if (!(RELEASE_STEP_ORDER as readonly string[]).includes(stepParam)) return params;
-        const current = readBoardFilterState(params);
-        return writeBoardFilterState(params, {
-          ...current,
-          selection: { ...current.selection, step: [stepParam] },
-        });
+        return params;
       },
       { replace: true },
     );
@@ -621,6 +619,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     }),
     [postingsReady, postedJobIds, releaseIdx, applicantIdx],
   );
+  /** ของที่ชิป "พร้อมประกาศ/ขาดอะไร" ต้องรู้ — ทะเบียนประกาศ + ทะเบียน "ไม่ประกาศ" (ตัวเดียวกับหัวข้อกรอง) */
+  const readinessFacts = useMemo<PublishReadinessFacts>(
+    () => ({ isReleased: (j) => releaseIdx.has(j.id), isSkipped: (j) => skipIdx.has(j.id) }),
+    [releaseIdx, skipIdx],
+  );
   const facetFacts = useMemo<BoardFacetFacts>(
     () => ({
       countsReady: breakdownLoaded,
@@ -628,10 +631,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       leads: (j) => countFor(leadIdx, j.id),
       isReleased: ledgerReady ? (j) => releaseIdx.has(j.id) : null,
       aiSent: breakdownLoaded ? (j) => aiCounts[j.id]?.sent ?? 0 : null,
-      // ติดขั้น (30 ก.ย. 2569) — ตัวเดียวกับเลขบนการ์ด · ใบที่ปล่อยแล้วไม่ติดขั้นไหน
-      stepOf: ledgerReady ? (j) => (releaseIdx.has(j.id) ? null : releaseStepOf(j, stageFacts)) : null,
+      // พร้อมประกาศไหม (2 ต.ค. 2569 — แทนติดขั้น) — ตัวเดียวกับชิปบนการ์ด
+      readinessOf: ledgerReady ? (j) => publishReadinessOf(j, readinessFacts) : null,
     }),
-    [breakdownLoaded, applicantIdx, leadIdx, ledgerReady, releaseIdx, aiCounts, stageFacts],
+    [breakdownLoaded, applicantIdx, leadIdx, ledgerReady, releaseIdx, aiCounts, readinessFacts],
   );
   /** ใบเปิดหลังแถบซ้าย — ตัวแทน `filters.filtered` ของทุกตัวเลขข้างล่าง */
   const openRows = useMemo(
@@ -1523,7 +1526,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               <BoardJobCard
                 key={job.id}
                 job={job}
-                progress={ledgerReady ? releaseProgressOf(job, releaseFacts) : null}
+                readiness={ledgerReady && !closedBox ? publishReadinessOf(job, readinessFacts) : null}
                 applicants={countFor(applicantIdx, job.id)}
                 ai={aiCounts[job.id] ?? null}
                 closed={Boolean(closedBox)}
@@ -2153,7 +2156,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       >
         <DialogContent
           className={cn(
-            'flex max-h-[min(92dvh,860px)] w-[min(calc(100vw-1.25rem),40rem)] max-w-none flex-col gap-0 overflow-hidden border-border/80 p-0',
+            'flex max-h-[min(92dvh,860px)] max-w-none flex-col gap-0 overflow-hidden border-border/80 p-0',
+            // ป๊อปหน้าเดียวกว้างกว่า (ซ้ายตัวอย่างคนนอก · ขวาช่องที่จะขึ้นประกาศ) · ป๊อป 4 ขั้นเดิมเท่าเดิม
+            stepsPopup ? 'w-[min(calc(100vw-1.25rem),40rem)]' : 'w-[min(calc(100vw-1.25rem),52rem)]',
             // พื้นทึบใต้ไล่เฉดของ jarvis-frost — เดิมโปร่ง ~5% ตัวหนังสือการ์ดกล่องงานข้างหลังลอยทะลุช่องว่างระหว่างการ์ด
             '!bg-background',
             EVEN_TYPE,
@@ -2164,7 +2169,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               {postingJob ? jobBoardCardTitle(postingJob) : ''}
             </DialogTitle>
             {/* คำอธิบายเหลือไว้ให้โปรแกรมอ่านจอ — บนจอตัดออก (เจ้าของ 30 ก.ย. 2569: "คำอธิบายอันไหนไม่จำเป็นก็ตัด") */}
-            <DialogDescription className="sr-only">ไล่งานประกาศของใบนี้ทีละขั้น</DialogDescription>
+            <DialogDescription className="sr-only">{stepsPopup ? 'ไล่งานประกาศของใบนี้ทีละขั้น' : 'ตรวจแล้วประกาศใบนี้'}</DialogDescription>
             {/* 🔴 ปุ่ม "หาคนทุกกอง + ให้ AI โทร" ย้ายไปอยู่บนแท็บ **รายชื่อ** ในป๊อป (เจ้าของ Choice 1 ต.ค. 2569
                 "4 ขั้นเดิม แต่ตัดของรก") — ส่ง `onSearchAllPools` ลงไป · ⚠️ ห้ามซ้อน Dialog ⇒ กดแล้วปิดป๊อปนี้ก่อน
                 ค่อยเปิดหน้าต่างหาคน · ใบที่ปิด/ยกเลิกแล้วไม่มีปุ่มนี้ (ส่งคนไปงานที่ไม่มีอยู่) */}
@@ -2174,25 +2179,26 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               <React.Suspense
                 fallback={<p className="py-6 text-center text-xs text-muted-foreground">กำลังโหลด…</p>}
               >
-                <BoardPostingSteps
-                  id={postingUnitId(postingJob)}
-                  chrome={false}
-                  onSearchAllPools={
-                    closedBox
-                      ? undefined
-                      : () => {
-                          const j = postingJob;
-                          setPostingJob(null);
-                          setLaneJob(j);
-                        }
-                  }
-                  onDone={() => {
+                {(() => {
+                  const onSearchAllPools = closedBox
+                    ? undefined
+                    : () => {
+                        const j = postingJob;
+                        setPostingJob(null);
+                        setLaneJob(j);
+                      };
+                  const onDone = () => {
                     setPostingJob(null);
                     void loadReleases();
                     void loadSkips();
                     setPostingsRev((n) => n + 1);
-                  }}
-                />
+                  };
+                  return stepsPopup ? (
+                    <BoardPostingSteps id={postingUnitId(postingJob)} chrome={false} onSearchAllPools={onSearchAllPools} onDone={onDone} />
+                  ) : (
+                    <BoardPublishSheet id={postingUnitId(postingJob)} onSearchAllPools={onSearchAllPools} onDone={onDone} />
+                  );
+                })()}
               </React.Suspense>
             ) : null}
           </div>

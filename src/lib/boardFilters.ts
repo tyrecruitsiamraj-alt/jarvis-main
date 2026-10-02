@@ -30,7 +30,13 @@ import { buildIncomeDisplay } from './incomeBreakdown';
 import { formatYmdDmyBe } from './dateTh';
 import { genderLabel } from './genderRequirement';
 import { isDrivingPositionLabel } from './jobBoardPositionPreset';
-import { RELEASE_STEP_ORDER, RELEASE_STEP_TEXT, type ReleaseStepKey } from './boardRelease';
+import {
+  READINESS_FACET_LABEL,
+  READINESS_FACET_ORDER,
+  readinessFacetValues,
+  type PublishReadiness,
+  type ReadinessFacetValue,
+} from './publishReadiness';
 import {
   UNSPECIFIED,
   applyFacetDefs,
@@ -52,7 +58,7 @@ import {
 export { UNSPECIFIED, visibleFacetOptions } from './facetEngine';
 
 export type BoardFacetKey =
-  | 'step'
+  | 'ready'
   | 'applicants'
   | 'release'
   | 'urgency'
@@ -86,10 +92,10 @@ export type BoardFacetFacts = {
   /** จำนวนคนที่ส่งให้ AI โทรแล้ว — `null` = ยังไม่ได้โหลดยอดเลย */
   aiSent: ((job: JobRequest) => number) | null;
   /**
-   * ใบนี้ติดขั้นไหน (ใบที่ปล่อยแล้ว = `null` ไม่ได้ติดขั้นไหน) — ตัวเดียวกับเลขบนการ์ด (`releaseStepOf`)
-   * 🔴 `null` ทั้งตัว = ทะเบียนลิงก์/การปล่อยยังโหลดไม่ครบ (ทุกใบจะตกขั้น 1 ปลอม ๆ) ⇒ หัวข้อต้องไม่โผล่
+   * ใบนี้พร้อมประกาศไหม/ขาดอะไร (2 ต.ค. 2569 — แทน "ติดขั้น") — ตัวเดียวกับชิปบนการ์ด (`publishReadinessOf`)
+   * 🔴 `null` ทั้งตัว = ทะเบียนการประกาศยังโหลดไม่ครบ (ทุกใบจะดู "ยังไม่ประกาศ" ปลอม ๆ) ⇒ หัวข้อต้องไม่โผล่
    */
-  stepOf?: ((job: JobRequest) => ReleaseStepKey | null) | null;
+  readinessOf?: ((job: JobRequest) => PublishReadiness) | null;
 };
 
 export type BoardDateField = 'required' | 'request';
@@ -214,23 +220,20 @@ const ymd = (v: string | undefined | null): string => (v ?? '').slice(0, 10);
 const FACETS: readonly FacetDef[] = [
   {
     /**
-     * ═══ ติดขั้น — ย้ายจากแถวบนหัวกล่องงานมาเป็นหัวข้อกรอง (เจ้าของสั่ง 30 ก.ย. 2569) ═══
-     * > *"ติดขั้น เอาไปไว้ในแต่ละกล่อง แล้วไปทำ Filter เอาเพื่อดูว่างานที่ติดขั้นๆๆมีเท่าไหร่"*
-     * → Choice "การ์ดใบขอแต่ละใบ": การ์ดบอก "ติดขั้น N" เอง · หัวข้อนี้บอกจำนวนต่อขั้น ติ๊กแล้วเหลือแต่ใบที่ติดขั้นนั้น
-     * นับจากตัวเดียวกับเลขบนการ์ด (`releaseStepOf`) · ใบที่ปล่อยแล้วไม่อยู่ขั้นไหน (ไม่ถูกนับ ติ๊กแล้วหลุด)
+     * ═══ พร้อมประกาศไหม — แทนหัวข้อ "ติดขั้น" (เจ้าของเลือก B 2 ต.ค. 2569) ═══
+     * การ์ดบอก "พร้อมประกาศ / ขาด: …" เอง · หัวข้อนี้บอกจำนวนต่อสภาพ ติ๊กแล้วเหลือแต่ใบสภาพนั้น
+     * นับจากตัวเดียวกับชิปบนการ์ด (`publishReadinessOf`) · ใบที่ประกาศแล้วไม่อยู่ในหัวข้อ (ติ๊กแล้วหลุด) ·
+     * ใบที่ขาดหลายช่องอยู่หลายค่า (ติ๊ก "ขาดสถานที่" แล้วใบที่ขาดทั้งสถานที่และเพศยังอยู่)
      */
-    key: 'step',
-    label: 'ติดขั้น',
+    key: 'ready',
+    label: 'พร้อมประกาศไหม',
     ui: 'check',
-    order: [...RELEASE_STEP_ORDER],
-    labelOf: (v) => {
-      const t = RELEASE_STEP_TEXT[v as ReleaseStepKey];
-      return t ? `${t.step} ${t.label}` : v;
-    },
-    available: (facts) => Boolean(facts.stepOf),
+    order: [...READINESS_FACET_ORDER],
+    labelOf: (v) => READINESS_FACET_LABEL[v as ReadinessFacetValue] ?? v,
+    available: (facts) => Boolean(facts.readinessOf),
     values: (job, facts) => {
-      const step = facts.stepOf?.(job);
-      return step ? [step] : [];
+      const r = facts.readinessOf?.(job);
+      return r ? readinessFacetValues(r) : [];
     },
   },
   {
@@ -404,8 +407,8 @@ export const BOARD_FACET_KEYS: readonly BoardFacetKey[] = FACETS.map((f) => f.ke
  * หัวข้อที่ได้ Dropdown ของตัวเองบนแถบตัวกรอง (เจ้าของเลือกแบบร่าง A 27 ก.ย. 2569)
  * ที่เหลือรวมอยู่ใน "ตัวกรองอื่น" · หัวข้อลูกอยู่ในกล่องเดียวกับหัวข้อแม่ (อำเภอในจังหวัด · งานย่อยในตำแหน่ง)
  */
-/** ติดขั้นขึ้นก่อน (30 ก.ย. 2569 — แทนแถว "ติดขั้น" บนหัวที่ถอดไป) */
-export const BOARD_PRIMARY_FACETS: readonly BoardFacetKey[] = ['step', 'position', 'unit', 'province', 'income'];
+/** "พร้อมประกาศไหม" ขึ้นก่อน (2 ต.ค. 2569 แทน "ติดขั้น" ซึ่ง 30 ก.ย. แทนแถวบนหัวที่ถอดไป) */
+export const BOARD_PRIMARY_FACETS: readonly BoardFacetKey[] = ['ready', 'position', 'unit', 'province', 'income'];
 export const BOARD_FACET_ATTACH: Partial<Record<BoardFacetKey, BoardFacetKey>> = {
   subtype: 'position',
   district: 'province',

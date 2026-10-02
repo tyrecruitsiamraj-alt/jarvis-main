@@ -11061,3 +11061,34 @@ Choice ของเจ้าของ: การ์ดแยกบนหน้�
 - วัดจริง (อ่านอย่างเดียว · ใบเปิดอยู่ 346 ใบ มีที่อยู่ 192): ก่อนแก้ซ้อนป้าย 71 ใบ · ซ้ำอำเภอ/จังหวัด 20 ใบ → หลังแก้ 0/0 · ผู้สมัครแนบไฟล์ 54 จาก 138 ใบ (39%)
 - ตรวจในเบราว์เซอร์ (ดักคำขอเขียนทุกเส้น): ไล่ป๊อปกล่องงานครบ 4 ขั้น · ใบประวัติเปิด PDF ที่แนบให้เลย · แก้น้ำหนักยิง PATCH `{id, profile:{weight_kg}}` ช่องเดียว ·
   ปุ่มโทรไม่ชนปุ่มปิด · แท็บการติดตามยังเปิดป๊อปติดต่อ (มีขั้นตอน) · **ไม่ได้เขียนฐานจริง**
+
+### 2 ต.ค. 2569 — คำ "หน้าสาธารณะ" → "ประกาศ" บนกล่องงาน · ป๊อปประกาศ "หน้าเดียว ระบบร่างให้" (เจ้าของเลือก B)
+
+เจ้าของ: *"หน้า กล่องงาน ก่อนขึ้นหน้า สาธารณะ หน้าสาธารณะเปลี่ยนเป็น ประกาศ และกล่องงานอะ มันดูงงๆ ขอแนวทางที่ดีกว่านี้"*
+→ วัดจริงก่อนเสนอ (346 ใบเปิด): ประกาศ 6 · ยังไม่ประกาศ 340 — "ติดขั้น 1" 193 · "ขั้น 2" 122 · "ขั้น 3" 4 · "ขั้น 4 มีลิงก์รอกด" 21 ·
+ไม่มีใครใส่อำเภอเอง 337/340 · มีคนสมัครแล้วแต่ยังไม่ประกาศ 12 · ค้างเกิน 30 วัน 188 · เกิน 90 วัน 103
+⇒ เสนอ 3 แบบ (A การ์ดบอกว่าขาดอะไร · B ป๊อปหน้าเดียวระบบร่างให้ · C ตาราง) → Choice **"B ป๊อปหน้าเดียว ระบบร่างให้ (แนะนำ)"** (รวม A)
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/publishReadiness.ts` (ใหม่) | 🔴 ตัวตัดสินที่เดียว "พร้อมประกาศไหม": `publishGapsOf` (สถานที่ = `publicSafeAddress` ให้ข้อความได้ · รายได้ = `publicIncomeOf` รู้หน่วย · เพศ = `genderNeedsChoice`) · `publishReadinessOf` (released → skipped → moved(กล่อง ERP ≠ sourcing) → gaps/ready) · คำบนชิป/ปุ่ม `readinessChipText` / `readinessActionText` · ค่าหัวข้อกรอง `readinessFacetValues` (ใบขาดหลายช่องอยู่หลายค่า · ประกาศแล้วไม่อยู่ในหัวข้อ) |
+| `src/components/jobs/BoardPublishSheet.tsx` (ใหม่) | ป๊อปหน้าเดียว: สภาพใบ 1 บรรทัด · ซ้าย **คนนอกจะเห็นแบบนี้** (`PublicJobCardPreview`) + ดูใบขอทั้งใบ/คนเก่า พับ · ขวา **ของที่จะขึ้นประกาศ** 5 แถว (สถานที่ · รายได้ · สวัสดิการ · เพศ · ให้เห็น) ค่าจริง + ป้าย ตามใบขอ/ตั้งเอง · ช่องที่ขาดสีเหลือง **กางช่องแรกที่ขาดให้เอง** · ตัวแก้ = ฟอร์มเดิม (`EditPublicJobFieldsDialog` ทีละ section · `GenderPicker`) **กางได้ทีละช่อง** (กันฟอร์มที่ถือช่องเดียวกันเขียนทับ) · ลิงก์สมัคร (ไม่บังคับ) · ไม่ประกาศใบนี้ · **เก็บร่าง / ประกาศ** · แท็บรายชื่อเดิม · ด่านเดิมครบ (เพศ · ตั้งไม่ประกาศ · ทีละใบ · ดึงประกาศลงทันที) |
+| `src/components/jobs/useJobPublishRegistry.ts` (ใหม่) | hook โหลด ใบขอ/ลิงก์/ทะเบียนประกาศ/ทะเบียนไม่ประกาศ (fail-closed เหมือนป๊อปเดิม · `buildJobKeyIndex`) — ป๊อปเดิมไม่แตะ |
+| `src/components/jobs/PublicJobCardPreview.tsx` (ใหม่) | การ์ดคนนอกแบบย่อ — ตัวคำนวณชุดเดียวกับ `/apply` (`publicSafeAddress` · `publicIncomeOf` · `publicFieldVisible`) ไม่มีของภายใน |
+| `src/components/jobs/PublishReadinessChip.tsx` (ใหม่) | ชิป เขียว=พร้อม/ประกาศแล้ว · เหลือง=ขาด · เทา=ERP พาไปต่อ · แดง=ตั้งไม่ประกาศ · ไม่มีติ๊กถูก |
+| `src/components/jobs/GenderPicker.tsx` (ใหม่) | ย้ายออกจาก `BoardPostingPage.tsx` ใช้ร่วมสองป๊อป (พฤติกรรมเดิม) |
+| `src/components/jobs/BoardJobCard.tsx` | แถว "ติดขั้น N" + จุด 4 ขั้น → `PublishReadinessChip` · ปุ่ม "ทำต่อขั้น N" → **ตรวจแล้วประกาศ / เติม N ช่อง / เปิดดู** · prop `progress` → `readiness` · ใบ ERP พาไปต่อที่ซ่อนจากหน้าสาธารณะใช้ชิปสถานะงานเดิม (ไม่ซ้ำ) |
+| `src/components/jobs/JobBoardView.tsx` | ป๊อปของการ์ด = `BoardPublishSheet` (กว้าง 52rem) · **`?popup=steps` = ป๊อป 4 ขั้นเดิม** (ทางถอย) · `readinessFacts` (ทะเบียนประกาศ + ไม่ประกาศ) ใช้ทั้งการ์ดและหัวข้อกรอง · ใบปิดไม่มีชิป · ลิงก์เก่า `?step=` ล้างทิ้งเฉย ๆ |
+| `src/lib/boardFilters.ts` | หัวข้อ `step` "ติดขั้น" → `ready` **"พร้อมประกาศไหม"** (พร้อมประกาศ · ขาดสถานที่ · ขาดรายได้ · ขาดเพศ · มีคนเริ่มงานแล้ว · ตั้งไม่ประกาศไว้) · `BoardFacetFacts.stepOf` → `readinessOf` · ยังขึ้นหัวข้อแรก |
+| `src/components/jobs/EditPublicJobFieldsDialog.tsx` · `src/lib/publicFieldsForm.ts` | section ใหม่ `visibility` + prop `hideVisibility` · `FormSectionsOwned.visibility?` — ให้กล่อง "ให้ผู้สมัครเห็นอะไรบ้าง" เป็นแถวของตัวเองได้โดยฟอร์มรายได้/สวัสดิการไม่ถือช่องนั้นซ้ำ · ป๊อปเดิม (`['income','benefits']`) พฤติกรรมเท่าเดิม |
+| `src/pages/jobs/BoardPostingPage.tsx` · `JobBoardView.tsx` · `boardRelease.ts` | คำ "หน้าสาธารณะ" → ✓ ประกาศแล้ว · ดึงประกาศลง · ใบนี้ประกาศแล้ว · เก็บที่ทำไว้ ยังไม่ประกาศ · hint/tooltip (commit 9f0495c) |
+| เทสต์ | `src/lib/publishReadiness.test.ts` (12) · `src/components/jobs/BoardPublishSheet.test.tsx` (6) · `tests/api/boardReadinessFilter.test.ts` (7 · แทน `boardStepFilter.test.ts` ที่ลบ) · `boardFilters.test.ts` ส่วนติดขั้น → พร้อมประกาศไหม · `BoardPostingSteps.test.tsx` เดิมยังผ่าน (ป๊อปเดิมคือทางถอย) |
+
+- 🔴 **ไม่แตะเลขบนหัวกล่องงาน** (3 ก้อน + ก้อนย่อย `buildReleaseLedger`) · `RELEASE_STEP_*`/`releaseStepOf`/`releaseProgressOf` ยังอยู่ให้ป๊อปเดิมและ ledger ใช้
+- ตรวจจริงในเบราว์เซอร์ (ดักคำขอเขียนทุกเส้น · ไม่ได้เขียนฐานจริง): การ์ดขึ้นชิป "ขาด: เพศ" / "ขาด: สถานที่ · รายได้ · เพศ" + ปุ่ม "เติม N ช่อง" · ไม่มีคำว่าติดขั้นทั้งหน้า ·
+  เปิดป๊อป Siamkubota: ตัวอย่างคนนอก · 5 แถว (ที่ขาดสีเหลือง ช่องสถานที่กางเอง) · ปุ่มประกาศถูกกันเพราะเพศ · "แก้แล้วบันทึกให้เอง" ไม่ยิงอะไรตอนแค่เปิดดู ·
+  `?popup=steps` ยังเปิดป๊อป 4 ขั้นเดิม · tsc 2 config · eslint · vitest ชุดเต็มผ่าน
+- 🔴 **feed กล่องงานต้องรู้หน่วยรายได้เหมือนหน้าสาธารณะ** (`api/_handlers/siamraj-unit-requests.ts` · `api/_lib/siamrajJobBenefits.ts` `fetchJobBenefitChipsAndIncomesById`):
+  `/api/siamraj/unit-requests` เดิมไม่มี `monthly_income` (0/343) ทั้งที่ `/api/public/jobs` คิดจากอัตรา ERP ให้ ⇒ ชิป "ขาดรายได้" เตือนผิด 225 ใบตอนวัดครั้งแรก ·
+  ตอนนี้แนบ `monthly_income`/`_base`/`_items` จากคำถาม ERP เดียวกับชิปสวัสดิการ (ไม่ทับ `total_income` · ของที่ทีม Online ตั้งเองชนะที่ฝั่งจอ `publicIncomeOf`) ·
+  การ์ดกล่องงานเปลี่ยนมาใช้ `publicIncomeOf` ตัวเดียว (เลิก `moneyOf` ของตัวเอง) — เลขเงินบนการ์ด ป๊อป และหน้าสาธารณะเป็นตัวเดียวกัน

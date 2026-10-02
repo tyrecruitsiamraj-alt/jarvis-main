@@ -8,11 +8,10 @@ import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import { getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
-import { RELEASE_STEP_ORDER, type ReleaseProgress } from '@/lib/boardRelease';
+import PublishReadinessChip from '@/components/jobs/PublishReadinessChip';
+import { publicIncomeOf, readinessActionText, type PublishReadiness } from '@/lib/publishReadiness';
 import { boardProvinceOf } from '@/lib/boardFilters';
 import { UNSPECIFIED } from '@/lib/facetEngine';
-import { INCOME_PERIOD_LABEL } from '@/lib/incomeBreakdown';
-import { incomeDisplay } from '@/lib/incomeLabel';
 import { isHiddenFromPublicByWorkStatus } from '@/lib/publicJobVisibility';
 import { isUnitRequestWorkStatus, UNIT_REQUEST_WORK_STATUS_LABELS } from '@/lib/unitRequestWorkStatus';
 import { releaseSkipText, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
@@ -21,7 +20,7 @@ import { releaseSkipText, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
  * ═══ การ์ดใบขอบนกล่องงาน — ฝั่งเจ้าหน้าที่ (แบบ A · 27 ก.ย. 2569) ═══
  *
  * เจ้าของ: *"หน้ากล่องงานไม่เข้ากับหน้าอื่นๆเลย รกมาก"* → เลือกแบบ A จากแบบร่าง
- * ⇒ การ์ดเหลือ 5 บรรทัด: ชื่อหน่วยงาน · ตำแหน่ง · อยู่ขั้นไหน · ที่ไหน/เงินเท่าไหร่ · ผู้สมัคร + ปุ่มทำต่อ
+ * ⇒ การ์ดเหลือ 5 บรรทัด: ชื่อหน่วยงาน · ตำแหน่ง · พร้อมประกาศไหม/ขาดอะไร · ที่ไหน/เงินเท่าไหร่ · ผู้สมัคร + ปุ่มทำต่อ
  * 🔴 ตัวอักษร: เจ้าของสั่งขยาย ("ตัวอักษรในการ์ดยังเล็กไป") ⇒ เนื้อความ text-sm · ชื่อ text-lg · ตำแหน่ง text-base
  *    (ปุ่มยังเป็น xs ตามคำสั่ง "ปุ่มยังใหญ่ไป" — ห้ามขยายปุ่มตาม)
  * ของที่ย้ายออกจากการ์ด: ป้ายสวัสดิการ · ชิปช่องทาง/คลิก · แถบ % · เลขที่ใบขอ · สาเหตุที่ขอ →
@@ -29,13 +28,15 @@ import { releaseSkipText, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
  *
  * 🔴 **แยกไฟล์จากการ์ดหน้าสมัครสาธารณะโดยตั้งใจ** — การ์ดเดิมใช้ร่วมสองหน้า แก้ฝั่งเจ้าหน้าที่แล้วหน้า
  * สาธารณะเพี้ยนตามได้ · ไฟล์นี้วาดอย่างเดียว ตัวเลข/ขั้นมาจากผู้เรียก (`releaseProgressOf` ฯลฯ ที่เดียว)
- * 🔴 ห้ามเครื่องหมายถูก (บ้านนี้ถอดติ๊กถูกไปสองรอบ) — ขั้นที่ทำแล้วใช้จุดสีเข้มแทน
+ * 🔴 ห้ามเครื่องหมายถูก (บ้านนี้ถอดติ๊กถูกไปสองรอบ)
+ * 🔴 2 ต.ค. 2569 (เจ้าของเลือก B "ป๊อปหน้าเดียว ระบบร่างให้"): แถว "ติดขั้น N" + จุด 4 ขั้น → ชิป **พร้อมประกาศ / ขาด: … /
+ *    ประกาศแล้ว** จาก `publishReadiness` ที่เดียว · ปุ่มท้ายการ์ดบอกว่าเปิดไปทำอะไร ("ตรวจแล้วประกาศ" / "เติม N ช่อง")
  * 🔴 ห้ามพาออกนอกกล่องงาน — กดการ์ด/ปุ่ม = เปิดป๊อปไล่งาน · ผู้สมัคร = สลับแท็บในหน้าเดิม
  */
 export type BoardJobCardProps = {
   job: JobRequest;
-  /** ขั้นของใบ — `null` = ทะเบียนยังโหลดไม่ครบ (ห้ามเดาขั้น 1 · 0%) */
-  progress: ReleaseProgress | null;
+  /** พร้อมประกาศไหม/ขาดอะไร — `null` = ทะเบียนยังโหลดไม่ครบ (ห้ามเดา "พร้อม" ทั้งที่ยังไม่รู้) */
+  readiness: PublishReadiness | null;
   applicants: number;
   /** ส่ง AI แล้ว x/y (เจ้าของเคาะ 22 ก.ย. 2569 ข้อ 6) — ไม่รู้/ยังไม่มีผู้สมัคร = ไม่ขึ้น */
   ai?: { sent: number; total: number } | null;
@@ -55,23 +56,13 @@ function shortPlace(job: JobRequest): string {
   return parts.length > 0 ? parts.join(' ') : 'ยังไม่ระบุสถานที่';
 }
 
-/** เงินต้องบอกหน่วยเสมอ — ตัวเดียวกับการ์ดเดิม/หน้าจับคู่ (`incomeDisplay`) · ไม่รู้หน่วย = คำเตือนใน tooltip */
-function moneyOf(job: JobRequest): { text: string; hint: string | null } | null {
-  if (job.income_display) {
-    return {
-      text: `฿${job.income_display.total.toLocaleString('th-TH')} ${INCOME_PERIOD_LABEL[job.income_display.period]}`,
-      hint: null,
-    };
-  }
-  const d = incomeDisplay({ totalIncome: job.total_income, monthlyIncome: job.monthly_income });
-  return d ? { text: d.text, hint: d.hint } : null;
-}
-
-const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, ai, closed, onOpen, onApplicants, skip }) => {
+const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip }) => {
   const age = getJobAgeChipInfo(job);
-  const money = moneyOf(job);
+  /** เงินต้องบอกหน่วยเสมอ — ตัวเดียวกับหน้าสาธารณะ/ป๊อปประกาศ (`publicIncomeOf`) · ไม่รู้หน่วย = คำเตือนใน tooltip */
+  const money = publicIncomeOf(job);
   const hidden = isUnitRequestWorkStatus(job.work_status) && isHiddenFromPublicByWorkStatus(job.work_status);
-  const step = progress && !progress.released ? progress.currentStep : null;
+  /** ชิปสภาพ — ใบที่ ERP พาไปต่อแล้วและซ่อนจากหน้าสาธารณะมีชิปสถานะงานของตัวเองอยู่แล้ว · ใบที่ตั้งไม่ประกาศมีชิปแดง ⇒ ไม่ซ้ำ */
+  const showReadiness = readiness !== null && !(readiness.kind === 'moved' && hidden) && readiness.kind !== 'skipped';
 
   return (
     <Card
@@ -109,32 +100,8 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
         </div>
       </div>
 
-      {/* ── อยู่ขั้นไหน (จุด 4 ขั้น · ไม่มีติ๊กถูก) ── */}
-      {progress ? (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="flex items-center gap-1" aria-hidden>
-            {RELEASE_STEP_ORDER.map((key, i) => (
-              <span
-                key={key}
-                className={cn(
-                  'h-2.5 w-2.5 rounded-full',
-                  i + 1 <= progress.doneSteps
-                    ? TONE.success.dot
-                    : !progress.released && i + 1 === progress.currentStep
-                      ? TONE.warn.dot /* ขั้นที่ค้าง = เหลืองแบบ "ยังไม่ปล่อย" (สีหลักเบอร์กันดีอ่านเป็นสัญญาณเตือน) */
-                      : 'bg-muted',
-                )}
-              />
-            ))}
-          </span>
-          {/* 🔴 "ติดขั้น N" บนการ์ดทุกใบ (เจ้าของ 30 ก.ย. 2569: *"ติดขั้น เอาไปไว้ในแต่ละกล่อง"* → Choice "การ์ดใบขอแต่ละใบ")
-              — แถวติดขั้นบนหัวกล่องงานถอดแล้ว · นับด้วยตัวเดียวกับหัวข้อกรอง "ติดขั้น" */}
-          <span className={cn('min-w-0 truncate', progress.released ? TONE.success.value : 'text-foreground')}>
-            {step ? <span className="font-medium">ติดขั้น {step} </span> : null}
-            {progress.label}
-          </span>
-        </div>
-      ) : null}
+      {/* ── พร้อมประกาศไหม / ขาดอะไร (2 ต.ค. 2569 — แทน "ติดขั้น N" + จุด 4 ขั้น) ── */}
+      {showReadiness && readiness ? <PublishReadinessChip readiness={readiness} /> : null}
 
       {/* ── ที่ไหน · เงินเท่าไหร่ ── */}
       <p className={cn('flex min-w-0 items-center gap-1.5 text-sm', DASH.muted)}>
@@ -159,7 +126,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
       ) : null}
 
       {/* "ไม่ปล่อย + เหตุผล" — ทีมต้องเห็นว่าใบนี้ตัดสินแล้ว (ไม่งั้นมีคนไล่ทำขั้นต่อซ้ำ) */}
-      {skip && !progress?.released ? (
+      {skip && readiness?.kind !== 'released' ? (
         <p className={cn('inline-flex w-fit max-w-full items-center gap-1 rounded-md px-2 py-0.5 text-sm', TONE.danger.chip)}>
           <Ban className="h-3.5 w-3.5 shrink-0" aria-hidden />
           <span className="truncate">ไม่ประกาศ · {releaseSkipText(skip)}</span>
@@ -207,7 +174,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, progress, applicants, 
             }}
             className="shrink-0 rounded-lg"
           >
-            {step ? `ทำต่อขั้น ${step}` : 'เปิดดู'}
+            {readinessActionText(readiness)}
             <ArrowRight aria-hidden />
           </Button>
         )}
