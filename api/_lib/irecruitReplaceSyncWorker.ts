@@ -62,7 +62,9 @@ export async function runReplaceSyncIfDue(
   const last = settings.lastRun ?? lastRunInMemory;
   // รอบที่ดึงสำเร็จแล้ววันนี้ = พอ · รอบที่ล้ม = รอ 1 ชั่วโมงแล้วลองใหม่
   const lastOkYmd = last && !last.error ? bangkokBusinessDateYmd(new Date(last.at)) : null;
-  if (!replaceSyncDueNow(ymd, bangkokHour(now), lastOkYmd, cfg.hour)) return null;
+  // เปลี่ยนกติกาหลังรอบล่าสุด = ดึงใหม่ทันที (ย้ายเวลาสายเดิม) ไม่ต้องรอพรุ่งนี้เช้า
+  const ruleChanged = Boolean(settings.ruleChangedAt && (!last || Date.parse(settings.ruleChangedAt) > Date.parse(last.at)));
+  if (!ruleChanged && !replaceSyncDueNow(ymd, bangkokHour(now), lastOkYmd, cfg.hour)) return null;
   if (lastFailedAt !== null && now.getTime() - lastFailedAt < RETRY_AFTER_FAIL_MS) return null;
 
   const summary = await runIrecruitReplaceSync({ now, horizonDays: cfg.horizonDays, actorName: REPLACE_SYNC_ACTOR_NAME });

@@ -40,7 +40,8 @@ import { REPLACE_FOLLOW_TOPIC } from '../../src/lib/irecruitReplaceSync.js';
 type Call = { sql: string; params: unknown[] };
 let calls: Call[] = [];
 let existingRefs: string[] = [];
-let settingsRows: unknown[] = [{ payload: { rule: { dayOffset: -1, time: '18:00' } }, updated_at: null, updated_by_name: null }];
+let existingRows: Array<{ id: string; source_ref: string; scheduled_at: string; mode: string; done: boolean }> = [];
+let settingsRows: unknown[] = [{ payload: { rule: { atStart: false, dayOffset: -1, time: '18:00' } }, updated_at: null, updated_by_name: null }];
 let settingsError: unknown = null;
 let sourceRefError: unknown = null;
 let insertErrorFor: string | null = null;
@@ -52,10 +53,16 @@ function fakeDb(sql: string, params: unknown[] = []) {
     if (settingsError) throw settingsError;
     return { rows: settingsRows };
   }
-  if (/select source_ref from/.test(sql)) {
+  if (/where source_ref = any/.test(sql)) {
     if (sourceRefError) throw sourceRefError;
-    return { rows: existingRefs.map((source_ref) => ({ source_ref })) };
+    return {
+      rows: [
+        ...existingRefs.map((source_ref) => ({ id: `ex-${source_ref}`, source_ref, scheduled_at: '2099-01-01T00:00:00Z', mode: 'ai', done: true })),
+        ...existingRows,
+      ],
+    };
   }
+  if (/update .*follow_entries set scheduled_at/.test(sql)) return { rows: [] };
   if (/insert into .*follow_entries/.test(sql)) {
     const ref = String(params[10]);
     if (insertErrorFor && ref === insertErrorFor) throw { code: '23505' };
@@ -86,7 +93,8 @@ const row = (job_id: string, over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   calls = [];
   existingRefs = [];
-  settingsRows = [{ payload: { rule: { dayOffset: -1, time: '18:00' } }, updated_at: null, updated_by_name: null }];
+  existingRows = [];
+  settingsRows = [{ payload: { rule: { atStart: false, dayOffset: -1, time: '18:00' } }, updated_at: null, updated_by_name: null }];
   settingsError = null;
   sourceRefError = null;
   insertErrorFor = null;
@@ -217,7 +225,7 @@ describe('runIrecruitReplaceSync', () => {
 
 describe('🔴 AI เริ่มโทรตั้งแต่ (เจ้าของสั่ง 2 ต.ค. 2569 "ถึงวันจันทร์เปลี่ยนเป็นคนโทรก่อนให้หมด")', () => {
   it('ดึงใหม่: สายที่นัดก่อน aiFrom สร้างเป็นคนโทร ไม่ส่ง Lumos · หลังจากนั้นยัง AI', async () => {
-    settingsRows = [{ payload: { rule: { dayOffset: -1, time: '18:00', aiFrom: '2026-10-04' } }, updated_at: null, updated_by_name: null }];
+    settingsRows = [{ payload: { rule: { atStart: false, dayOffset: -1, time: '18:00', aiFrom: '2026-10-04' } }, updated_at: null, updated_by_name: null }];
     irecruitSqlQuery.mockResolvedValue([
       row('A'), // โทร 2 ต.ค. 18:00 → คนโทร
       row('B', { mobile: '0899999999', want_date: wall('2026-10-06T08:00:00Z') }), // โทร 5 ต.ค. → AI
@@ -262,5 +270,32 @@ describe('🔴 AI เริ่มโทรตั้งแต่ (เจ้าข
     pushConfig = { baseUrl: 'x' };
     expect(await enforceReplaceAiFrom(null)).toEqual({ converted: 0, plansCancelled: 0, errors: 0 });
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('🔴 เวลาในระบบ = เวลาเข้างาน (เจ้าของ Choice 2 ต.ค. 2569) · สายเดิมย้ายเวลาให้', () => {
+  it('ดึงใหม่: นัดตรงเวลาเข้างาน · สายเดิมที่ยังไม่โทร: คนโทร = ย้ายเวลาอย่างเดียว · AI = ยกเลิกแผนเก่าแล้วส่งใหม่', async () => {
+    settingsRows = [{ payload: { rule: { atStart: true } }, updated_at: null, updated_by_name: null }];
+    existingRows = [
+      { id: 'm1', source_ref: 'irecruit-replace:M', scheduled_at: '2026-10-02T11:00:00Z', mode: 'manual', done: false },
+      { id: 'a1', source_ref: 'irecruit-replace:A2', scheduled_at: '2026-10-02T11:00:00Z', mode: 'ai', done: false },
+      { id: 'd1', source_ref: 'irecruit-replace:D2', scheduled_at: '2026-10-02T11:00:00Z', mode: 'manual', done: true },
+    ];
+    irecruitSqlQuery.mockResolvedValue([
+      row('N', { mobile: '0877777777' }), // ใหม่ เข้างาน 3 ต.ค. 07:30
+      row('M', { want_date: wall('2026-10-03T08:00:00Z') }),
+      row('A2', { mobile: '0866666666', want_date: wall('2026-10-03T08:00:00Z') }),
+      row('D2', { mobile: '0855555555', want_date: wall('2026-10-03T08:00:00Z') }),
+    ]);
+    const s = await runIrecruitReplaceSync({ now: NOW });
+    expect(inserts()[0]?.params[4]).toBe('2026-10-03T00:30:00.000Z'); // 07:30 ไทย
+    const moved = calls.filter((c) => /update .*follow_entries set scheduled_at/.test(c.sql)).map((c) => [c.params[0], c.params[1], c.params[2]]);
+    expect(moved).toEqual([
+      ['m1', '2026-10-03T01:00:00.000Z', 'เข้างาน 08:00 น.'],
+      ['a1', '2026-10-03T01:00:00.000Z', 'เข้างาน 08:00 น.'],
+    ]);
+    expect(cancelFollow).toHaveBeenCalledWith('a1', expect.any(Function));
+    expect(cancelFollow).toHaveBeenCalledTimes(1);
+    expect(s.realigned).toBe(2);
   });
 });

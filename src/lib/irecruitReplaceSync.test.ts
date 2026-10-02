@@ -33,15 +33,16 @@ describe('นาฬิกาไทยจาก mssql', () => {
 
 describe('กติกาเวลาโทร', () => {
   it('ค่าเริ่มต้น 18:00 ของวันก่อนเข้างาน · คำบนจอ', () => {
-    expect(DEFAULT_REPLACE_CALL_RULE).toEqual({ dayOffset: -1, time: '18:00', aiFrom: null });
-    expect(replaceCallRuleText(DEFAULT_REPLACE_CALL_RULE)).toBe('18:00 ของวันก่อนเข้างาน');
+    expect(DEFAULT_REPLACE_CALL_RULE).toEqual({ atStart: true, dayOffset: -1, time: '18:00', aiFrom: null });
+    expect(replaceCallRuleText(DEFAULT_REPLACE_CALL_RULE)).toBe('ตามเวลาเข้างาน');
+    expect(replaceCallRuleText({ ...DEFAULT_REPLACE_CALL_RULE, atStart: false })).toBe('18:00 ของวันก่อนเข้างาน');
     expect(replaceCallRuleText({ dayOffset: 0, time: '06:00' })).toBe('06:00 ของวันเข้างาน');
     expect(replaceCallRuleText({ dayOffset: -2, time: '09:30' })).toBe('09:30 ของสองวันก่อนเข้างาน');
   });
 
   it('อ่านค่าที่เก็บ: ถูกต้องผ่าน · เพี้ยนถอยไปค่าเริ่มต้นทีละช่อง · ไม่ throw', () => {
-    expect(normalizeReplaceCallRule({ dayOffset: 0, time: '7:05' })).toEqual({ dayOffset: 0, time: '07:05', aiFrom: null });
-    expect(normalizeReplaceCallRule({ dayOffset: -2, time: '23:59', aiFrom: '2026-10-06' })).toEqual({ dayOffset: -2, time: '23:59', aiFrom: '2026-10-06' });
+    expect(normalizeReplaceCallRule({ dayOffset: 0, time: '7:05' })).toEqual({ atStart: true, dayOffset: 0, time: '07:05', aiFrom: null });
+    expect(normalizeReplaceCallRule({ dayOffset: -2, time: '23:59', aiFrom: '2026-10-06' })).toEqual({ atStart: true, dayOffset: -2, time: '23:59', aiFrom: '2026-10-06' });
     expect(normalizeReplaceCallRule({ aiFrom: '6/10/2026' }).aiFrom).toBeNull();
     expect(normalizeReplaceCallRule({ dayOffset: -5, time: '25:00' })).toEqual(DEFAULT_REPLACE_CALL_RULE);
     expect(normalizeReplaceCallRule(null)).toEqual(DEFAULT_REPLACE_CALL_RULE);
@@ -58,25 +59,32 @@ describe('AI เริ่มโทรตั้งแต่ (aiFrom)', () => {
   });
 });
 
+const OLD_RULE = { atStart: false, dayOffset: -1 as const, time: '18:00' };
 describe('planReplaceCall — โทรเมื่อไหร่', () => {
+  it('🔴 ค่าเริ่ม = ตามเวลาเข้างาน (เจ้าของ Choice 2 ต.ค. 2569) · เลยเวลาเข้างานแล้ว = ไม่สร้าง', () => {
+    const w = { ymd: '2026-10-05', hhmm: '08:00' };
+    expect(planReplaceCall(w, DEFAULT_REPLACE_CALL_RULE, new Date('2026-10-02T06:00:00+07:00'))).toEqual({ at: new Date('2026-10-05T01:00:00.000Z'), asap: false });
+    expect(planReplaceCall(w, DEFAULT_REPLACE_CALL_RULE, new Date('2026-10-05T08:00:00+07:00'))).toBeNull();
+  });
+
   const wall = { ymd: '2026-10-05', hhmm: '07:30' }; // เข้างาน 5 ต.ค. 07:30 ไทย = 00:30Z
 
   it('ตามกติกา: 18:00 วันก่อน = 4 ต.ค. 18:00 ไทย (11:00Z)', () => {
     const now = new Date('2026-10-02T06:00:00+07:00');
-    expect(planReplaceCall(wall, DEFAULT_REPLACE_CALL_RULE, now)).toEqual({ at: new Date('2026-10-04T11:00:00.000Z'), asap: false });
+    expect(planReplaceCall(wall, OLD_RULE, now)).toEqual({ at: new Date('2026-10-04T11:00:00.000Z'), asap: false });
     expect(planReplaceCall(wall, { dayOffset: 0, time: '06:00' }, now)).toEqual({ at: new Date('2026-10-04T23:00:00.000Z'), asap: false });
   });
 
   it('🔴 เวลาตามกติกาผ่านไปแล้ว แต่ยังไม่ถึงเวลาเข้างาน = โทรเร็วที่สุด (+10 นาที)', () => {
     const now = new Date('2026-10-05T06:00:00+07:00'); // เช้าวันเข้างาน ก่อน 07:30
-    const plan = planReplaceCall(wall, DEFAULT_REPLACE_CALL_RULE, now);
+    const plan = planReplaceCall(wall, OLD_RULE, now);
     expect(plan?.asap).toBe(true);
     expect(plan?.at.getTime()).toBe(now.getTime() + REPLACE_ASAP_MINUTES * 60_000);
   });
 
   it('🔴 เลยเวลาเข้างานไปแล้ว = ไม่สร้างสาย', () => {
-    expect(planReplaceCall(wall, DEFAULT_REPLACE_CALL_RULE, new Date('2026-10-05T07:30:00+07:00'))).toBeNull();
-    expect(planReplaceCall(wall, DEFAULT_REPLACE_CALL_RULE, new Date('2026-10-06T00:00:00+07:00'))).toBeNull();
+    expect(planReplaceCall(wall, OLD_RULE, new Date('2026-10-05T07:30:00+07:00'))).toBeNull();
+    expect(planReplaceCall(wall, OLD_RULE, new Date('2026-10-06T00:00:00+07:00'))).toBeNull();
   });
 });
 

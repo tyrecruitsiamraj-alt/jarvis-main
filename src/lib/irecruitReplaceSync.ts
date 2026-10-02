@@ -25,6 +25,11 @@ export const REPLACE_FOLLOW_TOPIC = 'ติดตามส่งคนแทน'
 export const REPLACE_SYNC_ACTOR_NAME = 'ดึงจาก iRecruit';
 
 export type ReplaceCallRule = {
+  /**
+   * 🔴 **เวลาในระบบ = เวลาเข้างาน** (เจ้าของ Choice 2 ต.ค. 2569 หลังเห็น "ลง 8 โมงเช้า แต่ระบบบันทึกเป็น 18.00") —
+   * `true` (ค่าเริ่ม) = สายนัดตรงเวลาเข้างานของ iRecruit · `false` = ใช้ dayOffset + time ข้างล่าง
+   */
+  atStart: boolean;
   /** โทรก่อนวันเข้างานกี่วัน — 0 = วันเข้างาน · -1 = วันก่อนเข้างาน · -2 = สองวันก่อน */
   dayOffset: 0 | -1 | -2;
   /** เวลาไทย HH:MM */
@@ -37,7 +42,7 @@ export type ReplaceCallRule = {
   aiFrom: string | null;
 };
 
-export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = { dayOffset: -1, time: '18:00', aiFrom: null };
+export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = { atStart: true, dayOffset: -1, time: '18:00', aiFrom: null };
 
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -59,11 +64,12 @@ export function normalizeReplaceCallRule(raw: unknown): ReplaceCallRule {
   const time = m ? `${String(Number(m[1])).padStart(2, '0')}:${m[2]}` : DEFAULT_REPLACE_CALL_RULE.time;
   const af = typeof r.aiFrom === 'string' ? r.aiFrom.trim() : '';
   const aiFrom = YMD_RE.test(af) && !Number.isNaN(new Date(`${af}T00:00:00+07:00`).getTime()) ? af : null;
-  return { dayOffset, time, aiFrom };
+  return { atStart: r.atStart !== false, dayOffset, time, aiFrom };
 }
 
 /** "18:00 ของวันก่อนเข้างาน" — คำบนจอ ที่เดียว */
-export function replaceCallRuleText(rule: Pick<ReplaceCallRule, 'dayOffset' | 'time'>): string {
+export function replaceCallRuleText(rule: Pick<ReplaceCallRule, 'dayOffset' | 'time'> & { atStart?: boolean }): string {
+  if (rule.atStart) return 'ตามเวลาเข้างาน';
   const when = rule.dayOffset === 0 ? 'วันเข้างาน' : rule.dayOffset === -1 ? 'วันก่อนเข้างาน' : 'สองวันก่อนเข้างาน';
   return `${rule.time} ของ${when}`;
 }
@@ -110,11 +116,12 @@ export const REPLACE_ASAP_MINUTES = 10;
  */
 export function planReplaceCall(
   wall: ReplaceWantWall,
-  rule: Pick<ReplaceCallRule, 'dayOffset' | 'time'>,
+  rule: Pick<ReplaceCallRule, 'dayOffset' | 'time'> & { atStart?: boolean },
   now: Date,
 ): ReplaceCallPlan | null {
   const start = wantInstant(wall);
   if (Number.isNaN(start.getTime()) || start.getTime() <= now.getTime()) return null;
+  if (rule.atStart) return { at: start, asap: false };
   const at = new Date(`${shiftYmd(wall.ymd, rule.dayOffset)}T${rule.time}:00+07:00`);
   if (at.getTime() > now.getTime()) return { at, asap: false };
   return { at: new Date(now.getTime() + REPLACE_ASAP_MINUTES * 60_000), asap: true };
@@ -151,6 +158,8 @@ export type ReplaceSyncSummary = {
   /** สายที่เข้าคิว AI ได้ · สายที่ไม่ได้ส่ง (ปิดส่งอัตโนมัติ / ส่งไม่ถึง) */
   queued: number;
   notSent: number;
+  /** สายเดิมที่ย้ายเวลาให้ตรงกติกา (เช่น เปลี่ยนเป็นตามเวลาเข้างาน) */
+  realigned?: number;
   /** ดึงไม่ได้ทั้งรอบ — เหตุผลไทย · null = ปกติ */
   error: string | null;
 };

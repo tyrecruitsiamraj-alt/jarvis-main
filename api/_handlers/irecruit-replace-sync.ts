@@ -74,7 +74,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
       // ส่งมาเฉพาะบางช่องได้ (ป๊อปแก้เวลาโทรไม่ส่ง aiFrom) — ช่องที่ไม่ส่งคงค่าเดิม ห้ามล้างทิ้ง
       const rule = normalizeReplaceCallRule({ ...before.rule, ...(typeof body.rule === 'object' && body.rule ? body.rule : {}) });
-      await saveReplaceSyncSettings({ rule }, req.user.email || req.user.sub);
+      // ruleChangedAt = ให้ worker ดึงใหม่รอบถัดไป (≤ 5 นาที) แล้วย้ายเวลาสายเดิมให้ตรงกติกาใหม่
+      await saveReplaceSyncSettings({ rule, ruleChangedAt: new Date().toISOString() }, req.user.email || req.user.sub);
       await auditFromAuthed(req, {
         action: 'irecruit_replace_sync.rule',
         entityType: 'irecruit_replace_sync',

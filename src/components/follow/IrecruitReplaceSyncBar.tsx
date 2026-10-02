@@ -28,7 +28,9 @@ const DMY_HM = new Intl.DateTimeFormat('th-TH', {
 });
 const NUM = new Intl.NumberFormat('th-TH');
 
-const DAY_OFFSET_LABEL: Record<'0' | '-1' | '-2', string> = {
+/** 'start' = นัดตรงเวลาเข้างานของ iRecruit (ค่าเริ่ม · เจ้าของ Choice 2 ต.ค. 2569) */
+const DAY_OFFSET_LABEL: Record<'start' | '0' | '-1' | '-2', string> = {
+  start: 'ตามเวลาเข้างาน (iRecruit)',
   '0': 'วันเข้างาน',
   '-1': 'วันก่อนเข้างาน',
   '-2': 'สองวันก่อนเข้างาน',
@@ -36,14 +38,14 @@ const DAY_OFFSET_LABEL: Record<'0' | '-1' | '-2', string> = {
 
 function RuleEditor({ rule, onSaved }: { rule: ReplaceCallRule; onSaved: (s: ReplaceSyncStatus) => void }) {
   const [open, setOpen] = React.useState(false);
-  const [dayOffset, setDayOffset] = React.useState<string>(String(rule.dayOffset));
+  const [dayOffset, setDayOffset] = React.useState<string>(rule.atStart ? 'start' : String(rule.dayOffset));
   const [time, setTime] = React.useState(rule.time);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
-    setDayOffset(String(rule.dayOffset));
+    setDayOffset(rule.atStart ? 'start' : String(rule.dayOffset));
     setTime(rule.time);
     setError(null);
   }, [open, rule]);
@@ -53,8 +55,12 @@ function RuleEditor({ rule, onSaved }: { rule: ReplaceCallRule; onSaved: (s: Rep
     setError(null);
     try {
       // ส่งแค่วัน+เวลา — "AI เริ่มโทรตั้งแต่" คงค่าเดิมที่ server
-      const { dayOffset: d, time: t } = normalizeReplaceCallRule({ dayOffset: Number(dayOffset), time });
-      onSaved(await saveReplaceCallRule({ dayOffset: d, time: t }));
+      if (dayOffset === 'start') {
+        onSaved(await saveReplaceCallRule({ atStart: true }));
+      } else {
+        const { dayOffset: d, time: t } = normalizeReplaceCallRule({ dayOffset: Number(dayOffset), time });
+        onSaved(await saveReplaceCallRule({ atStart: false, dayOffset: d, time: t }));
+      }
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
@@ -88,11 +94,13 @@ function RuleEditor({ rule, onSaved }: { rule: ReplaceCallRule; onSaved: (s: Rep
             </SelectContent>
           </Select>
         </div>
+        {dayOffset === 'start' ? null : (
         <div className="space-y-1.5">
           <p className="text-xs text-muted-foreground">เวลา</p>
           {/* 🔴 ห้าม <input type="time"> (ขึ้นกับภาษาเครื่อง) — ใช้ TimeSelect24 ตัวกลาง */}
           <TimeSelect24 value={time} onChange={setTime} disabled={busy} label="เวลาโทร" className="min-h-9" />
         </div>
+        )}
         {error ? <p className={cn('text-xs', TONE.danger.value)}>{error}</p> : null}
         <div className="flex justify-end gap-2">
           <Button type="button" size="xs" variant="ghost" onClick={() => setOpen(false)} disabled={busy}>

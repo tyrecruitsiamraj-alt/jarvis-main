@@ -113,6 +113,8 @@ export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): 
 export type ReplaceSyncSettings = {
   rule: ReplaceCallRule;
   lastRun: ReplaceSyncSummary | null;
+  /** เปลี่ยนกติกาเมื่อไหร่ (ISO) — ใหม่กว่ารอบดึงล่าสุด = worker ดึงใหม่ทันทีเพื่อย้ายเวลาสายเดิมให้ตรง */
+  ruleChangedAt: string | null;
   updatedAt: string | null;
   updatedByName: string | null;
   /** ตาราง 133 มีแล้วไหม — ไม่มี = บอกตรง ๆ ว่าฐานยังไม่พร้อม (ห้ามเดา) */
@@ -121,12 +123,13 @@ export type ReplaceSyncSettings = {
 
 type SettingsRow = { payload: unknown; updated_at: string | Date | null; updated_by_name: string | null };
 
-function parsePayload(raw: unknown): { rule: ReplaceCallRule; lastRun: ReplaceSyncSummary | null } {
+function parsePayload(raw: unknown): { rule: ReplaceCallRule; lastRun: ReplaceSyncSummary | null; ruleChangedAt: string | null } {
   const p = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
   const lr = p.lastRun;
   const lastRun =
     typeof lr === 'object' && lr !== null && typeof (lr as { at?: unknown }).at === 'string' ? (lr as ReplaceSyncSummary) : null;
-  return { rule: normalizeReplaceCallRule(p.rule), lastRun };
+  const rc = typeof p.ruleChangedAt === 'string' && !Number.isNaN(Date.parse(p.ruleChangedAt)) ? p.ruleChangedAt : null;
+  return { rule: normalizeReplaceCallRule(p.rule), lastRun, ruleChangedAt: rc };
 }
 
 export async function getReplaceSyncSettings(): Promise<ReplaceSyncSettings> {
@@ -144,13 +147,13 @@ export async function getReplaceSyncSettings(): Promise<ReplaceSyncSettings> {
     };
   } catch (e) {
     if (!isPgUndefinedTable(e)) throw e;
-    return { rule: DEFAULT_REPLACE_CALL_RULE, lastRun: null, updatedAt: null, updatedByName: null, tableReady: false };
+    return { rule: DEFAULT_REPLACE_CALL_RULE, lastRun: null, ruleChangedAt: null, updatedAt: null, updatedByName: null, tableReady: false };
   }
 }
 
 /** เขียนทับเฉพาะคีย์ที่ส่งมา (jsonb ||) — กติกากับผลรอบล่าสุดเขียนคนละจังหวะ ห้ามทับกัน */
 export async function saveReplaceSyncSettings(
-  patch: { rule?: ReplaceCallRule; lastRun?: ReplaceSyncSummary },
+  patch: { rule?: ReplaceCallRule; lastRun?: ReplaceSyncSummary; ruleChangedAt?: string },
   updatedByName: string | null,
 ): Promise<void> {
   await dbQuery(
@@ -234,14 +237,17 @@ export async function runIrecruitReplaceSync(
 
     // ใบที่เคยดึงแล้ว — ถามฐานทีเดียวทั้งก้อน
     const refs = rows.map((r) => replaceSourceRef(r.job_id));
-    let existing = new Set<string>();
+    type ExistingRow = { id: string; source_ref: string; scheduled_at: string | Date; mode: string; done: boolean };
+    let existing = new Map<string, ExistingRow>();
     if (refs.length > 0) {
       try {
-        const { rows: ex } = await dbQuery<{ source_ref: string }>(
-          `select source_ref from ${followTable} where source_ref = any($1::text[])`,
+        const { rows: ex } = await dbQuery<ExistingRow>(
+          `select id, source_ref, scheduled_at, coalesce(call_mode, 'ai') as mode,
+                  (cancelled_at is not null or completed_at is not null or staff_call_outcome is not null) as done
+             from ${followTable} where source_ref = any($1::text[])`,
           [refs],
         );
-        existing = new Set(ex.map((x) => x.source_ref));
+        existing = new Map(ex.map((x) => [x.source_ref, x]));
       } catch (e) {
         if (isUndefinedColumn(e)) {
           summary.error = MIGRATION_133_NOT_READY;
@@ -254,10 +260,21 @@ export async function runIrecruitReplaceSync(
 
     // คัด + จัดกลุ่มตามเบอร์ (คนเดียวหลายใบ = ชุดเดียว)
     const groups = new Map<string, Candidate[]>();
+    /** สายเดิมที่เวลาไม่ตรงกติกาตอนนี้ (เช่น เพิ่งเปลี่ยนเป็น "ตามเวลาเข้างาน") — ยังไม่โทร/ไม่ปิด/ยังไม่ถึงเวลา เท่านั้น */
+    const realign: Array<{ row: ExistingRow; at: Date; wall: ReplaceWantWall; name: string; phone: string; siteName: string | null }> = [];
     for (const r of rows) {
       const ref = replaceSourceRef(r.job_id);
-      if (existing.has(ref)) {
+      const ex = existing.get(ref);
+      if (ex) {
         summary.alreadyIn += 1;
+        const cur = new Date(ex.scheduled_at);
+        const wallEx = wantWallFromSqlDate(r.want_date instanceof Date ? r.want_date : new Date(String(r.want_date)));
+        const want = planReplaceCall(wallEx, settings.rule, now);
+        const phoneEx = toE164Thai(r.mobile);
+        if (!ex.done && want && !want.asap && phoneEx && cur.getTime() > now.getTime() && Math.abs(cur.getTime() - want.at.getTime()) > 60_000) {
+          const nameEx = `${(r.fname ?? '').trim()} ${(r.lname ?? '').trim()}`.trim() || 'คนไปแทนงาน';
+          realign.push({ row: ex, at: want.at, wall: wallEx, name: nameEx, phone: phoneEx, siteName: r.site_name?.trim() || null });
+        }
         continue;
       }
       const phone = toE164Thai(r.mobile);
@@ -278,7 +295,7 @@ export async function runIrecruitReplaceSync(
       groups.set(phone, list);
     }
 
-    const autoAi = groups.size > 0 ? await isAutoDispatchEnabled('follow_entry') : false;
+    const autoAi = groups.size > 0 || realign.length > 0 ? await isAutoDispatchEnabled('follow_entry') : false;
 
     for (const cands of groups.values()) {
       cands.sort((a, b) => a.plan.at.getTime() - b.plan.at.getTime());
@@ -350,8 +367,54 @@ export async function runIrecruitReplaceSync(
       }
     }
 
+    // ── ย้ายเวลาสายเดิมให้ตรงกติกา ──
+    for (const r of realign) {
+      try {
+        const desired = replaceCallModeFor(r.at, settings.rule.aiFrom);
+        // สาย AI เดิม: ยกเลิกแผนเก่าที่ Lumos ก่อน (ไม่งั้น Lumos ยังโทรตามเวลาเก่า)
+        if (r.row.mode === 'ai') await cancelFollowReminder(r.row.id, staffNameOfPhone);
+        await dbQuery(`update ${followTable} set scheduled_at = $2, note = $3, call_mode = $4 where id = $1`, [
+          r.row.id,
+          r.at.toISOString(),
+          replaceCallNote(r.wall),
+          r.row.mode === 'manual' ? 'manual' : desired,
+        ]);
+        let state: FollowDispatchState = 'manual';
+        if (r.row.mode === 'ai' && desired === 'ai') {
+          state = 'off';
+          if (autoAi) {
+            const st = await enqueueFollowReminderPlan([
+              {
+                id: r.row.id,
+                recipient_name: r.name,
+                recipient_phone: r.phone,
+                topic: REPLACE_FOLLOW_TOPIC,
+                note: replaceCallNote(r.wall),
+                staffPhone: null,
+                scheduled_at: r.at,
+                callTimes: null,
+                callRound: 1,
+                staffName: null,
+                unitName: r.siteName,
+              },
+            ]);
+            state = st.get(r.row.id) ?? 'off';
+          }
+        }
+        try {
+          await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1`, [r.row.id, state]);
+        } catch (e) {
+          if (!isUndefinedColumn(e)) throw e;
+        }
+        summary.realigned = (summary.realigned ?? 0) + 1;
+      } catch (e) {
+        logError('irecruit.replaceSync: ย้ายเวลาสายเดิมไม่สำเร็จ', e, { id: r.row.id });
+      }
+    }
+
     await persistLastRun(summary, actorName);
     logInfo('irecruit.replaceSync.done', {
+      realigned: summary.realigned ?? 0,
       fetched: summary.fetched,
       added: summary.added,
       alreadyIn: summary.alreadyIn,
