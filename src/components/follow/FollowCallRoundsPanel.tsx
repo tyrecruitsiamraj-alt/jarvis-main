@@ -221,6 +221,25 @@ export default function FollowCallRoundsPanel({
   );
   const countsOfRound = useMemo(() => countFollowRoundBuckets(rowsOfRound), [rowsOfRound]);
   const roundLabelOf = (r: FollowRoundFilter) => (r === 'all' ? 'ทุกสาย' : roundFilterLabel(r));
+  /**
+   * กล่อง "เข้ามาในรอบนี้" ต้องแตกเลขให้เห็นว่ารวมอะไร (เจ้าของงง 3 ต.ค. 2569:
+   * *"สายที่ต้องตามมี 11 แต่เข้ามาบอกมี 49 คือไร"* — 49 = เหลือตาม 11 + ปิดงานแล้ว 33 +
+   * ยกเลิก 5 · สองเลขถูกทั้งคู่แต่จอไม่เคยบอกความสัมพันธ์) — ชุดเดียวกับเลขก้อนเสมอ
+   */
+  const allBreakdown = useMemo(() => {
+    let remaining = 0;
+    let closed = 0;
+    let cancelled = 0;
+    for (const e of rowsOfRound) {
+      if (e.cancelled) cancelled += 1;
+      else if (e.completed_at) closed += 1;
+      else remaining += 1;
+    }
+    const n = (v: number) => v.toLocaleString('th-TH');
+    return `เหลือตาม ${n(remaining)} · ปิดงานแล้ว ${n(closed)} · ยกเลิก ${n(cancelled)}`;
+  }, [rowsOfRound]);
+  /** คำใต้กล่อง — กล่องรวม ('all') ใช้เลขแตกก้อนแทนคำนิยามลอย ๆ */
+  const bucketFoot = (b: FollowRoundBucket) => (b === 'all' ? allBreakdown : FOLLOW_ROUND_BUCKET_HINT[b]);
 
   const openBucketDialog = (slot: FollowRoundFilter, b: FollowRoundBucket) => {
     const rows = slot === 'all' ? rowsOfRound : (roundRows.get(slot) ?? []);
@@ -351,7 +370,7 @@ export default function FollowCallRoundsPanel({
                   {FOLLOW_ROUND_BUCKET_LABEL[b]}
                 </span>
                 <span className="mt-0.5 line-clamp-2 text-[10.5px] leading-snug text-muted-foreground">
-                  {FOLLOW_ROUND_BUCKET_HINT[b]}
+                  {bucketFoot(b)}
                 </span>
                 {/* หลอดหนาที่ก้นการ์ด — จุดเด่นของแบบอ้างอิง */}
                 <span className="mt-auto block h-1.5 w-full overflow-hidden rounded-full bg-secondary" aria-hidden>
