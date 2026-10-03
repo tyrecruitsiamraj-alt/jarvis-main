@@ -8,8 +8,10 @@ import { breakdown, seriesByBucket, sumInRange } from '@/lib/trends/timeBuckets'
 import {
   FOLLOW_DIM_LABEL,
   FOLLOW_METRIC_LABEL,
+  followCallerStats,
   followDimGetter,
   followEventYmd,
+  followRoundPeople,
   rate,
   type FollowDim,
   type FollowMetric,
@@ -92,6 +94,12 @@ const FollowDashboard: React.FC = () => {
     dropped: count('dropped', previous),
   };
 
+  /** รอบแรกกี่คน รอบ 2 ขึ้นไปกี่คน + แยก AI/คนโทร (Journey ข้อ 15 · 3 ต.ค. 2569) */
+  const roundNow = useMemo(() => followRoundPeople(data, range), [data, range]);
+  const roundPrev = useMemo(() => followRoundPeople(data, previous), [data, previous]);
+  const callerNow = useMemo(() => followCallerStats(data, range), [data, range]);
+  const callerPrev = useMemo(() => followCallerStats(data, previous), [data, previous]);
+
   const dimRows = useMemo(
     () => breakdown(data, (x) => followEventYmd(x, metric), followDimGetter(dim, data), range, previous),
     [data, metric, dim, range, previous],
@@ -154,6 +162,29 @@ const FollowDashboard: React.FC = () => {
             <TrendKpiCard label="ไปถึงแล้ว" unit="คน" value={now.success} previous={prev.success} tone="success" spark={success.map((p) => p.value)} />
             <TrendKpiCard label="อัตราไปถึง" value={rate(now.success, now.completed)} previous={rate(prev.success, prev.completed)} asRate tone="success" foot={`${fmt(now.success)} จาก ${fmt(now.completed)} ที่ปิดงาน`} />
             <TrendKpiCard label="ยกเลิก / ลา / ไม่ไป" unit="คน" value={now.dropped} previous={prev.dropped} polarity="down-good" tone="danger" spark={dropped.map((p) => p.value)} />
+          </div>
+
+          {/* แถวที่สอง: รอบแรก/รอบถัดไป (นับคน) + แยก AI/คนโทรว่าโทรไปเท่าไหร่ ติดต่อได้เท่าไหร่
+              (Journey ข้อ 15 + เจ้าของสั่ง 3 ต.ค. 2569 — นิยาม "ติดต่อได้" ตัวเดียวกับแถวบน) */}
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <TrendKpiCard label="สายแรก" unit="คน" value={roundNow.first} previous={roundPrev.first} tone="info" foot="นับตามวันนัดโทรในช่วง" />
+            <TrendKpiCard label="สายที่ 2 ขึ้นไป" unit="คน" value={roundNow.later} previous={roundPrev.later} tone="violet" foot="นับตามวันนัดโทรในช่วง" />
+            <TrendKpiCard
+              label="AI ติดต่อได้"
+              unit="สาย"
+              value={callerNow.ai.connected}
+              previous={callerPrev.ai.connected}
+              tone="teal"
+              foot={`จาก ${fmt(callerNow.ai.calls)} สายที่ AI โทร`}
+            />
+            <TrendKpiCard
+              label="คนโทรติดต่อได้"
+              unit="สาย"
+              value={callerNow.manual.connected}
+              previous={callerPrev.manual.connected}
+              tone="warn"
+              foot={`จาก ${fmt(callerNow.manual.calls)} สายที่คนลงผล`}
+            />
           </div>
 
           <TrendSection title="ติดตามเริ่มงาน · แนวโน้ม">

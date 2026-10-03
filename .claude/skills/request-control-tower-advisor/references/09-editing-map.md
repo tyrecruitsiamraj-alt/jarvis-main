@@ -11145,3 +11145,32 @@ Choice ของเจ้าของ: การ์ดแยกบนหน้�
 - 2 ต.ค. 2569 (16:30) **เวลาในระบบ = เวลาเข้างาน** — เจ้าของ: *"บางคนลง 8 โมงเช้า แต่ระบบบันทึกเป็น 18.00"* → Choice "เวลาในระบบ = เวลาเข้างาน" ·
   `ReplaceCallRule.atStart` (ค่าเริ่ม true — กติกาที่เก็บไว้ไม่มีคีย์นี้ = true) · `planReplaceCall` นัดตรง want_date · ป๊อป "แก้เวลาโทร" มี "ตามเวลาเข้างาน (iRecruit)" ·
   รอบดึงย้ายเวลาสายเดิมที่ยังไม่โทร/ไม่ปิด/ยังไม่ถึงเวลาให้ตรงกติกา (`realigned` · AI = ยกเลิกแผนเก่าแล้วส่งใหม่) · เปลี่ยนกติกา = `payload.ruleChangedAt` ⇒ worker ดึงใหม่ภายใน 5 นาที
+
+### 3 ต.ค. 2569 — Journey หน้าติดตาม: อุดช่องว่าง 5 ข้อ + สรุปแผนเป็นรูป + แบ่ง AI/คน
+
+เจ้าของไล่ Journey 15 ข้อแล้วสั่ง: *"ทำทั้ง 5 ข้อเลย แล้วก็สรุปแผนทั้งวันอะ ทำให้โหลดเป็นรูปได้หน่อย"* + กลางทาง:
+*"ให้ตัวเลขหน้าติดตามแบ่งต่อได้ว่า คนโทรเท่าไหร่ Ai เท่าไหร่ แล้วบอกด้วยว่าทั้ง 2 อย่างโทรสำเร็จอย่างละเท่า"* ·
+*"ลงแผนทั้งเดือนแล้วแผนหาย — อยากดูทั้งหมดของทุกคน อยากดูแผนแยกรายคน"* (ตรวจฐานแล้วแผนไม่หาย —
+มุมมองรายวันเปิดที่วันนี้เสมอ แผนที่เริ่มพรุ่งนี้เลยมองไม่เห็น = ปัญหาทางเข้า ไม่ใช่ข้อมูล) ·
+*"คิดว่านายคือ user ทำผ่านระบบ ไม่ใช่หลังบ้าน"*
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `migrations/134_follow_time_tbd_wrong_date.sql` (ใหม่) | `follow_entries.time_tbd` (boolean) + CHECK `outcome_code` ทับ 101 เพิ่ม `wrong_date` · **ต้องรันก่อน "ยังไม่ชัวร์เวลา"/"จำวันผิด" ใช้ได้บน prod** (ก่อนนั้น 503 พร้อมข้อความไทย) |
+| `src/lib/followOutcome.ts` · `api/_handlers/follow.ts` | ผลปิดงานใหม่ `wrong_date` "จำวันผิด" (เราลงวันผิดเอง ไม่ใช่ความผิดของเขา — ไม่เข้า LOST/SUCCESS) · `time_tbd`: รับจากฟอร์ม (บังคับ `call_mode='manual'` — fail-safe ห้าม AI โทรเวลาที่ไม่จริง) · เวลาใน `scheduled_at` เป็น**ค่าแทน** (เที่ยงคืนไทย) · แก้เวลาจริงที่ PATCH/replace_schedule = ธงหลุดเอง · ฐานยังไม่รัน 134 → `FollowTimeTbdNotReady` 503 (ห้ามเงียบ) |
+| `src/pages/follow/FollowPage.tsx` | รอบ chooser 3 ทาง AI โทร / คนโทร / **ยังไม่ชัวร์เวลา** (tbd = เลือกแค่วัน `DayCalendarPicker`) · หน้าเสร็จสิ้นมีปุ่ม **"ดูแผนที่ลง (วันแรก)"** → ปิดป๊อป + สลับเดือน + เลือกวันนั้น (แก้ "แผนหาย") · `panelEntries`: ตัวกรอง "ใครโทร" มีผลกับแผง Call Pipeline ด้วย (เลขทุกกล่องแบ่ง AI/คน/ยังไม่ระบุเวลาได้) · บรรทัด `caller-stats`: "AI X สาย · ติดต่อได้ Y — คนโทร Z สาย · ติดต่อได้ W" (จาก `countFollowCallerResults` ทั้งขอบเขต) · `onQuickComplete` → `doComplete` |
+| `src/lib/followListFilter.ts` | `FollowCaller` + 'tbd' ("ยังไม่ระบุเวลา") · `countFollowCallerResults()` — สำเร็จ = ถัง `connected` (นิยามเดียวกับแผง) |
+| `src/components/follow/FollowPlanningCalendar.tsx` | ปุ่ม **ไป / ไม่ไป** บนแถว (Journey ข้อ 10 — สายที่ `state==='result'` และยังไม่ปิด · ผลอื่นอยู่ป๊อปจัดการ · กดพลาดย้อนในป๊อป) · ชื่อคน (รายวัน+รายเดือน) กดได้ = เปิดป๊อป **แผนทั้งหมดของคนนั้น** (`onOpenCell(row, '', row.rounds)`) · เวลา tbd ขึ้น "ยังไม่ระบุเวลา" |
+| `src/components/follow/FollowRoundsDialog.tsx` | `ymd=''` = โหมดแผนทั้งหมด ("แผนทั้งหมด N สาย") · ชิปรอบมีวันที่นำหน้า |
+| `src/components/follow/FollowEditDialog.tsx` | hint สาย tbd: "ยังไม่ระบุเวลา — เลือกเวลาจริงแล้วกดบันทึก" |
+| `src/lib/followDayReportImage.ts` (ใหม่) · `FollowDayReportDialog.tsx` | ปุ่ม **บันทึกเป็นรูป** — วาดตารางลง canvas 2x (Kanit · พื้นขาวเสมอ — รูปไปอยู่ในแชตคนอื่น ไม่ตามธีม · สีจาก `TONE.*.hex` เท่านั้น · แถวยกเลิกขีดฆ่า · คนโทรสีส้ม) → PNG `แผนติดตาม-YYYY-MM-DD.png` · รอ `document.fonts.load` ก่อนวาด ไม่งั้น fallback เงียบ |
+| `src/lib/followCompletion.ts` · `FollowCompletedCard.tsx` | `followedSpan()` — "ติดตามมา N วัน · M สาย" ใต้ป้ายผล (ข้อ 14 · ช่วงวันแรก→วันสุดท้าย ไม่นับถึงวันนี้ · tooltip ช่วงวัน) |
+| `api/_handlers/dashboard-trends.ts` · `src/lib/trends/types.ts` · `followTrends.ts` · `FollowDashboard.tsx` | `FollowTrendRow` + `phoneKey` (เบอร์ 9 ท้าย) `staffCallOutcome` `staffCalledAt` · `followRoundPeople()` (สายแรก/สายที่ 2+ นับ**คน** ตามวันนัด) · `followCallerStats()` (ผลคนลงทับผลคิว · นับวันที่ได้ผล) · แถว KPI ที่สอง: สายแรก · สายที่ 2 ขึ้นไป · AI ติดต่อได้ · คนโทรติดต่อได้ (ข้อ 15) |
+| `src/lib/aftercarePlanning.ts` · `AftercarePage.tsx` | `buildAftercareRealPlans()` — หน้าดูแลใช้**รอบจริงที่ตั้งตอนย้าย** (จับคู่เบอร์ 9 ท้าย) เป็นหลัก: สรุป "ตั้งรอบไว้ N · มีผลแล้ว · เลยกำหนด" + ชิป "ถัดไป วันที่·เวลา" · ปุ่มตั้งรอบไม่ติดวันเริ่มงานแล้ว · ไม่มีรอบจริงค่อยถอยไป preset 3/7/30 (สองนิยามห้ามโชว์ซ้อน) |
+| `src/lib/followDayReport.ts` · `followPlanning.ts` | แถว tbd ขึ้น "ยังไม่ระบุเวลา" · `roundResultLabel` notSent ของ tbd = "รอกำหนดเวลา" · `roundTimeText()` |
+| เทสต์ | `tests/api/followJourneyBatch.test.ts` (ใหม่ 10) · `followOutcome.test.ts` → parity 134 + 6 คำ · `followListFilter.test.ts` (+tbd +callerResults) · `trends.test.ts` factory +3 คีย์ |
+
+- ตรวจในเบราว์เซอร์ (fetch guard — PATCH/POST ตอบปลอม 201 ไม่แตะฐาน): ปุ่ม ไป ยิง `PATCH /api/follow?id=…` ถูกดัก ✓ · ตัวกรองคนโทรแล้วแผงเหลือ "ทุกสาย · 34" ✓ ·
+  ป๊อปเพิ่มคนขั้น 3 มี "ยังไม่ชัวร์เวลา" สลับเป็นเลือกวัน ✓ · บันทึกเป็นรูป → "บันทึกรูปแล้ว" + เปิด canvas ดูเองแล้วฟอนต์/คอลัมน์/ขีดฆ่าถูก ✓ ·
+  Dashboard แถวสอง (สายแรก 122 คน · สายที่ 2+ 80 คน) ✓ · หน้าดูแล: จำลองสายจริงผ่านชั้น GET ปลอม → ขึ้น "ตั้งรอบไว้ … · ถัดไป …" + ปุ่มเปิดใช้ ✓
+- ⚠️ "คนโทร ติดต่อได้ 0" บนเว็บตอนนี้ = จริง (ยังไม่มีใครลงผลด้วยปุ่มบนแถวเลย) — ว่าง = 0 ไม่ใช่บั๊ก

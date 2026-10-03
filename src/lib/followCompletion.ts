@@ -32,6 +32,7 @@ import type { FollowGroup } from '@/lib/followGrouping';
 import { isLostOutcome, isSuccessOutcome } from '@/lib/followOutcome';
 import { CONNECTED_CALL_OUTCOMES, UNREACHED_CALL_OUTCOMES } from '@/lib/callOutcomeBuckets';
 import { effectiveCallOutcome } from '@/lib/followStaffCall';
+import { toYmdBangkok } from '@/lib/dateTh';
 
 /** สถานะ followup ของคิวที่แปลว่า "AI เอาไม่อยู่ ต้องคนตาม" (migration 070) */
 export const NEEDS_HUMAN_STATE = 'needs_human';
@@ -206,4 +207,31 @@ export function completedFollowSummary(people: CompletedFollowPerson[]): string 
     .filter((r) => (byReason.get(r) ?? 0) > 0)
     .map((r) => `${COMPLETION_REASON_LABEL[r]} ${byReason.get(r)}`);
   return parts.join(' · ');
+}
+
+/**
+ * "ติดตามมา N วัน" บนการ์ดติดตามครบ (Journey ข้อ 14 · 3 ต.ค. 2569:
+ * *"ย้ายไปดูแลหลังเริ่มงาน + บอกว่าติดตามมากี่วัน"*)
+ *
+ * นับ **ช่วงวัน** จากวันแรกถึงวันสุดท้ายของสายที่ไม่ถูกยกเลิก (รวมปลายทั้งสองข้าง)
+ * ตามคำเจ้าของ *"ติดตามนาย ก ตั้งแต่วันที่ 1-7"* = 7 วัน · ไม่นับถึงวันนี้
+ * (คนกองไว้นานตัวเลขต้องไม่โตเอง) · null = ไม่มีสายที่มีเวลาเลย
+ */
+export function followedSpan(
+  group: Pick<FollowGroup, 'rounds'>,
+): { days: number; from: string; to: string; calls: number } | null {
+  const ymds: string[] = [];
+  let calls = 0;
+  for (const r of group.rounds) {
+    if (r.cancelled || !r.scheduled_at) continue;
+    const d = new Date(r.scheduled_at);
+    if (Number.isNaN(d.getTime())) continue;
+    calls += 1;
+    ymds.push(toYmdBangkok(d));
+  }
+  if (calls === 0) return null;
+  const from = ymds.reduce((a, b) => (a < b ? a : b));
+  const to = ymds.reduce((a, b) => (a > b ? a : b));
+  const days = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
+  return { days, from, to, calls };
 }

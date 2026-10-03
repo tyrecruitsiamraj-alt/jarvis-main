@@ -18,7 +18,12 @@ import {
 } from '@/lib/aftercareApi';
 import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
 import AftercarePlanningCalendar from '@/components/aftercare/AftercarePlanningCalendar';
-import { aftercareMissingStartDate } from '@/lib/aftercarePlanning';
+import {
+  aftercareMissingStartDate,
+  aftercareRealPlanSummary,
+  buildAftercareRealPlans,
+} from '@/lib/aftercarePlanning';
+import { phoneKey } from '@/lib/followDuplicateGuard';
 import { listFollowEntries, type FollowEntry } from '@/lib/followApi';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { pickerDisplayName } from '@/lib/boardPickerApi';
@@ -102,12 +107,36 @@ const AftercarePage: React.FC = () => {
   const now = new Date();
 
   const open = useMemo(() => items.filter((p) => !p.closed_at), [items]);
-  const needStartDate = useMemo(() => open.filter((p) => !p.start_date), [open]);
+  /**
+   * แผนจริงจากตอนกดย้าย (การ์ดติดตามครบ) — แหล่งเดียวกับหน้าติดตาม (3 ต.ค. 2569)
+   * มีแผนจริง = เลข/ปุ่ม/สรุปใช้แผนจริง · ไม่มี = ถอยไปรอบ preset จากวันเริ่มงาน
+   */
+  const realPlans = useMemo(
+    () => buildAftercareRealPlans(calls, now),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [calls],
+  );
+  const realPlanOf = useCallback(
+    (p: AftercarePerson) => {
+      const key = phoneKey(p.phone_e164);
+      return key ? (realPlans.get(key) ?? null) : null;
+    },
+    [realPlans],
+  );
+  /* มีรอบจริงรออยู่แล้ว = ไม่ติดเรื่องวันเริ่มงาน (เดิมขึ้นค้างทั้งที่สายตั้งไว้แล้ว) */
+  const needStartDate = useMemo(
+    () => open.filter((p) => !p.start_date && !realPlanOf(p)),
+    [open, realPlanOf],
+  );
   const overdueCount = useMemo(
     () =>
-      open.filter((p) => buildAftercareRounds(p.start_date, now).some((r) => r.overdue)).length,
+      open.filter((p) => {
+        const plan = realPlanOf(p);
+        if (plan) return plan.overdue > 0;
+        return buildAftercareRounds(p.start_date, now).some((r) => r.overdue);
+      }).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [open],
+    [open, realPlanOf],
   );
 
   const { pageItems, bar } = useListPagination(items);
@@ -296,7 +325,9 @@ const AftercarePage: React.FC = () => {
           <>
             <ul className="space-y-1.5">
               {pageItems.map((p) => {
-                const rounds = buildAftercareRounds(p.start_date, now);
+                const plan = realPlanOf(p);
+                /* มีแผนจริง = ไม่คิดรอบ preset ซ้อน (สองนิยามบนแถวเดียว = เลขทะเลาะกัน) */
+                const rounds = plan ? [] : buildAftercareRounds(p.start_date, now);
                 const busy = savingPhone === p.phone_e164;
                 return (
                   <li
@@ -322,11 +353,13 @@ const AftercarePage: React.FC = () => {
                         <span className="flex shrink-0 flex-wrap items-center gap-1.5">
                           <button
                             type="button"
-                            disabled={busy || rounds.length === 0}
+                            disabled={busy || (rounds.length === 0 && !plan)}
                             title={
-                              rounds.length === 0
-                                ? 'กรอกวันเริ่มงานก่อนจึงตั้งรอบโทรได้'
-                                : 'ไปตั้งตารางโทรที่หน้า Follow พร้อมชื่อ/เบอร์/เรื่อง'
+                              plan
+                                ? 'ดู/เพิ่มสายของคนนี้ที่หน้าติดตาม'
+                                : rounds.length === 0
+                                  ? 'กรอกวันเริ่มงานก่อนจึงตั้งรอบโทรได้'
+                                  : 'ไปตั้งตารางโทรที่หน้า Follow พร้อมชื่อ/เบอร์/เรื่อง'
                             }
                             onClick={() =>
                               navigate(
@@ -377,15 +410,28 @@ const AftercarePage: React.FC = () => {
                       <span
                         className={cn(
                           'text-[11px]',
-                          rounds.length === 0
-                            ? TONE.warn.value
-                            : rounds.some((r) => r.overdue)
+                          plan
+                            ? plan.overdue > 0
                               ? TONE.danger.value
-                              : DASH.muted,
+                              : DASH.muted
+                            : rounds.length === 0
+                              ? TONE.warn.value
+                              : rounds.some((r) => r.overdue)
+                                ? TONE.danger.value
+                                : DASH.muted,
                         )}
                       >
-                        {aftercareRoundsSummary(rounds)}
+                        {plan ? aftercareRealPlanSummary(plan) : aftercareRoundsSummary(rounds)}
                       </span>
+                      {/* นัดจริงที่ใกล้สุด — เวลาเดียวกับหน้าติดตาม (แหล่งเดียว) */}
+                      {plan?.next?.scheduled_at ? (
+                        <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', TONE.info.soft, TONE.info.value)}>
+                          ถัดไป {formatYmdDmyBe(toYmdBangkok(new Date(plan.next.scheduled_at)))}
+                          {plan.next.time_tbd === true
+                            ? ' · ยังไม่ระบุเวลา'
+                            : ` · ${new Date(plan.next.scheduled_at).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })} น.`}
+                        </span>
+                      ) : null}
                     </div>
 
                     {rounds.length > 0 ? (

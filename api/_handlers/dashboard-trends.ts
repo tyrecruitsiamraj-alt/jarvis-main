@@ -103,6 +103,8 @@ async function loadFollow(from: string, to: string): Promise<FollowTrendRow[]> {
   const { rows } = await dbQuery<Record<string, unknown>>(
     `select f.id::text as id, f.created_at, f.scheduled_at, f.completed_at, f.cancelled_at,
             f.outcome_code, f.call_round, coalesce(f.call_mode, 'ai') as call_mode,
+            right(regexp_replace(coalesce(f.recipient_phone, ''), '\\D', '', 'g'), 9) as phone_key,
+            f.staff_call_outcome, f.staff_called_at,
             f.topic, f.unit_name, f.site_code,
             f.created_by::text as staff_id,
             coalesce(nullif(btrim(u.nickname), ''), f.created_by_name) as staff_name,
@@ -117,6 +119,7 @@ async function loadFollow(from: string, to: string): Promise<FollowTrendRow[]> {
         and (f.created_at >= $1::date
              or f.completed_at >= $1::date
              or f.cancelled_at >= $1::date
+             or f.staff_called_at >= $1::date
              or coalesce(q.first_result_at, q.updated_at) >= $1::date)`,
     [from, to],
   );
@@ -134,6 +137,9 @@ async function loadFollow(from: string, to: string): Promise<FollowTrendRow[]> {
     attempt: r.attempt == null ? null : Number(r.attempt),
     callRound: r.call_round == null ? null : Number(r.call_round),
     callMode: r.call_mode === 'manual' ? 'manual' : 'ai',
+    phoneKey: clean(r.phone_key),
+    staffCallOutcome: clean(r.staff_call_outcome),
+    staffCalledAt: iso(r.staff_called_at),
     topic: clean(r.topic),
     unitName: clean(r.unit_name),
     siteCode: clean(r.site_code),

@@ -3,6 +3,7 @@ import type { AftercarePerson } from '@/lib/aftercareApi';
 import { phoneKey } from '@/lib/followDuplicateGuard';
 import { buildAftercareRounds, type AftercareRound } from '@/lib/aftercareRounds';
 import { followRoundState, type FollowPlanningRound } from '@/lib/followPlanning';
+import { effectiveCallOutcome } from '@/lib/followStaffCall';
 
 /**
  * ═══ ปฏิทิน Planning ของหน้า "ดูแลหลังเริ่มงาน" (เจ้าของสั่ง 1 ก.ย. 2569) ═══
@@ -117,4 +118,68 @@ export function buildAftercareMonthRows(
 /** คนที่ยังไม่รู้วันเริ่มงาน — ขึ้นปฏิทินไม่ได้ ต้องบอกแยกว่าค้างอยู่กี่คน */
 export function aftercareMissingStartDate(people: readonly AftercarePerson[]): AftercarePerson[] {
   return people.filter((p) => !p.start_date && !p.closed_at);
+}
+
+/**
+ * ═══ แผนจริงของคนหนึ่งคน (Journey ข้อ 14-15 · 3 ต.ค. 2569) ═══
+ *
+ * เจ้าของ: หน้าดูแลหลังเริ่มงานต้องใช้ **รอบที่ตั้งไว้ตอนกดย้าย** (การ์ดติดตามครบ)
+ * ไม่ใช่คิดใหม่จากวันเริ่มงาน — เดิมคนที่ย้ายมาพร้อมรอบแล้วยังขึ้น "ตั้งรอบโทรไม่ได้"
+ * เพราะวันเริ่มงานว่าง ทั้งที่สายรออยู่ในหน้าติดตามแล้ว (เลขสองหน้าไม่ตรงกัน)
+ *
+ * มีแผนจริง = ใช้แผนจริงเป็นหลัก · ไม่มี = ถอยไปรอบ preset จากวันเริ่มงานเหมือนเดิม
+ */
+export type AftercareRealPlan = {
+  /** สายที่ไม่ถูกยกเลิก เรียงตามเวลานัด */
+  calls: FollowEntry[];
+  /** นัดข้างหน้าที่ใกล้สุด — null = ไม่มีนัดเหลือ */
+  next: FollowEntry | null;
+  /** เลยเวลานัดแล้วยังไม่มีผลและยังไม่ปิด */
+  overdue: number;
+  /** มีผลโทรหรือปิดงานแล้ว */
+  done: number;
+};
+
+/** แผนจริงจับคู่คนด้วยเบอร์ 9 ตัวท้าย (คีย์เดียวกับการจับกลุ่มทุกที่) — คีย์ของ Map = phoneKey */
+export function buildAftercareRealPlans(
+  calls: readonly FollowEntry[],
+  now: Date = new Date(),
+): Map<string, AftercareRealPlan> {
+  const byPhone = new Map<string, FollowEntry[]>();
+  for (const c of calls) {
+    if (c.cancelled) continue;
+    const key = phoneKey(c.recipient_phone);
+    if (!key) continue;
+    const list = byPhone.get(key);
+    if (list) list.push(c);
+    else byPhone.set(key, [c]);
+  }
+  const out = new Map<string, AftercareRealPlan>();
+  for (const [key, list] of byPhone) {
+    list.sort((a, b) => String(a.scheduled_at ?? '').localeCompare(String(b.scheduled_at ?? '')));
+    let next: FollowEntry | null = null;
+    let overdue = 0;
+    let done = 0;
+    for (const e of list) {
+      /* "มีผลแล้ว" นิยามเดียวกับหน้าติดตาม — ผลที่คนลงเองทับผลคิว */
+      if (e.completed_at || effectiveCallOutcome(e)) {
+        done += 1;
+        continue;
+      }
+      const t = e.scheduled_at ? new Date(e.scheduled_at).getTime() : Number.NaN;
+      if (!Number.isNaN(t) && t < now.getTime()) overdue += 1;
+      else if (!next) next = e;
+    }
+    out.set(key, { calls: list, next, overdue, done });
+  }
+  return out;
+}
+
+/** บรรทัดสรุปใต้ชื่อเมื่อมีแผนจริง — คู่กับ `aftercareRoundsSummary` ของรอบ preset */
+export function aftercareRealPlanSummary(plan: AftercareRealPlan): string {
+  const n = (v: number) => v.toLocaleString('th-TH');
+  const parts = [`ตั้งรอบไว้ ${n(plan.calls.length)} สาย`];
+  if (plan.done > 0) parts.push(`มีผลแล้ว ${n(plan.done)}`);
+  if (plan.overdue > 0) parts.push(`เลยกำหนด ${n(plan.overdue)}`);
+  return parts.join(' · ');
 }

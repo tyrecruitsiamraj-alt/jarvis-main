@@ -156,3 +156,56 @@ export function followDimGetter(dim: FollowDim, rows: readonly FollowTrendRow[])
 export function rate(part: number, whole: number): number | null {
   return whole > 0 ? part / whole : null;
 }
+
+/**
+ * ═══ รอบแรก/รอบถัดไป + แยก AI/คนโทร (Journey ข้อ 15 · เจ้าของสั่ง 3 ต.ค. 2569) ═══
+ * *"กำลังติดตามกี่คน กี่สาย รอบแรกที่คน รอบสองกี่คน"* + *"คนโทรเท่าไหร่ Ai เท่าไหร่
+ * แล้วบอกด้วยว่าทั้ง 2 อย่างโทรสำเร็จอย่างละเท่าไหร่"*
+ */
+
+export type FollowTrendRange = { from: string; to: string };
+
+/**
+ * กี่ **คน** อยู่สายแรก / สายที่ 2 ขึ้นไป ในช่วง — นับคนด้วยเบอร์ (`phoneKey`)
+ * ตามวันนัดโทร (`scheduledAt`) · สายที่ยกเลิกไม่นับ · คนเดียวมีทั้งสองแบบ = นับทั้งสองช่อง
+ * (คำถามคือ "มีงานรอบไหนเท่าไหร่" ไม่ใช่การแบ่งคนเป็นก้อนเดียว)
+ */
+export function followRoundPeople(
+  rows: readonly FollowTrendRow[],
+  range: FollowTrendRange,
+): { first: number; later: number } {
+  const first = new Set<string>();
+  const later = new Set<string>();
+  for (const r of rows) {
+    if (r.cancelledAt) continue;
+    const y = bangkokYmd(r.scheduledAt);
+    if (!y || y < range.from || y > range.to) continue;
+    const key = r.phoneKey || r.id;
+    if ((r.callRound ?? 1) <= 1) first.add(key);
+    else later.add(key);
+  }
+  return { first: first.size, later: later.size };
+}
+
+/**
+ * สาย + ติดต่อได้ แยกข้าง AI/คนโทร ในช่วง — "ติดต่อได้" นิยามเดียวกับหน้าติดตาม
+ * (ถัง `connected` ของ `bucketOfCall` · ผลที่คนลงเองทับผลคิว เหมือน `effectiveCallOutcome`)
+ * วันที่นับ = วันที่ได้ผล (คนลง = `staffCalledAt` · AI = `resultAt`) ไม่ใช่วันนัด
+ */
+export function followCallerStats(
+  rows: readonly FollowTrendRow[],
+  range: FollowTrendRange,
+): Record<'ai' | 'manual', { calls: number; connected: number }> {
+  const out = { ai: { calls: 0, connected: 0 }, manual: { calls: 0, connected: 0 } };
+  for (const r of rows) {
+    const staff = Boolean(r.staffCallOutcome);
+    const y = bangkokYmd(staff ? r.staffCalledAt : r.resultAt);
+    if (!y || y < range.from || y > range.to) continue;
+    const b = bucketOfCall(staff ? null : r.callStatus, r.staffCallOutcome ?? r.callOutcome);
+    if (b !== 'connected' && b !== 'unreached') continue;
+    const side = out[r.callMode === 'manual' ? 'manual' : 'ai'];
+    side.calls += 1;
+    if (b === 'connected') side.connected += 1;
+  }
+  return out;
+}

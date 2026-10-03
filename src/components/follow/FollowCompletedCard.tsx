@@ -27,6 +27,7 @@ import { scheduleCallsByDay } from '@/lib/followWizard';
 import {
   COMPLETION_REASON_SHORT,
   COMPLETION_REASON_TONE,
+  followedSpan,
   reasonBlocksAftercare,
   selectAwaitingDecision,
   type CompletedFollowPerson,
@@ -115,6 +116,7 @@ const FollowCompletedCard: React.FC<{
               const g = p.group;
               const aftercare = isAftercareTopic(g.topic);
               const tone = COMPLETION_REASON_TONE[p.reason];
+              const span = followedSpan(g);
               return (
                 <tr key={g.key} className="border-b border-border/50 align-middle last:border-0">
                   <td className="px-4 py-3 md:px-5">
@@ -126,6 +128,15 @@ const FollowCompletedCard: React.FC<{
                     <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium', TONE[tone].chip)}>
                       {COMPLETION_REASON_SHORT[p.reason]}
                     </span>
+                    {/* "ติดตามมากี่วัน" (Journey ข้อ 14 · 3 ต.ค. 2569) — ช่วงวันแรกถึงวันสุดท้ายของชุด */}
+                    {span ? (
+                      <span
+                        className="block text-[11px] tabular-nums text-muted-foreground"
+                        title={`${formatYmdDmyBe(span.from)}${span.to !== span.from ? ` – ${formatYmdDmyBe(span.to)}` : ''} · ${span.calls.toLocaleString('th-TH')} สาย`}
+                      >
+                        ติดตามมา {span.days.toLocaleString('th-TH')} วัน · {span.calls.toLocaleString('th-TH')} สาย
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-3 py-3 md:px-5">
                     <span className="flex flex-wrap items-center justify-end gap-1.5">

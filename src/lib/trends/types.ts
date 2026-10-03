@@ -31,6 +31,12 @@ export type FollowTrendRow = {
   /** สายที่เท่าไหร่ (1 = สายแรก) */
   callRound: number | null;
   callMode: 'ai' | 'manual';
+  /** เบอร์ 9 ตัวท้าย (ตัวเลขล้วน) — นับ "คน" ข้ามหลายสายด้วยคีย์นี้ · null = ไม่มีเบอร์ */
+  phoneKey: string | null;
+  /** ผลที่คนลงเอง (130 · ชุดรหัสเดียวกับ AI) — ตีความด้วย `callOutcomeBuckets.ts` */
+  staffCallOutcome: string | null;
+  /** คนลงผลเมื่อไหร่ */
+  staffCalledAt: string | null;
   topic: string | null;
   unitName: string | null;
   siteCode: string | null;
