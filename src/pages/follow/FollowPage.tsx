@@ -245,7 +245,15 @@ const FollowPage: React.FC = () => {
    * 🔴 เดิมปิดป๊อปทันทีแล้วบอกผลที่แถบบนหน้า (เลื่อนจอแล้วมองไม่เห็น) · ถ้ามีสายที่ไม่ได้ส่ง AI
    *    ข้อความไปลงช่อง error **ในป๊อปที่ปิดไปแล้ว** = ไม่มีใครเห็นเลย
    */
-  const [doneInfo, setDoneInfo] = useState<{ lines: string[]; warn: string | null; firstDay: string | null } | null>(null);
+  const [doneInfo, setDoneInfo] = useState<{
+    lines: string[];
+    warn: string | null;
+    firstDay: string | null;
+    /** วันที่บันทึกไม่สำเร็จ — กดลองใหม่เฉพาะชุดนี้ (ตารางหลายวันล้มกลางทาง · 3 ต.ค. 2569) */
+    retry?: { label: string; run: () => Promise<void> };
+  } | null>(null);
+  /** ความคืบของการบันทึกตารางหลายวัน เช่น "วันที่ 2/5" — ชุดใหญ่ใช้เวลานาน จอต้องบอกว่าไม่ได้ค้าง */
+  const [submitProgress, setSubmitProgress] = useState<string | null>(null);
   /**
    * โหมดตารางโทร (16 ส.ค. · migration 092): ช่วงวัน × รอบเวลา/วัน
    * เช่น 1-7 ส.ค. วันละ 2 รอบ 07:00/08:00 → **หนึ่งสาย = หนึ่งแถว** ผูก group เดียว (1 ต.ค. 2569 · เดิม 1 แถว/วัน)
@@ -783,59 +791,100 @@ const FollowPage: React.FC = () => {
         let done = 0;
         // เก็บผล "ส่งให้ AI ได้ไหม" ของทุกรายการ แล้วสรุปทีเดียวตอนจบ
         const dispatchStates: Array<string | null> = [];
+        /**
+         * 🔴 **วันที่ล้มห้ามพาทั้งชุดล้ม** (3 ต.ค. 2569 — เจ้าของแจ้ง "บันทึกแล้วคาหน้าเดิม" +
+         * "ลงแผนเป็นเดือนแล้วแผนหาย" · วัดจากฐานเช้า 3 ต.ค.: ชุด 5 วันของจริงหลุดเหลือ
+         * วันแรกวันเดียว แล้วคนต้องมานั่งคีย์ 4 วันที่เหลือใหม่เองทั้งชุด)
+         * เดิม throw วันไหน = วันหลังจากนั้นไม่ถูกสร้างเลย ⇒ เปลี่ยนเป็นทำต่อให้ครบ
+         * แล้วรวบวันที่ล้มมาบอกพร้อมปุ่ม "ลองใหม่เฉพาะวันนั้น"
+         */
+        const failedDays: string[] = [];
+        const failedCalls: ScheduleCall[] = [];
+        let lastErr = '';
+        const byDay = scheduleCallsByDay(sendCalls);
         try {
           /**
            * 🔴 ส่ง AI **แผนละวัน** — หนึ่งคำขอต่อวัน มีทุกสายของวันนั้น (รอบในวันเดียวกัน = แผนเดียว ตามคำสั่ง 11 ก.ย.)
            * ไม่รวมทั้งชุดเป็นแผนเดียว: แผนที่ Lumos รับจริงมาตลอดยาวสุดวันเดียว ≤ 2 สาย (วัด 1 ต.ค. 2569)
            * และแผนแยกของเบอร์เดียวกันไม่ทับกันแล้ว (หลัง 12 ก.ย.: 35 จาก 35 สายได้โทร)
            */
-          for (const { calls: dayCalls } of scheduleCallsByDay(sendCalls)) {
+          for (const [dayIdx, { day, calls: dayCalls }] of byDay.entries()) {
+            // ชุดใหญ่ยิงทีละวัน ใช้เวลาหลายวินาที — บอกความคืบ ไม่ใช่ปล่อยให้จออ่านว่าค้าง
+            setSubmitProgress(`วันที่ ${dayIdx + 1}/${byDay.length}`);
             const first = dayCalls[0];
-            const createdEntries = await createFollowRounds({
-              recipient_name: recipientName,
-              recipient_phone: phone,
-              topic,
-              follow_team: followTeam,
-              note: note || undefined,
-              // ค่าบนสุด = สายแรกของวัน (วันที่มีสายเดียว เส้น API อ่านจากตรงนี้)
-              staff_phone: first.staffPhone || undefined,
-              scheduled_at: first.scheduledAt,
-              call_round: first.callRound,
-              // วันที่เลือกว่า "คนโทร" → ไม่ส่งเข้าคิว AI (121) แต่ยังเป็นแถวจริงในระบบ
-              call_mode: first.callMode,
-              group_id: groupId,
-              unit_name: unitName.trim() || undefined,
-              site_code: siteCode.trim() || undefined,
-              rounds: dayCalls.map((c) => ({
-                scheduled_at: c.scheduledAt,
-                staff_phone: c.staffPhone || undefined,
-                call_round: c.callRound,
-                call_mode: c.callMode,
-              })),
-            });
-            for (const createdEntry of createdEntries) {
-              dispatchStates.push(createdEntry.dispatch_state ?? null);
-              done += 1;
+            try {
+              const createdEntries = await createFollowRounds({
+                recipient_name: recipientName,
+                recipient_phone: phone,
+                topic,
+                follow_team: followTeam,
+                note: note || undefined,
+                // ค่าบนสุด = สายแรกของวัน (วันที่มีสายเดียว เส้น API อ่านจากตรงนี้)
+                staff_phone: first.staffPhone || undefined,
+                scheduled_at: first.scheduledAt,
+                call_round: first.callRound,
+                // วันที่เลือกว่า "คนโทร" → ไม่ส่งเข้าคิว AI (121) แต่ยังเป็นแถวจริงในระบบ
+                call_mode: first.callMode,
+                group_id: groupId,
+                unit_name: unitName.trim() || undefined,
+                site_code: siteCode.trim() || undefined,
+                rounds: dayCalls.map((c) => ({
+                  scheduled_at: c.scheduledAt,
+                  staff_phone: c.staffPhone || undefined,
+                  call_round: c.callRound,
+                  call_mode: c.callMode,
+                })),
+              });
+              for (const createdEntry of createdEntries) {
+                dispatchStates.push(createdEntry.dispatch_state ?? null);
+                done += 1;
+              }
+            } catch (err) {
+              lastErr = err instanceof Error ? err.message : 'ตั้งตารางไม่สำเร็จ';
+              failedDays.push(day);
+              failedCalls.push(...dayCalls);
             }
+          }
+          // ล้มทุกวัน = ไม่ใช่ "เสร็จสิ้น" — อยู่หน้าฟอร์มเดิมพร้อมเหตุผล ข้อมูลที่กรอกยังอยู่ครบ
+          if (done === 0) {
+            setFormError(lastErr || 'ตั้งตารางไม่สำเร็จ');
+            // ถ้ามาจากปุ่ม "ลองใหม่" บนหน้าเสร็จสิ้น — ผลต้องขึ้นบนหน้านั้นด้วย ไม่ใช่เงียบ
+            setDoneInfo((prev) => (prev ? { ...prev, warn: `ยังไม่สำเร็จ — ${lastErr || 'ตั้งตารางไม่สำเร็จ'}` } : prev));
+            return;
           }
           resetForm();
           /* 🔴 บอกทันทีถ้ามีรายการที่ "ไม่ได้ส่งให้ AI" — เดิมขึ้นว่าสำเร็จอย่างเดียว
              คนนั่งรอสายที่ไม่มีวันออก (เกิดจริง 24 ส.ค. 2569) */
           const warn = summarizeDispatchResults(dispatchStates.filter((st) => st !== 'manual'));
           /* 🔴 ข้อความต้องแยกสองฝั่ง — พอมีวันที่คนโทรเองแล้ว "AI จะโทรเองทั้งหมด" กลายเป็นคำโกหก */
-          const dayCount = new Set(sendCalls.map((c) => c.day)).size;
-          const aiCalls = sendCalls.filter((c) => c.callMode === 'ai').length;
-          const manualCalls = sendCalls.length - aiCalls;
-          const lines = [`${recipientName} · ${dayCount} วัน รวม ${sendCalls.length} สาย`];
+          const okCalls = sendCalls.filter((c) => !failedDays.includes(c.day));
+          const dayCount = new Set(okCalls.map((c) => c.day)).size;
+          const aiCalls = okCalls.filter((c) => c.callMode === 'ai').length;
+          const manualCalls = okCalls.length - aiCalls;
+          const lines = [`${recipientName} · ${dayCount} วัน รวม ${okCalls.length} สาย`];
           if (aiCalls > 0) lines.push(`AI โทร ${aiCalls} สาย`);
           if (manualCalls > 0) lines.push(`คนโทร ${manualCalls} สาย`);
-          setDoneInfo({ lines, warn: warn?.text ?? null, firstDay: [...new Set(sendCalls.map((c) => c.day))].sort()[0] ?? null });
+          const warnParts = [
+            failedDays.length > 0
+              ? `บันทึกไม่สำเร็จ ${failedDays.length} วัน (${failedDays.map((d) => formatYmdDmyBe(d)).join(' · ')})${lastErr ? ` — ${lastErr}` : ''}`
+              : null,
+            warn?.text ?? null,
+          ].filter(Boolean);
+          setDoneInfo({
+            lines,
+            warn: warnParts.length > 0 ? warnParts.join(' · ') : null,
+            firstDay: [...new Set(okCalls.map((c) => c.day))].sort()[0] ?? null,
+            retry:
+              failedCalls.length > 0
+                ? {
+                    label: `ลองใหม่เฉพาะวันที่ไม่สำเร็จ (${failedDays.length.toLocaleString('th-TH')} วัน)`,
+                    run: () => runSchedule(failedCalls),
+                  }
+                : undefined,
+          });
           await reload();
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'ตั้งตารางไม่สำเร็จ';
-          setFormError(done > 0 ? `${msg} — ตั้งไปแล้ว ${done} จาก ${sendCalls.length} สาย อย่ากดซ้ำทั้งชุด` : msg);
-          if (done > 0) await reload();
         } finally {
+          setSubmitProgress(null);
           setSubmitting(false);
         }
       };
@@ -1250,6 +1299,7 @@ const FollowPage: React.FC = () => {
         {replaceView ? <IrecruitReplaceSyncBar canManage={canManageMasters} onSynced={() => void reload(true)} /> : null}
         <FollowPlanningCalendar
           rows={planningRowsAllRounds}
+          allRows={allRows}
           month={calMonth}
           onMonthChange={setCalMonth}
           selectedYmd={fDate}
@@ -1263,7 +1313,6 @@ const FollowPage: React.FC = () => {
              เส้นเดียวกับปุ่มลงผล/ยกเลิกในป๊อปจัดการ */
           onStaffResult={(round, outcome) => doStaffCall(round.entry.id, outcome)}
           onCancelRound={(round) => doCancel(round.entry.id)}
-          onQuickComplete={(round, outcome) => doComplete(round.entry.id, outcome)}
           busyId={busyId}
           lastLoadedAt={lastLoadedAt}
           roundFilter={activeRound}
@@ -1504,6 +1553,19 @@ const FollowPage: React.FC = () => {
                       }}
                     >
                       ดูแผนที่ลง ({formatYmdDmyBe(doneInfo.firstDay)})
+                    </Button>
+                  ) : null}
+                  {/* วันที่ล้มลองใหม่ได้จากตรงนี้เลย — ไม่ต้องคีย์ทั้งชุดใหม่ (3 ต.ค. 2569) */}
+                  {doneInfo.retry ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={submitting}
+                      className={TONE.warn.value}
+                      onClick={() => void doneInfo.retry?.run()}
+                    >
+                      {submitting ? `กำลังบันทึก…${submitProgress ? ` ${submitProgress}` : ''}` : doneInfo.retry.label}
                     </Button>
                   ) : null}
                   <Button type="button" variant="outline" size="sm" onClick={() => setDoneInfo(null)}>
@@ -2332,7 +2394,11 @@ const FollowPage: React.FC = () => {
                   ) : (
                     <PhoneForwarded aria-hidden />
                   )}
-                  {submitting ? 'กำลังบันทึก…' : !scheduleMode && manualTimesPreview >= scheduledAtsPreview ? 'บันทึก' : 'บันทึก + ส่ง AI โทร'}
+                  {submitting
+                    ? `กำลังบันทึก…${submitProgress ? ` ${submitProgress}` : ''}`
+                    : !scheduleMode && manualTimesPreview >= scheduledAtsPreview
+                      ? 'บันทึก'
+                      : 'บันทึก + ส่ง AI โทร'}
                 </Button>
               )}
               <button

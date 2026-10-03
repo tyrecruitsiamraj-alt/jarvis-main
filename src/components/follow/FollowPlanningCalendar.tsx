@@ -357,14 +357,13 @@ const FollowPlanningCalendar: React.FC<{
    */
   onStaffResult?: (round: FollowPlanningRound, outcome: FollowStaffCallOutcome) => void | Promise<void>;
   onCancelRound?: (round: FollowPlanningRound) => void | Promise<void>;
-  /**
-   * ปุ่ม "ไป / ไม่ไป" บนแถวของสายที่**มีผลโทรแล้ว** (Journey ข้อ 10 · 3 ต.ค. 2569:
-   * *"เอา ไป / ไม่ไป ขึ้นมาเป็นปุ่มบนแถวด้วย ไม่ต้องเปิดป๊อป"*) — ผลอื่น (ลา/เลื่อน/จำวันผิด)
-   * ยังอยู่ในป๊อปจัดการ · กดพลาดย้อนได้ที่ปุ่มเดียวกันในป๊อป
-   */
-  onQuickComplete?: (round: FollowPlanningRound, outcome: 'went' | 'cancelled') => void | Promise<void>;
   /** รายการที่กำลังบันทึกอยู่ — ปุ่มของแถวนั้นกดซ้ำไม่ได้ */
   busyId?: string | null;
+  /**
+   * ชุดเต็มไม่ผ่านตัวกรองวัน/ใครโทร — ใช้หา "วันถัดไปที่มีแผน" เท่านั้น
+   * (`rows` ถูกตัวกรองวันของหน้าแม่บีบเหลือวันเดียวเมื่อเลือกวัน ⇒ มองไม่เห็นแผนวันอื่น)
+   */
+  allRows?: readonly FollowPlanningRow[];
 }> = ({
   rows,
   month,
@@ -379,8 +378,8 @@ const FollowPlanningCalendar: React.FC<{
   lastLoadedAt,
   onStaffResult,
   onCancelRound,
-  onQuickComplete,
   busyId = null,
+  allRows,
 }) => {
   const [view, setView] = useState<View>('day');
   /** สายที่กด "ยกเลิก" บนแถวแล้วรอยืนยัน (ยืนยันในที่เดิม ไม่เปิดป๊อป) */
@@ -399,6 +398,23 @@ const FollowPlanningCalendar: React.FC<{
     return [...found].sort((a, b) => a - b);
   }, [rows, dayYmd]);
   const daySummary = useMemo(() => summarizeFollowCalls(dayCalls.map((c) => c.round)), [dayCalls]);
+  /**
+   * วันถัดไปที่มีแผน (3 ต.ค. 2569 — เจ้าของแจ้ง *"ลงแผนเป็นเดือนแล้วแผนหาย"* · ตรวจฐานแล้ว
+   * แผนอยู่ครบ ที่หายคือ**สายตา**: มุมมองรายวันเปิดที่วันนี้ แผนที่เริ่มวันหน้าเลยมองไม่เห็น)
+   * วันว่างต้องชี้ทางต่อว่าแผนก้อนถัดไปอยู่วันไหน ไม่ใช่จบที่ "ไม่มีสาย"
+   */
+  const nextPlannedDay = useMemo(() => {
+    let best: { ymd: string; calls: number } | null = null;
+    const counts = new Map<string, number>();
+    for (const row of allRows ?? rows) {
+      for (const r of row.rounds) {
+        if (!r.ymd || r.ymd <= dayYmd || r.entry.cancelled) continue;
+        counts.set(r.ymd, (counts.get(r.ymd) ?? 0) + 1);
+      }
+    }
+    for (const [ymd, calls] of counts) if (!best || ymd < best.ymd) best = { ymd, calls };
+    return best;
+  }, [allRows, rows, dayYmd]);
   /**
    * 🔴 **ตารางนับเป็น "คน" ไม่ใช่ "สาย"** (เจ้าของทัก 11 ก.ย. 2569: *"เพิ่มโทรหลายรอบ
    * มันขึ้นหลายบรรทัด คนดูเขางง"*) · การ์ดตัวเลขด้านบนยังนับเป็นสายเหมือนเดิม
@@ -686,7 +702,25 @@ const FollowPlanningCalendar: React.FC<{
                         {pagePeople.length === 0 ? (
                           <tr>
                             <td colSpan={7} className="px-5 py-10 text-center text-sm text-muted-foreground">
-                              ไม่มีสายที่ต้องตาม{roundFilter !== 'all' ? `ใน${roundFilterLabel(roundFilter)}` : ''}
+                              <span className="block">
+                                ไม่มีสายที่ต้องตาม{roundFilter !== 'all' ? `ใน${roundFilterLabel(roundFilter)}` : ''}
+                              </span>
+                              {/* วันว่างชี้วันถัดไปที่มีแผน — แผนที่เริ่มวันหน้าไม่ใช่ "แผนหาย" (3 ต.ค. 2569) */}
+                              {nextPlannedDay ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="mt-3"
+                                  onClick={() => {
+                                    onMonthChange(nextPlannedDay.ymd.slice(0, 7));
+                                    onSelect(nextPlannedDay.ymd);
+                                  }}
+                                >
+                                  วันถัดไปที่มีแผน · {formatYmdDmyBe(nextPlannedDay.ymd)} ·{' '}
+                                  {nextPlannedDay.calls.toLocaleString('th-TH')} สาย
+                                </Button>
+                              ) : null}
                             </td>
                           </tr>
                         ) : null}
@@ -992,37 +1026,9 @@ const FollowPlanningCalendar: React.FC<{
                                         ) : (
                                           <span className="text-[12px] text-muted-foreground">—</span>
                                         )}
-                                        {/* 🔴 มีผลโทรแล้วแต่ยังไม่ปิดงาน — ปิดได้บนแถวเลย (Journey ข้อ 10 · 3 ต.ค. 2569)
-                                            ปุ่มอยู่บรรทัดเดียวเสมอ · ผลอื่น (ลา/เลื่อน/จำวันผิด) อยู่ในป๊อปจัดการ */}
-                                        {onQuickComplete && round.state === 'result' ? (
-                                          <span
-                                            className="mt-1 flex flex-nowrap items-center gap-1 whitespace-nowrap"
-                                            data-testid="quick-complete"
-                                          >
-                                            <Button
-                                              type="button"
-                                              variant="outline"
-                                              size="xs"
-                                              disabled={busy}
-                                              title={`ปิดงาน: ${row.group.name} ไปทำงานแล้ว`}
-                                              onClick={() => void onQuickComplete(round, 'went')}
-                                              className={TONE.success.value}
-                                            >
-                                              ไป
-                                            </Button>
-                                            <Button
-                                              type="button"
-                                              variant="outline"
-                                              size="xs"
-                                              disabled={busy}
-                                              title={`ปิดงาน: ${row.group.name} ไม่ไปแล้ว · กดพลาดย้อนได้ในป๊อปจัดการ`}
-                                              onClick={() => void onQuickComplete(round, 'cancelled')}
-                                              className={TONE.danger.value}
-                                            >
-                                              ไม่ไป
-                                            </Button>
-                                          </span>
-                                        ) : null}
+                                        {/* ⚠️ ปุ่ม ไป/ไม่ไป เคยอยู่บนแถวตรงนี้ (เช้า 3 ต.ค. 2569) — เจ้าของแก้คำสั่งบ่ายวันเดียวกัน:
+                                            *"ฉันหมายถึงให้เอาไปใส่ไว้ในหน้าจัดการ"* ⇒ ถอดออก · การลงผลทั้งหมดอยู่ป๊อปจัดการ
+                                            (ปุ่ม "บันทึกว่าเสร็จสิ้น" กางครบทุกคำ) ห้ามเอาปุ่มบนแถวกลับมาโดยไม่ได้สั่งใหม่ */}
                                       </span>
                                     );
                                   })}
