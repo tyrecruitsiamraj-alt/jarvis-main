@@ -87,6 +87,10 @@ describe('หน้าการติดตาม: หัวการ์ด Call
     expect(panel).toContain('ariaLabel="ดูเฉพาะสายที่"');
     expect(panel).toContain('data-testid="call-summary"');
     expect(panel).not.toContain('data-testid="call-matrix"');
+    // 🔴 ไม่มีหลอดสัดส่วนใต้เลข (เจ้าของสั่ง 3 ต.ค. 2569 "เอาหลอดออก")
+    const summary = panel.slice(panel.indexOf('data-testid="call-summary"'), panel.indexOf('สัญญาณ + ผลจาก AI'));
+    expect(summary).not.toContain('bg-secondary');
+    expect(summary).not.toContain('width: `');
     expect(panel).toContain('buildFollowCallMatrix(entries)');
     expect(panel.match(/\{filtersSlot\}/g)?.length).toBe(1);
     // 🔴 ไม่หุบการ์ดตอนว่างแล้ว (เจ้าของสั่ง 1 ต.ค. 2569 "ถ้าไม่มีข้อมูลก็เป็น 0 ไป") — ห้ามกลับไปหุบ

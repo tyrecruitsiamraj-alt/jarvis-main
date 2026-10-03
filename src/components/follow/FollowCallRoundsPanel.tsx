@@ -390,13 +390,11 @@ export default function FollowCallRoundsPanel({
         {/**
          * 🔴 โฉมโล่ง (เจ้าของเลือก 3 ต.ค. 2569 จาก 3 แบบ: *"เลขใหญ่แถวเดียว"* — ตารางเดิมดู "ไม่สวย งง")
          * เลข 5 ตัวของสายที่เลือกใน dropdown หัวการ์ด (ทั้งหมด/ไป/ไม่ไป/สรุปไม่ได้/ยกเลิก — บวกกันพอดี)
-         * + แถบสัดส่วนบาง ๆ ใต้เลข · ยอดต่อสายอยู่ใน dropdown แล้ว · กดเลขไหนเห็นรายชื่อชุดนั้น
+         * · ยอดต่อสายอยู่ใน dropdown แล้ว · กดเลขไหนเห็นรายชื่อชุดนั้น
          * ห้ามเติมกรอบ/กล่อง/คำอธิบายกลับ — เจ้าของอยาก "โล่ง ๆ ลีน ๆ"
          */}
         {(() => {
           const row = matrix[activeRound];
-          const total = row.total.length;
-          const parts = FOLLOW_MATRIX_COLS.filter((c) => c !== 'total');
           return (
             <div className="px-5 pb-5 pt-4" data-testid="call-summary">
               <div className="grid grid-cols-5 gap-2">
@@ -423,22 +421,7 @@ export default function FollowCallRoundsPanel({
                   );
                 })}
               </div>
-              {/* แถบสัดส่วน — ไป · ไม่ไป · สรุปไม่ได้ · ยกเลิก (สีชุดเดียวกับเลข) */}
-              <div className="mt-4 flex h-1.5 w-full overflow-hidden rounded-full bg-secondary" aria-hidden>
-                {total > 0
-                  ? parts.map((c) => {
-                      const n = row[c].length;
-                      if (n === 0) return null;
-                      return (
-                        <span
-                          key={c}
-                          className={cn('block h-full', TONE[FOLLOW_MATRIX_COL_TONE[c]].dot)}
-                          style={{ width: `${(n / total) * 100}%` }}
-                        />
-                      );
-                    })
-                  : null}
-              </div>
+              {/* แถบสัดส่วนใต้เลขถูกถอด (เจ้าของสั่ง 3 ต.ค. 2569 "เอาหลอดออก") — ห้ามเติมกลับ */}
             </div>
           );
         })()}
