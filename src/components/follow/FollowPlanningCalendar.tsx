@@ -619,11 +619,13 @@ const FollowPlanningCalendar: React.FC<{
                    * คอลัมน์จับคู่กับของเขา: ผู้สมัคร/ติดต่อ · หน่วยงาน · กำหนด(เวลานัด) ·
                    * สถานะ · บันทึกล่าสุด(สรุป AI) · เบอร์ฉุกเฉิน · จัดการ
                    */}
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full border-collapse text-left">
-                      <thead>
+                  {/* 🔴 จอแคบกว่า lg (มือถือ+แท็บเล็ต) = การ์ดต่อคน (แถวตารางเรียงลงเป็นกล่อง) ไม่ต้องเลื่อนข้าง — เจ้าของสั่ง 4 ต.ค. 2569
+                      "จัดเรียงหน้าให้รองรับบน Device อื่นดี ๆ" · lg ขึ้นไป = ตารางเดิมทุกอย่าง (ใช้ JSX ชุดเดียว ไม่แยกสองชุด) */}
+                  <div className="lg:overflow-x-auto">
+                    <table className="block w-full border-collapse text-left lg:table lg:min-w-full">
+                      <thead className="hidden lg:table-header-group">
                         <tr className={cn('border-b border-border', DASH.tableHead)}>
-                          <th className="min-w-[210px] px-4 py-2.5 text-[11px] font-medium md:px-5">
+                          <th className="min-w-[210px] px-4 py-2.5 text-[11px] font-medium lg:px-5">
                             ผู้ที่ต้องติดตาม / ติดต่อ
                           </th>
                           <th className="hidden min-w-[130px] px-3 py-2.5 text-[11px] font-medium lg:table-cell">หน่วยงาน</th>
@@ -631,10 +633,10 @@ const FollowPlanningCalendar: React.FC<{
                           <th className="min-w-[140px] px-3 py-2.5 text-[11px] font-medium">สถานะการโทร</th>
                           <th className="min-w-[220px] px-3 py-2.5 text-[11px] font-medium">เขาตอบว่าอะไร</th>
                           <th className="min-w-[150px] px-3 py-2.5 text-[11px] font-medium">เบอร์ฉุกเฉิน</th>
-                          <th className="px-3 py-2.5 text-right text-[11px] font-medium md:px-5">จัดการ</th>
+                          <th className="px-3 py-2.5 text-right text-[11px] font-medium lg:px-5">จัดการ</th>
                         </tr>
                       </thead>
-                      <tbody data-testid="day-calls">
+                      <tbody data-testid="day-calls" className="block lg:table-row-group">
                         {pagePeople.length === 0 ? (
                           <tr>
                             <td colSpan={7} className="px-5 py-10 text-center text-sm text-muted-foreground">
@@ -678,14 +680,14 @@ const FollowPlanningCalendar: React.FC<{
                               data-category={headline}
                               data-rounds={calls.length}
                               className={cn(
-                                'border-b border-border/50 align-top transition-colors last:border-0',
+                                'grid grid-cols-2 gap-x-3 border-b border-border/50 px-1 py-2 align-top transition-colors last:border-0 lg:table-row lg:p-0',
                                 /* เขียว=ตอบว่าไป · เหลือง=ไม่ได้คำตอบ · แดง=ตอบว่าไม่ไป
                                    ยังไม่มีผล = ขาว (นิยามอยู่ที่ callCategoryWashTone) */
                                 washTone ? TONE[washTone].wash : 'hover:bg-secondary/50',
                                 allCancelled && 'opacity-60',
                               )}
                             >
-                              <td className="px-4 py-3 md:px-5">
+                              <td className="col-span-2 px-3 py-2 lg:px-5 lg:py-3">
                                 <span className="flex items-start gap-2.5">
                                   {/* วงกลมอักษรย่อ — แบบอ้างอิงใช้รูปคน ฐานเราไม่มีรูป */}
                                   <span
@@ -732,7 +734,7 @@ const FollowPlanningCalendar: React.FC<{
                                   </span>
                                 </span>
                               </td>
-                              <td className="hidden px-3 py-3 text-[12px] text-muted-foreground lg:table-cell">
+                              <td className="col-span-2 px-3 pb-1 text-[12px] text-muted-foreground lg:table-cell lg:py-3">
                                 {row.group.unitName || '—'}
                               </td>
 
@@ -741,7 +743,7 @@ const FollowPlanningCalendar: React.FC<{
                                * ของทุกคอลัมน์คือสายเดียวกัน ถ้าเรียงไม่ตรง คนจะอ่านคำตอบผิดสาย
                                * (ใช้ `space-y-2` ชุดเดียวกันทั้งสามช่อง ห้ามใส่ระยะต่างกัน)
                                */}
-                              <td className="px-3 py-3">
+                              <td className="px-3 py-1.5 lg:py-3">
                                 <span className="block space-y-2">
                                   {calls.map(({ round, slot }) => (
                                     <span key={round.entry.id} className="flex items-center gap-1.5">
@@ -778,7 +780,7 @@ const FollowPlanningCalendar: React.FC<{
                                 </span>
                               </td>
 
-                              <td className="px-3 py-3">
+                              <td className="px-3 py-1.5 lg:py-3">
                                 <span className="block space-y-2">
                                   {calls.map(({ round, category }) => {
                                     const tone = roundTone(round);
@@ -841,7 +843,7 @@ const FollowPlanningCalendar: React.FC<{
                                 </span>
                               </td>
 
-                              <td className="px-3 py-3">
+                              <td className="col-span-2 px-3 py-1.5 lg:py-3">
                                 <span className="block space-y-2">
                                   {calls.map(({ round }) => {
                                     const ai = roundAiSummary(round);
@@ -984,7 +986,7 @@ const FollowPlanningCalendar: React.FC<{
                                   *"ไม่แสดงการโทรติดต่อเบอร์ฉุกเฉิน คือ ไม่ยอมบอกว่าโทรหาหรือยัง"*)
                                   เดิมเป็น `hidden xl:table-cell` ⇒ จอแคบกว่า 1280px มองไม่เห็นเลย
                                   ข้อมูลมีอยู่ในหน้าแต่ CSS ซ่อนไว้ = เท่ากับไม่มี */}
-                              <td className="px-3 py-3">
+                              <td className="col-span-2 px-3 py-1.5 lg:py-3">
                                 {emgList.length > 0 ? (
                                   <span className="block text-[11.5px] text-muted-foreground">
                                     {emgList.map((p) => (
@@ -1011,7 +1013,7 @@ const FollowPlanningCalendar: React.FC<{
                                 )}
                               </td>
 
-                              <td className="px-3 py-3 text-right md:px-5">
+                              <td className="col-span-2 px-3 py-2 text-right lg:px-5 lg:py-3">
                                 <span className="inline-flex items-center gap-1.5">
                                   {/* แบบอ้างอิงมีปุ่มโทรในแถว — ของเราลิงก์ tel: ไปแอปโทรของเครื่อง */}
                                   <a

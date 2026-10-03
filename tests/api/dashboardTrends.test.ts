@@ -106,7 +106,7 @@ describe('แท็บ Dashboard อยู่ในสองหน้า แล�
   });
   it('หน้าติดตามมีแท็บ Dashboard (?view=dashboard · กดเปลี่ยน = push) — 1 ต.ค. 2569 มีแท็บ ติดตามส่งคนแทน (?view=replace) คั่นกลาง', () => {
     const f = code('src/pages/follow/FollowPage.tsx');
-    expect(f).toContain('<TabsTrigger value="dashboard">Dashboard</TabsTrigger>');
+    expect(f).toMatch(/<TabsTrigger value="dashboard"[^>]*>Dashboard<\/TabsTrigger>/);
     expect(f).toContain("viewParam === 'dashboard' ? 'dashboard' : viewParam === 'replace' ? 'replace' : 'list'");
     // กดเปลี่ยนแท็บ = push (ไม่ใช่ replace) — ย้อนกลับแล้วไม่หลุดหน้า
     expect(f).toMatch(/if \(next === 'list'\) params\.delete\('view'\);\s*else params\.set\('view', next\);\s*setSearchParams\(params\);/);

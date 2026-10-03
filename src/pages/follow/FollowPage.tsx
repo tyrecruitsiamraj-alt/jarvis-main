@@ -1287,9 +1287,12 @@ const FollowPage: React.FC = () => {
           setFormOpen(true);
           setFormError(null);
         }}
-        className="inline-flex h-8 items-center gap-1 px-3 text-[11px] touch-manipulation"
+        className="inline-flex h-8 items-center gap-1 px-2.5 text-[11px] touch-manipulation sm:px-3"
       >
-        <Plus aria-hidden /> เพิ่มคนที่ต้องการติดตาม
+        <Plus aria-hidden />
+        {/* จอมือถือย่อคำ — ปุ่มชุดนี้ต้องอยู่บรรทัดเดียว (4 ต.ค. 2569) */}
+        <span className="sm:hidden">เพิ่มคน</span>
+        <span className="hidden sm:inline">เพิ่มคนที่ต้องการติดตาม</span>
       </Button>
       {/* สรุปแผนทั้งวันของวันที่ดูอยู่ (เจ้าของสั่ง 2 ต.ค. 2569 · Choice "หน้าสรุปบนจอ") */}
       <Button
@@ -1297,16 +1300,19 @@ const FollowPage: React.FC = () => {
         size="sm"
         variant="outline"
         onClick={() => setReportOpen(true)}
-        className="inline-flex h-8 items-center gap-1 px-3 text-[11px]"
+        aria-label="สรุปแผนทั้งวัน"
+        title="สรุปแผนทั้งวัน"
+        className="inline-flex h-8 items-center gap-1 px-2.5 text-[11px] sm:px-3"
       >
-        <ClipboardList aria-hidden /> สรุปแผนทั้งวัน
+        <ClipboardList aria-hidden />
+        <span className="hidden sm:inline">สรุปแผนทั้งวัน</span>
       </Button>
       {/* ═══ ตัวกรองทั้งหมดอยู่ในกล่องเดียว ข้าง ๆ ปุ่มเพิ่มคน (เจ้าของสั่ง 1 ก.ย. 2569) ═══
           *"ย้ายทุกช่วงเวลาเข้าไปไว้กับเลือกวัน · แล้วย้ายเลือกวันไปไว้ข้าง ๆ เพิ่มคน"*
           🔴 ยังเป็น `fDate`/`fBand` ชุดเดิม — และเป็น **ตัวเลือกวันตัวเดียวของหน้า**
           (ปฏิทินในการ์ดใช้ค่านี้ ไม่มีปุ่มเลือกวันของตัวเอง) */}
       <DayCalendarPicker
-        className="h-8 min-h-0 py-1 text-[11px]"
+        className="h-8 min-h-0 px-2.5 py-1 text-[11px] sm:px-3"
         value={fDate}
         onChange={pickCalendarDay}
         /* 🔴 "เลือกวัน" ทำให้คนใหม่คิดว่าต้องกดก่อนเพิ่มคน (ตาใหม่ 12 ก.ย. 2569)
@@ -1346,12 +1352,14 @@ const FollowPage: React.FC = () => {
             <button
               type="button"
               title="ตั้งค่ารายการตัวเลือก (ทำครั้งเดียวตอนเริ่มใช้)"
+              aria-label="ตั้งค่าตัวเลือก"
               className={cn(
-                'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-medium',
+                'inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-[11px] font-medium sm:px-3',
                 TONE.neutral.outline,
               )}
             >
-              <Settings2 className="h-3 w-3" aria-hidden /> ตั้งค่าตัวเลือก
+              <Settings2 className="h-3 w-3" aria-hidden />
+              <span className="hidden sm:inline">ตั้งค่าตัวเลือก</span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-52">
@@ -1401,23 +1409,27 @@ const FollowPage: React.FC = () => {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-4 md:px-6 md:pt-5">
         {/* ชื่อหน้ายังอยู่สำหรับโปรแกรมอ่านจอ/แท็บเบราว์เซอร์ — มองไม่เห็นบนจอตามที่เจ้าของสั่งถอด (ชื่อ = ชื่อเมนูเสมอ) */}
         <h1 className="sr-only">{conveyorLabel('follow')}</h1>
-        <Button type="button" variant="ghost" size="icon" aria-label="ย้อนกลับ" onClick={() => navigate('/')}>
+        {/* 🔴 จัดตามขนาดจอ (4 ต.ค. 2569 "รองรับ Device อื่นดี ๆ"): มือถือ = ย้อนกลับ+แท็บเต็มกว้าง แล้วปุ่มบรรทัดล่าง
+            · md ขึ้นไป = ย้อนกลับ · ปุ่ม · แท็บชิดขวา แถวเดียว (ลำดับเจ้าของเลือก) — สลับด้วย order ไม่ทำ JSX สองชุด */}
+        <Button type="button" variant="ghost" size="icon" aria-label="ย้อนกลับ" onClick={() => navigate('/')} className="order-1 shrink-0">
           <ArrowLeft aria-hidden />
         </Button>
         {/* 🔴 ปุ่มของหน้าอยู่ซ้าย · แท็บอยู่ขวา (เจ้าของเลือก 3 ต.ค. 2569 "สลับซ้ายขวาทั้งก้อน") — Dashboard ไม่มีปุ่มชุดนี้ */}
         {followView !== 'dashboard' ? (
-          <div className="flex min-w-0 flex-wrap items-center gap-2">{headerButtons}</div>
+          <div className="order-3 flex w-full min-w-0 flex-wrap items-center gap-1.5 sm:gap-2 md:order-2 md:w-auto">{headerButtons}</div>
         ) : null}
-        <span className="flex-1" />
+        <span className="hidden flex-1 md:order-3 md:block" />
         {/* แท็บ "รายชื่อติดตาม | ส่งคนแทน | Dashboard" — ?view=… · กดเปลี่ยน = push (ย้อนกลับแล้วไม่หลุดหน้า) */}
         <Tabs
           value={followView}
           onValueChange={(v) => setFollowView(v === 'dashboard' ? 'dashboard' : v === 'replace' ? 'replace' : 'list')}
+          className="order-2 min-w-0 flex-1 md:order-4 md:ml-auto md:flex-none"
         >
-          <TabsList>
-            <TabsTrigger value="list">รายชื่อติดตาม</TabsTrigger>
-            <TabsTrigger value="replace">ติดตามส่งคนแทน</TabsTrigger>
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          {/* มือถือ: แท็บแบ่งกว้างเท่ากันเต็มบรรทัด (เดิม Dashboard ล้นจอ) */}
+          <TabsList className="flex w-full md:inline-flex md:w-auto">
+            <TabsTrigger value="list" className="flex-1 px-2 text-xs sm:text-sm md:flex-none md:px-3">รายชื่อติดตาม</TabsTrigger>
+            <TabsTrigger value="replace" className="flex-1 px-2 text-xs sm:text-sm md:flex-none md:px-3">ติดตามส่งคนแทน</TabsTrigger>
+            <TabsTrigger value="dashboard" className="flex-1 px-2 text-xs sm:text-sm md:flex-none md:px-3">Dashboard</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

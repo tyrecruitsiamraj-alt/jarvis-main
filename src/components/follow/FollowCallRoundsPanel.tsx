@@ -422,13 +422,13 @@ export default function FollowCallRoundsPanel({
                     >
                       <span
                         className={cn(
-                          'text-3xl font-medium leading-none tabular-nums',
+                          'text-2xl font-medium leading-none tabular-nums sm:text-3xl',
                           n === 0 ? 'text-muted-foreground/50' : TONE[FOLLOW_MATRIX_COL_TONE[c]].value,
                         )}
                       >
                         {n.toLocaleString('th-TH')}
                       </span>
-                      <span className="mt-1.5 text-xs text-muted-foreground">{FOLLOW_MATRIX_COL_LABEL[c]}</span>
+                      <span className="mt-1.5 whitespace-nowrap text-[11px] text-muted-foreground sm:text-xs">{FOLLOW_MATRIX_COL_LABEL[c]}</span>
                     </button>
                   );
                 })}
@@ -455,13 +455,13 @@ export default function FollowCallRoundsPanel({
                   >
                     <span
                       className={cn(
-                        'text-3xl font-medium leading-none tabular-nums',
+                        'text-2xl font-medium leading-none tabular-nums sm:text-3xl',
                         list.length === 0 ? 'text-muted-foreground/50' : 'text-foreground',
                       )}
                     >
                       {list.length.toLocaleString('th-TH')}
                     </span>
-                    <span className="mt-1.5 text-xs text-muted-foreground">{label}</span>
+                    <span className="mt-1.5 whitespace-nowrap text-[11px] text-muted-foreground sm:text-xs">{label}</span>
                   </button>
                 ))}
               </div>
