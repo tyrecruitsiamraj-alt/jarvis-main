@@ -241,7 +241,7 @@ export default function FollowEditDialog({
       if (modeChanged) {
         const out = await replaceFollowSchedule(entry.id, scheduleReplaceBody(editable, draft));
         const parts = ['แก้ไขแล้ว', modeChangedMessage(mode, out.lumos)];
-        if (added > 0) parts.push(`เพิ่มอีก ${added} รอบ`);
+        if (added > 0) parts.push(`เพิ่มอีก ${added} สาย`);
         onSaved(parts.join(' · '));
         onClose();
         return;
@@ -255,7 +255,7 @@ export default function FollowEditDialog({
           : (saved.queue_refreshed ?? 0) > 0
             ? `แก้ไขแล้ว — อัปเดตบทพูดในคิว ${saved.queue_refreshed} สายด้วย`
             : 'แก้ไขแล้ว — แต่สายที่ AI รับไปแล้วยังใช้ข้อมูลเดิม (เรียกคืนไม่ได้)';
-      onSaved(added > 0 ? `${queueMsg} · เพิ่มอีก ${added} รอบ` : queueMsg);
+      onSaved(added > 0 ? `${queueMsg} · เพิ่มอีก ${added} สาย` : queueMsg);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'แก้ไขไม่สำเร็จ');
@@ -447,7 +447,7 @@ export default function FollowEditDialog({
               โชว์รอบที่มีอยู่แล้วให้เห็นก่อน จะได้ไม่ตั้งซ้อนกันเอง */}
           <div className={cn('space-y-2 rounded-xl border p-3', TONE.neutral.soft)}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
-              <span className="text-xs font-medium text-foreground">รอบโทรของคนนี้</span>
+              <span className="text-xs font-medium text-foreground">สายของคนนี้</span>
               <span className="text-[11px] text-muted-foreground">
                 มีอยู่ {(otherRounds.length + 1).toLocaleString('th-TH')} รอบ
                 {rounds.isoTimes.length > 0
@@ -489,7 +489,7 @@ export default function FollowEditDialog({
                 <div className="flex items-center gap-2">
                 <DateTimeField24
                   value={v}
-                  label={`รอบที่จะเพิ่ม ${i + 1}`}
+                  label={`สายที่จะเพิ่ม ${i + 1}`}
                   onChange={(next) =>
                     setExtraWhen((prev) => prev.map((x, idx) => (idx === i ? next : x)))
                   }
@@ -501,14 +501,14 @@ export default function FollowEditDialog({
                     setExtraWhen((prev) => prev.filter((_, idx) => idx !== i));
                     setExtraModes((prev) => prev.filter((_, idx) => idx !== i));
                   }}
-                  aria-label={`เอารอบที่จะเพิ่ม ${i + 1} ออก`}
+                  aria-label={`เอาสายที่จะเพิ่ม ${i + 1} ออก`}
                   className="inline-flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-secondary"
                 >
                   <X className="h-4 w-4" aria-hidden />
                 </button>
                 </div>
                 {/* ใครโทรรอบนี้ (เจ้าของสั่ง 3 ต.ค. 2569: ตั้งรอบเดียวก็ต้องเลือก AI/คนได้) */}
-                <div className="ml-1 flex flex-wrap items-center gap-3" role="group" aria-label={`ใครโทรรอบที่จะเพิ่ม ${i + 1}`}>
+                <div className="ml-1 flex flex-wrap items-center gap-3" role="group" aria-label={`ใครโทรสายที่จะเพิ่ม ${i + 1}`}>
                   {(['ai', 'manual'] as const).map((m) => (
                     <label key={m} className="flex cursor-pointer items-center gap-1.5">
                       <Checkbox
@@ -520,7 +520,7 @@ export default function FollowEditDialog({
                             return next;
                           })
                         }
-                        aria-label={`รอบที่จะเพิ่ม ${i + 1} — ${m === 'ai' ? 'AI โทร' : 'คนโทร'}`}
+                        aria-label={`สายที่จะเพิ่ม ${i + 1} — ${m === 'ai' ? 'AI โทร' : 'คนโทร'}`}
                       />
                       <span className={cn('text-xs font-medium', (extraModes[i] ?? 'ai') === m ? 'text-foreground' : 'text-muted-foreground')}>
                         {m === 'ai' ? 'AI โทร' : 'คนโทร'}
@@ -545,7 +545,7 @@ export default function FollowEditDialog({
                 TONE.info.outline,
               )}
             >
-              <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มรอบโทร
+              <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มสาย
             </button>
 
             {/* 🔴 ห้ามเงียบเมื่อมีของถูกตัด/ของเสี่ยง — คนต้องรู้ก่อนกดบันทึก */}

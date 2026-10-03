@@ -778,7 +778,7 @@ const FollowPage: React.FC = () => {
       }
       const calls = scheduleCalls();
       if (calls.length === 0) {
-        setFormError('ยังไม่มีสายให้โทร — เลือกวันที่จะโทร แล้วตั้งเวลาอย่างน้อย 1 รอบ');
+        setFormError('ยังไม่มีสายให้โทร — เลือกวันที่จะโทร แล้วตั้งเวลาอย่างน้อย 1 สาย');
         return;
       }
       const groupId = crypto.randomUUID();
@@ -908,7 +908,7 @@ const FollowPage: React.FC = () => {
     /** ค่าวันล้วนของ "ยังไม่ชัวร์เวลา" (YYYY-MM-DD) → เที่ยงคืนไทย (ห้ามให้ new Date ตีเป็น UTC) */
     const localToDate = (t: string) => (/^\d{4}-\d{2}-\d{2}$/.test(t) ? new Date(`${t}T00:00:00+07:00`) : new Date(t));
     if (times.length === 0) {
-      setFormError('กรุณาระบุเวลาที่ให้โทรอย่างน้อย 1 รอบ');
+      setFormError('กรุณาระบุเวลาที่ให้โทรอย่างน้อย 1 สาย');
       return;
     }
 
@@ -1014,7 +1014,7 @@ const FollowPage: React.FC = () => {
         const msg = err instanceof Error ? err.message : 'เพิ่มรายชื่อไม่สำเร็จ';
         setFormError(
           done > 0
-            ? `${msg} — แต่บันทึกไปแล้ว ${done} จาก ${sendIso.length} รอบ กรุณาเพิ่มเฉพาะรอบที่ยังขาด อย่ากดซ้ำทั้งชุด`
+            ? `${msg} — แต่บันทึกไปแล้ว ${done} จาก ${sendIso.length} สาย กรุณาเพิ่มเฉพาะสายที่ยังขาด อย่ากดซ้ำทั้งชุด`
             : msg,
         );
         if (done > 0) await reload();
@@ -1111,14 +1111,16 @@ const FollowPage: React.FC = () => {
    * ลง/ล้างผลโทรของรอบคนโทร (130 · เจ้าของเคาะ 30 ก.ย. 2569) — โหลดใหม่ให้ช่องปฏิทินเปลี่ยนสีทันที
    * ⚠️ ไม่แตะคิวโทร ไม่แตะการปิดงาน
    */
-  const doStaffCall = async (id: string, outcome: FollowStaffCallOutcome, note?: string) => {
+  const doStaffCall = async (id: string, outcome: FollowStaffCallOutcome, note?: string): Promise<boolean> => {
     setBusyId(id);
     setError(null);
     try {
       await recordFollowStaffCall(id, outcome, note);
       await reload();
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ลงผลโทรไม่สำเร็จ');
+      return false;
     } finally {
       setBusyId(null);
     }
@@ -1326,7 +1328,14 @@ const FollowPage: React.FC = () => {
           onEditRound={(round) => setEditing(round.entry)}
           /* ปุ่มบนแถวของสายที่คนโทร (เจ้าของ Choice 1 ต.ค. 2569 "ติดต่อสำเร็จ / ไม่สำเร็จ / ยกเลิก") —
              เส้นเดียวกับปุ่มลงผล/ยกเลิกในป๊อปจัดการ */
-          onStaffResult={(round, outcome) => doStaffCall(round.entry.id, outcome)}
+          onStaffResult={async (round, outcome, row) => {
+            const ok = await doStaffCall(round.entry.id, outcome);
+            /* "ติดต่อสำเร็จ" = คุยได้แล้ว รู้ผลแล้ว — เปิดป๊อปจัดการต่อให้เลย จะได้กดปิดงานจบ
+               ในจังหวะเดียว (3 ต.ค. 2569: เดิมต้องกดสองที่) · ไม่สำเร็จ/ล้มเหลวไม่เด้ง */
+            if (ok && outcome === 'acknowledged' && row) {
+              setOpenCell({ key: row.group.key, ymd: round.ymd ?? '' });
+            }
+          }}
           onCancelRound={(round) => doCancel(round.entry.id)}
           busyId={busyId}
           lastLoadedAt={lastLoadedAt}
@@ -2065,12 +2074,12 @@ const FollowPage: React.FC = () => {
                   );
                 })()}
                 <div className="space-y-1.5">
-                  <p className="ml-1 text-xs font-medium text-foreground">2 · วันละกี่รอบ</p>
+                  <p className="ml-1 text-xs font-medium text-foreground">2 · วันละกี่สาย</p>
                   {/* 🔴 ตั้งเวลารายวันได้ (เจ้าของ Choice 1 ต.ค. 2569 "ทุกวันต้องใช้เวลาเดียวกัน → แก้") —
                       ปิดอยู่ = ชุดเดียวทุกวันเหมือนเดิม · เปิดครั้งแรกลอกชุดเดียวลงทุกวันให้ก่อน */}
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="ml-1 text-xs font-medium text-muted-foreground">
-                      {perDayTimes ? 'เวลารายวัน (วันละไม่เกิน 5 รอบ)' : 'รอบเวลาต่อวัน (สูงสุด 5 รอบ)'}
+                      {perDayTimes ? 'เวลารายวัน (วันละไม่เกิน 5 สาย)' : 'เวลาต่อวัน (สูงสุด 5 สาย)'}
                     </span>
                     {sendDaysPreview > 1 ? (
                       <Button
@@ -2106,7 +2115,7 @@ const FollowPage: React.FC = () => {
                                 <TimeSelect24
                                   value={v}
                                   onChange={(next) => setDayTimeAt(d, i, next)}
-                                  label={`${label} รอบที่ ${i + 1}`}
+                                  label={`${label} สายที่ ${i + 1}`}
                                   className="min-h-[46px] flex-1"
                                 />
                                 <Button
@@ -2115,7 +2124,7 @@ const FollowPage: React.FC = () => {
                                   size="icon"
                                   onClick={() => removeDayTime(d, i)}
                                   disabled={list.length <= 1}
-                                  aria-label={`เอารอบที่ ${i + 1} ของ${label}ออก`}
+                                  aria-label={`เอาสายที่ ${i + 1} ของ${label}ออก`}
                                 >
                                   <X aria-hidden />
                                 </Button>
@@ -2123,7 +2132,7 @@ const FollowPage: React.FC = () => {
                             ))}
                             {list.length < 5 ? (
                               <Button type="button" variant="outline" size="xs" onClick={() => addDayTime(d)}>
-                                <Plus aria-hidden /> เพิ่มรอบของวันนั้น
+                                <Plus aria-hidden /> เพิ่มสายของวันนั้น
                               </Button>
                             ) : null}
                           </div>
@@ -2145,14 +2154,14 @@ const FollowPage: React.FC = () => {
                       <TimeSelect24
                         value={v}
                         onChange={(next) => setRoundAt(i, next)}
-                        label={`รอบที่ ${i + 1}`}
+                        label={`สายที่ ${i + 1}`}
                         className="min-h-[46px] flex-1"
                       />
                       <button
                         type="button"
                         onClick={() => removeRound(i)}
                         disabled={roundTimes.length <= 1}
-                        aria-label={`เอารอบที่ ${i + 1} ออก`}
+                        aria-label={`เอาสายที่ ${i + 1} ออก`}
                         className="inline-flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/60 text-slate-600 hover:text-foreground disabled:opacity-40 dark:border-white/15 dark:bg-white/10 dark:text-slate-300"
                       >
                         <X className="h-4 w-4" aria-hidden />
@@ -2165,7 +2174,7 @@ const FollowPage: React.FC = () => {
                       onClick={addRound}
                       className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-white/70 bg-white/60 px-4 py-1.5 text-xs font-medium text-slate-600 hover:text-foreground dark:border-white/15 dark:bg-white/10 dark:text-slate-300"
                     >
-                      <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มรอบต่อวัน
+                      <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มสายต่อวัน
                     </button>
                   ) : null}
                     </>
@@ -2214,14 +2223,14 @@ const FollowPage: React.FC = () => {
                           <DayCalendarPicker
                             value={/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ''}
                             onChange={(ymd) => setScheduledAtAt(i, ymd)}
-                            emptyLabel={`เลือกวันของรอบที่ ${i + 1}`}
+                            emptyLabel={`เลือกวันของสายที่ ${i + 1}`}
                           />
                         </span>
                       ) : (
                       <DateTimeField24
                         value={/^\d{4}-\d{2}-\d{2}$/.test(v) ? '' : v}
                         onChange={(next) => setScheduledAtAt(i, next)}
-                        label={`รอบที่ ${i + 1}`}
+                        label={`สายที่ ${i + 1}`}
                         className="min-h-[46px] flex-1"
                       />
                       )}
@@ -2229,8 +2238,8 @@ const FollowPage: React.FC = () => {
                         type="button"
                         onClick={() => removeScheduledAt(i)}
                         disabled={scheduledAts.length <= 1}
-                        title={scheduledAts.length <= 1 ? 'ต้องมีอย่างน้อย 1 รอบ' : 'เอารอบนี้ออก'}
-                        aria-label={`เอารอบที่ ${i + 1} ออก`}
+                        title={scheduledAts.length <= 1 ? 'ต้องมีอย่างน้อย 1 สาย' : 'เอาสายนี้ออก'}
+                        aria-label={`เอาสายที่ ${i + 1} ออก`}
                         className={cn(
                           'inline-flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border',
                           'border-white/70 bg-white/60 text-slate-600 hover:text-foreground',
@@ -2243,7 +2252,7 @@ const FollowPage: React.FC = () => {
                     </div>
                     {/* ใครโทรรอบนี้ (เจ้าของสั่ง 2 ต.ค. 2569) + "ยังไม่ชัวร์เวลา" (Journey ข้อ 5 · 3 ต.ค. 2569)
                         ยังไม่ชัวร์เวลา = เลือกแค่วัน แล้วมาเติมเวลาทีหลัง (เป็นคนโทรจนกว่าจะตั้งเวลา) */}
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1" role="group" aria-label={`ใครโทรรอบที่ ${i + 1}`}>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1" role="group" aria-label={`ใครโทรสายที่ ${i + 1}`}>
                       {(
                         [
                           { value: 'ai', label: 'AI โทร', on: 'text-primary' },
@@ -2255,7 +2264,7 @@ const FollowPage: React.FC = () => {
                           <Checkbox
                             checked={(callModes[i] ?? 'ai') === c.value}
                             onCheckedChange={() => setCallModeAt(i, c.value)}
-                            aria-label={`รอบที่ ${i + 1} — ${c.label}`}
+                            aria-label={`สายที่ ${i + 1} — ${c.label}`}
                           />
                           <span className={cn('text-xs font-medium', (callModes[i] ?? 'ai') === c.value ? c.on : 'text-muted-foreground')}>
                             {c.label}
@@ -2265,7 +2274,7 @@ const FollowPage: React.FC = () => {
                     </div>
                     <StaffContactField
                       id={`followStaffPhone${i}`}
-                      label={`เจ้าหน้าที่ที่ติดตามรอบที่ ${i + 1}`}
+                      label={`เจ้าหน้าที่ที่ติดตามสายที่ ${i + 1}`}
                       value={staffPhones[i] ?? ''}
                       onChange={(next) => setStaffPhoneAt(i, next)}
                       reloadSignal={contactsRev}
@@ -2280,7 +2289,7 @@ const FollowPage: React.FC = () => {
                         htmlFor={`followCallRound${i}`}
                         className="ml-1 text-xs font-medium text-muted-foreground"
                       >
-                        รอบนี้คือรอบโทรที่เท่าไหร่
+                        สายนี้คือสายที่เท่าไหร่
                       </label>
                       <select
                         id={`followCallRound${i}`}
@@ -2311,7 +2320,7 @@ const FollowPage: React.FC = () => {
                 onClick={addScheduledAt}
                 className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-white/70 bg-white/60 px-4 py-1.5 text-xs font-medium text-slate-600 hover:text-foreground dark:border-white/15 dark:bg-white/10 dark:text-slate-300"
               >
-                <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มรอบโทร
+                <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มสาย
               </button>
               <p className="ml-1 text-[11px] text-muted-foreground">
                 บางเรื่องต้องโทรมากกว่า 1 ครั้ง — ใส่ได้หลายรอบ ระบบจะสร้างเป็นรายการแยกให้รอบละ 1 รายการ
@@ -2470,7 +2479,7 @@ const FollowPage: React.FC = () => {
         }}
         onComplete={doComplete}
         onReopen={(id) => void doReopen(id)}
-        onStaffCall={doStaffCall}
+        onStaffCall={(id, outcome, note) => void doStaffCall(id, outcome, note)}
         onStaffCallClear={doStaffCallClear}
         onPurge={canPurge ? (id) => void doPurge(id) : null}
         purgingId={purgingId}
@@ -2539,7 +2548,7 @@ const FollowPage: React.FC = () => {
                     void go();
                   }}
                 >
-                  บันทึกเฉพาะที่ไม่ซ้ำ ({dupWarning.freshIso.length.toLocaleString('th-TH')} รอบ)
+                  บันทึกเฉพาะที่ไม่ซ้ำ ({dupWarning.freshIso.length.toLocaleString('th-TH')} สาย)
                 </AlertDialogAction>
               ) : null}
             </AlertDialogFooter>

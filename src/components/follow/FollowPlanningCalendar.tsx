@@ -351,7 +351,12 @@ const FollowPlanningCalendar: React.FC<{
    * ปุ่มบนแถวของ **สายที่คนโทร** (เจ้าของ Choice 1 ต.ค. 2569 "ติดต่อสำเร็จ / ไม่สำเร็จ / ยกเลิก")
    * ไม่ส่ง = ไม่มีปุ่ม (เช่นจอที่อ่านอย่างเดียว)
    */
-  onStaffResult?: (round: FollowPlanningRound, outcome: FollowStaffCallOutcome) => void | Promise<void>;
+  onStaffResult?: (
+    round: FollowPlanningRound,
+    outcome: FollowStaffCallOutcome,
+    /** แถวของคนนั้น — หน้าแม่ใช้เปิดป๊อปจัดการต่อให้ตอน "ติดต่อสำเร็จ" (3 ต.ค. 2569: โทรเสร็จจบในจังหวะเดียว) */
+    row?: FollowPlanningRow,
+  ) => void | Promise<void>;
   onCancelRound?: (round: FollowPlanningRound) => void | Promise<void>;
   /** รายการที่กำลังบันทึกอยู่ — ปุ่มของแถวนั้นกดซ้ำไม่ได้ */
   busyId?: string | null;
@@ -959,7 +964,7 @@ const FollowPlanningCalendar: React.FC<{
                                                 variant="outline"
                                                 size="xs"
                                                 disabled={busy}
-                                                onClick={() => void onStaffResult?.(round, q.outcome)}
+                                                onClick={() => void onStaffResult?.(round, q.outcome, row)}
                                                 className={
                                                   TONE[q.outcome === 'acknowledged' ? 'success' : 'warn'].value
                                                 }

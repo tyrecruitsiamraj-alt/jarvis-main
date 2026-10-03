@@ -121,7 +121,20 @@ type PeopleDialogState = {
   title: string;
   hint: string;
   people: FollowEntry[];
+  /** เปิดจากกล่องรวม ("เข้ามาในรอบนี้") = มีชิปแยก เหลือตาม/ปิดแล้ว/ยกเลิก ให้กด (3 ต.ค. 2569) */
+  splitByLife?: boolean;
 };
+
+/** สถานะชีวิตของสายในป๊อปรายชื่อ — นิยามเดียวกับเลขแตกก้อนใต้กล่องรวม */
+type PeopleLife = 'all' | 'remaining' | 'closed' | 'cancelled';
+const PEOPLE_LIFE_LABEL: Record<PeopleLife, string> = {
+  all: 'ทั้งหมด',
+  remaining: 'เหลือตาม',
+  closed: 'ปิดงานแล้ว',
+  cancelled: 'ยกเลิก',
+};
+const lifeOf = (e: FollowEntry): Exclude<PeopleLife, 'all'> =>
+  e.cancelled ? 'cancelled' : e.completed_at ? 'closed' : 'remaining';
 
 export default function FollowCallRoundsPanel({
   headerExtras,
@@ -171,6 +184,8 @@ export default function FollowCallRoundsPanel({
   const v2 = useUiV2();
   /** popup รายชื่อ — ใช้ร่วมกันทั้งกล่องถังและวันบนปฏิทิน · null = ปิดอยู่ */
   const [peopleDialog, setPeopleDialog] = useState<PeopleDialogState | null>(null);
+  /** ชิปที่เลือกอยู่ในป๊อปรายชื่อของกล่องรวม */
+  const [peopleLife, setPeopleLife] = useState<PeopleLife>('all');
   /** รอบที่กำลังดูอยู่ — มาจากหน้าแม่ (ตัวเลือกรอบมีที่เดียวทั้งหน้า) */
   const activeRound = round;
   const pickRound = (r: FollowRoundFilter) => onRoundChange(r);
@@ -244,10 +259,13 @@ export default function FollowCallRoundsPanel({
   const openBucketDialog = (slot: FollowRoundFilter, b: FollowRoundBucket) => {
     const rows = slot === 'all' ? rowsOfRound : (roundRows.get(slot) ?? []);
     const list = rows.filter((r) => inFollowRoundBucket(r, b));
+    setPeopleLife('all');
     setPeopleDialog({
       title: `${roundLabelOf(slot)} · ${FOLLOW_ROUND_BUCKET_LABEL[b]} (${list.length.toLocaleString('th-TH')} คน)`,
       hint: FOLLOW_ROUND_BUCKET_HINT[b],
       people: list,
+      // กล่องรวมคือที่เดียวที่เห็นสายทุกสถานะ — ให้แยกดู เหลือตาม/ปิดแล้ว/ยกเลิก ได้จากตรงนี้
+      splitByLife: b === 'all',
     });
   };
 
@@ -265,16 +283,48 @@ export default function FollowCallRoundsPanel({
               {peopleDialog?.hint ?? ''}
             </DialogDescription>
           </DialogHeader>
+          {/* ชิปแยกสถานะ (เฉพาะกล่องรวม) — ทางเดียวบนหน้านี้ที่ย้อนดูสายที่ยกเลิก/ปิดไปแล้ว */}
+          {peopleDialog?.splitByLife ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border/50 px-4 py-2">
+              {(['all', 'remaining', 'closed', 'cancelled'] as PeopleLife[]).map((lf) => {
+                const n =
+                  lf === 'all'
+                    ? peopleDialog.people.length
+                    : peopleDialog.people.filter((p) => lifeOf(p) === lf).length;
+                const on = peopleLife === lf;
+                return (
+                  <button
+                    key={lf}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setPeopleLife(lf)}
+                    className={cn(
+                      'inline-flex h-7 items-center rounded-full border px-2.5 text-[11px] font-medium tabular-nums transition-colors',
+                      on ? 'border-primary bg-primary text-primary-foreground' : TONE.neutral.outline,
+                    )}
+                  >
+                    {PEOPLE_LIFE_LABEL[lf]} · {n.toLocaleString('th-TH')}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
-            {peopleDialog && peopleDialog.people.length > 0 ? (
-              <ul className="space-y-1.5">
-                {peopleDialog.people.map((p) => (
-                  <PersonRow key={p.id} p={p} />
-                ))}
-              </ul>
-            ) : (
-              <p className={cn('py-4 text-center text-xs', DASH.muted)}>ไม่มีรายชื่อในกล่องนี้</p>
-            )}
+            {(() => {
+              const shown =
+                peopleDialog?.splitByLife && peopleLife !== 'all'
+                  ? (peopleDialog?.people ?? []).filter((p) => lifeOf(p) === peopleLife)
+                  : (peopleDialog?.people ?? []);
+              return peopleDialog && shown.length > 0 ? (
+                <ul className="space-y-1.5">
+                  {shown.map((p) => (
+                    <PersonRow key={p.id} p={p} />
+                  ))}
+                </ul>
+              ) : (
+                <p className={cn('py-4 text-center text-xs', DASH.muted)}>ไม่มีรายชื่อในกล่องนี้</p>
+              );
+            })()}
           </div>
         </DialogContent>
       </Dialog>

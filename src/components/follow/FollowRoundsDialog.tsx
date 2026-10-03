@@ -232,7 +232,7 @@ const FollowRoundsDialog: React.FC<{
                       variant="outline"
                       size="sm"
                       onClick={() => onEdit(it)}
-                      title="แก้ไขรอบนี้"
+                      title="แก้ไขสายนี้"
                       className="min-h-8 gap-1 px-2.5 text-[11px]"
                     >
                       <Pencil aria-hidden />

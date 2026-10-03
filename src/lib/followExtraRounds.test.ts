@@ -96,7 +96,7 @@ describe('extraRoundsNote', () => {
       invalidCount: 2,
       pastCount: 1,
     });
-    expect(note).toContain('เพิ่ม 2 รอบ');
+    expect(note).toContain('เพิ่ม 2 สาย');
     expect(note).toContain('ตัดเวลาซ้ำ 1');
     expect(note).toContain('เวลาไม่ถูกต้อง 2');
     expect(note).toContain('ผ่านมาแล้ว');
@@ -111,6 +111,6 @@ describe('extraRoundsNote', () => {
   it('มีแต่ของดี = บอกแค่จำนวนรอบ', () => {
     expect(
       extraRoundsNote({ isoTimes: ['a'], duplicateCount: 0, invalidCount: 0, pastCount: 0 }),
-    ).toBe('เพิ่ม 1 รอบ');
+    ).toBe('เพิ่ม 1 สาย');
   });
 });
