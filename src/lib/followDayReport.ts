@@ -25,6 +25,18 @@ export type FollowDayReportRow = {
   cancelled: boolean;
 };
 
+/**
+ * ตัวกรองก่อนดู/โหลดรูป (เจ้าของสั่ง 3 ต.ค. 2569: *"สรุปแผนก็ทำให้เลือกวัน เลือกสายได้
+ * เลือกว่าจะดูแค่คนหรือ AI หรือหมดเลย ก่อนโหลดรูป"*) — วันเลือกที่ ymd ของ build
+ */
+export type FollowDayReportFilter = {
+  caller: 'all' | 'ai' | 'manual';
+  /** เลขสาย (1/2/3…) หรือ 'all' */
+  call: number | 'all';
+};
+
+export const FOLLOW_DAY_REPORT_NO_FILTER: FollowDayReportFilter = { caller: 'all', call: 'all' };
+
 export type FollowDayReport = {
   ymd: string;
   rows: FollowDayReportRow[];
@@ -34,6 +46,10 @@ export type FollowDayReport = {
   ai: number;
   manual: number;
   cancelled: number;
+  /** เลขสายที่มีจริงของวันนั้น (ก่อนกรอง) — ไว้สร้างตัวเลือก "สายที่" */
+  callNos: number[];
+  /** คำบอกขอบเขตเมื่อกรอง เช่น "เฉพาะคนโทร · สายที่ 2" — '' = ทั้งหมด */
+  scope: string;
 };
 
 /** +66812345678 → 0812345678 (รายงานวางลง Excel/LINE ให้คนกดโทรต่อได้) · รูปอื่นคงเดิม */
@@ -43,13 +59,35 @@ export function localThaiPhone(raw: string): string {
   return m ? `0${m[1]}` : t;
 }
 
-export function buildFollowDayReport(entries: FollowEntry[], ymd: string, now = new Date()): FollowDayReport {
+export function buildFollowDayReport(
+  entries: FollowEntry[],
+  ymd: string,
+  now = new Date(),
+  filter: FollowDayReportFilter = FOLLOW_DAY_REPORT_NO_FILTER,
+): FollowDayReport {
   const planning = buildFollowPlanningRows(groupFollowEntries(entries, now));
-  const dayCalls = buildFollowDayCalls(planning, ymd).sort(
+  const allCalls = buildFollowDayCalls(planning, ymd).sort(
     (a, b) =>
       (a.round.time ?? '99:99').localeCompare(b.round.time ?? '99:99') ||
       a.row.group.name.localeCompare(b.row.group.name, 'th'),
   );
+  /** เลขสายของรายการ — ตัวเดียวกับที่ป้าย "สายที่ N" ใช้ (call_of_day ก่อนเสมอ) */
+  const callNoOf = (e: FollowEntry, slot: number | null) => e.call_of_day ?? e.call_round ?? slot;
+  const callNos = [...new Set(allCalls.map((c) => callNoOf(c.round.entry, c.slot)).filter((n): n is number => n != null))].sort(
+    (a, b) => a - b,
+  );
+  const dayCalls = allCalls.filter(({ round, slot }) => {
+    const e = round.entry;
+    if (filter.caller !== 'all' && followCallerOf(e) !== filter.caller) return false;
+    if (filter.call !== 'all' && callNoOf(e, slot) !== filter.call) return false;
+    return true;
+  });
+  const scope = [
+    filter.caller === 'all' ? null : filter.caller === 'ai' ? 'เฉพาะ AI โทร' : 'เฉพาะคนโทร',
+    filter.call === 'all' ? null : `สายที่ ${filter.call}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const rows: FollowDayReportRow[] = dayCalls.map(({ row, round, slot }) => {
     const e = round.entry;
     const cancelled = round.state === 'cancelled';
@@ -77,6 +115,8 @@ export function buildFollowDayReport(entries: FollowEntry[], ymd: string, now = 
     ai: live.filter((r) => r.caller === FOLLOW_CALLER_LABEL.ai).length,
     manual: live.filter((r) => r.caller === FOLLOW_CALLER_LABEL.manual).length,
     cancelled: rows.length - live.length,
+    callNos,
+    scope,
   };
 }
 

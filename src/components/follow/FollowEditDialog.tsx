@@ -4,7 +4,7 @@ import { Building2, LoaderCircle, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { createFollowEntry, replaceFollowSchedule, updateFollowEntry, type FollowEntry } from '@/lib/followApi';
-import { buildExtraRounds, extraRoundsNote } from '@/lib/followExtraRounds';
+import { buildExtraRounds, extraRoundsNote, localInputToIso } from '@/lib/followExtraRounds';
 import { BoardUnitPickerBody } from '@/components/follow/BoardUnitPicker';
 import {
   Dialog,
@@ -77,6 +77,11 @@ export default function FollowEditDialog({
   const [error, setError] = useState<string | null>(null);
   /** ช่องเวลาของ "รอบที่จะเพิ่ม" — ว่างอยู่ = ยังไม่เพิ่ม */
   const [extraWhen, setExtraWhen] = useState<string[]>([]);
+  /**
+   * ใครโทรของรอบที่จะเพิ่ม (เจ้าของสั่ง 3 ต.ค. 2569: *"ตั้งแบบวันเดียวก็ควรเลือกได้เหมือนกัน
+   * ว่าจะให้ AI โทรหรือให้คนโทร"*) — เดิมรอบที่เพิ่มทีหลังเป็น AI เสมอโดยไม่มีช่องให้เลือก
+   */
+  const [extraModes, setExtraModes] = useState<Array<'ai' | 'manual'>>([]);
   /** ตัวเลือกหน่วยงานจากบอร์ด — ชุดเดียวกับฟอร์มเพิ่ม (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ) */
   const [unitPickerOpen, setUnitPickerOpen] = useState(false);
   /**
@@ -113,6 +118,7 @@ export default function FollowEditDialog({
     setMode(entry.call_mode === 'manual' ? 'manual' : 'ai');
     setError(null);
     setExtraWhen([]);
+    setExtraModes([]);
     setScheduleEditing(false);
   }, [entry]);
 
@@ -199,6 +205,13 @@ export default function FollowEditDialog({
        * ⚠️ ยิงทีละรอบ ล้มกลางทางต้องบอกว่าสำเร็จไปกี่รอบ ไม่งั้นคนกดซ้ำแล้วได้รอบซ้อน
        */
       let added = 0;
+      /* จับคู่ "ช่องที่กรอก → ISO ที่สร้างจริง" เพื่อรู้ว่ารอบไหนให้ใครโทร
+         (buildExtraRounds ตัดซ้ำ/เรียงใหม่ — index เดิมใช้ตรง ๆ ไม่ได้ · ซ้ำกัน = ช่องแรกชนะ เหมือนกติกาตัดซ้ำ) */
+      const modeOfIso = new Map<string, 'ai' | 'manual'>();
+      extraWhen.forEach((raw, i) => {
+        const iso = localInputToIso(raw);
+        if (iso && !modeOfIso.has(iso)) modeOfIso.set(iso, extraModes[i] ?? 'ai');
+      });
       for (const iso of rounds.isoTimes) {
         await createFollowEntry({
           recipient_name: name,
@@ -209,6 +222,8 @@ export default function FollowEditDialog({
           note: note || undefined,
           staff_phone: staffPhone || undefined,
           scheduled_at: iso,
+          // ใครโทรของรอบใหม่ (3 ต.ค. 2569) — เดิมไม่ส่ง = AI เสมอ
+          call_mode: modeOfIso.get(iso) ?? 'ai',
           unit_name: unitName.trim() || undefined,
           site_code: siteCode.trim() || undefined,
         });
@@ -470,7 +485,8 @@ export default function FollowEditDialog({
             ) : null}
 
             {extraWhen.map((v, i) => (
-              <div key={i} className="flex items-center gap-2">
+              <div key={i} className="space-y-1.5 rounded-xl border border-border/60 p-2">
+                <div className="flex items-center gap-2">
                 <DateTimeField24
                   value={v}
                   label={`รอบที่จะเพิ่ม ${i + 1}`}
@@ -481,19 +497,47 @@ export default function FollowEditDialog({
                 />
                 <button
                   type="button"
-                  onClick={() => setExtraWhen((prev) => prev.filter((_, idx) => idx !== i))}
+                  onClick={() => {
+                    setExtraWhen((prev) => prev.filter((_, idx) => idx !== i));
+                    setExtraModes((prev) => prev.filter((_, idx) => idx !== i));
+                  }}
                   aria-label={`เอารอบที่จะเพิ่ม ${i + 1} ออก`}
                   className="inline-flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-secondary"
                 >
                   <X className="h-4 w-4" aria-hidden />
                 </button>
+                </div>
+                {/* ใครโทรรอบนี้ (เจ้าของสั่ง 3 ต.ค. 2569: ตั้งรอบเดียวก็ต้องเลือก AI/คนได้) */}
+                <div className="ml-1 flex flex-wrap items-center gap-3" role="group" aria-label={`ใครโทรรอบที่จะเพิ่ม ${i + 1}`}>
+                  {(['ai', 'manual'] as const).map((m) => (
+                    <label key={m} className="flex cursor-pointer items-center gap-1.5">
+                      <Checkbox
+                        checked={(extraModes[i] ?? 'ai') === m}
+                        onCheckedChange={() =>
+                          setExtraModes((prev) => {
+                            const next = [...prev];
+                            next[i] = m;
+                            return next;
+                          })
+                        }
+                        aria-label={`รอบที่จะเพิ่ม ${i + 1} — ${m === 'ai' ? 'AI โทร' : 'คนโทร'}`}
+                      />
+                      <span className={cn('text-xs font-medium', (extraModes[i] ?? 'ai') === m ? 'text-foreground' : 'text-muted-foreground')}>
+                        {m === 'ai' ? 'AI โทร' : 'คนโทร'}
+                      </span>
+                    </label>
+                  ))}
+                </div>
               </div>
             ))}
 
             <button
               type="button"
               onClick={() =>
-                setExtraWhen((prev) => (prev.length >= 5 ? prev : [...prev, when || '']))
+                {
+                  setExtraWhen((prev) => (prev.length >= 5 ? prev : [...prev, when || '']));
+                  setExtraModes((prev) => (prev.length >= 5 ? prev : [...prev, 'ai']));
+                }
               }
               disabled={extraWhen.length >= 5}
               className={cn(

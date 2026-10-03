@@ -23,7 +23,9 @@ const HEAD_H = 38;
 /** บรรทัดสรุปบนหัวรูป — ข้อความเดียวกับใน Dialog (นิยามเดียว) */
 export function followDayReportSummaryText(report: FollowDayReport): string {
   const n = (v: number) => v.toLocaleString('th-TH');
-  return `${n(report.people)} คน · ${n(report.calls)} สาย · AI โทร ${n(report.ai)} · คนโทร ${n(report.manual)} · ยกเลิก ${n(report.cancelled)}`;
+  const base = `${n(report.people)} คน · ${n(report.calls)} สาย · AI โทร ${n(report.ai)} · คนโทร ${n(report.manual)} · ยกเลิก ${n(report.cancelled)}`;
+  // กรองอยู่ต้องบอกบนรูป — คนรับรูปต่อไม่เห็นหน้าจอ ไม่งั้นอ่านว่าเป็นของทั้งวัน
+  return report.scope ? `${report.scope} — ${base}` : base;
 }
 
 /** วาดรายงานลง canvas (แยกจากการดาวน์โหลด เผื่อเอาไป preview) */
@@ -153,7 +155,9 @@ export async function downloadFollowDayReportPng(report: FollowDayReport): Promi
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `แผนติดตาม-${report.ymd}.png`;
+        // กรองอยู่ให้ชื่อไฟล์บอกด้วย — โหลดหลายรูปแล้วแยกออกว่าไฟล์ไหนคืออะไร
+        const scopeSlug = report.scope ? `-${report.scope.replace(/\s*·\s*/g, '-').replace(/\s+/g, '')}` : '';
+        a.download = `แผนติดตาม-${report.ymd}${scopeSlug}.png`;
         document.body.appendChild(a);
         a.click();
         a.remove();

@@ -3,16 +3,28 @@ import { Copy, ImageDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
+import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import type { FollowEntry } from '@/lib/followApi';
-import { buildFollowDayReport, followDayReportTsv, FOLLOW_DAY_REPORT_HEADERS } from '@/lib/followDayReport';
-import { downloadFollowDayReportPng } from '@/lib/followDayReportImage';
+import {
+  buildFollowDayReport,
+  followDayReportTsv,
+  FOLLOW_DAY_REPORT_HEADERS,
+  FOLLOW_DAY_REPORT_NO_FILTER,
+  type FollowDayReportFilter,
+} from '@/lib/followDayReport';
+import { downloadFollowDayReportPng, followDayReportSummaryText } from '@/lib/followDayReportImage';
 
 /**
  * ═══ สรุปแผนติดตามทั้งวัน (เจ้าของสั่ง 2 ต.ค. 2569 · Choice "หน้าสรุปบนจอ") ═══
  * ตัวเลขบรรทัดเดียว + ตารางทุกสายของวันนั้น · ปุ่มคัดลอก = วางลง Excel/LINE ได้ · ว่าง = แถว "ไม่มี…" (ตารางไม่หาย)
+ *
+ * 🔴 เลือกก่อนโหลดได้ (เจ้าของสั่ง 3 ต.ค. 2569: *"ทำให้เลือกวัน เลือกสายได้ เลือกว่าจะดู
+ * แค่คนหรือ AI หรือหมดเลย ก่อนโหลดรูป"*) — วัน · สายที่ · ใครโทร · ตาราง/ตัวเลข/รูป
+ * มาจากชุดที่กรองแล้วชุดเดียวกันเสมอ และรูป+ชื่อไฟล์บอกขอบเขตที่กรอง
  */
 const NUM = new Intl.NumberFormat('th-TH');
 
@@ -27,13 +39,28 @@ export default function FollowDayReportDialog({
   ymd: string;
   entries: FollowEntry[];
 }) {
-  const report = React.useMemo(() => (open ? buildFollowDayReport(entries, ymd) : null), [open, entries, ymd]);
+  const [selYmd, setSelYmd] = React.useState(ymd);
+  const [caller, setCaller] = React.useState<FollowDayReportFilter['caller']>('all');
+  const [call, setCall] = React.useState<string>('all');
   const [copied, setCopied] = React.useState<'ok' | 'fail' | null>(null);
   const [saved, setSaved] = React.useState<'ok' | 'fail' | null>(null);
   React.useEffect(() => {
+    // เปิดใหม่ = เริ่มที่วันที่หน้าดูอยู่ + ไม่กรอง (ค่าที่ค้างจากรอบก่อนทำให้ตัวเลขดูผิดวัน)
+    setSelYmd(ymd);
+    setCaller('all');
+    setCall('all');
     setCopied(null);
     setSaved(null);
   }, [open, ymd]);
+
+  const filter = React.useMemo<FollowDayReportFilter>(
+    () => ({ caller, call: call === 'all' ? 'all' : Number(call) }),
+    [caller, call],
+  );
+  const report = React.useMemo(
+    () => (open && selYmd ? buildFollowDayReport(entries, selYmd, new Date(), filter) : null),
+    [open, entries, selYmd, filter],
+  );
 
   const copy = async () => {
     if (!report) return;
@@ -55,13 +82,55 @@ export default function FollowDayReportDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto !bg-background">
         <DialogHeader className="text-left">
-          <DialogTitle>แผนติดตามวันที่ {formatYmdDmyBe(ymd)}</DialogTitle>
+          <DialogTitle>แผนติดตามวันที่ {selYmd ? formatYmdDmyBe(selYmd) : '—'}</DialogTitle>
           <DialogDescription className="tabular-nums text-foreground">
-            {report
-              ? `${NUM.format(report.people)} คน · ${NUM.format(report.calls)} สาย · AI โทร ${NUM.format(report.ai)} · คนโทร ${NUM.format(report.manual)} · ยกเลิก ${NUM.format(report.cancelled)}`
-              : ''}
+            {report ? followDayReportSummaryText(report) : ''}
           </DialogDescription>
         </DialogHeader>
+
+        {/* เลือกวัน · สายที่ · ใครโทร — มีผลทั้งตาราง ตัวเลข ปุ่มคัดลอก และรูปที่โหลด */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="day-report-filters">
+          <span className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">วัน</span>
+            <DayCalendarPicker
+              value={selYmd}
+              onChange={(v) => {
+                if (!v) return;
+                setSelYmd(v);
+                // เลขสายของแต่ละวันไม่เท่ากัน — เปลี่ยนวันแล้วล้างตัวกรองสาย กันค้างเลขที่วันใหม่ไม่มี
+                setCall('all');
+              }}
+              emptyLabel="เลือกวัน"
+            />
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">สายที่</span>
+            <ChoiceDropdown
+              value={call}
+              options={[
+                { value: 'all', label: 'ทุกสาย' },
+                ...(report?.callNos ?? []).map((n) => ({ value: String(n), label: `สายที่ ${n}` })),
+              ]}
+              onChange={setCall}
+              ariaLabel="ดูเฉพาะสายที่"
+              active={call !== 'all'}
+            />
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">ใครโทร</span>
+            <ChoiceDropdown<FollowDayReportFilter['caller']>
+              value={caller}
+              options={[
+                { value: 'all', label: 'ทั้งหมด' },
+                { value: 'ai', label: 'AI โทร' },
+                { value: 'manual', label: 'คนโทร' },
+              ]}
+              onChange={setCaller}
+              ariaLabel="ดูเฉพาะใครโทร"
+              active={caller !== 'all'}
+            />
+          </span>
+        </div>
 
         <div className="overflow-x-auto rounded-xl border border-border" data-testid="follow-day-report">
           <Table>

@@ -51,6 +51,32 @@ describe('buildFollowDayReport', () => {
     expect(buildFollowDayReport([entry({})], '2026-10-09', NOW)).toMatchObject({ rows: [], people: 0, calls: 0, ai: 0, manual: 0, cancelled: 0 });
   });
 
+  /**
+   * ตัวกรองก่อนโหลดรูป (เจ้าของสั่ง 3 ต.ค. 2569: "เลือกวัน เลือกสายได้ เลือกว่าจะดูแค่คนหรือ AI")
+   * 🔴 ตัวเลขสรุปต้องมาจากชุดที่กรองแล้วชุดเดียวกับตาราง · callNos มาจากก่อนกรอง (ไว้ทำตัวเลือก)
+   */
+  it('กรองใครโทร/สายที่ — แถวและเลขสรุปตามตัวกรอง · scope บอกขอบเขต · callNos ครบก่อนกรอง', () => {
+    const rows = [
+      entry({ scheduled_at: '2026-10-02T08:00:00+07:00', call_day: 1, call_of_day: 1 }),
+      entry({ scheduled_at: '2026-10-02T12:00:00+07:00', call_mode: 'manual', call_day: 1, call_of_day: 2 }),
+    ];
+    const manualOnly = buildFollowDayReport(rows, '2026-10-02', NOW, { caller: 'manual', call: 'all' });
+    expect(manualOnly.rows).toHaveLength(1);
+    expect(manualOnly).toMatchObject({ calls: 1, ai: 0, manual: 1, scope: 'เฉพาะคนโทร' });
+    expect(manualOnly.callNos).toEqual([1, 2]);
+
+    const call1 = buildFollowDayReport(rows, '2026-10-02', NOW, { caller: 'all', call: 1 });
+    expect(call1.rows.map((x) => x.call)).toEqual(['วันที่ 1 · สายที่ 1']);
+    expect(call1.scope).toBe('สายที่ 1');
+
+    const both = buildFollowDayReport(rows, '2026-10-02', NOW, { caller: 'ai', call: 2 });
+    expect(both.rows).toHaveLength(0);
+    expect(both.scope).toBe('เฉพาะ AI โทร · สายที่ 2');
+
+    // ไม่ส่ง filter = พฤติกรรมเดิมทุกตัว และ scope ว่าง (รูปไม่ขึ้นคำขอบเขต)
+    expect(buildFollowDayReport(rows, '2026-10-02', NOW).scope).toBe('');
+  });
+
   it('ข้อความคัดลอก: หัวตาราง + แถวละสาย คั่นแท็บ · แท็บในค่ากลายเป็นเว้นวรรค', () => {
     const r = buildFollowDayReport([entry({ unit_name: 'ไซต์\tA' })], '2026-10-02', NOW);
     const lines = followDayReportTsv(r).split('\n');

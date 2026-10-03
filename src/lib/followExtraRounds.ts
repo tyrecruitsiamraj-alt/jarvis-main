@@ -26,8 +26,9 @@ export type ExtraRoundsResult = {
   pastCount: number;
 };
 
-/** ค่าจาก `<input type="datetime-local">` (YYYY-MM-DDTHH:mm ตามเวลาเครื่อง) → ISO */
-function localInputToIso(value: string): string | null {
+/** ค่าจาก `<input type="datetime-local">` (YYYY-MM-DDTHH:mm ตามเวลาเครื่อง) → ISO
+ * export ไว้ให้จอจับคู่ "ช่องที่ i → ISO ที่สร้างจริง" (เช่น เลือกใครโทรต่อรอบ · 3 ต.ค. 2569) */
+export function localInputToIso(value: string): string | null {
   const t = (value || '').trim();
   if (!t) return null;
   // ต้องมีอย่างน้อย วันที่+เวลา — เบราว์เซอร์บางตัวใส่วินาทีมาด้วย
