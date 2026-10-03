@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { type FollowEntry } from '@/lib/followApi';
+import { followCallerOf } from '@/lib/followListFilter';
 import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
 
 import {
@@ -395,9 +396,20 @@ export default function FollowCallRoundsPanel({
          */}
         {(() => {
           const row = matrix[activeRound];
+          /**
+           * AI โทร / คนโทร ของสายที่เลือก (เจ้าของสั่ง 3 ต.ค. 2569: *"บอกเพิ่มด้วยว่า AI เท่าไหร่ คนเท่าไหร่
+           * แบบ ทั้งหมด และ แต่ละสาย"*) — นับจากชุดเดียวกับ "ทั้งหมด" ⇒ AI + คน = ทั้งหมดเสมอ
+           * แต่ละสาย = เลือกใน dropdown "สายที่" (เลขชุดนี้เปลี่ยนตามเหมือนเลขอื่น)
+           */
+          const aiList = row.total.filter((e) => followCallerOf(e) === 'ai');
+          const manualList = row.total.filter((e) => followCallerOf(e) === 'manual');
+          const callerCells: Array<{ key: string; label: string; list: FollowEntry[] }> = [
+            { key: 'ai', label: 'AI โทร', list: aiList },
+            { key: 'manual', label: 'คนโทร', list: manualList },
+          ];
           return (
             <div className="px-5 pb-5 pt-4" data-testid="call-summary">
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-4 gap-x-2 gap-y-4 md:grid-cols-7">
                 {FOLLOW_MATRIX_COLS.map((c) => {
                   const n = row[c].length;
                   return (
@@ -420,6 +432,38 @@ export default function FollowCallRoundsPanel({
                     </button>
                   );
                 })}
+                {/* เส้นคั่นบาง ๆ แยก "ผลของสาย" กับ "ใครโทร" — จอแคบตกแถวเอง */}
+                {callerCells.map(({ key, label, list }, i) => (
+                  <button
+                    key={key}
+                    type="button"
+                    disabled={list.length === 0}
+                    data-testid={`caller-${key}`}
+                    onClick={() => {
+                      setPeopleLife('all');
+                      setPeopleDialog({
+                        title: `${FOLLOW_MATRIX_ROW_LABEL[activeRound]} · ${label} (${list.length.toLocaleString('th-TH')} คน)`,
+                        hint: '',
+                        people: list,
+                        splitByLife: true,
+                      });
+                    }}
+                    className={cn(
+                      'flex flex-col items-start rounded-lg py-1 text-left transition-opacity hover:opacity-80 disabled:cursor-default disabled:hover:opacity-100',
+                      i === 0 && 'md:border-l md:border-border/70 md:pl-4',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'text-3xl font-medium leading-none tabular-nums',
+                        list.length === 0 ? 'text-muted-foreground/50' : 'text-foreground',
+                      )}
+                    >
+                      {list.length.toLocaleString('th-TH')}
+                    </span>
+                    <span className="mt-1.5 text-xs text-muted-foreground">{label}</span>
+                  </button>
+                ))}
               </div>
               {/* แถบสัดส่วนใต้เลขถูกถอด (เจ้าของสั่ง 3 ต.ค. 2569 "เอาหลอดออก") — ห้ามเติมกลับ */}
             </div>

@@ -21,7 +21,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import PageHeader from '@/components/shared/PageHeader';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +34,7 @@ import { TONE } from '@/lib/designTokens';
 import { followScheduleCounts } from '@/lib/followSchedule';
 import { roundTabLabel } from '@/lib/followRoundVisual';
 import { conveyorLabel } from '@/lib/soRecruitNav';
-import { Settings2, Plus, X, LoaderCircle, PhoneForwarded, Users, UserCog, Building2, ChevronLeft, ChevronRight, RefreshCw, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Settings2, Plus, X, LoaderCircle, PhoneForwarded, Users, UserCog, Building2, ChevronLeft, ChevronRight, RefreshCw, ClipboardList } from 'lucide-react';
 import {
   listFollowEntries,
   createFollowRounds,
@@ -1272,17 +1271,140 @@ const FollowPage: React.FC = () => {
    */
   const schedule = useMemo(() => followScheduleCounts(scopeItems), [scopeItems]);
 
+  /**
+   * ปุ่มทั้งหมดของหน้า — อยู่แถวบนสุดคู่กับแท็บ (เจ้าของสั่ง 3 ต.ค. 2569: *"ย้ายไปอยู่แถวเดียวกับ
+   * ติดตามคนเริ่มงาน / ส่งคนแทน แล้วเอาคำนั้นออก"* + แท็บก็แถวเดียวกัน) · เดิมอยู่หัวปฏิทิน
+   */
+  const headerButtons = (
+    <>
+      {/* 🔴 ปุ่ม "เพิ่มคนที่ต้องการติดตาม" อยู่แถวเดียวกับ "เพิ่มเจ้าหน้าที่"
+          (เจ้าของสั่ง 1 ก.ย. 2569) · ปุ่มนี้ **ทุกคนกดได้** ต่างจากอีกสองปุ่มที่เป็น
+          supervisor+ จึงอยู่นอกเงื่อนไข canManageMasters */}
+      <Button
+        size="sm"
+        type="button"
+        onClick={() => {
+          setFormOpen(true);
+          setFormError(null);
+        }}
+        className="inline-flex h-8 items-center gap-1 px-3 text-[11px] touch-manipulation"
+      >
+        <Plus aria-hidden /> เพิ่มคนที่ต้องการติดตาม
+      </Button>
+      {/* สรุปแผนทั้งวันของวันที่ดูอยู่ (เจ้าของสั่ง 2 ต.ค. 2569 · Choice "หน้าสรุปบนจอ") */}
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => setReportOpen(true)}
+        className="inline-flex h-8 items-center gap-1 px-3 text-[11px]"
+      >
+        <ClipboardList aria-hidden /> สรุปแผนทั้งวัน
+      </Button>
+      {/* ═══ ตัวกรองทั้งหมดอยู่ในกล่องเดียว ข้าง ๆ ปุ่มเพิ่มคน (เจ้าของสั่ง 1 ก.ย. 2569) ═══
+          *"ย้ายทุกช่วงเวลาเข้าไปไว้กับเลือกวัน · แล้วย้ายเลือกวันไปไว้ข้าง ๆ เพิ่มคน"*
+          🔴 ยังเป็น `fDate`/`fBand` ชุดเดิม — และเป็น **ตัวเลือกวันตัวเดียวของหน้า**
+          (ปฏิทินในการ์ดใช้ค่านี้ ไม่มีปุ่มเลือกวันของตัวเอง) */}
+      <DayCalendarPicker
+        className="h-8 min-h-0 py-1 text-[11px]"
+        value={fDate}
+        onChange={pickCalendarDay}
+        /* 🔴 "เลือกวัน" ทำให้คนใหม่คิดว่าต้องกดก่อนเพิ่มคน (ตาใหม่ 12 ก.ย. 2569)
+           — มันคือตัวเปลี่ยนวันที่ "ดู" ไม่ใช่ขั้นตอนของการสร้างงาน */
+        emptyLabel="ดูวันอื่น"
+        active={hasActiveFilter}
+        suffix={fBand ? TIME_BAND_LABEL[fBand].replace(/\s*\(.*\)$/, '') : ''}
+        onClearAll={() => {
+          pickCalendarDay('');
+          setFBand('');
+        }}
+        extra={
+          <label className="block space-y-1">
+            <span className="text-[11px] font-medium text-muted-foreground">ช่วงเวลา</span>
+            <select
+              value={fBand}
+              onChange={(e) => setFBand(e.target.value as TimeBand)}
+              className="jarvis-soft-field min-h-[36px] w-full text-xs"
+            >
+              <option value="">ทุกช่วงเวลา</option>
+              <option value="morning">{TIME_BAND_LABEL.morning}</option>
+              <option value="afternoon">{TIME_BAND_LABEL.afternoon}</option>
+              <option value="evening">{TIME_BAND_LABEL.evening}</option>
+            </select>
+          </label>
+        }
+      />
+      {/**
+       * 🔴 **ยุบเป็นเมนูรอง** (12 ก.ย. 2569) — "เพิ่มเรื่อง"/"เพิ่มเจ้าหน้าที่" เป็นงาน
+       * ตั้งค่าครั้งแรก ไม่ใช่งานประจำวัน · ของเดิมยืนเรียงเท่ากับปุ่มหลัก ทำให้คนใหม่
+       * ไม่รู้ว่าต้องกดอันไหนก่อน (ตาใหม่: *"ต้องกดก่อนหรือหลังเพิ่มคน"*)
+       * ⇒ หัวหน้าเหลือปุ่มเด่นปุ่มเดียวคือ "เพิ่มคนที่ต้องการติดตาม"
+       */}
+      {canManageMasters ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              title="ตั้งค่ารายการตัวเลือก (ทำครั้งเดียวตอนเริ่มใช้)"
+              className={cn(
+                'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-medium',
+                TONE.neutral.outline,
+              )}
+            >
+              <Settings2 className="h-3 w-3" aria-hidden /> ตั้งค่าตัวเลือก
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-52">
+            <DropdownMenuLabel className="text-[11px]">
+              ตั้งค่ารายการตัวเลือก
+            </DropdownMenuLabel>
+            <DropdownMenuItem onSelect={() => setTopicManagerOpen(true)}>
+              <Plus aria-hidden /> เพิ่มเรื่องที่ให้โทรติดตาม
+            </DropdownMenuItem>
+            {/* 🔴 **ตัวจริงของเบอร์เจ้าหน้าที่ = หน้าผู้ใช้งาน** (เจ้าของเคาะ 23 ก.ย. 2569
+                ย้ำคำสั่งเดิม 1 ก.ย.: *"กำหนดทั้ง Role คัดสรร ชื่อเล่น และเบอร์โทรทีเดียว"*)
+                ⇒ พาไปที่นั่นเลย · ช่องนี้โผล่เฉพาะ admin เพราะ /api/app-users เป็น admin
+                เท่านั้น — โชว์ให้ supervisor กดแล้วเจอหน้าโหลดไม่ขึ้นคือพาไปทางตัน */}
+            {canEditUsers ? (
+              <DropdownMenuItem onSelect={() => navigate('/settings?tab=users')}>
+                <UserCog aria-hidden /> ตั้งชื่อเล่น + เบอร์เจ้าหน้าที่ (หน้าผู้ใช้งาน)
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuItem onSelect={() => setStaffManagerOpen(true)}>
+              <Plus aria-hidden /> เพิ่มเบอร์คนที่ไม่มีบัญชีผู้ใช้
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
+      {/* รีเฟรช — ย้ายมาจากมุมขวาบนของแผงการโทรที่ถูกยุบเข้ามา */}
+      <button
+        type="button"
+        onClick={() => void reload()}
+        disabled={loading}
+        aria-label="รีเฟรช"
+        title="รีเฟรช"
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border hover:bg-secondary disabled:opacity-50"
+      >
+        <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} aria-hidden />
+      </button>
+    </>
+  );
+
   return (
     <div className="relative">
-      <PageHeader
-        /* 🔴 ชื่อหัวหน้าต้อง = ชื่อเมนู เสมอ — เดิมเป็น "Follow" */
-        title={conveyorLabel('follow')}
-        /* 🔴 ไม่มีประโยคใต้ชื่อหน้า (เจ้าของสั่ง 1 ต.ค. 2569: *"ลงรายชื่อคนที่ต้องติดตาม แล้ว AI จะโทรตามให้ เอาออก"*) */
-        backPath="/"
-      />
-
-      {/* แท็บ "รายชื่อติดตาม | Dashboard" (28 ก.ย. 2569) — ?view=dashboard · กดเปลี่ยน = push (ย้อนกลับแล้วไม่หลุดหน้า) */}
-      <div className="px-4 md:px-6">
+      {/**
+       * 🔴 แถวบนสุดแถวเดียว (เจ้าของสั่ง 3 ต.ค. 2569): ย้อนกลับ · แท็บ · ปุ่มทั้งหมดของหน้าชิดขวา
+       * ชื่อหน้า "ติดตามคนเริ่มงาน / ส่งคนแทน" ถอดออกตามสั่ง (ชื่อยังอยู่ที่เมนูและแถบบนของระบบ)
+       * หัว "ปฏิทินติดตาม + วันที่" ของปฏิทินถอดด้วย — วันที่อยู่ที่ปุ่มวันในตารางแล้ว
+       * แท็บ Dashboard ไม่มีปุ่มชุดนี้ (ไม่มีอะไรให้เพิ่ม/สรุป)
+       */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-4 md:px-6 md:pt-5">
+        {/* ชื่อหน้ายังอยู่สำหรับโปรแกรมอ่านจอ/แท็บเบราว์เซอร์ — มองไม่เห็นบนจอตามที่เจ้าของสั่งถอด (ชื่อ = ชื่อเมนูเสมอ) */}
+        <h1 className="sr-only">{conveyorLabel('follow')}</h1>
+        <Button type="button" variant="ghost" size="icon" aria-label="ย้อนกลับ" onClick={() => navigate('/')}>
+          <ArrowLeft aria-hidden />
+        </Button>
+        {/* แท็บ "รายชื่อติดตาม | ส่งคนแทน | Dashboard" — ?view=… · กดเปลี่ยน = push (ย้อนกลับแล้วไม่หลุดหน้า) */}
         <Tabs
           value={followView}
           onValueChange={(v) => setFollowView(v === 'dashboard' ? 'dashboard' : v === 'replace' ? 'replace' : 'list')}
@@ -1293,6 +1415,10 @@ const FollowPage: React.FC = () => {
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           </TabsList>
         </Tabs>
+        <span className="flex-1" />
+        {followView !== 'dashboard' ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-2">{headerButtons}</div>
+        ) : null}
       </div>
 
       {followView === 'dashboard' ? (
@@ -1379,120 +1505,6 @@ const FollowPage: React.FC = () => {
                 </>
               }
             />
-          }
-          headerAction={
-            <>
-              {/* 🔴 ปุ่ม "เพิ่มคนที่ต้องการติดตาม" อยู่แถวเดียวกับ "เพิ่มเจ้าหน้าที่"
-                  (เจ้าของสั่ง 1 ก.ย. 2569) · ปุ่มนี้ **ทุกคนกดได้** ต่างจากอีกสองปุ่มที่เป็น
-                  supervisor+ จึงอยู่นอกเงื่อนไข canManageMasters */}
-              <Button
-                size="sm"
-                type="button"
-                onClick={() => {
-                  setFormOpen(true);
-                  setFormError(null);
-                }}
-                className="inline-flex h-8 items-center gap-1 px-3 text-[11px] touch-manipulation"
-              >
-                <Plus aria-hidden /> เพิ่มคนที่ต้องการติดตาม
-              </Button>
-              {/* สรุปแผนทั้งวันของวันที่ดูอยู่ (เจ้าของสั่ง 2 ต.ค. 2569 · Choice "หน้าสรุปบนจอ") */}
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setReportOpen(true)}
-                className="inline-flex h-8 items-center gap-1 px-3 text-[11px]"
-              >
-                <ClipboardList aria-hidden /> สรุปแผนทั้งวัน
-              </Button>
-              {/* ═══ ตัวกรองทั้งหมดอยู่ในกล่องเดียว ข้าง ๆ ปุ่มเพิ่มคน (เจ้าของสั่ง 1 ก.ย. 2569) ═══
-                  *"ย้ายทุกช่วงเวลาเข้าไปไว้กับเลือกวัน · แล้วย้ายเลือกวันไปไว้ข้าง ๆ เพิ่มคน"*
-                  🔴 ยังเป็น `fDate`/`fBand` ชุดเดิม — และเป็น **ตัวเลือกวันตัวเดียวของหน้า**
-                  (ปฏิทินในการ์ดใช้ค่านี้ ไม่มีปุ่มเลือกวันของตัวเอง) */}
-              <DayCalendarPicker
-                className="h-8 min-h-0 py-1 text-[11px]"
-                value={fDate}
-                onChange={pickCalendarDay}
-                /* 🔴 "เลือกวัน" ทำให้คนใหม่คิดว่าต้องกดก่อนเพิ่มคน (ตาใหม่ 12 ก.ย. 2569)
-                   — มันคือตัวเปลี่ยนวันที่ "ดู" ไม่ใช่ขั้นตอนของการสร้างงาน */
-                emptyLabel="ดูวันอื่น"
-                active={hasActiveFilter}
-                suffix={fBand ? TIME_BAND_LABEL[fBand].replace(/\s*\(.*\)$/, '') : ''}
-                onClearAll={() => {
-                  pickCalendarDay('');
-                  setFBand('');
-                }}
-                extra={
-                  <label className="block space-y-1">
-                    <span className="text-[11px] font-medium text-muted-foreground">ช่วงเวลา</span>
-                    <select
-                      value={fBand}
-                      onChange={(e) => setFBand(e.target.value as TimeBand)}
-                      className="jarvis-soft-field min-h-[36px] w-full text-xs"
-                    >
-                      <option value="">ทุกช่วงเวลา</option>
-                      <option value="morning">{TIME_BAND_LABEL.morning}</option>
-                      <option value="afternoon">{TIME_BAND_LABEL.afternoon}</option>
-                      <option value="evening">{TIME_BAND_LABEL.evening}</option>
-                    </select>
-                  </label>
-                }
-              />
-              {/**
-               * 🔴 **ยุบเป็นเมนูรอง** (12 ก.ย. 2569) — "เพิ่มเรื่อง"/"เพิ่มเจ้าหน้าที่" เป็นงาน
-               * ตั้งค่าครั้งแรก ไม่ใช่งานประจำวัน · ของเดิมยืนเรียงเท่ากับปุ่มหลัก ทำให้คนใหม่
-               * ไม่รู้ว่าต้องกดอันไหนก่อน (ตาใหม่: *"ต้องกดก่อนหรือหลังเพิ่มคน"*)
-               * ⇒ หัวหน้าเหลือปุ่มเด่นปุ่มเดียวคือ "เพิ่มคนที่ต้องการติดตาม"
-               */}
-              {canManageMasters ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      title="ตั้งค่ารายการตัวเลือก (ทำครั้งเดียวตอนเริ่มใช้)"
-                      className={cn(
-                        'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-medium',
-                        TONE.neutral.outline,
-                      )}
-                    >
-                      <Settings2 className="h-3 w-3" aria-hidden /> ตั้งค่าตัวเลือก
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-52">
-                    <DropdownMenuLabel className="text-[11px]">
-                      ตั้งค่ารายการตัวเลือก
-                    </DropdownMenuLabel>
-                    <DropdownMenuItem onSelect={() => setTopicManagerOpen(true)}>
-                      <Plus aria-hidden /> เพิ่มเรื่องที่ให้โทรติดตาม
-                    </DropdownMenuItem>
-                    {/* 🔴 **ตัวจริงของเบอร์เจ้าหน้าที่ = หน้าผู้ใช้งาน** (เจ้าของเคาะ 23 ก.ย. 2569
-                        ย้ำคำสั่งเดิม 1 ก.ย.: *"กำหนดทั้ง Role คัดสรร ชื่อเล่น และเบอร์โทรทีเดียว"*)
-                        ⇒ พาไปที่นั่นเลย · ช่องนี้โผล่เฉพาะ admin เพราะ /api/app-users เป็น admin
-                        เท่านั้น — โชว์ให้ supervisor กดแล้วเจอหน้าโหลดไม่ขึ้นคือพาไปทางตัน */}
-                    {canEditUsers ? (
-                      <DropdownMenuItem onSelect={() => navigate('/settings?tab=users')}>
-                        <UserCog aria-hidden /> ตั้งชื่อเล่น + เบอร์เจ้าหน้าที่ (หน้าผู้ใช้งาน)
-                      </DropdownMenuItem>
-                    ) : null}
-                    <DropdownMenuItem onSelect={() => setStaffManagerOpen(true)}>
-                      <Plus aria-hidden /> เพิ่มเบอร์คนที่ไม่มีบัญชีผู้ใช้
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : null}
-              {/* รีเฟรช — ย้ายมาจากมุมขวาบนของแผงการโทรที่ถูกยุบเข้ามา */}
-              <button
-                type="button"
-                onClick={() => void reload()}
-                disabled={loading}
-                aria-label="รีเฟรช"
-                title="รีเฟรช"
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border hover:bg-secondary disabled:opacity-50"
-              >
-                <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} aria-hidden />
-              </button>
-            </>
           }
         />
 

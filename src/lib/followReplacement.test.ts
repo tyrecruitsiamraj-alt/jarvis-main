@@ -91,6 +91,18 @@ describe('หน้าการติดตาม: หัวการ์ด Call
     const summary = panel.slice(panel.indexOf('data-testid="call-summary"'), panel.indexOf('สัญญาณ + ผลจาก AI'));
     expect(summary).not.toContain('bg-secondary');
     expect(summary).not.toContain('width: `');
+    // AI โทร / คนโทร ของสายที่เลือก (3 ต.ค. 2569 "บอกเพิ่มด้วยว่า AI เท่าไหร่ คนเท่าไหร่ แบบทั้งหมดและแต่ละสาย")
+    expect(panel).toContain("{ key: 'ai', label: 'AI โทร', list: aiList }");
+    expect(panel).toContain("{ key: 'manual', label: 'คนโทร', list: manualList }");
+  });
+
+  it('🔴 แถวบนสุด = ย้อนกลับ + แท็บ + ปุ่มของหน้า · ชื่อหน้าไม่โชว์บนจอ (3 ต.ค. 2569)', () => {
+    expect(page).not.toContain('<PageHeader');
+    expect(page).toContain('<h1 className="sr-only">{conveyorLabel(\'follow\')}</h1>');
+    expect(page).toContain('{headerButtons}');
+    const calendar = read('components/follow/FollowPlanningCalendar.tsx');
+    expect(calendar).not.toContain('>ปฏิทินติดตาม</h2>');
+    expect(calendar).not.toContain('headerAction');
     expect(panel).toContain('buildFollowCallMatrix(entries)');
     expect(panel.match(/\{filtersSlot\}/g)?.length).toBe(1);
     // 🔴 ไม่หุบการ์ดตอนว่างแล้ว (เจ้าของสั่ง 1 ต.ค. 2569 "ถ้าไม่มีข้อมูลก็เป็น 0 ไป") — ห้ามกลับไปหุบ

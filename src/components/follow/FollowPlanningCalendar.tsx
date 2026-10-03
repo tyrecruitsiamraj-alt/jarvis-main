@@ -39,6 +39,7 @@ import {
   type FollowRoundFilter,
 } from '@/lib/followPlanning';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
+import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import {
   classifyFollowCall,
   followMicroRates,
@@ -82,8 +83,12 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type View = 'day' | 'month';
 
-/** จำนวนสายต่อหน้าในตารางรายวัน (แบบอ้างอิงแบ่งหน้าเหมือนกัน) */
-const DAY_PAGE_SIZE = 12;
+/**
+ * คนต่อหน้าในตารางรายวัน — เลือกได้ 10 / 15 (เจ้าของสั่ง 3 ต.ค. 2569 "ทำเป็น Pagination 10-15 ต่อหน้า")
+ * ค่าเริ่ม 10 · เดิมล็อก 12 ไม่มีตัวเลือก
+ */
+const DAY_PAGE_SIZES = [10, 15] as const;
+type DayPageSize = (typeof DAY_PAGE_SIZES)[number];
 
 /** ชื่อเดือนไทย + ปี พ.ศ. จากคีย์ YYYY-MM */
 function monthLabel(monthKey: string): string {
@@ -98,14 +103,6 @@ function shiftYmd(ymd: string, days: number): string {
   if (!m) return ymd;
   const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + days));
   return d.toISOString().slice(0, 10);
-}
-
-const THAI_WEEKDAY_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
-function dayHeading(ymd: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
-  if (!m) return ymd;
-  const dow = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).getUTCDay();
-  return `วัน${THAI_WEEKDAY_FULL[dow]}ที่ ${formatYmdDmyBe(ymd)}`;
 }
 
 /** ป้ายวันบนปุ่มเลือกวัน ("พฤ. 1 ต.ค. 2569") — 🔴 `Intl` ระดับโมดูล · คีย์วันเป็นสตริง จึงคิดเป็น UTC ล้วน */
@@ -313,8 +310,6 @@ const FollowPlanningCalendar: React.FC<{
   roundFilter: FollowRoundFilter;
   /** แผงรอบโทร + 7 ช่องสถานะสาย — วางเป็นการ์ดของตัวเองใต้การ์ดตัวเลข */
   roundsSlot?: React.ReactNode;
-  /** ปุ่มของหน้าแม่ (เพิ่มคน · เลือกวัน · เพิ่มเรื่อง/เจ้าหน้าที่ · รีเฟรช) */
-  headerAction?: React.ReactNode;
   /** เวลาที่ดึงข้อมูลสำเร็จล่าสุด — ไว้บอกคนว่าหน้าไม่ได้ค้าง (`null` = ยังไม่เคยโหลดจบ) */
   lastLoadedAt?: Date | null;
   /**
@@ -347,7 +342,6 @@ const FollowPlanningCalendar: React.FC<{
   onEditRound,
   roundFilter,
   roundsSlot,
-  headerAction,
   lastLoadedAt,
   onStaffResult,
   onCancelRound,
@@ -403,11 +397,13 @@ const FollowPlanningCalendar: React.FC<{
 
   /** แบ่งหน้าแบบแบบอ้างอิง — เปลี่ยนวัน/รอบแล้วต้องเด้งกลับหน้า 1 ไม่งั้นค้างหน้าว่าง */
   const [page, setPage] = useState(1);
-  useEffect(() => setPage(1), [dayYmd, roundFilter]);
-  const pageCount = Math.max(1, Math.ceil(dayPeople.length / DAY_PAGE_SIZE));
+  const [dayPageSize, setDayPageSize] = useState<DayPageSize>(10);
+  // เปลี่ยนวัน/สาย/จำนวนต่อหน้า = กลับหน้า 1 (ไม่งั้นค้างหน้าที่ไม่มีของ)
+  useEffect(() => setPage(1), [dayYmd, roundFilter, dayPageSize]);
+  const pageCount = Math.max(1, Math.ceil(dayPeople.length / dayPageSize));
   const safePage = Math.min(page, pageCount);
-  const firstIndex = (safePage - 1) * DAY_PAGE_SIZE;
-  const lastIndex = Math.min(firstIndex + DAY_PAGE_SIZE, dayPeople.length);
+  const firstIndex = (safePage - 1) * dayPageSize;
+  const lastIndex = Math.min(firstIndex + dayPageSize, dayPeople.length);
   const pagePeople = dayPeople.slice(firstIndex, lastIndex);
 
   /* ─── มุมมองรายเดือน ─── */
@@ -500,17 +496,7 @@ const FollowPlanningCalendar: React.FC<{
 
   return (
     <div className="space-y-4">
-      {/* ── หัวเรื่อง + ปุ่มทั้งหมดของหน้า (แบบอ้างอิงวางปุ่มหลักไว้มุมขวาบน) ── */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-[20px] font-medium leading-tight text-foreground">ปฏิทินติดตาม</h2>
-          <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-            {view === 'day' ? dayHeading(dayYmd) : monthLabel(month)}
-          </p>
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-2">{headerAction}</div>
-      </div>
-
+      {/* ── หัว "ปฏิทินติดตาม + วันที่" และปุ่มของหน้าย้ายขึ้นแถวบนสุดคู่กับแท็บแล้ว (เจ้าของสั่ง 3 ต.ค. 2569) ── */}
       {/* ── 1. การ์ดตัวเลข 4 ใบ ถูกถอด (เจ้าของเคาะ 3 ต.ค. 2569 — รวมเข้าตารางสายในแผงขั้นตอนข้างล่าง
           เลขชุดเดียวกันอยู่สองที่แล้วชนกันจนงง) · ห้ามเอากลับ ── */}
       {/* ── 2. แถบขั้นตอน = แผงรอบโทร + 7 ช่องสถานะสาย (การ์ดของตัวเอง) ── */}
@@ -1094,8 +1080,19 @@ const FollowPlanningCalendar: React.FC<{
                         </span>
                       ) : null}
                     </span>
+                    <span className="ml-auto flex flex-wrap items-center gap-2">
+                    {/* ต่อหน้า 10 / 15 — อยู่เสมอแม้มีหน้าเดียว (หน้าห้ามย่อ/ขยายเองตามจำนวนข้อมูล) */}
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-[11.5px] text-muted-foreground">ต่อหน้า</span>
+                      <ChoiceDropdown<string>
+                        value={String(dayPageSize)}
+                        options={DAY_PAGE_SIZES.map((n) => ({ value: String(n), label: `${n} คน` }))}
+                        onChange={(v) => setDayPageSize(Number(v) as DayPageSize)}
+                        ariaLabel="จำนวนคนต่อหน้า"
+                      />
+                    </span>
                     {pageCount > 1 ? (
-                      <span className="ml-auto flex items-center gap-1">
+                      <span className="flex items-center gap-1">
                         <button
                           type="button"
                           aria-label="หน้าก่อนหน้า"
@@ -1130,6 +1127,7 @@ const FollowPlanningCalendar: React.FC<{
                         </button>
                       </span>
                     ) : null}
+                    </span>
                   </div>
                 </>
             </>
