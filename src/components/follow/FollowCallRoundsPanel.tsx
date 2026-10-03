@@ -27,6 +27,16 @@ import {
 } from '@/lib/followRoundVisual';
 import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
 import {
+  FOLLOW_MATRIX_COLS,
+  FOLLOW_MATRIX_COL_LABEL,
+  FOLLOW_MATRIX_COL_TONE,
+  FOLLOW_MATRIX_ROWS,
+  FOLLOW_MATRIX_ROW_LABEL,
+  buildFollowCallMatrix,
+  type FollowMatrixCol,
+  type FollowMatrixRowKey,
+} from '@/lib/followCallMatrix';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -236,25 +246,20 @@ export default function FollowCallRoundsPanel({
   );
   const countsOfRound = useMemo(() => countFollowRoundBuckets(rowsOfRound), [rowsOfRound]);
   const roundLabelOf = (r: FollowRoundFilter) => (r === 'all' ? 'ทุกสาย' : roundFilterLabel(r));
-  /**
-   * กล่อง "เข้ามาในรอบนี้" ต้องแตกเลขให้เห็นว่ารวมอะไร (เจ้าของงง 3 ต.ค. 2569:
-   * *"สายที่ต้องตามมี 11 แต่เข้ามาบอกมี 49 คือไร"* — 49 = เหลือตาม 11 + ปิดงานแล้ว 33 +
-   * ยกเลิก 5 · สองเลขถูกทั้งคู่แต่จอไม่เคยบอกความสัมพันธ์) — ชุดเดียวกับเลขก้อนเสมอ
-   */
-  const allBreakdown = useMemo(() => {
-    let remaining = 0;
-    let closed = 0;
-    let cancelled = 0;
-    for (const e of rowsOfRound) {
-      if (e.cancelled) cancelled += 1;
-      else if (e.completed_at) closed += 1;
-      else remaining += 1;
-    }
-    const n = (v: number) => v.toLocaleString('th-TH');
-    return `เหลือตาม ${n(remaining)} · ปิดงานแล้ว ${n(closed)} · ยกเลิก ${n(cancelled)}`;
-  }, [rowsOfRound]);
-  /** คำใต้กล่อง — กล่องรวม ('all') ใช้เลขแตกก้อนแทนคำนิยามลอย ๆ */
-  const bucketFoot = (b: FollowRoundBucket) => (b === 'all' ? allBreakdown : FOLLOW_ROUND_BUCKET_HINT[b]);
+
+  /** ตารางสายก้อนเดียว (3 ต.ค. 2569) — แต่ละช่องถือรายชื่อจริง เลข = ความยาวลิสต์ */
+  const matrix = useMemo(() => buildFollowCallMatrix(entries), [entries]);
+  const openMatrixDialog = (r: FollowMatrixRowKey, c: FollowMatrixCol) => {
+    const list = matrix[r][c];
+    setPeopleLife('all');
+    setPeopleDialog({
+      title: `${FOLLOW_MATRIX_ROW_LABEL[r]} · ${FOLLOW_MATRIX_COL_LABEL[c]} (${list.length.toLocaleString('th-TH')} คน)`,
+      hint: '',
+      people: list,
+      // ช่อง "ทั้งหมด" เห็นทุกสถานะ — แยกดู เหลือตาม/ปิดแล้ว/ยกเลิก ได้ในป๊อป
+      splitByLife: c === 'total',
+    });
+  };
 
   const openBucketDialog = (slot: FollowRoundFilter, b: FollowRoundBucket) => {
     const rows = slot === 'all' ? rowsOfRound : (roundRows.get(slot) ?? []);
@@ -359,87 +364,99 @@ export default function FollowCallRoundsPanel({
      */
     return (
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        {/* หัวการ์ด: ไอคอน + ชื่อเรื่อง ซ้าย · ตัวเลือกรอบ ขวา (แบบอ้างอิงวางเป้าหมายไว้ขวา) */}
+        {/* หัวการ์ด: ไอคอน + ชื่อเรื่อง ซ้าย · ตัวกรองขวา */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-5">
           <GitBranch className={cn('h-5 w-5', TONE.primary.value)} aria-hidden />
           <h2 className="text-[17px] font-medium text-foreground">ขั้นตอนของสาย (Call Pipeline)</h2>
           <span className="flex-1" />
-          {/* 🔴 "ดูเฉพาะ" + "งานจบหรือยัง" เป็น dropdown คู่กันบนหัวการ์ด (เจ้าของสั่ง 1 ต.ค. 2569) — เดิมเป็นแถวชิป */}
           <div className="flex flex-wrap items-center gap-2" role="group" aria-label="ตัวกรอง">
-            {/* 🔴 เลขต่อสายต้องเห็นเลยไม่ต้องกด (เจ้าของสั่ง 3 ต.ค. 2569: *"มันต้องบอก
-                ทั้งหมดเท่าไหร่ สาย1เท่าไหร่ สาย2เท่าไหร่ สายที่3 เท่าไหร่"*) — เลิกพับใน dropdown
-                กดเม็ดไหน = กล่องข้างล่างนับเฉพาะสายนั้น (พฤติกรรมเดิมของ "ดูเฉพาะ") */}
-            {(['all', 1, 2, 3] as FollowRoundFilter[]).map((r) => {
-              const rows = r === 'all' ? [...roundRows.values()].flat() : (roundRows.get(r) ?? []);
-              const label = r === 'all' ? 'ทั้งหมด' : roundLabelOf(r);
-              const on = activeRound === r;
-              return (
-                <button
-                  key={String(r)}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => pickRound(r)}
-                  className={cn(
-                    'inline-flex h-8 items-center rounded-full border px-3 text-[11.5px] font-medium tabular-nums transition-colors',
-                    on ? 'border-primary bg-primary text-primary-foreground' : TONE.neutral.outline,
-                  )}
-                >
-                  {label} · {rows.length.toLocaleString('th-TH')}
-                </button>
-              );
-            })}
+            {/* 🔴 สายที่ = dropdown (เจ้าของสั่ง 3 ต.ค. 2569 "เอาพวกนี้รวมกันเป็น Dropdown") —
+                เลขต่อสายเห็นครบในตารางข้างล่างแล้ว · ตัวนี้กรองตารางรายชื่อด้านล่างหน้า */}
+            <span className="text-xs text-muted-foreground">สายที่</span>
+            <ChoiceDropdown
+              value={String(activeRound)}
+              options={FOLLOW_MATRIX_ROWS.map((r) => ({
+                value: String(r),
+                label: `${r === 'all' ? 'ทั้งหมด' : FOLLOW_MATRIX_ROW_LABEL[r]} · ${matrix[r].total.length.toLocaleString('th-TH')}`,
+              }))}
+              onChange={(v) => pickRound(v === 'all' ? 'all' : (Number(v) as 1 | 2 | 3))}
+              ariaLabel="ดูเฉพาะสายที่"
+              active={activeRound !== 'all'}
+            />
             {filtersSlot}
           </div>
         </div>
 
-        {/* การ์ดขั้นตอนย่อย — ทรงเดียวกับ Pipeline Stages ของแบบอ้างอิง */}
-        <div className="grid grid-cols-3 gap-3 px-5 pb-4 pt-4">
-          {FOLLOW_PIPELINE_SHOWN_BUCKETS.map((b, i) => {
-            const n = countsOfRound[b];
-            const vis = bucketVisual(b, n);
-            const tone = TONE[vis.tone];
-            const pct = countsOfRound.all > 0 ? Math.round((n / countsOfRound.all) * 100) : 0;
-            return (
-              <button
-                key={b}
-                type="button"
-                disabled={n === 0}
-                title={FOLLOW_ROUND_BUCKET_HINT[b]}
-                onClick={() => openBucketDialog(activeRound, b)}
-                className={cn(
-                  'flex flex-col rounded-xl border p-3 text-left transition-all',
-                  vis.muted
-                    ? 'cursor-default border-border/60 opacity-70'
-                    : cn(
-                        'border-border hover:-translate-y-0.5 hover:shadow-md',
-                        vis.actionable && cn(tone.soft, 'border-transparent'),
-                      ),
-                )}
-              >
-                <span className="flex items-start justify-between gap-2">
-                  <span className="text-[11px] font-medium text-muted-foreground">ขั้นที่ {i + 1}</span>
-                  <span
+        {/**
+         * 🔴 ตารางก้อนเดียว (เจ้าของเคาะ 3 ต.ค. 2569) แทนการ์ด 4 ใบ + กล่องขั้นตอน 3 กล่อง ที่พูดเรื่องเดียวกันสองที่
+         * ต้องบอกครบ: ทั้งหมด · สาย 1/2/3 · แต่ละสาย ไป/ไม่ไป/สรุปไม่ได้ (+ยกเลิก ไม่ให้เลขหายเงียบ)
+         * ทุกแถวบวกกันได้พอดี · กดเลขไหนเห็นรายชื่อชุดนั้น · กดชื่อแถว = กรองตารางรายชื่อด้านล่าง
+         */}
+        <div className="overflow-x-auto px-5 pb-4 pt-4">
+          <table className="w-full min-w-[520px] border-collapse text-left" data-testid="call-matrix">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="py-2 pr-3 text-[11px] font-medium text-muted-foreground" />
+                {FOLLOW_MATRIX_COLS.map((c) => (
+                  <th
+                    key={c}
+                    className={cn('px-2 py-2 text-right text-[11px] font-medium', TONE[FOLLOW_MATRIX_COL_TONE[c]].value)}
+                  >
+                    {FOLLOW_MATRIX_COL_LABEL[c]}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {FOLLOW_MATRIX_ROWS.map((r) => {
+                const on = activeRound === r;
+                return (
+                  <tr
+                    key={String(r)}
                     className={cn(
-                      'flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-medium tabular-nums',
-                      tone.chip,
+                      'border-b border-border/50 last:border-0',
+                      r === 'all' && 'font-medium',
+                      on && 'bg-primary/5',
                     )}
                   >
-                    {n.toLocaleString('th-TH')}
-                  </span>
-                </span>
-                <span className={cn('mt-2 text-[14px] font-medium leading-tight', tone.value)}>
-                  {FOLLOW_ROUND_BUCKET_LABEL[b]}
-                </span>
-                <span className="mt-0.5 line-clamp-2 text-[10.5px] leading-snug text-muted-foreground">
-                  {bucketFoot(b)}
-                </span>
-                {/* หลอดหนาที่ก้นการ์ด — จุดเด่นของแบบอ้างอิง */}
-                <span className="mt-auto block h-1.5 w-full overflow-hidden rounded-full bg-secondary" aria-hidden>
-                  <span className={cn('block h-full rounded-full', tone.dot)} style={{ width: `${pct}%` }} />
-                </span>
-              </button>
-            );
-          })}
+                    <th scope="row" className="py-1.5 pr-3">
+                      <button
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => pickRound(r)}
+                        className={cn(
+                          'text-left text-[12.5px] underline-offset-2 hover:underline',
+                          on ? 'font-medium text-primary' : 'text-foreground',
+                        )}
+                      >
+                        {FOLLOW_MATRIX_ROW_LABEL[r]}
+                      </button>
+                    </th>
+                    {FOLLOW_MATRIX_COLS.map((c) => {
+                      const list = matrix[r][c];
+                      return (
+                        <td key={c} className="px-2 py-1.5 text-right">
+                          <button
+                            type="button"
+                            disabled={list.length === 0}
+                            onClick={() => openMatrixDialog(r, c)}
+                            className={cn(
+                              'min-w-8 rounded-lg px-1.5 py-0.5 text-[15px] tabular-nums transition-colors',
+                              list.length === 0
+                                ? 'cursor-default text-muted-foreground/60'
+                                : cn(TONE[FOLLOW_MATRIX_COL_TONE[c]].value, 'hover:bg-accent'),
+                            )}
+                          >
+                            {list.length.toLocaleString('th-TH')}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
 
         {/* สัญญาณ + ผลจาก AI ของรอบที่เลือก (ของเดิม ย้ายมาเป็นบรรทัดท้ายการ์ด) */}

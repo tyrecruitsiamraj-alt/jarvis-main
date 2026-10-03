@@ -83,14 +83,20 @@ describe('หน้าการติดตาม: หัวการ์ด Call
   const page = read('pages/follow/FollowPage.tsx');
   const panel = read('components/follow/FollowCallRoundsPanel.tsx');
 
-  it('เลขต่อสายเป็นเม็ดกดได้ครบ 4 (ทั้งหมด·สาย 1·2·3) — ไม่พับใน dropdown', () => {
-    expect(panel).toMatch(/\(\['all', 1, 2, 3\] as FollowRoundFilter\[\]\)\.map/);
-    expect(panel).toContain("r === 'all' ? 'ทั้งหมด' : roundLabelOf(r)");
-    expect(panel).not.toContain('ariaLabel="ดูเฉพาะสายที่"');
+  it('สายที่ = dropdown (3 ต.ค. 2569 "เอาพวกนี้รวมกันเป็น Dropdown") · เลขต่อสายอยู่ในตารางสายก้อนเดียว', () => {
+    expect(panel).toContain('ariaLabel="ดูเฉพาะสายที่"');
+    expect(panel).toContain('data-testid="call-matrix"');
+    expect(panel).toContain('buildFollowCallMatrix(entries)');
     expect(panel.match(/\{filtersSlot\}/g)?.length).toBe(1);
     // 🔴 ไม่หุบการ์ดตอนว่างแล้ว (เจ้าของสั่ง 1 ต.ค. 2569 "ถ้าไม่มีข้อมูลก็เป็น 0 ไป") — ห้ามกลับไปหุบ
     expect(panel).not.toContain('const allEmpty');
     expect(panel).not.toContain('ยังไม่มีสายในระบบ');
+  });
+
+  it('🔴 การ์ดตัวเลข 4 ใบถูกถอด — เลขชุดเดียวกันห้ามอยู่สองที่อีก (3 ต.ค. 2569)', () => {
+    const calendar = read('components/follow/FollowPlanningCalendar.tsx');
+    expect(calendar).not.toContain('<StatCard');
+    expect(calendar).not.toContain('data-stat=');
   });
 
   it('ตัวกรองเหลือ "ใครโทร" ตัวเดียว — นับช่วง/งานจบหรือยัง/บรรทัดแยก AI-คน ถูกถอด (3 ต.ค. 2569)', () => {

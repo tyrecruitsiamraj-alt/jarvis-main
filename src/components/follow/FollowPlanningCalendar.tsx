@@ -255,37 +255,6 @@ const NAV_BTN = cn(
   TONE.neutral.outline,
 );
 
-/**
- * การ์ดตัวเลขแบบแบบอ้างอิง — ตราไอคอนมุมขวาบน · เลขใหญ่
- * (บรรทัดความหมายท้ายการ์ดถูกถอดทั้งระบบ — เจ้าของสั่ง 3 ต.ค. 2569 "เอาออก" · ห้ามเติมกลับ)
- */
-const StatCard: React.FC<{
-  label: string;
-  value: number;
-  tone: keyof typeof TONE;
-  icon: React.ReactNode;
-}> = ({ label, value, tone, icon }) => (
-  /* `data-stat` = จุดยึดของเทสต์ — โครงการ์ดเปลี่ยนหน้าตาได้ แต่เทสต์ยังเล็งค่าถูกใบ */
-  <Card data-stat={label} className="flex flex-col justify-between rounded-2xl p-5 shadow-sm">
-    <div className="flex items-start justify-between gap-3">
-      <span className="text-[13px] font-medium leading-snug text-muted-foreground">{label}</span>
-      <span
-        className={cn(
-          'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
-          TONE[tone].soft,
-          TONE[tone].value,
-        )}
-        aria-hidden
-      >
-        {icon}
-      </span>
-    </div>
-    <p className={cn('mt-3 text-[40px] font-medium leading-none tabular-nums', TONE[tone].value)}>
-      {value.toLocaleString('th-TH')}
-    </p>
-  </Card>
-);
-
 /** วงสรุป — SVG ล้วน ไม่มีไลบรารีกราฟ ไม่มี CSS ใหม่ · สีมาจาก `TONE.hex` เท่านั้น */
 const Donut: React.FC<{ percent: number | null; caption: string }> = ({ percent, caption }) => {
   const r = 52;
@@ -539,36 +508,8 @@ const FollowPlanningCalendar: React.FC<{
         <div className="flex min-w-0 flex-wrap items-center gap-2">{headerAction}</div>
       </div>
 
-      {/* ── 1. การ์ดตัวเลข 4 ใบ ── (คำกำกับใต้เลขถูกถอดทั้ง 4 ใบ — เจ้าของสั่ง 3 ต.ค. 2569 "เอาออก" · ห้ามเติมกลับ) */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-        <StatCard
-          label="สายที่ต้องตาม"
-          value={daySummary.total}
-          tone="neutral"
-          icon={<Phone className="h-5 w-5" />}
-        />
-        {/* 🔴 "ตอบว่าไป" ≠ ช่อง "ไป" ใน Pipeline ข้างล่าง — อันนั้นคือ *ปิดงาน* แล้วเท่านั้น
-            (เจ้าของจับได้ 8 ก.ย. 2569 ว่าเลขสองที่ไม่ตรงกัน) เขียนกำกับที่ท้ายการ์ดให้ชัด */}
-        <StatCard
-          label="ตอบว่าไป"
-          value={daySummary.went}
-          tone="success"
-          icon={<Check className="h-5 w-5" />}
-        />
-        <StatCard
-          label="ตอบว่าไม่ไป"
-          value={daySummary.notWent}
-          tone="danger"
-          icon={<X className="h-5 w-5" />}
-        />
-        <StatCard
-          label="ยังไม่รู้ผล"
-          value={daySummary.unknown}
-          tone="warn"
-          icon={<Clock className="h-5 w-5" />}
-        />
-      </div>
-
+      {/* ── 1. การ์ดตัวเลข 4 ใบ ถูกถอด (เจ้าของเคาะ 3 ต.ค. 2569 — รวมเข้าตารางสายในแผงขั้นตอนข้างล่าง
+          เลขชุดเดียวกันอยู่สองที่แล้วชนกันจนงง) · ห้ามเอากลับ ── */}
       {/* ── 2. แถบขั้นตอน = แผงรอบโทร + 7 ช่องสถานะสาย (การ์ดของตัวเอง) ── */}
       {roundsSlot}
 

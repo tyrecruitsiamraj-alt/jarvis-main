@@ -1,0 +1,91 @@
+/**
+ * ตารางสายรวมก้อนเดียว (เจ้าของเคาะ 3 ต.ค. 2569)
+ * 🔴 ด่าน: แต่ละแถว ไป + ไม่ไป + สรุปไม่ได้ + ยกเลิก = ทั้งหมด · แถวทุกสาย = สาย 1 + 2 + 3 ทุกคอลัมน์ ·
+ *    ยกเลิกต้องโผล่ (เจ้าของ "ไม่งั้นจะงงว่าหายไปไหน 1") · ผลคนลงเอง/ผลปิดงานนับเหมือนการ์ดเดิม
+ */
+import { describe, expect, it } from 'vitest';
+import type { FollowEntry } from '@/lib/followApi';
+import {
+  FOLLOW_MATRIX_COLS,
+  FOLLOW_MATRIX_ROWS,
+  buildFollowCallMatrix,
+  followMatrixCol,
+} from '@/lib/followCallMatrix';
+
+let seq = 0;
+const e = (over: Partial<FollowEntry>): FollowEntry =>
+  ({
+    id: `m-${(seq += 1)}`,
+    recipient_name: 'ทดสอบ',
+    recipient_phone: '0890000001',
+    topic: 'ติดตามเริ่มงาน',
+    scheduled_at: '2026-10-04T08:00:00+07:00',
+    cancelled: false,
+    completed_at: null,
+    outcome_code: null,
+    call_status: 'pending',
+    call_outcome: null,
+    staff_call_outcome: null,
+    call_of_day: 1,
+    ...over,
+  }) as FollowEntry;
+
+const NOW = new Date('2026-10-04T06:00:00+07:00');
+
+describe('followMatrixCol — สายหนึ่งสายตกช่องไหน', () => {
+  it('ยืนยันว่าไป = ไป · ปฏิเสธ = ไม่ไป · ยังไม่โทร = สรุปไม่ได้ · ยกเลิก = ยกเลิก', () => {
+    expect(followMatrixCol(e({ call_status: 'completed', call_outcome: 'confirmed' }), NOW)).toBe('went');
+    expect(followMatrixCol(e({ call_status: 'completed', call_outcome: 'declined' }), NOW)).toBe('notWent');
+    expect(followMatrixCol(e({}), NOW)).toBe('unknown');
+    expect(followMatrixCol(e({ cancelled: true }), NOW)).toBe('cancelled');
+  });
+
+  it('ปิดงานแล้วนับตามผลปิดงาน · ผลที่คนลงเองก็นับ (ตัวเดียวกับการ์ดเดิม)', () => {
+    expect(followMatrixCol(e({ completed_at: '2026-10-04T09:00:00+07:00', outcome_code: 'went' }), NOW)).toBe('went');
+    expect(followMatrixCol(e({ completed_at: '2026-10-04T09:00:00+07:00', outcome_code: 'cancelled' }), NOW)).toBe(
+      'notWent',
+    );
+    expect(followMatrixCol(e({ call_status: null, call_mode: 'manual', staff_call_outcome: 'confirmed' }), NOW)).toBe(
+      'went',
+    );
+  });
+});
+
+describe('buildFollowCallMatrix', () => {
+  const rows = [
+    e({ call_of_day: 1, call_status: 'completed', call_outcome: 'confirmed' }),
+    e({ call_of_day: 1 }),
+    e({ call_of_day: 1, cancelled: true }),
+    e({ call_of_day: 2, call_status: 'completed', call_outcome: 'declined' }),
+    e({ call_of_day: 2 }),
+    e({ call_of_day: 3 }),
+  ];
+  const m = buildFollowCallMatrix(rows, NOW);
+
+  it('🔴 ทุกแถวบวกกันได้พอดี: ไป + ไม่ไป + สรุปไม่ได้ + ยกเลิก = ทั้งหมด', () => {
+    for (const r of FOLLOW_MATRIX_ROWS) {
+      const sum = m[r].went.length + m[r].notWent.length + m[r].unknown.length + m[r].cancelled.length;
+      expect(sum, `แถว ${r}`).toBe(m[r].total.length);
+    }
+  });
+
+  it('🔴 แถวทุกสาย = สาย 1 + สาย 2 + สาย 3 ทุกคอลัมน์', () => {
+    for (const c of FOLLOW_MATRIX_COLS) {
+      expect(m.all[c].length, `คอลัมน์ ${c}`).toBe(m[1][c].length + m[2][c].length + m[3][c].length);
+    }
+  });
+
+  it('ตัวเลขจริงของชุดตัวอย่าง · ยกเลิกโผล่ ไม่หายไปเงียบ ๆ', () => {
+    expect(m.all.total).toHaveLength(6);
+    expect(m[1].total).toHaveLength(3);
+    expect(m[1].went).toHaveLength(1);
+    expect(m[1].cancelled).toHaveLength(1);
+    expect(m[2].notWent).toHaveLength(1);
+    expect(m[3].unknown).toHaveLength(1);
+  });
+
+  it('ว่าง = ทุกช่องเป็น 0 (ตารางไม่หาย)', () => {
+    const empty = buildFollowCallMatrix([], NOW);
+    for (const r of FOLLOW_MATRIX_ROWS) for (const c of FOLLOW_MATRIX_COLS) expect(empty[r][c]).toHaveLength(0);
+  });
+});

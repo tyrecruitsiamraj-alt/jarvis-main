@@ -90,9 +90,11 @@ function renderCalendar(
 const showMonthView = () =>
   fireEvent.mouseDown(screen.getByRole('tab', { name: /รายเดือน/ }), { button: 0 });
 
-/** เลขใหญ่ในการ์ดสถิติใบที่มีป้ายนี้ (การ์ดติด `data-stat` ไว้ให้เล็ง) */
-const statValue = (label: string) =>
-  document.querySelector(`[data-stat="${label}"] p`)?.textContent;
+/**
+ * 🔴 การ์ดตัวเลข 4 ใบถูกถอด (เจ้าของเคาะ 3 ต.ค. 2569 — รวมเข้าตารางสายของแผงขั้นตอน)
+ * เลขที่เคยเช็คบนการ์ด ย้ายไปคุมที่ `src/lib/followCallMatrix.test.ts` (บวกกันได้พอดีทุกแถว)
+ */
+const noStatCards = () => expect(document.querySelector('[data-stat]')).toBeNull();
 
 /**
  * แถวของตารางรายวันเท่านั้น — แผงข้างขวาก็มีรายการเหมือนกัน ต้องกันไม่ให้ปน
@@ -112,12 +114,8 @@ describe('หน้ารายวัน — สายที่ต้องต�
   it('เปิดมาเจอหน้ารายวันก่อน · บอกว่ามีกี่สายที่ต้องตาม', () => {
     renderCalendar(twoRounds());
     expect(screen.getByRole('tab', { name: /รายวัน/ }).getAttribute('aria-selected')).toBe('true');
-    // 2 สาย ยังไม่มีผล ทั้งคู่เลยเวลา (16:00 > 15:23/15:30)
-    expect(statValue('สายที่ต้องตาม')).toBe('2');
-    // ทั้งคู่ยังไม่มีผล ⇒ ไปกองที่ช่อง "ยังไม่รู้ผล" ช่องเดียว (เดิมแยก 6 ช่องจนอ่านไม่ออก)
-    expect(statValue('ยังไม่รู้ผล')).toBe('2');
-    expect(statValue('ตอบว่าไป')).toBe('0');
-    expect(statValue('ตอบว่าไม่ไป')).toBe('0');
+    // 🔴 การ์ดตัวเลข 4 ใบถอดแล้ว (3 ต.ค. 2569) — เลขอยู่ในตารางสายของแผงขั้นตอนที่เดียว
+    noStatCards();
   });
 
   it('🔴 สายที่ 1 ตกลงแล้ว ⇒ เห็นเขียว + "เขาตอบ:" ทันที ทั้งที่สายที่ 2 ยังรอผล', () => {
@@ -140,7 +138,6 @@ describe('หน้ารายวัน — สายที่ต้องต�
     expect(within(items[0]).getAllByText(/ผู้รับสายบอกว่าไปแน่นอน/)).toHaveLength(1);
     // บรรทัดของทั้งสามคอลัมน์ต้องเท่ากัน (บรรทัดที่ N = สายเดียวกัน)
     expect(cells[2].querySelectorAll(':scope > span > span').length).toBe(2);
-    expect(statValue('ตอบว่าไป')).toBe('1');
   });
 
   it('ไม่ไป ⇒ แดง + เหตุผลที่เขาตอบ', () => {
@@ -150,7 +147,6 @@ describe('หน้ารายวัน — สายที่ต้องต�
     const first = dayRows()[0];
     expect(within(first).getByText('ตอบว่าไม่ไป')).toBeTruthy();
     expect(within(first).getByText(/ได้งานที่อื่นใกล้บ้านกว่าแล้ว/)).toBeTruthy();
-    expect(statValue('ตอบว่าไม่ไป')).toBe('1');
   });
 
   it('ไม่รับสาย ⇒ ชิปบอก "ไม่ได้คำตอบ" (คนละคำกับช่อง "โทรไม่ติด" ของ Pipeline) และนับใน "ยังไม่รู้ผล"', () => {
@@ -158,7 +154,6 @@ describe('หน้ารายวัน — สายที่ต้องต�
     const first = dayRows()[0];
     expect(within(first).getByText(/ไม่ได้คำตอบ/)).toBeTruthy();
     // โทรไม่ติด (สาย 1) + เลยเวลานัด (สาย 2) = ยังไม่รู้ผลทั้งคู่
-    expect(statValue('ยังไม่รู้ผล')).toBe('2');
   });
 
   it('🔴 เลือก "สายที่ 2" ⇒ ลิสต์เหลือสายเดียว และเลขหัวคิดใหม่ตามที่เลือก', () => {
@@ -166,8 +161,6 @@ describe('หน้ารายวัน — สายที่ต้องต�
     const items = dayRows();
     expect(items).toHaveLength(1);
     expect(within(items[0]).getByText('สายที่ 2')).toBeTruthy();
-    expect(statValue('สายที่ต้องตาม')).toBe('1');
-    expect(statValue('ตอบว่าไป')).toBe('0');
   });
 
   it('เลือกสายที่วันนั้นไม่มี ⇒ บอกให้กลับไปกด "ทุกสาย" ไม่ใช่ปล่อยจอว่าง', () => {
@@ -200,7 +193,6 @@ describe('หน้ารายวัน — สายที่ต้องต�
   it('ยกเลิกแล้วยังเห็น (จาง) แต่ไม่นับเป็นสายที่ต้องตาม', () => {
     renderCalendar([entry({ id: 'r1', call_round: 1, cancelled: true })]);
     expect(dayRows()).toHaveLength(1);
-    expect(statValue('สายที่ต้องตาม')).toBe('0');
   });
 });
 
@@ -470,7 +462,6 @@ describe('ตำหนิ 11 ก.ย. 2569 — รวมสายของคน
 
   it('🔴 ตัวเลขบนการ์ดยังนับเป็น "สาย" เหมือนเดิม — รวมแถวห้ามทำเลขเปลี่ยน', () => {
     renderCalendar(threeRounds());
-    expect(statValue('สายที่ต้องตาม')).toBe('3');
     expect(dayRows()).toHaveLength(1);
   });
 
@@ -556,8 +547,6 @@ describe('ส่งไม่ถึง Lumos (push_failed)', () => {
 
   it('🔴 ไม่ไปแตะตัวเลขบนการ์ด — push_failed เป็นป้ายเสริม ไม่ใช่หมวดใหม่', () => {
     renderCalendar([failed()]);
-    expect(statValue('สายที่ต้องตาม')).toBe('1');
-    expect(statValue('ยังไม่รู้ผล')).toBe('1');
     expect(dayRows()[0].getAttribute('data-category')).toBe('overdue');
   });
 });
