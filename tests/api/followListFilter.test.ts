@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   followLifecycleTab,
@@ -92,6 +94,18 @@ describe('filterFollowEntries — ทุกเงื่อนไข AND', () => 
     expect(filterFollowEntries(rows, { ...base, tab: 'active' })).toHaveLength(1);
     expect(filterFollowEntries(rows, { ...base, tab: 'cancelled' })).toHaveLength(1);
     expect(filterFollowEntries(rows, { ...base, tab: 'success' })).toHaveLength(1);
+  });
+
+  it('🔴 ไม่ส่งแท็บ = ทุกสถานะ (3 ต.ค. 2569 — หน้าติดตามไม่กรองงานจบแล้ว สายที่ปิด/ยกเลิกต้องยังเห็นในตารางของวัน)', () => {
+    const rows = [entry({}), entry({ cancelled: true }), entry({ completed_at: 'x', outcome_code: 'went' })];
+    expect(filterFollowEntries(rows, { date: '', band: '' })).toHaveLength(3);
+    expect(countFollowCallers(rows).all).toBe(3);
+  });
+
+  it('🔴 หน้าติดตามเรียกตัวกรองโดยไม่ล็อกแท็บ "กำลังตาม" (เคยทำให้วันที่ปิดงานหมดเหลือ "ไม่มีสายที่ต้องตาม")', () => {
+    const page = fs.readFileSync(path.resolve(process.cwd(), 'src/pages/follow/FollowPage.tsx'), 'utf8');
+    expect(page).toContain('filterFollowEntries(scopeItems, { date: fDate, band: fBand, caller })');
+    expect(page).not.toContain("const tab: FollowTab = 'active'");
   });
 
   it('วันที่ + ช่วงเวลา + เจ้าของงาน รวมกัน', () => {

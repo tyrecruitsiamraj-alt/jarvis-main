@@ -67,7 +67,6 @@ import {
   FOLLOW_TABS,
   FOLLOW_TAB_LABEL,
   TIME_BAND_LABEL,
-  type FollowTab,
   type TimeBand,
 } from '@/lib/followListFilter';
 import {
@@ -156,9 +155,9 @@ const FollowPage: React.FC = () => {
    */
   /**
    * "งานจบหรือยัง" ถูกถอดออกจากหัวแผง (เจ้าของสั่ง 3 ต.ค. 2569 "เอาออก" — กลับคำสั่ง 1 ต.ค.)
-   * ลิสต์จึงยืนที่ "กำลังตาม" เสมอ · งานที่จบไปดูที่การ์ดติดตามครบ / ป๊อปแผนทั้งหมดของคน
+   * 🔴 ถอดแล้ว = **ตารางเห็นทุกสถานะ** ไม่ใช่ล็อกไว้ที่ "กำลังตาม" (แก้ค่ำ 3 ต.ค. 2569 — รอบแรกล็อกไว้
+   * พอสายของวันปิดงานหมด ตารางเหลือ "ไม่มีสายที่ต้องตาม" ทั้งที่วันนั้นมี 49 สาย เจ้าของถามว่าหายไปไหน)
    */
-  const tab: FollowTab = 'active';
   /** ใครโทร (เจ้าของสั่ง 2 ต.ค. 2569) — 'manual' = เหลือเฉพาะสายที่เจ้าหน้าที่ต้องโทรเอง */
   const [caller, setCaller] = useState<FollowCaller>('all');
   /** ป๊อปสรุปแผนทั้งวัน (เจ้าของสั่ง 2 ต.ค. 2569) — วัน = วันที่เลือกดูอยู่ (ไม่เลือก = วันนี้) */
@@ -1154,10 +1153,10 @@ const FollowPage: React.FC = () => {
     [items, replaceView],
   );
   const filtered = useMemo(
-    () => filterFollowEntries(scopeItems, { tab, date: fDate, band: fBand, caller }),
-    [scopeItems, tab, fDate, fBand, caller],
+    () => filterFollowEntries(scopeItems, { date: fDate, band: fBand, caller }),
+    [scopeItems, fDate, fBand, caller],
   );
-  const callerCounts = useMemo(() => countFollowCallers(scopeItems, tab), [scopeItems, tab]);
+  const callerCounts = useMemo(() => countFollowCallers(scopeItems), [scopeItems]);
   /**
    * แผงรอบโทรนับตาม **วันที่เลือก** และสลับดู **ทั้งเดือน** ได้ (เจ้าของเคาะ 3 ต.ค. 2569:
    * *"ทุกสาย = สายทุกสายบวกกัน · สายที่ 1 ก็ตามนั้น · ต้องเปลี่ยนตามวันที่เลือกด้วย"* +

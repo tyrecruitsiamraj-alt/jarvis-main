@@ -95,7 +95,11 @@ export function inTimeBand(iso: string | null | undefined, band: TimeBand): bool
 }
 
 export type FollowFilter = {
-  tab: FollowTab;
+  /**
+   * งานจบหรือยัง · ไม่ส่ง = ทุกสถานะ (หน้าติดตามไม่ส่งแล้ว — 3 ต.ค. 2569 เจ้าของถอดตัวเลือกนี้
+   * และสายที่ปิดงาน/ยกเลิกต้องยังเห็นในตารางของวันนั้น ไม่ใช่หายเหลือ "ไม่มีสายที่ต้องตาม")
+   */
+  tab?: FollowTab;
   /** YYYY-MM-DD · '' = ทุกวัน */
   date: string;
   band: TimeBand;
@@ -127,10 +131,10 @@ export function followCallerOf(e: Pick<FollowEntry, 'call_mode'>): 'ai' | 'manua
 }
 
 /** จำนวน **สาย** ต่อ "ใครโทร" ในแท็บที่เปิดอยู่ (ป้ายบนตัวเลือก) · ยังไม่ระบุเวลาเป็นกองย่อยของคนโทร */
-export function countFollowCallers(entries: FollowEntry[], tab: FollowTab): Record<FollowCaller, number> {
+export function countFollowCallers(entries: FollowEntry[], tab?: FollowTab): Record<FollowCaller, number> {
   const out: Record<FollowCaller, number> = { all: 0, ai: 0, manual: 0, tbd: 0 };
   for (const e of entries) {
-    if (followLifecycleTab(e) !== tab) continue;
+    if (tab && followLifecycleTab(e) !== tab) continue;
     out.all += 1;
     out[followCallerOf(e)] += 1;
     if (e.time_tbd === true) out.tbd += 1;
@@ -159,7 +163,7 @@ export function countFollowCallerResults(
 /** กรองรอบด้วยแท็บ + วันที่ + ช่วงเวลา + เจ้าของงาน (ทุกเงื่อนไข AND กัน) */
 export function filterFollowEntries(entries: FollowEntry[], f: FollowFilter): FollowEntry[] {
   return entries.filter((e) => {
-    if (followLifecycleTab(e) !== f.tab) return false;
+    if (f.tab && followLifecycleTab(e) !== f.tab) return false;
     if (f.date && bangkokDay(e.scheduled_at) !== f.date) return false;
     if (f.band && !inTimeBand(e.scheduled_at, f.band)) return false;
     if (f.owner && (e.created_by_name ?? '') !== f.owner) return false;
