@@ -59,9 +59,7 @@ import { groupFollowEntries } from '@/lib/followGrouping';
 import { followScopeEntries, followTeamForScope } from '@/lib/followReplacement';
 import {
   filterFollowEntries,
-  countFollowTabs,
   countFollowCallers,
-  countFollowCallerResults,
   followCallerOf,
   FOLLOW_CALLERS,
   FOLLOW_CALLER_LABEL,
@@ -156,7 +154,11 @@ const FollowPage: React.FC = () => {
    * แท็บสถานะ (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-6: แยกหน้า กำลังตาม/สำเร็จ/สิ้นสุด/ยกเลิก)
    * + filter ประจำวัน (วันที่/ช่วงเวลา/เจ้าของงาน) · ตรรกะที่ followListFilter.ts
    */
-  const [tab, setTab] = useState<FollowTab>('active');
+  /**
+   * "งานจบหรือยัง" ถูกถอดออกจากหัวแผง (เจ้าของสั่ง 3 ต.ค. 2569 "เอาออก" — กลับคำสั่ง 1 ต.ค.)
+   * ลิสต์จึงยืนที่ "กำลังตาม" เสมอ · งานที่จบไปดูที่การ์ดติดตามครบ / ป๊อปแผนทั้งหมดของคน
+   */
+  const tab: FollowTab = 'active';
   /** ใครโทร (เจ้าของสั่ง 2 ต.ค. 2569) — 'manual' = เหลือเฉพาะสายที่เจ้าหน้าที่ต้องโทรเอง */
   const [caller, setCaller] = useState<FollowCaller>('all');
   /** ป๊อปสรุปแผนทั้งวัน (เจ้าของสั่ง 2 ต.ค. 2569) — วัน = วันที่เลือกดูอยู่ (ไม่เลือก = วันนี้) */
@@ -424,7 +426,6 @@ const FollowPage: React.FC = () => {
   if (filterScope !== replaceView) {
     setFilterScope(replaceView);
     setActiveRound('all');
-    setTab('active');
     setCaller('all');
   }
   useEffect(() => {
@@ -1154,13 +1155,13 @@ const FollowPage: React.FC = () => {
     () => filterFollowEntries(scopeItems, { tab, date: fDate, band: fBand, caller }),
     [scopeItems, tab, fDate, fBand, caller],
   );
-  const tabCounts = useMemo(() => countFollowTabs(scopeItems), [scopeItems]);
   const callerCounts = useMemo(() => countFollowCallers(scopeItems, tab), [scopeItems, tab]);
   /**
    * แผงรอบโทรนับตาม **วันที่เลือก** และสลับดู **ทั้งเดือน** ได้ (เจ้าของเคาะ 3 ต.ค. 2569:
    * *"ทุกสาย = สายทุกสายบวกกัน · สายที่ 1 ก็ตามนั้น · ต้องเปลี่ยนตามวันที่เลือกด้วย"* +
    * *"Filter ก็ต้องดูแบบทั้งเดือนได้ด้วย"*) — เลิกนับสะสมตลอดกาล (1,250 สายที่ไม่มีใครใช้)
-   * และแบ่งตาม "ใครโทร" ได้เหมือนเดิม
+   * ⚠️ dropdown "นับช่วง" ถูกถอด (เจ้าของสั่งเย็นวันเดียวกัน "เอาออก") — ช่วงเดินตาม
+   * **แท็บ รายวัน/รายเดือน ของปฏิทิน** แทน: ดูรายวัน = นับวันที่เลือก · ดูรายเดือน = นับทั้งเดือน
    */
   const [panelRange, setPanelRange] = useState<'day' | 'month'>('day');
   const panelDay = fDate || toYmdBangkok(new Date());
@@ -1181,8 +1182,6 @@ const FollowPage: React.FC = () => {
     if (caller === 'tbd') return panelScope.filter((e) => e.time_tbd === true);
     return panelScope.filter((e) => followCallerOf(e) === caller);
   }, [panelScope, caller]);
-  /** "ทั้ง 2 อย่างโทรสำเร็จอย่างละเท่าไหร่" — สำเร็จ = ติดต่อได้ (นิยามเดียวกับถังในแผง) · ช่วงเดียวกับแผง */
-  const callerStats = useMemo(() => countFollowCallerResults(panelScope), [panelScope]);
   const hasActiveFilter = Boolean(fDate || fBand);
 
   /**
@@ -1315,6 +1314,7 @@ const FollowPage: React.FC = () => {
         <FollowPlanningCalendar
           rows={planningRowsAllRounds}
           allRows={allRows}
+          onViewChange={setPanelRange}
           month={calMonth}
           onMonthChange={setCalMonth}
           selectedYmd={fDate}
@@ -1343,33 +1343,12 @@ const FollowPage: React.FC = () => {
               round={activeRound}
               onRoundChange={setActiveRound}
               filtersSlot={
+                /**
+                 * 🔴 หัวแผงเหลือตัวกรองเดียว: "ใครโทร" (เจ้าของสั่ง 3 ต.ค. 2569 "เอาออก" 3 ตัว:
+                 * นับช่วง · งานจบหรือยัง · บรรทัดแยก AI/คน) — ช่วงที่นับเดินตามแท็บ
+                 * รายวัน/รายเดือนของปฏิทินเอง ไม่มีปุ่มซ้ำ · ห้ามเติมกลับโดยไม่ได้สั่งใหม่
+                 */
                 <>
-                  {/* ช่วงที่แผงนับ (เจ้าของเคาะ 3 ต.ค. 2569) — วันที่เลือกในปฏิทิน หรือทั้งเดือนที่เปิดอยู่ */}
-                  <span className="text-xs text-muted-foreground">นับช่วง</span>
-                  <ChoiceDropdown<'day' | 'month'>
-                    value={panelRange}
-                    options={[
-                      { value: 'day', label: `วันที่เลือก · ${formatYmdDmyBe(panelDay)}` },
-                      {
-                        value: 'month',
-                        label: `ทั้งเดือน · ${new Date(`${calMonth}-01T00:00:00+07:00`).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', month: 'short', year: 'numeric' })}`,
-                      },
-                    ]}
-                    onChange={setPanelRange}
-                    ariaLabel="แผงนับช่วงไหน"
-                    active={panelRange === 'month'}
-                  />
-                  <span className="text-xs text-muted-foreground">งานจบหรือยัง</span>
-                  <ChoiceDropdown
-                    value={tab}
-                    options={FOLLOW_TABS.map((t) => ({
-                      value: t,
-                      label: `${FOLLOW_TAB_LABEL[t]} · ${tabCounts[t].toLocaleString('th-TH')}`,
-                    }))}
-                    onChange={(v) => setTab(v)}
-                    ariaLabel="งานจบหรือยัง"
-                    active={tab !== 'active'}
-                  />
                   <span className="text-xs text-muted-foreground">ใครโทร</span>
                   <ChoiceDropdown
                     value={caller}
@@ -1381,14 +1360,6 @@ const FollowPage: React.FC = () => {
                     ariaLabel="ใครโทร"
                     active={caller !== 'all'}
                   />
-                  {/* ยอดแยก AI/คน + สำเร็จอย่างละเท่าไหร่ (เจ้าของสั่ง 3 ต.ค. 2569) —
-                      นับจาก scopeItems ทั้งขอบเขต ไม่ตามตัวกรอง จะได้เห็นสองฝั่งเทียบกันเสมอ */}
-                  <span className="text-xs tabular-nums text-muted-foreground" data-testid="caller-stats">
-                    AI {callerStats.ai.calls.toLocaleString('th-TH')} สาย · ติดต่อได้{' '}
-                    {callerStats.ai.done.toLocaleString('th-TH')} — คนโทร{' '}
-                    {callerStats.manual.calls.toLocaleString('th-TH')} สาย · ติดต่อได้{' '}
-                    {callerStats.manual.done.toLocaleString('th-TH')}
-                  </span>
                 </>
               }
             />

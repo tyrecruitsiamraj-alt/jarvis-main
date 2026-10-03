@@ -256,16 +256,15 @@ const NAV_BTN = cn(
 );
 
 /**
- * การ์ดตัวเลขแบบแบบอ้างอิง — ตราไอคอนมุมขวาบน · เลขใหญ่ · บรรทัดความหมายคั่นเส้นที่ท้าย
- * (ของเดิมเป็นช่องในแถวเดียว ไม่มีตราและไม่มีบรรทัดท้าย)
+ * การ์ดตัวเลขแบบแบบอ้างอิง — ตราไอคอนมุมขวาบน · เลขใหญ่
+ * (บรรทัดความหมายท้ายการ์ดถูกถอดทั้งระบบ — เจ้าของสั่ง 3 ต.ค. 2569 "เอาออก" · ห้ามเติมกลับ)
  */
 const StatCard: React.FC<{
   label: string;
   value: number;
   tone: keyof typeof TONE;
   icon: React.ReactNode;
-  foot: React.ReactNode;
-}> = ({ label, value, tone, icon, foot }) => (
+}> = ({ label, value, tone, icon }) => (
   /* `data-stat` = จุดยึดของเทสต์ — โครงการ์ดเปลี่ยนหน้าตาได้ แต่เทสต์ยังเล็งค่าถูกใบ */
   <Card data-stat={label} className="flex flex-col justify-between rounded-2xl p-5 shadow-sm">
     <div className="flex items-start justify-between gap-3">
@@ -283,9 +282,6 @@ const StatCard: React.FC<{
     </div>
     <p className={cn('mt-3 text-[40px] font-medium leading-none tabular-nums', TONE[tone].value)}>
       {value.toLocaleString('th-TH')}
-    </p>
-    <p className="mt-4 border-t border-border/70 pt-2.5 text-[11px] leading-snug text-muted-foreground">
-      {foot}
     </p>
   </Card>
 );
@@ -364,6 +360,8 @@ const FollowPlanningCalendar: React.FC<{
    * (`rows` ถูกตัวกรองวันของหน้าแม่บีบเหลือวันเดียวเมื่อเลือกวัน ⇒ มองไม่เห็นแผนวันอื่น)
    */
   allRows?: readonly FollowPlanningRow[];
+  /** บอกหน้าแม่ว่าดูรายวันหรือรายเดือนอยู่ — แผงรอบโทรนับช่วงตามนี้ (3 ต.ค. 2569) */
+  onViewChange?: (view: 'day' | 'month') => void;
 }> = ({
   rows,
   month,
@@ -380,6 +378,7 @@ const FollowPlanningCalendar: React.FC<{
   onCancelRound,
   busyId = null,
   allRows,
+  onViewChange,
 }) => {
   const [view, setView] = useState<View>('day');
   /** สายที่กด "ยกเลิก" บนแถวแล้วรอยืนยัน (ยืนยันในที่เดิม ไม่เปิดป๊อป) */
@@ -535,17 +534,13 @@ const FollowPlanningCalendar: React.FC<{
         <div className="flex min-w-0 flex-wrap items-center gap-2">{headerAction}</div>
       </div>
 
-      {/* ── 1. การ์ดตัวเลข 4 ใบ ── */}
+      {/* ── 1. การ์ดตัวเลข 4 ใบ ── (คำกำกับใต้เลขถูกถอดทั้ง 4 ใบ — เจ้าของสั่ง 3 ต.ค. 2569 "เอาออก" · ห้ามเติมกลับ) */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
         <StatCard
           label="สายที่ต้องตาม"
           value={daySummary.total}
           tone="neutral"
           icon={<Phone className="h-5 w-5" />}
-          /* 🔴 คำกำกับต้องพูดความจริงทั้งก้อน (เจ้าของงง 3 ต.ค. 2569: การ์ดนี้ 11 แต่กล่อง
-             "เข้ามาในรอบนี้" 49) — เลขนี้เดินตามตัวกรอง "งานจบหรือยัง" (ค่าเริ่ม = กำลังตาม)
-             สายที่ปิดงานระหว่างวันจึงหายจากการ์ด · ของเดิมเขียน "ทุกสายของวันที่เลือก" = โกหกครึ่งเดียว */
-          foot="ของวันที่เลือก · ยังไม่ปิดงาน ไม่นับที่ยกเลิก"
         />
         {/* 🔴 "ตอบว่าไป" ≠ ช่อง "ไป" ใน Pipeline ข้างล่าง — อันนั้นคือ *ปิดงาน* แล้วเท่านั้น
             (เจ้าของจับได้ 8 ก.ย. 2569 ว่าเลขสองที่ไม่ตรงกัน) เขียนกำกับที่ท้ายการ์ดให้ชัด */}
@@ -554,21 +549,18 @@ const FollowPlanningCalendar: React.FC<{
           value={daySummary.went}
           tone="success"
           icon={<Check className="h-5 w-5" />}
-          foot="คำตอบจากสาย — ยังไม่ใช่การปิดงาน"
         />
         <StatCard
           label="ตอบว่าไม่ไป"
           value={daySummary.notWent}
           tone="danger"
           icon={<X className="h-5 w-5" />}
-          foot={daySummary.notWent > 0 ? 'ต้องหาคนแทน / แจ้งหน่วยงาน' : 'ยังไม่มีใครตอบว่าไม่ไป'}
         />
         <StatCard
           label="ยังไม่รู้ผล"
           value={daySummary.unknown}
           tone="warn"
           icon={<Clock className="h-5 w-5" />}
-          foot="ไม่ได้คำตอบ · ยังไม่ถึงเวลา · เลยเวลานัด · ไม่ได้ส่งให้ AI"
         />
       </div>
 
@@ -579,7 +571,13 @@ const FollowPlanningCalendar: React.FC<{
       <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,2.4fr)_minmax(320px,1fr)]">
         <Card className="overflow-hidden rounded-2xl shadow-sm">
           <div className="flex flex-wrap items-center gap-2 border-b border-border/70 px-4 py-3 md:px-5">
-            <Tabs value={view} onValueChange={(v) => setView(v as View)}>
+            <Tabs
+              value={view}
+              onValueChange={(v) => {
+                setView(v as View);
+                onViewChange?.(v as View);
+              }}
+            >
               <TabsList className="h-9 rounded-full bg-muted p-1">
                 <TabsTrigger value="day" className="rounded-full px-4 text-xs">
                   รายวัน · สายที่ต้องตาม
@@ -785,6 +783,15 @@ const FollowPlanningCalendar: React.FC<{
                                     {calls.length > 1 ? (
                                       <span className="mt-0.5 block text-[10.5px] text-muted-foreground">
                                         {calls.length} สาย
+                                      </span>
+                                    ) : null}
+                                    {/* ใครเพิ่มเข้ามา (Journey ข้อ 8 · เจ้าของสั่ง 3 ต.ค. 2569 "การ์ดในนี้ต้องบอกด้วยว่าใครเพิ่มมา")
+                                        — เดิมต้องเปิดป๊อปจัดการถึงรู้ · "ดึงจาก iRecruit" เป็นชื่อแหล่งอยู่แล้ว ไม่เติมคำนำ */}
+                                    {row.group.createdByName ? (
+                                      <span className="mt-0.5 block truncate text-[10.5px] text-muted-foreground">
+                                        {row.group.createdByName.startsWith('ดึงจาก')
+                                          ? row.group.createdByName
+                                          : `เพิ่มโดย ${row.group.createdByName}`}
                                       </span>
                                     ) : null}
                                   </span>

@@ -72,29 +72,39 @@ describe('หน้าการติดตาม: สองแท็บเห�
 });
 
 /**
- * 🔴 เจ้าของสั่ง 1 ต.ค. 2569: *"งานจบหรือยัง ทำเป็น Dropdown แล้วย้ายไปไว้ กับตรง ดูเฉพาะ แล้ว ดูเฉพาะก็ทำเป็น Dropdown"*
- * ทั้งสองตัวอยู่บนหัวการ์ด "ขั้นตอนของสาย" คู่กัน · แถวชิปด้านล่างถอดแล้ว · ใช้ทั้งสองแท็บ (โค้ดชุดเดียว)
+ * 🔴 หัวการ์ด "ขั้นตอนของสาย" (แก้ 3 ต.ค. 2569 — เจ้าของสั่ง "เอาออก" ทีละตัวระหว่างไล่ Journey):
+ * เม็ดเลขต่อสาย **ทั้งหมด / สายที่ 1 / สายที่ 2 / สายที่ 3** เห็นเลขเลยไม่พับใน dropdown
+ * (*"มันต้องบอก ทั้งหมดเท่าไหร่ สาย1เท่าไหร่ สาย2เท่าไหร่ สายที่3 เท่าไหร่"*) ·
+ * ตัวกรองเหลือ "ใครโทร" ตัวเดียว — "นับช่วง" (แผงเดินตามแท็บรายวัน/รายเดือนแทน) ·
+ * "งานจบหรือยัง" (ลิสต์ยืนที่กำลังตาม) · บรรทัดแยก AI/คน ถูกถอดทั้งสาม ห้ามเติมกลับ
  */
-describe('หน้าการติดตาม: ดูเฉพาะ + งานจบหรือยัง เป็น dropdown คู่กัน', () => {
+describe('หน้าการติดตาม: หัวการ์ด Call Pipeline (ฉบับ 3 ต.ค. 2569)', () => {
   const read = (rel: string) => fs.readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
   const page = read('pages/follow/FollowPage.tsx');
   const panel = read('components/follow/FollowCallRoundsPanel.tsx');
 
-  it('ดูเฉพาะ = ChoiceDropdown บนหัวการ์ด ไม่ใช่ชิปรอบ · วางตัวกรองของหน้าแม่ไว้ข้างกัน', () => {
-    expect(panel).toContain('<ChoiceDropdown');
-    expect(panel).toContain('ariaLabel="ดูเฉพาะสายที่"');
-    expect(panel).not.toContain('aria-label="ตัวกรองรอบ"');
+  it('เลขต่อสายเป็นเม็ดกดได้ครบ 4 (ทั้งหมด·สาย 1·2·3) — ไม่พับใน dropdown', () => {
+    expect(panel).toMatch(/\(\['all', 1, 2, 3\] as FollowRoundFilter\[\]\)\.map/);
+    expect(panel).toContain("r === 'all' ? 'ทั้งหมด' : roundLabelOf(r)");
+    expect(panel).not.toContain('ariaLabel="ดูเฉพาะสายที่"');
     expect(panel.match(/\{filtersSlot\}/g)?.length).toBe(1);
     // 🔴 ไม่หุบการ์ดตอนว่างแล้ว (เจ้าของสั่ง 1 ต.ค. 2569 "ถ้าไม่มีข้อมูลก็เป็น 0 ไป") — ห้ามกลับไปหุบ
     expect(panel).not.toContain('const allEmpty');
     expect(panel).not.toContain('ยังไม่มีสายในระบบ');
   });
 
-  it('งานจบหรือยัง = ChoiceDropdown ที่ส่งเข้า filtersSlot · แถวชิปเดิมด้านล่างหายแล้ว', () => {
+  it('ตัวกรองเหลือ "ใครโทร" ตัวเดียว — นับช่วง/งานจบหรือยัง/บรรทัดแยก AI-คน ถูกถอด (3 ต.ค. 2569)', () => {
     expect(page).toContain('filtersSlot={');
-    expect(page).toContain('ariaLabel="งานจบหรือยัง"');
-    expect(page).not.toContain('>งานจบหรือยัง ·<');
-    expect(page).not.toMatch(/FOLLOW_TABS\.map\(\(t\) => \(\s*<button/);
+    expect(page).toContain('ariaLabel="ใครโทร"');
+    expect(page).not.toContain('ariaLabel="งานจบหรือยัง"');
+    expect(page).not.toContain('ariaLabel="แผงนับช่วงไหน"');
+    expect(page).not.toContain('data-testid="caller-stats"');
+  });
+
+  it('ช่วงที่แผงนับเดินตามแท็บรายวัน/รายเดือนของปฏิทิน (ไม่มีปุ่มซ้ำ)', () => {
+    expect(page).toContain('onViewChange={setPanelRange}');
+    const calendar = read('components/follow/FollowPlanningCalendar.tsx');
+    expect(calendar).toContain('onViewChange?.(v as View);');
   });
 
   it('🔴 ไม่มีประโยคใต้ชื่อหน้า "ลงรายชื่อคนที่ต้องติดตาม แล้ว AI จะโทรตามให้" (เจ้าของสั่งเอาออก 1 ต.ค. 2569)', () => {
@@ -103,6 +113,7 @@ describe('หน้าการติดตาม: ดูเฉพาะ + ง�
   });
 
   it('🔴 สลับแท็บทีม = ตัวกรองกลับค่าเริ่มต้น (กัน "ดูเฉพาะ" ค้างตอนแท็บว่างหุบหัวการ์ด)', () => {
-    expect(page).toMatch(/if \(filterScope !== replaceView\) \{\s*setFilterScope\(replaceView\);\s*setActiveRound\('all'\);\s*setTab\('active'\);/);
+    // "งานจบหรือยัง" ถูกถอด 3 ต.ค. 2569 — เหลือรีเซ็ตรอบ + ใครโทร (ลิสต์ยืนที่กำลังตามเสมอ)
+    expect(page).toMatch(/if \(filterScope !== replaceView\) \{\s*setFilterScope\(replaceView\);\s*setActiveRound\('all'\);\s*setCaller\('all'\);/);
   });
 });

@@ -316,17 +316,28 @@ export default function FollowCallRoundsPanel({
           <span className="flex-1" />
           {/* 🔴 "ดูเฉพาะ" + "งานจบหรือยัง" เป็น dropdown คู่กันบนหัวการ์ด (เจ้าของสั่ง 1 ต.ค. 2569) — เดิมเป็นแถวชิป */}
           <div className="flex flex-wrap items-center gap-2" role="group" aria-label="ตัวกรอง">
-            <span className="text-xs text-muted-foreground">ดูเฉพาะ</span>
-            <ChoiceDropdown
-              value={String(activeRound)}
-              options={(['all', 1, 2, 3] as FollowRoundFilter[]).map((r) => {
-                const rows = r === 'all' ? [...roundRows.values()].flat() : (roundRows.get(r) ?? []);
-                return { value: String(r), label: `${roundLabelOf(r)} · ${rows.length.toLocaleString('th-TH')}` };
-              })}
-              onChange={(v) => pickRound(v === 'all' ? 'all' : (Number(v) as 1 | 2 | 3))}
-              ariaLabel="ดูเฉพาะสายที่"
-              active={activeRound !== 'all'}
-            />
+            {/* 🔴 เลขต่อสายต้องเห็นเลยไม่ต้องกด (เจ้าของสั่ง 3 ต.ค. 2569: *"มันต้องบอก
+                ทั้งหมดเท่าไหร่ สาย1เท่าไหร่ สาย2เท่าไหร่ สายที่3 เท่าไหร่"*) — เลิกพับใน dropdown
+                กดเม็ดไหน = กล่องข้างล่างนับเฉพาะสายนั้น (พฤติกรรมเดิมของ "ดูเฉพาะ") */}
+            {(['all', 1, 2, 3] as FollowRoundFilter[]).map((r) => {
+              const rows = r === 'all' ? [...roundRows.values()].flat() : (roundRows.get(r) ?? []);
+              const label = r === 'all' ? 'ทั้งหมด' : roundLabelOf(r);
+              const on = activeRound === r;
+              return (
+                <button
+                  key={String(r)}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => pickRound(r)}
+                  className={cn(
+                    'inline-flex h-8 items-center rounded-full border px-3 text-[11.5px] font-medium tabular-nums transition-colors',
+                    on ? 'border-primary bg-primary text-primary-foreground' : TONE.neutral.outline,
+                  )}
+                >
+                  {label} · {rows.length.toLocaleString('th-TH')}
+                </button>
+              );
+            })}
             {filtersSlot}
           </div>
         </div>
