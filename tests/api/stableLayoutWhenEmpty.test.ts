@@ -15,7 +15,10 @@ describe('ทั้งระบบ: ว่างแล้วทรงเดิ�
   it('หน้าติดตาม — ขั้นตอนของสายไม่หุบ · แถวสัญญาณจองที่ · วงกลมอยู่เสมอ · ตารางมีหัวเสมอ · ไม่มีกล่องว่างท้ายหน้า', () => {
     const panel = read('src/components/follow/FollowCallRoundsPanel.tsx');
     expect(panel).not.toContain('const allEmpty');
-    expect(panel).toContain('className="invisible text-[11.5px] font-medium"');
+    // แถวสัญญาณท้ายการ์ดถูกถอดทั้งแถว (เจ้าของสั่ง 4 ต.ค. 2569 "รอโทร 30 คน — ยังไม่ถึงเวลาที่ตั้งไว้ เอาออก")
+    // ⇒ ไม่มีแถวให้จองที่แล้ว · การ์ดไม่สูง/เตี้ยตามข้อมูลเพราะเลขใหญ่อยู่เสมอ (ว่าง = 0)
+    expect(panel).not.toContain('className="invisible text-[11.5px] font-medium"');
+    expect(panel).toContain('data-testid="call-summary"');
     const cal = read('src/components/follow/FollowPlanningCalendar.tsx');
     expect(cal).not.toContain('ยังไม่มีผลเดือนนี้');
     expect(cal).not.toContain('วันที่เลือกไม่มีสายที่ต้องตาม');

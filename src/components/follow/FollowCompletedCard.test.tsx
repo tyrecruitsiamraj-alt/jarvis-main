@@ -1,3 +1,4 @@
+import React from 'react';
 /**
  * การ์ด "ติดตามครบ" (เจ้าของสั่ง 1 ต.ค. 2569)
  *
@@ -9,7 +10,11 @@
  * - บอกว่าไม่ไป ⇒ ไม่มีปุ่มย้าย
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+
+/** การ์ดมีปุ่มพาไปหน้าดูแลหลังเริ่มงาน (useNavigate) — ต้องอยู่ใต้ router (4 ต.ค. 2569) */
+const render = (ui: React.ReactElement) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
 import type { FollowEntry } from '@/lib/followApi';
 import { groupFollowEntries } from '@/lib/followGrouping';
 import { AFTERCARE_TOPIC } from '@/lib/aftercareRounds';

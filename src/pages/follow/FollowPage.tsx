@@ -54,7 +54,7 @@ import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
 import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
 import { buildBoardUnitOptions, mergeBoardUnitOptions, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
-import { groupFollowEntries } from '@/lib/followGrouping';
+import { followGroupKey, groupFollowEntries } from '@/lib/followGrouping';
 import { followScopeEntries, followTeamForScope } from '@/lib/followReplacement';
 import {
   filterFollowEntries,
@@ -245,6 +245,8 @@ const FollowPage: React.FC = () => {
    * 🔴 เดิมปิดป๊อปทันทีแล้วบอกผลที่แถบบนหน้า (เลื่อนจอแล้วมองไม่เห็น) · ถ้ามีสายที่ไม่ได้ส่ง AI
    *    ข้อความไปลงช่อง error **ในป๊อปที่ปิดไปแล้ว** = ไม่มีใครเห็นเลย
    */
+  /** มาจากหน้าอื่นด้วยลิงก์ตั้งรอบโทร — ปุ่ม "กลับหน้า…" ในฟอร์มและหน้าเสร็จสิ้น (null = เปิดเองจากหน้านี้) */
+  const [returnTo, setReturnTo] = useState<{ path: string; label: string } | null>(null);
   const [doneInfo, setDoneInfo] = useState<{
     lines: string[];
     warn: string | null;
@@ -440,7 +442,9 @@ const FollowPage: React.FC = () => {
     // หน่วยงานที่เลือกไว้แล้วตอนตั้งขั้น (Phase 6.6/6.9) — เติมให้ ไม่ต้องเลือกซ้ำ
     // ⚠️ เติมแค่ชื่อ · รหัสไซต์ให้คนยืนยันจาก picker เอง (ชื่ออาจซ้ำข้ามไซต์)
     if (prefill.unitName) setUnitName(prefill.unitName);
-    setPickedFrom('มาจากหน้าคัดสรร — เหลือเลือกวันและเวลา');
+    // ทางกลับหน้าเดิม (4 ต.ค. 2569 "ต้องมีทางเข้า และทางเอากลับ")
+    setReturnTo(prefill.back ? { path: prefill.back, label: prefill.backLabel || 'หน้าเดิม' } : null);
+    setPickedFrom(prefill.backLabel ? `มาจากหน้า${prefill.backLabel} — เหลือเลือกวันและเวลา` : 'มาจากหน้าคัดสรร — เหลือเลือกวันและเวลา');
     setFormOpen(true);
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
@@ -1286,6 +1290,7 @@ const FollowPage: React.FC = () => {
         onClick={() => {
           setFormOpen(true);
           setFormError(null);
+          setReturnTo(null); // เปิดเองจากหน้านี้ = ไม่มีหน้าเดิมให้กลับ
         }}
         className="inline-flex h-8 items-center gap-1 px-2.5 text-[11px] touch-manipulation sm:px-3"
       >
@@ -1493,6 +1498,11 @@ const FollowPage: React.FC = () => {
                  (เดิมโหลดแยก ⇒ จอเดียวมี "ทั้งหมด" สามค่าที่ไม่ตรงกัน)
                  ตัวกรอง "ใครโทร" มีผลกับแผงนี้ด้วย — เลขทุกกล่องแบ่งตามคนโทร/AI ได้ */
               entries={panelEntries}
+              /* จากรายชื่อในป๊อปของเลข → เปิดป๊อปจัดการคนนั้นได้เลย (4 ต.ค. 2569 ทางไปต่อ) */
+              onOpenPerson={(e) => {
+                const ymd = e.scheduled_at ? toYmdBangkok(new Date(e.scheduled_at)) : '';
+                setOpenCell({ key: followGroupKey(e), ymd });
+              }}
               loading={loading}
               onReload={() => void reload()}
               round={activeRound}
@@ -1610,6 +1620,21 @@ const FollowPage: React.FC = () => {
                       {submitting ? `กำลังบันทึก…${submitProgress ? ` ${submitProgress}` : ''}` : doneInfo.retry.label}
                     </Button>
                   ) : null}
+                  {returnTo ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        const to = returnTo.path;
+                        setFormOpen(false);
+                        setDoneInfo(null);
+                        setReturnTo(null);
+                        navigate(to);
+                      }}
+                    >
+                      <ArrowLeft aria-hidden /> กลับหน้า{returnTo.label}
+                    </Button>
+                  ) : null}
                   <Button type="button" variant="outline" size="sm" onClick={() => setDoneInfo(null)}>
                     <Plus aria-hidden /> เพิ่มคนต่อ
                   </Button>
@@ -1628,6 +1653,22 @@ const FollowPage: React.FC = () => {
             ) : (
             <>
             <DialogHeader className="px-4 pt-4 sm:px-5">
+              {returnTo ? (
+                <Button
+                  type="button"
+                  variant="link"
+                  size="xs"
+                  className="h-auto w-fit p-0"
+                  onClick={() => {
+                    const to = returnTo.path;
+                    setFormOpen(false);
+                    setReturnTo(null);
+                    navigate(to);
+                  }}
+                >
+                  <ArrowLeft aria-hidden /> กลับหน้า{returnTo.label}
+                </Button>
+              ) : null}
               <DialogTitle>เพิ่มคนที่ต้องการติดตาม</DialogTitle>
               <DialogDescription>ทำทีละขั้น — ใครก่อน แล้วหน่วยงาน แล้วค่อยตั้งวันเวลาที่จะโทร</DialogDescription>
             </DialogHeader>

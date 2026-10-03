@@ -11362,3 +11362,23 @@ Choice ของเจ้าของ: การ์ดแยกบนหน้�
 | `src/pages/aftercare/AftercarePage.tsx` | `PageHeader backPath="/follow"` — เดิมมาจากการ์ดติดตามครบแล้วไม่มีทางกลับ (นอกจากเมนู/ปุ่มย้อนเบราว์เซอร์) |
 
 - ⚠️ ยังเหลือคำ "รอบโทรที่ N" ใน dropdown "สายนี้คือสายที่เท่าไหร่" + บทพูดตัวอย่าง (`roundTabLabel` ใน `followRoundVisual.ts` — ลำดับทั้งชุดที่ใช้เลือกบท AI คนละความหมายกับ "สายที่" = ลำดับในวัน) · ยังไม่แตะ รอเจ้าของเคาะคำ
+
+### 4 ต.ค. 2569 — ทางเข้า/ทางกลับทุกฟังก์ชัน + แยก "รอโทร" ออกจาก "สรุปไม่ได้"
+
+เจ้าของ: *"มันต้องไม่ได้มีแค่ Function นะ มันต้องมีทางเข้า และทางเอากลับนะอย่าลืม"* + *"รอโทร 30 คน — ยังไม่ถึงเวลาที่ตั้งไว้ เอาออก ·
+รอโทร กับ สรุปผลไม่ได้ แยกกันนะ สรุปผลไม่ได้คือโทรไปแล้วแต่ไม่รู้ผลคือไปหรือไม่"*
+
+ไล่ทุกฟังก์ชันว่าเข้าได้จากไหน/ออกกลับได้ไหม — ทางตันที่เจอและแก้:
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/followPrefill.ts` | `back` / `backLabel` (`pf_back` · `pf_back_label`) + `safeFollowBackPath` รับเฉพาะ path ในระบบ (`/x` · ไม่รับ `//` / `http:` / ช่องว่าง) |
+| `src/pages/aftercare/AftercarePage.tsx` · `src/components/recruit-rm/SelectionProgressControls.tsx` | ลิงก์ตั้งรอบโทรส่งทางกลับมาด้วย (`/aftercare` "ดูแลหลังเริ่มงาน" · หน้าคัดสรร = `location.pathname+search` "คัดสรร") |
+| `src/pages/follow/FollowPage.tsx` | `returnTo` จาก prefill → ปุ่ม **"กลับหน้า…"** บนหัวฟอร์ม (ทิ้งกลางทางได้) + บนหน้าเสร็จสิ้น · เปิดฟอร์มเองจากหน้านี้ = ล้าง returnTo · `onOpenPerson` ให้แผงขั้นตอนของสาย |
+| `src/components/follow/FollowCallRoundsPanel.tsx` | ป๊อปรายชื่อจากเลข: ทุกคนมีปุ่ม **"จัดการ"** → ปิดป๊อปรายชื่อแล้วเปิดป๊อปจัดการของคนนั้น (ห้ามซ้อน Dialog) · ถอดแถวสัญญาณท้ายการ์ด ("รอโทร N คน — ยังไม่ถึงเวลา…") · grid md:8 ช่อง |
+| `src/components/follow/FollowCompletedCard.tsx` | ย้ายไปดูแลหลังเริ่มงานเสร็จ → ข้อความมีปุ่ม **"ไปหน้าดูแลหลังเริ่มงาน"** (`noticeMoved`) · ใช้ `useNavigate` ⇒ เทสต์ต้องห่อ `MemoryRouter` |
+| `src/lib/followCallMatrix.ts` | คอลัมน์ `unknown` → **`unclear` "สรุปไม่ได้"** (มีผลแล้วแต่ไม่รู้ว่าไป: unreachable · ปิดงานลา/เลื่อน/จำวันผิด) + **`waiting` "รอโทร"** (ยังไม่มีผล: waiting · overdue · notSent) สีฟ้า · ยังบวกกันพอดี |
+| เทสต์ | `followPrefill.test.ts` (+4 ทางกลับ/กันลิงก์นอก/ทางไปต่อ) · `followCallMatrix.test.ts` (แยกรอโทร/สรุปไม่ได้) · `FollowCompletedCard.test.tsx` (MemoryRouter) · `followReplacement` + `stableLayoutWhenEmpty` (ไม่มีแถวสัญญาณ) |
+
+- ตรวจจริง: เลขใหญ่ 31 = ไป 0 + ไม่ไป 0 + สรุปไม่ได้ 0 + รอโทร 30 + ยกเลิก 1 · ไม่มีประโยคเตือนแล้ว · ป๊อปรายชื่อรอโทร → จัดการ → ป๊อปจัดการคนนั้น (dialog เปิดอยู่ 1 ตัว) ·
+  หน้าดูแล → ตั้งรอบโทร → ฟอร์มขึ้น "กลับหน้าดูแลหลังเริ่มงาน" กดแล้วกลับ /aftercare จริง

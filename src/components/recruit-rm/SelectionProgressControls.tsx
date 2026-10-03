@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   INFORM_PLAN_KEY,
   PREP_CHECKLIST_ITEMS,
@@ -75,6 +75,7 @@ const SelectionProgressControls: React.FC<SelectionProgressControlsProps> = ({
   units,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const subject: SelectionProgressSubject | null =
     subjectProp ?? (legacyApplication ? { kind: 'application', application: legacyApplication } : null);
 
@@ -143,6 +144,9 @@ const SelectionProgressControls: React.FC<SelectionProgressControlsProps> = ({
       phone,
       topic: `แจ้งเข้างาน ${jobTitle ?? ''}`.trim(),
       unitName: unitName ?? undefined,
+      // ทางกลับมาที่ใบสมัครนี้ (4 ต.ค. 2569 "ต้องมีทางเข้า และทางเอากลับ")
+      back: `${location.pathname}${location.search}`,
+      backLabel: 'คัดสรร',
     });
   };
 

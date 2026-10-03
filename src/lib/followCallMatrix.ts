@@ -6,24 +6,28 @@
  *   1. ทั้งหมดเท่าไหร่ · 2. สาย 1 2 3 เท่าไหร่ · 3. แต่ละสาย ตอบว่าไป / ไม่ไป / สรุปไม่ได้ เท่าไหร่
  * + เคยสั่งให้โชว์ยกเลิก *"ไม่งั้นจะงงว่าหายไปไหน 1"*
  *
- * 🔴 **ทุกแถวบวกกันได้พอดี**: ไป + ไม่ไป + สรุปไม่ได้ + ยกเลิก = ทั้งหมด
+ * 🔴 **ทุกแถวบวกกันได้พอดี**: ไป + ไม่ไป + สรุปไม่ได้ + รอโทร + ยกเลิก = ทั้งหมด
  * และ แถวทุกสาย = สาย 1 + สาย 2 + สาย 3 ขึ้นไป ทุกคอลัมน์
  *
  * นิยามยืมของกลางทั้งหมด (หนึ่งเมตริกหนึ่งนิยาม):
  *   · สายที่เท่าไหร่ = `followRoundSlot` (ตัวเดียวกับปฏิทิน/ตารางรายวัน)
- *   · ไป / ไม่ไป / สรุปไม่ได้ = `callCategory` → `callVerdict` (ตัวเดียวกับการ์ดเดิม — รวมผลปิดงาน
+ *   · ไป / ไม่ไป / สรุปไม่ได้ / รอโทร = `callCategory` (ตัวเดียวกับตาราง — รวมผลปิดงาน
  *     และผลที่คนลงเอง) · ยกเลิก = หมวด cancelled
  *   · สายที่ไม่มีเลขสาย (ยังไม่เคยเข้าคิวและยังไม่มีผล) ไม่อยู่สายไหน — นิยามเดิมของแผง
  */
 import type { FollowEntry } from '@/lib/followApi';
-import { callCategory, callVerdict, followRoundState } from '@/lib/followPlanning';
+import { callCategory, followRoundState } from '@/lib/followPlanning';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 
 export type FollowMatrixRowKey = 'all' | 1 | 2 | 3;
-export type FollowMatrixCol = 'total' | 'went' | 'notWent' | 'unknown' | 'cancelled';
+/**
+ * 🔴 "รอโทร" กับ "สรุปไม่ได้" แยกกัน (เจ้าของสั่ง 4 ต.ค. 2569: *"สรุปผลไม่ได้คือโทรไปแล้วแต่ไม่รู้ผล
+ * คือไปหรือไม่"*) — เดิมรวมเป็นช่องเดียว "สรุปไม่ได้" ทั้งที่ 30 สายยังไม่ได้โทรเลย
+ */
+export type FollowMatrixCol = 'total' | 'went' | 'notWent' | 'unclear' | 'waiting' | 'cancelled';
 
 export const FOLLOW_MATRIX_ROWS: readonly FollowMatrixRowKey[] = ['all', 1, 2, 3];
-export const FOLLOW_MATRIX_COLS: readonly FollowMatrixCol[] = ['total', 'went', 'notWent', 'unknown', 'cancelled'];
+export const FOLLOW_MATRIX_COLS: readonly FollowMatrixCol[] = ['total', 'went', 'notWent', 'unclear', 'waiting', 'cancelled'];
 
 export const FOLLOW_MATRIX_ROW_LABEL: Record<FollowMatrixRowKey, string> = {
   all: 'ทุกสาย',
@@ -36,16 +40,19 @@ export const FOLLOW_MATRIX_COL_LABEL: Record<FollowMatrixCol, string> = {
   total: 'ทั้งหมด',
   went: 'ตอบว่าไป',
   notWent: 'ตอบว่าไม่ไป',
-  unknown: 'สรุปไม่ได้',
+  unclear: 'สรุปไม่ได้',
+  waiting: 'รอโทร',
   cancelled: 'ยกเลิก',
 };
 
 /** สีของคอลัมน์ — สีที่มีความหมายชุดเดิม (เขียว = ไป · แดง = ไม่ไป · เหลือง = ยังไม่รู้) */
-export const FOLLOW_MATRIX_COL_TONE: Record<FollowMatrixCol, 'neutral' | 'success' | 'danger' | 'warn'> = {
+export const FOLLOW_MATRIX_COL_TONE: Record<FollowMatrixCol, 'neutral' | 'success' | 'danger' | 'warn' | 'info'> = {
   total: 'neutral',
   went: 'success',
   notWent: 'danger',
-  unknown: 'warn',
+  unclear: 'warn',
+  /** ฟ้า = ยังไม่ถึงเวลา/รอผล (สีเดียวกับป้ายในตาราง) */
+  waiting: 'info',
   cancelled: 'neutral',
 };
 
@@ -55,16 +62,31 @@ const emptyRow = (): Record<FollowMatrixCol, FollowEntry[]> => ({
   total: [],
   went: [],
   notWent: [],
-  unknown: [],
+  unclear: [],
+  waiting: [],
   cancelled: [],
 });
 
-/** ช่องของสายหนึ่งสาย — ไป / ไม่ไป / สรุปไม่ได้ / ยกเลิก */
+/**
+ * ช่องของสายหนึ่งสาย — ไป / ไม่ไป / สรุปไม่ได้ / รอโทร / ยกเลิก (หมวดกลาง `callCategory` ตัวเดียวกับตาราง)
+ *   · สรุปไม่ได้ = **มีผลแล้ว** แต่ไม่รู้ว่าไปไหม: ไม่ได้คำตอบ (unreachable) · ปิดงานด้วย ลา/เลื่อน/จำวันผิด (other)
+ *   · รอโทร = **ยังไม่มีผล**: ยังไม่ถึงเวลา (waiting) · เลยเวลาแต่ผลยังไม่กลับ (overdue) · ไม่ได้ส่ง AI/รอคนโทร (notSent)
+ */
 export function followMatrixCol(entry: FollowEntry, now: Date = new Date()): Exclude<FollowMatrixCol, 'total'> {
   const round = { entry, state: followRoundState(entry, now), time: null, ymd: null };
-  const verdict = callVerdict(callCategory(round));
-  if (verdict === null) return 'cancelled';
-  return verdict;
+  switch (callCategory(round)) {
+    case 'cancelled':
+      return 'cancelled';
+    case 'agreed':
+      return 'went';
+    case 'lost':
+      return 'notWent';
+    case 'unreachable':
+    case 'other':
+      return 'unclear';
+    default:
+      return 'waiting';
+  }
 }
 
 /** ตารางเต็ม — แต่ละช่องถือรายชื่อจริง (กดดูรายชื่อได้ · เลข = ความยาวลิสต์ ไม่มีตัวนับแยก) */

@@ -273,6 +273,8 @@ const AftercarePage: React.FC = () => {
                   phone: row.person.phone_e164,
                   topic: AFTERCARE_TOPIC,
                   unitName: row.person.unit_name ?? undefined,
+                  back: '/aftercare',
+                  backLabel: 'ดูแลหลังเริ่มงาน',
                 }),
               )
             }
@@ -370,6 +372,8 @@ const AftercarePage: React.FC = () => {
                                   phone: p.phone_e164,
                                   topic: AFTERCARE_TOPIC,
                                   unitName: p.unit_name ?? undefined,
+                                  back: '/aftercare',
+                                  backLabel: 'ดูแลหลังเริ่มงาน',
                                 }),
                               )
                             }

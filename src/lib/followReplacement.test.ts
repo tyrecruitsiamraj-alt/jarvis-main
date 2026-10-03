@@ -93,7 +93,8 @@ describe('หน้าการติดตาม: หัวการ์ด Call
     expect(panel).toContain('data-testid="call-summary"');
     expect(panel).not.toContain('data-testid="call-matrix"');
     // 🔴 ไม่มีหลอดสัดส่วนใต้เลข (เจ้าของสั่ง 3 ต.ค. 2569 "เอาหลอดออก")
-    const summary = panel.slice(panel.indexOf('data-testid="call-summary"'), panel.indexOf('สัญญาณ + ผลจาก AI'));
+    const summary = panel.slice(panel.indexOf('data-testid="call-summary"'), panel.indexOf('แถวสัญญาณท้ายการ์ด'));
+    expect(summary.length).toBeGreaterThan(100);
     expect(summary).not.toContain('bg-secondary');
     expect(summary).not.toContain('width: `');
     // AI โทร / คนโทร ของสายที่เลือก (3 ต.ค. 2569 "บอกเพิ่มด้วยว่า AI เท่าไหร่ คนเท่าไหร่ แบบทั้งหมดและแต่ละสาย")

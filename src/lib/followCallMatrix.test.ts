@@ -33,11 +33,23 @@ const e = (over: Partial<FollowEntry>): FollowEntry =>
 const NOW = new Date('2026-10-04T06:00:00+07:00');
 
 describe('followMatrixCol — สายหนึ่งสายตกช่องไหน', () => {
-  it('ยืนยันว่าไป = ไป · ปฏิเสธ = ไม่ไป · ยังไม่โทร = สรุปไม่ได้ · ยกเลิก = ยกเลิก', () => {
+  it('ยืนยันว่าไป = ไป · ปฏิเสธ = ไม่ไป · ยังไม่โทร = รอโทร · ยกเลิก = ยกเลิก', () => {
     expect(followMatrixCol(e({ call_status: 'completed', call_outcome: 'confirmed' }), NOW)).toBe('went');
     expect(followMatrixCol(e({ call_status: 'completed', call_outcome: 'declined' }), NOW)).toBe('notWent');
-    expect(followMatrixCol(e({}), NOW)).toBe('unknown');
+    expect(followMatrixCol(e({}), NOW)).toBe('waiting');
     expect(followMatrixCol(e({ cancelled: true }), NOW)).toBe('cancelled');
+  });
+
+  /** เจ้าของ 4 ต.ค. 2569: "สรุปผลไม่ได้คือโทรไปแล้วแต่ไม่รู้ผลคือไปหรือไม่" — แยกจากรอโทร */
+  it('🔴 สรุปไม่ได้ = โทรแล้วมีผลแต่ไม่รู้ว่าไปไหม · รอโทร = ยังไม่มีผลเลย', () => {
+    // โทรแล้วไม่รับ = มีผล แต่ไม่รู้ว่าไป
+    expect(followMatrixCol(e({ call_status: 'completed', call_outcome: 'no_answer' }), NOW)).toBe('unclear');
+    // ปิดงานด้วย ลา / จำวันผิด = รู้ผลแต่ไม่ใช่ไป/ไม่ไป
+    expect(followMatrixCol(e({ completed_at: '2026-10-04T09:00:00+07:00', outcome_code: 'leave' }), NOW)).toBe('unclear');
+    // เลยเวลาแต่ผลยังไม่กลับ / ยังไม่ส่ง AI / คนยังไม่โทร = รอโทร
+    expect(followMatrixCol(e({ scheduled_at: '2026-10-04T05:00:00+07:00' }), NOW)).toBe('waiting');
+    expect(followMatrixCol(e({ call_status: null }), NOW)).toBe('waiting');
+    expect(followMatrixCol(e({ call_status: null, call_mode: 'manual' }), NOW)).toBe('waiting');
   });
 
   it('ปิดงานแล้วนับตามผลปิดงาน · ผลที่คนลงเองก็นับ (ตัวเดียวกับการ์ดเดิม)', () => {
@@ -62,9 +74,10 @@ describe('buildFollowCallMatrix', () => {
   ];
   const m = buildFollowCallMatrix(rows, NOW);
 
-  it('🔴 ทุกแถวบวกกันได้พอดี: ไป + ไม่ไป + สรุปไม่ได้ + ยกเลิก = ทั้งหมด', () => {
+  it('🔴 ทุกแถวบวกกันได้พอดี: ไป + ไม่ไป + สรุปไม่ได้ + รอโทร + ยกเลิก = ทั้งหมด', () => {
     for (const r of FOLLOW_MATRIX_ROWS) {
-      const sum = m[r].went.length + m[r].notWent.length + m[r].unknown.length + m[r].cancelled.length;
+      const sum =
+        m[r].went.length + m[r].notWent.length + m[r].unclear.length + m[r].waiting.length + m[r].cancelled.length;
       expect(sum, `แถว ${r}`).toBe(m[r].total.length);
     }
   });
@@ -81,7 +94,7 @@ describe('buildFollowCallMatrix', () => {
     expect(m[1].went).toHaveLength(1);
     expect(m[1].cancelled).toHaveLength(1);
     expect(m[2].notWent).toHaveLength(1);
-    expect(m[3].unknown).toHaveLength(1);
+    expect(m[3].waiting).toHaveLength(1);
   });
 
   it('ว่าง = ทุกช่องเป็น 0 (ตารางไม่หาย)', () => {

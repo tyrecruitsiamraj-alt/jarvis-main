@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LoaderCircle, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -75,6 +76,9 @@ const FollowCompletedCard: React.FC<{
   const [moving, setMoving] = useState<CompletedFollowPerson | null>(null);
   const [closing, setClosing] = useState<CompletedFollowPerson | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /** ข้อความล่าสุดมาจากการย้ายไปดูแลหลังเริ่มงาน — โชว์ปุ่มพาไปดู (4 ต.ค. 2569 "ต้องมีทางเข้า และทางเอากลับ") */
+  const [noticeMoved, setNoticeMoved] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <Card className="overflow-hidden rounded-2xl shadow-sm" data-testid="follow-completed-card">
@@ -88,9 +92,18 @@ const FollowCompletedCard: React.FC<{
       {notice ? (
         <p
           role="status"
-          className={cn('border-b px-4 py-2 text-xs font-medium md:px-5', TONE.success.soft, TONE.success.value)}
+          className={cn(
+            'flex flex-wrap items-center gap-2 border-b px-4 py-2 text-xs font-medium md:px-5',
+            TONE.success.soft,
+            TONE.success.value,
+          )}
         >
-          {notice}
+          <span>{notice}</span>
+          {noticeMoved ? (
+            <Button type="button" variant="link" size="xs" className="h-auto p-0" onClick={() => navigate('/aftercare')}>
+              ไปหน้าดูแลหลังเริ่มงาน
+            </Button>
+          ) : null}
         </p>
       ) : null}
 
@@ -187,6 +200,7 @@ const FollowCompletedCard: React.FC<{
         onDone={(text) => {
           setMoving(null);
           setNotice(text);
+          setNoticeMoved(true);
           onChanged();
         }}
       />
@@ -197,6 +211,7 @@ const FollowCompletedCard: React.FC<{
         onDone={(text) => {
           setClosing(null);
           setNotice(text);
+          setNoticeMoved(false);
           onChanged();
         }}
       />

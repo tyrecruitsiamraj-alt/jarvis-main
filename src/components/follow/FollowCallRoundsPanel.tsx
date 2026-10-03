@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { DASH, TONE } from '@/lib/designTokens';
 import { type FollowEntry } from '@/lib/followApi';
 import { followCallerOf } from '@/lib/followListFilter';
@@ -87,7 +88,7 @@ const ROUND_HELP_TEXT =
  */
 
 /** รายละเอียดของคนหนึ่งคนใน popup — เจ้าของขอ "ชื่อพร้อมรายละเอียดของแต่ละคน" */
-function PersonRow({ p }: { p: FollowEntry }) {
+function PersonRow({ p, onOpen }: { p: FollowEntry; onOpen?: (p: FollowEntry) => void }) {
   return (
     <li className={cn('rounded-lg border px-2.5 py-2', TONE.neutral.soft)}>
       <div className="flex items-start justify-between gap-2">
@@ -123,6 +124,14 @@ function PersonRow({ p }: { p: FollowEntry }) {
           {p.recipient_phone}
         </a>
       </div>
+      {/* 🔴 ทางไปต่อจากรายชื่อ (4 ต.ค. 2569 "ต้องมีทางเข้า และทางเอากลับ") — เดิมเห็นชื่อแล้วทำอะไรต่อไม่ได้ ต้องปิดไปหาเอง */}
+      {onOpen ? (
+        <div className="mt-1.5 flex justify-end">
+          <Button type="button" variant="outline" size="xs" onClick={() => onOpen(p)}>
+            จัดการ
+          </Button>
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -156,6 +165,7 @@ export default function FollowCallRoundsPanel({
   onRoundChange,
   embedded = false,
   filtersSlot,
+  onOpenPerson,
 }: {
   /**
    * ปุ่มเสริมข้างไอคอนปฏิทิน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-5: ปุ่ม "เพิ่มเรื่อง" /
@@ -190,6 +200,8 @@ export default function FollowCallRoundsPanel({
    * กับตรง ดูเฉพาะ"*) — หน้าแม่เป็นเจ้าของ state ของมัน · ไม่ส่ง = ไม่มี
    */
   filtersSlot?: React.ReactNode;
+  /** กด "จัดการ" ในป๊อปรายชื่อ = ปิดป๊อปนี้แล้วเปิดป๊อปจัดการของคนนั้น (หน้าแม่เป็นเจ้าของ) */
+  onOpenPerson?: (entry: FollowEntry) => void;
 }) {
   /** โฉมใหม่อยู่ไหม — เปลี่ยนแค่คลาสสี/ระยะ โครง JSX และข้อมูลเส้นเดียวกันทั้งสองโฉม */
   const v2 = useUiV2();
@@ -324,7 +336,18 @@ export default function FollowCallRoundsPanel({
               return peopleDialog && shown.length > 0 ? (
                 <ul className="space-y-1.5">
                   {shown.map((p) => (
-                    <PersonRow key={p.id} p={p} />
+                    <PersonRow
+                      key={p.id}
+                      p={p}
+                      onOpen={
+                        onOpenPerson
+                          ? (entry) => {
+                              setPeopleDialog(null); // ห้ามซ้อน Dialog — ปิดก่อนเปิดป๊อปจัดการ
+                              onOpenPerson(entry);
+                            }
+                          : undefined
+                      }
+                    />
                   ))}
                 </ul>
               ) : (
@@ -355,8 +378,6 @@ export default function FollowCallRoundsPanel({
    * 🔴 ของเดิมอยู่ครบ: ยอดต่อรอบ · แถบสัญญาณ · บรรทัดผลจาก AI · 7 ช่องกดดูรายชื่อได้
    */
   if (embedded) {
-    const signal = roundSignal(countsOfRound, overdueWaitingCount(rowsOfRound));
-    const aiText = followCallResultSummary(rowsOfRound);
     /**
      * 🔴 **ไม่หุบแล้ว — ไม่มีงานก็โชว์ครบ 7 ขั้นเป็นเลข 0** (เจ้าของสั่ง 1 ต.ค. 2569: *"สลับไปสลับมาแล้วมันหาย
      *    มันต้องคงไว้แต่ถ้าไม่มีข้อมูลก็เป็น 0 ไป … หน้าย่อขยายเองไม่คงไว้มันดูไม่เรียบร้อย"*)
@@ -409,7 +430,7 @@ export default function FollowCallRoundsPanel({
           ];
           return (
             <div className="px-5 pb-5 pt-4" data-testid="call-summary">
-              <div className="grid grid-cols-4 gap-x-2 gap-y-4 md:grid-cols-7">
+              <div className="grid grid-cols-4 gap-x-2 gap-y-4 md:grid-cols-8">
                 {FOLLOW_MATRIX_COLS.map((c) => {
                   const n = row[c].length;
                   return (
@@ -470,21 +491,8 @@ export default function FollowCallRoundsPanel({
           );
         })()}
 
-        {/* สัญญาณ + ผลจาก AI ของรอบที่เลือก (ของเดิม ย้ายมาเป็นบรรทัดท้ายการ์ด) */}
-        {/* 🔴 แถวสัญญาณ **จองที่ไว้เสมอ** (เจ้าของสั่ง 1 ต.ค. 2569 — สลับแท็บแล้วการ์ดห้ามสูง/เตี้ยเอง)
-            ไม่มีอะไรต้องบอก = แถวว่างความสูงเท่าเดิม (ไม่ใส่ข้อความ — เจ้าของเคยสั่งเอา "ยังไม่มีใครอยู่รอบนี้" ออก 18 ส.ค.) */}
-        <div className="flex items-center gap-2 border-t border-border/70 px-5 py-2.5">
-          {signal.text ? (
-            <>
-              <span className={cn('h-2 w-2 shrink-0 rounded-full', TONE[signal.tone].dot)} aria-hidden />
-              <p className={cn('text-[11.5px] font-medium', TONE[signal.tone].value)}>{signal.text}</p>
-            </>
-          ) : (
-            <p className="invisible text-[11.5px] font-medium" aria-hidden>
-              —
-            </p>
-          )}
-        </div>
+        {/* แถวสัญญาณท้ายการ์ด ("รอโทร 30 คน — ยังไม่ถึงเวลาที่ตั้งไว้" ฯลฯ) ถอดแล้ว — เจ้าของสั่ง 4 ต.ค. 2569 "เอาออก"
+            เลขรอโทรอยู่ในเลขใหญ่แล้ว · ห้ามเติมกลับ */}
         {/**
          * 🔴 **ถอดออก 21 ก.ย. 2569** (เจ้าของสั่ง *"เอาออกมันเกะกะ"*):
          *   · บรรทัด "AI ได้คำตอบแล้ว N สาย — ยืนยันว่าไป … · เบอร์ผิด …"
