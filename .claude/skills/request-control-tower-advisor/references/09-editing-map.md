@@ -11307,3 +11307,14 @@ Choice ของเจ้าของ: การ์ดแยกบนหน้�
 | --- | --- |
 | `src/components/follow/FollowPlanningCalendar.tsx` | `nextPlannedDay` กรองด้วย `roundFilter` (ผ่าน `followRoundSlot` ตัวเดียวกับ `buildFollowDayCalls`) |
 | `src/pages/follow/FollowPage.tsx` | `nextDayRows` = scopeItems กรองใครโทร (ไม่กรองวัน) → prop `allRows` ของปฏิทิน — ปุ่มนับชุดเดียวกับตาราง |
+
+### 3 ต.ค. 2569 (ต่อ 10) — ขั้นตอนของสายโฉมโล่ง: เลขใหญ่แถวเดียว
+
+เจ้าของ: *"โชว์แบบนี้แล้วมันดูไม่สวย ดูงง อยากได้แบบโล่ง ๆ ลีน ๆ"* → Choice 3 แบบ เลือก **"เลขใหญ่แถวเดียว"**
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/components/follow/FollowCallRoundsPanel.tsx` | ตารางสาย (`call-matrix`) → `data-testid="call-summary"`: เลขใหญ่ 5 ตัวไม่มีกรอบ (ทั้งหมด/ตอบว่าไป/ตอบว่าไม่ไป/สรุปไม่ได้/ยกเลิก) ของ**สายที่เลือกใน dropdown** + แถบสัดส่วนบาง 1.5 ใต้เลข · เลข 0 สีจาง · กดเลข = ป๊อปรายชื่อ · ตัวคิดยัง `buildFollowCallMatrix` เดิม (บวกกันพอดี) · ห้ามเติมกรอบ/ตาราง/คำอธิบายกลับ |
+| `src/lib/followReplacement.test.ts` | guard `call-summary` + ห้ามกลับเป็น `call-matrix` |
+
+- ตรวจจริง: ทั้งหมด 49 · 42 · 0 · 2 · 5 · สลับ dropdown สายที่ 1 → 25 · 22 · 0 · 1 · 2 ตรงกับตาราง "23 คน · 25 สาย"

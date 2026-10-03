@@ -388,76 +388,60 @@ export default function FollowCallRoundsPanel({
         </div>
 
         {/**
-         * 🔴 ตารางก้อนเดียว (เจ้าของเคาะ 3 ต.ค. 2569) แทนการ์ด 4 ใบ + กล่องขั้นตอน 3 กล่อง ที่พูดเรื่องเดียวกันสองที่
-         * ต้องบอกครบ: ทั้งหมด · สาย 1/2/3 · แต่ละสาย ไป/ไม่ไป/สรุปไม่ได้ (+ยกเลิก ไม่ให้เลขหายเงียบ)
-         * ทุกแถวบวกกันได้พอดี · กดเลขไหนเห็นรายชื่อชุดนั้น · กดชื่อแถว = กรองตารางรายชื่อด้านล่าง
+         * 🔴 โฉมโล่ง (เจ้าของเลือก 3 ต.ค. 2569 จาก 3 แบบ: *"เลขใหญ่แถวเดียว"* — ตารางเดิมดู "ไม่สวย งง")
+         * เลข 5 ตัวของสายที่เลือกใน dropdown หัวการ์ด (ทั้งหมด/ไป/ไม่ไป/สรุปไม่ได้/ยกเลิก — บวกกันพอดี)
+         * + แถบสัดส่วนบาง ๆ ใต้เลข · ยอดต่อสายอยู่ใน dropdown แล้ว · กดเลขไหนเห็นรายชื่อชุดนั้น
+         * ห้ามเติมกรอบ/กล่อง/คำอธิบายกลับ — เจ้าของอยาก "โล่ง ๆ ลีน ๆ"
          */}
-        <div className="overflow-x-auto px-5 pb-4 pt-4">
-          <table className="w-full min-w-[520px] border-collapse text-left" data-testid="call-matrix">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="py-2 pr-3 text-[11px] font-medium text-muted-foreground" />
-                {FOLLOW_MATRIX_COLS.map((c) => (
-                  <th
-                    key={c}
-                    className={cn('px-2 py-2 text-right text-[11px] font-medium', TONE[FOLLOW_MATRIX_COL_TONE[c]].value)}
-                  >
-                    {FOLLOW_MATRIX_COL_LABEL[c]}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {FOLLOW_MATRIX_ROWS.map((r) => {
-                const on = activeRound === r;
-                return (
-                  <tr
-                    key={String(r)}
-                    className={cn(
-                      'border-b border-border/50 last:border-0',
-                      r === 'all' && 'font-medium',
-                      on && 'bg-primary/5',
-                    )}
-                  >
-                    <th scope="row" className="py-1.5 pr-3">
-                      <button
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() => pickRound(r)}
+        {(() => {
+          const row = matrix[activeRound];
+          const total = row.total.length;
+          const parts = FOLLOW_MATRIX_COLS.filter((c) => c !== 'total');
+          return (
+            <div className="px-5 pb-5 pt-4" data-testid="call-summary">
+              <div className="grid grid-cols-5 gap-2">
+                {FOLLOW_MATRIX_COLS.map((c) => {
+                  const n = row[c].length;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      disabled={n === 0}
+                      onClick={() => openMatrixDialog(activeRound, c)}
+                      className="flex flex-col items-start rounded-lg py-1 text-left transition-opacity hover:opacity-80 disabled:cursor-default disabled:hover:opacity-100"
+                    >
+                      <span
                         className={cn(
-                          'text-left text-[12.5px] underline-offset-2 hover:underline',
-                          on ? 'font-medium text-primary' : 'text-foreground',
+                          'text-3xl font-medium leading-none tabular-nums',
+                          n === 0 ? 'text-muted-foreground/50' : TONE[FOLLOW_MATRIX_COL_TONE[c]].value,
                         )}
                       >
-                        {FOLLOW_MATRIX_ROW_LABEL[r]}
-                      </button>
-                    </th>
-                    {FOLLOW_MATRIX_COLS.map((c) => {
-                      const list = matrix[r][c];
+                        {n.toLocaleString('th-TH')}
+                      </span>
+                      <span className="mt-1.5 text-xs text-muted-foreground">{FOLLOW_MATRIX_COL_LABEL[c]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* แถบสัดส่วน — ไป · ไม่ไป · สรุปไม่ได้ · ยกเลิก (สีชุดเดียวกับเลข) */}
+              <div className="mt-4 flex h-1.5 w-full overflow-hidden rounded-full bg-secondary" aria-hidden>
+                {total > 0
+                  ? parts.map((c) => {
+                      const n = row[c].length;
+                      if (n === 0) return null;
                       return (
-                        <td key={c} className="px-2 py-1.5 text-right">
-                          <button
-                            type="button"
-                            disabled={list.length === 0}
-                            onClick={() => openMatrixDialog(r, c)}
-                            className={cn(
-                              'min-w-8 rounded-lg px-1.5 py-0.5 text-[15px] tabular-nums transition-colors',
-                              list.length === 0
-                                ? 'cursor-default text-muted-foreground/60'
-                                : cn(TONE[FOLLOW_MATRIX_COL_TONE[c]].value, 'hover:bg-accent'),
-                            )}
-                          >
-                            {list.length.toLocaleString('th-TH')}
-                          </button>
-                        </td>
+                        <span
+                          key={c}
+                          className={cn('block h-full', TONE[FOLLOW_MATRIX_COL_TONE[c]].dot)}
+                          style={{ width: `${(n / total) * 100}%` }}
+                        />
                       );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    })
+                  : null}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* สัญญาณ + ผลจาก AI ของรอบที่เลือก (ของเดิม ย้ายมาเป็นบรรทัดท้ายการ์ด) */}
         {/* 🔴 แถวสัญญาณ **จองที่ไว้เสมอ** (เจ้าของสั่ง 1 ต.ค. 2569 — สลับแท็บแล้วการ์ดห้ามสูง/เตี้ยเอง)

@@ -83,9 +83,10 @@ describe('หน้าการติดตาม: หัวการ์ด Call
   const page = read('pages/follow/FollowPage.tsx');
   const panel = read('components/follow/FollowCallRoundsPanel.tsx');
 
-  it('สายที่ = dropdown (3 ต.ค. 2569 "เอาพวกนี้รวมกันเป็น Dropdown") · เลขต่อสายอยู่ในตารางสายก้อนเดียว', () => {
+  it('สายที่ = dropdown (3 ต.ค. 2569 "เอาพวกนี้รวมกันเป็น Dropdown") · ตัวเลขเป็นเลขใหญ่แถวเดียวแบบโล่ง (เจ้าของเลือก)', () => {
     expect(panel).toContain('ariaLabel="ดูเฉพาะสายที่"');
-    expect(panel).toContain('data-testid="call-matrix"');
+    expect(panel).toContain('data-testid="call-summary"');
+    expect(panel).not.toContain('data-testid="call-matrix"');
     expect(panel).toContain('buildFollowCallMatrix(entries)');
     expect(panel.match(/\{filtersSlot\}/g)?.length).toBe(1);
     // 🔴 ไม่หุบการ์ดตอนว่างแล้ว (เจ้าของสั่ง 1 ต.ค. 2569 "ถ้าไม่มีข้อมูลก็เป็น 0 ไป") — ห้ามกลับไปหุบ
