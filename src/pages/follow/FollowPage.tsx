@@ -1224,6 +1224,14 @@ const FollowPage: React.FC = () => {
    */
   const scopeGroups = useMemo(() => groupFollowEntries(scopeItems), [scopeItems]);
   const allRows = useMemo(() => buildFollowPlanningRows(scopeGroups), [scopeGroups]);
+  /**
+   * ชุดที่ปุ่ม "วันถัดไปที่มีแผน" ใช้หา — ทุกวัน (ไม่กรองวัน) แต่กรองใครโทรเหมือนตาราง
+   * ปุ่มกับตารางต้องนับชุดเดียวกัน (3 ต.ค. 2569 "แก้ให้สอดคล้องกัน")
+   */
+  const nextDayRows = useMemo(
+    () => buildFollowPlanningRows(groupFollowEntries(filterFollowEntries(scopeItems, { date: '', band: '', caller }))),
+    [scopeItems, caller],
+  );
 
   /**
    * รายละเอียดของช่องที่กดในปฏิทิน — **อ่านจากชุดเต็ม**
@@ -1314,7 +1322,7 @@ const FollowPage: React.FC = () => {
         {replaceView ? <IrecruitReplaceSyncBar canManage={canManageMasters} onSynced={() => void reload(true)} /> : null}
         <FollowPlanningCalendar
           rows={planningRowsAllRounds}
-          allRows={allRows}
+          allRows={nextDayRows}
           onViewChange={setPanelRange}
           month={calMonth}
           onMonthChange={setCalMonth}

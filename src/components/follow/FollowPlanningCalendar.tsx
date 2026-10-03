@@ -38,6 +38,7 @@ import {
   type FollowPlanningRow,
   type FollowRoundFilter,
 } from '@/lib/followPlanning';
+import { followRoundSlot } from '@/lib/followRoundBuckets';
 import {
   classifyFollowCall,
   followMicroRates,
@@ -382,12 +383,14 @@ const FollowPlanningCalendar: React.FC<{
     for (const row of allRows ?? rows) {
       for (const r of row.rounds) {
         if (!r.ymd || r.ymd <= dayYmd || r.entry.cancelled) continue;
+        // นับตามสายที่เลือกอยู่ด้วย — ตารางกรองสายที่ 2 อยู่ ปุ่มต้องชี้วันถัดไปที่มีสายที่ 2 (3 ต.ค. 2569 "แก้ให้สอดคล้องกัน")
+        if (roundFilter !== 'all' && followRoundSlot(r.entry) !== roundFilter) continue;
         counts.set(r.ymd, (counts.get(r.ymd) ?? 0) + 1);
       }
     }
     for (const [ymd, calls] of counts) if (!best || ymd < best.ymd) best = { ymd, calls };
     return best;
-  }, [allRows, rows, dayYmd]);
+  }, [allRows, rows, dayYmd, roundFilter]);
   /**
    * 🔴 **ตารางนับเป็น "คน" ไม่ใช่ "สาย"** (เจ้าของทัก 11 ก.ย. 2569: *"เพิ่มโทรหลายรอบ
    * มันขึ้นหลายบรรทัด คนดูเขางง"*) · การ์ดตัวเลขด้านบนยังนับเป็นสายเหมือนเดิม
