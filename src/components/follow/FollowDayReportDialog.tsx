@@ -1,5 +1,5 @@
 import React from 'react';
-import { Copy } from 'lucide-react';
+import { Copy, ImageDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,6 +8,7 @@ import { TONE } from '@/lib/designTokens';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import type { FollowEntry } from '@/lib/followApi';
 import { buildFollowDayReport, followDayReportTsv, FOLLOW_DAY_REPORT_HEADERS } from '@/lib/followDayReport';
+import { downloadFollowDayReportPng } from '@/lib/followDayReportImage';
 
 /**
  * ═══ สรุปแผนติดตามทั้งวัน (เจ้าของสั่ง 2 ต.ค. 2569 · Choice "หน้าสรุปบนจอ") ═══
@@ -28,7 +29,11 @@ export default function FollowDayReportDialog({
 }) {
   const report = React.useMemo(() => (open ? buildFollowDayReport(entries, ymd) : null), [open, entries, ymd]);
   const [copied, setCopied] = React.useState<'ok' | 'fail' | null>(null);
-  React.useEffect(() => setCopied(null), [open, ymd]);
+  const [saved, setSaved] = React.useState<'ok' | 'fail' | null>(null);
+  React.useEffect(() => {
+    setCopied(null);
+    setSaved(null);
+  }, [open, ymd]);
 
   const copy = async () => {
     if (!report) return;
@@ -38,6 +43,12 @@ export default function FollowDayReportDialog({
     } catch {
       setCopied('fail');
     }
+  };
+
+  /* "สรุปแผนทั้งวันอะ ทำให้โหลดเป็นรูปได้หน่อย" (เจ้าของสั่ง 3 ต.ค. 2569) — PNG พื้นขาว ส่งต่อใน LINE ได้ */
+  const savePng = async () => {
+    if (!report) return;
+    setSaved((await downloadFollowDayReportPng(report)) ? 'ok' : 'fail');
   };
 
   return (
@@ -90,6 +101,11 @@ export default function FollowDayReportDialog({
         <div className="flex flex-wrap items-center justify-end gap-2">
           {copied === 'ok' ? <span className={cn('text-xs', TONE.success.value)}>คัดลอกแล้ว วางลง Excel ได้เลย</span> : null}
           {copied === 'fail' ? <span className={cn('text-xs', TONE.danger.value)}>คัดลอกไม่ได้ ลากคลุมตารางแล้วคัดลอกเอง</span> : null}
+          {saved === 'ok' ? <span className={cn('text-xs', TONE.success.value)}>บันทึกรูปแล้ว ดูในโฟลเดอร์ดาวน์โหลด</span> : null}
+          {saved === 'fail' ? <span className={cn('text-xs', TONE.danger.value)}>บันทึกรูปไม่ได้ ใช้ปุ่มคัดลอกตารางแทน</span> : null}
+          <Button type="button" size="sm" variant="outline" onClick={() => void savePng()} disabled={!report || report.rows.length === 0}>
+            <ImageDown aria-hidden /> บันทึกเป็นรูป
+          </Button>
           <Button type="button" size="sm" variant="outline" onClick={() => void copy()} disabled={!report || report.rows.length === 0}>
             <Copy aria-hidden /> คัดลอกตาราง
           </Button>

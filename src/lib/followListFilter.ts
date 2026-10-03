@@ -1,6 +1,7 @@
 import type { FollowEntry } from '@/lib/followApi';
 import { followGroupKey } from '@/lib/followGrouping';
 import { FOLLOW_OUTCOME_SUCCESS } from '@/lib/followOutcome';
+import { inFollowRoundBucket } from '@/lib/followRoundBuckets';
 
 /**
  * **แยกหน้าตามสถานะ + filter ประจำวัน** ของหน้า Follow
@@ -108,22 +109,49 @@ export type FollowFilter = {
   caller?: FollowCaller;
 };
 
-/** ตัวกรอง "ใครโทร" — แถวเก่าที่ไม่มี call_mode = AI โทร (ค่าเดียวกับที่เส้นหลังบ้านเติม) */
-export type FollowCaller = 'all' | 'ai' | 'manual';
-export const FOLLOW_CALLERS: readonly FollowCaller[] = ['all', 'ai', 'manual'];
-export const FOLLOW_CALLER_LABEL: Record<FollowCaller, string> = { all: 'ทั้งหมด', ai: 'AI โทร', manual: 'คนโทร' };
+/**
+ * ตัวกรอง "ใครโทร" — แถวเก่าที่ไม่มี call_mode = AI โทร (ค่าเดียวกับที่เส้นหลังบ้านเติม)
+ * `tbd` (134) = สายที่ยังไม่กำหนดเวลา — เป็นคนโทรอยู่แล้ว แต่ต้องมีกองให้ไล่เติมเวลา (Journey ข้อ 5)
+ */
+export type FollowCaller = 'all' | 'ai' | 'manual' | 'tbd';
+export const FOLLOW_CALLERS: readonly FollowCaller[] = ['all', 'ai', 'manual', 'tbd'];
+export const FOLLOW_CALLER_LABEL: Record<FollowCaller, string> = {
+  all: 'ทั้งหมด',
+  ai: 'AI โทร',
+  manual: 'คนโทร',
+  tbd: 'ยังไม่ระบุเวลา',
+};
 
-export function followCallerOf(e: Pick<FollowEntry, 'call_mode'>): Exclude<FollowCaller, 'all'> {
+export function followCallerOf(e: Pick<FollowEntry, 'call_mode'>): 'ai' | 'manual' {
   return e.call_mode === 'manual' ? 'manual' : 'ai';
 }
 
-/** จำนวน **สาย** ต่อ "ใครโทร" ในแท็บที่เปิดอยู่ (ป้ายบนตัวเลือก) */
+/** จำนวน **สาย** ต่อ "ใครโทร" ในแท็บที่เปิดอยู่ (ป้ายบนตัวเลือก) · ยังไม่ระบุเวลาเป็นกองย่อยของคนโทร */
 export function countFollowCallers(entries: FollowEntry[], tab: FollowTab): Record<FollowCaller, number> {
-  const out: Record<FollowCaller, number> = { all: 0, ai: 0, manual: 0 };
+  const out: Record<FollowCaller, number> = { all: 0, ai: 0, manual: 0, tbd: 0 };
   for (const e of entries) {
     if (followLifecycleTab(e) !== tab) continue;
     out.all += 1;
     out[followCallerOf(e)] += 1;
+    if (e.time_tbd === true) out.tbd += 1;
+  }
+  return out;
+}
+
+/**
+ * ยอดต่อฝั่ง "ใครโทร" + โทรสำเร็จของแต่ละฝั่ง (เจ้าของสั่ง 3 ต.ค. 2569:
+ * *"แบ่งต่อได้ว่า คนโทรเท่าไหร่ Ai เท่าไหร่ แล้วบอกด้วยว่าทั้ง 2 อย่างโทรสำเร็จอย่างละเท่าไหร่"*)
+ * สำเร็จ = ติดต่อได้ (ช่อง "โทรติด" ของ Pipeline — `inFollowRoundBucket('connected')` นิยามเดียว
+ * ทั้ง AI และผลที่คนลงเอง) · นับทุกสาย ไม่สนแท็บ/ตัวกรอง — เลขเดียวกับหัวการ์ด Pipeline
+ */
+export function countFollowCallerResults(
+  entries: FollowEntry[],
+): Record<'ai' | 'manual', { calls: number; done: number }> {
+  const out = { ai: { calls: 0, done: 0 }, manual: { calls: 0, done: 0 } };
+  for (const e of entries) {
+    const side = out[followCallerOf(e)];
+    side.calls += 1;
+    if (inFollowRoundBucket(e, 'connected')) side.done += 1;
   }
   return out;
 }
@@ -135,7 +163,9 @@ export function filterFollowEntries(entries: FollowEntry[], f: FollowFilter): Fo
     if (f.date && bangkokDay(e.scheduled_at) !== f.date) return false;
     if (f.band && !inTimeBand(e.scheduled_at, f.band)) return false;
     if (f.owner && (e.created_by_name ?? '') !== f.owner) return false;
-    if (f.caller && f.caller !== 'all' && followCallerOf(e) !== f.caller) return false;
+    if (f.caller === 'tbd') {
+      if (e.time_tbd !== true) return false;
+    } else if (f.caller && f.caller !== 'all' && followCallerOf(e) !== f.caller) return false;
     return true;
   });
 }

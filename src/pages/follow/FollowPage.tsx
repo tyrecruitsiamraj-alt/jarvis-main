@@ -61,6 +61,8 @@ import {
   filterFollowEntries,
   countFollowTabs,
   countFollowCallers,
+  countFollowCallerResults,
+  followCallerOf,
   FOLLOW_CALLERS,
   FOLLOW_CALLER_LABEL,
   type FollowCaller,
@@ -104,7 +106,7 @@ import TimeSelect24 from '@/components/shared/TimeSelect24';
 import DateTimeField24 from '@/components/shared/DateTimeField24';
 import { type FollowOutcome } from '@/lib/followOutcome';
 import { buildFollowPlanningRows, type FollowRoundFilter } from '@/lib/followPlanning';
-import { toYmdBangkok } from '@/lib/dateTh';
+import { toYmdBangkok, formatYmdDmyBe } from '@/lib/dateTh';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
 import {
   listStaffContacts,
@@ -237,13 +239,13 @@ const FollowPage: React.FC = () => {
    * ใครโทรรอบนี้ — โหมด "ระบุเวลาเอง" (เจ้าของสั่ง 2 ต.ค. 2569: *"เพิ่มปุ่มเลือก คนโทร / AI โทร ในระบุเวลาเอง"*)
    * 🔴 ขยับคู่กับ `scheduledAts` เสมอ (กับดักเดียวกับอาร์เรย์เบอร์/เลขสาย) · ค่าเริ่ม = AI โทร (พฤติกรรมเดิม)
    */
-  const [callModes, setCallModes] = useState<Array<'ai' | 'manual'>>(() => ['ai']);
+  const [callModes, setCallModes] = useState<Array<'ai' | 'manual' | 'tbd'>>(() => ['ai']);
   /**
    * บันทึกเสร็จแล้ว = ป๊อปเปลี่ยนเป็นหน้า "เสร็จสิ้น" (เจ้าของสั่ง 2 ต.ค. 2569: *"บันทึกแล้วไม่เด้งเสร็จสิ้น"*)
    * 🔴 เดิมปิดป๊อปทันทีแล้วบอกผลที่แถบบนหน้า (เลื่อนจอแล้วมองไม่เห็น) · ถ้ามีสายที่ไม่ได้ส่ง AI
    *    ข้อความไปลงช่อง error **ในป๊อปที่ปิดไปแล้ว** = ไม่มีใครเห็นเลย
    */
-  const [doneInfo, setDoneInfo] = useState<{ lines: string[]; warn: string | null } | null>(null);
+  const [doneInfo, setDoneInfo] = useState<{ lines: string[]; warn: string | null; firstDay: string | null } | null>(null);
   /**
    * โหมดตารางโทร (16 ส.ค. · migration 092): ช่วงวัน × รอบเวลา/วัน
    * เช่น 1-7 ส.ค. วันละ 2 รอบ 07:00/08:00 → **หนึ่งสาย = หนึ่งแถว** ผูก group เดียว (1 ต.ค. 2569 · เดิม 1 แถว/วัน)
@@ -562,9 +564,9 @@ const FollowPage: React.FC = () => {
     setCallRounds((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
     setCallModes((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
   };
-  const setCallModeAt = (i: number, v: 'ai' | 'manual') =>
+  const setCallModeAt = (i: number, v: 'ai' | 'manual' | 'tbd') =>
     setCallModes((prev) => {
-      const next = prev.length >= i + 1 ? [...prev] : [...prev, ...Array<'ai' | 'manual'>(i + 1 - prev.length).fill('ai')];
+      const next = prev.length >= i + 1 ? [...prev] : [...prev, ...Array<'ai' | 'manual' | 'tbd'>(i + 1 - prev.length).fill('ai')];
       next[i] = v;
       return next;
     });
@@ -661,9 +663,9 @@ const FollowPage: React.FC = () => {
     () => scheduledAts.filter((t) => t.trim()).length,
     [scheduledAts],
   );
-  /** รอบที่ตั้งให้คนโทร (โหมดระบุเวลาเอง) — ทวนก่อนส่ง/ปุ่มบันทึกพูดตามจริง */
+  /** รอบที่ตั้งให้คนโทร (โหมดระบุเวลาเอง · รวม "ยังไม่ชัวร์เวลา") — ทวนก่อนส่ง/ปุ่มบันทึกพูดตามจริง */
   const manualTimesPreview = useMemo(
-    () => scheduledAts.filter((t, i) => t.trim() && (callModes[i] ?? 'ai') === 'manual').length,
+    () => scheduledAts.filter((t, i) => t.trim() && (callModes[i] ?? 'ai') !== 'ai').length,
     [scheduledAts, callModes],
   );
 
@@ -827,7 +829,7 @@ const FollowPage: React.FC = () => {
           const lines = [`${recipientName} · ${dayCount} วัน รวม ${sendCalls.length} สาย`];
           if (aiCalls > 0) lines.push(`AI โทร ${aiCalls} สาย`);
           if (manualCalls > 0) lines.push(`คนโทร ${manualCalls} สาย`);
-          setDoneInfo({ lines, warn: warn?.text ?? null });
+          setDoneInfo({ lines, warn: warn?.text ?? null, firstDay: [...new Set(sendCalls.map((c) => c.day))].sort()[0] ?? null });
           await reload();
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'ตั้งตารางไม่สำเร็จ';
@@ -853,6 +855,8 @@ const FollowPage: React.FC = () => {
 
     // เรียงเวลาจากก่อนไปหลัง + ตัดเวลาซ้ำทิ้ง (กดเพิ่มแล้วลืมแก้ = ได้สองสายเวลาเดียวกัน)
     const times = [...new Set(scheduledAts.filter(Boolean))].sort();
+    /** ค่าวันล้วนของ "ยังไม่ชัวร์เวลา" (YYYY-MM-DD) → เที่ยงคืนไทย (ห้ามให้ new Date ตีเป็น UTC) */
+    const localToDate = (t: string) => (/^\d{4}-\d{2}-\d{2}$/.test(t) ? new Date(`${t}T00:00:00+07:00`) : new Date(t));
     if (times.length === 0) {
       setFormError('กรุณาระบุเวลาที่ให้โทรอย่างน้อย 1 รอบ');
       return;
@@ -862,7 +866,7 @@ const FollowPage: React.FC = () => {
      * 🔴 เตือนลงซ้ำก่อนยิง (เจ้าของสั่ง 18 ส.ค. 2569: *"นายคนนี้ลงวันเวลาเดิม
      * ก็เด้งเตือนเลยว่าซ้ำ"*) — เบอร์เดิม+เวลาเดิม (ระดับนาที) กับรายการที่ยังไม่ยกเลิก
      */
-    const isoTimes = times.map((t) => new Date(t).toISOString());
+    const isoTimes = times.map((t) => localToDate(t).toISOString());
     /**
      * 🔴 แมป **เวลา → เบอร์** ก่อนใช้ — `times` ถูก dedup + sort แล้ว index จึง**ไม่ตรง**
      * กับ `scheduledAts`/`staffPhones` อีก ใช้ index ตรง ๆ = เบอร์ไปโผล่ผิดรอบเงียบ ๆ
@@ -885,12 +889,14 @@ const FollowPage: React.FC = () => {
     const roundByIso = new Map<string, number>();
     times.forEach((t, i) => roundByIso.set(isoTimes[i], roundByLocal.get(t) ?? 1));
     /** แมป **เวลา → ใครโทร** แบบเดียวกับเบอร์/เลขสาย (ห้ามใช้ index ของ `times`) */
-    const modeByLocal = new Map<string, 'ai' | 'manual'>();
+    const modeByLocal = new Map<string, 'ai' | 'manual' | 'tbd'>();
     scheduledAts.forEach((v, i) => {
       if (v && !modeByLocal.has(v)) modeByLocal.set(v, callModes[i] ?? 'ai');
     });
-    const modeByIso = new Map<string, 'ai' | 'manual'>();
+    const modeByIso = new Map<string, 'ai' | 'manual' | 'tbd'>();
     times.forEach((t, i) => modeByIso.set(isoTimes[i], modeByLocal.get(t) ?? 'ai'));
+    /** ยังไม่ชัวร์เวลา = คนโทร + ติดธง time_tbd (เวลาในแถวเป็นค่าแทน — จอโชว์ "ยังไม่ระบุเวลา") */
+    const sendModeOf = (t: string): 'ai' | 'manual' => (modeByIso.get(t) === 'ai' ? 'ai' : 'manual');
     const dupCheck = findScheduleDuplicates(phone, isoTimes, items);
     /**
      * 🔴 **ทุกรอบของคนเดียวกันต้องอยู่ `group_id` เดียวกัน** (21 ก.ย. 2569)
@@ -925,7 +931,8 @@ const FollowPage: React.FC = () => {
           scheduled_at: sendIso[0],
           call_round: roundByIso.get(sendIso[0]) ?? 1,
           // ใครโทร (121) — ค่าบนสุด = ของสายแรก (สายเดียวเส้น API อ่านจากตรงนี้) · หลายสายอ่านจาก rounds[]
-          call_mode: modeByIso.get(sendIso[0]) ?? 'ai',
+          call_mode: sendModeOf(sendIso[0]),
+          time_tbd: modeByIso.get(sendIso[0]) === 'tbd' || undefined,
           group_id: groupId,
           unit_name: unitName.trim() || undefined,
           site_code: siteCode.trim() || undefined,
@@ -933,7 +940,8 @@ const FollowPage: React.FC = () => {
             scheduled_at: t,
             staff_phone: phoneByIso.get(t) || undefined,
             call_round: roundByIso.get(t) ?? 1,
-            call_mode: modeByIso.get(t) ?? 'ai',
+            call_mode: sendModeOf(t),
+            time_tbd: modeByIso.get(t) === 'tbd' || undefined,
           })),
         });
         for (const createdEntry of createdEntries) {
@@ -943,12 +951,14 @@ const FollowPage: React.FC = () => {
         resetForm();
         // สายที่ตั้งให้คนโทร = ตั้งใจไม่ส่ง AI ⇒ ไม่นับเป็นปัญหา
         const warn = summarizeDispatchResults(dispatchStates.filter((st) => st !== 'manual'));
-        const aiCalls = sendIso.filter((t) => (modeByIso.get(t) ?? 'ai') === 'ai').length;
-        const manualCalls = sendIso.length - aiCalls;
+        const aiCalls = sendIso.filter((t) => modeByIso.get(t) === 'ai' || !modeByIso.get(t)).length;
+        const tbdCalls = sendIso.filter((t) => modeByIso.get(t) === 'tbd').length;
+        const manualCalls = sendIso.length - aiCalls - tbdCalls;
         const lines = [`${recipientName} · ${sendIso.length} สาย`];
         if (aiCalls > 0) lines.push(`AI โทร ${aiCalls} สาย`);
         if (manualCalls > 0) lines.push(`คนโทร ${manualCalls} สาย`);
-        setDoneInfo({ lines, warn: warn?.text ?? null });
+        if (tbdCalls > 0) lines.push(`ยังไม่ระบุเวลา ${tbdCalls} สาย — เติมเวลาได้ที่ปุ่มแก้ไขบนแถว`);
+        setDoneInfo({ lines, warn: warn?.text ?? null, firstDay: sendIso.map((t) => toYmdBangkok(new Date(t))).sort()[0] ?? null });
         await reload();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'เพิ่มรายชื่อไม่สำเร็จ';
@@ -1097,6 +1107,18 @@ const FollowPage: React.FC = () => {
   );
   const tabCounts = useMemo(() => countFollowTabs(scopeItems), [scopeItems]);
   const callerCounts = useMemo(() => countFollowCallers(scopeItems, tab), [scopeItems, tab]);
+  /**
+   * แผงรอบโทรแบ่งตาม "ใครโทร" ได้ (เจ้าของสั่ง 3 ต.ค. 2569: *"ให้ตัวเลขหน้าติดตาม
+   * แบ่งต่อได้ว่า คนโทรเท่าไหร่ Ai เท่าไหร่"*) — ตัวกรองเดียวกับลิสต์ข้างล่าง แต่กรองเฉพาะ
+   * มิติใครโทร (ไม่พ่วงวัน/ช่วงเวลา — กล่องรอบโทรเป็นภาพรวมทั้งขอบเขตเสมอ)
+   */
+  const panelEntries = useMemo(() => {
+    if (caller === 'all') return scopeItems;
+    if (caller === 'tbd') return scopeItems.filter((e) => e.time_tbd === true);
+    return scopeItems.filter((e) => followCallerOf(e) === caller);
+  }, [scopeItems, caller]);
+  /** "ทั้ง 2 อย่างโทรสำเร็จอย่างละเท่าไหร่" — สำเร็จ = ติดต่อได้ (นิยามเดียวกับถังในแผง) */
+  const callerStats = useMemo(() => countFollowCallerResults(scopeItems), [scopeItems]);
   const hasActiveFilter = Boolean(fDate || fBand);
 
   /**
@@ -1150,8 +1172,9 @@ const FollowPage: React.FC = () => {
     return {
       group: row.group,
       ymd: openCell.ymd,
-      /* 🔴 รวมรอบที่ยกเลิกด้วย — Lumos โชว์ว่ายกเลิก จอเราต้องโชว์ด้วย ไม่งั้นสองระบบเล่าคนละเรื่อง */
-      rounds: row.rounds.filter((r) => r.ymd === openCell.ymd),
+      /* 🔴 รวมรอบที่ยกเลิกด้วย — Lumos โชว์ว่ายกเลิก จอเราต้องโชว์ด้วย ไม่งั้นสองระบบเล่าคนละเรื่อง
+         ymd ว่าง = "แผนทั้งหมดของคนนี้" (กดจากชื่อ · 3 ต.ค. 2569) — ทุกวันเรียงตามเวลา */
+      rounds: openCell.ymd ? row.rounds.filter((r) => r.ymd === openCell.ymd) : row.rounds,
     };
   }, [openCell, allRows]);
 
@@ -1240,6 +1263,7 @@ const FollowPage: React.FC = () => {
              เส้นเดียวกับปุ่มลงผล/ยกเลิกในป๊อปจัดการ */
           onStaffResult={(round, outcome) => doStaffCall(round.entry.id, outcome)}
           onCancelRound={(round) => doCancel(round.entry.id)}
+          onQuickComplete={(round, outcome) => doComplete(round.entry.id, outcome)}
           busyId={busyId}
           lastLoadedAt={lastLoadedAt}
           roundFilter={activeRound}
@@ -1247,8 +1271,9 @@ const FollowPage: React.FC = () => {
             <FollowCallRoundsPanel
               embedded
               /* 🔴 ส่งรายการก้อนเดียวกับที่หน้านี้ใช้ — แผงนี้ห้ามโหลดเอง
-                 (เดิมโหลดแยก ⇒ จอเดียวมี "ทั้งหมด" สามค่าที่ไม่ตรงกัน) */
-              entries={scopeItems}
+                 (เดิมโหลดแยก ⇒ จอเดียวมี "ทั้งหมด" สามค่าที่ไม่ตรงกัน)
+                 ตัวกรอง "ใครโทร" มีผลกับแผงนี้ด้วย — เลขทุกกล่องแบ่งตามคนโทร/AI ได้ */
+              entries={panelEntries}
               loading={loading}
               onReload={() => void reload()}
               round={activeRound}
@@ -1277,6 +1302,14 @@ const FollowPage: React.FC = () => {
                     ariaLabel="ใครโทร"
                     active={caller !== 'all'}
                   />
+                  {/* ยอดแยก AI/คน + สำเร็จอย่างละเท่าไหร่ (เจ้าของสั่ง 3 ต.ค. 2569) —
+                      นับจาก scopeItems ทั้งขอบเขต ไม่ตามตัวกรอง จะได้เห็นสองฝั่งเทียบกันเสมอ */}
+                  <span className="text-xs tabular-nums text-muted-foreground" data-testid="caller-stats">
+                    AI {callerStats.ai.calls.toLocaleString('th-TH')} สาย · ติดต่อได้{' '}
+                    {callerStats.ai.done.toLocaleString('th-TH')} — คนโทร{' '}
+                    {callerStats.manual.calls.toLocaleString('th-TH')} สาย · ติดต่อได้{' '}
+                    {callerStats.manual.done.toLocaleString('th-TH')}
+                  </span>
                 </>
               }
             />
@@ -1455,6 +1488,24 @@ const FollowPage: React.FC = () => {
                   </p>
                 ) : null}
                 <div className="flex flex-wrap justify-end gap-2">
+                  {/* ลงแผนแล้วต้องพาไปเห็นแผนเลย (เจ้าของ 3 ต.ค. 2569: "ลงแผนทั้งเดือนแล้วแผนหาย") —
+                      แผนที่เริ่มวันหน้า ปฏิทินวันนี้ไม่โชว์ คนอ่านว่าแผนหาย */}
+                  {doneInfo.firstDay ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const day = doneInfo.firstDay as string;
+                        setFormOpen(false);
+                        setDoneInfo(null);
+                        setCalMonth(day.slice(0, 7));
+                        pickCalendarDay(day);
+                      }}
+                    >
+                      ดูแผนที่ลง ({formatYmdDmyBe(doneInfo.firstDay)})
+                    </Button>
+                  ) : null}
                   <Button type="button" variant="outline" size="sm" onClick={() => setDoneInfo(null)}>
                     <Plus aria-hidden /> เพิ่มคนต่อ
                   </Button>
@@ -2093,13 +2144,24 @@ const FollowPage: React.FC = () => {
                   >
                     <div className="flex items-center gap-2">
                       {/* 🔴 ห้ามกลับไปใช้ `<input type=datetime-local>` — ขึ้น AM/PM
-                          ตามภาษาของเครื่องคนใช้ (ดู `DateTimeField24`) */}
+                          ตามภาษาของเครื่องคนใช้ (ดู `DateTimeField24`)
+                          "ยังไม่ชัวร์เวลา" = เลือกแค่วัน (ค่าเป็น YYYY-MM-DD · เวลาไว้เติมทีหลัง) */}
+                      {(callModes[i] ?? 'ai') === 'tbd' ? (
+                        <span className="flex min-h-[46px] flex-1 items-center">
+                          <DayCalendarPicker
+                            value={/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ''}
+                            onChange={(ymd) => setScheduledAtAt(i, ymd)}
+                            emptyLabel={`เลือกวันของรอบที่ ${i + 1}`}
+                          />
+                        </span>
+                      ) : (
                       <DateTimeField24
-                        value={v}
+                        value={/^\d{4}-\d{2}-\d{2}$/.test(v) ? '' : v}
                         onChange={(next) => setScheduledAtAt(i, next)}
                         label={`รอบที่ ${i + 1}`}
                         className="min-h-[46px] flex-1"
                       />
+                      )}
                       <button
                         type="button"
                         onClick={() => removeScheduledAt(i)}
@@ -2116,12 +2178,14 @@ const FollowPage: React.FC = () => {
                         <X className="h-4 w-4" aria-hidden />
                       </button>
                     </div>
-                    {/* ใครโทรรอบนี้ (เจ้าของสั่ง 2 ต.ค. 2569) — แบบเดียวกับช่องต่อวันของโหมดตาราง */}
+                    {/* ใครโทรรอบนี้ (เจ้าของสั่ง 2 ต.ค. 2569) + "ยังไม่ชัวร์เวลา" (Journey ข้อ 5 · 3 ต.ค. 2569)
+                        ยังไม่ชัวร์เวลา = เลือกแค่วัน แล้วมาเติมเวลาทีหลัง (เป็นคนโทรจนกว่าจะตั้งเวลา) */}
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1" role="group" aria-label={`ใครโทรรอบที่ ${i + 1}`}>
                       {(
                         [
                           { value: 'ai', label: 'AI โทร', on: 'text-primary' },
                           { value: 'manual', label: 'คนโทร', on: TONE.warn.value },
+                          { value: 'tbd', label: 'ยังไม่ชัวร์เวลา', on: TONE.warn.value },
                         ] as const
                       ).map((c) => (
                         <label key={c.value} className="flex cursor-pointer items-center gap-1.5">
@@ -2326,7 +2390,7 @@ const FollowPage: React.FC = () => {
         open={Boolean(openCell)}
         onClose={() => setOpenCell(null)}
         group={cellDetail?.group ?? null}
-        ymd={cellDetail?.ymd ?? null}
+        ymd={cellDetail?.ymd || null}
         rounds={cellDetail?.rounds ?? []}
         busyId={busyId}
         cancellingId={cancellingId}

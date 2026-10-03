@@ -4,6 +4,7 @@ import {
   filterFollowEntries,
   countFollowTabs,
   countFollowCallers,
+  countFollowCallerResults,
   listFollowOwners,
   inTimeBand,
   type FollowFilter,
@@ -170,7 +171,33 @@ describe('ใครโทร — AI โทร / คนโทร', () => {
   });
 
   it('เลขบนตัวเลือกนับสายในแท็บที่เปิดอยู่', () => {
-    expect(countFollowCallers([ai, old, manual, manualDone], 'active')).toEqual({ all: 3, ai: 2, manual: 1 });
-    expect(countFollowCallers([ai, old, manual, manualDone], 'cancelled')).toEqual({ all: 1, ai: 0, manual: 1 });
+    expect(countFollowCallers([ai, old, manual, manualDone], 'active')).toEqual({ all: 3, ai: 2, manual: 1, tbd: 0 });
+    expect(countFollowCallers([ai, old, manual, manualDone], 'cancelled')).toEqual({ all: 1, ai: 0, manual: 1, tbd: 0 });
+  });
+});
+
+/** 🔴 "ยังไม่ชัวร์เวลา" (134 · Journey ข้อ 5) + ยอดโทรสำเร็จแยกฝั่ง (เจ้าของสั่ง 3 ต.ค. 2569) */
+describe('ยังไม่ระบุเวลา + โทรสำเร็จแยก AI/คนโทร', () => {
+  const base: FollowFilter = { tab: 'active', date: '', band: '' };
+
+  it('ตัวกรอง "ยังไม่ระบุเวลา" เหลือเฉพาะสายที่ time_tbd · นับเป็นกองย่อยของคนโทร', () => {
+    const tbd = entry({ call_mode: 'manual', time_tbd: true });
+    const man = entry({ call_mode: 'manual' });
+    expect(filterFollowEntries([tbd, man], { ...base, caller: 'tbd' })).toEqual([tbd]);
+    expect(countFollowCallers([tbd, man], 'active')).toEqual({ all: 2, ai: 0, manual: 2, tbd: 1 });
+  });
+
+  it('countFollowCallerResults: นับสายต่อฝั่ง + สำเร็จ = ติดต่อได้ (นิยามช่อง "โทรติด" เดียวกันทั้ง AI และคนลงเอง)', () => {
+    const rows = [
+      entry({ call_outcome: 'confirmed', call_status: 'completed' }), // AI ติดต่อได้
+      entry({ call_outcome: 'no_answer', call_status: 'completed' }), // AI ไม่ติด
+      entry({}), // AI ยังไม่มีผล
+      entry({ call_mode: 'manual', staff_call_outcome: 'acknowledged' }), // คนโทร ติดต่อสำเร็จ
+      entry({ call_mode: 'manual' }), // คนโทร ยังไม่ลงผล
+    ];
+    expect(countFollowCallerResults(rows)).toEqual({
+      ai: { calls: 3, done: 1 },
+      manual: { calls: 2, done: 1 },
+    });
   });
 });

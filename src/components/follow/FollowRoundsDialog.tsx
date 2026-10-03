@@ -92,7 +92,7 @@ const FollowRoundsDialog: React.FC<{
         <DialogHeader>
           <DialogTitle>{group?.name ?? 'รายละเอียดการติดตาม'}</DialogTitle>
           <DialogDescription>
-            {ymd ? `นัดของวันที่ ${formatYmdDmyBe(ymd)} · ` : ''}
+            {ymd ? `นัดของวันที่ ${formatYmdDmyBe(ymd)} · ` : `แผนทั้งหมด ${rounds.length.toLocaleString('th-TH')} สาย · `}
             {group?.topic ?? ''}
           </DialogDescription>
         </DialogHeader>
@@ -137,7 +137,9 @@ const FollowRoundsDialog: React.FC<{
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   {/* 🔴 สีตาม "ผลเป็นยังไง" ไม่ใช่ "มีผลหรือยัง" — ชุดเดียวกับช่องในปฏิทิน */}
                   <span className={cn('tabular-nums', TONE[tone].chip)}>
-                    {r.time ? `${r.time} น.` : 'ไม่ได้ตั้งเวลา'}
+                    {/* โหมดแผนทั้งหมด (ymd ว่าง) ต้องบอกวันด้วย ไม่งั้นทุกสายดูเหมือนวันเดียวกัน */}
+                    {!ymd && r.ymd ? `${formatYmdDmyBe(r.ymd)} · ` : ''}
+                    {r.entry.time_tbd ? 'ยังไม่ระบุเวลา' : r.time ? `${r.time} น.` : 'ไม่ได้ตั้งเวลา'}
                   </span>
                   <span className="text-[11px] font-medium text-foreground">
                     {roundResultLabel(r)}

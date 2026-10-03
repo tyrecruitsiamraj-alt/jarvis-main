@@ -357,6 +357,12 @@ const FollowPlanningCalendar: React.FC<{
    */
   onStaffResult?: (round: FollowPlanningRound, outcome: FollowStaffCallOutcome) => void | Promise<void>;
   onCancelRound?: (round: FollowPlanningRound) => void | Promise<void>;
+  /**
+   * ปุ่ม "ไป / ไม่ไป" บนแถวของสายที่**มีผลโทรแล้ว** (Journey ข้อ 10 · 3 ต.ค. 2569:
+   * *"เอา ไป / ไม่ไป ขึ้นมาเป็นปุ่มบนแถวด้วย ไม่ต้องเปิดป๊อป"*) — ผลอื่น (ลา/เลื่อน/จำวันผิด)
+   * ยังอยู่ในป๊อปจัดการ · กดพลาดย้อนได้ที่ปุ่มเดียวกันในป๊อป
+   */
+  onQuickComplete?: (round: FollowPlanningRound, outcome: 'went' | 'cancelled') => void | Promise<void>;
   /** รายการที่กำลังบันทึกอยู่ — ปุ่มของแถวนั้นกดซ้ำไม่ได้ */
   busyId?: string | null;
 }> = ({
@@ -373,6 +379,7 @@ const FollowPlanningCalendar: React.FC<{
   lastLoadedAt,
   onStaffResult,
   onCancelRound,
+  onQuickComplete,
   busyId = null,
 }) => {
   const [view, setView] = useState<View>('day');
@@ -722,14 +729,18 @@ const FollowPlanningCalendar: React.FC<{
                                     {initials(row.group.name)}
                                   </span>
                                   <span className="min-w-0">
-                                    <span
+                                    {/* กดชื่อ = แผนทั้งหมดของคนนี้ทุกวัน (เจ้าของ 3 ต.ค. 2569: "อยากดูแผนแยกรายคน") */}
+                                    <button
+                                      type="button"
+                                      onClick={() => onOpenCell(row, '', row.rounds)}
+                                      title={`ดูแผนทั้งหมดของ ${row.group.name}`}
                                       className={cn(
-                                        'block truncate text-[13.5px] font-medium text-foreground',
+                                        'block max-w-full truncate text-left text-[13.5px] font-medium text-foreground underline-offset-2 hover:text-primary hover:underline',
                                         allCancelled && 'line-through',
                                       )}
                                     >
                                       {row.group.name}
-                                    </span>
+                                    </button>
                                     <span className="block truncate text-[11.5px] text-muted-foreground">
                                       {row.group.phone}
                                     </span>
@@ -762,7 +773,7 @@ const FollowPlanningCalendar: React.FC<{
                                             round.state === 'cancelled' && 'line-through',
                                           )}
                                         >
-                                          {round.time ?? '—'}
+                                          {round.entry.time_tbd ? 'ยังไม่ระบุเวลา' : (round.time ?? '—')}
                                         </span>
                                         <span className="mt-0.5 block whitespace-nowrap text-[10.5px] text-muted-foreground">
                                           {/* "วันที่ 2 · สายที่ 1" — ลำดับในวัน ไม่ใช่เลขทั้งชุด (1 ต.ค. 2569) */}
@@ -981,6 +992,37 @@ const FollowPlanningCalendar: React.FC<{
                                         ) : (
                                           <span className="text-[12px] text-muted-foreground">—</span>
                                         )}
+                                        {/* 🔴 มีผลโทรแล้วแต่ยังไม่ปิดงาน — ปิดได้บนแถวเลย (Journey ข้อ 10 · 3 ต.ค. 2569)
+                                            ปุ่มอยู่บรรทัดเดียวเสมอ · ผลอื่น (ลา/เลื่อน/จำวันผิด) อยู่ในป๊อปจัดการ */}
+                                        {onQuickComplete && round.state === 'result' ? (
+                                          <span
+                                            className="mt-1 flex flex-nowrap items-center gap-1 whitespace-nowrap"
+                                            data-testid="quick-complete"
+                                          >
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="xs"
+                                              disabled={busy}
+                                              title={`ปิดงาน: ${row.group.name} ไปทำงานแล้ว`}
+                                              onClick={() => void onQuickComplete(round, 'went')}
+                                              className={TONE.success.value}
+                                            >
+                                              ไป
+                                            </Button>
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="xs"
+                                              disabled={busy}
+                                              title={`ปิดงาน: ${row.group.name} ไม่ไปแล้ว · กดพลาดย้อนได้ในป๊อปจัดการ`}
+                                              onClick={() => void onQuickComplete(round, 'cancelled')}
+                                              className={TONE.danger.value}
+                                            >
+                                              ไม่ไป
+                                            </Button>
+                                          </span>
+                                        ) : null}
                                       </span>
                                     );
                                   })}
@@ -1184,9 +1226,15 @@ const FollowPlanningCalendar: React.FC<{
                     return (
                       <tr key={row.group.key} className="border-b border-border/50 last:border-0">
                         <td className="sticky left-0 z-10 max-w-[260px] bg-card px-4 py-2 align-top md:px-5">
-                          <span className="block truncate text-[12px] font-medium text-foreground">
+                          {/* กดชื่อ = แผนทั้งหมดของคนนี้ (เจ้าของ 3 ต.ค. 2569) — ไม่ต้องไล่กดทีละช่องวัน */}
+                          <button
+                            type="button"
+                            onClick={() => onOpenCell(row, '', row.rounds)}
+                            title={`ดูแผนทั้งหมดของ ${row.group.name}`}
+                            className="block max-w-full truncate text-left text-[12px] font-medium text-foreground underline-offset-2 hover:text-primary hover:underline"
+                          >
                             {row.group.name}
-                          </span>
+                          </button>
                           <span className="block truncate text-[11px] text-muted-foreground">
                             {row.group.unitName || row.group.phone}
                           </span>
