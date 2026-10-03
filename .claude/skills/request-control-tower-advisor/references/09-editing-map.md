@@ -11327,7 +11327,7 @@ Choice ของเจ้าของ: การ์ดแยกบนหน้�
 | ไฟล์ | ที่แก้ |
 | --- | --- |
 | `src/components/follow/FollowPlanningCalendar.tsx` | ตารางรายวัน: `DAY_PAGE_SIZES = [10, 15]` ค่าเริ่ม 10 (เดิมล็อก 12) · dropdown "ต่อหน้า" ข้างเลขหน้า อยู่เสมอแม้หน้าเดียว · เปลี่ยนขนาด = กลับหน้า 1 · ถอดหัว "ปฏิทินติดตาม + วันที่" + prop `headerAction` + `dayHeading` (วันที่อยู่ที่ปุ่มวันของตารางแล้ว) |
-| `src/pages/follow/FollowPage.tsx` | ถอด `PageHeader` · แถวบนสุดใหม่: ปุ่มย้อนกลับ (`Button` ghost icon → `/`) + แท็บ 3 แท็บ + `headerButtons` ชิดขวา (ไม่โชว์บนแท็บ Dashboard) · จอแคบปุ่มตกบรรทัดได้ · ชื่อหน้าเหลือ `<h1 className="sr-only">` (ด่าน `pageTitleParity` ชื่อ = ชื่อเมนู) |
+| `src/pages/follow/FollowPage.tsx` | ถอด `PageHeader` · แถวบนสุดใหม่: ปุ่มย้อนกลับ (`Button` ghost icon → `/`) + `headerButtons` + แท็บ 3 แท็บ**ชิดขวา** (เจ้าของเลือก "สลับซ้ายขวาทั้งก้อน" — ปุ่มซ้าย แท็บขวา · ปุ่มไม่โชว์บนแท็บ Dashboard) · จอแคบปุ่มตกบรรทัดได้ · ชื่อหน้าเหลือ `<h1 className="sr-only">` (ด่าน `pageTitleParity` ชื่อ = ชื่อเมนู) |
 | `src/components/follow/FollowCallRoundsPanel.tsx` | เลขใหญ่เพิ่ม **AI โทร / คนโทร** (เส้นคั่นบางก่อน · `followCallerOf` บน `matrix[activeRound].total` ⇒ AI + คน = ทั้งหมด · ตาม dropdown สายที่) · กดเลข = ป๊อปรายชื่อ (มีชิปเหลือตาม/ปิด/ยกเลิก) · grid 4 คอลัมน์จอแคบ / 7 คอลัมน์ md+ |
 | `src/lib/followReplacement.test.ts` | guard แถวบนสุด + AI/คนโทร |
 

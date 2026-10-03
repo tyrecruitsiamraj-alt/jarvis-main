@@ -1393,7 +1393,7 @@ const FollowPage: React.FC = () => {
   return (
     <div className="relative">
       {/**
-       * 🔴 แถวบนสุดแถวเดียว (เจ้าของสั่ง 3 ต.ค. 2569): ย้อนกลับ · แท็บ · ปุ่มทั้งหมดของหน้าชิดขวา
+       * 🔴 แถวบนสุดแถวเดียว (เจ้าของสั่ง 3 ต.ค. 2569): ย้อนกลับ · ปุ่มทั้งหมดของหน้า · แท็บชิดขวา
        * ชื่อหน้า "ติดตามคนเริ่มงาน / ส่งคนแทน" ถอดออกตามสั่ง (ชื่อยังอยู่ที่เมนูและแถบบนของระบบ)
        * หัว "ปฏิทินติดตาม + วันที่" ของปฏิทินถอดด้วย — วันที่อยู่ที่ปุ่มวันในตารางแล้ว
        * แท็บ Dashboard ไม่มีปุ่มชุดนี้ (ไม่มีอะไรให้เพิ่ม/สรุป)
@@ -1404,6 +1404,11 @@ const FollowPage: React.FC = () => {
         <Button type="button" variant="ghost" size="icon" aria-label="ย้อนกลับ" onClick={() => navigate('/')}>
           <ArrowLeft aria-hidden />
         </Button>
+        {/* 🔴 ปุ่มของหน้าอยู่ซ้าย · แท็บอยู่ขวา (เจ้าของเลือก 3 ต.ค. 2569 "สลับซ้ายขวาทั้งก้อน") — Dashboard ไม่มีปุ่มชุดนี้ */}
+        {followView !== 'dashboard' ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-2">{headerButtons}</div>
+        ) : null}
+        <span className="flex-1" />
         {/* แท็บ "รายชื่อติดตาม | ส่งคนแทน | Dashboard" — ?view=… · กดเปลี่ยน = push (ย้อนกลับแล้วไม่หลุดหน้า) */}
         <Tabs
           value={followView}
@@ -1415,10 +1420,6 @@ const FollowPage: React.FC = () => {
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           </TabsList>
         </Tabs>
-        <span className="flex-1" />
-        {followView !== 'dashboard' ? (
-          <div className="flex min-w-0 flex-wrap items-center gap-2">{headerButtons}</div>
-        ) : null}
       </div>
 
       {followView === 'dashboard' ? (
