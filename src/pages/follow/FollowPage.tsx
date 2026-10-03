@@ -1157,17 +1157,32 @@ const FollowPage: React.FC = () => {
   const tabCounts = useMemo(() => countFollowTabs(scopeItems), [scopeItems]);
   const callerCounts = useMemo(() => countFollowCallers(scopeItems, tab), [scopeItems, tab]);
   /**
-   * แผงรอบโทรแบ่งตาม "ใครโทร" ได้ (เจ้าของสั่ง 3 ต.ค. 2569: *"ให้ตัวเลขหน้าติดตาม
-   * แบ่งต่อได้ว่า คนโทรเท่าไหร่ Ai เท่าไหร่"*) — ตัวกรองเดียวกับลิสต์ข้างล่าง แต่กรองเฉพาะ
-   * มิติใครโทร (ไม่พ่วงวัน/ช่วงเวลา — กล่องรอบโทรเป็นภาพรวมทั้งขอบเขตเสมอ)
+   * แผงรอบโทรนับตาม **วันที่เลือก** และสลับดู **ทั้งเดือน** ได้ (เจ้าของเคาะ 3 ต.ค. 2569:
+   * *"ทุกสาย = สายทุกสายบวกกัน · สายที่ 1 ก็ตามนั้น · ต้องเปลี่ยนตามวันที่เลือกด้วย"* +
+   * *"Filter ก็ต้องดูแบบทั้งเดือนได้ด้วย"*) — เลิกนับสะสมตลอดกาล (1,250 สายที่ไม่มีใครใช้)
+   * และแบ่งตาม "ใครโทร" ได้เหมือนเดิม
    */
+  const [panelRange, setPanelRange] = useState<'day' | 'month'>('day');
+  const panelDay = fDate || toYmdBangkok(new Date());
+  /** สายในช่วงที่แผงดูอยู่ (วันเดียว/ทั้งเดือน) — ก่อนตัวกรองใครโทร */
+  const panelScope = useMemo(
+    () =>
+      scopeItems.filter((e) => {
+        if (!e.scheduled_at) return false;
+        const d = new Date(e.scheduled_at);
+        if (Number.isNaN(d.getTime())) return false;
+        const ymd = toYmdBangkok(d);
+        return panelRange === 'month' ? ymd.slice(0, 7) === calMonth : ymd === panelDay;
+      }),
+    [scopeItems, panelRange, panelDay, calMonth],
+  );
   const panelEntries = useMemo(() => {
-    if (caller === 'all') return scopeItems;
-    if (caller === 'tbd') return scopeItems.filter((e) => e.time_tbd === true);
-    return scopeItems.filter((e) => followCallerOf(e) === caller);
-  }, [scopeItems, caller]);
-  /** "ทั้ง 2 อย่างโทรสำเร็จอย่างละเท่าไหร่" — สำเร็จ = ติดต่อได้ (นิยามเดียวกับถังในแผง) */
-  const callerStats = useMemo(() => countFollowCallerResults(scopeItems), [scopeItems]);
+    if (caller === 'all') return panelScope;
+    if (caller === 'tbd') return panelScope.filter((e) => e.time_tbd === true);
+    return panelScope.filter((e) => followCallerOf(e) === caller);
+  }, [panelScope, caller]);
+  /** "ทั้ง 2 อย่างโทรสำเร็จอย่างละเท่าไหร่" — สำเร็จ = ติดต่อได้ (นิยามเดียวกับถังในแผง) · ช่วงเดียวกับแผง */
+  const callerStats = useMemo(() => countFollowCallerResults(panelScope), [panelScope]);
   const hasActiveFilter = Boolean(fDate || fBand);
 
   /**
@@ -1329,6 +1344,21 @@ const FollowPage: React.FC = () => {
               onRoundChange={setActiveRound}
               filtersSlot={
                 <>
+                  {/* ช่วงที่แผงนับ (เจ้าของเคาะ 3 ต.ค. 2569) — วันที่เลือกในปฏิทิน หรือทั้งเดือนที่เปิดอยู่ */}
+                  <span className="text-xs text-muted-foreground">นับช่วง</span>
+                  <ChoiceDropdown<'day' | 'month'>
+                    value={panelRange}
+                    options={[
+                      { value: 'day', label: `วันที่เลือก · ${formatYmdDmyBe(panelDay)}` },
+                      {
+                        value: 'month',
+                        label: `ทั้งเดือน · ${new Date(`${calMonth}-01T00:00:00+07:00`).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', month: 'short', year: 'numeric' })}`,
+                      },
+                    ]}
+                    onChange={setPanelRange}
+                    ariaLabel="แผงนับช่วงไหน"
+                    active={panelRange === 'month'}
+                  />
                   <span className="text-xs text-muted-foreground">งานจบหรือยัง</span>
                   <ChoiceDropdown
                     value={tab}
