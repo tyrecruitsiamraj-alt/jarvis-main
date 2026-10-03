@@ -20,9 +20,10 @@ import {
   requiresNote,
 } from '../../src/lib/followOutcome.js';
 
-const MIGRATION = new URL('../../migrations/101_follow_outcome_new_set.sql', import.meta.url);
+// 134 สร้าง CHECK ทับ 101 (เพิ่ม wrong_date) — parity ต้องเทียบกับตัวที่มีผลจริงตัวล่าสุด
+const MIGRATION = new URL('../../migrations/134_follow_time_tbd_wrong_date.sql', import.meta.url);
 
-describe('parity กับ CHECK constraint ใน migration 101', () => {
+describe('parity กับ CHECK constraint ใน migration 134 (ตัวล่าสุดที่ทับ 101)', () => {
   it('🔴 ค่าที่โค้ดรับได้ (ใหม่+เก่า) = ค่าที่ฐานรับ เป๊ะ ๆ', () => {
     // ⚠️ ตัดคอมเมนต์ `--` ออกก่อนเสมอ — คอมเมนต์ไทยมีวงเล็บได้ (เช่น "ชุดเก่า (095)")
     // ตัวอ่านเดิมหยุดที่ ')' ตัวแรกที่เจอ แล้วสรุปว่าค่าในฐานขาด (เทสต์แดงทั้งที่ SQL ถูก)
@@ -55,8 +56,8 @@ describe('parity กับ CHECK constraint ใน migration 101', () => {
     }
   });
 
-  it('ครบ 5 คำที่เจ้าของสั่ง 18 ส.ค. 2569 และไม่มีของเก่าปนในชุดที่ให้เลือก', () => {
-    expect([...FOLLOW_OUTCOMES]).toEqual(['went', 'arrived', 'cancelled', 'leave', 'postponed']);
+  it('5 คำที่เจ้าของสั่ง 18 ส.ค. 2569 + "จำวันผิด" (134 · Journey ข้อ 10) และไม่มีของเก่าปนในชุดที่ให้เลือก', () => {
+    expect([...FOLLOW_OUTCOMES]).toEqual(['went', 'arrived', 'cancelled', 'leave', 'postponed', 'wrong_date']);
     expect(FOLLOW_OUTCOMES).not.toContain('done');
     expect(FOLLOW_OUTCOMES).not.toContain('other');
   });

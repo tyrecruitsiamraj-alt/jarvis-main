@@ -95,6 +95,15 @@ export function isRoundOpen(state: FollowRoundState): boolean {
   return state === 'overdue' || state === 'sent' || state === 'waiting' || state === 'notSent';
 }
 
+/**
+ * ป้ายเวลาของสาย — ที่เดียวทั้งระบบ (ตาราง · ป๊อป · รายงาน)
+ * สาย "ยังไม่ชัวร์เวลา" (134) ถือเวลาแทนอยู่ ห้ามโชว์เป็นเวลาจริง
+ */
+export function roundTimeText(round: { entry: Pick<FollowEntry, 'time_tbd'>; time: string | null }): string {
+  if (round.entry.time_tbd === true) return 'ยังไม่ระบุเวลา';
+  return round.time ? `${round.time} น.` : 'ไม่ได้ตั้งเวลา';
+}
+
 export type FollowPlanningRound = {
   entry: FollowEntry;
   state: FollowRoundState;
@@ -278,6 +287,8 @@ export function roundResultLabel(round: FollowPlanningRound): string {
       return code ? followCallOutcomeText(code) : 'มีผลแล้ว';
     }
     case 'notSent':
+      // สายที่ยังไม่กำหนดเวลา (134) — ไม่ใช่ความผิดพลาด แค่รอคนมาเติมเวลา
+      if (e.time_tbd === true) return 'รอกำหนดเวลา';
       // 🔴 ไม่มีสายไหนกำลังจะเกิด — บอกให้รู้ตัว ไม่ใช่ปล่อยให้นั่งรอผลที่ไม่มีวันมา
       return 'ไม่ได้ส่ง';
     case 'overdue':

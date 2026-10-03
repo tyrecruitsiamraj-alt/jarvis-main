@@ -396,6 +396,12 @@ export default function FollowEditDialog({
             </label>
             {/* 🔴 ห้ามกลับไปใช้ `<input type=datetime-local>` — ขึ้น AM/PM ตามเครื่องคนใช้ */}
             <DateTimeField24 value={when} onChange={setWhen} label="เวลานัด" className="w-full" />
+            {/* สายที่ลงแบบ "ยังไม่ชัวร์เวลา" (134) — เวลาที่เห็นเป็นค่าแทน บันทึกเวลาจริงแล้วธงหลุดเอง */}
+            {entry.time_tbd === true ? (
+              <p className={cn('ml-1 rounded-lg px-2 py-1 text-[11px]', TONE.info.soft, TONE.info.value)}>
+                สายนี้ยังไม่ระบุเวลา — เลือกเวลาจริงแล้วกดบันทึก
+              </p>
+            ) : null}
             {/* สายคนโทรไม่เคยเข้าคิว (call_status = null) — เดิมขึ้นคำเตือนนี้ผิด ๆ ทุกครั้ง */}
             {entry.call_status && entry.call_status !== 'pending' ? (
               <p className={cn('ml-1 rounded-lg px-2 py-1 text-[11px]', TONE.warn.soft, TONE.warn.value)}>

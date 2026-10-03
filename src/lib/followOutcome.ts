@@ -22,7 +22,7 @@
  */
 
 /** ชุดที่หน้าเว็บให้เลือก — เรียงตามที่เจ้าหน้าที่จะเห็นบนปุ่ม */
-export const FOLLOW_OUTCOMES = ['went', 'arrived', 'cancelled', 'leave', 'postponed'] as const;
+export const FOLLOW_OUTCOMES = ['went', 'arrived', 'cancelled', 'leave', 'postponed', 'wrong_date'] as const;
 
 /** ชุดเก่า (095) — ไม่ให้เลือกใหม่แล้ว แต่ยังต้องอ่านออกและรับได้ */
 export const FOLLOW_OUTCOMES_LEGACY = ['done', 'job_cancelled', 'no_show_start', 'other'] as const;
@@ -44,6 +44,8 @@ export const FOLLOW_OUTCOME_LABEL: Record<FollowOutcomeAny, string> = {
   cancelled: 'ยกเลิก',
   leave: 'ลา',
   postponed: 'เลื่อน',
+  // จำวันผิด (134 · Journey ข้อ 10 — "ตัวเจ้าหน้าที่เราจำวันผิดเอง") — ไม่ใช่ความผิดของคนไปทำงาน
+  wrong_date: 'จำวันผิด',
   // ชุดเก่า — โชว์บนรายการที่ปิดไปก่อนหน้านี้
   done: 'เสร็จสิ้น',
   job_cancelled: 'ยกเลิกงาน',
@@ -58,6 +60,7 @@ export const FOLLOW_OUTCOME_HINT: Record<FollowOutcome, string> = {
   cancelled: 'ยกเลิก — ไม่ไปแล้ว/งานถูกยกเลิก',
   leave: 'ลา วันนี้ไม่ไป แต่ยังไม่หลุด',
   postponed: 'เลื่อนไปวันอื่น',
+  wrong_date: 'เราลงวันผิดเอง — นัดจริงเป็นอีกวัน (ไม่ใช่ความผิดของเขา)',
 };
 
 /**

@@ -55,7 +55,8 @@ export function buildFollowDayReport(entries: FollowEntry[], ymd: string, now = 
     const cancelled = round.state === 'cancelled';
     return {
       id: e.id,
-      time: round.time ?? '—',
+      // สาย "ยังไม่ชัวร์เวลา" (134) — เวลาใน scheduled_at เป็นค่าแทน ห้ามโชว์เป็นเวลาจริง
+      time: e.time_tbd === true ? 'ยังไม่ระบุเวลา' : (round.time ?? '—'),
       name: row.group.name,
       phone: localThaiPhone(row.group.phone),
       unit: e.unit_name?.trim() || row.group.unitName || '—',

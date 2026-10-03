@@ -78,6 +78,8 @@ type FollowRow = {
    * แถวเก่า/ฐานที่ยังไม่รัน 121 = null ⇒ อ่านว่า `ai` (พฤติกรรมเดิม)
    */
   call_mode: string | null;
+  /** ยังไม่กำหนดเวลาโทร (134) — เวลาใน scheduled_at เป็นค่าแทน */
+  time_tbd?: boolean | null;
   /** หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (migration 096) — snapshot ตอนกรอก ไม่ใช่ FK */
   unit_name: string | null;
   site_code: string | null;
@@ -151,6 +153,8 @@ function toResponse(r: FollowRow) {
     call_round: r.call_round == null ? null : Number(r.call_round),
     /** ใครโทรรอบนี้ (121) — แถวเก่า/ฐานยังไม่รัน 121 = ai (พฤติกรรมเดิม) */
     call_mode: r.call_mode === 'manual' ? 'manual' : 'ai',
+    /** ยังไม่กำหนดเวลา (134) — จอโชว์ "ยังไม่ระบุเวลา" แทนเวลา */
+    time_tbd: r.time_tbd === true,
     /** ทีมของรายการ (131) — แท็บ "ติดตามส่งคนแทน" อ่านช่องนี้ · ค่าอื่น/ไม่มี = ทีมติดตาม */
     follow_team: r.follow_team === FOLLOW_TEAM_REPLACEMENT ? FOLLOW_TEAM_REPLACEMENT : null,
     /**
@@ -297,6 +301,8 @@ export type ParsedFollowInput = {
    * ไม่ส่งมา = `'ai'` ⇒ ของเดิมที่ยิงมาโดยไม่มีคีย์นี้ไม่เปลี่ยนพฤติกรรม
    */
   callMode: 'ai' | 'manual';
+  /** ยังไม่กำหนดเวลา (134) — บังคับเป็นคนโทร (ห้ามส่ง AI โดยไม่มีเวลาจริง) */
+  timeTbd: boolean;
   /** หน่วยงานที่ตามเรื่องให้ (096) — เลือกจากใบขอหรือพิมพ์เอง · null = ไม่ได้ระบุ */
   unitName: string | null;
   /** รหัสไซต์ของหน่วยงานนั้น — เติมเองเมื่อเลือกจากใบขอ */
@@ -411,11 +417,18 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
     team = FOLLOW_TEAM_REPLACEMENT;
   }
 
+  /**
+   * ยังไม่ชัวร์เวลา (134 · Journey ข้อ 5) — เวลาที่ส่งมาเป็นค่าแทน (เที่ยงคืนของวันนั้น)
+   * 🔴 บังคับเป็นคนโทร: ส่งให้ AI โดยไม่มีเวลาจริง = โทรหาคนจริงเวลามั่ว (fail-safe ไปทาง manual)
+   */
+  const timeTbd = body.time_tbd === true;
+  if (timeTbd) callMode = 'manual';
+
   return {
     error: null,
     value: {
       name, phone, topic, note, staffPhone, when, groupId, callTimes, unitName, siteCode, callRound,
-      callMode, team,
+      callMode, team, timeTbd,
     },
   };
 }
@@ -427,12 +440,21 @@ export class FollowTeamNotReady extends Error {
   }
 }
 
+/** ฐานยังไม่รัน 134 — แจ้งให้ลองใหม่ ห้ามถอยไปบันทึกแบบมีเวลา (เวลาแทนจะกลายเป็นเวลาจริงเงียบ ๆ) */
+export class FollowTimeTbdNotReady extends Error {
+  constructor() {
+    super('ยังบันทึกสายแบบ "ยังไม่ชัวร์เวลา" ไม่ได้ตอนนี้ — ระบบกำลังอัปเดต ลองใหม่อีกครั้งในอีกสักครู่');
+  }
+}
+
 export type FollowRoundInput = {
   when: Date;
   staffPhone: string | null;
   callRound: number | null;
   /** ใครโทรรอบนี้ (121) — ไม่ระบุ = ตามค่าของทั้งคำขอ */
   callMode?: 'ai' | 'manual';
+  /** ยังไม่กำหนดเวลา (134) — บังคับคนโทรของรอบนั้น */
+  timeTbd?: boolean;
 };
 
 /**
@@ -458,12 +480,15 @@ export function parseFollowRounds(raw: unknown, primary: FollowRoundInput): Foll
     const phoneRaw = typeof o.staff_phone === 'string' ? o.staff_phone.trim() : '';
     const roundRaw = Number(o.call_round);
     const modeRaw = typeof o.call_mode === 'string' ? o.call_mode.trim() : '';
+    const timeTbd = o.time_tbd === true;
     out.push({
       when: at,
       staffPhone: phoneRaw || primary.staffPhone,
       callRound: Number.isInteger(roundRaw) && roundRaw >= 1 ? roundRaw : null,
       // อ่านไม่ออก = ไม่ระบุ ⇒ ตามค่าของทั้งคำขอ (ห้ามเดาเป็น ai เองตรงนี้)
-      callMode: modeRaw === 'ai' || modeRaw === 'manual' ? modeRaw : undefined,
+      // 🔴 ยังไม่ชัวร์เวลา = คนโทรเสมอ (ห้ามส่ง AI โดยไม่มีเวลาจริง)
+      callMode: timeTbd ? 'manual' : modeRaw === 'ai' || modeRaw === 'manual' ? modeRaw : undefined,
+      timeTbd,
     });
   }
   if (out.length === 0) return [primary];
@@ -555,6 +580,28 @@ async function insertFollowRow(
   round: FollowRoundInput,
 ): Promise<FollowRow | undefined> {
   const { name, phone, topic, note, groupId, callTimes, unitName, siteCode, callMode, team } = base;
+  /**
+   * ยังไม่ชัวร์เวลา (134) — insert ที่มีช่อง time_tbd (พ่วงช่องทีมด้วย เผื่อเพิ่มจากแท็บส่งคนแทน)
+   * ฐานยังไม่รัน 134 = แจ้งให้ลองใหม่ **ห้ามถอยไปบันทึกแบบมีเวลา** (ค่าแทนจะกลายเป็นเวลาจริงเงียบ ๆ)
+   */
+  if (round.timeTbd || base.timeTbd) {
+    try {
+      const { rows } = await dbQuery<FollowRow>(
+        `insert into ${followTable}
+           (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at,
+            group_id, call_times, unit_name, site_code, call_round, call_mode,
+            created_by, created_by_name, follow_team, time_tbd)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'manual', $12, $13, $14, true)
+         returning *`,
+        [name, phone, topic, note, round.staffPhone, round.when.toISOString(), groupId, callTimes,
+         unitName, siteCode, round.callRound, req.user.sub, req.user.email, team ?? null],
+      );
+      return rows[0];
+    } catch (e) {
+      if (isUndefinedColumn(e)) throw new FollowTimeTbdNotReady();
+      throw e;
+    }
+  }
   /**
    * ทีมส่งคนแทน (131) — insert ที่มีช่องทีม · ฐานยังไม่รัน 131 = แจ้งให้ลองใหม่ **ห้ามถอยไปบันทึกแบบไม่มีทีม**
    * ทีมติดตาม (null) ใช้ insert เดิมทุกตัวอักษร ⇒ ของเดิมไม่ขึ้นกับ migration ใหม่
@@ -886,6 +933,16 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
   const updated = rows[0];
   if (!updated) return sendError(res, 404, 'Not found', 'ไม่พบรายการ หรือปิด/ยกเลิกไปแล้ว');
 
+  // สายที่เคย "ยังไม่ชัวร์เวลา" (134): คนตั้งเวลาจริงแล้ว (เวลาเปลี่ยนจากค่าแทน) → ล้างธง
+  if (before.time_tbd === true && new Date(String(before.scheduled_at)).getTime() !== v.when.getTime()) {
+    try {
+      await dbQuery(`update ${followTable} set time_tbd = false where id = $1`, [id]);
+      updated.time_tbd = false;
+    } catch (e) {
+      if (!isUndefinedColumn(e)) throw e;
+    }
+  }
+
   /**
    * 🔴 แก้แถวแล้วต้องแก้บทพูดในคิวด้วย — payload ถูกสร้างตอนเข้าคิว ไม่ใช่ตอนเสิร์ฟ
    * ไม่แก้ = AI ไปพูดชุดเก่าโดยที่หน้าจอโชว์ชุดใหม่
@@ -1062,12 +1119,15 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
 
   // ② สายเดิมที่อยู่ต่อ: ย้ายเวลา/สลับคนโทร (+ ผูกชุดถ้าเดิมยังไม่มี)
   const toManual: string[] = [];
+  /** สาย "ยังไม่ชัวร์เวลา" ที่ถูกย้ายเวลา = ตั้งเวลาจริงแล้ว → ล้างธง (134) */
+  const movedIds: string[] = [];
   for (const r of rounds) {
     if (!r.id) continue;
     const before = byId.get(r.id);
     if (!before) continue;
     const beforeMode = before.call_mode === 'manual' ? 'manual' : 'ai';
     const moved = new Date(String(before.scheduled_at)).getTime() !== r.when.getTime();
+    if (moved) movedIds.push(r.id);
     if (!moved && beforeMode === r.callMode && before.group_id === groupId) continue;
     await dbQuery(
       `update ${followTable}
@@ -1088,6 +1148,13 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
     );
     try {
       await dbQuery(`update ${followTable} set dispatch_state = 'manual' where id = any($1::uuid[])`, [toManual]);
+    } catch (e) {
+      if (!isUndefinedColumn(e)) throw e;
+    }
+  }
+  if (movedIds.length > 0) {
+    try {
+      await dbQuery(`update ${followTable} set time_tbd = false where id = any($1::uuid[]) and time_tbd is true`, [movedIds]);
     } catch (e) {
       if (!isUndefinedColumn(e)) throw e;
     }
@@ -1370,6 +1437,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         return await createFollow(req, res);
       } catch (e) {
         if (e instanceof FollowTeamNotReady) return sendError(res, 503, 'Service unavailable', e.message);
+        if (e instanceof FollowTimeTbdNotReady) return sendError(res, 503, 'Service unavailable', e.message);
         throw e;
       }
     }
