@@ -2354,10 +2354,7 @@ const FollowPage: React.FC = () => {
               >
                 <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มสาย
               </button>
-              <p className="ml-1 text-[11px] text-muted-foreground">
-                บางเรื่องต้องโทรมากกว่า 1 ครั้ง — ใส่ได้หลายรอบ ระบบจะสร้างเป็นรายการแยกให้รอบละ 1 รายการ
-                (เวลาซ้ำกันจะถูกตัดออกอัตโนมัติ)
-              </p>
+              {/* ประโยคอธิบาย "ใส่ได้หลายรอบ…" ถอดแล้ว (4 ต.ค. 2569 ไล่ Journey — คำว่ารอบค้าง + เจ้าของไม่เอาประโยคอธิบาย) */}
             </div>
             )}
             </>
@@ -2390,9 +2387,9 @@ const FollowPage: React.FC = () => {
                 <span className="mt-0.5 block text-muted-foreground">
                   {scheduleMode
                     ? `ตารางหลายวัน — ${sendDaysPreview} วัน รวม ${scheduleCallsPreview} สาย`
-                    : `ตั้งไว้ ${scheduledAtsPreview} รอบ`}
+                    : `ตั้งไว้ ${scheduledAtsPreview} สาย`}
                   {!scheduleMode && manualTimesPreview > 0
-                    ? ` · คนโทร ${manualTimesPreview} รอบ · AI โทร ${scheduledAtsPreview - manualTimesPreview} รอบ`
+                    ? ` · คนโทร ${manualTimesPreview} สาย · AI โทร ${scheduledAtsPreview - manualTimesPreview} สาย`
                     : ' · กดแล้วไม่ต้องทำอะไรต่อ AI โทรเองตามเวลา'}
                 </span>
               </div>
