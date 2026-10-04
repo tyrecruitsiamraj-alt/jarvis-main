@@ -81,7 +81,11 @@ describe('POST — ตัวอย่างก่อนบันทึก / บ�
     dbQuery.mockImplementation((sql: string, params?: unknown[]) =>
       /max\(created_at\) as last_at[\s\S]*group by phone_e164/i.test(sql)
         ? Promise.resolve({ rows: [{ phone_e164: '+66822222222', last_at: LAST, params }] })
-        : Promise.resolve({ rows: [] }),
+        : /distinct on \(phone_e164\)/i.test(sql)
+          ? Promise.resolve({
+              rows: [{ phone_e164: '+66822222222', created_at: LAST, status: 'contacted', job: 'คนสวน', n: 2 }],
+            })
+          : Promise.resolve({ rows: [] }),
     );
     const file = xlsxBase64([H, person('สมชาย', 812345678), person('สมหญิง', '0822222222')]);
     const { res, json } = mockRes();
@@ -95,6 +99,21 @@ describe('POST — ตัวอย่างก่อนบันทึก / บ�
       ],
       ready: 1,
       skipped: 1,
+      // รายชื่อซ้ำ (4 ต.ค. 2569) — เบอร์ที่มีในระบบแล้ว: สมัครล่าสุด · สถานะล่าสุด · ข้ามไหม + ไฟล์ให้ดาวน์โหลด
+      duplicates: [
+        {
+          row: 3,
+          name: 'สมหญิง ใจดี',
+          phone: '0822222222',
+          lastAppliedAt: new Date(LAST).toISOString(),
+          lastStatus: 'contacted',
+          lastJob: 'คนสวน',
+          applications: 2,
+          skipped: true,
+          note: repeatImportReason(LAST),
+        },
+      ],
+      duplicatesFileBase64: expect.any(String),
     });
     const check = dbQuery.mock.calls.find((c) => /group by phone_e164/i.test(String(c[0])));
     expect(String(check?.[0])).toMatch(/at time zone 'Asia\/Bangkok'\)::date - 13\)/);

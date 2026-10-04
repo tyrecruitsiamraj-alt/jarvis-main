@@ -4,6 +4,7 @@
  */
 import { apiFetch } from '@/lib/apiFetch';
 import type { ImportPreviewRow } from '@/lib/applicantImport';
+import type { ImportDuplicate } from '@/lib/applicantImportDuplicates';
 
 export type ApplicationImportResult = {
   dryRun: boolean;
@@ -13,6 +14,10 @@ export type ApplicationImportResult = {
   /** บันทึกจริง = บันทึกได้กี่แถว */
   inserted?: number;
   skipped: number;
+  /** รายชื่อซ้ำ (เบอร์ที่มีในระบบแล้ว + ซ้ำในไฟล์) — 4 ต.ค. 2569 */
+  duplicates?: ImportDuplicate[];
+  /** ไฟล์ .xlsx ของรายชื่อซ้ำ (base64) — มีเมื่อมีรายชื่อซ้ำ */
+  duplicatesFileBase64?: string;
 };
 
 async function readError(r: Response, fallback: string): Promise<string> {
@@ -39,6 +44,17 @@ export async function downloadApplicationImportTemplate(): Promise<void> {
   const r = await apiFetch('/api/job-applications-import');
   if (!r.ok) throw new Error(await readError(r, 'ดาวน์โหลดไฟล์ตัวอย่างไม่สำเร็จ'));
   const { filename, mime, dataBase64 } = (await r.json()) as { filename: string; mime: string; dataBase64: string };
+  saveBase64File(filename, mime, dataBase64);
+}
+
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+/** ดาวน์โหลดไฟล์รายชื่อซ้ำ (.xlsx ที่ API สร้างให้แล้ว) */
+export function downloadImportDuplicates(dataBase64: string, filename = 'รายชื่อซ้ำ.xlsx'): void {
+  saveBase64File(filename, XLSX_MIME, dataBase64);
+}
+
+function saveBase64File(filename: string, mime: string, dataBase64: string): void {
   const bytes = Uint8Array.from(atob(dataBase64), (c) => c.charCodeAt(0));
   const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
   try {

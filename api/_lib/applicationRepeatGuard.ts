@@ -90,3 +90,34 @@ export async function recentPhoneApplications(
   for (const r of rows) out.set(r.phone_e164, new Date(r.last_at));
   return out;
 }
+
+/**
+ * ใบสมัครที่มีอยู่แล้วของแต่ละเบอร์ (ทุกช่วงเวลา) — ใบล่าสุด + จำนวนใบ
+ * ใช้บอก "รายชื่อซ้ำ" ตอนนำเข้า Excel (เจ้าของ 4 ต.ค. 2569: สมัครล่าสุดวันไหน · สถานะล่าสุด) · อ่านอย่างเดียว
+ */
+export async function existingApplicationsByPhone(
+  query: <T>(sql: string, params: unknown[]) => Promise<{ rows: T[] }>,
+  phones: string[],
+): Promise<Map<string, { lastAt: Date; status: string | null; job: string | null; count: number }>> {
+  const out = new Map<string, { lastAt: Date; status: string | null; job: string | null; count: number }>();
+  if (phones.length === 0) return out;
+  const { rows } = await query<{
+    phone_e164: string;
+    created_at: Date;
+    status: string | null;
+    job: string | null;
+    n: number | string;
+  }>(
+    `select distinct on (phone_e164) phone_e164, created_at, status,
+            coalesce(nullif(job_title, ''), nullif(unit_name, ''), nullif(position_interest, '')) as job,
+            count(*) over (partition by phone_e164) as n
+       from ${tbl}
+      where phone_e164 = any(select jarvis_phone_e164_thai(p) from unnest($1::text[]) p)
+      order by phone_e164, created_at desc`,
+    [phones],
+  );
+  for (const r of rows) {
+    out.set(r.phone_e164, { lastAt: new Date(r.created_at), status: r.status, job: r.job, count: Number(r.n) || 1 });
+  }
+  return out;
+}

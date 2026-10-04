@@ -40,7 +40,8 @@ import {
   staffInsertParams,
 } from '../../src/lib/staffApplicationInput.js';
 import { repeatImportReason } from '../../src/lib/applicationRepeat.js';
-import { lockAndFindRepeat, recentPhoneApplications } from '../_lib/applicationRepeatGuard.js';
+import { existingApplicationsByPhone, lockAndFindRepeat, recentPhoneApplications } from '../_lib/applicationRepeatGuard.js';
+import { duplicateSheetRows, type ImportDuplicate } from '../../src/lib/applicantImportDuplicates.js';
 
 const tbl = tableInAppSchema('public_job_applications');
 /** ~1.5 MB ไฟล์จริง — รายชื่อ 500 แถวใช้ไม่ถึง 100 KB */
@@ -66,6 +67,15 @@ function buildTemplateBase64(): string {
 }
 
 /** ไฟล์ → แถว (ชีต "ผู้สมัคร" ถ้ามี ไม่งั้นชีตแรก) · เซลล์เป็นข้อความตามที่ตาเห็นบน Excel */
+/** ไฟล์รายชื่อซ้ำให้ดาวน์โหลด (.xlsx) — สร้างฝั่ง server ตัวเดียวกับไฟล์ตัวอย่าง */
+function buildDuplicatesBase64(list: readonly ImportDuplicate[]): string {
+  const wb = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet(duplicateSheetRows(list));
+  sheet['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 30 }, { wch: 12 }, { wch: 48 }];
+  XLSX.utils.book_append_sheet(wb, sheet, 'รายชื่อซ้ำ');
+  return XLSX.write(wb, { type: 'base64', bookType: 'xlsx' }) as string;
+}
+
 function readSheetRows(buffer: Buffer): unknown[][] {
   const wb = XLSX.read(buffer, { type: 'buffer' });
   const name = wb.SheetNames.includes(IMPORT_SHEET_NAME) ? IMPORT_SHEET_NAME : wb.SheetNames[0];
@@ -125,6 +135,43 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const phones = [...new Set(plans.flatMap((p) => ('value' in p ? [p.value.phone] : [])))];
     const recent = await recentPhoneApplications((sql, params) => dbQuery(sql, params), phones);
     const blocked = new Map([...recent].map(([key, lastAt]) => [key, repeatImportReason(lastAt)]));
+
+    // รายชื่อซ้ำ (เจ้าของ 4 ต.ค. 2569) — เบอร์ที่มีใบในระบบแล้ว (ทุกช่วงเวลา) + เบอร์ซ้ำในไฟล์ · คิดก่อนติดป้ายข้าม
+    const existing = await existingApplicationsByPhone((sql, params) => dbQuery(sql, params), phones);
+    const duplicates: ImportDuplicate[] = [];
+    for (const p of plans) {
+      if ('value' in p) {
+        const key = toE164Thai(p.value.phone);
+        const hit = key ? existing.get(key) : undefined;
+        if (!hit) continue;
+        const block = key ? blocked.get(key) : undefined;
+        duplicates.push({
+          row: p.row,
+          name: p.value.full_name,
+          phone: p.value.phone,
+          lastAppliedAt: hit.lastAt.toISOString(),
+          lastStatus: hit.status,
+          lastJob: hit.job,
+          applications: hit.count,
+          skipped: Boolean(block),
+          note: block ?? 'เคยสมัครแล้ว เกิน 14 วัน นำเข้าได้',
+        });
+      } else if (/^เบอร์ซ้ำกับแถว/.test(p.reason)) {
+        duplicates.push({
+          row: p.row,
+          name: p.name,
+          phone: p.phone,
+          lastAppliedAt: null,
+          lastStatus: null,
+          lastJob: null,
+          applications: 0,
+          skipped: true,
+          note: p.reason,
+        });
+      }
+    }
+    const duplicatesOut =
+      duplicates.length > 0 ? { duplicates, duplicatesFileBase64: buildDuplicatesBase64(duplicates) } : { duplicates };
     plans = markBlockedPhones(plans, blocked, toE164Thai);
 
     if (dryRun) {
@@ -134,6 +181,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         rows: preview,
         ready: preview.filter((r) => r.ok).length,
         skipped: preview.filter((r) => !r.ok).length,
+        ...duplicatesOut,
       });
     }
 
@@ -175,6 +223,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       rows: result,
       inserted: insertedIds.length,
       skipped: result.filter((r) => !r.ok).length,
+      ...duplicatesOut,
     });
   } catch (e) {
     return handleApiError(res, e, 'job-applications-import');
