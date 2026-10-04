@@ -11627,3 +11627,14 @@ Choice: Lead ของคนอื่น = **ซ่อนไปเลย** (เ�
 
 - ตรวจจริง: ยิง POST จริงกับใบที่สถานะ contacted อยู่แล้ว → ไม่มีเหตุผล = 400 · มีเหตุผล = เก็บเหตุผล วันนัดที่ส่งปนถูกล้าง · แถวขึ้น "ไม่สำเร็จ / นัดหมาย" · แท็บการนัดหมายขึ้นเหตุผล → ลบ log ด้วย id คืนสภาพ (สถานะเดิม · 1 log เดิม)
 - คิวรีรายชื่อรันจริงสองผู้ดู: เจ้าของ Lead เห็น 166/Lead 2 · คนอื่นเห็น 163/Lead 0
+
+## ปุ่มบนแถวแท็บการติดต่อ = แบบ iRecruit (4 ต.ค. 2569)
+
+iRecruit (`rm-action-btn`): โทร (call · POST จดการโทรก่อนแล้วคลิกลิงก์ `tel:`) · ดำเนินการ (rule · ป๊อป) · ลบ Lead (person_remove · ส่งกลับทันที ไม่ถามยืนยัน)
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/recruitRm.ts` | `RM_CONTACT_ACTION_LABEL` + `rmRowActionLabel(tab, action)` (แท็บการติดต่อ: โทร · ดำเนินการ · ลบ Lead · แท็บอื่นคำเดิม) · `telHref` |
+| `src/components/recruit-rm/RmTable.tsx` | ไอคอนแท็บการติดต่อ Phone · ListChecks · UserMinus · ปุ่มแถวทุกแท็บเป็น `Button` ghost `iconXs` กลม สีเทา (เดิม `<button>` ปั้นเองมีกรอบ) |
+| `src/components/recruit-rm/RmWorkspace.tsx` | `dial`: ยิงจดเวลาก่อน แล้วคลิกลิงก์ `tel:` (ไม่เปลี่ยน URL หน้า — กันคำขอจดเวลาโดนยกเลิก) |
+| เทสต์ | `tests/api/contactTabIrecruitButtons2569-10-04.test.ts` |

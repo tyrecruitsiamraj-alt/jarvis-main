@@ -340,6 +340,7 @@ export const RM_ROW_ACTION_LABEL: Record<RmRowAction, string> = {
   ai: 'ส่ง AI โทร',
   /** กู้คืนใบที่ยกเลิกข้อมูล (135) — มุมมอง "ดูที่ยกเลิก" เท่านั้น */
   restore: 'กู้คืนเข้ารายชื่อหลัก',
+  /** แท็บการติดต่อเรียกตาม iRecruit — ดู `rmRowActionLabel` (คำนี้คือคำกลางของการกระทำ) */
   dial: 'กดโทร (จดเวลา)',
   view: 'ดูรายละเอียด',
   rule: 'บันทึกผลนัดหมาย',
@@ -347,6 +348,28 @@ export const RM_ROW_ACTION_LABEL: Record<RmRowAction, string> = {
   /** ส่งกลับเป็นใบว่าง ใครก็เก็บได้ — ปลดจอง + ถอด Lead + คืนล็อกเบอร์ · AI ไม่โทรเอง (Choice 1 ต.ค. 2569) */
   release: 'ลบออก — ส่งกลับแท็บผู้สมัคร',
 };
+
+/**
+ * 🔴 ปุ่มบนแถวแท็บการติดต่อ = คำเดียวกับ iRecruit (เจ้าของสั่ง 4 ต.ค. 2569 "ทำให้เหมือน iRecruit"):
+ * โทร (จดเวลา + เปิดหน้าโทร) · ดำเนินการ (ป๊อปติดต่อ/นัดหมาย) · ลบ Lead (ส่งกลับแท็บผู้สมัคร)
+ */
+export const RM_CONTACT_ACTION_LABEL: Partial<Record<RmRowAction, string>> = {
+  dial: 'โทร',
+  view: 'ดำเนินการ',
+  release: 'ลบ Lead',
+};
+
+/**
+ * ลิงก์เปิดหน้าโทรของเครื่อง (ปุ่ม "โทร" แบบ iRecruit) — เก็บแต่ตัวเลข/+ · ไม่มีเบอร์ = null (ไม่เปิดอะไร)
+ */
+export function telHref(phone: string | null | undefined): string | null {
+  const digits = (phone ?? '').replace(/[^\d+]/g, '');
+  return digits.replace(/\D/g, '').length >= 9 ? `tel:${digits}` : null;
+}
+
+export function rmRowActionLabel(tab: RmTab, action: RmRowAction): string {
+  return (tab === 'contact' ? RM_CONTACT_ACTION_LABEL[action] : undefined) ?? RM_ROW_ACTION_LABEL[action];
+}
 
 /**
  * ── "ดึงไปโทร" จากแถวรายชื่อผู้สมัคร (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก) ──────────

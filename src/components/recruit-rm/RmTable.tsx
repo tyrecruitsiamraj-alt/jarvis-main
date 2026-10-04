@@ -1,5 +1,6 @@
 import React from 'react';
-import { BookmarkPlus, Bot, Phone, PhoneCall, Eye, ClipboardCheck, UserMinus, Undo2, FileText, RotateCcw } from 'lucide-react';
+import { BookmarkPlus, Bot, Phone, PhoneCall, Eye, ClipboardCheck, ListChecks, UserMinus, Undo2, FileText, RotateCcw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 // ⚠️ DASH = token พื้นผิว dashboard · ขีดกลางคือ EM_DASH คนละตัว อย่าสับสน
 import { DASH, TONE } from '@/lib/designTokens';
@@ -19,7 +20,7 @@ import {
 } from '@/lib/publicApplicationsApi';
 import {
   RM_ROW_ACTIONS,
-  RM_ROW_ACTION_LABEL,
+  rmRowActionLabel,
   applicationAddressLabel,
   applicationJobLabel,
   applicationUnitLabel,
@@ -143,6 +144,13 @@ const ACTION_ICON: Record<RmRowAction, typeof Phone> = {
   remove: UserMinus,
   release: Undo2,
   restore: RotateCcw,
+};
+
+/** แท็บการติดต่อใช้ไอคอนชุด iRecruit (call · rule · person_remove) — 4 ต.ค. 2569 */
+const CONTACT_ACTION_ICON: Partial<Record<RmRowAction, typeof Phone>> = {
+  dial: Phone,
+  view: ListChecks,
+  release: UserMinus,
 };
 
 const RmTable: React.FC<{
@@ -433,8 +441,8 @@ const RmTable: React.FC<{
                   <td className="px-1.5 py-2">
                     <div className="flex items-center justify-end gap-0.5">
                       {actions.map((a) => {
-                        const Icon = ACTION_ICON[a];
-                        let label: string = RM_ROW_ACTION_LABEL[a];
+                        const Icon = (tab === 'contact' ? CONTACT_ACTION_ICON[a] : undefined) ?? ACTION_ICON[a];
+                        let label: string = rmRowActionLabel(tab, a);
                         let disabled = false;
                         // "โทร" = ดึงเข้าถังโทรของตัวเอง (call hold) — ใบที่จับไม่ได้
                         // ปุ่มต้อง disable พร้อมบอกเหตุผล ไม่ใช่กดแล้วค่อยไปพังที่ API
@@ -462,21 +470,21 @@ const RmTable: React.FC<{
                             label = 'มีคนเก็บไปโทรอยู่ · AI จะไม่โทรทับ';
                           }
                         }
+                        // ปุ่มกลมไม่มีกรอบ สีเทา แบบ iRecruit (rm-action-btn) — ใช้ Button ของ shadcn
                         return (
-                          <button
+                          <Button
                             key={a}
                             type="button"
+                            variant="ghost"
+                            size="iconXs"
                             onClick={() => onAction(a, r)}
                             disabled={disabled}
                             title={label}
                             aria-label={`${label} — ${r.full_name}`}
-                            className={cn(
-                              'rounded-full border p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40',
-                              TONE.primary.outline,
-                            )}
+                            className="rounded-full text-muted-foreground hover:text-foreground"
                           >
-                            <Icon className="h-3.5 w-3.5" aria-hidden />
-                          </button>
+                            <Icon aria-hidden />
+                          </Button>
                         );
                       })}
                     </div>

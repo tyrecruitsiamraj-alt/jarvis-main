@@ -27,6 +27,7 @@ import {
   RM_LIST_VIEW_LABEL,
   type RmListView,
   rmTabHasLeadTools,
+  telHref,
   type RmRowAction,
   type RmTab,
 } from '@/lib/recruitRm';
@@ -629,7 +630,16 @@ const RmWorkspace: React.FC<{
      */
     if (action === 'dial') {
       say(null);
-      void markApplicationDialed(row.id)
+      // แบบ iRecruit (4 ต.ค. 2569): ยิงจดเวลาก่อน แล้วค่อยเปิดหน้าโทรของเครื่อง —
+      // เปิดผ่านการคลิกลิงก์ ไม่ใช่เปลี่ยน URL หน้า (เปลี่ยนหน้าก่อน = คำขอจดเวลาอาจถูกยกเลิกเงียบ ๆ)
+      const dialing = markApplicationDialed(row.id);
+      const href = telHref(row.phone);
+      if (href) {
+        const link = document.createElement('a');
+        link.href = href;
+        link.click();
+      }
+      void dialing
         .then((r) => {
           setRows((prev) =>
             prev.map((x) =>
