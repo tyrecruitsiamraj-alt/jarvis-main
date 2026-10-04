@@ -11672,3 +11672,16 @@ iRecruit (`rm-action-btn`): โทร (call · POST จดการโทรก�
 - ถอยเฉพาะส่วน "ตารางเป็นการ์ดต่อคน" ของ c0e372b ใน `FollowPlanningCalendar.tsx` + `FollowCompletedCard.tsx` → ทุกจอเป็นตารางเดียวกัน เลื่อนข้างในกรอบตาราง
 - ของอื่นใน c0e372b ยังอยู่ (แถวบนไม่ล้นจอ · แผงขั้นตอนเลขเล็กบนมือถือ · ระยะแถบแบ่งหน้า)
 - 🔴 อย่ากลับไปทำการ์ดต่อคนบนมือถืออีก จนกว่าเจ้าของสั่ง
+
+## งานสรรหา/ติดตาม ค่ำ 4 ต.ค. 2569: แท็บโพสต์ประกาศ · ติ๊กโอทีต่อสายจริง · รูปแผนหน้าละรูป
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/components/jobs/JobBoardView.tsx` | `BOARD_VIEW_TABS` แท็บ board = **"โพสต์ประกาศ"** (เมนู/ชื่อหน้ายังเป็นงานสรรหา) · ชิปสวัสดิการการ์ดสาธารณะใช้ `publicBenefitList` |
+| `src/lib/publicFieldVisibility.ts` | `isOtBenefit` + `publicBenefitList` — 🔴 ช่องติ๊ก "โอที" (ป๊อปหน้า 3 · ให้ผู้สมัครเห็นอะไรบ้าง) เดิม**ไม่ได้ต่อกับอะไร** · ตอนนี้ติ๊กออก = ตัดชิป "โอที ~N บาท/ชม." (ERP · 327/339 ใบขอมี) |
+| `src/components/jobs/PublicJobCardPreview.tsx` | ตัวอย่างหน้า 4 ใช้ `publicBenefitList` ตัวเดียวกัน |
+| `src/lib/followDayReportImage.ts` | `paginateDayReportRows` (หน้าละ ~20 แถว · คนเดียวกันไม่ขาดข้ามรูป) · `drawFollowDayReport(report, page)` หัว "หน้า i/n" · ดาวน์โหลดหน้าละไฟล์ `-หน้า1จาก2` (เว้น 400ms) · คืนจำนวนรูป |
+| `src/components/follow/FollowDayReportDialog.tsx` | ปุ่ม "บันทึกเป็นรูป (N หน้า)" · ข้อความบอกกี่รูป |
+| เทสต์ | `tests/api/ownerBatch2569-10-04-night.test.ts` · ปรับ `pageTitleParity.test.ts` |
+
+- ตรวจจริง: หัวแท็บ/หัวหน้า = โพสต์ประกาศ · แผน 4/10 32 แถว → 2 รูป (18+14) ไม่ตัดคน · ติ๊กโอทีไม่ได้ลองกดบนจอ (บันทึกลงใบขอจริงทันที) — เทสต์คุม

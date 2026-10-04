@@ -6,7 +6,7 @@ import { TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { jobBoardCardSubtitle, jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { publicSafeAddress } from '@/lib/publicJobPrivacy';
-import { publicFieldVisible } from '@/lib/publicFieldVisibility';
+import { publicBenefitList, publicFieldVisible } from '@/lib/publicFieldVisibility';
 import { publicIncomeOf } from '@/lib/publishReadiness';
 import { benefitDisplayLabels } from '@/lib/extraBenefits';
 import { payCycleText, payCyclesOf } from '@/lib/payCycle';
@@ -24,9 +24,7 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 export default function PublicJobCardPreview({ job, className }: { job: JobRequest; className?: string }) {
   const place = publicSafeAddress(job);
   const income = publicFieldVisible(job, 'income') ? publicIncomeOf(job) : null;
-  const benefits = publicFieldVisible(job, 'benefits')
-    ? [...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)]
-    : [];
+  const benefits = publicBenefitList(job, benefitDisplayLabels(job.extra_benefits));
   const pay = publicFieldVisible(job, 'income') ? payCycleText(payCyclesOf(job)) : '';
   const subtitle = jobBoardCardSubtitle(job);
   return (

@@ -116,7 +116,7 @@ import { jobPositionUnits, sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { DASH, EVEN_TYPE, TONE, type ToneKey } from '@/lib/designTokens';
 import { INCOME_PERIOD_LABEL } from '@/lib/incomeBreakdown';
 import { incomeDisplay } from '@/lib/incomeLabel';
-import { publicFieldVisible } from '@/lib/publicFieldVisibility';
+import { publicBenefitList, publicFieldVisible } from '@/lib/publicFieldVisibility';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import {
   applyBoardFilters,
@@ -238,7 +238,8 @@ export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'dashb
  * ⇒ หัวต้องเป็นชื่อแท็บที่กดมา — กดแท็บ "การโทรของฉัน" หัวก็ต้องเขียน "การโทรของฉัน"
  */
 const BOARD_VIEW_TABS: ReadonlyArray<{ id: BoardViewId; label: string }> = [
-  { id: 'board', label: 'งานสรรหา' },
+  // เจ้าของสั่ง 4 ต.ค. 2569: แท็บ "งานสรรหา" → "โพสต์ประกาศ" (ชื่อหน้า/เมนูยังเป็นงานสรรหา)
+  { id: 'board', label: 'โพสต์ประกาศ' },
   // 🔴 ชื่อ + ลำดับแท็บตามที่เจ้าของเรียงเอง 30 ก.ย. 2569 (แบบ iRecruit): *"กล่องงาน > ผู้สมัคร > การติดตาม >
   // ติดตามนัดหมาย > ภาพรวม"* · สามแท็บกลางต้องตรงกับ `RM_TAB_LABEL` (lib/recruitRm — เทสต์คุม)
   { id: 'list', label: 'ผู้สมัคร' },
@@ -1818,9 +1819,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 {(() => {
                   /* รอบรับเงิน (4 ต.ค. 2569 — ไม่ใช่สวัสดิการ) ขึ้นหน้าแถวชิป ตามช่องรายได้ที่ติ๊กให้เห็น */
                   const pay = isStaff || publicFieldVisible(job, 'income') ? payCycleText(payCyclesOf(job)) : '';
-                  const chips = isStaff || publicFieldVisible(job, 'benefits')
+                  // ติ๊กโอทีออก = ตัดชิปโอทีบนประกาศ (4 ต.ค. 2569 · เดิมช่องนี้ไม่ได้ต่อกับอะไร) — เจ้าหน้าที่ยังเห็นครบ
+                  const chips = isStaff
                     ? [...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)]
-                    : [];
+                    : publicBenefitList(job, benefitDisplayLabels(job.extra_benefits));
                   return pay || chips.length > 0 ? (
                   // 🔴 มือถือ: พับเหลือแถวเดียวเลื่อนได้เหมือนแถวเงินเดือนด้านบน (เจ้าของเคาะ 5 ก.ย. 2569)
                   <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto sm:flex-wrap sm:overflow-visible">

@@ -16,7 +16,7 @@ import {
   FOLLOW_DAY_REPORT_NO_FILTER,
   type FollowDayReportFilter,
 } from '@/lib/followDayReport';
-import { downloadFollowDayReportPng, followDayReportSummaryText } from '@/lib/followDayReportImage';
+import { downloadFollowDayReportPng, followDayReportSummaryText, paginateDayReportRows } from '@/lib/followDayReportImage';
 
 /**
  * ═══ สรุปแผนติดตามทั้งวัน (เจ้าของสั่ง 2 ต.ค. 2569 · Choice "หน้าสรุปบนจอ") ═══
@@ -44,6 +44,7 @@ export default function FollowDayReportDialog({
   const [call, setCall] = React.useState<string>('all');
   const [copied, setCopied] = React.useState<'ok' | 'fail' | null>(null);
   const [saved, setSaved] = React.useState<'ok' | 'fail' | null>(null);
+  const [savedCount, setSavedCount] = React.useState(0);
   React.useEffect(() => {
     // เปิดใหม่ = เริ่มที่วันที่หน้าดูอยู่ + ไม่กรอง (ค่าที่ค้างจากรอบก่อนทำให้ตัวเลขดูผิดวัน)
     setSelYmd(ymd);
@@ -75,8 +76,12 @@ export default function FollowDayReportDialog({
   /* "สรุปแผนทั้งวันอะ ทำให้โหลดเป็นรูปได้หน่อย" (เจ้าของสั่ง 3 ต.ค. 2569) — PNG พื้นขาว ส่งต่อใน LINE ได้ */
   const savePng = async () => {
     if (!report) return;
-    setSaved((await downloadFollowDayReportPng(report)) ? 'ok' : 'fail');
+    const n = await downloadFollowDayReportPng(report);
+    setSavedCount(n);
+    setSaved(n > 0 ? 'ok' : 'fail');
   };
+  /** รูปหน้าละราว 20 แถว (4 ต.ค. 2569) — ปุ่มบอกว่าจะได้กี่รูป */
+  const imagePages = report ? paginateDayReportRows(report.rows).length : 0;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -170,10 +175,14 @@ export default function FollowDayReportDialog({
         <div className="flex flex-wrap items-center justify-end gap-2">
           {copied === 'ok' ? <span className={cn('text-xs', TONE.success.value)}>คัดลอกแล้ว วางลง Excel ได้เลย</span> : null}
           {copied === 'fail' ? <span className={cn('text-xs', TONE.danger.value)}>คัดลอกไม่ได้ ลากคลุมตารางแล้วคัดลอกเอง</span> : null}
-          {saved === 'ok' ? <span className={cn('text-xs', TONE.success.value)}>บันทึกรูปแล้ว ดูในโฟลเดอร์ดาวน์โหลด</span> : null}
+          {saved === 'ok' ? (
+            <span className={cn('text-xs', TONE.success.value)}>
+              บันทึกรูปแล้ว{savedCount > 1 ? ` ${savedCount} รูป` : ''} ดูในโฟลเดอร์ดาวน์โหลด
+            </span>
+          ) : null}
           {saved === 'fail' ? <span className={cn('text-xs', TONE.danger.value)}>บันทึกรูปไม่ได้ ใช้ปุ่มคัดลอกตารางแทน</span> : null}
           <Button type="button" size="sm" variant="outline" onClick={() => void savePng()} disabled={!report || report.rows.length === 0}>
-            <ImageDown aria-hidden /> บันทึกเป็นรูป
+            <ImageDown aria-hidden /> บันทึกเป็นรูป{imagePages > 1 ? ` (${imagePages} หน้า)` : ''}
           </Button>
           <Button type="button" size="sm" variant="outline" onClick={() => void copy()} disabled={!report || report.rows.length === 0}>
             <Copy aria-hidden /> คัดลอกตาราง

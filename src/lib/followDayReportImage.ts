@@ -12,6 +12,34 @@ import { TONE } from '@/lib/designTokens';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { FOLLOW_DAY_REPORT_HEADERS, type FollowDayReport } from '@/lib/followDayReport';
 
+type ReportRow = FollowDayReport['rows'][number];
+
+/**
+ * 🔴 แบ่งรูปเป็นหน้า (เจ้าของสั่ง 4 ต.ค. 2569: *"แผนที่บันทึกเป็นรูปพอมันเยอะ ๆ แล้วมันยาวมาก ก็โหลดเป็นรูปตามหน้า
+ * มีกี่หน้าก็รูปตามนั้น"*) — หน้าละราว `perPage` แถว · **สายของคนเดียวกันไม่ขาดข้ามรูป** (ชื่อเดียวกันอยู่ติดกัน)
+ * คนเดียวมีสายเกินหน้า = ยอมให้หน้านั้นยาวกว่า ดีกว่าตัดคนกลางทาง
+ */
+export const DAY_REPORT_ROWS_PER_IMAGE = 20;
+export function paginateDayReportRows(rows: readonly ReportRow[], perPage = DAY_REPORT_ROWS_PER_IMAGE): ReportRow[][] {
+  const groups: ReportRow[][] = [];
+  for (const r of rows) {
+    const last = groups[groups.length - 1];
+    if (last && last[0].name.trim() === r.name.trim()) last.push(r);
+    else groups.push([r]);
+  }
+  const pages: ReportRow[][] = [];
+  let cur: ReportRow[] = [];
+  for (const g of groups) {
+    if (cur.length > 0 && cur.length + g.length > perPage) {
+      pages.push(cur);
+      cur = [];
+    }
+    cur.push(...g);
+  }
+  if (cur.length > 0 || pages.length === 0) pages.push(cur);
+  return pages;
+}
+
 const FONT_FAMILY = 'Kanit, sans-serif';
 const font = (px: number, weight = 400) => `${weight} ${px}px ${FONT_FAMILY}`;
 
@@ -28,10 +56,17 @@ export function followDayReportSummaryText(report: FollowDayReport): string {
   return report.scope ? `${report.scope} — ${base}` : base;
 }
 
-/** วาดรายงานลง canvas (แยกจากการดาวน์โหลด เผื่อเอาไป preview) */
-export function drawFollowDayReport(report: FollowDayReport): HTMLCanvasElement {
+/**
+ * วาดรายงานลง canvas (แยกจากการดาวน์โหลด เผื่อเอาไป preview)
+ * `page` = วาดเฉพาะแถวของหน้านั้น + หัวบอก "หน้า i/n" (ไม่ส่ง = ทั้งวันรูปเดียวเหมือนเดิม)
+ */
+export function drawFollowDayReport(
+  report: FollowDayReport,
+  page?: { rows: readonly ReportRow[]; index: number; total: number },
+): HTMLCanvasElement {
   const headers = FOLLOW_DAY_REPORT_HEADERS;
-  const cells = report.rows.map((r) => [r.time, r.name, r.phone, r.unit, r.call, r.caller, r.result]);
+  const pageRows = page ? page.rows : report.rows;
+  const cells = pageRows.map((r) => [r.time, r.name, r.phone, r.unit, r.call, r.caller, r.result]);
   const rowCount = Math.max(1, cells.length); // ว่าง = แถว "ไม่มีแผนติดตาม" (ตารางไม่หาย)
 
   const measurer = document.createElement('canvas').getContext('2d');
@@ -63,7 +98,8 @@ export function drawFollowDayReport(report: FollowDayReport): HTMLCanvasElement 
   // หัวเรื่อง + สรุป
   ctx.fillStyle = TONE.primary.hex;
   ctx.font = font(18, 600);
-  ctx.fillText(`แผนติดตามวันที่ ${formatYmdDmyBe(report.ymd)}`, PAD, PAD + 10);
+  const pageTag = page && page.total > 1 ? ` · หน้า ${page.index + 1}/${page.total}` : '';
+  ctx.fillText(`แผนติดตามวันที่ ${formatYmdDmyBe(report.ymd)}${pageTag}`, PAD, PAD + 10);
   ctx.fillStyle = TONE.neutral.hex;
   ctx.font = font(13);
   ctx.fillText(followDayReportSummaryText(report), PAD, PAD + 38);
@@ -90,7 +126,7 @@ export function drawFollowDayReport(report: FollowDayReport): HTMLCanvasElement 
   cells.forEach((row, ri) => {
     const top = tableTop + HEAD_H + ri * ROW_H;
     const y = top + ROW_H / 2;
-    const r = report.rows[ri];
+    const r = pageRows[ri];
     if (ri % 2 === 1) {
       // ลายทางอ่อน ๆ ให้ไล่แถวตามสายตาได้ (ค่าโปร่งบนขาว ไม่ใช่สีใหม่)
       ctx.save();
@@ -136,16 +172,9 @@ export function drawFollowDayReport(report: FollowDayReport): HTMLCanvasElement 
   return canvas;
 }
 
-/** โหลดรูป PNG ของแผนวันนั้น — `false` = วาด/เซฟไม่ได้ ให้จอบอกคนใช้ */
-export async function downloadFollowDayReportPng(report: FollowDayReport): Promise<boolean> {
-  try {
-    // ไม่รอฟอนต์ = canvas วาดด้วย fallback เงียบ ๆ (ตัวหนังสือเพี้ยนทั้งรูป)
-    await Promise.all([document.fonts.load(font(18, 600)), document.fonts.load(font(13.5))]);
-  } catch {
-    /* ฟอนต์โหลดไม่ได้ก็ยังวาดได้ด้วย fallback */
-  }
-  const canvas = drawFollowDayReport(report);
-  return await new Promise<boolean>((resolve) => {
+/** canvas → ดาวน์โหลดไฟล์ PNG · `false` = เซฟไม่ได้ */
+function downloadCanvas(canvas: HTMLCanvasElement, filename: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
     try {
       canvas.toBlob((blob) => {
         if (!blob) {
@@ -155,9 +184,7 @@ export async function downloadFollowDayReportPng(report: FollowDayReport): Promi
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        // กรองอยู่ให้ชื่อไฟล์บอกด้วย — โหลดหลายรูปแล้วแยกออกว่าไฟล์ไหนคืออะไร
-        const scopeSlug = report.scope ? `-${report.scope.replace(/\s*·\s*/g, '-').replace(/\s+/g, '')}` : '';
-        a.download = `แผนติดตาม-${report.ymd}${scopeSlug}.png`;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -168,4 +195,28 @@ export async function downloadFollowDayReportPng(report: FollowDayReport): Promi
       resolve(false);
     }
   });
+}
+
+/**
+ * โหลดรูป PNG ของแผนวันนั้น — **หน้าละรูป** (`paginateDayReportRows`) · คืนจำนวนรูปที่เซฟได้ (0 = เซฟไม่ได้ ให้จอบอกคนใช้)
+ */
+export async function downloadFollowDayReportPng(report: FollowDayReport): Promise<number> {
+  try {
+    // ไม่รอฟอนต์ = canvas วาดด้วย fallback เงียบ ๆ (ตัวหนังสือเพี้ยนทั้งรูป)
+    await Promise.all([document.fonts.load(font(18, 600)), document.fonts.load(font(13.5))]);
+  } catch {
+    /* ฟอนต์โหลดไม่ได้ก็ยังวาดได้ด้วย fallback */
+  }
+  const pages = paginateDayReportRows(report.rows);
+  // กรองอยู่ให้ชื่อไฟล์บอกด้วย — โหลดหลายรูปแล้วแยกออกว่าไฟล์ไหนคืออะไร
+  const scopeSlug = report.scope ? `-${report.scope.replace(/\s*·\s*/g, '-').replace(/\s+/g, '')}` : '';
+  let saved = 0;
+  for (const [index, rows] of pages.entries()) {
+    const canvas = drawFollowDayReport(report, { rows, index, total: pages.length });
+    const pageSlug = pages.length > 1 ? `-หน้า${index + 1}จาก${pages.length}` : '';
+    if (await downloadCanvas(canvas, `แผนติดตาม-${report.ymd}${scopeSlug}${pageSlug}.png`)) saved += 1;
+    // เว้นจังหวะระหว่างไฟล์ — เบราว์เซอร์บางตัวตัดการดาวน์โหลดที่ยิงติดกันเร็ว ๆ
+    if (index < pages.length - 1) await new Promise((r) => window.setTimeout(r, 400));
+  }
+  return saved;
 }

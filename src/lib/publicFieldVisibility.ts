@@ -57,3 +57,21 @@ export function readPublicVisibility(
   for (const f of PUBLIC_TOGGLE_FIELDS) out[f] = vis?.[f] !== false;
   return out;
 }
+
+/** ชิปสวัสดิการที่เป็นโอที — ERP ส่งมาเป็น "โอที ~75 บาท/ชม." (327 จาก 339 ใบขอ · วัด 4 ต.ค. 2569) */
+export function isOtBenefit(label: string): boolean {
+  return /^\s*(โอที|OT\b|ค่าล่วงเวลา)/i.test(label);
+}
+
+/**
+ * 🔴 ชิปสวัสดิการที่หน้าสาธารณะเห็น — ที่เดียวของทั้งระบบ (4 ต.ค. 2569)
+ *
+ * เจอว่าช่องติ๊ก "โอที" ในป๊อปหน้า 3 **ไม่ได้ต่อกับอะไรเลย** — ติ๊กออกแล้วชิปโอทียังขึ้นบนประกาศ
+ * ⇒ ติ๊กสวัสดิการออก = ไม่มีชิปเลย · ติ๊กโอทีออก = ตัดเฉพาะชิปโอที สวัสดิการอื่นยังอยู่
+ * `extraLabels` = สวัสดิการที่ทีมติ๊กเพิ่มเอง (`benefitDisplayLabels(job.extra_benefits)`)
+ */
+export function publicBenefitList(job: JobRequest, extraLabels: readonly string[]): string[] {
+  if (!publicFieldVisible(job, 'benefits')) return [];
+  const all = [...(job.benefits ?? []), ...extraLabels];
+  return publicFieldVisible(job, 'ot') ? all : all.filter((b) => !isOtBenefit(b));
+}
