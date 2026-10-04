@@ -10,23 +10,42 @@ export function stripDistrictPrefix(d: string): string {
     .replace(/^อ\.\s*/u, '');
 }
 
+/**
+ * ตัวเทียบอำเภอ/เขตของที่อยู่หนึ่งอัน — **แยกที่อยู่ครั้งเดียว** แล้วเทียบกับอำเภอได้หลายตัว
+ *
+ * 🔴 ตัวกรองหน้างานสรรหาเคยหน่วง ~2 วินาทีต่อการติ๊ก (วัดจริง 4 ต.ค. 2569): หัวข้ออำเภอเรียก
+ * `districtMatchesFilter` ทีละอำเภอ (กรุงเทพฯ 50 เขต) ⇒ แยกที่อยู่ใบเดิมซ้ำ 50 รอบต่อใบ
+ */
+const matcherCache = new Map<string, (filterDistrict: string) => boolean>();
+const MATCHER_CACHE_MAX = 4000;
+
+export function districtMatcherFor(jobAddress: string): (filterDistrict: string) => boolean {
+  const hit = matcherCache.get(jobAddress);
+  if (hit) return hit;
+  const m = buildDistrictMatcher(jobAddress);
+  if (matcherCache.size >= MATCHER_CACHE_MAX) matcherCache.clear();
+  matcherCache.set(jobAddress, m);
+  return m;
+}
+
+function buildDistrictMatcher(jobAddress: string): (filterDistrict: string) => boolean {
+  const jobDist = inferDistrictFromAddress(jobAddress) || displayDistrictLine(jobAddress);
+  const blob = jobAddress.normalize('NFC');
+  const a = jobDist ? stripDistrictPrefix(jobDist).normalize('NFC') : null;
+  return (filterDistrict: string) => {
+    if (!filterDistrict) return true;
+    const b = stripDistrictPrefix(filterDistrict).normalize('NFC');
+    if (a === null) {
+      /** fallback: ชื่ออำเภอที่เลือกโผล่ในข้อความดิบ */
+      return b.length >= 2 && (blob.includes(b) || blob.includes(filterDistrict));
+    }
+    return a === b || a.includes(b) || b.includes(a);
+  };
+}
+
 /** เทียบชื่ออำเภอ/เขตจากที่อยู่ประกาศกับค่าที่เลือกจากรายการทางการ */
 export function districtMatchesFilter(jobAddress: string, filterDistrict: string): boolean {
-  if (!filterDistrict) return true;
-  const fromParse = inferDistrictFromAddress(jobAddress);
-  const fromHint = displayDistrictLine(jobAddress);
-  const jobDist = fromParse || fromHint;
-  if (!jobDist) {
-    /** fallback: ชื่ออำเภอที่เลือกโผล่ในข้อความดิบ */
-    const bare = stripDistrictPrefix(filterDistrict).normalize('NFC');
-    const blob = jobAddress.normalize('NFC');
-    return bare.length >= 2 && (blob.includes(bare) || blob.includes(filterDistrict));
-  }
-  const a = stripDistrictPrefix(jobDist).normalize('NFC');
-  const b = stripDistrictPrefix(filterDistrict).normalize('NFC');
-  if (a === b) return true;
-  if (a.includes(b) || b.includes(a)) return true;
-  return false;
+  return districtMatcherFor(jobAddress)(filterDistrict);
 }
 
 /** สรุปที่อยู่แบบแยกส่วน สำหรับหน้าหน่วยงาน */

@@ -23,7 +23,7 @@
 import type { JobRequest } from '@/types';
 import { publicJobPositionLabel } from './unitRequestDisplay';
 import { inferProvinceFromAddress } from './parseThaiJobAddress';
-import { districtMatchesFilter } from './districtMatch';
+import { districtMatcherFor } from './districtMatch';
 import { getDistrictOptionsForProvince } from './thaiDistricts';
 import { UNIT_SECTOR_LABEL } from './unitSector';
 import { buildIncomeDisplay } from './incomeBreakdown';
@@ -334,8 +334,8 @@ const FACETS: readonly FacetDef[] = [
       // ทีม Online กรอกอำเภอไว้ = ใช้ค่านั้น (ค่าเดียวกับที่ผู้สมัครเห็น) · ไม่กรอก = เดาจากที่อยู่ใบขอ
       const typed = (job.override_district ?? '').trim();
       if (typed) return [typed];
-      const addr = job.location_address || '';
-      const hit = getDistrictOptionsForProvince(prov).filter((d) => districtMatchesFilter(addr, d));
+      const matches = districtMatcherFor(job.location_address || '');
+      const hit = getDistrictOptionsForProvince(prov).filter(matches);
       return hit.length > 0 ? [...hit] : [UNSPECIFIED];
     },
   },

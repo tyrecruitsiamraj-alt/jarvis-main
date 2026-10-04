@@ -64,6 +64,40 @@ function activeDefs<T, K extends string, F, S extends FacetState<K>>(
 
 type ValueTable<K extends string> = Map<K, string[][]>;
 
+/**
+ * ค่าของแถวที่ไม่ขึ้นกับสิ่งที่ติ๊ก (หัวข้อที่ `values` รับแค่ row + facts) — จำไว้ข้ามการติ๊ก
+ * แถว/facts เป็นก้อนเดิมระหว่างกดตัวกรอง ⇒ ไม่ต้องแยกที่อยู่/คิดความพร้อมซ้ำทุกคลิก
+ * (ตัวกรองหน้างานสรรหาเคยหน่วง ~2 วินาทีต่อการติ๊ก · วัดจริง 4 ต.ค. 2569) · facts ก้อนใหม่ = แคชใหม่เอง
+ */
+const valueCache = new WeakMap<object, WeakMap<object, Map<string, string[]>>>();
+
+function cachedValues<T, K extends string, F, S extends FacetState<K>>(
+  d: FacetDef<T, K, F, S>,
+  row: T,
+  facts: F,
+  state: S,
+): string[] {
+  const usesState = d.values.length >= 3;
+  if (usesState || typeof row !== 'object' || row === null || typeof facts !== 'object' || facts === null) {
+    return d.values(row, facts, state);
+  }
+  let byRow = valueCache.get(facts);
+  if (!byRow) {
+    byRow = new WeakMap();
+    valueCache.set(facts, byRow);
+  }
+  let byKey = byRow.get(row);
+  if (!byKey) {
+    byKey = new Map();
+    byRow.set(row, byKey);
+  }
+  const hit = byKey.get(d.key);
+  if (hit) return hit;
+  const vals = d.values(row, facts, state);
+  byKey.set(d.key, vals);
+  return vals;
+}
+
 function buildValueTable<T, K extends string, F, S extends FacetState<K>>(
   rows: readonly T[],
   defs: readonly FacetDef<T, K, F, S>[],
@@ -71,7 +105,7 @@ function buildValueTable<T, K extends string, F, S extends FacetState<K>>(
   state: S,
 ): ValueTable<K> {
   const table: ValueTable<K> = new Map();
-  for (const d of defs) table.set(d.key, rows.map((row) => d.values(row, facts, state)));
+  for (const d of defs) table.set(d.key, rows.map((row) => cachedValues(d, row, facts, state)));
   return table;
 }
 
