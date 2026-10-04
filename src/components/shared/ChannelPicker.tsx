@@ -33,7 +33,9 @@ const ChannelPicker: React.FC<{
   onChange: (next: RecruitChannelMatch | null) => void;
   /** โหลดใหม่เมื่อค่านี้เปลี่ยน (ใช้ตอน dialog เปิด) */
   reloadKey?: unknown;
-}> = ({ value, onChange, reloadKey }) => {
+  /** บรรทัดบอกใต้ลิสต์ — ไม่ส่ง = "เลือกได้ 1 ช่องต่อลิงก์" (ตัวเลือกหลายช่อง `MultiChannelPicker` ส่งคำของตัวเอง) */
+  footHint?: string;
+}> = ({ value, onChange, reloadKey, footHint }) => {
   const [roots, setRoots] = useState<RecruitChannelMatch[]>([]);
   /** จำนวนลูกของแต่ละพ่อ — ตัวตัดสินว่ากดแล้ว "เข้าไปเลือกต่อ" หรือ "เลือกเลย" */
   const [childCounts, setChildCounts] = useState<Record<string, number>>({});
@@ -286,7 +288,8 @@ const ChannelPicker: React.FC<{
       )}
       {!query.trim() ? (
         <p className="text-[11px] text-muted-foreground">
-          กดช่องทางที่มีป้าย &ldquo;มีช่องรอง&rdquo; เพื่อเข้าไปเลือกช่องรองข้างใน · เลือกได้ 1 ช่องต่อลิงก์
+          กดช่องทางที่มีป้าย &ldquo;มีช่องรอง&rdquo; เพื่อเข้าไปเลือกช่องรองข้างใน ·{' '}
+          {footHint ?? 'เลือกได้ 1 ช่องต่อลิงก์'}
         </p>
       ) : null}
     </div>

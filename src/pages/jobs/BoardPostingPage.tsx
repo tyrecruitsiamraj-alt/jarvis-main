@@ -25,9 +25,10 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, ClipboardCheck, Send, UserMinus, Users } from 'lucide-react';
 
 import PageHeader from '@/components/shared/PageHeader';
-import EditPostingDialog from '@/components/jobs/EditPostingDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import GenderPicker from '@/components/jobs/GenderPicker';
+import AgeRangeFields from '@/components/jobs/AgeRangeFields';
+import PostingLinksList from '@/components/jobs/PostingLinksList';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import ReleaseSkipControl from '@/components/jobs/ReleaseSkipControl';
 import UnitRequestInfoFields from '@/components/jobs/UnitRequestInfoFields';
@@ -59,12 +60,11 @@ import {
   releaseStepOf,
   type ReleaseStepKey,
 } from '@/lib/boardRelease';
-import { EM_DASH } from '@/lib/displayFallback';
-import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import { publicSafeAddress } from '@/lib/publicJobPrivacy';
 import { INCOME_PERIOD_LABEL, buildIncomeDisplay } from '@/lib/incomeBreakdown';
 import { benefitDisplayLabels } from '@/lib/extraBenefits';
+import { boardCardAge } from '@/lib/boardCardFacts';
 import { EVEN_TYPE, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import { SEARCH_ALL_POOLS_AND_CALL } from '@/lib/candidateSearchLabels';
@@ -102,18 +102,6 @@ function Loading({ text = 'กำลังโหลดใบขอ…' }: { text
 }
 
 // ช่องเลือกเพศ (`GenderPicker`) ย้ายไปไฟล์ของตัวเอง 2 ต.ค. 2569 — ใช้ร่วมกับป๊อปประกาศหน้าเดียว (`BoardPublishSheet`)
-
-/** ข้อเท็จจริงหนึ่งช่องในการ์ดข้อมูลใบขอ */
-function Fact({ label, value, wide = false }: { label: string; value?: string | number | null; wide?: boolean }) {
-  return (
-    <div className={cn('min-w-0', wide && 'sm:col-span-2')}>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="break-words text-sm text-foreground">
-        {value === undefined || value === null || value === '' ? EM_DASH : value}
-      </dd>
-    </div>
-  );
-}
 
 /** หนึ่งแถวในสรุปขั้น 4 — ปุ่ม "แก้" พากลับไปขั้นของช่องนั้น */
 function SummaryRow({
@@ -333,13 +321,12 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
    * `currentStep` ใช้แค่ติดป้าย "ค้างที่นี่" ไม่ได้ใช้เลือกขั้นเริ่ม
    */
   const [openStep, setOpenStep] = React.useState<ReleaseStepKey>('info');
-  /** "ดูใบขอทั้งใบ" — หุบเป็นค่าตั้งต้น */
-  const [infoOpen, setInfoOpen] = React.useState(false);
   /** "คนเก่า + รายได้ย้อนหลัง" — หุบเป็นค่าตั้งต้น (เจ้าของ Choice 1 ต.ค. 2569 "4 ขั้นเดิม แต่ตัดของรก") */
   const [resignedOpen, setResignedOpen] = React.useState(false);
   /** ขั้น 4: ติ๊ก "สร้างลิงก์" ถึงกางฟอร์ม (ลิงก์ไม่บังคับ — Choice 30 ก.ย. 2569) */
   const [wantLink, setWantLink] = React.useState(false);
-  const [editPostingOpen, setEditPostingOpen] = React.useState(false);
+  /** "มีแล้ว N ลิงก์" กดแล้วกางรายการลิงก์ทีละอัน (เจ้าของ 4 ต.ค. 2569 — Choice "ครบ") */
+  const [linksOpen, setLinksOpen] = React.useState(false);
   const step: ReleaseStepKey = openStep;
 
   /**
@@ -481,41 +468,20 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             {/* ── ① ตรวจใบขอ ── */}
             {step === 'info' ? (
               <>
+                {/* 🔴 หน้า 1 = ข้อมูลใบขออย่างเดียว กางให้เห็นทั้งใบ (เจ้าของ 4 ต.ค. 2569: *"เปิดมาแล้วจะเจอเป็นรายละเอียดของใบงาน
+                    พวก รายได้ สวัสดิการ เงินเดือน ฯลฯ รายละเอียดแบบใบขอ · หน้าแรกเอาแค่เป็นข้อมูลใบขอ"*) — เดิมพับไว้ใต้ "ดูใบขอทั้งใบ"
+                    การ์ดสรุปสั้นเดิม (เลขที่/ตำแหน่ง/ผู้ติดต่อ/สถานที่) ถอด — ซ้ำกับใบเต็มทุกช่อง */}
                 <StepCard title="ข้อมูลใบขอ">
                   {job ? (
-                    <dl className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
-                      <Fact label="เลขที่ใบขอ" value={job.request_no} />
-                      <Fact label="ตำแหน่ง" value={job.job_description_code_1} />
-                      <Fact label="ต้องการวันที่" value={job.required_date ? formatYmdDmyBe(job.required_date) : null} />
-                      {/* 🔴 ผู้ติดต่อ + เบอร์ต้องอยู่ในสรุป (เจ้าของสั่ง 22 ก.ย. 2569) — มาจากใบขอ ERP */}
-                      <Fact label="ผู้ติดต่อหน่วยงาน" value={job.contact_name} />
-                      <Fact label="เบอร์ติดต่อ" value={job.contact_phone} />
-                      <Fact label="สถานที่" value={job.location_address} wide />
-                    </dl>
+                    <div className="space-y-3">
+                      <UnitRequestInfoFields job={job} />
+                      <RequestRateLinesBlock job={job} />
+                      {/* ใบเปิดไซต์ใหม่ไม่มีคนเก่า = บอกบรรทัดเดียว (ไม่วาดการ์ดที่มีแต่ "—") */}
+                      {!hasResignedInfo(job) ? <p className="text-xs text-muted-foreground">ใบนี้ไม่มีข้อมูลคนเก่า</p> : null}
+                    </div>
                   ) : (
                     <Loading />
                   )}
-                  {/* ใบเปิดไซต์ใหม่ไม่มีคนเก่า = บอกบรรทัดเดียวในการ์ดนี้ (ไม่วาดการ์ดที่มีแต่ "—") */}
-                  {job && !hasResignedInfo(job) ? (
-                    <p className="text-xs text-muted-foreground">ใบนี้ไม่มีข้อมูลคนเก่า</p>
-                  ) : null}
-                  {/* ดูใบขอทั้งใบในที่เดิม (เจ้าของสั่ง 28 ส.ค. 2569: ไม่ต้องเด้งไปหน้าใบงาน กดแล้วขยายให้ดูเลย) */}
-                  <Collapsible open={infoOpen} onOpenChange={setInfoOpen}>
-                    <CollapsibleTrigger asChild>
-                      <Button type="button" variant="ghost" size="xs">
-                        {infoOpen ? 'ย่อใบขอ' : 'ดูใบขอทั้งใบ'}
-                        <ChevronDown className={cn('transition-transform', infoOpen && 'rotate-180')} aria-hidden />
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-3 pt-3">
-                      {job ? (
-                        <>
-                          <UnitRequestInfoFields job={job} />
-                          <RequestRateLinesBlock job={job} />
-                        </>
-                      ) : null}
-                    </CollapsibleContent>
-                  </Collapsible>
                 </StepCard>
 
                 {/* คนที่ออก + รายได้จริง 3 เดือน — ใช้ตั้งรายได้ขั้น 3 · component ตัวเดียวกับหน้าใบขอ (ห้ามก๊อปโครง)
@@ -537,9 +503,6 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                   </StepCard>
                 ) : null}
 
-                <StepCard title="เพศที่รับ">
-                  {jobWithPatch ? <GenderPicker job={jobWithPatch} onSaved={onFieldsSaved} /> : <Loading />}
-                </StepCard>
               </>
             ) : null}
 
@@ -559,9 +522,23 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
               )
             ) : null}
 
+            {/* หน้า 3 มีเพศ + อายุด้วย (เจ้าของ 4 ต.ค. 2569: *"เลือกสวัสดิการ + รายได้ เพศ อายุ ดึงจากใบขอมาก่อน แก้ได้"*)
+                เพศย้ายมาจากหน้า 1 — หน้า 1 เหลือข้อมูลใบขออย่างเดียว */}
+            {step === 'benefits' ? (
+              <>
+                <StepCard title="เพศที่รับ">
+                  {jobWithPatch ? <GenderPicker job={jobWithPatch} onSaved={onFieldsSaved} /> : <Loading />}
+                </StepCard>
+                <StepCard title="อายุที่รับ">
+                  {jobWithPatch ? <AgeRangeFields job={jobWithPatch} onSaved={onFieldsSaved} /> : <Loading />}
+                </StepCard>
+              </>
+            ) : null}
+
             {/* ── ④ สรุป + ส่งประกาศ ── */}
             {step === 'publish' ? (
               <>
+                {/* 🔴 หน้า 4 = สรุป แก้ในหน้านี้ไม่ได้ (เจ้าของ 4 ต.ค. 2569) — ปุ่ม "แก้" พาไปหน้าของช่องนั้น */}
                 <StepCard title="สรุปก่อนส่ง">
                   {jobWithPatch ? (
                     <dl className="divide-y divide-border/60">
@@ -583,8 +560,11 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                           <span className="text-muted-foreground">ยังไม่ได้เลือก</span>
                         )}
                       </SummaryRow>
-                      <SummaryRow label="เพศที่รับ" warn={genderBlocked} onEdit={() => setOpenStep('info')}>
+                      <SummaryRow label="เพศที่รับ" warn={genderBlocked} onEdit={() => setOpenStep('benefits')}>
                         {genderText ?? 'ยังไม่ได้เลือก'}
+                      </SummaryRow>
+                      <SummaryRow label="อายุที่รับ" onEdit={() => setOpenStep('benefits')}>
+                        {boardCardAge(jobWithPatch)}
                       </SummaryRow>
                     </dl>
                   ) : (
@@ -593,13 +573,24 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 </StepCard>
 
                 <StepCard title="ลิงก์สมัคร" aside={<span className="text-xs text-muted-foreground">ไม่บังคับ</span>}>
-                  <p className="text-sm text-foreground">
-                    {linkCount === null
-                      ? 'กำลังโหลด…'
-                      : linkCount > 0
-                        ? `มีแล้ว ${NUM.format(linkCount)} ลิงก์`
-                        : 'ยังไม่มีลิงก์'}
-                  </p>
+                  {/* "มีแล้ว N ลิงก์" กดแล้วกางดูทีละลิงก์ว่าเกี่ยวกับอะไร (เจ้าของ 4 ต.ค. 2569 → Choice "ครบ") */}
+                  {linkCount === null ? (
+                    <p className="text-sm text-muted-foreground">กำลังโหลด…</p>
+                  ) : linkCount > 0 ? (
+                    <Collapsible open={linksOpen} onOpenChange={setLinksOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button type="button" variant="ghost" size="sm" className="-ml-2">
+                          มีแล้ว {NUM.format(linkCount)} ลิงก์
+                          <ChevronDown className={cn('transition-transform', linksOpen && 'rotate-180')} aria-hidden />
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pt-2">
+                        <PostingLinksList postings={(jobPostings ?? []).filter((p) => p.status === 'open')} onChanged={() => void loadPostings()} />
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">ยังไม่มีลิงก์</p>
+                  )}
                   <label htmlFor="posting-want-link" className="flex w-fit cursor-pointer items-center gap-3">
                     <Checkbox
                       id="posting-want-link"
@@ -615,26 +606,11 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                       previewFirst
                       job={job}
                       onClose={() => setWantLink(false)}
-                      onCreated={() => void loadPostings()}
+                      onCreated={() => {
+                        void loadPostings();
+                        setLinksOpen(true);
+                      }}
                     />
-                  ) : null}
-                  {latestPosting ? (
-                    <Collapsible open={editPostingOpen} onOpenChange={setEditPostingOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button type="button" variant="ghost" size="xs">
-                          แก้ข้อความประกาศ
-                          <ChevronDown className={cn('transition-transform', editPostingOpen && 'rotate-180')} aria-hidden />
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="pt-3">
-                        <EditPostingDialog
-                          embedded
-                          posting={latestPosting}
-                          onClose={() => setEditPostingOpen(false)}
-                          onSaved={() => void loadPostings()}
-                        />
-                      </CollapsibleContent>
-                    </Collapsible>
                   ) : null}
                 </StepCard>
 
@@ -649,8 +625,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 {!released && genderBlocked ? (
                   <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.warn.soft)}>
                     <p className={cn('text-sm', TONE.warn.value)}>ใบขอไม่ระบุเพศ เลือกเพศก่อนถึงจะส่งได้</p>
-                    <Button type="button" size="xs" variant="outline" onClick={() => setOpenStep('info')}>
-                      ไปขั้น 1 เลือกเพศ
+                    <Button type="button" size="xs" variant="outline" onClick={() => setOpenStep('benefits')}>
+                      ไปหน้า 3 เลือกเพศ
                     </Button>
                   </div>
                 ) : null}

@@ -57,8 +57,8 @@ describe('หัวข้อกรอง "พร้อมประกาศไ�
 });
 
 describe('ป๊อปของการ์ด', () => {
-  it('🔴 ค่าเริ่ม = ป๊อปประกาศหน้าเดียว · ?popup=steps = ป๊อป 4 ขั้นเดิม (ทางถอยยังอยู่ครบ)', () => {
-    expect(BOARD).toContain("searchParams.get('popup') === 'steps'");
+  it('🔴 ค่าเริ่ม = ป๊อป 4 หน้า (4 ต.ค. 2569) · ?popup=sheet = ป๊อปหน้าเดียว (ทางถอยยังอยู่ครบ)', () => {
+    expect(BOARD).toContain("searchParams.get('popup') !== 'sheet'");
     expect(BOARD).toContain('<BoardPublishSheet');
     expect(BOARD).toContain('<BoardPostingSteps');
     expect(fs.existsSync(path.join(ROOT, 'src/pages/jobs/BoardPostingPage.tsx'))).toBe(true);

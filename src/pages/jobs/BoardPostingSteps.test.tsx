@@ -99,7 +99,8 @@ describe('ป๊อปไล่งานโฉมใหม่ (30 ก.ย. 2569)
     renderSteps();
     const skipButton = await screen.findByRole('button', { name: /ไม่ประกาศใบนี้/ });
     expect(screen.getByRole('heading', { name: 'ข้อมูลใบขอ' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'เพศที่รับ' })).toBeTruthy();
+    // 4 ต.ค. 2569: หน้า 1 = ข้อมูลใบขออย่างเดียว · เพศย้ายไปหน้า 3
+    expect(screen.queryByRole('heading', { name: 'เพศที่รับ' })).toBeNull();
     expect(screen.queryByText('ติดอะไรไหม')).toBeNull();
     expect(screen.queryByText('ใครแก้อะไรไป')).toBeNull();
     expect(screen.queryByLabelText('หมายเหตุใบขอ')).toBeNull();
@@ -130,7 +131,7 @@ describe('ป๊อปไล่งานโฉมใหม่ (30 ก.ย. 2569)
     renderSteps(onDone);
     fireEvent.click(await screen.findByRole('button', { name: /สรุป \+ ส่งประกาศ/ }));
     expect((await screen.findByRole('button', { name: 'ส่งประกาศ' })).hasAttribute('disabled')).toBe(true);
-    expect(screen.getByRole('button', { name: 'ไปขั้น 1 เลือกเพศ' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'ไปหน้า 3 เลือกเพศ' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'บันทึกแบบร่าง' }));
     expect(onDone).toHaveBeenCalled();
     expect(releaseJobsToPublic).not.toHaveBeenCalled();
@@ -186,5 +187,35 @@ describe('ป๊อปไล่งาน — ตัดของรก (1 ต.ค
     fireEvent.mouseDown(await screen.findByRole('tab', { name: /รายชื่อ/ }), { button: 0 });
     await waitFor(() => expect(screen.getByRole('tab', { name: /รายชื่อ/ }).getAttribute('aria-selected')).toBe('true'));
     expect(screen.queryByRole('button', { name: /หาคนทุกกอง/ })).toBeNull();
+  });
+});
+
+/** 🔴 เจ้าของไล่ Journey 4 ต.ค. 2569 — 4 หน้า: ข้อมูลใบขอ → สถานที่ → สวัสดิการ+รายได้+เพศ+อายุ → สรุป (แก้ไม่ได้) */
+describe('ป๊อป 4 หน้าตาม Journey (4 ต.ค. 2569)', () => {
+  it('หน้า 1 กางใบขอทั้งใบเลย (ไม่ต้องกด "ดูใบขอทั้งใบ")', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    renderSteps();
+    await screen.findByRole('button', { name: /ไม่ประกาศใบนี้/ });
+    expect(screen.queryByRole('button', { name: /ดูใบขอทั้งใบ/ })).toBeNull();
+  });
+
+  it('หน้า 3 มีเพศ + อายุ (ดึงจากใบขอมาก่อน)', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    renderSteps();
+    fireEvent.click(await screen.findByRole('button', { name: /เลือกสวัสดิการ รายได้ เพศ อายุ/ }));
+    expect(await screen.findByRole('heading', { name: 'เพศที่รับ' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'อายุที่รับ' })).toBeTruthy();
+    expect(screen.getByLabelText('อายุต่ำสุด')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'บันทึกอายุ' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('หน้า 4 สรุปแก้ในหน้านี้ไม่ได้ — มีแถวอายุ · ปุ่ม "แก้" พาไปหน้าของช่องนั้น · ไม่มีฟอร์มแก้ข้อความประกาศในสรุป', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    renderSteps();
+    fireEvent.click(await screen.findByRole('button', { name: /สรุป \+ ส่งประกาศ/ }));
+    expect(screen.getByText('อายุที่รับ')).toBeTruthy();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'แก้อายุที่รับ' }));
+    expect(await screen.findByRole('heading', { name: 'อายุที่รับ' })).toBeTruthy();
   });
 });

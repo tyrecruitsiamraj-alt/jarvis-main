@@ -9,7 +9,7 @@ import {
   type RecruitChannelMatch,
 } from '@/lib/recruitPostings';
 import { createRecruitPosting, type CreatePostingBody } from '@/lib/recruitPostingsApi';
-import ChannelPicker from '@/components/shared/ChannelPicker';
+import MultiChannelPicker from '@/components/shared/MultiChannelPicker';
 import JobTitleField from '@/components/shared/JobTitleField';
 import {
   Dialog,
@@ -97,7 +97,8 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   previewFirst = false,
 }) => {
   /** ช่องทางของลิงก์นี้ — **1:1** (เจ้าของเคาะ 2 ก.ย. 2569: เลิกติ๊กหลายช่อง) */
-  const [picked, setPicked] = useState<RecruitChannelMatch | null>(null);
+  /** ช่องทางที่จะสร้างลิงก์ — หลายช่องได้ ได้ลิงก์ช่องละ 1 อัน (เจ้าของ 4 ต.ค. 2569) */
+  const [picked, setPicked] = useState<RecruitChannelMatch[]>([]);
   /** ลิสต์ช่องทางหุบไว้ก่อน — กางเมื่อจะเลือกจริง (เหตุผลอยู่ที่จุดเรียกใช้) */
   const [channelsOpen, setChannelsOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -180,7 +181,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setResponsible('');
     setFormType('rm');
     setShortLinks({});
-    setPicked(null);
+    setPicked([]);
     setChannelsOpen(false);
     /**
      * ผู้รับผิดชอบ = **ทีม Online** ที่เพิ่มไว้ในหน้าตั้งค่า (เจ้าของสั่ง 19 ส.ค. 2569)
@@ -231,7 +232,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
         salaryText: salaryText || null,
         contactName: contactName || null,
         contactPhone: contactPhone || null,
-        channels: picked ? [{ channelId: picked.id, label: recruitChannelLabel(picked) }] : [],
+        channels: picked.map((c) => ({ channelId: c.id, label: recruitChannelLabel(c) })),
         positionName: positionName.trim() || null,
         province: province || null,
         responsibleName: responsible || null,
@@ -425,9 +426,9 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                 >
                   <span className="text-xs font-medium text-muted-foreground">
                     ช่องทางที่จะส่ง{' '}
-                    {picked ? (
+                    {picked.length > 0 ? (
                       <span className="font-medium text-foreground">
-                        — {recruitChannelLabel(picked)}
+                        — {picked.length === 1 ? recruitChannelLabel(picked[0]) : `${picked.length} ช่องทาง`}
                       </span>
                     ) : (
                       <span className="font-normal opacity-70">(ไม่เลือกก็ได้ — จะได้ลิงก์กลาง 1 อัน)</span>
@@ -443,11 +444,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                 </button>
                 {channelsOpen ? (
                   <>
-                    <ChannelPicker value={picked} onChange={setPicked} reloadKey={open} />
-                    <p className="text-[11px] text-muted-foreground">
-                      1 ลิงก์ต่อ 1 ช่องทาง — อยากส่งช่องอื่นด้วย ให้สร้างลิงก์ใหม่อีกใบ
-                      (จะได้รู้ว่าผู้สมัครมาจากช่องไหนจริง ๆ)
-                    </p>
+                    <MultiChannelPicker value={picked} onChange={setPicked} reloadKey={open} />
                   </>
                 ) : null}
               </div>
@@ -493,7 +490,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-                {saving ? 'กำลังสร้าง…' : 'สร้างประกาศ + ลิงก์'}
+                {saving ? 'กำลังสร้าง…' : picked.length > 1 ? `สร้างประกาศ + ${picked.length} ลิงก์` : 'สร้างประกาศ + ลิงก์'}
               </button>
             </>
           )}

@@ -58,7 +58,7 @@ import {
 const BoardPostingSteps = React.lazy(() =>
   import('@/pages/jobs/BoardPostingPage').then((m) => ({ default: m.BoardPostingSteps })),
 );
-/** ป๊อปประกาศหน้าเดียว (เจ้าของเลือก B 2 ต.ค. 2569) — ป๊อป 4 ขั้นเดิมข้างบนยังเรียกได้ที่ `?popup=steps` (ทางถอย) */
+/** ป๊อปประกาศหน้าเดียว (เจ้าของเลือก B 2 ต.ค. 2569) — ตั้งแต่ 4 ต.ค. เป็นทางถอยที่ `?popup=sheet` (ค่าเริ่ม = ป๊อป 4 หน้า) */
 const BoardPublishSheet = React.lazy(() => import('@/components/jobs/BoardPublishSheet'));
 
 /**
@@ -417,8 +417,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    */
   const laneParam = searchParams.get('lane');
   const stepParam = searchParams.get('step');
-  /** ทางถอย: `?popup=steps` = ป๊อปไล่งาน 4 ขั้นเดิม · ค่าเริ่ม = ป๊อปประกาศหน้าเดียว (2 ต.ค. 2569) */
-  const stepsPopup = searchParams.get('popup') === 'steps';
+  /**
+   * ป๊อปของการ์ด = **4 หน้า** (เจ้าของ 4 ต.ค. 2569 ไล่ Journey: ข้อมูลใบขอ → สถานที่ → สวัสดิการ+รายได้+เพศ+อายุ → สรุป)
+   * กลับมาใช้ป๊อป 4 ขั้นแทนป๊อปหน้าเดียว (2 ต.ค.) · ทางถอย: `?popup=sheet` = ป๊อปหน้าเดียว
+   */
+  const stepsPopup = searchParams.get('popup') !== 'sheet';
   const legacyStage = searchParams.get('stage');
 
   const doneLane = useMemo<ClosedBoxKey | null>(() => {
