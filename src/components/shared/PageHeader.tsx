@@ -14,6 +14,16 @@ interface PageHeaderProps {
    */
   backLabel?: string;
   actions?: React.ReactNode;
+  /**
+   * ของที่ต่อท้ายชื่อหน้าในแถวเดียวกัน — เช่นแถบแท็บของหน้างานสรรหา/ติดตาม (เจ้าของสั่ง 4 ต.ค. 2569:
+   * *"โพสต์ประกาศ ผู้สมัคร การติดต่อ ติดตามนัดหมาย ภาพรวม ย้ายไปอยู่แถวเดียวกับคำว่า ผู้สมัคร"*) · จอแคบตกบรรทัดเอง
+   */
+  afterTitle?: React.ReactNode;
+  /**
+   * ซ่อนชื่อหน้า (+ คำอธิบาย) ให้เหลือ ← + `afterTitle` — เจ้าของสั่ง 4 ต.ค. 2569 *"เอาชื่อหน้าออกดีกว่าดูเยอะไป"*
+   * (ชื่อแท็บที่เลือกอยู่บอกแล้วว่าอยู่ไหน) · ชื่อยังอยู่สำหรับโปรแกรมอ่านหน้าจอ (sr-only)
+   */
+  hideTitle?: boolean;
 }
 
 const PageHeader: React.FC<PageHeaderProps> = ({
@@ -22,6 +32,8 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   backPath,
   backLabel,
   actions,
+  afterTitle,
+  hideTitle = false,
 }) => {
   const navigate = useNavigate();
 
@@ -35,7 +47,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
       {/* 🔴 ชื่อ+คำอธิบายกว้างไม่ต่ำกว่า min-w-40 — ถ้าต่ำกว่านั้น actions ต้อง "ตกบรรทัด" ไปใต้ชื่อ
           (เดิม min-w-0 + flex-1 ⇒ ฐานกว้าง 0 แถวเลยไม่เคยตกบรรทัด · 28 ก.ย. 2569 เจอที่กล่องงานบนจอ 375px:
           ปุ่ม 3 ตัวดันชื่อหน้าหายไป คำอธิบายถูกบีบเหลือคำละบรรทัด) · หน้าที่ปุ่มเล็กยังอยู่แถวเดียวกับชื่อเหมือนเดิม */}
-      <div className="flex min-w-40 flex-1 items-center gap-3">
+      <div className={cn('flex items-center gap-3', afterTitle ? 'order-1 shrink-0' : 'min-w-40 flex-1')}>
         {backPath && (
           <button
             type="button"
@@ -50,12 +62,23 @@ const PageHeader: React.FC<PageHeaderProps> = ({
             {backLabel ? <span className="whitespace-nowrap">{backLabel}</span> : null}
           </button>
         )}
-        <div className="min-w-0">
-          <h1 className="text-lg md:text-xl font-medium tracking-tight text-foreground truncate">{title}</h1>
-          {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
-        </div>
+        {hideTitle ? (
+          <h1 className="sr-only">{title}</h1>
+        ) : (
+          <div className={afterTitle ? 'shrink-0' : 'min-w-0'}>
+            <h1 className="text-lg md:text-xl font-medium tracking-tight text-foreground truncate">{title}</h1>
+            {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
+          </div>
+        )}
       </div>
-      {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
+      {/* แท็บต่อท้ายชื่อ: จอคอม = แถวเดียวกับ ← และปุ่ม · มือถือ = ลงแถวถัดไปเต็มกว้าง (แถวแรกเหลือ ← กับปุ่ม)
+          ไม่งั้นจอ 375 เห็นแท็บแค่ 1–2 อัน (4 ต.ค. 2569) */}
+      {afterTitle ? <div className="order-3 min-w-0 basis-full md:order-2 md:basis-0 md:flex-1">{afterTitle}</div> : null}
+      {actions && (
+        <div className={cn('flex min-w-0 max-w-full flex-wrap items-center gap-2', afterTitle && 'order-2 md:order-3')}>
+          {actions}
+        </div>
+      )}
     </div>
   );
 };

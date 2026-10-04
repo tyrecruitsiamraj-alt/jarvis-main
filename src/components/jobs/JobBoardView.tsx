@@ -1193,6 +1193,36 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           .join(' · ')
       : undefined;
 
+  /**
+   * แถบแท็บของหน้างานสรรหา — 🔴 อยู่แถวเดียวกับชื่อหน้า (เจ้าของสั่ง 4 ต.ค. 2569: *"โพสต์ประกาศ ผู้สมัคร การติดต่อ
+   * ติดตามนัดหมาย ภาพรวม ย้ายไปอยู่แถวเดียวกับคำว่า ผู้สมัคร"* · Choice "คงชื่อหน้าไว้ แท็บต่อท้าย")
+   * ⚠️ ทุกแท็บต้องอยู่ตำแหน่งเดียวกัน (คำสั่ง 14 ส.ค. 2569) — อยู่ในหัวหน้าจึงตรงกันทุกแท็บเอง
+   */
+  const staffTabs =
+    isStaff && onViewChange ? (
+      <div className="flex items-center gap-1 overflow-x-auto" role="tablist" aria-label="มุมมองหน้างานสรรหา">
+        {BOARD_VIEW_TABS.map((v) => {
+          const active = view === v.id;
+          return (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => onViewChange(v.id)}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors',
+                active
+                  ? cn(TONE.primary.value, 'border-b-2 border-current')
+                  : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {v.label}
+            </button>
+          );
+        })}
+      </div>
+    ) : null;
+
   return (
     <div className={isStaff ? 'relative' : 'relative bg-gradient-to-b from-primary/10 via-primary/[0.04] to-transparent'}>
       {isStaff ? (
@@ -1200,6 +1230,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           title={staffTitle}
           subtitle={staffSubtitle}
           backPath="/"
+          afterTitle={staffTabs}
+          /* ชื่อหน้าถอดออก เหลือ ← + แท็บ (เจ้าของสั่ง 4 ต.ค. 2569 "เอาชื่อหน้าออกดีกว่าดูเยอะไป") */
+          hideTitle={Boolean(staffTabs)}
           actions={
             view === 'board' ? (
               <>
@@ -1229,10 +1262,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </Button>
                 ) : null}
               </>
-            ) : view === 'list' ? (
-              /* แท็บผู้สมัครมีปุ่ม "ตั้งค่า" (ช่องทาง · เหตุผล · สร้างลิงก์) แบบ iRecruit (เจ้าของ 4 ต.ค. 2569 "เอาสิ่งที่ขาดมา")
-                 — แทนคำสั่ง 14 ส.ค. ที่ให้มีแค่หน้ากล่องงาน · แท็บงานสรรหาไม่แตะ */
-              <RecruitBoardTools />
+            ) : onRefresh ? (
+              /* 🔴 สร้างลิงก์ (ประกาศลอย) + ตั้งค่าบอร์ด อยู่แค่แท็บโพสต์ประกาศ — แท็บอื่นเหลือรีเฟรช (ย้ายขึ้นมาจากแถวใต้แท็บ)
+                 เจ้าของสั่ง 4 ต.ค. 2569 (กลับคำสั่งช่วงบ่ายวันเดียวกันที่ให้แท็บผู้สมัครมีปุ่มตั้งค่า) */
+              <Button
+                type="button"
+                variant="outline"
+                size="iconXs"
+                onClick={() => void onRefresh()}
+                aria-label="รีเฟรชข้อมูล"
+                title="รีเฟรชข้อมูล"
+              >
+                <RefreshCw />
+              </Button>
             ) : undefined
           }
         />
@@ -1312,29 +1354,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             ⚠️ **ต้องอยู่ position เดียวกันทุกแท็บ** (เจ้าของสั่ง 14 ส.ค. 2569: "Position
             เดียวกันกับหน้ากล่องงาน") — จึงอยู่ **เหนือ** ภาพรวมงานสรรหา · เดิม funnel
             แทรกก่อน tab bar ทำให้แท็บเลื่อนลงเฉพาะหน้ารายชื่อผู้สมัคร */}
-        {isStaff && onViewChange ? (
-          <div className="flex items-center gap-1 overflow-x-auto border-b border-border/60 sm:flex-wrap sm:overflow-visible">
-            {BOARD_VIEW_TABS.map((v) => {
-              const active = view === v.id;
-              return (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => onViewChange(v.id)}
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    'shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors',
-                    active
-                      ? cn(TONE.primary.value, 'border-b-2 border-current')
-                      : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {v.label}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
+        {/* 🔴 แถบแท็บย้ายขึ้นไปแถวเดียวกับชื่อหน้า (`staffTabs` ใน PageHeader · เจ้าของสั่ง 4 ต.ค. 2569) */}
 
         {/* 🔴 ศูนย์คุมงานสรรหา **ย้ายไปแท็บภาพรวมแล้ว** (30 ก.ย. 2569 · `BoardDashboard`) — แท็บผู้สมัครเหลือแค่
             รายชื่อแบบ iRecruit · ไม่ import ในไฟล์นี้อีก (ไฟล์นี้ใช้ร่วมหน้าสมัครสาธารณะ ของภายในไม่ควรติดไป) */}

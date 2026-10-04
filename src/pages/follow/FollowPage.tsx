@@ -317,6 +317,8 @@ const FollowPage: React.FC = () => {
    * โหลดลิสต์ใหม่ทันที ไม่ต้องรีเฟรชหน้า (เรื่อง กับ เจ้าหน้าที่ แยกตัวนับกัน)
    */
   const [topicsRev, setTopicsRev] = useState(0);
+  /** รีเฟรชแท็บ Dashboard = เปิดแผงใหม่ (ปุ่มรีเฟรชอยู่แถวแท็บ · 4 ต.ค. 2569) */
+  const [dashRev, setDashRev] = useState(0);
   const [contactsRev, setContactsRev] = useState(0);
   /** dialog จัดการเรื่อง / เจ้าหน้าที่ — เปิดจากปุ่มข้างปฏิทิน (supervisor+ เท่านั้น) */
   const [topicManagerOpen, setTopicManagerOpen] = useState(false);
@@ -1419,59 +1421,64 @@ const FollowPage: React.FC = () => {
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
-      {/* รีเฟรช — ย้ายมาจากมุมขวาบนของแผงการโทรที่ถูกยุบเข้ามา */}
-      <button
-        type="button"
-        onClick={() => void reload()}
-        disabled={loading}
-        aria-label="รีเฟรช"
-        title="รีเฟรช"
-        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border hover:bg-secondary disabled:opacity-50"
-      >
-        <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} aria-hidden />
-      </button>
     </>
   );
 
+  /** แท็บขีดเส้นใต้ชุดเดียวกับหน้างานสรรหา · มือถือย่อคำ/ช่องไฟ (4 ต.ค. 2569) */
+  const followTabClass = (value: typeof followView) =>
+    cn(
+      'shrink-0 rounded-none border-b-2 bg-transparent px-2 py-2 text-xs font-medium shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:px-3 sm:text-sm',
+      followView === value
+        ? cn(TONE.primary.value, 'border-current')
+        : 'border-transparent text-muted-foreground hover:text-foreground',
+    );
+
   return (
     <div className="relative">
-      {/**
-       * 🔴 แถวบนสุดแถวเดียว (เจ้าของสั่ง 3 ต.ค. 2569): ย้อนกลับ · ปุ่มทั้งหมดของหน้า · แท็บชิดขวา
-       * ชื่อหน้า "ติดตามคนเริ่มงาน / ส่งคนแทน" ถอดออกตามสั่ง (ชื่อยังอยู่ที่เมนูและแถบบนของระบบ)
-       * หัว "ปฏิทินติดตาม + วันที่" ของปฏิทินถอดด้วย — วันที่อยู่ที่ปุ่มวันในตารางแล้ว
-       * แท็บ Dashboard ไม่มีปุ่มชุดนี้ (ไม่มีอะไรให้เพิ่ม/สรุป)
-       */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-4 md:px-6 md:pt-5">
-        {/* ชื่อหน้ายังอยู่สำหรับโปรแกรมอ่านจอ/แท็บเบราว์เซอร์ — มองไม่เห็นบนจอตามที่เจ้าของสั่งถอด (ชื่อ = ชื่อเมนูเสมอ) */}
+      {/* 🔴 แบบหน้าผู้สมัคร (เจ้าของสั่ง 4 ต.ค. 2569 "หน้าการติดตามก็เหมือนกัน — แบบหน้าผู้สมัคร"):
+          แถว 1 = ← แท็บ (ขีดเส้นใต้ ชุดเดียวกับหน้างานสรรหา) ··· รีเฟรชชิดขวา · แถว 2 = ปุ่มของหน้า (Dashboard ไม่มี)
+          ชื่อหน้า "ติดตามคนเริ่มงาน / ส่งคนแทน" ถอดไว้ตั้งแต่ 3 ต.ค. — ยังอยู่สำหรับโปรแกรมอ่านจอ */}
+      <div className="space-y-2 px-4 pt-4 md:px-6 md:pt-5">
         <h1 className="sr-only">{conveyorLabel('follow')}</h1>
-        {/* 🔴 จัดตามขนาดจอ (4 ต.ค. 2569 "รองรับ Device อื่นดี ๆ"): มือถือ = ย้อนกลับ+แท็บเต็มกว้าง แล้วปุ่มบรรทัดล่าง
-            · md ขึ้นไป = ย้อนกลับ · ปุ่ม · แท็บชิดขวา แถวเดียว (ลำดับเจ้าของเลือก) — สลับด้วย order ไม่ทำ JSX สองชุด */}
-        <Button type="button" variant="ghost" size="icon" aria-label="ย้อนกลับ" onClick={() => navigate('/')} className="order-1 shrink-0">
-          <ArrowLeft aria-hidden />
-        </Button>
-        {/* 🔴 ปุ่มของหน้าอยู่ซ้าย · แท็บอยู่ขวา (เจ้าของเลือก 3 ต.ค. 2569 "สลับซ้ายขวาทั้งก้อน") — Dashboard ไม่มีปุ่มชุดนี้ */}
+        {/* จอคอม = ← แท็บ ↻ แถวเดียว · มือถือ = ← ··· ↻ แล้วแท็บลงแถวถัดไปเต็มกว้าง (ชุดเดียวกับ PageHeader) */}
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          <Button type="button" variant="ghost" size="icon" aria-label="ย้อนกลับ" onClick={() => navigate('/')} className="order-1 shrink-0">
+            <ArrowLeft aria-hidden />
+          </Button>
+          {/* แท็บ "รายชื่อติดตาม | ส่งคนแทน | Dashboard" — ?view=… · กดเปลี่ยน = push (ย้อนกลับแล้วไม่หลุดหน้า) */}
+          <Tabs
+            value={followView}
+            onValueChange={(v) => setFollowView(v === 'dashboard' ? 'dashboard' : v === 'replace' ? 'replace' : 'list')}
+            className="order-3 min-w-0 basis-full md:order-2 md:basis-0 md:flex-1"
+          >
+            <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none bg-transparent p-0">
+              <TabsTrigger value="list" className={followTabClass('list')}>รายชื่อติดตาม</TabsTrigger>
+              <TabsTrigger value="replace" className={followTabClass('replace')}>ติดตามส่งคนแทน</TabsTrigger>
+              <TabsTrigger value="dashboard" className={followTabClass('dashboard')}>Dashboard</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {/* รีเฟรช — ขึ้นมาแถวแท็บชิดขวาแบบหน้าผู้สมัคร (เดิมอยู่ท้ายแถวปุ่ม) · Dashboard = โหลดแผงใหม่ */}
+          <Button
+            type="button"
+            variant="outline"
+            size="iconXs"
+            onClick={() => (followView === 'dashboard' ? setDashRev((n) => n + 1) : void reload())}
+            disabled={loading}
+            aria-label="รีเฟรชข้อมูล"
+            title="รีเฟรชข้อมูล"
+            className="order-2 shrink-0 md:order-3"
+          >
+            <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden />
+          </Button>
+        </div>
         {followView !== 'dashboard' ? (
-          <div className="order-3 flex w-full min-w-0 flex-wrap items-center gap-1.5 sm:gap-2 md:order-2 md:w-auto">{headerButtons}</div>
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">{headerButtons}</div>
         ) : null}
-        <span className="hidden flex-1 md:order-3 md:block" />
-        {/* แท็บ "รายชื่อติดตาม | ส่งคนแทน | Dashboard" — ?view=… · กดเปลี่ยน = push (ย้อนกลับแล้วไม่หลุดหน้า) */}
-        <Tabs
-          value={followView}
-          onValueChange={(v) => setFollowView(v === 'dashboard' ? 'dashboard' : v === 'replace' ? 'replace' : 'list')}
-          className="order-2 min-w-0 flex-1 md:order-4 md:ml-auto md:flex-none"
-        >
-          {/* มือถือ: แท็บแบ่งกว้างเท่ากันเต็มบรรทัด (เดิม Dashboard ล้นจอ) */}
-          <TabsList className="flex w-full md:inline-flex md:w-auto">
-            <TabsTrigger value="list" className="flex-1 px-2 text-xs sm:text-sm md:flex-none md:px-3">รายชื่อติดตาม</TabsTrigger>
-            <TabsTrigger value="replace" className="flex-1 px-2 text-xs sm:text-sm md:flex-none md:px-3">ติดตามส่งคนแทน</TabsTrigger>
-            <TabsTrigger value="dashboard" className="flex-1 px-2 text-xs sm:text-sm md:flex-none md:px-3">Dashboard</TabsTrigger>
-          </TabsList>
-        </Tabs>
       </div>
 
       {followView === 'dashboard' ? (
         <div className="px-4 md:px-6 py-4">
-          <Suspense fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิด Dashboard…</p>}>
+          <Suspense key={dashRev} fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิด Dashboard…</p>}>
             <FollowDashboard />
           </Suspense>
         </div>

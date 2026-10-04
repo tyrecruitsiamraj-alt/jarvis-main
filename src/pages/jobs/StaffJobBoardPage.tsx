@@ -100,6 +100,8 @@ const StaffJobBoardPage: React.FC = () => {
     setSearchParams(params, { replace: true });
   }, [legacyBox, retiredView, searchParams, setSearchParams]);
 
+  /** รีเฟรชของแท็บผู้สมัคร/การติดต่อ/ติดตามนัดหมาย/ภาพรวม — ปุ่มอยู่แถวหัวหน้า (4 ต.ค. 2569) */
+  const [listRev, setListRev] = useState(0);
   const setView = (next: BoardViewId) => {
     const params = new URLSearchParams(searchParams);
     if (next === 'board') params.delete('view');
@@ -124,7 +126,7 @@ const StaffJobBoardPage: React.FC = () => {
         dataAgeSeconds={dataAgeSeconds}
         variant="staff"
         /* กดรีเฟรช = ข้ามสำเนา ไปถามระบบงานหลักสด */
-        onRefresh={() => refetch({ fresh: true })}
+        onRefresh={() => (view === 'board' ? refetch({ fresh: true }) : setListRev((n) => n + 1))}
         refreshing={refreshing}
         detailReturnTo="/jobs/board"
         // ช่องค้นหาย้ายไปอยู่ในแถบหัวแล้ว (แคบกว่าเดิม) — ข้อความยาวจะถูกตัดกลางคัน
@@ -142,11 +144,11 @@ const StaffJobBoardPage: React.FC = () => {
         onPublishedTotals={setBoardPublished}
         listContent={
           view === 'board' ? null : view === 'dashboard' ? (
-            <Suspense fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิดภาพรวม…</p>}>
+            <Suspense key={listRev} fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิดภาพรวม…</p>}>
               {classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview published={boardPublished} />}
             </Suspense>
           ) : (
-            <RmWorkspace tab={VIEW_TO_RM_TAB[view as (typeof RM_VIEWS)[number]]} jobs={allJobs} />
+            <RmWorkspace tab={VIEW_TO_RM_TAB[view as (typeof RM_VIEWS)[number]]} jobs={allJobs} refreshKey={listRev} />
           )
         }
       />

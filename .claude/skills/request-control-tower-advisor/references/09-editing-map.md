@@ -11685,3 +11685,16 @@ iRecruit (`rm-action-btn`): โทร (call · POST จดการโทรก�
 | เทสต์ | `tests/api/ownerBatch2569-10-04-night.test.ts` · ปรับ `pageTitleParity.test.ts` |
 
 - ตรวจจริง: หัวแท็บ/หัวหน้า = โพสต์ประกาศ · แผน 4/10 32 แถว → 2 รูป (18+14) ไม่ตัดคน · ติ๊กโอทีไม่ได้ลองกดบนจอ (บันทึกลงใบขอจริงทันที) — เทสต์คุม
+
+## แถวบนหน้างานสรรหา + หน้าติดตาม: ← แท็บ ··· ปุ่ม แถวเดียว (4 ต.ค. 2569 ดึก)
+
+เจ้าของ: สร้างลิงก์ (ประกาศลอย) + ตั้งค่าบอร์ด อยู่แค่แท็บโพสต์ประกาศ · รีเฟรชขึ้นไปแทนที่ปุ่มพวกนั้น · แท็บขึ้นแถวเดียวกับชื่อหน้า → *"เอาชื่อหน้าออกดีกว่าดูเยอะไป"* ·
+หน้าติดตามแบบเดียวกัน (Choice: "แบบหน้าผู้สมัคร")
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/components/shared/PageHeader.tsx` | prop `afterTitle` (แท็บ) + `hideTitle` (ชื่อเป็น sr-only) · จอ md+ = แถวเดียว · มือถือ = ← ··· ปุ่ม แล้วแท็บลงแถวถัดไปเต็มกว้าง (order + basis-full) |
+| `src/components/jobs/JobBoardView.tsx` | `staffTabs` ย้ายเข้า PageHeader (ถอดแถวแท็บเดิม) · แท็บ board = ค้นหา/สร้างลิงก์/ตั้งค่าบอร์ด/รีเฟรช · แท็บอื่น = รีเฟรชอย่างเดียว (ถอด RecruitBoardTools จากแท็บผู้สมัคร) |
+| `src/pages/jobs/StaffJobBoardPage.tsx` | `listRev` — รีเฟรชแท็บผู้สมัคร/การติดต่อ/ติดตามนัดหมาย = `RmWorkspace refreshKey` · ภาพรวม = `Suspense key` เปิดใหม่ |
+| `src/components/recruit-rm/RmWorkspace.tsx` | prop `refreshKey` · ถอดแถวปุ่ม "รีเฟรช" ตอนถูกคุมจากบอร์ด |
+| `src/pages/follow/FollowPage.tsx` | แถว 1 = ← แท็บขีดเส้นใต้ (`followTabClass`) ··· รีเฟรช · แถว 2 = ปุ่มของหน้า · รีเฟรชแท็บ Dashboard = `dashRev` |

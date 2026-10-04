@@ -142,7 +142,12 @@ const RmWorkspace: React.FC<{
    * (เจ้าของสั่ง 30 ก.ย. 2569) · ไม่ส่ง/ยังโหลดไม่ขึ้น = ไม่มีหัวข้อนี้
    */
   jobs?: readonly JobRequest[];
-}> = ({ tab: controlledTab, jobs }) => {
+  /**
+   * เพิ่มค่า = โหลดรายชื่อใหม่ — ปุ่มรีเฟรชย้ายขึ้นไปแถวหัวหน้า (เจ้าของสั่ง 4 ต.ค. 2569:
+   * *"ปุ่มรีเฟรช ย้ายขึ้นไปแทนปุ่มสร้างลิงก์"*) · แถวรีเฟรชในนี้ถูกถอดตอนคุมจากข้างนอก
+   */
+  refreshKey?: number;
+}> = ({ tab: controlledTab, jobs, refreshKey = 0 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const tab: RmTab = controlledTab ?? (isRmTab(tabParam) ? tabParam : 'candidates');
@@ -242,7 +247,7 @@ const RmWorkspace: React.FC<{
       .catch((e) => setLoadError(e instanceof Error ? e.message : 'โหลดรายชื่อผู้สมัครไม่สำเร็จ'))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [leadView, bucket, cancelledView]);
+  useEffect(load, [leadView, bucket, cancelledView, refreshKey]);
 
   const setCancelledView = (on: boolean) => {
     const next = new URLSearchParams(searchParams);
@@ -717,13 +722,8 @@ const RmWorkspace: React.FC<{
           แถบนี้จึงไม่ขึ้นบนบอร์ด — คงไว้เผื่อ RmWorkspace ถูกใช้เดี่ยว ๆ ที่อื่น) */}
       {/* ⚠️ ป้าย "ข้อมูลผู้สมัคร · N รายการ" ถูกเอาออก (เจ้าของสั่ง 14 ส.ค. 2569) —
           ซ้ำกับ tab bar ระดับบอร์ดที่มีชื่อแท็บ+จำนวนอยู่แล้ว · เหลือแค่ปุ่มรีเฟรช */}
-      {controlledTab ? (
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="secondary" size="xs" type="button" onClick={load} disabled={loading} >
-            <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden /> รีเฟรช
-          </Button>
-        </div>
-      ) : (
+      {/* คุมจากข้างนอก (บอร์ด) = ปุ่มรีเฟรชอยู่แถวหัวหน้าแล้ว (4 ต.ค. 2569) — ไม่มีแถวนี้ */}
+      {controlledTab ? null : (
         <div className={cn('flex flex-wrap items-center gap-1 border-b', DASH.divider)}>
           {RM_TABS.map((t) => {
             const active = t === tab;
