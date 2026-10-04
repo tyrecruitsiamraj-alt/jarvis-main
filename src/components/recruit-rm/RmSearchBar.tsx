@@ -107,7 +107,7 @@ const RmSearchBar: React.FC<{
         title={
           selectedCount === 0
             ? 'ติ๊กเลือกแถวก่อน'
-            : `จอง ${selectedCount} ใบ + ล็อกเบอร์กัน AI โทรทับ — ไปโทร+บันทึกผลที่แท็บการติดตาม`
+            : `จอง ${selectedCount} ใบ + ล็อกเบอร์กัน AI โทรทับ — ไปโทร+บันทึกผลที่แท็บการติดต่อ`
         }
         className="shrink-0"
       >

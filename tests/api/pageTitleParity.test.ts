@@ -49,7 +49,7 @@ describe('ชื่อหัวหน้าจอ = ชื่อเมนู', (
     expect(src).toContain('BOARD_VIEW_TABS.find((t) => t.id === view)');
     expect(src).toContain('BOARD_VIEW_TABS.map(');
     // ชื่อ + ลำดับที่เจ้าของเรียงเอง 30 ก.ย. 2569 (แบบ iRecruit)
-    for (const label of ['งานสรรหา', 'ผู้สมัคร', 'การติดตาม', 'ติดตามนัดหมาย', 'ภาพรวม']) {
+    for (const label of ['งานสรรหา', 'ผู้สมัคร', 'การติดต่อ', 'ติดตามนัดหมาย', 'ภาพรวม']) {
       expect(src).toContain(`label: '${label}'`);
     }
     // ชื่อเก่าที่เคยชนกันทั้งสองขั้นต้องหายไป

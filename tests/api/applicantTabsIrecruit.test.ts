@@ -34,11 +34,11 @@ const PANEL_UI = code('src/components/jobs/BoardFilterPanel.tsx');
 describe('แท็บ: กล่องงาน > ผู้สมัคร > การติดตาม > ติดตามนัดหมาย > ภาพรวม', () => {
   it('🔴 ลำดับและชื่อตามที่เจ้าของเรียงเอง', () => {
     const tabs = [...BOARD.matchAll(/\{ id: '(\w+)', label: '([^']+)' \}/g)].map((m) => `${m[1]}:${m[2]}`);
-    expect(tabs).toEqual(['board:งานสรรหา', 'list:ผู้สมัคร', 'contact:การติดตาม', 'appointments:ติดตามนัดหมาย', 'dashboard:ภาพรวม']);
+    expect(tabs).toEqual(['board:งานสรรหา', 'list:ผู้สมัคร', 'contact:การติดต่อ', 'appointments:ติดตามนัดหมาย', 'dashboard:ภาพรวม']);
   });
 
   it('ชื่อสามแท็บกลางเป็นชุดเดียวกับ RM_TAB_LABEL (ปุ่ม/ข้อความในแท็บผู้สมัครใช้ชื่อเดียวกับแถบแท็บ)', () => {
-    expect(RM_TAB_LABEL).toEqual({ candidates: 'ผู้สมัคร', contact: 'การติดตาม', appointments: 'ติดตามนัดหมาย' });
+    expect(RM_TAB_LABEL).toEqual({ candidates: 'ผู้สมัคร', contact: 'การติดต่อ', appointments: 'ติดตามนัดหมาย' });
     expect(WS).not.toContain('RM_TAB_BOARD_LABEL');
   });
 });

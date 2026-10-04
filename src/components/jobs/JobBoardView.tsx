@@ -242,7 +242,7 @@ const BOARD_VIEW_TABS: ReadonlyArray<{ id: BoardViewId; label: string }> = [
   // 🔴 ชื่อ + ลำดับแท็บตามที่เจ้าของเรียงเอง 30 ก.ย. 2569 (แบบ iRecruit): *"กล่องงาน > ผู้สมัคร > การติดตาม >
   // ติดตามนัดหมาย > ภาพรวม"* · สามแท็บกลางต้องตรงกับ `RM_TAB_LABEL` (lib/recruitRm — เทสต์คุม)
   { id: 'list', label: 'ผู้สมัคร' },
-  { id: 'contact', label: 'การติดตาม' },
+  { id: 'contact', label: 'การติดต่อ' },
   { id: 'appointments', label: 'ติดตามนัดหมาย' },
   // แท็บภาพรวม = มุมผู้บริหาร (28 ก.ย. 2569 ชื่อ "Dashboard" → เจ้าของเปลี่ยนเป็น "ภาพรวม" 30 ก.ย.) · `?view=dashboard` คงเดิม
   // เนื้อมาจาก StaffJobBoardPage (lazy · ห้าม import ในไฟล์นี้ — หน้าสมัครสาธารณะใช้ไฟล์นี้ร่วม)
