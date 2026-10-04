@@ -11398,3 +11398,20 @@ Choice ของเจ้าของ: การ์ดแยกบนหน้�
 | `tests/api/homeAiShare.test.ts` | +3 (SQL นับทีมไม่กรอง · บวกกันพอดีรายแท่ง · API เก่า = 0) |
 
 - ตรวจจริง (7 วัน): ทั้งหมด 231 = เริ่มงาน 177 + ส่งคนแทน 54 · กราฟแยกทีม 3 ต.ค. 84 = 44 + 40 (ตรงหน้าติดตามที่ไม่นับยกเลิก)
+
+### 4 ต.ค. 2569 (ต่อ) — หน้าแรก หัวข้อติดตาม นับแบบแผน = เลขเดียวกับหน้าติดตาม
+
+เจ้าของ: *"สองแท็บมีบอกทั้งหมดที่ต้องโทรเท่าไหร่ แยก AI/คน · วันที่ 4 รายชื่อติดตาม AI ~31 · ส่งคนแทน คนโทร ~27 ·
+หน้าแรกต้องได้ ทั้งหมด / AI โทรรวมสองรายการ / คนโทร · แยกดูรายวัน สัปดาห์ เดือน ก็ต้องได้ผลรวมตามช่วง"*
+เดิมหน้าแรกนับ "AI โทร" = AI โทรไปแล้ว · "คนโทร" = คนลงผลแล้ว · ตัดปลายช่วงที่ตอนนี้ ⇒ ไม่ตรงกับหน้าติดตาม
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `api/_lib/homeAiShareSql.ts` | เลน follow (ยกเว้นโหมด results) = **แผน**: `ai = call_mode ≠ manual` · `staff = call_mode = manual` (`FOLLOW_PLAN_AI_SQL/STAFF_SQL`) · **รวมยกเลิก** (เหมือนเลขทั้งหมดของหน้าติดตาม) · `$2` เป็น null ได้ · aftercare + แผงผลโทรนับแบบเดิม |
+| `src/lib/homeAiShare.ts` | `followPlanBounds(win)` ปลายช่วงเต็ม ไม่ตัดที่ตอนนี้ ("ทั้งหมด" = ไม่มีปลาย) · `followPlanPreviousBounds` |
+| `api/_handlers/home-ai-share.ts` | `Params` `$2` nullable · `followPlanParams()` ใช้กับกล่องตัวเลข/ช่วงก่อน/กราฟ/รายชื่อของ follow |
+| `src/components/home-ai-share/AiShareCard.tsx` · `AiShareDetail.tsx` · `src/pages/HomeAiSharePage.tsx` | `hideNotCalled` (follow ไม่มีกล่อง/ชั้น "ยังไม่โทร") · ไม่มีธง "ยังนับคนโทรไม่ได้" สำหรับ follow |
+| `src/lib/metricDictionary.ts` | คำอธิบาย followTotal/Ai/Staff ตามนิยามใหม่ |
+| เทสต์ | `homeAiShare.test.ts` (แผน · รวมยกเลิก · ปลายช่วง) · `homeCallResults.test.ts` (follow ไม่อยู่คู่ CTE เดียวกันแล้ว · แผงผลโทรยังแบบเดิม) · `HomeAiSharePage.test.tsx` (เทสต์กล่องทั่วไปย้ายไป aftercare · follow ไม่มียังไม่โทร · กล่องแยกทีม · สวิตช์แยกทีม) |
+
+- ตรวจจริง (API): 4 ต.ค. ทั้งหมด 58 = AI 31 + คน 27 (ส่งคนแทน 27) · 28 ก.ย.–4 ต.ค. 290 = 217 + 73 · ต.ค. 902 = 723 + 179

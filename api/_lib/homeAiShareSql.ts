@@ -136,6 +136,10 @@ export const FOLLOW_WAITING_AI_SQL = `exists (
        and q.status in ('pending', 'delivered')
        and ${queueOutcome('q')} is null)`;
 
+/** หัวข้อติดตามแบบแผน — ตั้งให้ AI โทร (ไม่ระบุ = AI · ตัวเดียวกับ `followCallerOf`) / ตั้งให้คนโทร */
+export const FOLLOW_PLAN_AI_SQL = "(f.call_mode is distinct from 'manual')";
+export const FOLLOW_PLAN_STAFF_SQL = "(f.call_mode = 'manual')";
+
 /** คนโทรแล้ว = เจ้าหน้าที่ลงผลของสายนี้ (130) · ฐานยังไม่รัน 130 = `false` (ยังไม่มีทางลงผลเลย) */
 export function followCalledByStaffSql(staffReady: boolean): string {
   return staffReady ? '(f.staff_called_at is not null)' : 'false';
@@ -160,13 +164,21 @@ export function buildFollowAiShareSql(
   mode: AiShareSqlMode = 'total',
   list?: AiShareListOpts,
 ): string {
+  /**
+   * 🔴 หัวข้อ "ติดตาม" นับแบบ **แผน** ชุดเดียวกับหน้าติดตาม (เจ้าของสั่ง 4 ต.ค. 2569: *"ทั้งหมดเท่าไหร่ AI โทรทั้ง 2 รายการ
+   * รวมเท่าไหร่ … ตอนนี้มีแค่หน้ารายชื่อติดตาม 31 ก็ต้องได้ 31 · แยกดูรายวัน สัปดาห์ เดือน ก็ต้องได้ผลรวมตามช่วงนั้น"*)
+   * ทั้งหมด = ทุกสายในช่วง (สองแท็บรวม · รวมยกเลิกเหมือนเลข "ทั้งหมด" ของหน้าติดตาม) · AI/คน = ตั้งให้ใครโทร
+   * ⇒ ไม่มี "ทั้งสองทาง" / "ยังไม่โทร" · ช่วงจบ = ปลายช่วงที่เลือกจริง (หน้าเรียกส่งปลายช่วงไม่ตัดที่ตอนนี้)
+   * ดูแลหลังเริ่มงาน + แผงผลโทร ยังนับแบบเดิม (ใครโทรไปแล้ว)
+   */
+  const plan = lane === 'follow' && mode !== 'results';
   return `
   with f0 as (
     select f.call_mode,
            /* ทีมของสาย (131) — หน้าแรกแยก "ติดตามคนเริ่มงาน / ติดตามส่งคนแทน" (เจ้าของสั่ง 4 ต.ค. 2569) */
            (f.follow_team = 'replacement') as replacement,
-           ${FOLLOW_CALLED_BY_AI_SQL} as ai,
-           ${followCalledByStaffSql(staffReady)} as staff,
+           ${plan ? FOLLOW_PLAN_AI_SQL : FOLLOW_CALLED_BY_AI_SQL} as ai,
+           ${plan ? FOLLOW_PLAN_STAFF_SQL : followCalledByStaffSql(staffReady)} as staff,
            ${FOLLOW_WAITING_AI_SQL} as waiting_ai,
            ${bkkDay('f.scheduled_at')} as day,
            ${followBuSql('f')} as bu${listCols(mode, "f.id::text as id,\n           nullif(btrim(f.recipient_name), '') as name,\n           f.scheduled_at as at")}${resultCols(
@@ -186,10 +198,10 @@ export function buildFollowAiShareSql(
          limit 1
       ) air on true`,
       )}
-     where f.cancelled_at is null
+     where ${plan ? 'true' : 'f.cancelled_at is null'}
        and ${FOLLOW_LANE_WHERE[lane]}
        and ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
-       and f.scheduled_at < $2::timestamptz
+       and ($2::timestamptz is null or f.scheduled_at < $2::timestamptz)
        and ($3::text is null or ${followBuSql('f')} = $3::text)
   )${
     mode === 'results'

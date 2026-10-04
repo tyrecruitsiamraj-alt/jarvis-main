@@ -240,15 +240,18 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(await screen.findByRole('heading', { name: 'ติดตาม' })).toBeTruthy();
   });
 
+  // หัวข้อติดตามนับแบบแผนแล้ว (ไม่มีกล่องยังไม่โทร · 4 ต.ค. 2569) — เทสต์พฤติกรรมกล่องทั่วไปใช้ดูแลหลังเริ่มงานแทน
   it('เทียบกับช่วงก่อน: ชิปขึ้นลง + ยอดของช่วงก่อน (รอบ 4)', async () => {
+    window.localStorage.setItem(BLOCK_STORE, 'aftercare');
     fetchHomeAiShare.mockResolvedValue(
       body({
+        aftercare: { total: 205, ai: 205, staff: 0, both: 0, notCalled: 0, waitingAi: 0, waitingStaff: 0 },
         previous: {
           from: '2026-09-17',
           to: '2026-09-23',
           label: '7 วันก่อนหน้า',
-          follow: { total: 257, ai: 250, staff: 0, both: 0, notCalled: 7 },
-          aftercare: null,
+          follow: null,
+          aftercare: { total: 257, ai: 250, staff: 0, both: 0, notCalled: 7 },
           applicants: { total: 1, ai: 1, staff: 0, both: 0, notCalled: 0 },
           matching: null,
         },
@@ -275,22 +278,24 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(screen.queryByText('ยังไม่มีงาน')).toBeNull();
   });
 
-  it('ฐานยังไม่มีช่องลงผลของคนโทร = บอกบนจอ', async () => {
-    fetchHomeAiShare.mockResolvedValue(body({ follow_staff_ready: false }));
+  it('ฐานยังไม่มีช่องลงผลของคนโทร = บอกบนจอ (ดูแลหลังเริ่มงาน · ติดตามนับแบบแผนไม่พึ่งช่องนี้)', async () => {
+    window.localStorage.setItem(BLOCK_STORE, 'aftercare');
+    fetchHomeAiShare.mockResolvedValue(body({ follow_staff_ready: false, aftercare: { total: 205, ai: 205, staff: 0, both: 0, notCalled: 0, waitingAi: 0, waitingStaff: 0 } }));
     render(<HomeAiSharePage />);
     expect(await screen.findByText(/ยังนับรายชื่อที่คนโทรไม่ได้/)).toBeTruthy();
   });
 
   it('🔴 มีสายแต่ยังไม่มีที่โทรแล้ว = ตัวเลือกบอก "AI —" ไม่ใช่ 0%', async () => {
+    window.localStorage.setItem(BLOCK_STORE, 'aftercare');
     fetchHomeAiShare.mockResolvedValue(
-      body({ follow: { total: 3, ai: 0, staff: 0, both: 0, notCalled: 3, waitingAi: 3, waitingStaff: 0 } }),
+      body({ aftercare: { total: 3, ai: 0, staff: 0, both: 0, notCalled: 3, waitingAi: 3, waitingStaff: 0 } }),
     );
     render(<HomeAiSharePage />);
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('3 รายชื่อ'));
     // แถบของกล่อง = % ของทั้งหมด ⇒ ยังไม่โทร 100%
     expect(stat('ยังไม่โทร')).toContain('100%');
     openPicker();
-    expect((await screen.findByRole('option', { name: /ติดตาม/ })).textContent).toContain('AI —');
+    expect((await screen.findByRole('option', { name: /ดูแลหลังเริ่มงาน/ })).textContent).toContain('AI —');
   });
 
   it('หัวข้อที่ล้มบอกเหตุ · ตัวเลือกของหัวข้อนั้นบอกว่าโหลดไม่ขึ้น', async () => {
@@ -317,8 +322,8 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   it('สวิตช์ "แยก BU": ค่าตั้งต้นแท่งแบ่ง AI/คน/ยังไม่โทร · กดแล้วเป็นแต่ละ BU · กดอีกทีกลับ', async () => {
     render(<HomeAiSharePage />);
     const chart = await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน' });
-    // ติดตามไม่มี "ทั้งสองทาง"
-    expect(chart.getAttribute('data-stacks')).toBe('AI โทร|คนโทร|ยังไม่โทร');
+    // ติดตามไม่มี "ทั้งสองทาง" · นับแบบแผน (4 ต.ค. 2569) ⇒ ไม่มีชั้น "ยังไม่โทร"
+    expect(chart.getAttribute('data-stacks')).toBe('AI โทร|คนโทร');
     expect(chart.getAttribute('data-flip')).toBe('segments');
     const sw = screen.getByRole('switch', { name: 'แยก BU' });
     expect(sw.getAttribute('aria-checked')).toBe('false');
@@ -328,7 +333,12 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(byBu.getAttribute('data-stacks')).toBe(AI_SHARE_BUS.join('|'));
     expect(byBu.getAttribute('data-flip')).toBe('bu');
     fireEvent.click(sw);
-    expect((await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน' })).getAttribute('data-stacks')).toBe('AI โทร|คนโทร|ยังไม่โทร');
+    expect((await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน' })).getAttribute('data-stacks')).toBe('AI โทร|คนโทร');
+    // สวิตช์ "แยกทีม" (เฉพาะติดตาม) — เปิดแล้วแยก BU ดับ
+    fireEvent.click(screen.getByRole('switch', { name: 'แยกทีม' }));
+    const byTeam = await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน แยกทีม' });
+    expect(byTeam.getAttribute('data-stacks')).toBe('ติดตามคนเริ่มงาน|ติดตามส่งคนแทน');
+    expect(screen.getByRole('switch', { name: 'แยก BU' }).getAttribute('aria-checked')).toBe('false');
   });
 
   it('รอบ 17: กล่องเรียง ทั้งหมด → AI โทร → คนโทร → (ทั้งสองทาง) → ยังไม่โทร · กล่องที่เป็น 0 กดไม่ได้', async () => {
@@ -339,7 +349,8 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
         .getAllByRole('button')
         .map((b) => b.getAttribute('aria-label') ?? '')
         .filter((n) => /^(ทั้งหมด|AI โทร|คนโทร|ทั้งสองทาง|ยังไม่โทร) \d/.test(n));
-    expect(names()).toEqual(['ทั้งหมด 205 รายชื่อ', 'AI โทร 205', 'คนโทร 0', 'ยังไม่โทร 0']);
+    // ติดตามนับแบบแผน (4 ต.ค. 2569): AI + คน = ทั้งหมด ⇒ ไม่มีกล่องยังไม่โทร
+    expect(names()).toEqual(['ทั้งหมด 205 รายชื่อ', 'AI โทร 205', 'คนโทร 0']);
     expect((tileOf('AI โทร') as HTMLButtonElement).disabled).toBe(false);
     expect((tileOf('คนโทร') as HTMLButtonElement).disabled).toBe(true);
     // จับคู่งานมีทั้งสองทาง — อยู่ก่อนยังไม่โทร
@@ -405,10 +416,10 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     expect(screen.queryByText('AI 100%')).toBeNull();
     expect(screen.queryByText('ของสายที่โทรแล้ว')).toBeNull();
-    // ติดตาม 205 สาย AI โทรทั้งหมด ⇒ แถบ AI 100% · คน/ยังไม่โทร 0%
+    // ติดตาม 205 สาย AI โทรทั้งหมด ⇒ แถบ AI 100% · คน 0% · ไม่มีกล่องยังไม่โทร (นับแบบแผน)
     expect(stat('AI โทร')).toContain('100%');
     expect(stat('คนโทร')).toContain('0%');
-    expect(stat('ยังไม่โทร')).toContain('0%');
+    expect(screen.queryByRole('button', { name: /^ยังไม่โทร \d/ })).toBeNull();
     // ไม่มีช่วงก่อน ⇒ ไม่มีชิปเทียบ
     expect(stat('AI โทร')).not.toContain('ใหม่');
   });
@@ -487,4 +498,16 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   });
 
 
+
+  it('🔴 หัวข้อติดตาม: กล่องแยกทีม ติดตามคนเริ่มงาน / ติดตามส่งคนแทน บวกกัน = ทั้งหมด (4 ต.ค. 2569)', async () => {
+    fetchHomeAiShare.mockResolvedValue(
+      body({ follow: { total: 58, ai: 31, staff: 27, both: 0, notCalled: 0, waitingAi: 0, waitingStaff: 0, teamReplacement: 27 } as never }),
+    );
+    render(<HomeAiSharePage />);
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('58 รายชื่อ'));
+    expect(stat('AI โทร')).toContain('31');
+    expect(stat('คนโทร')).toContain('27');
+    expect(stat('ติดตามคนเริ่มงาน')).toContain('31');
+    expect(stat('ติดตามส่งคนแทน')).toContain('27');
+  });
 });

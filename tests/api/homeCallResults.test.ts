@@ -44,8 +44,11 @@ const cteLines = (sql: string) =>
     .filter(Boolean);
 
 describe('SQL โหมดผลโทร — ขอบเขตเดียวกับกล่องตัวเลข', () => {
+  /**
+   * ⚠️ หัวข้อติดตามไม่อยู่ในคู่นี้แล้ว (4 ต.ค. 2569) — กล่องตัวเลขของติดตามนับแบบ **แผน** (ตั้งให้ใครโทร · รวมยกเลิก ·
+   * ปลายช่วงเต็ม) ตามคำสั่งเจ้าของ ส่วนแผงผลโทรยังนับ "ใครโทรไปแล้ว" ⇒ CTE สองโหมดต่างกันโดยตั้งใจ (ดูเทสต์ถัดไป)
+   */
   const pairs = () => [
-    [buildFollowAiShareSql(true, 'follow'), buildFollowAiShareSql(true, 'follow', 'results')],
     [buildFollowAiShareSql(false, 'aftercare'), buildFollowAiShareSql(false, 'aftercare', 'results')],
     [buildApplicantAiShareSql(), buildApplicantAiShareSql('results')],
     [buildMatchingAiShareSql(), buildMatchingAiShareSql('results')],
@@ -59,6 +62,14 @@ describe('SQL โหมดผลโทร — ขอบเขตเดียว�
       // โหมดนับไม่แตะ
       expect(count).not.toContain('ai_outcome');
     }
+  });
+
+  it('ติดตาม: แผงผลโทรยังนับแบบเดิม (ไม่นับยกเลิก · ใครโทรไปแล้ว) แม้กล่องตัวเลขนับแบบแผน', () => {
+    const results = buildFollowAiShareSql(true, 'follow', 'results');
+    expect(results).toContain('f.cancelled_at is null');
+    expect(results).not.toContain("(f.call_mode is distinct from 'manual') as ai");
+    const count = buildFollowAiShareSql(true, 'follow');
+    expect(count).toContain("(f.call_mode is distinct from 'manual') as ai");
   });
 
   it('ติดตาม: ผล AI = คิวของรอบนั้น (ไม่นับยกเลิก) · ผลคน = ช่องลงผล 130 (ยังไม่รัน 130 = ไม่อ้างคอลัมน์ใหม่)', () => {

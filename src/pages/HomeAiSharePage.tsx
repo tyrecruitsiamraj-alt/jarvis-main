@@ -245,8 +245,8 @@ const HomeAiSharePage: React.FC = () => {
         ])
       : null;
   })();
-  const flag =
-    meta.key === 'follow' ? (counts ? staffFlag : null) : meta.key === 'aftercare' ? (counts && counts.total > 0 ? staffFlag : null) : null;
+  // หัวข้อติดตามนับแบบแผน (ตั้งให้ใครโทร) ไม่พึ่งช่องผลของคนโทร ⇒ ไม่มีธง "ยังนับคนโทรไม่ได้"
+  const flag = meta.key === 'aftercare' ? (counts && counts.total > 0 ? staffFlag : null) : null;
 
   /**
    * แยกทีมของหัวข้อติดตาม (เจ้าของสั่ง 4 ต.ค. 2569) — ทั้งหมดของ "ติดตาม" รวมสองทีมอยู่แล้ว
@@ -338,9 +338,11 @@ const HomeAiSharePage: React.FC = () => {
         previousRange={prev ? rangeText(prev.from, prev.to) : null}
         onPick={openList}
         teams={teamsOfFollow}
+        hideNotCalled={meta.key === 'follow'}
       >
         <AiShareDetail
           withTeams={meta.key === 'follow'}
+          hideNotCalled={meta.key === 'follow'}
           unit={meta.unit}
           title={meta.title}
           win={win}

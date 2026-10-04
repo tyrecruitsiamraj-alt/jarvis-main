@@ -69,7 +69,9 @@ const AiShareDetail: React.FC<{
    * true = มีสวิตช์ "แยกทีม" ข้างสวิตช์แยก BU
    */
   withTeams?: boolean;
-}> = ({ title, unit, win, withBoth, data, loading, error, withTeams = false }) => {
+  /** ไม่มีชั้น "ยังไม่โทร" ในแท่ง (หัวข้อติดตามแบบแผน) */
+  hideNotCalled?: boolean;
+}> = ({ title, unit, win, withBoth, data, loading, error, withTeams = false, hideNotCalled = false }) => {
   /** สวิตช์ "แยก BU" — ปิดเป็นค่าตั้งต้น (ชั้นในแท่ง = AI/คน/ยังไม่โทร) */
   const [byBu, setByBu] = useState(false);
   /** สวิตช์ "แยกทีม" — เปิดได้ทีละตัวกับแยก BU (แท่งแยกได้ทีละมิติ) */
@@ -96,7 +98,9 @@ const AiShareDetail: React.FC<{
     const inView = drill.length > 0 && shownWin.from && shownWin.to ? rowsInRange(rows, shownWin.from, shownWin.to) : rows;
     const segments = detailSegments(inView, buckets);
     // ทั้งสองทาง: ติดตาม/ดูแลหลังเริ่มงานไม่มี แต่ถ้ามีเลขจริงขึ้นมาต้องโชว์เสมอ
-    const segmentStacks: UsageStack[] = AI_SHARE_SEGMENTS.filter((k) => k !== 'both' || withBoth || segments.both.some((v) => v > 0)).map(
+    const segmentStacks: UsageStack[] = AI_SHARE_SEGMENTS.filter(
+      (k) => (k !== 'both' || withBoth || segments.both.some((v) => v > 0)) && (k !== 'notCalled' || !hideNotCalled),
+    ).map(
       (k) => ({
         key: k,
         label: AI_SHARE_SEGMENT_LABEL[k],
@@ -120,7 +124,7 @@ const AiShareDetail: React.FC<{
     const last = buckets[buckets.length - 1];
     const range = first && last ? rangeTextFull(first.from, last.to) : null;
     return { buckets, grain, segmentStacks, buStacks, teamStacks, range };
-  }, [rows, shownWin, drill.length, today, withBoth, lockedBu]);
+  }, [rows, shownWin, drill.length, today, withBoth, lockedBu, hideNotCalled]);
   const teamOn = withTeams && byTeam;
   const failed = error ?? data?.error ?? null;
   const per = view ? AI_SHARE_GRAIN_LABEL[view.grain] : 'วัน';

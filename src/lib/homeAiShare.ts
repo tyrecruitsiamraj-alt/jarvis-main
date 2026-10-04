@@ -94,6 +94,29 @@ function alignedSpan(from: string, to: string): { unit: 'month' | 'year'; count:
 }
 
 /**
+ * ช่วงของหัวข้อ "ติดตาม" แบบแผน (เจ้าของสั่ง 4 ต.ค. 2569 "แยกดูรายวัน สัปดาห์ เดือน ก็ต้องได้ผลรวมตามช่วงนั้น")
+ * ปลายช่วง = ปลายช่วงที่เลือกจริง **ไม่ตัดที่ตอนนี้** (สายที่ตั้งไว้แต่ยังไม่ถึงเวลานับด้วย เหมือนหน้าติดตาม)
+ * "ทั้งหมด" (ไม่มีปลายช่วง) = `end: null` (ทุกสายที่เคยตั้ง)
+ */
+export function followPlanBounds(win: AiShareWindow): { start: Date | null; end: Date | null } {
+  const start = win.from ? new Date(`${win.from}T00:00:00+07:00`) : null;
+  const end = win.to ? new Date(`${addDays(win.to, 1)}T00:00:00+07:00`) : null;
+  return { start, end };
+}
+
+/** ช่วงก่อนหน้าของหัวข้อติดตามแบบแผน — ยาวเท่าช่วงที่เลือกเต็มช่วง (ไม่ตัดที่ตอนนี้) */
+export function followPlanPreviousBounds(
+  win: AiShareWindow,
+  now: Date,
+): { start: Date; end: Date } | null {
+  const prev = previousBounds(win, now);
+  const cur = followPlanBounds(win);
+  if (!prev || !cur.start || !cur.end) return null;
+  const len = cur.end.getTime() - cur.start.getTime();
+  return { start: prev.start, end: new Date(Math.min(prev.start.getTime() + len, cur.start.getTime())) };
+}
+
+/**
  * ═══ ช่วงก่อนหน้า (เทียบกับช่วงก่อน · รอบ 4) ═══
  * ยาวเท่ากัน **ณ จุดเดียวกันของช่วง** — สัปดาห์นี้ถึงวันพุธเที่ยง เทียบสัปดาห์ก่อนถึงวันพุธเที่ยง (ไม่เอาทั้งสัปดาห์ก่อนมาเทียบ
  * กับของที่ยังไม่จบ) · ทั้งเดือน = เดือนก่อนตั้งแต่วันที่ 1 เท่าจำนวนเวลาที่ผ่านไป · ทั้งปี (รอบ 17) = ปีก่อนตั้งแต่ 1 ม.ค.

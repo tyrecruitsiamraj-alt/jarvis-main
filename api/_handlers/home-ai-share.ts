@@ -46,6 +46,8 @@ import {
 import {
   AI_SHARE_LIST_PAGE,
   aiShareBounds,
+  followPlanBounds,
+  followPlanPreviousBounds,
   isAiShareBlock,
   isAiShareListKey,
   isAiShareSegment,
@@ -75,7 +77,14 @@ function isUndefinedColumn(e: unknown): boolean {
 }
 
 /** `$1` จุดเริ่ม (null = ทั้งหมด) · `$2` จุดจบ (ไม่รวม) · `$3` BU */
-type Params = [string | null, string, string | null];
+/** `$2` เป็น null ได้เฉพาะหัวข้อติดตามแบบแผนช่วง "ทั้งหมด" (ไม่มีปลายช่วง) — หัวข้ออื่นมีปลายเสมอ */
+type Params = [string | null, string | null, string | null];
+
+/** พารามิเตอร์ของหัวข้อติดตามแบบแผน — ปลายช่วงเต็ม ไม่ตัดที่ตอนนี้ (`followPlanBounds`) */
+function followPlanParams(win: AiShareWindow, bu: string | null): Params {
+  const { start, end } = followPlanBounds(win);
+  return [start ? start.toISOString() : null, end ? end.toISOString() : null, bu];
+}
 
 type CountRow = Record<string, number | string | null>;
 const num = (v: unknown) => Number(v ?? 0) || 0;
@@ -250,17 +259,23 @@ export async function buildHomeAiShare(
   }
 
   const params: Params = [start ? start.toISOString() : null, end.toISOString(), bu];
+  // หัวข้อติดตามนับแบบแผน — ปลายช่วงเต็ม ไม่ตัดที่ตอนนี้ (เจ้าของสั่ง 4 ต.ค. 2569 · ตัวเดียวกับหน้าติดตาม)
+  const followParams = followPlanParams(win, bu);
   // ช่วงก่อนหน้า (เทียบกับช่วงก่อน) — ยิงพร้อมกัน · ล้มก้อนไหนก้อนนั้นแค่ไม่มีการเทียบ
   const prev = previousBounds(win, now);
   const prevParams: Params | null = prev ? [prev.start.toISOString(), prev.end.toISOString(), bu] : null;
+  const followPrev = followPlanPreviousBounds(win, now);
+  const followPrevParams: Params | null = followPrev
+    ? [followPrev.start.toISOString(), followPrev.end.toISOString(), bu]
+    : prevParams;
   const [followR, aftercareR, appsR, matchR, prevR] = await Promise.allSettled([
-    loadFollowAiShare(params, 'follow'),
+    loadFollowAiShare(followParams, 'follow'),
     loadFollowAiShare(params, 'aftercare'),
     loadApplicantAiShare(params),
     loadMatchingAiShare(params),
     prevParams
       ? Promise.allSettled([
-          loadFollowAiShare(prevParams, 'follow'),
+          loadFollowAiShare(followPrevParams ?? prevParams, 'follow'),
           loadFollowAiShare(prevParams, 'aftercare'),
           loadApplicantAiShare(prevParams),
           loadMatchingAiShare(prevParams),
@@ -321,7 +336,10 @@ export async function buildAiShareDetail(
     return body;
   }
   try {
-    const r = await loadAiShareDetail([start ? start.toISOString() : null, end.toISOString(), bu], block);
+    const r = await loadAiShareDetail(
+      block === 'follow' ? followPlanParams(win, bu) : [start ? start.toISOString() : null, end.toISOString(), bu],
+      block,
+    );
     body.rows = r.rows;
     body.follow_staff_ready = r.staffReady;
   } catch (e) {
@@ -396,11 +414,15 @@ export async function buildAiShareList(
     return body;
   }
   try {
-    const r = await loadAiShareList([start ? start.toISOString() : null, end.toISOString(), bu], block, {
-      key,
-      limit: AI_SHARE_LIST_PAGE,
-      offset: page * AI_SHARE_LIST_PAGE,
-    });
+    const r = await loadAiShareList(
+      block === 'follow' ? followPlanParams(win, bu) : [start ? start.toISOString() : null, end.toISOString(), bu],
+      block,
+      {
+        key,
+        limit: AI_SHARE_LIST_PAGE,
+        offset: page * AI_SHARE_LIST_PAGE,
+      },
+    );
     body.rows = r.rows;
     body.total = r.total;
     body.follow_staff_ready = r.staffReady;

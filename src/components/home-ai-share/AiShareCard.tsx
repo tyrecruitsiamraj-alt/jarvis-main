@@ -80,6 +80,8 @@ export type AiShareCardProps = {
    * แยกแล้วอย่างละเท่าไหร่"*) — กล่องเล็กใต้แถวหลัก บวกกัน = ทั้งหมด · ไม่ส่ง = ไม่มีแถวนี้
    */
   teams?: ReadonlyArray<{ key: string; label: string; value: number; fillClass: string }> | null;
+  /** ไม่มีกล่อง "ยังไม่โทร" — หัวข้อติดตามนับแบบแผน AI + คน = ทั้งหมด (4 ต.ค. 2569) */
+  hideNotCalled?: boolean;
   /** กราฟยอดใช้งานของหัวข้อนี้ (หน้าเรียกเป็นคนโหลด) */
   children?: React.ReactNode;
   className?: string;
@@ -183,11 +185,12 @@ const AiShareCard: React.FC<AiShareCardProps> = ({
   previousRange = null,
   onPick,
   teams = null,
+  hideNotCalled = false,
   children,
   className,
 }) => {
   const showBoth = withBoth || (counts?.both ?? 0) > 0;
-  const segments = AI_SHARE_SEGMENTS.filter((k) => k !== 'both' || showBoth);
+  const segments = AI_SHARE_SEGMENTS.filter((k) => (k !== 'both' || showBoth) && (k !== 'notCalled' || !hideNotCalled));
   const total = counts?.total ?? 0;
   const helpOf = (k: AiShareSegment) => {
     const key = metrics[k];

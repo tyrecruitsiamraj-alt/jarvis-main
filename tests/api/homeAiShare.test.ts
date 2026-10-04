@@ -55,6 +55,7 @@ import {
   detailBuckets,
   detailSegments,
   detailTeamSeries,
+  followPlanBounds,
   drillWindow,
   isAiShareListKey,
   isBalanced,
@@ -188,12 +189,30 @@ describe('ติดตาม / ดูแลหลังเริ่มงาน:
     expect(buildFollowAiShareSql(true, 'aftercare')).toContain('f.topic = $4::text');
   });
 
-  it('ไม่นับที่ยกเลิก · นับรอบที่ถึงวันแล้ว · อ่านผลด้วย coalesce (ห้าม result is null)', () => {
+  /**
+   * 🔴 หัวข้อติดตามนับแบบแผน (เจ้าของสั่ง 4 ต.ค. 2569: *"ทั้งหมดเท่าไหร่ AI โทรทั้ง 2 รายการรวมเท่าไหร่ … รายชื่อติดตาม 31
+   * ก็ต้องได้ 31 · แยกดูรายวัน สัปดาห์ เดือน ก็ต้องได้ผลรวมตามช่วงนั้น"*) — ตัวเดียวกับหน้าติดตาม
+   */
+  it('ติดตาม: AI/คน = ตั้งให้ใครโทร · รวมยกเลิก (เหมือนเลขทั้งหมดของหน้าติดตาม) · ปลายช่วงเป็น null ได้', () => {
     const sql = buildFollowAiShareSql(true, 'follow');
+    expect(sql).toContain("(f.call_mode is distinct from 'manual') as ai");
+    expect(sql).toContain("(f.call_mode = 'manual') as staff");
+    expect(sql).not.toContain('f.cancelled_at is null');
+    expect(sql).toContain('($2::timestamptz is null or f.scheduled_at < $2::timestamptz)');
+  });
+
+  it('ดูแลหลังเริ่มงานยังนับแบบเดิม: ไม่นับที่ยกเลิก · ใครโทรไปแล้ว · อ่านผลด้วย coalesce (ห้าม result is null)', () => {
+    const sql = buildFollowAiShareSql(true, 'aftercare');
     expect(sql).toContain('f.cancelled_at is null');
-    expect(sql).toContain('f.scheduled_at < $2::timestamptz');
     expect(sql).toContain("coalesce(q.last_outcome, q.result->>'outcome')");
     expect(sql).not.toMatch(/result\s+is\s+null/);
+  });
+
+  it('ช่วงแบบแผนของติดตาม: ปลายช่วงเต็ม ไม่ตัดที่ตอนนี้ · "ทั้งหมด" ไม่มีปลาย', () => {
+    const b = followPlanBounds({ from: '2026-10-04', to: '2026-10-04' } as Parameters<typeof followPlanBounds>[0]);
+    expect(b.start?.toISOString()).toBe('2026-10-03T17:00:00.000Z');
+    expect(b.end?.toISOString()).toBe('2026-10-04T17:00:00.000Z');
+    expect(followPlanBounds({ from: null, to: null } as Parameters<typeof followPlanBounds>[0])).toEqual({ start: null, end: null });
   });
 
   it('ฐานมีช่องลงผลแล้ว = นับคนโทรจากเวลาที่ลงผล · ยังไม่รัน 130 = ไม่อ้างคอลัมน์ใหม่เลย', () => {
