@@ -21,10 +21,16 @@
  * แต่หน่วยงานมีให้ ซึ่งเจ้าหน้าที่รู้เองแล้วติ๊กเพิ่มบนประกาศ
  */
 
-export type ExtraBenefit = { key: string; label: string };
+/**
+ * `count` = รายการที่บอกจำนวนได้ (เจ้าของ 4 ต.ค. 2569: *"เลือกชุดฟอร์มก็บอกว่ากี่ชุด หรือไม่ระบุจำนวนชุด"*)
+ * บรรทัดที่บันทึก = "ชุดฟอร์ม 2 ชุด" · ไม่ระบุจำนวน = "ชุดฟอร์ม"
+ */
+import { isLegacyDailyPayLine } from '@/lib/payCycle';
+
+export type ExtraBenefit = { key: string; label: string; count?: { unit: string } };
 
 export const EXTRA_BENEFITS: readonly ExtraBenefit[] = [
-  { key: 'uniform', label: 'ชุดฟอร์ม' },
+  { key: 'uniform', label: 'ชุดฟอร์ม', count: { unit: 'ชุด' } },
   { key: 'dorm', label: 'ที่พัก/หอพัก' },
   { key: 'shuttle', label: 'รถรับส่ง' },
   { key: 'meal', label: 'อาหารกลางวัน' },
@@ -35,10 +41,15 @@ export const EXTRA_BENEFITS: readonly ExtraBenefit[] = [
   { key: 'salary_raise', label: 'ปรับเงินเดือนประจำปี' },
   { key: 'training', label: 'มีอบรม/สอนงาน' },
   { key: 'no_experience', label: 'ไม่ต้องมีประสบการณ์' },
-  { key: 'daily_pay', label: 'จ่ายรายวัน' },
 ];
 
-const BY_KEY = new Map(EXTRA_BENEFITS.map((b) => [b.key, b]));
+/**
+ * "จ่ายรายวัน" ไม่ใช่สวัสดิการแล้ว (เจ้าของ 4 ต.ค. 2569) — ย้ายไปเป็นรอบรับเงิน (`payCycle.ts`)
+ * คีย์เก่ายังอ่านได้ (ใบที่ติ๊กไว้ห้ามพัง) แต่ไม่อยู่ในรายการให้ติ๊ก และไม่โชว์เป็นสวัสดิการ
+ */
+const LEGACY_BENEFITS: readonly ExtraBenefit[] = [{ key: 'daily_pay', label: 'จ่ายรายวัน' }];
+
+const BY_KEY = new Map([...EXTRA_BENEFITS, ...LEGACY_BENEFITS].map((b) => [b.key, b]));
 
 export function isExtraBenefitKey(v: unknown): v is string {
   return typeof v === 'string' && BY_KEY.has(v);
@@ -68,6 +79,8 @@ export function benefitDisplayLabels(values: readonly string[] | null | undefine
   const out: string[] = [];
   for (const v of values) {
     if (typeof v !== 'string' || !v.trim()) continue;
+    // จ่ายรายวันยุคเก่า = รอบรับเงิน ไม่ใช่สวัสดิการ (โชว์ผ่าน `payCyclesOf` แทน)
+    if (isLegacyDailyPayLine(v)) continue;
     const hit = BY_KEY.get(v);
     out.push(hit ? hit.label : v.trim());
   }

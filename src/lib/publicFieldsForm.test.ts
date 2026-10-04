@@ -98,6 +98,7 @@ describe('formDiffersFromJob — ด่านเดียวที่ตัด�
       incomeRows: [],
       incomeTotal: '',
       benefitText: '',
+      payCycles: [],
       visibility: { income: true, benefits: true, ot: true, boss_nationality: true, required_date: true },
     };
     expect(formDiffersFromJob(blank)).toBe(true);
@@ -221,10 +222,10 @@ describe('ขั้น 3 สวัสดิการ — ติ๊กจาก�
     expect(formDiffersFromJob({ ...st, benefitText: benefitTextFromEntries(benefitEntriesFromText(st.benefitText)) })).toBe(false);
   });
 
-  it('ใส่รายละเอียด = ชื่อรายการ + เว้นวรรค + รายละเอียด · ทั้งบรรทัดไม่เกิน 30 ตัวอักษร', () => {
+  it('ใส่รายละเอียด = ชื่อรายการ + เว้นวรรค + รายละเอียด · ทั้งบรรทัดไม่เกิน BENEFIT_LABEL_MAX (60 ตั้งแต่ 4 ต.ค. 2569)', () => {
     expect(benefitLineOf({ kind: 'preset', key: 'shuttle', detail: 'จาก BTS หมอชิต' })).toBe('รถรับส่ง จาก BTS หมอชิต');
     expect(benefitLineOf({ kind: 'preset', key: 'shuttle', detail: '   ' })).toBe('รถรับส่ง');
-    expect(benefitDetailMax('shuttle')).toBe(30 - 'รถรับส่ง'.length - 1);
+    expect(benefitDetailMax('shuttle')).toBe(60 - 'รถรับส่ง'.length - 1);
     expect(benefitEntriesFromText('ปรับเงินเดือนประจำปี 3%')).toEqual([{ kind: 'preset', key: 'salary_raise', detail: '3%' }]);
   });
 });

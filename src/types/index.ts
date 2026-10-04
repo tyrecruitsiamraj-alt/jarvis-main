@@ -381,6 +381,8 @@ export interface JobRequest {
    * แนบมาจากฝั่ง API (`attachNotes`) ทุกเส้นที่ส่งใบขอออกมา
    */
   lead_rules?: RequestLeadRulesOverride | null;
+  /** รอบรับเงิน — หน้าสาธารณะได้ค่าที่คิดแล้วจาก API · ฝั่งเจ้าหน้าที่อ่านผ่าน `payCyclesOf(job)` (4 ต.ค. 2569) */
+  pay_cycles?: string[];
   /** override ฟิลด์ใบขอที่ผู้ใช้แก้เอง (อายุ/เพศ/สาขา) */
   field_overrides?: {
     age_min?: number | null;
@@ -404,6 +406,8 @@ export interface JobRequest {
     total_income?: number | null;
     /** สวัสดิการ (20 ส.ค. 2569 เป็น freetext · ค่าเก่าเป็นคีย์ยังอ่านได้) */
     benefits?: string[] | null;
+    /** รอบรับเงิน (4 ต.ค. 2569) — 'monthly' | 'weekly' | 'daily' · กติกาอยู่ `src/lib/payCycle.ts` */
+    pay_cycles?: string[] | null;
     /** รายได้แบบแยกส่วนที่ตั้งเอง — โครงอยู่ที่ `src/lib/incomeBreakdown.ts` */
     income?: {
       period: 'daily' | 'monthly';

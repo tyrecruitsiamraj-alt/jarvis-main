@@ -14,6 +14,7 @@ import {
   readPublicVisibility,
   type PublicToggleField,
 } from '@/lib/publicFieldVisibility';
+import { cleanPayCycles, payCyclesOf, type PayCycle } from '@/lib/payCycle';
 
 /** state ที่ประกอบเป็น patch — แชร์ระหว่างปุ่มบันทึกกับ auto-save (22 ก.ย. 2569) */
 export type OverridesFormState = {
@@ -25,6 +26,8 @@ export type OverridesFormState = {
   incomeRows: { label: string; amount: string }[];
   incomeTotal: string;
   benefitText: string;
+  /** รอบรับเงิน (4 ต.ค. 2569 — ย้ายออกจากสวัสดิการ) */
+  payCycles: PayCycle[];
   visibility: Record<PublicToggleField, boolean>;
 };
 
@@ -53,6 +56,7 @@ export function buildOverridesPatch(st: OverridesFormState): NonNullable<JobRequ
         ? null
         : Math.max(0, Math.trunc(Number(st.incomeTotal) || 0)),
     benefits: benefitLines.length > 0 ? benefitLines : null,
+    pay_cycles: cleanPayCycles(st.payCycles).length > 0 ? cleanPayCycles(st.payCycles) : null,
     income: hasBreakdown ? { period: st.incomePeriod, lines: parsedLines, total: totalNum } : null,
     public_visibility: Object.keys(visPatch).length > 0 ? visPatch : null,
   } as NonNullable<JobRequest['field_overrides']>;
@@ -85,7 +89,10 @@ export function formStateFromJob(job: JobRequest): Omit<OverridesFormState, 'job
         ? String(savedTotal)
         : '',
     // ค่าเก่าที่ติ๊กเป็นคีย์ → แปลงเป็นคำอ่านให้แก้ต่อได้ (ห้ามหายเงียบ)
+    // "จ่ายรายวัน" ยุคเก่าถูกตัดออกจากสวัสดิการ (benefitDisplayLabels) แล้วมาเป็นรอบรับเงินแทน — ทั้งสองฝั่งของตัวเทียบ
+    // คิดแบบเดียวกัน ⇒ เปิดดูเฉย ๆ ไม่บันทึก · ย้ายจริงตอนมีคนแก้หน้า 3
     benefitText: benefitDisplayLabels(job.extra_benefits).join('\n'),
+    payCycles: payCyclesOf(job),
     visibility: readPublicVisibility(job.field_overrides?.public_visibility),
   };
 }
@@ -305,6 +312,7 @@ export function formStateForSections(
     incomeRows: own.income ? values.incomeRows : saved.incomeRows,
     incomeTotal: own.income ? values.incomeTotal : saved.incomeTotal,
     benefitText: own.benefits ? values.benefitText : saved.benefitText,
+    payCycles: own.benefits ? values.payCycles : saved.payCycles,
     // ช่อง "ให้ผู้สมัครเห็นอะไรบ้าง" อยู่คู่ขั้น 3 — เว้นแต่ผู้เรียกบอกเองว่าถือ/ไม่ถือช่องนี้ (ป๊อปหน้าเดียว)
     visibility: (own.visibility ?? (own.income || own.benefits)) ? values.visibility : saved.visibility,
   };

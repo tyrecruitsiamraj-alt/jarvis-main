@@ -606,7 +606,8 @@ export async function createRecruitPosting(input: CreatePostingInput): Promise<R
   }
   const posting = rows[0];
 
-  const channels = (input.channels ?? []).slice(0, 20);
+  // ต่อการสร้างหนึ่งครั้ง (เจ้าของ 4 ต.ค. 2569: งานหนึ่งกี่ลิงก์ก็ได้) — ตรงกับ MAX_CHANNELS ฝั่งจอ
+  const channels = (input.channels ?? []).slice(0, 200);
   // ไม่เลือกช่องทางเลย = ยังได้ 1 ลิงก์กลาง (ไม่ระบุช่องทาง) จะได้ส่งออกได้ทันที
   const wanted = channels.length > 0 ? channels : [{ channelId: null, label: null, note: null }];
   const links: RecruitPostingLink[] = [];

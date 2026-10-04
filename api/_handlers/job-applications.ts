@@ -239,13 +239,20 @@ function toApplication(r: Row, viewerId?: string) {
  * ไม่ใช่แค่คอลัมน์นั้นหาย · เจอจริง 16 ส.ค. 2569: claim / lead / แก้เบอร์ / เปลี่ยนสถานะ
  * พังพร้อมกันหมดหลังเพิ่มคอลัมน์ origin (มีเทสต์ guard คุมแล้ว)
  */
+/**
+ * ช่องทางของใบสมัคร — เจ้าหน้าที่คีย์เอง = `channel_label` ของใบ · สมัครผ่านลิงก์ = ช่องทางของลิงก์ที่กด
+ * (เจ้าของ 4 ต.ค. 2569: *"รายชื่อต้องบอกช่องทางด้วย ที่เขาเจนไปมาจากนี้ๆ"*) — เดิมใบที่มาทางลิงก์ไม่มีช่องทางเลย
+ * ⚠️ อ้าง `a.link_id` — คอลัมน์นี้ใส่ตอนสมัครผ่าน /apply มาตั้งแต่ก่อน 074 จึงมีทุกฐาน
+ */
+const CHANNEL_LABEL_SQL = `coalesce(nullif(a.channel_label, ''), (select l.channel_label from ${tableInAppSchema('recruit_posting_links')} l where l.id = a.link_id)) as channel_label`;
+
 const LIST_COLUMNS = `
   id, full_name, title_prefix, first_name, last_name, phone, age, gender,
   province, district, subdistrict, postal_code,
   weight_kg, height_cm, education, referral_source,
   document_filename, document_mime, (document_bytes is not null) as has_document,
   job_id, job_title, unit_name, position_interest, note, status, admin_note,
-  line_id, specific_type, responsible_name, channel_label, license_types, created_by_name,
+  line_id, specific_type, responsible_name, ${CHANNEL_LABEL_SQL}, license_types, created_by_name,
   created_at,
   claimed_by, claimed_by_name, claimed_at,
   is_lead, lead_by_name, lead_at,
@@ -267,7 +274,7 @@ const LIST_COLUMNS_NO_CHOICE = `
   weight_kg, height_cm, education, referral_source,
   document_filename, document_mime, (document_bytes is not null) as has_document,
   job_id, job_title, unit_name, position_interest, note, status, admin_note,
-  line_id, specific_type, responsible_name, channel_label, license_types, created_by_name,
+  line_id, specific_type, responsible_name, ${CHANNEL_LABEL_SQL}, license_types, created_by_name,
   created_at,
   claimed_by, claimed_by_name, claimed_at,
   is_lead, lead_by_name, lead_at,

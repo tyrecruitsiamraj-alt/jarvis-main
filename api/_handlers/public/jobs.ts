@@ -1,5 +1,6 @@
 import { buildIncomeDisplay, type IncomeDisplay } from '../../../src/lib/incomeBreakdown.js';
 import { publicSafeAddress } from '../../../src/lib/publicJobPrivacy.js';
+import { payCyclesOf } from '../../../src/lib/payCycle.js';
 import {
   isSiamrajUnitRequestsEnabled,
   listSiamrajUnitRequests,
@@ -108,6 +109,11 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
     override_subdistrict: (r as Record<string, unknown>).override_subdistrict as string | undefined,
     /** สวัสดิการที่ติ๊กเพิ่มเอง (คีย์) — คนละชุดกับ `benefits` ที่มาจากอัตราจริงใน ERP */
     extra_benefits: (r as Record<string, unknown>).extra_benefits as string[] | undefined,
+    /** รอบรับเงิน (4 ต.ค. 2569 — ย้ายออกจากสวัสดิการ) · ใบเก่าที่ติ๊ก "จ่ายรายวัน" ไว้ = รายวัน */
+    pay_cycles: payCyclesOf({
+      field_overrides: (r as Record<string, unknown>).field_overrides as { pay_cycles?: unknown } | undefined,
+      extra_benefits: (r as Record<string, unknown>).extra_benefits as string[] | undefined,
+    }),
     /**
      * ⚠️ ฟิลด์ส่งต่อภายใน — `withBenefits()` ใช้แล้ว**ลบทิ้งก่อนตอบ**
      * ต้องพกมาทางนี้เพราะ `withBenefits` ทำงานบนก้อนที่ map แล้ว ซึ่งไม่มี

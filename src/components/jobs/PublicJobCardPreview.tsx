@@ -4,11 +4,13 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
-import { jobBoardCardSubtitle, jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import { jobBoardCardSubtitle, jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { publicSafeAddress } from '@/lib/publicJobPrivacy';
 import { publicFieldVisible } from '@/lib/publicFieldVisibility';
 import { publicIncomeOf } from '@/lib/publishReadiness';
 import { benefitDisplayLabels } from '@/lib/extraBenefits';
+import { payCycleText, payCyclesOf } from '@/lib/payCycle';
+import { publicJobTitle } from '@/lib/publicJobTitle';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 
 /**
@@ -25,12 +27,13 @@ export default function PublicJobCardPreview({ job, className }: { job: JobReque
   const benefits = publicFieldVisible(job, 'benefits')
     ? [...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)]
     : [];
+  const pay = publicFieldVisible(job, 'income') ? payCycleText(payCyclesOf(job)) : '';
   const subtitle = jobBoardCardSubtitle(job);
   return (
     <Card className={cn('space-y-3 rounded-2xl p-4', className)} data-testid="public-job-preview">
       <div className="space-y-1">
         <h3 className="line-clamp-2 text-base font-medium text-foreground">{jobBoardCardTitle(job)}</h3>
-        <p className="line-clamp-2 text-sm font-medium text-primary">{publicJobPositionLabel(job)}</p>
+        <p className="line-clamp-2 text-sm font-medium text-primary">{publicJobTitle(job)}</p>
         {subtitle ? <p className="line-clamp-2 text-xs text-muted-foreground">{subtitle}</p> : null}
       </div>
       <p className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -57,8 +60,9 @@ export default function PublicJobCardPreview({ job, className }: { job: JobReque
           </span>
         ) : null}
       </div>
-      {benefits.length > 0 ? (
+      {pay || benefits.length > 0 ? (
         <div className="flex flex-wrap items-center gap-1.5">
+          {pay ? <span className={cn('whitespace-nowrap', TONE.info.chip)}>{pay}</span> : null}
           {benefits.map((b) => (
             <span key={b} className={cn('whitespace-nowrap', TONE.success.chip)}>
               {b}

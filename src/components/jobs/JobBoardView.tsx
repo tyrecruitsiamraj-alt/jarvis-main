@@ -17,6 +17,7 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
 import { benefitDisplayLabels } from '@/lib/extraBenefits';
+import { payCycleText, payCyclesOf } from '@/lib/payCycle';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { resolveApplyPositionPreset } from '@/lib/jobBoardPositionPreset';
 import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
@@ -1810,17 +1811,24 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     ⚠️ ไม่มีข้อมูล = ไม่ขึ้นแถวนี้ (ห้ามขึ้นว่า "ไม่มีสวัสดิการ") */}
                 {/* ชิปสวัสดิการ = ของจาก ERP (อัตราจริง) + ของที่เจ้าหน้าที่ติ๊กเพิ่มเอง
                     เรียง ERP ก่อนเพราะมีตัวเลขจริงกำกับ น่าเชื่อกว่า */}
-                {(isStaff || publicFieldVisible(job, 'benefits')) &&
-                [...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)].length > 0 ? (
+                {(() => {
+                  /* รอบรับเงิน (4 ต.ค. 2569 — ไม่ใช่สวัสดิการ) ขึ้นหน้าแถวชิป ตามช่องรายได้ที่ติ๊กให้เห็น */
+                  const pay = isStaff || publicFieldVisible(job, 'income') ? payCycleText(payCyclesOf(job)) : '';
+                  const chips = isStaff || publicFieldVisible(job, 'benefits')
+                    ? [...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)]
+                    : [];
+                  return pay || chips.length > 0 ? (
                   // 🔴 มือถือ: พับเหลือแถวเดียวเลื่อนได้เหมือนแถวเงินเดือนด้านบน (เจ้าของเคาะ 5 ก.ย. 2569)
                   <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto sm:flex-wrap sm:overflow-visible">
-                    {[...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)].map((b) => (
+                    {pay ? <span className={cn('shrink-0 whitespace-nowrap', TONE.info.chip)}>{pay}</span> : null}
+                    {chips.map((b) => (
                       <span key={b} className={cn('shrink-0 whitespace-nowrap', TONE.success.chip)}>
                         {b}
                       </span>
                     ))}
                   </div>
-                ) : null}
+                  ) : null;
+                })()}
               </CardContent>
               <CardFooter className="mt-auto flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
                 {isStaff ? (

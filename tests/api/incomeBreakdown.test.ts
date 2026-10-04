@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  BENEFIT_LABEL_MAX,
   BENEFIT_LINE_MAX,
   INCOME_LINE_MAX,
   INCOME_OTHER_LABEL,
@@ -89,7 +90,7 @@ describe('normalizeIncomeLines / cleanIncomeBreakdown', () => {
 });
 
 describe('cleanBenefitLines (สวัสดิการ freetext จำกัดจำนวน)', () => {
-  it(`ตัดว่าง/ซ้ำ · จำกัด ${BENEFIT_LINE_MAX} รายการ · ป้ายยาวสุด 30 ตัวอักษร`, () => {
+  it(`ตัดว่าง/ซ้ำ · จำกัด ${BENEFIT_LINE_MAX} รายการ · ป้ายยาวสุด ${BENEFIT_LABEL_MAX} ตัวอักษร`, () => {
     const out = cleanBenefitLines([
       ' ชุดฟอร์ม ',
       'ชุดฟอร์ม',
@@ -104,7 +105,7 @@ describe('cleanBenefitLines (สวัสดิการ freetext จำกั�
     expect(out.length).toBeLessThanOrEqual(BENEFIT_LINE_MAX);
     expect(out[0]).toBe('ชุดฟอร์ม');
     expect(new Set(out).size).toBe(out.length);
-    for (const b of out) expect(b.length).toBeLessThanOrEqual(30);
+    for (const b of out) expect(b.length).toBeLessThanOrEqual(BENEFIT_LABEL_MAX);
   });
 
   it('ไม่ใช่ array = []', () => {

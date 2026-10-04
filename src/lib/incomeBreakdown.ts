@@ -54,8 +54,12 @@ export const INCOME_LABEL_MAX = 30;
 export const INCOME_OTHER_LABEL = 'อื่น ๆ (เช่น OT)';
 
 /** สวัสดิการแบบพิมพ์เอง — เจ้าของเคาะ "Freetext ล้วน จำกัดจำนวน" (20 ส.ค. 2569) */
-export const BENEFIT_LINE_MAX = 5;
-export const BENEFIT_LABEL_MAX = 30;
+/**
+ * สวัสดิการไม่ล็อก 5 แล้ว (เจ้าของ 4 ต.ค. 2569: *"ทำไมต้อง Lock ไว้ให้เลือกแค่ 5 ต้องเลือกได้เลย"*)
+ * เหลือเพดานกันข้อมูลบวม — ฝั่ง API (`cleanFieldOverrides`) ใช้ค่าเดียวกันนี้
+ */
+export const BENEFIT_LINE_MAX = 30;
+export const BENEFIT_LABEL_MAX = 60;
 
 export function isIncomePeriod(v: unknown): v is IncomePeriod {
   return v === 'daily' || v === 'monthly';

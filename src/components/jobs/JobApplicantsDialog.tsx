@@ -281,6 +281,13 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
           >
             {dashIfEmpty(applicantFactLine(a))}
           </p>
+          {/* มาจากช่องทางไหน = ลิงก์ที่เขากด (เจ้าของ 4 ต.ค. 2569: *"รายชื่อต้องบอกช่องทางด้วย ที่เขาเจนไปมาจากนี้ๆ"*)
+              ไม่รู้ช่องทาง = ไม่ขึ้นบรรทัดนี้ (ห้ามเดา) */}
+          {a.channel_label?.trim() ? (
+            <p className="mt-0.5 truncate text-xs leading-4 text-muted-foreground">
+              มาจาก <span className="text-foreground">{a.channel_label.trim()}</span>
+            </p>
+          ) : null}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <span

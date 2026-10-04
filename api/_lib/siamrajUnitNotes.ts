@@ -1,3 +1,5 @@
+import { BENEFIT_LABEL_MAX, BENEFIT_LINE_MAX } from '../../src/lib/incomeBreakdown.js';
+import { cleanPayCycles, type PayCycle } from '../../src/lib/payCycle.js';
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import {
@@ -46,6 +48,8 @@ export type UnitFieldOverrides = {
    * (ฝั่งแสดงแปลงคีย์เก่า → คำอ่านให้เอง)
    */
   benefits?: string[] | null;
+  /** รอบรับเงิน (4 ต.ค. 2569 — ย้ายออกจากสวัสดิการ) · กติกาอยู่ `src/lib/payCycle.ts` */
+  pay_cycles?: PayCycle[] | null;
   /**
    * รายได้แบบแยกส่วนที่เจ้าหน้าที่ตั้งเอง (20 ส.ค. 2569) — ทับ breakdown อัตโนมัติ
    * จาก ERP เฉพาะที่โชว์บนประกาศ · กติกา/เพดานอยู่ที่ `src/lib/incomeBreakdown.ts`
@@ -171,7 +175,8 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
     out.total_income = n === null ? null : Math.max(0, Math.trunc(n));
   }
 
-  // สวัสดิการ — freetext จำกัดจำนวน (เจ้าของเคาะ 20 ส.ค. 2569: 5 รายการ × 30 ตัวอักษร)
+  // สวัสดิการ — freetext จำกัดจำนวน · เพดานเดียวกับหน้าเว็บ (`BENEFIT_LINE_MAX` × `BENEFIT_LABEL_MAX`)
+  // 4 ต.ค. 2569 เจ้าของสั่งเลิกล็อก 5 รายการ (เดิม 5 × 30)
   if ('benefits' in o) {
     if (!Array.isArray(o.benefits)) {
       out.benefits = null;
@@ -180,14 +185,19 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
       const lines: string[] = [];
       for (const b of o.benefits) {
         if (typeof b !== 'string') continue;
-        const t = b.trim().slice(0, 30);
+        const t = b.trim().slice(0, BENEFIT_LABEL_MAX);
         if (!t || seen.has(t)) continue;
         seen.add(t);
         lines.push(t);
-        if (lines.length >= 5) break;
+        if (lines.length >= BENEFIT_LINE_MAX) break;
       }
       out.benefits = lines;
     }
+  }
+
+  if ('pay_cycles' in o) {
+    const cycles = cleanPayCycles(o.pay_cycles);
+    out.pay_cycles = cycles.length > 0 ? cycles : null;
   }
 
   // เกณฑ์ความเร่งเฉพาะใบ — กติกา/เพดานอยู่ที่ src/lib/requestLeadKind.ts ที่เดียว

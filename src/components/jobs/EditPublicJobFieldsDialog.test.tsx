@@ -24,6 +24,7 @@ vi.mock('@/lib/siamrajUnitRequestsApi', async (orig) => ({
 }));
 
 const { default: PublicJobFields } = await import('./EditPublicJobFieldsDialog');
+const { fetchSiamrajUnitRequest } = await import('@/lib/siamrajUnitRequestsApi');
 
 const job = (over: Partial<JobRequest> = {}) =>
   ({
@@ -113,6 +114,25 @@ describe('ขั้น 3 — รายได้เลือกได้ทาง
     });
   });
 
+  it('🔴 ชื่อซ้ำคนละยอด (เงินเดือน 12,000 / เงินเดือน 400) โชว์ครบ ติ๊ก 12,000 แล้วได้ 12,000 จริง (4 ต.ค. 2569)', async () => {
+    vi.mocked(fetchSiamrajUnitRequest).mockResolvedValueOnce({
+      rate_lines: [
+        { seq: 1, fee_name: 'เงินเดือน', is_wage: true, payment_rate: 12000 },
+        { seq: 2, fee_name: 'เงินเดือน', is_wage: false, payment_rate: 400 },
+      ],
+    } as unknown as JobRequest);
+    render(<PublicJobFields job={job()} sections={['income', 'benefits']} />);
+    await screen.findByText('12,000');
+    const rows = screen.getAllByRole('checkbox', { name: /^เงินเดือน/ });
+    expect(rows).toHaveLength(2);
+    fireEvent.click(rows[0]);
+    expect(rows[0].getAttribute('data-state')).toBe('checked');
+    expect(rows[1].getAttribute('data-state')).toBe('unchecked');
+    expect(screen.getByText('รวม 12,000')).toBeTruthy();
+    await flushAutosave();
+    expect(lastSaved()?.income).toMatchObject({ lines: [{ label: 'เงินเดือน', amount: 12000 }] });
+  });
+
   it('ใส่เอง = ยอดเดียว + ต่อวัน/ต่อเดือน (ติ๊กแล้วทางเดิมหลุดเอง)', async () => {
     render(<PublicJobFields job={job()} sections={['income', 'benefits']} />);
     fireEvent.click(screen.getByRole('checkbox', { name: 'ใส่เอง' }));
@@ -143,14 +163,40 @@ describe('ขั้น 3 — สวัสดิการติ๊กจากร
     expect(lastSaved()?.benefits).toEqual(['รถรับส่ง จาก BTS หมอชิต']);
   });
 
-  it('ครบ 5 รายการแล้ว อันที่เหลือติ๊กไม่ได้ · เพิ่มเองก็ไม่ได้', () => {
+  it('🔴 ไม่ล็อก 5 รายการแล้ว (4 ต.ค. 2569) — ติ๊กได้ทุกรายการ · เพิ่มเองได้ · ไม่มีตัวนับ N/5', () => {
     render(<PublicJobFields job={job()} sections={['income', 'benefits']} />);
-    for (const name of ['ชุดฟอร์ม', 'รถรับส่ง', 'ที่พัก/หอพัก', 'อาหารกลางวัน', 'ประกันสังคม']) {
+    for (const name of ['ชุดฟอร์ม', 'รถรับส่ง', 'ที่พัก/หอพัก', 'อาหารกลางวัน', 'ประกันสังคม', 'ประกันกลุ่ม']) {
       fireEvent.click(screen.getByRole('checkbox', { name }));
     }
-    expect(screen.getByText('5/5')).toBeTruthy();
-    expect(screen.getByRole('checkbox', { name: 'โบนัสประจำปี' }).hasAttribute('disabled')).toBe(true);
-    expect(screen.getByRole('button', { name: 'เพิ่มรายการเอง' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.queryByText('5/5')).toBeNull();
+    expect(screen.getByRole('checkbox', { name: 'โบนัสประจำปี' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByRole('button', { name: 'เพิ่มรายการเอง' }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('ชุดฟอร์มบอกจำนวนชุดได้ หรือไม่ระบุจำนวน · "จ่ายรายวัน" ไม่อยู่ในสวัสดิการ ย้ายไปช่องรับเงิน', async () => {
+    render(<PublicJobFields job={job()} sections={['income', 'benefits']} />);
+    expect(screen.queryByRole('checkbox', { name: 'จ่ายรายวัน' })).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ชุดฟอร์ม' }));
+    expect(screen.getByRole('checkbox', { name: 'ไม่ระบุจำนวนชุด' }).getAttribute('data-state')).toBe('checked');
+    fireEvent.change(screen.getByLabelText('จำนวนชุดฟอร์ม'), { target: { value: '3' } });
+    expect(screen.getByRole('checkbox', { name: 'ไม่ระบุจำนวนชุด' }).getAttribute('data-state')).toBe('unchecked');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'รายวัน' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'รายเดือน' }));
+    await flushAutosave();
+    expect(lastSaved()).toMatchObject({ benefits: ['ชุดฟอร์ม 3 ชุด'], pay_cycles: ['monthly', 'daily'] });
+  });
+
+  it('🔴 ใบเก่าที่ติ๊ก "จ่ายรายวัน" ไว้ในสวัสดิการ = เปิดมาเป็นรับเงินรายวัน และเปิดดูเฉย ๆ ไม่บันทึก', async () => {
+    render(
+      <PublicJobFields
+        job={job({ extra_benefits: ['จ่ายรายวัน', 'ชุดฟอร์ม'], field_overrides: { benefits: ['จ่ายรายวัน', 'ชุดฟอร์ม'] } as JobRequest['field_overrides'] })}
+        sections={['income', 'benefits']}
+      />,
+    );
+    expect(screen.getByRole('checkbox', { name: 'รายวัน' }).getAttribute('data-state')).toBe('checked');
+    expect(screen.getByRole('checkbox', { name: 'ชุดฟอร์ม' }).getAttribute('data-state')).toBe('checked');
+    await flushAutosave();
+    expect(saveUnitRequestMeta).not.toHaveBeenCalled();
   });
 
   it('🔴 ใบที่มีสวัสดิการพิมพ์เองไว้ เปิดดูแล้วไม่บันทึกทับ · บรรทัดที่พิมพ์เองยังอยู่ให้แก้', async () => {

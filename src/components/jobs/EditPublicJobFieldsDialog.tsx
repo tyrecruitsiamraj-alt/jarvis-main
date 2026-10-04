@@ -63,6 +63,7 @@ import {
   type OverridesFormState,
   type PlaceMode,
 } from '@/lib/publicFieldsForm';
+import { PAY_CYCLES, type PayCycle } from '@/lib/payCycle';
 import {
   PUBLIC_TOGGLE_FIELDS,
   PUBLIC_FIELD_LABEL,
@@ -214,6 +215,9 @@ const EditPublicJobFieldsDialog: React.FC<{
   const [rateChoices, setRateChoices] = useState<BenefitChoice[]>([]);
   const [ratesLoading, setRatesLoading] = useState(false);
 
+  /** รอบรับเงิน (4 ต.ค. 2569 — ไม่ใช่สวัสดิการ) */
+  const [payCycles, setPayCycles] = useState<PayCycle[]>(() => init?.payCycles ?? []);
+
   // ── ขั้น 3 สวัสดิการ (ลำดับตามที่บันทึกไว้เสมอ) ──
   const [benefits, setBenefits] = useState<BenefitEntry[]>(() => benefitEntriesFromText(init?.benefitText ?? ''));
   /** รายการทั่วไปที่กด "+ รายละเอียด" แล้ว (ช่องกางอยู่) */
@@ -293,14 +297,14 @@ const EditPublicJobFieldsDialog: React.FC<{
       autosaveTimer.current = null;
     }
     if (!job) return;
-    const st = formStateForSections(job, own, { ...place, incomePeriod, incomeRows, incomeTotal, benefitText, visibility });
+    const st = formStateForSections(job, own, { ...place, incomePeriod, incomeRows, incomeTotal, benefitText, payCycles, visibility });
     if (!formDiffersFromJob(st)) return;
     autosaveTimer.current = setTimeout(() => {
       autosaveTimer.current = null;
       void persistRef.current?.();
     }, 1500);
     // ทุก field ที่ประกอบเป็น patch + ใบขอ (ของที่บันทึกไว้) — เปลี่ยนเมื่อไหร่เทียบใหม่
-  }, [job, own, place, incomePeriod, incomeRows, incomeTotal, benefitText, visibility]);
+  }, [job, own, place, incomePeriod, incomeRows, incomeTotal, benefitText, payCycles, visibility]);
 
   /** unmount (สลับขั้น/ปิดป๊อป) ระหว่างมี auto-save ค้าง → flush กันของหาย */
   useEffect(() => {
@@ -330,7 +334,7 @@ const EditPublicJobFieldsDialog: React.FC<{
       setError('ใบขอนี้ไม่มีเลขที่ใบขอ บันทึกไม่ได้');
       return;
     }
-    const st = formStateForSections(job, own, { ...place, incomePeriod, incomeRows, incomeTotal, benefitText, visibility });
+    const st = formStateForSections(job, own, { ...place, incomePeriod, incomeRows, incomeTotal, benefitText, payCycles, visibility });
     // ไม่มีอะไรเปลี่ยน = ไม่ยิง (ด่านที่สอง เผื่อมีทางเรียกอื่นหลุดมา)
     if (!formDiffersFromJob(st)) return;
     setAutoStatus('saving');
@@ -403,25 +407,33 @@ const EditPublicJobFieldsDialog: React.FC<{
       }
       return { ...d, mode: next };
     });
-  const requestHas = (label: string) => income.requestRows.some((r) => r.label.trim() === label);
+  /**
+   * 🔴 บรรทัดรายได้จำด้วย **ชื่อ + ยอด** ไม่ใช่ชื่ออย่างเดียว (เจ้าของ 4 ต.ค. 2569: *"ฉันเลือก 12000 ทำไมช่องด้านล่างไม่ขึ้น 12000"*)
+   * ตารางอัตราของจริงมีชื่อซ้ำคนละยอด ("เงินเดือน" 12,000 ต่อเดือน กับ "เงินเดือน" 400 ต่อวัน) — เดิมจับด้วยชื่อ
+   * ติ๊ก 12,000 แล้วจอบอกว่าติ๊กอยู่ แต่ที่เก็บไว้เป็น 400 และติ๊กซ้ำก็ไม่เปลี่ยน
+   */
+  const rowKey = (label: string, amount: string | number | null | undefined) =>
+    `${label.trim()}\u0000${Math.trunc(Number(String(amount ?? '').replace(/,/g, '')) || 0)}`;
+  const requestHas = (label: string, amount: string | number | null | undefined) =>
+    income.requestRows.some((r) => rowKey(r.label, r.amount) === rowKey(label, amount));
   const setRequestRow = (row: { label: string; amount: string }, on: boolean) =>
     setIncome((d) => {
-      const has = d.requestRows.some((r) => r.label.trim() === row.label.trim());
+      const k = rowKey(row.label, row.amount);
+      const has = d.requestRows.some((r) => rowKey(r.label, r.amount) === k);
       if (on) return has ? d : { ...d, requestRows: [...d.requestRows, row] };
-      return { ...d, requestRows: d.requestRows.filter((r) => r.label.trim() !== row.label.trim()) };
+      return { ...d, requestRows: d.requestRows.filter((r) => rowKey(r.label, r.amount) !== k) };
     });
-  const erpNames = new Set(rateChoices.map((c) => c.name));
-  /**
-   * ตารางอัตราบางใบมีชื่อซ้ำหลายบรรทัด (ของจริง: "ค่าล่วงเวลา 1.5 เท่า" สองบรรทัดเลขเดียวกัน) — บรรทัดรายได้
-   * เก็บด้วยชื่อ ติ๊กอันหนึ่งอีกอันก็ติ๊กตาม ⇒ โชว์ชื่อละบรรทัดเดียว (อันแรกตามตาราง)
-   */
-  const rateRows = rateChoices.filter((c, i, all) => all.findIndex((x) => x.name === c.name) === i);
+  const erpKeys = new Set(rateChoices.map((c) => rowKey(c.name, c.amount)));
+  /** ชื่อซ้ำ + ยอดเดียวกัน = บรรทัดเดียว (ของจริง: "ค่าล่วงเวลา 1.5 เท่า" สองบรรทัดเลขเดียวกัน) · ชื่อซ้ำคนละยอดโชว์ครบ */
+  const rateRows = rateChoices.filter(
+    (c, i, all) => all.findIndex((x) => rowKey(x.name, x.amount) === rowKey(c.name, c.amount)) === i,
+  );
   /** บรรทัดที่ไม่อยู่ในตารางอัตรา (บันทึกไว้ก่อนหน้า) — ติ๊กคืน/ปลดได้เหมือนบรรทัดอื่น */
   const extraRows = [...openedRequestRows, ...income.requestRows].filter(
     (r, i, all) =>
       r.label.trim() !== '' &&
-      !erpNames.has(r.label.trim()) &&
-      all.findIndex((x) => x.label.trim() === r.label.trim()) === i,
+      !erpKeys.has(rowKey(r.label, r.amount)) &&
+      all.findIndex((x) => rowKey(x.label, x.amount) === rowKey(r.label, r.amount)) === i,
   );
   const requestLines = parseIncomeRows(income.requestRows);
   const requestSum = sumIncomeLines(requestLines);
@@ -558,7 +570,7 @@ const EditPublicJobFieldsDialog: React.FC<{
                   ) : (
                     <div className="divide-y divide-border/60">
                       {rateRows.map((c) => {
-                        const on = requestHas(c.name);
+                        const on = requestHas(c.name, c.amount);
                         const noAmount = !(c.amount != null && c.amount > 0);
                         return (
                           <CheckRow
@@ -583,10 +595,10 @@ const EditPublicJobFieldsDialog: React.FC<{
                       })}
                       {extraRows.map((r) => (
                         <CheckRow
-                          key={`extra-${r.label}`}
-                          id={`${uid}-extra-${r.label}`}
-                          checked={requestHas(r.label.trim())}
-                          disabled={!requestHas(r.label.trim()) && rowsFull}
+                          key={`extra-${r.label}-${r.amount}`}
+                          id={`${uid}-extra-${r.label}-${r.amount}`}
+                          checked={requestHas(r.label, r.amount)}
+                          disabled={!requestHas(r.label, r.amount) && rowsFull}
                           onCheckedChange={(v) => setRequestRow(r, v)}
                           label={r.label}
                           meta={NUM.format(Math.trunc(Number(r.amount)) || 0)}
@@ -690,18 +702,79 @@ const EditPublicJobFieldsDialog: React.FC<{
       ) : null}
 
       {showBenefits ? (
-        <StepCard
-          title="สวัสดิการ"
-          aside={
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {NUM.format(benefits.length)}/{NUM.format(BENEFIT_LINE_MAX)}
-            </span>
-          }
-        >
+        /* รอบรับเงิน — แยกจากสวัสดิการ (เจ้าของ 4 ต.ค. 2569: *"จ่ายรายวันไม่ใช่สวัสดิการ เป็นแค่ทางเลือกรับเงิน
+           ให้เลือกได้ว่าจะรับรายเดือน รายวัน รายสัปดาห์"*) · ติ๊กได้หลายแบบ (บางงานให้เลือกรับ) */
+        <StepCard title="รับเงิน">
+          <div role="group" aria-label="รอบรับเงิน" className="flex flex-wrap gap-x-6">
+            {PAY_CYCLES.map((c) => (
+              <CheckRow
+                key={c.key}
+                id={`${uid}-pay-${c.key}`}
+                checked={payCycles.includes(c.key)}
+                onCheckedChange={(v) =>
+                  setPayCycles((cur) =>
+                    PAY_CYCLES.map((x) => x.key).filter((k) => (k === c.key ? v : cur.includes(k))),
+                  )
+                }
+                label={c.label}
+              />
+            ))}
+          </div>
+        </StepCard>
+      ) : null}
+
+      {showBenefits ? (
+        /* 🔴 ไม่ล็อก 5 รายการแล้ว (เจ้าของ 4 ต.ค. 2569: *"ทำไมต้อง Lock ไว้ให้เลือกแค่ 5 ต้องเลือกได้เลย"*) */
+        <StepCard title="สวัสดิการ">
           <div className="grid gap-x-6 sm:grid-cols-2">
             {EXTRA_BENEFITS.map((b) => {
               const entry = presetEntry(b.key);
               const on = Boolean(entry);
+              if (b.count) {
+                /* รายการที่บอกจำนวนได้ (ชุดฟอร์ม) — ใส่กี่ชุด หรือติ๊กไม่ระบุจำนวน */
+                const n = (entry?.detail.match(/\d+/) ?? [''])[0];
+                const unspecified = on && !n;
+                return (
+                  <CheckRow
+                    key={b.key}
+                    id={`${uid}-benefit-${b.key}`}
+                    checked={on}
+                    disabled={!on && benefitsFull}
+                    onCheckedChange={(v) => togglePreset(b.key, v)}
+                    label={b.label}
+                  >
+                    {on ? (
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-20">
+                            <Input
+                              aria-label={`จำนวน${b.label}`}
+                              inputMode="numeric"
+                              className="text-right tabular-nums"
+                              value={n}
+                              placeholder="—"
+                              onChange={(e) => {
+                                const d = digitsOnly(e.target.value).slice(0, 2);
+                                setPresetDetail(b.key, d ? `${Number(d)} ${b.count?.unit}` : '');
+                              }}
+                            />
+                          </div>
+                          <span className="text-sm text-muted-foreground">{b.count.unit}</span>
+                        </div>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                          <Checkbox
+                            checked={unspecified}
+                            onCheckedChange={(v) => {
+                              if (v === true) setPresetDetail(b.key, '');
+                            }}
+                          />
+                          ไม่ระบุจำนวน{b.count.unit}
+                        </label>
+                      </div>
+                    ) : null}
+                  </CheckRow>
+                );
+              }
               const detailShown = Boolean(entry) && (detailOpen.has(b.key) || (entry?.detail.trim() ?? '') !== '');
               return (
                 <CheckRow

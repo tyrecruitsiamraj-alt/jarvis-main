@@ -29,6 +29,7 @@ import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import GenderPicker from '@/components/jobs/GenderPicker';
 import AgeRangeFields from '@/components/jobs/AgeRangeFields';
 import PostingLinksList from '@/components/jobs/PostingLinksList';
+import AddChannelLinks from '@/components/jobs/AddChannelLinks';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import ReleaseSkipControl from '@/components/jobs/ReleaseSkipControl';
 import UnitRequestInfoFields from '@/components/jobs/UnitRequestInfoFields';
@@ -65,6 +66,8 @@ import { publicSafeAddress } from '@/lib/publicJobPrivacy';
 import { INCOME_PERIOD_LABEL, buildIncomeDisplay } from '@/lib/incomeBreakdown';
 import { benefitDisplayLabels } from '@/lib/extraBenefits';
 import { boardCardAge } from '@/lib/boardCardFacts';
+import { payCycleText, payCyclesOf } from '@/lib/payCycle';
+import PublicJobCardPreview from '@/components/jobs/PublicJobCardPreview';
 import { EVEN_TYPE, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import { SEARCH_ALL_POOLS_AND_CALL } from '@/lib/candidateSearchLabels';
@@ -251,6 +254,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
     return (job ? idx.get(job.id) : undefined) ?? idx.get(id) ?? [];
   }, [postings, job, id]);
   const latestPosting = jobPostings?.[0] ?? null;
+  /** ประกาศที่ยังเปิดล่าสุด — สร้างลิงก์เพิ่มใต้ประกาศนี้ (ไม่สร้างประกาศใหม่ซ้ำ) */
+  const openPosting = jobPostings?.find((p) => p.status === 'open') ?? null;
   /** ลิงก์สมัครที่ยังใช้ได้ (ประกาศที่ยังเปิด) */
   const linkCount = jobPostings
     ? jobPostings.filter((p) => p.status === 'open').reduce((sum, p) => sum + p.links.length, 0)
@@ -538,6 +543,12 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             {/* ── ④ สรุป + ส่งประกาศ ── */}
             {step === 'publish' ? (
               <>
+                {/* ผู้สมัครจะเห็นแบบไหน (เจ้าของ 4 ต.ค. 2569: *"หน้าสรุปต้องบอกว่าผู้สมัครจะเห็นหน้าตาแบบไหน จะได้ตรวจว่าครบไหม"*)
+                    การ์ดตัวเดียวกับหน้าประกาศ — ช่องที่ติ๊กซ่อนก็ซ่อนในนี้ด้วย */}
+                <StepCard title="ผู้สมัครจะเห็นแบบนี้">
+                  {jobWithPatch ? <PublicJobCardPreview job={jobWithPatch} /> : <Loading />}
+                </StepCard>
+
                 {/* 🔴 หน้า 4 = สรุป แก้ในหน้านี้ไม่ได้ (เจ้าของ 4 ต.ค. 2569) — ปุ่ม "แก้" พาไปหน้าของช่องนั้น */}
                 <StepCard title="สรุปก่อนส่ง">
                   {jobWithPatch ? (
@@ -548,6 +559,11 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                       </SummaryRow>
                       <SummaryRow label="รายได้" onEdit={() => setOpenStep('benefits')}>
                         {incomeText ?? <span className="text-muted-foreground">ยังไม่ได้ตั้ง</span>}
+                      </SummaryRow>
+                      <SummaryRow label="รับเงิน" onEdit={() => setOpenStep('benefits')}>
+                        {payCycleText(payCyclesOf(jobWithPatch)).replace(/^รับเงิน/, '') || (
+                          <span className="text-muted-foreground">ยังไม่ได้เลือก</span>
+                        )}
                       </SummaryRow>
                       <SummaryRow label="สวัสดิการ" onEdit={() => setOpenStep('benefits')}>
                         {benefitLines.length > 0 ? (
@@ -599,7 +615,17 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                     />
                     <span className="text-sm text-foreground">{linkCount ? 'สร้างลิงก์เพิ่ม' : 'สร้างลิงก์'}</span>
                   </label>
-                  {wantLink && job ? (
+                  {/* มีประกาศแล้ว = เลือกช่องทางอย่างเดียว ข้อความเดิม (เจ้าของ 4 ต.ค. 2569 "ให้มันจำ แค่อยากเปลี่ยนช่องทาง")
+                      ยังไม่มี = กรอกข้อความประกาศครั้งแรกครั้งเดียว */}
+                  {wantLink && job && openPosting ? (
+                    <AddChannelLinks
+                      posting={openPosting}
+                      onCreated={() => {
+                        void loadPostings();
+                        setLinksOpen(false);
+                      }}
+                    />
+                  ) : wantLink && job ? (
                     <GenApplyLinkDialog
                       embedded
                       open

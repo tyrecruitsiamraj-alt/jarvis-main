@@ -165,6 +165,8 @@ export type UnitFieldOverrides = {
   total_income?: number | null;
   /** ตั้งแต่ 20 ส.ค. 2569 เก็บเป็นข้อความอิสระ (freetext จำกัด 5 รายการ) · คีย์เก่ายังอ่านได้ */
   benefits?: string[] | null;
+  /** รอบรับเงิน (4 ต.ค. 2569) — 'monthly' | 'weekly' | 'daily' · กติกาอยู่ `src/lib/payCycle.ts` */
+  pay_cycles?: string[] | null;
   /** รายได้แบบแยกส่วน — โครง/เพดานอยู่ที่ `src/lib/incomeBreakdown.ts` */
   income?: import('@/lib/incomeBreakdown').IncomeBreakdown | null;
   /**
