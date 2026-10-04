@@ -40,13 +40,14 @@ export const CONTACT_STATE_LABEL: Record<ContactState, string> = {
 
 type ProcessSource = Pick<
   PublicApplication,
-  'attendance_result' | 'appointment_at' | 'last_contact_ok' | 'last_call_outcome' | 'dial_count' | 'last_call_status' | 'ai_answer'
+  'attendance_result' | 'appointment_at' | 'last_contact_ok' | 'last_appointment_failed' | 'last_call_outcome' | 'dial_count' | 'last_call_status' | 'ai_answer'
 >;
 
 export function applicantProcessOf(r: ProcessSource): { step: ProcessStep; state: ProcessState } {
   if (r.attendance_result === 'showed') return { step: 'follow', state: 'ok' };
   if (r.attendance_result === 'no_show' || r.attendance_result === 'rescheduled') return { step: 'follow', state: 'fail' };
   if (r.appointment_at) return { step: 'follow', state: 'pending' };
+  if (r.last_contact_ok === true && r.last_appointment_failed === true) return { step: 'appointment', state: 'fail' };
   if (r.last_contact_ok === true) return { step: 'appointment', state: 'pending' };
   if (r.last_contact_ok === false) return { step: 'contact', state: 'fail' };
   return { step: 'contact', state: 'pending' };

@@ -11607,3 +11607,23 @@ Choice: เจ้าของงาน = **เจ้าหน้าที่ท�
 
 - ฟอร์มเพิ่มคนรองรับ 31 วันอยู่แล้ว (5 คือเพดานของป๊อปแก้ไข) · **วันละไม่เกิน 5 สาย ยังเป็นกติกาฝั่ง server เหมือนเดิม**
 - เจ้าหน้าที่ที่ยังไม่ได้ตั้งชื่อในหน้าผู้ใช้งาน โชว์เป็นเบอร์
+
+## Journey งานสรรหา: ผู้สมัคร → การติดต่อ → ติดต่อ/นัดหมาย แบบ iRecruit (4 ต.ค. 2569)
+
+เจ้าของ: 1 เก็บคนสนใจจากผู้สมัคร → 2 ย้ายไปการติดต่อ **ของใครของมัน** → 3 ติดต่อสำเร็จ/ไม่สำเร็จ →
+4 สำเร็จ = ปุ่มนัดหมาย (นัดได้ไหม · ไม่ได้ = เหตุผล) → 5 นัดที่ไหนแบบ iRecruit → 6 ไม่สำเร็จ = เหตุผลอย่างเดียว
+Choice: Lead ของคนอื่น = **ซ่อนไปเลย** (เหมือนใบที่คนอื่นเก็บไปโทร)
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `api/_handlers/job-applications.ts` | `leadWhere` = `(not is_lead or lead_by = ผู้ดู)` · `?lead=1` = Lead ของตัวเอง · อ้าง param ผู้ดูตัวเดียวกับ `claimWhere` · แถวมี `lead_by_me` + `last_appointment_failed` |
+| `src/lib/recruitRm.ts` | `isInRmTab` contact = `claimed_by_me` หรือ Lead ที่ `lead_by_me !== false` |
+| `api/_lib/applicationContacts.ts` · `api/_handlers/application-contacts.ts` | `appointmentFailed`: ok=true + เหตุผล (บังคับ) + ล้างวันนัด/สถานที่/ใบขอ · สถานะ `contacted` · `isAppointmentFailedLog` · ผลล่าสุดคืน `appointmentFailed` — **ไม่มี migration** (แถว ok=true มีเหตุผลได้ทางนี้ทางเดียว) |
+| `src/lib/applicantDetail.ts` | `APPOINTMENT_PLACES` (8 อันชุด iRecruit — ระบบเดิมไม่มีหน้าตั้งค่าสถานที่) · `appointmentPlaceValue` (อื่นๆ = คำที่พิมพ์) · `isAppointmentFailedContact` · `appointmentLogs` รวมแถวนัดไม่สำเร็จ |
+| `src/components/recruit-rm/ApplicantContactDialog.tsx` | ขั้น 2: ปุ่ม **นัดหมาย / นัดหมายไม่สำเร็จ** ขึ้นเมื่อติดต่อสำเร็จ (มีนัดเดิม = "นัดหมายใหม่") · นัดหมาย = วัน + สถานที่ (Select) + ลงหน่วยงาน · ไม่สำเร็จ = เหตุผล master ขั้น 2 × C (42 ตัว) |
+| `src/components/recruit-rm/ApplicantRecordTables.tsx` | แท็บการติดต่อ/การนัดหมายในป๊อปโชว์ "นัดหมายไม่สำเร็จ" + เหตุผล |
+| `src/lib/applicantProcess.ts` | ขั้นตอนบนแถว = นัดหมาย · ไม่สำเร็จ |
+| เทสต์ | `tests/api/recruitJourneyContact2569-10-04.test.ts` · `ApplicantContactDialog.test.tsx` · `recruitLead.test.ts` |
+
+- ตรวจจริง: ยิง POST จริงกับใบที่สถานะ contacted อยู่แล้ว → ไม่มีเหตุผล = 400 · มีเหตุผล = เก็บเหตุผล วันนัดที่ส่งปนถูกล้าง · แถวขึ้น "ไม่สำเร็จ / นัดหมาย" · แท็บการนัดหมายขึ้นเหตุผล → ลบ log ด้วย id คืนสภาพ (สถานะเดิม · 1 log เดิม)
+- คิวรีรายชื่อรันจริงสองผู้ดู: เจ้าของ Lead เห็น 166/Lead 2 · คนอื่นเห็น 163/Lead 0

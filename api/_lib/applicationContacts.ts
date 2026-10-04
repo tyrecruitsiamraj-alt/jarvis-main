@@ -13,7 +13,14 @@ const MAX_NOTE = 2000;
  * สถานะใบสมัครขยับตาม "ขั้นที่คนทำ" (เจ้าของเคาะ):
  * - ติดต่อสำเร็จ + นัดได้ → `converted` (ไปแท็บติดตามนัดหมาย)
  * - ติดต่อสำเร็จ แต่ยังนัดไม่ได้ / ติดต่อไม่สำเร็จ → `contacted` (ยังอยู่การติดต่อ ตามต่อ)
+ *
+ * "นัดหมายไม่สำเร็จ" (Journey ข้อ 4 · 4 ต.ค. 2569 แบบ iRecruit) = `ok=true` + เหตุผล (master ขั้น 2 × ไม่สำเร็จ)
+ * + ไม่มีวันนัด — แถว ok=true จะมีเหตุผลได้ทางนี้ทางเดียว (`isAppointmentFailedLog`) ไม่ต้องเพิ่มคอลัมน์
  */
+export function isAppointmentFailedLog(l: { ok: boolean; reasonLabel: string | null; appointmentAt: string | null }): boolean {
+  return l.ok && Boolean(l.reasonLabel) && !l.appointmentAt;
+}
+
 export type ContactLog = {
   id: string;
   applicationId: string;
@@ -79,6 +86,8 @@ export type CreateContactLogInput = {
   jobId?: unknown;
   jobLabel?: unknown;
   note?: unknown;
+  /** ติดต่อสำเร็จ แต่นัดหมายไม่สำเร็จ — เก็บเหตุผล ไม่มีวันนัด */
+  appointmentFailed?: boolean;
   createdBy?: string | null;
   createdByName?: string | null;
 };
@@ -87,12 +96,14 @@ export type CreateContactLogInput = {
  * บันทึกผล + ขยับสถานะใบในทรานแซกชันเดียวกันเชิงตรรกะ (สองคำสั่งเรียงกัน —
  * ถ้าอัปเดตสถานะล้ม log ยังอยู่ ซึ่งถูกต้อง: ผลติดต่อคือข้อเท็จจริง สถานะเป็นของแถม)
  *
- * ⚠️ ฝั่ง "ไม่สำเร็จ" ห้ามมีวันนัดติดไป · ฝั่ง "สำเร็จ" ห้ามมีเหตุผลติดไป —
+ * ⚠️ ฝั่ง "ไม่สำเร็จ" ห้ามมีวันนัดติดไป · ฝั่ง "สำเร็จ" ห้ามมีเหตุผลติดไป (ยกเว้นนัดหมายไม่สำเร็จ ซึ่งห้ามมีวันนัด) —
  * เคลียร์ที่นี่ ไม่เชื่อ payload (กติกาเดียวกับ resolveAppointment ของผลโทร)
  */
 export async function createContactLog(input: CreateContactLogInput): Promise<ContactLog> {
   const ok = Boolean(input.ok);
-  const appointmentAt = ok ? (input.appointmentAt ?? null) : null;
+  const apptFailed = ok && input.appointmentFailed === true;
+  const appointmentAt = ok && !apptFailed ? (input.appointmentAt ?? null) : null;
+  const keepReason = !ok || apptFailed;
   const { rows } = await dbQuery<Row>(
     `insert into ${table}
        (application_id, ok, reason_id, reason_label, appointment_at, appointment_place,
@@ -102,10 +113,10 @@ export async function createContactLog(input: CreateContactLogInput): Promise<Co
     [
       input.applicationId,
       ok,
-      ok ? null : (input.reasonId ?? null),
-      ok ? null : trimTo(input.reasonLabel, MAX_TEXT),
+      keepReason ? (input.reasonId ?? null) : null,
+      keepReason ? trimTo(input.reasonLabel, MAX_TEXT) : null,
       appointmentAt,
-      ok ? trimTo(input.appointmentPlace, MAX_TEXT) : null,
+      appointmentAt ? trimTo(input.appointmentPlace, MAX_TEXT) : null,
       ok && appointmentAt ? trimTo(input.jobId, MAX_TEXT) : null,
       ok && appointmentAt ? trimTo(input.jobLabel, MAX_TEXT) : null,
       trimTo(input.note, MAX_NOTE),
@@ -147,18 +158,30 @@ export async function listContactLogs(applicationId: string): Promise<ContactLog
  */
 export async function loadLatestContactResults(
   applicationIds: string[],
-): Promise<Map<string, { ok: boolean; at: string }>> {
-  const out = new Map<string, { ok: boolean; at: string }>();
+): Promise<Map<string, { ok: boolean; at: string; appointmentFailed: boolean }>> {
+  const out = new Map<string, { ok: boolean; at: string; appointmentFailed: boolean }>();
   if (applicationIds.length === 0) return out;
   try {
-    const { rows } = await dbQuery<{ application_id: string; ok: boolean; created_at: string }>(
-      `select distinct on (application_id) application_id, ok, created_at
+    const { rows } = await dbQuery<{
+      application_id: string;
+      ok: boolean;
+      created_at: string;
+      reason_label: string | null;
+      appointment_at: string | null;
+    }>(
+      `select distinct on (application_id) application_id, ok, created_at, reason_label, appointment_at
          from ${table}
         where application_id = any($1::uuid[])
         order by application_id, created_at desc`,
       [applicationIds],
     );
-    for (const r of rows) out.set(r.application_id, { ok: r.ok, at: r.created_at });
+    for (const r of rows) {
+      out.set(r.application_id, {
+        ok: r.ok,
+        at: r.created_at,
+        appointmentFailed: isAppointmentFailedLog({ ok: r.ok, reasonLabel: r.reason_label, appointmentAt: r.appointment_at }),
+      });
+    }
     return out;
   } catch (e) {
     if (isPgUndefinedTable(e)) return out;

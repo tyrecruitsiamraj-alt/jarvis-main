@@ -51,9 +51,10 @@ describe('buildApplicationsListQuery — Lead ไปแท็บการติ�
   it('⚠️ ลิสต์ปกติ (RmWorkspace) ต้อง **ส่ง Lead มาด้วย** (true) — client แบ่งไปแท็บการติดต่อ', () => {
     // เจ้าของสั่ง: "เก็บ Lead → รายชื่อไปอยู่ที่การติดต่อแทน" (เดิม Lead หายเข้าคลังสำรอง)
     // isInRmTab ฝั่งหน้าเว็บแบ่ง is_lead → contact · ถ้า server กรอง Lead ออก จะไม่มีมาแบ่ง
-    expect(buildApplicationsListQuery({ ...base }).leadWhere).toBe('true');
-    // ?lead=1 ยังใช้ได้ (ดูเฉพาะ Lead) เผื่อ bookmark เก่า
-    expect(buildApplicationsListQuery({ ...base, leadView: true }).leadWhere).toBe('is_lead');
+    // 🔴 4 ต.ค. 2569 ของใครของมัน (Choice "ซ่อนไปเลย"): Lead ของตัวเองมา · Lead ของคนอื่นหาย (อ้าง param ผู้ดูของ claimWhere)
+    expect(buildApplicationsListQuery({ ...base }).leadWhere).toBe('(not is_lead or lead_by::text = $1)');
+    // ?lead=1 ยังใช้ได้ (ดูเฉพาะ Lead ของตัวเอง) เผื่อ bookmark เก่า
+    expect(buildApplicationsListQuery({ ...base, leadView: true }).leadWhere).toBe('(is_lead and lead_by::text = $1)');
   });
 
   it('⚠️ เงื่อนไข Lead ต้องอยู่ใน SQL จริง ไม่ใช่แค่คืนค่ามาเฉย ๆ', () => {

@@ -33,6 +33,8 @@ export type SaveContactInput = {
   jobId?: string | null;
   jobLabel?: string | null;
   note?: string | null;
+  /** ติดต่อสำเร็จ แต่นัดหมายไม่สำเร็จ — ต้องมีเหตุผล (master ขั้นนัดหมาย × ไม่สำเร็จ) · ไม่มีวันนัด */
+  appointmentFailed?: boolean;
 };
 
 export async function saveContactLog(input: SaveContactInput): Promise<ContactLog> {

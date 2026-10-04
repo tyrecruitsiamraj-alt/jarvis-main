@@ -72,7 +72,9 @@ export function isInRmTab(r: PublicApplication, tab: RmTab): boolean {
   if (isClosedByCallOutcome(r)) return tab === 'candidates';
   // "เก็บไว้ทำงานต่อ" = เก็บไปติดต่อ (claim) **หรือ** เก็บ Lead (เจ้าของสั่ง 14 ส.ค. 2569:
   // "เก็บ Lead → รายชื่อไปอยู่ที่การติดต่อแทน" · เดิม Lead หายเข้าคลังสำรอง)
-  const kept = r.claimed_by_me === true || r.is_lead === true;
+  // 🔴 ของใครของมัน (Journey 4 ต.ค. 2569): Lead นับเฉพาะที่ผู้ดูเก็บ — server ซ่อน Lead ของคนอื่นแล้ว
+  // `lead_by_me` ไม่มากับแถว (server เก่า) = ถือตาม is_lead เหมือนเดิม
+  const kept = r.claimed_by_me === true || (r.is_lead === true && r.lead_by_me !== false);
   if (tab === 'contact') return kept;
   if (tab === 'candidates') return !kept;
   const st = RM_TAB_STATUSES[tab];

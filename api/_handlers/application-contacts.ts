@@ -7,6 +7,7 @@
  *
  * กติกา (ตรวจฝั่ง server ห้ามเชื่อฟอร์ม):
  * - ok=false ต้องมีเหตุผล (reasonLabel) — "ไม่สำเร็จเฉย ๆ" ไม่บอกอะไรใคร
+ * - ok=true + appointmentFailed=true = นัดหมายไม่สำเร็จ — ต้องมีเหตุผล · ห้ามมีวันนัด (4 ต.ค. 2569)
  * - นัด (appointmentAt) มีได้เฉพาะ ok=true · ปี พ.ศ. โดนดักเหมือนวันนัดผลโทร
  * - rbac เดียวกับใบสมัคร ('job-applications') — ใครเห็นใบ คนนั้นบันทึกผลติดต่อได้
  */
@@ -63,6 +64,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         jobId?: string | null;
         jobLabel?: string | null;
         note?: string | null;
+        appointmentFailed?: boolean;
       };
       const applicationId = (body.applicationId ?? '').trim();
       if (!applicationId) return sendError(res, 400, 'Bad request', 'applicationId จำเป็น');
@@ -75,10 +77,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!body.ok && !(body.reasonLabel ?? '').trim()) {
         return sendError(res, 400, 'Bad request', 'ติดต่อไม่สำเร็จต้องเลือกเหตุผล');
       }
+      const appointmentFailed = body.ok === true && body.appointmentFailed === true;
+      if (appointmentFailed && !(body.reasonLabel ?? '').trim()) {
+        return sendError(res, 400, 'Bad request', 'นัดหมายไม่สำเร็จต้องเลือกเหตุผล');
+      }
 
       // วันนัด: ตรวจด้วยด่านเดียวกับผลโทร (รูปแบบ + กันปี พ.ศ. + เที่ยงวันไทย)
       let appointmentAt: string | null = null;
-      if (body.ok && (body.appointmentAt ?? '').toString().trim()) {
+      if (body.ok && !appointmentFailed && (body.appointmentAt ?? '').toString().trim()) {
         const decided = resolveAppointment({
           outcome: 'confirmed',
           scope: 'scheduled',
@@ -99,6 +105,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         jobId: body.jobId,
         jobLabel: body.jobLabel,
         note: body.note,
+        appointmentFailed,
         createdBy: req.user?.sub ?? null,
         createdByName: req.user?.email ?? null,
       });
@@ -110,6 +117,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         after: {
           applicationId,
           ok: body.ok,
+          appointmentFailed,
           appointmentAt: log.appointmentAt,
           jobId: log.jobId,
           reasonLabel: log.reasonLabel,

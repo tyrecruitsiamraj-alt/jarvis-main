@@ -31,6 +31,8 @@ export type PublicApplication = {
    */
   last_contact_ok?: boolean | null;
   last_contact_at?: string | null;
+  /** ผลติดต่อล่าสุด = ติดต่อสำเร็จ แต่นัดหมายไม่สำเร็จ (มีเหตุผล · ไม่มีวันนัด) */
+  last_appointment_failed?: boolean;
   /**
    * เวลาที่ **เจ้าหน้าที่กดโทร** (095) — คนละอันกับ `last_call_at` ข้างบน
    * (อันนั้นคือเวลาที่ได้ **ผล** โทร จากคิว AI หรือถังคนโทร)
@@ -129,6 +131,8 @@ export type PublicApplication = {
    * ชื่อคนปัดจึงส่งให้ทุกคนเห็นได้ (claim ส่งเฉพาะของตัวเอง)
    */
   is_lead?: boolean;
+  /** Lead นี้ผู้ดูเป็นคนเก็บ — แท็บการติดต่อ = ของใครของมัน (4 ต.ค. 2569) */
+  lead_by_me?: boolean;
   lead_by_name?: string;
   lead_at?: string;
   /**

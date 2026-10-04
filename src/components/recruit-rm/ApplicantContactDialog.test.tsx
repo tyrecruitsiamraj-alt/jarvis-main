@@ -4,7 +4,8 @@
  * 🔴 ด่าน:
  * - หน้าตาตามรูป: หัว "รายละเอียดผู้สมัคร" · ขั้นตอนการดำเนินการ 3 ขั้น · แท็บ 6 แท็บ · ปุ่มบันทึก/ปิด
  * - กดเลือกในขั้นตอนยังไม่เขียน จนกด "บันทึก" · ไม่มีอะไรเปลี่ยน = กดบันทึกไม่ได้
- * - นัดหมายใหม่ = บันทึกผลติดต่อสำเร็จพร้อมวันนัด/สถานที่/หน่วยงาน (ไม่ได้เลือกหน่วยงาน = หาล่วงหน้า)
+ * - Journey 4 ต.ค. 2569: ติดต่อสำเร็จ → นัดหมาย / นัดหมายไม่สำเร็จ · นัดหมาย = วัน + สถานที่ (รายการ iRecruit) + หน่วยงาน
+ *   · นัดหมายไม่สำเร็จ = เหตุผล (ขั้น 2) · ติดต่อไม่สำเร็จ = เหตุผลอย่างเดียว ไม่มีปุ่มนัด
  * - ติดตามนัดกดไม่ได้ถ้ายังไม่มีนัด · แก้ข้อมูลแล้วส่งเฉพาะช่องที่เปลี่ยน
  * - ก้อน "ยกเลิกข้อมูลผู้สมัคร" ยังไม่มี (Choice เจ้าของ)
  * - แท็บว่างยังเป็นตาราง (หัวคอลัมน์ + แถว "ไม่มี…")
@@ -37,7 +38,16 @@ vi.mock('@/lib/publicApplicationsApi', async (importOriginal) => {
     setApplicationCancelled: (...a: unknown[]) => setApplicationCancelled(...a),
   };
 });
-vi.mock('@/lib/recruitReasonsApi', () => ({ fetchRecruitReasons: vi.fn(async () => []) }));
+// เหตุผลแยกตามขั้น — ขั้น 2 (นัดหมาย × ไม่สำเร็จ) มีตัวเลือกให้กด
+vi.mock('@/lib/recruitReasonsApi', () => ({
+  fetchRecruitReasons: vi.fn(async (o: { processCode?: string } = {}) =>
+    o.processCode === '2'
+      ? [{ id: 'r-appt', processCode: '2', outcomeCode: 'C', name: 'ไม่สะดวกสมัคร', sortOrder: 1, isActive: true }]
+      : [],
+  ),
+}));
+// jsdom ไม่มี scrollIntoView — Select ของ Radix เรียกตอนเปิดรายการ
+if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
 vi.mock('@/lib/siamrajUnitRequestsApi', () => ({ fetchSiamrajUnitRequests: vi.fn(async () => []) }));
 
 const { default: ApplicantContactDialog } = await import('./ApplicantContactDialog');
@@ -109,24 +119,69 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
     expect(onSaved).toHaveBeenCalled();
   });
 
-  it('ติดต่อไม่สำเร็จ ⇒ ต้องเลือกเหตุผลก่อน + นัดหมายใหม่กดไม่ได้', () => {
+  it('ติดต่อไม่สำเร็จ ⇒ ต้องเลือกเหตุผลก่อน + ไม่มีปุ่มนัดหมาย (Journey ข้อ 6)', () => {
     const { dialog } = renderDialog(app());
     fireEvent.click(within(dialog).getByRole('button', { name: /ติดต่อไม่สำเร็จ/ }));
     expect(within(dialog).getByRole('combobox', { name: 'เหตุผลที่ติดต่อไม่สำเร็จ' })).toBeTruthy();
-    expect((within(dialog).getByRole('button', { name: 'นัดหมายใหม่' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(dialog).queryByRole('button', { name: /^นัดหมาย/ })).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: 'บันทึก' }));
     expect(within(dialog).getByRole('alert').textContent).toBe('เลือกเหตุผลที่ติดต่อไม่สำเร็จ');
     expect(saveContactLog).not.toHaveBeenCalled();
   });
 
-  it('นัดหมายใหม่โดยไม่ใส่วัน ⇒ บอกให้ใส่วันนัด ไม่ยิงอะไร', () => {
+  it('🔴 Journey ข้อ 4: ยังไม่ติดต่อสำเร็จ = ไม่มีปุ่มนัด · กดติดต่อสำเร็จ ⇒ นัดหมาย / นัดหมายไม่สำเร็จ ขึ้น', () => {
     const { dialog } = renderDialog(app());
-    fireEvent.click(within(dialog).getByRole('button', { name: 'นัดหมายใหม่' }));
+    const step = within(dialog).getByTestId('step-appointment');
+    expect(within(step).queryByRole('button', { name: /นัดหมาย/ })).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: /ติดต่อสำเร็จ/ }));
+    expect(within(step).getByRole('button', { name: /^นัดหมาย$/ })).toBeTruthy();
+    expect(within(step).getByRole('button', { name: /นัดหมายไม่สำเร็จ/ })).toBeTruthy();
+  });
+
+  it('ผลล่าสุดติดต่อสำเร็จ + มีนัดเดิม ⇒ ปุ่มเป็น "นัดหมายใหม่"', () => {
+    const { dialog } = renderDialog(app({ last_contact_ok: true, appointment_at: '2026-09-15T05:00:00.000Z' }));
+    const step = within(dialog).getByTestId('step-appointment');
+    expect(within(step).getByRole('button', { name: /นัดหมายใหม่/ })).toBeTruthy();
+  });
+
+  it('นัดหมายโดยไม่ใส่วัน ⇒ บอกให้ใส่วันนัด ไม่ยิงอะไร · สถานที่เป็นรายการแบบ iRecruit', async () => {
+    const { dialog } = renderDialog(app());
+    fireEvent.click(within(dialog).getByRole('button', { name: /ติดต่อสำเร็จ/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /^นัดหมาย$/ }));
     expect(within(dialog).getByTestId('new-appointment')).toBeTruthy();
-    fireEvent.change(within(dialog).getByRole('textbox', { name: 'สถานที่นัดหมาย' }), { target: { value: 'สาขาลาดพร้าว' } });
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'สถานที่นัดหมาย' }));
+    for (const p of ['บูธคู้บอน', 'สำนักงานใหญ่', 'Online', 'อื่นๆ']) {
+      expect(await screen.findByRole('option', { name: p })).toBeTruthy();
+    }
+    fireEvent.click(screen.getByRole('option', { name: 'อื่นๆ' }));
+    expect(within(dialog).getByRole('textbox', { name: 'ชื่อสถานที่นัดหมาย' })).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: 'บันทึก' }));
-    expect(within(dialog).getByRole('alert').textContent).toBe('นัดหมายใหม่ต้องใส่วันนัด');
+    expect(within(dialog).getByRole('alert').textContent).toBe('นัดหมายต้องใส่วันนัด');
     expect(saveContactLog).not.toHaveBeenCalled();
+  });
+
+  it('🔴 นัดหมายไม่สำเร็จ ⇒ ต้องเลือกเหตุผล แล้วบันทึกเป็นติดต่อสำเร็จ + นัดไม่สำเร็จ + เหตุผล ไม่มีวันนัด', async () => {
+    saveContactLog.mockResolvedValue({});
+    const { dialog, onClose } = renderDialog(app());
+    fireEvent.click(within(dialog).getByRole('button', { name: /ติดต่อสำเร็จ/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /นัดหมายไม่สำเร็จ/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'บันทึก' }));
+    expect(within(dialog).getByRole('alert').textContent).toBe('เลือกเหตุผลที่นัดหมายไม่สำเร็จ');
+    expect(saveContactLog).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'เหตุผลที่นัดหมายไม่สำเร็จ' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'ไม่สะดวกสมัคร' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'บันทึก' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(saveContactLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ok: true,
+        appointmentFailed: true,
+        reasonId: 'r-appt',
+        reasonLabel: 'ไม่สะดวกสมัคร',
+        appointmentAt: null,
+        appointmentPlace: null,
+      }),
+    );
   });
 
   it('นัดหมายเดิมขึ้นในขั้นที่ 2 · ไม่มีนัด = ขีด + ปุ่มติดตามนัดกดไม่ได้', () => {

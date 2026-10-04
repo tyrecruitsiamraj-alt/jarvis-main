@@ -10,7 +10,7 @@ import {
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
 import type { ContactLog } from '@/lib/applicationContactsApi';
-import { appointmentLogs, attendanceLabel, type DetailCallRow } from '@/lib/applicantDetail';
+import { appointmentLogs, attendanceLabel, isAppointmentFailedContact, type DetailCallRow } from '@/lib/applicantDetail';
 import { ATTENDANCE_TONE } from '@/lib/appointmentAttendance';
 
 /**
@@ -95,6 +95,9 @@ export const ContactsTable: React.FC<{ logs: ContactLog[] }> = ({ logs }) => (
       <tr key={l.id} className="border-b border-border/50 last:border-0">
         <Td className={cn('whitespace-nowrap font-medium', l.ok ? TONE.success.value : TONE.danger.value)}>
           {l.ok ? 'ติดต่อสำเร็จ' : 'ติดต่อไม่สำเร็จ'}
+          {isAppointmentFailedContact(l) ? (
+            <span className={cn('block text-xs font-normal', TONE.danger.value)}>นัดหมายไม่สำเร็จ</span>
+          ) : null}
         </Td>
         <Td>{l.reasonLabel || EM_DASH}</Td>
         <Td className="text-muted-foreground">{l.note || EM_DASH}</Td>
@@ -107,15 +110,26 @@ export const ContactsTable: React.FC<{ logs: ContactLog[] }> = ({ logs }) => (
 export const AppointmentsTable: React.FC<{ logs: ContactLog[] }> = ({ logs }) => {
   const appts = appointmentLogs(logs);
   return (
-    <Table head={['นัดหมายวันที่', 'สถานที่นัดหมาย', 'ลงหน่วยงาน', 'บันทึกโดย']} empty="ยังไม่มีนัดหมาย" isEmpty={appts.length === 0}>
-      {appts.map((l) => (
+    <Table
+      head={['ผลการนัดหมาย', 'นัดหมายวันที่', 'สถานที่นัดหมาย', 'ลงหน่วยงาน', 'บันทึกโดย']}
+      empty="ยังไม่มีนัดหมาย"
+      isEmpty={appts.length === 0}
+    >
+      {appts.map((l) => {
+        const failed = isAppointmentFailedContact(l);
+        return (
         <tr key={l.id} className="border-b border-border/50 last:border-0">
-          <Td className="whitespace-nowrap tabular-nums">{formatYmdDmyBe(l.appointmentAt)}</Td>
-          <Td>{l.appointmentPlace || EM_DASH}</Td>
-          <Td>{l.jobLabel || 'หาล่วงหน้า'}</Td>
+          <Td className={cn('font-medium', failed ? TONE.danger.value : TONE.success.value)}>
+            {failed ? 'นัดหมายไม่สำเร็จ' : 'นัดหมายสำเร็จ'}
+            {failed ? <span className="block text-xs font-normal text-muted-foreground">{l.reasonLabel}</span> : null}
+          </Td>
+          <Td className="whitespace-nowrap tabular-nums">{failed ? EM_DASH : formatYmdDmyBe(l.appointmentAt)}</Td>
+          <Td>{failed ? EM_DASH : l.appointmentPlace || EM_DASH}</Td>
+          <Td>{failed ? EM_DASH : l.jobLabel || 'หาล่วงหน้า'}</Td>
           <Td className="whitespace-nowrap text-muted-foreground">{by(l.createdByName, l.createdAt)}</Td>
         </tr>
-      ))}
+        );
+      })}
     </Table>
   );
 };

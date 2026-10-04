@@ -40,6 +40,35 @@ export const PROCESS_STEPS = [
   { no: 3, title: 'การติดตามนัด', hint: 'บันทึกผลการติดตามนัดหมาย' },
 ] as const;
 
+/**
+ * สถานที่นัดหมาย — ชุดเดียวกับ iRecruit (Journey ข้อ 5 · 4 ต.ค. 2569 · ระบบเดิมไม่มีหน้าตั้งค่าสถานที่ = รายการตายตัว)
+ * "อื่นๆ" = พิมพ์ชื่อสถานที่เอง (ระบบเดิมเก็บแค่คำว่าอื่นๆ ซึ่งไม่บอกอะไร)
+ */
+export const APPOINTMENT_PLACE_OTHER = 'อื่นๆ';
+export const APPOINTMENT_PLACES = [
+  'บูธคู้บอน',
+  'บูธศรีราชา',
+  'บูธโลตัส ลาดพร้าว',
+  'บูธโลตัส พระราม 3',
+  'สำนักงานใหญ่',
+  'BigC สุวินทวงศ์',
+  'Online',
+  APPOINTMENT_PLACE_OTHER,
+] as const;
+
+/** สถานที่ที่จะบันทึก — "อื่นๆ" ใช้คำที่พิมพ์ (ว่าง = null ให้ฟอร์มบังคับ) */
+export function appointmentPlaceValue(picked: string, other: string): string | null {
+  if (!picked) return null;
+  if (picked !== APPOINTMENT_PLACE_OTHER) return picked;
+  const t = other.trim();
+  return t ? t : null;
+}
+
+/** แถวบันทึกติดต่อนี้คือ "ติดต่อสำเร็จ แต่นัดหมายไม่สำเร็จ" (ok + เหตุผล + ไม่มีวันนัด — กติกาเดียวกับ server) */
+export function isAppointmentFailedContact(l: Pick<ContactLog, 'ok' | 'reasonLabel' | 'appointmentAt'>): boolean {
+  return l.ok && Boolean(l.reasonLabel) && !l.appointmentAt;
+}
+
 /** ผลติดต่อล่าสุดของใบ (ขั้น 1 ที่ติ๊กไว้ตอนเปิดป๊อป) */
 export function contactChoiceOf(a: Pick<PublicApplication, 'last_contact_ok'>): ContactChoice | null {
   if (a.last_contact_ok === true) return 'ok';
@@ -108,7 +137,8 @@ export function detailCallRows(aiCalls: readonly ApplicantAiCall[], staffCalls: 
 
 /** แท็บการนัดหมาย — เฉพาะครั้งที่ติดต่อแล้วนัดได้ (ล่าสุดก่อน ตามลำดับที่ API ส่งมา) */
 export function appointmentLogs(logs: readonly ContactLog[]): ContactLog[] {
-  return logs.filter((l) => Boolean(l.appointmentAt));
+  // นัดหมายไม่สำเร็จก็เป็นประวัติการนัด (4 ต.ค. 2569) — ขึ้นแท็บการนัดหมายด้วยพร้อมเหตุผล
+  return logs.filter((l) => Boolean(l.appointmentAt) || isAppointmentFailedContact(l));
 }
 
 /** ผลติดตามนัดบนแถว */

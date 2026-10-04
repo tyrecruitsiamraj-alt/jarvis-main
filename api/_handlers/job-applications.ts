@@ -111,6 +111,7 @@ type Row = {
   claimed_by_name: string | null;
   claimed_at: string | Date | null;
   is_lead: boolean | null;
+  lead_by?: string | null;
   lead_by_name: string | null;
   lead_at: string | Date | null;
   /** ที่มาของคนนี้ (derived — ดู applicationOriginSql) · schema เก่าไม่มี = undefined */
@@ -158,6 +159,8 @@ function toApplication(r: Row, viewerId?: string) {
     // Lead เป็นสถานะระดับระบบ (ไม่ใช่ของใครคนหนึ่ง) — ชื่อคนปัดจึงส่งให้ทุกคนเห็นได้
     // ต่างจาก claim ที่เจ้าของสั่งว่า "คนอื่นจะไม่เห็นชื่อคนที่เก็บไป"
     is_lead: Boolean(r.is_lead),
+    // แท็บการติดต่อ = ของใครของมัน (Journey 4 ต.ค. 2569) — Lead ของคนอื่นถูกกรองที่คิวรีแล้ว
+    lead_by_me: Boolean(r.is_lead) && !!viewerId && r.lead_by === viewerId,
     lead_by_name: r.lead_by_name ?? undefined,
     lead_at: r.lead_at ? toIso(r.lead_at) : undefined,
     id: r.id,
@@ -256,7 +259,7 @@ const LIST_COLUMNS = `
   line_id, specific_type, responsible_name, ${CHANNEL_LABEL_SQL}, license_types, created_by_name,
   created_at,
   claimed_by, claimed_by_name, claimed_at,
-  is_lead, lead_by_name, lead_at,
+  is_lead, lead_by, lead_by_name, lead_at,
   selection_status, prep_checklist,
   dialed_first_at, dialed_last_at, dial_count,
   unclaimed_at, unclaimed_from_name, call_choice, call_choice_at, call_choice_by_name,
@@ -278,7 +281,7 @@ const LIST_COLUMNS_NO_CHOICE = `
   line_id, specific_type, responsible_name, ${CHANNEL_LABEL_SQL}, license_types, created_by_name,
   created_at,
   claimed_by, claimed_by_name, claimed_at,
-  is_lead, lead_by_name, lead_at,
+  is_lead, lead_by, lead_by_name, lead_at,
   selection_status, prep_checklist,
   dialed_first_at, dialed_last_at, dial_count,
   null::timestamptz as unclaimed_at, null::text as unclaimed_from_name,
@@ -303,7 +306,7 @@ const LIST_COLUMNS_NO_LEAD = `
   line_id, specific_type, responsible_name, channel_label, license_types, created_by_name,
   created_at,
   claimed_by, claimed_by_name, claimed_at,
-  false as is_lead, null::text as lead_by_name, null::timestamptz as lead_at
+  false as is_lead, null::text as lead_by, null::text as lead_by_name, null::timestamptz as lead_at
 `;
 
 /**
@@ -320,7 +323,7 @@ const LIST_COLUMNS_NO_CLAIM = `
   line_id, specific_type, responsible_name, channel_label, license_types, created_by_name,
   created_at,
   null::uuid as claimed_by, null::text as claimed_by_name, null::timestamptz as claimed_at,
-  false as is_lead, null::text as lead_by_name, null::timestamptz as lead_at
+  false as is_lead, null::text as lead_by, null::text as lead_by_name, null::timestamptz as lead_at
 `;
 
 /**
@@ -341,7 +344,7 @@ const LIST_COLUMNS_LEGACY = `
   null::text as channel_label, null::text[] as license_types, null::text as created_by_name,
   created_at,
   null::uuid as claimed_by, null::text as claimed_by_name, null::timestamptz as claimed_at,
-  false as is_lead, null::text as lead_by_name, null::timestamptz as lead_at
+  false as is_lead, null::text as lead_by, null::text as lead_by_name, null::timestamptz as lead_at
 `;
 
 /** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 074 */
@@ -415,8 +418,10 @@ export function buildApplicationsListQuery(input: {
   }
   let claimWhere = 'true';
   let legacyClaimWhere = 'true';
+  let viewerParam = '';
   if (!jobId) {
     params.push(viewerId);
+    viewerParam = `$${params.length}`;
     claimWhere = `(claimed_by is null or claimed_by::text = $${params.length})`;
     // legacy ต้องยังอ้าง param เดิมครบ (เหตุผลเดียวกับข้างบน)
     legacyClaimWhere = `($${params.length} = $${params.length})`;
@@ -426,8 +431,8 @@ export function buildApplicationsListQuery(input: {
    * ⚠️ **Lead ซ่อนทุกแท็บ ไม่ใช่แค่แท็บเดียว** — แท็บของหน้า RM เป็นตัวกรองฝั่งหน้าเว็บ
    * ที่หั่นลิสต์ก้อนเดียวกัน จึงต้องกรองที่ต้นทาง (คิวรีนี้) ไม่ใช่ที่ตัวกรองแต่ละแท็บ
    *
-   * ⚠️ เงื่อนไขนี้ **ไม่มี param** โดยตั้งใจ — ชุด legacy จึงแทนด้วย `true` ได้ตรง ๆ
-   * ไม่ต้องทำ no-op ที่อ้าง param เหมือน claimWhere (กติกา "ส่ง param เท่ากับที่อ้าง")
+   * ⚠️ เงื่อนไขนี้อ้าง **param ผู้ดูตัวเดียวกับ claimWhere** (4 ต.ค. 2569) — ชุด legacy แทนด้วย `true`/`false` ได้
+   * เพราะ legacyClaimWhere ยังอ้าง param นั้นอยู่ (กติกา "ส่ง param เท่ากับที่อ้าง")
    */
   /**
    * ⚠️ เปลี่ยน 14 ส.ค. 2569 (เจ้าของสั่ง): "เก็บ Lead → รายชื่อไปอยู่ที่การติดต่อแทน"
@@ -437,7 +442,15 @@ export function buildApplicationsListQuery(input: {
    * - dialog กล่องงาน (jobId) → **ยังซ่อน Lead** (เก็บ Lead แล้วออกจากที่สนใจ ไปการติดต่อ)
    * - ?lead=1 ยังใช้ได้ (แสดงเฉพาะ Lead) เผื่อดูอย่างเดียว แม้เอาปุ่มออกจากหน้าแล้ว
    */
-  const leadWhere = jobId ? 'not is_lead' : input.leadView ? 'is_lead' : 'true';
+  /**
+   * 🔴 Lead = ของใครของมัน (เจ้าของ 4 ต.ค. 2569 · Choice "ซ่อนไปเลย"): Lead ของคนอื่นหายจากรายชื่อเรา
+   * แบบเดียวกับใบที่คนอื่นเก็บไปโทร (claimWhere) — กันสองคนโทรหาคนเดียวกัน · อ้าง param เดียวกับ claimWhere
+   */
+  const leadWhere = jobId
+    ? 'not is_lead'
+    : input.leadView
+      ? `(is_lead and lead_by::text = ${viewerParam})`
+      : `(not is_lead or lead_by::text = ${viewerParam})`;
   conds.push('{{leadWhere}}');
   // drill-down จากกล่อง dashboard — เงื่อนไขอ้าง alias `a` จึงต้องตั้ง alias ที่ FROM
   if (input.bucketWhere) conds.push(input.bucketWhere);
@@ -483,7 +496,7 @@ async function queryWithLegacyFallback(
   } catch (e) {
     if (!isUndefinedColumn(e)) throw e;
   }
-  const legacyLead = leadWhere === 'is_lead' ? 'false' : 'true';
+  const legacyLead = leadWhere.startsWith('(is_lead') ? 'false' : 'true';
   try {
     const { rows } = await dbQuery<Row>(fill(LIST_COLUMNS_NO_LEAD, claimWhere, legacyLead), params);
     return rows;
@@ -1567,6 +1580,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         if (hit) {
           (item as Record<string, unknown>).last_contact_ok = hit.ok;
           (item as Record<string, unknown>).last_contact_at = hit.at;
+          if (hit.appointmentFailed) (item as Record<string, unknown>).last_appointment_failed = true;
         }
       }
       // ผลติดตามนัดล่าสุด (มา/ไม่มา/เลื่อน — migration 089) — แท็บนัดหมายโชว์ชิป/ปุ่ม
