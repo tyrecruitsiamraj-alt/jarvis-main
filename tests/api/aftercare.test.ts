@@ -158,9 +158,10 @@ describe('ถัง "เลยนัดยังไม่บันทึกผ�
     expect(cond).not.toMatch(/\bwith\b/i);
   });
 
-  it('เลขบนจอกดได้จริง (RmWorkspace ตั้ง bucket ให้)', () => {
+  it('กล่องกดบนแท็บติดตามนัดหมายถูกถอดแล้ว (เจ้าของสั่ง 4 ต.ค. 2569) — ถังยังเปิดจาก ?bucket= ได้', () => {
     const ws = stripComments(read('src/components/recruit-rm/RmWorkspace.tsx'));
-    expect(ws).toContain("params.set('bucket', 'overdue_no_result')");
+    expect(ws).not.toContain('เลยวันนัดแล้วยังไม่บันทึกผล');
+    expect(read('src/lib/recruitRmOverviewApi.ts')).toContain('overdue_no_result');
   });
 
   it('มีป้ายไทยของถัง (ห้ามโชว์ชื่อคีย์ดิบบนจอ)', () => {

@@ -46,7 +46,6 @@ import { summarizeCallChoice } from '@/lib/callChoiceSummary';
 import CallChoiceConfirmDialog from '@/components/recruit-rm/CallChoiceConfirmDialog';
 import { ATTENDANCE_LABEL, type AttendanceResult } from '@/lib/appointmentAttendance';
 import { buildAppointmentBoard } from '@/lib/appointmentBoard';
-import { fetchRecruitRmOverview, type RecruitRmOverview } from '@/lib/recruitRmOverviewApi';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { RM_BUCKET_LABEL, isRmBucket } from '@/lib/recruitRmOverviewApi';
 import {
@@ -456,28 +455,7 @@ const RmWorkspace: React.FC<{
    *  (แพตเทิร์นเดียวกับ RmTable ที่จับเวลาครั้งเดียวต่อ render ไม่ต้อง memo) */
   const now = new Date();
 
-  /**
-   * ก้อน "นัด → มาไหม" ที่ย้ายมาจากศูนย์คุมงานสรรหา (เจ้าของสั่ง 20 ส.ค. 2569 —
-   * เคาะ Choice: "แค่ย้ายก้อนนั้นไป อันอื่น ๆ เก็บไว้") · ยอด**ทั้งระบบ**จาก API เดิม
-   * ตัวเดียวกับศูนย์คุม (`/api/recruit-rm-overview`) — บอร์ดข้างล่างนับจากรายการ
-   * ในหน้านี้ (ผ่านตัวกรอง) สองชุดจึงใกล้กันแต่ไม่จำเป็นต้องเท่ากัน มีป้ายบอกแหล่งกำกับ
-   * · โหลดล้ม = ไม่แสดงแถว (ข้อมูลเสริม ห้ามทำหน้าหลักพัง)
-   */
-  const [rmOverview, setRmOverview] = useState<RecruitRmOverview | null>(null);
-  useEffect(() => {
-    if (tab !== 'appointments') return;
-    let cancelled = false;
-    fetchRecruitRmOverview()
-      .then((d) => {
-        if (!cancelled) setRmOverview(d);
-      })
-      .catch(() => {
-        if (!cancelled) setRmOverview(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [tab]);
+  // ก้อน "นัด → มาไหม" (ยอดทั้งระบบจาก /api/recruit-rm-overview) ถอดแล้ว 4 ต.ค. 2569 — ไม่ต้องโหลดอีก
 
   /** เลขบนปุ่มมุมมองย่อย — นับหลังตัวกรอง/คำค้นเดียวกัน เลขจึงตรงกับที่เห็นเสมอ */
   const listViewCounts = useMemo(() => {
@@ -862,12 +840,16 @@ const RmWorkspace: React.FC<{
               onDeleteLead={() => void applyLead(false)}
               leadBusy={leadBusy}
               leadView={leadView}
-              onAddApplicant={() => setAddOpen(true)}
-              onImportApplicants={() => setImportOpen(true)}
+              /* เพิ่มข้อมูลผู้สมัคร + นำเข้า Excel มีแค่แท็บผู้สมัคร (เจ้าของสั่ง 4 ต.ค. 2569) */
+              onAddApplicant={tab === 'candidates' ? () => setAddOpen(true) : undefined}
+              onImportApplicants={tab === 'candidates' ? () => setImportOpen(true) : undefined}
               onHoldSelected={() => void keepSelectedForSelf()}
               holdingSelected={holdingSelected}
               onSendAiSelected={() => askSendAi(selectedIds)}
               onExport={tab === 'candidates' ? () => downloadApplicantExport(filtered) : undefined}
+              /* แท็บติดตามนัดหมาย: "โหลดเป็น PDF" อยู่แถวเดียวกับเพิ่มข้อมูลผู้สมัคร (4 ต.ค. 2569) ·
+                 window.print + print CSS เฉพาะก้อน rm-print-area (เจ้าของเคาะเดิม 14 ส.ค. ไม่เพิ่ม lib) */
+              onPrintPdf={tab === 'appointments' ? () => window.print() : undefined}
               exportCount={filtered.length}
               cancelledView={cancelledView}
               onToggleCancelledView={tab === 'candidates' && !bucket ? () => setCancelledView(!cancelledView) : undefined}
@@ -901,86 +883,11 @@ const RmWorkspace: React.FC<{
 
           {tab === 'appointments' ? (
             <div className="space-y-2 rm-appointments-head">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                {/* เจ้าของนิยาม 14 ส.ค. 2569: "ติดตามการนัดหมายเป็นแค่หน้าเอาไว้ดูว่านัดที่ไหน
-                    วันไหน และกี่คน โหลดเป็น PDF ได้" — สรุปหัว + ปุ่มพิมพ์ (window.print
-                    ฝั่งเบราว์เซอร์ — เจ้าของเคาะ ไม่เพิ่ม lib) · print CSS ซ่อนส่วนอื่นของหน้า */}
-                <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.info.soft, TONE.info.value)}>
-                  นัดสัมภาษณ์ <b>{filtered.filter((r) => r.appointment_at).length.toLocaleString('th-TH')}</b> คน
-                  จากทั้งหมด {filtered.length.toLocaleString('th-TH')} คนที่รับเข้าทำงาน ·
-                  วันนัดมาจากผลโทร "สนใจ→นัดได้" หรือบันทึกผลติดต่อ "สำเร็จ→นัดได้"
-                </p>
-                <Button variant="secondary" size="xs" type="button" onClick={() => window.print()} className="shrink-0">
-                  🖨 โหลดเป็น PDF
-                </Button>
-              </div>
+              {/* 🔴 ประโยคสรุป "นัดสัมภาษณ์ N คน จากทั้งหมด…" ถอดออก · ปุ่ม "โหลดเป็น PDF" ย้ายไปแถวเครื่องมือ
+                  คู่กับเพิ่มข้อมูลผู้สมัคร (RmSearchBar `onPrintPdf`) — เจ้าของสั่ง 4 ต.ค. 2569 */}
 
-              {/* ก้อน "นัด → มาไหม" ที่ย้ายมาจากศูนย์คุมงานสรรหา (20 ส.ค. 2569) —
-                  ยอดทั้งระบบจากฐานของเรา · ต่างจากบอร์ดข้างล่างที่นับจากรายการในหน้า */}
-              {rmOverview ? (
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    นัด → มาไหม (ยอดทั้งระบบ · ย้ายมาจากศูนย์คุมงานสรรหา)
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {(
-                      [
-                        ['สำเร็จ · นัดได้', rmOverview.appointment.scheduled, 'success', null],
-                        ['สำเร็จ · ยังนัดไม่ได้', rmOverview.appointment.successNoAppointment, 'warn', null],
-                        [
-                          'นัดแล้ว · มา',
-                          rmOverview.attendance ? rmOverview.attendance.showed : null,
-                          'success',
-                          rmOverview.attendance
-                            ? rmOverview.attendance.overdueNoResult > 0
-                              ? null // เลขนี้แยกไปเป็นกล่องกดได้ข้างล่าง (Phase 7.6)
-                              : `นัดข้างหน้า ${rmOverview.attendance.upcoming}`
-                            : null,
-                        ],
-                        [
-                          'นัดแล้ว · ไม่มา',
-                          rmOverview.attendance ? rmOverview.attendance.noShow : null,
-                          'danger',
-                          null,
-                        ],
-                      ] as const
-                    ).map(([label, n, toneKey, sub]) => (
-                      <div key={label} className={cn('rounded-xl border px-3 py-2', TONE[toneKey].soft)}>
-                        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-                        <p className={cn('text-xl font-medium tabular-nums', TONE[toneKey].num)}>
-                          {n == null ? '—' : n.toLocaleString('th-TH')}
-                        </p>
-                        {sub ? <p className="text-xs text-muted-foreground">{sub}</p> : null}
-                      </div>
-                    ))}
-                  </div>
-                  {/* Phase 7.6 — เลข "เลยนัดยังไม่บันทึกผล" เดิมเป็นข้อความเฉย ๆ กดไม่ได้
-                      ตอนนี้เป็นกล่องกดแล้วลงไปเห็นรายชื่อจริง (ถัง `overdue_no_result`
-                      นิยามเดียวกับตัวนับ — เทสต์ bucket-parity คุมอยู่) */}
-                  {rmOverview.attendance && rmOverview.attendance.overdueNoResult > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const params = new URLSearchParams(searchParams);
-                        params.set('bucket', 'overdue_no_result');
-                        setSearchParams(params);
-                        setSelectedIds([]);
-                        setPage(1);
-                      }}
-                      className={cn(
-                        'w-full rounded-xl border px-3 py-2 text-left text-xs',
-                        TONE.danger.soft,
-                        TONE.danger.softHover,
-                      )}
-                    >
-                      <span className={cn('font-medium', TONE.danger.value)}>
-                        เลยวันนัดแล้วยังไม่บันทึกผล {rmOverview.attendance.overdueNoResult} ใบ
-                      </span>
-                      <span className={cn('ml-1', DASH.muted)}>— กดเพื่อดูรายชื่อและบันทึก มา/ไม่มา</span>
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
+              {/* ก้อน "นัด → มาไหม (ยอดทั้งระบบ · ย้ายมาจากศูนย์คุมงานสรรหา)" ถอดทั้งก้อน (เจ้าของสั่ง 4 ต.ค. 2569)
+                  เหลือบอร์ดสรุปนัดข้างล่าง (นับจากรายการในหน้า) · ถัง ?bucket=overdue_no_result ยังเปิดจากลิงก์เดิมได้ */}
 
               {/* บอร์ดสรุปนัด (เจ้าของสั่ง 20 ส.ค. 2569 ข้อ 12: *"มีบอร์ดแสดงว่านัดทั้งหมด
                   เท่าไหร่ มาเท่าไหร่ ไม่มาเท่าไหร่"* + รายวัน) — ตรรกะที่ appointmentBoard.ts
@@ -1044,10 +951,7 @@ const RmWorkspace: React.FC<{
               ⚠️ MyCallsSection ซ่อนตัวเองเมื่อไม่มีงานโทรค้าง (holds=0) — hint จึงบอกไว้เสมอ */}
           {tab === 'contact' ? (
             <>
-              <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.primary.soft, TONE.primary.value)}>
-                <b>2 ส่วนที่ทำงานคนละแบบ:</b> ① เก็บไปโทรเอง (จากหน้า Matching — ผูกเบอร์
-                มีเวลาโทร) โผล่ด้านบนตอนมีงานค้าง · ② เก็บไปติดต่อ (ใบที่คุณเก็บ) อยู่ในตารางด้านล่าง
-              </p>
+              {/* ป้าย "2 ส่วนที่ทำงานคนละแบบ…" ถอดออก (เจ้าของสั่ง 4 ต.ค. 2569 — ห้ามประโยคอธิบายบนจอ) */}
               {/* บอร์ดรับสมัคร = พื้นที่ของทีมสรรหา → เห็นเฉพาะงานโทรเลนสรรหา
                   (คนยังไม่สมัคร) · งานเลนคัดสรรมีหน้าของตัวเองที่ /matching/contact
                   (เจ้าของสั่ง 16 ส.ค. 2569: "ไม่ปนกัน") */}

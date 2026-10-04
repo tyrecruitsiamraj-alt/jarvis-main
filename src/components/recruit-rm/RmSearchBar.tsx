@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { UserPlus, BookmarkPlus, PhoneCall, Trash2, Archive, Bot, FileSpreadsheet, Download, UserX } from 'lucide-react';
+import { UserPlus, BookmarkPlus, PhoneCall, Trash2, Archive, Bot, FileSpreadsheet, Download, UserX, Printer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import SearchField from '@/components/shared/SearchField';
@@ -34,9 +34,12 @@ const RmSearchBar: React.FC<{
   selectedCount: number;
   onSaveLead: () => void;
   onDeleteLead: () => void;
-  onAddApplicant: () => void;
+  /** ไม่ส่ง = ไม่มีปุ่ม (มีแค่แท็บผู้สมัคร · 4 ต.ค. 2569) */
+  onAddApplicant?: () => void;
   /** นำเข้าผู้สมัครจาก Excel (1 ต.ค. 2569) — ไม่ส่ง = ไม่มีปุ่ม */
   onImportApplicants?: () => void;
+  /** "โหลดเป็น PDF" ของแท็บติดตามนัดหมาย (ย้ายมาแถวนี้ 4 ต.ค. 2569) — ไม่ส่ง = ไม่มีปุ่ม */
+  onPrintPdf?: () => void;
   /**
    * "เก็บไปโทรเอง" ทีละหลายคน — **ปุ่มรวม** ของเดิมสองปุ่ม (เจ้าของเคาะ 22 ส.ค. 2569)
    * กดทีเดียว = จองใบ (claim) + ล็อกเบอร์กัน AI โทรทับ (call hold)
@@ -67,6 +70,7 @@ const RmSearchBar: React.FC<{
   onDeleteLead,
   onAddApplicant,
   onImportApplicants,
+  onPrintPdf,
   onHoldSelected,
   holdingSelected = false,
   onSendAiSelected,
@@ -99,13 +103,21 @@ const RmSearchBar: React.FC<{
       </>
     )}
 
-    <Button variant="secondary" size="xs" type="button" onClick={onAddApplicant} className="shrink-0">
-      <UserPlus aria-hidden /> เพิ่มข้อมูลผู้สมัคร
-    </Button>
+    {onAddApplicant ? (
+      <Button variant="secondary" size="xs" type="button" onClick={onAddApplicant} className="shrink-0">
+        <UserPlus aria-hidden /> เพิ่มข้อมูลผู้สมัคร
+      </Button>
+    ) : null}
 
     {onImportApplicants ? (
       <Button variant="secondary" size="xs" type="button" onClick={onImportApplicants} className="shrink-0">
         <FileSpreadsheet aria-hidden /> นำเข้า Excel
+      </Button>
+    ) : null}
+
+    {onPrintPdf ? (
+      <Button variant="secondary" size="xs" type="button" onClick={onPrintPdf} className="shrink-0">
+        <Printer aria-hidden /> โหลดเป็น PDF
       </Button>
     ) : null}
 
