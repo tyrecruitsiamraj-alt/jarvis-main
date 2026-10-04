@@ -107,18 +107,17 @@ const FollowCompletedCard: React.FC<{
         </p>
       ) : null}
 
-      <div className="md:overflow-x-auto">
-        {/* จอแคบกว่า lg (มือถือ+แท็บเล็ต) = การ์ดต่อคน (เหมือนตารางรายวัน · 4 ต.ค. 2569) · lg ขึ้นไป = ตารางเดิม */}
-        <table className="block w-full border-collapse text-left lg:table lg:min-w-full">
-          <thead className="hidden lg:table-header-group">
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-left">
+          <thead>
             <tr className={cn('border-b border-border', DASH.tableHead)}>
-              <th className="min-w-[200px] px-4 py-2.5 text-[11px] font-medium lg:px-5">ชื่อ</th>
+              <th className="min-w-[200px] px-4 py-2.5 text-[11px] font-medium md:px-5">ชื่อ</th>
               <th className="min-w-[140px] px-3 py-2.5 text-[11px] font-medium">หน่วยงาน</th>
               <th className="min-w-[130px] px-3 py-2.5 text-[11px] font-medium">ผลการติดตาม</th>
-              <th className="px-3 py-2.5 text-right text-[11px] font-medium lg:px-5">จัดการ</th>
+              <th className="px-3 py-2.5 text-right text-[11px] font-medium md:px-5">จัดการ</th>
             </tr>
           </thead>
-          <tbody data-testid="follow-completed-rows" className="block lg:table-row-group">
+          <tbody data-testid="follow-completed-rows">
             {people.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-5 py-10 text-center text-sm text-muted-foreground">
@@ -132,16 +131,13 @@ const FollowCompletedCard: React.FC<{
               const tone = COMPLETION_REASON_TONE[p.reason];
               const span = followedSpan(g);
               return (
-                <tr
-                  key={g.key}
-                  className="grid grid-cols-2 gap-x-3 border-b border-border/50 py-2 align-middle last:border-0 lg:table-row lg:py-0"
-                >
-                  <td className="col-span-2 px-4 py-1.5 lg:px-5 lg:py-3">
+                <tr key={g.key} className="border-b border-border/50 align-middle last:border-0">
+                  <td className="px-4 py-3 md:px-5">
                     <span className="block text-sm font-medium text-foreground">{g.name}</span>
                     <span className="block text-[11px] tabular-nums text-muted-foreground">{g.phone}</span>
                   </td>
-                  <td className="px-4 py-1.5 text-xs text-muted-foreground lg:px-3 lg:py-3">{g.unitName || '—'}</td>
-                  <td className="px-3 py-1.5 lg:py-3">
+                  <td className="px-3 py-3 text-xs text-muted-foreground">{g.unitName || '—'}</td>
+                  <td className="px-3 py-3">
                     <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium', TONE[tone].chip)}>
                       {COMPLETION_REASON_SHORT[p.reason]}
                     </span>
@@ -155,7 +151,7 @@ const FollowCompletedCard: React.FC<{
                       </span>
                     ) : null}
                   </td>
-                  <td className="col-span-2 px-4 py-1.5 lg:px-5 lg:py-3">
+                  <td className="px-3 py-3 md:px-5">
                     <span className="flex flex-wrap items-center justify-end gap-1.5">
                       {/* ตอบว่าไม่ไป = ไม่มีอะไรให้ดูแลต่อ → เหลือแต่ปิดงาน */}
                       {reasonBlocksAftercare(p.reason) ? null : (
