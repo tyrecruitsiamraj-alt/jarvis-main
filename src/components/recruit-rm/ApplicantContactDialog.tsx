@@ -386,24 +386,26 @@ export default function ApplicantContactDialog({
               </>
             ) : null}
           </StepHead>
-          <div className="grid grid-cols-1 gap-3 border-t border-border/70 bg-muted/30 p-3 sm:grid-cols-3">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">นัดหมายวันที่</p>
-              <p className="text-sm tabular-nums text-foreground">
-                {a.appointment_at ? formatYmdDmyBe(a.appointment_at) : EM_DASH}
-              </p>
+          {/* นัดปัจจุบัน — ยังไม่มีนัดไม่ต้องโชว์ช่องขีด (เจ้าของสั่ง 4 ต.ค. 2569 · แบบ iRecruit) */}
+          {a.appointment_at ? (
+            <div
+              className="grid grid-cols-1 gap-3 border-t border-border/70 bg-muted/30 p-3 sm:grid-cols-3"
+              data-testid="current-appointment"
+            >
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">นัดหมายวันที่</p>
+                <p className="text-sm tabular-nums text-foreground">{formatYmdDmyBe(a.appointment_at)}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">สถานที่นัดหมาย</p>
+                <p className="text-sm text-foreground">{a.appointment_place || EM_DASH}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">ลงหน่วยงาน</p>
+                <p className="text-sm text-foreground">{a.appointment_job || 'หาล่วงหน้า'}</p>
+              </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">สถานที่นัดหมาย</p>
-              <p className="text-sm text-foreground">{a.appointment_place || EM_DASH}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">ลงหน่วยงาน</p>
-              <p className="text-sm text-foreground">
-                {a.appointment_job || (a.appointment_at ? 'หาล่วงหน้า' : EM_DASH)}
-              </p>
-            </div>
-          </div>
+          ) : null}
           {apptPick === 'ok' ? (
             <div className="grid grid-cols-1 gap-3 border-t border-border/70 p-3 sm:grid-cols-3" data-testid="new-appointment">
               <div className="space-y-1">

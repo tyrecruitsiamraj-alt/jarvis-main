@@ -184,7 +184,7 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
     );
   });
 
-  it('นัดหมายเดิมขึ้นในขั้นที่ 2 · ไม่มีนัด = ขีด + ปุ่มติดตามนัดกดไม่ได้', () => {
+  it('นัดหมายเดิมขึ้นในขั้นที่ 2 · ไม่มีนัด = ไม่โชว์ช่องนัด + ปุ่มติดตามนัดกดไม่ได้', () => {
     const withAppt = renderDialog(
       app({ appointment_at: '2026-09-15T05:00:00.000Z', appointment_place: 'สาขาลาดพร้าว', appointment_job: 'หน่วย ก' }),
     ).dialog;
@@ -194,6 +194,9 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
     expect(within(step).getByText('หน่วย ก')).toBeTruthy();
     cleanup();
     const noAppt = renderDialog(app()).dialog;
+    // ยังไม่มีนัด = ไม่โชว์ช่อง นัดหมายวันที่/สถานที่/ลงหน่วยงาน ที่เป็นขีด (เจ้าของสั่ง 4 ต.ค. 2569)
+    expect(within(noAppt).queryByTestId('current-appointment')).toBeNull();
+    expect(within(within(noAppt).getByTestId('step-appointment')).queryByText('นัดหมายวันที่')).toBeNull();
     const follow = within(noAppt).getByTestId('step-follow-up');
     const ok = within(follow).getByRole('button', { name: /ติดตามสำเร็จ/ }) as HTMLButtonElement;
     expect(ok.disabled).toBe(true);

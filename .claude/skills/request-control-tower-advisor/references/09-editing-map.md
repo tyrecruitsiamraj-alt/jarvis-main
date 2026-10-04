@@ -11638,3 +11638,4 @@ iRecruit (`rm-action-btn`): โทร (call · POST จดการโทรก�
 | `src/components/recruit-rm/RmTable.tsx` | ไอคอนแท็บการติดต่อ Phone · ListChecks · UserMinus · ปุ่มแถวทุกแท็บเป็น `Button` ghost `iconXs` กลม สีเทา (เดิม `<button>` ปั้นเองมีกรอบ) |
 | `src/components/recruit-rm/RmWorkspace.tsx` | `dial`: ยิงจดเวลาก่อน แล้วคลิกลิงก์ `tel:` (ไม่เปลี่ยน URL หน้า — กันคำขอจดเวลาโดนยกเลิก) |
 | เทสต์ | `tests/api/contactTabIrecruitButtons2569-10-04.test.ts` |
+- (4 ต.ค. ต่อ) ขั้น 2 ในป๊อป: ก้อน "นัดปัจจุบัน" (`data-testid="current-appointment"`) โชว์เฉพาะตอนมีนัด — ไม่มีนัดไม่ต้องโชว์ช่องขีด (เจ้าของสั่ง · ยกเว้นกติกา "ว่างแล้วห้ามหาย" จุดนี้)
