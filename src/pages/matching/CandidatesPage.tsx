@@ -157,7 +157,7 @@ const CandidatesPage: React.FC = () => {
   return (
     <div>
       <PageHeader
-        title="ผู้สมัครทั้งหมด"
+        title="รายชื่อรอลงงาน"
         subtitle={`${filtered.length} คน${filter !== 'all' ? ` (กรอง: ${statusFilters.find((f) => f.value === filter)?.label})` : ''}`}
         backPath="/matching"
         actions={

@@ -44,7 +44,7 @@ describe('originFromReturnTo', () => {
 
 describe('backLabelFor', () => {
   it('ได้คำที่มีชื่อหน้าต้นทาง ไม่ใช่ลูกศรเปล่า', () => {
-    expect(backLabelFor('/jobs/board?lane=released')).toBe('กลับไปกล่องงาน');
+    expect(backLabelFor('/jobs/board?lane=released')).toBe('กลับไปงานสรรหา');
     expect(backLabelFor('/apply')).toBe('กลับไปหน้าสมัครงาน');
   });
 

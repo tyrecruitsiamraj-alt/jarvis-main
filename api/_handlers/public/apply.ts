@@ -159,7 +159,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
           ], { autoPush: true });
         }
       } catch (e) {
-        logError('public/apply auto-dispatch failed (ใบสมัครถูกบันทึกแล้ว — ส่งซ้ำได้จากกล่องงาน)', e, {
+        logError('public/apply auto-dispatch failed (ใบสมัครถูกบันทึกแล้ว — ส่งซ้ำได้จากงานสรรหา)', e, {
           applicationId: id,
         });
       }

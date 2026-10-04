@@ -36,7 +36,7 @@ const SelectionContactPage: React.FC = () => (
  */
 const SelectionEmptyHint: React.FC = () => (
   <p className={cn('rounded-xl border px-3 py-2 text-[11px]', DASH.card, DASH.muted)}>
-    งานโทรมาจากปุ่ม “รับไปโทรเอง” บนหน้า Matching (คนบนบอร์ด) และปุ่มโทรในกล่องงาน
+    งานโทรมาจากปุ่ม “รับไปโทรเอง” บนหน้า Matching (คนบนบอร์ด) และปุ่มโทรในงานสรรหา
     (ใบสมัคร) — เก็บแล้ว AI จะไม่โทรทับเบอร์นั้น · งานเลนสรรหาอยู่ที่แท็บ “การติดต่อ”
     บนบอร์ดรับสมัคร
   </p>

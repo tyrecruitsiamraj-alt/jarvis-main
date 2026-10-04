@@ -704,7 +704,7 @@ export async function buildTeamOnline(
     const page = decisionSummary(w, rows.filter((r) => inPage(r.bu)), labelOf);
     const perBu = decisionSummary(w, rows, labelOf, knownBus);
     body.decisions = { total: page.total, byBu: perBu.byBu, skipsReady: skipR.ok };
-  } else body.errors.decisions = !reqR.ok ? 'อ่านใบขอจาก ERP ไม่ได้ตอนนี้' : 'อ่าน Gen link/ทะเบียนประกาศ/กล่องงานไม่ได้';
+  } else body.errors.decisions = !reqR.ok ? 'อ่านใบขอจาก ERP ไม่ได้ตอนนี้' : 'อ่าน Gen link/ทะเบียนประกาศ/งานสรรหาไม่ได้';
 
   // ── รายชื่อคนใช้งาน (เฉพาะหัวหน้า/admin) ──
   if (canSeePeople && actR.ok) {

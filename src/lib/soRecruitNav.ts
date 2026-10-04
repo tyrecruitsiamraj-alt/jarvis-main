@@ -164,7 +164,7 @@ export const CONVEYOR_VAULT: VaultItem[] = [
    */
   {
     key: 'job-boxes',
-    label: 'กล่องงาน',
+    label: 'งานสรรหา',
     blurb: 'ใบขอทั้งหมดแยกเป็นกล่องตามสถานะ — กำลังสรรหา · คัดเลือก · รอเริ่มงาน · ปิดแล้ว',
     path: '/jobs/board',
     icon: LayoutGrid,
@@ -173,7 +173,7 @@ export const CONVEYOR_VAULT: VaultItem[] = [
   },
   {
     key: 'candidates',
-    label: 'คลังคน',
+    label: 'รายชื่อรอลงงาน',
     blurb: 'ทุกคนที่เคยผ่านระบบ — ค้นย้อนหลังได้',
     path: '/matching/candidates',
     icon: Users,

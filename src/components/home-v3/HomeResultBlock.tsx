@@ -91,7 +91,7 @@ const HomeResultBlock: React.FC<{
             {result.unexplained !== 0 ? (
               <span className={TONE.warn.value}>
                 {' '}
-                · หัวกล่องงานตอนนี้ {fmt(result.boardOpen)} (สดกว่ารอบข้อมูล ERP {ageText(result.ageSeconds)})
+                · หน้างานสรรหาตอนนี้ {fmt(result.boardOpen)} (สดกว่ารอบข้อมูล ERP {ageText(result.ageSeconds)})
               </span>
             ) : null}
           </p>

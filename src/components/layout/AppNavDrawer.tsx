@@ -220,7 +220,7 @@ const AppNavDrawer: React.FC<Props> = ({
             className={cn(rowClass(false), 'text-muted-foreground')}
           >
             <ExternalLink className="h-4 w-4 shrink-0" />
-            <span className="truncate">หน้าสมัครสาธารณะ (/apply)</span>
+            <span className="truncate">ประกาศ (/apply)</span>
           </button>
         </nav>
 

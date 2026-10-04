@@ -183,7 +183,7 @@ export const APPLICATION_ORIGIN_LABEL: Record<ApplicationOrigin, string> = {
 
 /** คำอธิบายยาว — ใช้เป็น title ของชิป (บอกว่าทำไมคนนี้มาอยู่ตรงนี้) */
 export const APPLICATION_ORIGIN_HINT: Record<ApplicationOrigin, string> = {
-  self_apply: 'ผู้สมัครกรอกใบสมัครเข้ามาเอง ผ่านลิงก์ประกาศ/หน้าสมัครสาธารณะ',
+  self_apply: 'ผู้สมัครกรอกใบสมัครเข้ามาเอง ผ่านลิงก์หรือหน้าประกาศ',
   ai_found: 'AI ไปหามาจากฐาน (iRecruit/บอร์ด) แล้วโทรตามก่อน จึงได้ใบสมัครนี้',
   staff_added: 'เจ้าหน้าที่คีย์เข้าระบบเอง (เช่น โทรเข้ามาสมัครทางโทรศัพท์)',
 };

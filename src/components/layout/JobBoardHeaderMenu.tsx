@@ -65,7 +65,7 @@ const JobBoardHeaderMenu: React.FC<Props> = ({ variant = 'nav' }) => {
         >
           <ExternalLink className="mr-2.5 h-4 w-4 text-emerald-600" />
           <div>
-            <p className="text-sm font-medium">หน้าสมัครสาธารณะ</p>
+            <p className="text-sm font-medium">ประกาศ</p>
             <p className="text-[11px] text-muted-foreground">มุมมองผู้สมัคร /apply</p>
           </div>
         </DropdownMenuItem>

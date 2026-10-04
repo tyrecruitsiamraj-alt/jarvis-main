@@ -1146,7 +1146,7 @@ export const PENDING_WAITS: ReadonlyArray<{ key: PendingWait; label: string }> =
   { key: 'started', label: 'มีคนเริ่มงานแล้ว' },
   { key: 'filled', label: 'หาได้แล้ว (ไม่ต้องประกาศ)' },
   { key: 'cancelled', label: 'ยกเลิกแล้ว' },
-  { key: 'closed', label: 'ไม่อยู่ในกล่องงานแล้ว' },
+  { key: 'closed', label: 'ไม่อยู่ในงานสรรหาแล้ว' },
 ];
 
 /** ใบขอหนึ่งใบที่ตัดสินแล้ว (ฝั่ง server ประกอบจาก ERP + ประกาศ + ทะเบียนไม่ปล่อย + กล่องงาน) */

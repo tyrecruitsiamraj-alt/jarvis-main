@@ -234,7 +234,7 @@ export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'dashb
  * ⇒ หัวต้องเป็นชื่อแท็บที่กดมา — กดแท็บ "การโทรของฉัน" หัวก็ต้องเขียน "การโทรของฉัน"
  */
 const BOARD_VIEW_TABS: ReadonlyArray<{ id: BoardViewId; label: string }> = [
-  { id: 'board', label: 'กล่องงาน' },
+  { id: 'board', label: 'งานสรรหา' },
   // 🔴 ชื่อ + ลำดับแท็บตามที่เจ้าของเรียงเอง 30 ก.ย. 2569 (แบบ iRecruit): *"กล่องงาน > ผู้สมัคร > การติดตาม >
   // ติดตามนัดหมาย > ภาพรวม"* · สามแท็บกลางต้องตรงกับ `RM_TAB_LABEL` (lib/recruitRm — เทสต์คุม)
   { id: 'list', label: 'ผู้สมัคร' },
@@ -1144,7 +1144,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ⇒ ถอดการ์ดกรมท่าทึบ (PageHeroStrip) · ถอดพื้นไล่สี + กรอบกว้าง max-w-6xl ของฝั่งเจ้าหน้าที่
    * (หน้าสมัครสาธารณะยังเป็นหัวแบบหน้าปกนิตยสารเหมือนเดิม — คนละกลุ่มคนดู)
    */
-  const staffTitle = BOARD_VIEW_TABS.find((t) => t.id === view)?.label ?? 'กล่องงาน';
+  const staffTitle = BOARD_VIEW_TABS.find((t) => t.id === view)?.label ?? 'งานสรรหา';
   /* 🔴 ตัวเลขยังบอกไม่ได้ (กำลังโหลด/พัง/ไม่มีสิทธิ์) = **ไม่พิมพ์อะไรเลย** (บทเรียน 31 ส.ค. 2569)
      บอกหน่วยครบทั้ง "ใบขอ" และ "อัตรา" (บทเรียน "292 ตำแหน่ง") · % ปล่อยประกาศย้ายมาจากแถบบนหัวกล่องงาน */
   const staffSubtitle =

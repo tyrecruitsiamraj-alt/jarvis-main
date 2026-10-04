@@ -436,7 +436,7 @@ export function NoApplicantsSection({ data, loading, limit = 30 }: { data: Data 
     <Section
       title="ใบยังไม่มีผู้สมัคร · เยอะแค่ไหน · ค้างนานแค่ไหน"
       buBadge={buBadgeOf(data)}
-      foot="นับแบบเดียวกับกล่องงาน (ใบเปิดตอนนี้) · อายุ = นับจากวันที่ของใบขอ · ใบที่ค้างนานมาก ๆ ควรตรวจว่ายังต้องการคนไหม"
+      foot="นับแบบเดียวกับงานสรรหา (ใบเปิดตอนนี้) · อายุ = นับจากวันที่ของใบขอ · ใบที่ค้างนานมาก ๆ ควรตรวจว่ายังต้องการคนไหม"
       right={
         <div className="flex flex-wrap gap-2">
           <Button asChild size="xs" variant="outline">

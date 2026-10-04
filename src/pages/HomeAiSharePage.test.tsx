@@ -236,7 +236,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   it('เปิดหน้ามาใหม่ = หัวข้อที่เลือกไว้ล่าสุด · ค่าที่อ่านไม่ออก = ติดตาม', async () => {
     window.localStorage.setItem(BLOCK_STORE, 'applicants');
     render(<HomeAiSharePage />);
-    expect(await screen.findByRole('heading', { name: 'กล่องงาน' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'งานสรรหา' })).toBeTruthy();
     cleanup();
     window.localStorage.setItem(BLOCK_STORE, 'ไม่มีหัวข้อนี้');
     render(<HomeAiSharePage />);
@@ -309,7 +309,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     render(<HomeAiSharePage />);
     expect(await screen.findByText('โหลดตัวเลขส่วนนี้ไม่ขึ้น ลองรีเฟรชอีกครั้ง')).toBeTruthy();
     openPicker();
-    expect((await screen.findByRole('option', { name: /กล่องงาน/ })).textContent).toContain('โหลดไม่ขึ้น');
+    expect((await screen.findByRole('option', { name: /งานสรรหา/ })).textContent).toContain('โหลดไม่ขึ้น');
     expect(screen.getByRole('option', { name: /ติดตาม/ }).textContent).toContain('AI 100%');
   });
 
@@ -504,7 +504,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     render(<HomeAiSharePage />);
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     openPicker();
-    fireEvent.click(await screen.findByRole('option', { name: /กล่องงาน/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /งานสรรหา/ }));
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('78 รายชื่อ'));
     expect(stat('ทั้งหมด')).not.toMatch(/\d (สาย|ใบ|คน)\b/);
   });
@@ -547,10 +547,10 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     render(<HomeAiSharePage />);
     openPicker();
     const names = (await screen.findAllByRole('option')).map((o) => o.textContent ?? '');
-    for (const label of [conveyorLabel('follow'), conveyorLabel('aftercare'), 'กล่องงาน', conveyorLabel('matching')]) {
+    for (const label of [conveyorLabel('follow'), conveyorLabel('aftercare'), 'งานสรรหา', conveyorLabel('matching')]) {
       expect(names.some((n) => n.startsWith(label)), label).toBe(true);
     }
     expect(names.some((n) => n.includes('ผู้สมัครในกล่องงาน'))).toBe(false);
-    expect(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')?.label).toBe('กล่องงาน');
+    expect(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')?.label).toBe('งานสรรหา');
   });
 });

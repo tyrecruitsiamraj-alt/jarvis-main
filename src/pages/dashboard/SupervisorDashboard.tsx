@@ -553,7 +553,7 @@ const SupervisorDashboard: React.FC = () => {
         if (typeof expectedRequests === 'number' && list.length < expectedRequests) {
           setDetailDialogTitle(
             (prev) =>
-              `${prev} — เลขบนการ์ดคือ ${expectedRequests.toLocaleString('th-TH')} ใบ ส่วนที่เกินเป็นใบนอกกล่องงาน ยังดึงรายชื่อไม่ได้`,
+              `${prev} — เลขบนการ์ดคือ ${expectedRequests.toLocaleString('th-TH')} ใบ ส่วนที่เกินเป็นใบนอกงานสรรหา ยังดึงรายชื่อไม่ได้`,
           );
         }
       };

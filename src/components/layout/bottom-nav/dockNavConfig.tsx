@@ -68,7 +68,7 @@ export const DOCK_NAV_ITEMS: DockNavItem[] = [
   // { path: '/wl', label: 'WL', icon: CalendarDays, functionId: 'work_calendar_read' },
   {
     path: '/matching/candidates',
-    label: 'คลังคน',
+    label: 'รายชื่อรอลงงาน',
     icon: Users,
     functionId: 'candidates_read',
   },

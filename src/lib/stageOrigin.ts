@@ -22,7 +22,7 @@ export const ORIGIN_LABELS: Record<
   { label: string; path: string; blurb: string }
 > = {
   board: {
-    label: 'กล่องงาน',
+    label: 'งานสรรหา',
     path: '/jobs/board',
     blurb: 'ทำงานประกาศอยู่ — กดกลับไปได้ ขั้นที่กรองไว้ยังอยู่',
   },

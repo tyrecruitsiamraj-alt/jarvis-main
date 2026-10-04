@@ -44,7 +44,7 @@ export function onlineTasks(data: TeamOnlineResponse | null): NextTask[] {
       count: lane.publish,
       tone: 'warn',
       path: METRICS['teamOnline.lanePublish'].href,
-      action: 'เปิดกล่องงาน',
+      action: 'เปิดงานสรรหา',
       stepKey: 'requests',
     });
   }
@@ -57,7 +57,7 @@ export function onlineTasks(data: TeamOnlineResponse | null): NextTask[] {
       count: lane.silent,
       tone: 'warn',
       path: METRICS['teamOnline.laneSilent'].href,
-      action: 'เปิดกล่องงาน',
+      action: 'เปิดงานสรรหา',
       stepKey: 'requests',
     });
   }
@@ -71,7 +71,7 @@ export function onlineTasks(data: TeamOnlineResponse | null): NextTask[] {
       count: lane.sourcing,
       tone: 'info',
       path: METRICS['teamOnline.laneSourcing'].href,
-      action: 'เปิดกล่องงาน',
+      action: 'เปิดงานสรรหา',
       stepKey: 'requests',
     });
   }
