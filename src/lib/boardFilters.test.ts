@@ -5,6 +5,7 @@ import {
   applyBoardFilters,
   boardFacetValueLabel,
   buildBoardFacets,
+  drivingSubtypeOf,
   clearBoardFacets,
   countSelectedFacetValues,
   describeBoardFilters,
@@ -259,15 +260,27 @@ describe('ตำแหน่งงาน → งานย่อย (เฉพา
     expect(buildBoardFacets(rows, state({ position: ['คนสวน'] }), facts()).some((v) => v.key === 'subtype')).toBe(false);
   });
 
-  it('เลือก "ขับรถ" แล้ว งานย่อยโผล่: ส่วนกลาง · นาย · Valet · อื่น ๆ', () => {
+  it('เลือก "ขับรถ" แล้ว งานย่อยโผล่: ส่วนกลาง · นายไทย · นายต่างชาติ · Valet · อื่น ๆ (4 ต.ค. 2569)', () => {
     const v = buildBoardFacets(rows, state({ position: ['ขับรถ'] }), facts()).find((x) => x.key === 'subtype')!;
     expect(v.options.map((o) => [o.label, o.count])).toEqual([
       ['ส่วนกลาง', 1],
-      ['นาย (รถผู้บริหาร)', 1],
+      ['นายไทย', 1],
+      ['นายต่างชาติ', 0],
+      ['นาย (ไม่ระบุสัญชาติ)', 0],
       ['Valet', 1],
       ['อื่น ๆ', 1],
     ]);
-    expect(applyBoardFilters(rows, state({ position: ['ขับรถ'], subtype: ['boss'] }), facts())).toEqual([boss]);
+    expect(applyBoardFilters(rows, state({ position: ['ขับรถ'], subtype: ['boss_th'] }), facts())).toEqual([boss]);
+  });
+
+  it('นายแยกสัญชาติจากชนิดงานหรือช่องสัญชาติของนาย · "-" = ไม่ระบุ (ห้ามเดา)', () => {
+    const at = (code2: string, nat: string | null) =>
+      drivingSubtypeOf(job({ job_description_code_1: 'ขับรถ', job_description_code_2: code2, boss_nationality: nat }));
+    expect(at('รถผู้บริหาร', 'คนไทย')).toBe('boss_th');
+    expect(at('รถผู้บริหาร', 'ญี่ปุ่น')).toBe('boss_foreign');
+    expect(at('รถผู้บริหารต่างชาติ', null)).toBe('boss_foreign');
+    expect(at('รถผู้บริหาร', '-')).toBe('boss');
+    expect(at('ส่วนกลาง', 'ญี่ปุ่น')).toBe('central');
   });
 
   it('เอาตำแหน่งขับรถออก = งานย่อยที่ติ๊กไว้หลุดตาม', () => {

@@ -11469,3 +11469,20 @@ Choice ของเจ้าของ: การ์ดแยกบนหน้�
 
 - หลังแก้ (dev build): คำนวณตัวกรอง ~150 ms (จาก ~2,000) · ทั้งรอบรวมวาดการ์ด 0.4–0.6 วิ (production เร็วกว่านี้)
 - ⚠️ หัวข้อใหม่ที่ `values` ใช้ state ต้องประกาศพารามิเตอร์ตัวที่ 3 เสมอ (ตัวตัดสินว่าแคชได้ไหมคือ `values.length >= 3`)
+
+### 4 ต.ค. 2569 (ต่อ) — หน้าประกาศ (/apply): ตัวกรองหลายค่า · พนักงานขับรถ + ชนิด · ปุ่มสลับธีม
+
+เจ้าของ: *"หน้าสาธารณะ ปุ่มโหมดมืดสว่างสลับไม่มี · ส่วนกลางเอาไปรวมตรงขับรถ ต้องเป็น พนักงานขับรถ ส่วนกลาง นายไทย นายต่างชาติ ·
+ช่องเลือก Filter แล้วไม่ไป และเลือกได้ทีละหลายๆอัน"* → Choice "พนักงานขับรถ + ชนิด" · Filter = ทั้ง 3 ที่
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/boardFilters.ts` | `DRIVING_SUBTYPES` แยกนาย: `boss_th` นายไทย · `boss_foreign` นายต่างชาติ · `boss` นาย (ไม่ระบุสัญชาติ) — สัญชาติจากชนิดงาน (รถผู้บริหารคนไทย/ต่างชาติ) หรือ `boss_nationality` ("-" = ไม่ระบุ ห้ามเดา) · ชุดหัวข้อสาธารณะ `PUBLIC_FACET_KEYS` (จังหวัด›อำเภอ · ตำแหน่ง›ชนิดงานขับรถ) + `applyPublicFilters` / `buildPublicFacets` / `publicFilterState` (ทิ้งค่าหัวข้อภายในที่ติดมากับลิงก์) |
+| `src/lib/publicJobTitle.ts` (ใหม่) | ชื่อบนการ์ดหน้าประกาศ: งานขับรถ = "พนักงานขับรถ " + ชนิด · ⚠️ วาดอย่างเดียว ตัวกรอง/เรียง/หลังบ้านยังใช้ `publicJobPositionLabel` |
+| `src/components/jobs/JobBoardView.tsx` | ฝั่งสาธารณะอ่าน/เขียนตัวกรองใน URL `f.*` · การ์ดใช้ `publicJobTitle` · ถอดป้าย `JOB_TYPE_LABELS` (เคยขึ้น "ส่วนกลาง" บนการ์ดคนสวน) |
+| `src/components/jobs/JobBoardTopFilters.tsx` | prop `facetFilter` → แผงตัวกรองใช้ `FilterAccordion` (ติ๊กได้หลายค่า เลขต่อท้าย) แทน Dropdown ค่าเดียว 4 ช่อง · ชิป "กำลังกรอง" ต่อค่า |
+| `src/components/jobs/BoardFilterPanel.tsx` | export `FilterAccordion` |
+| `src/components/layout/ThemeToggleButton.tsx` (ใหม่) · `PublicApplyLayout.tsx` | ปุ่มสลับธีมบนหัวหน้าประกาศ (โหมดฝัง `?embed=1` ไม่มีหัว = ไม่มีปุ่ม) |
+| เทสต์ | `tests/api/publicApplyPage2569-10-04.test.ts` · `boardFilters.test.ts` (นายแยกสัญชาติ) |
+
+- ตรวจจริง /apply: 8 ใบ ชื่อ พนักงานขับรถ ส่วนกลาง×4 · นายไทย · นายต่างชาติ (Honda นายญี่ปุ่น) · Valet · คนสวน · ติ๊กกรุงเทพ+ปทุมธานี+ขับรถ → ชนิด ส่วนกลาง 4 · นายไทย 1 · Valet 1 · สลับธีมมืด↔สว่างได้

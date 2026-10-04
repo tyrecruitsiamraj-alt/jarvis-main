@@ -12,6 +12,8 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { TONE } from '@/lib/designTokens';
+import { FilterAccordion } from '@/components/jobs/BoardFilterPanel';
+import { BOARD_FACET_ATTACH, type BoardFacetKey, type BoardFacetView } from '@/lib/boardFilters';
 
 type Props = {
   search: string;
@@ -77,7 +79,19 @@ type Props = {
   hideFieldFilters?: boolean;
   /** ของเสริมท้ายแถบ (โหมด bar) — กล่องงานวางช่วงวันที่ + ปุ่มเรียง + ปุ่มล้างที่นี่ */
   extra?: React.ReactNode;
+  /**
+   * ตัวกรองแบบติ๊กได้หลายค่า (หน้าประกาศ /apply · เจ้าของ 4 ต.ค. 2569) — ส่งมา = ใช้แทน Dropdown ค่าเดียว 4 ช่อง
+   * ตัวเลือก/เลขต่อท้ายมาจากเครื่องกรองกลาง (ค่าที่ไม่มีงานไม่โผล่ ⇒ ไม่มีเลือกแล้วว่าง)
+   */
+  facetFilter?: {
+    facets: BoardFacetView[];
+    onToggle: (key: BoardFacetKey, value: string) => void;
+    onClear: () => void;
+  };
 };
+
+/** ลำดับหัวข้อบนหน้าประกาศ — พื้นที่ก่อน แล้วตำแหน่ง (อำเภอ/ชนิดงานขับรถอยู่ในหัวข้อแม่) */
+const PUBLIC_PRIMARY: readonly BoardFacetKey[] = ['province', 'position'];
 
 function countActiveFilters(...values: string[]): number {
   return values.filter(Boolean).length;
@@ -133,6 +147,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
   eyebrow,
   hideFieldFilters = false,
   extra,
+  facetFilter,
 }) => {
   const [sheetOpen, setSheetOpen] = useState(false);
   /**
@@ -142,8 +157,10 @@ const JobBoardTopFilters: React.FC<Props> = ({
    * 🔴 ถ้ามีตัวกรองเปิดอยู่ให้กางเอง — คนจะได้ไม่สงสัยว่าทำไมผลน้อย
    */
   const [fieldsOpen, setFieldsOpen] = useState(false);
+  const facetCount = facetFilter ? facetFilter.facets.reduce((n, f) => n + f.selectedCount, 0) : 0;
   const activeFilterCount = useMemo(
     () =>
+      facetCount +
       countActiveFilters(
         provinceFilter,
         districtFilter,
@@ -152,10 +169,11 @@ const JobBoardTopFilters: React.FC<Props> = ({
         recruiterFilter,
         contractTypeFilter,
       ),
-    [provinceFilter, districtFilter, positionFilter, subtypeFilter, recruiterFilter, contractTypeFilter],
+    [facetCount, provinceFilter, districtFilter, positionFilter, subtypeFilter, recruiterFilter, contractTypeFilter],
   );
 
   const clearAllFilters = () => {
+    facetFilter?.onClear();
     onProvinceFilterChange('');
     onDistrictFilterChange('');
     if (!lockPosition) onPositionFilterChange('');
@@ -170,7 +188,16 @@ const JobBoardTopFilters: React.FC<Props> = ({
    * ⚠️ ใช้ flex-wrap ไม่ใช่แถวตายตัว — จอแคบต้องตกบรรทัดเอง ไม่ใช่ทะลุขอบ
    * (กับดักเดิมของโปรเจกต์: shrink-0 คู่กับแถวที่ไม่ wrap = ทะลุ)
    */
-  const filterFields = (
+  const filterFields = facetFilter ? (
+    <div className="max-w-xl">
+      <FilterAccordion
+        facets={facetFilter.facets}
+        primary={PUBLIC_PRIMARY}
+        attach={BOARD_FACET_ATTACH}
+        onToggle={facetFilter.onToggle}
+      />
+    </div>
+  ) : (
     <div className="flex flex-wrap items-end gap-3">
       <LocationFilterSelect
         label="จังหวัด"
@@ -230,6 +257,13 @@ const JobBoardTopFilters: React.FC<Props> = ({
 
   const activeChips = (
     <>
+      {facetFilter?.facets.flatMap((f) =>
+        f.options
+          .filter((o) => o.selected)
+          .map((o) => (
+            <FilterChip key={`${f.key}:${o.value}`} label={`${f.label} ${o.label}`} onRemove={() => facetFilter.onToggle(f.key, o.value)} />
+          )),
+      )}
       {provinceFilter ? (
         <FilterChip label={`จังหวัด ${provinceFilter}`} onRemove={() => onProvinceFilterChange('')} />
       ) : null}

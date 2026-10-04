@@ -4,6 +4,7 @@ import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import { cn } from '@/lib/utils';
 import { isEmbedMode, startEmbedHeightReporter } from '@/lib/embedMode';
+import ThemeToggleButton from '@/components/layout/ThemeToggleButton';
 
 /**
  * เลย์เอาต์สำหรับผู้สมัครงานเท่านั้น — ไม่มีเมนูเข้าระบบภายใน
@@ -42,6 +43,8 @@ const PublicApplyLayout: React.FC<{ children: React.ReactNode }> = ({ children }
               <BrandTitle className="truncate text-base md:text-lg font-medium text-foreground tracking-tight" />
             </div>
           </div>
+          {/* สลับโหมดสว่าง/มืด (4 ต.ค. 2569) — โหมดฝัง `?embed=1` ไม่มีหัวนี้ จึงไม่มีปุ่ม (ให้กลืนกับหน้าที่เอาไปวาง) */}
+          <ThemeToggleButton className="ml-auto" />
         </div>
       </header>
 

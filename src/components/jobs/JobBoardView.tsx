@@ -2,9 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { trackPublicClick } from '@/lib/publicClickApi';
 import { useSearchParams } from 'react-router-dom';
 import type { JobRequest } from '@/types';
-import { JOB_TYPE_LABELS } from '@/types';
 import { jobSectorLabel } from '@/lib/unitRequestDisplay';
-import { jobBoardCardTitle, jobBoardCardSubtitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, jobBoardCardSubtitle } from '@/lib/unitRequestDisplay';
 import BoardCardProgress from '@/components/jobs/BoardCardProgress';
 import {
   canShowNumbers,
@@ -21,6 +20,7 @@ import { benefitDisplayLabels } from '@/lib/extraBenefits';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { resolveApplyPositionPreset } from '@/lib/jobBoardPositionPreset';
 import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
+import { publicJobTitle } from '@/lib/publicJobTitle';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
 import BoardJobCard from '@/components/jobs/BoardJobCard';
 import SearchField from '@/components/shared/SearchField';
@@ -129,6 +129,9 @@ import {
   sortBoardJobs,
   toggleBoardFacetValue,
   writeBoardFilterState,
+  applyPublicFilters,
+  buildPublicFacets,
+  publicFilterState,
   writeBoardSearch,
   type BoardDateField,
   type BoardFacetFacts,
@@ -604,6 +607,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     [boardFilterOn, searchParams],
   );
   /**
+   * ตัวกรองหน้าประกาศ (/apply) — เลือกได้หลายค่า อยู่ใน URL (`f.*`) แบบเดียวกับหน้างานสรรหา (เจ้าของ 4 ต.ค. 2569)
+   * 🔴 เฉพาะหัวข้อสาธารณะ (`PUBLIC_FACET_KEYS`) — ค่าของหัวข้อภายในที่ติดมากับลิงก์ถูกทิ้ง
+   */
+  const publicFilterOn = !isStaff;
+  const publicState = useMemo<BoardFilterState>(
+    () => (publicFilterOn ? publicFilterState(readBoardFilterState(searchParams)) : EMPTY_BOARD_FILTER_STATE),
+    [publicFilterOn, searchParams],
+  );
+  /**
    * ── เส้นทางงาน (เจ้าของสั่ง 27 ส.ค. 2569: "ทำให้มันไหลเป็นเส้น") ──
    * ตรรกะอยู่ lib/boardFlow (มีเทสต์) — ที่นี่แค่ประกอบ facts จาก index ที่โหลดอยู่แล้ว
    *
@@ -638,8 +650,17 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   );
   /** ใบเปิดหลังแถบซ้าย — ตัวแทน `filters.filtered` ของทุกตัวเลขข้างล่าง */
   const openRows = useMemo(
-    () => (boardFilterOn ? applyBoardFilters(filters.filtered, boardFilterState, facetFacts) : filters.filtered),
-    [boardFilterOn, filters.filtered, boardFilterState, facetFacts],
+    () =>
+      boardFilterOn
+        ? applyBoardFilters(filters.filtered, boardFilterState, facetFacts)
+        : publicFilterOn
+          ? applyPublicFilters(filters.filtered, publicState)
+          : filters.filtered,
+    [boardFilterOn, filters.filtered, boardFilterState, facetFacts, publicFilterOn, publicState],
+  );
+  const publicFacets = useMemo(
+    () => (publicFilterOn ? buildPublicFacets(filters.filtered, publicState) : []),
+    [publicFilterOn, filters.filtered, publicState],
   );
   const boardFacets = useMemo(
     () => (boardFilterOn ? buildBoardFacets(filters.filtered, boardFilterState, facetFacts) : []),
@@ -694,6 +715,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       );
     },
     [setSearchParams],
+  );
+
+  const togglePublicFacet = React.useCallback(
+    (key: BoardFacetKey, value: string) => commitBoardFilters(toggleBoardFacetValue(publicState, key, value)),
+    [commitBoardFilters, publicState],
+  );
+  const clearPublicFacets = React.useCallback(
+    () => commitBoardFilters(EMPTY_BOARD_FILTER_STATE),
+    [commitBoardFilters],
   );
 
   const toggleBoardFacet = React.useCallback(
@@ -1435,6 +1465,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           searchPlaceholder={searchPlaceholder}
           resultCount={!ledgerReady ? undefined : boxedJobs.length}
           totalCount={!ledgerReady ? undefined : filters.visibleCount}
+          facetFilter={
+            publicFilterOn
+              ? { facets: publicFacets, onToggle: togglePublicFacet, onClear: clearPublicFacets }
+              : undefined
+          }
         />
         )}
 
@@ -1590,7 +1625,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         เดิมตำแหน่งเป็นชิปเทา ๆ ปนอยู่แถวล่างกับประเภทงาน กวาดตาหาไม่เจอ
                         ทั้งที่เป็นคำที่คนใช้ตัดสินใจมากที่สุดบนการ์ด */}
                     <p className="line-clamp-2 text-sm font-medium text-primary">
-                      {publicJobPositionLabel(job)}
+                      {/* งานขับรถ = "พนักงานขับรถ + ชนิด" (เจ้าของ 4 ต.ค. 2569) — ป้ายชนิดงานแยกถูกถอด */}
+                      {publicJobTitle(job)}
                     </p>
                     {/* บรรทัดรอง: ตัดตำแหน่งที่ซ้ำกับบรรทัดสีน้ำเงินข้างบนออก (เดิมพิมพ์ซ้ำทุกใบ) */}
                     <p className="line-clamp-2 text-xs text-muted-foreground">
@@ -1685,11 +1721,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       {isHiddenFromPublicByWorkStatus(job.work_status) ? ' · ไม่ขึ้นประกาศ' : ''}
                     </span>
                   ) : null}
-                  {job.job_description_code_1 && job.job_type ? (
-                    <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                      {JOB_TYPE_LABELS[job.job_type]}
-                    </span>
-                  ) : (
+                  {/* ป้ายชนิดงาน (ส่วนกลาง/Valet …) ถอดแล้ว 4 ต.ค. 2569 — ชนิดอยู่ในชื่อตำแหน่ง ("พนักงานขับรถ ส่วนกลาง")
+                      ป้ายเดิมเดาจากคำแล้วขึ้น "ส่วนกลาง" บนการ์ดคนสวนด้วย */}
+                  {job.job_description_code_1 ? null : (
                     <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                       {jobSectorLabel(job)}
                     </span>

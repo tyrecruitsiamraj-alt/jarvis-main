@@ -214,7 +214,7 @@ function selectedTotal<K extends string>(facets: FacetView<K>[], sections: Filte
  * เนื้อในของตัวกรอง — หัวข้อพับได้ **เปิดได้ทีละหัวข้อ** (แบบ iRecruit) · หัวข้อลูกอยู่ในหัวข้อแม่ ·
  * หัวข้อเพิ่ม (`sections`) ต่อท้าย · 🔴 ตัวเดียวที่วาดหัวข้อ — ปุ่มเดียว/แถบซ้าย/แผงมือถือ ห้ามวาดเอง
  */
-function FilterAccordion<K extends string>({
+export function FilterAccordion<K extends string>({
   facets,
   primary = [],
   attach = {},

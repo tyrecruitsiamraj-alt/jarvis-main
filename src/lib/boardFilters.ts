@@ -182,18 +182,33 @@ export function onlineIncomeValue(job: JobRequest): string {
  * รถผู้บริหาร 53 (+คนไทย 3 · ต่างชาติ 2) · Valet Parking 19 · ชนิดที่ 2 5 · ไม่ระบุ 4 · ทดสอบ 2
  * ⇒ "นาย" = ทุกชื่อที่มีคำว่า "ผู้บริหาร" · ค่าที่ไม่เข้ากลุ่มไหน = "อื่น ๆ" · ว่าง/ไม่ระบุ = ไม่ระบุ
  */
-const DRIVING_SUBTYPES: ReadonlyArray<{ id: string; label: string }> = [
+export const DRIVING_SUBTYPES: ReadonlyArray<{ id: string; label: string }> = [
   { id: 'central', label: 'ส่วนกลาง' },
-  { id: 'boss', label: 'นาย (รถผู้บริหาร)' },
+  /** นายแยกสัญชาติ (เจ้าของ 4 ต.ค. 2569: *"พนักงานขับรถ ส่วนกลาง นายไทย นายต่างชาติ"*) */
+  { id: 'boss_th', label: 'นายไทย' },
+  { id: 'boss_foreign', label: 'นายต่างชาติ' },
+  { id: 'boss', label: 'นาย (ไม่ระบุสัญชาติ)' },
   { id: 'valet', label: 'Valet' },
   { id: 'other', label: 'อื่น ๆ' },
 ];
+
+/** สัญชาติของนายที่อ่านออก — "-" / ไม่ระบุ / ว่าง = อ่านไม่ออก (ห้ามเดา) */
+function bossNationalityOf(job: JobRequest, raw: string): 'th' | 'foreign' | null {
+  const nat = (job.boss_nationality ?? '').trim();
+  if (/ไทย/.test(raw) || /ไทย/.test(nat)) return 'th';
+  if (/ต่างชาติ|ต่างประเทศ/.test(raw)) return 'foreign';
+  if (nat && nat !== '-' && nat !== 'ไม่ระบุ') return 'foreign';
+  return null;
+}
 
 export function drivingSubtypeOf(job: JobRequest): string {
   const raw = (job.job_description_code_2 ?? '').trim();
   if (!raw || raw === 'ไม่ระบุ') return UNSPECIFIED;
   if (/ส่วนกลาง/.test(raw)) return 'central';
-  if (/ผู้บริหาร|นาย/.test(raw)) return 'boss';
+  if (/ผู้บริหาร|นาย/.test(raw)) {
+    const nat = bossNationalityOf(job, raw);
+    return nat === 'th' ? 'boss_th' : nat === 'foreign' ? 'boss_foreign' : 'boss';
+  }
   if (/valet|แวลเล่|แวลเลต/i.test(raw)) return 'valet';
   return 'other';
 }
@@ -462,6 +477,45 @@ export function buildBoardFacets(
 ): BoardFacetView[] {
   const dated = rows.filter((j) => passesDates(j, state.dates));
   return buildFacetViews(dated, FACETS, state, facts, boardFacetValueLabel);
+}
+
+/**
+ * ═══ ตัวกรองหน้าประกาศ (/apply) — เลือกได้หลายค่า (เจ้าของ 4 ต.ค. 2569) ═══
+ * เดิมเป็น Dropdown เลือกค่าเดียว 4 ช่อง + จังหวัดโชว์ครบ 77 จังหวัดแม้ไม่มีงาน (เลือกแล้วว่าง = "แล้วไม่ไป")
+ * ตอนนี้ใช้เครื่องกรองตัวเดียวกับหน้างานสรรหา — เฉพาะหัวข้อที่คนนอกเห็นได้ ค่าที่โชว์มีงานจริงเท่านั้น
+ * 🔴 ห้ามเพิ่มหัวข้อภายใน (พร้อมประกาศ/ผู้สมัคร/AI/เจ้าหน้าที่) ลงชุดนี้ — ข้อมูลภายในห้ามหลุดหน้าสาธารณะ
+ */
+export const PUBLIC_FACET_KEYS: readonly BoardFacetKey[] = ['province', 'district', 'position', 'subtype'];
+const PUBLIC_FACETS = FACETS.filter((f) => PUBLIC_FACET_KEYS.includes(f.key));
+/** หัวข้อสาธารณะไม่ใช้ข้อมูลภายในเลย — ก้อนคงที่ (เครื่องกรองจำค่าของแถวตามก้อนนี้) */
+const PUBLIC_FACTS: BoardFacetFacts = {
+  countsReady: false,
+  applicants: () => 0,
+  leads: () => 0,
+  isReleased: null,
+  aiSent: null,
+  readinessOf: null,
+};
+
+export function applyPublicFilters(rows: readonly JobRequest[], state: BoardFilterState): JobRequest[] {
+  return applyFacetDefs(rows, PUBLIC_FACETS, state, PUBLIC_FACTS);
+}
+
+/** คำบนหน้าประกาศ — ตำแหน่งขับรถเขียน "พนักงานขับรถ" ให้ตรงชื่อบนการ์ด (`publicJobTitle`) ค่าที่กรองยังเป็นค่าเดิม */
+function publicFacetValueLabel(key: BoardFacetKey, value: string): string {
+  if (key === 'position' && value !== UNSPECIFIED && isDrivingPositionLabel(value)) return 'พนักงานขับรถ';
+  return boardFacetValueLabel(key, value);
+}
+
+export function buildPublicFacets(rows: readonly JobRequest[], state: BoardFilterState): BoardFacetView[] {
+  return buildFacetViews(rows, PUBLIC_FACETS, state, PUBLIC_FACTS, publicFacetValueLabel);
+}
+
+/** ค่าที่ติ๊กอยู่ในชุดสาธารณะ — ค่าของหัวข้อภายในที่ติดมากับลิงก์ไม่นับ/ไม่ใช้ */
+export function publicFilterState(state: BoardFilterState): BoardFilterState {
+  const selection: BoardFilterState['selection'] = {};
+  for (const k of PUBLIC_FACET_KEYS) if (state.selection[k]?.length) selection[k] = state.selection[k];
+  return { selection, dates: null };
 }
 
 /** นับหัวข้อ/ค่าที่เลือกอยู่ (ปุ่ม "ตัวกรอง (N)" บนมือถือ) — ไม่นับช่วงวันที่ซึ่งอยู่แถบบน */
