@@ -9,6 +9,7 @@
 import { randomUUID } from 'node:crypto';
 import { dbQuery } from '../_lib/postgres.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
+import { FOLLOW_CALL_ROUND_MAX } from '../../src/lib/followCallRound.js';
 
 /** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 092 (group_id/call_times) */
 function isUndefinedColumn(e: unknown): boolean {
@@ -405,7 +406,10 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
   let callRound: number | null = null;
   if (body.call_round != null && body.call_round !== '') {
     const n = Number(body.call_round);
-    if (!Number.isInteger(n) || n < 1 || n > 9) return fail('สายที่เท่าไหร่ต้องเป็นเลข 1-9');
+    // เดิมตัน 9 — ลงหลายวันแล้ววันท้าย ๆ บันทึกไม่ได้ (4 ต.ค. 2569) · ดู followCallRound.ts
+    if (!Number.isInteger(n) || n < 1 || n > FOLLOW_CALL_ROUND_MAX) {
+      return fail(`สายที่เท่าไหร่ต้องเป็นเลข 1-${FOLLOW_CALL_ROUND_MAX}`);
+    }
     callRound = n;
   }
 

@@ -1,6 +1,6 @@
 /**
  * สรุปแผนติดตามทั้งวัน (เจ้าของสั่ง 2 ต.ค. 2569 · Choice "หน้าสรุปบนจอ")
- * 🔴 ด่าน: เฉพาะวันนั้น เรียงตามเวลา · ป้ายสาย "วันที่ D · สายที่ N" ตัวเดียวกับตาราง · ใครโทร · ยกเลิกอยู่ในรายงานแต่ไม่นับเป็นสาย ·
+ * 🔴 ด่าน: เฉพาะวันนั้น ชื่อเดียวกันติดกัน (คนเรียงตามสายแรก · ในคนเรียงตามเวลา) · ป้ายสาย "วันที่ D · สายที่ N" ตัวเดียวกับตาราง · ใครโทร · ยกเลิกอยู่ในรายงานแต่ไม่นับเป็นสาย ·
  *    ข้อความคัดลอกคั่นแท็บ หัวตาราง + แถวละสาย
  */
 import { describe, expect, it } from 'vitest';
@@ -38,13 +38,34 @@ describe('buildFollowDayReport', () => {
       entry({ scheduled_at: '2026-10-02T10:00:00+07:00', recipient_name: 'นางอีกคน', recipient_phone: '0899999999', cancelled: true }),
     ];
     const r = buildFollowDayReport(rows, '2026-10-02', NOW);
+    // ชื่อเดียวกันติดกัน (4 ต.ค. 2569): นายทดสอบ 08:00 + 12:00 มาก่อน แล้วค่อยนางอีกคน 10:00
     expect(r.rows.map((x) => [x.time, x.call, x.caller, x.cancelled])).toEqual([
       ['08:00', 'วันที่ 1 · สายที่ 1', 'AI โทร', false],
-      ['10:00', 'สายที่ 1', 'AI โทร', true],
       ['12:00', 'วันที่ 1 · สายที่ 2', 'คนโทร', false],
+      ['10:00', 'สายที่ 1', 'AI โทร', true],
     ]);
-    expect(r.rows[1].result).toBe('ยกเลิก');
+    expect(r.rows[2].result).toBe('ยกเลิก');
     expect(r).toMatchObject({ people: 1, calls: 2, ai: 1, manual: 1, cancelled: 1 });
+  });
+
+  it('🔴 ชื่อเดียวกันต้องอยู่ติดกัน — คนเรียงตามสายแรกของวัน · ในคนเดียวกันเรียงตามเวลา · สองเบอร์ชื่อเดียวก็ติดกัน', () => {
+    const rows = [
+      entry({ recipient_name: 'นายก', recipient_phone: '0811111111', scheduled_at: '2026-10-02T05:00:00+07:00' }),
+      entry({ recipient_name: 'นายข', recipient_phone: '0822222222', scheduled_at: '2026-10-02T05:00:00+07:00' }),
+      entry({ recipient_name: 'นายค', recipient_phone: '0833333333', scheduled_at: '2026-10-02T05:30:00+07:00' }),
+      entry({ recipient_name: 'นายก', recipient_phone: '0811111111', scheduled_at: '2026-10-02T06:00:00+07:00' }),
+      entry({ recipient_name: 'นายข', recipient_phone: '0822222222', scheduled_at: '2026-10-02T06:00:00+07:00' }),
+      entry({ recipient_name: 'นายค', recipient_phone: '0844444444', scheduled_at: '2026-10-02T06:00:00+07:00' }),
+    ];
+    const r = buildFollowDayReport(rows, '2026-10-02', NOW);
+    expect(r.rows.map((x) => `${x.time} ${x.name}`)).toEqual([
+      '05:00 นายก',
+      '06:00 นายก',
+      '05:00 นายข',
+      '06:00 นายข',
+      '05:30 นายค',
+      '06:00 นายค',
+    ]);
   });
 
   it('วันที่ไม่มีสาย = ไม่มีแถว เลขเป็น 0', () => {

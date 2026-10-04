@@ -313,14 +313,16 @@ describe('parseFollowInput — สายที่เท่าไหร่ (113)'
     expect(parseFollowInput(body).value?.callRound).toBeNull();
   });
 
-  it('รับเลข 1-9', () => {
+  it('รับเลข 1 ขึ้นไป — ลงหลายวันนับต่อทั้งชุด (4 ต.ค. 2569 เดิมตัน 9 วันท้าย ๆ บันทึกไม่ได้)', () => {
     expect(parseFollowInput({ ...body, call_round: 2 }).value?.callRound).toBe(2);
     expect(parseFollowInput({ ...body, call_round: '3' }).value?.callRound).toBe(3);
+    expect(parseFollowInput({ ...body, call_round: 10 }).value?.callRound).toBe(10);
+    expect(parseFollowInput({ ...body, call_round: 155 }).value?.callRound).toBe(155); // 31 วัน × 5 สาย
   });
 
   it('🔴 ค่านอกช่วง/อ่านไม่ออก = ปฏิเสธ ไม่แอบปัดให้', () => {
     expect(parseFollowInput({ ...body, call_round: 0 }).error).toBeTruthy();
-    expect(parseFollowInput({ ...body, call_round: 12 }).error).toBeTruthy();
+    expect(parseFollowInput({ ...body, call_round: 1000 }).error).toBeTruthy();
     expect(parseFollowInput({ ...body, call_round: 'สอง' }).error).toBeTruthy();
     expect(parseFollowInput({ ...body, call_round: 1.5 }).error).toBeTruthy();
   });

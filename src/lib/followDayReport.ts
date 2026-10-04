@@ -66,10 +66,25 @@ export function buildFollowDayReport(
   filter: FollowDayReportFilter = FOLLOW_DAY_REPORT_NO_FILTER,
 ): FollowDayReport {
   const planning = buildFollowPlanningRows(groupFollowEntries(entries, now));
-  const allCalls = buildFollowDayCalls(planning, ymd).sort(
+  /**
+   * 🔴 ชื่อเดียวกันต้องอยู่ติดกัน (เจ้าของสั่ง 4 ต.ค. 2569 — เดิมเรียงตามเวลาล้วน สายที่ 1 กับ 2 ของคนเดียวกันห่างกันครึ่งตาราง)
+   * คนเรียงตามสายแรกของวัน → ในคนเดียวกันเรียงตามเวลา · จับกลุ่มด้วยชื่อ (คนเดียวมีสองเบอร์ก็ยังติดกัน)
+   */
+  const dayCallsRaw = buildFollowDayCalls(planning, ymd);
+  const timeOf = (c: (typeof dayCallsRaw)[number]) => c.round.time ?? '99:99';
+  const nameKey = (c: (typeof dayCallsRaw)[number]) => c.row.group.name.trim().replace(/\s+/g, ' ');
+  const firstTime = new Map<string, string>();
+  for (const c of dayCallsRaw) {
+    const k = nameKey(c);
+    const t = timeOf(c);
+    if (!firstTime.has(k) || t < (firstTime.get(k) as string)) firstTime.set(k, t);
+  }
+  const allCalls = dayCallsRaw.sort(
     (a, b) =>
-      (a.round.time ?? '99:99').localeCompare(b.round.time ?? '99:99') ||
-      a.row.group.name.localeCompare(b.row.group.name, 'th'),
+      (firstTime.get(nameKey(a)) as string).localeCompare(firstTime.get(nameKey(b)) as string) ||
+      nameKey(a).localeCompare(nameKey(b), 'th') ||
+      timeOf(a).localeCompare(timeOf(b)) ||
+      a.row.group.phone.localeCompare(b.row.group.phone),
   );
   /** เลขสายของรายการ — ตัวเดียวกับที่ป้าย "สายที่ N" ใช้ (call_of_day ก่อนเสมอ) */
   const callNoOf = (e: FollowEntry, slot: number | null) => e.call_of_day ?? e.call_round ?? slot;

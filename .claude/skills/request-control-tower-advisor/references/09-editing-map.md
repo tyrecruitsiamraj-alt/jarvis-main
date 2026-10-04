@@ -11639,3 +11639,14 @@ iRecruit (`rm-action-btn`): โทร (call · POST จดการโทรก�
 | `src/components/recruit-rm/RmWorkspace.tsx` | `dial`: ยิงจดเวลาก่อน แล้วคลิกลิงก์ `tel:` (ไม่เปลี่ยน URL หน้า — กันคำขอจดเวลาโดนยกเลิก) |
 | เทสต์ | `tests/api/contactTabIrecruitButtons2569-10-04.test.ts` |
 - (4 ต.ค. ต่อ) ขั้น 2 ในป๊อป: ก้อน "นัดปัจจุบัน" (`data-testid="current-appointment"`) โชว์เฉพาะตอนมีนัด — ไม่มีนัดไม่ต้องโชว์ช่องขีด (เจ้าของสั่ง · ยกเว้นกติกา "ว่างแล้วห้ามหาย" จุดนี้)
+
+## หน้าติดตาม: ลงหลายวันวันท้าย ๆ บันทึกไม่ได้ + แผนรายวันชื่อเดียวกันติดกัน (4 ต.ค. 2569)
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/followCallRound.ts` (ใหม่) | `FOLLOW_CALL_ROUND_MAX = 999` — เดิม handler ตัน 9 แต่ตารางหลายวันนับ `call_round` ต่อทั้งชุด (5 วัน × 2 สาย → วันที่ 5 = 9–10 → "สายที่เท่าไหร่ต้องเป็นเลข 1-9") · AI ใช้แค่ 1 กับ ≥2 |
+| `api/_handlers/follow.ts` | `parseFollowInput` ใช้เพดานใหม่ |
+| `src/lib/followDayReport.ts` | แผนรายวัน (ป๊อป + รูป PNG + คัดลอก) ชื่อเดียวกันติดกัน: คนเรียงตามสายแรกของวัน → ในคนเรียงตามเวลา · จับกลุ่มด้วยชื่อ |
+| เทสต์ | `tests/api/followDispatch.test.ts` (รับ 10/155 · ปฏิเสธ 1000) · `src/lib/followDayReport.test.ts` |
+
+- ตรวจจริง: POST สายที่ 10 แบบคนโทร (dispatch_state manual ไม่เข้าคิว AI) ผ่าน → ลบด้วย id · ป๊อปแผน 4/10 32 แถว ชื่อซ้ำไม่แยกกันเลย
