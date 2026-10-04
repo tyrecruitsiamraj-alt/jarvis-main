@@ -948,6 +948,46 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
   }
 
   /**
+   * 🔴 เปลี่ยนเบอร์ทั้งชุด (เจ้าของสั่ง 4 ต.ค. 2569) — เคสจริง: ลงเบอร์ผิด 10 สาย แก้ทีละแถวแล้วหลุด 1 สาย
+   * (AI จะโทรหาเจ้าหน้าที่แทนผู้สมัคร) ⇒ `apply_phone_to_set: true` = สายที่ยังไม่ถึงเวลา/ไม่ปิด/ไม่ยกเลิกในชุดเดียวกันใช้เบอร์ใหม่ด้วย
+   * (สายที่ผ่านไปแล้วเป็นประวัติ — ไม่เปลี่ยนย้อนหลัง)
+   * แล้วค่อยส่งแผนให้ Lumos **ครั้งเดียว** ข้างล่าง (resync อ่านทุกรอบของแผนจากฐาน) — ไม่ยิงแก้ทีละแถว
+   */
+  let phoneAppliedIds: string[] = [];
+  const phoneChanged = phoneDigits(before.recipient_phone) !== phoneDigits(updated.recipient_phone);
+  if (body.apply_phone_to_set === true && phoneChanged && before.group_id) {
+    const { rows: sib } = await dbQuery<FollowRow>(
+      `update ${followTable}
+          set recipient_phone = $3, updated_at = now(), updated_by = $4, updated_by_name = $5
+        where group_id = $1 and id <> $2 and cancelled_at is null and completed_at is null
+          and scheduled_at > now()
+          and recipient_phone is distinct from $3
+        returning *`,
+      [before.group_id, id, updated.recipient_phone, req.user.sub, req.user.email ?? null],
+    );
+    phoneAppliedIds = sib.map((r) => String(r.id));
+    for (const r of sib) {
+      try {
+        await refreshFollowReminderPayload({
+          id: String(r.id),
+          recipient_name: String(r.recipient_name ?? ''),
+          recipient_phone: String(r.recipient_phone ?? ''),
+          topic: String(r.topic ?? ''),
+          note: (r.note as string | null) ?? null,
+          staffPhone: (r.staff_phone as string | null) ?? null,
+          staffName: await staffNameOfPhone((r.staff_phone as string | null) ?? null),
+          unitName: (r.unit_name as string | null) ?? null,
+          scheduled_at: new Date(String(r.scheduled_at)),
+          callTimes: r.call_times ?? null,
+          callRound: r.call_round ?? null,
+        });
+      } catch (e) {
+        logWarn('follow.update.siblingQueueRefreshFailed', { followId: r.id, error: String(e) });
+      }
+    }
+  }
+
+  /**
    * 🔴 แก้แถวแล้วต้องแก้บทพูดในคิวด้วย — payload ถูกสร้างตอนเข้าคิว ไม่ใช่ตอนเสิร์ฟ
    * ไม่แก้ = AI ไปพูดชุดเก่าโดยที่หน้าจอโชว์ชุดใหม่
    * ได้ผลเฉพาะสายที่ Lumos ยังไม่ดึงไป — ดึงไปแล้วบอกคนใช้ตรง ๆ
@@ -993,12 +1033,14 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
     entityType: 'follow_entry',
     entityId: id,
     before: toResponse(before),
-    after: { ...toResponse(updated), queueRefreshed, planResync },
+    after: { ...toResponse(updated), queueRefreshed, planResync, phoneAppliedIds },
   });
 
   return res.status(200).json({
     ...toResponse(updated),
     queue_refreshed: queueRefreshed,
+    /** จำนวนสายอื่นในชุดที่เปลี่ยนเบอร์ตามด้วย (apply_phone_to_set) */
+    phone_applied: phoneAppliedIds.length,
     /** ส่งแผนใหม่ให้ Lumos แล้วหรือยัง — จอต้องบอกคนกดได้ ห้ามเงียบ */
     lumos_resync: planResync,
   });

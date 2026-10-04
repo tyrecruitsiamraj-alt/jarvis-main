@@ -11650,3 +11650,18 @@ iRecruit (`rm-action-btn`): โทร (call · POST จดการโทรก�
 | เทสต์ | `tests/api/followDispatch.test.ts` (รับ 10/155 · ปฏิเสธ 1000) · `src/lib/followDayReport.test.ts` |
 
 - ตรวจจริง: POST สายที่ 10 แบบคนโทร (dispatch_state manual ไม่เข้าคิว AI) ผ่าน → ลบด้วย id · ป๊อปแผน 4/10 32 แถว ชื่อซ้ำไม่แยกกันเลย
+
+## หน้าติดตาม: เปลี่ยนเบอร์ทั้งชุด + เตือนเบอร์ผู้สมัคร = เบอร์เจ้าหน้าที่ (4 ต.ค. 2569)
+
+เคสจริง: ชุด 10 สาย ลงเบอร์เจ้าหน้าที่เป็นเบอร์ผู้สมัคร → แก้ทีละแถวแล้วหลุดสายที่ 10 (AI จะโทรหาเจ้าหน้าที่เอง)
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/followPhoneGuard.ts` (ใหม่) | `localPhoneDigits` · `staffPhoneMatchesApplicant` · `staffPhoneAckKey` · `STAFF_PHONE_SAME_WARNING` — เตือนครั้งแรก กดบันทึกซ้ำ = ยืนยัน |
+| `src/pages/follow/FollowPage.tsx` | `submit` เช็กเบอร์เจ้าหน้าที่ที่ใช้จริง (โหมดตาราง = `scheduleCalls()` · โหมดเวลาเอง = `staffPhones`) |
+| `src/components/follow/FollowEditDialog.tsx` | แก้เบอร์แล้วมีช่องติ๊ก "ใช้เบอร์นี้กับสายที่เหลือในชุดนี้ด้วย (N สาย)" ติ๊กไว้ก่อน · เตือนเบอร์เจ้าหน้าที่ |
+| `api/_handlers/follow.ts` (`updateFollow`) | `apply_phone_to_set: true` → อัปเดตเบอร์สายในชุด (group_id) ที่ยังไม่ถึงเวลา/ไม่ปิด/ไม่ยกเลิก + refresh payload คิว → ส่งแผนให้ Lumos **ครั้งเดียว** · คืน `phone_applied` |
+| เทสต์ | `tests/api/followPhoneGuard2569-10-04.test.ts` · `FollowEditDialog.test.tsx` (+4) |
+
+- ตรวจจริง: สร้างชุดทดสอบ 3 สาย (คนโทร เบอร์ปลอม) → PATCH apply_phone_to_set → 3 แถวเปลี่ยนเบอร์ครบ → ลบด้วย id
+- ⚠️ เครื่อง dev ไม่มีกุญแจ Lumos (`push ปิดอยู่`) — แก้ข้อมูลจริงที่ต้องให้ AI รู้ ต้องทำบนเว็บจริง

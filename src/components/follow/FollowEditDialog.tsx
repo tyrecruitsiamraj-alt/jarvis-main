@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Building2, LoaderCircle, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,12 @@ import {
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import StaffContactField from '@/components/follow/StaffContactField';
+import {
+  STAFF_PHONE_SAME_WARNING,
+  localPhoneDigits,
+  staffPhoneAckKey,
+  staffPhoneMatchesApplicant,
+} from '@/lib/followPhoneGuard';
 import DateTimeField24 from '@/components/shared/DateTimeField24';
 import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
@@ -110,11 +116,20 @@ export default function FollowEditDialog({
    * บันทึกผ่านเส้นแก้ตารางทั้งชุด (ถอน/ส่งคิว + ส่งแผนใหม่ให้ Lumos ครบในที่เดียว)
    */
   const [mode, setMode] = useState<'ai' | 'manual'>('ai');
+  /**
+   * 🔴 เปลี่ยนเบอร์แล้วใช้กับสายที่เหลือในชุดด้วย (เจ้าของสั่ง 4 ต.ค. 2569 — เคยแก้ทีละแถวแล้วหลุด 1 สาย
+   * AI เกือบโทรหาเจ้าหน้าที่แทนผู้สมัคร) · ค่าเริ่มต้น = ใช้ทั้งชุด (เคสแก้เบอร์ผิดคือเคสหลัก)
+   */
+  const [applyPhoneToSet, setApplyPhoneToSet] = useState(true);
+  /** ยืนยันแล้วว่าเบอร์ผู้สมัครเท่ากับเบอร์เจ้าหน้าที่จริง (กดบันทึกซ้ำ) */
+  const staffPhoneAckRef = useRef('');
 
   useEffect(() => {
     if (!entry) return;
     setName(entry.recipient_name ?? '');
     setPhone(entry.recipient_phone ?? '');
+    setApplyPhoneToSet(true);
+    staffPhoneAckRef.current = '';
     setTopic(entry.topic ?? '');
     setNote(entry.note ?? '');
     setStaffPhone(entry.staff_phone ?? '');
@@ -165,6 +180,14 @@ export default function FollowEditDialog({
   const canEditSchedule = setRows.some((r) => isEditableFollowRound(r, new Date()));
   const modeEditable = isEditableFollowRound(entry, new Date());
   const beforeMode: 'ai' | 'manual' = entry.call_mode === 'manual' ? 'manual' : 'ai';
+  /** สายอื่นในชุดที่ยังไม่ถึงเวลา ไม่ปิด ไม่ยกเลิก — กติกาเดียวกับ server (สายที่ผ่านไปแล้วเป็นประวัติ ไม่เปลี่ยนเบอร์ย้อน) */
+  const pendingSetRows = entry.group_id
+    ? setRows.filter(
+        (r) => r.id !== entry.id && !r.cancelled && !r.completed_at && Date.parse(r.scheduled_at ?? '') > Date.now(),
+      )
+    : [];
+  const phoneEdited = localPhoneDigits(phone) !== localPhoneDigits(entry.recipient_phone);
+  const askApplyPhone = phoneEdited && pendingSetRows.length > 0;
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,6 +209,15 @@ export default function FollowEditDialog({
      * สลับคนโทร = ส่ง **ทุกสายที่ยังแก้ได้ของชุด** ไปทีเดียว (เปลี่ยนแค่สายนี้) — ฝั่ง API ยกเลิกแผนเดิมแล้วส่งแผนใหม่
      * ทั้งชุด · ตรวจเวลาก่อนเขียนอะไร (เส้นนี้รับแต่เวลาอนาคต) จะได้ไม่แก้ข้อมูลไปครึ่งเดียว
      */
+    // เบอร์ผู้สมัครตรงกับเบอร์เจ้าหน้าที่ — เตือนครั้งแรก กดบันทึกซ้ำโดยไม่แก้ = ยืนยัน
+    if (staffPhoneMatchesApplicant(phone, [staffPhone])) {
+      const key = staffPhoneAckKey(phone, [staffPhone]);
+      if (staffPhoneAckRef.current !== key) {
+        staffPhoneAckRef.current = key;
+        setError(STAFF_PHONE_SAME_WARNING);
+        return;
+      }
+    }
     const editable = setRows.filter((r) => isEditableFollowRound(r, now));
     const draft = draftFromRows(editable).map((d) =>
       d.id === entry.id ? { ...d, mode, when: isoToBangkokInput(newIso) } : d,
@@ -214,7 +246,9 @@ export default function FollowEditDialog({
         scheduled_at: when ? new Date(when).toISOString() : undefined,
         unit_name: unitName.trim() || undefined,
         site_code: siteCode.trim() || undefined,
+        apply_phone_to_set: askApplyPhone && applyPhoneToSet ? true : undefined,
       });
+      const phoneMsg = (saved.phone_applied ?? 0) > 0 ? ` · เปลี่ยนเบอร์อีก ${saved.phone_applied} สายในชุด` : '';
       /**
        * รอบใหม่สร้างหลังแก้สำเร็จเท่านั้น — แก้ล้มแล้วยังเพิ่มรอบต่อ = ได้รอบที่ใช้ข้อมูลเก่า
        * ⚠️ ยิงทีละรอบ ล้มกลางทางต้องบอกว่าสำเร็จไปกี่รอบ ไม่งั้นคนกดซ้ำแล้วได้รอบซ้อน
@@ -255,7 +289,7 @@ export default function FollowEditDialog({
        */
       if (modeChanged) {
         const out = await replaceFollowSchedule(entry.id, scheduleReplaceBody(editable, draft));
-        const parts = ['แก้ไขแล้ว', modeChangedMessage(mode, out.lumos)];
+        const parts = ['แก้ไขแล้ว' + phoneMsg, modeChangedMessage(mode, out.lumos)];
         if (added > 0) parts.push(`เพิ่มอีก ${added} สาย`);
         onSaved(parts.join(' · '));
         onClose();
@@ -270,7 +304,7 @@ export default function FollowEditDialog({
           : (saved.queue_refreshed ?? 0) > 0
             ? `แก้ไขแล้ว — อัปเดตบทพูดในคิว ${saved.queue_refreshed} สายด้วย`
             : 'แก้ไขแล้ว — แต่สายที่ AI รับไปแล้วยังใช้ข้อมูลเดิม (เรียกคืนไม่ได้)';
-      onSaved(added > 0 ? `${queueMsg} · เพิ่มอีก ${added} สาย` : queueMsg);
+      onSaved(`${queueMsg}${phoneMsg}${added > 0 ? ` · เพิ่มอีก ${added} สาย` : ''}`);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'แก้ไขไม่สำเร็จ');
@@ -340,6 +374,18 @@ export default function FollowEditDialog({
               inputMode="tel"
               className="jarvis-soft-field min-h-[46px] w-full"
             />
+            {askApplyPhone ? (
+              <label className="ml-1 flex cursor-pointer items-center gap-1.5" data-testid="apply-phone-to-set">
+                <Checkbox
+                  checked={applyPhoneToSet}
+                  onCheckedChange={(v) => setApplyPhoneToSet(v === true)}
+                  aria-label="ใช้เบอร์นี้กับสายที่เหลือในชุดนี้ด้วย"
+                />
+                <span className="text-xs font-medium text-foreground">
+                  ใช้เบอร์นี้กับสายที่เหลือในชุดนี้ด้วย ({pendingSetRows.length} สาย)
+                </span>
+              </label>
+            ) : null}
           </div>
           {/* dropdown เรื่องจากลิสต์กลาง (100) — ตัวเดียวกับฟอร์มเพิ่ม
               ⚠️ แก้เรื่องแล้วกลุ่มการ์ดบนลิสต์เปลี่ยนตาม (จับกลุ่มด้วยเบอร์+เรื่อง)

@@ -144,3 +144,51 @@ describe('ใครโทรสายนี้', () => {
     expect(replaceFollowSchedule).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * 🔴 เปลี่ยนเบอร์ทั้งชุด + เตือนเบอร์ผู้สมัครตรงกับเบอร์เจ้าหน้าที่ (เจ้าของสั่ง 4 ต.ค. 2569 — เคยลงเบอร์เจ้าหน้าที่เป็นเบอร์ผู้สมัคร 10 สาย
+ * แก้ทีละแถวแล้วหลุด 1 สาย)
+ */
+describe('เปลี่ยนเบอร์ทั้งชุด + เตือนเบอร์เจ้าหน้าที่', () => {
+  const phoneBox = () => screen.getByLabelText('เบอร์โทร') as HTMLInputElement;
+
+  it('ยังไม่แก้เบอร์ = ไม่มีช่องติ๊ก · แก้เบอร์ = ขึ้น "ใช้เบอร์นี้กับสายที่เหลือในชุดนี้ด้วย (1 สาย)" ติ๊กไว้ก่อน', () => {
+    open(row({}));
+    expect(screen.queryByTestId('apply-phone-to-set')).toBeNull();
+    fireEvent.change(phoneBox(), { target: { value: '0899999999' } });
+    expect(screen.getByTestId('apply-phone-to-set').textContent).toContain('(1 สาย)');
+    expect(screen.getByRole('checkbox', { name: 'ใช้เบอร์นี้กับสายที่เหลือในชุดนี้ด้วย' }).getAttribute('data-state')).toBe('checked');
+  });
+
+  it('บันทึก ⇒ ส่ง apply_phone_to_set · ข้อความบอกจำนวนสายที่เปลี่ยนตาม', async () => {
+    updateFollowEntry.mockResolvedValue({ ...row({}), phone_applied: 1, lumos_resync: { pushed: true, rounds: 2, cancelled: true, reason: null } });
+    const onSaved = open(row({}));
+    fireEvent.change(phoneBox(), { target: { value: '0899999999' } });
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึกการแก้ไข' }));
+    await waitFor(() => expect(updateFollowEntry).toHaveBeenCalledTimes(1));
+    expect(updateFollowEntry.mock.calls[0][1]).toMatchObject({ recipient_phone: '0899999999', apply_phone_to_set: true });
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(String(onSaved.mock.calls[0][0])).toContain('เปลี่ยนเบอร์อีก 1 สายในชุด');
+  });
+
+  it('เอาติ๊กออก ⇒ แก้แค่สายนี้', async () => {
+    updateFollowEntry.mockResolvedValue({ ...row({}) });
+    open(row({}));
+    fireEvent.change(phoneBox(), { target: { value: '0899999999' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ใช้เบอร์นี้กับสายที่เหลือในชุดนี้ด้วย' }));
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึกการแก้ไข' }));
+    await waitFor(() => expect(updateFollowEntry).toHaveBeenCalledTimes(1));
+    expect(updateFollowEntry.mock.calls[0][1].apply_phone_to_set).toBeUndefined();
+  });
+
+  it('🔴 เบอร์ผู้สมัคร = เบอร์เจ้าหน้าที่ ⇒ เตือนก่อน ไม่บันทึก · กดซ้ำ = ยืนยันแล้วบันทึก', async () => {
+    updateFollowEntry.mockResolvedValue({ ...row({}) });
+    open(row({ staff_phone: '+66899999999' }));
+    fireEvent.change(phoneBox(), { target: { value: '0899999999' } });
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึกการแก้ไข' }));
+    expect(await screen.findByText(/เบอร์ผู้สมัครตรงกับเบอร์เจ้าหน้าที่/)).toBeTruthy();
+    expect(updateFollowEntry).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึกการแก้ไข' }));
+    await waitFor(() => expect(updateFollowEntry).toHaveBeenCalledTimes(1));
+  });
+});

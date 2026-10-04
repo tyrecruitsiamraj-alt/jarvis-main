@@ -174,6 +174,8 @@ export type EditFollowEntry = {
   scheduled_at?: string;
   unit_name?: string;
   site_code?: string;
+  /** เปลี่ยนเบอร์ของสายที่เหลือในชุดเดียวกันด้วย (4 ต.ค. 2569) */
+  apply_phone_to_set?: boolean;
 };
 
 async function readError(r: Response): Promise<string> {
@@ -286,7 +288,7 @@ export type FollowLumosResync = {
 export async function updateFollowEntry(
   id: string,
   input: EditFollowEntry,
-): Promise<FollowEntry & { queue_refreshed?: number; lumos_resync?: FollowLumosResync }> {
+): Promise<FollowEntry & { queue_refreshed?: number; lumos_resync?: FollowLumosResync; phone_applied?: number }> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ ...input, action: 'update' }),
@@ -295,6 +297,7 @@ export async function updateFollowEntry(
   return (await r.json()) as FollowEntry & {
     queue_refreshed?: number;
     lumos_resync?: FollowLumosResync;
+    phone_applied?: number;
   };
 }
 

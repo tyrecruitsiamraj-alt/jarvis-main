@@ -93,6 +93,7 @@ import type { JobRequest } from '@/types';
 import FollowEditDialog from '@/components/follow/FollowEditDialog';
 import RoundScriptNote from '@/components/follow/RoundScriptNote';
 import StaffContactField from '@/components/follow/StaffContactField';
+import { STAFF_PHONE_SAME_WARNING, staffPhoneAckKey, staffPhoneMatchesApplicant } from '@/lib/followPhoneGuard';
 import TopicField from '@/components/follow/TopicField';
 import FollowMasterManagerDialog from '@/components/follow/FollowMasterManagerDialog';
 import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
@@ -742,6 +743,8 @@ const FollowPage: React.FC = () => {
     goToStep(nextFollowStep(step));
   };
 
+  /** ยืนยันแล้วว่าเบอร์ผู้สมัครเท่ากับเบอร์เจ้าหน้าที่จริง (กดบันทึกซ้ำ) — ดู followPhoneGuard */
+  const staffPhoneAckRef = useRef('');
   const submit = async (e?: React.SyntheticEvent) => {
     e?.preventDefault();
     setFormError(null);
@@ -776,6 +779,20 @@ const FollowPage: React.FC = () => {
       return;
     }
     const recipientName = composeRecipientName(prefix, firstName, lastName);
+
+    /**
+     * 🔴 เบอร์ผู้สมัครตรงกับเบอร์เจ้าหน้าที่ (4 ต.ค. 2569 — เคยลง 10 สายแล้ว AI จะโทรหาเจ้าหน้าที่เอง)
+     * เตือนครั้งแรก · กดบันทึกซ้ำโดยไม่แก้เบอร์ = ยืนยันว่าตั้งใจ
+     */
+    const usedStaffPhones = scheduleMode ? scheduleCalls().map((c) => c.staffPhone) : staffPhones;
+    if (staffPhoneMatchesApplicant(phone, usedStaffPhones)) {
+      const key = staffPhoneAckKey(phone, usedStaffPhones);
+      if (staffPhoneAckRef.current !== key) {
+        staffPhoneAckRef.current = key;
+        setFormError(STAFF_PHONE_SAME_WARNING);
+        return;
+      }
+    }
 
     /**
      * โหมดตาราง: ช่วงวัน × เวลา → **หนึ่งสาย = หนึ่งแถว** ผูก group เดียว (เจ้าของ Choice 1 ต.ค. 2569)
