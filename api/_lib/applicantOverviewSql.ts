@@ -18,6 +18,7 @@ const APPS = tableInAppSchema('public_job_applications');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const HOLDS = tableInAppSchema('candidate_call_holds');
 const CONTACTS = tableInAppSchema('application_contact_logs');
+const CANCELLATIONS = tableInAppSchema('application_cancellations');
 const ATTENDANCE = tableInAppSchema('application_appointment_results');
 
 /** เบอร์ใน payload คิว — reminder ใช้ recipient_phone · interview ใช้ phone (กับดักซ้ำ) */
@@ -347,8 +348,13 @@ export const OVERVIEW_BUCKETS = {
    * จะโทรเองหรือส่ง AI · `claimed_by is null` กันแถวที่มีคนกดเก็บใหม่ระหว่างรอ
    * (การเก็บใหม่ = เลือกโทรเองโดยพฤตินัย — patchClaim/patchKeep ล้าง unclaimed_at ให้)
    */
+  /**
+   * ⚠️ ข้ามใบที่ "ยกเลิกข้อมูลผู้สมัคร" (135 · 4 ต.ค. 2569) — worker ใช้ถังนี้ส่ง AI โทรเอง ห้ามโทรหาใบที่ยกเลิก
+   * ตาราง 135 ต้องมีก่อนโค้ดนี้ขึ้น (สร้างแล้วบนฐานจริง 4 ต.ค. — deploy รัน migrate ซ้ำได้ `if not exists`)
+   */
   awaiting_call_choice: `(
     a.unclaimed_at is not null and a.call_choice is null and a.claimed_by is null
+    and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)
   )`,
 } as const;
 

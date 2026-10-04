@@ -1228,6 +1228,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </Button>
                 ) : null}
               </>
+            ) : view === 'list' ? (
+              /* แท็บผู้สมัครมีปุ่ม "ตั้งค่า" (ช่องทาง · เหตุผล · สร้างลิงก์) แบบ iRecruit (เจ้าของ 4 ต.ค. 2569 "เอาสิ่งที่ขาดมา")
+                 — แทนคำสั่ง 14 ส.ค. ที่ให้มีแค่หน้ากล่องงาน · แท็บงานสรรหาไม่แตะ */
+              <RecruitBoardTools />
             ) : undefined
           }
         />

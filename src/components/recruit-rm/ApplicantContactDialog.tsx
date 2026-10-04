@@ -29,6 +29,7 @@ import {
   fetchApplicantDetailExtras,
   fetchAttendanceLogs,
   recordAppointmentAttendance,
+  setApplicationCancelled,
   updateApplicationProfile,
   type ApplicantDetailExtras,
   type AttendanceLogItem,
@@ -104,6 +105,8 @@ export default function ApplicantContactDialog({
   onClose,
   onSaved,
   embedded = false,
+  mode = 'contact',
+  onCancelled,
 }: {
   application: PublicApplication | null;
   onClose: () => void;
@@ -111,6 +114,14 @@ export default function ApplicantContactDialog({
   onSaved: () => void;
   /** true = คืนเนื้อเปล่า ๆ ไม่ห่อ Dialog (ฝังในป๊อปดูรายชื่อของกล่องงาน) · 🔴 ห้ามซ้อน Dialog ใน Dialog */
   embedded?: boolean;
+  /**
+   * `profile` = ปุ่มดูข้อมูลของแท็บผู้สมัคร (เจ้าของส่งรูป iRecruit 4 ต.ค. 2569): **ไม่มีขั้นตอน 3 ขั้น** ·
+   * แท็บ 6 อันเหมือนเดิม · มีก้อน "ยกเลิกข้อมูลผู้สมัคร" · ปุ่มล่างเหลือ ปิด (บันทึกโผล่ตอนแก้ข้อมูล)
+   * `contact` (ค่าเดิม) = แท็บการติดต่อ/ติดตามนัดหมาย มีขั้นตอน 3 ขั้น + บันทึก/ปิด
+   */
+  mode?: 'contact' | 'profile';
+  /** ยกเลิกข้อมูลผู้สมัครสำเร็จ (โหมด profile) — หน้าแม่ปิดป๊อป + โหลดใหม่ (ใบหายจากรายชื่อหลัก) */
+  onCancelled?: () => void;
 }) {
   const a = application;
   const [tab, setTab] = useState<DetailTab>('info');
@@ -131,6 +142,9 @@ export default function ApplicantContactDialog({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // ── ยกเลิกข้อมูลผู้สมัคร (โหมด profile · 135) — กางยืนยันในป๊อปเดิม ไม่ซ้อน Dialog
+  const [cancelAsk, setCancelAsk] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const [reasons, setReasons] = useState<RecruitReason[]>([]);
   const [openJobs, setOpenJobs] = useState<JobRequest[]>([]);
@@ -253,6 +267,8 @@ export default function ApplicantContactDialog({
     <div className="space-y-4">
       <DialogHeaderLike embedded={embedded} name={a.full_name} />
 
+      {mode === 'contact' ? (
+      <>
       {/* ── ขั้นตอนการดำเนินการ ── */}
       <section className="space-y-2" aria-label="ขั้นตอนการดำเนินการ">
         <p className="text-xs font-medium text-muted-foreground">ขั้นตอนการดำเนินการ</p>
@@ -430,6 +446,8 @@ export default function ApplicantContactDialog({
           ) : null}
         </div>
       </section>
+      </>
+      ) : null}
 
       {/* ── แท็บรายละเอียด ── */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as DetailTab)}>
@@ -477,6 +495,53 @@ export default function ApplicantContactDialog({
             disabled={busy}
             phoneFixSlot={phoneFixSlot}
           />
+          {/* ยกเลิกข้อมูลผู้สมัคร (รูป iRecruit · Choice "ซ่อนจากรายชื่อหลัก กู้คืนได้" 4 ต.ค. 2569) */}
+          {mode === 'profile' && !a.cancelled_at ? (
+            <div className={cn('space-y-3 rounded-xl border p-3', TONE.danger.soft)} data-testid="cancel-applicant">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className={cn('text-sm font-medium', TONE.danger.value)}>ยกเลิกข้อมูลผู้สมัคร</p>
+                  <p className="text-xs text-muted-foreground">นำออกจากรายการหลัก กู้คืนได้ที่ "ดูที่ยกเลิก"</p>
+                </div>
+                {!cancelAsk ? (
+                  <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => setCancelAsk(true)}>
+                    ยกเลิกข้อมูล
+                  </Button>
+                ) : null}
+              </div>
+              {cancelAsk ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    aria-label="เหตุผลที่ยกเลิก"
+                    className="min-w-0 flex-1"
+                    placeholder="เหตุผล (ไม่ใส่ก็ได้)"
+                    value={cancelReason}
+                    maxLength={300}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    disabled={busy}
+                    onClick={() => {
+                      setBusy(true);
+                      setError(null);
+                      void setApplicationCancelled(a.id, true, cancelReason.trim() || null)
+                        .then(() => onCancelled?.())
+                        .catch((e: unknown) => setError(e instanceof Error ? e.message : 'ยกเลิกข้อมูลไม่สำเร็จ'))
+                        .finally(() => setBusy(false));
+                    }}
+                  >
+                    {busy ? <Loader2 className="animate-spin" aria-hidden /> : null} ยืนยันยกเลิก
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setCancelAsk(false)}>
+                    ไม่ยกเลิก
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </TabsContent>
         <TabsContent value="history" className="pt-2">
           <HistoryTable items={extras.history} />
@@ -501,9 +566,11 @@ export default function ApplicantContactDialog({
         </p>
       ) : null}
       <div className="flex flex-wrap justify-end gap-2 border-t border-border/70 pt-3">
-        <Button type="button" size="sm" onClick={() => void save()} disabled={!dirty || busy}>
-          {busy ? <Loader2 className="animate-spin" aria-hidden /> : null} บันทึก
-        </Button>
+        {mode === 'contact' || editing ? (
+          <Button type="button" size="sm" onClick={() => void save()} disabled={!dirty || busy}>
+            {busy ? <Loader2 className="animate-spin" aria-hidden /> : null} บันทึก
+          </Button>
+        ) : null}
         <Button type="button" size="sm" variant="outline" onClick={onClose} disabled={busy}>
           ปิด
         </Button>

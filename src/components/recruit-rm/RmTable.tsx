@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookmarkPlus, Phone, PhoneCall, Eye, ClipboardCheck, UserMinus, Undo2, FileText } from 'lucide-react';
+import { BookmarkPlus, Bot, Phone, PhoneCall, Eye, ClipboardCheck, UserMinus, Undo2, FileText, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 // ⚠️ DASH = token พื้นผิว dashboard · ขีดกลางคือ EM_DASH คนละตัว อย่าสับสน
 import { DASH, TONE } from '@/lib/designTokens';
@@ -34,6 +34,18 @@ import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { callResultLabel } from '@/lib/homeCallResults';
 import { INTEREST_MICRO_TONE } from '@/lib/trends/lumosPipeline';
 import { FOLLOW_STATUS_LABEL, FOLLOW_STATUS_TONE, isFollowCallStatus } from '@/lib/followApi';
+import { PROCESS_STATE_LABEL, PROCESS_STATE_TONE, PROCESS_STEP_LABEL, applicantProcessOf } from '@/lib/applicantProcess';
+
+/** สถานะแบบ iRecruit (เจ้าของ 4 ต.ค. 2569 "เอาสถานะมาเพิ่มพอ") — ชิปสถานะ + ขั้นที่อยู่ */
+function ProcessCell({ r }: { r: PublicApplication }) {
+  const p = applicantProcessOf(r);
+  return (
+    <span className="flex flex-col items-start gap-0.5">
+      <span className={cn('whitespace-nowrap', TONE[PROCESS_STATE_TONE[p.state]].chip)}>{PROCESS_STATE_LABEL[p.state]}</span>
+      <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>{PROCESS_STEP_LABEL[p.step]}</span>
+    </span>
+  );
+}
 
 /**
  * ตารางใบสมัครของหน้างานสรรหา (RM) — แถวคือ **ใบสมัครจริงจากหน้า /apply**
@@ -124,11 +136,13 @@ function AiAnswerCell({ r }: { r: PublicApplication }) {
 const ACTION_ICON: Record<RmRowAction, typeof Phone> = {
   bookmark: BookmarkPlus,
   call: Phone,
+  ai: Bot,
   dial: PhoneCall,
   view: Eye,
   rule: ClipboardCheck,
   remove: UserMinus,
   release: Undo2,
+  restore: RotateCcw,
 };
 
 const RmTable: React.FC<{
@@ -144,8 +158,10 @@ const RmTable: React.FC<{
   onAttendance?: (row: PublicApplication, result: AttendanceResult) => void;
   /** เจ้าของงาน = เจ้าหน้าที่สรรหาของใบขอที่สมัคร (ตัวเดียวกับหัวข้อกรอง "เจ้าหน้าที่สรรหา") */
   recruiterOf?: (r: PublicApplication) => string | null;
-}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, holdByRef = {}, onAttendance, recruiterOf }) => {
-  const actions = RM_ROW_ACTIONS[tab];
+  /** ปุ่มต่อแถวแทนชุดของแท็บ — มุมมอง "ดูที่ยกเลิก" ใช้ ดูรายละเอียด + กู้คืน (4 ต.ค. 2569) */
+  actionsOverride?: RmRowAction[];
+}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, holdByRef = {}, onAttendance, recruiterOf, actionsOverride }) => {
+  const actions = actionsOverride ?? RM_ROW_ACTIONS[tab];
   /**
    * 🔴 แท็บผู้สมัครใช้ชุดคอลัมน์ที่เจ้าของสั่งเอง (30 ก.ย. 2569 · Choice "เอาตามที่ฉันสั่ง"):
    * *"ตรงรายชื่อ โชว์ ชื่อ นามสกุล ที่อยู่ หน่วยงาน ชื่อเจ้าของงาน(แบงค์ คิว เล็ก ฯลฯ) เพศ อายุ สมัครมาแล้วกี่วัน
@@ -199,6 +215,7 @@ const RmTable: React.FC<{
                   <th className="px-1.5 py-2 text-right font-medium">อายุ</th>
                   <th className="px-1.5 py-2 font-medium">สมัครมาแล้ว</th>
                   <th className="px-1.5 py-2 font-medium">คำตอบกับ AI</th>
+                  <th className="px-1.5 py-2 font-medium">สถานะ</th>
                 </>
               ) : (
                 <>
@@ -284,6 +301,9 @@ const RmTable: React.FC<{
                       <td className={cn('px-1.5 py-2 whitespace-nowrap tabular-nums', DASH.cell)}>{daysAppliedText(r.created_at, now)}</td>
                       <td className="px-1.5 py-2">
                         <AiAnswerCell r={r} />
+                      </td>
+                      <td className="px-1.5 py-2">
+                        <ProcessCell r={r} />
                       </td>
                     </>
                   ) : (
@@ -429,6 +449,17 @@ const RmTable: React.FC<{
                             label = can.reason;
                           } else {
                             label = 'เก็บไปโทรเอง — จองใบ + ล็อกเบอร์กัน AI โทรทับ (กดเดียวได้ทั้งคู่)';
+                          }
+                        }
+                        // ส่ง AI โทร — เบอร์ใช้ไม่ได้/มีคนถืออยู่ = กดไม่ได้ พร้อมบอกเหตุผล (ยิงจริงต้องผ่านป๊อปยืนยัน)
+                        if (a === 'ai') {
+                          const held = holdByRef[r.id];
+                          if (r.phone_callable === false) {
+                            disabled = true;
+                            label = 'เบอร์นี้ใช้กับระบบโทรไม่ได้ — แก้เบอร์ที่ดูรายละเอียดก่อน';
+                          } else if (held || r.claimed) {
+                            disabled = true;
+                            label = 'มีคนเก็บไปโทรอยู่ · AI จะไม่โทรทับ';
                           }
                         }
                         return (

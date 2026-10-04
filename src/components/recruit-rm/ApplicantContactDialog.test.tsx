@@ -16,6 +16,7 @@ import type { PublicApplication } from '@/lib/publicApplicationsApi';
 const saveContactLog = vi.fn();
 const updateApplicationProfile = vi.fn();
 const recordAppointmentAttendance = vi.fn();
+const setApplicationCancelled = vi.fn();
 
 vi.mock('@/lib/applicationContactsApi', async (importOriginal) => {
   const mod = await importOriginal<typeof import('@/lib/applicationContactsApi')>();
@@ -33,6 +34,7 @@ vi.mock('@/lib/publicApplicationsApi', async (importOriginal) => {
     fetchAttendanceLogs: vi.fn(async () => []),
     updateApplicationProfile: (...a: unknown[]) => updateApplicationProfile(...a),
     recordAppointmentAttendance: (...a: unknown[]) => recordAppointmentAttendance(...a),
+    setApplicationCancelled: (...a: unknown[]) => setApplicationCancelled(...a),
   };
 });
 vi.mock('@/lib/recruitReasonsApi', () => ({ fetchRecruitReasons: vi.fn(async () => []) }));
@@ -45,6 +47,7 @@ afterEach(() => {
   saveContactLog.mockReset();
   updateApplicationProfile.mockReset();
   recordAppointmentAttendance.mockReset();
+  setApplicationCancelled.mockReset();
 });
 
 const app = (over: Partial<PublicApplication> = {}): PublicApplication =>
@@ -193,5 +196,38 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
     fireEvent.click(within(dialog).getByRole('tab', { name: 'การโทร' }));
     expect(await within(dialog).findByText('ยังไม่มีการโทร')).toBeTruthy();
     expect(within(dialog).getByRole('columnheader', { name: 'ใครโทร' })).toBeTruthy();
+  });
+});
+
+/** ปุ่มดูข้อมูลของแท็บผู้สมัคร = ป๊อปแบบรูป iRecruit (เจ้าของ 4 ต.ค. 2569) */
+describe('โหมด profile (แท็บผู้สมัคร)', () => {
+  it('ไม่มีขั้นตอน 3 ขั้น · แท็บ 6 อันครบ · ปุ่มล่างเหลือปิด · มีก้อนยกเลิกข้อมูลผู้สมัคร', async () => {
+    render(<ApplicantContactDialog mode="profile" application={app()} onClose={() => {}} onSaved={() => {}} />);
+    expect(screen.queryByTestId('step-contact')).toBeNull();
+    expect(screen.getAllByRole('tab')).toHaveLength(6);
+    expect(screen.queryByRole('button', { name: /^บันทึก$/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'ปิด' })).toBeTruthy();
+    expect(screen.getByTestId('cancel-applicant')).toBeTruthy();
+  });
+
+  it('🔴 ยกเลิกข้อมูล = ยืนยันในป๊อปเดิมก่อน (ไม่ซ้อนป๊อป) แล้วส่งเหตุผล · บอกหน้าแม่', async () => {
+    setApplicationCancelled.mockResolvedValue(undefined);
+    const onCancelled = vi.fn();
+    render(
+      <ApplicantContactDialog mode="profile" application={app()} onClose={() => {}} onSaved={() => {}} onCancelled={onCancelled} />,
+    );
+    const box = screen.getByTestId('cancel-applicant');
+    fireEvent.click(within(box).getByRole('button', { name: 'ยกเลิกข้อมูล' }));
+    expect(setApplicationCancelled).not.toHaveBeenCalled();
+    fireEvent.change(within(box).getByLabelText('เหตุผลที่ยกเลิก'), { target: { value: 'ไม่สะดวกแล้ว' } });
+    fireEvent.click(within(box).getByRole('button', { name: /ยืนยันยกเลิก/ }));
+    await waitFor(() => expect(onCancelled).toHaveBeenCalled());
+    expect(setApplicationCancelled).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111', true, 'ไม่สะดวกแล้ว');
+  });
+
+  it('โหมดเดิม (แท็บการติดต่อ) ยังมีขั้นตอน 3 ขั้น และไม่มีก้อนยกเลิก', () => {
+    render(<ApplicantContactDialog application={app()} onClose={() => {}} onSaved={() => {}} />);
+    expect(screen.getByTestId('step-contact')).toBeTruthy();
+    expect(screen.queryByTestId('cancel-applicant')).toBeNull();
   });
 });

@@ -83,8 +83,8 @@ describe('ปุ่มของแท็บการติดตาม', () => {
     expect(RM_ROW_ACTION_LABEL.release).toBe('ลบออก — ส่งกลับแท็บผู้สมัคร');
   });
 
-  it('แท็บอื่นไม่เปลี่ยน (ผู้สมัคร · ติดตามนัดหมาย)', () => {
-    expect(RM_ROW_ACTIONS.candidates).toEqual(['bookmark', 'call', 'view']);
+  it('แท็บอื่น: ผู้สมัครแบบ iRecruit + ส่ง AI โทร (4 ต.ค. 2569) · ติดตามนัดหมายเหมือนเดิม', () => {
+    expect(RM_ROW_ACTIONS.candidates).toEqual(['bookmark', 'call', 'ai', 'view']);
     expect(RM_ROW_ACTIONS.appointments).toEqual(['call', 'rule', 'remove']);
   });
 

@@ -91,6 +91,10 @@ export type PublicApplication = {
   responsible_name?: string;
   /** ช่องทางจาก master recruit_channels — แม่นกว่า referral_source ที่ผู้สมัครเลือกเอง */
   channel_label?: string;
+  /** ยกเลิกข้อมูลผู้สมัคร (135 · 4 ต.ค. 2569) — มีค่า = ซ่อนจากรายชื่อหลัก (มาเฉพาะมุมมอง "ที่ยกเลิก") */
+  cancelled_at?: string;
+  cancelled_by_name?: string | null;
+  cancel_reason?: string | null;
   license_types?: string[];
   /** เจ้าหน้าที่ที่คีย์ใบนี้ — undefined = ผู้สมัครกรอกเองผ่านลิงก์ */
   created_by_name?: string;
@@ -266,10 +270,13 @@ export async function fetchAllJobApplications(
   leadView = false,
   /** drill-down จากกล่อง dashboard (`?bucket=` — นิยามที่ applicantOverviewSql ฝั่ง server) */
   bucket?: string | null,
+  /** true = ดูเฉพาะใบที่ "ยกเลิกข้อมูลผู้สมัคร" (135) — ลิสต์ปกติไม่มีใบเหล่านี้ */
+  cancelledView = false,
 ): Promise<PublicApplication[]> {
   const qs = new URLSearchParams();
   if (leadView) qs.set('lead', '1');
   if (bucket) qs.set('bucket', bucket);
+  if (cancelledView) qs.set('cancelled', '1');
   const r = await apiFetch(`/api/job-applications${qs.size > 0 ? `?${qs}` : ''}`);
   if (!r.ok) throw new Error('โหลดรายชื่อผู้สมัครไม่สำเร็จ');
   const data = (await r.json()) as { items?: PublicApplication[] };
@@ -650,4 +657,19 @@ export async function saveSelectionProgress(
   }
   const data = (await r.json()) as { item: PublicApplication };
   return data.item;
+}
+
+/**
+ * ยกเลิกข้อมูลผู้สมัคร (ซ่อนจากรายชื่อหลัก AI ไม่โทรเอง) / กู้คืน — 135 · Choice ของเจ้าของ 4 ต.ค. 2569
+ */
+export async function setApplicationCancelled(id: string, cancelled: boolean, reason?: string | null): Promise<void> {
+  const r = await apiFetch('/api/job-applications', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, cancelled, cancel_reason: reason ?? null }),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message || (cancelled ? 'ยกเลิกข้อมูลไม่สำเร็จ' : 'กู้คืนไม่สำเร็จ'));
+  }
 }

@@ -206,7 +206,20 @@ describe('ใบขอที่สมัคร — คีย์ด้วย job_
 
   it('หัวข้อหลัก: นัดหมาย/เจ้าหน้าที่สรรหา/ผลโทร/ใบขอ/จังหวัด/วันสมัคร · อำเภออยู่ในกล่องจังหวัด', () => {
     // เจ้าหน้าที่สรรหาเพิ่ม 30 ก.ย. 2569 (ดูเป็นคน)
-    expect(APPLICANT_PRIMARY_FACETS).toEqual(['apptWhen', 'apptPlace', 'attendance', 'recruiter', 'call', 'job', 'province', 'days']);
+    // ขั้นตอน/สถานะ/สถานะการติดต่อ ขึ้นต้นแบบ iRecruit (4 ต.ค. 2569)
+    expect(APPLICANT_PRIMARY_FACETS).toEqual([
+      'apptWhen',
+      'apptPlace',
+      'attendance',
+      'recruiter',
+      'step',
+      'status',
+      'contactState',
+      'call',
+      'job',
+      'province',
+      'days',
+    ]);
     expect(APPLICANT_FACET_ATTACH).toEqual({ district: 'province' });
   });
 });

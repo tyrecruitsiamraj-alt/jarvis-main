@@ -14,7 +14,6 @@ import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
 import ImportApplicantsDialog from '@/components/recruit-rm/ImportApplicantsDialog';
 import ApplicantContactDialog from '@/components/recruit-rm/ApplicantContactDialog';
-import ApplicantProfileDialog from '@/components/recruit-rm/ApplicantProfileDialog';
 import {
   EMPTY_RM_FILTERS,
   RM_ROW_ACTION_LABEL,
@@ -36,10 +35,12 @@ import {
   fetchAllJobApplications,
   markApplicationDialed,
   recordAppointmentAttendance,
+  setApplicationCancelled,
   setJobApplicationLead,
   type CallChoiceOutcome,
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
+import { downloadApplicantExport } from '@/lib/applicantExport';
 import { summarizeCallChoice } from '@/lib/callChoiceSummary';
 import CallChoiceConfirmDialog from '@/components/recruit-rm/CallChoiceConfirmDialog';
 import { ATTENDANCE_LABEL, type AttendanceResult } from '@/lib/appointmentAttendance';
@@ -210,6 +211,8 @@ const RmWorkspace: React.FC<{
    * ⚠️ การกรองอยู่ฝั่ง server — ลิสต์ปกติไม่เคยมีแถว Lead ติดมาให้ต้องกรองซ้ำ
    */
   const leadView = searchParams.get('lead') === '1';
+  /** มุมมองใบที่ "ยกเลิกข้อมูลผู้สมัคร" (135 · 4 ต.ค. 2569) — เฉพาะแท็บผู้สมัคร · กู้คืนได้จากแถว */
+  const cancelledView = searchParams.get('cancelled') === '1';
   const [leadBusy, setLeadBusy] = useState(false);
 
   /**
@@ -233,12 +236,22 @@ const RmWorkspace: React.FC<{
   const load = () => {
     setLoading(true);
     setLoadError(null);
-    fetchAllJobApplications(leadView, bucket)
+    fetchAllJobApplications(leadView, bucket, cancelledView)
       .then(setRows)
       .catch((e) => setLoadError(e instanceof Error ? e.message : 'โหลดรายชื่อผู้สมัครไม่สำเร็จ'))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [leadView, bucket]);
+  useEffect(load, [leadView, bucket, cancelledView]);
+
+  const setCancelledView = (on: boolean) => {
+    const next = new URLSearchParams(searchParams);
+    if (on) next.set('cancelled', '1');
+    else next.delete('cancelled');
+    setSearchParams(next);
+    setSelectedIds([]);
+    setPage(1);
+    say(null);
+  };
 
   /** สลับมุมมอง — ต้องคง query param อื่นไว้ (`?view=` ของบอร์ด · `?tab=` · `?list=`) */
   const setLeadView = (on: boolean) => {
@@ -587,6 +600,22 @@ const RmWorkspace: React.FC<{
   );
 
   const onRowAction = (action: RmRowAction, row: PublicApplication) => {
+    // ส่ง AI โทรทีละแถว (4 ต.ค. 2569) — ผ่านป๊อปยืนยันรายชื่อเหมือนปุ่มรวม (ยิงสายจริง)
+    if (action === 'ai') {
+      askSendAi([row.id]);
+      return;
+    }
+    // กู้คืนใบที่ยกเลิกข้อมูล (135) — กลับเข้ารายชื่อหลักตามเดิม
+    if (action === 'restore') {
+      say(null);
+      void setApplicationCancelled(row.id, false)
+        .then(() => {
+          say(`กู้คืน ${row.full_name} เข้ารายชื่อหลักแล้ว`);
+          load();
+        })
+        .catch((e: unknown) => say(e instanceof Error ? e.message : 'กู้คืนไม่สำเร็จ'));
+      return;
+    }
     if (action === 'call') {
       // ปุ่มถูก disable ไว้แล้วถ้าจับไม่ได้ — เช็คซ้ำกันหลุดจาก keyboard/สคริปต์
       if (!canHoldApplication(row).ok || holdByRef[row.id]) return;
@@ -828,6 +857,10 @@ const RmWorkspace: React.FC<{
               onHoldSelected={() => void keepSelectedForSelf()}
               holdingSelected={holdingSelected}
               onSendAiSelected={() => askSendAi(selectedIds)}
+              onExport={tab === 'candidates' ? () => downloadApplicantExport(filtered) : undefined}
+              exportCount={filtered.length}
+              cancelledView={cancelledView}
+              onToggleCancelledView={tab === 'candidates' && !bucket ? () => setCancelledView(!cancelledView) : undefined}
             />
           </div>
 
@@ -1153,6 +1186,7 @@ const RmWorkspace: React.FC<{
                 holdByRef={holdByRef}
                 onAttendance={onAttendance}
                 recruiterOf={recruiterOf}
+                actionsOverride={cancelledView ? ['view', 'restore'] : undefined}
               />
               </div>
               <ListPaginationBar
@@ -1200,15 +1234,24 @@ const RmWorkspace: React.FC<{
         onConfirm={() => void confirmSendAi()}
       />
 
-      {/* ใบประวัติผู้สมัคร — ปุ่มดูรายละเอียดของแท็บผู้สมัคร (1 ต.ค. 2569) */}
-      <ApplicantProfileDialog
-        application={profileApp}
-        onClose={() => setProfileApp(null)}
-        onSaved={() => {
-          say('บันทึกข้อมูลผู้สมัครแล้ว');
-          load();
-        }}
-      />
+      {/* ดูข้อมูลของแท็บผู้สมัคร = ป๊อปแบบรูป iRecruit (4 ต.ค. 2569): แท็บ 6 อัน ไม่มีขั้นตอน 3 ขั้น + ยกเลิกข้อมูลผู้สมัคร
+          (แทนใบประวัติเต็มหน้า 1 ต.ค.) · คนละโหมดของป๊อปตัวเดียวกับแท็บการติดต่อ */}
+      {profileApp ? (
+        <ApplicantContactDialog
+          mode="profile"
+          application={profileApp}
+          onClose={() => setProfileApp(null)}
+          onSaved={() => {
+            say('บันทึกข้อมูลผู้สมัครแล้ว');
+            load();
+          }}
+          onCancelled={() => {
+            say(`ยกเลิกข้อมูล ${profileApp.full_name} แล้ว · กู้คืนได้ที่ "ดูที่ยกเลิก"`);
+            setProfileApp(null);
+            load();
+          }}
+        />
+      ) : null}
 
       {/* dialog รายละเอียด + ติดต่อสำเร็จ/ไม่สำเร็จ + นัด (ลิสต์ข้อ 7 · 14 ส.ค. 2569) */}
       <ApplicantContactDialog

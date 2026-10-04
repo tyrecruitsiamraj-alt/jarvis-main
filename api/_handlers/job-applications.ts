@@ -1,3 +1,4 @@
+import { cancelApplication, isUndefinedTable, loadCancellations, restoreApplication } from '../_lib/applicationCancellations.js';
 import { dbQuery, dbTransaction } from '../_lib/postgres.js';
 import {
   withRbac,
@@ -1174,6 +1175,40 @@ async function patchProfile(req: AuthedReq, res: ApiRes, id: string, raw: unknow
   return res.status(200).json({ item: toApplication(rows[0], req.user.sub), changed: keys });
 }
 
+/**
+ * ยกเลิกข้อมูลผู้สมัคร (ซ่อนจากรายชื่อหลัก) / กู้คืน — Choice ของเจ้าของ 4 ต.ค. 2569
+ * จำกัดตาม BU เหมือนทุก action · บันทึก audit ว่าใครกด (ประวัติไม่โชว์บนจอ)
+ */
+async function patchCancelled(req: AuthedReq, res: ApiRes, id: string, cancelled: boolean, rawReason: unknown) {
+  const { rows } = await dbQuery<{ job_id: string | null; department_code: string | null; full_name: string }>(
+    `select job_id, department_code, full_name from ${tbl} where id = $1 limit 1`,
+    [id],
+  );
+  const cur = rows[0];
+  if (!cur) return sendError(res, 404, 'Not found');
+  if (!(await isApplicationInWriteScope(req.user, cur))) return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+  const reason = typeof rawReason === 'string' && rawReason.trim() ? rawReason.trim().slice(0, 300) : null;
+  try {
+    if (cancelled) {
+      await cancelApplication({ id, byUserId: req.user.sub ?? null, byName: req.user.email ?? null, reason });
+    } else {
+      await restoreApplication(id);
+    }
+  } catch (e) {
+    if (isUndefinedTable(e)) {
+      return sendError(res, 503, 'Migration required', 'ปุ่มยกเลิกข้อมูลต้องรัน migration 135 ก่อน — ยังใช้ไม่ได้');
+    }
+    throw e;
+  }
+  await auditFromAuthed(req, {
+    action: cancelled ? 'job_application.cancel' : 'job_application.restore',
+    entityType: 'job_application',
+    entityId: id,
+    after: { cancelled, reason },
+  });
+  return res.status(200).json({ ok: true, cancelled });
+}
+
 async function patchStatus(req: AuthedReq, res: ApiRes) {
   const raw = await readJsonBody(req);
   if (typeof raw !== 'object' || raw === null) {
@@ -1197,6 +1232,8 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
   if (b.dial === true) return patchDial(req, res, id);
   // แก้ข้อมูลผู้สมัครจากป๊อปรายละเอียด (1 ต.ค. 2569) — เก็บ log ว่าใครแก้ ไม่โชว์บนจอ
   if (b.profile !== undefined) return patchProfile(req, res, id, b.profile);
+  // ยกเลิกข้อมูลผู้สมัคร / กู้คืน (135 · 4 ต.ค. 2569) — ซ่อนจากรายชื่อหลัก AI ไม่โทรเอง
+  if (typeof b.cancelled === 'boolean') return patchCancelled(req, res, id, b.cancelled, b.cancel_reason);
 
   const hasStatus = b.status !== undefined;
   const hasNote = b.admin_note !== undefined;
@@ -1292,15 +1329,21 @@ async function handler(req: AuthedReq, res: ApiRes) {
       // ⚠️ ต้องกรอง `not is_lead` ให้ตรงกับ dialog กล่องงาน (?job_id= ใช้ leadWhere='not is_lead')
       // ไม่งั้นเก็บ Lead แล้วเลขบนการ์ด (8) ไม่ตรงกับที่กดเข้าไปเห็น (5) — เชื่อไม่ได้
       // ฐานที่ยังไม่รัน 083 (ไม่มีคอลัมน์ is_lead) → ถอยเป็นนับทั้งหมด (42703)
-      const countsSql = (leadFilter: string) =>
+      // ไม่นับใบที่ "ยกเลิกข้อมูลผู้สมัคร" (135) — เลขบนการ์ดต้องเท่ารายชื่อที่กดเข้าไปเห็น
+      const NOT_CANCELLED = `and not exists (select 1 from ${tableInAppSchema('application_cancellations')} x where x.application_id = ${tbl}.id)`;
+      const countsSql = (leadFilter: string, cancelFilter = NOT_CANCELLED) =>
         `select job_id, count(*)::text as n from ${tbl}
-          where job_id is not null ${leadFilter} group by job_id`;
+          where job_id is not null ${leadFilter} ${cancelFilter} group by job_id`;
       let rows: Array<{ job_id: string; n: string }>;
       try {
         ({ rows } = await dbQuery<{ job_id: string; n: string }>(countsSql('and not is_lead')));
       } catch (e) {
-        if (!isUndefinedColumn(e)) throw e;
-        ({ rows } = await dbQuery<{ job_id: string; n: string }>(countsSql('')));
+        if (isUndefinedTable(e)) {
+          ({ rows } = await dbQuery<{ job_id: string; n: string }>(countsSql('and not is_lead', '')));
+        } else {
+          if (!isUndefinedColumn(e)) throw e;
+          ({ rows } = await dbQuery<{ job_id: string; n: string }>(countsSql('', '')));
+        }
       }
       const counts: Record<string, number> = {};
       for (const r of rows) {
@@ -1423,7 +1466,22 @@ async function handler(req: AuthedReq, res: ApiRes) {
       q.legacyClaimWhere,
       q.leadWhere,
     );
-    const items = rows.map((r) => toApplication(r, req.user.sub));
+    /**
+     * ใบที่ "ยกเลิกข้อมูลผู้สมัคร" (135) — ไม่อยู่ในรายชื่อหลักทุกแท็บ · `?cancelled=1` = ดูเฉพาะที่ยกเลิก (กู้คืนได้)
+     */
+    const allItems = rows.map((r) => toApplication(r, req.user.sub));
+    const cancels = await loadCancellations(allItems.map((i) => i.id));
+    const wantCancelled = getString(req.query?.cancelled) === '1';
+    const items = allItems.filter((i) => cancels.has(i.id) === wantCancelled);
+    for (const item of items) {
+      const c = cancels.get(item.id);
+      if (c) {
+        const rec = item as Record<string, unknown>;
+        rec.cancelled_at = c.at;
+        rec.cancelled_by_name = c.byName;
+        rec.cancel_reason = c.reason;
+      }
+    }
 
     // แนบผลโทรล่าสุดต่อคน — แท็บ "รายชื่อที่สนใจ" ของกล่องงานใช้ตัวนี้กรอง
     // (เจ้าของเคาะ 13 ส.ค. 2569: สนใจ = ตอบสนใจ **ตอนโทร** ไม่ใช่สถานะใบสมัคร)

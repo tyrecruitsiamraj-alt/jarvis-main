@@ -11565,3 +11565,28 @@ Gen ทีละหลายๆ Link ได้"* → Choice ลิงก์ = "�
 
 - ชื่อแท็บอยู่ 2 ที่: `JobBoardView.tsx` `BOARD_VIEW_TABS` (contact) + `src/lib/recruitRm.ts` `RM_TAB_LABEL.contact` (ปุ่ม "ไป…" ในข้อความแจ้งอ่านจากตัวนี้)
 - ข้อความที่อ้างชื่อแท็บ: `LumosPanels.tsx` · `RmSearchBar.tsx` · ⚠️ "รายการติดตาม" ของหน้าติดตาม (Follow) **ไม่เกี่ยว ไม่เปลี่ยน**
+
+### 4 ต.ค. 2569 (ต่อ) — แท็บผู้สมัคร: เติมของที่ขาดจาก iRecruit + ดูข้อมูลแบบรูป + ยกเลิกข้อมูลผู้สมัคร (135)
+
+เจ้าของเทียบกับ iRecruit แล้วเลือก: *"เอาสถานะมาเพิ่มพอ · ตัวกรองเอาของเขามาเสริม · เอาสิ่งที่ขาดมา · ปุ่มแบบของเขา + ส่ง AI โทร ·
+ดูรายละเอียดผู้สมัครต้องเก็บมาตามรูป"* · การเรียงแท็บเจ้าของตัดสินเอง (ไม่แตะ) · แท็บงานสรรหาห้ามยุ่ง ·
+Choice "ยกเลิกข้อมูล" = ซ่อนจากรายชื่อหลัก กู้คืนได้
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `migrations/135_application_cancellations.sql` (ใหม่ · **รันบนฐานจริงแล้ว 4 ต.ค.**) | ตาราง `application_cancellations` (มีแถว = ยกเลิกอยู่ · กู้คืน = ลบแถว) |
+| `api/_lib/applicationCancellations.ts` (ใหม่) | `loadCancellations` (42P01 = Map ว่าง) · `cancelApplication` (ปลดการเก็บ **ไม่ตั้ง `unclaimed_at`** — ตั้ง = เข้ากอง AI) · `restoreApplication` |
+| `api/_handlers/job-applications.ts` | PATCH `{id, cancelled, cancel_reason}` (BU scope + audit) · รายชื่อตัดใบที่ยกเลิก · `?cancelled=1` = เฉพาะที่ยกเลิก · ยอดต่อใบขอ (`counts=1`) ไม่นับที่ยกเลิก |
+| `api/_lib/applicantOverviewSql.ts` | 🔴 `awaiting_call_choice` ข้ามใบที่ยกเลิก — worker ส่ง AI โทรเองใช้ถังนี้ |
+| `src/lib/applicantProcess.ts` (ใหม่) | ขั้นตอน (การติดต่อ/นัดหมาย/ติดตามการนัดหมาย) × สถานะ (รอดำเนินการ/สำเร็จ/ไม่สำเร็จ) + สถานะการติดต่อ (ยังไม่โทร/โทรแล้ว/นัดสัมภาษณ์แล้ว) — คิดจากผลติดต่อ/วันนัด/ผลมา-ไม่มาที่มีอยู่แล้ว |
+| `src/lib/applicantFilters.ts` | หัวข้อใหม่ `step` `status` `contactState` `license` `specific` (ข้อมูลผู้สรรหา) · สามตัวแรกขึ้นต้นแถบ |
+| `src/components/recruit-rm/RmTable.tsx` · `src/lib/recruitRm.ts` | คอลัมน์ "สถานะ" (ชิป + ขั้น) แท็บผู้สมัคร · ปุ่มแถว `ai` (ส่ง AI โทร · ผ่านป๊อปยืนยัน) · `restore` + prop `actionsOverride` |
+| `src/components/recruit-rm/ApplicantContactDialog.tsx` | `mode="profile"`: ไม่มีขั้นตอน 3 ขั้น · แท็บ 6 อัน · ก้อน "ยกเลิกข้อมูลผู้สมัคร" ยืนยันในป๊อปเดิม · ปุ่มล่างเหลือ ปิด (บันทึกโผล่ตอนแก้ข้อมูล) |
+| `ApplicantProfileDialog.tsx` + เทสต์ | **ลบแล้ว** — ใบประวัติเต็มหน้า (1 ต.ค.) ถูกแทนด้วยโหมด profile (ไฟล์แนบอยู่ใน `ApplicantInfoPanel` เหมือนเดิม) |
+| `src/components/recruit-rm/RmSearchBar.tsx` · `RmWorkspace.tsx` | ปุ่ม "รายงาน" (`src/lib/applicantExport.ts` · .csv มี BOM · ทุกแถวที่กรองอยู่) · "ดูที่ยกเลิก / กลับรายชื่อหลัก" (`?cancelled=1`) |
+| `src/components/jobs/JobBoardView.tsx` | หัวแท็บผู้สมัคร (`view=list`) มี `RecruitBoardTools` (สร้างลิงก์ · ตั้งค่าบอร์ด) — แทนคำสั่ง 14 ส.ค. ที่ให้มีเฉพาะกล่องงาน |
+| เทสต์ | `tests/api/applicantIrecruitParity2569-10-04.test.ts` · `ApplicantContactDialog.test.tsx` (+3 โหมด profile) · ปรับ `applicantFilters.test.ts` / `contactTabRelease.test.ts` |
+
+- ตรวจจริง: แท็บผู้สมัครมีคอลัมน์สถานะ · ปุ่มแถว เก็บ Lead/เก็บไปโทรเอง/ส่ง AI โทร/ดูรายละเอียด · ตัวกรองขั้นตอน/สถานะ/สถานะการติดต่อขึ้น (ใบขับขี่/ข้อมูลผู้สรรหายังไม่มีข้อมูลในชุดที่โหลด = ซ่อนตามกติกา engine) ·
+  ป๊อปโหมด profile ตรงรูป · **ยิงเขียนจริงผ่าน API**: ยกเลิกใบที่ไม่มีคนเก็บ → รายชื่อหลัก 166→165 · อยู่ในมุมมองที่ยกเลิก · ยอดต่อใบขอ 200 · กู้คืนทันที → 166 (audit 2 แถว) · ถังรอเลือกวิธีโทรคิวรีได้ 200
+- ⚠️ สายที่ส่งให้ AI ไปแล้วก่อนกดยกเลิก **ไม่ถูกเรียกคืน** (การยกเลิกที่คิว Lumos ต้องใช้รหัสหัวขบวน — ไม่ได้ทำรอบนี้)

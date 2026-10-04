@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { UserPlus, BookmarkPlus, PhoneCall, Trash2, Archive, Bot, FileSpreadsheet } from 'lucide-react';
+import { UserPlus, BookmarkPlus, PhoneCall, Trash2, Archive, Bot, FileSpreadsheet, Download, UserX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import SearchField from '@/components/shared/SearchField';
@@ -50,6 +50,12 @@ const RmSearchBar: React.FC<{
   /** อยู่ในมุมมอง "คลังสำรอง (Lead)" อยู่ไหม — สลับป้ายปุ่มและตัวที่เน้น */
   leadView?: boolean;
   onToggleLeadView?: () => void;
+  /** ปุ่ม "รายงาน" (เติมจาก iRecruit 4 ต.ค. 2569) — ส่งออกทุกแถวที่กรองอยู่ · ไม่ส่ง = ไม่มีปุ่ม */
+  onExport?: () => void;
+  exportCount?: number;
+  /** มุมมองใบที่ "ยกเลิกข้อมูลผู้สมัคร" (135) — สลับไป-กลับรายชื่อหลัก */
+  cancelledView?: boolean;
+  onToggleCancelledView?: () => void;
 }> = ({
   keyword,
   onKeywordChange,
@@ -67,6 +73,10 @@ const RmSearchBar: React.FC<{
   leadBusy = false,
   leadView = false,
   onToggleLeadView,
+  onExport,
+  exportCount = 0,
+  cancelledView = false,
+  onToggleCancelledView,
 }) => (
   <div className="flex flex-wrap items-center gap-2">
     {hideSearch ? null : (
@@ -190,6 +200,32 @@ const RmSearchBar: React.FC<{
           </button>
         ) : null}
       </>
+    ) : null}
+
+    {onExport ? (
+      <Button
+        type="button"
+        variant="outline"
+        size="xs"
+        onClick={onExport}
+        disabled={exportCount === 0}
+        title={exportCount === 0 ? 'ไม่มีรายชื่อให้ส่งออก' : `ส่งออก ${exportCount} รายชื่อที่กรองอยู่ เป็นไฟล์ Excel (.csv)`}
+        className="shrink-0"
+      >
+        <Download aria-hidden /> รายงาน
+      </Button>
+    ) : null}
+    {onToggleCancelledView ? (
+      <Button
+        type="button"
+        variant={cancelledView ? 'default' : 'outline'}
+        size="xs"
+        onClick={onToggleCancelledView}
+        aria-pressed={cancelledView}
+        className="shrink-0"
+      >
+        <UserX aria-hidden /> {cancelledView ? 'กลับรายชื่อหลัก' : 'ดูที่ยกเลิก'}
+      </Button>
     ) : null}
   </div>
 );

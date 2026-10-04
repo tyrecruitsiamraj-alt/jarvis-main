@@ -20,6 +20,14 @@ import { ATTENDANCE_LABEL } from '@/lib/appointmentAttendance';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { fullDaysSince } from '@/lib/fullDays';
 import {
+  CONTACT_STATE_LABEL,
+  PROCESS_STATE_LABEL,
+  PROCESS_STEP_LABEL,
+  applicantContactStateOf,
+  applicantProcessOf,
+} from '@/lib/applicantProcess';
+import { RM_LICENSE_TYPES } from '@/lib/recruitRmMasters';
+import {
   UNSPECIFIED,
   applyFacetDefs,
   buildFacetViews,
@@ -38,7 +46,12 @@ export type ApplicantFacetKey =
   | 'apptPlace'
   | 'attendance'
   | 'recruiter'
+  | 'specific'
   | 'call'
+  | 'step'
+  | 'status'
+  | 'contactState'
+  | 'license'
   | 'job'
   | 'position'
   | 'province'
@@ -191,12 +204,48 @@ const FACETS: readonly Def[] = [
     values: (r, facts) => [trimOr(facts.recruiterOf?.(r))],
   },
   {
+    /** ข้อมูลผู้สรรหา (ช่องเดียวกับ iRecruit · `specific_type`) — 4 ต.ค. 2569 เติมจาก iRecruit */
+    key: 'specific',
+    label: 'ข้อมูลผู้สรรหา',
+    ui: 'check',
+    searchable: true,
+    values: (r) => [trimOr(r.specific_type)],
+  },
+  {
     key: 'call',
     label: 'ผลโทรล่าสุด',
     ui: 'chip',
     order: ['interested', 'pending', 'not_interested', 'none'],
     labelOf: (v) => CALL_LABEL[v] ?? v,
     values: (r) => [applicantCallValue(r)],
+  },
+  /**
+   * ═══ ขั้นตอน · สถานะ · สถานะการติดต่อ — เติมจาก iRecruit (เจ้าของ 4 ต.ค. 2569) ═══
+   * คิดจากตัวเดียวกับคอลัมน์ "สถานะ" (`applicantProcessOf`) — ตัวกรองกับตารางต้องพูดตรงกัน
+   */
+  {
+    key: 'step',
+    label: 'ขั้นตอน',
+    ui: 'chip',
+    order: ['contact', 'appointment', 'follow'],
+    labelOf: (v) => PROCESS_STEP_LABEL[v as keyof typeof PROCESS_STEP_LABEL] ?? v,
+    values: (r) => [applicantProcessOf(r).step],
+  },
+  {
+    key: 'status',
+    label: 'สถานะ',
+    ui: 'chip',
+    order: ['pending', 'ok', 'fail'],
+    labelOf: (v) => PROCESS_STATE_LABEL[v as keyof typeof PROCESS_STATE_LABEL] ?? v,
+    values: (r) => [applicantProcessOf(r).state],
+  },
+  {
+    key: 'contactState',
+    label: 'สถานะการติดต่อ',
+    ui: 'chip',
+    order: ['not_called', 'called', 'appointed'],
+    labelOf: (v) => CONTACT_STATE_LABEL[v as keyof typeof CONTACT_STATE_LABEL] ?? v,
+    values: (r) => [applicantContactStateOf(r)],
   },
   {
     /**
@@ -248,6 +297,17 @@ const FACETS: readonly Def[] = [
     values: (r) => {
       if (typeof r.age !== 'number' || !Number.isFinite(r.age)) return [UNSPECIFIED];
       return [AGE_BANDS.find((b) => r.age! >= b.min && r.age! <= b.max)?.id ?? UNSPECIFIED];
+    },
+  },
+  {
+    /** ใบขับขี่ (เติมจาก iRecruit 4 ต.ค. 2569) — คนหนึ่งมีได้หลายใบ = อยู่หลายค่า · ไม่ได้กรอก = ไม่ระบุ */
+    key: 'license',
+    label: 'ใบขับขี่',
+    ui: 'check',
+    order: [...RM_LICENSE_TYPES],
+    values: (r) => {
+      const list = (r.license_types ?? []).filter((t) => typeof t === 'string' && t.trim());
+      return list.length > 0 ? list : [UNSPECIFIED];
     },
   },
   {
@@ -356,6 +416,10 @@ export const APPLICANT_PRIMARY_FACETS: readonly ApplicantFacetKey[] = [
   'apptPlace',
   'attendance',
   'recruiter',
+  // ขั้นตอน/สถานะ/สถานะการติดต่อ ขึ้นต้นแบบ iRecruit (4 ต.ค. 2569)
+  'step',
+  'status',
+  'contactState',
   'call',
   'job',
   'province',
