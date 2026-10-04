@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Ban, EyeOff, MapPin, Users } from 'lucide-react';
+import { ArrowRight, Ban, Banknote, Building2, EyeOff, MapPin, UserRound, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
@@ -10,8 +10,7 @@ import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisp
 import { getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import PublishReadinessChip from '@/components/jobs/PublishReadinessChip';
 import { publicIncomeOf, readinessActionText, type PublishReadiness } from '@/lib/publishReadiness';
-import { boardProvinceOf } from '@/lib/boardFilters';
-import { UNSPECIFIED } from '@/lib/facetEngine';
+import { boardCardAge, boardCardGender, boardCardPlace, boardCardUnitName } from '@/lib/boardCardFacts';
 import { isHiddenFromPublicByWorkStatus } from '@/lib/publicJobVisibility';
 import { isUnitRequestWorkStatus, UNIT_REQUEST_WORK_STATUS_LABELS } from '@/lib/unitRequestWorkStatus';
 import { releaseSkipText, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
@@ -49,17 +48,12 @@ export type BoardJobCardProps = {
 };
 
 /** "บางพลี สมุทรปราการ" — อำเภอที่ทีม Online กรอก + จังหวัด · ไม่รู้ = บอกตรง ๆ (ไม่เดาจากจังหวัดไซต์) */
-function shortPlace(job: JobRequest): string {
-  const province = boardProvinceOf(job);
-  const district = (job.override_district ?? '').trim();
-  const parts = [district, province === UNSPECIFIED ? '' : province].filter(Boolean);
-  return parts.length > 0 ? parts.join(' ') : 'ยังไม่ระบุสถานที่';
-}
-
 const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip }) => {
   const age = getJobAgeChipInfo(job);
   /** เงินต้องบอกหน่วยเสมอ — ตัวเดียวกับหน้าสาธารณะ/ป๊อปประกาศ (`publicIncomeOf`) · ไม่รู้หน่วย = คำเตือนใน tooltip */
   const money = publicIncomeOf(job);
+  const gender = boardCardGender(job);
+  const unitName = boardCardUnitName(job);
   const hidden = isUnitRequestWorkStatus(job.work_status) && isHiddenFromPublicByWorkStatus(job.work_status);
   /** ชิปสภาพ — ใบที่ ERP พาไปต่อแล้วและซ่อนจากหน้าสาธารณะมีชิปสถานะงานของตัวเองอยู่แล้ว · ใบที่ตั้งไม่ประกาศมีชิปแดง ⇒ ไม่ซ้ำ */
   const showReadiness = readiness !== null && !(readiness.kind === 'moved' && hidden) && readiness.kind !== 'skipped';
@@ -88,6 +82,13 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
             {jobBoardCardTitle(job)}
           </h2>
           <p className="line-clamp-1 text-base font-medium text-primary">{publicJobPositionLabel(job)}</p>
+          {/* ชื่อหน่วยงาน (เจ้าของ 4 ต.ค. 2569 ข้อ 7) — หัวการ์ดเป็นชื่อจุดทำงาน · ซ้ำกันไม่พิมพ์ซ้ำ */}
+          {unitName ? (
+            <p className={cn('flex min-w-0 items-center gap-1.5 text-sm', DASH.muted)}>
+              <Building2 className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="line-clamp-2">{unitName}</span>
+            </p>
+          ) : null}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {job.urgency === 'urgent' ? (
@@ -103,19 +104,30 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
       {/* ── พร้อมประกาศไหม / ขาดอะไร (2 ต.ค. 2569 — แทน "ติดขั้น N" + จุด 4 ขั้น) ── */}
       {showReadiness && readiness ? <PublishReadinessChip readiness={readiness} /> : null}
 
-      {/* ── ที่ไหน · เงินเท่าไหร่ ── */}
-      <p className={cn('flex min-w-0 items-center gap-1.5 text-sm', DASH.muted)}>
-        <MapPin className="h-4 w-4 shrink-0" aria-hidden />
-        <span className="truncate">{shortPlace(job)}</span>
-        {money ? (
-          <>
-            <span aria-hidden>·</span>
-            <span className="shrink-0 tabular-nums" title={money.hint ?? undefined}>
+      {/* ── ที่ไหน (จังหวัด · เขต/อำเภอ) · เงินเท่าไหร่ — คนละบรรทัด ให้ที่ทำงานอ่านได้ครบ (4 ต.ค. 2569 ข้อ 7) ── */}
+      <div className="space-y-1.5">
+        <p className={cn('flex min-w-0 items-start gap-1.5 text-sm', DASH.muted)}>
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <span className="line-clamp-2">{boardCardPlace(job)}</span>
+        </p>
+        <p className={cn('flex min-w-0 items-center gap-1.5 text-sm', DASH.muted)}>
+          <Banknote className="h-4 w-4 shrink-0" aria-hidden />
+          {money ? (
+            <span className="tabular-nums" title={money.hint ?? undefined}>
               {money.text}
             </span>
-          </>
-        ) : null}
-      </p>
+          ) : (
+            <span className={TONE.warn.value}>ยังไม่ตั้งรายได้</span>
+          )}
+        </p>
+        {/* เพศ · อายุ — ไม่ระบุเพศ = สีเตือน (ประกาศไม่ได้จนกว่าจะเลือก) */}
+        <p className={cn('flex min-w-0 items-center gap-1.5 text-sm', DASH.muted)}>
+          <UserRound className="h-4 w-4 shrink-0" aria-hidden />
+          <span className={cn(!gender.known && TONE.warn.value)}>{gender.text}</span>
+          <span aria-hidden>·</span>
+          <span className="tabular-nums">{boardCardAge(job)}</span>
+        </p>
+      </div>
 
       {/* สถานะงานที่ทำให้ประกาศไม่ขึ้นหน้าสาธารณะ — ต้องรู้ (เจ้าของสั่ง 17 ส.ค. 2569) */}
       {hidden && isUnitRequestWorkStatus(job.work_status) ? (
