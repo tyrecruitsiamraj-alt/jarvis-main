@@ -2,7 +2,8 @@
  * ป๊อป "รายละเอียดผู้สมัคร" แบบรูป iRecruit (เจ้าของสั่ง 1 ต.ค. 2569)
  *
  * 🔴 ด่าน:
- * - หน้าตาตามรูป: หัว "รายละเอียดผู้สมัคร" · ขั้นตอนการดำเนินการ 3 ขั้น · แท็บ 6 แท็บ · ปุ่มบันทึก/ปิด
+ * - หน้าตาตามรูป: หัว "รายละเอียดผู้สมัคร" · ขั้นตอนการดำเนินการ · แท็บ 6 แท็บ · ปุ่มบันทึก/ปิด
+ * - 4 ต.ค. 2569: ขั้นนัดหมายโผล่หลังกดติดต่อสำเร็จ · ขั้นติดตามนัดอยู่แท็บติดตามนัดหมาย (mode="appointment")
  * - กดเลือกในขั้นตอนยังไม่เขียน จนกด "บันทึก" · ไม่มีอะไรเปลี่ยน = กดบันทึกไม่ได้
  * - Journey 4 ต.ค. 2569: ติดต่อสำเร็จ → นัดหมาย / นัดหมายไม่สำเร็จ · นัดหมาย = วัน + สถานที่ (รายการ iRecruit) + หน่วยงาน
  *   · นัดหมายไม่สำเร็จ = เหตุผล (ขั้น 2) · ติดต่อไม่สำเร็จ = เหตุผลอย่างเดียว ไม่มีปุ่มนัด
@@ -77,19 +78,25 @@ const app = (over: Partial<PublicApplication> = {}): PublicApplication =>
     ...over,
   }) as PublicApplication;
 
-const renderDialog = (a: PublicApplication, onSaved = vi.fn(), onClose = vi.fn()) => {
-  render(<ApplicantContactDialog application={a} onClose={onClose} onSaved={onSaved} />);
+const renderDialog = (
+  a: PublicApplication,
+  onSaved = vi.fn(),
+  onClose = vi.fn(),
+  mode: 'contact' | 'appointment' = 'contact',
+) => {
+  render(<ApplicantContactDialog application={a} onClose={onClose} onSaved={onSaved} mode={mode} />);
   return { onSaved, onClose, dialog: screen.getByRole('dialog') };
 };
 
 describe('ApplicantContactDialog (โฉม iRecruit)', () => {
-  it('หน้าตาตามรูป: หัว · 3 ขั้น · 6 แท็บ · บันทึก/ปิด · ไม่มีก้อนยกเลิกข้อมูลผู้สมัคร', () => {
+  it('หน้าตาตามรูป: หัว · ขั้นการติดต่อ · 6 แท็บ · บันทึก/ปิด · ไม่มีก้อนยกเลิกข้อมูลผู้สมัคร', () => {
     const { dialog } = renderDialog(app());
     expect(within(dialog).getByText('รายละเอียดผู้สมัคร')).toBeTruthy();
     expect(within(dialog).getByText('ขั้นตอนการดำเนินการ')).toBeTruthy();
-    for (const t of ['การติดต่อ', 'การนัดหมาย', 'การติดตามนัด']) {
-      expect(within(dialog).getAllByText(t).length).toBeGreaterThan(0);
-    }
+    expect(within(dialog).getByTestId('step-contact')).toBeTruthy();
+    // 🔴 4 ต.ค. 2569: ขั้นนัดหมายรอกดติดต่อสำเร็จ · ขั้นติดตามนัดอยู่แท็บติดตามนัดหมาย
+    expect(within(dialog).queryByTestId('step-appointment')).toBeNull();
+    expect(within(dialog).queryByTestId('step-follow-up')).toBeNull();
     for (const t of ['ข้อมูลผู้สมัคร', 'ประวัติการสมัคร', 'การโทร', 'การติดต่อ', 'การนัดหมาย', 'ติดตามนัดหมาย']) {
       expect(within(dialog).getByRole('tab', { name: t })).toBeTruthy();
     }
@@ -131,9 +138,12 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
 
   it('🔴 Journey ข้อ 4: ยังไม่ติดต่อสำเร็จ = ไม่มีปุ่มนัด · กดติดต่อสำเร็จ ⇒ นัดหมาย / นัดหมายไม่สำเร็จ ขึ้น', () => {
     const { dialog } = renderDialog(app());
-    const step = within(dialog).getByTestId('step-appointment');
-    expect(within(step).queryByRole('button', { name: /นัดหมาย/ })).toBeNull();
+    // ยังไม่กดติดต่อสำเร็จ = ขั้นนัดหมายยังไม่โผล่เลย (เจ้าของสั่ง 4 ต.ค. 2569)
+    expect(within(dialog).queryByTestId('step-appointment')).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: /ติดต่อสำเร็จ/ }));
+    const step = within(dialog).getByTestId('step-appointment');
+    // ฟอร์มนัดยังไม่โผล่จนกว่าจะเลือก "นัดหมาย"
+    expect(within(dialog).queryByTestId('new-appointment')).toBeNull();
     expect(within(step).getByRole('button', { name: /^นัดหมาย$/ })).toBeTruthy();
     expect(within(step).getByRole('button', { name: /นัดหมายไม่สำเร็จ/ })).toBeTruthy();
   });
@@ -184,20 +194,27 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
     );
   });
 
-  it('นัดหมายเดิมขึ้นในขั้นที่ 2 · ไม่มีนัด = ไม่โชว์ช่องนัด + ปุ่มติดตามนัดกดไม่ได้', () => {
+  it('นัดหมายเดิมขึ้นในขั้นที่ 2 (ผลล่าสุดติดต่อสำเร็จ) · ไม่มีนัด = ไม่โชว์ช่องนัด · แท็บติดตามนัด: ไม่มีนัด = กดติดตามไม่ได้', () => {
     const withAppt = renderDialog(
-      app({ appointment_at: '2026-09-15T05:00:00.000Z', appointment_place: 'สาขาลาดพร้าว', appointment_job: 'หน่วย ก' }),
+      app({
+        last_contact_ok: true,
+        appointment_at: '2026-09-15T05:00:00.000Z',
+        appointment_place: 'สาขาลาดพร้าว',
+        appointment_job: 'หน่วย ก',
+      }),
     ).dialog;
     const step = within(withAppt).getByTestId('step-appointment');
     expect(within(step).getByText('15/9/2569')).toBeTruthy();
     expect(within(step).getByText('สาขาลาดพร้าว')).toBeTruthy();
     expect(within(step).getByText('หน่วย ก')).toBeTruthy();
     cleanup();
-    const noAppt = renderDialog(app()).dialog;
+    const noAppt = renderDialog(app({ last_contact_ok: true })).dialog;
     // ยังไม่มีนัด = ไม่โชว์ช่อง นัดหมายวันที่/สถานที่/ลงหน่วยงาน ที่เป็นขีด (เจ้าของสั่ง 4 ต.ค. 2569)
     expect(within(noAppt).queryByTestId('current-appointment')).toBeNull();
     expect(within(within(noAppt).getByTestId('step-appointment')).queryByText('นัดหมายวันที่')).toBeNull();
-    const follow = within(noAppt).getByTestId('step-follow-up');
+    cleanup();
+    const apptTab = renderDialog(app(), vi.fn(), vi.fn(), 'appointment').dialog;
+    const follow = within(apptTab).getByTestId('step-follow-up');
     const ok = within(follow).getByRole('button', { name: /ติดตามสำเร็จ/ }) as HTMLButtonElement;
     expect(ok.disabled).toBe(true);
     expect(ok.title).toBe('ยังไม่มีนัดหมาย');
@@ -205,7 +222,10 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
 
   it('🔴 ติดตามไม่สำเร็จ ⇒ ต้องเลือกไม่มา/เลื่อนนัด แล้วบันทึกผลติดตามนัดของนัดเดิม', async () => {
     recordAppointmentAttendance.mockResolvedValue(undefined);
-    const { dialog, onClose } = renderDialog(app({ appointment_at: '2026-09-15T05:00:00.000Z' }));
+    const { dialog, onClose } = renderDialog(app({ appointment_at: '2026-09-15T05:00:00.000Z' }), vi.fn(), vi.fn(), 'appointment');
+    // แท็บติดตามนัดหมาย = นัดปัจจุบัน + ขั้นติดตามนัด · ไม่มีขั้นติดต่อ/นัดหมาย
+    expect(within(dialog).getByTestId('appointment-summary').textContent).toContain('15/9/2569');
+    expect(within(dialog).queryByTestId('step-contact')).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: /ติดตามไม่สำเร็จ/ }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'บันทึก' }));
     expect(within(dialog).getByRole('alert').textContent).toBe('เลือกว่าไม่มา หรือ เลื่อนนัด');
@@ -283,7 +303,7 @@ describe('โหมด profile (แท็บผู้สมัคร)', () => {
     expect(setApplicationCancelled).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111', true, 'ไม่สะดวกแล้ว');
   });
 
-  it('โหมดเดิม (แท็บการติดต่อ) ยังมีขั้นตอน 3 ขั้น และไม่มีก้อนยกเลิก', () => {
+  it('โหมดเดิม (แท็บการติดต่อ) มีขั้นการติดต่อ และไม่มีก้อนยกเลิก', () => {
     render(<ApplicantContactDialog application={app()} onClose={() => {}} onSaved={() => {}} />);
     expect(screen.getByTestId('step-contact')).toBeTruthy();
     expect(screen.queryByTestId('cancel-applicant')).toBeNull();

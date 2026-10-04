@@ -125,9 +125,10 @@ export default function ApplicantContactDialog({
   /**
    * `profile` = ปุ่มดูข้อมูลของแท็บผู้สมัคร (เจ้าของส่งรูป iRecruit 4 ต.ค. 2569): **ไม่มีขั้นตอน 3 ขั้น** ·
    * แท็บ 6 อันเหมือนเดิม · มีก้อน "ยกเลิกข้อมูลผู้สมัคร" · ปุ่มล่างเหลือ ปิด (บันทึกโผล่ตอนแก้ข้อมูล)
-   * `contact` (ค่าเดิม) = แท็บการติดต่อ/ติดตามนัดหมาย มีขั้นตอน 3 ขั้น + บันทึก/ปิด
+   * `contact` (ค่าเดิม) = แท็บการติดต่อ: ขั้น 1 การติดต่อ → กดติดต่อสำเร็จแล้วขั้น 2 การนัดหมายถึงโผล่ (เจ้าของสั่ง 4 ต.ค. 2569)
+   * `appointment` = แท็บติดตามนัดหมาย: นัดปัจจุบัน + ขั้น 3 การติดตามนัด (*"การติดตามนัดต้องไปอยู่ที่หน้าติดตามนัดหมาย"*)
    */
-  mode?: 'contact' | 'profile';
+  mode?: 'contact' | 'appointment' | 'profile';
   /** ยกเลิกข้อมูลผู้สมัครสำเร็จ (โหมด profile) — หน้าแม่ปิดป๊อป + โหลดใหม่ (ใบหายจากรายชื่อหลัก) */
   onCancelled?: () => void;
 }) {
@@ -295,12 +296,14 @@ export default function ApplicantContactDialog({
     <div className="space-y-4">
       <DialogHeaderLike embedded={embedded} name={a.full_name} />
 
-      {mode === 'contact' ? (
+      {mode !== 'profile' ? (
       <>
       {/* ── ขั้นตอนการดำเนินการ ── */}
       <section className="space-y-2" aria-label="ขั้นตอนการดำเนินการ">
         <p className="text-xs font-medium text-muted-foreground">ขั้นตอนการดำเนินการ</p>
 
+        {mode === 'contact' ? (
+        <>
         <div className="rounded-xl border border-border/70" data-testid="step-contact">
           <StepHead index={0} done={contactShown !== null}>
             <Button
@@ -351,6 +354,8 @@ export default function ApplicantContactDialog({
           ) : null}
         </div>
 
+        {/* 🔴 ขั้น 2 โผล่หลังกด "ติดต่อสำเร็จ" เท่านั้น (เจ้าของสั่ง 4 ต.ค. 2569) · ฟอร์มนัดโผล่หลังเลือก "นัดหมาย" */}
+        {apptUnlocked ? (
         <div className="overflow-hidden rounded-xl border border-border/70" data-testid="step-appointment">
           <StepHead index={1} done={Boolean(a.appointment_at)}>
             {apptUnlocked ? (
@@ -476,7 +481,32 @@ export default function ApplicantContactDialog({
             </div>
           ) : null}
         </div>
+        ) : null}
+        </>
+        ) : null}
 
+        {/* 🔴 การติดตามนัด อยู่แท็บติดตามนัดหมายเท่านั้น (เจ้าของสั่ง 4 ต.ค. 2569) — โชว์นัดปัจจุบันให้ดูคู่กัน */}
+        {mode === 'appointment' ? (
+        <>
+        <div
+          className="grid grid-cols-1 gap-3 rounded-xl border border-border/70 bg-muted/30 p-3 sm:grid-cols-3"
+          data-testid="appointment-summary"
+        >
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">นัดหมายวันที่</p>
+            <p className="text-sm tabular-nums text-foreground">
+              {a.appointment_at ? formatYmdDmyBe(a.appointment_at) : EM_DASH}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">สถานที่นัดหมาย</p>
+            <p className="text-sm text-foreground">{a.appointment_place || EM_DASH}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">ลงหน่วยงาน</p>
+            <p className="text-sm text-foreground">{a.appointment_job || (a.appointment_at ? 'หาล่วงหน้า' : EM_DASH)}</p>
+          </div>
+        </div>
         <div className="rounded-xl border border-border/70" data-testid="step-follow-up">
           <StepHead index={2} done={followInitial !== null}>
             <Button
@@ -528,6 +558,8 @@ export default function ApplicantContactDialog({
             </div>
           ) : null}
         </div>
+        </>
+        ) : null}
       </section>
       </>
       ) : null}
@@ -649,7 +681,7 @@ export default function ApplicantContactDialog({
         </p>
       ) : null}
       <div className="flex flex-wrap justify-end gap-2 border-t border-border/70 pt-3">
-        {mode === 'contact' || editing ? (
+        {mode !== 'profile' || editing ? (
           <Button type="button" size="sm" onClick={() => void save()} disabled={!dirty || busy}>
             {busy ? <Loader2 className="animate-spin" aria-hidden /> : null} บันทึก
           </Button>

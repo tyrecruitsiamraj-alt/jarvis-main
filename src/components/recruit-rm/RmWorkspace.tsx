@@ -1266,6 +1266,8 @@ const RmWorkspace: React.FC<{
       {/* dialog รายละเอียด + ติดต่อสำเร็จ/ไม่สำเร็จ + นัด (ลิสต์ข้อ 7 · 14 ส.ค. 2569) */}
       <ApplicantContactDialog
         application={contactApp}
+        /* แท็บติดตามนัดหมาย = ป๊อปติดตามนัด · แท็บการติดต่อ = ติดต่อ→นัดหมาย (4 ต.ค. 2569) */
+        mode={tab === 'appointments' ? 'appointment' : 'contact'}
         onClose={() => setContactApp(null)}
         onSaved={() => {
           say('บันทึกผลติดต่อแล้ว');

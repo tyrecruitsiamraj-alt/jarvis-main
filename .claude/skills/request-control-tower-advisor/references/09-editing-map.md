@@ -11698,3 +11698,16 @@ iRecruit (`rm-action-btn`): โทร (call · POST จดการโทรก�
 | `src/pages/jobs/StaffJobBoardPage.tsx` | `listRev` — รีเฟรชแท็บผู้สมัคร/การติดต่อ/ติดตามนัดหมาย = `RmWorkspace refreshKey` · ภาพรวม = `Suspense key` เปิดใหม่ |
 | `src/components/recruit-rm/RmWorkspace.tsx` | prop `refreshKey` · ถอดแถวปุ่ม "รีเฟรช" ตอนถูกคุมจากบอร์ด |
 | `src/pages/follow/FollowPage.tsx` | แถว 1 = ← แท็บขีดเส้นใต้ (`followTabClass`) ··· รีเฟรช · แถว 2 = ปุ่มของหน้า · รีเฟรชแท็บ Dashboard = `dashRev` |
+
+## ป๊อปรายละเอียดผู้สมัคร: แยกขั้นตามแท็บ (4 ต.ค. 2569 ดึก)
+
+เจ้าของ: *"การนัดหมาย ขึ้นหลังจากกดติดต่อสำเร็จ แล้วเลือกว่านัดหมายได้ ถ้าไม่เลือกก็ยังไม่ต้องขึ้น"* · *"การติดตามนัด ต้องไปอยู่ที่หน้าติดตามนัดหมาย"*
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/components/recruit-rm/ApplicantContactDialog.tsx` | `mode`: `contact` = ขั้น 1 · ขั้น 2 โผล่เมื่อ `apptUnlocked` (กด/ผลล่าสุดติดต่อสำเร็จ) · ฟอร์มนัดโผล่หลังเลือก "นัดหมาย" · ไม่มีขั้น 3 — `appointment` (ใหม่) = การ์ดนัดปัจจุบัน `appointment-summary` + ขั้น 3 การติดตามนัด · `profile` เหมือนเดิม |
+| `src/components/recruit-rm/RmWorkspace.tsx` | แท็บติดตามนัดหมาย เปิดป๊อป `mode="appointment"` · แท็บอื่น `contact` |
+| เทสต์ | `ApplicantContactDialog.test.tsx` (renderDialog รับ mode) |
+
+- ป๊อปฝังในกล่องงาน (`JobApplicantsDialog` embedded) = โหมด contact → ไม่มีขั้นติดตามนัดแล้ว
+- ⚠️ `applicantOverviewSql.test.ts` (parity กับฐานจริง) ใช้ ~4.8 วิ ชนเพดาน 5 วิได้ตอนฐานช้า — ตกแบบ timeout ไม่ใช่เลขเพี้ยน (รันซ้ำ `--testTimeout=60000` ผ่าน)
