@@ -75,11 +75,6 @@ export type AiShareCardProps = {
   previousRange?: string | null;
   /** กดกล่อง = ให้หน้าเปิด Popup รายชื่อของกล่องนั้น (รอบ 17) · ไม่ส่ง = กล่องกดไม่ได้ */
   onPick?: (key: AiShareListKey) => void;
-  /**
-   * แยกทีม (เฉพาะหัวข้อติดตาม · เจ้าของสั่ง 4 ต.ค. 2569: *"ยอด ติดตามคนเริ่มงาน กับ ติดตามส่งคนแทน บวกกัน …
-   * แยกแล้วอย่างละเท่าไหร่"*) — กล่องเล็กใต้แถวหลัก บวกกัน = ทั้งหมด · ไม่ส่ง = ไม่มีแถวนี้
-   */
-  teams?: ReadonlyArray<{ key: string; label: string; value: number; fillClass: string }> | null;
   /** ไม่มีกล่อง "ยังไม่โทร" — หัวข้อติดตามนับแบบแผน AI + คน = ทั้งหมด (4 ต.ค. 2569) */
   hideNotCalled?: boolean;
   /** กราฟยอดใช้งานของหัวข้อนี้ (หน้าเรียกเป็นคนโหลด) */
@@ -184,7 +179,6 @@ const AiShareCard: React.FC<AiShareCardProps> = ({
   previousLabel = null,
   previousRange = null,
   onPick,
-  teams = null,
   hideNotCalled = false,
   children,
   className,
@@ -203,7 +197,9 @@ const AiShareCard: React.FC<AiShareCardProps> = ({
   /** เปลี่ยนไปกี่ % จากช่วงก่อน — ไม่ลงสีดี/เสีย (`upIsGood` = null) */
   const pillOf = (cur: number, prev: number | undefined) => (previous && prev !== undefined ? countPill(cur, prev, null) : null);
   /** 5 กล่องเมื่อมี "ทั้งสองทาง" · ไม่งั้น 4 กล่อง */
-  const cols = segments.length + 1 > 4 ? 'xl:grid-cols-5' : 'xl:grid-cols-4';
+  const tiles = segments.length + 1;
+  /** 3 กล่อง (ติดตาม: ทั้งหมด · AI โทร · คนโทร) = แถวเดียวสามช่อง ไม่เหลือช่องโหว่ */
+  const cols = tiles > 4 ? 'sm:grid-cols-2 xl:grid-cols-5' : tiles === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2 xl:grid-cols-4';
 
   return (
     <Card variant="glass" className={cn('flex flex-col gap-6 p-5 sm:p-6', className)}>
@@ -212,7 +208,7 @@ const AiShareCard: React.FC<AiShareCardProps> = ({
       <h2 className="sr-only">{title}</h2>
 
       {loading && !counts ? (
-        <div className={cn('grid gap-3 sm:grid-cols-2', cols)} aria-label={`กำลังโหลด${title}`}>
+        <div className={cn('grid gap-3', cols)} aria-label={`กำลังโหลด${title}`}>
           {['total', ...segments].map((k) => (
             <Skeleton key={k} className="h-32 w-full rounded-xl" />
           ))}
@@ -222,7 +218,7 @@ const AiShareCard: React.FC<AiShareCardProps> = ({
       ) : counts ? (
         <div className="space-y-3">
           {/* ทั้งหมดขึ้นก่อน (รอบ 17 · เจ้าของ: "เรียงใหม่ ทั้งหมด AI โทร คนโทร ยังไม่โทร") */}
-          <div className={cn('grid gap-3 sm:grid-cols-2', cols)}>
+          <div className={cn('grid gap-3', cols)}>
             <Tile
               label="ทั้งหมด"
               value={total}
@@ -248,21 +244,6 @@ const AiShareCard: React.FC<AiShareCardProps> = ({
               />
             ))}
           </div>
-          {teams && teams.length > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2" data-testid="ai-share-teams">
-              {teams.map((t) => (
-                <Tile
-                  key={t.key}
-                  label={t.label}
-                  value={t.value}
-                  unit={unit}
-                  share={total > 0 ? Math.round((t.value / total) * 100) : 0}
-                  shareClass={t.fillClass}
-                  pill={null}
-                />
-              ))}
-            </div>
-          ) : null}
           {error ? <p className={cn('text-xs', TONE.danger.value)}>{error}</p> : null}
           {flag ? <p className={cn('text-xs', TONE.warn.value)}>{flag}</p> : null}
         </div>

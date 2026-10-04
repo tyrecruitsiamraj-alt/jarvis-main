@@ -521,7 +521,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
 
 
-  it('🔴 หัวข้อติดตาม: กล่องแยกทีม ติดตามคนเริ่มงาน / ติดตามส่งคนแทน บวกกัน = ทั้งหมด (4 ต.ค. 2569)', async () => {
+  it('🔴 หัวข้อติดตาม: ไม่มีกล่องแยกทีมบนแถวตัวเลขแล้ว (มีกล่องแยกใต้กราฟแทน · 4 ต.ค. 2569)', async () => {
     fetchHomeAiShare.mockResolvedValue(
       body({ follow: { total: 58, ai: 31, staff: 27, both: 0, notCalled: 0, waitingAi: 0, waitingStaff: 0, teamReplacement: 27 } as never }),
     );
@@ -529,8 +529,18 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('58 รายชื่อ'));
     expect(stat('AI โทร')).toContain('31');
     expect(stat('คนโทร')).toContain('27');
-    expect(stat('ติดตามคนเริ่มงาน')).toContain('31');
-    expect(stat('ติดตามส่งคนแทน')).toContain('27');
+    expect(screen.queryByTestId('ai-share-teams')).toBeNull();
+    expect(screen.getByTestId('follow-team-breakdown')).toBeTruthy();
+  });
+
+  it('🔴 กดแท่งวันไหน ตัวเลขด้านบนวิ่งตามวันนั้น · กดซ้ำ/ดูทั้งช่วง = กลับช่วงเดิม (4 ต.ค. 2569)', async () => {
+    render(<HomeAiSharePage />);
+    const chart = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
+    await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith(win));
+    fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
+    await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith({ from: win.to, to: win.to }));
+    fireEvent.click(within(screen.getByTestId('follow-team-breakdown')).getByRole('button', { name: 'ดูทั้งช่วง' }));
+    await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith(win));
   });
 
   it('🔴 คำในตัวเลือกหัวข้อ = คำในเมนู (เจ้าของสั่ง 4 ต.ค. 2569)', async () => {

@@ -31,7 +31,7 @@
  * 🔴 ห้ามหยิบของหน้าหลักเดิม (deck · 3 ก้อน · ยอด Lumos) กลับมาใส่เอง — เจ้าของจะสั่งเพิ่มทีละเรื่อง
  * 🔴 โฉมกระจกไม่เบลอของที่เลื่อนจอ (เคยทำเว็บกระตุก 5 ก.ย. 2569) — แสงนวลข้างหลังเบลอมาแล้ว การ์ดแค่โปร่ง
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import AiShareCard, { type AiShareCardProps } from '@/components/home-ai-share/AiShareCard';
 import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
@@ -46,7 +46,6 @@ import {
   type AiShareBlockKey,
   type AiShareCounts,
   type AiShareDetailResponse,
-  type AiShareFollow,
   type AiShareListKey,
   type AiShareResponse,
   type AiShareWindow,
@@ -145,6 +144,18 @@ const HomeAiSharePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [block, setBlock] = useState<AiShareBlockKey>(readBlock);
+  /**
+   * วันที่กดแท่งในกราฟ (หัวข้อติดตาม · 4 ต.ค. 2569) — กล่องตัวเลข/รายชื่อ/ผลโทร วิ่งตามวันนั้น
+   * เหมือนเลือกวันนั้นบนปฏิทิน · null = ช่วงบนปฏิทิน · เปลี่ยนช่วง/หัวข้อแล้วล้าง
+   */
+  const [focus, setFocus] = useState<AiShareWindow | null>(null);
+  const onFocusDay = useCallback((w: AiShareWindow | null) => {
+    setFocus((cur) => (cur?.from === w?.from && cur?.to === w?.to ? cur : w));
+  }, []);
+  useEffect(() => {
+    setFocus(null);
+  }, [win, block]);
+  const cardWin = focus ?? win;
   const choose = (v: string) => {
     if (!isAiShareBlock(v)) return;
     setBlock(v);
@@ -168,7 +179,7 @@ const HomeAiSharePage: React.FC = () => {
     let alive = true;
     setLoading(true);
     setError(null);
-    fetchHomeAiShare(win)
+    fetchHomeAiShare(cardWin)
       .then((d) => {
         if (alive) setData(d);
       })
@@ -181,7 +192,7 @@ const HomeAiSharePage: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, [win]);
+  }, [cardWin]);
 
   /**
    * แถววัน × BU ของหัวข้อที่เลือก — โหลดที่หน้า ส่งให้กราฟยอดใช้งาน (รอบ 9 ย้ายขึ้นมาจากกราฟ ·
@@ -210,7 +221,7 @@ const HomeAiSharePage: React.FC = () => {
   }, [block, win]);
 
   // เปลี่ยนช่วงแล้วเลขเก่าห้ามค้างให้อ่านผิดช่วง — ใช้ข้อมูลเฉพาะเมื่อตรงกับช่วงที่เลือก
-  const current = data && data.from === win.from && data.to === win.to ? data : null;
+  const current = data && data.from === cardWin.from && data.to === cardWin.to ? data : null;
   const detailNow = detail && detail.block === block && detail.from === win.from && detail.to === win.to ? detail : null;
   const meta = BLOCKS.find((b) => b.key === block) ?? BLOCKS[0];
   const counts: AiShareCounts | null = current?.[meta.key] ?? null;
@@ -252,24 +263,6 @@ const HomeAiSharePage: React.FC = () => {
   // หัวข้อติดตามนับแบบแผน (ตั้งให้ใครโทร) ไม่พึ่งช่องผลของคนโทร ⇒ ไม่มีธง "ยังนับคนโทรไม่ได้"
   const flag = meta.key === 'aftercare' ? (counts && counts.total > 0 ? staffFlag : null) : null;
 
-  /**
-   * แยกทีมของหัวข้อติดตาม (เจ้าของสั่ง 4 ต.ค. 2569) — ทั้งหมดของ "ติดตาม" รวมสองทีมอยู่แล้ว
-   * ส่งคนแทนมาจาก API · เริ่มงาน = ทั้งหมด − ส่งคนแทน ⇒ สองกล่องบวกกัน = ทั้งหมด
-   * API เก่าไม่มีช่องนี้ = ไม่โชว์แถวแยกทีม (ห้ามเดาเป็น 0)
-   */
-  const followNow = meta.key === 'follow' && current?.follow ? (current.follow as AiShareFollow) : null;
-  const teamsOfFollow =
-    followNow && typeof followNow.teamReplacement === 'number'
-      ? [
-          {
-            key: 'main',
-            label: 'ติดตามคนเริ่มงาน',
-            value: Math.max(0, followNow.total - followNow.teamReplacement),
-            fillClass: TONE.info.value,
-          },
-          { key: 'replacement', label: 'ติดตามส่งคนแทน', value: followNow.teamReplacement, fillClass: TONE.violet.value },
-        ]
-      : null;
 
   /** เลขท้ายของแต่ละตัวเลือก — ดูเทียบทั้ง 4 หัวข้อได้โดยไม่ต้องกดสลับ */
   const noteOf = (key: AiShareBlockKey) => {
@@ -341,12 +334,12 @@ const HomeAiSharePage: React.FC = () => {
         previousLabel={prev?.label ?? null}
         previousRange={prev ? rangeText(prev.from, prev.to) : null}
         onPick={openList}
-        teams={teamsOfFollow}
         hideNotCalled={meta.key === 'follow'}
       >
         <AiShareDetail
           withTeams={meta.key === 'follow'}
           hideNotCalled={meta.key === 'follow'}
+          onFocusDay={onFocusDay}
           unit={meta.unit}
           title={meta.title}
           win={win}
@@ -365,12 +358,12 @@ const HomeAiSharePage: React.FC = () => {
         blockTitle={meta.title}
         listKey={listKey}
         unit={meta.unit}
-        win={win}
+        win={cardWin}
         count={counts ? counts[listKey] : null}
       />
 
       {/* ผลโทร ซ่อนไว้ กดแล้วกาง (รอบ 18) · "ใครอยู่ในระบบ" ย้ายไป ตั้งค่า › ผู้ใช้งาน แล้ว (รอบ 19) */}
-      <HomeCallResultsPanel block={meta.key} blockTitle={meta.title} win={win} />
+      <HomeCallResultsPanel block={meta.key} blockTitle={meta.title} win={cardWin} />
     </div>
   );
 };

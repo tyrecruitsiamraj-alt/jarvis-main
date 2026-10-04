@@ -72,7 +72,12 @@ const AiShareDetail: React.FC<{
   withTeams?: boolean;
   /** ไม่มีชั้น "ยังไม่โทร" ในแท่ง (หัวข้อติดตามแบบแผน) */
   hideNotCalled?: boolean;
-}> = ({ title, unit, win, withBoth, data, loading, error, withTeams = false, hideNotCalled = false }) => {
+  /**
+   * แท่งรายวันที่กดเลือก → หน้าให้ตัวเลขด้านบนวิ่งตามวันนั้น (เจ้าของ 4 ต.ค. 2569 "เลือกแค่วันที่ 4 ตัวเลขไม่วิ่งตาม")
+   * null = กลับไปทั้งช่วง
+   */
+  onFocusDay?: (w: AiShareWindow | null) => void;
+}> = ({ title, unit, win, withBoth, data, loading, error, withTeams = false, hideNotCalled = false, onFocusDay }) => {
   /** สวิตช์ "แยก BU" — ปิดเป็นค่าตั้งต้น (ชั้นในแท่ง = AI/คน/ยังไม่โทร) */
   const [byBu, setByBu] = useState(false);
   /** สวิตช์ "แยกทีม" — เปิดได้ทีละตัวกับแยก BU (แท่งแยกได้ทีละมิติ) */
@@ -150,6 +155,11 @@ const AiShareDetail: React.FC<{
   /** แท่งรายวันของหัวข้อติดตาม = เลือกแท่งนั้นมาแตกดู (กดซ้ำ = กลับทั้งช่วง) */
   const pickDay = (i: number) => setPicked((cur) => (cur === i ? null : i));
   const pickedBucket = picked !== null ? view?.buckets[picked] ?? null : null;
+  const focusFrom = pickedBucket?.from ?? null;
+  const focusTo = pickedBucket?.to ?? null;
+  useEffect(() => {
+    onFocusDay?.(focusFrom && focusTo ? { from: focusFrom, to: focusTo } : null);
+  }, [focusFrom, focusTo, onFocusDay]);
   const breakdown = withTeams && view ? followTeamBreakdown(view.teamRowsOf(pickedBucket ? picked : null)) : null;
 
   return (
