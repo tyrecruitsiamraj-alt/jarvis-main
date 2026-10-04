@@ -216,7 +216,8 @@ export function buildFollowAiShareSql(
          count(*) filter (where ${SEGMENT_WHERE.notCalled})::int                               as not_called,
          count(*) filter (where ${SEGMENT_WHERE.notCalled} and waiting_ai)::int                as waiting_ai,
          count(*) filter (where ${SEGMENT_WHERE.notCalled} and call_mode = 'manual')::int      as waiting_staff,
-         count(*) filter (where replacement)::int                                              as team_replacement
+         count(*) filter (where replacement)::int                                              as team_replacement,
+         count(*) filter (where replacement and ${SEGMENT_WHERE.ai})::int                      as team_replacement_ai
     from f0${outGroup(mode)}`
   }`;
 }

@@ -55,6 +55,7 @@ import {
   detailBuckets,
   detailSegments,
   detailTeamSeries,
+  followTeamBreakdown,
   followPlanBounds,
   drillWindow,
   isAiShareListKey,
@@ -661,5 +662,35 @@ describe('หน้าแรก · ติดตาม แยกทีม', () =>
       [{ from: '2026-10-03', to: '2026-10-03', label: '3' }] as Parameters<typeof detailTeamSeries>[1],
     );
     expect(t).toEqual({ main: [5], replacement: [0] });
+  });
+});
+
+describe('followTeamBreakdown — กดแท่งแล้วดูว่าหนักไปทีมไหน (เจ้าของ 4 ต.ค. 2569)', () => {
+  it('🔴 ตัวอย่างของเจ้าของ: AI 50 คน 50 = รายชื่อติดตาม 70 (AI 50 · คน 20) + ส่งคนแทน 30 (AI 0 · คน 30)', () => {
+    const b = followTeamBreakdown([
+      { day: '2026-10-04', bu: 'LBD', total: 60, ai: 45, staff: 15, both: 0, notCalled: 0, teamReplacement: 20, teamReplacementAi: 0 },
+      { day: '2026-10-04', bu: 'LML', total: 40, ai: 5, staff: 35, both: 0, notCalled: 0, teamReplacement: 10, teamReplacementAi: 0 },
+    ]);
+    expect(b).toEqual({ main: { total: 70, ai: 50, staff: 20 }, replacement: { total: 30, ai: 0, staff: 30 } });
+  });
+
+  it('สองทีมบวกกัน = ทั้งหมด · AI + คน = ทั้งหมดของแต่ละทีม', () => {
+    const rows = [
+      { day: '2026-10-03', bu: 'LBD', total: 49, ai: 30, staff: 19, both: 0, notCalled: 0, teamReplacement: 19, teamReplacementAi: 0 },
+      { day: '2026-10-04', bu: 'LBD', total: 58, ai: 33, staff: 25, both: 0, notCalled: 0, teamReplacement: 27, teamReplacementAi: 2 },
+    ];
+    const b = followTeamBreakdown(rows);
+    expect(b.main.total + b.replacement.total).toBe(107);
+    expect(b.main.ai + b.replacement.ai).toBe(63);
+    for (const t of [b.main, b.replacement]) expect(t.ai + t.staff).toBe(t.total);
+  });
+
+  it('ไม่มีแถว = ทุกช่องเป็น 0 · API เก่าไม่มีช่องทีม = ทั้งหมดอยู่ฝั่งรายชื่อติดตาม', () => {
+    expect(followTeamBreakdown([])).toEqual({ main: { total: 0, ai: 0, staff: 0 }, replacement: { total: 0, ai: 0, staff: 0 } });
+    expect(followTeamBreakdown([{ day: '2026-10-04', bu: null, total: 5, ai: 3, staff: 2, both: 0, notCalled: 0 }]).main).toEqual({
+      total: 5,
+      ai: 3,
+      staff: 2,
+    });
   });
 });

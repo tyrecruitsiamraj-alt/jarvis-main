@@ -11415,3 +11415,18 @@ Choice ของเจ้าของ: การ์ดแยกบนหน้�
 | เทสต์ | `homeAiShare.test.ts` (แผน · รวมยกเลิก · ปลายช่วง) · `homeCallResults.test.ts` (follow ไม่อยู่คู่ CTE เดียวกันแล้ว · แผงผลโทรยังแบบเดิม) · `HomeAiSharePage.test.tsx` (เทสต์กล่องทั่วไปย้ายไป aftercare · follow ไม่มียังไม่โทร · กล่องแยกทีม · สวิตช์แยกทีม) |
 
 - ตรวจจริง (API): 4 ต.ค. ทั้งหมด 58 = AI 31 + คน 27 (ส่งคนแทน 27) · 28 ก.ย.–4 ต.ค. 290 = 217 + 73 · ต.ค. 902 = 723 + 179
+
+### 4 ต.ค. 2569 (ต่อ) — หน้าแรก กดแท่งติดตามแล้วเห็นว่าหนักไปทีมไหน + คำในตัวเลือกหัวข้อ = คำในเมนู
+
+เจ้าของ: *"พอกดแท่งกราฟก็ขึ้นบอกว่า … ไปหนักเรื่องไหน · เช่น AI 50 คน 50 กดไปเห็นว่าเป็น รายชื่อติดตาม 70 (AI 50 · คน 20)
+และติดตามส่งคนแทน 30 (คน 30 · AI 0)"* · *"คำใน Dropdown ในหน้าแรก ก็ทำให้ตรงกับหน้า menu"*
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `api/_lib/homeAiShareSql.ts` | เลน follow นับเพิ่ม `team_replacement_ai` (ส่งคนแทนที่ตั้ง AI โทร) ทั้งโหมดรวมและ byDayBu |
+| `api/_handlers/home-ai-share.ts` · `src/lib/homeAiShare.ts` | `teamReplacementAi?` บน `AiShareFollow`/`AiShareDetailRow` · `followTeamBreakdown(rows)` → `{main, replacement}` × `{total, ai, staff}` (คน = ทั้งหมด − AI ของทีมนั้น ⇒ บวกกันพอดีเสมอ) |
+| `src/components/home-ai-share/AiShareDetail.tsx` | `withTeams` + แท่งรายวัน = กดได้ (`pickDay` · กดซ้ำ = กลับทั้งช่วง) · กล่อง `data-testid="follow-team-breakdown"` ใต้กราฟ: ค่าตั้งต้น "รวมทั้งช่วง" · กดแท่ง = วันนั้น + ปุ่ม "ดูทั้งช่วง" · แท่งรายเดือน/สัปดาห์ยังกดลงไปดูชั้นล่างเหมือนเดิม |
+| `src/pages/HomeAiSharePage.tsx` | `title` ของหัวข้ออ่านจากเมนู `soRecruitNav` ที่เดียว: `conveyorLabel('follow'|'aftercare'|'matching')` · ผู้สมัคร = `CONVEYOR_VAULT` key `job-boxes` ("กล่องงาน") ⇒ เปลี่ยนชื่อเมนูแล้วหน้าแรกตาม |
+| เทสต์ | `homeAiShare.test.ts` +3 (ตัวอย่างของเจ้าของ 70/30 · บวกกันพอดี · ว่าง/API เก่า) · `HomeAiSharePage.test.tsx` (กดแท่งรายวันขึ้นกล่องแยกทีม · คำในตัวเลือก = คำในเมนู · ชื่อกราฟ/หัวข้อใช้ `FOLLOW_TITLE`) |
+
+- ตรวจจริง: 4 ต.ค. รายชื่อติดตาม 31 (AI 31 · คน 0) + ส่งคนแทน 27 (AI 0 · คน 27) = 58 · 3 ต.ค. 49 (AI 49) + 40 (คน 40) = 89 · ทั้งช่วง 223 (AI 217 · คน 6) + 67 (คน 67) = 290

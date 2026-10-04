@@ -53,6 +53,7 @@ import {
 } from '@/lib/homeAiShare';
 import { fetchHomeAiShare, fetchHomeAiShareDetail } from '@/lib/homeAiShareApi';
 import { rangeText } from '@/lib/periodPick';
+import { CONVEYOR_VAULT, conveyorLabel } from '@/lib/soRecruitNav';
 import { trendBuLabel } from '@/lib/trends/bu';
 import { EVEN_TYPE, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
@@ -79,18 +80,21 @@ type BlockMeta = {
   metrics: AiShareCardProps['metrics'];
 };
 
+/** ชื่อเมนูของหน้านั้น — คำในตัวเลือกต้องตรงกับเมนู (เจ้าของสั่ง 4 ต.ค. 2569) */
+const vaultLabel = (key: string) => CONVEYOR_VAULT.find((v) => v.key === key)?.label ?? key;
+
 /** ลำดับในตัวเลือก = ลำดับเดิมของหน้า (รอบ 2) · ติดตาม/ดูแลหลังเริ่มงานไม่มี "ทั้งสองทาง" (รอบหนึ่งตั้งได้ทางเดียว) · หน่วยเป็นรายชื่อทุกหัวข้อ (รอบ 18) */
 const BLOCKS: readonly BlockMeta[] = [
   {
     key: 'follow',
-    title: 'ติดตาม',
+    title: conveyorLabel('follow'),
     unit: AI_SHARE_UNIT,
     withBoth: false,
     metrics: { total: 'aiShare.followTotal', ai: 'aiShare.followAi', staff: 'aiShare.followStaff', both: null, notCalled: 'aiShare.followNotCalled' },
   },
   {
     key: 'aftercare',
-    title: 'ดูแลหลังเริ่มงาน',
+    title: conveyorLabel('aftercare'),
     unit: AI_SHARE_UNIT,
     withBoth: false,
     metrics: {
@@ -103,14 +107,14 @@ const BLOCKS: readonly BlockMeta[] = [
   },
   {
     key: 'applicants',
-    title: 'ผู้สมัครในกล่องงาน',
+    title: vaultLabel('job-boxes'),
     unit: AI_SHARE_UNIT,
     withBoth: true,
     metrics: { total: 'aiShare.appsTotal', ai: 'aiShare.appsAi', staff: 'aiShare.appsStaff', both: 'aiShare.appsBoth', notCalled: 'aiShare.appsNotCalled' },
   },
   {
     key: 'matching',
-    title: 'จับคู่งาน',
+    title: conveyorLabel('matching'),
     unit: AI_SHARE_UNIT,
     withBoth: true,
     metrics: { total: 'aiShare.matchTotal', ai: 'aiShare.matchAi', staff: 'aiShare.matchStaff', both: 'aiShare.matchBoth', notCalled: 'aiShare.matchNotCalled' },
@@ -286,7 +290,7 @@ const HomeAiSharePage: React.FC = () => {
       <SelectContent className={cn('rounded-xl', EVEN_TYPE)}>
         {BLOCKS.map((b) => (
           <SelectItem key={b.key} value={b.key} className="py-2">
-            <span className="flex w-60 items-center justify-between gap-6">
+            <span className="flex w-80 items-center justify-between gap-6">
               <span>{b.title}</span>
               <span className="text-xs text-muted-foreground tabular-nums">{noteOf(b.key)}</span>
             </span>

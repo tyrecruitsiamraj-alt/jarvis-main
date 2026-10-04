@@ -39,6 +39,7 @@ import {
   detailSegments,
   detailTeamSeries,
   drillWindow,
+  followTeamBreakdown,
   rowsInRange,
   type AiShareDetailResponse,
   type AiShareGrain,
@@ -77,6 +78,8 @@ const AiShareDetail: React.FC<{
   /** สวิตช์ "แยกทีม" — เปิดได้ทีละตัวกับแยก BU (แท่งแยกได้ทีละมิติ) */
   const [byTeam, setByTeam] = useState(false);
   const teamSwitchId = useId();
+  /** แท่งรายวันที่กดเลือก (หัวข้อติดตาม) — null = ดูทั้งช่วงที่กราฟโชว์ */
+  const [picked, setPicked] = useState<number | null>(null);
   /** ชั้นที่กดลงไปดู (รอบ 18) — ว่าง = ช่วงที่เลือกบนปฏิทิน · ตัวท้าย = ชั้นที่กำลังดู */
   const [drill, setDrill] = useState<AiShareWindow[]>([]);
   const switchId = useId();
@@ -84,6 +87,7 @@ const AiShareDetail: React.FC<{
   // เปลี่ยนหัวข้อ/ช่วงแล้วกลับชั้นบนสุด
   useEffect(() => {
     setDrill([]);
+    setPicked(null);
   }, [title, win]);
 
   const today = toYmdBangkok(new Date());
@@ -123,7 +127,12 @@ const AiShareDetail: React.FC<{
     const first = buckets[0];
     const last = buckets[buckets.length - 1];
     const range = first && last ? rangeTextFull(first.from, last.to) : null;
-    return { buckets, grain, segmentStacks, buStacks, teamStacks, range };
+    // แตกแยกทีม × AI/คน ของแท่งที่กด หรือทั้งช่วงที่โชว์ (4 ต.ค. 2569 "กดแท่งไปมันไปหนักเรื่องไหน")
+    const teamRowsOf = (i: number | null) => {
+      const b = i === null ? null : buckets[i];
+      return b ? rowsInRange(inView, b.from, b.to) : inView;
+    };
+    return { buckets, grain, segmentStacks, buStacks, teamStacks, range, teamRowsOf };
   }, [rows, shownWin, drill.length, today, withBoth, lockedBu, hideNotCalled]);
   const teamOn = withTeams && byTeam;
   const failed = error ?? data?.error ?? null;
@@ -133,8 +142,15 @@ const AiShareDetail: React.FC<{
   const openBucket = (i: number) => {
     const b = view?.buckets[i];
     const next = b && view ? drillWindow(b, view.grain) : null;
-    if (next) setDrill((d) => [...d, next]);
+    if (next) {
+      setPicked(null);
+      setDrill((d) => [...d, next]);
+    }
   };
+  /** แท่งรายวันของหัวข้อติดตาม = เลือกแท่งนั้นมาแตกดู (กดซ้ำ = กลับทั้งช่วง) */
+  const pickDay = (i: number) => setPicked((cur) => (cur === i ? null : i));
+  const pickedBucket = picked !== null ? view?.buckets[picked] ?? null : null;
+  const breakdown = withTeams && view ? followTeamBreakdown(view.teamRowsOf(pickedBucket ? picked : null)) : null;
 
   return (
     <section className="space-y-4" aria-label={`ยอดใช้งาน${title}`}>
@@ -194,9 +210,45 @@ const AiShareDetail: React.FC<{
           unit={unit}
           today={today}
           ariaLabel={`${title} ยอดใช้งานราย${per}${teamOn ? ' แยกทีม' : byBu ? ' แยก BU' : ''}`}
-          onPick={view.grain === 'day' ? undefined : openBucket}
-          pickHint={PICK_HINT[view.grain]}
+          onPick={view.grain === 'day' ? (withTeams ? pickDay : undefined) : openBucket}
+          pickHint={view.grain === 'day' && withTeams ? 'กดที่แท่งเพื่อดูแยกตามทีม' : PICK_HINT[view.grain]}
         />
+      ) : null}
+
+      {/* แยกทีม × AI/คน ของแท่งที่กด (หรือทั้งช่วง) — หัวข้อติดตามเท่านั้น */}
+      {breakdown ? (
+        <div className="space-y-2 rounded-xl border border-foreground/10 p-3" data-testid="follow-team-breakdown">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium text-foreground">
+              {pickedBucket ? rangeTextFull(pickedBucket.from, pickedBucket.to) : 'รวมทั้งช่วง'}
+            </p>
+            {pickedBucket ? (
+              <Button type="button" variant="link" size="xs" className="h-auto p-0" onClick={() => setPicked(null)}>
+                ดูทั้งช่วง
+              </Button>
+            ) : null}
+          </div>
+          {(
+            [
+              ['main', 'รายชื่อติดตาม'],
+              ['replacement', 'ติดตามส่งคนแทน'],
+            ] as const
+          ).map(([k, label]) => (
+            <div key={k} className="grid grid-cols-3 items-baseline gap-2 text-sm sm:grid-cols-4">
+              <span className="col-span-3 text-muted-foreground sm:col-span-1">{label}</span>
+              <span className="tabular-nums text-foreground">
+                <span className="text-lg font-medium">{breakdown[k].total.toLocaleString('th-TH')}</span>{' '}
+                <span className="text-xs text-muted-foreground">{unit}</span>
+              </span>
+              <span className="tabular-nums text-muted-foreground">
+                AI โทร <span className="font-medium text-foreground">{breakdown[k].ai.toLocaleString('th-TH')}</span>
+              </span>
+              <span className="tabular-nums text-muted-foreground">
+                คนโทร <span className="font-medium text-foreground">{breakdown[k].staff.toLocaleString('th-TH')}</span>
+              </span>
+            </div>
+          ))}
+        </div>
       ) : null}
     </section>
   );

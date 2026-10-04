@@ -109,7 +109,9 @@ export async function loadFollowAiShare(
       waitingAi: num(r?.waiting_ai),
       waitingStaff: num(r?.waiting_staff),
       // แยกทีมเฉพาะหัวข้อติดตาม (ดูแลหลังเริ่มงานไม่มีทีม)
-      ...(lane === 'follow' ? { teamReplacement: num(r?.team_replacement) } : {}),
+      ...(lane === 'follow'
+        ? { teamReplacement: num(r?.team_replacement), teamReplacementAi: num(r?.team_replacement_ai) }
+        : {}),
     };
   };
   try {
@@ -144,7 +146,9 @@ export async function loadAiShareDetail(
       ...base(r),
       day: String(r.day ?? ''),
       bu: r.bu ? String(r.bu) : null,
-      ...(block === 'follow' ? { teamReplacement: num(r.team_replacement) } : {}),
+      ...(block === 'follow'
+        ? { teamReplacement: num(r.team_replacement), teamReplacementAi: num(r.team_replacement_ai) }
+        : {}),
     }));
   };
   if (block === 'follow' || block === 'aftercare') {

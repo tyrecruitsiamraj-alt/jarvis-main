@@ -187,6 +187,8 @@ export type AiShareFollow = AiShareCounts & {
    * ไม่มีค่า = ฐานเก่า/หัวข้ออื่น (หน้าเว็บไม่โชว์บรรทัดแยกทีม)
    */
   teamReplacement?: number;
+  /** ในส่งคนแทน ตั้งให้ AI โทรกี่สาย (ที่เหลือของส่งคนแทน = คนโทร) */
+  teamReplacementAi?: number;
 };
 
 /** ผู้สมัคร — ยังไม่โทรแยกแบบเดียวกับถังของกล่องงาน: รอคิว AI · มีคนเก็บไว้ · ยังไม่มีใครแตะ */
@@ -248,6 +250,8 @@ export type AiShareDetailRow = AiShareCounts & {
   bu: string | null;
   /** เฉพาะหัวข้อติดตาม — ในแถวนี้เป็นของทีมส่งคนแทนกี่สาย (ที่เหลือ = ติดตามคนเริ่มงาน) */
   teamReplacement?: number;
+  /** ในส่งคนแทนของแถวนี้ ตั้งให้ AI โทรกี่สาย */
+  teamReplacementAi?: number;
 };
 
 export type AiShareDetailResponse = {
@@ -578,6 +582,31 @@ export function detailTeamSeries(
     out.main.push(Math.max(0, total - rep));
   }
   return out;
+}
+
+/**
+ * กดแท่งแล้วแตกให้ดู (เจ้าของสั่ง 4 ต.ค. 2569: *"AI โทร 50 คนโทร 50 พอกดไป เห็นว่าเป็น รายชื่อติดตาม 70 แบ่งเป็น AI 50
+ * คน 20 และติดตามส่งคนแทน 30 แบ่งเป็น คน 30 AI 0"*) — หัวข้อติดตามนับแบบแผน AI + คน = ทั้งหมดของแต่ละทีม
+ */
+export type FollowTeamBreakdown = Record<'main' | 'replacement', { total: number; ai: number; staff: number }>;
+
+export function followTeamBreakdown(rows: ReadonlyArray<AiShareDetailRow>): FollowTeamBreakdown {
+  let total = 0;
+  let ai = 0;
+  let rep = 0;
+  let repAi = 0;
+  for (const r of rows) {
+    total += r.total;
+    ai += r.ai;
+    rep += r.teamReplacement ?? 0;
+    repAi += r.teamReplacementAi ?? 0;
+  }
+  const mainTotal = Math.max(0, total - rep);
+  const mainAi = Math.max(0, ai - repAi);
+  return {
+    main: { total: mainTotal, ai: mainAi, staff: Math.max(0, mainTotal - mainAi) },
+    replacement: { total: rep, ai: repAi, staff: Math.max(0, rep - repAi) },
+  };
 }
 
 /**

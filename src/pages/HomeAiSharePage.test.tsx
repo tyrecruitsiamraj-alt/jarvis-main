@@ -14,6 +14,7 @@
  *    หน่วยบนจอเป็น "รายชื่อ" ทุกหัวข้อ (เจ้าของ: "เรานับจากรายชื่อ ต้องเป็นรายชื่อหมดเลย")
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CONVEYOR_VAULT, conveyorLabel } from '@/lib/soRecruitNav';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import {
   AI_SHARE_BUS,
@@ -72,6 +73,8 @@ vi.mock('@/components/home-ai-share/AiShareUsageChart', () => ({
 const { default: HomeAiSharePage } = await import('./HomeAiSharePage');
 
 const BLOCK_STORE = 'jarvis:home-ai-share:block';
+/** หัวข้อติดตามใช้ชื่อเดียวกับเมนู (4 ต.ค. 2569) */
+const FOLLOW_TITLE = 'ติดตามคนเริ่มงาน / ส่งคนแทน';
 const win = defaultAiShareWindow();
 
 function body(over: Partial<AiShareResponse> = {}): AiShareResponse {
@@ -188,7 +191,7 @@ afterEach(() => cleanup());
 describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   it('เริ่มที่ติดตาม · 7 วันล่าสุด · เลขตามที่เส้นส่งมา · กราฟของหัวข้อนั้นขึ้นเลย', async () => {
     render(<HomeAiSharePage />);
-    expect(await screen.findByRole('heading', { name: 'ติดตาม' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: FOLLOW_TITLE })).toBeTruthy();
     expect(fetchHomeAiShare).toHaveBeenCalledWith(win);
     expect(screen.getByRole('button', { name: /ช่วงเวลา 7 วันล่าสุด/ })).toBeTruthy();
     expect(screen.getByRole('combobox', { name: 'เลือกหัวข้อ' }).textContent).toContain('ติดตาม');
@@ -209,7 +212,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     // รอบ 16: ป้าย "หนักไปทาง AI" ถอดแล้ว
     expect(screen.queryByText('หนักไปทาง AI')).toBeNull();
     await waitFor(() => expect(fetchHomeAiShareDetail).toHaveBeenCalledWith('follow', win));
-    expect(await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน' })).toBeTruthy();
+    expect(await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` })).toBeTruthy();
     // รอบ 17: หัวกราฟบอกเดือน + ช่วงวันที่กำลังดู (แกนล่างเหลือเลขวัน)
     expect(screen.getByText(rangeTextFull(win.from!, win.to!))).toBeTruthy();
   });
@@ -233,11 +236,11 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   it('เปิดหน้ามาใหม่ = หัวข้อที่เลือกไว้ล่าสุด · ค่าที่อ่านไม่ออก = ติดตาม', async () => {
     window.localStorage.setItem(BLOCK_STORE, 'applicants');
     render(<HomeAiSharePage />);
-    expect(await screen.findByRole('heading', { name: 'ผู้สมัครในกล่องงาน' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'กล่องงาน' })).toBeTruthy();
     cleanup();
     window.localStorage.setItem(BLOCK_STORE, 'ไม่มีหัวข้อนี้');
     render(<HomeAiSharePage />);
-    expect(await screen.findByRole('heading', { name: 'ติดตาม' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: FOLLOW_TITLE })).toBeTruthy();
   });
 
   // หัวข้อติดตามนับแบบแผนแล้ว (ไม่มีกล่องยังไม่โทร · 4 ต.ค. 2569) — เทสต์พฤติกรรมกล่องทั่วไปใช้ดูแลหลังเริ่มงานแทน
@@ -306,37 +309,56 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     render(<HomeAiSharePage />);
     expect(await screen.findByText('โหลดตัวเลขส่วนนี้ไม่ขึ้น ลองรีเฟรชอีกครั้ง')).toBeTruthy();
     openPicker();
-    expect((await screen.findByRole('option', { name: /ผู้สมัครในกล่องงาน/ })).textContent).toContain('โหลดไม่ขึ้น');
+    expect((await screen.findByRole('option', { name: /กล่องงาน/ })).textContent).toContain('โหลดไม่ขึ้น');
     expect(screen.getByRole('option', { name: /ติดตาม/ }).textContent).toContain('AI 100%');
   });
 
-  it('🔴 แผงเลื่อน + ปุ่ม "ดูทั้งหมด" ถอดแล้ว (เจ้าของสั่ง 30 ก.ย.) — กดแท่งรายวันไม่มีอะไรเด้ง', async () => {
+  it('🔴 แผงเลื่อน + ปุ่ม "ดูทั้งหมด" ถอดแล้ว (เจ้าของสั่ง 30 ก.ย.) — กดแท่งรายวันไม่มีป๊อปเด้ง', async () => {
     render(<HomeAiSharePage />);
-    const chart = await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน' });
-    expect(chart.getAttribute('data-clickable')).toBe('no');
+    const chart = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
     fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.queryByRole('button', { name: 'ดูทั้งหมด' })).toBeNull();
   });
 
+  it('🔴 หัวข้อติดตาม: กดแท่งรายวัน = แตกดูว่าเป็นรายชื่อติดตาม/ส่งคนแทน อย่างละ AI กี่ คนกี่ (4 ต.ค. 2569)', async () => {
+    fetchHomeAiShareDetail.mockImplementation((block: AiShareDetailResponse['block']) =>
+      Promise.resolve({
+        ...detail(block),
+        rows: [
+          { day: win.to!, bu: 'LBD', total: 100, ai: 50, staff: 50, both: 0, notCalled: 0, teamReplacement: 30, teamReplacementAi: 0 },
+        ],
+      }),
+    );
+    render(<HomeAiSharePage />);
+    const chart = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
+    expect(chart.getAttribute('data-clickable')).toBe('yes');
+    fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
+    const box = screen.getByTestId('follow-team-breakdown');
+    const text = (box.textContent ?? '').replace(/\s+/g, '');
+    expect(text).toMatch(/รายชื่อติดตาม70\D*AIโทร50คนโทร20/);
+    expect(text).toMatch(/ติดตามส่งคนแทน30\D*AIโทร0คนโทร30/);
+    expect(within(box).getByRole('button', { name: 'ดูทั้งช่วง' })).toBeTruthy();
+  });
+
   it('สวิตช์ "แยก BU": ค่าตั้งต้นแท่งแบ่ง AI/คน/ยังไม่โทร · กดแล้วเป็นแต่ละ BU · กดอีกทีกลับ', async () => {
     render(<HomeAiSharePage />);
-    const chart = await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน' });
+    const chart = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
     // ติดตามไม่มี "ทั้งสองทาง" · นับแบบแผน (4 ต.ค. 2569) ⇒ ไม่มีชั้น "ยังไม่โทร"
     expect(chart.getAttribute('data-stacks')).toBe('AI โทร|คนโทร');
     expect(chart.getAttribute('data-flip')).toBe('segments');
     const sw = screen.getByRole('switch', { name: 'แยก BU' });
     expect(sw.getAttribute('aria-checked')).toBe('false');
     fireEvent.click(sw);
-    const byBu = await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน แยก BU' });
+    const byBu = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน แยก BU` });
     // รอบ 17: ครบทุก BU รอไว้ (ไม่ใช่เฉพาะที่มีงาน) เรียงตามชุดแผนก · ตัวจุดพลิกไพ่เปลี่ยน (รอบ 12)
     expect(byBu.getAttribute('data-stacks')).toBe(AI_SHARE_BUS.join('|'));
     expect(byBu.getAttribute('data-flip')).toBe('bu');
     fireEvent.click(sw);
-    expect((await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน' })).getAttribute('data-stacks')).toBe('AI โทร|คนโทร');
+    expect((await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` })).getAttribute('data-stacks')).toBe('AI โทร|คนโทร');
     // สวิตช์ "แยกทีม" (เฉพาะติดตาม) — เปิดแล้วแยก BU ดับ
     fireEvent.click(screen.getByRole('switch', { name: 'แยกทีม' }));
-    const byTeam = await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน แยกทีม' });
+    const byTeam = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน แยกทีม` });
     expect(byTeam.getAttribute('data-stacks')).toBe('ติดตามคนเริ่มงาน|ติดตามส่งคนแทน');
     expect(screen.getByRole('switch', { name: 'แยก BU' }).getAttribute('aria-checked')).toBe('false');
   });
@@ -366,7 +388,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     fireEvent.click(tileOf('AI โทร'));
     const dlg = await screen.findByRole('dialog');
     expect(fetchHomeAiShareList).toHaveBeenCalledWith('follow', 'ai', 0, win);
-    expect(within(dlg).getByText('ติดตาม · 7 วันล่าสุด')).toBeTruthy();
+    expect(within(dlg).getByText(`${FOLLOW_TITLE} · 7 วันล่าสุด`)).toBeTruthy();
     expect(await within(dlg).findByText('ผู้รับสาย 1')).toBeTruthy();
     // กล่องก้อนเดียว = ไม่ต้องมีคอลัมน์สถานะ · ไม่มีชื่อ/ไม่รู้ BU บอกตรง ๆ
     expect(within(dlg).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['ชื่อ', 'BU', 'วันที่']);
@@ -431,7 +453,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
       Promise.resolve({ ...detail(block), from: w.from, to: w.to }),
     );
     render(<HomeAiSharePage />);
-    await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน' });
+    await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
     fireEvent.click(screen.getByRole('button', { name: /ช่วงเวลา/ }));
     fireEvent.click(screen.getByRole('radio', { name: 'เดือน' }));
     fireEvent.click(screen.getByRole('button', { name: 'สิงหาคม 2569' }));
@@ -440,18 +462,18 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(fetchHomeAiShare).not.toHaveBeenCalledWith(expect.objectContaining({ from: '2026-08-01' }));
     fireEvent.click(screen.getByRole('button', { name: 'ยืนยัน' }));
     await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith({ from: '2026-08-01', to: '2026-09-30', unit: 'month' }));
-    const monthly = await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายเดือน' });
+    const monthly = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายเดือน` });
     expect(monthly.getAttribute('data-clickable')).toBe('yes');
     expect(within(monthly).getAllByRole('button').map((b) => b.textContent)).toEqual(['แท่ง 2026-08-01', 'แท่ง 2026-09-01']);
     expect(screen.getByText(rangeTextFull('2026-08-01', '2026-09-30'))).toBeTruthy();
     // กดแท่งกันยายน = ลงไปดูรายวันของกันยายน
     fireEvent.click(within(monthly).getByRole('button', { name: 'แท่ง 2026-09-01' }));
-    const daily = await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายวัน' });
+    const daily = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
     expect(within(daily).getAllByRole('button')).toHaveLength(30);
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByText(rangeTextFull('2026-09-01', '2026-09-30'))).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'กลับ' }));
-    expect(await screen.findByRole('img', { name: 'ติดตาม ยอดใช้งานรายเดือน' })).toBeTruthy();
+    expect(await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายเดือน` })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'กลับ' })).toBeNull();
   });
 
@@ -459,13 +481,13 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     render(<HomeAiSharePage />);
     const bar = await screen.findByRole('button', { name: /^ผลโทร/ });
     expect(bar.getAttribute('aria-expanded')).toBe('false');
-    await waitFor(() => expect(bar.textContent).toContain('ติดตาม · มีผล 207 รายชื่อ'));
+    await waitFor(() => expect(bar.textContent).toContain(`${FOLLOW_TITLE} · มีผล 207 รายชื่อ`));
     expect(fetchHomeAiShareResults).toHaveBeenCalledWith('follow', win);
     // รอบ 19: "ใครอยู่ในระบบ" ย้ายไป ตั้งค่า › ผู้ใช้งาน แล้ว — หน้าหลักไม่มีแผงนี้
     expect(screen.queryByRole('button', { name: /^ใครอยู่ในระบบ/ })).toBeNull();
-    expect(screen.queryByRole('list', { name: 'ผลโทร ติดตาม' })).toBeNull();
+    expect(screen.queryByRole('list', { name: `ผลโทร ${FOLLOW_TITLE}` })).toBeNull();
     fireEvent.click(bar);
-    const list = screen.getByRole('list', { name: 'ผลโทร ติดตาม' });
+    const list = screen.getByRole('list', { name: `ผลโทร ${FOLLOW_TITLE}` });
     const rows = within(list).getAllByRole('listitem').map((li) => li.textContent ?? '');
     // เรียงตามที่เจ้าของไล่: โทรแล้วไป → รับแล้ววาง → รับแล้วไม่ไป (ป้ายจากพจนานุกรมเมตริก)
     expect(rows.slice(0, 3).map((t) => t.replace(/[\d,]+%?/g, '').trim())).toEqual(['บอกว่าไป', 'รับแล้วเงียบ', 'บอกว่าไม่ไป']);
@@ -482,7 +504,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     render(<HomeAiSharePage />);
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     openPicker();
-    fireEvent.click(await screen.findByRole('option', { name: /ผู้สมัครในกล่องงาน/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /กล่องงาน/ }));
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('78 รายชื่อ'));
     expect(stat('ทั้งหมด')).not.toMatch(/\d (สาย|ใบ|คน)\b/);
   });
@@ -509,5 +531,16 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(stat('คนโทร')).toContain('27');
     expect(stat('ติดตามคนเริ่มงาน')).toContain('31');
     expect(stat('ติดตามส่งคนแทน')).toContain('27');
+  });
+
+  it('🔴 คำในตัวเลือกหัวข้อ = คำในเมนู (เจ้าของสั่ง 4 ต.ค. 2569)', async () => {
+    render(<HomeAiSharePage />);
+    openPicker();
+    const names = (await screen.findAllByRole('option')).map((o) => o.textContent ?? '');
+    for (const label of [conveyorLabel('follow'), conveyorLabel('aftercare'), 'กล่องงาน', conveyorLabel('matching')]) {
+      expect(names.some((n) => n.startsWith(label)), label).toBe(true);
+    }
+    expect(names.some((n) => n.includes('ผู้สมัครในกล่องงาน'))).toBe(false);
+    expect(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')?.label).toBe('กล่องงาน');
   });
 });
