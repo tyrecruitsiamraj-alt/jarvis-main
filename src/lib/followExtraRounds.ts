@@ -104,3 +104,24 @@ export function extraRoundsNote(r: ExtraRoundsResult): string | null {
   if (r.pastCount > 0) parts.push(`⚠️ ${r.pastCount} สายเป็นเวลาที่ผ่านมาแล้ว AI อาจไม่โทร`);
   return parts.length > 0 ? parts.join(' · ') : null;
 }
+
+/** เพิ่มสายในป๊อปแก้ไขได้ครั้งละกี่สาย — เดิม 5 (เจ้าของ 4 ต.ค. 2569: *"ต้องลงได้แบบทั้งเดือน"*) ⇒ สองเดือน */
+export const EXTRA_ROUNDS_MAX = 62;
+/** ช่วงวันที่กางทีเดียวได้ (ตรงกับตารางหลายวันของฟอร์มเพิ่มคน) */
+export const EXTRA_RANGE_MAX_DAYS = 31;
+
+/**
+ * ช่วงวัน → ช่องเวลาโทรวันละสาย (`YYYY-MM-DDTHH:MM` แบบที่ช่องวันเวลาใช้) — เติมทั้งเดือนได้ในกดเดียว
+ * ช่วงผิด/เวลาผิด = [] · ยาวเกิน `EXTRA_RANGE_MAX_DAYS` ตัดที่วันที่ 31
+ */
+export function extraRangeInputs(from: string, to: string, time: string): string[] {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || !/^\d{2}:\d{2}$/.test(time)) return [];
+  const start = Date.UTC(Number(from.slice(0, 4)), Number(from.slice(5, 7)) - 1, Number(from.slice(8, 10)));
+  const end = Date.UTC(Number(to.slice(0, 4)), Number(to.slice(5, 7)) - 1, Number(to.slice(8, 10)));
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return [];
+  const out: string[] = [];
+  for (let t = start; t <= end && out.length < EXTRA_RANGE_MAX_DAYS; t += 86_400_000) {
+    out.push(`${new Date(t).toISOString().slice(0, 10)}T${time}`);
+  }
+  return out;
+}

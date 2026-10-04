@@ -111,7 +111,56 @@ export type FollowFilter = {
   owner?: string;
   /** ใครโทร (เจ้าของสั่ง 2 ต.ค. 2569 "เพิ่ม filter ดึงรายชื่อเจ้าหน้าที่โทรเอง") · ไม่ส่ง/'all' = ทั้งหมด */
   caller?: FollowCaller;
+  /**
+   * เจ้าของงาน = **เจ้าหน้าที่ที่ติดตาม** (`staff_phone` · เจ้าของ Choice 4 ต.ค. 2569: *"เพิ่ม filter เลือกชื่อเจ้าของงาน
+   * เพื่อดูรายชื่อที่ลงแผนแล้วทั้งหมด"*) · `''`/ไม่ส่ง = ทุกคน · `FOLLOW_STAFF_NONE` = ไม่ได้ระบุเจ้าหน้าที่
+   */
+  staff?: string;
+  /** ชื่อของเบอร์เจ้าหน้าที่ (สมุดเบอร์) — ใช้จับกลุ่มเจ้าของงานด้วยชื่อ · ไม่ส่ง = จับด้วยเบอร์อย่างเดียว */
+  staffNameOf?: (phone: string) => string | null;
 };
+
+export const FOLLOW_STAFF_NONE = '__none__';
+
+/** คีย์เบอร์เจ้าหน้าที่ของรายการ — ตัดช่องว่าง/ขีด · +66 = 0 (เบอร์เดียวกันพิมพ์ต่างรูปต้องเป็นคนเดียวกัน) */
+export function followStaffKey(e: Pick<FollowEntry, 'staff_phone'>): string {
+  let d = (e.staff_phone ?? '').replace(/[^\d+]/g, '');
+  if (d.startsWith('+66')) d = `0${d.slice(3)}`;
+  else if (d.startsWith('66') && d.length === 11) d = `0${d.slice(2)}`;
+  return d || FOLLOW_STAFF_NONE;
+}
+
+/**
+ * คีย์กลุ่มของตัวกรองเจ้าของงาน — **ชื่อก่อน** (คนเดียวมีหลายเบอร์ในรายการเก่าได้ — วัดจริง 4 ต.ค. 2569 "กุ้งนาง" ขึ้นสองแถว)
+ * หาชื่อไม่เจอ = เบอร์ · ไม่ระบุ = `FOLLOW_STAFF_NONE`
+ */
+export function followStaffGroupKey(e: Pick<FollowEntry, 'staff_phone'>, nameOf: (phone: string) => string | null): string {
+  const phone = followStaffKey(e);
+  if (phone === FOLLOW_STAFF_NONE) return phone;
+  const name = nameOf(phone)?.trim();
+  return name ? `name:${name}` : phone;
+}
+
+export function followStaffOptions(
+  entries: readonly FollowEntry[],
+  nameOf: (phone: string) => string | null,
+): Array<{ value: string; label: string; count: number }> {
+  const count = new Map<string, number>();
+  for (const e of entries) {
+    const k = followStaffGroupKey(e, nameOf);
+    count.set(k, (count.get(k) ?? 0) + 1);
+  }
+  const out = [...count.entries()].map(([value, n]) => ({
+    value,
+    label: value === FOLLOW_STAFF_NONE ? 'ไม่ระบุเจ้าหน้าที่' : value.startsWith('name:') ? value.slice(5) : value,
+    count: n,
+  }));
+  return out.sort((a, b) => {
+    if (a.value === FOLLOW_STAFF_NONE) return 1;
+    if (b.value === FOLLOW_STAFF_NONE) return -1;
+    return a.label.localeCompare(b.label, 'th');
+  });
+}
 
 /**
  * ตัวกรอง "ใครโทร" — แถวเก่าที่ไม่มี call_mode = AI โทร (ค่าเดียวกับที่เส้นหลังบ้านเติม)
@@ -167,6 +216,7 @@ export function filterFollowEntries(entries: FollowEntry[], f: FollowFilter): Fo
     if (f.date && bangkokDay(e.scheduled_at) !== f.date) return false;
     if (f.band && !inTimeBand(e.scheduled_at, f.band)) return false;
     if (f.owner && (e.created_by_name ?? '') !== f.owner) return false;
+    if (f.staff && followStaffGroupKey(e, f.staffNameOf ?? (() => null)) !== f.staff) return false;
     if (f.caller === 'tbd') {
       if (e.time_tbd !== true) return false;
     } else if (f.caller && f.caller !== 'all' && followCallerOf(e) !== f.caller) return false;

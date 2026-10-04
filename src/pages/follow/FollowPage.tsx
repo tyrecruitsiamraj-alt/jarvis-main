@@ -1,3 +1,4 @@
+import { useFollowStaffNameOf } from '@/hooks/useFollowStaffNameOf';
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -58,6 +59,8 @@ import { followGroupKey, groupFollowEntries } from '@/lib/followGrouping';
 import { followScopeEntries, followTeamForScope } from '@/lib/followReplacement';
 import {
   filterFollowEntries,
+  followStaffGroupKey,
+  followStaffOptions,
   countFollowCallers,
   followCallerOf,
   FOLLOW_CALLERS,
@@ -159,6 +162,10 @@ const FollowPage: React.FC = () => {
    */
   /** ใครโทร (เจ้าของสั่ง 2 ต.ค. 2569) — 'manual' = เหลือเฉพาะสายที่เจ้าหน้าที่ต้องโทรเอง */
   const [caller, setCaller] = useState<FollowCaller>('all');
+  /** เจ้าของงาน = เจ้าหน้าที่ที่ติดตาม (4 ต.ค. 2569) — 'all' = ทุกคน (Select ห้ามค่าว่าง) */
+  const [staffFilter, setStaffFilter] = useState('all');
+  const staffKey = staffFilter === 'all' ? '' : staffFilter;
+  const staffNameOf = useFollowStaffNameOf();
   /** ป๊อปสรุปแผนทั้งวัน (เจ้าของสั่ง 2 ต.ค. 2569) — วัน = วันที่เลือกดูอยู่ (ไม่เลือก = วันนี้) */
   const [reportOpen, setReportOpen] = useState(false);
   const [fDate, setFDate] = useState('');
@@ -427,6 +434,7 @@ const FollowPage: React.FC = () => {
     setFilterScope(replaceView);
     setActiveRound('all');
     setCaller('all');
+    setStaffFilter('all');
   }
   useEffect(() => {
     const prefill = readFollowPrefill(searchParams);
@@ -1156,9 +1164,10 @@ const FollowPage: React.FC = () => {
     [items, replaceView],
   );
   const filtered = useMemo(
-    () => filterFollowEntries(scopeItems, { date: fDate, band: fBand, caller }),
-    [scopeItems, fDate, fBand, caller],
+    () => filterFollowEntries(scopeItems, { date: fDate, band: fBand, caller, staff: staffKey, staffNameOf }),
+    [scopeItems, fDate, fBand, caller, staffKey, staffNameOf],
   );
+  const staffOptions = useMemo(() => followStaffOptions(scopeItems, staffNameOf), [scopeItems, staffNameOf]);
   const callerCounts = useMemo(() => countFollowCallers(scopeItems), [scopeItems]);
   /**
    * แผงรอบโทรนับตาม **วันที่เลือก** และสลับดู **ทั้งเดือน** ได้ (เจ้าของเคาะ 3 ต.ค. 2569:
@@ -1182,10 +1191,11 @@ const FollowPage: React.FC = () => {
     [scopeItems, panelRange, panelDay, calMonth],
   );
   const panelEntries = useMemo(() => {
-    if (caller === 'all') return panelScope;
-    if (caller === 'tbd') return panelScope.filter((e) => e.time_tbd === true);
-    return panelScope.filter((e) => followCallerOf(e) === caller);
-  }, [panelScope, caller]);
+    const byStaff = staffKey ? panelScope.filter((e) => followStaffGroupKey(e, staffNameOf) === staffKey) : panelScope;
+    if (caller === 'all') return byStaff;
+    if (caller === 'tbd') return byStaff.filter((e) => e.time_tbd === true);
+    return byStaff.filter((e) => followCallerOf(e) === caller);
+  }, [panelScope, caller, staffKey, staffNameOf]);
   const hasActiveFilter = Boolean(fDate || fBand);
 
   /**
@@ -1232,8 +1242,11 @@ const FollowPage: React.FC = () => {
    * ปุ่มกับตารางต้องนับชุดเดียวกัน (3 ต.ค. 2569 "แก้ให้สอดคล้องกัน")
    */
   const nextDayRows = useMemo(
-    () => buildFollowPlanningRows(groupFollowEntries(filterFollowEntries(scopeItems, { date: '', band: '', caller }))),
-    [scopeItems, caller],
+    () =>
+      buildFollowPlanningRows(
+        groupFollowEntries(filterFollowEntries(scopeItems, { date: '', band: '', caller, staff: staffKey, staffNameOf })),
+      ),
+    [scopeItems, caller, staffKey, staffNameOf],
   );
 
   /**
@@ -1524,6 +1537,18 @@ const FollowPage: React.FC = () => {
                     onChange={(v) => setCaller(v)}
                     ariaLabel="ใครโทร"
                     active={caller !== 'all'}
+                  />
+                  {/* เจ้าของงาน = เจ้าหน้าที่ที่ติดตาม (เจ้าของ 4 ต.ค. 2569) — เลือกแล้วเห็นทุกรายชื่อที่คนนั้นลงแผน */}
+                  <span className="text-xs text-muted-foreground">เจ้าของงาน</span>
+                  <ChoiceDropdown
+                    value={staffFilter}
+                    options={[
+                      { value: 'all', label: `ทุกคน · ${scopeItems.length.toLocaleString('th-TH')}` },
+                      ...staffOptions.map((o) => ({ value: o.value, label: `${o.label} · ${o.count.toLocaleString('th-TH')}` })),
+                    ]}
+                    onChange={(v) => setStaffFilter(v)}
+                    ariaLabel="เจ้าของงาน"
+                    active={staffFilter !== 'all'}
                   />
                 </>
               }

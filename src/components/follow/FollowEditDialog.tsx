@@ -4,7 +4,13 @@ import { Building2, LoaderCircle, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { createFollowEntry, replaceFollowSchedule, updateFollowEntry, type FollowEntry } from '@/lib/followApi';
-import { buildExtraRounds, extraRoundsNote, localInputToIso } from '@/lib/followExtraRounds';
+import {
+  EXTRA_ROUNDS_MAX,
+  buildExtraRounds,
+  extraRangeInputs,
+  extraRoundsNote,
+  localInputToIso,
+} from '@/lib/followExtraRounds';
 import { BoardUnitPickerBody } from '@/components/follow/BoardUnitPicker';
 import {
   Dialog,
@@ -16,6 +22,8 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import StaffContactField from '@/components/follow/StaffContactField';
 import DateTimeField24 from '@/components/shared/DateTimeField24';
+import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
+import TimeSelect24 from '@/components/shared/TimeSelect24';
 import TopicField from '@/components/follow/TopicField';
 import FollowScheduleEditor from '@/components/follow/FollowScheduleEditor';
 import {
@@ -82,6 +90,13 @@ export default function FollowEditDialog({
    * ว่าจะให้ AI โทรหรือให้คนโทร"*) — เดิมรอบที่เพิ่มทีหลังเป็น AI เสมอโดยไม่มีช่องให้เลือก
    */
   const [extraModes, setExtraModes] = useState<Array<'ai' | 'manual'>>([]);
+  /** เพิ่มเป็นช่วงวัน (4 ต.ค. 2569 "ต้องลงได้แบบทั้งเดือน") — กางแล้วเลือก ตั้งแต่-ถึง + เวลา + ใครโทร */
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
+  const [rangeTime, setRangeTime] = useState('08:00');
+  const [rangeMode, setRangeMode] = useState<'ai' | 'manual'>('ai');
+  const rangeInputs = extraRangeInputs(rangeFrom, rangeTo, rangeTime);
   /** ตัวเลือกหน่วยงานจากบอร์ด — ชุดเดียวกับฟอร์มเพิ่ม (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ) */
   const [unitPickerOpen, setUnitPickerOpen] = useState(false);
   /**
@@ -531,22 +546,73 @@ export default function FollowEditDialog({
               </div>
             ))}
 
-            <button
-              type="button"
-              onClick={() =>
-                {
-                  setExtraWhen((prev) => (prev.length >= 5 ? prev : [...prev, when || '']));
-                  setExtraModes((prev) => (prev.length >= 5 ? prev : [...prev, 'ai']));
-                }
-              }
-              disabled={extraWhen.length >= 5}
-              className={cn(
-                'inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-4 text-xs font-medium disabled:opacity-40',
-                TONE.info.outline,
-              )}
-            >
-              <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มสาย
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setExtraWhen((prev) => (prev.length >= EXTRA_ROUNDS_MAX ? prev : [...prev, when || '']));
+                  setExtraModes((prev) => (prev.length >= EXTRA_ROUNDS_MAX ? prev : [...prev, 'ai']));
+                }}
+                disabled={extraWhen.length >= EXTRA_ROUNDS_MAX}
+                className={cn(
+                  'inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-4 text-xs font-medium disabled:opacity-40',
+                  TONE.info.outline,
+                )}
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มสาย
+              </button>
+              <Button type="button" size="xs" variant="outline" aria-expanded={rangeOpen} onClick={() => setRangeOpen((v) => !v)}>
+                <Plus aria-hidden /> เพิ่มเป็นช่วงวัน
+              </Button>
+            </div>
+            {/* เพิ่มเป็นช่วงวัน — วันละ 1 สายทั้งช่วง (สูงสุด 31 วันต่อครั้ง · เจ้าของ 4 ต.ค. 2569 "ลงได้แบบทั้งเดือน") */}
+            {rangeOpen ? (
+              <div className="space-y-2 rounded-xl border border-border/60 p-3" data-testid="extra-range">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">ตั้งแต่วันที่</p>
+                    <DayCalendarPicker value={rangeFrom} onChange={setRangeFrom} emptyLabel="เลือกวัน" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">ถึงวันที่</p>
+                    <DayCalendarPicker value={rangeTo} onChange={setRangeTo} emptyLabel="เลือกวัน" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">เวลาโทร</p>
+                    <TimeSelect24 value={rangeTime} onChange={setRangeTime} label="เวลาโทรของช่วงวัน" />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3" role="group" aria-label="ใครโทรช่วงวันนี้">
+                  {(['ai', 'manual'] as const).map((m) => (
+                    <label key={m} className="flex cursor-pointer items-center gap-1.5">
+                      <Checkbox
+                        checked={rangeMode === m}
+                        onCheckedChange={() => setRangeMode(m)}
+                        aria-label={`ช่วงวันนี้ — ${m === 'ai' ? 'AI โทร' : 'คนโทร'}`}
+                      />
+                      <span className={cn('text-xs font-medium', rangeMode === m ? 'text-foreground' : 'text-muted-foreground')}>
+                        {m === 'ai' ? 'AI โทร' : 'คนโทร'}
+                      </span>
+                    </label>
+                  ))}
+                  <Button
+                    type="button"
+                    size="xs"
+                    className="ml-auto"
+                    disabled={rangeInputs.length === 0 || extraWhen.length >= EXTRA_ROUNDS_MAX}
+                    onClick={() => {
+                      const room = Math.max(0, EXTRA_ROUNDS_MAX - extraWhen.length);
+                      const add = rangeInputs.slice(0, room);
+                      setExtraWhen((prev) => [...prev, ...add]);
+                      setExtraModes((prev) => [...prev, ...add.map(() => rangeMode)]);
+                      setRangeOpen(false);
+                    }}
+                  >
+                    เพิ่ม {rangeInputs.length.toLocaleString('th-TH')} วัน
+                  </Button>
+                </div>
+              </div>
+            ) : null}
 
             {/* 🔴 ห้ามเงียบเมื่อมีของถูกตัด/ของเสี่ยง — คนต้องรู้ก่อนกดบันทึก */}
             {roundsNote ? (
