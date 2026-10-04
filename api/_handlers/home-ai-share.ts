@@ -95,7 +95,13 @@ export async function loadFollowAiShare(
   const read = async (staffReady: boolean): Promise<AiShareFollow> => {
     const { rows } = await dbQuery<CountRow>(buildFollowAiShareSql(staffReady, lane), [...params, AFTERCARE_TOPIC]);
     const r = rows[0];
-    return { ...base(r), waitingAi: num(r?.waiting_ai), waitingStaff: num(r?.waiting_staff) };
+    return {
+      ...base(r),
+      waitingAi: num(r?.waiting_ai),
+      waitingStaff: num(r?.waiting_staff),
+      // แยกทีมเฉพาะหัวข้อติดตาม (ดูแลหลังเริ่มงานไม่มีทีม)
+      ...(lane === 'follow' ? { teamReplacement: num(r?.team_replacement) } : {}),
+    };
   };
   try {
     return { counts: await read(true), staffReady: true };
@@ -125,7 +131,12 @@ export async function loadAiShareDetail(
   const mode: AiShareSqlMode = 'byDayBu';
   const run = async (sql: string, extra: unknown[] = []) => {
     const { rows } = await dbQuery<CountRow>(sql, [...params, ...extra]);
-    return rows.map((r) => ({ ...base(r), day: String(r.day ?? ''), bu: r.bu ? String(r.bu) : null }));
+    return rows.map((r) => ({
+      ...base(r),
+      day: String(r.day ?? ''),
+      bu: r.bu ? String(r.bu) : null,
+      ...(block === 'follow' ? { teamReplacement: num(r.team_replacement) } : {}),
+    }));
   };
   if (block === 'follow' || block === 'aftercare') {
     try {

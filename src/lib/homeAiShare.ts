@@ -155,7 +155,16 @@ export type AiShareCounts = {
 };
 
 /** หน้าติดตาม / ดูแลหลังเริ่มงาน — ยังไม่โทรแยกเป็น รอ AI โทร · รอคนโทร (ที่เหลือ = ไม่ได้ส่งให้ AI) */
-export type AiShareFollow = AiShareCounts & { waitingAi: number; waitingStaff: number };
+export type AiShareFollow = AiShareCounts & {
+  waitingAi: number;
+  waitingStaff: number;
+  /**
+   * แยกทีม (เจ้าของสั่ง 4 ต.ค. 2569: *"ยอดของ ติดตามคนเริ่มงาน กับ ติดตามส่งคนแทน บวกกัน … แยกแล้วอย่างละเท่าไหร่"*)
+   * ส่งคนแทนเท่าไหร่ · ที่เหลือ (total − นี้) = ติดตามคนเริ่มงาน ⇒ สองทีมบวกกัน = total เสมอ
+   * ไม่มีค่า = ฐานเก่า/หัวข้ออื่น (หน้าเว็บไม่โชว์บรรทัดแยกทีม)
+   */
+  teamReplacement?: number;
+};
 
 /** ผู้สมัคร — ยังไม่โทรแยกแบบเดียวกับถังของกล่องงาน: รอคิว AI · มีคนเก็บไว้ · ยังไม่มีใครแตะ */
 export type AiShareApplicants = AiShareCounts & { waitingAi: number; held: number; untouched: number };
@@ -211,7 +220,12 @@ export function isAiShareBlock(v: unknown): v is AiShareBlockKey {
 }
 
 /** หนึ่งแถวของกราฟตอนกดการ์ด — วัน (เวลาไทย) × BU (ชุดแผนก · null = ไม่รู้ BU) */
-export type AiShareDetailRow = AiShareCounts & { day: string; bu: string | null };
+export type AiShareDetailRow = AiShareCounts & {
+  day: string;
+  bu: string | null;
+  /** เฉพาะหัวข้อติดตาม — ในแถวนี้เป็นของทีมส่งคนแทนกี่สาย (ที่เหลือ = ติดตามคนเริ่มงาน) */
+  teamReplacement?: number;
+};
 
 export type AiShareDetailResponse = {
   generated_at: string;
@@ -523,6 +537,25 @@ function buOrder(withWork: ReadonlySet<string>, base: readonly string[] = AI_SHA
 }
 
 const buLabelOf = (bu: string) => (bu === UNKNOWN_BU ? UNKNOWN_BU : trendBuLabel(bu));
+
+/**
+ * แยกทีมของหัวข้อติดตามรายแท่ง (เจ้าของสั่ง 4 ต.ค. 2569 "ยอดของแต่ละวัน ติดตามคนเริ่มงาน กับ ติดตามส่งคนแทน")
+ * ส่งคนแทน = `teamReplacement` · เริ่มงาน = ทั้งหมด − ส่งคนแทน ⇒ สองชั้นบวกกัน = ความสูงแท่งเดิมเสมอ
+ */
+export function detailTeamSeries(
+  rows: ReadonlyArray<AiShareDetailRow>,
+  buckets: ReadonlyArray<AiShareBucket>,
+): { main: number[]; replacement: number[] } {
+  const out = { main: [] as number[], replacement: [] as number[] };
+  for (const b of buckets) {
+    const inB = rowsInRange(rows, b.from, b.to);
+    const total = inB.reduce((sum, r) => sum + r.total, 0);
+    const rep = inB.reduce((sum, r) => sum + (r.teamReplacement ?? 0), 0);
+    out.replacement.push(rep);
+    out.main.push(Math.max(0, total - rep));
+  }
+  return out;
+}
 
 /**
  * แท่งซ้อนตาม BU (สวิตช์ "แยก BU" ของกราฟ · รอบ 7 · เจ้าของ: *"กด Switch เป็น BU ละเท่าไหร่"*)

@@ -46,6 +46,7 @@ import {
   type AiShareBlockKey,
   type AiShareCounts,
   type AiShareDetailResponse,
+  type AiShareFollow,
   type AiShareListKey,
   type AiShareResponse,
   type AiShareWindow,
@@ -247,6 +248,25 @@ const HomeAiSharePage: React.FC = () => {
   const flag =
     meta.key === 'follow' ? (counts ? staffFlag : null) : meta.key === 'aftercare' ? (counts && counts.total > 0 ? staffFlag : null) : null;
 
+  /**
+   * แยกทีมของหัวข้อติดตาม (เจ้าของสั่ง 4 ต.ค. 2569) — ทั้งหมดของ "ติดตาม" รวมสองทีมอยู่แล้ว
+   * ส่งคนแทนมาจาก API · เริ่มงาน = ทั้งหมด − ส่งคนแทน ⇒ สองกล่องบวกกัน = ทั้งหมด
+   * API เก่าไม่มีช่องนี้ = ไม่โชว์แถวแยกทีม (ห้ามเดาเป็น 0)
+   */
+  const followNow = meta.key === 'follow' && current?.follow ? (current.follow as AiShareFollow) : null;
+  const teamsOfFollow =
+    followNow && typeof followNow.teamReplacement === 'number'
+      ? [
+          {
+            key: 'main',
+            label: 'ติดตามคนเริ่มงาน',
+            value: Math.max(0, followNow.total - followNow.teamReplacement),
+            fillClass: TONE.info.value,
+          },
+          { key: 'replacement', label: 'ติดตามส่งคนแทน', value: followNow.teamReplacement, fillClass: TONE.violet.value },
+        ]
+      : null;
+
   /** เลขท้ายของแต่ละตัวเลือก — ดูเทียบทั้ง 4 หัวข้อได้โดยไม่ต้องกดสลับ */
   const noteOf = (key: AiShareBlockKey) => {
     if (!current) return '';
@@ -317,8 +337,10 @@ const HomeAiSharePage: React.FC = () => {
         previousLabel={prev?.label ?? null}
         previousRange={prev ? rangeText(prev.from, prev.to) : null}
         onPick={openList}
+        teams={teamsOfFollow}
       >
         <AiShareDetail
+          withTeams={meta.key === 'follow'}
           unit={meta.unit}
           title={meta.title}
           win={win}

@@ -37,6 +37,7 @@ import {
   detailBuSeries,
   detailBuckets,
   detailSegments,
+  detailTeamSeries,
   drillWindow,
   rowsInRange,
   type AiShareDetailResponse,
@@ -63,9 +64,17 @@ const AiShareDetail: React.FC<{
   data: AiShareDetailResponse | null;
   loading: boolean;
   error: string | null;
-}> = ({ title, unit, win, withBoth, data, loading, error }) => {
+  /**
+   * หัวข้อนี้แยกทีมได้ไหม (เฉพาะติดตาม · 4 ต.ค. 2569 "ติดตามคนเริ่มงาน กับ ติดตามส่งคนแทน แยกแล้วอย่างละเท่าไหร่")
+   * true = มีสวิตช์ "แยกทีม" ข้างสวิตช์แยก BU
+   */
+  withTeams?: boolean;
+}> = ({ title, unit, win, withBoth, data, loading, error, withTeams = false }) => {
   /** สวิตช์ "แยก BU" — ปิดเป็นค่าตั้งต้น (ชั้นในแท่ง = AI/คน/ยังไม่โทร) */
   const [byBu, setByBu] = useState(false);
+  /** สวิตช์ "แยกทีม" — เปิดได้ทีละตัวกับแยก BU (แท่งแยกได้ทีละมิติ) */
+  const [byTeam, setByTeam] = useState(false);
+  const teamSwitchId = useId();
   /** ชั้นที่กดลงไปดู (รอบ 18) — ว่าง = ช่วงที่เลือกบนปฏิทิน · ตัวท้าย = ชั้นที่กำลังดู */
   const [drill, setDrill] = useState<AiShareWindow[]>([]);
   const switchId = useId();
@@ -102,11 +111,17 @@ const AiShareDetail: React.FC<{
         ? { key: x.bu, label: x.bu, values: x.values, fill: TONE.neutral.value, dot: segmentDotClass('notCalled'), muted: true }
         : { key: x.bu, label: x.bu, title: x.label, values: x.values, fill: TONE[toneOfBu(x.bu)].value },
     );
+    const team = detailTeamSeries(inView, buckets);
+    const teamStacks: UsageStack[] = [
+      { key: 'main', label: 'ติดตามคนเริ่มงาน', values: team.main, fill: TONE.info.value },
+      { key: 'replacement', label: 'ติดตามส่งคนแทน', values: team.replacement, fill: TONE.violet.value },
+    ];
     const first = buckets[0];
     const last = buckets[buckets.length - 1];
     const range = first && last ? rangeTextFull(first.from, last.to) : null;
-    return { buckets, grain, segmentStacks, buStacks, range };
+    return { buckets, grain, segmentStacks, buStacks, teamStacks, range };
   }, [rows, shownWin, drill.length, today, withBoth, lockedBu]);
+  const teamOn = withTeams && byTeam;
   const failed = error ?? data?.error ?? null;
   const per = view ? AI_SHARE_GRAIN_LABEL[view.grain] : 'วัน';
 
@@ -132,11 +147,33 @@ const AiShareDetail: React.FC<{
           {view?.range ? <span className="font-normal tabular-nums text-muted-foreground">{view.range}</span> : null}
         </p>
         <div className="flex items-center gap-2">
-          <Switch id={switchId} checked={byBu} onCheckedChange={setByBu} />
+          <Switch
+            id={switchId}
+            checked={byBu}
+            onCheckedChange={(v) => {
+              setByBu(v);
+              if (v) setByTeam(false);
+            }}
+          />
           <Label htmlFor={switchId} className="cursor-pointer text-sm font-normal text-muted-foreground">
             แยก BU
           </Label>
         </div>
+        {withTeams ? (
+          <div className="flex items-center gap-2">
+            <Switch
+              id={teamSwitchId}
+              checked={byTeam}
+              onCheckedChange={(v) => {
+                setByTeam(v);
+                if (v) setByBu(false);
+              }}
+            />
+            <Label htmlFor={teamSwitchId} className="cursor-pointer text-sm font-normal text-muted-foreground">
+              แยกทีม
+            </Label>
+          </div>
+        ) : null}
       </div>
 
       {loading && !view ? (
@@ -146,13 +183,13 @@ const AiShareDetail: React.FC<{
       ) : view ? (
         <AiShareUsageChart
           buckets={view.buckets}
-          stacks={byBu ? view.buStacks : view.segmentStacks}
-          flipKey={byBu ? 'bu' : 'segments'}
-          hideZeroInTooltip={byBu}
+          stacks={teamOn ? view.teamStacks : byBu ? view.buStacks : view.segmentStacks}
+          flipKey={teamOn ? 'team' : byBu ? 'bu' : 'segments'}
+          hideZeroInTooltip={byBu || teamOn}
           grain={view.grain}
           unit={unit}
           today={today}
-          ariaLabel={`${title} ยอดใช้งานราย${per}${byBu ? ' แยก BU' : ''}`}
+          ariaLabel={`${title} ยอดใช้งานราย${per}${teamOn ? ' แยกทีม' : byBu ? ' แยก BU' : ''}`}
           onPick={view.grain === 'day' ? undefined : openBucket}
           pickHint={PICK_HINT[view.grain]}
         />

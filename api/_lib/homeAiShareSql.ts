@@ -163,6 +163,8 @@ export function buildFollowAiShareSql(
   return `
   with f0 as (
     select f.call_mode,
+           /* ทีมของสาย (131) — หน้าแรกแยก "ติดตามคนเริ่มงาน / ติดตามส่งคนแทน" (เจ้าของสั่ง 4 ต.ค. 2569) */
+           (f.follow_team = 'replacement') as replacement,
            ${FOLLOW_CALLED_BY_AI_SQL} as ai,
            ${followCalledByStaffSql(staffReady)} as staff,
            ${FOLLOW_WAITING_AI_SQL} as waiting_ai,
@@ -201,7 +203,8 @@ export function buildFollowAiShareSql(
          count(*) filter (where ${SEGMENT_WHERE.both})::int                                    as both,
          count(*) filter (where ${SEGMENT_WHERE.notCalled})::int                               as not_called,
          count(*) filter (where ${SEGMENT_WHERE.notCalled} and waiting_ai)::int                as waiting_ai,
-         count(*) filter (where ${SEGMENT_WHERE.notCalled} and call_mode = 'manual')::int      as waiting_staff
+         count(*) filter (where ${SEGMENT_WHERE.notCalled} and call_mode = 'manual')::int      as waiting_staff,
+         count(*) filter (where replacement)::int                                              as team_replacement
     from f0${outGroup(mode)}`
   }`;
 }

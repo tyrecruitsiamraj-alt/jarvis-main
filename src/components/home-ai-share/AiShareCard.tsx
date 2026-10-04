@@ -75,6 +75,11 @@ export type AiShareCardProps = {
   previousRange?: string | null;
   /** กดกล่อง = ให้หน้าเปิด Popup รายชื่อของกล่องนั้น (รอบ 17) · ไม่ส่ง = กล่องกดไม่ได้ */
   onPick?: (key: AiShareListKey) => void;
+  /**
+   * แยกทีม (เฉพาะหัวข้อติดตาม · เจ้าของสั่ง 4 ต.ค. 2569: *"ยอด ติดตามคนเริ่มงาน กับ ติดตามส่งคนแทน บวกกัน …
+   * แยกแล้วอย่างละเท่าไหร่"*) — กล่องเล็กใต้แถวหลัก บวกกัน = ทั้งหมด · ไม่ส่ง = ไม่มีแถวนี้
+   */
+  teams?: ReadonlyArray<{ key: string; label: string; value: number; fillClass: string }> | null;
   /** กราฟยอดใช้งานของหัวข้อนี้ (หน้าเรียกเป็นคนโหลด) */
   children?: React.ReactNode;
   className?: string;
@@ -177,6 +182,7 @@ const AiShareCard: React.FC<AiShareCardProps> = ({
   previousLabel = null,
   previousRange = null,
   onPick,
+  teams = null,
   children,
   className,
 }) => {
@@ -239,6 +245,21 @@ const AiShareCard: React.FC<AiShareCardProps> = ({
               />
             ))}
           </div>
+          {teams && teams.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2" data-testid="ai-share-teams">
+              {teams.map((t) => (
+                <Tile
+                  key={t.key}
+                  label={t.label}
+                  value={t.value}
+                  unit={unit}
+                  share={total > 0 ? Math.round((t.value / total) * 100) : 0}
+                  shareClass={t.fillClass}
+                  pill={null}
+                />
+              ))}
+            </div>
+          ) : null}
           {error ? <p className={cn('text-xs', TONE.danger.value)}>{error}</p> : null}
           {flag ? <p className={cn('text-xs', TONE.warn.value)}>{flag}</p> : null}
         </div>

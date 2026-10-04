@@ -54,6 +54,7 @@ import {
   defaultAiShareWindow,
   detailBuckets,
   detailSegments,
+  detailTeamSeries,
   drillWindow,
   isAiShareListKey,
   isBalanced,
@@ -604,5 +605,42 @@ describe('วันที่มากสุด + เส้นเฉลี่ย 
   it('เฉลี่ยหารเฉพาะวันที่ถึงแล้ว (วันที่ยังไม่ถึงไม่ทำให้ค่าเฉลี่ยต่ำหลอก)', () => {
     expect(detailAverage(buckets, [3, 6, 1, 0], '2026-09-30')).toBeCloseTo(10 / 3);
     expect(detailAverage(buckets, [3, 6, 1, 0], '2026-09-27')).toBeNull();
+  });
+});
+
+/**
+ * 🔴 หัวข้อติดตามแยกทีม (เจ้าของสั่ง 4 ต.ค. 2569: *"ยอดของ ติดตามคนเริ่มงาน กับ ติดตามส่งคนแทน บวกกัน
+ * … แยกแล้วอย่างละเท่าไหร่"*) — ทั้งหมดของหัวข้อติดตามรวมสองทีมอยู่แล้ว · ส่งคนแทนนับจาก follow_team
+ */
+describe('หน้าแรก · ติดตาม แยกทีม', () => {
+  it('SQL นับสายของทีมส่งคนแทนในชุดเดียวกับทั้งหมด (ไม่กรองทีมออก)', () => {
+    const sql = buildFollowAiShareSql(true, 'follow');
+    expect(sql).toContain("(f.follow_team = 'replacement') as replacement");
+    expect(sql).toContain('as team_replacement');
+    expect(sql).not.toMatch(/where[\s\S]*follow_team/);
+  });
+
+  it('รายแท่ง: เริ่มงาน + ส่งคนแทน = ทั้งหมดของแท่งเสมอ', () => {
+    const rows = [
+      { day: '2026-10-03', bu: 'LBD', total: 30, ai: 30, staff: 0, both: 0, notCalled: 0, teamReplacement: 0 },
+      { day: '2026-10-03', bu: 'LML', total: 19, ai: 0, staff: 0, both: 0, notCalled: 19, teamReplacement: 19 },
+      { day: '2026-10-04', bu: 'LBD', total: 57, ai: 31, staff: 0, both: 0, notCalled: 26, teamReplacement: 26 },
+    ];
+    const buckets = [
+      { from: '2026-10-03', to: '2026-10-03', label: '3' },
+      { from: '2026-10-04', to: '2026-10-04', label: '4' },
+    ] as Parameters<typeof detailTeamSeries>[1];
+    const t = detailTeamSeries(rows, buckets);
+    expect(t.replacement).toEqual([19, 26]);
+    expect(t.main).toEqual([30, 31]);
+    t.main.forEach((m, i) => expect(m + t.replacement[i]).toBe([49, 57][i]));
+  });
+
+  it('API เก่าไม่มีช่องทีม = ส่งคนแทนเป็น 0 ทั้งแท่ง (แท่งไม่หาย)', () => {
+    const t = detailTeamSeries(
+      [{ day: '2026-10-03', bu: null, total: 5, ai: 5, staff: 0, both: 0, notCalled: 0 }],
+      [{ from: '2026-10-03', to: '2026-10-03', label: '3' }] as Parameters<typeof detailTeamSeries>[1],
+    );
+    expect(t).toEqual({ main: [5], replacement: [0] });
   });
 });
