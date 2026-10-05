@@ -264,3 +264,19 @@ describe('monthlyGuaranteedIncome', () => {
     expect(DAYS_PER_MONTH).toBe(30);
   });
 });
+
+describe('โอทีในบทโทร (เจ้าของ 5 ต.ค. 2569: "โอทีถ้าไม่การันตีให้พูดว่า ขึ้นอยู่กับหน่วยงาน")', () => {
+  it('🔴 โอทีรายชั่วโมง = ไม่การันตี ⇒ บอกว่าขึ้นอยู่กับหน่วยงาน', async () => {
+    const { speakableBenefitLine } = await import('../../api/_lib/siamrajJobBenefits');
+    const line = speakableBenefitLine([{ fee_name: 'ค่าล่วงเวลา 1.5 เท่า', fee_rate: 75.4, unit: 'H' }]);
+    expect(line).toBe('มีโอทีชั่วโมงละประมาณ 75 บาท ขึ้นอยู่กับหน่วยงาน');
+  });
+  it('โอทีเหมารายเดือน = การันตี ⇒ บอกยอดเหมา ไม่ต้องมีคำว่าขึ้นอยู่กับหน่วยงาน', async () => {
+    const { speakableBenefitLine } = await import('../../api/_lib/siamrajJobBenefits');
+    const line = speakableBenefitLine([
+      { fee_name: 'ค่าล่วงเวลาเหมา', fee_rate: 3000, unit: 'M' },
+      { fee_name: 'ค่าล่วงเวลา 1.5 เท่า', fee_rate: 75, unit: 'H' },
+    ]);
+    expect(line).toBe('มีโอทีเหมาเดือนละ 3,000 บาท');
+  });
+});

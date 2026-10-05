@@ -53,6 +53,8 @@ const SPEAKABLE_GROUPS: Array<{ label: string; test: RegExp }> = [
 
 /** โอทีมาตรฐาน 1.5 เท่า — ตัวเดียวที่บอกตัวเลขได้ (หน่วยต่อชั่วโมงแน่นอน) */
 const OT_15 = /ล่วงเวลา\s*1\.5/;
+/** แถวโอทีทุกแบบ (ใช้หาโอทีเหมา) */
+const OT_ANY = /ล่วงเวลา|โอที|(^|[^a-z])ot([^a-z]|$)/i;
 
 /**
  * ประกอบประโยคสวัสดิการที่ AI พูดได้ — pure (มี unit test)
@@ -64,10 +66,21 @@ export function speakableBenefitLine(rates: JobBenefitRate[]): string {
   // ตั้งแต่ทำยอดรายเดือน จึงต้องกรองที่นี่ ไม่ใช่พึ่ง WHERE ของ SQL เหมือนเดิม)
   rates = rates.filter((r) => !r.is_wage);
 
+  /**
+   * โอที — 🔴 เจ้าของ 5 ต.ค. 2569: *"โอทีถ้าไม่การันตีให้พูดว่า ขึ้นอยู่กับหน่วยงาน"*
+   * การันตี = โอทีเหมารายเดือน (หน่วย `M` ใน ERP) ⇒ "มีโอทีเหมาเดือนละ … บาท"
+   * ไม่การันตี = อัตรารายชั่วโมง (`H` · ไม่รู้หน่วย) ⇒ "มีโอทีชั่วโมงละประมาณ … บาท ขึ้นอยู่กับหน่วยงาน"
+   * (หน่วย `H` แปลงเป็นรายเดือนไม่ได้อยู่แล้ว — `toMonthlyAmount` คืน null)
+   */
+  const otFixed = rates.find(
+    (r) => OT_ANY.test(r.fee_name) && Number(r.fee_rate) > 0 && (r.unit || '').trim().toUpperCase() === 'M',
+  );
   const ot = rates.find((r) => OT_15.test(r.fee_name) && Number(r.fee_rate) > 0);
-  if (ot) {
+  if (otFixed) {
+    parts.push(`มีโอทีเหมาเดือนละ ${Math.round(Number(otFixed.fee_rate)).toLocaleString('th-TH')} บาท`);
+  } else if (ot) {
     // ปัดเป็นจำนวนเต็ม — "เจ็ดสิบหกจุดแปดแปดบาท" ฟังทางโทรศัพท์แล้วงง
-    parts.push(`มีโอทีชั่วโมงละประมาณ ${Math.round(Number(ot.fee_rate))} บาท`);
+    parts.push(`มีโอทีชั่วโมงละประมาณ ${Math.round(Number(ot.fee_rate))} บาท ขึ้นอยู่กับหน่วยงาน`);
   }
 
   const found: string[] = [];
