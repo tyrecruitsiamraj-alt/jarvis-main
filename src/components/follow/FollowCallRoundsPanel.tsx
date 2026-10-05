@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { DASH, TONE } from '@/lib/designTokens';
 import { type FollowEntry } from '@/lib/followApi';
 import { followCallerOf } from '@/lib/followListFilter';
-import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
+import { followCallOutcomeText } from '@/lib/callOutcomeTone';
 
 import {
   countFollowRoundBuckets,
@@ -107,8 +107,8 @@ function PersonRow({ p, onOpen }: { p: FollowEntry; onOpen?: (p: FollowEntry) =>
           </p>
           {p.call_outcome || p.call_summary ? (
             <p className={cn('mt-1 rounded bg-background/60 px-1.5 py-1 text-[10px]', DASH.muted)}>
-              {/* 🔴 คำไทยจาก CALL_OUTCOME_LABEL — เดิมพ่นรหัสอังกฤษดิบเหมือนหน้าแม่ */}
-              ผล{p.call_outcome ? ` — ${(CALL_OUTCOME_LABEL as Record<string, string>)[p.call_outcome] ?? p.call_outcome}` : ''}
+              {/* 🔴 คำของงานติดตาม (QA 5 ต.ค. 2569: เดิมใช้คำงานสรรหา "สนใจ / ไม่สนใจ") */}
+              ผล{p.call_outcome ? ` — ${followCallOutcomeText(p.call_outcome)}` : ''}
               {p.call_summary ? `: ${p.call_summary}` : ''}
             </p>
           ) : null}
@@ -268,7 +268,7 @@ export default function FollowCallRoundsPanel({
     const list = matrix[r][c];
     setPeopleLife('all');
     setPeopleDialog({
-      title: `${FOLLOW_MATRIX_ROW_LABEL[r]} · ${FOLLOW_MATRIX_COL_LABEL[c]} (${list.length.toLocaleString('th-TH')} คน)`,
+      title: `${FOLLOW_MATRIX_ROW_LABEL[r]} · ${FOLLOW_MATRIX_COL_LABEL[c]} (${list.length.toLocaleString('th-TH')} สาย)`,
       hint: '',
       people: list,
       // ช่อง "ทั้งหมด" เห็นทุกสถานะ — แยกดู เหลือตาม/ปิดแล้ว/ยกเลิก ได้ในป๊อป
@@ -281,7 +281,7 @@ export default function FollowCallRoundsPanel({
     const list = rows.filter((r) => inFollowRoundBucket(r, b));
     setPeopleLife('all');
     setPeopleDialog({
-      title: `${roundLabelOf(slot)} · ${FOLLOW_ROUND_BUCKET_LABEL[b]} (${list.length.toLocaleString('th-TH')} คน)`,
+      title: `${roundLabelOf(slot)} · ${FOLLOW_ROUND_BUCKET_LABEL[b]} (${list.length.toLocaleString('th-TH')} สาย)`,
       hint: FOLLOW_ROUND_BUCKET_HINT[b],
       people: list,
       // กล่องรวมคือที่เดียวที่เห็นสายทุกสถานะ — ให้แยกดู เหลือตาม/ปิดแล้ว/ยกเลิก ได้จากตรงนี้
@@ -460,7 +460,7 @@ export default function FollowCallRoundsPanel({
                     onClick={() => {
                       setPeopleLife('all');
                       setPeopleDialog({
-                        title: `${FOLLOW_MATRIX_ROW_LABEL[activeRound]} · ${label} (${list.length.toLocaleString('th-TH')} คน)`,
+                        title: `${FOLLOW_MATRIX_ROW_LABEL[activeRound]} · ${label} (${list.length.toLocaleString('th-TH')} สาย)`,
                         hint: '',
                         people: list,
                         splitByLife: true,

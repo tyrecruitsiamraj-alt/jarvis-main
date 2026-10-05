@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { formatYmdDmyBe } from '@/lib/dateTh';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -200,7 +201,8 @@ const BoardDashboard: React.FC<{
         win={win}
         note={
           <>
-            {range.from} ถึง {range.to} · เทียบ {previous.from} ถึง {previous.to}
+            {formatYmdDmyBe(range.from)} ถึง {formatYmdDmyBe(range.to)} · เทียบ {formatYmdDmyBe(previous.from)} ถึง{' '}
+            {formatYmdDmyBe(previous.to)}
           </>
         }
       />

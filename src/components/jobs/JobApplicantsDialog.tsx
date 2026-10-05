@@ -39,6 +39,7 @@ import CallChoiceConfirmDialog from '@/components/recruit-rm/CallChoiceConfirmDi
 import JobRecallSuggestions from '@/components/jobs/JobRecallSuggestions';
 import ApplicantContactDialog from '@/components/recruit-rm/ApplicantContactDialog';
 import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 export type JobApplicantsDialogProps = {
   open: boolean;
@@ -152,7 +153,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
       setSendNotice(notice);
       reload(job.id);
     } catch (e) {
-      setSendNotice(e instanceof Error ? e.message : 'ส่งให้ AI โทรไม่สำเร็จ');
+      setSendNotice(friendlyErrorText(e, 'ส่งให้ AI โทรไม่สำเร็จ'));
     } finally {
       setSendBusy(false);
     }
@@ -169,7 +170,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
       a.click();
       a.remove();
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'โหลดไฟล์แนบไม่สำเร็จ');
+      setActionError(friendlyErrorText(e, 'โหลดไฟล์แนบไม่สำเร็จ'));
     } finally {
       setDownloadingId(null);
     }
@@ -184,7 +185,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
       await setJobApplicationLead(a.id, true);
       if (job) reload(job.id);
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'เก็บ Lead ไม่สำเร็จ');
+      setActionError(friendlyErrorText(e, 'เก็บ Lead ไม่สำเร็จ'));
     } finally {
       setLeadBusyId(null);
     }
@@ -210,7 +211,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
         if (job) reload(job.id);
       }
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'เก็บไปโทรเองไม่สำเร็จ');
+      setActionError(friendlyErrorText(e, 'เก็บไปโทรเองไม่สำเร็จ'));
     } finally {
       setSavingId(null);
     }
@@ -230,7 +231,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
         if (!cancelled) setItems(data);
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ');
+        if (!cancelled) setError(friendlyErrorText(e, 'โหลดข้อมูลไม่สำเร็จ'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

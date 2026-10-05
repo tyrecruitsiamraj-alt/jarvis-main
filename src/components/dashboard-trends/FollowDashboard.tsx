@@ -9,14 +9,15 @@ import {
   FOLLOW_DIM_LABEL,
   FOLLOW_METRIC_LABEL,
   followCallerStats,
+  followCountedYmd,
   followDimGetter,
-  followEventYmd,
   followRoundPeople,
   rate,
   type FollowDim,
   type FollowMetric,
 } from '@/lib/trends/followTrends';
 import { formatTrendNumber as fmt, formatTrendPct as pct } from '@/lib/trends/format';
+import { formatYmdDmyBe } from '@/lib/dateTh';
 import type { FollowTrendRow } from '@/lib/trends/types';
 import {
   DeltaChip,
@@ -29,6 +30,7 @@ import {
   TrendToolbar,
 } from './TrendParts';
 import { ChoiceDropdown } from '@/components/jobs/BoardFilterPanel';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 /**
  * ═══ แท็บ "Dashboard" ของหน้าติดตาม — ติดตามเริ่มงานมุมผู้บริหาร (28 ก.ย. 2569) ═══
@@ -59,7 +61,7 @@ const FollowDashboard: React.FC = () => {
     setError(null);
     fetchFollowTrendRows(win.fetchFrom, win.today)
       .then((r) => !cancelled && setRows(r))
-      .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : 'โหลดไม่สำเร็จ'))
+      .catch((e: unknown) => !cancelled && setError(friendlyErrorText(e, 'โหลดไม่สำเร็จ')))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -70,12 +72,14 @@ const FollowDashboard: React.FC = () => {
   const [metric, setMetric] = useState<FollowMetric>('registered');
 
   const data = useMemo(() => rows ?? [], [rows]);
-  const count = (m: FollowMetric, r: { from: string; to: string }) => sumInRange(data, (x) => followEventYmd(x, m), r);
+  /** 🔴 ตัวเลขแบบ "คน" นับคนไม่ซ้ำ · แบบ "สาย" นับทีละแถว — ทุกส่วนของจอใช้ตัวนี้ (ดู `followCountedYmd`) */
+  const ymdOf = useMemo(() => followCountedYmd(data), [data]);
+  const count = (m: FollowMetric, r: { from: string; to: string }) => sumInRange(data, (x) => ymdOf(x, m), r);
 
-  const reg = useMemo(() => seriesByBucket(data, (x) => followEventYmd(x, 'registered'), range, grain), [data, range, grain]);
-  const called = useMemo(() => seriesByBucket(data, (x) => followEventYmd(x, 'called'), range, grain), [data, range, grain]);
-  const success = useMemo(() => seriesByBucket(data, (x) => followEventYmd(x, 'success'), range, grain), [data, range, grain]);
-  const dropped = useMemo(() => seriesByBucket(data, (x) => followEventYmd(x, 'dropped'), range, grain), [data, range, grain]);
+  const reg = useMemo(() => seriesByBucket(data, (x) => ymdOf(x, 'registered'), range, grain), [data, ymdOf, range, grain]);
+  const called = useMemo(() => seriesByBucket(data, (x) => ymdOf(x, 'called'), range, grain), [data, ymdOf, range, grain]);
+  const success = useMemo(() => seriesByBucket(data, (x) => ymdOf(x, 'success'), range, grain), [data, ymdOf, range, grain]);
+  const dropped = useMemo(() => seriesByBucket(data, (x) => ymdOf(x, 'dropped'), range, grain), [data, ymdOf, range, grain]);
 
   const now = {
     registered: count('registered', range),
@@ -101,8 +105,8 @@ const FollowDashboard: React.FC = () => {
   const callerPrev = useMemo(() => followCallerStats(data, previous), [data, previous]);
 
   const dimRows = useMemo(
-    () => breakdown(data, (x) => followEventYmd(x, metric), followDimGetter(dim, data), range, previous),
-    [data, metric, dim, range, previous],
+    () => breakdown(data, (x) => ymdOf(x, metric), followDimGetter(dim, data), range, previous),
+    [data, ymdOf, metric, dim, range, previous],
   );
 
   /** ตารางเจ้าหน้าที่ (เฉพาะงานติดตาม) — คีย์ = รหัสผู้ใช้ */
@@ -112,11 +116,11 @@ const FollowDashboard: React.FC = () => {
       const key = x.staffId ?? `name:${x.staffName ?? 'ไม่ระบุ'}`;
       const row = byStaff.get(key) ?? { name: x.staffName ?? 'ไม่ระบุ', reg: 0, regPrev: 0, called: 0, completed: 0, success: 0 };
       const inR = (m: FollowMetric) => {
-        const y = followEventYmd(x, m);
+        const y = ymdOf(x, m);
         return Boolean(y && y >= range.from && y <= range.to);
       };
       const inP = (m: FollowMetric) => {
-        const y = followEventYmd(x, m);
+        const y = ymdOf(x, m);
         return Boolean(y && y >= previous.from && y <= previous.to);
       };
       if (inR('registered')) row.reg += 1;
@@ -130,12 +134,12 @@ const FollowDashboard: React.FC = () => {
       .map(([key, v]) => ({ key, ...v }))
       .filter((v) => v.reg + v.regPrev + v.called + v.completed > 0)
       .sort((a, b) => b.reg - a.reg || a.name.localeCompare(b.name, 'th'));
-  }, [data, range, previous]);
+  }, [data, ymdOf, range, previous]);
 
   const firstYmd = useMemo(() => {
     let m: string | null = null;
     for (const x of data) {
-      const y = followEventYmd(x, 'registered');
+      const y = ymdOf(x, 'registered');
       if (y && (!m || y < m)) m = y;
     }
     return m;
@@ -147,8 +151,9 @@ const FollowDashboard: React.FC = () => {
         win={win}
         note={
           <>
-            {range.from} ถึง {range.to} · เทียบ {previous.from} ถึง {previous.to}
-            {firstYmd && firstYmd > range.from ? ` · ข้อมูลเริ่ม ${firstYmd}` : ''}
+            {formatYmdDmyBe(range.from)} ถึง {formatYmdDmyBe(range.to)} · เทียบ {formatYmdDmyBe(previous.from)} ถึง{' '}
+            {formatYmdDmyBe(previous.to)}
+            {firstYmd && firstYmd > range.from ? ` · ข้อมูลเริ่ม ${formatYmdDmyBe(firstYmd)}` : ''}
           </>
         }
       />
@@ -156,7 +161,7 @@ const FollowDashboard: React.FC = () => {
       {rows ? (
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-            <TrendKpiCard label="ลงติดตาม" unit="ราย" value={now.registered} previous={prev.registered} tone="violet" spark={reg.map((p) => p.value)} />
+            <TrendKpiCard label="ลงติดตาม" unit="คน" value={now.registered} previous={prev.registered} tone="violet" spark={reg.map((p) => p.value)} />
             <TrendKpiCard label="โทรแล้ว" unit="สาย" value={now.called} previous={prev.called} tone="info" spark={called.map((p) => p.value)} />
             <TrendKpiCard label="ติดต่อได้" value={rate(now.connected, now.called)} previous={rate(prev.connected, prev.called)} asRate tone="teal" foot={`${fmt(now.connected)} จาก ${fmt(now.called)} สาย`} />
             <TrendKpiCard label="ไปถึงแล้ว" unit="คน" value={now.success} previous={prev.success} tone="success" spark={success.map((p) => p.value)} />

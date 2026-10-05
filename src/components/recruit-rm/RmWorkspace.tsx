@@ -83,6 +83,7 @@ import {
   type ApplicantFacetKey,
   type ApplicantFilterState,
 } from '@/lib/applicantFilters';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 /** แท็บของพื้นที่นี้ → `?view=` ของบอร์ดรับสมัคร · ชื่อแท็บใช้ `RM_TAB_LABEL` ชุดเดียวกับแถบแท็บของบอร์ด */
 const RM_TAB_BOARD_VIEW: Record<RmTab, string> = { candidates: 'list', contact: 'contact', appointments: 'appointments' };
@@ -262,7 +263,7 @@ const RmWorkspace: React.FC<{
     setLoadError(null);
     fetchAllJobApplications(leadView, bucket, cancelledView)
       .then(setRows)
-      .catch((e) => setLoadError(e instanceof Error ? e.message : 'โหลดรายชื่อผู้สมัครไม่สำเร็จ'))
+      .catch((e) => setLoadError(friendlyErrorText(e, 'โหลดรายชื่อผู้สมัครไม่สำเร็จ')))
       .finally(() => setLoading(false));
   };
   useEffect(load, [leadView, bucket, cancelledView, refreshKey]);
@@ -302,7 +303,7 @@ const RmWorkspace: React.FC<{
       setSelectedIds([]);
       load();
     } catch (e) {
-      say(e instanceof Error ? e.message : 'ถอย Lead ไม่สำเร็จ');
+      say(friendlyErrorText(e, 'ถอย Lead ไม่สำเร็จ'));
     } finally {
       setReleasing(false);
     }
@@ -324,7 +325,7 @@ const RmWorkspace: React.FC<{
         say(`บันทึกผลนัดของ ${row.full_name}: ${ATTENDANCE_LABEL[result]} แล้ว`);
         load();
       })
-      .catch((e) => say(e instanceof Error ? e.message : 'บันทึกผลนัดไม่สำเร็จ'));
+      .catch((e) => say(friendlyErrorText(e, 'บันทึกผลนัดไม่สำเร็จ')));
   };
 
   /**
@@ -583,7 +584,7 @@ const RmWorkspace: React.FC<{
       say(summarizeCallChoice(outcome), tab !== 'contact');
       load(); // ใบย้ายแท็บ (claimed_by_me) + ป้ายล็อกเปลี่ยน ต้องเห็นทันที
     } catch (e) {
-      say(e instanceof Error ? e.message : 'เก็บไปโทรเองไม่สำเร็จ');
+      say(friendlyErrorText(e, 'เก็บไปโทรเองไม่สำเร็จ'));
     }
   };
 
@@ -608,7 +609,7 @@ const RmWorkspace: React.FC<{
       setSelectedIds([]);
       load();
     } catch (e) {
-      say(e instanceof Error ? e.message : 'ส่ง AI โทรไม่สำเร็จ');
+      say(friendlyErrorText(e, 'ส่ง AI โทรไม่สำเร็จ'));
       setAiConfirmIds(null);
     } finally {
       setAiSending(false);
@@ -637,7 +638,7 @@ const RmWorkspace: React.FC<{
           say(`กู้คืน ${row.full_name} เข้ารายชื่อหลักแล้ว`);
           load();
         })
-        .catch((e: unknown) => say(e instanceof Error ? e.message : 'กู้คืนไม่สำเร็จ'));
+        .catch((e: unknown) => say(friendlyErrorText(e, 'กู้คืนไม่สำเร็จ')));
       return;
     }
     /**
@@ -652,7 +653,7 @@ const RmWorkspace: React.FC<{
           say(`เก็บ ${row.full_name} เข้า Lead แล้ว`, true);
           load();
         })
-        .catch((e: unknown) => say(e instanceof Error ? e.message : 'เก็บเข้า Lead ไม่สำเร็จ'));
+        .catch((e: unknown) => say(friendlyErrorText(e, 'เก็บเข้า Lead ไม่สำเร็จ')));
       return;
     }
     if (action === 'call') {
@@ -694,7 +695,7 @@ const RmWorkspace: React.FC<{
           say(`จดเวลาโทรของ ${row.full_name} แล้ว`);
         })
         .catch((e: unknown) => {
-          say(e instanceof Error ? e.message : 'จดเวลาโทรไม่สำเร็จ');
+          say(friendlyErrorText(e, 'จดเวลาโทรไม่สำเร็จ'));
         });
       return;
     }
@@ -721,7 +722,7 @@ const RmWorkspace: React.FC<{
           say(summarizeCallChoice(outcome));
           load(); // ใบย้ายกลับแท็บผู้สมัคร + ป้ายล็อกหาย ต้องเห็นทันที
         })
-        .catch((e: unknown) => say(e instanceof Error ? e.message : 'ลบออกไม่สำเร็จ'));
+        .catch((e: unknown) => say(friendlyErrorText(e, 'ลบออกไม่สำเร็จ')));
       return;
     }
     todo(`"${RM_ROW_ACTION_LABEL[action]}" ของ ${row.full_name}`);

@@ -6,7 +6,7 @@ import { phoneKey } from '@/lib/followDuplicateGuard';
  * คนเดียวหลายรอบแตกหลายแถว *"งงตาย"* — ต้องการการ์ดเดียวสรุปว่า โทรวันไหนกี่โมง ·
  * หน่วยงานไหน · ใครคีย์ · ติดตามวันไหนบ้าง · วันนี้เป็นครั้งที่เท่าไหร่)
  *
- * กลุ่ม = **เบอร์ (เลข 9 ตัวท้าย) + เรื่อง + ชื่อผู้รับ**
+ * กลุ่ม = **เบอร์ (เลข 9 ตัวท้าย) + เรื่อง + ชื่อผู้รับ + แผน (group_id)** — ดู `followGroupKey`
  * เบอร์อย่างเดียวไม่พอ: คนเดียวถูกตามหลายเรื่องพร้อมกันได้ ต้องแยกการ์ดกัน
  *
  * 🔴 **ชื่ออยู่ในคีย์ด้วย** (เจ้าของทัก 7 ก.ย. 2569: *"โชว์ไม่ครบคนป้ะ"*)
@@ -23,7 +23,7 @@ import { phoneKey } from '@/lib/followDuplicateGuard';
  */
 
 export type FollowGroup = {
-  /** เบอร์(9 ตัวท้าย)|เรื่อง|ชื่อ — ใช้เป็น React key ได้ */
+  /** เบอร์(9 ตัวท้าย)|เรื่อง|ชื่อ[|g:group_id] — ใช้เป็น React key ได้ */
   key: string;
   /** ชื่อจากรอบล่าสุดของกลุ่ม (ทุกรอบในกลุ่มชื่อเดียวกันอยู่แล้ว — ชื่ออยู่ในคีย์) */
   name: string;
@@ -87,14 +87,33 @@ const nameKey = (name: string | null | undefined): string =>
  * เจ้าของจับได้ว่าเลขไม่สอดคล้องกัน) — ก๊อปสูตรคีย์ไปไว้อีกที่เมื่อไหร่ = เพี้ยนอีก
  */
 export function followGroupKey(e: FollowEntry): string {
+  const person = followPersonKey(e);
+  /**
+   * 🔴 **หนึ่งแผน (group_id) = หนึ่งแถว** (QA 5 ต.ค. 2569 · วัดฐานจริง: แท็บเริ่มงาน 44 คน · ส่งคนแทน 57 คน
+   * มีหลายแผนใต้คีย์เดียวกัน) — เดิมคีย์ไม่ดู group_id ⇒ แผนคนละหน่วยงานรวมเป็นแถวเดียว
+   * ป๊อปขึ้นหน่วยงานผิด (One Bangkok ↔ พญาไท) · "แผนทั้งหมด 15 สาย" · เลข "วันที่/สายที่" ชนกันในแถวเดียว
+   * (เลขพวกนั้นนับต่อ group_id อยู่แล้ว ดู `followDayCall.ts`) · แถวเก่าที่ไม่มี group_id ยังรวมตามคนเหมือนเดิม
+   */
+  return e.group_id ? `${person}|g:${e.group_id}` : person;
+}
+
+/**
+ * คีย์ "คนเดียวกัน" (เบอร์ + เรื่อง + ชื่อ) ไม่สนแผน — ใช้กับการ์ด **ติดตามครบ** ที่ต้องตัดสินทีละคน
+ * (ติดตามต่อ = แผนใหม่ของคนเดิม ⇒ แผนเก่ายังไม่ควรโผล่ให้กดย้ายจนกว่าแผนใหม่จะจบ)
+ */
+export function followPersonKey(e: FollowEntry): string {
   // เบอร์อ่านไม่ออก (สั้นกว่า 9 หลัก) ถอยไปใช้เบอร์ดิบ — ยังจัดกลุ่มของตัวเองได้
   return `${phoneKey(e.recipient_phone) ?? e.recipient_phone}|${(e.topic || '').trim()}|${nameKey(e.recipient_name)}`;
 }
 
-export function groupFollowEntries(entries: FollowEntry[], now = new Date()): FollowGroup[] {
+export function groupFollowEntries(
+  entries: FollowEntry[],
+  now = new Date(),
+  keyOf: (e: FollowEntry) => string = followGroupKey,
+): FollowGroup[] {
   const buckets = new Map<string, FollowEntry[]>();
   for (const e of entries) {
-    const key = followGroupKey(e);
+    const key = keyOf(e);
     const list = buckets.get(key);
     if (list) list.push(e);
     else buckets.set(key, [e]);

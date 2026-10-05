@@ -73,6 +73,7 @@ import { EVEN_TYPE, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import { SEARCH_ALL_POOLS_AND_CALL } from '@/lib/candidateSearchLabels';
 import type { JobRequest } from '@/types';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 const EditPublicJobFieldsDialog = React.lazy(
   () => import('@/components/jobs/EditPublicJobFieldsDialog'),
@@ -204,7 +205,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
         if (alive) setJob(j);
       })
       .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e.message : 'โหลดใบขอไม่สำเร็จ');
+        if (alive) setError(friendlyErrorText(e, 'โหลดใบขอไม่สำเร็จ'));
       });
     return () => {
       alive = false;

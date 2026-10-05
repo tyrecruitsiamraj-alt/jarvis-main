@@ -618,7 +618,9 @@ export async function chooseApplicationCall(
       choice === 'manual' ? 'เก็บไปโทรเองไม่สำเร็จ' : choice === 'release' ? 'ลบออกไม่สำเร็จ' : 'ส่ง AI โทรไม่สำเร็จ';
     throw new Error(body?.message || fallback);
   }
-  return (await r.json()) as CallChoiceOutcome;
+  // 🔴 คำตอบไม่ครบรูป ห้ามพังที่ `skipped.length` (QA 5 ต.ค. 2569: ขึ้นอังกฤษดิบ "reading 'length'")
+  const out = (await r.json().catch(() => null)) as Partial<CallChoiceOutcome> | null;
+  return { choice: out?.choice ?? choice, done: out?.done ?? 0, skipped: Array.isArray(out?.skipped) ? out.skipped : [] };
 }
 
 /**

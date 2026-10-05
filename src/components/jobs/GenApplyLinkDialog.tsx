@@ -241,7 +241,10 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
         formType,
       };
       const created = await createRecruitPosting(body);
-      setLinks(created.links.map((l) => ({ code: l.code, label: l.channelLabel })));
+      // ลิงก์ที่ไม่มีรหัส = ลิงก์เสีย (/apply/p/undefined) ห้ามโชว์ให้คัดลอก (QA 5 ต.ค. 2569)
+      const usable = (created?.links ?? []).filter((l) => Boolean(l?.code));
+      if (usable.length === 0) throw new Error('สร้างลิงก์ไม่สำเร็จ');
+      setLinks(usable.map((l) => ({ code: l.code, label: l.channelLabel })));
       onCreated?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'สร้างประกาศไม่สำเร็จ');

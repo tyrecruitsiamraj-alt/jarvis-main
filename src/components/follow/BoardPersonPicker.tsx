@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import SearchField from '@/components/shared/SearchField';
 import { LoaderCircle, Users } from 'lucide-react';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 /**
  * เลือกชื่อจากบอร์ด ERP มาตั้งตารางโทรตาม (F5b · เจ้าของเคาะ 16 ส.ค. 2569)
@@ -41,7 +42,7 @@ const BoardPersonPicker: React.FC<BoardPersonPickerProps> = ({ open, onClose, on
         if (!cancelled) setPeople(rows);
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'โหลดรายชื่อไม่สำเร็จ');
+        if (!cancelled) setError(friendlyErrorText(e, 'โหลดรายชื่อไม่สำเร็จ'));
       });
     return () => {
       cancelled = true;

@@ -12,6 +12,7 @@ import {
 } from '@/lib/recruitPostings';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 const origin = () => (typeof window !== 'undefined' ? window.location.origin : '');
 
@@ -57,13 +58,14 @@ const AddChannelLinks: React.FC<{
     const wanted = picked.length > 0 ? picked : [null];
     try {
       for (const c of wanted) {
-        made.push(
-          await addPostingLink(posting.id, c ? { channelId: c.id, channelLabel: recruitChannelLabel(c) } : {}),
-        );
+        const link = await addPostingLink(posting.id, c ? { channelId: c.id, channelLabel: recruitChannelLabel(c) } : {});
+        // ไม่มีรหัส = ลิงก์เสีย (/apply/p/undefined) ห้ามโชว์ให้คัดลอก (QA 5 ต.ค. 2569)
+        if (!link?.code) throw new Error('สร้างลิงก์ไม่สำเร็จ');
+        made.push(link);
       }
     } catch (e) {
       setError(
-        `${e instanceof Error ? e.message : 'สร้างลิงก์ไม่สำเร็จ'}${made.length > 0 ? ` (สร้างได้แล้ว ${made.length} ลิงก์)` : ''}`,
+        `${friendlyErrorText(e, 'สร้างลิงก์ไม่สำเร็จ')}${made.length > 0 ? ` (สร้างได้แล้ว ${made.length} ลิงก์)` : ''}`,
       );
     } finally {
       setBusy(false);

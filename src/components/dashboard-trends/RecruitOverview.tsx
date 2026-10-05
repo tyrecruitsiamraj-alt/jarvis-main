@@ -57,6 +57,7 @@ import {
   SectionError,
   StaffTable,
 } from './RecruitOverviewParts';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 /**
  * ═══ แท็บ "ภาพรวม" ของกล่องงาน = ภาพรวมงานสรรหาแบบ iRecruit (เจ้าของสั่ง 30 ก.ย. 2569) ═══
@@ -134,7 +135,7 @@ const RecruitOverview: React.FC<{
     setState((s) => ({ ...s, loading: true, error: null }));
     fetchRecruitOverview(month, range)
       .then((data) => !cancelled && setState({ data, loading: false, error: null }))
-      .catch((e: unknown) => !cancelled && setState((s) => ({ ...s, loading: false, error: e instanceof Error ? e.message : 'โหลดไม่สำเร็จ' })));
+      .catch((e: unknown) => !cancelled && setState((s) => ({ ...s, loading: false, error: friendlyErrorText(e, 'โหลดไม่สำเร็จ') })));
     return () => {
       cancelled = true;
     };

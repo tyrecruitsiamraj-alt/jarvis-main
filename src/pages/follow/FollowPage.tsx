@@ -1,5 +1,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import SectionErrorBoundary from '@/components/shared/SectionErrorBoundary';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,6 +23,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { friendlyErrorText } from '@/lib/friendlyError';
 import {
   Dialog,
   DialogContent,
@@ -56,7 +59,7 @@ import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
 import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
 import { buildBoardUnitOptions, mergeBoardUnitOptions, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
-import { followGroupKey, groupFollowEntries } from '@/lib/followGrouping';
+import { followGroupKey, followPersonKey, groupFollowEntries } from '@/lib/followGrouping';
 import { followScopeEntries, followTeamForScope } from '@/lib/followReplacement';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { followMatrixColOfCategory, type FollowMatrixCol } from '@/lib/followCallMatrix';
@@ -504,14 +507,15 @@ const FollowPage: React.FC = () => {
    */
   const reload = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    if (!silent) setError(null);
     try {
       setItems(await listFollowEntries());
       // จดเวลาที่ **ดึงสำเร็จ** — ท้ายตารางเอาไปบอกคนว่าหน้าไม่ได้ค้าง (12 ก.ย. 2569)
       setLastLoadedAt(new Date());
+      // 🔴 สำเร็จเมื่อไหร่ (รวมรอบเงียบ) ล้างแถบล้มทิ้ง — QA 5 ต.ค. 2569: แถบ "Failed to fetch" ค้างทั้งที่เลขกลับมาแล้ว
+      setError(null);
     } catch (e) {
       // รีเฟรชเงียบล้ม = เงียบต่อ ของบนจอยังเป็นของเดิมที่ยังใช้ได้
-      if (!silent) setError(e instanceof Error ? e.message : 'โหลดรายการไม่สำเร็จ');
+      if (!silent) setError(friendlyErrorText(e, 'โหลดรายชื่อติดตามไม่ได้'));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -1097,7 +1101,7 @@ const FollowPage: React.FC = () => {
       setCancellingId(null);
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'ยกเลิกไม่สำเร็จ');
+      toast.error(friendlyErrorText(err, 'ยกเลิกไม่สำเร็จ'));
     } finally {
       setBusyId(null);
     }
@@ -1123,7 +1127,7 @@ const FollowPage: React.FC = () => {
           : 'ลบแล้ว',
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'ลบไม่สำเร็จ');
+      toast.error(friendlyErrorText(err, 'ลบไม่สำเร็จ'));
     } finally {
       setBusyId(null);
     }
@@ -1136,13 +1140,12 @@ const FollowPage: React.FC = () => {
    */
   const doComplete = async (id: string, outcome: FollowOutcome, note?: string, stopScope?: FollowStopScope) => {
     setBusyId(id);
-    setError(null);
     try {
       const out = await completeFollowEntry(id, outcome, note, stopScope);
-      if (out.stopped_error) setError('ปิดงานแล้ว แต่หยุดสายที่เหลือไม่สำเร็จ — กดยกเลิกสายที่เหลือเองที่ปุ่มจัดการ');
+      if (out.stopped_error) toast.error('ปิดงานแล้ว แต่หยุดสายที่เหลือไม่ได้ · กดยกเลิกสายที่เหลือเองที่ปุ่มจัดการ');
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'ปิดงานไม่สำเร็จ');
+      toast.error(friendlyErrorText(err, 'ปิดงานไม่สำเร็จ'));
     } finally {
       setBusyId(null);
     }
@@ -1154,12 +1157,11 @@ const FollowPage: React.FC = () => {
    */
   const doReopen = async (id: string) => {
     setBusyId(id);
-    setError(null);
     try {
       await reopenFollowEntry(id);
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'ย้อนสถานะไม่สำเร็จ');
+      toast.error(friendlyErrorText(err, 'ย้อนสถานะไม่สำเร็จ'));
     } finally {
       setBusyId(null);
     }
@@ -1171,13 +1173,12 @@ const FollowPage: React.FC = () => {
    */
   const doStaffCall = async (id: string, outcome: FollowStaffCallOutcome, note?: string): Promise<boolean> => {
     setBusyId(id);
-    setError(null);
     try {
       await recordFollowStaffCall(id, outcome, note);
       await reload();
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'ลงผลโทรไม่สำเร็จ');
+      toast.error(friendlyErrorText(err, 'ลงผลโทรไม่สำเร็จ'));
       return false;
     } finally {
       setBusyId(null);
@@ -1186,12 +1187,11 @@ const FollowPage: React.FC = () => {
 
   const doStaffCallClear = async (id: string) => {
     setBusyId(id);
-    setError(null);
     try {
       await clearFollowStaffCall(id);
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'ล้างผลโทรไม่สำเร็จ');
+      toast.error(friendlyErrorText(err, 'ล้างผลโทรไม่สำเร็จ'));
     } finally {
       setBusyId(null);
     }
@@ -1291,7 +1291,7 @@ const FollowPage: React.FC = () => {
   const groups = useMemo(() => groupFollowEntries(filtered), [filtered]);
 
   /**
-   * 🔴 การ์ด "ติดตามครบ" กิน `scopeGroups` (ชุดเต็มของแท็บ · ประกาศข้างล่าง) **ไม่ใช่ `groups`**
+   * 🔴 การ์ด "ติดตามครบ" กิน `scopePeople` (ชุดเต็มของแท็บ + คำค้น · ประกาศข้างล่าง) **ไม่ใช่ `groups`**
    * บทเรียน 3 ก.ย. 2569: แถบส่งต่อเดิมกินกลุ่มที่ผ่านตัวกรองแท็บ/วันที่แล้ว ⇒ เลือกวันอื่นแถบหายทั้งแถบ
    * ทั้งที่งานยังค้างจริง · กองนี้คือ **คิวงาน** ไม่ใช่มุมมองของตัวกรอง จึงนับจากชุดเต็มเสมอ
    */
@@ -1339,6 +1339,14 @@ const FollowPage: React.FC = () => {
    * (ปฏิทิน/เลขบนแท็บยังเคารพตัวกรองเหมือนเดิม ไม่งั้นเลขกับจอจะเถียงกันเอง)
    */
   const scopeGroups = useMemo(() => groupFollowEntries(scopeItems), [scopeItems]);
+  /**
+   * การ์ดติดตามครบตัดสินทีละ **คน** (รวมทุกแผนของคนเดิม) — แถวตาราง/ป๊อปยังแยกทีละแผน
+   * เคารพคำค้นแถบบน (QA 5 ต.ค. 2569: ค้น "พญาไท" แล้วการ์ดนี้ยังขึ้นคนหน่วยงานอื่น) แต่ไม่ตามตัวกรองวัน
+   */
+  const scopePeople = useMemo(
+    () => groupFollowEntries(searchedItems, new Date(), followPersonKey),
+    [searchedItems],
+  );
   const allRows = useMemo(() => buildFollowPlanningRows(scopeGroups), [scopeGroups]);
   /**
    * ชุดที่ปุ่ม "วันถัดไปที่มีแผน" ใช้หา — ทุกวัน (ไม่กรองวัน) แต่กรองใครโทรเหมือนตาราง
@@ -1586,7 +1594,35 @@ const FollowPage: React.FC = () => {
             🔴 ของเดิมอยู่ครบทุกชิ้น: แท็บรอบ + 7 กล่องสถานะสาย + ป๊อปรายชื่อ + ปุ่มทุกปุ่ม */}
         {/* แถบดึงจาก iRecruit — แท็บส่งคนแทนอย่างเดียว (เจ้าของสั่ง 2 ต.ค. 2569 · ข้อยกเว้นเดียวของ "สองแท็บเหมือนกัน")
             ดึงเองทุกเช้า · ปุ่มดึงตอนนี้/แก้เวลาโทร หัวหน้างานขึ้นไป · ดึงได้สายใหม่ = โหลดรายการใหม่ */}
-        {replaceView ? <IrecruitReplaceSyncBar canManage={canManageMasters} onSynced={() => void reload(true)} /> : null}
+        {/* 🔴 แถบโหลดไม่ได้อยู่บนสุด + ปุ่มลองใหม่ (QA 5 ต.ค. 2569: เดิมอยู่ท้ายหน้าลึก 3 จอ เป็นอังกฤษดิบ) */}
+        {error ? (
+          <div
+            role="alert"
+            className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-medium', TONE.danger.soft, TONE.danger.value)}
+          >
+            <span>
+              {error}
+              {lastLoadedAt ? ` · ข้อมูลบนจอเป็นของเมื่อ ${lastLoadedAt.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.` : ''}
+            </span>
+            <Button type="button" size="sm" variant="outline" onClick={() => void reload()} disabled={loading}>
+              ลองใหม่
+            </Button>
+          </div>
+        ) : null}
+        {replaceView ? (
+          <SectionErrorBoundary label="แถบ iRecruit">
+            <IrecruitReplaceSyncBar canManage={canManageMasters} onSynced={() => void reload(true)} />
+          </SectionErrorBoundary>
+        ) : null}
+        {/* 🔴 ยังไม่เคยโหลดสำเร็จ = ยังไม่รู้เลข ⇒ ห้ามขึ้น 0 / "ตามครบแล้ว" (QA 5 ต.ค. 2569) · กำลังโหลดขึ้นโครงหน้า · ล้มเหลือแถบข้างบน */}
+        {lastLoadedAt === null ? (
+          loading ? (
+            <div className="space-y-3" aria-busy="true" aria-label="กำลังโหลด" data-testid="follow-first-load">
+              <Skeleton className="h-24 w-full rounded-2xl" />
+              <Skeleton className="h-72 w-full rounded-2xl" />
+            </div>
+          ) : null
+        ) : (
         <FollowPlanningCalendar
           rows={calendarRows}
           allRows={nextDayRows}
@@ -1686,6 +1722,7 @@ const FollowPage: React.FC = () => {
             />
           }
         />
+        )}
 
         {/* 🔴 แถบสรุปเลข (ต้องโทรใครตอนนี้ / สถานะสาย) กับปุ่มรีเฟรช **ถูกถอดออก**
             (เจ้าของสั่ง 1 ก.ย. 2569) — เลขชุดเดียวกันกับปุ่มรีเฟรชอยู่บนแผง
@@ -2694,11 +2731,6 @@ const FollowPage: React.FC = () => {
             ⚠️ state `filter` ยังอยู่และยังกรองรายการข้างล่างตามเดิม — ตอนนี้ค้างที่
             'all' เสมอ · จะเอาชิปกลับมาก็แค่คืน block นี้ ไม่ต้องรื้ออย่างอื่น */}
 
-        {error ? (
-          <p className={cn('rounded-xl border px-3.5 py-2.5 text-xs font-medium', TONE.danger.soft, TONE.danger.value)}>
-            {error}
-          </p>
-        ) : null}
 
         {/* 🔴 กล่อง "ยังไม่มีรายชื่อที่ต้องติดตาม" ท้ายหน้าถอดแล้ว (เจ้าของสั่ง 1 ต.ค. 2569) — ขึ้นเฉพาะแท็บที่ว่าง
             ⇒ สลับแท็บแล้วหน้ายืด/หด · ว่างก็ดูจากเลข 0 บนการ์ดและตารางที่อยู่ครบแล้ว */}
@@ -2707,11 +2739,15 @@ const FollowPage: React.FC = () => {
             กองรอคนกดว่าจะย้ายไปดูแลหลังเริ่มงานไหม · รับชุดของแท็บที่เปิด (ไม่ผ่านตัวกรองงานจบหรือยัง/วันที่)
             ⚠️ กล่องเดิม "โทรได้คำตอบแล้ว…" (ถอด 20 ก.ย.) ห้ามคืน — การ์ดนี้นับเฉพาะคนที่ยังไม่มีใครตัดสิน
             จึงไม่ซ้ำกับเลขแท็บสำเร็จ (ย้าย/ไม่ย้าย = ปิดงานแล้ว ออกจากกองทันที) */}
-        <FollowCompletedCard
-          groups={scopeGroups}
-          followTeam={followTeam}
-          onChanged={() => void reload(true)}
-        />
+        {lastLoadedAt === null ? null : (
+          <FollowCompletedCard
+            /* สลับแท็บ = การ์ดใหม่ ข้อความแจ้งผลของอีกแท็บไม่ตามมา (QA 5 ต.ค. 2569) */
+            key={followTeam ?? "main"}
+            groups={scopePeople}
+            followTeam={followTeam}
+            onChanged={() => void reload(true)}
+          />
+        )}
       </div>
       )}
 

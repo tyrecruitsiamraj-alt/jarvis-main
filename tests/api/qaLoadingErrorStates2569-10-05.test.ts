@@ -36,9 +36,9 @@ describe('ข้อ 4 ป๊อปรายชื่อผู้สมัคร�
   it('🔴 ปุ่มบนแถวพลาดใช้ actionError — `error` (ซ่อนรายชื่อทั้งป๊อป) ตั้งได้จากการโหลดตอนเปิดเท่านั้น', () => {
     const sets = [...dlg.matchAll(/setError\((?!null)/g)];
     expect(sets).toHaveLength(1);
-    expect(dlg).toMatch(/if \(!cancelled\) setError\(e instanceof Error/);
+    expect(dlg).toMatch(/if \(!cancelled\) setError\(friendlyErrorText\(e,/);
     for (const msg of ['เก็บ Lead ไม่สำเร็จ', 'เก็บไปโทรเองไม่สำเร็จ', 'โหลดไฟล์แนบไม่สำเร็จ']) {
-      expect(dlg).toContain(`setActionError(e instanceof Error ? e.message : '${msg}')`);
+      expect(dlg).toContain(`setActionError(friendlyErrorText(e, '${msg}'))`);
     }
   });
   it('โหลดใหม่หลังกดปุ่มพลาด = บอก ไม่กลืนเงียบ', () => {

@@ -57,6 +57,7 @@ import {
   type MoveRoundMode,
 } from '@/lib/followAftercareMove';
 import type { ScheduleCall } from '@/lib/followWizard';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 /**
  * การ์ด **"ติดตามครบ"** บนหน้าติดตาม (เจ้าของสั่ง 1 ต.ค. 2569)
@@ -292,7 +293,7 @@ const MoveToAftercareDialog: React.FC<{
         source: 'follow_done',
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'ย้ายไปดูแลหลังเริ่มงานไม่สำเร็จ');
+      setError(friendlyErrorText(e, 'ย้ายไปดูแลหลังเริ่มงานไม่สำเร็จ'));
       setBusy(false);
       return;
     }
@@ -322,7 +323,7 @@ const MoveToAftercareDialog: React.FC<{
         created += dayCalls.length;
       }
     } catch (e) {
-      const why = e instanceof Error ? e.message : 'ตั้งรอบไม่สำเร็จ';
+      const why = friendlyErrorText(e, 'ตั้งรอบไม่สำเร็จ');
       setError(created > 0 ? `${why} — ตั้งไปแล้ว ${created} จาก ${calls.length} สาย` : why);
       setBusy(false);
       return;
@@ -557,7 +558,7 @@ const NotMovingDialog: React.FC<{
         created += dayCalls.length;
       }
     } catch (e) {
-      const why = e instanceof Error ? e.message : 'ตั้งสายไม่สำเร็จ';
+      const why = friendlyErrorText(e, 'ตั้งสายไม่สำเร็จ');
       setError(created > 0 ? `${why} — ตั้งไปแล้ว ${created} จาก ${calls.length} สาย` : why);
       setBusy(false);
       return;

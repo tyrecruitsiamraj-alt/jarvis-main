@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupFollowEntries } from '../../src/lib/followGrouping';
+import { followPersonKey, groupFollowEntries } from '../../src/lib/followGrouping';
 import type { FollowEntry } from '../../src/lib/followApi';
 
 /**
@@ -224,5 +224,33 @@ describe('overdueRound — รอบที่เลยเวลานัดแ�
     );
     expect(g.overdueRound).toBeNull();
     expect(g.nextRound?.id).toBe('a');
+  });
+});
+
+describe('หนึ่งแผน (group_id) = หนึ่งแถว (QA 5 ต.ค. 2569)', () => {
+  it('คนเดิม เรื่องเดิม แต่คนละแผน/คนละหน่วยงาน ⇒ แยกแถว · หน่วยงานไม่ปนกัน', () => {
+    const groups = groupFollowEntries(
+      [
+        entry({ group_id: 'g-ob', unit_name: 'One Bangkok' }),
+        entry({ group_id: 'g-ob', unit_name: 'One Bangkok', scheduled_at: '2026-08-19T09:00:00+07:00' }),
+        entry({ group_id: 'g-py', unit_name: 'พญาไท_ศรีราชา' }),
+      ],
+      NOW,
+    );
+    expect(groups).toHaveLength(2);
+    const ob = groups.find((g) => g.unitName === 'One Bangkok');
+    expect(ob?.rounds).toHaveLength(2);
+    expect(groups.find((g) => g.unitName === 'พญาไท_ศรีราชา')?.rounds).toHaveLength(1);
+  });
+
+  it('แถวเก่าไม่มี group_id ยังรวมตามคนเหมือนเดิม', () => {
+    const groups = groupFollowEntries([entry({ group_id: null }), entry({ group_id: null })], NOW);
+    expect(groups).toHaveLength(1);
+  });
+
+  it('จัดตามคน (followPersonKey) ⇒ ทุกแผนของคนเดิมรวมเป็นหนึ่ง — ใช้กับการ์ดติดตามครบ', () => {
+    const rows = [entry({ group_id: 'a' }), entry({ group_id: 'b' })];
+    expect(groupFollowEntries(rows, NOW)).toHaveLength(2);
+    expect(groupFollowEntries(rows, NOW, followPersonKey)).toHaveLength(1);
   });
 });

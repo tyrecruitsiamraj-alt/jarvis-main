@@ -41,6 +41,7 @@ import {
   validateScheduleDraft,
 } from '@/lib/followScheduleEdit';
 import type { BoardUnitOption } from '@/lib/boardUnitPicker';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 /**
  * แก้ไขรายการติดตาม (096 · เจ้าของสั่ง 17 ส.ค. 2569: *"เพิ่มให้แก้ไขได้"*)
@@ -307,7 +308,7 @@ export default function FollowEditDialog({
       onSaved(`${queueMsg}${phoneMsg}${added > 0 ? ` · เพิ่มอีก ${added} สาย` : ''}`);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'แก้ไขไม่สำเร็จ');
+      setError(friendlyErrorText(err, 'แก้ไขไม่สำเร็จ'));
     } finally {
       setBusy(false);
     }

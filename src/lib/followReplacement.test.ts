@@ -59,7 +59,8 @@ describe('หน้าการติดตาม: สองแท็บเห�
     }
     // 3 = ทีม · กอง · แถบดึงจาก iRecruit (เจ้าของสั่ง 2 ต.ค. 2569 — ข้อยกเว้นเดียวของกติกานี้ ห้ามเติมอย่างอื่น)
     expect(page.match(/replaceView \?/g)?.length).toBe(3);
-    expect(page).toContain('{replaceView ? <IrecruitReplaceSyncBar canManage={canManageMasters} onSynced={() => void reload(true)} /> : null}');
+    // ครอบด้วย SectionErrorBoundary (QA 5 ต.ค. 2569) — แถบพังไม่ลากทั้งหน้าจอขาว
+    expect(page).toMatch(/\{replaceView \? \(\s*<SectionErrorBoundary label="แถบ iRecruit">\s*<IrecruitReplaceSyncBar canManage=\{canManageMasters\} onSynced=\{\(\) => void reload\(true\)\} \/>/);
     expect(page).toContain("followTeamForScope(replaceView ? 'replacement' : 'main')");
     expect(page).toContain('<TopicField id="followTopic" value={topic} onChange={setTopic} reloadSignal={topicsRev} />');
   });

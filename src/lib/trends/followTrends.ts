@@ -4,13 +4,13 @@
  * 🔴 นิยามยืมจากตัวกลางเท่านั้น (หนึ่งเมตริกหนึ่งนิยาม):
  * - ผลโทร → ถัง (โทรติด/ไม่ติด/ยกเลิก/รอ) = `bucketOfCall` (`callOutcomeBuckets.ts`)
  * - "ไปตามนัดจริง" = `FOLLOW_OUTCOME_SUCCESS` (went · arrived · done) ตัวเดียวกับ /api/home-kpis
- * - ป้ายไทย = `FOLLOW_OUTCOME_LABEL` · `CALL_OUTCOME_LABEL`
+ * - ป้ายไทย = `FOLLOW_OUTCOME_LABEL` · `followCallOutcomeText` (คำของงานติดตาม ไม่ใช่ สนใจ/ไม่สนใจ)
  *
  * แต่ละตัวเลขนับตาม **วันที่ของเหตุการณ์นั้นเอง** (ลงรายชื่อ = วันลง · โทรแล้ว = วันที่ได้ผลโทร ·
  * ปิดงาน = วันที่ปิด) — ห้ามเอาวันลงรายชื่อไปนับผลที่เกิดทีหลัง (สัปดาห์นี้จะดูแย่ สัปดาห์ก่อนจะดูดีเกินจริง)
  */
 import { bucketOfCall } from '@/lib/callOutcomeBuckets';
-import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
+import { followCallOutcomeText } from '@/lib/callOutcomeTone';
 import { FOLLOW_OUTCOME_LABEL, FOLLOW_OUTCOME_SUCCESS, type FollowOutcomeAny } from '@/lib/followOutcome';
 import { bangkokYmd } from './timeBuckets';
 import { trendBuLabel } from './bu';
@@ -54,6 +54,52 @@ export function followEventYmd(row: FollowTrendRow, metric: FollowMetric): strin
     case 'cancelledEntry':
       return bangkokYmd(row.cancelledAt);
   }
+}
+
+/**
+ * ตัวเลขที่ตอบเป็น **คน** (ลงติดตาม · ปิดงาน · ไปถึงแล้ว · ยกเลิก/ลา/ไม่ไป · ยกเลิกการติดตาม)
+ * ส่วน "โทรแล้ว / ติดต่อได้" ตอบเป็น **สาย** — นับทีละแถวเหมือนเดิม
+ */
+export const FOLLOW_PERSON_METRICS: ReadonlySet<FollowMetric> = new Set<FollowMetric>([
+  'registered',
+  'completed',
+  'success',
+  'dropped',
+  'cancelledEntry',
+]);
+
+/** หนึ่งคน = เบอร์ 9 ตัวท้าย + หัวข้อ (ชุดเดียวกับการ์ดต่อคนของหน้าติดตาม) · ไม่มีเบอร์ = แถวนั้นนับเป็นหนึ่งคน */
+export function followTrendPersonKey(row: FollowTrendRow): string {
+  return row.phoneKey ? `${row.phoneKey}|${(row.topic ?? '').trim()}` : `id:${row.id}`;
+}
+
+/**
+ * ═══ วันที่ที่ "นับ" ของแต่ละแถว — แบบนับคนไม่ซ้ำ ═══
+ *
+ * 🔴 QA 5 ต.ค. 2569: การ์ดเขียน "ไปถึงแล้ว 791 คน · ยกเลิก 34 คน · ลงติดตาม 2,248 ราย" แต่นับทีละแถว
+ * (1 คนมีหลายสาย ⇒ ปิดงานทีเดียวได้หลายแถว) ของจริงราว 162 / 16 / 312 คน
+ * ⇒ ตัวเลขแบบคน นับเฉพาะแถวแรกของคนนั้น (วันที่ของเหตุการณ์เร็วสุด) · ตัวเลขแบบสายคืนวันที่ตามเดิม
+ * การ์ด · กราฟ · ตารางแยกมิติ · ตารางเจ้าหน้าที่ ต้องใช้ตัวนี้ตัวเดียว เลขถึงจะตรงกันทั้งจอ
+ */
+export function followCountedYmd(rows: readonly FollowTrendRow[]): (row: FollowTrendRow, metric: FollowMetric) => string | null {
+  const counted = new Map<FollowMetric, Set<string>>();
+  for (const m of FOLLOW_PERSON_METRICS) {
+    const first = new Map<string, { id: string; ymd: string }>();
+    for (const r of rows) {
+      const y = followEventYmd(r, m);
+      if (!y) continue;
+      const k = followTrendPersonKey(r);
+      const cur = first.get(k);
+      if (!cur || y < cur.ymd) first.set(k, { id: r.id, ymd: y });
+    }
+    counted.set(m, new Set([...first.values()].map((v) => v.id)));
+  }
+  return (row, metric) => {
+    const y = followEventYmd(row, metric);
+    if (!y) return null;
+    const ids = counted.get(metric);
+    return !ids || ids.has(row.id) ? y : null;
+  };
 }
 
 export type FollowDim = 'bu' | 'unit' | 'staff' | 'topic' | 'round' | 'mode' | 'outcome' | 'callOutcome';
@@ -148,7 +194,7 @@ export function followDimGetter(dim: FollowDim, rows: readonly FollowTrendRow[])
       return (r) => (r.outcomeCode ? FOLLOW_OUTCOME_LABEL[r.outcomeCode as FollowOutcomeAny] ?? r.outcomeCode : 'ยังไม่ปิดงาน');
     case 'callOutcome':
       return (r) =>
-        r.callOutcome ? CALL_OUTCOME_LABEL[r.callOutcome as keyof typeof CALL_OUTCOME_LABEL] ?? r.callOutcome : 'ยังไม่มีผลโทร';
+        r.callOutcome ? followCallOutcomeText(r.callOutcome) : 'ยังไม่มีผลโทร';
   }
 }
 

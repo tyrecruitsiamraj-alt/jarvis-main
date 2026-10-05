@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeTrendBu, siteBuOf, trendBuFromSiteCode, trendBuLabel } from './bu';
-import { followDimGetter, followEventYmd, followUnitResolver } from './followTrends';
+import { followCountedYmd, followDimGetter, followEventYmd, followUnitResolver } from './followTrends';
 import { activityLedger, cohortSeries, releaseStats } from './requestTrends';
 import { staffTable } from './staffTrends';
 import { seriesByBucket } from './timeBuckets';
@@ -255,5 +255,29 @@ describe('แบ่งงวดแล้วยอดรวมไม่หาย 
     const m = seriesByBucket(rows, (x) => followEventYmd(x, 'registered'), range, 'month');
     expect(d.reduce((s, p) => s + p.value, 0)).toBe(20);
     expect(m[0].value).toBe(20);
+  });
+});
+
+describe('ติดตาม — ตัวเลขแบบ "คน" นับคนไม่ซ้ำ (QA 5 ต.ค. 2569)', () => {
+  it('คนเดียว 3 สาย ปิดงานว่าไปถึงทั้ง 3 แถว ⇒ ไปถึงแล้ว 1 คน · ลงติดตาม 1 คน · แต่โทรแล้วนับ 3 สาย', () => {
+    const done = { phoneKey: '812345678', outcomeCode: 'went', completedAt: '2026-09-23T03:00:00Z' };
+    const called = { resultAt: '2026-09-22T05:00:00Z', callStatus: 'completed', callOutcome: 'confirmed' };
+    const rows = [f({ ...done, ...called }), f({ ...done, ...called }), f({ ...done, ...called })];
+    const ymd = followCountedYmd(rows);
+    const n = (m: Parameters<typeof ymd>[1]) => rows.filter((r) => ymd(r, m)).length;
+    expect(n('success')).toBe(1);
+    expect(n('registered')).toBe(1);
+    expect(n('called')).toBe(3);
+  });
+
+  it('เบอร์เดียวคนละหัวข้อ = คนละการ์ด · ไม่มีเบอร์ = นับทีละแถว', () => {
+    const rows = [
+      f({ phoneKey: '812345678', topic: 'ติดตามเริ่มงาน' }),
+      f({ phoneKey: '812345678', topic: 'ถามความเป็นอยู่' }),
+      f({ phoneKey: null }),
+      f({ phoneKey: null }),
+    ];
+    const ymd = followCountedYmd(rows);
+    expect(rows.filter((r) => ymd(r, 'registered')).length).toBe(4);
   });
 });
