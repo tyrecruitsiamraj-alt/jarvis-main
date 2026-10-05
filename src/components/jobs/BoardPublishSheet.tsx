@@ -388,7 +388,7 @@ export const BoardPublishSheet: React.FC<BoardPublishSheetProps> = ({ id, onDone
                 </p>
                 <label htmlFor="publish-want-link" className="flex w-fit cursor-pointer items-center gap-3">
                   <Checkbox id="publish-want-link" checked={wantLink} onCheckedChange={(v) => setWantLink(v === true)} />
-                  <span className="text-sm text-foreground">{linkCount ? 'สร้างลิงก์เพิ่ม' : 'สร้างลิงก์'}</span>
+                  <span className="text-sm text-foreground">{linkCount ? 'Gen link เพิ่ม' : 'Gen link'}</span>
                 </label>
               </div>
               {wantLink && job ? (

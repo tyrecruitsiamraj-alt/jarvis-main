@@ -648,7 +648,7 @@ export async function createPostingLink(
       throw e;
     }
   }
-  throw new Error('สร้างลิงก์ไม่สำเร็จ');
+  throw new Error('Gen link ไม่สำเร็จ');
 }
 
 /** ฟิลด์เนื้อหาที่แก้ไขได้ — ดู updateRecruitPosting ว่าทำไมไม่มี jobId/standaloneKind/departmentCode */

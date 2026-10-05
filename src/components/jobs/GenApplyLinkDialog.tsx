@@ -243,7 +243,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
       const created = await createRecruitPosting(body);
       // ลิงก์ที่ไม่มีรหัส = ลิงก์เสีย (/apply/p/undefined) ห้ามโชว์ให้คัดลอก (QA 5 ต.ค. 2569)
       const usable = (created?.links ?? []).filter((l) => Boolean(l?.code));
-      if (usable.length === 0) throw new Error('สร้างลิงก์ไม่สำเร็จ');
+      if (usable.length === 0) throw new Error('Gen link ไม่สำเร็จ');
       setLinks(usable.map((l) => ({ code: l.code, label: l.channelLabel })));
       onCreated?.();
     } catch (e) {
@@ -514,7 +514,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
             </span>
             <div className="min-w-0 flex-1">
               <DialogTitle className="text-base font-medium leading-tight sm:text-lg">
-                สร้างลิงก์รับสมัคร
+                Gen link รับสมัคร
               </DialogTitle>
               <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug">
                 {heading} — กรอกรายละเอียดที่ผู้สมัครจะเห็น แล้วเลือกช่องทางที่จะส่ง

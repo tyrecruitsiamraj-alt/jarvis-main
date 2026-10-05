@@ -194,7 +194,7 @@ const RecruitBoardTools: React.FC<{
               variant={btnVariant('link')}
               size="xs"
               onClick={() => onClickKey('link')}
-              title="สร้างลิงก์รับสมัครที่ไม่ผูกกับใบขอ"
+              title="Gen link รับสมัครที่ไม่ผูกกับใบขอ"
             >
               {/* จอเล็กตัดคำขยายออก ปุ่มหัวหน้าจะได้อยู่แถวเดียว (แบบ A · 27 ก.ย. 2569) */}
               <Plus aria-hidden /> {RM_TOOLBAR_LABEL.link}

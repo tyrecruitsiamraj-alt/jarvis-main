@@ -56,7 +56,7 @@ describe('กันจอขาว', () => {
   });
   it('ลิงก์ไม่มีรหัสไม่ถูกโชว์', () => {
     expect(read('src/components/jobs/GenApplyLinkDialog.tsx')).toContain('.filter((l) => Boolean(l?.code))');
-    expect(read('src/components/jobs/AddChannelLinks.tsx')).toContain("if (!link?.code) throw new Error('สร้างลิงก์ไม่สำเร็จ');");
+    expect(read('src/components/jobs/AddChannelLinks.tsx')).toContain("if (!link?.code) throw new Error('Gen link ไม่สำเร็จ');");
   });
 });
 
@@ -149,5 +149,28 @@ describe('ดีไซน์ / มือถือ / สถานะจอ (ก�
     setPageTitle(null);
     expect(g.document.title).toBe('So Recruit');
     g.document = prev;
+  });
+});
+
+describe('คำว่า "Gen link" ทั้งระบบ (เจ้าของยืนยัน 5 ต.ค. 2569)', () => {
+  it('ไม่มี "สร้างลิงก์" ในข้อความบนจอแล้ว', () => {
+    for (const f of [
+      'src/components/jobs/JobBoardView.tsx',
+      'src/components/jobs/GenApplyLinkDialog.tsx',
+      'src/components/jobs/AddChannelLinks.tsx',
+      'src/components/jobs/RecruitBoardTools.tsx',
+      'src/components/jobs/BoardPublishSheet.tsx',
+      'src/lib/roleFunctions.ts',
+      'src/lib/jobLinkSilence.ts',
+      'src/lib/recruitRm.ts',
+      'src/lib/boardFlow.ts',
+      'src/pages/recruit/RecruitChannelsPage.tsx',
+    ]) {
+      const code = read(f)
+        .split('\n')
+        .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l) && !/^\s+[^'"`<]*สร้างลิงก์[^'"`>]*$/.test(l))
+        .join('\n');
+      expect(code, f).not.toMatch(/['"`>]\s*[^'"`<]*สร้างลิงก์/);
+    }
   });
 });

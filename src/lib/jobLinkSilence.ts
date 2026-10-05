@@ -96,7 +96,7 @@ export function selectSilentLinkRows(input: SilentLinkInput, today = new Date())
 
 /** คำอธิบาย "ทำอะไรไปแล้ว" ของแถว — ทุกคำมีเลขรองรับ */
 export function silentRowFactLine(row: SilentLinkRow): string {
-  const base = `สร้างลิงก์ ${row.daysSincePosted.toLocaleString('th-TH')} วันก่อน`;
+  const base = `Gen link ${row.daysSincePosted.toLocaleString('th-TH')} วันก่อน`;
   return row.reason === 'no_views'
     ? `${base} · ยังไม่มีใครเห็นลิงก์ (คลิก 0)`
     : `${base} · มีคนกดดู ${row.clicks.toLocaleString('th-TH')} ครั้ง แต่ยังไม่มีใครกรอก`;

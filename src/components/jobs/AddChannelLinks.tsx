@@ -60,12 +60,12 @@ const AddChannelLinks: React.FC<{
       for (const c of wanted) {
         const link = await addPostingLink(posting.id, c ? { channelId: c.id, channelLabel: recruitChannelLabel(c) } : {});
         // ไม่มีรหัส = ลิงก์เสีย (/apply/p/undefined) ห้ามโชว์ให้คัดลอก (QA 5 ต.ค. 2569)
-        if (!link?.code) throw new Error('สร้างลิงก์ไม่สำเร็จ');
+        if (!link?.code) throw new Error('Gen link ไม่สำเร็จ');
         made.push(link);
       }
     } catch (e) {
       setError(
-        `${friendlyErrorText(e, 'สร้างลิงก์ไม่สำเร็จ')}${made.length > 0 ? ` (สร้างได้แล้ว ${made.length} ลิงก์)` : ''}`,
+        `${friendlyErrorText(e, 'Gen link ไม่สำเร็จ')}${made.length > 0 ? ` (Gen แล้ว ${made.length} ลิงก์)` : ''}`,
       );
     } finally {
       setBusy(false);

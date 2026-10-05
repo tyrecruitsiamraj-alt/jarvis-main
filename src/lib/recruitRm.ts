@@ -348,7 +348,7 @@ export type RmToolbarKey = (typeof RM_TOOLBAR_KEYS)[number];
 
 export const RM_TOOLBAR_LABEL: Record<RmToolbarKey, string> = {
   channels: 'ช่องทาง',
-  link: 'สร้างลิงก์',
+  link: 'Gen link', // เจ้าของยืนยัน 5 ต.ค. 2569 ใช้คำว่า Gen link ทั้งระบบ
   reasons: 'เหตุผล',
 };
 

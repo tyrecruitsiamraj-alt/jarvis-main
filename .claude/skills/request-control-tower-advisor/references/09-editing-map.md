@@ -12062,3 +12062,14 @@ Choice: รายได้เฉลี่ยโชว์ ติ๊กซ่อ�
 | เทสต์ | `tests/api/qaRound2_2569-10-05.test.ts` (ใหม่) · followGrouping · trends · followAftercareMove · FollowCompletedCard · FollowPlanningCalendar · boardDataState · aftercare · followReplacement · qaLoadingErrorStates |
 
 - ยังไม่ได้ทำ (บอกเจ้าของแล้ว): ลดขนาดการดึง /follow ต้องมีเส้นดึงเฉพาะที่เปลี่ยน (ทำแค่กันยิงซ้อน) · ตารางกว้างบนมือถือ (การ์ดต่อแถว) · ปุ่ม `<button>` ดิบ ~95 จุดเดิม
+
+## 5 ต.ค. 2569 (ดึก): คำว่า "Gen link" ทั้งระบบ
+
+เจ้าของยืนยันในแชท *"ใช่ Gen link"* + *"เปลี่ยนเป็น Gen link ให้หมดเลย"* (แทน "สร้างลิงก์" ของ 1 ต.ค.)
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/recruitRm.ts` | `RM_TOOLBAR_LABEL.link` = "Gen link" (ปุ่มหัวหน้า "Gen link (ประกาศลอย)") |
+| `JobBoardView.tsx` · `GenApplyLinkDialog.tsx` · `AddChannelLinks.tsx` · `RecruitBoardTools.tsx` · `BoardPublishSheet.tsx` | ป้าย "Gen link แล้ว" · หัวฟอร์ม "Gen link รับสมัคร" · "Gen link เพิ่ม" · error "Gen link ไม่สำเร็จ" |
+| `roleFunctions.ts` · `jobLinkSilence.ts` · `boardFlow.ts` · `RecruitChannelsPage.tsx` · `api/_lib/recruitPostings.ts` | ชื่อสิทธิ์ · "Gen link N วันก่อน" · hint · คำโปรย · error ฝั่ง server |
+| เทสต์ | jobLinkSilence · qaRound2_2569-10-05 (pin ไม่มี "สร้างลิงก์" บนจอ) |

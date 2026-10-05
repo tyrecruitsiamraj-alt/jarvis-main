@@ -106,7 +106,7 @@ export function isUntouchedReview(job: JobRequest, facts: BoardStageFacts): bool
 const STAGE_TEXT: Record<BoardStageKey, { label: string; hint: string }> = {
   review: {
     label: 'รอตรวจ',
-    hint: 'ใบที่เข้ามาแล้วยังไม่มีใครทำอะไรต่อ — เปิดดูว่าข้อมูลครบไหม ครบแล้วสร้างลิงก์ได้เลย ติดอะไรให้จดในช่องหมายเหตุ',
+    hint: 'ใบที่เข้ามาแล้วยังไม่มีใครทำอะไรต่อ — เปิดดูว่าข้อมูลครบไหม ครบแล้ว Gen link ได้เลย ติดอะไรให้จดในช่องหมายเหตุ',
   },
   toRelease: {
     label: 'รอประกาศ',

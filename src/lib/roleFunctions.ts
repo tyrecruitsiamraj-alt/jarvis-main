@@ -55,7 +55,7 @@ export const APP_FUNCTIONS: AppFunctionDef[] = [
    * ฝั่ง API (`recruit-postings`) ก็เปิดถึง staff อยู่ก่อนแล้ว — การลดขั้นนี้จึงไม่ได้
    * เปิดสิทธิ์ปล่อยประกาศใหม่ให้ใคร (ทานแล้ว 2 ก.ย. 2569)
    */
-  { id: 'recruit_postings', label: 'ประกาศรับสมัคร / สร้างลิงก์', group: 'งาน & หน่วยงาน', minimumRole: 'staff' },
+  { id: 'recruit_postings', label: 'ประกาศรับสมัคร / Gen link', group: 'งาน & หน่วยงาน', minimumRole: 'staff' },
   /**
    * 🔴 **แยกจาก `recruit_postings` โดยตั้งใจ** (เจ้าของสั่ง 2 ก.ย. 2569:
    * *"เพิ่มช่องทางหลัก ทางรอง ลบช่องทางหลัก ช่องทางรอง ทำให้ Staff เข้าถึงได้ด้วย"*)
