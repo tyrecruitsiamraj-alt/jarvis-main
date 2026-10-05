@@ -32,7 +32,7 @@ import PostingLinksList from '@/components/jobs/PostingLinksList';
 import AddChannelLinks from '@/components/jobs/AddChannelLinks';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import ReleaseSkipControl from '@/components/jobs/ReleaseSkipControl';
-import UnitRequestInfoFields from '@/components/jobs/UnitRequestInfoFields';
+import UnitRequestInfoFields, { UnitRequestBriefFields } from '@/components/jobs/UnitRequestInfoFields';
 import { RequestRateLinesBlock, ResignedEmployeeBlock } from '@/components/jobs/UnitRequestPayBlocks';
 import { StepCard } from '@/components/jobs/postingStepParts';
 import { Button } from '@/components/ui/button';
@@ -339,7 +339,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
    */
   const [openStep, setOpenStep] = React.useState<ReleaseStepKey>('info');
   /** "คนเก่า + รายได้ย้อนหลัง" — หุบเป็นค่าตั้งต้น (เจ้าของ Choice 1 ต.ค. 2569 "4 ขั้นเดิม แต่ตัดของรก") */
-  const [resignedOpen, setResignedOpen] = React.useState(false);
+  /** "ดูเพิ่ม" ใต้หน้า 1 — ส่วนเกินของใบขอ (ใบเต็ม + รายละเอียดคนเก่า) พับไว้เป็นค่าตั้งต้น */
+  const [moreOpen, setMoreOpen] = React.useState(false);
   /** ขั้น 4: ติ๊ก "สร้างลิงก์" ถึงกางฟอร์ม (ลิงก์ไม่บังคับ — Choice 30 ก.ย. 2569) */
   const [wantLink, setWantLink] = React.useState(false);
   /** "มีแล้ว N ลิงก์" กดแล้วกางรายการลิงก์ทีละอัน (เจ้าของ 4 ต.ค. 2569 — Choice "ครบ") */
@@ -495,36 +496,39 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             {/* ── ① ตรวจใบขอ ── */}
             {step === 'info' ? (
               <>
-                {/* 🔴 หน้า 1 = ข้อมูลใบขออย่างเดียว กางให้เห็นทั้งใบ (เจ้าของ 4 ต.ค. 2569: *"เปิดมาแล้วจะเจอเป็นรายละเอียดของใบงาน
-                    พวก รายได้ สวัสดิการ เงินเดือน ฯลฯ รายละเอียดแบบใบขอ · หน้าแรกเอาแค่เป็นข้อมูลใบขอ"*) — เดิมพับไว้ใต้ "ดูใบขอทั้งใบ"
-                    การ์ดสรุปสั้นเดิม (เลขที่/ตำแหน่ง/ผู้ติดต่อ/สถานที่) ถอด — ซ้ำกับใบเต็มทุกช่อง */}
+                {/* 🔴 หน้า 1 = เฉพาะที่เจ้าของสั่ง (5 ต.ค. 2569: *"รายละเอียดขอดูแค่นี้"* + Choice "เหลือแค่ที่บอก เก็บส่วนเกินไว้ใน ดูเพิ่ม")
+                    หน่วยงาน · ตำแหน่ง · วันที่ต้องการ · จำนวน · สถานที่ · วันเวลาทำงาน · อัตราตามใบขอ (ฐาน + สวัสดิการ)
+                    · ชื่อคนลาออก/ถูกเปลี่ยนตัว + รายได้ 3 เดือนล่าสุดของคนนั้น
+                    ส่วนเกิน (ใบเต็ม 26 ช่อง · สาเหตุ · รุ่นรถ · อัตราตามเงื่อนไข) อยู่ใต้ "ดูเพิ่ม" — เดิม 4 ต.ค. กางใบเต็มทั้งใบ */}
                 <StepCard title="ข้อมูลใบขอ">
                   {job ? (
                     <div className="space-y-3">
-                      <UnitRequestInfoFields job={job} />
+                      <UnitRequestBriefFields job={job} />
                       <RequestRateLinesBlock job={job} />
                       {/* ใบเปิดไซต์ใหม่ไม่มีคนเก่า = บอกบรรทัดเดียว (ไม่วาดการ์ดที่มีแต่ "—") */}
-                      {!hasResignedInfo(job) ? <p className="text-xs text-muted-foreground">ใบนี้ไม่มีข้อมูลคนเก่า</p> : null}
+                      {hasResignedInfo(job) ? (
+                        <ResignedEmployeeBlock job={job} compact brief />
+                      ) : (
+                        <p className="text-xs text-muted-foreground">ใบนี้ไม่มีข้อมูลคนเก่า</p>
+                      )}
                     </div>
                   ) : (
                     <Loading />
                   )}
                 </StepCard>
 
-                {/* คนที่ออก + รายได้จริง 3 เดือน — ใช้ตั้งรายได้ขั้น 3 · component ตัวเดียวกับหน้าใบขอ (ห้ามก๊อปโครง)
-                    🔴 พับไว้เป็นค่าตั้งต้น + ไม่มีประโยคอธิบายยาว (เจ้าของ Choice 1 ต.ค. 2569 "4 ขั้นเดิม แต่ตัดของรก") */}
-                {job && hasResignedInfo(job) ? (
+                {job ? (
                   <StepCard>
-                    <Collapsible open={resignedOpen} onOpenChange={setResignedOpen}>
+                    <Collapsible open={moreOpen} onOpenChange={setMoreOpen}>
                       <CollapsibleTrigger asChild>
                         <Button type="button" variant="ghost" size="xs" className="-ml-2">
-                          <UserMinus aria-hidden />
-                          คนเก่า + รายได้ย้อนหลัง
-                          <ChevronDown className={cn('transition-transform', resignedOpen && 'rotate-180')} aria-hidden />
+                          ดูเพิ่ม
+                          <ChevronDown className={cn('transition-transform', moreOpen && 'rotate-180')} aria-hidden />
                         </Button>
                       </CollapsibleTrigger>
-                      <CollapsibleContent className="pt-3">
-                        <ResignedEmployeeBlock job={job} compact />
+                      <CollapsibleContent className="space-y-3 pt-3" data-testid="request-more">
+                        <UnitRequestInfoFields job={job} />
+                        {hasResignedInfo(job) ? <ResignedEmployeeBlock job={job} compact /> : null}
                       </CollapsibleContent>
                     </Collapsible>
                   </StepCard>

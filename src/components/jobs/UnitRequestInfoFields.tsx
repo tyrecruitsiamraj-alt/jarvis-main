@@ -23,6 +23,7 @@ import { genderLabel } from '@/lib/genderRequirement';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { moneyFieldText } from '@/lib/unitRequestDetail';
+import { postingPositionText } from '@/lib/publicJobTitle';
 import type { JobRequest } from '@/types';
 
 /** ช่องข้อเท็จจริงหนึ่งช่อง — ไม่มีค่า = "—" (ห้ามปล่อยว่างให้คนเดา) */
@@ -105,5 +106,28 @@ const UnitRequestInfoFields: React.FC<{ job: JobRequest }> = ({ job: data }) => 
     <Field label="ค่าปรับต่อวันถ้าไม่มีคน" value={moneyFieldText(data.penalty_per_day)} />
   </div>
 );
+
+/**
+ * หน้า 1 ของป๊อปงานสรรหา — **เฉพาะช่องที่เจ้าของสั่ง** (5 ต.ค. 2569: *"รายละเอียดขอดูแค่นี้ … เอาแค่ข้อมูลจำเป็นมาให้ดูพอ"*
+ * + Choice "เหลือแค่ที่บอก เก็บส่วนเกินไว้ใน ดูเพิ่ม") · ส่วนเกินอยู่ `UnitRequestInfoFields` ตัวเต็มใต้ "ดูเพิ่ม"
+ * 🔴 ใช้เฉพาะหน้างานสรรหา (เจ้าของ: *"เฉพาะหน้า งานสรรหานะ"*) — หน้ารายละเอียดใบขอยังใช้ตัวเต็ม
+ */
+export const UnitRequestBriefFields: React.FC<{ job: JobRequest }> = ({ job: data }) => {
+  const need = jobPositionUnits(data);
+  const asked = data.request_positions != null && data.request_positions > 0 ? data.request_positions : null;
+  return (
+    <div className="grid gap-2 sm:grid-cols-2" data-testid="request-brief-fields">
+      <Field label="ชื่อหน่วยงาน" value={data.work_site_name || data.unit_name} />
+      <Field label="ตำแหน่ง" value={postingPositionText(data)} />
+      <Field label="วันที่ต้องการ" value={formatYmdDmyBe(data.required_date)} />
+      <Field
+        label="จำนวนที่ต้องการ"
+        value={`${need.toLocaleString('th-TH')} ตำแหน่ง${asked != null && asked !== need ? ` (ขอมา ${asked.toLocaleString('th-TH')})` : ''}`}
+      />
+      <Field label="สถานที่ปฏิบัติงาน" value={data.work_place || data.location_address} />
+      <Field label="วันเวลาในการทำงาน" value={data.work_schedule} />
+    </div>
+  );
+};
 
 export default UnitRequestInfoFields;

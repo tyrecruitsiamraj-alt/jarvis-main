@@ -115,8 +115,14 @@ export function RequestRateLinesBlock({ job }: { job: JobRequest }) {
 export function ResignedEmployeeBlock({
   job,
   compact = false,
+  brief = false,
 }: {
   job: JobRequest;
+  /**
+   * หน้า 1 ของป๊อปงานสรรหา (เจ้าของ 5 ต.ค. 2569): เห็นแค่ **ชื่อคนลาออก/ถูกเปลี่ยนตัว + รายได้ 3 เดือนล่าสุด**
+   * สาเหตุ · รุ่นรถ · อัตราตามเงื่อนไข ไปอยู่ใต้ "ดูเพิ่ม" (ตัว compact) · ใช้คู่กับ compact
+   */
+  brief?: boolean;
   /**
    * ป๊อปกล่องงาน (เจ้าของ Choice 1 ต.ค. 2569 "4 ขั้นเดิม แต่ตัดของรก"): ไม่ต้องมีหัวกล่อง (ปุ่มพับเป็นหัวแทน)
    * + ถอดประโยคอธิบายยาว เหลือที่มาสั้น ๆ · หน้าใบขอยังเต็มเหมือนเดิม
@@ -134,6 +140,8 @@ export function ResignedEmployeeBlock({
           คนที่ออก / เปลี่ยนตัว
         </div>
       )}
+      {brief ? <Field label="คนลาออก / ถูกเปลี่ยนตัว" value={job.resigned_employee_name} /> : null}
+      {brief ? null : (
       <div className="grid gap-2 sm:grid-cols-2">
         <Field label="ชื่อ - นามสกุล" value={job.resigned_employee_name} />
         <Field label="สาเหตุที่ลาออก" value={job.resigned_reason} />
@@ -145,14 +153,17 @@ export function ResignedEmployeeBlock({
           value={job.lastWorkingDay ? formatYmdDmyBe(job.lastWorkingDay) : undefined}
         />
       </div>
+      )}
 
       {/* อัตราตามเงื่อนไขของคนคนนี้ — คนละเรื่องกับรายได้จริงข้างล่าง
           🔴 ใช้คำ ERP ตรง ๆ ("ฝั่งจ่าย"/"ฝั่งเบิก") ไม่ตีความว่าฝั่งไหนเป็นเงินของใคร */}
+      {brief ? null : (
       <div className="grid gap-2 sm:grid-cols-3">
         <Field label="อัตราตามเงื่อนไข (ฝั่งจ่าย)" value={moneyFieldText(job.resigned_wage_fee_rate)} />
         <Field label="อัตราตามเงื่อนไข (ฝั่งเบิก)" value={moneyFieldText(job.resigned_wage_draw_rate)} />
         <Field label="อัตรานี้มีผลตั้งแต่" value={job.resigned_wage_effective_date} />
       </div>
+      )}
 
       {/* ── รายได้จริงย้อนหลัง 3 เดือน — **แยกรายงวด ไม่ใช่ค่าเฉลี่ย** ── */}
       <div className={boxCls}>

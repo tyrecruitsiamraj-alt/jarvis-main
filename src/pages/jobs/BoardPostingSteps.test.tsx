@@ -6,7 +6,7 @@
  *   ขั้น 4 สรุป + ส่งได้เลยโดยไม่ต้องมีลิงก์ (ยังต้องเลือกเพศ) · บันทึกแบบร่าง = ปิดป๊อปไม่ส่ง
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { JobRequest } from '@/types';
 
@@ -168,15 +168,32 @@ describe('ป๊อปไล่งาน — ตัดของรก (1 ต.ค
     resigned_wage_fee_rate: 400,
   } as unknown as JobRequest;
 
-  it('คนเก่า + รายได้ย้อนหลัง พับไว้เป็นค่าตั้งต้น · กดกางได้ · ไม่มีประโยคอธิบายยาวของ eSlip', async () => {
+  /** เจ้าของ 5 ต.ค. 2569: *"รายละเอียดขอดูแค่นี้"* + Choice "เหลือแค่ที่บอก เก็บส่วนเกินไว้ใน ดูเพิ่ม" · เฉพาะหน้างานสรรหา */
+  it('🔴 หน้า 1 เหลือแค่ที่เจ้าของสั่ง · ชื่อคนเก่า + รายได้ 3 เดือนเห็นเลย · ส่วนเกินอยู่ใต้ "ดูเพิ่ม"', async () => {
     currentJob = WITH_RESIGNED;
     fetchJobReleases.mockResolvedValue([]);
     renderSteps();
-    const toggle = await screen.findByRole('button', { name: /คนเก่า \+ รายได้ย้อนหลัง/ });
+    const brief = await screen.findByTestId('request-brief-fields');
+    const labels = [...brief.querySelectorAll('.text-\\[10px\\]')].map((e) => e.textContent);
+    expect(labels).toEqual([
+      'ชื่อหน่วยงาน',
+      'ตำแหน่ง',
+      'วันที่ต้องการ',
+      'จำนวนที่ต้องการ',
+      'สถานที่ปฏิบัติงาน',
+      'วันเวลาในการทำงาน',
+    ]);
+    expect(screen.getByText('คนลาออก / ถูกเปลี่ยนตัว')).toBeTruthy();
+    expect(screen.getByText('คนเก่า สมมุติ')).toBeTruthy();
+    expect(screen.getByText(/รายได้จริงย้อนหลัง 3 เดือน/)).toBeTruthy();
+    // ส่วนเกินยังไม่โผล่จนกว่าจะกดดูเพิ่ม
     expect(screen.queryByText('สาเหตุที่ลาออก')).toBeNull();
-    fireEvent.click(toggle);
-    expect(await screen.findByText('สาเหตุที่ลาออก')).toBeTruthy();
-    expect(screen.getByText('จาก eSlip ของไซต์นี้')).toBeTruthy();
+    expect(screen.queryByText('เลขที่ใบขอ')).toBeNull();
+    expect(screen.queryByText('ชื่อผู้ติดต่อหน่วยงาน')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /ดูเพิ่ม/ }));
+    const more = await screen.findByTestId('request-more');
+    expect(within(more).getByText('สาเหตุที่ลาออก')).toBeTruthy();
+    expect(within(more).getByText('เลขที่ใบขอ')).toBeTruthy();
     expect(screen.queryByText(/PR-4813/)).toBeNull();
     expect(screen.queryByText(/เงินได้ = ค่าแรง/)).toBeNull();
   });
