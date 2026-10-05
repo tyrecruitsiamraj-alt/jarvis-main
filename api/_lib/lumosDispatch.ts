@@ -17,6 +17,8 @@
  * ทุก enqueue กันซ้ำด้วย unique (channel, job_ref, person_ref) — คนเดิมในใบเดิมส่งครั้งเดียว
  */
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
+import { isOverAge, OVER_AGE_REASON } from '../../src/lib/applicantAge.js';
+import { loadApplyScriptFacts, type ApplyJobFacts } from './applyScriptFacts.js';
 import { tableInAppSchema } from './schema.js';
 import { errorSummaryText, logWarn, logInfo, logError } from './logger.js';
 import type { FollowDispatchState } from '@/lib/followDispatchState';
@@ -50,6 +52,7 @@ import {
   buildFollowMessage,
   buildOfferMessage,
   buildOfferQuestions,
+  buildApplyQuestions,
   buildScreeningQuestions,
   type EditableScriptKey,
 } from './lumosCallScript.js';
@@ -237,6 +240,11 @@ export function buildApplicationInterviewPayload(
     position_interest?: string | null;
   },
   now = new Date(),
+  /**
+   * มีค่า = ผู้สมัครกรอกเองผ่านลิงก์ ⇒ ใช้ **บทผู้สมัครผ่านลิงก์** (5 ต.ค. 2569) พร้อมพื้นที่/อายุ/รายได้ของใบขอ
+   * ไม่มี = บทเสนองานแบบเดิม (ใบที่เจ้าหน้าที่คีย์/นำเข้า)
+   */
+  applyFacts?: ApplyJobFacts | null,
 ): LumosInterviewPayload | null {
   const phone = toE164Thai(app.phone);
   if (!phone || !app.full_name?.trim() || !app.job_id) return null;
@@ -252,12 +260,14 @@ export function buildApplicationInterviewPayload(
     // เขากรอกใบสมัครมาเองแล้ว → บท Part 2 (เสนองาน) ไม่ใช่บทแนะนำตัวหาคนแปลกหน้า
     // ⚠️ เส้นนี้ถูกเรียกจาก /api/public/apply ซึ่งห้ามยิง ERP — ข้อมูลงานมีแค่ snapshot
     // บนใบ (ไม่มีเวลาทำงาน/เงื่อนไขรถ) บทจึงสั้นกว่าเส้นอื่นโดยตั้งใจ
-    questions: buildOfferQuestions({
-      candidateName: app.full_name,
-      position,
-      unit,
-      placeForTravel: unit,
-    }),
+    questions: applyFacts
+      ? buildApplyQuestions({ candidateName: app.full_name, position, unit, placeForTravel: unit, ...applyFacts })
+      : buildOfferQuestions({
+          candidateName: app.full_name,
+          position,
+          unit,
+          placeForTravel: unit,
+        }),
     type: 'phone',
     language: 'th',
     tone: 'professional',
@@ -324,6 +334,13 @@ export async function enqueueLumosInterviewForApplications(
     job_title?: string | null;
     unit_name?: string | null;
     position_interest?: string | null;
+    /** อายุที่ผู้สมัครกรอก — 58 ปีขึ้นไป AI ไม่โทร (`applicantAge.ts` · เจ้าของ 5 ต.ค. 2569) · ไม่รู้ = ส่งได้ */
+    age?: number | null;
+    /**
+     * คนคีย์ใบ — `null` = ผู้สมัครกรอกเองผ่านลิงก์ ⇒ บทผู้สมัครผ่านลิงก์ (5 ต.ค. 2569)
+     * มีชื่อ = เจ้าหน้าที่คีย์/นำเข้า ⇒ บทเสนองาน · ไม่ส่งคีย์นี้มา (undefined) = ไม่รู้ ⇒ บทเสนองานแบบเดิม
+     */
+    created_by_name?: string | null;
   }>,
   opts?: { autoPush?: boolean },
 ): Promise<LumosDispatchOutcome> {
@@ -331,8 +348,21 @@ export async function enqueueLumosInterviewForApplications(
   await ensureCallScriptsFresh();
   const skipped: LumosDispatchOutcome['skipped'] = [];
   const items: Array<{ personRef: string; payload: LumosInterviewPayload; matchRank: number | null }> = [];
+  // ข้อมูลใบขอของบทผู้สมัครผ่านลิงก์ — อ่านครั้งเดียวต่อใบขอ มีเพดานเวลา (ล้ม = บทสั้นลง ไม่ทำให้ส่งไม่ได้)
+  const applyFacts = applications.some((a) => a.created_by_name === null && !isOverAge(a.age))
+    ? await loadApplyScriptFacts(jobId)
+    : null;
   for (const app of applications) {
-    const payload = buildApplicationInterviewPayload(app);
+    // 🔴 อายุเกิน = ไม่เข้าคิวเลย ทุกเส้น (กรอกเสร็จ · ปุ่มส่ง AI · ตัวส่งเองหลังรอเลือกวิธีโทร) — ชื่อไปกล่อง "อายุเกิน" บนแท็บผู้สมัคร
+    if (isOverAge(app.age)) {
+      skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: OVER_AGE_REASON });
+      continue;
+    }
+    const payload = buildApplicationInterviewPayload(
+      app,
+      undefined,
+      app.created_by_name === null ? (applyFacts ?? {}) : null,
+    );
     if (!payload) {
       skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: NO_PHONE_REASON });
       continue;

@@ -1,4 +1,5 @@
 import { fullDaysSince } from '@/lib/fullDays';
+import { isOverAge } from '@/lib/applicantAge';
 import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
 /**
  * งานสรรหา (RM) — นิยามกลางของหน้า `/recruit/rm`
@@ -114,14 +115,15 @@ export function isClosedByCallOutcome(r: PublicApplication): boolean {
  * มุมมองย่อยของแท็บ "รายชื่อผู้สมัคร" (เจ้าของสั่ง 13 ส.ค. 2569: "แบ่ง 3 อัน")
  * ทั้งหมด / คนที่สนใจ / คนที่ไม่สนใจ — แบ่งด้วย **ผลโทร** ไม่ใช่สถานะใบสมัคร
  */
-export const RM_LIST_VIEWS = ['all', 'interested', 'declined', 'collect'] as const;
+export const RM_LIST_VIEWS = ['all', 'interested', 'declined', 'over_age', 'collect'] as const;
 export type RmListView = (typeof RM_LIST_VIEWS)[number];
 
 /**
  * ปุ่มมุมมองที่โชว์บนแท็บผู้สมัคร — 🔴 "รอเก็บใบสมัคร" ถอดออกจากจอ (เจ้าของสั่ง 5 ต.ค. 2569 "เอารอเก็บใบสมัคร 88 ไรนั่นออก")
  * นิยาม `collect` ยังอยู่ (ตัวนับ/เทสต์ใช้) · ลิงก์เก่า `?list=collect` ถอยไปรายชื่อทั้งหมด (ไม่ค้างมุมมองที่ไม่มีปุ่มกดกลับ)
  */
-export const RM_LIST_VIEWS_SHOWN = ['all', 'interested', 'declined'] as const satisfies readonly RmListView[];
+/** "อายุเกิน" (5 ต.ค. 2569) — อายุ 58 ปีขึ้นไป AI ไม่โทร ชื่อมารวมที่นี่ (`applicantAge.ts`) */
+export const RM_LIST_VIEWS_SHOWN = ['all', 'interested', 'declined', 'over_age'] as const satisfies readonly RmListView[];
 export function isShownRmListView(v: string | null | undefined): v is (typeof RM_LIST_VIEWS_SHOWN)[number] {
   return !!v && (RM_LIST_VIEWS_SHOWN as readonly string[]).includes(v);
 }
@@ -130,6 +132,7 @@ export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
   all: 'รายชื่อทั้งหมด',
   interested: 'รายชื่อคนที่สนใจ',
   declined: 'รายชื่อคนที่ไม่สนใจ',
+  over_age: 'อายุเกิน',
   // คิวงานสรรหา (16 ส.ค.): สนใจจริง แต่ยังไม่ขึ้นบอร์ด (= ยังไม่ได้มาสมัคร)
   // "ขึ้นบอร์ดแล้ว" = on_board (server จับคู่เบอร์กับคนบนบอร์ด ERP) → ออกจากคิวเอง
   collect: 'รอเก็บใบสมัคร',
@@ -152,6 +155,7 @@ export function isInRmListView(r: PublicApplication, view: RmListView): boolean 
   // คิวสรรหา: ตอบสนใจตอนโทร แต่ยังไม่ขึ้นบอร์ด (ยังไม่มาสมัคร) — พอสรรหาเก็บใบสมัคร
   // (ชื่อขึ้นบอร์ด) on_board = true → หลุดจากคิวเอง
   if (view === 'collect') return isInterestedApplicant(r) && r.on_board !== true;
+  if (view === 'over_age') return isOverAge(r.age);
   return true;
 }
 

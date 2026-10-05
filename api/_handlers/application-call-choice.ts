@@ -35,6 +35,7 @@ import {
   type ApiRes,
   type AuthedReq,
 } from '../_lib/http.js';
+import { isOverAge, OVER_AGE_REASON } from '../../src/lib/applicantAge.js';
 import { readJsonBody } from '../_lib/body.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
@@ -60,6 +61,8 @@ type Row = {
   position_interest: string | null;
   claimed_by: string | null;
   claimed_by_name: string | null;
+  age: number | null;
+  created_by_name: string | null;
 };
 
 export type CallChoiceResult = {
@@ -205,6 +208,11 @@ async function chooseAi(req: AuthedReq, rows: Row[]): Promise<CallChoiceResult> 
       skipped.push({ name: r.full_name, reason: 'ไม่มีเบอร์โทร' });
       continue;
     }
+    // อายุเกิน = AI ไม่โทร (5 ต.ค. 2569) — ไม่ปั๊มเป็น "ส่ง AI" ด้วย ไม่งั้นใบค้างสถานะส่ง AI ทั้งที่ไม่มีสาย
+    if (isOverAge(r.age)) {
+      skipped.push({ name: r.full_name, reason: OVER_AGE_REASON });
+      continue;
+    }
     const list = byJob.get(r.job_id) ?? [];
     list.push(r);
     byJob.set(r.job_id, list);
@@ -249,7 +257,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     const { rows } = await dbQuery<Row>(
       `select a.id, a.full_name, a.phone, a.job_id, a.department_code,
-              a.job_title, a.unit_name, a.position_interest, a.claimed_by, a.claimed_by_name
+              a.job_title, a.unit_name, a.position_interest, a.claimed_by, a.claimed_by_name, a.age,
+              a.created_by_name
          from ${tbl} a
         where a.id = any($1::uuid[])`,
       [ids],

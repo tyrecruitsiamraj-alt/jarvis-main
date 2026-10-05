@@ -22,6 +22,7 @@ import { loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 import { enqueueLumosInterviewForApplications } from '../_lib/lumosDispatch.js';
 import { CALLED_SQL, IN_QUEUE_SQL } from '../_lib/applicantOverviewSql.js';
 import { auditFromAuthed } from '../_lib/audit.js';
+import { OVER_AGE_MIN } from '../../src/lib/applicantAge.js';
 
 const tbl = tableInAppSchema('public_job_applications');
 
@@ -50,11 +51,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
       job_title: string | null;
       unit_name: string | null;
       position_interest: string | null;
+      age: number | null;
+      created_by_name: string | null;
     }>(
-      `select a.id, a.full_name, a.phone, a.job_id, a.job_title, a.unit_name, a.position_interest
+      `select a.id, a.full_name, a.phone, a.job_id, a.job_title, a.unit_name, a.position_interest, a.age,
+              a.created_by_name
          from ${tbl} a
         where a.job_id = $1
           and a.phone_e164 is not null
+          and (a.age is null or a.age < ${OVER_AGE_MIN})
           and not a.is_lead
           and a.claimed_by is null
           and not ${CALLED_SQL}

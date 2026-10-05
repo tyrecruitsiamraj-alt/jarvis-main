@@ -55,11 +55,12 @@ export const MAX_QUESTIONS = 14;
 // ⇒ เทสต์เดิมทั้งชุดผ่านโดยไม่ต้องรู้จักฟีเจอร์นี้ และลบแถวใน DB = กลับบทมาตรฐานทันที
 
 /** คีย์บทที่แก้ได้จากหน้าตั้งค่า → array บทในไฟล์ template */
-export type EditableScriptKey = 'interview' | 'offer' | 'follow' | 'follow_repeat';
+export type EditableScriptKey = 'interview' | 'offer' | 'apply' | 'follow' | 'follow_repeat';
 
 export const EDITABLE_SCRIPT_DEFAULTS: Record<EditableScriptKey, readonly string[]> = {
   interview: T.สัมภาษณ์เบื้องต้น,
   offer: T.เสนองาน,
+  apply: T.สมัครผ่านลิงก์,
   follow: T.ติดตาม,
   follow_repeat: T.ติดตามรอบถัดไป,
 };
@@ -135,6 +136,9 @@ export const KNOWN_PLACEHOLDERS: readonly string[] = [
   'เบอร์เจ้าหน้าที่',
   /** ชื่อเจ้าหน้าที่ผู้ติดตาม — ใช้แนะนำตัวต้นสาย (เจ้าของสั่ง 1 ก.ย. 2569) */
   'ชื่อเจ้าหน้าที่',
+  /** บทผู้สมัครผ่านลิงก์ (5 ต.ค. 2569) — "ตำบล … อำเภอ … จังหวัด …" · "20 ถึง 55 ปี" */
+  'พื้นที่ทำงาน',
+  'ช่วงอายุ',
   // ตัวแปรธง — ไม่พิมพ์อะไรออกมา แค่บอกว่าบรรทัดนี้ใช้กับใบแบบไหน
   'ต้องมีรถ',
   'ไม่มีวันเริ่มงาน',
@@ -297,6 +301,64 @@ export function buildOfferQuestions(f: CallScriptFacts, opts: OfferOptions = {})
     ...jobValues(f),
     เคยปฏิเสธงานอื่น: flag(opts.askStillLooking),
   });
+}
+
+// ─── บทที่ 2.1 · ผู้สมัครผ่านลิงก์ ─────────────────────────────────────────────
+
+export type ApplyScriptFacts = CallScriptFacts & {
+  /** พื้นที่ทำงานแบบพูดได้ ("ตำบลบางพลีใหญ่ อำเภอบางพลี จังหวัดสมุทรปราการ") — ว่าง = ข้ามบรรทัดพื้นที่ */
+  workArea?: string | null;
+  /** ช่วงอายุของใบขอแบบพูดได้ ("20 ถึง 55 ปี") — ว่าง = ข้ามบรรทัดอายุ */
+  ageRange?: string | null;
+  /** รายได้ต่อเดือน (สูตรเดียวกับหน้าประกาศ) — ไม่รู้ = ไม่พูดเรื่องเงินเลย ห้ามเดา */
+  monthlyIncome?: number | null;
+  /** สวัสดิการแบบพูดได้ (`speakableBenefitLine`) */
+  benefitLine?: string | null;
+};
+
+/**
+ * บทของคน **กรอกใบสมัครเองผ่านลิงก์** (เจ้าของ 5 ต.ค. 2569) — แยกจากบทเสนองาน (คนที่ฝากใบไว้/อยู่บนบอร์ด)
+ * ข้อมูลไหนไม่มี บรรทัดนั้นหายเอง (กติกาเดียวกับทุกบท)
+ */
+export function buildApplyQuestions(f: ApplyScriptFacts): string[] {
+  const income = Number(f.monthlyIncome);
+  return renderLines(activeScriptLines('apply'), {
+    ...jobValues(f),
+    พื้นที่ทำงาน: orDrop(f.workArea),
+    ช่วงอายุ: orDrop(f.ageRange),
+    รายได้ต่อเดือน: Number.isFinite(income) && income > 0 ? Math.round(income).toLocaleString('th-TH') : undefined,
+    สวัสดิการ: orDrop(f.benefitLine),
+  });
+}
+
+/** ช่วงอายุแบบพูดได้ — ไม่รู้ทั้งคู่ = '' */
+export function speakableAgeRange(min?: number | null, max?: number | null): string {
+  const lo = typeof min === 'number' && min > 0 ? min : null;
+  const hi = typeof max === 'number' && max > 0 ? max : null;
+  if (lo !== null && hi !== null) return lo === hi ? `${lo} ปี` : `${lo} ถึง ${hi} ปี`;
+  if (hi !== null) return `ไม่เกิน ${hi} ปี`;
+  if (lo !== null) return `ตั้งแต่ ${lo} ปีขึ้นไป`;
+  return '';
+}
+
+/**
+ * พื้นที่ทำงานแบบพูดได้ — คำเต็ม (TTS อ่าน "ต." "อ." เป็นตัวอักษร) · กรุงเทพฯ ใช้ แขวง/เขต
+ * ไม่รู้สักช่อง = ''
+ */
+export function speakableWorkArea(p: {
+  province?: string | null;
+  district?: string | null;
+  subdistrict?: string | null;
+}): string {
+  const province = clean(p.province);
+  const bkk = province === 'กรุงเทพมหานคร';
+  const sub = clean(p.subdistrict).replace(/^(?:ตำบล|ต\.|แขวง)\s*/u, '');
+  const dist = clean(p.district).replace(/^(?:อำเภอ|อ\.|เขต)\s*/u, '');
+  const bits: string[] = [];
+  if (sub) bits.push(`${bkk ? 'แขวง' : 'ตำบล'}${sub}`);
+  if (dist) bits.push(`${bkk ? 'เขต' : 'อำเภอ'}${dist}`);
+  if (province) bits.push(bkk ? province : `จังหวัด${province.replace(/^จังหวัด\s*/u, '')}`);
+  return bits.join(' ');
 }
 
 /**

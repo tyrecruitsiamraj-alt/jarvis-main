@@ -35,6 +35,7 @@ const tbl = tableInAppSchema('call_script_overrides');
 export const EDITABLE_SCRIPT_KEYS: readonly EditableScriptKey[] = [
   'interview',
   'offer',
+  'apply',
   'follow',
   'follow_repeat',
 ];

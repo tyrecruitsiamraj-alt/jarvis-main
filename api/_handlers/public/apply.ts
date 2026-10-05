@@ -155,6 +155,9 @@ export default async function handler(req: ApiReq, res: ApiRes) {
               job_title: v.jobTitle,
               unit_name: v.unitName,
               position_interest: v.positionInterest,
+              age: v.age,
+              // กรอกเองผ่านลิงก์ = ไม่มีคนคีย์ ⇒ บทผู้สมัครผ่านลิงก์ (5 ต.ค. 2569)
+              created_by_name: null,
             },
           ], { autoPush: true });
         }

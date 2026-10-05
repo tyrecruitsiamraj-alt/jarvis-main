@@ -14,6 +14,7 @@
  * · quiet hours 20:00-08:00 · กันซ้ำ channel+job+person) — ห้ามเขียน insert คิวเองที่นี่
  */
 import { dbQuery } from './postgres.js';
+import { OVER_AGE_MIN } from '../../src/lib/applicantAge.js';
 import { tableInAppSchema } from './schema.js';
 import { logError, logInfo } from './logger.js';
 import { notifyRoles } from './appNotifications.js';
@@ -124,11 +125,15 @@ async function autoSendToAi(limit: number): Promise<{ queued: number; skipped: n
     job_title: string | null;
     unit_name: string | null;
     position_interest: string | null;
+    age: number | null;
+    created_by_name: string | null;
   }>(
     `with due as (
        select a.id from ${APPS} a
         where ${OVERVIEW_BUCKETS.awaiting_call_choice}
           and a.unclaimed_at < now() - interval '${CALL_CHOICE_HOURS} hours'
+          -- อายุเกิน = AI ไม่โทร (5 ต.ค. 2569) — ไม่ปั๊ม auto_ai ให้ ไม่งั้นค้าง "ส่ง AI แล้ว" ทั้งที่ไม่มีสาย
+          and (a.age is null or a.age < ${OVER_AGE_MIN})
         order by a.unclaimed_at asc
         limit $1
      )
@@ -139,7 +144,8 @@ async function autoSendToAi(limit: number): Promise<{ queued: number; skipped: n
             updated_at = now()
        from due
       where a.id = due.id
-      returning a.id, a.full_name, a.phone, a.job_id, a.job_title, a.unit_name, a.position_interest`,
+      returning a.id, a.full_name, a.phone, a.job_id, a.job_title, a.unit_name, a.position_interest, a.age,
+                a.created_by_name`,
     [limit],
   );
   if (rows.length === 0) return { queued: 0, skipped: 0 };

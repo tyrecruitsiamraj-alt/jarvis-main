@@ -11950,3 +11950,35 @@ Choice: รายได้เฉลี่ยโชว์ ติ๊กซ่อ�
 - ตรวจใน Browser: ใบที่ประกาศ 13 ใบ การ์ดเจ้าหน้าที่กับหน้า /apply ตรงกันทุกตัวอักษร (หัว · ตำแหน่ง · ข้อมูล)
 - ⚠️ บุญรอดฯ ทีมพิมพ์รายได้เองไว้ 400 (ช่องเก่าไม่มีหน่วย) ⇒ ขึ้น "400 บาท/เดือน" ทั้งสองฝั่ง — ข้อมูลผิดหน่วย ต้องแก้ในขั้น 3
 - ⚠️ `boardCardPlace` บางใบเดาอำเภอผิดจากที่อยู่ (เช่น "สระบุรี · ธุรกิจ SME ขนาดเล็ก") — ของเดิม ยังไม่แก้
+
+## 5 ต.ค. 2569 (ดึก): อายุ 58+ AI ไม่โทร + กล่องอายุเกิน · บท Lumos ผู้สมัครผ่านลิงก์
+
+เจ้าของ (Journey งานสรรหา + Choice): อายุ 58 ปีขึ้นไป AI ไม่โทร ย้ายชื่อไปกล่อง "อายุเกิน" (แท็บผู้สมัคร คู่สนใจ/ไม่สนใจ) ·
+ทำบทใหม่เฉพาะคนสมัครผ่านลิงก์: เรียกชื่อ → งานที่สมัคร → พื้นที่ (จังหวัด อำเภอ ตำบล) → อายุ → วันสะดวกเริ่มงาน → สนใจบอกรายได้ → ไม่สนใจจบ
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/applicantAge.ts` (**ใหม่**) | `OVER_AGE_MIN = 58` · `isOverAge` · `OVER_AGE_REASON` — ตัวตัดสินเดียวทั้ง server และจอ · ไม่รู้อายุ = ไม่เกิน |
+| `src/lib/recruitRm.ts` | มุมมอง `over_age` "อายุเกิน" ใน `RM_LIST_VIEWS(_SHOWN)` · ทั้งหมดยังเห็นทุกคน |
+| `api/_lib/lumosDispatch.ts` | `enqueueLumosInterviewForApplications`: ข้ามอายุเกินก่อนประกอบ payload · `created_by_name === null` = กรอกเองผ่านลิงก์ ⇒ `buildApplyQuestions` + `loadApplyScriptFacts` (อ่านครั้งเดียวต่อใบขอ) · `buildApplicationInterviewPayload(app, now, applyFacts)` |
+| `api/_lib/applyScriptFacts.ts` (**ใหม่**) | พื้นที่ (`publicSafeAddressParts` → `speakableWorkArea`) · ช่วงอายุ · รายได้ (ทีมตั้งเองชนะ · ไม่งั้น `monthlyGuaranteedIncome`) · สวัสดิการ (`speakableBenefitLine`) — ใบขอผ่านสำเนา · เพดาน 4 วิ · ล้ม = `{}` (บรรทัดหาย ไม่เดา) |
+| `api/_lib/lumosCallScript.ts` · `.templates.ts` · `callScriptStore.ts` · `api/_handlers/call-scripts.ts` | บท `apply` "ผู้สมัครผ่านลิงก์" (แก้ได้ที่หน้าตั้งค่า) · ตัวแปร `{พื้นที่ทำงาน}` `{ช่วงอายุ}` · `speakableAgeRange` · `speakableWorkArea` |
+| `api/_handlers/public/apply.ts` · `application-dispatch.ts` · `api/_lib/callChoiceWorker.ts` · `application-call-choice.ts` | ส่ง `age` + `created_by_name` ทุกเส้น · ตัวส่งเอง/ปุ่มส่งทั้งใบขอไม่หยิบใบอายุเกิน · ปุ่มเลือกวิธีโทรไม่ปั๊ม "ส่ง AI" ให้ใบอายุเกิน |
+| เทสต์ | `tests/api/overAge2569-10-05.test.ts` · `tests/api/applyScript2569-10-05.test.ts` (ใหม่) · `rmCollectAndUnitPicker2569-10-05.test.ts` |
+
+- ลองกับใบขอจริงแบบอ่านอย่างเดียว (ไม่เข้าคิว): อ่านข้อมูล 39–120 ms · บทออกครบ 7 บรรทัด
+- ⚠️ ป้ายบทที่จดลงคิว (`stampScriptTag`) ของช่อง interview ยังเป็น `interview` ทั้งที่ใบสมัครใช้บทเสนองาน/ผู้สมัครผ่านลิงก์ — ของเดิม
+- ⚠️ ส่ง push ให้ Lumos ใช้ payload ในคิวตรง ๆ (ไม่เติมรายได้ตอนเสิร์ฟแบบเส้นดึงเดิม) — บทเสนองานเดิมจึงไม่พูดรายได้ · บทผู้สมัครผ่านลิงก์ใส่รายได้ตั้งแต่ตอนเข้าคิวแล้ว
+
+## 5 ต.ค. 2569 (ดึก): สวัสดิการบนการ์ด — เรียงลง · ไม่มีโอที · ถอด 5 รายการ · Valet parking
+
+เจ้าของ: *"รับเงินรายเดือน · รายสัปดาห์ · รายวัน บอกว่าเลือกได้"* · *"โอที ~75 บาท/ชม. เอาออก"* · *"รถรับส่ง เอาออกไปเลยไม่ต้องมีให้เลือกเลย"* ·
+ปรับเงินเดือนประจำปี · โบนัสประจำปี · อาหารกลางวัน · ที่พัก/หอพัก *"เอาออก"* · *"ให้มันเรียงลงไม่ใช่วางกองๆ"* · *"valet ไม่มีมันต้อง Valet parking"*
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/components/jobs/JobPublicFacts.tsx` | สวัสดิการเป็นรายการเรียงลง (ไอคอน Gift) · ตัดโอที (`isOtBenefit`) + รายการที่ถอด · รอบรับเงินบรรทัดของตัวเอง (`payCycleCardText`) |
+| `src/lib/payCycle.ts` | `payCycleCardText` — หลายรอบ "เลือกรับเงินได้ …" · `payCycleText` เดิมคงไว้ (หน้า 4 ใช้ตัดคำ "รับเงิน") |
+| `src/lib/extraBenefits.ts` | `RETIRED_BENEFITS` (dorm · shuttle · meal · bonus · salary_raise) ออกจากรายการให้ติ๊ก · `isRetiredBenefit` ตัดทั้งคีย์เก่าและข้อความ |
+| `src/lib/publicJobTitle.ts` · `recruitPostings.ts` · `boardFilters.ts` | "Valet" → "Valet parking" |
+| เทสต์ | JobPublicFacts · publicFieldsForm · EditPublicJobFieldsDialog · boardFilters · publicApplyPage2569-10-04 |

@@ -1,0 +1,89 @@
+/**
+ * ข้อมูลงานสำหรับ **บทผู้สมัครผ่านลิงก์** (เจ้าของ 5 ต.ค. 2569) — พื้นที่ (ตำบล อำเภอ จังหวัด) · ช่วงอายุ · รายได้ + สวัสดิการ
+ *
+ * 🔴 ไม่ทำให้ใบสมัครล้ม/ช้า: ใบขออ่านผ่านสำเนา (`listSiamrajUnitRequests` ตัวเดียวกับหน้า /apply) · อัตราเงินยิง ERP
+ *    ทั้งหมดมีเพดานเวลา — ช้า/ล่ม = คืนเท่าที่รู้ บรรทัดที่ไม่มีข้อมูลหายจากบทเอง (ไม่พูดเลขที่ไม่รู้)
+ * 🔴 ค่าที่ทีม Online ตั้งเอง (จังหวัด/อำเภอ/ตำบล · รายได้) ชนะของ ERP — เหมือนที่ผู้สมัครเห็นบนหน้า /apply
+ */
+import { listSiamrajUnitRequests } from './siamrajUnitRequests.js';
+import { attachNotes } from '../_handlers/siamraj-unit-requests.js';
+import {
+  fetchJobBenefitRates,
+  monthlyGuaranteedIncome,
+  requestNoFromJobRef,
+  speakableBenefitLine,
+} from './siamrajJobBenefits.js';
+import { publicSafeAddressParts } from '../../src/lib/publicJobPrivacy.js';
+import { speakableAgeRange, speakableWorkArea, type ApplyScriptFacts } from './lumosCallScript.js';
+import { logError } from './logger.js';
+
+export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'monthlyIncome' | 'benefitLine'>;
+
+const DEFAULT_TIMEOUT_MS = 4000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => resolve(fallback), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      () => {
+        clearTimeout(t);
+        resolve(fallback);
+      },
+    );
+  });
+}
+
+/** ค่ารายได้ที่ทีมตั้งเองบนใบ (ต่อเดือน) — ตั้งแบบรายวัน = ไม่ใช้ (คนละหน่วยกับประโยค "เดือนละ") */
+function manualMonthlyIncome(job: Record<string, unknown>): number | null {
+  const display = job.income_display as { period?: string; total?: number } | null | undefined;
+  if (display && display.period === 'monthly' && typeof display.total === 'number' && display.total > 0) {
+    return display.total;
+  }
+  if (display) return null;
+  const fo = job.field_overrides as { total_income?: number | null } | null | undefined;
+  return typeof fo?.total_income === 'number' && fo.total_income > 0 ? fo.total_income : null;
+}
+
+async function loadFacts(jobId: string): Promise<ApplyJobFacts> {
+  const out: ApplyJobFacts = {};
+  const items = (await listSiamrajUnitRequests({ limit: 500, mode: 'all' })) as unknown as Array<Record<string, unknown>>;
+  const found = items.find((j) => String(j.id ?? '') === jobId);
+  if (!found) return out;
+  // สำเนาเป็นของกลาง — แนบค่าที่ทีมตั้งลงสำเนาของเราเอง ห้ามแตะ object ในแคช
+  const job = { ...found };
+  await attachNotes([job]);
+
+  out.workArea = speakableWorkArea(publicSafeAddressParts(job as never)) || null;
+  out.ageRange =
+    speakableAgeRange(job.age_range_min as number | null | undefined, job.age_range_max as number | null | undefined) ||
+    null;
+
+  const manual = manualMonthlyIncome(job);
+  const requestNo = requestNoFromJobRef(jobId);
+  if (requestNo) {
+    const rates = (await fetchJobBenefitRates([requestNo])).get(requestNo) ?? [];
+    if (rates.length > 0) {
+      out.monthlyIncome = manual ?? (monthlyGuaranteedIncome(rates).total || null);
+      out.benefitLine = speakableBenefitLine(rates) || null;
+      return out;
+    }
+  }
+  out.monthlyIncome = manual;
+  return out;
+}
+
+/** ข้อมูลงานของบทผู้สมัครผ่านลิงก์ — ล้ม/เกินเวลา = `{}` (บทยังโทรได้ แค่สั้นลง) */
+export async function loadApplyScriptFacts(jobId: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<ApplyJobFacts> {
+  return withTimeout(
+    loadFacts(jobId).catch((e) => {
+      logError('apply-script.facts.failed', e, { jobId });
+      return {} as ApplyJobFacts;
+    }),
+    timeoutMs,
+    {},
+  );
+}

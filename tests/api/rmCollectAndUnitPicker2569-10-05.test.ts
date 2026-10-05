@@ -10,7 +10,8 @@ import { RM_LIST_VIEWS, RM_LIST_VIEWS_SHOWN, isShownRmListView } from '../../src
 
 describe('ปุ่มมุมมองแท็บผู้สมัคร', () => {
   it('โชว์ 3 ปุ่ม ไม่มีรอเก็บใบสมัคร · นิยาม collect ยังอยู่', () => {
-    expect([...RM_LIST_VIEWS_SHOWN]).toEqual(['all', 'interested', 'declined']);
+    // + "อายุเกิน" (5 ต.ค. 2569 · 58 ปีขึ้นไป AI ไม่โทร)
+    expect([...RM_LIST_VIEWS_SHOWN]).toEqual(['all', 'interested', 'declined', 'over_age']);
     expect(RM_LIST_VIEWS).toContain('collect');
     expect(isShownRmListView('collect')).toBe(false);
     expect(isShownRmListView('interested')).toBe(true);
