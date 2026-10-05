@@ -81,6 +81,17 @@ export function jobBoardCardSubtitle(job: JobRequest): string {
   return parts.join(' • ');
 }
 
+/**
+ * 🔴 บรรทัดรองของการ์ด **หน้าประกาศสาธารณะ** (เจ้าของสั่ง 5 ต.ค. 2569: *"หน้าประกาศ ตรงสาเหตุ ลาออก ไรนั่นเอาออก ไม่ต้องโชว์"*)
+ * เหลือแค่รายละเอียดตำแหน่ง — ไม่มี "สาเหตุที่ขอ: ลาออก/เปิดไซต์" และ **ไม่มีชื่อพนักงานคนเก่าที่ลาออก**
+ * (เดิมใช้ `jobBoardCardSubtitle` ตัวเดียวกับฝั่งเจ้าหน้าที่ ⇒ ชื่อคนเก่าหลุดไปหน้าสาธารณะด้วย)
+ * รายละเอียด "ไม่ระบุ" ไม่บอกอะไรคนนอก = ไม่โชว์
+ */
+export function publicJobCardSubtitle(job: JobRequest): string {
+  const detail = (job.job_description_code_2 ?? '').trim();
+  return detail && detail !== 'ไม่ระบุ' ? detail : '';
+}
+
 /** ป้ายเลือกใน dropdown */
 export function unitRequestSelectLabel(job: JobRequest): string {
   const unit = job.unit_name || '—';

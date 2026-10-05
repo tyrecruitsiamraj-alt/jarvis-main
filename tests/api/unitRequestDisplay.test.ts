@@ -93,3 +93,29 @@ describe('requestActionLabel / requestActionOrTypeLabel — คำนำหน�
     expect(requestActionOrTypeLabel(j)).toBe(JOB_TYPE_LABELS.new_hire);
   });
 });
+
+describe('publicJobCardSubtitle — หน้าประกาศไม่โชว์สาเหตุที่ขอ/ชื่อคนเก่า (เจ้าของสั่ง 5 ต.ค. 2569)', () => {
+  it('เหลือแค่รายละเอียดตำแหน่ง · ไม่มี "สาเหตุที่ขอ" · ไม่มีชื่อพนักงานคนเก่า · "ไม่ระบุ" = ว่าง', async () => {
+    const { publicJobCardSubtitle, jobBoardCardSubtitle } = await import('../../src/lib/unitRequestDisplay');
+    const job = {
+      request_action_name: 'ลาออก',
+      job_description_code_2: 'รถผู้บริหาร',
+      resigned_employee_name: 'คนเก่า สมมุติ',
+      job_type: 'driver',
+    } as never;
+    expect(publicJobCardSubtitle(job)).toBe('รถผู้บริหาร');
+    expect(publicJobCardSubtitle(job)).not.toContain('ลาออก');
+    expect(publicJobCardSubtitle(job)).not.toContain('คนเก่า');
+    expect(publicJobCardSubtitle({ job_description_code_2: 'ไม่ระบุ' } as never)).toBe('');
+    // ฝั่งเจ้าหน้าที่ยังเห็นครบเหมือนเดิม
+    expect(jobBoardCardSubtitle(job)).toContain('สาเหตุที่ขอ: ลาออก');
+  });
+  it('การ์ดสาธารณะ + ตัวอย่างหน้า 4 ใช้ตัวนี้', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const view = readFileSync(join(process.cwd(), 'src/components/jobs/JobBoardView.tsx'), 'utf8');
+    expect(view).toContain('(isStaff ? jobBoardCardSubtitle(job) : publicJobCardSubtitle(job))');
+    const preview = readFileSync(join(process.cwd(), 'src/components/jobs/PublicJobCardPreview.tsx'), 'utf8');
+    expect(preview).toContain('const subtitle = publicJobCardSubtitle(job);');
+  });
+});

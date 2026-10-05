@@ -3,7 +3,7 @@ import { trackPublicClick } from '@/lib/publicClickApi';
 import { useSearchParams } from 'react-router-dom';
 import type { JobRequest } from '@/types';
 import { jobSectorLabel } from '@/lib/unitRequestDisplay';
-import { jobBoardCardTitle, jobBoardCardSubtitle } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, jobBoardCardSubtitle, publicJobCardSubtitle } from '@/lib/unitRequestDisplay';
 import BoardCardProgress from '@/components/jobs/BoardCardProgress';
 import {
   canShowNumbers,
@@ -1658,8 +1658,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       {publicJobTitle(job)}
                     </p>
                     {/* บรรทัดรอง: ตัดตำแหน่งที่ซ้ำกับบรรทัดสีน้ำเงินข้างบนออก (เดิมพิมพ์ซ้ำทุกใบ) */}
+                    {/* หน้าสาธารณะไม่โชว์สาเหตุที่ขอ (ลาออก ฯลฯ) และชื่อคนเก่า (เจ้าของสั่ง 5 ต.ค. 2569) */}
                     <p className="line-clamp-2 text-xs text-muted-foreground">
-                      {jobBoardCardSubtitle(job) || EM_DASH}
+                      {(isStaff ? jobBoardCardSubtitle(job) : publicJobCardSubtitle(job)) || EM_DASH}
                     </p>
                     {/* เลขที่ใบขอโชว์เฉพาะเจ้าหน้าที่ (หน้าสมัครสาธารณะไม่ต้องเห็น จึงไม่จองที่)
                         แต่ในฝั่งเจ้าหน้าที่ต้องมีที่ยืนทุกใบ ไม่งั้นแถวล่างเลื่อนไม่ตรงกัน */}

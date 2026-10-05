@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
-import { jobBoardCardSubtitle, jobBoardCardTitle } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, publicJobCardSubtitle } from '@/lib/unitRequestDisplay';
 import { publicSafeAddress } from '@/lib/publicJobPrivacy';
 import { publicBenefitList, publicFieldVisible } from '@/lib/publicFieldVisibility';
 import { publicIncomeOf } from '@/lib/publishReadiness';
@@ -26,7 +26,8 @@ export default function PublicJobCardPreview({ job, className }: { job: JobReque
   const income = publicFieldVisible(job, 'income') ? publicIncomeOf(job) : null;
   const benefits = publicBenefitList(job, benefitDisplayLabels(job.extra_benefits));
   const pay = publicFieldVisible(job, 'income') ? payCycleText(payCyclesOf(job)) : '';
-  const subtitle = jobBoardCardSubtitle(job);
+  // ตัวเดียวกับการ์ดหน้าประกาศจริง — ไม่มีสาเหตุที่ขอ/ชื่อคนเก่า (5 ต.ค. 2569)
+  const subtitle = publicJobCardSubtitle(job);
   return (
     <Card className={cn('space-y-3 rounded-2xl p-4', className)} data-testid="public-job-preview">
       <div className="space-y-1">

@@ -591,23 +591,12 @@ const FollowPlanningCalendar: React.FC<{
 
           {view === 'day' ? (
             <>
-              {daySummary.notSent > 0 || (roundFilter !== 'all' && !daySlots.includes(roundFilter)) ? (
+              {/* ป้าย "N สายไม่ได้ส่งให้ AI — ต้องคนจัดการ" ถอดออก (เจ้าของสั่ง 5 ต.ค. 2569) — สถานะ "ไม่ได้ส่งให้ AI" ยังขึ้นบนแถวของสายนั้น */}
+              {roundFilter !== 'all' && !daySlots.includes(roundFilter) ? (
                 <div className="flex flex-wrap items-center gap-2 border-b border-border/70 px-4 py-2.5 md:px-5">
-                  {roundFilter !== 'all' && !daySlots.includes(roundFilter) ? (
-                    <span className="text-[11px] text-muted-foreground">
-                      วันที่ {formatYmdDmyBe(dayYmd)} ไม่มี{roundFilterLabel(roundFilter)} — กด "ทุกสาย" ข้างบนเพื่อดูสายอื่น
-                    </span>
-                  ) : null}
-                  {daySummary.notSent > 0 ? (
-                    <span
-                      className={cn(
-                        'ml-auto rounded-full px-2.5 py-1 text-[11px] font-medium',
-                        TONE.orange.chip,
-                      )}
-                    >
-                      {daySummary.notSent} สายไม่ได้ส่งให้ AI — ต้องคนจัดการ
-                    </span>
-                  ) : null}
+                  <span className="text-[11px] text-muted-foreground">
+                    วันที่ {formatYmdDmyBe(dayYmd)} ไม่มี{roundFilterLabel(roundFilter)} — กด "ทุกสาย" ข้างบนเพื่อดูสายอื่น
+                  </span>
                 </div>
               ) : null}
 

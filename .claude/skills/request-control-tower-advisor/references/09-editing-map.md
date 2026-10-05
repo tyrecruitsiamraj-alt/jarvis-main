@@ -11745,3 +11745,11 @@ iRecruit (`rm-action-btn`): โทร (call · POST จดการโทรก�
 
 - ไล่กดจริง (ดักคำขอเขียนทุกตัว ตอบ 418): ขั้น 1 ไม่ประกาศ (เหตุผล→POST job-release-skip) · ขั้น 2 ใส่เอง จังหวัด/อำเภอ → auto-save unit-notes + ลองอีกครั้ง · ขั้น 3 รายได้/รอบรับเงิน/สวัสดิการ/ชุดฟอร์ม/โอที/เพิ่มรายการเอง/เพศ/บันทึกอายุ · ขั้น 4 แก้×6 · มีแล้ว N ลิงก์ · Gen link กาง/พับ · Gen link กลาง (POST postings) · ฟอร์มประกาศแรก (ทั่วไป/แนบเอกสาร/ช่องทาง/ตัวอย่าง/Gen link) · ส่งประกาศ (POST job-public-release) · ดึงประกาศลง (DELETE) · บันทึกแบบร่าง · แท็บรายชื่อ · ปิด
 - ⚠️ Radix Select ใน Browser pane กดผ่าน JS ไม่ติด — ใช้ `focus()` + ปุ่ม Enter จริง
+
+## 5 ต.ค. 2569 (สาย): ถอดป้าย "ไม่ได้ส่งให้ AI" · คิวรีหน้าหลักรายวัน · หน้าประกาศไม่โชว์สาเหตุ/ชื่อคนเก่า
+
+- `src/components/follow/FollowPlanningCalendar.tsx` — ถอดป้าย "N สายไม่ได้ส่งให้ AI — ต้องคนจัดการ" (สถานะบนแถวยังอยู่)
+- `docs/sql/home-page-daily-queries.sql` (ใหม่) — คิวรีรายวัน 4 ก้อนหน้าหลัก สร้างจาก `buildXxxAiShareSql(..., 'byDayBu')` ห่อรวมทุก BU เป็นแถวละวัน
+  ⚠️ แก้ `api/_lib/homeAiShareSql.ts` เมื่อไหร่ ต้องสร้างไฟล์นี้ใหม่ · `both` เป็นคำสงวน ต้องใส่ "both"
+- `src/lib/unitRequestDisplay.ts` `publicJobCardSubtitle` — 🔴 บรรทัดรองการ์ดหน้าสาธารณะเหลือแค่รายละเอียดตำแหน่ง (เดิมใช้ตัวฝั่งเจ้าหน้าที่ ⇒ "สาเหตุที่ขอ: ลาออก" + **ชื่อพนักงานคนเก่า** หลุดไปหน้าสาธารณะ) · ใช้ที่ `JobBoardView` (!isStaff) + `PublicJobCardPreview`
+- `tests/api/applicantOverviewSql.test.ts` — เทสต์อ่านฐานจริงทั้งสองตัวให้เวลา 20 วิ
