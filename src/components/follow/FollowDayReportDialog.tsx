@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
-import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
+import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { formatYmdDmyBe } from '@/lib/dateTh';
@@ -19,6 +19,7 @@ import {
 import {
   DAY_REPORT_PAGE_SIZES,
   downloadFollowDayReportPng,
+  followDayReportRangeText,
   followDayReportSummaryText,
   paginateDayReportRows,
   type DayReportPageSize,
@@ -45,28 +46,33 @@ export default function FollowDayReportDialog({
   ymd: string;
   entries: FollowEntry[];
 }) {
-  const [selYmd, setSelYmd] = React.useState(ymd);
+  /** ช่วงวัน — เลือกบนปฏิทินอย่างเดียว (เจ้าของ Choice 5 ต.ค. 2569) · วันเดียว = เริ่ม/จบวันเดียวกัน */
+  const [range, setRange] = React.useState<DateRangeYmd>({ from: ymd, to: ymd });
+  const selYmd = range.from;
   const [caller, setCaller] = React.useState<FollowDayReportFilter['caller']>('all');
   const [call, setCall] = React.useState<string>('all');
+  /** วันที่ของแผน = ครั้งที่ติดตาม (เจ้าของ Choice 5 ต.ค. 2569) */
+  const [planDay, setPlanDay] = React.useState<string>('all');
   const [copied, setCopied] = React.useState<'ok' | 'fail' | null>(null);
   const [saved, setSaved] = React.useState<'ok' | 'fail' | null>(null);
   const [savedCount, setSavedCount] = React.useState(0);
   React.useEffect(() => {
     // เปิดใหม่ = เริ่มที่วันที่หน้าดูอยู่ + ไม่กรอง (ค่าที่ค้างจากรอบก่อนทำให้ตัวเลขดูผิดวัน)
-    setSelYmd(ymd);
+    setRange({ from: ymd, to: ymd });
     setCaller('all');
     setCall('all');
+    setPlanDay('all');
     setCopied(null);
     setSaved(null);
   }, [open, ymd]);
 
   const filter = React.useMemo<FollowDayReportFilter>(
-    () => ({ caller, call: call === 'all' ? 'all' : Number(call) }),
-    [caller, call],
+    () => ({ caller, call: call === 'all' ? 'all' : Number(call), planDay: planDay === 'all' ? 'all' : Number(planDay) }),
+    [caller, call, planDay],
   );
   const report = React.useMemo(
-    () => (open && selYmd ? buildFollowDayReport(entries, selYmd, new Date(), filter) : null),
-    [open, entries, selYmd, filter],
+    () => (open && selYmd ? buildFollowDayReport(entries, range, new Date(), filter) : null),
+    [open, entries, selYmd, range, filter],
   );
 
   const copy = async () => {
@@ -97,7 +103,7 @@ export default function FollowDayReportDialog({
   const imagePages = report && report.rows.length > 0 ? pages.length : 0;
   const [page, setPage] = React.useState(0);
   // เปลี่ยนวัน/สาย/ใครโทร/หน้าละกี่แถว = กลับหน้าแรก (หน้าเดิมอาจไม่มีในชุดใหม่)
-  React.useEffect(() => setPage(0), [open, selYmd, caller, call, pageSize]);
+  React.useEffect(() => setPage(0), [open, range, caller, call, planDay, pageSize]);
   const pageIdx = Math.min(page, pages.length - 1);
   const pageRows = pages[pageIdx] ?? [];
   const rowFrom = pages.slice(0, pageIdx).reduce((n, p) => n + p.length, 0);
@@ -106,7 +112,7 @@ export default function FollowDayReportDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto !bg-background">
         <DialogHeader className="text-left">
-          <DialogTitle>แผนติดตามวันที่ {selYmd ? formatYmdDmyBe(selYmd) : '—'}</DialogTitle>
+          <DialogTitle>แผนติดตามวันที่ {report ? followDayReportRangeText(report) : selYmd ? formatYmdDmyBe(selYmd) : '—'}</DialogTitle>
           <DialogDescription className="tabular-nums text-foreground">
             {report ? followDayReportSummaryText(report) : ''}
           </DialogDescription>
@@ -116,13 +122,14 @@ export default function FollowDayReportDialog({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="day-report-filters">
           <span className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">วัน</span>
-            <DayCalendarPicker
-              value={selYmd}
+            <DateRangeCalendarPicker
+              value={range}
               onChange={(v) => {
-                if (!v) return;
-                setSelYmd(v);
-                // เลขสายของแต่ละวันไม่เท่ากัน — เปลี่ยนวันแล้วล้างตัวกรองสาย กันค้างเลขที่วันใหม่ไม่มี
+                if (!v?.from) return;
+                setRange({ from: v.from, to: v.to || v.from });
+                // เลขสาย/วันที่ของแผนแต่ละช่วงไม่เท่ากัน — เปลี่ยนช่วงแล้วล้างตัวกรอง กันค้างเลขที่ช่วงใหม่ไม่มี
                 setCall('all');
+                setPlanDay('all');
               }}
               emptyLabel="เลือกวัน"
             />
@@ -138,6 +145,19 @@ export default function FollowDayReportDialog({
               onChange={setCall}
               ariaLabel="ดูเฉพาะสายที่"
               active={call !== 'all'}
+            />
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">วันที่ของแผน</span>
+            <ChoiceDropdown
+              value={planDay}
+              options={[
+                { value: 'all', label: 'ทุกวัน' },
+                ...(report?.planDays ?? []).map((n) => ({ value: String(n), label: `วันที่ ${n}` })),
+              ]}
+              onChange={setPlanDay}
+              ariaLabel="ดูเฉพาะวันที่ของแผน"
+              active={planDay !== 'all'}
             />
           </span>
           <span className="flex items-center gap-1.5">

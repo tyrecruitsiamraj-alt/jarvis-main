@@ -1110,20 +1110,11 @@ const FollowPlanningCalendar: React.FC<{
                         >
                           <ChevronLeft className="h-4 w-4" aria-hidden />
                         </button>
-                        {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            aria-current={n === page ? 'page' : undefined}
-                            onClick={() => setPage(n)}
-                            className={cn(
-                              'inline-flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-[11px] font-medium tabular-nums transition-colors',
-                              n === page ? 'border-primary bg-primary text-primary-foreground' : TONE.neutral.outline,
-                            )}
-                          >
-                            {n}
-                          </button>
-                        ))}
+                        {/* "1/13" แทนปุ่มเลขทุกหน้า (เจ้าของ 5 ต.ค. 2569: *"แถบหน้า 1 2 3 4 มันเยอะไปทำให้มันแบบเป็น 1/... ได้ไหม"*)
+                            — รูปเดียวกับตัวเปลี่ยนหน้าของมุมมองรายเดือน */}
+                        <span className="px-1 text-xs tabular-nums text-muted-foreground" aria-current="page" data-testid="day-page-indicator">
+                          {page}/{pageCount}
+                        </span>
                         <button
                           type="button"
                           aria-label="หน้าถัดไป"
@@ -1302,8 +1293,8 @@ const FollowPlanningCalendar: React.FC<{
                 >
                   <ChevronLeft aria-hidden />
                 </Button>
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  หน้า {monthSafePage} / {monthPageCount}
+                <span className="px-1 text-xs tabular-nums text-muted-foreground">
+                  {monthSafePage}/{monthPageCount}
                 </span>
                 <Button
                   type="button"

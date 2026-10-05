@@ -67,11 +67,11 @@ export function followStepError(step: FollowWizardStep, v: FollowWizardValues): 
   if (v.scheduleMode) {
     if (v.scheduleDays.length === 0) return 'เลือกช่วงวัน แล้วเลือกวันที่จะโทรอย่างน้อย 1 วัน';
     if (v.timesByDay) {
-      const empty = v.scheduleDays.find((d) => validScheduleTimes(v.timesByDay?.[d] ?? []).length === 0);
+      const empty = v.scheduleDays.find((d) => scheduleDaySlots(v.timesByDay?.[d] ?? []).length === 0);
       if (empty) return `ระบุเวลาของวัน${SCHEDULE_DAY_LABEL.format(new Date(`${empty}T00:00:00+07:00`))} อย่างน้อย 1 รอบ`;
       return null;
     }
-    if (validScheduleTimes(v.roundTimes).length === 0) return 'ระบุรอบเวลาอย่างน้อย 1 รอบ (เช่น 07:00)';
+    if (scheduleDaySlots(v.roundTimes).length === 0) return 'ระบุรอบเวลาอย่างน้อย 1 รอบ (เช่น 07:00)';
     return null;
   }
 
@@ -172,7 +172,15 @@ export type ScheduleCall = {
   staffPhone: string;
   /** สายที่เท่าไหร่ของทั้งชุด — นับต่อข้ามวัน (1 = บทสายแรก · 2 ขึ้นไป = บทรอบถัดไป) */
   callRound: number;
+  /** "ยังไม่ชัวร์เวลา" (134) — คนโทร · เวลาเป็นค่าแทน ไปเติมเวลาจริงทีหลัง */
+  timeTbd?: boolean;
 };
+
+/**
+ * ค่าพิเศษในช่องเวลาของตารางหลายวัน = "ยังไม่ชัวร์เวลา" (เจ้าของ 5 ต.ค. 2569 · Choice "เลือกได้ทีละสาย")
+ * แถวนั้นเป็นคนโทรเสมอ (ไม่มีเวลาจริงให้ AI โทร) · ลำดับสายตามแถวที่กรอก
+ */
+export const SCHEDULE_TBD = 'tbd';
 
 /**
  * ═══ ตารางหลายวัน → รายการสายทีละสาย (ไล่ทดสอบ + เจ้าของ Choice 1 ต.ค. 2569) ═══
@@ -195,18 +203,44 @@ export function buildScheduleCalls(input: {
   for (const day of [...new Set(input.days)].sort()) {
     const mode = input.modeOfDay(day);
     if (mode === 'off') continue;
-    for (const time of validScheduleTimes(input.timesOfDay(day))) {
+    for (const slot of scheduleDaySlots(input.timesOfDay(day))) {
       out.push({
         day,
-        time,
-        scheduledAt: new Date(`${day}T${time}:00+07:00`).toISOString(),
-        callMode: mode,
+        time: slot.time,
+        scheduledAt: new Date(`${day}T${slot.time}:00+07:00`).toISOString(),
+        // ยังไม่ชัวร์เวลา = คนโทรเสมอ (server ก็บังคับ — ส่งให้ AI โดยไม่มีเวลาจริง = โทรหาคนจริงเวลามั่ว)
+        callMode: slot.tbd ? 'manual' : mode,
         staffPhone: (input.staffPhoneOfDay(day) || '').trim(),
         callRound: round,
+        ...(slot.tbd ? { timeTbd: true } : {}),
       });
       round += 1;
     }
   }
+  return out;
+}
+
+/**
+ * ช่องเวลาของวันหนึ่ง → สายเรียงลำดับ
+ * ไม่มี "ยังไม่ชัวร์เวลา" = กติกาเดิม (ตัดซ้ำ · เรียงตามเวลา)
+ * มี = เรียงตามแถวที่กรอก (สายที่ 1 ยังไม่ชัวร์เวลา ต้องยังเป็นสายที่ 1 — ไม่ถูกเวลาแทนดันไปหน้า/หลัง)
+ * เวลาแทน = เที่ยงคืน + ลำดับแถว (ไม่ชนกัน · จอโชว์ "ยังไม่ระบุเวลา" จากธง)
+ */
+export function scheduleDaySlots(times: readonly string[]): Array<{ time: string; tbd: boolean }> {
+  if (!times.some((t) => t === SCHEDULE_TBD)) return validScheduleTimes(times).map((time) => ({ time, tbd: false }));
+  const out: Array<{ time: string; tbd: boolean }> = [];
+  const seen = new Set<string>();
+  times.forEach((raw, i) => {
+    if (raw === SCHEDULE_TBD) {
+      out.push({ time: `00:${String(Math.min(i, 59)).padStart(2, '0')}`, tbd: true });
+      return;
+    }
+    const [t] = validScheduleTimes([raw]);
+    if (t && !seen.has(t)) {
+      seen.add(t);
+      out.push({ time: t, tbd: false });
+    }
+  });
   return out;
 }
 

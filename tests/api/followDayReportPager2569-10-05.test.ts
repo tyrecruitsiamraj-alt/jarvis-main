@@ -19,7 +19,7 @@ describe('สรุปแผนทั้งวัน แบ่งหน้า', 
   });
   it('มีตัวเปลี่ยนหน้าเสมอ · เปลี่ยนตัวกรองแล้วกลับหน้าแรก · คัดลอก/รูป ยังใช้ทุกแถว', () => {
     expect(SRC).toContain('data-testid="day-report-pager"');
-    expect(SRC).toContain('setPage(0), [open, selYmd, caller, call, pageSize]');
+    expect(SRC).toContain('setPage(0), [open, range, caller, call, planDay, pageSize]');
     expect(SRC).toContain('followDayReportTsv(report)');
     expect(SRC).toContain('downloadFollowDayReportPng(report, pageSize)');
   });

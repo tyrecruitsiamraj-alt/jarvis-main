@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 /**
  * ปฏิทินติดตาม — **สองหน้าในผืนเดียว** (เจ้าของสั่ง 7 ก.ย. 2569 · ฉบับที่ 2)
  *
@@ -818,9 +819,17 @@ describe('รายเดือนแบ่งหน้า หน้าละ 10
     const bodyRows = () => document.querySelectorAll('table tbody tr').length;
     expect(bodyRows()).toBe(10);
     expect(pager.textContent).toContain('แสดง 1 ถึง 10 จากทั้งหมด 12 คน');
-    expect(pager.textContent).toContain('หน้า 1 / 2');
+    expect(pager.textContent).toContain('1/2');
     fireEvent.click(within(pager).getByRole('button', { name: 'หน้าถัดไป (รายเดือน)' }));
     expect(bodyRows()).toBe(2);
-    expect(screen.getByTestId('month-pager').textContent).toContain('หน้า 2 / 2');
+    expect(screen.getByTestId('month-pager').textContent).toContain('2/2');
+  });
+});
+
+describe('แถบหน้ารายวันเป็น "1/N" (เจ้าของ 5 ต.ค. 2569: "แถบหน้า 1 2 3 4 มันเยอะไป")', () => {
+  it('ไม่มีปุ่มเลขทุกหน้าแล้ว — เหลือ ก่อนหน้า · 1/N · ถัดไป', () => {
+    const src = readFileSync('src/components/follow/FollowPlanningCalendar.tsx', 'utf8');
+    expect(src).not.toContain('Array.from({ length: pageCount }');
+    expect(src).toContain('data-testid="day-page-indicator"');
   });
 });

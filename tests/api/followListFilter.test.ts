@@ -105,7 +105,8 @@ describe('filterFollowEntries — ทุกเงื่อนไข AND', () => 
   it('🔴 หน้าติดตามเรียกตัวกรองโดยไม่ล็อกแท็บ "กำลังตาม" (เคยทำให้วันที่ปิดงานหมดเหลือ "ไม่มีสายที่ต้องตาม")', () => {
     const page = fs.readFileSync(path.resolve(process.cwd(), 'src/pages/follow/FollowPage.tsx'), 'utf8');
     // เจ้าของงาน = อีเมลคนเพิ่ม (owner · 5 ต.ค. 2569) — ยังไม่มี tab ล็อก
-    expect(page).toContain('filterFollowEntries(scopeItems, { date: fDate, band: fBand, caller, owner: adderKey })');
+    // 5 ต.ค. 2569: ผ่านค้นหา + วันที่ของแผนก่อน (planScopedItems) — ยังไม่ล็อกแท็บเหมือนเดิม
+    expect(page).toContain('filterFollowEntries(planScopedItems, { date: fDate, band: fBand, caller, owner: adderKey })');
     expect(page).not.toContain("const tab: FollowTab = 'active'");
   });
 
@@ -214,5 +215,34 @@ describe('ยังไม่ระบุเวลา + โทรสำเร็�
       ai: { calls: 3, done: 1 },
       manual: { calls: 2, done: 1 },
     });
+  });
+});
+
+describe('ค้นหา + วันที่ของแผน (เจ้าของ 5 ต.ค. 2569)', () => {
+  it('ค้นชื่อคน · หน่วยงาน · รหัสไซต์ · เบอร์ (0 นำหน้าหรือ +66 ก็เจอ)', async () => {
+    const { matchesFollowSearch } = await import('../../src/lib/followListFilter');
+    const e = { recipient_name: 'นายสมชาย ใจดี', recipient_phone: '+66812345678', unit_name: 'พญาไท_ศรีราชา', site_code: 'S01' };
+    expect(matchesFollowSearch(e, 'สมชาย')).toBe(true);
+    expect(matchesFollowSearch(e, 'ศรีราชา')).toBe(true);
+    expect(matchesFollowSearch(e, 's01')).toBe(true);
+    expect(matchesFollowSearch(e, '0812345')).toBe(true);
+    expect(matchesFollowSearch(e, 'กรุงศรี')).toBe(false);
+    expect(matchesFollowSearch(e, '  ')).toBe(true);
+  });
+  it('วันที่ของแผน: ชุดวันเดียว = วันที่ 1 · ตัวเลือกนับสายต่อวัน', async () => {
+    const { followPlanDayOf, followPlanDayOptions } = await import('../../src/lib/followListFilter');
+    expect(followPlanDayOf({ call_day: null, scheduled_at: '2026-10-05T01:00:00Z' })).toBe(1);
+    expect(followPlanDayOf({ call_day: 3, scheduled_at: '2026-10-05T01:00:00Z' })).toBe(3);
+    expect(followPlanDayOf({ call_day: 3, scheduled_at: null })).toBeNull();
+    expect(
+      followPlanDayOptions([
+        { call_day: 2, scheduled_at: 'x' },
+        { call_day: 1, scheduled_at: 'x' },
+        { call_day: 2, scheduled_at: 'x' },
+      ] as never),
+    ).toEqual([
+      { day: 1, count: 1 },
+      { day: 2, count: 2 },
+    ]);
   });
 });

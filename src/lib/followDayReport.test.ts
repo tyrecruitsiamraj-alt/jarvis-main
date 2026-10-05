@@ -108,3 +108,30 @@ describe('buildFollowDayReport', () => {
     expect(lines[1].split('\t')[2]).toBe('0812345678');
   });
 });
+
+describe('สรุปแผนเลือกช่วงวัน + วันที่ของแผน (เจ้าของ Choice 5 ต.ค. 2569)', () => {
+  it('🔴 ช่วงหลายวัน = รวมทุกวัน เรียงวัน ติดวันหน้าเวลา · วันเดียว = แบบเดิม', () => {
+    const rows = [
+      entry({ id: 'a', scheduled_at: '2026-10-02T01:00:00Z', group_id: 'g1' }),
+      entry({ id: 'b', scheduled_at: '2026-10-03T01:00:00Z', group_id: 'g1' }),
+    ];
+    const one = buildFollowDayReport(rows, '2026-10-02', NOW);
+    expect(one.rows.map((r) => r.time)).toEqual(['08:00']);
+    expect(one.toYmd).toBe('2026-10-02');
+    const two = buildFollowDayReport(rows, { from: '2026-10-02', to: '2026-10-03' }, NOW);
+    expect(two.rows.map((r) => r.time)).toEqual(['2/10 08:00', '3/10 08:00']);
+    expect(two.toYmd).toBe('2026-10-03');
+  });
+
+  it('กรองวันที่ของแผน = ครั้งที่ติดตาม · ชุดวันเดียวนับเป็นวันที่ 1', () => {
+    const rows = [
+      entry({ id: 'a', scheduled_at: '2026-10-02T01:00:00Z', group_id: 'g1', call_day: 1 }),
+      entry({ id: 'b', scheduled_at: '2026-10-03T01:00:00Z', group_id: 'g1', call_day: 2 }),
+      entry({ id: 'c', recipient_phone: '0890000099', scheduled_at: '2026-10-03T02:00:00Z', call_day: null }),
+    ];
+    const r = buildFollowDayReport(rows, { from: '2026-10-02', to: '2026-10-03' }, NOW, { caller: 'all', call: 'all', planDay: 2 });
+    expect(r.planDays).toEqual([1, 2]);
+    expect(r.rows.map((x) => x.id)).toEqual(['b']);
+    expect(r.scope).toBe('วันที่ 2 ของแผน');
+  });
+});

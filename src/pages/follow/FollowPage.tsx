@@ -62,6 +62,9 @@ import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { followMatrixColOfCategory, type FollowMatrixCol } from '@/lib/followCallMatrix';
 import {
   filterFollowEntries,
+  matchesFollowSearch,
+  followPlanDayOf,
+  followPlanDayOptions,
   FOLLOW_ADDER_NONE,
   followAdderOptions,
   matchesFollowAdder,
@@ -85,6 +88,7 @@ import {
   prevFollowStep,
   scheduleDayStaffPhone,
   buildScheduleCalls,
+  SCHEDULE_TBD,
   scheduleCallsByDay,
   type FollowWizardStep,
   type ScheduleCall,
@@ -111,6 +115,8 @@ import DateTimeField24 from '@/components/shared/DateTimeField24';
 import { type FollowOutcome } from '@/lib/followOutcome';
 import { buildFollowPlanningRows, callCategory, type FollowPlanningRound, type FollowRoundFilter } from '@/lib/followPlanning';
 import { toYmdBangkok, formatYmdDmyBe } from '@/lib/dateTh';
+import { tbdPlaceholderAts } from '@/lib/followTbd';
+import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
 import {
   listStaffContacts,
@@ -869,6 +875,7 @@ const FollowPage: React.FC = () => {
                 call_round: first.callRound,
                 // วันที่เลือกว่า "คนโทร" → ไม่ส่งเข้าคิว AI (121) แต่ยังเป็นแถวจริงในระบบ
                 call_mode: first.callMode,
+                time_tbd: first.timeTbd || undefined,
                 group_id: groupId,
                 unit_name: unitName.trim() || undefined,
                 site_code: siteCode.trim() || undefined,
@@ -877,6 +884,7 @@ const FollowPage: React.FC = () => {
                   staff_phone: c.staffPhone || undefined,
                   call_round: c.callRound,
                   call_mode: c.callMode,
+                  time_tbd: c.timeTbd || undefined,
                 })),
               });
               for (const createdEntry of createdEntries) {
@@ -946,8 +954,14 @@ const FollowPage: React.FC = () => {
       return;
     }
 
+    /**
+     * 🔴 "ยังไม่ชัวร์เวลา" เก็บแค่วัน (YYYY-MM-DD) — สองสายวันเดียวกันได้ค่าเหมือนกันเป๊ะ ⇒ ตัวตัดเวลาซ้ำรวมเป็นสายเดียว
+     * และเลขสายชนกัน (เจ้าของเจอ 5 ต.ค. 2569: *"ขึ้นสายโทรครั้งที่ 1 ทั้ง2สายเลย ทั้งที่ตอนเพิ่มเลือก สาย1 สาย2"*)
+     * ⇒ ให้แต่ละสายมีเวลาแทนของตัวเอง (เที่ยงคืน + ลำดับช่องเป็นนาที) — จอโชว์ "ยังไม่ระบุเวลา" อยู่แล้ว (ธง time_tbd)
+     */
+    const effectiveAts = tbdPlaceholderAts(scheduledAts, callModes);
     // เรียงเวลาจากก่อนไปหลัง + ตัดเวลาซ้ำทิ้ง (กดเพิ่มแล้วลืมแก้ = ได้สองสายเวลาเดียวกัน)
-    const times = [...new Set(scheduledAts.filter(Boolean))].sort();
+    const times = [...new Set(effectiveAts.filter(Boolean))].sort();
     /** ค่าวันล้วนของ "ยังไม่ชัวร์เวลา" (YYYY-MM-DD) → เที่ยงคืนไทย (ห้ามให้ new Date ตีเป็น UTC) */
     const localToDate = (t: string) => (/^\d{4}-\d{2}-\d{2}$/.test(t) ? new Date(`${t}T00:00:00+07:00`) : new Date(t));
     if (times.length === 0) {
@@ -966,7 +980,7 @@ const FollowPage: React.FC = () => {
      * เวลาซ้ำกันเก็บเบอร์ของช่องแรกที่เจอ (ช่องที่ซ้ำถูกตัดทิ้งอยู่แล้ว)
      */
     const phoneByLocal = new Map<string, string>();
-    scheduledAts.forEach((v, i) => {
+    effectiveAts.forEach((v, i) => {
       if (v && !phoneByLocal.has(v)) phoneByLocal.set(v, (staffPhones[i] || '').trim());
     });
     const phoneByIso = new Map<string, string>();
@@ -976,14 +990,14 @@ const FollowPage: React.FC = () => {
      * เพราะถูก dedup + sort มาแล้ว (ใช้ index ตรง ๆ = บทไปโผล่ผิดรอบเงียบ ๆ)
      */
     const roundByLocal = new Map<string, number>();
-    scheduledAts.forEach((v, i) => {
+    effectiveAts.forEach((v, i) => {
       if (v && !roundByLocal.has(v)) roundByLocal.set(v, callRounds[i] ?? i + 1);
     });
     const roundByIso = new Map<string, number>();
     times.forEach((t, i) => roundByIso.set(isoTimes[i], roundByLocal.get(t) ?? 1));
     /** แมป **เวลา → ใครโทร** แบบเดียวกับเบอร์/เลขสาย (ห้ามใช้ index ของ `times`) */
     const modeByLocal = new Map<string, 'ai' | 'manual' | 'tbd'>();
-    scheduledAts.forEach((v, i) => {
+    effectiveAts.forEach((v, i) => {
       if (v && !modeByLocal.has(v)) modeByLocal.set(v, callModes[i] ?? 'ai');
     });
     const modeByIso = new Map<string, 'ai' | 'manual' | 'tbd'>();
@@ -1197,9 +1211,25 @@ const FollowPage: React.FC = () => {
     () => followScopeEntries(items, replaceView ? 'replacement' : 'main'),
     [items, replaceView],
   );
+  /**
+   * ค้นหา + วันที่ของแผน (เจ้าของ 5 ต.ค. 2569: *"เพิ่ม filter ค้นหา ชื่อหน่วยงาน / ชื่อพนักงาน · ครั้งที่ติดตาม"*
+   * → Choice ครั้งที่ติดตาม = วันที่ของแผน) — กรองก่อนทุกอย่าง ⇒ แผงขั้นตอนของสาย ตัวเลขบนตัวกรอง และตาราง ใช้ชุดเดียวกัน
+   * ช่องค้นหาอยู่แถบบนตามกติกาทั้งระบบ (`useHeaderSearch`)
+   */
+  const [followSearch, setFollowSearch] = useState('');
+  const [planDay, setPlanDay] = useState<string>('all');
+  useHeaderSearch({ value: followSearch, onChange: setFollowSearch, placeholder: 'ค้นหาชื่อ หน่วยงาน เบอร์' });
+  const searchedItems = useMemo(
+    () => (followSearch.trim() ? scopeItems.filter((e) => matchesFollowSearch(e, followSearch)) : scopeItems),
+    [scopeItems, followSearch],
+  );
+  const planScopedItems = useMemo(
+    () => (planDay === 'all' ? searchedItems : searchedItems.filter((e) => followPlanDayOf(e) === Number(planDay))),
+    [searchedItems, planDay],
+  );
   const filtered = useMemo(
-    () => filterFollowEntries(scopeItems, { date: fDate, band: fBand, caller, owner: adderKey }),
-    [scopeItems, fDate, fBand, caller, adderKey],
+    () => filterFollowEntries(planScopedItems, { date: fDate, band: fBand, caller, owner: adderKey }),
+    [planScopedItems, fDate, fBand, caller, adderKey],
   );
   /**
    * แผงรอบโทรนับตาม **วันที่เลือก** และสลับดู **ทั้งเดือน** ได้ (เจ้าของเคาะ 3 ต.ค. 2569:
@@ -1211,16 +1241,21 @@ const FollowPage: React.FC = () => {
   const [panelRange, setPanelRange] = useState<'day' | 'month'>('day');
   const panelDay = fDate || toYmdBangkok(new Date());
   /** สายในช่วงที่แผงดูอยู่ (วันเดียว/ทั้งเดือน) — ก่อนตัวกรองใครโทร */
-  const panelScope = useMemo(
-    () =>
-      scopeItems.filter((e) => {
-        if (!e.scheduled_at) return false;
-        const d = new Date(e.scheduled_at);
-        if (Number.isNaN(d.getTime())) return false;
-        const ymd = toYmdBangkok(d);
-        return panelRange === 'month' ? ymd.slice(0, 7) === calMonth : ymd === panelDay;
-      }),
-    [scopeItems, panelRange, panelDay, calMonth],
+  const inPanelRange = useCallback(
+    (e: FollowEntry) => {
+      if (!e.scheduled_at) return false;
+      const d = new Date(e.scheduled_at);
+      if (Number.isNaN(d.getTime())) return false;
+      const ymd = toYmdBangkok(d);
+      return panelRange === 'month' ? ymd.slice(0, 7) === calMonth : ymd === panelDay;
+    },
+    [panelRange, panelDay, calMonth],
+  );
+  const panelScope = useMemo(() => planScopedItems.filter(inPanelRange), [planScopedItems, inPanelRange]);
+  /** ตัวเลือก "วันที่ของแผน" นับในช่วงที่ดู (หลังค้นหา ก่อนเลือกวันที่ของแผน) */
+  const planDayOptions = useMemo(
+    () => followPlanDayOptions(searchedItems.filter((e) => inPanelRange(e) && followRoundSlot(e) !== null)),
+    [searchedItems, inPanelRange],
   );
   /** สายในช่วงที่ดูอยู่ + เจ้าของงาน (ยังไม่กรองใครโทร) — ฐานของเลขบนตัวเลือก "ใครโทร" */
   const panelByOwner = useMemo(
@@ -1597,6 +1632,21 @@ const FollowPage: React.FC = () => {
                   onChange={(v) => setAdderFilter(v)}
                   ariaLabel="เจ้าของงาน"
                   active={adderFilter !== 'all'}
+                />
+                {/* ครั้งที่ติดตาม = วันที่ของแผน (เจ้าของ Choice 5 ต.ค. 2569) */}
+                <span className="text-xs text-muted-foreground">วันที่ของแผน</span>
+                <ChoiceDropdown
+                  value={planDay}
+                  options={[
+                    { value: 'all', label: `ทุกวัน · ${planDayOptions.reduce((n, o) => n + o.count, 0).toLocaleString('th-TH')}` },
+                    ...planDayOptions.map((o) => ({
+                      value: String(o.day),
+                      label: `วันที่ ${o.day} · ${o.count.toLocaleString('th-TH')}`,
+                    })),
+                  ]}
+                  onChange={(v) => setPlanDay(v)}
+                  ariaLabel="วันที่ของแผน"
+                  active={planDay !== 'all'}
                 />
               </>
             </FollowFilterGroup>
@@ -2290,13 +2340,27 @@ const FollowPage: React.FC = () => {
                           <div key={d} className="space-y-1.5 rounded-xl border border-border/70 p-2.5">
                             <p className="text-xs font-medium text-foreground">{label}</p>
                             {list.map((v, i) => (
-                              <div key={i} className="flex items-center gap-2">
-                                <TimeSelect24
-                                  value={v}
-                                  onChange={(next) => setDayTimeAt(d, i, next)}
-                                  label={`${label} สายที่ ${i + 1}`}
-                                  className="min-h-[46px] flex-1"
-                                />
+                              <div key={i} className="flex flex-wrap items-center gap-2">
+                                {v === SCHEDULE_TBD ? (
+                                  <span className={cn('min-h-[46px] flex-1 content-center text-sm', TONE.warn.value)}>
+                                    สายที่ {i + 1} · ยังไม่ชัวร์เวลา
+                                  </span>
+                                ) : (
+                                  <TimeSelect24
+                                    value={v}
+                                    onChange={(next) => setDayTimeAt(d, i, next)}
+                                    label={`${label} สายที่ ${i + 1}`}
+                                    className="min-h-[46px] flex-1"
+                                  />
+                                )}
+                                <label className="flex cursor-pointer items-center gap-1.5">
+                                  <Checkbox
+                                    checked={v === SCHEDULE_TBD}
+                                    onCheckedChange={(on) => setDayTimeAt(d, i, on ? SCHEDULE_TBD : '08:00')}
+                                    aria-label={`${label} สายที่ ${i + 1} ยังไม่ชัวร์เวลา`}
+                                  />
+                                  <span className="text-xs text-muted-foreground">ยังไม่ชัวร์เวลา</span>
+                                </label>
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -2320,7 +2384,7 @@ const FollowPage: React.FC = () => {
                   ) : (
                     <>
                   {roundTimes.map((v, i) => (
-                    <div key={i} className="flex items-center gap-2">
+                    <div key={i} className="flex flex-wrap items-center gap-2">
                       {/**
                        * 🔴 **ห้ามกลับไปใช้ `<input type="time">`** (เจ้าของทัก 20 ก.ย. 2569:
                        * *"หน้าการติดตาม บางคนยังขึ้น am pm อยู่เลย"*)
@@ -2330,12 +2394,27 @@ const FollowPage: React.FC = () => {
                        * คนละหน้าจอกันทั้งที่เป็นข้อมูลชุดเดียวกัน · `lang` ของหน้าเว็บสั่งไม่ได้
                        * (ลองแล้ว Chrome ไม่สนใจ) ⇒ ต้องเลิกใช้ช่องของเบราว์เซอร์
                        */}
-                      <TimeSelect24
-                        value={v}
-                        onChange={(next) => setRoundAt(i, next)}
-                        label={`สายที่ ${i + 1}`}
-                        className="min-h-[46px] flex-1"
-                      />
+                      {v === SCHEDULE_TBD ? (
+                        <span className={cn('min-h-[46px] flex-1 content-center text-sm', TONE.warn.value)}>
+                          สายที่ {i + 1} · ยังไม่ชัวร์เวลา
+                        </span>
+                      ) : (
+                        <TimeSelect24
+                          value={v}
+                          onChange={(next) => setRoundAt(i, next)}
+                          label={`สายที่ ${i + 1}`}
+                          className="min-h-[46px] flex-1"
+                        />
+                      )}
+                      {/* ยังไม่ชัวร์เวลา (เจ้าของ 5 ต.ค. 2569 · Choice "เลือกได้ทีละสาย") — สายนี้ทุกวันเป็นคนโทร ไปเติมเวลาทีหลัง */}
+                      <label className="flex cursor-pointer items-center gap-1.5">
+                        <Checkbox
+                          checked={v === SCHEDULE_TBD}
+                          onCheckedChange={(on) => setRoundAt(i, on ? SCHEDULE_TBD : '08:00')}
+                          aria-label={`สายที่ ${i + 1} ยังไม่ชัวร์เวลา`}
+                        />
+                        <span className="text-xs text-muted-foreground">ยังไม่ชัวร์เวลา</span>
+                      </label>
                       <button
                         type="button"
                         onClick={() => removeRound(i)}

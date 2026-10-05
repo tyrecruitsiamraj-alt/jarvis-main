@@ -102,7 +102,7 @@ export function drawFollowDayReport(
   ctx.fillStyle = TONE.primary.hex;
   ctx.font = font(18, 600);
   const pageTag = page && page.total > 1 ? ` · หน้า ${page.index + 1}/${page.total}` : '';
-  ctx.fillText(`แผนติดตามวันที่ ${formatYmdDmyBe(report.ymd)}${pageTag}`, PAD, PAD + 10);
+  ctx.fillText(`แผนติดตามวันที่ ${followDayReportRangeText(report)}${pageTag}`, PAD, PAD + 10);
   ctx.fillStyle = TONE.neutral.hex;
   ctx.font = font(13);
   ctx.fillText(followDayReportSummaryText(report), PAD, PAD + 38);
@@ -221,9 +221,15 @@ export async function downloadFollowDayReportPng(
   for (const [index, rows] of pages.entries()) {
     const canvas = drawFollowDayReport(report, { rows, index, total: pages.length });
     const pageSlug = pages.length > 1 ? `-หน้า${index + 1}จาก${pages.length}` : '';
-    if (await downloadCanvas(canvas, `แผนติดตาม-${report.ymd}${scopeSlug}${pageSlug}.png`)) saved += 1;
+    if (await downloadCanvas(canvas, `แผนติดตาม-${report.ymd}${report.toYmd && report.toYmd !== report.ymd ? `_${report.toYmd}` : ''}${scopeSlug}${pageSlug}.png`)) saved += 1;
     // เว้นจังหวะระหว่างไฟล์ — เบราว์เซอร์บางตัวตัดการดาวน์โหลดที่ยิงติดกันเร็ว ๆ
     if (index < pages.length - 1) await new Promise((r) => window.setTimeout(r, 400));
   }
   return saved;
+}
+
+/** "5/10/2569" หรือ "5/10/2569 – 11/10/2569" — หัวรูป/หัวป๊อปเมื่อเลือกช่วงบนปฏิทิน (5 ต.ค. 2569) */
+export function followDayReportRangeText(report: Pick<FollowDayReport, 'ymd' | 'toYmd'>): string {
+  const to = report.toYmd || report.ymd;
+  return to === report.ymd ? formatYmdDmyBe(report.ymd) : `${formatYmdDmyBe(report.ymd)} – ${formatYmdDmyBe(to)}`;
 }

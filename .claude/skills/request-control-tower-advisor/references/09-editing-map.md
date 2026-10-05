@@ -12008,3 +12008,20 @@ Choice: รายได้เฉลี่ยโชว์ ติ๊กซ่อ�
 | เทสต์ | `tests/api/siamrajJobBenefits.test.ts` |
 
 - มีผลทุกบทที่พูดสวัสดิการ (เสนองานผ่านตัวเติมตอนยิง · ผู้สมัครผ่านลิงก์)
+
+## 5 ต.ค. 2569 (ดึก): หน้าติดตาม — ยังไม่ชัวร์เวลา (บั๊กเลขสาย + ตารางหลายวัน) · ค้นหา · วันที่ของแผน · สรุปแผนหลายวัน · แถบหน้า 1/N
+
+เจ้าของส่งรายการ 2–4 · Choice: ยังไม่ชัวร์เวลาในตารางหลายวัน = เลือกทีละสาย · แยกคนโทร = ใช้ตัวกรองใครโทรที่มีอยู่ ·
+ครั้งที่ติดตาม = วันที่ของแผน · สรุปแผนหลายวัน = เลือกช่วงบนปฏิทินอย่างเดียว · *"แถบหน้า 1 2 3 4 มันเยอะไปทำให้มันแบบเป็น 1/..."*
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/followTbd.ts` (**ใหม่**) · `FollowPage.tsx` | `tbdPlaceholderAts` — สายยังไม่ชัวร์เวลาวันเดียวกันได้เวลาแทนคนละนาที (เดิมค่าเหมือนกัน ⇒ ตัวตัดซ้ำรวมเป็นสายเดียว + เลขสายชน) |
+| `src/lib/followWizard.ts` | `SCHEDULE_TBD` · `scheduleDaySlots` (มีสายยังไม่ชัวร์เวลา = เรียงตามแถว) · `ScheduleCall.timeTbd` · ตรวจฟอร์มนับสายยังไม่ชัวร์เวลา |
+| `src/pages/follow/FollowPage.tsx` | ตารางหลายวัน: ช่องติ๊ก "ยังไม่ชัวร์เวลา" ทุกแถวเวลา (ทั้งชุดเดียว/รายวัน) · ส่ง `time_tbd` ต่อสาย · ค้นหาแถบบน (`useHeaderSearch`) · ตัวกรอง "วันที่ของแผน" · ชุดกรอง `searchedItems` → `planScopedItems` ก่อน `filtered`/`panelScope` |
+| `src/lib/followListFilter.ts` | `matchesFollowSearch` · `followPlanDayOf` · `followPlanDayOptions` · ป้าย tbd = "ยังไม่ชัวร์เวลา" (ตัวกรองนี้มีอยู่แล้วในใครโทร) |
+| `src/lib/followDayReport.ts` · `followDayReportImage.ts` · `FollowDayReportDialog.tsx` | ช่วงวัน (`{from,to}` · เพดาน 62 วัน · หลายวันติดวันหน้าเวลา) · `planDay` · `planDays` · `followDayReportRangeText` · ชื่อไฟล์รูปบอกช่วง · ป๊อปใช้ `DateRangeCalendarPicker` + dropdown วันที่ของแผน |
+| `src/components/follow/FollowPlanningCalendar.tsx` | แถบหน้ารายวัน/รายเดือน = "‹ 1/N ›" (เลิกปุ่มเลขทุกหน้า) |
+| เทสต์ | `src/lib/followTbd.test.ts` (ใหม่) · followDayReport · followListFilter · followDayReportPager2569-10-05 · FollowPlanningCalendar |
+
+- มีอยู่แล้ว (ไม่ได้ทำเพิ่ม): กดจัดการแล้วย้ายกล่อง · ตัวกรองเจ้าของงาน · ใครโทร · สายที่ในสรุปแผน

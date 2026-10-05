@@ -201,7 +201,8 @@ export const FOLLOW_CALLER_LABEL: Record<FollowCaller, string> = {
   all: 'ทั้งหมด',
   ai: 'AI โทร',
   manual: 'คนโทร',
-  tbd: 'ยังไม่ระบุเวลา',
+  // คำเดียวกับฟอร์มเพิ่มคน (เจ้าของ 5 ต.ค. 2569 ถามหาตัวกรอง "ยังไม่ชัวร์เวลา" — มีอยู่แล้วแต่คนละคำ)
+  tbd: 'ยังไม่ชัวร์เวลา',
 };
 
 export function followCallerOf(e: Pick<FollowEntry, 'call_mode'>): 'ai' | 'manual' {
@@ -236,6 +237,46 @@ export function countFollowCallerResults(
     if (inFollowRoundBucket(e, 'connected')) side.done += 1;
   }
   return out;
+}
+
+/**
+ * ค้นหาบนหน้าติดตาม (เจ้าของ 5 ต.ค. 2569: *"เพิ่ม filter ค้นหา ชื่อหน่วยงาน / ชื่อพนักงาน"*)
+ * ชื่อคนที่ติดตาม · หน่วยงาน · รหัสไซต์ · เบอร์ (ตัวเลขล้วน) — ไม่สนตัวพิมพ์/ช่องว่างซ้ำ · ว่าง = ผ่านหมด
+ */
+export function matchesFollowSearch(
+  e: Pick<FollowEntry, 'recipient_name' | 'recipient_phone' | 'unit_name' | 'site_code'>,
+  q: string,
+): boolean {
+  const needle = q.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!needle) return true;
+  const hay = [e.recipient_name, e.unit_name, e.site_code].map((v) => (v ?? '').toLowerCase().replace(/\s+/g, ' '));
+  if (hay.some((h) => h.includes(needle))) return true;
+  const digits = needle.replace(/\D/g, '');
+  if (digits.length >= 3) {
+    const phone = (e.recipient_phone ?? '').replace(/\D/g, '');
+    const local = phone.startsWith('66') ? `0${phone.slice(2)}` : phone;
+    return phone.includes(digits) || local.includes(digits);
+  }
+  return false;
+}
+
+/**
+ * "ครั้งที่ติดตาม" = **วันที่ของแผน** (เจ้าของ Choice 5 ต.ค. 2569) — วันที่ 1 / 2 / 3 ของชุดนั้น
+ * ชุดวันเดียว (`call_day` null) = วันที่ 1 · ไม่มีเวลา = null
+ */
+export function followPlanDayOf(e: Pick<FollowEntry, 'call_day' | 'scheduled_at'>): number | null {
+  if (!e.scheduled_at) return null;
+  return typeof e.call_day === 'number' && e.call_day > 0 ? e.call_day : 1;
+}
+
+/** ตัวเลือก "วันที่ของแผน" ที่มีจริงในชุด + จำนวนสาย (เรียงวัน) */
+export function followPlanDayOptions(entries: readonly FollowEntry[]): Array<{ day: number; count: number }> {
+  const by = new Map<number, number>();
+  for (const e of entries) {
+    const d = followPlanDayOf(e);
+    if (d !== null) by.set(d, (by.get(d) ?? 0) + 1);
+  }
+  return [...by.entries()].sort((a, b) => a[0] - b[0]).map(([day, count]) => ({ day, count }));
 }
 
 /** กรองรอบด้วยแท็บ + วันที่ + ช่วงเวลา + เจ้าของงาน (ทุกเงื่อนไข AND กัน) */
