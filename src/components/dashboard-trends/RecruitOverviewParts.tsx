@@ -80,7 +80,7 @@ export function OverviewCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className={cn('flex min-w-0 flex-col gap-4 rounded-2xl p-4', className)}>
+    <Card className={cn('flex min-w-0 flex-col gap-3 rounded-2xl p-3 sm:p-4', className)}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-3">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
@@ -110,7 +110,8 @@ export function EmptyNote({ children }: { children: React.ReactNode }) {
   return <p className={cn('py-6 text-center text-xs', DASH.sub)}>{children}</p>;
 }
 
-/** การ์ดตัวเลขแถวบน (แบบ iRecruit) — ไอคอน + ชื่อ · เลขใหญ่ + เทียบเดือนก่อน · บรรทัดล่าง */
+/** การ์ดตัวเลขแถวบน (แบบ iRecruit) — ไอคอน + ชื่อ · เลขใหญ่ + เทียบเดือนก่อน · บรรทัดล่าง
+ *  แบบ C (5 ต.ค. 2569): ช่องไฟแคบลง · ยังเป็นการ์ดเพราะมีเทียบเดือนก่อน + บรรทัดล่าง (ยุบเป็นชิปแล้วข้อมูลหาย) */
 export function OverviewKpi({
   icon: Icon,
   label,
@@ -126,7 +127,7 @@ export function OverviewKpi({
   foot?: React.ReactNode;
 }) {
   return (
-    <Card className="flex min-w-0 flex-col gap-2 rounded-2xl p-4">
+    <Card className="flex min-w-0 flex-col gap-1.5 rounded-2xl p-3">
       <p className={cn('flex items-center gap-2 text-xs', DASH.sub)}>
         <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
           <Icon className="size-3.5" aria-hidden />
@@ -358,7 +359,7 @@ export function DailyCard({ rows, icon }: { rows: readonly DailyRow[]; icon: Luc
                 {withNames.length === 0 ? (
                   <tr className={cn('border-t', DASH.tableRow)}>
                     <td colSpan={8} className={cn('px-2 py-4 text-center text-xs', DASH.sub)}>
-                      ยังไม่มีรายชื่อในเดือนนี้
+                      ยังไม่มีรายชื่อในช่วงนี้
                     </td>
                   </tr>
                 ) : null}
@@ -474,7 +475,7 @@ export function ChannelTable({ rows, total }: { rows: readonly ChannelRow[]; tot
 }
 
 export function PositionList({ rows }: { rows: readonly PositionRow[] }) {
-  if (rows.length === 0) return <EmptyNote>ยังไม่มีรายชื่อในเดือนนี้</EmptyNote>;
+  if (rows.length === 0) return <EmptyNote>ยังไม่มีรายชื่อในช่วงนี้</EmptyNote>;
   return (
     <ul className="space-y-3">
       {rows.map((r) => (
@@ -566,7 +567,7 @@ export function StaffTable({ staff, ai }: { staff: readonly RecruitStaffRow[]; a
           {rows.length === 0 ? (
             <tr className={cn('border-t', DASH.tableRow)}>
               <td colSpan={7} className={cn('px-2 py-4 text-center text-xs', DASH.sub)}>
-                เดือนนี้ยังไม่มีเจ้าหน้าที่ลงผล
+                ช่วงนี้ยังไม่มีเจ้าหน้าที่ลงผล
               </td>
             </tr>
           ) : (

@@ -88,3 +88,51 @@ export function monthOptions(first: string | null, last: string): string[] {
   }
   return out;
 }
+
+/**
+ * ═══ ดูเป็นรายวัน / ช่วงที่เลือกเอง (เจ้าของสั่ง 5 ต.ค. 2569: *"ตอนนี้ดูได้แค่แบบเดือนแต่อยากดูแบบรายวันหรือ ช่วงได้ด้วย"*) ═══
+ * - วันเดียว = from เท่ากับ to · เลือกกลับด้าน = สลับให้ · เลยวันนี้ = ตัดที่วันนี้
+ * - ช่วงที่เทียบ = **ยาวเท่ากัน ติดกันก่อนหน้า** (เลือก 3 วัน เทียบ 3 วันก่อนนั้น · วันเดียวเทียบเมื่อวาน)
+ * - ยาวสุด `RANGE_MAX_DAYS` วัน (กราฟรายวันวาดได้เท่านี้ — `dailyRows`) · เกิน = นับย้อนจากวันท้าย
+ * - ค่าผิด = null (ผู้เรียกถอยไปแบบเดือน)
+ */
+export const RANGE_MAX_DAYS = 62;
+
+const DAY_MS = 86_400_000;
+const ymdToDay = (ymd: string) => Math.round(Date.parse(`${ymd}T00:00:00Z`) / DAY_MS);
+const dayToYmd = (day: number) => new Date(day * DAY_MS).toISOString().slice(0, 10);
+
+export function isYmd(v: unknown): v is string {
+  return typeof v === 'string' && YMD_RE.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
+}
+
+export function rangeWindow(fromParam: unknown, toParam: unknown, today: string): RecruitOverviewWindow | null {
+  if (!YMD_RE.test(today)) throw new Error(`today ต้องเป็น YYYY-MM-DD: ${today}`);
+  if (!isYmd(fromParam) || !isYmd(toParam)) return null;
+  let a = ymdToDay(fromParam);
+  let b = ymdToDay(toParam);
+  if (a > b) [a, b] = [b, a];
+  const t = ymdToDay(today);
+  if (a > t) return null;
+  b = Math.min(b, t);
+  a = Math.max(a, b - (RANGE_MAX_DAYS - 1));
+  const len = b - a + 1;
+  const from = dayToYmd(a);
+  const to = dayToYmd(b);
+  return {
+    month: from.slice(0, 7),
+    from,
+    to,
+    prevFrom: dayToYmd(a - len),
+    prevTo: dayToYmd(a - 1),
+    isCurrent: b === t,
+    range: true,
+  };
+}
+
+/** เลื่อนช่วงไปก่อน/หลังเท่าความยาวของมัน (ปุ่ม ‹ › ตอนดูเป็นช่วง) */
+export function shiftRange(win: { from: string; to: string }, delta: number): { from: string; to: string } {
+  const a = ymdToDay(win.from);
+  const len = ymdToDay(win.to) - a + 1;
+  return { from: dayToYmd(a + delta * len), to: dayToYmd(a + delta * len + len - 1) };
+}

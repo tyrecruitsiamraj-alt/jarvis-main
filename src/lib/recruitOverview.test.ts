@@ -21,7 +21,7 @@ import {
   staffTableRows,
   totalsOf,
 } from './recruitOverview';
-import { monthLabel, monthOptions, monthWindow, shiftMonth } from './recruitOverviewWindow';
+import { RANGE_MAX_DAYS, monthLabel, monthOptions, monthWindow, rangeWindow, shiftMonth, shiftRange } from './recruitOverviewWindow';
 import type { RecruitAppFact } from './recruitOverviewTypes';
 
 const fact = (over: Partial<RecruitAppFact> = {}): RecruitAppFact => ({
@@ -267,5 +267,37 @@ describe('ผลงานรายคน', () => {
     expect(rows.find((r) => r.name === 'แบงค์')?.showRate).toBe(100);
     expect(rows.find((r) => r.name === 'คิว')?.showRate).toBeNull();
     expect(ai).toMatchObject({ called: 99, reached: 72, saidYes: 64 });
+  });
+});
+
+describe('ดูเป็นรายวัน / ช่วง (เจ้าของสั่ง 5 ต.ค. 2569)', () => {
+  it('วันเดียว = เทียบเมื่อวาน · ช่วง 3 วัน = เทียบ 3 วันก่อนหน้าติดกัน', () => {
+    expect(rangeWindow('2026-10-05', '2026-10-05', '2026-10-05')).toEqual({
+      month: '2026-10',
+      from: '2026-10-05',
+      to: '2026-10-05',
+      prevFrom: '2026-10-04',
+      prevTo: '2026-10-04',
+      isCurrent: true,
+      range: true,
+    });
+    const w = rangeWindow('2026-09-28', '2026-09-30', '2026-10-05');
+    expect([w?.from, w?.to, w?.prevFrom, w?.prevTo, w?.isCurrent]).toEqual(['2026-09-28', '2026-09-30', '2026-09-25', '2026-09-27', false]);
+  });
+
+  it('กลับด้าน = สลับ · เลยวันนี้ = ตัดที่วันนี้ · ยาวเกิน = นับย้อนจากวันท้าย · ค่าผิด/อนาคตทั้งช่วง = null', () => {
+    expect(rangeWindow('2026-10-03', '2026-10-01', '2026-10-05')?.from).toBe('2026-10-01');
+    expect(rangeWindow('2026-10-01', '2026-12-31', '2026-10-05')?.to).toBe('2026-10-05');
+    const long = rangeWindow('2026-01-01', '2026-10-05', '2026-10-05');
+    expect(long?.from).toBe('2026-08-05');
+    expect(dailyRows([], long!.from, long!.to)).toHaveLength(RANGE_MAX_DAYS);
+    expect(rangeWindow('2026-13-01', '2026-10-05', '2026-10-05')).toBeNull();
+    expect(rangeWindow("1=1'", '2026-10-05', '2026-10-05')).toBeNull();
+    expect(rangeWindow('2026-11-01', '2026-11-02', '2026-10-05')).toBeNull();
+  });
+
+  it('‹ › เลื่อนทีละความยาวช่วง', () => {
+    expect(shiftRange({ from: '2026-10-05', to: '2026-10-05' }, -1)).toEqual({ from: '2026-10-04', to: '2026-10-04' });
+    expect(shiftRange({ from: '2026-09-28', to: '2026-09-30' }, 1)).toEqual({ from: '2026-10-01', to: '2026-10-03' });
   });
 });

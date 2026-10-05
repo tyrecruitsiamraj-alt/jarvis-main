@@ -87,8 +87,10 @@ export type RecruitOverviewWindow = {
   to: string;
   prevFrom: string;
   prevTo: string;
-  /** เดือนนี้ยังไม่จบ (ปลายช่วง = วันนี้ · เทียบเดือนก่อนถึงวันที่เดียวกัน) */
+  /** เดือนนี้ยังไม่จบ (ปลายช่วง = วันนี้ · เทียบเดือนก่อนถึงวันที่เดียวกัน) · แบบช่วง = ปลายช่วงคือวันนี้ */
   isCurrent: boolean;
+  /** ช่วงที่เลือกเอง (รายวัน/ช่วง · 5 ต.ค. 2569) — เทียบช่วงยาวเท่ากันก่อนหน้า · ไม่มี = แบบเดือน */
+  range?: boolean;
 };
 
 export type RecruitOverviewResponse = {

@@ -29,7 +29,8 @@ import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import { rangeText } from '@/lib/teamOnline';
 import { shortTime } from '@/lib/dateTh';
 import { fetchRecruitOverview } from '@/lib/recruitOverviewApi';
-import { monthLabel, monthOptions, shiftMonth } from '@/lib/recruitOverviewWindow';
+import { monthLabel, monthOptions, shiftMonth, shiftRange } from '@/lib/recruitOverviewWindow';
+import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import {
   channelRows,
   cohortOf,
@@ -115,20 +116,29 @@ const RecruitOverview: React.FC<{
   published?: BoardPublishedTotals | null;
 }> = ({ published = null }) => {
   /** null = เดือนนี้ (ให้เส้นตัดสินจากวันไทยของ server) */
-  const [month, setMonth] = useState<string | null>(null);
+  const [month, setMonthState] = useState<string | null>(null);
+  /**
+   * ช่วงที่เลือกเอง — รายวันหรือช่วง (เจ้าของสั่ง 5 ต.ค. 2569: *"อยากดูแบบรายวันหรือ ช่วงได้ด้วย"*)
+   * มีค่า = ไม่ใช้เดือน · เลือกเดือนจากปุ่มเดือน = กลับแบบเดือน
+   */
+  const [range, setRange] = useState<DateRangeYmd | null>(null);
+  const setMonth = (m: string) => {
+    setRange(null);
+    setMonthState(m);
+  };
   const [rev, setRev] = useState(0);
   const [state, setState] = useState<Load>({ data: null, loading: true, error: null });
 
   useEffect(() => {
     let cancelled = false;
     setState((s) => ({ ...s, loading: true, error: null }));
-    fetchRecruitOverview(month)
+    fetchRecruitOverview(month, range)
       .then((data) => !cancelled && setState({ data, loading: false, error: null }))
       .catch((e: unknown) => !cancelled && setState((s) => ({ ...s, loading: false, error: e instanceof Error ? e.message : 'โหลดไม่สำเร็จ' })));
     return () => {
       cancelled = true;
     };
-  }, [month, rev]);
+  }, [month, range, rev]);
 
   const data = state.data;
   const win = data?.window ?? null;
@@ -177,23 +187,31 @@ const RecruitOverview: React.FC<{
   const { cur, prev } = view;
   const current = data.today.slice(0, 7);
   const options = monthOptions(data.firstDay ? data.firstDay.slice(0, 7) : null, current);
-  const canPrev = options.includes(shiftMonth(win.month, -1));
-  const canNext = win.month < current;
+  /** แบบช่วง: ‹ › เลื่อนทีละความยาวช่วง (วันเดียว = ทีละวัน) · ห้ามเลยวันนี้/ก่อนวันแรกที่มีข้อมูล */
+  const isRange = Boolean(win.range);
+  const prevRange = shiftRange(win, -1);
+  const canPrev = isRange ? !data.firstDay || prevRange.to >= data.firstDay : options.includes(shiftMonth(win.month, -1));
+  const canNext = isRange ? win.to < data.today : win.month < current;
+  const goPrev = () => (isRange ? setRange(prevRange) : setMonth(shiftMonth(win.month, -1)));
+  const goNext = () => (isRange ? setRange(shiftRange(win, 1)) : setMonth(shiftMonth(win.month, 1)));
+  /** คำเรียกช่วงในหัวการ์ด — แบบเดือน "เดือนนี้" · แบบช่วง "ช่วงนี้" */
+  const period = isRange ? 'ช่วงนี้' : 'เดือนนี้';
+  const prevWord = isRange ? 'ช่วงก่อน' : 'เดือนก่อน';
   const appsError = data.errors.apps ?? null;
 
   const compareNote = [
     view.prev
       ? `เทียบกับ ${rangeText({ from: win.prevFrom, to: win.prevTo })}`
       : view.prevPartial && data.firstDay
-        ? `ไม่เทียบเดือนก่อน ข้อมูลเพิ่งเริ่ม ${rangeText({ from: data.firstDay, to: data.firstDay })}`
-        : 'เดือนก่อนยังไม่มีข้อมูล',
+        ? `ไม่เทียบ${prevWord} ข้อมูลเพิ่งเริ่ม ${rangeText({ from: data.firstDay, to: data.firstDay })}`
+        : `${prevWord}ยังไม่มีข้อมูล`,
     `ข้อมูล ณ ${shortTime(data.generatedAt)} น.`,
   ]
     .filter(Boolean)
     .join(' · ');
 
   return (
-    <div className={cn('space-y-4', state.loading && 'opacity-70')}>
+    <div className={cn('space-y-3', state.loading && 'opacity-70')}>
       {/* ─── หัว: ชื่อ + เลือกเดือน (แบบ iRecruit) ─── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-medium text-foreground">ภาพรวมงานสรรหา</h2>
@@ -202,9 +220,9 @@ const RecruitOverview: React.FC<{
             type="button"
             size="iconXs"
             variant="outline"
-            aria-label="เดือนก่อน"
+            aria-label={isRange ? 'ช่วงก่อน' : 'เดือนก่อน'}
             disabled={!canPrev}
-            onClick={() => setMonth(shiftMonth(win.month, -1))}
+            onClick={goPrev}
           >
             <ChevronLeft aria-hidden />
           </Button>
@@ -218,12 +236,19 @@ const RecruitOverview: React.FC<{
             type="button"
             size="iconXs"
             variant="outline"
-            aria-label="เดือนถัดไป"
+            aria-label={isRange ? 'ช่วงถัดไป' : 'เดือนถัดไป'}
             disabled={!canNext}
-            onClick={() => setMonth(shiftMonth(win.month, 1))}
+            onClick={goNext}
           >
             <ChevronRight aria-hidden />
           </Button>
+          {/* รายวัน/ช่วง (5 ต.ค. 2569) — เลือกวันเดียว = รายวัน · "ทั้งเดือน" = กลับแบบเดือน */}
+          <DateRangeCalendarPicker
+            triggerVariant="filter"
+            emptyLabel="ทั้งเดือน"
+            value={isRange ? { from: win.from, to: win.to } : null}
+            onChange={setRange}
+          />
           <Button type="button" size="iconXs" variant="outline" aria-label="โหลดใหม่" onClick={() => setRev((n) => n + 1)}>
             <RefreshCw className={cn(state.loading && 'animate-spin')} aria-hidden />
           </Button>
@@ -286,26 +311,26 @@ const RecruitOverview: React.FC<{
       </div>
 
       {/* ─── เส้นทางของรายชื่อ + งานค้างตอนนี้ ─── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <OverviewCard
           icon={Filter}
           title="เส้นทางของรายชื่อ"
-          sub="รายชื่อที่เข้ามาเดือนนี้ ไปถึงขั้นไหนแล้ว"
+          sub={`รายชื่อที่เข้ามา${period} ไปถึงขั้นไหนแล้ว`}
           className="lg:col-span-2"
         >
           {/* 🔴 เดือนที่ยังไม่มีรายชื่อ = ขั้นครบเป็น 0 (เจ้าของสั่ง 1 ต.ค. 2569 — สลับเดือนแล้วการ์ดห้ามย่อ/ขยายเอง) */}
-          {apps ? <FunnelList steps={view.steps} /> : <EmptyNote>ยังไม่มีรายชื่อในเดือนนี้</EmptyNote>}
+          {apps ? <FunnelList steps={view.steps} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
           {data.errors.board ? <p className={cn('text-xs', TONE.warn.value)}>{data.errors.board}</p> : null}
         </OverviewCard>
-        <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="สถานะวันนี้ ไม่ขึ้นกับเดือนที่เลือก">
+        <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={`สถานะวันนี้ ไม่ขึ้นกับ${isRange ? 'ช่วง' : 'เดือน'}ที่เลือก`}>
           {data.backlog ? <BacklogBody backlog={data.backlog} /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
         </OverviewCard>
       </div>
 
       {/* ─── กรอกแล้วโทรวันไหน + รายวัน ─── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <OverviewCard icon={Timer} title="กรอกแล้วโทรวันไหน" sub="นับครบ 24 ชม. เป็น 1 วัน">
-          {apps ? <DelayList rows={view.delay} /> : <EmptyNote>ยังไม่มีรายชื่อในเดือนนี้</EmptyNote>}
+          {apps ? <DelayList rows={view.delay} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
         </OverviewCard>
         <div className="min-w-0 lg:col-span-2">
           <DailyCard rows={view.daily} icon={BarChart3} />
@@ -313,22 +338,22 @@ const RecruitOverview: React.FC<{
       </div>
 
       {/* ─── ช่องทาง + ตำแหน่ง ─── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <OverviewCard icon={Megaphone} title="ช่องทางการสมัคร" sub="รายชื่อเดือนนี้มาจากช่องทางไหน" className="lg:col-span-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <OverviewCard icon={Megaphone} title="ช่องทางการสมัคร" sub={`รายชื่อ${period}มาจากช่องทางไหน`} className="lg:col-span-2">
           <ChannelTable rows={view.channels.rows} total={view.channels.total} />
         </OverviewCard>
-        <OverviewCard icon={Briefcase} title="ตำแหน่งที่สมัคร" sub="10 อันดับแรกของเดือน">
+        <OverviewCard icon={Briefcase} title="ตำแหน่งที่สมัคร" sub={`10 อันดับแรกของ${isRange ? 'ช่วง' : 'เดือน'}`}>
           <PositionList rows={view.positions} />
         </OverviewCard>
       </div>
 
       {/* ─── เหตุผลที่ไม่สำเร็จ ─── */}
-      <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub="ผลล่าสุดของรายชื่อเดือนนี้ แยกตามขั้น">
+      <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub={`ผลล่าสุดของรายชื่อ${period} แยกตามขั้น`}>
         <ReasonColumns groups={view.reasons} />
       </OverviewCard>
 
       {/* ─── ผลงานรายคน ─── */}
-      <OverviewCard icon={Users} title="ผลงานรายคน" sub="งานที่ลงผลในเดือนนี้ · กดหัวคอลัมน์เพื่อเรียง">
+      <OverviewCard icon={Users} title="ผลงานรายคน" sub={`งานที่ลงผลใน${period} · กดหัวคอลัมน์เพื่อเรียง`}>
         {data.staff ? <StaffTable staff={data.staff} ai={data.ai} /> : <SectionError message={data.errors.staff ?? 'อ่านผลงานรายคนไม่ได้'} />}
       </OverviewCard>
     </div>

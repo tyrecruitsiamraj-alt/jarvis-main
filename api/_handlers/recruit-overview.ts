@@ -1,5 +1,5 @@
 /**
- * GET /api/recruit-overview?month=YYYY-MM — หน้า "ภาพรวมงานสรรหา" แบบ iRecruit (แท็บภาพรวมของกล่องงาน · 30 ก.ย. 2569)
+ * GET /api/recruit-overview?month=YYYY-MM | ?from=YYYY-MM-DD&to=YYYY-MM-DD (รายวัน/ช่วง · 5 ต.ค. 2569) — หน้า "ภาพรวมงานสรรหา" แบบ iRecruit (แท็บภาพรวมของกล่องงาน · 30 ก.ย. 2569)
  *
  * เจ้าของ: *"ทำหน้าภาพรวมให้เหมือน iRecruit ต่อเลย"* → Choice "ทั้งหน้าเป็น iRecruit" · "เลือกเดือนแบบ iRecruit" ·
  * นับโทร/ติดต่อสำเร็จแบบ "AI + คน" แล้ว *"บอกว่า มีกี่ใบที่ประกาศไป แล้วมีรายชื่อมาเท่าไหร่ Ai โทรไปให้ทั้งหมดเท่าไหร่
@@ -46,7 +46,7 @@ import { logError } from '../_lib/logger.js';
 import { INTEREST_VOCAB, classifyCallMicro } from '../../src/lib/callMicroOutcome.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
 import { addDays } from '../../src/lib/trends/timeBuckets.js';
-import { monthWindow } from '../../src/lib/recruitOverviewWindow.js';
+import { monthWindow, rangeWindow } from '../../src/lib/recruitOverviewWindow.js';
 import { fullDaysSince } from '../../src/lib/fullDays.js';
 import type {
   RecruitAiRow,
@@ -342,9 +342,11 @@ export async function buildRecruitOverview(
   monthParam: unknown,
   scope: DepartmentScope,
   now: Date,
+  /** ช่วงที่เลือกเอง (รายวัน/ช่วง · 5 ต.ค. 2569) — ค่าผิด/ไม่ส่ง = แบบเดือน */
+  range?: { from: unknown; to: unknown },
 ): Promise<RecruitOverviewResponse> {
   const today = toBangkokYmd(now);
-  const window = monthWindow(monthParam, today);
+  const window = (range ? rangeWindow(range.from, range.to, today) : null) ?? monthWindow(monthParam, today);
   const bu = scope.mode === 'code' ? normalizeTrendBu(scope.code) : null;
   const body: RecruitOverviewResponse = {
     version: 1,
@@ -437,7 +439,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
   try {
     const scope = await loadMatchingBuScope(req.user);
     const month = typeof req.query?.month === 'string' ? req.query.month.trim() : undefined;
-    const body = await buildRecruitOverview(month, scope, new Date());
+    const from = typeof req.query?.from === 'string' ? req.query.from.trim() : undefined;
+    const to = typeof req.query?.to === 'string' ? req.query.to.trim() : undefined;
+    const body = await buildRecruitOverview(month, scope, new Date(), from && to ? { from, to } : undefined);
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json(body);
   } catch (e) {

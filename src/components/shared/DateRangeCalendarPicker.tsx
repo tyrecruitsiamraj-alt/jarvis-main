@@ -22,6 +22,8 @@ export interface DateRangeCalendarPickerProps {
    * ไม่ส่ง = ช่องแบบฟอร์มเดิม (`jarvis-soft-field`) ทุกหน้าที่ใช้อยู่เหมือนเดิม
    */
   triggerVariant?: 'field' | 'filter';
+  /** คำตอนยังไม่เลือกช่วง (ปุ่ม + ตัวเลือกล้าง) — ไม่ส่ง = "ทั้งหมด" · ภาพรวมใช้ "ทั้งเดือน" (5 ต.ค. 2569) */
+  emptyLabel?: string;
 }
 
 function ymdToDate(ymd: string): Date | undefined {
@@ -30,8 +32,9 @@ function ymdToDate(ymd: string): Date | undefined {
   return new Date(p.y, p.m - 1, p.d);
 }
 
-function formatRangeLabel(value: DateRangeYmd | null): string {
-  if (!value?.from && !value?.to) return 'ทั้งหมด';
+function formatRangeLabel(value: DateRangeYmd | null, emptyLabel = 'ทั้งหมด'): string {
+  if (!value?.from && !value?.to) return emptyLabel;
+  if (value.from && value.to && value.from === value.to) return formatYmdDmyBe(value.from);
   if (value.from && value.to) {
     return `${formatYmdDmyBe(value.from)} – ${formatYmdDmyBe(value.to)}`;
   }
@@ -51,6 +54,15 @@ const PRESETS: { id: string; label: string; build: () => DateRangeYmd | null }[]
     id: 'all',
     label: 'ทั้งหมด',
     build: () => null,
+  },
+  {
+    /** วันเดียว (5 ต.ค. 2569 — ภาพรวมขอดูรายวัน) */
+    id: 'today',
+    label: 'วันนี้',
+    build: () => {
+      const d = toYmdLocal(new Date());
+      return { from: d, to: d };
+    },
   },
   {
     id: 'month',
@@ -76,6 +88,7 @@ const DateRangeCalendarPicker: React.FC<DateRangeCalendarPickerProps> = ({
   className,
   triggerId,
   triggerVariant = 'field',
+  emptyLabel,
 }) => {
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -88,7 +101,7 @@ const DateRangeCalendarPicker: React.FC<DateRangeCalendarPickerProps> = ({
     return { from, to };
   }, [value]);
 
-  const label = formatRangeLabel(value);
+  const label = formatRangeLabel(value, emptyLabel);
 
   const handleSelect = (range: DateRange | undefined) => {
     if (!range) {
@@ -160,7 +173,7 @@ const DateRangeCalendarPicker: React.FC<DateRangeCalendarPickerProps> = ({
                       : 'bg-secondary/80 text-foreground hover:bg-secondary',
                   )}
                 >
-                  {p.label}
+                  {p.id === 'all' && emptyLabel ? emptyLabel : p.label}
                 </button>
               );
             })}
