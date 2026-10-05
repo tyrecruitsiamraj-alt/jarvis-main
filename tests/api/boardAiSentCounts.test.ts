@@ -47,8 +47,10 @@ describe('ฝั่ง client ต้องรับ aiCounts และมี def
   it('type + ส่งต่อ + fallback ครบ', () => {
     expect(CLIENT).toContain('aiCounts: Record<string, { sent: number; total: number }>');
     expect(CLIENT).toContain('aiCounts: body.aiCounts ?? {}');
-    // fallback ตอน !r.ok ต้องมี aiCounts ด้วย
-    const at = CLIENT.indexOf('if (!r.ok) return {');
-    expect(CLIENT.slice(at, at + 120)).toContain('aiCounts: {}');
+    // 🔴 QA 5 ต.ค. 2569: !r.ok ต้องโยน — ก้อนว่างทำให้กล่องงานขึ้น "ยังไม่มีผู้สมัคร" ทุกใบตอน server พัง
+    // (การ์ดขึ้น "โหลดยอดผู้สมัครไม่ได้" แทน · ดู tests/api/qaLoadingErrorStates2569-10-05.test.ts)
+    const fn = CLIENT.slice(CLIENT.indexOf('export async function fetchJobApplicantBreakdown'));
+    expect(fn.slice(0, 400)).toMatch(/if \(!r\.ok\) throw new Error/);
+    expect(fn.slice(0, 400)).not.toContain('if (!r.ok) return {');
   });
 });

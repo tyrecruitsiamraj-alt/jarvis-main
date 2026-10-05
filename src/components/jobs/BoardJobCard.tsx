@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowRight, Ban, Banknote, Building2, EyeOff, MapPin, UserRound, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -38,7 +39,11 @@ export type BoardJobCardProps = {
   job: JobRequest;
   /** พร้อมประกาศไหม/ขาดอะไร — `null` = ทะเบียนยังโหลดไม่ครบ (ห้ามเดา "พร้อม" ทั้งที่ยังไม่รู้) */
   readiness: PublishReadiness | null;
-  applicants: number;
+  /**
+   * จำนวนผู้สมัคร — `null` = ยอดยังไม่มา · `'error'` = โหลดยอดไม่ได้ (QA 5 ต.ค. 2569)
+   * 🔴 สองแบบนี้ห้ามขึ้น "ยังไม่มีผู้สมัคร" — เดิมขึ้นตอนกำลังโหลด/โหลดพัง ทั้งที่ใบนั้นมีคนสมัครอยู่
+   */
+  applicants: number | null | 'error';
   /** ส่ง AI แล้ว x/y (เจ้าของเคาะ 22 ก.ย. 2569 ข้อ 6) — ไม่รู้/ยังไม่มีผู้สมัคร = ไม่ขึ้น */
   ai?: { sent: number; total: number } | null;
   /** กำลังดูใบที่ปิดแล้ว/ยกเลิก — ไม่มีปุ่มลงมือ (ส่งคนไปงานที่ไม่มีอยู่) */
@@ -152,7 +157,14 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
           (หลังขยายตัวอักษร 27 ก.ย. 2569 ข้อความยาวขึ้น ปุ่มของบางใบตกบรรทัด การ์ดเลยสูงไม่เท่ากัน) */}
       <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/70 pt-2">
         <div className="min-w-0">
-          {applicants > 0 ? (
+          {applicants === null ? (
+            <Skeleton className="h-5 w-28" aria-label="กำลังโหลดผู้สมัคร" />
+          ) : applicants === 'error' ? (
+            <span className={cn('inline-flex items-center gap-1.5 text-sm', TONE.warn.value)}>
+              <Users className="h-4 w-4 shrink-0" aria-hidden />
+              โหลดยอดผู้สมัครไม่ได้
+            </span>
+          ) : applicants > 0 ? (
             /* กดจำนวนผู้สมัคร = สลับไปแท็บรายชื่อผู้สมัครในหน้านี้ พร้อมติ๊กใบนี้ (ห้ามเด้งไปหน้าใบขอ) */
             <button
               type="button"
@@ -171,7 +183,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
               ยังไม่มีผู้สมัคร
             </span>
           )}
-          {applicants > 0 && ai && ai.total > 0 ? (
+          {typeof applicants === 'number' && applicants > 0 && ai && ai.total > 0 ? (
             <p className={cn('mt-0.5 text-sm', ai.sent >= ai.total ? TONE.success.value : TONE.warn.value)}>
               ส่ง AI แล้ว {ai.sent}/{ai.total}
             </p>

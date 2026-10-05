@@ -327,6 +327,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * 🔴 ยังไม่มา ≠ ทุกใบมีผู้สมัคร 0 — แถบกรองต้องไม่โชว์หัวข้อที่พึ่งยอดพวกนี้จนกว่าจะมา
    */
   const [breakdownLoaded, setBreakdownLoaded] = useState(false);
+  /** โหลดยอดผู้สมัครไม่ได้ — การ์ดต้องบอกว่าโหลดไม่ได้ ไม่ใช่ "ยังไม่มีผู้สมัคร" (QA 5 ต.ค. 2569) */
+  const [breakdownFailed, setBreakdownFailed] = useState(false);
   /**
    * 🔴 **ฟอร์มแก้ข้อมูลประกาศย้ายออกจากหน้านี้แล้ว** (27 ส.ค. 2569)
    * อยู่ที่แท็บ "ประกาศ / ลิงก์สมัคร" ของใบขอ ⇒ ไม่ต้องมี patch ทับการ์ดที่นี่อีก
@@ -1158,9 +1160,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         setLeadCounts(b.leadCounts);
         setAiCounts(b.aiCounts);
         setBreakdownLoaded(true);
+        setBreakdownFailed(false);
       })
       .catch(() => {
-        /* badge is optional — ignore */
+        // โหลดซ้ำพังหลังเคยได้ยอดแล้ว = ใช้ยอดเดิมต่อ · ไม่เคยได้เลย = การ์ดขึ้น "โหลดยอดผู้สมัครไม่ได้"
+        if (!cancelled) setBreakdownFailed(true);
       });
     return () => {
       cancelled = true;
@@ -1599,7 +1603,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 key={job.id}
                 job={job}
                 readiness={ledgerReady && !closedBox ? publishReadinessOf(job, readinessFacts) : null}
-                applicants={countFor(applicantIdx, job.id)}
+                applicants={
+                  breakdownLoaded ? countFor(applicantIdx, job.id) : breakdownFailed ? 'error' : null
+                }
                 ai={aiCounts[job.id] ?? null}
                 closed={Boolean(closedBox)}
                 onOpen={setPostingJob}

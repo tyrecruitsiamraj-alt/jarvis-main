@@ -38,6 +38,7 @@ import {
   markApplicationDialed,
   recordAppointmentAttendance,
   setApplicationCancelled,
+  setJobApplicationLead,
   type CallChoiceOutcome,
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
@@ -637,6 +638,21 @@ const RmWorkspace: React.FC<{
           load();
         })
         .catch((e: unknown) => say(e instanceof Error ? e.message : 'กู้คืนไม่สำเร็จ'));
+      return;
+    }
+    /**
+     * "เก็บเข้า Lead" บนแถวผู้สมัคร — 🔴 เดิมไม่เคยต่อ (ตกไปที่ todo "ยังไม่ได้ต่อกับระบบจริง") · QA 5 ต.ค. 2569
+     * ปุ่มเก็บ Lead บนแถวเครื่องมือถูกถอดเช้าวันเดียวกัน ⇒ ไม่เหลือทางเก็บ Lead · ตอนนี้ยิงเส้นเดียวกับป๊อปรายชื่อของใบงาน
+     * เก็บแล้วชื่อไปแท็บการติดต่อ (Lead ของฉัน) + ข้อความมีปุ่มพาไป
+     */
+    if (action === 'bookmark') {
+      say(null);
+      void setJobApplicationLead(row.id, true)
+        .then(() => {
+          say(`เก็บ ${row.full_name} เข้า Lead แล้ว`, true);
+          load();
+        })
+        .catch((e: unknown) => say(e instanceof Error ? e.message : 'เก็บเข้า Lead ไม่สำเร็จ'));
       return;
     }
     if (action === 'call') {

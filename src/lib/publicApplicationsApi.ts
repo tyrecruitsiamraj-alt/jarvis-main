@@ -125,6 +125,8 @@ export type PublicApplication = {
   claimed?: boolean;
   claimed_by_me?: boolean;
   claimed_by_name?: string;
+  /** เวลาที่ฉันเก็บไป (server ส่งเฉพาะของตัวเอง · 5 ต.ค. 2569) */
+  claimed_at?: string;
   /**
    * "เก็บ Lead" (migration 083) — ปัดใบออกจากรายชื่อทำงานไปคลังสำรอง
    * ⚠️ ต่างจาก claim: เป็นสถานะ **ระดับระบบ** ใครปัดก็หายจากลิสต์ของทุกคน
@@ -377,7 +379,8 @@ export type JobApplicantBreakdown = {
 
 export async function fetchJobApplicantBreakdown(): Promise<JobApplicantBreakdown> {
   const r = await apiFetch('/api/job-applications?counts=1');
-  if (!r.ok) return { counts: {}, byOrigin: {}, leadCounts: {}, aiCounts: {} };
+  // 🔴 โหลดไม่ได้ต้องโยน (QA 5 ต.ค. 2569) — เดิมคืนก้อนว่าง ⇒ กล่องงานขึ้น "ยังไม่มีผู้สมัคร" ทุกใบตอน server ตอบ 500
+  if (!r.ok) throw new Error('โหลดยอดผู้สมัครไม่สำเร็จ');
   const body = (await r.json()) as {
     counts?: Record<string, number>;
     countsByOrigin?: Record<string, Partial<Record<ApplicationOrigin, number>>>;

@@ -87,7 +87,13 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
    * อันไหนมาจาก AI หาให้"*) — กรองที่ลิสต์ต้นทางก้อนเดียว ทั้งสองแท็บจึงตรงกันเสมอ
    */
   const [loading, setLoading] = useState(false);
+  /** โหลดรายชื่อไม่ได้ (ตอนเปิดป๊อป) — ไม่มีรายชื่อให้โชว์ */
   const [error, setError] = useState<string | null>(null);
+  /**
+   * ปุ่มบนแถวพลาด (เก็บ Lead / เก็บไปโทรเอง / เปิดไฟล์ / โหลดใหม่) — ขึ้นแถบเตือนเหนือรายชื่อ
+   * 🔴 แยกจาก `error` (QA 5 ต.ค. 2569) — เดิมใช้ตัวเดียวกัน กดพลาดปุ่มเดียวรายชื่อหายทั้งป๊อป
+   */
+  const [actionError, setActionError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [sendBusy, setSendBusy] = useState(false);
@@ -98,7 +104,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
   const reload = (jobId: string) => {
     fetchJobApplications(jobId)
       .then(setItems)
-      .catch(() => {});
+      .catch(() => setActionError('โหลดรายชื่อใหม่ไม่ได้ ข้อมูลที่เห็นอาจไม่ใช่ล่าสุด'));
   };
 
   /**
@@ -163,7 +169,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
       a.click();
       a.remove();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'โหลดไฟล์แนบไม่สำเร็จ');
+      setActionError(e instanceof Error ? e.message : 'โหลดไฟล์แนบไม่สำเร็จ');
     } finally {
       setDownloadingId(null);
     }
@@ -173,12 +179,12 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
   const moveToLead = async (a: PublicApplication) => {
     if (!window.confirm(`เอา "${a.full_name}" ออกจากลิสต์ (เก็บเข้าคลังสำรอง Lead)?`)) return;
     setLeadBusyId(a.id);
-    setError(null);
+    setActionError(null);
     try {
       await setJobApplicationLead(a.id, true);
       if (job) reload(job.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'เก็บ Lead ไม่สำเร็จ');
+      setActionError(e instanceof Error ? e.message : 'เก็บ Lead ไม่สำเร็จ');
     } finally {
       setLeadBusyId(null);
     }
@@ -192,7 +198,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
    */
   const toggleClaim = async (a: PublicApplication) => {
     setSavingId(a.id);
-    setError(null);
+    setActionError(null);
     try {
       if (a.claimed_by_me) {
         const updated = await claimJobApplication(a.id, false);
@@ -200,11 +206,11 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
       } else {
         const outcome = await chooseApplicationCall([a.id], 'manual');
         // ข้ามบางส่วนได้ (เก็บใบได้แต่ล็อกเบอร์ไม่ได้) — ต้องบอก ไม่ใช่เงียบ
-        if (outcome.skipped.length > 0) setError(summarizeCallChoice(outcome));
+        if (outcome.skipped.length > 0) setActionError(summarizeCallChoice(outcome));
         if (job) reload(job.id);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'เก็บไปโทรเองไม่สำเร็จ');
+      setActionError(e instanceof Error ? e.message : 'เก็บไปโทรเองไม่สำเร็จ');
     } finally {
       setSavingId(null);
     }
@@ -218,6 +224,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
     setProcessing(null);
     setLoading(true);
     setError(null);
+    setActionError(null);
     fetchJobApplications(job.id)
       .then((data) => {
         if (!cancelled) setItems(data);
@@ -615,6 +622,11 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
             </div>
           ) : (
             <>
+              {actionError ? (
+                <p className={cn('mb-3 rounded-xl border px-3.5 py-3 text-sm', TONE.danger.soft, TONE.danger.value)}>
+                  {actionError}
+                </p>
+              ) : null}
               {/* มุมมองแท็บเดียวทุกขนาดจอ (19 ส.ค. 2569) */}
               <div>
                 {visible.length === 0 ? (

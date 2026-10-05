@@ -11,6 +11,8 @@ import { useWlBu } from '@/hooks/useWlBu';
 import { countEmployeesByBu, employeeIdsForBu, filterEmployeesByBu } from '@/lib/wlBuFilters';
 import { WORK_STATUS_LABELS } from '@/types';
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import { TONE } from '@/lib/designTokens';
 import ProductionDataPlaceholder from '@/components/shared/ProductionDataPlaceholder';
 
 function formatLocalYmd(d: Date): string {
@@ -40,7 +42,13 @@ const subMenus = [
 const WLDashboard: React.FC = () => {
   const navigate = useNavigate();
   const calendarEntries = useWorkCalendarEntries();
-  const { employees: wlEmployees } = useWlEmployees();
+  const { employees: wlEmployees, loading: wlLoading, loadError: wlLoadError } = useWlEmployees();
+  /**
+   * ยังโหลดอยู่ / โหลดไม่ได้ = ยังไม่รู้ ⇒ การ์ดขึ้น "—" ไม่ใช่ 0 (QA 5 ต.ค. 2569)
+   * เดิมขึ้น 0 ทุกใบระหว่างโหลดและตอนพัง — อ่านแล้วเหมือนไม่มีพนักงาน
+   */
+  const wlUnknown = wlLoading || Boolean(wlLoadError);
+  const statValue = (n: number) => (wlUnknown ? '—' : n);
   const { selectedBu, setSelectedBu, buLabel } = useWlBu();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogTitle, setDialogTitle] = useState('');
@@ -163,31 +171,36 @@ const WLDashboard: React.FC = () => {
             showUnassigned
           />
         </div>
+        {wlLoadError ? (
+          <p role="alert" className={cn('rounded-xl border px-4 py-3 text-sm', TONE.danger.soft, TONE.danger.value)}>
+            {wlLoadError}
+          </p>
+        ) : null}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard
             title="พนักงานทั้งหมด"
-            value={activeEmployees.length}
+            value={statValue(activeEmployees.length)}
             icon={Users}
             variant="primary"
             onClick={showEmployees}
           />
           <StatCard
             title="ทำงานวันนี้"
-            value={workingToday.length}
+            value={statValue(workingToday.length)}
             icon={CalendarDays}
             variant="success"
             onClick={showWorking}
           />
           <StatCard
             title="ปัญหาวันนี้"
-            value={issueToday.length}
+            value={statValue(issueToday.length)}
             icon={BarChart3}
             variant="destructive"
             onClick={showIssues}
           />
           <StatCard
             title="ว่างวันนี้"
-            value={availableToday.length}
+            value={statValue(availableToday.length)}
             variant="warning"
             onClick={showAvailable}
           />

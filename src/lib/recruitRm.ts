@@ -69,12 +69,17 @@ export function isInRmTab(r: PublicApplication, tab: RmTab): boolean {
   // เหตุผล: งาน**ใบนั้น**จบแล้ว ไม่ต้องตามต่อ แต่ **คนยังอยู่ในระบบ** เอาไปเสนอ
   // งานอื่นได้ · ถ้าปล่อยค้างในถัง "การติดต่อ" ของคนเก็บ จะเป็นงานค้างที่ไม่มีวันจบ
   // และคนคนนั้นจะหายจากคลังกลางไปเฉย ๆ
-  if (isClosedByCallOutcome(r)) return tab === 'candidates';
   // "เก็บไว้ทำงานต่อ" = เก็บไปติดต่อ (claim) **หรือ** เก็บ Lead (เจ้าของสั่ง 14 ส.ค. 2569:
   // "เก็บ Lead → รายชื่อไปอยู่ที่การติดต่อแทน" · เดิม Lead หายเข้าคลังสำรอง)
   // 🔴 ของใครของมัน (Journey 4 ต.ค. 2569): Lead นับเฉพาะที่ผู้ดูเก็บ — server ซ่อน Lead ของคนอื่นแล้ว
   // `lead_by_me` ไม่มากับแถว (server เก่า) = ถือตาม is_lead เหมือนเดิม
   const kept = r.claimed_by_me === true || (r.is_lead === true && r.lead_by_me !== false);
+  /**
+   * 🔴 ตอบไม่สนใจแล้ว = กลับคลังกลาง — **ยกเว้นเก็บมาหลังผลนั้น** (QA 5 ต.ค. 2569 · เจ้าของเจอเอง:
+   * "เก็บชื่อจากหน้าผู้สมัครแล้วไม่ไปหน้าการติดต่อ") — เดิมเช็คผลก่อนเสมอ ⇒ กดเก็บคนที่ไม่สนใจ ระบบล็อกเบอร์ให้
+   * แต่ชื่อค้างหน้าผู้สมัคร หาไม่เจอ ถอยไม่ได้ · ผลไม่สนใจที่มา **หลัง** การเก็บ ยังพากลับคลังกลางตามเดิม (13 ส.ค.)
+   */
+  if (isClosedByCallOutcome(r) && !(kept && keptAfterLastCall(r))) return tab === 'candidates';
   if (tab === 'contact') return kept;
   if (tab === 'candidates') return !kept;
   const st = RM_TAB_STATUSES[tab];
@@ -88,6 +93,18 @@ export function isInRmTab(r: PublicApplication, tab: RmTab): boolean {
  * ⚠️ ใบที่ **รับเข้าทำงานแล้ว** (converted) ไม่เข้าเงื่อนไขนี้ — ไปแท็บติดตามนัดหมาย
  * ตามเดิม แม้ผลโทรจะเป็นอะไรก็ตาม
  */
+/** เก็บ (claim/Lead ของฉัน) หลังผลโทรล่าสุดไหม — ไม่รู้เวลาเก็บ (server เก่า) = ไม่ใช่ */
+export function keptAfterLastCall(r: PublicApplication): boolean {
+  const t = (iso?: string | null) => (iso ? Date.parse(iso) : NaN);
+  const keptAt = Math.max(
+    r.claimed_by_me ? t(r.claimed_at) || -Infinity : -Infinity,
+    r.is_lead && r.lead_by_me !== false ? t(r.lead_at) || -Infinity : -Infinity,
+  );
+  if (!Number.isFinite(keptAt)) return false;
+  const callAt = t(r.last_call_at);
+  return Number.isNaN(callAt) || keptAt >= callAt;
+}
+
 export function isClosedByCallOutcome(r: PublicApplication): boolean {
   if (r.status === 'converted') return false;
   return r.last_call_outcome === 'declined';
@@ -349,7 +366,8 @@ export const RM_ROW_ACTIONS: Record<RmTab, RmRowAction[]> = {
    * ใบในแท็บนี้เก็บมาแล้วทั้งนั้น ⇒ ปุ่มเก็บ Lead/เก็บไปโทรเองไม่มีความหมายที่นี่
    */
   contact: ['dial', 'view', 'release'],
-  appointments: ['call', 'rule', 'remove'],
+  /** "เอาออกจากรายการ" (remove) ถอดแล้ว — ไม่เคยต่อกับระบบ กดแล้วแค่ขึ้น "ยังไม่ได้ต่อ" (QA 5 ต.ค. 2569) · ใส่กลับเมื่อเจ้าของบอกว่าให้ทำอะไร */
+  appointments: ['call', 'rule'],
 };
 
 export const RM_ROW_ACTION_LABEL: Record<RmRowAction, string> = {

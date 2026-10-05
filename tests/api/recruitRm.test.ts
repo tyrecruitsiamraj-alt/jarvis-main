@@ -144,6 +144,40 @@ describe('คนที่ตอบ "ไม่สนใจ" กลับเข้
     const noCall = { ...declined, last_call_outcome: undefined };
     expect(filterApplications([noCall], 'contact', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual(['d1']);
   });
+  /** QA 5 ต.ค. 2569 — เจ้าของเจอเอง: "เก็บชื่อจากหน้าผู้สมัครแล้วไม่ไปหน้า การติดต่อ" */
+  it('🔴 เก็บ (claim/Lead) **หลัง** ผลไม่สนใจ → ไปการติดต่อ · ผลไม่สนใจที่มาหลังการเก็บ → กลับผู้สมัครตามเดิม', () => {
+    const base = { ...declined, last_call_at: '2026-10-04T10:00:00+07:00' };
+    const claimedAfter = { ...base, claimed_at: '2026-10-05T09:00:00+07:00' };
+    expect(filterApplications([claimedAfter], 'contact', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual(['d1']);
+    expect(filterApplications([claimedAfter], 'candidates', EMPTY_RM_FILTERS, '')).toEqual([]);
+
+    const leadAfter = {
+      ...base,
+      claimed: false,
+      claimed_by_me: false,
+      is_lead: true,
+      lead_by_me: true,
+      lead_at: '2026-10-05T09:00:00+07:00',
+    };
+    expect(filterApplications([leadAfter], 'contact', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual(['d1']);
+
+    const claimedBefore = { ...base, claimed_at: '2026-10-03T09:00:00+07:00' };
+    expect(filterApplications([claimedBefore], 'contact', EMPTY_RM_FILTERS, '')).toEqual([]);
+    expect(filterApplications([claimedBefore], 'candidates', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual(['d1']);
+  });
+
+  it('Lead ของคนอื่นเก็บหลังผล ไม่พาไปการติดต่อของฉัน', () => {
+    const othersLead = {
+      ...declined,
+      claimed: false,
+      claimed_by_me: false,
+      is_lead: true,
+      lead_by_me: false,
+      lead_at: '2026-10-05T09:00:00+07:00',
+      last_call_at: '2026-10-04T10:00:00+07:00',
+    };
+    expect(filterApplications([othersLead], 'contact', EMPTY_RM_FILTERS, '')).toEqual([]);
+  });
 });
 
 describe('แท็บย่อย 3 อันของ "รายชื่อผู้สมัคร" (เจ้าของสั่ง 13 ส.ค. 2569)', () => {

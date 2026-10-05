@@ -3,6 +3,7 @@ import { ChevronDown, Download, RefreshCw, Search, SlidersHorizontal } from 'luc
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
@@ -54,6 +55,11 @@ type Props = {
   filterOptions: FilterOptions;
   lockedDepartmentCode?: string | null;
   loading?: boolean;
+  /**
+   * โหลดใบขอไม่ได้ — ขึ้นแถบแจ้ง + ปุ่มโหลดใหม่ แทนตัวเลขทั้งหน้า
+   * 🔴 QA 5 ต.ค. 2569: เดิมไม่ดู error เลย โหลดพัง = ทุกการ์ดขึ้น 0 เหมือนไม่มีงานค้าง
+   */
+  loadError?: string | null;
   refreshing?: boolean;
   onRefresh?: () => void;
   onExport?: () => void;
@@ -108,6 +114,7 @@ const DashboardShell: React.FC<Props> = ({
   filterOptions,
   lockedDepartmentCode = null,
   loading,
+  loadError,
   refreshing,
   onRefresh,
   onExport,
@@ -269,6 +276,19 @@ const DashboardShell: React.FC<Props> = ({
               </div>
               <Skeleton className="h-64 w-full rounded-2xl" />
             </div>
+          </div>
+        ) : loadError ? (
+          <div
+            role="alert"
+            className={cn('flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm', TONE.danger.soft, TONE.danger.value)}
+          >
+            <span>โหลดใบขอไม่ได้ · {loadError}</span>
+            {onRefresh ? (
+              <Button type="button" size="sm" variant="outline" onClick={onRefresh} disabled={refreshing}>
+                <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} aria-hidden />
+                โหลดใหม่
+              </Button>
+            ) : null}
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] gap-5">

@@ -133,7 +133,14 @@ const SupervisorDashboard: React.FC = () => {
     };
   }, []);
 
-  const { jobs, loading, refreshing, refetch, siamrajPrimary, dbSource } = useUnitRequestsFeed();
+  const { jobs, loading, refreshing, refetch, siamrajPrimary, dbSource, loadError, feedState } = useUnitRequestsFeed();
+  /** เส้นใบขอพัง/ไม่มีสิทธิ์ = ห้ามคิดเลขจาก jobs ว่าง (จะขึ้น 0 ทั้งหน้า) · QA 5 ต.ค. 2569 */
+  const feedProblem =
+    !DEMO_MODE && (feedState === 'failed' || feedState === 'forbidden')
+      ? feedState === 'forbidden'
+        ? 'ไม่มีสิทธิ์ดูใบขอ'
+        : (loadError ?? 'ลองโหลดใหม่')
+      : null;
 
   useEffect(() => {
     if (!lockedDepartmentCode) return;
@@ -901,6 +908,7 @@ const SupervisorDashboard: React.FC = () => {
         unassignedOplCount: filterApi.unassignedOplCount,
       }}
       loading={loading && !DEMO_MODE}
+      loadError={feedProblem}
       refreshing={refreshing}
       onRefresh={() => void refetch()}
       onExport={handleExport}

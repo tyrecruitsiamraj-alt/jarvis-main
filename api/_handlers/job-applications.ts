@@ -156,6 +156,8 @@ function toApplication(r: Row, viewerId?: string) {
     claimed,
     claimed_by_me: mine,
     claimed_by_name: mine ? (r.claimed_by_name ?? undefined) : undefined,
+    // เวลาที่ฉันเก็บ (เฉพาะของตัวเอง) — ให้หน้าเว็บรู้ว่าเก็บหลังผลโทร "ไม่สนใจ" ไหม (5 ต.ค. 2569)
+    claimed_at: mine && r.claimed_at ? toIso(r.claimed_at) : undefined,
     // Lead เป็นสถานะระดับระบบ (ไม่ใช่ของใครคนหนึ่ง) — ชื่อคนปัดจึงส่งให้ทุกคนเห็นได้
     // ต่างจาก claim ที่เจ้าของสั่งว่า "คนอื่นจะไม่เห็นชื่อคนที่เก็บไป"
     is_lead: Boolean(r.is_lead),

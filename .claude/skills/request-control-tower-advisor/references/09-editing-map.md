@@ -11871,3 +11871,19 @@ Choice: ถึงแล้ว/ไปแล้ว/ลา/เลื่อน/จ�
 
 - ⚠️ รอบแรกหลัง deploy: สายรุ่นเก่าที่ยังไม่ถึง 83 สาย (AI 73 · คน 10) ถูกยกเลิก + ถอนแผน Lumos แล้วสร้าง 3 สายต่อใบที่ยังอยู่ใน iRecruit
 - ⚠️ ค้าง: วิธีแยก WL / สแปร์ไซต์ของคนใน — รอเจ้าของส่งรูปหน้า manageReplace ของ iRecruit
+
+## 5 ต.ค. 2569 (ค่ำ): แก้จากรอบ QA ข้อ 1–5 (เจ้าของอนุมัติ "แก้ 1–5")
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/components/recruit-rm/RmWorkspace.tsx` | `onRowAction` เพิ่มทาง `'bookmark'` → `setJobApplicationLead(row.id, true)` + ข้อความมีปุ่มพาไปการติดต่อ (เดิมตกไป `todo()` "ยังไม่ได้ต่อกับระบบจริง") |
+| `src/lib/recruitRm.ts` | `keptAfterLastCall` (ใหม่) · `isInRmTab`: ผลไม่สนใจพากลับผู้สมัคร **ยกเว้น** เก็บ (claim/Lead ของฉัน) หลังผลนั้น · ไม่รู้เวลาเก็บ = ถือว่าไม่ใช่ (กลับผู้สมัครตามเดิม) · `RM_ROW_ACTIONS.appointments` ถอด `'remove'` (ไม่เคยต่อ) |
+| `api/_handlers/job-applications.ts` · `src/lib/publicApplicationsApi.ts` | `toApplication` ส่ง `claimed_at` (เฉพาะใบที่ฉันเก็บ) |
+| `src/components/jobs/BoardJobCard.tsx` · `JobBoardView.tsx` · `src/lib/publicApplicationsApi.ts` | `fetchJobApplicantBreakdown` โยนเมื่อ !r.ok (เดิมคืนก้อนว่าง = 0 ทุกใบ) · `applicants: number \| null \| 'error'` — ยอดยังไม่มา = Skeleton · โหลดพัง (ยังไม่เคยได้ยอด) = "โหลดยอดผู้สมัครไม่ได้" · state `breakdownFailed` |
+| `src/components/jobs/JobApplicantsDialog.tsx` | แยก `actionError` (ปุ่มบนแถว/โหลดใหม่ — แถบเหนือรายชื่อ) ออกจาก `error` (โหลดตอนเปิด — แทนรายชื่อ) · `reload` ไม่กลืน error แล้ว |
+| `src/components/dashboard/analytics/DashboardShell.tsx` · `src/pages/dashboard/SupervisorDashboard.tsx` | prop `loadError` — เส้นใบขอ `failed`/`forbidden` = แถบแจ้ง + ปุ่มโหลดใหม่ แทนตัวเลข 0 ทั้งหน้า |
+| `src/pages/wl/WLDashboard.tsx` | ยังโหลด/โหลดพัง = การ์ด 4 ใบขึ้น "—" + แถบแจ้ง error |
+| เทสต์ | `tests/api/recruitRm.test.ts` (เก็บหลังผล) · `tests/api/contactTabRelease.test.ts` (ทุกปุ่มบนแถวมีทาง · bookmark ยิงจริง) · `tests/api/qaLoadingErrorStates2569-10-05.test.ts` (ใหม่ ข้อ 3–5) |
+
+- ⚠️ ปุ่มเลือก BU บนหน้า WL ยังนับ 0 ระหว่างโหลด (ไม่อยู่ใน 5 ข้อ)
+- ⚠️ "เอาออกจากรายการ" ของติดตามนัดหมายถอดออก — ใส่กลับเมื่อเจ้าของบอกความหมาย

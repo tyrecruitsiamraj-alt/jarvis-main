@@ -83,9 +83,10 @@ describe('ปุ่มของแท็บการติดตาม', () => {
     expect(RM_ROW_ACTION_LABEL.release).toBe('ลบออก — ส่งกลับแท็บผู้สมัคร');
   });
 
-  it('แท็บอื่น: ผู้สมัครแบบ iRecruit + ส่ง AI โทร (4 ต.ค. 2569) · ติดตามนัดหมายเหมือนเดิม', () => {
+  it('แท็บอื่น: ผู้สมัครแบบ iRecruit + ส่ง AI โทร (4 ต.ค. 2569) · ติดตามนัดหมายเหลือโทร + บันทึกผล', () => {
     expect(RM_ROW_ACTIONS.candidates).toEqual(['bookmark', 'call', 'ai', 'view']);
-    expect(RM_ROW_ACTIONS.appointments).toEqual(['call', 'rule', 'remove']);
+    // "เอาออกจากรายการ" ไม่เคยต่อกับระบบ — ถอดออก (QA 5 ต.ค. 2569)
+    expect(RM_ROW_ACTIONS.appointments).toEqual(['call', 'rule']);
   });
 
   it('หน้าเว็บยิงเส้นเดียว choice=release แล้วโหลดใหม่ — ไม่ยิงปลดจอง/ถอด Lead/คืนล็อกแยกกันเอง', () => {
@@ -171,5 +172,18 @@ describe('POST /api/application-call-choice choice=release', () => {
     const { res, status } = mockRes();
     await handler(req({ ids: [MINE], choice: 'nope' }) as never, res as never);
     expect(status).toHaveBeenCalledWith(400);
+  });
+});
+
+describe('ปุ่มบนแถวต้องต่อกับระบบจริงทุกปุ่ม (QA 5 ต.ค. 2569)', () => {
+  const ws = readFileSync(new URL('../../src/components/recruit-rm/RmWorkspace.tsx', import.meta.url), 'utf8');
+  it('🔴 "เก็บเข้า Lead" บนแถวผู้สมัครยิง setJobApplicationLead ไม่ตกไปที่ "ยังไม่ได้ต่อ"', () => {
+    const block = ws.slice(ws.indexOf("if (action === 'bookmark')"), ws.indexOf("if (action === 'call')"));
+    expect(block).toContain('setJobApplicationLead(row.id, true)');
+    expect(block).toContain('return;');
+  });
+  it('ทุกปุ่มในทุกแท็บมีทางของตัวเองใน onRowAction', () => {
+    const handled = new Set([...ws.matchAll(/action === '(\w+)'/g)].map((m) => m[1]));
+    for (const actions of Object.values(RM_ROW_ACTIONS)) for (const a of actions) expect(handled, a).toContain(a);
   });
 });
