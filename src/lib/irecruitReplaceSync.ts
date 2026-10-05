@@ -24,16 +24,12 @@ export const REPLACE_FOLLOW_TOPIC = 'ติดตามส่งคนแทน'
 /** ชื่อคนสร้างที่ขึ้นในรายการ — ให้รู้ว่าไม่มีใครกรอก ระบบดึงมาเอง */
 export const REPLACE_SYNC_ACTOR_NAME = 'ดึงจาก iRecruit';
 
+/**
+ * ค่าตั้งของงานดึงส่งคนแทน — เหลือ "AI เริ่มโทรตั้งแต่" ช่องเดียว
+ * (กติกาเวลาโทรแบบตั้งได้ `atStart`/`dayOffset`/`time` ถอดแล้ว 5 ต.ค. 2569 — เวลาโทรเป็น 3 สายตาม Journey ของเจ้าของ:
+ * `planReplaceCalls`) · ค่าเก่าในฐานถูกอ่านข้ามไปเฉย ๆ
+ */
 export type ReplaceCallRule = {
-  /**
-   * 🔴 **เวลาในระบบ = เวลาเข้างาน** (เจ้าของ Choice 2 ต.ค. 2569 หลังเห็น "ลง 8 โมงเช้า แต่ระบบบันทึกเป็น 18.00") —
-   * `true` (ค่าเริ่ม) = สายนัดตรงเวลาเข้างานของ iRecruit · `false` = ใช้ dayOffset + time ข้างล่าง
-   */
-  atStart: boolean;
-  /** โทรก่อนวันเข้างานกี่วัน — 0 = วันเข้างาน · -1 = วันก่อนเข้างาน · -2 = สองวันก่อน */
-  dayOffset: 0 | -1 | -2;
-  /** เวลาไทย HH:MM */
-  time: string;
   /**
    * AI เริ่มโทรตั้งแต่วันไหน (YYYY-MM-DD ไทย) — สายที่นัด **ก่อน** วันนี้ = คนโทร · `null` = AI โทรทุกสาย
    * เจ้าของสั่ง 2 ต.ค. 2569: *"ของวันนี้ ไปจนถึงวันจันทร์ เปลี่ยนเป็นคนโทรก่อนให้หมดเลย เพราะจะเริ่มใช้จริงวันจันทร์"*
@@ -42,7 +38,7 @@ export type ReplaceCallRule = {
   aiFrom: string | null;
 };
 
-export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = { atStart: true, dayOffset: -1, time: '18:00', aiFrom: null };
+export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = { aiFrom: null };
 
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -52,26 +48,12 @@ export function replaceCallModeFor(at: Date, aiFrom: string | null): 'ai' | 'man
   return at.getTime() < new Date(`${aiFrom}T00:00:00+07:00`).getTime() ? 'manual' : 'ai';
 }
 
-const HHMM_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/;
-
-/** อ่านกติกาเวลาโทรจากที่เก็บ/จากฟอร์ม — ค่าที่อ่านไม่ออกถอยไปค่าเริ่มต้นทีละช่อง (ไม่ throw) */
+/** อ่านค่าตั้งจากที่เก็บ — ค่าที่อ่านไม่ออก = ไม่ตั้ง (ไม่ throw) */
 export function normalizeReplaceCallRule(raw: unknown): ReplaceCallRule {
   const r = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
-  const off = Number(r.dayOffset);
-  const dayOffset: ReplaceCallRule['dayOffset'] = off === 0 || off === -1 || off === -2 ? off : DEFAULT_REPLACE_CALL_RULE.dayOffset;
-  const t = typeof r.time === 'string' ? r.time.trim() : '';
-  const m = HHMM_RE.exec(t);
-  const time = m ? `${String(Number(m[1])).padStart(2, '0')}:${m[2]}` : DEFAULT_REPLACE_CALL_RULE.time;
   const af = typeof r.aiFrom === 'string' ? r.aiFrom.trim() : '';
   const aiFrom = YMD_RE.test(af) && !Number.isNaN(new Date(`${af}T00:00:00+07:00`).getTime()) ? af : null;
-  return { atStart: r.atStart !== false, dayOffset, time, aiFrom };
-}
-
-/** "18:00 ของวันก่อนเข้างาน" — คำบนจอ ที่เดียว */
-export function replaceCallRuleText(rule: Pick<ReplaceCallRule, 'dayOffset' | 'time'> & { atStart?: boolean }): string {
-  if (rule.atStart) return 'ตามเวลาเข้างาน';
-  const when = rule.dayOffset === 0 ? 'วันเข้างาน' : rule.dayOffset === -1 ? 'วันก่อนเข้างาน' : 'สองวันก่อนเข้างาน';
-  return `${rule.time} ของ${when}`;
+  return { aiFrom };
 }
 
 /** นาฬิกาไทยของ `want_date` — วัน + เวลาเข้างาน */
@@ -100,34 +82,10 @@ function shiftYmd(ymd: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-export type ReplaceCallPlan = {
-  /** เวลาที่จะโทร (ISO instant) */
-  at: Date;
-  /** เวลาตามกติกาผ่านไปแล้ว แต่ยังไม่ถึงเวลาเข้างาน ⇒ โทรเร็วที่สุด */
-  asap: boolean;
-};
-
-/** โทรเร็วที่สุด = อีกกี่นาทีจากตอนนี้ (ให้แผนไปถึง Lumos ทัน) */
+/** โทรเร็วที่สุด = อีกกี่นาทีจากตอนนี้ (ให้แผนไปถึง Lumos ทัน) — สายคอนเฟิร์มที่เพิ่มหลัง 16:00 */
 export const REPLACE_ASAP_MINUTES = 10;
 
-/**
- * สายของใบงานนี้ควรโทรเมื่อไหร่ — `null` = ไม่ต้องสร้าง (เลยเวลาเข้างานไปแล้ว)
- * ⚠️ ไม่มีช่วงห้ามโทรแล้ว (เจ้าของยกเลิก 28 ก.ย. 2569) — เวลาที่ตั้งคือเวลาที่โทร
- */
-export function planReplaceCall(
-  wall: ReplaceWantWall,
-  rule: Pick<ReplaceCallRule, 'dayOffset' | 'time'> & { atStart?: boolean },
-  now: Date,
-): ReplaceCallPlan | null {
-  const start = wantInstant(wall);
-  if (Number.isNaN(start.getTime()) || start.getTime() <= now.getTime()) return null;
-  if (rule.atStart) return { at: start, asap: false };
-  const at = new Date(`${shiftYmd(wall.ymd, rule.dayOffset)}T${rule.time}:00+07:00`);
-  if (at.getTime() > now.getTime()) return { at, asap: false };
-  return { at: new Date(now.getTime() + REPLACE_ASAP_MINUTES * 60_000), asap: true };
-}
-
-/** คีย์กันซ้ำของสายที่ดึงมา — หนึ่งใบงาน iRecruit = หนึ่งสาย */
+/** คีย์ของใบงาน (ส่วนหน้าของคีย์ต่อสาย `replaceSlotRef` · คีย์รุ่นเก่าก่อน 5 ต.ค. 2569 = คีย์นี้ตรง ๆ) */
 export function replaceSourceRef(jobId: string | number): string {
   return `irecruit-replace:${String(jobId).trim()}`;
 }
@@ -158,27 +116,28 @@ export type ReplaceSyncSummary = {
   /** สายที่เข้าคิว AI ได้ · สายที่ไม่ได้ส่ง (ปิดส่งอัตโนมัติ / ส่งไม่ถึง) */
   queued: number;
   notSent: number;
-  /** สายเดิมที่ย้ายเวลาให้ตรงกติกา (เช่น เปลี่ยนเป็นตามเวลาเข้างาน) */
+  /** สายเดิมที่ย้ายเวลาตาม iRecruit (แก้เวลาเข้างาน) */
   realigned?: number;
+  /** สายที่ยกเลิกให้เอง — iRecruit ยกเลิกใบ/เปลี่ยนคน/รุ่นเก่าที่ย้ายมาเป็น 3 สาย (5 ต.ค. 2569) */
+  cancelled?: number;
+  /** สาย AI ของคนในที่เปลี่ยนเป็นคนโทร (5 ต.ค. 2569) */
+  toManual?: number;
   /** ดึงไม่ได้ทั้งรอบ — เหตุผลไทย · null = ปกติ */
   error: string | null;
 };
 
 export type ReplaceSyncConfig = {
-  /** ปิดได้ด้วย `IRECRUIT_REPLACE_SYNC_ENABLED=false` — **ค่าเริ่มต้นคือเปิด** (เจ้าของเคาะ "ดึงเองทุกเช้า") */
+  /** ปิดได้ด้วย `IRECRUIT_REPLACE_SYNC_ENABLED=false` — **ค่าเริ่มต้นคือเปิด** */
   enabled: boolean;
-  /** เดินรอบประจำวันตั้งแต่กี่โมง (เวลาไทย 0–23) */
-  hour: number;
   /** ดึงใบที่เข้างานล่วงหน้ากี่วัน */
   horizonDays: number;
-  /** เช็กทุกกี่มิลลิวินาทีว่าถึงเวลาหรือยัง */
+  /** ดึงทุกกี่มิลลิวินาที — ค่าเริ่ม 5 นาที (เจ้าของ Choice 5 ต.ค. 2569 · เลิกรอบ 06:00) */
   tickMs: number;
   startupDelayMs: number;
 };
 
 export const REPLACE_SYNC_DEFAULTS: ReplaceSyncConfig = {
   enabled: true,
-  hour: 6,
   horizonDays: 31,
   tickMs: 5 * 60_000,
   startupDelayMs: 30_000,
@@ -204,18 +163,146 @@ function intEnv(raw: string | undefined, fallback: number, min: number, max: num
 export function readReplaceSyncConfig(env: Record<string, string | undefined>): ReplaceSyncConfig {
   return {
     enabled: boolEnv(env.IRECRUIT_REPLACE_SYNC_ENABLED, REPLACE_SYNC_DEFAULTS.enabled),
-    hour: intEnv(env.IRECRUIT_REPLACE_SYNC_HOUR, REPLACE_SYNC_DEFAULTS.hour, 0, 23),
     horizonDays: intEnv(env.IRECRUIT_REPLACE_SYNC_HORIZON_DAYS, REPLACE_SYNC_DEFAULTS.horizonDays, 1, 92),
     tickMs: intEnv(env.IRECRUIT_REPLACE_SYNC_TICK_MS, REPLACE_SYNC_DEFAULTS.tickMs, 10_000, 3_600_000),
     startupDelayMs: intEnv(env.IRECRUIT_REPLACE_SYNC_STARTUP_DELAY_MS, REPLACE_SYNC_DEFAULTS.startupDelayMs, 0, 600_000),
   };
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+ * Journey ใหม่ของงานติดตามส่งคนแทน (เจ้าของสั่ง 5 ต.ค. 2569)
+ * > 1. WL ไม่ต้องโทรติดตาม · 2. ติดตามแค่ Ex กับสแปร์ไซต์ (Choice: Ex = replace_type EX · สแปร์ = ไซต์ SPARE —
+ * >    ยังหาทางจับคู่คนกับไซต์ไม่ได้ ⇒ ส่วนแยกประเภทรอเจ้าของ ตอนนี้ยังตามทุกประเภทเหมือนเดิม)
+ * > 3. มีอัปเดตที่ iRecruit แล้วขึ้นเลย (Choice: เช็กทุก 5 นาที) · 5. แก้บน iRecruit แล้ว So Recruit ต้องเปลี่ยน
+ * > 4/7. สาย 1 = โทรคอนเฟิร์มเวลา · สาย 2 = ก่อนเข้างาน 1 ชม. · สาย 3 = ก่อนเข้างาน 15 นาที
+ * > 6. คอนเฟิร์มเริ่มโทร 16:00 (Choice: ของวันก่อนเข้างาน) · 8. เพิ่มหลัง 16:00 = โทรคอนเฟิร์มตามคิวต่อไปเรื่อย ๆ
+ * > (Choice: ใบที่ iRecruit ยกเลิก/เปลี่ยนคน/ไม่ต้องตามแล้ว = ยกเลิกสายให้เอง)
+ * ═══════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/** สายของใบงานหนึ่งใบ — คอนเฟิร์ม · ก่อนเข้างาน 1 ชม. · ก่อนเข้างาน 15 นาที */
+export type ReplaceSlot = 'confirm' | 'lead60' | 'lead15';
+export const REPLACE_SLOTS: readonly ReplaceSlot[] = ['confirm', 'lead60', 'lead15'];
+/** สายที่เท่าไหร่ของใบงาน (call_round) — สาย 1 คอนเฟิร์ม · 2–3 ก่อนเข้างาน */
+export const REPLACE_SLOT_ROUND: Record<ReplaceSlot, 1 | 2 | 3> = { confirm: 1, lead60: 2, lead15: 3 };
+/** โทรคอนเฟิร์มกี่โมง (นาฬิกาไทย) ของวันก่อนเข้างาน */
+export const REPLACE_CONFIRM_TIME = '16:00';
+/** สาย 2–3 โทรก่อนเวลาเข้างานกี่นาที */
+export const REPLACE_LEAD_MINUTES: Record<Exclude<ReplaceSlot, 'confirm'>, number> = { lead60: 60, lead15: 15 };
+/** คำบนจอของกติกาเวลาโทร — ที่เดียว */
+export const REPLACE_SCHEDULE_TEXT = 'คอนเฟิร์ม 16:00 วันก่อนเข้างาน · ก่อนเข้างาน 1 ชม. · ก่อน 15 นาที';
+
+export type ReplaceSlotPlan = { slot: ReplaceSlot; round: 1 | 2 | 3; at: Date; asap: boolean };
+
 /**
- * รอบประจำวันถึงเวลาหรือยัง — ถึงชั่วโมงที่ตั้ง (เวลาไทย) และวันนี้ยังไม่ได้ดึง
- * (เซิร์ฟเวอร์ดับตอน 06:00 ⇒ เดินรอบทันทีที่กลับมาในวันเดียวกัน · ไม่เดินซ้ำวันเดียวกัน)
+ * สายที่ใบงานนี้ต้องมี ณ ตอนนี้ — เฉพาะสายที่ยังไม่ถึงเวลา (เลยแล้ว = ไม่สร้าง)
+ * - คอนเฟิร์ม 16:00 วันก่อนเข้างาน · เลย 16:00 แล้ว (เพิ่มใบทีหลัง) = โทรตามคิว (อีก `REPLACE_ASAP_MINUTES` นาที)
+ *   แต่ถ้าคิวนั้นช้ากว่าสายก่อนเข้างานที่ยังมาไม่ถึง = ไม่ต้องคอนเฟิร์มแยก (สายก่อนเข้างานโทรอยู่แล้ว)
+ * - ก่อนเข้างาน 1 ชม. / 15 นาที — เลยแล้วไม่สร้าง
+ * - เลยเวลาเข้างานแล้ว = ไม่มีสาย
  */
-export function replaceSyncDueNow(bangkokYmd: string, bangkokHour: number, lastRunYmd: string | null, hour: number): boolean {
-  if (lastRunYmd === bangkokYmd) return false;
-  return bangkokHour >= hour;
+export function planReplaceCalls(wall: ReplaceWantWall, now: Date): ReplaceSlotPlan[] {
+  const start = wantInstant(wall);
+  if (Number.isNaN(start.getTime()) || start.getTime() <= now.getTime()) return [];
+  const leads = (['lead60', 'lead15'] as const)
+    .map((slot) => ({ slot, round: REPLACE_SLOT_ROUND[slot], at: new Date(start.getTime() - REPLACE_LEAD_MINUTES[slot] * 60_000), asap: false }))
+    .filter((p) => p.at.getTime() > now.getTime());
+  const confirmAt = new Date(`${shiftYmd(wall.ymd, -1)}T${REPLACE_CONFIRM_TIME}:00+07:00`);
+  const confirm: ReplaceSlotPlan =
+    confirmAt.getTime() > now.getTime()
+      ? { slot: 'confirm', round: 1, at: confirmAt, asap: false }
+      : { slot: 'confirm', round: 1, at: new Date(now.getTime() + REPLACE_ASAP_MINUTES * 60_000), asap: true };
+  const nextBoundary = leads[0]?.at ?? start;
+  return confirm.at.getTime() < nextBoundary.getTime() ? [confirm, ...leads] : leads;
+}
+
+/** คีย์กันซ้ำต่อสาย: ใบงาน + สาย + คนไปแทน (เปลี่ยนคน = คีย์ใหม่ ⇒ ของคนเดิมถูกยกเลิก ของคนใหม่ถูกสร้าง) */
+export function replaceSlotRef(jobId: string | number, slot: ReplaceSlot, personKey: string): string {
+  return `${replaceSourceRef(jobId)}:${slot}:${personKey}`;
+}
+
+/** แยกคีย์กลับ — คีย์รุ่นเก่า (หนึ่งใบหนึ่งสาย ก่อน 5 ต.ค. 2569) ไม่มี slot */
+export function parseReplaceRef(ref: string): { jobId: string; slot: ReplaceSlot | null; personKey: string | null } | null {
+  const m = /^irecruit-replace:([^:]+)(?::(confirm|lead60|lead15):([^:]+))?$/.exec(ref.trim());
+  if (!m) return null;
+  return { jobId: m[1], slot: (m[2] as ReplaceSlot | undefined) ?? null, personKey: m[3] ?? null };
+}
+
+/** หมายเหตุบนสาย (AI พูดด้วย) — สายคอนเฟิร์มบอกวันด้วย */
+export function replaceSlotNote(slot: ReplaceSlot, wall: ReplaceWantWall): string {
+  if (slot !== 'confirm') return replaceCallNote(wall);
+  const [, m, d] = wall.ymd.split('-').map(Number);
+  return `ยืนยันเวลาเข้างาน ${d}/${m} ${wall.hhmm} น.`;
+}
+
+export type ReplaceDesiredCall = { ref: string; jobId: string; slot: ReplaceSlot; at: Date; asap: boolean };
+export type ReplaceExistingCall = {
+  id: string;
+  ref: string;
+  scheduledAt: Date;
+  /** pending = ยังไม่ถึงเวลา (เกินตอนนี้ + ระยะกันชน) ไม่ยกเลิก ไม่ปิด ไม่มีผลคนลง · locked = อย่างอื่นทั้งหมด (แตะไม่ได้) */
+  state: 'pending' | 'locked';
+};
+export type ReplaceReconcile = {
+  create: ReplaceDesiredCall[];
+  reschedule: Array<{ existing: ReplaceExistingCall; desired: ReplaceDesiredCall }>;
+  cancel: ReplaceExistingCall[];
+};
+
+/**
+ * เทียบของที่ iRecruit ต้องการ (`desired`) กับสายที่มีอยู่ (`existing`) — ตรรกะล้วน มีเทสต์
+ * - คีย์ที่มีอยู่แล้ว (สถานะไหนก็ได้) = ไม่สร้างซ้ำ (คนยกเลิกเอง/โทรไปแล้ว ห้ามคืนชีพ)
+ * - มีอยู่ + ยังไม่ถึงเวลา + เวลาไม่ตรง (เกิน 1 นาที) = ย้ายเวลา · สายคอนเฟิร์มแบบ "ตามคิว" ไม่ย้าย (เวลาคิวขยับทุกรอบ)
+ * - สายที่ยังไม่ถึงเวลาแต่ iRecruit ไม่ต้องการแล้ว (ยกเลิก/เปลี่ยนคน/เลยเวลา) = ยกเลิก — **เฉพาะเมื่อ `safeToCancel`**
+ *   (ดึงจาก iRecruit ได้ครบ) ไม่งั้นดึงพังรอบเดียวยกเลิกทั้งระบบ
+ * - สายรุ่นเก่า (ไม่มี slot) ที่ยังไม่ถึงเวลา = ยกเลิก (ย้ายมาเป็น 3 สาย) · รุ่นเก่าที่ปิด/ยกเลิกไปแล้ว = ใบนั้นคนจัดการแล้ว ไม่สร้างใหม่
+ */
+export function reconcileReplaceCalls(
+  desired: readonly ReplaceDesiredCall[],
+  existing: readonly ReplaceExistingCall[],
+  opts: { safeToCancel: boolean },
+): ReplaceReconcile {
+  const out: ReplaceReconcile = { create: [], reschedule: [], cancel: [] };
+  const byRef = new Map(existing.map((e) => [e.ref, e]));
+  const desiredRefs = new Set(desired.map((d) => d.ref));
+  /** ใบที่มีสายรุ่นเก่าที่คนจัดการไปแล้ว — ไม่สร้างสายรุ่นใหม่ให้ใบนี้ */
+  const handledLegacyJobs = new Set<string>();
+  /** ใบที่สายรุ่นเก่ายังรอโทรอยู่ — สร้างรุ่นใหม่ได้ก็ต่อเมื่อยกเลิกของเก่าได้ในรอบเดียวกัน (กันโทรซ้อน) */
+  const pendingLegacyJobs = new Set<string>();
+  for (const e of existing) {
+    const p = parseReplaceRef(e.ref);
+    if (!p || p.slot) continue;
+    if (e.state === 'locked') handledLegacyJobs.add(p.jobId);
+    else pendingLegacyJobs.add(p.jobId);
+  }
+  for (const d of desired) {
+    const ex = byRef.get(d.ref);
+    if (!ex) {
+      if (handledLegacyJobs.has(d.jobId)) continue;
+      if (!opts.safeToCancel && pendingLegacyJobs.has(d.jobId)) continue;
+      out.create.push(d);
+      continue;
+    }
+    if (ex.state === 'pending' && !d.asap && Math.abs(ex.scheduledAt.getTime() - d.at.getTime()) > 60_000) {
+      out.reschedule.push({ existing: ex, desired: d });
+    }
+  }
+  if (opts.safeToCancel) {
+    for (const e of existing) {
+      if (e.state !== 'pending' || desiredRefs.has(e.ref)) continue;
+      if (!parseReplaceRef(e.ref)) continue; // ไม่ใช่สายที่ดึงมา — ไม่ยุ่ง
+      out.cancel.push(e);
+    }
+  }
+  return out;
+}
+
+/**
+ * ใครโทรตามประเภทคนไปแทน (เจ้าของ Choice 5 ต.ค. 2569 ระหว่างที่ยังแยก WL/สแปร์ไซต์ไม่ได้):
+ * **Ex (`replace_type = EX`) ให้ AI โทร · คนใน/อื่น ๆ ให้คนโทรเอง** — WL จะไม่โดน AI โทรแน่นอน · สแปร์ไซต์ยังมีคนตาม
+ * `byDate` = ผลของ aiFrom (ก่อนวันนั้นคนโทรอยู่แล้ว)
+ */
+export function replaceModeForType(replaceType: string | null | undefined, byDate: 'ai' | 'manual'): 'ai' | 'manual' {
+  if (byDate === 'manual') return 'manual';
+  return (replaceType ?? '').trim().toUpperCase() === 'EX' ? 'ai' : 'manual';
 }

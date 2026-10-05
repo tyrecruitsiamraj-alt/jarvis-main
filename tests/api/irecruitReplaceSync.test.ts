@@ -1,9 +1,10 @@
 // @vitest-environment node
 /**
- * ═══ ดึงส่งคนแทนจาก iRecruit → สายในแท็บติดตามส่งคนแทน (เจ้าของเคาะ 2 ต.ค. 2569) ═══
- * 🔴 ด่าน: SQL ของเจ้าของ (WS · job_type 2 · ตัด C) ช่วงวันนี้→+31 วันนาฬิกาไทย · คนเดียวหลายใบ = ชุดเดียว แผนเดียว ·
- *    กันซ้ำด้วย source_ref (ที่ฐาน) · ไม่มีเบอร์/เลยเวลาเข้างาน = ไม่สร้าง · เวลาโทร 18:00 วันก่อนเข้างาน · ผ่านไปแล้ว = โทรเร็วที่สุด ·
- *    ส่ง AI เฉพาะเมื่อสวิตช์ follow_entry เปิด · ฐานยังไม่รัน 133 / iRecruit ปิด = จดเหตุผล ไม่สร้างสาย
+ * ═══ ดึงส่งคนแทนจาก iRecruit → สายในแท็บติดตามส่งคนแทน ═══
+ * Journey 5 ต.ค. 2569 (เจ้าของ): 3 สายต่อใบ — คอนเฟิร์ม 16:00 วันก่อนเข้างาน · ก่อนเข้างาน 1 ชม. · ก่อน 15 นาที ·
+ * เพิ่มหลัง 16:00 = คอนเฟิร์มตามคิว · ดึงทุก 5 นาที · แก้เวลาใน iRecruit = ย้ายเวลา · ยกเลิกใบ/เปลี่ยนคน = ยกเลิกสายให้เอง
+ * 🔴 ด่าน: SQL ของเจ้าของ (WS · job_type 2 · ตัด C) · กันซ้ำด้วย source_ref · ส่ง AI เฉพาะสวิตช์ follow_entry เปิด · แผนละคน+วัน ·
+ *    ดึงพัง/ได้ 0 ใบทั้งที่มีสายรอ = ไม่ยกเลิกอะไร
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -36,14 +37,15 @@ vi.mock('../../api/_lib/followStaffName.js', () => ({ staffNameOfPhone: async ()
 
 import { enforceReplaceAiFrom, MIGRATION_133_NOT_READY, runIrecruitReplaceSync } from '../../api/_lib/irecruitReplaceSync.js';
 import { REPLACE_FOLLOW_TOPIC } from '../../src/lib/irecruitReplaceSync.js';
+import { createHash } from 'node:crypto';
 
 type Call = { sql: string; params: unknown[] };
 let calls: Call[] = [];
-let existingRefs: string[] = [];
-let existingRows: Array<{ id: string; source_ref: string; scheduled_at: string; mode: string; done: boolean }> = [];
-let settingsRows: unknown[] = [{ payload: { rule: { atStart: false, dayOffset: -1, time: '18:00' } }, updated_at: null, updated_by_name: null }];
+type Existing = { id: string; source_ref: string; scheduled_at: string; mode: string; group_id: string | null; recipient_phone: string | null; pending: boolean };
+let existingRows: Existing[] = [];
+let settingsRows: unknown[] = [];
 let settingsError: unknown = null;
-let sourceRefError: unknown = null;
+let existingError: unknown = null;
 let insertErrorFor: string | null = null;
 let insertSeq = 0;
 
@@ -53,19 +55,15 @@ function fakeDb(sql: string, params: unknown[] = []) {
     if (settingsError) throw settingsError;
     return { rows: settingsRows };
   }
-  if (/where source_ref = any/.test(sql)) {
-    if (sourceRefError) throw sourceRefError;
-    return {
-      rows: [
-        ...existingRefs.map((source_ref) => ({ id: `ex-${source_ref}`, source_ref, scheduled_at: '2099-01-01T00:00:00Z', mode: 'ai', done: true })),
-        ...existingRows,
-      ],
-    };
+  if (/where source_ref like 'irecruit-replace:%'/.test(sql)) {
+    if (existingError) throw existingError;
+    return { rows: existingRows };
   }
+  if (/set cancelled_at = now\(\)/.test(sql)) return { rows: [{ id: params[0] }] };
   if (/update .*follow_entries set scheduled_at/.test(sql)) return { rows: [] };
   if (/insert into .*follow_entries/.test(sql)) {
-    const ref = String(params[10]);
-    if (insertErrorFor && ref === insertErrorFor) throw { code: '23505' };
+    const ref = String(params[12]);
+    if (insertErrorFor && ref.startsWith(insertErrorFor)) throw { code: '23505' };
     insertSeq += 1;
     return { rows: [{ id: `id-${insertSeq}` }] };
   }
@@ -74,8 +72,12 @@ function fakeDb(sql: string, params: unknown[] = []) {
   throw new Error(`unexpected sql: ${sql.slice(0, 80)}`);
 }
 
-// 06:00 ไทย 2 ต.ค. 2569
-const NOW = new Date('2026-10-02T06:00:00+07:00');
+/** คีย์คนไปแทน = sha1(เบอร์ E.164) 10 ตัว — ตัวเดียวกับ server */
+const pk = (e164: string) => createHash('sha1').update(e164).digest('hex').slice(0, 10);
+const P1 = '+66812345678';
+
+// 10:00 ไทย 5 ต.ค. 2569 (ก่อน 16:00)
+const NOW = new Date('2026-10-05T10:00:00+07:00');
 // mssql คืนนาฬิกาไทยเป็น Date ที่ถือเป็น UTC
 const wall = (iso: string) => new Date(iso);
 const row = (job_id: string, over: Record<string, unknown> = {}) => ({
@@ -86,17 +88,17 @@ const row = (job_id: string, over: Record<string, unknown> = {}) => ({
   mobile: '0812345678',
   site_name: 'ไซต์ทดสอบ',
   site_code: 'S001',
-  want_date: wall('2026-10-03T07:30:00Z'),
+  want_date: wall('2026-10-06T07:30:00Z'),
+  replace_type: 'EX',
   ...over,
 });
 
 beforeEach(() => {
   calls = [];
-  existingRefs = [];
   existingRows = [];
-  settingsRows = [{ payload: { rule: { atStart: false, dayOffset: -1, time: '18:00' } }, updated_at: null, updated_by_name: null }];
+  settingsRows = [{ payload: { rule: {} }, updated_at: null, updated_by_name: null }];
   settingsError = null;
-  sourceRefError = null;
+  existingError = null;
   insertErrorFor = null;
   insertSeq = 0;
   dbQuery.mockReset();
@@ -114,85 +116,84 @@ beforeEach(() => {
 });
 
 const inserts = () => calls.filter((c) => /insert into .*follow_entries/.test(c.sql));
+const insRef = (c: Call) => String(c.params[12]);
 const persisted = () => calls.filter((c) => /insert into .*app_irecruit_replace_sync/.test(c.sql)).map((c) => JSON.parse(String(c.params[0])));
 
-describe('runIrecruitReplaceSync', () => {
-  it('🔴 ครบรอบ: SQL ของเจ้าของ ช่วงวันนี้→+31 วัน · คนเดียวหลายใบ = ชุดเดียว · ตัดซ้ำ/ไม่มีเบอร์/เลยเวลา · เวลาโทร 18:00 วันก่อน · ส่ง AI', async () => {
-    existingRefs = ['irecruit-replace:E'];
+describe('runIrecruitReplaceSync — 3 สายต่อใบ', () => {
+  it('🔴 ครบรอบ: คอนเฟิร์ม 16:00 วันก่อน · ก่อน 1 ชม. · ก่อน 15 นาที · คนเดียวหลายใบ = ชุดเดียว · แผนละคน+วัน · ตัดไม่มีเบอร์/เลยเวลา', async () => {
     irecruitSqlQuery.mockResolvedValue([
-      row('A'), // เข้างาน 3 ต.ค. 07:30 → โทร 2 ต.ค. 18:00
-      row('B', { want_date: wall('2026-10-04T05:00:00Z') }), // คนเดียวกัน เข้างาน 4 ต.ค. 05:00 → โทร 3 ต.ค. 18:00
-      row('C', { mobile: '089-999-9999', fname: 'อีกคน', want_date: wall('2026-10-03T08:00:00Z') }),
+      row('A'), // เข้างาน 6 ต.ค. 07:30
+      row('B', { want_date: wall('2026-10-07T05:00:00Z') }), // คนเดียวกัน เข้างาน 7 ต.ค. 05:00
+      row('C', { mobile: '089-999-9999', fname: 'อีกคน', want_date: wall('2026-10-06T08:00:00Z') }),
       row('D', { mobile: null }),
-      row('E'), // เคยดึงแล้ว
-      row('F', { want_date: wall('2026-10-01T08:00:00Z') }), // เลยเวลาเข้างาน
-      row('G', { mobile: '0870000000', want_date: wall('2026-10-02T09:00:00Z') }), // เข้างานวันนี้ 09:00 → เวลาตามกติกาผ่านแล้ว → โทรเร็วที่สุด
+      row('F', { want_date: wall('2026-10-04T08:00:00Z') }), // เลยเวลาเข้างาน
     ]);
 
     const s = await runIrecruitReplaceSync({ now: NOW });
 
     expect(s.error).toBeNull();
-    expect(s).toMatchObject({ fromYmd: '2026-10-02', toYmd: '2026-11-02', fetched: 7, added: 4, alreadyIn: 1, noPhone: 1, pastDue: 1, asap: 1, queued: 4, notSent: 0 });
+    expect(s).toMatchObject({ fromYmd: '2026-10-05', toYmd: '2026-11-05', fetched: 5, added: 9, alreadyIn: 0, noPhone: 1, pastDue: 1, asap: 0, queued: 9, notSent: 0, cancelled: 0 });
 
-    // SQL ของเจ้าของ + ช่วงวันเป็นนาฬิกาไทย (driver ถือเป็น UTC) · to ไม่รวม = วันถัดจาก toYmd
-    const [sql, inputs] = irecruitSqlQuery.mock.calls[0] as [string, { from: Date; to: Date }];
+    const [sql] = irecruitSqlQuery.mock.calls[0] as [string];
     expect(sql).toMatch(/h\.status = 'WS'/);
     expect(sql).toMatch(/h\.job_type = '2'/);
     expect(sql).toMatch(/ISNULL\(z\.status, ''\) <> 'C'/);
-    expect(sql).toMatch(/ORDER BY jr\.date_add DESC/);
-    expect(inputs.from.toISOString()).toBe('2026-10-02T00:00:00.000Z');
-    expect(inputs.to.toISOString()).toBe('2026-11-03T00:00:00.000Z');
 
-    const ins = inserts();
-    expect(ins).toHaveLength(4);
-    const byRef = Object.fromEntries(ins.map((c) => [String(c.params[10]), c.params]));
-    // ทีมส่งคนแทน · เรื่อง · เบอร์ E.164 · หน่วยงาน · โทร 18:00 วันก่อนเข้างาน (11:00Z) · ชื่อคนสร้าง
-    expect(byRef['irecruit-replace:A']).toEqual([
-      'ทดสอบ ระบบ', '+66812345678', REPLACE_FOLLOW_TOPIC, 'เข้างาน 07:30 น.', '2026-10-02T11:00:00.000Z',
-      expect.any(String), 'ไซต์ทดสอบ', 'S001', 'ดึงจาก iRecruit', 'replacement', 'irecruit-replace:A', 'ai',
+    const byRef = Object.fromEntries(inserts().map((c) => [insRef(c), c.params]));
+    // A: คอนเฟิร์ม 5 ต.ค. 16:00 (09:00Z) · ก่อน 1 ชม. 06:30 (5 ต.ค. 23:30Z) · ก่อน 15 นาที 07:15 (6 ต.ค. 00:15Z)
+    expect(byRef[`irecruit-replace:A:confirm:${pk(P1)}`]).toEqual([
+      'ทดสอบ ระบบ', P1, REPLACE_FOLLOW_TOPIC, 'ยืนยันเวลาเข้างาน 6/10 07:30 น.', '2026-10-05T09:00:00.000Z',
+      expect.any(String), 'ไซต์ทดสอบ', 'S001', 1, 'ai', 'ดึงจาก iRecruit', 'replacement', `irecruit-replace:A:confirm:${pk(P1)}`,
     ]);
-    expect(byRef['irecruit-replace:B']?.[4]).toBe('2026-10-03T11:00:00.000Z');
-    // A กับ B คนเดียวกัน = group_id เดียว · C คนละชุด
-    expect(byRef['irecruit-replace:A']?.[5]).toBe(byRef['irecruit-replace:B']?.[5]);
-    expect(byRef['irecruit-replace:C']?.[5]).not.toBe(byRef['irecruit-replace:A']?.[5]);
-    // G โทรเร็วที่สุด = ตอนนี้ + 10 นาที
-    expect(byRef['irecruit-replace:G']?.[4]).toBe(new Date(NOW.getTime() + 10 * 60_000).toISOString());
-    for (const c of ins) {
-      expect(c.sql).toMatch(/1, \$12, null/); // ทุกสายเป็นสายแรก
-      expect(c.params[11]).toBe('ai'); // ไม่ได้ตั้ง aiFrom = AI โทร
-    }
-    expect(ins.some((c) => String(c.params[10]) === 'irecruit-replace:D' || String(c.params[10]) === 'irecruit-replace:E' || String(c.params[10]) === 'irecruit-replace:F')).toBe(false);
+    expect(byRef[`irecruit-replace:A:lead60:${pk(P1)}`]?.slice(3, 5)).toEqual(['เข้างาน 07:30 น.', '2026-10-05T23:30:00.000Z']);
+    expect(byRef[`irecruit-replace:A:lead15:${pk(P1)}`]?.[4]).toBe('2026-10-06T00:15:00.000Z');
+    expect(byRef[`irecruit-replace:A:lead60:${pk(P1)}`]?.[8]).toBe(2);
+    expect(byRef[`irecruit-replace:A:lead15:${pk(P1)}`]?.[8]).toBe(3);
+    // A กับ B คนเดียวกัน = ชุดเดียว · C คนละชุด
+    expect(byRef[`irecruit-replace:A:confirm:${pk(P1)}`]?.[5]).toBe(byRef[`irecruit-replace:B:lead15:${pk(P1)}`]?.[5]);
+    expect(byRef[`irecruit-replace:C:confirm:${pk('+66899999999')}`]?.[5]).not.toBe(byRef[`irecruit-replace:A:confirm:${pk(P1)}`]?.[5]);
 
-    // แผนเดียวต่อชุด: ชุด A+B (เรียงตามเวลา) · ชุด C · ชุด G
-    expect(enqueuePlan).toHaveBeenCalledTimes(3);
-    const planAB = (enqueuePlan.mock.calls as Array<[Array<{ id: string; scheduled_at: Date; callRound: number; unitName: string | null }>]>).find((c) => c[0].length === 2)?.[0];
-    expect(planAB?.map((e) => e.scheduled_at.toISOString())).toEqual(['2026-10-02T11:00:00.000Z', '2026-10-03T11:00:00.000Z']);
-    expect(planAB?.every((e) => e.callRound === 1 && e.unitName === 'ไซต์ทดสอบ')).toBe(true);
+    // แผนละคน+วัน: คน 1 = 5 ต.ค. (A คอนเฟิร์ม) · 6 ต.ค. (A ก่อนเข้างาน 2 + B คอนเฟิร์ม 16:00) · 7 ต.ค. (B ก่อนเข้างาน 2) · C = 5 ต.ค. · 6 ต.ค.
+    expect(enqueuePlan).toHaveBeenCalledTimes(5);
+    const sizes = (enqueuePlan.mock.calls as Array<[unknown[]]>).map((c) => c[0].length).sort();
+    expect(sizes).toEqual([1, 1, 2, 2, 3]);
+    expect(persisted().at(-1)?.lastRun).toMatchObject({ added: 9, queued: 9 });
+  });
 
-    // จดสถานะส่ง + ผลรอบล่าสุด
-    expect(calls.filter((c) => /set dispatch_state/.test(c.sql)).map((c) => c.params[1])).toEqual(['queued', 'queued', 'queued', 'queued']);
-    expect(persisted().at(-1)?.lastRun).toMatchObject({ added: 4, queued: 4 });
+  it('🔴 เพิ่มหลัง 16:00 = คอนเฟิร์มตามคิว (อีก 10 นาที) · ก่อนเข้างานตามเดิม', async () => {
+    const late = new Date('2026-10-05T19:00:00+07:00');
+    irecruitSqlQuery.mockResolvedValue([row('A')]);
+    const s = await runIrecruitReplaceSync({ now: late });
+    expect(s).toMatchObject({ added: 3, asap: 1 });
+    expect(inserts().find((c) => insRef(c).includes(':confirm:'))?.params[4]).toBe(new Date(late.getTime() + 10 * 60_000).toISOString());
   });
 
   it('สวิตช์ส่งอัตโนมัติปิด = สร้างสายแต่ไม่ส่ง AI (off) · ไม่เรียก Lumos', async () => {
     autoDispatch.mockResolvedValue(false);
     irecruitSqlQuery.mockResolvedValue([row('A')]);
     const s = await runIrecruitReplaceSync({ now: NOW });
-    expect(s).toMatchObject({ added: 1, queued: 0, notSent: 1, error: null });
+    expect(s).toMatchObject({ added: 3, queued: 0, error: null });
     expect(enqueuePlan).not.toHaveBeenCalled();
-    expect(calls.filter((c) => /set dispatch_state/.test(c.sql)).map((c) => c.params[1])).toEqual(['off']);
+    expect(calls.filter((c) => /set dispatch_state/.test(c.sql)).map((c) => c.params[1])).toEqual(['off', 'off', 'off']);
   });
 
   it('🔴 สองรอบชนกัน: ฐานตอบ unique violation = นับว่ามีแล้ว ไม่พัง ไม่โทรซ้ำ', async () => {
-    insertErrorFor = 'irecruit-replace:A';
+    insertErrorFor = 'irecruit-replace:A:';
     irecruitSqlQuery.mockResolvedValue([row('A'), row('B', { mobile: '0899999999' })]);
     const s = await runIrecruitReplaceSync({ now: NOW });
-    expect(s).toMatchObject({ added: 1, alreadyIn: 1, error: null });
-    expect(enqueuePlan).toHaveBeenCalledTimes(1);
+    expect(s).toMatchObject({ added: 3, alreadyIn: 3, error: null });
+  });
+
+  it('🔴 aiFrom: สายที่นัดก่อนวันนั้น = คนโทร (ไม่ส่ง Lumos) · ตั้งแต่วันนั้น = AI', async () => {
+    settingsRows = [{ payload: { rule: { aiFrom: '2026-10-06' } }, updated_at: null, updated_by_name: null }];
+    irecruitSqlQuery.mockResolvedValue([row('A')]);
+    await runIrecruitReplaceSync({ now: NOW });
+    const modes = Object.fromEntries(inserts().map((c) => [insRef(c).split(':')[2], c.params[9]]));
+    expect(modes).toEqual({ confirm: 'manual', lead60: 'ai', lead15: 'ai' }); // คอนเฟิร์ม 5 ต.ค. = คนโทร · 6 ต.ค. = AI
   });
 
   it('🔴 ฐานยังไม่รัน 133 (source_ref) = จดเหตุผล ไม่สร้างสาย', async () => {
-    sourceRefError = { code: '42703' };
+    existingError = { code: '42703' };
     irecruitSqlQuery.mockResolvedValue([row('A')]);
     const s = await runIrecruitReplaceSync({ now: NOW });
     expect(s.error).toBe(MIGRATION_133_NOT_READY);
@@ -200,44 +201,121 @@ describe('runIrecruitReplaceSync', () => {
     expect(enqueuePlan).not.toHaveBeenCalled();
   });
 
-  it('ตารางตั้งค่ายังไม่มี = ไม่ถาม iRecruit ไม่สร้างสาย · iRecruit ปิดสวิตช์ = จดเหตุผลเดิมของสวิตช์', async () => {
+  it('ตารางตั้งค่ายังไม่มี = ไม่ถาม iRecruit · iRecruit ปิดสวิตช์ = จดเหตุผลเดิม · ต่อ iRecruit ไม่ได้ = ไม่สร้าง ไม่ยกเลิก', async () => {
     settingsError = { code: '42P01' };
-    const s1 = await runIrecruitReplaceSync({ now: NOW });
-    expect(s1.error).toBe(MIGRATION_133_NOT_READY);
+    expect((await runIrecruitReplaceSync({ now: NOW })).error).toBe(MIGRATION_133_NOT_READY);
     expect(irecruitSqlQuery).not.toHaveBeenCalled();
-
     settingsError = null;
     unavailable.mockReturnValue('ปิดการเชื่อม iRecruit ไว้ชั่วคราวตามที่สั่ง');
-    const s2 = await runIrecruitReplaceSync({ now: NOW });
-    expect(s2.error).toMatch(/ปิดการเชื่อม iRecruit/);
-    expect(irecruitSqlQuery).not.toHaveBeenCalled();
-    expect(inserts()).toHaveLength(0);
-  });
-
-  it('ต่อ iRecruit ไม่ได้กลางทาง = จดเหตุผล ไม่สร้างสาย', async () => {
+    expect((await runIrecruitReplaceSync({ now: NOW })).error).toMatch(/ปิดการเชื่อม iRecruit/);
+    unavailable.mockReturnValue(null);
     irecruitSqlQuery.mockRejectedValue(new Error('ECONNREFUSED'));
     const s = await runIrecruitReplaceSync({ now: NOW });
     expect(s.error).toMatch(/ต่อ iRecruit ไม่ได้/);
     expect(inserts()).toHaveLength(0);
-    expect(persisted().at(-1)?.lastRun?.error).toMatch(/ต่อ iRecruit ไม่ได้/);
+    expect(calls.some((c) => /set cancelled_at/.test(c.sql))).toBe(false);
   });
 });
 
-describe('🔴 AI เริ่มโทรตั้งแต่ (เจ้าของสั่ง 2 ต.ค. 2569 "ถึงวันจันทร์เปลี่ยนเป็นคนโทรก่อนให้หมด")', () => {
-  it('ดึงใหม่: สายที่นัดก่อน aiFrom สร้างเป็นคนโทร ไม่ส่ง Lumos · หลังจากนั้นยัง AI', async () => {
-    settingsRows = [{ payload: { rule: { atStart: false, dayOffset: -1, time: '18:00', aiFrom: '2026-10-04' } }, updated_at: null, updated_by_name: null }];
+describe('🔴 ใครโทรตามประเภทคนไปแทน (เจ้าของ Choice 5 ต.ค. 2569: Ex ให้ AI · คนในให้คนโทร)', () => {
+  it('คนใน (IN/ER/ไม่ระบุ) = สร้าง 3 สายเป็นคนโทร ไม่ส่ง Lumos · Ex = AI', async () => {
     irecruitSqlQuery.mockResolvedValue([
-      row('A'), // โทร 2 ต.ค. 18:00 → คนโทร
-      row('B', { mobile: '0899999999', want_date: wall('2026-10-06T08:00:00Z') }), // โทร 5 ต.ค. → AI
+      row('I', { replace_type: 'IN' }),
+      row('N', { mobile: '0877777777', replace_type: null }),
+      row('E', { mobile: '0866666666' }),
     ]);
     const s = await runIrecruitReplaceSync({ now: NOW });
-    const byRef = Object.fromEntries(inserts().map((c) => [String(c.params[10]), c.params[11]]));
-    expect(byRef).toEqual({ 'irecruit-replace:A': 'manual', 'irecruit-replace:B': 'ai' });
-    expect(enqueuePlan).toHaveBeenCalledTimes(1);
-    expect((enqueuePlan.mock.calls[0] as [Array<{ id: string }>])[0]).toHaveLength(1);
-    expect(s).toMatchObject({ added: 2, queued: 1, notSent: 0 });
+    const modeByJob = new Map<string, Set<unknown>>();
+    for (const c of inserts()) {
+      const job = String(c.params[12]).split(':')[1];
+      modeByJob.set(job, new Set([...(modeByJob.get(job) ?? []), c.params[9]]));
+    }
+    expect([...(modeByJob.get('I') ?? [])]).toEqual(['manual']);
+    expect([...(modeByJob.get('N') ?? [])]).toEqual(['manual']);
+    expect([...(modeByJob.get('E') ?? [])]).toEqual(['ai']);
+    expect((enqueuePlan.mock.calls as Array<[Array<{ recipient_phone: string }>]>).every((c) => c[0].every((e) => e.recipient_phone === '+66866666666'))).toBe(true);
+    expect(s).toMatchObject({ added: 9, queued: 3 });
   });
 
+  it('สาย AI เดิมของคนใน = เปลี่ยนเป็นคนโทร + ถอนแผนที่ Lumos (ไม่ทำกลับทาง)', async () => {
+    existingRows = [
+      { id: 'x1', source_ref: `irecruit-replace:I:lead60:${pk(P1)}`, scheduled_at: '2026-10-05T23:30:00Z', mode: 'ai', group_id: 'g', recipient_phone: P1, pending: true },
+    ];
+    irecruitSqlQuery.mockResolvedValue([row('I', { replace_type: 'IN' })]);
+    dbQuery.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (/set call_mode = 'manual'/.test(sql)) {
+        calls.push({ sql, params: params ?? [] });
+        return { rows: [] };
+      }
+      return fakeDb(sql, params);
+    });
+    const s = await runIrecruitReplaceSync({ now: NOW });
+    expect(cancelFollow).toHaveBeenCalledWith('x1', expect.any(Function));
+    expect(calls.some((c) => /set call_mode = 'manual'/.test(c.sql) && c.params[0] === 'x1')).toBe(true);
+    expect(s.toManual).toBe(1);
+  });
+});
+
+describe('runIrecruitReplaceSync — แก้บน iRecruit แล้ว So Recruit เปลี่ยนตาม (5 ต.ค. 2569)', () => {
+  const ex = (id: string, ref: string, iso: string, over: Partial<Existing> = {}): Existing => ({
+    id, source_ref: ref, scheduled_at: iso, mode: 'ai', group_id: 'g1', recipient_phone: P1, pending: true, ...over,
+  });
+
+  it('🔴 แก้เวลาเข้างาน = ย้ายเวลาสายที่ยังไม่ถึง (AI: ยกเลิกแผนเก่าแล้วส่งใหม่) · สายใหม่ใช้ชุดเดิมของคนนั้น', async () => {
+    existingRows = [
+      ex('c1', `irecruit-replace:A:confirm:${pk(P1)}`, '2026-10-05T09:00:00Z'),
+      ex('l1', `irecruit-replace:A:lead60:${pk(P1)}`, '2026-10-05T23:30:00Z'),
+    ];
+    irecruitSqlQuery.mockResolvedValue([row('A', { want_date: wall('2026-10-06T08:00:00Z') })]); // 07:30 → 08:00
+    const s = await runIrecruitReplaceSync({ now: NOW });
+    const moved = calls.filter((c) => /set scheduled_at/.test(c.sql)).map((c) => [c.params[0], c.params[1]]);
+    expect(moved).toEqual([['l1', '2026-10-06T00:00:00.000Z']]);
+    expect(cancelFollow).toHaveBeenCalledWith('l1', expect.any(Function));
+    // คอนเฟิร์ม 16:00 ไม่เปลี่ยน · lead15 ยังไม่มี = สร้าง (ชุดเดิม g1)
+    expect(inserts().map(insRef)).toEqual([`irecruit-replace:A:lead15:${pk(P1)}`]);
+    expect(inserts()[0].params[5]).toBe('g1');
+    expect(s).toMatchObject({ realigned: 1, added: 1, cancelled: 0 });
+  });
+
+  it('🔴 เปลี่ยนคนไปแทน = ยกเลิกสายที่ยังไม่ถึงของคนเดิม + สร้างของคนใหม่ · ใบหายจาก iRecruit = ยกเลิก · สายที่ล็อกแล้วไม่แตะ', async () => {
+    existingRows = [
+      ex('a1', `irecruit-replace:A:lead60:${pk(P1)}`, '2026-10-05T23:30:00Z'),
+      ex('a2', `irecruit-replace:A:confirm:${pk(P1)}`, '2026-10-05T02:00:00Z', { pending: false }), // โทรไปแล้ว
+      ex('y1', `irecruit-replace:Y:lead60:${pk(P1)}`, '2026-10-06T01:00:00Z', { mode: 'manual' }),
+    ];
+    irecruitSqlQuery.mockResolvedValue([row('A', { mobile: '0877777777' })]);
+    const s = await runIrecruitReplaceSync({ now: NOW });
+    const cancelledIds = calls.filter((c) => /set cancelled_at/.test(c.sql)).map((c) => c.params[0]);
+    expect(cancelledIds).toEqual(['a1', 'y1']);
+    expect(cancelFollow).toHaveBeenCalledWith('a1', expect.any(Function)); // AI = ถอนแผนที่ Lumos ด้วย
+    expect(cancelFollow).not.toHaveBeenCalledWith('y1', expect.any(Function)); // คนโทร = ไม่มีแผน
+    expect(inserts().map(insRef).every((r) => r.endsWith(pk('+66877777777')))).toBe(true);
+    expect(inserts()).toHaveLength(3);
+    expect(s.cancelled).toBe(2);
+  });
+
+  it('🔴 สายรุ่นเก่า (หนึ่งใบหนึ่งสาย) ที่ยังไม่ถึง = ยกเลิกแล้วสร้าง 3 สาย · รุ่นเก่าที่คนจัดการแล้ว = ไม่สร้างใหม่', async () => {
+    existingRows = [
+      ex('old', 'irecruit-replace:A', '2026-10-06T00:30:00Z'),
+      ex('done', 'irecruit-replace:B', '2026-10-04T00:30:00Z', { pending: false }),
+    ];
+    irecruitSqlQuery.mockResolvedValue([row('A'), row('B', { want_date: wall('2026-10-07T05:00:00Z') })]);
+    const s = await runIrecruitReplaceSync({ now: NOW });
+    expect(calls.filter((c) => /set cancelled_at/.test(c.sql)).map((c) => c.params[0])).toEqual(['old']);
+    expect(inserts().map((c) => insRef(c).split(':')[1])).toEqual(['A', 'A', 'A']);
+    expect(s).toMatchObject({ cancelled: 1, added: 3 });
+  });
+
+  it('🔴 iRecruit ตอบ 0 ใบทั้งที่มีสายรอโทร = ไม่ยกเลิกอะไรเลย (ห้ามล้างทั้งระบบเพราะรอบเดียวพัง)', async () => {
+    existingRows = [ex('a1', `irecruit-replace:A:lead60:${pk(P1)}`, '2026-10-05T23:30:00Z')];
+    irecruitSqlQuery.mockResolvedValue([]);
+    const s = await runIrecruitReplaceSync({ now: NOW });
+    expect(calls.some((c) => /set cancelled_at/.test(c.sql))).toBe(false);
+    expect(s.cancelled).toBe(0);
+  });
+});
+
+describe('🔴 AI เริ่มโทรตั้งแต่ — enforceReplaceAiFrom (เจ้าของสั่ง 2 ต.ค. 2569)', () => {
   it('สายเดิม: แผนล้วน = ยกเลิกทั้งแผนด้วยรหัสหัวขบวน · แผนที่มีสายหลังวันนั้น = ยกเลิกเฉพาะสาย · แล้วเปลี่ยนเป็นคนโทร', async () => {
     dbQuery.mockImplementation(async (sql: string, params?: unknown[]) => {
       calls.push({ sql, params: params ?? [] });
@@ -273,29 +351,3 @@ describe('🔴 AI เริ่มโทรตั้งแต่ (เจ้าข
   });
 });
 
-describe('🔴 เวลาในระบบ = เวลาเข้างาน (เจ้าของ Choice 2 ต.ค. 2569) · สายเดิมย้ายเวลาให้', () => {
-  it('ดึงใหม่: นัดตรงเวลาเข้างาน · สายเดิมที่ยังไม่โทร: คนโทร = ย้ายเวลาอย่างเดียว · AI = ยกเลิกแผนเก่าแล้วส่งใหม่', async () => {
-    settingsRows = [{ payload: { rule: { atStart: true } }, updated_at: null, updated_by_name: null }];
-    existingRows = [
-      { id: 'm1', source_ref: 'irecruit-replace:M', scheduled_at: '2026-10-02T11:00:00Z', mode: 'manual', done: false },
-      { id: 'a1', source_ref: 'irecruit-replace:A2', scheduled_at: '2026-10-02T11:00:00Z', mode: 'ai', done: false },
-      { id: 'd1', source_ref: 'irecruit-replace:D2', scheduled_at: '2026-10-02T11:00:00Z', mode: 'manual', done: true },
-    ];
-    irecruitSqlQuery.mockResolvedValue([
-      row('N', { mobile: '0877777777' }), // ใหม่ เข้างาน 3 ต.ค. 07:30
-      row('M', { want_date: wall('2026-10-03T08:00:00Z') }),
-      row('A2', { mobile: '0866666666', want_date: wall('2026-10-03T08:00:00Z') }),
-      row('D2', { mobile: '0855555555', want_date: wall('2026-10-03T08:00:00Z') }),
-    ]);
-    const s = await runIrecruitReplaceSync({ now: NOW });
-    expect(inserts()[0]?.params[4]).toBe('2026-10-03T00:30:00.000Z'); // 07:30 ไทย
-    const moved = calls.filter((c) => /update .*follow_entries set scheduled_at/.test(c.sql)).map((c) => [c.params[0], c.params[1], c.params[2]]);
-    expect(moved).toEqual([
-      ['m1', '2026-10-03T01:00:00.000Z', 'เข้างาน 08:00 น.'],
-      ['a1', '2026-10-03T01:00:00.000Z', 'เข้างาน 08:00 น.'],
-    ]);
-    expect(cancelFollow).toHaveBeenCalledWith('a1', expect.any(Function));
-    expect(cancelFollow).toHaveBeenCalledTimes(1);
-    expect(s.realigned).toBe(2);
-  });
-});

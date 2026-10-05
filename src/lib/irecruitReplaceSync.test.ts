@@ -7,15 +7,18 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_REPLACE_CALL_RULE,
   normalizeReplaceCallRule,
-  planReplaceCall,
+  parseReplaceRef,
+  planReplaceCalls,
+  reconcileReplaceCalls,
+  replaceModeForType,
   readReplaceSyncConfig,
   REPLACE_ASAP_MINUTES,
   REPLACE_SYNC_DEFAULTS,
   replaceCallNote,
-  replaceCallRuleText,
   replaceCallModeFor,
+  replaceSlotNote,
+  replaceSlotRef,
   replaceSourceRef,
-  replaceSyncDueNow,
   wantInstant,
   wantWallFromSqlDate,
 } from '@/lib/irecruitReplaceSync';
@@ -31,20 +34,11 @@ describe('นาฬิกาไทยจาก mssql', () => {
   });
 });
 
-describe('กติกาเวลาโทร', () => {
-  it('ค่าเริ่มต้น 18:00 ของวันก่อนเข้างาน · คำบนจอ', () => {
-    expect(DEFAULT_REPLACE_CALL_RULE).toEqual({ atStart: true, dayOffset: -1, time: '18:00', aiFrom: null });
-    expect(replaceCallRuleText(DEFAULT_REPLACE_CALL_RULE)).toBe('ตามเวลาเข้างาน');
-    expect(replaceCallRuleText({ ...DEFAULT_REPLACE_CALL_RULE, atStart: false })).toBe('18:00 ของวันก่อนเข้างาน');
-    expect(replaceCallRuleText({ dayOffset: 0, time: '06:00' })).toBe('06:00 ของวันเข้างาน');
-    expect(replaceCallRuleText({ dayOffset: -2, time: '09:30' })).toBe('09:30 ของสองวันก่อนเข้างาน');
-  });
-
-  it('อ่านค่าที่เก็บ: ถูกต้องผ่าน · เพี้ยนถอยไปค่าเริ่มต้นทีละช่อง · ไม่ throw', () => {
-    expect(normalizeReplaceCallRule({ dayOffset: 0, time: '7:05' })).toEqual({ atStart: true, dayOffset: 0, time: '07:05', aiFrom: null });
-    expect(normalizeReplaceCallRule({ dayOffset: -2, time: '23:59', aiFrom: '2026-10-06' })).toEqual({ atStart: true, dayOffset: -2, time: '23:59', aiFrom: '2026-10-06' });
-    expect(normalizeReplaceCallRule({ aiFrom: '6/10/2026' }).aiFrom).toBeNull();
-    expect(normalizeReplaceCallRule({ dayOffset: -5, time: '25:00' })).toEqual(DEFAULT_REPLACE_CALL_RULE);
+describe('ค่าตั้ง (เหลือ aiFrom · กติกาเวลาโทรแบบตั้งได้ถอดแล้ว 5 ต.ค. 2569)', () => {
+  it('ค่าเริ่ม = ไม่ตั้ง · อ่านวันที่ถูกต้อง · เพี้ยน/ค่าเก่าในฐาน = ข้าม ไม่ throw', () => {
+    expect(DEFAULT_REPLACE_CALL_RULE).toEqual({ aiFrom: null });
+    expect(normalizeReplaceCallRule({ atStart: false, dayOffset: -1, time: '18:00', aiFrom: '2026-10-06' })).toEqual({ aiFrom: '2026-10-06' });
+    expect(normalizeReplaceCallRule({ aiFrom: '6/10/2026' })).toEqual({ aiFrom: null });
     expect(normalizeReplaceCallRule(null)).toEqual(DEFAULT_REPLACE_CALL_RULE);
     expect(normalizeReplaceCallRule('x')).toEqual(DEFAULT_REPLACE_CALL_RULE);
   });
@@ -59,35 +53,6 @@ describe('AI เริ่มโทรตั้งแต่ (aiFrom)', () => {
   });
 });
 
-const OLD_RULE = { atStart: false, dayOffset: -1 as const, time: '18:00' };
-describe('planReplaceCall — โทรเมื่อไหร่', () => {
-  it('🔴 ค่าเริ่ม = ตามเวลาเข้างาน (เจ้าของ Choice 2 ต.ค. 2569) · เลยเวลาเข้างานแล้ว = ไม่สร้าง', () => {
-    const w = { ymd: '2026-10-05', hhmm: '08:00' };
-    expect(planReplaceCall(w, DEFAULT_REPLACE_CALL_RULE, new Date('2026-10-02T06:00:00+07:00'))).toEqual({ at: new Date('2026-10-05T01:00:00.000Z'), asap: false });
-    expect(planReplaceCall(w, DEFAULT_REPLACE_CALL_RULE, new Date('2026-10-05T08:00:00+07:00'))).toBeNull();
-  });
-
-  const wall = { ymd: '2026-10-05', hhmm: '07:30' }; // เข้างาน 5 ต.ค. 07:30 ไทย = 00:30Z
-
-  it('ตามกติกา: 18:00 วันก่อน = 4 ต.ค. 18:00 ไทย (11:00Z)', () => {
-    const now = new Date('2026-10-02T06:00:00+07:00');
-    expect(planReplaceCall(wall, OLD_RULE, now)).toEqual({ at: new Date('2026-10-04T11:00:00.000Z'), asap: false });
-    expect(planReplaceCall(wall, { dayOffset: 0, time: '06:00' }, now)).toEqual({ at: new Date('2026-10-04T23:00:00.000Z'), asap: false });
-  });
-
-  it('🔴 เวลาตามกติกาผ่านไปแล้ว แต่ยังไม่ถึงเวลาเข้างาน = โทรเร็วที่สุด (+10 นาที)', () => {
-    const now = new Date('2026-10-05T06:00:00+07:00'); // เช้าวันเข้างาน ก่อน 07:30
-    const plan = planReplaceCall(wall, OLD_RULE, now);
-    expect(plan?.asap).toBe(true);
-    expect(plan?.at.getTime()).toBe(now.getTime() + REPLACE_ASAP_MINUTES * 60_000);
-  });
-
-  it('🔴 เลยเวลาเข้างานไปแล้ว = ไม่สร้างสาย', () => {
-    expect(planReplaceCall(wall, OLD_RULE, new Date('2026-10-05T07:30:00+07:00'))).toBeNull();
-    expect(planReplaceCall(wall, OLD_RULE, new Date('2026-10-06T00:00:00+07:00'))).toBeNull();
-  });
-});
-
 describe('คีย์กันซ้ำ · หมายเหตุ', () => {
   it('หนึ่งใบงาน = หนึ่งคีย์ · หมายเหตุบอกแค่เวลาเข้างาน', () => {
     expect(replaceSourceRef(' 123456789012345678901234567890 ')).toBe('irecruit-replace:123456789012345678901234567890');
@@ -97,22 +62,109 @@ describe('คีย์กันซ้ำ · หมายเหตุ', () => {
 });
 
 describe('ค่าตั้งของ worker', () => {
-  it('env ว่าง = ค่าเริ่มต้น (เปิด · 06:00 · 31 วัน) ไม่ใช่ 0', () => {
+  it('env ว่าง = ค่าเริ่มต้น (เปิด · ทุก 5 นาที · 31 วัน) ไม่ใช่ 0', () => {
     expect(readReplaceSyncConfig({})).toEqual(REPLACE_SYNC_DEFAULTS);
-    expect(readReplaceSyncConfig({ IRECRUIT_REPLACE_SYNC_HOUR: '' }).hour).toBe(6);
+    expect(readReplaceSyncConfig({ IRECRUIT_REPLACE_SYNC_TICK_MS: '' }).tickMs).toBe(5 * 60_000);
   });
 
-  it('ปิดได้ · ตั้งชั่วโมง/ระยะล่วงหน้าได้ในขอบเขต', () => {
-    const c = readReplaceSyncConfig({ IRECRUIT_REPLACE_SYNC_ENABLED: 'false', IRECRUIT_REPLACE_SYNC_HOUR: '30', IRECRUIT_REPLACE_SYNC_HORIZON_DAYS: '7' });
+  it('ปิดได้ · ตั้งระยะล่วงหน้าได้ในขอบเขต (เลิกรอบ 06:00 แล้ว — ดึงทุก 5 นาที)', () => {
+    const c = readReplaceSyncConfig({ IRECRUIT_REPLACE_SYNC_ENABLED: 'false', IRECRUIT_REPLACE_SYNC_HORIZON_DAYS: '7' });
     expect(c.enabled).toBe(false);
-    expect(c.hour).toBe(23);
+    expect('hour' in c).toBe(false);
     expect(c.horizonDays).toBe(7);
   });
 
-  it('ถึงเวลาเมื่อถึงชั่วโมงที่ตั้งและวันนี้ยังไม่ได้ดึง · ดึงแล้ววันนี้ไม่ซ้ำ · เซิร์ฟเวอร์กลับมาสายก็ยังดึง', () => {
-    expect(replaceSyncDueNow('2026-10-02', 5, null, 6)).toBe(false);
-    expect(replaceSyncDueNow('2026-10-02', 6, null, 6)).toBe(true);
-    expect(replaceSyncDueNow('2026-10-02', 14, '2026-10-01', 6)).toBe(true);
-    expect(replaceSyncDueNow('2026-10-02', 14, '2026-10-02', 6)).toBe(false);
+});
+
+describe('Journey ส่งคนแทน 3 สาย (เจ้าของสั่ง 5 ต.ค. 2569)', () => {
+  const wall = { ymd: '2026-10-07', hhmm: '05:00' };
+  const at = (iso: string) => new Date(iso);
+
+  it('ปกติ: คอนเฟิร์ม 16:00 วันก่อน · ก่อนเข้างาน 1 ชม. · 15 นาที (สาย 1/2/3)', () => {
+    const p = planReplaceCalls(wall, at('2026-10-05T10:00:00+07:00'));
+    expect(p.map((x) => [x.slot, x.round, x.at.toISOString(), x.asap])).toEqual([
+      ['confirm', 1, '2026-10-06T09:00:00.000Z', false],
+      ['lead60', 2, '2026-10-06T21:00:00.000Z', false],
+      ['lead15', 3, '2026-10-06T21:45:00.000Z', false],
+    ]);
+  });
+
+  it('เพิ่มหลัง 16:00 = คอนเฟิร์มตามคิว (อีก 10 นาที) · ก่อนเข้างานตามเดิม', () => {
+    const now = at('2026-10-06T19:30:00+07:00');
+    const p = planReplaceCalls(wall, now);
+    expect(p[0]).toMatchObject({ slot: 'confirm', asap: true });
+    expect(p[0].at.getTime()).toBe(now.getTime() + REPLACE_ASAP_MINUTES * 60_000);
+    expect(p.map((x) => x.slot)).toEqual(['confirm', 'lead60', 'lead15']);
+  });
+
+  it('ใกล้เวลาเข้างาน: คิวคอนเฟิร์มช้ากว่าสายก่อนเข้างาน = ไม่คอนเฟิร์มแยก · สายที่เลยแล้วไม่สร้าง · เลยเวลาเข้างาน = ไม่มีสาย', () => {
+    expect(planReplaceCalls(wall, at('2026-10-07T03:55:00+07:00')).map((x) => x.slot)).toEqual(['lead60', 'lead15']);
+    expect(planReplaceCalls(wall, at('2026-10-07T04:20:00+07:00')).map((x) => x.slot)).toEqual(['confirm', 'lead15']);
+    expect(planReplaceCalls(wall, at('2026-10-07T04:50:00+07:00')).map((x) => x.slot)).toEqual([]);
+    expect(planReplaceCalls(wall, at('2026-10-07T05:00:00+07:00'))).toEqual([]);
+  });
+
+  it('คีย์ต่อสาย: ใบ + สาย + คน · อ่านคีย์รุ่นเก่าได้', () => {
+    expect(replaceSlotRef('J1', 'lead15', 'abc')).toBe('irecruit-replace:J1:lead15:abc');
+    expect(parseReplaceRef('irecruit-replace:J1:lead15:abc')).toEqual({ jobId: 'J1', slot: 'lead15', personKey: 'abc' });
+    expect(parseReplaceRef('irecruit-replace:J1')).toEqual({ jobId: 'J1', slot: null, personKey: null });
+    expect(parseReplaceRef('something-else')).toBeNull();
+    expect(replaceSlotNote('confirm', wall)).toBe('ยืนยันเวลาเข้างาน 7/10 05:00 น.');
+    expect(replaceSlotNote('lead60', wall)).toBe('เข้างาน 05:00 น.');
+  });
+
+  describe('reconcileReplaceCalls', () => {
+    const d = (job: string, slot: 'confirm' | 'lead60' | 'lead15', iso: string, person = 'p1', asap = false) => ({
+      ref: replaceSlotRef(job, slot, person), jobId: job, slot, at: at(iso), asap,
+    });
+    const e = (ref: string, iso: string, state: 'pending' | 'locked' = 'pending', id = ref) => ({ id, ref, scheduledAt: at(iso), state });
+
+    it('ใบใหม่ = สร้างครบ · มีอยู่แล้ว (สถานะไหนก็ได้) = ไม่สร้างซ้ำ', () => {
+      const want = [d('J1', 'confirm', '2026-10-06T09:00:00Z'), d('J1', 'lead60', '2026-10-06T21:00:00Z')];
+      expect(reconcileReplaceCalls(want, [], { safeToCancel: true }).create).toHaveLength(2);
+      const r = reconcileReplaceCalls(want, [e(want[0].ref, '2026-10-06T09:00:00Z', 'locked')], { safeToCancel: true });
+      expect(r.create.map((x) => x.slot)).toEqual(['lead60']);
+    });
+
+    it('iRecruit แก้เวลา = ย้ายเวลาสายที่ยังไม่ถึง · คอนเฟิร์มตามคิวไม่ย้าย · สายที่ล็อกแล้วไม่ย้าย', () => {
+      const want = [d('J1', 'lead60', '2026-10-06T22:00:00Z'), d('J1', 'confirm', '2026-10-06T12:10:00Z', 'p1', true)];
+      const r = reconcileReplaceCalls(
+        want,
+        [e(want[0].ref, '2026-10-06T21:00:00Z'), e(want[1].ref, '2026-10-06T12:00:00Z')],
+        { safeToCancel: true },
+      );
+      expect(r.reschedule.map((x) => x.desired.slot)).toEqual(['lead60']);
+      expect(r.cancel).toEqual([]);
+    });
+
+    it('iRecruit ยกเลิกใบ/เปลี่ยนคน = ยกเลิกสายที่ยังไม่ถึงของคนเดิม (+ สร้างของคนใหม่) · ไม่ปลอดภัย = ไม่ยกเลิก', () => {
+      const old = e(replaceSlotRef('J1', 'lead60', 'p1'), '2026-10-06T21:00:00Z');
+      const locked = e(replaceSlotRef('J1', 'confirm', 'p1'), '2026-10-06T09:00:00Z', 'locked');
+      const want = [d('J1', 'lead60', '2026-10-06T21:00:00Z', 'p2')];
+      const r = reconcileReplaceCalls(want, [old, locked], { safeToCancel: true });
+      expect(r.cancel).toEqual([old]);
+      expect(r.create.map((x) => x.ref)).toEqual([want[0].ref]);
+      expect(reconcileReplaceCalls([], [old], { safeToCancel: false }).cancel).toEqual([]);
+    });
+
+    it('สายรุ่นเก่า: ยังรอโทร = ยกเลิกแล้วสร้าง 3 สายแทน · คนจัดการไปแล้ว = ไม่สร้างใหม่ · ยกเลิกไม่ได้ = ยังไม่สร้าง (กันโทรซ้อน)', () => {
+      const want = [d('J1', 'lead60', '2026-10-06T21:00:00Z'), d('J2', 'lead60', '2026-10-06T21:00:00Z')];
+      const legacyPending = e('irecruit-replace:J1', '2026-10-06T22:00:00Z');
+      const legacyDone = e('irecruit-replace:J2', '2026-10-06T22:00:00Z', 'locked');
+      const r = reconcileReplaceCalls(want, [legacyPending, legacyDone], { safeToCancel: true });
+      expect(r.cancel).toEqual([legacyPending]);
+      expect(r.create.map((x) => x.jobId)).toEqual(['J1']);
+      expect(reconcileReplaceCalls(want, [legacyPending], { safeToCancel: false }).create.map((x) => x.jobId)).toEqual(['J2']);
+    });
+  });
+});
+
+describe('replaceModeForType (5 ต.ค. 2569)', () => {
+  it('EX = AI · คนใน/อื่น ๆ = คนโทร · ก่อน aiFrom = คนโทรเสมอ', () => {
+    expect(replaceModeForType('EX', 'ai')).toBe('ai');
+    expect(replaceModeForType(' ex ', 'ai')).toBe('ai');
+    expect(replaceModeForType('IN', 'ai')).toBe('manual');
+    expect(replaceModeForType(null, 'ai')).toBe('manual');
+    expect(replaceModeForType('EX', 'manual')).toBe('manual');
   });
 });

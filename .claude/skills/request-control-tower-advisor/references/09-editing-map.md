@@ -11854,3 +11854,20 @@ Choice: ถึงแล้ว/ไปแล้ว/ลา/เลื่อน/จ�
 
 - ⚠️ ฟิลด์ `urgency_emoji` / `job_family_emoji` จาก AI วิเคราะห์ใบขอยังอยู่ใน API แต่ไม่วาดบนจอแล้ว
 - `src/components/follow/FollowDayReportDialog.tsx` + `src/lib/followDayReportImage.ts` — ปุ่ม "สรุปแผนทั้งวัน" → "สรุปแผน" · เลือกหน้าละ 10/20/30/40/50 แถว (`DAY_REPORT_PAGE_SIZES` · ค่าเริ่ม 20) · `downloadFollowDayReportPng(report, perPage)` ใช้ค่าเดียวกับจอ ⇒ หน้า N = รูปที่ N (5 ต.ค. 2569)
+
+## 5 ต.ค. 2569 (เย็น): Journey ติดตามส่งคนแทน — 3 สาย · ดึงทุก 5 นาที · ตาม iRecruit
+
+เจ้าของ: WL ไม่โทร · ตามแค่ Ex + สแปร์ไซต์ · อัปเดตที่ iRecruit แล้วขึ้นเลย · สาย 1 คอนเฟิร์ม 16:00 (วันก่อนเข้างาน) · สาย 2 ก่อน 1 ชม. · สาย 3 ก่อน 15 นาที ·
+เพิ่มหลัง 16:00 = คอนเฟิร์มตามคิว · แก้บน iRecruit แล้ว So Recruit เปลี่ยน · Choice: เช็กทุก 5 นาที · ใบยกเลิก/เปลี่ยนคน = ยกเลิกสายให้เอง ·
+**แยก WL/สแปร์ยังไม่ได้** (คนในจับคู่ไซต์ไม่ติด — hr_staff ของ iRecruit ไม่ครบ · ERP ไม่มีเลขบัตรผูกพนักงาน) ⇒ Choice ระหว่างนี้: **Ex (replace_type EX) ให้ AI · คนในให้คนโทร**
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/irecruitReplaceSync.ts` | `planReplaceCalls` (3 สาย · asap คอนเฟิร์ม · ตัดสายที่เลย) · `replaceSlotRef`/`parseReplaceRef` (คีย์ = ใบ:สาย:แฮชเบอร์ · รุ่นเก่าไม่มีสาย) · `reconcileReplaceCalls` (สร้าง/ย้ายเวลา/ยกเลิก · `safeToCancel` · รุ่นเก่าที่คนจัดการแล้วไม่สร้างใหม่ · ยกเลิกรุ่นเก่าไม่ได้ = ยังไม่สร้าง) · `replaceModeForType` · `REPLACE_SCHEDULE_TEXT` · ถอด `planReplaceCall`/`replaceCallRuleText`/`replaceSyncDueNow`/`hour` · `ReplaceCallRule` เหลือ `aiFrom` |
+| `api/_lib/irecruitReplaceSync.ts` | `runIrecruitReplaceSync` เขียนใหม่ตาม reconcile: ยกเลิก → ย้ายเวลา → คนใน AI→คนโทร → สร้าง (ชุดเดิมของเบอร์) → ส่ง Lumos ทีละคน+วัน · SQL เพิ่ม `z.replace_type` · ยกเลิกได้เฉพาะสายที่นัดก่อนวันท้ายช่วงดึง · iRecruit ตอบ 0 ใบแต่มีสายรอ = ไม่ยกเลิก · ถอด `ruleChangedAt` |
+| `api/_lib/irecruitReplaceSyncWorker.ts` | ดึงทุก tick (5 นาที) แทนรอบ 06:00 · ล้มแล้วเว้น 15 นาที |
+| `api/_handlers/irecruit-replace-sync.ts` · `src/lib/irecruitReplaceSyncApi.ts` · `src/components/follow/IrecruitReplaceSyncBar.tsx` | ถอด PATCH/ป๊อปแก้เวลาโทร/`hour` · แถบบอก "ดึงทุก 5 นาที" + ย้ายเวลา/ยกเลิก |
+| เทสต์ | `src/lib/irecruitReplaceSync.test.ts` · `tests/api/irecruitReplaceSync.test.ts` (เขียนใหม่) |
+
+- ⚠️ รอบแรกหลัง deploy: สายรุ่นเก่าที่ยังไม่ถึง 83 สาย (AI 73 · คน 10) ถูกยกเลิก + ถอนแผน Lumos แล้วสร้าง 3 สายต่อใบที่ยังอยู่ใน iRecruit
+- ⚠️ ค้าง: วิธีแยก WL / สแปร์ไซต์ของคนใน — รอเจ้าของส่งรูปหน้า manageReplace ของ iRecruit

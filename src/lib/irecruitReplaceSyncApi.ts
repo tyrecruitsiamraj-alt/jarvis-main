@@ -4,7 +4,6 @@ import type { ReplaceCallRule, ReplaceSyncSummary } from '@/lib/irecruitReplaceS
 /** สภาพการดึงส่งคนแทนจาก iRecruit — `GET /api/irecruit-replace-sync` */
 export type ReplaceSyncStatus = {
   enabled: boolean;
-  hour: number;
   horizonDays: number;
   /** ใช้ iRecruit ไม่ได้เพราะอะไร — `null` = ปกติ */
   unavailableReason: string | null;
@@ -28,20 +27,9 @@ export async function fetchReplaceSyncStatus(): Promise<ReplaceSyncStatus> {
   return (await r.json()) as ReplaceSyncStatus;
 }
 
-/** ดึงตอนนี้หนึ่งรอบ — ตัวเดียวกับที่ระบบดึงทุกเช้า */
+/** ดึงตอนนี้หนึ่งรอบ — ตัวเดียวกับที่ระบบดึงทุก 5 นาที */
 export async function runReplaceSyncNow(): Promise<ReplaceSyncStatus & { summary: ReplaceSyncSummary }> {
   const r = await apiFetch('/api/irecruit-replace-sync', { method: 'POST' });
   if (!r.ok) throw new Error(await readError(r));
   return (await r.json()) as ReplaceSyncStatus & { summary: ReplaceSyncSummary };
-}
-
-/** ส่งเฉพาะช่องที่แก้ — ช่องที่ไม่ส่ง (เช่น aiFrom) ฝั่ง server คงค่าเดิม */
-export async function saveReplaceCallRule(rule: Partial<ReplaceCallRule>): Promise<ReplaceSyncStatus> {
-  const r = await apiFetch('/api/irecruit-replace-sync', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rule }),
-  });
-  if (!r.ok) throw new Error(await readError(r));
-  return (await r.json()) as ReplaceSyncStatus;
 }

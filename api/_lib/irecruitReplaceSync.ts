@@ -1,5 +1,7 @@
 /**
- * ═══ ดึงรายชื่อ "ส่งคนแทน" จาก iRecruit → สร้างสายในแท็บติดตามส่งคนแทน (2 ต.ค. 2569) ═══
+ * ═══ ดึงรายชื่อ "ส่งคนแทน" จาก iRecruit → สร้างสายในแท็บติดตามส่งคนแทน (2 ต.ค. 2569 · Journey 3 สาย + ดึงทุก 5 นาที 5 ต.ค. 2569) ═══
+ *
+ * 🔴 5 ต.ค. 2569: ลำดับข้างล่างเป็นของรุ่นแรก — ตอนนี้หนึ่งรอบ = `runIrecruitReplaceSync` (สร้าง/ย้ายเวลา/ยกเลิก ตาม `reconcileReplaceCalls`)
  *
  * เจ้าของส่ง SQL ของหน้า "จัดเวรติดตาม" มาเอง (ใบงาน `job_type='2'` สถานะ `WS` · คนไปแทน = `ir_job_request` ล่าสุด ·
  * ชื่อ/เบอร์จาก `z_hr_recruitment_header` ล่าสุด ตัดสถานะ C) และเคาะ: **ดึงเองทุกเช้า · เวลาโทรตั้งได้ · AI โทรเลย**
@@ -16,7 +18,7 @@
  * 🔴 ไม่ลบ/ไม่แก้สายเดิมที่คนกรอกเอง · ไม่แตะใบที่ iRecruit เปลี่ยนสถานะไปแล้ว (ยกเลิกเองในหน้าติดตามเหมือนสายปกติ)
  * ตรรกะเวลาโทร/คีย์/ค่าตั้งอยู่ `src/lib/irecruitReplaceSync.ts` (มีเทสต์) · ไฟล์นี้ต่อฐาน + iRecruit + Lumos
  */
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { dbQuery, isPgUndefinedTable, isPgUniqueViolation } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { irecruitSqlQuery, irecruitUnavailableReason } from './irecruitSqlServer.js';
@@ -37,16 +39,19 @@ import type { FollowDispatchState } from '../../src/lib/followDispatchState.js';
 import {
   DEFAULT_REPLACE_CALL_RULE,
   normalizeReplaceCallRule,
-  planReplaceCall,
+  planReplaceCalls,
+  reconcileReplaceCalls,
   REPLACE_FOLLOW_TOPIC,
   REPLACE_SYNC_ACTOR_NAME,
   REPLACE_SYNC_DEFAULTS,
   replaceCallModeFor,
-  replaceCallNote,
-  replaceSourceRef,
+  replaceModeForType,
+  replaceSlotNote,
+  replaceSlotRef,
   wantWallFromSqlDate,
-  type ReplaceCallPlan,
   type ReplaceCallRule,
+  type ReplaceDesiredCall,
+  type ReplaceExistingCall,
   type ReplaceSyncSummary,
   type ReplaceWantWall,
 } from '../../src/lib/irecruitReplaceSync.js';
@@ -71,6 +76,8 @@ export type IrecruitReplaceRow = {
   site_name: string | null;
   site_code: string | null;
   want_date: Date;
+  /** ประเภทคนไปแทนใน iRecruit (`z_hr_recruitment_header.replace_type`) — EX = คนนอก/อดีตพนักงาน · IN = คนใน · ER ฯลฯ */
+  replace_type?: string | null;
 };
 
 function shiftYmd(ymd: string, days: number): string {
@@ -85,7 +92,7 @@ function shiftYmd(ymd: string, days: number): string {
  */
 export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): Promise<IrecruitReplaceRow[]> {
   return irecruitSqlQuery<IrecruitReplaceRow>(
-    `SELECT h.job_id, h.replace_no, z.fname, z.lname, z.mobile, s.site_name, h.site_code, h.want_date
+    `SELECT h.job_id, h.replace_no, z.fname, z.lname, z.mobile, z.replace_type, s.site_name, h.site_code, h.want_date
        FROM ir_job_header h
        OUTER APPLY (
          SELECT TOP 1 jr.staff_id
@@ -94,7 +101,7 @@ export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): 
          ORDER BY jr.date_add DESC
        ) cand
        OUTER APPLY (
-         SELECT TOP 1 zz.fname, zz.lname, zz.mobile, zz.status
+         SELECT TOP 1 zz.fname, zz.lname, zz.mobile, zz.status, zz.replace_type
          FROM z_hr_recruitment_header zz
          WHERE zz.id_card = cand.staff_id
          ORDER BY zz.date_update DESC, zz.date_add DESC
@@ -113,8 +120,6 @@ export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): 
 export type ReplaceSyncSettings = {
   rule: ReplaceCallRule;
   lastRun: ReplaceSyncSummary | null;
-  /** เปลี่ยนกติกาเมื่อไหร่ (ISO) — ใหม่กว่ารอบดึงล่าสุด = worker ดึงใหม่ทันทีเพื่อย้ายเวลาสายเดิมให้ตรง */
-  ruleChangedAt: string | null;
   updatedAt: string | null;
   updatedByName: string | null;
   /** ตาราง 133 มีแล้วไหม — ไม่มี = บอกตรง ๆ ว่าฐานยังไม่พร้อม (ห้ามเดา) */
@@ -123,13 +128,12 @@ export type ReplaceSyncSettings = {
 
 type SettingsRow = { payload: unknown; updated_at: string | Date | null; updated_by_name: string | null };
 
-function parsePayload(raw: unknown): { rule: ReplaceCallRule; lastRun: ReplaceSyncSummary | null; ruleChangedAt: string | null } {
+function parsePayload(raw: unknown): { rule: ReplaceCallRule; lastRun: ReplaceSyncSummary | null } {
   const p = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
   const lr = p.lastRun;
   const lastRun =
     typeof lr === 'object' && lr !== null && typeof (lr as { at?: unknown }).at === 'string' ? (lr as ReplaceSyncSummary) : null;
-  const rc = typeof p.ruleChangedAt === 'string' && !Number.isNaN(Date.parse(p.ruleChangedAt)) ? p.ruleChangedAt : null;
-  return { rule: normalizeReplaceCallRule(p.rule), lastRun, ruleChangedAt: rc };
+  return { rule: normalizeReplaceCallRule(p.rule), lastRun };
 }
 
 export async function getReplaceSyncSettings(): Promise<ReplaceSyncSettings> {
@@ -147,13 +151,13 @@ export async function getReplaceSyncSettings(): Promise<ReplaceSyncSettings> {
     };
   } catch (e) {
     if (!isPgUndefinedTable(e)) throw e;
-    return { rule: DEFAULT_REPLACE_CALL_RULE, lastRun: null, ruleChangedAt: null, updatedAt: null, updatedByName: null, tableReady: false };
+    return { rule: DEFAULT_REPLACE_CALL_RULE, lastRun: null, updatedAt: null, updatedByName: null, tableReady: false };
   }
 }
 
 /** เขียนทับเฉพาะคีย์ที่ส่งมา (jsonb ||) — กติกากับผลรอบล่าสุดเขียนคนละจังหวะ ห้ามทับกัน */
 export async function saveReplaceSyncSettings(
-  patch: { rule?: ReplaceCallRule; lastRun?: ReplaceSyncSummary; ruleChangedAt?: string },
+  patch: { rule?: ReplaceCallRule; lastRun?: ReplaceSyncSummary },
   updatedByName: string | null,
 ): Promise<void> {
   await dbQuery(
@@ -167,16 +171,34 @@ export async function saveReplaceSyncSettings(
   );
 }
 
-type Candidate = {
-  mode: 'ai' | 'manual';
-  ref: string;
+/** ข้อมูลประกอบของสายที่ iRecruit ต้องการ — ใช้ตอนสร้าง/ย้ายเวลา (ชื่อ/เบอร์เป็นข้อมูลคน ห้ามพิมพ์ลง log) */
+type DesiredMeta = ReplaceDesiredCall & {
+  round: 1 | 2 | 3;
   name: string;
   phone: string;
   wall: ReplaceWantWall;
-  plan: ReplaceCallPlan;
   siteName: string | null;
   siteCode: string | null;
+  mode: 'ai' | 'manual';
 };
+
+type ExistingRow = {
+  id: string;
+  source_ref: string;
+  scheduled_at: string | Date;
+  mode: string;
+  group_id: string | null;
+  recipient_phone: string | null;
+  pending: boolean;
+};
+
+/** คีย์คนไปแทน — แฮชเบอร์ (ไม่เก็บเบอร์ดิบในคีย์) · เปลี่ยนคน = คีย์ใหม่ */
+function personKeyOf(phone: string): string {
+  return createHash('sha1').update(phone).digest('hex').slice(0, 10);
+}
+
+/** ระยะกันชน — สายที่จะโทรภายในนี้ถือว่ากำลังโทร แตะไม่ได้ */
+const LOCK_AHEAD_MS = 2 * 60_000;
 
 let running = false;
 
@@ -185,6 +207,51 @@ export function isReplaceSyncRunning(): boolean {
   return running;
 }
 
+/** ส่งแผนให้ Lumos ทีละ "คน + วัน" (หนึ่งแผนต่อวัน) — คืนสถานะต่อแถว */
+async function enqueueByPersonDay(items: Array<{ id: string; meta: DesiredMeta }>): Promise<Map<string, FollowDispatchState>> {
+  const out = new Map<string, FollowDispatchState>();
+  const groups = new Map<string, Array<{ id: string; meta: DesiredMeta }>>();
+  for (const it of items) {
+    const key = `${it.meta.phone}|${bangkokBusinessDateYmd(it.meta.at)}`;
+    groups.set(key, [...(groups.get(key) ?? []), it]);
+  }
+  for (const list of groups.values()) {
+    const inputs: FollowEntryInput[] = list.map(({ id, meta }) => ({
+      id,
+      recipient_name: meta.name,
+      recipient_phone: meta.phone,
+      topic: REPLACE_FOLLOW_TOPIC,
+      note: replaceSlotNote(meta.slot, meta.wall),
+      staffPhone: null,
+      scheduled_at: meta.at,
+      callTimes: null,
+      callRound: meta.round,
+      staffName: null,
+      unitName: meta.siteName,
+    }));
+    try {
+      for (const [id, st] of await enqueueFollowReminderPlan(inputs)) out.set(id, st);
+    } catch (e) {
+      logError('irecruit.replaceSync: ส่งแผนให้ Lumos ไม่สำเร็จ', e, { rows: inputs.length });
+    }
+  }
+  return out;
+}
+
+async function setDispatchState(id: string, state: FollowDispatchState): Promise<void> {
+  try {
+    await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1`, [id, state]);
+  } catch (e) {
+    if (!isUndefinedColumn(e)) throw e;
+  }
+}
+
+/**
+ * ═══ หนึ่งรอบ (ทุก 5 นาที · เจ้าของสั่ง 5 ต.ค. 2569) ═══
+ * ดึงใบ WS → สายที่ต้องมี (`planReplaceCalls` 3 สาย) → เทียบกับสายที่มี (`reconcileReplaceCalls`) →
+ * ยกเลิก (ใบยกเลิก/เปลี่ยนคน/รุ่นเก่า) · ย้ายเวลา (iRecruit แก้เวลา) · สร้างใหม่ — ส่ง Lumos เฉพาะสาย AI เมื่อสวิตช์ follow_entry เปิด
+ * 🔴 ดึงพัง/ได้ 0 ใบทั้งที่มีสายรอโทร = ไม่ยกเลิกอะไรเลย (ห้ามล้างทั้งระบบเพราะรอบเดียวพัง)
+ */
 export async function runIrecruitReplaceSync(
   opts: { now?: Date; horizonDays?: number; actorName?: string } = {},
 ): Promise<ReplaceSyncSummary> {
@@ -204,6 +271,8 @@ export async function runIrecruitReplaceSync(
     asap: 0,
     queued: 0,
     notSent: 0,
+    realigned: 0,
+    cancelled: 0,
     error: null,
   };
   if (running) {
@@ -221,7 +290,7 @@ export async function runIrecruitReplaceSync(
     const settings = await getReplaceSyncSettings();
     if (!settings.tableReady) {
       summary.error = MIGRATION_133_NOT_READY;
-      return summary; // ตารางยังไม่มี = จดลงฐานไม่ได้ · worker ถือผลไว้ในหน่วยความจำแทน
+      return summary;
     }
 
     let rows: IrecruitReplaceRow[];
@@ -235,20 +304,172 @@ export async function runIrecruitReplaceSync(
     }
     summary.fetched = rows.length;
 
-    // ใบที่เคยดึงแล้ว — ถามฐานทีเดียวทั้งก้อน
-    const refs = rows.map((r) => replaceSourceRef(r.job_id));
-    type ExistingRow = { id: string; source_ref: string; scheduled_at: string | Date; mode: string; done: boolean };
-    let existing = new Map<string, ExistingRow>();
-    if (refs.length > 0) {
+    // ── สายที่ iRecruit ต้องการตอนนี้ ──
+    const desired: DesiredMeta[] = [];
+    for (const r of rows) {
+      const phone = toE164Thai(r.mobile);
+      if (!phone) {
+        summary.noPhone += 1;
+        continue;
+      }
+      const wall = wantWallFromSqlDate(r.want_date instanceof Date ? r.want_date : new Date(String(r.want_date)));
+      const plans = planReplaceCalls(wall, now);
+      if (plans.length === 0) {
+        summary.pastDue += 1;
+        continue;
+      }
+      const name = `${(r.fname ?? '').trim()} ${(r.lname ?? '').trim()}`.trim() || 'คนไปแทนงาน';
+      const personKey = personKeyOf(phone);
+      for (const p of plans) {
+        desired.push({
+          ref: replaceSlotRef(r.job_id, p.slot, personKey),
+          jobId: String(r.job_id).trim(),
+          slot: p.slot,
+          round: p.round,
+          at: p.at,
+          asap: p.asap,
+          name,
+          phone,
+          wall,
+          siteName: r.site_name?.trim() || null,
+          siteCode: r.site_code?.trim() || null,
+          mode: replaceModeForType(r.replace_type, replaceCallModeFor(p.at, settings.rule.aiFrom)),
+        });
+      }
+    }
+
+    // ── สายที่มีอยู่ (ทั้งรุ่นเก่าหนึ่งใบหนึ่งสาย และรุ่น 3 สาย) ──
+    let existingRows: ExistingRow[];
+    try {
+      const { rows: ex } = await dbQuery<ExistingRow>(
+        `select id, source_ref, scheduled_at, coalesce(call_mode, 'ai') as mode, group_id::text as group_id, recipient_phone,
+                (cancelled_at is null and completed_at is null and staff_call_outcome is null
+                  and scheduled_at > $1::timestamptz) as pending
+           from ${followTable}
+          where source_ref like 'irecruit-replace:%' and scheduled_at >= $2::timestamptz`,
+        [new Date(now.getTime() + LOCK_AHEAD_MS).toISOString(), new Date(now.getTime() - 3 * 86_400_000).toISOString()],
+      );
+      existingRows = ex;
+    } catch (e) {
+      if (isUndefinedColumn(e)) {
+        summary.error = MIGRATION_133_NOT_READY;
+        await persistLastRun(summary, actorName);
+        return summary;
+      }
+      throw e;
+    }
+    /** ยกเลิกได้เฉพาะสายที่นัดก่อนวันท้ายของช่วงที่ดึง — ใบที่เข้างานเลยช่วงไป iRecruit ไม่ได้ตอบมารอบนี้ (ไม่ใช่ถูกยกเลิก) */
+    const cancelCutoff = new Date(`${summary.toYmd}T00:00:00+07:00`).getTime();
+    const existing: ReplaceExistingCall[] = existingRows.map((x) => {
+      const at = new Date(x.scheduled_at);
+      return { id: x.id, ref: x.source_ref, scheduledAt: at, state: x.pending && at.getTime() < cancelCutoff ? 'pending' : 'locked' };
+    });
+    // แถวที่นัดเลยวันท้ายช่วง: ยังย้ายเวลาได้ ⇒ ให้เป็น pending สำหรับการย้าย แต่ห้ามยกเลิก — แยกจัดการข้างล่าง
+    const pendingBeyond = new Set(
+      existingRows.filter((x) => x.pending && new Date(x.scheduled_at).getTime() >= cancelCutoff).map((x) => x.source_ref),
+    );
+    const pendingCount = existingRows.filter((x) => x.pending).length;
+    const safeToCancel = !(rows.length === 0 && pendingCount > 0);
+    if (!safeToCancel) logWarn('irecruit.replaceSync: iRecruit ตอบ 0 ใบแต่มีสายรอโทร — รอบนี้ไม่ยกเลิกอะไร', { pending: pendingCount });
+
+    const plan = reconcileReplaceCalls(
+      desired,
+      existing.map((e) => (pendingBeyond.has(e.ref) ? { ...e, state: 'pending' as const } : e)),
+      { safeToCancel },
+    );
+    plan.cancel = plan.cancel.filter((c) => !pendingBeyond.has(c.ref));
+    const metaByRef = new Map(desired.map((d) => [d.ref, d]));
+    const rowById = new Map(existingRows.map((x) => [x.id, x]));
+    summary.alreadyIn = desired.length - plan.create.length;
+    summary.asap = plan.create.filter((c) => c.asap).length;
+
+    const autoAi =
+      plan.create.length > 0 || plan.reschedule.length > 0 ? await isAutoDispatchEnabled('follow_entry') : false;
+
+    // ── 1) ยกเลิก (ก่อนสร้างของคนใหม่ — กันแผนสองคนชนกัน) ──
+    for (const c of plan.cancel) {
       try {
-        const { rows: ex } = await dbQuery<ExistingRow>(
-          `select id, source_ref, scheduled_at, coalesce(call_mode, 'ai') as mode,
-                  (cancelled_at is not null or completed_at is not null or staff_call_outcome is not null) as done
-             from ${followTable} where source_ref = any($1::text[])`,
-          [refs],
+        const { rows: done } = await dbQuery<{ id: string }>(
+          `update ${followTable} set cancelled_at = now()
+            where id = $1 and cancelled_at is null and completed_at is null returning id`,
+          [c.id],
         );
-        existing = new Map(ex.map((x) => [x.source_ref, x]));
+        if (done.length === 0) continue;
+        if (rowById.get(c.id)?.mode === 'ai') await cancelFollowReminder(c.id, staffNameOfPhone);
+        summary.cancelled = (summary.cancelled ?? 0) + 1;
       } catch (e) {
+        logError('irecruit.replaceSync: ยกเลิกสายไม่สำเร็จ', e, { id: c.id });
+      }
+    }
+
+    // ── 2) ย้ายเวลา (iRecruit แก้เวลาเข้างาน) ──
+    const toEnqueue: Array<{ id: string; meta: DesiredMeta }> = [];
+    for (const { existing: ex, desired: d } of plan.reschedule) {
+      const meta = metaByRef.get(d.ref);
+      if (!meta) continue;
+      try {
+        const wasAi = rowById.get(ex.id)?.mode === 'ai';
+        if (wasAi) await cancelFollowReminder(ex.id, staffNameOfPhone);
+        const mode = wasAi ? meta.mode : 'manual';
+        await dbQuery(`update ${followTable} set scheduled_at = $2, note = $3, call_mode = $4 where id = $1`, [
+          ex.id,
+          meta.at.toISOString(),
+          replaceSlotNote(meta.slot, meta.wall),
+          mode,
+        ]);
+        if (mode === 'ai' && autoAi) toEnqueue.push({ id: ex.id, meta });
+        else await setDispatchState(ex.id, mode === 'manual' ? 'manual' : 'off');
+        summary.realigned = (summary.realigned ?? 0) + 1;
+      } catch (e) {
+        logError('irecruit.replaceSync: ย้ายเวลาสายไม่สำเร็จ', e, { id: ex.id });
+      }
+    }
+
+    // ── 2.5) คนในที่เคยเป็นสาย AI → คนโทร (WL ห้ามโดน AI โทร · เจ้าของ Choice 5 ต.ค. 2569) ──
+    // ไม่ทำกลับทาง (คน → AI) เอง — เจ้าหน้าที่สลับเองได้ที่หน้าติดตาม ห้ามรอบ 5 นาทีไปทับ
+    const rescheduledIds = new Set(plan.reschedule.map((r) => r.existing.id));
+    for (const x of existingRows) {
+      if (!x.pending || x.mode !== 'ai' || rescheduledIds.has(x.id)) continue;
+      const meta = metaByRef.get(x.source_ref);
+      if (!meta || meta.mode !== 'manual') continue;
+      try {
+        await cancelFollowReminder(x.id, staffNameOfPhone);
+        await dbQuery(`update ${followTable} set call_mode = 'manual' where id = $1`, [x.id]);
+        await setDispatchState(x.id, 'manual');
+        summary.toManual = (summary.toManual ?? 0) + 1;
+      } catch (e) {
+        logError('irecruit.replaceSync: เปลี่ยนเป็นคนโทรไม่สำเร็จ', e, { id: x.id });
+      }
+    }
+
+    // ── 3) สร้างสายใหม่ — คนเดียวกัน (เบอร์เดียว) อยู่ชุดเดียวกัน ใช้ชุดเดิมถ้ามี ──
+    const groupOfPhone = new Map<string, string>();
+    for (const x of existingRows) if (x.pending && x.recipient_phone && x.group_id) groupOfPhone.set(x.recipient_phone, x.group_id);
+    for (const c of plan.create) {
+      const meta = metaByRef.get(c.ref);
+      if (!meta) continue;
+      const groupId = groupOfPhone.get(meta.phone) ?? randomUUID();
+      groupOfPhone.set(meta.phone, groupId);
+      try {
+        const { rows: ins } = await dbQuery<{ id: string }>(
+          `insert into ${followTable}
+             (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at,
+              group_id, call_times, unit_name, site_code, call_round, call_mode,
+              created_by, created_by_name, follow_team, source_ref)
+           values ($1, $2, $3, $4, null, $5, $6, null, $7, $8, $9, $10, null, $11, $12, $13)
+           returning id`,
+          [meta.name, meta.phone, REPLACE_FOLLOW_TOPIC, replaceSlotNote(meta.slot, meta.wall), meta.at.toISOString(), groupId,
+           meta.siteName, meta.siteCode, meta.round, meta.mode, actorName, FOLLOW_TEAM_REPLACEMENT, meta.ref],
+        );
+        if (!ins[0]) continue;
+        summary.added += 1;
+        if (meta.mode === 'ai' && autoAi) toEnqueue.push({ id: ins[0].id, meta });
+        else await setDispatchState(ins[0].id, meta.mode === 'manual' ? 'manual' : 'off');
+      } catch (e) {
+        if (isPgUniqueViolation(e)) {
+          summary.alreadyIn += 1; // สองรอบชนกัน — ฐานกันให้แล้ว
+          continue;
+        }
         if (isUndefinedColumn(e)) {
           summary.error = MIGRATION_133_NOT_READY;
           await persistLastRun(summary, actorName);
@@ -258,171 +479,30 @@ export async function runIrecruitReplaceSync(
       }
     }
 
-    // คัด + จัดกลุ่มตามเบอร์ (คนเดียวหลายใบ = ชุดเดียว)
-    const groups = new Map<string, Candidate[]>();
-    /** สายเดิมที่เวลาไม่ตรงกติกาตอนนี้ (เช่น เพิ่งเปลี่ยนเป็น "ตามเวลาเข้างาน") — ยังไม่โทร/ไม่ปิด/ยังไม่ถึงเวลา เท่านั้น */
-    const realign: Array<{ row: ExistingRow; at: Date; wall: ReplaceWantWall; name: string; phone: string; siteName: string | null }> = [];
-    for (const r of rows) {
-      const ref = replaceSourceRef(r.job_id);
-      const ex = existing.get(ref);
-      if (ex) {
-        summary.alreadyIn += 1;
-        const cur = new Date(ex.scheduled_at);
-        const wallEx = wantWallFromSqlDate(r.want_date instanceof Date ? r.want_date : new Date(String(r.want_date)));
-        const want = planReplaceCall(wallEx, settings.rule, now);
-        const phoneEx = toE164Thai(r.mobile);
-        if (!ex.done && want && !want.asap && phoneEx && cur.getTime() > now.getTime() && Math.abs(cur.getTime() - want.at.getTime()) > 60_000) {
-          const nameEx = `${(r.fname ?? '').trim()} ${(r.lname ?? '').trim()}`.trim() || 'คนไปแทนงาน';
-          realign.push({ row: ex, at: want.at, wall: wallEx, name: nameEx, phone: phoneEx, siteName: r.site_name?.trim() || null });
-        }
-        continue;
-      }
-      const phone = toE164Thai(r.mobile);
-      if (!phone) {
-        summary.noPhone += 1;
-        continue;
-      }
-      const wall = wantWallFromSqlDate(r.want_date instanceof Date ? r.want_date : new Date(String(r.want_date)));
-      const plan = planReplaceCall(wall, settings.rule, now);
-      if (!plan) {
-        summary.pastDue += 1;
-        continue;
-      }
-      if (plan.asap) summary.asap += 1;
-      const name = `${(r.fname ?? '').trim()} ${(r.lname ?? '').trim()}`.trim() || 'คนไปแทนงาน';
-      const list = groups.get(phone) ?? [];
-      list.push({ mode: replaceCallModeFor(plan.at, settings.rule.aiFrom), ref, name, phone, wall, plan, siteName: r.site_name?.trim() || null, siteCode: r.site_code?.trim() || null });
-      groups.set(phone, list);
-    }
-
-    const autoAi = groups.size > 0 || realign.length > 0 ? await isAutoDispatchEnabled('follow_entry') : false;
-
-    for (const cands of groups.values()) {
-      cands.sort((a, b) => a.plan.at.getTime() - b.plan.at.getTime());
-      const groupId = randomUUID();
-      const inserted: Array<{ id: string; cand: Candidate }> = [];
-      for (const c of cands) {
-        try {
-          const { rows: ins } = await dbQuery<{ id: string }>(
-            `insert into ${followTable}
-               (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at,
-                group_id, call_times, unit_name, site_code, call_round, call_mode,
-                created_by, created_by_name, follow_team, source_ref)
-             values ($1, $2, $3, $4, null, $5, $6, null, $7, $8, 1, $12, null, $9, $10, $11)
-             returning id`,
-            [c.name, c.phone, REPLACE_FOLLOW_TOPIC, replaceCallNote(c.wall), c.plan.at.toISOString(), groupId,
-             c.siteName, c.siteCode, actorName, FOLLOW_TEAM_REPLACEMENT, c.ref, c.mode],
-          );
-          if (ins[0]) inserted.push({ id: ins[0].id, cand: c });
-        } catch (e) {
-          // สองรอบชนกัน / ใบนี้เพิ่งถูกดึงไปเมื่อกี้ — ฐานกันให้แล้ว นับว่ามีแล้ว
-          if (isPgUniqueViolation(e)) {
-            summary.alreadyIn += 1;
-            continue;
-          }
-          if (isUndefinedColumn(e)) {
-            summary.error = MIGRATION_133_NOT_READY;
-            await persistLastRun(summary, actorName);
-            return summary;
-          }
-          throw e;
-        }
-      }
-      if (inserted.length === 0) continue;
-      summary.added += inserted.length;
-
-      // ส่งให้ AI เฉพาะเมื่อสวิตช์ส่งอัตโนมัติของงานติดตามเปิดอยู่ (เจ้าของคุมที่หน้าตั้งค่า)
-      let states = new Map<string, FollowDispatchState>();
-      const aiInserted = inserted.filter(({ cand }) => cand.mode === 'ai');
-      if (autoAi && aiInserted.length > 0) {
-        const inputs: FollowEntryInput[] = aiInserted.map(({ id, cand }) => ({
-          id,
-          recipient_name: cand.name,
-          recipient_phone: cand.phone,
-          topic: REPLACE_FOLLOW_TOPIC,
-          note: replaceCallNote(cand.wall),
-          staffPhone: null,
-          scheduled_at: cand.plan.at,
-          callTimes: null,
-          callRound: 1,
-          staffName: null,
-          unitName: cand.siteName,
-        }));
-        try {
-          states = await enqueueFollowReminderPlan(inputs);
-        } catch (e) {
-          logError('irecruit.replaceSync: ส่งแผนให้ Lumos ไม่สำเร็จ', e, { rows: inserted.length });
-          states = new Map();
-        }
-      }
-      for (const { id, cand } of inserted) {
-        const state: FollowDispatchState = cand.mode === 'manual' ? 'manual' : (states.get(id) ?? 'off');
-        if (state === 'queued') summary.queued += 1;
-        else if (state !== 'manual') summary.notSent += 1;
-        try {
-          await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1`, [id, state]);
-        } catch (e) {
-          if (!isUndefinedColumn(e)) throw e;
-        }
-      }
-    }
-
-    // ── ย้ายเวลาสายเดิมให้ตรงกติกา ──
-    for (const r of realign) {
-      try {
-        const desired = replaceCallModeFor(r.at, settings.rule.aiFrom);
-        // สาย AI เดิม: ยกเลิกแผนเก่าที่ Lumos ก่อน (ไม่งั้น Lumos ยังโทรตามเวลาเก่า)
-        if (r.row.mode === 'ai') await cancelFollowReminder(r.row.id, staffNameOfPhone);
-        await dbQuery(`update ${followTable} set scheduled_at = $2, note = $3, call_mode = $4 where id = $1`, [
-          r.row.id,
-          r.at.toISOString(),
-          replaceCallNote(r.wall),
-          r.row.mode === 'manual' ? 'manual' : desired,
-        ]);
-        let state: FollowDispatchState = 'manual';
-        if (r.row.mode === 'ai' && desired === 'ai') {
-          state = 'off';
-          if (autoAi) {
-            const st = await enqueueFollowReminderPlan([
-              {
-                id: r.row.id,
-                recipient_name: r.name,
-                recipient_phone: r.phone,
-                topic: REPLACE_FOLLOW_TOPIC,
-                note: replaceCallNote(r.wall),
-                staffPhone: null,
-                scheduled_at: r.at,
-                callTimes: null,
-                callRound: 1,
-                staffName: null,
-                unitName: r.siteName,
-              },
-            ]);
-            state = st.get(r.row.id) ?? 'off';
-          }
-        }
-        try {
-          await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1`, [r.row.id, state]);
-        } catch (e) {
-          if (!isUndefinedColumn(e)) throw e;
-        }
-        summary.realigned = (summary.realigned ?? 0) + 1;
-      } catch (e) {
-        logError('irecruit.replaceSync: ย้ายเวลาสายเดิมไม่สำเร็จ', e, { id: r.row.id });
+    // ── 4) ส่งแผนให้ Lumos (สาย AI · สวิตช์เปิด) ทีละคน+วัน ──
+    if (toEnqueue.length > 0) {
+      const states = await enqueueByPersonDay(toEnqueue);
+      for (const { id } of toEnqueue) {
+        const st = states.get(id) ?? 'off';
+        if (st === 'queued') summary.queued += 1;
+        else summary.notSent += 1;
+        await setDispatchState(id, st);
       }
     }
 
     await persistLastRun(summary, actorName);
     logInfo('irecruit.replaceSync.done', {
-      realigned: summary.realigned ?? 0,
       fetched: summary.fetched,
       added: summary.added,
       alreadyIn: summary.alreadyIn,
+      cancelled: summary.cancelled,
+      realigned: summary.realigned,
       noPhone: summary.noPhone,
       pastDue: summary.pastDue,
       asap: summary.asap,
       queued: summary.queued,
       notSent: summary.notSent,
+      safeToCancel,
       autoAi,
     });
     return summary;

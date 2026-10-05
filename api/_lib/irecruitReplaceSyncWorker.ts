@@ -9,24 +9,15 @@
  *    ปิดสวิตช์ `IRECRUIT_ENABLED` = รอบนั้นจดเหตุผลแล้วรอ (ไม่พัง) · รอบที่ล้มลองใหม่อีกทีใน 1 ชั่วโมง ไม่ใช่ทุก 5 นาที
  * ⚠️ สายที่สร้างจะ **ส่งให้ AI** เฉพาะเมื่อสวิตช์ส่งอัตโนมัติของงานติดตาม (`follow_entry`) เปิดอยู่ — คุมที่หน้าตั้งค่าเหมือนเดิม
  */
-import { bangkokBusinessDateYmd } from './businessDate.js';
 import { logError, logInfo, logWarn } from './logger.js';
 import { enforceReplaceAiFrom, getReplaceSyncSettings, runIrecruitReplaceSync } from './irecruitReplaceSync.js';
 import {
   readReplaceSyncConfig,
   REPLACE_SYNC_ACTOR_NAME,
-  replaceSyncDueNow,
   type ReplaceSyncConfig,
   type ReplaceSyncSummary,
 } from '../../src/lib/irecruitReplaceSync.js';
 
-const bangkokHourFormat = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hour12: false });
-
-/** ชั่วโมงไทยของเวลานี้ (0–23) */
-export function bangkokHour(now: Date): number {
-  const h = Number(bangkokHourFormat.format(now));
-  return Number.isFinite(h) ? h % 24 : now.getUTCHours();
-}
 
 let running = false;
 let stopped = false;
@@ -34,7 +25,7 @@ let stopped = false;
 let lastRunInMemory: ReplaceSyncSummary | null = null;
 /** รอบที่ล้ม — ลองใหม่อีกทีเมื่อผ่านไป 1 ชั่วโมง */
 let lastFailedAt: number | null = null;
-const RETRY_AFTER_FAIL_MS = 60 * 60_000;
+const RETRY_AFTER_FAIL_MS = 15 * 60_000;
 
 export function getReplaceSyncWorkerConfig(): ReplaceSyncConfig {
   return readReplaceSyncConfig(process.env);
@@ -49,7 +40,6 @@ export async function runReplaceSyncIfDue(
   cfg: ReplaceSyncConfig = getReplaceSyncWorkerConfig(),
   now: Date = new Date(),
 ): Promise<ReplaceSyncSummary | null> {
-  const ymd = bangkokBusinessDateYmd(now);
   const settings = await getReplaceSyncSettings();
   // "AI เริ่มโทรตั้งแต่" — บังคับทุกรอบ ไม่รอรอบดึงประจำวัน (เจ้าของสั่ง 2 ต.ค. 2569)
   if (settings.rule.aiFrom) {
@@ -59,12 +49,10 @@ export async function runReplaceSyncIfDue(
       logError('irecruit.replaceSync.aiFrom: รอบนี้ล้ม', e);
     }
   }
-  const last = settings.lastRun ?? lastRunInMemory;
-  // รอบที่ดึงสำเร็จแล้ววันนี้ = พอ · รอบที่ล้ม = รอ 1 ชั่วโมงแล้วลองใหม่
-  const lastOkYmd = last && !last.error ? bangkokBusinessDateYmd(new Date(last.at)) : null;
-  // เปลี่ยนกติกาหลังรอบล่าสุด = ดึงใหม่ทันที (ย้ายเวลาสายเดิม) ไม่ต้องรอพรุ่งนี้เช้า
-  const ruleChanged = Boolean(settings.ruleChangedAt && (!last || Date.parse(settings.ruleChangedAt) > Date.parse(last.at)));
-  if (!ruleChanged && !replaceSyncDueNow(ymd, bangkokHour(now), lastOkYmd, cfg.hour)) return null;
+  /**
+   * 🔴 ดึงทุกรอบ (ทุก `tickMs` = 5 นาที) — เจ้าของสั่ง 5 ต.ค. 2569: *"ไม่ต้องดึงทุก 6 โมงแล้ว เป็นมีอัปเดตที่ iRecruit แล้วขึ้นเลย"*
+   * (Choice "ทุก 5 นาที") · รอบที่ล้ม = เว้น `RETRY_AFTER_FAIL_MS` ก่อนลองใหม่ (ไม่ถล่ม iRecruit ตอนมันล่ม)
+   */
   if (lastFailedAt !== null && now.getTime() - lastFailedAt < RETRY_AFTER_FAIL_MS) return null;
 
   const summary = await runIrecruitReplaceSync({ now, horizonDays: cfg.horizonDays, actorName: REPLACE_SYNC_ACTOR_NAME });
@@ -99,7 +87,7 @@ export function startIrecruitReplaceSyncWorker(): boolean {
   if (running) return true;
   running = true;
   stopped = false;
-  logInfo('irecruit.replaceSync.worker.start', { hour: cfg.hour, horizonDays: cfg.horizonDays, tickMs: cfg.tickMs });
+  logInfo('irecruit.replaceSync.worker.start', { horizonDays: cfg.horizonDays, tickMs: cfg.tickMs });
 
   void (async () => {
     await sleepInterruptible(cfg.startupDelayMs);
