@@ -16,7 +16,13 @@ import {
   FOLLOW_DAY_REPORT_NO_FILTER,
   type FollowDayReportFilter,
 } from '@/lib/followDayReport';
-import { downloadFollowDayReportPng, followDayReportSummaryText, paginateDayReportRows } from '@/lib/followDayReportImage';
+import {
+  DAY_REPORT_PAGE_SIZES,
+  downloadFollowDayReportPng,
+  followDayReportSummaryText,
+  paginateDayReportRows,
+  type DayReportPageSize,
+} from '@/lib/followDayReportImage';
 
 /**
  * ═══ สรุปแผนติดตามทั้งวัน (เจ้าของสั่ง 2 ต.ค. 2569 · Choice "หน้าสรุปบนจอ") ═══
@@ -76,7 +82,7 @@ export default function FollowDayReportDialog({
   /* "สรุปแผนทั้งวันอะ ทำให้โหลดเป็นรูปได้หน่อย" (เจ้าของสั่ง 3 ต.ค. 2569) — PNG พื้นขาว ส่งต่อใน LINE ได้ */
   const savePng = async () => {
     if (!report) return;
-    const n = await downloadFollowDayReportPng(report);
+    const n = await downloadFollowDayReportPng(report, pageSize);
     setSavedCount(n);
     setSaved(n > 0 ? 'ok' : 'fail');
   };
@@ -85,11 +91,13 @@ export default function FollowDayReportDialog({
    * ใช้ตัวแบ่งเดียวกับรูป (หน้าละราว 20 · ชื่อเดียวกันไม่ขาดข้ามหน้า) ⇒ หน้า N บนจอ = รูปที่ N ที่โหลด
    * คัดลอกตาราง/บันทึกรูป ยังได้ทุกแถวเหมือนเดิม
    */
-  const pages = React.useMemo(() => (report ? paginateDayReportRows(report.rows) : [[]]), [report]);
+  /** หน้าละกี่แถว 10–50 (เจ้าของสั่ง 5 ต.ค. 2569) — ค่าเริ่ม 20 · รูปที่โหลดใช้ค่าเดียวกัน */
+  const [pageSize, setPageSize] = React.useState<DayReportPageSize>(20);
+  const pages = React.useMemo(() => (report ? paginateDayReportRows(report.rows, pageSize) : [[]]), [report, pageSize]);
   const imagePages = report && report.rows.length > 0 ? pages.length : 0;
   const [page, setPage] = React.useState(0);
-  // เปลี่ยนวัน/สาย/ใครโทร = กลับหน้าแรก (หน้าเดิมอาจไม่มีในชุดใหม่)
-  React.useEffect(() => setPage(0), [open, selYmd, caller, call]);
+  // เปลี่ยนวัน/สาย/ใครโทร/หน้าละกี่แถว = กลับหน้าแรก (หน้าเดิมอาจไม่มีในชุดใหม่)
+  React.useEffect(() => setPage(0), [open, selYmd, caller, call, pageSize]);
   const pageIdx = Math.min(page, pages.length - 1);
   const pageRows = pages[pageIdx] ?? [];
   const rowFrom = pages.slice(0, pageIdx).reduce((n, p) => n + p.length, 0);
@@ -191,6 +199,13 @@ export default function FollowDayReportDialog({
               : 'แถว 0 จาก 0'}
           </span>
           <span className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">หน้าละ</span>
+            <ChoiceDropdown<string>
+              value={String(pageSize)}
+              options={DAY_REPORT_PAGE_SIZES.map((n) => ({ value: String(n), label: `${n} แถว` }))}
+              onChange={(v) => setPageSize(Number(v) as DayReportPageSize)}
+              ariaLabel="หน้าละกี่แถว"
+            />
             <Button
               type="button"
               size="iconXs"

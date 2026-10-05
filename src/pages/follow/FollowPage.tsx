@@ -1388,12 +1388,12 @@ const FollowPage: React.FC = () => {
         size="sm"
         variant="outline"
         onClick={() => setReportOpen(true)}
-        aria-label="สรุปแผนทั้งวัน"
-        title="สรุปแผนทั้งวัน"
+        aria-label="สรุปแผน"
+        title="สรุปแผน"
         className="inline-flex h-8 items-center gap-1 px-2.5 text-[11px] sm:px-3"
       >
         <ClipboardList aria-hidden />
-        <span className="hidden sm:inline">สรุปแผนทั้งวัน</span>
+        <span className="hidden sm:inline">สรุปแผน</span>
       </Button>
       {/* ═══ ตัวกรองทั้งหมดอยู่ในกล่องเดียว ข้าง ๆ ปุ่มเพิ่มคน (เจ้าของสั่ง 1 ก.ย. 2569) ═══
           *"ย้ายทุกช่วงเวลาเข้าไปไว้กับเลือกวัน · แล้วย้ายเลือกวันไปไว้ข้าง ๆ เพิ่มคน"*

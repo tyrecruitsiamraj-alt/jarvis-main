@@ -11853,3 +11853,4 @@ Choice: ถึงแล้ว/ไปแล้ว/ลา/เลื่อน/จ�
 | เทสต์ | `tests/api/noEmojiOnScreen2569-10-05.test.ts` (ด่านกันกลับ — สแกน src หลังตัดคอมเมนต์) |
 
 - ⚠️ ฟิลด์ `urgency_emoji` / `job_family_emoji` จาก AI วิเคราะห์ใบขอยังอยู่ใน API แต่ไม่วาดบนจอแล้ว
+- `src/components/follow/FollowDayReportDialog.tsx` + `src/lib/followDayReportImage.ts` — ปุ่ม "สรุปแผนทั้งวัน" → "สรุปแผน" · เลือกหน้าละ 10/20/30/40/50 แถว (`DAY_REPORT_PAGE_SIZES` · ค่าเริ่ม 20) · `downloadFollowDayReportPng(report, perPage)` ใช้ค่าเดียวกับจอ ⇒ หน้า N = รูปที่ N (5 ต.ค. 2569)

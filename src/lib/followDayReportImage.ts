@@ -20,6 +20,9 @@ type ReportRow = FollowDayReport['rows'][number];
  * คนเดียวมีสายเกินหน้า = ยอมให้หน้านั้นยาวกว่า ดีกว่าตัดคนกลางทาง
  */
 export const DAY_REPORT_ROWS_PER_IMAGE = 20;
+/** ตัวเลือกหน้าละกี่แถว (เจ้าของสั่ง 5 ต.ค. 2569: *"เลือกได้ว่าอยากเห็นแค่หน้าละ 10 20 30 40 50"*) — จอกับรูปใช้ค่าเดียวกัน */
+export const DAY_REPORT_PAGE_SIZES = [10, 20, 30, 40, 50] as const;
+export type DayReportPageSize = (typeof DAY_REPORT_PAGE_SIZES)[number];
 export function paginateDayReportRows(rows: readonly ReportRow[], perPage = DAY_REPORT_ROWS_PER_IMAGE): ReportRow[][] {
   const groups: ReportRow[][] = [];
   for (const r of rows) {
@@ -200,14 +203,18 @@ function downloadCanvas(canvas: HTMLCanvasElement, filename: string): Promise<bo
 /**
  * โหลดรูป PNG ของแผนวันนั้น — **หน้าละรูป** (`paginateDayReportRows`) · คืนจำนวนรูปที่เซฟได้ (0 = เซฟไม่ได้ ให้จอบอกคนใช้)
  */
-export async function downloadFollowDayReportPng(report: FollowDayReport): Promise<number> {
+export async function downloadFollowDayReportPng(
+  report: FollowDayReport,
+  /** หน้าละกี่แถว — ค่าเดียวกับที่จอเลือกอยู่ ⇒ หน้า N บนจอ = รูปที่ N */
+  perPage: number = DAY_REPORT_ROWS_PER_IMAGE,
+): Promise<number> {
   try {
     // ไม่รอฟอนต์ = canvas วาดด้วย fallback เงียบ ๆ (ตัวหนังสือเพี้ยนทั้งรูป)
     await Promise.all([document.fonts.load(font(18, 600)), document.fonts.load(font(13.5))]);
   } catch {
     /* ฟอนต์โหลดไม่ได้ก็ยังวาดได้ด้วย fallback */
   }
-  const pages = paginateDayReportRows(report.rows);
+  const pages = paginateDayReportRows(report.rows, perPage);
   // กรองอยู่ให้ชื่อไฟล์บอกด้วย — โหลดหลายรูปแล้วแยกออกว่าไฟล์ไหนคืออะไร
   const scopeSlug = report.scope ? `-${report.scope.replace(/\s*·\s*/g, '-').replace(/\s+/g, '')}` : '';
   let saved = 0;
