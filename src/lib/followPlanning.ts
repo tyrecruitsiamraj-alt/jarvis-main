@@ -111,7 +111,54 @@ export type FollowPlanningRound = {
   time: string | null;
   /** วันของนัด (YYYY-MM-DD ตามเวลาไทย) — `null` = ไม่ได้ตั้งเวลา */
   ymd: string | null;
+  /**
+   * ผลที่เจ้าหน้าที่กด "จัดการ" ของคนนี้ในวันเดียวกัน (สายที่ปิดล่าสุด) — มีค่า = ทับหมวดของสายนี้
+   * (เจ้าของ Choice 5 ต.ค. 2569 "ทุกสายของวันนั้นย้ายตามที่คนกด") · ตั้งใน `buildFollowPlanningRows`
+   */
+  dayVerdict?: FollowCallCategory | null;
 };
+
+/**
+ * หมวดของสายที่**ปิดงานแล้ว**ตามผลที่คนกด — ไป · ไม่ไป · ยกเลิก · ที่เหลือ (ลา/เลื่อน/จำวันผิด) = ยังไม่รู้ผล
+ * 🔴 ยกเลิก = ถังยกเลิก ไม่ใช่ไม่ไป (เจ้าของสั่ง 5 ต.ค. 2569: *"ถ้าจัดการว่าไปก็ย้ายไปถังไป ไม่ไป ยกเลิก"*)
+ * ⚠️ สถิติคนหลุด (`isLostOutcome`) ยังนับยกเลิกเหมือนเดิม — คนละเรื่องกับถังบนจอ
+ */
+export function closedCallCategory(outcomeCode: string | null | undefined): FollowCallCategory {
+  if (isSuccessOutcome(outcomeCode)) return 'agreed';
+  if (outcomeCode === 'cancelled' || outcomeCode === 'job_cancelled') return 'cancelled';
+  if (isLostOutcome(outcomeCode)) return 'lost';
+  return 'other';
+}
+
+/**
+ * ผลที่คนกดของแต่ละ "คน + วัน" — ปิดล่าสุดชนะ · คีย์ = `keyOf(entry)|YYYY-MM-DD` (วันไทยของเวลานัด)
+ * ใช้ทั้งตารางรายวัน/รายเดือน (ผ่าน `dayVerdict`) และตารางสายรวม (`followCallMatrix`) ⇒ ถังตรงกันทุกที่
+ */
+export function staffDayVerdicts(
+  entries: readonly FollowEntry[],
+  keyOf: (e: FollowEntry) => string,
+): Map<string, FollowCallCategory> {
+  const latest = new Map<string, { at: string; cat: FollowCallCategory }>();
+  for (const e of entries) {
+    if (!e.completed_at || e.cancelled || !e.scheduled_at) continue;
+    const ymd = bangkokYmd(e.scheduled_at);
+    if (!ymd) continue;
+    const key = `${keyOf(e)}|${ymd}`;
+    const prev = latest.get(key);
+    if (!prev || e.completed_at > prev.at) latest.set(key, { at: e.completed_at, cat: closedCallCategory(e.outcome_code) });
+  }
+  return new Map([...latest].map(([k, v]) => [k, v.cat]));
+}
+
+/** ผลที่คนกดของวันที่สายนี้อยู่ (ไม่มี = null) */
+export function dayVerdictOf(
+  verdicts: ReadonlyMap<string, FollowCallCategory>,
+  key: string,
+  scheduledAt: string | null | undefined,
+): FollowCallCategory | null {
+  const ymd = scheduledAt ? bangkokYmd(scheduledAt) : null;
+  return ymd ? (verdicts.get(`${key}|${ymd}`) ?? null) : null;
+}
 
 export type FollowPlanningRow = {
   group: FollowGroup;
@@ -156,11 +203,13 @@ export function buildFollowPlanningRows(
   now: Date = new Date(),
 ): FollowPlanningRow[] {
   const rows: FollowPlanningRow[] = groups.map((group) => {
+    const verdicts = staffDayVerdicts(group.rounds, () => group.key);
     const rounds: FollowPlanningRound[] = group.rounds.map((entry) => ({
       entry,
       state: followRoundState(entry, now),
       time: entry.scheduled_at ? bangkokTime(entry.scheduled_at) : null,
       ymd: entry.scheduled_at ? bangkokYmd(entry.scheduled_at) : null,
+      dayVerdict: dayVerdictOf(verdicts, group.key, entry.scheduled_at),
     }));
 
     const days: string[] = [];
@@ -320,9 +369,8 @@ export function roundTone(round: FollowPlanningRound): ToneKey {
     case 'cancelled':
       return 'neutral';
     case 'closed':
-      if (isSuccessOutcome(e.outcome_code)) return 'success';
-      if (isLostOutcome(e.outcome_code)) return 'danger';
-      return 'warn'; // ลา/เลื่อน — ยังไม่จบจริง
+      // สีตามถังของผลที่คนกด (closedCallCategory) — ยกเลิก = เทา ไม่ใช่แดง (5 ต.ค. 2569)
+      return FOLLOW_CALL_CATEGORY_TONE[closedCallCategory(e.outcome_code)];
     case 'result':
       return CALL_OUTCOME_TONE[(effectiveCallOutcome(e) ?? '') as keyof typeof CALL_OUTCOME_TONE] ?? 'warn';
     case 'notSent':
@@ -554,14 +602,14 @@ export const FOLLOW_CALL_CATEGORY_TONE: Record<FollowCallCategory, ToneKey> = {
 };
 
 export function callCategory(round: FollowPlanningRound): FollowCallCategory {
+  /** 🔴 คนกดจัดการของวันนั้นแล้ว = ทุกสายของวันนั้นไปถังตามที่คนกด ทับคำตอบ AI (5 ต.ค. 2569) */
+  if (round.dayVerdict) return round.dayVerdict;
   const e = round.entry;
   switch (round.state) {
     case 'cancelled':
       return 'cancelled';
     case 'closed':
-      if (isSuccessOutcome(e.outcome_code)) return 'agreed';
-      if (isLostOutcome(e.outcome_code)) return 'lost';
-      return 'other';
+      return closedCallCategory(e.outcome_code);
     case 'result': {
       const tone = CALL_OUTCOME_TONE[(effectiveCallOutcome(e) ?? '') as keyof typeof CALL_OUTCOME_TONE];
       if (tone === 'success') return 'agreed';

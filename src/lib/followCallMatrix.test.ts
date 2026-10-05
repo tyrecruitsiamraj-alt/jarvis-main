@@ -54,7 +54,11 @@ describe('followMatrixCol — สายหนึ่งสายตกช่อ�
 
   it('ปิดงานแล้วนับตามผลปิดงาน · ผลที่คนลงเองก็นับ (ตัวเดียวกับการ์ดเดิม)', () => {
     expect(followMatrixCol(e({ completed_at: '2026-10-04T09:00:00+07:00', outcome_code: 'went' }), NOW)).toBe('went');
+    // ยกเลิก = ถังยกเลิก · ไม่ไป = ถังไม่ไป (เจ้าของสั่ง 5 ต.ค. 2569)
     expect(followMatrixCol(e({ completed_at: '2026-10-04T09:00:00+07:00', outcome_code: 'cancelled' }), NOW)).toBe(
+      'cancelled',
+    );
+    expect(followMatrixCol(e({ completed_at: '2026-10-04T09:00:00+07:00', outcome_code: 'no_show_start' }), NOW)).toBe(
       'notWent',
     );
     expect(followMatrixCol(e({ call_status: null, call_mode: 'manual', staff_call_outcome: 'confirmed' }), NOW)).toBe(
@@ -100,5 +104,41 @@ describe('buildFollowCallMatrix', () => {
   it('ว่าง = ทุกช่องเป็น 0 (ตารางไม่หาย)', () => {
     const empty = buildFollowCallMatrix([], NOW);
     for (const r of FOLLOW_MATRIX_ROWS) for (const c of FOLLOW_MATRIX_COLS) expect(empty[r][c]).toHaveLength(0);
+  });
+});
+
+describe('คนกดจัดการแล้ว = ทุกสายของคนนั้นในวันนั้นย้ายไปถังที่กด (เจ้าของ Choice 5 ต.ค. 2569)', () => {
+  it('AI ตอบว่าไม่ไป แต่คนกดว่าไปแล้ว ⇒ ทั้งสองสายของวันนั้นอยู่ถังไป · อีกวันไม่โดน · บวกกันยังลงตัว', () => {
+    const rows = [
+      e({ call_of_day: 1, call_status: 'completed', call_outcome: 'declined' }),
+      e({ call_of_day: 2, completed_at: '2026-10-04T09:00:00+07:00', outcome_code: 'went' }),
+      e({ call_of_day: 1, scheduled_at: '2026-10-05T08:00:00+07:00', call_status: 'completed', call_outcome: 'declined' }),
+      // คนอื่นวันเดียวกัน ไม่โดนผลของคนแรก
+      e({ recipient_phone: '0890000002', call_of_day: 1, call_status: 'completed', call_outcome: 'declined' }),
+    ];
+    const m = buildFollowCallMatrix(rows, NOW);
+    expect(m.all.went).toHaveLength(2);
+    expect(m.all.notWent).toHaveLength(2);
+    const sum = (['went', 'notWent', 'unclear', 'waiting', 'cancelled'] as const).reduce((n, c) => n + m.all[c].length, 0);
+    expect(sum).toBe(m.all.total.length);
+  });
+
+  it('กดยกเลิก ⇒ ถังยกเลิก · กดไม่ไป ⇒ ถังไม่ไป (ทั้งวัน)', () => {
+    const cancelled = buildFollowCallMatrix(
+      [
+        e({ call_of_day: 1, call_status: 'completed', call_outcome: 'confirmed' }),
+        e({ call_of_day: 2, completed_at: '2026-10-04T09:00:00+07:00', outcome_code: 'cancelled' }),
+      ],
+      NOW,
+    );
+    expect(cancelled.all.cancelled).toHaveLength(2);
+    const notWent = buildFollowCallMatrix(
+      [
+        e({ call_of_day: 1, call_status: 'completed', call_outcome: 'confirmed' }),
+        e({ call_of_day: 2, completed_at: '2026-10-04T09:00:00+07:00', outcome_code: 'no_show_start' }),
+      ],
+      NOW,
+    );
+    expect(notWent.all.notWent).toHaveLength(2);
   });
 });

@@ -271,8 +271,9 @@ describe('สีของรอบ — ต้องแปลว่า "ดี/�
     expect(tone({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'went' })).toBe('success');
   });
 
-  it('ปิดงานว่ายกเลิก = แดง · ลา/เลื่อน = เหลือง', () => {
-    expect(tone({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'cancelled' })).toBe('danger');
+  it('ปิดงานว่าไม่ไป = แดง · ยกเลิก = เทา (ถังยกเลิก · 5 ต.ค. 2569) · ลา/เลื่อน = เหลือง', () => {
+    expect(tone({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'no_show_start' })).toBe('danger');
+    expect(tone({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'cancelled' })).toBe('neutral');
     expect(tone({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'postponed' })).toBe('warn');
   });
 
@@ -438,9 +439,10 @@ describe('callCategory — หมวดผลของสาย', () => {
     expect(cat({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'went' })).toBe('agreed');
   });
 
-  it('ไม่ไป: declined และปิดงานว่าไม่ไป/ยกเลิก', () => {
+  it('ไม่ไป: declined และปิดงานว่าไม่ไป · ปิดงานว่ายกเลิก = ถังยกเลิก (เจ้าของสั่ง 5 ต.ค. 2569)', () => {
     expect(cat({ call_status: 'completed', call_outcome: 'declined' })).toBe('lost');
-    expect(cat({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'cancelled' })).toBe('lost');
+    expect(cat({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'no_show_start' })).toBe('lost');
+    expect(cat({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'cancelled' })).toBe('cancelled');
   });
 
   it('ติดต่อไม่ได้: ไม่รับ/ไม่ว่าง/ไม่ตอบ/โทรไม่สำเร็จ/เบอร์ผิด — เป็นสีเหลืองทั้งชุด', () => {

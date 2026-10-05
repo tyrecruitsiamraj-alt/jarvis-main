@@ -57,7 +57,8 @@ describe('parity กับ CHECK constraint ใน migration 134 (ตัวล�
   });
 
   it('5 คำที่เจ้าของสั่ง 18 ส.ค. 2569 + "จำวันผิด" (134 · Journey ข้อ 10) และไม่มีของเก่าปนในชุดที่ให้เลือก', () => {
-    expect([...FOLLOW_OUTCOMES]).toEqual(['went', 'arrived', 'cancelled', 'leave', 'postponed', 'wrong_date']);
+    // + "ไม่ไป" (no_show_start) กลับมาเป็นปุ่ม 5 ต.ค. 2569 — รหัสเดิมที่ฐานรับอยู่แล้ว
+    expect([...FOLLOW_OUTCOMES]).toEqual(['went', 'arrived', 'no_show_start', 'cancelled', 'leave', 'postponed', 'wrong_date']);
     expect(FOLLOW_OUTCOMES).not.toContain('done');
     expect(FOLLOW_OUTCOMES).not.toContain('other');
   });
@@ -77,7 +78,8 @@ describe('กติกาการใช้ค่า', () => {
     expect(isCurrentFollowOutcome('went')).toBe(true);
     expect(isCurrentFollowOutcome('leave')).toBe(true);
     expect(isCurrentFollowOutcome('done')).toBe(false);
-    expect(isCurrentFollowOutcome('no_show_start')).toBe(false);
+    expect(isCurrentFollowOutcome('no_show_start')).toBe(true);
+    expect(isCurrentFollowOutcome('job_cancelled')).toBe(false);
   });
 
   it('“คนหลุดจากงาน” = ยกเลิก + คำเก่าที่หมายความเดียวกัน', () => {

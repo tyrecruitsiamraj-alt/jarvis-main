@@ -16,7 +16,8 @@
  *   · สายที่ไม่มีเลขสาย (ยังไม่เคยเข้าคิวและยังไม่มีผล) ไม่อยู่สายไหน — นิยามเดิมของแผง
  */
 import type { FollowEntry } from '@/lib/followApi';
-import { callCategory, followRoundState } from '@/lib/followPlanning';
+import { callCategory, dayVerdictOf, followRoundState, staffDayVerdicts, type FollowCallCategory } from '@/lib/followPlanning';
+import { followGroupKey } from '@/lib/followGrouping';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 
 export type FollowMatrixRowKey = 'all' | 1 | 2 | 3;
@@ -72,8 +73,13 @@ const emptyRow = (): Record<FollowMatrixCol, FollowEntry[]> => ({
  *   · สรุปไม่ได้ = **มีผลแล้ว** แต่ไม่รู้ว่าไปไหม: ไม่ได้คำตอบ (unreachable) · ปิดงานด้วย ลา/เลื่อน/จำวันผิด (other)
  *   · รอโทร = **ยังไม่มีผล**: ยังไม่ถึงเวลา (waiting) · เลยเวลาแต่ผลยังไม่กลับ (overdue) · ไม่ได้ส่ง AI/รอคนโทร (notSent)
  */
-export function followMatrixCol(entry: FollowEntry, now: Date = new Date()): Exclude<FollowMatrixCol, 'total'> {
-  const round = { entry, state: followRoundState(entry, now), time: null, ymd: null };
+export function followMatrixCol(
+  entry: FollowEntry,
+  now: Date = new Date(),
+  /** ผลที่คนกดจัดการของคน+วันนี้ (`staffDayVerdicts`) — มีค่า = ทับหมวดของสาย (5 ต.ค. 2569) */
+  dayVerdict: FollowCallCategory | null = null,
+): Exclude<FollowMatrixCol, 'total'> {
+  const round = { entry, state: followRoundState(entry, now), time: null, ymd: null, dayVerdict };
   switch (callCategory(round)) {
     case 'cancelled':
       return 'cancelled';
@@ -92,10 +98,12 @@ export function followMatrixCol(entry: FollowEntry, now: Date = new Date()): Exc
 /** ตารางเต็ม — แต่ละช่องถือรายชื่อจริง (กดดูรายชื่อได้ · เลข = ความยาวลิสต์ ไม่มีตัวนับแยก) */
 export function buildFollowCallMatrix(entries: readonly FollowEntry[], now: Date = new Date()): FollowMatrix {
   const m: FollowMatrix = { all: emptyRow(), 1: emptyRow(), 2: emptyRow(), 3: emptyRow() };
+  // คนกดจัดการแล้ว = ทุกสายของคนนั้นในวันนั้นย้ายไปถังที่กด (ตัวเดียวกับตารางรายวัน — คีย์กลุ่มเดียวกัน)
+  const verdicts = staffDayVerdicts(entries, followGroupKey);
   for (const e of entries) {
     const slot = followRoundSlot(e);
     if (slot === null) continue;
-    const col = followMatrixCol(e, now);
+    const col = followMatrixCol(e, now, dayVerdictOf(verdicts, followGroupKey(e), e.scheduled_at));
     for (const key of ['all', slot] as const) {
       m[key].total.push(e);
       m[key][col].push(e);

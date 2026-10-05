@@ -11811,3 +11811,16 @@ Choice: ถึงแล้ว/ไปแล้ว/ลา/เลื่อน/จ�
 - เทสต์ `tests/api/followDayReportPager2569-10-05.test.ts`
 - `src/components/follow/FollowPlanningCalendar.tsx` — รายเดือน · ภาพรวม แบ่งหน้า หน้าละ 10 คน (`MONTH_PAGE_SIZE` · `month-pager` อยู่เสมอ) · เปลี่ยนเดือน/สาย = กลับหน้า 1 · แผงข้างขวายังนับทั้งเดือน (5 ต.ค. 2569)
 - `src/components/follow/FollowFilterGroup.tsx` (**ใหม่**) — แถวตัวกรองหน้าติดตาม (สายที่ dropdown คิดเลขจาก `buildFollowCallMatrix` + ลูกจากหน้าแม่: ใครโทร · เจ้าของงาน · ใครเพิ่ม) · ย้ายจากหัวการ์ด Call Pipeline ไปแถวแท็บรายวัน/รายเดือน ผ่าน prop `filtersSlot` ของ `FollowPlanningCalendar` · `FollowCallRoundsPanel` ไม่มี `filtersSlot` แล้ว (5 ต.ค. 2569)
+
+## 5 ต.ค. 2569 (เย็น): หน้าติดตาม — จัดการแล้วย้ายถังตามที่คนกด
+
+เจ้าของ: *"ถ้าจัดการว่าไปก็ย้ายไปถังไป ไม่ไป ยกเลิก"* · Choice: ปุ่มเดิม "ไม่ถอด" · AI ตอบอย่างหนึ่งแต่คนกดอีกอย่าง = "ทุกสายของวันนั้นย้ายตามที่คนกด"
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/followOutcome.ts` | ปุ่ม "ไม่ไป" = รหัสเดิม `no_show_start` (ย้ายจากชุดเก่าเข้าชุดที่ให้เลือก · ฐานรับอยู่แล้ว ไม่ต้อง migrate) · ป้าย "ไม่ไปเริ่มงาน" → "ไม่ไป" |
+| `src/lib/followPlanning.ts` | `closedCallCategory` (ไป/ถึงแล้ว → ไป · ไม่ไป → ไม่ไป · **ยกเลิก → ถังยกเลิก** · ลา/เลื่อน/จำวันผิด → ยังไม่รู้ผล) · `staffDayVerdicts` + `dayVerdictOf` (คน+วัน ปิดล่าสุดชนะ) · `FollowPlanningRound.dayVerdict` ตั้งใน `buildFollowPlanningRows` · `callCategory` เช็ค `dayVerdict` ก่อน · `roundTone` ของสายปิดงานใช้สีของถัง |
+| `src/lib/followCallMatrix.ts` | `buildFollowCallMatrix` ใช้ `staffDayVerdicts(entries, followGroupKey)` ⇒ ถังบนแผงตรงกับตาราง |
+| เทสต์ | `src/lib/followCallMatrix.test.ts` (override) · ปรับ `followPlanning.test.ts` · `followOutcome.test.ts` |
+
+- ⚠️ สถิติคนหลุด (`isLostOutcome` · ML · trends) ยังนับยกเลิกเป็นหลุดเหมือนเดิม — เปลี่ยนแค่ถังบนจอ

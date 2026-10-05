@@ -22,10 +22,14 @@
  */
 
 /** ชุดที่หน้าเว็บให้เลือก — เรียงตามที่เจ้าหน้าที่จะเห็นบนปุ่ม */
-export const FOLLOW_OUTCOMES = ['went', 'arrived', 'cancelled', 'leave', 'postponed', 'wrong_date'] as const;
+/**
+ * 🔴 "ไม่ไป" (`no_show_start`) กลับมาเป็นปุ่ม (เจ้าของสั่ง 5 ต.ค. 2569: *"ถ้าจัดการว่าไปก็ย้ายไปถังไป ไม่ไป ยกเลิก"*
+ * · Choice "ไม่ถอด" ปุ่มเดิม) — ใช้รหัสเดิมที่ฐานรับอยู่แล้ว ไม่ต้องแก้ CHECK constraint
+ */
+export const FOLLOW_OUTCOMES = ['went', 'arrived', 'no_show_start', 'cancelled', 'leave', 'postponed', 'wrong_date'] as const;
 
 /** ชุดเก่า (095) — ไม่ให้เลือกใหม่แล้ว แต่ยังต้องอ่านออกและรับได้ */
-export const FOLLOW_OUTCOMES_LEGACY = ['done', 'job_cancelled', 'no_show_start', 'other'] as const;
+export const FOLLOW_OUTCOMES_LEGACY = ['done', 'job_cancelled', 'other'] as const;
 
 export type FollowOutcome = (typeof FOLLOW_OUTCOMES)[number];
 export type FollowOutcomeLegacy = (typeof FOLLOW_OUTCOMES_LEGACY)[number];
@@ -49,7 +53,8 @@ export const FOLLOW_OUTCOME_LABEL: Record<FollowOutcomeAny, string> = {
   // ชุดเก่า — โชว์บนรายการที่ปิดไปก่อนหน้านี้
   done: 'เสร็จสิ้น',
   job_cancelled: 'ยกเลิกงาน',
-  no_show_start: 'ไม่ไปเริ่มงาน',
+  // ไม่ไป (5 ต.ค. 2569 กลับมาเป็นปุ่ม · เดิม "ไม่ไปเริ่มงาน")
+  no_show_start: 'ไม่ไป',
   other: 'อื่น ๆ',
 };
 
@@ -57,7 +62,8 @@ export const FOLLOW_OUTCOME_LABEL: Record<FollowOutcomeAny, string> = {
 export const FOLLOW_OUTCOME_HINT: Record<FollowOutcome, string> = {
   went: 'ไปตามนัดแล้ว (ออกจากบ้าน/เดินทางแล้ว)',
   arrived: 'ถึงหน่วยงานแล้ว เริ่มงานได้',
-  cancelled: 'ยกเลิก — ไม่ไปแล้ว/งานถูกยกเลิก',
+  no_show_start: 'ไม่ไปตามนัด',
+  cancelled: 'ยกเลิก — ไม่ต้องตามแล้ว/งานถูกยกเลิก',
   leave: 'ลา วันนี้ไม่ไป แต่ยังไม่หลุด',
   postponed: 'เลื่อนไปวันอื่น',
   wrong_date: 'เราลงวันผิดเอง — นัดจริงเป็นอีกวัน (ไม่ใช่ความผิดของเขา)',
