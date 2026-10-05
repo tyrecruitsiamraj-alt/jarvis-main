@@ -103,7 +103,7 @@ describe.skipIf(!hasDb)('sum-check + bucket-parity กับฐานจริ�
       );
       expect(`${bucket}=${cnt[0].n}`).toBe(`${bucket}=${want}`);
     }
-  });
+  }, 20_000); // อ่านฐานจริงทุกถัง ~4–5 วิ — ชนเพดาน 5 วิตอนฐานช้า (ตก timeout ไม่ใช่เลขเพี้ยน · 4–5 ต.ค. 2569)
 
   it('claimed_idle breakdown รวมเท่ากับถัง claimed_idle', async () => {
     const { dbQuery } = await import('../../api/_lib/postgres.js');

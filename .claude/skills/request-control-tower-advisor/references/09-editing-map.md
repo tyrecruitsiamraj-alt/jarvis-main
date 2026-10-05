@@ -11721,3 +11721,12 @@ iRecruit (`rm-action-btn`): โทร (call · POST จดการโทรก�
 | เทสต์ | `tests/api/aftercare.test.ts` — กล่องกดถัง overdue ถูกถอดแล้ว (ถังยังอยู่ที่ ?bucket=) |
 
 - ถัง `?bucket=overdue_no_result` ยังเปิดจากลิงก์เดิมได้ · บอร์ดสรุปนัด (นัดทั้งหมด/มา/ไม่มา/รอผล + รายวัน) ยังอยู่
+
+## หน้าติดตาม 5 ต.ค. 2569: หน่วยงานโชว์ทุกจอ + ตัวกรอง "ใครเพิ่ม"
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/components/follow/FollowPlanningCalendar.tsx` | คอลัมน์หน่วยงานถอด `hidden lg:table-cell` — 🔴 เคยซ่อนต่ำกว่า lg ตั้งแต่ 16 ก.ย. (ช่วงมือถือเป็นการ์ดยังโชว์ในการ์ด) พอถอยการ์ดกลับเป็นตาราง (f8563ac) หน่วยงานหายบนมือถือ |
+| `src/lib/followListFilter.ts` | `FollowFilter.owner` (created_by_name) กลับมาใช้ · `followAdderOptions` · `followAdderLabel` (ตัดโดเมนอีเมล) · `matchesFollowAdder` (ไม่สนตัวพิมพ์) · `FOLLOW_ADDER_NONE` |
+| `src/pages/follow/FollowPage.tsx` | dropdown "ใครเพิ่ม" ต่อจากเจ้าของงาน: ทุกคน · **ของฉัน** (อีเมลที่ล็อกอิน) · รายชื่อ · ใช้กับตาราง/แผงขั้นตอน/วันถัดไป · สลับแท็บทีม = กลับทุกคน ยกเว้น "ของฉัน" |
+| เทสต์ | `tests/api/followAdderUnit2569-10-05.test.ts` · ปรับ `followListFilter.test.ts` · `applicantOverviewSql.test.ts` parity ให้เวลา 20 วิ (ฐานจริงช้า ~5 วิ) |

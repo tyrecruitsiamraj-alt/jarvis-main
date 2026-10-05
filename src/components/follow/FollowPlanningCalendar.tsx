@@ -626,7 +626,7 @@ const FollowPlanningCalendar: React.FC<{
                           <th className="min-w-[210px] px-4 py-2.5 text-[11px] font-medium md:px-5">
                             ผู้ที่ต้องติดตาม / ติดต่อ
                           </th>
-                          <th className="hidden min-w-[130px] px-3 py-2.5 text-[11px] font-medium lg:table-cell">หน่วยงาน</th>
+                          <th className="min-w-[130px] px-3 py-2.5 text-[11px] font-medium">หน่วยงาน</th>
                           <th className="min-w-[110px] px-3 py-2.5 text-[11px] font-medium">เวลานัด / รอบ</th>
                           <th className="min-w-[140px] px-3 py-2.5 text-[11px] font-medium">สถานะการโทร</th>
                           <th className="min-w-[220px] px-3 py-2.5 text-[11px] font-medium">เขาตอบว่าอะไร</th>
@@ -732,7 +732,8 @@ const FollowPlanningCalendar: React.FC<{
                                   </span>
                                 </span>
                               </td>
-                              <td className="hidden px-3 py-3 text-[12px] text-muted-foreground lg:table-cell">
+                              {/* 🔴 หน่วยงานโชว์ทุกจอ (5 ต.ค. 2569 เจ้าของเจอ "ชื่อหน่วยงานหาย" บนมือถือ — ตารางกลับเป็นแบบเดิมแล้วคอลัมน์นี้ยังซ่อนต่ำกว่า lg) */}
+                              <td className="px-3 py-3 text-[12px] text-muted-foreground">
                                 {row.group.unitName || '—'}
                               </td>
 

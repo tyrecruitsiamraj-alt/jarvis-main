@@ -104,9 +104,8 @@ export type FollowFilter = {
   date: string;
   band: TimeBand;
   /**
-   * ชื่อเจ้าของงาน (created_by_name) · `''`/ไม่ส่ง = ทุกคน
-   * ⚠️ **ไม่มีช่องนี้บนจอแล้ว** (เจ้าของสั่งถอด 1 ก.ย. 2569 ตอนเปลี่ยนตัวกรองเป็น
-   * ไอคอนปฏิทิน + ช่วงเวลา) — ตรรกะยังอยู่เผื่อเอากลับ และ `listFollowOwners()` ยังใช้ได้
+   * **ใครเพิ่ม** (created_by_name) · `''`/ไม่ส่ง = ทุกคน · `FOLLOW_ADDER_NONE` = ไม่มีชื่อคนเพิ่ม
+   * กลับมาอยู่บนจอ 5 ต.ค. 2569 (เจ้าของ: *"Filter ดูได้ว่ารายชื่อที่เพิ่มไปใครเพิ่ม เพราะคนเพิ่มอยากดูแค่งานตัวเอง"*)
    */
   owner?: string;
   /** ใครโทร (เจ้าของสั่ง 2 ต.ค. 2569 "เพิ่ม filter ดึงรายชื่อเจ้าหน้าที่โทรเอง") · ไม่ส่ง/'all' = ทั้งหมด */
@@ -121,6 +120,36 @@ export type FollowFilter = {
 };
 
 export const FOLLOW_STAFF_NONE = '__none__';
+export const FOLLOW_ADDER_NONE = '__none__';
+
+/** ชื่อสั้นของคนเพิ่ม — เก็บเป็นอีเมล ตัดโดเมนออก (kunthida.b@siamraj.com → kunthida.b) */
+export function followAdderLabel(name: string | null | undefined): string {
+  const n = (name ?? '').trim();
+  if (!n) return 'ไม่ระบุคนเพิ่ม';
+  return n.includes('@') ? n.slice(0, n.indexOf('@')) : n;
+}
+
+/** ตัวเลือก "ใครเพิ่ม" + จำนวน — เรียงชื่อ · ไม่ระบุไว้ท้าย */
+export function followAdderOptions(entries: readonly FollowEntry[]): Array<{ value: string; label: string; count: number }> {
+  const count = new Map<string, number>();
+  for (const e of entries) {
+    const k = (e.created_by_name ?? '').trim() || FOLLOW_ADDER_NONE;
+    count.set(k, (count.get(k) ?? 0) + 1);
+  }
+  return [...count.entries()]
+    .map(([value, n]) => ({ value, label: value === FOLLOW_ADDER_NONE ? 'ไม่ระบุคนเพิ่ม' : followAdderLabel(value), count: n }))
+    .sort((a, b) => {
+      if (a.value === FOLLOW_ADDER_NONE) return 1;
+      if (b.value === FOLLOW_ADDER_NONE) return -1;
+      return a.label.localeCompare(b.label, 'th');
+    });
+}
+
+/** รายการนี้ตรงตัวกรอง "ใครเพิ่ม" ไหม */
+export function matchesFollowAdder(e: Pick<FollowEntry, 'created_by_name'>, owner: string): boolean {
+  const v = (e.created_by_name ?? '').trim();
+  return owner === FOLLOW_ADDER_NONE ? v === '' : v.toLowerCase() === owner.trim().toLowerCase();
+}
 
 /** คีย์เบอร์เจ้าหน้าที่ของรายการ — ตัดช่องว่าง/ขีด · +66 = 0 (เบอร์เดียวกันพิมพ์ต่างรูปต้องเป็นคนเดียวกัน) */
 export function followStaffKey(e: Pick<FollowEntry, 'staff_phone'>): string {
@@ -215,7 +244,7 @@ export function filterFollowEntries(entries: FollowEntry[], f: FollowFilter): Fo
     if (f.tab && followLifecycleTab(e) !== f.tab) return false;
     if (f.date && bangkokDay(e.scheduled_at) !== f.date) return false;
     if (f.band && !inTimeBand(e.scheduled_at, f.band)) return false;
-    if (f.owner && (e.created_by_name ?? '') !== f.owner) return false;
+    if (f.owner && !matchesFollowAdder(e, f.owner)) return false;
     if (f.staff && followStaffGroupKey(e, f.staffNameOf ?? (() => null)) !== f.staff) return false;
     if (f.caller === 'tbd') {
       if (e.time_tbd !== true) return false;

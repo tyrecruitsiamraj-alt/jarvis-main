@@ -104,7 +104,10 @@ describe('filterFollowEntries — ทุกเงื่อนไข AND', () => 
 
   it('🔴 หน้าติดตามเรียกตัวกรองโดยไม่ล็อกแท็บ "กำลังตาม" (เคยทำให้วันที่ปิดงานหมดเหลือ "ไม่มีสายที่ต้องตาม")', () => {
     const page = fs.readFileSync(path.resolve(process.cwd(), 'src/pages/follow/FollowPage.tsx'), 'utf8');
-    expect(page).toContain('filterFollowEntries(scopeItems, { date: fDate, band: fBand, caller, staff: staffKey, staffNameOf })');
+    // + ใครเพิ่ม (owner · 5 ต.ค. 2569) — ยังไม่มี tab ล็อก
+    expect(page).toContain(
+      'filterFollowEntries(scopeItems, { date: fDate, band: fBand, caller, staff: staffKey, staffNameOf, owner: adderKey })',
+    );
     expect(page).not.toContain("const tab: FollowTab = 'active'");
   });
 

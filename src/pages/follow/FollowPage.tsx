@@ -61,6 +61,8 @@ import {
   filterFollowEntries,
   followStaffGroupKey,
   followStaffOptions,
+  followAdderOptions,
+  matchesFollowAdder,
   countFollowCallers,
   followCallerOf,
   FOLLOW_CALLERS,
@@ -166,6 +168,10 @@ const FollowPage: React.FC = () => {
   /** เจ้าของงาน = เจ้าหน้าที่ที่ติดตาม (4 ต.ค. 2569) — 'all' = ทุกคน (Select ห้ามค่าว่าง) */
   const [staffFilter, setStaffFilter] = useState('all');
   const staffKey = staffFilter === 'all' ? '' : staffFilter;
+  /**
+   * ใครเพิ่ม (created_by_name · 5 ต.ค. 2569: *"คนเพิ่มอยากดูแค่งานตัวเอง"*) — 'all' = ทุกคน · 'me' = ของฉัน (อีเมลที่ล็อกอิน)
+   */
+  const [adderFilter, setAdderFilter] = useState('all');
   const staffNameOf = useFollowStaffNameOf();
   /** ป๊อปสรุปแผนทั้งวัน (เจ้าของสั่ง 2 ต.ค. 2569) — วัน = วันที่เลือกดูอยู่ (ไม่เลือก = วันนี้) */
   const [reportOpen, setReportOpen] = useState(false);
@@ -324,6 +330,7 @@ const FollowPage: React.FC = () => {
   const [topicManagerOpen, setTopicManagerOpen] = useState(false);
   const [staffManagerOpen, setStaffManagerOpen] = useState(false);
   const { user } = useAuth();
+  const adderKey = adderFilter === 'all' ? '' : adderFilter === 'me' ? (user?.email ?? '') : adderFilter;
   const navigate = useNavigate();
   /** เพิ่มเรื่อง/เจ้าหน้าที่ได้เฉพาะ supervisor ขึ้นไป (เจ้าของสั่ง ค่ำ-5) */
   const canManageMasters = user?.role === 'supervisor' || user?.role === 'admin';
@@ -438,6 +445,8 @@ const FollowPage: React.FC = () => {
     setActiveRound('all');
     setCaller('all');
     setStaffFilter('all');
+    // ใครเพิ่ม: "ของฉัน" ติดข้ามแท็บได้ (ความหมายเดิม) · เลือกชื่อคนอื่นไว้ = กลับทุกคน (อีกแท็บอาจไม่มีชื่อนั้น)
+    if (adderFilter !== 'me') setAdderFilter('all');
   }
   useEffect(() => {
     const prefill = readFollowPrefill(searchParams);
@@ -1183,10 +1192,15 @@ const FollowPage: React.FC = () => {
     [items, replaceView],
   );
   const filtered = useMemo(
-    () => filterFollowEntries(scopeItems, { date: fDate, band: fBand, caller, staff: staffKey, staffNameOf }),
-    [scopeItems, fDate, fBand, caller, staffKey, staffNameOf],
+    () => filterFollowEntries(scopeItems, { date: fDate, band: fBand, caller, staff: staffKey, staffNameOf, owner: adderKey }),
+    [scopeItems, fDate, fBand, caller, staffKey, staffNameOf, adderKey],
   );
   const staffOptions = useMemo(() => followStaffOptions(scopeItems, staffNameOf), [scopeItems, staffNameOf]);
+  const adderOptions = useMemo(() => followAdderOptions(scopeItems), [scopeItems]);
+  const myAddedCount = useMemo(
+    () => (user?.email ? scopeItems.filter((e) => matchesFollowAdder(e, user.email)).length : 0),
+    [scopeItems, user?.email],
+  );
   const callerCounts = useMemo(() => countFollowCallers(scopeItems), [scopeItems]);
   /**
    * แผงรอบโทรนับตาม **วันที่เลือก** และสลับดู **ทั้งเดือน** ได้ (เจ้าของเคาะ 3 ต.ค. 2569:
@@ -1210,11 +1224,12 @@ const FollowPage: React.FC = () => {
     [scopeItems, panelRange, panelDay, calMonth],
   );
   const panelEntries = useMemo(() => {
-    const byStaff = staffKey ? panelScope.filter((e) => followStaffGroupKey(e, staffNameOf) === staffKey) : panelScope;
+    const byAdder = adderKey ? panelScope.filter((e) => matchesFollowAdder(e, adderKey)) : panelScope;
+    const byStaff = staffKey ? byAdder.filter((e) => followStaffGroupKey(e, staffNameOf) === staffKey) : byAdder;
     if (caller === 'all') return byStaff;
     if (caller === 'tbd') return byStaff.filter((e) => e.time_tbd === true);
     return byStaff.filter((e) => followCallerOf(e) === caller);
-  }, [panelScope, caller, staffKey, staffNameOf]);
+  }, [panelScope, caller, staffKey, staffNameOf, adderKey]);
   const hasActiveFilter = Boolean(fDate || fBand);
 
   /**
@@ -1263,9 +1278,11 @@ const FollowPage: React.FC = () => {
   const nextDayRows = useMemo(
     () =>
       buildFollowPlanningRows(
-        groupFollowEntries(filterFollowEntries(scopeItems, { date: '', band: '', caller, staff: staffKey, staffNameOf })),
+        groupFollowEntries(
+          filterFollowEntries(scopeItems, { date: '', band: '', caller, staff: staffKey, staffNameOf, owner: adderKey }),
+        ),
       ),
-    [scopeItems, caller, staffKey, staffNameOf],
+    [scopeItems, caller, staffKey, staffNameOf, adderKey],
   );
 
   /**
@@ -1573,6 +1590,19 @@ const FollowPage: React.FC = () => {
                     onChange={(v) => setStaffFilter(v)}
                     ariaLabel="เจ้าของงาน"
                     active={staffFilter !== 'all'}
+                  />
+                  {/* ใครเพิ่ม (5 ต.ค. 2569) — "ของฉัน" มาก่อน: คนเพิ่มดูแค่งานตัวเองได้ในกดเดียว */}
+                  <span className="text-xs text-muted-foreground">ใครเพิ่ม</span>
+                  <ChoiceDropdown
+                    value={adderFilter}
+                    options={[
+                      { value: 'all', label: `ทุกคน · ${scopeItems.length.toLocaleString('th-TH')}` },
+                      ...(user?.email ? [{ value: 'me', label: `ของฉัน · ${myAddedCount.toLocaleString('th-TH')}` }] : []),
+                      ...adderOptions.map((o) => ({ value: o.value, label: `${o.label} · ${o.count.toLocaleString('th-TH')}` })),
+                    ]}
+                    onChange={(v) => setAdderFilter(v)}
+                    ariaLabel="ใครเพิ่ม"
+                    active={adderFilter !== 'all'}
                   />
                 </>
               }
