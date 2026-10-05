@@ -525,7 +525,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
             className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
           >
             <span className={cn('text-sm font-medium', TONE.danger.value)}>
-              🚩 ต้องคนตาม {needsHuman.length.toLocaleString('th-TH')} คน — AI โทรจนสุดมือแล้ว
+              ต้องคนตาม {needsHuman.length.toLocaleString('th-TH')} คน — AI โทรจนสุดมือแล้ว
             </span>
             <ChevronDown
               className={cn('h-4 w-4 shrink-0 transition-transform', openBucket && 'rotate-180')}

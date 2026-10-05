@@ -380,7 +380,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                           saveFailed ? TONE.danger.value : TONE.success.value,
                         )}
                       >
-                        {saveFailed ? '🔴 ' : '✓ '}
+                        
                         {saveMsg}
                       </span>
                     ) : null}

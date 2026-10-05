@@ -33,7 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ClipboardCheck, Download, Loader2, MapPin, Phone, UserMinus, UserPlus, Users } from 'lucide-react';
+import { Bot, ClipboardCheck, Download, Loader2, MapPin, Phone, UserMinus, UserPlus, Users } from 'lucide-react';
 import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
 import CallChoiceConfirmDialog from '@/components/recruit-rm/CallChoiceConfirmDialog';
 import JobRecallSuggestions from '@/components/jobs/JobRecallSuggestions';
@@ -304,7 +304,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
               เบอร์ใช้โทรไม่ได้
             </span>
           ) : a.claimed ? (
-            <span className="text-[10px] text-muted-foreground">🔒 มีคนเก็บแล้ว</span>
+            <span className="text-[10px] text-muted-foreground">มีคนเก็บแล้ว</span>
           ) : isFollowCallStatus(a.last_call_status) ? (
             /**
              * 🔴 สถานะสายระหว่างทาง (21 ก.ย. 2569) — เจ้าของสั่งให้แท็บรายชื่อ
@@ -412,7 +412,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
           </button>
           {a.claimed && !a.claimed_by_me ? (
             <span className="rounded-full border border-transparent bg-muted/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-              🔒 เพื่อนเก็บไปโทรแล้ว
+              เพื่อนเก็บไปโทรแล้ว
             </span>
           ) : (
             <button
@@ -426,7 +426,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
                   : 'border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300',
               )}
             >
-              {a.claimed_by_me ? '✓ ฉันเก็บไปโทรเองแล้ว — กดเพื่อคืน' : 'เก็บไปโทรเอง'}
+              {a.claimed_by_me ? 'ฉันเก็บไปโทรเองแล้ว — กดเพื่อคืน' : 'เก็บไปโทรเอง'}
             </button>
           )}
         </div>
@@ -488,7 +488,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
                 onClick={() => setConfirmSend(true)}
                 className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
-                {sendBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '🤖'} ส่งให้ AI โทร
+                {sendBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bot className="h-3.5 w-3.5" aria-hidden />} ส่งให้ AI โทร
                 {sendableApprox > 0 ? ` (~${sendableApprox})` : ''}
               </button>
             )}

@@ -11837,3 +11837,19 @@ Choice: ถึงแล้ว/ไปแล้ว/ลา/เลื่อน/จ�
 
 - `src/pages/follow/FollowPage.tsx` — เลขบน "ใครโทร"/"เจ้าของงาน" นับจาก `panelScope` (วัน/เดือนที่ปฏิทินดูอยู่) + เฉพาะสายที่มีเลขสาย (`followRoundSlot`) = ชุดเดียวกับ "สายที่ · ทั้งหมด" (เดิมนับทั้งแท็บ 1,652) · ตัวเลือกนับหลังตัวกรองอีกตัว
 - 🔴 "เจ้าของงาน" = อีเมลคนเพิ่ม (`created_by_name` · `adderFilter`) + "ของฉัน" · ตัวกรองเจ้าของงานแบบเดิม (ชื่อเจ้าหน้าที่ติดตาม · `staffFilter`/`followStaffOptions`) ถอดออกจากหน้า · "ใครเพิ่ม" ถอด (ยุบเข้าเจ้าของงาน) — lib `followStaffGroupKey`/`followStaffOptions` ยังอยู่
+
+## 5 ต.ค. 2569 (ค่ำ): ชื่อย้ายไปตามกล่อง + ถอดอิโมจิทั้งระบบ
+
+เจ้าของ: *"แยกผลอะว่า สมมตินาย ก โทรแล้วผลเป็นไงย้ายไป … มันจะย้ายชื่อไปตามกล่อง"* · *"อิโมจิที่ทำให้ดูเป็น Ai อะเอาออกด้วย"*
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/followCallMatrix.ts` | `followMatrixColOfCategory` (หมวด → กล่อง) ตัวเดียวกับ `followMatrixCol` |
+| `src/components/follow/FollowCallRoundsPanel.tsx` | props `resultBox` / `onResultBoxChange` — กดกล่องผล = กรองตาราง (aria-pressed · กดซ้ำ/กดทั้งหมด = ล้าง) · ไม่ส่ง = ป๊อปรายชื่อแบบเดิม |
+| `src/pages/follow/FollowPage.tsx` | state `resultBox` (รีเซ็ตตอนสลับแท็บทีม) · `calendarRows` = แถวที่มีสายในกล่อง (ช่วงวัน/เดือน + สายที่ + `callCategory` รวม dayVerdict) และ**เหลือเฉพาะสายในกล่อง** ⇒ "N สาย" ใต้ตาราง = เลขบนกล่อง · ป๊อปรายละเอียดยังอ่าน `allRows` |
+| `src/components/shared/ToneDot.tsx` (**ใหม่**) | จุดสีจาก `TONE[tone].dot` แทนอิโมจิวงกลมสี |
+| `src/lib/irecruitMatchTypes.ts` · `candidateSpecTypes.ts` · `homeCallDigest.ts` | `matchTierEmoji`→`matchTierTone` · `adjacentTierEmoji`→`adjacentTierTone` · `FOLLOW_UP_TONE` ไม่มี `dot` อิโมจิแล้ว |
+| ~30 ไฟล์ (lumosDispatchApi labels · RmTable · MatchingPage · JobApplicantsDialog · home · dashboard · notifications ใน api/_lib) | ถอดอิโมจิ/✓ ออกจากข้อความบนจอ · ที่เคยเป็นตัวบอกสถานะอย่างเดียว → `ToneDot`/ไอคอน lucide |
+| เทสต์ | `tests/api/noEmojiOnScreen2569-10-05.test.ts` (ด่านกันกลับ — สแกน src หลังตัดคอมเมนต์) |
+
+- ⚠️ ฟิลด์ `urgency_emoji` / `job_family_emoji` จาก AI วิเคราะห์ใบขอยังอยู่ใน API แต่ไม่วาดบนจอแล้ว

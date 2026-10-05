@@ -239,7 +239,7 @@ export async function applyCallFollowupToQueueRow(input: {
   if (input.outcome === 'confirmed') {
     await notifyRoles(['admin'], {
       type: 'call_confirmed',
-      title: `📞 ${who} สนใจงาน — รีบติดต่อกลับ`,
+      title: `${who} สนใจงาน — รีบติดต่อกลับ`,
       body: `ใบขอ ${row.job_ref} · AI โทรแล้วเขาตอบรับ อย่าปล่อยให้เย็นตัว`,
       link: '/follow',
       dedupeKey: `call_confirmed:${row.id}`,
@@ -247,7 +247,7 @@ export async function applyCallFollowupToQueueRow(input: {
   } else if (decision.action === 'needs_human') {
     await notifyRoles(['admin'], {
       type: 'needs_human',
-      title: `🚩 ${who} ต้องคนตาม — AI โทรจนสุดมือแล้ว`,
+      title: `${who} ต้องคนตาม — AI โทรจนสุดมือแล้ว`,
       body: `ใบขอ ${row.job_ref} · ${decision.reason}`,
       link: '/follow',
       dedupeKey: `needs_human:${row.id}`,

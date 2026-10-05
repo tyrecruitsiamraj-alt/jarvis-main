@@ -1,4 +1,5 @@
 import React from 'react';
+import ToneDot from '@/components/shared/ToneDot';
 import type { JobRequest } from '@/types';
 import { computeJobUrgency, requestStatusLabel, type JobUrgencyMeta } from '@/lib/jobUrgency';
 import { REQUEST_LEAD_KIND_TONE } from '@/lib/requestLeadKind';
@@ -44,7 +45,7 @@ const JobUrgencyBadge: React.FC<Props> = ({ job, className, compact }) => {
       className={cn('inline-flex items-center gap-1 text-xs font-medium', statusStyle(meta.kind), className)}
     >
       {/* 🟢 = ล่วงหน้า (สีเดียวกับตัวหนังสือ) · 🔴 = ต้องรีบ — เดิมเป็น 🔵 ขัดกับสีเขียว */}
-      {!compact && hot ? '🔴' : !compact && meta.kind === 'advance' ? '🟢' : null}
+      {!compact && hot ? <ToneDot tone="danger" /> : !compact && meta.kind === 'advance' ? <ToneDot tone="success" /> : null}
       {label}
     </span>
   );

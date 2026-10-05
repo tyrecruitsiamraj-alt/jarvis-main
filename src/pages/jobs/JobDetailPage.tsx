@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import ToneDot from '@/components/shared/ToneDot';
 import { Button } from '@/components/ui/button';
 import { unitLabel } from '@/lib/unitDisplay';
 import { JOB_URGENCY_TONE } from '@/lib/jobUrgency';
@@ -427,7 +428,8 @@ const JobDetailPage: React.FC = () => {
                 TONE[JOB_URGENCY_TONE[job.urgency]].value,
               )}
             >
-              {job.urgency === 'urgent' ? '🔴 ด่วน' : '🟢 ล่วงหน้า'}
+              <ToneDot tone={job.urgency === 'urgent' ? 'danger' : 'success'} className="mr-1" />
+              {job.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
             </span>
           </div>
 

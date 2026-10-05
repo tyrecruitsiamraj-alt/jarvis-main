@@ -128,7 +128,7 @@ describe('BoardPublishSheet — ป๊อปประกาศหน้าเด
     fetchJobReleases.mockResolvedValue(released);
     renderSheet();
     const pull = await screen.findByRole('button', { name: 'ดึงประกาศลง' });
-    expect(screen.getByText('✓ ประกาศแล้ว')).toBeTruthy();
+    expect(screen.getByText('ประกาศแล้ว')).toBeTruthy(); // ไม่มี ✓ (ถอดอิโมจิทั้งระบบ 5 ต.ค. 2569)
     expect(screen.queryByRole('button', { name: 'ประกาศ' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'เก็บร่าง' })).toBeNull();
     fetchJobReleases.mockResolvedValue([]);

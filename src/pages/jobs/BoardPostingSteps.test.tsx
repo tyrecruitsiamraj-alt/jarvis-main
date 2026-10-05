@@ -75,7 +75,7 @@ describe('ป๊อปไล่งาน — ดึงประกาศลง�
     fetchJobReleases.mockResolvedValue(released);
     renderSteps();
     const button = await screen.findByRole('button', { name: 'ดึงประกาศลง' });
-    expect(screen.getByText('✓ ประกาศแล้ว')).toBeTruthy();
+    expect(screen.getByText('ประกาศแล้ว')).toBeTruthy(); // ไม่มี ✓ (ถอดอิโมจิทั้งระบบ 5 ต.ค. 2569)
     fetchJobReleases.mockResolvedValue([]);
     fireEvent.click(button);
     await waitFor(() => expect(unreleaseJobsFromPublic).toHaveBeenCalledWith([JOB_ID]));

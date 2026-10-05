@@ -101,7 +101,7 @@ export function extraRoundsNote(r: ExtraRoundsResult): string | null {
   if (r.isoTimes.length > 0) parts.push(`เพิ่ม ${r.isoTimes.length} สาย`);
   if (r.duplicateCount > 0) parts.push(`ตัดเวลาซ้ำ ${r.duplicateCount}`);
   if (r.invalidCount > 0) parts.push(`เวลาไม่ถูกต้อง ${r.invalidCount}`);
-  if (r.pastCount > 0) parts.push(`⚠️ ${r.pastCount} สายเป็นเวลาที่ผ่านมาแล้ว AI อาจไม่โทร`);
+  if (r.pastCount > 0) parts.push(`${r.pastCount} สายเป็นเวลาที่ผ่านมาแล้ว AI อาจไม่โทร`);
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 

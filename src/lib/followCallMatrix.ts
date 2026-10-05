@@ -80,7 +80,15 @@ export function followMatrixCol(
   dayVerdict: FollowCallCategory | null = null,
 ): Exclude<FollowMatrixCol, 'total'> {
   const round = { entry, state: followRoundState(entry, now), time: null, ymd: null, dayVerdict };
-  switch (callCategory(round)) {
+  return followMatrixColOfCategory(callCategory(round));
+}
+
+/**
+ * หมวดของสาย → กล่องบนแผง (ตัวเดียวกับ `followMatrixCol`) — ตารางรายวันใช้กรอง "ชื่อย้ายไปตามกล่อง"
+ * (เจ้าของสั่ง 5 ต.ค. 2569) ด้วยนิยามเดียวกับเลขบนกล่อง
+ */
+export function followMatrixColOfCategory(category: FollowCallCategory): Exclude<FollowMatrixCol, 'total'> {
+  switch (category) {
     case 'cancelled':
       return 'cancelled';
     case 'agreed':

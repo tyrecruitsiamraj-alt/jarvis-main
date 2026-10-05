@@ -74,7 +74,7 @@ describe('ดึงลงจากหน้าสาธารณะ — ปุ�
   const m127 = read('migrations/127_close_stale_match_retries_2569_09_29.sql');
 
   it('ป๊อปไล่งาน: ใบที่ปล่อยแล้วมีปุ่มดึงลงข้างป้ายเลย (ไม่ต้องไล่ไปขั้น 4) · ปุ่มเล็กแบบกล่องงาน · ปุ่มเดิมขั้น 4 ยังอยู่', () => {
-    const badge = popup.indexOf('✓ ประกาศแล้ว');
+    const badge = popup.indexOf('ประกาศแล้ว');
     const headerButton = popup.indexOf("'ดึงประกาศลง'");
     expect(badge).toBeGreaterThan(-1);
     expect(headerButton).toBeGreaterThan(badge);

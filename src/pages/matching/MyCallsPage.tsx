@@ -271,7 +271,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
       {/* PageHeader เดิมถูกถอด — ตอนนี้เป็น section บนหน้าหลัก ใช้หัวเรื่องบรรทัดเดียว */}
       <div className="border-b border-slate-200 pb-1 dark:border-slate-800">
         <h2 className={cn('text-base font-medium', DASH.cellStrong)}>
-          📞 {lane ? CALL_LANE_LABEL[lane] : 'โทรของฉัน'}
+          {lane ? CALL_LANE_LABEL[lane] : 'โทรของฉัน'}
         </h2>
         <p className={cn('text-xs', DASH.muted)}>
           {lane ? CALL_LANE_HINT[lane] : 'งานที่เก็บมาโทรเอง'} — เรียงให้แล้วว่าโทรใครก่อน ·
@@ -617,7 +617,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                           TONE.violet.solid,
                         )}
                       >
-                        {bookedIds[id] ? 'จองตัวแล้ว ✓' : 'จองตัวเลย'}
+                        {bookedIds[id] ? 'จองตัวแล้ว' : 'จองตัวเลย'}
                       </button>
                       {action.reason ? (
                         <span className={cn('text-[10px]', DASH.muted)}>{action.reason}</span>

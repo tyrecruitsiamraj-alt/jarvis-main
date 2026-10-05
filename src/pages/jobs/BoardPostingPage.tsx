@@ -469,7 +469,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                  สาธารณะต้องมีปุ่มให้ย้อนกลับมาได้"* → Choice "บนหัวป๊อป ข้างป้าย ปล่อยแล้ว") · ปุ่มเดิมในขั้น 4 ยังอยู่ */
               <div className="flex flex-wrap items-center gap-2">
                 <span className={cn('rounded-full border px-3 py-1 text-xs', TONE.success.soft, TONE.success.value)}>
-                  ✓ ประกาศแล้ว
+                  ประกาศแล้ว
                 </span>
                 <Button
                   type="button"

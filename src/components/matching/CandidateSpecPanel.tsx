@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import ToneDot from '@/components/shared/ToneDot';
 import { Sparkles, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import {
   type CandidateSpecAnalysis,
-  adjacentTierEmoji,
+  adjacentTierTone,
   compensationVerdictLabel,
   complianceVerdictLabel,
 } from '@/lib/candidateSpecTypes';
@@ -26,6 +27,13 @@ type Props = {
 function verdictClass(comp: CandidateSpecAnalysis['compensation_verdict']): string {
   const tone = TONE[comp === 'ok' ? 'success' : comp === 'fail' ? 'danger' : 'warn'];
   return cn(tone.soft, tone.value);
+}
+
+/** อิโมจิจาก AI (urgency_emoji/job_family_emoji) ไม่วาดบนจอแล้ว (5 ต.ค. 2569) — จุดสีจากระดับเร่งด่วนแทน */
+function urgencyTone(analysis: CandidateSpecAnalysis): 'danger' | 'success' | 'warn' {
+  if (analysis.urgency_level === 'high') return 'danger';
+  if (analysis.urgency_level === 'low') return 'success';
+  return 'warn';
 }
 
 function urgencyLabel(analysis: CandidateSpecAnalysis, long = false): string {
@@ -96,7 +104,7 @@ function FullAnalysisBody({ analysis }: { analysis: CandidateSpecAnalysis }) {
             {analysis.adjacent_positions.map((row) => (
               <div key={`${row.tier}-${row.title}`} className="text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">
-                  {adjacentTierEmoji(row.tier)} {row.title}
+                  <ToneDot tone={adjacentTierTone(row.tier)} /> {row.title}
                 </span>
                 {row.note ? ` — ${row.note}` : ''}
               </div>
@@ -111,7 +119,7 @@ function FullAnalysisBody({ analysis }: { analysis: CandidateSpecAnalysis }) {
           <div className="space-y-1">
             {analysis.excluded_positions.map((row) => (
               <div key={row.title} className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">✕ {row.title}</span>
+                <span className="font-medium text-foreground">{row.title}</span>
                 {row.reason ? ` — ${row.reason}` : ''}
               </div>
             ))}
@@ -213,10 +221,10 @@ export default function CandidateSpecPanel({
       <div className="rounded-xl border border-violet-200/70 bg-violet-50/40 px-3 py-2.5 space-y-1.5 dark:bg-violet-950/50 dark:border-violet-800">
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="outline" className="border-violet-200 bg-white text-violet-800 dark:bg-white/5 dark:border-violet-800 dark:text-violet-200">
-            {analysis.job_family_emoji} {analysis.job_family_label}
+            {analysis.job_family_label}
           </Badge>
           <Badge variant="outline" className="border-slate-200 bg-white text-slate-700 dark:bg-white/5 dark:border-slate-800 dark:text-slate-300">
-            {analysis.urgency_emoji} {urgencyLabel(analysis)}
+            <ToneDot tone={urgencyTone(analysis)} /> {urgencyLabel(analysis)}
           </Badge>
           <Badge variant="outline" className={verdictClass(analysis.compensation_verdict)}>
             {compensationVerdictLabel(analysis.compensation_verdict)}
@@ -245,10 +253,10 @@ export default function CandidateSpecPanel({
           </div>
           <div className="flex flex-wrap gap-1.5">
             <Badge variant="outline" className="border-violet-200 bg-white text-violet-800 dark:bg-white/5 dark:border-violet-800 dark:text-violet-200">
-              {analysis.job_family_emoji} {analysis.job_family_code}. {analysis.job_family_label}
+              {analysis.job_family_code}. {analysis.job_family_label}
             </Badge>
             <Badge variant="outline" className="border-slate-200 bg-white text-slate-700 dark:bg-white/5 dark:border-slate-800 dark:text-slate-300">
-              {analysis.urgency_emoji} {urgencyLabel(analysis, true)}
+              <ToneDot tone={urgencyTone(analysis)} /> {urgencyLabel(analysis, true)}
             </Badge>
             <Badge variant="outline" className={verdictClass(analysis.compensation_verdict)}>
               {compensationVerdictLabel(analysis.compensation_verdict)}

@@ -112,7 +112,7 @@ const DashboardLeadKindChart: React.FC<DashboardLeadKindChartProps> = ({
           </p>
         ) : (
           <p className={cn('mt-2 rounded-lg px-2.5 py-1.5 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
-            ⚠️ ตัวเลขไม่ตรงกัน: {mismatchNote}
+            ตัวเลขไม่ตรงกัน: {mismatchNote}
           </p>
         )
       ) : (

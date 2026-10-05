@@ -401,7 +401,7 @@ const RmTable: React.FC<{
                                     active ? 'ring-2 ring-ring' : 'opacity-75 hover:opacity-100',
                                   )}
                                 >
-                                  {k === 'showed' ? '✓ มาแล้ว' : '✗ ไม่มา'}
+                                  {k === 'showed' ? 'มาแล้ว' : 'ไม่มา'}
                                 </button>
                               );
                             })}
@@ -419,7 +419,7 @@ const RmTable: React.FC<{
                         */}
                       {r.dialed_last_at ? (
                         <span className="inline-flex flex-col gap-0.5">
-                          <span>📞 {formatDateTimeTh(r.dialed_last_at)}</span>
+                          <span>{formatDateTimeTh(r.dialed_last_at)}</span>
                           {(r.dial_count ?? 0) > 1 ? (
                             <span className="text-xs text-muted-foreground">
                               โทรไปแล้ว {r.dial_count} ครั้ง

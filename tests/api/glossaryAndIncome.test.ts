@@ -28,10 +28,10 @@ describe('พจนานุกรมศัพท์', () => {
   });
 
   it('คำที่มักเข้าใจผิดถูกยกมาเตือนใน tooltip', () => {
-    expect(glossaryHelp('lumos')).toContain('⚠');
-    expect(glossaryHelp('bu')).toContain('⚠');
+    expect(glossaryHelp('lumos')).toContain('ระวัง:');
+    expect(glossaryHelp('bu')).toContain('ระวัง:');
     // คำที่ไม่มี notThis ต้องไม่มีบรรทัดเตือนลอย ๆ
-    expect(glossaryHelp('scraping')).not.toContain('⚠');
+    expect(glossaryHelp('scraping')).not.toContain('ระวัง:');
   });
 
   it('ตัว <Term> อ่านคำอธิบายจากพจนานุกรม ไม่ได้พิมพ์เอง', () => {

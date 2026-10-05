@@ -146,7 +146,7 @@ export default function RecruitControlPanel() {
       <div className="space-y-1">
         {failed ? (
           <p className={cn('text-[11px]', DASH.muted)}>
-            ⚠️ โหมดสำรอง — อ่านตัวเลขแผงใหม่ไม่ได้ (แสดงแผงภาพรวมเดิมแทน)
+            โหมดสำรอง — อ่านตัวเลขแผงใหม่ไม่ได้ (แสดงแผงภาพรวมเดิมแทน)
           </p>
         ) : null}
         <RecruitFunnelPanel />
@@ -292,7 +292,7 @@ export default function RecruitControlPanel() {
       </div>
 
       {flags.length > 0 ? (
-        <p className={cn('text-xs', DASH.muted)}>{flags.map((f) => `⚠️ ${f.note}`).join(' · ')}</p>
+        <p className={cn('text-xs', DASH.muted)}>{flags.map((f) => f.note).join(' · ')}</p>
       ) : null}
     </div>
   );

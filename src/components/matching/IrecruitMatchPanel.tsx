@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ToneDot from '@/components/shared/ToneDot';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { Users, RefreshCw, Phone, MessageCircle, ChevronRight } from 'lucide-react';
@@ -7,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import {
   type IrecruitCandidateMatch,
   type IrecruitMatchResult,
-  matchTierEmoji,
+  matchTierTone,
   matchTierLabel,
 } from '@/lib/irecruitMatchTypes';
 
@@ -63,7 +64,7 @@ function CandidateDetailDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
-            {match ? matchTierEmoji(match.tier) : ''} {match?.full_name}
+            {match ? <ToneDot tone={matchTierTone(match.tier)} /> : null} {match?.full_name}
           </DialogTitle>
           <DialogDescription className="sr-only">รายละเอียดผู้สมัคร iRecruit</DialogDescription>
         </DialogHeader>
@@ -71,7 +72,7 @@ function CandidateDetailDialog({
           <div className="space-y-3">
             <div className="flex flex-wrap gap-1.5">
               <Badge variant="outline" className={TONE.neutral.outline}>
-                {matchTierEmoji(match.tier)} {matchTierLabel(match.tier)}
+                <ToneDot tone={matchTierTone(match.tier)} /> {matchTierLabel(match.tier)}
               </Badge>
               <Badge variant="outline" className={TONE.neutral.outline}>
                 สถานะ: {match.process_status_name}
@@ -231,7 +232,7 @@ export default function IrecruitMatchPanel({ loading, error, result, onMatch, on
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium text-foreground">
-                  {matchTierEmoji(m.tier)} {m.full_name}
+                  <ToneDot tone={matchTierTone(m.tier)} /> {m.full_name}
                 </span>
                 <span className="flex items-center gap-1">
                   <Badge variant="outline" className={cn('text-[10px]', TONE.neutral.outline)}>

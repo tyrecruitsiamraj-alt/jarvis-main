@@ -185,5 +185,5 @@ export function summarizeDispatchResults(
   const reasons = [...new Set(bad.map((s) => FOLLOW_DISPATCH_META[s as FollowDispatchState].label))];
   const retryable = bad.every((s) => FOLLOW_DISPATCH_META[s as FollowDispatchState].retryable);
   const scope = bad.length === states.length ? 'ทั้งหมด' : `${bad.length} จาก ${states.length} รายการ`;
-  return { text: `🔴 ${scope} ยังไม่ได้ส่งให้ AI โทร — ${reasons.join(' · ')}`, retryable };
+  return { text: `${scope} ยังไม่ได้ส่งให้ AI โทร — ${reasons.join(' · ')}`, retryable };
 }

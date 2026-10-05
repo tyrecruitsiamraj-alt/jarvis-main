@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Phone, MessageCircle, ArrowLeft, UserPlus, CheckCircle2 } from 'lucide-react';
 import type { IrecruitCandidateMatch } from '@/lib/irecruitMatchTypes';
-import { matchTierEmoji, matchTierLabel } from '@/lib/irecruitMatchTypes';
+import { matchTierTone, matchTierLabel } from '@/lib/irecruitMatchTypes';
+import ToneDot from '@/components/shared/ToneDot';
 import { proposalStatusLabel, type ProposalStatus } from '@/lib/candidateProposalsApi';
 import {
   describeScoreBreakdown,
@@ -52,12 +53,13 @@ const VERDICT_TONE: Record<CriterionVerdict, ToneKey> = {
 function VerdictChip({ label, verdict }: { label: string; verdict: CriterionVerdict }) {
   const tone = TONE[VERDICT_TONE[verdict] ?? 'neutral'];
   const meta = {
-    icon: verdict === 'pass' ? '✓' : verdict === 'fail' ? '✗' : '–',
+    icon: verdict === 'pass' ? '' : verdict === 'fail' ? '×' : '–',
     className: cn(tone.soft, tone.value),
   };
   return (
     <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', meta.className)}>
-      {label} {meta.icon}
+      {label}
+      {meta.icon ? ` ${meta.icon}` : ''}
     </span>
   );
 }
@@ -143,7 +145,7 @@ export default function ScoredCandidateCard({
         onClick={() => onPropose(match, 'reserved', buildWhy())}
         className="inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50 dark:bg-violet-950/50 dark:border-violet-800 dark:text-violet-300"
       >
-        {proposalBusy ? 'บันทึก…' : proposalStatus === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
+        {proposalBusy ? 'บันทึก…' : proposalStatus === 'reserved' ? 'จองตัวแล้ว' : 'จองตัว'}
       </button>
       <button
         type="button"
@@ -151,7 +153,7 @@ export default function ScoredCandidateCard({
         onClick={() => onPropose(match, 'placed', buildWhy())}
         className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-emerald-700 disabled:opacity-50 dark:border-emerald-800"
       >
-        {proposalBusy ? 'บันทึก…' : proposalStatus === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
+        {proposalBusy ? 'บันทึก…' : proposalStatus === 'placed' ? 'ลงงานแล้ว' : 'ลงงานแล้ว'}
       </button>
     </div>
   ) : null;
@@ -172,7 +174,7 @@ export default function ScoredCandidateCard({
         </div>
 
         <p className="text-sm font-medium text-foreground">
-          {matchTierEmoji(match.tier)} {match.full_name}
+          <ToneDot tone={matchTierTone(match.tier)} /> {match.full_name}
         </p>
 
         <div className="rounded-md border border-white/70 bg-white/70 px-2.5 py-2 space-y-1.5 dark:bg-white/5 dark:border-white/10">
@@ -228,7 +230,7 @@ export default function ScoredCandidateCard({
     <div className="rounded-lg border border-white/70 bg-white/70 px-2.5 py-2 space-y-1.5 dark:bg-white/5 dark:border-white/10">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
-          {matchTierEmoji(match.tier)} {match.full_name}
+          <ToneDot tone={matchTierTone(match.tier)} /> {match.full_name}
           {proposalStatus ? (
             <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 align-middle text-[10px] font-medium text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300">
               <CheckCircle2 className="h-2.5 w-2.5" /> {proposalStatusLabel(proposalStatus)}

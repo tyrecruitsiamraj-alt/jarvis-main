@@ -147,6 +147,7 @@ describe('หน้าการติดตาม: หัวการ์ด Call
 
   it('🔴 สลับแท็บทีม = ตัวกรองกลับค่าเริ่มต้น (กัน "ดูเฉพาะ" ค้างตอนแท็บว่างหุบหัวการ์ด)', () => {
     // "งานจบหรือยัง" ถูกถอด 3 ต.ค. 2569 — เหลือรีเซ็ตรอบ + ใครโทร (ลิสต์ยืนที่กำลังตามเสมอ)
-    expect(page).toMatch(/if \(filterScope !== replaceView\) \{\s*setFilterScope\(replaceView\);\s*setActiveRound\('all'\);\s*setCaller\('all'\);/);
+    // + กล่องผลที่เลือก (5 ต.ค. 2569 "ชื่อย้ายไปตามกล่อง") ก็กลับเป็นทุกคน
+    expect(page).toMatch(/if \(filterScope !== replaceView\) \{\s*setFilterScope\(replaceView\);\s*setActiveRound\('all'\);\s*setResultBox\(null\);\s*setCaller\('all'\);/);
   });
 });

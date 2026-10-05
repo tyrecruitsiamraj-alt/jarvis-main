@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
-import { CalendarDays, ChevronDown, ChevronRight, RefreshCw, RotateCcw } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronRight, RefreshCw, RotateCcw, X } from 'lucide-react';
 import FilterChips from '@/components/shared/FilterChips';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -1056,7 +1056,7 @@ const RmWorkspace: React.FC<{
                     มุมมองนี้รวมทุกแท็บ/ทุกสถานะ
                   </span>
                   <Button variant="ghost" size="sm" type="button" onClick={clearBucket} className="shrink-0">
-                    ✕ ล้าง
+                    <X aria-hidden /> ล้าง
                   </Button>
                 </div>
               ) : null}

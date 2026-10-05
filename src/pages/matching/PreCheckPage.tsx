@@ -6,7 +6,7 @@ import { useUrlDialogHistory } from '@/hooks/useUrlDialogHistory';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import { MapPin, ClipboardCheck, Navigation, Users } from 'lucide-react';
+import { MapPin, ClipboardCheck, Navigation, Users, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { JOB_URGENCY_TONE } from '@/lib/jobUrgency';
@@ -1034,7 +1034,7 @@ const PreCheckPage: React.FC = () => {
                           </p>
                         ) : null}
                         {jobDetail.location_address ? (
-                          <p className="text-xs text-muted-foreground">📍 {jobDetail.location_address}</p>
+                          <p className="text-xs text-muted-foreground">{jobDetail.location_address}</p>
                         ) : null}
                         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                           <span className={cn('rounded-full border px-2 py-0.5 text-[11px]', TONE.neutral.outline)}>
@@ -1160,7 +1160,7 @@ const PreCheckPage: React.FC = () => {
                                     onClick={() => setEditBranches((prev) => prev.filter((_, xi) => xi !== i))}
                                     className="rounded-full border border-red-200 bg-white px-2 py-1 text-[11px] text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/50"
                                   >
-                                    ✕
+                                    <X className="h-3 w-3" aria-label="ลบ" />
                                   </button>
                                 </div>
                               ))}

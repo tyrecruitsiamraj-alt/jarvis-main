@@ -279,7 +279,7 @@ const LumosCallRatePanel: React.FC = () => {
     else if (trend?.volumeDir === 'down') parts.push('ปริมาณลดลง');
     // งานค้างต้องโผล่บนหัวแผงด้วย — หุบแผงอยู่ก็ต้องเห็นว่ามีของค้าง (ห้ามเงียบ)
     const stuckTotal = stuck ? stuck.notDelivered + stuck.deliveredSilent : 0;
-    if (stuckTotal > 0) parts.push(`🚩 ค้างไม่มีผลกลับ ${fmtN(stuckTotal)} สาย`);
+    if (stuckTotal > 0) parts.push(`ค้างไม่มีผลกลับ ${fmtN(stuckTotal)} สาย`);
     return `${parts.join(' · ')} — กดเพื่อดู`;
   })();
 

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import ToneDot from '@/components/shared/ToneDot';
 import { Button } from '@/components/ui/button';
 import { unitOneLine } from '@/lib/unitDisplay';
 import { conveyorLabel } from '@/lib/soRecruitNav';
@@ -119,7 +120,7 @@ import { JOB_FAMILIES, classifyJobFamily, candidateMatchesFamily, fallbackKeywor
 import {
   type IrecruitCandidateMatch,
   type IrecruitMatchResult,
-  matchTierEmoji,
+  matchTierTone,
   matchTierLabel,
 } from '@/lib/irecruitMatchTypes';
 import {
@@ -455,7 +456,7 @@ function suggestedProposalReason(status: ProposalStatus, aiReason?: string | nul
 
 /** ผลเช็คคุณสมบัติรายข้อ — โทนกลาง: ผ่าน=เขียว · ต้องดู=เหลือง · ไม่ผ่าน=แดง · ไม่รู้=เทา */
 const CHECK_META: Record<CheckVerdict, { icon: string; tone: ToneKey }> = {
-  pass: { icon: '✓', tone: 'success' },
+  pass: { icon: '', tone: 'success' },
   warn: { icon: '!', tone: 'warn' },
   fail: { icon: '×', tone: 'danger' },
   unknown: { icon: '?', tone: 'neutral' },
@@ -465,7 +466,8 @@ function CheckChip({ label, verdict }: { label: string; verdict: CheckVerdict })
   const meta = CHECK_META[verdict];
   return (
     <span className={TONE[meta.tone].chip}>
-      {label} {meta.icon}
+      {label}
+      {meta.icon ? ` ${meta.icon}` : ''}
     </span>
   );
 }
@@ -485,15 +487,16 @@ function LumosUrgentBadge({ nextAction }: { nextAction: LumosNextAction | null |
       title={nextAction.reason || 'AI แนะนำให้โทรกลับหาคนนี้ด่วน'}
       className="inline-flex items-center gap-0.5 rounded-full border border-red-300 bg-red-50 px-1.5 py-0.5 text-[9px] font-medium text-red-700 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300"
     >
-      📞 โทรกลับด่วน
+      โทรกลับด่วน
     </span>
   );
 }
 
-function boardTierMeta(tier: BoardCandidateMatch['tier']): { icon: string; label: string; tone: ToneKey } {
-  if (tier === 'green') return { icon: '🟢', label: 'ลงได้ทันที', tone: 'success' };
-  if (tier === 'red') return { icon: '🔴', label: 'ห่างไกล', tone: 'danger' };
-  return { icon: '🟡', label: 'พอได้ ต้องเช็ค', tone: 'warn' };
+function boardTierMeta(tier: BoardCandidateMatch['tier']): { label: string; tone: ToneKey } {
+  // อิโมจิวงกลมสีถอดทั้งระบบ (5 ต.ค. 2569) — จุดสีวาดด้วย ToneDot จาก tone
+  if (tier === 'green') return { label: 'ลงได้ทันที', tone: 'success' };
+  if (tier === 'red') return { label: 'ห่างไกล', tone: 'danger' };
+  return { label: 'พอได้ ต้องเช็ค', tone: 'warn' };
 }
 
 /** ข้อความตำแหน่งจากใบขอ (รวม job description + staff title) สำหรับ classify family */
@@ -1262,7 +1265,7 @@ const MatchingPage: React.FC = () => {
         );
       }
       if (extraQueued > 0) parts.push(`ส่งไปงานอื่นที่เลือกไว้อีก ${extraQueued} รายการ`);
-      if (extraFailed.length > 0) parts.push(`⚠️ ส่งไปงาน ${extraFailed.join(', ')} ไม่สำเร็จ`);
+      if (extraFailed.length > 0) parts.push(`ส่งไปงาน ${extraFailed.join(', ')} ไม่สำเร็จ`);
       setLumosNotice(parts.join(' · '));
     } catch (e) {
       setLumosError(e instanceof Error ? e.message : 'ส่ง AI โทรไม่สำเร็จ');
@@ -2712,7 +2715,7 @@ const MatchingPage: React.FC = () => {
                             title={inc?.hint ?? undefined}
                           >
                             {inc ? inc.text : '— บาท'}
-                            {inc?.period === 'unknown' ? ' ⚠' : ''} · ต้องการ{' '}
+                            {' · '}ต้องการ{' '}
                             {formatYmdDmyBe(j.required_date)}
                           </span>
                         );
@@ -2886,7 +2889,7 @@ const MatchingPage: React.FC = () => {
                       .join(' · ')}
                   </p>
                 ) : null}
-                <div className="text-[11px] text-muted-foreground">📍 {jobDetail.location_address}</div>
+                <div className="text-[11px] text-muted-foreground">{jobDetail.location_address}</div>
                 <div className="flex flex-wrap gap-1.5">
                   <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     เพศ: {jobDetail.gender_requirement || 'ไม่ระบุ'}
@@ -3293,7 +3296,7 @@ const MatchingPage: React.FC = () => {
                                   aria-label={`เกณฑ์สี ${TIER_CRITERIA[m.tier].label}`}
                                   className="cursor-help rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 >
-                                  {meta.icon}
+                                  <ToneDot tone={meta.tone} />
                                 </span>
                               </TierCriteriaTooltip>{' '}
                               {m.full_name}
@@ -3438,7 +3441,7 @@ const MatchingPage: React.FC = () => {
                         {heldByOther || heldByMe ? (
                           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                             <span className={TONE.neutral.chip}>
-                              🔒 {heldByMe ? 'คุณ' : heldByOther?.heldByName || 'เจ้าหน้าที่อีกคน'}
+                              {heldByMe ? 'คุณ' : heldByOther?.heldByName || 'เจ้าหน้าที่อีกคน'}
                               {' '}รับไปตามอยู่ · AI จะไม่โทรทับ
                             </span>
                           </div>
@@ -3508,7 +3511,7 @@ const MatchingPage: React.FC = () => {
                   </div>
                   {irSendNotice[jobDetail.id] ? (
                     <p className="mt-1 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] text-primary">
-                      🤖 {irSendNotice[jobDetail.id]}
+                      {irSendNotice[jobDetail.id]}
                     </p>
                   ) : null}
 
@@ -3598,7 +3601,7 @@ const MatchingPage: React.FC = () => {
                                         aria-label={`เกณฑ์สี ${TIER_CRITERIA[m.tier].label}`}
                                         className="cursor-help rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                       >
-                                        {matchTierEmoji(m.tier)}
+                                        <ToneDot tone={matchTierTone(m.tier)} />
                                       </span>
                                     </TierCriteriaTooltip>{' '}
                                     {m.full_name}{' '}
@@ -4146,7 +4149,7 @@ const MatchingPage: React.FC = () => {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-foreground">
-              {candDetail ? boardTierMeta(candDetail.tier).icon : ''} {candDetail?.full_name}
+              {candDetail ? <ToneDot tone={boardTierMeta(candDetail.tier).tone} /> : null} {candDetail?.full_name}
               {candDetail?.nick_name ? ` (${candDetail.nick_name})` : ''}
             </DialogTitle>
             <DialogDescription className="sr-only">รายละเอียดพนักงานของเราและเหตุผลที่ AI เลือก</DialogDescription>
@@ -4280,7 +4283,7 @@ const MatchingPage: React.FC = () => {
                           className={proposalActionButtonClass('contacted', current?.status)}
                         >
                           <PhoneCall className="h-3.5 w-3.5" />
-                          {busy ? 'กำลังบันทึก…' : current?.status === 'contacted' ? 'ติดต่อแล้ว ✓' : 'ติดต่อแล้ว'}
+                          {busy ? 'กำลังบันทึก…' : current?.status === 'contacted' ? 'ติดต่อแล้ว' : 'ติดต่อแล้ว'}
                         </button>
                         <button
                           type="button"
@@ -4289,7 +4292,7 @@ const MatchingPage: React.FC = () => {
                           className={proposalActionButtonClass('reserved', current?.status)}
                         >
                           <UserCheck className="h-3.5 w-3.5" />
-                          {busy ? 'กำลังบันทึก…' : current?.status === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
+                          {busy ? 'กำลังบันทึก…' : current?.status === 'reserved' ? 'จองตัวแล้ว' : 'จองตัว'}
                         </button>
                         <button
                           type="button"
@@ -4298,7 +4301,7 @@ const MatchingPage: React.FC = () => {
                           className={proposalActionButtonClass('placed', current?.status)}
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />
-                          {busy ? 'กำลังบันทึก…' : current?.status === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
+                          {busy ? 'กำลังบันทึก…' : current?.status === 'placed' ? 'ลงงานแล้ว' : 'ลงงานแล้ว'}
                         </button>
                         <button
                           type="button"
@@ -4307,7 +4310,7 @@ const MatchingPage: React.FC = () => {
                           className={proposalActionButtonClass('rejected', current?.status)}
                         >
                           <UserX className="h-3.5 w-3.5" />
-                          {current?.status === 'rejected' ? 'ไม่ผ่าน ✓' : 'ไม่ผ่าน'}
+                          {current?.status === 'rejected' ? 'ไม่ผ่าน' : 'ไม่ผ่าน'}
                         </button>
                         {current && isActiveWorkflowStatus(current.status) ? (
                           <button

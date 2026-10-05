@@ -22,7 +22,7 @@ import type { JobRequest } from '@/types';
 
 /** ผลเช็คคุณสมบัติรายข้อ — โทนกลาง: ผ่าน=เขียว · ต้องดู=เหลือง · ไม่ผ่าน=แดง · ไม่รู้=เทา */
 const CHECK_META: Record<CheckVerdict, { icon: string; tone: ToneKey }> = {
-  pass: { icon: '✓', tone: 'success' },
+  pass: { icon: '', tone: 'success' },
   warn: { icon: '!', tone: 'warn' },
   fail: { icon: '×', tone: 'danger' },
   unknown: { icon: '?', tone: 'neutral' },
@@ -37,7 +37,8 @@ export function CheckChip({ label, verdict }: { label: string; verdict: CheckVer
   const meta = CHECK_META[verdict];
   return (
     <span className={TONE[meta.tone].chip}>
-      {label} {meta.icon}
+      {label}
+      {meta.icon ? ` ${meta.icon}` : ''}
     </span>
   );
 }

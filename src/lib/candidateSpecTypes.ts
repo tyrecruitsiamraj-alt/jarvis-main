@@ -33,8 +33,9 @@ export function complianceVerdictLabel(v: CandidateSpecAnalysis['compliance_verd
   return 'Compliance ระวัง';
 }
 
-export function adjacentTierEmoji(tier: 'green' | 'yellow' | 'red'): string {
-  if (tier === 'green') return '🟢';
-  if (tier === 'red') return '🔴';
-  return '🟡';
+/** สีของระดับ (แทนอิโมจิวงกลมสี · ถอดทั้งระบบ 5 ต.ค. 2569) — วาดด้วย `ToneDot` */
+export function adjacentTierTone(tier: 'green' | 'yellow' | 'red'): 'success' | 'danger' | 'warn' {
+  if (tier === 'green') return 'success';
+  if (tier === 'red') return 'danger';
+  return 'warn';
 }

@@ -99,10 +99,10 @@ export function recruitLanePoolSummary(result: {
     parts.push(ok.map((s) => `${s.label} ${s.loaded.toLocaleString('th-TH')}`).join(' · '));
   }
   const failed = result.sources.filter((s) => s.error);
-  if (failed.length > 0) parts.push(`⚠️ อ่านไม่ได้: ${failed.map((s) => s.label).join(' · ')}`);
+  if (failed.length > 0) parts.push(`อ่านไม่ได้: ${failed.map((s) => s.label).join(' · ')}`);
   if (result.duplicates_dropped > 0) parts.push(`ตัดคนซ้ำข้ามแหล่ง ${result.duplicates_dropped}`);
   if (result.on_board_dropped > 0) parts.push(`ได้ใบสมัครแล้ว ${result.on_board_dropped} (ไปเลนคัดสรร)`);
-  if (result.board_check_unavailable) parts.push('⚠️ เช็คบอร์ด ERP ไม่ได้ — อาจมีคนที่ได้ใบสมัครแล้วปนอยู่');
+  if (result.board_check_unavailable) parts.push('เช็คบอร์ด ERP ไม่ได้ — อาจมีคนที่ได้ใบสมัครแล้วปนอยู่');
   return parts.join(' · ');
 }
 
@@ -174,7 +174,7 @@ export function selectionRecallPoolSummary(r: {
   pool_unavailable: boolean;
   duplicates_dropped: number;
 }): string {
-  if (r.pool_unavailable) return '⚠️ อ่านกองคนที่เคยปฏิเสธไม่ได้ — ลองใหม่อีกครั้ง';
+  if (r.pool_unavailable) return 'อ่านกองคนที่เคยปฏิเสธไม่ได้ — ลองใหม่อีกครั้ง';
   if (r.pool_size === 0) return 'ยังไม่มีใครในกอง "เคยตอบไม่สนใจงานอื่น"';
   const parts = [`ค้นจากกอง ${r.pool_size.toLocaleString('th-TH')} คนที่เคยตอบไม่สนใจงานอื่น`];
   if (r.duplicates_dropped > 0) parts.push(`ตัดคนซ้ำ ${r.duplicates_dropped}`);

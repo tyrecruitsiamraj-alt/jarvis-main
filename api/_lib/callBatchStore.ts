@@ -150,7 +150,7 @@ export async function createCallBatch(input: CreateBatchInput): Promise<CallBatc
   if (status === 'pending_approval') {
     await notifyRoles(['admin', 'supervisor'], {
       type: 'batch_pending',
-      title: `📋 ชุดส่งงานโทรรออนุมัติ — ${input.items.length.toLocaleString('th-TH')} คน`,
+      title: `ชุดส่งงานโทรรออนุมัติ — ${input.items.length.toLocaleString('th-TH')} คน`,
       body: `ใบขอ ${input.requestNo || input.jobId} · สร้างโดย ${input.createdByName || 'ระบบ'}`,
       // หน้างานโทรถูกปิด 10 ส.ค. 2569 — แผงอนุมัติย้ายไปอยู่หน้าหลักแล้ว
       link: '/',

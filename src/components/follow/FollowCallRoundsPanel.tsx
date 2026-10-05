@@ -165,6 +165,8 @@ export default function FollowCallRoundsPanel({
   onRoundChange,
   embedded = false,
   onOpenPerson,
+  resultBox = null,
+  onResultBoxChange,
 }: {
   /**
    * ปุ่มเสริมข้างไอคอนปฏิทิน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-5: ปุ่ม "เพิ่มเรื่อง" /
@@ -196,6 +198,12 @@ export default function FollowCallRoundsPanel({
   embedded?: boolean;
   /** กด "จัดการ" ในป๊อปรายชื่อ = ปิดป๊อปนี้แล้วเปิดป๊อปจัดการของคนนั้น (หน้าแม่เป็นเจ้าของ) */
   onOpenPerson?: (entry: FollowEntry) => void;
+  /**
+   * 🔴 "ชื่อย้ายไปตามกล่อง" (เจ้าของสั่ง 5 ต.ค. 2569) — ส่งมา = กดกล่องผล (ตอบว่าไป/ไม่ไป/สรุปไม่ได้/รอโทร/ยกเลิก)
+   * แล้วตารางข้างล่างเหลือคนในกล่องนั้น · กดซ้ำหรือกด "ทั้งหมด" = เห็นทุกคน · ไม่ส่ง = กดแล้วเปิดป๊อปรายชื่อแบบเดิม
+   */
+  resultBox?: FollowMatrixCol | null;
+  onResultBoxChange?: (box: FollowMatrixCol | null) => void;
 }) {
   /** โฉมใหม่อยู่ไหม — เปลี่ยนแค่คลาสสี/ระยะ โครง JSX และข้อมูลเส้นเดียวกันทั้งสองโฉม */
   const v2 = useUiV2();
@@ -412,13 +420,23 @@ export default function FollowCallRoundsPanel({
               <div className="grid grid-cols-4 gap-x-2 gap-y-4 md:grid-cols-8">
                 {FOLLOW_MATRIX_COLS.map((c) => {
                   const n = row[c].length;
+                  /** กล่องที่เลือกอยู่ — "ทั้งหมด" = ไม่ได้เลือกกล่องไหน */
+                  const selected = onResultBoxChange ? (c === 'total' ? resultBox === null : resultBox === c) : false;
                   return (
                     <button
                       key={c}
                       type="button"
-                      disabled={n === 0}
-                      onClick={() => openMatrixDialog(activeRound, c)}
-                      className="flex flex-col items-start rounded-lg py-1 text-left transition-opacity hover:opacity-80 disabled:cursor-default disabled:hover:opacity-100"
+                      disabled={n === 0 && !selected}
+                      aria-pressed={onResultBoxChange ? selected : undefined}
+                      data-testid={`result-box-${c}`}
+                      onClick={() => {
+                        if (!onResultBoxChange) return openMatrixDialog(activeRound, c);
+                        onResultBoxChange(c === 'total' || resultBox === c ? null : c);
+                      }}
+                      className={cn(
+                        'flex flex-col items-start rounded-lg px-2 py-1 text-left transition-colors hover:bg-muted/60 disabled:cursor-default disabled:hover:bg-transparent',
+                        selected && 'bg-muted ring-1 ring-border',
+                      )}
                     >
                       <span
                         className={cn(

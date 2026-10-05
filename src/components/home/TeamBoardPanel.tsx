@@ -293,7 +293,7 @@ const TeamColumn: React.FC<{
       ) : (
         head
       )}
-      {stuck ? <p className={cn('mt-0.5 text-xs', T.danger)}>⚠ {stuck}</p> : null}
+      {stuck ? <p className={cn('mt-0.5 text-xs', T.danger)}>{stuck}</p> : null}
       {error ? (
         /* Error ไม่เงียบ — ทีมวัดไม่ได้ต้องบอกตรง ๆ ห้ามโชว์ 0 ปลอม */
         <p className={cn('mt-2 text-xs', T.warn)}>วัดไม่ได้ — {error}</p>

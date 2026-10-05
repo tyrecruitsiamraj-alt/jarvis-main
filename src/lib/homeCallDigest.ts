@@ -34,11 +34,11 @@ export type CallBoxKey = keyof FlowCallBoxes;
  * ย้ายมาจาก `HomePage.tsx` (7 ก.ย. 2569) เพื่อให้บอร์ดทีมกับป๊อปอ่านชุดเดียวกัน
  */
 export const FOLLOW_UP_TONE = {
-  good: { tone: 'success', dot: '🟢', hint: 'สนใจงาน — พร้อมให้จอง' },
-  warn: { tone: 'warn', dot: '🟡', hint: 'ไม่สะดวก — รอ AI โทรซ้ำตามนัด' },
-  act: { tone: 'orange', dot: '🟠', hint: 'ไม่สะดวก — ต้องคนเร่งจัดการ' },
-  bad: { tone: 'danger', dot: '🔴', hint: 'ไม่สนใจงาน' },
-} as const satisfies Record<string, { tone: ToneKey; dot: string; hint: string }>;
+  good: { tone: 'success', hint: 'สนใจงาน — พร้อมให้จอง' },
+  warn: { tone: 'warn', hint: 'ไม่สะดวก — รอ AI โทรซ้ำตามนัด' },
+  act: { tone: 'orange', hint: 'ไม่สะดวก — ต้องคนเร่งจัดการ' },
+  bad: { tone: 'danger', hint: 'ไม่สนใจงาน' },
+} as const satisfies Record<string, { tone: ToneKey; hint: string }>;
 
 export type FollowUpTone = keyof typeof FOLLOW_UP_TONE;
 

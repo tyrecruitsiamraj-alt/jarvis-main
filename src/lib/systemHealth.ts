@@ -178,14 +178,14 @@ export function healthAlertFor(
   if (bad && !wasBad) {
     return {
       kind: 'down',
-      title: `🚨 ${check.label} ผิดปกติ`,
+      title: `${check.label} ผิดปกติ`,
       body: `${check.value} · ${check.hint}`,
     };
   }
   if (!bad && wasBad) {
     return {
       kind: 'recovered',
-      title: `✅ ${check.label} กลับมาปกติแล้ว`,
+      title: `${check.label} กลับมาปกติแล้ว`,
       body: `${check.value}`,
     };
   }

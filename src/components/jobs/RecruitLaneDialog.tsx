@@ -137,7 +137,7 @@ const RecruitLaneDialog: React.FC<RecruitLaneDialogProps> = ({ open, job, onClos
           <div className="space-y-3">
             {result.dispatch ? (
               <p className="rounded-xl bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
-                🤖 {recruitLaneSendSummary(result.dispatch)}
+                {recruitLaneSendSummary(result.dispatch)}
               </p>
             ) : null}
             <p className="text-[11px] text-muted-foreground">{recruitLanePoolSummary(result)}</p>

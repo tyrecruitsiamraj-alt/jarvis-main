@@ -1879,7 +1879,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       * ⚠️ รอ `postingsReady` ก่อน ไม่งั้นแวบแรกไม่มีใบไหนติดเขียวเลย
                       */}
                     {postingsReady && postedJobIds.has(job.id) ? (
-                      <span className={cn('self-start', TONE.success.chip)}>✓ สร้างลิงก์แล้ว</span>
+                      <span className={cn('self-start', TONE.success.chip)}>สร้างลิงก์แล้ว</span>
                     ) : null}
                     {/* ยอดคลิกบนหน้าสมัครสาธารณะ 30 วัน — ขึ้นเฉพาะใบที่มีคนกดจริง
                         (ใบที่ยังไม่มีใครกดไม่ต้องขึ้นชิป 0 · ชิปที่ขึ้นทุกใบไม่ใช่สัญญาณ) */}

@@ -234,7 +234,7 @@ export const BoardPublishSheet: React.FC<BoardPublishSheetProps> = ({ id, onDone
             <div className="flex flex-wrap items-center gap-2" data-testid="publish-status">
               {released ? (
                 <>
-                  <span className={cn('rounded-full border px-3 py-1 text-xs', TONE.success.soft, TONE.success.value)}>✓ ประกาศแล้ว</span>
+                  <span className={cn('rounded-full border px-3 py-1 text-xs', TONE.success.soft, TONE.success.value)}>ประกาศแล้ว</span>
                   <Button type="button" size="xs" variant="outline" disabled={busy || !job} onClick={() => void toggleRelease(false)}>
                     {busy ? 'กำลังบันทึก…' : 'ดึงประกาศลง'}
                   </Button>

@@ -124,21 +124,21 @@ export async function cancelLumosCall(input: {
 export type LumosCallBadge = { label: string; cls: string; tone: 'idle' | 'sent' | 'good' | 'bad' | 'off' };
 
 const OUTCOME_BADGE: Record<string, LumosCallBadge> = {
-  confirmed: { label: '✅ สนใจงาน', cls: 'border-emerald-300 bg-emerald-100 text-emerald-800', tone: 'good' },
-  acknowledged: { label: '📗 รับทราบแล้ว', cls: 'border-sky-300 bg-sky-100 text-sky-800', tone: 'sent' },
-  completed: { label: '📗 คุยจบแล้ว', cls: 'border-sky-300 bg-sky-100 text-sky-800', tone: 'sent' },
-  declined: { label: '❌ ปฏิเสธ', cls: 'border-red-300 bg-red-100 text-red-800', tone: 'bad' },
-  no_answer: { label: '📵 ไม่รับสาย', cls: 'border-amber-300 bg-amber-100 text-amber-800', tone: 'bad' },
-  unresponsive: { label: '📵 ไม่รับสาย', cls: 'border-amber-300 bg-amber-100 text-amber-800', tone: 'bad' },
-  cancelled: { label: '⚠️ AI ยกเลิกสาย', cls: 'border-slate-300 bg-slate-100 text-slate-700', tone: 'off' },
+  confirmed: { label: 'สนใจงาน', cls: 'border-emerald-300 bg-emerald-100 text-emerald-800', tone: 'good' },
+  acknowledged: { label: 'รับทราบแล้ว', cls: 'border-sky-300 bg-sky-100 text-sky-800', tone: 'sent' },
+  completed: { label: 'คุยจบแล้ว', cls: 'border-sky-300 bg-sky-100 text-sky-800', tone: 'sent' },
+  declined: { label: 'ปฏิเสธ', cls: 'border-red-300 bg-red-100 text-red-800', tone: 'bad' },
+  no_answer: { label: 'ไม่รับสาย', cls: 'border-amber-300 bg-amber-100 text-amber-800', tone: 'bad' },
+  unresponsive: { label: 'ไม่รับสาย', cls: 'border-amber-300 bg-amber-100 text-amber-800', tone: 'bad' },
+  cancelled: { label: 'AI ยกเลิกสาย', cls: 'border-slate-300 bg-slate-100 text-slate-700', tone: 'off' },
 };
 
 const STATUS_BADGE: Record<LumosQueueStatus, LumosCallBadge> = {
-  pending: { label: '⏳ รอ AI โทร', cls: 'border-slate-300 bg-slate-100 text-slate-700', tone: 'idle' },
-  delivered: { label: '📞 AI รับไปโทรแล้ว', cls: 'border-blue-300 bg-blue-100 text-blue-800', tone: 'sent' },
-  completed: { label: '📗 โทรจบแล้ว', cls: 'border-sky-300 bg-sky-100 text-sky-800', tone: 'sent' },
-  failed: { label: '⚠️ โทรไม่สำเร็จ', cls: 'border-red-300 bg-red-50 text-red-700', tone: 'bad' },
-  cancelled: { label: '⛔ ยกเลิกแล้ว', cls: 'border-slate-300 bg-slate-50 text-slate-500', tone: 'off' },
+  pending: { label: 'รอ AI โทร', cls: 'border-slate-300 bg-slate-100 text-slate-700', tone: 'idle' },
+  delivered: { label: 'AI รับไปโทรแล้ว', cls: 'border-blue-300 bg-blue-100 text-blue-800', tone: 'sent' },
+  completed: { label: 'โทรจบแล้ว', cls: 'border-sky-300 bg-sky-100 text-sky-800', tone: 'sent' },
+  failed: { label: 'โทรไม่สำเร็จ', cls: 'border-red-300 bg-red-50 text-red-700', tone: 'bad' },
+  cancelled: { label: 'ยกเลิกแล้ว', cls: 'border-slate-300 bg-slate-50 text-slate-500', tone: 'off' },
 };
 
 /** ผลการโทรมาก่อนสถานะคิว — outcome บอกเรื่องได้ตรงกว่า 'completed' */

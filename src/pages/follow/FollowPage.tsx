@@ -59,6 +59,7 @@ import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplica
 import { followGroupKey, groupFollowEntries } from '@/lib/followGrouping';
 import { followScopeEntries, followTeamForScope } from '@/lib/followReplacement';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
+import { followMatrixColOfCategory, type FollowMatrixCol } from '@/lib/followCallMatrix';
 import {
   filterFollowEntries,
   FOLLOW_ADDER_NONE,
@@ -108,7 +109,7 @@ import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
 import DateTimeField24 from '@/components/shared/DateTimeField24';
 import { type FollowOutcome } from '@/lib/followOutcome';
-import { buildFollowPlanningRows, type FollowRoundFilter } from '@/lib/followPlanning';
+import { buildFollowPlanningRows, callCategory, type FollowPlanningRound, type FollowRoundFilter } from '@/lib/followPlanning';
 import { toYmdBangkok, formatYmdDmyBe } from '@/lib/dateTh';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
 import {
@@ -203,6 +204,11 @@ const FollowPage: React.FC = () => {
    * *"ทำไมมีสองที่พูดเรื่องเดียวกัน"* · ค่าเริ่มต้น "ทุกสาย" = เปิดมาเห็นงานครบก่อน
    */
   const [activeRound, setActiveRound] = useState<FollowRoundFilter>('all');
+  /**
+   * กล่องผลที่เลือกบนแผงขั้นตอนของสาย — ตารางเหลือคนในกล่องนั้น ("ชื่อย้ายไปตามกล่อง" · เจ้าของสั่ง 5 ต.ค. 2569)
+   * null = ทุกคน · นิยามกล่อง = `followMatrixColOfCategory(callCategory(...))` ตัวเดียวกับเลขบนกล่อง
+   */
+  const [resultBox, setResultBox] = useState<FollowMatrixCol | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
   const [prefix, setPrefix] = useState('');
@@ -442,6 +448,7 @@ const FollowPage: React.FC = () => {
   if (filterScope !== replaceView) {
     setFilterScope(replaceView);
     setActiveRound('all');
+    setResultBox(null);
     setCaller('all');
     // เจ้าของงาน: "ของฉัน" ติดข้ามแท็บได้ (ความหมายเดิม) · เลือกอีเมลคนอื่นไว้ = กลับทุกคน (อีกแท็บอาจไม่มีชื่อนั้น)
     if (adderFilter !== 'me') setAdderFilter('all');
@@ -1262,6 +1269,23 @@ const FollowPage: React.FC = () => {
    * ถ้าไปเรียงในตาราง (หลังแบ่งหน้า) ลำดับจะถูกแค่ภายในหน้านั้น หน้า 2 มีของด่วนกว่าซ่อนอยู่
    */
   const planningRowsAllRounds = useMemo(() => buildFollowPlanningRows(groups), [groups]);
+  /**
+   * ตารางหลังกดกล่องผล — เหลือคนที่มีสายในช่วงที่ดู (วัน/เดือน) อยู่ในกล่องนั้น
+   * นับสายแบบเดียวกับแผง: มีเลขสาย · ตรงสายที่เลือก · หมวดผลรวมผลที่คนกดจัดการแล้ว (`dayVerdict`)
+   */
+  const calendarRows = useMemo(() => {
+    if (!resultBox) return planningRowsAllRounds;
+    const inBox = (r: FollowPlanningRound) => {
+      if (!r.ymd || (panelRange === 'month' ? r.ymd.slice(0, 7) !== calMonth : r.ymd !== panelDay)) return false;
+      const slot = followRoundSlot(r.entry);
+      if (slot === null || (activeRound !== 'all' && slot !== activeRound)) return false;
+      return followMatrixColOfCategory(callCategory(r)) === resultBox;
+    };
+    // แถวเหลือเฉพาะสายที่อยู่ในกล่อง ⇒ "N สาย" ใต้ตาราง = เลขบนกล่อง · ป๊อปรายละเอียดยังอ่านจาก allRows (เห็นครบทุกสาย)
+    return planningRowsAllRounds
+      .map((row) => ({ ...row, rounds: row.rounds.filter(inBox) }))
+      .filter((row) => row.rounds.length > 0);
+  }, [planningRowsAllRounds, resultBox, panelRange, calMonth, panelDay, activeRound]);
 
   /**
    * 🔴 ปฏิทินรับ **ชุดไม่กรองรอบ** (เปลี่ยน 7 ก.ย. 2569 · ฉบับที่ 2 ของปฏิทินสองหน้า)
@@ -1529,7 +1553,7 @@ const FollowPage: React.FC = () => {
             ดึงเองทุกเช้า · ปุ่มดึงตอนนี้/แก้เวลาโทร หัวหน้างานขึ้นไป · ดึงได้สายใหม่ = โหลดรายการใหม่ */}
         {replaceView ? <IrecruitReplaceSyncBar canManage={canManageMasters} onSynced={() => void reload(true)} /> : null}
         <FollowPlanningCalendar
-          rows={planningRowsAllRounds}
+          rows={calendarRows}
           allRows={nextDayRows}
           onViewChange={setPanelRange}
           month={calMonth}
@@ -1607,6 +1631,8 @@ const FollowPage: React.FC = () => {
               onReload={() => void reload()}
               round={activeRound}
               onRoundChange={setActiveRound}
+              resultBox={resultBox}
+              onResultBoxChange={setResultBox}
             />
           }
         />
@@ -1806,7 +1832,7 @@ const FollowPage: React.FC = () => {
                           current ? 'text-primary' : done ? TONE.success.value : 'text-muted-foreground',
                         )}
                       >
-                        {done ? '✓' : s.step} · {s.title}
+                        {s.step} · {s.title}
                       </span>
                       <span className="truncate text-[10px] text-muted-foreground">
                         {followStepSummary(s.step, { ...wizardValues, recipientName: composeRecipientName(prefix, firstName, lastName), unitName, siteCode }) ?? s.hint}
@@ -2670,7 +2696,7 @@ const FollowPage: React.FC = () => {
           <AlertDialogContent className="max-w-md">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-base">
-                ⚠️ ลงซ้ำกับรายการที่มีอยู่แล้ว
+                ลงซ้ำกับรายการที่มีอยู่แล้ว
               </AlertDialogTitle>
               <AlertDialogDescription className="text-xs">
                 เบอร์นี้มีคิวโทรเวลาเดียวกันอยู่แล้ว — ตั้งซ้ำ = AI โทรซ้อนหาคนเดิม

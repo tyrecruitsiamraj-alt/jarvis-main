@@ -1,5 +1,6 @@
 /** รายชื่อคนในกล่องผลโทรของป๊อป "ผลจากการโทร" — ย้ายมาจาก `HomePage.tsx` 29 ก.ย. 2569 (ใช้ใน `useHomeCallDialogs`) */
 import { cn } from '@/lib/utils';
+import ToneDot from '@/components/shared/ToneDot';
 import { TONE } from '@/lib/designTokens';
 import type { FlowFollowUpItem } from '@/lib/flowSummaryApi';
 import { FOLLOW_UP_TONE, type FollowUpTone } from '@/lib/homeCallDigest';
@@ -37,7 +38,7 @@ export default function FollowUpList({
         >
           <div className="flex items-center justify-between gap-2">
             <span className="truncate text-[11px] font-medium text-foreground">
-              <span aria-hidden>{t.dot}</span> {it.name || it.person_ref}
+              <ToneDot tone={t.tone} /> {it.name || it.person_ref}
             </span>
             <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{it.request_no}</span>
           </div>

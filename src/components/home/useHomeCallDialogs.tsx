@@ -8,6 +8,7 @@
  * ⇒ กดชื่อ = ปิดป๊อปรายชื่อแล้วเปิดรายละเอียดคน (เรียงกัน ไม่ซ้อน) · มีปุ่ม "กลับไปรายชื่อ" ให้กดคนถัดไปได้เหมือนเดิม
  */
 import React, { useState } from 'react';
+import ToneDot from '@/components/shared/ToneDot';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ArrowLeft, Phone, PhoneCall, PhoneForwarded } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -162,7 +163,7 @@ export function useHomeCallDialogs(opts: { flow: FlowSummary | null; reloadFlow:
               {((flow?.lumos.waiting_call ?? 0) + (flow?.lumos.delivered_waiting ?? 0)).toLocaleString('th-TH')})
             </DialogTitle>
             <DialogDescription>
-              เรียงคนที่ค้างนานขึ้นก่อน · 🔴 = เกิน 2 วันยังไม่มีผลกลับ ควรเช็คกับทีม Lumos
+              เรียงคนที่ค้างนานขึ้นก่อน · จุดแดง = เกิน 2 วันยังไม่มีผลกลับ ควรเช็คกับทีม Lumos
               {flow && flow.lumos.waiting_call + flow.lumos.delivered_waiting > flow.active_calls.length
                 ? ` · โชว์ ${flow.active_calls.length} รายการแรก`
                 : ''}
@@ -186,7 +187,7 @@ export function useHomeCallDialogs(opts: { flow: FlowSummary | null; reloadFlow:
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-[11px] font-medium text-foreground">
-                        <span aria-hidden>{it.stale ? '🔴' : '📞'}</span> {it.name || it.person_ref}
+                        <ToneDot tone={it.stale ? 'danger' : 'primary'} /> {it.name || it.person_ref}
                       </span>
                       <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{it.request_no}</span>
                     </div>
@@ -210,7 +211,7 @@ export function useHomeCallDialogs(opts: { flow: FlowSummary | null; reloadFlow:
             <>
               <DialogHeader>
                 <DialogTitle className="text-foreground">
-                  <span aria-hidden>{FOLLOW_UP_TONE[personDetail.tone].dot}</span>{' '}
+                  <ToneDot tone={FOLLOW_UP_TONE[personDetail.tone].tone} />{' '}
                   {personDetail.item.name || personDetail.item.person_ref}
                 </DialogTitle>
                 <DialogDescription>{FOLLOW_UP_TONE[personDetail.tone].hint}</DialogDescription>
@@ -262,7 +263,7 @@ export function useHomeCallDialogs(opts: { flow: FlowSummary | null; reloadFlow:
                               TONE.violet.solid,
                             )}
                           >
-                            {bookedKeys[bookingKeyOf(item)] ? 'จองตัวแล้ว ✓' : 'จองตัวเลย'}
+                            {bookedKeys[bookingKeyOf(item)] ? 'จองตัวแล้ว' : 'จองตัวเลย'}
                           </button>
                           {action.reason ? <p className="text-[10px] text-muted-foreground">{action.reason}</p> : null}
                           {bookingError ? (

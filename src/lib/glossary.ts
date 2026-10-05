@@ -146,5 +146,5 @@ export const GLOSSARY_KEYS = Object.keys(GLOSSARY) as GlossaryKey[];
 /** ข้อความ tooltip ของศัพท์หนึ่งคำ — นิยาม + สิ่งที่มักเข้าใจผิด */
 export function glossaryHelp(key: GlossaryKey): string {
   const g: GlossaryEntry = GLOSSARY[key];
-  return g.notThis ? `${g.term} — ${g.meaning}\n⚠ ${g.notThis}` : `${g.term} — ${g.meaning}`;
+  return g.notThis ? `${g.term} — ${g.meaning}\nระวัง: ${g.notThis}` : `${g.term} — ${g.meaning}`;
 }
