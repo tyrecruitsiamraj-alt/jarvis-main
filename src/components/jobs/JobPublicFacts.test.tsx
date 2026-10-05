@@ -1,0 +1,102 @@
+/**
+ * การ์ดโพสต์ประกาศกับหน้า /apply ใช้ข้อมูลงานตัวเดียว (เจ้าของ 5 ต.ค. 2569:
+ * "หน้า Apply ติ๊กอะไรแล้วเห็นอะไร หน้า โพสต์ประกาศ ก็เห็นเหมือนกันสิ่ ไม่งั้นจะเช็คยังไงหล่ะว่าถูกต้องหรือเปล่า")
+ */
+import React from 'react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import type { JobRequest } from '@/types';
+import JobPublicFacts from './JobPublicFacts';
+import { benefitWithAmount, jobAverageIncome, jobBaseIncome } from '@/lib/jobPublicFacts';
+
+afterEach(cleanup);
+
+const JOB = {
+  id: 'j1',
+  unit_name: 'KYE',
+  location_address: 'ต.บางพลีใหญ่ อ.บางพลี จ.สมุทรปราการ',
+  override_province: 'สมุทรปราการ',
+  override_district: 'บางพลี',
+  work_schedule: 'จันทร์ - เสาร์ • 08.00 - 17.00 น.',
+  monthly_income: 18300,
+  monthly_income_base: 12000,
+  total_income: 12000,
+  monthly_income_items: [
+    { label: 'ค่าโทรศัพท์', monthly: 300 },
+    { label: 'ค่าเดินทาง', monthly: 6000 },
+  ],
+  benefits: ['โอที ~75 บาท/ชม.', 'เบี้ยขยัน', 'ค่าเดินทาง', 'ค่าโทรศัพท์'],
+  gender_requirement: 'M',
+  age_range_min: 20,
+  age_range_max: 55,
+  resigned_income_3m: [
+    { from: '2025-02-01', to: '2025-02-28', pay: 16000, deduct: 500, net: 15500 },
+    { from: '2025-01-01', to: '2025-01-31', pay: 16000, deduct: 500, net: 15500 },
+  ],
+  lastWorkingDay: '2025-03-31',
+} as unknown as JobRequest;
+
+describe('ตัวกลางของข้อมูลงาน', () => {
+  it('🔴 ฐานเงินเดือน = ฐานจริงจาก ERP ไม่ใช่ยอดรวม (สวัสดิการโชว์ยอดตัวเองแล้ว) · ทีม Online ตั้งเองชนะ', () => {
+    expect(jobBaseIncome(JOB)?.text).toBe('12,000 บาท/เดือน');
+    const manual = { ...JOB, field_overrides: { total_income: 14000 } } as unknown as JobRequest;
+    expect(jobBaseIncome(manual)?.text).toBe('14,000 บาท/เดือน');
+  });
+
+  it('รายได้เฉลี่ย = สูตรเดียวกับปุ่ม "ใช้รายได้คนเก่า" · server ส่งมาแล้วใช้ตัวนั้น', () => {
+    expect(jobAverageIncome(JOB)).toBe(15500);
+    expect(jobAverageIncome({ average_income: 17000 } as JobRequest)).toBe(17000);
+    expect(jobAverageIncome({} as JobRequest)).toBeNull();
+  });
+
+  it('สวัสดิการบอกยอดถ้ารู้ · ชิปที่มีตัวเลขอยู่แล้วไม่แตะ', () => {
+    expect(benefitWithAmount('ค่าเดินทาง', JOB.monthly_income_items)).toBe('ค่าเดินทาง 6,000 บาท/เดือน');
+    expect(benefitWithAmount('เบี้ยขยัน', JOB.monthly_income_items)).toBe('เบี้ยขยัน');
+    expect(benefitWithAmount('โอที ~75 บาท/ชม.', JOB.monthly_income_items)).toBe('โอที ~75 บาท/ชม.');
+  });
+});
+
+describe('JobPublicFacts', () => {
+  it('เห็นครบตามที่เจ้าของเรียง: สถานที่ · วันเวลาทำงาน · ฐาน · รายได้เฉลี่ย · สวัสดิการ+ยอด · เพศ · อายุ', () => {
+    render(<JobPublicFacts job={JOB} />);
+    const text = screen.getByTestId('job-public-facts').textContent ?? '';
+    for (const part of [
+      'สมุทรปราการ · บางพลี',
+      'จันทร์ - เสาร์ • 08.00 - 17.00 น.',
+      'ฐานเงินเดือน 12,000 บาท/เดือน',
+      'รายได้เฉลี่ย 15,500 บาท/เดือน',
+      'ค่าเดินทาง 6,000 บาท/เดือน',
+      'ค่าโทรศัพท์ 300 บาท/เดือน',
+      'เบี้ยขยัน',
+      'ชาย',
+      'อายุ 20–55 ปี',
+    ]) {
+      expect(text, part).toContain(part);
+    }
+    expect(text).not.toContain('คนเก่า');
+  });
+
+  it('🔴 ติ๊กซ่อนในขั้น 3 = หายทั้งสองฝั่ง (การ์ดเจ้าหน้าที่ใช้ตัวเดียวกัน)', () => {
+    const hidden = {
+      ...JOB,
+      field_overrides: { public_visibility: { income: false, average_income: false, benefits: false } },
+    } as unknown as JobRequest;
+    for (const staff of [false, true]) {
+      cleanup();
+      render(<JobPublicFacts job={hidden} staff={staff} />);
+      const text = screen.getByTestId('job-public-facts').textContent ?? '';
+      expect(text).not.toContain('ฐานเงินเดือน');
+      expect(text).not.toContain('รายได้เฉลี่ย');
+      expect(screen.queryByTestId('job-public-benefits')).toBeNull();
+      expect(text).toContain('อายุ 20–55 ปี');
+    }
+  });
+
+  it('ติ๊กโอทีออก = ชิปโอทีหาย สวัสดิการอื่นยังอยู่', () => {
+    const noOt = { ...JOB, field_overrides: { public_visibility: { ot: false } } } as unknown as JobRequest;
+    render(<JobPublicFacts job={noOt} />);
+    const chips = screen.getByTestId('job-public-benefits').textContent ?? '';
+    expect(chips).not.toContain('โอที');
+    expect(chips).toContain('เบี้ยขยัน');
+  });
+});

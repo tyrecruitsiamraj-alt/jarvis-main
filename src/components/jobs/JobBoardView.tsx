@@ -13,17 +13,15 @@ import {
 } from '@/lib/boardDataState';
 import { apiFetch, httpStatusOf } from '@/lib/apiFetch';
 import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
-import { formatYmdDmyBe } from '@/lib/dateTh';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
-import { benefitDisplayLabels } from '@/lib/extraBenefits';
-import { payCycleText, payCyclesOf } from '@/lib/payCycle';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { resolveApplyPositionPreset } from '@/lib/jobBoardPositionPreset';
 import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
 import BoardJobCard from '@/components/jobs/BoardJobCard';
+import JobPublicFacts from '@/components/jobs/JobPublicFacts';
 import SearchField from '@/components/shared/SearchField';
 import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
@@ -114,9 +112,6 @@ import {
 import { CLOSED_RANGE_OPTIONS } from '@/hooks/useClosedRequestsFeed';
 import { jobPositionUnits, sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { DASH, EVEN_TYPE, TONE, type ToneKey } from '@/lib/designTokens';
-import { INCOME_PERIOD_LABEL } from '@/lib/incomeBreakdown';
-import { incomeDisplay } from '@/lib/incomeLabel';
-import { publicBenefitList, publicFieldVisible } from '@/lib/publicFieldVisibility';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import {
   applyBoardFilters,
@@ -144,7 +139,7 @@ import { BoardFilterBar, BoardResetButton } from '@/components/jobs/BoardFilterP
 import { compareJobsByAgeDaysDesc, getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { MapPin, Briefcase, Calendar, Banknote, RefreshCw, Send, Users, Link2, Pencil, Search, Flag, EyeOff, LoaderCircle } from 'lucide-react';
+import { MapPin, Briefcase, RefreshCw, Send, Users, Link2, Pencil, Search, EyeOff, LoaderCircle } from 'lucide-react';
 const RecruitLaneDialog = React.lazy(() => import('@/components/jobs/RecruitLaneDialog'));
 import {
   isUnitRequestWorkStatus,
@@ -1778,98 +1773,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   ความแปรผันของเนื้อด้านบน (ชิปช่องทางที่หายทั้งบล็อกในบางใบ ฯลฯ)
                   จึงไม่ทำให้แถบ "ผู้สมัคร N คน" ของแต่ละใบอยู่คนละระดับอีก */}
               <CardContent className="flex-1 space-y-2 pb-4">
-                <p className="flex items-start gap-2 text-xs text-muted-foreground line-clamp-2">
-                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" />
-                  {/* ข้อความสำรองแบบเดียวกับการ์ดกล่องลอย ('ไม่ได้ระบุจังหวัด') —
-                      คำที่ผู้สมัครทั่วไปอ่านรู้เรื่อง เพราะโผล่บนหน้าสมัครสาธารณะด้วย */}
-                  {job.location_address?.trim() || 'ไม่ได้ระบุสถานที่'}
-                </p>
-                {/**
-                 * 🔴 มือถือ: แถวนี้พับเหลือแถวเดียวเลื่อนซ้าย-ขวาได้ (เจ้าของเคาะ 5 ก.ย. 2569
-                 * — Haiku ทดสอบมือถือให้ 62/100 เพราะปุ่ม "สมัครงาน" ต้องเลื่อนหาไกลเกินไป)
-                 * ⚠️ ข้อมูลห้ามหาย — ทุกฟิลด์ยังอยู่ครบ แค่ไม่ตกลงบรรทัดใหม่บนจอแคบ
-                 * จอกว้างขึ้น (`sm:`) กลับไปพับหลายบรรทัดตามเดิม
-                 */}
-                <div className="flex flex-nowrap items-center gap-x-3 gap-y-1.5 overflow-x-auto text-xs sm:flex-wrap sm:overflow-visible">
-                  {/* ยอดรายเดือน = ค่าแรงหลัก + รายได้มั่นคง (เจ้าของสั่ง 16 ส.ค. 2569)
-                      ⚠️ ถอยไป total_income เมื่อคิดไม่ได้ — แต่ตัวนั้นบางใบเป็น**อัตรารายวัน**
-                      (410 = ค่าแรง/วัน · 20 จาก 200 ใบ) จึงไม่ติดคำว่า "/เดือน" ให้ */}
-                  {/**
-                   * 🔴 **เงินต้องบอกหน่วยเสมอ — และ "ไม่รู้หน่วย" ต้องบอกว่าไม่รู้** (21 ก.ย. 2569)
-                   *
-                   * ของเดิมปั้นสูตรเองตรงนี้ แล้วกรณีสุดท้ายพิมพ์ `฿400` เปล่า ๆ เท่ากับ
-                   * `฿12,000` ทุกประการ ⇒ กวาดตาผ่าน ๆ อ่านเป็น "เงินเดือน 400"
-                   * (เจ้าของทักเอง · ของจริงมี 20 จาก 200 ใบที่เป็นค่าแรง**ต่อวัน**)
-                   *
-                   * เปลี่ยนมาใช้ `incomeDisplay()` ซึ่งเป็นตัวเดียวกับที่หน้าจับคู่ใช้อยู่แล้ว
-                   * ⇒ หนึ่งเมตริกหนึ่งนิยาม · ไม่รู้หน่วย = ขึ้น "บาท" เฉย ๆ + คำเตือนใน tooltip
-                   * ⚠️ คำเตือนเป็นภาษาภายใน (พูดถึง ERP) ⇒ **เฉพาะเจ้าหน้าที่**
-                   * การ์ดใบนี้โผล่บนหน้าสมัครสาธารณะด้วย
-                   */}
-                  {(isStaff || publicFieldVisible(job, 'income')) && (() => {
-                    const money = job.income_display
-                      ? {
-                          text: `฿${job.income_display.total.toLocaleString('th-TH')} ${INCOME_PERIOD_LABEL[job.income_display.period]}`,
-                          hint: null as string | null,
-                        }
-                      : (() => {
-                          const d = incomeDisplay({
-                            totalIncome: job.total_income,
-                            monthlyIncome: job.monthly_income,
-                          });
-                          return d ? { text: d.text, hint: d.hint } : null;
-                        })();
-                    if (!money) return null;
-                    return (
-                      <span
-                        className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-foreground font-medium"
-                        title={isStaff && money.hint ? money.hint : undefined}
-                      >
-                        <Banknote className="h-3.5 w-3.5 text-success" />
-                        {money.text}
-                      </span>
-                    );
-                  })()}
-                  {isStaff || publicFieldVisible(job, 'required_date') ? (
-                    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-muted-foreground">
-                      <Calendar className="h-3.5 w-3.5" />
-                      ต้องการ {formatYmdDmyBe(job.required_date)}
-                    </span>
-                  ) : null}
-                  {/* สัญชาติเจ้านาย (เจ้าของสั่ง 17 ส.ค. 2569 — เอาขึ้นทั้งกล่องงานและหน้าสาธารณะ)
-                      ⚠️ ERP กรอกมาแค่ ~40% ของใบขอ · ไม่มีข้อมูล = ไม่ขึ้นบรรทัดนี้
-                      ห้ามขึ้นว่า "ไม่ระบุ" — การ์ดนี้โผล่บนหน้าสมัครสาธารณะด้วย */}
-                  {job.boss_nationality?.trim() && (isStaff || publicFieldVisible(job, 'boss_nationality')) ? (
-                    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-muted-foreground">
-                      <Flag className="h-3.5 w-3.5" />
-                      นายสัญชาติ {job.boss_nationality.trim()}
-                    </span>
-                  ) : null}
-                </div>
-                {/* สวัสดิการ (เจ้าของเคาะ 16 ส.ค. 2569 — "เอาเหมือนที่ AI พูด")
-                    ⚠️ ตัวเลขทั้งหมดเป็น **อัตราจ่าย** ที่พนักงานได้จริง ไม่ใช่อัตราเบิก
-                    ⚠️ ไม่มีข้อมูล = ไม่ขึ้นแถวนี้ (ห้ามขึ้นว่า "ไม่มีสวัสดิการ") */}
-                {/* ชิปสวัสดิการ = ของจาก ERP (อัตราจริง) + ของที่เจ้าหน้าที่ติ๊กเพิ่มเอง
-                    เรียง ERP ก่อนเพราะมีตัวเลขจริงกำกับ น่าเชื่อกว่า */}
-                {(() => {
-                  /* รอบรับเงิน (4 ต.ค. 2569 — ไม่ใช่สวัสดิการ) ขึ้นหน้าแถวชิป ตามช่องรายได้ที่ติ๊กให้เห็น */
-                  const pay = isStaff || publicFieldVisible(job, 'income') ? payCycleText(payCyclesOf(job)) : '';
-                  // ติ๊กโอทีออก = ตัดชิปโอทีบนประกาศ (4 ต.ค. 2569 · เดิมช่องนี้ไม่ได้ต่อกับอะไร) — เจ้าหน้าที่ยังเห็นครบ
-                  const chips = isStaff
-                    ? [...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)]
-                    : publicBenefitList(job, benefitDisplayLabels(job.extra_benefits));
-                  return pay || chips.length > 0 ? (
-                  // 🔴 มือถือ: พับเหลือแถวเดียวเลื่อนได้เหมือนแถวเงินเดือนด้านบน (เจ้าของเคาะ 5 ก.ย. 2569)
-                  <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto sm:flex-wrap sm:overflow-visible">
-                    {pay ? <span className={cn('shrink-0 whitespace-nowrap', TONE.info.chip)}>{pay}</span> : null}
-                    {chips.map((b) => (
-                      <span key={b} className={cn('shrink-0 whitespace-nowrap', TONE.success.chip)}>
-                        {b}
-                      </span>
-                    ))}
-                  </div>
-                  ) : null;
-                })()}
+                {/* ข้อมูลงาน — ตัวเดียวกับการ์ดโพสต์ประกาศของเจ้าหน้าที่ (`JobPublicFacts` · เจ้าของ 5 ต.ค. 2569:
+                    *"หน้า Apply ติ๊กอะไรแล้วเห็นอะไร หน้า โพสต์ประกาศ ก็เห็นเหมือนกัน"*) — ที่อยู่ปลอดภัยมาจาก server แล้ว */}
+                <JobPublicFacts job={job} />
               </CardContent>
               <CardFooter className="mt-auto flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
                 {isStaff ? (

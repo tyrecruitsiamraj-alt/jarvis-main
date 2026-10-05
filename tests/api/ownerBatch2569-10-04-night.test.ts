@@ -36,9 +36,13 @@ describe('2 — ติ๊กโอทีออก = ตัดชิปโอท�
     expect(isOtBenefit('เบี้ยขยัน')).toBe(false);
   });
   it('การ์ดประกาศ + ตัวอย่างหน้า 4 ใช้ตัวเดียวกัน (ไม่มีจุดที่ลืม)', () => {
-    for (const f of ['src/components/jobs/JobBoardView.tsx', 'src/components/jobs/PublicJobCardPreview.tsx']) {
-      expect(readFileSync(join(process.cwd(), f), 'utf8')).toContain('publicBenefitList(job, benefitDisplayLabels(job.extra_benefits))');
+    // 5 ต.ค. 2569: ทั้งสองจุด (+ การ์ดโพสต์ประกาศ) ใช้ `JobPublicFacts` ตัวเดียว ⇒ ตัดชิปที่เดียว
+    for (const f of ['src/components/jobs/JobBoardView.tsx', 'src/components/jobs/PublicJobCardPreview.tsx', 'src/components/jobs/BoardJobCard.tsx']) {
+      expect(readFileSync(join(process.cwd(), f), 'utf8')).toMatch(/<JobPublicFacts job=\{job\}/);
     }
+    expect(readFileSync(join(process.cwd(), 'src/components/jobs/JobPublicFacts.tsx'), 'utf8')).toContain(
+      'publicBenefitList(job, benefitDisplayLabels(job.extra_benefits))',
+    );
   });
 });
 

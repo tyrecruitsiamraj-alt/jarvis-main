@@ -25,6 +25,7 @@ import {
   moneyFieldText,
   resignedIncomeRows,
   visibleRateLines,
+  postingRateLines,
 } from '@/lib/unitRequestDetail';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
@@ -62,8 +63,15 @@ function periodNote(
  * 🔴 ใบขอหนึ่งใบมีเฉลี่ย 15 บรรทัด · ตัดแถวที่ทั้งจ่ายและเบิกเป็น 0 ทิ้ง
  * แต่บรรทัดค่าจ้างหลักโชว์เสมอ · ไม่มีบรรทัดเลย = ไม่วาดกล่อง
  */
-export function RequestRateLinesBlock({ job }: { job: JobRequest }) {
-  const lines = visibleRateLines(job);
+export function RequestRateLinesBlock({
+  job,
+  posting = false,
+}: {
+  job: JobRequest;
+  /** หน้า 1 ป๊อปงานสรรหา — ตัดค่าหัก/โอที/ชดเชย ปกส./นักขัตฤกษ์ (`postingRateLines` · 5 ต.ค. 2569) */
+  posting?: boolean;
+}) {
+  const lines = posting ? postingRateLines(job) : visibleRateLines(job);
   if (lines.length === 0) return null;
   return (
     <div className={boxCls}>

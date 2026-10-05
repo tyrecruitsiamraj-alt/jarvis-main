@@ -17,9 +17,13 @@ import { incomeDisplay } from '../../src/lib/incomeLabel.js';
 const src = readFileSync(resolve(process.cwd(), 'src/components/jobs/JobBoardView.tsx'), 'utf-8');
 
 describe('การ์ดกล่องงานต้องใช้ตัวกลางเรื่องหน่วยเงิน', () => {
-  it('🔴 ต้องเรียก incomeDisplay ไม่ใช่ปั้นสูตรเอง', () => {
-    expect(src).toContain("import { incomeDisplay } from '@/lib/incomeLabel'");
-    expect(src).toContain('incomeDisplay({');
+  /** 5 ต.ค. 2569: การ์ดหน้า /apply ส่งต่อให้ `JobPublicFacts` → `jobBaseIncome` → `publicIncomeOf` → `incomeDisplay` */
+  it('🔴 ต้องผ่านตัวกลาง ไม่ใช่ปั้นสูตรเอง', () => {
+    expect(src).toContain('<JobPublicFacts job={job} />');
+    const facts = readFileSync(resolve(process.cwd(), 'src/lib/jobPublicFacts.ts'), 'utf-8');
+    expect(facts).toContain('publicIncomeOf(job)');
+    const readiness = readFileSync(resolve(process.cwd(), 'src/lib/publishReadiness.ts'), 'utf-8');
+    expect(readiness).toContain('incomeDisplay({');
   });
 
   it('🔴 สูตรเดิมที่พิมพ์ตัวเลขเปล่า ๆ ต้องไม่กลับมา', () => {
@@ -27,10 +31,11 @@ describe('การ์ดกล่องงานต้องใช้ตัว�
     expect(src).not.toContain('`฿${job.monthly_income.toLocaleString(');
   });
 
-  it('🔴 คำเตือนภาษาภายในต้องกั้นด้วย isStaff', () => {
-    const at = src.indexOf('incomeDisplay({');
-    const block = src.slice(at - 900, at + 900);
-    expect(block).toContain('isStaff && money.hint');
+  it('🔴 คำเตือนภาษาภายในต้องกั้นด้วยธงเจ้าหน้าที่', () => {
+    const facts = readFileSync(resolve(process.cwd(), 'src/components/jobs/JobPublicFacts.tsx'), 'utf-8');
+    expect(facts).toContain('title={staff ? (income.hint ?? undefined) : undefined}');
+    // หน้า /apply เรียกโดยไม่เปิดธงเจ้าหน้าที่
+    expect(src).not.toContain('<JobPublicFacts job={job} staff');
   });
 });
 

@@ -327,3 +327,46 @@ describe('จอบอกที่มาของรายได้จริง'
     expect(popup).toMatch(/<Collapsible open=\{moreOpen\}/);
   });
 });
+
+describe('ตารางอัตราหน้า 1 ป๊อปงานสรรหา (เจ้าของ 5 ต.ค. 2569: "เอาพวกที่มันหักๆ กับ โอทีเนี่ยออก")', () => {
+  it('🔴 รายการที่เจ้าของยกมาถูกตัดครบ', async () => {
+    const { isPostingHiddenRateLine } = await import('../../src/lib/unitRequestDetail');
+    for (const name of [
+      'เงินชดเชยลาป่วย (ปกส)',
+      'เงินชดเชยพักร้อน (ปกส)',
+      'ค่าปรับขาดงาน (ตามอัตรา)',
+      'ค่าปรับมาสาย (ตามจำนวนเงิน)',
+      'ค่าล่วงเวลา(สูตร)',
+      'ค่าล่วงเวลา 1.5 เท่า',
+      'ค่าล่วงเวลา 2.0 เท่า',
+      'ค่าล่วงเวลา 3.0 เท่า',
+      'นักขัตฤกษ์ฟรี',
+      'OT เหมา',
+    ]) {
+      expect(isPostingHiddenRateLine(name), name).toBe(true);
+    }
+  });
+
+  it('ค่าจ้าง/สวัสดิการที่ผู้สมัครอยากรู้ยังอยู่', async () => {
+    const { isPostingHiddenRateLine } = await import('../../src/lib/unitRequestDetail');
+    for (const name of ['ค่าจ้าง', 'เงินเดือน', 'เบี้ยขยัน', 'ค่าโทรศัพท์', 'ค่ารถ/ค่าเดินทาง/TAXI', 'ค่าแทนงาน (ไซต์)', 'Total']) {
+      expect(isPostingHiddenRateLine(name), name).toBe(false);
+    }
+  });
+
+  it('ค่าจ้างหลักไม่ถูกตัดแม้ชื่อเข้าเกณฑ์ · ป๊อปหน้า 1 ใช้ตัวกรองนี้ หน้าใบขอไม่ใช้', async () => {
+    const { postingRateLines } = await import('../../src/lib/unitRequestDetail');
+    const job = {
+      rate_lines: [
+        { seq: 1, fee_name: 'ค่าจ้าง (หักประกัน)', payment_rate: 500, draw_rate: 0, is_wage: true },
+        { seq: 2, fee_name: 'ค่าล่วงเวลา 1.5 เท่า', payment_rate: 90, draw_rate: 0, is_wage: false },
+        { seq: 3, fee_name: 'เบี้ยขยัน', payment_rate: 500, draw_rate: 0, is_wage: false },
+      ],
+    } as never;
+    expect(postingRateLines(job).map((l) => l.seq)).toEqual([1, 3]);
+    const popupSrc = readFileSync(resolve(__dirname, '../../src/pages/jobs/BoardPostingPage.tsx'), 'utf8');
+    const pageSrc = readFileSync(resolve(__dirname, '../../src/pages/jobs/SiamrajUnitRequestDetailPage.tsx'), 'utf8');
+    expect(popupSrc).toContain('<RequestRateLinesBlock job={job} posting />');
+    expect(pageSrc).not.toContain('posting />');
+  });
+});

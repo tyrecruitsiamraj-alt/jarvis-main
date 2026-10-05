@@ -148,6 +148,25 @@ export function visibleRateLines(job: JobRequest): UnitRequestRateLine[] {
   );
 }
 
+/**
+ * บรรทัดที่ไม่ต้องโชว์ในหน้า 1 ของป๊อปงานสรรหา (เจ้าของ 5 ต.ค. 2569 ยกตัวอย่าง: เงินชดเชยลาป่วย/พักร้อน (ปกส) ·
+ * ค่าปรับขาดงาน/มาสาย · ค่าล่วงเวลา(สูตร)/1.5/2.0/3.0 เท่า · นักขัตฤกษ์ฟรี — *"เอาพวกที่มันหักๆ กับ โอทีเนี่ยออก"*)
+ * 🔴 ค่าจ้างหลัก (`is_wage`) ไม่ตัดเสมอ · หน้าใบขอกับขั้น 3 (ค่าปรับห้ามถอด) ยังเห็นครบ
+ */
+const POSTING_HIDDEN_RATE_WORDS = ['ค่าปรับ', 'หัก', 'มาสาย', 'ขาดงาน', 'ล่วงเวลา', 'โอที', 'ปกส', 'ชดเชย', 'นักขัตฤกษ์'];
+const OT_WORD = /(^|[^a-z])ot([^a-z]|$)/i;
+
+export function isPostingHiddenRateLine(feeName: string | null | undefined): boolean {
+  const t = (feeName ?? '').trim();
+  if (!t) return false;
+  return POSTING_HIDDEN_RATE_WORDS.some((w) => t.includes(w)) || OT_WORD.test(t);
+}
+
+/** ตารางอัตราของหน้า 1 ป๊อปงานสรรหา — ตัดค่าหัก/โอที/ชดเชย ปกส./นักขัตฤกษ์ · ค่าจ้างหลักอยู่เสมอ */
+export function postingRateLines(job: JobRequest): UnitRequestRateLine[] {
+  return visibleRateLines(job).filter((l) => l.is_wage || !isPostingHiddenRateLine(l.fee_name));
+}
+
 /** ข้อความของค่าหนึ่งช่อง (ที่เดียว — จอไม่ต้องเขียนเงื่อนไขเอง) */
 export function detailValueText(v: DetailValue): string {
   switch (v.kind) {

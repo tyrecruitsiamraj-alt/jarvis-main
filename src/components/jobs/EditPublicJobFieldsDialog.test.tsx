@@ -56,11 +56,12 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('ขั้น 2 — ใบขอเขียนว่า / ใส่รายละเอียดเอง', () => {
+// คำบนปุ่มเปลี่ยนตามเจ้าของ 5 ต.ค. 2569 (Journey งานสรรหา หน้า 2: "ตามใบขอ หรือ ใส่เอง")
+describe('ขั้น 2 — ตามใบขอ / ใส่เอง', () => {
   it('🔴 เปิดดูเฉย ๆ = ติ๊ก "ใบขอเขียนว่า" ไว้ ไม่มีช่องเลือก และไม่บันทึกอะไร', async () => {
     render(<PublicJobFields job={job()} sections={['place']} />);
-    expect(screen.getByRole('checkbox', { name: 'ใบขอเขียนว่า' }).getAttribute('data-state')).toBe('checked');
-    expect(screen.getByRole('checkbox', { name: 'ใส่รายละเอียดเอง' }).getAttribute('data-state')).toBe('unchecked');
+    expect(screen.getByRole('checkbox', { name: 'ตามใบขอ' }).getAttribute('data-state')).toBe('checked');
+    expect(screen.getByRole('checkbox', { name: 'ใส่เอง' }).getAttribute('data-state')).toBe('unchecked');
     expect(screen.queryAllByRole('combobox')).toHaveLength(0);
     await flushAutosave();
     expect(saveUnitRequestMeta).not.toHaveBeenCalled();
@@ -69,7 +70,7 @@ describe('ขั้น 2 — ใบขอเขียนว่า / ใส่ร
 
   it('ติ๊กใส่เอง = โชว์จังหวัด/อำเภอ/ตำบล เลือกที่อ่านจากใบขอไว้ให้ แล้วบันทึกเอง', async () => {
     render(<PublicJobFields job={job()} sections={['place']} />);
-    fireEvent.click(screen.getByRole('checkbox', { name: 'ใส่รายละเอียดเอง' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ใส่เอง' }));
     expect(screen.getAllByRole('combobox')).toHaveLength(3);
     await flushAutosave();
     expect(lastSaved()).toMatchObject({ province: 'กรุงเทพมหานคร', district: 'บางรัก', subdistrict: 'สุริยวงศ์' });
@@ -81,10 +82,10 @@ describe('ขั้น 2 — ใบขอเขียนว่า / ใส่ร
       field_overrides: { province: 'ลพบุรี' } as JobRequest['field_overrides'],
     });
     render(<PublicJobFields job={saved} sections={['place']} />);
-    expect(screen.getByRole('checkbox', { name: 'ใส่รายละเอียดเอง' }).getAttribute('data-state')).toBe('checked');
+    expect(screen.getByRole('checkbox', { name: 'ใส่เอง' }).getAttribute('data-state')).toBe('checked');
     await flushAutosave();
     expect(saveUnitRequestMeta).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'ใบขอเขียนว่า' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ตามใบขอ' }));
     expect(screen.queryAllByRole('combobox')).toHaveLength(0);
     await flushAutosave();
     expect(lastSaved()).toMatchObject({ province: null, district: null, subdistrict: null });

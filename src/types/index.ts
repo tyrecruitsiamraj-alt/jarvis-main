@@ -312,6 +312,11 @@ export interface JobRequest {
   monthly_income_base?: number;
   monthly_income_items?: Array<{ label: string; monthly: number }>;
   /**
+   * รายได้เฉลี่ยต่อเดือน (สุทธิของคนเก่าในไซต์นี้) — หน้าสาธารณะได้จาก server เท่านั้น (ไม่ส่ง eSlip ออกไป)
+   * ฝั่งเจ้าหน้าที่คิดจาก `resigned_income_3m` ด้วยสูตรเดียวกัน · `jobAverageIncome` (5 ต.ค. 2569)
+   */
+  average_income?: number;
+  /**
    * รายได้แบบแยกส่วนที่**เจ้าหน้าที่ตั้งเอง** (20 ส.ค. 2569) — มาก่อน breakdown
    * อัตโนมัติจาก ERP เสมอ · ผ่าน `buildIncomeDisplay` มาแล้ว = เลข balance เสมอ
    * (บรรทัด "อื่น ๆ" ถูกเติมให้แล้ว) · undefined = ไม่ได้ตั้ง ใช้การแสดงแบบเดิม
@@ -421,6 +426,8 @@ export interface JobRequest {
       ot?: boolean;
       boss_nationality?: boolean;
       required_date?: boolean;
+      /** รายได้เฉลี่ย (ยอดของคนเก่า · 5 ต.ค. 2569) */
+      average_income?: boolean;
     } | null;
   } | null;
 }

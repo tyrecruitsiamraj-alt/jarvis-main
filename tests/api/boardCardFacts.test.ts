@@ -39,10 +39,14 @@ describe('ชื่อหน่วยงาน', () => {
     expect(boardCardUnitName(job({ unit_name: 'บริษัท เควายอี จำกัด' }))).toBeNull();
     expect(boardCardUnitName(job({ work_site_name: 'KYE', unit_name: '' }))).toBeNull();
   });
-  it('การ์ดใช้ครบสี่ตัว', () => {
-    const src = readFileSync('src/components/jobs/BoardJobCard.tsx', 'utf8');
-    for (const f of ['boardCardPlace(job)', 'boardCardAge(job)', 'boardCardGender(job)', 'boardCardUnitName(job)', 'money.text']) {
-      expect(src).toContain(f);
+  /** 5 ต.ค. 2569: ข้อมูลงานย้ายไป `JobPublicFacts` ตัวเดียวกับหน้า /apply · ชื่อคู่สัญญาถอดจากการ์ด (หน้า /apply ไม่มี) */
+  it('การ์ดใช้ส่วนข้อมูลตัวเดียวกับหน้า /apply · ส่วนนั้นใช้ตัวกลางครบ', () => {
+    const card = readFileSync('src/components/jobs/BoardJobCard.tsx', 'utf8');
+    expect(card).toContain('<JobPublicFacts job={job} staff />');
+    expect(card).not.toContain('boardCardUnitName(job)');
+    const facts = readFileSync('src/components/jobs/JobPublicFacts.tsx', 'utf8');
+    for (const f of ['boardCardPlace(job)', 'boardCardAge(job)', 'boardCardGender(job)', 'jobBaseIncome(job)', 'jobAverageIncome(job)']) {
+      expect(facts).toContain(f);
     }
   });
 });

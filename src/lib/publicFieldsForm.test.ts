@@ -99,7 +99,7 @@ describe('formDiffersFromJob — ด่านเดียวที่ตัด�
       incomeTotal: '',
       benefitText: '',
       payCycles: [],
-      visibility: { income: true, benefits: true, ot: true, boss_nationality: true, required_date: true },
+      visibility: { income: true, benefits: true, ot: true, boss_nationality: true, required_date: true, average_income: true },
     };
     expect(formDiffersFromJob(blank)).toBe(true);
   });

@@ -11928,3 +11928,25 @@ Choice เดิม (Journey งานสรรหา): "เหลือแค�
 | เทสต์ | `src/pages/jobs/BoardPostingSteps.test.tsx` · `tests/api/unitRequestDetail.test.ts` |
 
 - หน้ารายละเอียดใบขอ (`SiamrajUnitRequestDetailPage`) กับป๊อปทางถอย `?popup=sheet` ไม่ได้แตะ
+
+## 5 ต.ค. 2569 (ดึก): การ์ดโพสต์ประกาศ = หน้า /apply · หน้า 2 คำใหม่ · ตารางอัตราหน้า 1 ตัดค่าหัก/โอที
+
+เจ้าของ: การ์ดต้องเห็น *"ชื่อหน่วยงาน · ผ่านมากี่วัน · ตำแหน่ง · ฐานเงินเดือน · สวัสดิการว่าได้เท่าไหร่ · รายได้เฉลี่ย (ของคนเก่า) · เพศ · อายุ ·
+วันเวลาทำงาน · จังหวัด+อำเภอ"* · *"หน้า Apply ติ๊กอะไรแล้วเห็นอะไร หน้า โพสต์ประกาศ ก็เห็นเหมือนกันสิ่ ไม่งั้นจะเช็คยังไง"* ·
+Choice: รายได้เฉลี่ยโชว์ ติ๊กซ่อนได้ในขั้น 3 · *"เอาพวกที่มันหักๆ กับ โอทีเนี่ยออก"* (ตารางอัตราหน้า 1)
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/components/jobs/JobPublicFacts.tsx` (**ใหม่**) | ข้อมูลงานชุดเดียว: สถานที่ (`boardCardPlace`) · วันเวลาทำงาน · ฐานเงินเดือน (`jobBaseIncome`) · รายได้เฉลี่ย (`jobAverageIncome`) · สวัสดิการ+ยอด (`publicBenefitList` → `benefitWithAmount`) · รอบรับเงิน · เพศ · อายุ · วันที่ต้องการ/สัญชาตินาย · ทุกช่องผ่าน `publicFieldVisible` · `staff` = สีเตือนอย่างเดียว |
+| `src/lib/jobPublicFacts.ts` (**ใหม่**) | `jobAverageIncome` (server ส่งมาก่อน · ไม่มีคิดจาก eSlip) · `benefitWithAmount` (ยอดจาก `monthly_income_items`) · `jobBaseIncome` (ทีมตั้งเองชนะ · ไม่งั้นฐาน ERP · 🔴 ไม่ใช่ยอดรวม) |
+| `src/components/jobs/BoardJobCard.tsx` | หัว = หน่วยงาน + `publicJobTitle` + รายละเอียดตำแหน่ง · ถอดชื่อคู่สัญญา · ตัวกลาง `<JobPublicFacts staff />` |
+| `src/components/jobs/JobBoardView.tsx` (การ์ดหน้า /apply) · `PublicJobCardPreview.tsx` (ขั้น 4) | ใช้ `<JobPublicFacts />` แทนโค้ดเงิน/สวัสดิการเดิม |
+| `src/lib/publicFieldVisibility.ts` · `src/types/index.ts` · `api/_lib/siamrajUnitNotes.ts` | ช่องติ๊กใหม่ `average_income` ("รายได้เฉลี่ย") — ไม่มีคีย์ = โชว์ |
+| `api/_handlers/public/jobs.ts` | ส่ง `work_site_name` · `average_income` (ยอดเดียว ไม่ส่งงวด eSlip · ติ๊กซ่อน = ไม่ส่ง) · `field_overrides.gender/total_income` · `monthly_income_items` แม้ทีมตั้งรายได้เอง |
+| `src/components/jobs/EditPublicJobFieldsDialog.tsx` | หน้า 2: "ตามใบขอ" / "ใส่เอง" (เดิม ใบขอเขียนว่า / ใส่รายละเอียดเอง) |
+| `src/lib/unitRequestDetail.ts` · `UnitRequestPayBlocks.tsx` · `BoardPostingPage.tsx` | `isPostingHiddenRateLine`/`postingRateLines` — หน้า 1 ป๊อปตัดค่าปรับ/หัก/โอที/ชดเชย ปกส./นักขัตฤกษ์ (`<RequestRateLinesBlock posting />`) · ค่าจ้างหลักอยู่เสมอ · ขั้น 3 กับหน้าใบขอยังครบ |
+| เทสต์ | `src/components/jobs/JobPublicFacts.test.tsx` (ใหม่) · boardCardFacts · boardCardIncomeUnit · boardReadinessFilter · ownerBatch2569-10-04-night · unitRequestDetail · EditPublicJobFieldsDialog · publicFieldsForm |
+
+- ตรวจใน Browser: ใบที่ประกาศ 13 ใบ การ์ดเจ้าหน้าที่กับหน้า /apply ตรงกันทุกตัวอักษร (หัว · ตำแหน่ง · ข้อมูล)
+- ⚠️ บุญรอดฯ ทีมพิมพ์รายได้เองไว้ 400 (ช่องเก่าไม่มีหน่วย) ⇒ ขึ้น "400 บาท/เดือน" ทั้งสองฝั่ง — ข้อมูลผิดหน่วย ต้องแก้ในขั้น 3
+- ⚠️ `boardCardPlace` บางใบเดาอำเภอผิดจากที่อยู่ (เช่น "สระบุรี · ธุรกิจ SME ขนาดเล็ก") — ของเดิม ยังไม่แก้

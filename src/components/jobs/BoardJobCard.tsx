@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Ban, Banknote, Building2, EyeOff, MapPin, UserRound, Users } from 'lucide-react';
+import { ArrowRight, Ban, EyeOff, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -7,11 +7,12 @@ import PrequestBadge from '@/components/jobs/PrequestBadge';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
-import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, publicJobCardSubtitle } from '@/lib/unitRequestDisplay';
+import { publicJobTitle } from '@/lib/publicJobTitle';
+import JobPublicFacts from '@/components/jobs/JobPublicFacts';
 import { getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import PublishReadinessChip from '@/components/jobs/PublishReadinessChip';
-import { publicIncomeOf, readinessActionText, type PublishReadiness } from '@/lib/publishReadiness';
-import { boardCardAge, boardCardGender, boardCardPlace, boardCardUnitName } from '@/lib/boardCardFacts';
+import { readinessActionText, type PublishReadiness } from '@/lib/publishReadiness';
 import { isHiddenFromPublicByWorkStatus } from '@/lib/publicJobVisibility';
 import { isUnitRequestWorkStatus, UNIT_REQUEST_WORK_STATUS_LABELS } from '@/lib/unitRequestWorkStatus';
 import { releaseSkipText, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
@@ -57,10 +58,7 @@ export type BoardJobCardProps = {
 /** "บางพลี สมุทรปราการ" — อำเภอที่ทีม Online กรอก + จังหวัด · ไม่รู้ = บอกตรง ๆ (ไม่เดาจากจังหวัดไซต์) */
 const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip }) => {
   const age = getJobAgeChipInfo(job);
-  /** เงินต้องบอกหน่วยเสมอ — ตัวเดียวกับหน้าสาธารณะ/ป๊อปประกาศ (`publicIncomeOf`) · ไม่รู้หน่วย = คำเตือนใน tooltip */
-  const money = publicIncomeOf(job);
-  const gender = boardCardGender(job);
-  const unitName = boardCardUnitName(job);
+  const subtitle = publicJobCardSubtitle(job);
   const hidden = isUnitRequestWorkStatus(job.work_status) && isHiddenFromPublicByWorkStatus(job.work_status);
   /** ชิปสภาพ — ใบที่ ERP พาไปต่อแล้วและซ่อนจากหน้าสาธารณะมีชิปสถานะงานของตัวเองอยู่แล้ว · ใบที่ตั้งไม่ประกาศมีชิปแดง ⇒ ไม่ซ้ำ */
   const showReadiness = readiness !== null && !(readiness.kind === 'moved' && hidden) && readiness.kind !== 'skipped';
@@ -88,14 +86,9 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
           <h2 className="line-clamp-2 text-lg font-medium text-foreground group-hover:text-primary">
             {jobBoardCardTitle(job)}
           </h2>
-          <p className="line-clamp-1 text-base font-medium text-primary">{publicJobPositionLabel(job)}</p>
-          {/* ชื่อหน่วยงาน (เจ้าของ 4 ต.ค. 2569 ข้อ 7) — หัวการ์ดเป็นชื่อจุดทำงาน · ซ้ำกันไม่พิมพ์ซ้ำ */}
-          {unitName ? (
-            <p className={cn('flex min-w-0 items-center gap-1.5 text-sm', DASH.muted)}>
-              <Building2 className="h-4 w-4 shrink-0" aria-hidden />
-              <span className="line-clamp-2">{unitName}</span>
-            </p>
-          ) : null}
+          {/* ตำแหน่ง — ตัวเดียวกับหน้า /apply (ขับรถบอกชนิด) · ชื่อคู่สัญญาถอด (5 ต.ค. 2569: การ์ดต้องเห็นเหมือนหน้า /apply) */}
+          <p className="line-clamp-1 text-base font-medium text-primary">{publicJobTitle(job)}</p>
+          {subtitle ? <p className={cn('line-clamp-2 text-sm', DASH.muted)}>{subtitle}</p> : null}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {job.urgency === 'urgent' ? (
@@ -111,30 +104,9 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
       {/* ── พร้อมประกาศไหม / ขาดอะไร (2 ต.ค. 2569 — แทน "ติดขั้น N" + จุด 4 ขั้น) ── */}
       {showReadiness && readiness ? <PublishReadinessChip readiness={readiness} /> : null}
 
-      {/* ── ที่ไหน (จังหวัด · เขต/อำเภอ) บรรทัดของตัวเอง ให้อ่านได้ครบ (4 ต.ค. 2569 ข้อ 7)
-          · แบบ C (5 ต.ค. 2569): เงิน · เพศ · อายุ รวมบรรทัดเดียว (เดิม 2 บรรทัด) ── */}
-      <div className="space-y-1">
-        <p className={cn('flex min-w-0 items-start gap-1.5 text-sm', DASH.muted)}>
-          <MapPin className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <span className="line-clamp-2">{boardCardPlace(job)}</span>
-        </p>
-        <p className={cn('flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm', DASH.muted)}>
-          <Banknote className="h-4 w-4 shrink-0" aria-hidden />
-          {money ? (
-            <span className="tabular-nums" title={money.hint ?? undefined}>
-              {money.text}
-            </span>
-          ) : (
-            <span className={TONE.warn.value}>ยังไม่ตั้งรายได้</span>
-          )}
-          <span aria-hidden>·</span>
-          {/* เพศ · อายุ — ไม่ระบุเพศ = สีเตือน (ประกาศไม่ได้จนกว่าจะเลือก) */}
-          <UserRound className="h-4 w-4 shrink-0" aria-hidden />
-          <span className={cn(!gender.known && TONE.warn.value)}>{gender.text}</span>
-          <span aria-hidden>·</span>
-          <span className="tabular-nums">{boardCardAge(job)}</span>
-        </p>
-      </div>
+      {/* ── ข้อมูลงาน: ตัวเดียวกับการ์ดหน้า /apply (`JobPublicFacts`) — ติ๊กซ่อนในขั้น 3 แล้วที่นี่ก็หายด้วย
+          (เจ้าของ 5 ต.ค. 2569: *"ไม่งั้นจะเช็คยังไงหล่ะว่าถูกต้องหรือเปล่า"*) ── */}
+      <JobPublicFacts job={job} staff />
 
       {/* สถานะงานที่ทำให้ประกาศไม่ขึ้นหน้าสาธารณะ — ต้องรู้ (เจ้าของสั่ง 17 ส.ค. 2569) */}
       {hidden && isUnitRequestWorkStatus(job.work_status) ? (

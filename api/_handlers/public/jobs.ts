@@ -1,6 +1,8 @@
 import { buildIncomeDisplay, type IncomeDisplay } from '../../../src/lib/incomeBreakdown.js';
 import { publicSafeAddress } from '../../../src/lib/publicJobPrivacy.js';
 import { payCyclesOf } from '../../../src/lib/payCycle.js';
+import { resignedMonthlyNetAverage } from '../../../src/lib/resignedIncome.js';
+import type { ResignedIncomeMonth } from '../../../src/types/index.js';
 import {
   isSiamrajUnitRequestsEnabled,
   listSiamrajUnitRequests,
@@ -69,6 +71,11 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
   return {
     id: r.id,
     unit_name: r.unit_name,
+    /**
+     * ชื่อจุดทำงาน (เช่น KYE · ENCO) — หัวการ์ดฝั่งเจ้าหน้าที่ใช้ชื่อนี้ (`unitLabel`) ⇒ หน้า /apply ต้องหัวเดียวกัน
+     * (เจ้าของ 5 ต.ค. 2569: "หน้า Apply … หน้า โพสต์ประกาศ ก็เห็นเหมือนกัน") · ระดับเดียวกับ unit_name ที่ส่งอยู่แล้ว
+     */
+    work_site_name: ((r as Record<string, unknown>).work_site_name as string | null | undefined) || undefined,
     request_no: r.request_no ?? undefined,
     request_action_name: r.request_action_name ?? undefined,
     /**
@@ -155,10 +162,38 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
      * แล้วหน้าสาธารณะไม่เคยเห็น · ส่งเฉพาะ visibility ไม่ส่งทั้งก้อน (ที่เหลือเป็นข้อมูลภายใน)
      */
     field_overrides: (() => {
+      const fo = (r as Record<string, unknown>).field_overrides as
+        | { public_visibility?: Record<string, boolean> | null; gender?: string | null; total_income?: number | null }
+        | undefined;
+      const pv = fo?.public_visibility;
+      // เพศที่ทีม Online เลือกทับ + รายได้รวมที่พิมพ์เอง (5 ต.ค. 2569) — การ์ดเจ้าหน้าที่กับหน้า /apply ต้องขึ้นค่าเดียวกัน
+      // (`publicIncomeOf`/`jobBaseIncome` อ่านจาก field_overrides) · ไม่ใช่ข้อมูลส่วนตัว
+      const gender = typeof fo?.gender === 'string' && fo.gender.trim() ? fo.gender.trim() : undefined;
+      const total = typeof fo?.total_income === 'number' && fo.total_income > 0 ? fo.total_income : undefined;
+      return pv || gender || total
+        ? {
+            ...(pv ? { public_visibility: pv } : {}),
+            ...(gender ? { gender } : {}),
+            ...(total ? { total_income: total } : {}),
+          }
+        : undefined;
+    })(),
+    /**
+     * รายได้เฉลี่ยต่อเดือน (สุทธิของคนเก่าในไซต์นี้ · เจ้าของ 5 ต.ค. 2569) — ส่ง **ยอดเดียว** ไม่ส่งงวด eSlip/ชื่อคนเก่า
+     * ติ๊กซ่อนในขั้น 3 (`average_income: false`) = ไม่ส่งเลย · สูตรเดียวกับฝั่งเจ้าหน้าที่ (`resignedMonthlyNetAverage`)
+     */
+    average_income: (() => {
       const pv = ((r as Record<string, unknown>).field_overrides as
         | { public_visibility?: Record<string, boolean> | null }
         | undefined)?.public_visibility;
-      return pv ? { public_visibility: pv } : undefined;
+      if (pv?.average_income === false) return undefined;
+      const rec = r as Record<string, unknown>;
+      return (
+        resignedMonthlyNetAverage(
+          rec.resigned_income_3m as ResignedIncomeMonth[] | null | undefined,
+          (rec.lastWorkingDay as string | null | undefined) ?? null,
+        )?.amount ?? undefined
+      );
     })(),
   };
 }
@@ -205,6 +240,9 @@ async function withBenefits(jobs: PublicJob[]): Promise<PublicJobOut[]> {
       return {
         ...rest,
         ...(found && found.length > 0 ? { benefits: found } : {}),
+        // ยอดต่อเดือนของสวัสดิการแต่ละตัว (ค่าเดินทาง 3,000 ฯลฯ) — การ์ดเจ้าหน้าที่โชว์ ⇒ หน้า /apply ต้องโชว์เหมือนกัน (5 ต.ค. 2569)
+        // ไม่ส่ง monthly_income_base — ฐานใช้ยอดที่ทีมตั้งเอง (income_display) ตามเดิม
+        ...(income?.items ? { monthly_income_items: income.items } : {}),
         ...(rest.income_display.period === 'monthly'
           ? { monthly_income: rest.income_display.total }
           : {}),

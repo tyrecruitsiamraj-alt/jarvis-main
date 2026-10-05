@@ -504,7 +504,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                   {job ? (
                     <div className="space-y-3">
                       <UnitRequestBriefFields job={job} />
-                      <RequestRateLinesBlock job={job} />
+                      <RequestRateLinesBlock job={job} posting />
                       {/* ใบเปิดไซต์ใหม่ไม่มีคนเก่า = บอกบรรทัดเดียว (ไม่วาดการ์ดที่มีแต่ "—") */}
                       {hasResignedInfo(job) ? (
                         <ResignedEmployeeBlock job={job} compact brief />

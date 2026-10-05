@@ -80,7 +80,9 @@ describe('feed กล่องงานรู้หน่วยรายได�
     expect(FEED).toContain('fetchJobBenefitChipsAndIncomesById(ids)');
     expect(FEED).toContain('it.monthly_income = income.total;');
     expect(FEED).not.toMatch(/it\.total_income\s*=\s*income/);
-    expect(JOB_CARD).toContain('publicIncomeOf(job)');
+    // 5 ต.ค. 2569: การ์ดส่งต่อให้ `JobPublicFacts` (ตัวเดียวกับหน้า /apply) → `jobBaseIncome` → `publicIncomeOf`
+    expect(JOB_CARD).toContain('<JobPublicFacts job={job} staff />');
     expect(JOB_CARD).not.toContain('incomeDisplay(');
+    expect(code('src/lib/jobPublicFacts.ts')).toContain('publicIncomeOf(job)');
   });
 });

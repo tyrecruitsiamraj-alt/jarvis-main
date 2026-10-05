@@ -22,6 +22,8 @@ export const PUBLIC_TOGGLE_FIELDS = [
   'ot',
   'boss_nationality',
   'required_date',
+  // รายได้เฉลี่ย = สุทธิเฉลี่ยต่อเดือนของคนเก่าในไซต์นี้ (เจ้าของ 5 ต.ค. 2569 · Choice "โชว์ ติ๊กซ่อนได้ในขั้น 3")
+  'average_income',
 ] as const;
 
 export type PublicToggleField = (typeof PUBLIC_TOGGLE_FIELDS)[number];
@@ -33,6 +35,7 @@ export const PUBLIC_FIELD_LABEL: Record<PublicToggleField, string> = {
   ot: 'โอที',
   boss_nationality: 'สัญชาตินายจ้าง',
   required_date: 'วันที่ต้องการ',
+  average_income: 'รายได้เฉลี่ย',
 };
 
 type VisibilityMap = NonNullable<

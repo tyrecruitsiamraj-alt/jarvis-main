@@ -486,7 +486,7 @@ const EditPublicJobFieldsDialog: React.FC<{
               id={`${uid}-place-request`}
               checked={placeMode === 'request'}
               onSelect={() => choosePlace('request')}
-              title="ใบขอเขียนว่า"
+              title="ตามใบขอ"
             >
               <p className="whitespace-pre-wrap break-words text-sm text-foreground">
                 {job.location_address?.trim() || 'ใบขอไม่ได้ใส่ที่อยู่มา'}
@@ -498,7 +498,7 @@ const EditPublicJobFieldsDialog: React.FC<{
               id={`${uid}-place-manual`}
               checked={placeMode === 'manual'}
               onSelect={() => choosePlace('manual')}
-              title="ใส่รายละเอียดเอง"
+              title="ใส่เอง"
             >
               {placeMode === 'manual' ? (
                 <>
