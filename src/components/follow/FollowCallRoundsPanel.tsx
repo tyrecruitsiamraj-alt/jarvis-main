@@ -164,7 +164,6 @@ export default function FollowCallRoundsPanel({
   round,
   onRoundChange,
   embedded = false,
-  filtersSlot,
   onOpenPerson,
 }: {
   /**
@@ -195,11 +194,6 @@ export default function FollowCallRoundsPanel({
    * (แพตเทิร์นเดียวกับ `embedded` ของ dialog ตามกติกา CLAUDE.md)
    */
   embedded?: boolean;
-  /**
-   * ตัวกรองเพิ่มที่วางข้าง "ดูเฉพาะ" บนหัวการ์ด (เจ้าของ 1 ต.ค. 2569: *"งานจบหรือยัง ทำเป็น Dropdown แล้วย้ายไปไว้
-   * กับตรง ดูเฉพาะ"*) — หน้าแม่เป็นเจ้าของ state ของมัน · ไม่ส่ง = ไม่มี
-   */
-  filtersSlot?: React.ReactNode;
   /** กด "จัดการ" ในป๊อปรายชื่อ = ปิดป๊อปนี้แล้วเปิดป๊อปจัดการของคนนั้น (หน้าแม่เป็นเจ้าของ) */
   onOpenPerson?: (entry: FollowEntry) => void;
 }) {
@@ -390,23 +384,8 @@ export default function FollowCallRoundsPanel({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-5">
           <GitBranch className={cn('h-5 w-5', TONE.primary.value)} aria-hidden />
           <h2 className="text-[17px] font-medium text-foreground">ขั้นตอนของสาย (Call Pipeline)</h2>
-          <span className="flex-1" />
-          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="ตัวกรอง">
-            {/* 🔴 สายที่ = dropdown (เจ้าของสั่ง 3 ต.ค. 2569 "เอาพวกนี้รวมกันเป็น Dropdown") —
-                เลขต่อสายเห็นครบในตารางข้างล่างแล้ว · ตัวนี้กรองตารางรายชื่อด้านล่างหน้า */}
-            <span className="text-xs text-muted-foreground">สายที่</span>
-            <ChoiceDropdown
-              value={String(activeRound)}
-              options={FOLLOW_MATRIX_ROWS.map((r) => ({
-                value: String(r),
-                label: `${r === 'all' ? 'ทั้งหมด' : FOLLOW_MATRIX_ROW_LABEL[r]} · ${matrix[r].total.length.toLocaleString('th-TH')}`,
-              }))}
-              onChange={(v) => pickRound(v === 'all' ? 'all' : (Number(v) as 1 | 2 | 3))}
-              ariaLabel="ดูเฉพาะสายที่"
-              active={activeRound !== 'all'}
-            />
-            {filtersSlot}
-          </div>
+          {/* แถวตัวกรอง (สายที่ · ใครโทร · เจ้าของงาน · ใครเพิ่ม) ย้ายไปแถวแท็บรายวัน/รายเดือนแล้ว
+              (เจ้าของสั่ง 5 ต.ค. 2569) — `FollowFilterGroup` · แผงนี้ยังเดินตามสายที่เลือกผ่าน prop `round` */}
         </div>
 
         {/**

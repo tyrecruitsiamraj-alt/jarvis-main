@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import FollowCallRoundsPanel from '@/components/follow/FollowCallRoundsPanel';
+import FollowFilterGroup from '@/components/follow/FollowFilterGroup';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { followScheduleCounts } from '@/lib/followSchedule';
@@ -1533,6 +1534,51 @@ const FollowPage: React.FC = () => {
              เพราะของเดิมซ่อนอยู่ในป๊อป "จัดการ" อีกชั้น) · ไม่ต้องจำ cellToReopen
              เพราะไม่ได้เปิดมาจากป๊อป จึงไม่มีป๊อปให้กลับไป */
           onEditRound={(round) => setEditing(round.entry)}
+          /* 🔴 แถวตัวกรอง (สายที่ · ใครโทร · เจ้าของงาน · ใครเพิ่ม) อยู่แถวเดียวกับแท็บรายวัน/รายเดือน
+             (เจ้าของสั่ง 5 ต.ค. 2569 — เดิมอยู่หัวการ์ดขั้นตอนของสาย) · "ใครโทร" เป็นตัวกรองเดียวของหัวแผงเดิม
+             (3 ต.ค. 2569 ถอด นับช่วง · งานจบหรือยัง · บรรทัดแยก AI/คน) ห้ามเติมกลับโดยไม่ได้สั่งใหม่ */
+          filtersSlot={
+            <FollowFilterGroup entries={panelEntries} round={activeRound} onRoundChange={setActiveRound}>
+              <>
+                <span className="text-xs text-muted-foreground">ใครโทร</span>
+                <ChoiceDropdown
+                  value={caller}
+                  options={FOLLOW_CALLERS.map((c) => ({
+                    value: c,
+                    label: `${FOLLOW_CALLER_LABEL[c]} · ${callerCounts[c].toLocaleString('th-TH')}`,
+                  }))}
+                  onChange={(v) => setCaller(v)}
+                  ariaLabel="ใครโทร"
+                  active={caller !== 'all'}
+                />
+                {/* เจ้าของงาน = เจ้าหน้าที่ที่ติดตาม (เจ้าของ 4 ต.ค. 2569) — เลือกแล้วเห็นทุกรายชื่อที่คนนั้นลงแผน */}
+                <span className="text-xs text-muted-foreground">เจ้าของงาน</span>
+                <ChoiceDropdown
+                  value={staffFilter}
+                  options={[
+                    { value: 'all', label: `ทุกคน · ${scopeItems.length.toLocaleString('th-TH')}` },
+                    ...staffOptions.map((o) => ({ value: o.value, label: `${o.label} · ${o.count.toLocaleString('th-TH')}` })),
+                  ]}
+                  onChange={(v) => setStaffFilter(v)}
+                  ariaLabel="เจ้าของงาน"
+                  active={staffFilter !== 'all'}
+                />
+                {/* ใครเพิ่ม (5 ต.ค. 2569) — "ของฉัน" มาก่อน: คนเพิ่มดูแค่งานตัวเองได้ในกดเดียว */}
+                <span className="text-xs text-muted-foreground">ใครเพิ่ม</span>
+                <ChoiceDropdown
+                  value={adderFilter}
+                  options={[
+                    { value: 'all', label: `ทุกคน · ${scopeItems.length.toLocaleString('th-TH')}` },
+                    ...(user?.email ? [{ value: 'me', label: `ของฉัน · ${myAddedCount.toLocaleString('th-TH')}` }] : []),
+                    ...adderOptions.map((o) => ({ value: o.value, label: `${o.label} · ${o.count.toLocaleString('th-TH')}` })),
+                  ]}
+                  onChange={(v) => setAdderFilter(v)}
+                  ariaLabel="ใครเพิ่ม"
+                  active={adderFilter !== 'all'}
+                />
+              </>
+            </FollowFilterGroup>
+          }
           /* ปุ่มบนแถวของสายที่คนโทร (เจ้าของ Choice 1 ต.ค. 2569 "ติดต่อสำเร็จ / ไม่สำเร็จ / ยกเลิก") —
              เส้นเดียวกับปุ่มลงผล/ยกเลิกในป๊อปจัดการ */
           onStaffResult={async (round, outcome, row) => {
@@ -1563,51 +1609,6 @@ const FollowPage: React.FC = () => {
               onReload={() => void reload()}
               round={activeRound}
               onRoundChange={setActiveRound}
-              filtersSlot={
-                /**
-                 * 🔴 หัวแผงเหลือตัวกรองเดียว: "ใครโทร" (เจ้าของสั่ง 3 ต.ค. 2569 "เอาออก" 3 ตัว:
-                 * นับช่วง · งานจบหรือยัง · บรรทัดแยก AI/คน) — ช่วงที่นับเดินตามแท็บ
-                 * รายวัน/รายเดือนของปฏิทินเอง ไม่มีปุ่มซ้ำ · ห้ามเติมกลับโดยไม่ได้สั่งใหม่
-                 */
-                <>
-                  <span className="text-xs text-muted-foreground">ใครโทร</span>
-                  <ChoiceDropdown
-                    value={caller}
-                    options={FOLLOW_CALLERS.map((c) => ({
-                      value: c,
-                      label: `${FOLLOW_CALLER_LABEL[c]} · ${callerCounts[c].toLocaleString('th-TH')}`,
-                    }))}
-                    onChange={(v) => setCaller(v)}
-                    ariaLabel="ใครโทร"
-                    active={caller !== 'all'}
-                  />
-                  {/* เจ้าของงาน = เจ้าหน้าที่ที่ติดตาม (เจ้าของ 4 ต.ค. 2569) — เลือกแล้วเห็นทุกรายชื่อที่คนนั้นลงแผน */}
-                  <span className="text-xs text-muted-foreground">เจ้าของงาน</span>
-                  <ChoiceDropdown
-                    value={staffFilter}
-                    options={[
-                      { value: 'all', label: `ทุกคน · ${scopeItems.length.toLocaleString('th-TH')}` },
-                      ...staffOptions.map((o) => ({ value: o.value, label: `${o.label} · ${o.count.toLocaleString('th-TH')}` })),
-                    ]}
-                    onChange={(v) => setStaffFilter(v)}
-                    ariaLabel="เจ้าของงาน"
-                    active={staffFilter !== 'all'}
-                  />
-                  {/* ใครเพิ่ม (5 ต.ค. 2569) — "ของฉัน" มาก่อน: คนเพิ่มดูแค่งานตัวเองได้ในกดเดียว */}
-                  <span className="text-xs text-muted-foreground">ใครเพิ่ม</span>
-                  <ChoiceDropdown
-                    value={adderFilter}
-                    options={[
-                      { value: 'all', label: `ทุกคน · ${scopeItems.length.toLocaleString('th-TH')}` },
-                      ...(user?.email ? [{ value: 'me', label: `ของฉัน · ${myAddedCount.toLocaleString('th-TH')}` }] : []),
-                      ...adderOptions.map((o) => ({ value: o.value, label: `${o.label} · ${o.count.toLocaleString('th-TH')}` })),
-                    ]}
-                    onChange={(v) => setAdderFilter(v)}
-                    ariaLabel="ใครเพิ่ม"
-                    active={adderFilter !== 'all'}
-                  />
-                </>
-              }
             />
           }
         />

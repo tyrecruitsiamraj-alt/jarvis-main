@@ -312,6 +312,8 @@ const FollowPlanningCalendar: React.FC<{
   roundFilter: FollowRoundFilter;
   /** แผงรอบโทร + 7 ช่องสถานะสาย — วางเป็นการ์ดของตัวเองใต้การ์ดตัวเลข */
   roundsSlot?: React.ReactNode;
+  /** แถวตัวกรองของหน้า วางต่อจากแท็บรายวัน/รายเดือน (เจ้าของสั่ง 5 ต.ค. 2569) · ไม่ส่ง = ไม่มี */
+  filtersSlot?: React.ReactNode;
   /** เวลาที่ดึงข้อมูลสำเร็จล่าสุด — ไว้บอกคนว่าหน้าไม่ได้ค้าง (`null` = ยังไม่เคยโหลดจบ) */
   lastLoadedAt?: Date | null;
   /**
@@ -344,6 +346,7 @@ const FollowPlanningCalendar: React.FC<{
   onEditRound,
   roundFilter,
   roundsSlot,
+  filtersSlot,
   lastLoadedAt,
   onStaffResult,
   onCancelRound,
@@ -535,6 +538,8 @@ const FollowPlanningCalendar: React.FC<{
                 </TabsTrigger>
               </TabsList>
             </Tabs>
+            {/* แถวตัวกรองของหน้า (สายที่ · ใครโทร · เจ้าของงาน · ใครเพิ่ม) — หน้าแม่ส่งมา (5 ต.ค. 2569) */}
+            {filtersSlot}
             <span className="flex-1" />
             {view === 'day' ? (
               <div className="flex items-center gap-1">

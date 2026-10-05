@@ -11810,3 +11810,4 @@ Choice: ถึงแล้ว/ไปแล้ว/ลา/เลื่อน/จ�
 - `src/components/follow/FollowDayReportDialog.tsx` — ตารางบนจอแบ่งหน้าด้วย `paginateDayReportRows` ตัวเดียวกับรูป (หน้าละราว 20 · ชื่อเดียวกันไม่ขาดข้ามหน้า) ⇒ หน้า N = รูปที่ N · ‹ › + "แถว a–b จาก n" อยู่เสมอ · เปลี่ยนวัน/สาย/ใครโทร = กลับหน้าแรก · คัดลอก/บันทึกรูปยังได้ทุกแถว
 - เทสต์ `tests/api/followDayReportPager2569-10-05.test.ts`
 - `src/components/follow/FollowPlanningCalendar.tsx` — รายเดือน · ภาพรวม แบ่งหน้า หน้าละ 10 คน (`MONTH_PAGE_SIZE` · `month-pager` อยู่เสมอ) · เปลี่ยนเดือน/สาย = กลับหน้า 1 · แผงข้างขวายังนับทั้งเดือน (5 ต.ค. 2569)
+- `src/components/follow/FollowFilterGroup.tsx` (**ใหม่**) — แถวตัวกรองหน้าติดตาม (สายที่ dropdown คิดเลขจาก `buildFollowCallMatrix` + ลูกจากหน้าแม่: ใครโทร · เจ้าของงาน · ใครเพิ่ม) · ย้ายจากหัวการ์ด Call Pipeline ไปแถวแท็บรายวัน/รายเดือน ผ่าน prop `filtersSlot` ของ `FollowPlanningCalendar` · `FollowCallRoundsPanel` ไม่มี `filtersSlot` แล้ว (5 ต.ค. 2569)

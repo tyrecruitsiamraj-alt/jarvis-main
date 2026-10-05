@@ -89,7 +89,9 @@ describe('หน้าการติดตาม: หัวการ์ด Call
   const panel = read('components/follow/FollowCallRoundsPanel.tsx');
 
   it('สายที่ = dropdown (3 ต.ค. 2569 "เอาพวกนี้รวมกันเป็น Dropdown") · ตัวเลขเป็นเลขใหญ่แถวเดียวแบบโล่ง (เจ้าของเลือก)', () => {
-    expect(panel).toContain('ariaLabel="ดูเฉพาะสายที่"');
+    // dropdown สายที่ ย้ายไปแถวแท็บรายวัน/รายเดือน (5 ต.ค. 2569) — FollowFilterGroup
+    expect(read('components/follow/FollowFilterGroup.tsx')).toContain('ariaLabel="ดูเฉพาะสายที่"');
+    expect(page).toContain('<FollowFilterGroup');
     expect(panel).toContain('data-testid="call-summary"');
     expect(panel).not.toContain('data-testid="call-matrix"');
     // 🔴 ไม่มีหลอดสัดส่วนใต้เลข (เจ้าของสั่ง 3 ต.ค. 2569 "เอาหลอดออก")
@@ -110,7 +112,9 @@ describe('หน้าการติดตาม: หัวการ์ด Call
     expect(calendar).not.toContain('>ปฏิทินติดตาม</h2>');
     expect(calendar).not.toContain('headerAction');
     expect(panel).toContain('buildFollowCallMatrix(entries)');
-    expect(panel.match(/\{filtersSlot\}/g)?.length).toBe(1);
+    // แถวตัวกรองย้ายจากหัวแผงไปแถวแท็บรายวัน/รายเดือน (5 ต.ค. 2569) — ปฏิทินวางหนึ่งที่ แผงไม่มีแล้ว
+    expect(panel).not.toContain('filtersSlot');
+    expect(calendar.match(/\{filtersSlot\}/g)?.length).toBe(1);
     // 🔴 ไม่หุบการ์ดตอนว่างแล้ว (เจ้าของสั่ง 1 ต.ค. 2569 "ถ้าไม่มีข้อมูลก็เป็น 0 ไป") — ห้ามกลับไปหุบ
     expect(panel).not.toContain('const allEmpty');
     expect(panel).not.toContain('ยังไม่มีสายในระบบ');
