@@ -106,7 +106,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
       <div className={cn('space-y-3', className)}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className={cn('text-xs font-medium', broken ? TONE.warn.value : DASH.muted)}>
-            {stateText.title} · {stateText.hint}
+            {stateText.title}{stateText.hint ? ` · ${stateText.hint}` : ''}
           </p>
           {stateText.canRetry && onRetry ? (
             <Button type="button" size="xs" variant="outline" onClick={onRetry}>

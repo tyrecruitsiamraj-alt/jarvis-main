@@ -220,7 +220,7 @@ function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): st
       return `${r.time ?? 'ไม่ได้ตั้งเวลา'} — ${roundResultLabel(r)}${why}${ai ? `\n    เขาตอบ: ${ai}` : ''}`;
     })
     .join('\n');
-  return `${name} · ${formatYmdDmyBe(ymd)}\n${detail}\n(กดเพื่อดูรายละเอียดและจัดการรอบนี้)`;
+  return `${name} · ${formatYmdDmyBe(ymd)}\n${detail}`;
 }
 
 /**
@@ -943,20 +943,13 @@ const FollowPlanningCalendar: React.FC<{
                                           </span>
                                         ) : reply ? (
                                           <>
+                                            {/* คำพูดจริงอย่างเดียว · สรุปของ AI ย้ายไปอยู่ตอนชี้ (QA 5 ต.ค. 2569: ร้อยแก้วทุกแถว) */}
                                             <span
                                               className="line-clamp-2 text-[12.5px] font-medium leading-snug text-foreground"
-                                              title={reply}
+                                              title={ai ? `${reply}\n\nAI สรุป: ${ai}` : reply}
                                             >
                                               “{reply}”
                                             </span>
-                                            {ai ? (
-                                              <span
-                                                className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground"
-                                                title={ai}
-                                              >
-                                                สรุปโดย AI: {ai}
-                                              </span>
-                                            ) : null}
                                           </>
                                         ) : ai ? (
                                           <span className="line-clamp-3 text-[12px] leading-snug text-foreground/80" title={ai}>
@@ -1009,10 +1002,10 @@ const FollowPlanningCalendar: React.FC<{
                                      * ตรวจผลจริง 18 สาย (10 ก.ย. 2569): 23 ช่องที่ Lumos ส่งกลับ
                                      * ไม่มีช่องไหนบอกว่าโทรเบอร์ฉุกเฉินหรือยัง และไม่มีผลไหน
                                      * เอ่ยถึงเบอร์นี้เลย · เขียนว่า "โทรแล้ว" เมื่อไหร่คือจอโกหก
+                                     * QA 5 ต.ค. 2569: ย่อเหลือสถานะสั้น (เดิม "แนบไปกับสายแล้ว · Lumos ไม่ได้บอกว่าโทรหรือยัง")
+                                     * ⚠️ ห้ามถอดทั้งบรรทัด — เจ้าของทัก 10 ก.ย. ว่า "ไม่ยอมบอกว่าโทรหาหรือยัง"
                                      */}
-                                    <span className="block text-[10.5px]">
-                                      แนบไปกับสายแล้ว · Lumos ไม่ได้บอกว่าโทรหรือยัง
-                                    </span>
+                                    <span className="block text-[10.5px]">ยังไม่รู้ว่าโทรหรือยัง</span>
                                   </span>
                                 ) : (
                                   <span
@@ -1336,7 +1329,7 @@ const FollowPlanningCalendar: React.FC<{
              * ไม่ใช่สายทั้งหมด · ของเดิมวงไม่บอกฐาน คนเลยอ่านเป็นอัตราคนมาทำงานจริง
              */}
             <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-              {`คิดจาก ${monthMicro.talked} สายที่ได้คุยเรื่องของเราจริง — ไม่รับสาย/ไม่ใช่เจ้าตัว/รับแล้วเงียบ ไม่ถูกนำมาหาร`}
+              {`จาก ${monthMicro.talked} สายที่ได้คุย`}
             </p>
 
             {/* สองอัตราที่เหลือ — คนละฐานกับวง จึงต้องเขียนฐานกำกับทุกตัว */}
@@ -1385,19 +1378,15 @@ const FollowPlanningCalendar: React.FC<{
           <Card className="overflow-hidden rounded-2xl shadow-sm">
             <div className="flex items-center gap-2 px-4 pt-4">
               <PhoneOff className={cn('h-4 w-4', TONE.warn.value)} aria-hidden />
-              <h3 className="text-[13px] font-medium text-foreground">ต้องตามด่วน</h3>
+              <h3 className="text-[13px] font-medium text-foreground">ต้องตามด่วน · ทั้งเดือน</h3>
               <span
                 className={cn('ml-auto rounded-full px-2 py-0.5 text-[11px] font-medium', TONE.warn.chip)}
               >
                 {overdueAll.length}
               </span>
             </div>
-            {/* 🔴 บอก **สิ่งที่ต้องลงมือ** ไม่ใช่บอกแค่สถานะ (ตาใหม่ 12 ก.ย. 2569:
-                *"ต้องตามด่วน แล้วให้ทำอะไร"*) */}
-            <p className="px-4 pb-3 pt-1 text-[11px] leading-snug text-muted-foreground">
-              เลยเวลานัดแล้วยังไม่มีผลกลับ — ทั้งเดือน ไม่ใช่เฉพาะวันที่เลือก ·
-              {' '}<span className="font-medium text-foreground">กดปุ่มโทรข้างชื่อ โทรเองได้เลย</span>
-            </p>
+            {/* ประโยคสอนวิธีใช้ถอดแล้ว (QA 5 ต.ค. 2569) — ปุ่มโทรอยู่ข้างชื่อทุกแถว · "ทั้งเดือน" อยู่บนหัว */}
+            <div className="pb-3" />
             {overdueAll.length === 0 ? (
               <p
                 className={cn(
@@ -1406,7 +1395,7 @@ const FollowPlanningCalendar: React.FC<{
                   TONE.success.value,
                 )}
               >
-                ไม่มีสายไหนค้าง — ตามครบแล้ว
+                ไม่มีสายค้าง
               </p>
             ) : (
               <ul className="divide-y divide-border/60 border-t border-border/70">

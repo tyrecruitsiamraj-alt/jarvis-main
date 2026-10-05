@@ -18,9 +18,10 @@ export const FOLLOW_WIZARD_STEPS: ReadonlyArray<{
   title: string;
   hint: string;
 }> = [
-  { step: 1, title: 'คนที่จะติดตาม', hint: 'เลือกชื่อจากบอร์ด หรือคีย์เอง + เรื่องที่จะให้โทร' },
-  { step: 2, title: 'หน่วยงาน', hint: 'ตามเรื่องให้หน่วยงานไหน (ข้ามได้)' },
-  { step: 3, title: 'ตั้งเวลา', hint: 'ให้ AI โทรเมื่อไหร่' },
+  // ป้ายใต้ขั้นสั้นที่สุด (QA 5 ต.ค. 2569 — เดิมพูดซ้ำคำโปรยหัวป๊อป)
+  { step: 1, title: 'คนที่จะติดตาม', hint: 'ชื่อ · เบอร์ · เรื่อง' },
+  { step: 2, title: 'หน่วยงาน', hint: 'ถ้ามี' },
+  { step: 3, title: 'ตั้งเวลา', hint: 'วันเวลาที่โทร' },
 ];
 
 export type FollowWizardValues = {

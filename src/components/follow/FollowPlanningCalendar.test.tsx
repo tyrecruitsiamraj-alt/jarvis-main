@@ -207,7 +207,8 @@ describe('เบอร์ฉุกเฉินบนหน้ารายวั�
     // เพราะหัวคอลัมน์บอกอยู่)
     expect(within(li).getByText(/\+66898143230/)).toBeTruthy();
     // ถ้อยคำชัดขึ้น 10 ก.ย. 2569 — แยก "แนบเบอร์ไปแล้ว" (เรารู้) ออกจาก "โทรหรือยัง" (เราไม่รู้)
-    expect(within(li).getByText(/แนบไปกับสายแล้ว · Lumos ไม่ได้บอกว่าโทรหรือยัง/)).toBeTruthy();
+    // QA 5 ต.ค. 2569: ย่อเหลือสถานะสั้น · ยังห้ามเขียนว่าโทรแล้ว
+    expect(within(li).getByText('ยังไม่รู้ว่าโทรหรือยัง')).toBeTruthy();
     expect(within(li).queryByText(/โทรเบอร์ฉุกเฉินแล้ว/)).toBeNull();
   });
 
@@ -364,8 +365,9 @@ describe('ตำหนิ 10 ก.ย. 2569', () => {
     ]);
     const row = dayRows()[0];
     expect(row.textContent).toContain('ไม่ไปแล้ว รถยางแตก');
-    // สรุปของ AI ยังอยู่ แต่เป็นตัวรอง — ต้องมีคำกำกับว่าเป็นของ AI ไม่ใช่คำของเขา
-    expect(row.textContent).toContain('สรุปโดย AI:');
+    // QA 5 ต.ค. 2569: สรุปของ AI ไม่ขึ้นเป็นร้อยแก้วทุกแถวแล้ว — อยู่ตอนชี้ (title) พร้อมคำกำกับว่าเป็นของ AI
+    expect(row.textContent).not.toContain('ผู้รับสายแจ้งว่ารถยางแตก');
+    expect(row.querySelector('[title*="AI สรุป: ผู้รับสายแจ้งว่ารถยางแตก"]')).toBeTruthy();
   });
 
   it('ไม่มีคำพูดแต่มีสรุป ⇒ ใช้สรุปแทน · ไม่มีทั้งคู่ ⇒ บอกตรง ๆ ห้ามเดาว่าเขาไม่พูด', () => {
@@ -403,8 +405,7 @@ describe('ตำหนิ 10 ก.ย. 2569', () => {
       }),
     ]);
     const text = dayRows()[0].textContent ?? '';
-    expect(text).toContain('แนบไปกับสายแล้ว');
-    expect(text).toContain('ไม่ได้บอกว่าโทรหรือยัง');
+    expect(text).toContain('ยังไม่รู้ว่าโทรหรือยัง');
     expect(text).not.toContain('โทรแล้ว');
   });
 
@@ -587,9 +588,10 @@ describe('แผน 20/20 — คำตอบต้องอยู่บนจ�
     expect(screen.queryByText('ยังไม่มีผลเดือนนี้')).toBeNull();
   });
 
-  it('🔴 "ต้องตามด่วน" ต้องบอกสิ่งที่ต้องลงมือ ไม่ใช่บอกแค่สถานะ', () => {
+  it('"ต้องตามด่วน" บอกขอบเขตบนหัว · ประโยคสอนวิธีใช้ถอดแล้ว (QA 5 ต.ค. 2569)', () => {
     renderCalendar([entry({ id: 'a', call_round: 1 })]);
-    expect(screen.getByText(/กดปุ่มโทรข้างชื่อ โทรเองได้เลย/)).toBeTruthy();
+    expect(screen.getByText('ต้องตามด่วน · ทั้งเดือน')).toBeTruthy();
+    expect(screen.queryByText(/กดปุ่มโทรข้างชื่อ/)).toBeNull();
   });
 
   /** 🔴 เจ้าของสั่ง 1 ต.ค. 2569 (Choice "เอาออกทั้ง 2 จุด") — บรรทัดอัปเดตเหลือแค่เวลา */
@@ -660,7 +662,7 @@ describe('ผลละเอียดของเดือน', () => {
         call_summary: 'ผู้รับสายบอกว่ากำลังเดินทางอยู่',
       }),
     ]);
-    expect(screen.getByText(/คิดจาก 1 สายที่ได้คุยเรื่องของเราจริง/)).toBeTruthy();
+    expect(screen.getByText('จาก 1 สายที่ได้คุย')).toBeTruthy();
   });
 
   it('มีอัตรารับสายและอัตราได้คุย พร้อมเศษส่วนกำกับ', () => {

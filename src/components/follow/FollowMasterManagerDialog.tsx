@@ -108,7 +108,8 @@ export default function FollowMasterManagerDialog<T>({
       <DialogContent className="flex max-h-[85vh] max-w-lg flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="text-base">{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          {/* ว่าง = ไม่มีคำโปรย (QA 5 ต.ค. 2569) · ยังมีให้โปรแกรมอ่านจอ */}
+          <DialogDescription className={description ? undefined : 'sr-only'}>{description || title}</DialogDescription>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">

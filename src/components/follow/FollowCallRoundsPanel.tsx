@@ -391,7 +391,7 @@ export default function FollowCallRoundsPanel({
         {/* หัวการ์ด: ไอคอน + ชื่อเรื่อง ซ้าย · ตัวกรองขวา */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-5">
           <GitBranch className={cn('h-5 w-5', TONE.primary.value)} aria-hidden />
-          <h2 className="text-[17px] font-medium text-foreground">ขั้นตอนของสาย (Call Pipeline)</h2>
+          <h2 className="text-[17px] font-medium text-foreground">ขั้นตอนของสาย</h2>
           {/* แถวตัวกรอง (สายที่ · ใครโทร · เจ้าของงาน · ใครเพิ่ม) ย้ายไปแถวแท็บรายวัน/รายเดือนแล้ว
               (เจ้าของสั่ง 5 ต.ค. 2569) — `FollowFilterGroup` · แผงนี้ยังเดินตามสายที่เลือกผ่าน prop `round` */}
         </div>

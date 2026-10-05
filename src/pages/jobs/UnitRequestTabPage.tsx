@@ -638,9 +638,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
           <AlertDialogHeader>
             <AlertDialogTitle>ให้ AI โทรหา {pickedMatches.length} คนนี้?</AlertDialogTitle>
             <AlertDialogDescription>
-              AI จะโทรออกหาคนในรายชื่อนี้จริง (เว้นช่วง 20:00–08:00 น. ระบบเลื่อนให้เอง) ·
-              คนที่มีเจ้าหน้าที่ถือไปโทรอยู่ · เบอร์ที่พักไว้ · คนที่เคยปฏิเสธงานใบนี้
-              ระบบจะข้ามให้เองและรายงานกลับ
+              AI โทรออกจริงทันที · ข้ามคนที่เจ้าหน้าที่ถือไว้ เบอร์ที่พักไว้ และคนที่เคยปฏิเสธใบนี้
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="max-h-48 overflow-y-auto rounded-xl border border-border/70 px-3 py-2">

@@ -59,3 +59,37 @@ describe('กันจอขาว', () => {
     expect(read('src/components/jobs/AddChannelLinks.tsx')).toContain("if (!link?.code) throw new Error('สร้างลิงก์ไม่สำเร็จ');");
   });
 });
+
+describe('คำบนจอ — ตัดประโยคอธิบาย / ไม่มีรหัสอังกฤษดิบ', () => {
+  it('รหัสผลโทรในสรุปของ Lumos กลายเป็นคำไทยของงานติดตาม', async () => {
+    const { thaiOutcomeWords } = await import('../../src/lib/followPlanning');
+    expect(thaiOutcomeWords('ผลลัพธ์ที่บันทึกไว้คือ confirmed')).not.toMatch(/confirmed/);
+    expect(thaiOutcomeWords('สถานะ preparing')).toBe('สถานะ กำลังเตรียมสาย');
+    expect(thaiOutcomeWords('ข้อความปกติ')).toBe('ข้อความปกติ');
+  });
+  it('ไม่มีข้อความช่วงห้ามโทร 20:00–08:00 บนจอแล้ว (ยกเลิก 28 ก.ย.)', () => {
+    for (const f of [
+      'src/components/recruit-rm/CallChoiceConfirmDialog.tsx',
+      'src/pages/jobs/UnitRequestTabPage.tsx',
+      'src/components/jobs/JobRecallSuggestions.tsx',
+      'src/components/dashboard/LumosCallRatePanel.tsx',
+    ]) {
+      expect(read(f), f).not.toMatch(/20:00–08:00/);
+    }
+  });
+  it('ประโยคยาวที่ QA เจอหายจากจอ', () => {
+    const gone: Array<[string, string]> = [
+      ['src/pages/follow/FollowPage.tsx', 'ทำทีละขั้น — ใครก่อน'],
+      ['src/pages/follow/FollowPage.tsx', '① คนที่จะติดตาม'],
+      ['src/components/follow/StaffContactField.tsx', 'เลือกชื่อแล้วเบอร์ขึ้นเอง'],
+      ['src/components/follow/FollowPlanningCalendar.tsx', 'ไม่ถูกนำมาหาร'],
+      ['src/components/follow/FollowPlanningCalendar.tsx', 'ไม่ใช่เฉพาะวันที่เลือก'],
+      ['src/components/follow/FollowEditDialog.tsx', 'ใครกรอกคนนั้นเป็นเจ้าของ'],
+      ['src/components/follow/RoundScriptNote.tsx', 'แก้บทได้ที่หน้าตั้งค่า'],
+      ['src/components/follow/FollowCallRoundsPanel.tsx', '(Call Pipeline)'],
+      ['src/components/jobs/JobBoardView.tsx', 'ตัวเลขข้างบนทั้งหมดไม่นับส่วนนี้'],
+      ['src/lib/recruitRm.ts', 'ล็อกต้องเช็คสิทธิ์ BU'],
+    ];
+    for (const [f, text] of gone) expect(read(f), `${f}: ${text}`).not.toContain(text);
+  });
+});

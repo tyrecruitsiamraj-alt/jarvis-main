@@ -160,8 +160,7 @@ const JobRecallSuggestions: React.FC<{ jobId: string }> = ({ jobId }) => {
                     {pickedNames.length > 10 ? ` และอีก ${pickedNames.length - 10} คน` : ''}
                   </p>
                   <p className={cn('text-[10px]', DASH.muted)}>
-                    ระบบเว้นช่วง 20:00–08:00 น. ให้เอง · คนที่มีเจ้าหน้าที่ถือไปโทรอยู่ ·
-                    เบอร์ที่พักไว้ · คนที่เคยปฏิเสธใบนี้ จะถูกข้ามและรายงานกลับ
+                    ข้ามคนที่เจ้าหน้าที่ถือไว้ เบอร์ที่พักไว้ และคนที่เคยปฏิเสธใบนี้
                   </p>
                   <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                     <Button size="sm"

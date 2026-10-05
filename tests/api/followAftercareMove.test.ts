@@ -21,6 +21,7 @@ import {
   continueStartYmd,
   firstContinueDraft,
   lastFollowYmd,
+  moveBaseYmd,
   moveRoundDays,
   parseContinueDays,
   validateContinue,
@@ -224,5 +225,16 @@ describe('อื่น ๆ', () => {
     expect(isAftercareTopic(` ${AFTERCARE_TOPIC} `)).toBe(true);
     expect(isAftercareTopic('แจ้งเข้างาน')).toBe(false);
     expect(isAftercareTopic(null)).toBe(false);
+  });
+});
+
+describe('วันฐานไม่ย้อนหลังวันนี้ (QA 5 ต.ค. 2569)', () => {
+  const today = new Date('2026-10-05T03:00:00Z'); // 10:00 ไทย
+  it('วันสุดท้ายผ่านมาแล้ว (23/9) ⇒ นับจากวันนี้ · รอบแรก 3 วัน = 8/10 ไม่ใช่ 26/9', () => {
+    expect(moveBaseYmd('2026-09-23', today)).toBe('2026-10-05');
+    expect(moveRoundDays([{ days: '3', time: '09:00', mode: 'ai' }], moveBaseYmd('2026-09-23', today))[0]).toBe('2026-10-08');
+  });
+  it('วันสุดท้ายยังไม่ถึง ⇒ บวกจากวันสุดท้ายตามที่เจ้าของสั่ง', () => {
+    expect(moveBaseYmd('2026-10-07', today)).toBe('2026-10-07');
   });
 });

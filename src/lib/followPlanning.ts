@@ -500,7 +500,20 @@ export function isGoodResult(round: FollowPlanningRound): boolean {
  */
 export function roundAiSummary(round: FollowPlanningRound): string | null {
   const s = (round.entry.call_summary ?? '').trim();
-  return s === '' ? null : s;
+  return s === '' ? null : thaiOutcomeWords(s);
+}
+
+/** สถานะคิวที่ Lumos ชอบหลุดมาในสรุป — นอกชุดผลโทร */
+const QUEUE_STATUS_WORDS: Record<string, string> = { preparing: 'กำลังเตรียมสาย', pending: 'รอโทร', completed: 'โทรจบแล้ว' };
+const RAW_OUTCOME_RE =
+  /\b(confirmed|acknowledged|declined|reschedule_requested|wrong_person|no_answer|busy|unresponsive|failed|cancelled|preparing|pending|completed)\b/g;
+
+/**
+ * รหัสอังกฤษในสรุปของ Lumos → คำไทยของงานติดตาม (QA 5 ต.ค. 2569: "…ผลลัพธ์ที่บันทึกไว้คือ confirmed")
+ * แปลแค่รหัสที่รู้จักทั้งคำ ไม่แตะเนื้อความอื่น
+ */
+export function thaiOutcomeWords(text: string): string {
+  return text.replace(RAW_OUTCOME_RE, (code) => QUEUE_STATUS_WORDS[code] ?? followCallOutcomeText(code));
 }
 
 /**

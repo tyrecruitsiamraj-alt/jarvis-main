@@ -834,6 +834,12 @@ const FollowPage: React.FC = () => {
         setFormError('ยังไม่มีสายให้โทร — เลือกวันที่จะโทร แล้วตั้งเวลาอย่างน้อย 1 สาย');
         return;
       }
+      /** 🔴 เวลาที่ผ่านไปแล้วจับก่อนส่ง (QA 5 ต.ค. 2569: ค่าเริ่ม = วันนี้ 07:00 · เปิดตอนเย็นกดบันทึก ⇒ server ปฏิเสธวันแรกทีหลัง) */
+      const pastCall = calls.find((c) => !c.timeTbd && new Date(c.scheduledAt).getTime() <= Date.now());
+      if (pastCall) {
+        setFormError(`${formatYmdDmyBe(pastCall.day)} ${pastCall.time} ผ่านมาแล้ว · เปลี่ยนเวลา หรือเริ่มวันพรุ่งนี้`);
+        return;
+      }
       const groupId = crypto.randomUUID();
       const dupCheck = findScheduleDuplicates(
         phone,
@@ -1482,7 +1488,7 @@ const FollowPage: React.FC = () => {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              title="ตั้งค่ารายการตัวเลือก (ทำครั้งเดียวตอนเริ่มใช้)"
+              title="ตั้งค่าตัวเลือก"
               aria-label="ตั้งค่าตัวเลือก"
               className={cn(
                 'inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-[11px] font-medium sm:px-3',
@@ -1863,7 +1869,8 @@ const FollowPage: React.FC = () => {
                 </Button>
               ) : null}
               <DialogTitle>เพิ่มคนที่ต้องการติดตาม</DialogTitle>
-              <DialogDescription>ทำทีละขั้น — ใครก่อน แล้วหน่วยงาน แล้วค่อยตั้งวันเวลาที่จะโทร</DialogDescription>
+              {/* QA 5 ต.ค. 2569: คำโปรยพูดซ้ำแถบขั้น 1·2·3 ⇒ เหลือไว้ให้โปรแกรมอ่านจอเท่านั้น */}
+              <DialogDescription className="sr-only">เพิ่มคนที่ต้องการติดตาม 3 ขั้น</DialogDescription>
             </DialogHeader>
           <form
             /**
@@ -1880,17 +1887,7 @@ const FollowPage: React.FC = () => {
             }}
             className="jarvis-frost space-y-3 p-4 sm:p-5"
           >
-            {/* 🔴 บอกทางทั้งเส้นก่อน (12 ก.ย. 2569) — ตาใหม่ปิดฟอร์มทิ้งกลางคันเพราะ
-                ไม่รู้ว่าขั้น 2-3 มีอะไร กลัวกรอกผิดแล้วพัง */}
-            <p className="text-[11.5px] leading-snug text-muted-foreground">
-              <span className="font-medium text-foreground">ขั้นที่ {step} จาก 3</span>
-              {' · '}① คนที่จะติดตาม → ② หน่วยงาน (ข้ามได้) → ③ วันเวลาที่ให้ AI โทร
-              {step === 1 ? (
-                <>
-                  {' · '}ช่องที่มี <span className={TONE.danger.value}>*</span> ต้องกรอก
-                </>
-              ) : null}
-            </p>
+            {/* บรรทัด "ขั้นที่ N จาก 3 · ① → ② → ③" ถอดแล้ว (QA 5 ต.ค. 2569) — แถบขั้นข้างล่างบอกทางทั้งเส้นอยู่แล้ว */}
             {/* แถบขั้น 1→2→3 (เจ้าของสั่ง 18 ส.ค. 2569) — กดย้อนกลับขั้นที่ทำแล้วได้
                 ขั้นที่ยังไม่ถึงกดไม่ได้ ต้องผ่านด่านของขั้นก่อนหน้าเอง */}
             <ol className="flex items-stretch gap-1.5">
@@ -2037,11 +2034,7 @@ const FollowPage: React.FC = () => {
               </button>
               {unitName ? (
                 <span className="jarvis-chip jarvis-chip-info">{unitName}</span>
-              ) : (
-                <span className="text-[11px] text-muted-foreground">
-                  ข้ามได้ถ้าไม่ผูกหน่วยงาน
-                </span>
-              )}
+              ) : null}
             </div>
 
             {/* หน่วยงาน (096 · เจ้าของสั่ง 17 ส.ค. 2569) — เลือกจากใบขอแล้วรหัสไซต์ขึ้นเอง
@@ -2065,7 +2058,7 @@ const FollowPage: React.FC = () => {
                   // พิมพ์เองแล้วรหัสไซต์เดิมใช้ไม่ได้ — รหัสไซต์มาจากการ "เลือกจากบอร์ด" เท่านั้น
                   if (siteCode) setSiteCode('');
                 }}
-                placeholder="กดปุ่มด้านบนเพื่อเลือก หรือพิมพ์ชื่อหน่วยงานเอง"
+                placeholder="ชื่อหน่วยงาน"
                 className="jarvis-soft-field min-h-[46px] w-full"
               />
               {siteCode ? (
@@ -2083,11 +2076,7 @@ const FollowPage: React.FC = () => {
                     ล้าง
                   </button>
                 </p>
-              ) : (
-                <p className="ml-1 text-[10px] text-muted-foreground">
-                  เลือกจากบอร์ดแล้วรหัสไซต์จะขึ้นเอง · พิมพ์เองได้แต่จะไม่มีรหัสไซต์
-                </p>
-              )}
+              ) : null}
             </div>
 
             {/* 🔴 ช่องเบอร์เจ้าหน้าที่ **ย้ายไปขั้น 3 (หน้าตั้งวันเวลา)** แล้ว
@@ -2488,10 +2477,7 @@ const FollowPage: React.FC = () => {
                       รวม {days} วัน {calls.length} สาย — AI โทร {ai} · เราโทรเอง {calls.length - ai}
                     </p>
                   ) : (
-                    <p className="ml-1 text-[11px] text-muted-foreground">
-                      ① เลือกช่วงวัน แล้วเลือกว่าวันไหนใครโทร → ② วันละกี่รอบ
-                      แล้วระบบจะสรุปจำนวนสายให้
-                    </p>
+                    <p className="ml-1 text-[11px] text-muted-foreground">ยังไม่มีสาย</p>
                   );
                 })()}
               </div>
@@ -2653,7 +2639,7 @@ const FollowPage: React.FC = () => {
                     : `ตั้งไว้ ${scheduledAtsPreview} สาย`}
                   {!scheduleMode && manualTimesPreview > 0
                     ? ` · คนโทร ${manualTimesPreview} สาย · AI โทร ${scheduledAtsPreview - manualTimesPreview} สาย`
-                    : ' · กดแล้วไม่ต้องทำอะไรต่อ AI โทรเองตามเวลา'}
+                    : ''}
                 </span>
               </div>
             ) : null}
@@ -2852,7 +2838,7 @@ const FollowPage: React.FC = () => {
         open={topicManagerOpen}
         onClose={() => setTopicManagerOpen(false)}
         title="เรื่องที่จะให้โทรติดตาม"
-        description="ตัวเลือกใน dropdown ตอนเพิ่มรายชื่อ — เพิ่มแล้วใช้ได้ทันทีทุกฟอร์ม"
+        description=""
         fields={[{ key: 'name', placeholder: 'เพิ่มเรื่องใหม่ เช่น ติดตามเบิกเบี้ยเลี้ยง' }]}
         load={listFollowTopics}
         create={(f) => createFollowTopic(f.name ?? '')}

@@ -311,26 +311,25 @@ const RecruitOverview: React.FC<{
         />
       </div>
 
-      {/* ─── เส้นทางของรายชื่อ + งานค้างตอนนี้ ─── */}
+      {/* ─── เส้นทางของรายชื่อ + งานค้างตอนนี้ ─── (คำโปรยใต้หัวถอดเกือบหมด QA 5 ต.ค. 2569 · มีปุ่ม "วิธีอ่าน" แล้ว) */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <OverviewCard
           icon={Filter}
           title="เส้นทางของรายชื่อ"
-          sub={`รายชื่อที่เข้ามา${period} ไปถึงขั้นไหนแล้ว`}
           className="lg:col-span-2"
         >
           {/* 🔴 เดือนที่ยังไม่มีรายชื่อ = ขั้นครบเป็น 0 (เจ้าของสั่ง 1 ต.ค. 2569 — สลับเดือนแล้วการ์ดห้ามย่อ/ขยายเอง) */}
           {apps ? <FunnelList steps={view.steps} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
           {data.errors.board ? <p className={cn('text-xs', TONE.warn.value)}>{data.errors.board}</p> : null}
         </OverviewCard>
-        <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={`สถานะวันนี้ ไม่ขึ้นกับ${isRange ? 'ช่วง' : 'เดือน'}ที่เลือก`}>
+        <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">
           {data.backlog ? <BacklogBody backlog={data.backlog} /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
         </OverviewCard>
       </div>
 
       {/* ─── กรอกแล้วโทรวันไหน + รายวัน ─── */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <OverviewCard icon={Timer} title="กรอกแล้วโทรวันไหน" sub="นับครบ 24 ชม. เป็น 1 วัน">
+        <OverviewCard icon={Timer} title="กรอกแล้วโทรวันไหน">
           {apps ? <DelayList rows={view.delay} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
         </OverviewCard>
         <div className="min-w-0 lg:col-span-2">
@@ -340,21 +339,21 @@ const RecruitOverview: React.FC<{
 
       {/* ─── ช่องทาง + ตำแหน่ง ─── */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <OverviewCard icon={Megaphone} title="ช่องทางการสมัคร" sub={`รายชื่อ${period}มาจากช่องทางไหน`} className="lg:col-span-2">
+        <OverviewCard icon={Megaphone} title="ช่องทางการสมัคร" className="lg:col-span-2">
           <ChannelTable rows={view.channels.rows} total={view.channels.total} />
         </OverviewCard>
-        <OverviewCard icon={Briefcase} title="ตำแหน่งที่สมัคร" sub={`10 อันดับแรกของ${isRange ? 'ช่วง' : 'เดือน'}`}>
+        <OverviewCard icon={Briefcase} title="ตำแหน่งที่สมัคร" sub="10 อันดับ">
           <PositionList rows={view.positions} />
         </OverviewCard>
       </div>
 
       {/* ─── เหตุผลที่ไม่สำเร็จ ─── */}
-      <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub={`ผลล่าสุดของรายชื่อ${period} แยกตามขั้น`}>
+      <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ">
         <ReasonColumns groups={view.reasons} />
       </OverviewCard>
 
       {/* ─── ผลงานรายคน ─── */}
-      <OverviewCard icon={Users} title="ผลงานรายคน" sub={`งานที่ลงผลใน${period} · กดหัวคอลัมน์เพื่อเรียง`}>
+      <OverviewCard icon={Users} title="ผลงานรายคน">
         {data.staff ? <StaffTable staff={data.staff} ai={data.ai} /> : <SectionError message={data.errors.staff ?? 'อ่านผลงานรายคนไม่ได้'} />}
       </OverviewCard>
     </div>

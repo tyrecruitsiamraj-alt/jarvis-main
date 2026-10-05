@@ -2005,10 +2005,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             <Separator className="mb-4" />
             <div className="mb-3">
               <h2 className="text-sm font-medium text-foreground">กล่องลอย (ไม่ผูกใบขอ)</h2>
-              <p className={cn('mt-0.5 text-xs', DASH.muted)}>
-                ประกาศที่ไม่ได้มาจากใบขอของหน่วยงาน — ตัวเลขข้างบนทั้งหมดไม่นับส่วนนี้ ·
-                กดที่กล่องเพื่อสร้างลิงก์รับสมัครของประเภทนั้น
-              </p>
+              {/* คำโปรยใต้หัวถอดแล้ว (QA 5 ต.ค. 2569) — หัว "ไม่ผูกใบขอ" บอกพอแล้ว */}
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {STANDALONE_POSTING_KINDS.map((k) => {

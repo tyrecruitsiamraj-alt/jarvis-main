@@ -435,7 +435,7 @@ export function canHoldApplication(row: {
 }): RmHoldability {
   if (!row.phone?.trim()) return { ok: false, reason: 'ไม่มีเบอร์โทร' };
   if (!row.job_id?.trim()) {
-    return { ok: false, reason: 'ใบคีย์เอง ไม่ผูกใบขอ — เก็บเข้าถังโทรไม่ได้ (ล็อกต้องเช็คสิทธิ์ BU จากใบขอ)' };
+    return { ok: false, reason: 'ใบคีย์เองที่ไม่ผูกใบขอ เก็บไปโทรเองไม่ได้' };
   }
   return { ok: true };
 }

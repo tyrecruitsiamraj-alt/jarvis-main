@@ -88,9 +88,6 @@ const RoundScriptNote: React.FC<{
               {line}
             </p>
           ))}
-          <p className={cn('pt-0.5 text-[10px]', DASH.muted)}>
-            คำใน {'{ }'} จะถูกเติมค่าจริงตอนโทร · แก้บทได้ที่หน้าตั้งค่า → บทพูดของ AI
-          </p>
         </div>
       ) : null}
     </div>

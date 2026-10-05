@@ -330,8 +330,7 @@ export default function FollowEditDialog({
             เจ้าของข้อมูล{' '}
             <span className="font-medium text-foreground">
               {entry.created_by_name || 'ไม่ทราบ'}
-            </span>{' '}
-            — แก้ไม่ได้ ใครกรอกคนนั้นเป็นเจ้าของ
+            </span>
           </DialogDescription>
         </DialogHeader>
         {scheduleEditing ? (
@@ -452,11 +451,7 @@ export default function FollowEditDialog({
                   ล้าง
                 </button>
               </p>
-            ) : (
-              <p className="ml-1 text-[10px] text-muted-foreground">
-                เลือกจากบอร์ดแล้วรหัสไซต์จะขึ้นเอง · พิมพ์เองได้แต่จะไม่มีรหัสไซต์
-              </p>
-            )}
+            ) : null}
           </div>
           {/* dropdown ชื่อ+เบอร์จากรายชื่อกลาง (099 · เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ)
               ⚠️ select ในฟอร์มนี้กด Enter แล้วฟอร์มยิง save ได้ — ยอมรับได้เพราะ
@@ -482,7 +477,7 @@ export default function FollowEditDialog({
             {/* สายคนโทรไม่เคยเข้าคิว (call_status = null) — เดิมขึ้นคำเตือนนี้ผิด ๆ ทุกครั้ง */}
             {entry.call_status && entry.call_status !== 'pending' ? (
               <p className={cn('ml-1 rounded-lg px-2 py-1 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
-                สายนี้ AI รับไปแล้ว — แก้ที่นี่ไม่ทำให้สายที่ออกไปเปลี่ยนตาม
+                AI รับสายนี้ไปแล้ว
               </p>
             ) : null}
           </div>
@@ -673,11 +668,7 @@ export default function FollowEditDialog({
               >
                 {roundsNote}
               </p>
-            ) : (
-              <p className="text-[10px] text-muted-foreground">
-                กดเพิ่มรอบแล้วตั้งวัน-เวลา · เวลาซ้ำกับรอบเดิมจะถูกตัดให้อัตโนมัติ
-              </p>
-            )}
+            ) : null}
           </div>
 
           <div className="space-y-1.5">

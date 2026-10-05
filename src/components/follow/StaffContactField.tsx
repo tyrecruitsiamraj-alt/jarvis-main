@@ -174,11 +174,8 @@ export default function StaffContactField({
           className="jarvis-soft-field min-h-[46px] w-full"
         />
       </div>
-      <p className="ml-1 text-[10px] text-muted-foreground">
-        เลือกชื่อแล้วเบอร์ขึ้นเอง — ชื่อ/เบอร์ตั้งที่ <strong>ตั้งค่า → ผู้ใช้งาน</strong>{' '}
-        (ชื่อเล่น + สายงาน สรรหา/คัดสรร + เบอร์) · ชื่อที่ยังไม่ได้ตั้ง พิมพ์เบอร์เองได้
-        แล้วระบบจำไว้ให้ · AI บอกเบอร์นี้ตอนท้ายสายให้ผู้สมัครโทรกลับ
-      </p>
+      {/* คำใบ้สามท่อนถอดแล้ว (QA 5 ต.ค. 2569) — เหลือป้ายสั้นบอกว่าเบอร์นี้ใช้ทำอะไร */}
+      <p className="ml-1 text-[10px] text-muted-foreground">เบอร์ที่ AI บอกให้โทรกลับ</p>
     </div>
   );
 }

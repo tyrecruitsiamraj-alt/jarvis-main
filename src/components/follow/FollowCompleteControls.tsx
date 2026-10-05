@@ -56,7 +56,7 @@ const FollowCompleteControls: React.FC<{
         disabled={busy}
         onClick={() => setOpen(true)}
         /* กดแล้วยัง**ไม่ปิดทันที** — กางให้เลือกเหตุผลก่อน · คนใหม่ไม่รู้ ต้องบอก */
-        title="ปิดงานติดตามรายนี้ — กดแล้วเลือกก่อนว่าปิดเพราะอะไร ยังไม่ปิดทันที"
+        title="ปิดงานติดตามรายนี้"
         /**
          * 🔴 **คำบนปุ่มต้องขึ้นต้นด้วยกริยา และห้ามใช้สีเขียวแบบป้ายสถานะ**
          * (เจ้าของทัก 1 ก.ย. 2569: *"ทำไมขึ้นว่าเสร็จสิ้น เพราะในระบบ Lumos บอกยกเลิก
@@ -110,7 +110,7 @@ const FollowCompleteControls: React.FC<{
         value={note}
         maxLength={300}
         onChange={(e) => setNote(e.target.value)}
-        placeholder="หมายเหตุ (ถ้ามี) — พิมพ์ก่อนกดคำด้านบน"
+        placeholder="หมายเหตุ (ถ้ามี)"
         className="min-h-[36px] rounded-lg border border-border bg-background px-2.5 text-[12px]"
       />
       {alwaysOpen ? null : (

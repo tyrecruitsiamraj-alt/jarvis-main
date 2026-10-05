@@ -47,6 +47,7 @@ import {
   firstMoveRound,
   isAftercareTopic,
   lastFollowYmd,
+  moveBaseYmd,
   moveRoundDays,
   nextMoveRound,
   openFollowRounds,
@@ -264,8 +265,9 @@ const MoveToAftercareDialog: React.FC<{
   const aftercare = isAftercareTopic(g?.topic);
   const title = aftercare ? 'ตามต่อ' : 'ย้ายไปดูแลหลังเริ่มงาน';
   const today = now();
-  /** วันฐาน = วันติดตามวันสุดท้ายของชุด · รอบแรกนับจากวันนี้ รอบถัดไปบวกต่อจากรอบก่อน */
-  const baseYmd = g ? lastFollowYmd(g.rounds, today) : null;
+  /** วันฐาน = วันติดตามวันสุดท้ายของชุด (ไม่ย้อนหลังวันนี้) · รอบแรกนับจากวันฐาน รอบถัดไปบวกต่อจากรอบก่อน */
+  const lastYmd = g ? lastFollowYmd(g.rounds, today) : null;
+  const baseYmd = lastYmd ? moveBaseYmd(lastYmd, today) : null;
   const roundDays = baseYmd ? moveRoundDays(rounds, baseYmd) : rounds.map(() => null);
 
   const patch = (i: number, next: Partial<MoveRoundDraft>) =>
@@ -349,9 +351,14 @@ const MoveToAftercareDialog: React.FC<{
           </DialogDescription>
         </DialogHeader>
 
-        {baseYmd ? (
+        {lastYmd && baseYmd ? (
           <p className="text-xs text-muted-foreground" data-testid="move-base-day">
-            ติดตามวันสุดท้าย <span className="tabular-nums text-foreground">{formatYmdDmyBe(baseYmd)}</span>
+            ติดตามวันสุดท้าย <span className="tabular-nums text-foreground">{formatYmdDmyBe(lastYmd)}</span>
+            {baseYmd !== lastYmd ? (
+              <>
+                {' · '}นับจากวันนี้ <span className="tabular-nums text-foreground">{formatYmdDmyBe(baseYmd)}</span>
+              </>
+            ) : null}
           </p>
         ) : null}
 

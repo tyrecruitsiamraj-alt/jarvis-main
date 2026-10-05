@@ -72,8 +72,7 @@ const CallChoiceConfirmDialog: React.FC<CallChoiceConfirmDialogProps> = ({
       <div className={cn('space-y-2 rounded-xl border p-3', DASH.card)}>
         <p className="text-sm font-medium">ให้ AI โทรหา {names.length} คนนี้?</p>
         <p className={cn('text-xs', DASH.muted)}>
-          AI จะโทรออกหาคนในรายชื่อนี้จริง (เว้นช่วง 20:00–08:00 น. ระบบเลื่อนให้เอง) · คนที่มี
-          เจ้าหน้าที่ถือไปโทรอยู่ · เบอร์ที่พักไว้ · คนที่เคยปฏิเสธงานใบนี้ ระบบจะข้ามให้เองและรายงานกลับ
+          AI โทรออกจริงทันที · ข้ามคนที่เจ้าหน้าที่ถือไว้ เบอร์ที่พักไว้ และคนที่เคยปฏิเสธใบนี้
         </p>
         {namesBlock}
         <div className="flex flex-wrap justify-end gap-2">
@@ -107,9 +106,7 @@ const CallChoiceConfirmDialog: React.FC<CallChoiceConfirmDialogProps> = ({
         <AlertDialogHeader>
           <AlertDialogTitle>ให้ AI โทรหา {names.length} คนนี้?</AlertDialogTitle>
           <AlertDialogDescription>
-            AI จะโทรออกหาคนในรายชื่อนี้จริง (เว้นช่วง 20:00–08:00 น. ระบบเลื่อนให้เอง) ·
-            คนที่มีเจ้าหน้าที่ถือไปโทรอยู่ · เบอร์ที่พักไว้ · คนที่เคยปฏิเสธงานใบนี้
-            ระบบจะข้ามให้เองและรายงานกลับ
+            AI โทรออกจริงทันที · ข้ามคนที่เจ้าหน้าที่ถือไว้ เบอร์ที่พักไว้ และคนที่เคยปฏิเสธใบนี้
           </AlertDialogDescription>
         </AlertDialogHeader>
 

@@ -36,7 +36,6 @@ export default function TopicField({
       reloadSignal={reloadSignal}
       emptyOptionLabel="— เลือกเรื่อง —"
       manualPlaceholder="เช่น ยืนยันวันเริ่มงาน 15 ส.ค."
-      hint="เรื่องนี้ AI จะพูดเป็นหัวเรื่องตอนโทร"
       load={listFollowTopicsCached}
       toValue={(t) => t.name}
       /**
@@ -47,7 +46,8 @@ export default function TopicField({
        * ⚠️ **เก็บค่าเป็น `t.name` เหมือนเดิม** (`toValue`) — คำอธิบายเป็นแค่ตัวช่วยอ่าน
        *    ห้ามหลุดเข้าไปในค่าที่บันทึก ไม่งั้น AI จะพูดคำอธิบายออกไปด้วย
        */
-      toLabel={(t) => (t.description?.trim() ? `${t.name} — ${t.description.trim()}` : t.name)}
+      /* QA 5 ต.ค. 2569: ตัวเลือกยาว 71 ตัวอักษรดันป๊อปล้นจอ 375 + อ่านเป็นคำอธิบายยาว ⇒ เหลือชื่อเรื่อง */
+      toLabel={(t) => t.name}
     />
   );
 }

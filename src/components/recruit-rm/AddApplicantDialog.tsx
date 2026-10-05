@@ -352,9 +352,7 @@ const AddApplicantDialog: React.FC<{
       <DialogContent className="flex max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[38rem] flex-col gap-0 overflow-hidden rounded-3xl p-0">
         <DialogHeader className="shrink-0 border-b border-border/50 px-5 py-4 text-left">
           <DialogTitle className="text-base font-medium">เพิ่มข้อมูลผู้สมัคร</DialogTitle>
-          <DialogDescription className="text-xs">
-            สำหรับคนที่โทรเข้ามาสมัคร — ใบนี้จะไปอยู่รวมกับใบสมัครจากลิงก์ และมีชื่อผู้บันทึกติดไว้
-          </DialogDescription>
+          <DialogDescription className="text-xs">คนที่โทรเข้ามาสมัคร</DialogDescription>
         </DialogHeader>
 
         {body}

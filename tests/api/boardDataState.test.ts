@@ -85,7 +85,9 @@ describe('ข้อความที่ขึ้นจอของแต่ล�
   });
 
   it('🔴 ทุกข้อความต้องบอกว่า "ยังบอกไม่ได้" ไม่ใช่ "ไม่มีงาน"', () => {
-    expect(LEDGER_STATE_TEXT.failed.hint).toMatch(/ไม่ใช่ว่าไม่มีงาน/);
+    // QA 5 ต.ค. 2569: ย่อประโยค "…ไม่ใช่ว่าไม่มีงาน" ⇒ บอกตรง ๆ ว่ายังบอกไม่ได้
+    expect(LEDGER_STATE_TEXT.failed.hint).toMatch(/ยังบอกไม่ได้/);
+    expect(LEDGER_STATE_TEXT.failed.hint).not.toMatch(/ไม่มีงาน/);
     expect(UNKNOWN_NUMBER).not.toBe('0');
     expect(UNKNOWN_NUMBER).toBe('—');
   });
