@@ -32,9 +32,11 @@ describe('ใครเพิ่ม', () => {
     expect(filterFollowEntries(rows, { date: '', band: '', owner: FOLLOW_ADDER_NONE }).map((r) => r.id)).toEqual(['4']);
     expect(matchesFollowAdder(e('5', 'a@b.com'), 'c@d.com')).toBe(false);
   });
-  it('หน้าติดตามมี dropdown "ใครเพิ่ม" + ตัวเลือก "ของฉัน" และใช้กับตาราง/แผง/วันถัดไป', () => {
+  it('"ใครเพิ่ม" ยุบเข้า "เจ้าของงาน" = อีเมลคนเพิ่ม (5 ต.ค. 2569) + "ของฉัน" · ใช้กับตาราง/แผง/วันถัดไป', () => {
     const src = readFileSync(join(process.cwd(), 'src/pages/follow/FollowPage.tsx'), 'utf8');
-    expect(src).toContain('ariaLabel="ใครเพิ่ม"');
+    expect(src).not.toContain('ariaLabel="ใครเพิ่ม"');
+    expect(src).toContain('ariaLabel="เจ้าของงาน"');
+    expect(src).not.toContain('staffFilter');
     expect(src).toContain("{ value: 'me', label: `ของฉัน · ");
     expect(src.match(/owner: adderKey/g)?.length).toBe(2);
     expect(src).toContain('matchesFollowAdder(e, adderKey)');
@@ -46,5 +48,15 @@ describe('หน่วยงานโชว์ทุกจอ', () => {
     const src = readFileSync(join(process.cwd(), 'src/components/follow/FollowPlanningCalendar.tsx'), 'utf8');
     expect(src).toContain('<th className="min-w-[130px] px-3 py-2.5 text-[11px] font-medium">หน่วยงาน</th>');
     expect(src).not.toContain('font-medium lg:table-cell">หน่วยงาน');
+  });
+});
+
+describe('เลขบนตัวกรองหน้าติดตาม = ชุดเดียวกับ "สายที่ · ทั้งหมด" (เจ้าของสั่ง 5 ต.ค. 2569)', () => {
+  it('ใครโทร/เจ้าของงาน นับจากช่วงที่ปฏิทินดูอยู่ + เฉพาะสายที่มีเลขสาย ไม่ใช่ทั้งแท็บ', () => {
+    const src = readFileSync(join(process.cwd(), 'src/pages/follow/FollowPage.tsx'), 'utf8');
+    expect(src).toContain('countFollowCallers(panelByOwner.filter((e) => followRoundSlot(e) !== null))');
+    expect(src).not.toContain('countFollowCallers(scopeItems)');
+    expect(src).toContain('followAdderOptions(ownerBase)');
+    expect(src).toContain("{ value: 'all', label: `ทุกคน · ${ownerBase.length.toLocaleString('th-TH')}` }");
   });
 });

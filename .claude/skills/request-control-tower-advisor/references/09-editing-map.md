@@ -11832,3 +11832,8 @@ Choice: ถึงแล้ว/ไปแล้ว/ลา/เลื่อน/จ�
 - `index.html` — `<link rel="manifest">` · theme-color · meta ของ iPhone · apple-touch-icon ใหม่
 - 🔴 **ไม่มี service worker โดยตั้งใจ** — ไม่แคชหน้า deploy แล้วเห็นของใหม่ทันที · ถ้าจะทำ offline ทีหลังต้องคิดเรื่อง SSO redirect + ของค้างก่อน
 - ⚠️ ไอคอนอยู่ใต้กติกา nginx cache 1 ปี (`docker/nginx.conf`) — เปลี่ยนรูปไอคอนให้เปลี่ยนชื่อไฟล์ด้วย
+
+## 5 ต.ค. 2569 (เย็น): ตัวกรองหน้าติดตาม — เลขตรงกัน · เจ้าของงาน = อีเมล
+
+- `src/pages/follow/FollowPage.tsx` — เลขบน "ใครโทร"/"เจ้าของงาน" นับจาก `panelScope` (วัน/เดือนที่ปฏิทินดูอยู่) + เฉพาะสายที่มีเลขสาย (`followRoundSlot`) = ชุดเดียวกับ "สายที่ · ทั้งหมด" (เดิมนับทั้งแท็บ 1,652) · ตัวเลือกนับหลังตัวกรองอีกตัว
+- 🔴 "เจ้าของงาน" = อีเมลคนเพิ่ม (`created_by_name` · `adderFilter`) + "ของฉัน" · ตัวกรองเจ้าของงานแบบเดิม (ชื่อเจ้าหน้าที่ติดตาม · `staffFilter`/`followStaffOptions`) ถอดออกจากหน้า · "ใครเพิ่ม" ถอด (ยุบเข้าเจ้าของงาน) — lib `followStaffGroupKey`/`followStaffOptions` ยังอยู่

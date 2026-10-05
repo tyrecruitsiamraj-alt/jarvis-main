@@ -1,4 +1,3 @@
-import { useFollowStaffNameOf } from '@/hooks/useFollowStaffNameOf';
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -59,10 +58,10 @@ import { buildBoardUnitOptions, mergeBoardUnitOptions, type BoardUnitOption } fr
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
 import { followGroupKey, groupFollowEntries } from '@/lib/followGrouping';
 import { followScopeEntries, followTeamForScope } from '@/lib/followReplacement';
+import { followRoundSlot } from '@/lib/followRoundBuckets';
 import {
   filterFollowEntries,
-  followStaffGroupKey,
-  followStaffOptions,
+  FOLLOW_ADDER_NONE,
   followAdderOptions,
   matchesFollowAdder,
   countFollowCallers,
@@ -167,14 +166,12 @@ const FollowPage: React.FC = () => {
    */
   /** ใครโทร (เจ้าของสั่ง 2 ต.ค. 2569) — 'manual' = เหลือเฉพาะสายที่เจ้าหน้าที่ต้องโทรเอง */
   const [caller, setCaller] = useState<FollowCaller>('all');
-  /** เจ้าของงาน = เจ้าหน้าที่ที่ติดตาม (4 ต.ค. 2569) — 'all' = ทุกคน (Select ห้ามค่าว่าง) */
-  const [staffFilter, setStaffFilter] = useState('all');
-  const staffKey = staffFilter === 'all' ? '' : staffFilter;
   /**
-   * ใครเพิ่ม (created_by_name · 5 ต.ค. 2569: *"คนเพิ่มอยากดูแค่งานตัวเอง"*) — 'all' = ทุกคน · 'me' = ของฉัน (อีเมลที่ล็อกอิน)
+   * 🔴 เจ้าของงาน = **อีเมลคนเพิ่ม** (created_by_name) — เจ้าของสั่ง 5 ต.ค. 2569: *"เจ้าของงานก็ตามเมล์อะ พวก
+   * duangthida.p@siamraj.com"* + *"คำว่า ใครเพิ่มก็เอาออกไปจาก Filter"* ⇒ ตัวกรองเดิมสองตัว (เจ้าของงาน = ชื่อเจ้าหน้าที่ติดตาม ·
+   * ใครเพิ่ม) ยุบเหลือตัวนี้ตัวเดียว · 'all' = ทุกคน · 'me' = ของฉัน (อีเมลที่ล็อกอิน · "คนเพิ่มอยากดูแค่งานตัวเอง")
    */
   const [adderFilter, setAdderFilter] = useState('all');
-  const staffNameOf = useFollowStaffNameOf();
   /** ป๊อปสรุปแผนทั้งวัน (เจ้าของสั่ง 2 ต.ค. 2569) — วัน = วันที่เลือกดูอยู่ (ไม่เลือก = วันนี้) */
   const [reportOpen, setReportOpen] = useState(false);
   const [fDate, setFDate] = useState('');
@@ -446,8 +443,7 @@ const FollowPage: React.FC = () => {
     setFilterScope(replaceView);
     setActiveRound('all');
     setCaller('all');
-    setStaffFilter('all');
-    // ใครเพิ่ม: "ของฉัน" ติดข้ามแท็บได้ (ความหมายเดิม) · เลือกชื่อคนอื่นไว้ = กลับทุกคน (อีกแท็บอาจไม่มีชื่อนั้น)
+    // เจ้าของงาน: "ของฉัน" ติดข้ามแท็บได้ (ความหมายเดิม) · เลือกอีเมลคนอื่นไว้ = กลับทุกคน (อีกแท็บอาจไม่มีชื่อนั้น)
     if (adderFilter !== 'me') setAdderFilter('all');
   }
   useEffect(() => {
@@ -1195,16 +1191,9 @@ const FollowPage: React.FC = () => {
     [items, replaceView],
   );
   const filtered = useMemo(
-    () => filterFollowEntries(scopeItems, { date: fDate, band: fBand, caller, staff: staffKey, staffNameOf, owner: adderKey }),
-    [scopeItems, fDate, fBand, caller, staffKey, staffNameOf, adderKey],
+    () => filterFollowEntries(scopeItems, { date: fDate, band: fBand, caller, owner: adderKey }),
+    [scopeItems, fDate, fBand, caller, adderKey],
   );
-  const staffOptions = useMemo(() => followStaffOptions(scopeItems, staffNameOf), [scopeItems, staffNameOf]);
-  const adderOptions = useMemo(() => followAdderOptions(scopeItems), [scopeItems]);
-  const myAddedCount = useMemo(
-    () => (user?.email ? scopeItems.filter((e) => matchesFollowAdder(e, user.email)).length : 0),
-    [scopeItems, user?.email],
-  );
-  const callerCounts = useMemo(() => countFollowCallers(scopeItems), [scopeItems]);
   /**
    * แผงรอบโทรนับตาม **วันที่เลือก** และสลับดู **ทั้งเดือน** ได้ (เจ้าของเคาะ 3 ต.ค. 2569:
    * *"ทุกสาย = สายทุกสายบวกกัน · สายที่ 1 ก็ตามนั้น · ต้องเปลี่ยนตามวันที่เลือกด้วย"* +
@@ -1226,13 +1215,31 @@ const FollowPage: React.FC = () => {
       }),
     [scopeItems, panelRange, panelDay, calMonth],
   );
-  const panelEntries = useMemo(() => {
-    const byAdder = adderKey ? panelScope.filter((e) => matchesFollowAdder(e, adderKey)) : panelScope;
-    const byStaff = staffKey ? byAdder.filter((e) => followStaffGroupKey(e, staffNameOf) === staffKey) : byAdder;
-    if (caller === 'all') return byStaff;
-    if (caller === 'tbd') return byStaff.filter((e) => e.time_tbd === true);
-    return byStaff.filter((e) => followCallerOf(e) === caller);
-  }, [panelScope, caller, staffKey, staffNameOf, adderKey]);
+  /** สายในช่วงที่ดูอยู่ + เจ้าของงาน (ยังไม่กรองใครโทร) — ฐานของเลขบนตัวเลือก "ใครโทร" */
+  const panelByOwner = useMemo(
+    () => (adderKey ? panelScope.filter((e) => matchesFollowAdder(e, adderKey)) : panelScope),
+    [panelScope, adderKey],
+  );
+  const panelEntries = useMemo(() => filterFollowEntries(panelByOwner, { date: '', band: '', caller }), [panelByOwner, caller]);
+  /**
+   * 🔴 เลขบนตัวเลือกนับชุดเดียวกับ "สายที่ · ทั้งหมด" (เจ้าของสั่ง 5 ต.ค. 2569: *"ใครโทร ทั้งหมดเป็นพันเลยคืออะไร
+   * มันต้อง 251 แล้ว Ai เท่าไหร่ คนเท่าไหร่"*) — เดิมนับทั้งแท็บตลอดกาล (1,652) · ตอนนี้ = ช่วงที่ปฏิทินดูอยู่
+   * (วัน/เดือน) และนับเฉพาะสายที่มีเลขสาย (นิยามเดียวกับแผง `buildFollowCallMatrix`) ⇒ ทั้งหมด = AI + คน = เลขสายที่
+   * · ตัวเลือกแต่ละตัวนับหลังตัวกรองอีกตัว (เลือกเจ้าของงานแล้ว เลขใครโทรเหลือของคนนั้น)
+   */
+  const callerCounts = useMemo(
+    () => countFollowCallers(panelByOwner.filter((e) => followRoundSlot(e) !== null)),
+    [panelByOwner],
+  );
+  const ownerBase = useMemo(
+    () => filterFollowEntries(panelScope, { date: '', band: '', caller }).filter((e) => followRoundSlot(e) !== null),
+    [panelScope, caller],
+  );
+  const adderOptions = useMemo(() => followAdderOptions(ownerBase), [ownerBase]);
+  const myAddedCount = useMemo(
+    () => (user?.email ? ownerBase.filter((e) => matchesFollowAdder(e, user.email)).length : 0),
+    [ownerBase, user?.email],
+  );
   const hasActiveFilter = Boolean(fDate || fBand);
 
   /**
@@ -1282,10 +1289,10 @@ const FollowPage: React.FC = () => {
     () =>
       buildFollowPlanningRows(
         groupFollowEntries(
-          filterFollowEntries(scopeItems, { date: '', band: '', caller, staff: staffKey, staffNameOf, owner: adderKey }),
+          filterFollowEntries(scopeItems, { date: '', band: '', caller, owner: adderKey }),
         ),
       ),
-    [scopeItems, caller, staffKey, staffNameOf, adderKey],
+    [scopeItems, caller, adderKey],
   );
 
   /**
@@ -1551,29 +1558,20 @@ const FollowPage: React.FC = () => {
                   ariaLabel="ใครโทร"
                   active={caller !== 'all'}
                 />
-                {/* เจ้าของงาน = เจ้าหน้าที่ที่ติดตาม (เจ้าของ 4 ต.ค. 2569) — เลือกแล้วเห็นทุกรายชื่อที่คนนั้นลงแผน */}
+                {/* เจ้าของงาน = อีเมลคนเพิ่ม (เจ้าของสั่ง 5 ต.ค. 2569) · "ใครเพิ่ม" ยุบเข้ามาแล้ว · "ของฉัน" มาก่อน */}
                 <span className="text-xs text-muted-foreground">เจ้าของงาน</span>
-                <ChoiceDropdown
-                  value={staffFilter}
-                  options={[
-                    { value: 'all', label: `ทุกคน · ${scopeItems.length.toLocaleString('th-TH')}` },
-                    ...staffOptions.map((o) => ({ value: o.value, label: `${o.label} · ${o.count.toLocaleString('th-TH')}` })),
-                  ]}
-                  onChange={(v) => setStaffFilter(v)}
-                  ariaLabel="เจ้าของงาน"
-                  active={staffFilter !== 'all'}
-                />
-                {/* ใครเพิ่ม (5 ต.ค. 2569) — "ของฉัน" มาก่อน: คนเพิ่มดูแค่งานตัวเองได้ในกดเดียว */}
-                <span className="text-xs text-muted-foreground">ใครเพิ่ม</span>
                 <ChoiceDropdown
                   value={adderFilter}
                   options={[
-                    { value: 'all', label: `ทุกคน · ${scopeItems.length.toLocaleString('th-TH')}` },
+                    { value: 'all', label: `ทุกคน · ${ownerBase.length.toLocaleString('th-TH')}` },
                     ...(user?.email ? [{ value: 'me', label: `ของฉัน · ${myAddedCount.toLocaleString('th-TH')}` }] : []),
-                    ...adderOptions.map((o) => ({ value: o.value, label: `${o.label} · ${o.count.toLocaleString('th-TH')}` })),
+                    ...adderOptions.map((o) => ({
+                      value: o.value,
+                      label: `${o.value === FOLLOW_ADDER_NONE ? o.label : o.value} · ${o.count.toLocaleString('th-TH')}`,
+                    })),
                   ]}
                   onChange={(v) => setAdderFilter(v)}
-                  ariaLabel="ใครเพิ่ม"
+                  ariaLabel="เจ้าของงาน"
                   active={adderFilter !== 'all'}
                 />
               </>
