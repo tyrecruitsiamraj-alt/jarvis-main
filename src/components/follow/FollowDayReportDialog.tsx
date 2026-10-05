@@ -1,5 +1,5 @@
 import React from 'react';
-import { Copy, ImageDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, ImageDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -80,8 +80,19 @@ export default function FollowDayReportDialog({
     setSavedCount(n);
     setSaved(n > 0 ? 'ok' : 'fail');
   };
-  /** รูปหน้าละราว 20 แถว (4 ต.ค. 2569) — ปุ่มบอกว่าจะได้กี่รูป */
-  const imagePages = report ? paginateDayReportRows(report.rows).length : 0;
+  /**
+   * 🔴 ตารางบนจอแบ่งหน้า (เจ้าของสั่ง 5 ต.ค. 2569: *"ทำเป็น Pagination ตอนนี้มันยาวไป เอาหน้าละ 10-20"*)
+   * ใช้ตัวแบ่งเดียวกับรูป (หน้าละราว 20 · ชื่อเดียวกันไม่ขาดข้ามหน้า) ⇒ หน้า N บนจอ = รูปที่ N ที่โหลด
+   * คัดลอกตาราง/บันทึกรูป ยังได้ทุกแถวเหมือนเดิม
+   */
+  const pages = React.useMemo(() => (report ? paginateDayReportRows(report.rows) : [[]]), [report]);
+  const imagePages = report && report.rows.length > 0 ? pages.length : 0;
+  const [page, setPage] = React.useState(0);
+  // เปลี่ยนวัน/สาย/ใครโทร = กลับหน้าแรก (หน้าเดิมอาจไม่มีในชุดใหม่)
+  React.useEffect(() => setPage(0), [open, selYmd, caller, call]);
+  const pageIdx = Math.min(page, pages.length - 1);
+  const pageRows = pages[pageIdx] ?? [];
+  const rowFrom = pages.slice(0, pageIdx).reduce((n, p) => n + p.length, 0);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -149,8 +160,8 @@ export default function FollowDayReportDialog({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {report && report.rows.length > 0 ? (
-                report.rows.map((r) => (
+              {pageRows.length > 0 ? (
+                pageRows.map((r) => (
                   <TableRow key={r.id} className={cn(r.cancelled && 'text-muted-foreground line-through')}>
                     <TableCell className="whitespace-nowrap tabular-nums">{r.time}</TableCell>
                     <TableCell className="whitespace-nowrap">{r.name}</TableCell>
@@ -170,6 +181,40 @@ export default function FollowDayReportDialog({
               )}
             </TableBody>
           </Table>
+        </div>
+
+        {/* ตัวเปลี่ยนหน้า — อยู่เสมอ (1 หน้าก็โชว์ 1 / 1 · ว่างแล้วห้ามหาย) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground" data-testid="day-report-pager">
+          <span className="tabular-nums">
+            {report && report.rows.length > 0
+              ? `แถว ${NUM.format(rowFrom + 1)}–${NUM.format(rowFrom + pageRows.length)} จาก ${NUM.format(report.rows.length)}`
+              : 'แถว 0 จาก 0'}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Button
+              type="button"
+              size="iconXs"
+              variant="outline"
+              aria-label="หน้าก่อน"
+              disabled={pageIdx === 0}
+              onClick={() => setPage(pageIdx - 1)}
+            >
+              <ChevronLeft aria-hidden />
+            </Button>
+            <span className="tabular-nums">
+              หน้า {NUM.format(pageIdx + 1)} / {NUM.format(pages.length)}
+            </span>
+            <Button
+              type="button"
+              size="iconXs"
+              variant="outline"
+              aria-label="หน้าถัดไป"
+              disabled={pageIdx >= pages.length - 1}
+              onClick={() => setPage(pageIdx + 1)}
+            >
+              <ChevronRight aria-hidden />
+            </Button>
+          </span>
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
