@@ -42,10 +42,10 @@ describe('หน้าการติดตาม: สองแท็บเห�
   const page = read('pages/follow/FollowPage.tsx');
   const edit = read('components/follow/FollowEditDialog.tsx');
 
-  it('มีแท็บ ติดตามส่งคนแทน คั่นระหว่างรายชื่อติดตามกับ Dashboard', () => {
+  it('มีแท็บ ติดตามส่งคนแทน คั่นระหว่างติดตามคนเริ่มงานกับ Dashboard', () => {
     // className ของแท็บเปลี่ยนตามจอได้ (4 ต.ค. 2569 จัดหน้ารองรับมือถือ) — เช็คค่า+คำ+ลำดับ ไม่ผูกคลาส
     const order = [
-      /<TabsTrigger value="list"[^>]*>รายชื่อติดตาม<\/TabsTrigger>/,
+      /<TabsTrigger value="list"[^>]*>ติดตามคนเริ่มงาน<\/TabsTrigger>/,
       /<TabsTrigger value="replace"[^>]*>ติดตามส่งคนแทน<\/TabsTrigger>/,
       /<TabsTrigger value="dashboard"[^>]*>Dashboard<\/TabsTrigger>/,
     ].map((re) => page.search(re));

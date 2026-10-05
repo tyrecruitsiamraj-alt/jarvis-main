@@ -1360,7 +1360,7 @@ const FollowPage: React.FC = () => {
 
   /**
    * ปุ่มทั้งหมดของหน้า — อยู่แถวบนสุดคู่กับแท็บ (เจ้าของสั่ง 3 ต.ค. 2569: *"ย้ายไปอยู่แถวเดียวกับ
-   * ติดตามคนเริ่มงาน / ส่งคนแทน แล้วเอาคำนั้นออก"* + แท็บก็แถวเดียวกัน) · เดิมอยู่หัวปฏิทิน
+   * ติดตามคนเริ่มงาน / ติดตามส่งคนแทน แล้วเอาคำนั้นออก"* + แท็บก็แถวเดียวกัน) · เดิมอยู่หัวปฏิทิน
    */
   const headerButtons = (
     <>
@@ -1488,7 +1488,7 @@ const FollowPage: React.FC = () => {
     <div className="relative">
       {/* 🔴 แบบหน้าผู้สมัคร (เจ้าของสั่ง 4 ต.ค. 2569 "หน้าการติดตามก็เหมือนกัน — แบบหน้าผู้สมัคร"):
           แถว 1 = ← แท็บ (ขีดเส้นใต้ ชุดเดียวกับหน้างานสรรหา) ··· รีเฟรชชิดขวา · แถว 2 = ปุ่มของหน้า (Dashboard ไม่มี)
-          ชื่อหน้า "ติดตามคนเริ่มงาน / ส่งคนแทน" ถอดไว้ตั้งแต่ 3 ต.ค. — ยังอยู่สำหรับโปรแกรมอ่านจอ */}
+          ชื่อหน้า "ติดตามคนเริ่มงาน / ติดตามส่งคนแทน" ถอดไว้ตั้งแต่ 3 ต.ค. — ยังอยู่สำหรับโปรแกรมอ่านจอ */}
       <div className="space-y-2 px-4 pt-4 md:px-6 md:pt-5">
         <h1 className="sr-only">{conveyorLabel('follow')}</h1>
         {/* จอคอม = ← แท็บ ↻ แถวเดียว · มือถือ = ← ··· ↻ แล้วแท็บลงแถวถัดไปเต็มกว้าง (ชุดเดียวกับ PageHeader) */}
@@ -1503,7 +1503,7 @@ const FollowPage: React.FC = () => {
             className="order-3 min-w-0 basis-full md:order-2 md:basis-0 md:flex-1"
           >
             <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none bg-transparent p-0">
-              <TabsTrigger value="list" className={followTabClass('list')}>รายชื่อติดตาม</TabsTrigger>
+              <TabsTrigger value="list" className={followTabClass('list')}>ติดตามคนเริ่มงาน</TabsTrigger>
               <TabsTrigger value="replace" className={followTabClass('replace')}>ติดตามส่งคนแทน</TabsTrigger>
               <TabsTrigger value="dashboard" className={followTabClass('dashboard')}>Dashboard</TabsTrigger>
             </TabsList>

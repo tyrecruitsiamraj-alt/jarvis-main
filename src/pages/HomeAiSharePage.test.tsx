@@ -74,7 +74,7 @@ const { default: HomeAiSharePage } = await import('./HomeAiSharePage');
 
 const BLOCK_STORE = 'jarvis:home-ai-share:block';
 /** หัวข้อติดตามใช้ชื่อเดียวกับเมนู (4 ต.ค. 2569) */
-const FOLLOW_TITLE = 'ติดตามคนเริ่มงาน / ส่งคนแทน';
+const FOLLOW_TITLE = 'ติดตามคนเริ่มงาน / ติดตามส่งคนแทน';
 const win = defaultAiShareWindow();
 
 function body(over: Partial<AiShareResponse> = {}): AiShareResponse {
@@ -336,7 +336,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
     const box = screen.getByTestId('follow-team-breakdown');
     const text = (box.textContent ?? '').replace(/\s+/g, '');
-    expect(text).toMatch(/รายชื่อติดตาม70\D*AIโทร50คนโทร20/);
+    expect(text).toMatch(/ติดตามคนเริ่มงาน70\D*AIโทร50คนโทร20/);
     expect(text).toMatch(/ติดตามส่งคนแทน30\D*AIโทร0คนโทร30/);
     expect(within(box).getByRole('button', { name: 'ดูทั้งช่วง' })).toBeTruthy();
   });

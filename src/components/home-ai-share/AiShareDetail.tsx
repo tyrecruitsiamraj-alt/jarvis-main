@@ -240,7 +240,7 @@ const AiShareDetail: React.FC<{
           </div>
           {(
             [
-              ['main', 'รายชื่อติดตาม'],
+              ['main', 'ติดตามคนเริ่มงาน'],
               ['replacement', 'ติดตามส่งคนแทน'],
             ] as const
           ).map(([k, label]) => (

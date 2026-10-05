@@ -19,7 +19,7 @@ const renderAt = (path: string) =>
 describe('StageBanner', () => {
   it('🔴 หน้าติดตาม: ไม่มีไอคอน ไม่มีประโยค "ตามคนที่รับปากแล้ว…" · ยังมีชื่อหน้า + ต่อไป', () => {
     const { container } = renderAt('/follow?view=replace');
-    expect(screen.getByText('ติดตามคนเริ่มงาน / ส่งคนแทน')).toBeTruthy();
+    expect(screen.getByText('ติดตามคนเริ่มงาน / ติดตามส่งคนแทน')).toBeTruthy();
     expect(screen.queryByText('ตามคนที่รับปากแล้ว จนถึงวันเริ่มงานจริง')).toBeNull();
     expect(screen.getByText(/ต่อไป: ดูแลหลังเริ่มงาน/)).toBeTruthy();
     // ไอคอนที่เหลือมีตัวเดียว = ลูกศรในลิงก์ "ต่อไป"
