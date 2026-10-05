@@ -31,14 +31,9 @@ export type ExtraBenefit = { key: string; label: string; count?: { unit: string 
 
 export const EXTRA_BENEFITS: readonly ExtraBenefit[] = [
   { key: 'uniform', label: 'ชุดฟอร์ม', count: { unit: 'ชุด' } },
-  { key: 'dorm', label: 'ที่พัก/หอพัก' },
-  { key: 'shuttle', label: 'รถรับส่ง' },
-  { key: 'meal', label: 'อาหารกลางวัน' },
   { key: 'social_security', label: 'ประกันสังคม' },
   { key: 'group_insurance', label: 'ประกันกลุ่ม' },
   { key: 'annual_leave', label: 'วันลาพักร้อน' },
-  { key: 'bonus', label: 'โบนัสประจำปี' },
-  { key: 'salary_raise', label: 'ปรับเงินเดือนประจำปี' },
   { key: 'training', label: 'มีอบรม/สอนงาน' },
   { key: 'no_experience', label: 'ไม่ต้องมีประสบการณ์' },
 ];
@@ -49,7 +44,28 @@ export const EXTRA_BENEFITS: readonly ExtraBenefit[] = [
  */
 const LEGACY_BENEFITS: readonly ExtraBenefit[] = [{ key: 'daily_pay', label: 'จ่ายรายวัน' }];
 
-const BY_KEY = new Map([...EXTRA_BENEFITS, ...LEGACY_BENEFITS].map((b) => [b.key, b]));
+/**
+ * 🔴 ถอดแล้ว (เจ้าของ 5 ต.ค. 2569: *"รถรับส่ง เอาออกไปเลยไม่ต้องมีให้เลือกเลย"* · ปรับเงินเดือนประจำปี · โบนัสประจำปี ·
+ * อาหารกลางวัน · ที่พัก/หอพัก *"เอาออก"*) — ไม่อยู่ในรายการให้ติ๊ก **และไม่โชว์** แม้ใบเก่าติ๊กไว้
+ * (ทั้งแบบคีย์ยุคเก่าและข้อความยุคใหม่) · คีย์ยังรู้จักอยู่ กันค่าที่บันทึกไว้กลายเป็นค่าแปลก
+ */
+const RETIRED_BENEFITS: readonly ExtraBenefit[] = [
+  { key: 'dorm', label: 'ที่พัก/หอพัก' },
+  { key: 'shuttle', label: 'รถรับส่ง' },
+  { key: 'meal', label: 'อาหารกลางวัน' },
+  { key: 'bonus', label: 'โบนัสประจำปี' },
+  { key: 'salary_raise', label: 'ปรับเงินเดือนประจำปี' },
+];
+const RETIRED_KEYS = new Set(RETIRED_BENEFITS.map((b) => b.key));
+const RETIRED_LABELS = new Set(RETIRED_BENEFITS.map((b) => b.label));
+
+/** สวัสดิการที่ถอดแล้ว — ไม่โชว์ทุกที่ (ใช้กับชิปจาก ERP ด้วย ถ้าชื่อตรงกัน) */
+export function isRetiredBenefit(v: string): boolean {
+  const t = v.trim();
+  return RETIRED_KEYS.has(t) || RETIRED_LABELS.has(t);
+}
+
+const BY_KEY = new Map([...EXTRA_BENEFITS, ...LEGACY_BENEFITS, ...RETIRED_BENEFITS].map((b) => [b.key, b]));
 
 export function isExtraBenefitKey(v: unknown): v is string {
   return typeof v === 'string' && BY_KEY.has(v);
@@ -63,6 +79,7 @@ export function extraBenefitLabels(keys: readonly string[] | null | undefined): 
   if (!keys || keys.length === 0) return [];
   const out: string[] = [];
   for (const k of keys) {
+    if (isRetiredBenefit(k)) continue;
     const hit = BY_KEY.get(k);
     if (hit) out.push(hit.label);
   }
@@ -81,6 +98,7 @@ export function benefitDisplayLabels(values: readonly string[] | null | undefine
     if (typeof v !== 'string' || !v.trim()) continue;
     // จ่ายรายวันยุคเก่า = รอบรับเงิน ไม่ใช่สวัสดิการ (โชว์ผ่าน `payCyclesOf` แทน)
     if (isLegacyDailyPayLine(v)) continue;
+    if (isRetiredBenefit(v)) continue;
     const hit = BY_KEY.get(v);
     out.push(hit ? hit.label : v.trim());
   }

@@ -188,7 +188,7 @@ export const DRIVING_SUBTYPES: ReadonlyArray<{ id: string; label: string }> = [
   { id: 'boss_th', label: 'นายไทย' },
   { id: 'boss_foreign', label: 'นายต่างชาติ' },
   { id: 'boss', label: 'นาย (ไม่ระบุสัญชาติ)' },
-  { id: 'valet', label: 'Valet' },
+  { id: 'valet', label: 'Valet parking' },
   { id: 'other', label: 'อื่น ๆ' },
 ];
 

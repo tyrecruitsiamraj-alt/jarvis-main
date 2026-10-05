@@ -1,12 +1,12 @@
 import React from 'react';
-import { Banknote, Calendar, Clock, Flag, MapPin, UserRound } from 'lucide-react';
+import { Banknote, Calendar, Clock, Flag, Gift, MapPin, UserRound, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { boardCardAge, boardCardGender, boardCardPlace } from '@/lib/boardCardFacts';
-import { publicBenefitList, publicFieldVisible } from '@/lib/publicFieldVisibility';
-import { benefitDisplayLabels } from '@/lib/extraBenefits';
-import { payCycleText, payCyclesOf } from '@/lib/payCycle';
+import { isOtBenefit, publicBenefitList, publicFieldVisible } from '@/lib/publicFieldVisibility';
+import { benefitDisplayLabels, isRetiredBenefit } from '@/lib/extraBenefits';
+import { payCycleCardText, payCyclesOf } from '@/lib/payCycle';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { benefitWithAmount, jobAverageIncome, jobBaseIncome } from '@/lib/jobPublicFacts';
 
@@ -34,11 +34,15 @@ export default function JobPublicFacts({
 }) {
   const incomeShown = publicFieldVisible(job, 'income');
   const income = incomeShown ? jobBaseIncome(job) : null;
-  const pay = incomeShown ? payCycleText(payCyclesOf(job)) : '';
+  const pay = incomeShown ? payCycleCardText(payCyclesOf(job)) : '';
   const average = publicFieldVisible(job, 'average_income') ? jobAverageIncome(job) : null;
-  const benefits = publicBenefitList(job, benefitDisplayLabels(job.extra_benefits)).map((b) =>
-    benefitWithAmount(b, job.monthly_income_items),
-  );
+  /**
+   * สวัสดิการ — 🔴 ไม่มีโอที + ไม่มีรายการที่ถอดแล้ว (เจ้าของ 5 ต.ค. 2569: *"โอที ~75 บาท/ชม. เอาออก"* ·
+   * รถรับส่ง · ปรับเงินเดือนประจำปี · โบนัสประจำปี · อาหารกลางวัน · ที่พัก/หอพัก *"เอาออก"*)
+   */
+  const benefits = publicBenefitList(job, benefitDisplayLabels(job.extra_benefits))
+    .filter((b) => !isOtBenefit(b) && !isRetiredBenefit(b))
+    .map((b) => benefitWithAmount(b, job.monthly_income_items));
   const gender = boardCardGender(job);
   const schedule = (job.work_schedule ?? '').trim();
   const requiredDate = publicFieldVisible(job, 'required_date') && job.required_date ? job.required_date : null;
@@ -75,14 +79,23 @@ export default function JobPublicFacts({
           ) : null}
         </p>
       ) : null}
-      {pay || benefits.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1.5 pt-0.5" data-testid="job-public-benefits">
-          {pay ? <span className={cn('whitespace-nowrap', TONE.info.chip)}>{pay}</span> : null}
-          {benefits.map((b) => (
-            <span key={b} className={cn('whitespace-nowrap', TONE.success.chip)}>
-              {b}
-            </span>
-          ))}
+      {pay ? (
+        <p className={row}>
+          <Wallet className={icon} aria-hidden />
+          <span>{pay}</span>
+        </p>
+      ) : null}
+      {/* เรียงลงทีละบรรทัด (เจ้าของ 5 ต.ค. 2569: *"ให้มันเรียงลงไม่ใช่วางกองๆกันเละเทะ"*) */}
+      {benefits.length > 0 ? (
+        <div className={row} data-testid="job-public-benefits">
+          <Gift className={icon} aria-hidden />
+          <ul className="min-w-0 space-y-0.5">
+            {benefits.map((b) => (
+              <li key={b} className="text-foreground">
+                {b}
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
       <p className={row}>

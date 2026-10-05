@@ -156,21 +156,25 @@ describe('ขั้น 3 — รายได้เลือกได้ทาง
 describe('ขั้น 3 — สวัสดิการติ๊กจากรายการทั่วไป', () => {
   it('ติ๊ก + ใส่รายละเอียดต่อท้าย = บรรทัดเดียว "ชื่อ รายละเอียด"', async () => {
     render(<PublicJobFields job={job()} sections={['income', 'benefits']} />);
-    fireEvent.click(screen.getByRole('checkbox', { name: 'รถรับส่ง' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'มีอบรม/สอนงาน' }));
     fireEvent.click(screen.getByRole('button', { name: 'รายละเอียด' }));
-    fireEvent.change(screen.getByLabelText('รายละเอียด รถรับส่ง'), { target: { value: 'จาก BTS หมอชิต' } });
-    expect(screen.getByText('รถรับส่ง จาก BTS หมอชิต')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('รายละเอียด มีอบรม/สอนงาน'), { target: { value: '3 วันแรก' } });
+    expect(screen.getByText('มีอบรม/สอนงาน 3 วันแรก')).toBeTruthy();
     await flushAutosave();
-    expect(lastSaved()?.benefits).toEqual(['รถรับส่ง จาก BTS หมอชิต']);
+    expect(lastSaved()?.benefits).toEqual(['มีอบรม/สอนงาน 3 วันแรก']);
   });
 
   it('🔴 ไม่ล็อก 5 รายการแล้ว (4 ต.ค. 2569) — ติ๊กได้ทุกรายการ · เพิ่มเองได้ · ไม่มีตัวนับ N/5', () => {
     render(<PublicJobFields job={job()} sections={['income', 'benefits']} />);
-    for (const name of ['ชุดฟอร์ม', 'รถรับส่ง', 'ที่พัก/หอพัก', 'อาหารกลางวัน', 'ประกันสังคม', 'ประกันกลุ่ม']) {
+    for (const name of ['ชุดฟอร์ม', 'ประกันสังคม', 'ประกันกลุ่ม', 'วันลาพักร้อน', 'มีอบรม/สอนงาน']) {
       fireEvent.click(screen.getByRole('checkbox', { name }));
     }
     expect(screen.queryByText('5/5')).toBeNull();
-    expect(screen.getByRole('checkbox', { name: 'โบนัสประจำปี' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByRole('checkbox', { name: 'ไม่ต้องมีประสบการณ์' }).hasAttribute('disabled')).toBe(false);
+    // 🔴 ถอดแล้ว (เจ้าของ 5 ต.ค. 2569) — ไม่มีให้เลือก
+    for (const gone of ['รถรับส่ง', 'ที่พัก/หอพัก', 'อาหารกลางวัน', 'โบนัสประจำปี', 'ปรับเงินเดือนประจำปี']) {
+      expect(screen.queryByRole('checkbox', { name: gone }), gone).toBeNull();
+    }
     expect(screen.getByRole('button', { name: 'เพิ่มรายการเอง' }).hasAttribute('disabled')).toBe(false);
   });
 

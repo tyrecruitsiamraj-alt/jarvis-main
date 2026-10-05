@@ -210,7 +210,7 @@ describe('ขั้น 3 รายได้ — เลือกได้ทา�
 
 describe('ขั้น 3 สวัสดิการ — ติ๊กจากรายการทั่วไป + รายละเอียดต่อท้าย', () => {
   it('🔴 บรรทัดที่บันทึกไว้ → ฟอร์ม → กลับเป็นบรรทัดเดิมเป๊ะ (ลำดับเดิม · ชื่อซ้ำ/พิมพ์เองไม่หาย)', () => {
-    const text = ['ชุดฟอร์ม', 'รถรับส่ง  จาก BTS หมอชิต', 'ข้าวฟรี 1 มื้อ', 'รถรับส่ง', 'ประกันสังคม'].join('\n');
+    const text = ['ชุดฟอร์ม', 'มีอบรม/สอนงาน  3 วันแรก', 'ข้าวฟรี 1 มื้อ', 'มีอบรม/สอนงาน', 'ประกันสังคม'].join('\n');
     const entries = benefitEntriesFromText(text);
     expect(entries.map((e) => e.kind)).toEqual(['preset', 'preset', 'custom', 'custom', 'preset']);
     expect(cleanBenefitLines(benefitTextFromEntries(entries).split('\n'))).toEqual(cleanBenefitLines(text.split('\n')));
@@ -223,10 +223,11 @@ describe('ขั้น 3 สวัสดิการ — ติ๊กจาก�
   });
 
   it('ใส่รายละเอียด = ชื่อรายการ + เว้นวรรค + รายละเอียด · ทั้งบรรทัดไม่เกิน BENEFIT_LABEL_MAX (60 ตั้งแต่ 4 ต.ค. 2569)', () => {
-    expect(benefitLineOf({ kind: 'preset', key: 'shuttle', detail: 'จาก BTS หมอชิต' })).toBe('รถรับส่ง จาก BTS หมอชิต');
-    expect(benefitLineOf({ kind: 'preset', key: 'shuttle', detail: '   ' })).toBe('รถรับส่ง');
-    expect(benefitDetailMax('shuttle')).toBe(60 - 'รถรับส่ง'.length - 1);
-    expect(benefitEntriesFromText('ปรับเงินเดือนประจำปี 3%')).toEqual([{ kind: 'preset', key: 'salary_raise', detail: '3%' }]);
+    // รถรับส่ง/ปรับเงินเดือนประจำปี ถอดจากรายการแล้ว (5 ต.ค. 2569) — ใช้รายการที่ยังอยู่
+    expect(benefitLineOf({ kind: 'preset', key: 'training', detail: '3 วันแรก' })).toBe('มีอบรม/สอนงาน 3 วันแรก');
+    expect(benefitLineOf({ kind: 'preset', key: 'training', detail: '   ' })).toBe('มีอบรม/สอนงาน');
+    expect(benefitDetailMax('training')).toBe(60 - 'มีอบรม/สอนงาน'.length - 1);
+    expect(benefitEntriesFromText('วันลาพักร้อน 6 วัน')).toEqual([{ kind: 'preset', key: 'annual_leave', detail: '6 วัน' }]);
   });
 });
 

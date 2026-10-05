@@ -267,7 +267,7 @@ describe('ตำแหน่งงาน → งานย่อย (เฉพา
       ['นายไทย', 1],
       ['นายต่างชาติ', 0],
       ['นาย (ไม่ระบุสัญชาติ)', 0],
-      ['Valet', 1],
+      ['Valet parking', 1],
       ['อื่น ๆ', 1],
     ]);
     expect(applyBoardFilters(rows, state({ position: ['ขับรถ'], subtype: ['boss_th'] }), facts())).toEqual([boss]);

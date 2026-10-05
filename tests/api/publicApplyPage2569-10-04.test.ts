@@ -38,7 +38,7 @@ describe('ชื่อตำแหน่งบนหน้าประกาศ'
     expect(publicJobTitle(job({}))).toBe('พนักงานขับรถ ส่วนกลาง');
     expect(publicJobTitle(job({ job_description_code_2: 'รถผู้บริหาร', boss_nationality: 'คนไทย' }))).toBe('พนักงานขับรถ นายไทย');
     expect(publicJobTitle(job({ job_description_code_2: 'รถผู้บริหาร', boss_nationality: 'ญี่ปุ่น' }))).toBe('พนักงานขับรถ นายต่างชาติ');
-    expect(publicJobTitle(job({ job_description_code_2: 'Valet Parking' }))).toBe('พนักงานขับรถ Valet');
+    expect(publicJobTitle(job({ job_description_code_2: 'Valet Parking' }))).toBe('พนักงานขับรถ Valet parking'); // เจ้าของ 5 ต.ค. 2569: "valet ไม่มีมันต้อง Valet parking"
     expect(publicJobTitle(job({ job_description_code_2: 'ไม่ระบุ' }))).toBe('พนักงานขับรถ');
     expect(publicJobTitle(job({ job_description_code_1: 'คนสวน', job_description_code_2: 'ส่วนกลาง' }))).toBe('คนสวน');
   });

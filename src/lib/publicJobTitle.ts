@@ -16,7 +16,7 @@ const DRIVER_KIND: Record<string, string> = {
   boss_th: 'นายไทย',
   boss_foreign: 'นายต่างชาติ',
   boss: 'นาย',
-  valet: 'Valet',
+  valet: 'Valet parking',
 };
 
 export function publicJobTitle(job: JobRequest): string {

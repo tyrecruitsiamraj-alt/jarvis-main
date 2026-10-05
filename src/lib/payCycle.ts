@@ -39,6 +39,16 @@ export function payCyclesOf(src: {
   return (src.extra_benefits ?? []).some((b) => typeof b === 'string' && isLegacyDailyPayLine(b)) ? ['daily'] : [];
 }
 
+/**
+ * บรรทัดบนการ์ด (เจ้าของ 5 ต.ค. 2569: *"รับเงินรายเดือน · รายสัปดาห์ · รายวัน บอกว่าเลือกได้"*)
+ * หลายรอบ = "เลือกรับเงินได้ รายเดือน · รายสัปดาห์ · รายวัน" · รอบเดียว = "รับเงินรายเดือน" · ว่าง = ''
+ */
+export function payCycleCardText(cycles: readonly PayCycle[]): string {
+  if (cycles.length === 0) return '';
+  const labels = cycles.map((k) => PAY_CYCLES.find((c) => c.key === k)?.label ?? k);
+  return labels.length > 1 ? `เลือกรับเงินได้ ${labels.join(' · ')}` : `รับเงิน${labels[0]}`;
+}
+
 /** "รับเงินรายวัน · รายเดือน" — ว่าง = '' */
 export function payCycleText(cycles: readonly PayCycle[]): string {
   if (cycles.length === 0) return '';

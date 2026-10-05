@@ -10,7 +10,7 @@ export const STANDALONE_POSTING_KINDS = [
   { code: 'thai_executive', label: 'ผู้บริหารคนไทย' },
   { code: 'foreign_executive', label: 'ผู้บริหารต่างชาติ' },
   { code: 'central', label: 'ส่วนกลาง' },
-  { code: 'valet', label: 'Valet' },
+  { code: 'valet', label: 'Valet parking' },
   { code: 'government', label: 'ราชการ' },
 ] as const;
 

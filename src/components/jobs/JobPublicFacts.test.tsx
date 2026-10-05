@@ -92,11 +92,20 @@ describe('JobPublicFacts', () => {
     }
   });
 
-  it('ติ๊กโอทีออก = ชิปโอทีหาย สวัสดิการอื่นยังอยู่', () => {
-    const noOt = { ...JOB, field_overrides: { public_visibility: { ot: false } } } as unknown as JobRequest;
-    render(<JobPublicFacts job={noOt} />);
-    const chips = screen.getByTestId('job-public-benefits').textContent ?? '';
-    expect(chips).not.toContain('โอที');
-    expect(chips).toContain('เบี้ยขยัน');
+  it('🔴 โอทีไม่ขึ้น · รายการที่ถอดแล้วไม่ขึ้นแม้ใบเก่าติ๊กไว้ · เรียงลงทีละบรรทัด (เจ้าของ 5 ต.ค. 2569)', () => {
+    const old = {
+      ...JOB,
+      extra_benefits: ['ประกันสังคม', 'รถรับส่ง', 'shuttle', 'โบนัสประจำปี', 'อาหารกลางวัน', 'ที่พัก/หอพัก', 'ปรับเงินเดือนประจำปี'],
+    } as unknown as JobRequest;
+    render(<JobPublicFacts job={old} />);
+    const items = [...screen.getByTestId('job-public-benefits').querySelectorAll('li')].map((li) => li.textContent);
+    expect(items).toEqual(['เบี้ยขยัน', 'ค่าเดินทาง 6,000 บาท/เดือน', 'ค่าโทรศัพท์ 300 บาท/เดือน', 'ประกันสังคม']);
+  });
+
+  it('รอบรับเงินหลายแบบ = บอกว่าเลือกได้ · แบบเดียว = รับเงินแบบนั้น', async () => {
+    const { payCycleCardText } = await import('@/lib/payCycle');
+    expect(payCycleCardText(['monthly', 'weekly', 'daily'])).toBe('เลือกรับเงินได้ รายเดือน · รายสัปดาห์ · รายวัน');
+    expect(payCycleCardText(['monthly'])).toBe('รับเงินรายเดือน');
+    expect(payCycleCardText([])).toBe('');
   });
 });
