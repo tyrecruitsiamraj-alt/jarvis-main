@@ -88,20 +88,21 @@ const AddChannelLinks: React.FC<{
       <MultiChannelPicker value={picked} onChange={setPicked} reloadKey={posting.id} />
       <Button type="button" className="w-full" disabled={busy} onClick={() => void create()}>
         {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Link2 aria-hidden />}
+        {/* คำว่า "Gen link" ทั้งก้อน (เจ้าของสั่ง 5 ต.ค. 2569 "สร้างลิงก์ เปลี่ยนเป็น Gen link") */}
         {busy
-          ? 'กำลังสร้าง…'
+          ? 'กำลัง Gen link…'
           : picked.length > 1
-            ? `สร้าง ${picked.length} ลิงก์`
+            ? `Gen ${picked.length} ลิงก์`
             : picked.length === 1
-              ? 'สร้างลิงก์'
-              : 'สร้างลิงก์กลาง 1 อัน'}
+              ? 'Gen link'
+              : 'Gen link กลาง 1 อัน'}
       </Button>
       {error ? <p className={cn('text-xs', TONE.danger.value)}>{error}</p> : null}
 
       {done.length > 0 ? (
         <div ref={resultRef} className={cn('space-y-2 rounded-xl border px-3 py-3', TONE.success.soft)} data-testid="new-links">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium text-foreground">สร้างแล้ว {done.length} ลิงก์</p>
+            <p className="text-sm font-medium text-foreground">Gen แล้ว {done.length} ลิงก์</p>
             {done.length > 1 ? (
               <Button type="button" size="xs" variant="outline" onClick={() => void copy('all', allText)}>
                 {copied === 'all' ? <Check aria-hidden /> : <Copy aria-hidden />}

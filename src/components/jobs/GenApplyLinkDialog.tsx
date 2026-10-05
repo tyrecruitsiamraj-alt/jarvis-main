@@ -490,7 +490,8 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-                {saving ? 'กำลังสร้าง…' : picked.length > 1 ? `สร้างประกาศ + ${picked.length} ลิงก์` : 'สร้างประกาศ + ลิงก์'}
+                {/* คำว่า Gen link (เจ้าของสั่ง 5 ต.ค. 2569) */}
+                {saving ? 'กำลัง Gen link…' : picked.length > 1 ? `Gen ${picked.length} ลิงก์` : 'Gen link'}
               </button>
             </>
           )}

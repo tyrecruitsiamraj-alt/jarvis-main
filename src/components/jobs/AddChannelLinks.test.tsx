@@ -43,10 +43,10 @@ describe('AddChannelLinks', () => {
     const onCreated = vi.fn();
     render(<AddChannelLinks posting={posting} onCreated={onCreated} />);
     expect(screen.getByText('คนสวน สมมุติ')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /สร้างลิงก์กลาง 1 อัน/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Gen link กลาง 1 อัน/ })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'เลือกสองช่องทาง' }));
-    fireEvent.click(screen.getByRole('button', { name: /สร้าง 2 ลิงก์/ }));
-    await waitFor(() => expect(screen.getByText('สร้างแล้ว 2 ลิงก์')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /Gen 2 ลิงก์/ }));
+    await waitFor(() => expect(screen.getByText('Gen แล้ว 2 ลิงก์')).toBeTruthy());
     expect(addPostingLink).toHaveBeenCalledTimes(2);
     expect(addPostingLink.mock.calls.every(([id]) => id === 'p1')).toBe(true);
     expect(screen.getByRole('button', { name: 'คัดลอกลิงก์ Finnix' })).toBeTruthy();

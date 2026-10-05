@@ -18,6 +18,7 @@
  *   — ชุดนั้นอยู่คนละบล็อกในหน้าใบขอ ไม่ได้อยู่ในตารางนี้
  */
 import React from 'react';
+import { genderLabel } from '@/lib/genderRequirement';
 
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
@@ -90,7 +91,8 @@ const UnitRequestInfoFields: React.FC<{ job: JobRequest }> = ({ job: data }) => 
           : undefined
       }
     />
-    <Field label="เพศ" value={data.gender_requirement} />
+    {/* ERP ส่งเป็นรหัส (0 = ไม่ระบุ · M/F) — เคยโชว์ "0" ดิบบนหน้า 1 (5 ต.ค. 2569) ⇒ แปลงเป็นคำด้วยตัวกลาง */}
+    <Field label="เพศ" value={genderLabel(data.gender_requirement)} />
     <Field label="สัญชาติเจ้านาย" value={data.boss_nationality} />
     <Field label="ประเภทใบขอ" value={data.request_action_name} />
     <Field

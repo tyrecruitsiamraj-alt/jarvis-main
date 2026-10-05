@@ -137,13 +137,25 @@ describe('ป๊อปไล่งานโฉมใหม่ (30 ก.ย. 2569)
     expect(releaseJobsToPublic).not.toHaveBeenCalled();
   });
 
-  it('ขั้น 4: ติ๊ก "สร้างลิงก์" ถึงกางฟอร์มสร้างลิงก์', async () => {
+  it('ขั้น 4: ปุ่ม "Gen link" แบบกางลง — พับไว้ก่อน · กดกางฟอร์ม · กดซ้ำพับ (เจ้าของสั่ง 5 ต.ค. 2569)', async () => {
     fetchJobReleases.mockResolvedValue([]);
     renderSteps();
     fireEvent.click(await screen.findByRole('button', { name: /สรุป \+ ส่งประกาศ/ }));
-    expect(screen.queryByRole('button', { name: 'สร้างประกาศ + ลิงก์' })).toBeNull();
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'สร้างลิงก์' }));
-    expect(await screen.findByRole('button', { name: 'สร้างประกาศ + ลิงก์' })).toBeTruthy();
+    const toggle = await screen.findByTestId('gen-link-toggle');
+    expect(toggle.textContent).toContain('Gen link');
+    expect(screen.queryByRole('checkbox', { name: 'สร้างลิงก์' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Gen link' })).toHaveLength(1); // ปุ่มกางอย่างเดียว ยังไม่มีฟอร์ม
+    fireEvent.click(toggle);
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Gen link' }).length).toBe(2)); // + ปุ่มส่งในฟอร์ม
+    fireEvent.click(toggle);
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Gen link' })).toHaveLength(1));
+  });
+
+  it('แถบ 4 ขั้นอยู่แถวเดียว (กริด 4 ช่อง) · ป้ายค้างที่นี่อยู่ในช่องของขั้น (เจ้าของสั่ง 5 ต.ค. 2569)', async () => {
+    renderSteps();
+    const nav = await screen.findByRole('navigation', { name: 'ขั้นตอนของงานประกาศ' });
+    expect(nav.className).toContain('grid-cols-4');
+    expect(nav.querySelectorAll('button')).toHaveLength(4);
   });
 });
 

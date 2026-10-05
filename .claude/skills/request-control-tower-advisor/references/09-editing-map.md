@@ -11730,3 +11730,18 @@ iRecruit (`rm-action-btn`): โทร (call · POST จดการโทรก�
 | `src/lib/followListFilter.ts` | `FollowFilter.owner` (created_by_name) กลับมาใช้ · `followAdderOptions` · `followAdderLabel` (ตัดโดเมนอีเมล) · `matchesFollowAdder` (ไม่สนตัวพิมพ์) · `FOLLOW_ADDER_NONE` |
 | `src/pages/follow/FollowPage.tsx` | dropdown "ใครเพิ่ม" ต่อจากเจ้าของงาน: ทุกคน · **ของฉัน** (อีเมลที่ล็อกอิน) · รายชื่อ · ใช้กับตาราง/แผงขั้นตอน/วันถัดไป · สลับแท็บทีม = กลับทุกคน ยกเว้น "ของฉัน" |
 | เทสต์ | `tests/api/followAdderUnit2569-10-05.test.ts` · ปรับ `followListFilter.test.ts` · `applicantOverviewSql.test.ts` parity ให้เวลา 20 วิ (ฐานจริงช้า ~5 วิ) |
+
+## ป๊อปโพสต์ประกาศ: Journey 6 ข้อ + ไล่กดทุกปุ่ม (5 ต.ค. 2569)
+
+เจ้าของ: แถบขั้นแถวเดียว · หน้า 4 ตำแหน่งต้องบอกว่าขับรถอะไร · "สร้างลิงก์" → **Gen link** แบบกางลง · *"ต้องกดได้จริง เทสด้วยว่าปุ่มไหนตาย"*
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/pages/jobs/BoardPostingPage.tsx` | แถบ 4 ขั้น = `grid-cols-4` (ป้ายค้างที่นี่อยู่ในช่อง) · ตำแหน่ง = `postingPositionText` · Gen link = `Collapsible` (`gen-link-toggle`) แทนช่องติ๊ก · 🔴 `jobWithPatch` memo (เดิมสร้างใหม่ทุก render → auto-save หน้า 2/3 ยิงช้า ~20 วิ แทน 1.5) · 🔴 `toggleRelease` ไม่สำเร็จ = ขึ้นข้อความ (เดิมกลืนเงียบ) |
+| `src/lib/publicJobTitle.ts` | `postingPositionText` — ชื่อเดียวกับหน้าประกาศ · ไม่รู้ชนิด = ต่อรายละเอียดใบขอ (ชนิดที่ 2 / รถกอล์ฟ) หรือ "(ใบขอไม่ระบุชนิด)" · นายไม่รู้สัญชาติ = "(ใบขอไม่ระบุสัญชาตินาย)" |
+| `src/components/jobs/UnitRequestInfoFields.tsx` | เพศหน้า 1 ผ่าน `genderLabel` (เดิมโชว์ "0" ดิบ) |
+| `src/components/jobs/AddChannelLinks.tsx` · `GenApplyLinkDialog.tsx` | ปุ่มข้างในเป็นคำ Gen link |
+| เทสต์ | `tests/api/postingJourney2569-10-05.test.ts` · `BoardPostingSteps.test.tsx` · `AddChannelLinks.test.tsx` |
+
+- ไล่กดจริง (ดักคำขอเขียนทุกตัว ตอบ 418): ขั้น 1 ไม่ประกาศ (เหตุผล→POST job-release-skip) · ขั้น 2 ใส่เอง จังหวัด/อำเภอ → auto-save unit-notes + ลองอีกครั้ง · ขั้น 3 รายได้/รอบรับเงิน/สวัสดิการ/ชุดฟอร์ม/โอที/เพิ่มรายการเอง/เพศ/บันทึกอายุ · ขั้น 4 แก้×6 · มีแล้ว N ลิงก์ · Gen link กาง/พับ · Gen link กลาง (POST postings) · ฟอร์มประกาศแรก (ทั่วไป/แนบเอกสาร/ช่องทาง/ตัวอย่าง/Gen link) · ส่งประกาศ (POST job-public-release) · ดึงประกาศลง (DELETE) · บันทึกแบบร่าง · แท็บรายชื่อ · ปิด
+- ⚠️ Radix Select ใน Browser pane กดผ่าน JS ไม่ติด — ใช้ `focus()` + ปุ่ม Enter จริง

@@ -22,7 +22,7 @@
  */
 import React from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ChevronDown, ChevronRight, ClipboardCheck, Send, UserMinus, Users } from 'lucide-react';
+import { ChevronDown, ChevronRight, ClipboardCheck, Link2, Send, UserMinus, Users } from 'lucide-react';
 
 import PageHeader from '@/components/shared/PageHeader';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
@@ -61,7 +61,8 @@ import {
   releaseStepOf,
   type ReleaseStepKey,
 } from '@/lib/boardRelease';
-import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
+import { postingPositionText } from '@/lib/publicJobTitle';
 import { publicSafeAddress } from '@/lib/publicJobPrivacy';
 import { INCOME_PERIOD_LABEL, buildIncomeDisplay } from '@/lib/incomeBreakdown';
 import { benefitDisplayLabels } from '@/lib/extraBenefits';
@@ -275,12 +276,16 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const toggleRelease = async (next: boolean) => {
     if (!job) return;
     setReleaseBusy(true);
+    setSendError(null);
     try {
       if (next) await releaseJobsToPublic([job.id]);
       else await unreleaseJobsFromPublic([job.id]);
       await loadReleases();
-    } catch {
-      /* สภาพจริงมาจากทะเบียน — โหลดไม่สำเร็จก็ยังโชว์ค่าเดิม ไม่โชว์ค่าที่ยังไม่จริง */
+    } catch (e) {
+      /* สภาพจริงมาจากทะเบียน — ค่าเดิมยังโชว์อยู่ · 🔴 แต่ต้องบอกว่าไม่สำเร็จ (5 ต.ค. 2569 ไล่กดทุกปุ่มเจอ:
+         เดิมกลืนเงียบ กด "ดึงประกาศลง" แล้วล้ม = จอนิ่ง คนเข้าใจว่าดึงลงแล้ว) */
+      const fallback = next ? 'ประกาศไม่สำเร็จ ลองอีกครั้ง' : 'ดึงประกาศลงไม่สำเร็จ ลองอีกครั้ง';
+      setSendError(e instanceof Error && e.message ? `${fallback} (${e.message})` : fallback);
     } finally {
       setReleaseBusy(false);
     }
@@ -302,7 +307,14 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
     }
   };
 
-  const jobWithPatch = job ? ({ ...job, ...publicPatch } as JobRequest) : null;
+  /**
+   * 🔴 ต้อง memo (5 ต.ค. 2569 เจอตอนไล่กดทุกปุ่ม): เดิมสร้างก้อนใหม่ทุก render — หน้าบอร์ดข้างหลัง render ถี่
+   * ⇒ auto-save ของฟอร์มหน้า 2/3 (ผูกกับ `job`) รีเซ็ตนาฬิกา 1.5 วิไม่หยุด กว่าจะยิงจริง ~20 วิ
+   */
+  const jobWithPatch = React.useMemo(
+    () => (job ? ({ ...job, ...publicPatch } as JobRequest) : null),
+    [job, publicPatch],
+  );
   /** 🔴 ใบขอไม่ระบุเพศและยังไม่มีใครเลือก = ส่งประกาศไม่ได้ (เจ้าของเคาะ 26 ก.ย. 2569) */
   const genderBlocked = jobWithPatch ? genderNeedsChoice(jobWithPatch) : false;
 
@@ -407,42 +419,47 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
 
           <TabsContent value="review" className="mt-4 space-y-4">
             {/* ── แถบขั้น 1-4 — บอกสามอย่าง: ขั้นไหนผ่านแล้ว · ใบนี้ค้างขั้นไหน · กำลังเปิดดูขั้นไหน ── */}
-            <nav className="flex flex-wrap items-center gap-1" aria-label="ขั้นตอนของงานประกาศ">
-              {RELEASE_STEP_ORDER.map((k, i) => {
+            {/* 🔴 4 ขั้นอยู่แถวเดียวเสมอ (เจ้าของสั่ง 5 ต.ค. 2569 "ให้อยู่แถวเดียวกัน") — กริด 4 ช่อง ชื่อยาวตัดบรรทัดในช่องตัวเอง
+                ป้าย "ค้างที่นี่" อยู่ใต้ชื่อในช่องเดียวกัน (เดิมต่อท้ายจนขั้น 4 ตกบรรทัด) */}
+            <nav className="grid grid-cols-4 gap-1.5" aria-label="ขั้นตอนของงานประกาศ">
+              {RELEASE_STEP_ORDER.map((k) => {
                 const t = RELEASE_STEP_TEXT[k];
                 const on = step === k;
                 const passed = doneStep(k);
                 const here = currentStep === k;
                 return (
-                  <React.Fragment key={k}>
-                    {i > 0 ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" aria-hidden /> : null}
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant={on ? 'default' : 'outline'}
-                      aria-current={on ? 'step' : undefined}
-                      title={t.todo}
-                      onClick={() => setOpenStep(k)}
-                      className={cn(!on && passed && TONE.success.value)}
+                  <Button
+                    key={k}
+                    type="button"
+                    size="xs"
+                    variant={on ? 'default' : 'outline'}
+                    aria-current={on ? 'step' : undefined}
+                    title={t.todo}
+                    onClick={() => setOpenStep(k)}
+                    className={cn(
+                      'h-auto min-h-9 items-start justify-start whitespace-normal py-1.5 text-left leading-snug',
+                      !on && passed && TONE.success.value,
+                    )}
+                  >
+                    {/* 🔴 **ห้ามใส่เครื่องหมายถูก** (เจ้าของสั่ง 28 ส.ค. 2569) — โชว์เลขขั้นเสมอ */}
+                    <span
+                      className={cn(
+                        'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-xs tabular-nums',
+                        on ? 'bg-primary-foreground/20' : 'bg-secondary',
+                      )}
+                      aria-hidden
                     >
-                      {/* 🔴 **ห้ามใส่เครื่องหมายถูก** (เจ้าของสั่ง 28 ส.ค. 2569) — โชว์เลขขั้นเสมอ */}
-                      <span
-                        className={cn(
-                          'flex h-4 w-4 items-center justify-center rounded-full text-xs tabular-nums',
-                          on ? 'bg-primary-foreground/20' : 'bg-secondary',
-                        )}
-                        aria-hidden
-                      >
-                        {t.step}
-                      </span>
-                      {t.label}
+                      {t.step}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block">{t.label}</span>
                       {here ? (
-                        <span className={cn('font-normal', on ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+                        <span className={cn('block font-normal', on ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
                           ค้างที่นี่
                         </span>
                       ) : null}
-                    </Button>
-                  </React.Fragment>
+                    </span>
+                  </Button>
                 );
               })}
             </nav>
@@ -463,6 +480,11 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 >
                   {releaseBusy ? 'กำลังบันทึก…' : 'ดึงประกาศลง'}
                 </Button>
+                {sendError ? (
+                  <p role="alert" className="text-xs text-destructive">
+                    {sendError}
+                  </p>
+                ) : null}
               </div>
             ) : skip ? (
               <p className={cn('w-fit rounded-full border px-3 py-1 text-xs', TONE.danger.soft, TONE.danger.value)}>
@@ -553,7 +575,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 <StepCard title="สรุปก่อนส่ง">
                   {jobWithPatch ? (
                     <dl className="divide-y divide-border/60">
-                      <SummaryRow label="ตำแหน่ง">{publicJobPositionLabel(jobWithPatch)}</SummaryRow>
+                      <SummaryRow label="ตำแหน่ง">{postingPositionText(jobWithPatch)}</SummaryRow>
                       <SummaryRow label="สถานที่" onEdit={() => setOpenStep('place')}>
                         {publicSafeAddress(jobWithPatch) || 'ไม่ระบุจังหวัด'}
                       </SummaryRow>
@@ -607,37 +629,41 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                   ) : (
                     <p className="text-sm text-muted-foreground">ยังไม่มีลิงก์</p>
                   )}
-                  <label htmlFor="posting-want-link" className="flex w-fit cursor-pointer items-center gap-3">
-                    <Checkbox
-                      id="posting-want-link"
-                      checked={wantLink}
-                      onCheckedChange={(v) => setWantLink(v === true)}
-                    />
-                    <span className="text-sm text-foreground">{linkCount ? 'สร้างลิงก์เพิ่ม' : 'สร้างลิงก์'}</span>
-                  </label>
-                  {/* มีประกาศแล้ว = เลือกช่องทางอย่างเดียว ข้อความเดิม (เจ้าของ 4 ต.ค. 2569 "ให้มันจำ แค่อยากเปลี่ยนช่องทาง")
-                      ยังไม่มี = กรอกข้อความประกาศครั้งแรกครั้งเดียว */}
-                  {wantLink && job && openPosting ? (
-                    <AddChannelLinks
-                      posting={openPosting}
-                      onCreated={() => {
-                        void loadPostings();
-                        setLinksOpen(false);
-                      }}
-                    />
-                  ) : wantLink && job ? (
-                    <GenApplyLinkDialog
-                      embedded
-                      open
-                      previewFirst
-                      job={job}
-                      onClose={() => setWantLink(false)}
-                      onCreated={() => {
-                        void loadPostings();
-                        setLinksOpen(true);
-                      }}
-                    />
-                  ) : null}
+                  {/* 🔴 "Gen link" เป็นปุ่มกางลง (เจ้าของสั่ง 5 ต.ค. 2569: *"สร้างลิงก์ เปลี่ยนเป็น Gen link และพอกดไป
+                      ให้มันเป็น Dropdown ไม่ใช่ค้างโชว์ไว้"*) — เดิมเป็นช่องติ๊กที่กางฟอร์มค้างไว้ · กดอีกครั้ง = พับ
+                      มีประกาศแล้ว = เลือกช่องทางอย่างเดียว ข้อความเดิม · ยังไม่มี = กรอกข้อความประกาศครั้งแรกครั้งเดียว */}
+                  <Collapsible open={wantLink} onOpenChange={setWantLink}>
+                    <CollapsibleTrigger asChild>
+                      <Button type="button" variant="outline" size="sm" data-testid="gen-link-toggle">
+                        <Link2 aria-hidden />
+                        {linkCount ? 'Gen link เพิ่ม' : 'Gen link'}
+                        <ChevronDown className={cn('transition-transform', wantLink && 'rotate-180')} aria-hidden />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-3">
+                      {job && openPosting ? (
+                        <AddChannelLinks
+                          posting={openPosting}
+                          onCreated={() => {
+                            void loadPostings();
+                            setLinksOpen(false);
+                          }}
+                        />
+                      ) : job ? (
+                        <GenApplyLinkDialog
+                          embedded
+                          open
+                          previewFirst
+                          job={job}
+                          onClose={() => setWantLink(false)}
+                          onCreated={() => {
+                            void loadPostings();
+                            setLinksOpen(true);
+                          }}
+                        />
+                      ) : null}
+                    </CollapsibleContent>
+                  </Collapsible>
                 </StepCard>
 
                 {!released && skip ? (
@@ -662,6 +688,11 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 ) : released ? (
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     <p className={cn('mr-auto text-sm', TONE.success.value)}>ใบนี้ประกาศแล้ว</p>
+                    {sendError ? (
+                      <p role="alert" className="text-xs text-destructive">
+                        {sendError}
+                      </p>
+                    ) : null}
                     <Button
                       type="button"
                       variant="outline"
