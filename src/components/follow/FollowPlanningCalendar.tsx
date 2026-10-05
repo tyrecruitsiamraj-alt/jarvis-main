@@ -88,6 +88,8 @@ type View = 'day' | 'month';
  * ค่าเริ่ม 10 · เดิมล็อก 12 ไม่มีตัวเลือก
  */
 const DAY_PAGE_SIZES = [10, 15] as const;
+/** รายเดือนหน้าละ 10 คน (5 ต.ค. 2569) */
+const MONTH_PAGE_SIZE = 10;
 type DayPageSize = (typeof DAY_PAGE_SIZES)[number];
 
 /** ชื่อเดือนไทย + ปี พ.ศ. จากคีย์ YYYY-MM */
@@ -412,6 +414,17 @@ const FollowPlanningCalendar: React.FC<{
     [rows, roundFilter],
   );
   const monthRows = useMemo(() => buildFollowMonthRows(monthSource, month), [monthSource, month]);
+  /**
+   * 🔴 รายเดือนแบ่งหน้า หน้าละ 10 คน (เจ้าของสั่ง 5 ต.ค. 2569: *"รายเดือน · ภาพรวม ทำเป็น pagination ด้วยหน้าละ 10"*)
+   * เปลี่ยนเดือน/สาย = กลับหน้า 1 · ตัวเลขแผงข้างขวายังนับทั้งเดือน (ไม่ใช่แค่หน้าที่ดู)
+   */
+  const [monthPage, setMonthPage] = useState(1);
+  useEffect(() => setMonthPage(1), [month, roundFilter]);
+  const monthPageCount = Math.max(1, Math.ceil(monthRows.length / MONTH_PAGE_SIZE));
+  const monthSafePage = Math.min(monthPage, monthPageCount);
+  const monthFirst = (monthSafePage - 1) * MONTH_PAGE_SIZE;
+  const monthLast = Math.min(monthFirst + MONTH_PAGE_SIZE, monthRows.length);
+  const monthPageRows = monthRows.slice(monthFirst, monthLast);
   const cols = useMemo(() => monthDayColumns(month), [month]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -1167,7 +1180,7 @@ const FollowPlanningCalendar: React.FC<{
                       </td>
                     </tr>
                   ) : null}
-                  {monthRows.map(({ row, byDay }) => {
+                  {monthPageRows.map(({ row, byDay }) => {
                     const s = personMonthSummary(row, month);
                     const parts: Array<[FollowCallCategory, number]> = (
                       [
@@ -1263,6 +1276,43 @@ const FollowPlanningCalendar: React.FC<{
               </table>
             </div>
           )}
+          {/* ตัวเปลี่ยนหน้ารายเดือน — อยู่เสมอ (หน้าเดียวก็โชว์ 1 / 1 · ว่างแล้วห้ามหาย) */}
+          {view === 'month' ? (
+            <div
+              className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 px-4 py-3 md:px-5"
+              data-testid="month-pager"
+            >
+              <span className="text-xs tabular-nums text-muted-foreground">
+                แสดง {monthRows.length === 0 ? 0 : monthFirst + 1} ถึง {monthLast} จากทั้งหมด{' '}
+                {monthRows.length.toLocaleString('th-TH')} คน
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  size="iconXs"
+                  variant="outline"
+                  aria-label="หน้าก่อนหน้า (รายเดือน)"
+                  disabled={monthSafePage <= 1}
+                  onClick={() => setMonthPage(monthSafePage - 1)}
+                >
+                  <ChevronLeft aria-hidden />
+                </Button>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  หน้า {monthSafePage} / {monthPageCount}
+                </span>
+                <Button
+                  type="button"
+                  size="iconXs"
+                  variant="outline"
+                  aria-label="หน้าถัดไป (รายเดือน)"
+                  disabled={monthSafePage >= monthPageCount}
+                  onClick={() => setMonthPage(monthSafePage + 1)}
+                >
+                  <ChevronRight aria-hidden />
+                </Button>
+              </span>
+            </div>
+          ) : null}
         </Card>
 
         {/* ── แผงข้างขวา ── */}

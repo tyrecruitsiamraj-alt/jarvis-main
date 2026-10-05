@@ -800,3 +800,27 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
     expect(screen.queryByTestId('staff-quick')).toBeNull();
   });
 });
+
+describe('รายเดือนแบ่งหน้า หน้าละ 10 คน (เจ้าของสั่ง 5 ต.ค. 2569)', () => {
+  it('12 คน ⇒ หน้าแรก 10 · หน้าถัดไป 2 · ตัวเปลี่ยนหน้าบอกช่วงถูก', () => {
+    renderCalendar(
+      Array.from({ length: 12 }, (_, i) =>
+        entry({
+          id: `m${i}`,
+          recipient_name: `คนที่ ${String(i + 1).padStart(2, '0')}`,
+          recipient_phone: `08100000${String(i).padStart(2, '0')}`,
+          scheduled_at: '2026-09-03T02:00:00Z',
+        }),
+      ),
+    );
+    showMonthView();
+    const pager = screen.getByTestId('month-pager');
+    const bodyRows = () => document.querySelectorAll('table tbody tr').length;
+    expect(bodyRows()).toBe(10);
+    expect(pager.textContent).toContain('แสดง 1 ถึง 10 จากทั้งหมด 12 คน');
+    expect(pager.textContent).toContain('หน้า 1 / 2');
+    fireEvent.click(within(pager).getByRole('button', { name: 'หน้าถัดไป (รายเดือน)' }));
+    expect(bodyRows()).toBe(2);
+    expect(screen.getByTestId('month-pager').textContent).toContain('หน้า 2 / 2');
+  });
+});

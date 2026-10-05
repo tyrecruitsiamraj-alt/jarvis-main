@@ -11809,3 +11809,4 @@ Choice: ถึงแล้ว/ไปแล้ว/ลา/เลื่อน/จ�
 
 - `src/components/follow/FollowDayReportDialog.tsx` — ตารางบนจอแบ่งหน้าด้วย `paginateDayReportRows` ตัวเดียวกับรูป (หน้าละราว 20 · ชื่อเดียวกันไม่ขาดข้ามหน้า) ⇒ หน้า N = รูปที่ N · ‹ › + "แถว a–b จาก n" อยู่เสมอ · เปลี่ยนวัน/สาย/ใครโทร = กลับหน้าแรก · คัดลอก/บันทึกรูปยังได้ทุกแถว
 - เทสต์ `tests/api/followDayReportPager2569-10-05.test.ts`
+- `src/components/follow/FollowPlanningCalendar.tsx` — รายเดือน · ภาพรวม แบ่งหน้า หน้าละ 10 คน (`MONTH_PAGE_SIZE` · `month-pager` อยู่เสมอ) · เปลี่ยนเดือน/สาย = กลับหน้า 1 · แผงข้างขวายังนับทั้งเดือน (5 ต.ค. 2569)
