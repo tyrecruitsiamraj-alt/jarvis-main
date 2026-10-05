@@ -11824,3 +11824,11 @@ Choice: ถึงแล้ว/ไปแล้ว/ลา/เลื่อน/จ�
 | เทสต์ | `src/lib/followCallMatrix.test.ts` (override) · ปรับ `followPlanning.test.ts` · `followOutcome.test.ts` |
 
 - ⚠️ สถิติคนหลุด (`isLostOutcome` · ML · trends) ยังนับยกเลิกเป็นหลุดเหมือนเดิม — เปลี่ยนแค่ถังบนจอ
+
+## 5 ต.ค. 2569: ติดตั้งเป็นแอปบนมือถือ (PWA)
+
+- `public/manifest.webmanifest` (**ใหม่**) — ชื่อ So Recruit · standalone · start_url `/` · สีกรมท่า `#12203c` (manifest ใช้ตัวแปรธีมไม่ได้)
+- `public/pwa-192.png` · `public/pwa-512.png` · `public/apple-touch-icon.png` (**ใหม่**) — ย่อจาก `so-work-logo.png` (ไฟล์นั้นจริง ๆ เป็น JPEG ชื่อ .png · ไอคอนใหม่แปลงเป็น PNG จริงแล้ว)
+- `index.html` — `<link rel="manifest">` · theme-color · meta ของ iPhone · apple-touch-icon ใหม่
+- 🔴 **ไม่มี service worker โดยตั้งใจ** — ไม่แคชหน้า deploy แล้วเห็นของใหม่ทันที · ถ้าจะทำ offline ทีหลังต้องคิดเรื่อง SSO redirect + ของค้างก่อน
+- ⚠️ ไอคอนอยู่ใต้กติกา nginx cache 1 ปี (`docker/nginx.conf`) — เปลี่ยนรูปไอคอนให้เปลี่ยนชื่อไฟล์ด้วย

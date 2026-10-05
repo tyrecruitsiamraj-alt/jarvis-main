@@ -8,7 +8,17 @@
     <meta name="author" content="So Recruit" />
 
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/so-work-logo.png" />
+    <!-- ติดตั้งเป็นแอปบนมือถือ (PWA · เจ้าของถาม 5 ต.ค. 2569 "ทำให้ติดตั้งเป็นแอพลงที่เครื่องมือถือได้ไหม")
+         Android: Chrome › ติดตั้งแอป · iPhone: Safari › แชร์ › เพิ่มไปยังหน้าจอโฮม
+         ไม่มี service worker โดยตั้งใจ — ไม่แคชหน้าเว็บ deploy แล้วเห็นของใหม่ทันทีเหมือนเดิม
+         สีแถบบน = กรมท่าของแบรนด์ (#12203c ตาม CLAUDE.md · manifest ใช้ตัวแปรธีมไม่ได้) -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#12203c" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="So Recruit" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
     <meta property="og:title" content="So Recruit" />
     <meta property="og:description" content="ระบบบริหารกำลังคนและการสรรหา (Workforce &amp; recruitment)" />
