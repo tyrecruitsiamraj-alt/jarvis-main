@@ -35,19 +35,28 @@ import {
   type CompletedFollowPerson,
 } from '@/lib/followCompletion';
 import {
+  CONTINUE_DAY_PRESETS,
+  CONTINUE_MAX_DAYS,
   MOVE_DAY_PRESETS,
   MOVE_MAX_ROUNDS,
   MOVE_MODE_LABEL,
+  buildContinueCalls,
   buildMoveCalls,
+  continueStartYmd,
+  firstContinueDraft,
   firstMoveRound,
   isAftercareTopic,
-  moveRoundDay,
+  lastFollowYmd,
+  moveRoundDays,
   nextMoveRound,
   openFollowRounds,
+  validateContinue,
   validateMoveRounds,
+  type ContinueDraft,
   type MoveRoundDraft,
   type MoveRoundMode,
 } from '@/lib/followAftercareMove';
+import type { ScheduleCall } from '@/lib/followWizard';
 
 /**
  * การ์ด **"ติดตามครบ"** บนหน้าติดตาม (เจ้าของสั่ง 1 ต.ค. 2569)
@@ -56,6 +65,8 @@ import {
  * ไปติดตามหลังเริ่มงานไหม ถ้าติดตามจะให้ติดตามในอีกกี่วันข้างหน้า"*
  * Choice: การ์ดแยกบนหน้า · ปุ่ม 3/7/30 + พิมพ์เอง + เพิ่มรอบเองได้ · ตั้งได้ว่า AI หรือคนโทร
  * · "ไม่ย้าย" = เลือกผลปิดงาน 5 แบบ · "ย้าย" = ปิดงานชุดเดิมเป็น "ไปแล้ว"
+ * · 5 ต.ค. 2569: ย้าย = นับจากวันติดตามวันสุดท้ายแล้วบวกต่อกัน (3 → 7 → 15 → 30) ·
+ *   ไม่ย้าย = ปิดงาน หรือ **ติดตามต่อ** อีก N วัน (ชื่อกลับไปตารางติดตาม · ครบแล้วกลับมากองนี้)
  *
  * 🔴 รับ `groups` จากหน้าแม่ (ชุดของแท็บที่เปิด · ไม่ผ่านตัวกรองงานจบหรือยัง/วันที่)
  *    ยอดกับรายชื่อมาจากชุดเดียวกันเสมอ · ใครอยู่ในกองตัดสินที่ `followCompletion.ts` ที่เดียว
@@ -204,6 +215,8 @@ const FollowCompletedCard: React.FC<{
       <NotMovingDialog
         key={`close-${closing?.group.key ?? 'none'}`}
         person={closing}
+        followTeam={followTeam}
+        now={now}
         onClose={() => setClosing(null)}
         onDone={(text) => {
           setClosing(null);
@@ -250,18 +263,21 @@ const MoveToAftercareDialog: React.FC<{
   const aftercare = isAftercareTopic(g?.topic);
   const title = aftercare ? 'ตามต่อ' : 'ย้ายไปดูแลหลังเริ่มงาน';
   const today = now();
+  /** วันฐาน = วันติดตามวันสุดท้ายของชุด · รอบแรกนับจากวันนี้ รอบถัดไปบวกต่อจากรอบก่อน */
+  const baseYmd = g ? lastFollowYmd(g.rounds, today) : null;
+  const roundDays = baseYmd ? moveRoundDays(rounds, baseYmd) : rounds.map(() => null);
 
   const patch = (i: number, next: Partial<MoveRoundDraft>) =>
     setRounds((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...next } : r)));
 
   const submit = async () => {
-    if (!g || busy) return;
-    const invalid = validateMoveRounds(rounds);
+    if (!g || !baseYmd || busy) return;
+    const invalid = validateMoveRounds(rounds, baseYmd, now());
     if (invalid) {
       setError(invalid);
       return;
     }
-    const calls = buildMoveCalls(rounds, now(), staffPhoneOf(g));
+    const calls = buildMoveCalls(rounds, baseYmd, staffPhoneOf(g));
     const latest = g.rounds[g.rounds.length - 1];
     setBusy(true);
     setError(null);
@@ -332,9 +348,15 @@ const MoveToAftercareDialog: React.FC<{
           </DialogDescription>
         </DialogHeader>
 
+        {baseYmd ? (
+          <p className="text-xs text-muted-foreground" data-testid="move-base-day">
+            ติดตามวันสุดท้าย <span className="tabular-nums text-foreground">{formatYmdDmyBe(baseYmd)}</span>
+          </p>
+        ) : null}
+
         <ol className="space-y-2" aria-label="รอบโทร">
           {rounds.map((r, i) => {
-            const day = moveRoundDay(r, today);
+            const day = roundDays[i];
             return (
               <li key={i} className="space-y-2 rounded-xl border border-border/70 p-3" data-testid="move-round">
                 <div className="flex items-center justify-between gap-2">
@@ -351,7 +373,7 @@ const MoveToAftercareDialog: React.FC<{
                   </Button>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground">อีก</span>
+                  <span className="text-xs text-muted-foreground">{i === 0 ? 'อีก' : 'ต่ออีก'}</span>
                   {MOVE_DAY_PRESETS.map((d) => (
                     <Button
                       key={d}
@@ -380,7 +402,9 @@ const MoveToAftercareDialog: React.FC<{
                     />
                   </div>
                   <span className="text-xs text-muted-foreground">วัน</span>
-                  <span className="text-xs tabular-nums text-foreground">{day ? formatYmdDmyBe(day) : '—'}</span>
+                  <span className="text-xs tabular-nums text-foreground" data-testid="move-round-day">
+                    {day ? formatYmdDmyBe(day) : '—'}
+                  </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <TimeSelect24
@@ -442,16 +466,33 @@ const MoveToAftercareDialog: React.FC<{
   );
 };
 
-/** ป๊อป "ไม่ย้าย" — เลือกผลปิดงาน 5 แบบ แล้วปิดทุกรอบที่ยังเปิดของชุดนี้ */
+/**
+ * ป๊อป "ไม่ย้าย" — สองทาง (เจ้าของ 5 ต.ค. 2569: *"ไม่ย้ายเพราะอะไร จะติดตามต่อหรอ ถ้าติดตามต่อติดตามต่ออีกกี่วัน"*)
+ *   ① **ติดตามต่อ** อีก N วัน วันละ 1 สาย (เรื่องเดิม · ทีมเดิม · คนรับผิดชอบเดิม) — รอบเก่าไม่ปิด
+ *      มีนัดข้างหน้าแล้ว ⇒ หลุดจากกองนี้เอง ไปอยู่ตารางติดตาม · ครบแล้วกลับมาให้ตัดสินอีกรอบ
+ *   ② **ปิดงาน** เลือกผล แล้วปิดทุกรอบที่ยังเปิดของชุดนี้ (ของเดิม)
+ * ชุดดูแลหลังเริ่มงานไม่มีทาง ① (มีปุ่ม "ตามต่อ" บนแถวอยู่แล้ว)
+ */
 const NotMovingDialog: React.FC<{
   person: CompletedFollowPerson | null;
+  followTeam?: 'replacement';
+  now: () => Date;
   onClose: () => void;
   onDone: (notice: string) => void;
-}> = ({ person, onClose, onDone }) => {
+}> = ({ person, followTeam, now, onClose, onDone }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ContinueDraft>(() => firstContinueDraft());
   const g = person?.group ?? null;
-  const title = isAftercareTopic(g?.topic) ? 'ไม่ตามต่อ' : 'ไม่ย้าย';
+  const aftercare = isAftercareTopic(g?.topic);
+  const title = aftercare ? 'ไม่ตามต่อ' : 'ไม่ย้าย';
+  const today = now();
+  const startYmd = g ? continueStartYmd(lastFollowYmd(g.rounds, today), today) : null;
+  const preview: ScheduleCall[] =
+    g && startYmd && !validateContinue(draft)
+      ? buildContinueCalls(draft, startYmd, staffPhoneOf(g), lastCallRoundOf(g))
+      : [];
+  const patch = (next: Partial<ContinueDraft>) => setDraft((prev) => ({ ...prev, ...next }));
 
   const complete = async (outcome: FollowOutcome, note?: string, stopScope?: FollowStopScope) => {
     if (!g || busy) return;
@@ -474,6 +515,62 @@ const NotMovingDialog: React.FC<{
     onDone(`ปิดงาน ${g.name} แล้ว · ${FOLLOW_OUTCOME_LABEL[outcome]}`);
   };
 
+  /** ติดตามต่อ — สร้างแผนละวัน group_id ใหม่ชุดเดียว (กติกาเดียวกับตารางหลายวัน) · ล้มกลางทางต้องบอกว่าตั้งไปกี่สาย */
+  const continueFollow = async () => {
+    if (!g || !startYmd || busy) return;
+    const invalid = validateContinue(draft);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+    const calls = buildContinueCalls(draft, startYmd, staffPhoneOf(g), lastCallRoundOf(g));
+    if (calls.length === 0) {
+      setError('ตั้งสายไม่ได้');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    let created = 0;
+    try {
+      const groupId = crypto.randomUUID();
+      for (const { calls: dayCalls } of scheduleCallsByDay(calls)) {
+        const first = dayCalls[0];
+        await createFollowRounds({
+          recipient_name: g.name,
+          recipient_phone: g.phone,
+          topic: g.topic,
+          follow_team: followTeam,
+          staff_phone: first.staffPhone || undefined,
+          scheduled_at: first.scheduledAt,
+          call_round: first.callRound,
+          call_mode: first.callMode,
+          group_id: groupId,
+          unit_name: g.unitName ?? undefined,
+          site_code: g.siteCode ?? undefined,
+          rounds: dayCalls.map((c) => ({
+            scheduled_at: c.scheduledAt,
+            staff_phone: c.staffPhone || undefined,
+            call_round: c.callRound,
+            call_mode: c.callMode,
+          })),
+        });
+        created += dayCalls.length;
+      }
+    } catch (e) {
+      const why = e instanceof Error ? e.message : 'ตั้งสายไม่สำเร็จ';
+      setError(created > 0 ? `${why} — ตั้งไปแล้ว ${created} จาก ${calls.length} สาย` : why);
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    const last = calls[calls.length - 1];
+    onDone(
+      `ติดตาม ${g.name} ต่อ ${calls.length} วัน · ${formatYmdDmyBe(calls[0].day)}${
+        last.day !== calls[0].day ? ` – ${formatYmdDmyBe(last.day)}` : ''
+      }`,
+    );
+  };
+
   return (
     <Dialog
       open={Boolean(person)}
@@ -484,11 +581,86 @@ const NotMovingDialog: React.FC<{
         }
       }}
     >
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[88vh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{g ? `${g.name}${g.unitName ? ` · ${g.unitName}` : ''}` : ''}</DialogDescription>
         </DialogHeader>
+
+        {aftercare ? null : (
+          <section className="space-y-2 rounded-xl border border-border/70 p-3" data-testid="continue-follow">
+            <h3 className="text-sm font-medium text-foreground">ติดตามต่อ</h3>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">อีก</span>
+              {CONTINUE_DAY_PRESETS.map((d) => (
+                <Button
+                  key={d}
+                  type="button"
+                  size="xs"
+                  variant={draft.days.trim() === String(d) ? 'default' : 'outline'}
+                  aria-pressed={draft.days.trim() === String(d)}
+                  disabled={busy}
+                  onClick={() => patch({ days: String(d) })}
+                >
+                  {d}
+                </Button>
+              ))}
+              <div className="w-20">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={CONTINUE_MAX_DAYS}
+                  value={draft.days}
+                  disabled={busy}
+                  onChange={(e) => patch({ days: e.target.value })}
+                  aria-label="ติดตามต่ออีกกี่วัน"
+                  className="h-9 text-xs tabular-nums"
+                />
+              </div>
+              <span className="text-xs text-muted-foreground">วัน</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <TimeSelect24
+                value={draft.time}
+                onChange={(v) => patch({ time: v })}
+                disabled={busy}
+                label="เวลาโทรติดตามต่อ"
+                className="min-h-9"
+              />
+              <span className="flex items-center gap-1" role="group" aria-label="ใครโทรติดตามต่อ">
+                {(Object.keys(MOVE_MODE_LABEL) as MoveRoundMode[]).map((m) => (
+                  <Button
+                    key={m}
+                    type="button"
+                    size="xs"
+                    variant={draft.mode === m ? 'default' : 'outline'}
+                    aria-pressed={draft.mode === m}
+                    disabled={busy}
+                    onClick={() => patch({ mode: m })}
+                  >
+                    {MOVE_MODE_LABEL[m]}
+                  </Button>
+                ))}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs tabular-nums text-foreground" data-testid="continue-preview">
+                {preview.length > 0
+                  ? `${formatYmdDmyBe(preview[0].day)}${
+                      preview.length > 1 ? ` – ${formatYmdDmyBe(preview[preview.length - 1].day)}` : ''
+                    } · ${preview.length.toLocaleString('th-TH')} สาย`
+                  : '—'}
+              </span>
+              <Button type="button" size="sm" disabled={busy || preview.length === 0} onClick={() => void continueFollow()}>
+                {busy ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
+                ติดตามต่อ
+              </Button>
+            </div>
+          </section>
+        )}
+
+        {aftercare ? null : <h3 className="text-sm font-medium text-foreground">ปิดงาน</h3>}
         <FollowCompleteControls alwaysOpen busy={busy} onComplete={complete} />
         {error ? (
           <p role="alert" className={cn('text-xs font-medium', TONE.danger.value)}>
@@ -499,5 +671,16 @@ const NotMovingDialog: React.FC<{
     </Dialog>
   );
 };
+
+/** สายที่สูงสุดของชุด (ไม่นับยกเลิก) — ติดตามต่อนับเลขสายต่อจากนี้ */
+function lastCallRoundOf(group: FollowGroup): number {
+  let max = 0;
+  for (const r of group.rounds) {
+    if (r.cancelled) continue;
+    const n = Number(r.call_round ?? 0);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return max > 0 ? max : group.rounds.filter((r) => !r.cancelled).length;
+}
 
 export default FollowCompletedCard;

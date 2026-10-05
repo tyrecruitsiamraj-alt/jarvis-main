@@ -6,7 +6,8 @@ import React from 'react';
  * - ว่างก็ยังอยู่ (หัวการ์ด 0 คน + แถว "ไม่มี…") — กติกาทั้งระบบวันเดียวกัน
  * - ย้าย = ลงทะเบียนดูแล → ตั้งรอบ **แผนละวัน group_id เดียว** หัวข้อถามความเป็นอยู่ → ปิดชุดเดิมเป็น "ไปแล้ว"
  * - ตั้งรอบล้มกลางทาง ⇒ **ห้ามปิดชุดเดิม** (คนต้องยังอยู่ในกอง) + บอกว่าตั้งไปแล้วกี่สาย
- * - ไม่ย้าย = เลือกผล 5 แบบ แล้วปิดทุกรอบที่ยังเปิด
+ * - ไม่ย้าย = เลือกผล 5 แบบ แล้วปิดทุกรอบที่ยังเปิด · หรือ **ติดตามต่อ** อีก N วัน (5 ต.ค. 2569)
+ * - 🔴 5 ต.ค. 2569: วันของรอบดูแล = วันติดตามวันสุดท้าย + บวกต่อกัน (ชุดตัวอย่างจบ 30 ก.ย. ⇒ +3 = 3 ต.ค. · +7 = 10 ต.ค.)
  * - บอกว่าไม่ไป ⇒ ไม่มีปุ่มย้าย
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -129,7 +130,7 @@ describe('FollowCompletedCard', () => {
     expect(screen.getByRole('button', { name: 'ไม่ตามต่อ' })).toBeTruthy();
   });
 
-  it('🔴 ย้าย 2 รอบ (อีก 3 วัน AI + อีก 7 วัน คนโทร) ⇒ ลงทะเบียน → ตั้งแผนละวัน group เดียว → ปิดชุดเดิมเป็น "ไปแล้ว"', async () => {
+  it('🔴 ย้าย 2 รอบ (อีก 3 วัน AI + ต่ออีก 7 วัน คนโทร) ⇒ ลงทะเบียน → ตั้งแผนละวัน group เดียว → ปิดชุดเดิมเป็น "ไปแล้ว"', async () => {
     moveToAftercare.mockResolvedValue({});
     createFollowRounds.mockResolvedValue([]);
     completeFollowEntry.mockResolvedValue({});
@@ -140,11 +141,13 @@ describe('FollowCompletedCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ย้ายไปดูแลหลังเริ่มงาน' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getAllByTestId('move-round')).toHaveLength(1);
-    expect(within(dialog).getByText('4/10/2569')).toBeTruthy();
+    expect(within(dialog).getByTestId('move-base-day').textContent).toBe('ติดตามวันสุดท้าย 30/9/2569');
+    expect(within(dialog).getByText('3/10/2569')).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: /เพิ่มรอบ/ }));
     const rounds = within(dialog).getAllByTestId('move-round');
     expect(rounds).toHaveLength(2);
-    expect(within(rounds[1]).getByText('8/10/2569')).toBeTruthy();
+    // บวกต่อจากรอบแรก: 3 ต.ค. + 7 = 10 ต.ค. (ไม่ใช่ 30 ก.ย. + 7)
+    expect(within(rounds[1]).getByText('10/10/2569')).toBeTruthy();
     fireEvent.click(within(rounds[1]).getByRole('button', { name: 'คนโทร' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'ย้ายไปดูแลหลังเริ่มงาน' }));
 
@@ -164,12 +167,12 @@ describe('FollowCompletedCard', () => {
       follow_team: 'replacement',
       recipient_phone: '0812345678',
       staff_phone: '0899999999',
-      scheduled_at: '2026-10-04T00:00:00.000Z',
+      scheduled_at: '2026-10-03T00:00:00.000Z',
       call_round: 1,
       call_mode: 'ai',
       unit_name: 'หน่วยงาน ก',
     });
-    expect(second).toMatchObject({ scheduled_at: '2026-10-08T00:00:00.000Z', call_round: 2, call_mode: 'manual' });
+    expect(second).toMatchObject({ scheduled_at: '2026-10-10T00:00:00.000Z', call_round: 2, call_mode: 'manual' });
     expect(first.group_id).toBeTruthy();
     expect(second.group_id).toBe(first.group_id);
     expect(first.group_id).not.toBe('g-old');
@@ -197,16 +200,72 @@ describe('FollowCompletedCard', () => {
     expect(onChanged).not.toHaveBeenCalled();
   });
 
-  it('รอบซ้ำกัน ⇒ ไม่ยิงอะไรเลย + บอกรอบที่ผิด', async () => {
+  it('รอบที่ตกวันเวลาที่ผ่านไปแล้ว ⇒ ไม่ยิงอะไรเลย + บอกรอบที่ผิด', async () => {
     render(<FollowCompletedCard groups={groupsOf(going)} onChanged={() => {}} now={NOW} />);
     fireEvent.click(screen.getByRole('button', { name: 'ย้ายไปดูแลหลังเริ่มงาน' }));
     const dialog = await screen.findByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: /เพิ่มรอบ/ }));
-    const rounds = within(dialog).getAllByTestId('move-round');
-    fireEvent.click(within(rounds[1]).getByRole('button', { name: '3' }));
+    // 30 ก.ย. + 1 = 1 ต.ค. 07:00 — ตอนนี้ 1 ต.ค. 10:00 แล้ว
+    fireEvent.change(within(dialog).getByLabelText('จำนวนวันของรอบที่ 1'), { target: { value: '1' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'ย้ายไปดูแลหลังเริ่มงาน' }));
-    expect(await within(dialog).findByRole('alert')).toHaveProperty('textContent', 'รอบที่ 2: ซ้ำกับรอบก่อนหน้า');
+    expect(await within(dialog).findByRole('alert')).toHaveProperty('textContent', 'รอบที่ 1: 1/10/2569 07:00 ผ่านมาแล้ว');
     expect(moveToAftercare).not.toHaveBeenCalled();
+    expect(createFollowRounds).not.toHaveBeenCalled();
+  });
+
+  it('🔴 ไม่ย้าย → ติดตามต่ออีก 3 วัน คนโทร ⇒ วันละสาย 2–4 ต.ค. เรื่องเดิม ทีมเดิม · ไม่ปิดชุดเดิม', async () => {
+    createFollowRounds.mockResolvedValue([]);
+    const onChanged = vi.fn();
+    render(<FollowCompletedCard groups={groupsOf(going)} followTeam="replacement" onChanged={onChanged} now={NOW} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ไม่ย้าย' }));
+    const dialog = await screen.findByRole('dialog');
+    const box = within(within(dialog).getByTestId('continue-follow'));
+    fireEvent.click(box.getByRole('button', { name: '3' }));
+    fireEvent.click(box.getByRole('button', { name: 'คนโทร' }));
+    // จบ 30 ก.ย. ⇒ วันถัดไป 1 ต.ค. แต่วันนี้ 1 ต.ค. แล้ว ⇒ เริ่มพรุ่งนี้
+    expect(box.getByTestId('continue-preview').textContent).toBe('2/10/2569 – 4/10/2569 · 3 สาย');
+    fireEvent.click(box.getByRole('button', { name: 'ติดตามต่อ' }));
+
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    expect(createFollowRounds).toHaveBeenCalledTimes(3);
+    const sent = createFollowRounds.mock.calls.map((c) => c[0] as Record<string, unknown>);
+    expect(sent.map((x) => [x.scheduled_at, x.call_round, x.call_mode])).toEqual([
+      ['2026-10-02T00:00:00.000Z', 3, 'manual'],
+      ['2026-10-03T00:00:00.000Z', 4, 'manual'],
+      ['2026-10-04T00:00:00.000Z', 5, 'manual'],
+    ]);
+    expect(sent[0]).toMatchObject({
+      topic: 'แจ้งเข้างาน',
+      follow_team: 'replacement',
+      recipient_phone: '0812345678',
+      staff_phone: '0899999999',
+    });
+    expect(new Set(sent.map((x) => x.group_id)).size).toBe(1);
+    expect(sent[0].group_id).not.toBe('g-old');
+    expect(completeFollowEntry).not.toHaveBeenCalled();
+    expect(moveToAftercare).not.toHaveBeenCalled();
+    expect((await screen.findByRole('status')).textContent).toContain('ต่อ 3 วัน');
+  });
+
+  it('ติดตามต่อล้มกลางทาง ⇒ บอกว่าตั้งไปแล้วกี่สาย · ไม่ปิดป๊อป', async () => {
+    createFollowRounds.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('เส้นล่ม'));
+    const onChanged = vi.fn();
+    render(<FollowCompletedCard groups={groupsOf(going)} onChanged={onChanged} now={NOW} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ไม่ย้าย' }));
+    const dialog = await screen.findByRole('dialog');
+    const box = within(within(dialog).getByTestId('continue-follow'));
+    fireEvent.click(box.getByRole('button', { name: '3' }));
+    fireEvent.click(box.getByRole('button', { name: 'ติดตามต่อ' }));
+    expect(await within(dialog).findByRole('alert')).toHaveProperty('textContent', 'เส้นล่ม — ตั้งไปแล้ว 1 จาก 3 สาย');
+    expect(onChanged).not.toHaveBeenCalled();
+  });
+
+  it('ชุดดูแลหลังเริ่มงาน ⇒ ป๊อปไม่ตามต่อไม่มีทางติดตามต่อ (มีปุ่มตามต่อบนแถวแล้ว)', async () => {
+    render(
+      <FollowCompletedCard groups={groupsOf([row({ id: 'c1', topic: AFTERCARE_TOPIC })])} onChanged={() => {}} now={NOW} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'ไม่ตามต่อ' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByTestId('continue-follow')).toBeNull();
   });
 
   it('ไม่ย้าย ⇒ เลือก "ลา" แล้วปิดทุกรอบที่ยังเปิดด้วยผลนั้น', async () => {
