@@ -11982,3 +11982,17 @@ Choice: รายได้เฉลี่ยโชว์ ติ๊กซ่อ�
 | `src/lib/extraBenefits.ts` | `RETIRED_BENEFITS` (dorm · shuttle · meal · bonus · salary_raise) ออกจากรายการให้ติ๊ก · `isRetiredBenefit` ตัดทั้งคีย์เก่าและข้อความ |
 | `src/lib/publicJobTitle.ts` · `recruitPostings.ts` · `boardFilters.ts` | "Valet" → "Valet parking" |
 | เทสต์ | JobPublicFacts · publicFieldsForm · EditPublicJobFieldsDialog · boardFilters · publicApplyPage2569-10-04 |
+
+## 5 ต.ค. 2569 (ดึก): บทเสนองานพูดรายได้ (เติมตอนยิง) · ชื่อหน่วยงาน/อิโมจิในบทใบสมัคร
+
+เจ้าของ: *"ให้บทเสนองานเดิมพูดรายได้ด้วย"* · *"ขอดูว่าส่งไปถูกไหม"* → ดึงบทที่ส่งจริงล่าสุด 3 ใบ เจอ "ที่ หน่วยงานของเรา" + อิโมจิในตำแหน่ง + ไม่มีรายได้
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `api/_lib/lumosPayloadIncome.ts` (**ใหม่**) | `enrichPayloadsWithIncome` — เติมประโยครายได้+สวัสดิการ (ตัวเดียวกับของเดิมตอนเสิร์ฟ) ก่อนยิง · ใบขอจากรหัสใน payload (`jobRefOfPayload`) · ข้าม payload ที่มีคำว่า "บาท" แล้ว (บทผู้สมัครผ่านลิงก์) · ERP เพดาน 4 วิ |
+| `api/_lib/lumosPushTracking.ts` | `pushQueueRowsTracked` เรียกเติมก่อนยิงทุกครั้ง (รอบแรก + ส่งซ้ำ) |
+| `api/_lib/lumosDispatch.ts` | `speechText` ตัดอิโมจิจากตำแหน่ง · หน่วยงานถอยไปชื่อจุดทำงานจากใบขอ (`jobFacts.unitName`) ทั้งบทเสนองานและบทผู้สมัครผ่านลิงก์ · โหลดข้อมูลใบขอทุกครั้งที่มีคนส่งได้ |
+| `api/_lib/applyScriptFacts.ts` | `unitName` (work_site_name → unit_name) |
+| เทสต์ | `tests/api/lumosPayloadIncome.test.ts` (ใหม่) · `tests/api/applyScript2569-10-05.test.ts` |
+
+- ⚠️ ประโยคสวัสดิการที่ AI พูด (`speakableBenefitLine`) ยังพูดโอที — การ์ดถอดโอทีแล้ว แต่บทโทรยังคงไว้ (ยังไม่ได้รับคำสั่ง)

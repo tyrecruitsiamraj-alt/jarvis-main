@@ -16,6 +16,7 @@
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { errorSummaryText, logError, logInfo, logWarn } from './logger.js';
+import { enrichPayloadsWithIncome } from './lumosPayloadIncome.js';
 import {
   getLumosPushConfig,
   pushInterviews,
@@ -74,6 +75,8 @@ export async function pushQueueRowsTracked(
 ): Promise<{ pushed: number; failed: number }> {
   const out = { pushed: 0, failed: 0 };
   if (rows.length === 0 || !getLumosPushConfig()) return out;
+  // รายได้ + สวัสดิการ — เติมตอนยิง (แทนจังหวะ "Lumos มาดึงคิว" ที่ตายไปแล้ว · เจ้าของ 5 ต.ค. 2569) · ล้มไม่ขวางการยิง
+  await enrichPayloadsWithIncome(rows.map((r) => r.payload));
   for (const row of rows) {
     if (!row.payload || typeof row.payload !== 'object') {
       out.failed += 1;

@@ -100,3 +100,18 @@ describe('🔴 ใบไหนได้บทไหน', () => {
     }
   });
 });
+
+describe('🔴 บทที่ส่งจริง 5 ต.ค. 2569 เจอ "ที่ หน่วยงานของเรา" + อิโมจิในตำแหน่ง', () => {
+  it('ใบสมัครไม่มีชื่อหน่วยงาน = ใช้ชื่อจุดทำงานจากใบขอ · ตำแหน่งตัดอิโมจิ (ทั้งสองบท)', async () => {
+    const { speechText } = await import('../../api/_lib/lumosDispatch');
+    expect(speechText('พนักงานรับรถลานจอด 📍รพ.สมิติเวช ซ.สุขุมวิท 49')).toBe('พนักงานรับรถลานจอด รพ.สมิติเวช ซ.สุขุมวิท 49');
+    const noUnit = { ...APP, unit_name: null, job_title: 'พนักงานรับรถลานจอด 📍รพ.สมิติเวช' };
+    for (const apply of [{}, null]) {
+      const p = buildApplicationInterviewPayload(noUnit, new Date(), apply, { unitName: 'สมิติเวช สุขุมวิท' });
+      const all = p?.questions.join(' ') ?? '';
+      expect(all).toContain('สมิติเวช สุขุมวิท');
+      expect(all).not.toContain('หน่วยงานของเรา');
+      expect(all).not.toContain('📍');
+    }
+  });
+});

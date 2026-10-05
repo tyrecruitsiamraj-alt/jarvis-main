@@ -221,6 +221,11 @@ export function buildInterviewPayload(
   };
 }
 
+/** ข้อความที่ AI จะอ่านออกเสียง — ตัดอิโมจิ/สัญลักษณ์ภาพ · ยุบช่องว่าง */
+export function speechText(v: string): string {
+  return v.replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, ' ').replace(/\s+/g, ' ').trim();
+}
+
 /**
  * payload สำหรับ **ใบสมัครจากบอร์ดรับสมัคร** (S8 · เจ้าของเคาะ 15 ส.ค. 2569:
  * "เมื่อมีคนกรอกรายชื่อเข้ามาผ่านหน้าสาธารณะ...ส่งให้ Lumos โทร" — อัตโนมัติทันทีที่กรอก)
@@ -245,11 +250,15 @@ export function buildApplicationInterviewPayload(
    * ไม่มี = บทเสนองานแบบเดิม (ใบที่เจ้าหน้าที่คีย์/นำเข้า)
    */
   applyFacts?: ApplyJobFacts | null,
+  /** ข้อมูลใบขอ (ชื่อจุดทำงาน) — ใช้ได้ทั้งบทเสนองานและบทผู้สมัครผ่านลิงก์ */
+  jobFacts?: ApplyJobFacts | null,
 ): LumosInterviewPayload | null {
   const phone = toE164Thai(app.phone);
   if (!phone || !app.full_name?.trim() || !app.job_id) return null;
-  const position = (app.job_title || app.position_interest || 'งานที่เปิดรับ').trim();
-  const unit = (app.unit_name || '').trim() || 'หน่วยงานของเรา';
+  // หัวข้อประกาศบางใบมีอิโมจิ ("📍รพ.สมิติเวช") — AI อ่านออกเสียงไม่ได้/อ่านแปลก ⇒ ตัดก่อนพูด (5 ต.ค. 2569)
+  const position = speechText(app.job_title || app.position_interest || '') || 'งานที่เปิดรับ';
+  // ใบสมัครไม่มีชื่อหน่วยงาน = ใช้ชื่อจุดทำงานจากใบขอ (เดิมพูดว่า "หน่วยงานของเรา")
+  const unit = (app.unit_name || '').trim() || (jobFacts?.unitName ?? '').trim() || 'หน่วยงานของเรา';
   return {
     client_candidate_id: `${app.job_id}::app-${app.id}`,
     client_interview_id: `${app.job_id}::app-${app.id}::interview`,
@@ -348,10 +357,8 @@ export async function enqueueLumosInterviewForApplications(
   await ensureCallScriptsFresh();
   const skipped: LumosDispatchOutcome['skipped'] = [];
   const items: Array<{ personRef: string; payload: LumosInterviewPayload; matchRank: number | null }> = [];
-  // ข้อมูลใบขอของบทผู้สมัครผ่านลิงก์ — อ่านครั้งเดียวต่อใบขอ มีเพดานเวลา (ล้ม = บทสั้นลง ไม่ทำให้ส่งไม่ได้)
-  const applyFacts = applications.some((a) => a.created_by_name === null && !isOverAge(a.age))
-    ? await loadApplyScriptFacts(jobId)
-    : null;
+  // ข้อมูลใบขอ (ชื่อจุดทำงาน · พื้นที่ · อายุ · รายได้) — อ่านครั้งเดียวต่อใบขอ มีเพดานเวลา (ล้ม = บทสั้นลง ไม่ทำให้ส่งไม่ได้)
+  const applyFacts = applications.some((a) => !isOverAge(a.age)) ? await loadApplyScriptFacts(jobId) : null;
   for (const app of applications) {
     // 🔴 อายุเกิน = ไม่เข้าคิวเลย ทุกเส้น (กรอกเสร็จ · ปุ่มส่ง AI · ตัวส่งเองหลังรอเลือกวิธีโทร) — ชื่อไปกล่อง "อายุเกิน" บนแท็บผู้สมัคร
     if (isOverAge(app.age)) {
@@ -362,6 +369,7 @@ export async function enqueueLumosInterviewForApplications(
       app,
       undefined,
       app.created_by_name === null ? (applyFacts ?? {}) : null,
+      applyFacts,
     );
     if (!payload) {
       skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: NO_PHONE_REASON });

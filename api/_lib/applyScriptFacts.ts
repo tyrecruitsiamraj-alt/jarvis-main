@@ -17,7 +17,13 @@ import { publicSafeAddressParts } from '../../src/lib/publicJobPrivacy.js';
 import { speakableAgeRange, speakableWorkArea, type ApplyScriptFacts } from './lumosCallScript.js';
 import { logError } from './logger.js';
 
-export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'monthlyIncome' | 'benefitLine'>;
+export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'monthlyIncome' | 'benefitLine'> & {
+  /**
+   * ชื่อจุดทำงานจากใบขอ (work_site_name → unit_name) — 🔴 ใบสมัครหลายใบไม่ได้เก็บชื่อหน่วยงานไว้
+   * เดิม AI จึงพูดว่า "งานนี้ทำที่ หน่วยงานของเรา" (เจอในบทที่ส่งจริง 5 ต.ค. 2569)
+   */
+  unitName?: string | null;
+};
 
 const DEFAULT_TIMEOUT_MS = 4000;
 
@@ -57,6 +63,7 @@ async function loadFacts(jobId: string): Promise<ApplyJobFacts> {
   const job = { ...found };
   await attachNotes([job]);
 
+  out.unitName = String(job.work_site_name ?? '').trim() || String(job.unit_name ?? '').trim() || null;
   out.workArea = speakableWorkArea(publicSafeAddressParts(job as never)) || null;
   out.ageRange =
     speakableAgeRange(job.age_range_min as number | null | undefined, job.age_range_max as number | null | undefined) ||
