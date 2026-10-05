@@ -20,7 +20,8 @@ import {
   isInRmListView,
   isRmListView,
   provincesFromApplications,
-  rmTabHasLeadTools,
+  CONTACT_CHIPS,
+  isInContactChip,
   splitApplicantName,
   toggleInList,
 } from '../../src/lib/recruitRm';
@@ -100,10 +101,12 @@ describe('แท็บ = สถานะใบสมัคร (ข้อมู�
     for (const t of RM_TABS) expect(RM_TAB_STATUSES[t] !== undefined).toBe(true);
   });
 
-  it('เครื่องมือ Lead มีเฉพาะแท็บแรก (ตาม HTML ระบบเดิม)', () => {
-    expect(rmTabHasLeadTools('candidates')).toBe(true);
-    expect(rmTabHasLeadTools('contact')).toBe(false);
-    expect(rmTabHasLeadTools('appointments')).toBe(false);
+  it('ชิปการติดต่อ (5 ต.ค. 2569): ยังไม่โทร + โทรแล้ว = ทั้งหมด · โทรแล้ว = กดโทรจริงหรือมีผลโทร', () => {
+    expect(CONTACT_CHIPS.map((c) => c.label)).toEqual(['ทั้งหมด', 'ยังไม่โทร', 'โทรแล้ว']);
+    const rows = [{ dialed_last_at: '2026-10-01T07:00:00Z' }, { last_call_at: '2026-10-01T07:00:00Z' }, {}];
+    expect(rows.filter((r) => isInContactChip(r, 'called'))).toHaveLength(2);
+    expect(rows.filter((r) => isInContactChip(r, 'uncalled'))).toHaveLength(1);
+    expect(rows.filter((r) => isInContactChip(r, 'all'))).toHaveLength(3);
   });
 });
 

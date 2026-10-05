@@ -16,7 +16,9 @@ import { isUnitRequestWorkStatus, UNIT_REQUEST_WORK_STATUS_LABELS } from '@/lib/
 import { releaseSkipText, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
 
 /**
- * ═══ การ์ดใบขอบนกล่องงาน — ฝั่งเจ้าหน้าที่ (แบบ A · 27 ก.ย. 2569) ═══
+ * ═══ การ์ดใบขอบนกล่องงาน — ฝั่งเจ้าหน้าที่ (แบบ A · 27 ก.ย. 2569 → กระชับแบบ C · 5 ต.ค. 2569) ═══
+ *
+ * แบบ C: ช่องไฟในการ์ดแคบลง (p-3 · gap-2) · เงิน/เพศ/อายุรวมบรรทัดเดียว · ขนาดตัวอักษรคงเดิม (เจ้าของเคยสั่งขยาย)
  *
  * เจ้าของ: *"หน้ากล่องงานไม่เข้ากับหน้าอื่นๆเลย รกมาก"* → เลือกแบบ A จากแบบร่าง
  * ⇒ การ์ดเหลือ 5 บรรทัด: ชื่อหน่วยงาน · ตำแหน่ง · พร้อมประกาศไหม/ขาดอะไร · ที่ไหน/เงินเท่าไหร่ · ผู้สมัคร + ปุ่มทำต่อ
@@ -70,13 +72,13 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
         }
       }}
       className={cn(
-        'group flex h-full cursor-pointer flex-col gap-3 rounded-2xl p-4 shadow-sm transition-colors hover:border-primary/30',
+        'group flex h-full cursor-pointer flex-col gap-2 rounded-2xl p-3 shadow-sm transition-colors hover:border-primary/30',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
       )}
     >
       {/* ── ชื่อ + ตำแหน่ง · มุมขวา = ด่วน / ค้างกี่วัน ── */}
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 space-y-1">
+        <div className="min-w-0 space-y-0.5">
           <PrequestBadge job={job} />
           <h2 className="line-clamp-2 text-lg font-medium text-foreground group-hover:text-primary">
             {jobBoardCardTitle(job)}
@@ -104,13 +106,14 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
       {/* ── พร้อมประกาศไหม / ขาดอะไร (2 ต.ค. 2569 — แทน "ติดขั้น N" + จุด 4 ขั้น) ── */}
       {showReadiness && readiness ? <PublishReadinessChip readiness={readiness} /> : null}
 
-      {/* ── ที่ไหน (จังหวัด · เขต/อำเภอ) · เงินเท่าไหร่ — คนละบรรทัด ให้ที่ทำงานอ่านได้ครบ (4 ต.ค. 2569 ข้อ 7) ── */}
-      <div className="space-y-1.5">
+      {/* ── ที่ไหน (จังหวัด · เขต/อำเภอ) บรรทัดของตัวเอง ให้อ่านได้ครบ (4 ต.ค. 2569 ข้อ 7)
+          · แบบ C (5 ต.ค. 2569): เงิน · เพศ · อายุ รวมบรรทัดเดียว (เดิม 2 บรรทัด) ── */}
+      <div className="space-y-1">
         <p className={cn('flex min-w-0 items-start gap-1.5 text-sm', DASH.muted)}>
           <MapPin className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span className="line-clamp-2">{boardCardPlace(job)}</span>
         </p>
-        <p className={cn('flex min-w-0 items-center gap-1.5 text-sm', DASH.muted)}>
+        <p className={cn('flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm', DASH.muted)}>
           <Banknote className="h-4 w-4 shrink-0" aria-hidden />
           {money ? (
             <span className="tabular-nums" title={money.hint ?? undefined}>
@@ -119,9 +122,8 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
           ) : (
             <span className={TONE.warn.value}>ยังไม่ตั้งรายได้</span>
           )}
-        </p>
-        {/* เพศ · อายุ — ไม่ระบุเพศ = สีเตือน (ประกาศไม่ได้จนกว่าจะเลือก) */}
-        <p className={cn('flex min-w-0 items-center gap-1.5 text-sm', DASH.muted)}>
+          <span aria-hidden>·</span>
+          {/* เพศ · อายุ — ไม่ระบุเพศ = สีเตือน (ประกาศไม่ได้จนกว่าจะเลือก) */}
           <UserRound className="h-4 w-4 shrink-0" aria-hidden />
           <span className={cn(!gender.known && TONE.warn.value)}>{gender.text}</span>
           <span aria-hidden>·</span>
@@ -148,7 +150,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
       {/* ── ผู้สมัคร + ปุ่มทำต่อ — ตรึงก้นการ์ด ──
           🔴 ปุ่มอยู่ขวาแถวเดียวกันเสมอ (ไม่ตกบรรทัด) — "ส่ง AI แล้ว x/y" อยู่บรรทัดใต้จำนวนผู้สมัคร
           (หลังขยายตัวอักษร 27 ก.ย. 2569 ข้อความยาวขึ้น ปุ่มของบางใบตกบรรทัด การ์ดเลยสูงไม่เท่ากัน) */}
-      <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/70 pt-3">
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/70 pt-2">
         <div className="min-w-0">
           {applicants > 0 ? (
             /* กดจำนวนผู้สมัคร = สลับไปแท็บรายชื่อผู้สมัครในหน้านี้ พร้อมติ๊กใบนี้ (ห้ามเด้งไปหน้าใบขอ) */

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronRight, RefreshCw, RotateCcw } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronRight, RefreshCw, RotateCcw } from 'lucide-react';
+import FilterChips from '@/components/shared/FilterChips';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
@@ -27,7 +28,6 @@ import {
   RM_LIST_VIEWS_SHOWN,
   RM_LIST_VIEW_LABEL,
   type RmListView,
-  rmTabHasLeadTools,
   telHref,
   type RmRowAction,
   type RmTab,
@@ -38,7 +38,6 @@ import {
   markApplicationDialed,
   recordAppointmentAttendance,
   setApplicationCancelled,
-  setJobApplicationLead,
   type CallChoiceOutcome,
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
@@ -46,14 +45,17 @@ import { downloadApplicantExport } from '@/lib/applicantExport';
 import { summarizeCallChoice } from '@/lib/callChoiceSummary';
 import CallChoiceConfirmDialog from '@/components/recruit-rm/CallChoiceConfirmDialog';
 import { ATTENDANCE_LABEL, type AttendanceResult } from '@/lib/appointmentAttendance';
-import { buildAppointmentBoard } from '@/lib/appointmentBoard';
+import {
+  APPOINTMENT_CHIPS,
+  appointmentChipCount,
+  buildAppointmentBoard,
+  isInAppointmentChip,
+  type AppointmentChip,
+} from '@/lib/appointmentBoard';
+import { CONTACT_CHIPS, isInContactChip, type ContactChip } from '@/lib/recruitRm';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { RM_BUCKET_LABEL, isRmBucket } from '@/lib/recruitRmOverviewApi';
-import {
-  LEAD_VIEW_HINT,
-  summarizeLeadUpdate,
-  type LeadUpdateResult,
-} from '@/lib/recruitLead';
+import { LEAD_VIEW_LABEL } from '@/lib/recruitLead';
 import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { canHoldApplication } from '@/lib/recruitRm';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
@@ -147,7 +149,14 @@ const RmWorkspace: React.FC<{
    * *"ปุ่มรีเฟรช ย้ายขึ้นไปแทนปุ่มสร้างลิงก์"*) · แถวรีเฟรชในนี้ถูกถอดตอนคุมจากข้างนอก
    */
   refreshKey?: number;
-}> = ({ tab: controlledTab, jobs, refreshKey = 0 }) => {
+  /**
+   * วันที่สมัคร คุมจากข้างนอก — ปุ่มปฏิทินอยู่ข้างรีเฟรชบนแถวหัวหน้า (เจ้าของสั่ง 5 ต.ค. 2569:
+   * *"Filter วันที่ย้ายไปข้างๆปุ่ม Refresh ทั้งหน้า ผู้สมัคร การติดต่อ ติดตามการนัดหมาย"*)
+   * ส่งมา = หัวข้อ "วันที่สมัคร" หายจากแถบกรองข้าง · ไม่ส่ง = ทางถอยแบบเดิม (อยู่ในแถบกรอง)
+   */
+  dateRange?: DateRangeYmd | null;
+  onDateRangeChange?: (next: DateRangeYmd | null) => void;
+}> = ({ tab: controlledTab, jobs, refreshKey = 0, dateRange: controlledDateRange, onDateRangeChange }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const tab: RmTab = controlledTab ?? (isRmTab(tabParam) ? tabParam : 'candidates');
@@ -219,7 +228,15 @@ const RmWorkspace: React.FC<{
   const leadView = searchParams.get('lead') === '1';
   /** มุมมองใบที่ "ยกเลิกข้อมูลผู้สมัคร" (135 · 4 ต.ค. 2569) — เฉพาะแท็บผู้สมัคร · กู้คืนได้จากแถว */
   const cancelledView = searchParams.get('cancelled') === '1';
-  const [leadBusy, setLeadBusy] = useState(false);
+  /** กำลังยิง "ถอย Lead" ของแท็บการติดต่อ — ปิดปุ่มกันกดซ้อน */
+  const [releasing, setReleasing] = useState(false);
+  /**
+   * ชิปกรองแบบ C (เจ้าของเคาะ 5 ต.ค. 2569 "การ์ดเดิมแต่กระชับ" ทุกแท็บ) — การติดต่อ: ทั้งหมด/ยังไม่โทร/โทรแล้ว ·
+   * ติดตามนัดหมาย: นัดทั้งหมด/มา/ไม่มา/รอผล (แทนกล่องตัวเลข 4 ใบ) · ไม่ผูก URL (ของคนที่นั่งดู)
+   */
+  const [contactChip, setContactChip] = useState<ContactChip>('all');
+  const [appointmentChip, setAppointmentChip] = useState<AppointmentChip>('all');
+  const [showAppointmentDays, setShowAppointmentDays] = useState(false);
 
   /**
    * drill-down จากกล่อง Dashboard (`?bucket=` — S6) · เงื่อนไขกรองอยู่ฝั่ง server
@@ -271,29 +288,23 @@ const RmWorkspace: React.FC<{
   };
 
   /**
-   * เก็บ/ลบ Lead เป็นชุด — ยิงทีละใบแล้วสรุปผลรวม (ไม่มี endpoint bulk)
-   * ⚠️ ล้มบางใบต้องรายงาน ไม่ใช่กลืน (summarizeLeadUpdate มีเทสต์คุม)
+   * "ถอย Lead" จากแถวที่ติ๊ก (แท็บการติดต่อ · เจ้าของสั่ง 5 ต.ค. 2569) — ย้ายกลับแท็บผู้สมัคร
+   * 🔴 เส้นเดียวกับปุ่ม "ถอย Lead" บนแถว (`release`) · server ทำครบ (ปลดจอง + ถอด Lead + คืนล็อกเบอร์)
    */
-  const applyLead = async (lead: boolean) => {
-    if (selectedIds.length === 0 || leadBusy) return;
-    setLeadBusy(true);
+  const releaseSelected = async () => {
+    if (selectedIds.length === 0 || releasing) return;
+    setReleasing(true);
     say(null);
-    const results: LeadUpdateResult[] = await Promise.all(
-      selectedIds.map((id) =>
-        setJobApplicationLead(id, lead)
-          .then((): LeadUpdateResult => ({ ok: true }))
-          .catch(
-            (e): LeadUpdateResult => ({
-              ok: false,
-              message: e instanceof Error ? e.message : 'ไม่ทราบสาเหตุ',
-            }),
-          ),
-      ),
-    );
-    say(summarizeLeadUpdate(results, lead).message);
-    setSelectedIds([]);
-    setLeadBusy(false);
-    load();
+    try {
+      const outcome = await chooseApplicationCall(selectedIds, 'release');
+      say(summarizeCallChoice(outcome));
+      setSelectedIds([]);
+      load();
+    } catch (e) {
+      say(e instanceof Error ? e.message : 'ถอย Lead ไม่สำเร็จ');
+    } finally {
+      setReleasing(false);
+    }
   };
 
   /**
@@ -323,13 +334,22 @@ const RmWorkspace: React.FC<{
    * ช่วงวันเป็นของ "คนที่กำลังนั่งดู" ไม่ใช่ของลิงก์ (และ bucket drill-down
    * มีความหมายของช่วงเวลาอยู่ในตัวแล้ว)
    */
-  const [dateRange, setDateRange] = useState<DateRangeYmd | null>(null);
+  const [ownDateRange, setOwnDateRange] = useState<DateRangeYmd | null>(null);
+  const dateInHeader = onDateRangeChange !== undefined;
+  const dateRange = dateInHeader ? (controlledDateRange ?? null) : ownDateRange;
   /** เปลี่ยนช่วงวัน = กลับหน้า 1 + ล้างที่ติ๊กไว้ (ของที่ติ๊กอาจหลุดออกจากชุดที่เห็นแล้ว) */
   const changeDateRange = (next: DateRangeYmd | null) => {
-    setDateRange(next);
+    if (onDateRangeChange) onDateRangeChange(next);
+    else setOwnDateRange(next);
     setPage(1);
     setSelectedIds([]);
   };
+  /** ช่วงวันเปลี่ยนจากปุ่มบนหัวหน้า — กลับหน้า 1 + ล้างที่ติ๊ก เหมือนกดในแถบกรอง */
+  useEffect(() => {
+    if (!dateInHeader) return;
+    setPage(1);
+    setSelectedIds([]);
+  }, [dateInHeader, controlledDateRange?.from, controlledDateRange?.to]);
 
   /** จำนวนต่อแท็บ — นิยามเดียวกับตัวกรอง (isInRmTab) เลขบนแท็บจึงตรงกับที่เห็นเสมอ */
   const tabCounts = useMemo(() => {
@@ -378,15 +398,18 @@ const RmWorkspace: React.FC<{
     commitApplicantFilters(toggleApplicantFacetValue(applicantFilterState, key, value));
   const clearApplicantFacets = () => commitApplicantFilters(EMPTY_APPLICANT_FILTER_STATE);
   const applicantFacetCount = countSelectedApplicantValues(applicantFilterState);
-  /** จำนวนที่ติ๊กทั้งแถบ (รวมวันที่สมัคร) — เลขบนปุ่มกางแถบ */
-  const panelSelected = applicantFacetCount + (dateRange ? 1 : 0);
+  /** จำนวนที่ติ๊กทั้งแถบ (รวมวันที่สมัครเมื่ออยู่ในแถบ) — เลขบนปุ่มกางแถบ */
+  const panelSelected = applicantFacetCount + (!dateInHeader && dateRange ? 1 : 0);
   /** ปุ่ม "ล้าง" ของแถบซ้าย = ล้างทุกอย่างในแถบ รวมวันที่สมัคร (อยู่ในแถบเดียวกัน) */
   const clearApplicantPanel = () => {
     clearApplicantFacets();
-    if (dateRange) changeDateRange(null);
+    // วันที่อยู่หัวหน้า = ไม่ใช่ของแถบนี้ ล้างแถบไม่แตะวันที่
+    if (!dateInHeader && dateRange) changeDateRange(null);
   };
   /** วันที่สมัครเป็นหัวข้อหนึ่งในแถบกรอง (ตามแบบร่าง: "ช่องทาง · วันที่สมัคร" อยู่ในแถบซ้าย) */
-  const applicantPanelSections: FilterExtraSection[] = [
+  const applicantPanelSections: FilterExtraSection[] = dateInHeader
+    ? []
+    : [
     {
       key: 'applied',
       label: 'วันที่สมัคร',
@@ -480,11 +503,26 @@ const RmWorkspace: React.FC<{
     setPage(1);
   };
 
-  const totalPages = getTotalPages(filtered.length, pageSize);
+  /** เลขบนชิปการติดต่อ — นับจากชุดเดียวกับตาราง (ก่อนกดชิป) */
+  const contactChipCounts = useMemo(() => {
+    const out = {} as Record<ContactChip, number>;
+    for (const c of CONTACT_CHIPS) out[c.id] = filtered.filter((r) => isInContactChip(r, c.id)).length;
+    return out;
+  }, [filtered]);
+
+  /** ชุดที่ตารางโชว์ = `filtered` + ชิปของแท็บ (ถัง drill-down ไม่กรองต่อ — เลขต้องเท่ากล่องที่กดมา) */
+  const shown = useMemo(() => {
+    if (bucket) return filtered;
+    if (tab === 'contact') return filtered.filter((r) => isInContactChip(r, contactChip));
+    if (tab === 'appointments') return filtered.filter((r) => isInAppointmentChip(r, appointmentChip));
+    return filtered;
+  }, [bucket, filtered, tab, contactChip, appointmentChip]);
+
+  const totalPages = getTotalPages(shown.length, pageSize);
   const currentPage = Math.min(page, totalPages);
   const pageRows = useMemo(
-    () => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [filtered, currentPage, pageSize],
+    () => shown.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [shown, currentPage, pageSize],
   );
 
   /**
@@ -740,30 +778,64 @@ const RmWorkspace: React.FC<{
       {/* แท็บย่อย 3 อันของ "รายชื่อผู้สมัคร" (เจ้าของสั่ง 13 ส.ค. 2569)
           แบ่งด้วย **ผลโทร** ไม่ใช่สถานะใบสมัคร · เห็นครบทั้ง 3 เสมอแม้ยอดเป็น 0
           (0 คือคำตอบ ไม่ใช่ช่องว่าง) · โผล่เฉพาะแท็บนี้ — แท็บอื่นมีความหมายของตัวเอง */}
-      {tab === 'candidates' ? (
-        <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          {RM_LIST_VIEWS_SHOWN.map((v) => {
-            const active = v === listView;
-            return (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setListView(v)}
-                aria-pressed={active}
-                className={cn(
-                  'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                  active
-                    ? 'bg-primary text-primary-foreground'
-                    : cn('bg-muted hover:bg-muted/70', DASH.muted),
-                )}
-              >
-                {RM_LIST_VIEW_LABEL[v]}
-                <span className="ml-1.5 text-xs tabular-nums">
-                  {loading ? '…' : listViewCounts[v].toLocaleString('th-TH')}
-                </span>
-              </button>
-            );
-          })}
+      {/* แบบ C (เจ้าของเคาะ 5 ต.ค. 2569 · ทุกแท็บ): หัวแต่ละแท็บ = แถวชิปกรองมีตัวเลข ไม่มีกล่องตัวเลขใหญ่
+          · ผู้สมัคร = มุมมองย่อย 3 อัน (URL ?list=) · การติดต่อ = ยังไม่โทร/โทรแล้ว · ติดตามนัดหมาย = มา/ไม่มา/รอผล
+          · โหมด drill-down (?bucket=) ไม่มีชิป — เลขต้องเท่ากล่องที่กดมา */}
+      {!bucket && tab === 'candidates' ? (
+        <div className="mt-3">
+          <FilterChips
+            ariaLabel="มุมมองผู้สมัคร"
+            value={listView}
+            onChange={setListView}
+            chips={RM_LIST_VIEWS_SHOWN.map((v) => ({
+              id: v,
+              label: RM_LIST_VIEW_LABEL[v],
+              count: loading ? null : listViewCounts[v],
+            }))}
+          />
+        </div>
+      ) : null}
+      {!bucket && tab === 'contact' ? (
+        <div className="mt-3">
+          <FilterChips
+            ariaLabel="กรองการติดต่อ"
+            value={contactChip}
+            onChange={(next) => {
+              setContactChip(next);
+              setPage(1);
+              setSelectedIds([]);
+            }}
+            chips={CONTACT_CHIPS.map((c) => ({ ...c, count: loading ? null : contactChipCounts[c.id] }))}
+          />
+        </div>
+      ) : null}
+      {!bucket && tab === 'appointments' ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <FilterChips
+            ariaLabel="กรองผลนัด"
+            value={appointmentChip}
+            onChange={(next) => {
+              setAppointmentChip(next);
+              setPage(1);
+              setSelectedIds([]);
+            }}
+            chips={APPOINTMENT_CHIPS.map((c) => ({
+              id: c.id,
+              label: c.label,
+              count: loading ? null : appointmentChipCount(appointmentBoard, c.id),
+            }))}
+          />
+          {/* ตารางรายวัน (ข้อ 12 · 20 ส.ค. 2569) ยังอยู่ — กางจากปุ่มนี้แทนการวางค้างไว้หัวแท็บ */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={() => setShowAppointmentDays((v) => !v)}
+            aria-expanded={showAppointmentDays}
+          >
+            <CalendarDays aria-hidden /> รายวัน
+            <ChevronDown className={cn('transition-transform', showAppointmentDays && 'rotate-180')} aria-hidden />
+          </Button>
         </div>
       ) : null}
 
@@ -794,7 +866,7 @@ const RmWorkspace: React.FC<{
             onClear={clearApplicantPanel}
             resultText={`เหลือ ${filtered.length.toLocaleString('th-TH')} รายชื่อ`}
           />
-          {applicantFacetCount > 0 || dateRange ? (
+          {panelSelected > 0 ? (
             <>
               <Button type="button" variant="outline" size="xs" onClick={clearApplicantPanel}>
                 <RotateCcw aria-hidden /> ล้าง
@@ -826,36 +898,31 @@ const RmWorkspace: React.FC<{
           {/* ⚠️ RmToolbar (ช่องทาง/สร้างลิงก์/เหตุผล) ถูกเอาออก (เจ้าของสั่ง 14 ส.ค. 2569:
               "กล่องช่องทาง ฯลฯ มีแค่หน้ากล่องงาน") — เครื่องมือพวกนี้เหลือที่ RecruitBoardTools
               บนกล่องงาน (view=board) เท่านั้น · เหลือแค่ค้นหา + เพิ่มผู้สมัคร + Lead */}
-          <div className={cn('rounded-2xl border p-3', DASH.card)}>
-            <RmSearchBar
-              hideSearch={searchInHeader}
-              keyword={keyword}
-              onKeywordChange={(v) => {
-                setKeyword(v);
-                setPage(1);
-              }}
-              onSearch={() => setPage(1)}
-              showLeadTools={rmTabHasLeadTools(tab)}
-              selectedCount={selectedIds.length}
-              onSaveLead={() => void applyLead(true)}
-              onDeleteLead={() => void applyLead(false)}
-              leadBusy={leadBusy}
-              leadView={leadView}
-              /* เพิ่มข้อมูลผู้สมัคร + นำเข้า Excel มีแค่แท็บผู้สมัคร (เจ้าของสั่ง 4 ต.ค. 2569) */
-              onAddApplicant={tab === 'candidates' ? () => setAddOpen(true) : undefined}
-              onImportApplicants={tab === 'candidates' ? () => setImportOpen(true) : undefined}
-              onHoldSelected={() => void keepSelectedForSelf()}
-              holdingSelected={holdingSelected}
-              onSendAiSelected={() => askSendAi(selectedIds)}
-              onExport={tab === 'candidates' ? () => downloadApplicantExport(filtered) : undefined}
-              /* แท็บติดตามนัดหมาย: "โหลดเป็น PDF" อยู่แถวเดียวกับเพิ่มข้อมูลผู้สมัคร (4 ต.ค. 2569) ·
-                 window.print + print CSS เฉพาะก้อน rm-print-area (เจ้าของเคาะเดิม 14 ส.ค. ไม่เพิ่ม lib) */
-              onPrintPdf={tab === 'appointments' ? () => window.print() : undefined}
-              exportCount={filtered.length}
-              cancelledView={cancelledView}
-              onToggleCancelledView={tab === 'candidates' && !bucket ? () => setCancelledView(!cancelledView) : undefined}
-            />
-          </div>
+          {/* แบบ C (5 ต.ค. 2569): แถวปุ่มลอย ไม่มีกล่องครอบ · ปุ่มต่อแท็บตามที่เจ้าของสั่ง (ดูหัวไฟล์ RmSearchBar) */}
+          <RmSearchBar
+            hideSearch={searchInHeader}
+            keyword={keyword}
+            onKeywordChange={(v) => {
+              setKeyword(v);
+              setPage(1);
+            }}
+            onSearch={() => setPage(1)}
+            selectedCount={selectedIds.length}
+            /* เพิ่มข้อมูลผู้สมัคร + นำเข้า Excel + รายงาน มีแค่แท็บผู้สมัคร (เจ้าของสั่ง 4–5 ต.ค. 2569) */
+            onAddApplicant={tab === 'candidates' ? () => setAddOpen(true) : undefined}
+            onImportApplicants={tab === 'candidates' ? () => setImportOpen(true) : undefined}
+            /* "เก็บไปโทรเอง" เหลือแท็บผู้สมัครแท็บเดียว — การติดต่อ: *"ไม่ต้องมีคำว่าเก็บไปโทรเองแล้ว"* (5 ต.ค. 2569) */
+            onHoldSelected={tab === 'candidates' ? () => void keepSelectedForSelf() : undefined}
+            holdingSelected={holdingSelected}
+            onSendAiSelected={() => askSendAi(selectedIds)}
+            /* "ถอย Lead" — การติดต่อ ติ๊กแล้วโผล่ (5 ต.ค. 2569) · ย้ายกลับแท็บผู้สมัคร */
+            onReleaseSelected={tab === 'contact' ? () => void releaseSelected() : undefined}
+            releasing={releasing}
+            onExport={tab === 'candidates' ? () => downloadApplicantExport(shown) : undefined}
+            exportCount={shown.length}
+            /* แท็บติดตามนัดหมาย: "โหลดเป็น PDF" (4 ต.ค. 2569) · window.print + print CSS เฉพาะก้อน rm-print-area */
+            onPrintPdf={tab === 'appointments' ? () => window.print() : undefined}
+          />
 
           {notice ? (
             <div
@@ -875,11 +942,22 @@ const RmWorkspace: React.FC<{
             </div>
           ) : null}
 
-          {/* อยู่คลังสำรองต้องบอกให้รู้ตัว ไม่งั้นอ่านว่า "รายชื่อหายไปไหนหมด" */}
-          {leadView ? (
-            <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.violet.soft, TONE.violet.value)}>
-              {LEAD_VIEW_HINT}
-            </p>
+          {/* ปุ่มเข้า "คลังสำรอง (Lead)" / "ดูที่ยกเลิก" ถอดจากแถวเครื่องมือแล้ว (เจ้าของสั่ง 5 ต.ค. 2569 — ผู้สมัครมี 5 ปุ่ม)
+              ลิงก์เก่า ?lead=1 / ?cancelled=1 ยังเปิดได้ — ต้องมีทางกลับรายชื่อหลักเสมอ */}
+          {leadView || cancelledView ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={cn('whitespace-nowrap', TONE.violet.chip)}>
+                {leadView ? 'คลังสำรอง (Lead)' : 'ใบที่ยกเลิกข้อมูล'}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={() => (leadView ? setLeadView(false) : setCancelledView(false))}
+              >
+                {LEAD_VIEW_LABEL.exit}
+              </Button>
+            </div>
           ) : null}
 
           {tab === 'appointments' ? (
@@ -893,25 +971,10 @@ const RmWorkspace: React.FC<{
               {/* บอร์ดสรุปนัด (เจ้าของสั่ง 20 ส.ค. 2569 ข้อ 12: *"มีบอร์ดแสดงว่านัดทั้งหมด
                   เท่าไหร่ มาเท่าไหร่ ไม่มาเท่าไหร่"* + รายวัน) — ตรรกะที่ appointmentBoard.ts
                   · สีจาก TONE ที่เดียว · "รอผล" ต้องเห็นเป็นเลข ไม่ใช่หาย */}
-              {appointmentBoard.total.total > 0 ? (
+              {/* กล่องตัวเลข 4 ใบ → ชิปกรองหัวแท็บ (แบบ C · 5 ต.ค. 2569) · ตารางรายวันกางจากปุ่ม "รายวัน"
+                  🔴 ว่าง = แถว "ไม่มีนัด" ไม่ใช่ตารางหาย */}
+              {showAppointmentDays ? (
                 <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {(
-                      [
-                        ['นัดทั้งหมด', appointmentBoard.total.total, 'info'],
-                        ['มา', appointmentBoard.total.showed, 'success'],
-                        ['ไม่มา', appointmentBoard.total.noShow, 'danger'],
-                        ['รอผล / เลื่อนนัด', appointmentBoard.total.pending + appointmentBoard.total.rescheduled, 'warn'],
-                      ] as const
-                    ).map(([label, n, toneKey]) => (
-                      <div key={label} className={cn('rounded-xl border px-3 py-2', TONE[toneKey].soft)}>
-                        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-                        <p className={cn('text-xl font-medium tabular-nums', TONE[toneKey].num)}>
-                          {n.toLocaleString('th-TH')}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
                   <div className="overflow-x-auto rounded-xl border border-border/70">
                     <table className="w-full text-xs">
                       <thead>
@@ -925,6 +988,13 @@ const RmWorkspace: React.FC<{
                         </tr>
                       </thead>
                       <tbody>
+                        {appointmentBoard.days.length === 0 ? (
+                          <tr className={cn('border-t', DASH.tableRow)}>
+                            <td colSpan={6} className={cn('px-3 py-3 text-center', DASH.cellMuted)}>
+                              ไม่มีนัด
+                            </td>
+                          </tr>
+                        ) : null}
                         {appointmentBoard.days.map((d) => (
                           <tr key={d.date} className={cn('border-t', DASH.tableRow)}>
                             <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cellStrong)}>
@@ -1108,9 +1178,9 @@ const RmWorkspace: React.FC<{
                 page={currentPage}
                 totalPages={totalPages}
                 pageSize={pageSize}
-                totalItems={filtered.length}
-                pageFrom={filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
-                pageTo={Math.min(currentPage * pageSize, filtered.length)}
+                totalItems={shown.length}
+                pageFrom={shown.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
+                pageTo={Math.min(currentPage * pageSize, shown.length)}
                 onPageChange={setPage}
                 onPageSizeChange={(s) => {
                   setPageSize(s);
@@ -1161,7 +1231,7 @@ const RmWorkspace: React.FC<{
             load();
           }}
           onCancelled={() => {
-            say(`ยกเลิกข้อมูล ${profileApp.full_name} แล้ว · กู้คืนได้ที่ "ดูที่ยกเลิก"`);
+            say(`ยกเลิกข้อมูล ${profileApp.full_name} แล้ว`);
             setProfileApp(null);
             load();
           }}

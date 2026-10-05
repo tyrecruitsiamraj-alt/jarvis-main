@@ -10,8 +10,8 @@ import { RM_ROW_ACTIONS, rmRowActionLabel, telHref } from '../../src/lib/recruit
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
 
 describe('แท็บการติดต่อ — ปุ่มแบบ iRecruit', () => {
-  it('3 ปุ่ม ลำดับเดียวกับ iRecruit: โทร · ดำเนินการ · ลบ Lead', () => {
-    expect(RM_ROW_ACTIONS.contact.map((a) => rmRowActionLabel('contact', a))).toEqual(['โทร', 'ดำเนินการ', 'ลบ Lead']);
+  it('3 ปุ่ม ลำดับเดียวกับ iRecruit: โทร · ดำเนินการ · ถอย Lead (เดิม "ลบ Lead" · เจ้าของเรียกถอย Lead 5 ต.ค. 2569)', () => {
+    expect(RM_ROW_ACTIONS.contact.map((a) => rmRowActionLabel('contact', a))).toEqual(['โทร', 'ดำเนินการ', 'ถอย Lead']);
   });
 
   it('แท็บอื่นคำเดิม (ผู้สมัคร "ดูรายละเอียด" ไม่เปลี่ยน)', () => {

@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import JobBoardView, { type BoardViewId } from '@/components/jobs/JobBoardView';
 import RmWorkspace from '@/components/recruit-rm/RmWorkspace';
+import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { useClosedRequestsFeed } from '@/hooks/useClosedRequestsFeed';
 import type { JobBoxKey } from '@/lib/jobBoxGroups';
@@ -102,6 +103,12 @@ const StaffJobBoardPage: React.FC = () => {
 
   /** รีเฟรชของแท็บผู้สมัคร/การติดต่อ/ติดตามนัดหมาย/ภาพรวม — ปุ่มอยู่แถวหัวหน้า (4 ต.ค. 2569) */
   const [listRev, setListRev] = useState(0);
+  /**
+   * วันที่สมัคร ของแท็บผู้สมัคร/การติดต่อ/ติดตามนัดหมาย — ปุ่มปฏิทินอยู่ข้างรีเฟรช (เจ้าของสั่ง 5 ต.ค. 2569:
+   * *"Filter วันที่ย้ายไปข้างๆปุ่ม Refresh"*) · ค่าเดียวใช้ร่วมสามแท็บ (สลับแท็บแล้วช่วงวันไม่หาย)
+   */
+  const [applicantDates, setApplicantDates] = useState<DateRangeYmd | null>(null);
+  const rmView = (RM_VIEWS as readonly string[]).includes(view);
   const setView = (next: BoardViewId) => {
     const params = new URLSearchParams(searchParams);
     if (next === 'board') params.delete('view');
@@ -142,13 +149,24 @@ const StaffJobBoardPage: React.FC = () => {
         onReloadClosed={closed.reload}
         initialBox={legacyBox}
         onPublishedTotals={setBoardPublished}
+        listHeaderActions={
+          rmView ? (
+            <DateRangeCalendarPicker triggerVariant="filter" value={applicantDates} onChange={setApplicantDates} />
+          ) : null
+        }
         listContent={
           view === 'board' ? null : view === 'dashboard' ? (
             <Suspense key={listRev} fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิดภาพรวม…</p>}>
               {classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview published={boardPublished} />}
             </Suspense>
           ) : (
-            <RmWorkspace tab={VIEW_TO_RM_TAB[view as (typeof RM_VIEWS)[number]]} jobs={allJobs} refreshKey={listRev} />
+            <RmWorkspace
+              tab={VIEW_TO_RM_TAB[view as (typeof RM_VIEWS)[number]]}
+              jobs={allJobs}
+              refreshKey={listRev}
+              dateRange={applicantDates}
+              onDateRangeChange={setApplicantDates}
+            />
           )
         }
       />

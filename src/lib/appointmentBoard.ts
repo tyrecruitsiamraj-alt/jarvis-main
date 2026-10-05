@@ -69,3 +69,35 @@ export function buildAppointmentBoard(rows: readonly AppointmentBoardRow[]): App
     days: [...byDay.values()].sort((a, b) => b.date.localeCompare(a.date)),
   };
 }
+
+/**
+ * ═══ ชิปกรองแท็บติดตามนัดหมาย (แบบ C · เจ้าของเคาะ 5 ต.ค. 2569) ═══
+ * แทนกล่องตัวเลข 4 ใบ — กดแล้วตารางกรองตาม · เลขบนชิป = เลขบนบอร์ดเดิม (`buildAppointmentBoard`)
+ * "รอผล" รวมเลื่อนนัด (กล่องเดิมก็รวม "รอผล / เลื่อนนัด") ⇒ มา + ไม่มา + รอผล = นัดทั้งหมด
+ */
+export type AppointmentChip = 'all' | 'showed' | 'no_show' | 'pending';
+
+export const APPOINTMENT_CHIPS: readonly { id: AppointmentChip; label: string; tone: 'info' | 'success' | 'danger' | 'warn' }[] = [
+  { id: 'all', label: 'นัดทั้งหมด', tone: 'info' },
+  { id: 'showed', label: 'มา', tone: 'success' },
+  { id: 'no_show', label: 'ไม่มา', tone: 'danger' },
+  { id: 'pending', label: 'รอผล', tone: 'warn' },
+];
+
+export function appointmentChipCount(board: AppointmentBoard, chip: AppointmentChip): number {
+  const t = board.total;
+  if (chip === 'showed') return t.showed;
+  if (chip === 'no_show') return t.noShow;
+  if (chip === 'pending') return t.pending + t.rescheduled;
+  return t.total;
+}
+
+/** แถวนี้อยู่ในชิปไหม — นิยามเดียวกับ `bump` (แถวไม่มีวันนัดอยู่แค่ "นัดทั้งหมด" ไม่ได้ไม่นับ เพื่อไม่ให้แถวหาย) */
+export function isInAppointmentChip(r: AppointmentBoardRow, chip: AppointmentChip): boolean {
+  if (chip === 'all') return true;
+  if (!r.appointment_at) return false;
+  const result = isAttendanceResult(r.attendance_result) ? r.attendance_result : null;
+  if (chip === 'showed') return result === 'showed';
+  if (chip === 'no_show') return result === 'no_show';
+  return result === null || result === 'rescheduled';
+}

@@ -143,11 +143,25 @@ export function isRmListView(v: string | null | undefined): v is RmListView {
 }
 
 /**
- * ⚠️ **แถวเครื่องมือของแท็บแรกไม่เหมือนอีกสองแท็บ** — ตาม HTML เดิม
- * แท็บ "ข้อมูลผู้สมัคร" เท่านั้นที่มีเครื่องมือ Lead (เก็บ Lead / ลบ Lead)
+ * ═══ ชิปกรองแท็บการติดต่อ (แบบ C · เจ้าของเคาะ 5 ต.ค. 2569) ═══
+ * เครื่องมือ Lead บนแถวเครื่องมือถูกถอดแล้ว (ผู้สมัครเหลือ 5 ปุ่ม) — ที่เคยเป็น `rmTabHasLeadTools`
+ * "โทรแล้ว" = มีเวลากดโทรจริง (095) หรือมีผลโทร — ลำดับความจริงเดียวกับคอลัมน์ "โทรล่าสุด" ใน RmTable
  */
-export function rmTabHasLeadTools(tab: RmTab): boolean {
-  return tab === 'candidates';
+export type ContactChip = 'all' | 'uncalled' | 'called';
+
+export const CONTACT_CHIPS: readonly { id: ContactChip; label: string }[] = [
+  { id: 'all', label: 'ทั้งหมด' },
+  { id: 'uncalled', label: 'ยังไม่โทร' },
+  { id: 'called', label: 'โทรแล้ว' },
+];
+
+export function isInContactChip(
+  r: { dialed_last_at?: string | null; last_call_at?: string | null },
+  chip: ContactChip,
+): boolean {
+  if (chip === 'all') return true;
+  const called = Boolean(r.dialed_last_at || r.last_call_at);
+  return chip === 'called' ? called : !called;
 }
 
 /**
@@ -360,12 +374,12 @@ export const RM_ROW_ACTION_LABEL: Record<RmRowAction, string> = {
 
 /**
  * 🔴 ปุ่มบนแถวแท็บการติดต่อ = คำเดียวกับ iRecruit (เจ้าของสั่ง 4 ต.ค. 2569 "ทำให้เหมือน iRecruit"):
- * โทร (จดเวลา + เปิดหน้าโทร) · ดำเนินการ (ป๊อปติดต่อ/นัดหมาย) · ลบ Lead (ส่งกลับแท็บผู้สมัคร)
+ * โทร (จดเวลา + เปิดหน้าโทร) · ดำเนินการ (ป๊อปติดต่อ/นัดหมาย) · ถอย Lead (ส่งกลับแท็บผู้สมัคร · เดิมชื่อ "ลบ Lead" เปลี่ยนตามคำเจ้าของ 5 ต.ค. 2569)
  */
 export const RM_CONTACT_ACTION_LABEL: Partial<Record<RmRowAction, string>> = {
   dial: 'โทร',
   view: 'ดำเนินการ',
-  release: 'ลบ Lead',
+  release: 'ถอย Lead',
 };
 
 /**

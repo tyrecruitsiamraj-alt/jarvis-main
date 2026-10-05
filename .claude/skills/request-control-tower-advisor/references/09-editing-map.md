@@ -11776,3 +11776,31 @@ Choice: ถึงแล้ว/ไปแล้ว/ลา/เลื่อน/จ�
 
 - ตรวจจริง (คนโทร เบอร์ปลอม · เครื่อง dev ไม่มีกุญแจ Lumos): ชุด 30–31 ธ.ค. วันละ 2 สาย · ถึงแล้ว 30/12 10:00 → ยกเลิก 30/12 14:00 อย่างเดียว · ยกเลิก+ทั้งชุด → ยกเลิกอีก 3 สายข้ามวัน → ลบด้วย id
 - ⚠️ สายที่ Lumos โทรไปแล้ว/กำลังโทร เรียกคืนไม่ได้ (เหมือนเดิม) — หยุดได้เฉพาะที่ยังไม่ถึงเวลา
+
+## 5 ต.ค. 2569 (บ่าย): หน้างานสรรหา แบบ C "การ์ดเดิมแต่กระชับ" ทุกแท็บ + ภาพรวมรายวัน/ช่วง
+
+เจ้าของเคาะแบบ C (ชิปกรองมีตัวเลขแทนกล่องตัวเลขใหญ่ · ปุ่มแถวเดียว · การ์ด/ตารางแน่นขึ้น) ทุกแท็บ ·
+*"หน้า ผู้สมัคร มีแค่ เพิ่มข้อมูลผู้สมัคร · นำเข้า Excel · เก็บไปโทรเอง · ส่ง Ai โทร · รายงาน — ดูที่ยกเลิกไม่ต้องมีโชว์"* ·
+*"การติดต่อ ไม่ต้องมีคำว่าเก็บไปโทรเองแล้ว แต่ถ้าติ๊ก Lead ให้มีคำว่า ถอยLead"* · *"Filter วันที่ย้ายไปข้างๆปุ่ม Refresh"* ·
+*"ภาพรวม … อยากดูแบบรายวันหรือ ช่วงได้ด้วย"*
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/components/shared/FilterChips.tsx` | **ใหม่** — แถวชิปกรองมีตัวเลข (shadcn `Button` default/outline · `null` = "…") ใช้หัวแท็บผู้สมัคร/การติดต่อ/ติดตามนัดหมาย |
+| `src/components/recruit-rm/RmSearchBar.tsx` | ถอด เก็บ Lead / ลบ Lead / คลังสำรอง / ดูที่ยกเลิก · เพิ่ม "ถอย Lead (N)" (`onReleaseSelected` โผล่เฉพาะตอนติ๊ก) · ไม่ส่ง prop = ไม่มีปุ่ม |
+| `src/components/recruit-rm/RmWorkspace.tsx` | ปุ่มรายแท็บ: ผู้สมัคร 5 ปุ่ม · การติดต่อ = ส่ง AI + ถอย Lead · นัดหมาย = PDF + ส่ง AI · `releaseSelected` ยิง `chooseApplicationCall(ids,'release')` เส้นเดียวกับปุ่มบนแถว · ชิป `contactChip`/`appointmentChip` → ชุด `shown` (ตาราง/เลขหน้า/รายงาน) · กล่องนัด 4 ใบ → ชิป + ตารางรายวันกางจากปุ่ม "รายวัน" · ลิงก์เก่า `?lead=1`/`?cancelled=1` มีป้าย + ปุ่มกลับ · `applyLead` ถอดแล้ว · รับ `dateRange`/`onDateRangeChange` จากหน้าแม่ (ส่งมา = หัวข้อวันที่สมัครหายจากแถบกรอง) |
+| `src/lib/recruitRm.ts` | `CONTACT_CHIPS` + `isInContactChip` (โทรแล้ว = `dialed_last_at` หรือ `last_call_at`) · ถอด `rmTabHasLeadTools` · ป้ายปุ่มแถว release = "ถอย Lead" |
+| `src/lib/appointmentBoard.ts` | `APPOINTMENT_CHIPS` · `appointmentChipCount` · `isInAppointmentChip` (รอผลรวมเลื่อนนัด) |
+| `src/lib/recruitLead.ts` | ถอด `LEAD_VIEW_HINT` |
+| `src/components/jobs/BoardReleaseHeader.tsx` | การ์ดตัวเลข 3 ใบ + บรรทัดท้าย → แถวชิปเดียว (`LaneChip`) เลนครบ 7 อันกดได้ |
+| `src/components/jobs/BoardJobCard.tsx` | p-3 · gap-2 · เงิน/เพศ/อายุบรรทัดเดียว (สถานที่ยังบรรทัดของตัวเอง · ขนาดตัวอักษรเดิม) |
+| `src/components/jobs/JobBoardView.tsx` | ช่องไฟการ์ดเจ้าหน้าที่ gap-3 · 🔴 "แสดง N … ต้องหาคน X" + เลขหน้า นับจาก `flowJobs` (เดิม `boxedJobs` ⇒ กดเลนแล้วเลขไม่เปลี่ยน) · prop `listHeaderActions` วางข้างรีเฟรชของแท็บ RM |
+| `src/pages/jobs/StaffJobBoardPage.tsx` | `applicantDates` ใช้ร่วม 3 แท็บ · ปฏิทิน `DateRangeCalendarPicker` ข้างรีเฟรช |
+| `src/components/shared/DateRangeCalendarPicker.tsx` | ตัวเลือก "วันนี้" · `emptyLabel` · วันเดียวโชว์วันเดียว |
+| `src/lib/recruitOverviewWindow.ts` | `rangeWindow` (เทียบช่วงยาวเท่ากันก่อนหน้า · ยาวสุด `RANGE_MAX_DAYS`=62 ตามกราฟรายวัน) · `shiftRange` |
+| `api/_handlers/recruit-overview.ts` · `src/lib/recruitOverviewApi.ts` | `?from=&to=` (ค่าผิด = ถอยไปแบบเดือน) |
+| `src/components/dashboard-trends/RecruitOverview.tsx` (+Parts) | ปฏิทินข้างปุ่มเดือน ("ทั้งเดือน" = กลับแบบเดือน) · ‹ › ตอนดูช่วง = เลื่อนทีละความยาวช่วง · คำหัวการ์ด เดือนนี้/ช่วงนี้ · ช่องไฟแคบลง |
+| เทสต์ | `tests/api/recruitStyleC2569-10-05.test.ts` (ใหม่) · `recruitRm.test.ts` · `contactTabIrecruitButtons…` · `src/lib/recruitOverview.test.ts` |
+
+- ⚠️ ไม่ได้ยุบคอลัมน์ตารางแท็บผู้สมัคร — ชุดคอลัมน์เจ้าของสั่งเอง 30 ก.ย. (ชื่อ · นามสกุล · … · สถานะ)
+- ⚠️ ปุ่ม "ดูที่ยกเลิก" ไม่มีบนจอแล้ว (เจ้าของสั่ง) — กู้คืนใบที่ยกเลิกได้ทางลิงก์ `?cancelled=1` อย่างเดียว

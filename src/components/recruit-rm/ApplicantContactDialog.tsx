@@ -633,7 +633,7 @@ export default function ApplicantContactDialog({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className={cn('text-sm font-medium', TONE.danger.value)}>ยกเลิกข้อมูลผู้สมัคร</p>
-                  <p className="text-xs text-muted-foreground">นำออกจากรายการหลัก กู้คืนได้ที่ "ดูที่ยกเลิก"</p>
+                  <p className="text-xs text-muted-foreground">นำออกจากรายการหลัก</p>
                 </div>
                 {!cancelAsk ? (
                   <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => setCancelAsk(true)}>

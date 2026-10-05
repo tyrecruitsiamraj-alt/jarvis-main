@@ -202,6 +202,8 @@ export type JobBoardViewProps = {
   view?: BoardViewId;
   onViewChange?: (view: BoardViewId) => void;
   listContent?: React.ReactNode;
+  /** ของแท็บ RM ที่วางข้างปุ่มรีเฟรชบนแถวหัวหน้า (ปฏิทินวันที่สมัคร · 5 ต.ค. 2569) — แท็บโพสต์ประกาศไม่ใช้ */
+  listHeaderActions?: React.ReactNode;
   /**
    * ชุดใบที่ปิดแล้ว/ยกเลิก (คนละ feed กับกล่องงาน) — ส่งมาจาก `StaffJobBoardPage`
    * เจ้าของสั่ง 19 ส.ค. 2569: *"ปิดแล้วกับยกเลิกในหน้ากล่องงานมันต้องกดแล้วดูได้
@@ -269,6 +271,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   view = 'board',
   onViewChange,
   listContent,
+  listHeaderActions,
   closedJobs,
   closedLoading = false,
   closedError = null,
@@ -1264,17 +1267,21 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               </>
             ) : onRefresh ? (
               /* 🔴 สร้างลิงก์ (ประกาศลอย) + ตั้งค่าบอร์ด อยู่แค่แท็บโพสต์ประกาศ — แท็บอื่นเหลือรีเฟรช (ย้ายขึ้นมาจากแถวใต้แท็บ)
-                 เจ้าของสั่ง 4 ต.ค. 2569 (กลับคำสั่งช่วงบ่ายวันเดียวกันที่ให้แท็บผู้สมัครมีปุ่มตั้งค่า) */
-              <Button
-                type="button"
-                variant="outline"
-                size="iconXs"
-                onClick={() => void onRefresh()}
-                aria-label="รีเฟรชข้อมูล"
-                title="รีเฟรชข้อมูล"
-              >
-                <RefreshCw />
-              </Button>
+                 เจ้าของสั่ง 4 ต.ค. 2569 (กลับคำสั่งช่วงบ่ายวันเดียวกันที่ให้แท็บผู้สมัครมีปุ่มตั้งค่า)
+                 · `listHeaderActions` = ของแท็บนั้นที่วางข้างรีเฟรช (ปฏิทินวันที่สมัคร · 5 ต.ค. 2569) */
+              <>
+                {listHeaderActions}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="iconXs"
+                  onClick={() => void onRefresh()}
+                  aria-label="รีเฟรชข้อมูล"
+                  title="รีเฟรชข้อมูล"
+                >
+                  <RefreshCw />
+                </Button>
+              </>
             ) : undefined
           }
         />
@@ -1371,7 +1378,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             🔴 เลนสามก้อน/ขั้น 1–4 ยังกดกรองได้เหมือนเดิม (เจ้าของสั่งไว้ 27 ส.ค. 2569 — ห้ามถอด)
             หน้าสมัครสาธารณะใช้แถบตัวกรองแบบการ์ด frost ตัวเดิม (ข้างล่าง) */}
         {isStaff && view === 'board' ? (
-          <div className="mt-4 space-y-4">
+          <div className="mt-3 space-y-3">
             <BoardReleaseHeader
               state={ledgerState}
               ageLabel={dataAgeLabel(dataAgeSeconds)}
@@ -1400,7 +1407,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 sort={boardSort}
                 onSortChange={setBoardSort}
               />
-              {/* 🔴 "แสดง N จาก M ใบขอ · ต้องหาคน X อัตรา" (เจ้าของเลือกคำเอง 27 ก.ย. 2569) ·
+              {/* 🔴 "แสดง N จาก M ใบขอ · ต้องหาคน X อัตรา" (เจ้าของเลือกคำเอง 27 ก.ย. 2569) · N/X = ชุดที่การ์ดโชว์จริง รวมเลนที่กด (`flowJobs` · 5 ต.ค. 2569) ·
                   ตัวเลขยังบอกไม่ได้ = ไม่พิมพ์ (ห้ามขึ้น "0 ใบขอ" ปลอม) · ล้างตัวกรองโผล่เฉพาะตอนมีตัวกรอง */}
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 {closedBox ? (
@@ -1410,7 +1417,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 ) : null}
                 {ledgerReady ? (
                   <span>
-                    แสดง <span className="font-medium text-foreground">{boxedJobs.length.toLocaleString('th-TH')}</span>{' '}
+                    แสดง <span className="font-medium text-foreground">{flowJobs.length.toLocaleString('th-TH')}</span>{' '}
                     จาก{' '}
                     {(closedBox
                       ? filterByClosedBox(closedJobs ?? [], closedBox).length
@@ -1418,8 +1425,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     ).toLocaleString('th-TH')}{' '}
                     ใบขอ ·{' '}
                     {closedBox
-                      ? `${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตรา`
-                      : `ต้องหาคน ${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตรา`}
+                      ? `${sumJobPositionUnits(flowJobs).toLocaleString('th-TH')} อัตรา`
+                      : `ต้องหาคน ${sumJobPositionUnits(flowJobs).toLocaleString('th-TH')} อัตรา`}
                   </span>
                 ) : null}
                 {hasAnyBoardFilter(boardFilterState) || filters.search.trim() !== '' || Boolean(selectionLabel) ? (
@@ -1572,7 +1579,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             (จอ lg มีที่เหลือจากแถบ 16rem ให้การ์ดแค่ 2 คอลัมน์ · xl ขึ้นไปกลับเป็น 3 เหมือนเดิม)
             🔴 เฉพาะเจ้าหน้าที่ + มุมมองกล่องงาน — หน้าสมัครสาธารณะได้กริดเดิมทุกพิกเซล */}
         <div className="mt-3">
-        <div ref={cardListRef} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* แบบ C (5 ต.ค. 2569): ช่องไฟระหว่างการ์ดเจ้าหน้าที่แคบลง · หน้าสาธารณะเท่าเดิม */}
+        <div ref={cardListRef} className={cn('grid sm:grid-cols-2 lg:grid-cols-3', isStaff ? 'gap-3' : 'gap-4')}>
           {boardFilterOn && ledgerReady && flowJobs.length === 0 && hasAnyBoardFilter(boardFilterState) ? (
             <div
               className={cn(
@@ -2041,12 +2049,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         </div>
 
         {/* แถบเลขหน้า — ตัวเดียวกับหน้าหน่วยงาน/ผู้สมัคร เลือกจำนวนต่อหน้าได้ (20/40/60/100) */}
-        {boxedJobs.length > 0 ? (
+        {/* 🔴 นับจาก `flowJobs` (ชุดเดียวกับการ์ดที่โชว์ · รวมเลนที่กด) — เดิมใช้ `boxedJobs` เลยไม่เปลี่ยนตามเลน (5 ต.ค. 2569) */}
+        {flowJobs.length > 0 ? (
           <div className="pb-10 pt-4">
             <ListPaginationBar
               page={currentPage}
               pageSize={pageSize}
-              totalItems={boxedJobs.length}
+              totalItems={flowJobs.length}
               totalPages={totalPages}
               pageFrom={pageStart + 1}
               pageTo={pageStart + visibleJobs.length}

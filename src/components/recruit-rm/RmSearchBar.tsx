@@ -1,10 +1,9 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { UserPlus, BookmarkPlus, PhoneCall, Trash2, Archive, Bot, FileSpreadsheet, Download, UserX, Printer } from 'lucide-react';
+import { UserPlus, PhoneCall, Bot, FileSpreadsheet, Download, Printer, UserMinus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import SearchField from '@/components/shared/SearchField';
-import { LEAD_VIEW_LABEL } from '@/lib/recruitLead';
 
 /** คำในช่องค้นหาของแท็บผู้สมัคร — ใช้ทั้งแถบบนและทางถอย (คำเดียวกันสองที่) */
 export const RM_SEARCH_PLACEHOLDER = 'ค้นหาจาก ชื่อ นามสกุล เบอร์ หรือชื่องาน';
@@ -12,8 +11,11 @@ export const RM_SEARCH_PLACEHOLDER = 'ค้นหาจาก ชื่อ น�
 /**
  * แถวค้นหา + เครื่องมือ — ตาม HTML ของระบบเดิม
  *
- * ⚠️ **แท็บ "ข้อมูลผู้สมัคร" เท่านั้นที่มีเครื่องมือ Lead** (เก็บ Lead / ลบ Lead)
- * อีกสองแท็บมีแค่ ค้นหา + เพิ่มข้อมูลผู้สมัคร · คุมจาก `rmTabHasLeadTools()` ที่ lib
+ * 🔴 ปุ่มต่อแท็บ (เจ้าของสั่ง 5 ต.ค. 2569) — ไม่ส่ง prop = ไม่มีปุ่ม · ผู้เรียกคุมว่าแท็บไหนได้อะไร
+ * · ผู้สมัคร = เพิ่มข้อมูลผู้สมัคร · นำเข้า Excel · เก็บไปโทรเอง · ส่ง AI โทร · รายงาน (5 ปุ่มเท่านั้น
+ *   — เก็บ Lead / ลบ Lead / คลังสำรอง / ดูที่ยกเลิก ถอดออกจากแถวนี้)
+ * · การติดต่อ = ส่ง AI โทร + "ถอย Lead" ตอนติ๊ก (ไม่มีเก็บไปโทรเอง — รายชื่อในแท็บนี้เก็บมาแล้ว)
+ * · ติดตามนัดหมาย = โหลดเป็น PDF + ส่ง AI โทร
  *
  * "เพิ่มข้อมูลผู้สมัคร" = เปิดฟอร์มคีย์เอง (AddApplicantDialog) สำหรับคนที่โทรเข้ามาสมัคร
  * บันทึกลงตารางใบสมัครเดียวกับที่มาจากลิงก์ ไม่แตกเป็นสองชุด
@@ -30,10 +32,7 @@ const RmSearchBar: React.FC<{
    * `false` = ทางถอยตอนไม่มีแถบบน (วาดช่อง + ปุ่ม "ค้นหา" ที่นี่เหมือนเดิม)
    */
   hideSearch?: boolean;
-  showLeadTools: boolean;
   selectedCount: number;
-  onSaveLead: () => void;
-  onDeleteLead: () => void;
   /** ไม่ส่ง = ไม่มีปุ่ม (มีแค่แท็บผู้สมัคร · 4 ต.ค. 2569) */
   onAddApplicant?: () => void;
   /** นำเข้าผู้สมัครจาก Excel (1 ต.ค. 2569) — ไม่ส่ง = ไม่มีปุ่ม */
@@ -48,39 +47,28 @@ const RmSearchBar: React.FC<{
   holdingSelected?: boolean;
   /** "ส่ง AI โทร" ทีละหลายคน — 🔴 ยิงสายจริง ผู้เรียกต้องมี popup ยืนยันรายชื่อก่อนเสมอ */
   onSendAiSelected?: () => void;
-  /** กำลังยิงเก็บ/ลบ Lead อยู่ — ปิดปุ่มกันกดซ้อน (ยิงทีละใบหลายใบพร้อมกัน) */
-  leadBusy?: boolean;
-  /** อยู่ในมุมมอง "คลังสำรอง (Lead)" อยู่ไหม — สลับป้ายปุ่มและตัวที่เน้น */
-  leadView?: boolean;
-  onToggleLeadView?: () => void;
+  /** "ถอย Lead" ของแท็บการติดต่อ — ส่งแถวที่ติ๊กกลับแท็บผู้สมัคร · ไม่ส่ง = ไม่มีปุ่ม */
+  onReleaseSelected?: () => void;
+  releasing?: boolean;
   /** ปุ่ม "รายงาน" (เติมจาก iRecruit 4 ต.ค. 2569) — ส่งออกทุกแถวที่กรองอยู่ · ไม่ส่ง = ไม่มีปุ่ม */
   onExport?: () => void;
   exportCount?: number;
-  /** มุมมองใบที่ "ยกเลิกข้อมูลผู้สมัคร" (135) — สลับไป-กลับรายชื่อหลัก */
-  cancelledView?: boolean;
-  onToggleCancelledView?: () => void;
 }> = ({
   keyword,
   onKeywordChange,
   onSearch,
   hideSearch = false,
-  showLeadTools,
   selectedCount,
-  onSaveLead,
-  onDeleteLead,
   onAddApplicant,
   onImportApplicants,
   onPrintPdf,
   onHoldSelected,
   holdingSelected = false,
   onSendAiSelected,
-  leadBusy = false,
-  leadView = false,
-  onToggleLeadView,
+  onReleaseSelected,
+  releasing = false,
   onExport,
   exportCount = 0,
-  cancelledView = false,
-  onToggleCancelledView,
 }) => (
   <div className="flex flex-wrap items-center gap-2">
     {hideSearch ? null : (
@@ -160,58 +148,20 @@ const RmSearchBar: React.FC<{
       </button>
     ) : null}
 
-    {showLeadTools ? (
-      <>
-        {/* ⚠️ ทำกับ "แถวที่ติ๊กไว้" — ปิดไว้ตอนยังไม่ได้ติ๊ก · ระบบเดิมกดได้ตลอด
-            แล้วเงียบเมื่อไม่ได้เลือก ซึ่งอ่านไม่ออกว่าทำงานไหม */}
-        {/* อยู่คลังสำรองแล้วปุ่ม "เก็บ Lead" ไม่มีความหมาย (ทุกแถวเป็น Lead อยู่แล้ว)
-            — ซ่อนไปเลยดีกว่าปุ่มที่กดแล้วไม่เกิดอะไร */}
-        {!leadView ? (
-          <Button size="xs"
-            type="button"
-            onClick={onSaveLead}
-            disabled={selectedCount === 0 || leadBusy}
-            title={
-              selectedCount === 0
-                ? 'ติ๊กเลือกแถวก่อน'
-                : `ปัด ${selectedCount} รายการเข้าคลังสำรอง — หายจากรายชื่อทำงานทุกแท็บ`
-            }
-            className="shrink-0"
-          >
-            <BookmarkPlus aria-hidden />
-            {leadBusy ? 'กำลังเก็บ…' : 'เก็บ Lead'}
-            {selectedCount > 0 ? ` (${selectedCount})` : ''}
-          </Button>
-        ) : null}
-        <Button variant="secondary" size="xs"
-          type="button"
-          onClick={onDeleteLead}
-          disabled={selectedCount === 0 || leadBusy}
-          title={
-            selectedCount === 0
-              ? 'ติ๊กเลือกแถวก่อน'
-              : `เรียก ${selectedCount} รายการกลับเข้ารายชื่อทำงาน`
-          }
-          className="shrink-0"
-        >
-          <Trash2 aria-hidden />
-          {leadBusy ? 'กำลังลบ…' : 'ลบ Lead'}
-          {leadView && selectedCount > 0 ? ` (${selectedCount})` : ''}
-        </Button>
-        {onToggleLeadView ? (
-          <button
-            type="button"
-            onClick={onToggleLeadView}
-            className={cn(
-              'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium',
-              leadView ? TONE.violet.solid : cn(TONE.violet.soft, TONE.violet.value, TONE.violet.softHover),
-            )}
-          >
-            <Archive className="h-3.5 w-3.5" aria-hidden />
-            {leadView ? LEAD_VIEW_LABEL.exit : LEAD_VIEW_LABEL.enter}
-          </button>
-        ) : null}
-      </>
+    {/* "ถอย Lead" (เจ้าของสั่ง 5 ต.ค. 2569: *"ถ้าติ๊ก Lead ให้มีคำว่า ถอยLead ขึ้นมา แล้วมันจะถูกย้ายไป หน้า ผู้สมัคร"*)
+        โผล่เฉพาะตอนติ๊กแล้ว · ทำงานเดียวกับปุ่มบนแถว (release) */}
+    {onReleaseSelected && selectedCount > 0 ? (
+      <Button
+        variant="outline"
+        size="xs"
+        type="button"
+        onClick={onReleaseSelected}
+        disabled={releasing}
+        className="shrink-0"
+      >
+        <UserMinus aria-hidden />
+        {releasing ? 'กำลังถอย…' : `ถอย Lead (${selectedCount})`}
+      </Button>
     ) : null}
 
     {onExport ? (
@@ -225,18 +175,6 @@ const RmSearchBar: React.FC<{
         className="shrink-0"
       >
         <Download aria-hidden /> รายงาน
-      </Button>
-    ) : null}
-    {onToggleCancelledView ? (
-      <Button
-        type="button"
-        variant={cancelledView ? 'default' : 'outline'}
-        size="xs"
-        onClick={onToggleCancelledView}
-        aria-pressed={cancelledView}
-        className="shrink-0"
-      >
-        <UserX aria-hidden /> {cancelledView ? 'กลับรายชื่อหลัก' : 'ดูที่ยกเลิก'}
       </Button>
     ) : null}
   </div>
