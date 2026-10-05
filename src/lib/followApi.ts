@@ -326,17 +326,23 @@ export async function purgeFollowEntry(id: string): Promise<{ queueRowsDeleted: 
  * ปิดงานติดตาม (095 · เจ้าของสั่ง 17 ส.ค. 2569 ข้อ 7 ของงานคัดสรร)
  * `outcome_note` บังคับเฉพาะ 'other' — server เป็นด่านตัดสินอีกชั้น
  */
+/**
+ * ปิดงาน 1 สาย — server หยุดสายที่เหลือให้ด้วย (5 ต.ค. 2569): `day` = เฉพาะวันนั้น (ค่าเริ่ม ทุกผล) ·
+ * `set` = ทุกวันของชุด (รับเฉพาะผล "ยกเลิก") · `stopped_rounds` = ยกเลิกไปกี่สาย · `stopped_error` = หยุดไม่สำเร็จ
+ */
+export type FollowStopScope = 'day' | 'set';
 export async function completeFollowEntry(
   id: string,
   outcome: FollowOutcome,
   note?: string,
-): Promise<FollowEntry> {
+  stopScope: FollowStopScope = 'day',
+): Promise<FollowEntry & { stopped_rounds?: number; stopped_error?: boolean }> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    body: JSON.stringify({ outcome_code: outcome, outcome_note: note?.trim() || undefined }),
+    body: JSON.stringify({ outcome_code: outcome, outcome_note: note?.trim() || undefined, stop_scope: stopScope }),
   });
   if (!r.ok) throw new Error(await readError(r));
-  return (await r.json()) as FollowEntry;
+  return (await r.json()) as FollowEntry & { stopped_rounds?: number; stopped_error?: boolean };
 }
 
 export const FOLLOW_STATUS_LABEL: Record<FollowCallStatus, string> = {

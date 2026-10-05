@@ -1,3 +1,4 @@
+import type { FollowStopScope } from '@/lib/followApi';
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoaderCircle, Plus, X } from 'lucide-react';
@@ -452,7 +453,7 @@ const NotMovingDialog: React.FC<{
   const g = person?.group ?? null;
   const title = isAftercareTopic(g?.topic) ? 'ไม่ตามต่อ' : 'ไม่ย้าย';
 
-  const complete = async (outcome: FollowOutcome, note?: string) => {
+  const complete = async (outcome: FollowOutcome, note?: string, stopScope?: FollowStopScope) => {
     if (!g || busy) return;
     setBusy(true);
     setError(null);
@@ -460,7 +461,7 @@ const NotMovingDialog: React.FC<{
     const open = openFollowRounds(g.rounds);
     for (const r of open) {
       try {
-        await completeFollowEntry(r.id, outcome, note);
+        await completeFollowEntry(r.id, outcome, note, stopScope);
       } catch {
         failed += 1;
       }

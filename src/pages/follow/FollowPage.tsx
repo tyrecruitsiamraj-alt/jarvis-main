@@ -46,6 +46,7 @@ import {
   recordFollowStaffCall,
   clearFollowStaffCall,
   type FollowEntry,
+  type FollowStopScope,
   updateFollowEntry,
 } from '@/lib/followApi';
 import type { FollowStaffCallOutcome } from '@/lib/followStaffCall';
@@ -1112,14 +1113,15 @@ const FollowPage: React.FC = () => {
 
   /**
    * ปิดงาน (095) — บันทึกว่าจบแบบไหน แล้วโหลดใหม่ให้ป้ายบนแถวขึ้นทันที
-   * ⚠️ ไม่แตะคิวโทร: รายการที่ปิดแล้วแต่ยังมีรอบค้างในตาราง ต้องกดยกเลิกแยก
-   * (ปิดแล้วลบสายที่นัดไว้เอง = เดาแทนคน เจ้าของยังไม่ได้สั่ง)
+   * 🔴 server หยุดสายที่เหลือให้ด้วย (เจ้าของสั่ง 5 ต.ค. 2569 — เดิมปิดแล้ว AI ยังโทรต่อ): ทุกผล = วันนั้น ·
+   * "ยกเลิก" เลือก วันนั้น/ทั้งชุด · หยุดไม่สำเร็จต้องบอก (ไม่งั้นคนเชื่อว่าไม่โทรแล้ว)
    */
-  const doComplete = async (id: string, outcome: FollowOutcome, note?: string) => {
+  const doComplete = async (id: string, outcome: FollowOutcome, note?: string, stopScope?: FollowStopScope) => {
     setBusyId(id);
     setError(null);
     try {
-      await completeFollowEntry(id, outcome, note);
+      const out = await completeFollowEntry(id, outcome, note, stopScope);
+      if (out.stopped_error) setError('ปิดงานแล้ว แต่หยุดสายที่เหลือไม่สำเร็จ — กดยกเลิกสายที่เหลือเองที่ปุ่มจัดการ');
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ปิดงานไม่สำเร็จ');

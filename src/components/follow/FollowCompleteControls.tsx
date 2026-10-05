@@ -9,6 +9,7 @@ import {
   FOLLOW_OUTCOME_LABEL,
   type FollowOutcome,
 } from '@/lib/followOutcome';
+import type { FollowStopScope } from '@/lib/followApi';
 
 /**
  * ปิดงานติดตาม (migration 095 · ชุดคำใหม่ 101)
@@ -31,15 +32,19 @@ const FollowCompleteControls: React.FC<{
    * (1 ต.ค. 2569 · ป๊อปมีปุ่มปิดของตัวเองอยู่แล้ว)
    */
   alwaysOpen?: boolean;
-  onComplete: (outcome: FollowOutcome, note?: string) => void | Promise<void>;
+  /** `stopScope` — สายที่เหลือหยุดแค่ไหน (5 ต.ค. 2569): ทุกผล = วันนั้น · "ยกเลิก" ให้คนกดเลือก วันนั้น/ทั้งชุด */
+  onComplete: (outcome: FollowOutcome, note?: string, stopScope?: FollowStopScope) => void | Promise<void>;
 }> = ({ busy = false, alwaysOpen = false, onComplete }) => {
   const [open, setOpen] = useState(alwaysOpen);
   const [note, setNote] = useState('');
+  /** กด "ยกเลิก" แล้วถามก่อนว่าหยุดสายที่เหลือแค่วันนี้หรือทั้งชุด (เจ้าของ Choice 5 ต.ค. 2569 "ให้เขาเลือกได้") */
+  const [askCancelScope, setAskCancelScope] = useState(false);
 
-  const submit = async (outcome: FollowOutcome) => {
-    await onComplete(outcome, note.trim() || undefined);
+  const submit = async (outcome: FollowOutcome, stopScope: FollowStopScope = 'day') => {
+    await onComplete(outcome, note.trim() || undefined, stopScope);
     if (!alwaysOpen) setOpen(false);
     setNote('');
+    setAskCancelScope(false);
   };
 
   if (!open) {
@@ -78,13 +83,27 @@ const FollowCompleteControls: React.FC<{
             size="sm"
             disabled={busy}
             title={FOLLOW_OUTCOME_HINT[o]}
-            onClick={() => void submit(o)}
+            onClick={() => (o === 'cancelled' ? setAskCancelScope(true) : void submit(o))}
             className="min-h-8 px-3 text-[11px]"
           >
             {FOLLOW_OUTCOME_LABEL[o]}
           </Button>
         ))}
       </div>
+      {askCancelScope ? (
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="หยุดสายที่เหลือ" data-testid="cancel-stop-scope">
+          <span className="text-[11px] text-muted-foreground">หยุดสายที่เหลือ</span>
+          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void submit('cancelled', 'day')} className="min-h-8 px-3 text-[11px]">
+            แค่วันนี้
+          </Button>
+          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void submit('cancelled', 'set')} className="min-h-8 px-3 text-[11px]">
+            ทั้งชุด
+          </Button>
+          <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setAskCancelScope(false)} className="min-h-8 px-3 text-[11px]">
+            ไม่ยกเลิก
+          </Button>
+        </div>
+      ) : null}
       {/* หมายเหตุไม่บังคับแล้ว (ชุดใหม่ไม่มี "อื่น ๆ") — พิมพ์ก่อนกดคำ เดี๋ยวเก็บไปด้วย */}
       <input
         type="text"

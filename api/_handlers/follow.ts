@@ -840,14 +840,91 @@ async function completeFollow(req: AuthedReq, res: ApiRes, body: Record<string, 
     return sendError(res, 404, 'Not found', 'ไม่พบรายการ หรือปิด/ยกเลิกไปแล้ว');
   }
 
+  /**
+   * 🔴 ปิดงานแล้วหยุดสายที่เหลือ (เจ้าของ 5 ต.ค. 2569 — วัดย้อน 30 วัน: กด "ถึงแล้ว" แล้วยังโดน AI โทรต่อ 56 สาย ·
+   * "ไปแล้ว" 55 · "ยกเลิก" 3) · Choice: ทุกผล = หยุดเฉพาะวันนั้น · "ยกเลิก" ให้คนกดเลือก วันนั้น / ทั้งชุด
+   */
+  const stopScope: FollowStopScope = outcome === 'cancelled' && body?.stop_scope === 'set' ? 'set' : 'day';
+  let stoppedIds: string[] = [];
+  try {
+    stoppedIds = await stopRemainingFollowRounds(done, stopScope);
+  } catch (e) {
+    // ปิดงานสำเร็จแล้ว — หยุดสายที่เหลือไม่สำเร็จต้องไม่ทำให้การปิดล้ม แต่ต้องบอกจอ (stopped_error)
+    logWarn('follow.complete.stopRemainingFailed', { followId: id, error: String(e) });
+    await auditFromAuthed(req, {
+      action: 'follow.complete',
+      entityType: 'follow_entry',
+      entityId: id,
+      after: { outcome_code: outcome, outcome_note: note, stopScope, stopError: String(e) },
+    });
+    return res.status(200).json({ ...toResponse(done), stopped_rounds: 0, stopped_error: true });
+  }
+
   await auditFromAuthed(req, {
     action: 'follow.complete',
     entityType: 'follow_entry',
     entityId: id,
-    after: { outcome_code: outcome, outcome_note: note },
+    after: { outcome_code: outcome, outcome_note: note, stopScope, stoppedIds },
   });
 
-  return res.status(200).json(toResponse(done));
+  return res.status(200).json({ ...toResponse(done), stopped_rounds: stoppedIds.length });
+}
+
+type FollowStopScope = 'day' | 'set';
+
+/**
+ * สายที่เหลือของคนนี้ (ชุดเดียวกัน `group_id` หรือแผนเดียวกันที่ Lumos `plan_ref`) ที่ยังไม่ถึงเวลา ไม่ปิด ไม่ยกเลิก
+ * — `day` = เฉพาะวันเดียวกับสายที่ปิด (เวลาไทย) · `set` = ทุกวัน
+ * ⇒ ตั้งยกเลิก (จอขึ้น "ยกเลิก") แล้วยกเลิกคิวฝั่งเรา + ที่ Lumos ด้วย `cancelFollowReminder` ตัวเดียวกับปุ่มยกเลิก
+ * (รอบในแผนหลายรอบ = ส่งรอบที่ยังเหลือเป็นแผนใหม่ · ไม่เหลือ = ยกเลิกแผน) · สายที่ปิดเองก็ถอนคิวด้วยถ้ายังไม่ได้โทร
+ */
+async function stopRemainingFollowRounds(done: FollowRow, scope: FollowStopScope): Promise<string[]> {
+  const doneId = String(done.id);
+  let planRef: string | null = null;
+  try {
+    const { rows: pr } = await dbQuery<{ plan_ref: string | null }>(
+      `select plan_ref from ${tableInAppSchema('lumos_dispatch_queue')}
+        where channel = 'reminder' and job_ref = 'follow' and person_ref = $1 limit 1`,
+      [`follow-${doneId}`],
+    );
+    planRef = pr[0]?.plan_ref ?? null;
+  } catch (e) {
+    if (!isUndefinedColumn(e)) throw e;
+  }
+  const groupId = (done.group_id as string | null | undefined) ?? null;
+  if (!groupId && !planRef) {
+    // สายเดี่ยว — ถอนคิวของตัวเองอย่างเดียว (ยังไม่ได้โทร = ไม่ต้องโทรแล้ว)
+    await cancelFollowReminder(doneId, staffNameOfPhone);
+    return [];
+  }
+  const { rows: sib } = await dbQuery<{ id: string }>(
+    `update ${followTable} f
+        set cancelled_at = now()
+      where f.id <> $1::uuid
+        and f.cancelled_at is null and f.completed_at is null
+        and f.scheduled_at > now()
+        and (
+          ($2::uuid is not null and f.group_id = $2::uuid)
+          or ($3::text is not null and f.id::text in (
+            select substring(q.person_ref from 8) from ${tableInAppSchema('lumos_dispatch_queue')} q
+             where q.channel = 'reminder' and q.job_ref = 'follow' and q.plan_ref = $3::text))
+        )
+        and ($4::text = 'set'
+          or to_char(timezone('Asia/Bangkok', f.scheduled_at), 'YYYY-MM-DD')
+           = to_char(timezone('Asia/Bangkok', $5::timestamptz), 'YYYY-MM-DD'))
+      returning f.id::text as id`,
+    [doneId, groupId, planRef, scope, done.scheduled_at],
+  );
+  const ids = sib.map((r) => r.id);
+  // ถอนคิว + แจ้ง Lumos ทีละสาย (ตัวเดียวกับปุ่มยกเลิก) — สายที่ปิดเองด้วย เผื่อปิดก่อน AI โทรรอบนั้น
+  for (const sid of [doneId, ...ids]) {
+    try {
+      await cancelFollowReminder(sid, staffNameOfPhone);
+    } catch (e) {
+      logWarn('follow.complete.stopRound.cancelFailed', { followId: sid, error: String(e) });
+    }
+  }
+  return ids;
 }
 
 /**

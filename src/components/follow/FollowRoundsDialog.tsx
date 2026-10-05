@@ -1,3 +1,4 @@
+import type { FollowStopScope } from '@/lib/followApi';
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Building2, Pencil, Phone, RotateCcw, Trash2, X } from 'lucide-react';
@@ -55,7 +56,7 @@ const FollowRoundsDialog: React.FC<{
    * ย้อนสถานะปิดงาน (feedback 2 ก.ย. 2569) — เลือกผลผิดแล้วแก้ต่อได้ ไม่ต้องสร้างใหม่
    */
   onReopen: (id: string) => void | Promise<void>;
-  onComplete: (id: string, outcome: FollowOutcome, note?: string) => void | Promise<void>;
+  onComplete: (id: string, outcome: FollowOutcome, note?: string, stopScope?: FollowStopScope) => void | Promise<void>;
   /** ลง/ล้างผลโทรของรอบคนโทร (130 · 30 ก.ย. 2569) — โชว์เฉพาะรอบที่ตั้งเป็นคนโทร */
   onStaffCall: (id: string, outcome: FollowStaffCallOutcome, note?: string) => void | Promise<void>;
   onStaffCallClear: (id: string) => void | Promise<void>;
@@ -241,7 +242,7 @@ const FollowRoundsDialog: React.FC<{
                   ) : null}
                   {/* ปิดงาน — ไม่ผูกกับ call_status: ตามจนจบเองโดย AI ยังไม่โทรก็ปิดได้ */}
                   {canWork ? (
-                    <FollowCompleteControls busy={busy} onComplete={(o, n) => onComplete(it.id, o, n)} />
+                    <FollowCompleteControls busy={busy} onComplete={(o, n, sc) => onComplete(it.id, o, n, sc)} />
                   ) : null}
                   {canCancel ? (
                     cancellingId === it.id ? (

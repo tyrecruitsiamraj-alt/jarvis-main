@@ -11760,3 +11760,19 @@ iRecruit (`rm-action-btn`): โทร (call · POST จดการโทรก�
 - `src/components/recruit-rm/RmWorkspace.tsx` — วาดปุ่มจาก `RM_LIST_VIEWS_SHOWN` · `?list=collect` เก่า → รายชื่อทั้งหมด
 - `src/components/recruit-rm/ApplicantContactDialog.tsx` — "ลงหน่วยงาน" = `SearchableSelect` (Popover+Command ในป๊อปพิมพ์ได้) ป้าย `appointmentUnitLabel` = ชื่อจุดทำงาน · ตำแหน่ง (เลขที่ใบขอ) · ค้นด้วยชื่อ/ตำแหน่ง/เลขที่ใบขอ/รหัสไซต์ · job_label ที่บันทึกใช้คำเดียวกัน (เดิมเลขที่ใบขอล้วน)
 - เทสต์ `tests/api/rmCollectAndUnitPicker2569-10-05.test.ts`
+
+## หน้าติดตาม: ปิดงานแล้วหยุดสายที่เหลือ (5 ต.ค. 2569)
+
+เจ้าของถาม: *"กดจัดการ ยกเลิก หรือกดว่าถึงแล้วตั้งแต่สายแรก AI ก็โทรอยู่ดีใช่ไหม ทำให้ไม่ต้องโทรได้ไหม"* — วัดย้อน 30 วัน: ปิดงานแล้วยังโดน AI โทรต่อ ถึงแล้ว 56 · ไปแล้ว 55 · ยกเลิก 3
+Choice: ถึงแล้ว/ไปแล้ว/ลา/เลื่อน/จำวันผิด = หยุดเฉพาะวันนั้น · ยกเลิก = ให้คนกดเลือก วันนี้ / ทั้งชุด
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `api/_handlers/follow.ts` | `completeFollow` → `stopRemainingFollowRounds(done, scope)`: พี่น้องชุดเดียวกัน (`group_id` หรือ `plan_ref`) ที่ยังไม่ถึงเวลา ไม่ปิด ไม่ยกเลิก (`day` = วันเวลาไทยเดียวกัน) → ตั้ง `cancelled_at` + `cancelFollowReminder` ทีละสาย (ตัวเดียวกับปุ่มยกเลิก: ถอนคิว + ส่งแผนที่เหลือ/ยกเลิกแผนที่ Lumos) รวมสายที่ปิดเองถ้ายังไม่โทร · `stop_scope=set` รับเฉพาะผล cancelled · คืน `stopped_rounds` / `stopped_error` |
+| `src/lib/followApi.ts` | `completeFollowEntry(id, outcome, note, stopScope='day')` · `FollowStopScope` |
+| `src/components/follow/FollowCompleteControls.tsx` | กด "ยกเลิก" → ถาม แค่วันนี้ / ทั้งชุด / ไม่ยกเลิก (`cancel-stop-scope`) |
+| `FollowPage.tsx` · `FollowRoundsDialog.tsx` · `FollowCompletedCard.tsx` | ส่ง scope ต่อ · หยุดไม่สำเร็จ = ขึ้นข้อความ |
+| เทสต์ | `FollowCompleteControls.test.tsx` · `tests/api/followStopAfterComplete2569-10-05.test.ts` · ปรับ `FollowCompletedCard.test.tsx` |
+
+- ตรวจจริง (คนโทร เบอร์ปลอม · เครื่อง dev ไม่มีกุญแจ Lumos): ชุด 30–31 ธ.ค. วันละ 2 สาย · ถึงแล้ว 30/12 10:00 → ยกเลิก 30/12 14:00 อย่างเดียว · ยกเลิก+ทั้งชุด → ยกเลิกอีก 3 สายข้ามวัน → ลบด้วย id
+- ⚠️ สายที่ Lumos โทรไปแล้ว/กำลังโทร เรียกคืนไม่ได้ (เหมือนเดิม) — หยุดได้เฉพาะที่ยังไม่ถึงเวลา

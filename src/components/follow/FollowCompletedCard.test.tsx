@@ -219,8 +219,9 @@ describe('FollowCompletedCard', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'ลา' }));
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
     expect(completeFollowEntry.mock.calls).toEqual([
-      ['a1', 'leave', undefined],
-      ['a2', 'leave', undefined],
+      // + ขอบเขตหยุดสายที่เหลือ (5 ต.ค. 2569 — ทุกผล = วันนั้น)
+      ['a1', 'leave', undefined, 'day'],
+      ['a2', 'leave', undefined, 'day'],
     ]);
     expect(moveToAftercare).not.toHaveBeenCalled();
   });
