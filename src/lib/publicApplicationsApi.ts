@@ -518,21 +518,19 @@ export type ApplicantDetailExtras = {
   staffCalls: ApplicantStaffCall[];
 };
 
-/** ของประกอบป๊อปรายละเอียด (อ่านอย่างเดียว) — ล้ม = รายการว่าง (ป๊อปยังเปิดได้ ไม่พังทั้งป๊อป) */
+/**
+ * ของประกอบป๊อปรายละเอียด (อ่านอย่างเดียว)
+ * 🔴 ล้ม = throw (QA 5 ต.ค. 2569) — ป๊อปจับเองแล้วขึ้น "โหลดไม่ได้" แทน "ยังไม่มีการโทร"
+ */
 export async function fetchApplicantDetailExtras(id: string): Promise<ApplicantDetailExtras> {
-  const empty: ApplicantDetailExtras = { history: [], aiCalls: [], staffCalls: [] };
-  try {
-    const r = await apiFetch(`/api/job-applications?detail_of=${encodeURIComponent(id)}`);
-    if (!r.ok) return empty;
-    const body = (await r.json()) as Partial<ApplicantDetailExtras>;
-    return {
-      history: body.history ?? [],
-      aiCalls: body.aiCalls ?? [],
-      staffCalls: body.staffCalls ?? [],
-    };
-  } catch {
-    return empty;
-  }
+  const r = await apiFetch(`/api/job-applications?detail_of=${encodeURIComponent(id)}`);
+  if (!r.ok) throw new Error('โหลดประวัติผู้สมัครไม่ได้');
+  const body = (await r.json()) as Partial<ApplicantDetailExtras>;
+  return {
+    history: body.history ?? [],
+    aiCalls: body.aiCalls ?? [],
+    staffCalls: body.staffCalls ?? [],
+  };
 }
 
 /** แท็บ "ติดตามนัดหมาย" — ผลติดตามนัดทุกครั้ง (ล่าสุดก่อน) */
@@ -545,14 +543,11 @@ export type AttendanceLogItem = {
   createdAt: string;
 };
 
+/** 🔴 ล้ม = throw (QA 5 ต.ค. 2569) — ป๊อปขึ้น "โหลดไม่ได้" แทน "ยังไม่มีผลติดตามนัด" */
 export async function fetchAttendanceLogs(applicationId: string): Promise<AttendanceLogItem[]> {
-  try {
-    const r = await apiFetch(`/api/application-attendance?applicationId=${encodeURIComponent(applicationId)}`);
-    if (!r.ok) return [];
-    return ((await r.json()) as { items?: AttendanceLogItem[] }).items ?? [];
-  } catch {
-    return [];
-  }
+  const r = await apiFetch(`/api/application-attendance?applicationId=${encodeURIComponent(applicationId)}`);
+  if (!r.ok) throw new Error('โหลดผลติดตามนัดไม่ได้');
+  return ((await r.json()) as { items?: AttendanceLogItem[] }).items ?? [];
 }
 
 /**

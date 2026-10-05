@@ -26,6 +26,7 @@ export default function FollowFilterGroup({
   const matrix = useMemo(() => buildFollowCallMatrix(entries), [entries]);
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label="ตัวกรอง">
+      <span className="inline-flex items-center gap-1.5">
       <span className="text-xs text-muted-foreground">สายที่</span>
       <ChoiceDropdown
         value={String(round)}
@@ -37,6 +38,7 @@ export default function FollowFilterGroup({
         ariaLabel="ดูเฉพาะสายที่"
         active={round !== 'all'}
       />
+      </span>
       {children}
     </div>
   );

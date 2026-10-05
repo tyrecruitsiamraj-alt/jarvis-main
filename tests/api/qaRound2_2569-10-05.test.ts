@@ -93,3 +93,61 @@ describe('คำบนจอ — ตัดประโยคอธิบาย /
     for (const [f, text] of gone) expect(read(f), `${f}: ${text}`).not.toContain(text);
   });
 });
+
+describe('ดีไซน์ / มือถือ / สถานะจอ (ก้อน 3)', () => {
+  it('สีแบรนด์โหมดมืด: ค่าตั้งต้นใช้ค่าธีม · สีที่ตั้งเองสว่างขึ้น ไม่เกิน 65%', async () => {
+    const { brandPrimaryForTheme, DEFAULT_BRANDING } = await import('../../src/lib/brandingStorage');
+    expect(brandPrimaryForTheme(DEFAULT_BRANDING.primaryHsl, false)).toBe(DEFAULT_BRANDING.primaryHsl);
+    expect(brandPrimaryForTheme(DEFAULT_BRANDING.primaryHsl, true)).toBeNull();
+    expect(brandPrimaryForTheme('210 60% 30%', true)).toBe('210 60% 50%');
+    expect(brandPrimaryForTheme('210 60% 60%', true)).toBe('210 60% 65%');
+  });
+  it('ป๊อปมีพื้นทึบทั้งสองธีม + ม่านโหมดมืดเข้ม + ปุ่มปิด 36px', () => {
+    const d = read('src/components/ui/dialog.tsx');
+    expect(d).toContain('jarvis-frost bg-card dark:bg-card');
+    expect(d).toContain('dark:bg-background/80');
+    expect(d).toContain('h-9 w-9');
+  });
+  it('ช่วงเวลากลางคืน 20–06 กรองได้ (ข้ามเที่ยงคืน)', async () => {
+    const { filterFollowEntries } = await import('../../src/lib/followListFilter');
+    const e = (iso: string) => ({ id: iso, scheduled_at: iso }) as never;
+    const rows = [e('2026-10-05T19:00:00Z'), e('2026-10-04T21:30:00Z'), e('2026-10-05T05:00:00Z')];
+    // 02:00 ไทย + 04:30 ไทย อยู่ในกลางคืน · 12:00 ไทยไม่อยู่
+    const out = filterFollowEntries(rows, { date: '', band: 'night' } as never);
+    expect(out.map((r: { id: string }) => r.id).sort()).toEqual(['2026-10-04T21:30:00Z', '2026-10-05T19:00:00Z'].sort());
+  });
+  it('ตารางผู้สมัครว่าง = หัวตาราง + แถว "ไม่พบใบสมัคร" (ไม่หายทั้งตาราง)', () => {
+    const t = read('src/components/recruit-rm/RmTable.tsx');
+    expect(t).not.toContain('ลองล้างคำค้นหรือเปลี่ยนแท็บ');
+    expect(t).toContain('data-testid="rm-empty-row"');
+  });
+  it('ไม่มีป๊อปซ้อนป๊อปในป๊อปเพิ่มคน — ตัวเลือกชื่อ/หน่วยงานฝังในที่เดิม', () => {
+    const page = read('src/pages/follow/FollowPage.tsx');
+    expect(page).not.toMatch(/<BoardPersonPicker\b/);
+    expect(page).not.toMatch(/<BoardUnitPicker\b/);
+    expect(page).toContain('<BoardPersonPickerBody');
+    expect(page).toContain('<BoardUnitPickerBody');
+  });
+  it('แถบขั้นมีป้ายสั้นบนจอแคบ', async () => {
+    const { RELEASE_STEP_TEXT } = await import('../../src/lib/boardRelease');
+    expect(Object.values(RELEASE_STEP_TEXT).map((t) => t.short)).toEqual(['ตรวจใบขอ', 'สถานที่', 'รายได้', 'ส่ง']);
+  });
+  it('อ่าน meta ใบขอไม่ได้ = feed ล้ม ไม่ถอยไป /api/jobs เงียบ ๆ', () => {
+    expect(read('src/lib/siamrajUnitRequestsApi.ts')).toContain("if (!r.ok) throw new HttpError(r.status, 'อ่านใบขอจากระบบงานหลักไม่ได้');");
+  });
+  it('ใบประวัติ: โหลดไม่ได้แยกจากยังไม่มี', () => {
+    expect(read('src/components/recruit-rm/ApplicantRecordTables.tsx')).toContain("if (state === 'failed')");
+    expect(read('src/lib/applicationContactsApi.ts')).toContain("throw new Error('โหลดประวัติการติดต่อไม่ได้')");
+  });
+  it('ชื่อแท็บเบราว์เซอร์ = หน้า · ชื่อระบบ', async () => {
+    const { setPageTitle } = await import('../../src/lib/brandingStorage');
+    const g = globalThis as { document?: { title: string } };
+    const prev = g.document;
+    g.document = { title: '' };
+    setPageTitle('ติดตามคนเริ่มงาน');
+    expect(g.document.title).toBe('ติดตามคนเริ่มงาน · So Recruit');
+    setPageTitle(null);
+    expect(g.document.title).toBe('So Recruit');
+    g.document = prev;
+  });
+});

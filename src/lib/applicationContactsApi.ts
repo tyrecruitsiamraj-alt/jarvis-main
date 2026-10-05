@@ -50,16 +50,14 @@ export async function saveContactLog(input: SaveContactInput): Promise<ContactLo
   return (data as { item: ContactLog }).item;
 }
 
-/** ประวัติการติดต่อของใบ (ล่าสุดก่อน) — ล้มคืนว่าง ไม่ให้ dialog พัง */
+/**
+ * ประวัติการติดต่อของใบ (ล่าสุดก่อน)
+ * 🔴 ล้ม = throw (QA 5 ต.ค. 2569: เดิมคืน [] เงียบ ๆ ⇒ แท็บขึ้น "ยังไม่มีการบันทึกผลติดต่อ" ทั้งที่โหลดไม่ได้)
+ * ป๊อปรายละเอียดจับเองแล้วขึ้น "โหลดไม่ได้" ในตาราง (ป๊อปไม่พัง)
+ */
 export async function fetchContactLogs(applicationId: string): Promise<ContactLog[]> {
-  try {
-    const r = await apiFetch(
-      `/api/application-contacts?applicationId=${encodeURIComponent(applicationId)}`,
-    );
-    if (!r.ok) return [];
-    const data = await readJsonSafe<{ items?: ContactLog[] }>(r);
-    return data?.items ?? [];
-  } catch {
-    return [];
-  }
+  const r = await apiFetch(`/api/application-contacts?applicationId=${encodeURIComponent(applicationId)}`);
+  if (!r.ok) throw new Error('โหลดประวัติการติดต่อไม่ได้');
+  const data = await readJsonSafe<{ items?: ContactLog[] }>(r);
+  return data?.items ?? [];
 }

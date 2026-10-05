@@ -1,15 +1,34 @@
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
+import { th } from "date-fns/locale";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
+/**
+ * 🔴 ปฏิทินภาษาไทย + ปี พ.ศ. ทุกตัว (QA 5 ต.ค. 2569: หัวปฏิทินเป็น "October 2026 · Su Mo Tu" ทั้งที่ทั้งระบบใช้ พ.ศ.)
+ * ส่ง locale/formatters เองจากหน้าได้ — ค่านี้เป็นค่าตั้งต้น
+ */
+const TH_MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+const TH_FORMATTERS = {
+  formatCaption: (d: Date) => `${TH_MONTHS[d.getMonth()]} ${d.getFullYear() + 543}`,
+  formatMonthCaption: (d: Date) => TH_MONTHS[d.getMonth()],
+  formatYearCaption: (d: Date) => String(d.getFullYear() + 543),
+};
+const TH_LABELS = {
+  labelMonthDropdown: () => "เดือน",
+  labelYearDropdown: () => "ปี",
+  labelNext: () => "เดือนถัดไป",
+  labelPrevious: () => "เดือนก่อน",
+};
+
 function Calendar({ className, classNames, showOutsideDays = true, ...props }: CalendarProps) {
   return (
     <DayPicker
+      locale={th}
       showOutsideDays={showOutsideDays}
       className={cn("p-3", className)}
       classNames={{
@@ -46,6 +65,8 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />,
       }}
       {...props}
+      formatters={{ ...TH_FORMATTERS, ...props.formatters }}
+      labels={{ ...TH_LABELS, ...props.labels }}
     />
   );
 }

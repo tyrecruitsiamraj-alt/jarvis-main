@@ -427,7 +427,7 @@ export default function FollowEditDialog({
               <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/30 p-3">
                 <BoardUnitPickerBody
                   units={unitOptions}
-                  listClassName="max-h-56"
+                  listClassName="max-h-56 overflow-y-auto"
                   onPick={(u: BoardUnitOption) => {
                     setUnitName(u.unitName);
                     setSiteCode(u.siteCode);

@@ -102,7 +102,12 @@ function incomeSummaryText(job: JobRequest): string | null {
   return null;
 }
 
+/** ใบขอโหลดไม่ได้ — ช่องที่รอใบขอห้ามขึ้น "กำลังโหลด…" ค้าง (แถบล้มอยู่บนสุดแล้ว) */
+const JobLoadFailedContext = React.createContext(false);
+
 function Loading({ text = 'กำลังโหลดใบขอ…' }: { text?: string }) {
+  const failed = React.useContext(JobLoadFailedContext);
+  if (failed) return <p className="text-xs text-muted-foreground">—</p>;
   return <p className="text-xs text-muted-foreground">{text}</p>;
 }
 
@@ -197,6 +202,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   /** ทะเบียน "ไม่ปล่อย + เหตุผล" (29 ก.ย. 2569) — `null` = ยังอ่านไม่ได้ ⇒ ไม่โชว์ปุ่ม (ห้ามเดาว่ายังไม่ได้ตั้ง) */
   const [skips, setSkips] = React.useState<JobReleaseSkip[] | null>(null);
 
+  const [jobRev, setJobRev] = React.useState(0);
   React.useEffect(() => {
     let alive = true;
     setError(null);
@@ -210,7 +216,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, jobRev]);
 
   const loadPostings = React.useCallback(async () => {
     try {
@@ -375,6 +381,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const benefitLines = jobWithPatch ? benefitDisplayLabels(jobWithPatch.extra_benefits) : [];
 
   return (
+    <JobLoadFailedContext.Provider value={Boolean(error && !job)}>
     <div className={cn('relative', EVEN_TYPE)}>
       {chrome ? (
         <PageHeader
@@ -386,7 +393,17 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
       ) : null}
 
       <div className={cn('space-y-4', chrome ? 'px-4 py-4 md:px-6' : 'py-1')}>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {/* 🔴 โหลดใบขอไม่ได้ = บอกพร้อมปุ่มลองใหม่ · เนื้อขั้นยังรอใบขอ ปุ่มถัดไปปิด (QA 5 ต.ค. 2569: เดิมค้าง "กำลังโหลด…" แต่กดถัดไปได้) */}
+        {error ? (
+          <div role="alert" className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm', TONE.danger.soft, TONE.danger.value)}>
+            <span>{error}</span>
+            {!job ? (
+              <Button type="button" size="xs" variant="outline" onClick={() => setJobRev((n) => n + 1)}>
+                ลองใหม่
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
 
         {/**
          * ═══ สองช่องบนสุด: **ตรวจสอบ** กับ **รายชื่อ** (เจ้าของสั่ง 21 ก.ย. 2569) ═══
@@ -439,7 +456,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                     title={t.todo}
                     onClick={() => setOpenStep(k)}
                     className={cn(
-                      'h-auto min-h-9 items-start justify-start whitespace-normal py-1.5 text-left leading-snug',
+                      // จอแคบ: เลขอยู่บน ป้ายสั้นอยู่ล่าง ไม่ตัดคำ (QA 5 ต.ค. 2569: จอ 375 ขึ้น "สถาน/ที่" บรรทัดละพยางค์)
+                      'h-auto min-h-9 flex-col items-center justify-start gap-0.5 whitespace-normal px-1 py-1.5 text-center leading-snug sm:flex-row sm:items-start sm:px-2.5 sm:text-left',
                       !on && passed && TONE.success.value,
                     )}
                   >
@@ -454,7 +472,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                       {t.step}
                     </span>
                     <span className="min-w-0">
-                      <span className="block">{t.label}</span>
+                      <span className="block whitespace-nowrap sm:hidden">{t.short}</span>
+                      <span className="hidden sm:block">{t.label}</span>
                       {here ? (
                         <span className={cn('block font-normal', on ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
                           ค้างที่นี่
@@ -738,7 +757,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
 
             {/* ── ปุ่มไปขั้นต่อไป — ขั้น 4 ไม่มี เพราะปุ่มลงมือคือ "ส่งประกาศ" ในขั้นนั้นเอง ── */}
             {nextStep ? (
-              <Button type="button" className="w-full" onClick={() => setOpenStep(nextStep)}>
+              <Button type="button" className="w-full" disabled={!job} onClick={() => setOpenStep(nextStep)}>
                 ถัดไป ขั้น {RELEASE_STEP_TEXT[nextStep].step} {RELEASE_STEP_TEXT[nextStep].label}
                 <ChevronRight aria-hidden />
               </Button>
@@ -753,6 +772,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
         </Tabs>
       </div>
     </div>
+    </JobLoadFailedContext.Provider>
   );
 };
 

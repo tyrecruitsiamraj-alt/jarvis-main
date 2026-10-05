@@ -68,13 +68,16 @@ const ApplicantInfoPanel: React.FC<{
     <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
       <Field label="ชื่อ">
         {editing ? (
+          /* 🔴 คำนำหน้าห่อกล่องกว้างคงที่ (QA 5 ต.ค. 2569: จอ 375 ช่องคำนำหน้ากว้าง 313px ช่องชื่อเหลือ 38px —
+             `jarvis-soft-field` ของ SelectTrigger ตั้ง w-full ทับ w-24) · ช่องชื่อกินที่เหลือ */
           <div className="flex gap-1.5">
+            <div className="w-24 shrink-0">
             <Select
               value={draft.title_prefix || NO_PREFIX}
               onValueChange={(v) => set('title_prefix', v === NO_PREFIX ? '' : v)}
               disabled={disabled}
             >
-              <SelectTrigger className="h-9 w-24 shrink-0 text-xs" aria-label="คำนำหน้า">
+              <SelectTrigger className="h-9 text-xs" aria-label="คำนำหน้า">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -86,12 +89,13 @@ const ApplicantInfoPanel: React.FC<{
                 ))}
               </SelectContent>
             </Select>
+            </div>
             <Input
               value={draft.first_name}
               onChange={(e) => set('first_name', e.target.value)}
               disabled={disabled}
               aria-label="ชื่อ"
-              className="h-9 text-sm"
+              className="h-9 min-w-0 flex-1 text-sm"
             />
           </div>
         ) : (

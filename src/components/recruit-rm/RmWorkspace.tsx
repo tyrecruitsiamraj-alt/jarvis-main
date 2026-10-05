@@ -776,7 +776,7 @@ const RmWorkspace: React.FC<{
               >
                 {RM_TAB_LABEL[t]}
                 <span className={cn('ml-1.5 text-xs tabular-nums', active ? '' : DASH.muted)}>
-                  {loading ? '…' : tabCounts[t].toLocaleString('th-TH')}
+                  {loading ? '…' : loadError ? '—' : tabCounts[t].toLocaleString('th-TH')}
                 </span>
               </button>
             );
@@ -807,7 +807,8 @@ const RmWorkspace: React.FC<{
             chips={RM_LIST_VIEWS_SHOWN.map((v) => ({
               id: v,
               label: RM_LIST_VIEW_LABEL[v],
-              count: loading ? null : listViewCounts[v],
+              // โหลดล้ม = ยังไม่รู้เลข (null = "—") ไม่ใช่ 0 (QA 5 ต.ค. 2569)
+              count: loading ? null : loadError ? 'unknown' : listViewCounts[v],
             }))}
           />
         </div>
@@ -822,7 +823,7 @@ const RmWorkspace: React.FC<{
               setPage(1);
               setSelectedIds([]);
             }}
-            chips={CONTACT_CHIPS.map((c) => ({ ...c, count: loading ? null : contactChipCounts[c.id] }))}
+            chips={CONTACT_CHIPS.map((c) => ({ ...c, count: loading ? null : loadError ? 'unknown' : contactChipCounts[c.id] }))}
           />
         </div>
       ) : null}
@@ -1049,10 +1050,10 @@ const RmWorkspace: React.FC<{
 
           {loadError ? (
             <p className={cn('rounded-xl border px-3 py-2 text-[12px]', TONE.danger.soft, TONE.danger.value)}>
-              {loadError} —{' '}
-              <button type="button" onClick={load} className="underline">
+              {loadError}{' '}
+              <Button type="button" size="xs" variant="outline" onClick={load}>
                 ลองใหม่
-              </button>
+              </Button>
             </p>
           ) : loading ? (
             <p className={cn('rounded-xl border px-3 py-6 text-center text-sm', DASH.card, DASH.muted)}>

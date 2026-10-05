@@ -234,7 +234,7 @@ export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'dashb
  * "ผู้สมัคร" ถูกถอดออกจากสายพาน ⇒ หัวหน้าจอว่างเปล่า (เจอ 27 ก.ย. 2569 · เจ้าของสั่ง "แก้เลย")
  * ⇒ หัวต้องเป็นชื่อแท็บที่กดมา — กดแท็บ "การโทรของฉัน" หัวก็ต้องเขียน "การโทรของฉัน"
  */
-const BOARD_VIEW_TABS: ReadonlyArray<{ id: BoardViewId; label: string }> = [
+export const BOARD_VIEW_TABS: ReadonlyArray<{ id: BoardViewId; label: string }> = [
   // เจ้าของสั่ง 4 ต.ค. 2569: แท็บ "งานสรรหา" → "โพสต์ประกาศ" (ชื่อหน้า/เมนูยังเป็นงานสรรหา)
   { id: 'board', label: 'โพสต์ประกาศ' },
   // 🔴 ชื่อ + ลำดับแท็บตามที่เจ้าของเรียงเอง 30 ก.ย. 2569 (แบบ iRecruit): *"กล่องงาน > ผู้สมัคร > การติดตาม >
@@ -1524,7 +1524,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </p>
         )}
 
-        {!loading && boxedJobs.length === 0 && (
+        {/* โหลดล้ม = ห้ามขึ้น "ไม่ตรงตัวกรอง" ชี้ทางผิด (QA 5 ต.ค. 2569) · ข้อความล้มอยู่ข้างบนแล้ว */}
+        {!loading && !loadError && boxedJobs.length === 0 && (
           <div className="mt-10 jarvis-frost rounded-2xl border border-dashed border-white/70 p-10 text-center">
             {closedBox && closedLoading ? (
               <>

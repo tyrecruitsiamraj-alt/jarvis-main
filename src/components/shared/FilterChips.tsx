@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
  * 🔴 เลข 0 ต้องโชว์ (ว่าง = 0 ห้ามหาย) · `null` = ยังโหลดไม่เสร็จ → "…" (ห้ามขึ้น 0 ปลอม)
  * ปุ่มมาจาก shadcn `Button` (ห้ามปั้นปุ่มเอง) — เลือกอยู่ = default · ไม่ได้เลือก = outline
  */
-export type FilterChip<T extends string> = { id: T; label: string; count: number | null };
+/** count: null = กำลังโหลด ("…") · 'unknown' = โหลดไม่ได้ ("—" ไม่ใช่ 0 · QA 5 ต.ค. 2569) */
+export type FilterChip<T extends string> = { id: T; label: string; count: number | null | 'unknown' };
 
 export default function FilterChips<T extends string>({
   chips,
@@ -33,7 +34,7 @@ export default function FilterChips<T extends string>({
             onClick={() => onChange(c.id)}
           >
             {c.label}
-            <span className="tabular-nums">{c.count === null ? '…' : c.count.toLocaleString('th-TH')}</span>
+            <span className="tabular-nums">{c.count === null ? '…' : c.count === 'unknown' ? '—' : c.count.toLocaleString('th-TH')}</span>
           </Button>
         );
       })}

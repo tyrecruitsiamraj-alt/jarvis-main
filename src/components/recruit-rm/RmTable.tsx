@@ -181,13 +181,11 @@ const RmTable: React.FC<{
   const now = new Date();
   const allChecked = rows.length > 0 && rows.every((r) => selectedIds.includes(r.id));
 
-  if (rows.length === 0) {
-    return (
-      <p className={cn('rounded-xl border px-3 py-6 text-center text-sm', DASH.card, DASH.muted)}>
-        ไม่พบใบสมัครตามเงื่อนไขที่เลือก — ลองล้างคำค้นหรือเปลี่ยนแท็บ
-      </p>
-    );
-  }
+  /**
+   * 🔴 ว่างแล้วตารางห้ามหาย (กติกา 1 ต.ค. 2569 · QA 5 ต.ค. 2569 เจอว่าตารางหายเหลือย่อหน้า)
+   * ⇒ หัวตารางอยู่เสมอ + แถวเดียว "ไม่พบใบสมัคร" · จำนวนคอลัมน์ต้องตรงกับหัวข้างล่าง
+   */
+  const colCount = 1 + (ownerColumns ? 10 : 4) + (tab === 'appointments' ? 1 : 0) + (tab === 'contact' ? 1 : 0) + 1;
 
   return (
     <div className={cn('overflow-hidden rounded-xl border', DASH.card)}>
@@ -208,6 +206,7 @@ const RmTable: React.FC<{
                   type="checkbox"
                   checked={allChecked}
                   onChange={onToggleAll}
+                  disabled={rows.length === 0}
                   aria-label="เลือกทั้งหมดในหน้านี้"
                   className="h-3.5 w-3.5 cursor-pointer accent-sky-600"
                 />
@@ -249,6 +248,13 @@ const RmTable: React.FC<{
             </tr>
           </thead>
           <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={colCount} className={cn('px-3 py-6 text-center text-sm', DASH.muted)} data-testid="rm-empty-row">
+                  ไม่พบใบสมัครตามเงื่อนไขที่เลือก
+                </td>
+              </tr>
+            ) : null}
             {rows.map((r) => {
               const checked = selectedIds.includes(r.id);
               const { firstName, lastName } = splitApplicantName(r);

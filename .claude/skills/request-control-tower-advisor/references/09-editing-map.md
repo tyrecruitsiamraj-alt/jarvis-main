@@ -12037,3 +12037,28 @@ Choice: รายได้เฉลี่ยโชว์ ติ๊กซ่อ�
 | เทสต์ | `tests/api/followPlanning.test.ts` |
 
 - ไม่แก้ค่าที่เก็บ (call_outcome ยังเป็นของ Lumos) · กล่อง/หมวดยังเป็นสรุปไม่ได้ · ผลที่คนลงเองไม่แตะ
+
+## 5 ต.ค. 2569 (ดึก): แก้ตามรายงาน QA 5 กลุ่ม (ติดตาม + งานสรรหา) — เจ้าของ "อนุมัติให้แก้ ทั้งหมด"
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/followGrouping.ts` | `followGroupKey` ใส่ `group_id` (หนึ่งแผน = หนึ่งแถว · แถวเก่าไม่มี group_id รวมตามคนเหมือนเดิม) · `followPersonKey` (คีย์คนเดิม) · `groupFollowEntries(entries, now, keyOf)` |
+| `src/pages/follow/FollowPage.tsx` | `scopePeople` (จัดตามคน + คำค้น) ให้การ์ดติดตามครบ · key ตามแท็บ · โหลดครั้งแรก = Skeleton · แถบล้มบนสุด + ลองใหม่ · รอบเงียบสำเร็จล้างแถบ · รอบเงียบห้ามซ้อน (`reloadingRef`) · ปุ่มในป๊อปพลาด = `toast.error` · ตารางหลายวันจับเวลาที่ผ่านแล้วก่อนส่ง · ตัวเลือกชื่อ/หน่วยงานฝังในป๊อปเพิ่มคน (เลิก Dialog ซ้อน) · `usePageTitle` · ตัดคำโปรย/①②③/คำใบ้ · ตัวกรองป้าย+dropdown เป็นคู่ · ช่วงเวลา "กลางคืน" |
+| `src/lib/trends/followTrends.ts` · `FollowDashboard.tsx` | `followCountedYmd` + `FOLLOW_PERSON_METRICS` + `followTrendPersonKey` (เลขแบบคนนับคนไม่ซ้ำ · การ์ด/กราฟ/แยกมิติ/ตารางเจ้าหน้าที่ใช้ตัวเดียว) · "ลงติดตาม" หน่วย "คน" · วันที่ พ.ศ. · ผลโทรใช้ `followCallOutcomeText` |
+| `src/lib/friendlyError.ts` (**ใหม่**) | `friendlyErrorText(e, fallback)` — เน็ตหลุด = "ต่อเซิร์ฟเวอร์ไม่ได้" · อังกฤษดิบ = fallback · ไทยส่งต่อ · ใช้แทน `e.message` ในไฟล์ที่ QA เจอ |
+| `src/components/shared/SectionErrorBoundary.tsx` (**ใหม่**) | ErrorBoundary ตัวแรกของระบบ — ครอบแถบ iRecruit |
+| `src/components/follow/IrecruitReplaceSyncBar.tsx` | ตรวจรูปคำตอบ · `rule?.aiFrom` · อ่านไม่ได้ = "อ่านสถานะไม่ได้" + ลองใหม่ · ชิ้นสั้นไม่มี "·" นำ |
+| `src/lib/followAftercareMove.ts` · `FollowCompletedCard.tsx` | `moveBaseYmd` = max(วันสุดท้าย, วันนี้) · ป๊อปบอก "นับจากวันนี้" |
+| `src/lib/followPlanning.ts` · `FollowPlanningCalendar.tsx` | `thaiOutcomeWords` (รหัสอังกฤษในสรุป Lumos → ไทย) · สรุปโดย AI ย้ายไป title · เบอร์ฉุกเฉิน "ยังไม่รู้ว่าโทรหรือยัง" (ห้ามถอดทั้งบรรทัด — เจ้าของทัก 10 ก.ย.) · ต้องตามด่วน · ทั้งเดือน |
+| `src/components/ui/dialog.tsx` | `bg-card dark:bg-card` ใต้ jarvis-frost (โหมดมืดเคยโปร่ง 66–86%) · ม่าน `dark:bg-background/80` · ปุ่มปิด 36px ป้าย "ปิดหน้าต่าง" |
+| `src/lib/brandingStorage.ts` · `src/hooks/usePageTitle.ts` (**ใหม่**) | `brandPrimaryForTheme` (โหมดมืด + สีตั้งต้น = ค่าธีม index.css) · `setPageTitle` ชื่อแท็บ "หน้า · ชื่อระบบ" |
+| `src/components/ui/calendar.tsx` | locale th + ปี พ.ศ. + ป้ายไทย ทุกปฏิทิน |
+| `src/components/follow/BoardPersonPicker.tsx` | `BoardPersonPickerBody` (ฝังได้ · มีลองใหม่) |
+| `src/lib/siamrajUnitRequestsApi.ts` · `useUnitRequestsFeed.ts` · `JobBoardView.tsx` | meta อ่านไม่ได้ = throw (เลิกถอยไป /api/jobs เงียบ ๆ) · ล้มแล้วไม่ขึ้นกล่อง "ไม่ตรงตัวกรอง" · `BOARD_VIEW_TABS` export |
+| `applicationContactsApi.ts` · `publicApplicationsApi.ts` · `ApplicantRecordTables.tsx` · `ApplicantContactDialog.tsx` | fetch ประวัติ/ติดต่อ/ติดตามนัด ล้ม = throw · `RecordLoadProvider` แยก กำลังโหลด/โหลดไม่ได้+ลองใหม่/ยังไม่มี · `skipped ?? []` |
+| `RmTable.tsx` · `RmWorkspace.tsx` · `FilterChips.tsx` | ว่างคงหัวตาราง + แถว "ไม่พบใบสมัคร" · ชิปโหลดล้ม = "—" (`count: 'unknown'`) |
+| `BoardPostingPage.tsx` · `boardRelease.ts` | ใบขอโหลดไม่ได้ = แถบ + ลองใหม่ · ถัดไปปิด · ช่องรอใบขอขึ้น "—" · แถบขั้นจอแคบ = เลขบน + `short` (ตรวจใบขอ/สถานที่/รายได้/ส่ง) |
+| ข้อความ | ช่วงห้ามโทร 20–08 ถอด 5 จุด · tooltip/คำโปรยยาวตามรายการ QA (ภาพรวม · กล่องลอย · ฟอร์มคีย์ผู้สมัคร · เลน/ขั้น · ป๊อปแก้ไข · ตัวเลือกเรื่องเหลือชื่อ) |
+| เทสต์ | `tests/api/qaRound2_2569-10-05.test.ts` (ใหม่) · followGrouping · trends · followAftercareMove · FollowCompletedCard · FollowPlanningCalendar · boardDataState · aftercare · followReplacement · qaLoadingErrorStates |
+
+- ยังไม่ได้ทำ (บอกเจ้าของแล้ว): ลดขนาดการดึง /follow ต้องมีเส้นดึงเฉพาะที่เปลี่ยน (ทำแค่กันยิงซ้อน) · ตารางกว้างบนมือถือ (การ์ดต่อแถว) · ปุ่ม `<button>` ดิบ ~95 จุดเดิม

@@ -139,7 +139,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <ClaimIdleAlertDialog />
 
       {/* Top header — จอใหญ่ (lg+) */}
-      <header className="hidden lg:flex items-center justify-between gap-2 2xl:gap-4 px-3 xl:px-4 2xl:px-8 py-3 border-b border-border bg-background/95 sticky top-0 z-40">
+      <header className="hidden lg:flex items-center justify-between gap-2 2xl:gap-4 px-3 xl:px-4 2xl:px-8 py-3 border-b border-border bg-background sticky top-0 z-40">
         <div className="flex items-center gap-2 min-w-0">
           {hamburger}
           <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 shrink-0">
@@ -221,7 +221,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* หัวแบบย่อ — แท็บเล็ต/มือถือ (ต่ำกว่า lg)
           ช่องค้นหา: แท็บเล็ต (sm+) อยู่แถวเดียวกัน ซ้ายกระดิ่ง · มือถือจอเล็กอยู่แถวที่สองใต้แถบ
           (ข้างกระดิ่งบนจอ < 640px ไม่มีที่พอ — ดูคอมเมนต์ข้างล่างเรื่องเบียด) */}
-      <header className="lg:hidden border-b border-border bg-background/95 sticky top-0 z-40 safe-area-pt">
+      <header className="lg:hidden border-b border-border bg-background sticky top-0 z-40 safe-area-pt">
       <div className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3">
         <div className="flex items-center gap-1 min-w-0">
           {hamburger}

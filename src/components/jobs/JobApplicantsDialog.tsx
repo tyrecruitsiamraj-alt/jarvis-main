@@ -40,6 +40,7 @@ import JobRecallSuggestions from '@/components/jobs/JobRecallSuggestions';
 import ApplicantContactDialog from '@/components/recruit-rm/ApplicantContactDialog';
 import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import { friendlyErrorText } from '@/lib/friendlyError';
+import { toast } from 'sonner';
 
 export type JobApplicantsDialogProps = {
   open: boolean;
@@ -169,6 +170,8 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
       document.body.appendChild(a);
       a.click();
       a.remove();
+      // บอกว่าโหลดแล้ว (QA 5 ต.ค. 2569: ดาวน์โหลดเงียบ ไม่มีอะไรบนจอ)
+      toast.success(`ดาวน์โหลด ${doc.filename || 'เอกสารแนบ'} แล้ว`);
     } catch (e) {
       setActionError(friendlyErrorText(e, 'โหลดไฟล์แนบไม่สำเร็จ'));
     } finally {
@@ -557,7 +560,8 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
                     : 'bg-muted text-muted-foreground hover:bg-muted/70',
                 )}
               >
-                {label} <span className="tabular-nums">({n})</span>
+                {/* กำลังโหลด / โหลดไม่ได้ = ยังไม่รู้เลข ห้ามขึ้น (0) (QA 5 ต.ค. 2569) */}
+                {label} <span className="tabular-nums">({loading ? '…' : error ? '—' : n})</span>
               </button>
             ))}
           </div>

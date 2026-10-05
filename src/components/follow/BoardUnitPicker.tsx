@@ -55,7 +55,7 @@ export const BoardUnitPickerBody: React.FC<{
 
       {units.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          ยังโหลดหน่วยงานไม่ได้ — ปิดหน้าต่างนี้แล้วพิมพ์ชื่อหน่วยงานเองได้
+          ยังไม่มีรายชื่อหน่วยงาน · พิมพ์ชื่อเองได้
         </p>
       ) : (
         <div className={listClassName ?? 'min-h-0 flex-1 overflow-y-auto'}>

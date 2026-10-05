@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import JobBoardView, { type BoardViewId } from '@/components/jobs/JobBoardView';
+import JobBoardView, { BOARD_VIEW_TABS, type BoardViewId } from '@/components/jobs/JobBoardView';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import RmWorkspace from '@/components/recruit-rm/RmWorkspace';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
@@ -84,6 +85,8 @@ const StaffJobBoardPage: React.FC = () => {
     ? (raw as BoardViewId)
     : 'board';
   const retiredView = (RETIRED_VIEWS as readonly string[]).includes(raw ?? '');
+  // ชื่อแท็บเบราว์เซอร์ตามแท็บที่เปิด (QA 5 ต.ค. 2569)
+  usePageTitle(BOARD_VIEW_TABS.find((t) => t.id === view)?.label ?? 'งานสรรหา');
   /** ทางถอยของแท็บภาพรวม — แผง Dashboard เดิม (28 ก.ย.) ยังเปิดได้ที่ `?view=dashboard&dash=classic` */
   const classicDashboard = searchParams.get('dash') === 'classic';
   /**

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, CalendarX, Check, Loader2, Pencil, UserRound, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,8 @@ import {
   CallsTable,
   ContactsTable,
   HistoryTable,
+  RecordLoadProvider,
+  type RecordLoadState,
 } from '@/components/recruit-rm/ApplicantRecordTables';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
@@ -171,6 +173,38 @@ export default function ApplicantContactDialog({
   const [logs, setLogs] = useState<ContactLog[]>([]);
   const [extras, setExtras] = useState<ApplicantDetailExtras>(EMPTY_EXTRAS);
   const [attendance, setAttendance] = useState<AttendanceLogItem[]>([]);
+  /**
+   * สภาพการโหลดของแท็บประวัติ/การโทร/การติดต่อ/ติดตามนัด — แยก "กำลังโหลด / โหลดไม่ได้" ออกจาก "ยังไม่มี"
+   * (QA 5 ต.ค. 2569: เส้นล้มแล้วแท็บขึ้น "ยังไม่มีการโทร" ทั้งที่ของจริงมีสาย AI)
+   */
+  const [recState, setRecState] = useState<Record<'logs' | 'extras' | 'attendance', RecordLoadState>>({
+    logs: 'loading',
+    extras: 'loading',
+    attendance: 'loading',
+  });
+  const loadRecords = useCallback((id: string, isCancelled: () => boolean = () => false) => {
+    setRecState({ logs: 'loading', extras: 'loading', attendance: 'loading' });
+    const settle = (key: 'logs' | 'extras' | 'attendance', ok: boolean) =>
+      !isCancelled() && setRecState((prev) => ({ ...prev, [key]: ok ? 'ready' : 'failed' }));
+    void fetchContactLogs(id)
+      .then((v) => {
+        if (!isCancelled()) setLogs(v);
+        settle('logs', true);
+      })
+      .catch(() => settle('logs', false));
+    void fetchApplicantDetailExtras(id)
+      .then((v) => {
+        if (!isCancelled()) setExtras(v);
+        settle('extras', true);
+      })
+      .catch(() => settle('extras', false));
+    void fetchAttendanceLogs(id)
+      .then((v) => {
+        if (!isCancelled()) setAttendance(v);
+        settle('attendance', true);
+      })
+      .catch(() => settle('attendance', false));
+  }, []);
 
   // เปิดคนใหม่ = เริ่มใหม่ทั้งหมด + โหลดของประกอบ · กัน race (`cancelled`) — กดไล่แถวเร็ว ๆ
   // แล้ว response ที่มาช้าต้องไม่ทับของคนที่เปิดอยู่ (ทุกตัวกลืน error เป็นรายการว่าง)
@@ -194,9 +228,7 @@ export default function ApplicantContactDialog({
     setLogs([]);
     setExtras(EMPTY_EXTRAS);
     setAttendance([]);
-    void fetchContactLogs(application.id).then((v) => !cancelled && setLogs(v));
-    void fetchApplicantDetailExtras(application.id).then((v) => !cancelled && setExtras(v));
-    void fetchAttendanceLogs(application.id).then((v) => !cancelled && setAttendance(v));
+    loadRecords(application.id, () => cancelled);
     void fetchRecruitReasons({ processCode: '1', outcomeCode: 'C' })
       .then((v) => !cancelled && setReasons(v))
       .catch(() => !cancelled && setReasons([]));
@@ -209,7 +241,7 @@ export default function ApplicantContactDialog({
     return () => {
       cancelled = true;
     };
-  }, [application]);
+  }, [application, loadRecords]);
 
   const baseDraft = useMemo(() => (a ? profileDraftOf(a) : null), [a]);
   const callRows = useMemo(() => detailCallRows(extras.aiCalls, extras.staffCalls), [extras]);
@@ -676,19 +708,29 @@ export default function ApplicantContactDialog({
           ) : null}
         </TabsContent>
         <TabsContent value="history" className="pt-2">
-          <HistoryTable items={extras.history} />
+          <RecordLoadProvider state={recState.extras} onRetry={() => loadRecords(a.id)}>
+            <HistoryTable items={extras.history} />
+          </RecordLoadProvider>
         </TabsContent>
         <TabsContent value="calls" className="pt-2">
-          <CallsTable rows={callRows} application={a} />
+          <RecordLoadProvider state={recState.extras} onRetry={() => loadRecords(a.id)}>
+            <CallsTable rows={callRows} application={a} />
+          </RecordLoadProvider>
         </TabsContent>
         <TabsContent value="contacts" className="pt-2">
-          <ContactsTable logs={logs} />
+          <RecordLoadProvider state={recState.logs} onRetry={() => loadRecords(a.id)}>
+            <ContactsTable logs={logs} />
+          </RecordLoadProvider>
         </TabsContent>
         <TabsContent value="appointments" className="pt-2">
-          <AppointmentsTable logs={logs} />
+          <RecordLoadProvider state={recState.logs} onRetry={() => loadRecords(a.id)}>
+            <AppointmentsTable logs={logs} />
+          </RecordLoadProvider>
         </TabsContent>
         <TabsContent value="attendance" className="pt-2">
-          <AttendanceTable logs={attendance} />
+          <RecordLoadProvider state={recState.attendance} onRetry={() => loadRecords(a.id)}>
+            <AttendanceTable logs={attendance} />
+          </RecordLoadProvider>
         </TabsContent>
       </Tabs>
 
@@ -698,6 +740,8 @@ export default function ApplicantContactDialog({
         </p>
       ) : null}
       <div className="flex flex-wrap justify-end gap-2 border-t border-border/70 pt-3">
+        {/* ปุ่มบันทึกปิดอยู่ต้องบอกเหตุ (QA 5 ต.ค. 2569: กดแล้วเงียบ ไม่รู้ว่าทำไมไม่ไป) */}
+        {editing && !dirty ? <span className="self-center text-xs text-muted-foreground">ยังไม่ได้แก้</span> : null}
         {mode !== 'profile' || editing ? (
           <Button type="button" size="sm" onClick={() => void save()} disabled={!dirty || busy}>
             {busy ? <Loader2 className="animate-spin" aria-hidden /> : null} บันทึก

@@ -149,10 +149,27 @@ export function faviconHrefForBranding(logoDataUrl: string | null): string {
   return logo;
 }
 
+/**
+ * ═══ ชื่อแท็บเบราว์เซอร์ = "หน้า · ชื่อระบบ" (QA 5 ต.ค. 2569: ทุกหน้าเป็น "So Recruit" เปิดหลายแท็บแยกไม่ออก) ═══
+ * หน้าเรียก `setPageTitle('ติดตามคนเริ่มงาน')` · แบรนด์โหลดทีหลังก็ไม่ทับ เพราะประกอบจากตัวแปรชุดเดียวกัน
+ */
+let currentPageTitle: string | null = null;
+let currentAppName: string = DEFAULT_BRANDING.appName;
+
+function composeDocumentTitle(): string {
+  return currentPageTitle ? `${currentPageTitle} · ${currentAppName}` : currentAppName;
+}
+
+export function setPageTitle(label: string | null): void {
+  currentPageTitle = label?.trim() || null;
+  if (typeof document !== 'undefined') document.title = composeDocumentTitle();
+}
+
 export function applyBrandingToDocument(c: BrandingConfig): void {
   if (typeof document === 'undefined') return;
   const name = (c.appName || DEFAULT_BRANDING.appName).trim() || DEFAULT_BRANDING.appName;
-  document.title = name;
+  currentAppName = name;
+  document.title = composeDocumentTitle();
 
   const faviconHref = faviconHrefForBranding(c.logoDataUrl);
   const appleIconHref = (c.logoDataUrl || DEFAULT_LOGO_PATH).trim() || DEFAULT_LOGO_PATH;
@@ -175,7 +192,7 @@ export function applyBrandingToDocument(c: BrandingConfig): void {
 
   const root = document.documentElement;
 
-  root.style.setProperty('--primary', c.primaryHsl);
+  // --primary / --ring / --sidebar-primary ตั้งตามธีมที่ `applyBrandPrimaryVars` (เรียกจาก applyBrandSurfaceVars)
   root.style.setProperty('--primary-foreground', '0 0% 100%');
   /**
    * 🔴 **`--accent` ไม่ใช่สีแบรนด์ — ห้ามทับด้วยสีแบรนด์อีก** (5 ก.ย. 2569)
@@ -187,10 +204,7 @@ export function applyBrandingToDocument(c: BrandingConfig): void {
    */
   root.style.removeProperty('--accent');
   root.style.removeProperty('--accent-foreground');
-  root.style.setProperty('--ring', c.primaryHsl);
-  root.style.setProperty('--sidebar-primary', c.primaryHsl);
   root.style.setProperty('--sidebar-primary-foreground', '0 0% 100%');
-  root.style.setProperty('--sidebar-ring', c.primaryHsl);
 
   const pp = c.primaryHsl.trim().split(/\s+/);
   const ph = pp[0] ?? '0';
@@ -237,6 +251,7 @@ export function applyBrandSurfaceVars(c: BrandingConfig): void {
   if (typeof document === 'undefined') return;
   lastBrandingConfig = c;
   const root = document.documentElement;
+  applyBrandPrimaryVars(root, c.primaryHsl);
 
   if (isDarkTheme()) {
     for (const v of SURFACE_VARS) root.style.removeProperty(v);
@@ -265,6 +280,33 @@ export function applyBrandSurfaceVars(c: BrandingConfig): void {
       '--gradient-hero',
       `linear-gradient(135deg, hsl(${c.backgroundHsl}), hsl(${c.backgroundHsl}))`,
     );
+  }
+}
+
+/** ตัวแปรสีแบรนด์ที่ต้องเปลี่ยนตามธีม */
+const PRIMARY_VARS = ['--primary', '--ring', '--sidebar-primary', '--sidebar-ring'] as const;
+
+/**
+ * สีแบรนด์ (--primary ฯลฯ) ของธีมที่เปิดอยู่ — `null` = ใช้ค่าของธีมใน index.css (ถอด inline)
+ *
+ * 🔴 QA 5 ต.ค. 2569: เดิมเขียนค่าธีมสว่าง (353 50% 37%) ทับทั้งสองธีม ⇒ โหมดมืดตัวหนังสือ `text-primary`
+ * บนพื้นเข้ม contrast 2.34:1 · ตอนนี้ธีมมืด + สีแบรนด์ตั้งต้น = ใช้ค่าธีมมืดของ index.css (353 55% 50%)
+ * · สีแบรนด์ที่ตั้งเองในโหมดมืด = ความสว่าง +13 (ระยะเดียวกับคู่ค่าตั้งต้น) ไม่เกิน 65%
+ */
+export function brandPrimaryForTheme(primaryHsl: string, dark: boolean): string | null {
+  if (!dark) return primaryHsl;
+  if (primaryHsl.trim() === DEFAULT_BRANDING.primaryHsl) return null;
+  const [h = '0', sat = '50%', l = '40%'] = primaryHsl.trim().split(/\s+/);
+  const lNum = parseInt(l.replace('%', ''), 10);
+  if (!Number.isFinite(lNum)) return null;
+  return `${h} ${sat} ${Math.min(65, Math.max(lNum + 13, 50))}%`;
+}
+
+function applyBrandPrimaryVars(root: HTMLElement, primaryHsl: string): void {
+  const v = brandPrimaryForTheme(primaryHsl, isDarkTheme());
+  for (const name of PRIMARY_VARS) {
+    if (v) root.style.setProperty(name, v);
+    else root.style.removeProperty(name);
   }
 }
 

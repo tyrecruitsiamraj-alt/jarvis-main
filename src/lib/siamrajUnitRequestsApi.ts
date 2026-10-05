@@ -13,9 +13,11 @@ export type SiamrajFeedMeta = {
 
 export async function fetchSiamrajFeedMeta(): Promise<SiamrajFeedMeta> {
   const r = await apiFetch('/api/siamraj/unit-requests?meta=1', { cache: 'no-store' });
-  if (!r.ok) {
-    return { enabled: false, readOnly: true, mode: 'staffing_queue' };
-  }
+  /**
+   * 🔴 อ่าน meta ไม่ได้ = feed ล้ม ห้ามแปลว่า "ปิดอยู่" (QA 5 ต.ค. 2569: บอร์ดสลับไปอ่าน /api/jobs ตารางเก่าเงียบ ๆ
+   * ขึ้น "ทั้งหมด 11 · ประกาศ 0" แทน 346 ใบ ไม่มีคำเตือนสักบรรทัด) · ปิดจริง server ตอบ 200 + enabled:false
+   */
+  if (!r.ok) throw new HttpError(r.status, 'อ่านใบขอจากระบบงานหลักไม่ได้');
   return readJsonSafe<SiamrajFeedMeta>(r);
 }
 

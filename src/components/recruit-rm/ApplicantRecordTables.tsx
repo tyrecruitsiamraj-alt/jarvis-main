@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { DASH, TONE } from '@/lib/designTokens';
 import { EM_DASH } from '@/lib/displayFallback';
 import { formatDateTimeTh, formatYmdDmyBe } from '@/lib/dateTh';
@@ -17,6 +18,38 @@ import { ATTENDANCE_TONE } from '@/lib/appointmentAttendance';
  * ตารางของแท็บประวัติ/การโทร/การติดต่อ/การนัดหมาย/ติดตามนัดหมาย ในป๊อปรายละเอียดผู้สมัคร
  * 🔴 ว่างก็ยังเป็นตาราง (หัวคอลัมน์ + แถว "ไม่มี…") — กติกาทั้งระบบ 1 ต.ค. 2569 สลับแท็บแล้วทรงไม่เปลี่ยน
  */
+export type RecordLoadState = 'loading' | 'failed' | 'ready';
+
+/**
+ * สภาพการโหลดของตารางในกล่อง — หน้าแม่ครอบด้วย `RecordLoadProvider`
+ * 🔴 QA 5 ต.ค. 2569: โหลดไม่ได้/กำลังโหลด เดิมขึ้น "ยังไม่มี…" เหมือนว่างจริง
+ */
+const RecordLoadContext = React.createContext<{ state: RecordLoadState; onRetry?: () => void }>({ state: 'ready' });
+
+export const RecordLoadProvider: React.FC<{ state: RecordLoadState; onRetry?: () => void; children: React.ReactNode }> = ({
+  state,
+  onRetry,
+  children,
+}) => <RecordLoadContext.Provider value={{ state, onRetry }}>{children}</RecordLoadContext.Provider>;
+
+const EmptyCell: React.FC<{ empty: string }> = ({ empty }) => {
+  const { state, onRetry } = React.useContext(RecordLoadContext);
+  if (state === 'loading') return <>กำลังโหลด…</>;
+  if (state === 'failed') {
+    return (
+      <span className={cn('inline-flex flex-wrap items-center justify-center gap-2', TONE.danger.value)}>
+        โหลดไม่ได้
+        {onRetry ? (
+          <Button type="button" size="xs" variant="outline" onClick={onRetry}>
+            ลองใหม่
+          </Button>
+        ) : null}
+      </span>
+    );
+  }
+  return <>{empty}</>;
+};
+
 const Table: React.FC<{ head: string[]; empty: string; children: React.ReactNode; isEmpty: boolean }> = ({
   head,
   empty,
@@ -38,7 +71,7 @@ const Table: React.FC<{ head: string[]; empty: string; children: React.ReactNode
         {isEmpty ? (
           <tr>
             <td colSpan={head.length} className="px-3 py-6 text-center text-xs text-muted-foreground">
-              {empty}
+              <EmptyCell empty={empty} />
             </td>
           </tr>
         ) : (

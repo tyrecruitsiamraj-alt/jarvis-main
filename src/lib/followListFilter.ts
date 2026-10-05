@@ -52,12 +52,14 @@ export function followLifecycleTab(e: FollowEntry): FollowTab {
   return 'active';
 }
 
-export type TimeBand = '' | 'morning' | 'afternoon' | 'evening';
+export type TimeBand = '' | 'morning' | 'afternoon' | 'evening' | 'night';
 
 export const TIME_BAND_LABEL: Record<Exclude<TimeBand, ''>, string> = {
   morning: 'เช้า (06:00–12:00)',
   afternoon: 'บ่าย (12:00–17:00)',
   evening: 'เย็น (17:00–20:00)',
+  // ยกเลิกช่วงห้ามโทรแล้ว (28 ก.ย. 2569) มีสายจริงตี 2–5 ⇒ ต้องกรองช่วงนี้ได้ (QA 5 ต.ค. 2569)
+  night: 'กลางคืน (20:00–06:00)',
 };
 
 /** ชั่วโมงของช่วงเวลา (เวลาไทย) — ปลายเปิด [from, to) */
@@ -65,6 +67,7 @@ const BAND_RANGE: Record<Exclude<TimeBand, ''>, [number, number]> = {
   morning: [6, 12],
   afternoon: [12, 17],
   evening: [17, 20],
+  night: [20, 30], // ข้ามเที่ยงคืน — ดู inBand
 };
 
 /** ชั่วโมงเวลาไทยของ ISO — null = อ่านไม่ได้ */
@@ -91,7 +94,9 @@ export function inTimeBand(iso: string | null | undefined, band: TimeBand): bool
   const h = bangkokHour(iso);
   if (h == null) return false;
   const [from, to] = BAND_RANGE[band];
-  return h >= from && h < to;
+  // ช่วงข้ามเที่ยงคืน (กลางคืน 20–06): ชั่วโมง 0–5 นับเป็น 24–29
+  const hh = to > 24 && h < to - 24 ? h + 24 : h;
+  return hh >= from && hh < to;
 }
 
 export type FollowFilter = {

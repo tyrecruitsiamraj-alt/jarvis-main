@@ -8,6 +8,7 @@ import { enrichJobsWithPenalty } from '@/lib/jobPenalty';
 import { publishUnitRequestsFeed } from '@/lib/jobFeedBroadcast';
 import { getWorkCalendarSnapshot, subscribeWorkCalendar } from '@/lib/workCalendarStore';
 import type { JobRequest } from '@/types';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 const SIAMRAJ_POLL_MS = 60_000;
 const UNIT_REQUESTS_FETCH_LIMIT = 500;
@@ -114,11 +115,7 @@ export function useUnitRequestsFeed(options?: { skip?: boolean }): {
         setJobs([]);
         setDataAgeSeconds(null);
         setFeedState(httpStatusOf(e) === 403 ? 'forbidden' : 'failed');
-        setLoadError(
-          e instanceof Error && e.message
-            ? e.message
-            : 'โหลดข้อมูลหน่วยงานไม่สำเร็จ — ลองใหม่อีกครั้ง',
-        );
+        setLoadError(friendlyErrorText(e, 'โหลดใบขอไม่สำเร็จ'));
       } finally {
         setRefreshing(false);
         setLoading(false);

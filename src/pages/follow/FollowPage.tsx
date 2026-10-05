@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import SectionErrorBoundary from '@/components/shared/SectionErrorBoundary';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
@@ -54,8 +55,8 @@ import {
 } from '@/lib/followApi';
 import type { FollowStaffCallOutcome } from '@/lib/followStaffCall';
 import { summarizeDispatchResults } from '@/lib/followDispatchState';
-import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
-import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
+import { BoardPersonPickerBody } from '@/components/follow/BoardPersonPicker';
+import { BoardUnitPickerBody } from '@/components/follow/BoardUnitPicker';
 import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
 import { buildBoardUnitOptions, mergeBoardUnitOptions, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
@@ -446,6 +447,8 @@ const FollowPage: React.FC = () => {
     setSearchParams(params);
   };
   const replaceView = followView === 'replace';
+  // ชื่อแท็บเบราว์เซอร์ตามแท็บที่เปิด (QA 5 ต.ค. 2569)
+  usePageTitle(followView === 'dashboard' ? 'Dashboard ติดตาม' : followView === 'replace' ? 'ติดตามส่งคนแทน' : 'ติดตามคนเริ่มงาน');
   /** ทีมที่บันทึกตอนกดเพิ่มจากแท็บนี้ — รายชื่อติดตามไม่ส่งคีย์ (เหมือนเดิมทุกตัวอักษร) */
   const followTeam = followTeamForScope(replaceView ? 'replacement' : 'main');
   /**
@@ -505,7 +508,14 @@ const FollowPage: React.FC = () => {
    * @param silent `true` = รีเฟรชเบื้องหลัง **ห้ามขึ้นสถานะกำลังโหลด**
    * (ไม่งั้นทุก 25 วิ จอจะกะพริบเป็นโครงกระดูกทั้งที่คนกำลังอ่านอยู่)
    */
+  const reloadingRef = useRef(false);
   const reload = useCallback(async (silent = false) => {
+    /**
+     * 🔴 รอบเงียบห้ามซ้อนรอบที่ยังโหลดไม่จบ (QA 5 ต.ค. 2569: ชุดเต็ม ~2.6 MB · เน็ตช้า = ยิงทับกันเรื่อย ๆ)
+     * คนกดเอง (ไม่เงียบ) ยังยิงได้เสมอ
+     */
+    if (silent && reloadingRef.current) return;
+    reloadingRef.current = true;
     if (!silent) setLoading(true);
     try {
       setItems(await listFollowEntries());
@@ -517,6 +527,7 @@ const FollowPage: React.FC = () => {
       // รีเฟรชเงียบล้ม = เงียบต่อ ของบนจอยังเป็นของเดิมที่ยังใช้ได้
       if (!silent) setError(friendlyErrorText(e, 'โหลดรายชื่อติดตามไม่ได้'));
     } finally {
+      reloadingRef.current = false;
       if (!silent) setLoading(false);
     }
   }, []);
@@ -1473,6 +1484,7 @@ const FollowPage: React.FC = () => {
               <option value="morning">{TIME_BAND_LABEL.morning}</option>
               <option value="afternoon">{TIME_BAND_LABEL.afternoon}</option>
               <option value="evening">{TIME_BAND_LABEL.evening}</option>
+              <option value="night">{TIME_BAND_LABEL.night}</option>
             </select>
           </label>
         }
@@ -1648,6 +1660,8 @@ const FollowPage: React.FC = () => {
           filtersSlot={
             <FollowFilterGroup entries={panelEntries} round={activeRound} onRoundChange={setActiveRound}>
               <>
+                {/* ป้าย+dropdown ห่อเป็นคู่ จอแคบตัดบรรทัดแล้วไม่หลุดจากกัน (QA 5 ต.ค. 2569) */}
+                <span className="inline-flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground">ใครโทร</span>
                 <ChoiceDropdown
                   value={caller}
@@ -1659,7 +1673,9 @@ const FollowPage: React.FC = () => {
                   ariaLabel="ใครโทร"
                   active={caller !== 'all'}
                 />
+                </span>
                 {/* เจ้าของงาน = อีเมลคนเพิ่ม (เจ้าของสั่ง 5 ต.ค. 2569) · "ใครเพิ่ม" ยุบเข้ามาแล้ว · "ของฉัน" มาก่อน */}
+                <span className="inline-flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground">เจ้าของงาน</span>
                 <ChoiceDropdown
                   value={adderFilter}
@@ -1675,7 +1691,9 @@ const FollowPage: React.FC = () => {
                   ariaLabel="เจ้าของงาน"
                   active={adderFilter !== 'all'}
                 />
+                </span>
                 {/* ครั้งที่ติดตาม = วันที่ของแผน (เจ้าของ Choice 5 ต.ค. 2569) */}
+                <span className="inline-flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground">วันที่ของแผน</span>
                 <ChoiceDropdown
                   value={planDay}
@@ -1690,6 +1708,7 @@ const FollowPage: React.FC = () => {
                   ariaLabel="วันที่ของแผน"
                   active={planDay !== 'all'}
                 />
+                </span>
               </>
             </FollowFilterGroup>
           }
@@ -1851,7 +1870,7 @@ const FollowPage: React.FC = () => {
               </div>
             ) : (
             <>
-            <DialogHeader className="px-4 pt-4 sm:px-5">
+            <DialogHeader className="min-w-0 px-4 pt-4 sm:px-5">
               {returnTo ? (
                 <Button
                   type="button"
@@ -1885,7 +1904,7 @@ const FollowPage: React.FC = () => {
                 e.preventDefault();
               }
             }}
-            className="jarvis-frost space-y-3 p-4 sm:p-5"
+            className="jarvis-frost min-w-0 space-y-3 p-4 sm:p-5"
           >
             {/* บรรทัด "ขั้นที่ N จาก 3 · ① → ② → ③" ถอดแล้ว (QA 5 ต.ค. 2569) — แถบขั้นข้างล่างบอกทางทั้งเส้นอยู่แล้ว */}
             {/* แถบขั้น 1→2→3 (เจ้าของสั่ง 18 ส.ค. 2569) — กดย้อนกลับขั้นที่ทำแล้วได้
@@ -1933,14 +1952,15 @@ const FollowPage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => setPickerOpen(true)}
+                onClick={() => setPickerOpen((v) => !v)}
+                aria-expanded={pickerOpen}
                 className={cn(
                   'inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium',
                   TONE.info.outline,
                 )}
               >
                 <Users className="h-3.5 w-3.5" aria-hidden />
-                เลือกชื่อจากบอร์ด
+                {pickerOpen ? 'ปิดรายชื่อ' : 'เลือกชื่อจากบอร์ด'}
               </button>
               {pickedFrom ? (
                 <span className="jarvis-chip jarvis-chip-info">{pickedFrom}</span>
@@ -1948,6 +1968,12 @@ const FollowPage: React.FC = () => {
                 <span className="text-[11px] text-muted-foreground">หรือคีย์ชื่อเองด้านล่าง</span>
               )}
             </div>
+            {/* 🔴 แผงเลือกชื่อ **ฝังในป๊อปเดียวกัน** — ห้าม Dialog ซ้อน Dialog (QA 5 ต.ค. 2569) */}
+            {pickerOpen ? (
+              <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/30 p-3" data-testid="follow-person-picker">
+                <BoardPersonPickerBody onPick={pickPerson} listClassName="max-h-64 overflow-y-auto" />
+              </div>
+            ) : null}
 
             {/* คำนำหน้า + ชื่อ + นามสกุล — API รับ recipient_name ก้อนเดียว ประกอบตอนส่ง
                 นามสกุลไม่บังคับ บางเคสมีแค่ชื่อที่คนแนะนำมา ไม่ควรบล็อกไม่ให้ลงรายชื่อ */}
@@ -2023,19 +2049,26 @@ const FollowPage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => setUnitPickerOpen(true)}
+                onClick={() => setUnitPickerOpen((v) => !v)}
+                aria-expanded={unitPickerOpen}
                 className={cn(
                   'inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium',
                   TONE.info.outline,
                 )}
               >
                 <Building2 className="h-3.5 w-3.5" aria-hidden />
-                เลือกหน่วยงานจากบอร์ด
+                {unitPickerOpen ? 'ปิดรายชื่อหน่วยงาน' : 'เลือกหน่วยงานจากบอร์ด'}
               </button>
               {unitName ? (
                 <span className="jarvis-chip jarvis-chip-info">{unitName}</span>
               ) : null}
             </div>
+            {/* 🔴 แผงเลือกหน่วยงาน **ฝังในป๊อปเดียวกัน** (แพตเทิร์นเดียวกับป๊อปแก้ไข) — ห้าม Dialog ซ้อน Dialog */}
+            {unitPickerOpen ? (
+              <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/30 p-3" data-testid="follow-unit-picker">
+                <BoardUnitPickerBody units={unitOptions} onPick={pickUnit} listClassName="max-h-64 overflow-y-auto" />
+              </div>
+            ) : null}
 
             {/* หน่วยงาน (096 · เจ้าของสั่ง 17 ส.ค. 2569) — เลือกจากใบขอแล้วรหัสไซต์ขึ้นเอง
                 ⚠️ เก็บเป็น **ข้อความ ไม่ใช่ FK ไปใบขอ** — ใบขออยู่คนละฐาน (ERP) และเลขที่ใบ
@@ -2770,18 +2803,7 @@ const FollowPage: React.FC = () => {
         entries={scopeItems}
       />
 
-      <BoardPersonPicker
-        open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        onPick={pickPerson}
-      />
-
-      <BoardUnitPicker
-        open={unitPickerOpen}
-        onClose={() => setUnitPickerOpen(false)}
-        units={unitOptions}
-        onPick={pickUnit}
-      />
+      {/* ตัวเลือกชื่อ/หน่วยงานจากบอร์ดฝังอยู่ในป๊อปเพิ่มคนแล้ว (QA 5 ต.ค. 2569 — เลิกเปิดป๊อปซ้อน) */}
 
       {/* popup เตือนลงซ้ำ (เจ้าของสั่ง 18 ส.ค. 2569) — บอกชนกับใคร เวลาไหน
           เลือกได้: บันทึกเฉพาะรอบที่ไม่ซ้ำ หรือกลับไปแก้ · ไม่มีปุ่ม "บันทึกซ้ำทั้งหมด"

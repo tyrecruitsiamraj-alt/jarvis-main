@@ -143,11 +143,12 @@ export const RELEASE_STEP_ORDER: readonly ReleaseStepKey[] = [
  */
 export const RELEASE_STEP_TEXT: Record<
   ReleaseStepKey,
-  { step: number; label: string; state: string; hint: string; todo: string }
+  { step: number; label: string; /** ป้ายสั้นบนจอแคบ (QA 5 ต.ค. 2569: จอ 375 ป้ายยาวตัดบรรทัดละคำ) */ short: string; state: string; hint: string; todo: string }
 > = {
   info: {
     step: 1,
     label: 'ตรวจใบขอ',
+    short: 'ตรวจใบขอ',
     state: 'ยังไม่มีใครอ่าน',
     hint: 'ไม่มีร่องรอยว่ามีคนเปิดดูใบนี้ — ไม่มีหมายเหตุ ไม่มีการแก้ข้อมูลประกาศ',
     // 4 ต.ค. 2569: หน้า 1 = ข้อมูลใบขออย่างเดียว (เพศย้ายไปหน้า 3)
@@ -156,6 +157,7 @@ export const RELEASE_STEP_TEXT: Record<
   place: {
     step: 2,
     label: 'ใส่สถานที่ปฏิบัติงาน',
+    short: 'สถานที่',
     state: 'อ่านแล้ว มีหมายเหตุค้าง',
     hint: 'มีคนอ่านใบนี้แล้ว แต่ยังไม่ได้กรอกของที่จะขึ้นประกาศ',
     todo: 'เลือกว่าจะใช้ที่อยู่ตามใบขอ หรือใส่จังหวัด อำเภอ ตำบลเอง',
@@ -164,6 +166,7 @@ export const RELEASE_STEP_TEXT: Record<
     step: 3,
     // 4 ต.ค. 2569: หน้า 3 = สวัสดิการ + รายได้ + เพศ + อายุ (ดึงจากใบขอมาก่อน แก้ได้)
     label: 'เลือกสวัสดิการ รายได้ เพศ อายุ',
+    short: 'รายได้',
     state: 'ข้อมูลถูกแตะแล้ว',
     hint: 'แก้ข้อมูลที่จะขึ้นประกาศไปบ้างแล้ว แต่ยังไม่มีลิงก์สมัคร',
     todo: 'ตรวจรายได้ สวัสดิการ เพศ อายุ',
@@ -172,6 +175,7 @@ export const RELEASE_STEP_TEXT: Record<
     step: 4,
     // 30 ก.ย. 2569: ขั้น 4 เป็นสรุป + ส่ง · ลิงก์ไม่บังคับแล้ว (Choice "ส่งได้เลย ลิงก์ไม่บังคับ")
     label: 'สรุป + ส่งประกาศ',
+    short: 'ส่ง',
     state: 'มีลิงก์แล้ว รอกดส่ง',
     hint: 'มีลิงก์สมัครแล้ว เหลือกดส่งประกาศ — คนนอกกับ AI จะเห็นทันที',
     todo: 'ดูสรุปแล้วกดส่งประกาศ',

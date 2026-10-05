@@ -58,6 +58,7 @@ import {
   StaffTable,
 } from './RecruitOverviewParts';
 import { friendlyErrorText } from '@/lib/friendlyError';
+import { TrendState } from './TrendParts';
 
 /**
  * ═══ แท็บ "ภาพรวม" ของกล่องงาน = ภาพรวมงานสรรหาแบบ iRecruit (เจ้าของสั่ง 30 ก.ย. 2569) ═══
@@ -135,7 +136,7 @@ const RecruitOverview: React.FC<{
     setState((s) => ({ ...s, loading: true, error: null }));
     fetchRecruitOverview(month, range)
       .then((data) => !cancelled && setState({ data, loading: false, error: null }))
-      .catch((e: unknown) => !cancelled && setState((s) => ({ ...s, loading: false, error: friendlyErrorText(e, 'โหลดไม่สำเร็จ') })));
+      .catch((e: unknown) => !cancelled && setState((s) => ({ ...s, loading: false, error: friendlyErrorText(e, 'โหลดภาพรวมไม่ได้') })));
     return () => {
       cancelled = true;
     };
@@ -171,7 +172,8 @@ const RecruitOverview: React.FC<{
   }, [data, win, apps]);
 
   if (!data || !win || !view) {
-    if (state.error) return <SectionError message={state.error} />;
+    // ล้มแล้วมีปุ่มลองใหม่ (QA 5 ต.ค. 2569: เดิมเหลือข้อความอังกฤษดิบบรรทัดเดียว กดอะไรต่อไม่ได้)
+    if (state.error) return <TrendState loading={false} error={state.error} onRetry={() => setRev((n) => n + 1)} />;
     return (
       <div className="space-y-4" aria-busy>
         <Skeleton className="h-10 w-72 rounded-xl" />
