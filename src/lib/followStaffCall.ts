@@ -13,6 +13,7 @@
  * ไฟล์นี้ pure — เทสต์ที่ `tests/api/followStaffCall.test.ts`
  */
 import { followCallOutcomeText } from '@/lib/callOutcomeTone';
+import type { FollowOutcome } from '@/lib/followOutcome';
 
 /**
  * เรียงตามที่ต้องเห็นก่อน — ตอบแล้ว (ไป/ไม่ไป/ขอเลื่อน) ก่อน ยกหูไม่ได้ทีหลัง
@@ -35,14 +36,35 @@ export type FollowStaffCallOutcome = (typeof FOLLOW_STAFF_CALL_OUTCOMES)[number]
  * ปุ่มอยู่บนแถว ไม่ต้องเปิดป๊อป) · "ยกเลิก" = ยกเลิกสายนี้ (เส้นยกเลิกเดิม) ไม่ใช่ผลโทร
  */
 export const FOLLOW_STAFF_QUICK_RESULTS: ReadonlyArray<{ outcome: FollowStaffCallOutcome; label: string }> = [
-  { outcome: 'acknowledged', label: 'ติดต่อสำเร็จ' },
-  { outcome: 'no_answer', label: 'ไม่สำเร็จ' },
+  /**
+   * 🔴 6 ต.ค. 2569 (เจ้าของ Choice "ไป / ไม่ไป / ขอเลื่อน / ติดต่อไม่ได้" แทน "ติดต่อสำเร็จ / ไม่สำเร็จ")
+   * *"ถ้าเป็นคนโทรเองไม่ต้องเก็บผลคำตอบ แต่ต้องเก็บว่าเขาไปหรือไม่ไป"* · ปุ่มอยู่ในช่อง "เขาตอบว่าอะไร"
+   * + ป๊อปจัดการ ตัวเดียวกัน · กดแล้วถามต่อว่าจบเรื่องเลยไหม (`STAFF_FINISH_OUTCOME`)
+   */
+  { outcome: 'confirmed', label: 'ไป' },
+  { outcome: 'declined', label: 'ไม่ไป' },
+  { outcome: 'reschedule_requested', label: 'ขอเลื่อน' },
+  { outcome: 'no_answer', label: 'ติดต่อไม่ได้' },
 ];
+
+/**
+ * ผลโทรของคน → ผลปิดงานเมื่อกด "จบเรื่องนี้" (ขั้น 2 · เจ้าของเคาะ 6 ต.ค. 2569: *"ลงผลโทร เสร็จก็ค่อยเลือกว่า เสร็จสิ้นเลยไหม"*)
+ * ไม่มีในชุดนี้ (ติดต่อไม่ได้) = ไม่ถาม โทรต่อตามแผน
+ */
+export const STAFF_FINISH_OUTCOME: Partial<Record<FollowStaffCallOutcome, FollowOutcome>> = {
+  confirmed: 'went',
+  declined: 'no_show_start',
+  reschedule_requested: 'postponed',
+};
 
 /** คำของผลที่ **คนลงเอง** ที่ต่างจากคำของ AI — ชุดเดียวกับปุ่มบนแถว (ป๊อป/ชิปอ่านตรงกัน) */
 const STAFF_WORDS: Partial<Record<FollowStaffCallOutcome, string>> = {
+  confirmed: 'ไป',
+  declined: 'ไม่ไป',
+  reschedule_requested: 'ขอเลื่อน',
+  no_answer: 'ติดต่อไม่ได้',
+  // ชุดเก่า (1–5 ต.ค. 2569) — ยังอ่านออก
   acknowledged: 'ติดต่อสำเร็จ',
-  no_answer: 'ติดต่อไม่สำเร็จ',
 };
 
 export const FOLLOW_STAFF_CALL_NOTE_MAX = 300;

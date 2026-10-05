@@ -1714,14 +1714,9 @@ const FollowPage: React.FC = () => {
           }
           /* ปุ่มบนแถวของสายที่คนโทร (เจ้าของ Choice 1 ต.ค. 2569 "ติดต่อสำเร็จ / ไม่สำเร็จ / ยกเลิก") —
              เส้นเดียวกับปุ่มลงผล/ยกเลิกในป๊อปจัดการ */
-          onStaffResult={async (round, outcome, row) => {
-            const ok = await doStaffCall(round.entry.id, outcome);
-            /* "ติดต่อสำเร็จ" = คุยได้แล้ว รู้ผลแล้ว — เปิดป๊อปจัดการต่อให้เลย จะได้กดปิดงานจบ
-               ในจังหวะเดียว (3 ต.ค. 2569: เดิมต้องกดสองที่) · ไม่สำเร็จ/ล้มเหลวไม่เด้ง */
-            if (ok && outcome === 'acknowledged' && row) {
-              setOpenCell({ key: row.group.key, ymd: round.ymd ?? '' });
-            }
-          }}
+          /* สายคนโทร 2 ขั้นในช่อง "เขาตอบว่าอะไร" (6 ต.ค. 2569) — ขั้น 2 ถามจบเรื่องในที่เดิม ไม่เด้งป๊อปแล้ว */
+          onStaffResult={(round, outcome) => doStaffCall(round.entry.id, outcome)}
+          onFinishRound={(round, outcome) => doComplete(round.entry.id, outcome, undefined, 'set')}
           onCancelRound={(round) => doCancel(round.entry.id)}
           busyId={busyId}
           lastLoadedAt={lastLoadedAt}
@@ -2789,7 +2784,7 @@ const FollowPage: React.FC = () => {
         }}
         onComplete={doComplete}
         onReopen={(id) => void doReopen(id)}
-        onStaffCall={(id, outcome, note) => void doStaffCall(id, outcome, note)}
+        onStaffCall={(id, outcome, note) => doStaffCall(id, outcome, note)}
         onStaffCallClear={doStaffCallClear}
         onPurge={canPurge ? (id) => void doPurge(id) : null}
         purgingId={purgingId}

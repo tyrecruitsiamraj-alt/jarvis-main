@@ -58,7 +58,7 @@ const FollowRoundsDialog: React.FC<{
   onReopen: (id: string) => void | Promise<void>;
   onComplete: (id: string, outcome: FollowOutcome, note?: string, stopScope?: FollowStopScope) => void | Promise<void>;
   /** ลง/ล้างผลโทรของรอบคนโทร (130 · 30 ก.ย. 2569) — โชว์เฉพาะรอบที่ตั้งเป็นคนโทร */
-  onStaffCall: (id: string, outcome: FollowStaffCallOutcome, note?: string) => void | Promise<void>;
+  onStaffCall: (id: string, outcome: FollowStaffCallOutcome, note?: string) => boolean | void | Promise<boolean | void>;
   onStaffCallClear: (id: string) => void | Promise<void>;
   /**
    * ลบทิ้งจริง — โชว์เฉพาะ admin (เจ้าของสั่ง 3 ก.ย. 2569: *"ทำให้ฉันลบได้หน่อย
@@ -183,15 +183,16 @@ const FollowRoundsDialog: React.FC<{
                   </p>
                 ) : null}
 
-                {/* 🔴 รอบคนโทร: ที่ลงผลของสายนี้ (130 · เจ้าของเคาะ 30 ก.ย. 2569) — หน้าหลักนับ "คนโทร" จากตรงนี้
-                    แยกจากปุ่มปิดงานโดยตั้งใจ: ปิดงาน = ทั้งเรื่องจบ · ผลโทร = สายนี้โทรแล้วได้อะไร */}
-                {canRecordStaffCall(it) ? (
-                  <div className="mt-2 space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground">ผลโทรของสายนี้</p>
+                {/* 🔴 รอบคนโทร: ลงผล 2 ขั้น (เจ้าของเคาะ 6 ต.ค. 2569 *"ลงผลโทร เสร็จก็ค่อยเลือกว่า เสร็จสิ้นเลยไหม"*)
+                    ขั้น 1 ไป / ไม่ไป / ขอเลื่อน / ติดต่อไม่ได้ → ขั้น 2 จบเรื่องเลยไหม — ตัวเดียวกับช่อง "เขาตอบว่าอะไร"
+                    ⇒ รอบคนโทรไม่มีปุ่ม "บันทึกว่าเสร็จสิ้น" แยกแล้ว (ข้างล่าง) */}
+                {canRecordStaffCall(it) && !(it.completed_at && !it.staff_call_outcome) ? (
+                  <div className="mt-2">
                     <FollowStaffCallControls
                       entry={it}
                       busy={busy}
-                      onRecord={(o, n) => onStaffCall(it.id, o, n)}
+                      onRecord={(o) => onStaffCall(it.id, o)}
+                      onFinish={(o) => onComplete(it.id, o, undefined, 'set')}
                       onClear={() => onStaffCallClear(it.id)}
                     />
                   </div>
@@ -241,7 +242,8 @@ const FollowRoundsDialog: React.FC<{
                     </Button>
                   ) : null}
                   {/* ปิดงาน — ไม่ผูกกับ call_status: ตามจนจบเองโดย AI ยังไม่โทรก็ปิดได้ */}
-                  {canWork ? (
+                  {/* รอบ AI ยังมี "บันทึกว่าเสร็จสิ้น" · รอบคนโทรจบเรื่องผ่านขั้น 2 ข้างบนแทน (6 ต.ค. 2569) */}
+                  {canWork && !canRecordStaffCall(it) ? (
                     <FollowCompleteControls busy={busy} onComplete={(o, n, sc) => onComplete(it.id, o, n, sc)} />
                   ) : null}
                   {canCancel ? (

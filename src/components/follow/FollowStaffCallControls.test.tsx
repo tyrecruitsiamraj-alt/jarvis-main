@@ -34,27 +34,50 @@ function entry(over: Partial<FollowEntry> = {}): FollowEntry {
   } as FollowEntry;
 }
 
-describe('ปุ่มลงผลโทร', () => {
-  it('ยังไม่ลงผล → กางในที่เดิม · เลือกผลแล้วบันทึกพร้อมหมายเหตุ', async () => {
-    const onRecord = vi.fn().mockResolvedValue(undefined);
-    render(<FollowStaffCallControls entry={entry()} onRecord={onRecord} onClear={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /ลงผลโทร/ }));
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(onRecord).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText('หมายเหตุผลโทร'), { target: { value: 'ยืนยันเริ่มพรุ่งนี้' } });
-    fireEvent.click(screen.getByRole('button', { name: 'ยืนยันว่าไป' }));
-    await waitFor(() => expect(onRecord).toHaveBeenCalledWith('confirmed', 'ยืนยันเริ่มพรุ่งนี้'));
-  });
-
-  it('มีครบ 6 ผล = ชุดของกล่องงาน + ติดต่อสำเร็จ (คำของงานติดตาม · คำเดียวกับปุ่มบนแถว)', () => {
-    render(<FollowStaffCallControls entry={entry()} onRecord={vi.fn()} onClear={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /ลงผลโทร/ }));
-    for (const label of ['ยืนยันว่าไป', 'ยกเลิก — ไม่ไปแล้ว', 'ขอเลื่อน', 'ติดต่อสำเร็จ', 'ติดต่อไม่สำเร็จ', 'เบอร์ผิด']) {
+describe('ลงผลสายคนโทร 2 ขั้น (เจ้าของเคาะ 6 ต.ค. 2569)', () => {
+  it('ขั้น 1 มี ไป / ไม่ไป / ขอเลื่อน / ติดต่อไม่ได้ · ไม่มีช่องพิมพ์คำตอบ', () => {
+    render(<FollowStaffCallControls entry={entry()} onRecord={vi.fn()} onFinish={vi.fn()} />);
+    for (const label of ['ไป', 'ไม่ไป', 'ขอเลื่อน', 'ติดต่อไม่ได้']) {
       expect(screen.getByRole('button', { name: label })).toBeTruthy();
     }
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('ลงแล้ว → เห็นผล + คนลง · ล้างต้องยืนยันก่อน', async () => {
+  it('กด ไม่ไป → บันทึกผล → ถามจบเรื่อง · กดจบ = ปิดงานว่าไม่ไป', async () => {
+    const onRecord = vi.fn().mockResolvedValue(true);
+    const onFinish = vi.fn().mockResolvedValue(undefined);
+    render(<FollowStaffCallControls entry={entry()} onRecord={onRecord} onFinish={onFinish} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ไม่ไป' }));
+    await waitFor(() => expect(onRecord).toHaveBeenCalledWith('declined'));
+    expect(await screen.findByText('จบเรื่องนี้เลยไหม')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'จบ · ไม่ไป' }));
+    await waitFor(() => expect(onFinish).toHaveBeenCalledWith('no_show_start'));
+  });
+
+  it('กด ไป → โทรต่อตามแผน = ไม่ปิดงาน', async () => {
+    const onFinish = vi.fn();
+    render(<FollowStaffCallControls entry={entry()} onRecord={vi.fn().mockResolvedValue(true)} onFinish={onFinish} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ไป' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'โทรต่อตามแผน' }));
+    expect(screen.queryByText('จบเรื่องนี้เลยไหม')).toBeNull();
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it('ติดต่อไม่ได้ = ไม่ถาม โทรต่อเลย · บันทึกไม่ผ่าน = ไม่ถาม', async () => {
+    const onRecord = vi.fn().mockResolvedValue(true);
+    const { unmount } = render(<FollowStaffCallControls entry={entry()} onRecord={onRecord} onFinish={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ติดต่อไม่ได้' }));
+    await waitFor(() => expect(onRecord).toHaveBeenCalledWith('no_answer'));
+    expect(screen.queryByText('จบเรื่องนี้เลยไหม')).toBeNull();
+    unmount();
+    render(<FollowStaffCallControls entry={entry()} onRecord={vi.fn().mockResolvedValue(false)} onFinish={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ไม่ไป' }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.queryByText('จบเรื่องนี้เลยไหม')).toBeNull();
+  });
+
+  it('ลงแล้ว → เห็นผล + คนลง · แก้ได้ · ล้างต้องยืนยันก่อน', async () => {
     const onClear = vi.fn().mockResolvedValue(undefined);
     render(
       <FollowStaffCallControls
@@ -64,10 +87,11 @@ describe('ปุ่มลงผลโทร', () => {
           staff_called_by_name: 'staff@example.com',
         })}
         onRecord={vi.fn()}
+        onFinish={vi.fn()}
         onClear={onClear}
       />,
     );
-    expect(screen.getByText('คนโทร: ติดต่อไม่สำเร็จ')).toBeTruthy();
+    expect(screen.getByText('ติดต่อไม่ได้')).toBeTruthy();
     expect(screen.getByText(/staff@example\.com/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'ล้างผล' }));
     expect(onClear).not.toHaveBeenCalled();
@@ -104,7 +128,9 @@ describe('ป๊อปของรอบ: ปุ่มลงผลโชว์�
         rounds={[round(entry({ id: 'm1' })), round(entry({ id: 'a1', call_mode: 'ai', dispatch_state: 'queued' }))]}
       />,
     );
-    expect(screen.getAllByText('ผลโทรของสายนี้')).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: /ลงผลโทร/ })).toHaveLength(1);
+    expect(screen.getAllByText('เขาไปไหม')).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'ไม่ไป' })).toHaveLength(1);
+    // รอบคนโทรไม่มี "บันทึกว่าเสร็จสิ้น" แยก · รอบ AI ยังมี (6 ต.ค. 2569)
+    expect(screen.getAllByRole('button', { name: /บันทึกว่าเสร็จสิ้น/ })).toHaveLength(1);
   });
 });

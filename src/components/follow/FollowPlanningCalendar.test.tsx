@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
  * 5. เบอร์ฉุกเฉิน: ห้ามมีคำว่า "โทรแล้ว" (Lumos ไม่ส่งข้อมูลนี้กลับมา)
  */
 import { describe, expect, it, afterEach, vi } from 'vitest';
-import { render, screen, cleanup, within, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup, within, fireEvent, waitFor } from '@testing-library/react';
 
 import FollowPlanningCalendar from './FollowPlanningCalendar';
 import { groupFollowEntries } from '@/lib/followGrouping';
@@ -63,8 +63,9 @@ function renderCalendar(
     onEditRound?: (round: { entry: FollowEntry }) => void;
     lastLoadedAt?: Date | null;
     onSelect?: (ymd: string) => void;
-    onStaffResult?: (round: { entry: FollowEntry }, outcome: string) => void;
+    onStaffResult?: (round: { entry: FollowEntry }, outcome: string) => unknown;
     onCancelRound?: (round: { entry: FollowEntry }) => void;
+    onFinishRound?: (round: { entry: FollowEntry }, outcome: string) => void;
   } = {},
 ) {
   const rows = buildFollowPlanningRows(groupFollowEntries(entries, NOW), NOW);
@@ -80,8 +81,9 @@ function renderCalendar(
       roundsSlot={opts.roundsSlot}
       onEditRound={opts.onEditRound}
       lastLoadedAt={opts.lastLoadedAt ?? null}
-      onStaffResult={opts.onStaffResult}
+      onStaffResult={opts.onStaffResult as never}
       onCancelRound={opts.onCancelRound}
+      onFinishRound={opts.onFinishRound}
     />,
   );
   return rows;
@@ -755,16 +757,31 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
   const manual = (over: Partial<FollowEntry> = {}) =>
     entry({ id: 'm1', call_round: 1, call_mode: 'manual', call_status: null, dispatch_state: 'manual', ...over });
 
-  it('สายคนโทรที่ยังไม่ลงผล ⇒ มีสามปุ่ม · กดติดต่อสำเร็จ/ไม่สำเร็จ = ส่งรหัสของปุ่ม', () => {
-    const onStaffResult = vi.fn();
+  it('🔴 สายคนโทรที่ยังไม่ลงผล ⇒ ช่อง "เขาตอบว่าอะไร" มี ไป / ไม่ไป / ขอเลื่อน / ติดต่อไม่ได้ (6 ต.ค. 2569)', async () => {
+    const onStaffResult = vi.fn().mockResolvedValue(false);
     renderCalendar([manual()], { onStaffResult, onCancelRound: vi.fn() });
     const row = dayRows()[0];
-    fireEvent.click(within(row).getByRole('button', { name: 'ติดต่อสำเร็จ' }));
-    fireEvent.click(within(row).getByRole('button', { name: 'ไม่สำเร็จ' }));
+    for (const label of ['ไป', 'ไม่ไป', 'ขอเลื่อน', 'ติดต่อไม่ได้']) {
+      fireEvent.click(within(row).getByRole('button', { name: label }));
+    }
+    await waitFor(() => expect(onStaffResult).toHaveBeenCalledTimes(4));
     expect(onStaffResult.mock.calls.map((c) => [(c[0] as { entry: FollowEntry }).entry.id, c[1]])).toEqual([
-      ['m1', 'acknowledged'],
+      ['m1', 'confirmed'],
+      ['m1', 'declined'],
+      ['m1', 'reschedule_requested'],
       ['m1', 'no_answer'],
     ]);
+  });
+
+  it('🔴 กด ไม่ไป แล้วถามจบเรื่องในที่เดิม · กดจบ = ปิดงานว่าไม่ไป', async () => {
+    const onFinishRound = vi.fn();
+    renderCalendar([manual()], { onStaffResult: vi.fn().mockResolvedValue(true), onCancelRound: vi.fn(), onFinishRound });
+    const row = dayRows()[0];
+    fireEvent.click(within(row).getByRole('button', { name: 'ไม่ไป' }));
+    fireEvent.click(await within(row).findByRole('button', { name: 'จบ · ไม่ไป' }));
+    await waitFor(() => expect(onFinishRound).toHaveBeenCalled());
+    expect((onFinishRound.mock.calls[0][0] as { entry: FollowEntry }).entry.id).toBe('m1');
+    expect(onFinishRound.mock.calls[0][1]).toBe('no_show_start');
   });
 
   it('🔴 ยกเลิก ต้องยืนยันในที่เดิมก่อน (ย้อนไม่ได้)', () => {
@@ -778,7 +795,7 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
     expect((onCancelRound.mock.calls[0][0] as { entry: FollowEntry }).entry.id).toBe('m1');
   });
 
-  it('สายของ AI ไม่มีปุ่ม · ลงผลแล้วขึ้นคำของปุ่ม ("คนโทร: ติดต่อสำเร็จ") และปุ่มหาย', () => {
+  it('สายของ AI ไม่มีปุ่ม · ลงผลแล้วขึ้นคำของปุ่ม ("คนโทร: ไป") ปุ่มหาย เหลือ แก้', () => {
     renderCalendar(
       [
         entry({ id: 'ai1', call_round: 1 }),
@@ -786,7 +803,7 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
           id: 'm2',
           recipient_phone: '0899999999',
           recipient_name: 'คนที่สอง',
-          staff_call_outcome: 'acknowledged',
+          staff_call_outcome: 'confirmed',
           staff_called_at: '2026-09-07T08:40:00Z',
           staff_called_by_name: 'staff@example.com',
         }),
@@ -794,8 +811,9 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
       { onStaffResult: vi.fn(), onCancelRound: vi.fn() },
     );
     expect(screen.queryByTestId('staff-quick')).toBeNull();
-    expect(screen.getByText('คนโทร: ติดต่อสำเร็จ')).toBeTruthy();
-    expect(screen.getByText(/staff@example\.com · 15:40 น\./)).toBeTruthy();
+    expect(screen.getByText('คนโทร: ไป')).toBeTruthy();
+    expect(screen.getByText(/staff@example\.com · .*15:40 น\./)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'แก้' })).toBeTruthy();
   });
 
   it('ไม่ได้ส่งตัวจัดการมา (จออ่านอย่างเดียว) ⇒ ไม่มีปุ่ม', () => {

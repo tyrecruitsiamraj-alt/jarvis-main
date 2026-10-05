@@ -6,11 +6,12 @@ import { shiftMonth } from '@/lib/followCallCalendar';
 import { dayCallTabLabel, roundFilterLabel } from '@/lib/followRoundVisual';
 import { followDayCallLabel } from '@/lib/followDayCall';
 import {
-  FOLLOW_STAFF_QUICK_RESULTS,
   followStaffCallText,
   isStaffCallResult,
   type FollowStaffCallOutcome,
 } from '@/lib/followStaffCall';
+import type { FollowOutcome } from '@/lib/followOutcome';
+import FollowStaffCallControls from '@/components/follow/FollowStaffCallControls';
 import { toYmdBangkok, toYmdLocal, parseYmd, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   buildFollowDayCalls,
@@ -325,9 +326,10 @@ const FollowPlanningCalendar: React.FC<{
   onStaffResult?: (
     round: FollowPlanningRound,
     outcome: FollowStaffCallOutcome,
-    /** แถวของคนนั้น — หน้าแม่ใช้เปิดป๊อปจัดการต่อให้ตอน "ติดต่อสำเร็จ" (3 ต.ค. 2569: โทรเสร็จจบในจังหวะเดียว) */
     row?: FollowPlanningRow,
-  ) => void | Promise<void>;
+  ) => boolean | void | Promise<boolean | void>;
+  /** ขั้น 2 ของสายคนโทร "จบเรื่องนี้" (6 ต.ค. 2569) — ปิดงานด้วยผลนี้ + หยุดสายที่เหลือทั้งชุด */
+  onFinishRound?: (round: FollowPlanningRound, outcome: FollowOutcome) => void | Promise<void>;
   onCancelRound?: (round: FollowPlanningRound) => void | Promise<void>;
   /** รายการที่กำลังบันทึกอยู่ — ปุ่มของแถวนั้นกดซ้ำไม่ได้ */
   busyId?: string | null;
@@ -351,6 +353,7 @@ const FollowPlanningCalendar: React.FC<{
   filtersSlot,
   lastLoadedAt,
   onStaffResult,
+  onFinishRound,
   onCancelRound,
   busyId = null,
   allRows,
@@ -862,24 +865,22 @@ const FollowPlanningCalendar: React.FC<{
                                     const pushErr = roundPushFailed(round) ? roundPushError(round) : null;
                                     const e = round.entry;
                                     /**
-                                     * 🔴 **สายที่คนโทร ลงผลบนแถวได้เลย** (เจ้าของสั่ง 1 ต.ค. 2569: *"ต้องอัพเดทสถานะได้
-                                     * แบบติดต่อสำเร็จหรือไม่ ยกเลิกอะ ตอนนี้พอคนโทรเองมันไม่มี"* · Choice
-                                     * "ติดต่อสำเร็จ / ไม่สำเร็จ / ยกเลิก") — ยกเลิกต้องยืนยันในที่เดิมก่อน (ย้อนไม่ได้)
-                                     * ลงผลแล้วแก้/ล้างได้ที่ปุ่ม "จัดการ" (ป๊อปเดิม)
+                                     * 🔴 **สายที่คนโทร ลงผลในช่องนี้ 2 ขั้น** (เจ้าของเคาะ 6 ต.ค. 2569 — แทน "ติดต่อสำเร็จ / ไม่สำเร็จ" ของ 1 ต.ค.)
+                                     * *"ถ้าเป็นคนโทรเองไม่ต้องเก็บผลคำตอบ แต่ต้องเก็บว่าเขาไปหรือไม่ไป"* ⇒ ช่องนี้ของสายคนโทร = ปุ่ม
+                                     * ไป / ไม่ไป / ขอเลื่อน / ติดต่อไม่ได้ → ถามจบเรื่องเลยไหม (`FollowStaffCallControls` ตัวเดียวกับป๊อปจัดการ)
+                                     * ยกเลิกสายต้องยืนยันในที่เดิมก่อน (ย้อนไม่ได้) · ปิดงานจากป๊อปไปแล้วโดยไม่มีผล = โชว์แบบเดิม
                                      */
-                                    const canQuick =
+                                    const manualRow =
                                       Boolean(onStaffResult && onCancelRound) &&
                                       e.call_mode === 'manual' &&
                                       round.state !== 'cancelled' &&
-                                      round.state !== 'closed' &&
-                                      !e.staff_call_outcome;
+                                      !(round.state === 'closed' && !e.staff_call_outcome);
                                     const busy = busyId === e.id;
                                     return (
                                       <span key={round.entry.id} className="flex min-h-[34px] flex-col justify-center">
-                                        {/* 🔴 คำพูดของเขามาก่อนเสมอ — หัวคอลัมน์ถามว่า "เขาตอบว่าอะไร"
-                                            สรุปของ AI เป็นคำบรรยายบุคคลที่สาม ใช้เป็นตัวรอง */}
-                                        {/* 🔴 ปุ่มอยู่บรรทัดเดียวเสมอ (ตัดบรรทัด = บรรทัดของคอลัมน์นี้ไม่ตรงกับเวลาของสายนั้น) — แคบก็เลื่อนตารางแนวนอน */}
-                                        {canQuick && confirmCancelId === e.id ? (
+                                        {/* 🔴 คำพูดของเขามาก่อนเสมอ (สาย AI) — หัวคอลัมน์ถามว่า "เขาตอบว่าอะไร"
+                                            🔴 ปุ่มอยู่บรรทัดเดียวเสมอ (ตัดบรรทัด = บรรทัดของคอลัมน์นี้ไม่ตรงกับเวลาของสายนั้น) */}
+                                        {manualRow && confirmCancelId === e.id ? (
                                           <span className="flex flex-nowrap items-center gap-1 whitespace-nowrap">
                                             <span className="text-[11px] text-muted-foreground">ยกเลิกสายนี้ไหม</span>
                                             <Button
@@ -898,35 +899,29 @@ const FollowPlanningCalendar: React.FC<{
                                               ไม่
                                             </Button>
                                           </span>
-                                        ) : canQuick ? (
-                                          <span className="flex flex-nowrap items-center gap-1 whitespace-nowrap" data-testid="staff-quick">
-                                            {FOLLOW_STAFF_QUICK_RESULTS.map((q) => (
-                                              <Button
-                                                key={q.outcome}
-                                                type="button"
-                                                variant="outline"
-                                                size="xs"
-                                                disabled={busy}
-                                                onClick={() => void onStaffResult?.(round, q.outcome, row)}
-                                                className={
-                                                  TONE[q.outcome === 'acknowledged' ? 'success' : 'warn'].value
-                                                }
-                                              >
-                                                {q.label}
-                                              </Button>
-                                            ))}
-                                            <Button
-                                              type="button"
-                                              variant="outline"
-                                              size="xs"
-                                              disabled={busy}
-                                              onClick={() => setConfirmCancelId(e.id)}
-                                            >
-                                              ยกเลิก
-                                            </Button>
-                                          </span>
+                                        ) : manualRow ? (
+                                          <FollowStaffCallControls
+                                            compact
+                                            entry={e}
+                                            busy={busy}
+                                            onRecord={(o) => onStaffResult?.(round, o, row)}
+                                            onFinish={(o) => onFinishRound?.(round, o)}
+                                            extra={
+                                              round.state !== 'closed' ? (
+                                                <Button
+                                                  type="button"
+                                                  variant="outline"
+                                                  size="xs"
+                                                  disabled={busy}
+                                                  onClick={() => setConfirmCancelId(e.id)}
+                                                >
+                                                  ยกเลิก
+                                                </Button>
+                                              ) : null
+                                            }
+                                          />
                                         ) : round.state === 'result' && isStaffCallResult(e) ? (
-                                          /* ผลที่คนลงเอง — หมายเหตุของเขา ไม่มีก็บอกว่าใครลงเมื่อไหร่ */
+                                          /* ผลที่คนลงเอง (สายที่ปิดแล้ว/จอที่อ่านอย่างเดียว) — หมายเหตุ หรือใครลงเมื่อไหร่ */
                                           <span className="text-[12px] leading-snug text-muted-foreground">
                                             {e.staff_call_note ||
                                               [
@@ -977,9 +972,8 @@ const FollowPlanningCalendar: React.FC<{
                                         ) : (
                                           <span className="text-[12px] text-muted-foreground">—</span>
                                         )}
-                                        {/* ⚠️ ปุ่ม ไป/ไม่ไป เคยอยู่บนแถวตรงนี้ (เช้า 3 ต.ค. 2569) — เจ้าของแก้คำสั่งบ่ายวันเดียวกัน:
-                                            *"ฉันหมายถึงให้เอาไปใส่ไว้ในหน้าจัดการ"* ⇒ ถอดออก · การลงผลทั้งหมดอยู่ป๊อปจัดการ
-                                            (ปุ่ม "บันทึกว่าเสร็จสิ้น" กางครบทุกคำ) ห้ามเอาปุ่มบนแถวกลับมาโดยไม่ได้สั่งใหม่ */}
+                                        {/* ประวัติ: ปุ่ม ไป/ไม่ไป เคยอยู่ตรงนี้เช้า 3 ต.ค. แล้วถอดไปป๊อปจัดการ · 6 ต.ค. 2569 เจ้าของสั่งใหม่ให้กลับมา
+                                            (เฉพาะสายคนโทร · 2 ขั้น · ตัวเดียวกับป๊อป) */}
                                       </span>
                                     );
                                   })}

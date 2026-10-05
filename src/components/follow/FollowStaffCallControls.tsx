@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { PhoneCall } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { TONE } from '@/lib/designTokens';
 import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 import type { FollowEntry } from '@/lib/followApi';
+import { FOLLOW_OUTCOME_LABEL, type FollowOutcome } from '@/lib/followOutcome';
 import {
-  FOLLOW_STAFF_CALL_NOTE_MAX,
-  FOLLOW_STAFF_CALL_OUTCOMES,
+  FOLLOW_STAFF_QUICK_RESULTS,
+  STAFF_FINISH_OUTCOME,
   followStaffCallText,
   type FollowStaffCallOutcome,
 } from '@/lib/followStaffCall';
@@ -22,105 +21,125 @@ const WHEN = new Intl.DateTimeFormat('th-TH', {
 });
 
 /**
- * ═══ ลงผลโทรของรอบที่ตั้งให้ "คนโทร" (migration 130 · เจ้าของเคาะ 30 ก.ย. 2569) ═══
+ * ═══ ลงผลของสายที่ "คนโทร" — 2 ขั้น (เจ้าของเคาะ 6 ต.ค. 2569) ═══
  *
- * หน้าหลักนับ "คนโทร" จาก **โทรจริงที่มีผลบันทึก** — รอบคนโทรเดิมไม่มีที่ลงผล ปุ่มนี้คือที่ลงผลนั้น
- * แพตเทิร์นเดียวกับ `FollowCompleteControls`: ปุ่มเดียว กดแล้วกางให้เลือกคำในที่เดิม (**ไม่ซ้อน Dialog**)
- * · พิมพ์หมายเหตุก่อนแล้วกดคำ = บันทึกทันที · ลงแล้วแก้ได้ ล้างได้ (ต้องยืนยันก่อนล้าง)
- * ⚠️ ไม่แตะคิวโทร ไม่แตะการปิดงาน — ปิดงานยังเป็นปุ่มของมันเอง
+ * > *"ถ้าเป็นคนโทรเองไม่ต้องเก็บผลคำตอบ แต่ต้องเก็บว่าเขาไปหรือไม่ไป"* ·
+ * > *"ลงผลโทร เสร็จก็ค่อยเลือกว่า เสร็จสิ้นเลยไหม"*
+ *
+ * ขั้น 1 = ไป / ไม่ไป / ขอเลื่อน / ติดต่อไม่ได้ (บันทึกเป็นผลโทรของสายนี้ · migration 130)
+ * ขั้น 2 = ถ้าผลเป็น ไป / ไม่ไป / ขอเลื่อน ⇒ ถาม "จบเรื่องนี้เลยไหม" — จบ = ปิดงาน + หยุดสายที่เหลือทั้งชุด ·
+ *          โทรต่อ = แผนเดินต่อ · ติดต่อไม่ได้ = ไม่ถาม โทรต่อเลย
+ *
+ * ตัวเดียวกันทั้งช่อง "เขาตอบว่าอะไร" ของตารางรายวัน (`compact`) และป๊อปจัดการ — ไม่ซ้อน Dialog ·
+ * ไม่มีช่องพิมพ์คำตอบ (คนโทรไม่ต้องเก็บคำตอบ) · หมายเหตุเก่าที่เคยพิมพ์ยังโชว์
  */
 const FollowStaffCallControls: React.FC<{
   entry: FollowEntry;
   busy?: boolean;
-  onRecord: (outcome: FollowStaffCallOutcome, note?: string) => void | Promise<void>;
-  onClear: () => void | Promise<void>;
-}> = ({ entry, busy = false, onRecord, onClear }) => {
-  const [open, setOpen] = useState(false);
+  /** แถวตาราง = ปุ่มบรรทัดเดียว ไม่มีหัวข้อ */
+  compact?: boolean;
+  /** คืน `false` = บันทึกไม่สำเร็จ (ไม่ไปขั้น 2) */
+  onRecord: (outcome: FollowStaffCallOutcome) => boolean | void | Promise<boolean | void>;
+  /** ขั้น 2 "จบเรื่องนี้" — ปิดงานด้วยผลนี้ + หยุดสายที่เหลือทั้งชุด */
+  onFinish: (outcome: FollowOutcome) => void | Promise<void>;
+  /** ล้างผล (ป๊อปจัดการ) — ไม่ส่ง = ไม่มีปุ่มล้าง */
+  onClear?: () => void | Promise<void>;
+  /** ปุ่มยกเลิกสายต่อท้ายปุ่มผล (ตารางรายวัน) */
+  extra?: React.ReactNode;
+}> = ({ entry, busy = false, compact = false, onRecord, onFinish, onClear, extra }) => {
+  const recorded = entry.staff_call_outcome && entry.staff_called_at ? (entry.staff_call_outcome as FollowStaffCallOutcome) : null;
+  const closed = Boolean(entry.completed_at);
+  const [editing, setEditing] = useState(false);
+  /** ขั้น 2 ค้างอยู่ของผลไหน (null = ไม่ถาม) */
+  const [askFinish, setAskFinish] = useState<FollowStaffCallOutcome | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
-  const [note, setNote] = useState('');
-  const recorded = entry.staff_call_outcome && entry.staff_called_at ? entry.staff_call_outcome : null;
 
-  const submit = async (outcome: FollowStaffCallOutcome) => {
-    await onRecord(outcome, note.trim() || undefined);
-    setOpen(false);
-    setNote('');
+  const pick = async (outcome: FollowStaffCallOutcome) => {
+    const ok = await onRecord(outcome);
+    if (ok === false) return;
+    setEditing(false);
+    setAskFinish(!closed && STAFF_FINISH_OUTCOME[outcome] ? outcome : null);
   };
 
-  if (open) {
+  const row = cn('flex items-center gap-1', compact ? 'flex-nowrap whitespace-nowrap' : 'flex-wrap');
+
+  // ── ขั้น 2: จบเรื่องนี้เลยไหม ──
+  if (askFinish) {
+    const finishWith = STAFF_FINISH_OUTCOME[askFinish] as FollowOutcome;
     return (
-      <div className="flex w-full flex-col gap-2 rounded-xl border border-border bg-muted/30 p-3">
-        <p className="text-xs font-medium text-foreground">โทรแล้วได้ผลอะไร</p>
-        <div className="flex flex-wrap gap-1.5">
-          {FOLLOW_STAFF_CALL_OUTCOMES.map((o) => (
+      <span className={row} data-testid="staff-finish-ask">
+        <span className="text-[11px] text-muted-foreground">จบเรื่องนี้เลยไหม</span>
+        <Button
+          type="button"
+          size="xs"
+          disabled={busy}
+          onClick={async () => {
+            await onFinish(finishWith);
+            setAskFinish(null);
+          }}
+        >
+          จบ · {FOLLOW_OUTCOME_LABEL[finishWith]}
+        </Button>
+        <Button type="button" variant="outline" size="xs" disabled={busy} onClick={() => setAskFinish(null)}>
+          โทรต่อตามแผน
+        </Button>
+      </span>
+    );
+  }
+
+  // ── ขั้น 1: ยังไม่ลงผล หรือกดแก้ ──
+  if (!recorded || editing) {
+    return (
+      <span className={cn('flex flex-col gap-1.5', compact && 'gap-1')}>
+        {!compact ? <span className="text-xs font-medium text-muted-foreground">เขาไปไหม</span> : null}
+        <span className={row} data-testid="staff-quick">
+          {FOLLOW_STAFF_QUICK_RESULTS.map((q) => (
             <Button
-              key={o}
+              key={q.outcome}
               type="button"
               variant="outline"
               size="xs"
               disabled={busy}
-              onClick={() => void submit(o)}
-              className={cn(recorded === o && TONE[CALL_OUTCOME_TONE[o]].value)}
+              onClick={() => void pick(q.outcome)}
+              className={cn(TONE[CALL_OUTCOME_TONE[q.outcome] ?? 'warn'].value, recorded === q.outcome && 'border-current')}
             >
-              {followStaffCallText(o)}
+              {q.label}
             </Button>
           ))}
-        </div>
-        <Input
-          value={note}
-          maxLength={FOLLOW_STAFF_CALL_NOTE_MAX}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="มีหมายเหตุให้พิมพ์ก่อน แล้วค่อยกดผล"
-          aria-label="หมายเหตุผลโทร"
-          className="h-9 text-xs"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="xs"
-          onClick={() => {
-            setOpen(false);
-            setNote('');
-          }}
-          className="w-fit"
-        >
-          ปิด
-        </Button>
-      </div>
+          {editing ? (
+            <Button type="button" variant="ghost" size="xs" onClick={() => setEditing(false)}>
+              ไม่แก้
+            </Button>
+          ) : (
+            extra
+          )}
+        </span>
+      </span>
     );
   }
 
-  if (!recorded) {
-    return (
-      <Button
-        type="button"
-        variant="outline"
-        size="xs"
-        disabled={busy}
-        onClick={() => setOpen(true)}
-        title="กดแล้วเลือกผล ระบบบันทึกตอนเลือกผล"
-      >
-        <PhoneCall aria-hidden />
-        {busy ? 'กำลังบันทึก…' : 'ลงผลโทร'}
-      </Button>
-    );
-  }
-
+  // ── ลงแล้ว ──
   return (
-    <div className="flex w-full flex-col gap-1.5">
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className={TONE[CALL_OUTCOME_TONE[recorded as FollowStaffCallOutcome] ?? 'warn'].chip}>
-          คนโทร: {followStaffCallText(recorded)}
+    <span className={cn('flex flex-col gap-1', !compact && 'gap-1.5')} data-testid="staff-recorded">
+      <span className={cn(row, 'text-xs')}>
+        <span className={TONE[CALL_OUTCOME_TONE[recorded] ?? 'warn'].chip}>{followStaffCallText(recorded)}</span>
+        {closed ? <span className="text-muted-foreground">จบแล้ว</span> : null}
+        <span className="tabular-nums text-muted-foreground">
+          {[entry.staff_called_by_name, entry.staff_called_at ? `${WHEN.format(new Date(entry.staff_called_at))} น.` : null]
+            .filter(Boolean)
+            .join(' · ')}
         </span>
-        <span className="text-muted-foreground tabular-nums">
-          {entry.staff_called_by_name ? `${entry.staff_called_by_name} · ` : ''}
-          {entry.staff_called_at ? WHEN.format(new Date(entry.staff_called_at)) : ''}
-        </span>
-      </div>
-      {entry.staff_call_note ? <p className="text-xs text-muted-foreground">{entry.staff_call_note}</p> : null}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {confirmClear ? (
-          <>
-            <span className="text-xs text-muted-foreground">ล้างผลโทรนี้ไหม</span>
+        {!closed ? (
+          <Button type="button" variant="ghost" size="xs" disabled={busy} onClick={() => setEditing(true)}>
+            แก้
+          </Button>
+        ) : null}
+      </span>
+      {entry.staff_call_note ? <span className="text-xs text-muted-foreground">{entry.staff_call_note}</span> : null}
+      {onClear && !closed ? (
+        confirmClear ? (
+          <span className={row}>
+            <span className="text-xs text-muted-foreground">ล้างผลนี้ไหม</span>
             <Button
               type="button"
               variant="destructive"
@@ -136,26 +155,21 @@ const FollowStaffCallControls: React.FC<{
             <Button type="button" variant="outline" size="xs" onClick={() => setConfirmClear(false)}>
               ไม่
             </Button>
-          </>
+          </span>
         ) : (
-          <>
-            <Button type="button" variant="outline" size="xs" disabled={busy} onClick={() => setOpen(true)}>
-              แก้ผลโทร
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              disabled={busy}
-              onClick={() => setConfirmClear(true)}
-              className={TONE.danger.value}
-            >
-              ล้างผล
-            </Button>
-          </>
-        )}
-      </div>
-    </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            disabled={busy}
+            onClick={() => setConfirmClear(true)}
+            className={cn('w-fit', TONE.danger.value)}
+          >
+            ล้างผล
+          </Button>
+        )
+      ) : null}
+    </span>
   );
 };
 

@@ -20,6 +20,7 @@ import {
   FOLLOW_STAFF_CALL_NOTE_MAX,
   FOLLOW_STAFF_CALL_OUTCOMES,
   FOLLOW_STAFF_QUICK_RESULTS,
+  STAFF_FINISH_OUTCOME,
   canRecordStaffCall,
   effectiveCallOutcome,
   followStaffCallText,
@@ -67,19 +68,27 @@ describe('ศัพท์ผลชุดเดียวกับผลที่�
     for (const o of FOLLOW_STAFF_CALL_OUTCOMES) expect(CALL_OUTCOME_TONE[o], o).toBeTruthy();
   });
 
-  it('ใช้คำของงานติดตาม ไม่ใช่คำของงานหาคน · ผลของคนใช้คำของปุ่ม', () => {
-    expect(followStaffCallText('confirmed')).toBe('ยืนยันว่าไป');
-    expect(followStaffCallText('declined')).toBe('ยกเลิก — ไม่ไปแล้ว');
+  it('ผลของคนใช้คำของปุ่ม (6 ต.ค. 2569) · ชุดเก่ายังอ่านออก', () => {
+    expect(followStaffCallText('confirmed')).toBe('ไป');
+    expect(followStaffCallText('declined')).toBe('ไม่ไป');
+    expect(followStaffCallText('reschedule_requested')).toBe('ขอเลื่อน');
+    expect(followStaffCallText('no_answer')).toBe('ติดต่อไม่ได้');
     expect(followStaffCallText('acknowledged')).toBe('ติดต่อสำเร็จ');
-    expect(followStaffCallText('no_answer')).toBe('ติดต่อไม่สำเร็จ');
   });
 
-  it('ปุ่มบนแถว = ติดต่อสำเร็จ / ไม่สำเร็จ (ยกเลิก = ยกเลิกสาย ไม่ใช่ผลโทร) · รหัสผ่านตัวตรวจของ server', () => {
+  it('🔴 ปุ่มสายคนโทร = ไป / ไม่ไป / ขอเลื่อน / ติดต่อไม่ได้ (เจ้าของเคาะ 6 ต.ค. 2569) · รหัสผ่านตัวตรวจของ server', () => {
     expect(FOLLOW_STAFF_QUICK_RESULTS).toEqual([
-      { outcome: 'acknowledged', label: 'ติดต่อสำเร็จ' },
-      { outcome: 'no_answer', label: 'ไม่สำเร็จ' },
+      { outcome: 'confirmed', label: 'ไป' },
+      { outcome: 'declined', label: 'ไม่ไป' },
+      { outcome: 'reschedule_requested', label: 'ขอเลื่อน' },
+      { outcome: 'no_answer', label: 'ติดต่อไม่ได้' },
     ]);
     for (const q of FOLLOW_STAFF_QUICK_RESULTS) expect(validateFollowStaffCall({ outcome: q.outcome }).ok).toBe(true);
+  });
+
+  it('ขั้น 2 จบเรื่อง: ไป→ไปแล้ว · ไม่ไป→ไม่ไป · ขอเลื่อน→เลื่อน · ติดต่อไม่ได้ไม่ถาม', () => {
+    expect(STAFF_FINISH_OUTCOME).toEqual({ confirmed: 'went', declined: 'no_show_start', reschedule_requested: 'postponed' });
+    expect(STAFF_FINISH_OUTCOME.no_answer).toBeUndefined();
   });
 });
 
@@ -138,19 +147,19 @@ describe('ปฏิทิน: ลงผลแล้วช่องต้อง�
     expect(followRoundState(entry(), NOW)).toBe('notSent');
   });
 
-  it('ลงผล "ยืนยันว่าไป" = มีผลแล้ว · สีเขียว · หมวดตอบว่าไป', () => {
+  it('ลงผล "ไป" = มีผลแล้ว · สีเขียว · หมวดตอบว่าไป', () => {
     const e = entry({ staff_call_outcome: 'confirmed', staff_called_at: '2026-09-30T03:00:00Z' });
     const r = round(e);
     expect(r.state).toBe('result');
-    expect(roundResultLabel(r)).toBe('ยืนยันว่าไป');
+    expect(roundResultLabel(r)).toBe('ไป');
     expect(roundTone(r)).toBe('success');
     expect(callCategory(r)).toBe('agreed');
   });
 
-  it('ลงผล "ติดต่อไม่สำเร็จ" = หมวดไม่ได้คำตอบ · คำบนจอเป็นคำของปุ่ม', () => {
+  it('ลงผล "ติดต่อไม่ได้" = หมวดไม่ได้คำตอบ · คำบนจอเป็นคำของปุ่ม', () => {
     const r = round(entry({ staff_call_outcome: 'no_answer', staff_called_at: '2026-09-30T03:00:00Z' }));
     expect(callCategory(r)).toBe('unreachable');
-    expect(roundResultLabel(r)).toBe('ติดต่อไม่สำเร็จ');
+    expect(roundResultLabel(r)).toBe('ติดต่อไม่ได้');
   });
 
   it('ลงผล "ติดต่อสำเร็จ" = เขียว (ชุดเดียวกับ "รับสายแล้ว" ของ AI) · คำบนจอ "ติดต่อสำเร็จ"', () => {

@@ -12081,3 +12081,20 @@ Choice: รายได้เฉลี่ยโชว์ ติ๊กซ่อ�
 | `src/index.css` (`.dark`) | `--primary` / `--ring` / `--sidebar-primary` / `--sidebar-ring` = 353 70% 64% · `--primary-foreground` / `--sidebar-primary-foreground` = 220 54% 12% (กรมท่าเข้ม) — ตัวหนังสือสีหลักบนการ์ด 5.2:1 · ปุ่ม 5.3:1 |
 | `src/lib/brandingStorage.ts` | `applyBrandPrimaryVars` คุมตัวหนังสือบนสีหลักด้วย (สว่าง = ขาว inline · มืด = ถอด inline ใช้ index.css) · สีแบรนด์ที่ตั้งเองโหมดมืด = โทนเดิม 64% |
 | เทสต์ | `tests/api/qaRound2_2569-10-05.test.ts` |
+
+## 6 ต.ค. 2569: สายคนโทรลงผล 2 ขั้น ในช่อง "เขาตอบว่าอะไร" + ป๊อปจัดการ
+
+เจ้าของ: *"ถ้าเป็นคนโทรเองไม่ต้องเก็บผลคำตอบ แต่ต้องเก็บว่าเขาไปหรือไม่ไป"* · Choice ปุ่ม "ไป / ไม่ไป / ขอเลื่อน / ติดต่อไม่ได้" ·
+*"ลงผลโทร เสร็จก็ค่อยเลือกว่า เสร็จสิ้นเลยไหม"* · ยุบ "ลงผลโทร" กับ "บันทึกว่าเสร็จสิ้น" ของสายคนโทรเป็นขั้นเดียว
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/followStaffCall.ts` | `FOLLOW_STAFF_QUICK_RESULTS` = confirmed ไป · declined ไม่ไป · reschedule_requested ขอเลื่อน · no_answer ติดต่อไม่ได้ · `STAFF_FINISH_OUTCOME` (ไป→went · ไม่ไป→no_show_start · ขอเลื่อน→postponed) · คำของคนลงเปลี่ยนตาม (acknowledged ชุดเก่ายังอ่านออก) |
+| `src/components/follow/FollowStaffCallControls.tsx` | เขียนใหม่ — ขั้น 1 ปุ่ม 4 ตัว (ไม่มีช่องพิมพ์) · ขั้น 2 "จบเรื่องนี้เลยไหม" [จบ · …] [โทรต่อตามแผน] · ติดต่อไม่ได้/บันทึกไม่ผ่าน = ไม่ถาม · ลงแล้ว = ผล + ใครลง + แก้ (+ ล้างผลในป๊อป) · `compact` สำหรับแถวตาราง |
+| `FollowPlanningCalendar.tsx` | ช่อง "เขาตอบว่าอะไร" ของสายคนโทร = `FollowStaffCallControls compact` (+ ยกเลิกสาย) · prop ใหม่ `onFinishRound` · `onStaffResult` คืน boolean |
+| `FollowRoundsDialog.tsx` | รอบคนโทรใช้ตัวเดียวกัน · ไม่มี "บันทึกว่าเสร็จสิ้น" แยกสำหรับรอบคนโทร (รอบ AI ยังมี) |
+| `FollowPage.tsx` | `onStaffResult` → `doStaffCall` (เลิกเด้งป๊อปตอนติดต่อสำเร็จ) · `onFinishRound` → `doComplete(id, outcome, undefined, 'set')` |
+| เทสต์ | followStaffCall · FollowStaffCallControls · FollowPlanningCalendar |
+
+- จบเรื่อง = ปิดงาน + หยุดสายที่เหลือ **ทั้งชุด** (`stop_scope: 'set'`) · ตรวจใน Browser (ตัวดักเขียน): ส่ง `{action:'staff_call',outcome:'declined'}` แล้ว `{outcome_code:'no_show_start',stop_scope:'set'}`
+- ลา / จำวันผิด / ถึงแล้ว ของสายคนโทร: ไม่มีในขั้น 2 — ยังปิดได้จากการ์ดติดตามครบ ("ไม่ย้าย")
