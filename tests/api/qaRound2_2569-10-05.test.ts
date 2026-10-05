@@ -95,12 +95,12 @@ describe('คำบนจอ — ตัดประโยคอธิบาย /
 });
 
 describe('ดีไซน์ / มือถือ / สถานะจอ (ก้อน 3)', () => {
-  it('สีแบรนด์โหมดมืด: ค่าตั้งต้นใช้ค่าธีม · สีที่ตั้งเองสว่างขึ้น ไม่เกิน 65%', async () => {
+  it('สีแบรนด์โหมดมืด: ค่าตั้งต้นใช้ค่าธีม · สีที่ตั้งเองความสว่าง 64%', async () => {
     const { brandPrimaryForTheme, DEFAULT_BRANDING } = await import('../../src/lib/brandingStorage');
     expect(brandPrimaryForTheme(DEFAULT_BRANDING.primaryHsl, false)).toBe(DEFAULT_BRANDING.primaryHsl);
     expect(brandPrimaryForTheme(DEFAULT_BRANDING.primaryHsl, true)).toBeNull();
-    expect(brandPrimaryForTheme('210 60% 30%', true)).toBe('210 60% 50%');
-    expect(brandPrimaryForTheme('210 60% 60%', true)).toBe('210 60% 65%');
+    expect(brandPrimaryForTheme('210 60% 30%', true)).toBe('210 60% 64%');
+    expect(brandPrimaryForTheme('210 60% 70%', true)).toBe('210 60% 64%');
   });
   it('ป๊อปมีพื้นทึบทั้งสองธีม + ม่านโหมดมืดเข้ม + ปุ่มปิด 36px', () => {
     const d = read('src/components/ui/dialog.tsx');
@@ -172,5 +172,20 @@ describe('คำว่า "Gen link" ทั้งระบบ (เจ้าข�
         .join('\n');
       expect(code, f).not.toMatch(/['"`>]\s*[^'"`<]*สร้างลิงก์/);
     }
+  });
+});
+
+describe('สีหลักโหมดมืดอ่านชัด (เจ้าของ Choice 5 ต.ค. 2569)', () => {
+  it('index.css: สีหลักสว่าง 353 70% 64% + ตัวหนังสือบนสีหลักกรมท่าเข้ม', () => {
+    const css = read('src/index.css');
+    const dark = css.slice(css.indexOf('  .dark {'), css.indexOf('--sidebar-ring', css.indexOf('  .dark {')) + 40);
+    expect(dark).toContain('--primary: 353 70% 64%;');
+    expect(dark).toContain('--primary-foreground: 220 54% 12%;');
+    expect(dark).toContain('--sidebar-primary-foreground: 220 54% 12%;');
+  });
+  it('branding ไม่เขียนตัวหนังสือขาวทับโหมดมืด', () => {
+    const b = read('src/lib/brandingStorage.ts');
+    expect(b).not.toContain("root.style.setProperty('--primary-foreground', '0 0% 100%');");
+    expect(b).toContain("if (dark) root.style.removeProperty(name);");
   });
 });

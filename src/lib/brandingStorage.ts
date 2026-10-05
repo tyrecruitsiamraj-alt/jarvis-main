@@ -192,8 +192,7 @@ export function applyBrandingToDocument(c: BrandingConfig): void {
 
   const root = document.documentElement;
 
-  // --primary / --ring / --sidebar-primary ตั้งตามธีมที่ `applyBrandPrimaryVars` (เรียกจาก applyBrandSurfaceVars)
-  root.style.setProperty('--primary-foreground', '0 0% 100%');
+  // --primary / --ring / --sidebar-primary (+ ตัวหนังสือบนสีหลัก) ตั้งตามธีมที่ `applyBrandPrimaryVars` (เรียกจาก applyBrandSurfaceVars)
   /**
    * 🔴 **`--accent` ไม่ใช่สีแบรนด์ — ห้ามทับด้วยสีแบรนด์อีก** (5 ก.ย. 2569)
    * ใน shadcn `--accent` คือ **พื้นอ่อนตอนเอาเมาส์ชี้** (เมนู · รายการ · แถวที่เลือกอยู่)
@@ -204,7 +203,6 @@ export function applyBrandingToDocument(c: BrandingConfig): void {
    */
   root.style.removeProperty('--accent');
   root.style.removeProperty('--accent-foreground');
-  root.style.setProperty('--sidebar-primary-foreground', '0 0% 100%');
 
   const pp = c.primaryHsl.trim().split(/\s+/);
   const ph = pp[0] ?? '0';
@@ -285,28 +283,34 @@ export function applyBrandSurfaceVars(c: BrandingConfig): void {
 
 /** ตัวแปรสีแบรนด์ที่ต้องเปลี่ยนตามธีม */
 const PRIMARY_VARS = ['--primary', '--ring', '--sidebar-primary', '--sidebar-ring'] as const;
+const PRIMARY_FOREGROUND_VARS = ['--primary-foreground', '--sidebar-primary-foreground'] as const;
 
 /**
  * สีแบรนด์ (--primary ฯลฯ) ของธีมที่เปิดอยู่ — `null` = ใช้ค่าของธีมใน index.css (ถอด inline)
  *
  * 🔴 QA 5 ต.ค. 2569: เดิมเขียนค่าธีมสว่าง (353 50% 37%) ทับทั้งสองธีม ⇒ โหมดมืดตัวหนังสือ `text-primary`
- * บนพื้นเข้ม contrast 2.34:1 · ตอนนี้ธีมมืด + สีแบรนด์ตั้งต้น = ใช้ค่าธีมมืดของ index.css (353 55% 50%)
- * · สีแบรนด์ที่ตั้งเองในโหมดมืด = ความสว่าง +13 (ระยะเดียวกับคู่ค่าตั้งต้น) ไม่เกิน 65%
+ * บนพื้นเข้ม contrast 2.34:1 · ตอนนี้ธีมมืด + สีแบรนด์ตั้งต้น = ใช้ค่าธีมมืดของ index.css (353 70% 64%)
+ * · สีแบรนด์ที่ตั้งเองในโหมดมืด = โทนเดิม ความสว่าง 64% (เจ้าของ Choice 5 ต.ค. 2569)
  */
 export function brandPrimaryForTheme(primaryHsl: string, dark: boolean): string | null {
   if (!dark) return primaryHsl;
   if (primaryHsl.trim() === DEFAULT_BRANDING.primaryHsl) return null;
-  const [h = '0', sat = '50%', l = '40%'] = primaryHsl.trim().split(/\s+/);
-  const lNum = parseInt(l.replace('%', ''), 10);
-  if (!Number.isFinite(lNum)) return null;
-  return `${h} ${sat} ${Math.min(65, Math.max(lNum + 13, 50))}%`;
+  const [h = '0', sat = '50%'] = primaryHsl.trim().split(/\s+/);
+  // สีแบรนด์ที่ตั้งเอง: โทนเดิม ความสว่างเท่าค่าโหมดมืดตั้งต้น (64%) — ตัวหนังสือกรมท่าบนปุ่มยังอ่านชัด
+  return `${h} ${sat} 64%`;
 }
 
 function applyBrandPrimaryVars(root: HTMLElement, primaryHsl: string): void {
-  const v = brandPrimaryForTheme(primaryHsl, isDarkTheme());
+  const dark = isDarkTheme();
+  const v = brandPrimaryForTheme(primaryHsl, dark);
   for (const name of PRIMARY_VARS) {
     if (v) root.style.setProperty(name, v);
     else root.style.removeProperty(name);
+  }
+  // ตัวหนังสือบนสีหลัก: ธีมสว่าง = ขาว · ธีมมืด = ค่าของ index.css (กรมท่าเข้ม)
+  for (const name of PRIMARY_FOREGROUND_VARS) {
+    if (dark) root.style.removeProperty(name);
+    else root.style.setProperty(name, '0 0% 100%');
   }
 }
 

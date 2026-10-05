@@ -12073,3 +12073,11 @@ Choice: รายได้เฉลี่ยโชว์ ติ๊กซ่อ�
 | `JobBoardView.tsx` · `GenApplyLinkDialog.tsx` · `AddChannelLinks.tsx` · `RecruitBoardTools.tsx` · `BoardPublishSheet.tsx` | ป้าย "Gen link แล้ว" · หัวฟอร์ม "Gen link รับสมัคร" · "Gen link เพิ่ม" · error "Gen link ไม่สำเร็จ" |
 | `roleFunctions.ts` · `jobLinkSilence.ts` · `boardFlow.ts` · `RecruitChannelsPage.tsx` · `api/_lib/recruitPostings.ts` | ชื่อสิทธิ์ · "Gen link N วันก่อน" · hint · คำโปรย · error ฝั่ง server |
 | เทสต์ | jobLinkSilence · qaRound2_2569-10-05 (pin ไม่มี "สร้างลิงก์" บนจอ) |
+
+## 5 ต.ค. 2569 (ดึก): สีหลักโหมดมืดอ่านชัด (เจ้าของ Choice "สว่างขึ้น + ตัวหนังสือบนปุ่มกรมท่า")
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/index.css` (`.dark`) | `--primary` / `--ring` / `--sidebar-primary` / `--sidebar-ring` = 353 70% 64% · `--primary-foreground` / `--sidebar-primary-foreground` = 220 54% 12% (กรมท่าเข้ม) — ตัวหนังสือสีหลักบนการ์ด 5.2:1 · ปุ่ม 5.3:1 |
+| `src/lib/brandingStorage.ts` | `applyBrandPrimaryVars` คุมตัวหนังสือบนสีหลักด้วย (สว่าง = ขาว inline · มืด = ถอด inline ใช้ index.css) · สีแบรนด์ที่ตั้งเองโหมดมืด = โทนเดิม 64% |
+| เทสต์ | `tests/api/qaRound2_2569-10-05.test.ts` |
