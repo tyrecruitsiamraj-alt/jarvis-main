@@ -777,3 +777,15 @@ describe('buildFollowDayPeople — รวมสายของคนเดีย
     expect(people.reduce((n, p) => n + p.calls.length, 0)).toBe(calls.length);
   });
 });
+
+describe('Lumos บอกไม่รับสาย แต่มีคำพูดผู้รับสาย (เจ้าของ 5 ต.ค. 2569)', () => {
+  it('🔴 มีคำตอบ = "สรุปไม่ได้ · รับสายแล้ว" · ไม่มีคำตอบ = ไม่รับสายตามเดิม · ผลอื่นไม่แตะ', async () => {
+    const { answeredButMarkedUnreached, ANSWERED_UNCLEAR_LABEL } = await import('../../src/lib/followPlanning');
+    expect(ANSWERED_UNCLEAR_LABEL).toBe('สรุปไม่ได้ · รับสายแล้ว');
+    expect(answeredButMarkedUnreached({ call_outcome: 'no_answer', call_reply: 'ครับ ครับ ผม' })).toBe(true);
+    expect(answeredButMarkedUnreached({ call_outcome: 'busy', call_reply: 'ฮัลโหล' })).toBe(true);
+    expect(answeredButMarkedUnreached({ call_outcome: 'no_answer', call_reply: null })).toBe(false);
+    expect(answeredButMarkedUnreached({ call_outcome: 'no_answer', call_reply: ' … ' })).toBe(false);
+    expect(answeredButMarkedUnreached({ call_outcome: 'confirmed', call_reply: 'ไปครับ' })).toBe(false);
+  });
+});

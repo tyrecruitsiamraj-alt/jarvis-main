@@ -12025,3 +12025,15 @@ Choice: รายได้เฉลี่ยโชว์ ติ๊กซ่อ�
 | เทสต์ | `src/lib/followTbd.test.ts` (ใหม่) · followDayReport · followListFilter · followDayReportPager2569-10-05 · FollowPlanningCalendar |
 
 - มีอยู่แล้ว (ไม่ได้ทำเพิ่ม): กดจัดการแล้วย้ายกล่อง · ตัวกรองเจ้าของงาน · ใครโทร · สายที่ในสรุปแผน
+
+## 5 ต.ค. 2569 (ดึก): Lumos บอกไม่รับสาย แต่มีคำพูดผู้รับสาย ⇒ "สรุปไม่ได้ · รับสายแล้ว"
+
+เจ้าของเจอ: ผู้รับสายตอบ *"ครับ ครับ ผม"* แต่ขึ้นว่าไม่ได้คำตอบ · ไม่รับสาย — ตรวจผลดิบแล้ว Lumos ส่ง `no_answer` มาเองทั้งที่ transcript มีคำตอบ
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/followPlanning.ts` | `answeredButMarkedUnreached` (ผล AI ∈ UNREACHED + `call_reply` มีตัวอักษร) · `ANSWERED_UNCLEAR_LABEL` · `roundResultLabel` ใช้ป้ายนี้ |
+| `src/components/follow/FollowPlanningCalendar.tsx` | ชิปสถานะบนแถว = "สรุปไม่ได้ · รับสายแล้ว" |
+| เทสต์ | `tests/api/followPlanning.test.ts` |
+
+- ไม่แก้ค่าที่เก็บ (call_outcome ยังเป็นของ Lumos) · กล่อง/หมวดยังเป็นสรุปไม่ได้ · ผลที่คนลงเองไม่แตะ

@@ -31,6 +31,8 @@ import {
   roundPushFailed,
   roundReplyText,
   roundResultLabel,
+  answeredButMarkedUnreached,
+  ANSWERED_UNCLEAR_LABEL,
   roundTone,
   summarizeFollowCalls,
   type FollowCallCategory,
@@ -804,7 +806,9 @@ const FollowPlanningCalendar: React.FC<{
                                     const chipText =
                                       round.state === 'result' && isStaffCallResult(round.entry)
                                         ? `คนโทร: ${roundResultLabel(round)}`
-                                        : `${FOLLOW_CALL_CATEGORY_LABEL[category]}${
+                                        : round.state === 'result' && answeredButMarkedUnreached(round.entry)
+                                          ? ANSWERED_UNCLEAR_LABEL
+                                          : `${FOLLOW_CALL_CATEGORY_LABEL[category]}${
                                             round.state === 'result' &&
                                             (category === 'unreachable' || round.entry.call_outcome === 'acknowledged')
                                               ? ` — ${roundResultLabel(round)}`

@@ -4,6 +4,7 @@ import { CALL_OUTCOME_TONE, followCallOutcomeText } from '@/lib/callOutcomeTone'
 import { followDispatchLabel } from '@/lib/followDispatchState';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { effectiveCallOutcome, followStaffCallText, isStaffCallResult } from '@/lib/followStaffCall';
+import { UNREACHED_CALL_OUTCOMES } from '@/lib/callOutcomeBuckets';
 import type { ToneKey } from '@/lib/designTokens';
 import {
   FOLLOW_OUTCOME_LABEL,
@@ -320,6 +321,22 @@ export function buildFollowMonthRows(
  * `FOLLOW_OUTCOME_LABEL`) · รหัสที่ไม่มีคำแปลให้คืนรหัสไปตามตรง ห้ามซ่อน
  * ⚠️ ลำดับต้องตรงกับ `followRoundState` — ไม่งั้นสีกับคำบนชิปเดียวกันจะขัดกันเอง
  */
+/**
+ * 🔴 Lumos บอกว่า "ไม่รับสาย" แต่บทสนทนาที่แนบมามีคำพูดของผู้รับสาย (เจ้าของเจอ 5 ต.ค. 2569: ตอบว่า *"ครับ ครับ ผม"*
+ * แต่สรุปมาว่าไม่ได้คำตอบ ไม่รับสาย — ตรวจแล้วเป็นผลที่ Lumos ส่งมาผิดเอง) ⇒ จอบอก **"สรุปไม่ได้ · รับสายแล้ว"**
+ * ให้คนเข้าไปเช็ค แทนการนับเป็นไม่รับสาย · ใช้เฉพาะผลของ AI (ผลที่คนลงเองไม่แตะ) · หมวด/กล่องยังเป็นสรุปไม่ได้เหมือนเดิม
+ */
+export function answeredButMarkedUnreached(
+  entry: Pick<FollowEntry, 'call_outcome' | 'call_reply'>,
+): boolean {
+  const ai = (entry.call_outcome ?? '').trim();
+  if (!(UNREACHED_CALL_OUTCOMES as readonly string[]).includes(ai)) return false;
+  return /[\p{L}\p{N}]/u.test(entry.call_reply ?? '');
+}
+
+/** ป้ายของกรณีข้างบน — คำเดียวทั้งแถว รายงาน และรูป */
+export const ANSWERED_UNCLEAR_LABEL = 'สรุปไม่ได้ · รับสายแล้ว';
+
 export function roundResultLabel(round: FollowPlanningRound): string {
   const e = round.entry;
   switch (round.state) {
@@ -333,6 +350,7 @@ export function roundResultLabel(round: FollowPlanningRound): string {
       const code = effectiveCallOutcome(e);
       // ผลที่คนลงเองใช้คำของปุ่มที่เขากด ("ติดต่อสำเร็จ") — ไม่ใช่คำของ AI ("รับสายแล้ว")
       if (code && isStaffCallResult(e)) return followStaffCallText(code);
+      if (answeredButMarkedUnreached(e)) return ANSWERED_UNCLEAR_LABEL;
       return code ? followCallOutcomeText(code) : 'มีผลแล้ว';
     }
     case 'notSent':
