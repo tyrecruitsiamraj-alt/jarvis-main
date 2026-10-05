@@ -100,6 +100,15 @@ export function isClosedByCallOutcome(r: PublicApplication): boolean {
 export const RM_LIST_VIEWS = ['all', 'interested', 'declined', 'collect'] as const;
 export type RmListView = (typeof RM_LIST_VIEWS)[number];
 
+/**
+ * ปุ่มมุมมองที่โชว์บนแท็บผู้สมัคร — 🔴 "รอเก็บใบสมัคร" ถอดออกจากจอ (เจ้าของสั่ง 5 ต.ค. 2569 "เอารอเก็บใบสมัคร 88 ไรนั่นออก")
+ * นิยาม `collect` ยังอยู่ (ตัวนับ/เทสต์ใช้) · ลิงก์เก่า `?list=collect` ถอยไปรายชื่อทั้งหมด (ไม่ค้างมุมมองที่ไม่มีปุ่มกดกลับ)
+ */
+export const RM_LIST_VIEWS_SHOWN = ['all', 'interested', 'declined'] as const satisfies readonly RmListView[];
+export function isShownRmListView(v: string | null | undefined): v is (typeof RM_LIST_VIEWS_SHOWN)[number] {
+  return !!v && (RM_LIST_VIEWS_SHOWN as readonly string[]).includes(v);
+}
+
 export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
   all: 'รายชื่อทั้งหมด',
   interested: 'รายชื่อคนที่สนใจ',

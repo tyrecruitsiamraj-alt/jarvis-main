@@ -22,8 +22,9 @@ import {
   filterApplications,
   isInRmTab,
   isInRmListView,
-  isRmListView,
+  isShownRmListView,
   RM_LIST_VIEWS,
+  RM_LIST_VIEWS_SHOWN,
   RM_LIST_VIEW_LABEL,
   type RmListView,
   rmTabHasLeadTools,
@@ -155,7 +156,7 @@ const RmWorkspace: React.FC<{
    * เก็บใน `?list=` เพื่อให้ refresh/แชร์ลิงก์แล้วยังอยู่มุมมองเดิม — แพตเทิร์นเดียวกับ ?tab=
    */
   const listParam = searchParams.get('list');
-  const listView: RmListView = isRmListView(listParam) ? listParam : 'all';
+  const listView: RmListView = isShownRmListView(listParam) ? listParam : 'all';
 
   const [rows, setRows] = useState<PublicApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -741,7 +742,7 @@ const RmWorkspace: React.FC<{
           (0 คือคำตอบ ไม่ใช่ช่องว่าง) · โผล่เฉพาะแท็บนี้ — แท็บอื่นมีความหมายของตัวเอง */}
       {tab === 'candidates' ? (
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          {RM_LIST_VIEWS.map((v) => {
+          {RM_LIST_VIEWS_SHOWN.map((v) => {
             const active = v === listView;
             return (
               <button

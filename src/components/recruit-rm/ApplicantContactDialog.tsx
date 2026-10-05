@@ -39,7 +39,15 @@ import { fetchRecruitReasons } from '@/lib/recruitReasonsApi';
 import type { RecruitReason } from '@/lib/recruitReasons';
 import { fetchContactLogs, saveContactLog, type ContactLog } from '@/lib/applicationContactsApi';
 import { fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
-import { unitRequestCardTitle } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import { publicJobTitle } from '@/lib/publicJobTitle';
+import SearchableSelect from '@/components/shared/SearchableSelect';
+
+/** ป้ายหน่วยงานของนัด — ชื่อจุดทำงาน · ตำแหน่ง (เลขที่ใบขอ) · เก็บคำเดียวกันลงประวัตินัดด้วย (5 ต.ค. 2569) */
+function appointmentUnitLabel(j: JobRequest): string {
+  const no = j.request_no?.trim();
+  return `${jobBoardCardTitle(j)} · ${publicJobTitle(j)}${no ? ` (${no})` : ''}`;
+}
 import { canRecordAttendance } from '@/lib/appointmentAttendance';
 import { profileDraftOf, profilePatchFromDraft, type ProfileDraft } from '@/lib/applicantProfileEdit';
 import {
@@ -265,7 +273,7 @@ export default function ApplicantContactDialog({
           appointmentAt: booked ? apptDate : null,
           appointmentPlace: booked ? placeValue : null,
           jobId: booked && apptJob !== ADVANCE ? apptJob : null,
-          jobLabel: booked ? (selectedJob ? unitRequestCardTitle(selectedJob) : 'หาล่วงหน้า') : null,
+          jobLabel: booked ? (selectedJob ? appointmentUnitLabel(selectedJob) : 'หาล่วงหน้า') : null,
           note: null,
         });
         saved.push(booked ? 'นัดหมาย' : apptFailed ? 'ผลนัดหมาย' : 'ผลการติดต่อ');
@@ -445,20 +453,29 @@ export default function ApplicantContactDialog({
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">ลงหน่วยงาน</p>
-                <Select value={apptJob} onValueChange={setApptJob} disabled={busy}>
-                  <SelectTrigger className="h-9 text-sm" aria-label="ลงหน่วยงาน">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {/* เจ้าของเคาะเดิม: บางกรณีนัดไว้แต่ยังไม่รู้ลงใบไหน — เป็นค่าเริ่มต้น */}
-                    <SelectItem value={ADVANCE}>ยังไม่ระบุ — หาล่วงหน้า</SelectItem>
-                    {openJobs.map((j) => (
-                      <SelectItem key={j.id} value={j.id}>
-                        {unitRequestCardTitle(j)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* 🔴 ชื่อหน่วยงาน + พิมพ์ค้นได้ (เจ้าของสั่ง 5 ต.ค. 2569: *"ลงหน่วยงาน ขอเป็นชื่อได้ไหม ค้นหาจากชื่อมันง่ายกว่า
+                    และพิมพ์ค้นหาได้ด้วย"*) — เดิมเป็นเลขที่ใบขอล้วน · ค้นได้ทั้งชื่อ/ตำแหน่ง/เลขที่ใบขอ/รหัสไซต์
+                    "ยังไม่ระบุ — หาล่วงหน้า" อยู่บนสุด (เจ้าของเคาะเดิม: นัดไว้แต่ยังไม่รู้ลงใบไหน) */}
+                <div aria-label="ลงหน่วยงาน" data-testid="appointment-unit">
+                  <SearchableSelect
+                    value={apptJob}
+                    onChange={setApptJob}
+                    disabled={busy}
+                    placeholder="เลือกหน่วยงาน"
+                    searchPlaceholder="พิมพ์ชื่อหน่วยงาน ตำแหน่ง หรือเลขที่ใบขอ"
+                    emptyText="ไม่พบหน่วยงาน"
+                    options={[
+                      { value: ADVANCE, label: 'ยังไม่ระบุ — หาล่วงหน้า' },
+                      ...openJobs.map((j) => ({
+                        value: j.id,
+                        label: appointmentUnitLabel(j),
+                        keywords: [j.request_no, j.site_code, j.unit_name, j.work_site_name, publicJobPositionLabel(j)]
+                          .filter(Boolean)
+                          .join(' '),
+                      })),
+                    ]}
+                  />
+                </div>
               </div>
             </div>
           ) : null}

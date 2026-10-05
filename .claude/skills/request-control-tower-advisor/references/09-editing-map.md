@@ -11753,3 +11753,10 @@ iRecruit (`rm-action-btn`): โทร (call · POST จดการโทรก�
   ⚠️ แก้ `api/_lib/homeAiShareSql.ts` เมื่อไหร่ ต้องสร้างไฟล์นี้ใหม่ · `both` เป็นคำสงวน ต้องใส่ "both"
 - `src/lib/unitRequestDisplay.ts` `publicJobCardSubtitle` — 🔴 บรรทัดรองการ์ดหน้าสาธารณะเหลือแค่รายละเอียดตำแหน่ง (เดิมใช้ตัวฝั่งเจ้าหน้าที่ ⇒ "สาเหตุที่ขอ: ลาออก" + **ชื่อพนักงานคนเก่า** หลุดไปหน้าสาธารณะ) · ใช้ที่ `JobBoardView` (!isStaff) + `PublicJobCardPreview`
 - `tests/api/applicantOverviewSql.test.ts` — เทสต์อ่านฐานจริงทั้งสองตัวให้เวลา 20 วิ
+
+## 5 ต.ค. 2569: ถอดปุ่ม "รอเก็บใบสมัคร" + ลงหน่วยงานเป็นชื่อค้นได้
+
+- `src/lib/recruitRm.ts` — `RM_LIST_VIEWS_SHOWN` (ทั้งหมด/สนใจ/ไม่สนใจ) + `isShownRmListView` · นิยาม `collect` ยังอยู่ (ตัวนับ/เทสต์ใช้)
+- `src/components/recruit-rm/RmWorkspace.tsx` — วาดปุ่มจาก `RM_LIST_VIEWS_SHOWN` · `?list=collect` เก่า → รายชื่อทั้งหมด
+- `src/components/recruit-rm/ApplicantContactDialog.tsx` — "ลงหน่วยงาน" = `SearchableSelect` (Popover+Command ในป๊อปพิมพ์ได้) ป้าย `appointmentUnitLabel` = ชื่อจุดทำงาน · ตำแหน่ง (เลขที่ใบขอ) · ค้นด้วยชื่อ/ตำแหน่ง/เลขที่ใบขอ/รหัสไซต์ · job_label ที่บันทึกใช้คำเดียวกัน (เดิมเลขที่ใบขอล้วน)
+- เทสต์ `tests/api/rmCollectAndUnitPicker2569-10-05.test.ts`
