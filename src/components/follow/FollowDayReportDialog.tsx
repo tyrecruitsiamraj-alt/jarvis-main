@@ -236,9 +236,13 @@ export default function FollowDayReportDialog({
             >
               <ChevronLeft aria-hidden />
             </Button>
-            <span className="tabular-nums">
-              หน้า {NUM.format(pageIdx + 1)} / {NUM.format(pages.length)}
-            </span>
+            {/* เลือกหน้าได้เลย (เจ้าของ 6 ต.ค. 2569 "เอาเป็น Dropdown") — รูป "1/13" ชุดเดียวกับตารางรายวัน */}
+            <ChoiceDropdown<string>
+              value={String(pageIdx)}
+              options={pages.map((_, i) => ({ value: String(i), label: `${i + 1}/${pages.length}` }))}
+              onChange={(v) => setPage(Number(v))}
+              ariaLabel="เลือกหน้า"
+            />
             <Button
               type="button"
               size="iconXs"

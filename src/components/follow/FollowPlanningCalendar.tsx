@@ -213,6 +213,11 @@ function mobileSoftBg(tone: keyof typeof TONE): string {
 }
 
 /** ข้อความบอกช่อง — ตัวเลขลอย ๆ อ่านไม่ออกว่าคืออะไร ต้องมีคำกำกับตอนเอาเมาส์จ่อ */
+/** ตัวเลือกของ dropdown เลือกหน้า — "1/13" … "13/13" */
+function pageOptions(count: number): Array<{ value: string; label: string }> {
+  return Array.from({ length: count }, (_, i) => ({ value: String(i + 1), label: `${i + 1}/${count}` }));
+}
+
 function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): string {
   const detail = rounds
     .map((r) => {
@@ -1106,8 +1111,14 @@ const FollowPlanningCalendar: React.FC<{
                         </button>
                         {/* "1/13" แทนปุ่มเลขทุกหน้า (เจ้าของ 5 ต.ค. 2569: *"แถบหน้า 1 2 3 4 มันเยอะไปทำให้มันแบบเป็น 1/... ได้ไหม"*)
                             — รูปเดียวกับตัวเปลี่ยนหน้าของมุมมองรายเดือน */}
-                        <span className="px-1 text-xs tabular-nums text-muted-foreground" aria-current="page" data-testid="day-page-indicator">
-                          {page}/{pageCount}
+                        {/* 🔴 กด "1/13" แล้วเลือกหน้าได้เลย (เจ้าของ 6 ต.ค. 2569 *"เอาเป็น Dropdown ทีมงานบอกขี้เกียจเลื่อนทีละหน้า"*) */}
+                        <span aria-current="page" data-testid="day-page-indicator">
+                          <ChoiceDropdown<string>
+                            value={String(page)}
+                            options={pageOptions(pageCount)}
+                            onChange={(v) => setPage(Number(v))}
+                            ariaLabel="เลือกหน้า"
+                          />
                         </span>
                         <button
                           type="button"
@@ -1286,8 +1297,14 @@ const FollowPlanningCalendar: React.FC<{
                 >
                   <ChevronLeft aria-hidden />
                 </Button>
-                <span className="px-1 text-xs tabular-nums text-muted-foreground">
-                  {monthSafePage}/{monthPageCount}
+                {/* เลือกหน้าได้เลย (6 ต.ค. 2569) — ตัวเดียวกับรายวัน */}
+                <span aria-current="page" data-testid="month-page-indicator">
+                  <ChoiceDropdown<string>
+                    value={String(monthSafePage)}
+                    options={pageOptions(monthPageCount)}
+                    onChange={(v) => setMonthPage(Number(v))}
+                    ariaLabel="เลือกหน้า (รายเดือน)"
+                  />
                 </span>
                 <Button
                   type="button"

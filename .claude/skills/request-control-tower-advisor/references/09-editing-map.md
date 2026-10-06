@@ -12117,3 +12117,12 @@ Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แ�
 | เทสต์ | irecruitReplaceSync (ยกเลิกทีเดียว · แผนละครั้ง · คนในที่สลับเองไม่ถูกสลับกลับ · เติมประเภท) · followPlanning · followDayCall · followReplacement |
 
 - ตรวจ Browser (ตัวดักเขียน): แท็บส่งคนแทน กล่อง "ตอบว่าไป" 4 = การ์ดผลของเดือน 4 (เดิม 0) · สรุปไม่ได้ 3 · ไม่มีขีดฆ่า · สายที่ 1/2/3 · ตัวกรองประเภทขึ้น (ค่าเติมหลัง deploy + รอบดึงถัดไป)
+
+## 6 ต.ค. 2569: ตัวเปลี่ยนหน้า "1/N" เป็น dropdown เลือกหน้า
+
+เจ้าของ: *"จาก 1/10 เอาเป็น Dropdown ทีมงานบอกขี้เกียจเลื่อนทีละหน้า"*
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/components/follow/FollowPlanningCalendar.tsx` | ตัวบอกหน้ารายวัน (`day-page-indicator`) + รายเดือน (`month-page-indicator`) = `ChoiceDropdown` ตัวเลือก "1/N … N/N" (`pageOptions`) · ปุ่ม ‹ › ยังอยู่ |
+| `src/components/follow/FollowDayReportDialog.tsx` | สรุปแผน "หน้า x / y" → dropdown รูปเดียวกัน |
