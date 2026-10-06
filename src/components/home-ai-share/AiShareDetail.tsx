@@ -4,7 +4,7 @@
  * รอบ 5 เจ้าของ: *"พอเลือกดูอันไหนก็แสดงกราฟ · กราฟขอกราฟแท่ง default ย้อนหลัง 7 วัน ถ้าเปลี่ยน calendar ก็เปลี่ยนตาม ·
  * กราฟโชว์ว่ายอดใช้งานของแต่ละวัน แต่ละเดือนเท่าไหร่"*
  * - แท่งรายวันตลอดช่วงที่เลือก · ยาวเกิน 62 วัน = รายเดือน (`detailBuckets`)
- * - สวิตช์ "แยก BU" (รอบ 7) — ปิด (ค่าตั้งต้น) = ชั้นในแท่งเป็น AI โทร/คนโทร/ยังไม่โทร · เปิด = แต่ละ BU เท่าไหร่
+ * - แบ่งแท่งตาม (6 ต.ค. 2569 รวมสวิตช์ "แยก BU" + "แยกทีม" เป็นตัวเลือกเดียว): ใครโทร (ค่าตั้งต้น) · BU · ทีม (ติดตามเท่านั้น)
  *   รอบ 12: กดสวิตช์แล้วแท่งพลิกไพ่ทีละแท่งจากซ้ายไปขวา (`flipKey`) — เจ้าของ *"หมุนก้อนพวกแท่งกราฟเหมือนหมุนไพ่"*
  *   ยอดบนหัวแท่งเท่ากันทั้งสองแบบ (แถวชุดเดียวกัน) · ไม่จำค่า เปิดหน้าใหม่กลับเป็น AI/คน ตามที่เจ้าของบอก
  * - แถววัน × BU มาจากหน้า (รอบ 9 · หน้าโหลด `?detail=` ครั้งเดียว) — หน้าส่งมาเฉพาะชุดที่ตรงกับหัวข้อ/ช่วงที่เลือกอยู่
@@ -17,15 +17,14 @@
  * - 🔴 **แผงเลื่อนจากขวา + ปุ่ม "ดูทั้งหมด" ถอดแล้ว** (30 ก.ย. 2569 · เจ้าของ: *"ไอที่กดกราฟแท่งแล้วมีหน้า Slide ออกมา
  *   ฉันให้เอาออกแล้วหนิ ไม่ต้องมีแล้ว"*) ⇒ แท่งรายวันกดไม่ได้ (ไม่มีข้างในให้ลงไปแล้ว) · อย่าเอากลับมาเอง
  */
-import React, { useEffect, useId, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import AiShareUsageChart, { type UsageStack } from '@/components/home-ai-share/AiShareUsageChart';
 import { segmentDotClass, segmentFillClass } from '@/components/home-ai-share/segmentStyle';
 import { toneOfBu } from '@/components/team-online/teamOnlineTones';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TONE } from '@/lib/designTokens';
 import { toYmdBangkok } from '@/lib/dateTh';
 import {
@@ -78,16 +77,15 @@ const AiShareDetail: React.FC<{
    */
   onFocusDay?: (w: AiShareWindow | null) => void;
 }> = ({ title, unit, win, withBoth, data, loading, error, withTeams = false, hideNotCalled = false, onFocusDay }) => {
-  /** สวิตช์ "แยก BU" — ปิดเป็นค่าตั้งต้น (ชั้นในแท่ง = AI/คน/ยังไม่โทร) */
-  const [byBu, setByBu] = useState(false);
-  /** สวิตช์ "แยกทีม" — เปิดได้ทีละตัวกับแยก BU (แท่งแยกได้ทีละมิติ) */
-  const [byTeam, setByTeam] = useState(false);
-  const teamSwitchId = useId();
+  /**
+   * แท่งแบ่งตามอะไร — ตัวเลือกเดียว (6 ต.ค. 2569 · เจ้าของ: *"ปุ่ม แยกทีม แยก Bu มันจะทำแยกกันมาทำไม"*)
+   * เดิมเป็นสวิตช์สองตัวที่เปิดได้ทีละตัว · ค่าตั้งต้น = ใครโทร (AI/คน) · "ทีม" มีเฉพาะหัวข้อติดตาม
+   */
+  const [splitBy, setSplitBy] = useState<'caller' | 'bu' | 'team'>('caller');
   /** แท่งรายวันที่กดเลือก (หัวข้อติดตาม) — null = ดูทั้งช่วงที่กราฟโชว์ */
   const [picked, setPicked] = useState<number | null>(null);
   /** ชั้นที่กดลงไปดู (รอบ 18) — ว่าง = ช่วงที่เลือกบนปฏิทิน · ตัวท้าย = ชั้นที่กำลังดู */
   const [drill, setDrill] = useState<AiShareWindow[]>([]);
-  const switchId = useId();
 
   // เปลี่ยนหัวข้อ/ช่วงแล้วกลับชั้นบนสุด
   useEffect(() => {
@@ -139,7 +137,8 @@ const AiShareDetail: React.FC<{
     };
     return { buckets, grain, segmentStacks, buStacks, teamStacks, range, teamRowsOf };
   }, [rows, shownWin, drill.length, today, withBoth, lockedBu, hideNotCalled]);
-  const teamOn = withTeams && byTeam;
+  const teamOn = withTeams && splitBy === 'team';
+  const byBu = splitBy === 'bu';
   const failed = error ?? data?.error ?? null;
   const per = view ? AI_SHARE_GRAIN_LABEL[view.grain] : 'วัน';
 
@@ -176,34 +175,21 @@ const AiShareDetail: React.FC<{
           ยอดใช้งานราย{per}
           {view?.range ? <span className="font-normal tabular-nums text-muted-foreground">{view.range}</span> : null}
         </p>
-        <div className="flex items-center gap-2">
-          <Switch
-            id={switchId}
-            checked={byBu}
-            onCheckedChange={(v) => {
-              setByBu(v);
-              if (v) setByTeam(false);
-            }}
-          />
-          <Label htmlFor={switchId} className="cursor-pointer text-sm font-normal text-muted-foreground">
-            แยก BU
-          </Label>
-        </div>
-        {withTeams ? (
-          <div className="flex items-center gap-2">
-            <Switch
-              id={teamSwitchId}
-              checked={byTeam}
-              onCheckedChange={(v) => {
-                setByTeam(v);
-                if (v) setByBu(false);
-              }}
-            />
-            <Label htmlFor={teamSwitchId} className="cursor-pointer text-sm font-normal text-muted-foreground">
-              แยกทีม
-            </Label>
-          </div>
-        ) : null}
+        <Tabs value={teamOn ? 'team' : splitBy === 'team' ? 'caller' : splitBy} onValueChange={(v) => setSplitBy(v as typeof splitBy)}>
+          <TabsList className="h-9 rounded-full bg-muted p-1" aria-label="แบ่งแท่งตาม">
+            <TabsTrigger value="caller" className="rounded-full px-2.5 text-xs sm:px-4">
+              ใครโทร
+            </TabsTrigger>
+            <TabsTrigger value="bu" className="rounded-full px-2.5 text-xs sm:px-4">
+              BU
+            </TabsTrigger>
+            {withTeams ? (
+              <TabsTrigger value="team" className="rounded-full px-2.5 text-xs sm:px-4">
+                ทีม
+              </TabsTrigger>
+            ) : null}
+          </TabsList>
+        </Tabs>
       </div>
 
       {loading && !view ? (

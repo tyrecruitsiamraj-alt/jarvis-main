@@ -12181,3 +12181,20 @@ Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แ�
 | เทสต์ | trends · followJourneyBatch · followNumbersReconcile (Dashboard บวกลงตัว) |
 
 - ตรวจ Browser 6 ต.ค.: หน้าติดตามแท็บเริ่มงาน 202/176/2/1/5/8/10 = Dashboard วันเดียวกัน แท็บเดียวกัน ทุกช่อง
+
+### รอบ 3/3 หน้าหลัก: ผลโทรของติดตาม = ช่องเดียวกับหน้าติดตาม + ตัวเลือกแบ่งแท่งเดียว (6 ต.ค. 2569)
+
+เจ้าของ: *"หน้าหลัก ก็คือยอดที่มาจากตัวเลขพวกนี้เพราะงั้นอย่าเพี้ยน"* · *"หน้าหลักรวมได้แต่ต้องแยกให้เห็น"* · *"ปุ่ม แยกทีม แยก Bu มันจะทำแยกกันมาทำไม"*
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `api/_lib/followCategory.ts` | **ใหม่** — `categorizeFollowRows` (หมวด + สายที่ + ใครโทร ด้วยฟังก์ชันกลางของหน้าติดตาม) · `FOLLOW_QUEUE_CALL_COLS` / `FOLLOW_ENTRY_CATEGORY_COLS` = ช่องที่ต้อง select · ยกเลิก ⇒ `call_status = 'cancelled'` เหมือน `listFollow` · 🔴 ตัวเดียวที่ Dashboard และหน้าหลักใช้ ห้ามเขียนการจัดหมวดซ้ำ |
+| `api/_handlers/dashboard-trends.ts` | `loadFollow` เรียก `categorizeFollowRows` แทนโค้ดจัดหมวดในไฟล์ |
+| `api/_handlers/home-ai-share.ts` | `?results=follow` → `loadFollowResultsSplit(followPlanParams)` — ช่วงเดียวกับกล่อง "ทั้งหมด" (สองแท็บ · รวมยกเลิก) · คืน `follow` = แท็บ × ใครโทร × ช่อง · หัวข้ออื่นใช้ `tallyCallResults` เดิม |
+| `src/lib/homeCallResults.ts` | `FOLLOW_RESULT_KEYS` · `FollowResultsSplit` · `followResultRows` (แถว + รวมต่อแท็บ) |
+| `src/components/home-ai-share/HomeCallResultsPanel.tsx` | หัวข้อติดตาม = ตาราง ผล · ติดตามคนเริ่มงาน · ติดตามส่งคนแทน · รวม (คำ/สีจาก `FOLLOW_MATRIX_COL_*`) + แถวทั้งหมด = กล่องด้านบน · จอแคบไม่มีแถบ/ป้ายสี |
+| `src/components/home-ai-share/AiShareDetail.tsx` | สวิตช์ "แยก BU" + "แยกทีม" → Tabs เดียว "แบ่งแท่งตาม": ใครโทร · BU · ทีม (ทีมเฉพาะติดตาม) |
+| เทสต์ | `followNumbersReconcile` — ตัวจัดหมวดฝั่งเซิร์ฟเวอร์ = แผง · แถวหน้าหลักบวกลงตัว · ต้นทางเดียว · ไม่มี Switch |
+
+- ตรวจ Browser 6 ต.ค.: หน้าหลักเดือน ต.ค. เริ่มงาน ไป 491 / ไม่ไป 3 / ไม่รับสาย 2 / สรุปไม่ได้ 19 = การ์ด "ผลของเดือนนี้" หน้าติดตาม (515 สายที่มีผล) · ส่งคนแทน 4/0/3/0 · วันที่ 6 ต.ค. ส่งคนแทน 293 สาย ทุกช่องเท่าแผงหน้าติดตาม · กล่องทั้งหมด 1,111 = ตาราง
+- ⚠️ ส่งคนแทนยกเลิก 275 สาย (นัดวันที่ 6) มาจากรอบสร้างใหม่ 5 ต.ค. 15:00–17:34 ตอนแยก EX/คนใน — หลังจากนั้นไม่มียกเลิกเพิ่ม

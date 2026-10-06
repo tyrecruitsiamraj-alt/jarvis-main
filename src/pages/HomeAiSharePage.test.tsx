@@ -6,7 +6,7 @@
  *    ฐานยังไม่มีช่องลงผลของคนโทร = บอกบนจอ · หัวข้อที่ล้มบอกเหตุ ห้ามขึ้น 0 ·
  *    "ใครอยู่ในระบบ" ย้ายไป ตั้งค่า › ผู้ใช้งาน แล้ว (รอบ 19 · เทสต์อยู่ `src/pages/settings/UserPresence.test.tsx`) ·
  *    แผงเลื่อนตอนกดแท่ง + ปุ่ม "ดูทั้งหมด" ถอดแล้ว (เจ้าของสั่ง 30 ก.ย.) — แท่งรายวันกดไม่ได้ ·
- *    กดสวิตช์แยก BU แล้วแท่งกราฟพลิกไพ่ (รอบ 12 · กล่องยอดไม่พลิกแล้ว) ·
+ *    เลือกแบ่งแท่งตาม BU แล้วแท่งกราฟพลิกไพ่ (รอบ 12 · กล่องยอดไม่พลิกแล้ว) ·
  *    รอบ 17: กล่องเรียง ทั้งหมด → AI โทร → คนโทร → ยังไม่โทร · กดกล่อง = Popup รายชื่อ (กล่อง 0 กดไม่ได้) ·
  *    ปฏิทิน + dropdown อยู่ฝั่งซ้ายต่อจากชื่อหน้า · แยก BU ขึ้นครบทุก BU · หัวกราฟบอกเดือน + ช่วงวัน ·
  *    รอบ 18: เลือกหลายเดือนบนปฏิทิน (กดยืนยันก่อน) = หนึ่งแท่งต่อเดือน กดแท่งลงไปดูรายวัน มีปุ่มกลับ ·
@@ -341,26 +341,28 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(within(box).getByRole('button', { name: 'ดูทั้งช่วง' })).toBeTruthy();
   });
 
-  it('สวิตช์ "แยก BU": ค่าตั้งต้นแท่งแบ่ง AI/คน/ยังไม่โทร · กดแล้วเป็นแต่ละ BU · กดอีกทีกลับ', async () => {
+  it('แบ่งแท่งตาม (ตัวเลือกเดียว 6 ต.ค. 2569): ค่าตั้งต้น ใครโทร · BU = แต่ละ BU · ทีม = สองแท็บ · กลับมาใครโทรได้', async () => {
     render(<HomeAiSharePage />);
     const chart = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
     // ติดตามไม่มี "ทั้งสองทาง" · นับแบบแผน (4 ต.ค. 2569) ⇒ ไม่มีชั้น "ยังไม่โทร"
     expect(chart.getAttribute('data-stacks')).toBe('AI โทร|คนโทร');
     expect(chart.getAttribute('data-flip')).toBe('segments');
-    const sw = screen.getByRole('switch', { name: 'แยก BU' });
-    expect(sw.getAttribute('aria-checked')).toBe('false');
-    fireEvent.click(sw);
+    // สวิตช์สองตัวเดิมถอดแล้ว (เจ้าของ: "ปุ่ม แยกทีม แยก Bu มันจะทำแยกกันมาทำไม")
+    expect(screen.queryByRole('switch', { name: 'แยก BU' })).toBeNull();
+    expect(screen.queryByRole('switch', { name: 'แยกทีม' })).toBeNull();
+    const group = screen.getByRole('tablist', { name: 'แบ่งแท่งตาม' });
+    const pick = (name: string) => fireEvent.mouseDown(within(group).getByRole('tab', { name }), { button: 0 });
+    expect(within(group).getByRole('tab', { name: 'ใครโทร' }).getAttribute('aria-selected')).toBe('true');
+    pick('BU');
     const byBu = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน แยก BU` });
     // รอบ 17: ครบทุก BU รอไว้ (ไม่ใช่เฉพาะที่มีงาน) เรียงตามชุดแผนก · ตัวจุดพลิกไพ่เปลี่ยน (รอบ 12)
     expect(byBu.getAttribute('data-stacks')).toBe(AI_SHARE_BUS.join('|'));
     expect(byBu.getAttribute('data-flip')).toBe('bu');
-    fireEvent.click(sw);
-    expect((await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` })).getAttribute('data-stacks')).toBe('AI โทร|คนโทร');
-    // สวิตช์ "แยกทีม" (เฉพาะติดตาม) — เปิดแล้วแยก BU ดับ
-    fireEvent.click(screen.getByRole('switch', { name: 'แยกทีม' }));
+    pick('ทีม');
     const byTeam = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน แยกทีม` });
     expect(byTeam.getAttribute('data-stacks')).toBe('ติดตามคนเริ่มงาน|ติดตามส่งคนแทน');
-    expect(screen.getByRole('switch', { name: 'แยก BU' }).getAttribute('aria-checked')).toBe('false');
+    pick('ใครโทร');
+    expect((await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` })).getAttribute('data-stacks')).toBe('AI โทร|คนโทร');
   });
 
   it('รอบ 17: กล่องเรียง ทั้งหมด → AI โทร → คนโทร → (ทั้งสองทาง) → ยังไม่โทร · กล่องที่เป็น 0 กดไม่ได้', async () => {

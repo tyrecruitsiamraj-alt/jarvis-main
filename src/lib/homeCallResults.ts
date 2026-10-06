@@ -63,6 +63,69 @@ export function emptyCallResultCounts(): CallResultCounts {
   return { no_pickup: 0, wrong_person: 0, picked_silent: 0, said_yes: 0, said_no: 0, not_yet: 0, talked_unclear: 0 };
 }
 
+/**
+ * ═══ ผลโทรของหัวข้อติดตาม — ช่องเดียวกับแผงขั้นตอนของสายบนหน้าติดตาม (6 ต.ค. 2569) ═══
+ * เจ้าของ: *"หน้าหลัก ก็คือยอดที่มาจากตัวเลขพวกนี้เพราะงั้นอย่าเพี้ยน"* + *"หน้าหลักรวมได้แต่ต้องแยกให้เห็น"*
+ * ⇒ หนึ่งแถว = หนึ่งสาย (ชุดเดียวกับกล่อง "ทั้งหมด" ด้านบน รวมรอโทร/ยกเลิก) · หมวดจาก `callCategory` (เซิร์ฟเวอร์
+ *   `api/_lib/followCategory.ts`) · แยกแท็บ ติดตามคนเริ่มงาน / ติดตามส่งคนแทน และ AI โทร / คนโทร
+ * ทุกช่องรวมกัน = ทั้งหมด (เทสต์คุม `followNumbersReconcile.test.ts`)
+ */
+export const FOLLOW_RESULT_KEYS = ['went', 'notWent', 'noAnswer', 'unclear', 'waiting', 'cancelled'] as const;
+export type FollowResultKey = (typeof FOLLOW_RESULT_KEYS)[number];
+export type FollowResultCounts = Record<FollowResultKey, number>;
+export type FollowResultTeam = 'main' | 'replacement';
+/** แท็บ × ใครโทร × ช่อง */
+export type FollowResultsSplit = Record<FollowResultTeam, Record<'ai' | 'staff', FollowResultCounts>>;
+
+export function emptyFollowResultCounts(): FollowResultCounts {
+  return { went: 0, notWent: 0, noAnswer: 0, unclear: 0, waiting: 0, cancelled: 0 };
+}
+export function emptyFollowResultsSplit(): FollowResultsSplit {
+  return {
+    main: { ai: emptyFollowResultCounts(), staff: emptyFollowResultCounts() },
+    replacement: { ai: emptyFollowResultCounts(), staff: emptyFollowResultCounts() },
+  };
+}
+
+export type FollowResultRow = {
+  key: FollowResultKey;
+  main: number;
+  replacement: number;
+  ai: number;
+  staff: number;
+  total: number;
+  /** % ของทั้งหมด — ปัดรวมกันได้ 100 */
+  pct: number;
+};
+
+/** แถวของแผง (ลำดับเดียวกับแผงขั้นตอนของสาย) · `total` = ทุกสาย = กล่อง "ทั้งหมด" */
+export function followResultRows(split: FollowResultsSplit): {
+  rows: FollowResultRow[];
+  total: number;
+  byTeam: Record<FollowResultTeam, number>;
+} {
+  const sumTeam = (t: FollowResultTeam, k: FollowResultKey) => split[t].ai[k] + split[t].staff[k];
+  const totals = FOLLOW_RESULT_KEYS.map((k) => sumTeam('main', k) + sumTeam('replacement', k));
+  const pct = roundToHundred(totals);
+  const rows = FOLLOW_RESULT_KEYS.map((key, i) => ({
+    key,
+    main: sumTeam('main', key),
+    replacement: sumTeam('replacement', key),
+    ai: split.main.ai[key] + split.replacement.ai[key],
+    staff: split.main.staff[key] + split.replacement.staff[key],
+    total: totals[i],
+    pct: pct[i],
+  }));
+  return {
+    rows,
+    total: totals.reduce((s, v) => s + v, 0),
+    byTeam: {
+      main: rows.reduce((s, r) => s + r.main, 0),
+      replacement: rows.reduce((s, r) => s + r.replacement, 0),
+    },
+  };
+}
+
 export type AiShareResultsResponse = {
   generated_at: string;
   block: AiShareBlockKey;
@@ -76,6 +139,8 @@ export type AiShareResultsResponse = {
   staff: CallResultCounts;
   /** ติดตาม/ดูแลหลังเริ่มงาน — ฐานยังไม่มีช่องลงผลของคนโทร (migration 130) */
   follow_staff_ready: boolean;
+  /** หัวข้อติดตามเท่านั้น — ช่องเดียวกับหน้าติดตาม แยกแท็บ × ใครโทร · หัวข้ออื่น = null */
+  follow?: FollowResultsSplit | null;
   error: string | null;
 };
 

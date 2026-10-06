@@ -154,3 +154,73 @@ describe('Dashboard ติดตาม — ช่องเดียวกับ�
     expect(c.ai.calls + c.manual.calls).toBe(called);
   });
 });
+
+describe('หน้าหลัก + Dashboard ใช้ตัวจัดหมวดฝั่งเซิร์ฟเวอร์ตัวเดียว = แผงหน้าติดตาม (6 ต.ค. 2569)', () => {
+  /** แถวดิบแบบที่ SQL ส่งมา (ยกเลิก = cancelled_at · คิว = call_status/call_outcome) */
+  const RAW = ENTRIES.map((x) => ({
+    id: x.id,
+    recipient_name: x.recipient_name,
+    recipient_phone: x.recipient_phone,
+    topic: x.topic,
+    scheduled_at: x.scheduled_at,
+    cancelled_at: x.cancelled ? '2026-10-06T01:00:00Z' : null,
+    call_status: x.call_status,
+    call_outcome: x.call_outcome,
+    call_reply: x.call_reply ?? null,
+    call_summary: x.call_summary ?? null,
+    call_round: x.call_round ?? null,
+    call_mode: x.call_mode,
+    staff_call_outcome: x.staff_call_outcome ?? null,
+    staff_called_at: x.staff_called_at ?? null,
+  }));
+
+  it('ช่องของทุกสาย = แผงขั้นตอนของสาย · AI/คน = ตัวกรองใครโทร', async () => {
+    const { categorizeFollowRows } = await import('../../api/_lib/followCategory');
+    const { followMatrixColOfCategory } = await import('../../src/lib/followCallMatrix');
+    const derived = categorizeFollowRows(RAW, NOW);
+    const m = buildFollowCallMatrix(withFollowDayCalls(ENTRIES.map((x) => ({ ...x, call_status: x.cancelled ? 'cancelled' : x.call_status }))), NOW);
+    const count = { went: 0, notWent: 0, noAnswer: 0, unclear: 0, waiting: 0, cancelled: 0 };
+    for (const d of derived.values()) count[followMatrixColOfCategory(d.category)] += 1;
+    expect(derived.size).toBe(m.all.total.length);
+    for (const k of Object.keys(count) as (keyof typeof count)[]) expect(count[k], k).toBe(m.all[k].length);
+    const manual = [...derived.values()].filter((d) => d.caller === 'manual').length;
+    expect(manual).toBe(m.all.total.filter((x) => followCallerOf(x) === 'manual').length);
+  });
+
+  it('แผงผลโทรของหน้าหลัก: ทุกช่องรวมกัน = ทั้งหมด · สองแท็บรวมกัน = ทั้งหมด', async () => {
+    const { followResultRows, emptyFollowResultsSplit } = await import('../../src/lib/homeCallResults');
+    const split = emptyFollowResultsSplit();
+    split.main.ai.went = 145;
+    split.main.staff.went = 32;
+    split.main.ai.cancelled = 10;
+    split.replacement.ai.noAnswer = 3;
+    split.replacement.staff.waiting = 12;
+    const t = followResultRows(split);
+    expect(t.total).toBe(202);
+    expect(t.byTeam.main + t.byTeam.replacement).toBe(t.total);
+    expect(t.rows.reduce((s, r) => s + r.total, 0)).toBe(t.total);
+    for (const r of t.rows) {
+      expect(r.main + r.replacement, r.key).toBe(r.total);
+      expect(r.ai + r.staff, r.key).toBe(r.total);
+    }
+    expect(t.rows.reduce((s, r) => s + r.pct, 0)).toBe(100);
+  });
+
+  it('ต้นทางเดียว: Dashboard + หน้าหลักเรียก categorizeFollowRows · หน้าหลักใช้ช่วงเดียวกับกล่องทั้งหมด', async () => {
+    const { readFileSync } = await import('node:fs');
+    const dash = readFileSync('api/_handlers/dashboard-trends.ts', 'utf8');
+    const home = readFileSync('api/_handlers/home-ai-share.ts', 'utf8');
+    expect(dash).toContain('categorizeFollowRows(rows)');
+    expect(dash).not.toMatch(/callCategory\(/);
+    expect(home).toContain('categorizeFollowRows(rows)');
+    expect(home).toContain('loadFollowResultsSplit(followPlanParams(win, bu))');
+  });
+
+  it('กราฟหน้าหลัก: แบ่งแท่งเป็นตัวเลือกเดียว (ใครโทร · BU · ทีม) ไม่มีสวิตช์สองตัวแล้ว', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('src/components/home-ai-share/AiShareDetail.tsx', 'utf8');
+    expect(src).not.toContain('<Switch');
+    expect(src).toContain('aria-label="แบ่งแท่งตาม"');
+    for (const v of ['caller', 'bu', 'team']) expect(src).toMatch(new RegExp(`<TabsTrigger value="${v}"`));
+  });
+});

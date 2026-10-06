@@ -23,7 +23,7 @@ import type { UserRole } from '../_lib/auth.js';
 import { respondServiceError } from '../_lib/domainErrors.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { loadMatchingBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
-import { parseBuParam } from '../_lib/homeBuSql.js';
+import { followBuJoin, followBuSql, parseBuParam } from '../_lib/homeBuSql.js';
 import {
   buildApplicantAiShareSql,
   buildFollowAiShareSql,
@@ -31,18 +31,25 @@ import {
   type AiShareListOpts,
   type AiShareSqlMode,
   type FollowLane,
+  FOLLOW_QUEUE_MATCH,
 } from '../_lib/homeAiShareSql.js';
 import { logWarn } from '../_lib/logger.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
 import {
   emptyCallResultCounts,
+  emptyFollowResultsSplit,
   tallyCallResults,
   vocabOfBlock,
   type AiShareResultsResponse,
   type CallResultCounts,
   type CallResultSourceRow,
+  type FollowResultsSplit,
 } from '../../src/lib/homeCallResults.js';
+import { categorizeFollowRows, FOLLOW_ENTRY_CATEGORY_COLS, FOLLOW_QUEUE_CALL_COLS } from '../_lib/followCategory.js';
+import { tableInAppSchema } from '../_lib/schema.js';
+import { followMatrixColOfCategory } from '../../src/lib/followCallMatrix.js';
+import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import {
   AI_SHARE_LIST_PAGE,
   aiShareBounds,
@@ -67,6 +74,9 @@ import {
   type AiShareResponse,
   type AiShareWindow,
 } from '../../src/lib/homeAiShare.js';
+
+const FOLLOW_TABLE = tableInAppSchema('follow_entries');
+const QUEUE_TABLE = tableInAppSchema('lumos_dispatch_queue');
 
 const CACHE_MS = 30_000;
 const cache = new Map<string, { at: number; body: AiShareResponse }>();
@@ -353,6 +363,35 @@ export async function buildAiShareDetail(
   return body;
 }
 
+/**
+ * ผลโทรของหัวข้อติดตาม — **ช่องเดียวกับแผงขั้นตอนของสายบนหน้าติดตาม** (6 ต.ค. 2569 · เจ้าของ "อย่าเพี้ยน อย่าเอ๋อ")
+ * ชุดแถว = ชุดเดียวกับกล่อง "ทั้งหมด" ของหัวข้อติดตาม (ช่วงแผน `followPlanParams` · สองแท็บ · รวมยกเลิก)
+ * หมวด = `categorizeFollowRows` (ตัวเดียวกับ Dashboard) · แยกแท็บ × ใครโทร (`followCallerOf`)
+ */
+export async function loadFollowResultsSplit(params: Params): Promise<FollowResultsSplit> {
+  const { rows } = await dbQuery<Record<string, unknown>>(
+    `select ${FOLLOW_ENTRY_CATEGORY_COLS}, f.call_mode, f.follow_team,
+            ${FOLLOW_QUEUE_CALL_COLS}
+       from ${FOLLOW_TABLE} f
+       ${followBuJoin('f')}
+       left join ${QUEUE_TABLE} q on ${FOLLOW_QUEUE_MATCH}
+      where f.topic is distinct from $4::text
+        and ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
+        and ($2::timestamptz is null or f.scheduled_at < $2::timestamptz)
+        and ($3::text is null or ${followBuSql('f')} = $3::text)`,
+    [...params, AFTERCARE_TOPIC],
+  );
+  const derived = categorizeFollowRows(rows);
+  const out = emptyFollowResultsSplit();
+  for (const r of rows) {
+    const d = derived.get(String(r.id));
+    if (!d) continue;
+    const team = r.follow_team === FOLLOW_TEAM_REPLACEMENT ? 'replacement' : 'main';
+    out[team][d.caller === 'manual' ? 'staff' : 'ai'][followMatrixColOfCategory(d.category)] += 1;
+  }
+  return out;
+}
+
 export async function buildAiShareResults(
   block: AiShareBlockKey,
   win: AiShareWindow,
@@ -371,6 +410,7 @@ export async function buildAiShareResults(
     ai: emptyCallResultCounts(),
     staff: emptyCallResultCounts(),
     follow_staff_ready: false,
+    follow: null,
     error: null,
   };
   if (scope.mode === 'none') {
@@ -378,6 +418,11 @@ export async function buildAiShareResults(
     return body;
   }
   try {
+    if (block === 'follow') {
+      body.follow = await loadFollowResultsSplit(followPlanParams(win, bu));
+      body.follow_staff_ready = true;
+      return body;
+    }
     const r = await loadAiShareResults([start ? start.toISOString() : null, end.toISOString(), bu], block);
     body.ai = r.ai;
     body.staff = r.staff;

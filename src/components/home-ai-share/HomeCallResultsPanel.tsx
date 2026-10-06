@@ -22,10 +22,100 @@ import { segmentDotClass, segmentFillClass } from '@/components/home-ai-share/se
 import { TONE } from '@/lib/designTokens';
 import { AI_SHARE_SEGMENT_LABEL, AI_SHARE_UNIT, type AiShareBlockKey, type AiShareWindow } from '@/lib/homeAiShare';
 import { fetchHomeAiShareResults } from '@/lib/homeAiShareApi';
-import { callResultRows, type AiShareResultsResponse } from '@/lib/homeCallResults';
+import { FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE } from '@/lib/followCallMatrix';
+import { callResultRows, followResultRows, type AiShareResultsResponse, type FollowResultsSplit } from '@/lib/homeCallResults';
 import { cn } from '@/lib/utils';
 
 const NUM = new Intl.NumberFormat('th-TH');
+
+/** หัวคอลัมน์แท็บ — คำเดียวกับแท็บบนหน้าติดตาม */
+const TEAM_COLS = [
+  ['main', 'ติดตามคนเริ่มงาน'],
+  ['replacement', 'ติดตามส่งคนแทน'],
+] as const;
+
+/**
+ * ผลโทรของหัวข้อติดตาม (6 ต.ค. 2569) — ช่องเดียวกับแผงขั้นตอนของสายบนหน้าติดตาม แยกแท็บให้เห็น
+ * (เจ้าของ: *"หน้าหลักรวมได้แต่ต้องแยกให้เห็น"*) · แถบ = % ของทั้งหมด แบ่งสี AI/คนโทร · แถวล่าง = ทั้งหมด = กล่องด้านบน
+ */
+function FollowResultsTable({ split, blockTitle }: { split: FollowResultsSplit; blockTitle: string }) {
+  const t = followResultRows(split);
+  const cell = 'w-16 shrink-0 text-right text-sm tabular-nums sm:w-28';
+  return (
+    <>
+      {/* จอแคบไม่มีแถบ ⇒ ไม่มีป้ายสีของแถบ */}
+      <div className="hidden flex-wrap items-center gap-x-5 gap-y-1 text-sm text-foreground sm:flex" aria-label="สีในแถบ">
+        {(['ai', 'staff'] as const).map((k) => (
+          <span key={k} className="inline-flex items-center gap-2">
+            <span className={cn('inline-block h-3 w-3 rounded-sm', segmentDotClass(k))} aria-hidden />
+            {AI_SHARE_SEGMENT_LABEL[k]}
+          </span>
+        ))}
+      </div>
+      <div className="space-y-3" role="table" aria-label={`ผลโทร ${blockTitle}`} data-testid="home-follow-results">
+        <div role="row" className="flex items-end gap-3 text-xs text-muted-foreground">
+          <span role="columnheader" className="w-24 shrink-0 sm:w-32">
+            ผล
+          </span>
+          <span role="columnheader" className="hidden flex-1 sm:block" />
+          {TEAM_COLS.map(([k, label]) => (
+            <span key={k} role="columnheader" className={cn(cell, 'text-xs')}>
+              {label}
+            </span>
+          ))}
+          <span role="columnheader" className={cn(cell, 'text-xs')}>
+            รวม
+          </span>
+        </div>
+        {t.rows.map((r) => (
+          <div
+            key={r.key}
+            role="row"
+            className="flex items-center gap-3"
+            title={`${AI_SHARE_SEGMENT_LABEL.ai} ${NUM.format(r.ai)} · ${AI_SHARE_SEGMENT_LABEL.staff} ${NUM.format(r.staff)} · ${NUM.format(r.pct)}%`}
+          >
+            <span role="cell" className="inline-flex w-24 shrink-0 items-center gap-2 text-sm text-foreground sm:w-32">
+              <span className={cn('inline-block h-2 w-2 shrink-0 rounded-full', TONE[FOLLOW_MATRIX_COL_TONE[r.key]].dot)} aria-hidden />
+              <span className="truncate">{FOLLOW_MATRIX_COL_LABEL[r.key]}</span>
+            </span>
+            <span role="cell" className="hidden h-2.5 flex-1 overflow-hidden rounded-full bg-muted sm:flex" aria-hidden>
+              <span
+                className={cn('h-full bg-current', segmentFillClass('ai'))}
+                style={{ width: `${t.total > 0 ? (r.ai / t.total) * 100 : 0}%` }}
+              />
+              <span
+                className={cn('h-full bg-current', segmentFillClass('staff'))}
+                style={{ width: `${t.total > 0 ? (r.staff / t.total) * 100 : 0}%` }}
+              />
+            </span>
+            {TEAM_COLS.map(([k]) => (
+              <span key={k} role="cell" className={cn(cell, 'text-muted-foreground')}>
+                {NUM.format(r[k])}
+              </span>
+            ))}
+            <span role="cell" className={cn(cell, 'font-medium text-foreground')}>
+              {NUM.format(r.total)}
+            </span>
+          </div>
+        ))}
+        <div role="row" className="flex items-center gap-3 border-t border-foreground/10 pt-3">
+          <span role="cell" className="w-24 shrink-0 text-sm font-medium text-foreground sm:w-32">
+            {FOLLOW_MATRIX_COL_LABEL.total}
+          </span>
+          <span role="cell" className="hidden flex-1 sm:block" aria-hidden />
+          {TEAM_COLS.map(([k]) => (
+            <span key={k} role="cell" className={cn(cell, 'text-muted-foreground')}>
+              {NUM.format(t.byTeam[k])}
+            </span>
+          ))}
+          <span role="cell" className={cn(cell, 'font-medium text-foreground')}>
+            {NUM.format(t.total)}
+          </span>
+        </div>
+      </div>
+    </>
+  );
+}
 
 const HomeCallResultsPanel: React.FC<{
   block: AiShareBlockKey;
@@ -55,8 +145,15 @@ const HomeCallResultsPanel: React.FC<{
   // เปลี่ยนหัวข้อ/ช่วงแล้วเลขเก่าห้ามค้าง — ใช้เฉพาะคำตอบที่ตรงกับที่เลือกอยู่
   const current = data && data.block === block && data.from === win.from && data.to === win.to ? data : null;
   const failed = error ?? current?.error ?? null;
-  const table = current && !current.error ? callResultRows(current) : null;
-  const headline = table ? `${blockTitle} · มีผล ${NUM.format(table.total)} ${AI_SHARE_UNIT}` : null;
+  const followSplit = current && !current.error && block === 'follow' ? current.follow ?? null : null;
+  const followTable = followSplit ? followResultRows(followSplit) : null;
+  const table = current && !current.error && !followTable ? callResultRows(current) : null;
+  const headline = followTable
+    ? `${blockTitle} · ทั้งหมด ${NUM.format(followTable.total)} ${AI_SHARE_UNIT}`
+    : table
+      ? `${blockTitle} · มีผล ${NUM.format(table.total)} ${AI_SHARE_UNIT}`
+      : null;
+  const ready = !!table || !!followTable;
 
   return (
     <Card variant="glass" className="p-5 sm:p-6">
@@ -78,14 +175,16 @@ const HomeCallResultsPanel: React.FC<{
         </h2>
 
         <CollapsibleContent className="space-y-4 pt-4">
-          {!table && !failed ? (
+          {!ready && !failed ? (
             <div className="space-y-2" aria-label="กำลังโหลดผลโทร">
               {Array.from({ length: 4 }, (_, i) => (
                 <Skeleton key={i} className="h-6 w-full rounded-lg" />
               ))}
             </div>
-          ) : failed && !table ? (
+          ) : failed && !ready ? (
             <p className={cn('text-sm', TONE.danger.value)}>{failed}</p>
+          ) : followSplit ? (
+            <FollowResultsTable split={followSplit} blockTitle={blockTitle} />
           ) : table ? (
             /* 🔴 ไม่มีผลโทรในช่วงนี้ = แถวครบทุกผลเป็น 0 ไม่สลับไปเป็นข้อความ (เจ้าของสั่ง 1 ต.ค. 2569 —
                สลับช่วงวัน/หัวข้อแล้วแผงห้ามย่อ/ขยายเอง "ถ้าไม่มีข้อมูลก็เป็น 0 ไป") */
