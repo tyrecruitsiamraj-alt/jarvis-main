@@ -339,7 +339,7 @@ export async function runIrecruitReplaceSync(
           wall,
           siteName: r.site_name?.trim() || null,
           siteCode: r.site_code?.trim() || null,
-          mode: replaceModeForType(r.replace_type, replaceCallModeFor(p.at, settings.rule.aiFrom)),
+          mode: replaceModeForType(r.replace_type, replaceCallModeFor(p.at, settings.rule.aiFrom, settings.rule.aiPaused)),
           replaceType: (r.replace_type ?? '').trim() || null,
         });
       }
@@ -642,7 +642,6 @@ export async function enforceReplaceAiFrom(aiFrom: string | null): Promise<{ con
   if (!aiFrom || !getLumosPushConfig()) return out;
   const cut = new Date(`${aiFrom}T00:00:00+07:00`);
   if (Number.isNaN(cut.getTime())) return out;
-  const queueTable = tableInAppSchema('lumos_dispatch_queue');
   const { rows: aff } = await dbQuery<{ id: string }>(
     `select id from ${followTable}
       where follow_team = $1 and cancelled_at is null and completed_at is null
@@ -650,7 +649,43 @@ export async function enforceReplaceAiFrom(aiFrom: string | null): Promise<{ con
     [FOLLOW_TEAM_REPLACEMENT, cut.toISOString()],
   );
   if (aff.length === 0) return out;
-  const ids = new Set(aff.map((r) => r.id));
+  const res = await convertReplaceAiRowsToManual(new Set(aff.map((r) => r.id)), 'aiFrom');
+  logInfo('irecruit.replaceSync.aiFrom.done', { aiFrom, ...res });
+  return res;
+}
+
+/**
+ * ═══ พัก AI ของงานส่งคนแทน (เจ้าของสั่ง 6 ต.ค. 2569 ค่ำ "อย่าพึ่งส่งให้ Ai โทร") ═══
+ * สาย AI ที่ **ยังไม่ถึงเวลาโทร** (`scheduled_at` หลังตอนนี้) · ยังไม่ยกเลิก/ปิด → คนโทร + ยกเลิกแผนที่ Lumos
+ * สายที่ถึงเวลาไปแล้ว = AI โทรไปแล้ว/กำลังโทร — คงเป็นของ AI (Choice "หยุดสายที่ยังไม่โทร + ของใหม่")
+ * 🔴 ไม่มีคีย์ push (เครื่อง dev) = ไม่ทำอะไร · เรียกจาก worker ทุกรอบ + ตอนกดพักบนจอ
+ */
+export async function enforceReplaceAiPaused(now: Date = new Date()): Promise<{ converted: number; plansCancelled: number; errors: number }> {
+  const out = { converted: 0, plansCancelled: 0, errors: 0 };
+  if (!getLumosPushConfig()) return out;
+  const { rows: aff } = await dbQuery<{ id: string }>(
+    `select id from ${followTable}
+      where follow_team = $1 and cancelled_at is null and completed_at is null
+        and coalesce(call_mode, 'ai') = 'ai' and scheduled_at > $2`,
+    [FOLLOW_TEAM_REPLACEMENT, now.toISOString()],
+  );
+  if (aff.length === 0) return out;
+  const res = await convertReplaceAiRowsToManual(new Set(aff.map((r) => r.id)), 'aiPaused');
+  logInfo('irecruit.replaceSync.aiPaused.done', res);
+  return res;
+}
+
+/**
+ * สาย AI ชุดนี้ → คนโทร + ยกเลิกแผนที่ Lumos (ใช้ร่วม "AI เริ่มโทรตั้งแต่" กับ "พัก AI")
+ * - แผนที่มีแต่สายในชุดนี้ = ยกเลิกทั้งแผนด้วยรหัสหัวขบวน (`plan_ref`) ครั้งเดียว
+ * - แผนที่มีสายอื่นปน = ยกเลิกเฉพาะสายในชุด (`cancelFollowReminder` ส่งสายที่เหลือเป็นแผนใหม่)
+ */
+async function convertReplaceAiRowsToManual(
+  ids: Set<string>,
+  tag: 'aiFrom' | 'aiPaused',
+): Promise<{ converted: number; plansCancelled: number; errors: number }> {
+  const out = { converted: 0, plansCancelled: 0, errors: 0 };
+  const queueTable = tableInAppSchema('lumos_dispatch_queue');
   const { rows: qrows } = await dbQuery<{ person_ref: string; plan_ref: string | null }>(
     `select person_ref, plan_ref from ${queueTable}
       where channel = 'reminder' and job_ref = 'follow' and status = 'pending' and plan_ref in (
@@ -685,7 +720,7 @@ export async function enforceReplaceAiFrom(aiFrom: string | null): Promise<{ con
       }
     } catch (e) {
       out.errors += 1;
-      logError('irecruit.replaceSync.aiFrom: ยกเลิกแผนไม่สำเร็จ', e, { planRef });
+      logError(`irecruit.replaceSync.${tag}: ยกเลิกแผนไม่สำเร็จ`, e, { planRef });
     }
   }
   // แถวที่ไม่มีแผนในคิว (ยังไม่เคยส่ง) — ยกเลิกแถวคิวเดี่ยว ๆ ของมันถ้ามี
@@ -695,7 +730,7 @@ export async function enforceReplaceAiFrom(aiFrom: string | null): Promise<{ con
       await cancelFollowReminder(id, staffNameOfPhone);
     } catch (e) {
       out.errors += 1;
-      logError('irecruit.replaceSync.aiFrom: ยกเลิกคิวไม่สำเร็จ', e, { id });
+      logError(`irecruit.replaceSync.${tag}: ยกเลิกคิวไม่สำเร็จ`, e, { id });
     }
   }
   const upd = await dbQuery<{ id: string }>(
@@ -704,6 +739,5 @@ export async function enforceReplaceAiFrom(aiFrom: string | null): Promise<{ con
     [[...ids]],
   );
   out.converted = upd.rows.length;
-  logInfo('irecruit.replaceSync.aiFrom.done', { aiFrom, ...out });
   return out;
 }

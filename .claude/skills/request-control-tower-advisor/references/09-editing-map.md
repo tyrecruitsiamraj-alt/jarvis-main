@@ -12381,7 +12381,7 @@ Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แ�
 | ไฟล์ | เปลี่ยนอะไร |
 |---|---|
 | `src/components/jobs/PostingFieldBox.tsx` | **ใหม่** — `PostingFieldBox` (ชื่อช่อง · ค่าที่ผู้สมัครเห็น/"ยังไม่ได้ใส่" แดง · ปุ่ม "ใบขอ" = Popover ดูค่า ERP อย่างเดียว ไม่มีข้อมูล = ไม่มีปุ่ม · ปุ่ม "แก้"/"เสร็จ" กางฟอร์ม) · `TotalIncomeField` (ยอดรวม: มีรายการ = `income.total` · ไม่มี = `total_income`) |
-| `src/pages/jobs/BoardPostingPage.tsx` | `flow="one"` — ชิปช่องที่ขาด · ข้อมูลใบขอ (ไม่มีช่องวางโพสต์ — เจ้าของ "วางข้อความโพสต์ ก็ไม่ต้องมีแล้วสิ่") · 9 กล่อง (รายได้ · รายได้รวม · สวัสดิการ+รับเงิน · เพศ · อายุ · สถานที่ · วันเวลา · รายละเอียดงาน · คุณสมบัติ) · ลิงก์ · ข้อความโพสต์ · ส่งประกาศ · ไม่ประกาศใบนี้ · กางได้ทีละกล่อง (`openBox`) · ฟอร์มวาดเฉพาะตอนกาง · ปุ่มเตือนเพศ = กางกล่องเพศ |
+| `src/pages/jobs/BoardPostingPage.tsx` | `flow="one"` — ชิปช่องที่ขาด · ข้อมูลใบขอ (ไม่มีช่องวางโพสต์ — เจ้าของ "วางข้อความโพสต์ ก็ไม่ต้องมีแล้วสิ่" · ไม่มีการ์ดข้อมูลใบขอ — "เอาออก") · 9 กล่อง (รายได้ · รายได้รวม · สวัสดิการ+รับเงิน · เพศ · อายุ · สถานที่ · วันเวลา · รายละเอียดงาน · คุณสมบัติ) · ลิงก์ · ข้อความโพสต์ · ส่งประกาศ · ไม่ประกาศใบนี้ · กางได้ทีละกล่อง (`openBox`) · ฟอร์มวาดเฉพาะตอนกาง · ปุ่มเตือนเพศ = กางกล่องเพศ |
 | `src/components/jobs/EditPublicJobFieldsDialog.tsx` | prop `bare` — ไม่ห่อการ์ด/หัวข้อ (ใช้ในกล่อง) |
 | `src/components/jobs/ScheduleRequirementsFields.tsx` | prop `only` — วาดช่องเดียว (schedule / details / requirements) |
 | `api/_handlers/siamraj-unit-requests.ts` (`attachNotes`) · `src/types/index.ts` | เก็บ `erp_age_range_min/max` · `erp_work_schedule` ก่อนทับ (แบบ `erp_gender_requirement`) |
@@ -12406,3 +12406,19 @@ Choice เจ้าของ: คนที่ครบ 3 รอบไม่ต�
 
 - ⚠️ ใบคีย์/นำเข้าไม่ถูกส่งเอง (กติกาเดิม "นำเข้าแล้ว AI ยังไม่โทร") · ใบก่อนด่านรายได้ไม่ถูกหยิบ (กันโทรใบเก่าที่ตกด้วยเหตุอื่น)
 - ตรวจ: คิวรีกับฐานจริงแบบอ่านอย่างเดียว (OPL6909018 ไม่หยิบใบ 2 ต.ค. · ใบอายุ 63 ไม่หยิบ) · บันทึกรายได้จริงแล้วคืนค่า — POST ยังตอบ 0.2 วิ ไม่มี error
+
+### พัก AI ของติดตามส่งคนแทน (6 ต.ค. 2569 ค่ำ · เจ้าของ "ติดตามส่งคนแทน อย่าพึ่งส่งให้ Ai โทร")
+
+Choice: "หยุดสายที่ยังไม่โทร + ของใหม่" · "จนกว่าจะสั่งเปิด" · ก่อนพัก: AI รอโทร 35 สาย (สายแรก 7 ต.ค. 07:30) · AI โทรแล้ววันนี้ 54 สาย (คงเป็นของ AI)
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/lib/irecruitReplaceSync.ts` | `ReplaceCallRule.aiPaused` · `replaceCallModeFor(at, aiFrom, aiPaused)` พัก = คนโทร · `normalizeReplaceCallRule` อ่าน `aiPaused === true` เท่านั้น |
+| `api/_lib/irecruitReplaceSync.ts` | `enforceReplaceAiPaused` (สาย AI `scheduled_at > now` → คนโทร + ยกเลิกแผน) · แยกตัวแปลงร่วม `convertReplaceAiRowsToManual` (ใช้กับ aiFrom ด้วย) · รอบดึงส่ง aiPaused |
+| `api/_lib/irecruitReplaceSyncWorker.ts` | บังคับพักทุกรอบ (5 นาที) |
+| `api/_handlers/irecruit-replace-sync.ts` | `PATCH { aiPaused }` (supervisor+) บันทึก + บังคับทันที + audit `irecruit_replace_sync.ai_paused` |
+| `src/lib/irecruitReplaceSyncApi.ts` · `src/pages/follow/FollowPage.tsx` | `setReplaceAiPaused` · สวิตช์ "AI โทร / พัก AI" ข้างปุ่ม "ดึงตอนนี้" (หัวหน้างานขึ้นไป · อ่านค่าไม่ได้ = ไม่โชว์) |
+| เทสต์ | `src/lib/irecruitReplaceSync.test.ts` |
+
+- ⚠️ เปิดกลับ = สายที่เปลี่ยนเป็นคนโทรไปแล้วยังเป็นคนโทร (ไม่ย้อน) · สายใหม่ตามกติกาเดิม (EX = AI · คนใน = คนโทร)
+- ⚠️ ยกเลิกแผนที่ Lumos ทำเฉพาะเครื่องที่มีคีย์ push (เซิร์ฟเวอร์จริง)

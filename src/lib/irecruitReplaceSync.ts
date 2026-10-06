@@ -36,14 +36,21 @@ export type ReplaceCallRule = {
    * 🔴 server บังคับทุก 5 นาที (`enforceReplaceAiFrom`) — สาย AI ที่นัดก่อนวันนี้ถูกเปลี่ยนเป็นคนโทร + ยกเลิกแผนที่ Lumos
    */
   aiFrom: string | null;
+  /**
+   * 🔴 พัก AI (เจ้าของสั่ง 6 ต.ค. 2569 ค่ำ: *"ติดตามส่งคนแทน อย่าพึ่งส่งให้ Ai โทร"* → Choice "หยุดสายที่ยังไม่โทร + ของใหม่" ·
+   * "จนกว่าจะสั่งเปิด") — `true` = สายใหม่จาก iRecruit เป็นคนโทรหมด · server เปลี่ยนสาย AI ที่ยังไม่ถึงเวลาเป็นคนโทร
+   * + ยกเลิกแผนที่ Lumos (`enforceReplaceAiPaused`) · สายที่ AI โทรไปแล้วคงเป็นผลของ AI · เปิดกลับ = สายที่เปลี่ยนไปแล้วยังเป็นคนโทร
+   */
+  aiPaused: boolean;
 };
 
-export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = { aiFrom: null };
+export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = { aiFrom: null, aiPaused: false };
 
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** สายที่นัดเวลานี้ใครโทร — ก่อนวัน `aiFrom` (เที่ยงคืนไทย) = คนโทร */
-export function replaceCallModeFor(at: Date, aiFrom: string | null): 'ai' | 'manual' {
+export function replaceCallModeFor(at: Date, aiFrom: string | null, aiPaused = false): 'ai' | 'manual' {
+  if (aiPaused) return 'manual';
   if (!aiFrom) return 'ai';
   return at.getTime() < new Date(`${aiFrom}T00:00:00+07:00`).getTime() ? 'manual' : 'ai';
 }
@@ -53,7 +60,7 @@ export function normalizeReplaceCallRule(raw: unknown): ReplaceCallRule {
   const r = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
   const af = typeof r.aiFrom === 'string' ? r.aiFrom.trim() : '';
   const aiFrom = YMD_RE.test(af) && !Number.isNaN(new Date(`${af}T00:00:00+07:00`).getTime()) ? af : null;
-  return { aiFrom };
+  return { aiFrom, aiPaused: r.aiPaused === true };
 }
 
 /** นาฬิกาไทยของ `want_date` — วัน + เวลาเข้างาน */

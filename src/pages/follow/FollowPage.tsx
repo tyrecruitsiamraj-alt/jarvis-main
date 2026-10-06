@@ -23,7 +23,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { runReplaceSyncNow } from '@/lib/irecruitReplaceSyncApi';
+import { fetchReplaceSyncStatus, runReplaceSyncNow, setReplaceAiPaused } from '@/lib/irecruitReplaceSyncApi';
+import { Switch } from '@/components/ui/switch';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import {
   Dialog,
@@ -538,6 +539,40 @@ const FollowPage: React.FC = () => {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  /**
+   * สวิตช์ "AI โทร" ของแท็บส่งคนแทน (เจ้าของสั่ง 6 ต.ค. 2569 ค่ำ: *"ติดตามส่งคนแทน อย่าพึ่งส่งให้ Ai โทร"* →
+   * Choice "หยุดสายที่ยังไม่โทร + ของใหม่" · "จนกว่าจะสั่งเปิด") — ปิด = พัก AI · `null` = ยังอ่านไม่ได้ (ไม่โชว์สวิตช์ ห้ามเดา)
+   */
+  const [replaceAiOn, setReplaceAiOn] = useState<boolean | null>(null);
+  const [aiSwitchBusy, setAiSwitchBusy] = useState(false);
+  useEffect(() => {
+    if (followView !== 'replace') return;
+    let alive = true;
+    fetchReplaceSyncStatus()
+      .then((st) => {
+        if (alive) setReplaceAiOn(!st.rule.aiPaused);
+      })
+      .catch(() => {
+        if (alive) setReplaceAiOn(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [followView]);
+  const toggleReplaceAi = async (on: boolean) => {
+    setAiSwitchBusy(true);
+    try {
+      const st = await setReplaceAiPaused(!on);
+      setReplaceAiOn(!st.rule.aiPaused);
+      toast.success(on ? 'เปิด AI โทรแล้ว · สายใหม่ให้ AI โทร' : 'พัก AI แล้ว · สายที่ยังไม่โทรเปลี่ยนเป็นคนโทร');
+      await reload(true);
+    } catch (e) {
+      toast.error(friendlyErrorText(e, 'เปลี่ยนไม่สำเร็จ'));
+    } finally {
+      setAiSwitchBusy(false);
+    }
+  };
 
   /** "ดึงตอนนี้" ของแท็บส่งคนแทน — ดึงจาก iRecruit แล้วโหลดรายการใหม่ (6 ต.ค. 2569 แทนแถบ iRecruit) */
   const [pulling, setPulling] = useState(false);
@@ -1619,17 +1654,29 @@ const FollowPage: React.FC = () => {
               ดึงจาก iRecruit แล้วโหลดรายการใหม่ · หัวหน้างานขึ้นไป (server กันอีกชั้น) · คนอื่นหน้านี้รีเฟรชเองทุก 25 วิ */}
           {followView === 'replace' ? (
             canManageMasters ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                onClick={() => void pullIrecruitNow()}
-                disabled={pulling || loading}
-                className="order-2 shrink-0 md:order-3"
-              >
-                {pulling ? <LoaderCircle className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />}
-                {pulling ? 'กำลังดึง…' : 'ดึงตอนนี้'}
-              </Button>
+              <div className="order-2 flex shrink-0 items-center gap-3 md:order-3">
+                {replaceAiOn !== null ? (
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="replace-ai-switch">
+                    <Switch
+                      checked={replaceAiOn}
+                      disabled={aiSwitchBusy}
+                      onCheckedChange={(v) => void toggleReplaceAi(v)}
+                      aria-label="AI โทร"
+                    />
+                    {replaceAiOn ? 'AI โทร' : 'พัก AI'}
+                  </label>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() => void pullIrecruitNow()}
+                  disabled={pulling || loading}
+                >
+                  {pulling ? <LoaderCircle className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />}
+                  {pulling ? 'กำลังดึง…' : 'ดึงตอนนี้'}
+                </Button>
+              </div>
             ) : null
           ) : (
             /* รีเฟรช — ขึ้นมาแถวแท็บชิดขวาแบบหน้าผู้สมัคร (เดิมอยู่ท้ายแถวปุ่ม) · Dashboard = โหลดแผงใหม่ */

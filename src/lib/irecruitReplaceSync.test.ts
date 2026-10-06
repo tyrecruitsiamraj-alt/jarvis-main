@@ -36,9 +36,14 @@ describe('นาฬิกาไทยจาก mssql', () => {
 
 describe('ค่าตั้ง (เหลือ aiFrom · กติกาเวลาโทรแบบตั้งได้ถอดแล้ว 5 ต.ค. 2569)', () => {
   it('ค่าเริ่ม = ไม่ตั้ง · อ่านวันที่ถูกต้อง · เพี้ยน/ค่าเก่าในฐาน = ข้าม ไม่ throw', () => {
-    expect(DEFAULT_REPLACE_CALL_RULE).toEqual({ aiFrom: null });
-    expect(normalizeReplaceCallRule({ atStart: false, dayOffset: -1, time: '18:00', aiFrom: '2026-10-06' })).toEqual({ aiFrom: '2026-10-06' });
-    expect(normalizeReplaceCallRule({ aiFrom: '6/10/2026' })).toEqual({ aiFrom: null });
+    expect(DEFAULT_REPLACE_CALL_RULE).toEqual({ aiFrom: null, aiPaused: false });
+    expect(normalizeReplaceCallRule({ atStart: false, dayOffset: -1, time: '18:00', aiFrom: '2026-10-06' })).toEqual({
+      aiFrom: '2026-10-06',
+      aiPaused: false,
+    });
+    expect(normalizeReplaceCallRule({ aiFrom: '6/10/2026' })).toEqual({ aiFrom: null, aiPaused: false });
+    expect(normalizeReplaceCallRule({ aiFrom: '2026-10-06', aiPaused: true })).toEqual({ aiFrom: '2026-10-06', aiPaused: true });
+    expect(normalizeReplaceCallRule({ aiPaused: 'yes' }).aiPaused).toBe(false);
     expect(normalizeReplaceCallRule(null)).toEqual(DEFAULT_REPLACE_CALL_RULE);
     expect(normalizeReplaceCallRule('x')).toEqual(DEFAULT_REPLACE_CALL_RULE);
   });
@@ -166,5 +171,32 @@ describe('replaceModeForType (5 ต.ค. 2569)', () => {
     expect(replaceModeForType('IN', 'ai')).toBe('manual');
     expect(replaceModeForType(null, 'ai')).toBe('manual');
     expect(replaceModeForType('EX', 'manual')).toBe('manual');
+  });
+});
+
+/**
+ * 🔴 พัก AI (เจ้าของสั่ง 6 ต.ค. 2569 ค่ำ: "ติดตามส่งคนแทน อย่าพึ่งส่งให้ Ai โทร" → Choice "หยุดสายที่ยังไม่โทร + ของใหม่" ·
+ * "จนกว่าจะสั่งเปิด")
+ */
+describe('พัก AI (aiPaused)', () => {
+  it('พัก = สายใหม่เป็นคนโทรทุกสาย แม้ EX · ไม่พัก = กติกาเดิม', () => {
+    const at = new Date('2026-10-08T07:30:00+07:00');
+    expect(replaceCallModeFor(at, '2026-10-06', true)).toBe('manual');
+    expect(replaceModeForType('EX', replaceCallModeFor(at, '2026-10-06', true))).toBe('manual');
+    expect(replaceModeForType('EX', replaceCallModeFor(at, '2026-10-06', false))).toBe('ai');
+    expect(replaceCallModeFor(at, null, true)).toBe('manual');
+  });
+  it('server: สาย AI ที่ยังไม่ถึงเวลาเท่านั้น → คนโทร + ยกเลิกแผน · worker บังคับทุกรอบ · PATCH หัวหน้างานขึ้นไป', async () => {
+    const { readFileSync } = await import('node:fs');
+    const lib = readFileSync(`${process.cwd()}/api/_lib/irecruitReplaceSync.ts`, 'utf8');
+    expect(lib).toContain("and coalesce(call_mode, 'ai') = 'ai' and scheduled_at > $2`");
+    expect(lib).toContain('replaceCallModeFor(p.at, settings.rule.aiFrom, settings.rule.aiPaused)');
+    const worker = readFileSync(`${process.cwd()}/api/_lib/irecruitReplaceSyncWorker.ts`, 'utf8');
+    expect(worker).toContain('if (settings.rule.aiPaused) {');
+    const handler = readFileSync(`${process.cwd()}/api/_handlers/irecruit-replace-sync.ts`, 'utf8');
+    expect(handler).toContain("if (method === 'PATCH') {");
+    expect(handler).toContain('const enforced = body.aiPaused ? await enforceReplaceAiPaused() : null;');
+    const page = readFileSync(`${process.cwd()}/src/pages/follow/FollowPage.tsx`, 'utf8');
+    expect(page).toContain('data-testid="replace-ai-switch"');
   });
 });

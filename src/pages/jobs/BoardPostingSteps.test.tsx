@@ -350,6 +350,8 @@ describe('ป๊อปประกาศหน้าเดียว 9 กล่�
     // เจ้าของ 6 ต.ค. ค่ำ: "วางข้อความโพสต์ ก็ไม่ต้องมีแล้วสิ่"
     expect(screen.queryByRole('heading', { name: 'วางข้อความโพสต์' })).toBeNull();
     expect(screen.queryByTestId('post-text-paste')).toBeNull();
+    // เจ้าของ 6 ต.ค. ค่ำ: การ์ด "ข้อมูลใบขอ" — "เอาออก"
+    expect(screen.queryByTestId('quick-master-toggle')).toBeNull();
     expect(screen.getByRole('heading', { name: 'ลิงก์สมัคร' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'ข้อความโพสต์' })).toBeTruthy();
     expect(await screen.findByRole('button', { name: 'ส่งประกาศ' })).toBeTruthy();

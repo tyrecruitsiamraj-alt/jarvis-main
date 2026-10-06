@@ -10,7 +10,12 @@
  * ⚠️ สายที่สร้างจะ **ส่งให้ AI** เฉพาะเมื่อสวิตช์ส่งอัตโนมัติของงานติดตาม (`follow_entry`) เปิดอยู่ — คุมที่หน้าตั้งค่าเหมือนเดิม
  */
 import { logError, logInfo, logWarn } from './logger.js';
-import { enforceReplaceAiFrom, getReplaceSyncSettings, runIrecruitReplaceSync } from './irecruitReplaceSync.js';
+import {
+  enforceReplaceAiFrom,
+  enforceReplaceAiPaused,
+  getReplaceSyncSettings,
+  runIrecruitReplaceSync,
+} from './irecruitReplaceSync.js';
 import {
   readReplaceSyncConfig,
   REPLACE_SYNC_ACTOR_NAME,
@@ -47,6 +52,14 @@ export async function runReplaceSyncIfDue(
       await enforceReplaceAiFrom(settings.rule.aiFrom);
     } catch (e) {
       logError('irecruit.replaceSync.aiFrom: รอบนี้ล้ม', e);
+    }
+  }
+  // "พัก AI" (เจ้าของสั่ง 6 ต.ค. 2569 ค่ำ) — บังคับทุกรอบเหมือนกัน · สายใหม่ที่รอบดึงสร้างเป็นคนโทรอยู่แล้ว (`replaceCallModeFor`)
+  if (settings.rule.aiPaused) {
+    try {
+      await enforceReplaceAiPaused(now);
+    } catch (e) {
+      logError('irecruit.replaceSync.aiPaused: รอบนี้ล้ม', e);
     }
   }
   /**

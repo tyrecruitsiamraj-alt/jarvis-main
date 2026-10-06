@@ -27,6 +27,17 @@ export async function fetchReplaceSyncStatus(): Promise<ReplaceSyncStatus> {
   return (await r.json()) as ReplaceSyncStatus;
 }
 
+/** พัก/เปิด AI ของงานส่งคนแทน (6 ต.ค. 2569) — พัก = สาย AI ที่ยังไม่ถึงเวลาเป็นคนโทร + ยกเลิกแผนที่ Lumos */
+export async function setReplaceAiPaused(aiPaused: boolean): Promise<ReplaceSyncStatus> {
+  const r = await apiFetch('/api/irecruit-replace-sync', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ aiPaused }),
+  });
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as ReplaceSyncStatus;
+}
+
 /** ดึงตอนนี้หนึ่งรอบ — ตัวเดียวกับที่ระบบดึงทุก 5 นาที */
 export async function runReplaceSyncNow(): Promise<ReplaceSyncStatus & { summary: ReplaceSyncSummary }> {
   const r = await apiFetch('/api/irecruit-replace-sync', { method: 'POST' });
