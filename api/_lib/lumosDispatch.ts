@@ -256,7 +256,10 @@ export function buildApplicationInterviewPayload(
   const phone = toE164Thai(app.phone);
   if (!phone || !app.full_name?.trim() || !app.job_id) return null;
   // หัวข้อประกาศบางใบมีอิโมจิ ("📍รพ.สมิติเวช") — AI อ่านออกเสียงไม่ได้/อ่านแปลก ⇒ ตัดก่อนพูด (5 ต.ค. 2569)
-  const position = speechText(app.job_title || app.position_interest || '') || 'งานที่เปิดรับ';
+  // 🔴 ชื่อตำแหน่งจากใบขอก่อน (6 ต.ค. 2569) — หัวข้อประกาศบางใบยาวทั้งก้อน ("ขับรถผู้บริหารญี่ปุ่น รับนายแถวสุขุมวิท ส่งแถว…")
+  const position =
+    speechText(jobFacts?.positionTitle || applyFacts?.positionTitle || app.job_title || app.position_interest || '') ||
+    'งานที่เปิดรับ';
   // ใบสมัครไม่มีชื่อหน่วยงาน = ใช้ชื่อจุดทำงานจากใบขอ (เดิมพูดว่า "หน่วยงานของเรา")
   const unit = (app.unit_name || '').trim() || (jobFacts?.unitName ?? '').trim() || 'หน่วยงานของเรา';
   return {
@@ -275,7 +278,11 @@ export function buildApplicationInterviewPayload(
           candidateName: app.full_name,
           position,
           unit,
-          placeForTravel: unit,
+          // พื้นที่ · อายุ · รายได้ · สวัสดิการของใบขอ (6 ต.ค. 2569 — บทเสนองานบอกเหมือนบทสมัครผ่านลิงก์)
+          workArea: jobFacts?.workArea,
+          ageRange: jobFacts?.ageRange,
+          monthlyIncome: jobFacts?.monthlyIncome,
+          benefitLine: jobFacts?.benefitLine,
         }),
     type: 'phone',
     language: 'th',
@@ -363,6 +370,15 @@ export async function enqueueLumosInterviewForApplications(
     // 🔴 อายุเกิน = ไม่เข้าคิวเลย ทุกเส้น (กรอกเสร็จ · ปุ่มส่ง AI · ตัวส่งเองหลังรอเลือกวิธีโทร) — ชื่อไปกล่อง "อายุเกิน" บนแท็บผู้สมัคร
     if (isOverAge(app.age)) {
       skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: OVER_AGE_REASON });
+      continue;
+    }
+    // 🔴 ไม่มีรายได้ = ไม่ส่ง AI (6 ต.ค. 2569) · อ่านใบขอไม่ทัน = ไม่ส่งเหมือนกัน (fail-safe ไปทางไม่ส่ง) แต่บอกคนละเหตุ
+    if (!applyFacts?.loaded) {
+      skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: FACTS_UNREAD_REASON });
+      continue;
+    }
+    if (!(Number(applyFacts.monthlyIncome) > 0)) {
+      skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: NO_INCOME_REASON });
       continue;
     }
     const payload = buildApplicationInterviewPayload(
@@ -711,6 +727,13 @@ export type LumosDispatchOutcome = {
 };
 
 const NO_PHONE_REASON = 'ไม่มีเบอร์มือถือที่ใช้โทรได้ (ต้องเป็นมือถือ 10 หลัก)';
+/**
+ * 🔴 ใบขอไม่มีรายได้ = AI ไม่โทร (เจ้าของ 6 ต.ค. 2569 · Choice "ใบที่ข้อมูลไม่ครบ ไม่ให้ตัดบรรทัดทิ้ง —
+ *    ไม่มีรายได้ก็ไม่ส่งให้ AI โทรจนกว่าจะตั้งรายได้") · เดิมบรรทัดรายได้หายเงียบ ผู้สมัครไม่รู้ว่าได้เงินเท่าไหร่
+ * อ่านใบขอไม่ทัน (ERP ช้า/ล่ม) = ไม่ส่งเหมือนกัน แต่บอกคนละเหตุ (กดส่งใหม่ได้เลย ไม่ต้องไปตั้งรายได้)
+ */
+export const NO_INCOME_REASON = 'ใบขอยังไม่ตั้งรายได้ — ตั้งรายได้ที่ป๊อปโพสต์ประกาศ หน้า 3 ก่อน แล้วค่อยส่ง AI';
+export const FACTS_UNREAD_REASON = 'อ่านรายได้ของใบขอไม่ทัน — ลองกดส่ง AI ใหม่อีกครั้ง';
 const HELD_REASON = 'เจ้าหน้าที่รับไปโทรเองอยู่ — AI ไม่โทรทับ';
 const SUPPRESSED_REASON = 'เบอร์นี้ถูกพักอยู่ (แจ้งว่าไม่หางานแล้ว / เบอร์เสีย)';
 const DECLINED_REASON = 'เคยปฏิเสธงานนี้ไปแล้ว — ไม่เสนอซ้ำ';

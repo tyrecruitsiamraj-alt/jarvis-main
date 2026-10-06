@@ -143,6 +143,8 @@ export const KNOWN_PLACEHOLDERS: readonly string[] = [
   'ต้องมีรถ',
   'ไม่มีวันเริ่มงาน',
   'เคยปฏิเสธงานอื่น',
+  /** ใบไม่ระบุช่วงอายุ — ถามอายุตรง ๆ แทนการตัดบรรทัดทิ้ง (6 ต.ค. 2569) */
+  'ไม่มีช่วงอายุ',
 ];
 
 const PLACEHOLDER = /\{([^{}]+)\}/g;
@@ -296,9 +298,9 @@ export type OfferOptions = {
  * ต่างจากบทที่ 1 สองเรื่อง: **ไม่ถามค่าแรงที่คาดหวัง/ประสบการณ์ซ้ำ** (เขาเห็นเงื่อนไข
  * ตอนสมัครแล้วและเรามีโปรไฟล์อยู่) · **ปิดด้วยการนัด** ไม่ใช่ "เดี๋ยวเจ้าหน้าที่ติดต่อกลับ"
  */
-export function buildOfferQuestions(f: CallScriptFacts, opts: OfferOptions = {}): string[] {
+export function buildOfferQuestions(f: ApplyScriptFacts, opts: OfferOptions = {}): string[] {
   return renderLines(activeScriptLines('offer'), {
-    ...jobValues(f),
+    ...applyValues(f),
     เคยปฏิเสธงานอื่น: flag(opts.askStillLooking),
   });
 }
@@ -321,14 +323,28 @@ export type ApplyScriptFacts = CallScriptFacts & {
  * ข้อมูลไหนไม่มี บรรทัดนั้นหายเอง (กติกาเดียวกับทุกบท)
  */
 export function buildApplyQuestions(f: ApplyScriptFacts): string[] {
+  return renderLines(activeScriptLines('apply'), applyValues(f));
+}
+
+/**
+ * ค่าของบทที่บอกพื้นที่/อายุ/รายได้ (บทสมัครผ่านลิงก์ + บทเสนองาน · 6 ต.ค. 2569 ใช้ชุดเดียวกัน)
+ * 🔴 ไม่ตัดบรรทัดทิ้งเมื่อทำได้ (เจ้าของ Choice "ใบที่ข้อมูลไม่ครบ ไม่ให้ตัดบรรทัดทิ้ง"):
+ *    พื้นที่ไม่มี = ใช้ชื่อหน่วยงาน (ตัวโหลดเติมจังหวัดให้ก่อนแล้ว) · ช่วงอายุไม่มี = ถามอายุตรง ๆ (`{ไม่มีช่วงอายุ}`)
+ *    รายได้ไม่มี = ตัวส่งไม่ส่งให้ AI เลย (`enqueueLumosInterviewForApplications`) — บรรทัดรายได้ไม่หายเงียบ
+ */
+function applyValues(f: ApplyScriptFacts): ScriptValues {
   const income = Number(f.monthlyIncome);
-  return renderLines(activeScriptLines('apply'), {
-    ...jobValues(f),
-    พื้นที่ทำงาน: orDrop(f.workArea),
-    ช่วงอายุ: orDrop(f.ageRange),
+  const base = jobValues(f);
+  const ageRange = orDrop(f.ageRange);
+  return {
+    ...base,
+    // ชื่อหน่วยงานจริงเท่านั้น — ห้ามถอยไปพูด "หน่วยงานของเรา" เป็นสถานที่
+    พื้นที่ทำงาน: orDrop(f.workArea) ?? orDrop(f.placeForTravel) ?? orDrop(f.unit),
+    ช่วงอายุ: ageRange,
+    ไม่มีช่วงอายุ: flag(!ageRange),
     รายได้ต่อเดือน: Number.isFinite(income) && income > 0 ? Math.round(income).toLocaleString('th-TH') : undefined,
     สวัสดิการ: orDrop(f.benefitLine),
-  });
+  };
 }
 
 /** ช่วงอายุแบบพูดได้ — ไม่รู้ทั้งคู่ = '' */
@@ -352,8 +368,12 @@ export function speakableWorkArea(p: {
 }): string {
   const province = clean(p.province);
   const bkk = province === 'กรุงเทพมหานคร';
-  const sub = clean(p.subdistrict).replace(/^(?:ตำบล|ต\.|แขวง)\s*/u, '');
-  const dist = clean(p.district).replace(/^(?:อำเภอ|อ\.|เขต)\s*/u, '');
+  // ช่องตำบลบางใบกลืนชื่อเขตต่อท้ายมาด้วย (OPL6906115 "แขวงจตุจักร แขตจตุจักร") — ตัดตั้งแต่คำนำหน้าเขต/อำเภอทิ้ง
+  const sub = clean(p.subdistrict)
+    .replace(/\s+(?:แขต|เขต|อำเภอ|อ\.)\S*.*$/u, '')
+    .replace(/^(?:ตำบล|ต\.|แขวง)\s*/u, '');
+  // "แขต" = สะกดผิดที่เจอในใบขอจริง (OPL6906115 "แขตจตุจักร") — ไม่ตัดแล้ว AI พูด "เขตแขตจตุจักร"
+  const dist = clean(p.district).replace(/^(?:อำเภอ|อ\.|เขต|แขต)\s*/u, '');
   const bits: string[] = [];
   if (sub) bits.push(`${bkk ? 'แขวง' : 'ตำบล'}${sub}`);
   if (dist) bits.push(`${bkk ? 'เขต' : 'อำเภอ'}${dist}`);

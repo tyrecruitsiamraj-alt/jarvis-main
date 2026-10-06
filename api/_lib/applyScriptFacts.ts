@@ -14,6 +14,10 @@ import {
   speakableBenefitLine,
 } from './siamrajJobBenefits.js';
 import { publicSafeAddressParts } from '../../src/lib/publicJobPrivacy.js';
+import { publicJobTitle } from '../../src/lib/publicJobTitle.js';
+import { boardProvinceOf } from '../../src/lib/boardFilters.js';
+import { UNSPECIFIED } from '../../src/lib/facetEngine.js';
+import type { JobRequest } from '../../src/types/index.js';
 import { speakableAgeRange, speakableWorkArea, type ApplyScriptFacts } from './lumosCallScript.js';
 import { logError } from './logger.js';
 
@@ -23,6 +27,10 @@ export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'mo
    * เดิม AI จึงพูดว่า "งานนี้ทำที่ หน่วยงานของเรา" (เจอในบทที่ส่งจริง 5 ต.ค. 2569)
    */
   unitName?: string | null;
+  /** ชื่อตำแหน่งสั้นแบบหน้าประกาศ (`publicJobTitle` เช่น "พนักงานขับรถ ผู้บริหาร") — แทนหัวข้อประกาศยาว ๆ (6 ต.ค. 2569) */
+  positionTitle?: string | null;
+  /** อ่านใบขอได้จริงไหม — false = ล้ม/เกินเวลา (แยกจาก "ใบไม่มีรายได้" · ตัวส่งใช้ตัดสินว่าไม่ส่งเพราะอะไร) */
+  loaded?: boolean;
 };
 
 const DEFAULT_TIMEOUT_MS = 4000;
@@ -55,7 +63,7 @@ function manualMonthlyIncome(job: Record<string, unknown>): number | null {
 }
 
 async function loadFacts(jobId: string): Promise<ApplyJobFacts> {
-  const out: ApplyJobFacts = {};
+  const out: ApplyJobFacts = { loaded: true };
   const items = (await listSiamrajUnitRequests({ limit: 500, mode: 'all' })) as unknown as Array<Record<string, unknown>>;
   const found = items.find((j) => String(j.id ?? '') === jobId);
   if (!found) return out;
@@ -64,7 +72,20 @@ async function loadFacts(jobId: string): Promise<ApplyJobFacts> {
   await attachNotes([job]);
 
   out.unitName = String(job.work_site_name ?? '').trim() || String(job.unit_name ?? '').trim() || null;
-  out.workArea = speakableWorkArea(publicSafeAddressParts(job as never)) || null;
+  try {
+    out.positionTitle = publicJobTitle(job as unknown as JobRequest).trim() || null;
+  } catch {
+    out.positionTitle = null;
+  }
+  /**
+   * 🔴 พื้นที่ไม่ตัดบรรทัดทิ้ง (เจ้าของ 6 ต.ค. 2569) — ไม่มีตำบล/อำเภอ = จังหวัด (ตัวเดียวกับตัวกรองจังหวัดบนหน้า)
+   * ไม่มีจังหวัดด้วย = ตัวประกอบบทใช้ชื่อหน่วยงานแทน (`applyValues`)
+   */
+  const province = boardProvinceOf(job as unknown as JobRequest);
+  out.workArea =
+    speakableWorkArea(publicSafeAddressParts(job as never)) ||
+    (province && province !== UNSPECIFIED ? speakableWorkArea({ province }) : '') ||
+    null;
   out.ageRange =
     speakableAgeRange(job.age_range_min as number | null | undefined, job.age_range_max as number | null | undefined) ||
     null;

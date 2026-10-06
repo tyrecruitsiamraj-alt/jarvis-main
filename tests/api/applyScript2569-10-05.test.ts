@@ -64,13 +64,18 @@ describe('บทผู้สมัครผ่านลิงก์', () => {
     expect(q.join(' ')).not.toContain('ฝากใบสมัคร');
   });
 
-  it('ข้อมูลไม่มี = บรรทัดนั้นหาย (ไม่พูดเลขที่ไม่รู้)', () => {
+  /**
+   * 🔴 6 ต.ค. 2569 (เจ้าของ Choice "ใบที่ข้อมูลไม่ครบ ไม่ให้ตัดบรรทัดทิ้ง") — เดิมตัดบรรทัดพื้นที่/อายุทิ้ง เหลือ 3 ข้อ
+   * พื้นที่ไม่มี = ใช้ชื่อหน่วยงาน · ช่วงอายุไม่มี = ถามอายุตรง ๆ · รายได้ไม่มี = ยังไม่พูดเลข (ตัวส่งไม่ส่งใบแบบนี้ให้ AI อยู่แล้ว)
+   */
+  it('ข้อมูลไม่ครบ = ใช้ค่าแทน ไม่ตัดบรรทัด · ไม่พูดเลขที่ไม่รู้', () => {
     const q = buildApplyQuestions({ candidateName: APP.full_name, position: APP.job_title, unit: APP.unit_name });
     const all = q.join(' ');
     expect(all).not.toContain('บาท');
     expect(all).not.toContain('รับอายุ');
-    expect(all).not.toContain('อยู่ที่');
-    expect(q.length).toBe(3);
+    expect(all).toContain(`อยู่ที่ ${APP.unit_name}`);
+    expect(q).toContain('ตอนนี้คุณอายุเท่าไหร่ครับ');
+    expect(q.length).toBe(5);
   });
 
   it('แก้ได้จากหน้าตั้งค่า (ลิสต์บทครบ) · ตัวแปรใหม่ลงทะเบียนกันพิมพ์ผิด', () => {
