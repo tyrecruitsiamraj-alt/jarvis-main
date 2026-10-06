@@ -10,6 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { JobRequest } from '@/types';
+import { INCOME_LINE_MAX } from '@/lib/incomeBreakdown';
 
 const saveUnitRequestMeta = vi.fn(async (..._a: unknown[]) => undefined);
 const RATE_LINES = [
@@ -103,7 +104,7 @@ describe('ขั้น 3 — รายได้เลือกได้ทาง
     expect(saveUnitRequestMeta).not.toHaveBeenCalled();
     fireEvent.click(salary);
     fireEvent.click(screen.getByRole('checkbox', { name: /ค่าเบี้ยขยัน/ }));
-    expect(screen.getByText('รวม 15,500')).toBeTruthy();
+    expect(screen.getByText(`รวม 15,500 · 2/${INCOME_LINE_MAX} รายการ`)).toBeTruthy();
     await flushAutosave();
     expect(lastSaved()?.income).toEqual({
       period: 'monthly',
@@ -129,7 +130,7 @@ describe('ขั้น 3 — รายได้เลือกได้ทาง
     fireEvent.click(rows[0]);
     expect(rows[0].getAttribute('data-state')).toBe('checked');
     expect(rows[1].getAttribute('data-state')).toBe('unchecked');
-    expect(screen.getByText('รวม 12,000')).toBeTruthy();
+    expect(screen.getByText(`รวม 12,000 · 1/${INCOME_LINE_MAX} รายการ`)).toBeTruthy();
     await flushAutosave();
     expect(lastSaved()?.income).toMatchObject({ lines: [{ label: 'เงินเดือน', amount: 12000 }] });
   });

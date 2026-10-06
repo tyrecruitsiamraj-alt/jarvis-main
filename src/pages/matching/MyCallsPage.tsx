@@ -26,7 +26,7 @@ import {
 } from '@/lib/callHoldsApi';
 import { bookingActionFor, bookingTargetFromHold } from '@/lib/callResultBooking';
 import { ProposalConflictError, saveProposal } from '@/lib/candidateProposalsApi';
-import { Phone, RefreshCw, ArrowRight } from 'lucide-react';
+import { Phone } from 'lucide-react';
 
 /**
  * หน้า "โทรของฉัน" — ถังงานโทรของเจ้าหน้าที่คนเดียว
@@ -144,11 +144,6 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
       items: list,
     }));
   }, [holds]);
-
-  const dueSoonCount = useMemo(
-    () => holds.filter((h) => msLeftOf(h, now) <= DUE_SOON_MS).length,
-    [holds, now],
-  );
 
   const openForm = (hold: CallHold) => {
     setOpenRef(hold.id);
@@ -279,67 +274,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
         </p>
       </div>
 
-      {/* แผนผังปลายทาง — กดผลแล้วงานวิ่งไปไหนต่อ */}
-      <div className={cn('rounded-2xl border p-4', DASH.card)}>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <div>
-            <p className={DASH.eyebrow}>รอโทร</p>
-            <p className={cn('font-mono text-3xl font-medium tabular-nums', DASH.cellStrong)}>
-              {holds.length.toLocaleString('th-TH')}
-            </p>
-            <p className={cn('text-xs', DASH.muted)}>
-              {dueSoonCount > 0
-                ? `ใกล้คาย ${dueSoonCount.toLocaleString('th-TH')} คน — รีบโทรก่อน`
-                : 'ล็อกอยู่ได้ 1 วันต่อคน'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={load}
-            className={cn(
-              'ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium',
-              TONE.neutral.soft,
-              TONE.neutral.value,
-              TONE.neutral.softHover,
-            )}
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} /> รีเฟรช
-          </button>
-        </div>
-
-        <div className="mt-3 grid gap-1.5">
-          {OUTCOME_ORDER.map((key) => {
-            const tone = TONE[CALL_OUTCOME_TONE[key]];
-            const count =
-              key === 'declined'
-                ? tally.declinedByScope.job
-                : (tally.byOutcome[key] ?? 0);
-            const extra = key === 'declined' ? tally.declinedByScope.all : null;
-            return (
-              <div
-                key={key}
-                className={cn(
-                  'flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border px-3 py-2 text-xs font-medium',
-                  tone.soft,
-                  tone.value,
-                )}
-              >
-                <ArrowRight className="h-3.5 w-3.5 shrink-0" />
-                <span>{CALL_RESULT_LABEL[key]}</span>
-                <span className={cn('font-normal', DASH.muted)}>
-                  → {CALL_RESULT_DESTINATION[key]}
-                </span>
-                <span className="ml-auto font-mono tabular-nums">
-                  วันนี้ {count.toLocaleString('th-TH')}
-                  {extra != null && extra > 0
-                    ? ` · ไม่หางานแล้ว ${extra.toLocaleString('th-TH')}`
-                    : ''}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {/* แผนผังปลายทาง (รอโทร N · รีเฟรช · ผล → ไปไหนต่อ 5 แถว) ถอดแล้ว — เจ้าของสั่ง 6 ต.ค. 2569 "เอาออก" */}
 
       {error ? <p className={cn('px-1 text-xs', TONE.danger.value)}>{error}</p> : null}
 

@@ -559,7 +559,12 @@ const EditPublicJobFieldsDialog: React.FC<{
               checked={income.mode === 'request'}
               onSelect={() => chooseIncome('request')}
               title="ตามใบขอ"
-              meta={income.mode === 'request' && requestSum > 0 ? `รวม ${NUM.format(requestSum)}` : undefined}
+              /* จำนวนที่ติ๊ก/เพดาน (ตรวจปุ่มตาย 6 ต.ค. 2569) — ครบ 10 แล้วช่องที่เหลือกดไม่ได้ ต้องเห็นว่าเพราะครบ ไม่ใช่ปุ่มเสีย */
+              meta={
+                income.mode === 'request' && (requestSum > 0 || income.requestRows.length > 0)
+                  ? `รวม ${NUM.format(requestSum)} · ${income.requestRows.length}/${INCOME_LINE_MAX} รายการ`
+                  : undefined
+              }
             >
               {income.mode === 'request' ? (
                 <>
