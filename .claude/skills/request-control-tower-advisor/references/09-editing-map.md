@@ -12126,3 +12126,13 @@ Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แ�
 | --- | --- |
 | `src/components/follow/FollowPlanningCalendar.tsx` | ตัวบอกหน้ารายวัน (`day-page-indicator`) + รายเดือน (`month-page-indicator`) = `ChoiceDropdown` ตัวเลือก "1/N … N/N" (`pageOptions`) · ปุ่ม ‹ › ยังอยู่ |
 | `src/components/follow/FollowDayReportDialog.tsx` | สรุปแผน "หน้า x / y" → dropdown รูปเดียวกัน |
+
+## 6 ต.ค. 2569: ถอดแถบ iRecruit เหลือปุ่ม "ดึงตอนนี้" แทนปุ่มรีเฟรช (แท็บส่งคนแทน)
+
+เจ้าของ: *"เอาออกไม่ต้องโชว์ เหลือไว้แค่ปุ่ม ดึงตอนนี้ แต่ก็ย้ายไปแทนปุ่ม refresh แล้วปุ่ม refresh เอาออก"*
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/pages/follow/FollowPage.tsx` | แท็บส่งคนแทน: ปุ่มมุมขวาแถวแท็บ = "ดึงตอนนี้" (`pullIrecruitNow` → `runReplaceSyncNow` แล้ว `reload(true)` · toast ผล) เฉพาะหัวหน้างานขึ้นไป · คนอื่นไม่มีปุ่ม (หน้ารีเฟรชเองทุก 25 วิ) · แท็บอื่นยังเป็นปุ่มรีเฟรช |
+| `src/components/follow/IrecruitReplaceSyncBar.tsx` · `src/components/shared/SectionErrorBoundary.tsx` | **ลบ** (ไม่มีที่ใช้แล้ว) |
+| เทสต์ | followReplacement (`replaceView ?` เหลือ 2 · ปุ่มดึงตอนนี้) · qaRound2 |

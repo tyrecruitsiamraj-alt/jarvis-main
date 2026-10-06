@@ -2,7 +2,6 @@ import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useStat
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import SectionErrorBoundary from '@/components/shared/SectionErrorBoundary';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,6 +23,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { runReplaceSyncNow } from '@/lib/irecruitReplaceSyncApi';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import {
   Dialog,
@@ -109,7 +109,6 @@ import { STAFF_PHONE_SAME_WARNING, staffPhoneAckKey, staffPhoneMatchesApplicant 
 import TopicField from '@/components/follow/TopicField';
 import FollowMasterManagerDialog from '@/components/follow/FollowMasterManagerDialog';
 import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
-import IrecruitReplaceSyncBar from '@/components/follow/IrecruitReplaceSyncBar';
 import FollowDayReportDialog from '@/components/follow/FollowDayReportDialog';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import FollowCompletedCard from '@/components/follow/FollowCompletedCard';
@@ -535,6 +534,23 @@ const FollowPage: React.FC = () => {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  /** "ดึงตอนนี้" ของแท็บส่งคนแทน — ดึงจาก iRecruit แล้วโหลดรายการใหม่ (6 ต.ค. 2569 แทนแถบ iRecruit) */
+  const [pulling, setPulling] = useState(false);
+  const pullIrecruitNow = async () => {
+    setPulling(true);
+    try {
+      const res = await runReplaceSyncNow();
+      const sum = res?.summary;
+      if (sum?.error) toast.error(friendlyErrorText(new Error(sum.error), 'ดึงจาก iRecruit ไม่สำเร็จ'));
+      else toast.success(`ดึงแล้ว · เพิ่ม ${sum?.added ?? 0} · ยกเลิก ${sum?.cancelled ?? 0}`);
+      await reload(true);
+    } catch (e) {
+      toast.error(friendlyErrorText(e, 'ดึงจาก iRecruit ไม่สำเร็จ'));
+    } finally {
+      setPulling(false);
+    }
+  };
 
   /**
    * ═══ 🔴 ผลโทรต้องขึ้นเองโดยไม่ต้องกดรีเฟรช (เจ้าของแจ้ง 5 ก.ย. 2569:
@@ -1580,19 +1596,37 @@ const FollowPage: React.FC = () => {
               <TabsTrigger value="dashboard" className={followTabClass('dashboard')}>Dashboard</TabsTrigger>
             </TabsList>
           </Tabs>
-          {/* รีเฟรช — ขึ้นมาแถวแท็บชิดขวาแบบหน้าผู้สมัคร (เดิมอยู่ท้ายแถวปุ่ม) · Dashboard = โหลดแผงใหม่ */}
-          <Button
-            type="button"
-            variant="outline"
-            size="iconXs"
-            onClick={() => (followView === 'dashboard' ? setDashRev((n) => n + 1) : void reload())}
-            disabled={loading}
-            aria-label="รีเฟรชข้อมูล"
-            title="รีเฟรชข้อมูล"
-            className="order-2 shrink-0 md:order-3"
-          >
-            <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden />
-          </Button>
+          {/* แท็บส่งคนแทน: "ดึงตอนนี้" แทนปุ่มรีเฟรช (เจ้าของสั่ง 6 ต.ค. 2569 — ถอดแถบ iRecruit เหลือปุ่มนี้ปุ่มเดียว)
+              ดึงจาก iRecruit แล้วโหลดรายการใหม่ · หัวหน้างานขึ้นไป (server กันอีกชั้น) · คนอื่นหน้านี้รีเฟรชเองทุก 25 วิ */}
+          {followView === 'replace' ? (
+            canManageMasters ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={() => void pullIrecruitNow()}
+                disabled={pulling || loading}
+                className="order-2 shrink-0 md:order-3"
+              >
+                {pulling ? <LoaderCircle className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />}
+                {pulling ? 'กำลังดึง…' : 'ดึงตอนนี้'}
+              </Button>
+            ) : null
+          ) : (
+            /* รีเฟรช — ขึ้นมาแถวแท็บชิดขวาแบบหน้าผู้สมัคร (เดิมอยู่ท้ายแถวปุ่ม) · Dashboard = โหลดแผงใหม่ */
+            <Button
+              type="button"
+              variant="outline"
+              size="iconXs"
+              onClick={() => (followView === 'dashboard' ? setDashRev((n) => n + 1) : void reload())}
+              disabled={loading}
+              aria-label="รีเฟรชข้อมูล"
+              title="รีเฟรชข้อมูล"
+              className="order-2 shrink-0 md:order-3"
+            >
+              <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden />
+            </Button>
+          )}
         </div>
         {followView !== 'dashboard' ? (
           <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">{headerButtons}</div>
@@ -1638,11 +1672,7 @@ const FollowPage: React.FC = () => {
             </Button>
           </div>
         ) : null}
-        {replaceView ? (
-          <SectionErrorBoundary label="แถบ iRecruit">
-            <IrecruitReplaceSyncBar canManage={canManageMasters} onSynced={() => void reload(true)} />
-          </SectionErrorBoundary>
-        ) : null}
+        {/* แถบ iRecruit (ดึงล่าสุด · เวลาโทร · AI เริ่มโทร) ถอดแล้ว — เจ้าของ 6 ต.ค. 2569 "เอาออกไม่ต้องโชว์ เหลือไว้แค่ปุ่ม ดึงตอนนี้" */}
         {/* 🔴 ยังไม่เคยโหลดสำเร็จ = ยังไม่รู้เลข ⇒ ห้ามขึ้น 0 / "ตามครบแล้ว" (QA 5 ต.ค. 2569) · กำลังโหลดขึ้นโครงหน้า · ล้มเหลือแถบข้างบน */}
         {lastLoadedAt === null ? (
           loading ? (

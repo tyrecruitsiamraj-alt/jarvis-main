@@ -57,10 +57,12 @@ describe('หน้าการติดตาม: สองแท็บเห�
     for (const gone of ['เพิ่มคนที่จะไปแทนงาน', 'ยังไม่มีคนที่ส่งไปแทนงาน', 'REPLACEMENT_TOPIC', 'effectiveTopic']) {
       expect(page, gone).not.toContain(gone);
     }
-    // 3 = ทีม · กอง · แถบดึงจาก iRecruit (เจ้าของสั่ง 2 ต.ค. 2569 — ข้อยกเว้นเดียวของกติกานี้ ห้ามเติมอย่างอื่น)
-    expect(page.match(/replaceView \?/g)?.length).toBe(3);
-    // ครอบด้วย SectionErrorBoundary (QA 5 ต.ค. 2569) — แถบพังไม่ลากทั้งหน้าจอขาว
-    expect(page).toMatch(/\{replaceView \? \(\s*<SectionErrorBoundary label="แถบ iRecruit">\s*<IrecruitReplaceSyncBar canManage=\{canManageMasters\} onSynced=\{\(\) => void reload\(true\)\} \/>/);
+    // 2 = ทีม · กอง — แถบ iRecruit ถอดแล้ว (เจ้าของ 6 ต.ค. 2569 "เอาออกไม่ต้องโชว์ เหลือไว้แค่ปุ่ม ดึงตอนนี้")
+    expect(page.match(/replaceView \?/g)?.length).toBe(2);
+    expect(page).not.toContain('IrecruitReplaceSyncBar');
+    // ข้อยกเว้นเดียวของแท็บนี้ = ปุ่ม "ดึงตอนนี้" แทนปุ่มรีเฟรช (หัวหน้างานขึ้นไป)
+    expect(page).toMatch(/followView === 'replace' \? \(\s*canManageMasters \? \(/);
+    expect(page).toContain("{pulling ? 'กำลังดึง…' : 'ดึงตอนนี้'}");
     expect(page).toContain("followTeamForScope(replaceView ? 'replacement' : 'main')");
     expect(page).toContain('<TopicField id="followTopic" value={topic} onChange={setTopic} reloadSignal={topicsRev} />');
   });

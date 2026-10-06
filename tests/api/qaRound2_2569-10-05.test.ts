@@ -45,11 +45,10 @@ describe('หน้าติดตาม — โหลด / ล้ม / ว่�
 });
 
 describe('กันจอขาว', () => {
-  it('แถบ iRecruit ตรวจรูปคำตอบ + อ่าน rule แบบปลอดภัย', () => {
-    const bar = read('src/components/follow/IrecruitReplaceSyncBar.tsx');
-    expect(bar).toContain("if (!next?.rule || !next.summary) throw new Error('ดึงไม่สำเร็จ');");
-    expect(bar).toContain('status.rule?.aiFrom');
-    expect(bar).not.toContain('(ก่อนหน้านั้นคนโทร)');
+  it('แถบ iRecruit ถอดแล้ว (6 ต.ค. 2569) — ปุ่มดึงตอนนี้อ่านผลแบบปลอดภัย (คำตอบผิดรูปไม่พัง)', () => {
+    const page = read('src/pages/follow/FollowPage.tsx');
+    expect(page).toContain('const sum = res?.summary;');
+    expect(page).toContain('${sum?.added ?? 0}');
   });
   it('เก็บไปโทรเอง: skipped ไม่มี = []', () => {
     expect(read('src/lib/publicApplicationsApi.ts')).toContain('skipped: Array.isArray(out?.skipped) ? out.skipped : []');
