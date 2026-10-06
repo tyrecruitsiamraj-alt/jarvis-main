@@ -23,7 +23,8 @@ describe('ทั้งระบบ: ว่างแล้วทรงเดิ�
     expect(cal).not.toContain('ยังไม่มีผลเดือนนี้');
     expect(cal).not.toContain('วันที่เลือกไม่มีสายที่ต้องตาม');
     expect(cal).not.toContain('monthRows.length === 0 ? (\n            <p');
-    expect(cal).toContain('<Donut percent={microRates.successRate ?? 0}');
+    // วงกลมอยู่เสมอ ไม่มีผล = 0% (6 ต.ค. 2569 นับด้วยนิยามเดียวกับแผงขั้นตอน)
+    expect(cal).toContain('<Donut percent={monthWithResult > 0 ? (monthBoxes.went / monthWithResult) * 100 : 0}');
     expect(read('src/pages/follow/FollowPage.tsx')).not.toContain('>ยังไม่มีรายชื่อที่ต้องติดตาม<');
     // การ์ดติดตามครบ (1 ต.ค. 2569) — ไม่มีคนก็ยังอยู่: หัว 0 คน + แถว "ไม่มี…" (กล่องเดิมซ่อนตัวเอง = ผิดกติกา)
     const card = read('src/components/follow/FollowCompletedCard.tsx');
