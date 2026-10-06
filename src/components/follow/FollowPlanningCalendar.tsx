@@ -40,6 +40,7 @@ import {
   type FollowRoundFilter,
 } from '@/lib/followPlanning';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
+import { followCallerOf } from '@/lib/followListFilter';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import { FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE, followMatrixColOfCategory } from '@/lib/followCallMatrix';
 import { DASH } from '@/lib/designTokens';
@@ -454,13 +455,21 @@ const FollowPlanningCalendar: React.FC<{
    * (4 ช่องตามนิยามเจ้าของ 6 ต.ค. 2569 — ตัวอ่านคำพูดย้ายไปอยู่ใน `callCategory` แล้ว ทุกจอใช้ตัวเดียว)
    * นับด้วย `callCategory` → `followMatrixColOfCategory` ตัวเดียวกับ `buildFollowCallMatrix` (เฉพาะสายที่มีเลขสาย)
    */
+  /**
+   * แยก AI โทร / คนโทร (เจ้าของ 6 ต.ค. 2569 — Choice "รวม AI กับคนโทร" ⇒ ต้องเห็นแยก) · ใครโทร = `followCallerOf`
+   * ตัวเดียวกับตัวกรองใครโทร ⇒ AI + คน = รวม ทุกแถว
+   */
   const monthBoxes = useMemo(() => {
-    const out = { went: 0, notWent: 0, noAnswer: 0, unclear: 0 };
+    const zero = () => ({ went: 0, notWent: 0, noAnswer: 0, unclear: 0 });
+    const out = { ...zero(), ai: zero(), manual: zero() };
     for (const r of summarySource) {
       for (const round of r.rounds) {
         if (round.ymd?.slice(0, 7) !== month || followRoundSlot(round.entry) === null) continue;
         const col = followMatrixColOfCategory(callCategory(round));
-        if (col === 'went' || col === 'notWent' || col === 'noAnswer' || col === 'unclear') out[col] += 1;
+        if (col === 'went' || col === 'notWent' || col === 'noAnswer' || col === 'unclear') {
+          out[col] += 1;
+          out[followCallerOf(round.entry)][col] += 1;
+        }
       }
     }
     return out;
@@ -1312,18 +1321,26 @@ const FollowPlanningCalendar: React.FC<{
             </div>
             <p className="mt-2 text-[11px] leading-snug text-muted-foreground">{`จาก ${monthWithResult} สายที่มีผล`}</p>
 
-            {/* สามช่องชุดเดียวกับกล่องขั้นตอนของสาย — คำ/สี/นิยามเดียวกัน (6 ต.ค. 2569) */}
-            <dl className="mt-3 space-y-1.5 border-t border-border/70 pt-3 text-[12px]" data-testid="month-result-boxes">
-              {(['went', 'notWent', 'noAnswer', 'unclear'] as const).map((k) => (
-                <div key={k} className="flex items-baseline justify-between gap-2">
-                  <dt className="flex items-center gap-1.5 text-muted-foreground">
-                    <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', TONE[FOLLOW_MATRIX_COL_TONE[k]].dot)} aria-hidden />
-                    {FOLLOW_MATRIX_COL_LABEL[k]}
-                  </dt>
-                  <dd className={cn('font-medium tabular-nums', TONE[FOLLOW_MATRIX_COL_TONE[k]].value)}>{monthBoxes[k]}</dd>
-                </div>
-              ))}
-            </dl>
+            {/* 4 ช่องชุดเดียวกับกล่องขั้นตอนของสาย แยก AI โทร / คนโทร (6 ต.ค. 2569) — AI + คน = รวม */}
+            <div className="mt-3 border-t border-border/70 pt-3 text-[12px]" data-testid="month-result-boxes">
+              <div className="grid grid-cols-[1fr_auto_auto_auto] items-baseline gap-x-3 gap-y-1.5">
+                <span />
+                <span className="text-right text-[11px] text-muted-foreground">AI โทร</span>
+                <span className="text-right text-[11px] text-muted-foreground">คนโทร</span>
+                <span className="text-right text-[11px] text-muted-foreground">รวม</span>
+                {(['went', 'notWent', 'noAnswer', 'unclear'] as const).map((k) => (
+                  <React.Fragment key={k}>
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', TONE[FOLLOW_MATRIX_COL_TONE[k]].dot)} aria-hidden />
+                      {FOLLOW_MATRIX_COL_LABEL[k]}
+                    </span>
+                    <span className="text-right tabular-nums text-foreground" data-testid={`month-${k}-ai`}>{monthBoxes.ai[k]}</span>
+                    <span className="text-right tabular-nums text-foreground" data-testid={`month-${k}-manual`}>{monthBoxes.manual[k]}</span>
+                    <span className={cn('text-right font-medium tabular-nums', TONE[FOLLOW_MATRIX_COL_TONE[k]].value)}>{monthBoxes[k]}</span>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
           </Card>
 
           <Card className="overflow-hidden rounded-2xl shadow-sm">

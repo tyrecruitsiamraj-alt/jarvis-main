@@ -653,6 +653,33 @@ describe('ผลของเดือน = นิยามเดียวกั�
     }
   });
 
+  it('🔴 แยก AI โทร / คนโทร (เจ้าของ 6 ต.ค. 2569 "รวม AI กับคนโทร") — AI + คน = รวม ทุกแถว', () => {
+    renderCalendar([
+      entry({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' }),
+      entry({ id: 'b', call_round: 1, recipient_phone: '0899999998', recipient_name: 'คนที่สอง', call_status: 'completed', call_outcome: 'confirmed' }),
+      entry({
+        id: 'c',
+        call_round: 1,
+        recipient_phone: '0899999997',
+        recipient_name: 'คนที่สาม',
+        call_mode: 'manual',
+        call_status: null,
+        staff_call_outcome: 'confirmed',
+        staff_called_at: '2026-10-06T03:00:00Z',
+      }),
+    ]);
+    const box = screen.getByTestId('month-result-boxes');
+    expect(within(box).getByText('AI โทร')).toBeTruthy();
+    expect(within(box).getByText('คนโทร')).toBeTruthy();
+    expect(screen.getByTestId('month-went-ai').textContent).toBe('2');
+    expect(screen.getByTestId('month-went-manual').textContent).toBe('1');
+    for (const k of ['went', 'notWent', 'noAnswer', 'unclear']) {
+      const ai = Number(screen.getByTestId(`month-${k}-ai`).textContent);
+      const manual = Number(screen.getByTestId(`month-${k}-manual`).textContent);
+      expect(ai + manual, k).toBe(k === 'went' ? 3 : 0);
+    }
+  });
+
   /** 🔴 เจ้าของสั่ง 1 ต.ค. 2569 (Choice "เอาออกทั้งสองอย่าง") — แถว "ยังไม่มีผลกลับ" + ประโยคใต้ถังถอดแล้ว */
   it('🔴 การ์ดผลของเดือนไม่มีแถว "ยังไม่มีผลกลับ" และไม่มีประโยค "ถังพวกนี้อ่านจาก…"', () => {
     renderCalendar([entry({ id: 'a', call_round: 1 })]);
