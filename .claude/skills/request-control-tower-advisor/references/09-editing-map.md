@@ -12136,3 +12136,15 @@ Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แ�
 | `src/pages/follow/FollowPage.tsx` | แท็บส่งคนแทน: ปุ่มมุมขวาแถวแท็บ = "ดึงตอนนี้" (`pullIrecruitNow` → `runReplaceSyncNow` แล้ว `reload(true)` · toast ผล) เฉพาะหัวหน้างานขึ้นไป · คนอื่นไม่มีปุ่ม (หน้ารีเฟรชเองทุก 25 วิ) · แท็บอื่นยังเป็นปุ่มรีเฟรช |
 | `src/components/follow/IrecruitReplaceSyncBar.tsx` · `src/components/shared/SectionErrorBoundary.tsx` | **ลบ** (ไม่มีที่ใช้แล้ว) |
 | เทสต์ | followReplacement (`replaceView ?` เหลือ 2 · ปุ่มดึงตอนนี้) · qaRound2 |
+
+## 6 ต.ค. 2569: การ์ด "ผลของเดือนนี้" ใช้นิยามเดียวกับกล่องขั้นตอนของสาย
+
+เจ้าของ: *"จำเป็นต้องเยอะขนาดนี้ไหม"* · *"ไม่ต้องแยกไรนะรวมมันไม่รู้แยกเราเหมือนกันไหม"*
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/components/follow/FollowPlanningCalendar.tsx` | ถอดถังละเอียด 7 ถัง + อัตรารับสาย/ได้คุย (`followCallMicro` · 13 ก.ย.) · `monthBoxes` นับด้วย `callCategory` → `followMatrixColOfCategory` (ตัวเดียวกับ `buildFollowCallMatrix` · เฉพาะสายที่มีเลขสาย) · วง = ตอบว่าไป ÷ สายที่มีผล · 3 ช่อง ตอบว่าไป/ไม่ไป/สรุปไม่ได้ (`month-result-boxes`) |
+| เทสต์ | FollowPlanningCalendar (ไม่มีถังละเอียด · 3 ช่อง · ฐาน "จาก N สายที่มีผล") |
+
+- ⚠️ นิยามกลางนับ "รับสายแล้ว" (acknowledged) ของ AI เป็น **ตอบว่าไป** (CALL_OUTCOME_TONE success) — เจ้าของเคยทัก 13 ก.ย. ว่าไม่ใช่ · ถามเจ้าของแล้ว รอเคาะว่าย้ายไปสรุปไม่ได้ทั้งระบบไหม
+- `followCallMicro.ts` ยังอยู่ (ไม่มีจอไหนใช้แล้วนอกจากเทสต์ของมัน)

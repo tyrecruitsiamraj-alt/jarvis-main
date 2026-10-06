@@ -43,16 +43,7 @@ import {
 } from '@/lib/followPlanning';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
-import {
-  classifyFollowCall,
-  followMicroRates,
-  FOLLOW_MICRO_HINT,
-  FOLLOW_MICRO_LABEL,
-  FOLLOW_MICRO_TONE,
-  summarizeFollowMicro,
-  type FollowMicroInput,
-  type FollowMicroOutcome,
-} from '@/lib/followCallMicro';
+import { FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE, followMatrixColOfCategory } from '@/lib/followCallMatrix';
 import { DASH } from '@/lib/designTokens';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -461,31 +452,23 @@ const FollowPlanningCalendar: React.FC<{
   const decided = monthSummary.went + monthSummary.notWent;
 
   /**
-   * ═══ ผลแบบละเอียด + Success Rate (เจ้าของสั่ง 13 ก.ย. 2569) ═══
-   *
-   * > *"อยากรู้แบบ micro รับสายเท่าไหร่ ไม่รับเท่าไหร่ รับแล้ววาง รับแล้วคุยแต่ไป
-   * >  รับแล้วคุยแต่ไม่ไป อยากรู้ละเอียดระดับนั้น เพื่อทำ Success Rate"*
-   *
-   * 🔴 ของเดิมวงกลมเขียนว่า "ตอบว่าไป" แล้วเอา `acknowledged` มานับเป็นไปทั้งกอง
-   * ทั้งที่ในกองนั้นมีทั้ง *"ยังไม่ได้ไป"* *"ไปหาหมอ"* *"กำลังอาบน้ำ"* ปนกัน
-   * ⇒ วัดกับผลจริง 37 สาย วงจะขึ้น 88.6% ทั้งที่ไม่มีใคร `confirmed` สักสาย
-   * นิยามใหม่อยู่ที่ `followCallMicro.ts` ที่เดียว (อ่านคำพูดจริง + สรุปของ AI)
+   * ═══ ผลของเดือน = นิยามเดียวกับกล่องขั้นตอนของสาย (เจ้าของ 6 ต.ค. 2569) ═══
+   * > *"จำเป็นต้องเยอะขนาดนี้ไหม"* · *"ไม่ต้องแยกไรนะรวมมันไม่รู้แยกเราเหมือนกันไหม"*
+   * เดิมแยก 7 ถังด้วยตัวอ่านคำพูด (`followCallMicro` · 13 ก.ย.) คนละนิยามกับกล่องข้างบน ⇒ เหลือ ไป / ไม่ไป / สรุปไม่ได้
+   * นับด้วย `callCategory` → `followMatrixColOfCategory` ตัวเดียวกับ `buildFollowCallMatrix` (เฉพาะสายที่มีเลขสาย)
    */
-  const monthMicro = useMemo(() => {
-    const calls: FollowMicroInput[] = [];
+  const monthBoxes = useMemo(() => {
+    const out = { went: 0, notWent: 0, unclear: 0 };
     for (const r of monthSource) {
       for (const round of r.rounds) {
-        if (round.ymd?.slice(0, 7) !== month) continue;
-        calls.push({
-          outcome: round.entry.call_outcome,
-          reply: round.entry.call_reply,
-          summary: round.entry.call_summary,
-        });
+        if (round.ymd?.slice(0, 7) !== month || followRoundSlot(round.entry) === null) continue;
+        const col = followMatrixColOfCategory(callCategory(round));
+        if (col === 'went' || col === 'notWent' || col === 'unclear') out[col] += 1;
       }
     }
-    return summarizeFollowMicro(calls);
+    return out;
   }, [monthSource, month]);
-  const microRates = followMicroRates(monthMicro);
+  const monthWithResult = monthBoxes.went + monthBoxes.notWent + monthBoxes.unclear;
 
   const overdueAll = useMemo(() => {
     const out: Array<{ row: FollowPlanningRow; round: FollowPlanningRound }> = [];
@@ -1334,57 +1317,21 @@ const FollowPlanningCalendar: React.FC<{
              * แทนของ 12 ก.ย. ที่สลับวงกลมไปเป็นกล่องข้อความ + ประโยคอธิบาย (สูงไม่เท่าวงกลม)
              */}
             <div className="mt-3">
-              <Donut percent={microRates.successRate ?? 0} caption="บอกว่าไป" />
+              <Donut percent={monthWithResult > 0 ? (monthBoxes.went / monthWithResult) * 100 : 0} caption="ตอบว่าไป" />
             </div>
+            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">{`จาก ${monthWithResult} สายที่มีผล`}</p>
 
-            {/**
-             * 🔴 **บอกฐานติดกับตัวเลขเสมอ** — Success Rate หารด้วย "สายที่ได้คุย"
-             * ไม่ใช่สายทั้งหมด · ของเดิมวงไม่บอกฐาน คนเลยอ่านเป็นอัตราคนมาทำงานจริง
-             */}
-            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-              {`จาก ${monthMicro.talked} สายที่ได้คุย`}
-            </p>
-
-            {/* สองอัตราที่เหลือ — คนละฐานกับวง จึงต้องเขียนฐานกำกับทุกตัว */}
-            <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-border/70 pt-3 text-[12px]">
-              <div className={cn('rounded-xl px-2.5 py-2', TONE.neutral.soft)}>
-                <dt className="text-[11px] text-muted-foreground">มีคนรับสาย</dt>
-                <dd className="font-medium tabular-nums text-foreground">
-                  {`${(microRates.reachRate ?? 0).toFixed(0)}%`}
-                  <span className="ml-1 text-[10.5px] font-normal text-muted-foreground">
-                    {monthMicro.pickedUp}/{monthMicro.withResult} สาย
-                  </span>
-                </dd>
-              </div>
-              <div className={cn('rounded-xl px-2.5 py-2', TONE.neutral.soft)}>
-                <dt className="text-[11px] text-muted-foreground">ได้คุยเรื่องของเรา</dt>
-                <dd className="font-medium tabular-nums text-foreground">
-                  {`${(microRates.talkRate ?? 0).toFixed(0)}%`}
-                  <span className="ml-1 text-[10.5px] font-normal text-muted-foreground">
-                    {monthMicro.talked}/{monthMicro.withResult} สาย
-                  </span>
-                </dd>
-              </div>
-            </dl>
-
-            {/* ── ผลละเอียดทุกถัง ── หนึ่งสายอยู่ถังเดียว รวมกัน = สายที่มีผลกลับ */}
-            <dl className="mt-3 space-y-1.5 border-t border-border/70 pt-3 text-[12px]">
-              {(Object.keys(FOLLOW_MICRO_LABEL) as FollowMicroOutcome[]).map((k) => (
-                <div key={k} className="flex items-baseline justify-between gap-2" title={FOLLOW_MICRO_HINT[k]}>
+            {/* สามช่องชุดเดียวกับกล่องขั้นตอนของสาย — คำ/สี/นิยามเดียวกัน (6 ต.ค. 2569) */}
+            <dl className="mt-3 space-y-1.5 border-t border-border/70 pt-3 text-[12px]" data-testid="month-result-boxes">
+              {(['went', 'notWent', 'unclear'] as const).map((k) => (
+                <div key={k} className="flex items-baseline justify-between gap-2">
                   <dt className="flex items-center gap-1.5 text-muted-foreground">
-                    <span
-                      className={cn('h-1.5 w-1.5 shrink-0 rounded-full', TONE[FOLLOW_MICRO_TONE[k]].dot)}
-                      aria-hidden
-                    />
-                    {FOLLOW_MICRO_LABEL[k]}
+                    <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', TONE[FOLLOW_MATRIX_COL_TONE[k]].dot)} aria-hidden />
+                    {FOLLOW_MATRIX_COL_LABEL[k]}
                   </dt>
-                  <dd className={cn('font-medium tabular-nums', TONE[FOLLOW_MICRO_TONE[k]].value)}>
-                    {monthMicro[k]}
-                  </dd>
+                  <dd className={cn('font-medium tabular-nums', TONE[FOLLOW_MATRIX_COL_TONE[k]].value)}>{monthBoxes[k]}</dd>
                 </div>
               ))}
-              {/* 🔴 แถว "ยังไม่มีผลกลับ" + ประโยคใต้ถัง ("ถังพวกนี้อ่านจากคำที่เขาพูด…") ถอดแล้ว —
-                  เจ้าของสั่ง 1 ต.ค. 2569 (Choice "เอาออกทั้งสองอย่าง") · ห้ามเติมกลับ */}
             </dl>
           </Card>
 
