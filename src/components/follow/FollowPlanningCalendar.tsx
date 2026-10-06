@@ -24,19 +24,17 @@ import {
   filterPlanningRowsByRound,
   isGoodResult,
   monthDayColumns,
-  personMonthSummary,
   roundAiSummary,
   roundDispatchReason,
   roundEmergencyPhone,
   roundPushError,
   roundPushFailed,
   roundReplyText,
+  followRoundLabel,
   roundResultLabel,
   answeredButMarkedUnreached,
   ANSWERED_UNCLEAR_LABEL,
   roundTone,
-  summarizeFollowCalls,
-  type FollowCallCategory,
   type FollowPlanningRound,
   type FollowPlanningRow,
   type FollowRoundFilter,
@@ -240,14 +238,10 @@ const STAFF_AT = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', ho
  * 🔴 เหลือแค่จุดสี + คำตอบ (เจ้าของสั่ง 1 ต.ค. 2569: *"พวกอักษรที่เขียนว่า เขียว แดง ฯลฯ เอาออก เหลือแค่สีกับคำตอบก็พอ มันรก"*)
  *    ห้ามเติมชื่อสี/วงเล็บอธิบายกลับ
  */
-const DAY_LEGEND: ReadonlyArray<[keyof typeof TONE, string]> = [
-  ['success', 'ตอบว่าไป'],
-  ['danger', 'ตอบว่าไม่ไป'],
-  ['warn', 'ยังไม่รู้ผล'],
-  ['primary', 'ยังไม่ถึงเวลา'],
-  ['orange', 'ไม่ได้ส่งให้ AI'],
-  ['neutral', 'ยกเลิก'],
-];
+// 🔴 สร้างจากหมวดกลาง (คำ + สี) — คำเดียวกับป้ายในตารางและช่องบนแผง (6 ต.ค. 2569)
+const DAY_LEGEND: ReadonlyArray<[keyof typeof TONE, string]> = (
+  ['agreed', 'lost', 'unreachable', 'other', 'waiting', 'overdue', 'notSent', 'cancelled'] as const
+).map((c) => [FOLLOW_CALL_CATEGORY_TONE[c], FOLLOW_CALL_CATEGORY_LABEL[c]]);
 
 const NAV_BTN = cn(
   'inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors',
@@ -334,10 +328,16 @@ const FollowPlanningCalendar: React.FC<{
    * (`rows` ถูกตัวกรองวันของหน้าแม่บีบเหลือวันเดียวเมื่อเลือกวัน ⇒ มองไม่เห็นแผนวันอื่น)
    */
   allRows?: readonly FollowPlanningRow[];
+  /**
+   * แถวของการ์ด "ผลของเดือนนี้" + "ต้องตามด่วน" — ทั้งเดือนตามตัวกรองเดียวกับแผงขั้นตอน (6 ต.ค. 2569)
+   * ไม่ส่ง = ใช้ `rows` (พฤติกรรมเดิม · เทสต์)
+   */
+  summaryRows?: readonly FollowPlanningRow[];
   /** บอกหน้าแม่ว่าดูรายวันหรือรายเดือนอยู่ — แผงรอบโทรนับช่วงตามนี้ (3 ต.ค. 2569) */
   onViewChange?: (view: 'day' | 'month') => void;
 }> = ({
   rows,
+  summaryRows,
   month,
   onMonthChange,
   selectedYmd,
@@ -371,7 +371,6 @@ const FollowPlanningCalendar: React.FC<{
     for (const c of buildFollowDayCalls(rows, dayYmd, 'all')) if (c.slot) found.add(c.slot);
     return [...found].sort((a, b) => a - b);
   }, [rows, dayYmd]);
-  const daySummary = useMemo(() => summarizeFollowCalls(dayCalls.map((c) => c.round)), [dayCalls]);
   /**
    * วันถัดไปที่มีแผน (3 ต.ค. 2569 — เจ้าของแจ้ง *"ลงแผนเป็นเดือนแล้วแผนหาย"* · ตรวจฐานแล้ว
    * แผนอยู่ครบ ที่หายคือ**สายตา**: มุมมองรายวันเปิดที่วันนี้ แผนที่เริ่มวันหน้าเลยมองไม่เห็น)
@@ -418,6 +417,11 @@ const FollowPlanningCalendar: React.FC<{
     [rows, roundFilter],
   );
   const monthRows = useMemo(() => buildFollowMonthRows(monthSource, month), [monthSource, month]);
+  /** การ์ดผลของเดือน + ต้องตามด่วน — ชุดทั้งเดือนจากหน้าแม่ (ไม่หดตามกล่อง/วัน) · ยังเคารพ "สายที่" */
+  const summarySource = useMemo(() => {
+    const base = summaryRows ?? rows;
+    return roundFilter === 'all' ? base : filterPlanningRowsByRound(base, roundFilter);
+  }, [summaryRows, rows, roundFilter]);
   /**
    * 🔴 รายเดือนแบ่งหน้า หน้าละ 10 คน (เจ้าของสั่ง 5 ต.ค. 2569: *"รายเดือน · ภาพรวม ทำเป็น pagination ด้วยหน้าละ 10"*)
    * เปลี่ยนเดือน/สาย = กลับหน้า 1 · ตัวเลขแผงข้างขวายังนับทั้งเดือน (ไม่ใช่แค่หน้าที่ดู)
@@ -442,45 +446,40 @@ const FollowPlanningCalendar: React.FC<{
    * ⚠️ ของเขามี Show-up Rate จริง (คนมาเริ่มงานจริงกี่ %) — **เราไม่มีข้อมูลนั้นในฐาน**
    *    จึงไม่ทำ ไม่ใช่ลืม (แต่งเลขใส่จอ = จอโกหก)
    */
-  const monthSummary = useMemo(
-    () =>
-      summarizeFollowCalls(
-        monthSource.flatMap((r) => r.rounds.filter((x) => x.ymd?.slice(0, 7) === month)),
-      ),
-    [monthSource, month],
-  );
-  const decided = monthSummary.went + monthSummary.notWent;
 
   /**
    * ═══ ผลของเดือน = นิยามเดียวกับกล่องขั้นตอนของสาย (เจ้าของ 6 ต.ค. 2569) ═══
    * > *"จำเป็นต้องเยอะขนาดนี้ไหม"* · *"ไม่ต้องแยกไรนะรวมมันไม่รู้แยกเราเหมือนกันไหม"*
-   * เดิมแยก 7 ถังด้วยตัวอ่านคำพูด (`followCallMicro` · 13 ก.ย.) คนละนิยามกับกล่องข้างบน ⇒ เหลือ ไป / ไม่ไป / สรุปไม่ได้
+   * เดิมแยก 7 ถังด้วยตัวอ่านคำพูด (`followCallMicro` · 13 ก.ย.) คนละนิยามกับกล่องข้างบน ⇒ เหลือ ไป / ไม่ไป / ไม่รับสาย / สรุปไม่ได้
+   * (4 ช่องตามนิยามเจ้าของ 6 ต.ค. 2569 — ตัวอ่านคำพูดย้ายไปอยู่ใน `callCategory` แล้ว ทุกจอใช้ตัวเดียว)
    * นับด้วย `callCategory` → `followMatrixColOfCategory` ตัวเดียวกับ `buildFollowCallMatrix` (เฉพาะสายที่มีเลขสาย)
    */
   const monthBoxes = useMemo(() => {
-    const out = { went: 0, notWent: 0, unclear: 0 };
-    for (const r of monthSource) {
+    const out = { went: 0, notWent: 0, noAnswer: 0, unclear: 0 };
+    for (const r of summarySource) {
       for (const round of r.rounds) {
         if (round.ymd?.slice(0, 7) !== month || followRoundSlot(round.entry) === null) continue;
         const col = followMatrixColOfCategory(callCategory(round));
-        if (col === 'went' || col === 'notWent' || col === 'unclear') out[col] += 1;
+        if (col === 'went' || col === 'notWent' || col === 'noAnswer' || col === 'unclear') out[col] += 1;
       }
     }
     return out;
-  }, [monthSource, month]);
-  const monthWithResult = monthBoxes.went + monthBoxes.notWent + monthBoxes.unclear;
+  }, [summarySource, month]);
+  const monthWithResult = monthBoxes.went + monthBoxes.notWent + monthBoxes.noAnswer + monthBoxes.unclear;
 
   const overdueAll = useMemo(() => {
     const out: Array<{ row: FollowPlanningRow; round: FollowPlanningRound }> = [];
-    for (const row of monthSource) {
+    for (const row of summarySource) {
       for (const round of row.rounds) {
+        // ทั้งเดือนจริง (หัวการ์ดบอก "ทั้งเดือน" · 6 ต.ค. 2569 เดิมไม่กรองเดือน)
+        if (round.ymd?.slice(0, 7) !== month) continue;
         if (callCategory(round) === 'overdue') out.push({ row, round });
       }
     }
     return out.sort((a, b) =>
       (a.round.entry.scheduled_at ?? '').localeCompare(b.round.entry.scheduled_at ?? ''),
     );
-  }, [monthSource]);
+  }, [summarySource, month]);
 
   /**
    * เดือนหนึ่งมี 30 คอลัมน์ ⇒ เปิดมาเจอต้นเดือนซึ่งมักว่างเปล่า **ดูเหมือนไม่มีงาน**
@@ -501,7 +500,6 @@ const FollowPlanningCalendar: React.FC<{
     box.scrollLeft = Math.max(0, cell.offsetLeft - 220);
   }, [focusYmd, view]);
 
-  const statTone = (c: FollowCallCategory) => TONE[FOLLOW_CALL_CATEGORY_TONE[c]].value;
 
   return (
     <div className="space-y-4">
@@ -797,17 +795,8 @@ const FollowPlanningCalendar: React.FC<{
                                      */
                                     const failed = roundPushFailed(round);
                                     /* ผลที่คนลงเอง = คำของปุ่มที่เขากด ("คนโทร: ติดต่อสำเร็จ") — ไม่ใช่หัวหมวดของ AI */
-                                    const chipText =
-                                      round.state === 'result' && isStaffCallResult(round.entry)
-                                        ? `คนโทร: ${roundResultLabel(round)}`
-                                        : round.state === 'result' && answeredButMarkedUnreached(round.entry)
-                                          ? ANSWERED_UNCLEAR_LABEL
-                                          : `${FOLLOW_CALL_CATEGORY_LABEL[category]}${
-                                            round.state === 'result' &&
-                                            (category === 'unreachable' || round.entry.call_outcome === 'acknowledged')
-                                              ? ` — ${roundResultLabel(round)}`
-                                              : ''
-                                          }`;
+                                    // ป้ายตัวเดียวกับสรุปแผน/รูป (`followRoundLabel` · 6 ต.ค. 2569)
+                                    const chipText = followRoundLabel(round);
                                     return (
                                       <span
                                         key={round.entry.id}
@@ -1165,14 +1154,16 @@ const FollowPlanningCalendar: React.FC<{
                     </tr>
                   ) : null}
                   {monthPageRows.map(({ row, byDay }) => {
-                    const s = personMonthSummary(row, month);
-                    const parts: Array<[FollowCallCategory, number]> = (
-                      [
-                        ['agreed', s.went],
-                        ['lost', s.notWent],
-                        ['overdue', s.unknown],
-                      ] as Array<[FollowCallCategory, number]>
-                    ).filter(([, n]) => n > 0);
+                    // ช่องเดียวกับแผงขั้นตอน — รวมทุกช่อง = N สาย (6 ต.ค. 2569 "บวกลบกันแล้วต้องเท่ากัน")
+                    const monthCalls = row.rounds.filter((r) => r.ymd?.slice(0, 7) === month);
+                    const colCount = new Map<string, number>();
+                    for (const r of monthCalls) {
+                      const col = followMatrixColOfCategory(callCategory(r));
+                      colCount.set(col, (colCount.get(col) ?? 0) + 1);
+                    }
+                    const parts = (['went', 'notWent', 'noAnswer', 'unclear', 'waiting', 'cancelled'] as const)
+                      .map((c) => [c, colCount.get(c) ?? 0] as const)
+                      .filter(([, n]) => n > 0);
                     return (
                       <tr key={row.group.key} className="border-b border-border/50 last:border-0">
                         <td className="sticky left-0 z-10 max-w-[260px] bg-card px-4 py-2 align-top md:px-5">
@@ -1190,11 +1181,11 @@ const FollowPlanningCalendar: React.FC<{
                           </span>
                           <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[10px]">
                             <span className="font-medium tabular-nums text-foreground">
-                              {s.total} ครั้ง
+                              {monthCalls.length} สาย
                             </span>
                             {parts.map(([c, n]) => (
-                              <span key={c} className={cn('font-medium', statTone(c))}>
-                                {c === 'overdue' ? 'ยังไม่รู้ผล' : FOLLOW_CALL_CATEGORY_LABEL[c]} {n}
+                              <span key={c} className={cn('font-medium', TONE[FOLLOW_MATRIX_COL_TONE[c]].value)}>
+                                {FOLLOW_MATRIX_COL_LABEL[c]} {n}
                               </span>
                             ))}
                           </span>
@@ -1323,7 +1314,7 @@ const FollowPlanningCalendar: React.FC<{
 
             {/* สามช่องชุดเดียวกับกล่องขั้นตอนของสาย — คำ/สี/นิยามเดียวกัน (6 ต.ค. 2569) */}
             <dl className="mt-3 space-y-1.5 border-t border-border/70 pt-3 text-[12px]" data-testid="month-result-boxes">
-              {(['went', 'notWent', 'unclear'] as const).map((k) => (
+              {(['went', 'notWent', 'noAnswer', 'unclear'] as const).map((k) => (
                 <div key={k} className="flex items-baseline justify-between gap-2">
                   <dt className="flex items-center gap-1.5 text-muted-foreground">
                     <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', TONE[FOLLOW_MATRIX_COL_TONE[k]].dot)} aria-hidden />

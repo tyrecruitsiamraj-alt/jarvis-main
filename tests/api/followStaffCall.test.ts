@@ -162,10 +162,11 @@ describe('ปฏิทิน: ลงผลแล้วช่องต้อง�
     expect(roundResultLabel(r)).toBe('ติดต่อไม่ได้');
   });
 
-  it('ลงผล "ติดต่อสำเร็จ" = เขียว (ชุดเดียวกับ "รับสายแล้ว" ของ AI) · คำบนจอ "ติดต่อสำเร็จ"', () => {
+  it('ลงผล "ติดต่อสำเร็จ" (ชุดเก่า) = สรุปไม่ได้ (ไม่บอกว่าไปไหม · 6 ต.ค. 2569) · คำบนจอ "ติดต่อสำเร็จ"', () => {
     const r = round(entry({ staff_call_outcome: 'acknowledged', staff_called_at: '2026-09-30T03:00:00Z' }));
     expect(r.state).toBe('result');
-    expect(roundTone(r)).toBe('success');
+    expect(callCategory(r)).toBe('other');
+    expect(roundTone(r)).toBe('violet');
     expect(roundResultLabel(r)).toBe('ติดต่อสำเร็จ');
     expect(inFollowRoundBucket(r.entry, 'connected')).toBe(true);
   });

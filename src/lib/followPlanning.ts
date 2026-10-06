@@ -2,6 +2,7 @@ import type { FollowEntry } from '@/lib/followApi';
 import type { FollowGroup } from '@/lib/followGrouping';
 import { CALL_OUTCOME_TONE, followCallOutcomeText } from '@/lib/callOutcomeTone';
 import { followDispatchLabel } from '@/lib/followDispatchState';
+import { classifyFollowCall } from '@/lib/followCallMicro';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { effectiveCallOutcome, followStaffCallText, isStaffCallResult } from '@/lib/followStaffCall';
 import { UNREACHED_CALL_OUTCOMES } from '@/lib/callOutcomeBuckets';
@@ -343,6 +344,24 @@ export function answeredButMarkedUnreached(
   return /[\p{L}\p{N}]/u.test(entry.call_reply ?? '');
 }
 
+/**
+ * ═══ ป้ายผลของสายหนึ่งสาย — ตัวเดียวทั้งตาราง สรุปแผน รูป (6 ต.ค. 2569 "เอาคำให้ตรงกันไปเลย") ═══
+ * = คำของหมวด (ชุดเดียวกับช่องบนแผง) + รายละเอียดหลังขีด
+ * ผลที่คนลงเอง = "… · คนโทร" · ไม่รับสาย/สรุปไม่ได้ บอกผลดิบต่อท้ายเมื่อคำไม่ซ้ำ
+ */
+export function followRoundLabel(round: FollowPlanningRound): string {
+  const category = callCategory(round);
+  const base = FOLLOW_CALL_CATEGORY_LABEL[category];
+  if (round.state !== 'result') return base;
+  if (isStaffCallResult(round.entry)) return `${base} · คนโทร`;
+  if (answeredButMarkedUnreached(round.entry)) return `${base} — รับสายแล้ว`;
+  if (category === 'unreachable' || category === 'other') {
+    const raw = roundResultLabel(round);
+    if (raw !== base) return `${base} — ${raw}`;
+  }
+  return base;
+}
+
 /** ป้ายของกรณีข้างบน — คำเดียวทั้งแถว รายงาน และรูป */
 export const ANSWERED_UNCLEAR_LABEL = 'สรุปไม่ได้ · รับสายแล้ว';
 
@@ -399,11 +418,12 @@ export function roundTone(round: FollowPlanningRound): ToneKey {
       // สีตามถังของผลที่คนกด (closedCallCategory) — ยกเลิก = เทา ไม่ใช่แดง (5 ต.ค. 2569)
       return FOLLOW_CALL_CATEGORY_TONE[closedCallCategory(e.outcome_code)];
     case 'result':
-      return CALL_OUTCOME_TONE[(effectiveCallOutcome(e) ?? '') as keyof typeof CALL_OUTCOME_TONE] ?? 'warn';
+      // 🔴 สีตามหมวดเดียวกับป้าย (6 ต.ค. 2569 — เดิมใช้สีรหัสผล "รับสายแล้ว" เขียวทั้งที่ป้ายบอกสรุปไม่ได้)
+      return FOLLOW_CALL_CATEGORY_TONE[callCategory(round)];
     case 'notSent':
       return 'orange';
     case 'overdue':
-      return 'warn';
+      return FOLLOW_CALL_CATEGORY_TONE.overdue;
     case 'sent':
       return 'primary';
     default:
@@ -621,12 +641,13 @@ export type FollowCallCategory =
 export const FOLLOW_CALL_CATEGORY_LABEL: Record<FollowCallCategory, string> = {
   agreed: 'ตอบว่าไป',
   lost: 'ตอบว่าไม่ไป',
-  unreachable: 'ไม่ได้คำตอบ',
-  waiting: 'ยังไม่ถึงเวลา',
-  overdue: 'เลยเวลานัด',
-  notSent: 'ไม่ได้ส่งให้ AI',
+  unreachable: 'ไม่รับสาย',
+  // 🔴 ขึ้นต้นด้วย "รอโทร" = คำของช่องบนแผง (ช่องรอโทร = สามหมวดนี้รวมกัน · 6 ต.ค. 2569)
+  waiting: 'รอโทร · ยังไม่ถึงเวลา',
+  overdue: 'รอโทร · เลยเวลานัด',
+  notSent: 'รอโทร · ไม่ได้ส่งให้ AI',
   cancelled: 'ยกเลิก',
-  other: 'ยังไม่รู้ผล',
+  other: 'สรุปไม่ได้',
 };
 
 /** สีของหมวด — ต้องเท่ากับ `roundTone` ของรอบในหมวดนั้น ไม่งั้นเลขกับชิปสีคนละเรื่อง */
@@ -635,11 +656,63 @@ export const FOLLOW_CALL_CATEGORY_TONE: Record<FollowCallCategory, ToneKey> = {
   unreachable: 'warn',
   lost: 'danger',
   waiting: 'primary',
-  overdue: 'warn',
+  // ฟ้า (6 ต.ค. 2569) — เหลืองเป็นของ "ไม่รับสาย" แล้ว สองหมวดห้ามสีเดียวกัน
+  overdue: 'info',
   notSent: 'orange',
   cancelled: 'neutral',
-  other: 'warn',
+  // สรุปไม่ได้ = ม่วง (6 ต.ค. 2569) — ไม่ชนเหลืองของไม่รับสาย · ชุดเดียวกับช่องของแผง
+  other: 'violet',
 };
+
+/**
+ * ═══ หมวดของสายที่มีผลแล้ว — 4 ช่องตามที่เจ้าของนิยาม (6 ต.ค. 2569) ═══
+ * > *"1. ไป คือ มีคำตอบที่ดูแล้วว่าไป 2. ไม่ไป คือ คำตอบที่ดูแล้วว่าไม่ไป 3. ไม่รับสาย ก็ไม่รับสาย
+ * >  4. สรุปไม่ได้คือ คำตอบกำกวม ไม่รู้อะว่าไปไหม"*
+ *
+ * - ผลจาก AI = **อ่านคำตอบจริง** (`classifyFollowCall` — คำพูด + สรุป) ไม่ใช่รหัสผลอย่างเดียว
+ *   (รหัส `acknowledged` "รับสายแล้ว" เคยนับเป็นไปทั้งกอง ทั้งที่บางสายบอก "ยังไม่ได้ไป" — เจ้าของทัก 13 ก.ย.)
+ *   บอกว่าไป · ยังเตรียมตัวอยู่ = ไป · บอกว่าไม่ไป = ไม่ไป · ไม่มีคนรับ = ไม่รับสาย ·
+ *   รับแล้วเงียบ / ไม่ใช่เจ้าตัว / คุยแต่ไม่บอก = สรุปไม่ได้
+ * - ผลที่คนลงเอง = ปุ่มที่คนกด (ไป · ไม่ไป · ติดต่อไม่ได้ · ที่เหลือ = สรุปไม่ได้)
+ * - ผลรหัส `cancelled` ของ Lumos = ยกเลิก
+ */
+function resultCallCategory(e: FollowEntry): FollowCallCategory {
+  const code = effectiveCallOutcome(e) ?? '';
+  if (code === 'cancelled') return 'cancelled';
+  if (isStaffCallResult(e)) {
+    if (code === 'confirmed') return 'agreed';
+    if (code === 'declined') return 'lost';
+    if (UNREACHED_CALL_OUTCOMES.includes(code as (typeof UNREACHED_CALL_OUTCOMES)[number])) return 'unreachable';
+    return 'other';
+  }
+  // ขอเลื่อน = ยังไม่รู้ว่าไปไหม (ทั้งผลของ AI และของคน · ปิดงาน "เลื่อน" ก็อยู่สรุปไม่ได้)
+  if (code === 'reschedule_requested') return 'other';
+  /**
+   * Lumos บอก "ไม่รับสาย" แต่มีคำพูดผู้รับสาย (เคสนายบรรจบ "ครับ ครับ ผม") = รับสายแล้ว ⇒ อ่านคำตอบแทนรหัส
+   * (เจ้าของ: "ไม่รับสาย ก็ไม่รับสาย" — มีคนพูดแปลว่ารับ)
+   */
+  const outcomeForReading = answeredButMarkedUnreached(e) ? 'acknowledged' : e.call_outcome;
+  switch (classifyFollowCall({ outcome: outcomeForReading, reply: e.call_reply, summary: e.call_summary })) {
+    case 'said_going':
+    case 'getting_ready':
+      return 'agreed';
+    case 'said_not_going':
+      return 'lost';
+    case 'no_pickup':
+      return 'unreachable';
+    case 'wrong_person':
+    case 'picked_silent':
+    case 'talked_unclear':
+      return 'other';
+    default: {
+      // อ่านไม่ออกเลย — ถอยไปใช้สีของรหัสผล (พฤติกรรมเดิม)
+      const tone = CALL_OUTCOME_TONE[code as keyof typeof CALL_OUTCOME_TONE];
+      if (tone === 'success') return 'agreed';
+      if (tone === 'danger') return 'lost';
+      return 'other';
+    }
+  }
+}
 
 export function callCategory(round: FollowPlanningRound): FollowCallCategory {
   /** 🔴 คนกดจัดการของวันนั้นแล้ว = ทุกสายของวันนั้นไปถังตามที่คนกด ทับคำตอบ AI (5 ต.ค. 2569) */
@@ -650,13 +723,8 @@ export function callCategory(round: FollowPlanningRound): FollowCallCategory {
       return 'cancelled';
     case 'closed':
       return closedCallCategory(e.outcome_code);
-    case 'result': {
-      const tone = CALL_OUTCOME_TONE[(effectiveCallOutcome(e) ?? '') as keyof typeof CALL_OUTCOME_TONE];
-      if (tone === 'success') return 'agreed';
-      if (tone === 'danger') return 'lost';
-      if (tone === 'neutral') return 'cancelled';
-      return 'unreachable';
-    }
+    case 'result':
+      return resultCallCategory(e);
     case 'overdue':
       return 'overdue';
     case 'notSent':

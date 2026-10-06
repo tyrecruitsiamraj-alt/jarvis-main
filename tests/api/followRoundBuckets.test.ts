@@ -158,8 +158,8 @@ describe('🔴 แดชบอร์ดการโทร — สายที่
     expect(followRoundSlot({ call_attempt: 3, call_status: 'completed' })).toBe(3);
   });
 
-  it('ยังไม่เคยเข้าคิวและไม่มีผล = ยังไม่อยู่รอบไหน', () => {
-    expect(followRoundSlot({ call_attempt: null, call_status: 'pending', call_outcome: null })).toBeNull();
+  it('ไม่รู้ลำดับเลย = สายที่ 1 (6 ต.ค. 2569 — เดิม null ทำให้แผงไม่นับแต่หน้าหลัก/ตารางนับ)', () => {
+    expect(followRoundSlot({ call_attempt: null, call_status: 'pending', call_outcome: null })).toBe(1);
   });
 
   it('เกิน 3 รวบเป็น 3 (เพดานเริ่มต้นคือ 3 ครั้ง)', () => {

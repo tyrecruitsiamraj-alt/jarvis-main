@@ -25,10 +25,11 @@ export type FollowMatrixRowKey = 'all' | 1 | 2 | 3;
  * 🔴 "รอโทร" กับ "สรุปไม่ได้" แยกกัน (เจ้าของสั่ง 4 ต.ค. 2569: *"สรุปผลไม่ได้คือโทรไปแล้วแต่ไม่รู้ผล
  * คือไปหรือไม่"*) — เดิมรวมเป็นช่องเดียว "สรุปไม่ได้" ทั้งที่ 30 สายยังไม่ได้โทรเลย
  */
-export type FollowMatrixCol = 'total' | 'went' | 'notWent' | 'unclear' | 'waiting' | 'cancelled';
+export type FollowMatrixCol = 'total' | 'went' | 'notWent' | 'noAnswer' | 'unclear' | 'waiting' | 'cancelled';
 
 export const FOLLOW_MATRIX_ROWS: readonly FollowMatrixRowKey[] = ['all', 1, 2, 3];
-export const FOLLOW_MATRIX_COLS: readonly FollowMatrixCol[] = ['total', 'went', 'notWent', 'unclear', 'waiting', 'cancelled'];
+/** 🔴 ไป · ไม่ไป · ไม่รับสาย · สรุปไม่ได้ — 4 ช่องตามที่เจ้าของนิยาม (6 ต.ค. 2569) */
+export const FOLLOW_MATRIX_COLS: readonly FollowMatrixCol[] = ['total', 'went', 'notWent', 'noAnswer', 'unclear', 'waiting', 'cancelled'];
 
 export const FOLLOW_MATRIX_ROW_LABEL: Record<FollowMatrixRowKey, string> = {
   all: 'ทุกสาย',
@@ -41,17 +42,20 @@ export const FOLLOW_MATRIX_COL_LABEL: Record<FollowMatrixCol, string> = {
   total: 'ทั้งหมด',
   went: 'ตอบว่าไป',
   notWent: 'ตอบว่าไม่ไป',
+  noAnswer: 'ไม่รับสาย',
   unclear: 'สรุปไม่ได้',
   waiting: 'รอโทร',
   cancelled: 'ยกเลิก',
 };
 
 /** สีของคอลัมน์ — สีที่มีความหมายชุดเดิม (เขียว = ไป · แดง = ไม่ไป · เหลือง = ยังไม่รู้) */
-export const FOLLOW_MATRIX_COL_TONE: Record<FollowMatrixCol, 'neutral' | 'success' | 'danger' | 'warn' | 'info'> = {
+export const FOLLOW_MATRIX_COL_TONE: Record<FollowMatrixCol, 'neutral' | 'success' | 'danger' | 'warn' | 'info' | 'violet'> = {
   total: 'neutral',
   went: 'success',
   notWent: 'danger',
-  unclear: 'warn',
+  noAnswer: 'warn',
+  // สีเดียวกับหมวด "สรุปไม่ได้" ของตาราง (FOLLOW_CALL_CATEGORY_TONE.other)
+  unclear: 'violet',
   /** ฟ้า = ยังไม่ถึงเวลา/รอผล (สีเดียวกับป้ายในตาราง) */
   waiting: 'info',
   cancelled: 'neutral',
@@ -63,6 +67,7 @@ const emptyRow = (): Record<FollowMatrixCol, FollowEntry[]> => ({
   total: [],
   went: [],
   notWent: [],
+  noAnswer: [],
   unclear: [],
   waiting: [],
   cancelled: [],
@@ -96,6 +101,7 @@ export function followMatrixColOfCategory(category: FollowCallCategory): Exclude
     case 'lost':
       return 'notWent';
     case 'unreachable':
+      return 'noAnswer';
     case 'other':
       return 'unclear';
     default:

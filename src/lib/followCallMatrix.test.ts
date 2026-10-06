@@ -42,8 +42,10 @@ describe('followMatrixCol — สายหนึ่งสายตกช่อ�
 
   /** เจ้าของ 4 ต.ค. 2569: "สรุปผลไม่ได้คือโทรไปแล้วแต่ไม่รู้ผลคือไปหรือไม่" — แยกจากรอโทร */
   it('🔴 สรุปไม่ได้ = โทรแล้วมีผลแต่ไม่รู้ว่าไปไหม · รอโทร = ยังไม่มีผลเลย', () => {
-    // โทรแล้วไม่รับ = มีผล แต่ไม่รู้ว่าไป
-    expect(followMatrixCol(e({ call_status: 'completed', call_outcome: 'no_answer' }), NOW)).toBe('unclear');
+    // โทรแล้วไม่รับ = ช่องไม่รับสายของมันเอง (6 ต.ค. 2569 — 4 ช่องตามนิยามเจ้าของ)
+    expect(followMatrixCol(e({ call_status: 'completed', call_outcome: 'no_answer' }), NOW)).toBe('noAnswer');
+    // รับแล้วไม่บอกว่าไปไหม = สรุปไม่ได้
+    expect(followMatrixCol(e({ call_status: 'completed', call_outcome: 'acknowledged' }), NOW)).toBe('unclear');
     // ปิดงานด้วย ลา / จำวันผิด = รู้ผลแต่ไม่ใช่ไป/ไม่ไป
     expect(followMatrixCol(e({ completed_at: '2026-10-04T09:00:00+07:00', outcome_code: 'leave' }), NOW)).toBe('unclear');
     // เลยเวลาแต่ผลยังไม่กลับ / ยังไม่ส่ง AI / คนยังไม่โทร = รอโทร

@@ -165,6 +165,10 @@ export function followRoundSlot(row: {
    * `attempt_count` ยังใช้เป็นทางถอยของแถวเก่าที่ไม่มี `call_round`
    */
   if (row.call_round != null) return callAttemptSlot(row.call_round);
-  if (row.call_attempt == null && row.call_status === 'pending' && !row.call_outcome) return null;
+  /**
+   * 🔴 ไม่รู้ลำดับเลย = สายแรก (6 ต.ค. 2569 — เจ้าของ "บวกลบกันแล้วต้องเท่ากัน")
+   * เดิมคืน null ⇒ แผงขั้นตอนไม่นับสายพวกนี้ แต่หน้าหลัก/ตาราง/สรุปแผนนับ ⇒ "ทั้งหมด" สามที่ไม่เท่ากัน
+   */
+  if (row.call_attempt == null) return 1;
   return callAttemptSlot(row.call_attempt);
 }

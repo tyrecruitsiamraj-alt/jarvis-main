@@ -107,17 +107,17 @@ describe('FollowCompletedCard', () => {
     const rows = within(screen.getByTestId('follow-completed-rows')).getAllByRole('row');
     expect(rows).toHaveLength(1);
     expect(within(rows[0]).getByText('นายทดสอบ ระบบ')).toBeTruthy();
-    expect(within(rows[0]).getByText('บอกว่าไป')).toBeTruthy();
+    expect(within(rows[0]).getByText('ตอบว่าไป')).toBeTruthy();
     expect(within(rows[0]).getByRole('button', { name: 'ย้ายไปดูแลหลังเริ่มงาน' })).toBeTruthy();
     expect(within(rows[0]).getByRole('button', { name: 'ไม่ย้าย' })).toBeTruthy();
     expect(screen.getByText('1 คน')).toBeTruthy();
   });
 
-  it('บอกว่าไม่ไป ⇒ ไม่มีปุ่มย้าย เหลือแต่ไม่ย้าย', () => {
+  it('ตอบว่าไม่ไป ⇒ ไม่มีปุ่มย้าย เหลือแต่ไม่ย้าย', () => {
     render(
       <FollowCompletedCard groups={groupsOf([row({ id: 'n1', call_outcome: 'declined' })])} onChanged={() => {}} now={NOW} />,
     );
-    expect(screen.getByText('บอกว่าไม่ไป')).toBeTruthy();
+    expect(screen.getByText('ตอบว่าไม่ไป')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'ย้ายไปดูแลหลังเริ่มงาน' })).toBeNull();
     expect(screen.getByRole('button', { name: 'ไม่ย้าย' })).toBeTruthy();
   });

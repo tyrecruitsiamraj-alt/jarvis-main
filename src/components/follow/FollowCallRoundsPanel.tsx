@@ -30,6 +30,7 @@ import {
 import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
 import {
   FOLLOW_MATRIX_COLS,
+  followMatrixCol,
   FOLLOW_MATRIX_COL_LABEL,
   FOLLOW_MATRIX_COL_TONE,
   FOLLOW_MATRIX_ROWS,
@@ -153,8 +154,9 @@ const PEOPLE_LIFE_LABEL: Record<PeopleLife, string> = {
   closed: 'ปิดงานแล้ว',
   cancelled: 'ยกเลิก',
 };
+/** ยกเลิก = ช่องยกเลิกของแผง (`followMatrixCol`) ไม่ใช่ธงยกเลิกดิบ — สายที่ยกเลิกแต่โทรแล้วมีผลนับตามผล (6 ต.ค. 2569) */
 const lifeOf = (e: FollowEntry): Exclude<PeopleLife, 'all'> =>
-  e.cancelled ? 'cancelled' : e.completed_at ? 'closed' : 'remaining';
+  followMatrixCol(e) === 'cancelled' ? 'cancelled' : e.completed_at || e.cancelled ? 'closed' : 'remaining';
 
 export default function FollowCallRoundsPanel({
   headerExtras,

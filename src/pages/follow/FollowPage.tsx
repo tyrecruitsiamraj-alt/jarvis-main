@@ -36,7 +36,6 @@ import FollowCallRoundsPanel from '@/components/follow/FollowCallRoundsPanel';
 import FollowFilterGroup from '@/components/follow/FollowFilterGroup';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { followScheduleCounts } from '@/lib/followSchedule';
 import { roundTabLabel } from '@/lib/followRoundVisual';
 import { conveyorLabel } from '@/lib/soRecruitNav';
 import { ArrowLeft, Settings2, Plus, X, LoaderCircle, PhoneForwarded, Users, UserCog, Building2, ChevronLeft, ChevronRight, RefreshCw, ClipboardList } from 'lucide-react';
@@ -1292,21 +1291,46 @@ const FollowPage: React.FC = () => {
   );
   const panelScope = useMemo(() => planScopedItems.filter(inPanelRange), [planScopedItems, inPanelRange]);
   /** เลขบนตัวกรอง EX/คนใน — ช่วงที่ปฏิทินดูอยู่ · นับเฉพาะสายที่มีเลขสาย (นิยามเดียวกับแผงขั้นตอน) */
-  const replaceKindCounts = useMemo(
-    () => countReplaceKinds(scopeItems.filter((e) => inPanelRange(e) && followRoundSlot(e) !== null)),
-    [scopeItems, inPanelRange],
+  /**
+   * 🔴 ฐานของเลขบนตัวเลือก = ชุดเดียวกับแผง ถอดเฉพาะตัวกรองของตัวเลือกนั้นเอง (6 ต.ค. 2569 "บวกลบกันแล้วต้องเท่ากัน")
+   * เดิม "ประเภท" ไม่สนค้นหา/วันที่ของแผน/เจ้าของ/ใครโทร และ "วันที่ของแผน" ไม่สนเจ้าของ/ใครโทร ⇒ "ทั้งหมด · N" ≠ แผง
+   */
+  const panelBase = useCallback(
+    (list: readonly FollowEntry[]) => {
+      const inRange = list.filter(inPanelRange);
+      const byOwner = adderKey ? inRange.filter((e) => matchesFollowAdder(e, adderKey)) : inRange;
+      return filterFollowEntries(byOwner, { date: '', band: fBand, caller }).filter((e) => followRoundSlot(e) !== null);
+    },
+    [inPanelRange, adderKey, fBand, caller],
   );
-  /** ตัวเลือก "วันที่ของแผน" นับในช่วงที่ดู (หลังค้นหา ก่อนเลือกวันที่ของแผน) */
-  const planDayOptions = useMemo(
-    () => followPlanDayOptions(searchedItems.filter((e) => inPanelRange(e) && followRoundSlot(e) !== null)),
-    [searchedItems, inPanelRange],
-  );
+  const replaceKindCounts = useMemo(() => {
+    const searched = followSearch.trim() ? scopeItems.filter((e) => matchesFollowSearch(e, followSearch)) : scopeItems;
+    const planned = planDay === 'all' ? searched : searched.filter((e) => followPlanDayOf(e) === Number(planDay));
+    return countReplaceKinds(panelBase(planned));
+  }, [scopeItems, followSearch, planDay, panelBase]);
+  /** ตัวเลือก "วันที่ของแผน" — ฐานเดียวกับแผง ยกเว้นตัวกรองวันที่ของแผนเอง */
+  const planDayOptions = useMemo(() => followPlanDayOptions(panelBase(searchedItems)), [searchedItems, panelBase]);
   /** สายในช่วงที่ดูอยู่ + เจ้าของงาน (ยังไม่กรองใครโทร) — ฐานของเลขบนตัวเลือก "ใครโทร" */
   const panelByOwner = useMemo(
     () => (adderKey ? panelScope.filter((e) => matchesFollowAdder(e, adderKey)) : panelScope),
     [panelScope, adderKey],
   );
-  const panelEntries = useMemo(() => filterFollowEntries(panelByOwner, { date: '', band: '', caller }), [panelByOwner, caller]);
+  // 🔴 ช่วงเวลา (fBand) กรองแผงด้วย — เดิมตารางกรองแต่แผงไม่กรอง ⇒ "N สาย" ใต้ตาราง ≠ ทั้งหมดบนแผง (6 ต.ค. 2569)
+  const panelEntries = useMemo(() => filterFollowEntries(panelByOwner, { date: '', band: fBand, caller }), [panelByOwner, fBand, caller]);
+  /**
+   * ═══ ชุดของการ์ด "ผลของเดือนนี้" + "ต้องตามด่วน · ทั้งเดือน" (6 ต.ค. 2569) ═══
+   * ตัวกรองเดียวกับแผงขั้นตอน แต่ช่วง = ทั้งเดือนของปฏิทินเสมอ · ไม่หดตามกล่องที่กด/วันที่เลือก
+   * (เดิมอ่านแถวของตารางที่ถูกกรองตามกล่อง ⇒ กดกล่อง "ตอบว่าไป" แล้ววงกลมเป็น 100%)
+   */
+  const monthSummaryRows = useMemo(() => {
+    const inMonth = planScopedItems.filter((e) => {
+      if (!e.scheduled_at) return false;
+      const d = new Date(e.scheduled_at);
+      return !Number.isNaN(d.getTime()) && toYmdBangkok(d).slice(0, 7) === calMonth;
+    });
+    const byOwner = adderKey ? inMonth.filter((e) => matchesFollowAdder(e, adderKey)) : inMonth;
+    return buildFollowPlanningRows(groupFollowEntries(filterFollowEntries(byOwner, { date: '', band: fBand, caller })));
+  }, [planScopedItems, calMonth, adderKey, fBand, caller]);
   /**
    * 🔴 เลขบนตัวเลือกนับชุดเดียวกับ "สายที่ · ทั้งหมด" (เจ้าของสั่ง 5 ต.ค. 2569: *"ใครโทร ทั้งหมดเป็นพันเลยคืออะไร
    * มันต้อง 251 แล้ว Ai เท่าไหร่ คนเท่าไหร่"*) — เดิมนับทั้งแท็บตลอดกาล (1,652) · ตอนนี้ = ช่วงที่ปฏิทินดูอยู่
@@ -1430,20 +1454,7 @@ const FollowPage: React.FC = () => {
     setCalMonth(ymd ? ymd.slice(0, 7) : calMonth);
   };
 
-  const counts = useMemo(() => {
-    // 🔴 นับเฉพาะที่อยู่ในคิวจริง — เดิม API เดา 'pending' ให้แถวที่ไม่เคยส่ง ตัวเลขจึงเกินจริง
-    const pending = scopeItems.filter((i) => i.call_status === 'pending').length;
-    const notSent = scopeItems.filter((i) => !i.call_status && !i.cancelled).length;
-    const done = scopeItems.filter((i) => i.call_status === 'completed').length;
-    return { total: scopeItems.length, pending, done, notSent };
-  }, [scopeItems]);
-
-  /**
-   * 🔴 ถังตามเวลานัด — **นิยามเดียวกับหน้าแรก** (`followScheduleCounts`)
-   * หน้าแรกส่งคนมาที่นี่ด้วยพาดหัว "เลยเวลานัดแล้ว N ราย" แต่เดิมหน้านี้ไม่มีเลขนั้น
-   * อยู่เลย ⇒ คนกดมาแล้วหาไม่เจอว่าต้องโทรใคร (audit คนใหม่ 26 ส.ค. 2569)
-   */
-  const schedule = useMemo(() => followScheduleCounts(scopeItems), [scopeItems]);
+  // ตัวนับ counts / schedule ที่ไม่มีจอไหนโชว์ถอดแล้ว (6 ต.ค. 2569 — กันคนเอานิยามเก่ากลับมาใช้)
 
   /**
    * ปุ่มทั้งหมดของหน้า — อยู่แถวบนสุดคู่กับแท็บ (เจ้าของสั่ง 3 ต.ค. 2569: *"ย้ายไปอยู่แถวเดียวกับ
@@ -1685,6 +1696,7 @@ const FollowPage: React.FC = () => {
         <FollowPlanningCalendar
           rows={calendarRows}
           allRows={nextDayRows}
+          summaryRows={monthSummaryRows}
           onViewChange={setPanelRange}
           month={calMonth}
           onMonthChange={setCalMonth}

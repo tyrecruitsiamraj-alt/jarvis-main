@@ -33,6 +33,7 @@ import { isLostOutcome, isSuccessOutcome } from '@/lib/followOutcome';
 import { CONNECTED_CALL_OUTCOMES, UNREACHED_CALL_OUTCOMES } from '@/lib/callOutcomeBuckets';
 import { effectiveCallOutcome } from '@/lib/followStaffCall';
 import { toYmdBangkok } from '@/lib/dateTh';
+import { callCategory, followRoundState } from '@/lib/followPlanning';
 
 /** สถานะ followup ของคิวที่แปลว่า "AI เอาไม่อยู่ ต้องคนตาม" (migration 070) */
 export const NEEDS_HUMAN_STATE = 'needs_human';
@@ -78,6 +79,7 @@ export type CompletionReason =
   | 'ai_going'
   | 'ai_not_going'
   | 'needs_human'
+  | 'no_answer'
   | 'called_no_close';
 
 export type CompletedFollowPerson = {
@@ -93,6 +95,7 @@ export const COMPLETION_REASON_LABEL: Record<CompletionReason, string> = {
   ai_going: 'AI ได้คำตอบว่าไป — รอปิดงาน/ส่งต่อ',
   ai_not_going: 'AI ได้คำตอบว่าไม่ไป — รอปิดงานว่าไม่ไป',
   needs_human: 'AI เอาไม่อยู่ ต้องคนตามต่อ',
+  no_answer: 'โทรครบรอบแล้ว ไม่รับสายทุกสาย',
   called_no_close: 'โทรครบรอบแล้ว แต่ยังไม่ได้ปิดงาน',
 };
 
@@ -116,13 +119,18 @@ function reasonOf(rounds: FollowRoundLike[]): CompletionReason | null {
    * ตารางหลายวันโทรครบทุกรอบแม้ยืนยันแล้ว (วัดได้ 51/51) ⇒ วันแรกบอกว่าไป วันถัดไปไม่รับ
    * เดิมขึ้น "ยังไม่ได้คำตอบ" ทั้งที่เขาตอบไปแล้ว
    */
-  const said = active
-    .map((r) => effectiveCallOutcome(r))
-    .filter((code) => code === 'confirmed' || code === 'declined');
+  /**
+   * 🔴 6 ต.ค. 2569: อ่านด้วยหมวดเดียวกับแผงขั้นตอน (`callCategory` — อ่านคำตอบจริง ไม่ใช่รหัส confirmed/declined)
+   * เดิม "รับสายแล้ว · ไปครับ" ขึ้นตอบว่าไปบนแผง แต่การ์ดนี้ขึ้นยังไม่ได้คำตอบ
+   */
+  const cats = (rounds as FollowEntry[])
+    .map((r) => callCategory({ entry: r, state: followRoundState(r), time: null, ymd: null }))
+    .filter((c) => c !== 'cancelled');
+  const said = cats.filter((c) => c === 'agreed' || c === 'lost');
   const last = said[said.length - 1];
-  if (last === 'declined') return 'ai_not_going';
-  if (last === 'confirmed') return 'ai_going';
-  return 'called_no_close';
+  if (last === 'lost') return 'ai_not_going';
+  if (last === 'agreed') return 'ai_going';
+  return cats.length > 0 && cats.every((c) => c === 'unreachable') ? 'no_answer' : 'called_no_close';
 }
 
 /**
@@ -156,6 +164,7 @@ export function selectCompletedFollowPeople(groups: FollowGroup[]): CompletedFol
     ai_going: 1,
     needs_human: 2,
     called_no_close: 3,
+    no_answer: 3,
     // ไม่ไปแล้วอยู่ท้ายสุด — ไม่ใช่งานที่ต้องรีบส่งต่อ
     ai_not_going: 4,
   };
@@ -181,21 +190,24 @@ export function selectAwaitingDecision(groups: FollowGroup[]): CompletedFollowPe
 }
 
 /** ป้ายสั้นบนแถวของการ์ด — คำชุดเดียวกับถังผลโทร (บอกว่าไป / บอกว่าไม่ไป) */
+/** 🔴 คำเดียวกับช่องของแผงขั้นตอน (6 ต.ค. 2569 "เอาคำให้ตรงกันไปเลย") */
 export const COMPLETION_REASON_SHORT: Record<CompletionReason, string> = {
   closed_success: 'ปิดงานว่าไปแล้ว',
-  ai_going: 'บอกว่าไป',
-  ai_not_going: 'บอกว่าไม่ไป',
+  ai_going: 'ตอบว่าไป',
+  ai_not_going: 'ตอบว่าไม่ไป',
   needs_human: 'ต้องคนตาม',
-  called_no_close: 'ยังไม่ได้คำตอบ',
+  no_answer: 'ไม่รับสาย',
+  called_no_close: 'สรุปไม่ได้',
 };
 
 /** สีของป้าย — เขียว = จบดี · แดง = จบไม่ดี · ส้ม = คนต้องเข้าไปจัดการ · เหลือง = ยังไม่จบ */
-export const COMPLETION_REASON_TONE: Record<CompletionReason, 'success' | 'danger' | 'orange' | 'warn'> = {
+export const COMPLETION_REASON_TONE: Record<CompletionReason, 'success' | 'danger' | 'orange' | 'warn' | 'violet'> = {
   closed_success: 'success',
   ai_going: 'success',
   ai_not_going: 'danger',
   needs_human: 'orange',
-  called_no_close: 'warn',
+  no_answer: 'warn',
+  called_no_close: 'violet',
 };
 
 /** สรุปสั้น ๆ ใต้หัวกล่อง — ไม่มีของ = null (กล่องซ่อนตัวเอง) */

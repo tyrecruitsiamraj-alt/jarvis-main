@@ -169,12 +169,14 @@ describe('เลือกคนที่โทรครบแล้ว', () => {
     expect(people).toHaveLength(0);
   });
 
-  it('โทรครบแต่ยังไม่ปิดงาน = เข้ากองแบบ called_no_close', () => {
+  it('โทรครบแต่ยังไม่ปิดงาน = เข้ากอง · ไม่รับสายทุกสาย = no_answer · คุยแต่ไม่บอก = called_no_close (6 ต.ค. 2569)', () => {
     const people = selectCompletedFollowPeople([
       group('ช', [round({ call_outcome: 'no_answer' })]),
     ]);
     expect(people).toHaveLength(1);
-    expect(people[0].reason).toBe('called_no_close');
+    expect(people[0].reason).toBe('no_answer');
+    const unclear = selectCompletedFollowPeople([group('ซ', [round({ call_outcome: 'acknowledged' })])]);
+    expect(unclear[0].reason).toBe('called_no_close');
   });
 
   it('เรียงจบดีขึ้นก่อน (พร้อมส่งต่อเลย)', () => {
@@ -243,7 +245,7 @@ describe('การ์ดติดตามครบ — เฉพาะคน�
     ]);
     expect(notGoing[0].reason).toBe('ai_not_going');
     const none = selectAwaitingDecision([group('x', [round({ call_outcome: 'no_answer' })])]);
-    expect(none[0].reason).toBe('called_no_close');
+    expect(none[0].reason).toBe('no_answer');
   });
 
   it('🔴 ย้าย/ไม่ย้ายแล้ว (ปิดงานครบทุกรอบที่ไม่ยกเลิก) ⇒ ออกจากกองทันที ไม่โผล่ซ้ำหลังรีเฟรช', () => {
@@ -276,8 +278,11 @@ describe('การ์ดติดตามครบ — เฉพาะคน�
   });
 
   it('ป้ายสั้นใช้คำชุดเดียวกับถังผลโทร + มีสีครบทุกเหตุผล', () => {
-    expect(COMPLETION_REASON_SHORT.ai_going).toBe('บอกว่าไป');
-    expect(COMPLETION_REASON_SHORT.ai_not_going).toBe('บอกว่าไม่ไป');
+    // คำเดียวกับช่องของแผงขั้นตอน (6 ต.ค. 2569)
+    expect(COMPLETION_REASON_SHORT.ai_going).toBe('ตอบว่าไป');
+    expect(COMPLETION_REASON_SHORT.ai_not_going).toBe('ตอบว่าไม่ไป');
+    expect(COMPLETION_REASON_SHORT.no_answer).toBe('ไม่รับสาย');
+    expect(COMPLETION_REASON_SHORT.called_no_close).toBe('สรุปไม่ได้');
     for (const k of Object.keys(COMPLETION_REASON_LABEL)) {
       expect(COMPLETION_REASON_SHORT[k as keyof typeof COMPLETION_REASON_SHORT]).toBeTruthy();
       expect(COMPLETION_REASON_TONE[k as keyof typeof COMPLETION_REASON_TONE]).toBeTruthy();

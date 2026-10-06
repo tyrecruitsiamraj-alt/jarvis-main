@@ -24,6 +24,7 @@ import {
   paginateDayReportRows,
   type DayReportPageSize,
 } from '@/lib/followDayReportImage';
+import { FOLLOW_MATRIX_ROW_LABEL } from '@/lib/followCallMatrix';
 
 /**
  * ═══ สรุปแผนติดตามทั้งวัน (เจ้าของสั่ง 2 ต.ค. 2569 · Choice "หน้าสรุปบนจอ") ═══
@@ -140,7 +141,7 @@ export default function FollowDayReportDialog({
               value={call}
               options={[
                 { value: 'all', label: 'ทุกสาย' },
-                ...(report?.callNos ?? []).map((n) => ({ value: String(n), label: `สายที่ ${n}` })),
+                ...(report?.callNos ?? []).map((n) => ({ value: String(n), label: FOLLOW_MATRIX_ROW_LABEL[n as 1 | 2 | 3] ?? `สายที่ ${n}` })),
               ]}
               onChange={setCall}
               ariaLabel="ดูเฉพาะสายที่"

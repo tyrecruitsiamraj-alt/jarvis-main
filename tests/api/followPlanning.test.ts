@@ -211,7 +211,7 @@ describe('roundResultLabel — ช่องปฏิทินต้องบอ�
 
   it('ผลการโทรเป็นคำไทย (ชุดคำของงานติดตาม — ดู describe ท้ายไฟล์)', () => {
     expect(label({ call_outcome: 'acknowledged' })).toBe('รับสายแล้ว');
-    expect(label({ call_outcome: 'declined' })).toBe('ยกเลิก — ไม่ไปแล้ว');
+    expect(label({ call_outcome: 'declined' })).toBe('ตอบว่าไม่ไป');
     expect(label({ call_outcome: 'wrong_person' })).toBe('เบอร์ผิด');
   });
 
@@ -239,8 +239,8 @@ describe('คำผลโทรฉบับงานติดตาม (เจ�
     return roundResultLabel(rows[0].rounds[0]);
   };
 
-  it('🔴 declined ในงานติดตาม = ยกเลิก ไม่ใช่ "ไม่สนใจ" (คำของงานหาคน)', () => {
-    expect(label({ call_outcome: 'declined' })).toBe('ยกเลิก — ไม่ไปแล้ว');
+  it('🔴 declined ในงานติดตาม = ตอบว่าไม่ไป ไม่ใช่ "ไม่สนใจ" (คำของงานหาคน) · ไม่ใช่ "ยกเลิก" (ชนช่องยกเลิก · 6 ต.ค. 2569)', () => {
+    expect(label({ call_outcome: 'declined' })).toBe('ตอบว่าไม่ไป');
   });
 
   it('confirmed = ยืนยันว่าไป · acknowledged = รับสายแล้ว (ไม่เขียนให้ดูจบดีเกินจริง)', () => {
@@ -265,8 +265,8 @@ describe('สีของรอบ — ต้องแปลว่า "ดี/�
     expect(tone({ call_outcome: 'declined' })).toBe('danger');
   });
 
-  it('🔴 เลยเวลายังไม่มีผล = เหลือง (ยังไม่จบ) ไม่ใช่แดง', () => {
-    expect(tone({ scheduled_at: '2026-09-01T02:00:00Z' })).toBe('warn');
+  it('🔴 เลยเวลายังไม่มีผล = ฟ้า (รอโทร · ไม่ชนเหลืองของไม่รับสาย · 6 ต.ค. 2569) ไม่ใช่แดง', () => {
+    expect(tone({ scheduled_at: '2026-09-01T02:00:00Z' })).toBe('info');
   });
 
   it('ยืนยันว่าไป/ปิดงานว่าไปแล้ว = เขียว', () => {
@@ -277,7 +277,8 @@ describe('สีของรอบ — ต้องแปลว่า "ดี/�
   it('ปิดงานว่าไม่ไป = แดง · ยกเลิก = เทา (ถังยกเลิก · 5 ต.ค. 2569) · ลา/เลื่อน = เหลือง', () => {
     expect(tone({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'no_show_start' })).toBe('danger');
     expect(tone({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'cancelled' })).toBe('neutral');
-    expect(tone({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'postponed' })).toBe('warn');
+    // ลา/เลื่อน = สรุปไม่ได้ (ม่วง · 6 ต.ค. 2569)
+    expect(tone({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'postponed' })).toBe('violet');
   });
 
   it('ไม่ได้ส่งให้ AI = ส้ม (ต้องคนจัดการ) · ยกเลิกทิ้ง = เทา', () => {
@@ -373,7 +374,7 @@ describe('ผลการโทรทุกสาย + สรุปจาก AI'
       NOW,
     )[0].rounds[0];
     expect(roundTone(r)).toBe('danger');
-    expect(roundResultLabel(r)).toBe('ยกเลิก — ไม่ไปแล้ว');
+    expect(roundResultLabel(r)).toBe('ตอบว่าไม่ไป');
   });
 
   it('roundAiSummary คืนสรุปที่ AI เขียน · ว่าง/ช่องว่างล้วน = null (ห้ามขึ้นกล่องเปล่า)', () => {
@@ -436,9 +437,11 @@ describe('callCategory — หมวดผลของสาย', () => {
   const cat = (over: Partial<FollowEntry>) =>
     callCategory(buildFollowPlanningRows(groupFollowEntries([entry(over)], NOW), NOW)[0].rounds[0]);
 
-  it('ตกลง: confirmed/acknowledged และปิดงานว่าไป', () => {
+  // 🔴 6 ต.ค. 2569 นิยามเจ้าของ: ไป = คำตอบที่ดูแล้วว่าไป · "รับสายแล้ว" เฉย ๆ = สรุปไม่ได้
+  it('ตกลง: confirmed · รับสายแล้วที่คำตอบบอกว่าไป · ปิดงานว่าไป', () => {
     expect(cat({ call_status: 'completed', call_outcome: 'confirmed' })).toBe('agreed');
-    expect(cat({ call_status: 'completed', call_outcome: 'acknowledged' })).toBe('agreed');
+    expect(cat({ call_status: 'completed', call_outcome: 'acknowledged', call_reply: 'ไปครับ ออกจากบ้านแล้ว' })).toBe('agreed');
+    expect(cat({ call_status: 'completed', call_outcome: 'acknowledged' })).toBe('other');
     expect(cat({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'went' })).toBe('agreed');
   });
 
@@ -448,10 +451,14 @@ describe('callCategory — หมวดผลของสาย', () => {
     expect(cat({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'cancelled' })).toBe('cancelled');
   });
 
-  it('ติดต่อไม่ได้: ไม่รับ/ไม่ว่าง/ไม่ตอบ/โทรไม่สำเร็จ/เบอร์ผิด — เป็นสีเหลืองทั้งชุด', () => {
-    for (const o of ['no_answer', 'busy', 'unresponsive', 'failed', 'wrong_person'] as const) {
+  it('ไม่รับสาย: ไม่รับ/ไม่ว่าง/ไม่ตอบ/โทรไม่สำเร็จ · ไม่ใช่เจ้าตัว / ขอเลื่อน = สรุปไม่ได้ (6 ต.ค. 2569)', () => {
+    for (const o of ['no_answer', 'busy', 'unresponsive', 'failed'] as const) {
       expect(cat({ call_status: 'completed', call_outcome: o })).toBe('unreachable');
     }
+    expect(cat({ call_status: 'completed', call_outcome: 'wrong_person' })).toBe('other');
+    expect(cat({ call_status: 'completed', call_outcome: 'reschedule_requested' })).toBe('other');
+    // Lumos บอกไม่รับ แต่มีคำพูด = รับแล้ว อ่านคำตอบ (เคสนายบรรจบ)
+    expect(cat({ call_status: 'completed', call_outcome: 'no_answer', call_reply: 'ครับ ครับ ผม' })).not.toBe('unreachable');
   });
 
   it('🔴 เลยเวลายังไม่มีผล ≠ ติดต่อไม่ได้ — คนละงานที่ต้องทำต่อ', () => {
@@ -614,16 +621,16 @@ describe('callVerdict / summarize — สามคำตอบบนหัวห
   it('ไป = agreed · ไม่ไป = lost · ที่เหลือทั้งหมด = ยังไม่รู้ผล · ยกเลิกไม่นับ', () => {
     const s = sum([
       { call_status: 'completed', call_outcome: 'confirmed' }, // ไป
-      { call_status: 'completed', call_outcome: 'acknowledged' }, // ไป
+      { call_status: 'completed', call_outcome: 'acknowledged' }, // รับสายเฉย ๆ → สรุปไม่ได้ (6 ต.ค. 2569)
       { call_status: 'completed', call_outcome: 'declined' }, // ไม่ไป
       { call_status: 'completed', call_outcome: 'no_answer' }, // โทรไม่ติด → ยังไม่รู้ผล
       { scheduled_at: '2026-09-01T02:00:00Z' }, // เลยเวลานัด → ยังไม่รู้ผล
       { scheduled_at: '2026-09-01T09:00:00Z', call_status: null }, // ไม่ได้ส่ง → ยังไม่รู้ผล
       { cancelled: true }, // ยกเลิก → ไม่นับเลย
     ]);
-    expect(s.went).toBe(2);
+    expect(s.went).toBe(1);
     expect(s.notWent).toBe(1);
-    expect(s.unknown).toBe(3);
+    expect(s.unknown).toBe(4);
     expect(s.total).toBe(6);
     expect(s.went + s.notWent + s.unknown).toBe(s.total);
   });

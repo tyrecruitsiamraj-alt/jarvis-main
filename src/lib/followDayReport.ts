@@ -9,7 +9,8 @@
  */
 import type { FollowEntry } from '@/lib/followApi';
 import { groupFollowEntries } from '@/lib/followGrouping';
-import { buildFollowDayCalls, buildFollowPlanningRows, roundResultLabel } from '@/lib/followPlanning';
+import { buildFollowDayCalls, buildFollowPlanningRows, callCategory, followRoundLabel } from '@/lib/followPlanning';
+import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { followDayCallLabel } from '@/lib/followDayCall';
 import { followCallerOf, FOLLOW_CALLER_LABEL } from '@/lib/followListFilter';
 
@@ -115,8 +116,8 @@ export function buildFollowDayReport(
       timeOf(a).localeCompare(timeOf(b)) ||
       a.row.group.phone.localeCompare(b.row.group.phone),
   );
-  /** เลขสายของรายการ — ตัวเดียวกับที่ป้าย "สายที่ N" ใช้ (call_of_day ก่อนเสมอ) */
-  const callNoOf = (e: FollowEntry, slot: number | null) => e.call_of_day ?? e.call_round ?? slot;
+  /** กองสายที่ — ตัวเดียวกับตัวกรอง "สายที่" ของแผง (`followRoundSlot` · 3 = 3 ขึ้นไป · 6 ต.ค. 2569) */
+  const callNoOf = (e: FollowEntry, _slot: number | null): number | null => followRoundSlot(e);
   const callNos = [...new Set(allCalls.map((c) => callNoOf(c.round.entry, c.slot)).filter((n): n is number => n != null))].sort(
     (a, b) => a - b,
   );
@@ -140,7 +141,8 @@ export function buildFollowDayReport(
     .join(' · ');
   const rows: FollowDayReportRow[] = dayCalls.map(({ row, round, slot, day }) => {
     const e = round.entry;
-    const cancelled = round.state === 'cancelled';
+    // ยกเลิก = หมวดยกเลิกของแผง (สายที่ยกเลิกแต่โทรแล้วมีผลนับตามผล · 6 ต.ค. 2569)
+    const cancelled = callCategory(round) === 'cancelled';
     // สาย "ยังไม่ชัวร์เวลา" (134) — เวลาใน scheduled_at เป็นค่าแทน ห้ามโชว์เป็นเวลาจริง
     const time = e.time_tbd === true ? 'ยังไม่ระบุเวลา' : (round.time ?? '—');
     return {
@@ -154,7 +156,7 @@ export function buildFollowDayReport(
         followDayCallLabel({ day: e.call_day ?? null, call: e.call_of_day ?? e.call_round ?? null }) ??
         (slot ? `สายที่ ${slot}` : '—'),
       caller: FOLLOW_CALLER_LABEL[followCallerOf(e)],
-      result: roundResultLabel(round),
+      result: followRoundLabel(round),
       cancelled,
     };
   });
@@ -164,7 +166,7 @@ export function buildFollowDayReport(
     toYmd,
     planDays,
     rows,
-    people: new Set(dayCalls.filter((c) => c.round.state !== 'cancelled').map((c) => c.row.group.key)).size,
+    people: new Set(dayCalls.filter((c) => callCategory(c.round) !== 'cancelled').map((c) => c.row.group.key)).size,
     calls: live.length,
     ai: live.filter((r) => r.caller === FOLLOW_CALLER_LABEL.ai).length,
     manual: live.filter((r) => r.caller === FOLLOW_CALLER_LABEL.manual).length,

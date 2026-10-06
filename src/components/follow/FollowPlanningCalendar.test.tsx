@@ -137,7 +137,7 @@ describe('หน้ารายวัน — สายที่ต้องต�
     expect(within(items[0]).getByText('สายที่ 2')).toBeTruthy();
     // 🔴 ผลของสาย 1 ต้องไม่ลามไปทับสาย 2 — ช่องคำตอบมีข้อความของสาย 1 ช่องเดียว
     expect(within(items[0]).getByText('ตอบว่าไป')).toBeTruthy();
-    expect(within(items[0]).getByText('เลยเวลานัด')).toBeTruthy();
+    expect(within(items[0]).getByText('รอโทร · เลยเวลานัด')).toBeTruthy();
     expect(within(items[0]).getAllByText(/ผู้รับสายบอกว่าไปแน่นอน/)).toHaveLength(1);
     // บรรทัดของทั้งสามคอลัมน์ต้องเท่ากัน (บรรทัดที่ N = สายเดียวกัน)
     expect(cells[2].querySelectorAll(':scope > span > span').length).toBe(2);
@@ -152,10 +152,10 @@ describe('หน้ารายวัน — สายที่ต้องต�
     expect(within(first).getByText(/ได้งานที่อื่นใกล้บ้านกว่าแล้ว/)).toBeTruthy();
   });
 
-  it('ไม่รับสาย ⇒ ชิปบอก "ไม่ได้คำตอบ" (คนละคำกับช่อง "โทรไม่ติด" ของ Pipeline) และนับใน "ยังไม่รู้ผล"', () => {
+  it('ไม่รับสาย ⇒ ชิปบอก "ไม่รับสาย" คำเดียวกับช่องของแผงขั้นตอน (6 ต.ค. 2569)', () => {
     renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'no_answer' }));
     const first = dayRows()[0];
-    expect(within(first).getByText(/ไม่ได้คำตอบ/)).toBeTruthy();
+    expect(within(first).getAllByText(/ไม่รับสาย/).length).toBeGreaterThan(0);
     // โทรไม่ติด (สาย 1) + เลยเวลานัด (สาย 2) = ยังไม่รู้ผลทั้งคู่
   });
 
@@ -229,7 +229,7 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     expect(screen.getAllByRole('columnheader')).toHaveLength(31);
   });
 
-  it('🔴 สรุปทั้งเดือนใต้ชื่อ — กี่ครั้ง และแยกสามคำตอบ ไป/ไม่ไป/ยังไม่รู้ผล', () => {
+  it('🔴 สรุปทั้งเดือนใต้ชื่อ — กี่สาย และแยกช่องเดียวกับแผง (ไป/ไม่ไป/ไม่รับสาย · 6 ต.ค. 2569)', () => {
     renderCalendar([
       entry({ id: 'r1', call_round: 1, scheduled_at: '2026-09-01T02:00:00Z', call_status: 'completed', call_outcome: 'confirmed' }),
       entry({ id: 'r2', call_round: 2, scheduled_at: '2026-09-03T02:00:00Z', call_status: 'completed', call_outcome: 'no_answer' }),
@@ -237,10 +237,10 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     ]);
     showMonthView();
     const monthCell = screen.getAllByRole('cell')[0];
-    expect(within(monthCell).getByText('3 ครั้ง')).toBeTruthy();
+    expect(within(monthCell).getByText('3 สาย')).toBeTruthy();
     expect(within(monthCell).getByText('ตอบว่าไป 1')).toBeTruthy();
     expect(within(monthCell).getByText('ตอบว่าไม่ไป 1')).toBeTruthy();
-    expect(within(monthCell).getByText('ยังไม่รู้ผล 1')).toBeTruthy();
+    expect(within(monthCell).getByText('ไม่รับสาย 1')).toBeTruthy();
   });
 
   it('ช่องวันบอกผลด้วยคำสั้นของหมวด (ไม่ใช่คำยาวที่ล้นช่อง)', () => {
@@ -253,13 +253,13 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     expect(dayCells.some((c) => within(c).queryByText(/ยกเลิก — ไม่ไปแล้ว/))).toBe(false);
   });
 
-  it('คำอธิบายสีเป็นชุดเดียวกับหน้ารายวัน — เขียวไป เหลืองยังไม่รู้ผล แดงไม่ไป', () => {
+  it('คำอธิบายสีเป็นชุดเดียวกับป้ายและแผง — ไป / ไม่ไป / ไม่รับสาย / สรุปไม่ได้ / รอโทร… / ยกเลิก', () => {
     renderCalendar(twoRounds());
     showMonthView();
     const legend = within(screen.getByRole('group', { name: 'ความหมายของสี' }));
-    expect(legend.getByText('ตอบว่าไป')).toBeTruthy();
-    expect(legend.getByText('ยังไม่รู้ผล')).toBeTruthy();
-    expect(legend.getByText('ตอบว่าไม่ไป')).toBeTruthy();
+    for (const w of ['ตอบว่าไป', 'ตอบว่าไม่ไป', 'ไม่รับสาย', 'สรุปไม่ได้', 'รอโทร · เลยเวลานัด', 'ยกเลิก']) {
+      expect(legend.getByText(w)).toBeTruthy();
+    }
   });
 
   /** 🔴 เจ้าของสั่ง 1 ต.ค. 2569: *"พวกอักษรที่เขียนว่า เขียว แดง ฯลฯ เอาออก เหลือแค่สีกับคำตอบก็พอ มันรก"* */
@@ -271,7 +271,7 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     for (const word of ['เขียว', 'แดง', 'เหลือง', 'น้ำเงิน', 'ส้ม', 'เทา', '=', '(']) {
       expect(text).not.toContain(word);
     }
-    expect(within(legend).getAllByText(/./).length).toBe(6);
+    expect(within(legend).getAllByText(/./).length).toBe(8);
   });
 });
 
@@ -331,7 +331,7 @@ describe('แถว "ไม่ไป" — พื้นแดงอ่อนท�
  */
 describe('ตำหนิ 10 ก.ย. 2569', () => {
   it('🔴 สายที่ 1 มีผลว่าไป ต้องได้ **สีเขียวทั้งแถว** ไม่ใช่แค่ชิปเล็ก ๆ', () => {
-    renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'acknowledged' }));
+    renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'confirmed' }));
     const row = dayRows().find((r) => r.getAttribute('data-category') === 'agreed');
     expect(row).toBeTruthy();
     expect(row!.className).toContain(TONE.success.wash.split(' ')[0]);
@@ -529,7 +529,7 @@ describe('ส่งไม่ถึง Lumos (push_failed)', () => {
     const row = dayRows()[0];
     expect(within(row).getByText('ส่งไม่ถึง Lumos')).toBeTruthy();
     // ป้ายเดิมยังอยู่ — บอกทั้งสองเรื่อง ไม่ใช่เอาอันใหม่ไปทับ
-    expect(within(row).getByText('เลยเวลานัด')).toBeTruthy();
+    expect(within(row).getByText('รอโทร · เลยเวลานัด')).toBeTruthy();
   });
 
   it('บอกเหตุจริงที่ Lumos ตอบกลับ แทนที่จะเป็นขีดกลางว่าง ๆ', () => {
@@ -620,7 +620,7 @@ describe('ช่องว่างที่เหลือจากรอบว�
   it('🔴 "เลยเวลานัด" ต้องบอกด้วยว่า **ส่งให้ AI แล้ว** — คนละเรื่องกับ "ไม่ได้ส่งให้ AI"', () => {
     renderCalendar([entry({ id: 'a', call_round: 1, call_status: 'delivered' })]);
     const row = dayRows()[0];
-    expect(within(row).getByText('เลยเวลานัด')).toBeTruthy();
+    expect(within(row).getByText('รอโทร · เลยเวลานัด')).toBeTruthy();
     expect(within(row).getByText(/ส่งให้ AI แล้ว ยังไม่มีผลกลับ/)).toBeTruthy();
     // 🔴 1 ต.ค. 2569: ถอดท่อนผลกลับช้าออกแล้ว — เหลือแค่ข้อเท็จจริงว่าส่งแล้ว
     expect(row.textContent).not.toContain('ชั่วโมง');
@@ -638,14 +638,15 @@ describe('ช่องว่างที่เหลือจากรอบว�
  * ของเดิมนับ `acknowledged` เป็น "ตอบว่าไป" ทั้งกอง ⇒ วงโกหก
  */
 describe('ผลของเดือน = นิยามเดียวกับกล่องขั้นตอนของสาย (เจ้าของ 6 ต.ค. 2569)', () => {
-  it('🔴 เหลือ 3 ช่อง ตอบว่าไป / ตอบว่าไม่ไป / สรุปไม่ได้ · ไม่มีถังละเอียด 7 ถัง', () => {
+  it('🔴 4 ช่อง ตอบว่าไป / ตอบว่าไม่ไป / ไม่รับสาย / สรุปไม่ได้ · ไม่มีถังละเอียด 7 ถัง', () => {
     renderCalendar([
       entry({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' }),
       entry({ id: 'b', call_round: 1, recipient_phone: '0899999998', recipient_name: 'คนที่สอง', call_status: 'failed', call_outcome: 'no_answer' }),
     ]);
     const box = screen.getByTestId('month-result-boxes');
     expect(within(box).getByText('ตอบว่าไป').closest('div')!.textContent).toContain('1');
-    expect(within(box).getByText('สรุปไม่ได้').closest('div')!.textContent).toContain('1');
+    expect(within(box).getByText('ไม่รับสาย').closest('div')!.textContent).toContain('1');
+    expect(within(box).getByText('สรุปไม่ได้').closest('div')!.textContent).toContain('0');
     expect(screen.getByText('จาก 2 สายที่มีผล')).toBeTruthy();
     for (const gone of ['คุยแล้ว บอกว่าไป', 'มีคนรับสาย', 'ได้คุยเรื่องของเรา', 'ไม่ใช่เจ้าตัว']) {
       expect(screen.queryByText(gone)).toBeNull();
@@ -781,7 +782,8 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
       { onStaffResult: vi.fn(), onCancelRound: vi.fn() },
     );
     expect(screen.queryByTestId('staff-quick')).toBeNull();
-    expect(screen.getByText('คนโทร: ไป')).toBeTruthy();
+    // ป้ายตัวเดียวกับแผง + "· คนโทร" (6 ต.ค. 2569)
+    expect(screen.getByText('ตอบว่าไป · คนโทร')).toBeTruthy();
     expect(screen.getByText(/staff@example\.com · .*15:40 น\./)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'แก้' })).toBeTruthy();
   });
