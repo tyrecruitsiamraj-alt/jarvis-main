@@ -162,6 +162,9 @@ export async function attachNotes(items: unknown[]): Promise<void> {
         if (fo.subdistrict) it.override_subdistrict = fo.subdistrict;
         if (fo.total_income != null) it.total_income = fo.total_income;
         if (fo.benefits && fo.benefits.length > 0) it.extra_benefits = fo.benefits;
+        // วันเวลาทำงาน + คุณสมบัติที่ตั้งเอง (6 ต.ค. 2569 · วางข้อความโพสต์) — null = ใช้ค่า ERP / ไม่มี
+        if (fo.work_schedule) it.work_schedule = fo.work_schedule;
+        if (fo.requirements && fo.requirements.length > 0) it.requirements = fo.requirements;
         /**
          * รายได้แบบแยกส่วนที่ตั้งเอง (20 ส.ค. 2569) — แนบเป็น income_display
          * ผ่าน buildIncomeDisplay ให้เลข balance แล้ว (บรรทัด "อื่น ๆ" ถูกเติมที่นี่)

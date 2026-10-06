@@ -1,5 +1,6 @@
-import { BENEFIT_LABEL_MAX, BENEFIT_LINE_MAX } from '../../src/lib/incomeBreakdown.js';
+import { BENEFIT_LABEL_MAX, BENEFIT_LINE_MAX, INCOME_LABEL_MAX } from '../../src/lib/incomeBreakdown.js';
 import { cleanPayCycles, type PayCycle } from '../../src/lib/payCycle.js';
+import { cleanRequirementLines, POST_SCHEDULE_MAX } from '../../src/lib/postText.js';
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import {
@@ -50,6 +51,13 @@ export type UnitFieldOverrides = {
   benefits?: string[] | null;
   /** รอบรับเงิน (4 ต.ค. 2569 — ย้ายออกจากสวัสดิการ) · กติกาอยู่ `src/lib/payCycle.ts` */
   pay_cycles?: PayCycle[] | null;
+  /**
+   * วันเวลาทำงานที่เจ้าหน้าที่แก้เอง (6 ต.ค. 2569 · วางข้อความโพสต์แล้วเติมช่อง) — ทับ `work_schedule` จาก ERP
+   * เฉพาะที่โชว์บนประกาศ · null = ใช้ค่า ERP · เพดาน `POST_SCHEDULE_MAX` (`src/lib/postText.ts`)
+   */
+  work_schedule?: string | null;
+  /** คุณสมบัติผู้สมัคร (6 ต.ค. 2569) — เช่น "มีประสบการณ์ขับรถนาย 1 ปีขึ้นไป" · เพดาน `POST_REQUIREMENT_*` */
+  requirements?: string[] | null;
   /**
    * รายได้แบบแยกส่วนที่เจ้าหน้าที่ตั้งเอง (20 ส.ค. 2569) — ทับ breakdown อัตโนมัติ
    * จาก ERP เฉพาะที่โชว์บนประกาศ · กติกา/เพดานอยู่ที่ `src/lib/incomeBreakdown.ts`
@@ -202,6 +210,13 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
     out.pay_cycles = cycles.length > 0 ? cycles : null;
   }
 
+  // วันเวลาทำงาน + คุณสมบัติ (6 ต.ค. 2569) — เพดานเดียวกับหน้าเว็บ (`src/lib/postText.ts`)
+  if ('work_schedule' in o) out.work_schedule = textOrNull(o.work_schedule, POST_SCHEDULE_MAX);
+  if ('requirements' in o) {
+    const req = cleanRequirementLines(o.requirements);
+    out.requirements = req.length > 0 ? req : null;
+  }
+
   // เกณฑ์ความเร่งเฉพาะใบ — กติกา/เพดานอยู่ที่ src/lib/requestLeadKind.ts ที่เดียว
   // (หน้าเว็บกับฝั่ง API ต้อง sanitize ด้วยตัวเดียวกัน ไม่งั้นค่าที่บันทึกได้อาจคำนวณไม่ได้)
   if ('lead_rules' in o) out.lead_rules = cleanRequestLeadRulesOverride(o.lead_rules);
@@ -218,7 +233,7 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
         for (const item of io.lines) {
           if (!item || typeof item !== 'object') continue;
           const r = item as Record<string, unknown>;
-          const label = typeof r.label === 'string' ? r.label.trim().slice(0, 30) : '';
+          const label = typeof r.label === 'string' ? r.label.trim().slice(0, INCOME_LABEL_MAX) : '';
           const amount = Number(r.amount);
           if (!label || !Number.isFinite(amount) || amount <= 0) continue;
           lines.push({ label, amount: Math.trunc(amount) });

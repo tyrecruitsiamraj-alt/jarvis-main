@@ -49,10 +49,19 @@ export function jobBaseIncome(
 ): { text: string; hint: string | null } | null {
   // ทีมตั้งแบบแยกส่วน (ต่อวัน/ต่อเดือน) — เขียนรูปเดียวกับบรรทัดอื่นบนการ์ด ("15,500 บาท/เดือน" ไม่ใช่ "฿15,500 ต่อเดือน")
   if (job.income_display && job.income_display.total > 0) {
-    return {
-      text: `${NUM.format(job.income_display.total)} บาท/${job.income_display.period === 'daily' ? 'วัน' : 'เดือน'}`,
-      hint: null,
-    };
+    const unit = job.income_display.period === 'daily' ? 'วัน' : 'เดือน';
+    /**
+     * 🔴 มีบรรทัด "ฐานเงินเดือน" = ฐานคือบรรทัดนั้น ไม่ใช่ยอดรวม (6 ต.ค. 2569 — วางข้อความโพสต์
+     * "เงินเดือน 11,160 … รายได้รวม 17,000" แล้วการ์ดขึ้น "ฐานเงินเดือน 17,000" ผิด) · ยอดรวมต่อท้ายในวงเล็บ
+     */
+    const baseLine = job.income_display.lines.find((l) => l.label === 'ฐานเงินเดือน');
+    if (baseLine && baseLine.amount > 0 && baseLine.amount < job.income_display.total) {
+      return {
+        text: `${NUM.format(baseLine.amount)} บาท/${unit} (รายได้รวม ${NUM.format(job.income_display.total)})`,
+        hint: null,
+      };
+    }
+    return { text: `${NUM.format(job.income_display.total)} บาท/${unit}`, hint: null };
   }
   const pub = publicIncomeOf(job);
   if (pub?.manual) return { text: pub.text, hint: null };

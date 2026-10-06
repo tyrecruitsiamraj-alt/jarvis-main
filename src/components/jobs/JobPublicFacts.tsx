@@ -1,5 +1,5 @@
 import React from 'react';
-import { Banknote, Calendar, Clock, Flag, Gift, MapPin, UserRound, Wallet } from 'lucide-react';
+import { Banknote, Calendar, Clock, Flag, Gift, ListChecks, MapPin, UserRound, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
@@ -47,6 +47,7 @@ export default function JobPublicFacts({
     .filter((b) => !isOtBenefit(b) && !isRetiredBenefit(b))
     .map((b) => benefitWithAmount(b, job.monthly_income_items));
   const gender = boardCardGender(job);
+  const requirements = job.requirements ?? [];
   const schedule = (job.work_schedule ?? '').trim();
   const requiredDate = publicFieldVisible(job, 'required_date') && job.required_date ? job.required_date : null;
   const boss = publicFieldVisible(job, 'boss_nationality') ? (job.boss_nationality ?? '').trim() : '';
@@ -107,6 +108,19 @@ export default function JobPublicFacts({
         <span aria-hidden>·</span>
         <span className="tabular-nums">{boardCardAge(job)}</span>
       </p>
+      {/* คุณสมบัติที่ทีมตั้งเอง (6 ต.ค. 2569 · วางข้อความโพสต์) — เรียงลงทีละบรรทัดแบบสวัสดิการ */}
+      {requirements.length > 0 ? (
+        <div className={row} data-testid="job-public-requirements">
+          <ListChecks className={icon} aria-hidden />
+          <ul className="min-w-0 space-y-0.5">
+            {requirements.map((r) => (
+              <li key={r} className="text-foreground">
+                {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {requiredDate || boss ? (
         <p className={cn(row, 'flex-wrap gap-x-3 gap-y-0.5')}>
           {requiredDate ? (

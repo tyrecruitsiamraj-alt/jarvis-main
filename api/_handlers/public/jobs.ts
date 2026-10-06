@@ -45,6 +45,8 @@ type JobRow = {
   job_description_code_2?: string | null;
   vehicle_required: string | null;
   work_schedule: string | null;
+  /** คุณสมบัติที่ทีมตั้งเอง (6 ต.ค. 2569) — แนบโดย `attachNotes` */
+  requirements?: string[] | null;
   penalty_per_day: number;
   days_without_worker: number;
   total_penalty: number;
@@ -104,6 +106,7 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
     gender_requirement: r.gender_requirement || undefined,
     vehicle_required: r.vehicle_required || undefined,
     work_schedule: r.work_schedule || undefined,
+    requirements: Array.isArray(r.requirements) && r.requirements.length > 0 ? r.requirements : undefined,
     /**
      * สัญชาติเจ้านาย (เจ้าของสั่ง 17 ส.ค. 2569 — เอาขึ้นทั้งกล่องงานและหน้าสาธารณะ)
      * ⚠️ ERP กรอกมาแค่ ~40% ของใบขอ · ค่าที่เป็นขีด/ว่างถูกล้างเป็น undefined ตั้งแต่

@@ -296,6 +296,8 @@ export interface JobRequest {
   age_range_max?: number;
   vehicle_required?: string;
   work_schedule?: string;
+  /** คุณสมบัติผู้สมัคร (6 ต.ค. 2569) — มาจาก `field_overrides.requirements` · ขึ้นการ์ดหน้าสมัคร */
+  requirements?: string[];
   /**
    * สวัสดิการที่โชว์บนประกาศได้ เช่น ["โอที ~75 บาท/ชม.", "เบี้ยขยัน", "ค่าเดินทาง"]
    * (เจ้าของเคาะ 16 ส.ค. 2569 — กติกาเดียวกับที่ AI พูดตอนโทร)
@@ -413,6 +415,10 @@ export interface JobRequest {
     benefits?: string[] | null;
     /** รอบรับเงิน (4 ต.ค. 2569) — 'monthly' | 'weekly' | 'daily' · กติกาอยู่ `src/lib/payCycle.ts` */
     pay_cycles?: string[] | null;
+    /** วันเวลาทำงานที่แก้เอง (6 ต.ค. 2569 · วางข้อความโพสต์) — ทับ `work_schedule` จาก ERP · กติกา `src/lib/postText.ts` */
+    work_schedule?: string | null;
+    /** คุณสมบัติผู้สมัคร (6 ต.ค. 2569) */
+    requirements?: string[] | null;
     /** รายได้แบบแยกส่วนที่ตั้งเอง — โครงอยู่ที่ `src/lib/incomeBreakdown.ts` */
     income?: {
       period: 'daily' | 'monthly';

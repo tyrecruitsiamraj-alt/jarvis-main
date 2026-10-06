@@ -49,7 +49,8 @@ export const SUGGESTED_INCOME_LABELS: readonly string[] = [
 
 /** เพดานกันข้อมูลบวม — sanitizer ฝั่ง API ใช้ชุดเดียวกัน */
 export const INCOME_LINE_MAX = 10;
-export const INCOME_LABEL_MAX = 30;
+/** 40 (6 ต.ค. 2569 · เดิม 30) — "เบี้ยเลี้ยงนอกเขตกทม.และปริมณฑล" 31 ตัว โดนตัดกลางคำ */
+export const INCOME_LABEL_MAX = 40;
 /** ป้ายบรรทัดส่วนต่างที่ระบบเติมเอง */
 export const INCOME_OTHER_LABEL = 'อื่น ๆ (เช่น OT)';
 

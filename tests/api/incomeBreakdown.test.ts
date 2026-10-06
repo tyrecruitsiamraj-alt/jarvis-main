@@ -70,7 +70,7 @@ describe('normalizeIncomeLines / cleanIncomeBreakdown', () => {
     ]);
     expect(out).toHaveLength(2);
     expect(out[0]).toEqual({ label: 'ฐานเงินเดือน', amount: 15000 });
-    expect(out[1].label.length).toBeLessThanOrEqual(30);
+    expect(out[1].label.length).toBeLessThanOrEqual(40); // INCOME_LABEL_MAX 30 → 40 (6 ต.ค. 2569)
   });
 
   it(`จำกัดไม่เกิน ${INCOME_LINE_MAX} รายการ`, () => {

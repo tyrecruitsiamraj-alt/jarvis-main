@@ -22,12 +22,16 @@
  */
 import React from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ChevronDown, ChevronRight, ClipboardCheck, Link2, Send, UserMinus, Users } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Link2, Send, UserMinus, Users } from 'lucide-react';
 
 import PageHeader from '@/components/shared/PageHeader';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import GenderPicker from '@/components/jobs/GenderPicker';
 import AgeRangeFields from '@/components/jobs/AgeRangeFields';
+import PostTextPasteCard from '@/components/jobs/PostTextPasteCard';
+import ScheduleRequirementsFields from '@/components/jobs/ScheduleRequirementsFields';
+import { buildPostText } from '@/lib/postText';
+import { applyLinkPath } from '@/lib/recruitPostings';
 import PostingLinksList from '@/components/jobs/PostingLinksList';
 import AddChannelLinks from '@/components/jobs/AddChannelLinks';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
@@ -104,6 +108,30 @@ function incomeSummaryText(job: JobRequest): string | null {
 
 /** ใบขอโหลดไม่ได้ — ช่องที่รอใบขอห้ามขึ้น "กำลังโหลด…" ค้าง (แถบล้มอยู่บนสุดแล้ว) */
 const JobLoadFailedContext = React.createContext(false);
+
+/** ปุ่มคัดลอกข้อความโพสต์ — คัดลอกไม่ได้ (เบราว์เซอร์ไม่ให้) = ลากเลือกจากกล่องข้อความเองได้ */
+function CopyTextButton({ text }: { text: string }) {
+  const [copied, setCopied] = React.useState(false);
+  return (
+    <Button
+      type="button"
+      size="xs"
+      variant="outline"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1500);
+        } catch {
+          /* คัดลอกไม่ได้ — เลือกข้อความในกล่องเองได้ */
+        }
+      }}
+    >
+      {copied ? <Check className={TONE.success.value} aria-hidden /> : <Copy aria-hidden />}
+      {copied ? 'คัดลอกแล้ว' : 'คัดลอก'}
+    </Button>
+  );
+}
 
 function Loading({ text = 'กำลังโหลดใบขอ…' }: { text?: string }) {
   const failed = React.useContext(JobLoadFailedContext);
@@ -372,6 +400,12 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const stepIdx = RELEASE_STEP_ORDER.indexOf(step);
   const nextStep = stepIdx >= 0 ? RELEASE_STEP_ORDER[stepIdx + 1] : undefined;
   const onFieldsSaved = (patch: Partial<JobRequest>) => setPublicPatch((prev) => ({ ...prev, ...patch }));
+  /** วางข้อความโพสต์แล้วบันทึก = ฟอร์มรายได้/สวัสดิการเปิดใหม่ด้วยค่าใหม่ (ฟอร์มถือ state ของตัวเองตั้งแต่ตอนเปิด) */
+  const [pasteRev, setPasteRev] = React.useState(0);
+  const onPasteSaved = (patch: Partial<JobRequest>) => {
+    onFieldsSaved(patch);
+    setPasteRev((n) => n + 1);
+  };
 
   // ── สรุปขั้น 4 ──
   const genderChosen = jobWithPatch ? onlineGenderChoice(jobWithPatch) : null;
@@ -379,6 +413,11 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const genderText = genderChosen ?? (genderErp === 'ชาย' || genderErp === 'หญิง' ? genderErp : null);
   const incomeText = jobWithPatch ? incomeSummaryText(jobWithPatch) : null;
   const benefitLines = jobWithPatch ? benefitDisplayLabels(jobWithPatch.extra_benefits) : [];
+  /** ลิงก์แรกของประกาศที่เปิดอยู่ — ต่อท้ายข้อความโพสต์ */
+  const firstLinkCode = openPosting?.links[0]?.code ?? null;
+  const postText = jobWithPatch
+    ? buildPostText(jobWithPatch, firstLinkCode ? `${window.location.origin}${applyLinkPath(firstLinkCode)}` : null)
+    : null;
 
   return (
     <JobLoadFailedContext.Provider value={Boolean(error && !job)}>
@@ -558,11 +597,18 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             ) : null}
 
             {/* ── ② สถานที่ปฏิบัติงาน · ③ รายได้ + สวัสดิการ — ฟอร์มฝัง (บันทึกเอง ไม่มีปุ่มบันทึกแล้วปิด) ── */}
+            {/* วางข้อความโพสต์ → เติมช่องของหน้านี้ (เจ้าของ 6 ต.ค. 2569 → Choice "ทำทั้งสองอย่าง") */}
+            {step === 'benefits' ? (
+              <StepCard title="วางข้อความโพสต์">
+                {jobWithPatch ? <PostTextPasteCard job={jobWithPatch} onSaved={onPasteSaved} /> : <Loading />}
+              </StepCard>
+            ) : null}
+
             {step === 'place' || step === 'benefits' ? (
               jobWithPatch ? (
                 <React.Suspense fallback={<Loading text="กำลังโหลดฟอร์ม…" />}>
                   <EditPublicJobFieldsDialog
-                    key={`${jobWithPatch.id}-${step}`}
+                    key={`${jobWithPatch.id}-${step}-${pasteRev}`}
                     sections={step === 'place' ? ['place'] : ['income', 'benefits']}
                     job={jobWithPatch}
                     onSaved={onFieldsSaved}
@@ -582,6 +628,9 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 </StepCard>
                 <StepCard title="อายุที่รับ">
                   {jobWithPatch ? <AgeRangeFields job={jobWithPatch} onSaved={onFieldsSaved} /> : <Loading />}
+                </StepCard>
+                <StepCard title="วันเวลาทำงาน · คุณสมบัติ">
+                  {jobWithPatch ? <ScheduleRequirementsFields job={jobWithPatch} onSaved={onFieldsSaved} /> : <Loading />}
                 </StepCard>
               </>
             ) : null}
@@ -628,7 +677,35 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                       <SummaryRow label="อายุที่รับ" onEdit={() => setOpenStep('benefits')}>
                         {boardCardAge(jobWithPatch)}
                       </SummaryRow>
+                      <SummaryRow label="วันเวลาทำงาน" onEdit={() => setOpenStep('benefits')}>
+                        {(jobWithPatch.work_schedule ?? '').trim() || <span className="text-muted-foreground">ไม่ระบุ</span>}
+                      </SummaryRow>
+                      <SummaryRow label="คุณสมบัติ" onEdit={() => setOpenStep('benefits')}>
+                        {jobWithPatch.requirements && jobWithPatch.requirements.length > 0 ? (
+                          <span className="flex flex-col">
+                            {jobWithPatch.requirements.map((r) => (
+                              <span key={r}>{r}</span>
+                            ))}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">ไม่ระบุ</span>
+                        )}
+                      </SummaryRow>
                     </dl>
+                  ) : (
+                    <Loading />
+                  )}
+                </StepCard>
+
+                {/* ข้อความโพสต์ให้คัดลอก (6 ต.ค. 2569) — รูปเดียวกับที่ทีมโพสต์ · มีลิงก์ = ต่อท้าย · ไม่มีชื่อหน่วยงาน */}
+                <StepCard
+                  title="ข้อความโพสต์"
+                  aside={postText ? <CopyTextButton text={postText} /> : null}
+                >
+                  {postText ? (
+                    <pre className="whitespace-pre-wrap break-words rounded-xl bg-muted/60 p-3 font-sans text-sm text-foreground" data-testid="post-text">
+                      {postText}
+                    </pre>
                   ) : (
                     <Loading />
                   )}

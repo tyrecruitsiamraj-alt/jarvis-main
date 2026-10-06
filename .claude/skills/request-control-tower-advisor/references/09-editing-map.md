@@ -12240,3 +12240,21 @@ Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แ�
 
 - ⚠️ เปิด `/apply/p/<code>` = นับ `hit_count` +1 ในฐานจริง — ตรวจด้วยการป้อนข้อมูลเองในเบราว์เซอร์ (ดัก fetch) ห้ามเปิดลิงก์จริงซ้ำ ๆ
 - ตรวจ Browser: ลิงก์ Fashionisland ขึ้นการ์ดแบบ /apply (สถานที่ · เวลา · เงินเดือน · สวัสดิการ · เพศ/อายุ · วันที่ต้องการ · สมัครงาน) · ฟอร์มขึ้น "สมัคร: Fashionisland" · จอ 375 ไม่เลื่อนข้าง
+
+### ข้อความโพสต์ประกาศ: วางแล้วเติมช่อง + คัดลอกข้อความโพสต์ (6 ต.ค. 2569 · Choice "ทำทั้งสองอย่าง")
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/lib/postText.ts` | **ใหม่** — `parsePostText` (รายได้แยกรายการ · รายได้รวม · วันเวลาทำงาน · เพศ · อายุ · คุณสมบัติ · ไม่เอาหัวโพสต์/โน้ตในวงเล็บ · จุลภาคในตัวเลขไม่แยก) · `postTextOverridesPatch` · `buildPostText` (ไม่มีชื่อหน่วยงาน · ช่องที่ซ่อนไม่ใส่ · ลิงก์ท้าย) · เพดาน `POST_SCHEDULE_MAX` / `POST_REQUIREMENT_*` · `cleanRequirementLines` |
+| `src/components/jobs/PostTextPasteCard.tsx` | **ใหม่** — หน้า 3: วาง → เห็นที่อ่านได้ → "ใช้ข้อมูลนี้" ถึงบันทึก (`saveUnitFieldOverridesPatch` ครั้งเดียว · ช่องเดิมไม่โดนล้าง) |
+| `src/components/jobs/ScheduleRequirementsFields.tsx` | **ใหม่** — หน้า 3: วันเวลาทำงาน (ทับ ERP) + คุณสมบัติ บรรทัดละข้อ · กดบันทึกเอง · บันทึกเฉพาะช่องที่แก้ |
+| `src/pages/jobs/BoardPostingPage.tsx` | หน้า 3 มีสองการ์ดข้างบน (ฟอร์มรายได้ remount หลังวาง `pasteRev`) · หน้า 4 สรุปเพิ่มวันเวลาทำงาน/คุณสมบัติ + การ์ด "ข้อความโพสต์" ปุ่มคัดลอก (ลิงก์แรกของประกาศที่เปิด) |
+| `api/_lib/siamrajUnitNotes.ts` | `field_overrides.work_schedule` · `requirements` (sanitizer) · ป้ายรายได้ใช้ `INCOME_LABEL_MAX` |
+| `api/_handlers/siamraj-unit-requests.ts` | `attachNotes` ทับ `work_schedule` / แนบ `requirements` |
+| `api/_handlers/public/jobs.ts` | `toPublicJob` ส่ง `requirements` |
+| `src/components/jobs/JobPublicFacts.tsx` | แถวคุณสมบัติ (เรียงลงแบบสวัสดิการ) |
+| `src/lib/jobPublicFacts.ts` | มีบรรทัด "ฐานเงินเดือน" = ฐานคือบรรทัดนั้น + "(รายได้รวม …)" — เดิมเอายอดรวมไปเรียกว่าฐาน |
+| `src/lib/incomeBreakdown.ts` | `INCOME_LABEL_MAX` 30 → 40 |
+| `src/types/index.ts` · `src/lib/siamrajUnitRequestsApi.ts` | type ช่องใหม่ |
+
+- ตรวจ Browser (ดักเขียน): วางตัวอย่างของเจ้าของในหน้า 3 → อ่านได้ครบ · กดใช้ข้อมูลนี้ → payload มีช่องใหม่ + ช่องเดิมครบ (ไม่ได้เขียนฐานจริง) · หน้า 4 ข้อความโพสต์ + คัดลอก

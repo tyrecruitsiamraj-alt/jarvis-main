@@ -169,6 +169,9 @@ export type UnitFieldOverrides = {
   benefits?: string[] | null;
   /** รอบรับเงิน (4 ต.ค. 2569) — 'monthly' | 'weekly' | 'daily' · กติกาอยู่ `src/lib/payCycle.ts` */
   pay_cycles?: string[] | null;
+  /** วันเวลาทำงาน + คุณสมบัติ (6 ต.ค. 2569) — ต้องตรงกับฝั่ง API (`siamrajUnitNotes.ts`) */
+  work_schedule?: string | null;
+  requirements?: string[] | null;
   /** รายได้แบบแยกส่วน — โครง/เพดานอยู่ที่ `src/lib/incomeBreakdown.ts` */
   income?: import('@/lib/incomeBreakdown').IncomeBreakdown | null;
   /**
