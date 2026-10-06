@@ -309,10 +309,83 @@ describe('ป๊อปประกาศ 2 จอ (6 ต.ค. 2569)', () => {
     expect(await screen.findByRole('heading', { name: 'เพศที่รับ' })).toBeTruthy();
   });
 
-  it('ป๊อปบนงานสรรหาใช้ 2 จอเป็นค่าเริ่ม · ?popup=steps = 4 หน้า · ?popup=sheet = หน้าเดียว', async () => {
+  it('ป๊อปบนงานสรรหา: ค่าเริ่ม = หน้าเดียว 9 กล่อง (6 ต.ค. ค่ำ) · ?popup=quick = 2 จอ · ?popup=steps = 4 หน้า', async () => {
     const { readFileSync } = await import('node:fs');
     const src = readFileSync(`${process.cwd()}/src/components/jobs/JobBoardView.tsx`, 'utf8');
-    expect(src).toContain("searchParams.get('popup') === 'steps' ? 'steps' : 'quick'");
+    expect(src).toContain("popupParam === 'steps' ? 'steps' : popupParam === 'quick' ? 'quick' : 'one'");
     expect(src).toContain('flow={postingFlow}');
+  });
+});
+
+/**
+ * 🔴 หน้าเดียว 9 กล่อง + Gen link (เจ้าของ 6 ต.ค. 2569 ค่ำ: *"แยกกล่องให้ใส่แบบนี้ … ทุกหน้ามีปุ่มข้างเพื่อกดแล้วเด้ง Popup
+ * ให้ดูได้ … มีหน้าเดียวแค่ใส่รายละเอียด กับ Genlink จบๆเลย"* → Choice "ทำเลย")
+ */
+describe('ป๊อปประกาศหน้าเดียว 9 กล่อง (6 ต.ค. 2569 ค่ำ)', () => {
+  const renderOne = (onDone: () => void = () => {}) =>
+    render(
+      <MemoryRouter>
+        <BoardPostingSteps id={JOB_ID} chrome={false} flow="one" onDone={onDone} />
+      </MemoryRouter>,
+    );
+  const BOXES = ['income', 'total', 'benefits', 'gender', 'age', 'place', 'schedule', 'details', 'requirements'];
+
+  it('9 กล่องเรียงตามที่เจ้าของสั่ง · ไม่มีแถบขั้น · ลิงก์ + ข้อความโพสต์ + ส่งประกาศอยู่หน้าเดียวกัน', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    renderOne();
+    await screen.findByTestId('box-income');
+    expect(BOXES.map((k) => screen.getByTestId(`box-${k}`).querySelector('h3')?.textContent)).toEqual([
+      'รายได้',
+      'รายได้รวม',
+      'สวัสดิการ',
+      'เพศ',
+      'อายุ',
+      'สถานที่ปฏิบัติงาน',
+      'วันเวลาทำงาน',
+      'รายละเอียดงาน',
+      'คุณสมบัติ',
+    ]);
+    expect(screen.queryByTestId('quick-steps')).toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'ขั้นตอนของงานประกาศ' })).toBeNull();
+    // เจ้าของ 6 ต.ค. ค่ำ: "วางข้อความโพสต์ ก็ไม่ต้องมีแล้วสิ่"
+    expect(screen.queryByRole('heading', { name: 'วางข้อความโพสต์' })).toBeNull();
+    expect(screen.queryByTestId('post-text-paste')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'ลิงก์สมัคร' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'ข้อความโพสต์' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'ส่งประกาศ' })).toBeTruthy();
+  });
+
+  it('ช่องที่ขาดขึ้น "ยังไม่ได้ใส่" · ปุ่ม "แก้" กางทีละกล่อง · ปุ่มใบขอไม่มีถ้าใบขอไม่มีข้อมูลช่องนั้น', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    renderOne();
+    const gender = await screen.findByTestId('box-gender');
+    expect(gender.textContent).toContain('ยังไม่ได้ใส่');
+    expect(screen.getByTestId('box-income').textContent).toContain('ยังไม่ได้ใส่');
+    // ใบนี้ไม่มีคุณสมบัติ/รถในใบขอ = ไม่มีปุ่ม "ใบขอ" (ห้ามปุ่มตาย)
+    expect(within(screen.getByTestId('box-requirements')).queryByRole('button', { name: /ตามใบขอ/ })).toBeNull();
+    expect(within(screen.getByTestId('box-details')).queryByRole('button', { name: /ตามใบขอ/ })).toBeNull();
+    expect(within(gender).getByRole('button', { name: 'เพศ ตามใบขอ' })).toBeTruthy();
+    fireEvent.click(within(gender).getByRole('button', { name: 'แก้' }));
+    expect(await within(gender).findByRole('button', { name: 'ชาย' })).toBeTruthy();
+    const age = screen.getByTestId('box-age');
+    fireEvent.click(within(age).getByRole('button', { name: 'แก้' }));
+    // กางกล่องใหม่ = กล่องเดิมพับ
+    await waitFor(() => expect(within(gender).queryByRole('button', { name: 'ชาย' })).toBeNull());
+    expect(within(age).getByRole('button', { name: 'เสร็จ' })).toBeTruthy();
+  });
+
+  it('ไม่ระบุเพศ = ส่งไม่ได้ · ปุ่ม "เลือกเพศ" กางกล่องเพศ', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    renderOne();
+    expect((await screen.findByRole('button', { name: 'ส่งประกาศ' })).hasAttribute('disabled')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'เลือกเพศ' }));
+    expect(await within(screen.getByTestId('box-gender')).findByRole('button', { name: 'ชาย' })).toBeTruthy();
+  });
+
+  it('API เก็บค่าใบขอเดิมก่อนทับ (อายุ · วันเวลาทำงาน) ให้ปุ่ม "ใบขอ" เรียกดูได้', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(`${process.cwd()}/api/_handlers/siamraj-unit-requests.ts`, 'utf8');
+    expect(src).toContain('it.erp_age_range_min = it.age_range_min ?? null;');
+    expect(src).toContain('it.erp_work_schedule = it.work_schedule ?? null;');
   });
 });

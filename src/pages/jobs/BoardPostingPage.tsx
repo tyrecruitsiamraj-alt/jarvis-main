@@ -79,6 +79,12 @@ import { benefitDisplayLabels } from '@/lib/extraBenefits';
 import { boardCardAge } from '@/lib/boardCardFacts';
 import { PUBLISH_GAP_LABEL, publishGapsOf } from '@/lib/publishReadiness';
 import { payCycleText, payCyclesOf } from '@/lib/payCycle';
+import { PostingFieldBox, TotalIncomeField } from '@/components/jobs/PostingFieldBox';
+import { publicIncomeOf } from '@/lib/publishReadiness';
+import { boardCardGender } from '@/lib/boardCardFacts';
+import { isOtBenefit, publicBenefitList } from '@/lib/publicFieldVisibility';
+import { isRetiredBenefit } from '@/lib/extraBenefits';
+import { resignedMonthlyNetAverage } from '@/lib/resignedIncome';
 import PublicJobCardPreview from '@/components/jobs/PublicJobCardPreview';
 import { EVEN_TYPE, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
@@ -189,11 +195,24 @@ export type BoardPostingStepsProps = {
    * ย้ายจากหัวป๊อปที่วางทับแถบขั้นประกาศ) · ไม่ส่ง = ไม่มีปุ่ม (ใบปิด/ยกเลิก · หน้า deep-link)
    */
   onSearchAllPools?: () => void;
-  /** `quick` = 2 จอ เริ่มจากวางโพสต์ (6 ต.ค. 2569) · `steps` = 4 หน้าเดิม (ทางถอย `?popup=steps`) */
-  flow?: 'quick' | 'steps';
+  /**
+   * `one` = หน้าเดียว 9 กล่อง + Gen link (6 ต.ค. 2569 ค่ำ · ค่าเริ่มของป๊อปบนงานสรรหา) ·
+   * `quick` = 2 จอ (ทางถอย `?popup=quick`) · `steps` = 4 หน้าเดิม (ทางถอย `?popup=steps`)
+   */
+  flow?: 'one' | 'quick' | 'steps';
 };
 
 type QuickStepKey = 'fill' | 'publish';
+type OneBoxKey =
+  | 'income'
+  | 'total'
+  | 'benefits'
+  | 'gender'
+  | 'age'
+  | 'place'
+  | 'schedule'
+  | 'details'
+  | 'requirements';
 const QUICK_STEP_TEXT: Record<QuickStepKey, { step: number; label: string }> = {
   fill: { step: 1, label: 'ข้อมูลประกาศ' },
   publish: { step: 2, label: 'ประกาศ + Gen link' },
@@ -212,6 +231,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   flow = 'steps',
 }) => {
   const quick = flow === 'quick';
+  const one = flow === 'one';
   const navigate = useNavigate();
   const location = useLocation();
   /** ปุ่มย้อนกลับของโหมดหน้า = กลับหน้าที่พามา · โหมด popup ใช้ `onDone` */
@@ -403,12 +423,24 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   /** ข้อมูลใบขอ (master) บนจอ 1 — พับไว้ กดกางดู */
   const [masterOpen, setMasterOpen] = React.useState(false);
   /** ปุ่ม "แก้"/"ไปเลือกเพศ" — โฉม 2 จอพากลับจอ 1 · โฉม 4 หน้าพาไปหน้าของช่องนั้น */
-  const goEdit = (k: ReleaseStepKey) => (quick ? setQuickStep('fill') : setOpenStep(k));
+  /** โฉมหน้าเดียว: กล่องที่กางฟอร์มอยู่ (กางได้ทีละกล่อง — ฟอร์มสองตัวไม่ถือค่าชนกัน) */
+  const [openBox, setOpenBox] = React.useState<OneBoxKey | null>(null);
+  const goEdit = (k: ReleaseStepKey) => {
+    if (one) {
+      // หน้าเดียว: กางกล่องเพศแล้วเลื่อนไปหา · ตั้งไม่ประกาศ = ปุ่มยกเลิกอยู่ล่างสุดของหน้าอยู่แล้ว
+      if (k === 'benefits') {
+        setOpenBox('gender');
+        window.setTimeout(() => document.querySelector('[data-testid="box-gender"]')?.scrollIntoView({ block: 'center' }), 50);
+      }
+    }
+    else if (quick) setQuickStep('fill');
+    else setOpenStep(k);
+  };
   /** โฉม 2 จอ: ใบที่ยังไม่มีลิงก์ = ฟอร์ม Gen link กางรอเลย (จอ 2 คือจอประกาศ + Gen link) */
   const noLinkYet = linkCount === 0;
   React.useEffect(() => {
-    if (quick && noLinkYet) setWantLink(true);
-  }, [quick, noLinkYet]);
+    if ((quick || one) && noLinkYet) setWantLink(true);
+  }, [quick, one, noLinkYet]);
 
   /**
    * ขั้นนี้ผ่านแล้วหรือยัง — ใช้ระบายสีบนแถบ
@@ -542,18 +574,24 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 {!released && skip ? (
                   <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.danger.soft)}>
                     <p className={cn('text-sm', TONE.danger.value)}>
-                      {quick ? 'ใบนี้ตั้งไม่ประกาศไว้ ยกเลิกที่จอ 1 ก่อนถึงจะส่งได้' : 'ใบนี้ตั้งไม่ประกาศไว้ ยกเลิกที่ขั้น 1 ก่อนถึงจะส่งได้'}
+                      {one
+                        ? 'ใบนี้ตั้งไม่ประกาศไว้ ยกเลิกที่ปุ่มล่างสุดก่อนถึงจะส่งได้'
+                        : quick
+                          ? 'ใบนี้ตั้งไม่ประกาศไว้ ยกเลิกที่จอ 1 ก่อนถึงจะส่งได้'
+                          : 'ใบนี้ตั้งไม่ประกาศไว้ ยกเลิกที่ขั้น 1 ก่อนถึงจะส่งได้'}
                     </p>
+                    {one ? null : (
                     <Button type="button" size="xs" variant="outline" onClick={() => goEdit('info')}>
                       {quick ? 'กลับจอ 1' : 'ไปขั้น 1'}
                     </Button>
+                    )}
                   </div>
                 ) : null}
                 {!released && genderBlocked ? (
                   <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.warn.soft)}>
                     <p className={cn('text-sm', TONE.warn.value)}>ใบขอไม่ระบุเพศ เลือกเพศก่อนถึงจะส่งได้</p>
                     <Button type="button" size="xs" variant="outline" onClick={() => goEdit('benefits')}>
-                      {quick ? 'กลับไปเลือกเพศ' : 'ไปหน้า 3 เลือกเพศ'}
+                      {one ? 'เลือกเพศ' : quick ? 'กลับไปเลือกเพศ' : 'ไปหน้า 3 เลือกเพศ'}
                     </Button>
                   </div>
                 ) : null}
@@ -670,14 +708,9 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
     </div>
   );
 
-  const quickBody =
-    quickStep === 'fill' ? (
-      <>
-        {gapBar}
-        <StepCard title="วางข้อความโพสต์">
-          {jobWithPatch ? <PostTextPasteCard job={jobWithPatch} onSaved={onPasteSaved} /> : <Loading />}
-        </StepCard>
 
+  const masterCard = (
+    <>
         {/* ข้อมูลใบขอ (master) — เจ้าของถาม 6 ต.ค. 2569 "ยังดูข้อมูล master ได้ใช่ไหม" */}
         <StepCard>
           <Collapsible open={masterOpen} onOpenChange={setMasterOpen}>
@@ -713,6 +746,177 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             </CollapsibleContent>
           </Collapsible>
         </StepCard>
+
+    </>
+  );
+
+  // ── โฉมหน้าเดียว 9 กล่อง (6 ต.ค. 2569 ค่ำ) ──
+  const boxProps = (k: OneBoxKey) => ({
+    open: openBox === k,
+    onOpenChange: (v: boolean) => setOpenBox(v ? k : null),
+  });
+  const lines = (xs: readonly string[]) => (
+    <span className="flex flex-col">
+      {xs.map((x) => (
+        <span key={x}>{x}</span>
+      ))}
+    </span>
+  );
+  const none = <span className="text-muted-foreground">ไม่ระบุ</span>;
+  const oneBody = (() => {
+    const j = jobWithPatch;
+    const src = job;
+    if (!j || !src) return <Loading />;
+    const shownIncome = publicIncomeOf(j);
+    const incomeValue = j.income_display
+      ? lines(j.income_display.lines.map((l) => `${l.label} ${NUM.format(l.amount)}`))
+      : (shownIncome?.text ?? null);
+    const totalValue = j.income_display
+      ? `${NUM.format(j.income_display.total)} บาท ${INCOME_PERIOD_LABEL[j.income_display.period]}`
+      : (shownIncome?.text ?? null);
+    const benefitList = publicBenefitList(j, benefitDisplayLabels(j.extra_benefits)).filter(
+      (b) => !isOtBenefit(b) && !isRetiredBenefit(b),
+    );
+    const pay = payCycleText(payCyclesOf(j));
+    const resignedAvg = resignedMonthlyNetAverage(src.resigned_income_3m, src.lastWorkingDay);
+    const erpAgeMin = 'erp_age_range_min' in src ? src.erp_age_range_min : src.age_range_min;
+    const erpAgeMax = 'erp_age_range_max' in src ? src.erp_age_range_max : src.age_range_max;
+    const erpAge =
+      erpAgeMin != null || erpAgeMax != null
+        ? boardCardAge({ ...src, age_range_min: erpAgeMin ?? undefined, age_range_max: erpAgeMax ?? undefined })
+        : null;
+    const erpSchedule = ('erp_work_schedule' in src ? src.erp_work_schedule : src.work_schedule)?.trim() || null;
+    const erpGender = erpGenderLabel(src);
+    const erpBenefits = src.benefits ?? [];
+    const k = (name: string) => `${j.id}-${name}-${pasteRev}`;
+    return (
+      <>
+        {gapBar}
+        {/* ไม่มีช่องวางข้อความโพสต์ (เจ้าของ 6 ต.ค. 2569 ค่ำ: "วางข้อความโพสต์ ก็ไม่ต้องมีแล้วสิ่") — ใส่ทีละกล่องแทน */}
+        {masterCard}
+
+        <PostingFieldBox
+          title="รายได้"
+          testId="box-income"
+          value={incomeValue}
+          missing={Boolean(gaps?.includes('income'))}
+          erp={<RequestRateLinesBlock job={src} posting />}
+          editor={
+            <React.Suspense fallback={<Loading text="กำลังโหลดฟอร์ม…" />}>
+              <EditPublicJobFieldsDialog key={k('income')} bare sections={['income']} job={j} onSaved={onFieldsSaved} />
+            </React.Suspense>
+          }
+          {...boxProps('income')}
+        />
+        <PostingFieldBox
+          title="รายได้รวม"
+          testId="box-total"
+          value={totalValue ?? none}
+          erp={
+            src.monthly_income || resignedAvg ? (
+              <dl className="space-y-1">
+                {src.monthly_income ? (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">คิดจากอัตราใบขอ</dt>
+                    <dd className="tabular-nums">{NUM.format(src.monthly_income)} บาท/เดือน</dd>
+                  </div>
+                ) : null}
+                {resignedAvg ? (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">คนเก่าเฉลี่ย</dt>
+                    <dd className="tabular-nums">{NUM.format(resignedAvg.amount)} บาท/เดือน</dd>
+                  </div>
+                ) : null}
+              </dl>
+            ) : null
+          }
+          editor={<TotalIncomeField key={k('total')} job={j} onSaved={onFieldsSaved} />}
+          {...boxProps('total')}
+        />
+        <PostingFieldBox
+          title="สวัสดิการ"
+          testId="box-benefits"
+          value={benefitList.length > 0 || pay ? lines([...benefitList, ...(pay ? [pay] : [])]) : none}
+          erp={erpBenefits.length > 0 ? lines(erpBenefits) : null}
+          editor={
+            <React.Suspense fallback={<Loading text="กำลังโหลดฟอร์ม…" />}>
+              <EditPublicJobFieldsDialog key={k('benefits')} bare hideVisibility sections={['benefits']} job={j} onSaved={onFieldsSaved} />
+            </React.Suspense>
+          }
+          {...boxProps('benefits')}
+        />
+        <PostingFieldBox
+          title="เพศ"
+          testId="box-gender"
+          value={boardCardGender(j).text}
+          missing={Boolean(gaps?.includes('gender'))}
+          erp={<p>{erpGender}</p>}
+          editor={<GenderPicker key={k('gender')} job={j} onSaved={onFieldsSaved} />}
+          {...boxProps('gender')}
+        />
+        <PostingFieldBox
+          title="อายุ"
+          testId="box-age"
+          value={boardCardAge(j).replace(/^อายุ\s*/u, '')}
+          erp={erpAge ? <p>{erpAge.replace(/^อายุ\s*/u, '')}</p> : null}
+          editor={<AgeRangeFields key={k('age')} job={j} onSaved={onFieldsSaved} />}
+          {...boxProps('age')}
+        />
+        <PostingFieldBox
+          title="สถานที่ปฏิบัติงาน"
+          testId="box-place"
+          value={publicSafeAddress(j)}
+          missing={Boolean(gaps?.includes('place'))}
+          erp={src.location_address?.trim() ? <p className="whitespace-pre-wrap">{src.location_address}</p> : null}
+          editor={
+            <React.Suspense fallback={<Loading text="กำลังโหลดฟอร์ม…" />}>
+              <EditPublicJobFieldsDialog key={k('place')} bare sections={['place']} job={j} onSaved={onFieldsSaved} />
+            </React.Suspense>
+          }
+          {...boxProps('place')}
+        />
+        <PostingFieldBox
+          title="วันเวลาทำงาน"
+          testId="box-schedule"
+          value={(j.work_schedule ?? '').trim() || none}
+          erp={erpSchedule ? <p>{erpSchedule}</p> : null}
+          editor={<ScheduleRequirementsFields key={k('schedule')} only="schedule" job={j} onSaved={onFieldsSaved} />}
+          {...boxProps('schedule')}
+        />
+        <PostingFieldBox
+          title="รายละเอียดงาน"
+          testId="box-details"
+          value={j.job_details && j.job_details.length > 0 ? lines(j.job_details) : none}
+          erp={src.vehicle_required?.trim() ? <p>รถ {src.vehicle_required}</p> : null}
+          editor={<ScheduleRequirementsFields key={k('details')} only="details" job={j} onSaved={onFieldsSaved} />}
+          {...boxProps('details')}
+        />
+        <PostingFieldBox
+          title="คุณสมบัติ"
+          testId="box-requirements"
+          value={j.requirements && j.requirements.length > 0 ? lines(j.requirements) : none}
+          erp={null}
+          editor={<ScheduleRequirementsFields key={k('requirements')} only="requirements" job={j} onSaved={onFieldsSaved} />}
+          {...boxProps('requirements')}
+        />
+
+        {linksCard}
+        {postTextCard}
+        {publishActions}
+        <ReleaseSkipControl jobId={j.id} skip={skip} released={released} onChanged={() => void loadSkips()} />
+      </>
+    );
+  })();
+
+  const quickBody =
+    quickStep === 'fill' ? (
+      <>
+        {gapBar}
+        <StepCard title="วางข้อความโพสต์">
+          {jobWithPatch ? <PostTextPasteCard job={jobWithPatch} onSaved={onPasteSaved} /> : <Loading />}
+        </StepCard>
+
+        {masterCard}
 
         {jobWithPatch ? (
           <React.Suspense fallback={<Loading text="กำลังโหลดฟอร์ม…" />}>
@@ -819,7 +1023,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             {/* ── แถบขั้น 1-4 — บอกสามอย่าง: ขั้นไหนผ่านแล้ว · ใบนี้ค้างขั้นไหน · กำลังเปิดดูขั้นไหน ── */}
             {/* 🔴 4 ขั้นอยู่แถวเดียวเสมอ (เจ้าของสั่ง 5 ต.ค. 2569 "ให้อยู่แถวเดียวกัน") — กริด 4 ช่อง ชื่อยาวตัดบรรทัดในช่องตัวเอง
                 ป้าย "ค้างที่นี่" อยู่ใต้ชื่อในช่องเดียวกัน (เดิมต่อท้ายจนขั้น 4 ตกบรรทัด) */}
-            {quick ? (
+            {one ? null : quick ? (
               quickNav
             ) : (
             <nav className="grid grid-cols-4 gap-1.5" aria-label="ขั้นตอนของงานประกาศ">
@@ -896,7 +1100,9 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
               </p>
             ) : null}
 
-            {quick ? (
+            {one ? (
+              oneBody
+            ) : quick ? (
               quickBody
             ) : (
             <>
@@ -1086,7 +1292,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
 const BoardPostingPage: React.FC = () => {
   const { id = '' } = useParams();
   const location = useLocation();
-  const flow = new URLSearchParams(location.search).get('popup') === 'steps' ? 'steps' : 'quick';
+  const p = new URLSearchParams(location.search).get('popup');
+  const flow = p === 'steps' ? 'steps' : p === 'quick' ? 'quick' : 'one';
   return <BoardPostingSteps id={id} flow={flow} />;
 };
 

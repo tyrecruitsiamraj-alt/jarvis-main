@@ -140,6 +140,14 @@ export async function attachNotes(items: unknown[]): Promise<void> {
          * ค่ากลาง แล้วเลขสองหน้าไม่ตรงกันโดยไม่มีใครรู้
          */
         if (fo.lead_rules) it.lead_rules = fo.lead_rules;
+        /**
+         * ค่าที่ใบขอเขียนไว้ก่อนทับ (6 ต.ค. 2569 ป๊อปประกาศหน้าเดียว) — ปุ่ม "ใบขอ" ข้างกล่องอายุ/วันเวลาทำงาน
+         * ต้องโชว์ของ ERP แม้ทีม Online แก้ทับไปแล้ว (แบบเดียวกับ `erp_gender_requirement`)
+         */
+        if (fo.age_min !== undefined || fo.age_max !== undefined) {
+          it.erp_age_range_min = it.age_range_min ?? null;
+          it.erp_age_range_max = it.age_range_max ?? null;
+        }
         if (fo.age_min !== undefined) it.age_range_min = fo.age_min;
         if (fo.age_max !== undefined) it.age_range_max = fo.age_max;
         if (fo.gender !== undefined && fo.gender !== null) {
@@ -163,7 +171,10 @@ export async function attachNotes(items: unknown[]): Promise<void> {
         if (fo.total_income != null) it.total_income = fo.total_income;
         if (fo.benefits && fo.benefits.length > 0) it.extra_benefits = fo.benefits;
         // วันเวลาทำงาน + คุณสมบัติที่ตั้งเอง (6 ต.ค. 2569 · วางข้อความโพสต์) — null = ใช้ค่า ERP / ไม่มี
-        if (fo.work_schedule) it.work_schedule = fo.work_schedule;
+        if (fo.work_schedule) {
+          it.erp_work_schedule = it.work_schedule ?? null;
+          it.work_schedule = fo.work_schedule;
+        }
         if (fo.requirements && fo.requirements.length > 0) it.requirements = fo.requirements;
         if (fo.job_details && fo.job_details.length > 0) it.job_details = fo.job_details;
         /**

@@ -239,6 +239,10 @@ export interface JobRequest {
    * มีเฉพาะใบที่ `field_overrides.gender` ตั้งไว้แล้ว · ไม่มี = `gender_requirement` คือค่า ERP
    */
   erp_gender_requirement?: string | null;
+  /** อายุ/วันเวลาทำงานที่ใบขอ ERP เขียนไว้ก่อนทีม Online แก้ทับ (6 ต.ค. 2569 · ปุ่ม "ใบขอ" ป๊อปประกาศหน้าเดียว) — ไม่มีคีย์ = ไม่ได้ทับ */
+  erp_age_range_min?: number | null;
+  erp_age_range_max?: number | null;
+  erp_work_schedule?: string | null;
   request_no?: string;
   resigned_title_prefix?: string;
   resigned_first_name?: string;

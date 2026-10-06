@@ -12372,3 +12372,21 @@ Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แ�
 | เทสต์ | `tests/api/postText.test.ts` + `tests/api/fixtures/post-driver-{1,2,3}.txt` |
 
 - ตรวจในเบราว์เซอร์ (ดัก fetch ที่ไม่ใช่ GET) ใบจริง OPL6910006 · OPL6910002 · OPL6909018: วางแล้วแยกครบทุกช่อง · กดใช้ข้อมูลนี้ (ถูกดัก ไม่เขียนฐาน) การ์ดผู้สมัครขึ้นรายละเอียดงาน
+
+### ป๊อปประกาศหน้าเดียว 9 กล่อง + Gen link (6 ต.ค. 2569 ค่ำ · ค่าเริ่มของป๊อปบนงานสรรหา)
+
+เจ้าของ: *"แยกกล่องให้ใส่แบบนี้ … รายได้ · รายได้รวม · สวัสดิการ · เพศ · อายุ · สถานที่ปฏิบัติงาน · ทุกหน้ามีปุ่มข้างเพื่อกดแล้วเด้ง Popup
+ให้ดูได้แต่จะไม่เอารายละเอียดตามนั้นก็ได้ … มีหน้าเดียวแค่ใส่รายละเอียด กับ Genlink จบๆเลย"* → Choice "ทำเลย"
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/components/jobs/PostingFieldBox.tsx` | **ใหม่** — `PostingFieldBox` (ชื่อช่อง · ค่าที่ผู้สมัครเห็น/"ยังไม่ได้ใส่" แดง · ปุ่ม "ใบขอ" = Popover ดูค่า ERP อย่างเดียว ไม่มีข้อมูล = ไม่มีปุ่ม · ปุ่ม "แก้"/"เสร็จ" กางฟอร์ม) · `TotalIncomeField` (ยอดรวม: มีรายการ = `income.total` · ไม่มี = `total_income`) |
+| `src/pages/jobs/BoardPostingPage.tsx` | `flow="one"` — ชิปช่องที่ขาด · ข้อมูลใบขอ (ไม่มีช่องวางโพสต์ — เจ้าของ "วางข้อความโพสต์ ก็ไม่ต้องมีแล้วสิ่") · 9 กล่อง (รายได้ · รายได้รวม · สวัสดิการ+รับเงิน · เพศ · อายุ · สถานที่ · วันเวลา · รายละเอียดงาน · คุณสมบัติ) · ลิงก์ · ข้อความโพสต์ · ส่งประกาศ · ไม่ประกาศใบนี้ · กางได้ทีละกล่อง (`openBox`) · ฟอร์มวาดเฉพาะตอนกาง · ปุ่มเตือนเพศ = กางกล่องเพศ |
+| `src/components/jobs/EditPublicJobFieldsDialog.tsx` | prop `bare` — ไม่ห่อการ์ด/หัวข้อ (ใช้ในกล่อง) |
+| `src/components/jobs/ScheduleRequirementsFields.tsx` | prop `only` — วาดช่องเดียว (schedule / details / requirements) |
+| `api/_handlers/siamraj-unit-requests.ts` (`attachNotes`) · `src/types/index.ts` | เก็บ `erp_age_range_min/max` · `erp_work_schedule` ก่อนทับ (แบบ `erp_gender_requirement`) |
+| `src/components/jobs/JobBoardView.tsx` | ค่าเริ่ม `one` · `?popup=quick` = 2 จอ · `?popup=steps` = 4 หน้า · `?popup=sheet` = ป๊อปหน้าเดียวแบบ 2 ต.ค. |
+| เทสต์ | `src/pages/jobs/BoardPostingSteps.test.tsx` (4 เคสหน้าเดียว) |
+
+- 🔴 ป๊อปนี้อยู่ใน Dialog — ปุ่ม "ใบขอ" ต้องเป็น Popover ห้ามเปิด Dialog ซ้อน
+- ตรวจในเบราว์เซอร์ (ดัก fetch ที่ไม่ใช่ GET): OPL6910006 วางโพสต์ A-HOST แล้ว 9 กล่องเติมเอง · ปุ่มใบขอเด้งในป๊อปงานสรรหาได้ · เปิดป๊อปไม่เขียนฐาน

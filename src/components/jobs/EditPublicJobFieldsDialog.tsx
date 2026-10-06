@@ -180,6 +180,10 @@ function SeenLine({ children }: { children: React.ReactNode }) {
   );
 }
 
+function BareBox({ children }: { title?: React.ReactNode; children: React.ReactNode }) {
+  return <div className="space-y-3">{children}</div>;
+}
+
 const EditPublicJobFieldsDialog: React.FC<{
   job: JobRequest | null;
   sections?: PublicFieldSection[];
@@ -188,8 +192,10 @@ const EditPublicJobFieldsDialog: React.FC<{
    * วาดกล่องนั้นเป็นแถวแยก (`sections={['visibility']}`) ⇒ ฟอร์มนี้ต้องไม่ถือช่องนั้นด้วย ไม่งั้นเขียนทับกัน
    */
   hideVisibility?: boolean;
+  /** ไม่มีการ์ด/หัวข้อห่อแต่ละส่วน — ป๊อปประกาศหน้าเดียว (6 ต.ค. 2569) วางฟอร์มในกล่องที่มีชื่อช่องอยู่แล้ว */
+  bare?: boolean;
   onSaved?: (patch: Partial<JobRequest>) => void;
-}> = ({ job, sections, hideVisibility = false, onSaved }) => {
+}> = ({ job, sections, hideVisibility = false, bare = false, onSaved }) => {
   const uid = useId();
   /**
    * 🔴 **ค่าตั้งต้นมาจากใบขอตั้งแต่ render แรก** (แก้ 27 ก.ย. 2569) — เดิมเริ่มจากค่าว่างแล้ว
@@ -477,10 +483,13 @@ const EditPublicJobFieldsDialog: React.FC<{
   const customs = benefits.filter((e): e is Extract<BenefitEntry, { kind: 'custom' }> => e.kind === 'custom');
   const benefitPreview = cleanBenefitLines(benefitText.split('\n'));
 
+  /** ห่อแต่ละส่วน — `bare` = ไม่มีการ์ด/หัวข้อ */
+  const Box = bare ? BareBox : StepCard;
+
   return (
     <div className="space-y-4">
       {showPlace ? (
-        <StepCard title="สถานที่ปฏิบัติงาน">
+        <Box title="สถานที่ปฏิบัติงาน">
           <div role="group" aria-label="สถานที่ที่ผู้สมัครจะเห็น" className="space-y-3">
             <ChoiceBox
               id={`${uid}-place-request`}
@@ -548,11 +557,11 @@ const EditPublicJobFieldsDialog: React.FC<{
               ) : null}
             </ChoiceBox>
           </div>
-        </StepCard>
+        </Box>
       ) : null}
 
       {showIncome ? (
-        <StepCard title="รายได้">
+        <Box title="รายได้">
           <div role="group" aria-label="รายได้ที่จะขึ้นประกาศ" className="space-y-3">
             <ChoiceBox
               id={`${uid}-income-request`}
@@ -703,13 +712,13 @@ const EditPublicJobFieldsDialog: React.FC<{
               <p className={cn('text-xs', TONE.warn.value)}>ยอดที่ใส่น้อยกว่ารวมของรายการ ประกาศใช้ยอดรวมของรายการแทน</p>
             ) : null}
           </div>
-        </StepCard>
+        </Box>
       ) : null}
 
       {showBenefits ? (
         /* รอบรับเงิน — แยกจากสวัสดิการ (เจ้าของ 4 ต.ค. 2569: *"จ่ายรายวันไม่ใช่สวัสดิการ เป็นแค่ทางเลือกรับเงิน
            ให้เลือกได้ว่าจะรับรายเดือน รายวัน รายสัปดาห์"*) · ติ๊กได้หลายแบบ (บางงานให้เลือกรับ) */
-        <StepCard title="รับเงิน">
+        <Box title="รับเงิน">
           <div role="group" aria-label="รอบรับเงิน" className="flex flex-wrap gap-x-6">
             {PAY_CYCLES.map((c) => (
               <CheckRow
@@ -725,12 +734,12 @@ const EditPublicJobFieldsDialog: React.FC<{
               />
             ))}
           </div>
-        </StepCard>
+        </Box>
       ) : null}
 
       {showBenefits ? (
         /* 🔴 ไม่ล็อก 5 รายการแล้ว (เจ้าของ 4 ต.ค. 2569: *"ทำไมต้อง Lock ไว้ให้เลือกแค่ 5 ต้องเลือกได้เลย"*) */
-        <StepCard title="สวัสดิการ">
+        <Box title="สวัสดิการ">
           <div className="grid gap-x-6 sm:grid-cols-2">
             {EXTRA_BENEFITS.map((b) => {
               const entry = presetEntry(b.key);
@@ -858,7 +867,7 @@ const EditPublicJobFieldsDialog: React.FC<{
               <p className="text-muted-foreground">ยังไม่ได้เลือก</p>
             )}
           </div>
-        </StepCard>
+        </Box>
       ) : null}
 
       {/**
@@ -866,7 +875,7 @@ const EditPublicJobFieldsDialog: React.FC<{
        * อยู่คู่ขั้น 3 · เอาติ๊กออก = ซ่อนทั้งช่องบนหน้าสมัคร ไม่ลบค่า · ตัวตัดสินอยู่ที่ `publicFieldVisible()`
        */}
       {showVisibility ? (
-        <StepCard title="ให้ผู้สมัครเห็นอะไรบ้าง">
+        <Box title="ให้ผู้สมัครเห็นอะไรบ้าง">
           <div className="grid gap-x-6 sm:grid-cols-2">
             {PUBLIC_TOGGLE_FIELDS.map((f) => (
               <CheckRow
@@ -878,7 +887,7 @@ const EditPublicJobFieldsDialog: React.FC<{
               />
             ))}
           </div>
-        </StepCard>
+        </Box>
       ) : null}
 
       {/* 🔴 ป้ายสถานะ auto-save — ไม่มีปุ่มบันทึก/ปิดแล้ว (เจ้าของ 30 ก.ย. 2569: "ไม่ต้องมีคำว่าบันทึกแล้วปิด") */}

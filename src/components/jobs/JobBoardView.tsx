@@ -424,8 +424,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * กลับมาใช้ป๊อป 4 ขั้นแทนป๊อปหน้าเดียว (2 ต.ค.) · ทางถอย: `?popup=sheet` = ป๊อปหน้าเดียว
    */
   const stepsPopup = searchParams.get('popup') !== 'sheet';
-  /** 2 จอ เริ่มจากวางโพสต์ = ค่าเริ่ม (6 ต.ค. 2569 Choice "เหลือ 2 จอ") · `?popup=steps` = 4 หน้าแบบ 4 ต.ค. */
-  const postingFlow: 'quick' | 'steps' = searchParams.get('popup') === 'steps' ? 'steps' : 'quick';
+  /**
+   * หน้าเดียว 9 กล่อง + Gen link = ค่าเริ่ม (6 ต.ค. 2569 ค่ำ Choice "ทำเลย") ·
+   * `?popup=quick` = 2 จอ (6 ต.ค. บ่าย) · `?popup=steps` = 4 หน้าแบบ 4 ต.ค. · `?popup=sheet` = ป๊อปหน้าเดียวแบบ 2 ต.ค.
+   */
+  const popupParam = searchParams.get('popup');
+  const postingFlow: 'one' | 'quick' | 'steps' =
+    popupParam === 'steps' ? 'steps' : popupParam === 'quick' ? 'quick' : 'one';
   const legacyStage = searchParams.get('stage');
 
   const doneLane = useMemo<ClosedBoxKey | null>(() => {

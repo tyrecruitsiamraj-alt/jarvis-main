@@ -20,10 +20,14 @@ import type { JobRequest } from '@/types';
 export default function ScheduleRequirementsFields({
   job,
   onSaved,
+  only,
 }: {
   job: JobRequest;
   onSaved: (patch: Partial<JobRequest>) => void;
+  /** วาดช่องเดียว (ป๊อปประกาศหน้าเดียว 6 ต.ค. 2569 — กล่องละช่อง) · ไม่ส่ง = ครบ 3 ช่องแบบเดิม */
+  only?: 'schedule' | 'details' | 'requirements';
 }) {
+  const showField = (k: 'schedule' | 'details' | 'requirements') => !only || only === k;
   const initSchedule = (job.work_schedule ?? '').trim();
   const initReq = (job.requirements ?? []).join('\n');
   const initDet = (job.job_details ?? []).join('\n');
@@ -78,51 +82,57 @@ export default function ScheduleRequirementsFields({
 
   return (
     <div className="space-y-3">
-      <div className="space-y-1">
-        <Label htmlFor={`${id}-schedule`} className="text-xs text-muted-foreground">
-          วันเวลาทำงาน
-        </Label>
-        <Input
-          id={`${id}-schedule`}
-          value={schedule}
-          maxLength={POST_SCHEDULE_MAX}
-          onChange={(e) => {
-            setSchedule(e.target.value);
-            setSaved(false);
-          }}
-          placeholder="เช่น จ.-ศ. เวลา 08.00-17.00 น."
-        />
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor={`${id}-det`} className="text-xs text-muted-foreground">
-          รายละเอียดงาน · บรรทัดละข้อ
-        </Label>
-        <Textarea
-          id={`${id}-det`}
-          value={det}
-          rows={3}
-          onChange={(e) => {
-            setDet(e.target.value);
-            setSaved(false);
-          }}
-          placeholder="เช่น รับนาย ลาดพร้าว"
-        />
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor={`${id}-req`} className="text-xs text-muted-foreground">
-          คุณสมบัติ · บรรทัดละข้อ
-        </Label>
-        <Textarea
-          id={`${id}-req`}
-          value={req}
-          rows={4}
-          onChange={(e) => {
-            setReq(e.target.value);
-            setSaved(false);
-          }}
-          placeholder="เช่น มีประสบการณ์ 1 ปีขึ้นไป"
-        />
-      </div>
+      {showField('schedule') ? (
+        <div className="space-y-1">
+          <Label htmlFor={`${id}-schedule`} className="text-xs text-muted-foreground">
+            วันเวลาทำงาน
+          </Label>
+          <Input
+            id={`${id}-schedule`}
+            value={schedule}
+            maxLength={POST_SCHEDULE_MAX}
+            onChange={(e) => {
+              setSchedule(e.target.value);
+              setSaved(false);
+            }}
+            placeholder="เช่น จ.-ศ. เวลา 08.00-17.00 น."
+          />
+        </div>
+      ) : null}
+      {showField('details') ? (
+        <div className="space-y-1">
+          <Label htmlFor={`${id}-det`} className="text-xs text-muted-foreground">
+            รายละเอียดงาน · บรรทัดละข้อ
+          </Label>
+          <Textarea
+            id={`${id}-det`}
+            value={det}
+            rows={3}
+            onChange={(e) => {
+              setDet(e.target.value);
+              setSaved(false);
+            }}
+            placeholder="เช่น รับนาย ลาดพร้าว"
+          />
+        </div>
+      ) : null}
+      {showField('requirements') ? (
+        <div className="space-y-1">
+          <Label htmlFor={`${id}-req`} className="text-xs text-muted-foreground">
+            คุณสมบัติ · บรรทัดละข้อ
+          </Label>
+          <Textarea
+            id={`${id}-req`}
+            value={req}
+            rows={4}
+            onChange={(e) => {
+              setReq(e.target.value);
+              setSaved(false);
+            }}
+            placeholder="เช่น มีประสบการณ์ 1 ปีขึ้นไป"
+          />
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-3">
         <Button type="button" size="sm" variant="outline" disabled={busy || (!scheduleDirty && !reqDirty && !detDirty)} onClick={() => void save()}>
           {busy ? 'กำลังบันทึก…' : 'บันทึก'}
