@@ -17,6 +17,9 @@ import { aftercareRealPlanSummary, buildAftercareRealPlans } from '../../src/lib
 import type { FollowEntry } from '../../src/lib/followApi.js';
 
 const trendRow = (over: Partial<FollowTrendRow>): FollowTrendRow => ({
+  team: 'main',
+  category: 'waiting',
+  slot: 1,
   id: Math.random().toString(36).slice(2),
   createdAt: null,
   scheduledAt: null,
@@ -85,60 +88,44 @@ describe('followedSpan — ติดตามมา N วัน (Journey ข้�
   });
 });
 
-describe('followRoundPeople — รอบแรกกี่คน รอบ 2+ กี่คน (Journey ข้อ 15)', () => {
-  it('นับเป็นคน (เบอร์เดียวหลายสายรอบเดียวกัน = 1 คน) และยกเลิกไม่นับ', () => {
+describe('followRoundPeople — สายที่ 1 กี่คน สายที่ 2 ขึ้นไปกี่คน (Journey ข้อ 15 · สายที่ = followRoundSlot 6 ต.ค. 2569)', () => {
+  it('นับเป็นคน (เบอร์เดียวหลายสายกองเดียวกัน = 1 คน) และยกเลิกไม่นับ', () => {
     const rows = [
-      trendRow({ phoneKey: '890000001', callRound: 1, scheduledAt: '2026-10-03T02:00:00Z' }),
-      trendRow({ phoneKey: '890000001', callRound: 1, scheduledAt: '2026-10-04T02:00:00Z' }),
-      trendRow({ phoneKey: '890000001', callRound: 2, scheduledAt: '2026-10-05T02:00:00Z' }),
-      trendRow({ phoneKey: '890000002', callRound: 3, scheduledAt: '2026-10-05T02:00:00Z' }),
-      trendRow({ phoneKey: '890000003', callRound: 1, scheduledAt: '2026-10-05T02:00:00Z', cancelledAt: '2026-10-05T03:00:00Z' }),
+      trendRow({ phoneKey: '890000001', slot: 1, scheduledAt: '2026-10-03T02:00:00Z' }),
+      trendRow({ phoneKey: '890000001', slot: 1, scheduledAt: '2026-10-04T02:00:00Z' }),
+      trendRow({ phoneKey: '890000001', slot: 2, scheduledAt: '2026-10-05T02:00:00Z' }),
+      trendRow({ phoneKey: '890000002', slot: 3, scheduledAt: '2026-10-05T02:00:00Z' }),
+      trendRow({ phoneKey: '890000003', slot: 1, scheduledAt: '2026-10-05T02:00:00Z', category: 'cancelled' }),
       // นอกช่วง — ไม่นับ
-      trendRow({ phoneKey: '890000004', callRound: 1, scheduledAt: '2026-11-05T02:00:00Z' }),
+      trendRow({ phoneKey: '890000004', slot: 1, scheduledAt: '2026-11-05T02:00:00Z' }),
     ];
     expect(followRoundPeople(rows, RANGE)).toEqual({ first: 1, later: 2 });
   });
 
-  it('ไม่มีเบอร์ = นับด้วย id (ไม่หายเงียบ) · callRound null = สายแรก', () => {
+  it('ไม่มีเบอร์ = นับด้วย id (ไม่หายเงียบ)', () => {
     const rows = [
-      trendRow({ phoneKey: null, callRound: null, scheduledAt: '2026-10-03T02:00:00Z' }),
-      trendRow({ phoneKey: null, callRound: null, scheduledAt: '2026-10-03T02:00:00Z' }),
+      trendRow({ phoneKey: null, scheduledAt: '2026-10-03T02:00:00Z' }),
+      trendRow({ phoneKey: null, scheduledAt: '2026-10-03T02:00:00Z' }),
     ];
     expect(followRoundPeople(rows, RANGE)).toEqual({ first: 2, later: 0 });
   });
 });
 
-describe('followCallerStats — AI/คนโทร โทรเท่าไหร่ ติดต่อได้เท่าไหร่', () => {
-  it('ฝั่ง AI ใช้ผลคิว · ฝั่งคนใช้ผลที่คนลงเอง (acknowledged = ติดต่อได้)', () => {
+describe('followCallerStats — AI/คนโทร โทรเท่าไหร่ ติดต่อได้เท่าไหร่ (หมวดกลาง · 6 ต.ค. 2569)', () => {
+  it('โทรแล้ว = ไป/ไม่ไป/ไม่รับสาย/สรุปไม่ได้ · ติดต่อได้ = ไม่รวมไม่รับสาย · ยังไม่มีผลไม่นับ · แยกตามใครโทร', () => {
+    const at = '2026-10-03T02:00:00Z';
     const rows = [
-      trendRow({ callMode: 'ai', callStatus: 'completed', callOutcome: 'confirmed', resultAt: '2026-10-03T02:00:00Z' }),
-      trendRow({ callMode: 'ai', callStatus: 'completed', callOutcome: 'no_answer', resultAt: '2026-10-03T02:00:00Z' }),
-      trendRow({ callMode: 'manual', staffCallOutcome: 'acknowledged', staffCalledAt: '2026-10-03T02:00:00Z' }),
-      trendRow({ callMode: 'manual', staffCallOutcome: 'no_answer', staffCalledAt: '2026-10-03T02:00:00Z' }),
-      // ยังไม่มีผล — ไม่นับเป็น "โทรแล้ว"
-      trendRow({ callMode: 'manual' }),
-      trendRow({ callMode: 'ai', callStatus: 'pending' }),
+      trendRow({ callMode: 'ai', category: 'agreed', scheduledAt: at }),
+      trendRow({ callMode: 'ai', category: 'unreachable', scheduledAt: at }),
+      trendRow({ callMode: 'manual', category: 'other', scheduledAt: at }),
+      trendRow({ callMode: 'manual', category: 'unreachable', scheduledAt: at }),
+      trendRow({ callMode: 'manual', category: 'notSent', scheduledAt: at }),
+      trendRow({ callMode: 'ai', category: 'waiting', scheduledAt: at }),
+      trendRow({ callMode: 'ai', category: 'cancelled', scheduledAt: at }),
     ];
     expect(followCallerStats(rows, RANGE)).toEqual({
       ai: { calls: 2, connected: 1 },
       manual: { calls: 2, connected: 1 },
-    });
-  });
-
-  it('ผลที่คนลงเองทับผลคิว และนับที่วันที่คนลง ไม่ใช่วันผลคิว', () => {
-    const rows = [
-      trendRow({
-        callMode: 'manual',
-        callStatus: 'completed',
-        callOutcome: 'no_answer',
-        resultAt: '2026-09-01T02:00:00Z', // นอกช่วง
-        staffCallOutcome: 'confirmed',
-        staffCalledAt: '2026-10-03T02:00:00Z', // ในช่วง
-      }),
-    ];
-    expect(followCallerStats(rows, RANGE)).toEqual({
-      ai: { calls: 0, connected: 0 },
-      manual: { calls: 1, connected: 1 },
     });
   });
 });

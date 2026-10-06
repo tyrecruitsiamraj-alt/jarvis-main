@@ -111,3 +111,46 @@ describe('คำเดียวกันทุกที่', () => {
     }
   });
 });
+
+describe('Dashboard ติดตาม — ช่องเดียวกับแผง และบวกลงตัว (6 ต.ค. 2569)', () => {
+  it('ทั้งหมด = ไป + ไม่ไป + ไม่รับสาย + สรุปไม่ได้ + รอโทร + ยกเลิก · AI + คน = โทรแล้ว', async () => {
+    const { followMatrixInRange, followCallerStats, followEventYmd } = await import('../../src/lib/trends/followTrends');
+    const cats = ['agreed', 'lost', 'unreachable', 'other', 'waiting', 'overdue', 'notSent', 'cancelled'] as const;
+    const rows = cats.flatMap((category, i) =>
+      [0, 1].map((k) => ({
+        id: `${category}-${k}`,
+        team: 'main' as const,
+        category,
+        slot: 1 as const,
+        createdAt: '2026-10-01T02:00:00Z',
+        scheduledAt: '2026-10-06T02:00:00Z',
+        resultAt: null,
+        completedAt: null,
+        cancelledAt: null,
+        outcomeCode: null,
+        callStatus: null,
+        callOutcome: null,
+        attempt: null,
+        callRound: 1,
+        callMode: (k === 0 ? 'ai' : 'manual') as 'ai' | 'manual',
+        phoneKey: `8${i}${k}`,
+        staffCallOutcome: null,
+        staffCalledAt: null,
+        topic: 'ติดตามเริ่มงาน',
+        unitName: null,
+        siteCode: null,
+        staffId: null,
+        staffName: null,
+        bu: null,
+      })),
+    );
+    const range = { from: '2026-10-01', to: '2026-10-31' };
+    const m = followMatrixInRange(rows, range);
+    expect(m.went + m.notWent + m.noAnswer + m.unclear + m.waiting + m.cancelled).toBe(m.total);
+    expect(m.total).toBe(rows.length);
+    const called = rows.filter((r) => followEventYmd(r, 'called')).length;
+    expect(called).toBe(m.went + m.notWent + m.noAnswer + m.unclear);
+    const c = followCallerStats(rows, range);
+    expect(c.ai.calls + c.manual.calls).toBe(called);
+  });
+});

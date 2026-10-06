@@ -37,6 +37,12 @@ import { toBangkokYmd } from '../_lib/businessDate.js';
 import { siteBuSql } from '../_lib/siteBuSql.js';
 import { classifyCallMicro, vocabForPersonRef } from '../../src/lib/callMicroOutcome.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
+import type { FollowEntry } from '../../src/lib/followApi.js';
+import { withFollowDayCalls } from '../../src/lib/followDayCall.js';
+import { followGroupKey } from '../../src/lib/followGrouping.js';
+import { callCategory, dayVerdictOf, followRoundState, staffDayVerdicts, type FollowPlanningRound } from '../../src/lib/followPlanning.js';
+import { followRoundSlot } from '../../src/lib/followRoundBuckets.js';
+import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import type {
   ApplicantLumos,
   ApplicantTrendRow,
@@ -110,21 +116,76 @@ async function loadFollow(from: string, to: string): Promise<FollowTrendRow[]> {
             coalesce(nullif(btrim(u.nickname), ''), f.created_by_name) as staff_name,
             coalesce(u.department_code, ${SITE_BU('f.site_code')}) as bu,
             q.status as call_status, ${outcome} as call_outcome, q.attempt_count as attempt,
-            case when ${outcome} is not null then coalesce(q.first_result_at, q.updated_at) end as result_at
+            case when ${outcome} is not null then coalesce(q.first_result_at, q.updated_at) end as result_at,
+            f.follow_team, f.group_id::text as group_id, f.recipient_name, f.recipient_phone, f.source_ref,
+            q.result->>'summary' as call_summary,
+            (select string_agg(x.t->>'text', ' · ' order by x.ord)
+               from jsonb_array_elements(
+                      case when jsonb_typeof(q.result->'transcript') = 'array' then q.result->'transcript' else '[]'::jsonb end
+                    ) with ordinality as x(t, ord)
+              where x.t->>'role' = 'candidate' and coalesce(btrim(x.t->>'text'), '') <> '') as call_reply
        from ${FOLLOW} f
        left join ${USERS} u on u.id = f.created_by
        left join ${QUEUE} q
               on q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref = 'follow-' || f.id::text
       where f.created_at < ($2::date + 1)
         and (f.created_at >= $1::date
+             -- ช่องของแผงนับตามวันนัดโทร ⇒ สายที่ลงก่อนช่วงแต่นัดในช่วงต้องมาด้วย (6 ต.ค. 2569)
+             or (f.scheduled_at >= $1::date and f.scheduled_at < ($2::date + 1))
              or f.completed_at >= $1::date
              or f.cancelled_at >= $1::date
              or f.staff_called_at >= $1::date
              or coalesce(q.first_result_at, q.updated_at) >= $1::date)`,
     [from, to],
   );
+  /**
+   * 🔴 หมวดของสาย + สายที่ คิดด้วยฟังก์ชันกลางตัวเดียวกับหน้าติดตาม (6 ต.ค. 2569 — เจ้าของ "ตัวเลข… ต้องสอดคล้องกัน")
+   * อ่านคำตอบจริง (คำพูด + สรุป) · ผลที่คนกดของวันนั้น (dayVerdict) · ลำดับสายในวัน · ไม่ส่งข้อความออกไปหน้าเว็บ
+   */
+  const now = new Date();
+  const entries = withFollowDayCalls(
+    rows.map(
+      (r) =>
+        ({
+          id: String(r.id),
+          recipient_name: clean(r.recipient_name) ?? '',
+          recipient_phone: clean(r.recipient_phone) ?? '',
+          topic: clean(r.topic) ?? '',
+          group_id: clean(r.group_id),
+          source_ref: clean(r.source_ref),
+          scheduled_at: iso(r.scheduled_at),
+          completed_at: iso(r.completed_at),
+          outcome_code: clean(r.outcome_code),
+          cancelled: r.cancelled_at != null,
+          call_status: clean(r.call_status),
+          call_outcome: clean(r.call_outcome),
+          call_summary: clean(r.call_summary),
+          call_reply: clean(r.call_reply),
+          call_round: r.call_round == null ? null : Number(r.call_round),
+          call_attempt: r.attempt == null ? null : Number(r.attempt),
+          staff_call_outcome: clean(r.staff_call_outcome),
+          staff_called_at: iso(r.staff_called_at),
+        }) as unknown as FollowEntry,
+    ),
+  );
+  const verdicts = staffDayVerdicts(entries, followGroupKey);
+  const derived = new Map(
+    entries.map((e) => {
+      const round = {
+        entry: e,
+        state: followRoundState(e, now),
+        time: null,
+        ymd: null,
+        dayVerdict: dayVerdictOf(verdicts, followGroupKey(e), e.scheduled_at),
+      } as FollowPlanningRound;
+      return [e.id, { category: callCategory(round), slot: followRoundSlot(e) ?? 1 }] as const;
+    }),
+  );
   return rows.map((r) => ({
     id: String(r.id),
+    team: r.follow_team === FOLLOW_TEAM_REPLACEMENT ? ('replacement' as const) : ('main' as const),
+    category: derived.get(String(r.id))?.category ?? 'waiting',
+    slot: derived.get(String(r.id))?.slot ?? 1,
     createdAt: iso(r.created_at),
     scheduledAt: iso(r.scheduled_at),
     resultAt: iso(r.result_at),

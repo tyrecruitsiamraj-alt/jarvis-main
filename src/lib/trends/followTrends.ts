@@ -9,8 +9,8 @@
  * แต่ละตัวเลขนับตาม **วันที่ของเหตุการณ์นั้นเอง** (ลงรายชื่อ = วันลง · โทรแล้ว = วันที่ได้ผลโทร ·
  * ปิดงาน = วันที่ปิด) — ห้ามเอาวันลงรายชื่อไปนับผลที่เกิดทีหลัง (สัปดาห์นี้จะดูแย่ สัปดาห์ก่อนจะดูดีเกินจริง)
  */
-import { bucketOfCall } from '@/lib/callOutcomeBuckets';
-import { followCallOutcomeText } from '@/lib/callOutcomeTone';
+import { FOLLOW_CALL_CATEGORY_LABEL, type FollowCallCategory } from '@/lib/followPlanning';
+import { FOLLOW_MATRIX_ROW_LABEL, followMatrixColOfCategory, type FollowMatrixCol } from '@/lib/followCallMatrix';
 import { FOLLOW_OUTCOME_LABEL, FOLLOW_OUTCOME_SUCCESS, type FollowOutcomeAny } from '@/lib/followOutcome';
 import { bangkokYmd } from './timeBuckets';
 import { trendBuLabel } from './bu';
@@ -23,8 +23,9 @@ export const FOLLOW_METRIC_LABEL: Record<FollowMetric, string> = {
   called: 'โทรแล้ว',
   connected: 'ติดต่อได้',
   completed: 'ปิดงาน',
-  success: 'ไปถึงแล้ว',
-  dropped: 'ยกเลิก / ลา / ไม่ไป',
+  // 🔴 คำของ "ปิดงาน" (ต่อคน) แยกจากคำของผลโทร (ต่อสาย: ตอบว่าไป…) — 6 ต.ค. 2569 ไม่ให้ต้องเดาว่าตัวไหนคือตัวไหน
+  success: 'ปิดงานว่าไปแล้ว',
+  dropped: 'ปิดงานว่าไม่ไป · ยกเลิก · ลา',
   cancelledEntry: 'ยกเลิกการติดตาม',
 };
 
@@ -33,18 +34,42 @@ const FOLLOW_DROPPED: readonly string[] = ['cancelled', 'leave', 'job_cancelled'
 
 const isSuccess = (code: string | null) => Boolean(code && (FOLLOW_OUTCOME_SUCCESS as readonly string[]).includes(code));
 
+/** สายที่โทรแล้วมีผล (ช่องของแผง: ไป · ไม่ไป · ไม่รับสาย · สรุปไม่ได้) */
+const CALLED_CATEGORIES: ReadonlySet<FollowCallCategory> = new Set(['agreed', 'lost', 'unreachable', 'other']);
+/** มีคนรับ = โทรแล้ว ยกเว้นไม่รับสาย */
+const ANSWERED_CATEGORIES: ReadonlySet<FollowCallCategory> = new Set(['agreed', 'lost', 'other']);
+
+/**
+ * ═══ ช่องของแผงขั้นตอนของสาย ในช่วงที่เลือก (ตามวันนัดโทร) — เลขชุดเดียวกับหน้าติดตาม (6 ต.ค. 2569) ═══
+ * ทั้งหมด = ไป + ไม่ไป + ไม่รับสาย + สรุปไม่ได้ + รอโทร + ยกเลิก
+ */
+export function followMatrixInRange(
+  rows: readonly FollowTrendRow[],
+  range: { from: string; to: string },
+): Record<Exclude<FollowMatrixCol, 'total'>, number> & { total: number } {
+  const out = { total: 0, went: 0, notWent: 0, noAnswer: 0, unclear: 0, waiting: 0, cancelled: 0 };
+  for (const r of rows) {
+    const y = bangkokYmd(r.scheduledAt);
+    if (!y || y < range.from || y > range.to) continue;
+    out.total += 1;
+    out[followMatrixColOfCategory(r.category)] += 1;
+  }
+  return out;
+}
+
 /** วันที่ (ปฏิทินกรุงเทพ) ที่แถวนี้นับเข้าตัวเลขนั้น · `null` = แถวนี้ไม่นับ */
 export function followEventYmd(row: FollowTrendRow, metric: FollowMetric): string | null {
   switch (metric) {
     case 'registered':
       return bangkokYmd(row.createdAt);
+    /**
+     * 🔴 6 ต.ค. 2569: นับจากหมวดกลางตามวันนัดโทร (ตัวเดียวกับแผงขั้นตอนของสายบนหน้าติดตาม)
+     * โทรแล้ว = ไป + ไม่ไป + ไม่รับสาย + สรุปไม่ได้ · ติดต่อได้ = ไป + ไม่ไป + สรุปไม่ได้ (มีคนรับ)
+     */
     case 'called':
-    case 'connected': {
-      if (!row.resultAt) return null;
-      const b = bucketOfCall(row.callStatus, row.callOutcome);
-      if (metric === 'connected') return b === 'connected' ? bangkokYmd(row.resultAt) : null;
-      return b === 'connected' || b === 'unreached' ? bangkokYmd(row.resultAt) : null;
-    }
+      return CALLED_CATEGORIES.has(row.category) ? bangkokYmd(row.scheduledAt) : null;
+    case 'connected':
+      return ANSWERED_CATEGORIES.has(row.category) ? bangkokYmd(row.scheduledAt) : null;
     case 'completed':
       return bangkokYmd(row.completedAt);
     case 'success':
@@ -102,14 +127,15 @@ export function followCountedYmd(rows: readonly FollowTrendRow[]): (row: FollowT
   };
 }
 
-export type FollowDim = 'bu' | 'unit' | 'staff' | 'topic' | 'round' | 'mode' | 'outcome' | 'callOutcome';
+export type FollowDim = 'bu' | 'team' | 'unit' | 'staff' | 'topic' | 'round' | 'mode' | 'outcome' | 'callOutcome';
 
 export const FOLLOW_DIM_LABEL: Record<FollowDim, string> = {
   bu: 'BU',
+  team: 'แท็บ',
   unit: 'หน่วยงาน',
   staff: 'เจ้าหน้าที่',
   topic: 'หัวข้อ',
-  round: 'รอบโทร',
+  round: 'สายที่',
   mode: 'ใครโทร',
   outcome: 'ผลปิดงาน',
   callOutcome: 'ผลโทร',
@@ -187,14 +213,16 @@ export function followDimGetter(dim: FollowDim, rows: readonly FollowTrendRow[])
     case 'topic':
       return (r) => r.topic ?? 'ไม่ระบุ';
     case 'round':
-      return (r) => ((r.callRound ?? 1) >= 2 ? 'สายที่ 2 ขึ้นไป' : 'สายแรก');
+      return (r) => FOLLOW_MATRIX_ROW_LABEL[r.slot];
+    case 'team':
+      return (r) => (r.team === 'replacement' ? 'ติดตามส่งคนแทน' : 'ติดตามคนเริ่มงาน');
     case 'mode':
       return (r) => (r.callMode === 'manual' ? 'เจ้าหน้าที่โทรเอง' : 'AI โทร');
     case 'outcome':
       return (r) => (r.outcomeCode ? FOLLOW_OUTCOME_LABEL[r.outcomeCode as FollowOutcomeAny] ?? r.outcomeCode : 'ยังไม่ปิดงาน');
     case 'callOutcome':
-      return (r) =>
-        r.callOutcome ? followCallOutcomeText(r.callOutcome) : 'ยังไม่มีผลโทร';
+      // คำของหมวดเดียวกับป้ายบนหน้าติดตาม (6 ต.ค. 2569)
+      return (r) => FOLLOW_CALL_CATEGORY_LABEL[r.category];
   }
 }
 
@@ -223,11 +251,12 @@ export function followRoundPeople(
   const first = new Set<string>();
   const later = new Set<string>();
   for (const r of rows) {
-    if (r.cancelledAt) continue;
+    // ยกเลิก = ช่องยกเลิกของแผง · สายที่ = followRoundSlot (ตัวเดียวกับหน้าติดตาม · 6 ต.ค. 2569)
+    if (r.category === 'cancelled') continue;
     const y = bangkokYmd(r.scheduledAt);
     if (!y || y < range.from || y > range.to) continue;
-    const key = r.phoneKey || r.id;
-    if ((r.callRound ?? 1) <= 1) first.add(key);
+    const key = followTrendPersonKey(r);
+    if (r.slot === 1) first.add(key);
     else later.add(key);
   }
   return { first: first.size, later: later.size };
@@ -244,14 +273,13 @@ export function followCallerStats(
 ): Record<'ai' | 'manual', { calls: number; connected: number }> {
   const out = { ai: { calls: 0, connected: 0 }, manual: { calls: 0, connected: 0 } };
   for (const r of rows) {
-    const staff = Boolean(r.staffCallOutcome);
-    const y = bangkokYmd(staff ? r.staffCalledAt : r.resultAt);
+    // หมวดกลาง + วันนัดโทร (6 ต.ค. 2569) ⇒ AI + คน = "โทรแล้ว" ของแถวบนพอดี
+    const y = bangkokYmd(r.scheduledAt);
     if (!y || y < range.from || y > range.to) continue;
-    const b = bucketOfCall(staff ? null : r.callStatus, r.staffCallOutcome ?? r.callOutcome);
-    if (b !== 'connected' && b !== 'unreached') continue;
+    if (!CALLED_CATEGORIES.has(r.category)) continue;
     const side = out[r.callMode === 'manual' ? 'manual' : 'ai'];
     side.calls += 1;
-    if (b === 'connected') side.connected += 1;
+    if (ANSWERED_CATEGORIES.has(r.category)) side.connected += 1;
   }
   return out;
 }

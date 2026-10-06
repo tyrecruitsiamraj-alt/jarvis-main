@@ -11,6 +11,7 @@ import {
   followCallerStats,
   followCountedYmd,
   followDimGetter,
+  followMatrixInRange,
   followRoundPeople,
   rate,
   type FollowDim,
@@ -18,6 +19,7 @@ import {
 } from '@/lib/trends/followTrends';
 import { formatTrendNumber as fmt, formatTrendPct as pct } from '@/lib/trends/format';
 import { formatYmdDmyBe } from '@/lib/dateTh';
+import { FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE } from '@/lib/followCallMatrix';
 import type { FollowTrendRow } from '@/lib/trends/types';
 import {
   DeltaChip,
@@ -71,7 +73,12 @@ const FollowDashboard: React.FC = () => {
   const [dim, setDim] = useState<FollowDim>('unit');
   const [metric, setMetric] = useState<FollowMetric>('registered');
 
-  const data = useMemo(() => rows ?? [], [rows]);
+  /** แท็บ — ติดตามคนเริ่มงาน / ติดตามส่งคนแทน แยกกันของใครของมัน (เจ้าของ 6 ต.ค. 2569) · ทั้งหมด = รวมสองแท็บ */
+  const [team, setTeam] = useState<'all' | 'main' | 'replacement'>('all');
+  const data = useMemo(() => (rows ?? []).filter((r) => team === 'all' || r.team === team), [rows, team]);
+  /** ช่องเดียวกับแผงขั้นตอนของสาย (ตามวันนัดโทร) */
+  const matrixNow = useMemo(() => followMatrixInRange(data, range), [data, range]);
+  const matrixPrev = useMemo(() => followMatrixInRange(data, previous), [data, previous]);
   /** 🔴 ตัวเลขแบบ "คน" นับคนไม่ซ้ำ · แบบ "สาย" นับทีละแถว — ทุกส่วนของจอใช้ตัวนี้ (ดู `followCountedYmd`) */
   const ymdOf = useMemo(() => followCountedYmd(data), [data]);
   const count = (m: FollowMetric, r: { from: string; to: string }) => sumInRange(data, (x) => ymdOf(x, m), r);
@@ -160,13 +167,42 @@ const FollowDashboard: React.FC = () => {
       <TrendState loading={loading && !rows} error={error} onRetry={() => setRev((n) => n + 1)} />
       {rows ? (
         <>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={cn('text-xs', DASH.sub)}>แท็บ</span>
+            <ChoiceDropdown<'all' | 'main' | 'replacement'>
+              value={team}
+              options={[
+                { value: 'all', label: 'ทั้งสองแท็บ' },
+                { value: 'main', label: 'ติดตามคนเริ่มงาน' },
+                { value: 'replacement', label: 'ติดตามส่งคนแทน' },
+              ]}
+              onChange={setTeam}
+              ariaLabel="แท็บ"
+              active={team !== 'all'}
+            />
+          </div>
+
+          {/* 🔴 ช่องเดียวกับแผง "ขั้นตอนของสาย" บนหน้าติดตาม — นับตามวันนัดโทรในช่วง · คำเดียวกัน (6 ต.ค. 2569) */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7" data-testid="follow-dashboard-matrix">
+            {(['total', 'went', 'notWent', 'noAnswer', 'unclear', 'waiting', 'cancelled'] as const).map((k) => (
+              <TrendKpiCard
+                key={k}
+                label={FOLLOW_MATRIX_COL_LABEL[k]}
+                unit="สาย"
+                value={matrixNow[k]}
+                previous={matrixPrev[k]}
+                tone={k === 'total' ? 'primary' : FOLLOW_MATRIX_COL_TONE[k] === 'neutral' ? 'primary' : FOLLOW_MATRIX_COL_TONE[k]}
+              />
+            ))}
+          </div>
+
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             <TrendKpiCard label="ลงติดตาม" unit="คน" value={now.registered} previous={prev.registered} tone="violet" spark={reg.map((p) => p.value)} />
             <TrendKpiCard label="โทรแล้ว" unit="สาย" value={now.called} previous={prev.called} tone="info" spark={called.map((p) => p.value)} />
             <TrendKpiCard label="ติดต่อได้" value={rate(now.connected, now.called)} previous={rate(prev.connected, prev.called)} asRate tone="teal" foot={`${fmt(now.connected)} จาก ${fmt(now.called)} สาย`} />
-            <TrendKpiCard label="ไปถึงแล้ว" unit="คน" value={now.success} previous={prev.success} tone="success" spark={success.map((p) => p.value)} />
-            <TrendKpiCard label="อัตราไปถึง" value={rate(now.success, now.completed)} previous={rate(prev.success, prev.completed)} asRate tone="success" foot={`${fmt(now.success)} จาก ${fmt(now.completed)} ที่ปิดงาน`} />
-            <TrendKpiCard label="ยกเลิก / ลา / ไม่ไป" unit="คน" value={now.dropped} previous={prev.dropped} polarity="down-good" tone="danger" spark={dropped.map((p) => p.value)} />
+            <TrendKpiCard label="ปิดงานว่าไปแล้ว" unit="คน" value={now.success} previous={prev.success} tone="success" spark={success.map((p) => p.value)} />
+            <TrendKpiCard label="อัตราปิดงานว่าไป" value={rate(now.success, now.completed)} previous={rate(prev.success, prev.completed)} asRate tone="success" foot={`${fmt(now.success)} จาก ${fmt(now.completed)} ที่ปิดงาน`} />
+            <TrendKpiCard label="ปิดงานว่าไม่ไป · ยกเลิก · ลา" unit="คน" value={now.dropped} previous={prev.dropped} polarity="down-good" tone="danger" spark={dropped.map((p) => p.value)} />
           </div>
 
           {/* แถวที่สอง: รอบแรก/รอบถัดไป (นับคน) + แยก AI/คนโทรว่าโทรไปเท่าไหร่ ติดต่อได้เท่าไหร่
@@ -195,7 +231,7 @@ const FollowDashboard: React.FC = () => {
           <TrendSection title="ติดตามเริ่มงาน · แนวโน้ม">
             <Card className="space-y-4 rounded-2xl p-4">
               <TrendChart
-                ariaLabel="ลงติดตาม โทรแล้ว ไปถึงแล้ว และยกเลิกลา ต่องวด"
+                ariaLabel="ลงติดตาม โทรแล้ว ปิดงานว่าไปแล้ว และปิดงานว่าไม่ไป ต่องวด"
                 data={reg.map((p, i) => ({
                   label: p.label,
                   registered: p.value,
@@ -206,8 +242,8 @@ const FollowDashboard: React.FC = () => {
                 series={[
                   { key: 'registered', label: 'ลงติดตาม', kind: 'bar', tone: 'violet' },
                   { key: 'called', label: 'โทรแล้ว', kind: 'line', tone: 'info' },
-                  { key: 'success', label: 'ไปถึงแล้ว', kind: 'line', tone: 'success' },
-                  { key: 'dropped', label: 'ยกเลิก / ลา / ไม่ไป', kind: 'line', tone: 'danger', dashed: true },
+                  { key: 'success', label: FOLLOW_METRIC_LABEL.success, kind: 'line', tone: 'success' },
+                  { key: 'dropped', label: FOLLOW_METRIC_LABEL.dropped, kind: 'line', tone: 'danger', dashed: true },
                 ]}
               />
               <div className="flex flex-wrap items-center gap-2">
@@ -219,7 +255,7 @@ const FollowDashboard: React.FC = () => {
                 dim={dim}
                 onDimChange={setDim}
                 rows={dimRows}
-                unit={`${FOLLOW_METRIC_LABEL[metric]} (${metric === 'called' ? 'สาย' : 'ราย'})`}
+                unit={`${FOLLOW_METRIC_LABEL[metric]} (${metric === 'called' ? 'สาย' : 'คน'})`}
                 polarity={metric === 'dropped' ? 'down-good' : 'up-good'}
                 tone={metric === 'dropped' ? 'danger' : metric === 'success' ? 'success' : 'violet'}
               />
@@ -234,8 +270,8 @@ const FollowDashboard: React.FC = () => {
                   { key: 'reg', label: 'ลงติดตาม', align: 'right' },
                   { key: 'called', label: 'โทรแล้ว', align: 'right' },
                   { key: 'completed', label: 'ปิดงาน', align: 'right' },
-                  { key: 'success', label: 'ไปถึงแล้ว', align: 'right' },
-                  { key: 'rate', label: 'อัตราไปถึง', align: 'right' },
+                  { key: 'success', label: FOLLOW_METRIC_LABEL.success, align: 'right' },
+                  { key: 'rate', label: 'อัตราปิดงานว่าไป', align: 'right' },
                   { key: 'delta', label: 'ลงติดตามเทียบช่วงก่อน', align: 'right' },
                 ]}
                 rows={staff.map((s) => ({

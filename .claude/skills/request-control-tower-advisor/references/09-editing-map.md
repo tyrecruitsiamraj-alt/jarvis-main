@@ -12169,3 +12169,15 @@ Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แ�
 
 - ตรวจ Browser: รายวัน 175+2+1+5+9+10 = 202 = "202 สาย" ท้ายตาราง · รายเดือน 488+2+2+19+534+70 = 1,115 · การ์ดเดือน = แผง
 - ยังเหลือ: Dashboard (รอบ 2) · หน้าหลัก + ปุ่มแยกทีม/BU (รอบ 3)
+
+## 6 ต.ค. 2569: Dashboard ติดตามใช้หมวดกลางเดียวกับหน้าติดตาม (รอบ 2/3)
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `api/_handlers/dashboard-trends.ts` | loadFollow คิด `category` (callCategory + อ่านคำตอบ + dayVerdict) · `slot` (followRoundSlot หลัง withFollowDayCalls) · `team` ที่ server · ไม่ส่งข้อความถอดเสียงออก · ดึงสายที่นัดในช่วงด้วย (เดิมขาดสายที่ลงก่อนช่วง) |
+| `src/lib/trends/types.ts` | FollowTrendRow + team · category · slot |
+| `src/lib/trends/followTrends.ts` | โทรแล้ว = ไป+ไม่ไป+ไม่รับสาย+สรุปไม่ได้ (วันนัดโทร) · ติดต่อได้ = ไม่รวมไม่รับสาย · `followMatrixInRange` · สายแรก/2+ ใช้ slot · AI/คนใช้หมวดกลาง · มิติ "แท็บ" · มิติผลโทร = คำของหมวด · ปิดงาน "ปิดงานว่าไปแล้ว" / "ปิดงานว่าไม่ไป · ยกเลิก · ลา" |
+| `src/components/dashboard-trends/FollowDashboard.tsx` | ตัวเลือกแท็บ (ทั้งสองแท็บ/เริ่มงาน/ส่งคนแทน) · แถวช่องเดียวกับแผง 7 ช่อง · คำปิดงานใหม่ · หน่วย "คน" |
+| เทสต์ | trends · followJourneyBatch · followNumbersReconcile (Dashboard บวกลงตัว) |
+
+- ตรวจ Browser 6 ต.ค.: หน้าติดตามแท็บเริ่มงาน 202/176/2/1/5/8/10 = Dashboard วันเดียวกัน แท็บเดียวกัน ทุกช่อง

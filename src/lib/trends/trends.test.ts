@@ -41,6 +41,9 @@ describe('BU ชุดเดียว (รหัสแผนก) — ตาร�
 });
 
 const f = (over: Partial<FollowTrendRow>): FollowTrendRow => ({
+  team: 'main',
+  category: 'waiting',
+  slot: 1,
   id: Math.random().toString(36).slice(2),
   createdAt: '2026-09-22T03:00:00Z',
   scheduledAt: null,
@@ -69,11 +72,14 @@ describe('ติดตาม — นับตามวันที่ของ�
   it('ลงรายชื่อ = วันลง (ปฏิทินกรุงเทพ)', () => {
     expect(followEventYmd(f({ createdAt: '2026-09-21T18:30:00Z' }), 'registered')).toBe('2026-09-22');
   });
-  it('โทรแล้ว = มีผลโทรจริง (ติด/ไม่ติด) · ยกเลิก/ยังรอ ไม่นับ', () => {
-    expect(followEventYmd(f({ resultAt: '2026-09-23T02:00:00Z', callStatus: 'completed', callOutcome: 'confirmed' }), 'called')).toBe('2026-09-23');
-    expect(followEventYmd(f({ resultAt: '2026-09-23T02:00:00Z', callStatus: 'completed', callOutcome: 'no_answer' }), 'called')).toBe('2026-09-23');
-    expect(followEventYmd(f({ resultAt: '2026-09-23T02:00:00Z', callStatus: 'completed', callOutcome: 'no_answer' }), 'connected')).toBeNull();
-    expect(followEventYmd(f({ resultAt: '2026-09-23T02:00:00Z', callStatus: 'cancelled', callOutcome: null }), 'called')).toBeNull();
+  it('โทรแล้ว = หมวดไป/ไม่ไป/ไม่รับสาย/สรุปไม่ได้ ตามวันนัดโทร · ติดต่อได้ = ไม่รวมไม่รับสาย (6 ต.ค. 2569)', () => {
+    const at = '2026-09-23T02:00:00Z';
+    expect(followEventYmd(f({ scheduledAt: at, category: 'agreed' }), 'called')).toBe('2026-09-23');
+    expect(followEventYmd(f({ scheduledAt: at, category: 'unreachable' }), 'called')).toBe('2026-09-23');
+    expect(followEventYmd(f({ scheduledAt: at, category: 'unreachable' }), 'connected')).toBeNull();
+    expect(followEventYmd(f({ scheduledAt: at, category: 'other' }), 'connected')).toBe('2026-09-23');
+    expect(followEventYmd(f({ scheduledAt: at, category: 'cancelled' }), 'called')).toBeNull();
+    expect(followEventYmd(f({ scheduledAt: at, category: 'waiting' }), 'called')).toBeNull();
   });
   it('ไปถึงแล้ว = went/arrived/done (ตัวเดียวกับหน้าแรก) · ยกเลิก/ลา = ไม่สำเร็จ · เลื่อน = ไม่นับทั้งสองฝั่ง', () => {
     const at = '2026-09-24T05:00:00Z';
@@ -120,8 +126,10 @@ describe('ติดตาม — นับตามวันที่ของ�
   it('รอบโทร/ใครโทร', () => {
     const round = followDimGetter('round', []);
     const mode = followDimGetter('mode', []);
-    expect(round(f({ callRound: 2 }))).toBe('สายที่ 2 ขึ้นไป');
-    expect(round(f({ callRound: null }))).toBe('สายแรก');
+    // สายที่ = followRoundSlot ตัวเดียวกับหน้าติดตาม (6 ต.ค. 2569)
+    expect(round(f({ slot: 2 }))).toBe('สายที่ 2');
+    expect(round(f({ slot: 3 }))).toBe('สายที่ 3 ขึ้นไป');
+    expect(round(f({ slot: 1 }))).toBe('สายที่ 1');
     expect(mode(f({ callMode: 'manual' }))).toBe('เจ้าหน้าที่โทรเอง');
   });
 });
@@ -259,9 +267,9 @@ describe('แบ่งงวดแล้วยอดรวมไม่หาย 
 });
 
 describe('ติดตาม — ตัวเลขแบบ "คน" นับคนไม่ซ้ำ (QA 5 ต.ค. 2569)', () => {
-  it('คนเดียว 3 สาย ปิดงานว่าไปถึงทั้ง 3 แถว ⇒ ไปถึงแล้ว 1 คน · ลงติดตาม 1 คน · แต่โทรแล้วนับ 3 สาย', () => {
+  it('คนเดียว 3 สาย ปิดงานว่าไปทั้ง 3 แถว ⇒ ปิดงานว่าไปแล้ว 1 คน · ลงติดตาม 1 คน · แต่โทรแล้วนับ 3 สาย', () => {
     const done = { phoneKey: '812345678', outcomeCode: 'went', completedAt: '2026-09-23T03:00:00Z' };
-    const called = { resultAt: '2026-09-22T05:00:00Z', callStatus: 'completed', callOutcome: 'confirmed' };
+    const called = { scheduledAt: '2026-09-22T05:00:00Z', category: 'agreed' as const };
     const rows = [f({ ...done, ...called }), f({ ...done, ...called }), f({ ...done, ...called })];
     const ymd = followCountedYmd(rows);
     const n = (m: Parameters<typeof ymd>[1]) => rows.filter((r) => ymd(r, m)).length;

@@ -1,3 +1,4 @@
+import type { FollowCallCategory } from '@/lib/followPlanning';
 import type { CallMicroOutcome } from '@/lib/callMicroOutcome';
 
 /**
@@ -11,6 +12,15 @@ import type { CallMicroOutcome } from '@/lib/callMicroOutcome';
 /** รายการติดตาม 1 แถว = คน 1 คน 1 วันที่โทร (หนึ่งแถวของ follow_entries) */
 export type FollowTrendRow = {
   id: string;
+  /** แท็บของรายการ — ติดตามคนเริ่มงาน (main) / ติดตามส่งคนแทน (replacement) · 6 ต.ค. 2569 */
+  team: 'main' | 'replacement';
+  /**
+   * หมวดของสาย — คิดที่ server ด้วย `callCategory` ตัวเดียวกับหน้าติดตาม (อ่านคำตอบจริง + ผลที่คนกด)
+   * ⇒ ไป / ไม่ไป / ไม่รับสาย / สรุปไม่ได้ / รอโทร / ยกเลิก ตรงกับแผงขั้นตอนของสายทุกตัว (6 ต.ค. 2569)
+   */
+  category: FollowCallCategory;
+  /** สายที่ 1 / 2 / 3 ขึ้นไป — `followRoundSlot` ตัวเดียวกับหน้าติดตาม */
+  slot: 1 | 2 | 3;
   /** ลงรายชื่อเมื่อไหร่ */
   createdAt: string | null;
   /** วันที่นัดให้ AI/เจ้าหน้าที่โทร */
