@@ -179,7 +179,15 @@ export default function FollowEditDialog({
   /** สายของชุดนี้ (ชุดเดียวกันเท่านั้น) + ยังมีสายที่แก้ได้ไหม — ไม่มีเลย = ไม่ต้องโชว์ปุ่มแก้ตาราง */
   const setRows = followSetRows(entry, siblings);
   const canEditSchedule = setRows.some((r) => isEditableFollowRound(r, new Date()));
-  const modeEditable = isEditableFollowRound(entry, new Date());
+  /**
+   * 🔴 สลับ AI/คนโทรได้ไหม — นับจาก **เวลาที่เลือกในช่องตอนนี้** ไม่ใช่เวลาเดิมในฐาน (เจ้าของ 6 ต.ค. 2569:
+   * *"ยังไม่ชัวร์เวลา แก้ไขเวลาแล้ว ต้องการเปลี่ยนจาก AI โทรให้เป็นคนโทร ไม่มีปุ่มเปลี่ยน"*)
+   * สาย "ยังไม่ชัวร์เวลา" เก็บเวลาแทนเป็นเที่ยงคืนของวันนั้น (`followTbd.ts`) ⇒ ถึงวันจริงเวลาแทนเลยไปแล้ว ปุ่มหาย
+   * ทั้งที่คนเพิ่งเลือกเวลาจริงในอนาคต · ตอนบันทึก เวลาใหม่ถูกบันทึกก่อน แล้วค่อยส่งตารางใหม่ (ฝั่ง API ตรวจเวลาอนาคตผ่าน)
+   */
+  const chosenIso = when ? new Date(when).toISOString() : entry.scheduled_at;
+  const withChosenTime = (r: FollowEntry): FollowEntry => (r.id === entry.id ? { ...r, scheduled_at: chosenIso } : r);
+  const modeEditable = isEditableFollowRound(withChosenTime(entry), new Date());
   const beforeMode: 'ai' | 'manual' = entry.call_mode === 'manual' ? 'manual' : 'ai';
   /** สายอื่นในชุดที่ยังไม่ถึงเวลา ไม่ปิด ไม่ยกเลิก — กติกาเดียวกับ server (สายที่ผ่านไปแล้วเป็นประวัติ ไม่เปลี่ยนเบอร์ย้อน) */
   const pendingSetRows = entry.group_id
@@ -219,7 +227,8 @@ export default function FollowEditDialog({
         return;
       }
     }
-    const editable = setRows.filter((r) => isEditableFollowRound(r, now));
+    // สายที่เปิดแก้นับด้วยเวลาที่เลือก (กติกาเดียวกับ modeEditable) — ไม่งั้นสายยังไม่ชัวร์เวลาหลุดจากตารางที่ส่ง
+    const editable = setRows.map(withChosenTime).filter((r) => isEditableFollowRound(r, now));
     const draft = draftFromRows(editable).map((d) =>
       d.id === entry.id ? { ...d, mode, when: isoToBangkokInput(newIso) } : d,
     );

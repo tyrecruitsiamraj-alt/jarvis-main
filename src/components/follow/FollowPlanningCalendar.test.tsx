@@ -67,6 +67,7 @@ function renderCalendar(
     onCancelRound?: (round: { entry: FollowEntry }) => void;
     onFinishRound?: (round: { entry: FollowEntry }, outcome: string) => void;
     resultEntries?: FollowEntry[];
+    splitDone?: boolean;
   } = {},
 ) {
   const rows = buildFollowPlanningRows(groupFollowEntries(entries, NOW), NOW);
@@ -86,6 +87,7 @@ function renderCalendar(
       onCancelRound={opts.onCancelRound}
       onFinishRound={opts.onFinishRound}
       resultEntries={opts.resultEntries}
+      splitDone={opts.splitDone}
     />,
   );
   return rows;
@@ -872,5 +874,33 @@ describe('แถบหน้ารายวันเป็น "1/N" (เจ้�
     const src = readFileSync('src/components/follow/FollowPlanningCalendar.tsx', 'utf8');
     expect(src).not.toContain('Array.from({ length: pageCount }');
     expect(src).toContain('data-testid="day-page-indicator"');
+  });
+});
+
+
+/** 🔴 คนที่จัดการจบแล้ว → การ์ด "สำเร็จ / ยกเลิก" ใต้ตาราง (เจ้าของ 6 ต.ค. 2569 · Choice "การ์ดแยกใต้ตาราง") */
+describe('การ์ดสำเร็จ / ยกเลิก', () => {
+  const list = () => [
+    entry({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'confirmed', completed_at: `${TODAY}T05:00:00Z`, outcome_code: 'went', completed_by_name: 'คนปิดงาน' }),
+    entry({ id: 'b', call_round: 1, recipient_phone: '0899999998', recipient_name: 'คนที่สอง', call_status: 'pending' }),
+    entry({ id: 'c', call_round: 1, recipient_phone: '0899999997', recipient_name: 'คนที่สาม', cancelled: true, call_status: 'cancelled' }),
+  ];
+  it('แยก = ตารางเหลือคนที่ยังต้องตาม · การ์ดสำเร็จ 1 ยกเลิก 1 · ผล + ใครจัดการ', () => {
+    renderCalendar(list(), { splitDone: true });
+    const names = dayRows().map((r) => r.textContent ?? '');
+    expect(names.some((t) => t.includes('คนที่สอง'))).toBe(true);
+    expect(names.some((t) => t.includes('คนที่สาม'))).toBe(false);
+    const card = screen.getByTestId('follow-day-done');
+    expect(within(card).getByRole('button', { name: /สำเร็จ 1/ })).toBeTruthy();
+    expect(within(card).getByRole('button', { name: /ยกเลิก 1/ })).toBeTruthy();
+    expect(card.textContent).toContain('ไปแล้ว');
+    expect(card.textContent).toContain('คนปิดงาน');
+    fireEvent.click(within(card).getByRole('button', { name: /ยกเลิก 1/ }));
+    expect(card.textContent).toContain('คนที่สาม');
+  });
+  it('ไม่แยก (กดกล่องตัวเลขอยู่) = ทุกคนอยู่ในตาราง · ไม่มีการ์ด', () => {
+    renderCalendar(list(), { splitDone: false });
+    expect(screen.queryByTestId('follow-day-done')).toBeNull();
+    expect(dayRows().some((r) => (r.textContent ?? '').includes('คนที่สาม'))).toBe(true);
   });
 });

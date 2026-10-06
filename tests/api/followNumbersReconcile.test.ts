@@ -224,3 +224,29 @@ describe('หน้าหลัก + Dashboard ใช้ตัวจัดหม
     for (const v of ['caller', 'bu', 'team']) expect(src).toMatch(new RegExp(`<TabsTrigger value="${v}"`));
   });
 });
+
+describe('การ์ด "สำเร็จ / ยกเลิก" ใต้ตารางรายวัน (เจ้าของ 6 ต.ค. 2569)', () => {
+  const call = (over: Partial<FollowEntry>) => ({ round: { entry: e(over) } }) as never;
+  it('ทุกสายปิดงาน = สำเร็จ · ยกเลิกทุกสาย/ปิดว่ายกเลิก = ยกเลิก · ยังมีสายค้าง = อยู่ในตาราง', async () => {
+    const { followDayPersonDone } = await import('../../src/lib/followPlanning');
+    expect(followDayPersonDone({ calls: [call({ completed_at: '2026-10-06T03:00:00Z', outcome_code: 'went' }), call({ cancelled: true })] })).toBe('success');
+    expect(followDayPersonDone({ calls: [call({ cancelled: true }), call({ cancelled: true })] })).toBe('cancelled');
+    expect(followDayPersonDone({ calls: [call({ completed_at: '2026-10-06T03:00:00Z', outcome_code: 'cancelled' })] })).toBe('cancelled');
+    expect(followDayPersonDone({ calls: [call({ completed_at: '2026-10-06T03:00:00Z', outcome_code: 'no_show_start' })] })).toBe('success');
+    expect(followDayPersonDone({ calls: [call({ completed_at: '2026-10-06T03:00:00Z', outcome_code: 'went' }), call({})] })).toBeNull();
+    expect(followDayPersonDone({ calls: [] })).toBeNull();
+  });
+});
+
+describe('API "ติดตามครั้งที่" (137)', () => {
+  it('รับ 1–99 · 1 = ไม่เก็บ · นอกช่วง = แจ้งผิด', async () => {
+    const { parseFollowInput } = await import('../../api/_handlers/follow');
+    const base = { recipient_name: 'ทดสอบ ระบบ', recipient_phone: '0812345678', topic: 'ติดตามเริ่มงาน', scheduled_at: '2026-12-01T02:00:00Z' };
+    const now = new Date('2026-10-06T00:00:00Z');
+    expect(parseFollowInput({ ...base, plan_day_start: 3 }, now).value?.planDayStart).toBe(3);
+    expect(parseFollowInput({ ...base, plan_day_start: 1 }, now).value?.planDayStart).toBeNull();
+    expect(parseFollowInput(base, now).value?.planDayStart).toBeNull();
+    expect(parseFollowInput({ ...base, plan_day_start: 0 }, now).error).toContain('plan_day_start');
+    expect(parseFollowInput({ ...base, plan_day_start: 120 }, now).error).toContain('plan_day_start');
+  });
+});

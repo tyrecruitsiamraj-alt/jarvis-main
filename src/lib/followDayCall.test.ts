@@ -130,3 +130,30 @@ describe('แถวส่งคนแทนจาก iRecruit = สายที�
     expect(e.call_of_day).toBe(2);
   });
 });
+
+/** 🔴 "ติดตามครั้งที่" ตอนเพิ่มคน (137 · เจ้าของ 6 ต.ค. 2569) — เลขวันแรกของชุด วันถัดไปนับต่อ */
+describe('ติดตามครั้งที่ (plan_day_start)', () => {
+  it('ตารางหลายวันเริ่มครั้งที่ 3 ⇒ วันที่ 3, 4, 5', () => {
+    const pos = followDayCallPositions([
+      row({ id: 'a', scheduled_at: at(1, 9), call_round: 1, plan_day_start: 3 }),
+      row({ id: 'b', scheduled_at: at(2, 9), call_round: 2, plan_day_start: 3 }),
+      row({ id: 'c', scheduled_at: at(3, 9), call_round: 3, plan_day_start: 3 }),
+    ]);
+    expect([pos.get('a')?.day, pos.get('b')?.day, pos.get('c')?.day]).toEqual([3, 4, 5]);
+  });
+  it('ชุดวันเดียวตั้งครั้งที่ 2 ⇒ ขึ้น "วันที่ 2 · สายที่ N" (ไม่ตั้ง = ไม่มีเลขวันตามเดิม)', () => {
+    const pos = followDayCallPositions([
+      row({ id: 'a', scheduled_at: at(1, 9), call_round: 1, plan_day_start: 2 }),
+      row({ id: 'b', scheduled_at: at(1, 10), call_round: 2, plan_day_start: 2 }),
+    ]);
+    expect(followDayCallLabel(pos.get('b')!)).toBe('วันที่ 2 · สายที่ 2');
+  });
+  it('แถวไม่มีชุด ตั้งครั้งที่ 4 ⇒ วันที่ 4 · ตั้ง 1/ไม่ตั้ง = ไม่มีเลขวัน', () => {
+    const pos = followDayCallPositions([
+      row({ id: 'x', group_id: null, scheduled_at: at(1, 9), call_round: 1, plan_day_start: 4 }),
+      row({ id: 'y', group_id: null, scheduled_at: at(1, 9), call_round: 1, plan_day_start: 1 }),
+    ]);
+    expect(pos.get('x')?.day).toBe(4);
+    expect(pos.get('y')?.day).toBeNull();
+  });
+});

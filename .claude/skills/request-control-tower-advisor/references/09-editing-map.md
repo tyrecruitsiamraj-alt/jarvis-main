@@ -12271,3 +12271,19 @@ Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แ�
 | เทสต์ | `src/hooks/useLiveTick.test.tsx` (6) · `HomeAiSharePage.test.tsx` "หน้าหลักอัปเดตสด" |
 
 - ตรวจ Browser: เวลาอัปเดตขยับ 16:25:12 → 16:25:43 เอง · ยิง GET 2 เส้น (เลข + กราฟ) · ไม่มีโครงโหลด · แผงผลโทรพับ = ไม่ยิง
+
+### ขั้นตอนเพิ่มติดตาม 3 ข้อ (6 ต.ค. 2569)
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/components/follow/FollowEditDialog.tsx` | ① สลับ AI/คนโทร นับจาก**เวลาที่เลือกในช่อง** (`withChosenTime`) ไม่ใช่เวลาในฐาน — สาย "ยังไม่ชัวร์เวลา" เวลาแทน = เที่ยงคืน ถึงวันจริงเลยแล้ว ปุ่มเคยหาย · ตารางที่ส่ง (`editable`) ก็นับแบบเดียวกัน · บันทึกเวลาก่อนแล้วค่อยส่งตาราง (API ตรวจอนาคตผ่าน) |
+| `migrations/137_follow_plan_day_start.sql` | **ใหม่** — `follow_entries.plan_day_start smallint` (1–99 · null = 1) · **รันบนฐานจริงแล้ว 6 ต.ค.** |
+| `api/_handlers/follow.ts` | ② รับ `plan_day_start` (1–99 · 1 = ไม่เก็บ) · `insertFollowRow` ตั้งค่าหลัง insert (insert เดิมทุกแบบไม่แตะ · ฐานไม่มีช่อง = log) · `toResponse` ส่งกลับ |
+| `src/lib/followDayCall.ts` | เลขวัน = `plan_day_start` + วันนับจากวันแรกของชุด · ตั้งไว้ = ชุดวันเดียว/แถวไม่มีชุดก็ขึ้นเลขวัน |
+| `src/pages/follow/FollowPage.tsx` | ขั้น 3 ตัวเลือก "ติดตามครั้งที่" 1–10 (ทั้งสองโหมด) · ส่งทุกคำขอของชุด · `splitDone={!resultBox}` |
+| `src/lib/followPlanning.ts` | ③ `followDayPersonDone` — ทุกสายของวันปิดงาน/ยกเลิก → success / cancelled (ปิดว่ายกเลิก = cancelled) |
+| `src/components/follow/FollowDayDoneCard.tsx` | **ใหม่** — การ์ด "สำเร็จ / ยกเลิก" ใต้ตารางรายวัน · สลับมีตัวเลข · ชื่อ · หน่วยงาน · ผล · ใครจัดการ · จัดการ · 10 แถวแรก + ดูทั้งหมด |
+| `src/components/follow/FollowPlanningCalendar.tsx` | prop `splitDone` — ตารางเหลือคนที่ยังต้องตาม (ท้ายตารางนับคน/สายของตาราง) · กดกล่องตัวเลขอยู่ = ไม่แยก |
+| เทสต์ | `FollowEditDialogTbd.test.tsx` · `followDayCall.test.ts` (ติดตามครั้งที่) · `FollowPlanningCalendar.test.tsx` (การ์ด) · `followNumbersReconcile` (done + API parse) |
+
+- ตรวจ Browser: วันที่ 6 ตาราง 57 คน · การ์ดสำเร็จ 39 ยกเลิก 6 · ขั้น 3 มี "ติดตามครั้งที่" ทั้งสองโหมด (ไม่ได้บันทึกจริง)

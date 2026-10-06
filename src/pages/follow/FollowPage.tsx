@@ -290,6 +290,11 @@ const FollowPage: React.FC = () => {
    *    "ยืนยันแล้ววันนั้นหยุด (stop_early)" ไม่ตรงของจริง · หยุดก่อนได้ทางเดียวคือตอบว่าไม่ไป/กดยกเลิก
    */
   const [scheduleMode, setScheduleMode] = useState(false);
+  /**
+   * "ติดตามครั้งที่" ของวันแรกในชุด (137 · เจ้าของ 6 ต.ค. 2569 *"ขั้นตอนที่ 3 ตั้งเวลา เพิ่มหัวข้อ ติดตามครั้งที่"*)
+   * เช่น เคยตามไปแล้ว 2 ครั้ง ชุดใหม่เลือก 3 → วันถัดไปนับ 4, 5 … · 1 = นับใหม่ตามเดิม (ไม่ส่งค่า)
+   */
+  const [planDayStart, setPlanDayStart] = useState(1);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [roundTimes, setRoundTimes] = useState<string[]>(() => ['07:00']);
@@ -603,6 +608,7 @@ const FollowPage: React.FC = () => {
     setCallRounds([1]);
     setCallModes(['ai']);
     setDateFrom('');
+    setPlanDayStart(1);
     setDateTo('');
     setRoundTimes(['07:00']);
     setSkippedDays(new Set());
@@ -913,6 +919,7 @@ const FollowPage: React.FC = () => {
                 call_mode: first.callMode,
                 time_tbd: first.timeTbd || undefined,
                 group_id: groupId,
+                plan_day_start: planDayStart > 1 ? planDayStart : undefined,
                 unit_name: unitName.trim() || undefined,
                 site_code: siteCode.trim() || undefined,
                 rounds: dayCalls.map((c) => ({
@@ -1077,6 +1084,7 @@ const FollowPage: React.FC = () => {
           call_mode: sendModeOf(sendIso[0]),
           time_tbd: modeByIso.get(sendIso[0]) === 'tbd' || undefined,
           group_id: groupId,
+          plan_day_start: planDayStart > 1 ? planDayStart : undefined,
           unit_name: unitName.trim() || undefined,
           site_code: siteCode.trim() || undefined,
           rounds: sendIso.map((t) => ({
@@ -1699,6 +1707,8 @@ const FollowPage: React.FC = () => {
           summaryRows={monthSummaryRows}
           /* การ์ดผล = ชุดเดียวกับกล่องขั้นตอนของสาย (เจ้าของ 6 ต.ค. 2569 "ก็ยอด 202") */
           resultEntries={panelEntries}
+          /* คนที่จัดการจบแล้ว → การ์ด "สำเร็จ / ยกเลิก" ใต้ตาราง · กดกล่องตัวเลขอยู่ = ไม่แยก (ตารางคือรายชื่อของกล่องนั้น) */
+          splitDone={!resultBox}
           onViewChange={setPanelRange}
           month={calMonth}
           onMonthChange={setCalMonth}
@@ -2214,6 +2224,17 @@ const FollowPage: React.FC = () => {
               >
                 ตารางหลายวัน
               </button>
+            </div>
+
+            {/* ติดตามครั้งที่ (เจ้าของ 6 ต.ค. 2569) — ใช้ทั้งสองโหมด · เลขวันแรกของชุด วันถัดไปนับต่อ */}
+            <div className="flex items-center gap-2">
+              <span className="ml-1 text-xs font-medium text-muted-foreground">ติดตามครั้งที่</span>
+              <ChoiceDropdown<string>
+                value={String(planDayStart)}
+                options={Array.from({ length: 10 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
+                onChange={(v) => setPlanDayStart(Number(v))}
+                ariaLabel="ติดตามครั้งที่"
+              />
             </div>
 
             {scheduleMode ? (

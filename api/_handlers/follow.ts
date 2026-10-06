@@ -81,6 +81,8 @@ type FollowRow = {
   call_mode: string | null;
   /** ยังไม่กำหนดเวลาโทร (134) — เวลาใน scheduled_at เป็นค่าแทน */
   time_tbd?: boolean | null;
+  /** ติดตามครั้งที่ของวันแรกในชุด (137) */
+  plan_day_start?: number | null;
   replace_type?: string | null;
   source_ref?: string | null;
   /** หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (migration 096) — snapshot ตอนกรอก ไม่ใช่ FK */
@@ -158,6 +160,7 @@ function toResponse(r: FollowRow) {
     call_mode: r.call_mode === 'manual' ? 'manual' : 'ai',
     /** ยังไม่กำหนดเวลา (134) — จอโชว์ "ยังไม่ระบุเวลา" แทนเวลา */
     time_tbd: r.time_tbd === true,
+    plan_day_start: typeof r.plan_day_start === 'number' && r.plan_day_start > 1 ? r.plan_day_start : null,
     /** ประเภทใบส่งคนแทนจาก iRecruit (136) — EX = คนนอก · อื่น ๆ = คนใน · null = ไม่รู้ */
     replace_type: r.replace_type?.trim() || null,
     /** ที่มาของแถว (133) — หน้าจออ่านสายที่ 1/2/3 ของแถวจาก iRecruit จากตรงนี้ */
@@ -310,6 +313,8 @@ export type ParsedFollowInput = {
   callMode: 'ai' | 'manual';
   /** ยังไม่กำหนดเวลา (134) — บังคับเป็นคนโทร (ห้ามส่ง AI โดยไม่มีเวลาจริง) */
   timeTbd: boolean;
+  /** "ติดตามครั้งที่" ของวันแรกในชุด (137) — null = นับ 1 · ตั้งหลัง insert (`insertFollowRow`) */
+  planDayStart?: number | null;
   /** หน่วยงานที่ตามเรื่องให้ (096) — เลือกจากใบขอหรือพิมพ์เอง · null = ไม่ได้ระบุ */
   unitName: string | null;
   /** รหัสไซต์ของหน่วยงานนั้น — เติมเองเมื่อเลือกจากใบขอ */
@@ -434,11 +439,18 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
   const timeTbd = body.time_tbd === true;
   if (timeTbd) callMode = 'manual';
 
+  /** "ติดตามครั้งที่" ของวันแรกในชุด (137 · 6 ต.ค. 2569) — 2…99 เก็บ · ไม่ส่ง/1 = null (นับ 1 ตามเดิม) */
+  const startRaw = Number(body.plan_day_start);
+  if (body.plan_day_start != null && (!Number.isInteger(startRaw) || startRaw < 1 || startRaw > 99)) {
+    return fail('plan_day_start ต้องเป็นเลข 1–99');
+  }
+  const planDayStart = Number.isInteger(startRaw) && startRaw > 1 ? startRaw : null;
+
   return {
     error: null,
     value: {
       name, phone, topic, note, staffPhone, when, groupId, callTimes, unitName, siteCode, callRound,
-      callMode, team, timeTbd,
+      callMode, team, timeTbd, planDayStart,
     },
   };
 }
@@ -584,7 +596,29 @@ async function createFollowRounds(
  *
  * ฐานที่รัน 092 แล้วเก็บ `group_id`/`call_times` · ยังไม่รัน → ถอยไป insert ชุดเดิม (42703)
  */
+/**
+ * insert หนึ่งสาย + ตั้ง "ติดตามครั้งที่" (137 · 6 ต.ค. 2569) ทีหลัง — คำสั่ง insert เดิมทุกแบบไม่ต้องแตะ
+ * ฐานยังไม่รัน 137 = บันทึกสายได้ตามเดิม แต่เลขครั้งที่หาย ⇒ log ไว้ (รัน migration ก่อน deploy)
+ */
 async function insertFollowRow(
+  req: AuthedReq,
+  base: ParsedFollowInput,
+  round: FollowRoundInput,
+): Promise<FollowRow | undefined> {
+  const row = await insertFollowRowBase(req, base, round);
+  if (row && base.planDayStart && base.planDayStart > 1) {
+    try {
+      await dbQuery(`update ${followTable} set plan_day_start = $2 where id = $1`, [row.id, base.planDayStart]);
+      (row as FollowRow & { plan_day_start?: number }).plan_day_start = base.planDayStart;
+    } catch (e) {
+      if (!isUndefinedColumn(e)) throw e;
+      logWarn('follow.plan_day_start: ฐานยังไม่รัน 137 — ไม่ได้เก็บเลขติดตามครั้งที่', { id: row.id });
+    }
+  }
+  return row;
+}
+
+async function insertFollowRowBase(
   req: AuthedReq,
   base: ParsedFollowInput,
   round: FollowRoundInput,

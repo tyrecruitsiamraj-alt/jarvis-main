@@ -16,6 +16,9 @@ import { toYmdBangkok, toYmdLocal, parseYmd, THAI_MONTHS, ceToBeYear, formatYmdD
 import {
   buildFollowDayCalls,
   buildFollowDayPeople,
+  followDayPersonDone,
+  type FollowDayDoneKind,
+  type FollowDayPerson,
   buildFollowMonthRows,
   callCategory,
   callCategoryWashTone,
@@ -41,6 +44,7 @@ import {
 } from '@/lib/followPlanning';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { followCallerOf } from '@/lib/followListFilter';
+import FollowDayDoneCard from '@/components/follow/FollowDayDoneCard';
 import type { FollowEntry } from '@/lib/followApi';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import { buildFollowCallMatrix, FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE, followMatrixColOfCategory } from '@/lib/followCallMatrix';
@@ -341,12 +345,18 @@ const FollowPlanningCalendar: React.FC<{
    * ไม่ส่ง = นับจาก `summaryRows` ทั้งเดือน (พฤติกรรมเดิม · เทสต์)
    */
   resultEntries?: readonly FollowEntry[];
+  /**
+   * แยกคนที่จัดการจบแล้วออกจากตารางรายวัน ไปการ์ด "สำเร็จ / ยกเลิก" ใต้ตาราง (เจ้าของ 6 ต.ค. 2569)
+   * หน้าแม่ปิดตอนกดกล่องตัวเลขอยู่ (กล่องยกเลิกต้องเห็นคนยกเลิกในตาราง ไม่ใช่ตารางว่าง)
+   */
+  splitDone?: boolean;
   /** บอกหน้าแม่ว่าดูรายวันหรือรายเดือนอยู่ — แผงรอบโทรนับช่วงตามนี้ (3 ต.ค. 2569) */
   onViewChange?: (view: 'day' | 'month') => void;
 }> = ({
   rows,
   summaryRows,
   resultEntries,
+  splitDone = false,
   month,
   onMonthChange,
   selectedYmd,
@@ -404,10 +414,22 @@ const FollowPlanningCalendar: React.FC<{
    * มันขึ้นหลายบรรทัด คนดูเขางง"*) · การ์ดตัวเลขด้านบนยังนับเป็นสายเหมือนเดิม
    * — คนละคำถาม: การ์ดถามว่า "มีกี่สายต้องตาม" ตารางถามว่า "ต้องตามใครบ้าง"
    */
-  const dayPeople = useMemo(
+  const allDayPeople = useMemo(
     () => buildFollowDayPeople(rows, dayYmd, roundFilter),
     [rows, dayYmd, roundFilter],
   );
+  /** คนที่จัดการจบแล้ว (สำเร็จ/ยกเลิก) → การ์ดใต้ตาราง · ที่เหลือ = ตาราง "สายที่ต้องตาม" */
+  const { dayPeople, donePeople } = useMemo(() => {
+    if (!splitDone) return { dayPeople: allDayPeople, donePeople: [] as Array<{ person: FollowDayPerson; kind: FollowDayDoneKind }> };
+    const active: FollowDayPerson[] = [];
+    const done: Array<{ person: FollowDayPerson; kind: FollowDayDoneKind }> = [];
+    for (const p of allDayPeople) {
+      const kind = followDayPersonDone(p);
+      if (kind) done.push({ person: p, kind });
+      else active.push(p);
+    }
+    return { dayPeople: active, donePeople: done };
+  }, [allDayPeople, splitDone]);
 
   /** แบ่งหน้าแบบแบบอ้างอิง — เปลี่ยนวัน/รอบแล้วต้องเด้งกลับหน้า 1 ไม่งั้นค้างหน้าว่าง */
   const [page, setPage] = useState(1);
@@ -543,6 +565,7 @@ const FollowPlanningCalendar: React.FC<{
 
       {/* ── 3. รายการหลัก (2/3) + แผงข้างขวา (1/3) ── */}
       <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,2.4fr)_minmax(320px,1fr)]">
+        <div className="min-w-0 space-y-4">
         <Card className="overflow-hidden rounded-2xl shadow-sm">
           <div className="flex flex-wrap items-center gap-2 border-b border-border/70 px-4 py-3 md:px-5">
             <Tabs
@@ -1071,7 +1094,8 @@ const FollowPlanningCalendar: React.FC<{
                     <span className="text-[11.5px] text-muted-foreground">
                       แสดง {dayPeople.length === 0 ? 0 : firstIndex + 1} ถึง {lastIndex} จากทั้งหมด{' '}
                       {dayPeople.length.toLocaleString('th-TH')} คน ·{' '}
-                      {dayCalls.length.toLocaleString('th-TH')} สาย
+                      {/* สายของคนที่ยังอยู่ในตาราง (คนที่จัดการจบแล้วไปอยู่การ์ดข้างล่าง) */}
+                      {dayPeople.reduce((n, p) => n + p.calls.length, 0).toLocaleString('th-TH')} สาย
                       {/**
                        * 🔴 เหลือแค่เวลาอัปเดต (เจ้าของสั่ง 1 ต.ค. 2569 · Choice "เอาออกทั้ง 2 จุด")
                        * ประโยคอธิบายเรื่องหน้าดึงเอง/ผลกลับช้าถูกถอดทั้งคู่ — ห้ามเติมกลับ
@@ -1326,6 +1350,14 @@ const FollowPlanningCalendar: React.FC<{
             </div>
           ) : null}
         </Card>
+        {/* คนที่จัดการจบแล้วของวันนั้น — การ์ดแยกใต้ตาราง (เจ้าของ 6 ต.ค. 2569 · Choice "การ์ดแยกใต้ตาราง") */}
+        {view === 'day' && splitDone ? (
+          <FollowDayDoneCard
+            people={donePeople}
+            onOpen={(p) => onOpenCell(p.row, p.calls[0]?.round.ymd ?? dayYmd, p.calls.map((c) => c.round))}
+          />
+        ) : null}
+        </div>
 
         {/* ── แผงข้างขวา ── */}
         <div className="space-y-4">

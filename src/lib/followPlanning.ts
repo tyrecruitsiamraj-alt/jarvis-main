@@ -962,3 +962,23 @@ export function roundEmergencyPhone(round: FollowPlanningRound): string | null {
   const p = (round.entry.emergency_phone ?? '').trim();
   return p === '' ? null : p;
 }
+
+/**
+ * ═══ คนที่ "จัดการจบแล้ว" ของวันนั้น (เจ้าของ 6 ต.ค. 2569 · Choice "การ์ดแยกใต้ตาราง") ═══
+ * > *"ถ้ากดจัดการแล้ว ต้องการให้ย้ายไปอยู่หน้า สำเร็จ / ยกเลิก"* — "มีกล่องแยก"
+ * จบแล้ว = ทุกสายของคนนั้นในวันนั้นปิดงานแล้ว (`completed_at`) หรือยกเลิก
+ * - `success` = มีสายที่ปิดงานด้วยผลที่ไม่ใช่ยกเลิก (ไปแล้ว · ถึงแล้ว · ไม่ไป · ลา · เลื่อน · จำวันผิด …)
+ * - `cancelled` = ยกเลิกทุกสาย หรือปิดงานว่า "ยกเลิก"/"ยกเลิกงาน"
+ * - null = ยังมีสายที่ต้องตาม (อยู่ในตารางเหมือนเดิม)
+ */
+export type FollowDayDoneKind = 'success' | 'cancelled';
+
+const CANCEL_OUTCOMES = new Set(['cancelled', 'job_cancelled']);
+
+export function followDayPersonDone(p: Pick<FollowDayPerson, 'calls'>): FollowDayDoneKind | null {
+  const entries = p.calls.map((c) => c.round.entry);
+  if (entries.length === 0) return null;
+  if (!entries.every((e) => e.cancelled || e.completed_at)) return null;
+  const success = entries.some((e) => e.completed_at && !e.cancelled && !CANCEL_OUTCOMES.has(e.outcome_code ?? ''));
+  return success ? 'success' : 'cancelled';
+}

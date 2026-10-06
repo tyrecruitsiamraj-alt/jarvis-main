@@ -23,7 +23,20 @@ export type FollowDayCallPos = {
 };
 
 type DayCallRow = Pick<FollowEntry, 'id' | 'group_id' | 'scheduled_at' | 'call_round' | 'cancelled'> &
-  Partial<Pick<FollowEntry, 'source_ref'>>;
+  Partial<Pick<FollowEntry, 'source_ref' | 'plan_day_start'>>;
+
+/**
+ * "ติดตามครั้งที่" ที่ตั้งตอนเพิ่ม (137 · เจ้าของ 6 ต.ค. 2569) — เลขวันแรกของชุด · ไม่ตั้ง/1 = นับ 1 ตามเดิม
+ * ตั้งไว้ (> 1) = ชุดวันเดียวก็ขึ้นเลขวัน (เช่น "วันที่ 3 · สายที่ 1") ไม่งั้นคนอ่านไม่รู้ว่าเป็นครั้งที่เท่าไหร่
+ */
+const startOf = (rows: readonly DayCallRow[]): number | null => {
+  let best: number | null = null;
+  for (const r of rows) {
+    const v = r.plan_day_start;
+    if (typeof v === 'number' && Number.isInteger(v) && v > 1 && (best === null || v < best)) best = v;
+  }
+  return best;
+};
 
 /** 🔴 `Intl` ระดับโมดูลเท่านั้น */
 const BKK_YMD = new Intl.DateTimeFormat('en-CA', {
@@ -67,7 +80,7 @@ export function followDayCallPositions(entries: readonly DayCallRow[]): Map<stri
       continue;
     }
     if (!e.group_id) {
-      out.set(e.id, { day: null, call: e.call_round ?? null });
+      out.set(e.id, { day: startOf([e]), call: e.call_round ?? null });
       continue;
     }
     const list = sets.get(e.group_id);
@@ -90,8 +103,9 @@ export function followDayCallPositions(entries: readonly DayCallRow[]): Map<stri
     const days = [...byDay.keys()].sort();
     const first = days[0];
     const multiDay = days.length > 1;
+    const start = startOf(rows);
     for (const [ymd, list] of byDay) {
-      const day = multiDay && first ? daysBetween(first, ymd) + 1 : null;
+      const day = first && (multiDay || start !== null) ? daysBetween(first, ymd) + (start ?? 1) : null;
       const all = [...list].sort(byRoundThenTime);
       const live = all.filter((r) => !r.cancelled);
       for (const r of all) {
