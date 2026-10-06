@@ -166,6 +166,9 @@ export function parsePostText(input: string): ParsedPost {
   const requirements: string[] = [];
   body.forEach((line, i) => {
     if (i === incomeIdx || /^\(.*\)$/u.test(line)) return;
+    // สวัสดิการ (เลือกจากชิปใบขอ ไม่ใช่คุณสมบัติ) · บรรทัดลิงก์สมัคร — ข้อความที่ buildPostText พิมพ์เองก็มีสองบรรทัดนี้
+    // เดิมวางกลับมาแล้วไปลงช่องคุณสมบัติ (เจอตอนลองป๊อป 2 จอ 6 ต.ค. 2569)
+    if (/^สวัสดิการ/u.test(line) || /^สมัครงาน/u.test(line) || /https?:\/\//u.test(line)) return;
     const hasGenderAge = genderOf(line) !== null || /อายุ\s*\d/u.test(line);
     if (!out.schedule && !hasGenderAge && (TIME_RANGE.test(line) || SCHEDULE_HINT.test(line))) {
       out.schedule = line.slice(0, POST_SCHEDULE_MAX);

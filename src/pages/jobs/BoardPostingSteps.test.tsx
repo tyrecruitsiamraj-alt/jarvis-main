@@ -248,3 +248,71 @@ describe('ป๊อป 4 หน้าตาม Journey (4 ต.ค. 2569)', () =>
     expect(await screen.findByRole('heading', { name: 'อายุที่รับ' })).toBeTruthy();
   });
 });
+
+/**
+ * 🔴 2 จอ เริ่มจากวางโพสต์ (เจ้าของไล่ Journey งานสรรหา 6 ต.ค. 2569 → Choice "เหลือ 2 จอ เริ่มจากวางโพสต์")
+ * + เจ้าของถาม "ยังดูข้อมูล master ได้ใช่ไหม" ⇒ การ์ดข้อมูลใบขอกางดูได้บนจอ 1
+ */
+describe('ป๊อปประกาศ 2 จอ (6 ต.ค. 2569)', () => {
+  const renderQuick = (onDone: () => void = () => {}) =>
+    render(
+      <MemoryRouter>
+        <BoardPostingSteps id={JOB_ID} chrome={false} flow="quick" onDone={onDone} />
+      </MemoryRouter>,
+    );
+
+  it('จอ 1: วางโพสต์อยู่บนสุด · ช่องทุกช่องในจอเดียว · ข้อมูลใบขอกางดูได้ · ช่องที่ขาดขึ้นแดง', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    renderQuick();
+    const nav = await screen.findByTestId('quick-steps');
+    expect(nav.querySelectorAll('button')).toHaveLength(2);
+    expect(within(nav).getByText('ข้อมูลประกาศ')).toBeTruthy();
+    expect(within(nav).getByText('ประกาศ + Gen link')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'วางข้อความโพสต์' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'เพศที่รับ' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'อายุที่รับ' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'วันเวลาทำงาน · คุณสมบัติ' })).toBeTruthy();
+    // ใบนี้ไม่มีรายได้ + ไม่ระบุเพศ = ขึ้นแดงทั้งบนและล่าง
+    await waitFor(() => expect(screen.getAllByTestId('quick-gaps')[0].textContent).toContain('รายได้'));
+    expect(screen.getAllByTestId('quick-gaps')[0].textContent).toContain('เพศ');
+    fireEvent.click(screen.getByTestId('quick-master-toggle'));
+    expect(await screen.findByTestId('quick-master')).toBeTruthy();
+    // 4 หน้าเดิมไม่โผล่
+    expect(screen.queryByRole('navigation', { name: 'ขั้นตอนของงานประกาศ' })?.className).not.toContain('grid-cols-4');
+  });
+
+  it('จอ 2: ลิงก์ (ยังไม่มี = ฟอร์ม Gen link กางรอ) · ข้อความโพสต์ · ตัวอย่างผู้สมัคร · ส่งประกาศแล้วปิดป๊อป', async () => {
+    currentJob = { ...JOB, gender_requirement: 'ชาย' } as JobRequest;
+    fetchJobReleases.mockResolvedValue([]);
+    const onDone = vi.fn();
+    renderQuick(onDone);
+    fireEvent.click(await screen.findByRole('button', { name: /ถัดไป ประกาศ \+ Gen link/ }));
+    expect(screen.getByRole('heading', { name: 'ลิงก์สมัคร' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'ข้อความโพสต์' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'ผู้สมัครจะเห็นแบบนี้' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'สรุปก่อนส่ง' })).toBeNull();
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Gen link' }).length).toBe(2));
+    const send = screen.getByRole('button', { name: 'ส่งประกาศ' });
+    await waitFor(() => expect(send.hasAttribute('disabled')).toBe(false));
+    fetchJobReleases.mockResolvedValue(released);
+    fireEvent.click(send);
+    await waitFor(() => expect(releaseJobsToPublic).toHaveBeenCalledWith([JOB_ID]));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+  });
+
+  it('จอ 2: ไม่ระบุเพศ = ส่งไม่ได้ · ปุ่มพากลับจอ 1', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    renderQuick();
+    fireEvent.click(await screen.findByRole('button', { name: /ถัดไป ประกาศ \+ Gen link/ }));
+    expect((await screen.findByRole('button', { name: 'ส่งประกาศ' })).hasAttribute('disabled')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'กลับไปเลือกเพศ' }));
+    expect(await screen.findByRole('heading', { name: 'เพศที่รับ' })).toBeTruthy();
+  });
+
+  it('ป๊อปบนงานสรรหาใช้ 2 จอเป็นค่าเริ่ม · ?popup=steps = 4 หน้า · ?popup=sheet = หน้าเดียว', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(`${process.cwd()}/src/components/jobs/JobBoardView.tsx`, 'utf8');
+    expect(src).toContain("searchParams.get('popup') === 'steps' ? 'steps' : 'quick'");
+    expect(src).toContain('flow={postingFlow}');
+  });
+});

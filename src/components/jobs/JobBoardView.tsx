@@ -424,6 +424,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * กลับมาใช้ป๊อป 4 ขั้นแทนป๊อปหน้าเดียว (2 ต.ค.) · ทางถอย: `?popup=sheet` = ป๊อปหน้าเดียว
    */
   const stepsPopup = searchParams.get('popup') !== 'sheet';
+  /** 2 จอ เริ่มจากวางโพสต์ = ค่าเริ่ม (6 ต.ค. 2569 Choice "เหลือ 2 จอ") · `?popup=steps` = 4 หน้าแบบ 4 ต.ค. */
+  const postingFlow: 'quick' | 'steps' = searchParams.get('popup') === 'steps' ? 'steps' : 'quick';
   const legacyStage = searchParams.get('stage');
 
   const doneLane = useMemo<ClosedBoxKey | null>(() => {
@@ -2185,7 +2187,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     setPostingsRev((n) => n + 1);
                   };
                   return stepsPopup ? (
-                    <BoardPostingSteps id={postingUnitId(postingJob)} chrome={false} onSearchAllPools={onSearchAllPools} onDone={onDone} />
+                    <BoardPostingSteps
+                      id={postingUnitId(postingJob)}
+                      chrome={false}
+                      flow={postingFlow}
+                      onSearchAllPools={onSearchAllPools}
+                      onDone={onDone}
+                    />
                   ) : (
                     <BoardPublishSheet id={postingUnitId(postingJob)} onSearchAllPools={onSearchAllPools} onDone={onDone} />
                   );

@@ -19,6 +19,12 @@
  *   ทั้งป๊อป: ตัดคำอธิบายที่ไม่จำเป็น · ระยะตัวอักษร/บรรทัดเท่ากัน (`EVEN_TYPE`) · Kanit ตัวเดียว
  *
  * 🔴 **ฟอร์มทุกตัวฝังในหน้า ไม่ห่อ Dialog** (เจ้าของสั่ง: *"ไม่เอาแบบ Popup เด้งนะ"*)
+ *
+ * ═══ 2 จอ เริ่มจากวางโพสต์ (6 ต.ค. 2569 ไล่ Journey งานสรรหา → Choice "เหลือ 2 จอ เริ่มจากวางโพสต์") ═══
+ *   `flow="quick"` (ค่าเริ่มของป๊อปบนงานสรรหา): ① ข้อมูลประกาศ — วางโพสต์ › ช่องทุกช่องในจอเดียว · ช่องที่ยังขาดขึ้นแดง ·
+ *   ข้อมูลใบขอ (master) กางดูได้ · ② ประกาศ + Gen link — ลิงก์ · ข้อความโพสต์คัดลอก · ตัวอย่างที่ผู้สมัครเห็น · ส่งประกาศ
+ *   เจ้าของถาม *"ยังดูข้อมูล master ได้ใช่ไหม"* ⇒ การ์ด "ข้อมูลใบขอ" อยู่จอ 1 · ฟอร์มสถานที่/รายได้/เพศ/อายุดึงค่าใบขอมาก่อนเหมือนเดิม
+ *   ทางถอย: `?popup=steps` = 4 หน้าแบบ 4 ต.ค. (`flow="steps"` — ค่าเริ่มของ component นี้ เทสต์เดิมยังวิ่งทางนี้)
  */
 import React from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -71,6 +77,7 @@ import { publicSafeAddress } from '@/lib/publicJobPrivacy';
 import { INCOME_PERIOD_LABEL, buildIncomeDisplay } from '@/lib/incomeBreakdown';
 import { benefitDisplayLabels } from '@/lib/extraBenefits';
 import { boardCardAge } from '@/lib/boardCardFacts';
+import { PUBLISH_GAP_LABEL, publishGapsOf } from '@/lib/publishReadiness';
 import { payCycleText, payCyclesOf } from '@/lib/payCycle';
 import PublicJobCardPreview from '@/components/jobs/PublicJobCardPreview';
 import { EVEN_TYPE, TONE } from '@/lib/designTokens';
@@ -182,6 +189,14 @@ export type BoardPostingStepsProps = {
    * ย้ายจากหัวป๊อปที่วางทับแถบขั้นประกาศ) · ไม่ส่ง = ไม่มีปุ่ม (ใบปิด/ยกเลิก · หน้า deep-link)
    */
   onSearchAllPools?: () => void;
+  /** `quick` = 2 จอ เริ่มจากวางโพสต์ (6 ต.ค. 2569) · `steps` = 4 หน้าเดิม (ทางถอย `?popup=steps`) */
+  flow?: 'quick' | 'steps';
+};
+
+type QuickStepKey = 'fill' | 'publish';
+const QUICK_STEP_TEXT: Record<QuickStepKey, { step: number; label: string }> = {
+  fill: { step: 1, label: 'ข้อมูลประกาศ' },
+  publish: { step: 2, label: 'ประกาศ + Gen link' },
 };
 
 /**
@@ -194,7 +209,9 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   onDone,
   chrome = true,
   onSearchAllPools,
+  flow = 'steps',
 }) => {
+  const quick = flow === 'quick';
   const navigate = useNavigate();
   const location = useLocation();
   /** ปุ่มย้อนกลับของโหมดหน้า = กลับหน้าที่พามา · โหมด popup ใช้ `onDone` */
@@ -381,6 +398,17 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   /** "มีแล้ว N ลิงก์" กดแล้วกางรายการลิงก์ทีละอัน (เจ้าของ 4 ต.ค. 2569 — Choice "ครบ") */
   const [linksOpen, setLinksOpen] = React.useState(false);
   const step: ReleaseStepKey = openStep;
+  /** จอที่เปิดอยู่ของโฉม 2 จอ — เริ่มที่วางโพสต์เสมอ */
+  const [quickStep, setQuickStep] = React.useState<QuickStepKey>('fill');
+  /** ข้อมูลใบขอ (master) บนจอ 1 — พับไว้ กดกางดู */
+  const [masterOpen, setMasterOpen] = React.useState(false);
+  /** ปุ่ม "แก้"/"ไปเลือกเพศ" — โฉม 2 จอพากลับจอ 1 · โฉม 4 หน้าพาไปหน้าของช่องนั้น */
+  const goEdit = (k: ReleaseStepKey) => (quick ? setQuickStep('fill') : setOpenStep(k));
+  /** โฉม 2 จอ: ใบที่ยังไม่มีลิงก์ = ฟอร์ม Gen link กางรอเลย (จอ 2 คือจอประกาศ + Gen link) */
+  const noLinkYet = linkCount === 0;
+  React.useEffect(() => {
+    if (quick && noLinkYet) setWantLink(true);
+  }, [quick, noLinkYet]);
 
   /**
    * ขั้นนี้ผ่านแล้วหรือยัง — ใช้ระบายสีบนแถบ
@@ -418,6 +446,318 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const postText = jobWithPatch
     ? buildPostText(jobWithPatch, firstLinkCode ? `${window.location.origin}${applyLinkPath(firstLinkCode)}` : null)
     : null;
+
+
+  // ── ชิ้นของจอประกาศ — ใช้ทั้งหน้า 4 (โฉม 4 หน้า) และจอ 2 (โฉม 2 จอ) ──
+  const previewCard = (
+    <>
+                {/* ผู้สมัครจะเห็นแบบไหน (เจ้าของ 4 ต.ค. 2569: *"หน้าสรุปต้องบอกว่าผู้สมัครจะเห็นหน้าตาแบบไหน จะได้ตรวจว่าครบไหม"*)
+                    การ์ดตัวเดียวกับหน้าประกาศ — ช่องที่ติ๊กซ่อนก็ซ่อนในนี้ด้วย */}
+                <StepCard title="ผู้สมัครจะเห็นแบบนี้">
+                  {jobWithPatch ? <PublicJobCardPreview job={jobWithPatch} /> : <Loading />}
+                </StepCard>
+
+    </>
+  );
+  const postTextCard = (
+    <>
+                {/* ข้อความโพสต์ให้คัดลอก (6 ต.ค. 2569) — รูปเดียวกับที่ทีมโพสต์ · มีลิงก์ = ต่อท้าย · ไม่มีชื่อหน่วยงาน */}
+                <StepCard
+                  title="ข้อความโพสต์"
+                  aside={postText ? <CopyTextButton text={postText} /> : null}
+                >
+                  {postText ? (
+                    <pre className="whitespace-pre-wrap break-words rounded-xl bg-muted/60 p-3 font-sans text-sm text-foreground" data-testid="post-text">
+                      {postText}
+                    </pre>
+                  ) : (
+                    <Loading />
+                  )}
+                </StepCard>
+
+    </>
+  );
+  const linksCard = (
+    <>
+                <StepCard title="ลิงก์สมัคร" aside={<span className="text-xs text-muted-foreground">ไม่บังคับ</span>}>
+                  {/* "มีแล้ว N ลิงก์" กดแล้วกางดูทีละลิงก์ว่าเกี่ยวกับอะไร (เจ้าของ 4 ต.ค. 2569 → Choice "ครบ") */}
+                  {linkCount === null ? (
+                    <p className="text-sm text-muted-foreground">กำลังโหลด…</p>
+                  ) : linkCount > 0 ? (
+                    <Collapsible open={linksOpen} onOpenChange={setLinksOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button type="button" variant="ghost" size="sm" className="-ml-2">
+                          มีแล้ว {NUM.format(linkCount)} ลิงก์
+                          <ChevronDown className={cn('transition-transform', linksOpen && 'rotate-180')} aria-hidden />
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pt-2">
+                        <PostingLinksList postings={(jobPostings ?? []).filter((p) => p.status === 'open')} onChanged={() => void loadPostings()} />
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">ยังไม่มีลิงก์</p>
+                  )}
+                  {/* 🔴 "Gen link" เป็นปุ่มกางลง (เจ้าของสั่ง 5 ต.ค. 2569: *"สร้างลิงก์ เปลี่ยนเป็น Gen link และพอกดไป
+                      ให้มันเป็น Dropdown ไม่ใช่ค้างโชว์ไว้"*) — เดิมเป็นช่องติ๊กที่กางฟอร์มค้างไว้ · กดอีกครั้ง = พับ
+                      มีประกาศแล้ว = เลือกช่องทางอย่างเดียว ข้อความเดิม · ยังไม่มี = กรอกข้อความประกาศครั้งแรกครั้งเดียว */}
+                  <Collapsible open={wantLink} onOpenChange={setWantLink}>
+                    <CollapsibleTrigger asChild>
+                      <Button type="button" variant="outline" size="sm" data-testid="gen-link-toggle">
+                        <Link2 aria-hidden />
+                        {linkCount ? 'Gen link เพิ่ม' : 'Gen link'}
+                        <ChevronDown className={cn('transition-transform', wantLink && 'rotate-180')} aria-hidden />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-3">
+                      {job && openPosting ? (
+                        <AddChannelLinks
+                          posting={openPosting}
+                          onCreated={() => {
+                            void loadPostings();
+                            setLinksOpen(false);
+                          }}
+                        />
+                      ) : job ? (
+                        <GenApplyLinkDialog
+                          embedded
+                          open
+                          previewFirst
+                          job={job}
+                          onClose={() => setWantLink(false)}
+                          onCreated={() => {
+                            void loadPostings();
+                            setLinksOpen(true);
+                          }}
+                        />
+                      ) : null}
+                    </CollapsibleContent>
+                  </Collapsible>
+                </StepCard>
+
+    </>
+  );
+  const publishActions = (
+    <>
+                {!released && skip ? (
+                  <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.danger.soft)}>
+                    <p className={cn('text-sm', TONE.danger.value)}>
+                      {quick ? 'ใบนี้ตั้งไม่ประกาศไว้ ยกเลิกที่จอ 1 ก่อนถึงจะส่งได้' : 'ใบนี้ตั้งไม่ประกาศไว้ ยกเลิกที่ขั้น 1 ก่อนถึงจะส่งได้'}
+                    </p>
+                    <Button type="button" size="xs" variant="outline" onClick={() => goEdit('info')}>
+                      {quick ? 'กลับจอ 1' : 'ไปขั้น 1'}
+                    </Button>
+                  </div>
+                ) : null}
+                {!released && genderBlocked ? (
+                  <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.warn.soft)}>
+                    <p className={cn('text-sm', TONE.warn.value)}>ใบขอไม่ระบุเพศ เลือกเพศก่อนถึงจะส่งได้</p>
+                    <Button type="button" size="xs" variant="outline" onClick={() => goEdit('benefits')}>
+                      {quick ? 'กลับไปเลือกเพศ' : 'ไปหน้า 3 เลือกเพศ'}
+                    </Button>
+                  </div>
+                ) : null}
+
+                {released === null ? (
+                  <Loading text="กำลังอ่านทะเบียนการประกาศ…" />
+                ) : released ? (
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <p className={cn('mr-auto text-sm', TONE.success.value)}>ใบนี้ประกาศแล้ว</p>
+                    {sendError ? (
+                      <p role="alert" className="text-xs text-destructive">
+                        {sendError}
+                      </p>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={releaseBusy || !job}
+                      onClick={() => void toggleRelease(false)}
+                    >
+                      {releaseBusy ? 'กำลังบันทึก…' : 'ดึงประกาศลง'}
+                    </Button>
+                    <Button type="button" onClick={leaveToBoard}>
+                      ปิด
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {sendError ? <p className="mr-auto text-xs text-destructive">{sendError}</p> : null}
+                    {/* ร่าง = ของที่ทำไว้บันทึกแล้วทุกขั้น ยังไม่ขึ้นหน้าสาธารณะ ⇒ ปิดป๊อปกลับกล่องงาน */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={releaseBusy}
+                      title="เก็บที่ทำไว้ ยังไม่ประกาศ"
+                      onClick={leaveToBoard}
+                    >
+                      บันทึกแบบร่าง
+                    </Button>
+                    <Button
+                      type="button"
+                      /* 🔴 ส่งได้เลย ลิงก์ไม่บังคับ (Choice 30 ก.ย. 2569) · ยังต้องผ่านสองด่าน: เลือกเพศแล้ว + ไม่ได้ตั้งไม่ปล่อย */
+                      disabled={releaseBusy || !job || genderBlocked || Boolean(skip)}
+                      onClick={() => void sendPost()}
+                    >
+                      {releaseBusy ? 'กำลังส่ง…' : 'ส่งประกาศ'}
+                    </Button>
+                  </div>
+                )}
+    </>
+  );
+  const publishTail = (
+    <>
+      {postTextCard}
+      {linksCard}
+      {publishActions}
+    </>
+  );
+  /** ช่องที่ยังขาดก่อนประกาศ — ตัวตัดสินเดียวกับชิปบนการ์ดงานสรรหา (`publishGapsOf`) */
+  const gaps = jobWithPatch ? publishGapsOf(jobWithPatch) : null;
+
+
+  // ── โฉม 2 จอ (6 ต.ค. 2569) ──
+  const quickNav = (
+    <nav className="grid grid-cols-2 gap-1.5" aria-label="ขั้นตอนของงานประกาศ" data-testid="quick-steps">
+      {(Object.keys(QUICK_STEP_TEXT) as QuickStepKey[]).map((k) => {
+        const t = QUICK_STEP_TEXT[k];
+        const on = quickStep === k;
+        return (
+          <Button
+            key={k}
+            type="button"
+            size="sm"
+            variant={on ? 'default' : 'outline'}
+            aria-current={on ? 'step' : undefined}
+            onClick={() => setQuickStep(k)}
+            className="justify-start"
+          >
+            <span
+              className={cn(
+                'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-xs tabular-nums',
+                on ? 'bg-primary-foreground/20' : 'bg-secondary',
+              )}
+              aria-hidden
+            >
+              {t.step}
+            </span>
+            {t.label}
+          </Button>
+        );
+      })}
+    </nav>
+  );
+
+  /** ช่องที่ยังขาด — ขึ้นแดงทุกช่อง · ครบ = ชิปเขียว (ว่างแล้วห้ามหาย) */
+  const gapBar = (
+    <div className="flex flex-wrap items-center gap-1.5" data-testid="quick-gaps">
+      {gaps === null ? (
+        <Loading />
+      ) : gaps.length === 0 ? (
+        <span className={cn('rounded-full border px-2.5 py-0.5 text-xs', TONE.success.soft, TONE.success.value)}>
+          ข้อมูลครบ
+        </span>
+      ) : (
+        <>
+          <span className="text-xs text-muted-foreground">ยังขาด</span>
+          {gaps.map((g) => (
+            <span key={g} className={cn('rounded-full border px-2.5 py-0.5 text-xs', TONE.danger.soft, TONE.danger.value)}>
+              {PUBLISH_GAP_LABEL[g]}
+            </span>
+          ))}
+        </>
+      )}
+    </div>
+  );
+
+  const quickBody =
+    quickStep === 'fill' ? (
+      <>
+        {gapBar}
+        <StepCard title="วางข้อความโพสต์">
+          {jobWithPatch ? <PostTextPasteCard job={jobWithPatch} onSaved={onPasteSaved} /> : <Loading />}
+        </StepCard>
+
+        {/* ข้อมูลใบขอ (master) — เจ้าของถาม 6 ต.ค. 2569 "ยังดูข้อมูล master ได้ใช่ไหม" */}
+        <StepCard>
+          <Collapsible open={masterOpen} onOpenChange={setMasterOpen}>
+            <CollapsibleTrigger asChild>
+              <Button type="button" variant="ghost" size="sm" className="-ml-2" data-testid="quick-master-toggle">
+                ข้อมูลใบขอ
+                <ChevronDown className={cn('transition-transform', masterOpen && 'rotate-180')} aria-hidden />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 pt-3" data-testid="quick-master">
+              {job ? (
+                <>
+                  <UnitRequestBriefFields job={job} />
+                  <RequestRateLinesBlock job={job} posting />
+                  {hasResignedInfo(job) ? <ResignedEmployeeBlock job={job} compact brief /> : null}
+                  {/* ใบเต็ม (26 ช่อง) พับอีกชั้น — ช่องบนซ้ำกับสรุปข้างบน (หน้า 1 ของโฉม 4 หน้าก็แบบนี้) */}
+                  <Collapsible open={moreOpen} onOpenChange={setMoreOpen}>
+                    <CollapsibleTrigger asChild>
+                      <Button type="button" variant="ghost" size="xs" className="-ml-2">
+                        ดูเพิ่ม
+                        <ChevronDown className={cn('transition-transform', moreOpen && 'rotate-180')} aria-hidden />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3 pt-3">
+                      <UnitRequestInfoFields job={job} />
+                      {hasResignedInfo(job) ? <ResignedEmployeeBlock job={job} compact /> : null}
+                    </CollapsibleContent>
+                  </Collapsible>
+                </>
+              ) : (
+                <Loading />
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </StepCard>
+
+        {jobWithPatch ? (
+          <React.Suspense fallback={<Loading text="กำลังโหลดฟอร์ม…" />}>
+            <EditPublicJobFieldsDialog
+              key={`${jobWithPatch.id}-quick-${pasteRev}`}
+              sections={['place', 'income', 'benefits']}
+              job={jobWithPatch}
+              onSaved={onFieldsSaved}
+            />
+          </React.Suspense>
+        ) : (
+          <Loading />
+        )}
+        <StepCard title="เพศที่รับ">
+          {jobWithPatch ? <GenderPicker key={`gender-${pasteRev}`} job={jobWithPatch} onSaved={onFieldsSaved} /> : <Loading />}
+        </StepCard>
+        <StepCard title="อายุที่รับ">
+          {jobWithPatch ? <AgeRangeFields key={`age-${pasteRev}`} job={jobWithPatch} onSaved={onFieldsSaved} /> : <Loading />}
+        </StepCard>
+        <StepCard title="วันเวลาทำงาน · คุณสมบัติ">
+          {jobWithPatch ? (
+            <ScheduleRequirementsFields key={`sched-${pasteRev}`} job={jobWithPatch} onSaved={onFieldsSaved} />
+          ) : (
+            <Loading />
+          )}
+        </StepCard>
+
+        {gapBar}
+        <Button type="button" className="w-full" disabled={!job} onClick={() => setQuickStep('publish')}>
+          ถัดไป {QUICK_STEP_TEXT.publish.label}
+          <ChevronRight aria-hidden />
+        </Button>
+        {job ? (
+          <ReleaseSkipControl jobId={job.id} skip={skip} released={released} onChanged={() => void loadSkips()} />
+        ) : null}
+      </>
+    ) : (
+      <>
+        {gapBar}
+        {linksCard}
+        {postTextCard}
+        {previewCard}
+        {publishActions}
+      </>
+    );
 
   return (
     <JobLoadFailedContext.Provider value={Boolean(error && !job)}>
@@ -479,6 +819,9 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             {/* ── แถบขั้น 1-4 — บอกสามอย่าง: ขั้นไหนผ่านแล้ว · ใบนี้ค้างขั้นไหน · กำลังเปิดดูขั้นไหน ── */}
             {/* 🔴 4 ขั้นอยู่แถวเดียวเสมอ (เจ้าของสั่ง 5 ต.ค. 2569 "ให้อยู่แถวเดียวกัน") — กริด 4 ช่อง ชื่อยาวตัดบรรทัดในช่องตัวเอง
                 ป้าย "ค้างที่นี่" อยู่ใต้ชื่อในช่องเดียวกัน (เดิมต่อท้ายจนขั้น 4 ตกบรรทัด) */}
+            {quick ? (
+              quickNav
+            ) : (
             <nav className="grid grid-cols-4 gap-1.5" aria-label="ขั้นตอนของงานประกาศ">
               {RELEASE_STEP_ORDER.map((k) => {
                 const t = RELEASE_STEP_TEXT[k];
@@ -523,6 +866,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 );
               })}
             </nav>
+            )}
 
             {released ? (
               /* 🔴 ปุ่มย้อนกลับอยู่ข้างป้ายเลย ไม่ต้องไล่ไปขั้น 4 (เจ้าของเคาะ 29 ก.ย. 2569: *"ถ้าอันไหนต้องการเอาออกจากหน้า
@@ -552,6 +896,10 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
               </p>
             ) : null}
 
+            {quick ? (
+              quickBody
+            ) : (
+            <>
             {/* ── ① ตรวจใบขอ ── */}
             {step === 'info' ? (
               <>
@@ -638,12 +986,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             {/* ── ④ สรุป + ส่งประกาศ ── */}
             {step === 'publish' ? (
               <>
-                {/* ผู้สมัครจะเห็นแบบไหน (เจ้าของ 4 ต.ค. 2569: *"หน้าสรุปต้องบอกว่าผู้สมัครจะเห็นหน้าตาแบบไหน จะได้ตรวจว่าครบไหม"*)
-                    การ์ดตัวเดียวกับหน้าประกาศ — ช่องที่ติ๊กซ่อนก็ซ่อนในนี้ด้วย */}
-                <StepCard title="ผู้สมัครจะเห็นแบบนี้">
-                  {jobWithPatch ? <PublicJobCardPreview job={jobWithPatch} /> : <Loading />}
-                </StepCard>
-
+                {previewCard}
                 {/* 🔴 หน้า 4 = สรุป แก้ในหน้านี้ไม่ได้ (เจ้าของ 4 ต.ค. 2569) — ปุ่ม "แก้" พาไปหน้าของช่องนั้น */}
                 <StepCard title="สรุปก่อนส่ง">
                   {jobWithPatch ? (
@@ -697,138 +1040,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                   )}
                 </StepCard>
 
-                {/* ข้อความโพสต์ให้คัดลอก (6 ต.ค. 2569) — รูปเดียวกับที่ทีมโพสต์ · มีลิงก์ = ต่อท้าย · ไม่มีชื่อหน่วยงาน */}
-                <StepCard
-                  title="ข้อความโพสต์"
-                  aside={postText ? <CopyTextButton text={postText} /> : null}
-                >
-                  {postText ? (
-                    <pre className="whitespace-pre-wrap break-words rounded-xl bg-muted/60 p-3 font-sans text-sm text-foreground" data-testid="post-text">
-                      {postText}
-                    </pre>
-                  ) : (
-                    <Loading />
-                  )}
-                </StepCard>
-
-                <StepCard title="ลิงก์สมัคร" aside={<span className="text-xs text-muted-foreground">ไม่บังคับ</span>}>
-                  {/* "มีแล้ว N ลิงก์" กดแล้วกางดูทีละลิงก์ว่าเกี่ยวกับอะไร (เจ้าของ 4 ต.ค. 2569 → Choice "ครบ") */}
-                  {linkCount === null ? (
-                    <p className="text-sm text-muted-foreground">กำลังโหลด…</p>
-                  ) : linkCount > 0 ? (
-                    <Collapsible open={linksOpen} onOpenChange={setLinksOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button type="button" variant="ghost" size="sm" className="-ml-2">
-                          มีแล้ว {NUM.format(linkCount)} ลิงก์
-                          <ChevronDown className={cn('transition-transform', linksOpen && 'rotate-180')} aria-hidden />
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="pt-2">
-                        <PostingLinksList postings={(jobPostings ?? []).filter((p) => p.status === 'open')} onChanged={() => void loadPostings()} />
-                      </CollapsibleContent>
-                    </Collapsible>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">ยังไม่มีลิงก์</p>
-                  )}
-                  {/* 🔴 "Gen link" เป็นปุ่มกางลง (เจ้าของสั่ง 5 ต.ค. 2569: *"สร้างลิงก์ เปลี่ยนเป็น Gen link และพอกดไป
-                      ให้มันเป็น Dropdown ไม่ใช่ค้างโชว์ไว้"*) — เดิมเป็นช่องติ๊กที่กางฟอร์มค้างไว้ · กดอีกครั้ง = พับ
-                      มีประกาศแล้ว = เลือกช่องทางอย่างเดียว ข้อความเดิม · ยังไม่มี = กรอกข้อความประกาศครั้งแรกครั้งเดียว */}
-                  <Collapsible open={wantLink} onOpenChange={setWantLink}>
-                    <CollapsibleTrigger asChild>
-                      <Button type="button" variant="outline" size="sm" data-testid="gen-link-toggle">
-                        <Link2 aria-hidden />
-                        {linkCount ? 'Gen link เพิ่ม' : 'Gen link'}
-                        <ChevronDown className={cn('transition-transform', wantLink && 'rotate-180')} aria-hidden />
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pt-3">
-                      {job && openPosting ? (
-                        <AddChannelLinks
-                          posting={openPosting}
-                          onCreated={() => {
-                            void loadPostings();
-                            setLinksOpen(false);
-                          }}
-                        />
-                      ) : job ? (
-                        <GenApplyLinkDialog
-                          embedded
-                          open
-                          previewFirst
-                          job={job}
-                          onClose={() => setWantLink(false)}
-                          onCreated={() => {
-                            void loadPostings();
-                            setLinksOpen(true);
-                          }}
-                        />
-                      ) : null}
-                    </CollapsibleContent>
-                  </Collapsible>
-                </StepCard>
-
-                {!released && skip ? (
-                  <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.danger.soft)}>
-                    <p className={cn('text-sm', TONE.danger.value)}>ใบนี้ตั้งไม่ประกาศไว้ ยกเลิกที่ขั้น 1 ก่อนถึงจะส่งได้</p>
-                    <Button type="button" size="xs" variant="outline" onClick={() => setOpenStep('info')}>
-                      ไปขั้น 1
-                    </Button>
-                  </div>
-                ) : null}
-                {!released && genderBlocked ? (
-                  <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.warn.soft)}>
-                    <p className={cn('text-sm', TONE.warn.value)}>ใบขอไม่ระบุเพศ เลือกเพศก่อนถึงจะส่งได้</p>
-                    <Button type="button" size="xs" variant="outline" onClick={() => setOpenStep('benefits')}>
-                      ไปหน้า 3 เลือกเพศ
-                    </Button>
-                  </div>
-                ) : null}
-
-                {released === null ? (
-                  <Loading text="กำลังอ่านทะเบียนการประกาศ…" />
-                ) : released ? (
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <p className={cn('mr-auto text-sm', TONE.success.value)}>ใบนี้ประกาศแล้ว</p>
-                    {sendError ? (
-                      <p role="alert" className="text-xs text-destructive">
-                        {sendError}
-                      </p>
-                    ) : null}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={releaseBusy || !job}
-                      onClick={() => void toggleRelease(false)}
-                    >
-                      {releaseBusy ? 'กำลังบันทึก…' : 'ดึงประกาศลง'}
-                    </Button>
-                    <Button type="button" onClick={leaveToBoard}>
-                      ปิด
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    {sendError ? <p className="mr-auto text-xs text-destructive">{sendError}</p> : null}
-                    {/* ร่าง = ของที่ทำไว้บันทึกแล้วทุกขั้น ยังไม่ขึ้นหน้าสาธารณะ ⇒ ปิดป๊อปกลับกล่องงาน */}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={releaseBusy}
-                      title="เก็บที่ทำไว้ ยังไม่ประกาศ"
-                      onClick={leaveToBoard}
-                    >
-                      บันทึกแบบร่าง
-                    </Button>
-                    <Button
-                      type="button"
-                      /* 🔴 ส่งได้เลย ลิงก์ไม่บังคับ (Choice 30 ก.ย. 2569) · ยังต้องผ่านสองด่าน: เลือกเพศแล้ว + ไม่ได้ตั้งไม่ปล่อย */
-                      disabled={releaseBusy || !job || genderBlocked || Boolean(skip)}
-                      onClick={() => void sendPost()}
-                    >
-                      {releaseBusy ? 'กำลังส่ง…' : 'ส่งประกาศ'}
-                    </Button>
-                  </div>
-                )}
+                {publishTail}
               </>
             ) : null}
 
@@ -845,6 +1057,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             {step === 'info' && job ? (
               <ReleaseSkipControl jobId={job.id} skip={skip} released={released} onChanged={() => void loadSkips()} />
             ) : null}
+            </>
+            )}
           </TabsContent>
         </Tabs>
       </div>
@@ -860,7 +1074,9 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
  */
 const BoardPostingPage: React.FC = () => {
   const { id = '' } = useParams();
-  return <BoardPostingSteps id={id} />;
+  const location = useLocation();
+  const flow = new URLSearchParams(location.search).get('popup') === 'steps' ? 'steps' : 'quick';
+  return <BoardPostingSteps id={id} flow={flow} />;
 };
 
 export default BoardPostingPage;
