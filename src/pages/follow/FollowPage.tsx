@@ -1697,6 +1697,8 @@ const FollowPage: React.FC = () => {
           rows={calendarRows}
           allRows={nextDayRows}
           summaryRows={monthSummaryRows}
+          /* การ์ดผล = ชุดเดียวกับกล่องขั้นตอนของสาย (เจ้าของ 6 ต.ค. 2569 "ก็ยอด 202") */
+          resultEntries={panelEntries}
           onViewChange={setPanelRange}
           month={calMonth}
           onMonthChange={setCalMonth}

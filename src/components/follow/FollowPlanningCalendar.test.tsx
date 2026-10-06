@@ -66,6 +66,7 @@ function renderCalendar(
     onStaffResult?: (round: { entry: FollowEntry }, outcome: string) => unknown;
     onCancelRound?: (round: { entry: FollowEntry }) => void;
     onFinishRound?: (round: { entry: FollowEntry }, outcome: string) => void;
+    resultEntries?: FollowEntry[];
   } = {},
 ) {
   const rows = buildFollowPlanningRows(groupFollowEntries(entries, NOW), NOW);
@@ -84,6 +85,7 @@ function renderCalendar(
       onStaffResult={opts.onStaffResult as never}
       onCancelRound={opts.onCancelRound}
       onFinishRound={opts.onFinishRound}
+      resultEntries={opts.resultEntries}
     />,
   );
   return rows;
@@ -678,6 +680,26 @@ describe('ผลของเดือน = นิยามเดียวกั�
       const manual = Number(screen.getByTestId(`month-${k}-manual`).textContent);
       expect(ai + manual, k).toBe(k === 'went' ? 3 : 0);
     }
+  });
+
+  it('🔴 การ์ดผล = ชุดเดียวกับกล่องขั้นตอนของสาย (เจ้าของ 6 ต.ค. 2569 "ก็ยอด 202") — ทั้งหมด = ทั้งหมดของกล่อง · ตามแท็บสายที่', async () => {
+    const { buildFollowCallMatrix } = await import('@/lib/followCallMatrix');
+    const list = [
+      entry({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' }),
+      entry({ id: 'b', call_round: 2, recipient_phone: '0899999998', recipient_name: 'คนที่สอง', call_status: 'failed', call_outcome: 'no_answer' }),
+      entry({ id: 'c', call_round: 1, recipient_phone: '0899999997', recipient_name: 'คนที่สาม', cancelled: true, call_status: 'cancelled' }),
+      entry({ id: 'd', call_round: 1, recipient_phone: '0899999996', recipient_name: 'คนที่สี่', call_status: 'pending' }),
+    ];
+    renderCalendar(list, { resultEntries: list });
+    const m = buildFollowCallMatrix(list);
+    expect(screen.getByText('ผลของวันนี้')).toBeTruthy();
+    expect(Number(screen.getByTestId('month-total').textContent)).toBe(m.all.total.length);
+    expect(Number(screen.getByTestId('month-total-ai').textContent) + Number(screen.getByTestId('month-total-manual').textContent)).toBe(
+      m.all.total.length,
+    );
+    cleanup();
+    renderCalendar(list, { resultEntries: list, roundFilter: 1 });
+    expect(Number(screen.getByTestId('month-total').textContent)).toBe(m[1].total.length);
   });
 
   /** 🔴 เจ้าของสั่ง 1 ต.ค. 2569 (Choice "เอาออกทั้งสองอย่าง") — แถว "ยังไม่มีผลกลับ" + ประโยคใต้ถังถอดแล้ว */

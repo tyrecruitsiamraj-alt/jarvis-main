@@ -41,8 +41,9 @@ import {
 } from '@/lib/followPlanning';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { followCallerOf } from '@/lib/followListFilter';
+import type { FollowEntry } from '@/lib/followApi';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
-import { FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE, followMatrixColOfCategory } from '@/lib/followCallMatrix';
+import { buildFollowCallMatrix, FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE, followMatrixColOfCategory } from '@/lib/followCallMatrix';
 import { DASH } from '@/lib/designTokens';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -334,11 +335,18 @@ const FollowPlanningCalendar: React.FC<{
    * ไม่ส่ง = ใช้ `rows` (พฤติกรรมเดิม · เทสต์)
    */
   summaryRows?: readonly FollowPlanningRow[];
+  /**
+   * สายชุดเดียวกับกล่อง "ขั้นตอนของสาย" (ช่วงวัน/เดือน + ตัวกรองเดียวกัน) — การ์ดผลนับจากชุดนี้ด้วย `buildFollowCallMatrix`
+   * ตัวเดียวกับกล่อง ⇒ ทั้งหมดบนการ์ด = ทั้งหมดบนกล่อง (เจ้าของ 6 ต.ค. 2569 "มันก็ต้องแค่ของหน้านี้สิ่ ก็ยอด 202")
+   * ไม่ส่ง = นับจาก `summaryRows` ทั้งเดือน (พฤติกรรมเดิม · เทสต์)
+   */
+  resultEntries?: readonly FollowEntry[];
   /** บอกหน้าแม่ว่าดูรายวันหรือรายเดือนอยู่ — แผงรอบโทรนับช่วงตามนี้ (3 ต.ค. 2569) */
   onViewChange?: (view: 'day' | 'month') => void;
 }> = ({
   rows,
   summaryRows,
+  resultEntries,
   month,
   onMonthChange,
   selectedYmd,
@@ -460,21 +468,36 @@ const FollowPlanningCalendar: React.FC<{
    * ตัวเดียวกับตัวกรองใครโทร ⇒ AI + คน = รวม ทุกแถว
    */
   const monthBoxes = useMemo(() => {
-    const zero = () => ({ went: 0, notWent: 0, noAnswer: 0, unclear: 0 });
+    type Cols = Record<'went' | 'notWent' | 'noAnswer' | 'unclear' | 'waiting' | 'cancelled', number>;
+    const zero = (): Cols => ({ went: 0, notWent: 0, noAnswer: 0, unclear: 0, waiting: 0, cancelled: 0 });
     const out = { ...zero(), ai: zero(), manual: zero() };
+    if (resultEntries) {
+      // ชุดเดียวกับกล่องขั้นตอนของสาย — แถวตามแท็บสายที่เลือก (ทุกสาย / สายที่ 1 / 2 / 3 ขึ้นไป)
+      const row = buildFollowCallMatrix(resultEntries)[roundFilter];
+      for (const k of ['went', 'notWent', 'noAnswer', 'unclear', 'waiting', 'cancelled'] as const) {
+        for (const e of row[k]) {
+          out[k] += 1;
+          out[followCallerOf(e)][k] += 1;
+        }
+      }
+      return out;
+    }
     for (const r of summarySource) {
       for (const round of r.rounds) {
         if (round.ymd?.slice(0, 7) !== month || followRoundSlot(round.entry) === null) continue;
         const col = followMatrixColOfCategory(callCategory(round));
-        if (col === 'went' || col === 'notWent' || col === 'noAnswer' || col === 'unclear') {
-          out[col] += 1;
-          out[followCallerOf(round.entry)][col] += 1;
-        }
+        out[col] += 1;
+        out[followCallerOf(round.entry)][col] += 1;
       }
     }
     return out;
-  }, [summarySource, month]);
+  }, [resultEntries, roundFilter, summarySource, month]);
   const monthWithResult = monthBoxes.went + monthBoxes.notWent + monthBoxes.noAnswer + monthBoxes.unclear;
+  const monthTotal = monthWithResult + monthBoxes.waiting + monthBoxes.cancelled;
+  /** หัวการ์ด — ตามช่วงที่กล่องขั้นตอนของสายนับอยู่ (มีชุดของหน้า) · ไม่มีชุด = ทั้งเดือนแบบเดิม */
+  const resultIsDay = !!resultEntries && view === 'day';
+  const resultTitle = resultIsDay ? (dayYmd === today ? 'ผลของวันนี้' : 'ผลของวันที่เลือก') : 'ผลของเดือนนี้';
+  const resultSub = resultIsDay ? dayPillLabel(dayYmd) : monthLabel(month);
 
   const overdueAll = useMemo(() => {
     const out: Array<{ row: FollowPlanningRow; round: FollowPlanningRound }> = [];
@@ -1307,9 +1330,9 @@ const FollowPlanningCalendar: React.FC<{
         {/* ── แผงข้างขวา ── */}
         <div className="space-y-4">
           <Card className="rounded-2xl p-5 shadow-sm">
-            <h3 className="text-[13px] font-medium text-foreground">ผลของเดือนนี้</h3>
+            <h3 className="text-[13px] font-medium text-foreground">{resultTitle}</h3>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              {monthLabel(month)}
+              {resultSub}
               {roundFilter !== 'all' ? ` · เฉพาะ${roundFilterLabel(roundFilter)}` : ''}
             </p>
             {/**
@@ -1328,7 +1351,7 @@ const FollowPlanningCalendar: React.FC<{
                 <span className="text-right text-[11px] text-muted-foreground">AI โทร</span>
                 <span className="text-right text-[11px] text-muted-foreground">คนโทร</span>
                 <span className="text-right text-[11px] text-muted-foreground">รวม</span>
-                {(['went', 'notWent', 'noAnswer', 'unclear'] as const).map((k) => (
+                {(['went', 'notWent', 'noAnswer', 'unclear', 'waiting', 'cancelled'] as const).map((k) => (
                   <React.Fragment key={k}>
                     <span className="flex items-center gap-1.5 text-muted-foreground">
                       <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', TONE[FOLLOW_MATRIX_COL_TONE[k]].dot)} aria-hidden />
@@ -1339,6 +1362,16 @@ const FollowPlanningCalendar: React.FC<{
                     <span className={cn('text-right font-medium tabular-nums', TONE[FOLLOW_MATRIX_COL_TONE[k]].value)}>{monthBoxes[k]}</span>
                   </React.Fragment>
                 ))}
+                {/* แถวทั้งหมด = เลข "ทั้งหมด" ของกล่องขั้นตอนของสาย */}
+                <span className="border-t border-border/70 pt-1.5 font-medium text-foreground">{FOLLOW_MATRIX_COL_LABEL.total}</span>
+                {(['ai', 'manual'] as const).map((c) => (
+                  <span key={c} className="border-t border-border/70 pt-1.5 text-right tabular-nums text-foreground" data-testid={`month-total-${c}`}>
+                    {Object.values(monthBoxes[c]).reduce((a, b) => a + b, 0)}
+                  </span>
+                ))}
+                <span className="border-t border-border/70 pt-1.5 text-right font-medium tabular-nums text-foreground" data-testid="month-total">
+                  {monthTotal}
+                </span>
               </div>
             </div>
           </Card>
