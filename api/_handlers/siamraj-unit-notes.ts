@@ -9,6 +9,7 @@ import { readJsonBody, getString } from '../_lib/body.js';
 import { clearUnitRequestCache } from '../_lib/unitRequestCache.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { getUnitNote, upsertUnitNote } from '../_lib/siamrajUnitNotes.js';
+import { dispatchWaitingApplicationsInBackground } from '../_lib/incomeReadyDispatch.js';
 import { checkFunctionAccess } from '../_lib/roleFunctionGrants.js';
 import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
 
@@ -97,6 +98,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
       // 🔴 ล้างสำเนาลิสต์ทันที — เหตุผลเต็มอยู่ที่ `siamraj-unit-assignments.ts` (21 ก.ย. 2569)
       clearUnitRequestCache();
+      /**
+       * ตั้งรายได้แล้ว → ใบสมัครผ่านลิงก์ที่ค้างเพราะยังไม่มีรายได้ เข้าคิว AI เอง (เจ้าของ 6 ต.ค. 2569 Choice
+       * "ส่งเองเมื่อตั้งรายได้") · ไม่รอ · ล้มไม่กระทบการบันทึก — กติกาเต็มที่ `api/_lib/incomeReadyDispatch.ts`
+       */
+      if (touchesFieldOverrides) dispatchWaitingApplicationsInBackground(requestNo, item.field_overrides);
       return res.status(200).json(item);
     } catch (e) {
       return handleApiError(res, e, 'siamraj-unit-notes POST', { userId: req.user.sub });
