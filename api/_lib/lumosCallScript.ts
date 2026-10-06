@@ -55,12 +55,13 @@ export const MAX_QUESTIONS = 14;
 // ⇒ เทสต์เดิมทั้งชุดผ่านโดยไม่ต้องรู้จักฟีเจอร์นี้ และลบแถวใน DB = กลับบทมาตรฐานทันที
 
 /** คีย์บทที่แก้ได้จากหน้าตั้งค่า → array บทในไฟล์ template */
-export type EditableScriptKey = 'interview' | 'offer' | 'apply' | 'follow' | 'follow_repeat';
+export type EditableScriptKey = 'interview' | 'offer' | 'apply' | 'applied' | 'follow' | 'follow_repeat';
 
 export const EDITABLE_SCRIPT_DEFAULTS: Record<EditableScriptKey, readonly string[]> = {
   interview: T.สัมภาษณ์เบื้องต้น,
   offer: T.เสนองาน,
   apply: T.สมัครผ่านลิงก์,
+  applied: T.ผู้สมัครคีย์เอง,
   follow: T.ติดตาม,
   follow_repeat: T.ติดตามรอบถัดไป,
 };
@@ -298,9 +299,9 @@ export type OfferOptions = {
  * ต่างจากบทที่ 1 สองเรื่อง: **ไม่ถามค่าแรงที่คาดหวัง/ประสบการณ์ซ้ำ** (เขาเห็นเงื่อนไข
  * ตอนสมัครแล้วและเรามีโปรไฟล์อยู่) · **ปิดด้วยการนัด** ไม่ใช่ "เดี๋ยวเจ้าหน้าที่ติดต่อกลับ"
  */
-export function buildOfferQuestions(f: ApplyScriptFacts, opts: OfferOptions = {}): string[] {
+export function buildOfferQuestions(f: CallScriptFacts, opts: OfferOptions = {}): string[] {
   return renderLines(activeScriptLines('offer'), {
-    ...applyValues(f),
+    ...jobValues(f),
     เคยปฏิเสธงานอื่น: flag(opts.askStillLooking),
   });
 }
@@ -324,6 +325,14 @@ export type ApplyScriptFacts = CallScriptFacts & {
  */
 export function buildApplyQuestions(f: ApplyScriptFacts): string[] {
   return renderLines(activeScriptLines('apply'), applyValues(f));
+}
+
+/**
+ * บทของ **ใบสมัครที่เจ้าหน้าที่คีย์/นำเข้า** (เจ้าของ 6 ต.ค. 2569 · Choice "ใช้ลำดับ Journey เมื่อวาน") —
+ * ลำดับเดียวกับบทสมัครผ่านลิงก์ ต่างแค่ประโยคแรก ("เคยฝากใบสมัครไว้กับเรา") · ค่าชุดเดียวกัน (`applyValues`)
+ */
+export function buildAppliedQuestions(f: ApplyScriptFacts): string[] {
+  return renderLines(activeScriptLines('applied'), applyValues(f));
 }
 
 /**

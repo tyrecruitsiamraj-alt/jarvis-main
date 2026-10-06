@@ -7,7 +7,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildApplicationInterviewPayload, FACTS_UNREAD_REASON, NO_INCOME_REASON } from '../../api/_lib/lumosDispatch';
-import { buildOfferQuestions, KNOWN_PLACEHOLDERS } from '../../api/_lib/lumosCallScript';
+import { buildAppliedQuestions, buildOfferQuestions, KNOWN_PLACEHOLDERS } from '../../api/_lib/lumosCallScript';
+import { EDITABLE_SCRIPT_KEYS } from '../../api/_lib/callScriptStore';
 import { CALL_SCRIPT_TEMPLATES } from '../../api/_lib/lumosCallScript.templates';
 
 const code = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
@@ -30,7 +31,7 @@ const FACTS = {
   benefitLine: 'มีเบี้ยขยัน ค่าครองชีพให้ด้วย',
 };
 
-describe('บทเสนองานใหม่ (ใบที่เจ้าหน้าที่คีย์/นำเข้า)', () => {
+describe('บทผู้สมัครที่เจ้าหน้าที่คีย์/นำเข้า (applied)', () => {
   const p = buildApplicationInterviewPayload(APP, new Date('2026-10-06T03:00:00Z'), null, FACTS)!;
   const all = p.questions.join(' | ');
   it('ไม่มี "หน่วยงานของเรา" · ตำแหน่งสั้นจากใบขอ ไม่ใช่หัวข้อประกาศทั้งก้อน', () => {
@@ -40,26 +41,42 @@ describe('บทเสนองานใหม่ (ใบที่เจ้า�
     expect(p.questions[0]).toContain('เคยฝากใบสมัครไว้กับเรา');
     expect(p.questions[0]).toContain('ที่ อีซูซุมอเตอร์');
   });
-  it('บอกพื้นที่ · อายุ · รายได้ · สวัสดิการ เหมือนบทสมัครผ่านลิงก์ · ปิดด้วยนัดโทรกลับ', () => {
-    expect(all).toContain('งานนี้อยู่ที่ ตำบลสำโรง อำเภอพระประแดง จังหวัดสมุทรปราการ');
-    expect(all).toContain('งานนี้รับอายุ 30 ถึง 50 ปี');
-    expect(all).toContain('เดือนละ 17,000 บาท');
-    expect(all).toContain('มีเบี้ยขยัน ค่าครองชีพให้ด้วยครับ');
-    expect(p.questions[p.questions.length - 1]).toContain('นัดวันสัมภาษณ์');
+  it('🔴 ลำดับ Journey ของเจ้าของ (5 ต.ค.): ชื่อ → สนใจงาน → พื้นที่ → อายุ → วันเริ่มงาน → รายได้ → ไม่สนใจก็จบ · ไม่มีคำถามที่ไม่ได้สั่ง', () => {
+    expect(p.questions).toEqual([
+      'สวัสดีครับ คุณทดสอบ ระบบ ผมติดต่อจากสยามราชธานีนะครับ คุณเคยฝากใบสมัครไว้กับเรา ตอนนี้มีงานตำแหน่งพนักงานขับรถ ผู้บริหาร ที่ อีซูซุมอเตอร์ สนใจงานนี้ไหมครับ',
+      'งานนี้อยู่ที่ ตำบลสำโรง อำเภอพระประแดง จังหวัดสมุทรปราการ สะดวกเดินทางไปทำงานไหมครับ',
+      'งานนี้รับอายุ 30 ถึง 50 ปี ตอนนี้คุณอายุเท่าไหร่ครับ',
+      'ถ้าได้งานนี้ สะดวกเริ่มงานได้วันไหนครับ',
+      'งานนี้รายได้ประมาณเดือนละ 17,000 บาทครับ',
+      'มีเบี้ยขยัน ค่าครองชีพให้ด้วยครับ',
+      'ถ้ายังไม่สนใจงานนี้ ไม่เป็นไรครับ ขอบคุณที่สละเวลาครับ',
+    ]);
+    // เมื่อวานไม่ได้สั่ง (เจ้าของ 6 ต.ค. "เมื่อวานฉันไม่ได้สั่งไว้แบบนี้หนิ")
+    for (const extra of ['เวลาทำงาน', 'รถของตัวเอง', 'ขอทราบเหตุผล', 'นัดวันสัมภาษณ์', 'ยังหางานอยู่ไหม']) {
+      expect(all).not.toContain(extra);
+    }
   });
   it('ไม่มีช่วงอายุ = ถามอายุตรง ๆ (ไม่ตัดบรรทัด) · ไม่มีพื้นที่ = ใช้ชื่อหน่วยงาน', () => {
-    const q = buildOfferQuestions({ candidateName: 'ทดสอบ', position: 'แม่บ้าน', unit: 'สยามพารากอน', monthlyIncome: 12000 });
+    const q = buildAppliedQuestions({ candidateName: 'ทดสอบ', position: 'แม่บ้าน', unit: 'สยามพารากอน', monthlyIncome: 12000 });
     expect(q).toContain('ตอนนี้คุณอายุเท่าไหร่ครับ');
     expect(q.join(' ')).toContain('งานนี้อยู่ที่ สยามพารากอน');
   });
   it('ไม่รู้ชื่อหน่วยงานด้วย = ไม่พูด "อยู่ที่ หน่วยงานของเรา"', () => {
-    const q = buildOfferQuestions({ candidateName: 'ทดสอบ', position: 'แม่บ้าน', unit: '' });
+    const q = buildAppliedQuestions({ candidateName: 'ทดสอบ', position: 'แม่บ้าน', unit: '' });
     expect(q.join(' ')).not.toContain('อยู่ที่ หน่วยงานของเรา');
   });
-  it('บทในไฟล์: ตัวแปรลงทะเบียนครบ · ไม่เกิน 14 ข้อ · ไม่พิมพ์เลขรายได้เอง', () => {
+  it('บทในไฟล์: ตัวแปรลงทะเบียนครบ · ไม่เกิน 14 ข้อ · ไม่พิมพ์เลขรายได้เอง · แก้ได้จากหน้าตั้งค่า', () => {
     expect(KNOWN_PLACEHOLDERS).toContain('ไม่มีช่วงอายุ');
-    expect(CALL_SCRIPT_TEMPLATES.เสนองาน.length).toBeLessThanOrEqual(14);
-    for (const line of CALL_SCRIPT_TEMPLATES.เสนองาน) expect(line).not.toMatch(/\d[\d,]*\s*บาท/);
+    expect(CALL_SCRIPT_TEMPLATES.ผู้สมัครคีย์เอง.length).toBeLessThanOrEqual(14);
+    for (const line of CALL_SCRIPT_TEMPLATES.ผู้สมัครคีย์เอง) expect(line).not.toMatch(/\d[\d,]*\s*บาท/);
+    expect(EDITABLE_SCRIPT_KEYS).toContain('applied');
+  });
+  it('🔴 บทเสนองาน (เส้นชวนกลับ เลนคัดสรร) ไม่ถูกแตะ — ยังถาม "ยังหางานอยู่ไหม" + เหตุผล + นัดโทรกลับเหมือนเดิม', () => {
+    const q = buildOfferQuestions({ candidateName: 'ทดสอบ', position: 'แม่บ้าน', unit: 'สยามพารากอน' }, { askStillLooking: true });
+    const all = q.join(' ');
+    expect(all).toContain('ยังหางานอยู่ไหม');
+    expect(all).toContain('ขอทราบเหตุผล');
+    expect(q[q.length - 1]).toContain('นัดวันสัมภาษณ์');
   });
 });
 

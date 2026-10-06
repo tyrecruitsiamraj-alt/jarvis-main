@@ -53,6 +53,7 @@ import {
   buildOfferMessage,
   buildOfferQuestions,
   buildApplyQuestions,
+  buildAppliedQuestions,
   buildScreeningQuestions,
   type EditableScriptKey,
 } from './lumosCallScript.js';
@@ -274,11 +275,11 @@ export function buildApplicationInterviewPayload(
     // บนใบ (ไม่มีเวลาทำงาน/เงื่อนไขรถ) บทจึงสั้นกว่าเส้นอื่นโดยตั้งใจ
     questions: applyFacts
       ? buildApplyQuestions({ candidateName: app.full_name, position, unit, placeForTravel: unit, ...applyFacts })
-      : buildOfferQuestions({
+      : // ใบที่เจ้าหน้าที่คีย์/นำเข้า = บทของตัวเอง ลำดับ Journey เดียวกับบทสมัครผ่านลิงก์ (6 ต.ค. 2569)
+        buildAppliedQuestions({
           candidateName: app.full_name,
           position,
           unit,
-          // พื้นที่ · อายุ · รายได้ · สวัสดิการของใบขอ (6 ต.ค. 2569 — บทเสนองานบอกเหมือนบทสมัครผ่านลิงก์)
           workArea: jobFacts?.workArea,
           ageRange: jobFacts?.ageRange,
           monthlyIncome: jobFacts?.monthlyIncome,
