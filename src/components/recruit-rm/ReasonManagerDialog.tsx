@@ -144,7 +144,7 @@ const ReasonManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = ({
                             className={
                               r.isActive
                                 ? 'min-w-0 flex-1 truncate text-xs text-foreground'
-                                : 'min-w-0 flex-1 truncate text-xs text-muted-foreground line-through'
+                                : 'min-w-0 flex-1 truncate text-xs text-muted-foreground'
                             }
                           >
                             {r.name}

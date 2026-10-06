@@ -35,3 +35,30 @@ export function followScopeEntries<T extends { follow_team?: string | null }>(it
 export function followTeamForScope(scope: FollowScope): FollowTeam | undefined {
   return scope === 'replacement' ? FOLLOW_TEAM_REPLACEMENT : undefined;
 }
+
+/**
+ * ═══ แยก EX กับ คนใน บนแท็บส่งคนแทน (เจ้าของสั่ง 6 ต.ค. 2569 "แยก Ex กับ คนใน เพิ่ม Filter มา") ═══
+ * ค่ามาจาก `replace_type` ของ iRecruit (migration 136 · รอบดึงเติมให้) — 'EX' = คนนอก (AI โทร) · ค่าอื่น = คนใน (คนโทร)
+ * ไม่มีค่า = ไม่ระบุ (คีย์เอง / แถวเก่านอกช่วงที่ดึง)
+ */
+export type ReplaceKind = 'ex' | 'inner' | 'unknown';
+export type ReplaceKindFilter = 'all' | ReplaceKind;
+export const REPLACE_KIND_FILTERS: readonly ReplaceKindFilter[] = ['all', 'ex', 'inner', 'unknown'];
+export const REPLACE_KIND_LABEL: Record<ReplaceKindFilter, string> = {
+  all: 'ทั้งหมด',
+  ex: 'EX',
+  inner: 'คนใน',
+  unknown: 'ไม่ระบุ',
+};
+
+export function replaceKindOf(entry: { replace_type?: string | null }): ReplaceKind {
+  const t = (entry.replace_type ?? '').trim().toUpperCase();
+  if (!t) return 'unknown';
+  return t === 'EX' ? 'ex' : 'inner';
+}
+
+export function countReplaceKinds(items: readonly { replace_type?: string | null }[]): Record<ReplaceKindFilter, number> {
+  const out: Record<ReplaceKindFilter, number> = { all: items.length, ex: 0, inner: 0, unknown: 0 };
+  for (const e of items) out[replaceKindOf(e)] += 1;
+  return out;
+}

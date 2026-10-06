@@ -52,6 +52,10 @@ export type FollowEntry = {
    * จอทุกจุดโชว์ "ยังไม่ระบุเวลา" · เป็นคนโทรเสมอจนกว่าจะตั้งเวลาจริง
    */
   time_tbd?: boolean;
+  /** ประเภทใบส่งคนแทนจาก iRecruit (136) — 'EX' = คนนอก · ค่าอื่น = คนใน · null = ไม่รู้ */
+  replace_type?: string | null;
+  /** ที่มาของแถว (133) — `irecruit-replace:<ใบ>:<ช่อง>:<คน>` = ดึงจาก iRecruit · null = คีย์เอง */
+  source_ref?: string | null;
   /**
    * รอบเวลาของวันนั้น (092 · HH:MM) — **หนึ่งแถว = หนึ่งวัน แต่มีได้หลายรอบ**
    * `null`/ไม่มี = รอบเดียวตามเวลาใน `scheduled_at`

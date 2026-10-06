@@ -109,3 +109,24 @@ describe('scheduleDraftDayCallLabels (ตัวแก้ตาราง)', () =>
     ]);
   });
 });
+
+describe('แถวส่งคนแทนจาก iRecruit = สายที่ 1/2/3 ตาม Journey (6 ต.ค. 2569)', () => {
+  it('คอนเฟิร์ม = สายที่ 1 · ก่อน 1 ชม. = สายที่ 2 · ก่อน 15 นาที = สายที่ 3 · ไม่มีเลขวัน', () => {
+    const rows = [
+      row({ id: 'c', group_id: 'g', scheduled_at: at(1, 9), source_ref: 'irecruit-replace:J1:confirm:abc' }),
+      row({ id: 'l60', group_id: 'g', scheduled_at: at(2, 0), source_ref: 'irecruit-replace:J1:lead60:abc' }),
+      row({ id: 'l15', group_id: 'g', scheduled_at: at(2, 1), source_ref: 'irecruit-replace:J1:lead15:abc' }),
+    ];
+    const out = withFollowDayCalls(rows);
+    expect(out.map((e) => [e.id, e.call_day, e.call_of_day])).toEqual([
+      ['c', null, 1],
+      ['l60', null, 2],
+      ['l15', null, 3],
+    ]);
+  });
+
+  it('แถวคีย์เอง / รุ่นเก่าหนึ่งใบหนึ่งสาย = กติกาเดิม', () => {
+    const [e] = withFollowDayCalls([row({ id: 'x', group_id: null, call_round: 2, source_ref: 'irecruit-replace:OLD' })]);
+    expect(e.call_of_day).toBe(2);
+  });
+});

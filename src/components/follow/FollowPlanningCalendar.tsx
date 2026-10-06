@@ -718,8 +718,9 @@ const FollowPlanningCalendar: React.FC<{
                                       onClick={() => onOpenCell(row, '', row.rounds)}
                                       title={`ดูแผนทั้งหมดของ ${row.group.name}`}
                                       className={cn(
-                                        'block max-w-full truncate text-left text-[13.5px] font-medium text-foreground underline-offset-2 hover:text-primary hover:underline',
-                                        allCancelled && 'line-through',
+                                        'block max-w-full truncate text-left text-[13.5px] font-medium underline-offset-2 hover:text-primary hover:underline',
+                                        /* ยกเลิกหมด = สีจาง ไม่ขีดฆ่า (เจ้าของ 6 ต.ค. 2569: "ขีดกลางค่า… ใช้สีไม่ดีกว่าหรอ") */
+                                        allCancelled ? 'text-muted-foreground' : 'text-foreground',
                                       )}
                                     >
                                       {row.group.name}
@@ -762,8 +763,9 @@ const FollowPlanningCalendar: React.FC<{
                                       <span className="min-w-0">
                                         <span
                                           className={cn(
-                                            'block text-[15px] font-medium leading-none tabular-nums text-foreground',
-                                            round.state === 'cancelled' && 'line-through',
+                                            'block text-[15px] font-medium leading-none tabular-nums',
+                                            // ยกเลิก = สีจาง ไม่ขีดฆ่า (6 ต.ค. 2569) — ป้าย "ยกเลิก" ในช่องสถานะบอกอยู่แล้ว
+                                            round.state === 'cancelled' ? 'text-muted-foreground' : 'text-foreground',
                                           )}
                                         >
                                           {round.entry.time_tbd ? 'ยังไม่ระบุเวลา' : (round.time ?? '—')}
@@ -1235,7 +1237,6 @@ const FollowPlanningCalendar: React.FC<{
                                       <span
                                         className={cn(
                                           'block text-[10px] font-medium tabular-nums',
-                                          r.state === 'cancelled' && 'line-through',
                                         )}
                                       >
                                         {r.time ?? '—'}

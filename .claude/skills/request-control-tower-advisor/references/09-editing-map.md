@@ -12098,3 +12098,22 @@ Choice: รายได้เฉลี่ยโชว์ ติ๊กซ่อ�
 
 - จบเรื่อง = ปิดงาน + หยุดสายที่เหลือ **ทั้งชุด** (`stop_scope: 'set'`) · ตรวจใน Browser (ตัวดักเขียน): ส่ง `{action:'staff_call',outcome:'declined'}` แล้ว `{outcome_code:'no_show_start',stop_scope:'set'}`
 - ขั้น 2 มี "จบ · ลา" กับ "จบ · จำวันผิด" ต่อท้ายปุ่มจบหลักด้วย (`STAFF_FINISH_EXTRA` · เจ้าของสั่ง 6 ต.ค. 2569) · "ถึงแล้ว" ยังปิดจากการ์ดติดตามครบ
+
+## 6 ต.ค. 2569: ตัวเลขตรงกันทั้งระบบ + ติดตามส่งคนแทนตาม Journey + แยก EX/คนใน + เลิกขีดฆ่า
+
+เจ้าของ: *"ถ้าตัวเลขเพี้ยน ตอบไม่ตรงกันทั้งระบบอยู่แบบนี้ก็ตายพอดี"* · Journey ส่งคนแทน 7 ข้อ (ดึงทุก 5 นาที · สาย 1 16:00 ·
+สาย 2 ก่อน 1 ชม. · สาย 3 ก่อน 15 นาที · สรุป/แสดง/นับแบบหน้าติดตามคนเริ่มงาน · แก้เป็นคนโทรได้แล้วเลขเปลี่ยน) ·
+Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แยก Ex กับ คนใน เพิ่ม Filter"* · *"ขีดกลาง… ใช้สีไม่ดีกว่าหรอ"*
+
+| ไฟล์ | ที่แก้ |
+| --- | --- |
+| `src/lib/followPlanning.ts` | 🔴 `followRoundState`: ยกเลิกแต่โทรไปแล้วมีผล (ไม่ใช่รหัส cancelled) = `result` — กติกากลาง ทุกจอที่ใช้สภาพของรอบนับตามผล (เคส 4 vs 0) |
+| `api/_lib/irecruitReplaceSync.ts` | ขั้น 1 ยกเลิก: ติดธงทั้งรอบคำสั่งเดียว แล้ว `cancelFlaggedFollowRowsAtLumos` (ใหม่ · แผนละครั้ง · ทุกสายยกเลิก = ลบด้วย `plan_ref`) — เดิมทีละแถวทำให้ Lumos ยังโทรสายที่ยกเลิก (วัดจริง 7 สาย 6 ต.ค.) · ขั้น 2.5 คนใน AI→คนโทร เฉพาะแถวก่อน `REPLACE_TYPE_RULE_FROM` (เจ้าหน้าที่สลับคนในเป็น AI แล้วไม่ถูกสลับกลับ) · ขั้น 3.5 เติม `replace_type` ทุกรอบ |
+| `migrations/136_follow_replace_type.sql` (**ใหม่**) | `follow_entries.replace_type` |
+| `api/_handlers/follow.ts` · `src/lib/followApi.ts` | ส่ง `replace_type` · `source_ref` |
+| `src/lib/irecruitReplaceSync.ts` · `src/lib/followDayCall.ts` | `replaceSlotRoundOfRef` — แถวจาก iRecruit "สายที่" = 1 คอนเฟิร์ม · 2 ก่อน 1 ชม. · 3 ก่อน 15 นาที (ไม่มีเลขวัน) |
+| `src/lib/followReplacement.ts` · `FollowPage.tsx` | `replaceKindOf` · `countReplaceKinds` · ตัวกรอง "ประเภท" (ทั้งหมด/EX/คนใน/ไม่ระบุ) เฉพาะแท็บส่งคนแทน · กรองก่อนทุกอย่าง (`kindScopedItems`) |
+| `FollowPlanningCalendar.tsx` · `FollowDayReportDialog.tsx` · `FollowPage.tsx` · `ReasonManagerDialog.tsx` | เลิก `line-through` ⇒ สีจาง (`text-muted-foreground`) |
+| เทสต์ | irecruitReplaceSync (ยกเลิกทีเดียว · แผนละครั้ง · คนในที่สลับเองไม่ถูกสลับกลับ · เติมประเภท) · followPlanning · followDayCall · followReplacement |
+
+- ตรวจ Browser (ตัวดักเขียน): แท็บส่งคนแทน กล่อง "ตอบว่าไป" 4 = การ์ดผลของเดือน 4 (เดิม 0) · สรุปไม่ได้ 3 · ไม่มีขีดฆ่า · สายที่ 1/2/3 · ตัวกรองประเภทขึ้น (ค่าเติมหลัง deploy + รอบดึงถัดไป)

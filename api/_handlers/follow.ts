@@ -81,6 +81,8 @@ type FollowRow = {
   call_mode: string | null;
   /** ยังไม่กำหนดเวลาโทร (134) — เวลาใน scheduled_at เป็นค่าแทน */
   time_tbd?: boolean | null;
+  replace_type?: string | null;
+  source_ref?: string | null;
   /** หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (migration 096) — snapshot ตอนกรอก ไม่ใช่ FK */
   unit_name: string | null;
   site_code: string | null;
@@ -156,6 +158,10 @@ function toResponse(r: FollowRow) {
     call_mode: r.call_mode === 'manual' ? 'manual' : 'ai',
     /** ยังไม่กำหนดเวลา (134) — จอโชว์ "ยังไม่ระบุเวลา" แทนเวลา */
     time_tbd: r.time_tbd === true,
+    /** ประเภทใบส่งคนแทนจาก iRecruit (136) — EX = คนนอก · อื่น ๆ = คนใน · null = ไม่รู้ */
+    replace_type: r.replace_type?.trim() || null,
+    /** ที่มาของแถว (133) — หน้าจออ่านสายที่ 1/2/3 ของแถวจาก iRecruit จากตรงนี้ */
+    source_ref: r.source_ref ?? null,
     /** ทีมของรายการ (131) — แท็บ "ติดตามส่งคนแทน" อ่านช่องนี้ · ค่าอื่น/ไม่มี = ทีมติดตาม */
     follow_team: r.follow_team === FOLLOW_TEAM_REPLACEMENT ? FOLLOW_TEAM_REPLACEMENT : null,
     /**

@@ -13,6 +13,7 @@
  * ไฟล์นี้ pure — เทสต์ที่ `src/lib/followDayCall.test.ts`
  */
 import type { FollowEntry } from '@/lib/followApi';
+import { replaceSlotRoundOfRef } from '@/lib/irecruitReplaceSync';
 
 export type FollowDayCallPos = {
   /** วันที่เท่าไหร่ของชุด — null = ชุดวันเดียว / แถวเก่าไม่มีชุด */
@@ -21,7 +22,8 @@ export type FollowDayCallPos = {
   call: number | null;
 };
 
-type DayCallRow = Pick<FollowEntry, 'id' | 'group_id' | 'scheduled_at' | 'call_round' | 'cancelled'>;
+type DayCallRow = Pick<FollowEntry, 'id' | 'group_id' | 'scheduled_at' | 'call_round' | 'cancelled'> &
+  Partial<Pick<FollowEntry, 'source_ref'>>;
 
 /** 🔴 `Intl` ระดับโมดูลเท่านั้น */
 const BKK_YMD = new Intl.DateTimeFormat('en-CA', {
@@ -55,6 +57,15 @@ export function followDayCallPositions(entries: readonly DayCallRow[]): Map<stri
   const out = new Map<string, FollowDayCallPos>();
   const sets = new Map<string, DayCallRow[]>();
   for (const e of entries) {
+    /**
+     * 🔴 แถวส่งคนแทนจาก iRecruit = "สายที่ 1/2/3" ตาม Journey ไม่ใช่ลำดับในวัน (เจ้าของ 6 ต.ค. 2569)
+     * เดิมคอนเฟิร์ม 16:00 ขึ้น "วันที่ 1 สายที่ 1" · ก่อน 1 ชม. ขึ้น "วันที่ 2 สายที่ 1" ⇒ สายที่ 2 ของ Journey ไปอยู่กองสายที่ 1
+     */
+    const slot = replaceSlotRoundOfRef(e.source_ref);
+    if (slot != null) {
+      out.set(e.id, { day: null, call: slot });
+      continue;
+    }
     if (!e.group_id) {
       out.set(e.id, { day: null, call: e.call_round ?? null });
       continue;

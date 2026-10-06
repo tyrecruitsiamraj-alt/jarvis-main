@@ -73,7 +73,16 @@ const ms = (iso: string | null | undefined): number | null => {
  * (ยกเลิก > ปิดงาน > มีผล > เลยเวลา > ส่งแล้ว > ยังไม่ถึงเวลา)
  */
 export function followRoundState(entry: FollowEntry, now: Date = new Date()): FollowRoundState {
-  if (entry.cancelled) return 'cancelled';
+  if (entry.cancelled) {
+    /**
+     * 🔴 **โทรไปแล้วจริงและมีผล = นับตามผล แม้ถูกยกเลิกทีหลัง** (กติกากลางทั้งระบบ · เจ้าของ 6 ต.ค. 2569
+     * *"ถ้าตัวเลขเพี้ยน ตอบไม่ตรงกันทั้งระบบอยู่แบบนี้ก็ตายพอดี"*) — เคสจริง: สายส่งคนแทนถูกยกเลิก 5 ต.ค.
+     * แต่ Lumos โทรเช้า 6 ต.ค. 4 คนบอกว่าไป ⇒ การ์ดผลของเดือนนับ 4 แต่กล่องขั้นตอนนับเป็นยกเลิก 0
+     * ผลรหัส `cancelled` ของ Lumos เองไม่ใช่การคุย ⇒ ยังเป็นยกเลิก
+     */
+    const code = effectiveCallOutcome(entry);
+    return code && code !== 'cancelled' ? 'result' : 'cancelled';
+  }
   if (entry.completed_at) return 'closed';
   /**
    * ผลจาก AI **หรือ** ผลที่คนลงเองของรอบคนโทร (130 · 30 ก.ย. 2569) — ลงผลแล้วช่องต้องเปลี่ยนทันที

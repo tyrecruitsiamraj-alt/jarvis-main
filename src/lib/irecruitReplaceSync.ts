@@ -195,6 +195,16 @@ export const REPLACE_SCHEDULE_TEXT = 'คอนเฟิร์ม 16:00 วั�
 export type ReplaceSlotPlan = { slot: ReplaceSlot; round: 1 | 2 | 3; at: Date; asap: boolean };
 
 /**
+ * สายที่ 1/2/3 ตาม Journey ของแถวที่ดึงจาก iRecruit — อ่านจาก `source_ref` (`irecruit-replace:<ใบ>:<ช่อง>:<คน>`)
+ * null = ไม่ใช่แถวจาก iRecruit รุ่น 3 สาย (คีย์เอง / รุ่นเก่าหนึ่งใบหนึ่งสาย)
+ * (เจ้าของ 6 ต.ค. 2569: Journey สาย 1 คอนเฟิร์ม 16:00 · สาย 2 ก่อน 1 ชม. · สาย 3 ก่อน 15 นาที)
+ */
+export function replaceSlotRoundOfRef(ref: string | null | undefined): 1 | 2 | 3 | null {
+  const m = /^irecruit-replace:[^:]+:(confirm|lead60|lead15)(?::|$)/.exec(ref ?? '');
+  return m ? REPLACE_SLOT_ROUND[m[1] as ReplaceSlot] : null;
+}
+
+/**
  * สายที่ใบงานนี้ต้องมี ณ ตอนนี้ — เฉพาะสายที่ยังไม่ถึงเวลา (เลยแล้ว = ไม่สร้าง)
  * - คอนเฟิร์ม 16:00 วันก่อนเข้างาน · เลย 16:00 แล้ว (เพิ่มใบทีหลัง) = โทรตามคิว (อีก `REPLACE_ASAP_MINUTES` นาที)
  *   แต่ถ้าคิวนั้นช้ากว่าสายก่อนเข้างานที่ยังมาไม่ถึง = ไม่ต้องคอนเฟิร์มแยก (สายก่อนเข้างานโทรอยู่แล้ว)

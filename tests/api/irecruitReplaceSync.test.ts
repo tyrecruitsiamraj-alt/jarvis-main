@@ -35,13 +35,13 @@ vi.mock('../../api/_lib/lumosDispatch.js', () => ({
 vi.mock('../../api/_lib/lumosPushClient.js', () => ({ getLumosPushConfig: () => pushConfig }));
 vi.mock('../../api/_lib/followStaffName.js', () => ({ staffNameOfPhone: async () => null }));
 
-import { enforceReplaceAiFrom, MIGRATION_133_NOT_READY, runIrecruitReplaceSync } from '../../api/_lib/irecruitReplaceSync.js';
+import { cancelFlaggedFollowRowsAtLumos, enforceReplaceAiFrom, MIGRATION_133_NOT_READY, runIrecruitReplaceSync } from '../../api/_lib/irecruitReplaceSync.js';
 import { REPLACE_FOLLOW_TOPIC } from '../../src/lib/irecruitReplaceSync.js';
 import { createHash } from 'node:crypto';
 
 type Call = { sql: string; params: unknown[] };
 let calls: Call[] = [];
-type Existing = { id: string; source_ref: string; scheduled_at: string; mode: string; group_id: string | null; recipient_phone: string | null; pending: boolean };
+type Existing = { id: string; source_ref: string; scheduled_at: string; mode: string; group_id: string | null; recipient_phone: string | null; pending: boolean; before_type_rule?: boolean };
 let existingRows: Existing[] = [];
 let settingsRows: unknown[] = [];
 let settingsError: unknown = null;
@@ -59,7 +59,12 @@ function fakeDb(sql: string, params: unknown[] = []) {
     if (existingError) throw existingError;
     return { rows: existingRows };
   }
-  if (/set cancelled_at = now\(\)/.test(sql)) return { rows: [{ id: params[0] }] };
+  // ยกเลิกทีเดียวทั้งรอบ (6 ต.ค. 2569) — params[0] = รายการ id
+  if (/set cancelled_at = now\(\)/.test(sql)) return { rows: (params[0] as string[]).map((id) => ({ id })) };
+  // หาแผนที่ Lumos ของแถวที่ยกเลิก — ในเทสต์ไม่มีแผน ⇒ ยกเลิกทีละแถวด้วย cancelFollowReminder
+  if (/select person_ref, plan_ref from/.test(sql)) return { rows: [] };
+  // ขั้น 3.5 เก็บประเภทจาก iRecruit (136)
+  if (/set replace_type = d\.t/.test(sql)) return { rows: [] };
   if (/update .*follow_entries set scheduled_at/.test(sql)) return { rows: [] };
   if (/insert into .*follow_entries/.test(sql)) {
     const ref = String(params[12]);
@@ -239,7 +244,8 @@ describe('🔴 ใครโทรตามประเภทคนไปแท�
 
   it('สาย AI เดิมของคนใน = เปลี่ยนเป็นคนโทร + ถอนแผนที่ Lumos (ไม่ทำกลับทาง)', async () => {
     existingRows = [
-      { id: 'x1', source_ref: `irecruit-replace:I:lead60:${pk(P1)}`, scheduled_at: '2026-10-05T23:30:00Z', mode: 'ai', group_id: 'g', recipient_phone: P1, pending: true },
+      // แถวที่สร้างก่อนกติกา EX/คนใน (before_type_rule) — แถวใหม่ที่เป็น AI = เจ้าหน้าที่สลับเอง ห้ามสลับกลับ (6 ต.ค. 2569)
+      { id: 'x1', source_ref: `irecruit-replace:I:lead60:${pk(P1)}`, scheduled_at: '2026-10-05T23:30:00Z', mode: 'ai', group_id: 'g', recipient_phone: P1, pending: true, before_type_rule: true },
     ];
     irecruitSqlQuery.mockResolvedValue([row('I', { replace_type: 'IN' })]);
     dbQuery.mockImplementation(async (sql: string, params?: unknown[]) => {
@@ -253,6 +259,28 @@ describe('🔴 ใครโทรตามประเภทคนไปแท�
     expect(cancelFollow).toHaveBeenCalledWith('x1', expect.any(Function));
     expect(calls.some((c) => /set call_mode = 'manual'/.test(c.sql) && c.params[0] === 'x1')).toBe(true);
     expect(s.toManual).toBe(1);
+  });
+});
+
+describe('เจ้าหน้าที่สลับคนในเป็น AI เอง = รอบดึงไม่สลับกลับ (6 ต.ค. 2569)', () => {
+  it('แถวที่สร้างหลังกติกา (before_type_rule = false) เป็น AI = ไม่แตะ', async () => {
+    existingRows = [
+      { id: 'x2', source_ref: `irecruit-replace:I:lead60:${pk(P1)}`, scheduled_at: '2026-10-05T23:30:00Z', mode: 'ai', group_id: 'g', recipient_phone: P1, pending: true, before_type_rule: false },
+    ];
+    irecruitSqlQuery.mockResolvedValue([row('I', { replace_type: 'IN' })]);
+    const s = await runIrecruitReplaceSync({ now: NOW });
+    expect(cancelFollow).not.toHaveBeenCalledWith('x2', expect.any(Function));
+    expect(calls.some((c) => /set call_mode = 'manual'/.test(c.sql))).toBe(false);
+    expect(s.toManual ?? 0).toBe(0);
+  });
+
+  it('ทุกรอบเติมประเภทจาก iRecruit ลงแถว (EX / คนใน) ตาม source_ref', async () => {
+    existingRows = [];
+    irecruitSqlQuery.mockResolvedValue([row('E', { replace_type: 'EX' })]);
+    await runIrecruitReplaceSync({ now: NOW });
+    const upd = calls.find((c) => /set replace_type = d\.t/.test(c.sql));
+    expect(upd).toBeTruthy();
+    expect((upd?.params[1] as string[]).every((t) => t === 'EX')).toBe(true);
   });
 });
 
@@ -285,8 +313,10 @@ describe('runIrecruitReplaceSync — แก้บน iRecruit แล้ว So Re
     ];
     irecruitSqlQuery.mockResolvedValue([row('A', { mobile: '0877777777' })]);
     const s = await runIrecruitReplaceSync({ now: NOW });
-    const cancelledIds = calls.filter((c) => /set cancelled_at/.test(c.sql)).map((c) => c.params[0]);
+    const cancelledIds = calls.filter((c) => /set cancelled_at/.test(c.sql)).flatMap((c) => c.params[0] as string[]);
     expect(cancelledIds).toEqual(['a1', 'y1']);
+    // 🔴 ติดธงทั้งรอบในคำสั่งเดียว (ไม่ใช่ทีละแถว) — แผนใหม่ที่ส่งไป Lumos จะได้ไม่ดึงพี่น้องที่กำลังจะยกเลิกกลับเข้าไป
+    expect(calls.filter((c) => /set cancelled_at/.test(c.sql))).toHaveLength(1);
     expect(cancelFollow).toHaveBeenCalledWith('a1', expect.any(Function)); // AI = ถอนแผนที่ Lumos ด้วย
     expect(cancelFollow).not.toHaveBeenCalledWith('y1', expect.any(Function)); // คนโทร = ไม่มีแผน
     expect(inserts().map(insRef).every((r) => r.endsWith(pk('+66877777777')))).toBe(true);
@@ -301,7 +331,7 @@ describe('runIrecruitReplaceSync — แก้บน iRecruit แล้ว So Re
     ];
     irecruitSqlQuery.mockResolvedValue([row('A'), row('B', { want_date: wall('2026-10-07T05:00:00Z') })]);
     const s = await runIrecruitReplaceSync({ now: NOW });
-    expect(calls.filter((c) => /set cancelled_at/.test(c.sql)).map((c) => c.params[0])).toEqual(['old']);
+    expect(calls.filter((c) => /set cancelled_at/.test(c.sql)).flatMap((c) => c.params[0] as string[])).toEqual(['old']);
     expect(inserts().map((c) => insRef(c).split(':')[1])).toEqual(['A', 'A', 'A']);
     expect(s).toMatchObject({ cancelled: 1, added: 3 });
   });
@@ -351,3 +381,42 @@ describe('🔴 AI เริ่มโทรตั้งแต่ — enforceRepla
   });
 });
 
+
+describe('🔴 ยกเลิกแล้วต้องถึง Lumos — ทีละแผน แผนละครั้ง (6 ต.ค. 2569: สายที่ยกเลิก 5 ต.ค. ถูกโทรเช้า 6 ต.ค.)', () => {
+  it('แผนที่ทุกสายถูกยกเลิก = ลบที่ Lumos ด้วยรหัสหัวขบวนครั้งเดียว · ไม่ส่งแผนใหม่ทีละแถว', async () => {
+    cancelFollow.mockClear();
+    cancelPushed.mockClear();
+    dbQuery.mockImplementation(async (sql: string) => {
+      if (/select person_ref, plan_ref from/.test(sql)) {
+        return { rows: [{ person_ref: 'follow-l60', plan_ref: 'follow-l60' }, { person_ref: 'follow-l15', plan_ref: 'follow-l60' }] };
+      }
+      return { rows: [] };
+    });
+    const out = await cancelFlaggedFollowRowsAtLumos(['l60', 'l15'], async () => null);
+    expect(cancelPushed).toHaveBeenCalledTimes(1);
+    expect(cancelPushed).toHaveBeenCalledWith('follow-l60');
+    expect(cancelFollow).not.toHaveBeenCalled();
+    expect(out).toMatchObject({ plansCancelled: 1, plansResent: 0, errors: 0 });
+  });
+
+  it('แผนที่ยังมีสายอื่นเหลือ = ส่งแผนใหม่ครั้งเดียว (ไม่ใช่ทีละแถว)', async () => {
+    cancelFollow.mockClear();
+    cancelPushed.mockClear();
+    dbQuery.mockImplementation(async (sql: string) => {
+      if (/select person_ref, plan_ref from/.test(sql)) {
+        return {
+          rows: [
+            { person_ref: 'follow-a', plan_ref: 'follow-a' },
+            { person_ref: 'follow-b', plan_ref: 'follow-a' },
+            { person_ref: 'follow-keep', plan_ref: 'follow-a' },
+          ],
+        };
+      }
+      return { rows: [] };
+    });
+    const out = await cancelFlaggedFollowRowsAtLumos(['a', 'b'], async () => null);
+    expect(cancelFollow).toHaveBeenCalledTimes(1);
+    expect(cancelPushed).not.toHaveBeenCalled();
+    expect(out).toMatchObject({ plansCancelled: 0, plansResent: 1 });
+  });
+});

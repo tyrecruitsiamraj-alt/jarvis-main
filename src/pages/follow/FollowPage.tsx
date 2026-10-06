@@ -61,7 +61,7 @@ import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
 import { buildBoardUnitOptions, mergeBoardUnitOptions, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
 import { followGroupKey, followPersonKey, groupFollowEntries } from '@/lib/followGrouping';
-import { followScopeEntries, followTeamForScope } from '@/lib/followReplacement';
+import { countReplaceKinds, REPLACE_KIND_FILTERS, REPLACE_KIND_LABEL, replaceKindOf, type ReplaceKindFilter, followScopeEntries, followTeamForScope } from '@/lib/followReplacement';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { followMatrixColOfCategory, type FollowMatrixCol } from '@/lib/followCallMatrix';
 import {
@@ -1235,10 +1235,16 @@ const FollowPage: React.FC = () => {
    */
   const [followSearch, setFollowSearch] = useState('');
   const [planDay, setPlanDay] = useState<string>('all');
+  /** EX / คนใน — แท็บส่งคนแทนเท่านั้น (เจ้าของสั่ง 6 ต.ค. 2569) · กรองก่อนทุกอย่างเหมือนค้นหา ⇒ แผง/ตาราง/การ์ดเลขชุดเดียวกัน */
+  const [replaceKind, setReplaceKind] = useState<ReplaceKindFilter>('all');
+  const kindScopedItems = useMemo(
+    () => (followView === 'replace' && replaceKind !== 'all' ? scopeItems.filter((e) => replaceKindOf(e) === replaceKind) : scopeItems),
+    [scopeItems, followView, replaceKind],
+  );
   useHeaderSearch({ value: followSearch, onChange: setFollowSearch, placeholder: 'ค้นหาชื่อ หน่วยงาน เบอร์' });
   const searchedItems = useMemo(
-    () => (followSearch.trim() ? scopeItems.filter((e) => matchesFollowSearch(e, followSearch)) : scopeItems),
-    [scopeItems, followSearch],
+    () => (followSearch.trim() ? kindScopedItems.filter((e) => matchesFollowSearch(e, followSearch)) : kindScopedItems),
+    [kindScopedItems, followSearch],
   );
   const planScopedItems = useMemo(
     () => (planDay === 'all' ? searchedItems : searchedItems.filter((e) => followPlanDayOf(e) === Number(planDay))),
@@ -1269,6 +1275,11 @@ const FollowPage: React.FC = () => {
     [panelRange, panelDay, calMonth],
   );
   const panelScope = useMemo(() => planScopedItems.filter(inPanelRange), [planScopedItems, inPanelRange]);
+  /** เลขบนตัวกรอง EX/คนใน — ช่วงที่ปฏิทินดูอยู่ · นับเฉพาะสายที่มีเลขสาย (นิยามเดียวกับแผงขั้นตอน) */
+  const replaceKindCounts = useMemo(
+    () => countReplaceKinds(scopeItems.filter((e) => inPanelRange(e) && followRoundSlot(e) !== null)),
+    [scopeItems, inPanelRange],
+  );
   /** ตัวเลือก "วันที่ของแผน" นับในช่วงที่ดู (หลังค้นหา ก่อนเลือกวันที่ของแผน) */
   const planDayOptions = useMemo(
     () => followPlanDayOptions(searchedItems.filter((e) => inPanelRange(e) && followRoundSlot(e) !== null)),
@@ -1373,10 +1384,10 @@ const FollowPage: React.FC = () => {
     () =>
       buildFollowPlanningRows(
         groupFollowEntries(
-          filterFollowEntries(scopeItems, { date: '', band: '', caller, owner: adderKey }),
+          filterFollowEntries(kindScopedItems, { date: '', band: '', caller, owner: adderKey }),
         ),
       ),
-    [scopeItems, caller, adderKey],
+    [kindScopedItems, caller, adderKey],
   );
 
   /**
@@ -1709,6 +1720,22 @@ const FollowPage: React.FC = () => {
                   active={planDay !== 'all'}
                 />
                 </span>
+                {/* EX / คนใน — แท็บส่งคนแทนเท่านั้น (เจ้าของสั่ง 6 ต.ค. 2569) */}
+                {followView === 'replace' ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground">ประเภท</span>
+                    <ChoiceDropdown
+                      value={replaceKind}
+                      options={REPLACE_KIND_FILTERS.map((k) => ({
+                        value: k,
+                        label: `${REPLACE_KIND_LABEL[k]} · ${replaceKindCounts[k].toLocaleString('th-TH')}`,
+                      }))}
+                      onChange={(v) => setReplaceKind(v as ReplaceKindFilter)}
+                      ariaLabel="ประเภท EX หรือคนใน"
+                      active={replaceKind !== 'all'}
+                    />
+                  </span>
+                ) : null}
               </>
             </FollowFilterGroup>
           }
@@ -2260,7 +2287,7 @@ const FollowPage: React.FC = () => {
                               <span
                                 className={cn(
                                   'flex-1 text-xs font-medium',
-                                  mode === 'off' ? 'text-muted-foreground line-through' : 'text-foreground',
+                                  mode === 'off' ? 'text-muted-foreground' : 'text-foreground',
                                 )}
                               >
                                 {dayLabel(d)}
@@ -2795,7 +2822,7 @@ const FollowPage: React.FC = () => {
         open={reportOpen}
         onClose={() => setReportOpen(false)}
         ymd={fDate || toYmdBangkok(new Date())}
-        entries={scopeItems}
+        entries={kindScopedItems}
       />
 
       {/* ตัวเลือกชื่อ/หน่วยงานจากบอร์ดฝังอยู่ในป๊อปเพิ่มคนแล้ว (QA 5 ต.ค. 2569 — เลิกเปิดป๊อปซ้อน) */}

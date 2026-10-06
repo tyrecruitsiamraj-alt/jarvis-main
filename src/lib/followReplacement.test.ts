@@ -67,8 +67,10 @@ describe('หน้าการติดตาม: สองแท็บเห�
 
   it('🔴 จออ่านจากชุดของแท็บ · ตัวกันนัดซ้ำเทียบทั้งก้อน · สร้างทุกทางส่งทีมของแท็บ · รอบเพิ่มทีหลังตามทีมเดิม', () => {
     expect(page).toContain("followScopeEntries(items, replaceView ? 'replacement' : 'main')");
-    expect(page).toContain('filterFollowEntries(scopeItems,');
-    expect(page).toContain('entries={scopeItems}');
+    // 6 ต.ค. 2569: ตัวกรอง EX/คนใน กรองต่อจากชุดของแท็บ (`kindScopedItems`) — ทั้งแท็บเดิมยังเท่าเดิมเพราะไม่กรองเมื่อไม่ใช่แท็บส่งคนแทน
+    expect(page).toContain('filterFollowEntries(kindScopedItems,');
+    expect(page).toContain('entries={kindScopedItems}');
+    expect(page).toContain("followView === 'replace' && replaceKind !== 'all' ? scopeItems.filter((e) => replaceKindOf(e) === replaceKind) : scopeItems");
     // ตัวกันนัดซ้ำทั้งสองโหมดเทียบกับ `items` ทั้งก้อน (ทุกทีม) — โหมดตารางเทียบทุกสาย ไม่ใช่แค่สายแรกของวัน
     expect(page).toMatch(/findScheduleDuplicates\(\s*phone,\s*calls\.map\(\(c\) => c\.scheduledAt\),\s*items,?\s*\)/);
     expect(page).toContain('findScheduleDuplicates(phone, isoTimes, items)');

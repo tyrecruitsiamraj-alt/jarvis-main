@@ -48,8 +48,11 @@ function entry(over: Partial<FollowEntry> = {}): FollowEntry {
 }
 
 describe('followRoundState — สภาพของรอบต้องต่อสองที่ (เวลานัด + คิวโทร)', () => {
-  it('ยกเลิกชนะทุกอย่าง', () => {
-    expect(followRoundState(entry({ cancelled: true, call_outcome: 'answered' }), NOW)).toBe('cancelled');
+  it('ยกเลิกชนะทุกอย่าง — ยกเว้นโทรไปแล้วมีผลจริง (6 ต.ค. 2569: นับตามผลทั้งระบบ)', () => {
+    expect(followRoundState(entry({ cancelled: true }), NOW)).toBe('cancelled');
+    expect(followRoundState(entry({ cancelled: true, call_outcome: 'cancelled' }), NOW)).toBe('cancelled');
+    // ยกเลิกแล้วแต่ Lumos ยังโทรและได้ผล = นับตามผล (กล่องขั้นตอน = การ์ดผลของเดือน)
+    expect(followRoundState(entry({ cancelled: true, call_outcome: 'confirmed' }), NOW)).toBe('result');
   });
 
   it('ปิดงานแล้วชนะผลการโทร', () => {

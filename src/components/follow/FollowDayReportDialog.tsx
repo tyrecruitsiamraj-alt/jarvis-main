@@ -190,7 +190,7 @@ export default function FollowDayReportDialog({
             <TableBody>
               {pageRows.length > 0 ? (
                 pageRows.map((r) => (
-                  <TableRow key={r.id} className={cn(r.cancelled && 'text-muted-foreground line-through')}>
+                  <TableRow key={r.id} className={cn(r.cancelled && 'text-muted-foreground')}>
                     <TableCell className="whitespace-nowrap tabular-nums">{r.time}</TableCell>
                     <TableCell className="whitespace-nowrap">{r.name}</TableCell>
                     <TableCell className="whitespace-nowrap tabular-nums">{r.phone}</TableCell>
