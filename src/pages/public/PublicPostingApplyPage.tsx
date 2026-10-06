@@ -4,6 +4,9 @@ import { Loader2 } from 'lucide-react';
 import { fetchPublicPostingByCode, type PublicPostingInfo } from '@/lib/recruitPostingsApi';
 import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
 import PublicPostingPreview from '@/components/jobs/PublicPostingPreview';
+import PublicJobCardPreview from '@/components/jobs/PublicJobCardPreview';
+import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
+import { boardCardPlace } from '@/lib/boardCardFacts';
 
 /**
  * หน้าเปิดจากลิงก์ที่เจ้าหน้าที่สร้าง — /apply/p/<code>
@@ -61,11 +64,25 @@ const PublicPostingApplyPage: React.FC = () => {
   }
 
   const closed = info.status === 'closed';
+  /**
+   * มีใบงาน = การ์ดแบบหน้า /apply (เจ้าของ 6 ต.ค. 2569 "มันต้องเห็นแบบหน้า apply สิ่") — ข้อมูลชุดเดียวกับหน้ารวม
+   * ไม่มี (ประกาศลอย/ใบไม่ผ่านด่าน/ปิดรับแล้ว) = การ์ดประกาศเดิม
+   */
+  const job = !closed && info.job ? enrichJobsWithUrgency([info.job])[0] ?? null : null;
 
   return (
     // หน้าที่คนนอกเห็น = หน้าตาแบรนด์ที่หรูสุดในระบบ (mockup rev.3 ข้อ 10)
-    // การ์ดเดี่ยวกลางจอ · ป้ายทองบรรทัดบน · ปุ่มหมึกเต็มความกว้าง · ปิดท้ายด้วยคำสัญญาว่าจะติดต่อกลับ
-    <div className="mx-auto w-full max-w-md px-4 py-10 sm:py-14">
+    <div className={job ? 'mx-auto w-full max-w-xl px-4 py-8 sm:py-12' : 'mx-auto w-full max-w-md px-4 py-10 sm:py-14'}>
+      {job ? (
+        <PublicJobCardPreview
+          job={job}
+          onApply={() => setApplyOpen(true)}
+          // ใบขอไม่มีที่อยู่ = ใช้สถานที่ที่เจ้าหน้าที่พิมพ์ตอน Gen link (ห้ามขึ้น "ยังไม่ระบุสถานที่" ทั้งที่พิมพ์ไว้แล้ว)
+          placeText={boardCardPlace(job) === 'ยังไม่ระบุสถานที่' ? info.locationText : null}
+          note={info.detail}
+          className="p-5 sm:p-6"
+        />
+      ) : (
       <PublicPostingPreview
         data={info}
         footer={
@@ -89,11 +106,12 @@ const PublicPostingApplyPage: React.FC = () => {
           )
         }
       />
+      )}
 
       <PublicApplyDialog
         open={applyOpen}
         onClose={() => setApplyOpen(false)}
-        job={null}
+        job={job}
         posting={{
           postingId: info.postingId,
           linkId: info.linkId,

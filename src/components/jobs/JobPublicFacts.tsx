@@ -27,10 +27,13 @@ export default function JobPublicFacts({
   job,
   staff = false,
   className,
+  placeText,
 }: {
   job: JobRequest;
   staff?: boolean;
   className?: string;
+  /** สถานที่ที่เจ้าหน้าที่พิมพ์ตอน Gen link — หน้าลิงก์ส่งมาเมื่อใบขอไม่มีที่อยู่ (6 ต.ค. 2569) */
+  placeText?: string | null;
 }) {
   const incomeShown = publicFieldVisible(job, 'income');
   const income = incomeShown ? jobBaseIncome(job) : null;
@@ -55,7 +58,7 @@ export default function JobPublicFacts({
     <div className={cn('space-y-1', className)} data-testid="job-public-facts">
       <p className={row}>
         <MapPin className={icon} aria-hidden />
-        <span className="line-clamp-2">{boardCardPlace(job)}</span>
+        <span className="line-clamp-2">{placeText?.trim() || boardCardPlace(job)}</span>
       </p>
       <p className={row}>
         <Clock className={icon} aria-hidden />

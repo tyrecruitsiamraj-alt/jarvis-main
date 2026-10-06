@@ -356,6 +356,37 @@ async function getPublicSiamrajJob(id: string): Promise<PublicJob | null> {
   return toPublicJob(visible[0] as unknown as JobRow);
 }
 
+/**
+ * ใบงานของลิงก์ที่เจ้าหน้าที่ Gen ให้ (`/apply/p/<code>` · 6 ต.ค. 2569)
+ * เจ้าของ: *"ตอน Gen link คนกด link เห็น [การ์ดเล็ก] แต่มันต้องเห็นแบบหน้า apply สิ่"*
+ * ⇒ หน้าลิงก์ต้องได้ข้อมูลงานชุดเดียวกับการ์ดหน้า /apply (`toPublicJob` + `withBenefits` ตัวเดียวกัน)
+ *
+ * ด่านที่ยังใช้: ใบล่วงหน้า · ใบยังเปิดอยู่ใน ERP
+ * ด่านที่**ไม่ใช้**กับหน้าลิงก์ (ลิงก์มีสถานะเปิด/ปิดรับของตัวเอง — เจ้าหน้าที่ Gen ให้คนนอกเองแล้ว):
+ *   · ปล่อยขึ้นหน้ารวม — ยังไม่ปล่อยก็ยังไม่โผล่ใน /apply เหมือนเดิม
+ *   · ได้คนแล้ว (รอเริ่มงาน/รอแจ้งเข้า) — วัดจริง 6 ต.ค.: ใบ Fashionisland "รอแจ้งเข้า" แต่ทีมเพิ่ง Gen link หาคนเพิ่ม
+ *     ⇒ ถ้าใช้ด่านนี้ หน้าลิงก์ตกไปการ์ดเล็กทั้งที่ลิงก์ยังรับสมัครอยู่
+ * ไม่ผ่านด่าน = null ⇒ หน้าลิงก์ใช้การ์ดประกาศเดิม (`PublicPostingPreview`)
+ */
+export async function getLinkedPublicJob(id: string): Promise<PublicJobOut | null> {
+  if (!id) return null;
+  if (isSiamrajUnitRequestsEnabled()) {
+    if (!isPublicVisibleByPrequest({ id }, prequestPublicEnabled())) return null;
+    const item = await getSiamrajUnitRequestById(id);
+    if (!item || !isPublicVisible(item)) return null;
+    // ค่าที่เจ้าหน้าที่แก้เอง (สถานที่ · รายได้ · สวัสดิการ) ต้องทับเหมือนการ์ดหน้ารวม
+    const [withEdits] = await withStaffOverrides([item as unknown as Record<string, unknown>]);
+    return (await withBenefits([toPublicJob(withEdits as unknown as JobRow)]))[0] ?? null;
+  }
+  const { rows } = await dbQuery<JobRow>(
+    `select * from jarvis_rm.jobs where id = $1 and status in ('open', 'in_progress') limit 1`,
+    [id],
+  );
+  if (rows.length === 0) return null;
+  const { manual_income: _drop, ...out } = toPublicJob(rows[0]);
+  return out;
+}
+
 export default async function handler(req: ApiReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   if (method !== 'GET') return sendError(res, 405, 'Method not allowed');

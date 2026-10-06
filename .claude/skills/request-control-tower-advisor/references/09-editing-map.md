@@ -12226,3 +12226,17 @@ Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แ�
 | `src/pages/follow/FollowPage.tsx` | ส่ง `resultEntries={panelEntries}` (ชุดเดียวกับกล่อง) |
 
 - ตรวจ Browser: เริ่มงาน วันที่ 6 การ์ด 202 = กล่อง 202 (177/3/1/5/6/10 · AI 168 คน 34) · รายเดือน 1,119 = 1,119 · ส่งคนแทน 307 = 307
+
+### หน้าเปิดจาก Gen link = การ์ดแบบหน้า /apply (6 ต.ค. 2569 · เจ้าของ "มันต้องเห็นแบบหน้า apply สิ่")
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `api/_handlers/public/jobs.ts` | `getLinkedPublicJob(id)` (export ใหม่) — ใบงานรูปเดียวกับการ์ด /apply (`toPublicJob` + `withStaffOverrides` + `withBenefits`) · ด่านที่ใช้: ใบล่วงหน้า · ใบเปิดใน ERP · **ไม่ใช้** ด่านปล่อยขึ้นหน้ารวม + ได้คนแล้ว (ลิงก์มีเปิด/ปิดรับของตัวเอง — ใบ Fashionisland "รอแจ้งเข้า" แต่ทีม Gen link หาคนเพิ่ม) · หน้ารวม `getPublicSiamrajJob` ไม่แตะ |
+| `api/_handlers/public/apply-link.ts` | คืน `job` (null = ไม่ผ่านด่าน/โหลดล้ม · ห้ามทำลิงก์ล่ม) |
+| `src/lib/recruitPostingsApi.ts` | `PublicPostingInfo.job` |
+| `src/pages/public/PublicPostingApplyPage.tsx` | มีใบงาน = `PublicJobCardPreview` + ปุ่มสมัครจริง · ฟอร์มได้ `job` + บริบทประกาศ · ใบขอไม่มีที่อยู่ = ใช้สถานที่ที่พิมพ์ตอน Gen link · ไม่มีใบงาน = การ์ดประกาศเดิม |
+| `src/components/jobs/PublicJobCardPreview.tsx` | prop `onApply` (ปุ่มสมัครจริง) · `placeText` · `note` |
+| `src/components/jobs/JobPublicFacts.tsx` | prop `placeText` |
+
+- ⚠️ เปิด `/apply/p/<code>` = นับ `hit_count` +1 ในฐานจริง — ตรวจด้วยการป้อนข้อมูลเองในเบราว์เซอร์ (ดัก fetch) ห้ามเปิดลิงก์จริงซ้ำ ๆ
+- ตรวจ Browser: ลิงก์ Fashionisland ขึ้นการ์ดแบบ /apply (สถานที่ · เวลา · เงินเดือน · สวัสดิการ · เพศ/อายุ · วันที่ต้องการ · สมัครงาน) · ฟอร์มขึ้น "สมัคร: Fashionisland" · จอ 375 ไม่เลื่อนข้าง

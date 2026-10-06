@@ -1,5 +1,6 @@
 import { apiFetch, HttpError } from '@/lib/apiFetch';
 import { readErrorMessage, readJsonSafe } from '@/lib/api';
+import type { JobRequest } from '@/types';
 import type {
   RecruitChannel,
   RecruitChannelMatch,
@@ -226,6 +227,8 @@ export type PublicPostingInfo = {
   contactPhone: string | null;
   status: 'open' | 'closed';
   channelLabel: string | null;
+  /** ใบงานรูปเดียวกับการ์ดหน้า /apply (6 ต.ค. 2569) · null = ใบไม่ผ่านด่าน/ไม่มีใบ ⇒ ใช้การ์ดประกาศ */
+  job?: JobRequest | null;
 };
 
 /** เปิดลิงก์สาธารณะ — ไม่ต้องล็อกอิน */

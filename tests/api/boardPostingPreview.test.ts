@@ -40,3 +40,41 @@ describe('GenApplyLinkDialog — ตัวอย่างก่อนสร้�
     expect(GEN).toContain('data={{ title, detail, locationText, salaryText, contactName, contactPhone }}');
   });
 });
+
+/**
+ * 🔴 หน้าเปิดจาก Gen link = การ์ดแบบหน้า /apply (เจ้าของ 6 ต.ค. 2569: *"มันต้องเห็นแบบหน้า apply สิ่"*)
+ * ข้อมูลงานชุดเดียวกับหน้ารวม · การ์ดประกาศเดิมเป็นทางถอยเมื่อไม่มีใบงาน
+ */
+describe('หน้าลิงก์ /apply/p = การ์ดเดียวกับหน้า /apply', () => {
+  const JOBS = read('api/_handlers/public/jobs.ts');
+  const LINK = read('api/_handlers/public/apply-link.ts');
+  const linked = JOBS.slice(JOBS.indexOf('export async function getLinkedPublicJob'), JOBS.indexOf('export default async function handler'));
+
+  it('หน้าใช้ PublicJobCardPreview ตัวเดียวกับตัวอย่างในป๊อปประกาศ + ปุ่มสมัครจริง · ส่งใบงานเข้าฟอร์ม', () => {
+    expect(PAGE).toContain('<PublicJobCardPreview');
+    expect(PAGE).toContain('onApply={() => setApplyOpen(true)}');
+    expect(PAGE).toContain('job={job}');
+    // ไม่มีใบงาน = การ์ดประกาศเดิม
+    expect(PAGE).toContain('<PublicPostingPreview');
+  });
+
+  it('เส้นลิงก์คืนใบงานจาก getLinkedPublicJob · โหลดล้ม = null ไม่ทำลิงก์ล่ม', () => {
+    expect(LINK).toContain('getLinkedPublicJob(posting.jobId)');
+    expect(LINK).toMatch(/catch \(e\)[\s\S]*logWarn/);
+  });
+
+  it('ใบงานของลิงก์: ยังมีด่านใบล่วงหน้า + ใบยังเปิด + ทับค่าที่แก้เอง · ไม่ใช้ด่านปล่อยขึ้นหน้ารวม/ได้คนแล้ว', () => {
+    expect(linked).toContain('isPublicVisibleByPrequest');
+    expect(linked).toContain('isPublicVisible(item)');
+    expect(linked).toContain('withStaffOverrides');
+    expect(linked).toContain('withBenefits');
+    expect(linked).not.toContain('onlyReleasedJobs(');
+    expect(linked).not.toContain('withoutFilledJobs(');
+  });
+
+  it('หน้ารวม /apply ยังมีด่านปล่อย + ได้คนแล้วครบ (ไม่ถูกแตะ)', () => {
+    const single = JOBS.slice(JOBS.indexOf('async function getPublicSiamrajJob'), JOBS.indexOf('/**\n * ใบงานของลิงก์'));
+    expect(single).toContain('onlyReleasedJobs(');
+    expect(single).toContain('withoutFilledJobs(');
+  });
+});
