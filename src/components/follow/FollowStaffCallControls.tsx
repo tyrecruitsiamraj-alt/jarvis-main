@@ -6,6 +6,7 @@ import type { FollowEntry } from '@/lib/followApi';
 import { FOLLOW_OUTCOME_LABEL, type FollowOutcome } from '@/lib/followOutcome';
 import {
   FOLLOW_STAFF_QUICK_RESULTS,
+  STAFF_FINISH_EXTRA,
   STAFF_FINISH_OUTCOME,
   followStaffCallText,
   type FollowStaffCallOutcome,
@@ -27,7 +28,7 @@ const WHEN = new Intl.DateTimeFormat('th-TH', {
  * > *"ลงผลโทร เสร็จก็ค่อยเลือกว่า เสร็จสิ้นเลยไหม"*
  *
  * ขั้น 1 = ไป / ไม่ไป / ขอเลื่อน / ติดต่อไม่ได้ (บันทึกเป็นผลโทรของสายนี้ · migration 130)
- * ขั้น 2 = ถ้าผลเป็น ไป / ไม่ไป / ขอเลื่อน ⇒ ถาม "จบเรื่องนี้เลยไหม" — จบ = ปิดงาน + หยุดสายที่เหลือทั้งชุด ·
+ * ขั้น 2 = ถ้าผลเป็น ไป / ไม่ไป / ขอเลื่อน ⇒ ถาม "จบเรื่องนี้เลยไหม" — จบ (· ลา · จำวันผิด) = ปิดงาน + หยุดสายที่เหลือทั้งชุด ·
  *          โทรต่อ = แผนเดินต่อ · ติดต่อไม่ได้ = ไม่ถาม โทรต่อเลย
  *
  * ตัวเดียวกันทั้งช่อง "เขาตอบว่าอะไร" ของตารางรายวัน (`compact`) และป๊อปจัดการ — ไม่ซ้อน Dialog ·
@@ -69,17 +70,22 @@ const FollowStaffCallControls: React.FC<{
     return (
       <span className={row} data-testid="staff-finish-ask">
         <span className="text-[11px] text-muted-foreground">จบเรื่องนี้เลยไหม</span>
-        <Button
-          type="button"
-          size="xs"
-          disabled={busy}
-          onClick={async () => {
-            await onFinish(finishWith);
-            setAskFinish(null);
-          }}
-        >
-          จบ · {FOLLOW_OUTCOME_LABEL[finishWith]}
-        </Button>
+        {/* ปุ่มจบหลักของผลนั้นมาก่อน แล้วตามด้วย ลา · จำวันผิด (6 ต.ค. 2569) */}
+        {[finishWith, ...STAFF_FINISH_EXTRA.filter((o) => o !== finishWith)].map((o, i) => (
+          <Button
+            key={o}
+            type="button"
+            size="xs"
+            variant={i === 0 ? 'default' : 'outline'}
+            disabled={busy}
+            onClick={async () => {
+              await onFinish(o);
+              setAskFinish(null);
+            }}
+          >
+            จบ · {FOLLOW_OUTCOME_LABEL[o]}
+          </Button>
+        ))}
         <Button type="button" variant="outline" size="xs" disabled={busy} onClick={() => setAskFinish(null)}>
           โทรต่อตามแผน
         </Button>

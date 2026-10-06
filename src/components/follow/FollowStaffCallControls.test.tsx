@@ -55,6 +55,16 @@ describe('ลงผลสายคนโทร 2 ขั้น (เจ้าข�
     await waitFor(() => expect(onFinish).toHaveBeenCalledWith('no_show_start'));
   });
 
+  it('🔴 ขั้น 2 มี ลา กับ จำวันผิด ด้วย (เจ้าของสั่ง 6 ต.ค. 2569)', async () => {
+    const onFinish = vi.fn().mockResolvedValue(undefined);
+    render(<FollowStaffCallControls entry={entry()} onRecord={vi.fn().mockResolvedValue(true)} onFinish={onFinish} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ขอเลื่อน' }));
+    expect(await screen.findByRole('button', { name: 'จบ · เลื่อน' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'จบ · ลา' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'จบ · จำวันผิด' }));
+    await waitFor(() => expect(onFinish).toHaveBeenCalledWith('wrong_date'));
+  });
+
   it('กด ไป → โทรต่อตามแผน = ไม่ปิดงาน', async () => {
     const onFinish = vi.fn();
     render(<FollowStaffCallControls entry={entry()} onRecord={vi.fn().mockResolvedValue(true)} onFinish={onFinish} />);

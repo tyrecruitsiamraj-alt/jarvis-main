@@ -12097,4 +12097,4 @@ Choice: รายได้เฉลี่ยโชว์ ติ๊กซ่อ�
 | เทสต์ | followStaffCall · FollowStaffCallControls · FollowPlanningCalendar |
 
 - จบเรื่อง = ปิดงาน + หยุดสายที่เหลือ **ทั้งชุด** (`stop_scope: 'set'`) · ตรวจใน Browser (ตัวดักเขียน): ส่ง `{action:'staff_call',outcome:'declined'}` แล้ว `{outcome_code:'no_show_start',stop_scope:'set'}`
-- ลา / จำวันผิด / ถึงแล้ว ของสายคนโทร: ไม่มีในขั้น 2 — ยังปิดได้จากการ์ดติดตามครบ ("ไม่ย้าย")
+- ขั้น 2 มี "จบ · ลา" กับ "จบ · จำวันผิด" ต่อท้ายปุ่มจบหลักด้วย (`STAFF_FINISH_EXTRA` · เจ้าของสั่ง 6 ต.ค. 2569) · "ถึงแล้ว" ยังปิดจากการ์ดติดตามครบ

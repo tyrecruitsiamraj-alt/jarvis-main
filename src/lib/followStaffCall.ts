@@ -57,6 +57,12 @@ export const STAFF_FINISH_OUTCOME: Partial<Record<FollowStaffCallOutcome, Follow
   reschedule_requested: 'postponed',
 };
 
+/**
+ * ผลปิดงานเพิ่มเติมในขั้น 2 (เจ้าของสั่ง 6 ต.ค. 2569 *"ใส่ ลา กับ จำวันผิด ในขั้น 2 ด้วย"*)
+ * ต่อท้ายปุ่มจบหลักของผลนั้น — ลา · จำวันผิด ไม่ใช่ผลโทร แต่เป็นเหตุจบเรื่องที่คนโทรรู้ตอนคุย
+ */
+export const STAFF_FINISH_EXTRA: readonly FollowOutcome[] = ['leave', 'wrong_date'];
+
 /** คำของผลที่ **คนลงเอง** ที่ต่างจากคำของ AI — ชุดเดียวกับปุ่มบนแถว (ป๊อป/ชิปอ่านตรงกัน) */
 const STAFF_WORDS: Partial<Record<FollowStaffCallOutcome, string>> = {
   confirmed: 'ไป',
