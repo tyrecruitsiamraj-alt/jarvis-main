@@ -58,6 +58,8 @@ export type UnitFieldOverrides = {
   work_schedule?: string | null;
   /** คุณสมบัติผู้สมัคร (6 ต.ค. 2569) — เช่น "มีประสบการณ์ขับรถนาย 1 ปีขึ้นไป" · เพดาน `POST_REQUIREMENT_*` */
   requirements?: string[] | null;
+  /** รายละเอียดงาน (6 ต.ค. 2569) — จุดรับนาย · จุดส่งนาย · รถที่ใช้ · เพดานเดียวกับคุณสมบัติ */
+  job_details?: string[] | null;
   /**
    * รายได้แบบแยกส่วนที่เจ้าหน้าที่ตั้งเอง (20 ส.ค. 2569) — ทับ breakdown อัตโนมัติ
    * จาก ERP เฉพาะที่โชว์บนประกาศ · กติกา/เพดานอยู่ที่ `src/lib/incomeBreakdown.ts`
@@ -215,6 +217,10 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
   if ('requirements' in o) {
     const req = cleanRequirementLines(o.requirements);
     out.requirements = req.length > 0 ? req : null;
+  }
+  if ('job_details' in o) {
+    const det = cleanRequirementLines(o.job_details);
+    out.job_details = det.length > 0 ? det : null;
   }
 
   // เกณฑ์ความเร่งเฉพาะใบ — กติกา/เพดานอยู่ที่ src/lib/requestLeadKind.ts ที่เดียว

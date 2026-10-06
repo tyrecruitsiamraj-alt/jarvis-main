@@ -271,7 +271,7 @@ describe('ป๊อปประกาศ 2 จอ (6 ต.ค. 2569)', () => {
     expect(screen.getByRole('heading', { name: 'วางข้อความโพสต์' })).toBeTruthy();
     expect(await screen.findByRole('heading', { name: 'เพศที่รับ' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'อายุที่รับ' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'วันเวลาทำงาน · คุณสมบัติ' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'วันเวลาทำงาน · รายละเอียดงาน · คุณสมบัติ' })).toBeTruthy();
     // ใบนี้ไม่มีรายได้ + ไม่ระบุเพศ = ขึ้นแดงทั้งบนและล่าง
     await waitFor(() => expect(screen.getAllByTestId('quick-gaps')[0].textContent).toContain('รายได้'));
     expect(screen.getAllByTestId('quick-gaps')[0].textContent).toContain('เพศ');

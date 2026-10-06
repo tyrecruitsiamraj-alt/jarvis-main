@@ -732,7 +732,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
         <StepCard title="อายุที่รับ">
           {jobWithPatch ? <AgeRangeFields key={`age-${pasteRev}`} job={jobWithPatch} onSaved={onFieldsSaved} /> : <Loading />}
         </StepCard>
-        <StepCard title="วันเวลาทำงาน · คุณสมบัติ">
+        <StepCard title="วันเวลาทำงาน · รายละเอียดงาน · คุณสมบัติ">
           {jobWithPatch ? (
             <ScheduleRequirementsFields key={`sched-${pasteRev}`} job={jobWithPatch} onSaved={onFieldsSaved} />
           ) : (
@@ -977,7 +977,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 <StepCard title="อายุที่รับ">
                   {jobWithPatch ? <AgeRangeFields job={jobWithPatch} onSaved={onFieldsSaved} /> : <Loading />}
                 </StepCard>
-                <StepCard title="วันเวลาทำงาน · คุณสมบัติ">
+                <StepCard title="วันเวลาทำงาน · รายละเอียดงาน · คุณสมบัติ">
                   {jobWithPatch ? <ScheduleRequirementsFields job={jobWithPatch} onSaved={onFieldsSaved} /> : <Loading />}
                 </StepCard>
               </>
@@ -1022,6 +1022,17 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                       </SummaryRow>
                       <SummaryRow label="วันเวลาทำงาน" onEdit={() => setOpenStep('benefits')}>
                         {(jobWithPatch.work_schedule ?? '').trim() || <span className="text-muted-foreground">ไม่ระบุ</span>}
+                      </SummaryRow>
+                      <SummaryRow label="รายละเอียดงาน" onEdit={() => setOpenStep('benefits')}>
+                        {jobWithPatch.job_details && jobWithPatch.job_details.length > 0 ? (
+                          <span className="flex flex-col">
+                            {jobWithPatch.job_details.map((d) => (
+                              <span key={d}>{d}</span>
+                            ))}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">ไม่ระบุ</span>
+                        )}
                       </SummaryRow>
                       <SummaryRow label="คุณสมบัติ" onEdit={() => setOpenStep('benefits')}>
                         {jobWithPatch.requirements && jobWithPatch.requirements.length > 0 ? (

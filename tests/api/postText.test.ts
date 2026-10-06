@@ -3,6 +3,7 @@
  * ข้อความโพสต์ประกาศ — วางแล้วเติมช่อง + สร้างข้อความให้คัดลอก (เจ้าของ 6 ต.ค. 2569 → Choice "ทำทั้งสองอย่าง")
  * ตัวอย่างจริงที่เจ้าของวางมา
  */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   buildPostText,
@@ -174,5 +175,49 @@ describe('วางข้อความที่ระบบพิมพ์เ�
     expect(p.requirements).toEqual(['ขยัน']);
     expect(p.schedule).toBe('จันทร์ - ศุกร์ 07.00-16.00 น.');
     expect(p.ageMin).toBe(25);
+  });
+});
+
+/**
+ * โพสต์คนขับรถจริง 3 ใบที่เจ้าของให้ลอง (6 ต.ค. 2569) — บรรทัดละรายการ · จุดรับ/ส่งนาย · รถที่ใช้ · รายรับคนเก่า
+ * เดิมอ่านได้แค่เงินเดือนบรรทัดเดียว · วันกับเวลาแยกบรรทัดได้ครึ่งเดียว · จุดรับนาย/รถ/ค่าตำแหน่งไปปนในคุณสมบัติ
+ */
+describe('โพสต์คนขับรถ 3 ใบ (6 ต.ค. 2569)', () => {
+  const read = (n: number) =>
+    parsePostText(readFileSync(new URL(`./fixtures/post-driver-${n}.txt`, import.meta.url), 'utf8'));
+  it('ใบ 1: รายได้บรรทัดละรายการ 4 รายการ · รายรับคนเก่า = รายได้รวม · วัน+เวลา+วันหยุดรวมกัน', () => {
+    const p = read(1);
+    expect(p.incomeLines.map((l) => [l.label, l.amount])).toEqual([
+      ['ฐานเงินเดือน', 13000],
+      ['ค่าตำแหน่ง', 3000],
+      ['ค่าโทรศัพท์', 1000],
+      ['โอที การันตรี', 2844],
+    ]);
+    expect(p.total).toBe(22000);
+    expect(p.schedule).toBe('ทำงาน จันทร์-ศุกร์ เวลาปฎิบัติงาน 09.00-18.00 หยุดเสาร์-อาทิตย์');
+    expect([p.gender, p.ageMin, p.ageMax]).toEqual(['ชาย', 25, 50]);
+    expect(p.details).toEqual(['รับนาย นาคนิวาส 48 ลาดพร้าว', 'ส่งนาย อาคารเอ็มเอส ทาวเวอร์ พหลโยธิน', 'รถที่ใช้งาน Toyota Velifire']);
+    expect(p.requirements).toHaveLength(5);
+    expect(p.requirements.join(' ')).not.toMatch(/รายรับ|ค่าตำแหน่ง|รับนาย|รถที่ใช้งาน|หยุด/);
+  });
+  it('ใบ 2: บรรทัดรายได้คั่นจุลภาค + โน้ตในวงเล็บ · กม.21 ไม่ใช่เงิน · รถซ้ำสองบรรทัดเหลือบรรทัดเดียว', () => {
+    const p = read(2);
+    expect(p.incomeLines.map((l) => l.label)).toEqual(['ฐานเงินเดือน', 'เบี้ยขยัน', 'ครองชีพ', 'เบี้ยเลี้ยงนอกเขตกทม.และปริมณฑล', 'แท๊กซี่']);
+    expect(p.total).toBe(21000);
+    expect(p.details).toEqual(['รับนายไทย อ่างศิลา ชลบุรี', 'ส่งนาย นิสสัน บางนาตราด กม.21', 'รถที่ใช้งาน นิสสัน เซเรน่า']);
+    expect(p.requirements).toHaveLength(3);
+  });
+  it('ใบ 3: "ฐาน" = ฐานเงินเดือน · เพศหญิง · เวลามาก่อนวันในโพสต์ก็เรียงวันก่อน', () => {
+    const p = read(3);
+    expect(p.incomeLines[0]).toEqual({ label: 'ฐานเงินเดือน', amount: 13000 });
+    expect(p.incomeLines).toHaveLength(5);
+    expect(p.gender).toBe('หญิง');
+    expect(p.schedule).toBe('จันทร์-เสาร์ เวลา 08.00-17.00 หยุด อาทิตย์ และตามปฎิทินบริษัท');
+    expect(postTextOverridesPatch(null, p).job_details).toEqual(p.details);
+  });
+  it('รายละเอียดงานขึ้นข้อความโพสต์ · API เก็บ job_details', () => {
+    const src = readFileSync(new URL('../../api/_lib/siamrajUnitNotes.ts', import.meta.url), 'utf8');
+    expect(src).toContain("if ('job_details' in o)");
+    expect(readFileSync(new URL('../../src/components/jobs/JobPublicFacts.tsx', import.meta.url), 'utf8')).toContain('job-public-details');
   });
 });

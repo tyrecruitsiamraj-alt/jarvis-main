@@ -12356,3 +12356,19 @@ Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แ�
 | เทสต์ | `src/pages/jobs/BoardPostingSteps.test.tsx` (4 เคส 2 จอ) · `tests/api/postText.test.ts` |
 
 - ตรวจในเบราว์เซอร์ (ดัก fetch ที่ไม่ใช่ GET): เปิดป๊อป 2 จอไม่มีเขียนฐาน · วางโพสต์ → อายุ 25/50 + เวลาทำงานเติมเอง (POST unit-notes ถูกดัก) · จอ 375 ไม่ล้น
+
+### วางโพสต์คนขับรถ 3 ใบจริง + ช่องรายละเอียดงาน (6 ต.ค. 2569 ค่ำ · เจ้าของ "ลองเอาไปใส่ดูมันจะไปเติมให้จริงไหม")
+
+ก่อนแก้ โพสต์ A-HOST / นิสสัน พาวเวอร์เทรน / เค.เอช.เมทัล อ่านได้แค่เงินเดือนบรรทัดเดียว · วันกับเวลาแยกบรรทัดได้ครึ่งเดียว · จุดรับนาย/รถ/ค่าตำแหน่ง/หัวโพสต์ ปนในคุณสมบัติ
+เจ้าของ Choice: "รายรับคนเก่า …++" = รายได้รวม · จุดรับ/ส่งนาย + รถที่ใช้ "ถามนายว่าแบบไหนตรง Journey" ⇒ ช่องใหม่ **รายละเอียดงาน** (ผู้สมัครเห็น · AI ไม่พูด)
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/lib/postText.ts` | `parsePostText` จัดทีละบรรทัด: รายละเอียดงาน (`DETAIL_LINE`) → รายได้ (ทุกส่วนเป็นเงิน = บรรทัดรายได้ · รวมหลายบรรทัด · ตัดโน้ตวงเล็บ · ยอด < 50 ไม่ใช่เงิน) → วันเวลา (วัน → เวลา → วันหยุด ต่อกัน) → คุณสมบัติ · `TOTAL_RE` อ่าน "รายรับ…" · "ฐาน" = ฐานเงินเดือน · หัวโพสต์ `****` ทิ้ง · `details` → `job_details` · `buildPostText` พิมพ์รายละเอียดงานต่อจากเวลา |
+| `src/types/index.ts` · `src/lib/siamrajUnitRequestsApi.ts` · `api/_lib/siamrajUnitNotes.ts` | ช่อง `job_details` (sanitizer ใช้ `cleanRequirementLines`) |
+| `api/_handlers/siamraj-unit-requests.ts` (`attachNotes`) · `api/_handlers/public/jobs.ts` | แนบ/ส่ง `job_details` ให้หน้า /apply และหน้าลิงก์ |
+| `src/components/jobs/JobPublicFacts.tsx` | แถวไอคอนรถ `job-public-details` ก่อนคุณสมบัติ |
+| `src/components/jobs/ScheduleRequirementsFields.tsx` · `PostTextPasteCard.tsx` · `BoardPostingPage.tsx` | ช่องแก้รายละเอียดงาน · แถวในตัวอย่างที่อ่านได้ · แถวสรุปหน้า 4 |
+| เทสต์ | `tests/api/postText.test.ts` + `tests/api/fixtures/post-driver-{1,2,3}.txt` |
+
+- ตรวจในเบราว์เซอร์ (ดัก fetch ที่ไม่ใช่ GET) ใบจริง OPL6910006 · OPL6910002 · OPL6909018: วางแล้วแยกครบทุกช่อง · กดใช้ข้อมูลนี้ (ถูกดัก ไม่เขียนฐาน) การ์ดผู้สมัครขึ้นรายละเอียดงาน

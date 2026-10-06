@@ -48,6 +48,7 @@ export default function PostTextPasteCard({
           : `ไม่เกิน ${parsed.ageMax} ปี`,
     ]);
   }
+  if (parsed.details.length > 0) rows.push(['รายละเอียดงาน', parsed.details.join('\n')]);
   if (parsed.requirements.length > 0) rows.push(['คุณสมบัติ', parsed.requirements.join('\n')]);
 
   const apply = async () => {
@@ -65,6 +66,7 @@ export default function PostTextPasteCard({
         field_overrides: next as JobRequest['field_overrides'],
         ...(next.work_schedule ? { work_schedule: next.work_schedule } : {}),
         ...(next.requirements ? { requirements: next.requirements } : {}),
+        ...(next.job_details ? { job_details: next.job_details } : {}),
         ...(next.age_min != null ? { age_range_min: next.age_min } : {}),
         ...(next.age_max != null ? { age_range_max: next.age_max } : {}),
         ...(next.gender ? { gender_requirement: next.gender } : {}),

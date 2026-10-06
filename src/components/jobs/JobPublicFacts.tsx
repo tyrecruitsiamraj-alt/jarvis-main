@@ -1,5 +1,5 @@
 import React from 'react';
-import { Banknote, Calendar, Clock, Flag, Gift, ListChecks, MapPin, UserRound, Wallet } from 'lucide-react';
+import { Banknote, Calendar, Car, Clock, Flag, Gift, ListChecks, MapPin, UserRound, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
@@ -48,6 +48,7 @@ export default function JobPublicFacts({
     .map((b) => benefitWithAmount(b, job.monthly_income_items));
   const gender = boardCardGender(job);
   const requirements = job.requirements ?? [];
+  const details = job.job_details ?? [];
   const schedule = (job.work_schedule ?? '').trim();
   const requiredDate = publicFieldVisible(job, 'required_date') && job.required_date ? job.required_date : null;
   const boss = publicFieldVisible(job, 'boss_nationality') ? (job.boss_nationality ?? '').trim() : '';
@@ -108,6 +109,19 @@ export default function JobPublicFacts({
         <span aria-hidden>·</span>
         <span className="tabular-nums">{boardCardAge(job)}</span>
       </p>
+      {/* รายละเอียดงาน (6 ต.ค. 2569) — จุดรับ/ส่งนาย · รถที่ใช้ · บรรทัดละข้อ */}
+      {details.length > 0 ? (
+        <div className={row} data-testid="job-public-details">
+          <Car className={icon} aria-hidden />
+          <ul className="min-w-0 space-y-0.5">
+            {details.map((d) => (
+              <li key={d} className="text-foreground">
+                {d}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {/* คุณสมบัติที่ทีมตั้งเอง (6 ต.ค. 2569 · วางข้อความโพสต์) — เรียงลงทีละบรรทัดแบบสวัสดิการ */}
       {requirements.length > 0 ? (
         <div className={row} data-testid="job-public-requirements">

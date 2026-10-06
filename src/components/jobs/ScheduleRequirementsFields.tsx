@@ -14,6 +14,7 @@ import type { JobRequest } from '@/types';
  * ช่องใหม่คู่กับ "วางข้อความโพสต์" — วางแล้วเติมให้ แก้ต่อเองได้ที่นี่
  * - วันเวลาทำงาน: ค่าตั้งต้น = ใบขอ (ERP) · แก้แล้วเก็บ `field_overrides.work_schedule` ทับเฉพาะที่โชว์บนประกาศ
  * - คุณสมบัติ: บรรทัดละข้อ เก็บ `field_overrides.requirements`
+ * - รายละเอียดงาน (6 ต.ค. 2569): จุดรับนาย · จุดส่งนาย · รถที่ใช้ — บรรทัดละข้อ เก็บ `field_overrides.job_details`
  * 🔴 กด "บันทึก" เอง (เลิก auto-save ทั้งระบบ) · บันทึกเฉพาะช่องที่แก้ — ไม่แก้วันเวลา = ไม่แช่ค่า ERP ลงฐาน
  */
 export default function ScheduleRequirementsFields({
@@ -25,8 +26,10 @@ export default function ScheduleRequirementsFields({
 }) {
   const initSchedule = (job.work_schedule ?? '').trim();
   const initReq = (job.requirements ?? []).join('\n');
+  const initDet = (job.job_details ?? []).join('\n');
   const [schedule, setSchedule] = React.useState(initSchedule);
   const [req, setReq] = React.useState(initReq);
+  const [det, setDet] = React.useState(initDet);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [saved, setSaved] = React.useState(false);
@@ -35,10 +38,12 @@ export default function ScheduleRequirementsFields({
   React.useEffect(() => {
     setSchedule(initSchedule);
     setReq(initReq);
-  }, [initSchedule, initReq]);
+    setDet(initDet);
+  }, [initSchedule, initReq, initDet]);
 
   const scheduleDirty = schedule.trim() !== initSchedule;
   const reqDirty = req.trim() !== initReq.trim();
+  const detDirty = det.trim() !== initDet.trim();
 
   const save = async () => {
     const requestNo = unitRequestNoteKey(job);
@@ -47,9 +52,11 @@ export default function ScheduleRequirementsFields({
       return;
     }
     const lines = cleanRequirementLines(req.split('\n'));
-    const patch: { work_schedule?: string | null; requirements?: string[] | null } = {};
+    const detLines = cleanRequirementLines(det.split('\n'));
+    const patch: { work_schedule?: string | null; requirements?: string[] | null; job_details?: string[] | null } = {};
     if (scheduleDirty) patch.work_schedule = schedule.trim().slice(0, POST_SCHEDULE_MAX) || null;
     if (reqDirty) patch.requirements = lines.length > 0 ? lines : null;
+    if (detDirty) patch.job_details = detLines.length > 0 ? detLines : null;
     setBusy(true);
     setError(null);
     setSaved(false);
@@ -59,6 +66,7 @@ export default function ScheduleRequirementsFields({
         field_overrides: next as JobRequest['field_overrides'],
         ...(scheduleDirty ? { work_schedule: patch.work_schedule ?? '' } : {}),
         ...(reqDirty ? { requirements: lines } : {}),
+        ...(detDirty ? { job_details: detLines } : {}),
       });
       setSaved(true);
     } catch (e) {
@@ -86,6 +94,21 @@ export default function ScheduleRequirementsFields({
         />
       </div>
       <div className="space-y-1">
+        <Label htmlFor={`${id}-det`} className="text-xs text-muted-foreground">
+          รายละเอียดงาน · บรรทัดละข้อ
+        </Label>
+        <Textarea
+          id={`${id}-det`}
+          value={det}
+          rows={3}
+          onChange={(e) => {
+            setDet(e.target.value);
+            setSaved(false);
+          }}
+          placeholder="เช่น รับนาย ลาดพร้าว"
+        />
+      </div>
+      <div className="space-y-1">
         <Label htmlFor={`${id}-req`} className="text-xs text-muted-foreground">
           คุณสมบัติ · บรรทัดละข้อ
         </Label>
@@ -101,7 +124,7 @@ export default function ScheduleRequirementsFields({
         />
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" size="sm" variant="outline" disabled={busy || (!scheduleDirty && !reqDirty)} onClick={() => void save()}>
+        <Button type="button" size="sm" variant="outline" disabled={busy || (!scheduleDirty && !reqDirty && !detDirty)} onClick={() => void save()}>
           {busy ? 'กำลังบันทึก…' : 'บันทึก'}
         </Button>
         {saved ? <span className={cn('text-sm', TONE.success.value)}>บันทึกแล้ว</span> : null}

@@ -298,6 +298,8 @@ export interface JobRequest {
   work_schedule?: string;
   /** คุณสมบัติผู้สมัคร (6 ต.ค. 2569) — มาจาก `field_overrides.requirements` · ขึ้นการ์ดหน้าสมัคร */
   requirements?: string[];
+  /** รายละเอียดงาน (6 ต.ค. 2569) — จุดรับนาย · จุดส่งนาย · รถที่ใช้ · มาจาก `field_overrides.job_details` · ขึ้นการ์ดหน้าสมัคร */
+  job_details?: string[];
   /**
    * สวัสดิการที่โชว์บนประกาศได้ เช่น ["โอที ~75 บาท/ชม.", "เบี้ยขยัน", "ค่าเดินทาง"]
    * (เจ้าของเคาะ 16 ส.ค. 2569 — กติกาเดียวกับที่ AI พูดตอนโทร)
@@ -419,6 +421,8 @@ export interface JobRequest {
     work_schedule?: string | null;
     /** คุณสมบัติผู้สมัคร (6 ต.ค. 2569) */
     requirements?: string[] | null;
+    /** รายละเอียดงาน (6 ต.ค. 2569) — จุดรับ/ส่งนาย · รถที่ใช้ */
+    job_details?: string[] | null;
     /** รายได้แบบแยกส่วนที่ตั้งเอง — โครงอยู่ที่ `src/lib/incomeBreakdown.ts` */
     income?: {
       period: 'daily' | 'monthly';

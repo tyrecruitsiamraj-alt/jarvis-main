@@ -172,6 +172,8 @@ export type UnitFieldOverrides = {
   /** วันเวลาทำงาน + คุณสมบัติ (6 ต.ค. 2569) — ต้องตรงกับฝั่ง API (`siamrajUnitNotes.ts`) */
   work_schedule?: string | null;
   requirements?: string[] | null;
+  /** รายละเอียดงาน (6 ต.ค. 2569) — จุดรับ/ส่งนาย · รถที่ใช้ */
+  job_details?: string[] | null;
   /** รายได้แบบแยกส่วน — โครง/เพดานอยู่ที่ `src/lib/incomeBreakdown.ts` */
   income?: import('@/lib/incomeBreakdown').IncomeBreakdown | null;
   /**
