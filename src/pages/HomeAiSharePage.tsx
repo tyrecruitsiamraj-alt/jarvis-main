@@ -31,7 +31,9 @@
  * 🔴 ห้ามหยิบของหน้าหลักเดิม (deck · 3 ก้อน · ยอด Lumos) กลับมาใส่เอง — เจ้าของจะสั่งเพิ่มทีละเรื่อง
  * 🔴 โฉมกระจกไม่เบลอของที่เลื่อนจอ (เคยทำเว็บกระตุก 5 ก.ย. 2569) — แสงนวลข้างหลังเบลอมาแล้ว การ์ดแค่โปร่ง
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useLiveTick } from '@/hooks/useLiveTick';
+import { toYmdBangkok } from '@/lib/dateTh';
 import AiShareCard, { type AiShareCardProps } from '@/components/home-ai-share/AiShareCard';
 import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
@@ -58,6 +60,15 @@ import { EVEN_TYPE, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 
 const NUM = new Intl.NumberFormat('th-TH');
+const CLOCK = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Bangkok' });
+
+/**
+ * อัปเดตสดทุก 30 วิ (เจ้าของ 6 ต.ค. 2569 "หน้าหลัก ต้องทำเป็น Interactive" → Choice "ตัวเลขอัปเดตเองสด ๆ")
+ * 30 วิ = เท่ารอบ cache ของเส้น `/api/home-ai-share` (เร็วกว่านี้ได้เลขเดิม)
+ */
+const LIVE_MS = 30_000;
+/** ช่วงที่เลือกยังมีวันนี้อยู่ไหม — จบไปแล้ว = เลขไม่เปลี่ยนอีก ไม่ต้องดึงซ้ำ */
+const isLiveWindow = (w: AiShareWindow) => !w.to || w.to >= toYmdBangkok(new Date());
 
 /** รายละเอียดของ "ยังไม่โทร" (ขึ้นตอนจี้) — บอกเฉพาะส่วนที่มีจริง */
 const partsText = (parts: Array<[string, number]>) =>
@@ -175,13 +186,23 @@ const HomeAiSharePage: React.FC = () => {
     setListOpen(true);
   };
 
+  /** อัปเดตสด — เลขรอบ (ตัวเดียวทั้งหน้า ส่งต่อให้กราฟ/แผงผลโทร) · เวลาที่โหลดสำเร็จล่าสุด */
+  const live = isLiveWindow(cardWin);
+  const tick = useLiveTick(live, LIVE_MS);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const cardWinRef = useRef(cardWin);
+  cardWinRef.current = cardWin;
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setError(null);
     fetchHomeAiShare(cardWin)
       .then((d) => {
-        if (alive) setData(d);
+        if (alive) {
+          setData(d);
+          setUpdatedAt(new Date());
+        }
       })
       .catch((e: unknown) => {
         if (alive) setError(e instanceof Error && e.message ? e.message : 'โหลดหน้าหลักไม่ขึ้น ลองรีเฟรชอีกครั้ง');
@@ -193,6 +214,24 @@ const HomeAiSharePage: React.FC = () => {
       alive = false;
     };
   }, [cardWin]);
+
+  // รอบอัปเดตสด — โหลดเงียบ ๆ เลขเดิมค้างไว้จนเลขใหม่มา · ล้มก็เงียบ (รอบหน้าลองใหม่ ห้ามล้างจอเป็น error)
+  useEffect(() => {
+    if (tick === 0) return;
+    let alive = true;
+    const w = cardWinRef.current;
+    fetchHomeAiShare(w)
+      .then((d) => {
+        if (alive && d.from === cardWinRef.current.from && d.to === cardWinRef.current.to) {
+          setData(d);
+          setUpdatedAt(new Date());
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [tick]);
 
   /**
    * แถววัน × BU ของหัวข้อที่เลือก — โหลดที่หน้า ส่งให้กราฟยอดใช้งาน (รอบ 9 ย้ายขึ้นมาจากกราฟ ·
@@ -219,6 +258,24 @@ const HomeAiSharePage: React.FC = () => {
       alive = false;
     };
   }, [block, win]);
+
+  // กราฟอัปเดตสดด้วยรอบเดียวกัน — โหลดเงียบ (ไม่ขึ้นโครงโหลด กราฟไม่กระพริบ)
+  const blockWinRef = useRef({ block, win });
+  blockWinRef.current = { block, win };
+  useEffect(() => {
+    if (tick === 0) return;
+    let alive = true;
+    const { block: b, win: w } = blockWinRef.current;
+    fetchHomeAiShareDetail(b, w)
+      .then((d) => {
+        const cur = blockWinRef.current;
+        if (alive && d.block === cur.block && d.from === cur.win.from && d.to === cur.win.to) setDetail(d);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [tick]);
 
   // เปลี่ยนช่วงแล้วเลขเก่าห้ามค้างให้อ่านผิดช่วง — ใช้ข้อมูลเฉพาะเมื่อตรงกับช่วงที่เลือก
   const current = data && data.from === cardWin.from && data.to === cardWin.to ? data : null;
@@ -315,6 +372,13 @@ const HomeAiSharePage: React.FC = () => {
           {current?.forced_bu && current.bu ? (
             <span className="text-sm text-muted-foreground">{trendBuLabel(current.bu)}</span>
           ) : null}
+          {/* จุดเขียวกระพริบ = กำลังอัปเดตสด · เวลาที่เลขชุดนี้มาถึง (ช่วงที่จบไปแล้ว = ไม่มีจุด) */}
+          {updatedAt ? (
+            <span className="inline-flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" data-testid="home-live">
+              {live ? <span className={cn('h-2 w-2 animate-pulse rounded-full', TONE.success.dot)} aria-hidden /> : null}
+              {live ? 'สด · ' : ''}อัปเดต {CLOCK.format(updatedAt)}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -335,6 +399,7 @@ const HomeAiSharePage: React.FC = () => {
         previousRange={prev ? rangeText(prev.from, prev.to) : null}
         onPick={openList}
         hideNotCalled={meta.key === 'follow'}
+        liveKey={`${meta.key}|${cardWin.from ?? ''}|${cardWin.to ?? ''}`}
       >
         <AiShareDetail
           withTeams={meta.key === 'follow'}
@@ -363,7 +428,7 @@ const HomeAiSharePage: React.FC = () => {
       />
 
       {/* ผลโทร ซ่อนไว้ กดแล้วกาง (รอบ 18) · "ใครอยู่ในระบบ" ย้ายไป ตั้งค่า › ผู้ใช้งาน แล้ว (รอบ 19) */}
-      <HomeCallResultsPanel block={meta.key} blockTitle={meta.title} win={cardWin} />
+      <HomeCallResultsPanel block={meta.key} blockTitle={meta.title} win={cardWin} tick={tick} />
     </div>
   );
 };

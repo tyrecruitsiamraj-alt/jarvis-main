@@ -15,7 +15,7 @@
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONVEYOR_VAULT, conveyorLabel } from '@/lib/soRecruitNav';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import {
   AI_SHARE_BUS,
   defaultAiShareWindow,
@@ -554,5 +554,38 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     }
     expect(names.some((n) => n.includes('ผู้สมัครในกล่องงาน'))).toBe(false);
     expect(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')?.label).toBe('งานสรรหา');
+  });
+});
+
+/**
+ * 🔴 อัปเดตสด (เจ้าของ 6 ต.ค. 2569 "หน้าหลัก ต้องทำเป็น Interactive" → Choice "ตัวเลขอัปเดตเองสด ๆ")
+ * ทุก 30 วิ ดึงเลข + กราฟใหม่เงียบ ๆ (ไม่ขึ้นโครงโหลด) · มีป้าย "สด · อัปเดต hh:mm:ss"
+ */
+describe('หน้าหลักอัปเดตสด', () => {
+  it('ครบ 30 วิ ดึงเลขกับกราฟใหม่ · เลขใหม่ขึ้นโดยไม่หายไปเป็นโครงโหลด', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<HomeAiSharePage />);
+      await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+      expect(screen.getByTestId('home-live').textContent).toMatch(/^สด · อัปเดต /);
+      const cards = fetchHomeAiShare.mock.calls.length;
+      const charts = fetchHomeAiShareDetail.mock.calls.length;
+      const next = body();
+      next.follow = { ...next.follow!, total: 210, ai: 210 };
+      fetchHomeAiShare.mockResolvedValue(next);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(fetchHomeAiShare.mock.calls.length).toBe(cards + 1);
+      expect(fetchHomeAiShareDetail.mock.calls.length).toBe(charts + 1);
+      // ระหว่างรอเลขใหม่ กล่องยังอยู่ (ไม่สลับเป็นโครงโหลด)
+      expect(screen.queryByLabelText(/^กำลังโหลด/)).toBeNull();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+      await waitFor(() => expect(stat('ทั้งหมด')).toContain('210 รายชื่อ'));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

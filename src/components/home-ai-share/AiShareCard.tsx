@@ -31,6 +31,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useCountUp } from '@/hooks/useCountUp';
 import { segmentFillClass } from '@/components/home-ai-share/segmentStyle';
 import { Pill } from '@/components/team-online/TeamKpiCard';
 import { TONE } from '@/lib/designTokens';
@@ -77,6 +78,8 @@ export type AiShareCardProps = {
   onPick?: (key: AiShareListKey) => void;
   /** ไม่มีกล่อง "ยังไม่โทร" — หัวข้อติดตามนับแบบแผน AI + คน = ทั้งหมด (4 ต.ค. 2569) */
   hideNotCalled?: boolean;
+  /** หัวข้อ + ช่วงที่ดูอยู่ (อัปเดตสด 6 ต.ค. 2569) — เลขวิ่งเฉพาะตอนค่านี้ไม่เปลี่ยน */
+  liveKey?: string;
   /** กราฟยอดใช้งานของหัวข้อนี้ (หน้าเรียกเป็นคนโหลด) */
   children?: React.ReactNode;
   className?: string;
@@ -107,7 +110,10 @@ function Tile({
   foot,
   hint,
   onClick,
+  liveKey,
 }: {
+  /** หัวข้อ + ช่วง — เปลี่ยนแล้วเลขเปลี่ยนทันที ไม่วิ่ง */
+  liveKey?: string;
   label: string;
   value: number;
   unit?: string;
@@ -121,6 +127,8 @@ function Tile({
   /** กดแล้วเปิดรายชื่อ · ไม่มี หรือเลขเป็น 0 = กดไม่ได้ */
   onClick?: () => void;
 }) {
+  // อัปเดตสดแล้วเลขวิ่งไปค่าใหม่ (6 ต.ค. 2569) — ชื่อปุ่มสำหรับโปรแกรมอ่านจอใช้ค่าจริงเสมอ
+  const shown = useCountUp(value, liveKey);
   // ข้างในปุ่มใช้ span ล้วน (ปุ่มห้ามมี div/p ข้างใน) · ชื่อปุ่ม = ป้าย + เลข (โปรแกรมอ่านจอได้ยินเลขด้วย)
   return (
     <Button
@@ -141,7 +149,7 @@ function Tile({
         ) : null}
       </span>
       <span className="block text-3xl font-light tabular-nums text-foreground">
-        {NUM.format(value)}
+        {NUM.format(shown)}
         {unit ? (
           <>
             {' '}
@@ -180,6 +188,7 @@ const AiShareCard: React.FC<AiShareCardProps> = ({
   previousRange = null,
   onPick,
   hideNotCalled = false,
+  liveKey = '',
   children,
   className,
 }) => {
@@ -221,6 +230,7 @@ const AiShareCard: React.FC<AiShareCardProps> = ({
           <div className={cn('grid gap-3', cols)}>
             <Tile
               label="ทั้งหมด"
+              liveKey={liveKey}
               value={total}
               unit={unit}
               share={null}
@@ -233,6 +243,7 @@ const AiShareCard: React.FC<AiShareCardProps> = ({
             {segments.map((k) => (
               <Tile
                 key={k}
+                liveKey={liveKey}
                 label={AI_SHARE_SEGMENT_LABEL[k]}
                 value={counts[k]}
                 share={shareOf?.get(k) ?? 0}

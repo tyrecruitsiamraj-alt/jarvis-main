@@ -122,7 +122,9 @@ const HomeCallResultsPanel: React.FC<{
   /** ชื่อหัวข้อ เช่น "ติดตาม" — ขึ้นบนแถบหัว */
   blockTitle: string;
   win: AiShareWindow;
-}> = ({ block, blockTitle, win }) => {
+  /** เลขรอบอัปเดตสดของหน้า (6 ต.ค. 2569) — เปลี่ยนแล้วโหลดใหม่เงียบ ๆ เฉพาะตอนแผงกางอยู่ */
+  tick?: number;
+}> = ({ block, blockTitle, win, tick = 0 }) => {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<AiShareResultsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +143,25 @@ const HomeCallResultsPanel: React.FC<{
       alive = false;
     };
   }, [block, win]);
+
+  // อัปเดตสด — แผงพับอยู่ไม่โหลด (ไม่มีใครดู) · ล้มก็เงียบ เลขเดิมค้างไว้
+  const openRef = React.useRef(open);
+  openRef.current = open;
+  const keyRef = React.useRef({ block, win });
+  keyRef.current = { block, win };
+  useEffect(() => {
+    if (tick === 0 || !openRef.current) return;
+    let alive = true;
+    const { block: b, win: w } = keyRef.current;
+    fetchHomeAiShareResults(b, w)
+      .then((d) => {
+        if (alive) setData(d);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [tick]);
 
   // เปลี่ยนหัวข้อ/ช่วงแล้วเลขเก่าห้ามค้าง — ใช้เฉพาะคำตอบที่ตรงกับที่เลือกอยู่
   const current = data && data.block === block && data.from === win.from && data.to === win.to ? data : null;
