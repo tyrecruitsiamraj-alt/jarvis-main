@@ -12330,3 +12330,16 @@ Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แ�
 | `src/pages/public/PublicPostingApplyPage.tsx` | ส่ง `channelLabel` ของลิงก์ให้ฟอร์ม |
 | `api/_handlers/public/apply.ts` | มี `link_id` = อ่าน `channel_label` ของลิงก์ แล้วบันทึก `referral_source` ตามลิงก์เสมอ (ไม่เชื่อค่าจากหน้าเว็บ · อ่านไม่ได้ = ค่าที่ส่งมา) |
 | เทสต์ | `tests/api/referralChannel.test.ts` |
+
+### บทโทรงานสรรหาพูดเวลาทำงาน (6 ต.ค. 2569 ค่ำ · ไล่ Journey งานสรรหา · Choice "เพิ่มแค่เวลาทำงาน" — คุณสมบัติไม่พูด)
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `api/_lib/lumosCallScript.templates.ts` | บท `สมัครผ่านลิงก์` + `ผู้สมัครคีย์เอง` เพิ่ม `'เวลาทำงาน {เวลาทำงาน} ครับ'` ต่อจากสวัสดิการ (บอก ไม่ถาม) · บทเสนองานไม่แตะ |
+| `api/_lib/lumosCallScript.ts` | **`speakableWorkTime`** — ช่อง work_schedule ดิบ → ช่วงวัน + ช่วงเวลา ("วันจันทร์ถึงวันศุกร์ 08:30 ถึง 17:30 น.") · พูดถึงกะ = "ทำงานเป็นกะ" · หลายช่วงเวลาไม่ใช่กะ = ไม่พูดเวลา · จันทร์–อาทิตย์ + "ทำ 6 วัน" = "สัปดาห์ละ 6 วัน" · หาไม่เจอ = '' (บรรทัดหาย) |
+| `api/_lib/applyScriptFacts.ts` | `workSchedule` จาก `job.work_schedule` หลัง `attachNotes` (ค่าที่วางจากโพสต์ชนะ ERP) |
+| `api/_lib/lumosDispatch.ts` | บท `applied` ส่ง `workSchedule` ด้วย (บทลิงก์ได้ผ่าน spread อยู่แล้ว) |
+| เทสต์ | `tests/api/offerScript2569-10-06.test.ts` (ข้อความดิบจริง 10 แบบ + ตำแหน่งบรรทัด) |
+
+- ⚠️ ไม่ใช้ `buildJobBrief().workSchedule` — ตัดสั้นด้วย "…" กลางคำ ("ตามธ…") AI อ่านออกเสียงเพี้ยน
+- วัดกับใบจริง 353 ใบ (อ่านอย่างเดียว): พูดได้ 341 · ไม่พูด 12 (เช่น "ตามตารางลูกค้ากำหนด")

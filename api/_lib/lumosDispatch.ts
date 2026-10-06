@@ -284,6 +284,7 @@ export function buildApplicationInterviewPayload(
           ageRange: jobFacts?.ageRange,
           monthlyIncome: jobFacts?.monthlyIncome,
           benefitLine: jobFacts?.benefitLine,
+          workSchedule: jobFacts?.workSchedule,
         }),
     type: 'phone',
     language: 'th',

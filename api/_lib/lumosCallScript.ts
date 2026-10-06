@@ -356,6 +356,43 @@ function applyValues(f: ApplyScriptFacts): ScriptValues {
   };
 }
 
+const DAY_NAME = '(จันทร์|จันทร|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์|อาทิตย์)';
+const DAY_RANGE_RE = new RegExp(`(?:วัน)?${DAY_NAME}\\s*(?:-|–|ถึง)\\s*(?:วัน)?${DAY_NAME}`, 'u');
+const TIME_RANGE_RE = /(\d{1,2})[.:](\d{2})\s*(?:น\.?)?\s*(?:-|–|ถึง)\s*(\d{1,2})[.:](\d{2})/gu;
+const fullDay = (d: string) => (d === 'จันทร' ? 'จันทร์' : d === 'พฤหัส' ? 'พฤหัสบดี' : d);
+const hhmm = (h: string, m: string) => `${h.padStart(2, '0')}:${m}`;
+
+/**
+ * เวลาทำงานแบบพูดได้ (เจ้าของ 6 ต.ค. 2569 · Choice "เพิ่มแค่เวลาทำงาน") — ช่อง work_schedule จริงยาวและปนหมายเหตุ
+ * ("วันจันทร์ - วันศุกร์ หรือ 5 วัน/สัปดาห์ ตามธนาคารฯกำหนด • เวลา 8.30 - 17.30 หรือ 9 ชม./วัน …") ตัดสั้นแบบเดิมแล้วขาดกลางคำ
+ * ⇒ หยิบแค่ **ช่วงวัน** + **ช่วงเวลา** → "วันจันทร์ถึงวันศุกร์ 08:30 ถึง 17:30 น."
+ * - พูดถึงกะ = "ทำงานเป็นกะ" (ไม่อ่านกรอบเวลารวม) · หลายช่วงเวลาไม่ใช่กะ (คนละวัน/คนละลูกค้า) = ไม่พูดเวลา ดีกว่าพูดครึ่งเดียว
+ * - จันทร์ถึงอาทิตย์ แต่บอกจำนวนวัน ("ทำ 6 วัน หยุด 1 วัน") = "สัปดาห์ละ 6 วัน"
+ * - หาอะไรไม่เจอเลย = '' (บรรทัดหายเอง — ไม่อ่านข้อความดิบให้ผู้สมัครฟัง)
+ */
+export function speakableWorkTime(raw?: string | null): string {
+  const s = clean(raw).replace(/\s+/gu, ' ');
+  if (!s) return '';
+  const count = s.match(/(\d)\s*วัน\s*(?:\/|ต่อ)\s*สัปดาห์|ทำ(?:งาน)?\s*(\d)\s*วัน/u);
+  const n = count?.[1] ?? count?.[2] ?? null;
+  const range = s.match(DAY_RANGE_RE);
+  let days = '';
+  if (range) {
+    const [a, b] = [fullDay(range[1]), fullDay(range[2])];
+    days = a === 'จันทร์' && b === 'อาทิตย์' && n ? `สัปดาห์ละ ${n} วัน` : `วัน${a}ถึงวัน${b}`;
+  } else if (n) {
+    days = `สัปดาห์ละ ${n} วัน`;
+  } else if (/ทุกวัน/u.test(s)) {
+    days = 'ทุกวัน';
+  }
+  const times = [...new Set([...s.matchAll(TIME_RANGE_RE)].map((m) => `${hhmm(m[1], m[2])} ถึง ${hhmm(m[3], m[4])} น.`))];
+  // พูดถึงกะ = ช่วงเวลาบนใบคือกรอบรวมทุกกะ ("9 ชม. ตามตารางกะ ในช่วง 08.30 - 20.00") อ่านแล้วเข้าใจผิด
+  let hours = '';
+  if (/กะ/u.test(s)) hours = 'ทำงานเป็นกะ';
+  else if (times.length === 1) hours = times[0];
+  return [days, hours].filter(Boolean).join(' ');
+}
+
 /** ช่วงอายุแบบพูดได้ — ไม่รู้ทั้งคู่ = '' */
 export function speakableAgeRange(min?: number | null, max?: number | null): string {
   const lo = typeof min === 'number' && min > 0 ? min : null;

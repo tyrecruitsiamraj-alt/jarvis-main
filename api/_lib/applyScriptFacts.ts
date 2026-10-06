@@ -18,10 +18,10 @@ import { publicJobTitle } from '../../src/lib/publicJobTitle.js';
 import { boardProvinceOf } from '../../src/lib/boardFilters.js';
 import { UNSPECIFIED } from '../../src/lib/facetEngine.js';
 import type { JobRequest } from '../../src/types/index.js';
-import { speakableAgeRange, speakableWorkArea, type ApplyScriptFacts } from './lumosCallScript.js';
+import { speakableAgeRange, speakableWorkArea, speakableWorkTime, type ApplyScriptFacts } from './lumosCallScript.js';
 import { logError } from './logger.js';
 
-export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'monthlyIncome' | 'benefitLine'> & {
+export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'monthlyIncome' | 'benefitLine' | 'workSchedule'> & {
   /**
    * ชื่อจุดทำงานจากใบขอ (work_site_name → unit_name) — 🔴 ใบสมัครหลายใบไม่ได้เก็บชื่อหน่วยงานไว้
    * เดิม AI จึงพูดว่า "งานนี้ทำที่ หน่วยงานของเรา" (เจอในบทที่ส่งจริง 5 ต.ค. 2569)
@@ -86,6 +86,11 @@ async function loadFacts(jobId: string): Promise<ApplyJobFacts> {
     speakableWorkArea(publicSafeAddressParts(job as never)) ||
     (province && province !== UNSPECIFIED ? speakableWorkArea({ province }) : '') ||
     null;
+  /**
+   * เวลาทำงาน (เจ้าของ 6 ต.ค. 2569 · Choice "เพิ่มแค่เวลาทำงาน") — ค่าที่วางจากโพสต์ (`field_overrides.work_schedule`)
+   * ชนะ ERP แล้วใน `attachNotes` · หยิบแค่ช่วงวัน + ช่วงเวลา (`speakableWorkTime`) · หาไม่เจอ = บรรทัดหายเอง
+   */
+  out.workSchedule = speakableWorkTime(job.work_schedule as string | null | undefined) || null;
   out.ageRange =
     speakableAgeRange(job.age_range_min as number | null | undefined, job.age_range_max as number | null | undefined) ||
     null;

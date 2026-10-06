@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildApplicationInterviewPayload, FACTS_UNREAD_REASON, NO_INCOME_REASON } from '../../api/_lib/lumosDispatch';
-import { buildAppliedQuestions, buildOfferQuestions, KNOWN_PLACEHOLDERS } from '../../api/_lib/lumosCallScript';
+import { buildAppliedQuestions, buildOfferQuestions, KNOWN_PLACEHOLDERS, speakableWorkTime } from '../../api/_lib/lumosCallScript';
 import { EDITABLE_SCRIPT_KEYS } from '../../api/_lib/callScriptStore';
 import { CALL_SCRIPT_TEMPLATES } from '../../api/_lib/lumosCallScript.templates';
 
@@ -51,10 +51,28 @@ describe('บทผู้สมัครที่เจ้าหน้าที�
       'มีเบี้ยขยัน ค่าครองชีพให้ด้วยครับ',
       'ถ้ายังไม่สนใจงานนี้ ไม่เป็นไรครับ ขอบคุณที่สละเวลาครับ',
     ]);
-    // เมื่อวานไม่ได้สั่ง (เจ้าของ 6 ต.ค. "เมื่อวานฉันไม่ได้สั่งไว้แบบนี้หนิ")
+    // เมื่อวานไม่ได้สั่ง (เจ้าของ 6 ต.ค. "เมื่อวานฉันไม่ได้สั่งไว้แบบนี้หนิ") · เวลาทำงานเพิ่มทีหลังตาม Choice — ใบนี้ไม่มีเวลาทำงานเลยไม่พูด
     for (const extra of ['เวลาทำงาน', 'รถของตัวเอง', 'ขอทราบเหตุผล', 'นัดวันสัมภาษณ์', 'ยังหางานอยู่ไหม']) {
       expect(all).not.toContain(extra);
     }
+  });
+  /**
+   * 🔴 เวลาทำงาน (เจ้าของ 6 ต.ค. 2569 ค่ำ · Choice "เพิ่มแค่เวลาทำงาน" — คุณสมบัติไม่พูด)
+   * พูดต่อจากสวัสดิการ เป็นประโยคบอก ไม่ใช่คำถาม · ใบไม่มีเวลาทำงาน = บรรทัดหาย (เคสข้างบน)
+   */
+  it('มีเวลาทำงาน = พูดต่อจากสวัสดิการ ทั้งบทคีย์เองและบทสมัครผ่านลิงก์ · ไม่พูดคุณสมบัติ', () => {
+    const withTime = { ...FACTS, workSchedule: 'วันจันทร์ถึงวันเสาร์ 08:00 ถึง 17:00 น.' };
+    for (const q of [
+      buildApplicationInterviewPayload(APP, new Date('2026-10-06T03:00:00Z'), null, withTime)!.questions,
+      buildApplicationInterviewPayload({ ...APP, unit_name: null }, new Date('2026-10-06T03:00:00Z'), withTime, withTime)!
+        .questions,
+    ]) {
+      const i = q.indexOf('มีเบี้ยขยัน ค่าครองชีพให้ด้วยครับ');
+      expect(q[i + 1]).toBe('เวลาทำงาน วันจันทร์ถึงวันเสาร์ 08:00 ถึง 17:00 น. ครับ');
+      expect(q[i + 2]).toContain('ถ้ายังไม่สนใจงานนี้');
+      expect(q.join(' ')).not.toContain('คุณสมบัติ');
+    }
+    expect(code('api/_lib/applyScriptFacts.ts')).toContain('speakableWorkTime(job.work_schedule');
   });
   it('ไม่มีช่วงอายุ = ถามอายุตรง ๆ (ไม่ตัดบรรทัด) · ไม่มีพื้นที่ = ใช้ชื่อหน่วยงาน', () => {
     const q = buildAppliedQuestions({ candidateName: 'ทดสอบ', position: 'แม่บ้าน', unit: 'สยามพารากอน', monthlyIncome: 12000 });
@@ -110,5 +128,23 @@ describe('พื้นที่พูดได้ — ข้อมูลที�
     );
     expect(speakableWorkArea({ province: 'กรุงเทพมหานคร', district: 'แขตจตุจักร', subdistrict: '' })).toBe('เขตจตุจักร กรุงเทพมหานคร');
     expect(speakableWorkArea({ province: 'ปทุมธานี' })).toBe('จังหวัดปทุมธานี');
+  });
+});
+
+/** เวลาทำงานจากช่องจริงของใบขอ (ข้อความดิบที่เจอในระบบ 6 ต.ค. 2569) */
+describe('speakableWorkTime', () => {
+  it.each([
+    ['วันจันทร์ - วันศุกร์ • 08.00 - 17.00 น. (หากมีการเข้าหรือออกก่อนเวลา ลูกค้าจะเซ็นต์เอกสารกำกับให้ทุกครั้ง) (9 ชั่วโมงรวมพัก)', 'วันจันทร์ถึงวันศุกร์ 08:00 ถึง 17:00 น.'],
+    ['จันทร์-ศุกร์ • 8:00-17:00 น.', 'วันจันทร์ถึงวันศุกร์ 08:00 ถึง 17:00 น.'],
+    ['วันจันทร์ - วันศุกร์ หรือ 5 วัน/สัปดาห์ ตามธนาคารฯกำหนด • เวลา 8.30 - 17.30 หรือ 9 ชม./วัน รวมพัก หรือตามธนาคารฯกำหนด', 'วันจันทร์ถึงวันศุกร์ 08:30 ถึง 17:30 น.'],
+    ['ทำงาน 6 วัน/สัปดาห์ตามตารางกะ • แบ่งออกเป็น 3 กะ เวลา 09.30-18.30 , 11.00-19.00 , 13.30-22.30 น.', 'สัปดาห์ละ 6 วัน ทำงานเป็นกะ'],
+    ['จันทร์ - อาทิตย์ (พนักงาน 1 คน ทำ 6 วัน หยุด 1 วัน) • 07.00 - 16.00 น.', 'สัปดาห์ละ 6 วัน 07:00 ถึง 16:00 น.'],
+    ['วันจันทร - วันเสาร์ • ตามที่หน่วยงานที่กำหนด', 'วันจันทร์ถึงวันเสาร์'],
+    ['ปฏิบัติงาน 5 วัน/สัปดาห์ วันจันทร์ - ศุกร์ • 9.00 น. - 18.00 น. ( รวมพัก 1 ชม. )', 'วันจันทร์ถึงวันศุกร์ 09:00 ถึง 18:00 น.'],
+    ['วันจันทร์ - วันศุกร์ , วันเสาร์ (ครึ่งวันเช้า) • วันจันทร์ - วันศุกร์ 08.00 - 17.00 น. , วันเสาร์ 08.00 - 12.00 น.', 'วันจันทร์ถึงวันศุกร์'],
+    ['ตามตารางลูกค้ากำหนด • ตามตารางลูกค้ากำหนด', ''],
+    ['', ''],
+  ])('%s', (raw, want) => {
+    expect(speakableWorkTime(raw)).toBe(want);
   });
 });
