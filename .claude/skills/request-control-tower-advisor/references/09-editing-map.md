@@ -12320,3 +12320,13 @@ Choice "คงเดิม EX = AI · คนใน = คนโทร" · *"แ�
 | `src/pages/public/PublicPostingApplyPage.tsx` | ถอดกล่องรายละเอียดที่พิมพ์ตอน Gen link ต่อท้ายการ์ด — /apply ไม่มี · ข้อความเดิมมีอิโมจิ + เบอร์เจ้าหน้าที่ + รายได้ขัดกับการ์ด |
 
 - ตรวจหลังแก้: ตัวอย่างหน้า 4 = /apply ทุกบรรทัด
+
+### ลิงก์ที่ Gen ล็อกช่องทาง (6 ต.ค. 2569 · เจ้าของ "Link ที่ Gen ต้อง Lock ช่องทางด้วยสิ่" · เคยสั่ง 2 ต.ค.)
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/lib/referralChannel.ts` | **ใหม่** — ชื่อช่องทางของลิงก์ → ค่าในใบสมัคร (Facebook* → facebook · Tiktok → tiktok · ป้าย/ใบปลิว → flyer · อื่น เช่น LINE OA → other · ไม่มี = null ไม่ล็อก) |
+| `src/components/jobs/PublicApplyDialog.tsx` | `posting.channelLabel` มีค่า = ช่อง "เห็นประกาศจากช่องทางไหน" เป็นข้อความ + กุญแจ เลือกไม่ได้ · ส่งค่าตามลิงก์ · ลิงก์กลาง/หน้า /apply = เลือกเองได้ตามเดิม |
+| `src/pages/public/PublicPostingApplyPage.tsx` | ส่ง `channelLabel` ของลิงก์ให้ฟอร์ม |
+| `api/_handlers/public/apply.ts` | มี `link_id` = อ่าน `channel_label` ของลิงก์ แล้วบันทึก `referral_source` ตามลิงก์เสมอ (ไม่เชื่อค่าจากหน้าเว็บ · อ่านไม่ได้ = ค่าที่ส่งมา) |
+| เทสต์ | `tests/api/referralChannel.test.ts` |

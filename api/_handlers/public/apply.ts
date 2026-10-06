@@ -1,4 +1,5 @@
-import { dbTransaction } from '../../_lib/postgres.js';
+import { dbQuery, dbTransaction } from '../../_lib/postgres.js';
+import { referralSourceOfChannel } from '../../../src/lib/referralChannel.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { readJsonBody } from '../../_lib/body.js';
 import { tableInAppSchema } from '../../_lib/schema.js';
@@ -49,6 +50,24 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     const parsed = validatePublicApplication(await readJsonBody(req));
     if (!parsed.ok) return sendError(res, 400, 'Bad request', parsed.message);
     const v = parsed.value;
+
+    /**
+     * 🔴 ลิงก์ที่ Gen มีช่องทาง = บันทึกช่องทางตามลิงก์เสมอ (เจ้าของ 6 ต.ค. 2569 "Link ที่ Gen ต้อง Lock ช่องทางด้วยสิ่")
+     * หน้าเว็บล็อกช่องไว้แล้ว แต่ฝั่งนี้ไม่เชื่อค่าที่ส่งมา (หน้าสาธารณะ ใครยิงตรงก็ได้) · ลิงก์กลาง = ค่าที่ผู้สมัครเลือก
+     * อ่านไม่ได้ = ใช้ค่าที่ส่งมา (ห้ามทำใบสมัครล่มเพราะข้อมูลเสริม)
+     */
+    if (v.linkId) {
+      try {
+        const { rows } = await dbQuery<{ channel_label: string | null }>(
+          `select channel_label from ${tableInAppSchema('recruit_posting_links')} where id::text = $1 limit 1`,
+          [v.linkId],
+        );
+        const locked = referralSourceOfChannel(rows[0]?.channel_label);
+        if (locked) v.referralSource = locked;
+      } catch {
+        /* ใช้ค่าที่ส่งมา */
+      }
+    }
 
     const docBytes = v.document ? Buffer.from(v.document.base64, 'base64') : null;
     // จำแผนกเจ้าของงานไว้กับใบ — ใบขอปิดแล้วรายชื่อต้องยังอยู่ในคลังกลาง (migration 082)

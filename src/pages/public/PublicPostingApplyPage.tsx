@@ -118,6 +118,8 @@ const PublicPostingApplyPage: React.FC = () => {
           linkId: info.linkId,
           jobId: info.jobId,
           title: info.title,
+          // ช่องทางของลิงก์ — ฟอร์มล็อกช่อง "เห็นประกาศจากช่องทางไหน" ตามนี้ (6 ต.ค. 2569)
+          channelLabel: info.channelLabel,
         }}
       />
     </div>

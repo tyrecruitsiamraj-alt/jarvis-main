@@ -25,7 +25,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CheckCircle2, ClipboardList, Loader2, MapPin, Paperclip, PhoneCall, Send, UserRound, X } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Loader2, Lock, MapPin, Paperclip, PhoneCall, Send, UserRound, X } from 'lucide-react';
+import { referralSourceOfChannel } from '@/lib/referralChannel';
 
 const MAX_DOC_MB = 3;
 const DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png';
@@ -51,7 +52,14 @@ export type PublicApplyDialogProps = {
   job: JobRequest | null;
   onClose: () => void;
   /** เปิดจากลิงก์ประกาศ — ไม่มี job object แต่มีบริบทประกาศ/ช่องทาง */
-  posting?: { postingId: string; linkId: string; jobId: string | null; title: string } | null;
+  posting?: {
+    postingId: string;
+    linkId: string;
+    jobId: string | null;
+    title: string;
+    /** ช่องทางของลิงก์ที่ Gen (6 ต.ค. 2569) — มีค่า = ช่อง "เห็นประกาศจากช่องทางไหน" ล็อกตามลิงก์ เลือกเองไม่ได้ */
+    channelLabel?: string | null;
+  } | null;
 };
 
 type Gender = 'male' | 'female' | 'other';
@@ -103,6 +111,9 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
   const [height, setHeight] = useState('');
   const [education, setEducation] = useState('');
   const [referralSource, setReferralSource] = useState('');
+  /** ลิงก์มีช่องทาง = ล็อก (เจ้าของ 6 ต.ค. 2569 "Link ที่ Gen ต้อง Lock ช่องทางด้วยสิ่") · ลิงก์กลาง = เลือกเองได้ */
+  const lockedChannel = posting?.channelLabel?.trim() || null;
+  const lockedSource = referralSourceOfChannel(lockedChannel);
   const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -201,7 +212,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
           weight_kg: weight.trim() ? Number(weight) : null,
           height_cm: height.trim() ? Number(height) : null,
           education: education || null,
-          referral_source: referralSource || null,
+          referral_source: lockedSource ?? (referralSource || null),
           document,
           job_id: job?.id ?? posting?.jobId ?? null,
           /**
@@ -500,18 +511,30 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                 </div>
 
                 <Field label="เห็นประกาศจากช่องทางไหน">
-                  <select
-                    value={referralSource}
-                    onChange={(e) => setReferralSource(e.target.value)}
-                    className="jarvis-soft-field"
-                  >
-                    <option value="">— เลือกช่องทาง —</option>
-                    {REFERRAL_SOURCES.map((s) => (
-                      <option key={s} value={s}>
-                        {REFERRAL_SOURCE_LABEL[s]}
-                      </option>
-                    ))}
-                  </select>
+                  {lockedChannel ? (
+                    // ลิงก์ที่ Gen มีช่องทางอยู่แล้ว — ล็อก เลือกเองไม่ได้ (ช่องทางเต็มของลิงก์ ไม่ใช่แค่ตัวเลือก 5 ค่า)
+                    <p
+                      className="jarvis-soft-field flex items-center gap-2 text-muted-foreground"
+                      aria-label={`ช่องทาง ${lockedChannel}`}
+                      data-testid="apply-channel-locked"
+                    >
+                      <Lock className="h-4 w-4 shrink-0" aria-hidden />
+                      <span className="min-w-0 truncate text-foreground">{lockedChannel}</span>
+                    </p>
+                  ) : (
+                    <select
+                      value={referralSource}
+                      onChange={(e) => setReferralSource(e.target.value)}
+                      className="jarvis-soft-field"
+                    >
+                      <option value="">— เลือกช่องทาง —</option>
+                      {REFERRAL_SOURCES.map((s) => (
+                        <option key={s} value={s}>
+                          {REFERRAL_SOURCE_LABEL[s]}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </Field>
 
                 <Field label={`แนบเอกสาร (PDF/รูป ≤ ${MAX_DOC_MB}MB)`}>
