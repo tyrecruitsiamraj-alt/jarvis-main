@@ -3,6 +3,7 @@ import type { FollowGroup } from '@/lib/followGrouping';
 import { CALL_OUTCOME_TONE, followCallOutcomeText } from '@/lib/callOutcomeTone';
 import { followDispatchLabel } from '@/lib/followDispatchState';
 import { classifyFollowCall } from '@/lib/followCallMicro';
+import { isVoicemailReply } from '@/lib/callMicroOutcome';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { effectiveCallOutcome, followStaffCallText, isStaffCallResult } from '@/lib/followStaffCall';
 import { UNREACHED_CALL_OUTCOMES } from '@/lib/callOutcomeBuckets';
@@ -341,6 +342,8 @@ export function answeredButMarkedUnreached(
 ): boolean {
   const ai = (entry.call_outcome ?? '').trim();
   if (!(UNREACHED_CALL_OUTCOMES as readonly string[]).includes(ai)) return false;
+  // 🔴 เสียงระบบฝากข้อความ/ปิดเครื่อง ไม่ใช่คนรับ — เชื่อ Lumos (7 ต.ค. 2569 ปัญหา Lumos ข้อ 7)
+  if (isVoicemailReply(entry.call_reply)) return false;
   return /[\p{L}\p{N}]/u.test(entry.call_reply ?? '');
 }
 

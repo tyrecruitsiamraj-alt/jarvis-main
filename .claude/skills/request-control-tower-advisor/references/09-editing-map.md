@@ -12513,3 +12513,18 @@ Choice เจ้าของ แก้ 2 ข้อ:
 | เทสต์ | `tests/api/boardPostingPreview.test.ts` |
 
 - ⚠️ `isHiddenFromPublicByWorkStatus` ยังอยู่ (ใช้เลือกว่าจะโชว์ป้ายสถานะ) แต่ไม่กรองหน้าสาธารณะแล้ว · ไม่อยากให้ขึ้น = "ดึงประกาศลง"
+
+### ปัญหา Lumos 7/10/2569 ข้อ 1 · 6 · 7 · 8 (เจ้าของ "ผิดที่ใคร" → Choice แก้ฝั่งเรา)
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `api/_lib/followCancelResend.ts` | **ใหม่** ข้อ 1 — `cancelResendSql` (แถวติดตามยกเลิก · นัดหลังตอนนี้ · คิว cancelled · `push_state` ≠ `cancel_resent` · แผนนั้นไม่มีสาย pending · ทีละ 50) · `resendFollowCancels` ส่ง `cancelPushedReminderIgnoringMissing` ซ้ำ สำเร็จ = จด `push_state = 'cancel_resent'` ล้ม = รอบหน้า · ไม่มีคีย์ push = ไม่ทำ |
+| `api/_lib/followPushRetryWorker.ts` | เรียก `resendFollowCancels()` ก่อน `repairDeclinedFollowDays()` ทุกนาที |
+| `src/lib/callMicroOutcome.ts` | `has` ไม่สนช่องว่าง (คำถอดเสียงเว้นวรรคกลางคำ) · `isVoicemailReply` + เช็คก่อนอ่านคำ = `no_pickup` (ข้อ 7) · FOLLOW yes เพิ่ม บนรถ/ขึ้นรถ/นั่งรถ/กำลังออกจากบ้าน/กำลังจะไป (ข้อ 6) · มาถึง (ข้อ 8) · notYet เพิ่ม ยังไม่(ได้)ขึ้นรถ |
+| `src/lib/followPlanning.ts` | `answeredButMarkedUnreached` ไม่นับเสียงระบบฝากข้อความ ⇒ เชื่อ `no_answer`/`unresponsive` ของ Lumos |
+| เทสต์ | `tests/api/followCancelResend.test.ts` · `tests/api/followPlanning.test.ts` (ประโยคจริง) |
+
+- วัดจริง 30 วัน (acknowledged/unresponsive/no_answer 525 สาย): สรุปไม่ได้ 111 → 99 · ไป +5 · ไม่รับสาย +7 · ถังอื่นไม่ขยับ
+- ⚠️ ห้ามใส่ "ยังไม่ถึง" ใน notYet — 20 สาย "ยังไม่ถึงหน่วยงาน กำลังเดินทาง" ย้ายจาก said_yes ไป not_yet = อัตราสำเร็จหน้าแรกตกเงียบ ๆ
+- 🔴 เราเชื่อรหัส Lumos อยู่แล้วเมื่อชัด (`DECIDED_BY_CODE`: confirmed/declined/no_answer/busy) · อ่านคำเฉพาะ `acknowledged` (รับสายแล้ว ไม่บอกไปไหม) กับ `unresponsive`
+- ข้อ 2 (เนื้อหาสายเบอร์ฉุกเฉิน) · ข้อ 7 ส่วน "ไม่โทรเบอร์ฉุกเฉิน" = ฝั่ง Lumos

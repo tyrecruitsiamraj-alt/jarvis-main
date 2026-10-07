@@ -799,3 +799,27 @@ describe('Lumos บอกไม่รับสาย แต่มีคำพู
     expect(answeredButMarkedUnreached({ call_outcome: 'confirmed', call_reply: 'ไปครับ' })).toBe(false);
   });
 });
+
+describe('คลังคำปัญหา Lumos 7 ต.ค. 2569 ข้อ 6 · 7 · 8 (ประโยคจริงจากสาย)', () => {
+  it('🔴 ข้อ 6 อยู่บนรถ / ขึ้นรถ = ไป · ข้อ 8 ถึง / มาถึง = ไป · คำถอดเสียงเว้นวรรคกลางคำก็อ่านได้', async () => {
+    const { classifyFollowCall } = await import('../../src/lib/followCallMicro');
+    const ack = (reply: string) => classifyFollowCall({ outcome: 'acknowledged', reply, summary: null });
+    expect(ack('เตรียม ตัว ขึ้น รถ ครับ')).toBe('said_going');
+    expect(ack('อยู่บนรถค่ะ')).toBe('said_going');
+    expect(ack('ใช่ ค่ะ นั่ง รถ แล้ว ค่ะ')).toBe('said_going');
+    expect(ack('ถึง ณ 844 แล้ว ครับ มาถึง 44 แล้ว ครับ')).toBe('said_going');
+    expect(ack('ยังไม่ได้ขึ้นรถครับ')).toBe('getting_ready');
+    // ยังไม่ถึงแต่กำลังเดินทาง = ไปเหมือนเดิม (ห้ามย้ายถังเงียบ ๆ)
+    expect(classifyFollowCall({ outcome: 'acknowledged', reply: 'ยังครับ กำลังเดินทางครับ', summary: 'แจ้งว่ายังไม่ถึงหน่วยงาน กำลังเดินทางอยู่' })).toBe('said_going');
+  });
+  it('🔴 ข้อ 7 เสียงระบบฝากข้อความ = ไม่รับสาย ตามที่ Lumos ส่งมา (ไม่ขึ้น "รับสายแล้ว")', async () => {
+    const { classifyFollowCall } = await import('../../src/lib/followCallMicro');
+    const { answeredButMarkedUnreached } = await import('../../src/lib/followPlanning');
+    expect(answeredButMarkedUnreached({ call_outcome: 'unresponsive', call_reply: 'กรุณาฝากข้อความค่ะ' })).toBe(false);
+    expect(answeredButMarkedUnreached({ call_outcome: 'no_answer', call_reply: 'For English, please press two. · ฝากหมายเลขนี้กด 1' })).toBe(false);
+    expect(classifyFollowCall({ outcome: 'unresponsive', reply: 'กรุณาฝากข้อความหลังได้ยินเสียงสัญญาณ', summary: null })).toBe('no_pickup');
+    expect(classifyFollowCall({ outcome: 'acknowledged', reply: 'กรุณาฝากข้อความค่ะ', summary: null })).toBe('no_pickup');
+    // คนรับจริงยังเป็นกรณีเดิม
+    expect(answeredButMarkedUnreached({ call_outcome: 'no_answer', call_reply: 'ครับ ครับ ผม' })).toBe(true);
+  });
+});

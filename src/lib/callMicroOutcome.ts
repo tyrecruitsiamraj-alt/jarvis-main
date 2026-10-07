@@ -137,8 +137,38 @@ export function stripQuestionClauses(text: string): string {
   return out.replace(/\s+/g, ' ').trim();
 }
 
-const has = (haystack: string, words: readonly string[]): boolean =>
-  words.some((w) => haystack.includes(w.toLowerCase()));
+/**
+ * 🔴 ไม่สนช่องว่าง (7 ต.ค. 2569) — คำถอดเสียงของ Lumos เว้นวรรคกลางคำไทย: *"เตรียม ตัว ขึ้น รถ"* · *"มา ถึง แล้ว"*
+ * ภาษาไทยไม่เว้นวรรคระหว่างคำอยู่แล้ว ⇒ เทียบทั้งแบบเดิมและแบบตัดช่องว่างทิ้ง
+ */
+const tight = (s: string) => s.replace(/\s+/g, '');
+const has = (haystack: string, words: readonly string[]): boolean => {
+  const t = tight(haystack);
+  return words.some((w) => haystack.includes(w.toLowerCase()) || t.includes(tight(w.toLowerCase())));
+};
+
+/**
+ * ═══ ระบบฝากข้อความ / ปิดเครื่อง = ไม่มีคนรับ (เจ้าของ 7 ต.ค. 2569 ปัญหา Lumos ข้อ 7) ═══
+ * คำพูดในสายเป็นเสียงเครื่อง (*"กรุณาฝากข้อความค่ะ"*) ไม่ใช่คน — เดิมจอขึ้น "สรุปไม่ได้ — รับสายแล้ว"
+ * เพราะเห็นว่ามีคำพูด · Lumos เองส่ง `no_answer` / `unresponsive` มาถูกแล้ว ⇒ เชื่อ Lumos
+ */
+const VOICEMAIL_WORDS = [
+  'ฝากข้อความ',
+  'ฝากหมายเลข',
+  'for english, please press',
+  'หมายเลขที่ท่านเรียก',
+  'เลขหมายที่ท่านเรียก',
+  'ไม่สามารถติดต่อได้ในขณะนี้',
+  'ปิดเครื่องหรืออยู่นอกพื้นที่',
+  'อยู่นอกพื้นที่ให้บริการ',
+  'leave a message',
+  'voicemail',
+] as const;
+
+export function isVoicemailReply(reply: string | null | undefined): boolean {
+  const r = (reply ?? '').trim().toLowerCase();
+  return r !== '' && has(r, VOICEMAIL_WORDS);
+}
 
 /** รหัสผลจาก Lumos ที่ตัดสินได้เลย ไม่ต้องอ่านคำพูด — เหมือนกันทุกงาน */
 const DECIDED_BY_CODE: Record<string, CallMicroOutcome> = {
@@ -185,6 +215,9 @@ export function classifyCallMicro(
 
   if (`${rawSummary} ${reply}`.trim() === '')
     return code === 'unresponsive' ? 'no_pickup' : 'picked_silent';
+
+  // เสียงเครื่องฝากข้อความ = ไม่มีคนรับ (ไม่ใช่ "คุยแล้วไม่ชัด")
+  if (isVoicemailReply(reply)) return 'no_pickup';
 
   // พูดแต่คำทักทาย/คำรับสั้น ๆ แล้วจบ ⇒ ยังไม่ได้ตอบคำถาม
   if (rawSummary === '' && GREETING_ONLY.test(reply.replace(/\s+/g, ' '))) return 'picked_silent';
@@ -313,7 +346,15 @@ export const FOLLOW_VOCAB: CallMicroVocab = {
     'ขับรถอยู่',
     'ขับไปแล้ว',
     'รอรถ',
+    // 🔴 อยู่บนรถ / ขึ้นรถแล้ว = เตรียมตัวไปแล้ว (เจ้าของ 7 ต.ค. 2569 ปัญหา Lumos ข้อ 6)
+    'บนรถ',
+    'ขึ้นรถ',
+    'นั่งรถ',
+    'กำลังออกจากบ้าน',
+    'กำลังจะไป',
     'ถึงแล้ว',
+    // 🔴 "ถึง" / "มาถึง" = ไป (ข้อ 8 · ของจริง *"ถึง ณ 844 แล้ว ครับ มาถึง 44 แล้ว ครับ"*)
+    'มาถึง',
     'ถึงหน่วยงาน',
     'ถึงที่ทำงาน',
     'ถึงโรงพยาบาล',
@@ -337,6 +378,10 @@ export const FOLLOW_VOCAB: CallMicroVocab = {
     'ยังไม่ตื่น',
     'ยังไม่ได้เตรียม',
     'ยังไม่ได้ออก',
+    // ต้องอยู่ฝั่งนี้ — ไม่งั้น "ยังไม่ได้ขึ้นรถ" ไปเจอ "ขึ้นรถ" ของฝั่งไป
+    // ⚠️ "ยังไม่ถึง (กำลังเดินทาง)" ไม่ใส่ — ของเดิมนับเป็นไปมาตลอด ย้ายถัง = อัตราสำเร็จบนหน้าแรกขยับเงียบ ๆ
+    'ยังไม่ได้ขึ้นรถ',
+    'ยังไม่ขึ้นรถ',
   ],
   topic: ['เตรียมตัว', 'ไปทำงาน', 'ถึงหน่วยงาน', 'เดินทาง', 'ไปที่หน่วยงาน'],
 };
