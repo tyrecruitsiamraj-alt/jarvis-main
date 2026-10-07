@@ -53,6 +53,8 @@ import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { journeyResultOf, type FollowJourneyEvent, type FollowJourneyResponse, type FollowJourneyRow } from '../../src/lib/followJourney.js';
 import { createHash } from 'node:crypto';
 import { loadHomeLumosSummary } from '../_lib/homeLumosSummarySql.js';
+import { loadTopicReport } from '../_lib/homeTopicReportSql.js';
+import type { TopicReportBlock, TopicReportResponse } from '../../src/lib/homeTopicReport.js';
 import type { HomeLumosSummaryResponse } from '../../src/lib/homeLumosSummary.js';
 import {
   AI_SHARE_LIST_PAGE,
@@ -576,6 +578,36 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const scope: DepartmentScope = await loadMatchingBuScope(req.user);
     const bu = scope.mode === 'code' ? normalizeTrendBu(scope.code) : parseBuParam(q.bu);
     const win = parseAiShareWindow({ from: q.from, to: q.to });
+    // `?report=<ก้อน>` = รายงานผลโทร งานสรรหา / จับคู่งาน / ดูแลหลังเริ่มงาน (7 ต.ค. 2569) — ช่วง/BU เดียวกับกล่อง
+    if (q.report !== undefined) {
+      const block = q.report;
+      if (block !== 'applicants' && block !== 'matching' && block !== 'aftercare') {
+        return sendError(res, 400, 'Bad request', 'ไม่รู้จักก้อนนี้');
+      }
+      const body: TopicReportResponse = {
+        generated_at: new Date().toISOString(),
+        block: block as TopicReportBlock,
+        from: win.from,
+        to: win.to,
+        bu,
+        report: null,
+        error: null,
+      };
+      if (scope.mode === 'none') {
+        body.error = 'บัญชีนี้ยังไม่ได้ผูกแผนก เลยยังดูผลโทรไม่ได้';
+        return res.status(200).json(body);
+      }
+      try {
+        const { start, end } = aiShareBounds(win, new Date());
+        body.report = await loadTopicReport(block as TopicReportBlock, start, end, bu);
+      } catch (e) {
+        logWarn('home-ai-share report failed', { block, error: errText(e) });
+        body.error = 'โหลดผลโทรไม่ขึ้น ลองรีเฟรชอีกครั้ง';
+      }
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json(body);
+    }
+
     // `?summary=lumos` = สรุปแบบบอท Lumos (7 ต.ค. 2569) — งานที่ส่งให้ AI ช่วงเดียวกับปฏิทิน
     if (q.summary !== undefined) {
       if (q.summary !== 'lumos') return sendError(res, 400, 'Bad request', 'ไม่รู้จักก้อนนี้');

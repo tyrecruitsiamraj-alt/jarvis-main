@@ -35,6 +35,40 @@ vi.mock('@/lib/homeAiShareApi', () => ({
   fetchHomeAiShare: (...a: unknown[]) => fetchHomeAiShare(...a),
   fetchHomeAiShareDetail: (...a: unknown[]) => fetchHomeAiShareDetail(...a),
   fetchHomeAiShareList: (...a: unknown[]) => fetchHomeAiShareList(...a),
+  // รายงานผลโทรของหัวข้ออื่น (7 ต.ค. 2569)
+  fetchTopicReport: (block: string, w: { from: string | null; to: string | null }) =>
+    Promise.resolve({
+      generated_at: '2026-10-07T10:00:00.000Z',
+      block,
+      from: w.from,
+      to: w.to,
+      bu: null,
+      error: null,
+      report: {
+        funnel: [
+          { key: 'published', label: 'ประกาศ', value: 34 },
+          { key: 'total', label: 'ใบสมัครเข้ามา', value: 204 },
+          { key: 'called', label: 'ติดต่อแล้ว', value: 188 },
+          { key: 'interested', label: 'สนใจ', value: 106 },
+        ],
+        cols: [
+          { key: 'interested', label: 'สนใจ', tone: 'success' },
+          { key: 'noResult', label: 'ยังไม่มีผล', tone: 'info' },
+        ],
+        cells: [
+          { bu: 'LBD', seg: 'ai', col: 'interested', n: 104 },
+          { bu: 'LBD', seg: 'ai', col: 'noResult', n: 80 },
+          { bu: 'LBD', seg: 'notCalled', col: 'noResult', n: 12 },
+          { bu: 'LBA', seg: 'ai', col: 'interested', n: 2 },
+          { bu: 'LBA', seg: 'ai', col: 'noResult', n: 2 },
+          { bu: null, seg: 'notCalled', col: 'noResult', n: 4 },
+        ],
+        extra: [
+          { title: 'ส่งต่อให้คน', items: [{ key: 'handoff', label: 'AI โทรแล้ว คนรับต่อ', value: 0 }] },
+          { title: 'ใบที่ยังรอ', items: [{ key: 'retry', label: 'รอ AI ลองใหม่', value: 42, tone: 'warn' }] },
+        ],
+      },
+    }),
   // สรุปแบบบอท Lumos (7 ต.ค. 2569)
   fetchHomeLumosSummary: (w: { from: string | null; to: string | null }) =>
     Promise.resolve({
@@ -599,14 +633,21 @@ describe('หน้าหลักอ่านไล่บนลงล่าง 
     for (const id of ['kpi-pick', 'ai-gauge', 'bu-breakdown', 'follow-team-breakdown', 'result-bars']) {
       expect(screen.queryByTestId(id)).toBeNull();
     }
+    // งานสรรหา = เส้นทาง → ก้อนละ BU (ครบ 4 ก้อน) → ส่งต่อให้คน / ใบที่ยังรอ (7 ต.ค. 2569)
     pickTopic(new RegExp(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')!.label));
-    const apps = await screen.findByTestId('lumos-stats-applicants');
-    await waitFor(() => expect(within(apps).getByRole('img', { name: /ผลโทร 178/ })).toBeTruthy());
-    expect(within(apps).getByTestId('lumos-applicants-sum').textContent).toBe('100 + 43 + 35 + 0 = 178');
-    expect(within(apps).getByTestId('lumos-applicants-backlog').textContent).toContain('46');
+    const rep = await screen.findByTestId('topic-report-applicants');
+    await waitFor(() => expect(within(rep).getByTestId('report-funnel').textContent).toContain('ประกาศ34'));
+    expect(within(rep).getByTestId('report-funnel').textContent).toContain('ติดต่อแล้ว188');
+    const rcells = (key: string) => within(within(rep).getByTestId(key)).getAllByRole('cell').map((c) => c.textContent);
+    expect(rcells('report-row-LBD-ai')).toEqual(['AI โทร', '184', '104', '80']);
+    expect(rcells('report-row-LBD-staff')).toEqual(['คนโทร', '0', '0', '0']);
+    expect(rcells('report-row-LBD-total')).toEqual(['รวม LBD', '196', '104', '92']);
+    expect(within(rep).getByTestId('report-sum').textContent).toBe('LBD 196 + LBA 4 + ไม่ระบุ 4 = 204 รายชื่อ');
+    expect(within(rep).getByTestId('report-extra-ใบที่ยังรอ').textContent).toContain('42');
     pickTopic(/จับคู่งาน/);
     await screen.findByRole('heading', { name: 'จับคู่งาน' });
     expect(screen.queryByTestId('lumos-stats-matching')).toBeNull();
+    expect(await screen.findByTestId('topic-report-matching')).toBeTruthy();
   });
 });
 

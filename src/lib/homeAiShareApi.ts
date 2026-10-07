@@ -10,6 +10,7 @@ import type {
 } from '@/lib/homeAiShare';
 import type { FollowJourneyResponse } from '@/lib/followJourney';
 import type { HomeLumosSummaryResponse } from '@/lib/homeLumosSummary';
+import type { TopicReportBlock, TopicReportResponse } from '@/lib/homeTopicReport';
 
 function queryOf(q: AiShareWindow & { bu?: string | null }, extra: Record<string, string> = {}): string {
   const p = new URLSearchParams(extra);
@@ -60,4 +61,9 @@ export function fetchFollowJourney(q: AiShareWindow & { bu?: string | null }): P
 /** สรุปแบบบอท Lumos (7 ต.ค. 2569) — งานที่ส่งให้ AI ช่วงเดียวกับปฏิทิน */
 export function fetchHomeLumosSummary(q: AiShareWindow & { bu?: string | null }): Promise<HomeLumosSummaryResponse> {
   return read<HomeLumosSummaryResponse>(`/api/home-ai-share${queryOf(q, { summary: 'lumos' })}`);
+}
+
+/** รายงานผลโทร งานสรรหา / จับคู่งาน / ดูแลหลังเริ่มงาน (7 ต.ค. 2569) */
+export function fetchTopicReport(block: TopicReportBlock, q: AiShareWindow & { bu?: string | null }): Promise<TopicReportResponse> {
+  return read<TopicReportResponse>(`/api/home-ai-share${queryOf(q, { report: block })}`);
 }

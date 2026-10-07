@@ -21,8 +21,10 @@ import { queueCancelled, queueLastResultAt, queueOutcome, queuePayloadNameSql, q
 import {
   CALLED_BY_AI_SQL,
   CALLED_BY_STAFF_SQL,
+  HAS_APPOINTMENT_SQL,
   HELD_OR_CLAIMED_SQL,
   IN_QUEUE_SQL,
+  LATEST_ATTENDANCE_SQL,
   LATEST_AI_RESULT_LATERAL,
   LATEST_STAFF_RESULT_LATERAL,
   holdEventAtSql,
@@ -43,6 +45,7 @@ const APPS = tableInAppSchema('public_job_applications');
 const FOLLOW = tableInAppSchema('follow_entries');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const HOLDS = tableInAppSchema('candidate_call_holds');
+const CONTACTS = tableInAppSchema('application_contact_logs');
 
 /**
  * รูปผลลัพธ์ — `total` = ยอดรวมก้อนเดียว (การ์ด) · `byDayBu` = แยกวัน (เวลาไทย) × BU (กราฟ) ·
@@ -50,7 +53,8 @@ const HOLDS = tableInAppSchema('candidate_call_holds');
  * `results` = ผลล่าสุดของงานที่โทรแล้ว แยก AI/คน (แผง "ผลโทร" · รอบ 18 — หน้าเว็บ/เส้นเป็นคนจัดถังด้วยคำพูด)
  * ทุกโหมดใช้ CTE ตัวเดียวกัน ⇒ ผลรวมทุกแถวของ `byDayBu` = ยอดของ `total` · จำนวนชื่อของ `list` = เลขในกล่อง (เทสต์คุม)
  */
-export type AiShareSqlMode = 'total' | 'byDayBu' | 'list' | 'results';
+/** `report` = ทุกแถวของชุดเดียวกับกล่อง + ผลล่าสุดสองฝั่ง (รายงานผลโทรหน้าหลัก 7 ต.ค. 2569 · นับต่อที่ Node) */
+export type AiShareSqlMode = 'total' | 'byDayBu' | 'list' | 'results' | 'report';
 
 /** หน้าของรายชื่อ — `key` = กล่องที่กด · `limit`/`offset` เป็นจำนวนเต็มที่ตรวจแล้วเท่านั้น */
 export type AiShareListOpts = { key: AiShareListKey; limit: number; offset: number };
@@ -103,8 +107,11 @@ function listSelect(from: string, list: AiShareListOpts | undefined): string {
 /** คอลัมน์เพิ่มของ CTE เฉพาะโหมดรายชื่อ — โหมดนับไม่แตะ (คิวรีเดิมไม่เปลี่ยน) */
 const listCols = (mode: AiShareSqlMode, cols: string) => (mode === 'list' ? `,\n           ${cols}` : '');
 /** คอลัมน์/ตารางเพิ่มของ CTE เฉพาะโหมดผลโทร (รอบ 18) — โหมดอื่นไม่แตะ */
-const resultCols = (mode: AiShareSqlMode, cols: string) => (mode === 'results' ? `,\n           ${cols}` : '');
-const resultJoins = (mode: AiShareSqlMode, joins: string) => (mode === 'results' ? `\n      ${joins}` : '');
+const withResults = (mode: AiShareSqlMode) => mode === 'results' || mode === 'report';
+const resultCols = (mode: AiShareSqlMode, cols: string) => (withResults(mode) ? `,\n           ${cols}` : '');
+/** คอลัมน์เพิ่มเฉพาะโหมดรายงาน */
+const reportCols = (mode: AiShareSqlMode, cols: string) => (mode === 'report' ? `,\n           ${cols}` : '');
+const resultJoins = (mode: AiShareSqlMode, joins: string) => (withResults(mode) ? `\n      ${joins}` : '');
 
 /**
  * ท้ายคิวรีของผลโทร — รายชื่อที่มีผลอย่างน้อยหนึ่งฝั่ง · ฝั่งละผลล่าสุดพร้อมเวลา (หน้าเว็บ/เส้นเลือกผลล่าสุดผลเดียวต่อรายชื่อ)
@@ -184,7 +191,7 @@ export function buildFollowAiShareSql(
            ${followBuSql('f')} as bu${listCols(mode, "f.id::text as id,\n           nullif(btrim(f.recipient_name), '') as name,\n           f.scheduled_at as at")}${resultCols(
              mode,
              `air.outcome as ai_outcome, air.summary as ai_summary, air.reply as ai_reply, air.at as ai_at,\n           case when ${followCalledByStaffSql(staffReady)} then nullif(btrim(${staffReady ? 'f.staff_call_outcome' : 'null::text'}), '') end as staff_outcome,\n           ${staffReady ? 'f.staff_called_at' : 'null::timestamptz'} as staff_at`,
-           )}
+           )}${reportCols(mode, `(f.cancelled_at is not null) as cancelled,\n           (${staffReady ? 'f.staff_called_at' : 'null::timestamptz'} is null and f.call_mode = 'manual') as waiting_staff`)}
       from ${FOLLOW} f
       ${followBuJoin('f')}${resultJoins(
         mode,
@@ -204,7 +211,9 @@ export function buildFollowAiShareSql(
        and ($2::timestamptz is null or f.scheduled_at < $2::timestamptz)
        and ($3::text is null or ${followBuSql('f')} = $3::text)
   )${
-    mode === 'results'
+    mode === 'report'
+      ? `\n  select * from f0`
+      : mode === 'results'
       ? resultsSelect('f0')
       : mode === 'list'
       ? listSelect('f0', list)
@@ -237,6 +246,16 @@ export function buildApplicantAiShareSql(mode: AiShareSqlMode = 'total', list?: 
            ${appBuSql('a')} as bu${listCols(mode, "a.id::text as id,\n           nullif(btrim(a.full_name), '') as name,\n           a.created_at as at")}${resultCols(
              mode,
              'air.outcome as ai_outcome, air.summary as ai_summary, air.reply as ai_reply, air.at as ai_at,\n           str.outcome as staff_outcome, str.at as staff_at',
+           )}${reportCols(
+             mode,
+             [
+               'a.age',
+               `${HAS_APPOINTMENT_SQL} as appointment`,
+               `${LATEST_ATTENDANCE_SQL} as attendance`,
+               `(select c.ok from ${CONTACTS} c where c.application_id = a.id order by c.created_at desc limit 1) as log_ok`,
+               `(select max(c.created_at) from ${CONTACTS} c where c.application_id = a.id) as log_at`,
+               `exists (select 1 from ${QUEUE} q where q.person_ref = 'app-' || a.id::text and q.status in ('pending', 'delivered') and q.followup_state = 'retry_scheduled') as retry`,
+             ].join(',\n           '),
            )}
       from ${APPS} a
       ${appBuJoin('a')}${resultJoins(mode, `${LATEST_AI_RESULT_LATERAL}\n      ${LATEST_STAFF_RESULT_LATERAL}`)}
@@ -245,7 +264,9 @@ export function buildApplicantAiShareSql(mode: AiShareSqlMode = 'total', list?: 
        and a.created_at < $2::timestamptz
        and ($3::text is null or ${appBuSql('a')} = $3::text)
   )${
-    mode === 'results'
+    mode === 'report'
+      ? `\n  select * from a0`
+      : mode === 'results'
       ? resultsSelect('a0')
       : mode === 'list'
       ? listSelect('a0', list)
@@ -337,7 +358,9 @@ export function buildMatchingAiShareSql(mode: AiShareSqlMode = 'total', list?: A
        and ($3::text is null or bu = $3::text)
      group by person, job
   )${
-    mode === 'results'
+    mode === 'report'
+      ? `\n  select * from pairs`
+      : mode === 'results'
       ? resultsSelect('pairs')
       : mode === 'list'
       ? listSelect('pairs', list)

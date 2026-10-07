@@ -4,12 +4,11 @@
  * *"เนี่ยเอาออก แล้วไออันที่มีก็แค่เอาทั้งหมดกลับมา"* (ถอดรายการข้างโดนัท · คืนแถวรวม) → *"เอาแบบนี้"* (ภาพอ้างอิง)
  * - การ์ดผลโทร (ติดตาม): ก้อนละ BU — เรื่อง × ใครโทร × ผล 7 ช่อง (เจ้าของ 7 ต.ค. ดึก "Bu เอาไปรวมตรงผลเลย") · ผู้สมัคร = แท่ง + งานเก่า
  * - `useHomeLumosSummary` = ตัวโหลดของหน้า (หน้าเรียกครั้งเดียว ส่งข้อมูลเข้าการ์ด)
- * - `FOLLOW_RESULT_COLS` / `APPLICANT_RESULT_COLS` = ชื่อ + สีของแต่ละผล ที่เดียวทั้งหน้า
+ * - `FOLLOW_RESULT_COLS` = ชื่อ + สีของแต่ละผลของติดตาม · หัวข้ออื่นอยู่ `TopicReportCard`
  * บรรทัดบวกใต้ตาราง (ไม่ลงตัว = แดง) · นิยาม `src/lib/homeLumosSummary.ts`
  * 🔴 สีจาก TONE ชุดเดียวกับหน้าติดตาม · กราฟใช้ `currentColor` + คลาส TONE · ไม่มีประโยคอธิบายบนจอ
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Bar, BarChart, Cell, LabelList, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -23,13 +22,11 @@ import { fetchHomeLumosSummary } from '@/lib/homeAiShareApi';
 import {
   followBucketAddsUp,
   followBuBlocks,
-  lumosBucketAddsUp,
   type FollowBucket,
   type FollowBucketKey,
   type FollowBuCell,
   type FollowTeamKey,
   type HomeLumosSummaryResponse,
-  type LumosBucket,
 } from '@/lib/homeLumosSummary';
 import { cn } from '@/lib/utils';
 
@@ -49,15 +46,7 @@ export const FOLLOW_RESULT_COLS: ReadonlyArray<{ key: FollowBucketKey; label: st
   { key: 'cancelled', label: 'ยกเลิก', tone: FOLLOW_MATRIX_COL_TONE.cancelled },
 ];
 
-/** ผลของงานรับสมัคร (งานที่ส่งให้ AI) */
-export const APPLICANT_RESULT_COLS: ReadonlyArray<{ key: Exclude<keyof LumosBucket, 'total'>; label: string; tone: ToneKey }> = [
-  { key: 'done', label: 'มีผลแล้ว', tone: 'success' },
-  { key: 'waiting', label: 'ยังรอ', tone: 'info' },
-  { key: 'failed', label: 'ล้มเหลว', tone: 'warn' },
-  { key: 'cancelled', label: 'ยกเลิก', tone: 'neutral' },
-];
-
-export const hasLumosResults = (block: AiShareBlockKey) => block === 'follow' || block === 'applicants';
+export const hasLumosResults = (block: AiShareBlockKey) => block === 'follow';
 
 /** ตัวโหลดตัวเดียวของหน้า — ช่วงตามแท่งที่กด · อัปเดตสดเงียบ ๆ รอบเดียวกับหน้า */
 export function useHomeLumosSummary(block: AiShareBlockKey, win: AiShareWindow, tick: number) {
@@ -103,32 +92,6 @@ export function useHomeLumosSummary(block: AiShareBlockKey, win: AiShareWindow, 
   return { current, failed: error ?? current?.error ?? null };
 }
 
-/** กราฟแท่งทีละผล — แท่งมนสีตามความหมาย · เลขบนหัวแท่ง · ชื่อผลใต้แท่ง (แบบ "Pipeline Stage Breakdown") */
-function ResultBars({ slices, label }: { slices: ResultSlice[]; label: string }) {
-  return (
-    <div className="h-64 w-full text-muted-foreground" role="img" aria-label={label} data-testid="result-bars">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={slices} margin={{ top: 24, right: 8, bottom: 0, left: 0 }}>
-          <XAxis dataKey="label" tickLine={false} axisLine={false} interval={0} tick={{ fill: 'currentColor', fontSize: 12 }} />
-          <YAxis hide />
-          <Bar dataKey="value" radius={[12, 12, 12, 12]} maxBarSize={56} isAnimationActive={false} minPointSize={4}>
-            {slices.map((s) => (
-              <Cell key={s.key} fill="currentColor" className={TONE[s.tone].value} />
-            ))}
-            <LabelList
-              dataKey="value"
-              position="top"
-              className="fill-foreground"
-              formatter={(v: number) => NUM.format(v)}
-              style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}
-            />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
 const AiShareLumosStats: React.FC<{
   block: AiShareBlockKey;
   unit: string;
@@ -141,11 +104,7 @@ const AiShareLumosStats: React.FC<{
     <Card variant="solid" className={cn('space-y-6 p-6 sm:p-7', className)} data-testid={`lumos-stats-${block}`}>
       <h2 className="text-xl font-medium text-foreground">ผลโทร</h2>
       {failed ? <p className={cn('text-sm', TONE.danger.value)}>{failed}</p> : null}
-      {block === 'follow' ? (
-        <FollowResults split={data?.follow ?? null} cells={data?.followByBu ?? null} unit={unit} />
-      ) : (
-        <ApplicantResults b={data?.applicants ?? null} backlog={data?.backlog ?? null} unit={unit} />
-      )}
+      <FollowResults split={data?.follow ?? null} cells={data?.followByBu ?? null} unit={unit} />
     </Card>
   );
 };
@@ -264,29 +223,6 @@ function FollowResults({
         {blocks.map((b) => `${b.bu ?? 'ไม่ระบุ'} ${NUM.format(b.sum.total)}`).join(' + ')} = {NUM.format(sumOfBlocks)} {unit}
         {ok ? '' : ` · ไม่ตรงกับ ${NUM.format(all)}`}
       </p>
-    </div>
-  );
-}
-
-/** ผู้สมัคร — งานที่ส่งให้ AI · แท่ง + งานเก่า */
-function ApplicantResults({ b, backlog, unit }: { b: LumosBucket | null; backlog: number | null; unit: string }) {
-  const slices: ResultSlice[] = APPLICANT_RESULT_COLS.map((c) => ({ key: c.key, label: c.label, tone: c.tone, value: b ? b[c.key] : 0 }));
-  return (
-    <div className="space-y-5">
-      {b ? <ResultBars slices={slices} label={`ผลโทร ${NUM.format(b.total)} ${unit}`} /> : <Skeleton className="h-64 w-full rounded-xl" />}
-      <div className="flex items-center gap-3 border-t border-foreground/10 pt-4 text-sm" data-testid="lumos-applicants-backlog">
-        <span className="flex-1 text-foreground">งานเก่าที่ต้องติดตาม</span>
-        <span className="text-base font-medium tabular-nums text-foreground">{backlog === null ? '—' : NUM.format(backlog)}</span>
-      </div>
-      {b ? (
-        <p
-          className={cn('text-xs tabular-nums', lumosBucketAddsUp(b) ? 'text-muted-foreground' : TONE.danger.value)}
-          data-testid="lumos-applicants-sum"
-        >
-          {APPLICANT_RESULT_COLS.map((c) => NUM.format(b[c.key])).join(' + ')} = {NUM.format(b.done + b.waiting + b.failed + b.cancelled)}
-          {lumosBucketAddsUp(b) ? '' : ` · ไม่ตรงกับ ${NUM.format(b.total)}`}
-        </p>
-      ) : null}
     </div>
   );
 }

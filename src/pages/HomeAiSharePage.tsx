@@ -35,6 +35,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveTick } from '@/hooks/useLiveTick';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { KpiTile } from '@/components/home-ai-share/HomeKpis';
+import TopicReportCard from '@/components/home-ai-share/TopicReportCard';
 import { segmentDotClass, segmentFillClass } from '@/components/home-ai-share/segmentStyle';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { metricHelp, type MetricKey } from '@/lib/metricDictionary';
@@ -473,8 +474,12 @@ const HomeAiSharePage: React.FC = () => {
         />
       </Card>
 
-      {/* ผลโทร — ติดตามแบ่งก้อนละ BU · ช่วงตามแท่งที่กด */}
-      <AiShareLumosStats block={meta.key} unit={meta.unit} data={lumos.current} failed={lumos.failed} />
+      {/* ผลโทร — ติดตามแบ่งก้อนละ BU · หัวข้ออื่น = เส้นทาง → เทียบ AI/คน ก้อนละ BU → ส่งต่อให้คน + ที่ยังรอ (7 ต.ค. 2569) · ช่วงตามแท่งที่กด */}
+      {meta.key === 'follow' ? (
+        <AiShareLumosStats block={meta.key} unit={meta.unit} data={lumos.current} failed={lumos.failed} />
+      ) : (
+        <TopicReportCard block={meta.key} win={cardWin} tick={tick} unit={meta.unit} />
+      )}
 
       {/* หัวข้อติดตาม กด AI โทร / คนโทร = แยกเรื่อง → ผล → รายชื่อ (เจ้าของ 7 ต.ค. 2569 "ป๊อปเดิม เปลี่ยนข้างใน") */}
       <FollowCallerDialog
