@@ -8,7 +8,7 @@ import { isOtBenefit, publicBenefitList, publicFieldVisible } from '@/lib/public
 import { benefitDisplayLabels, isRetiredBenefit } from '@/lib/extraBenefits';
 import { payCycleCardText, payCyclesOf } from '@/lib/payCycle';
 import { formatYmdDmyBe } from '@/lib/dateTh';
-import { benefitWithAmount, jobAverageIncome, jobBaseIncome } from '@/lib/jobPublicFacts';
+import { benefitWithAmount, jobAverageIncome, jobIncomeLine } from '@/lib/jobPublicFacts';
 
 const NUM = new Intl.NumberFormat('th-TH');
 
@@ -36,7 +36,8 @@ export default function JobPublicFacts({
   placeText?: string | null;
 }) {
   const incomeShown = publicFieldVisible(job, 'income');
-  const income = incomeShown ? jobBaseIncome(job) : null;
+  // ฐาน · รายได้รวม แยกช่อง (เจ้าของ 7 ต.ค. 2569 "รายได้รวมยังไม่มีบนกล่องเลย มีแค่ฐานเอง")
+  const income = incomeShown ? jobIncomeLine(job) : null;
   const pay = incomeShown ? payCycleCardText(payCyclesOf(job)) : '';
   const average = publicFieldVisible(job, 'average_income') ? jobAverageIncome(job) : null;
   /**
@@ -71,9 +72,15 @@ export default function JobPublicFacts({
           <Banknote className={icon} aria-hidden />
           {incomeShown ? (
             income ? (
-              <span className="tabular-nums text-foreground" title={staff ? (income.hint ?? undefined) : undefined}>
-                ฐานเงินเดือน {income.text}
-              </span>
+              <>
+                {income.base ? (
+                  <span className="tabular-nums text-foreground" title={staff ? (income.hint ?? undefined) : undefined}>
+                    ฐานเงินเดือน {income.base}
+                  </span>
+                ) : null}
+                {income.base && income.total ? <span aria-hidden>·</span> : null}
+                {income.total ? <span className="tabular-nums text-foreground">รายได้รวม {income.total}</span> : null}
+              </>
             ) : (
               <span className={staff ? TONE.warn.value : undefined}>ยังไม่ตั้งรายได้</span>
             )

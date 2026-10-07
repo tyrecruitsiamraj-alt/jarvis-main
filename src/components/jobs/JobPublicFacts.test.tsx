@@ -109,3 +109,28 @@ describe('JobPublicFacts', () => {
     expect(payCycleCardText([])).toBe('');
   });
 });
+
+/** เจ้าของ 7 ต.ค. 2569: "รายได้รวมยังไม่มีบนกล่องเลย มีแค่ฐานเอง" — ฐาน · รายได้รวม แยกช่องบนการ์ด */
+describe('jobIncomeLine — ฐาน · รายได้รวม', async () => {
+  const { jobIncomeLine } = await import('@/lib/jobPublicFacts');
+  it('ERP: ฐาน + รายได้รวม (รวมมากกว่าฐาน) · รวมเท่าฐาน = ไม่ขึ้นซ้ำ', () => {
+    expect(jobIncomeLine({ monthly_income_base: 13000, monthly_income: 17500 } as never)).toEqual({
+      base: '13,000 บาท/เดือน',
+      total: '17,500 บาท/เดือน',
+      hint: null,
+    });
+    expect(jobIncomeLine({ monthly_income_base: 13000, monthly_income: 13000 } as never)?.total).toBeNull();
+  });
+  it('ทีมแยกรายการ: มีบรรทัดฐาน = ฐาน + รวม · ไม่มีบรรทัดฐาน = รายได้รวมอย่างเดียว (ไม่เรียกยอดรวมว่าฐาน)', () => {
+    const withBase = { income_display: { period: 'monthly', lines: [{ label: 'ฐานเงินเดือน', amount: 13000 }, { label: 'ค่าตำแหน่ง', amount: 3000 }], total: 22000 } };
+    expect(jobIncomeLine(withBase as never)).toEqual({ base: '13,000 บาท/เดือน', total: '22,000 บาท/เดือน', hint: null });
+    const noBase = { income_display: { period: 'monthly', lines: [{ label: 'รายได้โดยประมาณ', amount: 22969 }], total: 22969 } };
+    expect(jobIncomeLine(noBase as never)).toEqual({ base: null, total: '22,969 บาท/เดือน', hint: null });
+  });
+  it('การ์ดขึ้นทั้งสองช่อง', () => {
+    render(<JobPublicFacts job={{ ...JOB, monthly_income_base: 13000, monthly_income: 17500 } as never} />);
+    const t = screen.getByTestId('job-public-facts').textContent ?? '';
+    expect(t).toContain('ฐานเงินเดือน 13,000 บาท/เดือน');
+    expect(t).toContain('รายได้รวม 17,500 บาท/เดือน');
+  });
+});

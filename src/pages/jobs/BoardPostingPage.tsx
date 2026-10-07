@@ -85,7 +85,7 @@ import { boardCardGender } from '@/lib/boardCardFacts';
 import { isOtBenefit, publicBenefitList } from '@/lib/publicFieldVisibility';
 import { isRetiredBenefit } from '@/lib/extraBenefits';
 import { resignedMonthlyNetAverage } from '@/lib/resignedIncome';
-import { jobBaseIncome } from '@/lib/jobPublicFacts';
+import { jobIncomeLine } from '@/lib/jobPublicFacts';
 import PublicJobCardPreview from '@/components/jobs/PublicJobCardPreview';
 import { EVEN_TYPE, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
@@ -555,7 +555,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                         <GenApplyLinkDialog
                           embedded
                           open
-                          previewFirst
+                          hidePreview
                           job={job}
                           onClose={() => setWantLink(false)}
                           onCreated={() => {
@@ -770,18 +770,19 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
     if (!j || !src) return <Loading />;
     const shownIncome = publicIncomeOf(j);
     // ไม่ได้แยกรายการเอง = คำเดียวกับบรรทัดเงินบนการ์ดผู้สมัคร (`jobBaseIncome` · 7 ต.ค. 2569 เดิมขึ้น "รายได้โดยประมาณ …")
-    const baseIncome = jobBaseIncome(j);
+    const incomeLine = jobIncomeLine(j);
     // บรรทัดแรก = คำเดียวกับการ์ดผู้สมัครเสมอ · แยกหลายรายการ = รายการต่อท้าย
     const breakdownLines =
       j.income_display && j.income_display.lines.length > 1
         ? j.income_display.lines.map((l) => `${l.label} ${NUM.format(l.amount)}`)
         : [];
-    const incomeValue = baseIncome
-      ? lines([`ฐานเงินเดือน ${baseIncome.text}`, ...breakdownLines])
-      : (shownIncome?.text ?? null);
-    const totalValue = j.income_display
-      ? `${NUM.format(j.income_display.total)} บาท ${INCOME_PERIOD_LABEL[j.income_display.period]}`
-      : (shownIncome?.text ?? null);
+    const incomeValue = incomeLine?.base
+      ? lines([`ฐานเงินเดือน ${incomeLine.base}`, ...breakdownLines])
+      : breakdownLines.length > 0
+        ? lines(breakdownLines)
+        : (shownIncome?.text ?? null);
+    // รายได้รวม = ตัวเดียวกับการ์ด · รวมเท่าฐาน (ไม่มีเงินอื่น) = ใช้ฐาน
+    const totalValue = incomeLine?.total ?? incomeLine?.base ?? null;
     const benefitList = publicBenefitList(j, benefitDisplayLabels(j.extra_benefits)).filter(
       (b) => !isOtBenefit(b) && !isRetiredBenefit(b),
     );

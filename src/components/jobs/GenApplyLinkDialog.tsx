@@ -47,6 +47,11 @@ export type GenApplyLinkDialogProps = {
    * ลำดับ "ตัวอย่าง → สร้างลิงก์ → ส่ง") · ไม่ส่ง = หุบไว้เหมือนเดิม (ที่อื่นที่เรียกไม่เปลี่ยน)
    */
   previewFirst?: boolean;
+  /**
+   * ไม่มีตัวอย่างหน้าสมัครในฟอร์ม (7 ต.ค. 2569) — ป๊อปประกาศมีการ์ด "ผู้สมัครจะเห็นแบบนี้" ของจริงอยู่แล้ว
+   * (ตัวอย่างในฟอร์มเป็นการ์ดประกาศแบบเก่า ใช้เฉพาะลิงก์ที่ไม่ผูกใบขอ — ผูกใบขอแล้วหน้าลิงก์ใช้การ์ดเดียวกับ /apply)
+   */
+  hidePreview?: boolean;
 };
 
 function LinkRow({ url, label }: { url: string; label?: string | null }) {
@@ -95,6 +100,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   onCreated,
   embedded = false,
   previewFirst = false,
+  hidePreview = false,
 }) => {
   /** ช่องทางของลิงก์นี้ — **1:1** (เจ้าของเคาะ 2 ก.ย. 2569: เลิกติ๊กหลายช่อง) */
   /** ช่องทางที่จะสร้างลิงก์ — หลายช่องได้ ได้ลิงก์ช่องละ 1 อัน (เจ้าของ 4 ต.ค. 2569) */
@@ -459,6 +465,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                * กางในป๊อปเดิม — 🔴 ห้าม Dialog ซ้อน Dialog · ใช้ component ตัวเดียวกับหน้าจริง
                * ⇒ ตัวอย่างตรงกับที่ผู้สมัครเห็นเป๊ะ (ไม่ก๊อปโครงมาวาดใหม่)
                */}
+              {hidePreview ? null : (
               <button
                 type="button"
                 onClick={() => setPreviewOpen((v) => !v)}
@@ -470,7 +477,8 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                 {previewOpen ? <ChevronUp className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 {previewOpen ? 'ซ่อนตัวอย่าง' : 'ดูตัวอย่างหน้าสมัคร'}
               </button>
-              {previewOpen ? (
+              )}
+              {previewOpen && !hidePreview ? (
                 <div className="rounded-2xl bg-muted/40 p-3">
                   <p className="mb-2 text-[11px] text-muted-foreground">
                     นี่คือสิ่งที่ผู้สมัครจะเห็นเมื่อเปิดลิงก์ — ยังไม่ได้สร้าง แก้ด้านบนแล้วตัวอย่างเปลี่ยนตาม

@@ -45,7 +45,7 @@ describe('ชื่อหน่วยงาน', () => {
     expect(card).toContain('<JobPublicFacts job={job} staff />');
     expect(card).not.toContain('boardCardUnitName(job)');
     const facts = readFileSync('src/components/jobs/JobPublicFacts.tsx', 'utf8');
-    for (const f of ['boardCardPlace(job)', 'boardCardAge(job)', 'boardCardGender(job)', 'jobBaseIncome(job)', 'jobAverageIncome(job)']) {
+    for (const f of ['boardCardPlace(job)', 'boardCardAge(job)', 'boardCardGender(job)', 'jobIncomeLine(job)', 'jobAverageIncome(job)']) {
       expect(facts).toContain(f);
     }
   });

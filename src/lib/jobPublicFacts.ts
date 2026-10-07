@@ -71,3 +71,39 @@ export function jobBaseIncome(
   }
   return pub ? { text: pub.text, hint: pub.hint } : null;
 }
+
+/**
+ * ═══ บรรทัดเงินบนการ์ด: ฐาน · รายได้รวม แยกกัน (เจ้าของ 7 ต.ค. 2569: *"รายได้รวมยังไม่มีบนกล่องเลย มีแค่ฐานเอง"*) ═══
+ * - ทีมแยกรายการเอง (`income_display`): มีบรรทัด "ฐานเงินเดือน" = ฐาน · ยอดรวมของรายการ = รายได้รวม
+ *   ไม่มีบรรทัดฐาน = รายได้รวมอย่างเดียว (เดิมเอายอดรวมไปเขียนว่า "ฐานเงินเดือน" — ผิด)
+ * - ทีมตั้งยอดเดี่ยว (`total_income`) = รายได้รวม
+ * - ERP: `monthly_income_base` = ฐาน · `monthly_income` (ฐาน + เงินประจำ) = รายได้รวม
+ * รายได้รวมเท่ากับฐาน = ไม่ขึ้นซ้ำ (`total` = null) · ไม่รู้อะไรเลย = null
+ * ใช้ทั้งการ์ดผู้สมัคร (`JobPublicFacts`) และกล่องรายได้/รายได้รวมในป๊อปประกาศ — คำเดียวกันทุกที่
+ */
+export function jobIncomeLine(
+  job: Pick<JobRequest, 'income_display' | 'field_overrides' | 'total_income' | 'monthly_income' | 'monthly_income_base'>,
+): { base: string | null; total: string | null; hint: string | null } | null {
+  if (job.income_display && job.income_display.total > 0) {
+    const unit = job.income_display.period === 'daily' ? 'วัน' : 'เดือน';
+    const baseLine = job.income_display.lines.find((l) => l.label === 'ฐานเงินเดือน' && l.amount > 0);
+    const base = baseLine ? `${NUM.format(baseLine.amount)} บาท/${unit}` : null;
+    const total =
+      !baseLine || job.income_display.total > baseLine.amount ? `${NUM.format(job.income_display.total)} บาท/${unit}` : null;
+    return { base, total, hint: null };
+  }
+  const pub = publicIncomeOf(job);
+  if (pub?.manual) return { base: null, total: pub.text, hint: null };
+  const b = job.monthly_income_base;
+  const t = job.monthly_income;
+  const hasBase = typeof b === 'number' && Number.isFinite(b) && b > 0;
+  const hasTotal = typeof t === 'number' && Number.isFinite(t) && t > 0 && (!hasBase || t > (b as number));
+  if (hasBase || hasTotal) {
+    return {
+      base: hasBase ? `${NUM.format(b as number)} บาท/เดือน` : null,
+      total: hasTotal ? `${NUM.format(t as number)} บาท/เดือน` : null,
+      hint: null,
+    };
+  }
+  return pub ? { base: pub.text, total: null, hint: pub.hint } : null;
+}
