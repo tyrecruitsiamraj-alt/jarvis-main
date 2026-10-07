@@ -25,14 +25,15 @@ export const REPORT_SEGS: ReadonlyArray<{ key: ReportSeg; label: string }> = [
 
 export type ReportCol = { key: string; label: string; tone: ToneKey };
 export type ReportCell = { bu: string | null; seg: ReportSeg; col: string; n: number };
-export type ReportItem = { key: string; label: string; value: number; tone?: ToneKey };
+/** `parts` = แยกเลขของขั้นนั้น (AI/คน ฯลฯ) · รวมกัน = `value` เสมอ (ตัวตรวจเลขคุม) */
+export type ReportItem = { key: string; label: string; value: number; tone?: ToneKey; seg?: ReportSeg; parts?: ReportItem[] };
 export type TopicReport = {
   /** เส้นทางซ้ายไปขวา */
   funnel: ReportItem[];
   cols: ReportCol[];
   /** BU × ก้อน × ผล — หน้ารวมเองเป็นก้อนละ BU */
   cells: ReportCell[];
-  /** ส่วนท้าย: ส่งต่อให้คน · คนที่จับคู่รอ · ต้องสั่งงาน (ใบที่ยังรอถอดแล้ว 7 ต.ค. 2569) */
+  /** ส่วนท้าย: ส่งต่อให้คน · ต้องสั่งงาน (ใบที่ยังรอถอดแล้ว · คนที่จับคู่รอย้ายไปแยกในเส้นทาง 7 ต.ค. 2569) */
   extra: Array<{ title: string; items: ReportItem[] }>;
 };
 export type TopicReportBlock = 'applicants' | 'matching' | 'aftercare';
@@ -59,6 +60,12 @@ export type ReportSourceRow = {
   staff_at: string | Date | null;
   // ผู้สมัคร
   age?: number | null;
+  created_at?: string | Date | null;
+  /** เข้าคิว AI ครั้งแรก (แถวของใบเอง) */
+  ai_queued_at?: string | Date | null;
+  /** โทรครั้งแรกของ AI / ของคน (หลักฐานชุดเดียวกับกอง AI โทร / คนโทร) */
+  first_ai_at?: string | Date | null;
+  first_staff_at?: string | Date | null;
   appointment?: boolean | null;
   attendance?: string | null;
   log_ok?: boolean | null;
@@ -71,7 +78,7 @@ export type ReportSourceRow = {
   waiting_staff?: boolean | null;
 };
 
-/** ผลแบบ "สนใจ" (ผู้สมัคร · จับคู่งาน) */
+/** ผลแบบ "สนใจ" (ผู้สมัคร) */
 export const INTEREST_COLS: ReportCol[] = [
   { key: 'interested', label: 'สนใจ', tone: 'success' },
   { key: 'notInterested', label: 'ไม่สนใจ', tone: 'danger' },
@@ -80,6 +87,11 @@ export const INTEREST_COLS: ReportCol[] = [
   { key: 'unclear', label: 'สรุปไม่ได้', tone: 'violet' },
   { key: 'noResult', label: 'ยังไม่มีผล', tone: 'info' },
 ];
+
+/** จับคู่งานถามว่าไปไหม (เจ้าของ 7 ต.ค. 2569 "ผลเป็นยังไง ไปไม่ไป") — คีย์เดียวกับ INTEREST_COLS */
+export const MATCH_COLS: ReportCol[] = INTEREST_COLS.map((c) =>
+  c.key === 'interested' ? { ...c, label: 'ไป' } : c.key === 'notInterested' ? { ...c, label: 'ไม่ไป' } : c,
+);
 
 /**
  * ดูแลหลังเริ่มงาน — ยังไม่มีศัพท์ผลของงานนี้เอง (คำถามคือความเป็นอยู่ ไม่ใช่ไป/ไม่ไป) ⇒ แบ่งแค่ติดต่อได้หรือไม่ ไม่ตีความเกิน
@@ -159,18 +171,117 @@ const count = (rows: readonly ReportSourceRow[], f: (r: ReportSourceRow) => bool
 /** อายุเกินที่ระบบไม่ส่งให้ AI (`OVER_AGE_MIN` = 58 · `src/lib/applicantAge.ts`) */
 export const OVER_AGE_MIN = 58;
 
-export function buildApplicantsReport(rows: readonly ReportSourceRow[], published: number): TopicReport {
+/**
+ * ระบบส่งเองตอนกรอก = เข้าคิวภายใน 10 นาทีหลังกรอก · ช้ากว่านั้น = เจ้าหน้าที่สั่ง
+ * (ฐานไม่ได้จดว่าใครส่ง — เจ้าของเลือก "ดูจากเวลา" 7 ต.ค. 2569 · วัดจริง 1–7 ต.ค. ส่งเองทุกใบเข้าคิวในไม่กี่วินาที)
+ */
+export const AUTO_DISPATCH_MINUTES = 10;
+/** "โทรทันที" = โทรครั้งแรกภายใน 15 นาทีหลังกรอก (เจ้าของเลือก 7 ต.ค. 2569) */
+export const FAST_CALL_MINUTES = 15;
+
+/** ใครโทรคนแรก (เจ้าของเลือก "ใครโทรคนแรก" เป็นตัวแบ่งนัด/มาตามนัด) · ไม่มีหลักฐานโทร = null */
+export function firstCallerOf(r: ReportSourceRow): 'ai' | 'staff' | null {
+  const a = ms(r.first_ai_at);
+  const s = ms(r.first_staff_at);
+  if (a < 0 && s < 0) return r.ai ? 'ai' : r.staff ? 'staff' : null;
+  if (a < 0) return 'staff';
+  if (s < 0) return 'ai';
+  return a <= s ? 'ai' : 'staff';
+}
+
+export type DispatchKind = 'auto' | 'manual' | 'overAge' | 'notSent';
+export function dispatchKindOf(r: ReportSourceRow): DispatchKind {
+  const q = ms(r.ai_queued_at);
+  if (q >= 0) {
+    const c = ms(r.created_at);
+    return c >= 0 && q - c < AUTO_DISPATCH_MINUTES * 60_000 ? 'auto' : 'manual';
+  }
+  return (r.age ?? 0) >= OVER_AGE_MIN ? 'overAge' : 'notSent';
+}
+
+/** โทรครั้งแรกภายใน 15 นาทีหลังกรอก → ใครโทร · ไม่ทัน = null */
+export function fastCallerOf(r: ReportSourceRow): 'ai' | 'staff' | null {
+  const c = ms(r.created_at);
+  const first = [ms(r.first_ai_at), ms(r.first_staff_at)].filter((t) => t >= 0);
+  if (c < 0 || !first.length || Math.min(...first) - c > FAST_CALL_MINUTES * 60_000) return null;
+  return firstCallerOf(r);
+}
+
+/** แยก AI / คน ตามใครโทรคนแรก (ไม่มีหลักฐานโทร = คน — นัดทุกนัดคนเป็นคนลง) */
+function byFirstCaller(
+  rows: readonly ReportSourceRow[],
+  f: (r: ReportSourceRow) => boolean,
+  labels = ['AI โทรก่อน', 'คนโทรก่อน'],
+): ReportItem[] {
+  const hit = rows.filter(f);
+  const ai = count(hit, (r) => firstCallerOf(r) === 'ai');
+  return [
+    { key: 'ai', label: labels[0], value: ai, seg: 'ai' },
+    { key: 'staff', label: labels[1], value: hit.length - ai, seg: 'staff' },
+  ];
+}
+
+const step = (key: string, label: string, parts: ReportItem[]): ReportItem => ({
+  key,
+  label,
+  value: parts.reduce((n, p) => n + p.value, 0),
+  parts,
+});
+
+/** โทรแล้ว แยกกองเดียวกับกล่อง (AI โทร / คนโทร / ทั้งสองทาง) */
+function calledStep(rows: readonly ReportSourceRow[]): ReportItem {
+  return step(
+    'called',
+    'โทรแล้ว',
+    REPORT_SEGS.filter((s) => s.key !== 'notCalled').map((s) => ({
+      key: s.key,
+      label: s.label,
+      value: count(rows, (r) => segOf(r) === s.key),
+      seg: s.key,
+    })),
+  );
+}
+
+/**
+ * งานสรรหา — เจ้าของ 7 ต.ค. 2569 (10 ข้อ): ใบขอ → ประกาศ → ใบสมัคร (AI ส่งเอง/เจ้าหน้าที่สั่ง) → โทรแล้ว (AI/คน)
+ * → โทรภายใน 15 นาที (AI/คน) → สนใจ → นัดได้ → มาตามนัด (แยกใครโทรคนแรก) · BU = ก้อนละ BU ด้านล่าง
+ */
+export function buildApplicantsReport(rows: readonly ReportSourceRow[], published: number, jobsIn = 0): TopicReport {
   const col = (r: ReportSourceRow) => interestColOf(r);
   const staffResult = (r: ReportSourceRow) => !!r.staff_outcome || typeof r.log_ok === 'boolean';
-  const overAge = (r: ReportSourceRow) => (r.age ?? 0) >= OVER_AGE_MIN;
+  const kind = (k: DispatchKind) => count(rows, (r) => dispatchKindOf(r) === k);
+  const fastAi = count(rows, (r) => fastCallerOf(r) === 'ai');
+  const fastStaff = count(rows, (r) => fastCallerOf(r) === 'staff');
   return {
     funnel: [
+      { key: 'jobsIn', label: 'ใบขอเข้ามา', value: jobsIn },
       { key: 'published', label: 'ประกาศ', value: published },
-      { key: 'total', label: 'ใบสมัครเข้ามา', value: rows.length },
-      { key: 'called', label: 'ติดต่อแล้ว', value: count(rows, (r) => r.ai || r.staff) },
-      { key: 'interested', label: 'สนใจ', value: count(rows, (r) => col(r) === 'interested') },
-      { key: 'appointment', label: 'นัดหมาย', value: count(rows, (r) => !!r.appointment) },
-      { key: 'showed', label: 'มาตามนัด', value: count(rows, (r) => r.attendance === 'showed') },
+      step('total', 'ใบสมัครเข้ามา', [
+        { key: 'auto', label: 'AI ส่งเองตอนกรอก', value: kind('auto'), seg: 'ai' },
+        { key: 'manual', label: 'เจ้าหน้าที่สั่ง AI', value: kind('manual'), seg: 'staff' },
+        { key: 'overAge', label: 'อายุเกิน ไม่ส่ง AI', value: kind('overAge'), tone: 'danger' },
+        { key: 'notSent', label: 'ไม่ได้ส่ง AI', value: kind('notSent'), seg: 'notCalled' },
+      ]),
+      calledStep(rows),
+      step('fast', `โทรภายใน ${FAST_CALL_MINUTES} นาที`, [
+        { key: 'ai', label: 'AI', value: fastAi, seg: 'ai' },
+        { key: 'staff', label: 'คน', value: fastStaff, seg: 'staff' },
+      ]),
+      step(
+        'interested',
+        'สนใจ',
+        byFirstCaller(rows, (r) => col(r) === 'interested'),
+      ),
+      step(
+        'appointment',
+        'นัดได้',
+        byFirstCaller(rows, (r) => !!r.appointment),
+      ),
+      step(
+        'showed',
+        'มาตามนัด',
+        byFirstCaller(rows, (r) => r.attendance === 'showed'),
+      ),
     ],
     cols: INTEREST_COLS,
     cells: cellsOf(rows, col),
@@ -232,29 +343,36 @@ export const emptyMatchingFlow = (): MatchingFlow => ({
  */
 export function buildMatchingReport(rows: readonly ReportSourceRow[], f: MatchingFlow): TopicReport {
   const col = (r: ReportSourceRow) => interestColOf(r);
+  const bySeg = (f2: (r: ReportSourceRow) => boolean): ReportItem[] =>
+    REPORT_SEGS.filter((s) => s.key !== 'notCalled').map((s) => ({
+      key: s.key,
+      label: s.label,
+      value: count(rows, (r) => f2(r) && segOf(r) === s.key),
+      seg: s.key,
+    }));
   return {
     funnel: [
       { key: 'jobsIn', label: 'ใบขอเข้ามา', value: f.jobsIn },
       { key: 'jobsMatched', label: 'AI จับคู่แล้ว', value: f.jobsMatched },
       { key: 'jobsRecommend', label: 'มีคนแนะนำ', value: f.jobsRecommend },
-      { key: 'matched', label: 'คนที่จับคู่รอ', value: f.matched },
+      step('matched', 'คนที่จับคู่รอ', [
+        { key: 'green', label: 'เขียว', value: f.green, tone: 'success' },
+        { key: 'yellow', label: 'เหลือง', value: f.yellow, tone: 'warn' },
+        { key: 'red', label: 'แดง', value: f.red, tone: 'danger' },
+      ]),
       { key: 'total', label: 'ส่งโทร', value: rows.length },
-      { key: 'called', label: 'ติดต่อแล้ว', value: count(rows, (r) => r.ai || r.staff) },
-      { key: 'interested', label: 'สนใจ', value: count(rows, (r) => col(r) === 'interested') },
+      calledStep(rows),
+      step(
+        'interested',
+        'ไป',
+        bySeg((r) => col(r) === 'interested'),
+      ),
       { key: 'reserved', label: 'จอง', value: f.reserved },
       { key: 'placed', label: 'ส่งตัว', value: f.placed },
     ],
-    cols: INTEREST_COLS,
+    cols: MATCH_COLS,
     cells: cellsOf(rows, col),
     extra: [
-      {
-        title: 'คนที่จับคู่รอ',
-        items: [
-          { key: 'green', label: 'เขียว', value: f.green, tone: 'success' },
-          { key: 'yellow', label: 'เหลือง', value: f.yellow, tone: 'warn' },
-          { key: 'red', label: 'แดง', value: f.red, tone: 'danger' },
-        ],
-      },
       {
         title: 'ต้องสั่งงาน',
         items: [

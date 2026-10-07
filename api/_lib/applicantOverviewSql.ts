@@ -227,6 +227,27 @@ export const FIRST_CALLED_AT_SQL = `(
   ) t
 )`;
 
+/**
+ * เวลาโทรครั้งแรกแยกใครโทร (หน้าหลัก งานสรรหา 7 ต.ค. 2569 "โทรทันที AI เท่านี้ คนเท่านี้" · "นัดโดยคน/AI" = ใครโทรคนแรก)
+ * หลักฐานชุดเดียวกับ `CALLED_BY_AI_SQL` / `CALLED_BY_STAFF_SQL` — มีเวลา ⇔ อยู่ในกองนั้น
+ */
+export const FIRST_AI_CALL_AT_SQL = `(
+  select min(${qcol('q', QUEUE_EVENT_AT)}) from ${QUEUE} q where ${AI_RESULT_OF_APP_SQL}
+)`;
+export const FIRST_STAFF_CALL_AT_SQL = `(
+  select min(at) from (
+    select c.created_at as at from ${CONTACTS} c where c.application_id = a.id
+    union all
+    select ${qcol('h', HOLD_EVENT_AT)} from ${HOLDS} h
+     where ((h.source = 'application' and h.candidate_ref = a.id::text)
+            or (a.phone_e164 is not null and h.phone_e164 = a.phone_e164
+                and ${qcol('h', HOLD_EVENT_AT)} >= a.created_at))
+       and h.result_outcome is not null
+  ) t
+)`;
+/** เวลาที่ใบนี้เข้าคิว AI ครั้งแรก (แถว `app-<id>` เท่านั้น — คิวของใบเอง ไม่นับเบอร์เดียวกันจากเลนอื่น) */
+export const AI_QUEUED_AT_SQL = `(select min(q.created_at) from ${QUEUE} q where q.person_ref = 'app-' || a.id::text)`;
+
 /** มีนัดจริง — กติกาเดียวกับ list: contact log (086) ชนะ hold (085 คีย์เบอร์) */
 export const HAS_APPOINTMENT_SQL = `(
   exists (select 1 from ${CONTACTS} c

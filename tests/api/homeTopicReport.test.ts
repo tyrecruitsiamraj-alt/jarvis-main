@@ -7,7 +7,10 @@ import {
   buildAftercareReport,
   buildApplicantsReport,
   buildMatchingReport,
+  dispatchKindOf,
   emptyMatchingFlow,
+  fastCallerOf,
+  firstCallerOf,
   interestColOf,
   reportBuBlocks,
   REPORT_SEGS,
@@ -72,15 +75,22 @@ describe('homeTopicReport', () => {
       row({ bu: 'LBA', age: 60 }),
       row({ bu: null }),
     ];
-    const r = buildApplicantsReport(rows, 5);
+    const r = buildApplicantsReport(rows, 5, 9);
     expect(r.funnel.map((f) => [f.key, f.value])).toEqual([
+      ['jobsIn', 9],
       ['published', 5],
       ['total', 6],
       ['called', 3],
+      ['fast', 0],
       ['interested', 2],
       ['appointment', 1],
       ['showed', 1],
     ]);
+    // แยกในขั้นรวมกัน = เลขของขั้นเสมอ
+    for (const f of r.funnel) if (f.parts) expect(f.parts.reduce((n, p) => n + p.value, 0)).toBe(f.value);
+    const parts = (k: string) => Object.fromEntries((r.funnel.find((f) => f.key === k)?.parts ?? []).map((p) => [p.key, p.value]));
+    expect(parts('total')).toEqual({ auto: 0, manual: 0, overAge: 1, notSent: 5 });
+    expect(parts('called')).toEqual({ ai: 2, staff: 0, both: 1 });
     const blocks = reportBuBlocks(r);
     expect(blocks.map((b) => [b.bu, b.total])).toEqual([
       ['LBD', 3],
@@ -97,6 +107,27 @@ describe('homeTopicReport', () => {
     expect(r.extra.map((x) => x.title)).toEqual(['ส่งต่อให้คน']);
     const hand = Object.fromEntries(r.extra[0].items.map((i) => [i.key, i.value]));
     expect(hand).toMatchObject({ handoff: 1, staffResult: 1 });
+  });
+
+  it('ส่ง AI เอง/คนสั่ง ดูจากเวลา · โทรทันที 15 นาที · ใครโทรคนแรก', () => {
+    const at = (m: number) => new Date(Date.parse('2026-10-01T03:00:00Z') + m * 60_000).toISOString();
+    const base = { created_at: at(0) };
+    expect(dispatchKindOf(row({ ...base, ai_queued_at: at(0.1) }))).toBe('auto');
+    expect(dispatchKindOf(row({ ...base, ai_queued_at: at(30) }))).toBe('manual');
+    expect(dispatchKindOf(row({ ...base, age: 60 }))).toBe('overAge');
+    expect(dispatchKindOf(row({ ...base }))).toBe('notSent');
+    const both = row({ ...base, ai: true, staff: true, first_ai_at: at(20), first_staff_at: at(5) });
+    expect(firstCallerOf(both)).toBe('staff');
+    expect(fastCallerOf(both)).toBe('staff');
+    expect(fastCallerOf(row({ ...base, ai: true, first_ai_at: at(16) }))).toBeNull();
+    expect(fastCallerOf(row({ ...base, ai: true, first_ai_at: at(3) }))).toBe('ai');
+    // นัดที่ไม่มีหลักฐานโทร = คน (คนเป็นคนลงนัด)
+    const r = buildApplicantsReport(
+      [row({ ...base, appointment: true }), row({ ...base, ai: true, first_ai_at: at(1), appointment: true })],
+      0,
+    );
+    const appt = Object.fromEntries((r.funnel.find((f) => f.key === 'appointment')?.parts ?? []).map((p) => [p.key, p.value]));
+    expect(appt).toEqual({ ai: 1, staff: 1 });
   });
 
   it('จับคู่งาน / ดูแลหลังเริ่มงาน: รวม = ทั้งหมด · ว่าง = ไม่มีก้อน', () => {
@@ -128,8 +159,9 @@ describe('homeTopicReport', () => {
       ['reserved', 0],
       ['placed', 0],
     ]);
-    expect(m.extra[0].items.reduce((n, i) => n + i.value, 0)).toBe(555);
-    expect(m.extra.map((x) => x.title)).toEqual(['คนที่จับคู่รอ', 'ต้องสั่งงาน', 'ส่งต่อให้คน']);
+    expect(m.funnel.find((f) => f.key === 'matched')?.parts?.map((p) => p.value)).toEqual([248, 267, 40]);
+    expect(m.cols.slice(0, 2).map((c) => c.label)).toEqual(['ไป', 'ไม่ไป']);
+    expect(m.extra.map((x) => x.title)).toEqual(['ต้องสั่งงาน', 'ส่งต่อให้คน']);
     const a = buildAftercareReport([
       row({ ai: true, ai_outcome: 'confirmed', ai_at: '2026-10-01T00:00:00Z' }),
       row({ staff: true, staff_outcome: 'no_answer', staff_at: '2026-10-01T00:00:00Z' }),

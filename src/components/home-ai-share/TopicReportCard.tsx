@@ -1,14 +1,13 @@
 /**
  * ═══ ผลโทร — งานสรรหา · จับคู่งาน · ดูแลหลังเริ่มงาน (หน้าหลัก · เจ้าของ 7 ต.ค. 2569) ═══
  * Choice "เอาตามนี้ครบ 3 ส่วน" · "ทำพร้อมกันทั้ง 3" — หน้าตาชุดเดียวกับผลโทรของติดตาม
- * 1. เส้นทางซ้ายไปขวา (เลขใหญ่ · % ของรายชื่อทั้งหมด)
+ * 1. เส้นทางซ้ายไปขวา (เลขใหญ่ · % ของรายชื่อทั้งหมด · ใต้เลขแยก AI/คน ของขั้นนั้น รวมกัน = เลขใหญ่)
  * 2. เทียบ AI / คน ก้อนละ BU (BU ไม่มีงานไม่ขึ้น · ในก้อนครบ 4 แถวแม้เป็น 0) · บรรทัดบวกทุก BU = ทั้งหมด
- * 3. ส่งต่อให้คน + ใบที่ยังรอ
+ * 3. ส่งต่อให้คน (+ จับคู่งาน: ต้องสั่งงาน)
  * นิยาม `src/lib/homeTopicReport.ts` · ข้อมูล `/api/home-ai-share?report=<ก้อน>` (ชุดแถวเดียวกับกล่องด้านบน)
  * 🔴 shadcn (Card · Table · Skeleton) · สีจาก TONE · ไม่มีประโยคอธิบายบนจอ
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -86,22 +85,44 @@ const TopicReportCard: React.FC<{ block: TopicReportBlock; win: AiShareWindow; t
         <Skeleton className="h-64 w-full rounded-xl" />
       ) : (
         <>
-          {/* 1. เส้นทาง — % เทียบรายชื่อทั้งหมด (ขั้นก่อนรายชื่อไม่มี %) */}
-          <ol className="flex flex-wrap items-stretch gap-2" data-testid="report-funnel">
+          {/* 1. เส้นทาง อ่านซ้ายไปขวา บนลงล่าง — % เทียบรายชื่อทั้งหมด (ขั้นก่อนรายชื่อไม่มี %) · คอลัมน์ลงตัวกับจำนวนขั้น ไม่มีกล่องค้างเดี่ยว */}
+          <ol
+            className={cn('grid grid-cols-1 gap-3', report.funnel.length % 4 === 0 ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3')}
+            data-testid="report-funnel"
+          >
             {report.funnel.map((f, i) => {
               const afterTotal = report.funnel.findIndex((x) => x.key === 'total') < i;
               return (
-                <li key={f.key} className="flex items-center gap-2">
-                  <span className="min-w-28 rounded-xl bg-muted px-4 py-3">
-                    <span className="block text-xs text-muted-foreground">{f.label}</span>
-                    <span className="block text-2xl font-medium tabular-nums text-foreground">{NUM.format(f.value)}</span>
+                <li key={f.key} className="flex min-w-0 flex-col gap-1 rounded-xl bg-muted px-4 py-3" data-testid={`report-step-${f.key}`}>
+                  <span className="text-xs text-muted-foreground">{f.label}</span>
+                  <span className="flex items-baseline gap-2">
+                    <span className="text-2xl font-medium tabular-nums text-foreground">{NUM.format(f.value)}</span>
                     {afterTotal ? (
-                      <span className="block text-xs tabular-nums text-muted-foreground">
+                      <span className="text-xs tabular-nums text-muted-foreground">
                         {total > 0 ? `${NUM.format(Math.round((f.value / total) * 100))}%` : '0%'}
                       </span>
                     ) : null}
                   </span>
-                  {i < report.funnel.length - 1 ? <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden /> : null}
+                  {f.parts?.length ? (
+                    <ul className="space-y-0.5 border-t border-foreground/10 pt-1.5">
+                      {f.parts.map((p) => (
+                        <li
+                          key={p.key}
+                          className="flex items-center justify-between gap-3 text-xs"
+                          data-testid={`report-part-${f.key}-${p.key}`}
+                        >
+                          <span className="flex items-center gap-1.5 whitespace-nowrap text-muted-foreground">
+                            <span
+                              className={cn('h-2 w-2 rounded-full', p.seg ? segmentDotClass(p.seg) : TONE[p.tone ?? 'neutral'].dot)}
+                              aria-hidden
+                            />
+                            {p.label}
+                          </span>
+                          <span className="font-medium tabular-nums text-foreground">{NUM.format(p.value)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </li>
               );
             })}
@@ -190,8 +211,8 @@ const TopicReportCard: React.FC<{ block: TopicReportBlock; win: AiShareWindow; t
             {sumOfBlocks === total ? '' : ` · ไม่ตรงกับ ${NUM.format(total)}`}
           </p>
 
-          {/* 3. ส่งต่อให้คน · ที่ยังรอ */}
-          <div className={cn('grid gap-4', report.extra.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2')}>
+          {/* 3. ส่งต่อให้คน (+ ต้องสั่งงาน) */}
+          <div className={cn('grid gap-4', report.extra.length > 1 ? 'md:grid-cols-2' : '')}>
             {report.extra.map((x) => (
               <section key={x.title} className="space-y-2 rounded-2xl bg-muted/50 p-4 sm:p-5" data-testid={`report-extra-${x.title}`}>
                 <h3 className="text-base font-medium text-foreground">{x.title}</h3>

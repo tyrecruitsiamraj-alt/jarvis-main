@@ -19,8 +19,11 @@
 import { tableInAppSchema } from './schema.js';
 import { queueCancelled, queueLastResultAt, queueOutcome, queuePayloadNameSql, queueReplySql } from './lumosQueueDefs.js';
 import {
+  AI_QUEUED_AT_SQL,
   CALLED_BY_AI_SQL,
   CALLED_BY_STAFF_SQL,
+  FIRST_AI_CALL_AT_SQL,
+  FIRST_STAFF_CALL_AT_SQL,
   HAS_APPOINTMENT_SQL,
   HELD_OR_CLAIMED_SQL,
   IN_QUEUE_SQL,
@@ -250,6 +253,10 @@ export function buildApplicantAiShareSql(mode: AiShareSqlMode = 'total', list?: 
              mode,
              [
                'a.age',
+               'a.created_at',
+               `${AI_QUEUED_AT_SQL} as ai_queued_at`,
+               `${FIRST_AI_CALL_AT_SQL} as first_ai_at`,
+               `${FIRST_STAFF_CALL_AT_SQL} as first_staff_at`,
                `${HAS_APPOINTMENT_SQL} as appointment`,
                `${LATEST_ATTENDANCE_SQL} as attendance`,
                `(select c.ok from ${CONTACTS} c where c.application_id = a.id order by c.created_at desc limit 1) as log_ok`,

@@ -133,15 +133,37 @@ async function main() {
         eq(`${t} · เส้นทาง ติดต่อแล้ว = AI + คน + สองทาง`, r.funnel.find((f) => f.key === 'called')?.value ?? -1, c.ai + c.staff + c.both);
         if (block === 'matching') {
           const fv = (k: string) => r.funnel.find((f) => f.key === k)?.value ?? -1;
-          const tiers = r.extra.find((x) => x.title === 'คนที่จับคู่รอ')?.items.reduce((n, i) => n + i.value, 0) ?? -1;
+          const tierParts = r.funnel.find((f) => f.key === 'matched')?.parts ?? [];
+          const tiers = tierParts.reduce((n, i) => n + i.value, 0);
           eq(`${t} · จับคู่รอ เขียว + เหลือง + แดง = คนที่จับคู่รอ`, tiers, fv('matched'));
           const act = Object.fromEntries((r.extra.find((x) => x.title === 'ต้องสั่งงาน')?.items ?? []).map((i) => [i.key, i.value]));
           eq(`${t} · มีคนแนะนำ + ไม่มีคนเหมาะ = AI จับคู่แล้ว`, fv('jobsRecommend') + (act.jobsNone ?? 0), fv('jobsMatched'));
           checks += 1;
           if (fv('jobsMatched') > fv('jobsIn')) problems.push(`${t} · AI จับคู่แล้ว ${fv('jobsMatched')} > ใบขอเข้ามา ${fv('jobsIn')}`);
-          const green = r.extra[0].items.find((i) => i.key === 'green')?.value ?? 0;
+          const green = tierParts.find((i) => i.key === 'green')?.value ?? 0;
           checks += 1;
           if ((act.greenUncontacted ?? 0) > green) problems.push(`${t} · เขียวยังไม่มีใครโทร > เขียวทั้งหมด`);
+        }
+        // ทุกขั้นที่แยก AI/คน: แยกรวมกัน = เลขของขั้น · ขั้น "โทรแล้ว" แยก = กล่อง AI / คน / สองทาง
+        for (const f of r.funnel) {
+          if (!f.parts) continue;
+          eq(
+            `${t} · ขั้น ${f.label} แยกรวม = เลขของขั้น`,
+            f.parts.reduce((n, p) => n + p.value, 0),
+            f.value,
+          );
+        }
+        const calledParts = Object.fromEntries((r.funnel.find((f) => f.key === 'called')?.parts ?? []).map((p) => [p.key, p.value]));
+        if (block !== 'aftercare') {
+          eq(`${t} · ขั้นโทรแล้ว AI = กล่อง AI`, calledParts.ai ?? -1, c.ai);
+          eq(`${t} · ขั้นโทรแล้ว คน = กล่อง คน`, calledParts.staff ?? -1, c.staff);
+          eq(`${t} · ขั้นโทรแล้ว สองทาง = กล่อง สองทาง`, calledParts.both ?? -1, c.both);
+        }
+        if (block === 'applicants') {
+          const fv = (k: string) => r.funnel.find((f) => f.key === k)?.value ?? -1;
+          eq(`${t} · ใบสมัคร (AI ส่งเอง + คนสั่ง + อายุเกิน + ไม่ได้ส่ง) = กล่อง`, fv('total'), c.total);
+          checks += 1;
+          if (fv('fast') > fv('called')) problems.push(`${t} · โทรภายใน 15 นาที ${fv('fast')} > โทรแล้ว ${fv('called')}`);
         }
         for (const s of REPORT_SEGS) {
           eq(

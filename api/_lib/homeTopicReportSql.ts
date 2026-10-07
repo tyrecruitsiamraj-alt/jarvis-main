@@ -50,6 +50,10 @@ function toRow(r: Record<string, unknown>): ReportSourceRow {
     staff_outcome: str(r.staff_outcome),
     staff_at: (r.staff_at as string | Date | null) ?? null,
     age: r.age == null ? null : Number(r.age),
+    created_at: (r.created_at as string | Date | null) ?? null,
+    ai_queued_at: (r.ai_queued_at as string | Date | null) ?? null,
+    first_ai_at: (r.first_ai_at as string | Date | null) ?? null,
+    first_staff_at: (r.first_staff_at as string | Date | null) ?? null,
     appointment: r.appointment == null ? null : bool(r.appointment),
     attendance: str(r.attendance),
     log_ok: r.log_ok == null ? null : bool(r.log_ok),
@@ -65,7 +69,7 @@ function toRow(r: Record<string, unknown>): ReportSourceRow {
 export async function loadTopicReport(block: TopicReportBlock, start: Date | null, end: Date, bu: string | null): Promise<TopicReport> {
   const params = [start ? start.toISOString() : null, end.toISOString(), bu];
   if (block === 'applicants') {
-    const [{ rows }, pub] = await Promise.all([
+    const [{ rows }, pub, jobs] = await Promise.all([
       dbQuery<Record<string, unknown>>(buildApplicantAiShareSql('report'), params),
       dbQuery<{ n: number }>(
         `select count(*)::int as n
@@ -76,8 +80,9 @@ export async function loadTopicReport(block: TopicReportBlock, start: Date | nul
             and ($3::text is null or ${trendBuSql(siteBuSql('m.site_code'))} = $3::text)`,
         params,
       ),
+      loadJobsInWindow(start, end, bu),
     ]);
-    return buildApplicantsReport(rows.map(toRow), Number(pub.rows[0]?.n ?? 0));
+    return buildApplicantsReport(rows.map(toRow), Number(pub.rows[0]?.n ?? 0), jobs.length);
   }
   if (block === 'matching') {
     const [{ rows }, flow] = await Promise.all([
@@ -95,17 +100,22 @@ export async function loadTopicReport(block: TopicReportBlock, start: Date | nul
  * ผลจับคู่ = `loadBoardMatchTierMap` (คนที่ยังว่าง = `isBoardCandidateAvailable` ตัวเดียวกับ `matching-flow-summary`)
  * ⚠️ ใบที่เข้ามาแล้วปิดไปแล้วไม่อยู่ในรายการใบเปิด ⇒ ไม่นับ
  */
-async function loadMatchingFlow(start: Date | null, end: Date, bu: string | null): Promise<MatchingFlow> {
-  const f = emptyMatchingFlow();
+/** ใบขอที่เข้ามาในช่วง (ใบที่ยังเปิด · ตามวันส่งใบ) — ตัวเดียวของ "ใบขอเข้ามา" ทั้งงานสรรหาและจับคู่งาน */
+async function loadJobsInWindow(start: Date | null, end: Date, bu: string | null): Promise<JobRequest[]> {
   const raw = (await listSiamrajUnitRequests({ limit: 500, departmentScope: { mode: 'all' } as DepartmentScope })) as unknown[];
   const fromYmd = start ? toYmdBangkok(start) : null;
   const toYmd = toYmdBangkok(new Date(end.getTime() - 1));
-  const jobs = enrichJobsWithUrgency(raw as JobRequest[]).filter((j) => {
+  return enrichJobsWithUrgency(raw as JobRequest[]).filter((j) => {
     if (bu && trendBuFromSiteCode(j.site_code) !== bu) return false;
     const rec = j as unknown as Record<string, unknown>;
     const d = String(rec.submittedAt || rec.request_date || rec.created_at || '').slice(0, 10);
     return !!d && (!fromYmd || d >= fromYmd) && d <= toYmd;
   });
+}
+
+async function loadMatchingFlow(start: Date | null, end: Date, bu: string | null): Promise<MatchingFlow> {
+  const f = emptyMatchingFlow();
+  const jobs = await loadJobsInWindow(start, end, bu);
   f.jobsIn = jobs.length;
   if (!jobs.length) return f;
   const ids = jobs.map((j) => j.id);
