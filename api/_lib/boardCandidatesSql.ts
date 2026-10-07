@@ -108,7 +108,7 @@ LEFT JOIN dbo.ms_province_amphur      AS am ON am.province_code = ra.province_co
 LEFT JOIN dbo.ms_province_tambon      AS tb ON tb.province_code = ra.province_code AND tb.amphur_code = ra.amphur_code AND tb.tambon_code = ra.tambon_code
 WHERE c.board_id    = @boardId
   AND c.is_archived = 'N'
-  AND c.column_id   IN (/*COLUMN_IDS*/)
+  AND (c.column_id IN (/*COLUMN_IDS*/) /*INFORMED_ALSO*/)
   /*EXCLUDE_INFORMED*/
 ORDER BY c.last_activity_at DESC, c.card_id DESC
 `;
@@ -166,6 +166,11 @@ export function boardDropColumnId(): number {
   return Number(process.env.BOARD_DROP_COLUMN_ID || 5);
 }
 
+/** คอลัมน์ "งานรายวัน" (8) — เพิ่มบนบอร์ดทีหลัง 10 ส.ค. 2569 · วัดจริง 7 ต.ค. 2569: 91 คน */
+export function boardDailyWorkColumnId(): number {
+  return Number(process.env.BOARD_DAILY_WORK_COLUMN_ID || 8);
+}
+
 /**
  * คอลัมน์ "Checklist" — คนเริ่มสมัครแล้วแต่เอกสารยังไม่ครบ (ยังไม่นับว่าได้ใบสมัคร)
  * = กองของ **เลนสรรหา** (R2b) · ห้ามเอาไปปนกับ To do ซึ่งเป็นกองของคัดสรร
@@ -212,19 +217,32 @@ export async function listBoardReadyCandidates(options?: {
   limit?: number;
   /** ตัดคนที่ "แจ้งเข้าแล้ว" (is_inform='Y') ออก — ใช้กับกองเลนสรรหา/ตารางโทรตาม */
   excludeInformed?: boolean;
+  /**
+   * คอลัมน์ที่เอา **เฉพาะคนแจ้งเข้าแล้ว** (is_inform='Y') — ใช้กับ Checklist ใน picker หน้าติดตาม
+   * (7 ต.ค. 2569: คนได้งานแล้วแต่การ์ดค้าง Checklist 662 คน หาชื่อไม่เจอ)
+   */
+  informedAlsoFromColumnIds?: number[];
 }): Promise<BoardReadyCandidate[]> {
   const boardId = options?.boardId ?? Number(process.env.BOARD_READY_BOARD_ID || 1);
   const columnIds = (
     options?.columnIds?.length ? options.columnIds : [options?.columnId ?? boardPrimaryColumnId()]
   ).filter((n) => Number.isInteger(n) && n > 0);
-  const limit = Math.min(Math.max(options?.limit ?? 500, 1), 2000);
+  const limit = Math.min(Math.max(options?.limit ?? 500, 1), 5000);
 
   const inputs: Record<string, unknown> = { boardId, limit };
   const placeholders = columnIds.map((id, i) => {
     inputs[`col${i}`] = id;
     return `@col${i}`;
   });
-  const sql = LIST_SQL.replace('/*COLUMN_IDS*/', placeholders.join(', ')).replace(
+  const informedCols = (options?.informedAlsoFromColumnIds ?? []).filter((n) => Number.isInteger(n) && n > 0);
+  const informedPlaceholders = informedCols.map((id, i) => {
+    inputs[`icol${i}`] = id;
+    return `@icol${i}`;
+  });
+  const informedAlso = informedPlaceholders.length
+    ? `OR (c.column_id IN (${informedPlaceholders.join(', ')}) AND ISNULL(r.is_inform, 'N') = 'Y')`
+    : '';
+  const sql = LIST_SQL.replace('/*COLUMN_IDS*/', placeholders.join(', ')).replace('/*INFORMED_ALSO*/', informedAlso).replace(
     '/*EXCLUDE_INFORMED*/',
     options?.excludeInformed ? EXCLUDE_INFORMED_SQL : '',
   );

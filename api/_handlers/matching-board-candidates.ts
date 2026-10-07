@@ -23,6 +23,8 @@ import {
   boardInProcessColumnId,
   boardDoneColumnId,
   boardDropColumnId,
+  boardDailyWorkColumnId,
+  boardChecklistColumnId,
 } from '../_lib/boardCandidatesSql.js';
 import { loadBoardAvailabilityContext } from '../_lib/boardAvailability.js';
 import { filterAvailableBoardMatches } from '@/lib/boardMatchAvailability';
@@ -120,8 +122,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
           boardInProcessColumnId(),
           boardDoneColumnId(),
           boardDropColumnId(),
+          // 🔴 7 ต.ค. 2569 (เจ้าของ "ชื่อจากบอร์ดมาไม่ครบ … หาไม่เจอ"): ถัง งานรายวัน ไม่เคยอยู่ในลิสต์
+          boardDailyWorkColumnId(),
         ],
-        limit: 2000,
+        // 🔴 การ์ดค้าง Checklist แต่แจ้งเข้าแล้ว (ได้งานแล้ว 662 คน) — เป็นคนที่ต้องตามพอดี · Checklist ที่ยังสมัครไม่เสร็จยังไม่เอา
+        informedAlsoFromColumnIds: [boardChecklistColumnId()],
+        // เดิม 2000 — รวมถังใหม่แล้วเกือบชนเพดาน (1,891 คน) ตัดเงียบ ๆ = หาชื่อไม่เจออีก
+        limit: 5000,
       });
       res.setHeader?.('Cache-Control', 'no-store');
       return res.status(200).json({

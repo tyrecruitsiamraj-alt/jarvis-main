@@ -66,8 +66,19 @@ describe('รหัสถังบนบอร์ด (ค่าเริ่ม�
 });
 
 describe('โหมด picker ของ /api/matching/board-candidates', () => {
-  it('ไม่มีถัง Checklist อยู่ในรายการคอลัมน์', () => {
-    expect(pickerBlock).not.toContain('boardChecklistColumnId');
+  /**
+   * 🔴 7 ต.ค. 2569 เจ้าของ: *"ชื่อจากบอร์ด เหมือนมาไม่ครบ … หาไม่เจอ"* — คนนั้นแจ้งเข้าแล้ว แต่การ์ดค้าง Checklist
+   * (วัดจริง 662 คน) ⇒ Checklist เข้าได้ **เฉพาะคนแจ้งเข้าแล้ว** · ที่ยังสมัครไม่เสร็จยังไม่เอาเหมือนเดิม
+   */
+  it('Checklist ไม่อยู่ในรายการคอลัมน์หลัก · เข้าได้ผ่าน informedAlsoFromColumnIds เท่านั้น', () => {
+    const cols = pickerBlock.slice(pickerBlock.indexOf('columnIds: ['), pickerBlock.indexOf('],'));
+    expect(cols).not.toContain('boardChecklistColumnId');
+    expect(pickerBlock).toContain('informedAlsoFromColumnIds: [boardChecklistColumnId()]');
+  });
+
+  it('🔴 ถัง งานรายวัน อยู่ในลิสต์ · เพดานไม่ตัดเงียบ (เกิน 2000)', () => {
+    expect(pickerBlock).toContain('boardDailyWorkColumnId()');
+    expect(pickerBlock).toContain('limit: 5000');
   });
 
   it('ครบ 6 ถังที่เหลือ', () => {
