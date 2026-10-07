@@ -30,6 +30,7 @@ import {
 } from './lumosDispatch.js';
 import type { LumosReminderPayload } from './lumosDispatch.js';
 import { staffNameOfPhone } from './followStaffName.js';
+import { repairDeclinedFollowDays } from './followDeclineDayRepair.js';
 import {
   readFollowPushRetryConfig,
   shouldRetryFollowPush,
@@ -309,6 +310,12 @@ export function startFollowPushRetryWorker(): boolean {
         await runFollowPushRetryOnce(nowCfg);
       } catch (e) {
         logError('follow.pushRetry: รอบนี้ล้มทั้งรอบ', e);
+      }
+      // ตอบว่า "วันนี้ไม่ไป" → วันถัดไปโทรต่อ (เจ้าของ 7 ต.ค. 2569) — ส่งแผนของวันถัดไปที่ถูกยกเลิกไปด้วยกลับให้ Lumos
+      try {
+        await repairDeclinedFollowDays();
+      } catch (e) {
+        logError('follow.declineDayRepair: รอบนี้ล้ม', e);
       }
       await sleepInterruptible(nowCfg.intervalMs);
     }
