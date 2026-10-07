@@ -12,6 +12,7 @@ import {
 } from '@/lib/followStaffCall';
 import type { FollowOutcome } from '@/lib/followOutcome';
 import FollowStaffCallControls from '@/components/follow/FollowStaffCallControls';
+import FollowCancelMenu, { type FollowCancelChoice } from '@/components/follow/FollowCancelMenu';
 import { toYmdBangkok, toYmdLocal, parseYmd, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   buildFollowDayCalls,
@@ -326,7 +327,8 @@ const FollowPlanningCalendar: React.FC<{
   ) => boolean | void | Promise<boolean | void>;
   /** ขั้น 2 ของสายคนโทร "จบเรื่องนี้" (6 ต.ค. 2569) — ปิดงานด้วยผลนี้ + หยุดสายที่เหลือทั้งชุด */
   onFinishRound?: (round: FollowPlanningRound, outcome: FollowOutcome) => void | Promise<void>;
-  onCancelRound?: (round: FollowPlanningRound) => void | Promise<void>;
+  /** ยกเลิก 3 แบบ (7 ต.ค. 2569) — ไม่ส่ง choice = สายนี้สายเดียว */
+  onCancelRound?: (round: FollowPlanningRound, choice?: FollowCancelChoice) => void | Promise<void>;
   /** รายการที่กำลังบันทึกอยู่ — ปุ่มของแถวนั้นกดซ้ำไม่ได้ */
   busyId?: string | null;
   /**
@@ -376,7 +378,6 @@ const FollowPlanningCalendar: React.FC<{
 }) => {
   const [view, setView] = useState<View>('day');
   /** สายที่กด "ยกเลิก" บนแถวแล้วรอยืนยัน (ยืนยันในที่เดิม ไม่เปิดป๊อป) */
-  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const today = toYmdBangkok(new Date());
   const dayYmd = selectedYmd || today;
 
@@ -910,30 +911,19 @@ const FollowPlanningCalendar: React.FC<{
                                       round.state !== 'cancelled' &&
                                       !(round.state === 'closed' && !e.staff_call_outcome);
                                     const busy = busyId === e.id;
+                                    /** 🔴 สาย AI ที่ยังไม่มีผล — ยกเลิกได้ 3 แบบจากแถว (7 ต.ค. 2569 · เดิมยกเลิกได้แค่ในป๊อป) */
+                                    const aiCancellable =
+                                      !manualRow &&
+                                      Boolean(onCancelRound) &&
+                                      e.call_mode !== 'manual' &&
+                                      (['waiting', 'sent', 'overdue', 'notSent'] as const).includes(
+                                        round.state as 'waiting' | 'sent' | 'overdue' | 'notSent',
+                                      );
                                     return (
                                       <span key={round.entry.id} className="flex min-h-[34px] flex-col justify-center">
                                         {/* 🔴 คำพูดของเขามาก่อนเสมอ (สาย AI) — หัวคอลัมน์ถามว่า "เขาตอบว่าอะไร"
                                             🔴 ปุ่มอยู่บรรทัดเดียวเสมอ (ตัดบรรทัด = บรรทัดของคอลัมน์นี้ไม่ตรงกับเวลาของสายนั้น) */}
-                                        {manualRow && confirmCancelId === e.id ? (
-                                          <span className="flex flex-nowrap items-center gap-1 whitespace-nowrap">
-                                            <span className="text-[11px] text-muted-foreground">ยกเลิกสายนี้ไหม</span>
-                                            <Button
-                                              type="button"
-                                              variant="destructive"
-                                              size="xs"
-                                              disabled={busy}
-                                              onClick={() => {
-                                                setConfirmCancelId(null);
-                                                void onCancelRound?.(round);
-                                              }}
-                                            >
-                                              ยกเลิกเลย
-                                            </Button>
-                                            <Button type="button" variant="outline" size="xs" onClick={() => setConfirmCancelId(null)}>
-                                              ไม่
-                                            </Button>
-                                          </span>
-                                        ) : manualRow ? (
+                                        {manualRow ? (
                                           <FollowStaffCallControls
                                             compact
                                             entry={e}
@@ -942,15 +932,7 @@ const FollowPlanningCalendar: React.FC<{
                                             onFinish={(o) => onFinishRound?.(round, o)}
                                             extra={
                                               round.state !== 'closed' ? (
-                                                <Button
-                                                  type="button"
-                                                  variant="outline"
-                                                  size="xs"
-                                                  disabled={busy}
-                                                  onClick={() => setConfirmCancelId(e.id)}
-                                                >
-                                                  ยกเลิก
-                                                </Button>
+                                                <FollowCancelMenu busy={busy} onCancel={(c) => onCancelRound?.(round, c)} />
                                               ) : null
                                             }
                                           />
@@ -1003,9 +985,14 @@ const FollowPlanningCalendar: React.FC<{
                                           <span className="text-[12px] text-muted-foreground">
                                             ส่งให้ AI แล้ว ยังไม่มีผลกลับ
                                           </span>
-                                        ) : (
+                                        ) : aiCancellable ? null : (
                                           <span className="text-[12px] text-muted-foreground">—</span>
                                         )}
+                                        {aiCancellable ? (
+                                          <span className="mt-1">
+                                            <FollowCancelMenu busy={busy} onCancel={(c) => onCancelRound?.(round, c)} />
+                                          </span>
+                                        ) : null}
                                         {/* ประวัติ: ปุ่ม ไป/ไม่ไป เคยอยู่ตรงนี้เช้า 3 ต.ค. แล้วถอดไปป๊อปจัดการ · 6 ต.ค. 2569 เจ้าของสั่งใหม่ให้กลับมา
                                             (เฉพาะสายคนโทร · 2 ขั้น · ตัวเดียวกับป๊อป) */}
                                       </span>

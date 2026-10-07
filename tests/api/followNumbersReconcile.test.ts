@@ -225,15 +225,17 @@ describe('หน้าหลัก + Dashboard ใช้ตัวจัดหม
   });
 });
 
-describe('การ์ด "สำเร็จ / ยกเลิก" ใต้ตารางรายวัน (เจ้าของ 6 ต.ค. 2569)', () => {
-  const call = (over: Partial<FollowEntry>) => ({ round: { entry: e(over) } }) as never;
-  it('ทุกสายปิดงาน = สำเร็จ · ยกเลิกทุกสาย/ปิดว่ายกเลิก = ยกเลิก · ยังมีสายค้าง = อยู่ในตาราง', async () => {
+describe('คนที่จบแล้วของวัน (7 ต.ค. 2569 Journey ข้อ 5 · Choice "เหลือแค่ที่ยังไม่จบ")', () => {
+  const call = (category: string, over: Partial<FollowEntry> = {}) => ({ round: { entry: e(over) }, category }) as never;
+  it('🔴 ไม่ไป > ไป > ยกเลิกหมด · คนปิดครบ (ลา/เลื่อน) = สรุปไม่ได้ที่จบแล้ว · สรุปไม่ได้/ไม่รับสาย/รอโทร ที่ยังไม่มีใครปิด = อยู่ในตาราง', async () => {
     const { followDayPersonDone } = await import('../../src/lib/followPlanning');
-    expect(followDayPersonDone({ calls: [call({ completed_at: '2026-10-06T03:00:00Z', outcome_code: 'went' }), call({ cancelled: true })] })).toBe('success');
-    expect(followDayPersonDone({ calls: [call({ cancelled: true }), call({ cancelled: true })] })).toBe('cancelled');
-    expect(followDayPersonDone({ calls: [call({ completed_at: '2026-10-06T03:00:00Z', outcome_code: 'cancelled' })] })).toBe('cancelled');
-    expect(followDayPersonDone({ calls: [call({ completed_at: '2026-10-06T03:00:00Z', outcome_code: 'no_show_start' })] })).toBe('success');
-    expect(followDayPersonDone({ calls: [call({ completed_at: '2026-10-06T03:00:00Z', outcome_code: 'went' }), call({})] })).toBeNull();
+    expect(followDayPersonDone({ calls: [call('agreed'), call('waiting')] })).toBe('agreed');
+    expect(followDayPersonDone({ calls: [call('agreed'), call('lost')] })).toBe('lost');
+    expect(followDayPersonDone({ calls: [call('cancelled', { cancelled: true }), call('cancelled', { cancelled: true })] })).toBe('cancelled');
+    expect(followDayPersonDone({ calls: [call('other', { completed_at: '2026-10-06T03:00:00Z', outcome_code: 'leave' })] })).toBe('other');
+    expect(followDayPersonDone({ calls: [call('other')] })).toBeNull();
+    expect(followDayPersonDone({ calls: [call('unreachable'), call('waiting')] })).toBeNull();
+    expect(followDayPersonDone({ calls: [call('cancelled', { cancelled: true }), call('overdue')] })).toBeNull();
     expect(followDayPersonDone({ calls: [] })).toBeNull();
   });
 });

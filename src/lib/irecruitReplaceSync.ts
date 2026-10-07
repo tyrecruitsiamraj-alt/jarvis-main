@@ -253,6 +253,15 @@ export function replaceSlotNote(slot: ReplaceSlot, wall: ReplaceWantWall): strin
 }
 
 export type ReplaceDesiredCall = { ref: string; jobId: string; slot: ReplaceSlot; at: Date; asap: boolean };
+
+/**
+ * แก้ล่าสุดชนะ (7 ต.ค. 2569) — แถวที่เจ้าหน้าที่แก้บนระบบแล้ว ย้ายเวลาตาม iRecruit **เฉพาะเมื่อ iRecruit เปลี่ยนทีหลัง**
+ * `syncedNote` = หมายเหตุในแถว (เวลาเข้างานของ iRecruit ตอนดึงล่าสุด) · `irecruitNote` = ของ iRecruit ตอนนี้
+ * ตรงกัน = iRecruit ไม่ได้เปลี่ยน ⇒ ไม่ทับ (false) · ต่างกัน = iRecruit เปลี่ยน ⇒ ย้ายตาม (true)
+ */
+export function irecruitChangedSinceSync(syncedNote: string | null | undefined, irecruitNote: string): boolean {
+  return (syncedNote ?? '').trim() !== irecruitNote.trim();
+}
 export type ReplaceExistingCall = {
   id: string;
   ref: string;

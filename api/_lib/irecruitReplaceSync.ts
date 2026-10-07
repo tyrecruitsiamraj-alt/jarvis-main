@@ -47,6 +47,7 @@ import {
   replaceCallModeFor,
   replaceModeForType,
   replaceSlotNote,
+  irecruitChangedSinceSync,
   replaceSlotRef,
   wantWallFromSqlDate,
   type ReplaceCallRule,
@@ -194,6 +195,10 @@ type ExistingRow = {
   pending: boolean;
   /** สร้างก่อนกติกา EX = AI · คนใน = คนโทร — เฉพาะแถวพวกนี้ที่รอบดึงเปลี่ยน AI → คนโทรให้เอง */
   before_type_rule: boolean;
+  /** เจ้าหน้าที่เคยแก้แถวนี้บนระบบ (`updated_by` — รอบดึงไม่เคยตั้งค่านี้) */
+  staff_edited: boolean;
+  /** หมายเหตุ = เวลาเข้างานของ iRecruit ตอนดึงครั้งล่าสุด (`replaceSlotNote`) */
+  note: string | null;
 };
 
 /** คีย์คนไปแทน — แฮชเบอร์ (ไม่เก็บเบอร์ดิบในคีย์) · เปลี่ยนคน = คีย์ใหม่ */
@@ -352,7 +357,8 @@ export async function runIrecruitReplaceSync(
         `select id, source_ref, scheduled_at, coalesce(call_mode, 'ai') as mode, group_id::text as group_id, recipient_phone,
                 (cancelled_at is null and completed_at is null and staff_call_outcome is null
                   and scheduled_at > $1::timestamptz) as pending,
-                (created_at < $3::timestamptz) as before_type_rule
+                (created_at < $3::timestamptz) as before_type_rule,
+                (updated_by is not null) as staff_edited, note
            from ${followTable}
           where source_ref like 'irecruit-replace:%' and scheduled_at >= $2::timestamptz`,
         [
@@ -392,6 +398,19 @@ export async function runIrecruitReplaceSync(
     plan.cancel = plan.cancel.filter((c) => !pendingBeyond.has(c.ref));
     const metaByRef = new Map(desired.map((d) => [d.ref, d]));
     const rowById = new Map(existingRows.map((x) => [x.id, x]));
+    /**
+     * 🔴 แก้ล่าสุดชนะ (เจ้าของ 7 ต.ค. 2569: *"ถ้าแก้มาจาก irecruit ใช้ irecruit แก้บนระบบใช้บนระบบ อันไหนแก้ล่าสุดใช้อันนั้น"*)
+     * เดิมรอบดึงย้ายเวลากลับตาม iRecruit ทุก 5 นาที ⇒ เจ้าหน้าที่แก้เวลาบนระบบไม่ติด
+     * iRecruit ไม่มีเวลาแก้ไขให้เทียบ ⇒ ใช้หมายเหตุ (เวลาเข้างานของ iRecruit ตอนดึงล่าสุด):
+     * หมายเหตุยังตรงกับ iRecruit ตอนนี้ = iRecruit ไม่ได้เปลี่ยน ⇒ ที่เวลาไม่ตรงคือเจ้าหน้าที่แก้ทีหลัง → ไม่ทับ
+     * หมายเหตุไม่ตรง = iRecruit เปลี่ยนทีหลัง → ย้ายตาม iRecruit
+     */
+    plan.reschedule = plan.reschedule.filter(({ existing: ex, desired: d }) => {
+      const row = rowById.get(ex.id);
+      const meta = metaByRef.get(d.ref);
+      if (!row?.staff_edited || !meta) return true;
+      return irecruitChangedSinceSync(row.note, replaceSlotNote(meta.slot, meta.wall));
+    });
     summary.alreadyIn = desired.length - plan.create.length;
     summary.asap = plan.create.filter((c) => c.asap).length;
 
@@ -427,9 +446,11 @@ export async function runIrecruitReplaceSync(
       const meta = metaByRef.get(d.ref);
       if (!meta) continue;
       try {
-        const wasAi = rowById.get(ex.id)?.mode === 'ai';
+        const row = rowById.get(ex.id);
+        const wasAi = row?.mode === 'ai';
         if (wasAi) await cancelFollowReminder(ex.id, staffNameOfPhone);
-        const mode = wasAi ? meta.mode : 'manual';
+        // เจ้าหน้าที่เคยสลับคน → AI เอง = คงที่เขาเลือก (iRecruit เปลี่ยนแค่เวลา ไม่ได้เปลี่ยนใครโทร) · พัก AI ยังบังคับทับอยู่
+        const mode = wasAi ? (row?.staff_edited && !settings.rule.aiPaused ? 'ai' : meta.mode) : 'manual';
         await dbQuery(`update ${followTable} set scheduled_at = $2, note = $3, call_mode = $4 where id = $1`, [
           ex.id,
           meta.at.toISOString(),

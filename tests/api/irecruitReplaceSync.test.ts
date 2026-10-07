@@ -6,6 +6,7 @@
  * 🔴 ด่าน: SQL ของเจ้าของ (WS · job_type 2 · ตัด C) · กันซ้ำด้วย source_ref · ส่ง AI เฉพาะสวิตช์ follow_entry เปิด · แผนละคน+วัน ·
  *    ดึงพัง/ได้ 0 ใบทั้งที่มีสายรอ = ไม่ยกเลิกอะไร
  */
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const irecruitSqlQuery = vi.fn();
@@ -418,5 +419,27 @@ describe('🔴 ยกเลิกแล้วต้องถึง Lumos — ท
     expect(cancelFollow).toHaveBeenCalledTimes(1);
     expect(cancelPushed).not.toHaveBeenCalled();
     expect(out).toMatchObject({ plansCancelled: 0, plansResent: 1 });
+  });
+});
+
+describe('แก้ล่าสุดชนะ (เจ้าของ 7 ต.ค. 2569 "อันไหนแก้ล่าสุดใช้อันนั้น")', () => {
+  it('หมายเหตุยังตรงกับ iRecruit = iRecruit ไม่ได้เปลี่ยน ⇒ ไม่ทับเวลาที่เจ้าหน้าที่แก้ · ไม่ตรง = ย้ายตาม iRecruit', async () => {
+    const { irecruitChangedSinceSync, replaceSlotNote } = await import('../../src/lib/irecruitReplaceSync');
+    const wall = { ymd: '2026-10-08', hhmm: '08:00' } as never;
+    const note = replaceSlotNote('confirm' as never, wall);
+    expect(irecruitChangedSinceSync(note, note)).toBe(false);
+    expect(irecruitChangedSinceSync(note, replaceSlotNote('confirm' as never, { ymd: '2026-10-08', hhmm: '09:00' } as never))).toBe(true);
+    expect(irecruitChangedSinceSync(null, note)).toBe(true);
+  });
+  it('🔴 รอบดึงกรองการย้ายเวลาของแถวที่เจ้าหน้าที่แก้ · คงโหมด AI ที่เขาเลือก (ยกเว้นพัก AI)', () => {
+    const src = readFileSync(new URL('../../api/_lib/irecruitReplaceSync.ts', import.meta.url), 'utf8');
+    expect(src).toContain('(updated_by is not null) as staff_edited, note');
+    expect(src).toContain('return irecruitChangedSinceSync(row.note, replaceSlotNote(meta.slot, meta.wall));');
+    expect(src).toContain("row?.staff_edited && !settings.rule.aiPaused ? 'ai' : meta.mode");
+  });
+  it('🔴 พัก AI อยู่ = สายที่เพิ่มเองในแท็บส่งคนแทนเป็นคนโทรตั้งแต่สร้าง · แก้ตารางเป็น AI ไม่ได้', () => {
+    const h = readFileSync(new URL('../../api/_handlers/follow.ts', import.meta.url), 'utf8');
+    expect(h).toContain("base = { ...inputBase, callMode: 'manual' };");
+    expect(h).toContain('ส่งคนแทนพัก AI อยู่');
   });
 });

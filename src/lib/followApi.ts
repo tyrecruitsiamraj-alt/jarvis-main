@@ -296,7 +296,7 @@ export type FollowLumosResync = {
 export async function updateFollowEntry(
   id: string,
   input: EditFollowEntry,
-): Promise<FollowEntry & { queue_refreshed?: number; lumos_resync?: FollowLumosResync; phone_applied?: number }> {
+): Promise<FollowEntry & { queue_refreshed?: number; lumos_resync?: FollowLumosResync; phone_applied?: number; lumos_other_failed?: number }> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ ...input, action: 'update' }),
@@ -306,12 +306,24 @@ export async function updateFollowEntry(
     queue_refreshed?: number;
     lumos_resync?: FollowLumosResync;
     phone_applied?: number;
+    lumos_other_failed?: number;
   };
 }
 
 export async function cancelFollowEntry(id: string): Promise<void> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
   if (!r.ok) throw new Error(await readError(r));
+}
+
+/** ยกเลิกทั้งวัน / เลิกตามคนนี้ (7 ต.ค. 2569) — เฉพาะสายที่ยังไม่มีผล · `lumos_failed` > 0 = ต้องบอกจอ */
+export type FollowCancelScope = 'day' | 'person';
+export async function cancelFollowScope(
+  id: string,
+  scope: FollowCancelScope,
+): Promise<{ cancelled: number; lumos_failed: number }> {
+  const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}&scope=${scope}`, { method: 'DELETE' });
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as { cancelled: number; lumos_failed: number };
 }
 
 /**

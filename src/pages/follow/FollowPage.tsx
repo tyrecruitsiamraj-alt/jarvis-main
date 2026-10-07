@@ -48,6 +48,8 @@ import {
   completeFollowEntry,
   reopenFollowEntry,
   recordFollowStaffCall,
+  cancelFollowScope,
+  type FollowCancelScope,
   clearFollowStaffCall,
   type FollowEntry,
   type FollowStopScope,
@@ -139,6 +141,9 @@ function nowForInput(): string {
  * คำนำหน้าที่ให้เลือก — เก็บเป็นข้อความติดหน้าชื่อตามธรรมเนียมไทย ("นายสมชาย ใจดี")
  * ค่าว่าง = ไม่ระบุ (บางเคสมีแค่ชื่อเล่น/ชื่อที่คนแนะนำมา)
  */
+/** ตั้งตารางได้ยาวสุดกี่วันต่อครั้ง (7 ต.ค. 2569 · เดิม 31 ตัดเงียบ) — server แก้ตารางรับได้ 92 × 5 สาย */
+const MAX_FOLLOW_DAYS = 92;
+
 const NAME_PREFIXES = ['', 'นาย', 'นาง', 'นางสาว'] as const;
 
 /** ป้ายวันแบบสั้น (พฤ. 2 ต.ค.) ของตารางหลายวัน — ประกาศระดับโมดูล (กติกา `new Intl.*`) */
@@ -702,14 +707,18 @@ const FollowPage: React.FC = () => {
   const removeRound = (i: number) =>
     setRoundTimes((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
 
-  /** วันในช่วง [from, to] เป็น YYYY-MM-DD (สูงสุด 31 วัน) — คืน [] ถ้าช่วงผิด */
+  /**
+   * วันในช่วง [from, to] เป็น YYYY-MM-DD — คืน [] ถ้าช่วงผิด
+   * 🔴 7 ต.ค. 2569 เจ้าของ: *"จะเพิ่มกี่วันกี่สายก็ได้"* — เดิมตัดที่ 31 วันเงียบ ๆ (เลือก 45 วันได้ 31)
+   * ⇒ ขยายเป็น `MAX_FOLLOW_DAYS` และคืนเกินมา 1 วันให้ด่านตอนบันทึกบอกได้ว่ายาวเกิน
+   */
   const daysInRange = (from: string, to: string): string[] => {
     if (!from || !to) return [];
     const start = new Date(`${from}T00:00:00+07:00`);
     const end = new Date(`${to}T00:00:00+07:00`);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return [];
     const out: string[] = [];
-    for (let d = new Date(start); d <= end && out.length < 31; d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(start); d <= end && out.length <= MAX_FOLLOW_DAYS; d.setDate(d.getDate() + 1)) {
       out.push(d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }));
     }
     return out;
@@ -892,8 +901,13 @@ const FollowPage: React.FC = () => {
      * เวลารายวันได้ · วันที่ "ไม่โทร" ข้าม · เลขรอบนับต่อทั้งชุด (`buildScheduleCalls`) · ตอบไม่ไป = หยุดทั้งชุด (server)
      */
     if (scheduleMode) {
-      if (daysInRange(dateFrom, dateTo).length === 0) {
-        setFormError('เลือกช่วงวันให้ถูกต้อง (ไม่เกิน 31 วัน · วันเริ่มต้องไม่หลังวันจบ)');
+      const rangeDays = daysInRange(dateFrom, dateTo).length;
+      if (rangeDays === 0) {
+        setFormError('วันเริ่มต้องไม่หลังวันจบ');
+        return;
+      }
+      if (rangeDays > MAX_FOLLOW_DAYS) {
+        setFormError(`ตั้งได้ไม่เกิน ${MAX_FOLLOW_DAYS} วันต่อครั้ง · เกินนี้ให้ตั้งเพิ่มอีกรอบ`);
         return;
       }
       const calls = scheduleCalls();
@@ -1101,38 +1115,43 @@ const FollowPage: React.FC = () => {
       const dispatchStates: Array<string | null> = [];
       try {
         /**
-         * 🔴 **ยิงครั้งเดียวทุกรอบ** (เจ้าของสั่ง 11 ก.ย. 2569) — เดิมวนยิงทีละรอบ
-         * ฝั่งเราเลยสร้าง **แผนแยกกันรอบละแผน** ไปที่เบอร์เดียวกัน แผนหลังทับแผนแรก
-         * สายแรกจึงไม่ได้โทรและไม่มีผลกลับ (วัดจริง: สายที่นัดก่อนได้ผล 1 จาก 16)
+         * 🔴 **ยิงครั้งเดียวต่อวัน** — 11 ก.ย. 2569 เจ้าของสั่งเลิกยิงทีละรอบ (แผนแยกรอบละแผนทับกัน สายแรกไม่ได้โทร)
          * ⚠️ ห้ามกลับไปวน `for` ยิงทีละรอบเด็ดขาด
+         * 7 ต.ค. 2569 (ตรวจ Journey): เดิมยิงทุกวันเป็นคำขอเดียว ⇒ Lumos ได้แผนเดียวยาวหลายวัน ซึ่งไม่เคยยืนยันว่ารับ
+         * (แผนที่ Lumos รับจริงยาวสุดวันเดียว) ⇒ แบ่งแผนละวัน เหมือนโหมดตาราง · ทุกวัน `group_id` เดียวกัน
          */
-        const createdEntries = await createFollowRounds({
-          recipient_name: recipientName,
-          recipient_phone: phone,
-          topic,
-          follow_team: followTeam,
-          note: note || undefined,
-          staff_phone: phoneByIso.get(sendIso[0]) || undefined,
-          scheduled_at: sendIso[0],
-          call_round: roundByIso.get(sendIso[0]) ?? 1,
-          // ใครโทร (121) — ค่าบนสุด = ของสายแรก (สายเดียวเส้น API อ่านจากตรงนี้) · หลายสายอ่านจาก rounds[]
-          call_mode: sendModeOf(sendIso[0]),
-          time_tbd: modeByIso.get(sendIso[0]) === 'tbd' || undefined,
-          group_id: groupId,
-          plan_day_start: planDayStart > 1 ? planDayStart : undefined,
-          unit_name: unitName.trim() || undefined,
-          site_code: siteCode.trim() || undefined,
-          rounds: sendIso.map((t) => ({
-            scheduled_at: t,
-            staff_phone: phoneByIso.get(t) || undefined,
-            call_round: roundByIso.get(t) ?? 1,
-            call_mode: sendModeOf(t),
-            time_tbd: modeByIso.get(t) === 'tbd' || undefined,
-          })),
-        });
-        for (const createdEntry of createdEntries) {
-          dispatchStates.push(createdEntry.dispatch_state ?? null);
-          done += 1;
+        const dayOf = (t: string) => toYmdBangkok(new Date(t));
+        const days = [...new Set(sendIso.map(dayOf))].sort();
+        for (const day of days) {
+          const dayIso = sendIso.filter((t) => dayOf(t) === day);
+          const createdEntries = await createFollowRounds({
+            recipient_name: recipientName,
+            recipient_phone: phone,
+            topic,
+            follow_team: followTeam,
+            note: note || undefined,
+            staff_phone: phoneByIso.get(dayIso[0]) || undefined,
+            scheduled_at: dayIso[0],
+            call_round: roundByIso.get(dayIso[0]) ?? 1,
+            // ใครโทร (121) — ค่าบนสุด = ของสายแรก (สายเดียวเส้น API อ่านจากตรงนี้) · หลายสายอ่านจาก rounds[]
+            call_mode: sendModeOf(dayIso[0]),
+            time_tbd: modeByIso.get(dayIso[0]) === 'tbd' || undefined,
+            group_id: groupId,
+            plan_day_start: planDayStart > 1 ? planDayStart : undefined,
+            unit_name: unitName.trim() || undefined,
+            site_code: siteCode.trim() || undefined,
+            rounds: dayIso.map((t) => ({
+              scheduled_at: t,
+              staff_phone: phoneByIso.get(t) || undefined,
+              call_round: roundByIso.get(t) ?? 1,
+              call_mode: sendModeOf(t),
+              time_tbd: modeByIso.get(t) === 'tbd' || undefined,
+            })),
+          });
+          for (const createdEntry of createdEntries) {
+            dispatchStates.push(createdEntry.dispatch_state ?? null);
+            done += 1;
+          }
         }
         resetForm();
         // สายที่ตั้งให้คนโทร = ตั้งใจไม่ส่ง AI ⇒ ไม่นับเป็นปัญหา
@@ -1174,6 +1193,21 @@ const FollowPage: React.FC = () => {
     try {
       await cancelFollowEntry(id);
       setCancellingId(null);
+      await reload();
+    } catch (err) {
+      toast.error(friendlyErrorText(err, 'ยกเลิกไม่สำเร็จ'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /** ยกเลิกทั้งวัน / เลิกตามคนนี้ (เจ้าของ 7 ต.ค. 2569 Journey ข้อ 2) — เฉพาะสายที่ยังไม่มีผล */
+  const doCancelScope = async (id: string, scope: FollowCancelScope) => {
+    setBusyId(id);
+    try {
+      const out = await cancelFollowScope(id, scope);
+      if (out.lumos_failed > 0) toast.error(`ยกเลิกแล้ว ${out.cancelled} สาย แต่บอก AI ไม่สำเร็จ ลองกดอีกครั้ง`);
+      else toast.success(`ยกเลิกแล้ว ${out.cancelled} สาย`);
       await reload();
     } catch (err) {
       toast.error(friendlyErrorText(err, 'ยกเลิกไม่สำเร็จ'));
@@ -1846,7 +1880,9 @@ const FollowPage: React.FC = () => {
           /* สายคนโทร 2 ขั้นในช่อง "เขาตอบว่าอะไร" (6 ต.ค. 2569) — ขั้น 2 ถามจบเรื่องในที่เดิม ไม่เด้งป๊อปแล้ว */
           onStaffResult={(round, outcome) => doStaffCall(round.entry.id, outcome)}
           onFinishRound={(round, outcome) => doComplete(round.entry.id, outcome, undefined, 'set')}
-          onCancelRound={(round) => doCancel(round.entry.id)}
+          onCancelRound={(round, choice) =>
+            choice && choice !== 'call' ? doCancelScope(round.entry.id, choice) : doCancel(round.entry.id)
+          }
           busyId={busyId}
           lastLoadedAt={lastLoadedAt}
           roundFilter={activeRound}

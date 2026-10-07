@@ -967,21 +967,26 @@ export function roundEmergencyPhone(round: FollowPlanningRound): string | null {
 }
 
 /**
- * ═══ คนที่ "จัดการจบแล้ว" ของวันนั้น (เจ้าของ 6 ต.ค. 2569 · Choice "การ์ดแยกใต้ตาราง") ═══
- * > *"ถ้ากดจัดการแล้ว ต้องการให้ย้ายไปอยู่หน้า สำเร็จ / ยกเลิก"* — "มีกล่องแยก"
- * จบแล้ว = ทุกสายของคนนั้นในวันนั้นปิดงานแล้ว (`completed_at`) หรือยกเลิก
- * - `success` = มีสายที่ปิดงานด้วยผลที่ไม่ใช่ยกเลิก (ไปแล้ว · ถึงแล้ว · ไม่ไป · ลา · เลื่อน · จำวันผิด …)
- * - `cancelled` = ยกเลิกทุกสาย หรือปิดงานว่า "ยกเลิก"/"ยกเลิกงาน"
- * - null = ยังมีสายที่ต้องตาม (อยู่ในตารางเหมือนเดิม)
+ * ═══ คนที่ "จบแล้ว" ของวันนั้น — ออกจากตาราง "สายที่ต้องตาม" ไปการ์ดใต้ตาราง ═══
+ * 6 ต.ค. 2569: จบ = คนกดจัดการ (ปิด/ยกเลิก) ทุกสาย
+ * 🔴 7 ต.ค. 2569 เจ้าของ (Journey ข้อ 5 · Choice "เหลือแค่ที่ยังไม่จบ"): *"สรุปมาว่าไปก็ย้ายไปกล่องไป ไม่ไป ยกเลิก
+ * สรุปไม่ได้ก็แยกไป"* ⇒ ตัดสินจาก**หมวดของสาย** (`callCategory` ตัวเดียวกับกล่องบนแผง) ไม่ต้องรอคนกด
+ * - มีสายไหนตอบว่าไม่ไป → `lost` (ก่อนไป — ต้องรู้ก่อนว่าขาดคน)
+ * - มีสายไหนตอบว่าไป → `agreed`
+ * - ยกเลิกทุกสาย → `cancelled`
+ * - คนปิดครบทุกสายแล้ว (ลา · เลื่อน · จำวันผิด …) → `other` (สรุปไม่ได้ แต่คนจัดการจบแล้ว)
+ * - ที่เหลือ (สรุปไม่ได้ / ไม่รับสาย / รอโทร ที่ยังไม่มีใครจัดการ) = null → อยู่ในตารางต้องตาม
  */
-export type FollowDayDoneKind = 'success' | 'cancelled';
-
-const CANCEL_OUTCOMES = new Set(['cancelled', 'job_cancelled']);
+export type FollowDayDoneKind = 'agreed' | 'lost' | 'other' | 'cancelled';
 
 export function followDayPersonDone(p: Pick<FollowDayPerson, 'calls'>): FollowDayDoneKind | null {
+  if (p.calls.length === 0) return null;
+  // หมวดที่ตารางใช้อยู่แล้ว (`FollowDayCall.category`) — ตัวเดียวกับสีชิปบนแถว
+  const cats = p.calls.map((c) => c.category ?? callCategory(c.round));
+  if (cats.includes('lost')) return 'lost';
+  if (cats.includes('agreed')) return 'agreed';
+  if (cats.every((c) => c === 'cancelled')) return 'cancelled';
   const entries = p.calls.map((c) => c.round.entry);
-  if (entries.length === 0) return null;
-  if (!entries.every((e) => e.cancelled || e.completed_at)) return null;
-  const success = entries.some((e) => e.completed_at && !e.cancelled && !CANCEL_OUTCOMES.has(e.outcome_code ?? ''));
-  return success ? 'success' : 'cancelled';
+  if (entries.every((e) => e.cancelled || e.completed_at)) return 'other';
+  return null;
 }

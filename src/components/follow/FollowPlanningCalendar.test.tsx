@@ -810,15 +810,29 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
     expect(onFinishRound.mock.calls[0][1]).toBe('no_show_start');
   });
 
-  it('🔴 ยกเลิก ต้องยืนยันในที่เดิมก่อน (ย้อนไม่ได้)', () => {
+  /** 🔴 7 ต.ค. 2569 Journey ข้อ 2: ยกเลิก 3 แบบ — สายนี้ / ทั้งวัน / เลิกตามคนนี้ · ยืนยันก่อนเสมอ (ย้อนไม่ได้) */
+  it('🔴 ยกเลิก = เลือก 3 แบบในป๊อป แล้วยืนยันก่อน', async () => {
     const onCancelRound = vi.fn();
     renderCalendar([manual()], { onStaffResult: vi.fn(), onCancelRound });
     const row = dayRows()[0];
     fireEvent.click(within(row).getByRole('button', { name: 'ยกเลิก' }));
+    for (const label of ['ยกเลิกสายนี้', 'ยกเลิกทั้งวัน', 'เลิกตามคนนี้']) {
+      expect(await screen.findByRole('button', { name: label })).toBeTruthy();
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'ยกเลิกทั้งวัน' }));
     expect(onCancelRound).not.toHaveBeenCalled();
-    expect(within(row).getByText('ยกเลิกสายนี้ไหม')).toBeTruthy();
-    fireEvent.click(within(row).getByRole('button', { name: 'ยกเลิกเลย' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'ยกเลิกเลย' }));
+    await waitFor(() => expect(onCancelRound).toHaveBeenCalled());
     expect((onCancelRound.mock.calls[0][0] as { entry: FollowEntry }).entry.id).toBe('m1');
+    expect(onCancelRound.mock.calls[0][1]).toBe('day');
+  });
+
+  it('🔴 สาย AI ที่ยังไม่มีผลก็ยกเลิกจากแถวได้ · สาย AI ที่มีผลแล้วไม่มีปุ่ม', () => {
+    renderCalendar(
+      [entry({ id: 'ai-wait', call_round: 1, call_status: 'pending' }), entry({ id: 'ai-done', call_round: 2, call_outcome: 'confirmed', call_status: 'completed' })],
+      { onStaffResult: vi.fn(), onCancelRound: vi.fn() },
+    );
+    expect(screen.getAllByTestId('follow-cancel-open')).toHaveLength(1);
   });
 
   it('สายของ AI ไม่มีปุ่ม · ลงผลแล้วขึ้นคำของปุ่ม ("คนโทร: ไป") ปุ่มหาย เหลือ แก้', () => {
@@ -883,22 +897,32 @@ describe('แถบหน้ารายวันเป็น "1/N" (เจ้�
 
 
 /** 🔴 คนที่จัดการจบแล้ว → การ์ด "สำเร็จ / ยกเลิก" ใต้ตาราง (เจ้าของ 6 ต.ค. 2569 · Choice "การ์ดแยกใต้ตาราง") */
-describe('การ์ดสำเร็จ / ยกเลิก', () => {
+describe('การ์ดจบแล้ว (7 ต.ค. 2569: แท็บตามกล่อง · จบเองจากผล AI)', () => {
   const list = () => [
     entry({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'confirmed', completed_at: `${TODAY}T05:00:00Z`, outcome_code: 'went', completed_by_name: 'คนปิดงาน' }),
     entry({ id: 'b', call_round: 1, recipient_phone: '0899999998', recipient_name: 'คนที่สอง', call_status: 'pending' }),
     entry({ id: 'c', call_round: 1, recipient_phone: '0899999997', recipient_name: 'คนที่สาม', cancelled: true, call_status: 'cancelled' }),
+    // AI ตอบว่าไม่ไป — ไม่มีใครกดปิด ก็ออกจากตารางเอง
+    entry({ id: 'd', call_round: 1, recipient_phone: '0899999996', recipient_name: 'คนที่สี่', call_status: 'completed', call_outcome: 'declined' }),
+    // AI สรุปไม่ได้ — ยังอยู่ในตาราง
+    entry({ id: 'e', call_round: 1, recipient_phone: '0899999995', recipient_name: 'คนที่ห้า', call_status: 'completed', call_outcome: 'acknowledged', call_reply: 'ใครครับ' }),
   ];
-  it('แยก = ตารางเหลือคนที่ยังต้องตาม · การ์ดสำเร็จ 1 ยกเลิก 1 · ผล + ใครจัดการ', () => {
+  it('🔴 ตารางเหลือแค่ที่ยังไม่จบ (รอโทร · สรุปไม่ได้) · ไป / ไม่ไป / ยกเลิก ไปการ์ด · ผล + ใครจัดการ', () => {
     renderCalendar(list(), { splitDone: true });
     const names = dayRows().map((r) => r.textContent ?? '');
     expect(names.some((t) => t.includes('คนที่สอง'))).toBe(true);
+    expect(names.some((t) => t.includes('คนที่ห้า'))).toBe(true);
     expect(names.some((t) => t.includes('คนที่สาม'))).toBe(false);
+    expect(names.some((t) => t.includes('คนที่สี่'))).toBe(false);
     const card = screen.getByTestId('follow-day-done');
-    expect(within(card).getByRole('button', { name: /สำเร็จ 1/ })).toBeTruthy();
+    expect(within(card).getByRole('button', { name: /ตอบว่าไป 1/ })).toBeTruthy();
+    expect(within(card).getByRole('button', { name: /ตอบว่าไม่ไป 1/ })).toBeTruthy();
     expect(within(card).getByRole('button', { name: /ยกเลิก 1/ })).toBeTruthy();
     expect(card.textContent).toContain('ไปแล้ว');
     expect(card.textContent).toContain('คนปิดงาน');
+    fireEvent.click(within(card).getByRole('button', { name: /ตอบว่าไม่ไป 1/ }));
+    expect(card.textContent).toContain('คนที่สี่');
+    expect(card.textContent).toContain('AI');
     fireEvent.click(within(card).getByRole('button', { name: /ยกเลิก 1/ }));
     expect(card.textContent).toContain('คนที่สาม');
   });

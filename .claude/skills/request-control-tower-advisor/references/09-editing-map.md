@@ -12553,3 +12553,28 @@ Choice เจ้าของ แก้ 2 ข้อ:
 
 - ต้นเหตุ (วัดจริง): คนที่หาไม่เจอแจ้งเข้าแล้วแต่การ์ดค้าง Checklist · Checklist แจ้งเข้าแล้ว 662 คน · ถังงานรายวัน 91 คนไม่เคยอยู่ในลิสต์ · รวมแล้ว 1,138 → 1,891 คน (เกือบชนเพดาน 2000 เดิม)
 - ⚠️ Checklist ที่ยังสมัครไม่เสร็จยังไม่เอา (กติกา 16 ส.ค.)
+
+### Journey หน้าติดตาม 8 ข้อ (7 ต.ค. 2569 · เจ้าของ "หน้านี้ไม่ควรมีปัญหาไรแล้ว")
+
+Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" · ข้อ 7 "อันไหนแก้ล่าสุดใช้อันนั้น" · ข้อ 4 คงแบบเดิม (รหัสชัดเชื่อ Lumos · รับสายแล้ว = อ่านสรุป)
+
+| ข้อ | ไฟล์ | เปลี่ยนอะไร |
+|---|---|---|
+| 1 | `src/pages/follow/FollowPage.tsx` | `MAX_FOLLOW_DAYS` 92 (เดิม 31 ตัดเงียบ) + ด่านบอกเมื่อเกิน · โหมดระบุเวลาเองยิง `createFollowRounds` **ทีละวัน** (เดิมแผนเดียวหลายวัน) |
+| 1 | `api/_handlers/follow.ts` | `MAX_SCHEDULE_ROUNDS` 460 (92 × 5) |
+| 2 | `api/_lib/followCancelScope.ts` | **ใหม่** — `cancelScopeTargetsSql` (เบอร์ 9 หลักท้าย + ทีม · ยังไม่มีผล · day = วันไทยเดียวกัน) · `cancelFollowScope` ติดธงก่อน แล้วแจ้ง Lumos ทีละแผน (ไม่เหลือ = ยกเลิกแผน · เหลือ = resync) |
+| 2 | `api/_handlers/follow.ts` · `src/lib/followApi.ts` | `DELETE ?id=&scope=day|person` · `cancelFollowScope` |
+| 2 | `src/components/follow/FollowCancelMenu.tsx` | **ใหม่** — ปุ่ม "ยกเลิก" → Popover สายนี้ / ทั้งวัน / เลิกตามคนนี้ → ยืนยัน |
+| 2 | `FollowPlanningCalendar.tsx` · `FollowPage.tsx` | แถวคนโทรใช้เมนูนี้ (แทนยืนยันในแถว) · สาย AI ที่ยังไม่มีผลมีปุ่มด้วย (`aiCancellable`) · `onCancelRound(round, choice)` |
+| 3 | `api/_handlers/follow.ts` `updateFollow` | เปลี่ยนเบอร์/ชื่อ → สายรอโทรในแผนเดียวกันเปลี่ยนตาม (`samePlanIds`) · resync ทุกแผนที่โดนแก้ · `lumos_other_failed` |
+| 3 | `src/components/follow/FollowEditDialog.tsx` | สายที่เพิ่ม → `replaceFollowSchedule` (ผูกชุด + เลขสาย) แทน POST ทีละสาย |
+| 5 | `src/lib/followPlanning.ts` | `followDayPersonDone` ใช้ `FollowDayCall.category`: ไม่ไป > ไป > ยกเลิกหมด · คนปิดครบ = other · ที่เหลือ = อยู่ในตาราง · kind = agreed/lost/other/cancelled |
+| 5 | `src/components/follow/FollowDayDoneCard.tsx` | หัว "จบแล้ว" · แท็บ ตอบว่าไป / ตอบว่าไม่ไป / สรุปไม่ได้ / ยกเลิก (คำ/สีของกล่อง) · ใครจัดการ = AI เมื่อไม่มีคนปิด |
+| 7 | `api/_lib/irecruitReplaceSync.ts` · `src/lib/irecruitReplaceSync.ts` | แก้ล่าสุดชนะ: แถว `updated_by` ไม่ว่าง + หมายเหตุยังตรง iRecruit (`irecruitChangedSinceSync`) = ไม่ย้ายเวลา · ย้ายตาม iRecruit แล้วคงโหมด AI ที่เจ้าหน้าที่เลือก (ยกเว้นพัก AI) |
+| 7 | `api/_handlers/follow.ts` | พัก AI ส่งคนแทน: สร้าง = คนโทรตั้งแต่แรก · แก้ตารางเป็น AI = 409 |
+| 8 | (commit ก่อนหน้า) | picker ชื่อจากบอร์ด |
+| เทสต์ | | `followCancelScope` · `followEditReachesLumos` · `followNumbersReconcile` · `irecruitReplaceSync` · `FollowPlanningCalendar` |
+
+- ⚠️ ข้อ 7 ใช้หมายเหตุเป็นตัวจำเวลา iRecruit — เจ้าหน้าที่แก้หมายเหตุแถวส่งคนแทนเอง = นับว่า iRecruit เปลี่ยน (ย้ายตาม iRecruit)
+- ⚠️ ข้อ 2 "คนนี้" = เบอร์ + ทีม ไม่ใช่ `group_id` · ยกเลิกเฉพาะสายที่ยังไม่มีผล
+- ยังไม่ทำ: ข้อ 1 สลับ AI/คนรายสายในโหมดตาราง (ตอนนี้รายวัน) · ข้อ 6 คนลงผลบนสาย AI ที่โทรไม่ติด (ต้องปิดงานแทน)

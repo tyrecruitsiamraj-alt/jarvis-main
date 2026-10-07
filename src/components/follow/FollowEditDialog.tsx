@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Building2, LoaderCircle, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { createFollowEntry, replaceFollowSchedule, updateFollowEntry, type FollowEntry } from '@/lib/followApi';
+import { replaceFollowSchedule, updateFollowEntry, type FollowEntry } from '@/lib/followApi';
 import {
   EXTRA_ROUNDS_MAX,
   buildExtraRounds,
@@ -258,12 +258,15 @@ export default function FollowEditDialog({
         site_code: siteCode.trim() || undefined,
         apply_phone_to_set: askApplyPhone && applyPhoneToSet ? true : undefined,
       });
-      const phoneMsg = (saved.phone_applied ?? 0) > 0 ? ` · เปลี่ยนเบอร์อีก ${saved.phone_applied} สายในชุด` : '';
+      const phoneMsg =
+        ((saved.phone_applied ?? 0) > 0 ? ` · เปลี่ยนเบอร์อีก ${saved.phone_applied} สายในชุด` : '') +
+        ((saved.lumos_other_failed ?? 0) > 0 ? ` · ส่งวันอื่นให้ AI ไม่สำเร็จ ${saved.lumos_other_failed} วัน กดบันทึกอีกครั้ง` : '');
       /**
        * รอบใหม่สร้างหลังแก้สำเร็จเท่านั้น — แก้ล้มแล้วยังเพิ่มรอบต่อ = ได้รอบที่ใช้ข้อมูลเก่า
-       * ⚠️ ยิงทีละรอบ ล้มกลางทางต้องบอกว่าสำเร็จไปกี่รอบ ไม่งั้นคนกดซ้ำแล้วได้รอบซ้อน
+       * 🔴 7 ต.ค. 2569: เดิมยิงสร้างทีละรอบ (POST) ⇒ รอบใหม่ไม่มีชุด (`group_id`) ไม่มีสายที่ · Lumos ได้แผนแยกทีละรอบ ·
+       * ไม่ขึ้นในตัวแก้ตาราง · ยกเลิกทั้งชุดแล้วไม่โดน ⇒ ส่งผ่านเส้นแก้ตารางทั้งชุดครั้งเดียว (ผูกชุด + เลขสาย + ส่ง Lumos ทีละวัน)
        */
-      let added = 0;
+      const added = rounds.isoTimes.length;
       /* จับคู่ "ช่องที่กรอก → ISO ที่สร้างจริง" เพื่อรู้ว่ารอบไหนให้ใครโทร
          (buildExtraRounds ตัดซ้ำ/เรียงใหม่ — index เดิมใช้ตรง ๆ ไม่ได้ · ซ้ำกัน = ช่องแรกชนะ เหมือนกติกาตัดซ้ำ) */
       const modeOfIso = new Map<string, 'ai' | 'manual'>();
@@ -271,35 +274,17 @@ export default function FollowEditDialog({
         const iso = localInputToIso(raw);
         if (iso && !modeOfIso.has(iso)) modeOfIso.set(iso, extraModes[i] ?? 'ai');
       });
-      for (const iso of rounds.isoTimes) {
-        await createFollowEntry({
-          recipient_name: name,
-          recipient_phone: phone,
-          topic,
-          // รอบที่เพิ่มทีหลังอยู่ทีมเดียวกับรายการเดิม (1 ต.ค. 2569) — ไม่งั้นรอบใหม่ของคนส่งแทนไปโผล่แท็บรายชื่อติดตาม
-          follow_team: entry.follow_team === 'replacement' ? 'replacement' : undefined,
-          note: note || undefined,
-          staff_phone: staffPhone || undefined,
-          scheduled_at: iso,
-          // ใครโทรของรอบใหม่ (3 ต.ค. 2569) — เดิมไม่ส่ง = AI เสมอ
-          call_mode: modeOfIso.get(iso) ?? 'ai',
-          unit_name: unitName.trim() || undefined,
-          site_code: siteCode.trim() || undefined,
-        });
-        added += 1;
-      }
+      const addedRows = rounds.isoTimes.map((iso, i) => ({
+        key: `new-${i}`,
+        id: null,
+        when: isoToBangkokInput(iso),
+        mode: modeOfIso.get(iso) ?? ('ai' as const),
+      }));
 
-      /**
-       * 🔴 **บอกผลการส่งใหม่ให้ Lumos ด้วย** (13 ก.ย. 2569)
-       *
-       * ของเดิมบอกแค่ว่าแก้คิวฝั่งเราได้กี่สาย ซึ่งไม่ใช่คำถามที่คนกดอยากรู้ —
-       * เขาอยากรู้ว่า **AI จะโทรตามเวลาใหม่ไหม** · วัดจริงกับงานวันที่ 14 ก.ย.
-       * 3 ใน 10 คนที่ถูกกดแก้ Lumos ยังถือเวลาเดิม (รอบหาย · เวลาเป็น 20:00 ·
-       * โดนโทรตามเวลาเดิมไปแล้ว) ⇒ ส่งใหม่ไม่สำเร็จต้องขึ้นบนจอ ห้ามเงียบ
-       */
-      if (modeChanged) {
-        const out = await replaceFollowSchedule(entry.id, scheduleReplaceBody(editable, draft));
-        const parts = ['แก้ไขแล้ว' + phoneMsg, modeChangedMessage(mode, out.lumos)];
+      if (modeChanged || added > 0) {
+        const out = await replaceFollowSchedule(entry.id, scheduleReplaceBody(editable, [...draft, ...addedRows]));
+        const parts = ['แก้ไขแล้ว' + phoneMsg];
+        if (modeChanged) parts.push(modeChangedMessage(mode, out.lumos));
         if (added > 0) parts.push(`เพิ่มอีก ${added} สาย`);
         onSaved(parts.join(' · '));
         onClose();
@@ -314,7 +299,7 @@ export default function FollowEditDialog({
           : (saved.queue_refreshed ?? 0) > 0
             ? `แก้ไขแล้ว — อัปเดตบทพูดในคิว ${saved.queue_refreshed} สายด้วย`
             : 'แก้ไขแล้ว — แต่สายที่ AI รับไปแล้วยังใช้ข้อมูลเดิม (เรียกคืนไม่ได้)';
-      onSaved(`${queueMsg}${phoneMsg}${added > 0 ? ` · เพิ่มอีก ${added} สาย` : ''}`);
+      onSaved(`${queueMsg}${phoneMsg}`);
       onClose();
     } catch (err) {
       setError(friendlyErrorText(err, 'แก้ไขไม่สำเร็จ'));

@@ -77,7 +77,9 @@ describe('หน้าการติดตาม: สองแท็บเห�
     expect(page).toMatch(/findScheduleDuplicates\(\s*phone,\s*calls\.map\(\(c\) => c\.scheduledAt\),\s*items,?\s*\)/);
     expect(page).toContain('findScheduleDuplicates(phone, isoTimes, items)');
     expect(page.match(/follow_team: followTeam,/g)?.length).toBe(2);
-    expect(edit).toContain("follow_team: entry.follow_team === 'replacement' ? 'replacement' : undefined,");
+    // 7 ต.ค. 2569: รอบที่เพิ่มจากป๊อปแก้ไขไปทางแก้ตารางทั้งชุด — server ใช้ทีมของแถวเดิม (anchor) ให้เอง
+    expect(edit).toContain('scheduleReplaceBody(editable, [...draft, ...addedRows])');
+    expect(read('../api/_handlers/follow.ts')).toContain('team: anchor.follow_team === FOLLOW_TEAM_REPLACEMENT ? FOLLOW_TEAM_REPLACEMENT : null,');
   });
 });
 

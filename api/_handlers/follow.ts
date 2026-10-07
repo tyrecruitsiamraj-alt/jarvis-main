@@ -27,6 +27,8 @@ import type { FollowDispatchState } from '@/lib/followDispatchState';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { staffNameOfPhone } from '../_lib/followStaffName.js';
 import { restoreRoundsStoppedByClose, type ReopenRestore } from '../_lib/followReopenRestore.js';
+import { cancelFollowScope, parseCancelScope } from '../_lib/followCancelScope.js';
+import { getReplaceSyncSettings } from '../_lib/irecruitReplaceSync.js';
 import { logWarn } from '../_lib/logger.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import {
@@ -527,9 +529,25 @@ export function parseFollowRounds(raw: unknown, primary: FollowRoundInput): Foll
 async function createFollowRounds(
   req: AuthedReq,
   res: ApiRes,
-  base: ParsedFollowInput,
-  rounds: FollowRoundInput[],
+  inputBase: ParsedFollowInput,
+  inputRounds: FollowRoundInput[],
 ): Promise<void> {
+  /**
+   * 🔴 พัก AI ของส่งคนแทนอยู่ (เจ้าของ 6 ต.ค. 2569 "อย่าพึ่งส่งให้ Ai โทร") — สายที่เพิ่มเองในแท็บนั้นเป็นคนโทรตั้งแต่สร้าง
+   * (ตรวจ Journey 7 ต.ค.: เดิมส่ง Lumos ไปก่อน แล้วรอบดึง 5 นาทีค่อยเปลี่ยนเป็นคนโทร — สายที่นัดในช่วงนั้นโดน AI โทรได้)
+   */
+  let base = inputBase;
+  let rounds = inputRounds;
+  if (inputBase.team === FOLLOW_TEAM_REPLACEMENT) {
+    try {
+      if ((await getReplaceSyncSettings()).rule.aiPaused) {
+        base = { ...inputBase, callMode: 'manual' };
+        rounds = inputRounds.map((r) => ({ ...r, callMode: 'manual' as const }));
+      }
+    } catch (e) {
+      logWarn('follow.create.replaceAiPausedCheckFailed', { error: String(e) });
+    }
+  }
   const createdRows: FollowRow[] = [];
   for (const r of rounds) {
     const row = await insertFollowRow(req, base, r);
@@ -777,6 +795,21 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
 async function cancelFollow(req: AuthedReq, res: ApiRes) {
   const id = getString(req.query?.id) ?? '';
   if (!id) return sendError(res, 400, 'Bad request', 'Query id is required');
+
+  /** 🔴 ยกเลิกวันนี้ / เลิกตามคนนี้ (เจ้าของ 7 ต.ค. 2569 Journey ข้อ 2) — ไม่ส่ง scope = สายเดียวแบบเดิม */
+  const scope = parseCancelScope(getString(req.query?.scope));
+  if (scope) {
+    if (!UUID_RE.test(id)) return sendError(res, 400, 'Bad request', 'ต้องระบุ id ของรายการติดตาม');
+    const out = await cancelFollowScope(id, scope, { sub: req.user.sub, email: req.user.email ?? null });
+    if (out.ids.length === 0) return sendError(res, 404, 'Not found', 'ไม่มีสายที่ยังยกเลิกได้');
+    await auditFromAuthed(req, {
+      action: 'follow.cancel',
+      entityType: 'follow_entry',
+      entityId: id,
+      after: { scope, cancelledIds: out.ids, lumosFailed: out.lumosFailed },
+    });
+    return res.status(200).json({ cancelled: out.ids.length, lumos_failed: out.lumosFailed });
+  }
 
   const { rows } = await dbQuery<FollowRow>(
     `update ${followTable} set cancelled_at = now()
@@ -1139,11 +1172,72 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
    * `resyncFollowPlanWithLumos` = ยกเลิกของเดิมที่ Lumos แล้วส่ง **แผนใหม่ทั้งก้อน**
    * (ทุกรอบที่ยังไม่ถูกโทร) ⚠️ ล้มเหลวห้ามทำให้การแก้ล้ม — แถวถูกแก้ไปแล้ว
    */
+  /**
+   * 🔴 แผนที่ Lumos มีเบอร์/ชื่อได้ชุดเดียว (มาจากหัวขบวน) — แก้เบอร์/ชื่อที่สาย 2 ของวัน = Lumos ไม่เห็น
+   * (ตรวจ Journey 7 ต.ค. 2569) ⇒ เปลี่ยนเบอร์/ชื่อ = สายอื่นที่ยังรอโทรในแผนเดียวกันเปลี่ยนตามเสมอ
+   */
+  const nameChanged = String(before.recipient_name ?? '') !== String(updated.recipient_name ?? '');
+  let samePlanIds: string[] = [];
+  if (phoneChanged || nameChanged) {
+    try {
+      const { rows: mates } = await dbQuery<{ id: string }>(
+        `update ${followTable} f
+            set recipient_phone = $2, recipient_name = $3, updated_at = now(), updated_by = $4, updated_by_name = $5
+          where f.id <> $1::uuid and f.cancelled_at is null and f.completed_at is null
+            and f.id::text in (
+              select substring(y.person_ref from 8) from ${queueTable} y
+               where y.channel = 'reminder' and y.job_ref = 'follow' and y.status = 'pending'
+                 and coalesce(y.plan_ref, y.person_ref) = (
+                   select coalesce(x.plan_ref, x.person_ref) from ${queueTable} x
+                    where x.channel = 'reminder' and x.job_ref = 'follow' and x.person_ref = 'follow-' || $1::text
+                    limit 1))
+          returning f.id::text as id`,
+        [id, updated.recipient_phone, updated.recipient_name, req.user.sub, req.user.email ?? null],
+      );
+      samePlanIds = mates.map((m) => m.id);
+    } catch (e) {
+      logWarn('follow.update.samePlanSyncFailed', { followId: id, error: String(e) });
+    }
+  }
+
+  /**
+   * ส่งใหม่ **ทุกแผนที่โดนแก้** (แถวนี้ + สายในชุดที่เปลี่ยนเบอร์ตาม) — เดิมส่งแค่แผนของแถวที่เปิดแก้
+   * ⇒ เปลี่ยนเบอร์ทั้งชุด 30 วัน แต่ Lumos ได้เบอร์ใหม่แค่วันเดียว (ตรวจ Journey 7 ต.ค. 2569)
+   * `planResync` = ผลของแผนแถวนี้ (จอใช้) · แผนอื่นล้ม = ใส่เหตุผลลงผลนี้ ห้ามเงียบ
+   */
   let planResync: Awaited<ReturnType<typeof resyncFollowPlanWithLumos>> | null = null;
   try {
     planResync = await resyncFollowPlanWithLumos(id, staffNameOfPhone);
   } catch (e) {
     logWarn('follow.update.lumosResyncFailed', { followId: id, error: String(e) });
+  }
+  const otherIds = [...new Set([...phoneAppliedIds, ...samePlanIds])];
+  let otherPlansFailed = 0;
+  if (otherIds.length > 0) {
+    try {
+      const { rows: plans } = await dbQuery<{ id: string }>(
+        `select distinct on (coalesce(plan_ref, person_ref)) substring(person_ref from 8) as id
+           from ${queueTable}
+          where channel = 'reminder' and job_ref = 'follow' and status = 'pending'
+            and person_ref = any($1::text[])
+            and coalesce(plan_ref, person_ref) <> coalesce(
+              (select coalesce(plan_ref, person_ref) from ${queueTable}
+                where channel = 'reminder' and job_ref = 'follow' and person_ref = $2 limit 1), '')
+          order by coalesce(plan_ref, person_ref), next_attempt_at`,
+        [otherIds.map((x) => `follow-${x}`), `follow-${id}`],
+      );
+      for (const p of plans) {
+        try {
+          const r = await resyncFollowPlanWithLumos(p.id, staffNameOfPhone);
+          if (!r.pushed && r.rounds > 0) otherPlansFailed += 1;
+        } catch (e) {
+          otherPlansFailed += 1;
+          logWarn('follow.update.lumosResyncOtherFailed', { followId: p.id, error: String(e) });
+        }
+      }
+    } catch (e) {
+      logWarn('follow.update.lumosResyncOthersFailed', { followId: id, error: String(e) });
+    }
   }
 
   await auditFromAuthed(req, {
@@ -1151,7 +1245,7 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
     entityType: 'follow_entry',
     entityId: id,
     before: toResponse(before),
-    after: { ...toResponse(updated), queueRefreshed, planResync, phoneAppliedIds },
+    after: { ...toResponse(updated), queueRefreshed, planResync, phoneAppliedIds, samePlanIds, otherPlansFailed },
   });
 
   return res.status(200).json({
@@ -1161,6 +1255,8 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
     phone_applied: phoneAppliedIds.length,
     /** ส่งแผนใหม่ให้ Lumos แล้วหรือยัง — จอต้องบอกคนกดได้ ห้ามเงียบ */
     lumos_resync: planResync,
+    /** แผนวันอื่น (เปลี่ยนเบอร์ทั้งชุด) ที่ส่งให้ Lumos ไม่สำเร็จ */
+    lumos_other_failed: otherPlansFailed,
   });
 }
 
@@ -1178,7 +1274,8 @@ export type FollowScheduleReplace = {
   rounds: Array<{ id: string | null; when: Date; callMode: 'ai' | 'manual' }>;
 };
 
-const MAX_SCHEDULE_ROUNDS = 160;
+/** 92 วัน × 5 สาย (7 ต.ค. 2569 · เดิม 160 = แก้ตาราง 31 วันเต็ม) */
+const MAX_SCHEDULE_ROUNDS = 460;
 
 export function parseFollowScheduleReplace(
   raw: unknown,
@@ -1232,6 +1329,16 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
   const anchor = anchorRows[0];
   if (!anchor) return sendError(res, 404, 'Not found', 'ไม่พบรายการติดตาม');
   if (anchor.cancelled_at != null) return sendError(res, 409, 'Conflict', 'รายการนี้ยกเลิกไปแล้ว แก้ตารางไม่ได้');
+  // พัก AI ของส่งคนแทนอยู่ = สลับ/เพิ่มเป็น AI ไม่ได้ (ตัวเดียวกับตอนสร้าง · 7 ต.ค. 2569)
+  if (anchor.follow_team === FOLLOW_TEAM_REPLACEMENT && rounds.some((r) => r.callMode === 'ai')) {
+    try {
+      if ((await getReplaceSyncSettings()).rule.aiPaused) {
+        return sendError(res, 409, 'Conflict', 'ส่งคนแทนพัก AI อยู่ — ตั้งเป็นคนโทร หรือเปิด AI ก่อน');
+      }
+    } catch (e) {
+      logWarn('follow.replaceSchedule.replaceAiPausedCheckFailed', { error: String(e) });
+    }
+  }
 
   // สายที่จะแก้ต้องยังแก้ได้จริง — คนเดียวกัน ชุดเดียวกัน อนาคต ยังไม่ถูกโทร (คนอื่นอาจแก้/สายอาจออกไประหว่างเปิดจอ)
   type ReplaceRow = FollowRow & { q_status: string | null; q_result_at: string | Date | null };
