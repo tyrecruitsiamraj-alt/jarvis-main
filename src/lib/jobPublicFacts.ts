@@ -74,34 +74,54 @@ export function jobBaseIncome(
 
 /**
  * ═══ บรรทัดเงินบนการ์ด: ฐาน · รายได้รวม แยกกัน (เจ้าของ 7 ต.ค. 2569: *"รายได้รวมยังไม่มีบนกล่องเลย มีแค่ฐานเอง"*) ═══
- * - ทีมแยกรายการเอง (`income_display`): มีบรรทัด "ฐานเงินเดือน" = ฐาน · ยอดรวมของรายการ = รายได้รวม
- *   ไม่มีบรรทัดฐาน = รายได้รวมอย่างเดียว (เดิมเอายอดรวมไปเขียนว่า "ฐานเงินเดือน" — ผิด)
- * - ทีมตั้งยอดเดี่ยว (`total_income`) = รายได้รวม
+ * - ทีมแยกรายการเอง (`income_display`): บรรทัด "ฐานเงินเดือน" = ฐาน (ไม่มี = ฐานจาก ERP) · ยอดรวมของรายการ = รายได้รวม
+ *   (เลิกเอายอดรวมไปเขียนว่า "ฐานเงินเดือน")
+ * - ทีมตั้งยอดเดี่ยว (`total_income`) = รายได้รวม · ฐานจาก ERP
  * - ERP: `monthly_income_base` = ฐาน · `monthly_income` (ฐาน + เงินประจำ) = รายได้รวม
- * รายได้รวมเท่ากับฐาน = ไม่ขึ้นซ้ำ (`total` = null) · ไม่รู้อะไรเลย = null
+ * 7 ต.ค. 2569 รอบ 2: ขึ้นทั้งสองช่องเสมอ แม้เท่ากัน · ฐานที่ไม่มีที่มาเลย = null (ไม่เดา) · ไม่รู้อะไรเลย = null
  * ใช้ทั้งการ์ดผู้สมัคร (`JobPublicFacts`) และกล่องรายได้/รายได้รวมในป๊อปประกาศ — คำเดียวกันทุกที่
  */
 export function jobIncomeLine(
   job: Pick<JobRequest, 'income_display' | 'field_overrides' | 'total_income' | 'monthly_income' | 'monthly_income_base'>,
 ): { base: string | null; total: string | null; hint: string | null } | null {
+  /**
+   * 🔴 ขึ้นทั้งสองช่องเสมอ (เจ้าของ 7 ต.ค. 2569: *"ต้องโชว์ทั้ง ฐานเงินเดือน และ รายได้รวม ไม่ใช่โชว์แค่อย่างใดอย่างนึง"*)
+   * ฐาน: บรรทัด "ฐานเงินเดือน" ที่ทีมตั้ง → ฐานจาก ERP (`monthly_income_base` · เฉพาะต่อเดือน) · ไม่รู้จริง ๆ = null
+   * รวม: ยอดรวมที่ทีมตั้ง → ยอดเดี่ยวที่ทีมตั้ง → ERP `monthly_income` → เท่าฐาน (ไม่มีเงินอื่น)
+   */
+  const erpBase =
+    typeof job.monthly_income_base === 'number' && Number.isFinite(job.monthly_income_base) && job.monthly_income_base > 0
+      ? job.monthly_income_base
+      : null;
+  const erpTotal =
+    typeof job.monthly_income === 'number' && Number.isFinite(job.monthly_income) && job.monthly_income > 0
+      ? job.monthly_income
+      : null;
+  const fmt = (n: number, unit: 'เดือน' | 'วัน' = 'เดือน') => `${NUM.format(n)} บาท/${unit}`;
   if (job.income_display && job.income_display.total > 0) {
-    const unit = job.income_display.period === 'daily' ? 'วัน' : 'เดือน';
+    const daily = job.income_display.period === 'daily';
+    const unit = daily ? 'วัน' : 'เดือน';
     const baseLine = job.income_display.lines.find((l) => l.label === 'ฐานเงินเดือน' && l.amount > 0);
-    const base = baseLine ? `${NUM.format(baseLine.amount)} บาท/${unit}` : null;
-    const total =
-      !baseLine || job.income_display.total > baseLine.amount ? `${NUM.format(job.income_display.total)} บาท/${unit}` : null;
-    return { base, total, hint: null };
+    // ฐานจาก ERP เป็นต่อเดือน — ทีมตั้งแบบรายวันห้ามเอามาปน
+    const base = baseLine ? fmt(baseLine.amount, unit) : !daily && erpBase ? fmt(erpBase) : null;
+    return { base, total: fmt(job.income_display.total, unit), hint: null };
   }
   const pub = publicIncomeOf(job);
-  if (pub?.manual) return { base: null, total: pub.text, hint: null };
-  const b = job.monthly_income_base;
-  const t = job.monthly_income;
-  const hasBase = typeof b === 'number' && Number.isFinite(b) && b > 0;
-  const hasTotal = typeof t === 'number' && Number.isFinite(t) && t > 0 && (!hasBase || t > (b as number));
-  if (hasBase || hasTotal) {
+  if (pub?.manual) {
+    /**
+     * ยอดเดี่ยวที่ทีมตั้งต่ำกว่าฐานของ ERP = ไม่ใช่รายได้ต่อเดือน (ของจริง 7 ต.ค. 2569: LMO6801013 ตั้ง 400 = ค่าแรงรายวัน
+     * แต่การ์ดขึ้น "400 บาท/เดือน") ⇒ ไม่โชว์ยอดนั้น ใช้ยอดของ ERP แทน · ทีมต้องแก้ที่กล่องรายได้รวม
+     */
+    const manual = job.field_overrides?.total_income;
+    if (erpBase && typeof manual === 'number' && manual < erpBase) {
+      return { base: fmt(erpBase), total: fmt(erpTotal ?? erpBase), hint: `ยอดที่ตั้งไว้ ${NUM.format(manual)} ต่ำกว่าฐาน — แก้ที่กล่องรายได้รวม` };
+    }
+    return { base: erpBase ? fmt(erpBase) : null, total: pub.text, hint: null };
+  }
+  if (erpBase || erpTotal) {
     return {
-      base: hasBase ? `${NUM.format(b as number)} บาท/เดือน` : null,
-      total: hasTotal ? `${NUM.format(t as number)} บาท/เดือน` : null,
+      base: erpBase ? fmt(erpBase) : null,
+      total: fmt((erpTotal ?? erpBase) as number),
       hint: null,
     };
   }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Ban, EyeOff, Users } from 'lucide-react';
+import { ArrowRight, Ban, EyeOff, StickyNote, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -107,6 +107,18 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
       {/* ── ข้อมูลงาน: ตัวเดียวกับการ์ดหน้า /apply (`JobPublicFacts`) — ติ๊กซ่อนในขั้น 3 แล้วที่นี่ก็หายด้วย
           (เจ้าของ 5 ต.ค. 2569: *"ไม่งั้นจะเช็คยังไงหล่ะว่าถูกต้องหรือเปล่า"*) ── */}
       <JobPublicFacts job={job} staff />
+
+      {/* หมายเหตุใบขอ (เจ้าของ 7 ต.ค. 2569: *"หมายเหตุ เอามาโชว์ที่หน้า โพสต์ประกาศ ของแต่ละงานด้วย"*) —
+          `list_note` ช่องเดียวกับหน้าใบขอ · การ์ดนี้เจ้าหน้าที่เห็นคนเดียว ไม่ขึ้นหน้า /apply */}
+      {job.list_note?.trim() ? (
+        <p className={cn('flex min-w-0 items-start gap-1.5 text-sm', DASH.muted)} data-testid="board-card-note">
+          <StickyNote className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <span className="min-w-0 whitespace-pre-line break-words text-foreground line-clamp-3" title={job.list_note.trim()}>
+            <span className={cn('mr-1', DASH.muted)}>หมายเหตุ</span>
+            {job.list_note.trim()}
+          </span>
+        </p>
+      ) : null}
 
       {/* สถานะงานที่ทำให้ประกาศไม่ขึ้นหน้าสาธารณะ — ต้องรู้ (เจ้าของสั่ง 17 ส.ค. 2569) */}
       {hidden && isUnitRequestWorkStatus(job.work_status) ? (
