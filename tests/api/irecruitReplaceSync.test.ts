@@ -563,3 +563,16 @@ describe('ชื่อหน่วยงานสั้น (7 ต.ค. 2569 "เ
     expect(replaceSiteShortName('')).toBeNull();
   });
 });
+
+describe('🔴 ลงย้อนหลังข้ามวัน (เจ้าของ 7 ต.ค. 2569 "เอาด้วย ดึงมาแต่ไม่ต้องส่งไป lumos")', () => {
+  it('ดึงใบที่วันเข้างานเลยไปแล้ว (ไม่เกิน 7 วัน) ถ้าเพิ่งลงภายใน 2 วัน · สายเป็นคนโทร', async () => {
+    irecruitSqlQuery.mockResolvedValue([row('P', { want_date: wall('2026-10-04T08:00:00Z') })]);
+    await runIrecruitReplaceSync({ now: NOW });
+    const [sql, params] = irecruitSqlQuery.mock.calls[0] as [string, Record<string, Date>];
+    expect(sql).toContain('OR (h.want_date >= @pastFrom AND h.want_date < @from AND h.date_add >= @addedSince)');
+    expect(params.pastFrom.toISOString().slice(0, 10)).toBe('2026-09-28');
+    expect(params.addedSince.toISOString().slice(0, 10)).toBe('2026-10-03');
+    expect(inserts().map((c) => c.params[9])).toEqual(['manual', 'manual', 'manual']);
+    expect(enqueuePlan).not.toHaveBeenCalled();
+  });
+});

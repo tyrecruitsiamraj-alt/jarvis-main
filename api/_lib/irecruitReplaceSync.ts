@@ -104,6 +104,10 @@ function shiftYmd(ymd: string, days: number): string {
  * SQL ของเจ้าของ (2 ต.ค. 2569) — เพิ่ม `site_code` ให้ผูกหน่วยงานได้ · ช่วงวันเป็นนาฬิกาไทย
  * (driver ถือค่าในฐานเป็น UTC ⇒ ส่ง Date ที่ส่วน UTC = นาฬิกาไทย · `to` ไม่รวม = วันถัดจาก toYmd)
  */
+/** ลงย้อนหลัง: วันเข้างานย้อนได้กี่วัน · ต้องเพิ่งลงใน iRecruit ภายในกี่วัน (นาฬิกาไทยตาม `date_add`) */
+const REPLACE_PAST_WANT_DAYS = 7;
+const REPLACE_PAST_ADDED_DAYS = 2;
+
 export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): Promise<IrecruitReplaceRow[]> {
   return irecruitSqlQuery<IrecruitReplaceRow>(
     `SELECT h.job_id, h.replace_no, z.fname, z.lname, z.mobile, z.replace_type, s.site_name, h.site_code, h.want_date,
@@ -130,11 +134,20 @@ export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): 
       -- 🔴 W "รอดำเนินการ" ด้วย (เจ้าของ 7 ต.ค. 2569 Choice "ตามด้วย" — วิภพ/นันทชัยใบ W ไม่ขึ้น) · C = ยกเลิก ไม่เอา
       WHERE h.status IN ('W', 'WS')
         AND h.job_type = '2'
-        AND h.want_date >= @from
-        AND h.want_date < @to
+        AND (
+          (h.want_date >= @from AND h.want_date < @to)
+          -- 🔴 ลงย้อนหลัง (เจ้าของ 7 ต.ค. 2569 "เอาด้วย ดึงมาแต่ไม่ต้องส่งไป lumos"): วันเข้างานเลยไปแล้ว (ไม่เกิน 7 วัน)
+          --    แต่เพิ่งลงใน iRecruit ภายใน 2 วัน ⇒ ขึ้นบนจอ สายทั้งหมดเป็นคนโทร (planReplaceCallsFull past)
+          OR (h.want_date >= @pastFrom AND h.want_date < @from AND h.date_add >= @addedSince)
+        )
         AND ISNULL(z.status, '') <> 'C'
       ORDER BY h.want_date ASC`,
-    { from: new Date(`${fromYmd}T00:00:00Z`), to: new Date(`${shiftYmd(toYmd, 1)}T00:00:00Z`) },
+    {
+      from: new Date(`${fromYmd}T00:00:00Z`),
+      to: new Date(`${shiftYmd(toYmd, 1)}T00:00:00Z`),
+      pastFrom: new Date(`${shiftYmd(fromYmd, -REPLACE_PAST_WANT_DAYS)}T00:00:00Z`),
+      addedSince: new Date(`${shiftYmd(fromYmd, -REPLACE_PAST_ADDED_DAYS)}T00:00:00Z`),
+    },
   );
 }
 
@@ -393,7 +406,8 @@ export async function runIrecruitReplaceSync(
           where source_ref like 'irecruit-replace:%' and scheduled_at >= $2::timestamptz`,
         [
           new Date(now.getTime() + LOCK_AHEAD_MS).toISOString(),
-          new Date(now.getTime() - 3 * 86_400_000).toISOString(),
+          // ย้อนพอครอบใบลงย้อนหลัง (วันเข้างานถึง 7 วัน + คอนเฟิร์มวันก่อน) — ไม่งั้นทุกรอบพยายามสร้างซ้ำแล้วชนตัวกันซ้ำ
+          new Date(now.getTime() - (REPLACE_PAST_WANT_DAYS + 2) * 86_400_000).toISOString(),
           REPLACE_TYPE_RULE_FROM,
         ],
       );
