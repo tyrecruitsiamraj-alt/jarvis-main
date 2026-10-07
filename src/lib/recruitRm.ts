@@ -371,7 +371,11 @@ export const RM_ROW_ACTIONS: Record<RmTab, RmRowAction[]> = {
    */
   contact: ['dial', 'view', 'release'],
   /** "เอาออกจากรายการ" (remove) ถอดแล้ว — ไม่เคยต่อกับระบบ กดแล้วแค่ขึ้น "ยังไม่ได้ต่อ" (QA 5 ต.ค. 2569) · ใส่กลับเมื่อเจ้าของบอกว่าให้ทำอะไร */
-  appointments: ['call', 'rule'],
+  /**
+   * 🔴 ถอด "เก็บไปโทรเอง" (call) — เจ้าของ Choice 7 ต.ค. 2569 ก่อนทีมย้ายจาก iRecruit: ใบในแท็บนี้นัดแล้วทั้งนั้น ·
+   * ใบคีย์เองที่ไม่ผูกใบขอขึ้นปุ่มที่กดไม่ได้ทุกแถว ("ใบคีย์เองที่ไม่ผูกใบขอ เก็บไปโทรเองไม่ได้") คนเห็นเป็นปุ่มเสีย
+   */
+  appointments: ['rule'],
 };
 
 export const RM_ROW_ACTION_LABEL: Record<RmRowAction, string> = {

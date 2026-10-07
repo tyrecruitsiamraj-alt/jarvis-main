@@ -86,7 +86,8 @@ describe('ปุ่มของแท็บการติดตาม', () => {
   it('แท็บอื่น: ผู้สมัครแบบ iRecruit + ส่ง AI โทร (4 ต.ค. 2569) · ติดตามนัดหมายเหลือโทร + บันทึกผล', () => {
     expect(RM_ROW_ACTIONS.candidates).toEqual(['bookmark', 'call', 'ai', 'view']);
     // "เอาออกจากรายการ" ไม่เคยต่อกับระบบ — ถอดออก (QA 5 ต.ค. 2569)
-    expect(RM_ROW_ACTIONS.appointments).toEqual(['call', 'rule']);
+    // 7 ต.ค. 2569: ถอดเก็บไปโทรเอง (ปุ่มที่กดไม่ได้ทุกแถวของใบคีย์เอง)
+    expect(RM_ROW_ACTIONS.appointments).toEqual(['rule']);
   });
 
   it('หน้าเว็บยิงเส้นเดียว choice=release แล้วโหลดใหม่ — ไม่ยิงปลดจอง/ถอด Lead/คืนล็อกแยกกันเอง', () => {

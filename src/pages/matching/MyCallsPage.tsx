@@ -8,7 +8,15 @@ import {
   resolveAppointment,
 } from '@/lib/callAppointment';
 import { cn } from '@/lib/utils';
-import { CALL_LANE_HINT, CALL_LANE_LABEL, filterHoldsByLane, type CallLane } from '@/lib/callLane';
+import { CALL_LANE_LABEL, filterHoldsByLane, type CallLane } from '@/lib/callLane';
+import { fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
+import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
+import { publicJobTitle } from '@/lib/publicJobTitle';
+
+/** เลขใบขอที่อ่านได้ — ไม่มีเลข = ตัดคำนำหน้ารหัสภายในออก (ห้ามโชว์ "siamraj-sql:…") */
+function requestNoText(requestNo: string | null, jobId: string): string {
+  return (requestNo || jobId).replace(/^siamraj-(?:sql|pre):/u, '');
+}
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import NameAvatar from '@/components/shared/NameAvatar';
 import {
@@ -145,6 +153,30 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
     }));
   }, [holds]);
 
+  /** ชื่อหน่วยงาน · ตำแหน่ง ต่อใบขอ (7 ต.ค. 2569) — อ่านไม่ได้ = ใช้เลขใบขอ */
+  const [jobTitles, setJobTitles] = useState<Record<string, string>>({});
+  const jobIdsKey = grouped.map((g) => g.jobId).join('|');
+  useEffect(() => {
+    let alive = true;
+    const ids = jobIdsKey ? jobIdsKey.split('|') : [];
+    for (const id of ids) {
+      if (!/^siamraj-(?:sql|pre):/u.test(id)) continue;
+      fetchSiamrajUnitRequest(id)
+        .then((job) => {
+          if (!alive || !job) return;
+          const position = publicJobTitle(job).trim();
+          const title = [jobBoardCardTitle(job), position].filter(Boolean).join(' · ');
+          if (title) setJobTitles((prev) => ({ ...prev, [id]: title }));
+        })
+        .catch(() => {
+          /* อ่านใบขอไม่ได้ — คงเลขใบขอไว้ */
+        });
+    }
+    return () => {
+      alive = false;
+    };
+  }, [jobIdsKey]);
+
   const openForm = (hold: CallHold) => {
     setOpenRef(hold.id);
     setOutcome(null);
@@ -268,10 +300,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
         <h2 className={cn('text-base font-medium', DASH.cellStrong)}>
           {lane ? CALL_LANE_LABEL[lane] : 'โทรของฉัน'}
         </h2>
-        <p className={cn('text-xs', DASH.muted)}>
-          {lane ? CALL_LANE_HINT[lane] : 'งานที่เก็บมาโทรเอง'} — เรียงให้แล้วว่าโทรใครก่อน ·
-          โทรเสร็จบันทึกผลที่นี่
-        </p>
+        {/* ประโยคอธิบายใต้หัวถอดแล้ว (เจ้าของ Choice 7 ต.ค. 2569 — ห้ามประโยคอธิบายบนจอ) */}
       </div>
 
       {/* แผนผังปลายทาง (รอโทร N · รีเฟรช · ผล → ไปไหนต่อ 5 แถว) ถอดแล้ว — เจ้าของสั่ง 6 ต.ค. 2569 "เอาออก" */}
@@ -302,8 +331,12 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                   DASH.tableHead,
                 )}
               >
-                <span className="font-mono text-xs font-medium">
-                  {group.requestNo || group.jobId}
+                {/* ชื่อหน่วยงาน · ตำแหน่ง แทนรหัสภายใน (เจ้าของ Choice 7 ต.ค. 2569 — เดิมขึ้น "siamraj-sql:LBM6903002") */}
+                <span className="min-w-0 text-xs font-medium">
+                  {jobTitles[group.jobId] ?? requestNoText(group.requestNo, group.jobId)}
+                  {jobTitles[group.jobId] ? (
+                    <span className={cn('ml-2 font-normal tabular-nums', DASH.muted)}>{requestNoText(group.requestNo, group.jobId)}</span>
+                  ) : null}
                 </span>
                 <span className="text-[11px]">
                   {group.items.length.toLocaleString('th-TH')} คนต้องโทร
