@@ -320,6 +320,15 @@ export function planReplaceCalls(
   return confirm.at.getTime() < nextBoundary.getTime() ? [confirm, ...leads] : leads;
 }
 
+/**
+ * ชื่อหน่วยงานสั้น (เจ้าของ 7 ต.ค. 2569: *"หน่วยงานเอาแค่ชื่อพอ ไอคำว่า พขร.... ไม่ต้องเอามา"*)
+ * `ir_ms_site.site_name` = "krungsri - พขร. (ส่วนกลาง) 2 คน , …" ⇒ ตัดตั้งแต่ " - " (มีช่องว่างสองข้าง · "Asian-HD" ไม่โดน)
+ */
+export function replaceSiteShortName(raw: string | null | undefined): string | null {
+  const name = (raw ?? '').split(/\s+-\s+/)[0].trim();
+  return name || null;
+}
+
 export type ReplaceSlotPlanFull = ReplaceSlotPlan & { past: boolean };
 
 /**
@@ -439,11 +448,12 @@ export function reconcileReplaceCalls(
 }
 
 /**
- * ใครโทรตามประเภทคนไปแทน (เจ้าของ Choice 5 ต.ค. 2569 ระหว่างที่ยังแยก WL/สแปร์ไซต์ไม่ได้):
- * **Ex (`replace_type = EX`) ให้ AI โทร · คนใน/อื่น ๆ ให้คนโทรเอง** — WL จะไม่โดน AI โทรแน่นอน · สแปร์ไซต์ยังมีคนตาม
- * `byDate` = ผลของ aiFrom (ก่อนวันนั้นคนโทรอยู่แล้ว)
+ * ใครโทรตามประเภทคนไปแทน
+ * 5 ต.ค. 2569 (Choice ระหว่างที่ยังแยก WL ไม่ได้): EX = AI · ที่เหลือคนโทร
+ * 🔴 7 ต.ค. 2569 เจ้าของ: *"ถ้าไม่ใช่ WL Default เป็น AI โทรเท่านั้น"* + Choice "คนใน (IN) = WL"
+ * ⇒ **IN = คนโทร · ที่เหลือ (EX · ไม่ระบุ · ER) = AI** · แก้รายสายได้เสมอ · พัก AI / aiFrom ทับ (`byDate`)
  */
 export function replaceModeForType(replaceType: string | null | undefined, byDate: 'ai' | 'manual'): 'ai' | 'manual' {
   if (byDate === 'manual') return 'manual';
-  return (replaceType ?? '').trim().toUpperCase() === 'EX' ? 'ai' : 'manual';
+  return (replaceType ?? '').trim().toUpperCase() === 'IN' ? 'manual' : 'ai';
 }

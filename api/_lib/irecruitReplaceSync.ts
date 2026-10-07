@@ -28,6 +28,7 @@ import {
   cancelFollowReminder,
   cancelPushedReminderIgnoringMissing,
   enqueueFollowReminderPlan,
+  replanFollowSetWithLumos,
   type FollowEntryInput,
 } from './lumosDispatch.js';
 import { getLumosPushConfig } from './lumosPushClient.js';
@@ -47,6 +48,7 @@ import {
   replaceCallModeFor,
   replaceModeForType,
   replaceSlotNote,
+  replaceSiteShortName,
   irecruitChangedSinceSync,
   replaceSlotRef,
   wantWallFromSqlDate,
@@ -219,6 +221,10 @@ type ExistingRow = {
   staff_edited: boolean;
   /** หมายเหตุ = เวลาเข้างานของ iRecruit ตอนดึงครั้งล่าสุด (`replaceSlotNote`) */
   note: string | null;
+  /** ชื่อ/หน่วยงานปัจจุบันในแถว — iRecruit แก้แล้วต้องตาม (7 ต.ค. 2569) */
+  recipient_name: string | null;
+  unit_name: string | null;
+  site_code: string | null;
 };
 
 /** คีย์คนไปแทน — แฮชเบอร์ (ไม่เก็บเบอร์ดิบในคีย์) · เปลี่ยนคน = คีย์ใหม่ */
@@ -364,7 +370,7 @@ export async function runIrecruitReplaceSync(
           name,
           phone,
           wall,
-          siteName: r.site_name?.trim() || null,
+          siteName: replaceSiteShortName(r.site_name),
           adder: replaceAdderLabel(r),
           siteCode: r.site_code?.trim() || null,
           // สายที่เลยเวลาแล้ว = คนโทร (AI ไม่โทรย้อนหลัง)
@@ -382,7 +388,7 @@ export async function runIrecruitReplaceSync(
                 (cancelled_at is null and completed_at is null and staff_call_outcome is null
                   and scheduled_at > $1::timestamptz) as pending,
                 (created_at < $3::timestamptz) as before_type_rule,
-                (updated_by is not null) as staff_edited, note
+                (updated_by is not null) as staff_edited, note, recipient_name, unit_name, site_code
            from ${followTable}
           where source_ref like 'irecruit-replace:%' and scheduled_at >= $2::timestamptz`,
         [
@@ -505,6 +511,38 @@ export async function runIrecruitReplaceSync(
         summary.toManual = (summary.toManual ?? 0) + 1;
       } catch (e) {
         logError('irecruit.replaceSync: เปลี่ยนเป็นคนโทรไม่สำเร็จ', e, { id: x.id });
+      }
+    }
+
+    // ── 2.55) iRecruit แก้ชื่อ/หน่วยงาน → ระบบแก้ตาม แล้วส่งแผนใหม่ให้ Lumos (เจ้าของ 7 ต.ค. 2569:
+    //    *"irecruit แก้อะไรระบบนี้แก้ตาม แล้วแก้ทับส่งไป lumos อีกที"*) — เฉพาะสายที่ยังไม่ถึงเวลา
+    //    (เวลา/ยกเลิก/เปลี่ยนคน ทำในขั้น 1–2 แล้ว · เปลี่ยนเบอร์ = คนใหม่ ⇒ ยกเลิกของเดิม + สร้างใหม่)
+    const changedAi: string[] = [];
+    for (const x of existingRows) {
+      if (!x.pending) continue;
+      const meta = metaByRef.get(x.source_ref);
+      if (!meta) continue;
+      const nameChanged = (x.recipient_name ?? '') !== meta.name;
+      const siteChanged = (x.unit_name ?? null) !== meta.siteName || (x.site_code ?? null) !== meta.siteCode;
+      if (!nameChanged && !siteChanged) continue;
+      try {
+        await dbQuery(`update ${followTable} set recipient_name = $2, unit_name = $3, site_code = $4 where id = $1`, [
+          x.id,
+          meta.name,
+          meta.siteName,
+          meta.siteCode,
+        ]);
+        if (x.mode === 'ai' && !rescheduledIds.has(x.id)) changedAi.push(x.id);
+      } catch (e) {
+        logError('irecruit.replaceSync: แก้ชื่อ/หน่วยงานตาม iRecruit ไม่สำเร็จ', e, { id: x.id });
+      }
+    }
+    if (changedAi.length > 0 && getLumosPushConfig() && (await isAutoDispatchEnabled('follow_entry'))) {
+      try {
+        const res = await replanFollowSetWithLumos({ memberIds: changedAi, cancelledIds: [], resolveStaffName: staffNameOfPhone });
+        if (res.reason) logWarn('irecruit.replaceSync: ส่งแผนใหม่หลังแก้ชื่อ/หน่วยงานไม่ครบ', { reason: res.reason });
+      } catch (e) {
+        logError('irecruit.replaceSync: ส่งแผนใหม่หลังแก้ชื่อ/หน่วยงานล้ม', e, { rows: changedAi.length });
       }
     }
 

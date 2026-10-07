@@ -27,11 +27,13 @@ vi.mock('../../api/_lib/postgres.js', () => ({
 vi.mock('../../api/_lib/lumosDispatchMode.js', () => ({ isAutoDispatchEnabled: () => autoDispatch() }));
 const cancelFollow = vi.fn(async () => true);
 const cancelPushed = vi.fn(async () => undefined);
+const replan = vi.fn(async () => ({ rounds: 1, plans: 1, cancelledOld: true, pushedPlans: 1, states: {} }));
 let pushConfig: unknown = { baseUrl: 'x' };
 vi.mock('../../api/_lib/lumosDispatch.js', () => ({
   enqueueFollowReminderPlan: (...a: unknown[]) => enqueuePlan(...a),
   cancelFollowReminder: (...a: unknown[]) => cancelFollow(...a),
   cancelPushedReminderIgnoringMissing: (...a: unknown[]) => cancelPushed(...a),
+  replanFollowSetWithLumos: (...a: unknown[]) => replan(...a),
 }));
 vi.mock('../../api/_lib/lumosPushClient.js', () => ({ getLumosPushConfig: () => pushConfig }));
 vi.mock('../../api/_lib/followStaffName.js', () => ({ staffNameOfPhone: async () => null }));
@@ -67,6 +69,9 @@ function fakeDb(sql: string, params: unknown[] = []) {
   // ขั้น 3.5 เก็บประเภทจาก iRecruit (136)
   if (/set replace_type = d\.t/.test(sql)) return { rows: [] };
   if (/update .*follow_entries set scheduled_at/.test(sql)) return { rows: [] };
+  // 7 ต.ค. 2569: iRecruit แก้ชื่อ/หน่วยงาน · เติม "เพิ่มโดย"
+  if (/update .*follow_entries set recipient_name = \$2, unit_name/.test(sql)) return { rows: [] };
+  if (/set created_by_name = v\.adder/.test(sql)) return { rows: [] };
   if (/insert into .*follow_entries/.test(sql)) {
     const ref = String(params[12]);
     if (insertErrorFor && ref.startsWith(insertErrorFor)) throw { code: '23505' };
@@ -227,7 +232,8 @@ describe('runIrecruitReplaceSync — 3 สายต่อใบ', () => {
 });
 
 describe('🔴 ใครโทรตามประเภทคนไปแทน (เจ้าของ Choice 5 ต.ค. 2569: Ex ให้ AI · คนในให้คนโทร)', () => {
-  it('คนใน (IN/ER/ไม่ระบุ) = สร้าง 3 สายเป็นคนโทร ไม่ส่ง Lumos · Ex = AI', async () => {
+  /** 🔴 7 ต.ค. 2569 เจ้าของ "ถ้าไม่ใช่ WL Default เป็น AI" + Choice "คนใน (IN) = WL" — ไม่ระบุ/EX = AI */
+  it('คนใน (IN = WL) = 3 สายคนโทร ไม่ส่ง Lumos · ไม่ระบุ/EX = AI', async () => {
     irecruitSqlQuery.mockResolvedValue([
       row('I', { replace_type: 'IN' }),
       row('N', { mobile: '0877777777', replace_type: null }),
@@ -240,10 +246,10 @@ describe('🔴 ใครโทรตามประเภทคนไปแท�
       modeByJob.set(job, new Set([...(modeByJob.get(job) ?? []), c.params[9]]));
     }
     expect([...(modeByJob.get('I') ?? [])]).toEqual(['manual']);
-    expect([...(modeByJob.get('N') ?? [])]).toEqual(['manual']);
+    expect([...(modeByJob.get('N') ?? [])]).toEqual(['ai']);
     expect([...(modeByJob.get('E') ?? [])]).toEqual(['ai']);
-    expect((enqueuePlan.mock.calls as Array<[Array<{ recipient_phone: string }>]>).every((c) => c[0].every((e) => e.recipient_phone === '+66866666666'))).toBe(true);
-    expect(s).toMatchObject({ added: 9, queued: 3 });
+    expect((enqueuePlan.mock.calls as Array<[Array<{ recipient_phone: string }>]>).every((c) => c[0].every((e) => e.recipient_phone !== P1))).toBe(true);
+    expect(s).toMatchObject({ added: 9, queued: 6 });
   });
 
   it('สาย AI เดิมของคนใน = เปลี่ยนเป็นคนโทร + ถอนแผนที่ Lumos (ไม่ทำกลับทาง)', async () => {
@@ -530,5 +536,30 @@ describe('🔴 ส่งคนแทน 7 ต.ค. 2569 รอบบ่าย (�
     expect(h).toContain('if (movedToFuture && !calledConfirm && ');
     const api = readFileSync(new URL('../../api/_handlers/irecruit-replace-sync.ts', import.meta.url), 'utf8');
     expect(api).toContain("'เวลาคอนเฟิร์มต้องเป็น HH:MM'");
+  });
+});
+
+describe('🔴 iRecruit แก้อะไร ระบบแก้ตาม แล้วส่งให้ Lumos (เจ้าของ 7 ต.ค. 2569)', () => {
+  it('แก้ชื่อ/หน่วยงานใน iRecruit → แถวที่ยังไม่ถึงเวลาเปลี่ยนตาม · สาย AI ส่งแผนใหม่', async () => {
+    replan.mockClear();
+    existingRows = [
+      { id: 'n1', source_ref: `irecruit-replace:A:lead15:${pk(P1)}`, scheduled_at: '2026-10-06T00:15:00Z', mode: 'ai', group_id: 'g', recipient_phone: P1, pending: true, before_type_rule: false, staff_edited: false, note: 'เข้างาน 07:30 น.', recipient_name: 'ชื่อเก่า', unit_name: 'หน่วยเก่า', site_code: 'OLD' },
+    ];
+    irecruitSqlQuery.mockResolvedValue([row('A')]);
+    await runIrecruitReplaceSync({ now: NOW });
+    const upd = calls.find((c) => /set recipient_name = \$2, unit_name = \$3, site_code = \$4/.test(c.sql));
+    expect(upd?.params?.[0]).toBe('n1');
+    expect(upd?.params?.[1]).not.toBe('ชื่อเก่า');
+    expect(replan).toHaveBeenCalledWith(expect.objectContaining({ memberIds: ['n1'] }));
+  });
+});
+
+describe('ชื่อหน่วยงานสั้น (7 ต.ค. 2569 "เอาแค่ชื่อ")', () => {
+  it('ตัดส่วนตำแหน่งหลัง " - " · ชื่อที่มีขีดติดกันไม่โดน', async () => {
+    const { replaceSiteShortName } = await import('../../src/lib/irecruitReplaceSync');
+    expect(replaceSiteShortName('krungsri - พขร. (ส่วนกลาง) 2 คน , พขร. (ปตน.) 823 คน')).toBe('krungsri');
+    expect(replaceSiteShortName('Asian-HD - พขร. (ปตน.) 68 คน')).toBe('Asian-HD');
+    expect(replaceSiteShortName('รพ.กรุงเทพ - พขร.(รถกอล์ฟ) 20 คน')).toBe('รพ.กรุงเทพ');
+    expect(replaceSiteShortName('')).toBeNull();
   });
 });

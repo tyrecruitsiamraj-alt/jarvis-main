@@ -12637,3 +12637,15 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 
 - วัด: ใบ 7–9 ต.ค. 78 ใบ มีอีเมลคนเพิ่ม 8 · ชื่อ 63 (2 คนที่ไม่มีอีเมลใน iRecruit) · ไม่รู้ 7
 - 🔴 ลบสายที่ดึงจาก iRecruit ทั้งหมด 1,022 แถว + คิว 473 ตามเจ้าของสั่ง (สำรองที่ `.backups/irecruit-replace-follow-2026-10-07T07-09-23-569Z.json` · ไม่ commit)
+
+### ส่งคนแทน: WL = คนใน · iRecruit แก้อะไรระบบแก้ตาม (7 ต.ค. 2569 เย็น · เจ้าของ 7 ข้อ)
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/lib/irecruitReplaceSync.ts` `replaceModeForType` | Choice "คนใน (IN) = WL" + *"ถ้าไม่ใช่ WL Default เป็น AI"* ⇒ IN = คนโทร · EX / ไม่ระบุ / ER = AI (พัก AI / aiFrom ยังทับ) |
+| `api/_lib/irecruitReplaceSync.ts` ขั้น 2.55 | *"irecruit แก้อะไรระบบนี้แก้ตาม แล้วแก้ทับส่งไป lumos อีกที"* — แถวที่ยังไม่ถึงเวลา: ชื่อ/หน่วยงาน/รหัสไซต์ต่างจาก iRecruit = แก้ตาม · สาย AI → `replanFollowSetWithLumos` · (เวลา/ยกเลิก/เปลี่ยนคน ขั้น 1–2 เดิม · เปลี่ยนเบอร์ = คนใหม่) |
+| เทสต์ | `tests/api/irecruitReplaceSync.test.ts` · `src/lib/irecruitReplaceSync.test.ts` |
+
+- iRecruit ไม่มีช่อง WL (replace_type มีแค่ EX 721 · IN 622 · ว่าง 430 · ER 1 ใน 14 วัน)
+- หน่วยงาน = `replaceSiteShortName` (ตัด " - พขร. …" ทิ้ง · เจ้าของ "เอาแค่ชื่อพอ") — แถวเดิมแก้ตามเองในขั้น 2.55
+- ⚠️ พัก AI ยังเปิดอยู่ ⇒ ทุกสายยังเป็นคนโทรจนกว่าเจ้าของเปิด

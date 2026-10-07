@@ -171,7 +171,9 @@ describe('replaceModeForType (5 ต.ค. 2569)', () => {
     expect(replaceModeForType('EX', 'ai')).toBe('ai');
     expect(replaceModeForType(' ex ', 'ai')).toBe('ai');
     expect(replaceModeForType('IN', 'ai')).toBe('manual');
-    expect(replaceModeForType(null, 'ai')).toBe('manual');
+    // 7 ต.ค. 2569: ไม่ใช่ WL (IN) = AI — ไม่ระบุ/ER ด้วย
+    expect(replaceModeForType(null, 'ai')).toBe('ai');
+    expect(replaceModeForType('ER', 'ai')).toBe('ai');
     expect(replaceModeForType('EX', 'manual')).toBe('manual');
   });
 });
