@@ -111,6 +111,11 @@ async function main() {
         eq(`${t} · ผลโทร ก้อน BU รวม = กล่องทั้งหมด`, bb.reduce((n, x) => n + x.total, 0), c.total);
         eq(`${t} · เส้นทาง ทั้งหมด = กล่อง`, r.funnel.find((f) => f.key === 'total')?.value ?? -1, c.total);
         eq(`${t} · เส้นทาง ติดต่อแล้ว = AI + คน + สองทาง`, r.funnel.find((f) => f.key === 'called')?.value ?? -1, c.ai + c.staff + c.both);
+        if (block === 'matching') {
+          // จับคู่ไว้รอ: เขียว + เหลือง + แดง = คนที่จับคู่ไว้
+          const tiers = r.extra.find((x) => x.title === 'คนที่จับคู่ไว้')?.items.reduce((n, i) => n + i.value, 0) ?? -1;
+          eq(`${t} · จับคู่ไว้ สีรวม = คนที่จับคู่ไว้`, tiers, r.funnel.find((f) => f.key === 'matched')?.value ?? -1);
+        }
         for (const s of REPORT_SEGS) {
           eq(`${t} · ผลโทร ก้อน ${s.key} = กล่อง`, bb.reduce((n, x) => n + x.bySeg[s.key].total, 0), c[s.key]);
         }

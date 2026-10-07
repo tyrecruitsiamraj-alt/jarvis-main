@@ -213,17 +213,34 @@ export function buildApplicantsReport(rows: readonly ReportSourceRow[], publishe
   };
 }
 
-export function buildMatchingReport(rows: readonly ReportSourceRow[]): TopicReport {
+/** ผลจับคู่ที่ระบบคิดไว้ในช่วง (`board_match_results` · นับตามครั้งล่าสุดที่คิดใบขอนั้น) — คน × ใบขอ */
+export type MatchedSummary = { jobs: number; people: number; green: number; yellow: number; red: number };
+
+/**
+ * จับคู่งาน — เจ้าของ 7 ต.ค. 2569: *"ยังใช้อยู่ … เวลามีใบขอเข้ามามันก็ยังต้อง match ไว้รอ"* → Choice "นับด้วย"
+ * เส้นทาง: ใบขอที่จับคู่ → คนที่จับคู่ไว้ → ส่งโทร (= กล่องทั้งหมด) → ติดต่อแล้ว → สนใจ
+ */
+export function buildMatchingReport(rows: readonly ReportSourceRow[], matched: MatchedSummary): TopicReport {
   const col = (r: ReportSourceRow) => interestColOf(r);
   return {
     funnel: [
-      { key: 'total', label: 'คนที่ส่งจับคู่', value: rows.length },
+      { key: 'jobsMatched', label: 'ใบขอที่จับคู่', value: matched.jobs },
+      { key: 'matched', label: 'คนที่จับคู่ไว้', value: matched.people },
+      { key: 'total', label: 'ส่งโทร', value: rows.length },
       { key: 'called', label: 'ติดต่อแล้ว', value: count(rows, (r) => r.ai || r.staff) },
       { key: 'interested', label: 'สนใจ', value: count(rows, (r) => col(r) === 'interested') },
     ],
     cols: INTEREST_COLS,
     cells: cellsOf(rows, col),
     extra: [
+      {
+        title: 'คนที่จับคู่ไว้',
+        items: [
+          { key: 'green', label: 'เขียว', value: matched.green, tone: 'success' },
+          { key: 'yellow', label: 'เหลือง', value: matched.yellow, tone: 'warn' },
+          { key: 'red', label: 'แดง', value: matched.red, tone: 'danger' },
+        ],
+      },
       {
         title: 'ส่งต่อให้คน',
         items: [

@@ -191,7 +191,7 @@ const TopicReportCard: React.FC<{ block: TopicReportBlock; win: AiShareWindow; t
           </p>
 
           {/* 3. ส่งต่อให้คน · ที่ยังรอ */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className={cn('grid gap-4', report.extra.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2')}>
             {report.extra.map((x) => (
               <section key={x.title} className="space-y-2 rounded-2xl bg-muted/50 p-4 sm:p-5" data-testid={`report-extra-${x.title}`}>
                 <h3 className="text-base font-medium text-foreground">{x.title}</h3>

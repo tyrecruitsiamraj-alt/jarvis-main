@@ -19,6 +19,7 @@ import {
 
 const RELEASES = tableInAppSchema('job_public_releases');
 const MAP = tableInAppSchema('job_site_map');
+const MATCHES = tableInAppSchema('board_match_results');
 
 const bool = (v: unknown) => v === true || v === 't' || v === 'true';
 
@@ -66,8 +67,32 @@ export async function loadTopicReport(block: TopicReportBlock, start: Date | nul
     return buildApplicantsReport(rows.map(toRow), Number(pub.rows[0]?.n ?? 0));
   }
   if (block === 'matching') {
-    const { rows } = await dbQuery<Record<string, unknown>>(buildMatchingAiShareSql('report'), params);
-    return buildMatchingReport(rows.map(toRow));
+    const [{ rows }, m] = await Promise.all([
+      dbQuery<Record<string, unknown>>(buildMatchingAiShareSql('report'), params),
+      // จับคู่ไว้รอ — ผลที่ระบบคิดไว้ของใบขอ (คิดใหม่ = เวลาเลื่อน ⇒ นับครั้งล่าสุดในช่วง) · คน × ใบขอ แยกสี
+      dbQuery<{ jobs: number; people: number; green: number; yellow: number; red: number }>(
+        `select count(distinct r.job_id)::int as jobs,
+                count(x.m)::int as people,
+                count(x.m) filter (where x.m->>'tier' = 'green')::int as green,
+                count(x.m) filter (where x.m->>'tier' = 'yellow')::int as yellow,
+                count(x.m) filter (where x.m->>'tier' = 'red')::int as red
+           from ${MATCHES} r
+           left join ${MAP} mp on mp.job_id = r.job_id
+           left join lateral jsonb_array_elements(coalesce(r.result->'matches', '[]'::jsonb)) as x(m) on true
+          where ($1::timestamptz is null or r.computed_at >= $1::timestamptz)
+            and r.computed_at < $2::timestamptz
+            and ($3::text is null or ${trendBuSql(siteBuSql('mp.site_code'))} = $3::text)`,
+        params,
+      ),
+    ]);
+    const s = m.rows[0];
+    return buildMatchingReport(rows.map(toRow), {
+      jobs: Number(s?.jobs ?? 0),
+      people: Number(s?.people ?? 0),
+      green: Number(s?.green ?? 0),
+      yellow: Number(s?.yellow ?? 0),
+      red: Number(s?.red ?? 0),
+    });
   }
   const { rows } = await dbQuery<Record<string, unknown>>(buildFollowAiShareSql(true, 'aftercare', 'report'), [...params, AFTERCARE_TOPIC]);
   return buildAftercareReport(rows.map(toRow));

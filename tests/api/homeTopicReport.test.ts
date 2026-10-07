@@ -99,9 +99,25 @@ describe('homeTopicReport', () => {
   });
 
   it('จับคู่งาน / ดูแลหลังเริ่มงาน: รวม = ทั้งหมด · ว่าง = ไม่มีก้อน', () => {
-    expect(reportBuBlocks(buildMatchingReport([]))).toEqual([]);
-    const m = buildMatchingReport([row({ ai: true, ai_outcome: 'declined', ai_at: '2026-10-01T00:00:00Z' }), row({ waiting_ai: true })]);
-    expect(m.funnel.map((f) => f.value)).toEqual([2, 1, 0]);
+    const none = { jobs: 0, people: 0, green: 0, yellow: 0, red: 0 };
+    expect(reportBuBlocks(buildMatchingReport([], none))).toEqual([]);
+    // จับคู่ไว้รอ (เจ้าของ "ยังใช้อยู่ … ต้อง match ไว้รอ") อยู่หน้าเส้นทาง · สีรวม = คนที่จับคู่ไว้
+    const m = buildMatchingReport([row({ ai: true, ai_outcome: 'declined', ai_at: '2026-10-01T00:00:00Z' }), row({ waiting_ai: true })], {
+      jobs: 38,
+      people: 560,
+      green: 300,
+      yellow: 200,
+      red: 60,
+    });
+    expect(m.funnel.map((f) => [f.key, f.value])).toEqual([
+      ['jobsMatched', 38],
+      ['matched', 560],
+      ['total', 2],
+      ['called', 1],
+      ['interested', 0],
+    ]);
+    const tiers = m.extra[0].items.reduce((n, i) => n + i.value, 0);
+    expect(tiers).toBe(560);
     const a = buildAftercareReport([
       row({ ai: true, ai_outcome: 'confirmed', ai_at: '2026-10-01T00:00:00Z' }),
       row({ staff: true, staff_outcome: 'no_answer', staff_at: '2026-10-01T00:00:00Z' }),
