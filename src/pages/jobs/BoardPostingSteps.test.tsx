@@ -353,7 +353,9 @@ describe('ป๊อปประกาศหน้าเดียว 9 กล่�
     // เจ้าของ 6 ต.ค. ค่ำ: การ์ด "ข้อมูลใบขอ" — "เอาออก"
     expect(screen.queryByTestId('quick-master-toggle')).toBeNull();
     expect(screen.getByRole('heading', { name: 'ลิงก์สมัคร' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'ข้อความโพสต์' })).toBeTruthy();
+    // เจ้าของ 7 ต.ค.: "ข้อความโพสต์ เปลี่ยนเป็นหน้าตาที่จะเห็นเลย"
+    expect(screen.queryByRole('heading', { name: 'ข้อความโพสต์' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'ผู้สมัครจะเห็นแบบนี้' })).toBeTruthy();
     expect(await screen.findByRole('button', { name: 'ส่งประกาศ' })).toBeTruthy();
   });
 

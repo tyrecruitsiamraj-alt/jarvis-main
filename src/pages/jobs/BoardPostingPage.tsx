@@ -85,6 +85,7 @@ import { boardCardGender } from '@/lib/boardCardFacts';
 import { isOtBenefit, publicBenefitList } from '@/lib/publicFieldVisibility';
 import { isRetiredBenefit } from '@/lib/extraBenefits';
 import { resignedMonthlyNetAverage } from '@/lib/resignedIncome';
+import { jobBaseIncome } from '@/lib/jobPublicFacts';
 import PublicJobCardPreview from '@/components/jobs/PublicJobCardPreview';
 import { EVEN_TYPE, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
@@ -768,8 +769,15 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
     const src = job;
     if (!j || !src) return <Loading />;
     const shownIncome = publicIncomeOf(j);
-    const incomeValue = j.income_display
-      ? lines(j.income_display.lines.map((l) => `${l.label} ${NUM.format(l.amount)}`))
+    // ไม่ได้แยกรายการเอง = คำเดียวกับบรรทัดเงินบนการ์ดผู้สมัคร (`jobBaseIncome` · 7 ต.ค. 2569 เดิมขึ้น "รายได้โดยประมาณ …")
+    const baseIncome = jobBaseIncome(j);
+    // บรรทัดแรก = คำเดียวกับการ์ดผู้สมัครเสมอ · แยกหลายรายการ = รายการต่อท้าย
+    const breakdownLines =
+      j.income_display && j.income_display.lines.length > 1
+        ? j.income_display.lines.map((l) => `${l.label} ${NUM.format(l.amount)}`)
+        : [];
+    const incomeValue = baseIncome
+      ? lines([`ฐานเงินเดือน ${baseIncome.text}`, ...breakdownLines])
       : (shownIncome?.text ?? null);
     const totalValue = j.income_display
       ? `${NUM.format(j.income_display.total)} บาท ${INCOME_PERIOD_LABEL[j.income_display.period]}`
@@ -901,7 +909,9 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
         />
 
         {linksCard}
-        {postTextCard}
+        {/* การ์ดที่ผู้สมัครเห็นแทนข้อความโพสต์ (เจ้าของ 7 ต.ค. 2569: *"ข้อความโพสต์ เปลี่ยนเป็นหน้าตาที่จะเห็นเลย"* —
+            หน้าลิงก์ที่ Gen · หน้า /apply · การ์ดโพสต์ประกาศ ต้องเห็นแบบเดียวกัน = `JobPublicFacts` ตัวเดียวกันทั้งสามที่) */}
+        {previewCard}
         {publishActions}
         <ReleaseSkipControl jobId={j.id} skip={skip} released={released} onChanged={() => void loadSkips()} />
       </>
