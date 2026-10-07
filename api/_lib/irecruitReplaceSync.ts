@@ -104,8 +104,7 @@ function shiftYmd(ymd: string, days: number): string {
  * SQL ของเจ้าของ (2 ต.ค. 2569) — เพิ่ม `site_code` ให้ผูกหน่วยงานได้ · ช่วงวันเป็นนาฬิกาไทย
  * (driver ถือค่าในฐานเป็น UTC ⇒ ส่ง Date ที่ส่วน UTC = นาฬิกาไทย · `to` ไม่รวม = วันถัดจาก toYmd)
  */
-/** ลงย้อนหลัง: วันเข้างานย้อนได้กี่วัน · ต้องเพิ่งลงใน iRecruit ภายในกี่วัน (นาฬิกาไทยตาม `date_add`) */
-const REPLACE_PAST_WANT_DAYS = 7;
+/** ลงย้อนหลัง: ต้องเพิ่งลงใน iRecruit ภายในกี่วัน (นาฬิกาไทยตาม `date_add`) — วันเข้างานย้อนได้ไม่จำกัด */
 const REPLACE_PAST_ADDED_DAYS = 2;
 
 export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): Promise<IrecruitReplaceRow[]> {
@@ -136,16 +135,15 @@ export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): 
         AND h.job_type = '2'
         AND (
           (h.want_date >= @from AND h.want_date < @to)
-          -- 🔴 ลงย้อนหลัง (เจ้าของ 7 ต.ค. 2569 "เอาด้วย ดึงมาแต่ไม่ต้องส่งไป lumos"): วันเข้างานเลยไปแล้ว (ไม่เกิน 7 วัน)
-          --    แต่เพิ่งลงใน iRecruit ภายใน 2 วัน ⇒ ขึ้นบนจอ สายทั้งหมดเป็นคนโทร (planReplaceCallsFull past)
-          OR (h.want_date >= @pastFrom AND h.want_date < @from AND h.date_add >= @addedSince)
+          -- 🔴 ลงย้อนหลัง (เจ้าของ 7 ต.ค. 2569 "เอาด้วย ดึงมาแต่ไม่ต้องส่งไป lumos" · "ไม่ต้องกำหนด 7 วัน"):
+          --    วันเข้างานเลยไปแล้ว (ย้อนกี่วันก็ได้) แต่เพิ่งลงใน iRecruit ภายใน 2 วัน ⇒ ขึ้นบนจอ สายทั้งหมดเป็นคนโทร
+          OR (h.want_date < @from AND h.date_add >= @addedSince)
         )
         AND ISNULL(z.status, '') <> 'C'
       ORDER BY h.want_date ASC`,
     {
       from: new Date(`${fromYmd}T00:00:00Z`),
       to: new Date(`${shiftYmd(toYmd, 1)}T00:00:00Z`),
-      pastFrom: new Date(`${shiftYmd(fromYmd, -REPLACE_PAST_WANT_DAYS)}T00:00:00Z`),
       addedSince: new Date(`${shiftYmd(fromYmd, -REPLACE_PAST_ADDED_DAYS)}T00:00:00Z`),
     },
   );
@@ -403,12 +401,14 @@ export async function runIrecruitReplaceSync(
                 (created_at < $3::timestamptz) as before_type_rule,
                 (updated_by is not null) as staff_edited, note, recipient_name, unit_name, site_code
            from ${followTable}
-          where source_ref like 'irecruit-replace:%' and scheduled_at >= $2::timestamptz`,
+          where source_ref like 'irecruit-replace:%'
+            and (scheduled_at >= $2::timestamptz or source_ref = any($4::text[]))`,
         [
           new Date(now.getTime() + LOCK_AHEAD_MS).toISOString(),
-          // ย้อนพอครอบใบลงย้อนหลัง (วันเข้างานถึง 7 วัน + คอนเฟิร์มวันก่อน) — ไม่งั้นทุกรอบพยายามสร้างซ้ำแล้วชนตัวกันซ้ำ
-          new Date(now.getTime() - (REPLACE_PAST_WANT_DAYS + 2) * 86_400_000).toISOString(),
+          new Date(now.getTime() - 3 * 86_400_000).toISOString(),
           REPLACE_TYPE_RULE_FROM,
+          // ใบลงย้อนหลัง (วันเข้างานเก่ากว่า 3 วัน) — หาด้วยคีย์ ไม่งั้นทุกรอบพยายามสร้างซ้ำแล้วชนตัวกันซ้ำ
+          desired.map((d) => d.ref),
         ],
       );
       existingRows = ex;
