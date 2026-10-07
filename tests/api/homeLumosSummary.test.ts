@@ -6,6 +6,7 @@ import {
   doneBucketOf,
   emptyFollowBucket,
   followBucketAddsUp,
+  followBuBlocks,
   followBuTable,
   sumFollowBuckets,
   FOLLOW_BUCKET_KEYS,
@@ -62,5 +63,25 @@ describe('homeLumosSummary', () => {
     expect(rep.total.ai).toBe(0);
     // AI โทรอย่างเดียว
     expect(followBuTable(cells, 'all', 'ai').total.total).toBe(548);
+  });
+
+  it('ผลโทรแบ่งก้อนละ BU: BU ไม่มีงานไม่ขึ้น · แถว = เรื่อง × ใครโทรครบ 4 แถว · รวมก้อน = ผลรวมแถว · ทุกก้อนรวม = ทั้งหมด', () => {
+    const cells: FollowBuCell[] = [
+      { bu: 'LBD', team: 'main', caller: 'ai', bucket: 'went', n: 469 },
+      { bu: 'LBD', team: 'main', caller: 'ai', bucket: 'failed', n: 99 },
+      { bu: 'LBD', team: 'main', caller: 'manual', bucket: 'went', n: 77 },
+      { bu: 'LBD', team: 'replacement', caller: 'manual', bucket: 'waiting', n: 638 },
+      { bu: 'LBA', team: 'replacement', caller: 'manual', bucket: 'waiting', n: 61 },
+      { bu: 'LML', team: 'main', caller: 'ai', bucket: 'went', n: 0 },
+    ];
+    const blocks = followBuBlocks(cells);
+    expect(blocks.map((b) => b.bu)).toEqual(['LBD', 'LBA']);
+    const lbd = blocks[0];
+    // ครบ 4 แถวแม้เป็น 0 — เทียบ AI กับคนได้ทุกเรื่อง
+    expect(lbd.rows.map((r) => `${r.team}:${r.caller}:${r.total}`)).toEqual(['main:ai:568', 'main:manual:77', 'replacement:ai:0', 'replacement:manual:638']);
+    expect(blocks[1].rows.map((r) => r.total)).toEqual([0, 0, 0, 61]);
+    expect(lbd.rows.reduce((n, r) => n + r.total, 0)).toBe(lbd.sum.total);
+    expect(lbd.sum).toMatchObject({ total: 1283, ai: 568, staff: 715 });
+    expect(blocks.reduce((n, b) => n + b.sum.total, 0)).toBe(followBuTable(cells, 'all', 'all').total.total);
   });
 });

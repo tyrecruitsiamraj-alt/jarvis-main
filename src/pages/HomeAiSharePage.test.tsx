@@ -339,24 +339,10 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(screen.queryByRole('button', { name: 'ดูทั้งหมด' })).toBeNull();
   });
 
-  it('🔴 หัวข้อติดตาม: กดแท่งรายวัน = แตกดูว่าเป็นรายชื่อติดตาม/ส่งคนแทน อย่างละ AI กี่ คนกี่ (4 ต.ค. 2569)', async () => {
-    fetchHomeAiShareDetail.mockImplementation((block: AiShareDetailResponse['block']) =>
-      Promise.resolve({
-        ...detail(block),
-        rows: [
-          { day: win.to!, bu: 'LBD', total: 100, ai: 50, staff: 50, both: 0, notCalled: 0, teamReplacement: 30, teamReplacementAi: 0 },
-        ],
-      }),
-    );
+  it('🔴 กล่อง "รวมทั้งช่วง" ใต้กราฟถอดแล้ว (เจ้าของ 7 ต.ค. 2569 "มันดูยากเกินไป" · แยกเรื่องอยู่ในผลโทรก้อนละ BU)', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    const chart = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
-    expect(chart.getAttribute('data-clickable')).toBe('yes');
-    fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
-    const box = screen.getByTestId('follow-team-breakdown');
-    const text = (box.textContent ?? '').replace(/\s+/g, '');
-    expect(text).toMatch(/ติดตามคนเริ่มงาน70\D*AIโทร50คนโทร20/);
-    expect(text).toMatch(/ติดตามส่งคนแทน30\D*AIโทร0คนโทร30/);
-    expect(within(box).getByRole('button', { name: 'ดูทั้งช่วง' })).toBeTruthy();
+    await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
+    expect(screen.queryByTestId('follow-team-breakdown')).toBeNull();
   });
 
   it('แบ่งแท่งตาม (ตัวเลือกเดียว 6 ต.ค. 2569): ค่าตั้งต้น ใครโทร · BU = แต่ละ BU · ทีม = สองแท็บ · กลับมาใครโทรได้', async () => {
@@ -534,7 +520,6 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(stat('AI โทร')).toContain('31');
     expect(stat('คนโทร')).toContain('27');
     expect(screen.queryByTestId('ai-share-teams')).toBeNull();
-    expect(screen.getByTestId('follow-team-breakdown')).toBeTruthy();
   });
 
   it('🔴 กดแท่งวันไหน ตัวเลขด้านบนวิ่งตามวันนั้น · กดซ้ำ/ดูทั้งช่วง = กลับช่วงเดิม (4 ต.ค. 2569)', async () => {
@@ -543,7 +528,8 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith(win));
     fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
     await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith({ from: win.to, to: win.to }));
-    fireEvent.click(within(screen.getByTestId('follow-team-breakdown')).getByRole('button', { name: 'ดูทั้งช่วง' }));
+    // กดแท่งเดิมซ้ำ = กลับทั้งช่วง
+    fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
     await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith(win));
   });
 
@@ -592,48 +578,35 @@ describe('กดกล่อง AI โทร / คนโทร ของติ�
   });
 });
 
-describe('เลย์เอาต์ตามภาพอ้างอิง (7 ต.ค. 2569 ดึก)', () => {
-  it('ผลโทร = กราฟแท่ง + ตาราง AI/คน/รวม · แยก BU · เกจ AI ทำงาน · รวมทั้งช่วงโดนัท', async () => {
+describe('หน้าหลักอ่านไล่บนลงล่าง (7 ต.ค. 2569 ดึก)', () => {
+  it('ทั้งหมด → AI → คน → กราฟรายวัน → ผลโทรก้อนละ BU (เรื่อง × ใครโทรครบ 4 แถว) · BU ไม่มีงานไม่ขึ้น · ทุก BU รวม = ทั้งหมด', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const box = await screen.findByTestId('lumos-stats-follow');
-    await waitFor(() => expect(within(box).getByRole('img', { name: /ผลโทร 1,478/ })).toBeTruthy());
     expect(within(box).getByRole('heading', { name: 'ผลโทร' })).toBeTruthy();
-    const cells = (row: string) =>
-      within(within(box).getByTestId(`lumos-follow-${row}`)).getAllByRole('cell').slice(1).map((c) => c.textContent);
-    // ทั้งหมด · ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · รอ · ล้มเหลว · ยกเลิก — แถวรวมกลับมา ("เอาทั้งหมดกลับมา")
-    expect(cells('AI โทร')).toEqual(['673', '469', '0', '0', '15', '0', '99', '90']);
-    expect(cells('คนโทร')).toEqual(['805', '77', '1', '1', '0', '699', '3', '24']);
-    expect(cells('รวม')).toEqual(['1,478', '546', '1', '1', '15', '699', '102', '114']);
-    expect(within(box).getByTestId('lumos-follow-sum').textContent).toBe(
-      'AI 469 + 0 + 0 + 15 + 0 + 99 + 90 = 673 · คน 77 + 1 + 1 + 0 + 699 + 3 + 24 = 805',
-    );
-    // รายการข้างโดนัทถอดแล้ว (เจ้าของ "เนี่ยเอาออก")
-    expect(within(box).queryByText('มีผลการโทร')).toBeNull();
-    // กล่องเลือกผลถอดแล้ว (เจ้าของ "Dropdown ไป ไม่ไป ไรนั่นเอาออกเถอะเกะกะ")
-    expect(screen.queryByTestId('kpi-pick')).toBeNull();
-    // แยก BU — แถวรวม = การ์ด · LBD ใช้ AI · LBA ใช้คนล้วน
-    const bu = screen.getByTestId('bu-breakdown');
-    const buCells = (key: string) =>
-      within(within(bu).getByTestId(`bu-row-${key}`)).getAllByRole('cell').slice(1, 4).map((c) => c.textContent);
-    expect(buCells('LBD')).toEqual(['1,417', '673', '744']);
-    expect(buCells('LBA')).toEqual(['61', '0', '61']);
-    expect(buCells('total')).toEqual(['1,478', '673', '805']);
-    fireEvent.mouseDown(within(bu).getByRole('tab', { name: 'ติดตามส่งคนแทน' }));
-    await waitFor(() => expect(buCells('total')).toEqual(['699', '0', '699']));
-    // เกจ = AI โทร ÷ ทั้งหมด (205 ÷ 205 ของชุดทดสอบการ์ด)
-    expect(within(screen.getByTestId('ai-gauge')).getByRole('img', { name: 'AI ทำงาน 100%' })).toBeTruthy();
+    const lbd = await within(box).findByTestId('bu-block-LBD');
+    const cells = (key: string) => within(within(box).getByTestId(key)).getAllByRole('cell').map((c) => c.textContent);
+    // เรื่อง · ใครโทร · ทั้งหมด · ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · รอ · ล้มเหลว · ยกเลิก
+    expect(cells('bu-row-LBD-main-ai')).toEqual(['ติดตามคนเริ่มงาน', 'AI โทร', '673', '469', '0', '0', '15', '0', '99', '90']);
+    expect(cells('bu-row-LBD-main-manual')).toEqual(['', 'คนโทร', '106', '77', '1', '1', '0', '0', '3', '24']);
+    // ส่งคนแทน AI = 0 ก็ขึ้น (เทียบ AI กับคนได้ทุกเรื่อง)
+    expect(cells('bu-row-LBD-replacement-ai')).toEqual(['ติดตามส่งคนแทน', 'AI โทร', '0', '0', '0', '0', '0', '0', '0', '0']);
+    expect(cells('bu-row-LBD-total')[1]).toBe('1,417');
+    expect(within(lbd).getAllByText('673').length).toBeGreaterThan(0);
+    expect(within(box).getByTestId('bu-block-LBA')).toBeTruthy();
+    expect(within(box).queryByTestId('bu-block-LML')).toBeNull();
+    expect(within(box).getByTestId('lumos-follow-sum').textContent).toBe('LBD 1,417 + LBA 61 = 1,478 รายชื่อ');
+    // ถอดแล้ว
+    for (const id of ['kpi-pick', 'ai-gauge', 'bu-breakdown', 'follow-team-breakdown', 'result-bars']) {
+      expect(screen.queryByTestId(id)).toBeNull();
+    }
     pickTopic(new RegExp(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')!.label));
     const apps = await screen.findByTestId('lumos-stats-applicants');
     await waitFor(() => expect(within(apps).getByRole('img', { name: /ผลโทร 178/ })).toBeTruthy());
     expect(within(apps).getByTestId('lumos-applicants-sum').textContent).toBe('100 + 43 + 35 + 0 = 178');
     expect(within(apps).getByTestId('lumos-applicants-backlog').textContent).toContain('46');
-    // หัวข้อที่ไม่มีผลโทร = ไม่มีการ์ดผลโทร · เกจย้ายเข้ากริดกล่อง
     pickTopic(/จับคู่งาน/);
     await screen.findByRole('heading', { name: 'จับคู่งาน' });
     expect(screen.queryByTestId('lumos-stats-matching')).toBeNull();
-    expect(screen.queryByTestId('lumos-stats-follow')).toBeNull();
-    expect(screen.queryByTestId('bu-breakdown')).toBeNull();
-    expect(screen.getByTestId('ai-gauge')).toBeTruthy();
   });
 });
 

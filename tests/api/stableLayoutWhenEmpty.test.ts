@@ -32,10 +32,11 @@ describe('ทั้งระบบ: ว่างแล้วทรงเดิ�
     expect(card).toContain('ไม่มีคนที่ติดตามครบ');
   });
 
-  it('หน้าหลัก — การ์ดผลโทร: ว่าง = โดนัทวงเทาเต็มวง (ไม่หาย) · ตารางมีหัวเสมอ (แผงผลโทรล่างสุดถอดแล้ว 7 ต.ค. 2569)', () => {
+  it('หน้าหลัก — การ์ดผลโทร: ไม่มี BU ไหนมีงาน = แถว "ไม่มีรายชื่อ" (ไม่หาย) · ในก้อน BU ขึ้นครบ 4 แถวแม้เป็น 0', () => {
     const p = read('src/components/home-ai-share/AiShareLumosStats.tsx');
-    expect(p).not.toContain('ยังไม่มีผลโทร');
-    expect(p).toContain("data.length ? data : [{ key: 'empty', value: 1 }]");
+    expect(p).toContain('blocks.length === 0 ?');
+    expect(p).toContain('ไม่มีรายชื่อ');
+    expect(read('src/lib/homeLumosSummary.ts')).toContain('out.push({ team, caller, total, buckets });');
   });
 
   it('กล่องงาน › ภาพรวม — เส้นทางของรายชื่อ/กรอกแล้วโทรวันไหนเป็น 0 · ตารางรายวัน/ช่องทางมีหัวเสมอ', () => {

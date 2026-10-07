@@ -17,7 +17,7 @@
  * - 🔴 **แผงเลื่อนจากขวา + ปุ่ม "ดูทั้งหมด" ถอดแล้ว** (30 ก.ย. 2569 · เจ้าของ: *"ไอที่กดกราฟแท่งแล้วมีหน้า Slide ออกมา
  *   ฉันให้เอาออกแล้วหนิ ไม่ต้องมีแล้ว"*) ⇒ แท่งรายวันกดไม่ได้ (ไม่มีข้างในให้ลงไปแล้ว) · อย่าเอากลับมาเอง
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import AiShareUsageChart, { type UsageStack } from '@/components/home-ai-share/AiShareUsageChart';
 import { segmentDotClass, segmentFillClass } from '@/components/home-ai-share/segmentStyle';
@@ -43,7 +43,6 @@ import {
   type AiShareDetailResponse,
   type AiShareGrain,
   type AiShareWindow,
-  type FollowTeamBreakdown,
 } from '@/lib/homeAiShare';
 import { rangeTextFull } from '@/lib/periodPick';
 import { cn } from '@/lib/utils';
@@ -77,13 +76,8 @@ const AiShareDetail: React.FC<{
    * null = กลับไปทั้งช่วง
    */
   onFocusDay?: (w: AiShareWindow | null) => void;
-  /**
-   * หน้าวาด "รวมทั้งช่วง" เองที่คอลัมน์ขวา (เจ้าของ 7 ต.ค. 2569 เลย์เอาต์แบบภาพ) — ส่งค่าออกทาง `onBreakdown`
-   * ไม่วาดกล่องใต้กราฟ · `resetKey` เปลี่ยน = กลับทั้งช่วง (ปุ่ม "ดูทั้งช่วง" อยู่ที่การ์ดของหน้า)
-   */
+  /** ไม่วาดกล่อง "รวมทั้งช่วง" ใต้กราฟ (หน้าหลักถอดแล้ว 7 ต.ค. 2569 "มันดูยากเกินไป") */
   hideBreakdown?: boolean;
-  resetKey?: number;
-  onBreakdown?: (b: { label: string; picked: boolean; data: FollowTeamBreakdown } | null) => void;
 }> = ({
   title,
   unit,
@@ -96,8 +90,6 @@ const AiShareDetail: React.FC<{
   hideNotCalled = false,
   onFocusDay,
   hideBreakdown = false,
-  resetKey = 0,
-  onBreakdown,
 }) => {
   /**
    * แท่งแบ่งตามอะไร — ตัวเลือกเดียว (6 ต.ค. 2569 · เจ้าของ: *"ปุ่ม แยกทีม แยก Bu มันจะทำแยกกันมาทำไม"*)
@@ -182,21 +174,6 @@ const AiShareDetail: React.FC<{
     onFocusDay?.(focusFrom && focusTo ? { from: focusFrom, to: focusTo } : null);
   }, [focusFrom, focusTo, onFocusDay]);
   const breakdown = withTeams && view ? followTeamBreakdown(view.teamRowsOf(pickedBucket ? picked : null)) : null;
-  // ปุ่ม "ดูทั้งช่วง" ของหน้า
-  useEffect(() => {
-    if (resetKey > 0) setPicked(null);
-  }, [resetKey]);
-  // ส่งตัวเลขออกให้หน้า — เทียบด้วยคีย์ข้อความ (วัตถุใหม่ทุกรอบ ห้ามใช้เป็น deps ตรง ๆ ไม่งั้นวนไม่จบ)
-  const breakdownLabel = pickedBucket ? rangeTextFull(pickedBucket.from, pickedBucket.to) : 'รวมทั้งช่วง';
-  const breakdownKey = breakdown ? `${breakdownLabel}|${picked !== null}|${JSON.stringify(breakdown)}` : '';
-  const breakdownRef = useRef(breakdown);
-  breakdownRef.current = breakdown;
-  useEffect(() => {
-    if (!onBreakdown) return;
-    const b = breakdownRef.current;
-    onBreakdown(b ? { label: breakdownLabel, picked: pickedBucket !== null, data: b } : null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- คีย์ข้อความแทนวัตถุ
-  }, [breakdownKey, onBreakdown]);
 
   return (
     <section className="space-y-4" aria-label={`ยอดใช้งาน${title}`}>

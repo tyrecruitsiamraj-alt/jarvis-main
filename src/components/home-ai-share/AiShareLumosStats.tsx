@@ -2,29 +2,31 @@
  * ═══ ผลโทร — หน้าหลัก (เจ้าของ 7 ต.ค. 2569 · เลย์เอาต์ตามภาพอ้างอิง "Pipeline Stage Breakdown") ═══
  * ที่มา: *"ตัวเลขต้องได้ตามหัวข้อแบบที่บอททำ"* → *"ต้องรู้ทั้งคนและ Ai"* → *"มีผลการโทร … ไปไม่ไป"* (แตก 4 ช่อง) →
  * *"เนี่ยเอาออก แล้วไออันที่มีก็แค่เอาทั้งหมดกลับมา"* (ถอดรายการข้างโดนัท · คืนแถวรวม) → *"เอาแบบนี้"* (ภาพอ้างอิง)
- * - การ์ดผลโทร: กราฟแท่งทีละผล (สีตามความหมาย) + ตาราง AI โทร / คนโทร / รวม (ติดตาม) · ผู้สมัคร = แท่ง + งานเก่า
- * - `useHomeLumosSummary` = ตัวโหลดตัวเดียวของหน้า (การ์ดนี้ + กล่องเลือกผลใน 2×2 ใช้ชุดเดียวกัน ไม่โหลดซ้ำ)
+ * - การ์ดผลโทร (ติดตาม): ก้อนละ BU — เรื่อง × ใครโทร × ผล 7 ช่อง (เจ้าของ 7 ต.ค. ดึก "Bu เอาไปรวมตรงผลเลย") · ผู้สมัคร = แท่ง + งานเก่า
+ * - `useHomeLumosSummary` = ตัวโหลดของหน้า (หน้าเรียกครั้งเดียว ส่งข้อมูลเข้าการ์ด)
  * - `FOLLOW_RESULT_COLS` / `APPLICANT_RESULT_COLS` = ชื่อ + สีของแต่ละผล ที่เดียวทั้งหน้า
  * บรรทัดบวกใต้ตาราง (ไม่ลงตัว = แดง) · นิยาม `src/lib/homeLumosSummary.ts`
  * 🔴 สีจาก TONE ชุดเดียวกับหน้าติดตาม · กราฟใช้ `currentColor` + คลาส TONE · ไม่มีประโยคอธิบายบนจอ
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Bar, BarChart, Cell, LabelList, Pie, PieChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, Cell, LabelList, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { toneOfBu } from '@/components/team-online/teamOnlineTones';
+import { trendBuLabel } from '@/lib/trends/bu';
 import { TONE } from '@/lib/designTokens';
 import { FOLLOW_MATRIX_COL_TONE } from '@/lib/followCallMatrix';
 import type { AiShareBlockKey, AiShareWindow } from '@/lib/homeAiShare';
 import { fetchHomeLumosSummary } from '@/lib/homeAiShareApi';
 import {
-  FOLLOW_BUCKET_KEYS,
   followBucketAddsUp,
-  followBucketSum,
+  followBuBlocks,
   lumosBucketAddsUp,
-  sumFollowBuckets,
   type FollowBucket,
   type FollowBucketKey,
+  type FollowBuCell,
+  type FollowTeamKey,
   type HomeLumosSummaryResponse,
   type LumosBucket,
 } from '@/lib/homeLumosSummary';
@@ -100,47 +102,6 @@ export function useHomeLumosSummary(block: AiShareBlockKey, win: AiShareWindow, 
   return { current, failed: error ?? current?.error ?? null };
 }
 
-/** โดนัท + เลขกลางวง · ว่าง = วงเทาเต็มวง (ไม่หาย) · ใช้ที่การ์ดรวมทั้งช่วง */
-export function Donut({ slices, total, unit, label }: { slices: ResultSlice[]; total: number | null; unit: string; label: string }) {
-  const data = slices.filter((s) => s.value > 0);
-  return (
-    <div className="relative mx-auto aspect-square w-full max-w-48" role="img" aria-label={label}>
-      {total === null ? (
-        <Skeleton className="h-full w-full rounded-full" />
-      ) : (
-        <>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={data.length ? data : [{ key: 'empty', value: 1 }]}
-                dataKey="value"
-                nameKey="key"
-                innerRadius="68%"
-                outerRadius="100%"
-                paddingAngle={data.length > 1 ? 1.5 : 0}
-                stroke="none"
-                startAngle={90}
-                endAngle={-270}
-                isAnimationActive={false}
-              >
-                {data.length ? (
-                  data.map((s) => <Cell key={s.key} fill="currentColor" className={TONE[s.tone].value} />)
-                ) : (
-                  <Cell fill="currentColor" className="text-muted" />
-                )}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-2xl font-light tabular-nums text-foreground">{NUM.format(total)}</span>
-            <span className="text-xs text-muted-foreground">{unit}</span>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 /** กราฟแท่งทีละผล — แท่งมนสีตามความหมาย · เลขบนหัวแท่ง · ชื่อผลใต้แท่ง (แบบ "Pipeline Stage Breakdown") */
 function ResultBars({ slices, label }: { slices: ResultSlice[]; label: string }) {
   return (
@@ -180,7 +141,7 @@ const AiShareLumosStats: React.FC<{
       <h2 className="text-base font-medium text-foreground">ผลโทร</h2>
       {failed ? <p className={cn('text-sm', TONE.danger.value)}>{failed}</p> : null}
       {block === 'follow' ? (
-        <FollowResults split={data?.follow ?? null} unit={unit} />
+        <FollowResults split={data?.follow ?? null} cells={data?.followByBu ?? null} unit={unit} />
       ) : (
         <ApplicantResults b={data?.applicants ?? null} backlog={data?.backlog ?? null} unit={unit} />
       )}
@@ -188,67 +149,107 @@ const AiShareLumosStats: React.FC<{
   );
 };
 
-const followSumText = (b: FollowBucket) =>
-  `${FOLLOW_BUCKET_KEYS.map((k) => NUM.format(b[k])).join(' + ')} = ${NUM.format(followBucketSum(b))}`;
+const TEAM_LABEL: Record<FollowTeamKey, string> = { main: 'ติดตามคนเริ่มงาน', replacement: 'ติดตามส่งคนแทน' };
+const CALLER_LABEL = { ai: 'AI โทร', manual: 'คนโทร' } as const;
 
-/** ติดตาม — แท่งของรวม + ตาราง AI โทร / คนโทร / รวม */
-function FollowResults({ split, unit }: { split: { ai: FollowBucket; staff: FollowBucket } | null; unit: string }) {
-  const all = split ? sumFollowBuckets(split.ai, split.staff) : null;
-  const slices: ResultSlice[] = FOLLOW_RESULT_COLS.map((c) => ({ key: c.key, label: c.label, tone: c.tone, value: all ? all[c.key] : 0 }));
-  const rows: Array<[string, FollowBucket | null]> = [
-    ['AI โทร', split?.ai ?? null],
-    ['คนโทร', split?.staff ?? null],
-    ['รวม', all],
-  ];
-  const ok = rows.every(([, b]) => !b || followBucketAddsUp(b));
+/**
+ * ติดตาม — ก้อนละ BU (เจ้าของ "Bu เอาไปรวมตรงผลเลย") · หัวก้อน = BU · ทั้งหมด · AI โทร · คนโทร
+ * ตาราง = เรื่อง × ใครโทร (เฉพาะที่มีรายชื่อ) × ผล 7 ช่อง · แถวรวมของ BU · BU ไม่มีงานไม่ขึ้น
+ * บรรทัดล่าง = ทุก BU บวกกัน = กล่องทั้งหมดด้านบน
+ */
+function FollowResults({
+  split,
+  cells,
+  unit,
+}: {
+  split: { ai: FollowBucket; staff: FollowBucket } | null;
+  cells: FollowBuCell[] | null;
+  unit: string;
+}) {
+  if (!split || !cells) return <Skeleton className="h-48 w-full rounded-xl" />;
+  const blocks = followBuBlocks(cells);
+  const all = split.ai.total + split.staff.total;
+  const sumOfBlocks = blocks.reduce((n, b) => n + b.sum.total, 0);
+  const ok = sumOfBlocks === all && followBucketAddsUp(split.ai) && followBucketAddsUp(split.staff);
+  const num = (n: number) => (
+    <span className={cn('tabular-nums', n > 0 ? 'text-foreground' : 'text-muted-foreground')}>{NUM.format(n)}</span>
+  );
   return (
-    <div className="space-y-5">
-      {all ? (
-        <ResultBars slices={slices} label={`ผลโทร ${NUM.format(all.total)} ${unit}`} />
-      ) : (
-        <Skeleton className="h-64 w-full rounded-xl" />
-      )}
-
-      <div className="overflow-x-auto" data-testid="lumos-stats-follow-table">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs" />
-              <TableHead className="whitespace-nowrap text-right text-xs">ทั้งหมด</TableHead>
-              {FOLLOW_RESULT_COLS.map((c) => (
-                <TableHead key={c.key} className="whitespace-nowrap text-right text-xs">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className={cn('h-2 w-2 rounded-full', TONE[c.tone].dot)} aria-hidden />
-                    {c.label}
-                  </span>
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map(([label, b]) => (
-              <TableRow key={label} data-testid={`lumos-follow-${label}`} className={cn(label === 'รวม' && 'font-medium')}>
-                <TableCell className="whitespace-nowrap text-sm text-foreground">{label}</TableCell>
-                <TableCell className="text-right tabular-nums text-foreground">{b ? NUM.format(b.total) : '—'}</TableCell>
-                {FOLLOW_RESULT_COLS.map((c) => (
-                  <TableCell
-                    key={c.key}
-                    className={cn('text-right tabular-nums', b && b[c.key] > 0 ? 'text-foreground' : 'text-muted-foreground')}
-                  >
-                    {b ? NUM.format(b[c.key]) : '—'}
-                  </TableCell>
+    <div className="space-y-6">
+      {blocks.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีรายชื่อ</p> : null}
+      {blocks.map((b) => (
+        <section key={b.bu ?? 'none'} className="space-y-3" data-testid={`bu-block-${b.bu ?? 'none'}`}>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+            <h3 className="flex items-center gap-2 text-lg font-medium text-foreground" title={b.bu ? trendBuLabel(b.bu) : undefined}>
+              <span className={cn('h-3 w-3 rounded-full bg-current', TONE[b.bu ? toneOfBu(b.bu) : 'neutral'].value)} aria-hidden />
+              {b.bu ?? 'ไม่ระบุ BU'}
+              <span className="text-base font-light tabular-nums text-muted-foreground">
+                {NUM.format(b.sum.total)} {unit}
+              </span>
+            </h3>
+            <p className="flex gap-5 text-sm tabular-nums text-muted-foreground">
+              <span>
+                AI โทร <span className="text-base font-medium text-foreground">{NUM.format(b.sum.ai)}</span>
+              </span>
+              <span>
+                คนโทร <span className="text-base font-medium text-foreground">{NUM.format(b.sum.staff)}</span>
+              </span>
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">เรื่อง</TableHead>
+                  <TableHead className="text-xs">ใครโทร</TableHead>
+                  <TableHead className="whitespace-nowrap text-right text-xs">ทั้งหมด</TableHead>
+                  {FOLLOW_RESULT_COLS.map((c) => (
+                    <TableHead key={c.key} className="whitespace-nowrap text-right text-xs">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className={cn('h-2 w-2 rounded-full', TONE[c.tone].dot)} aria-hidden />
+                        {c.label}
+                      </span>
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {b.rows.map((r, i) => (
+                  <TableRow key={`${r.team}:${r.caller}`} data-testid={`bu-row-${b.bu ?? 'none'}-${r.team}-${r.caller}`}>
+                    <TableCell className="whitespace-nowrap text-sm text-foreground">
+                      {i === 0 || b.rows[i - 1].team !== r.team ? TEAM_LABEL[r.team] : ''}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-foreground">{CALLER_LABEL[r.caller]}</TableCell>
+                    <TableCell className="text-right font-medium">{num(r.total)}</TableCell>
+                    {FOLLOW_RESULT_COLS.map((c) => (
+                      <TableCell key={c.key} className="text-right">
+                        {num(r.buckets[c.key])}
+                      </TableCell>
+                    ))}
+                  </TableRow>
                 ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      {split ? (
-        <p className={cn('text-xs tabular-nums', ok ? 'text-muted-foreground' : TONE.danger.value)} data-testid="lumos-follow-sum">
-          AI {followSumText(split.ai)} · คน {followSumText(split.staff)}
-          {ok ? '' : ' · ไม่ลงตัว'}
-        </p>
-      ) : null}
+              </TableBody>
+              <TableFooter>
+                <TableRow data-testid={`bu-row-${b.bu ?? 'none'}-total`} className="font-medium">
+                  <TableCell className="whitespace-nowrap text-sm text-foreground" colSpan={2}>
+                    รวม {b.bu ?? 'ไม่ระบุ BU'}
+                  </TableCell>
+                  <TableCell className="text-right">{num(b.sum.total)}</TableCell>
+                  {FOLLOW_RESULT_COLS.map((c) => (
+                    <TableCell key={c.key} className="text-right">
+                      {num(b.sum.buckets[c.key])}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </div>
+        </section>
+      ))}
+      <p className={cn('text-xs tabular-nums', ok ? 'text-muted-foreground' : TONE.danger.value)} data-testid="lumos-follow-sum">
+        {blocks.map((b) => `${b.bu ?? 'ไม่ระบุ'} ${NUM.format(b.sum.total)}`).join(' + ')} = {NUM.format(sumOfBlocks)} {unit}
+        {ok ? '' : ` · ไม่ตรงกับ ${NUM.format(all)}`}
+      </p>
     </div>
   );
 }

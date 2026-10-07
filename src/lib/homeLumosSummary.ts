@@ -132,3 +132,35 @@ export function followBuTable(
   const rows = [...byBu.values()].sort((a, b) => (a.bu === null ? 1 : 0) - (b.bu === null ? 1 : 0) || b.total - a.total);
   return { rows, total };
 }
+
+/**
+ * ผลโทรแบ่งก้อนละ BU (เจ้าของ 7 ต.ค. 2569 ดึก: *"Bu เอาไปรวมตรงผลเลย · Lbd Ai โทรเท่านี้ คนโทรเท่านี้ ไป ไม่ไป ฯลฯ
+ * แยก Ai กับคน แยกเรื่อง · Lba เท่าไหร่ · Bu ไหนไม่มีก็ไม่ต้องโชว์"*)
+ * ก้อน = BU ที่มีงาน (มากไปน้อย · ไม่ระบุไว้ท้าย) · แถว = เรื่อง × ใครโทร **ครบ 4 แถวเสมอ** (0 ก็ขึ้น) · รวมของก้อน = ผลรวมทุกแถว
+ */
+export type FollowBuBlockRow = { team: FollowTeamKey; caller: 'ai' | 'manual'; total: number; buckets: Record<FollowBucketKey, number> };
+export type FollowBuBlock = { bu: string | null; sum: FollowBuRow; rows: FollowBuBlockRow[] };
+
+export function followBuBlocks(cells: readonly FollowBuCell[]): FollowBuBlock[] {
+  const { rows } = followBuTable(cells, 'all', 'all');
+  return rows
+    .filter((r) => r.total > 0)
+    .map((sum) => {
+      const mine = cells.filter((c) => (c.bu ?? null) === sum.bu);
+      const out: FollowBuBlockRow[] = [];
+      for (const team of ['main', 'replacement'] as const) {
+        for (const caller of ['ai', 'manual'] as const) {
+          const buckets = emptyBuckets();
+          let total = 0;
+          for (const c of mine) {
+            if (c.team !== team || c.caller !== caller) continue;
+            buckets[c.bucket] += c.n;
+            total += c.n;
+          }
+          // ครบทุกเรื่อง × ใครโทรเสมอ แม้เป็น 0 (เจ้าของ "ทุกอย่างต้องรายงานเพื่อเปรียบเทียบระหว่างคนกับ Ai")
+          out.push({ team, caller, total, buckets });
+        }
+      }
+      return { bu: sum.bu, sum, rows: out };
+    });
+}

@@ -9,15 +9,11 @@
  */
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
-import { Donut, type ResultSlice, type ToneKey } from '@/components/home-ai-share/AiShareLumosStats';
 import { useCountUp } from '@/hooks/useCountUp';
 import { Pill } from '@/components/team-online/TeamKpiCard';
 import { TONE } from '@/lib/designTokens';
 import type { DeltaPill } from '@/lib/teamOnline';
-import type { FollowTeamBreakdown } from '@/lib/homeAiShare';
 import { cn } from '@/lib/utils';
 
 const NUM = new Intl.NumberFormat('th-TH');
@@ -116,146 +112,5 @@ export function KpiTile({
         ) : null}
       </span>
     </Button>
-  );
-}
-
-export type RangeRow = {
-  key: string;
-  label: string;
-  value: number;
-  ai?: number;
-  staff?: number;
-  tone?: ToneKey;
-};
-
-/**
- * รวมทั้งช่วง — โดนัท + รายการมีเส้นคั่น แบบการ์ด "Win Rate by Region" ในภาพอ้างอิง
- * ติดตาม: คนเริ่มงาน (ฟ้า) / ส่งคนแทน (ม่วง) สีเดียวกับแท่ง "ทีม" ในกราฟรายวัน · แถวละ AI โทร / คนโทร
- */
-export function RangeSummary({
-  title,
-  rows,
-  unit,
-  onClear,
-  testId,
-  className,
-}: {
-  title: string;
-  rows: RangeRow[] | null;
-  unit: string;
-  /** แท่งที่กดอยู่ → ปุ่มกลับทั้งช่วง */
-  onClear?: () => void;
-  testId?: string;
-  className?: string;
-}) {
-  const total = rows ? rows.reduce((n, r) => n + r.value, 0) : null;
-  const slices: ResultSlice[] = (rows ?? []).map((r) => ({ key: r.key, label: r.label, tone: r.tone ?? 'neutral', value: r.value }));
-  return (
-    <Card variant="glass" className={cn('space-y-4 p-5 sm:p-6', className)} data-testid={testId}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-base font-medium text-foreground">{title}</h2>
-        {onClear ? (
-          <Button type="button" variant="link" size="xs" className="h-auto p-0" onClick={onClear}>
-            ดูทั้งช่วง
-          </Button>
-        ) : null}
-      </div>
-      <Donut slices={slices} total={total} unit={unit} label={`${title} ${total === null ? '' : NUM.format(total)} ${unit}`} />
-      {rows === null ? (
-        <Skeleton className="h-24 w-full rounded-xl" />
-      ) : (
-        <ul className="divide-y divide-foreground/10">
-          {rows.map((r) => (
-            <li key={r.key} className="space-y-1 py-3 last:pb-0">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="flex items-center gap-2 text-sm text-foreground">
-                  {r.tone ? <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', TONE[r.tone].dot)} aria-hidden /> : null}
-                  {r.label}
-                </span>
-                <span className="tabular-nums text-foreground">
-                  <span className="text-xl font-medium">{NUM.format(r.value)}</span>
-                  <span className="ml-1 text-xs text-muted-foreground">{unit}</span>
-                </span>
-              </div>
-              {r.ai !== undefined && r.staff !== undefined ? (
-                <div className="flex justify-end gap-4 text-xs tabular-nums text-muted-foreground">
-                  <span>
-                    AI โทร <span className="font-medium text-foreground">{NUM.format(r.ai)}</span>
-                  </span>
-                  <span>
-                    คนโทร <span className="font-medium text-foreground">{NUM.format(r.staff)}</span>
-                  </span>
-                </div>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
-/** แถวของติดตาม 2 แท็บ จากตัวแตกทีมของกราฟ */
-export const followRangeRows = (b: FollowTeamBreakdown): RangeRow[] => [
-  { key: 'main', label: 'ติดตามคนเริ่มงาน', value: b.main.total, ai: b.main.ai, staff: b.main.staff, tone: 'info' },
-  {
-    key: 'replacement',
-    label: 'ติดตามส่งคนแทน',
-    value: b.replacement.total,
-    ai: b.replacement.ai,
-    staff: b.replacement.staff,
-    tone: 'violet',
-  },
-];
-
-/**
- * เกจ "AI ทำงาน" (เจ้าของ 7 ต.ค. 2569 Choice "AI ทำงานกี่ %" จากการ์ด "Forecast Accuracy") = AI โทร ÷ ทั้งหมด
- * พื้นเบอร์กันดี (`primary`) · ครึ่งวงจาง = ส่วนที่เหลือ · % ตัวเดียวกับแถบในกล่อง AI โทร
- */
-export function AiGauge({ ai, total, unit, className }: { ai: number | null; total: number | null; unit: string; className?: string }) {
-  const pct = ai !== null && total ? Math.round((ai / total) * 100) : 0;
-  const data = [
-    { key: 'ai', value: pct },
-    { key: 'rest', value: 100 - pct },
-  ];
-  return (
-    <div
-      className={cn(
-        'flex flex-col items-center rounded-2xl bg-primary p-5 text-primary-foreground shadow-sm shadow-foreground/5',
-        className,
-      )}
-      data-testid="ai-gauge"
-    >
-      <h2 className="text-base font-medium">AI ทำงาน</h2>
-      <div className="relative h-32 w-full max-w-60" role="img" aria-label={`AI ทำงาน ${pct}%`}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              nameKey="key"
-              cx="50%"
-              cy="100%"
-              startAngle={180}
-              endAngle={0}
-              innerRadius="150%"
-              outerRadius="190%"
-              stroke="none"
-              cornerRadius={8}
-              isAnimationActive={false}
-            >
-              <Cell fill="currentColor" />
-              <Cell fill="currentColor" fillOpacity={0.25} />
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center">
-          <span className="text-4xl font-light tabular-nums">{ai === null ? '—' : `${NUM.format(pct)}%`}</span>
-        </div>
-      </div>
-      <p className="mt-2 text-xs tabular-nums opacity-80">
-        {ai === null || total === null ? '—' : `${NUM.format(ai)} จาก ${NUM.format(total)} ${unit}`}
-      </p>
-    </div>
   );
 }
