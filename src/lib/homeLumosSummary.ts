@@ -23,6 +23,8 @@ export type HomeLumosSummaryResponse = {
   to: string | null;
   bu: string | null;
   follow: { ai: FollowBucket; staff: FollowBucket } | null;
+  /** แยก BU × เรื่อง × ใครโทร × ผล (ติดตาม) */
+  followByBu?: FollowBuCell[];
   applicants: LumosBucket | null;
   /** ใบสมัครก่อนช่วงนี้ที่ยังรอ AI */
   backlog: number | null;
@@ -92,4 +94,41 @@ export function doneBucketOf(result: string): FollowBucketKey {
     default:
       return 'unclear';
   }
+}
+
+/**
+ * ═══ แยก BU (เจ้าของ 7 ต.ค. 2569) ═══
+ * *"Bu แต่ละ Bu ใช้ไปเท่าไหร่ ใช้ไปกับเรื่องอะไร อย่างละเท่าไหร่ ผล … ยังไง Bu ไหนใช้คนเยอะ ใช้ Ai เยอะ"*
+ * เซิร์ฟเวอร์ส่งช่องย่อย BU × เรื่อง (แท็บ) × ใครโทร × ผล · หน้าเลือกเรื่อง/ใครโทรแล้วรวมเอง ⇒ ทุกแถวบวกกันได้ยอดของการ์ดพอดี
+ */
+export type FollowTeamKey = 'main' | 'replacement';
+export type FollowBuCell = { bu: string | null; team: FollowTeamKey; caller: 'ai' | 'manual'; bucket: FollowBucketKey; n: number };
+export type FollowBuRow = { bu: string | null; total: number; ai: number; staff: number; buckets: Record<FollowBucketKey, number> };
+
+const emptyBuckets = (): Record<FollowBucketKey, number> =>
+  Object.fromEntries(FOLLOW_BUCKET_KEYS.map((k) => [k, 0])) as Record<FollowBucketKey, number>;
+
+export function followBuTable(
+  cells: readonly FollowBuCell[],
+  team: 'all' | FollowTeamKey,
+  caller: 'all' | 'ai' | 'manual',
+): { rows: FollowBuRow[]; total: FollowBuRow } {
+  const byBu = new Map<string, FollowBuRow>();
+  const total: FollowBuRow = { bu: null, total: 0, ai: 0, staff: 0, buckets: emptyBuckets() };
+  for (const c of cells) {
+    if (team !== 'all' && c.team !== team) continue;
+    if (caller !== 'all' && c.caller !== caller) continue;
+    const k = c.bu ?? '';
+    const row = byBu.get(k) ?? { bu: c.bu, total: 0, ai: 0, staff: 0, buckets: emptyBuckets() };
+    for (const r of [row, total]) {
+      r.total += c.n;
+      if (c.caller === 'ai') r.ai += c.n;
+      else r.staff += c.n;
+      r.buckets[c.bucket] += c.n;
+    }
+    byBu.set(k, row);
+  }
+  // มากไปน้อย · ไม่ระบุ BU ไว้ท้าย
+  const rows = [...byBu.values()].sort((a, b) => (a.bu === null ? 1 : 0) - (b.bu === null ? 1 : 0) || b.total - a.total);
+  return { rows, total };
 }

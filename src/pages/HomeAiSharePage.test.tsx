@@ -46,6 +46,19 @@ vi.mock('@/lib/homeAiShareApi', () => ({
         ai: { total: 673, went: 469, notWent: 0, reschedule: 0, unclear: 15, waiting: 0, failed: 99, cancelled: 90 },
         staff: { total: 805, went: 77, notWent: 1, reschedule: 1, unclear: 0, waiting: 699, failed: 3, cancelled: 24 },
       },
+      followByBu: [
+        { bu: 'LBD', team: 'main', caller: 'ai', bucket: 'went', n: 469 },
+        { bu: 'LBD', team: 'main', caller: 'ai', bucket: 'unclear', n: 15 },
+        { bu: 'LBD', team: 'main', caller: 'ai', bucket: 'failed', n: 99 },
+        { bu: 'LBD', team: 'main', caller: 'ai', bucket: 'cancelled', n: 90 },
+        { bu: 'LBD', team: 'main', caller: 'manual', bucket: 'went', n: 77 },
+        { bu: 'LBD', team: 'main', caller: 'manual', bucket: 'notWent', n: 1 },
+        { bu: 'LBD', team: 'main', caller: 'manual', bucket: 'reschedule', n: 1 },
+        { bu: 'LBD', team: 'main', caller: 'manual', bucket: 'failed', n: 3 },
+        { bu: 'LBD', team: 'main', caller: 'manual', bucket: 'cancelled', n: 24 },
+        { bu: 'LBD', team: 'replacement', caller: 'manual', bucket: 'waiting', n: 638 },
+        { bu: 'LBA', team: 'replacement', caller: 'manual', bucket: 'waiting', n: 61 },
+      ],
       applicants: { total: 178, done: 100, waiting: 43, failed: 35, cancelled: 0 },
       backlog: 46,
       error: null,
@@ -580,7 +593,7 @@ describe('กดกล่อง AI โทร / คนโทร ของติ�
 });
 
 describe('เลย์เอาต์ตามภาพอ้างอิง (7 ต.ค. 2569 ดึก)', () => {
-  it('ผลโทร = กราฟแท่ง + ตาราง AI/คน/รวม · กล่องเลือกผลตอบได้ทุกผล · เกจ AI ทำงาน · รวมทั้งช่วงโดนัท', async () => {
+  it('ผลโทร = กราฟแท่ง + ตาราง AI/คน/รวม · แยก BU · เกจ AI ทำงาน · รวมทั้งช่วงโดนัท', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const box = await screen.findByTestId('lumos-stats-follow');
     await waitFor(() => expect(within(box).getByRole('img', { name: /ผลโทร 1,478/ })).toBeTruthy());
@@ -596,9 +609,17 @@ describe('เลย์เอาต์ตามภาพอ้างอิง (7 
     );
     // รายการข้างโดนัทถอดแล้ว (เจ้าของ "เนี่ยเอาออก")
     expect(within(box).queryByText('มีผลการโทร')).toBeNull();
-    // กล่องเลือกผล (ใบที่ 4) — ค่าตั้งต้น ไป 546 · 7 ผลให้เลือก
-    const pick = screen.getByTestId('kpi-pick');
-    expect(within(pick).getByTestId('kpi-pick-value').textContent).toBe('546');
+    // กล่องเลือกผลถอดแล้ว (เจ้าของ "Dropdown ไป ไม่ไป ไรนั่นเอาออกเถอะเกะกะ")
+    expect(screen.queryByTestId('kpi-pick')).toBeNull();
+    // แยก BU — แถวรวม = การ์ด · LBD ใช้ AI · LBA ใช้คนล้วน
+    const bu = screen.getByTestId('bu-breakdown');
+    const buCells = (key: string) =>
+      within(within(bu).getByTestId(`bu-row-${key}`)).getAllByRole('cell').slice(1, 4).map((c) => c.textContent);
+    expect(buCells('LBD')).toEqual(['1,417', '673', '744']);
+    expect(buCells('LBA')).toEqual(['61', '0', '61']);
+    expect(buCells('total')).toEqual(['1,478', '673', '805']);
+    fireEvent.mouseDown(within(bu).getByRole('tab', { name: 'ติดตามส่งคนแทน' }));
+    await waitFor(() => expect(buCells('total')).toEqual(['699', '0', '699']));
     // เกจ = AI โทร ÷ ทั้งหมด (205 ÷ 205 ของชุดทดสอบการ์ด)
     expect(within(screen.getByTestId('ai-gauge')).getByRole('img', { name: 'AI ทำงาน 100%' })).toBeTruthy();
     pickTopic(new RegExp(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')!.label));
@@ -611,7 +632,7 @@ describe('เลย์เอาต์ตามภาพอ้างอิง (7 
     await screen.findByRole('heading', { name: 'จับคู่งาน' });
     expect(screen.queryByTestId('lumos-stats-matching')).toBeNull();
     expect(screen.queryByTestId('lumos-stats-follow')).toBeNull();
-    expect(screen.queryByTestId('kpi-pick')).toBeNull();
+    expect(screen.queryByTestId('bu-breakdown')).toBeNull();
     expect(screen.getByTestId('ai-gauge')).toBeTruthy();
   });
 });

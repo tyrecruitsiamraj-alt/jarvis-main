@@ -34,7 +34,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveTick } from '@/hooks/useLiveTick';
 import { toYmdBangkok } from '@/lib/dateTh';
-import { AiGauge, followRangeRows, KpiPickTile, KpiTile, RangeSummary } from '@/components/home-ai-share/HomeKpis';
+import { AiGauge, followRangeRows, KpiTile, RangeSummary } from '@/components/home-ai-share/HomeKpis';
+import BuBreakdownCard from '@/components/home-ai-share/BuBreakdownCard';
 import { segmentDotClass, segmentFillClass } from '@/components/home-ai-share/segmentStyle';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { metricHelp, type MetricKey } from '@/lib/metricDictionary';
@@ -42,12 +43,7 @@ import { countPill } from '@/lib/teamOnline';
 import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
 import FollowCallerDialog from '@/components/home-ai-share/FollowCallerDialog';
-import AiShareLumosStats, {
-  APPLICANT_RESULT_COLS,
-  FOLLOW_RESULT_COLS,
-  hasLumosResults,
-  useHomeLumosSummary,
-} from '@/components/home-ai-share/AiShareLumosStats';
+import AiShareLumosStats, { hasLumosResults, useHomeLumosSummary } from '@/components/home-ai-share/AiShareLumosStats';
 import PeriodPicker from '@/components/shared/PeriodPicker';
 import { Card } from '@/components/ui/card';
 import {
@@ -185,8 +181,6 @@ const HomeAiSharePage: React.FC = () => {
   /** "รวมทั้งช่วง" คอลัมน์ขวา — ตัวแตกทีมจากกราฟ (แท่งที่กด/ทั้งช่วง) · ปุ่มดูทั้งช่วง = เพิ่มเลขรอบ */
   const [teamSplit, setTeamSplit] = useState<{ label: string; picked: boolean; data: FollowTeamBreakdown } | null>(null);
   const [resetSeq, setResetSeq] = useState(0);
-  /** กล่องเลือกผล — ผลที่เลือกอยู่ (ค่าตั้งต้น = ไป) */
-  const [pickKey, setPickKey] = useState('went');
   const choose = (v: string) => {
     if (!isAiShareBlock(v)) return;
     setBlock(v);
@@ -393,17 +387,7 @@ const HomeAiSharePage: React.FC = () => {
     return k === 'notCalled' && hint ? [help, hint].filter(Boolean).join('\n') : help;
   };
   const hasResults = hasLumosResults(meta.key);
-  /** กล่องเลือกผล (ใบที่ 4) — ผลโทรของหัวข้อนั้น · ยังไม่มาก็ขึ้นกล่องไว้ (เลขเป็นขีด) */
-  const lumosFollow = lumos.current?.follow ?? null;
-  const lumosApps = lumos.current?.applicants ?? null;
-  const pickOptions =
-    meta.key === 'follow'
-      ? FOLLOW_RESULT_COLS.map((c) => ({ key: c.key, label: c.label, tone: c.tone, value: lumosFollow ? lumosFollow.ai[c.key] + lumosFollow.staff[c.key] : 0 }))
-      : meta.key === 'applicants'
-        ? APPLICANT_RESULT_COLS.map((c) => ({ key: c.key, label: c.label, tone: c.tone, value: lumosApps ? lumosApps[c.key] : 0 }))
-        : null;
-  const pickTotal = meta.key === 'follow' ? (lumosFollow ? lumosFollow.ai.total + lumosFollow.staff.total : 0) : (lumosApps?.total ?? 0);
-  const tileCount = 1 + segs.length + (pickOptions ? 1 : 0);
+  const tileCount = 1 + segs.length;
 
   return (
     // ช่องไฟ + ระยะบรรทัดเท่ากันทั้งหน้า (รอบ 18 · `EVEN_TYPE`) — ป๊อป/แผงที่ลอยออกนอกหน้าใส่ของตัวเองอีกที
@@ -442,8 +426,8 @@ const HomeAiSharePage: React.FC = () => {
 
       {/*
         เลย์เอาต์ตามภาพอ้างอิงที่ 2 (เจ้าของ 7 ต.ค. 2569 "เอาแบบนี้" → Choice "วางตามภาพ")
-        แถวบน: กล่อง 2×2 (ทั้งหมด · AI โทร · คนโทร · เลือกผล) | กราฟยอดใช้งานรายวัน
-        แถวล่าง: ผลโทร (แท่ง + ตาราง) | เกจ AI ทำงาน + รวมทั้งช่วง (โดนัท)
+        แถวบน: กล่อง (ทั้งหมด กว้าง 2 ช่อง · AI โทร · คนโทร) | กราฟยอดใช้งานรายวัน · กล่องเลือกผลถอดแล้ว ("เกะกะ")
+        แถวล่าง: ผลโทร (แท่ง + ตาราง) | เกจ AI ทำงาน + รวมทั้งช่วง (โดนัท) · ล่างสุด: แยก BU
         กล่องเป็นจำนวนคี่ = ทั้งหมดกว้าง 2 ช่อง (ไม่มีกล่องค้างเดี่ยว) · หัวข้อที่ไม่มีผลโทร = เกจอยู่ในกริดกล่อง
       */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -480,9 +464,6 @@ const HomeAiSharePage: React.FC = () => {
               onClick={() => openList(k)}
             />
           ))}
-          {pickOptions ? (
-            <KpiPickTile options={pickOptions} value={pickKey} onChange={setPickKey} total={pickTotal} loading={!lumos.current} />
-          ) : null}
           {!hasResults ? <AiGauge className="col-span-2" ai={counts ? counts.ai : null} total={counts ? counts.total : null} unit={meta.unit} /> : null}
           {blockError ? <p className={cn('col-span-2 text-xs', TONE.danger.value)}>{blockError}</p> : null}
           {flag ? <p className={cn('col-span-2 text-xs', TONE.warn.value)}>{flag}</p> : null}
@@ -526,6 +507,9 @@ const HomeAiSharePage: React.FC = () => {
           </div>
         </div>
       ) : null}
+
+      {/* แยก BU (เจ้าของ 7 ต.ค. 2569 "Bu แต่ละ Bu ใช้ไปเท่าไหร่ ใช้ไปกับเรื่องอะไร … Bu ไหนใช้คนเยอะ ใช้ Ai เยอะ") */}
+      {meta.key === 'follow' ? <BuBreakdownCard cells={lumos.current?.followByBu ?? null} /> : null}
 
       {/* หัวข้อติดตาม กด AI โทร / คนโทร = แยกเรื่อง → ผล → รายชื่อ (เจ้าของ 7 ต.ค. 2569 "ป๊อปเดิม เปลี่ยนข้างใน") */}
       <FollowCallerDialog

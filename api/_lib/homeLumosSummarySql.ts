@@ -7,7 +7,15 @@ import { tableInAppSchema } from './schema.js';
 import { followBuJoin, followBuSql, queueBuJoins, queueBuSql } from './homeBuSql.js';
 import { FOLLOW_QUEUE_MATCH } from './homeAiShareSql.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
-import { doneBucketOf, emptyFollowBucket, type FollowBucket, type FollowBucketKey, type LumosBucket } from '../../src/lib/homeLumosSummary.js';
+import {
+  doneBucketOf,
+  emptyFollowBucket,
+  type FollowBucket,
+  type FollowBucketKey,
+  type FollowBuCell,
+  type LumosBucket,
+} from '../../src/lib/homeLumosSummary.js';
+import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { categorizeFollowRows, FOLLOW_ENTRY_CATEGORY_COLS, FOLLOW_QUEUE_CALL_COLS } from './followCategory.js';
 import { journeyResultOf } from '../../src/lib/followJourney.js';
 
@@ -47,12 +55,18 @@ export async function loadHomeLumosSummary(
   start: Date | null,
   end: Date | null,
   bu: string | null,
-): Promise<{ follow: { ai: FollowBucket; staff: FollowBucket }; applicants: LumosBucket; backlog: number }> {
+): Promise<{
+  follow: { ai: FollowBucket; staff: FollowBucket };
+  followByBu: FollowBuCell[];
+  applicants: LumosBucket;
+  backlog: number;
+}> {
   const p = [start ? start.toISOString() : null, end ? end.toISOString() : null, bu];
   const [follow, apps, backlog] = await Promise.all([
     dbQuery<Record<string, unknown>>(
       `select ${FOLLOW_ENTRY_CATEGORY_COLS}, f.call_mode, f.follow_team,
               ${FOLLOW_BUCKET_SQL} as ledger_bucket,
+              ${followBuSql('f')} as summary_bu,
               ${FOLLOW_QUEUE_CALL_COLS}
          from ${FOLLOW} f
          ${followBuJoin('f')}
@@ -89,6 +103,7 @@ export async function loadHomeLumosSummary(
   // หมวดของหน้าติดตาม — ใช้แตก "มีผล" เท่านั้น (รอ/ล้มเหลว/ยกเลิก ตัดด้วย CASE เดียวกับเดิม)
   const derived = categorizeFollowRows(follow.rows);
   const split = { ai: emptyFollowBucket(), staff: emptyFollowBucket() };
+  const byBuCells = new Map<string, FollowBuCell>();
   for (const r of follow.rows) {
     const b = r.call_mode === 'manual' ? split.staff : split.ai;
     const first = String(r.ledger_bucket) as 'done' | 'waiting' | 'failed' | 'cancelled';
@@ -100,6 +115,19 @@ export async function loadHomeLumosSummary(
     }
     b[key] += 1;
     b.total += 1;
+    // แยก BU — ช่องย่อยเดียวกับข้างบน (รวมทุกช่อง = split พอดี)
+    const bu = typeof r.summary_bu === 'string' && r.summary_bu ? r.summary_bu : null;
+    const team = r.follow_team === FOLLOW_TEAM_REPLACEMENT ? 'replacement' : 'main';
+    const caller = r.call_mode === 'manual' ? 'manual' : 'ai';
+    const ck = `${bu ?? ''}|${team}|${caller}|${key}`;
+    const cell = byBuCells.get(ck) ?? { bu, team, caller, bucket: key, n: 0 };
+    cell.n += 1;
+    byBuCells.set(ck, cell);
   }
-  return { follow: split, applicants: bucket(apps.rows[0]), backlog: Number(backlog.rows[0]?.n ?? 0) };
+  return {
+    follow: split,
+    followByBu: [...byBuCells.values()],
+    applicants: bucket(apps.rows[0]),
+    backlog: Number(backlog.rows[0]?.n ?? 0),
+  };
 }

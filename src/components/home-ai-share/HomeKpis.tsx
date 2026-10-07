@@ -11,7 +11,6 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
 import { Donut, type ResultSlice, type ToneKey } from '@/components/home-ai-share/AiShareLumosStats';
 import { useCountUp } from '@/hooks/useCountUp';
@@ -208,65 +207,6 @@ export const followRangeRows = (b: FollowTeamBreakdown): RangeRow[] => [
     tone: 'violet',
   },
 ];
-
-/**
- * กล่องเลือกผล (ใบที่ 4 ของ 2×2) — เจ้าของ: *"ต้องตอบ ไป ไม่ไป ขอเลื่อน สรุปไม่ได้ รอดำเนินการ ล้มเหลว ยกเลิก หมดนี่ได้"*
- * ⇒ กล่องเดียว เลือกผลจากแถบหัว (Select) · เลข + แถบ % ของทั้งหมด · ไม่ใช่ปุ่ม (ในปุ่มห้ามมีตัวเลือก)
- */
-export function KpiPickTile({
-  options,
-  value,
-  onChange,
-  total,
-  loading = false,
-}: {
-  options: ReadonlyArray<{ key: string; label: string; tone: ToneKey; value: number }>;
-  value: string;
-  onChange: (key: string) => void;
-  total: number;
-  loading?: boolean;
-}) {
-  const cur = options.find((o) => o.key === value) ?? options[0];
-  const pct = total > 0 && cur ? Math.round((cur.value / total) * 100) : 0;
-  return (
-    <div className="flex h-full flex-col rounded-2xl bg-muted p-1.5 shadow-sm shadow-foreground/5 dark:bg-muted/60" data-testid="kpi-pick">
-      <div className="flex items-center gap-2 px-1.5 py-1">
-        <Select value={cur?.key} onValueChange={onChange}>
-          <SelectTrigger
-            aria-label="เลือกผลโทร"
-            className="h-8 max-w-full !w-auto gap-2 border-0 bg-transparent px-1.5 text-sm text-muted-foreground shadow-none"
-          >
-            <span className="flex items-center gap-2">
-              {cur ? <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', TONE[cur.tone].dot)} aria-hidden /> : null}
-              <SelectValue>{cur?.label}</SelectValue>
-            </span>
-          </SelectTrigger>
-          <SelectContent className="rounded-xl">
-            {options.map((o) => (
-              <SelectItem key={o.key} value={o.key}>
-                <span className="flex w-40 items-center justify-between gap-4">
-                  <span>{o.label}</span>
-                  <span className="text-xs tabular-nums text-muted-foreground">{NUM.format(o.value)}</span>
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="flex-1 space-y-3 rounded-xl bg-card p-4 text-foreground">
-        <span className="block text-3xl font-light tabular-nums" data-testid="kpi-pick-value">
-          {loading || !cur ? '—' : NUM.format(cur.value)}
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="block h-1.5 flex-1 overflow-hidden rounded-full bg-muted" aria-hidden>
-            <span className={cn('block h-full rounded-full bg-current', cur ? TONE[cur.tone].value : '')} style={{ width: `${pct}%` }} />
-          </span>
-          <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">{NUM.format(pct)}%</span>
-        </span>
-      </div>
-    </div>
-  );
-}
 
 /**
  * เกจ "AI ทำงาน" (เจ้าของ 7 ต.ค. 2569 Choice "AI ทำงานกี่ %" จากการ์ด "Forecast Accuracy") = AI โทร ÷ ทั้งหมด
