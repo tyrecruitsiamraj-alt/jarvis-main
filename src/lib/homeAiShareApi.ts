@@ -11,6 +11,7 @@ import type {
 import type { AiShareResultsResponse } from '@/lib/homeCallResults';
 import type { FollowJourneyResponse } from '@/lib/followJourney';
 import type { FollowLedgerResponse } from '@/lib/followLedger';
+import type { HomeLumosSummaryResponse } from '@/lib/homeLumosSummary';
 
 function queryOf(q: AiShareWindow & { bu?: string | null }, extra: Record<string, string> = {}): string {
   const p = new URLSearchParams(extra);
@@ -69,4 +70,9 @@ export function fetchFollowJourney(q: AiShareWindow & { bu?: string | null }): P
 /** สมุดบัญชีติดตาม (7 ต.ค. 2569) — ช่วง = เวลาที่เกิดรายการ */
 export function fetchFollowLedger(q: AiShareWindow & { bu?: string | null }): Promise<FollowLedgerResponse> {
   return read<FollowLedgerResponse>(`/api/home-ai-share${queryOf(q, { ledger: 'follow' })}`);
+}
+
+/** สรุปแบบบอท Lumos (7 ต.ค. 2569) — งานที่ส่งให้ AI ช่วงเดียวกับปฏิทิน */
+export function fetchHomeLumosSummary(q: AiShareWindow & { bu?: string | null }): Promise<HomeLumosSummaryResponse> {
+  return read<HomeLumosSummaryResponse>(`/api/home-ai-share${queryOf(q, { summary: 'lumos' })}`);
 }

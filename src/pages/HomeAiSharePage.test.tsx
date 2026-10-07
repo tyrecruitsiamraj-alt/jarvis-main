@@ -38,6 +38,18 @@ vi.mock('@/lib/homeAiShareApi', () => ({
   fetchHomeAiShareDetail: (...a: unknown[]) => fetchHomeAiShareDetail(...a),
   fetchHomeAiShareList: (...a: unknown[]) => fetchHomeAiShareList(...a),
   fetchHomeAiShareResults: (...a: unknown[]) => fetchHomeAiShareResults(...a),
+  // สรุปแบบบอท Lumos (7 ต.ค. 2569)
+  fetchHomeLumosSummary: (w: { from: string | null; to: string | null }) =>
+    Promise.resolve({
+      generated_at: '2026-10-07T10:00:00.000Z',
+      from: w.from,
+      to: w.to,
+      bu: null,
+      follow: { total: 676, done: 488, waiting: 0, failed: 99, cancelled: 89 },
+      applicants: { total: 178, done: 100, waiting: 43, failed: 35, cancelled: 0 },
+      backlog: 46,
+      error: null,
+    }),
   // เส้นทางติดตาม (7 ต.ค. 2569) — ช่วงเดียวกับที่ขอ · สองสาย คนเดียวกัน (AI ไป + คนโทร รอโทร)
   fetchFollowJourney: (w: { from: string | null; to: string | null }) =>
     Promise.resolve({
@@ -639,6 +651,28 @@ describe('แผงผลโทรของติดตาม = ตาราง 
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'ติดตามส่งคนแทน' }));
     await waitFor(() => expect(cells('ทั้งหมด')).toEqual(['0', '700', '700']));
     expect(cells('ตอบว่าไป')).toEqual(['0', '0', '0']);
+  });
+});
+
+describe('เลขตามหัวข้อบอท Lumos ในการ์ดเดิม (7 ต.ค. 2569)', () => {
+  it('ติดตาม = งานติดตาม 5 ช่อง · ผู้สมัคร = งานรับสมัคร + งานเก่า · บวกกันได้ทั้งหมด', async () => {
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
+    const box = await screen.findByTestId('lumos-stats-follow');
+    await waitFor(() => expect(within(box).getByTestId('lumos-follow-total').textContent).toContain('676'));
+    expect(within(box).getByTestId('lumos-follow-sum').textContent).toBe('488 + 0 + 99 + 89 = 676');
+    expect(within(box).getByText('มีผลการโทร')).toBeTruthy();
+    openPicker();
+    fireEvent.click(await screen.findByRole('option', { name: new RegExp(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')!.label) }));
+    const apps = await screen.findByTestId('lumos-stats-applicants');
+    await waitFor(() => expect(within(apps).getByTestId('lumos-applicants-total').textContent).toContain('178'));
+    expect(within(apps).getByTestId('lumos-applicants-sum').textContent).toBe('100 + 43 + 35 + 0 = 178');
+    expect(within(apps).getByTestId('lumos-applicants-backlog').textContent).toContain('46');
+    // หัวข้อที่บอทไม่มี = ไม่มีแถวนี้
+    openPicker();
+    fireEvent.click(await screen.findByRole('option', { name: /จับคู่งาน/ }));
+    await screen.findByRole('heading', { name: 'จับคู่งาน' });
+    expect(screen.queryByTestId('lumos-stats-matching')).toBeNull();
+    expect(screen.queryByTestId('lumos-stats-follow')).toBeNull();
   });
 });
 

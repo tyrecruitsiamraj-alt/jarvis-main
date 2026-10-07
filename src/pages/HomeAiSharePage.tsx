@@ -40,6 +40,7 @@ import AiShareCard, { type AiShareCardProps } from '@/components/home-ai-share/A
 import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
 import FollowCallerDialog from '@/components/home-ai-share/FollowCallerDialog';
+import AiShareLumosStats from '@/components/home-ai-share/AiShareLumosStats';
 import HomeCallResultsPanel from '@/components/home-ai-share/HomeCallResultsPanel';
 import PeriodPicker from '@/components/shared/PeriodPicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -415,6 +416,12 @@ const HomeAiSharePage: React.FC = () => {
         hideNotCalled={meta.key === 'follow'}
         liveKey={`${meta.key}|${cardWin.from ?? ''}|${cardWin.to ?? ''}`}
       >
+        {/* เลขตามหัวข้อบอท Lumos (7 ต.ค. 2569 · Choice "ในการ์ดเดิมตาม Dropdown") — ติดตาม/ผู้สมัครเท่านั้น */}
+        {meta.key === 'follow' || meta.key === 'applicants' ? (
+          <div className="mb-5 border-b border-foreground/10 pb-5">
+            <AiShareLumosStats block={meta.key} win={cardWin} tick={tick} />
+          </div>
+        ) : null}
         <AiShareDetail
           withTeams={meta.key === 'follow'}
           hideNotCalled={meta.key === 'follow'}

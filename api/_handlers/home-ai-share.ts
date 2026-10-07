@@ -53,6 +53,8 @@ import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { journeyResultOf, type FollowJourneyEvent, type FollowJourneyResponse, type FollowJourneyRow } from '../../src/lib/followJourney.js';
 import { createHash } from 'node:crypto';
 import { loadFollowLedger } from '../_lib/followLedgerSql.js';
+import { loadHomeLumosSummary } from '../_lib/homeLumosSummarySql.js';
+import type { HomeLumosSummaryResponse } from '../../src/lib/homeLumosSummary.js';
 import type { FollowLedgerResponse } from '../../src/lib/followLedger.js';
 import {
   AI_SHARE_LIST_PAGE,
@@ -576,6 +578,34 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const scope: DepartmentScope = await loadMatchingBuScope(req.user);
     const bu = scope.mode === 'code' ? normalizeTrendBu(scope.code) : parseBuParam(q.bu);
     const win = parseAiShareWindow({ from: q.from, to: q.to });
+    // `?summary=lumos` = สรุปแบบบอท Lumos (7 ต.ค. 2569) — งานที่ส่งให้ AI ช่วงเดียวกับปฏิทิน
+    if (q.summary !== undefined) {
+      if (q.summary !== 'lumos') return sendError(res, 400, 'Bad request', 'ไม่รู้จักก้อนนี้');
+      const body: HomeLumosSummaryResponse = {
+        generated_at: new Date().toISOString(),
+        from: win.from,
+        to: win.to,
+        bu,
+        follow: null,
+        applicants: null,
+        backlog: null,
+        error: null,
+      };
+      if (scope.mode === 'none') {
+        body.error = 'บัญชีนี้ยังไม่ได้ผูกแผนก เลยยังดูสรุปไม่ได้';
+        return res.status(200).json(body);
+      }
+      try {
+        const { start, end } = followPlanBounds(win);
+        Object.assign(body, await loadHomeLumosSummary(start, end, bu));
+      } catch (e) {
+        logWarn('home-ai-share lumos summary failed', { error: errText(e) });
+        body.error = 'โหลดสรุปไม่ขึ้น ลองรีเฟรชอีกครั้ง';
+      }
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json(body);
+    }
+
     // `?ledger=follow` = สมุดบัญชีติดตาม (7 ต.ค. 2569) — ช่วง = เวลาที่เกิดรายการ (ไม่ใช่วันนัดโทร)
     if (q.ledger !== undefined) {
       if (q.ledger !== 'follow') return sendError(res, 400, 'Bad request', 'ไม่รู้จักก้อนนี้');
