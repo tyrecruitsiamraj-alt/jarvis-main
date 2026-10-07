@@ -16,12 +16,11 @@ import {
   fetchMonthlyIncomesById,
   type MonthlyIncomeItem,
 } from '../../_lib/siamrajJobBenefits.js';
-import { attachNotes, attachWorkStatus } from '../siamraj-unit-requests.js';
+import { attachNotes } from '../siamraj-unit-requests.js';
 import { isReleased, loadReleasedJobKeys } from '../../_lib/jobPublicReleases.js';
 import {
   isPublicPrequestEnabled,
   isPublicVisibleByPrequest,
-  isPublicVisibleByWorkStatus,
 } from '../../../src/lib/publicJobVisibility.js';
 
 type JobRow = {
@@ -275,18 +274,11 @@ function isPublicVisible(job: { status?: string }) {
 }
 
 /**
- * ซ่อนใบที่ **ได้ตัวคนแล้ว** (เจ้าของเคาะ 17 ส.ค. 2569: รอเริ่มงาน + รอแจ้งเข้า)
- * สถานะงานเก็บฝั่ง Jarvis (PG) ไม่ใช่ ERP — ต้องแนบก่อนกรอง
- * ⚠️ แนบไม่ได้ (ตารางล่ม) = **ไม่กรอง** ดีกว่าให้ประกาศหายทั้งหน้า
+ * 🔴 ด่าน "ได้ตัวคนแล้ว" (สถานะงาน รอเริ่มงาน/รอแจ้งเข้า/ทำงานรายวัน/จ่ายรายวัน) **ถอดแล้ว** 7 ต.ค. 2569
+ * เจ้าของ: *"จ่ายรายวัน · ไม่ขึ้นประกาศ — ทำไมถึงไม่ขึ้นประกาศ ถ้าสั่งให้ขึ้นก็ต้องขึ้น"*
+ * ⇒ ทีมกดส่งประกาศแล้ว (`onlyReleasedJobs`) = ขึ้นเสมอ · ไม่อยากให้ขึ้นต้องกด "ดึงประกาศลง" เอง
+ * (กติกาเก่า 17/20 ส.ค. ซ่อนให้เองตอนยังไม่มีด่านปล่อย — มีด่านปล่อยแล้วสองด่านขัดกัน)
  */
-async function withoutFilledJobs<T extends Record<string, unknown>>(jobs: T[]): Promise<T[]> {
-  try {
-    await attachWorkStatus(jobs);
-  } catch {
-    return jobs;
-  }
-  return jobs.filter((j) => isPublicVisibleByWorkStatus(j));
-}
 
 /**
  * ทับค่าที่เจ้าหน้าที่แก้เองจากกล่องงาน (จังหวัด/อำเภอ/ตำบล · รายได้รวม · สวัสดิการติ๊กเพิ่ม)
@@ -339,7 +331,7 @@ async function listPublicSiamrajJobs(limit: number): Promise<PublicJob[]> {
     (j) => isPublicVisible(j) && isPublicVisibleByPrequest(j, prequestOk),
   ) as unknown as Array<Record<string, unknown>>;
   const released = await onlyReleasedJobs(open);
-  const stillHiring = await withStaffOverrides(await withoutFilledJobs(released));
+  const stillHiring = await withStaffOverrides(released);
   return stillHiring.map((j) => toPublicJob(j as unknown as JobRow));
 }
 
@@ -354,10 +346,8 @@ async function getPublicSiamrajJob(id: string): Promise<PublicJob | null> {
   if ((await onlyReleasedJobs([item as unknown as Record<string, unknown>])).length === 0) {
     return null;
   }
-  // เปิดตรงด้วยลิงก์ก็ต้องซ่อนเหมือนกัน — ไม่งั้นลิงก์เก่าที่คนแชร์ไว้ยังพาไปสมัครใบที่ได้คนแล้ว
-  const visible = await withStaffOverrides(
-    await withoutFilledJobs([item as unknown as Record<string, unknown>]),
-  );
+  // ด่านได้คนแล้วถอดแล้ว (7 ต.ค. 2569) — ส่งประกาศแล้ว = ขึ้น
+  const visible = await withStaffOverrides([item as unknown as Record<string, unknown>]);
   if (visible.length === 0) return null;
   return toPublicJob(visible[0] as unknown as JobRow);
 }

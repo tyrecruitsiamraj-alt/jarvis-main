@@ -72,9 +72,9 @@ describe('หน้าลิงก์ /apply/p = การ์ดเดียว�
     expect(linked).not.toContain('withoutFilledJobs(');
   });
 
-  it('หน้ารวม /apply ยังมีด่านปล่อย + ได้คนแล้วครบ (ไม่ถูกแตะ)', () => {
+  it('หน้ารวม /apply ยังมีด่านปล่อย · ด่าน "ได้คนแล้ว" ถอดแล้ว (เจ้าของ 7 ต.ค. 2569 "ถ้าสั่งให้ขึ้นก็ต้องขึ้น")', () => {
     const single = JOBS.slice(JOBS.indexOf('async function getPublicSiamrajJob'), JOBS.indexOf('/**\n * ใบงานของลิงก์'));
     expect(single).toContain('onlyReleasedJobs(');
-    expect(single).toContain('withoutFilledJobs(');
+    expect(JOBS).not.toContain('withoutFilledJobs(');
   });
 });

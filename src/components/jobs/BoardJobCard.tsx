@@ -120,11 +120,11 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
         </p>
       ) : null}
 
-      {/* สถานะงานที่ทำให้ประกาศไม่ขึ้นหน้าสาธารณะ — ต้องรู้ (เจ้าของสั่ง 17 ส.ค. 2569) */}
+      {/* สถานะงาน (รอเริ่มงาน/รอแจ้งเข้า/ทำงานรายวัน/จ่ายรายวัน) — บอกให้รู้เฉย ๆ ไม่ซ่อนประกาศแล้ว
+          (เจ้าของ 7 ต.ค. 2569: *"ทำไมถึงไม่ขึ้นประกาศ ถ้าสั่งให้ขึ้นก็ต้องขึ้น"*) */}
       {hidden && isUnitRequestWorkStatus(job.work_status) ? (
-        <p className={cn('inline-flex w-fit items-center gap-1 rounded-md px-2 py-0.5 text-sm', TONE.warn.chip)}>
-          <EyeOff className="h-3.5 w-3.5" aria-hidden />
-          {UNIT_REQUEST_WORK_STATUS_LABELS[job.work_status]} · ไม่ขึ้นประกาศ
+        <p className={cn('inline-flex w-fit items-center gap-1 rounded-md px-2 py-0.5 text-sm', TONE.neutral.chip)}>
+          {UNIT_REQUEST_WORK_STATUS_LABELS[job.work_status]}
         </p>
       ) : null}
 

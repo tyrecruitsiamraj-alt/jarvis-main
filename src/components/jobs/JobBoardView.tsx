@@ -1750,22 +1750,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   {isStaff && isUnitRequestWorkStatus(job.work_status) ? (
                     <span
                       title={
-                        isHiddenFromPublicByWorkStatus(job.work_status)
-                          ? 'สถานะนี้แปลว่าได้ตัวคนแล้ว — ประกาศจึงไม่ขึ้น (เปลี่ยนสถานะแล้วประกาศกลับมาเอง)'
-                          : 'สถานะงานที่เจ้าหน้าที่ตั้งไว้'
+                        'สถานะงานที่เจ้าหน้าที่ตั้งไว้'
                       }
                       className={cn(
                         'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium',
-                        isHiddenFromPublicByWorkStatus(job.work_status)
-                          ? TONE.warn.chip
-                          : 'bg-muted text-muted-foreground',
+                        'bg-muted text-muted-foreground',
                       )}
                     >
-                      {isHiddenFromPublicByWorkStatus(job.work_status) ? (
-                        <EyeOff className="h-3 w-3" aria-hidden />
-                      ) : null}
+                      {/* ไม่ซ่อนประกาศแล้ว (7 ต.ค. 2569 "ถ้าสั่งให้ขึ้นก็ต้องขึ้น") — บอกสถานะอย่างเดียว */}
                       {UNIT_REQUEST_WORK_STATUS_LABELS[job.work_status]}
-                      {isHiddenFromPublicByWorkStatus(job.work_status) ? ' · ไม่ขึ้นประกาศ' : ''}
                     </span>
                   ) : null}
                   {/* ป้ายชนิดงาน (ส่วนกลาง/Valet …) ถอดแล้ว 4 ต.ค. 2569 — ชนิดอยู่ในชื่อตำแหน่ง ("พนักงานขับรถ ส่วนกลาง")
