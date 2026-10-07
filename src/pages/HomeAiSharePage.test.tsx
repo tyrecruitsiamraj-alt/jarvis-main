@@ -583,14 +583,15 @@ describe('การ์ดผลโทร (7 ต.ค. 2569)', () => {
   it('ติดตาม = โดนัท + รายการ + ตาราง AI/คน/รวม · ผู้สมัคร = งานรับสมัคร + งานเก่า · บวกกันได้ทั้งหมด', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const box = await screen.findByTestId('lumos-stats-follow');
-    await waitFor(() => expect(within(box).getByTestId('lumos-follow-รวม').textContent).toContain('1,478'));
+    await waitFor(() => expect(within(box).getByRole('img', { name: /ผลโทร 1,478/ })).toBeTruthy());
+    // ตารางไม่มีแถวรวมซ้ำกับรายการข้างโดนัท (เจ้าของ "มันซ้ำกันปะ")
+    expect(within(box).queryByTestId('lumos-follow-รวม')).toBeNull();
     // ทั้งคนและ AI (เจ้าของ "ต้องรู้ทั้งคนและ Ai") · แถวรวม = กล่องทั้งหมด
     const cells = (row: string) =>
       within(within(box).getByTestId(`lumos-follow-${row}`)).getAllByRole('cell').slice(1).map((c) => c.textContent);
     // ทั้งหมด · ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · รอ · ล้มเหลว · ยกเลิก (มีผลการโทรแตก 4 ช่อง · เจ้าของ "แตกเลย")
     expect(cells('AI โทร')).toEqual(['673', '469', '0', '0', '15', '0', '99', '90']);
     expect(cells('คนโทร')).toEqual(['805', '77', '1', '1', '0', '699', '3', '24']);
-    expect(cells('รวม')).toEqual(['1,478', '546', '1', '1', '15', '699', '102', '114']);
     expect(within(box).getByTestId('lumos-follow-sum').textContent).toBe(
       'AI 469 + 0 + 0 + 15 + 0 + 99 + 90 = 673 · คน 77 + 1 + 1 + 0 + 699 + 3 + 24 = 805',
     );

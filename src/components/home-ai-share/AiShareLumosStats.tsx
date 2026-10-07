@@ -2,7 +2,7 @@
  * ═══ ผลโทร — การ์ดของหน้าหลัก ตามหัวข้อใน Dropdown (เจ้าของ 7 ต.ค. 2569) ═══
  * ที่มา: *"ตัวเลขต้องได้ตามหัวข้อแบบที่บอททำ"* → *"แล้วคนอะ ต้องรู้ทั้งคนและ Ai"* → *"มีผลการโทร … ไปไม่ไป"* (แตก 4 ช่อง) →
  * *"งานติดตาม เปลี่ยนเป็น ผลโทร · Dashboard ระดับที่ผู้บริหารเปิดดูแล้วแบบว้าว กราฟสวย ตัวเลขถูก"*
- * - หัวข้อติดตาม: โดนัทของทั้งหมด (แถวรวม) + รายการช่องพร้อมเลขและ % · ตาราง AI โทร / คนโทร / รวม
+ * - หัวข้อติดตาม: โดนัทของทั้งหมด + รายการช่องพร้อมเลขและ % (= ยอดรวม) · ตาราง AI โทร / คนโทร (ไม่มีแถวรวมซ้ำ)
  *   ช่อง: ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ (= มีผลการโทร) · รอดำเนินการ · ล้มเหลว · ยกเลิก · แถวรวม = กล่องทั้งหมด
  * - หัวข้อผู้สมัคร: งานที่ส่งให้ AI — มีผลแล้ว · ยังรอ · ล้มเหลว · ยกเลิก + งานเก่าที่ต้องติดตาม
  * - หัวข้ออื่น = ไม่มีการ์ดนี้
@@ -215,12 +215,12 @@ function FollowResults({ split, unit }: { split: { ai: FollowBucket; staff: Foll
     tone: c.tone,
     value: all ? all[c.key] : 0,
   }));
+  // ตารางเหลือ AI โทร / คนโทร — ยอดรวมอยู่ที่โดนัท + รายการแล้ว (เจ้าของ 7 ต.ค. 2569 "กล่อง ผลโทร มันซ้ำกันปะ")
   const rows: Array<[string, FollowBucket | null]> = [
     ['AI โทร', split?.ai ?? null],
     ['คนโทร', split?.staff ?? null],
-    ['รวม', all],
   ];
-  const ok = rows.every(([, b]) => !b || followBucketAddsUp(b));
+  const ok = [...rows.map(([, b]) => b), all].every((b) => !b || followBucketAddsUp(b));
   return (
     <div className="space-y-6">
       <div className="grid items-center gap-6 md:grid-cols-5">
@@ -253,29 +253,20 @@ function FollowResults({ split, unit }: { split: { ai: FollowBucket; staff: Foll
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map(([label, b]) => {
-              const strong = label === 'รวม';
-              return (
-                <TableRow key={label} data-testid={`lumos-follow-${label}`}>
-                  <TableCell className={cn('whitespace-nowrap text-sm text-foreground', strong && 'font-medium')}>{label}</TableCell>
-                  <TableCell className={cn('text-right tabular-nums text-foreground', strong && 'font-medium')}>
-                    {b ? NUM.format(b.total) : '—'}
+            {rows.map(([label, b]) => (
+              <TableRow key={label} data-testid={`lumos-follow-${label}`}>
+                <TableCell className="whitespace-nowrap text-sm text-foreground">{label}</TableCell>
+                <TableCell className="text-right tabular-nums text-foreground">{b ? NUM.format(b.total) : '—'}</TableCell>
+                {FOLLOW_COLS.map((c) => (
+                  <TableCell
+                    key={c.key}
+                    className={cn('text-right tabular-nums', b && b[c.key] > 0 ? 'text-foreground' : 'text-muted-foreground')}
+                  >
+                    {b ? NUM.format(b[c.key]) : '—'}
                   </TableCell>
-                  {FOLLOW_COLS.map((c) => (
-                    <TableCell
-                      key={c.key}
-                      className={cn(
-                        'text-right tabular-nums',
-                        strong && 'font-medium',
-                        b && b[c.key] > 0 ? 'text-foreground' : 'text-muted-foreground',
-                      )}
-                    >
-                      {b ? NUM.format(b[c.key]) : '—'}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              );
-            })}
+                ))}
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </div>
