@@ -1013,7 +1013,7 @@ async function getApplicationDetailExtras(req: AuthedReq, res: ApiRes, id: strin
         limit 50`,
       [base.phone_e164, id],
     );
-    const visible = [];
+    const visible: Array<Record<string, unknown>> = [];
     for (const r of rows) {
       if (await isApplicationInWriteScope(req.user, r)) {
         visible.push({

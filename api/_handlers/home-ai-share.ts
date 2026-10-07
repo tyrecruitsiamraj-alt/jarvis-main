@@ -50,6 +50,8 @@ import { categorizeFollowRows, FOLLOW_ENTRY_CATEGORY_COLS, FOLLOW_QUEUE_CALL_COL
 import { tableInAppSchema } from '../_lib/schema.js';
 import { followMatrixColOfCategory } from '../../src/lib/followCallMatrix.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
+import { journeyResultOf, type FollowJourneyEvent, type FollowJourneyResponse, type FollowJourneyRow } from '../../src/lib/followJourney.js';
+import { createHash } from 'node:crypto';
 import {
   AI_SHARE_LIST_PAGE,
   aiShareBounds,
@@ -392,6 +394,85 @@ export async function loadFollowResultsSplit(params: Params): Promise<FollowResu
   return out;
 }
 
+/**
+ * ═══ เส้นทางติดตาม (หน้าหลัก · เจ้าของ 7 ต.ค. 2569 "เก็บแบบไมโครเลยได้ไหม และ มี interactive") ═══
+ * `?journey=follow` — ทุกสายในช่วง (นับตามวันที่โทร · BU เดียวกับการ์ด) แบบเบา + เหตุการณ์จากรอบดึง iRecruit
+ * หมวดจาก `categorizeFollowRows` ตัวเดียวกับหน้าติดตาม · ไม่ส่งเบอร์ (คีย์คน = แฮชเบอร์ + ทีม)
+ */
+const AUDIT_TABLE = tableInAppSchema('audit_logs');
+
+export async function loadFollowJourney(params: Params): Promise<{ rows: FollowJourneyRow[]; events: FollowJourneyEvent[] }> {
+  const { rows } = await dbQuery<Record<string, unknown>>(
+    `select ${FOLLOW_ENTRY_CATEGORY_COLS}, f.call_mode, f.follow_team, f.unit_name, f.replace_type,
+            ${FOLLOW_QUEUE_CALL_COLS}
+       from ${FOLLOW_TABLE} f
+       ${followBuJoin('f')}
+       left join ${QUEUE_TABLE} q on ${FOLLOW_QUEUE_MATCH}
+      where f.topic is distinct from $4::text
+        and ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
+        and ($2::timestamptz is null or f.scheduled_at < $2::timestamptz)
+        and ($3::text is null or ${followBuSql('f')} = $3::text)
+      order by f.scheduled_at`,
+    [...params, AFTERCARE_TOPIC],
+  );
+  const derived = categorizeFollowRows(rows);
+  const out: FollowJourneyRow[] = [];
+  for (const r of rows) {
+    const d = derived.get(String(r.id));
+    if (!d) continue;
+    const team = r.follow_team === FOLLOW_TEAM_REPLACEMENT ? 'replacement' : 'main';
+    const at = r.scheduled_at instanceof Date ? r.scheduled_at.toISOString() : String(r.scheduled_at ?? '');
+    const phone = String(r.recipient_phone ?? '').replace(/\D/g, '').slice(-9);
+    const outcome = String(r.staff_call_outcome ?? '').trim() || String(r.call_outcome ?? '').trim() || null;
+    const job = /^irecruit-replace:([^:]+):/.exec(String(r.source_ref ?? ''))?.[1]?.trim() ?? null;
+    out.push({
+      id: String(r.id),
+      person: createHash('sha1').update(`${team}|${phone || String(r.id)}`).digest('hex').slice(0, 12),
+      name: String(r.recipient_name ?? '').trim() || '—',
+      unit: (r.unit_name as string | null) ?? null,
+      at,
+      ymd: at ? JOURNEY_YMD.format(new Date(at)) : '',
+      team,
+      caller: d.caller,
+      result: journeyResultOf(d.category, outcome),
+      job,
+      replaceType: (r.replace_type as string | null) ?? null,
+    });
+  }
+  let events: FollowJourneyEvent[] = [];
+  try {
+    const { rows: ev } = await dbQuery<{ created_at: Date | string; action: string; new_value: unknown }>(
+      `select l.created_at, l.action, l.new_value
+         from ${AUDIT_TABLE} l
+         ${params[2] ? `join ${FOLLOW_TABLE} f on f.id::text = l.entity_id ${followBuJoin('f')}` : ''}
+        where l.action in ('irecruit_replace_sync.edit', 'irecruit_replace_sync.cancel')
+          and ($1::timestamptz is null or l.created_at >= $1::timestamptz)
+          and ($2::timestamptz is null or l.created_at < $2::timestamptz)
+          ${params[2] ? `and ${followBuSql('f')} = $3::text` : 'and $3::text is null'}
+        order by l.created_at`,
+      params,
+    );
+    events = ev.map((e) => {
+      const v = (typeof e.new_value === 'string' ? JSON.parse(e.new_value) : e.new_value) as Record<string, unknown> | null;
+      const at = e.created_at instanceof Date ? e.created_at.toISOString() : String(e.created_at);
+      return {
+        at,
+        ymd: JOURNEY_YMD.format(new Date(at)),
+        kind: e.action.endsWith('.cancel') ? ('cancel' as const) : ('edit' as const),
+        job: String(v?.job ?? ''),
+        name: String(v?.name ?? '—'),
+        unit: (v?.unit as string | null) ?? null,
+      };
+    });
+  } catch (e) {
+    logWarn('home-ai-share journey events failed', { error: errText(e) });
+  }
+  return { rows: out, events };
+}
+
+/** 🔴 `Intl` ระดับโมดูลเท่านั้น */
+const JOURNEY_YMD = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' });
+
 export async function buildAiShareResults(
   block: AiShareBlockKey,
   win: AiShareWindow,
@@ -491,6 +572,23 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const scope: DepartmentScope = await loadMatchingBuScope(req.user);
     const bu = scope.mode === 'code' ? normalizeTrendBu(scope.code) : parseBuParam(q.bu);
     const win = parseAiShareWindow({ from: q.from, to: q.to });
+    // `?journey=follow` = เส้นทางติดตามทีละขั้น (7 ต.ค. 2569) — สิทธิ์เท่าหน้าติดตาม
+    if (q.journey !== undefined) {
+      if (q.journey !== 'follow') return sendError(res, 400, 'Bad request', 'ไม่รู้จักก้อนนี้');
+      const body: FollowJourneyResponse = { generated_at: new Date().toISOString(), from: win.from, to: win.to, bu, rows: [], events: [], error: null };
+      if (scope.mode === 'none') {
+        body.error = 'บัญชีนี้ยังไม่ได้ผูกแผนก เลยยังดูเส้นทางติดตามไม่ได้';
+        return res.status(200).json(body);
+      }
+      try {
+        Object.assign(body, await loadFollowJourney(followPlanParams(win, bu)));
+      } catch (e) {
+        logWarn('home-ai-share journey failed', { error: errText(e) });
+        body.error = 'โหลดเส้นทางติดตามไม่ขึ้น ลองรีเฟรชอีกครั้ง';
+      }
+      return res.status(200).json(body);
+    }
+
     // `?results=<ก้อน>` = ผลโทรของก้อนนั้น แยก AI/คน (รอบ 18) — ตัวนับล้วน
     if (q.results !== undefined) {
       if (!isAiShareBlock(q.results)) return sendError(res, 400, 'Bad request', 'ไม่รู้จักก้อนนี้');

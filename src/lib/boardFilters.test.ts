@@ -275,7 +275,7 @@ describe('ตำแหน่งงาน → งานย่อย (เฉพา
 
   it('นายแยกสัญชาติจากชนิดงานหรือช่องสัญชาติของนาย · "-" = ไม่ระบุ (ห้ามเดา)', () => {
     const at = (code2: string, nat: string | null) =>
-      drivingSubtypeOf(job({ job_description_code_1: 'ขับรถ', job_description_code_2: code2, boss_nationality: nat }));
+      drivingSubtypeOf(job({ job_description_code_1: 'ขับรถ', job_description_code_2: code2, boss_nationality: nat ?? undefined }));
     expect(at('รถผู้บริหาร', 'คนไทย')).toBe('boss_th');
     expect(at('รถผู้บริหาร', 'ญี่ปุ่น')).toBe('boss_foreign');
     expect(at('รถผู้บริหารต่างชาติ', null)).toBe('boss_foreign');

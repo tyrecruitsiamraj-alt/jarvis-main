@@ -34,6 +34,7 @@ import {
 import { getLumosPushConfig } from './lumosPushClient.js';
 import { staffNameOfPhone } from './followStaffName.js';
 import { bangkokBusinessDateYmd } from './businessDate.js';
+import { auditContextFromActor, writeAudit } from './audit.js';
 import { logError, logInfo, logWarn, errorSummaryText } from './logger.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import type { FollowDispatchState } from '../../src/lib/followDispatchState.js';
@@ -51,6 +52,7 @@ import {
   replaceSiteShortName,
   irecruitChangedSinceSync,
   replaceSlotRef,
+  parseReplaceRef,
   wantWallFromSqlDate,
   type ReplaceCallRule,
   type ReplaceDesiredCall,
@@ -106,6 +108,28 @@ function shiftYmd(ymd: string, days: number): string {
  */
 /** ลงย้อนหลัง: ต้องเพิ่งลงใน iRecruit ภายในกี่วัน (นาฬิกาไทยตาม `date_add`) — วันเข้างานย้อนได้ไม่จำกัด */
 const REPLACE_PAST_ADDED_DAYS = 2;
+
+/**
+ * เหตุการณ์ที่ iRecruit แก้ / ยกเลิกใบ → audit (หน้าหลักนับ "iRecruit แก้กี่ใบ / ยกเลิกกี่ใบ" · เจ้าของ 7 ต.ค. 2569 "ต้องมี")
+ * ⚠️ จดไม่สำเร็จห้ามทำให้รอบดึงล้ม
+ */
+const REPLACE_EVENT_CTX = auditContextFromActor({ userId: '', userEmail: REPLACE_SYNC_ACTOR_NAME, role: 'admin' });
+async function logReplaceEvent(
+  kind: 'edit' | 'cancel',
+  followId: string,
+  info: { job: string; name: string; unit: string | null; what?: string },
+): Promise<void> {
+  try {
+    await writeAudit(REPLACE_EVENT_CTX, {
+      action: `irecruit_replace_sync.${kind}`,
+      entityType: 'follow_entry',
+      entityId: followId,
+      after: info,
+    });
+  } catch (e) {
+    logWarn('irecruit.replaceSync: จดเหตุการณ์ไม่สำเร็จ', { kind, error: errorSummaryText(e) });
+  }
+}
 
 export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): Promise<IrecruitReplaceRow[]> {
   return irecruitSqlQuery<IrecruitReplaceRow>(
@@ -476,6 +500,14 @@ export async function runIrecruitReplaceSync(
           [cancelIds],
         );
         summary.cancelled = (summary.cancelled ?? 0) + done.length;
+        for (const r of done) {
+          const x = rowById.get(r.id);
+          await logReplaceEvent('cancel', r.id, {
+            job: parseReplaceRef(x?.source_ref ?? '')?.jobId ?? '',
+            name: x?.recipient_name ?? '',
+            unit: x?.unit_name ?? null,
+          });
+        }
         const aiIds = done.map((r) => r.id).filter((id) => rowById.get(id)?.mode === 'ai');
         const res = await cancelFlaggedFollowRowsAtLumos(aiIds, staffNameOfPhone);
         if (res.errors > 0) logWarn('irecruit.replaceSync: ยกเลิกที่ Lumos ไม่ครบ', res);
@@ -504,6 +536,7 @@ export async function runIrecruitReplaceSync(
         if (mode === 'ai' && autoAi) toEnqueue.push({ id: ex.id, meta });
         else await setDispatchState(ex.id, mode === 'manual' ? 'manual' : 'off');
         summary.realigned = (summary.realigned ?? 0) + 1;
+        await logReplaceEvent('edit', ex.id, { job: meta.jobId, name: meta.name, unit: meta.siteName, what: 'time' });
       } catch (e) {
         logError('irecruit.replaceSync: ย้ายเวลาสายไม่สำเร็จ', e, { id: ex.id });
       }
@@ -547,6 +580,7 @@ export async function runIrecruitReplaceSync(
           meta.siteCode,
         ]);
         if (x.pending && x.mode === 'ai' && !rescheduledIds.has(x.id)) changedAi.push(x.id);
+        await logReplaceEvent('edit', x.id, { job: meta.jobId, name: meta.name, unit: meta.siteName, what: 'name_unit' });
       } catch (e) {
         logError('irecruit.replaceSync: แก้ชื่อ/หน่วยงานตาม iRecruit ไม่สำเร็จ', e, { id: x.id });
       }

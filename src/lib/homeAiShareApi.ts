@@ -9,6 +9,7 @@ import type {
   AiShareWindow,
 } from '@/lib/homeAiShare';
 import type { AiShareResultsResponse } from '@/lib/homeCallResults';
+import type { FollowJourneyResponse } from '@/lib/followJourney';
 
 function queryOf(q: AiShareWindow & { bu?: string | null }, extra: Record<string, string> = {}): string {
   const p = new URLSearchParams(extra);
@@ -57,4 +58,9 @@ export function fetchHomeAiShareResults(
   q: AiShareWindow & { bu?: string | null },
 ): Promise<AiShareResultsResponse> {
   return read<AiShareResultsResponse>(`/api/home-ai-share${queryOf(q, { results: block })}`);
+}
+
+/** เส้นทางติดตามทีละขั้น (7 ต.ค. 2569) — ทุกสายในช่วงแบบเบา ไม่มีเบอร์ · หน้านับเอง */
+export function fetchFollowJourney(q: AiShareWindow & { bu?: string | null }): Promise<FollowJourneyResponse> {
+  return read<FollowJourneyResponse>(`/api/home-ai-share${queryOf(q, { journey: 'follow' })}`);
 }

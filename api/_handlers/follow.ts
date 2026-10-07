@@ -1559,6 +1559,7 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
     callMode: 'ai',
     unitName: anchor.unit_name ?? null,
     siteCode: anchor.site_code ?? null,
+    timeTbd: false,
     callRound: null,
     team: anchor.follow_team === FOLLOW_TEAM_REPLACEMENT ? FOLLOW_TEAM_REPLACEMENT : null,
   };

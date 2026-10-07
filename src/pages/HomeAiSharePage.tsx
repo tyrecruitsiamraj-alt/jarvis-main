@@ -37,6 +37,7 @@ import { toYmdBangkok } from '@/lib/dateTh';
 import AiShareCard, { type AiShareCardProps } from '@/components/home-ai-share/AiShareCard';
 import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
+import FollowJourneyPanel from '@/components/home-ai-share/FollowJourneyPanel';
 import HomeCallResultsPanel from '@/components/home-ai-share/HomeCallResultsPanel';
 import PeriodPicker from '@/components/shared/PeriodPicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -414,6 +415,9 @@ const HomeAiSharePage: React.FC = () => {
           error={detailError}
         />
       </AiShareCard>
+
+      {/* เส้นทางติดตามทีละขั้น (7 ต.ค. 2569) — หัวข้อติดตามเท่านั้น · ช่วงเดียวกับกล่องด้านบน */}
+      {meta.key === 'follow' ? <FollowJourneyPanel win={cardWin} tick={tick} /> : null}
 
       <AiShareListDialog
         key={listSeq}

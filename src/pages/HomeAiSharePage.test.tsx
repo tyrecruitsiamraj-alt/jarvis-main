@@ -37,6 +37,20 @@ vi.mock('@/lib/homeAiShareApi', () => ({
   fetchHomeAiShareDetail: (...a: unknown[]) => fetchHomeAiShareDetail(...a),
   fetchHomeAiShareList: (...a: unknown[]) => fetchHomeAiShareList(...a),
   fetchHomeAiShareResults: (...a: unknown[]) => fetchHomeAiShareResults(...a),
+  // เส้นทางติดตาม (7 ต.ค. 2569) — ช่วงเดียวกับที่ขอ · สองสาย คนเดียวกัน (AI ไป + คนโทร รอโทร)
+  fetchFollowJourney: (w: { from: string | null; to: string | null }) =>
+    Promise.resolve({
+      generated_at: '2026-10-07T10:00:00.000Z',
+      from: w.from,
+      to: w.to,
+      bu: null,
+      events: [],
+      error: null,
+      rows: [
+        { id: 'j1', person: 'p1', name: 'คนทดสอบ', unit: null, at: '2026-10-07T02:00:00.000Z', ymd: '2026-10-07', team: 'main', caller: 'ai', result: 'agreed', job: null, replaceType: null },
+        { id: 'j2', person: 'p1', name: 'คนทดสอบ', unit: null, at: '2026-10-07T03:00:00.000Z', ymd: '2026-10-07', team: 'main', caller: 'manual', result: 'waiting', job: null, replaceType: null },
+      ],
+    }),
 }));
 // กราฟ recharts วัดขนาดจอไม่ได้ใน jsdom — แทนด้วยปุ่มหนึ่งปุ่มต่อแท่ง (กดแล้วเรียก onPick เหมือนกดแท่งจริง)
 // ชั้นในแท่งติดไว้ที่ data-stacks · ตัวจุดพลิกไพ่ที่ data-flip · กดได้ไหมที่ data-clickable ⇒ เทสต์สวิตช์/การกดลงไปดูได้
@@ -371,6 +385,8 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     const names = () =>
       screen
         .getAllByRole('button')
+        // แผงเส้นทางติดตาม (7 ต.ค. 2569) มีป้ายชื่อเดียวกัน — นับเฉพาะกล่องบนการ์ด
+        .filter((b) => !b.closest('[data-testid="follow-journey"]'))
         .map((b) => b.getAttribute('aria-label') ?? '')
         .filter((n) => /^(ทั้งหมด|AI โทร|คนโทร|ทั้งสองทาง|ยังไม่โทร) \d/.test(n));
     // ติดตามนับแบบแผน (4 ต.ค. 2569): AI + คน = ทั้งหมด ⇒ ไม่มีกล่องยังไม่โทร
@@ -561,6 +577,23 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
  * 🔴 อัปเดตสด (เจ้าของ 6 ต.ค. 2569 "หน้าหลัก ต้องทำเป็น Interactive" → Choice "ตัวเลขอัปเดตเองสด ๆ")
  * ทุก 30 วิ ดึงเลข + กราฟใหม่เงียบ ๆ (ไม่ขึ้นโครงโหลด) · มีป้าย "สด · อัปเดต hh:mm:ss"
  */
+describe('เส้นทางติดตาม (7 ต.ค. 2569)', () => {
+  it('หัวข้อติดตามมีแผง · เลขใหญ่ = สาย · รวมผล = สายทั้งหมด · กดเลขเห็นรายชื่อ', async () => {
+    render(<HomeAiSharePage />);
+    const panel = await screen.findByTestId('follow-journey');
+    await waitFor(() => expect(within(panel).getByTestId('journey-added').textContent).toContain('2 สาย'));
+    // คนเดียวมีทั้งสาย AI และคนโทร ⇒ คน = 1 แต่สายบวกกันได้ 2
+    expect(within(panel).getByTestId('journey-added').textContent).toContain('1 คน');
+    expect(within(panel).getByTestId('journey-ai').textContent).toContain('1 สาย');
+    expect(within(panel).getByTestId('journey-manual').textContent).toContain('1 สาย');
+    expect(within(panel).getByTestId('journey-sum').textContent).toBe('รวม 2 สาย');
+    expect(within(panel).getByTestId('journey-caller-sum').textContent).toBe('รวม 2 สาย');
+    fireEvent.click(within(panel).getByTestId('journey-agreed'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('คนทดสอบ')).toBeTruthy();
+  });
+});
+
 describe('หน้าหลักอัปเดตสด', () => {
   it('ครบ 30 วิ ดึงเลขกับกราฟใหม่ · เลขใหม่ขึ้นโดยไม่หายไปเป็นโครงโหลด', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });

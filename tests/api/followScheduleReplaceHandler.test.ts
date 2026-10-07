@@ -10,7 +10,12 @@ const dbQuery = vi.fn();
 const replan = vi.fn();
 
 vi.mock('../../api/_lib/postgres.js', () => ({ dbQuery: (...a: unknown[]) => dbQuery(...a), isPgUndefinedTable: () => false }));
-vi.mock('../../api/_lib/audit.js', () => ({ auditFromAuthed: vi.fn(async () => undefined) }));
+vi.mock('../../api/_lib/audit.js', () => ({
+  auditFromAuthed: vi.fn(async () => undefined),
+  // รอบดึง iRecruit เขียนเหตุการณ์แก้/ยกเลิก (หน้าหลักเส้นทางติดตาม · 7 ต.ค. 2569)
+  auditContextFromActor: vi.fn(() => ({})),
+  writeAudit: vi.fn(async () => undefined),
+}));
 vi.mock('../../api/_lib/followStaffName.js', () => ({ staffNameOfPhone: vi.fn(async () => null) }));
 const autoDispatch = vi.fn(async () => true);
 vi.mock('../../api/_lib/lumosDispatchMode.js', () => ({ isAutoDispatchEnabled: () => autoDispatch() }));

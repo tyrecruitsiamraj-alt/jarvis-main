@@ -34,7 +34,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
      * ใบงานแบบการ์ดหน้า /apply (6 ต.ค. 2569 · เจ้าของ "มันต้องเห็นแบบหน้า apply สิ่") — ช่องสาธารณะชุดเดียวกับหน้ารวม
      * โหลดไม่ขึ้น/ไม่ผ่านด่าน = null ⇒ หน้าใช้การ์ดประกาศเดิม · ห้ามทำให้ลิงก์ล่ม (คนจริงกำลังจะสมัคร)
      */
-    let job = null;
+    let job: Awaited<ReturnType<typeof getLinkedPublicJob>> | null = null;
     if (posting.jobId && posting.status !== 'closed') {
       try {
         job = await getLinkedPublicJob(posting.jobId);
