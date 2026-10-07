@@ -205,6 +205,21 @@ describe('หน้าหลัก + Dashboard ใช้ตัวจัดหม
       expect(r.ai + r.staff, r.key).toBe(r.total);
     }
     expect(t.rows.reduce((s, r) => s + r.pct, 0)).toBe(100);
+    expect(t.byCaller.ai + t.byCaller.staff).toBe(t.total);
+    // แท็บแยก (7 ต.ค. 2569 ตาราง รวม/AI/คนโทร): สองแท็บรวมกัน = รวม ทุกแถวทุกคอลัมน์
+    const main = followResultRows(split, 'main');
+    const rep = followResultRows(split, 'replacement');
+    expect(main.total).toBe(187);
+    expect(main.byCaller).toEqual({ ai: 155, staff: 32 });
+    expect(rep.total).toBe(15);
+    for (const [i, r] of t.rows.entries()) {
+      expect(main.rows[i].ai + rep.rows[i].ai, r.key).toBe(r.ai);
+      expect(main.rows[i].staff + rep.rows[i].staff, r.key).toBe(r.staff);
+    }
+    for (const x of [main, rep]) {
+      for (const r of x.rows) expect(r.ai + r.staff, r.key).toBe(r.total);
+      expect(x.rows.reduce((s, r) => s + r.total, 0)).toBe(x.total);
+    }
   });
 
   it('ต้นทางเดียว: Dashboard + หน้าหลักเรียก categorizeFollowRows · หน้าหลักใช้ช่วงเดียวกับกล่องทั้งหมด', async () => {

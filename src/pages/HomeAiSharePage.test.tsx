@@ -607,6 +607,40 @@ describe('กดกล่อง AI โทร / คนโทร ของติ�
   });
 });
 
+describe('แผงผลโทรของติดตาม = ตาราง AI โทร / คนโทร / รวม (7 ต.ค. 2569)', () => {
+  it('ทุกแถว AI + คนโทร = รวม · แถวทั้งหมด = ผลรวม · สลับแท็บแล้วเลขตามแท็บ', async () => {
+    fetchHomeAiShareResults.mockImplementation((block: AiShareResultsResponse['block'], w: { from: string | null; to: string | null }) => {
+      const base = results(block, w);
+      if (block !== 'follow') return Promise.resolve(base);
+      const z = { went: 0, notWent: 0, noAnswer: 0, unclear: 0, waiting: 0, cancelled: 0 };
+      return Promise.resolve({
+        ...base,
+        follow: {
+          main: { ai: { ...z, went: 570, cancelled: 70, waiting: 3 }, staff: { ...z, went: 81, cancelled: 15 } },
+          replacement: { ai: { ...z }, staff: { ...z, cancelled: 11, waiting: 689 } },
+        },
+      });
+    });
+    render(<HomeAiSharePage />);
+    const bar = await screen.findByRole('button', { name: /^ผลโทร/ });
+    fireEvent.click(bar);
+    const table = await screen.findByTestId('home-follow-results');
+    const cells = (label: string) => {
+      const row = within(table)
+        .getAllByRole('row')
+        .find((r) => (r.textContent ?? '').startsWith(label));
+      return within(row!).getAllByRole('cell').map((c) => c.textContent ?? '').filter((t) => /^[\d,]+$/.test(t));
+    };
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent).filter(Boolean)).toEqual(['ผล', 'AI โทร', 'คนโทร', 'รวม']);
+    expect(cells('ตอบว่าไป')).toEqual(['570', '81', '651']);
+    expect(cells('รอโทร')).toEqual(['3', '689', '692']);
+    expect(cells('ทั้งหมด')).toEqual(['643', '796', '1,439']);
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'ติดตามส่งคนแทน' }));
+    await waitFor(() => expect(cells('ทั้งหมด')).toEqual(['0', '700', '700']));
+    expect(cells('ตอบว่าไป')).toEqual(['0', '0', '0']);
+  });
+});
+
 describe('หน้าหลักอัปเดตสด', () => {
   it('ครบ 30 วิ ดึงเลขกับกราฟใหม่ · เลขใหม่ขึ้นโดยไม่หายไปเป็นโครงโหลด', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });

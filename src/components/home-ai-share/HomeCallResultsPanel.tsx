@@ -18,12 +18,19 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { segmentDotClass, segmentFillClass } from '@/components/home-ai-share/segmentStyle';
 import { TONE } from '@/lib/designTokens';
 import { AI_SHARE_SEGMENT_LABEL, AI_SHARE_UNIT, type AiShareBlockKey, type AiShareWindow } from '@/lib/homeAiShare';
 import { fetchHomeAiShareResults } from '@/lib/homeAiShareApi';
 import { FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE } from '@/lib/followCallMatrix';
-import { callResultRows, followResultRows, type AiShareResultsResponse, type FollowResultsSplit } from '@/lib/homeCallResults';
+import {
+  callResultRows,
+  followResultRows,
+  type AiShareResultsResponse,
+  type FollowResultScope,
+  type FollowResultsSplit,
+} from '@/lib/homeCallResults';
 import { cn } from '@/lib/utils';
 
 const NUM = new Intl.NumberFormat('th-TH');
@@ -34,23 +41,39 @@ const TEAM_COLS = [
   ['replacement', 'ติดตามส่งคนแทน'],
 ] as const;
 
+/** แท็บของตาราง — รวม 2 แท็บ หรือดูทีละแท็บ (คำเดียวกับแท็บบนหน้าติดตาม) */
+const SCOPES: ReadonlyArray<readonly [FollowResultScope, string]> = [['all', 'รวม 2 แท็บ'], ...TEAM_COLS];
+
 /**
- * ผลโทรของหัวข้อติดตาม (6 ต.ค. 2569) — ช่องเดียวกับแผงขั้นตอนของสายบนหน้าติดตาม แยกแท็บให้เห็น
- * (เจ้าของ: *"หน้าหลักรวมได้แต่ต้องแยกให้เห็น"*) · แถบ = % ของทั้งหมด แบ่งสี AI/คนโทร · แถวล่าง = ทั้งหมด = กล่องด้านบน
+ * ผลโทรของหัวข้อติดตาม — ตาราง ผล × AI โทร / คนโทร / รวม (เจ้าของ 7 ต.ค. 2569: *"ตอบว่าไป 651 แล้ว 651 คือ คนเท่าไหร่
+ * Ai เท่าไหร่"* → *"เอาเป็นตารางเลย"*) · แท็บ รวม / แยกแท็บ · แถบ = % ของทั้งหมด แบ่งสี AI/คนโทร ·
+ * แถวล่าง = ทั้งหมด (แท็บรวม = กล่องด้านบน) · ทุกแถว AI + คนโทร = รวม
  */
 function FollowResultsTable({ split, blockTitle }: { split: FollowResultsSplit; blockTitle: string }) {
-  const t = followResultRows(split);
-  const cell = 'w-16 shrink-0 text-right text-sm tabular-nums sm:w-28';
+  const [scope, setScope] = useState<FollowResultScope>('all');
+  const t = followResultRows(split, scope);
+  const cell = 'w-16 shrink-0 text-right text-sm tabular-nums sm:w-24';
   return (
     <>
-      {/* จอแคบไม่มีแถบ ⇒ ไม่มีป้ายสีของแถบ */}
-      <div className="hidden flex-wrap items-center gap-x-5 gap-y-1 text-sm text-foreground sm:flex" aria-label="สีในแถบ">
-        {(['ai', 'staff'] as const).map((k) => (
-          <span key={k} className="inline-flex items-center gap-2">
-            <span className={cn('inline-block h-3 w-3 rounded-sm', segmentDotClass(k))} aria-hidden />
-            {AI_SHARE_SEGMENT_LABEL[k]}
-          </span>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2">
+        <Tabs value={scope} onValueChange={(v) => setScope(v as FollowResultScope)}>
+          <TabsList>
+            {SCOPES.map(([k, label]) => (
+              <TabsTrigger key={k} value={k}>
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        {/* จอแคบไม่มีแถบ ⇒ ไม่มีป้ายสีของแถบ */}
+        <div className="hidden flex-wrap items-center gap-x-5 gap-y-1 text-sm text-foreground sm:flex" aria-label="สีในแถบ">
+          {(['ai', 'staff'] as const).map((k) => (
+            <span key={k} className="inline-flex items-center gap-2">
+              <span className={cn('inline-block h-3 w-3 rounded-sm', segmentDotClass(k))} aria-hidden />
+              {AI_SHARE_SEGMENT_LABEL[k]}
+            </span>
+          ))}
+        </div>
       </div>
       <div className="space-y-3" role="table" aria-label={`ผลโทร ${blockTitle}`} data-testid="home-follow-results">
         <div role="row" className="flex items-end gap-3 text-xs text-muted-foreground">
@@ -58,9 +81,9 @@ function FollowResultsTable({ split, blockTitle }: { split: FollowResultsSplit; 
             ผล
           </span>
           <span role="columnheader" className="hidden flex-1 sm:block" />
-          {TEAM_COLS.map(([k, label]) => (
+          {(['ai', 'staff'] as const).map((k) => (
             <span key={k} role="columnheader" className={cn(cell, 'text-xs')}>
-              {label}
+              {AI_SHARE_SEGMENT_LABEL[k]}
             </span>
           ))}
           <span role="columnheader" className={cn(cell, 'text-xs')}>
@@ -68,12 +91,7 @@ function FollowResultsTable({ split, blockTitle }: { split: FollowResultsSplit; 
           </span>
         </div>
         {t.rows.map((r) => (
-          <div
-            key={r.key}
-            role="row"
-            className="flex items-center gap-3"
-            title={`${AI_SHARE_SEGMENT_LABEL.ai} ${NUM.format(r.ai)} · ${AI_SHARE_SEGMENT_LABEL.staff} ${NUM.format(r.staff)} · ${NUM.format(r.pct)}%`}
-          >
+          <div key={r.key} role="row" className="flex items-center gap-3" title={`${NUM.format(r.pct)}% ของทั้งหมด`}>
             <span role="cell" className="inline-flex w-24 shrink-0 items-center gap-2 text-sm text-foreground sm:w-32">
               <span className={cn('inline-block h-2 w-2 shrink-0 rounded-full', TONE[FOLLOW_MATRIX_COL_TONE[r.key]].dot)} aria-hidden />
               <span className="truncate">{FOLLOW_MATRIX_COL_LABEL[r.key]}</span>
@@ -88,11 +106,12 @@ function FollowResultsTable({ split, blockTitle }: { split: FollowResultsSplit; 
                 style={{ width: `${t.total > 0 ? (r.staff / t.total) * 100 : 0}%` }}
               />
             </span>
-            {TEAM_COLS.map(([k]) => (
-              <span key={k} role="cell" className={cn(cell, 'text-muted-foreground')}>
-                {NUM.format(r[k])}
-              </span>
-            ))}
+            <span role="cell" className={cn(cell, 'text-muted-foreground')}>
+              {NUM.format(r.ai)}
+            </span>
+            <span role="cell" className={cn(cell, 'text-muted-foreground')}>
+              {NUM.format(r.staff)}
+            </span>
             <span role="cell" className={cn(cell, 'font-medium text-foreground')}>
               {NUM.format(r.total)}
             </span>
@@ -103,11 +122,12 @@ function FollowResultsTable({ split, blockTitle }: { split: FollowResultsSplit; 
             {FOLLOW_MATRIX_COL_LABEL.total}
           </span>
           <span role="cell" className="hidden flex-1 sm:block" aria-hidden />
-          {TEAM_COLS.map(([k]) => (
-            <span key={k} role="cell" className={cn(cell, 'text-muted-foreground')}>
-              {NUM.format(t.byTeam[k])}
-            </span>
-          ))}
+          <span role="cell" className={cn(cell, 'text-muted-foreground')}>
+            {NUM.format(t.byCaller.ai)}
+          </span>
+          <span role="cell" className={cn(cell, 'text-muted-foreground')}>
+            {NUM.format(t.byCaller.staff)}
+          </span>
           <span role="cell" className={cn(cell, 'font-medium text-foreground')}>
             {NUM.format(t.total)}
           </span>

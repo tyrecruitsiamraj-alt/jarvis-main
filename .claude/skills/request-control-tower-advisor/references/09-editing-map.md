@@ -12680,3 +12680,4 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 | `scripts/follow-numbers-check.ts` | **ใหม่** อ่านอย่างเดียว — ตาราง รวม/AI/คน × ผล ของ 2 แท็บ + เทียบ SQL ดิบ · ไม่ลงตัว = exit 1 · `npx tsx scripts/follow-numbers-check.ts [from] [to]` |
 
 - วัด 1–7 ต.ค.: ทั้งหมด 1,478 = AI 673 + คน 805 · ทุกผล AI + คน = รวม · ผลรวมทุกช่อง = ทั้งหมด · SQL ดิบตรงหน้าจอทุกแท็บ
+- (ต่อ) แผงผลโทรของติดตาม (`HomeCallResultsPanel.tsx` `FollowResultsTable`) = ตาราง ผล × **AI โทร / คนโทร / รวม** + แท็บ รวม 2 แท็บ / ติดตามคนเริ่มงาน / ติดตามส่งคนแทน (เจ้าของ "เอาเป็นตารางเลย") · `followResultRows(split, scope)` คืน `byCaller` · เทสต์ `followNumbersReconcile.test.ts` + `HomeAiSharePage.test.tsx`

@@ -99,20 +99,32 @@ export type FollowResultRow = {
 };
 
 /** แถวของแผง (ลำดับเดียวกับแผงขั้นตอนของสาย) · `total` = ทุกสาย = กล่อง "ทั้งหมด" */
-export function followResultRows(split: FollowResultsSplit): {
+export type FollowResultScope = 'all' | FollowResultTeam;
+
+/**
+ * ตารางผลของแผง — แท็บ รวม / แยกแท็บ (เจ้าของ 7 ต.ค. 2569 "เอาเป็นตารางเลย": ไป 651 = AI เท่าไหร่ คนเท่าไหร่)
+ * ทุกแถว AI + คนโทร = รวม · ผลรวมทุกแถว = ทั้งหมด (คอลัมน์ไหนก็ได้) — เทสต์คุม `followNumbersReconcile.test.ts`
+ */
+export function followResultRows(
+  split: FollowResultsSplit,
+  scope: FollowResultScope = 'all',
+): {
   rows: FollowResultRow[];
   total: number;
   byTeam: Record<FollowResultTeam, number>;
+  byCaller: Record<'ai' | 'staff', number>;
 } {
+  const teams: FollowResultTeam[] = scope === 'all' ? ['main', 'replacement'] : [scope];
   const sumTeam = (t: FollowResultTeam, k: FollowResultKey) => split[t].ai[k] + split[t].staff[k];
-  const totals = FOLLOW_RESULT_KEYS.map((k) => sumTeam('main', k) + sumTeam('replacement', k));
+  const of = (c: 'ai' | 'staff', k: FollowResultKey) => teams.reduce((n, t) => n + split[t][c][k], 0);
+  const totals = FOLLOW_RESULT_KEYS.map((k) => of('ai', k) + of('staff', k));
   const pct = roundToHundred(totals);
   const rows = FOLLOW_RESULT_KEYS.map((key, i) => ({
     key,
-    main: sumTeam('main', key),
-    replacement: sumTeam('replacement', key),
-    ai: split.main.ai[key] + split.replacement.ai[key],
-    staff: split.main.staff[key] + split.replacement.staff[key],
+    main: teams.includes('main') ? sumTeam('main', key) : 0,
+    replacement: teams.includes('replacement') ? sumTeam('replacement', key) : 0,
+    ai: of('ai', key),
+    staff: of('staff', key),
     total: totals[i],
     pct: pct[i],
   }));
@@ -122,6 +134,10 @@ export function followResultRows(split: FollowResultsSplit): {
     byTeam: {
       main: rows.reduce((s, r) => s + r.main, 0),
       replacement: rows.reduce((s, r) => s + r.replacement, 0),
+    },
+    byCaller: {
+      ai: rows.reduce((s, r) => s + r.ai, 0),
+      staff: rows.reduce((s, r) => s + r.staff, 0),
     },
   };
 }
