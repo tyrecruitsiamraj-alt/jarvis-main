@@ -34,7 +34,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveTick } from '@/hooks/useLiveTick';
 import { toYmdBangkok } from '@/lib/dateTh';
-import { followRangeRows, KpiTile, RangeSummary } from '@/components/home-ai-share/HomeKpis';
+import { AiGauge, followRangeRows, KpiPickTile, KpiTile, RangeSummary } from '@/components/home-ai-share/HomeKpis';
 import { segmentDotClass, segmentFillClass } from '@/components/home-ai-share/segmentStyle';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { metricHelp, type MetricKey } from '@/lib/metricDictionary';
@@ -42,7 +42,12 @@ import { countPill } from '@/lib/teamOnline';
 import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
 import FollowCallerDialog from '@/components/home-ai-share/FollowCallerDialog';
-import AiShareLumosStats from '@/components/home-ai-share/AiShareLumosStats';
+import AiShareLumosStats, {
+  APPLICANT_RESULT_COLS,
+  FOLLOW_RESULT_COLS,
+  hasLumosResults,
+  useHomeLumosSummary,
+} from '@/components/home-ai-share/AiShareLumosStats';
 import PeriodPicker from '@/components/shared/PeriodPicker';
 import { Card } from '@/components/ui/card';
 import {
@@ -180,6 +185,8 @@ const HomeAiSharePage: React.FC = () => {
   /** "รวมทั้งช่วง" คอลัมน์ขวา — ตัวแตกทีมจากกราฟ (แท่งที่กด/ทั้งช่วง) · ปุ่มดูทั้งช่วง = เพิ่มเลขรอบ */
   const [teamSplit, setTeamSplit] = useState<{ label: string; picked: boolean; data: FollowTeamBreakdown } | null>(null);
   const [resetSeq, setResetSeq] = useState(0);
+  /** กล่องเลือกผล — ผลที่เลือกอยู่ (ค่าตั้งต้น = ไป) */
+  const [pickKey, setPickKey] = useState('went');
   const choose = (v: string) => {
     if (!isAiShareBlock(v)) return;
     setBlock(v);
@@ -202,6 +209,8 @@ const HomeAiSharePage: React.FC = () => {
   /** อัปเดตสด — เลขรอบ (ตัวเดียวทั้งหน้า ส่งต่อให้กราฟ/แผงผลโทร) · เวลาที่โหลดสำเร็จล่าสุด */
   const live = isLiveWindow(cardWin);
   const tick = useLiveTick(live, LIVE_MS);
+  /** ผลโทร (การ์ดผลโทร + กล่องเลือกผล) — โหลดครั้งเดียวทั้งหน้า */
+  const lumos = useHomeLumosSummary(block, cardWin, tick);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const cardWinRef = useRef(cardWin);
   cardWinRef.current = cardWin;
@@ -383,7 +392,18 @@ const HomeAiSharePage: React.FC = () => {
     const help = key ? metricHelp(key) : undefined;
     return k === 'notCalled' && hint ? [help, hint].filter(Boolean).join('\n') : help;
   };
-  const hasResults = meta.key === 'follow' || meta.key === 'applicants';
+  const hasResults = hasLumosResults(meta.key);
+  /** กล่องเลือกผล (ใบที่ 4) — ผลโทรของหัวข้อนั้น · ยังไม่มาก็ขึ้นกล่องไว้ (เลขเป็นขีด) */
+  const lumosFollow = lumos.current?.follow ?? null;
+  const lumosApps = lumos.current?.applicants ?? null;
+  const pickOptions =
+    meta.key === 'follow'
+      ? FOLLOW_RESULT_COLS.map((c) => ({ key: c.key, label: c.label, tone: c.tone, value: lumosFollow ? lumosFollow.ai[c.key] + lumosFollow.staff[c.key] : 0 }))
+      : meta.key === 'applicants'
+        ? APPLICANT_RESULT_COLS.map((c) => ({ key: c.key, label: c.label, tone: c.tone, value: lumosApps ? lumosApps[c.key] : 0 }))
+        : null;
+  const pickTotal = meta.key === 'follow' ? (lumosFollow ? lumosFollow.ai.total + lumosFollow.staff.total : 0) : (lumosApps?.total ?? 0);
+  const tileCount = 1 + segs.length + (pickOptions ? 1 : 0);
 
   return (
     // ช่องไฟ + ระยะบรรทัดเท่ากันทั้งหน้า (รอบ 18 · `EVEN_TYPE`) — ป๊อป/แผงที่ลอยออกนอกหน้าใส่ของตัวเองอีกที
@@ -421,82 +441,91 @@ const HomeAiSharePage: React.FC = () => {
       {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
 
       {/*
-        เลย์เอาต์แบบภาพอ้างอิง (Choice "แบบภาพ"): ซ้าย 2 ส่วน = กราฟรายวัน → ผลโทร · ขวา = ทั้งหมด (กรมท่า) → AI/คน → รวมทั้งช่วง
-        ลำดับใน DOM = คอลัมน์ขวา → ซ้าย · จอกว้างวางด้วย col/row-start
+        เลย์เอาต์ตามภาพอ้างอิงที่ 2 (เจ้าของ 7 ต.ค. 2569 "เอาแบบนี้" → Choice "วางตามภาพ")
+        แถวบน: กล่อง 2×2 (ทั้งหมด · AI โทร · คนโทร · เลือกผล) | กราฟยอดใช้งานรายวัน
+        แถวล่าง: ผลโทร (แท่ง + ตาราง) | เกจ AI ทำงาน + รวมทั้งช่วง (โดนัท)
+        กล่องเป็นจำนวนคี่ = ทั้งหมดกว้าง 2 ช่อง (ไม่มีกล่องค้างเดี่ยว) · หัวข้อที่ไม่มีผลโทร = เกจอยู่ในกริดกล่อง
       */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <h2 className="sr-only">{meta.title}</h2>
-        <div className="min-w-0 space-y-5 self-start lg:col-start-3 lg:row-start-1">
-          <KpiTile
-            emphasis
-            label="ทั้งหมด"
-            value={total}
-            unit={meta.unit}
-            liveKey={liveKey}
-            loading={loading && !counts}
-            pill={pillOf(total, prevCounts?.total)}
-            pillTitle={compareTitle}
-            foot={prevCounts && prev?.label ? `${prev.label} ${NUM.format(prevCounts.total)}` : null}
-            hint={metricHelp(meta.metrics.total)}
-            onClick={() => openList('total')}
-          />
-          {/* AI โทร / คนโทร (+ ทั้งสองทาง · ยังไม่โทร) ใต้กล่องทั้งหมด — 2 คอลัมน์ */}
-          <div className="grid grid-cols-2 gap-4 [&>*]:min-w-0">
-            {segs.map((k) => (
-              <KpiTile
-                key={k}
-                label={AI_SHARE_SEGMENT_LABEL[k]}
-                value={counts ? counts[k] : 0}
-                liveKey={liveKey}
-                loading={loading && !counts}
-                dotClass={segmentDotClass(k)}
-                share={shareOf?.get(k) ?? 0}
-                shareClass={segmentFillClass(k)}
-                pill={counts ? pillOf(counts[k], prevCounts?.[k]) : null}
-                pillTitle={compareTitle}
-                hint={helpOf(k)}
-                onClick={() => openList(k)}
-              />
-            ))}
+        <div className="grid min-w-0 grid-cols-2 content-start gap-4 [&>*]:min-w-0">
+          <div className={cn('h-full', tileCount % 2 === 1 && 'col-span-2')}>
+            <KpiTile
+              emphasis
+              label="ทั้งหมด"
+              value={total}
+              unit={meta.unit}
+              liveKey={liveKey}
+              loading={loading && !counts}
+              pill={pillOf(total, prevCounts?.total)}
+              pillTitle={compareTitle}
+              foot={prevCounts && prev?.label ? `${prev.label} ${NUM.format(prevCounts.total)}` : null}
+              hint={metricHelp(meta.metrics.total)}
+              onClick={() => openList('total')}
+            />
           </div>
-          {blockError ? <p className={cn('text-xs', TONE.danger.value)}>{blockError}</p> : null}
-          {flag ? <p className={cn('text-xs', TONE.warn.value)}>{flag}</p> : null}
-          {/* รวมทั้งช่วง = แยก 2 แท็บของติดตาม (หัวข้ออื่นซ้ำกับกล่องด้านบน เลยไม่มี) */}
-          {meta.key === 'follow' ? (
-            <RangeSummary
-              title={teamSplit?.label ?? 'รวมทั้งช่วง'}
-              rows={teamSplit ? followRangeRows(teamSplit.data) : null}
-              unit={meta.unit}
-              onClear={teamSplit?.picked ? () => setResetSeq((n) => n + 1) : undefined}
-              testId="follow-team-breakdown"
+          {segs.map((k) => (
+            <KpiTile
+              key={k}
+              label={AI_SHARE_SEGMENT_LABEL[k]}
+              value={counts ? counts[k] : 0}
+              liveKey={liveKey}
+              loading={loading && !counts}
+              dotClass={segmentDotClass(k)}
+              share={shareOf?.get(k) ?? 0}
+              shareClass={segmentFillClass(k)}
+              pill={counts ? pillOf(counts[k], prevCounts?.[k]) : null}
+              pillTitle={compareTitle}
+              hint={helpOf(k)}
+              onClick={() => openList(k)}
             />
+          ))}
+          {pickOptions ? (
+            <KpiPickTile options={pickOptions} value={pickKey} onChange={setPickKey} total={pickTotal} loading={!lumos.current} />
           ) : null}
+          {!hasResults ? <AiGauge className="col-span-2" ai={counts ? counts.ai : null} total={counts ? counts.total : null} unit={meta.unit} /> : null}
+          {blockError ? <p className={cn('col-span-2 text-xs', TONE.danger.value)}>{blockError}</p> : null}
+          {flag ? <p className={cn('col-span-2 text-xs', TONE.warn.value)}>{flag}</p> : null}
         </div>
 
-        <div className="min-w-0 space-y-5 lg:col-span-2 lg:col-start-1 lg:row-start-1">
-          <Card variant="glass" className="p-5 sm:p-6">
-            <AiShareDetail
-              withTeams={meta.key === 'follow'}
-              hideNotCalled={meta.key === 'follow'}
-              onFocusDay={onFocusDay}
-              unit={meta.unit}
-              title={meta.title}
-              win={win}
-              withBoth={meta.withBoth}
-              data={detailNow}
-              loading={detailLoading}
-              error={detailError}
-              hideBreakdown
-              resetKey={resetSeq}
-              onBreakdown={setTeamSplit}
-            />
-          </Card>
-
-          {/* ผลโทร (เจ้าของ 7 ต.ค. 2569 "งานติดตาม เปลี่ยนเป็น ผลโทร") — ติดตาม/ผู้สมัครเท่านั้น · ช่วงตามแท่งที่กด */}
-          {hasResults ? <AiShareLumosStats block={meta.key} win={cardWin} tick={tick} unit={meta.unit} /> : null}
-        </div>
-
+        <Card variant="glass" className="min-w-0 p-5 sm:p-6">
+          <AiShareDetail
+            withTeams={meta.key === 'follow'}
+            hideNotCalled={meta.key === 'follow'}
+            onFocusDay={onFocusDay}
+            unit={meta.unit}
+            title={meta.title}
+            win={win}
+            withBoth={meta.withBoth}
+            data={detailNow}
+            loading={detailLoading}
+            error={detailError}
+            hideBreakdown
+            resetKey={resetSeq}
+            onBreakdown={setTeamSplit}
+          />
+        </Card>
       </div>
+
+      {hasResults ? (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-4">
+          {/* ผลโทร (เจ้าของ 7 ต.ค. 2569 "งานติดตาม เปลี่ยนเป็น ผลโทร") — ช่วงตามแท่งที่กด */}
+          <AiShareLumosStats className="min-w-0 lg:col-span-3" block={meta.key} unit={meta.unit} data={lumos.current} failed={lumos.failed} />
+          <div className="min-w-0 space-y-5">
+            <AiGauge ai={counts ? counts.ai : null} total={counts ? counts.total : null} unit={meta.unit} />
+            {/* รวมทั้งช่วง = แยก 2 แท็บของติดตาม (หัวข้ออื่นซ้ำกับกล่องด้านบน เลยไม่มี) */}
+            {meta.key === 'follow' ? (
+              <RangeSummary
+                title={teamSplit?.label ?? 'รวมทั้งช่วง'}
+                rows={teamSplit ? followRangeRows(teamSplit.data) : null}
+                unit={meta.unit}
+                onClear={teamSplit?.picked ? () => setResetSeq((n) => n + 1) : undefined}
+                testId="follow-team-breakdown"
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {/* หัวข้อติดตาม กด AI โทร / คนโทร = แยกเรื่อง → ผล → รายชื่อ (เจ้าของ 7 ต.ค. 2569 "ป๊อปเดิม เปลี่ยนข้างใน") */}
       <FollowCallerDialog

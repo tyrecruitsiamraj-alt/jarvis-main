@@ -579,38 +579,40 @@ describe('กดกล่อง AI โทร / คนโทร ของติ�
   });
 });
 
-describe('การ์ดผลโทร (7 ต.ค. 2569)', () => {
-  it('ติดตาม = โดนัท + รายการ + ตาราง AI/คน/รวม · ผู้สมัคร = งานรับสมัคร + งานเก่า · บวกกันได้ทั้งหมด', async () => {
+describe('เลย์เอาต์ตามภาพอ้างอิง (7 ต.ค. 2569 ดึก)', () => {
+  it('ผลโทร = กราฟแท่ง + ตาราง AI/คน/รวม · กล่องเลือกผลตอบได้ทุกผล · เกจ AI ทำงาน · รวมทั้งช่วงโดนัท', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const box = await screen.findByTestId('lumos-stats-follow');
     await waitFor(() => expect(within(box).getByRole('img', { name: /ผลโทร 1,478/ })).toBeTruthy());
-    // ตารางไม่มีแถวรวมซ้ำกับรายการข้างโดนัท (เจ้าของ "มันซ้ำกันปะ")
-    expect(within(box).queryByTestId('lumos-follow-รวม')).toBeNull();
-    // ทั้งคนและ AI (เจ้าของ "ต้องรู้ทั้งคนและ Ai") · แถวรวม = กล่องทั้งหมด
+    expect(within(box).getByRole('heading', { name: 'ผลโทร' })).toBeTruthy();
     const cells = (row: string) =>
       within(within(box).getByTestId(`lumos-follow-${row}`)).getAllByRole('cell').slice(1).map((c) => c.textContent);
-    // ทั้งหมด · ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · รอ · ล้มเหลว · ยกเลิก (มีผลการโทรแตก 4 ช่อง · เจ้าของ "แตกเลย")
+    // ทั้งหมด · ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · รอ · ล้มเหลว · ยกเลิก — แถวรวมกลับมา ("เอาทั้งหมดกลับมา")
     expect(cells('AI โทร')).toEqual(['673', '469', '0', '0', '15', '0', '99', '90']);
     expect(cells('คนโทร')).toEqual(['805', '77', '1', '1', '0', '699', '3', '24']);
+    expect(cells('รวม')).toEqual(['1,478', '546', '1', '1', '15', '699', '102', '114']);
     expect(within(box).getByTestId('lumos-follow-sum').textContent).toBe(
       'AI 469 + 0 + 0 + 15 + 0 + 99 + 90 = 673 · คน 77 + 1 + 1 + 0 + 699 + 3 + 24 = 805',
     );
-    expect(within(box).getByText('มีผลการโทร')).toBeTruthy();
-    expect(within(box).getByRole('heading', { name: 'ผลโทร' })).toBeTruthy();
-    // รายการข้างโดนัท: เลข + % ของทั้งหมด (ปัดรวม 100)
-    expect(within(box).getByTestId('result-legend-went').textContent).toContain('546');
-    expect(within(box).getByTestId('result-legend-went').textContent).toContain('37%');
+    // รายการข้างโดนัทถอดแล้ว (เจ้าของ "เนี่ยเอาออก")
+    expect(within(box).queryByText('มีผลการโทร')).toBeNull();
+    // กล่องเลือกผล (ใบที่ 4) — ค่าตั้งต้น ไป 546 · 7 ผลให้เลือก
+    const pick = screen.getByTestId('kpi-pick');
+    expect(within(pick).getByTestId('kpi-pick-value').textContent).toBe('546');
+    // เกจ = AI โทร ÷ ทั้งหมด (205 ÷ 205 ของชุดทดสอบการ์ด)
+    expect(within(screen.getByTestId('ai-gauge')).getByRole('img', { name: 'AI ทำงาน 100%' })).toBeTruthy();
     pickTopic(new RegExp(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')!.label));
     const apps = await screen.findByTestId('lumos-stats-applicants');
     await waitFor(() => expect(within(apps).getByRole('img', { name: /ผลโทร 178/ })).toBeTruthy());
-    expect(within(apps).getByTestId('result-legend-done').textContent).toContain('100');
     expect(within(apps).getByTestId('lumos-applicants-sum').textContent).toBe('100 + 43 + 35 + 0 = 178');
     expect(within(apps).getByTestId('lumos-applicants-backlog').textContent).toContain('46');
-    // หัวข้อที่บอทไม่มี = ไม่มีแถวนี้
+    // หัวข้อที่ไม่มีผลโทร = ไม่มีการ์ดผลโทร · เกจย้ายเข้ากริดกล่อง
     pickTopic(/จับคู่งาน/);
     await screen.findByRole('heading', { name: 'จับคู่งาน' });
     expect(screen.queryByTestId('lumos-stats-matching')).toBeNull();
     expect(screen.queryByTestId('lumos-stats-follow')).toBeNull();
+    expect(screen.queryByTestId('kpi-pick')).toBeNull();
+    expect(screen.getByTestId('ai-gauge')).toBeTruthy();
   });
 });
 
