@@ -32,7 +32,9 @@
  * 🔴 โฉมกระจกไม่เบลอของที่เลื่อนจอ (เคยทำเว็บกระตุก 5 ก.ย. 2569) — แสงนวลข้างหลังเบลอมาแล้ว การ์ดแค่โปร่ง
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useLiveTick } from '@/hooks/useLiveTick';
+import { Button } from '@/components/ui/button';
 import { toYmdBangkok } from '@/lib/dateTh';
 import AiShareCard, { type AiShareCardProps } from '@/components/home-ai-share/AiShareCard';
 import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
@@ -373,6 +375,14 @@ const HomeAiSharePage: React.FC = () => {
           <PeriodPicker value={win} onChange={setWin} />
           {/* dropdown หัวข้ออยู่ข้างปฏิทิน (รอบ 10 · เจ้าของ: "ย้าย Dropdown ไปไว้ข้าง calendar") สูงเท่าปุ่มปฏิทิน */}
           {picker}
+          {/* สมุดบัญชีติดตาม (7 ต.ค. 2569 · Choice "บนหน้าหลัก") — หัวข้อติดตามเท่านั้น */}
+          {meta.key === 'follow' ? (
+            <Button asChild variant="outline" className="h-10 rounded-full">
+              <Link to="/?home=ledger" data-testid="open-ledger">
+                สมุดบัญชี
+              </Link>
+            </Button>
+          ) : null}
           {current?.forced_bu && current.bu ? (
             <span className="text-sm text-muted-foreground">{trendBuLabel(current.bu)}</span>
           ) : null}

@@ -16,6 +16,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONVEYOR_VAULT, conveyorLabel } from '@/lib/soRecruitNav';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import {
   AI_SHARE_BUS,
   defaultAiShareWindow,
@@ -204,7 +205,7 @@ afterEach(() => cleanup());
 
 describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   it('เริ่มที่ติดตาม · 7 วันล่าสุด · เลขตามที่เส้นส่งมา · กราฟของหัวข้อนั้นขึ้นเลย', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     expect(await screen.findByRole('heading', { name: FOLLOW_TITLE })).toBeTruthy();
     expect(fetchHomeAiShare).toHaveBeenCalledWith(win);
     expect(screen.getByRole('button', { name: /ช่วงเวลา 7 วันล่าสุด/ })).toBeTruthy();
@@ -232,7 +233,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   });
 
   it('dropdown บอก AI % ของทุกหัวข้อ · เลือกแล้วตัวเลข + กราฟเปลี่ยนตาม · จำไว้ในเครื่อง', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     openPicker();
     const matching = await screen.findByRole('option', { name: /จับคู่งาน/ });
@@ -249,11 +250,11 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
   it('เปิดหน้ามาใหม่ = หัวข้อที่เลือกไว้ล่าสุด · ค่าที่อ่านไม่ออก = ติดตาม', async () => {
     window.localStorage.setItem(BLOCK_STORE, 'applicants');
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     expect(await screen.findByRole('heading', { name: 'งานสรรหา' })).toBeTruthy();
     cleanup();
     window.localStorage.setItem(BLOCK_STORE, 'ไม่มีหัวข้อนี้');
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     expect(await screen.findByRole('heading', { name: FOLLOW_TITLE })).toBeTruthy();
   });
 
@@ -274,7 +275,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
         },
       }),
     );
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('7 วันก่อนหน้า 257'));
     // รอบ 8: ชิปเป็น % ที่เปลี่ยนจากช่วงก่อน (countPill ตัวเดียวกับหน้าทีม Online) — AI 205 เทียบ 250 ⇒ 18.0% · ทั้งหมด 205 เทียบ 257 ⇒ 20.2%
     expect(stat('AI โทร')).toContain('18.0%');
@@ -289,7 +290,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
   it('หัวข้อที่ยังไม่มีสายเลย = กล่องเป็น 0 (ป้ายหนักไปทางไหนถอดแล้ว)', async () => {
     window.localStorage.setItem(BLOCK_STORE, 'aftercare');
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('0 รายชื่อ'));
     expect(stat('AI โทร')).toContain('0%');
     expect(screen.queryByText('ยังไม่มีงาน')).toBeNull();
@@ -298,7 +299,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   it('ฐานยังไม่มีช่องลงผลของคนโทร = บอกบนจอ (ดูแลหลังเริ่มงาน · ติดตามนับแบบแผนไม่พึ่งช่องนี้)', async () => {
     window.localStorage.setItem(BLOCK_STORE, 'aftercare');
     fetchHomeAiShare.mockResolvedValue(body({ follow_staff_ready: false, aftercare: { total: 205, ai: 205, staff: 0, both: 0, notCalled: 0, waitingAi: 0, waitingStaff: 0 } }));
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     expect(await screen.findByText(/ยังนับรายชื่อที่คนโทรไม่ได้/)).toBeTruthy();
   });
 
@@ -307,7 +308,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     fetchHomeAiShare.mockResolvedValue(
       body({ aftercare: { total: 3, ai: 0, staff: 0, both: 0, notCalled: 3, waitingAi: 3, waitingStaff: 0 } }),
     );
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('3 รายชื่อ'));
     // แถบของกล่อง = % ของทั้งหมด ⇒ ยังไม่โทร 100%
     expect(stat('ยังไม่โทร')).toContain('100%');
@@ -320,7 +321,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     fetchHomeAiShare.mockResolvedValue(
       body({ applicants: null, errors: { applicants: 'โหลดตัวเลขส่วนนี้ไม่ขึ้น ลองรีเฟรชอีกครั้ง' } }),
     );
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     expect(await screen.findByText('โหลดตัวเลขส่วนนี้ไม่ขึ้น ลองรีเฟรชอีกครั้ง')).toBeTruthy();
     openPicker();
     expect((await screen.findByRole('option', { name: /งานสรรหา/ })).textContent).toContain('โหลดไม่ขึ้น');
@@ -328,7 +329,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   });
 
   it('🔴 แผงเลื่อน + ปุ่ม "ดูทั้งหมด" ถอดแล้ว (เจ้าของสั่ง 30 ก.ย.) — กดแท่งรายวันไม่มีป๊อปเด้ง', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const chart = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
     fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -344,7 +345,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
         ],
       }),
     );
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const chart = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
     expect(chart.getAttribute('data-clickable')).toBe('yes');
     fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
@@ -356,7 +357,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   });
 
   it('แบ่งแท่งตาม (ตัวเลือกเดียว 6 ต.ค. 2569): ค่าตั้งต้น ใครโทร · BU = แต่ละ BU · ทีม = สองแท็บ · กลับมาใครโทรได้', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const chart = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
     // ติดตามไม่มี "ทั้งสองทาง" · นับแบบแผน (4 ต.ค. 2569) ⇒ ไม่มีชั้น "ยังไม่โทร"
     expect(chart.getAttribute('data-stacks')).toBe('AI โทร|คนโทร');
@@ -380,7 +381,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   });
 
   it('รอบ 17: กล่องเรียง ทั้งหมด → AI โทร → คนโทร → (ทั้งสองทาง) → ยังไม่โทร · กล่องที่เป็น 0 กดไม่ได้', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     const names = () =>
       screen
@@ -399,7 +400,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   });
 
   it('รอบ 17: กดกล่อง = Popup รายชื่อของกล่องนั้น (ช่วงเดียวกับหน้า) · ชื่อ · BU · วันที่ · เปลี่ยนหน้าได้', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     // หัวข้อติดตาม กด AI โทร = ป๊อปแยกเรื่องแล้ว (7 ต.ค. 2569) ⇒ ป๊อปรายชื่อแบบเดิมดูที่จับคู่งาน
     openPicker();
@@ -425,7 +426,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   });
 
   it('รอบ 17: กล่อง "ทั้งหมด" = ทุกก้อน + คอลัมน์สถานะว่าอยู่ก้อนไหน · เปิดใหม่เริ่มหน้าแรก', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     fireEvent.click(tileOf('ทั้งหมด'));
     let dlg = await screen.findByRole('dialog');
@@ -446,7 +447,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
   it('รอบ 17: ไม่มีสิทธิ์ดูรายชื่อ = Popup บอกเหตุ ไม่ใช่หน้าว่าง', async () => {
     fetchHomeAiShareList.mockRejectedValue(new Error('บัญชีนี้ยังไม่มีสิทธิ์ดูรายชื่อส่วนนี้'));
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     fireEvent.click(tileOf('ทั้งหมด'));
     const dlg = await screen.findByRole('dialog');
@@ -454,7 +455,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   });
 
   it('รอบ 8: แถว "AI 100% ของสายที่โทรแล้ว" ถอดแล้ว · ยอดเป็นกล่อง Visual Control มีแถบ % ของทั้งหมด', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     expect(screen.queryByText('AI 100%')).toBeNull();
     expect(screen.queryByText('ของสายที่โทรแล้ว')).toBeNull();
@@ -472,7 +473,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     fetchHomeAiShareDetail.mockImplementation((block: AiShareDetailResponse['block'], w: { from: string | null; to: string | null }) =>
       Promise.resolve({ ...detail(block), from: w.from, to: w.to }),
     );
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
     fireEvent.click(screen.getByRole('button', { name: /ช่วงเวลา/ }));
     fireEvent.click(screen.getByRole('radio', { name: 'เดือน' }));
@@ -498,7 +499,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   });
 
   it('รอบ 18: แผง "ผลโทร" ปิดไว้เป็นค่าตั้งต้น · แถบหัวบอกมีผลกี่รายชื่อ · กดแล้วกางเห็นผลแต่ละแบบ', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const bar = await screen.findByRole('button', { name: /^ผลโทร/ });
     expect(bar.getAttribute('aria-expanded')).toBe('false');
     await waitFor(() => expect(bar.textContent).toContain(`${FOLLOW_TITLE} · มีผล 207 รายชื่อ`));
@@ -521,7 +522,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   });
 
   it('รอบ 18: หน่วยเป็น "รายชื่อ" ทุกหัวข้อ — ไม่เหลือ สาย/ใบ/คน บนกล่อง', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     openPicker();
     fireEvent.click(await screen.findByRole('option', { name: /งานสรรหา/ }));
@@ -530,7 +531,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   });
 
   it('รอบ 18: ช่องไฟ + ระยะบรรทัดเท่ากันทั้งหน้าและในป๊อปรายชื่อ', async () => {
-    const { container } = render(<HomeAiSharePage />);
+    const { container } = render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     const root = container.firstElementChild as HTMLElement;
     for (const c of EVEN_TYPE.split(' ')) expect(root.classList.contains(c)).toBe(true);
@@ -545,7 +546,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     fetchHomeAiShare.mockResolvedValue(
       body({ follow: { total: 58, ai: 31, staff: 27, both: 0, notCalled: 0, waitingAi: 0, waitingStaff: 0, teamReplacement: 27 } as never }),
     );
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('58 รายชื่อ'));
     expect(stat('AI โทร')).toContain('31');
     expect(stat('คนโทร')).toContain('27');
@@ -554,7 +555,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   });
 
   it('🔴 กดแท่งวันไหน ตัวเลขด้านบนวิ่งตามวันนั้น · กดซ้ำ/ดูทั้งช่วง = กลับช่วงเดิม (4 ต.ค. 2569)', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const chart = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
     await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith(win));
     fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
@@ -564,7 +565,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   });
 
   it('🔴 คำในตัวเลือกหัวข้อ = คำในเมนู (เจ้าของสั่ง 4 ต.ค. 2569)', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     openPicker();
     const names = (await screen.findAllByRole('option')).map((o) => o.textContent ?? '');
     for (const label of [conveyorLabel('follow'), conveyorLabel('aftercare'), 'งานสรรหา', conveyorLabel('matching')]) {
@@ -581,7 +582,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
  */
 describe('กดกล่อง AI โทร / คนโทร ของติดตาม (7 ต.ค. 2569)', () => {
   it('ป๊อปเดิมเปลี่ยนข้างใน: เรื่อง 2 แท็บ → ผลของเรื่อง (รวมทุกช่อง = ทั้งหมด) → รายชื่อ · กลับได้ทุกชั้น', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('AI โทร')).toContain('205'));
     fireEvent.click(tileOf('AI โทร'));
     const dialog = await screen.findByTestId('caller-dialog');
@@ -601,7 +602,7 @@ describe('กดกล่อง AI โทร / คนโทร ของติ�
   });
 
   it('กดคนโทร = แบบเดียวกัน (นับเฉพาะสายที่คนโทร)', async () => {
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('AI โทร')).toContain('205'));
     expect((tileOf('คนโทร') as HTMLButtonElement).disabled).toBe(true);
   });
@@ -621,7 +622,7 @@ describe('แผงผลโทรของติดตาม = ตาราง 
         },
       });
     });
-    render(<HomeAiSharePage />);
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const bar = await screen.findByRole('button', { name: /^ผลโทร/ });
     fireEvent.click(bar);
     const table = await screen.findByTestId('home-follow-results');
@@ -645,7 +646,7 @@ describe('หน้าหลักอัปเดตสด', () => {
   it('ครบ 30 วิ ดึงเลขกับกราฟใหม่ · เลขใหม่ขึ้นโดยไม่หายไปเป็นโครงโหลด', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
-      render(<HomeAiSharePage />);
+      render(<HomeAiSharePage />, { wrapper: MemoryRouter });
       await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
       expect(screen.getByTestId('home-live').textContent).toMatch(/^สด · อัปเดต /);
       const cards = fetchHomeAiShare.mock.calls.length;

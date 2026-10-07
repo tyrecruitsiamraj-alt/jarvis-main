@@ -12681,3 +12681,17 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 
 - วัด 1–7 ต.ค.: ทั้งหมด 1,478 = AI 673 + คน 805 · ทุกผล AI + คน = รวม · ผลรวมทุกช่อง = ทั้งหมด · SQL ดิบตรงหน้าจอทุกแท็บ
 - (ต่อ) แผงผลโทรของติดตาม (`HomeCallResultsPanel.tsx` `FollowResultsTable`) = ตาราง ผล × **AI โทร / คนโทร / รวม** + แท็บ รวม 2 แท็บ / ติดตามคนเริ่มงาน / ติดตามส่งคนแทน (เจ้าของ "เอาเป็นตารางเลย") · `followResultRows(split, scope)` คืน `byCaller` · เทสต์ `followNumbersReconcile.test.ts` + `HomeAiSharePage.test.tsx`
+
+### สมุดบัญชีติดตาม (7 ต.ค. 2569 ค่ำ · เจ้าของ "นึกภาพธนาคาร · ละเอียดทุก Activity" · ยังไม่ push)
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/lib/followLedger.ts` | **ใหม่** (pure) — เข้า = เพิ่ม · ออก = ได้ผล/ยกเลิก (ครั้งเดียวต่อสาย · ออกก่อนเข้าปัดเป็นเวลาเข้า) · ส่ง AI / แก้ / ย้อนสถานะ / ล้างผล / iRecruit แก้ = ไม่กระทบยอด · `buildLedger` คืนยอดต่อบรรทัด ⇒ ยกมา + เพิ่ม − ได้ผล − ยกเลิก = คงเหลือ ลงตัวโดยโครงสร้าง |
+| `api/_lib/followLedgerSql.ts` | **ใหม่** — สายชุดเดียวกับการ์ด (ไม่รวมดูแลหลังเริ่มงาน) + หมวด `categorizeFollowRows` · เวลาได้ผล = `staff_called_at` / `q.first_result_at` · ใครยกเลิก = audit `follow.cancel` (รวม `cancelledIds`) / `irecruit_replace_sync.cancel` |
+| `api/_handlers/home-ai-share.ts` | `?ledger=follow&from&to` — ช่วง = เวลาที่เกิดรายการ (ไม่ใช่วันนัด) |
+| `src/pages/FollowLedgerPage.tsx` · `HomePage.tsx` · `src/lib/homeV3.ts` | **ใหม่** หน้า `/?home=ledger` (ไม่จำในเครื่อง · `useHomeVariant` อ่านใหม่เมื่อ URL เปลี่ยน) · ปุ่ม "สมุดบัญชี" บนหน้าหลักหัวข้อติดตาม · แท็บ = คิดยอดใหม่ · กรองรายการ/ค้นหาบนแถบบน = ซ่อนบรรทัด ยอดไม่เปลี่ยน |
+| เทสต์ | `tests/api/followLedger.test.ts` (ลงตัวทุกช่วง) · `src/pages/FollowLedgerPage.test.tsx` · `HomeAiSharePage.test.tsx` ห่อ `MemoryRouter` แล้ว |
+
+- วัดจริง 1–7 ต.ค.: 10 + 2,902 − 690 − 200 = 2,022 · แยกแท็บลงตัว · ทั้งหมดลงตัว
+- ⚠️ ยังไม่มีเวลาโทรแต่ละครั้งของ Lumos (มีแค่ผลแรก/ล่าสุด) · iRecruit แก้/ยกเลิก เริ่มเก็บหลัง deploy
+- บอท Lumos "สะสมเดือนนี้" ไม่ใช่ของเรา: มีผล 667 ≈ ผลที่ Lumos ส่งกลับ 658 · "รอดำเนินการ 703" ฝั่งเรารอจริง 201 — ส่วนต่างยังไม่รู้ ต้องขอรายการจาก Lumos

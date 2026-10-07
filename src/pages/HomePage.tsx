@@ -413,13 +413,22 @@ const HomePageClassic: React.FC = () => {
 const HomeAiSharePage = lazy(() => import('@/pages/HomeAiSharePage'));
 const HomeV3Page = lazy(() => import('@/pages/HomeV3Page'));
 const TeamOnlinePage = lazy(() => import('@/pages/TeamOnlinePage'));
+const FollowLedgerPage = lazy(() => import('@/pages/FollowLedgerPage'));
 
 const HomePage: React.FC = () => {
   const variant = useHomeVariant();
   if (variant === 'classic') return <HomePageClassic />;
   return (
     <Suspense fallback={null}>
-      {variant === 'online' ? <TeamOnlinePage /> : variant === 'v3' ? <HomeV3Page /> : <HomeAiSharePage />}
+      {variant === 'online' ? (
+        <TeamOnlinePage />
+      ) : variant === 'v3' ? (
+        <HomeV3Page />
+      ) : variant === 'ledger' ? (
+        <FollowLedgerPage />
+      ) : (
+        <HomeAiSharePage />
+      )}
     </Suspense>
   );
 };
