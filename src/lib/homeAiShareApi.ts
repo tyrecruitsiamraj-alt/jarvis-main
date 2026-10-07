@@ -8,7 +8,6 @@ import type {
   AiShareResponse,
   AiShareWindow,
 } from '@/lib/homeAiShare';
-import type { AiShareResultsResponse } from '@/lib/homeCallResults';
 import type { FollowJourneyResponse } from '@/lib/followJourney';
 import type { HomeLumosSummaryResponse } from '@/lib/homeLumosSummary';
 
@@ -51,14 +50,6 @@ export function fetchHomeAiShareList(
   q: AiShareWindow & { bu?: string | null },
 ): Promise<AiShareListResponse> {
   return read<AiShareListResponse>(`/api/home-ai-share${queryOf(q, { list: block, segment: key, page: String(page) })}`);
-}
-
-/** ผลโทรของก้อนเดียว แยก AI/คน (แผง "ผลโทร" · รอบ 18) — ตัวนับล้วน */
-export function fetchHomeAiShareResults(
-  block: AiShareBlockKey,
-  q: AiShareWindow & { bu?: string | null },
-): Promise<AiShareResultsResponse> {
-  return read<AiShareResultsResponse>(`/api/home-ai-share${queryOf(q, { results: block })}`);
 }
 
 /** เส้นทางติดตามทีละขั้น (7 ต.ค. 2569) — ทุกสายในช่วงแบบเบา ไม่มีเบอร์ · หน้านับเอง */

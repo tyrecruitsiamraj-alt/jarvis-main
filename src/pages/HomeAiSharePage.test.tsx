@@ -25,19 +25,16 @@ import {
   type AiShareListResponse,
   type AiShareResponse,
 } from '@/lib/homeAiShare';
-import { emptyCallResultCounts, type AiShareResultsResponse } from '@/lib/homeCallResults';
 import { EVEN_TYPE } from '@/lib/designTokens';
 import { rangeTextFull } from '@/lib/periodPick';
 
 const fetchHomeAiShare = vi.fn();
 const fetchHomeAiShareDetail = vi.fn();
 const fetchHomeAiShareList = vi.fn();
-const fetchHomeAiShareResults = vi.fn();
 vi.mock('@/lib/homeAiShareApi', () => ({
   fetchHomeAiShare: (...a: unknown[]) => fetchHomeAiShare(...a),
   fetchHomeAiShareDetail: (...a: unknown[]) => fetchHomeAiShareDetail(...a),
   fetchHomeAiShareList: (...a: unknown[]) => fetchHomeAiShareList(...a),
-  fetchHomeAiShareResults: (...a: unknown[]) => fetchHomeAiShareResults(...a),
   // สรุปแบบบอท Lumos (7 ต.ค. 2569)
   fetchHomeLumosSummary: (w: { from: string | null; to: string | null }) =>
     Promise.resolve({
@@ -167,22 +164,6 @@ function list(block: AiShareListResponse['block'], key: AiShareListKey, page: nu
   };
 }
 
-/** ผลโทรของหัวข้อหนึ่ง (แผงผลโทร รอบ 18) — ช่วงตามที่ขอ */
-function results(block: AiShareResultsResponse['block'], w: { from: string | null; to: string | null }): AiShareResultsResponse {
-  const follow = block === 'follow' || block === 'aftercare';
-  return {
-    generated_at: '2026-09-30T02:00:00.000Z',
-    block,
-    from: w.from,
-    to: w.to,
-    bu: null,
-    vocab: follow ? 'follow' : 'interest',
-    ai: { ...emptyCallResultCounts(), said_yes: 153, picked_silent: 1, said_no: 3, no_pickup: 15, talked_unclear: 33 },
-    staff: { ...emptyCallResultCounts(), said_yes: 2 },
-    follow_staff_ready: true,
-    error: null,
-  };
-}
 
 
 /** กล่องหนึ่งก้อน (Visual Control รอบ 8 · รอบ 17 เป็นปุ่ม ชื่อปุ่ม = ป้าย + เลข เช่น "AI โทร 205") */
@@ -212,9 +193,6 @@ beforeEach(() => {
   fetchHomeAiShareList
     .mockReset()
     .mockImplementation((block: AiShareListResponse['block'], key: AiShareListKey, page: number) => Promise.resolve(list(block, key, page)));
-  fetchHomeAiShareResults
-    .mockReset()
-    .mockImplementation((block: AiShareResultsResponse['block'], w: { from: string | null; to: string | null }) => Promise.resolve(results(block, w)));
 });
 afterEach(() => cleanup());
 
@@ -513,27 +491,10 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(screen.queryByRole('button', { name: 'กลับ' })).toBeNull();
   });
 
-  it('รอบ 18: แผง "ผลโทร" ปิดไว้เป็นค่าตั้งต้น · แถบหัวบอกมีผลกี่รายชื่อ · กดแล้วกางเห็นผลแต่ละแบบ', async () => {
+  it('🔴 แผง "ผลโทร" ล่างสุดถอดแล้ว (เจ้าของ 7 ต.ค. 2569 "ผลโทร ล่างสุดเอาออกได้เลย")', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    const bar = await screen.findByRole('button', { name: /^ผลโทร/ });
-    expect(bar.getAttribute('aria-expanded')).toBe('false');
-    await waitFor(() => expect(bar.textContent).toContain(`${FOLLOW_TITLE} · มีผล 207 รายชื่อ`));
-    expect(fetchHomeAiShareResults).toHaveBeenCalledWith('follow', win);
-    // รอบ 19: "ใครอยู่ในระบบ" ย้ายไป ตั้งค่า › ผู้ใช้งาน แล้ว — หน้าหลักไม่มีแผงนี้
-    expect(screen.queryByRole('button', { name: /^ใครอยู่ในระบบ/ })).toBeNull();
-    expect(screen.queryByRole('list', { name: `ผลโทร ${FOLLOW_TITLE}` })).toBeNull();
-    fireEvent.click(bar);
-    const list = screen.getByRole('list', { name: `ผลโทร ${FOLLOW_TITLE}` });
-    const rows = within(list).getAllByRole('listitem').map((li) => li.textContent ?? '');
-    // เรียงตามที่เจ้าของไล่: โทรแล้วไป → รับแล้ววาง → รับแล้วไม่ไป (ป้ายจากพจนานุกรมเมตริก)
-    expect(rows.slice(0, 3).map((t) => t.replace(/[\d,]+%?/g, '').trim())).toEqual(['บอกว่าไป', 'รับแล้วเงียบ', 'บอกว่าไม่ไป']);
-    expect(rows[0]).toContain('155');
-    expect(within(list).getAllByRole('listitem')).toHaveLength(7);
-    // จับคู่งานถาม "สนใจไหม"
-    openPicker();
-    fireEvent.click(await screen.findByRole('option', { name: /จับคู่งาน/ }));
-    await waitFor(() => expect(fetchHomeAiShareResults).toHaveBeenLastCalledWith('matching', win));
-    expect(await screen.findByText('ตอบว่าสนใจ')).toBeTruthy();
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+    expect(screen.queryByRole('button', { name: /^ผลโทร/ })).toBeNull();
   });
 
   it('รอบ 18: หน่วยเป็น "รายชื่อ" ทุกหัวข้อ — ไม่เหลือ สาย/ใบ/คน บนกล่อง', async () => {
@@ -623,42 +584,8 @@ describe('กดกล่อง AI โทร / คนโทร ของติ�
   });
 });
 
-describe('แผงผลโทรของติดตาม = ตาราง AI โทร / คนโทร / รวม (7 ต.ค. 2569)', () => {
-  it('ทุกแถว AI + คนโทร = รวม · แถวทั้งหมด = ผลรวม · สลับแท็บแล้วเลขตามแท็บ', async () => {
-    fetchHomeAiShareResults.mockImplementation((block: AiShareResultsResponse['block'], w: { from: string | null; to: string | null }) => {
-      const base = results(block, w);
-      if (block !== 'follow') return Promise.resolve(base);
-      const z = { went: 0, notWent: 0, noAnswer: 0, unclear: 0, waiting: 0, cancelled: 0 };
-      return Promise.resolve({
-        ...base,
-        follow: {
-          main: { ai: { ...z, went: 570, cancelled: 70, waiting: 3 }, staff: { ...z, went: 81, cancelled: 15 } },
-          replacement: { ai: { ...z }, staff: { ...z, cancelled: 11, waiting: 689 } },
-        },
-      });
-    });
-    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    const bar = await screen.findByRole('button', { name: /^ผลโทร/ });
-    fireEvent.click(bar);
-    const table = await screen.findByTestId('home-follow-results');
-    const cells = (label: string) => {
-      const row = within(table)
-        .getAllByRole('row')
-        .find((r) => (r.textContent ?? '').startsWith(label));
-      return within(row!).getAllByRole('cell').map((c) => c.textContent ?? '').filter((t) => /^[\d,]+$/.test(t));
-    };
-    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent).filter(Boolean)).toEqual(['ผล', 'AI โทร', 'คนโทร', 'รวม']);
-    expect(cells('ตอบว่าไป')).toEqual(['570', '81', '651']);
-    expect(cells('รอโทร')).toEqual(['3', '689', '692']);
-    expect(cells('ทั้งหมด')).toEqual(['643', '796', '1,439']);
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'ติดตามส่งคนแทน' }));
-    await waitFor(() => expect(cells('ทั้งหมด')).toEqual(['0', '700', '700']));
-    expect(cells('ตอบว่าไป')).toEqual(['0', '0', '0']);
-  });
-});
-
-describe('เลขตามหัวข้อบอท Lumos ในการ์ดเดิม (7 ต.ค. 2569)', () => {
-  it('ติดตาม = งานติดตาม 5 ช่อง · ผู้สมัคร = งานรับสมัคร + งานเก่า · บวกกันได้ทั้งหมด', async () => {
+describe('การ์ดผลโทร (7 ต.ค. 2569)', () => {
+  it('ติดตาม = โดนัท + รายการ + ตาราง AI/คน/รวม · ผู้สมัคร = งานรับสมัคร + งานเก่า · บวกกันได้ทั้งหมด', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const box = await screen.findByTestId('lumos-stats-follow');
     await waitFor(() => expect(within(box).getByTestId('lumos-follow-รวม').textContent).toContain('1,478'));
@@ -673,10 +600,15 @@ describe('เลขตามหัวข้อบอท Lumos ในการ์
       'AI 469 + 0 + 0 + 15 + 0 + 99 + 90 = 673 · คน 77 + 1 + 1 + 0 + 699 + 3 + 24 = 805',
     );
     expect(within(box).getByText('มีผลการโทร')).toBeTruthy();
+    expect(within(box).getByRole('heading', { name: 'ผลโทร' })).toBeTruthy();
+    // รายการข้างโดนัท: เลข + % ของทั้งหมด (ปัดรวม 100)
+    expect(within(box).getByTestId('result-legend-went').textContent).toContain('546');
+    expect(within(box).getByTestId('result-legend-went').textContent).toContain('37%');
     openPicker();
     fireEvent.click(await screen.findByRole('option', { name: new RegExp(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')!.label) }));
     const apps = await screen.findByTestId('lumos-stats-applicants');
-    await waitFor(() => expect(within(apps).getByTestId('lumos-applicants-total').textContent).toContain('178'));
+    await waitFor(() => expect(within(apps).getByRole('img', { name: /ผลโทร 178/ })).toBeTruthy());
+    expect(within(apps).getByTestId('result-legend-done').textContent).toContain('100');
     expect(within(apps).getByTestId('lumos-applicants-sum').textContent).toBe('100 + 43 + 35 + 0 = 178');
     expect(within(apps).getByTestId('lumos-applicants-backlog').textContent).toContain('46');
     // หัวข้อที่บอทไม่มี = ไม่มีแถวนี้

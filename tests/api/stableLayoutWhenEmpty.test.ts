@@ -32,10 +32,10 @@ describe('ทั้งระบบ: ว่างแล้วทรงเดิ�
     expect(card).toContain('ไม่มีคนที่ติดตามครบ');
   });
 
-  it('หน้าหลัก — แผงผลโทรไม่สลับเป็น "ช่วงนี้ยังไม่มีผลโทร" · แถบไม่หารศูนย์', () => {
-    const p = read('src/components/home-ai-share/HomeCallResultsPanel.tsx');
-    expect(p).not.toContain('ช่วงนี้ยังไม่มีผลโทร');
-    expect(p).toContain('table.total > 0 ? (r.ai / table.total) * 100 : 0');
+  it('หน้าหลัก — การ์ดผลโทร: ว่าง = โดนัทวงเทาเต็มวง (ไม่หาย) · ตารางมีหัวเสมอ (แผงผลโทรล่างสุดถอดแล้ว 7 ต.ค. 2569)', () => {
+    const p = read('src/components/home-ai-share/AiShareLumosStats.tsx');
+    expect(p).not.toContain('ยังไม่มีผลโทร');
+    expect(p).toContain("data.length ? data : [{ key: 'empty', value: 1 }]");
   });
 
   it('กล่องงาน › ภาพรวม — เส้นทางของรายชื่อ/กรอกแล้วโทรวันไหนเป็น 0 · ตารางรายวัน/ช่องทางมีหัวเสมอ', () => {

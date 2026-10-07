@@ -39,8 +39,8 @@ import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
 import FollowCallerDialog from '@/components/home-ai-share/FollowCallerDialog';
 import AiShareLumosStats from '@/components/home-ai-share/AiShareLumosStats';
-import HomeCallResultsPanel from '@/components/home-ai-share/HomeCallResultsPanel';
 import PeriodPicker from '@/components/shared/PeriodPicker';
+import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AI_SHARE_UNIT,
@@ -405,13 +405,13 @@ const HomeAiSharePage: React.FC = () => {
         onPick={openList}
         hideNotCalled={meta.key === 'follow'}
         liveKey={`${meta.key}|${cardWin.from ?? ''}|${cardWin.to ?? ''}`}
-      >
-        {/* เลขตามหัวข้อบอท Lumos (7 ต.ค. 2569 · Choice "ในการ์ดเดิมตาม Dropdown") — ติดตาม/ผู้สมัครเท่านั้น */}
-        {meta.key === 'follow' || meta.key === 'applicants' ? (
-          <div className="mb-5 border-b border-foreground/10 pb-5">
-            <AiShareLumosStats block={meta.key} win={cardWin} tick={tick} />
-          </div>
-        ) : null}
+      />
+
+      {/* ผลโทร (เจ้าของ 7 ต.ค. 2569 "งานติดตาม เปลี่ยนเป็น ผลโทร") — ติดตาม/ผู้สมัครเท่านั้น · ช่วงตามแท่งที่กด */}
+      <AiShareLumosStats block={meta.key} win={cardWin} tick={tick} unit={meta.unit} />
+
+      {/* ยอดใช้งานรายวัน + รวมทั้งช่วง — การ์ดของตัวเอง (ลำดับตามที่เจ้าของไล่ 7 ต.ค. 2569) */}
+      <Card variant="glass" className="p-5 sm:p-6">
         <AiShareDetail
           withTeams={meta.key === 'follow'}
           hideNotCalled={meta.key === 'follow'}
@@ -424,7 +424,7 @@ const HomeAiSharePage: React.FC = () => {
           loading={detailLoading}
           error={detailError}
         />
-      </AiShareCard>
+      </Card>
 
       {/* หัวข้อติดตาม กด AI โทร / คนโทร = แยกเรื่อง → ผล → รายชื่อ (เจ้าของ 7 ต.ค. 2569 "ป๊อปเดิม เปลี่ยนข้างใน") */}
       <FollowCallerDialog
@@ -450,8 +450,6 @@ const HomeAiSharePage: React.FC = () => {
         count={counts ? counts[listKey] : null}
       />
 
-      {/* ผลโทร ซ่อนไว้ กดแล้วกาง (รอบ 18) · "ใครอยู่ในระบบ" ย้ายไป ตั้งค่า › ผู้ใช้งาน แล้ว (รอบ 19) */}
-      <HomeCallResultsPanel block={meta.key} blockTitle={meta.title} win={cardWin} tick={tick} />
     </div>
   );
 };
