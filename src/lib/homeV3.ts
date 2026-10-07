@@ -12,15 +12,13 @@
  *    หน้าเดิมยังเรียกได้ที่ `?home=classic` และโค้ดยังอยู่ครบ เป็นทางถอย (กติกา safe implementation)
  */
 import * as React from 'react';
-import { useLocation } from 'react-router-dom';
 
 export const HOME_V3_KEY = 'jarvis.home.v3';
 
-/** `ledger` = สมุดบัญชีติดตาม (7 ต.ค. 2569 · เปิดจากปุ่มบนหน้าหลัก) — ไม่จำในเครื่อง เปิดหน้าหลักใหม่ = หน้าหลักเดิม */
-export type HomeVariant = 'new' | 'classic' | 'v3' | 'online' | 'ledger';
+export type HomeVariant = 'new' | 'classic' | 'v3' | 'online';
 
 const isVariant = (v: unknown): v is HomeVariant =>
-  v === 'new' || v === 'classic' || v === 'v3' || v === 'online' || v === 'ledger';
+  v === 'new' || v === 'classic' || v === 'v3' || v === 'online';
 
 function paramMode(): HomeVariant | null {
   try {
@@ -37,7 +35,7 @@ export function homeVariant(): HomeVariant {
   try {
     // 'new' = ค่าตั้งต้น ⇒ ล้างค่าจำ · โฉมอื่นเก็บชื่อไว้ (v3 เก็บ '1' เดิมเพื่อความเข้ากันได้)
     if (forced === 'new') window.localStorage.removeItem(HOME_V3_KEY);
-    else if (forced && forced !== 'ledger') window.localStorage.setItem(HOME_V3_KEY, forced === 'v3' ? '1' : forced);
+    else if (forced) window.localStorage.setItem(HOME_V3_KEY, forced === 'v3' ? '1' : forced);
   } catch {
     /* ปิด storage ก็ปล่อยผ่าน — URL ยังสั่งได้ต่อรอบ */
   }
@@ -55,9 +53,7 @@ export function isHomeV3(): boolean {
   return homeVariant() === 'v3';
 }
 
-/** อ่านครั้งเดียวต่อ URL — กันหน้าสลับกลางทาง · กดปุ่มสมุดบัญชี/กลับหน้าหลัก (เปลี่ยน `?home=`) แล้วอ่านใหม่ */
+/** อ่านครั้งเดียวต่อการเปิดหน้า — กันหน้าสลับกลางทาง */
 export function useHomeVariant(): HomeVariant {
-  const { search } = useLocation();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- อ่านจาก window.location ตาม URL ที่เปลี่ยน
-  return React.useMemo(() => homeVariant(), [search]);
+  return React.useMemo(() => homeVariant(), []);
 }
