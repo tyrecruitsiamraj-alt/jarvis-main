@@ -91,3 +91,21 @@ describe('channelDeleteWarning', () => {
     expect(channelDeleteWarning({ name: 'Jobthai' })).toContain('ลิงก์ที่สร้างไว้แล้วยังใช้ได้');
   });
 });
+
+describe('ลบหลายรายการ (เจ้าของ 7 ต.ค. 2569)', async () => {
+  const { channelBulkDeleteSummary } = await import('../../src/lib/recruitChannelAdmin');
+  it('รวมจำนวนช่องทางรองที่จะหายไปด้วย', () => {
+    const s = channelBulkDeleteSummary([
+      { name: 'Facebook Group', childCount: 36 },
+      { name: 'Tiktok', childCount: 0 },
+      { name: 'Line', childCount: 1 },
+    ]);
+    expect(s.count).toBe(3);
+    expect(s.kids).toBe(37);
+    expect(s.title).toBe('ลบ 3 ช่องทาง?');
+    expect(s.detail).toContain('ช่องทางรองข้างใต้ 37 ช่องจะถูกลบไปด้วย');
+  });
+  it('ช่องทางรอง (ไม่มีลูก) = ไม่เตือนเรื่องลูก', () => {
+    expect(channelBulkDeleteSummary([{ name: 'กลุ่ม ก' }, { name: 'กลุ่ม ข' }]).detail).toBe('ลิงก์ที่สร้างไว้แล้วยังใช้ได้');
+  });
+});

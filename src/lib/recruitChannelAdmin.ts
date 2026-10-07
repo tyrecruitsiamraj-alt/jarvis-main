@@ -87,3 +87,26 @@ export function channelDeleteWarning(channel: { name: string; childCount?: numbe
   }
   return `ลบ "${channel.name}" ใช่ไหม? (ลิงก์ที่สร้างไว้แล้วยังใช้ได้)`;
 }
+
+/**
+ * สรุปก่อนลบหลายรายการ (เจ้าของ 7 ต.ค. 2569: *"ช่องทางหลัก ช่องทาง ทำให้เลือกมี Checkbox และ ลบทีละหลายๆรายการได้"*)
+ * 🔴 ลบช่องทางหลัก = ลบช่องทางรองข้างใต้ไปด้วย (FK cascade) — รวมยอดให้เห็นก่อนยืนยันเสมอ (กติกาเดียวกับลบทีละอัน)
+ */
+export function channelBulkDeleteSummary(rows: ReadonlyArray<{ name: string; childCount?: number }>): {
+  count: number;
+  kids: number;
+  title: string;
+  detail: string;
+} {
+  const count = rows.length;
+  const kids = rows.reduce((s, r) => s + Math.max(0, Math.trunc(Number(r.childCount)) || 0), 0);
+  return {
+    count,
+    kids,
+    title: `ลบ ${count.toLocaleString('th-TH')} ช่องทาง?`,
+    detail:
+      kids > 0
+        ? `ช่องทางรองข้างใต้ ${kids.toLocaleString('th-TH')} ช่องจะถูกลบไปด้วย · ลิงก์ที่สร้างไว้แล้วยังใช้ได้`
+        : 'ลิงก์ที่สร้างไว้แล้วยังใช้ได้',
+  };
+}

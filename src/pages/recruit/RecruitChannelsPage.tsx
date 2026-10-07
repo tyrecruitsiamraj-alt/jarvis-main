@@ -2,6 +2,18 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, LoaderCircle, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 
 import PageHeader from '@/components/shared/PageHeader';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import {
@@ -15,6 +27,7 @@ import type { RecruitChannel } from '@/lib/recruitPostings';
 import {
   CHANNEL_ADMIN_PAGE_SIZE,
   CHANNEL_ADMIN_VIEW_LABEL,
+  channelBulkDeleteSummary,
   channelDeleteWarning,
   channelNameChanged,
   channelNameError,
@@ -171,6 +184,13 @@ const RecruitChannelsPage: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  /**
+   * เลือกหลายแถวแล้วลบทีเดียว (เจ้าของ 7 ต.ค. 2569: *"ทำให้เลือกมี Checkbox และ ลบทีละหลายๆรายการได้"*)
+   * เก็บทั้งแถว (ไม่ใช่แค่ id) — ต้องรู้จำนวนช่องทางรองของแต่ละพ่อตอนสรุปก่อนลบ · เลือกข้ามหน้าได้ · เปลี่ยนแท็บ/คำค้น = ล้าง
+   */
+  const [selected, setSelected] = useState<Map<string, RecruitChannel>>(() => new Map());
+  const [bulkAsk, setBulkAsk] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   /** ลำดับคำขอ — คำตอบที่มาช้ากว่าคำขอใหม่ต้องถูกทิ้ง ไม่งั้นผลเก่าทับผลใหม่ */
   const seqRef = useRef(0);
@@ -188,6 +208,7 @@ const RecruitChannelsPage: React.FC = () => {
   // เปลี่ยนคำค้น/มุมมอง/ตัวกรองพ่อ = กลับหน้าแรกเสมอ (ไม่งั้นค้างหน้า 7 ของผลเก่า)
   useEffect(() => {
     setPage(1);
+    setSelected(new Map());
   }, [debounced, view, parentFilter]);
 
   /**
@@ -349,6 +370,49 @@ const RecruitChannelsPage: React.FC = () => {
     }
   };
 
+  const toggleRow = (row: RecruitChannel, on: boolean) =>
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (on) next.set(row.id, row);
+      else next.delete(row.id);
+      return next;
+    });
+  const pageAllOn = rows.length > 0 && rows.every((r) => selected.has(r.id));
+  const pageSomeOn = rows.some((r) => selected.has(r.id));
+  const togglePage = (on: boolean) =>
+    setSelected((prev) => {
+      const next = new Map(prev);
+      for (const r of rows) {
+        if (on) next.set(r.id, r);
+        else next.delete(r.id);
+      }
+      return next;
+    });
+  const bulk = channelBulkDeleteSummary([...selected.values()]);
+
+  /** ลบทีละตัวตามลำดับ (API ลบได้ทีละ id) · บางตัวล้ม = บอกจำนวนที่ล้ม ตัวที่ลบได้ก็ลบไปแล้ว */
+  const onBulkDelete = async () => {
+    const list = [...selected.values()];
+    setBulkBusy(true);
+    setError('');
+    let failed = 0;
+    let lastError = '';
+    for (const row of list) {
+      try {
+        await deleteRecruitChannel(row.id);
+      } catch (e) {
+        failed += 1;
+        lastError = e instanceof Error ? e.message : 'ลบไม่สำเร็จ';
+      }
+    }
+    setBulkBusy(false);
+    setBulkAsk(false);
+    setSelected(new Map());
+    await Promise.all([load(), loadRoots()]);
+    if (failed > 0) setError(`ลบไม่สำเร็จ ${failed.toLocaleString('th-TH')} รายการ (${lastError})`);
+    if (list.length - failed > 0) flash(`ลบแล้ว ${(list.length - failed).toLocaleString('th-TH')} รายการ`);
+  };
+
   if (!canManage) {
     return (
       <div className="min-h-screen">
@@ -498,9 +562,39 @@ const RecruitChannelsPage: React.FC = () => {
               {debounced ? 'ไม่เจอช่องทางที่ตรงกับคำค้น' : 'ยังไม่มีช่องทางในมุมมองนี้'}
             </p>
           ) : (
+            <>
+            {/* เลือกทั้งหน้า + ลบที่เลือก (7 ต.ค. 2569) */}
+            <div className="flex flex-wrap items-center gap-3 border-b border-border px-3 py-2" data-testid="channel-bulk-bar">
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                <Checkbox
+                  checked={pageAllOn ? true : pageSomeOn ? 'indeterminate' : false}
+                  onCheckedChange={(v) => togglePage(v === true)}
+                  aria-label="เลือกทั้งหน้านี้"
+                />
+                เลือกทั้งหน้านี้
+              </label>
+              {selected.size > 0 ? (
+                <>
+                  <span className="text-xs tabular-nums text-foreground">เลือกแล้ว {selected.size.toLocaleString('th-TH')}</span>
+                  <Button type="button" size="xs" variant="destructive" disabled={bulkBusy} onClick={() => setBulkAsk(true)}>
+                    <Trash2 aria-hidden />
+                    ลบที่เลือก
+                  </Button>
+                  <Button type="button" size="xs" variant="ghost" disabled={bulkBusy} onClick={() => setSelected(new Map())}>
+                    ยกเลิกที่เลือก
+                  </Button>
+                </>
+              ) : null}
+            </div>
             <ul className="divide-y divide-border">
               {rows.map((row) => (
                 <li key={row.id} className="flex items-center gap-2 px-3 py-2.5">
+                  <Checkbox
+                    checked={selected.has(row.id)}
+                    onCheckedChange={(v) => toggleRow(row, v === true)}
+                    disabled={bulkBusy}
+                    aria-label={`เลือก ${row.name}`}
+                  />
                   <div className="min-w-0 flex-1">
                     {editingId === row.id ? (
                       <div className="flex gap-2">
@@ -589,8 +683,43 @@ const RecruitChannelsPage: React.FC = () => {
                 </li>
               ))}
             </ul>
+            </>
           )}
         </div>
+
+        <AlertDialog open={bulkAsk} onOpenChange={(v) => !bulkBusy && setBulkAsk(v)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{bulk.title}</AlertDialogTitle>
+              <AlertDialogDescription>{bulk.detail}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <ul className="max-h-40 space-y-0.5 overflow-y-auto text-sm text-foreground" data-testid="channel-bulk-list">
+              {[...selected.values()].slice(0, 8).map((r) => (
+                <li key={r.id} className="truncate">
+                  {r.name}
+                  {r.childCount ? (
+                    <span className="text-muted-foreground"> · ช่องทางรอง {r.childCount.toLocaleString('th-TH')}</span>
+                  ) : null}
+                </li>
+              ))}
+              {selected.size > 8 ? (
+                <li className="text-muted-foreground">และอีก {(selected.size - 8).toLocaleString('th-TH')} รายการ</li>
+              ) : null}
+            </ul>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={bulkBusy}>ยกเลิก</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={bulkBusy}
+                onClick={(e) => {
+                  e.preventDefault();
+                  void onBulkDelete();
+                }}
+              >
+                {bulkBusy ? 'กำลังลบ…' : `ลบ ${bulk.count.toLocaleString('th-TH')} ช่องทาง`}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* แบ่งหน้า */}
         <div className="flex flex-wrap items-center justify-between gap-2">
