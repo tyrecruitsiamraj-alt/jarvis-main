@@ -37,18 +37,30 @@ type ToneKey = keyof typeof TONE;
 type Slice = { key: string; label: string; tone: ToneKey; value: number };
 
 /** คอลัมน์ของงานติดตาม — สีชุดเดียวกับหน้าติดตาม (ขอเลื่อน = ส้ม แยกจากสรุปไม่ได้ให้เห็นบนโดนัท) */
-const FOLLOW_COLS: ReadonlyArray<{ key: FollowBucketKey; label: string; tone: ToneKey }> = [
+const FOLLOW_COLS: ReadonlyArray<{
+  key: FollowBucketKey;
+  label: string;
+  tone: ToneKey;
+}> = [
   { key: 'went', label: 'ไป', tone: FOLLOW_MATRIX_COL_TONE.went },
   { key: 'notWent', label: 'ไม่ไป', tone: FOLLOW_MATRIX_COL_TONE.notWent },
   { key: 'reschedule', label: 'ขอเลื่อน', tone: 'orange' },
   { key: 'unclear', label: 'สรุปไม่ได้', tone: FOLLOW_MATRIX_COL_TONE.unclear },
-  { key: 'waiting', label: 'รอดำเนินการ', tone: FOLLOW_MATRIX_COL_TONE.waiting },
+  {
+    key: 'waiting',
+    label: 'รอดำเนินการ',
+    tone: FOLLOW_MATRIX_COL_TONE.waiting,
+  },
   { key: 'failed', label: 'ล้มเหลว', tone: FOLLOW_MATRIX_COL_TONE.noAnswer },
   { key: 'cancelled', label: 'ยกเลิก', tone: FOLLOW_MATRIX_COL_TONE.cancelled },
 ];
 const DONE_KEYS: readonly FollowBucketKey[] = ['went', 'notWent', 'reschedule', 'unclear'];
 
-const APPLICANT_COLS: ReadonlyArray<{ key: Exclude<keyof LumosBucket, 'total'>; label: string; tone: ToneKey }> = [
+const APPLICANT_COLS: ReadonlyArray<{
+  key: Exclude<keyof LumosBucket, 'total'>;
+  label: string;
+  tone: ToneKey;
+}> = [
   { key: 'done', label: 'มีผลแล้ว', tone: 'success' },
   { key: 'waiting', label: 'ยังรอ', tone: 'info' },
   { key: 'failed', label: 'ล้มเหลว', tone: 'warn' },
@@ -130,12 +142,12 @@ function Legend({ slices, groups }: { slices: Slice[]; groups?: Array<{ label: s
   );
 }
 
-const AiShareLumosStats: React.FC<{ block: AiShareBlockKey; win: AiShareWindow; tick: number; unit: string }> = ({
-  block,
-  win,
-  tick,
-  unit,
-}) => {
+const AiShareLumosStats: React.FC<{
+  block: AiShareBlockKey;
+  win: AiShareWindow;
+  tick: number;
+  unit: string;
+}> = ({ block, win, tick, unit }) => {
   const shown = block === 'follow' || block === 'applicants';
   const [data, setData] = useState<HomeLumosSummaryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -191,12 +203,18 @@ const AiShareLumosStats: React.FC<{ block: AiShareBlockKey; win: AiShareWindow; 
   );
 };
 
-const followSumText = (b: FollowBucket) => `${FOLLOW_BUCKET_KEYS.map((k) => NUM.format(b[k])).join(' + ')} = ${NUM.format(followBucketSum(b))}`;
+const followSumText = (b: FollowBucket) =>
+  `${FOLLOW_BUCKET_KEYS.map((k) => NUM.format(b[k])).join(' + ')} = ${NUM.format(followBucketSum(b))}`;
 
 /** ติดตาม — โดนัทของรวม + รายการ · ตาราง AI โทร / คนโทร / รวม */
 function FollowResults({ split, unit }: { split: { ai: FollowBucket; staff: FollowBucket } | null; unit: string }) {
   const all = split ? sumFollowBuckets(split.ai, split.staff) : null;
-  const slices: Slice[] = FOLLOW_COLS.map((c) => ({ key: c.key, label: c.label, tone: c.tone, value: all ? all[c.key] : 0 }));
+  const slices: Slice[] = FOLLOW_COLS.map((c) => ({
+    key: c.key,
+    label: c.label,
+    tone: c.tone,
+    value: all ? all[c.key] : 0,
+  }));
   const rows: Array<[string, FollowBucket | null]> = [
     ['AI โทร', split?.ai ?? null],
     ['คนโทร', split?.staff ?? null],
@@ -210,7 +228,11 @@ function FollowResults({ split, unit }: { split: { ai: FollowBucket; staff: Foll
           <Donut slices={slices} total={all ? all.total : null} unit={unit} label={`ผลโทร ${all ? NUM.format(all.total) : ''} ${unit}`} />
         </div>
         <div className="md:col-span-3">
-          {all ? <Legend slices={slices} groups={[{ label: 'มีผลการโทร', keys: DONE_KEYS }]} /> : <Skeleton className="h-56 w-full rounded-xl" />}
+          {all ? (
+            <Legend slices={slices} groups={[{ label: 'มีผลการโทร', keys: DONE_KEYS }]} />
+          ) : (
+            <Skeleton className="h-56 w-full rounded-xl" />
+          )}
         </div>
       </div>
 
@@ -242,7 +264,11 @@ function FollowResults({ split, unit }: { split: { ai: FollowBucket; staff: Foll
                   {FOLLOW_COLS.map((c) => (
                     <TableCell
                       key={c.key}
-                      className={cn('text-right tabular-nums', strong && 'font-medium', b && b[c.key] > 0 ? 'text-foreground' : 'text-muted-foreground')}
+                      className={cn(
+                        'text-right tabular-nums',
+                        strong && 'font-medium',
+                        b && b[c.key] > 0 ? 'text-foreground' : 'text-muted-foreground',
+                      )}
                     >
                       {b ? NUM.format(b[c.key]) : '—'}
                     </TableCell>
@@ -265,7 +291,12 @@ function FollowResults({ split, unit }: { split: { ai: FollowBucket; staff: Foll
 
 /** ผู้สมัคร — งานที่ส่งให้ AI · โดนัท + รายการ + งานเก่า */
 function ApplicantResults({ b, backlog, unit }: { b: LumosBucket | null; backlog: number | null; unit: string }) {
-  const slices: Slice[] = APPLICANT_COLS.map((c) => ({ key: c.key, label: c.label, tone: c.tone, value: b ? b[c.key] : 0 }));
+  const slices: Slice[] = APPLICANT_COLS.map((c) => ({
+    key: c.key,
+    label: c.label,
+    tone: c.tone,
+    value: b ? b[c.key] : 0,
+  }));
   return (
     <div className="space-y-6">
       <div className="grid items-center gap-6 md:grid-cols-5">
@@ -275,14 +306,16 @@ function ApplicantResults({ b, backlog, unit }: { b: LumosBucket | null; backlog
         <div className="space-y-4 md:col-span-3">
           {b ? <Legend slices={slices} /> : <Skeleton className="h-40 w-full rounded-xl" />}
           <div className="flex items-center gap-3 border-t border-foreground/10 pt-4 text-sm" data-testid="lumos-applicants-backlog">
-            <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', TONE.warn.dot)} aria-hidden />
             <span className="flex-1 text-foreground">งานเก่าที่ต้องติดตาม</span>
             <span className="text-base font-medium tabular-nums text-foreground">{backlog === null ? '—' : NUM.format(backlog)}</span>
           </div>
         </div>
       </div>
       {b ? (
-        <p className={cn('text-xs tabular-nums', lumosBucketAddsUp(b) ? 'text-muted-foreground' : TONE.danger.value)} data-testid="lumos-applicants-sum">
+        <p
+          className={cn('text-xs tabular-nums', lumosBucketAddsUp(b) ? 'text-muted-foreground' : TONE.danger.value)}
+          data-testid="lumos-applicants-sum"
+        >
           {APPLICANT_COLS.map((c) => NUM.format(b[c.key])).join(' + ')} = {NUM.format(b.done + b.waiting + b.failed + b.cancelled)}
           {lumosBucketAddsUp(b) ? '' : ` · ไม่ตรงกับ ${NUM.format(b.total)}`}
         </p>

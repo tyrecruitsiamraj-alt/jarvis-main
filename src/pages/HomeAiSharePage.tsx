@@ -34,16 +34,24 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveTick } from '@/hooks/useLiveTick';
 import { toYmdBangkok } from '@/lib/dateTh';
-import AiShareCard, { type AiShareCardProps } from '@/components/home-ai-share/AiShareCard';
+import { followRangeRows, KpiTile, RangeSummary } from '@/components/home-ai-share/HomeKpis';
+import { segmentDotClass, segmentFillClass } from '@/components/home-ai-share/segmentStyle';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { metricHelp, type MetricKey } from '@/lib/metricDictionary';
+import { countPill } from '@/lib/teamOnline';
 import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
 import FollowCallerDialog from '@/components/home-ai-share/FollowCallerDialog';
 import AiShareLumosStats from '@/components/home-ai-share/AiShareLumosStats';
 import PeriodPicker from '@/components/shared/PeriodPicker';
 import { Card } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
+  AI_SHARE_SEGMENTS,
+  AI_SHARE_SEGMENT_LABEL,
   AI_SHARE_UNIT,
+  segmentsOfTotal,
+  type AiShareSegment,
+  type FollowTeamBreakdown,
   defaultAiShareWindow,
   isAiShareBlock,
   sharesOfCalled,
@@ -87,9 +95,9 @@ const STAFF_NOT_READY = 'ยังนับรายชื่อที่คน�
 type BlockMeta = {
   key: AiShareBlockKey;
   title: string;
-  unit: AiShareCardProps['unit'];
+  unit: string;
   withBoth: boolean;
-  metrics: AiShareCardProps['metrics'];
+  metrics: { total: MetricKey } & Record<AiShareSegment, MetricKey | null>;
 };
 
 /** ชื่อเมนูของหน้านั้น — คำในตัวเลือกต้องตรงกับเมนู (เจ้าของสั่ง 4 ต.ค. 2569) */
@@ -169,6 +177,9 @@ const HomeAiSharePage: React.FC = () => {
     setFocus(null);
   }, [win, block]);
   const cardWin = focus ?? win;
+  /** "รวมทั้งช่วง" คอลัมน์ขวา — ตัวแตกทีมจากกราฟ (แท่งที่กด/ทั้งช่วง) · ปุ่มดูทั้งช่วง = เพิ่มเลขรอบ */
+  const [teamSplit, setTeamSplit] = useState<{ label: string; picked: boolean; data: FollowTeamBreakdown } | null>(null);
+  const [resetSeq, setResetSeq] = useState(0);
   const choose = (v: string) => {
     if (!isAiShareBlock(v)) return;
     setBlock(v);
@@ -336,24 +347,43 @@ const HomeAiSharePage: React.FC = () => {
     return s ? `AI ${NUM.format(s.ai)}%` : 'AI —';
   };
 
+  /**
+   * หัวข้อเป็นปุ่มเม็ดยาวเรียงกัน (เจ้าของ 7 ต.ค. 2569 Choice "ปุ่มเม็ดยาวเรียงกัน" จากภาพอ้างอิง) — แทน Dropdown
+   * AI % ของแต่ละหัวข้อขึ้นตอนจี้ (`noteOf`) · ปุ่มที่เลือก = เบอร์กันดี (`primary`)
+   */
   const picker = (
-    <Select value={meta.key} onValueChange={choose}>
-      {/* `!` = ชนะ `.jarvis-soft-field` ของ SelectTrigger ซึ่งอยู่ชั้น utilities หลัง Tailwind (แบบเดียวกับ TONE.bar) */}
-      <SelectTrigger aria-label="เลือกหัวข้อ" className="h-10 min-w-52 gap-3 !w-auto !rounded-full !text-base font-medium">
-        <SelectValue>{meta.title}</SelectValue>
-      </SelectTrigger>
-      <SelectContent className={cn('rounded-xl', EVEN_TYPE)}>
+    <Tabs value={meta.key} onValueChange={choose}>
+      <TabsList aria-label="เลือกหัวข้อ" className="h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
         {BLOCKS.map((b) => (
-          <SelectItem key={b.key} value={b.key} className="py-2">
-            <span className="flex w-80 items-center justify-between gap-6">
-              <span>{b.title}</span>
-              <span className="text-xs text-muted-foreground tabular-nums">{noteOf(b.key)}</span>
-            </span>
-          </SelectItem>
+          <TabsTrigger
+            key={b.key}
+            value={b.key}
+            title={noteOf(b.key)}
+            className="h-10 rounded-full border border-foreground/10 bg-card px-5 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+          >
+            {b.title}
+          </TabsTrigger>
         ))}
-      </SelectContent>
-    </Select>
+      </TabsList>
+    </Tabs>
   );
+
+  // ── กล่องตัวเลข (โฉมผู้บริหาร 7 ต.ค. 2569 · `HomeKpis`) ──
+  const showBoth = meta.withBoth || (counts?.both ?? 0) > 0;
+  const segs = AI_SHARE_SEGMENTS.filter((k) => (k !== 'both' || showBoth) && (k !== 'notCalled' || meta.key !== 'follow'));
+  const shareOf = counts ? new Map(segmentsOfTotal(counts).map((x) => [x.key, x.pct])) : null;
+  const prevCounts = prev ? prev[meta.key] : null;
+  const pillOf = (cur: number, p: number | undefined) => (prevCounts && p !== undefined ? countPill(cur, p, null) : null);
+  const compareTitle = prev ? `เทียบกับ ${rangeText(prev.from, prev.to)} ช่วงเวลาเดียวกัน` : undefined;
+  // เลขมาถึงครั้งแรก = ขึ้นทันที ไม่วิ่งจาก 0 (คีย์เปลี่ยนตอนมีข้อมูล) · อัปเดตสดรอบต่อไปจึงค่อยวิ่ง
+  const liveKey = `${meta.key}|${cardWin.from ?? ''}|${cardWin.to ?? ''}|${counts ? 'on' : 'off'}`;
+  const total = counts?.total ?? 0;
+  const helpOf = (k: AiShareSegment) => {
+    const key = meta.metrics[k];
+    const help = key ? metricHelp(key) : undefined;
+    return k === 'notCalled' && hint ? [help, hint].filter(Boolean).join('\n') : help;
+  };
+  const hasResults = meta.key === 'follow' || meta.key === 'applicants';
 
   return (
     // ช่องไฟ + ระยะบรรทัดเท่ากันทั้งหน้า (รอบ 18 · `EVEN_TYPE`) — ป๊อป/แผงที่ลอยออกนอกหน้าใส่ของตัวเองอีกที
@@ -366,17 +396,10 @@ const HomeAiSharePage: React.FC = () => {
         <div className="absolute bottom-10 right-1/4 h-72 w-72 rounded-full bg-primary/10 blur-3xl dark:bg-primary/10" />
       </div>
 
-      {/* ฝั่งซ้ายทั้งแถว (รอบ 17 · เจ้าของ: "calendar และ Dropdown ย้ายไปฝั่งซ้าย") — ชื่อหน้า → ปฏิทิน → dropdown หัวข้อ */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <h1 className="text-2xl font-light text-foreground">หน้าหลัก</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* ปุ่มปฏิทินเป็นไอคอนอย่างเดียว ไม่มีคำนำหน้า (เจ้าของสั่งถอดทั้ง "7 วันล่าสุด" และ "ช่วง" 30 ก.ย. 2569) */}
-          <PeriodPicker value={win} onChange={setWin} />
-          {/* dropdown หัวข้ออยู่ข้างปฏิทิน (รอบ 10 · เจ้าของ: "ย้าย Dropdown ไปไว้ข้าง calendar") สูงเท่าปุ่มปฏิทิน */}
-          {picker}
-          {current?.forced_bu && current.bu ? (
-            <span className="text-sm text-muted-foreground">{trendBuLabel(current.bu)}</span>
-          ) : null}
+      {/* หัวหน้า (เจ้าของ 7 ต.ค. 2569 ภาพอ้างอิง): ชื่อหน้าใหญ่ → แถวปฏิทิน + ปุ่มหัวข้อ */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-4xl font-light text-foreground">หน้าหลัก</h1>
           {/* จุดเขียวกระพริบ = กำลังอัปเดตสด · เวลาที่เลขชุดนี้มาถึง (ช่วงที่จบไปแล้ว = ไม่มีจุด) */}
           {updatedAt ? (
             <span className="inline-flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" data-testid="home-live">
@@ -385,46 +408,95 @@ const HomeAiSharePage: React.FC = () => {
             </span>
           ) : null}
         </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* ปุ่มปฏิทินเป็นไอคอนอย่างเดียว ไม่มีคำนำหน้า (เจ้าของสั่งถอดทั้ง "7 วันล่าสุด" และ "ช่วง" 30 ก.ย. 2569) */}
+          <PeriodPicker value={win} onChange={setWin} />
+          {picker}
+          {current?.forced_bu && current.bu ? (
+            <span className="text-sm text-muted-foreground">{trendBuLabel(current.bu)}</span>
+          ) : null}
+        </div>
       </div>
 
       {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
 
-      <AiShareCard
-        title={meta.title}
-        unit={meta.unit}
-        counts={counts}
-        loading={loading}
-        error={blockError}
-        withBoth={meta.withBoth}
-        metrics={meta.metrics}
-        notCalledHint={hint}
-        flag={flag}
-        previous={prev ? prev[meta.key] : null}
-        previousLabel={prev?.label ?? null}
-        previousRange={prev ? rangeText(prev.from, prev.to) : null}
-        onPick={openList}
-        hideNotCalled={meta.key === 'follow'}
-        liveKey={`${meta.key}|${cardWin.from ?? ''}|${cardWin.to ?? ''}`}
-      />
+      {/*
+        เลย์เอาต์แบบภาพอ้างอิง (Choice "แบบภาพ"): ซ้าย 2 ส่วน = กราฟรายวัน → ผลโทร · ขวา = ทั้งหมด (กรมท่า) → AI/คน → รวมทั้งช่วง
+        ลำดับใน DOM = คอลัมน์ขวา → ซ้าย · จอกว้างวางด้วย col/row-start
+      */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <h2 className="sr-only">{meta.title}</h2>
+        <div className="min-w-0 space-y-5 self-start lg:col-start-3 lg:row-start-1">
+          <KpiTile
+            emphasis
+            label="ทั้งหมด"
+            value={total}
+            unit={meta.unit}
+            liveKey={liveKey}
+            loading={loading && !counts}
+            pill={pillOf(total, prevCounts?.total)}
+            pillTitle={compareTitle}
+            foot={prevCounts && prev?.label ? `${prev.label} ${NUM.format(prevCounts.total)}` : null}
+            hint={metricHelp(meta.metrics.total)}
+            onClick={() => openList('total')}
+          />
+          {/* AI โทร / คนโทร (+ ทั้งสองทาง · ยังไม่โทร) ใต้กล่องทั้งหมด — 2 คอลัมน์ */}
+          <div className="grid grid-cols-2 gap-4 [&>*]:min-w-0">
+            {segs.map((k) => (
+              <KpiTile
+                key={k}
+                label={AI_SHARE_SEGMENT_LABEL[k]}
+                value={counts ? counts[k] : 0}
+                liveKey={liveKey}
+                loading={loading && !counts}
+                dotClass={segmentDotClass(k)}
+                share={shareOf?.get(k) ?? 0}
+                shareClass={segmentFillClass(k)}
+                pill={counts ? pillOf(counts[k], prevCounts?.[k]) : null}
+                pillTitle={compareTitle}
+                hint={helpOf(k)}
+                onClick={() => openList(k)}
+              />
+            ))}
+          </div>
+          {blockError ? <p className={cn('text-xs', TONE.danger.value)}>{blockError}</p> : null}
+          {flag ? <p className={cn('text-xs', TONE.warn.value)}>{flag}</p> : null}
+          {/* รวมทั้งช่วง = แยก 2 แท็บของติดตาม (หัวข้ออื่นซ้ำกับกล่องด้านบน เลยไม่มี) */}
+          {meta.key === 'follow' ? (
+            <RangeSummary
+              title={teamSplit?.label ?? 'รวมทั้งช่วง'}
+              rows={teamSplit ? followRangeRows(teamSplit.data) : null}
+              unit={meta.unit}
+              onClear={teamSplit?.picked ? () => setResetSeq((n) => n + 1) : undefined}
+              testId="follow-team-breakdown"
+            />
+          ) : null}
+        </div>
 
-      {/* ผลโทร (เจ้าของ 7 ต.ค. 2569 "งานติดตาม เปลี่ยนเป็น ผลโทร") — ติดตาม/ผู้สมัครเท่านั้น · ช่วงตามแท่งที่กด */}
-      <AiShareLumosStats block={meta.key} win={cardWin} tick={tick} unit={meta.unit} />
+        <div className="min-w-0 space-y-5 lg:col-span-2 lg:col-start-1 lg:row-start-1">
+          <Card variant="glass" className="p-5 sm:p-6">
+            <AiShareDetail
+              withTeams={meta.key === 'follow'}
+              hideNotCalled={meta.key === 'follow'}
+              onFocusDay={onFocusDay}
+              unit={meta.unit}
+              title={meta.title}
+              win={win}
+              withBoth={meta.withBoth}
+              data={detailNow}
+              loading={detailLoading}
+              error={detailError}
+              hideBreakdown
+              resetKey={resetSeq}
+              onBreakdown={setTeamSplit}
+            />
+          </Card>
 
-      {/* ยอดใช้งานรายวัน + รวมทั้งช่วง — การ์ดของตัวเอง (ลำดับตามที่เจ้าของไล่ 7 ต.ค. 2569) */}
-      <Card variant="glass" className="p-5 sm:p-6">
-        <AiShareDetail
-          withTeams={meta.key === 'follow'}
-          hideNotCalled={meta.key === 'follow'}
-          onFocusDay={onFocusDay}
-          unit={meta.unit}
-          title={meta.title}
-          win={win}
-          withBoth={meta.withBoth}
-          data={detailNow}
-          loading={detailLoading}
-          error={detailError}
-        />
-      </Card>
+          {/* ผลโทร (เจ้าของ 7 ต.ค. 2569 "งานติดตาม เปลี่ยนเป็น ผลโทร") — ติดตาม/ผู้สมัครเท่านั้น · ช่วงตามแท่งที่กด */}
+          {hasResults ? <AiShareLumosStats block={meta.key} win={cardWin} tick={tick} unit={meta.unit} /> : null}
+        </div>
+
+      </div>
 
       {/* หัวข้อติดตาม กด AI โทร / คนโทร = แยกเรื่อง → ผล → รายชื่อ (เจ้าของ 7 ต.ค. 2569 "ป๊อปเดิม เปลี่ยนข้างใน") */}
       <FollowCallerDialog

@@ -171,7 +171,9 @@ const tileOf = (label: string) => screen.getByRole('button', { name: new RegExp(
 /** ข้อความของกล่อง (ป้าย + ชิป + เลข + แถบ/บรรทัดท้าย) */
 const stat = (label: string) => (tileOf(label).textContent ?? '').replace(/\s+/g, ' ');
 
-const openPicker = () => fireEvent.click(screen.getByRole('combobox', { name: 'เลือกหัวข้อ' }));
+/** ปุ่มหัวข้อ (เม็ดยาว · 7 ต.ค. 2569 แทน Dropdown) — Radix Tabs เลือกตอน mousedown */
+const topicTab = (name: RegExp) => screen.getByRole('tab', { name });
+const pickTopic = (name: RegExp) => fireEvent.mouseDown(topicTab(name));
 
 beforeAll(() => {
   // กันไว้เผื่อมี recharts ResponsiveContainer ในหน้า — jsdom ไม่มี ResizeObserver (แบบเดียวกับเทสต์หน้าทีม Online)
@@ -202,17 +204,15 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(await screen.findByRole('heading', { name: FOLLOW_TITLE })).toBeTruthy();
     expect(fetchHomeAiShare).toHaveBeenCalledWith(win);
     expect(screen.getByRole('button', { name: /ช่วงเวลา 7 วันล่าสุด/ })).toBeTruthy();
-    expect(screen.getByRole('combobox', { name: 'เลือกหัวข้อ' }).textContent).toContain('ติดตาม');
-    // รอบ 10: dropdown อยู่หัวหน้าข้างปุ่มปฏิทิน (ไม่อยู่ในแผงแล้ว)
-    const picker = screen.getByRole('combobox', { name: 'เลือกหัวข้อ' });
+    // หัวข้อเป็นปุ่มเม็ดยาวเรียงกัน (7 ต.ค. 2569) — ติดตามถูกเลือกอยู่
+    const picker = screen.getByRole('tablist', { name: 'เลือกหัวข้อ' });
+    expect(within(picker).getByRole('tab', { selected: true }).textContent).toContain('ติดตาม');
+    expect(within(picker).getAllByRole('tab')).toHaveLength(4);
+    // แถวเดียวกัน: ปฏิทิน → ปุ่มหัวข้อ · ชื่อหน้าอยู่บนสุด
     const calendar = screen.getByRole('button', { name: /ช่วงเวลา/ });
-    expect(picker.parentElement?.contains(calendar)).toBe(true);
-    // รอบ 17: ฝั่งซ้ายต่อจากชื่อหน้า — ชื่อหน้า → ปฏิทิน → dropdown (ไม่มีตัวดันไปขวา)
-    const h1 = screen.getByRole('heading', { level: 1, name: 'หน้าหลัก' });
-    expect(h1.parentElement?.contains(picker)).toBe(true);
-    expect(h1.compareDocumentPosition(calendar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(calendar.compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(h1.parentElement?.className).not.toContain('justify-between');
+    const h1 = screen.getByRole('heading', { level: 1, name: 'หน้าหลัก' });
+    expect(h1.compareDocumentPosition(calendar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     expect(stat('AI โทร')).toContain('205');
     // ติดตามตั้งได้ทางเดียว ⇒ ไม่มีกล่อง "ทั้งสองทาง"
@@ -228,11 +228,10 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   it('dropdown บอก AI % ของทุกหัวข้อ · เลือกแล้วตัวเลข + กราฟเปลี่ยนตาม · จำไว้ในเครื่อง', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
-    openPicker();
-    const matching = await screen.findByRole('option', { name: /จับคู่งาน/ });
-    expect(matching.textContent).toContain('AI 100%');
-    expect(screen.getByRole('option', { name: /ดูแลหลังเริ่มงาน/ }).textContent).toContain('ยังไม่มีงาน');
-    fireEvent.click(matching);
+    // AI % ของแต่ละหัวข้อขึ้นตอนจี้ปุ่ม
+    expect(topicTab(/จับคู่งาน/).getAttribute('title')).toContain('AI 100%');
+    expect(topicTab(/ดูแลหลังเริ่มงาน/).getAttribute('title')).toContain('ยังไม่มีงาน');
+    pickTopic(/จับคู่งาน/);
     expect(await screen.findByRole('heading', { name: 'จับคู่งาน' })).toBeTruthy();
     expect(stat('ทั้งหมด')).toContain('43 รายชื่อ');
     // จับคู่งานมีช่อง "ทั้งสองทาง"
@@ -305,8 +304,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('3 รายชื่อ'));
     // แถบของกล่อง = % ของทั้งหมด ⇒ ยังไม่โทร 100%
     expect(stat('ยังไม่โทร')).toContain('100%');
-    openPicker();
-    expect((await screen.findByRole('option', { name: /ดูแลหลังเริ่มงาน/ })).textContent).toContain('AI —');
+    expect(topicTab(/ดูแลหลังเริ่มงาน/).getAttribute('title')).toContain('AI —');
   });
 
   it('หัวข้อที่ล้มบอกเหตุ · ตัวเลือกของหัวข้อนั้นบอกว่าโหลดไม่ขึ้น', async () => {
@@ -316,9 +314,8 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     );
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     expect(await screen.findByText('โหลดตัวเลขส่วนนี้ไม่ขึ้น ลองรีเฟรชอีกครั้ง')).toBeTruthy();
-    openPicker();
-    expect((await screen.findByRole('option', { name: /งานสรรหา/ })).textContent).toContain('โหลดไม่ขึ้น');
-    expect(screen.getByRole('option', { name: /ติดตาม/ }).textContent).toContain('AI 100%');
+    expect(topicTab(/งานสรรหา/).getAttribute('title')).toContain('โหลดไม่ขึ้น');
+    expect(topicTab(/ติดตาม/).getAttribute('title')).toContain('AI 100%');
   });
 
   it('🔴 แผงเลื่อน + ปุ่ม "ดูทั้งหมด" ถอดแล้ว (เจ้าของสั่ง 30 ก.ย.) — กดแท่งรายวันไม่มีป๊อปเด้ง', async () => {
@@ -386,8 +383,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect((tileOf('AI โทร') as HTMLButtonElement).disabled).toBe(false);
     expect((tileOf('คนโทร') as HTMLButtonElement).disabled).toBe(true);
     // จับคู่งานมีทั้งสองทาง — อยู่ก่อนยังไม่โทร
-    openPicker();
-    fireEvent.click(await screen.findByRole('option', { name: /จับคู่งาน/ }));
+    pickTopic(/จับคู่งาน/);
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('43 รายชื่อ'));
     expect(names()).toEqual(['ทั้งหมด 43 รายชื่อ', 'AI โทร 40', 'คนโทร 0', 'ทั้งสองทาง 0', 'ยังไม่โทร 3']);
   });
@@ -396,8 +392,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     // หัวข้อติดตาม กด AI โทร = ป๊อปแยกเรื่องแล้ว (7 ต.ค. 2569) ⇒ ป๊อปรายชื่อแบบเดิมดูที่จับคู่งาน
-    openPicker();
-    fireEvent.click(await screen.findByRole('option', { name: /จับคู่งาน/ }));
+    pickTopic(/จับคู่งาน/);
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('43 รายชื่อ'));
     fireEvent.click(tileOf('AI โทร'));
     const dlg = await screen.findByRole('dialog');
@@ -500,8 +495,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   it('รอบ 18: หน่วยเป็น "รายชื่อ" ทุกหัวข้อ — ไม่เหลือ สาย/ใบ/คน บนกล่อง', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
-    openPicker();
-    fireEvent.click(await screen.findByRole('option', { name: /งานสรรหา/ }));
+    pickTopic(/งานสรรหา/);
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('78 รายชื่อ'));
     expect(stat('ทั้งหมด')).not.toMatch(/\d (สาย|ใบ|คน)\b/);
   });
@@ -542,8 +536,9 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
   it('🔴 คำในตัวเลือกหัวข้อ = คำในเมนู (เจ้าของสั่ง 4 ต.ค. 2569)', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    openPicker();
-    const names = (await screen.findAllByRole('option')).map((o) => o.textContent ?? '');
+    const names = (await screen.findAllByRole('tab', {}, { timeout: 3000 }))
+      .filter((t) => t.closest('[aria-label="เลือกหัวข้อ"]'))
+      .map((o) => o.textContent ?? '');
     for (const label of [conveyorLabel('follow'), conveyorLabel('aftercare'), 'งานสรรหา', conveyorLabel('matching')]) {
       expect(names.some((n) => n.startsWith(label)), label).toBe(true);
     }
@@ -604,16 +599,14 @@ describe('การ์ดผลโทร (7 ต.ค. 2569)', () => {
     // รายการข้างโดนัท: เลข + % ของทั้งหมด (ปัดรวม 100)
     expect(within(box).getByTestId('result-legend-went').textContent).toContain('546');
     expect(within(box).getByTestId('result-legend-went').textContent).toContain('37%');
-    openPicker();
-    fireEvent.click(await screen.findByRole('option', { name: new RegExp(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')!.label) }));
+    pickTopic(new RegExp(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')!.label));
     const apps = await screen.findByTestId('lumos-stats-applicants');
     await waitFor(() => expect(within(apps).getByRole('img', { name: /ผลโทร 178/ })).toBeTruthy());
     expect(within(apps).getByTestId('result-legend-done').textContent).toContain('100');
     expect(within(apps).getByTestId('lumos-applicants-sum').textContent).toBe('100 + 43 + 35 + 0 = 178');
     expect(within(apps).getByTestId('lumos-applicants-backlog').textContent).toContain('46');
     // หัวข้อที่บอทไม่มี = ไม่มีแถวนี้
-    openPicker();
-    fireEvent.click(await screen.findByRole('option', { name: /จับคู่งาน/ }));
+    pickTopic(/จับคู่งาน/);
     await screen.findByRole('heading', { name: 'จับคู่งาน' });
     expect(screen.queryByTestId('lumos-stats-matching')).toBeNull();
     expect(screen.queryByTestId('lumos-stats-follow')).toBeNull();
