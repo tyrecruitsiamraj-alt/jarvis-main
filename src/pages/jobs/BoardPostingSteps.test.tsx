@@ -359,6 +359,16 @@ describe('ป๊อปประกาศหน้าเดียว 9 กล่�
     expect(await screen.findByRole('button', { name: 'ส่งประกาศ' })).toBeTruthy();
   });
 
+  it('ฟอร์ม Gen link ใบแรก = เลือกช่องทางอย่างเดียว ไม่มีช่องหัวข้อ/รายละเอียด/ค่าตอบแทน/ผู้ติดต่อ (เจ้าของ Choice 7 ต.ค. 2569)', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    renderOne();
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Gen link' }).length).toBe(2));
+    for (const t of ['หัวข้อประกาศ', 'รายละเอียดที่ผู้สมัครเห็น', 'ค่าตอบแทน', 'ผู้ติดต่อ', 'ดูตัวอย่างหน้าสมัคร']) {
+      expect(screen.queryByText(new RegExp(t))).toBeNull();
+    }
+    expect(screen.getByText(/ช่องทางที่จะส่ง/)).toBeTruthy();
+  });
+
   it('ช่องที่ขาดขึ้น "ยังไม่ได้ใส่" · ปุ่ม "แก้" กางทีละกล่อง · ปุ่มใบขอไม่มีถ้าใบขอไม่มีข้อมูลช่องนั้น', async () => {
     fetchJobReleases.mockResolvedValue([]);
     renderOne();

@@ -265,6 +265,70 @@ export default function ApplicantContactDialog({
   const selectedJob = openJobs.find((j) => j.id === apptJob) ?? null;
   const selectedApptReason = apptReasons.find((r) => r.id === apptReasonId) ?? null;
   const placeValue = appointmentPlaceValue(apptPlace, apptPlaceOther);
+  /**
+   * ช่องนัดหมาย (วัน · สถานที่ · ลงหน่วยงาน) — ใช้ทั้งขั้น 2 "นัดหมาย" และขั้น 3 "เลื่อนนัด"
+   * (เจ้าของ Choice 7 ต.ค. 2569 "ถามวันนัดใหม่ + สถานที่" — เดิมเลื่อนนัดบันทึกได้โดยไม่รู้ว่าเลื่อนไปวันไหน)
+   */
+  const apptFields = (testId: string) => (
+            <div className="grid grid-cols-1 gap-3 border-t border-border/70 p-3 sm:grid-cols-3" data-testid={testId}>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">นัดหมายวันที่ *</p>
+                <DateSelectDmyBe value={apptDate} onChange={setApptDate} allowEmpty disabled={busy} />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">สถานที่นัดหมาย *</p>
+                <Select value={apptPlace || undefined} onValueChange={setApptPlace} disabled={busy}>
+                  <SelectTrigger className="h-9 text-sm" aria-label="สถานที่นัดหมาย">
+                    <SelectValue placeholder="เลือกสถานที่นัดหมาย" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {APPOINTMENT_PLACES.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {apptPlace === APPOINTMENT_PLACE_OTHER ? (
+                  <Input
+                    value={apptPlaceOther}
+                    onChange={(e) => setApptPlaceOther(e.target.value)}
+                    disabled={busy}
+                    maxLength={300}
+                    aria-label="ชื่อสถานที่นัดหมาย"
+                    placeholder="ชื่อสถานที่"
+                    className="h-9 text-sm"
+                  />
+                ) : null}
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">ลงหน่วยงาน</p>
+                {/* 🔴 ชื่อหน่วยงาน + พิมพ์ค้นได้ (เจ้าของสั่ง 5 ต.ค. 2569: *"ลงหน่วยงาน ขอเป็นชื่อได้ไหม ค้นหาจากชื่อมันง่ายกว่า
+                    และพิมพ์ค้นหาได้ด้วย"*) — เดิมเป็นเลขที่ใบขอล้วน · ค้นได้ทั้งชื่อ/ตำแหน่ง/เลขที่ใบขอ/รหัสไซต์
+                    "ยังไม่ระบุ — หาล่วงหน้า" อยู่บนสุด (เจ้าของเคาะเดิม: นัดไว้แต่ยังไม่รู้ลงใบไหน) */}
+                <div aria-label="ลงหน่วยงาน" data-testid="appointment-unit">
+                  <SearchableSelect
+                    value={apptJob}
+                    onChange={setApptJob}
+                    disabled={busy}
+                    placeholder="เลือกหน่วยงาน"
+                    searchPlaceholder="พิมพ์ชื่อหน่วยงาน ตำแหน่ง หรือเลขที่ใบขอ"
+                    emptyText="ไม่พบหน่วยงาน"
+                    options={[
+                      { value: ADVANCE, label: 'ยังไม่ระบุ — หาล่วงหน้า' },
+                      ...openJobs.map((j) => ({
+                        value: j.id,
+                        label: appointmentUnitLabel(j),
+                        keywords: [j.request_no, j.site_code, j.unit_name, j.work_site_name, publicJobPositionLabel(j)]
+                          .filter(Boolean)
+                          .join(' '),
+                      })),
+                    ]}
+                  />
+                </div>
+              </div>
+            </div>
+  );
   // ปุ่มขั้น 2 ขึ้นเมื่อติดต่อสำเร็จ (กดตอนนี้ หรือผลล่าสุดสำเร็จอยู่แล้ว) — ตาม Journey ข้อ 4
   const apptUnlocked = contactShown === 'ok';
   const profile = editing && draft ? profilePatchFromDraft(baseDraft, draft) : { patch: {}, error: null };
@@ -283,6 +347,10 @@ export default function ApplicantContactDialog({
     }
     if (apptPick === 'fail' && !selectedApptReason) return setError('เลือกเหตุผลที่นัดหมายไม่สำเร็จ');
     if (followPicked === 'fail') return setError('เลือกว่าไม่มา หรือ เลื่อนนัด');
+    if (followPicked === 'rescheduled' && !apptDate) return setError('เลื่อนนัดต้องใส่วันนัดใหม่');
+    if (followPicked === 'rescheduled' && !placeValue) {
+      return setError(apptPlace === APPOINTMENT_PLACE_OTHER ? 'พิมพ์ชื่อสถานที่นัดหมาย' : 'เลือกสถานที่นัดหมาย');
+    }
     setBusy(true);
     const saved: string[] = [];
     try {
@@ -317,6 +385,22 @@ export default function ApplicantContactDialog({
           result: followPicked,
         });
         saved.push('ผลติดตามนัด');
+        // เลื่อนนัด = นัดใหม่ตามวัน/สถานที่ที่กรอก (ขึ้นในติดตามนัดหมายตามวันใหม่)
+        if (followPicked === 'rescheduled') {
+          await saveContactLog({
+            applicationId: a.id,
+            ok: true,
+            appointmentFailed: false,
+            reasonId: null,
+            reasonLabel: null,
+            appointmentAt: apptDate,
+            appointmentPlace: placeValue,
+            jobId: apptJob !== ADVANCE ? apptJob : null,
+            jobLabel: selectedJob ? appointmentUnitLabel(selectedJob) : 'หาล่วงหน้า',
+            note: null,
+          });
+          saved.push('นัดใหม่');
+        }
       }
       onSaved();
       onClose();
@@ -451,66 +535,7 @@ export default function ApplicantContactDialog({
               </div>
             </div>
           ) : null}
-          {apptPick === 'ok' ? (
-            <div className="grid grid-cols-1 gap-3 border-t border-border/70 p-3 sm:grid-cols-3" data-testid="new-appointment">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">นัดหมายวันที่ *</p>
-                <DateSelectDmyBe value={apptDate} onChange={setApptDate} allowEmpty disabled={busy} />
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">สถานที่นัดหมาย *</p>
-                <Select value={apptPlace || undefined} onValueChange={setApptPlace} disabled={busy}>
-                  <SelectTrigger className="h-9 text-sm" aria-label="สถานที่นัดหมาย">
-                    <SelectValue placeholder="เลือกสถานที่นัดหมาย" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {APPOINTMENT_PLACES.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {apptPlace === APPOINTMENT_PLACE_OTHER ? (
-                  <Input
-                    value={apptPlaceOther}
-                    onChange={(e) => setApptPlaceOther(e.target.value)}
-                    disabled={busy}
-                    maxLength={300}
-                    aria-label="ชื่อสถานที่นัดหมาย"
-                    placeholder="ชื่อสถานที่"
-                    className="h-9 text-sm"
-                  />
-                ) : null}
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">ลงหน่วยงาน</p>
-                {/* 🔴 ชื่อหน่วยงาน + พิมพ์ค้นได้ (เจ้าของสั่ง 5 ต.ค. 2569: *"ลงหน่วยงาน ขอเป็นชื่อได้ไหม ค้นหาจากชื่อมันง่ายกว่า
-                    และพิมพ์ค้นหาได้ด้วย"*) — เดิมเป็นเลขที่ใบขอล้วน · ค้นได้ทั้งชื่อ/ตำแหน่ง/เลขที่ใบขอ/รหัสไซต์
-                    "ยังไม่ระบุ — หาล่วงหน้า" อยู่บนสุด (เจ้าของเคาะเดิม: นัดไว้แต่ยังไม่รู้ลงใบไหน) */}
-                <div aria-label="ลงหน่วยงาน" data-testid="appointment-unit">
-                  <SearchableSelect
-                    value={apptJob}
-                    onChange={setApptJob}
-                    disabled={busy}
-                    placeholder="เลือกหน่วยงาน"
-                    searchPlaceholder="พิมพ์ชื่อหน่วยงาน ตำแหน่ง หรือเลขที่ใบขอ"
-                    emptyText="ไม่พบหน่วยงาน"
-                    options={[
-                      { value: ADVANCE, label: 'ยังไม่ระบุ — หาล่วงหน้า' },
-                      ...openJobs.map((j) => ({
-                        value: j.id,
-                        label: appointmentUnitLabel(j),
-                        keywords: [j.request_no, j.site_code, j.unit_name, j.work_site_name, publicJobPositionLabel(j)]
-                          .filter(Boolean)
-                          .join(' '),
-                      })),
-                    ]}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : null}
+          {apptPick === 'ok' ? apptFields('new-appointment') : null}
           {apptPick === 'fail' ? (
             <div className="border-t border-border/70 p-3" data-testid="appointment-failed">
               <Select value={apptReasonId || undefined} onValueChange={setApptReasonId} disabled={busy}>
@@ -606,6 +631,7 @@ export default function ApplicantContactDialog({
               ))}
             </div>
           ) : null}
+          {followPicked === 'rescheduled' ? apptFields('reschedule-appointment') : null}
         </div>
         </>
         ) : null}

@@ -556,6 +556,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                           embedded
                           open
                           hidePreview
+                          channelOnly
                           job={job}
                           onClose={() => setWantLink(false)}
                           onCreated={() => {

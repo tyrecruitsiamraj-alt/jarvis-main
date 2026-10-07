@@ -12469,3 +12469,14 @@ Choice เจ้าของ แก้ 2 ข้อ:
 | เทสต์ | `tests/api/contactTabRelease.test.ts` |
 
 - ยังค้างให้เจ้าของตัดสิน: ฟอร์ม Gen link ลิงก์แรกยังให้กรอกหัวข้อ/รายละเอียด/สถานที่/ค่าตอบแทน/ผู้ติดต่อ (ผู้สมัครไม่เห็นแล้ว) · เลื่อนนัดไม่ถามวันนัดใหม่
+
+### Gen link ใบแรก = เลือกช่องทางอย่างเดียว · เลื่อนนัดต้องใส่วันนัดใหม่ (7 ต.ค. 2569 · Choice เจ้าของหลังไล่ปุ่มตาย)
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/components/jobs/GenApplyLinkDialog.tsx` | prop `channelOnly` — ซ่อนหัวข้อ/รายละเอียด/สถานที่/ค่าตอบแทน/ผู้ติดต่อ/เบอร์/ตำแหน่ง/จังหวัด/ผู้รับผิดชอบ/ประเภทฟอร์ม (ค่าตั้งต้นจากใบขอยังบันทึกตามเดิม) · กางรายการช่องทางให้เลย |
+| `src/pages/jobs/BoardPostingPage.tsx` | ฟอร์ม Gen link ในป๊อป `hidePreview channelOnly` |
+| `src/components/recruit-rm/ApplicantContactDialog.tsx` | `apptFields(testId)` ใช้ร่วมขั้น 2 นัดหมาย + ขั้น 3 เลื่อนนัด · เลื่อนนัด = ต้องใส่วัน + สถานที่ · บันทึก = ผลติดตามนัดเดิม (rescheduled) + `saveContactLog` นัดใหม่ |
+| เทสต์ | `ApplicantContactDialog.test.tsx` (เลื่อนนัด) · `BoardPostingSteps.test.tsx` (ฟอร์มช่องทางอย่างเดียว) |
+
+- ตรวจในเบราว์เซอร์ (ดักการเขียน): เลื่อนนัด → เลือก 15/10/2569 + สถานที่ → POST attendance + POST application-contacts · ฟอร์ม Gen link เหลือค้นหาช่องทาง + รายการ + ปุ่ม

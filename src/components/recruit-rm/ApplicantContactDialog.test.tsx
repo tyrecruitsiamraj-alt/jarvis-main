@@ -240,6 +240,19 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
     expect(saveContactLog).not.toHaveBeenCalled();
   });
 
+  it('🔴 เลื่อนนัด ⇒ ขึ้นช่องวันนัดใหม่ + สถานที่ · ไม่ใส่วัน = บันทึกไม่ได้ (เจ้าของ Choice 7 ต.ค. 2569)', () => {
+    const { dialog } = renderDialog(app({ appointment_at: '2026-09-15T05:00:00.000Z' }), vi.fn(), vi.fn(), 'appointment');
+    fireEvent.click(within(dialog).getByRole('button', { name: /ติดตามไม่สำเร็จ/ }));
+    expect(within(dialog).queryByTestId('reschedule-appointment')).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'เลื่อนนัด' }));
+    const box = within(dialog).getByTestId('reschedule-appointment');
+    expect(within(box).getByRole('combobox', { name: 'สถานที่นัดหมาย' })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'บันทึก' }));
+    expect(within(dialog).getByRole('alert').textContent).toBe('เลื่อนนัดต้องใส่วันนัดใหม่');
+    expect(recordAppointmentAttendance).not.toHaveBeenCalled();
+    expect(saveContactLog).not.toHaveBeenCalled();
+  });
+
   it('🔴 แก้ข้อมูล: เปลี่ยนอายุ → บันทึก ⇒ ส่งเฉพาะช่องที่เปลี่ยน · ยกเลิกแก้ไข = ไม่ส่งอะไร', async () => {
     updateApplicationProfile.mockResolvedValue({});
     const { dialog, onClose } = renderDialog(app());

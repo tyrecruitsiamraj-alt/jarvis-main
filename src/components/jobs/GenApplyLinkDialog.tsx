@@ -52,6 +52,8 @@ export type GenApplyLinkDialogProps = {
    * (ตัวอย่างในฟอร์มเป็นการ์ดประกาศแบบเก่า ใช้เฉพาะลิงก์ที่ไม่ผูกใบขอ — ผูกใบขอแล้วหน้าลิงก์ใช้การ์ดเดียวกับ /apply)
    */
   hidePreview?: boolean;
+  /** เหลือแค่เลือกช่องทาง + Gen link (7 ต.ค. 2569 · ป๊อปประกาศ) — ช่องอื่นใช้ค่าตั้งต้นจากใบขอ */
+  channelOnly?: boolean;
 };
 
 function LinkRow({ url, label }: { url: string; label?: string | null }) {
@@ -101,6 +103,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   embedded = false,
   previewFirst = false,
   hidePreview = false,
+  channelOnly = false,
 }) => {
   /** ช่องทางของลิงก์นี้ — **1:1** (เจ้าของเคาะ 2 ก.ย. 2569: เลิกติ๊กหลายช่อง) */
   /** ช่องทางที่จะสร้างลิงก์ — หลายช่องได้ ได้ลิงก์ช่องละ 1 อัน (เจ้าของ 4 ต.ค. 2569) */
@@ -188,7 +191,8 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setFormType('rm');
     setShortLinks({});
     setPicked([]);
-    setChannelsOpen(false);
+    // เหลือแค่ช่องทาง = กางรายการช่องทางให้เลย (ไม่มีอะไรอื่นให้ทำในฟอร์มนี้)
+    setChannelsOpen(channelOnly);
     /**
      * ผู้รับผิดชอบ = **ทีม Online** ที่เพิ่มไว้ในหน้าตั้งค่า (เจ้าของสั่ง 19 ส.ค. 2569)
      * เดิมดึงผู้ใช้ทั้งระบบมาให้เลือก ซึ่งได้ชื่อคนที่ไม่เกี่ยวกับงานประกาศเลย
@@ -198,7 +202,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     void refreshJobStaffFromApi()
       .then(() => setOnlineNames(buildOnlineNameOptions()))
       .catch(() => setOnlineNames(buildOnlineNameOptions()));
-  }, [open, job, standalone]);
+  }, [open, job, standalone, channelOnly]);
 
   /**
    * ⚠️ ล้มแล้วต้องคืนเป็นลิงก์ยาว ไม่ใช่ปล่อยติ๊กค้างทั้งที่ยังเป็นลิงก์เดิม
@@ -292,135 +296,141 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
             </div>
           ) : (
             <>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  หัวข้อประกาศ <span className="text-destructive">*</span>
-                </label>
-                <input className={fieldCls} value={title} onChange={(e) => setTitle(e.target.value)} />
-                {/* 🔴 บอกให้รู้ว่าค่านี้ไปโผล่ที่ไหน — คนกรอกจะได้รู้ว่าต้องเขียนให้คนนอกอ่านเข้าใจ */}
-                <p className="text-[11px] leading-4 text-muted-foreground">
-                  บรรทัดนี้คือ<span className="font-medium text-foreground">หัวเรื่องตัวใหญ่ที่ผู้สมัครเห็น</span>เมื่อกดลิงก์เข้ามา
-                  — ควรขึ้นต้นด้วยตำแหน่งงาน
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  รายละเอียดที่ผู้สมัครเห็น <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
-                </label>
-                <textarea
-                  className={`${fieldCls} min-h-[76px]`}
-                  value={detail}
-                  onChange={(e) => setDetail(e.target.value)}
-                  placeholder="เช่น ลักษณะงาน เวลาทำงาน สวัสดิการ"
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {/* เหลือแค่เลือกช่องทาง (เจ้าของ Choice 7 ต.ค. 2569) — ลิงก์ผูกใบขอ = หน้าลิงก์ใช้การ์ดเดียวกับ /apply
+                  ช่องหัวข้อ/รายละเอียด/สถานที่/ค่าตอบแทน/ผู้ติดต่อ ไม่ขึ้นให้ผู้สมัครเห็นแล้ว · ค่าตั้งต้นจากใบขอยังบันทึกตามเดิม */}
+              {channelOnly ? null : (
+              <>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">
-                    สถานที่ทำงาน <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
+                    หัวข้อประกาศ <span className="text-destructive">*</span>
                   </label>
-                  <input
-                    className={fieldCls}
-                    value={locationText}
-                    onChange={(e) => setLocationText(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    ค่าตอบแทน <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
-                  </label>
-                  <input
-                    className={fieldCls}
-                    value={salaryText}
-                    onChange={(e) => setSalaryText(e.target.value)}
-                    placeholder="เช่น 15,000–18,000 บาท"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    ผู้ติดต่อ <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
-                  </label>
-                  <input
-                    className={fieldCls}
-                    value={contactName}
-                    onChange={(e) => setContactName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    เบอร์ติดต่อ <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
-                  </label>
-                  <input
-                    className={fieldCls}
-                    value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* ── ข้อมูลที่ระบบเดิมเก็บตอนสร้างลิงก์ (เจ้าของสั่ง 11 ส.ค. 2569) ──
-                  ตำแหน่ง/จังหวัดเติมจากใบขอให้แล้ว · ไม่บังคับกรอกเพื่อไม่ให้ประกาศลอย
-                  ที่รีบส่งออกติดฟอร์ม แต่กรอกไว้แล้วรายงานย้อนหลังตอบได้ว่าลิงก์ไหนของงานไหน */}
-              <div className="grid gap-3 sm:grid-cols-2">
-                {/* ตำแหน่งของประกาศ — ลิสต์กรองตาม BU ของใบขอ/กล่องงานที่กำลังสร้างลิงก์ */}
-                <JobTitleField
-                  value={positionName}
-                  onChange={setPositionName}
-                  departmentCode={job?.department_code ?? standalone?.departmentCode ?? null}
-                  inputClassName={fieldCls}
-                  labelClassName="text-xs font-medium text-muted-foreground"
-                />
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">จังหวัด</label>
-                  <select className={fieldCls} value={province} onChange={(e) => setProvince(e.target.value)}>
-                    <option value="">ไม่ระบุ</option>
-                    {THAI_PROVINCE_NAMES_SORTED.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">ผู้รับผิดชอบ</label>
-                  <select
-                    className={fieldCls}
-                    value={responsible}
-                    onChange={(e) => setResponsible(e.target.value)}
-                  >
-                    <option value="">ไม่ระบุ</option>
-                    {onlineNames.map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-muted-foreground">
-                    ชื่อมาจากทีม Online (ตั้งค่า → สรรหา / คัดสรร / OPL / Online)
+                  <input className={fieldCls} value={title} onChange={(e) => setTitle(e.target.value)} />
+                  {/* 🔴 บอกให้รู้ว่าค่านี้ไปโผล่ที่ไหน — คนกรอกจะได้รู้ว่าต้องเขียนให้คนนอกอ่านเข้าใจ */}
+                  <p className="text-[11px] leading-4 text-muted-foreground">
+                    บรรทัดนี้คือ<span className="font-medium text-foreground">หัวเรื่องตัวใหญ่ที่ผู้สมัครเห็น</span>เมื่อกดลิงก์เข้ามา
+                    — ควรขึ้นต้นด้วยตำแหน่งงาน
                   </p>
                 </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">ประเภทฟอร์มการสมัคร</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {RM_FORM_TYPES.map((f) => (
-                    <button
-                      key={f.code}
-                      type="button"
-                      onClick={() => setFormType(f.code)}
-                      className={
-                        formType === f.code
-                          ? 'rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs font-medium text-primary'
-                          : 'rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-secondary'
-                      }
-                    >
-                      {f.label}
-                    </button>
-                  ))}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    รายละเอียดที่ผู้สมัครเห็น <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
+                  </label>
+                  <textarea
+                    className={`${fieldCls} min-h-[76px]`}
+                    value={detail}
+                    onChange={(e) => setDetail(e.target.value)}
+                    placeholder="เช่น ลักษณะงาน เวลาทำงาน สวัสดิการ"
+                  />
                 </div>
-              </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      สถานที่ทำงาน <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
+                    </label>
+                    <input
+                      className={fieldCls}
+                      value={locationText}
+                      onChange={(e) => setLocationText(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      ค่าตอบแทน <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
+                    </label>
+                    <input
+                      className={fieldCls}
+                      value={salaryText}
+                      onChange={(e) => setSalaryText(e.target.value)}
+                      placeholder="เช่น 15,000–18,000 บาท"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      ผู้ติดต่อ <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
+                    </label>
+                    <input
+                      className={fieldCls}
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      เบอร์ติดต่อ <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
+                    </label>
+                    <input
+                      className={fieldCls}
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                    />
+                  </div>
+                </div>
 
+                {/* ── ข้อมูลที่ระบบเดิมเก็บตอนสร้างลิงก์ (เจ้าของสั่ง 11 ส.ค. 2569) ──
+                    ตำแหน่ง/จังหวัดเติมจากใบขอให้แล้ว · ไม่บังคับกรอกเพื่อไม่ให้ประกาศลอย
+                    ที่รีบส่งออกติดฟอร์ม แต่กรอกไว้แล้วรายงานย้อนหลังตอบได้ว่าลิงก์ไหนของงานไหน */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {/* ตำแหน่งของประกาศ — ลิสต์กรองตาม BU ของใบขอ/กล่องงานที่กำลังสร้างลิงก์ */}
+                  <JobTitleField
+                    value={positionName}
+                    onChange={setPositionName}
+                    departmentCode={job?.department_code ?? standalone?.departmentCode ?? null}
+                    inputClassName={fieldCls}
+                    labelClassName="text-xs font-medium text-muted-foreground"
+                  />
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">จังหวัด</label>
+                    <select className={fieldCls} value={province} onChange={(e) => setProvince(e.target.value)}>
+                      <option value="">ไม่ระบุ</option>
+                      {THAI_PROVINCE_NAMES_SORTED.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">ผู้รับผิดชอบ</label>
+                    <select
+                      className={fieldCls}
+                      value={responsible}
+                      onChange={(e) => setResponsible(e.target.value)}
+                    >
+                      <option value="">ไม่ระบุ</option>
+                      {onlineNames.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-muted-foreground">
+                      ชื่อมาจากทีม Online (ตั้งค่า → สรรหา / คัดสรร / OPL / Online)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">ประเภทฟอร์มการสมัคร</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {RM_FORM_TYPES.map((f) => (
+                      <button
+                        key={f.code}
+                        type="button"
+                        onClick={() => setFormType(f.code)}
+                        className={
+                          formType === f.code
+                            ? 'rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs font-medium text-primary'
+                            : 'rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-secondary'
+                        }
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+              </>
+              )}
               {/* ── ช่องทางที่จะส่ง — 🔴 **หุบไว้เป็นค่าตั้งต้น** (แก้ 27 ส.ค. 2569) ──
                   ของเดิมกางลิสต์ช่องทางทั้งหมด (30+ ช่อง) ⇒ กินครึ่งหน้าจอ
                   โมเดลที่สวมบทพนักงานใหม่มาลองทำภารกิจนี้บอกว่า
