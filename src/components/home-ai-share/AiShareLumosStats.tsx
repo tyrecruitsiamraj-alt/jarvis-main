@@ -14,6 +14,7 @@ import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toneOfBu } from '@/components/team-online/teamOnlineTones';
+import { segmentDotClass } from '@/components/home-ai-share/segmentStyle';
 import { trendBuLabel } from '@/lib/trends/bu';
 import { TONE } from '@/lib/designTokens';
 import { FOLLOW_MATRIX_COL_TONE } from '@/lib/followCallMatrix';
@@ -137,8 +138,8 @@ const AiShareLumosStats: React.FC<{
 }> = ({ block, unit, data, failed, className }) => {
   if (!hasLumosResults(block)) return null;
   return (
-    <Card variant="glass" className={cn('space-y-5 p-5 sm:p-6', className)} data-testid={`lumos-stats-${block}`}>
-      <h2 className="text-base font-medium text-foreground">ผลโทร</h2>
+    <Card variant="solid" className={cn('space-y-6 p-6 sm:p-7', className)} data-testid={`lumos-stats-${block}`}>
+      <h2 className="text-xl font-medium text-foreground">ผลโทร</h2>
       {failed ? <p className={cn('text-sm', TONE.danger.value)}>{failed}</p> : null}
       {block === 'follow' ? (
         <FollowResults split={data?.follow ?? null} cells={data?.followByBu ?? null} unit={unit} />
@@ -178,22 +179,35 @@ function FollowResults({
     <div className="space-y-6">
       {blocks.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีรายชื่อ</p> : null}
       {blocks.map((b) => (
-        <section key={b.bu ?? 'none'} className="space-y-3" data-testid={`bu-block-${b.bu ?? 'none'}`}>
-          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-            <h3 className="flex items-center gap-2 text-lg font-medium text-foreground" title={b.bu ? trendBuLabel(b.bu) : undefined}>
-              <span className={cn('h-3 w-3 rounded-full bg-current', TONE[b.bu ? toneOfBu(b.bu) : 'neutral'].value)} aria-hidden />
+        <section
+          key={b.bu ?? 'none'}
+          className="space-y-4 rounded-2xl border border-foreground/10 p-4 sm:p-5"
+          data-testid={`bu-block-${b.bu ?? 'none'}`}
+        >
+          {/* หัวก้อน BU — ชื่อ · ยอด · ชิป AI โทร / คนโทร (แบบรายการในภาพอ้างอิง) */}
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+            <h3 className="flex items-baseline gap-3 text-xl font-medium text-foreground" title={b.bu ? trendBuLabel(b.bu) : undefined}>
+              <span
+                className={cn('h-3 w-3 self-center rounded-full bg-current', TONE[b.bu ? toneOfBu(b.bu) : 'neutral'].value)}
+                aria-hidden
+              />
               {b.bu ?? 'ไม่ระบุ BU'}
-              <span className="text-base font-light tabular-nums text-muted-foreground">
-                {NUM.format(b.sum.total)} {unit}
-              </span>
+              <span className="text-2xl tabular-nums">{NUM.format(b.sum.total)}</span>
+              <span className="text-sm font-normal text-muted-foreground">{unit}</span>
             </h3>
-            <p className="flex gap-5 text-sm tabular-nums text-muted-foreground">
-              <span>
-                AI โทร <span className="text-base font-medium text-foreground">{NUM.format(b.sum.ai)}</span>
-              </span>
-              <span>
-                คนโทร <span className="text-base font-medium text-foreground">{NUM.format(b.sum.staff)}</span>
-              </span>
+            <p className="flex flex-wrap gap-2 text-sm tabular-nums">
+              {(
+                [
+                  ['ai', 'AI โทร', b.sum.ai],
+                  ['staff', 'คนโทร', b.sum.staff],
+                ] as const
+              ).map(([k, label, n]) => (
+                <span key={k} className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-muted-foreground">
+                  <span className={cn('h-2 w-2 rounded-full', segmentDotClass(k))} aria-hidden />
+                  {label}
+                  <span className="font-medium text-foreground">{NUM.format(n)}</span>
+                </span>
+              ))}
             </p>
           </div>
           <div className="overflow-x-auto">
@@ -230,7 +244,7 @@ function FollowResults({
                 ))}
               </TableBody>
               <TableFooter>
-                <TableRow data-testid={`bu-row-${b.bu ?? 'none'}-total`} className="font-medium">
+                <TableRow data-testid={`bu-row-${b.bu ?? 'none'}-total`} className="border-0 bg-muted/60 font-medium hover:bg-muted/60">
                   <TableCell className="whitespace-nowrap text-sm text-foreground" colSpan={2}>
                     รวม {b.bu ?? 'ไม่ระบุ BU'}
                   </TableCell>

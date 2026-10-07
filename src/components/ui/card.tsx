@@ -23,6 +23,8 @@ const cardVariants = cva("text-card-foreground", {
         "before:bg-gradient-to-r before:from-transparent before:via-primary/50 before:to-transparent",
         "dark:from-card/70 dark:to-card/45 dark:shadow-background/50 dark:ring-foreground/5",
       ].join(" "),
+      /** พื้นขาวทึบ มุมมน เงานุ่ม — การ์ดของหน้าหลักโฉมผู้บริหาร (เจ้าของ 7 ต.ค. 2569 ภาพอ้างอิง) */
+      solid: "rounded-2xl bg-card shadow-xl shadow-foreground/10 ring-1 ring-foreground/5 dark:shadow-background/50",
     },
   },
   defaultVariants: { variant: "default" },

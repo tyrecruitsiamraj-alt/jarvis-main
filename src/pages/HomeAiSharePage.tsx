@@ -457,7 +457,7 @@ const HomeAiSharePage: React.FC = () => {
       {blockError ? <p className={cn('text-xs', TONE.danger.value)}>{blockError}</p> : null}
       {flag ? <p className={cn('text-xs', TONE.warn.value)}>{flag}</p> : null}
 
-      <Card variant="glass" className="min-w-0 p-5 sm:p-6">
+      <Card variant="solid" className="min-w-0 p-6 sm:p-7">
         <AiShareDetail
           withTeams={meta.key === 'follow'}
           hideNotCalled={meta.key === 'follow'}

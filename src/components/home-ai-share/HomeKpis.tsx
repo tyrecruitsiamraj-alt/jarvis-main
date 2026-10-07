@@ -18,9 +18,13 @@ import { cn } from '@/lib/utils';
 
 const NUM = new Intl.NumberFormat('th-TH');
 
+/**
+ * โฉมตามภาพอ้างอิง (เจ้าของ 7 ต.ค. 2569 "ทำให้สวยแบบรูป ห้ามเพิ่ม หรือ เอาข้อมูลอะไรฉันออก")
+ * กล่อง = แถบหัวสีเข้ม (ป้าย) + แผ่นขาวด้านใน (เลข · ชิป · บรรทัดท้าย/แถบ) · ทั้งหมด = เบอร์กันดี · ที่เหลือ = กรมท่า
+ */
 const OUTER = cn(
-  'h-full w-full flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl p-1.5 text-left font-normal',
-  'shadow-sm shadow-foreground/5 transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-100',
+  'h-full w-full flex-col items-stretch justify-start gap-0 whitespace-normal rounded-2xl p-2 text-left font-normal',
+  'shadow-xl shadow-foreground/10 transition-all hover:-translate-y-0.5 hover:shadow-2xl disabled:opacity-100',
 );
 
 export function KpiTile({
@@ -52,7 +56,7 @@ export function KpiTile({
   hint?: string;
   onClick?: () => void;
   liveKey?: string;
-  /** กล่องหลัก (ทั้งหมด) — แถบหัวกรมท่า */
+  /** กล่องหลัก (ทั้งหมด) — แถบหัวเบอร์กันดี */
   emphasis?: boolean;
   loading?: boolean;
 }) {
@@ -68,26 +72,31 @@ export function KpiTile({
       className={cn(
         OUTER,
         emphasis
-          ? 'bg-foreground text-background hover:bg-foreground hover:text-background dark:bg-accent dark:text-foreground dark:hover:bg-accent dark:hover:text-foreground'
-          : 'bg-muted text-foreground hover:bg-muted hover:text-foreground dark:bg-muted/60 dark:hover:bg-muted/60',
+          ? 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground'
+          : 'bg-foreground text-background hover:bg-foreground hover:text-background dark:bg-accent dark:text-foreground dark:hover:bg-accent dark:hover:text-foreground',
       )}
     >
-      <span className="flex items-center gap-2 px-3 py-2.5">
-        {dotClass ? <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', dotClass)} aria-hidden /> : null}
-        <span className={cn('truncate text-sm', emphasis ? 'font-medium' : 'text-muted-foreground')}>{label}</span>
+      <span className="flex items-center gap-3 px-3 py-3">
+        {/* วงกลมหน้าป้ายแบบภาพอ้างอิง (ไม่มีไอคอน — เจ้าของไม่เอาอิโมจิ) · จุดสีของก้อน */}
+        {dotClass ? (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-background/15" aria-hidden>
+            <span className={cn('h-3 w-3 rounded-full ring-2 ring-background/40', dotClass)} />
+          </span>
+        ) : null}
+        <span className="truncate text-base font-medium">{label}</span>
       </span>
-      <span className="block flex-1 space-y-3 rounded-xl bg-card p-4 text-foreground">
+      <span className="block flex-1 space-y-3 rounded-xl bg-card p-5 text-foreground">
         <span className="flex flex-wrap items-start justify-between gap-2">
           {loading ? (
             // ในปุ่มห้ามมีกล่องที่ตั้งขนาดเอง (เทสต์ typographyRules) — ระหว่างโหลดขึ้นขีดจาง ๆ ขนาดเท่าตัวเลข
-            <span className={cn('block font-light text-muted-foreground', emphasis ? 'text-5xl' : 'text-3xl')}>—</span>
+            <span className="block text-4xl font-medium text-muted-foreground">—</span>
           ) : (
-            <span className={cn('block font-light tabular-nums', emphasis ? 'text-5xl' : 'text-3xl')}>
+            <span className="block text-4xl font-medium tabular-nums">
               {NUM.format(shown)}
               {unit ? (
                 <>
                   {' '}
-                  <span className="text-sm text-muted-foreground">{unit}</span>
+                  <span className="text-sm font-normal text-muted-foreground">{unit}</span>
                 </>
               ) : null}
             </span>
