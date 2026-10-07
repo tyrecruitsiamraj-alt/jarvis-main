@@ -3,6 +3,7 @@
  * เจ้าของ: *"ฉันไม่ได้ต้องการให้เป็นแบบบอท แต่ฉันหมายถึงตัวเลขต้องได้ตามหัวข้อแบบที่บอททำ"* → Choice "ในการ์ดเดิมตาม Dropdown"
  * - หัวข้อติดตาม = งานติดตาม: ตาราง AI โทร / คนโทร / รวม × งานที่ต้องติดตาม · มีผลการโทร · รอดำเนินการ · ล้มเหลว · ยกเลิก
  *   (เจ้าของ *"แล้วคนอะ บอกแล้วไงต้องรู้ทั้งคนและ Ai"*) · แถวรวม = กล่อง "ทั้งหมด" ของการ์ด
+ *   มีผลการโทร แตกเป็น ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ (เจ้าของ "แตกเลย") · สีตามตารางผลโทร (`FOLLOW_MATRIX_COL_TONE`)
  * - หัวข้อผู้สมัคร = งานรับสมัคร: ใบสมัคร · มีผลแล้ว · ยังรอ · ล้มเหลว · ยกเลิก + งานเก่าที่ต้องติดตาม
  * - หัวข้ออื่น (บอทไม่มี) = ไม่มีแถวนี้
  * งานรับสมัครนับงานที่ส่งให้ AI (คิว Lumos ของเรา) · ช่วงเดียวกับปฏิทิน · บรรทัดบวกให้เห็น (ไม่ลงตัว = แดง) · นิยาม `src/lib/homeLumosSummary.ts`
@@ -14,21 +15,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { TONE } from '@/lib/designTokens';
 import type { AiShareBlockKey, AiShareWindow } from '@/lib/homeAiShare';
 import { fetchHomeLumosSummary } from '@/lib/homeAiShareApi';
-import { lumosBucketAddsUp, sumLumosBuckets, type HomeLumosSummaryResponse, type LumosBucket } from '@/lib/homeLumosSummary';
+import {
+  FOLLOW_BUCKET_KEYS,
+  followBucketAddsUp,
+  followBucketSum,
+  lumosBucketAddsUp,
+  sumFollowBuckets,
+  type FollowBucket,
+  type FollowBucketKey,
+  type HomeLumosSummaryResponse,
+  type LumosBucket,
+} from '@/lib/homeLumosSummary';
+import { FOLLOW_MATRIX_COL_TONE } from '@/lib/followCallMatrix';
 import { cn } from '@/lib/utils';
 
 const NUM = new Intl.NumberFormat('th-TH');
 
-type Tone = 'success' | 'warn' | 'danger' | 'neutral' | null;
+type Tone = keyof typeof TONE | null;
 type Cell = { key: keyof LumosBucket | 'backlog'; label: string; tone: Tone };
 
-const FOLLOW: Cell[] = [
-  { key: 'total', label: 'งานที่ต้องติดตาม', tone: null },
-  { key: 'done', label: 'มีผลการโทร', tone: 'success' },
-  { key: 'waiting', label: 'รอดำเนินการ', tone: 'warn' },
-  { key: 'failed', label: 'ล้มเหลว', tone: 'danger' },
-  { key: 'cancelled', label: 'ยกเลิก', tone: 'neutral' },
-];
 const APPLICANTS: Cell[] = [
   { key: 'total', label: 'ใบสมัคร', tone: null },
   { key: 'done', label: 'มีผลแล้ว', tone: 'success' },
@@ -95,14 +100,36 @@ const sumText = (b: LumosBucket) =>
     b.done + b.waiting + b.failed + b.cancelled,
   )}`;
 
-/** งานติดตาม — AI โทร / คนโทร / รวม (แถวรวม = กล่องทั้งหมดของการ์ด) */
-function FollowTable({ split, failed }: { split: { ai: LumosBucket; staff: LumosBucket } | null; failed: string | null }) {
-  const rows: Array<[string, LumosBucket | null]> = [
+/** คอลัมน์ของงานติดตาม — สีชุดเดียวกับตารางผลโทร */
+const FOLLOW_COLS: ReadonlyArray<{ key: FollowBucketKey; label: string; tone: keyof typeof TONE }> = [
+  { key: 'went', label: 'ไป', tone: FOLLOW_MATRIX_COL_TONE.went },
+  { key: 'notWent', label: 'ไม่ไป', tone: FOLLOW_MATRIX_COL_TONE.notWent },
+  { key: 'reschedule', label: 'ขอเลื่อน', tone: FOLLOW_MATRIX_COL_TONE.unclear },
+  { key: 'unclear', label: 'สรุปไม่ได้', tone: FOLLOW_MATRIX_COL_TONE.unclear },
+  { key: 'waiting', label: 'รอดำเนินการ', tone: FOLLOW_MATRIX_COL_TONE.waiting },
+  { key: 'failed', label: 'ล้มเหลว', tone: FOLLOW_MATRIX_COL_TONE.noAnswer },
+  { key: 'cancelled', label: 'ยกเลิก', tone: FOLLOW_MATRIX_COL_TONE.cancelled },
+];
+const DONE_KEYS: readonly FollowBucketKey[] = ['went', 'notWent', 'reschedule', 'unclear'];
+
+const followSumText = (b: FollowBucket) => `${FOLLOW_BUCKET_KEYS.map((k) => NUM.format(b[k])).join(' + ')} = ${NUM.format(followBucketSum(b))}`;
+
+/** งานติดตาม — AI โทร / คนโทร / รวม (แถวรวม = กล่องทั้งหมดของการ์ด) · มีผลการโทรแตก 4 ช่อง */
+function FollowTable({ split, failed }: { split: { ai: FollowBucket; staff: FollowBucket } | null; failed: string | null }) {
+  const rows: Array<[string, FollowBucket | null]> = [
     ['AI โทร', split?.ai ?? null],
     ['คนโทร', split?.staff ?? null],
-    ['รวม', split ? sumLumosBuckets(split.ai, split.staff) : null],
+    ['รวม', split ? sumFollowBuckets(split.ai, split.staff) : null],
   ];
-  const ok = rows.every(([, b]) => !b || lumosBucketAddsUp(b));
+  const ok = rows.every(([, b]) => !b || followBucketAddsUp(b));
+  const cell = (n: number | null, strong: boolean, tone: keyof typeof TONE | null) =>
+    n === null ? (
+      <Skeleton className="ml-auto h-6 w-10" />
+    ) : (
+      <span className={cn('text-lg tabular-nums', strong ? 'font-medium' : 'font-light', tone ? numClass(n, tone) : 'text-foreground')}>
+        {NUM.format(n)}
+      </span>
+    );
   return (
     <div className="space-y-3" data-testid="lumos-stats-follow">
       <h3 className="text-sm font-medium text-foreground">งานติดตาม</h3>
@@ -112,10 +139,19 @@ function FollowTable({ split, failed }: { split: { ai: LumosBucket; staff: Lumos
           <TableHeader>
             <TableRow>
               <TableHead className="text-xs" />
-              {FOLLOW.map((c) => (
-                <TableHead key={c.key} className="text-right text-xs">
+              <TableHead className="text-xs" />
+              <TableHead colSpan={DONE_KEYS.length} className="border-b border-border/70 text-center text-xs">
+                มีผลการโทร
+              </TableHead>
+              <TableHead colSpan={FOLLOW_COLS.length - DONE_KEYS.length} className="text-xs" />
+            </TableRow>
+            <TableRow>
+              <TableHead className="text-xs" />
+              <TableHead className="whitespace-nowrap text-right text-xs">งานที่ต้องติดตาม</TableHead>
+              {FOLLOW_COLS.map((c) => (
+                <TableHead key={c.key} className="whitespace-nowrap text-right text-xs">
                   <span className="inline-flex items-center gap-1.5">
-                    {c.tone ? <span className={cn('h-2 w-2 rounded-full', TONE[c.tone].dot)} aria-hidden /> : null}
+                    <span className={cn('h-2 w-2 rounded-full', TONE[c.tone].dot)} aria-hidden />
                     {c.label}
                   </span>
                 </TableHead>
@@ -123,33 +159,26 @@ function FollowTable({ split, failed }: { split: { ai: LumosBucket; staff: Lumos
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map(([label, b]) => (
-              <TableRow key={label} data-testid={`lumos-follow-${label}`}>
-                <TableCell className={cn('whitespace-nowrap text-sm', label === 'รวม' ? 'font-medium text-foreground' : 'text-foreground')}>
-                  {label}
-                </TableCell>
-                {FOLLOW.map((c) => {
-                  const n = b ? b[c.key as keyof LumosBucket] : null;
-                  return (
+            {rows.map(([label, b]) => {
+              const strong = label === 'รวม';
+              return (
+                <TableRow key={label} data-testid={`lumos-follow-${label}`}>
+                  <TableCell className={cn('whitespace-nowrap text-sm text-foreground', strong && 'font-medium')}>{label}</TableCell>
+                  <TableCell className="text-right">{cell(b ? b.total : null, strong, null)}</TableCell>
+                  {FOLLOW_COLS.map((c) => (
                     <TableCell key={c.key} className="text-right">
-                      {n === null ? (
-                        <Skeleton className="ml-auto h-6 w-12" />
-                      ) : (
-                        <span className={cn('text-lg tabular-nums', label === 'รวม' ? 'font-medium' : 'font-light', c.key === 'total' ? 'text-foreground' : numClass(n, c.tone))}>
-                          {NUM.format(n)}
-                        </span>
-                      )}
+                      {cell(b ? b[c.key] : null, strong, c.tone)}
                     </TableCell>
-                  );
-                })}
-              </TableRow>
-            ))}
+                  ))}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
       {split ? (
         <p className={cn('text-xs tabular-nums', ok ? 'text-muted-foreground' : TONE.danger.value)} data-testid="lumos-follow-sum">
-          AI {sumText(split.ai)} · คน {sumText(split.staff)}
+          AI {followSumText(split.ai)} · คน {followSumText(split.staff)}
           {ok ? '' : ' · ไม่ลงตัว'}
         </p>
       ) : null}

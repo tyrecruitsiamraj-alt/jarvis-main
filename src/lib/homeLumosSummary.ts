@@ -7,6 +7,8 @@
  *   ⇒ AI + คน = กล่อง "ทั้งหมด" ของการ์ดพอดี (หน่วยเดียวกัน)
  *   AI: ผลจากคิว Lumos — completed = มีผล · failed = ล้มเหลว · cancelled/ยกเลิกสาย = ยกเลิก · ที่เหลือ = รอ
  *   คน: ผลที่คนลง — ติดต่อไม่ได้ (no_answer) = ล้มเหลว · ผลอื่น = มีผล · ไม่มีผลแต่ยกเลิก = ยกเลิก · ที่เหลือ = รอ
+ *   มีผล แตกเป็น ไป / ไม่ไป / ขอเลื่อน / สรุปไม่ได้ (เจ้าของ "แตกเลย") ด้วยหมวดของหน้าติดตาม (`categorizeFollowRows`)
+ *   — มีผลแต่สายถูกยกเลิกทีหลัง = ยกเลิก · มีผลแต่หน้าติดตามนับไม่รับสาย = ล้มเหลว (ลาป่วยที่หน้าติดตามนับสรุปไม่ได้ = คงเดิม · เจ้าของ Choice)
  * งานรับสมัคร = นับ "งานที่ส่งให้ AI" จากคิว (`lumos_dispatch_queue`) แบบที่บอทนับ
  *   งานรับสมัคร = คิว interview · วัน = วันที่เข้าคิว
  *   งานเก่า = คิว interview ที่เข้าก่อนช่วงนี้และยังรออยู่
@@ -20,7 +22,7 @@ export type HomeLumosSummaryResponse = {
   from: string | null;
   to: string | null;
   bu: string | null;
-  follow: { ai: LumosBucket; staff: LumosBucket } | null;
+  follow: { ai: FollowBucket; staff: FollowBucket } | null;
   applicants: LumosBucket | null;
   /** ใบสมัครก่อนช่วงนี้ที่ยังรอ AI */
   backlog: number | null;
@@ -38,3 +40,56 @@ export const sumLumosBuckets = (a: LumosBucket, b: LumosBucket): LumosBucket => 
   failed: a.failed + b.failed,
   cancelled: a.cancelled + b.cancelled,
 });
+
+/** งานติดตาม — ช่องแยกกันขาด · รวมทุกช่อง = ทั้งหมด */
+export type FollowBucket = {
+  total: number;
+  went: number;
+  notWent: number;
+  reschedule: number;
+  unclear: number;
+  waiting: number;
+  failed: number;
+  cancelled: number;
+};
+export const FOLLOW_BUCKET_KEYS = ['went', 'notWent', 'reschedule', 'unclear', 'waiting', 'failed', 'cancelled'] as const;
+export type FollowBucketKey = (typeof FOLLOW_BUCKET_KEYS)[number];
+export const emptyFollowBucket = (): FollowBucket => ({
+  total: 0,
+  went: 0,
+  notWent: 0,
+  reschedule: 0,
+  unclear: 0,
+  waiting: 0,
+  failed: 0,
+  cancelled: 0,
+});
+export const followBucketSum = (b: FollowBucket) => FOLLOW_BUCKET_KEYS.reduce((n, k) => n + b[k], 0);
+export const followBucketAddsUp = (b: FollowBucket) => followBucketSum(b) === b.total;
+export const sumFollowBuckets = (a: FollowBucket, b: FollowBucket): FollowBucket => {
+  const out = emptyFollowBucket();
+  out.total = a.total + b.total;
+  for (const k of FOLLOW_BUCKET_KEYS) out[k] = a[k] + b[k];
+  return out;
+};
+
+/**
+ * ช่องของสายที่ "มีผล" (ขั้นแรกตัดด้วยผลคิว/ผลที่คนลง) → แตกด้วยหมวดของหน้าติดตาม
+ * `result` = ผลของหน้าติดตาม (`journeyResultOf`) — ไป / ไม่ไป / ขอเลื่อน / สรุปไม่ได้ / ไม่รับสาย / ยกเลิก / รอโทร
+ */
+export function doneBucketOf(result: string): FollowBucketKey {
+  switch (result) {
+    case 'agreed':
+      return 'went';
+    case 'lost':
+      return 'notWent';
+    case 'reschedule':
+      return 'reschedule';
+    case 'unreachable':
+      return 'failed';
+    case 'cancelled':
+      return 'cancelled';
+    default:
+      return 'unclear';
+  }
+}

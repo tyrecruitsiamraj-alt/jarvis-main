@@ -7,7 +7,9 @@ import { tableInAppSchema } from './schema.js';
 import { followBuJoin, followBuSql, queueBuJoins, queueBuSql } from './homeBuSql.js';
 import { FOLLOW_QUEUE_MATCH } from './homeAiShareSql.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
-import { emptyLumosBucket, type LumosBucket } from '../../src/lib/homeLumosSummary.js';
+import { doneBucketOf, emptyFollowBucket, type FollowBucket, type FollowBucketKey, type LumosBucket } from '../../src/lib/homeLumosSummary.js';
+import { categorizeFollowRows, FOLLOW_ENTRY_CATEGORY_COLS, FOLLOW_QUEUE_CALL_COLS } from './followCategory.js';
+import { journeyResultOf } from '../../src/lib/followJourney.js';
 
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const FOLLOW = tableInAppSchema('follow_entries');
@@ -45,21 +47,20 @@ export async function loadHomeLumosSummary(
   start: Date | null,
   end: Date | null,
   bu: string | null,
-): Promise<{ follow: { ai: LumosBucket; staff: LumosBucket }; applicants: LumosBucket; backlog: number }> {
+): Promise<{ follow: { ai: FollowBucket; staff: FollowBucket }; applicants: LumosBucket; backlog: number }> {
   const p = [start ? start.toISOString() : null, end ? end.toISOString() : null, bu];
   const [follow, apps, backlog] = await Promise.all([
-    dbQuery<{ who: string; bucket: keyof Omit<LumosBucket, 'total'>; n: number }>(
-      `select case when f.call_mode = 'manual' then 'staff' else 'ai' end as who,
-              ${FOLLOW_BUCKET_SQL} as bucket,
-              count(*)::int as n
+    dbQuery<Record<string, unknown>>(
+      `select ${FOLLOW_ENTRY_CATEGORY_COLS}, f.call_mode, f.follow_team,
+              ${FOLLOW_BUCKET_SQL} as ledger_bucket,
+              ${FOLLOW_QUEUE_CALL_COLS}
          from ${FOLLOW} f
          ${followBuJoin('f')}
          left join ${QUEUE} q on ${FOLLOW_QUEUE_MATCH}
         where f.topic is distinct from $4::text
           and ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
           and ($2::timestamptz is null or f.scheduled_at < $2::timestamptz)
-          and ($3::text is null or ${followBuSql('f')} = $3::text)
-        group by 1, 2`,
+          and ($3::text is null or ${followBuSql('f')} = $3::text)`,
       [...p, AFTERCARE_TOPIC],
     ),
     dbQuery<Row>(
@@ -85,11 +86,20 @@ export async function loadHomeLumosSummary(
         )
       : Promise.resolve({ rows: [{ n: 0 }] }),
   ]);
-  const split = { ai: emptyLumosBucket(), staff: emptyLumosBucket() };
+  // หมวดของหน้าติดตาม — ใช้แตก "มีผล" เท่านั้น (รอ/ล้มเหลว/ยกเลิก ตัดด้วย CASE เดียวกับเดิม)
+  const derived = categorizeFollowRows(follow.rows);
+  const split = { ai: emptyFollowBucket(), staff: emptyFollowBucket() };
   for (const r of follow.rows) {
-    const b = r.who === 'staff' ? split.staff : split.ai;
-    b[r.bucket] += Number(r.n);
-    b.total += Number(r.n);
+    const b = r.call_mode === 'manual' ? split.staff : split.ai;
+    const first = String(r.ledger_bucket) as 'done' | 'waiting' | 'failed' | 'cancelled';
+    let key: FollowBucketKey = first === 'done' ? 'unclear' : first;
+    if (first === 'done') {
+      const d = derived.get(String(r.id));
+      const outcome = (typeof r.staff_call_outcome === 'string' && r.staff_call_outcome.trim()) || (typeof r.call_outcome === 'string' ? r.call_outcome : null);
+      key = d ? doneBucketOf(journeyResultOf(d.category, outcome)) : 'unclear';
+    }
+    b[key] += 1;
+    b.total += 1;
   }
   return { follow: split, applicants: bucket(apps.rows[0]), backlog: Number(backlog.rows[0]?.n ?? 0) };
 }

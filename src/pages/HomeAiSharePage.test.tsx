@@ -46,8 +46,8 @@ vi.mock('@/lib/homeAiShareApi', () => ({
       to: w.to,
       bu: null,
       follow: {
-        ai: { total: 673, done: 488, waiting: 0, failed: 99, cancelled: 86 },
-        staff: { total: 805, done: 79, waiting: 699, failed: 3, cancelled: 24 },
+        ai: { total: 673, went: 469, notWent: 0, reschedule: 0, unclear: 15, waiting: 0, failed: 99, cancelled: 90 },
+        staff: { total: 805, went: 77, notWent: 1, reschedule: 1, unclear: 0, waiting: 699, failed: 3, cancelled: 24 },
       },
       applicants: { total: 178, done: 100, waiting: 43, failed: 35, cancelled: 0 },
       backlog: 46,
@@ -665,10 +665,13 @@ describe('เลขตามหัวข้อบอท Lumos ในการ์
     // ทั้งคนและ AI (เจ้าของ "ต้องรู้ทั้งคนและ Ai") · แถวรวม = กล่องทั้งหมด
     const cells = (row: string) =>
       within(within(box).getByTestId(`lumos-follow-${row}`)).getAllByRole('cell').slice(1).map((c) => c.textContent);
-    expect(cells('AI โทร')).toEqual(['673', '488', '0', '99', '86']);
-    expect(cells('คนโทร')).toEqual(['805', '79', '699', '3', '24']);
-    expect(cells('รวม')).toEqual(['1,478', '567', '699', '102', '110']);
-    expect(within(box).getByTestId('lumos-follow-sum').textContent).toBe('AI 488 + 0 + 99 + 86 = 673 · คน 79 + 699 + 3 + 24 = 805');
+    // ทั้งหมด · ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · รอ · ล้มเหลว · ยกเลิก (มีผลการโทรแตก 4 ช่อง · เจ้าของ "แตกเลย")
+    expect(cells('AI โทร')).toEqual(['673', '469', '0', '0', '15', '0', '99', '90']);
+    expect(cells('คนโทร')).toEqual(['805', '77', '1', '1', '0', '699', '3', '24']);
+    expect(cells('รวม')).toEqual(['1,478', '546', '1', '1', '15', '699', '102', '114']);
+    expect(within(box).getByTestId('lumos-follow-sum').textContent).toBe(
+      'AI 469 + 0 + 0 + 15 + 0 + 99 + 90 = 673 · คน 77 + 1 + 1 + 0 + 699 + 3 + 24 = 805',
+    );
     expect(within(box).getByText('มีผลการโทร')).toBeTruthy();
     openPicker();
     fireEvent.click(await screen.findByRole('option', { name: new RegExp(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')!.label) }));
