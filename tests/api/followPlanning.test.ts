@@ -823,3 +823,14 @@ describe('คลังคำปัญหา Lumos 7 ต.ค. 2569 ข้อ 6 ·
     expect(answeredButMarkedUnreached({ call_outcome: 'no_answer', call_reply: 'ครับ ครับ ผม' })).toBe(true);
   });
 });
+
+describe('🔴 ขอเลื่อน ขึ้นคำว่าเลื่อน (เจ้าของ 7 ต.ค. 2569 "ให้บอกว่า นาย ก เลื่อน")', () => {
+  it('ป้าย = ขอเลื่อน (คน/AI) · หมวดยังเป็นสรุปไม่ได้', async () => {
+    const { followRoundLabel, callCategory } = await import('../../src/lib/followPlanning');
+    const mk = (over: Record<string, unknown>) => ({ entry: { id: 'x', scheduled_at: '2026-10-07T09:00:00Z', ...over }, state: 'result', time: '16:00', ymd: '2026-10-07' }) as never;
+    const staff = mk({ call_mode: 'manual', staff_call_outcome: 'reschedule_requested', staff_called_at: '2026-10-07T09:01:00Z' });
+    expect(followRoundLabel(staff)).toBe('ขอเลื่อน · คนโทร');
+    expect(callCategory(staff)).toBe('other');
+    expect(followRoundLabel(mk({ call_outcome: 'reschedule_requested' }))).toBe('ขอเลื่อน');
+  });
+});

@@ -94,7 +94,8 @@ describe('สรุปแผน = แผง (ข้อมูลชุดเด�
     const words = new Set(Object.values(FOLLOW_CALL_CATEGORY_LABEL));
     for (const r of report.rows) {
       const head = r.result.split(/ — | · คนโทร/)[0];
-      expect(words.has(head), r.result).toBe(true);
+      // ข้อยกเว้นเดียว (7 ต.ค. 2569 เจ้าของ "ให้บอกว่า นาย ก เลื่อน"): ขอเลื่อน = หมวดสรุปไม่ได้ แต่ป้ายบอกตรง ๆ
+      expect(words.has(head) || head === 'ขอเลื่อน', r.result).toBe(true);
     }
   });
 });

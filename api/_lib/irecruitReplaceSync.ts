@@ -519,7 +519,7 @@ export async function runIrecruitReplaceSync(
     //    (เวลา/ยกเลิก/เปลี่ยนคน ทำในขั้น 1–2 แล้ว · เปลี่ยนเบอร์ = คนใหม่ ⇒ ยกเลิกของเดิม + สร้างใหม่)
     const changedAi: string[] = [];
     for (const x of existingRows) {
-      if (!x.pending) continue;
+      // ชื่อ/หน่วยงานบนจอแก้ทุกแถว (สายที่ผ่านแล้วก็โชว์) · ส่ง Lumos ใหม่เฉพาะสาย AI ที่ยังไม่ถึงเวลา
       const meta = metaByRef.get(x.source_ref);
       if (!meta) continue;
       const nameChanged = (x.recipient_name ?? '') !== meta.name;
@@ -532,7 +532,7 @@ export async function runIrecruitReplaceSync(
           meta.siteName,
           meta.siteCode,
         ]);
-        if (x.mode === 'ai' && !rescheduledIds.has(x.id)) changedAi.push(x.id);
+        if (x.pending && x.mode === 'ai' && !rescheduledIds.has(x.id)) changedAi.push(x.id);
       } catch (e) {
         logError('irecruit.replaceSync: แก้ชื่อ/หน่วยงานตาม iRecruit ไม่สำเร็จ', e, { id: x.id });
       }

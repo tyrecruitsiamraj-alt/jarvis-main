@@ -369,6 +369,13 @@ export function followRoundLabel(round: FollowPlanningRound): string {
   const category = callCategory(round);
   const base = FOLLOW_CALL_CATEGORY_LABEL[category];
   if (round.state !== 'result') return base;
+  /**
+   * 🔴 ขอเลื่อน = บอกตรง ๆ ว่าเลื่อน (เจ้าของ 7 ต.ค. 2569: *"โทรแล้ว บอกขอเลื่อนเวลา ให้บอกว่า นาย ก เลื่อน"*)
+   * เดิมขึ้น "สรุปไม่ได้" · ถัง/ตัวเลขยังอยู่หมวดสรุปไม่ได้ตามเดิม (นิยามกล่องไม่เปลี่ยน)
+   */
+  if (category === 'other' && effectiveCallOutcome(round.entry) === 'reschedule_requested') {
+    return isStaffCallResult(round.entry) ? 'ขอเลื่อน · คนโทร' : 'ขอเลื่อน';
+  }
   if (isStaffCallResult(round.entry)) return `${base} · คนโทร`;
   if (answeredButMarkedUnreached(round.entry)) return `${base} — รับสายแล้ว`;
   if (category === 'unreachable' || category === 'other') {
