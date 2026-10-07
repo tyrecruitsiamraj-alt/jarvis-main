@@ -215,7 +215,7 @@ const FollowRoundsDialog: React.FC<{
                         size="sm"
                         disabled={busy}
                         onClick={() => onReopen(it.id)}
-                        title="ล้างผลปิดงานให้กลับมาแก้ต่อได้ — ไม่แตะสายที่โทรไปแล้ว"
+                        title="ล้างผลปิดงาน · สายที่ถูกหยุดตอนปิดกลับมาด้วย"
                         className={cn('min-h-8 gap-1 px-2.5 text-[11px]', TONE.warn.value)}
                       >
                         <RotateCcw aria-hidden />

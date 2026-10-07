@@ -12528,3 +12528,17 @@ Choice เจ้าของ แก้ 2 ข้อ:
 - ⚠️ ห้ามใส่ "ยังไม่ถึง" ใน notYet — 20 สาย "ยังไม่ถึงหน่วยงาน กำลังเดินทาง" ย้ายจาก said_yes ไป not_yet = อัตราสำเร็จหน้าแรกตกเงียบ ๆ
 - 🔴 เราเชื่อรหัส Lumos อยู่แล้วเมื่อชัด (`DECIDED_BY_CODE`: confirmed/declined/no_answer/busy) · อ่านคำเฉพาะ `acknowledged` (รับสายแล้ว ไม่บอกไปไหม) กับ `unresponsive`
 - ข้อ 2 (เนื้อหาสายเบอร์ฉุกเฉิน) · ข้อ 7 ส่วน "ไม่โทรเบอร์ฉุกเฉิน" = ฝั่ง Lumos
+
+### ปัญหา Lumos 7/10/2569 ข้อ 3 · 4 · 5 (ไม่สลับเป็นคนโทรเอง · ย้อนสถานะทั้ง 2 สาย · ปุ่มผลเป็นป๊อป)
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `api/_lib/followDeclineDayRepair.ts` | ข้อ 3 — ถอดสาขา "เลยเวลา = คนโทร" · SQL เอาเฉพาะแถวอนาคต (`> now() + 3 minutes`) · ไม่มี `toManual` แล้ว (ณัฐพล · อิทธิชัย ถูกตัวนี้สลับตอน 08:17 7 ต.ค.) |
+| `api/_lib/followReopenRestore.ts` | **ใหม่** ข้อ 4 — `stoppedIdsOf` (audit `new_value` เป็น string) · `restoreRoundsStoppedByClose` อ่าน `stoppedIds` จาก audit `follow.complete` ล่าสุด · เปิดแถวที่ `cancelled_at` ห่างเวลาปิด < 120 วิ · AI อนาคต = คิว pending (ล้าง `push_state`) + `resyncFollowPlanWithLumos` ทีละแผน · AI เลยเวลา/คนโทร = เปิดแถวอย่างเดียว ไม่แตะ `call_mode` |
+| `api/_handlers/follow.ts` | `reopenFollow` เรียกตัวคืน · ตอบ `restored_rounds` / `restore_error` · audit `follow.reopen` มี `restore` |
+| `src/lib/followApi.ts` · `src/pages/follow/FollowPage.tsx` · `FollowRoundsDialog.tsx` | `restore_error` → toast · tooltip ปุ่มย้อนสถานะ |
+| `src/components/follow/FollowStaffCallControls.tsx` | ข้อ 5 — `compact` (ตาราง) = ปุ่ม "ลงผล"/"แก้ผล"/"จบเรื่องนี้ไหม" ปุ่มเดียว เด้ง Popover (ปุ่ม `sm` 2 คอลัมน์) · ขั้น 2 อยู่ใน Popover เดียวกัน · ป๊อปจัดการ (ไม่ compact) หน้าตาเดิม |
+| เทสต์ | `tests/api/followReopenRestore.test.ts` · `tests/api/followDeclineDayRepair.test.ts` · `FollowStaffCallControls.test.tsx` |
+
+- ตรวจ: Browser หน้า /follow (ดัก fetch) กด แก้ → ป๊อป 4 ปุ่ม → ไม่ไป → ยิง PATCH 1 ครั้ง (ถูกดัก) → ป๊อปเปลี่ยนเป็น "จบเรื่องนี้เลยไหม" · audit จริง 3 วัน: ตัวอ่าน `stoppedIds` ใช้ได้ (1 ใบจะคืน 1 สาย)
+- ⚠️ ย้อนสถานะยังไม่ได้ยิงจริงบน production (จะส่งแผนให้ Lumos จริง)

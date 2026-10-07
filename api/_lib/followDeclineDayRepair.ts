@@ -10,7 +10,9 @@
  * ตัวซ่อม (เดินทุกรอบของตัวส่งซ้ำงานติดตาม · เครื่องที่มีคีย์ push เท่านั้น):
  *   หาแถวติดตาม AI ที่ยังเปิด · คิวทุกแถวถูกยกเลิก · ชุดเดียวกันมีคนตอบ declined **วันก่อนหน้า** แถวนั้น
  *   - ยังไม่ถึงเวลา → คืนคิวเป็น pending แล้วส่งแผนใหม่ให้ Lumos (`resyncFollowPlanWithLumos`)
- *   - เลยเวลาไปแล้ว → คนโทร (Lumos รับแต่เวลาอนาคต · ส่งเวลาที่ผ่านแล้ว = โทรทันทีผิดเวลา)
+ *   - เลยเวลาไปแล้ว → **ไม่แตะ** (จอขึ้นเลยเวลานัด คนตัดสินเอง)
+ *     🔴 เดิมสลับเป็นคนโทรเอง — เจ้าของ 7 ต.ค. 2569 ปัญหา Lumos ข้อ 3: *"ไม่ต้องการให้เปลี่ยนอัตโนมัติ"*
+ *     (ณัฐพล · อิทธิชัย ถูกตัวนี้สลับตอน 08:17)
  *   แถวของ **วันเดียวกับที่ตอบว่าไม่ไป** ไม่แตะ (หยุดวันนั้นตามกติกา)
  * 🔴 แถวที่ซ่อมแล้วมีคิว pending ⇒ ไม่เข้าเงื่อนไขอีก (ไม่วนซ้ำ)
  */
@@ -38,7 +40,7 @@ export function declineOrphanSql(): string {
        and coalesce(f.call_mode, 'ai') = 'ai'
        and coalesce(f.follow_team, '') <> 'replacement'
        and f.group_id is not null
-       and f.scheduled_at > now() - interval '1 day'
+       and f.scheduled_at > now() + interval '${MIN_LEAD_MINUTES} minutes'
        and exists (select 1 from ${queueTable} q
                     where q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref = 'follow-' || f.id::text)
        and not exists (select 1 from ${queueTable} q
@@ -54,22 +56,12 @@ export function declineOrphanSql(): string {
      limit 200`;
 }
 
-export async function repairDeclinedFollowDays(): Promise<{ resent: number; groups: number; toManual: number; errors: number }> {
-  const out = { resent: 0, groups: 0, toManual: 0, errors: 0 };
+export async function repairDeclinedFollowDays(): Promise<{ resent: number; groups: number; errors: number }> {
+  const out = { resent: 0, groups: 0, errors: 0 };
   if (!getLumosPushConfig()) return out;
   const { rows } = await dbQuery<OrphanRow>(declineOrphanSql());
   if (rows.length === 0) return out;
 
-  // เลยเวลาแล้ว → คนโทร
-  const past = rows.filter((r) => !r.future).map((r) => r.id);
-  if (past.length > 0) {
-    const upd = await dbQuery<{ id: string }>(
-      `update ${followTable} set call_mode = 'manual', dispatch_state = 'manual'
-        where id = any($1::uuid[]) and coalesce(call_mode, 'ai') = 'ai' returning id`,
-      [past],
-    );
-    out.toManual = upd.rows.length;
-  }
 
   // ยังไม่ถึงเวลา → คืนคิว + ส่งแผนใหม่ทีละชุด
   const byGroup = new Map<string, string[]>();

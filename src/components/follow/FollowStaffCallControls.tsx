@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TONE } from '@/lib/designTokens';
 import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 import type { FollowEntry } from '@/lib/followApi';
@@ -32,6 +33,8 @@ const WHEN = new Intl.DateTimeFormat('th-TH', {
  *          โทรต่อ = แผนเดินต่อ · ติดต่อไม่ได้ = ไม่ถาม โทรต่อเลย
  *
  * ตัวเดียวกันทั้งช่อง "เขาตอบว่าอะไร" ของตารางรายวัน (`compact`) และป๊อปจัดการ — ไม่ซ้อน Dialog ·
+ * 🔴 ตาราง (`compact`) = ปุ่ม "ลงผล" ปุ่มเดียว กดแล้วเด้ง Popover ให้เลือก (เจ้าของ 7 ต.ค. 2569 ปัญหา Lumos ข้อ 5:
+ * *"เลื่อนดูงานแล้วมือมันไปกดโดนของคนอื่น"*) · ขั้น 2 "จบเรื่องนี้ไหม" อยู่ใน Popover เดียวกัน ·
  * ไม่มีช่องพิมพ์คำตอบ (คนโทรไม่ต้องเก็บคำตอบ) · หมายเหตุเก่าที่เคยพิมพ์ยังโชว์
  */
 const FollowStaffCallControls: React.FC<{
@@ -54,64 +57,123 @@ const FollowStaffCallControls: React.FC<{
   /** ขั้น 2 ค้างอยู่ของผลไหน (null = ไม่ถาม) */
   const [askFinish, setAskFinish] = useState<FollowStaffCallOutcome | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  /** Popover ของตาราง (`compact`) */
+  const [open, setOpen] = useState(false);
 
   const pick = async (outcome: FollowStaffCallOutcome) => {
     const ok = await onRecord(outcome);
     if (ok === false) return;
     setEditing(false);
-    setAskFinish(!closed && STAFF_FINISH_OUTCOME[outcome] ? outcome : null);
+    const ask = !closed && STAFF_FINISH_OUTCOME[outcome] ? outcome : null;
+    setAskFinish(ask);
+    if (!ask) setOpen(false);
   };
 
   const row = cn('flex items-center gap-1', compact ? 'flex-nowrap whitespace-nowrap' : 'flex-wrap');
+  /** ใน Popover ปุ่มใหญ่ขึ้น 2 คอลัมน์ — กดง่าย ไม่โดนข้าง ๆ */
+  const btnSize = compact ? 'sm' : 'xs';
+  const panelRow = compact ? 'grid grid-cols-2 gap-2' : row;
 
   // ── ขั้น 2: จบเรื่องนี้เลยไหม ──
-  if (askFinish) {
-    const finishWith = STAFF_FINISH_OUTCOME[askFinish] as FollowOutcome;
+  const finishPanel = (ask: FollowStaffCallOutcome) => {
+    const finishWith = STAFF_FINISH_OUTCOME[ask] as FollowOutcome;
     return (
-      <span className={row} data-testid="staff-finish-ask">
-        <span className="text-[11px] text-muted-foreground">จบเรื่องนี้เลยไหม</span>
-        {/* ปุ่มจบหลักของผลนั้นมาก่อน แล้วตามด้วย ลา · จำวันผิด (6 ต.ค. 2569) */}
-        {[finishWith, ...STAFF_FINISH_EXTRA.filter((o) => o !== finishWith)].map((o, i) => (
+      <span className={cn(compact ? 'flex flex-col gap-2' : row)} data-testid="staff-finish-ask">
+        <span className={compact ? 'text-sm font-medium' : 'text-[11px] text-muted-foreground'}>จบเรื่องนี้เลยไหม</span>
+        <span className={panelRow}>
+          {/* ปุ่มจบหลักของผลนั้นมาก่อน แล้วตามด้วย ลา · จำวันผิด (6 ต.ค. 2569) */}
+          {[finishWith, ...STAFF_FINISH_EXTRA.filter((o) => o !== finishWith)].map((o, i) => (
+            <Button
+              key={o}
+              type="button"
+              size={btnSize}
+              variant={i === 0 ? 'default' : 'outline'}
+              disabled={busy}
+              onClick={async () => {
+                await onFinish(o);
+                setAskFinish(null);
+                setOpen(false);
+              }}
+            >
+              จบ · {FOLLOW_OUTCOME_LABEL[o]}
+            </Button>
+          ))}
           <Button
-            key={o}
             type="button"
-            size="xs"
-            variant={i === 0 ? 'default' : 'outline'}
+            variant="outline"
+            size={btnSize}
             disabled={busy}
-            onClick={async () => {
-              await onFinish(o);
+            onClick={() => {
               setAskFinish(null);
+              setOpen(false);
             }}
           >
-            จบ · {FOLLOW_OUTCOME_LABEL[o]}
+            โทรต่อตามแผน
           </Button>
-        ))}
-        <Button type="button" variant="outline" size="xs" disabled={busy} onClick={() => setAskFinish(null)}>
-          โทรต่อตามแผน
+        </span>
+      </span>
+    );
+  };
+
+  // ── ขั้น 1: ยังไม่ลงผล หรือกดแก้ ──
+  const quickPanel = (
+    <span className={panelRow} data-testid="staff-quick">
+      {FOLLOW_STAFF_QUICK_RESULTS.map((q) => (
+        <Button
+          key={q.outcome}
+          type="button"
+          variant="outline"
+          size={btnSize}
+          disabled={busy}
+          onClick={() => void pick(q.outcome)}
+          className={cn(TONE[CALL_OUTCOME_TONE[q.outcome] ?? 'warn'].value, recorded === q.outcome && 'border-current')}
+        >
+          {q.label}
         </Button>
+      ))}
+    </span>
+  );
+
+  // ── ตาราง: ปุ่มเดียว เด้ง Popover ──
+  if (compact && (askFinish || !recorded || editing)) {
+    return (
+      <span className={row}>
+        <Popover
+          open={open}
+          onOpenChange={(o) => {
+            setOpen(o);
+            if (!o) setEditing(false);
+          }}
+        >
+          <PopoverTrigger asChild>
+            <Button type="button" variant="outline" size="xs" disabled={busy} data-testid="staff-result-open">
+              {askFinish ? 'จบเรื่องนี้ไหม' : editing ? 'แก้ผล' : 'ลงผล'}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="flex w-64 flex-col gap-2 p-3">
+            {askFinish ? (
+              finishPanel(askFinish)
+            ) : (
+              <>
+                <span className="text-sm font-medium">เขาไปไหม</span>
+                {quickPanel}
+              </>
+            )}
+          </PopoverContent>
+        </Popover>
+        {extra}
       </span>
     );
   }
 
-  // ── ขั้น 1: ยังไม่ลงผล หรือกดแก้ ──
+  if (askFinish) return finishPanel(askFinish);
+
   if (!recorded || editing) {
     return (
-      <span className={cn('flex flex-col gap-1.5', compact && 'gap-1')}>
-        {!compact ? <span className="text-xs font-medium text-muted-foreground">เขาไปไหม</span> : null}
-        <span className={row} data-testid="staff-quick">
-          {FOLLOW_STAFF_QUICK_RESULTS.map((q) => (
-            <Button
-              key={q.outcome}
-              type="button"
-              variant="outline"
-              size="xs"
-              disabled={busy}
-              onClick={() => void pick(q.outcome)}
-              className={cn(TONE[CALL_OUTCOME_TONE[q.outcome] ?? 'warn'].value, recorded === q.outcome && 'border-current')}
-            >
-              {q.label}
-            </Button>
-          ))}
+      <span className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-muted-foreground">เขาไปไหม</span>
+        <span className={row}>
+          {quickPanel}
           {editing ? (
             <Button type="button" variant="ghost" size="xs" onClick={() => setEditing(false)}>
               ไม่แก้
@@ -136,7 +198,16 @@ const FollowStaffCallControls: React.FC<{
             .join(' · ')}
         </span>
         {!closed ? (
-          <Button type="button" variant="ghost" size="xs" disabled={busy} onClick={() => setEditing(true)}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            disabled={busy}
+            onClick={() => {
+              setEditing(true);
+              setOpen(true);
+            }}
+          >
             แก้
           </Button>
         ) : null}

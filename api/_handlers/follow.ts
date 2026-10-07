@@ -26,6 +26,7 @@ import { readJsonBody, getString } from '../_lib/body.js';
 import type { FollowDispatchState } from '@/lib/followDispatchState';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { staffNameOfPhone } from '../_lib/followStaffName.js';
+import { restoreRoundsStoppedByClose, type ReopenRestore } from '../_lib/followReopenRestore.js';
 import { logWarn } from '../_lib/logger.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import {
@@ -1453,7 +1454,7 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
  * เดิมกด "เสร็จสิ้น" แล้วปุ่มทุกปุ่มของรอบนั้นหายไป — เลือกผิดคือแก้ไม่ได้เลย
  * ต้องสร้างรายการใหม่ทั้งชุด
  *
- * 🔴 **ล้างเฉพาะช่องปิดงาน ไม่แตะคิวโทรและไม่แตะการยกเลิก** — ปิดงานเป็นบันทึกของคน
+ * 🔴 ล้างช่องปิดงาน + คืนสายที่การปิดครั้งนั้นหยุดไว้ (`restoreRoundsStoppedByClose` · 7 ต.ค. 2569) — ปิดงานเป็นบันทึกของคน
  * ส่วนสายที่โทรไปแล้วเป็นเหตุการณ์ที่เกิดขึ้นจริง ย้อนไม่ได้และไม่ควรย้อน
  * ⚠️ รายการที่ **ยกเลิก** ไปแล้วย้อนทางนี้ไม่ได้ (คนละเรื่องกับปิดงาน)
  */
@@ -1486,15 +1487,24 @@ async function reopenFollow(req: AuthedReq, res: ApiRes) {
   const done = rows[0];
   if (!done) return sendError(res, 404, 'Not found', 'ย้อนสถานะไม่สำเร็จ');
 
+  /** 🔴 คืนสายที่ปิดงานครั้งนั้นหยุดไว้ด้วย (เจ้าของ 7 ต.ค. 2569: *"ต้องการให้ย้อนสถานะทั้ง 2 สายเลย"*) */
+  let restore: ReopenRestore = { restored: 0, resent: 0 };
+  try {
+    restore = await restoreRoundsStoppedByClose(id);
+  } catch (e) {
+    logWarn('follow.reopen.restoreFailed', { followId: id, error: String(e) });
+    restore = { restored: 0, resent: 0, error: 'คืนสายที่ถูกหยุดไม่สำเร็จ' };
+  }
+
   await auditFromAuthed(req, {
     action: 'follow.reopen',
     entityType: 'follow_entry',
     entityId: id,
     before: { outcome_code: before.outcome_code, outcome_note: before.outcome_note },
-    after: { outcome_code: null },
+    after: { outcome_code: null, restore },
   });
 
-  return res.status(200).json(toResponse(done));
+  return res.status(200).json({ ...toResponse(done), restored_rounds: restore.restored, restore_error: restore.error ?? null });
 }
 
 /** ฐานยังไม่รัน migration 130 — บอกตรง ๆ แทนจะปล่อย error ดิบของ Postgres */

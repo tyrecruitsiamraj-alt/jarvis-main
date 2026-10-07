@@ -144,3 +144,18 @@ describe('ป๊อปของรอบ: ปุ่มลงผลโชว์�
     expect(screen.getAllByRole('button', { name: /บันทึกว่าเสร็จสิ้น/ })).toHaveLength(1);
   });
 });
+
+describe('🔴 ตาราง = ปุ่มลงผลปุ่มเดียว เด้งป๊อป (เจ้าของ 7 ต.ค. 2569 ปัญหา Lumos ข้อ 5 "เลื่อนดูแล้วมือไปกดโดนของคนอื่น")', () => {
+  it('แถวไม่มีปุ่ม ไป/ไม่ไป ตรง ๆ · กด "ลงผล" แล้วเลือกในป๊อป · ขั้น 2 อยู่ในป๊อปเดียวกัน', async () => {
+    const onRecord = vi.fn().mockResolvedValue(true);
+    const onFinish = vi.fn().mockResolvedValue(undefined);
+    render(<FollowStaffCallControls compact entry={entry()} onRecord={onRecord} onFinish={onFinish} extra={<span>ยกเลิกสาย</span>} />);
+    expect(screen.queryByRole('button', { name: 'ไม่ไป' })).toBeNull();
+    expect(screen.getByText('ยกเลิกสาย')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'ลงผล' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'ไม่ไป' }));
+    await waitFor(() => expect(onRecord).toHaveBeenCalledWith('declined'));
+    fireEvent.click(await screen.findByRole('button', { name: 'จบ · ไม่ไป' }));
+    await waitFor(() => expect(onFinish).toHaveBeenCalledWith('no_show_start'));
+  });
+});

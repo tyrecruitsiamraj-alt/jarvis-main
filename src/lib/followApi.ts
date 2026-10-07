@@ -398,13 +398,16 @@ export const FOLLOW_STATUS_BAR: Record<FollowCallStatus, string> = {
  * **ย้อนสถานะปิดงาน** (feedback 2 ก.ย. 2569) — ล้างผลปิดงานให้กลับมาแก้ต่อได้
  * ⚠️ ไม่แตะคิวโทร · รายการที่ยกเลิกไปแล้วย้อนทางนี้ไม่ได้
  */
-export async function reopenFollowEntry(id: string): Promise<FollowEntry> {
+/** ย้อนสถานะ = คืนสายที่การปิดครั้งนั้นหยุดไว้ด้วย (7 ต.ค. 2569) — `restore_error` = คืนไม่ครบ ต้องบอกจอ */
+export async function reopenFollowEntry(
+  id: string,
+): Promise<FollowEntry & { restored_rounds?: number; restore_error?: string | null }> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ action: 'reopen' }),
   });
   if (!r.ok) throw new Error(await readError(r));
-  return (await r.json()) as FollowEntry;
+  return (await r.json()) as FollowEntry & { restored_rounds?: number; restore_error?: string | null };
 }
 
 /**

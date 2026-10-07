@@ -23,11 +23,13 @@ describe('หาแถวที่ค้าง', () => {
     expect(sql).toContain("x.last_outcome = 'declined'");
     expect(sql).toContain("(g.scheduled_at at time zone 'Asia/Bangkok')::date < (f.scheduled_at at time zone 'Asia/Bangkok')::date");
     expect(sql).toContain("<> 'replacement'");
+    // 🔴 ข้อ 3 (7 ต.ค. 2569): เลยเวลาแล้วไม่แตะ — ไม่สลับเป็นคนโทรเอง
+    expect(sql).toContain("f.scheduled_at > now() + interval '3 minutes'");
   });
 });
 
 describe('ซ่อม', () => {
-  it('ยังไม่ถึงเวลา = คืนคิวแล้วส่งแผนใหม่ทีละชุด · เลยเวลา = คนโทร', async () => {
+  it('ยังไม่ถึงเวลา = คืนคิวแล้วส่งแผนใหม่ทีละชุด · 🔴 ไม่มีการสลับเป็นคนโทร', async () => {
     dbQuery.mockImplementation(async (sql: string) => {
       if (sql.includes('select f.id::text')) {
         return {
@@ -39,7 +41,6 @@ describe('ซ่อม', () => {
           ],
         };
       }
-      if (sql.includes("set call_mode = 'manual'")) return { rows: [{ id: 'past1' }] };
       return { rows: [] };
     });
     resync.mockResolvedValue({ rounds: 2, cancelled: true, pushed: true });
@@ -49,7 +50,8 @@ describe('ซ่อม', () => {
     expect(resync.mock.calls[1][0]).toBe('b1');
     const repend = dbQuery.mock.calls.find((c) => String(c[0]).includes("set status = 'pending'"));
     expect(repend?.[1]).toEqual([['follow-a1', 'follow-a2']]);
-    expect(r).toEqual({ resent: 4, groups: 2, toManual: 1, errors: 0 });
+    expect(r).toEqual({ resent: 4, groups: 2, errors: 0 });
+    expect(dbQuery.mock.calls.some((c) => String(c[0]).includes("call_mode = 'manual'"))).toBe(false);
   });
 
   it('ผูกกับตัวส่งซ้ำงานติดตาม (เดินทุกรอบ บนเครื่องที่มีคีย์ push)', () => {

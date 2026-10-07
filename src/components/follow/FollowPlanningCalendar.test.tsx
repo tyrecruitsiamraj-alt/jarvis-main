@@ -779,12 +779,15 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
   const manual = (over: Partial<FollowEntry> = {}) =>
     entry({ id: 'm1', call_round: 1, call_mode: 'manual', call_status: null, dispatch_state: 'manual', ...over });
 
-  it('🔴 สายคนโทรที่ยังไม่ลงผล ⇒ ช่อง "เขาตอบว่าอะไร" มี ไป / ไม่ไป / ขอเลื่อน / ติดต่อไม่ได้ (6 ต.ค. 2569)', async () => {
+  /** 🔴 7 ต.ค. 2569 (ปัญหา Lumos ข้อ 5): ปุ่มผลอยู่ในป๊อปของปุ่ม "ลงผล" — แถวไม่มีปุ่ม ไป/ไม่ไป ตรง ๆ แล้ว */
+  it('🔴 สายคนโทรที่ยังไม่ลงผล ⇒ ปุ่ม "ลงผล" เปิดป๊อป ไป / ไม่ไป / ขอเลื่อน / ติดต่อไม่ได้ (6 ต.ค. 2569)', async () => {
     const onStaffResult = vi.fn().mockResolvedValue(false);
     renderCalendar([manual()], { onStaffResult, onCancelRound: vi.fn() });
     const row = dayRows()[0];
+    expect(within(row).queryByRole('button', { name: 'ไม่ไป' })).toBeNull();
+    fireEvent.click(within(row).getByRole('button', { name: 'ลงผล' }));
     for (const label of ['ไป', 'ไม่ไป', 'ขอเลื่อน', 'ติดต่อไม่ได้']) {
-      fireEvent.click(within(row).getByRole('button', { name: label }));
+      fireEvent.click(await screen.findByRole('button', { name: label }));
     }
     await waitFor(() => expect(onStaffResult).toHaveBeenCalledTimes(4));
     expect(onStaffResult.mock.calls.map((c) => [(c[0] as { entry: FollowEntry }).entry.id, c[1]])).toEqual([
@@ -795,12 +798,13 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
     ]);
   });
 
-  it('🔴 กด ไม่ไป แล้วถามจบเรื่องในที่เดิม · กดจบ = ปิดงานว่าไม่ไป', async () => {
+  it('🔴 กด ไม่ไป แล้วถามจบเรื่องในป๊อปเดิม · กดจบ = ปิดงานว่าไม่ไป', async () => {
     const onFinishRound = vi.fn();
     renderCalendar([manual()], { onStaffResult: vi.fn().mockResolvedValue(true), onCancelRound: vi.fn(), onFinishRound });
     const row = dayRows()[0];
-    fireEvent.click(within(row).getByRole('button', { name: 'ไม่ไป' }));
-    fireEvent.click(await within(row).findByRole('button', { name: 'จบ · ไม่ไป' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'ลงผล' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'ไม่ไป' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'จบ · ไม่ไป' }));
     await waitFor(() => expect(onFinishRound).toHaveBeenCalled());
     expect((onFinishRound.mock.calls[0][0] as { entry: FollowEntry }).entry.id).toBe('m1');
     expect(onFinishRound.mock.calls[0][1]).toBe('no_show_start');

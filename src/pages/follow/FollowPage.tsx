@@ -1228,12 +1228,13 @@ const FollowPage: React.FC = () => {
 
   /**
    * ย้อนสถานะปิดงาน (feedback 2 ก.ย. 2569) — ล้างผลปิดงานแล้วโหลดใหม่ให้ปุ่มกลับมา
-   * ⚠️ ไม่แตะคิวโทร (เหมือนตอนปิดงาน) — สายที่โทรไปแล้วเป็นเหตุการณ์จริง ย้อนไม่ได้
+   * 🔴 server คืนสายที่การปิดครั้งนั้นหยุดไว้ด้วย (7 ต.ค. 2569 "ย้อนสถานะทั้ง 2 สาย") · สายที่โทรไปแล้วย้อนไม่ได้
    */
   const doReopen = async (id: string) => {
     setBusyId(id);
     try {
-      await reopenFollowEntry(id);
+      const out = await reopenFollowEntry(id);
+      if (out.restore_error) toast.error(out.restore_error);
       await reload();
     } catch (err) {
       toast.error(friendlyErrorText(err, 'ย้อนสถานะไม่สำเร็จ'));
