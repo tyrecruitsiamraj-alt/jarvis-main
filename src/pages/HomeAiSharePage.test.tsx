@@ -45,7 +45,10 @@ vi.mock('@/lib/homeAiShareApi', () => ({
       from: w.from,
       to: w.to,
       bu: null,
-      follow: { total: 676, done: 488, waiting: 0, failed: 99, cancelled: 89 },
+      follow: {
+        ai: { total: 673, done: 488, waiting: 0, failed: 99, cancelled: 86 },
+        staff: { total: 805, done: 79, waiting: 699, failed: 3, cancelled: 24 },
+      },
       applicants: { total: 178, done: 100, waiting: 43, failed: 35, cancelled: 0 },
       backlog: 46,
       error: null,
@@ -658,8 +661,14 @@ describe('เลขตามหัวข้อบอท Lumos ในการ์
   it('ติดตาม = งานติดตาม 5 ช่อง · ผู้สมัคร = งานรับสมัคร + งานเก่า · บวกกันได้ทั้งหมด', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const box = await screen.findByTestId('lumos-stats-follow');
-    await waitFor(() => expect(within(box).getByTestId('lumos-follow-total').textContent).toContain('676'));
-    expect(within(box).getByTestId('lumos-follow-sum').textContent).toBe('488 + 0 + 99 + 89 = 676');
+    await waitFor(() => expect(within(box).getByTestId('lumos-follow-รวม').textContent).toContain('1,478'));
+    // ทั้งคนและ AI (เจ้าของ "ต้องรู้ทั้งคนและ Ai") · แถวรวม = กล่องทั้งหมด
+    const cells = (row: string) =>
+      within(within(box).getByTestId(`lumos-follow-${row}`)).getAllByRole('cell').slice(1).map((c) => c.textContent);
+    expect(cells('AI โทร')).toEqual(['673', '488', '0', '99', '86']);
+    expect(cells('คนโทร')).toEqual(['805', '79', '699', '3', '24']);
+    expect(cells('รวม')).toEqual(['1,478', '567', '699', '102', '110']);
+    expect(within(box).getByTestId('lumos-follow-sum').textContent).toBe('AI 488 + 0 + 99 + 86 = 673 · คน 79 + 699 + 3 + 24 = 805');
     expect(within(box).getByText('มีผลการโทร')).toBeTruthy();
     openPicker();
     fireEvent.click(await screen.findByRole('option', { name: new RegExp(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')!.label) }));
