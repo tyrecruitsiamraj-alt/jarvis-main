@@ -37,7 +37,7 @@ import { toYmdBangkok } from '@/lib/dateTh';
 import AiShareCard, { type AiShareCardProps } from '@/components/home-ai-share/AiShareCard';
 import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
-import FollowJourneyPanel from '@/components/home-ai-share/FollowJourneyPanel';
+import FollowCallerDialog from '@/components/home-ai-share/FollowCallerDialog';
 import HomeCallResultsPanel from '@/components/home-ai-share/HomeCallResultsPanel';
 import PeriodPicker from '@/components/shared/PeriodPicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -319,6 +319,9 @@ const HomeAiSharePage: React.FC = () => {
       : null;
   })();
   // หัวข้อติดตามนับแบบแผน (ตั้งให้ใครโทร) ไม่พึ่งช่องผลของคนโทร ⇒ ไม่มีธง "ยังนับคนโทรไม่ได้"
+  /** กล่องที่เปิดป๊อปแยกเรื่อง (ติดตาม · AI โทร/คนโทร) — null = ป๊อปรายชื่อเดิม */
+  const callerList: 'ai' | 'manual' | null =
+    meta.key === 'follow' && listKey === 'ai' ? 'ai' : meta.key === 'follow' && listKey === 'staff' ? 'manual' : null;
   const flag = meta.key === 'aftercare' ? (counts && counts.total > 0 ? staffFlag : null) : null;
 
 
@@ -416,12 +419,21 @@ const HomeAiSharePage: React.FC = () => {
         />
       </AiShareCard>
 
-      {/* เส้นทางติดตามทีละขั้น (7 ต.ค. 2569) — หัวข้อติดตามเท่านั้น · ช่วงเดียวกับกล่องด้านบน */}
-      {meta.key === 'follow' ? <FollowJourneyPanel win={cardWin} tick={tick} /> : null}
+      {/* หัวข้อติดตาม กด AI โทร / คนโทร = แยกเรื่อง → ผล → รายชื่อ (เจ้าของ 7 ต.ค. 2569 "ป๊อปเดิม เปลี่ยนข้างใน") */}
+      <FollowCallerDialog
+        key={`caller-${listSeq}`}
+        open={listOpen && callerList !== null}
+        onOpenChange={setListOpen}
+        caller={callerList ?? 'ai'}
+        blockTitle={meta.title}
+        unit={meta.unit}
+        win={cardWin}
+        count={counts ? counts[listKey] : null}
+      />
 
       <AiShareListDialog
         key={listSeq}
-        open={listOpen}
+        open={listOpen && callerList === null}
         onOpenChange={setListOpen}
         block={meta.key}
         blockTitle={meta.title}

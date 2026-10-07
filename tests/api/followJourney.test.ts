@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest';
 import { followMatrixColOfCategory } from '@/lib/followCallMatrix';
 import type { FollowCallCategory } from '@/lib/followPlanning';
 import {
+  FOLLOW_CALLER_COLS,
   FOLLOW_JOURNEY_RESULTS,
+  followCallerBreakdown,
   journeyCount,
   journeyDaily,
   journeyEventsOf,
@@ -23,6 +25,7 @@ const row = (p: Partial<FollowJourneyRow> & { id: string }): FollowJourneyRow =>
   person: p.id,
   name: `คน ${p.id}`,
   unit: null,
+  bu: null,
   at: '2026-10-07T02:00:00.000Z',
   ymd: '2026-10-07',
   team: 'main',
@@ -104,5 +107,23 @@ describe('followJourney', () => {
     // 5 ต.ค. = 1 คน · 7 ต.ค. = 7 คน ⇒ 4
     expect(journeyPerDay(ROWS)).toBe(4);
     expect(journeyPerDay([])).toBe(0);
+  });
+
+  it('กดกล่อง AI โทร / คนโทร: แยก 2 แท็บ · ทุกช่องรวมกัน = ทั้งหมดของแท็บ · AI + คน = ทุกแถว', () => {
+    const ai = followCallerBreakdown(ROWS, 'ai');
+    const staff = followCallerBreakdown(ROWS, 'manual');
+    expect(ai.map((t) => t.team)).toEqual(['main', 'replacement']);
+    for (const t of [...ai, ...staff]) {
+      expect(FOLLOW_CALLER_COLS.reduce((n, c) => n + t.cols[c].length, 0)).toBe(t.rows.length);
+    }
+    expect([...ai, ...staff].reduce((n, t) => n + t.rows.length, 0)).toBe(ROWS.length);
+    const main = ai[0];
+    // แถว 1 ไป · 3 ไม่ไป · 4 ขอเลื่อน + 5 สรุปไม่ได้ = สรุปไม่ได้ 2
+    expect(main.cols.went.map((r) => r.id)).toEqual(['1']);
+    expect(main.cols.notWent.map((r) => r.id)).toEqual(['3']);
+    expect(main.cols.unclear.map((r) => r.id)).toEqual(['4', '5']);
+    expect(main.called).toHaveLength(4);
+    expect(ai[1].cols.cancelled.map((r) => r.id)).toEqual(['7']);
+    expect(ai[1].cols.waiting.map((r) => r.id)).toEqual(['8', '9', '10']);
   });
 });

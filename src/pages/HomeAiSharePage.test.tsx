@@ -47,8 +47,8 @@ vi.mock('@/lib/homeAiShareApi', () => ({
       events: [],
       error: null,
       rows: [
-        { id: 'j1', person: 'p1', name: 'คนทดสอบ', unit: null, at: '2026-10-07T02:00:00.000Z', ymd: '2026-10-07', team: 'main', caller: 'ai', result: 'agreed', job: null, replaceType: null },
-        { id: 'j2', person: 'p1', name: 'คนทดสอบ', unit: null, at: '2026-10-07T03:00:00.000Z', ymd: '2026-10-07', team: 'main', caller: 'manual', result: 'waiting', job: null, replaceType: null },
+        { id: 'j1', person: 'p1', name: 'คนทดสอบ', unit: null, bu: null, at: '2026-10-07T02:00:00.000Z', ymd: '2026-10-07', team: 'main', caller: 'ai', result: 'agreed', job: null, replaceType: null },
+        { id: 'j2', person: 'p1', name: 'คนทดสอบ', unit: null, bu: null, at: '2026-10-07T03:00:00.000Z', ymd: '2026-10-07', team: 'main', caller: 'manual', result: 'waiting', job: null, replaceType: null },
       ],
     }),
 }));
@@ -385,8 +385,6 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     const names = () =>
       screen
         .getAllByRole('button')
-        // แผงเส้นทางติดตาม (7 ต.ค. 2569) มีป้ายชื่อเดียวกัน — นับเฉพาะกล่องบนการ์ด
-        .filter((b) => !b.closest('[data-testid="follow-journey"]'))
         .map((b) => b.getAttribute('aria-label') ?? '')
         .filter((n) => /^(ทั้งหมด|AI โทร|คนโทร|ทั้งสองทาง|ยังไม่โทร) \d/.test(n));
     // ติดตามนับแบบแผน (4 ต.ค. 2569): AI + คน = ทั้งหมด ⇒ ไม่มีกล่องยังไม่โทร
@@ -403,10 +401,14 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   it('รอบ 17: กดกล่อง = Popup รายชื่อของกล่องนั้น (ช่วงเดียวกับหน้า) · ชื่อ · BU · วันที่ · เปลี่ยนหน้าได้', async () => {
     render(<HomeAiSharePage />);
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+    // หัวข้อติดตาม กด AI โทร = ป๊อปแยกเรื่องแล้ว (7 ต.ค. 2569) ⇒ ป๊อปรายชื่อแบบเดิมดูที่จับคู่งาน
+    openPicker();
+    fireEvent.click(await screen.findByRole('option', { name: /จับคู่งาน/ }));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('43 รายชื่อ'));
     fireEvent.click(tileOf('AI โทร'));
     const dlg = await screen.findByRole('dialog');
-    expect(fetchHomeAiShareList).toHaveBeenCalledWith('follow', 'ai', 0, win);
-    expect(within(dlg).getByText(`${FOLLOW_TITLE} · 7 วันล่าสุด`)).toBeTruthy();
+    expect(fetchHomeAiShareList).toHaveBeenCalledWith('matching', 'ai', 0, win);
+    expect(within(dlg).getByText('จับคู่งาน · 7 วันล่าสุด')).toBeTruthy();
     expect(await within(dlg).findByText('ผู้รับสาย 1')).toBeTruthy();
     // กล่องก้อนเดียว = ไม่ต้องมีคอลัมน์สถานะ · ไม่มีชื่อ/ไม่รู้ BU บอกตรง ๆ
     expect(within(dlg).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['ชื่อ', 'BU', 'วันที่']);
@@ -415,7 +417,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(within(dlg).getByText('แสดง 1–20 จาก 45 รายชื่อ')).toBeTruthy();
     expect(within(dlg).getByText('หน้า 1 / 3')).toBeTruthy();
     fireEvent.click(within(dlg).getByRole('button', { name: 'ถัดไป' }));
-    await waitFor(() => expect(fetchHomeAiShareList).toHaveBeenLastCalledWith('follow', 'ai', 1, win));
+    await waitFor(() => expect(fetchHomeAiShareList).toHaveBeenLastCalledWith('matching', 'ai', 1, win));
     expect(await within(dlg).findByText('ผู้รับสาย 21')).toBeTruthy();
     expect(within(dlg).getByText('หน้า 2 / 3')).toBeTruthy();
     // 🔴 ไม่มีเบอร์โทรในป๊อป
@@ -446,7 +448,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     fetchHomeAiShareList.mockRejectedValue(new Error('บัญชีนี้ยังไม่มีสิทธิ์ดูรายชื่อส่วนนี้'));
     render(<HomeAiSharePage />);
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
-    fireEvent.click(tileOf('AI โทร'));
+    fireEvent.click(tileOf('ทั้งหมด'));
     const dlg = await screen.findByRole('dialog');
     expect(await within(dlg).findByText('บัญชีนี้ยังไม่มีสิทธิ์ดูรายชื่อส่วนนี้')).toBeTruthy();
   });
@@ -577,20 +579,31 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
  * 🔴 อัปเดตสด (เจ้าของ 6 ต.ค. 2569 "หน้าหลัก ต้องทำเป็น Interactive" → Choice "ตัวเลขอัปเดตเองสด ๆ")
  * ทุก 30 วิ ดึงเลข + กราฟใหม่เงียบ ๆ (ไม่ขึ้นโครงโหลด) · มีป้าย "สด · อัปเดต hh:mm:ss"
  */
-describe('เส้นทางติดตาม (7 ต.ค. 2569)', () => {
-  it('หัวข้อติดตามมีแผง · เลขใหญ่ = สาย · รวมผล = สายทั้งหมด · กดเลขเห็นรายชื่อ', async () => {
+describe('กดกล่อง AI โทร / คนโทร ของติดตาม (7 ต.ค. 2569)', () => {
+  it('ป๊อปเดิมเปลี่ยนข้างใน: เรื่อง 2 แท็บ → ผลของเรื่อง (รวมทุกช่อง = ทั้งหมด) → รายชื่อ · กลับได้ทุกชั้น', async () => {
     render(<HomeAiSharePage />);
-    const panel = await screen.findByTestId('follow-journey');
-    await waitFor(() => expect(within(panel).getByTestId('journey-added').textContent).toContain('2 สาย'));
-    // คนเดียวมีทั้งสาย AI และคนโทร ⇒ คน = 1 แต่สายบวกกันได้ 2
-    expect(within(panel).getByTestId('journey-added').textContent).toContain('1 คน');
-    expect(within(panel).getByTestId('journey-ai').textContent).toContain('1 สาย');
-    expect(within(panel).getByTestId('journey-manual').textContent).toContain('1 สาย');
-    expect(within(panel).getByTestId('journey-sum').textContent).toBe('รวม 2 สาย');
-    expect(within(panel).getByTestId('journey-caller-sum').textContent).toBe('รวม 2 สาย');
-    fireEvent.click(within(panel).getByTestId('journey-agreed'));
-    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(stat('AI โทร')).toContain('205'));
+    fireEvent.click(tileOf('AI โทร'));
+    const dialog = await screen.findByTestId('caller-dialog');
+    // ไม่ใช่ป๊อปรายชื่อแบบเดิม
+    expect(fetchHomeAiShareList).not.toHaveBeenCalled();
+    const main = await within(dialog).findByTestId('caller-topic-main');
+    expect(within(dialog).getByTestId('caller-topic-replacement').textContent).toContain('ติดตามส่งคนแทน');
+    expect(main.getAttribute('aria-label')).toBe('ติดตามคนเริ่มงาน 1 รายชื่อ');
+    fireEvent.click(main);
+    expect(within(dialog).getByTestId('caller-sum').textContent).toBe('โทรแล้ว 1 + ยกเลิก 0 + รอโทร 0 = 1 รายชื่อ');
+    fireEvent.click(within(dialog).getByTestId('caller-col-went'));
     expect(within(dialog).getByText('คนทดสอบ')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: /ติดตามคนเริ่มงาน/ }));
+    expect(within(dialog).getByTestId('caller-topic')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: /ทุกเรื่อง/ }));
+    expect(within(dialog).getByTestId('caller-topics')).toBeTruthy();
+  });
+
+  it('กดคนโทร = แบบเดียวกัน (นับเฉพาะสายที่คนโทร)', async () => {
+    render(<HomeAiSharePage />);
+    await waitFor(() => expect(stat('AI โทร')).toContain('205'));
+    expect((tileOf('คนโทร') as HTMLButtonElement).disabled).toBe(true);
   });
 });
 

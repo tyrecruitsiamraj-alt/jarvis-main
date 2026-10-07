@@ -404,6 +404,7 @@ const AUDIT_TABLE = tableInAppSchema('audit_logs');
 export async function loadFollowJourney(params: Params): Promise<{ rows: FollowJourneyRow[]; events: FollowJourneyEvent[] }> {
   const { rows } = await dbQuery<Record<string, unknown>>(
     `select ${FOLLOW_ENTRY_CATEGORY_COLS}, f.call_mode, f.follow_team, f.unit_name, f.replace_type,
+            ${followBuSql('f')} as journey_bu,
             ${FOLLOW_QUEUE_CALL_COLS}
        from ${FOLLOW_TABLE} f
        ${followBuJoin('f')}
@@ -430,6 +431,7 @@ export async function loadFollowJourney(params: Params): Promise<{ rows: FollowJ
       person: createHash('sha1').update(`${team}|${phone || String(r.id)}`).digest('hex').slice(0, 12),
       name: String(r.recipient_name ?? '').trim() || '—',
       unit: (r.unit_name as string | null) ?? null,
+      bu: r.journey_bu ? String(r.journey_bu) : null,
       at,
       ymd: at ? JOURNEY_YMD.format(new Date(at)) : '',
       team,

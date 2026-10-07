@@ -30,6 +30,8 @@ export type FollowJourneyRow = {
   person: string;
   name: string;
   unit: string | null;
+  /** BU ของแถว (คำนวณแบบเดียวกับการ์ด) */
+  bu: string | null;
   /** เวลานัด ISO */
   at: string;
   /** วันไทย YYYY-MM-DD ของเวลานัด */
@@ -221,4 +223,33 @@ export function journeyResultMatrixCol(
     default:
       return 'waiting';
   }
+}
+
+/**
+ * ═══ กดกล่อง AI โทร / คนโทร บนหน้าหลัก (เจ้าของ 7 ต.ค. 2569 ค่ำ) ═══
+ * *"ถ้ากด Aiโทร … แต่ละเรื่องที่ Ai โทรให้เท่าไหร่ · กดแต่ละเรื่อง = โทรไปเท่าไหร่ · ไป ไม่ไป ไม่รับสาย สรุปไม่ได้ · ยกเลิก · รอโทร"*
+ * Choice: เรื่อง = 2 แท็บของติดตามก่อน · คนโทรแบบเดียวกัน · ป๊อปเดิมเปลี่ยนข้างใน
+ * ช่อง = ช่องของแผงหน้าติดตาม (`journeyResultMatrixCol` · ขอเลื่อนอยู่ในสรุปไม่ได้) ⇒ รวมทุกช่อง = ทั้งหมดของเรื่องนั้นเสมอ
+ */
+export type FollowCallerCol = 'went' | 'notWent' | 'noAnswer' | 'unclear' | 'cancelled' | 'waiting';
+export const FOLLOW_CALLER_CALLED: readonly FollowCallerCol[] = ['went', 'notWent', 'noAnswer', 'unclear'];
+export const FOLLOW_CALLER_COLS: readonly FollowCallerCol[] = [...FOLLOW_CALLER_CALLED, 'cancelled', 'waiting'];
+
+export type FollowCallerTopic = {
+  team: FollowJourneyTeam;
+  rows: FollowJourneyRow[];
+  cols: Record<FollowCallerCol, FollowJourneyRow[]>;
+  called: FollowJourneyRow[];
+};
+
+export function followCallerBreakdown(rows: readonly FollowJourneyRow[], caller: 'ai' | 'manual'): FollowCallerTopic[] {
+  return (['main', 'replacement'] as const).map((team) => {
+    const mine = rows.filter((r) => r.team === team && r.caller === caller);
+    const cols = Object.fromEntries(FOLLOW_CALLER_COLS.map((c) => [c, [] as FollowJourneyRow[]])) as Record<
+      FollowCallerCol,
+      FollowJourneyRow[]
+    >;
+    for (const r of mine) cols[journeyResultMatrixCol(r.result)].push(r);
+    return { team, rows: mine, cols, called: FOLLOW_CALLER_CALLED.flatMap((c) => cols[c]) };
+  });
 }
