@@ -56,10 +56,10 @@ describe('homeTopicReport', () => {
     expect(interestColOf(row({}))).toBe('noResult');
   });
 
-  it('ผู้สมัคร: เส้นทาง · ทุกก้อนรวม = ทั้งหมด · ใบที่ยังรอ', () => {
+  it('ผู้สมัคร: เส้นทาง · ทุกก้อนรวม = ทั้งหมด · ไม่มีส่วนใบที่ยังรอแล้ว', () => {
     const rows = [
       row({ ai: true, ai_outcome: 'confirmed', ai_at: '2026-10-01T01:00:00Z', appointment: true, attendance: 'showed' }),
-      row({ ai: true, ai_outcome: 'no_answer', ai_at: '2026-10-01T01:00:00Z', retry: true }),
+      row({ ai: true, ai_outcome: 'no_answer', ai_at: '2026-10-01T01:00:00Z' }),
       row({
         ai: true,
         staff: true,
@@ -93,8 +93,8 @@ describe('homeTopicReport', () => {
       expect(Object.keys(b.bySeg)).toEqual(REPORT_SEGS.map((s) => s.key));
       for (const s of REPORT_SEGS) expect(Object.values(b.bySeg[s.key].cols).reduce((n, v) => n + v, 0)).toBe(b.bySeg[s.key].total);
     }
-    const wait = Object.fromEntries(r.extra[1].items.map((i) => [i.key, i.value]));
-    expect(wait).toMatchObject({ retry: 1, inQueue: 1, overAge: 1, untouched: 1 });
+    // เจ้าของ 7 ต.ค. 2569: "งานสรรหา และ จับคู่งาน จะเอาพวกใบที่ยังรอมาทำไม" → เอาออก
+    expect(r.extra.map((x) => x.title)).toEqual(['ส่งต่อให้คน']);
     const hand = Object.fromEntries(r.extra[0].items.map((i) => [i.key, i.value]));
     expect(hand).toMatchObject({ handoff: 1, staffResult: 1 });
   });
@@ -129,6 +129,7 @@ describe('homeTopicReport', () => {
       ['placed', 0],
     ]);
     expect(m.extra[0].items.reduce((n, i) => n + i.value, 0)).toBe(555);
+    expect(m.extra.map((x) => x.title)).toEqual(['คนที่จับคู่รอ', 'ต้องสั่งงาน', 'ส่งต่อให้คน']);
     const a = buildAftercareReport([
       row({ ai: true, ai_outcome: 'confirmed', ai_at: '2026-10-01T00:00:00Z' }),
       row({ staff: true, staff_outcome: 'no_answer', staff_at: '2026-10-01T00:00:00Z' }),

@@ -32,7 +32,7 @@ export type TopicReport = {
   cols: ReportCol[];
   /** BU × ก้อน × ผล — หน้ารวมเองเป็นก้อนละ BU */
   cells: ReportCell[];
-  /** ส่วนท้าย: ส่งต่อให้คน · ใบที่ยังรอ */
+  /** ส่วนท้าย: ส่งต่อให้คน · คนที่จับคู่รอ · ต้องสั่งงาน (ใบที่ยังรอถอดแล้ว 7 ต.ค. 2569) */
   extra: Array<{ title: string; items: ReportItem[] }>;
 };
 export type TopicReportBlock = 'applicants' | 'matching' | 'aftercare';
@@ -63,7 +63,6 @@ export type ReportSourceRow = {
   attendance?: string | null;
   log_ok?: boolean | null;
   log_at?: string | Date | null;
-  retry?: boolean | null;
   in_queue?: boolean | null;
   held?: boolean | null;
   // จับคู่งาน / ดูแล
@@ -184,31 +183,6 @@ export function buildApplicantsReport(rows: readonly ReportSourceRow[], publishe
           { key: 'noShow', label: 'ไม่มาตามนัด', value: count(rows, (r) => r.attendance === 'no_show'), tone: 'danger' },
         ],
       },
-      {
-        title: 'ใบที่ยังรอ',
-        items: [
-          { key: 'retry', label: 'รอ AI ลองใหม่', value: count(rows, (r) => !!r.retry), tone: 'warn' },
-          { key: 'inQueue', label: 'อยู่ในคิว AI ยังไม่มีผล', value: count(rows, (r) => !!r.in_queue && !r.retry), tone: 'info' },
-          {
-            key: 'held',
-            label: 'เจ้าหน้าที่รับไว้ รอบันทึกผล',
-            value: count(rows, (r) => !!r.held && !staffResult(r) && !r.in_queue),
-            tone: 'violet',
-          },
-          {
-            key: 'overAge',
-            label: 'อายุเกิน ไม่ส่ง AI',
-            value: count(rows, (r) => segOf(r) === 'notCalled' && overAge(r)),
-            tone: 'neutral',
-          },
-          {
-            key: 'untouched',
-            label: 'ยังไม่มีใครแตะ',
-            value: count(rows, (r) => segOf(r) === 'notCalled' && !r.in_queue && !r.held && !overAge(r)),
-            tone: 'danger',
-          },
-        ],
-      },
     ],
   };
 }
@@ -235,9 +209,6 @@ export type MatchingFlow = {
   greenUncontacted: number;
   reserved: number;
   placed: number;
-  retry: number;
-  needsHuman: number;
-  stale: number;
 };
 
 export const emptyMatchingFlow = (): MatchingFlow => ({
@@ -254,9 +225,6 @@ export const emptyMatchingFlow = (): MatchingFlow => ({
   greenUncontacted: 0,
   reserved: 0,
   placed: 0,
-  retry: 0,
-  needsHuman: 0,
-  stale: 0,
 });
 
 /**
@@ -296,23 +264,10 @@ export function buildMatchingReport(rows: readonly ReportSourceRow[], f: Matchin
         ],
       },
       {
-        title: 'ที่ยังรอ',
+        title: 'ส่งต่อให้คน',
         items: [
-          {
-            key: 'inQueue',
-            label: 'อยู่ในคิว AI ยังไม่มีผล',
-            value: count(rows, (r) => segOf(r) === 'notCalled' && !!r.waiting_ai),
-            tone: 'info',
-          },
-          { key: 'stale', label: 'ส่ง AI แล้วค้างเกิน 2 วัน', value: f.stale, tone: 'warn' },
-          { key: 'retry', label: 'รอ AI โทรซ้ำ', value: f.retry, tone: 'warn' },
-          { key: 'needsHuman', label: 'ต้องให้คนเร่งจัดการ', value: f.needsHuman, tone: 'danger' },
-          {
-            key: 'held',
-            label: 'เจ้าหน้าที่รับไว้ รอบันทึกผล',
-            value: count(rows, (r) => segOf(r) === 'notCalled' && !r.waiting_ai && !!r.holding),
-            tone: 'violet',
-          },
+          { key: 'handoff', label: 'AI โทรแล้ว คนรับต่อ', value: count(rows, (r) => r.ai && r.staff) },
+          { key: 'staffResult', label: 'คนลงผลแล้ว', value: count(rows, (r) => r.staff) },
         ],
       },
     ],

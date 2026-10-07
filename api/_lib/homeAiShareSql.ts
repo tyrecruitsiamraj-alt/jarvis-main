@@ -254,7 +254,6 @@ export function buildApplicantAiShareSql(mode: AiShareSqlMode = 'total', list?: 
                `${LATEST_ATTENDANCE_SQL} as attendance`,
                `(select c.ok from ${CONTACTS} c where c.application_id = a.id order by c.created_at desc limit 1) as log_ok`,
                `(select max(c.created_at) from ${CONTACTS} c where c.application_id = a.id) as log_at`,
-               `exists (select 1 from ${QUEUE} q where q.person_ref = 'app-' || a.id::text and q.status in ('pending', 'delivered') and q.followup_state = 'retry_scheduled') as retry`,
              ].join(',\n           '),
            )}
       from ${APPS} a

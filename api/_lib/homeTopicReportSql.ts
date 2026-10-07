@@ -11,7 +11,6 @@ import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
 import { listSiamrajUnitRequests } from './siamrajUnitRequests.js';
 import { loadBoardMatchTierMap } from './boardMatchStore.js';
 import { loadBoardAvailabilityContext } from './boardAvailability.js';
-import { queueStale } from './lumosQueueDefs.js';
 import type { DepartmentScope } from './departmentScope.js';
 import { isBoardCandidateAvailable } from '../../src/lib/boardMatchAvailability.js';
 import { enrichJobsWithUrgency } from '../../src/lib/jobUrgency.js';
@@ -55,7 +54,6 @@ function toRow(r: Record<string, unknown>): ReportSourceRow {
     attendance: str(r.attendance),
     log_ok: r.log_ok == null ? null : bool(r.log_ok),
     log_at: (r.log_at as string | Date | null) ?? null,
-    retry: bool(r.retry),
     in_queue: bool(r.in_queue),
     held: bool(r.held),
     waiting_ai: bool(r.waiting_ai),
@@ -111,7 +109,7 @@ async function loadMatchingFlow(start: Date | null, end: Date, bu: string | null
   f.jobsIn = jobs.length;
   if (!jobs.length) return f;
   const ids = jobs.map((j) => j.id);
-  const [tierMap, ctx, posted, touched, prop, q] = await Promise.all([
+  const [tierMap, ctx, posted, touched, prop] = await Promise.all([
     loadBoardMatchTierMap(),
     loadBoardAvailabilityContext(),
     dbQuery<{ job_id: string }>(
@@ -130,14 +128,6 @@ async function loadMatchingFlow(start: Date | null, end: Date, bu: string | null
       `select count(*) filter (where status = 'reserved')::int as reserved,
               count(*) filter (where status = 'placed')::int as placed
          from ${PROPOSALS} where job_id = any($1)`,
-      [ids],
-    ),
-    dbQuery<{ retry: number; needs: number; stale: number }>(
-      `select count(*) filter (where q.followup_state = 'retry_scheduled')::int as retry,
-              count(*) filter (where q.followup_state = 'needs_human')::int as needs,
-              count(*) filter (where ${queueStale("'2 days'", 'q')})::int as stale
-         from ${QUEUE} q
-        where q.job_ref = any($1) and (q.person_ref like 'card-%' or q.person_ref like 'ir-%')`,
       [ids],
     ),
   ]);
@@ -168,8 +158,5 @@ async function loadMatchingFlow(start: Date | null, end: Date, bu: string | null
   }
   f.reserved = Number(prop.rows[0]?.reserved ?? 0);
   f.placed = Number(prop.rows[0]?.placed ?? 0);
-  f.retry = Number(q.rows[0]?.retry ?? 0);
-  f.needsHuman = Number(q.rows[0]?.needs ?? 0);
-  f.stale = Number(q.rows[0]?.stale ?? 0);
   return f;
 }

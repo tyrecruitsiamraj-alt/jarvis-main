@@ -64,8 +64,7 @@ vi.mock('@/lib/homeAiShareApi', () => ({
           { bu: null, seg: 'notCalled', col: 'noResult', n: 4 },
         ],
         extra: [
-          { title: 'ส่งต่อให้คน', items: [{ key: 'handoff', label: 'AI โทรแล้ว คนรับต่อ', value: 0 }] },
-          { title: 'ใบที่ยังรอ', items: [{ key: 'retry', label: 'รอ AI ลองใหม่', value: 42, tone: 'warn' }] },
+          { title: 'ส่งต่อให้คน', items: [{ key: 'handoff', label: 'AI โทรแล้ว คนรับต่อ', value: 3 }] },
         ],
       },
     }),
@@ -643,7 +642,8 @@ describe('หน้าหลักอ่านไล่บนลงล่าง 
     expect(rcells('report-row-LBD-staff')).toEqual(['คนโทร', '0', '0', '0']);
     expect(rcells('report-row-LBD-total')).toEqual(['รวม LBD', '196', '104', '92']);
     expect(within(rep).getByTestId('report-sum').textContent).toBe('LBD 196 + LBA 4 + ไม่ระบุ 4 = 204 รายชื่อ');
-    expect(within(rep).getByTestId('report-extra-ใบที่ยังรอ').textContent).toContain('42');
+    expect(within(rep).getByTestId('report-extra-ส่งต่อให้คน').textContent).toContain('3');
+    expect(within(rep).queryByTestId('report-extra-ใบที่ยังรอ')).toBeNull();
     pickTopic(/จับคู่งาน/);
     await screen.findByRole('heading', { name: 'จับคู่งาน' });
     expect(screen.queryByTestId('lumos-stats-matching')).toBeNull();
