@@ -827,6 +827,24 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
     expect(onCancelRound.mock.calls[0][1]).toBe('day');
   });
 
+  /** 🔴 7 ต.ค. 2569: AI โทรไม่ติด แล้วคนโทรเองได้คำตอบ ⇒ ลงผลบนสาย AI ได้ · AI ได้คำตอบแล้วไม่มีปุ่ม */
+  it('🔴 สาย AI ที่โทรไม่ติดมีปุ่มลงผล · ลงแล้วผลของคนชนะ', async () => {
+    const onStaffResult = vi.fn().mockResolvedValue(false);
+    renderCalendar(
+      [
+        entry({ id: 'ai-miss', call_round: 1, call_status: 'completed', call_outcome: 'no_answer' }),
+        entry({ id: 'ai-ok', call_round: 2, call_status: 'completed', call_outcome: 'confirmed' }),
+      ],
+      { onStaffResult, onCancelRound: vi.fn() },
+    );
+    const row = dayRows()[0];
+    expect(within(row).getAllByRole('button', { name: 'ลงผล' })).toHaveLength(1);
+    fireEvent.click(within(row).getByRole('button', { name: 'ลงผล' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'ไป' }));
+    await waitFor(() => expect(onStaffResult).toHaveBeenCalled());
+    expect((onStaffResult.mock.calls[0][0] as { entry: FollowEntry }).entry.id).toBe('ai-miss');
+  });
+
   it('🔴 สาย AI ที่ยังไม่มีผลก็ยกเลิกจากแถวได้ · สาย AI ที่มีผลแล้วไม่มีปุ่ม', () => {
     renderCalendar(
       [entry({ id: 'ai-wait', call_round: 1, call_status: 'pending' }), entry({ id: 'ai-done', call_round: 2, call_outcome: 'confirmed', call_status: 'completed' })],

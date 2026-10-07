@@ -8,6 +8,7 @@ import { followDayCallLabel } from '@/lib/followDayCall';
 import {
   followStaffCallText,
   isStaffCallResult,
+  canRecordStaffCall,
   type FollowStaffCallOutcome,
 } from '@/lib/followStaffCall';
 import type { FollowOutcome } from '@/lib/followOutcome';
@@ -919,11 +920,25 @@ const FollowPlanningCalendar: React.FC<{
                                       (['waiting', 'sent', 'overdue', 'notSent'] as const).includes(
                                         round.state as 'waiting' | 'sent' | 'overdue' | 'notSent',
                                       );
+                                    /**
+                                     * 🔴 สาย AI ที่ไม่ได้คำตอบ (เลยเวลา · ไม่ได้ส่ง · ไม่รับสาย/ไม่ชัด) — คนโทรเองแล้วลงผลบนสายนี้ได้
+                                     * (เจ้าของ 7 ต.ค. 2569 "ทำทั้ง 2 เรื่องเลย") · ลงแล้ว = ผลของคนแทน AI · แก้/ล้างได้เหมือนสายคนโทร
+                                     */
+                                    const aiStaffRow =
+                                      !manualRow &&
+                                      Boolean(onStaffResult && onCancelRound) &&
+                                      e.call_mode !== 'manual' &&
+                                      canRecordStaffCall(e) &&
+                                      (isStaffCallResult(e) ||
+                                        round.state === 'overdue' ||
+                                        round.state === 'notSent' ||
+                                        round.state === 'result');
+                                    const aiStaffRecorded = aiStaffRow && isStaffCallResult(e) && round.state !== 'cancelled';
                                     return (
                                       <span key={round.entry.id} className="flex min-h-[34px] flex-col justify-center">
                                         {/* 🔴 คำพูดของเขามาก่อนเสมอ (สาย AI) — หัวคอลัมน์ถามว่า "เขาตอบว่าอะไร"
                                             🔴 ปุ่มอยู่บรรทัดเดียวเสมอ (ตัดบรรทัด = บรรทัดของคอลัมน์นี้ไม่ตรงกับเวลาของสายนั้น) */}
-                                        {manualRow ? (
+                                        {manualRow || aiStaffRecorded ? (
                                           <FollowStaffCallControls
                                             compact
                                             entry={e}
@@ -988,7 +1003,22 @@ const FollowPlanningCalendar: React.FC<{
                                         ) : aiCancellable ? null : (
                                           <span className="text-[12px] text-muted-foreground">—</span>
                                         )}
-                                        {aiCancellable ? (
+                                        {aiStaffRow && !aiStaffRecorded ? (
+                                          <span className="mt-1">
+                                            <FollowStaffCallControls
+                                              compact
+                                              entry={e}
+                                              busy={busy}
+                                              onRecord={(o) => onStaffResult?.(round, o, row)}
+                                              onFinish={(o) => onFinishRound?.(round, o)}
+                                              extra={
+                                                aiCancellable ? (
+                                                  <FollowCancelMenu busy={busy} onCancel={(c) => onCancelRound?.(round, c)} />
+                                                ) : null
+                                              }
+                                            />
+                                          </span>
+                                        ) : aiCancellable ? (
                                           <span className="mt-1">
                                             <FollowCancelMenu busy={busy} onCancel={(c) => onCancelRound?.(round, c)} />
                                           </span>

@@ -7,7 +7,7 @@
  * 🔴 ด่านที่ห้ามหลุด:
  * 1. ศัพท์ผลต้องชุดเดียวกับผลที่เจ้าหน้าที่ลงในกล่องงาน — แยกชุดเมื่อไหร่ สี/คำของสองแหล่งจะเพี้ยนกันเอง
  * 2. ค่าที่อ่านไม่ออก = ปฏิเสธ ห้ามเดาเป็นผลใดผลหนึ่ง
- * 3. ลงผลได้เฉพาะรอบคนโทร — รอบของ AI ลงซ้อนไม่ได้ (นับสายเดียวสองฝั่ง)
+ * 3. ลงผลได้รอบคนโทร + สาย AI ที่ยังไม่ได้คำตอบ (7 ต.ค. 2569) — AI ได้คำตอบแล้วลงซ้อนไม่ได้
  * 4. ลงผลแล้วช่องปฏิทิน/กล่องนับต้องเปลี่ยนตาม — ไม่งั้นรอบที่โทรจบแล้วยังขึ้น "ไม่ได้ส่ง" ตลอดไป
  * 5. (1 ต.ค. 2569) ปุ่มบนแถว "ติดต่อสำเร็จ / ไม่สำเร็จ" ใช้รหัสของ Lumos ที่มีอยู่แล้ว (`acknowledged` / `no_answer`)
  *    แต่คำบนจอเป็นคำของปุ่ม — ไม่ใช่ "รับสายแล้ว" ของ AI
@@ -122,20 +122,26 @@ describe('ลงผลได้เฉพาะรอบคนโทร', () => {
   it('รอบคนโทรที่ยังไม่ยกเลิก = ได้', () => {
     expect(canRecordStaffCall(entry())).toBe(true);
   });
-  it('🔴 รอบของ AI = ไม่ได้ (นับสายเดียวสองฝั่ง)', () => {
-    expect(canRecordStaffCall(entry({ call_mode: 'ai' }))).toBe(false);
+  /** 🔴 7 ต.ค. 2569: สาย AI ที่ยังไม่ได้คำตอบลงผลเองได้ · AI ได้ ไป/ไม่ไป/ขอเลื่อน แล้ว = ห้ามทับ (นับสายเดียวสองฝั่ง) */
+  it('🔴 สาย AI: ไม่ได้คำตอบ = ได้ · ได้คำตอบแล้ว = ไม่ได้', () => {
+    expect(canRecordStaffCall(entry({ call_mode: 'ai' }))).toBe(true);
+    expect(canRecordStaffCall(entry({ call_mode: 'ai', call_outcome: 'no_answer' }))).toBe(true);
+    expect(canRecordStaffCall(entry({ call_mode: 'ai', call_outcome: 'acknowledged' }))).toBe(true);
+    for (const code of ['confirmed', 'declined', 'reschedule_requested', 'cancelled']) {
+      expect(canRecordStaffCall(entry({ call_mode: 'ai', call_outcome: code }))).toBe(false);
+    }
   });
   it('รอบที่ยกเลิก = ไม่ได้', () => {
     expect(canRecordStaffCall(entry({ cancelled: true }))).toBe(false);
   });
 });
 
-describe('ผลของสาย = ผลจาก AI ก่อน แล้วค่อยผลที่คนลง', () => {
+describe('ผลของสาย = ผลที่คนลงก่อน แล้วค่อยผลจาก AI (7 ต.ค. 2569)', () => {
   it('มีแต่ผลที่คนลง', () => {
     expect(effectiveCallOutcome({ call_outcome: null, staff_call_outcome: 'declined' })).toBe('declined');
   });
-  it('มีทั้งคู่ (ข้อมูลที่ไม่ควรเกิด) = ผลจาก AI ชนะ', () => {
-    expect(effectiveCallOutcome({ call_outcome: 'no_answer', staff_call_outcome: 'confirmed' })).toBe('no_answer');
+  it('🔴 AI โทรไม่ติด แล้วคนโทรเองได้คำตอบ = ผลของคนชนะ', () => {
+    expect(effectiveCallOutcome({ call_outcome: 'no_answer', staff_call_outcome: 'confirmed' })).toBe('confirmed');
   });
   it('ไม่มีเลย = null', () => {
     expect(effectiveCallOutcome({ call_outcome: '  ', staff_call_outcome: null })).toBeNull();
@@ -193,5 +199,15 @@ describe('กล่องนับของรอบ: สายที่คน�
     expect(inFollowRoundBucket(entry({ staff_call_outcome: 'confirmed' }), 'connected')).toBe(true);
     expect(inFollowRoundBucket(entry({ staff_call_outcome: 'confirmed' }), 'waiting')).toBe(false);
     expect(inFollowRoundBucket(entry({ staff_call_outcome: 'no_answer' }), 'unreached')).toBe(true);
+  });
+});
+
+describe('🔴 server: ลงผลบนสาย AI (7 ต.ค. 2569)', () => {
+  it('AI ได้คำตอบแล้ว = ปฏิเสธ · ไม่ได้คำตอบ = ลงได้ + ถอนสาย AI ที่ยังรอโทรของช่องนี้', async () => {
+    const { readFileSync } = await import('node:fs');
+    const h = readFileSync(new URL('../../api/_handlers/follow.ts', import.meta.url), 'utf8');
+    expect(h).toContain('if (isAiDecisiveOutcome(q[0]?.outcome))');
+    expect(h).toContain('if (isAiRow && aiQueuePending)');
+    expect(h).not.toContain("where id = $1 and cancelled_at is null and call_mode = 'manual'");
   });
 });

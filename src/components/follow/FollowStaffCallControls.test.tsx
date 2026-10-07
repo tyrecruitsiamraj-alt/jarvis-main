@@ -131,17 +131,22 @@ describe('ป๊อปของรอบ: ปุ่มลงผลโชว์�
     onAskPurge: vi.fn(),
   };
 
-  it('รอบคนโทรมีที่ลงผล · รอบของ AI ไม่มี', () => {
+  /** 🔴 7 ต.ค. 2569 เจ้าของ "ทำทั้ง 2 เรื่องเลย": สาย AI ที่ไม่ได้คำตอบลงผลเองได้ · AI ได้คำตอบแล้ว/ยังไม่ถึงเวลา = ไม่มี */
+  it('รอบคนโทรมีที่ลงผล · สาย AI ที่โทรไม่ติดมีด้วย · AI ได้คำตอบแล้ว/ยังไม่ถึงเวลา ไม่มี', () => {
     render(
       <FollowRoundsDialog
         {...baseProps}
-        rounds={[round(entry({ id: 'm1' })), round(entry({ id: 'a1', call_mode: 'ai', dispatch_state: 'queued' }))]}
+        rounds={[
+          round(entry({ id: 'm1' })),
+          round(entry({ id: 'a1', call_mode: 'ai', dispatch_state: 'queued', call_outcome: 'no_answer' })),
+          round(entry({ id: 'a2', call_mode: 'ai', dispatch_state: 'queued', call_outcome: 'confirmed' })),
+          round(entry({ id: 'a3', call_mode: 'ai', dispatch_state: 'queued', scheduled_at: '2099-01-01T02:00:00Z' })),
+        ]}
       />,
     );
-    expect(screen.getAllByText('เขาไปไหม')).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'ไม่ไป' })).toHaveLength(1);
-    // รอบคนโทรไม่มี "บันทึกว่าเสร็จสิ้น" แยก · รอบ AI ยังมี (6 ต.ค. 2569)
-    expect(screen.getAllByRole('button', { name: /บันทึกว่าเสร็จสิ้น/ })).toHaveLength(1);
+    expect(screen.getAllByText('เขาไปไหม')).toHaveLength(2);
+    // สาย AI ยังมี "บันทึกว่าเสร็จสิ้น" ทุกสาย · รอบคนโทรไม่มี (6 ต.ค. 2569)
+    expect(screen.getAllByRole('button', { name: /บันทึกว่าเสร็จสิ้น/ })).toHaveLength(3);
   });
 });
 

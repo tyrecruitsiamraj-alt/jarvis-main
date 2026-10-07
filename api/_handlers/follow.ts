@@ -46,7 +46,7 @@ import {
   isFollowOutcome,
   requiresNote,
 } from '../../src/lib/followOutcome.js';
-import { validateFollowStaffCall } from '../../src/lib/followStaffCall.js';
+import { isAiDecisiveOutcome, validateFollowStaffCall } from '../../src/lib/followStaffCall.js';
 
 const followTable = tableInAppSchema('follow_entries');
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
@@ -1643,20 +1643,43 @@ async function recordStaffCall(req: AuthedReq, res: ApiRes, body: Record<string,
   if (!before) return sendError(res, 404, 'Not found', 'ไม่พบรายการ');
   if (!hasStaffCallColumns(before)) return sendError(res, 503, 'Service unavailable', STAFF_CALL_NOT_READY);
   if (before.cancelled_at) return sendError(res, 400, 'Bad request', 'รายการนี้ยกเลิกไปแล้ว ลงผลไม่ได้');
-  if (before.call_mode !== 'manual') {
-    return sendError(res, 400, 'Bad request', 'รอบนี้ให้ AI โทร ลงผลเองได้เฉพาะรอบที่ตั้งให้คนโทร');
+  /**
+   * 🔴 สาย AI ลงผลเองได้แล้ว (เจ้าของ 7 ต.ค. 2569: *"ถ้าสาย AI โทรไม่ติดแล้วเจ้าหน้าที่โทรเองได้คำตอบ"* → ทำ)
+   * เฉพาะเมื่อ AI ยังไม่ได้คำตอบ (ไม่รับสาย · ไม่ชัด · ยังไม่มีผล) — AI ได้ ไป/ไม่ไป/ขอเลื่อน แล้ว = ห้ามทับ
+   */
+  const isAiRow = before.call_mode !== 'manual';
+  let aiQueuePending = false;
+  if (isAiRow) {
+    const { rows: q } = await dbQuery<{ outcome: string | null; status: string | null }>(
+      `select coalesce(last_outcome, result->>'outcome') as outcome, status from ${queueTable}
+        where channel = 'reminder' and job_ref = 'follow' and person_ref = $1 limit 1`,
+      [`follow-${id}`],
+    );
+    if (isAiDecisiveOutcome(q[0]?.outcome)) {
+      return sendError(res, 400, 'Bad request', 'AI ได้คำตอบของสายนี้แล้ว ลงผลทับไม่ได้');
+    }
+    aiQueuePending = q[0]?.status === 'pending';
   }
 
   const { rows } = await dbQuery<FollowRow>(
     `update ${followTable}
         set staff_call_outcome = $2, staff_call_note = $3, staff_called_at = now(),
             staff_called_by = $4, staff_called_by_name = $5
-      where id = $1 and cancelled_at is null and call_mode = 'manual'
+      where id = $1 and cancelled_at is null
       returning *`,
     [id, v.value.outcome, v.value.note, req.user.sub, req.user.email ?? null],
   );
   const done = rows[0];
   if (!done) return sendError(res, 404, 'Not found', 'ไม่พบรายการนี้ หรือยกเลิกไปแล้ว');
+
+  // คนได้คำตอบแล้ว — สาย AI ของช่องนี้ที่ยังรอโทรไม่ต้องโทรแล้ว (ถอนคิว + แจ้ง Lumos ตัวเดียวกับปุ่มยกเลิก)
+  if (isAiRow && aiQueuePending) {
+    try {
+      await cancelFollowReminder(id, staffNameOfPhone);
+    } catch (e) {
+      logWarn('follow.staffCall.cancelAiFailed', { followId: id, error: String(e) });
+    }
+  }
 
   await auditFromAuthed(req, {
     action: 'follow.staff_call',

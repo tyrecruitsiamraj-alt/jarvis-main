@@ -268,3 +268,31 @@ describe('ขั้นที่ 3 — เวลารายวัน', () => {
     expect(followStepError(3, sched({ timesByDay: null, roundTimes: [] }))).toMatch(/รอบเวลา/);
   });
 });
+
+describe('🔴 ใครโทรรายสายในโหมดตาราง (เจ้าของ 7 ต.ค. 2569 "ทำทั้ง 2 เรื่องเลย")', () => {
+  it('วัน AI: สาย 1 AI · สาย 2 คนโทร ได้ · วันคนโทรทับทุกสาย · ยังไม่ชัวร์เวลา = คนโทรเสมอ', () => {
+    const calls = buildScheduleCalls({
+      days: ['2026-10-08', '2026-10-09'],
+      modeOfDay: (d) => (d === '2026-10-09' ? 'manual' : 'ai'),
+      timesOfDay: () => ['07:00', '08:00'],
+      staffPhoneOfDay: () => '',
+      modeOfSlot: (_d, t) => (t === '08:00' ? 'manual' : 'ai'),
+    });
+    expect(calls.map((c) => `${c.day} ${c.time} ${c.callMode}`)).toEqual([
+      '2026-10-08 07:00 ai',
+      '2026-10-08 08:00 manual',
+      '2026-10-09 07:00 manual',
+      '2026-10-09 08:00 manual',
+    ]);
+    expect(calls.map((c) => c.callRound)).toEqual([1, 2, 3, 4]);
+  });
+  it('ไม่ส่งรายสาย = ตามวันเหมือนเดิม', () => {
+    const calls = buildScheduleCalls({
+      days: ['2026-10-08'],
+      modeOfDay: () => 'ai',
+      timesOfDay: () => ['07:00', '08:00'],
+      staffPhoneOfDay: () => '',
+    });
+    expect(calls.every((c) => c.callMode === 'ai')).toBe(true);
+  });
+});

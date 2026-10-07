@@ -84,9 +84,22 @@ export function followStaffCallText(code: string): string {
   return STAFF_WORDS[code as FollowStaffCallOutcome] ?? followCallOutcomeText(code);
 }
 
-/** ผลของรอบนี้มาจากคนโทร (ไม่มีผลจาก AI) — ใช้เลือกคำบนจอ */
+/**
+ * ผลของรอบนี้มาจากคนโทร — ใช้เลือกคำบนจอ
+ * 🔴 7 ต.ค. 2569: คนลงผลบนสาย AI ที่ไม่ได้คำตอบได้แล้ว ⇒ มีผลของคน = ผลของคนเสมอ (คนโทรทีหลัง AI)
+ */
 export function isStaffCallResult(entry: { call_outcome?: string | null; staff_call_outcome?: string | null }): boolean {
-  return !(entry.call_outcome ?? '').trim() && Boolean((entry.staff_call_outcome ?? '').trim());
+  return Boolean((entry.staff_call_outcome ?? '').trim());
+}
+
+/**
+ * ผลจาก AI ที่ได้คำตอบแล้ว — คนลงผลทับไม่ได้ (กันสายเดียวนับสองทาง)
+ * ที่เหลือ (ไม่รับสาย · รับสายแต่ไม่ชัด · ยังไม่มีผล) = คนโทรเองแล้วลงผลได้
+ */
+export const AI_DECISIVE_OUTCOMES = ['confirmed', 'declined', 'reschedule_requested', 'cancelled'] as const;
+
+export function isAiDecisiveOutcome(code: string | null | undefined): boolean {
+  return (AI_DECISIVE_OUTCOMES as readonly string[]).includes((code ?? '').trim());
 }
 
 export type FollowStaffCallInput = { outcome: FollowStaffCallOutcome; note: string | null };
@@ -108,23 +121,31 @@ export function validateFollowStaffCall(input: {
 }
 
 /**
- * ลงผลคนโทรได้ไหม — **เฉพาะรอบที่ตั้งเป็นคนโทร** และยังไม่ถูกยกเลิก
- * (รอบของ AI มีผลจาก Lumos อยู่แล้ว · รอบหนึ่งตั้งได้ทางเดียว หน้าหลักจึงไม่มีก้อน "ทั้งสองทาง" ของหน้าติดตาม)
+ * ลงผลคนโทรได้ไหม — รอบที่ตั้งเป็นคนโทร (ยังไม่ยกเลิก)
+ * 🔴 7 ต.ค. 2569 เจ้าของ: *"ถ้าสาย AI โทรไม่ติดแล้วเจ้าหน้าที่โทรเองได้คำตอบ"* → ทำ ⇒ สาย AI ที่ยังไม่ได้คำตอบก็ลงได้
+ * (`isAiDecisiveOutcome` = AI ได้คำตอบแล้ว ห้ามทับ)
  */
-export function canRecordStaffCall(entry: { call_mode?: string | null; cancelled?: boolean }): boolean {
-  return entry.call_mode === 'manual' && !entry.cancelled;
+export function canRecordStaffCall(entry: {
+  call_mode?: string | null;
+  cancelled?: boolean;
+  call_outcome?: string | null;
+}): boolean {
+  if (entry.cancelled) return false;
+  if (entry.call_mode === 'manual') return true;
+  return !isAiDecisiveOutcome(entry.call_outcome);
 }
 
 /**
- * ผลของสายที่ใช้ตัดสินสภาพ/สี/หมวดของรอบ — ผลจาก AI ก่อน ถ้าไม่มีค่อยใช้ผลที่คนลง
- * รอบหนึ่งมีได้แหล่งเดียวอยู่แล้ว (คนลงผลได้เฉพาะรอบคนโทร ซึ่งไม่เคยเข้าคิว AI)
+ * ผลของสายที่ใช้ตัดสินสภาพ/สี/หมวดของรอบ
+ * 🔴 7 ต.ค. 2569: **ผลที่คนลงมาก่อน** — คนลงผลบนสาย AI ได้เฉพาะเมื่อ AI ไม่ได้คำตอบ (โทรทีหลัง AI) ⇒ ของคนใหม่กว่า
+ * รอบคนโทรไม่มีผล AI อยู่แล้ว (ไม่เคยเข้าคิว) ⇒ เหมือนเดิม
  */
 export function effectiveCallOutcome(entry: {
   call_outcome?: string | null;
   staff_call_outcome?: string | null;
 }): string | null {
-  const ai = (entry.call_outcome ?? '').trim();
-  if (ai) return ai;
   const staff = (entry.staff_call_outcome ?? '').trim();
-  return staff || null;
+  if (staff) return staff;
+  const ai = (entry.call_outcome ?? '').trim();
+  return ai || null;
 }

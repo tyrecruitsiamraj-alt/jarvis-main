@@ -12578,3 +12578,18 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ⚠️ ข้อ 7 ใช้หมายเหตุเป็นตัวจำเวลา iRecruit — เจ้าหน้าที่แก้หมายเหตุแถวส่งคนแทนเอง = นับว่า iRecruit เปลี่ยน (ย้ายตาม iRecruit)
 - ⚠️ ข้อ 2 "คนนี้" = เบอร์ + ทีม ไม่ใช่ `group_id` · ยกเลิกเฉพาะสายที่ยังไม่มีผล
 - ยังไม่ทำ: ข้อ 1 สลับ AI/คนรายสายในโหมดตาราง (ตอนนี้รายวัน) · ข้อ 6 คนลงผลบนสาย AI ที่โทรไม่ติด (ต้องปิดงานแทน)
+
+### หน้าติดตาม: ใครโทรรายสาย (โหมดตาราง) + ลงผลบนสาย AI ที่โทรไม่ติด (7 ต.ค. 2569 · เจ้าของ "ทำทั้ง 2 เรื่องเลย")
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/lib/followWizard.ts` | `buildScheduleCalls` รับ `modeOfSlot(day, time)` — วัน AI เลือกบางสายเป็นคนโทรได้ · วันคนโทรทับทุกสาย · ยังไม่ชัวร์เวลา = คนโทรเสมอ |
+| `src/pages/follow/FollowPage.tsx` | `roundModes` / `roundModesByDay` (ตำแหน่งตรงกับ `roundTimes` / `roundTimesByDay`) · `padModes` · `modesOfScheduleDay` · `modeOfScheduleSlot` · `slotModeGroup` (AI โทร · คนโทร · ยังไม่ชัวร์เวลา) แทนกล่องยังไม่ชัวร์เวลา ทั้งเวลาชุดเดียวและรายวัน · เพิ่ม/ลบสาย/สลับรายวันลอกโหมดตาม |
+| `src/lib/followStaffCall.ts` | `AI_DECISIVE_OUTCOMES` / `isAiDecisiveOutcome` · `canRecordStaffCall` = คนโทร หรือ AI ที่ยังไม่ได้คำตอบ · `effectiveCallOutcome` **ผลของคนก่อน** · `isStaffCallResult` = มีผลของคน |
+| `api/_handlers/follow.ts` `recordStaffCall` | สาย AI: อ่านผลจากคิว · ได้คำตอบแล้ว = 400 · ลงได้แล้วคิวยังรอโทร = `cancelFollowReminder` |
+| `src/components/follow/FollowPlanningCalendar.tsx` | `aiStaffRow` (เลยเวลา · ไม่ได้ส่ง · มีผลไม่ชัด) = ปุ่มลงผล + ยกเลิก · ลงแล้วเป็นแบบสายคนโทร |
+| `src/components/follow/FollowRoundsDialog.tsx` | ป๊อปรายละเอียด: สาย AI ที่ถึงเวลา/มีผลลงผลได้ · "บันทึกว่าเสร็จสิ้น" ยังอยู่ทุกสาย AI |
+| เทสต์ | `followWizard.test.ts` · `followStaffCall.test.ts` · `FollowStaffCallControls.test.tsx` · `FollowPlanningCalendar.test.tsx` |
+
+- ⚠️ ล้างผลของคนบนสาย AI ไม่คืนสาย AI ที่ถูกถอนตอนลงผล
+- ตรวจ: Browser /follow ดัก fetch — สาย AI เลยเวลามี "ลงผล" + ป๊อป 4 ปุ่ม · ฟอร์มเพิ่มคน ตาราง 07:00 AI · 08:00 คนโทร → "AI โทร 1 · เราโทรเอง 1" · picker เจอกันตชาติ (Checklist · แจ้งเข้าแล้ว) · ไม่มีการเขียน

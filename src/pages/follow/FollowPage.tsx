@@ -334,6 +334,12 @@ const FollowPage: React.FC = () => {
   const [perDayTimes, setPerDayTimes] = useState(false);
   const [roundTimesByDay, setRoundTimesByDay] = useState<Record<string, string[]>>({});
   /**
+   * 🔴 ใครโทรรายสาย (เจ้าของ 7 ต.ค. 2569 "ทำทั้ง 2 เรื่องเลย" — เดิมโหมดตารางเลือกได้แค่ทั้งวัน)
+   * ตำแหน่งตรงกับ `roundTimes` / `roundTimesByDay` · วันที่ติ๊ก "คนโทร" ทับทุกสายของวันนั้น
+   */
+  const [roundModes, setRoundModes] = useState<Array<'ai' | 'manual'>>(() => ['ai']);
+  const [roundModesByDay, setRoundModesByDay] = useState<Record<string, Array<'ai' | 'manual'>>>({});
+  /**
    * หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (096) — เลือกจากใบขอแล้วเติมให้ทั้งคู่
    * (เจ้าของสั่ง: *"เพิ่มชื่อหน่วยงาน โดยเลือกจากใบงานได้เลย · Code site ถ้าเลือกหน่วยงานก็ให้ขึ้นมาเลย"*)
    */
@@ -655,6 +661,8 @@ const FollowPage: React.FC = () => {
     setManualDays(new Set());
     setPerDayTimes(false);
     setRoundTimesByDay({});
+    setRoundModes(['ai']);
+    setRoundModesByDay({});
     setUnitName('');
     setSiteCode('');
     setFormError(null);
@@ -703,9 +711,21 @@ const FollowPage: React.FC = () => {
 
   const setRoundAt = (i: number, v: string) =>
     setRoundTimes((prev) => prev.map((x, idx) => (idx === i ? v : x)));
-  const addRound = () => setRoundTimes((prev) => (prev.length >= 5 ? prev : [...prev, '08:00']));
-  const removeRound = (i: number) =>
-    setRoundTimes((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
+  /** ใครโทรรายสายให้ยาวเท่ารายการเวลา (ช่องที่ยังไม่เคยเลือก = AI) */
+  const padModes = (m: ReadonlyArray<'ai' | 'manual'> | undefined, n: number): Array<'ai' | 'manual'> =>
+    Array.from({ length: n }, (_, i) => m?.[i] ?? 'ai');
+  const addRound = () => {
+    if (roundTimes.length >= 5) return;
+    setRoundModes([...padModes(roundModes, roundTimes.length), 'ai']);
+    setRoundTimes([...roundTimes, '08:00']);
+  };
+  const removeRound = (i: number) => {
+    if (roundTimes.length <= 1) return;
+    setRoundModes(padModes(roundModes, roundTimes.length).filter((_, idx) => idx !== i));
+    setRoundTimes(roundTimes.filter((_, idx) => idx !== i));
+  };
+  const setRoundModeAt = (i: number, v: 'ai' | 'manual') =>
+    setRoundModes(padModes(roundModes, roundTimes.length).map((x, idx) => (idx === i ? v : x)));
 
   /**
    * วันในช่วง [from, to] เป็น YYYY-MM-DD — คืน [] ถ้าช่วงผิด
@@ -741,6 +761,32 @@ const FollowPage: React.FC = () => {
   /** เวลาของวันนั้น — ตัวเดียวที่ตัดสิน (สรุปบนจอกับตอนส่งอ่านจากที่นี่ ไม่งั้นทวนกับส่งคนละเวลา) */
   const timesOfScheduleDay = (day: string): string[] =>
     perDayTimes ? (roundTimesByDay[day] ?? roundTimes) : roundTimes;
+  /** ใครโทรรายสายของวันนั้น — ตำแหน่งตรงกับ `timesOfScheduleDay(day)` */
+  const modesOfScheduleDay = (day: string): Array<'ai' | 'manual'> =>
+    padModes(perDayTimes ? (roundModesByDay[day] ?? roundModes) : roundModes, timesOfScheduleDay(day).length);
+  const modeOfScheduleSlot = (day: string, time: string): 'ai' | 'manual' => {
+    const i = timesOfScheduleDay(day).indexOf(time);
+    return i >= 0 ? (modesOfScheduleDay(day)[i] ?? 'ai') : 'ai';
+  };
+  const setDayModeAt = (day: string, i: number, v: 'ai' | 'manual') =>
+    setRoundModesByDay((prev) => ({ ...prev, [day]: modesOfScheduleDay(day).map((x, idx) => (idx === i ? v : x)) }));
+  /** ช่องเลือกใครโทรของสายหนึ่งในโหมดตาราง — ชุดเดียวกับโหมดระบุเวลาเอง (AI โทร · คนโทร · ยังไม่ชัวร์เวลา) */
+  const slotModeGroup = (current: 'ai' | 'manual' | 'tbd', pick: (v: 'ai' | 'manual' | 'tbd') => void, label: string) => (
+    <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-1" role="group" aria-label={`ใครโทร${label}`}>
+      {(
+        [
+          { value: 'ai', label: 'AI โทร', on: 'text-primary' },
+          { value: 'manual', label: 'คนโทร', on: TONE.warn.value },
+          { value: 'tbd', label: 'ยังไม่ชัวร์เวลา', on: TONE.warn.value },
+        ] as const
+      ).map((c) => (
+        <label key={c.value} className="flex cursor-pointer items-center gap-1.5">
+          <Checkbox checked={current === c.value} onCheckedChange={() => pick(c.value)} aria-label={`${label} — ${c.label}`} />
+          <span className={cn('text-xs font-medium', current === c.value ? c.on : 'text-muted-foreground')}>{c.label}</span>
+        </label>
+      ))}
+    </div>
+  );
   /** สายทั้งชุดของโหมดตาราง (หนึ่งสาย = หนึ่งแถว) — สรุปบนจอกับตอนส่งใช้ตัวเดียวกัน */
   const scheduleCalls = (): ScheduleCall[] =>
     buildScheduleCalls({
@@ -748,6 +794,7 @@ const FollowPage: React.FC = () => {
       modeOfDay: modeOfScheduleDay,
       timesOfDay: timesOfScheduleDay,
       staffPhoneOfDay: staffPhoneForDay,
+      modeOfSlot: modeOfScheduleSlot,
     });
   const setDayTimeAt = (day: string, i: number, v: string) =>
     setRoundTimesByDay((prev) => {
@@ -755,16 +802,18 @@ const FollowPage: React.FC = () => {
       list[i] = v;
       return { ...prev, [day]: list };
     });
-  const addDayTime = (day: string) =>
-    setRoundTimesByDay((prev) => {
-      const list = prev[day] ?? roundTimes;
-      return list.length >= 5 ? prev : { ...prev, [day]: [...list, '08:00'] };
-    });
-  const removeDayTime = (day: string, i: number) =>
-    setRoundTimesByDay((prev) => {
-      const list = prev[day] ?? roundTimes;
-      return list.length <= 1 ? prev : { ...prev, [day]: list.filter((_, idx) => idx !== i) };
-    });
+  const addDayTime = (day: string) => {
+    const list = timesOfScheduleDay(day);
+    if (list.length >= 5) return;
+    setRoundModesByDay((prev) => ({ ...prev, [day]: [...modesOfScheduleDay(day), 'ai'] }));
+    setRoundTimesByDay((prev) => ({ ...prev, [day]: [...list, '08:00'] }));
+  };
+  const removeDayTime = (day: string, i: number) => {
+    const list = timesOfScheduleDay(day);
+    if (list.length <= 1) return;
+    setRoundModesByDay((prev) => ({ ...prev, [day]: modesOfScheduleDay(day).filter((_, idx) => idx !== i) }));
+    setRoundTimesByDay((prev) => ({ ...prev, [day]: list.filter((_, idx) => idx !== i) }));
+  };
 
   /**
    * ตัวเลขสำหรับกล่อง "ทวนก่อนส่ง" — **ใช้สูตรเดียวกับตอนส่งจริง**
@@ -780,7 +829,7 @@ const FollowPage: React.FC = () => {
   );
   /** จำนวนสายของโหมดตาราง — สูตรเดียวกับตอนส่ง (`scheduleCalls`) */
   // eslint-disable-next-line react-hooks/exhaustive-deps -- scheduleCalls อ่านจาก state ชุดนี้ทั้งหมด
-  const scheduleCallsPreview = useMemo(() => scheduleCalls().length, [dateFrom, dateTo, skippedDays, manualDays, roundTimes, perDayTimes, roundTimesByDay]);
+  const scheduleCallsPreview = useMemo(() => scheduleCalls().length, [dateFrom, dateTo, skippedDays, manualDays, roundTimes, perDayTimes, roundTimesByDay, roundModes, roundModesByDay]);
   const scheduledAtsPreview = useMemo(
     () => scheduledAts.filter((t) => t.trim()).length,
     [scheduledAts],
@@ -2552,6 +2601,11 @@ const FollowPage: React.FC = () => {
                               for (const d of daysInRange(dateFrom, dateTo)) if (!next[d]) next[d] = [...roundTimes];
                               return next;
                             });
+                            setRoundModesByDay((prev) => {
+                              const next = { ...prev };
+                              for (const d of daysInRange(dateFrom, dateTo)) if (!next[d]) next[d] = padModes(roundModes, roundTimes.length);
+                              return next;
+                            });
                           }
                           setPerDayTimes((v) => !v);
                         }}
@@ -2583,14 +2637,6 @@ const FollowPage: React.FC = () => {
                                     className="min-h-[46px] flex-1"
                                   />
                                 )}
-                                <label className="flex cursor-pointer items-center gap-1.5">
-                                  <Checkbox
-                                    checked={v === SCHEDULE_TBD}
-                                    onCheckedChange={(on) => setDayTimeAt(d, i, on ? SCHEDULE_TBD : '08:00')}
-                                    aria-label={`${label} สายที่ ${i + 1} ยังไม่ชัวร์เวลา`}
-                                  />
-                                  <span className="text-xs text-muted-foreground">ยังไม่ชัวร์เวลา</span>
-                                </label>
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -2601,6 +2647,15 @@ const FollowPage: React.FC = () => {
                                 >
                                   <X aria-hidden />
                                 </Button>
+                                {slotModeGroup(
+                                  v === SCHEDULE_TBD ? 'tbd' : (modesOfScheduleDay(d)[i] ?? 'ai'),
+                                  (m) => {
+                                    if (m === 'tbd') return setDayTimeAt(d, i, SCHEDULE_TBD);
+                                    if (v === SCHEDULE_TBD) setDayTimeAt(d, i, '08:00');
+                                    setDayModeAt(d, i, m);
+                                  },
+                                  `${label} สายที่ ${i + 1}`,
+                                )}
                               </div>
                             ))}
                             {list.length < 5 ? (
@@ -2636,15 +2691,7 @@ const FollowPage: React.FC = () => {
                           className="min-h-[46px] flex-1"
                         />
                       )}
-                      {/* ยังไม่ชัวร์เวลา (เจ้าของ 5 ต.ค. 2569 · Choice "เลือกได้ทีละสาย") — สายนี้ทุกวันเป็นคนโทร ไปเติมเวลาทีหลัง */}
-                      <label className="flex cursor-pointer items-center gap-1.5">
-                        <Checkbox
-                          checked={v === SCHEDULE_TBD}
-                          onCheckedChange={(on) => setRoundAt(i, on ? SCHEDULE_TBD : '08:00')}
-                          aria-label={`สายที่ ${i + 1} ยังไม่ชัวร์เวลา`}
-                        />
-                        <span className="text-xs text-muted-foreground">ยังไม่ชัวร์เวลา</span>
-                      </label>
+
                       <button
                         type="button"
                         onClick={() => removeRound(i)}
@@ -2654,6 +2701,16 @@ const FollowPage: React.FC = () => {
                       >
                         <X className="h-4 w-4" aria-hidden />
                       </button>
+                      {/* ใครโทรรายสาย (7 ต.ค. 2569) + ยังไม่ชัวร์เวลา (5 ต.ค. 2569 · สายนี้ทุกวันเป็นคนโทร ไปเติมเวลาทีหลัง) */}
+                      {slotModeGroup(
+                        v === SCHEDULE_TBD ? 'tbd' : (padModes(roundModes, roundTimes.length)[i] ?? 'ai'),
+                        (m) => {
+                          if (m === 'tbd') return setRoundAt(i, SCHEDULE_TBD);
+                          if (v === SCHEDULE_TBD) setRoundAt(i, '08:00');
+                          setRoundModeAt(i, m);
+                        },
+                        `สายที่ ${i + 1}`,
+                      )}
                     </div>
                   ))}
                   {roundTimes.length < 5 ? (

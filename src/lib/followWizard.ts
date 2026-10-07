@@ -196,6 +196,11 @@ export function buildScheduleCalls(input: {
   modeOfDay: (day: string) => ScheduleDayMode;
   timesOfDay: (day: string) => readonly string[];
   staffPhoneOfDay: (day: string) => string;
+  /**
+   * ใครโทรรายสาย (7 ต.ค. 2569) — วันที่เป็น AI แล้วเลือกให้บางสายเป็นคนโทรได้ · ไม่ส่ง = ทั้งวันตามวัน
+   * วันที่ตั้งเป็นคนโทร = คนโทรทุกสาย (ทับรายสาย)
+   */
+  modeOfSlot?: (day: string, time: string) => 'ai' | 'manual';
   /** เลขรอบแรกของชุด (ค่าตั้งต้น 1) */
   startRound?: number;
 }): ScheduleCall[] {
@@ -210,7 +215,7 @@ export function buildScheduleCalls(input: {
         time: slot.time,
         scheduledAt: new Date(`${day}T${slot.time}:00+07:00`).toISOString(),
         // ยังไม่ชัวร์เวลา = คนโทรเสมอ (server ก็บังคับ — ส่งให้ AI โดยไม่มีเวลาจริง = โทรหาคนจริงเวลามั่ว)
-        callMode: slot.tbd ? 'manual' : mode,
+        callMode: slot.tbd ? 'manual' : mode === 'manual' ? 'manual' : (input.modeOfSlot?.(day, slot.time) ?? mode),
         staffPhone: (input.staffPhoneOfDay(day) || '').trim(),
         callRound: round,
         ...(slot.tbd ? { timeTbd: true } : {}),

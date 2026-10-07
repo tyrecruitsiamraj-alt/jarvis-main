@@ -186,7 +186,13 @@ const FollowRoundsDialog: React.FC<{
                 {/* 🔴 รอบคนโทร: ลงผล 2 ขั้น (เจ้าของเคาะ 6 ต.ค. 2569 *"ลงผลโทร เสร็จก็ค่อยเลือกว่า เสร็จสิ้นเลยไหม"*)
                     ขั้น 1 ไป / ไม่ไป / ขอเลื่อน / ติดต่อไม่ได้ → ขั้น 2 จบเรื่องเลยไหม — ตัวเดียวกับช่อง "เขาตอบว่าอะไร"
                     ⇒ รอบคนโทรไม่มีปุ่ม "บันทึกว่าเสร็จสิ้น" แยกแล้ว (ข้างล่าง) */}
-                {canRecordStaffCall(it) && !(it.completed_at && !it.staff_call_outcome) ? (
+                {/* 7 ต.ค. 2569: สาย AI ที่ไม่ได้คำตอบ (ถึงเวลาแล้ว/มีผลไม่ชัด) ลงผลเองได้ด้วย — สาย AI ที่ยังไม่ถึงเวลาไม่โชว์ */}
+                {canRecordStaffCall(it) &&
+                (it.call_mode === 'manual' ||
+                  Boolean(it.staff_call_outcome) ||
+                  Boolean(it.call_outcome) ||
+                  Date.parse(it.scheduled_at ?? '') <= Date.now()) &&
+                !(it.completed_at && !it.staff_call_outcome) ? (
                   <div className="mt-2">
                     <FollowStaffCallControls
                       entry={it}
@@ -243,7 +249,7 @@ const FollowRoundsDialog: React.FC<{
                   ) : null}
                   {/* ปิดงาน — ไม่ผูกกับ call_status: ตามจนจบเองโดย AI ยังไม่โทรก็ปิดได้ */}
                   {/* รอบ AI ยังมี "บันทึกว่าเสร็จสิ้น" · รอบคนโทรจบเรื่องผ่านขั้น 2 ข้างบนแทน (6 ต.ค. 2569) */}
-                  {canWork && !canRecordStaffCall(it) ? (
+                  {canWork && it.call_mode !== 'manual' ? (
                     <FollowCompleteControls busy={busy} onComplete={(o, n, sc) => onComplete(it.id, o, n, sc)} />
                   ) : null}
                   {canCancel ? (
