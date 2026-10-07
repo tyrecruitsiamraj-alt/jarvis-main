@@ -247,6 +247,23 @@ export async function createFollowRounds(
     : [data as FollowEntry];
 }
 
+/**
+ * ส่งคนแทนคีย์เอง = 3 สายจากวันเวลาเข้างาน (เจ้าของ 7 ต.ค. 2569 "ต้องมี 3 สายนะทุกคนเลย")
+ * server คิดสายเอง (`planReplaceCalls` ตัวเดียวกับรอบดึง iRecruit) — `scheduled_at` ส่งเพื่อผ่านตัวตรวจเดิมเท่านั้น
+ */
+export async function createReplaceFollow(
+  input: Omit<NewFollowEntry, 'rounds'> & {
+    replace_start: { ymd: string; hhmm: string };
+    /** ใครโทรรายสาย — confirm / lead60 / lead15 */
+    replace_modes?: Record<'confirm' | 'lead60' | 'lead15', 'ai' | 'manual'>;
+  },
+): Promise<FollowEntry[]> {
+  const r = await apiFetch('/api/follow', { method: 'POST', body: JSON.stringify(input) });
+  if (!r.ok) throw new Error(await readError(r));
+  const data = (await r.json()) as { items?: FollowEntry[] } | FollowEntry;
+  return Array.isArray((data as { items?: FollowEntry[] }).items) ? (data as { items: FollowEntry[] }).items : [data as FollowEntry];
+}
+
 /** ผลของการแก้ตารางทั้งชุด (1 ต.ค. 2569) — `lumos.pushed = false` ต้องขึ้นบนจอ ห้ามเงียบ */
 export type FollowScheduleReplaceResult = {
   group_id: string;

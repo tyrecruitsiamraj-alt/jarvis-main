@@ -12604,3 +12604,36 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - วัดจริงที่พลาด: ย้าย 03:00 → 04:00 หลังสาย 03:00 ล้ม = ไม่ส่ง · คิวยกเลิกแล้วย้ายเวลา = ไม่ส่ง · คนเดียว 3 สาย 09:25 คนละแผน + แผนเก่าถือ 10:25 = โทรซ้ำ 10:27
 - ทางแก้ตาราง (`follow.schedule.replace`) ตรวจแล้วเวลาคิวตรงแถวหมด
 - ข้อ 3 Journey: เจ้าของ Choice "คงแยกวันแบบเดิม" (ส่งทุกวันทันทีตอนบันทึก แพ็กแผนละวัน)
+
+### ทดสอบผ่านจอ + แท็บส่งคนแทน 3 สายทุกคน (7 ต.ค. 2569 · เจ้าของ "ทดสอบผ่านหน้า ui ยัง" · "ต้องมี 3 สายนะทุกคนเลย" · Choice "วันเข้างาน")
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/lib/irecruitReplaceSync.ts` | `replaceWorkYmd` (สาย 2/3 = เวลาโทร + 60/15 นาที · สาย 1 = วันในหมายเหตุ "ยืนยันเวลาเข้างาน d/m" · ข้ามปี) · `replaceSlotRoundOfRef` รับ `manual-replace:` ด้วย |
+| `src/lib/followPlanning.ts` | `followEntryYmd` = วันที่สายอยู่บนจอ (ส่งคนแทน = วันเข้างาน) · ใช้ใน `buildFollowPlanningRows` / `staffDayVerdicts` / `dayVerdictOf(…, entry)` |
+| `src/lib/followListFilter.ts` · `FollowPage.tsx` (`inPanelRange` · `onOpenPerson`) · `followCallMatrix.ts` · `api/_lib/followCategory.ts` (+ `f.note`) | วันเดียวกันทุกที่ — ตาราง แผง ตัวกรองวัน ผลที่คนกด |
+| `src/components/follow/FollowPlanningCalendar.tsx` | ป้าย "สายที่ 1 · คอนเฟิร์ม / สายที่ 2 · ก่อน 1 ชม. / สายที่ 3 · ก่อน 15 นาที" · เวลาโทรคนละวันกับแถวใส่ "7/10 16:00" (`callTimeText`) · **`pinnedKeys`** กดลงผลแล้วแถวค้างในตารางจนเปลี่ยนวัน (เดิมแถวย้ายไปการ์ดจบแล้วทันที คำถามขั้น 2 หาย) |
+| `api/_handlers/follow.ts` | `parseReplaceStart` · POST `replace_start: {ymd, hhmm}` (ทีมส่งคนแทนเท่านั้น) → `planReplaceCalls` ตัวเดียวกับรอบดึง → สายละแถว `source_ref = manual-replace:<วันเวลา-สุ่ม>:<สาย>:m` + หมายเหตุ `replaceSlotNote` · `FollowRoundInput.note/sourceRef` (อัปเดตหลัง insert ก่อนเข้าคิว) |
+| `src/components/follow/ReplaceStartFields.tsx` | **ใหม่** — วันเวลาเข้างาน + AI/คนโทร (พัก AI = คนโทรเท่านั้น) + พรีวิว 3 สาย ("ต่อคิวโทรทันที" / "เลยเวลาแล้ว ไม่โทร") |
+| `src/pages/follow/FollowPage.tsx` · `src/lib/followApi.ts` | ขั้น 3 ของแท็บส่งคนแทน = `ReplaceStartFields` · `createReplaceFollow` · ทวนก่อนส่ง/ปุ่มบันทึกพูดตามจริง (ตารางคนโทรทั้งหมดไม่พูดว่า "ส่ง AI โทร") |
+| เทสต์ | `irecruitReplaceSync.test.ts` · `followEditReachesLumos.test.ts` |
+
+- ตรวจผ่านจอ (API บนเครื่องไม่มีคีย์ Lumos · สายทดสอบคนโทรเท่านั้น · ลบด้วย id ครบ 8 แถว): เพิ่มคน 2 วัน × 2 สาย · แก้เวลาด้วยดินสอ · ลงผลไม่ไป → จบ (สายที่เหลือของวันถูกหยุด วันถัดไปไม่แตะ) · ล้างผล · ย้อนสถานะ (สาย 2 กลับมา) · ยกเลิก ทั้งวัน/สายนี้/เลิกตามคนนี้ · แท็บส่งคนแทน: เพิ่มคน 3 สาย 7/10 16:00 · 07:00 · 07:45 · ลงผลไป · เลิกตามคนนี้ (2 สาย)
+- ⚠️ ใบงานที่ดึงมาหลังเวลาก่อน 1 ชม. ผ่านไปแล้ว มีแค่ 2 สาย (วัด 7 ต.ค.: 1 จาก 262 ใบ) — กติกาเดิม "เลยแล้วไม่สร้าง"
+
+### ส่งคนแทน รอบบ่าย 7 ต.ค. 2569 (เจ้าของ 6 ข้อ + "รอดำเนินการ ตามด้วย" + "ลงย้อนหลัง ขึ้น แต่ไม่โทร")
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `api/_lib/irecruitReplaceSync.ts` | SQL `h.status IN ('W','WS')` (W = รอดำเนินการ) · ดึง `adder_email` (users.staff_id = user_add) / `adder_name` (hr_staff) → `replaceAdderLabel` = "เพิ่มโดย" ตอนสร้าง + เติมแถวเดิมที่ยังเป็น "ดึงจาก iRecruit…" · `planReplaceCallsFull` (3 สายเสมอ · `past` = คนโทร) · ใช้เวลาโทรจาก `settings.rule` |
+| `src/lib/irecruitReplaceSync.ts` | `ReplaceCallRule.confirmTime` / `leadMinutes` (ค่าเริ่ม 16:00 · [60, 15]) · `normalizeReplaceCallRule` ตรวจ · `planReplaceCalls(wall, now, timing)` · `planReplaceCallsFull` · `leadText` · `replaceScheduleText` · `replaceLeadStart` (วันเข้างานของสาย 2/3 จากหมายเหตุ "เข้างาน HH:MM") |
+| `api/_handlers/irecruit-replace-sync.ts` | PATCH รับ `confirmTime` / `leadMinutes` (ค่าเพี้ยน = 400) · `ruleText` ตามค่าที่ตั้ง |
+| `api/_handlers/follow.ts` | `replace_start` ใช้ `planReplaceCallsFull` + เวลาที่ตั้ง · `replace_modes` ใครโทรรายสาย · สายที่เลยเวลา = คนโทร · แก้เวลาสายคอนเฟิร์มที่โทรแล้ว = ไม่คืนเข้าคิว (`calledConfirm`) |
+| `src/components/follow/ReplaceTimingDialog.tsx` | **ใหม่** ปุ่ม "เวลาโทร" ข้างดึงตอนนี้ (หัวหน้างานขึ้นไป) — คอนเฟิร์มกี่โมง · สาย 2/3 ก่อนเข้างานกี่นาที |
+| `src/components/follow/ReplaceStartFields.tsx` · `FollowPage.tsx` | 3 สายเสมอ · AI/คนโทรรายสาย (พัก AI = คนโทร) · สายเลยเวลา "เลยเวลาแล้ว คนโทร" · เวลาโทรจากค่าตั้ง |
+| `src/components/follow/FollowPlanningCalendar.tsx` | ป้ายสาย 2/3 = ระยะจริงก่อนเข้างาน (`leadText`) · ปุ่มวันกว้างคงที่ `w-40` (เดิมปุ่มลูกศรขยับตามชื่อวัน) |
+| `src/components/follow/FollowCallRoundsPanel.tsx` | 9 ช่องแถวเดียว `md:grid-cols-9` |
+| เทสต์ | `tests/api/irecruitReplaceSync.test.ts` · `src/lib/irecruitReplaceSync.test.ts` · `src/lib/followReplacement.test.ts` |
+
+- วัด: ใบ 7–9 ต.ค. 78 ใบ มีอีเมลคนเพิ่ม 8 · ชื่อ 63 (2 คนที่ไม่มีอีเมลใน iRecruit) · ไม่รู้ 7
+- 🔴 ลบสายที่ดึงจาก iRecruit ทั้งหมด 1,022 แถว + คิว 473 ตามเจ้าของสั่ง (สำรองที่ `.backups/irecruit-replace-follow-2026-10-07T07-09-23-569Z.json` · ไม่ commit)

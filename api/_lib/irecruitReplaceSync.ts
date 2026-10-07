@@ -39,7 +39,7 @@ import type { FollowDispatchState } from '../../src/lib/followDispatchState.js';
 import {
   DEFAULT_REPLACE_CALL_RULE,
   normalizeReplaceCallRule,
-  planReplaceCalls,
+  planReplaceCallsFull,
   reconcileReplaceCalls,
   REPLACE_FOLLOW_TOPIC,
   REPLACE_SYNC_ACTOR_NAME,
@@ -79,7 +79,18 @@ export type IrecruitReplaceRow = {
   want_date: Date;
   /** ประเภทคนไปแทนใน iRecruit (`z_hr_recruitment_header.replace_type`) — EX = คนนอก/อดีตพนักงาน · IN = คนใน · ER ฯลฯ */
   replace_type?: string | null;
+  /** อีเมล/ชื่อคนที่เพิ่มใบใน iRecruit — โชว์เป็น "เพิ่มโดย" */
+  adder_email?: string | null;
+  adder_name?: string | null;
 };
+
+/** "เพิ่มโดย" ของสายที่ดึงมา — อีเมลคนเพิ่มใบใน iRecruit · ไม่มีอีเมล = ชื่อ · ไม่รู้เลย = null (ใช้ป้ายของรอบดึง) */
+export function replaceAdderLabel(r: Pick<IrecruitReplaceRow, 'adder_email' | 'adder_name'>): string | null {
+  const email = (r.adder_email ?? '').trim();
+  if (email) return email;
+  const name = (r.adder_name ?? '').trim();
+  return name || null;
+}
 
 function shiftYmd(ymd: string, days: number): string {
   const d = new Date(`${ymd}T00:00:00Z`);
@@ -93,8 +104,14 @@ function shiftYmd(ymd: string, days: number): string {
  */
 export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): Promise<IrecruitReplaceRow[]> {
   return irecruitSqlQuery<IrecruitReplaceRow>(
-    `SELECT h.job_id, h.replace_no, z.fname, z.lname, z.mobile, z.replace_type, s.site_name, h.site_code, h.want_date
+    `SELECT h.job_id, h.replace_no, z.fname, z.lname, z.mobile, z.replace_type, s.site_name, h.site_code, h.want_date,
+            ua.email AS adder_email, hs.nm AS adder_name
        FROM ir_job_header h
+       -- คนที่เพิ่มใบใน iRecruit (7 ต.ค. 2569 เจ้าของ "ดึงเมล์คนเพิ่มแผนมาด้วย") — users.staff_id = เลขบัตรใน user_add
+       OUTER APPLY (SELECT TOP 1 u.email FROM users u WHERE u.staff_id = h.user_add) ua
+       OUTER APPLY (
+         SELECT TOP 1 LTRIM(RTRIM(CONCAT(LTRIM(RTRIM(st.fname)), N' ', LTRIM(RTRIM(st.lname))))) AS nm FROM hr_staff st WHERE st.staff_id = h.user_add
+       ) hs
        OUTER APPLY (
          SELECT TOP 1 jr.staff_id
          FROM ir_job_request jr
@@ -108,7 +125,8 @@ export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): 
          ORDER BY zz.date_update DESC, zz.date_add DESC
        ) z
        LEFT JOIN ir_ms_site s ON s.site_code = h.site_code
-      WHERE h.status = 'WS'
+      -- 🔴 W "รอดำเนินการ" ด้วย (เจ้าของ 7 ต.ค. 2569 Choice "ตามด้วย" — วิภพ/นันทชัยใบ W ไม่ขึ้น) · C = ยกเลิก ไม่เอา
+      WHERE h.status IN ('W', 'WS')
         AND h.job_type = '2'
         AND h.want_date >= @from
         AND h.want_date < @to
@@ -180,6 +198,8 @@ type DesiredMeta = ReplaceDesiredCall & {
   wall: ReplaceWantWall;
   siteName: string | null;
   siteCode: string | null;
+  /** "เพิ่มโดย" — อีเมลคนเพิ่มใบใน iRecruit (`replaceAdderLabel`) */
+  adder: string | null;
   mode: 'ai' | 'manual';
   /** ประเภทจาก iRecruit (EX · คนใน ฯลฯ) — เก็บลงแถวให้หน้าติดตามกรองได้ (136 · เจ้าของสั่ง 6 ต.ค. 2569) */
   replaceType: string | null;
@@ -324,11 +344,13 @@ export async function runIrecruitReplaceSync(
         continue;
       }
       const wall = wantWallFromSqlDate(r.want_date instanceof Date ? r.want_date : new Date(String(r.want_date)));
-      const plans = planReplaceCalls(wall, now);
-      if (plans.length === 0) {
-        summary.pastDue += 1;
-        continue;
-      }
+      /**
+       * 🔴 3 สายครบทุกใบ · สายที่เลยเวลาแล้ว = คนโทร (เจ้าของ 7 ต.ค. 2569 "ต้องมี 3 สายนะทุกคนเลย" · ลงย้อนหลัง "ขึ้น แต่ไม่โทร")
+       * เดิมใบที่เลยเวลาเข้างานแล้วข้ามทั้งใบ (`pastDue`) ⇒ คนที่ทีมเพิ่งเพิ่มไม่ขึ้นบนจอเลย
+       */
+      const plans = planReplaceCallsFull(wall, now, settings.rule);
+      if (plans.length === 0) continue;
+      if (plans.every((p) => p.past)) summary.pastDue += 1;
       const name = `${(r.fname ?? '').trim()} ${(r.lname ?? '').trim()}`.trim() || 'คนไปแทนงาน';
       const personKey = personKeyOf(phone);
       for (const p of plans) {
@@ -343,8 +365,10 @@ export async function runIrecruitReplaceSync(
           phone,
           wall,
           siteName: r.site_name?.trim() || null,
+          adder: replaceAdderLabel(r),
           siteCode: r.site_code?.trim() || null,
-          mode: replaceModeForType(r.replace_type, replaceCallModeFor(p.at, settings.rule.aiFrom, settings.rule.aiPaused)),
+          // สายที่เลยเวลาแล้ว = คนโทร (AI ไม่โทรย้อนหลัง)
+          mode: p.past ? 'manual' : replaceModeForType(r.replace_type, replaceCallModeFor(p.at, settings.rule.aiFrom, settings.rule.aiPaused)),
           replaceType: (r.replace_type ?? '').trim() || null,
         });
       }
@@ -484,6 +508,21 @@ export async function runIrecruitReplaceSync(
       }
     }
 
+    // ── 2.6) "เพิ่มโดย" ของสายที่ดึงมาก่อนหน้านี้ = อีเมลคนเพิ่มใบใน iRecruit (7 ต.ค. 2569) — เติมเฉพาะแถวที่ยังเป็นป้ายของรอบดึง ──
+    const adderRefs = desired.filter((d) => d.adder).map((d) => [d.ref, d.adder as string] as const);
+    if (adderRefs.length > 0) {
+      try {
+        await dbQuery(
+          `update ${followTable} f set created_by_name = v.adder
+             from unnest($1::text[], $2::text[]) as v(ref, adder)
+            where f.source_ref = v.ref and f.created_by_name like 'ดึงจาก iRecruit%'`,
+          [adderRefs.map((a) => a[0]), adderRefs.map((a) => a[1])],
+        );
+      } catch (e) {
+        logWarn('irecruit.replaceSync: เติมคนเพิ่มใบไม่สำเร็จ', { error: errorSummaryText(e) });
+      }
+    }
+
     // ── 3) สร้างสายใหม่ — คนเดียวกัน (เบอร์เดียว) อยู่ชุดเดียวกัน ใช้ชุดเดิมถ้ามี ──
     const groupOfPhone = new Map<string, string>();
     for (const x of existingRows) if (x.pending && x.recipient_phone && x.group_id) groupOfPhone.set(x.recipient_phone, x.group_id);
@@ -501,7 +540,7 @@ export async function runIrecruitReplaceSync(
            values ($1, $2, $3, $4, null, $5, $6, null, $7, $8, $9, $10, null, $11, $12, $13)
            returning id`,
           [meta.name, meta.phone, REPLACE_FOLLOW_TOPIC, replaceSlotNote(meta.slot, meta.wall), meta.at.toISOString(), groupId,
-           meta.siteName, meta.siteCode, meta.round, meta.mode, actorName, FOLLOW_TEAM_REPLACEMENT, meta.ref],
+           meta.siteName, meta.siteCode, meta.round, meta.mode, meta.adder ?? actorName, FOLLOW_TEAM_REPLACEMENT, meta.ref],
         );
         if (!ins[0]) continue;
         summary.added += 1;

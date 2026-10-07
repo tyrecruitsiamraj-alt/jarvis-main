@@ -2,6 +2,7 @@ import type { FollowEntry } from '@/lib/followApi';
 import { followGroupKey } from '@/lib/followGrouping';
 import { FOLLOW_OUTCOME_SUCCESS } from '@/lib/followOutcome';
 import { inFollowRoundBucket } from '@/lib/followRoundBuckets';
+import { replaceWorkYmd } from '@/lib/irecruitReplaceSync';
 
 /**
  * **แยกหน้าตามสถานะ + filter ประจำวัน** ของหน้า Follow
@@ -288,7 +289,8 @@ export function followPlanDayOptions(entries: readonly FollowEntry[]): Array<{ d
 export function filterFollowEntries(entries: FollowEntry[], f: FollowFilter): FollowEntry[] {
   return entries.filter((e) => {
     if (f.tab && followLifecycleTab(e) !== f.tab) return false;
-    if (f.date && bangkokDay(e.scheduled_at) !== f.date) return false;
+    // สายส่งคนแทนจาก iRecruit อยู่วันเข้างาน (7 ต.ค. 2569 · ตัวเดียวกับตาราง `followEntryYmd`)
+    if (f.date && (replaceWorkYmd(e) ?? bangkokDay(e.scheduled_at)) !== f.date) return false;
     if (f.band && !inTimeBand(e.scheduled_at, f.band)) return false;
     if (f.owner && !matchesFollowAdder(e, f.owner)) return false;
     if (f.staff && followStaffGroupKey(e, f.staffNameOf ?? (() => null)) !== f.staff) return false;

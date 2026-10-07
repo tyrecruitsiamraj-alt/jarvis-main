@@ -14,6 +14,7 @@ import {
 import type { FollowOutcome } from '@/lib/followOutcome';
 import FollowStaffCallControls from '@/components/follow/FollowStaffCallControls';
 import FollowCancelMenu, { type FollowCancelChoice } from '@/components/follow/FollowCancelMenu';
+import { leadText, replaceLeadStart, replaceSlotRoundOfRef } from '@/lib/irecruitReplaceSync';
 import { toYmdBangkok, toYmdLocal, parseYmd, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   buildFollowDayCalls,
@@ -146,7 +147,8 @@ const DayPickerPill: React.FC<{ value: string; today: string; onPick: (ymd: stri
           type="button"
           variant="outline"
           size="xs"
-          className="rounded-full tabular-nums"
+          // กว้างคงที่ — เดิมกว้างตามชื่อวัน ปุ่มลูกศรขยับทุกครั้งที่เปลี่ยนวัน (เจ้าของ 7 ต.ค. 2569 "เลื่อนวันแล้วมันเลื่อนไปเลื่อนมา")
+          className="w-40 justify-center rounded-full tabular-nums"
           aria-label={`เลือกวัน · ${dayPillLabel(value)}`}
           data-testid="day-pill"
         >
@@ -232,10 +234,33 @@ function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): st
  */
 function callLabelOf(round: FollowPlanningRound, slot: 1 | 2 | 3 | null): string {
   const e = round.entry;
+  // 🔴 ส่งคนแทนจาก iRecruit: บอกว่าเป็นสายอะไร (เจ้าของ 7 ต.ค. 2569 "ลงสายไว้แบบนี้จะได้ไม่งง")
+  const replaceSlot = replaceSlotRoundOfRef(e.source_ref);
+  if (replaceSlot) {
+    // สาย 2/3 = ระยะจริงก่อนเข้างาน (เวลาโทรตั้งผ่านจอได้แล้ว 7 ต.ค. 2569 — ห้ามเขียนตายตัว)
+    const at = Date.parse(e.scheduled_at ?? '');
+    const start = replaceSlot > 1 ? replaceLeadStart(at, e.note) : null;
+    const lead = start != null ? Math.round((start - at) / 60_000) : null;
+    return `สายที่ ${replaceSlot} · ${replaceSlot === 1 ? 'คอนเฟิร์ม' : lead != null && lead > 0 ? leadText(lead) : 'ก่อนเข้างาน'}`;
+  }
   return (
     followDayCallLabel({ day: e.call_day ?? null, call: e.call_of_day ?? e.call_round ?? null }) ??
     (slot ? dayCallTabLabel(slot) : 'ยังไม่อยู่รอบไหน')
   );
+}
+
+
+/** วัน/เดือนไทยของเวลานัด — 🔴 `Intl` ระดับโมดูล */
+const CALL_DM = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'numeric' });
+const CALL_YMD = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' });
+
+/** เวลาของสายบนตารางรายวัน — โทรคนละวันกับแถว (สาย 1 ส่งคนแทน = วันก่อนเข้างาน) ใส่วัน/เดือนนำหน้า */
+function callTimeText(round: FollowPlanningRound): string {
+  if (round.entry.time_tbd) return 'ยังไม่ระบุเวลา';
+  const t = round.time ?? '—';
+  const at = Date.parse(round.entry.scheduled_at ?? '');
+  if (!Number.isFinite(at) || !round.ymd || CALL_YMD.format(new Date(at)) === round.ymd) return t;
+  return `${CALL_DM.format(new Date(at))} ${t}`;
 }
 
 /** เวลาที่คนลงผล (HH:MM ไทย) — 🔴 `Intl` ระดับโมดูล */
@@ -420,18 +445,28 @@ const FollowPlanningCalendar: React.FC<{
     () => buildFollowDayPeople(rows, dayYmd, roundFilter),
     [rows, dayYmd, roundFilter],
   );
+  /**
+   * 🔴 คนที่เพิ่งกดลงผลบนจอนี้ — ค้างอยู่ในตารางจนเปลี่ยนวัน (7 ต.ค. 2569 ทดสอบผ่านจอ: กด "ไม่ไป" แล้วแถวย้ายไปการ์ดจบแล้ว
+   * ทันที คำถามขั้น 2 "จบเรื่องนี้เลยไหม" หายไปกับแถว สายที่เหลือของวันนั้นไม่ได้ถูกถาม)
+   */
+  const [pinnedKeys, setPinnedKeys] = useState<Set<string>>(() => new Set());
+  useEffect(() => setPinnedKeys(new Set()), [dayYmd]);
+  const recordStaffResult = (round: FollowPlanningRound, outcome: FollowStaffCallOutcome, row: FollowPlanningRow) => {
+    setPinnedKeys((prev) => new Set(prev).add(row.group.key));
+    return onStaffResult?.(round, outcome, row);
+  };
   /** คนที่จัดการจบแล้ว (สำเร็จ/ยกเลิก) → การ์ดใต้ตาราง · ที่เหลือ = ตาราง "สายที่ต้องตาม" */
   const { dayPeople, donePeople } = useMemo(() => {
     if (!splitDone) return { dayPeople: allDayPeople, donePeople: [] as Array<{ person: FollowDayPerson; kind: FollowDayDoneKind }> };
     const active: FollowDayPerson[] = [];
     const done: Array<{ person: FollowDayPerson; kind: FollowDayDoneKind }> = [];
     for (const p of allDayPeople) {
-      const kind = followDayPersonDone(p);
+      const kind = pinnedKeys.has(p.row.group.key) ? null : followDayPersonDone(p);
       if (kind) done.push({ person: p, kind });
       else active.push(p);
     }
     return { dayPeople: active, donePeople: done };
-  }, [allDayPeople, splitDone]);
+  }, [allDayPeople, splitDone, pinnedKeys]);
 
   /** แบ่งหน้าแบบแบบอ้างอิง — เปลี่ยนวัน/รอบแล้วต้องเด้งกลับหน้า 1 ไม่งั้นค้างหน้าว่าง */
   const [page, setPage] = useState(1);
@@ -811,7 +846,7 @@ const FollowPlanningCalendar: React.FC<{
                                             round.state === 'cancelled' ? 'text-muted-foreground' : 'text-foreground',
                                           )}
                                         >
-                                          {round.entry.time_tbd ? 'ยังไม่ระบุเวลา' : (round.time ?? '—')}
+                                          {callTimeText(round)}
                                         </span>
                                         <span className="mt-0.5 block whitespace-nowrap text-[10.5px] text-muted-foreground">
                                           {/* "วันที่ 2 · สายที่ 1" — ลำดับในวัน ไม่ใช่เลขทั้งชุด (1 ต.ค. 2569) */}
@@ -943,7 +978,7 @@ const FollowPlanningCalendar: React.FC<{
                                             compact
                                             entry={e}
                                             busy={busy}
-                                            onRecord={(o) => onStaffResult?.(round, o, row)}
+                                            onRecord={(o) => recordStaffResult(round, o, row)}
                                             onFinish={(o) => onFinishRound?.(round, o)}
                                             extra={
                                               round.state !== 'closed' ? (
@@ -1009,7 +1044,7 @@ const FollowPlanningCalendar: React.FC<{
                                               compact
                                               entry={e}
                                               busy={busy}
-                                              onRecord={(o) => onStaffResult?.(round, o, row)}
+                                              onRecord={(o) => recordStaffResult(round, o, row)}
                                               onFinish={(o) => onFinishRound?.(round, o)}
                                               extra={
                                                 aiCancellable ? (

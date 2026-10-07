@@ -419,7 +419,8 @@ export default function FollowCallRoundsPanel({
           ];
           return (
             <div className="px-5 pb-5 pt-4" data-testid="call-summary">
-              <div className="grid grid-cols-4 gap-x-2 gap-y-4 md:grid-cols-8">
+              {/* 9 ช่องแถวเดียว (เจ้าของ 7 ต.ค. 2569 "แถวมันตก ทำให้มันอยู่แถวเดียวกัน") — 7 หมวด + AI โทร + คนโทร */}
+              <div className="grid grid-cols-4 gap-x-2 gap-y-4 md:grid-cols-9">
                 {FOLLOW_MATRIX_COLS.map((c) => {
                   const n = row[c].length;
                   /** กล่องที่เลือกอยู่ — "ทั้งหมด" = ไม่ได้เลือกกล่องไหน */

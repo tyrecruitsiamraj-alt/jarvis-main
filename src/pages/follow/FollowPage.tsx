@@ -48,6 +48,7 @@ import {
   completeFollowEntry,
   reopenFollowEntry,
   recordFollowStaffCall,
+  createReplaceFollow,
   cancelFollowScope,
   type FollowCancelScope,
   clearFollowStaffCall,
@@ -117,8 +118,15 @@ import FollowCompletedCard from '@/components/follow/FollowCompletedCard';
 import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
 import DateTimeField24 from '@/components/shared/DateTimeField24';
+import ReplaceTimingDialog from '@/components/follow/ReplaceTimingDialog';
+import ReplaceStartFields, {
+  REPLACE_SLOT_MODES_MANUAL,
+  replaceStartOf,
+  type ReplaceSlotModes,
+} from '@/components/follow/ReplaceStartFields';
+import { DEFAULT_REPLACE_CALL_RULE, planReplaceCallsFull, type ReplaceTiming } from '@/lib/irecruitReplaceSync';
 import { type FollowOutcome } from '@/lib/followOutcome';
-import { buildFollowPlanningRows, callCategory, type FollowPlanningRound, type FollowRoundFilter } from '@/lib/followPlanning';
+import { buildFollowPlanningRows, callCategory, followEntryYmd, type FollowPlanningRound, type FollowRoundFilter } from '@/lib/followPlanning';
 import { toYmdBangkok, formatYmdDmyBe } from '@/lib/dateTh';
 import { tbdPlaceholderAts } from '@/lib/followTbd';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
@@ -331,6 +339,16 @@ const FollowPage: React.FC = () => {
    * ปิดอยู่ = ทุกวันใช้ `roundTimes` เหมือนเดิม · เปิด = แต่ละวันมีเวลาของตัวเอง (`roundTimesByDay`)
    * เปิดครั้งแรกลอกเวลาชุดเดียวลงทุกวันให้ก่อน แล้วค่อยแก้เฉพาะวันที่ต่าง (แพตเทิร์นเดียวกับเบอร์รายวัน)
    */
+  /**
+   * แท็บส่งคนแทน: วันเวลาเข้างาน ("YYYY-MM-DDTHH:MM") — ระบบลง 3 สายให้ (เจ้าของ 7 ต.ค. 2569 "ต้องมี 3 สายนะทุกคนเลย")
+   * ค่าเริ่ม = พรุ่งนี้ 08:00
+   */
+  const defaultReplaceStart = () => `${toYmdBangkok(new Date(Date.now() + 86_400_000))}T08:00`;
+  const [replaceStartVal, setReplaceStartVal] = useState(defaultReplaceStart);
+  /** ใครโทรรายสาย (เจ้าของ 7 ต.ค. 2569 "แต่ละสายเลือกได้ว่าคนหรือ AI โทร") */
+  const [replaceModes, setReplaceModes] = useState<ReplaceSlotModes>(REPLACE_SLOT_MODES_MANUAL);
+  /** เวลาโทรที่ตั้งบนจอ (`rule.confirmTime` / `leadMinutes`) — อ่านพร้อมสวิตช์พัก AI */
+  const [replaceTiming, setReplaceTiming] = useState<ReplaceTiming>(DEFAULT_REPLACE_CALL_RULE);
   const [perDayTimes, setPerDayTimes] = useState(false);
   const [roundTimesByDay, setRoundTimesByDay] = useState<Record<string, string[]>>({});
   /**
@@ -562,7 +580,10 @@ const FollowPage: React.FC = () => {
     let alive = true;
     fetchReplaceSyncStatus()
       .then((st) => {
-        if (alive) setReplaceAiOn(!st.rule.aiPaused);
+        if (alive) {
+          setReplaceAiOn(!st.rule.aiPaused);
+          setReplaceTiming({ confirmTime: st.rule.confirmTime ?? '16:00', leadMinutes: st.rule.leadMinutes ?? [60, 15] });
+        }
       })
       .catch(() => {
         if (alive) setReplaceAiOn(null);
@@ -639,6 +660,8 @@ const FollowPage: React.FC = () => {
   }, [reload]);
 
   const resetForm = () => {
+    setReplaceStartVal(defaultReplaceStart());
+    setReplaceModes(REPLACE_SLOT_MODES_MANUAL);
     setPrefix('');
     setFirstName('');
     setLastName('');
@@ -919,6 +942,65 @@ const FollowPage: React.FC = () => {
      * กลืนเงียบ ๆ (เหมือนกดไม่ติด) — คนที่ตั้งใจจริงจะกดอีกครั้งหลังอ่านหน้าจอ
      */
     if (isSubmitTooSoonAfterStep3(step3EnteredAtRef.current, Date.now())) return;
+    /** 🔴 แท็บส่งคนแทน = 3 สายจากวันเวลาเข้างาน (7 ต.ค. 2569) — server คิดสายด้วยกติกาเดียวกับรอบดึง iRecruit */
+    if (replaceView) {
+      for (const st of [1, 2] as const) {
+        const err = followStepError(st, wizardValues);
+        if (err) {
+          setStep(st);
+          setFormError(err);
+          return;
+        }
+      }
+      const start = replaceStartOf(replaceStartVal);
+      const plans = start ? planReplaceCallsFull(start, new Date(), replaceTiming) : [];
+      if (!start || plans.length === 0) {
+        setFormError('ใส่วันเวลาเข้างาน');
+        return;
+      }
+      const recipientName = composeRecipientName(prefix, firstName, lastName);
+      // สายที่เลยเวลาแล้ว = คนโทร (AI ไม่โทรย้อนหลัง) · พัก AI = คนโทรทุกสาย
+      const modes: ReplaceSlotModes = { ...replaceModes };
+      for (const p of plans) if (p.past || replaceAiOn === false) modes[p.slot] = 'manual';
+      const mode = Object.values(modes).includes('ai') ? 'ai' : 'manual';
+      setSubmitting(true);
+      try {
+        const created = await createReplaceFollow({
+          recipient_name: recipientName,
+          recipient_phone: phone,
+          topic,
+          follow_team: followTeam,
+          note: note || undefined,
+          staff_phone: staffPhones[0] || undefined,
+          scheduled_at: plans[0].at.toISOString(),
+          call_round: plans[0].round,
+          call_mode: mode,
+          group_id: crypto.randomUUID(),
+          unit_name: unitName.trim() || undefined,
+          site_code: siteCode.trim() || undefined,
+          replace_start: start,
+          replace_modes: modes,
+        });
+        resetForm();
+        setDoneInfo({
+          lines: (() => {
+            const ai = created.filter((c) => c.call_mode !== 'manual').length;
+            const out = [`${recipientName} · ${created.length} สาย`];
+            if (ai > 0) out.push(`AI โทร ${ai} สาย`);
+            if (created.length - ai > 0) out.push(`คนโทร ${created.length - ai} สาย`);
+            return out;
+          })(),
+          warn: null,
+          firstDay: start.ymd,
+        });
+        await reload();
+      } catch (err) {
+        setFormError(friendlyErrorText(err, 'บันทึกไม่สำเร็จ'));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
     /**
      * 🔴 กันข้ามขั้น — ต่อให้กด Enter จากขั้นไหนก็ต้องผ่านทุกขั้นก่อนถึงจะยิงจริง
      * ไม่ผ่านตรงไหนให้เด้งกลับไป**ขั้นนั้น** ไม่ใช่ขึ้น error ลอย ๆ ที่คนหาไม่เจอ
@@ -1408,10 +1490,9 @@ const FollowPage: React.FC = () => {
   /** สายในช่วงที่แผงดูอยู่ (วันเดียว/ทั้งเดือน) — ก่อนตัวกรองใครโทร */
   const inPanelRange = useCallback(
     (e: FollowEntry) => {
-      if (!e.scheduled_at) return false;
-      const d = new Date(e.scheduled_at);
-      if (Number.isNaN(d.getTime())) return false;
-      const ymd = toYmdBangkok(d);
+      // วันของสาย = ตัวเดียวกับตาราง (`followEntryYmd` · ส่งคนแทนจาก iRecruit = วันเข้างาน · 7 ต.ค. 2569)
+      const ymd = followEntryYmd(e);
+      if (!ymd) return false;
       return panelRange === 'month' ? ymd.slice(0, 7) === calMonth : ymd === panelDay;
     },
     [panelRange, panelDay, calMonth],
@@ -1750,6 +1831,8 @@ const FollowPage: React.FC = () => {
                     {replaceAiOn ? 'AI โทร' : 'พัก AI'}
                   </label>
                 ) : null}
+                {/* เวลาโทร 16:00 / ก่อน 1 ชม. / ก่อน 15 นาที ตั้งผ่านจอ (เจ้าของ 7 ต.ค. 2569) */}
+                {replaceAiOn !== null ? <ReplaceTimingDialog timing={replaceTiming} onSaved={setReplaceTiming} /> : null}
                 <Button
                   type="button"
                   variant="outline"
@@ -1944,8 +2027,7 @@ const FollowPage: React.FC = () => {
               entries={panelEntries}
               /* จากรายชื่อในป๊อปของเลข → เปิดป๊อปจัดการคนนั้นได้เลย (4 ต.ค. 2569 ทางไปต่อ) */
               onOpenPerson={(e) => {
-                const ymd = e.scheduled_at ? toYmdBangkok(new Date(e.scheduled_at)) : '';
-                setOpenCell({ key: followGroupKey(e), ymd });
+                setOpenCell({ key: followGroupKey(e), ymd: followEntryYmd(e) ?? '' });
               }}
               loading={loading}
               onReload={() => void reload()}
@@ -2328,7 +2410,24 @@ const FollowPage: React.FC = () => {
             </>
             ) : null}
 
-            {step === 3 ? (
+            {step === 3 && replaceView ? (
+              <ReplaceStartFields
+                value={replaceStartVal}
+                onChange={setReplaceStartVal}
+                modes={replaceModes}
+                onModesChange={setReplaceModes}
+                timing={replaceTiming}
+                aiPaused={replaceAiOn === false}
+              >
+                <StaffContactField
+                  id="followStaffPhoneReplace"
+                  label="เจ้าหน้าที่ที่ติดตาม (ถ้ามี)"
+                  value={staffPhones[0] ?? ''}
+                  onChange={(next) => setStaffPhoneAt(0, next)}
+                  reloadSignal={contactsRev}
+                />
+              </ReplaceStartFields>
+            ) : step === 3 ? (
             <>
             {/* สลับโหมด: รอบเดี่ยว/หลายรอบ (เวลาเจาะจง) vs ตารางหลายวัน (ช่วงวัน × รอบ/วัน) */}
             <div className="flex items-center gap-2 rounded-full border border-white/70 bg-white/40 p-1 text-xs dark:border-white/15 dark:bg-white/5">
@@ -2895,10 +2994,17 @@ const FollowPage: React.FC = () => {
                   {unitName ? <> · หน่วยงาน {unitName}</> : null}
                 </span>
                 <span className="mt-0.5 block text-muted-foreground">
-                  {scheduleMode
-                    ? `ตารางหลายวัน — ${sendDaysPreview} วัน รวม ${scheduleCallsPreview} สาย`
-                    : `ตั้งไว้ ${scheduledAtsPreview} สาย`}
-                  {!scheduleMode && manualTimesPreview > 0
+                  {replaceView
+                    ? (() => {
+                        // ส่งคนแทน: จำนวนสายจริงจากวันเวลาเข้างาน (ตัวเดียวกับตอนบันทึก)
+                        const st = replaceStartOf(replaceStartVal);
+                        const n = st ? planReplaceCallsFull(st, new Date(), replaceTiming).length : 0;
+                        return st ? `เข้างาน ${formatYmdDmyBe(st.ymd)} ${st.hhmm} น. — ${n} สาย` : 'ยังไม่ได้ใส่วันเวลาเข้างาน';
+                      })()
+                    : scheduleMode
+                      ? `ตารางหลายวัน — ${sendDaysPreview} วัน รวม ${scheduleCallsPreview} สาย`
+                      : `ตั้งไว้ ${scheduledAtsPreview} สาย`}
+                  {!replaceView && !scheduleMode && manualTimesPreview > 0
                     ? ` · คนโทร ${manualTimesPreview} สาย · AI โทร ${scheduledAtsPreview - manualTimesPreview} สาย`
                     : ''}
                 </span>
@@ -2945,8 +3051,13 @@ const FollowPage: React.FC = () => {
                   )}
                   {submitting
                     ? `กำลังบันทึก…${submitProgress ? ` ${submitProgress}` : ''}`
-                    : !scheduleMode && manualTimesPreview >= scheduledAtsPreview
-                      ? 'บันทึก'
+                    : (replaceView
+                          ? replaceAiOn === false || !Object.values(replaceModes).includes('ai')
+                          : scheduleMode
+                            ? !scheduleCalls().some((c) => c.callMode === 'ai')
+                            : manualTimesPreview >= scheduledAtsPreview)
+                      ? // ไม่มีสาย AI ⇒ ห้ามพูดว่าส่ง AI (7 ต.ค. 2569 ทดสอบผ่านจอ: ตารางคนโทรทั้งหมดยังขึ้น "ส่ง AI โทร")
+                        'บันทึก'
                       : 'บันทึก + ส่ง AI โทร'}
                 </Button>
               )}

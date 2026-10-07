@@ -9,6 +9,7 @@
 import { randomUUID } from 'node:crypto';
 import { dbQuery } from '../_lib/postgres.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
+import { planReplaceCallsFull, replaceSlotNote, replaceSlotRoundOfRef } from '../../src/lib/irecruitReplaceSync.js';
 import { FOLLOW_CALL_ROUND_MAX } from '../../src/lib/followCallRound.js';
 
 /** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 092 (group_id/call_times) */
@@ -479,6 +480,10 @@ export type FollowRoundInput = {
   callMode?: 'ai' | 'manual';
   /** ยังไม่กำหนดเวลา (134) — บังคับคนโทรของรอบนั้น */
   timeTbd?: boolean;
+  /** หมายเหตุเฉพาะรอบ (ส่งคนแทนคีย์เอง: "ยืนยันเวลาเข้างาน …" / "เข้างาน … น.") — ไม่ส่ง = ของทั้งคำขอ */
+  note?: string | null;
+  /** คีย์ของสาย (ส่งคนแทนคีย์เอง `manual-replace:<ใบ>:<สาย>:m`) */
+  sourceRef?: string | null;
 };
 
 /**
@@ -574,7 +579,7 @@ async function createFollowRounds(
         recipient_name: base.name,
         recipient_phone: base.phone,
         topic: base.topic,
-        note: base.note,
+        note: rounds[i]?.note !== undefined ? (rounds[i]?.note ?? null) : base.note,
         staffPhone: rounds[i]?.staffPhone ?? base.staffPhone,
         staffName,
         unitName: base.unitName,
@@ -624,6 +629,13 @@ async function insertFollowRow(
   round: FollowRoundInput,
 ): Promise<FollowRow | undefined> {
   const row = await insertFollowRowBase(req, base, round);
+  if (row && (round.note !== undefined || round.sourceRef)) {
+    const { rows: upd } = await dbQuery<FollowRow>(
+      `update ${followTable} set note = $2, source_ref = coalesce($3, source_ref) where id = $1 returning *`,
+      [row.id, round.note === undefined ? row.note : round.note, round.sourceRef ?? null],
+    );
+    if (upd[0]) Object.assign(row, upd[0]);
+  }
   if (row && base.planDayStart && base.planDayStart > 1) {
     try {
       await dbQuery(`update ${followTable} set plan_day_start = $2 where id = $1`, [row.id, base.planDayStart]);
@@ -711,6 +723,16 @@ async function insertFollowRowBase(
   }
 }
 
+/** `{ ymd: 'YYYY-MM-DD', hhmm: 'HH:MM' }` ของวันเวลาเข้างาน — รูปไม่ถูก = null */
+export function parseReplaceStart(v: unknown): { ymd: string; hhmm: string } | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const ymd = typeof o.ymd === 'string' ? o.ymd.trim() : '';
+  const hhmm = typeof o.hhmm === 'string' ? o.hhmm.trim() : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(hhmm)) return null;
+  return { ymd, hhmm };
+}
+
 async function createFollow(req: AuthedReq, res: ApiRes) {
   const raw = await readJsonBody(req);
   const parsed = parseFollowInput(raw);
@@ -730,6 +752,44 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
    * ต้องรู้ทุกรอบ**ตั้งแต่ตอนสร้าง** ถึงจะประกอบแผนเดียวที่มีครบทุก step ได้ —
    * จะไปรวมทีหลังไม่ได้ เพราะแผนแรกถูกส่งไปแล้ว
    */
+  /**
+   * 🔴 ส่งคนแทนคีย์เอง = 3 สายตาม Journey เหมือนที่ดึงจาก iRecruit (เจ้าของ 7 ต.ค. 2569: *"ต้องมี 3 สายนะทุกคนเลย"* ·
+   * *"สายที่ 1 คอนเฟิร์ม 16:00 ลงหลัง 16:00 ต่อคิว · สายที่ 2 ก่อน 1 ชม. · สายที่ 3 ก่อน 15 นาที"*)
+   * body `replace_start: { ymd, hhmm }` (วันเวลาเข้างาน) → `planReplaceCalls` ตัวเดียวกับรอบดึง
+   */
+  const replaceStart = parseReplaceStart((raw as Record<string, unknown> | null)?.replace_start);
+  if (replaceStart) {
+    if (parsed.value.team !== FOLLOW_TEAM_REPLACEMENT) return sendError(res, 400, 'Bad request', 'เวลาเข้างานใช้กับส่งคนแทนเท่านั้น');
+    // เวลาโทรตามที่ตั้งบนจอ (`rule.confirmTime` / `leadMinutes` · 7 ต.ค. 2569)
+    const replaceRule = (await getReplaceSyncSettings()).rule;
+    // 🔴 3 สายเสมอ · สายที่เลยเวลาแล้ว = คนโทร (เจ้าของ 7 ต.ค. 2569 ลงย้อนหลัง "ขึ้น แต่ไม่โทร" ·
+    //    "เริ่มงาน 7 โมง แต่ลงตอน 8 โมงไม่ต้องโทร")
+    const plans = planReplaceCallsFull(replaceStart, new Date(), replaceRule);
+    if (plans.length === 0) return sendError(res, 400, 'Bad request', 'วันเวลาเข้างานไม่ถูกต้อง');
+    /** ใครโทรรายสาย (เจ้าของ 7 ต.ค. 2569 "แต่ละสายเลือกได้ว่าคนหรือ AI โทร") — ไม่ส่ง = ตามทั้งคำขอ · พัก AI = คนโทร (createFollowRounds) */
+    const modesRaw = (raw as Record<string, unknown> | null)?.replace_modes;
+    const modeOfSlot = (slot: string): 'ai' | 'manual' => {
+      const v = modesRaw && typeof modesRaw === 'object' ? (modesRaw as Record<string, unknown>)[slot] : undefined;
+      return v === 'ai' || v === 'manual' ? v : parsed.value!.callMode;
+    };
+    const jobKey = `${replaceStart.ymd.replace(/-/g, '')}${replaceStart.hhmm.replace(':', '')}-${randomUUID().slice(0, 8)}`;
+    const base = { ...parsed.value, groupId: parsed.value.groupId ?? randomUUID() };
+    await createFollowRounds(
+      req,
+      res,
+      base,
+      plans.map((p) => ({
+        when: p.at,
+        staffPhone,
+        callRound: p.round,
+        callMode: p.past ? ('manual' as const) : modeOfSlot(p.slot),
+        note: replaceSlotNote(p.slot, replaceStart),
+        sourceRef: `manual-replace:${jobKey}:${p.slot}:m`,
+      })),
+    );
+    return;
+  }
+
   const rounds = parseFollowRounds(raw, { when, staffPhone, callRound });
   if (rounds.length > 1) {
     await createFollowRounds(req, res, parsed.value, rounds);
@@ -1278,7 +1338,9 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
   try {
     const movedToFuture =
       new Date(String(before.scheduled_at)).getTime() !== v.when.getTime() && v.when.getTime() > Date.now() + 60_000;
-    if (movedToFuture && (updated.call_mode ?? 'ai') !== 'manual') {
+    // 🔴 สายคอนเฟิร์มของส่งคนแทนที่โทรไปแล้ว แก้เวลาแล้วไม่โทรใหม่ (เจ้าของ 7 ต.ค. 2569 "ถ้าโทรไปแล้วแก้เวลา ไม่ต้องโทร Confirm ใหม่")
+    const calledConfirm = replaceSlotRoundOfRef((before as FollowRow & { source_ref?: string | null }).source_ref) === 1;
+    if (movedToFuture && !calledConfirm && (updated.call_mode ?? 'ai') !== 'manual') {
       await dbQuery(
         `update ${queueTable} set status = 'cancelled', updated_at = now()
           where channel = 'reminder' and job_ref = 'follow' and person_ref = $1 and status in ('failed', 'completed')`,

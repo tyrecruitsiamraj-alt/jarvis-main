@@ -44,3 +44,14 @@ export async function runReplaceSyncNow(): Promise<ReplaceSyncStatus & { summary
   if (!r.ok) throw new Error(await readError(r));
   return (await r.json()) as ReplaceSyncStatus & { summary: ReplaceSyncSummary };
 }
+
+/** ตั้งเวลาโทรของส่งคนแทน (7 ต.ค. 2569 เจ้าของ "ต้องปรับผ่าน ui") — คอนเฟิร์มกี่โมง · สาย 2/3 ก่อนเข้างานกี่นาที */
+export async function setReplaceTiming(timing: { confirmTime: string; leadMinutes: [number, number] }): Promise<ReplaceSyncStatus> {
+  const r = await apiFetch('/api/irecruit-replace-sync', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(timing),
+  });
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as ReplaceSyncStatus;
+}

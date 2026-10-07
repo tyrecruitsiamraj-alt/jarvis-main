@@ -42,9 +42,16 @@ export type ReplaceCallRule = {
    * + ยกเลิกแผนที่ Lumos (`enforceReplaceAiPaused`) · สายที่ AI โทรไปแล้วคงเป็นผลของ AI · เปิดกลับ = สายที่เปลี่ยนไปแล้วยังเป็นคนโทร
    */
   aiPaused: boolean;
+  /**
+   * 🔴 เวลาโทรตั้งผ่านจอได้ (เจ้าของ 7 ต.ค. 2569: *"ขอหน้าตั้งเวลาในการโทร ทีตอนนี้มันตั้งไว้ว่าเป็น 16.00 แต่ถ้าจะปรับ
+   * ต้องปรับผ่าน ui"*) — สาย 1 คอนเฟิร์มกี่โมงของวันก่อนเข้างาน · สาย 2/3 โทรก่อนเข้างานกี่นาที
+   * เปลี่ยนแล้วรอบดึงย้ายสายของ iRecruit ที่ยังไม่ถึงเวลาตามเอง (แถวที่เจ้าหน้าที่แก้เองไม่ทับ)
+   */
+  confirmTime: string;
+  leadMinutes: [number, number];
 };
 
-export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = { aiFrom: null, aiPaused: false };
+export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = { aiFrom: null, aiPaused: false, confirmTime: '16:00', leadMinutes: [60, 15] };
 
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -60,7 +67,28 @@ export function normalizeReplaceCallRule(raw: unknown): ReplaceCallRule {
   const r = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
   const af = typeof r.aiFrom === 'string' ? r.aiFrom.trim() : '';
   const aiFrom = YMD_RE.test(af) && !Number.isNaN(new Date(`${af}T00:00:00+07:00`).getTime()) ? af : null;
-  return { aiFrom, aiPaused: r.aiPaused === true };
+  const ct = typeof r.confirmTime === 'string' ? r.confirmTime.trim() : '';
+  const confirmTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(ct) ? ct : DEFAULT_REPLACE_CALL_RULE.confirmTime;
+  const lm = Array.isArray(r.leadMinutes) ? r.leadMinutes.map(Number) : [];
+  const okLead = (n: number) => Number.isInteger(n) && n >= 5 && n <= 600;
+  const leadMinutes: [number, number] =
+    lm.length === 2 && okLead(lm[0]) && okLead(lm[1]) && lm[0] > lm[1] ? [lm[0], lm[1]] : [...DEFAULT_REPLACE_CALL_RULE.leadMinutes];
+  return { aiFrom, aiPaused: r.aiPaused === true, confirmTime, leadMinutes };
+}
+
+/** เวลาโทรของใบงาน — ส่วนของกติกาที่ `planReplaceCalls` ใช้ */
+export type ReplaceTiming = Pick<ReplaceCallRule, 'confirmTime' | 'leadMinutes'>;
+
+/** "ก่อน 1 ชม." / "ก่อน 15 นาที" / "ก่อน 1 ชม. 30 นาที" */
+export function leadText(min: number): string {
+  if (min % 60 === 0) return `ก่อน ${min / 60} ชม.`;
+  if (min > 60) return `ก่อน ${Math.floor(min / 60)} ชม. ${min % 60} นาที`;
+  return `ก่อน ${min} นาที`;
+}
+
+/** คำบนจอของกติกาเวลาโทร — ที่เดียว (ตามค่าที่ตั้ง) */
+export function replaceScheduleText(t: ReplaceTiming): string {
+  return `คอนเฟิร์ม ${t.confirmTime} วันก่อนเข้างาน · ${leadText(t.leadMinutes[0])} · ${leadText(t.leadMinutes[1])}`;
 }
 
 /** นาฬิกาไทยของ `want_date` — วัน + เวลาเข้างาน */
@@ -207,8 +235,62 @@ export type ReplaceSlotPlan = { slot: ReplaceSlot; round: 1 | 2 | 3; at: Date; a
  * (เจ้าของ 6 ต.ค. 2569: Journey สาย 1 คอนเฟิร์ม 16:00 · สาย 2 ก่อน 1 ชม. · สาย 3 ก่อน 15 นาที)
  */
 export function replaceSlotRoundOfRef(ref: string | null | undefined): 1 | 2 | 3 | null {
-  const m = /^irecruit-replace:[^:]+:(confirm|lead60|lead15)(?::|$)/.exec(ref ?? '');
+  // `manual-replace:` = เจ้าหน้าที่คีย์เองในแท็บส่งคนแทน (7 ต.ค. 2569) — 3 สายแบบเดียวกัน แต่รอบดึง iRecruit ไม่แตะ
+  const m = /^(?:irecruit|manual)-replace:[^:]+:(confirm|lead60|lead15)(?::|$)/.exec(ref ?? '');
   return m ? REPLACE_SLOT_ROUND[m[1] as ReplaceSlot] : null;
+}
+
+/**
+ * เวลาเข้างานของสาย 2/3 — หมายเหตุ "เข้างาน HH:MM น." = ครั้งแรกของเวลานั้นที่ไม่ก่อนเวลาโทร (ms) · อ่านไม่ออก = null
+ * (ตั้งเวลาโทรผ่านจอได้แล้ว 7 ต.ค. 2569 ⇒ ห้ามเดาจากค่าคงที่ 60/15 นาที)
+ */
+export function replaceLeadStart(callAtMs: number, note: string | null | undefined): number | null {
+  const m = /เข้างาน\s+(\d{1,2}):(\d{2})/.exec(note ?? '');
+  if (!m || !Number.isFinite(callAtMs)) return null;
+  const ymd = BKK_YMD_FMT.format(new Date(callAtMs));
+  const hhmm = `${m[1].padStart(2, '0')}:${m[2]}`;
+  let t = Date.parse(`${ymd}T${hhmm}:00+07:00`);
+  if (!Number.isFinite(t)) return null;
+  if (t < callAtMs) t += 86_400_000;
+  return t;
+}
+
+/** 🔴 `Intl` ระดับโมดูลเท่านั้น */
+const BKK_YMD_FMT = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' });
+
+/**
+ * ═══ วันเข้างานของสายส่งคนแทน (เจ้าของ 7 ต.ค. 2569 Choice "วันเข้างาน") ═══
+ * *"ในหน้า ติดตามส่งคนแทนงาน ต้องมี 3 สายนะทุกคนเลย"* — สาย 1 (คอนเฟิร์ม 16:00) อยู่วันก่อนเข้างาน
+ * ตารางรายวันเดิมวางสายตามวันที่โทร ⇒ วันเข้างานเห็นแค่สาย 2–3 · ⇒ ทั้ง 3 สายของใบงานอยู่ที่ **วันเข้างาน**
+ * - สาย 2/3 = เวลาโทร + 60/15 นาที (= เวลาเข้างาน)
+ * - สาย 1 = วันในหมายเหตุ "ยืนยันเวลาเข้างาน d/m HH:MM น." (`replaceSlotNote`) · อ่านไม่ออก = วันถัดจากวันที่โทร
+ * null = ไม่ใช่แถวรุ่น 3 สายจาก iRecruit (คีย์เอง ⇒ วางตามวันที่โทรเหมือนเดิม)
+ */
+export function replaceWorkYmd(e: {
+  source_ref?: string | null;
+  scheduled_at?: string | null;
+  note?: string | null;
+}): string | null {
+  const m = /^(?:irecruit|manual)-replace:[^:]+:(confirm|lead60|lead15)(?::|$)/.exec(e.source_ref ?? '');
+  if (!m) return null;
+  const at = Date.parse(e.scheduled_at ?? '');
+  if (!Number.isFinite(at)) return null;
+  const slot = m[1] as ReplaceSlot;
+  if (slot !== 'confirm') {
+    const start = replaceLeadStart(at, e.note);
+    return BKK_YMD_FMT.format(new Date(start ?? at + REPLACE_LEAD_MINUTES[slot] * 60_000));
+  }
+  const n = /(\d{1,2})\/(\d{1,2})\s+\d{1,2}:\d{2}/.exec(e.note ?? '');
+  if (n) {
+    const [y, mo] = BKK_YMD_FMT.format(new Date(at)).split('-').map(Number);
+    const d = Number(n[1]);
+    const mm = Number(n[2]);
+    if (mm >= 1 && mm <= 12 && d >= 1 && d <= 31) {
+      const year = mm < mo ? y + 1 : y;
+      return `${year}-${String(mm).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+  return BKK_YMD_FMT.format(new Date(at + 86_400_000));
 }
 
 /**
@@ -218,19 +300,52 @@ export function replaceSlotRoundOfRef(ref: string | null | undefined): 1 | 2 | 3
  * - ก่อนเข้างาน 1 ชม. / 15 นาที — เลยแล้วไม่สร้าง
  * - เลยเวลาเข้างานแล้ว = ไม่มีสาย
  */
-export function planReplaceCalls(wall: ReplaceWantWall, now: Date): ReplaceSlotPlan[] {
+export function planReplaceCalls(
+  wall: ReplaceWantWall,
+  now: Date,
+  timing: ReplaceTiming = DEFAULT_REPLACE_CALL_RULE,
+): ReplaceSlotPlan[] {
   const start = wantInstant(wall);
   if (Number.isNaN(start.getTime()) || start.getTime() <= now.getTime()) return [];
+  const leadOf = { lead60: timing.leadMinutes[0], lead15: timing.leadMinutes[1] } as const;
   const leads = (['lead60', 'lead15'] as const)
-    .map((slot) => ({ slot, round: REPLACE_SLOT_ROUND[slot], at: new Date(start.getTime() - REPLACE_LEAD_MINUTES[slot] * 60_000), asap: false }))
+    .map((slot) => ({ slot, round: REPLACE_SLOT_ROUND[slot], at: new Date(start.getTime() - leadOf[slot] * 60_000), asap: false }))
     .filter((p) => p.at.getTime() > now.getTime());
-  const confirmAt = new Date(`${shiftYmd(wall.ymd, -1)}T${REPLACE_CONFIRM_TIME}:00+07:00`);
+  const confirmAt = new Date(`${shiftYmd(wall.ymd, -1)}T${timing.confirmTime}:00+07:00`);
   const confirm: ReplaceSlotPlan =
     confirmAt.getTime() > now.getTime()
       ? { slot: 'confirm', round: 1, at: confirmAt, asap: false }
       : { slot: 'confirm', round: 1, at: new Date(now.getTime() + REPLACE_ASAP_MINUTES * 60_000), asap: true };
   const nextBoundary = leads[0]?.at ?? start;
   return confirm.at.getTime() < nextBoundary.getTime() ? [confirm, ...leads] : leads;
+}
+
+export type ReplaceSlotPlanFull = ReplaceSlotPlan & { past: boolean };
+
+/**
+ * ═══ 3 สายครบทุกใบ (เจ้าของ 7 ต.ค. 2569: *"ต้องมี 3 สายนะทุกคนเลย"* · ลงย้อนหลัง = *"ขึ้น แต่ไม่โทร"*) ═══
+ * สายที่ยังโทรได้ = ตาม `planReplaceCalls` (รวมคอนเฟิร์มต่อคิว) · สายที่เลยเวลาไปแล้ว = `past: true` เวลาตามกติกา
+ * (คอนเฟิร์ม = วันก่อนเข้างานเวลาที่ตั้ง · สาย 2/3 = ก่อนเข้างาน) ⇒ ผู้เรียกต้องตั้งเป็นคนโทร (AI ไม่โทรย้อนหลัง)
+ */
+export function planReplaceCallsFull(
+  wall: ReplaceWantWall,
+  now: Date,
+  timing: ReplaceTiming = DEFAULT_REPLACE_CALL_RULE,
+): ReplaceSlotPlanFull[] {
+  const start = wantInstant(wall);
+  if (Number.isNaN(start.getTime())) return [];
+  const live = planReplaceCalls(wall, now, timing);
+  const fixedAt: Record<ReplaceSlot, Date> = {
+    confirm: new Date(`${shiftYmd(wall.ymd, -1)}T${timing.confirmTime}:00+07:00`),
+    lead60: new Date(start.getTime() - timing.leadMinutes[0] * 60_000),
+    lead15: new Date(start.getTime() - timing.leadMinutes[1] * 60_000),
+  };
+  return REPLACE_SLOTS.map((slot) => {
+    const l = live.find((p) => p.slot === slot);
+    return l
+      ? { ...l, past: false }
+      : { slot, round: REPLACE_SLOT_ROUND[slot], at: fixedAt[slot], asap: false, past: true };
+  });
 }
 
 /** คีย์กันซ้ำต่อสาย: ใบงาน + สาย + คนไปแทน (เปลี่ยนคน = คีย์ใหม่ ⇒ ของคนเดิมถูกยกเลิก ของคนใหม่ถูกสร้าง) */

@@ -138,10 +138,13 @@ describe('runIrecruitReplaceSync — 3 สายต่อใบ', () => {
     const s = await runIrecruitReplaceSync({ now: NOW });
 
     expect(s.error).toBeNull();
-    expect(s).toMatchObject({ fromYmd: '2026-10-05', toYmd: '2026-11-05', fetched: 5, added: 9, alreadyIn: 0, noPhone: 1, pastDue: 1, asap: 0, queued: 9, notSent: 0, cancelled: 0 });
+    // 🔴 7 ต.ค. 2569: ใบที่เลยเวลาเข้างาน (F) ก็ลง 3 สาย แต่เป็นคนโทร ("ขึ้น แต่ไม่โทร") ⇒ added 9 + 3 · queued ยัง 9
+    expect(s).toMatchObject({ fromYmd: '2026-10-05', toYmd: '2026-11-05', fetched: 5, added: 12, alreadyIn: 0, noPhone: 1, pastDue: 1, asap: 0, queued: 9, notSent: 0, cancelled: 0 });
+    expect(inserts().filter((c) => insRef(c).startsWith('irecruit-replace:F:')).map((c) => c.params[9])).toEqual(['manual', 'manual', 'manual']);
 
     const [sql] = irecruitSqlQuery.mock.calls[0] as [string];
-    expect(sql).toMatch(/h\.status = 'WS'/);
+    // 7 ต.ค. 2569 เจ้าของ Choice "ตามด้วย" — ใบ "รอดำเนินการ" (W) ด้วย
+    expect(sql).toMatch(/h\.status IN \('W', 'WS'\)/);
     expect(sql).toMatch(/h\.job_type = '2'/);
     expect(sql).toMatch(/ISNULL\(z\.status, ''\) <> 'C'/);
 
@@ -163,7 +166,7 @@ describe('runIrecruitReplaceSync — 3 สายต่อใบ', () => {
     expect(enqueuePlan).toHaveBeenCalledTimes(5);
     const sizes = (enqueuePlan.mock.calls as Array<[unknown[]]>).map((c) => c[0].length).sort();
     expect(sizes).toEqual([1, 1, 2, 2, 3]);
-    expect(persisted().at(-1)?.lastRun).toMatchObject({ added: 9, queued: 9 });
+    expect(persisted().at(-1)?.lastRun).toMatchObject({ added: 12, queued: 9 });
   });
 
   it('🔴 เพิ่มหลัง 16:00 = คอนเฟิร์มตามคิว (อีก 10 นาที) · ก่อนเข้างานตามเดิม', async () => {
@@ -441,5 +444,91 @@ describe('แก้ล่าสุดชนะ (เจ้าของ 7 ต.ค.
     const h = readFileSync(new URL('../../api/_handlers/follow.ts', import.meta.url), 'utf8');
     expect(h).toContain("base = { ...inputBase, callMode: 'manual' };");
     expect(h).toContain('ส่งคนแทนพัก AI อยู่');
+  });
+});
+
+describe('🔴 ส่งคนแทน: 3 สายอยู่วันเข้างาน (เจ้าของ 7 ต.ค. 2569 "ต้องมี 3 สายนะทุกคนเลย" · Choice "วันเข้างาน")', () => {
+  it('สาย 2/3 = เวลาโทร + 60/15 นาที · สาย 1 = วันในหมายเหตุ · ข้ามปี · คีย์เอง = null', async () => {
+    const { replaceWorkYmd } = await import('../../src/lib/irecruitReplaceSync');
+    expect(replaceWorkYmd({ source_ref: 'irecruit-replace:J1:confirm:p', scheduled_at: '2026-10-07T09:00:00.000Z', note: 'ยืนยันเวลาเข้างาน 8/10 06:00 น.' })).toBe('2026-10-08');
+    expect(replaceWorkYmd({ source_ref: 'irecruit-replace:J1:lead60:p', scheduled_at: '2026-10-07T22:00:00.000Z' })).toBe('2026-10-08');
+    expect(replaceWorkYmd({ source_ref: 'irecruit-replace:J1:lead15:p', scheduled_at: '2026-10-07T22:45:00.000Z' })).toBe('2026-10-08');
+    // เข้างาน 00:30 → สาย 2 โทร 23:30 วันก่อน แต่ยังอยู่วันเข้างาน
+    expect(replaceWorkYmd({ source_ref: 'irecruit-replace:J1:lead60:p', scheduled_at: '2026-10-08T16:30:00.000Z' })).toBe('2026-10-09');
+    expect(replaceWorkYmd({ source_ref: 'irecruit-replace:J1:confirm:p', scheduled_at: '2026-12-31T09:00:00.000Z', note: 'ยืนยันเวลาเข้างาน 1/1 08:00 น.' })).toBe('2027-01-01');
+    expect(replaceWorkYmd({ source_ref: null, scheduled_at: '2026-10-07T09:00:00.000Z' })).toBeNull();
+  });
+  it('ตาราง/แผง/ตัวกรองวัน/ผลที่คนกด ใช้วันเดียวกัน', async () => {
+    const { followEntryYmd } = await import('../../src/lib/followPlanning');
+    expect(followEntryYmd({ source_ref: 'irecruit-replace:J1:confirm:p', scheduled_at: '2026-10-07T09:00:00.000Z', note: 'ยืนยันเวลาเข้างาน 8/10 06:00 น.' })).toBe('2026-10-08');
+    expect(followEntryYmd({ scheduled_at: '2026-10-07T09:00:00.000Z' })).toBe('2026-10-07');
+    const page = readFileSync(new URL('../../src/pages/follow/FollowPage.tsx', import.meta.url), 'utf8');
+    expect(page).toContain('const ymd = followEntryYmd(e);');
+    expect(readFileSync(new URL('../../src/lib/followListFilter.ts', import.meta.url), 'utf8')).toContain('(replaceWorkYmd(e) ?? bangkokDay(e.scheduled_at)) !== f.date');
+    const cal = readFileSync(new URL('../../src/components/follow/FollowPlanningCalendar.tsx', import.meta.url), 'utf8');
+    expect(cal).toContain("replaceSlot === 1 ? 'คอนเฟิร์ม' : lead != null && lead > 0 ? leadText(lead) : 'ก่อนเข้างาน'");
+  });
+});
+
+describe('🔴 ส่งคนแทนคีย์เอง = 3 สายจากวันเวลาเข้างาน (7 ต.ค. 2569)', () => {
+  it('คีย์ manual-replace อ่านเลขสาย/วันเข้างานได้เหมือนของ iRecruit', async () => {
+    const { replaceSlotRoundOfRef, replaceWorkYmd } = await import('../../src/lib/irecruitReplaceSync');
+    expect(replaceSlotRoundOfRef('manual-replace:202610080800-ab:lead15:m')).toBe(3);
+    expect(replaceWorkYmd({ source_ref: 'manual-replace:202610080800-ab:lead60:m', scheduled_at: '2026-10-08T00:00:00.000Z' })).toBe('2026-10-08');
+  });
+  it('server: replace_start → planReplaceCalls ตัวเดียวกับรอบดึง · หมายเหตุ/คีย์รายสาย · รอบดึงไม่แตะ (กรองแค่ irecruit-replace)', async () => {
+    const { parseReplaceStart } = await import('../../api/_handlers/follow');
+    expect(parseReplaceStart({ ymd: '2026-10-08', hhmm: '08:00' })).toEqual({ ymd: '2026-10-08', hhmm: '08:00' });
+    expect(parseReplaceStart({ ymd: '8/10', hhmm: '8:00' })).toBeNull();
+    const h = readFileSync(new URL('../../api/_handlers/follow.ts', import.meta.url), 'utf8');
+    expect(h).toContain('const plans = planReplaceCallsFull(replaceStart, new Date(), replaceRule);');
+    expect(h).toContain("callMode: p.past ? ('manual' as const) : modeOfSlot(p.slot),");
+    expect(h).toContain('sourceRef: `manual-replace:${jobKey}:${p.slot}:m`');
+    const sync = readFileSync(new URL('../../api/_lib/irecruitReplaceSync.ts', import.meta.url), 'utf8');
+    expect(sync).toContain("where source_ref like 'irecruit-replace:%'");
+  });
+  it('จอ: แท็บส่งคนแทนขั้นตั้งเวลา = วันเวลาเข้างาน + พรีวิว 3 สาย', () => {
+    const page = readFileSync(new URL('../../src/pages/follow/FollowPage.tsx', import.meta.url), 'utf8');
+    expect(page).toContain('step === 3 && replaceView ? (');
+    expect(page).toContain('replace_start: start,');
+  });
+});
+
+describe('🔴 ส่งคนแทน 7 ต.ค. 2569 รอบบ่าย (เจ้าของ 6 ข้อ)', () => {
+  it('3 สายครบเสมอ · สายที่เลยเวลา = past (คนโทร) · ลงย้อนหลังทั้งใบก็ยังลง', async () => {
+    const { planReplaceCallsFull } = await import('../../src/lib/irecruitReplaceSync');
+    const wall = { ymd: '2026-10-07', hhmm: '07:00' };
+    const after = planReplaceCallsFull(wall, new Date('2026-10-07T01:00:00Z')); // 08:00 ไทย = ลงหลังเข้างาน
+    expect(after.map((p) => [p.slot, p.past])).toEqual([['confirm', true], ['lead60', true], ['lead15', true]]);
+    const before = planReplaceCallsFull(wall, new Date('2026-10-06T00:00:00Z'));
+    expect(before.every((p) => !p.past)).toBe(true);
+  });
+  it('เวลาโทรตั้งได้ · ค่าเพี้ยน = ค่าเริ่ม · สาย 2 ต้องก่อนสาย 3', async () => {
+    const { normalizeReplaceCallRule, planReplaceCalls, replaceScheduleText } = await import('../../src/lib/irecruitReplaceSync');
+    const r = normalizeReplaceCallRule({ confirmTime: '17:30', leadMinutes: [90, 20] });
+    expect(r).toMatchObject({ confirmTime: '17:30', leadMinutes: [90, 20] });
+    expect(normalizeReplaceCallRule({ confirmTime: '25:00', leadMinutes: [10, 20] })).toMatchObject({ confirmTime: '16:00', leadMinutes: [60, 15] });
+    const p = planReplaceCalls({ ymd: '2026-10-09', hhmm: '08:00' }, new Date('2026-10-07T00:00:00Z'), r);
+    expect(p.map((x) => x.at.toISOString())).toEqual(['2026-10-08T10:30:00.000Z', '2026-10-08T23:30:00.000Z', '2026-10-09T00:40:00.000Z']);
+    expect(replaceScheduleText(r)).toBe('คอนเฟิร์ม 17:30 วันก่อนเข้างาน · ก่อน 1 ชม. 30 นาที · ก่อน 20 นาที');
+  });
+  it('วันเข้างานของสาย 2/3 อ่านจากหมายเหตุ (ไม่ผูก 60/15 นาที)', async () => {
+    const { replaceLeadStart } = await import('../../src/lib/irecruitReplaceSync');
+    expect(replaceLeadStart(Date.parse('2026-10-08T16:30:00Z'), 'เข้างาน 01:00 น.')).toBe(Date.parse('2026-10-08T18:00:00Z'));
+    expect(replaceLeadStart(Date.parse('2026-10-08T16:30:00Z'), null)).toBeNull();
+  });
+  it('เพิ่มโดย = อีเมลคนเพิ่มใบใน iRecruit → ชื่อ → null · เติมให้แถวเดิมที่ยังเป็นป้ายรอบดึง', async () => {
+    const { replaceAdderLabel } = await import('../../api/_lib/irecruitReplaceSync');
+    expect(replaceAdderLabel({ adder_email: ' a@siamraj.com ', adder_name: 'x' })).toBe('a@siamraj.com');
+    expect(replaceAdderLabel({ adder_email: null, adder_name: ' สมชาย ใจดี ' })).toBe('สมชาย ใจดี');
+    expect(replaceAdderLabel({ adder_email: '', adder_name: '' })).toBeNull();
+    const src = readFileSync(new URL('../../api/_lib/irecruitReplaceSync.ts', import.meta.url), 'utf8');
+    expect(src).toContain("where f.source_ref = v.ref and f.created_by_name like 'ดึงจาก iRecruit%'");
+  });
+  it('แก้เวลาสายคอนเฟิร์มที่โทรแล้ว ไม่ส่งโทรใหม่ · ตั้งเวลาโทรผ่าน API ค่าเพี้ยน = 400', () => {
+    const h = readFileSync(new URL('../../api/_handlers/follow.ts', import.meta.url), 'utf8');
+    expect(h).toContain('if (movedToFuture && !calledConfirm && ');
+    const api = readFileSync(new URL('../../api/_handlers/irecruit-replace-sync.ts', import.meta.url), 'utf8');
+    expect(api).toContain("'เวลาคอนเฟิร์มต้องเป็น HH:MM'");
   });
 });

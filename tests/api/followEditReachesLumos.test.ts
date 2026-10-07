@@ -40,3 +40,16 @@ describe('🔴 ป๊อปแก้ไข: คนเดียวกันห้
     expect(handler).toContain('คนนี้มีอีกสายเวลาเดียวกันอยู่แล้ว');
   });
 });
+
+describe('🔴 ทดสอบผ่านจอ 7 ต.ค. 2569', () => {
+  const cal = readFileSync(new URL('../../src/components/follow/FollowPlanningCalendar.tsx', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../../src/pages/follow/FollowPage.tsx', import.meta.url), 'utf8');
+  it('กดลงผลแล้วแถวค้างในตาราง (ไม่งั้นคำถาม "จบเรื่องนี้เลยไหม" หายไปกับแถว)', () => {
+    expect(cal).toContain('pinnedKeys.has(p.row.group.key) ? null : followDayPersonDone(p)');
+    expect(cal).toContain('onRecord={(o) => recordStaffResult(round, o, row)}');
+  });
+  it('ตารางคนโทรทั้งหมด ปุ่มบันทึกไม่พูดว่าส่ง AI', () => {
+    expect(page).toContain("? !scheduleCalls().some((c) => c.callMode === 'ai')");
+    expect(page).toContain("? replaceAiOn === false || !Object.values(replaceModes).includes('ai')");
+  });
+});

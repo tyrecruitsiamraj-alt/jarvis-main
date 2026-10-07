@@ -7,6 +7,7 @@ import { isVoicemailReply } from '@/lib/callMicroOutcome';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { effectiveCallOutcome, followStaffCallText, isStaffCallResult } from '@/lib/followStaffCall';
 import { UNREACHED_CALL_OUTCOMES } from '@/lib/callOutcomeBuckets';
+import { replaceWorkYmd } from '@/lib/irecruitReplaceSync';
 import type { ToneKey } from '@/lib/designTokens';
 import {
   FOLLOW_OUTCOME_LABEL,
@@ -143,6 +144,18 @@ export function closedCallCategory(outcomeCode: string | null | undefined): Foll
 }
 
 /**
+ * วันที่สายนี้อยู่บนตาราง (YYYY-MM-DD เวลาไทย) — ปกติ = วันที่โทร
+ * 🔴 สายส่งคนแทนจาก iRecruit = **วันเข้างาน** (7 ต.ค. 2569 · 3 สายของใบงานอยู่วันเดียวกัน — `replaceWorkYmd`)
+ */
+export function followEntryYmd(e: {
+  scheduled_at?: string | null;
+  source_ref?: string | null;
+  note?: string | null;
+}): string | null {
+  return replaceWorkYmd(e) ?? (e.scheduled_at ? bangkokYmd(e.scheduled_at) : null);
+}
+
+/**
  * ผลที่คนกดของแต่ละ "คน + วัน" — ปิดล่าสุดชนะ · คีย์ = `keyOf(entry)|YYYY-MM-DD` (วันไทยของเวลานัด)
  * ใช้ทั้งตารางรายวัน/รายเดือน (ผ่าน `dayVerdict`) และตารางสายรวม (`followCallMatrix`) ⇒ ถังตรงกันทุกที่
  */
@@ -153,7 +166,7 @@ export function staffDayVerdicts(
   const latest = new Map<string, { at: string; cat: FollowCallCategory }>();
   for (const e of entries) {
     if (!e.completed_at || e.cancelled || !e.scheduled_at) continue;
-    const ymd = bangkokYmd(e.scheduled_at);
+    const ymd = followEntryYmd(e);
     if (!ymd) continue;
     const key = `${keyOf(e)}|${ymd}`;
     const prev = latest.get(key);
@@ -166,9 +179,9 @@ export function staffDayVerdicts(
 export function dayVerdictOf(
   verdicts: ReadonlyMap<string, FollowCallCategory>,
   key: string,
-  scheduledAt: string | null | undefined,
+  entry: { scheduled_at?: string | null; source_ref?: string | null; note?: string | null },
 ): FollowCallCategory | null {
-  const ymd = scheduledAt ? bangkokYmd(scheduledAt) : null;
+  const ymd = followEntryYmd(entry);
   return ymd ? (verdicts.get(`${key}|${ymd}`) ?? null) : null;
 }
 
@@ -220,8 +233,8 @@ export function buildFollowPlanningRows(
       entry,
       state: followRoundState(entry, now),
       time: entry.scheduled_at ? bangkokTime(entry.scheduled_at) : null,
-      ymd: entry.scheduled_at ? bangkokYmd(entry.scheduled_at) : null,
-      dayVerdict: dayVerdictOf(verdicts, group.key, entry.scheduled_at),
+      ymd: followEntryYmd(entry),
+      dayVerdict: dayVerdictOf(verdicts, group.key, entry),
     }));
 
     const days: string[] = [];

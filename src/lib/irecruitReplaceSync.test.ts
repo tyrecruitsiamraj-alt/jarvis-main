@@ -34,15 +34,17 @@ describe('นาฬิกาไทยจาก mssql', () => {
   });
 });
 
-describe('ค่าตั้ง (เหลือ aiFrom · กติกาเวลาโทรแบบตั้งได้ถอดแล้ว 5 ต.ค. 2569)', () => {
+// 7 ต.ค. 2569: เวลาโทรกลับมาตั้งได้ผ่านจอ (`confirmTime` / `leadMinutes` — เจ้าของ "ต้องปรับผ่าน ui") · ค่าเก่ารูปแบบเดิมยังข้าม
+describe('ค่าตั้ง (aiFrom · aiPaused · เวลาโทร)', () => {
   it('ค่าเริ่ม = ไม่ตั้ง · อ่านวันที่ถูกต้อง · เพี้ยน/ค่าเก่าในฐาน = ข้าม ไม่ throw', () => {
-    expect(DEFAULT_REPLACE_CALL_RULE).toEqual({ aiFrom: null, aiPaused: false });
+    expect(DEFAULT_REPLACE_CALL_RULE).toEqual({ aiFrom: null, aiPaused: false, confirmTime: '16:00', leadMinutes: [60, 15] });
     expect(normalizeReplaceCallRule({ atStart: false, dayOffset: -1, time: '18:00', aiFrom: '2026-10-06' })).toEqual({
       aiFrom: '2026-10-06',
       aiPaused: false,
+      confirmTime: '16:00', leadMinutes: [60, 15],
     });
-    expect(normalizeReplaceCallRule({ aiFrom: '6/10/2026' })).toEqual({ aiFrom: null, aiPaused: false });
-    expect(normalizeReplaceCallRule({ aiFrom: '2026-10-06', aiPaused: true })).toEqual({ aiFrom: '2026-10-06', aiPaused: true });
+    expect(normalizeReplaceCallRule({ aiFrom: '6/10/2026' })).toEqual({ aiFrom: null, aiPaused: false, confirmTime: '16:00', leadMinutes: [60, 15] });
+    expect(normalizeReplaceCallRule({ aiFrom: '2026-10-06', aiPaused: true })).toEqual({ aiFrom: '2026-10-06', aiPaused: true, confirmTime: '16:00', leadMinutes: [60, 15] });
     expect(normalizeReplaceCallRule({ aiPaused: 'yes' }).aiPaused).toBe(false);
     expect(normalizeReplaceCallRule(null)).toEqual(DEFAULT_REPLACE_CALL_RULE);
     expect(normalizeReplaceCallRule('x')).toEqual(DEFAULT_REPLACE_CALL_RULE);
@@ -195,7 +197,7 @@ describe('พัก AI (aiPaused)', () => {
     expect(worker).toContain('if (settings.rule.aiPaused) {');
     const handler = readFileSync(`${process.cwd()}/api/_handlers/irecruit-replace-sync.ts`, 'utf8');
     expect(handler).toContain("if (method === 'PATCH') {");
-    expect(handler).toContain('const enforced = body.aiPaused ? await enforceReplaceAiPaused() : null;');
+    expect(handler).toContain('const enforced = hasPause && body.aiPaused ? await enforceReplaceAiPaused() : null;');
     const page = readFileSync(`${process.cwd()}/src/pages/follow/FollowPage.tsx`, 'utf8');
     expect(page).toContain('data-testid="replace-ai-switch"');
   });

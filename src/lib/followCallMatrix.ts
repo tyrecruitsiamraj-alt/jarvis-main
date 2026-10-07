@@ -117,7 +117,7 @@ export function buildFollowCallMatrix(entries: readonly FollowEntry[], now: Date
   for (const e of entries) {
     const slot = followRoundSlot(e);
     if (slot === null) continue;
-    const col = followMatrixCol(e, now, dayVerdictOf(verdicts, followGroupKey(e), e.scheduled_at));
+    const col = followMatrixCol(e, now, dayVerdictOf(verdicts, followGroupKey(e), e));
     for (const key of ['all', slot] as const) {
       m[key].total.push(e);
       m[key][col].push(e);

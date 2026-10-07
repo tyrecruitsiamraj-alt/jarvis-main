@@ -36,7 +36,7 @@ export const FOLLOW_QUEUE_CALL_COLS = `q.status as call_status,
 /** ช่องของแถว follow_entries ที่การจัดหมวดต้องใช้ */
 export const FOLLOW_ENTRY_CATEGORY_COLS = `f.id::text as id, f.scheduled_at, f.completed_at, f.cancelled_at, f.outcome_code,
             f.call_round, f.staff_call_outcome, f.staff_called_at, f.topic, f.group_id::text as group_id,
-            f.recipient_name, f.recipient_phone, f.source_ref`;
+            f.recipient_name, f.recipient_phone, f.source_ref, f.note`;
 
 const iso = (v: unknown): string | null => {
   if (v == null) return null;
@@ -57,6 +57,8 @@ function toEntry(r: Record<string, unknown>): FollowEntry {
     topic: clean(r.topic) ?? '',
     group_id: clean(r.group_id),
     source_ref: clean(r.source_ref),
+    // หมายเหตุของสายส่งคนแทน = วันเข้างาน (`replaceWorkYmd`) — ผลที่คนกดของวันต้องอยู่วันเดียวกับจอ
+    note: clean(r.note),
     scheduled_at: iso(r.scheduled_at),
     completed_at: iso(r.completed_at),
     outcome_code: clean(r.outcome_code),
@@ -87,7 +89,7 @@ export function categorizeFollowRows(
         state: followRoundState(e, now),
         time: null,
         ymd: null,
-        dayVerdict: dayVerdictOf(verdicts, followGroupKey(e), e.scheduled_at),
+        dayVerdict: dayVerdictOf(verdicts, followGroupKey(e), e),
       } as FollowPlanningRound;
       return [e.id, { category: callCategory(round), slot: followRoundSlot(e) ?? 1, caller: followCallerOf(e) }] as const;
     }),

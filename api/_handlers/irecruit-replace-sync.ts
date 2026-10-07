@@ -21,7 +21,7 @@ import {
   saveReplaceSyncSettings,
 } from '../_lib/irecruitReplaceSync.js';
 import { getLastReplaceSyncInMemory, getReplaceSyncWorkerConfig } from '../_lib/irecruitReplaceSyncWorker.js';
-import { REPLACE_SCHEDULE_TEXT } from '../../src/lib/irecruitReplaceSync.js';
+import { normalizeReplaceCallRule, replaceScheduleText } from '../../src/lib/irecruitReplaceSync.js';
 
 async function statusPayload() {
   const cfg = getReplaceSyncWorkerConfig();
@@ -33,7 +33,7 @@ async function statusPayload() {
     tableReady: settings.tableReady,
     running: isReplaceSyncRunning(),
     rule: settings.rule,
-    ruleText: REPLACE_SCHEDULE_TEXT,
+    ruleText: replaceScheduleText(settings.rule),
     lastRun: settings.lastRun ?? getLastReplaceSyncInMemory(),
     updatedAt: settings.updatedAt,
     updatedByName: settings.updatedByName,
@@ -68,14 +68,29 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (method === 'PATCH') {
       const raw = await readJsonBody(req);
       const body = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
-      if (typeof body.aiPaused !== 'boolean') return sendError(res, 400, 'Bad request', 'aiPaused ต้องเป็น true/false');
+      const hasPause = typeof body.aiPaused === 'boolean';
+      /** เวลาโทร (7 ต.ค. 2569 เจ้าของ "ต้องปรับผ่าน ui") — `confirmTime` "HH:MM" · `leadMinutes` [สาย 2, สาย 3] นาที */
+      const hasTiming = body.confirmTime !== undefined || body.leadMinutes !== undefined;
+      if (!hasPause && !hasTiming) return sendError(res, 400, 'Bad request', 'ส่ง aiPaused หรือเวลาโทรมาอย่างน้อยหนึ่งอย่าง');
       const settings = await getReplaceSyncSettings();
       if (!settings.tableReady) return sendError(res, 409, 'Conflict', 'ยังไม่มีตารางค่าตั้ง (migration 133)');
-      const rule = { ...settings.rule, aiPaused: body.aiPaused };
+      const rule = normalizeReplaceCallRule({
+        ...settings.rule,
+        ...(hasPause ? { aiPaused: body.aiPaused } : {}),
+        ...(body.confirmTime !== undefined ? { confirmTime: body.confirmTime } : {}),
+        ...(body.leadMinutes !== undefined ? { leadMinutes: body.leadMinutes } : {}),
+      });
+      // ค่าที่ส่งมาอ่านไม่ออก = ปฏิเสธ (ห้ามถอยไปค่าเริ่มเงียบ ๆ)
+      if (body.confirmTime !== undefined && rule.confirmTime !== body.confirmTime) {
+        return sendError(res, 400, 'Bad request', 'เวลาคอนเฟิร์มต้องเป็น HH:MM');
+      }
+      if (body.leadMinutes !== undefined && JSON.stringify(rule.leadMinutes) !== JSON.stringify(body.leadMinutes)) {
+        return sendError(res, 400, 'Bad request', 'สาย 2 ต้องโทรก่อนสาย 3 · 5–600 นาที');
+      }
       await saveReplaceSyncSettings({ rule }, req.user.email || req.user.sub);
-      const enforced = body.aiPaused ? await enforceReplaceAiPaused() : null;
+      const enforced = hasPause && body.aiPaused ? await enforceReplaceAiPaused() : null;
       await auditFromAuthed(req, {
-        action: 'irecruit_replace_sync.ai_paused',
+        action: hasTiming ? 'irecruit_replace_sync.timing' : 'irecruit_replace_sync.ai_paused',
         entityType: 'irecruit_replace_sync',
         entityId: 'default',
         before: { rule: settings.rule },

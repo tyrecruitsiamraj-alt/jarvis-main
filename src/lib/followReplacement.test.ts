@@ -58,7 +58,9 @@ describe('หน้าการติดตาม: สองแท็บเห�
       expect(page, gone).not.toContain(gone);
     }
     // 2 = ทีม · กอง — แถบ iRecruit ถอดแล้ว (เจ้าของ 6 ต.ค. 2569 "เอาออกไม่ต้องโชว์ เหลือไว้แค่ปุ่ม ดึงตอนนี้")
-    expect(page.match(/replaceView \?/g)?.length).toBe(2);
+    // +1 (7 ต.ค. 2569) = ทวนก่อนส่งของขั้นตั้งเวลาส่งคนแทน (3 สายจากวันเวลาเข้างาน — เจ้าของ "ต้องมี 3 สายนะทุกคนเลย")
+    expect(page.match(/replaceView \?/g)?.length).toBe(3);
+    expect(page).toContain('step === 3 && replaceView ? (');
     expect(page).not.toContain('IrecruitReplaceSyncBar');
     // ข้อยกเว้นเดียวของแท็บนี้ = ปุ่ม "ดึงตอนนี้" แทนปุ่มรีเฟรช (หัวหน้างานขึ้นไป)
     expect(page).toMatch(/followView === 'replace' \? \(\s*canManageMasters \? \(/);
@@ -76,7 +78,8 @@ describe('หน้าการติดตาม: สองแท็บเห�
     // ตัวกันนัดซ้ำทั้งสองโหมดเทียบกับ `items` ทั้งก้อน (ทุกทีม) — โหมดตารางเทียบทุกสาย ไม่ใช่แค่สายแรกของวัน
     expect(page).toMatch(/findScheduleDuplicates\(\s*phone,\s*calls\.map\(\(c\) => c\.scheduledAt\),\s*items,?\s*\)/);
     expect(page).toContain('findScheduleDuplicates(phone, isoTimes, items)');
-    expect(page.match(/follow_team: followTeam,/g)?.length).toBe(2);
+    // 3 = ระบุเวลาเอง · ตารางหลายวัน · ส่งคนแทนจากวันเวลาเข้างาน (7 ต.ค. 2569)
+    expect(page.match(/follow_team: followTeam,/g)?.length).toBe(3);
     // 7 ต.ค. 2569: รอบที่เพิ่มจากป๊อปแก้ไขไปทางแก้ตารางทั้งชุด — server ใช้ทีมของแถวเดิม (anchor) ให้เอง
     expect(edit).toContain('scheduleReplaceBody(editable, [...draft, ...addedRows])');
     expect(read('../api/_handlers/follow.ts')).toContain('team: anchor.follow_team === FOLLOW_TEAM_REPLACEMENT ? FOLLOW_TEAM_REPLACEMENT : null,');

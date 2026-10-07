@@ -42,3 +42,4 @@ wipe-backup-*.json
 # ลงใหม่บนเครื่องอื่นด้วย: npx skills add shadcn/ui   (เวอร์ชันล็อกที่ skills-lock.json)
 .claude/skills/shadcn
 .claude/skills/migrate-radix-to-base
+.backups/
