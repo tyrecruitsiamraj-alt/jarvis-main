@@ -213,39 +213,86 @@ export function buildApplicantsReport(rows: readonly ReportSourceRow[], publishe
   };
 }
 
-/** ผลจับคู่ที่ระบบคิดไว้ในช่วง (`board_match_results` · นับตามครั้งล่าสุดที่คิดใบขอนั้น) — คน × ใบขอ */
-export type MatchedSummary = { jobs: number; people: number; green: number; yellow: number; red: number };
+/**
+ * เส้นทางจับคู่งาน (เจ้าของ 7 ต.ค. 2569 "จับคู่งานก็ต้องเป็น เข้ามากี่ใบ Ai match รอแล้วเท่าไหร่ คนโทร … คิดต่อให้บ้าง"
+ * → Choice "เอาตามนี้") — ใบขอที่เข้ามาในช่วง (ใบที่ยังเปิด) · ผลจับคู่ของใบเหล่านั้น · การเสนอ/จอง/ส่งตัวของทีมจับคู่งาน
+ * ⚠️ จอง/ส่งตัว = สถานะทีมจับคู่งาน (`candidate_proposals`) ไม่ใช่หาได้ทางการจาก ERP
+ */
+export type MatchingFlow = {
+  jobsIn: number;
+  jobsMatched: number;
+  /** มีคนเขียว/เหลืองที่ยังว่าง */
+  jobsRecommend: number;
+  jobsNone: number;
+  /** ใบด่วน ไม่มีคนแนะนำ ยังไม่ส่งโพสต์ */
+  urgentStuck: number;
+  matched: number;
+  green: number;
+  yellow: number;
+  red: number;
+  greenAvailable: number;
+  /** เขียวที่ยังว่าง และยังไม่มีใครโทร (ไม่มีคิว/ไม่มีคนรับ) */
+  greenUncontacted: number;
+  reserved: number;
+  placed: number;
+  retry: number;
+  needsHuman: number;
+  stale: number;
+};
+
+export const emptyMatchingFlow = (): MatchingFlow => ({
+  jobsIn: 0,
+  jobsMatched: 0,
+  jobsRecommend: 0,
+  jobsNone: 0,
+  urgentStuck: 0,
+  matched: 0,
+  green: 0,
+  yellow: 0,
+  red: 0,
+  greenAvailable: 0,
+  greenUncontacted: 0,
+  reserved: 0,
+  placed: 0,
+  retry: 0,
+  needsHuman: 0,
+  stale: 0,
+});
 
 /**
- * จับคู่งาน — เจ้าของ 7 ต.ค. 2569: *"ยังใช้อยู่ … เวลามีใบขอเข้ามามันก็ยังต้อง match ไว้รอ"* → Choice "นับด้วย"
- * เส้นทาง: ใบขอที่จับคู่ → คนที่จับคู่ไว้ → ส่งโทร (= กล่องทั้งหมด) → ติดต่อแล้ว → สนใจ
+ * จับคู่งาน — เส้นทาง: ใบขอเข้ามา → AI จับคู่แล้ว → มีคนแนะนำ → คนที่จับคู่รอ → ส่งโทร (= กล่อง) → ติดต่อแล้ว → สนใจ → จอง → ส่งตัว
  */
-export function buildMatchingReport(rows: readonly ReportSourceRow[], matched: MatchedSummary): TopicReport {
+export function buildMatchingReport(rows: readonly ReportSourceRow[], f: MatchingFlow): TopicReport {
   const col = (r: ReportSourceRow) => interestColOf(r);
   return {
     funnel: [
-      { key: 'jobsMatched', label: 'ใบขอที่จับคู่', value: matched.jobs },
-      { key: 'matched', label: 'คนที่จับคู่ไว้', value: matched.people },
+      { key: 'jobsIn', label: 'ใบขอเข้ามา', value: f.jobsIn },
+      { key: 'jobsMatched', label: 'AI จับคู่แล้ว', value: f.jobsMatched },
+      { key: 'jobsRecommend', label: 'มีคนแนะนำ', value: f.jobsRecommend },
+      { key: 'matched', label: 'คนที่จับคู่รอ', value: f.matched },
       { key: 'total', label: 'ส่งโทร', value: rows.length },
       { key: 'called', label: 'ติดต่อแล้ว', value: count(rows, (r) => r.ai || r.staff) },
       { key: 'interested', label: 'สนใจ', value: count(rows, (r) => col(r) === 'interested') },
+      { key: 'reserved', label: 'จอง', value: f.reserved },
+      { key: 'placed', label: 'ส่งตัว', value: f.placed },
     ],
     cols: INTEREST_COLS,
     cells: cellsOf(rows, col),
     extra: [
       {
-        title: 'คนที่จับคู่ไว้',
+        title: 'คนที่จับคู่รอ',
         items: [
-          { key: 'green', label: 'เขียว', value: matched.green, tone: 'success' },
-          { key: 'yellow', label: 'เหลือง', value: matched.yellow, tone: 'warn' },
-          { key: 'red', label: 'แดง', value: matched.red, tone: 'danger' },
+          { key: 'green', label: 'เขียว', value: f.green, tone: 'success' },
+          { key: 'yellow', label: 'เหลือง', value: f.yellow, tone: 'warn' },
+          { key: 'red', label: 'แดง', value: f.red, tone: 'danger' },
         ],
       },
       {
-        title: 'ส่งต่อให้คน',
+        title: 'ต้องสั่งงาน',
         items: [
-          { key: 'handoff', label: 'AI โทรแล้ว คนรับต่อ', value: count(rows, (r) => r.ai && r.staff) },
-          { key: 'staffResult', label: 'คนลงผลแล้ว', value: count(rows, (r) => r.staff) },
+          { key: 'greenUncontacted', label: 'เขียวที่ยังว่าง ยังไม่มีใครโทร', value: f.greenUncontacted, tone: 'success' },
+          { key: 'jobsNone', label: 'ใบขอที่ไม่มีคนเหมาะ', value: f.jobsNone, tone: 'danger' },
+          { key: 'urgentStuck', label: 'ใบด่วน ไม่มีคน ยังไม่ส่งโพสต์', value: f.urgentStuck, tone: 'danger' },
         ],
       },
       {
@@ -257,17 +304,14 @@ export function buildMatchingReport(rows: readonly ReportSourceRow[], matched: M
             value: count(rows, (r) => segOf(r) === 'notCalled' && !!r.waiting_ai),
             tone: 'info',
           },
+          { key: 'stale', label: 'ส่ง AI แล้วค้างเกิน 2 วัน', value: f.stale, tone: 'warn' },
+          { key: 'retry', label: 'รอ AI โทรซ้ำ', value: f.retry, tone: 'warn' },
+          { key: 'needsHuman', label: 'ต้องให้คนเร่งจัดการ', value: f.needsHuman, tone: 'danger' },
           {
             key: 'held',
             label: 'เจ้าหน้าที่รับไว้ รอบันทึกผล',
             value: count(rows, (r) => segOf(r) === 'notCalled' && !r.waiting_ai && !!r.holding),
             tone: 'violet',
-          },
-          {
-            key: 'untouched',
-            label: 'ไม่มีผลกลับมา',
-            value: count(rows, (r) => segOf(r) === 'notCalled' && !r.waiting_ai && !r.holding),
-            tone: 'danger',
           },
         ],
       },

@@ -72,7 +72,11 @@ async function main() {
       const det = await home.buildAiShareDetail(block, win, scope, bu, now);
       const rows = det.rows ?? [];
       for (const k of ['total', 'ai', 'staff', 'both', 'notCalled'] as const) {
-        eq(`${t} · กราฟรายวันรวม ${k}`, rows.reduce((n, r) => n + (r as Record<string, number>)[k], 0), c[k]);
+        eq(
+          `${t} · กราฟรายวันรวม ${k}`,
+          rows.reduce((n, r) => n + (r as Record<string, number>)[k], 0),
+          c[k],
+        );
       }
       // ③ (เฉพาะทุก BU — ป๊อปรายชื่อใช้ BU ของบัญชี)
       if (!bu) {
@@ -96,11 +100,23 @@ async function main() {
           if (!followBucketAddsUp(b)) problems.push(`${t} · ผลโทร ${who} ผลทุกช่องรวม ≠ ทั้งหมด`);
         }
         const bb = followBuBlocks(s.followByBu);
-        eq(`${t} · ผลโทร ก้อน BU รวม = กล่องทั้งหมด`, bb.reduce((n, x) => n + x.sum.total, 0), c.total);
+        eq(
+          `${t} · ผลโทร ก้อน BU รวม = กล่องทั้งหมด`,
+          bb.reduce((n, x) => n + x.sum.total, 0),
+          c.total,
+        );
         for (const x of bb) {
-          eq(`${t} · ${x.bu} แถวในก้อนรวม = ก้อน`, x.rows.reduce((n, r) => n + r.total, 0), x.sum.total);
+          eq(
+            `${t} · ${x.bu} แถวในก้อนรวม = ก้อน`,
+            x.rows.reduce((n, r) => n + r.total, 0),
+            x.sum.total,
+          );
           for (const r of x.rows) {
-            eq(`${t} · ${x.bu} ${r.team}/${r.caller} ผลทุกช่องรวม`, FOLLOW_BUCKET_KEYS.reduce((n, k) => n + r.buckets[k], 0), r.total);
+            eq(
+              `${t} · ${x.bu} ${r.team}/${r.caller} ผลทุกช่องรวม`,
+              FOLLOW_BUCKET_KEYS.reduce((n, k) => n + r.buckets[k], 0),
+              r.total,
+            );
           }
           eq(`${t} · ${x.bu} AI + คน = ก้อน`, x.sum.ai + x.sum.staff, x.sum.total);
         }
@@ -108,22 +124,45 @@ async function main() {
         const { start, end } = aiShareBounds(win, now);
         const r = await loadTopicReport(block, start, end, bu);
         const bb = reportBuBlocks(r);
-        eq(`${t} · ผลโทร ก้อน BU รวม = กล่องทั้งหมด`, bb.reduce((n, x) => n + x.total, 0), c.total);
+        eq(
+          `${t} · ผลโทร ก้อน BU รวม = กล่องทั้งหมด`,
+          bb.reduce((n, x) => n + x.total, 0),
+          c.total,
+        );
         eq(`${t} · เส้นทาง ทั้งหมด = กล่อง`, r.funnel.find((f) => f.key === 'total')?.value ?? -1, c.total);
         eq(`${t} · เส้นทาง ติดต่อแล้ว = AI + คน + สองทาง`, r.funnel.find((f) => f.key === 'called')?.value ?? -1, c.ai + c.staff + c.both);
         if (block === 'matching') {
-          // จับคู่ไว้รอ: เขียว + เหลือง + แดง = คนที่จับคู่ไว้
-          const tiers = r.extra.find((x) => x.title === 'คนที่จับคู่ไว้')?.items.reduce((n, i) => n + i.value, 0) ?? -1;
-          eq(`${t} · จับคู่ไว้ สีรวม = คนที่จับคู่ไว้`, tiers, r.funnel.find((f) => f.key === 'matched')?.value ?? -1);
+          const fv = (k: string) => r.funnel.find((f) => f.key === k)?.value ?? -1;
+          const tiers = r.extra.find((x) => x.title === 'คนที่จับคู่รอ')?.items.reduce((n, i) => n + i.value, 0) ?? -1;
+          eq(`${t} · จับคู่รอ เขียว + เหลือง + แดง = คนที่จับคู่รอ`, tiers, fv('matched'));
+          const act = Object.fromEntries((r.extra.find((x) => x.title === 'ต้องสั่งงาน')?.items ?? []).map((i) => [i.key, i.value]));
+          eq(`${t} · มีคนแนะนำ + ไม่มีคนเหมาะ = AI จับคู่แล้ว`, fv('jobsRecommend') + (act.jobsNone ?? 0), fv('jobsMatched'));
+          checks += 1;
+          if (fv('jobsMatched') > fv('jobsIn')) problems.push(`${t} · AI จับคู่แล้ว ${fv('jobsMatched')} > ใบขอเข้ามา ${fv('jobsIn')}`);
+          const green = r.extra[0].items.find((i) => i.key === 'green')?.value ?? 0;
+          checks += 1;
+          if ((act.greenUncontacted ?? 0) > green) problems.push(`${t} · เขียวยังไม่มีใครโทร > เขียวทั้งหมด`);
         }
         for (const s of REPORT_SEGS) {
-          eq(`${t} · ผลโทร ก้อน ${s.key} = กล่อง`, bb.reduce((n, x) => n + x.bySeg[s.key].total, 0), c[s.key]);
+          eq(
+            `${t} · ผลโทร ก้อน ${s.key} = กล่อง`,
+            bb.reduce((n, x) => n + x.bySeg[s.key].total, 0),
+            c[s.key],
+          );
         }
         for (const x of bb) {
           for (const s of REPORT_SEGS) {
-            eq(`${t} · ${x.bu} ${s.key} ผลทุกช่องรวม`, Object.values(x.bySeg[s.key].cols).reduce((n, v) => n + v, 0), x.bySeg[s.key].total);
+            eq(
+              `${t} · ${x.bu} ${s.key} ผลทุกช่องรวม`,
+              Object.values(x.bySeg[s.key].cols).reduce((n, v) => n + v, 0),
+              x.bySeg[s.key].total,
+            );
           }
-          eq(`${t} · ${x.bu} แถวรวม = ก้อน`, Object.values(x.sum).reduce((n, v) => n + v, 0), x.total);
+          eq(
+            `${t} · ${x.bu} แถวรวม = ก้อน`,
+            Object.values(x.sum).reduce((n, v) => n + v, 0),
+            x.total,
+          );
         }
       }
     }
@@ -135,7 +174,11 @@ async function main() {
     // ⑤ ทีละ BU ที่มีงานในช่วงนี้
     const { start, end } = followPlanBounds(win);
     const s = await loadHomeLumosSummary(start, end, null);
-    const bus = new Set(followBuBlocks(s.followByBu).map((b) => b.bu).filter((b): b is string => !!b));
+    const bus = new Set(
+      followBuBlocks(s.followByBu)
+        .map((b) => b.bu)
+        .filter((b): b is string => !!b),
+    );
     const ab = aiShareBounds(win, now);
     for (const block of ['applicants'] as const) {
       const r = await loadTopicReport(block, ab.start, ab.end, null);

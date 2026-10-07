@@ -8,10 +8,22 @@ import { tableInAppSchema } from './schema.js';
 import { buildApplicantAiShareSql, buildFollowAiShareSql, buildMatchingAiShareSql } from './homeAiShareSql.js';
 import { siteBuSql, trendBuSql } from './siteBuSql.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
+import { listSiamrajUnitRequests } from './siamrajUnitRequests.js';
+import { loadBoardMatchTierMap } from './boardMatchStore.js';
+import { loadBoardAvailabilityContext } from './boardAvailability.js';
+import { queueStale } from './lumosQueueDefs.js';
+import type { DepartmentScope } from './departmentScope.js';
+import { isBoardCandidateAvailable } from '../../src/lib/boardMatchAvailability.js';
+import { enrichJobsWithUrgency } from '../../src/lib/jobUrgency.js';
+import { trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
+import { toYmdBangkok } from '../../src/lib/dateTh.js';
+import type { JobRequest } from '../../src/types/index.js';
 import {
   buildAftercareReport,
   buildApplicantsReport,
   buildMatchingReport,
+  emptyMatchingFlow,
+  type MatchingFlow,
   type ReportSourceRow,
   type TopicReport,
   type TopicReportBlock,
@@ -19,7 +31,10 @@ import {
 
 const RELEASES = tableInAppSchema('job_public_releases');
 const MAP = tableInAppSchema('job_site_map');
-const MATCHES = tableInAppSchema('board_match_results');
+const QUEUE = tableInAppSchema('lumos_dispatch_queue');
+const HOLDS = tableInAppSchema('candidate_call_holds');
+const PROPOSALS = tableInAppSchema('candidate_proposals');
+const POSTINGS = tableInAppSchema('job_posting_requests');
 
 const bool = (v: unknown) => v === true || v === 't' || v === 'true';
 
@@ -67,33 +82,94 @@ export async function loadTopicReport(block: TopicReportBlock, start: Date | nul
     return buildApplicantsReport(rows.map(toRow), Number(pub.rows[0]?.n ?? 0));
   }
   if (block === 'matching') {
-    const [{ rows }, m] = await Promise.all([
+    const [{ rows }, flow] = await Promise.all([
       dbQuery<Record<string, unknown>>(buildMatchingAiShareSql('report'), params),
-      // จับคู่ไว้รอ — ผลที่ระบบคิดไว้ของใบขอ (คิดใหม่ = เวลาเลื่อน ⇒ นับครั้งล่าสุดในช่วง) · คน × ใบขอ แยกสี
-      dbQuery<{ jobs: number; people: number; green: number; yellow: number; red: number }>(
-        `select count(distinct r.job_id)::int as jobs,
-                count(x.m)::int as people,
-                count(x.m) filter (where x.m->>'tier' = 'green')::int as green,
-                count(x.m) filter (where x.m->>'tier' = 'yellow')::int as yellow,
-                count(x.m) filter (where x.m->>'tier' = 'red')::int as red
-           from ${MATCHES} r
-           left join ${MAP} mp on mp.job_id = r.job_id
-           left join lateral jsonb_array_elements(coalesce(r.result->'matches', '[]'::jsonb)) as x(m) on true
-          where ($1::timestamptz is null or r.computed_at >= $1::timestamptz)
-            and r.computed_at < $2::timestamptz
-            and ($3::text is null or ${trendBuSql(siteBuSql('mp.site_code'))} = $3::text)`,
-        params,
-      ),
+      loadMatchingFlow(start, end, bu),
     ]);
-    const s = m.rows[0];
-    return buildMatchingReport(rows.map(toRow), {
-      jobs: Number(s?.jobs ?? 0),
-      people: Number(s?.people ?? 0),
-      green: Number(s?.green ?? 0),
-      yellow: Number(s?.yellow ?? 0),
-      red: Number(s?.red ?? 0),
-    });
+    return buildMatchingReport(rows.map(toRow), flow);
   }
   const { rows } = await dbQuery<Record<string, unknown>>(buildFollowAiShareSql(true, 'aftercare', 'report'), [...params, AFTERCARE_TOPIC]);
   return buildAftercareReport(rows.map(toRow));
+}
+
+/**
+ * เส้นทางจับคู่งาน — ใบขอที่เข้ามาในช่วง (ใบที่ยังเปิด · ท่อเดียวกับหน้าจับคู่งาน `listSiamrajUnitRequests`)
+ * ผลจับคู่ = `loadBoardMatchTierMap` (คนที่ยังว่าง = `isBoardCandidateAvailable` ตัวเดียวกับ `matching-flow-summary`)
+ * ⚠️ ใบที่เข้ามาแล้วปิดไปแล้วไม่อยู่ในรายการใบเปิด ⇒ ไม่นับ
+ */
+async function loadMatchingFlow(start: Date | null, end: Date, bu: string | null): Promise<MatchingFlow> {
+  const f = emptyMatchingFlow();
+  const raw = (await listSiamrajUnitRequests({ limit: 500, departmentScope: { mode: 'all' } as DepartmentScope })) as unknown[];
+  const fromYmd = start ? toYmdBangkok(start) : null;
+  const toYmd = toYmdBangkok(new Date(end.getTime() - 1));
+  const jobs = enrichJobsWithUrgency(raw as JobRequest[]).filter((j) => {
+    if (bu && trendBuFromSiteCode(j.site_code) !== bu) return false;
+    const rec = j as unknown as Record<string, unknown>;
+    const d = String(rec.submittedAt || rec.request_date || rec.created_at || '').slice(0, 10);
+    return !!d && (!fromYmd || d >= fromYmd) && d <= toYmd;
+  });
+  f.jobsIn = jobs.length;
+  if (!jobs.length) return f;
+  const ids = jobs.map((j) => j.id);
+  const [tierMap, ctx, posted, touched, prop, q] = await Promise.all([
+    loadBoardMatchTierMap(),
+    loadBoardAvailabilityContext(),
+    dbQuery<{ job_id: string }>(
+      `select distinct job_id from ${POSTINGS} where status in ('pending', 'in_progress', 'posted') and job_id = any($1)`,
+      [ids],
+    ),
+    // คู่ (บัตร × ใบขอ) ที่มีคนแตะแล้ว — ส่ง AI หรือมีคนรับไปโทร
+    dbQuery<{ job_id: string; card: string }>(
+      `select q.job_ref as job_id, substring(q.person_ref from 6) as card
+         from ${QUEUE} q where q.job_ref = any($1) and q.person_ref like 'card-%'
+       union
+       select h.job_id, h.candidate_ref from ${HOLDS} h where h.source = 'board' and h.job_id = any($1)`,
+      [ids],
+    ),
+    dbQuery<{ reserved: number; placed: number }>(
+      `select count(*) filter (where status = 'reserved')::int as reserved,
+              count(*) filter (where status = 'placed')::int as placed
+         from ${PROPOSALS} where job_id = any($1)`,
+      [ids],
+    ),
+    dbQuery<{ retry: number; needs: number; stale: number }>(
+      `select count(*) filter (where q.followup_state = 'retry_scheduled')::int as retry,
+              count(*) filter (where q.followup_state = 'needs_human')::int as needs,
+              count(*) filter (where ${queueStale("'2 days'", 'q')})::int as stale
+         from ${QUEUE} q
+        where q.job_ref = any($1) and (q.person_ref like 'card-%' or q.person_ref like 'ir-%')`,
+      [ids],
+    ),
+  ]);
+  const postedIds = new Set(posted.rows.map((r) => r.job_id));
+  const touchedSet = new Set(touched.rows.map((r) => `${r.job_id}|${r.card}`));
+  for (const j of jobs) {
+    const entry = tierMap.get(j.id);
+    if (!entry) continue;
+    f.jobsMatched += 1;
+    const avail = entry.tiers.filter((t) => isBoardCandidateAvailable(t.cardId, j.id, ctx));
+    const recommend = avail.some((t) => t.tier === 'green' || t.tier === 'yellow');
+    if (recommend) f.jobsRecommend += 1;
+    else {
+      f.jobsNone += 1;
+      if (j.urgency === 'urgent' && !postedIds.has(j.id)) f.urgentStuck += 1;
+    }
+    for (const t of entry.tiers) {
+      f.matched += 1;
+      if (t.tier === 'green') f.green += 1;
+      else if (t.tier === 'yellow') f.yellow += 1;
+      else f.red += 1;
+    }
+    for (const t of avail) {
+      if (t.tier !== 'green') continue;
+      f.greenAvailable += 1;
+      if (!touchedSet.has(`${j.id}|${t.cardId}`)) f.greenUncontacted += 1;
+    }
+  }
+  f.reserved = Number(prop.rows[0]?.reserved ?? 0);
+  f.placed = Number(prop.rows[0]?.placed ?? 0);
+  f.retry = Number(q.rows[0]?.retry ?? 0);
+  f.needsHuman = Number(q.rows[0]?.needs ?? 0);
+  f.stale = Number(q.rows[0]?.stale ?? 0);
+  return f;
 }

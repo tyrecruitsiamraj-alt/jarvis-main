@@ -7,6 +7,7 @@ import {
   buildAftercareReport,
   buildApplicantsReport,
   buildMatchingReport,
+  emptyMatchingFlow,
   interestColOf,
   reportBuBlocks,
   REPORT_SEGS,
@@ -99,25 +100,35 @@ describe('homeTopicReport', () => {
   });
 
   it('จับคู่งาน / ดูแลหลังเริ่มงาน: รวม = ทั้งหมด · ว่าง = ไม่มีก้อน', () => {
-    const none = { jobs: 0, people: 0, green: 0, yellow: 0, red: 0 };
-    expect(reportBuBlocks(buildMatchingReport([], none))).toEqual([]);
-    // จับคู่ไว้รอ (เจ้าของ "ยังใช้อยู่ … ต้อง match ไว้รอ") อยู่หน้าเส้นทาง · สีรวม = คนที่จับคู่ไว้
-    const m = buildMatchingReport([row({ ai: true, ai_outcome: 'declined', ai_at: '2026-10-01T00:00:00Z' }), row({ waiting_ai: true })], {
-      jobs: 38,
-      people: 560,
-      green: 300,
-      yellow: 200,
-      red: 60,
-    });
+    expect(reportBuBlocks(buildMatchingReport([], emptyMatchingFlow()))).toEqual([]);
+    // เส้นทางจับคู่งาน (เจ้าของ "เข้ามากี่ใบ Ai match รอแล้วเท่าไหร่ คนโทร … คิดต่อให้บ้าง")
+    const flow = {
+      ...emptyMatchingFlow(),
+      jobsIn: 37,
+      jobsMatched: 37,
+      jobsRecommend: 33,
+      jobsNone: 4,
+      matched: 555,
+      green: 248,
+      yellow: 267,
+      red: 40,
+    };
+    const m = buildMatchingReport(
+      [row({ ai: true, ai_outcome: 'declined', ai_at: '2026-10-01T00:00:00Z' }), row({ waiting_ai: true })],
+      flow,
+    );
     expect(m.funnel.map((f) => [f.key, f.value])).toEqual([
-      ['jobsMatched', 38],
-      ['matched', 560],
+      ['jobsIn', 37],
+      ['jobsMatched', 37],
+      ['jobsRecommend', 33],
+      ['matched', 555],
       ['total', 2],
       ['called', 1],
       ['interested', 0],
+      ['reserved', 0],
+      ['placed', 0],
     ]);
-    const tiers = m.extra[0].items.reduce((n, i) => n + i.value, 0);
-    expect(tiers).toBe(560);
+    expect(m.extra[0].items.reduce((n, i) => n + i.value, 0)).toBe(555);
     const a = buildAftercareReport([
       row({ ai: true, ai_outcome: 'confirmed', ai_at: '2026-10-01T00:00:00Z' }),
       row({ staff: true, staff_outcome: 'no_answer', staff_at: '2026-10-01T00:00:00Z' }),
