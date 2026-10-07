@@ -35,7 +35,6 @@ import {
   enqueueFollowReminder,
   enqueueFollowReminderPlan,
   cancelFollowReminder,
-  resyncFollowPlanWithLumos,
   replanFollowSetWithLumos,
   refreshFollowReminderPayload,
 } from '../_lib/lumosDispatch.js';
@@ -1051,6 +1050,49 @@ export function parseFollowEditInput(
  * ⚠️ PATCH เดิม (ไม่มี action) = **ปิดงาน** ยังทำงานเหมือนเดิมทุกอย่าง
  * แยกด้วย action เพราะของเก่ามีคนใช้อยู่ เปลี่ยนความหมายกลางทางคือพังเงียบ
  */
+/**
+ * ส่งแผนใหม่ให้ Lumos ทุกวันที่โดนแก้ของคนนี้ (เบอร์ 9 หลักท้าย + ทีมเดียวกัน) — แผนละวัน ยกเลิกแผนเดิมทุกตัวก่อน
+ * `days` = เวลาที่ใช้หาวัน (ก่อน/หลังแก้) · `ids` = แถวที่โดนแก้ (วันของแถวพวกนี้นับด้วย)
+ */
+async function replanPersonDays(
+  anchor: FollowRow,
+  times: Array<string | Date | null | undefined>,
+  ids: readonly string[],
+): Promise<{ pushed: boolean; rounds: number; cancelled: boolean; reason?: string }> {
+  if (!(await isAutoDispatchEnabled('follow_entry'))) {
+    return { pushed: false, rounds: 0, cancelled: false, reason: 'ปิดส่งงานให้ AI อัตโนมัติอยู่' };
+  }
+  const { rows: members } = await dbQuery<{ id: string }>(
+    `with days as (
+       select distinct (t at time zone 'Asia/Bangkok')::date as d from unnest($1::timestamptz[]) t
+       union
+       select distinct (scheduled_at at time zone 'Asia/Bangkok')::date from ${followTable} where id = any($2::uuid[])
+     )
+     select f.id::text as id from ${followTable} f
+      where f.cancelled_at is null and f.completed_at is null and coalesce(f.call_mode, 'ai') = 'ai'
+        and f.scheduled_at > now()
+        and right(regexp_replace(coalesce(f.recipient_phone, ''), '\\D', '', 'g'), 9)
+          = right(regexp_replace($3::text, '\\D', '', 'g'), 9)
+        and coalesce(f.follow_team, '') = coalesce($4::text, '')
+        and (f.scheduled_at at time zone 'Asia/Bangkok')::date in (select d from days)`,
+    [
+      times.filter(Boolean).map((t) => new Date(String(t)).toISOString()),
+      [...ids],
+      String(anchor.recipient_phone ?? ''),
+      (anchor as FollowRow & { follow_team?: string | null }).follow_team ?? null,
+    ],
+  );
+  const memberIds = members.map((m) => m.id);
+  const out = await replanFollowSetWithLumos({ memberIds, cancelledIds: [...ids].filter((x) => !memberIds.includes(x)), resolveStaffName: staffNameOfPhone });
+  const pushed = out.plans > 0 && out.pushedPlans === out.plans;
+  return {
+    pushed,
+    rounds: out.rounds,
+    cancelled: out.cancelledOld,
+    reason: pushed ? undefined : (out.reason ?? (out.rounds === 0 ? 'ไม่มีสาย AI ที่ยังรอโทร' : 'ส่งแผนให้ Lumos ไม่ครบ')),
+  };
+}
+
 async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, unknown>) {
   const id = typeof req.query?.id === 'string' ? req.query.id.trim() : '';
   if (!UUID_RE.test(id)) return sendError(res, 400, 'Bad request', 'ต้องระบุ id ของรายการติดตาม');
@@ -1073,6 +1115,24 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
   }
   if (before.completed_at != null) {
     return sendError(res, 409, 'Conflict', 'รายการนี้ปิดงานไปแล้ว แก้ไขไม่ได้');
+  }
+
+  /**
+   * 🔴 คนเดียวกันห้ามมีสองสายนาทีเดียวกัน (กติกาเดียวกับแก้ตาราง) — 7 ต.ค. 2569 เจอ 3 สาย 09:25 ของคนเดียว
+   * จากการแก้ทีละแถว ⇒ Lumos โทรซ้อน · ตรวจเฉพาะตอนเปลี่ยนเวลา (แก้ช่องอื่นของแถวที่ซ้อนอยู่แล้วยังบันทึกได้)
+   */
+  if (new Date(String(before.scheduled_at)).getTime() !== v.when.getTime()) {
+    const { rows: clash } = await dbQuery<{ id: string }>(
+      `select id::text as id from ${followTable}
+        where id <> $1::uuid and cancelled_at is null and completed_at is null
+          and date_trunc('minute', scheduled_at) = date_trunc('minute', $2::timestamptz)
+          and right(regexp_replace(coalesce(recipient_phone, ''), '\\D', '', 'g'), 9)
+            = right(regexp_replace($3::text, '\\D', '', 'g'), 9)
+          and coalesce(follow_team, '') = coalesce($4::text, '')
+        limit 1`,
+      [id, v.when.toISOString(), v.phone, (before as FollowRow & { follow_team?: string | null }).follow_team ?? null],
+    );
+    if (clash.length > 0) return sendError(res, 409, 'Conflict', 'คนนี้มีอีกสายเวลาเดียวกันอยู่แล้ว — เลือกเวลาอื่น');
   }
 
   const { rows } = await dbQuery<FollowRow>(
@@ -1205,41 +1265,31 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
    * ⇒ เปลี่ยนเบอร์ทั้งชุด 30 วัน แต่ Lumos ได้เบอร์ใหม่แค่วันเดียว (ตรวจ Journey 7 ต.ค. 2569)
    * `planResync` = ผลของแผนแถวนี้ (จอใช้) · แผนอื่นล้ม = ใส่เหตุผลลงผลนี้ ห้ามเงียบ
    */
-  let planResync: Awaited<ReturnType<typeof resyncFollowPlanWithLumos>> | null = null;
-  try {
-    planResync = await resyncFollowPlanWithLumos(id, staffNameOfPhone);
-  } catch (e) {
-    logWarn('follow.update.lumosResyncFailed', { followId: id, error: String(e) });
-  }
-  const otherIds = [...new Set([...phoneAppliedIds, ...samePlanIds])];
+  /**
+   * 🔴 ส่งแผนใหม่ให้ Lumos **ทั้งวันของคนนี้** (เจ้าของ 7 ต.ค. 2569: *"แก้ไขเวลาแล้ว ไม่โทรตามเวลาที่แก้"*)
+   * วัดจริงที่พลาด (ทางเดิม `resyncFollowPlanWithLumos` = ส่งใหม่เฉพาะแผนเดิมของแถวที่แก้):
+   * - สายที่โทรไปแล้ว (ล้ม/มีผล) หรือคิวถูกยกเลิก แล้วย้ายเวลาไปข้างหน้า → ไม่มีอะไรไป Lumos เลย ไม่มีวันโทร
+   * - แก้หลายแถวของคนเดียวกัน → แผนแยก 3 แผนเวลาเดียวกัน + แผนเก่ายังถือเวลาเดิม (โทรซ้ำ 09:25 แล้ว 10:27)
+   * ⇒ ใช้ตัวเดียวกับ "แก้ตาราง" (`replanFollowSetWithLumos`): ทุกสาย AI ที่ยังรอโทรของคนนี้ในวันที่โดนแก้
+   * ยกเลิกแผนเดิมทุกตัวก่อน แล้วส่งแผนละวัน · สายที่โทรไปแล้วแต่ย้ายไปอนาคต = คืนเข้าคิวก่อน (ตั้ง cancelled ให้ revive)
+   */
+  let planResync: { pushed: boolean; rounds: number; cancelled: boolean; reason?: string } | null = null;
   let otherPlansFailed = 0;
-  if (otherIds.length > 0) {
-    try {
-      const { rows: plans } = await dbQuery<{ id: string }>(
-        `select distinct on (coalesce(plan_ref, person_ref)) substring(person_ref from 8) as id
-           from ${queueTable}
-          where channel = 'reminder' and job_ref = 'follow' and status = 'pending'
-            and person_ref = any($1::text[])
-            and coalesce(plan_ref, person_ref) <> coalesce(
-              (select coalesce(plan_ref, person_ref) from ${queueTable}
-                where channel = 'reminder' and job_ref = 'follow' and person_ref = $2 limit 1), '')
-          order by coalesce(plan_ref, person_ref), next_attempt_at`,
-        [otherIds.map((x) => `follow-${x}`), `follow-${id}`],
+  try {
+    const movedToFuture =
+      new Date(String(before.scheduled_at)).getTime() !== v.when.getTime() && v.when.getTime() > Date.now() + 60_000;
+    if (movedToFuture && (updated.call_mode ?? 'ai') !== 'manual') {
+      await dbQuery(
+        `update ${queueTable} set status = 'cancelled', updated_at = now()
+          where channel = 'reminder' and job_ref = 'follow' and person_ref = $1 and status in ('failed', 'completed')`,
+        [`follow-${id}`],
       );
-      for (const p of plans) {
-        try {
-          const r = await resyncFollowPlanWithLumos(p.id, staffNameOfPhone);
-          if (!r.pushed && r.rounds > 0) otherPlansFailed += 1;
-        } catch (e) {
-          otherPlansFailed += 1;
-          logWarn('follow.update.lumosResyncOtherFailed', { followId: p.id, error: String(e) });
-        }
-      }
-    } catch (e) {
-      logWarn('follow.update.lumosResyncOthersFailed', { followId: id, error: String(e) });
     }
+    planResync = await replanPersonDays(updated, [before.scheduled_at, updated.scheduled_at], [id, ...phoneAppliedIds, ...samePlanIds]);
+  } catch (e) {
+    otherPlansFailed += 1;
+    logWarn('follow.update.lumosReplanFailed', { followId: id, error: String(e) });
   }
-
   await auditFromAuthed(req, {
     action: 'follow.update',
     entityType: 'follow_entry',

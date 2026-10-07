@@ -16,13 +16,27 @@ describe('แก้แล้ว Lumos ต้องรู้ทุกแผน', 
     expect(handler).toContain('if (phoneChanged || nameChanged)');
     expect(handler).toContain('samePlanIds = mates.map((m) => m.id);');
   });
-  it('ส่งใหม่ทุกแผนที่โดนแก้ (ไม่ใช่แค่แผนของแถวที่เปิด) · ล้มต้องบอกจอ', () => {
-    expect(handler).toContain('const otherIds = [...new Set([...phoneAppliedIds, ...samePlanIds])];');
+  /**
+   * 🔴 7 ต.ค. 2569 เจ้าของ "แก้ไขเวลาแล้ว ไม่โทรตามเวลาที่แก้" — วัดจริง: สายที่โทรไปแล้ว/คิวยกเลิกแล้วย้ายไปอนาคต ไม่ถึง Lumos ·
+   * แก้หลายแถวของคนเดียวกัน = 3 แผนเวลาเดียวกัน + แผนเก่าถือเวลาเดิม (โทร 09:25 แล้ว 10:27)
+   * ⇒ ป๊อปแก้ไขใช้ตัวเดียวกับแก้ตาราง: ทุกสาย AI ที่รอโทรของคนนี้ในวันที่โดนแก้ ส่งแผนละวัน ยกเลิกแผนเดิมทุกตัวก่อน
+   */
+  it('ส่งใหม่ทั้งวันของคนนี้ด้วยตัวเดียวกับแก้ตาราง · สายที่โทรไปแล้วย้ายไปอนาคต = คืนเข้าคิว · ล้มต้องบอกจอ', () => {
+    expect(handler).toContain('planResync = await replanPersonDays(updated, [before.scheduled_at, updated.scheduled_at], [id, ...phoneAppliedIds, ...samePlanIds]);');
+    expect(handler).toContain("and person_ref = $1 and status in ('failed', 'completed')");
+    expect(handler).toMatch(/async function replanPersonDays[\s\S]*replanFollowSetWithLumos\(/);
     expect(handler).toContain('lumos_other_failed: otherPlansFailed');
     expect(dialog).toContain('saved.lumos_other_failed');
   });
   it('🔴 เพิ่มสายจากป๊อปแก้ไข = ผ่านเส้นแก้ตารางทั้งชุด ไม่ใช่ POST ทีละสาย', () => {
     expect(dialog).not.toContain('createFollowEntry(');
     expect(dialog).toContain('scheduleReplaceBody(editable, [...draft, ...addedRows])');
+  });
+});
+
+describe('🔴 ป๊อปแก้ไข: คนเดียวกันห้ามสองสายนาทีเดียวกัน (7 ต.ค. 2569 เจอ 3 สาย 09:25)', () => {
+  it('ตรวจตอนเปลี่ยนเวลา · เบอร์ + ทีมเดียวกัน · 409', () => {
+    expect(handler).toContain("date_trunc('minute', scheduled_at) = date_trunc('minute', $2::timestamptz)");
+    expect(handler).toContain('คนนี้มีอีกสายเวลาเดียวกันอยู่แล้ว');
   });
 });
