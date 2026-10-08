@@ -83,8 +83,8 @@ export const FOLLOW_JOURNEY_STAGE_LABEL: Record<FollowJourneyStage, string> = {
   cancelled: 'ยกเลิก',
   waiting: 'รอโทร',
   irecruit: 'ดึงจาก iRecruit',
-  inside: 'คนใน',
-  outside: 'คนนอก',
+  inside: 'WL',
+  outside: 'ไม่ใช่ WL',
   irecruitEdit: 'iRecruit แก้',
   irecruitCancel: 'iRecruit ยกเลิก',
 };
@@ -104,9 +104,10 @@ export function journeyRowsOf(rows: readonly FollowJourneyRow[], stage: FollowJo
     case 'irecruit':
       return rows.filter((r) => r.job != null);
     case 'inside':
-      return rows.filter((r) => r.team === 'replacement' && (r.replaceType ?? '').trim().toUpperCase() === 'IN');
+      // 8 ต.ค. 2569: กลุ่มมาจากรายชื่อ WL ของ iRecruit ('WL') ไม่ใช่ช่อง IN/EX ในประวัติ (ค่าเก่าค้าง)
+      return rows.filter((r) => r.team === 'replacement' && (r.replaceType ?? '').trim().toUpperCase() === 'WL');
     case 'outside':
-      return rows.filter((r) => r.team === 'replacement' && (r.replaceType ?? '').trim().toUpperCase() !== 'IN');
+      return rows.filter((r) => r.team === 'replacement' && (r.replaceType ?? '').trim().toUpperCase() !== 'WL');
     case 'irecruitEdit':
     case 'irecruitCancel':
       return [];

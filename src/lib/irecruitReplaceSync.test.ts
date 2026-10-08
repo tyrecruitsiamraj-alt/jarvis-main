@@ -175,12 +175,13 @@ describe('Journey ส่งคนแทน 3 สาย (เจ้าของส
   });
 });
 
-describe('replaceModeForType (5 ต.ค. 2569)', () => {
-  it('EX = AI · คนใน/อื่น ๆ = คนโทร · ก่อน aiFrom = คนโทรเสมอ', () => {
+describe('replaceModeForType (8 ต.ค. 2569 "แค่ WL ที่คนโทร ที่เหลือ AI เลย")', () => {
+  it('WL = คนโทร · ที่เหลือ (EX · IN เก่า · ไม่ระบุ · ER) = AI · ก่อน aiFrom/พัก AI = คนโทรเสมอ', () => {
+    expect(replaceModeForType('WL', 'ai')).toBe('manual');
+    expect(replaceModeForType(' wl ', 'ai')).toBe('manual');
     expect(replaceModeForType('EX', 'ai')).toBe('ai');
-    expect(replaceModeForType(' ex ', 'ai')).toBe('ai');
-    expect(replaceModeForType('IN', 'ai')).toBe('manual');
-    // 7 ต.ค. 2569: ไม่ใช่ WL (IN) = AI — ไม่ระบุ/ER ด้วย
+    // อิศเรศ: ประวัติ iRecruit ติด IN ค่าเก่า (ลาออก ก.พ. 2022) — ไม่ใช่ WL ⇒ AI
+    expect(replaceModeForType('IN', 'ai')).toBe('ai');
     expect(replaceModeForType(null, 'ai')).toBe('ai');
     expect(replaceModeForType('ER', 'ai')).toBe('ai');
     expect(replaceModeForType('EX', 'manual')).toBe('manual');

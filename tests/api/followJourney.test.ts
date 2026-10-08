@@ -43,8 +43,8 @@ const ROWS: FollowJourneyRow[] = [
   row({ id: '4', person: 'c', result: 'reschedule' }),
   row({ id: '5', person: 'd', result: 'other' }),
   row({ id: '6', person: 'e', result: 'unreachable', caller: 'manual' }),
-  row({ id: '7', person: 'f', result: 'cancelled', team: 'replacement', job: 'J1', replaceType: 'IN' }),
-  row({ id: '8', person: 'f', result: 'waiting', team: 'replacement', job: 'J1', replaceType: 'IN' }),
+  row({ id: '7', person: 'f', result: 'cancelled', team: 'replacement', job: 'J1', replaceType: 'WL' }),
+  row({ id: '8', person: 'f', result: 'waiting', team: 'replacement', job: 'J1', replaceType: 'WL' }),
   row({ id: '9', person: 'g', result: 'waiting', team: 'replacement', job: 'J2', replaceType: 'EX' }),
   row({ id: '10', person: 'h', result: 'waiting', team: 'replacement', replaceType: null }),
 ];
@@ -82,7 +82,7 @@ describe('followJourney', () => {
     expect(journeyCount(ROWS, [], 'called')).toEqual({ people: 5, calls: 6 });
   });
 
-  it('ส่งคนแทน: ใบ iRecruit · คนใน = IN · คนนอก = ที่เหลือ', () => {
+  it('ส่งคนแทน: ใบ iRecruit · WL = รายชื่อ WL · ไม่ใช่ WL = ที่เหลือ (8 ต.ค. 2569)', () => {
     const rep = journeyScope(ROWS, 'replacement');
     expect(journeyCount(rep, [], 'irecruit')).toEqual({ people: 2, calls: 3 });
     expect(journeyRowsOf(rep, 'inside').map((r) => r.id)).toEqual(['7', '8']);

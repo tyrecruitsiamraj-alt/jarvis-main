@@ -81,7 +81,11 @@ export type IrecruitReplaceRow = {
   site_name: string | null;
   site_code: string | null;
   want_date: Date;
-  /** ประเภทคนไปแทนใน iRecruit (`z_hr_recruitment_header.replace_type`) — EX = คนนอก/อดีตพนักงาน · IN = คนใน · ER ฯลฯ */
+  /**
+   * กลุ่มคนไปแทน — 'WL' = อยู่ในรายชื่อ WL ของ iRecruit (`staff_wl_view`) · 'EX' = ไม่ใช่ WL
+   * 🔴 8 ต.ค. 2569 เลิกอ่าน `z_hr_recruitment_header.replace_type` (IN/EX ในประวัติค้างค่าเก่า — อิศเรศลาออก ก.พ. 2022
+   *    แต่ยังติด IN ⇒ ขึ้นคนโทรผิด · คนที่ติด IN อยู่ในพนักงานจริงแค่ 8 จาก 55) · เจ้าของ: *"แค่ WL ที่คนโทร ที่เหลือ AI เลย"*
+   */
   replace_type?: string | null;
   /** อีเมล/ชื่อคนที่เพิ่มใบใน iRecruit — โชว์เป็น "เพิ่มโดย" */
   adder_email?: string | null;
@@ -133,7 +137,9 @@ async function logReplaceEvent(
 
 export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): Promise<IrecruitReplaceRow[]> {
   return irecruitSqlQuery<IrecruitReplaceRow>(
-    `SELECT h.job_id, h.replace_no, z.fname, z.lname, z.mobile, z.replace_type, s.site_name, h.site_code, h.want_date,
+    `SELECT h.job_id, h.replace_no, z.fname, z.lname, z.mobile,
+            CASE WHEN wl.staff_id IS NOT NULL THEN 'WL' ELSE 'EX' END AS replace_type,
+            s.site_name, h.site_code, h.want_date,
             ua.email AS adder_email, hs.nm AS adder_name
        FROM ir_job_header h
        -- คนที่เพิ่มใบใน iRecruit (7 ต.ค. 2569 เจ้าของ "ดึงเมล์คนเพิ่มแผนมาด้วย") — users.staff_id = เลขบัตรใน user_add
@@ -153,6 +159,8 @@ export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): 
          WHERE zz.id_card = cand.staff_id
          ORDER BY zz.date_update DESC, zz.date_add DESC
        ) z
+       -- WL = รายชื่อ WL ของ iRecruit (84 คน 8 ต.ค. 2569) — ตัวเดียวที่ตัดสินคนโทร (ที่เหลือ AI)
+       OUTER APPLY (SELECT TOP 1 w.staff_id FROM staff_wl_view w WHERE w.staff_id = cand.staff_id) wl
        LEFT JOIN ir_ms_site s ON s.site_code = h.site_code
       -- 🔴 W "รอดำเนินการ" ด้วย (เจ้าของ 7 ต.ค. 2569 Choice "ตามด้วย" — วิภพ/นันทชัยใบ W ไม่ขึ้น) · C = ยกเลิก ไม่เอา
       WHERE h.status IN ('W', 'WS')
@@ -543,14 +551,14 @@ export async function runIrecruitReplaceSync(
       }
     }
 
-    // ── 2.5) คนในที่เคยเป็นสาย AI → คนโทร (WL ห้ามโดน AI โทร · เจ้าของ Choice 5 ต.ค. 2569) ──
+    // ── 2.5) WL ที่เป็นสาย AI → คนโทร (WL ห้ามโดน AI โทร · เจ้าของ Choice 5 ต.ค. 2569 · 8 ต.ค. แยกด้วยรายชื่อ WL) ──
     // ไม่ทำกลับทาง (คน → AI) เอง — เจ้าหน้าที่สลับเองได้ที่หน้าติดตาม ห้ามรอบ 5 นาทีไปทับ
     // 🔴 6 ต.ค. 2569: ทำเฉพาะแถวที่สร้างก่อนกติกานี้ (`before_type_rule`) — แถวใหม่ของคนในสร้างเป็นคนโทรอยู่แล้ว
     //    ถ้าเจอคนในที่เป็น AI = เจ้าหน้าที่สลับเอง (เจ้าของ: "ถ้าคนจะโทรให้แก้") ⇒ เดิมรอบ 5 นาทีสลับกลับทุกครั้ง ห้ามแล้ว
     const rescheduledIds = new Set(plan.reschedule.map((r) => r.existing.id));
     for (const x of existingRows) {
       // เจ้าหน้าที่สลับเป็น AI เอง = ห้ามทับ (8 ต.ค. 2569 — แถวรุ่นก่อน 6 ต.ค. เดิมโดนสลับกลับทุก 5 นาที)
-      if (!x.pending || x.mode !== 'ai' || rescheduledIds.has(x.id) || !x.before_type_rule || x.staff_edited) continue;
+      if (!x.pending || x.mode !== 'ai' || rescheduledIds.has(x.id) || x.staff_edited) continue;
       const meta = metaByRef.get(x.source_ref);
       if (!meta || meta.mode !== 'manual') continue;
       try {
@@ -560,6 +568,26 @@ export async function runIrecruitReplaceSync(
         summary.toManual = (summary.toManual ?? 0) + 1;
       } catch (e) {
         logError('irecruit.replaceSync: เปลี่ยนเป็นคนโทรไม่สำเร็จ', e, { id: x.id });
+      }
+    }
+
+    // ── 2.6) ไม่ใช่ WL ที่ระบบเคยตั้งเป็นคนโทร → AI (เจ้าของ 8 ต.ค. 2569 "แค่ WL ที่คนโทร ที่เหลือ AI เลย") ──
+    // เดิมคนที่ติด IN ในประวัติ iRecruit เป็นคนโทร (ค่าเก่าค้าง เช่นอิศเรศ) · เจ้าหน้าที่แก้เอง (`staff_edited`) = ห้ามทับ
+    // สายที่เลยเวลาไม่แตะ (`pending` = ยังไม่ถึงเวลา) · พัก AI / aiFrom อยู่ = meta.mode เป็นคนโทรอยู่แล้ว ไม่เข้าเงื่อนไข
+    // 🔴 ปิดไว้ก่อน (เจ้าของ 8 ต.ค. 2569 "เดี๋ยวขอเทสก่อนนะ" — สายเดิม 619 สาย · 185 ใน 24 ชม.) — เปิดด้วย env
+    //    `IRECRUIT_REPLACE_EXISTING_TO_AI=true` เมื่อเจ้าของสั่ง · ใบที่ดึงเข้ามาใหม่ใช้กติกาใหม่อยู่แล้ว
+    const flipExistingToAi = (process.env.IRECRUIT_REPLACE_EXISTING_TO_AI || '').trim().toLowerCase() === 'true';
+    for (const x of flipExistingToAi ? existingRows : []) {
+      if (!x.pending || x.mode !== 'manual' || rescheduledIds.has(x.id) || x.staff_edited) continue;
+      const meta = metaByRef.get(x.source_ref);
+      if (!meta || meta.mode !== 'ai') continue;
+      try {
+        await dbQuery(`update ${followTable} set call_mode = 'ai' where id = $1 and call_mode = 'manual'`, [x.id]);
+        if (autoAi) toEnqueue.push({ id: x.id, meta });
+        else await setDispatchState(x.id, 'off');
+        summary.toAi = (summary.toAi ?? 0) + 1;
+      } catch (e) {
+        logError('irecruit.replaceSync: เปลี่ยนเป็น AI ไม่สำเร็จ', e, { id: x.id });
       }
     }
 

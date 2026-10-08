@@ -44,7 +44,7 @@ import { createHash } from 'node:crypto';
 
 type Call = { sql: string; params: unknown[] };
 let calls: Call[] = [];
-type Existing = { id: string; source_ref: string; scheduled_at: string; mode: string; group_id: string | null; recipient_phone: string | null; pending: boolean; before_type_rule?: boolean };
+type Existing = { id: string; source_ref: string; scheduled_at: string; mode: string; group_id: string | null; recipient_phone: string | null; pending: boolean; before_type_rule?: boolean; staff_edited?: boolean };
 let existingRows: Existing[] = [];
 let settingsRows: unknown[] = [];
 let settingsError: unknown = null;
@@ -231,11 +231,17 @@ describe('runIrecruitReplaceSync — 3 สายต่อใบ', () => {
   });
 });
 
-describe('🔴 ใครโทรตามประเภทคนไปแทน (เจ้าของ Choice 5 ต.ค. 2569: Ex ให้ AI · คนในให้คนโทร)', () => {
-  /** 🔴 7 ต.ค. 2569 เจ้าของ "ถ้าไม่ใช่ WL Default เป็น AI" + Choice "คนใน (IN) = WL" — ไม่ระบุ/EX = AI */
-  it('คนใน (IN = WL) = 3 สายคนโทร ไม่ส่ง Lumos · ไม่ระบุ/EX = AI', async () => {
+describe('🔴 ใครโทร: WL = คนโทร · ที่เหลือ AI (เจ้าของ 8 ต.ค. 2569 "แค่ WL ที่คนโทร ที่เหลือ AI เลย")', () => {
+  it('รอบดึงอ่านรายชื่อ WL ของ iRecruit (ไม่ใช่ช่อง IN/EX ในประวัติ)', () => {
+    const src = readFileSync(new URL('../../api/_lib/irecruitReplaceSync.ts', import.meta.url), 'utf8');
+    expect(src).toContain("CASE WHEN wl.staff_id IS NOT NULL THEN 'WL' ELSE 'EX' END AS replace_type");
+    expect(src).toContain('FROM staff_wl_view w WHERE w.staff_id = cand.staff_id');
+    expect(src).not.toContain('z.mobile, z.replace_type');
+  });
+
+  it('WL = 3 สายคนโทร ไม่ส่ง Lumos · ไม่ระบุ/EX = AI', async () => {
     irecruitSqlQuery.mockResolvedValue([
-      row('I', { replace_type: 'IN' }),
+      row('I', { replace_type: 'WL' }),
       row('N', { mobile: '0877777777', replace_type: null }),
       row('E', { mobile: '0866666666' }),
     ]);
@@ -252,12 +258,11 @@ describe('🔴 ใครโทรตามประเภทคนไปแท�
     expect(s).toMatchObject({ added: 9, queued: 6 });
   });
 
-  it('สาย AI เดิมของคนใน = เปลี่ยนเป็นคนโทร + ถอนแผนที่ Lumos (ไม่ทำกลับทาง)', async () => {
+  it('สาย AI เดิมของ WL (ระบบตั้ง ไม่มีคนแก้) = เปลี่ยนเป็นคนโทร + ถอนแผนที่ Lumos', async () => {
     existingRows = [
-      // แถวที่สร้างก่อนกติกา EX/คนใน (before_type_rule) — แถวใหม่ที่เป็น AI = เจ้าหน้าที่สลับเอง ห้ามสลับกลับ (6 ต.ค. 2569)
-      { id: 'x1', source_ref: `irecruit-replace:I:lead60:${pk(P1)}`, scheduled_at: '2026-10-05T23:30:00Z', mode: 'ai', group_id: 'g', recipient_phone: P1, pending: true, before_type_rule: true },
+      { id: 'x1', source_ref: `irecruit-replace:I:lead60:${pk(P1)}`, scheduled_at: '2026-10-05T23:30:00Z', mode: 'ai', group_id: 'g', recipient_phone: P1, pending: true, before_type_rule: false },
     ];
-    irecruitSqlQuery.mockResolvedValue([row('I', { replace_type: 'IN' })]);
+    irecruitSqlQuery.mockResolvedValue([row('I', { replace_type: 'WL' })]);
     dbQuery.mockImplementation(async (sql: string, params?: unknown[]) => {
       if (/set call_mode = 'manual'/.test(sql)) {
         calls.push({ sql, params: params ?? [] });
@@ -272,16 +277,49 @@ describe('🔴 ใครโทรตามประเภทคนไปแท�
   });
 });
 
-describe('เจ้าหน้าที่สลับคนในเป็น AI เอง = รอบดึงไม่สลับกลับ (6 ต.ค. 2569)', () => {
-  it('แถวที่สร้างหลังกติกา (before_type_rule = false) เป็น AI = ไม่แตะ', async () => {
+describe('เจ้าหน้าที่สลับเอง = รอบดึงไม่สลับกลับ (6 ต.ค. 2569 · 8 ต.ค. ใช้ staff_edited)', () => {
+  it('WL ที่เจ้าหน้าที่สลับเป็น AI เอง = ไม่แตะ', async () => {
     existingRows = [
-      { id: 'x2', source_ref: `irecruit-replace:I:lead60:${pk(P1)}`, scheduled_at: '2026-10-05T23:30:00Z', mode: 'ai', group_id: 'g', recipient_phone: P1, pending: true, before_type_rule: false },
+      { id: 'x2', source_ref: `irecruit-replace:I:lead60:${pk(P1)}`, scheduled_at: '2026-10-05T23:30:00Z', mode: 'ai', group_id: 'g', recipient_phone: P1, pending: true, before_type_rule: false, staff_edited: true },
     ];
-    irecruitSqlQuery.mockResolvedValue([row('I', { replace_type: 'IN' })]);
+    irecruitSqlQuery.mockResolvedValue([row('I', { replace_type: 'WL' })]);
     const s = await runIrecruitReplaceSync({ now: NOW });
     expect(cancelFollow).not.toHaveBeenCalledWith('x2', expect.any(Function));
     expect(calls.some((c) => /set call_mode = 'manual'/.test(c.sql))).toBe(false);
     expect(s.toManual ?? 0).toBe(0);
+  });
+
+  // 8 ต.ค. 2569: ไม่ใช่ WL ที่ระบบเคยตั้งเป็นคนโทร (IN ค่าเก่า เช่นอิศเรศ) → AI · เจ้าหน้าที่ตั้งคนโทรเอง = ไม่แตะ
+  it('สวิตช์ปิด (ค่าเริ่ม · เจ้าของ "ขอเทสก่อน") = สายเดิมคงเป็นคนโทร', async () => {
+    delete process.env.IRECRUIT_REPLACE_EXISTING_TO_AI;
+    existingRows = [
+      { id: 'm1', source_ref: `irecruit-replace:E:lead60:${pk(P1)}`, scheduled_at: '2026-10-05T23:30:00Z', mode: 'manual', group_id: 'g', recipient_phone: P1, pending: true },
+    ];
+    irecruitSqlQuery.mockResolvedValue([row('E', { replace_type: 'EX' })]);
+    const s = await runIrecruitReplaceSync({ now: NOW });
+    expect(calls.some((c) => /set call_mode = 'ai'/.test(c.sql))).toBe(false);
+    expect(s.toAi ?? 0).toBe(0);
+  });
+
+  it('สวิตช์เปิด: ไม่ใช่ WL ที่ระบบตั้งเป็นคนโทร = เปลี่ยนเป็น AI + ส่งแผน · คนแก้เอง = ไม่แตะ', async () => {
+    process.env.IRECRUIT_REPLACE_EXISTING_TO_AI = 'true';
+    existingRows = [
+      { id: 'm1', source_ref: `irecruit-replace:E:lead60:${pk(P1)}`, scheduled_at: '2026-10-05T23:30:00Z', mode: 'manual', group_id: 'g', recipient_phone: P1, pending: true },
+      { id: 'm2', source_ref: `irecruit-replace:E:lead15:${pk(P1)}`, scheduled_at: '2026-10-06T00:15:00Z', mode: 'manual', group_id: 'g', recipient_phone: P1, pending: true, staff_edited: true },
+    ];
+    irecruitSqlQuery.mockResolvedValue([row('E', { replace_type: 'EX' })]);
+    dbQuery.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (/set call_mode = 'ai'/.test(sql)) {
+        calls.push({ sql, params: params ?? [] });
+        return { rows: [] };
+      }
+      return fakeDb(sql, params);
+    });
+    const s = await runIrecruitReplaceSync({ now: NOW });
+    delete process.env.IRECRUIT_REPLACE_EXISTING_TO_AI;
+    const toAi = calls.filter((c) => /set call_mode = 'ai'/.test(c.sql)).map((c) => c.params[0]);
+    expect(toAi).toEqual(['m1']);
+    expect(s.toAi).toBe(1);
   });
 
   it('ทุกรอบเติมประเภทจาก iRecruit ลงแถว (EX / คนใน) ตาม source_ref', async () => {

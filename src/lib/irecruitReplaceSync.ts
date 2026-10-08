@@ -157,6 +157,8 @@ export type ReplaceSyncSummary = {
   cancelled?: number;
   /** สาย AI ของคนในที่เปลี่ยนเป็นคนโทร (5 ต.ค. 2569) */
   toManual?: number;
+  /** ไม่ใช่ WL ที่ระบบเคยตั้งเป็นคนโทร → AI (8 ต.ค. 2569) */
+  toAi?: number;
   /** ดึงไม่ได้ทั้งรอบ — เหตุผลไทย · null = ปกติ */
   error: string | null;
 };
@@ -504,9 +506,10 @@ export function reconcileReplaceCalls(
  * ใครโทรตามประเภทคนไปแทน
  * 5 ต.ค. 2569 (Choice ระหว่างที่ยังแยก WL ไม่ได้): EX = AI · ที่เหลือคนโทร
  * 🔴 7 ต.ค. 2569 เจ้าของ: *"ถ้าไม่ใช่ WL Default เป็น AI โทรเท่านั้น"* + Choice "คนใน (IN) = WL"
- * ⇒ **IN = คนโทร · ที่เหลือ (EX · ไม่ระบุ · ER) = AI** · แก้รายสายได้เสมอ · พัก AI / aiFrom ทับ (`byDate`)
+ * 🔴 8 ต.ค. 2569 เจ้าของ: *"แค่ WL ที่คนโทร ที่เหลือ AI เลย"* — กลุ่มมาจากรายชื่อ WL ของ iRecruit (รอบดึงใส่ 'WL' / 'EX')
+ * ⇒ **WL = คนโทร · ที่เหลือ = AI** · ช่อง IN/EX ในประวัติ iRecruit ไม่ใช้แล้ว (ค่าเก่าค้าง) · แก้รายสายได้เสมอ · พัก AI / aiFrom ทับ (`byDate`)
  */
 export function replaceModeForType(replaceType: string | null | undefined, byDate: 'ai' | 'manual'): 'ai' | 'manual' {
   if (byDate === 'manual') return 'manual';
-  return (replaceType ?? '').trim().toUpperCase() === 'IN' ? 'manual' : 'ai';
+  return (replaceType ?? '').trim().toUpperCase() === 'WL' ? 'manual' : 'ai';
 }
