@@ -38,3 +38,18 @@ describe('เก็บไปโทรเอง: ใบไม่ผูกใบ�
     expect(src).toMatch(/if \(!r\.phone\?\.trim\(\) \|\| !r\.job_id\?\.trim\(\)\) \{\s*okIds\.push\(r\.id\);\s*continue;/);
   });
 });
+
+describe('หน้าตั้งค่าบทพูด: กดบทไหนค่อยกาง · ถอดวงกลมอักษรย่อ (8 ต.ค. 2569)', () => {
+  it('บทพูดอยู่ที่ตั้งค่าที่เดียว · เปิดมาเห็นแค่ชื่อบท กดแล้วกาง · แก้ค้าง = กางค้าง', async () => {
+    const { readFileSync, existsSync } = await import('node:fs');
+    expect(existsSync('src/components/call-scripts/PageScriptsButton.tsx')).toBe(false);
+    const tab = readFileSync('src/pages/settings/CallScriptsTab.tsx', 'utf8');
+    expect(tab).toContain('const open = openKeys.has(s.key) || dirty;');
+    expect(tab).toContain('aria-expanded={open}');
+  });
+  it('ไม่มีวงกลมอักษรย่อหน้าชื่อ (หน้าการติดต่อ · ตารางติดตาม)', async () => {
+    const { readFileSync } = await import('node:fs');
+    expect(readFileSync('src/pages/matching/MyCallsPage.tsx', 'utf8')).not.toContain('<NameAvatar');
+    expect(readFileSync('src/components/follow/FollowPlanningCalendar.tsx', 'utf8')).not.toContain('initials(row.group.name)');
+  });
+});

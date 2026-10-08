@@ -18,7 +18,6 @@ function requestNoText(requestNo: string | null, jobId: string): string {
   return (requestNo || jobId).replace(/^siamraj-(?:sql|pre):/u, '');
 }
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
-import NameAvatar from '@/components/shared/NameAvatar';
 import {
   CALL_HOLD_SOURCE_LABEL,
   fetchMyCallQueue,
@@ -354,7 +353,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
                     className={cn('border-b px-4 py-3 last:border-b-0', DASH.divider, dueSoon && TONE.warn.soft)}
                   >
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                      <NameAvatar name={hold.candidateName || hold.candidateRef} size="sm" />
+                      {/* วงกลมอักษรย่อถอดแล้ว (เจ้าของ 8 ต.ค. 2569 "มันต้องไม่มีไอรูปหน้าตาพวกนี้ มันรก") */}
                       <div className="min-w-0 flex-1">
                         <p className={cn('text-sm font-medium', DASH.cellStrong)}>
                           {hold.candidateName || `ผู้สมัคร #${hold.candidateRef}`}

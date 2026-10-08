@@ -193,10 +193,6 @@ const DayPickerPill: React.FC<{ value: string; today: string; onPick: (ymd: stri
   );
 };
 
-/** อักษรย่อในวงกลมหน้าแถว — แบบอ้างอิงใช้รูปคน ฐานเราไม่มีรูป จึงใช้อักษรแรกของชื่อ */
-function initials(name: string): string {
-  return name.replace(/^["']|["']$/g, '').trim().slice(0, 1) || '?';
-}
 
 /**
  * ตำหนิ QA รอบสอง (6 ก.ย. 2569): บนมือถือช่องวันเล็ก (~30px) และแยกช่อง "มีนัด/มีผล"
@@ -755,7 +751,6 @@ const FollowPlanningCalendar: React.FC<{
                           const washTone = callCategoryWashTone(headline);
                           /* ทุกสายของคนนี้ยกเลิกหมด = ทั้งแถวจาง (เดิมตัดสินรายสาย) */
                           const allCancelled = calls.every((c) => c.round.state === 'cancelled');
-                          const headTone = roundTone(calls[0].round);
                           /* เบอร์ฉุกเฉินของคนเดียวกันมักเป็นเบอร์เดียว — โชว์ที่ไม่ซ้ำ */
                           const emgList = [
                             ...new Set(
@@ -778,17 +773,7 @@ const FollowPlanningCalendar: React.FC<{
                             >
                               <td className="px-4 py-3 md:px-5">
                                 <span className="flex items-start gap-2.5">
-                                  {/* วงกลมอักษรย่อ — แบบอ้างอิงใช้รูปคน ฐานเราไม่มีรูป */}
-                                  <span
-                                    className={cn(
-                                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-medium',
-                                      TONE[headTone].soft,
-                                      TONE[headTone].value,
-                                    )}
-                                    aria-hidden
-                                  >
-                                    {initials(row.group.name)}
-                                  </span>
+                                  {/* วงกลมอักษรย่อถอดแล้ว (เจ้าของ 8 ต.ค. 2569 "มันต้องไม่มีไอรูปหน้าตาพวกนี้ มันรก") */}
                                   <span className="min-w-0">
                                     {/* กดชื่อ = แผนทั้งหมดของคนนี้ทุกวัน (เจ้าของ 3 ต.ค. 2569: "อยากดูแผนแยกรายคน") */}
                                     <button

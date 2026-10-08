@@ -11,7 +11,8 @@
  *    ตัวเดียวทั้งบรรทัดหายตอนโทรจริง (validate ฝั่ง server กันไว้อีกชั้น)
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { LoaderCircle, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { ChevronDown, LoaderCircle, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 import { apiFetch } from '@/lib/apiFetch';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -41,6 +42,15 @@ const CallScriptsTab: React.FC = () => {
   const [draft, setDraft] = useState<Record<string, string[]>>({});
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /** บทที่กางอยู่ — เปิดหน้ามาเห็นแค่ชื่อบท กดบทไหนค่อยกาง (เจ้าของ 8 ต.ค. 2569 "แยกให้ดูง่าย ๆ กดบทไหนค่อยกางบทพูดมา") */
+  const [openKeys, setOpenKeys] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleOpen = (key: string) =>
+    setOpenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   const load = useCallback(async () => {
     setError(null);
@@ -130,11 +140,20 @@ const CallScriptsTab: React.FC = () => {
         const lines = draft[s.key] ?? [];
         const dirty = JSON.stringify(lines) !== JSON.stringify(s.lines);
         const busy = busyKey === s.key;
+        // แก้ค้างอยู่ = กางค้างไว้ (ห้ามพับแล้วของที่พิมพ์หายไปจากสายตา)
+        const open = openKeys.has(s.key) || dirty;
         return (
-          <section key={s.key} className={cn('rounded-xl border p-4', DASH.card)}>
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <h3 className="text-sm font-medium text-foreground">{s.label}</h3>
-              <p className="text-xs text-muted-foreground">{s.hint}</p>
+          <section key={s.key} className={cn('rounded-xl border p-4', DASH.card)} data-testid={`script-${s.key}`}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => toggleOpen(s.key)}
+              aria-expanded={open}
+              className="h-auto w-full flex-wrap items-baseline justify-start gap-x-2 gap-y-1 whitespace-normal rounded-lg p-0 text-left font-normal hover:bg-transparent"
+            >
+              <ChevronDown className={cn('self-center text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden />
+              <span className="text-sm font-medium text-foreground">{s.label}</span>
+              <span className="text-xs text-muted-foreground">{s.hint}</span>
               {s.overridden ? (
                 <span className={cn('ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium', TONE.info.chip)}>
                   ใช้ฉบับแก้อยู่{s.updated_by ? ` · แก้ล่าสุดโดย ${s.updated_by}` : ''}
@@ -142,7 +161,9 @@ const CallScriptsTab: React.FC = () => {
               ) : (
                 <span className="ml-auto text-[10px] text-muted-foreground">ใช้บทมาตรฐานอยู่</span>
               )}
-            </div>
+            </Button>
+            {open ? (
+              <>
 
             <ol className="mt-3 space-y-1.5">
               {lines.map((line, i) => (
@@ -235,6 +256,8 @@ const CallScriptsTab: React.FC = () => {
                 </>
               ) : null}
             </div>
+              </>
+            ) : null}
           </section>
         );
       })}
