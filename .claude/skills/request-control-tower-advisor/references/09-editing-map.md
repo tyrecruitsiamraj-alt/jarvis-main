@@ -12781,3 +12781,5 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · `src/lib/homeSplit.ts` (ผล/BU แบ่งก้อน — แหล่งเดียวกับตารางราย BU) · `TopicReportCard` = `useTopicReport` + ตารางราย BU
   · ตัวเลือก BU บนหัวหน้า (ส่ง `bu` ทุกเส้น · บัญชีล็อก BU ไม่เห็น) · กล่องติดตาม/ดูแลบอก โทรแล้ว · รอโทร · ยกเลิก (นับตามแผน)
   · ⚠️ `src/lib/homeOverview.ts` เป็นของหน้า v3 คนละไฟล์ อย่าเขียนทับ
+- (8 ต.ค. 2569) migration 139 ดัชนี `lumos_dispatch_queue` บนนิพจน์เบอร์ `coalesce(payload->>'recipient_phone', payload->>'phone')` + `person_ref`
+  — คิวรีภาพรวมผู้สมัคร (`buildOverviewSql`) 16.7 วิ → 0.1 วิ (เลขเดิมทุกตัว) · แก้ `QUEUE_PHONE` เมื่อไหร่ต้องแก้ดัชนีตาม (เทสต์คุม)

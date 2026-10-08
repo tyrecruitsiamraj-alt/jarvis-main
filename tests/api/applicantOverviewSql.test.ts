@@ -61,6 +61,17 @@ describe('โครงสร้าง SQL (static — กับดักที�
   });
 });
 
+describe('ดัชนีเบอร์ในคิว (migration 139 · 8 ต.ค. 2569)', () => {
+  it('🔴 นิพจน์ในดัชนี = นิพจน์เบอร์ที่คิวรีใช้ ทุกตัวอักษร (ไม่ตรง = ตัววางแผนไม่หยิบ กลับไปช้า 17 วิ)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const mig = readFileSync('migrations/139_lumos_queue_phone_index.sql', 'utf8');
+    const src = readFileSync('api/_lib/applicantOverviewSql.ts', 'utf8');
+    expect(src).toContain("const QUEUE_PHONE = `coalesce(payload->>'recipient_phone', payload->>'phone')`;");
+    expect(mig).toContain("((coalesce(payload->>'recipient_phone', payload->>'phone')))");
+    expect(mig).toContain('on lumos_dispatch_queue (person_ref)');
+  });
+});
+
 describe.skipIf(!hasDb)('sum-check + bucket-parity กับฐานจริง (read-only)', () => {
   it('ถังการโทรรวมกลับเป็น total เป๊ะ: called + in_queue + held + untouched = total', async () => {
     const { dbQuery } = await import('../../api/_lib/postgres.js');
@@ -77,7 +88,7 @@ describe.skipIf(!hasDb)('sum-check + bucket-parity กับฐานจริ�
     expect(Number(o.uncalled_age_0_3) + Number(o.uncalled_age_4_7) + Number(o.uncalled_age_over7)).toBe(
       Number(o.total) - Number(o.called),
     );
-  }, 60_000); // อ่านฐานจริง ~17 วิ (8 ต.ค. 2569) · เดิม ~5 วิ (5 ต.ค. ตก timeout ซ้ำ — เลขตรงทุกครั้ง)
+  }, 60_000); // อ่านฐานจริง · ช้าเพราะไม่มีดัชนีเบอร์ในคิว (5–8 ต.ค. 2569 ตก timeout ซ้ำ ~17 วิ) → migration 139 เหลือ ~0.1 วิ
 
   it('เลขบนกล่อง = จำนวนแถวจาก bucketCondition เดียวกัน (parity ทุกถัง)', async () => {
     const { dbQuery } = await import('../../api/_lib/postgres.js');
@@ -103,8 +114,8 @@ describe.skipIf(!hasDb)('sum-check + bucket-parity กับฐานจริ�
       );
       expect(`${bucket}=${cnt[0].n}`).toBe(`${bucket}=${want}`);
     }
-  }, 90_000); // อ่านฐานจริงทุกถัง — 8 ต.ค. 2569 คิวรีภาพรวมเดียวใช้ ~17 วิ (ใบ 341 · คิว 2,145 แถว) ⇒ ชนเพดาน 20 วิ ทั้งที่เลขตรง
-  // เทสต์นี้คุมว่า "เลขตรง" ไม่ได้คุมความเร็ว · ความช้าแยกไปแก้ต่างหาก (คิวรีจับเบอร์ใน jsonb แบบซ้อนกัน)
+  }, 90_000); // อ่านฐานจริงทุกถัง · 8 ต.ค. 2569 ใช้ ~17 วิ ต่อคิวรีจนชนเพดาน → ดัชนีเบอร์ในคิว (migration 139) เหลือ ~0.1 วิ
+  // (ลดเพดานกลับหลัง migration 139 ขึ้นฐานจริงแล้ว)
 
   it('claimed_idle breakdown รวมเท่ากับถัง claimed_idle', async () => {
     const { dbQuery } = await import('../../api/_lib/postgres.js');
