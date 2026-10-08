@@ -13,6 +13,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, LoaderCircle, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { apiFetch } from '@/lib/apiFetch';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -20,6 +21,8 @@ import { cn } from '@/lib/utils';
 
 type ScriptItem = {
   key: string;
+  /** เรื่องของบท — จอแยกแท็บตามนี้ (8 ต.ค. 2569) */
+  topic: string;
   label: string;
   hint: string;
   lines: string[];
@@ -34,6 +37,36 @@ type ApiBody = {
   placeholders: string[];
   scripts: ScriptItem[];
 };
+
+/**
+ * ลำดับแท็บเรื่อง (เจ้าของ 8 ต.ค. 2569: *"หน้าตั้งค่าต้องแยกเรื่องเลย จะได้รู้ว่าบทพูดของแต่ละเรื่องเป็นแบบไหนต้องแก้อะไร"*)
+ * เรื่องที่ไม่อยู่ในลิสต์ (server เพิ่มบทใหม่) ต่อท้ายตามลำดับที่มา — ห้ามหาย
+ */
+const TOPIC_ORDER = ['งานสรรหา', 'งานจับคู่ · ชวนกลับ', 'ติดตามคนเริ่มงาน', 'ติดตามส่งคนแทน'];
+
+function groupScriptsByTopic<T extends { topic?: string }>(scripts: readonly T[]): { topic: string; scripts: T[] }[] {
+  const map = new Map<string, T[]>();
+  for (const s of scripts) {
+    const t = s.topic || 'อื่น ๆ';
+    map.set(t, [...(map.get(t) ?? []), s]);
+  }
+  const rank = (t: string) => {
+    const i = TOPIC_ORDER.indexOf(t);
+    return i < 0 ? TOPIC_ORDER.length : i;
+  };
+  return [...map.entries()].sort((a, b) => rank(a[0]) - rank(b[0])).map(([topic, list]) => ({ topic, scripts: list }));
+}
+
+/** ตัวแปรที่บทมาตรฐานของเรื่องนี้ใช้ — ให้รู้ว่าเรื่องนี้แก้อะไรได้ */
+function placeholdersOf(scripts: readonly ScriptItem[], known: readonly string[]): string[] {
+  const used = new Set<string>();
+  for (const s of scripts) {
+    for (const line of [...s.default_lines, ...s.lines]) {
+      for (const m of line.matchAll(/\{([^{}]+)\}/g)) used.add(m[1]);
+    }
+  }
+  return known.filter((p) => used.has(p));
+}
 
 const CallScriptsTab: React.FC = () => {
   const [data, setData] = useState<ApiBody | null>(null);
@@ -121,6 +154,8 @@ const CallScriptsTab: React.FC = () => {
     );
   }
 
+  const groups = groupScriptsByTopic(data.scripts);
+
   return (
     <div className="space-y-5">
       <div>
@@ -136,7 +171,17 @@ const CallScriptsTab: React.FC = () => {
       {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
       {notice ? <p className={cn('text-sm', TONE.success.value)}>{notice}</p> : null}
 
-      {data.scripts.map((s) => {
+      <Tabs defaultValue={groups[0]?.topic}>
+        <TabsList className="h-auto flex-wrap justify-start">
+          {groups.map((g) => (
+            <TabsTrigger key={g.topic} value={g.topic} data-testid={`script-topic-${g.topic}`}>
+              {g.topic}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        {groups.map((g) => (
+          <TabsContent key={g.topic} value={g.topic} className="mt-4 space-y-4">
+      {g.scripts.map((s) => {
         const lines = draft[s.key] ?? [];
         const dirty = JSON.stringify(lines) !== JSON.stringify(s.lines);
         const busy = busyKey === s.key;
@@ -263,13 +308,15 @@ const CallScriptsTab: React.FC = () => {
       })}
 
       <section className={cn('rounded-xl border p-4', DASH.card)}>
-        <h3 className="text-xs font-medium text-foreground">ตัวแปรที่ใช้ได้ในบท</h3>
+        <h3 className="text-xs font-medium text-foreground">ตัวแปรของเรื่องนี้</h3>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
           พิมพ์ในวงเล็บปีกกา ระบบเติมค่าจริงให้ตอนโทร · พิมพ์ชื่อผิดระบบจะไม่ยอมบันทึก
-          · ห้ามพิมพ์ตัวเลขเงินเอง — ใช้ {'{รายได้ต่อเดือน}'} ระบบจะเติมเลขที่ถูกต้องของใบขอนั้น
+          {placeholdersOf(g.scripts, data.placeholders).includes('รายได้ต่อเดือน') ? (
+            <> · ห้ามพิมพ์ตัวเลขเงินเอง — ใช้ {'{รายได้ต่อเดือน}'} ระบบจะเติมเลขที่ถูกต้องของใบขอนั้น</>
+          ) : null}
         </p>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {data.placeholders.map((ph) => (
+          {placeholdersOf(g.scripts, data.placeholders).map((ph) => (
             <code
               key={ph}
               className="rounded-md bg-secondary px-2 py-0.5 font-mono text-[11px] text-foreground"
@@ -279,6 +326,9 @@ const CallScriptsTab: React.FC = () => {
           ))}
         </div>
       </section>
+          </TabsContent>
+        ))}
+      </Tabs>
     </div>
   );
 };

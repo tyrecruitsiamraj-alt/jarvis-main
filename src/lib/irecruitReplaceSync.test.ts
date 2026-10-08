@@ -104,11 +104,20 @@ describe('Journey ส่งคนแทน 3 สาย (เจ้าของส
     expect(p.map((x) => x.slot)).toEqual(['confirm', 'lead60', 'lead15']);
   });
 
-  it('ใกล้เวลาเข้างาน: คิวคอนเฟิร์มช้ากว่าสายก่อนเข้างาน = ไม่คอนเฟิร์มแยก · สายที่เลยแล้วไม่สร้าง · เลยเวลาเข้างาน = ไม่มีสาย', () => {
-    expect(planReplaceCalls(wall, at('2026-10-07T03:55:00+07:00')).map((x) => x.slot)).toEqual(['lead60', 'lead15']);
-    expect(planReplaceCalls(wall, at('2026-10-07T04:20:00+07:00')).map((x) => x.slot)).toEqual(['confirm', 'lead15']);
-    expect(planReplaceCalls(wall, at('2026-10-07T04:50:00+07:00')).map((x) => x.slot)).toEqual([]);
+  // 8 ต.ค. 2569 เจ้าของ: *"เพิ่มมาตอนไหนก็ช่างสายแรกต้องโทรคอนเฟิร์ม"* — ของเดิมทิ้งคอนเฟิร์ม สายแรกเลยถาม "ถึงแล้วหรือยัง"
+  it('ใกล้เวลาเข้างาน: สายแรกยังเป็นคอนเฟิร์มเสมอ · สายก่อนเข้างานที่ถึงก่อนคอนเฟิร์มไม่สร้าง · เลยเวลาเข้างาน = ไม่มีสาย', () => {
+    const slots = (iso: string) => planReplaceCalls(wall, at(iso)).map((x) => [x.slot, x.at.toISOString()]);
+    expect(slots('2026-10-07T03:55:00+07:00')).toEqual([
+      ['confirm', '2026-10-06T21:05:00.000Z'],
+      ['lead15', '2026-10-06T21:45:00.000Z'],
+    ]);
+    expect(slots('2026-10-07T04:20:00+07:00').map((x) => x[0])).toEqual(['confirm', 'lead15']);
+    // เหลือ 10 นาที = คอนเฟิร์มครึ่งทาง (ไม่เลยเวลาเข้างาน)
+    expect(slots('2026-10-07T04:50:00+07:00')).toEqual([['confirm', '2026-10-06T21:55:00.000Z']]);
     expect(planReplaceCalls(wall, at('2026-10-07T05:00:00+07:00'))).toEqual([]);
+    for (const iso of ['2026-10-05T10:00:00+07:00', '2026-10-06T23:59:00+07:00', '2026-10-07T04:40:00+07:00']) {
+      expect(planReplaceCalls(wall, at(iso))[0].slot).toBe('confirm');
+    }
   });
 
   it('คีย์ต่อสาย: ใบ + สาย + คน · อ่านคีย์รุ่นเก่าได้', () => {

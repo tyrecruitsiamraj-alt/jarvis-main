@@ -296,7 +296,7 @@ export function replaceWorkYmd(e: {
 /**
  * สายที่ใบงานนี้ต้องมี ณ ตอนนี้ — เฉพาะสายที่ยังไม่ถึงเวลา (เลยแล้ว = ไม่สร้าง)
  * - คอนเฟิร์ม 16:00 วันก่อนเข้างาน · เลย 16:00 แล้ว (เพิ่มใบทีหลัง) = โทรตามคิว (อีก `REPLACE_ASAP_MINUTES` นาที)
- *   แต่ถ้าคิวนั้นช้ากว่าสายก่อนเข้างานที่ยังมาไม่ถึง = ไม่ต้องคอนเฟิร์มแยก (สายก่อนเข้างานโทรอยู่แล้ว)
+ *   สายคอนเฟิร์มมีเสมอ (8 ต.ค. 2569) · สายก่อนเข้างานที่ถึงก่อนคอนเฟิร์มไม่สร้าง
  * - ก่อนเข้างาน 1 ชม. / 15 นาที — เลยแล้วไม่สร้าง
  * - เลยเวลาเข้างานแล้ว = ไม่มีสาย
  */
@@ -312,12 +312,17 @@ export function planReplaceCalls(
     .map((slot) => ({ slot, round: REPLACE_SLOT_ROUND[slot], at: new Date(start.getTime() - leadOf[slot] * 60_000), asap: false }))
     .filter((p) => p.at.getTime() > now.getTime());
   const confirmAt = new Date(`${shiftYmd(wall.ymd, -1)}T${timing.confirmTime}:00+07:00`);
+  /**
+   * 🔴 สายแรกต้องเป็นคอนเฟิร์มเสมอ (เจ้าของสั่ง 8 ต.ค. 2569: *"เพิ่มมาตอนไหนก็ช่างสายแรกต้องโทรคอนเฟิร์ม"*)
+   * ของเดิมทิ้งคอนเฟิร์มเมื่อคิวช้ากว่าสายก่อนเข้างาน ⇒ คนที่เพิ่มบ่ายวันเข้างานได้สายแรกถาม "ถึงแล้วหรือยัง"
+   * ⇒ เพิ่มช้า = คอนเฟิร์มตามคิว (ไม่เกินครึ่งทางถึงเวลาเข้างาน) · สายก่อนเข้างานที่ถึงก่อนคอนเฟิร์มไม่สร้าง
+   */
+  const asapMs = Math.min(REPLACE_ASAP_MINUTES * 60_000, Math.floor((start.getTime() - now.getTime()) / 2));
   const confirm: ReplaceSlotPlan =
-    confirmAt.getTime() > now.getTime()
+    confirmAt.getTime() > now.getTime() && confirmAt.getTime() < start.getTime()
       ? { slot: 'confirm', round: 1, at: confirmAt, asap: false }
-      : { slot: 'confirm', round: 1, at: new Date(now.getTime() + REPLACE_ASAP_MINUTES * 60_000), asap: true };
-  const nextBoundary = leads[0]?.at ?? start;
-  return confirm.at.getTime() < nextBoundary.getTime() ? [confirm, ...leads] : leads;
+      : { slot: 'confirm', round: 1, at: new Date(now.getTime() + asapMs), asap: true };
+  return [confirm, ...leads.filter((p) => p.at.getTime() > confirm.at.getTime())];
 }
 
 /**
@@ -367,6 +372,43 @@ export function parseReplaceRef(ref: string): { jobId: string; slot: ReplaceSlot
   const m = /^irecruit-replace:([^:]+)(?::(confirm|lead60|lead15):([^:]+))?$/.exec(ref.trim());
   if (!m) return null;
   return { jobId: m[1], slot: (m[2] as ReplaceSlot | undefined) ?? null, personKey: m[3] ?? null };
+}
+
+/**
+ * สายนี้ต้องพูดบทส่งคนแทนแบบไหน (เจ้าของสั่ง 8 ต.ค. 2569) — อ่านจากหัวเรื่อง + หมายเหตุที่ระบบเขียนเอง (`replaceSlotNote`)
+ * ใช้ได้ทั้งสายที่ดึงจาก iRecruit · คีย์เองในแท็บ · แก้ตารางทีหลัง เพราะทุกทางเขียนหมายเหตุตัวเดียวกัน
+ * - "ยืนยันเวลาเข้างาน d/m HH:MM น." = คอนเฟิร์ม · "เข้างาน HH:MM น." = ก่อนเข้างาน
+ * - หมายเหตุอ่านไม่ออก = ดูสายที่ (สาย 1 = คอนเฟิร์ม) · ไม่รู้วัน/เวลา = null (บทใช้คำแทน)
+ * null = ไม่ใช่สายส่งคนแทน (ใช้บทติดตามเดิม)
+ */
+export function replaceScriptOf(e: {
+  topic: string | null | undefined;
+  note: string | null | undefined;
+  callRound: number | null | undefined;
+  callAtMs: number;
+}): { kind: 'confirm' | 'before'; workYmd: string | null; startTime: string | null } | null {
+  if ((e.topic ?? '').trim() !== REPLACE_FOLLOW_TOPIC) return null;
+  const note = e.note ?? '';
+  const speak = (h: string, m: string) => `${Number(h)}:${m} น.`;
+  const c = /ยืนยันเวลาเข้างาน\s+(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/.exec(note);
+  if (c) {
+    let workYmd: string | null = null;
+    if (Number.isFinite(e.callAtMs)) {
+      const [y, mo] = BKK_YMD_FMT.format(new Date(e.callAtMs)).split('-').map(Number);
+      const mm = Number(c[2]);
+      const d = Number(c[1]);
+      if (mm >= 1 && mm <= 12 && d >= 1 && d <= 31) {
+        workYmd = `${mm < mo ? y + 1 : y}-${String(mm).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+    }
+    return { kind: 'confirm', workYmd, startTime: speak(c[3], c[4]) };
+  }
+  const l = /เข้างาน\s+(\d{1,2}):(\d{2})/.exec(note);
+  if (l) {
+    const start = replaceLeadStart(e.callAtMs, note);
+    return { kind: 'before', workYmd: start == null ? null : BKK_YMD_FMT.format(new Date(start)), startTime: speak(l[1], l[2]) };
+  }
+  return { kind: (e.callRound ?? 1) <= 1 ? 'confirm' : 'before', workYmd: null, startTime: null };
 }
 
 /** หมายเหตุบนสาย (AI พูดด้วย) — สายคอนเฟิร์มบอกวันด้วย */

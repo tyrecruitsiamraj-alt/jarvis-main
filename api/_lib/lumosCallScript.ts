@@ -55,7 +55,15 @@ export const MAX_QUESTIONS = 14;
 // ⇒ เทสต์เดิมทั้งชุดผ่านโดยไม่ต้องรู้จักฟีเจอร์นี้ และลบแถวใน DB = กลับบทมาตรฐานทันที
 
 /** คีย์บทที่แก้ได้จากหน้าตั้งค่า → array บทในไฟล์ template */
-export type EditableScriptKey = 'interview' | 'offer' | 'apply' | 'applied' | 'follow' | 'follow_repeat';
+export type EditableScriptKey =
+  | 'interview'
+  | 'offer'
+  | 'apply'
+  | 'applied'
+  | 'follow'
+  | 'follow_repeat'
+  | 'replace_confirm'
+  | 'replace_before';
 
 export const EDITABLE_SCRIPT_DEFAULTS: Record<EditableScriptKey, readonly string[]> = {
   interview: T.สัมภาษณ์เบื้องต้น,
@@ -64,6 +72,8 @@ export const EDITABLE_SCRIPT_DEFAULTS: Record<EditableScriptKey, readonly string
   applied: T.ผู้สมัครคีย์เอง,
   follow: T.ติดตาม,
   follow_repeat: T.ติดตามรอบถัดไป,
+  replace_confirm: T.ส่งคนแทนคอนเฟิร์ม,
+  replace_before: T.ส่งคนแทนก่อนเข้างาน,
 };
 
 let scriptOverrides: Partial<Record<EditableScriptKey, readonly string[]>> = {};
@@ -146,6 +156,9 @@ export const KNOWN_PLACEHOLDERS: readonly string[] = [
   'เคยปฏิเสธงานอื่น',
   /** ใบไม่ระบุช่วงอายุ — ถามอายุตรง ๆ แทนการตัดบรรทัดทิ้ง (6 ต.ค. 2569) */
   'ไม่มีช่วงอายุ',
+  /** ติดตามส่งคนแทน (8 ต.ค. 2569) — "พรุ่งนี้" / "วันนี้" / "วันที่ 9 ตุลาคม" · "8:00 น." */
+  'วัน',
+  'เวลาเข้างาน',
 ];
 
 const PLACEHOLDER = /\{([^{}]+)\}/g;
@@ -582,6 +595,52 @@ export function buildFollowMessage(
        * ทั้งบทเดิมและบทใหม่ ⇒ "หน่วยงานที่นัดไว้" อ่านลื่นทั้งสองแบบ
        */
       หน่วยงาน: clean(input.unitName) || 'ที่นัดไว้',
+    },
+    lines.length,
+  ).join(' ');
+}
+
+const TH_MONTHS = [
+  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+];
+
+/**
+ * คำบอกวันของบทส่งคนแทน — เทียบวันที่โทรกับวันเข้างาน (YYYY-MM-DD ไทยทั้งคู่)
+ * วันเดียวกัน = "วันนี้" · ถัดไปวันเดียว = "พรุ่งนี้" · อื่น ๆ = "วันที่ 9 ตุลาคม"
+ */
+export function replaceDayWord(callYmd: string, workYmd: string): string {
+  const call = Date.parse(`${callYmd}T00:00:00Z`);
+  const work = Date.parse(`${workYmd}T00:00:00Z`);
+  if (!Number.isFinite(call) || !Number.isFinite(work)) return '';
+  const diff = Math.round((work - call) / 86_400_000);
+  if (diff === 0) return 'วันนี้';
+  if (diff === 1) return 'พรุ่งนี้';
+  const [, m, d] = workYmd.split('-').map(Number);
+  return `วันที่ ${d} ${TH_MONTHS[m - 1] ?? ''}`.trim();
+}
+
+/**
+ * บทติดตามส่งคนแทน (เจ้าของสั่ง 8 ต.ค. 2569) — สาย 1 คอนเฟิร์ม · สาย 2–3 ก่อนเข้างาน (บทเดียวกัน)
+ * `dayWord`/`startTime` ไม่มี = ค่าแทนที่ยังพูดได้ ห้ามทิ้งบรรทัดคำถามหลัก (กติกาเดียวกับ `หน่วยงาน` ข้างบน)
+ */
+export function buildReplaceFollowMessage(
+  input: Pick<FollowMessageInput, 'recipientName' | 'staffName' | 'unitName'>,
+  kind: 'confirm' | 'before',
+  when: { dayWord?: string | null; startTime?: string | null },
+): string {
+  const lines = activeScriptLines(kind === 'confirm' ? 'replace_confirm' : 'replace_before');
+  const day = clean(when.dayWord);
+  return renderLines(
+    lines,
+    {
+      ผู้โทร: CALLER_ORG,
+      ชื่อผู้รับ: polite(input.recipientName),
+      ชื่อเจ้าหน้าที่: stripThaiNamePrefix(input.staffName),
+      หน่วยงาน: clean(input.unitName) || 'ที่นัดไว้',
+      // "พรุ่งนี้มีไป" ติดกันตามภาษาพูด · รูปวันที่เว้นวรรคก่อนคำถัดไป ("วันที่ 9 ตุลาคม มีไป")
+      วัน: day.startsWith('วันที่') ? `${day} ` : day,
+      เวลาเข้างาน: clean(when.startTime) || 'ที่นัดไว้',
     },
     lines.length,
   ).join(' ');

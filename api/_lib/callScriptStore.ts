@@ -39,6 +39,8 @@ export const EDITABLE_SCRIPT_KEYS: readonly EditableScriptKey[] = [
   'applied',
   'follow',
   'follow_repeat',
+  'replace_confirm',
+  'replace_before',
 ];
 
 export function isEditableScriptKey(v: unknown): v is EditableScriptKey {

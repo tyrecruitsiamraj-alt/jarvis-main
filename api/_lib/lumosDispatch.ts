@@ -43,6 +43,7 @@ import { bangkokIso } from './bangkokIso.js';
 import { pushQueuedRows } from './lumosPushTracking.js';
 import { ensureCallScriptsFresh } from './callScriptStore.js';
 import { MATCH_RANK_UNKNOWN, matchRankFromTier } from '../../src/lib/matchRank.js';
+import { replaceScriptOf } from '../../src/lib/irecruitReplaceSync.js';
 import { buildJobBrief, speakableDate } from './lumosJobBrief.js';
 import {
   activeScriptFingerprint,
@@ -50,6 +51,8 @@ import {
   appendExtraInfoToPayload,
   buildExtraInfoSentence,
   buildFollowMessage,
+  buildReplaceFollowMessage,
+  replaceDayWord,
   buildOfferMessage,
   buildOfferQuestions,
   buildApplyQuestions,
@@ -1587,19 +1590,47 @@ export function buildFollowReminderPayload(
     : 1;
   const roundOf = (stepIndex: number): 'first' | 'repeat' =>
     baseRound + stepIndex === 1 ? 'first' : 'repeat';
+  /**
+   * 🔴 ติดตามส่งคนแทนพูดบทของตัวเอง (เจ้าของสั่ง 8 ต.ค. 2569) — สาย 1 คอนเฟิร์ม "พรุ่งนี้มีไปทำงาน เวลา … คอนเฟิร์มไหม"
+   * สาย 2–3 ถามว่าออกเดินทางแล้วหรือยัง · ของเดิมใช้บทติดตามทั่วไป สายแรกจึงถาม "ถึงหน่วยงานแล้วใช่ไหม"
+   */
+  const stepMessage = (stepIndex: number, at: string): string => {
+    const atMs = Date.parse(at);
+    const replace = replaceScriptOf({
+      topic: entry.topic,
+      note: entry.note,
+      callRound: baseRound + stepIndex,
+      callAtMs: atMs,
+    });
+    if (!replace) return messageFor(roundOf(stepIndex));
+    const callYmd = Number.isFinite(atMs)
+      ? new Date(atMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+      : '';
+    return buildReplaceFollowMessage(
+      { recipientName: entry.recipient_name, staffName: entry.staffName, unitName: entry.unitName },
+      replace.kind,
+      {
+        dayWord: replace.workYmd && callYmd ? replaceDayWord(callYmd, replace.workYmd) : null,
+        startTime: replace.startTime,
+      },
+    );
+  };
   // หลายรอบในวันเดียว → หลาย step (เวลาต่างกัน) · Lumos หยุดที่เหลือเองเมื่อยืนยัน (stop_early)
   const times = (entry.callTimes || []).filter((t) => /^\d{1,2}:\d{2}$/.test((t || '').trim()));
   const steps =
     times.length > 0
-      ? times.map((t, i) => ({
-          type: (roundOf(i) === 'first' ? 'remind' : 'follow_up') as 'remind' | 'follow_up',
-          message: messageFor(roundOf(i)),
-          scheduled_at: dayAtTime(entry.scheduled_at, t),
-        }))
+      ? times.map((t, i) => {
+          const at = dayAtTime(entry.scheduled_at, t);
+          return {
+            type: (roundOf(i) === 'first' ? 'remind' : 'follow_up') as 'remind' | 'follow_up',
+            message: stepMessage(i, at),
+            scheduled_at: at,
+          };
+        })
       : [
           {
             type: (roundOf(0) === 'first' ? 'remind' : 'follow_up') as 'remind' | 'follow_up',
-            message: messageFor(roundOf(0)),
+            message: stepMessage(0, bangkokIso(entry.scheduled_at)),
             scheduled_at: bangkokIso(entry.scheduled_at),
           },
         ];
