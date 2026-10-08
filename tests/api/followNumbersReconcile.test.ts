@@ -245,7 +245,11 @@ describe('คนที่จบแล้วของวัน (7 ต.ค. 2569 J
   const call = (category: string, over: Partial<FollowEntry> = {}) => ({ round: { entry: e(over) }, category }) as never;
   it('🔴 ไม่ไป > ไป > ยกเลิกหมด · คนปิดครบ (ลา/เลื่อน) = สรุปไม่ได้ที่จบแล้ว · สรุปไม่ได้/ไม่รับสาย/รอโทร ที่ยังไม่มีใครปิด = อยู่ในตาราง', async () => {
     const { followDayPersonDone } = await import('../../src/lib/followPlanning');
-    expect(followDayPersonDone({ calls: [call('agreed'), call('waiting')] })).toBe('agreed');
+    // 🔴 8 ต.ค. 2569: สายแรกตอบแล้วแต่สายของวันนั้นยังไม่มีผล = ยังไม่จบ (สาย 2 ของคนโทรต้องโทรต่อได้)
+    expect(followDayPersonDone({ calls: [call('agreed'), call('waiting')] })).toBeNull();
+    expect(followDayPersonDone({ calls: [call('agreed'), call('overdue')] })).toBeNull();
+    expect(followDayPersonDone({ calls: [call('lost'), call('notSent')] })).toBeNull();
+    expect(followDayPersonDone({ calls: [call('agreed'), call('unreachable')] })).toBe('agreed');
     expect(followDayPersonDone({ calls: [call('agreed'), call('lost')] })).toBe('lost');
     expect(followDayPersonDone({ calls: [call('cancelled', { cancelled: true }), call('cancelled', { cancelled: true })] })).toBe('cancelled');
     expect(followDayPersonDone({ calls: [call('other', { completed_at: '2026-10-06T03:00:00Z', outcome_code: 'leave' })] })).toBe('other');

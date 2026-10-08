@@ -996,13 +996,20 @@ export function roundEmergencyPhone(round: FollowPlanningRound): string | null {
  * - ยกเลิกทุกสาย → `cancelled`
  * - คนปิดครบทุกสายแล้ว (ลา · เลื่อน · จำวันผิด …) → `other` (สรุปไม่ได้ แต่คนจัดการจบแล้ว)
  * - ที่เหลือ (สรุปไม่ได้ / ไม่รับสาย / รอโทร ที่ยังไม่มีใครจัดการ) = null → อยู่ในตารางต้องตาม
+ * 🔴 8 ต.ค. 2569 เจ้าของ: *"โทรสายแรกเสร็จไม่ต้องย้ายอัตโนมัติ เพราะสาย 2 ที่เป็นคนโทรมันโทรต่อไม่ได้
+ * จะย้ายได้ต้องจบของวันนั้นของคนนั้น ๆ"* ⇒ ยังมีสายของวันนั้นที่ยังไม่มีผล (รอโทร · เลยเวลา · ไม่ได้ส่ง AI) = ยังไม่จบ
+ * อยู่ในตารางต่อ ไม่ว่าสายก่อนหน้าจะตอบไปหรือไม่ไปแล้ว
  */
 export type FollowDayDoneKind = 'agreed' | 'lost' | 'other' | 'cancelled';
+
+/** สายที่ยังไม่มีผล — มีสักสายในวันนั้น คนนั้นยังไม่จบ */
+const FOLLOW_OPEN_CATEGORIES: ReadonlySet<FollowCallCategory> = new Set(['waiting', 'overdue', 'notSent']);
 
 export function followDayPersonDone(p: Pick<FollowDayPerson, 'calls'>): FollowDayDoneKind | null {
   if (p.calls.length === 0) return null;
   // หมวดที่ตารางใช้อยู่แล้ว (`FollowDayCall.category`) — ตัวเดียวกับสีชิปบนแถว
   const cats = p.calls.map((c) => c.category ?? callCategory(c.round));
+  if (cats.some((c) => FOLLOW_OPEN_CATEGORIES.has(c))) return null;
   if (cats.includes('lost')) return 'lost';
   if (cats.includes('agreed')) return 'agreed';
   if (cats.every((c) => c === 'cancelled')) return 'cancelled';

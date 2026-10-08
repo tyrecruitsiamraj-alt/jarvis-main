@@ -19,7 +19,10 @@ describe('หาแถวที่ค้าง', () => {
   it('AI · เปิดอยู่ · คิวยกเลิกหมด · ชุดเดียวกันตอบ declined วันก่อนหน้า (วันเดียวกันไม่แตะ) · ไม่ใช่ส่งคนแทน', () => {
     const sql = mod.declineOrphanSql();
     expect(sql).toContain("coalesce(f.call_mode, 'ai') = 'ai'");
-    expect(sql).toContain("q.status <> 'cancelled'");
+    expect(sql).toContain("y.status <> 'cancelled'");
+    // 🔴 8 ต.ค. 2569: คิว pending แต่แผนถึง Lumos ก่อนคำตอบไม่ไป = แผนโดนยกเลิกที่ Lumos แล้ว ต้องส่งใหม่ด้วย
+    expect(sql).toContain('l.push_accepted_at < d.declined_at');
+    expect(sql).toContain('coalesce(q.plan_ref, q.person_ref) as plan');
     expect(sql).toContain("x.last_outcome = 'declined'");
     expect(sql).toContain("(g.scheduled_at at time zone 'Asia/Bangkok')::date < (f.scheduled_at at time zone 'Asia/Bangkok')::date");
     expect(sql).toContain("<> 'replacement'");
@@ -29,15 +32,17 @@ describe('หาแถวที่ค้าง', () => {
 });
 
 describe('ซ่อม', () => {
-  it('ยังไม่ถึงเวลา = คืนคิวแล้วส่งแผนใหม่ทีละชุด · 🔴 ไม่มีการสลับเป็นคนโทร', async () => {
+  it('ยังไม่ถึงเวลา = คืนคิวแล้วส่งแผนใหม่ **ทีละแผน** (แผนละวัน) · 🔴 ไม่มีการสลับเป็นคนโทร', async () => {
     dbQuery.mockImplementation(async (sql: string) => {
       if (sql.includes('select f.id::text')) {
         return {
           rows: [
-            { id: 'past1', group_id: 'g1', future: false },
-            { id: 'a1', group_id: 'g1', future: true },
-            { id: 'a2', group_id: 'g1', future: true },
-            { id: 'b1', group_id: 'g2', future: true },
+            { id: 'past1', group_id: 'g1', plan: 'p0', future: false },
+            { id: 'a1', group_id: 'g1', plan: 'p1', future: true },
+            { id: 'a2', group_id: 'g1', plan: 'p1', future: true },
+            // 🔴 ชุดเดียวกัน วันถัดไป = อีกแผน — 7 ต.ค. ส่งแค่แผนแรกของชุด วันนี้ Lumos เลยไม่โทร
+            { id: 'a3', group_id: 'g1', plan: 'p2', future: true },
+            { id: 'b1', group_id: 'g2', plan: 'p3', future: true },
           ],
         };
       }
@@ -45,12 +50,10 @@ describe('ซ่อม', () => {
     });
     resync.mockResolvedValue({ rounds: 2, cancelled: true, pushed: true });
     const r = await mod.repairDeclinedFollowDays();
-    expect(resync).toHaveBeenCalledTimes(2);
-    expect(resync.mock.calls[0][0]).toBe('a1');
-    expect(resync.mock.calls[1][0]).toBe('b1');
+    expect(resync.mock.calls.map((c) => c[0])).toEqual(['a1', 'a3', 'b1']);
     const repend = dbQuery.mock.calls.find((c) => String(c[0]).includes("set status = 'pending'"));
     expect(repend?.[1]).toEqual([['follow-a1', 'follow-a2']]);
-    expect(r).toEqual({ resent: 4, groups: 2, errors: 0 });
+    expect(r).toEqual({ resent: 6, plans: 3, errors: 0 });
     expect(dbQuery.mock.calls.some((c) => String(c[0]).includes("call_mode = 'manual'"))).toBe(false);
   });
 

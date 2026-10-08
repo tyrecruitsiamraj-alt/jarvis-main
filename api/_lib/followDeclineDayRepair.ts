@@ -28,48 +28,66 @@ const queueTable = tableInAppSchema('lumos_dispatch_queue');
 /** สายที่จะถึงเวลาในอีกไม่กี่นาที ไม่ส่งใหม่ (กันส่งเวลาที่กลายเป็นอดีตระหว่างทาง) */
 const MIN_LEAD_MINUTES = 3;
 
-type OrphanRow = { id: string; group_id: string | null; future: boolean };
+type OrphanRow = { id: string; group_id: string | null; plan: string; future: boolean };
 
-/** แถวที่ค้างเพราะตอบไม่ไปวันก่อน — แยกออกมาให้ตรวจแบบอ่านอย่างเดียวได้ */
+/**
+ * แถวที่ค้างเพราะตอบไม่ไปวันก่อน — แยกออกมาให้ตรวจแบบอ่านอย่างเดียวได้
+ * ค้างได้ 2 แบบ (ต้องมีคนตอบ declined ในชุดเดียวกัน **วันก่อนหน้า**):
+ *   A. คิวทุกแถวของสายนี้ถูกยกเลิก (แบบเดิม)
+ *   B. 🔴 คิวขึ้น pending แต่แผนของมันถึง Lumos **ก่อน** คำตอบไม่ไป ⇒ แผนนั้นโดนยกเลิกที่ Lumos ไปแล้ว
+ *      (8 ต.ค. 2569 ณัฐพล · อิทธิชัย: รอบซ่อม 7 ต.ค. คืนคิวทุกวันแต่ส่งกลับแค่แผนแรกของชุด
+ *       — แผนละวัน ⇒ วันที่เหลือขึ้น "ส่งให้ AI แล้ว" แต่ Lumos ไม่มีแผน ไม่โทร)
+ * คืน `plan` = รหัสแผน (แผนละวัน) — ซ่อมทีละแผน ไม่ใช่ทีละชุด
+ */
 export function declineOrphanSql(): string {
   return `
     select f.id::text as id, f.group_id::text as group_id,
+           coalesce(q.plan_ref, q.person_ref) as plan,
            (f.scheduled_at > now() + interval '${MIN_LEAD_MINUTES} minutes') as future
       from ${followTable} f
+      join ${queueTable} q
+        on q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref = 'follow-' || f.id::text
+      join lateral (
+        select max(coalesce(x.last_result_at, x.first_result_at, x.updated_at)) as declined_at
+          from ${followTable} g
+          join ${queueTable} x on x.channel = 'reminder' and x.job_ref = 'follow' and x.person_ref = 'follow-' || g.id::text
+         where g.group_id = f.group_id and x.last_outcome = 'declined'
+           and (g.scheduled_at at time zone 'Asia/Bangkok')::date < (f.scheduled_at at time zone 'Asia/Bangkok')::date
+      ) d on d.declined_at is not null
      where f.cancelled_at is null and f.completed_at is null
        and coalesce(f.call_mode, 'ai') = 'ai'
        and coalesce(f.follow_team, '') <> 'replacement'
        and f.group_id is not null
        and f.scheduled_at > now() + interval '${MIN_LEAD_MINUTES} minutes'
-       and exists (select 1 from ${queueTable} q
-                    where q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref = 'follow-' || f.id::text)
-       and not exists (select 1 from ${queueTable} q
-                    where q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref = 'follow-' || f.id::text
-                      and q.status <> 'cancelled')
-       and exists (
-         select 1 from ${followTable} g
-           join ${queueTable} x on x.channel = 'reminder' and x.job_ref = 'follow' and x.person_ref = 'follow-' || g.id::text
-          where g.group_id = f.group_id and x.last_outcome = 'declined'
-            and (g.scheduled_at at time zone 'Asia/Bangkok')::date < (f.scheduled_at at time zone 'Asia/Bangkok')::date
+       and (
+         -- A. คิวทุกแถวถูกยกเลิก
+         not exists (select 1 from ${queueTable} y
+                      where y.channel = 'reminder' and y.job_ref = 'follow' and y.person_ref = 'follow-' || f.id::text
+                        and y.status <> 'cancelled')
+         -- B. รอโทรอยู่ แต่หัวขบวนของแผนถึง Lumos ก่อนคำตอบไม่ไป (แผนโดนยกเลิกที่ Lumos แล้ว)
+         or (q.status = 'pending' and q.result is null and exists (
+               select 1 from ${queueTable} l
+                where l.channel = 'reminder' and l.job_ref = 'follow'
+                  and l.person_ref = coalesce(q.plan_ref, q.person_ref)
+                  and l.push_accepted_at < d.declined_at))
        )
      order by f.group_id, f.scheduled_at
      limit 200`;
 }
 
-export async function repairDeclinedFollowDays(): Promise<{ resent: number; groups: number; errors: number }> {
-  const out = { resent: 0, groups: 0, errors: 0 };
+export async function repairDeclinedFollowDays(): Promise<{ resent: number; plans: number; errors: number }> {
+  const out = { resent: 0, plans: 0, errors: 0 };
   if (!getLumosPushConfig()) return out;
   const { rows } = await dbQuery<OrphanRow>(declineOrphanSql());
   if (rows.length === 0) return out;
 
-
-  // ยังไม่ถึงเวลา → คืนคิว + ส่งแผนใหม่ทีละชุด
-  const byGroup = new Map<string, string[]>();
+  // ยังไม่ถึงเวลา → คืนคิว + ส่งแผนใหม่ **ทีละแผน** (แผนละวัน — 7 ต.ค. ส่งแค่แผนแรกของชุด วันที่เหลือไม่ถึง Lumos)
+  const byPlan = new Map<string, string[]>();
   for (const r of rows) {
-    if (!r.future || !r.group_id) continue;
-    byGroup.set(r.group_id, [...(byGroup.get(r.group_id) ?? []), r.id]);
+    if (!r.future) continue;
+    byPlan.set(r.plan, [...(byPlan.get(r.plan) ?? []), r.id]);
   }
-  for (const [groupId, ids] of byGroup) {
+  for (const [plan, ids] of byPlan) {
     try {
       await dbQuery(
         `update ${queueTable} set status = 'pending', updated_at = now()
@@ -80,14 +98,14 @@ export async function repairDeclinedFollowDays(): Promise<{ resent: number; grou
       const res = await resyncFollowPlanWithLumos(ids[0], staffNameOfPhone);
       if (res.pushed) {
         out.resent += res.rounds;
-        out.groups += 1;
+        out.plans += 1;
       } else {
         out.errors += 1;
-        logError('follow.declineDayRepair: ส่งแผนใหม่ไม่สำเร็จ', new Error(res.reason ?? 'unknown'), { groupId, rounds: ids.length });
+        logError('follow.declineDayRepair: ส่งแผนใหม่ไม่สำเร็จ', new Error(res.reason ?? 'unknown'), { plan, rounds: ids.length });
       }
     } catch (e) {
       out.errors += 1;
-      logError('follow.declineDayRepair: ชุดนี้ล้ม', e, { groupId });
+      logError('follow.declineDayRepair: แผนนี้ล้ม', e, { plan });
     }
   }
   logInfo('follow.declineDayRepair', out);
