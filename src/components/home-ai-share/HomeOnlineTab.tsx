@@ -1,0 +1,253 @@
+/**
+ * ═══ หน้าหลัก แท็บ "ทีม Online" (เจ้าของ 8 ต.ค. 2569) ═══
+ * ใบขอ → ส่งไปประกาศ → ผลประกาศ → งานอะไรเยอะ (3 มุม) → แต่ละ BU · ทุกก้อนรวมได้เท่าใบขอเข้า (`onlineReportAddsUp`)
+ * ตัวคิด `src/lib/homeOnline.ts` · ตัวโหลด `api/_lib/homeOnlineSql.ts` (โหมด `?online=1` ของ `/api/home-ai-share`)
+ * 🔴 shadcn + Tailwind · สีจาก TONE (เขียว = ปิดครบ · เหลือง = เปิดอยู่/เหลือหา) · ไม่มีประโยคอธิบายบนจอ
+ */
+import React, { useEffect, useRef, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { HomeSection, StatStrip, type StatItem } from '@/components/home-ai-share/HomeSections';
+import { fetchHomeOnline } from '@/lib/homeAiShareApi';
+import type { AiShareWindow } from '@/lib/homeAiShare';
+import {
+  ONLINE_REQUEST_STATES,
+  onlineReportAddsUp,
+  type OnlineCount,
+  type OnlineReport,
+  type OnlineReportResponse,
+  type OnlineRequestState,
+} from '@/lib/homeOnline';
+import { TONE, type ToneKey } from '@/lib/designTokens';
+import { trendBuLabel } from '@/lib/trends/bu';
+import { cn } from '@/lib/utils';
+
+const NUM = new Intl.NumberFormat('th-TH');
+const DAY = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const FULL_DAY = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+/** สีที่มีความหมาย: ปิดครบ = เขียว · เปิดอยู่ (เหลือหา) = เหลือง · ยกเลิก = เทา · หาได้บางส่วนแล้วยกเลิก = ส้ม */
+const STATE_TONE: Record<OnlineRequestState, ToneKey> = {
+  open: 'warn',
+  fullyClosed: 'success',
+  cancelledAll: 'neutral',
+  partialCancelled: 'orange',
+};
+
+function useHomeOnline(q: AiShareWindow & { bu: string | null }, tick: number) {
+  const [data, setData] = useState<OnlineReportResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const qRef = useRef(q);
+  qRef.current = q;
+  useEffect(() => {
+    let alive = true;
+    setError(null);
+    fetchHomeOnline(q)
+      .then((d) => alive && setData(d))
+      .catch((e: unknown) => alive && setError(e instanceof Error && e.message ? e.message : 'โหลดไม่ขึ้น ลองรีเฟรชอีกครั้ง'));
+    return () => {
+      alive = false;
+    };
+  }, [q]);
+  useEffect(() => {
+    if (tick === 0) return;
+    let alive = true;
+    fetchHomeOnline(qRef.current)
+      .then((d) => alive && setData(d))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [tick]);
+  return { data, error: error ?? data?.error ?? null };
+}
+
+const stateItems = (s: Record<OnlineRequestState, number>): StatItem[] =>
+  ONLINE_REQUEST_STATES.map((x) => ({ key: x.key, label: x.label, value: s[x.key], tone: STATE_TONE[x.key] }));
+
+function CountBars({ title, rows, total, testId }: { title: string; rows: OnlineCount[]; total: number; testId: string }) {
+  const max = Math.max(1, ...rows.map((r) => r.n));
+  return (
+    <div className="min-w-0 space-y-2" data-testid={testId}>
+      <h3 className="text-sm font-medium text-foreground">{title}</h3>
+      <ul className="space-y-1.5">
+        {rows.map((r) => (
+          <li key={r.key} className="grid grid-cols-[minmax(0,9rem)_1fr_2.5rem] items-center gap-2 text-sm">
+            <span className={cn('truncate', r.key === 'ไม่ระบุ' ? 'text-muted-foreground' : 'text-foreground')} title={r.label}>
+              {r.label}
+            </span>
+            <span className="h-2 overflow-hidden rounded-full bg-muted" aria-hidden>
+              <span className={cn('block h-full rounded-full', TONE.primary.dot)} style={{ width: `${(r.n / max) * 100}%` }} />
+            </span>
+            <span className="text-right tabular-nums text-foreground">{NUM.format(r.n)}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs tabular-nums text-muted-foreground">รวม {NUM.format(rows.reduce((n, r) => n + r.n, 0))} = ใบขอ {NUM.format(total)}</p>
+    </div>
+  );
+}
+
+function DailyBars({ report }: { report: OnlineReport }) {
+  const days = report.requests.daily;
+  const max = Math.max(1, ...days.map((d) => d.total));
+  return (
+    <div className="space-y-2" data-testid="online-daily">
+      <h3 className="text-sm font-medium text-foreground">เข้ารายวัน</h3>
+      <ul className="space-y-1">
+        {days.map((d) => (
+          <li key={d.day} className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-xs">
+            <span className="tabular-nums text-muted-foreground">{DAY.format(new Date(`${d.day}T00:00:00Z`))}</span>
+            <span className="flex h-3 overflow-hidden rounded-full bg-muted" aria-hidden>
+              {ONLINE_REQUEST_STATES.map((s) =>
+                d.byState[s.key] > 0 ? (
+                  <span key={s.key} className={cn('h-full', TONE[STATE_TONE[s.key]].dot)} style={{ width: `${(d.byState[s.key] / max) * 100}%` }} />
+                ) : null,
+              )}
+            </span>
+            <span className="text-right tabular-nums text-foreground">{NUM.format(d.total)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: number }> = ({ q, tick }) => {
+  const { data, error } = useHomeOnline(q, tick);
+  const report = data?.report ?? null;
+  const thDay = (ymd: string) => FULL_DAY.format(new Date(`${ymd}T00:00:00Z`));
+  const sub = data
+    ? `${data.from === data.to ? thDay(data.from) : `${thDay(data.from)} – ${thDay(data.to)}`} · นับตามวันที่ต้องการคน${data.bu ? ` · ${trendBuLabel(data.bu)}` : ' · ทุก BU'}`
+    : null;
+  if (error) return <p className={cn('text-sm', TONE.danger.value)}>{error}</p>;
+  if (!report) return <Skeleton className="h-96 w-full rounded-2xl" />;
+  const ok = onlineReportAddsUp(report);
+  const r = report.requests;
+  return (
+    <div className="space-y-5" data-testid="home-online">
+      {!ok ? (
+        <p className={cn('text-xs', TONE.danger.value)} data-testid="online-mismatch">
+          เลขบางก้อนรวมไม่เท่าใบขอเข้า
+        </p>
+      ) : null}
+
+      <HomeSection title="ใบขอ" sub={sub} testId="online-requests">
+        <StatStrip
+          testId="online-request-states"
+          items={[{ key: 'total', label: 'ใบขอเข้า', value: r.total, unit: `ใบ · ${NUM.format(r.positions)} อัตรา` }, ...stateItems(r.byState)]}
+        />
+        <DailyBars report={report} />
+      </HomeSection>
+
+      <HomeSection title="ส่งไปประกาศ" sub={sub} testId="online-posting">
+        <StatStrip
+          testId="online-posting-strip"
+          items={[
+            { key: 'total', label: 'ใบขอเข้า', value: report.posting.total },
+            { key: 'released', label: 'ประกาศแล้ว', value: report.posting.released, tone: 'success' },
+            { key: 'notReleasedOpen', label: 'ยังไม่ประกาศ (ใบยังเปิด)', value: report.posting.notReleasedOpen, tone: 'warn' },
+            { key: 'notReleasedEnded', label: 'ไม่ได้ประกาศ (จบไปแล้ว)', value: report.posting.notReleasedEnded, tone: 'neutral' },
+          ]}
+        />
+      </HomeSection>
+
+      <HomeSection title="ผลประกาศ" sub={sub} testId="online-results">
+        <StatStrip
+          testId="online-results-strip"
+          items={[
+            { key: 'released', label: 'ประกาศแล้ว', value: report.results.released },
+            { key: 'with', label: 'มีคนสมัคร', value: report.results.withApplications, tone: 'success' },
+            { key: 'without', label: 'ยังไม่มีคนสมัคร', value: report.results.withoutApplications, tone: 'warn' },
+            { key: 'apps', label: 'ใบสมัครรวม', value: report.results.applications, unit: 'ใบ' },
+          ]}
+        />
+        <div className="overflow-x-auto">
+          <Table data-testid="online-top">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">ใบขอ</TableHead>
+                <TableHead className="text-xs">หน่วยงาน · ตำแหน่ง</TableHead>
+                <TableHead className="text-xs">BU</TableHead>
+                <TableHead className="text-right text-xs">คนสมัคร</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {report.results.top.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                    ไม่มีใบที่ประกาศในช่วงนี้
+                  </TableCell>
+                </TableRow>
+              ) : (
+                report.results.top.map((t) => (
+                  <TableRow key={t.requestNo}>
+                    <TableCell className="whitespace-nowrap text-sm tabular-nums">{t.requestNo}</TableCell>
+                    <TableCell className="text-sm">{[t.unitName, t.position].filter(Boolean).join(' · ') || '—'}</TableCell>
+                    <TableCell className="text-sm">{t.bu ?? '—'}</TableCell>
+                    <TableCell className="text-right text-sm font-medium tabular-nums">{NUM.format(t.applications)}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </HomeSection>
+
+      <HomeSection title="งานอะไรเยอะ" sub={sub} testId="online-types">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <CountBars title="อุตสาหกรรมลูกค้า" rows={report.types.industry} total={r.total} testId="online-type-industry" />
+          <CountBars title="ราชการ / เอกชน" rows={report.types.sector} total={r.total} testId="online-type-sector" />
+          <CountBars title="ตำแหน่ง" rows={report.types.position} total={r.total} testId="online-type-position" />
+        </div>
+      </HomeSection>
+
+      <HomeSection title="แต่ละ BU" sub={sub} testId="online-bu">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">BU</TableHead>
+                <TableHead className="text-right text-xs">ใบขอเข้า</TableHead>
+                {ONLINE_REQUEST_STATES.map((s) => (
+                  <TableHead key={s.key} className="whitespace-nowrap text-right text-xs">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className={cn('h-2 w-2 rounded-full', TONE[STATE_TONE[s.key]].dot)} aria-hidden />
+                      {s.label}
+                    </span>
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {report.bu.map((b) => (
+                <TableRow key={b.bu ?? 'none'} data-testid={`online-bu-${b.bu ?? 'none'}`}>
+                  <TableCell className="text-sm">{b.bu ?? 'ไม่ระบุ BU'}</TableCell>
+                  <TableCell className="text-right text-sm font-medium tabular-nums">{NUM.format(b.total)}</TableCell>
+                  {ONLINE_REQUEST_STATES.map((s) => (
+                    <TableCell key={s.key} className="text-right text-sm tabular-nums">
+                      {NUM.format(b.byState[s.key])}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+            <TableFooter>
+              <TableRow className="font-medium">
+                <TableCell className="text-sm">รวม</TableCell>
+                <TableCell className="text-right text-sm tabular-nums">{NUM.format(r.total)}</TableCell>
+                {ONLINE_REQUEST_STATES.map((s) => (
+                  <TableCell key={s.key} className="text-right text-sm tabular-nums">
+                    {NUM.format(r.byState[s.key])}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </div>
+      </HomeSection>
+    </div>
+  );
+};
+
+export default HomeOnlineTab;

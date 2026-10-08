@@ -46,6 +46,7 @@ import { countPill } from '@/lib/teamOnline';
 import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
 import FollowCallerDialog from '@/components/home-ai-share/FollowCallerDialog';
+import HomeOnlineTab from '@/components/home-ai-share/HomeOnlineTab';
 import AiShareLumosStats, { FOLLOW_RESULT_COLS, useHomeLumosSummary } from '@/components/home-ai-share/AiShareLumosStats';
 import {
   followBuSplit,
@@ -205,6 +206,8 @@ const BLOCKS: readonly BlockMeta[] = [
 
 /** หัวข้อที่เลือกไว้ล่าสุด — จำในเครื่องของคนดูเท่านั้น (อ่านไม่ได้ = กลับไปติดตาม) */
 const BLOCK_STORE = 'jarvis:home-ai-share:block';
+/** ค่าของปุ่มแท็บทีม Online ในแถบหัวข้อ (ไม่ใช่ `AiShareBlockKey`) */
+const ONLINE_TAB = 'online';
 function readBlock(): AiShareBlockKey {
   try {
     const v = window.localStorage.getItem(BLOCK_STORE);
@@ -227,6 +230,11 @@ const HomeAiSharePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [block, setBlock] = useState<AiShareBlockKey>(readBlock);
+  /**
+   * แท็บทีม Online (เจ้าของ 8 ต.ค. 2569 "แยกหน้าได้จาก 4 แท็บเป็น 5 แท็บ") — ใบขอ → ประกาศ → ผลประกาศ → ประเภทงาน → BU
+   * แยกจาก `block` (ไม่ใช่ก้อนของตัวนับกล่องเดิม) · เลือกแล้วส่วนของหัวข้อเดิมซ่อนทั้งหมด
+   */
+  const [online, setOnline] = useState(false);
   /** BU ที่เลือก (null = ทุก BU) — ส่งไปทุกเส้นของหน้า · บัญชีที่ถูกล็อก BU เซิร์ฟเวอร์บังคับเอง */
   const [bu, setBu] = useState<string | null>(null);
   /**
@@ -245,7 +253,12 @@ const HomeAiSharePage: React.FC = () => {
   const winQ = useMemo(() => ({ ...win, bu }), [win, bu]);
   const cardQ = useMemo(() => ({ ...cardWin, bu }), [cardWin, bu]);
   const choose = (v: string) => {
+    if (v === ONLINE_TAB) {
+      setOnline(true);
+      return;
+    }
     if (!isAiShareBlock(v)) return;
+    setOnline(false);
     setBlock(v);
     saveBlock(v);
   };
@@ -420,8 +433,14 @@ const HomeAiSharePage: React.FC = () => {
    * AI % ของแต่ละหัวข้อขึ้นตอนจี้ (`noteOf`) · ปุ่มที่เลือก = เบอร์กันดี (`primary`)
    */
   const picker = (
-    <Tabs value={meta.key} onValueChange={choose}>
+    <Tabs value={online ? ONLINE_TAB : meta.key} onValueChange={choose}>
       <TabsList aria-label="เลือกหัวข้อ" className="h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+        <TabsTrigger
+          value={ONLINE_TAB}
+          className="h-10 rounded-full border border-foreground/10 bg-card px-5 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+        >
+          ทีม Online
+        </TabsTrigger>
         {BLOCKS.map((b) => (
           <TabsTrigger
             key={b.key}
@@ -725,6 +744,9 @@ const HomeAiSharePage: React.FC = () => {
       {blockError ? <p className={cn('text-xs', TONE.danger.value)}>{blockError}</p> : null}
       {flag ? <p className={cn('text-xs', TONE.warn.value)}>{flag}</p> : null}
 
+      {online ? <HomeOnlineTab q={winQ} tick={tick} /> : null}
+      {online ? null : (
+      <>
       {/* ชื่อหัวข้อสำหรับโปรแกรมอ่านจอ — งานสรรหา/จับคู่งาน การ์ดแรกใช้ชื่อส่วน (ติดตาม/ดูแล การ์ดแรกคือชื่อหัวข้อเอง) */}
       {meta.key === 'applicants' || meta.key === 'matching' ? <h2 className="sr-only">{meta.title}</h2> : null}
 
@@ -840,6 +862,8 @@ const HomeAiSharePage: React.FC = () => {
         <AiShareLumosStats block={meta.key} unit={meta.unit} data={lumos.current} failed={lumos.failed} />
       ) : (
         <TopicReportCard block={meta.key} report={report} failed={topic.failed} unit={meta.unit} />
+      )}
+      </>
       )}
 
       {/* หัวข้อติดตาม กด AI โทร / คนโทร = แยกเรื่อง → ผล → รายชื่อ (เจ้าของ 7 ต.ค. 2569 "ป๊อปเดิม เปลี่ยนข้างใน") */}

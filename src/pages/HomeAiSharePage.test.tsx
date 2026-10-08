@@ -279,7 +279,14 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     // หัวข้อเป็นปุ่มเม็ดยาวเรียงกัน (7 ต.ค. 2569) — ติดตามถูกเลือกอยู่
     const picker = screen.getByRole('tablist', { name: 'เลือกหัวข้อ' });
     expect(within(picker).getByRole('tab', { selected: true }).textContent).toContain('ติดตาม');
-    expect(within(picker).getAllByRole('tab')).toHaveLength(4);
+    // 8 ต.ค. 2569 เจ้าของ "แยกหน้าได้จาก 4 แท็บเป็น 5 แท็บ" — ทีม Online เป็นปุ่มแรก
+    expect(within(picker).getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'ทีม Online',
+      expect.stringContaining('ติดตาม'),
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+    ]);
     // แถวเดียวกัน: ปฏิทิน → ปุ่มหัวข้อ · ชื่อหน้าอยู่บนสุด
     const calendar = screen.getByRole('button', { name: /ช่วงเวลา/ });
     expect(calendar.compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

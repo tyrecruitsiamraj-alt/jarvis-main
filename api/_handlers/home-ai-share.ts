@@ -18,6 +18,9 @@
  * ตัวนับล้วน (ไม่มีชื่อ/เบอร์) ⇒ เปิดเท่ากับกล่องตัวเลข · นิยามอยู่ `src/lib/homeCallResults.ts`
  */
 import { withAuth, sendError, type ApiRes, type AuthedReq } from '../_lib/http.js';
+import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
+import { buildOnlineReport, type OnlineReportResponse } from '../../src/lib/homeOnline.js';
+import { toYmdBangkok } from '../../src/lib/dateTh.js';
 import { checkApiAccess, type ApiResource } from '../_lib/rbac.js';
 import type { UserRole } from '../_lib/auth.js';
 import { respondServiceError } from '../_lib/domainErrors.js';
@@ -603,6 +606,29 @@ async function handler(req: AuthedReq, res: ApiRes) {
       } catch (e) {
         logWarn('home-ai-share report failed', { block, error: errText(e) });
         body.error = 'โหลดผลโทรไม่ขึ้น ลองรีเฟรชอีกครั้ง';
+      }
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json(body);
+    }
+
+    // `?online=1` = แท็บทีม Online (8 ต.ค. 2569) — ใบขอ → ประกาศ → ผลประกาศ → ประเภทงาน → BU · ช่วง/BU เดียวกับกล่อง
+    // ช่วง "ทั้งหมด" = ย้อน 365 วัน (ตัวดึงใบขอของ ERP ต้องมีวันเริ่ม)
+    if (q.online !== undefined) {
+      const { start, end } = aiShareBounds(win, new Date());
+      const ymd = (d: Date) => toYmdBangkok(d);
+      const from = start ? ymd(start) : ymd(new Date(end.getTime() - 365 * 86_400_000));
+      const to = ymd(new Date(end.getTime() - 1));
+      const body: OnlineReportResponse = { generated_at: new Date().toISOString(), from, to, bu, report: null, error: null };
+      if (scope.mode === 'none') {
+        body.error = 'บัญชีนี้ยังไม่ได้ผูกแผนก เลยยังดูข้อมูลทีม Online ไม่ได้';
+        return res.status(200).json(body);
+      }
+      try {
+        const rows = await loadOnlineRequestRows({ from, to, bu, departmentScope: { mode: 'all' } as DepartmentScope });
+        body.report = buildOnlineReport(rows, { from, to });
+      } catch (e) {
+        logWarn('home-ai-share online failed', { error: errText(e) });
+        body.error = 'โหลดข้อมูลทีม Online ไม่ขึ้น ลองรีเฟรชอีกครั้ง';
       }
       res.setHeader?.('Cache-Control', 'no-store');
       return res.status(200).json(body);

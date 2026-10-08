@@ -1,4 +1,5 @@
 /** ตัวดึง `/api/home-ai-share` — หน้าหลัก "ระบบไปกี่ %" (30 ก.ย. 2569) */
+import type { OnlineReportResponse } from '@/lib/homeOnline';
 import { apiFetch } from '@/lib/apiFetch';
 import type {
   AiShareBlockKey,
@@ -61,6 +62,11 @@ export function fetchFollowJourney(q: AiShareWindow & { bu?: string | null }): P
 /** สรุปแบบบอท Lumos (7 ต.ค. 2569) — งานที่ส่งให้ AI ช่วงเดียวกับปฏิทิน */
 export function fetchHomeLumosSummary(q: AiShareWindow & { bu?: string | null }): Promise<HomeLumosSummaryResponse> {
   return read<HomeLumosSummaryResponse>(`/api/home-ai-share${queryOf(q, { summary: 'lumos' })}`);
+}
+
+/** แท็บทีม Online (8 ต.ค. 2569) — ใบขอ → ประกาศ → ผลประกาศ → ประเภทงาน → BU */
+export function fetchHomeOnline(q: AiShareWindow & { bu?: string | null }): Promise<OnlineReportResponse> {
+  return read<OnlineReportResponse>(`/api/home-ai-share${queryOf(q, { online: '1' })}`);
 }
 
 /** รายงานผลโทร งานสรรหา / จับคู่งาน / ดูแลหลังเริ่มงาน (7 ต.ค. 2569) */
