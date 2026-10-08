@@ -56,6 +56,16 @@ export const FOLLOW_RESULT_COLS: ReadonlyArray<{ key: FollowBucketKey; label: st
   { key: 'waiting', label: 'รอดำเนินการ', tone: FOLLOW_MATRIX_COL_TONE.waiting },
 ];
 
+/**
+ * ชั้น "โทรแล้ว" (เจ้าของ 8 ต.ค. 2569: *"บอกว่า Ai โทร ทั้งหมด ไป ไม่ไป ฯลฯ แต่ไม่มีบอกว่าโทรไปแล้วเท่าไหร่ แล้วค่อยบอกว่า ไป ไม่ไป"*)
+ * ทั้งหมด = โทรแล้ว (ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · ล้มเหลว) + ยังไม่ได้โทร (ยกเลิก · รอดำเนินการ) — ทุกแถวต้องลงตัว
+ */
+const FOLLOW_CALLED_KEYS: readonly FollowBucketKey[] = ['went', 'notWent', 'reschedule', 'unclear', 'failed'];
+const CALLED_COLS = FOLLOW_RESULT_COLS.filter((c) => FOLLOW_CALLED_KEYS.includes(c.key));
+const NOT_CALLED_COLS = FOLLOW_RESULT_COLS.filter((c) => !FOLLOW_CALLED_KEYS.includes(c.key));
+const followCalledOf = (buckets: Record<FollowBucketKey, number>): number =>
+  FOLLOW_CALLED_KEYS.reduce((n, k) => n + (buckets[k] ?? 0), 0);
+
 export const hasLumosResults = (block: AiShareBlockKey) => block === 'follow';
 
 /** ตัวโหลดตัวเดียวของหน้า — ช่วงตามแท่งที่กด · อัปเดตสดเงียบ ๆ รอบเดียวกับหน้า */
@@ -124,7 +134,7 @@ const CALLER_LABEL = { ai: 'AI โทร', manual: 'คนโทร' } as const;
 
 /**
  * ติดตาม — ก้อนละ BU (เจ้าของ "Bu เอาไปรวมตรงผลเลย") · หัวก้อน = BU · ทั้งหมด · AI โทร · คนโทร
- * ตาราง = เรื่อง × ใครโทร (เฉพาะที่มีรายชื่อ) × ผล 7 ช่อง · แถวรวมของ BU · BU ไม่มีงานไม่ขึ้น
+ * ตาราง = เรื่อง × ใครโทร (เฉพาะที่มีรายชื่อ) × ทั้งหมด → โทรแล้ว (รวม + ผล 5) → ยังไม่ได้โทร (ยกเลิก · รอ) · แถวรวมของ BU · BU ไม่มีงานไม่ขึ้น
  * บรรทัดล่าง = ทุก BU บวกกัน = กล่องทั้งหมดด้านบน
  */
 function FollowResults({
@@ -182,12 +192,33 @@ function FollowResults({
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
+                {/* หัว 2 ชั้น: โทรแล้ว (รวม + ผล 5 แบบ) | ยังไม่ได้โทร (ยกเลิก · รอดำเนินการ) */}
+                <TableRow className="border-0 hover:bg-transparent">
+                  <TableHead className="text-xs" rowSpan={2}>เรื่อง</TableHead>
+                  <TableHead className="text-xs" rowSpan={2}>ใครโทร</TableHead>
+                  <TableHead className="whitespace-nowrap text-right text-xs" rowSpan={2}>ทั้งหมด</TableHead>
+                  <TableHead className="border-l border-foreground/10 text-center text-xs" colSpan={1 + CALLED_COLS.length}>
+                    โทรแล้ว
+                  </TableHead>
+                  <TableHead className="border-l border-foreground/10 text-center text-xs" colSpan={NOT_CALLED_COLS.length}>
+                    ยังไม่ได้โทร
+                  </TableHead>
+                </TableRow>
                 <TableRow>
-                  <TableHead className="text-xs">เรื่อง</TableHead>
-                  <TableHead className="text-xs">ใครโทร</TableHead>
-                  <TableHead className="whitespace-nowrap text-right text-xs">ทั้งหมด</TableHead>
-                  {FOLLOW_RESULT_COLS.map((c) => (
+                  <TableHead className="whitespace-nowrap border-l border-foreground/10 text-right text-xs">รวม</TableHead>
+                  {CALLED_COLS.map((c) => (
                     <TableHead key={c.key} className="whitespace-nowrap text-right text-xs">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className={cn('h-2 w-2 rounded-full', TONE[c.tone].dot)} aria-hidden />
+                        {c.label}
+                      </span>
+                    </TableHead>
+                  ))}
+                  {NOT_CALLED_COLS.map((c, i) => (
+                    <TableHead
+                      key={c.key}
+                      className={cn('whitespace-nowrap text-right text-xs', i === 0 && 'border-l border-foreground/10')}
+                    >
                       <span className="inline-flex items-center gap-1.5">
                         <span className={cn('h-2 w-2 rounded-full', TONE[c.tone].dot)} aria-hidden />
                         {c.label}
@@ -204,8 +235,16 @@ function FollowResults({
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm text-foreground">{CALLER_LABEL[r.caller]}</TableCell>
                     <TableCell className="text-right font-medium">{num(r.total)}</TableCell>
-                    {FOLLOW_RESULT_COLS.map((c) => (
+                    <TableCell className="border-l border-foreground/10 text-right font-medium" data-testid="bu-cell-called">
+                      {num(followCalledOf(r.buckets))}
+                    </TableCell>
+                    {CALLED_COLS.map((c) => (
                       <TableCell key={c.key} className="text-right">
+                        {num(r.buckets[c.key])}
+                      </TableCell>
+                    ))}
+                    {NOT_CALLED_COLS.map((c, j) => (
+                      <TableCell key={c.key} className={cn('text-right', j === 0 && 'border-l border-foreground/10')}>
                         {num(r.buckets[c.key])}
                       </TableCell>
                     ))}
@@ -218,8 +257,14 @@ function FollowResults({
                     รวม {b.bu ?? 'ไม่ระบุ BU'}
                   </TableCell>
                   <TableCell className="text-right">{num(b.sum.total)}</TableCell>
-                  {FOLLOW_RESULT_COLS.map((c) => (
+                  <TableCell className="border-l border-foreground/10 text-right">{num(followCalledOf(b.sum.buckets))}</TableCell>
+                  {CALLED_COLS.map((c) => (
                     <TableCell key={c.key} className="text-right">
+                      {num(b.sum.buckets[c.key])}
+                    </TableCell>
+                  ))}
+                  {NOT_CALLED_COLS.map((c, j) => (
+                    <TableCell key={c.key} className={cn('text-right', j === 0 && 'border-l border-foreground/10')}>
                       {num(b.sum.buckets[c.key])}
                     </TableCell>
                   ))}

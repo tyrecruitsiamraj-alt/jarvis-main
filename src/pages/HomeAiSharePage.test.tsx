@@ -681,11 +681,15 @@ describe('หน้าหลักอ่านไล่บนลงล่าง 
       within(within(box).getByTestId(key))
         .getAllByRole('cell')
         .map((c) => c.textContent);
-    // เรื่อง · ใครโทร · ทั้งหมด · ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · ล้มเหลว · ยกเลิก · รอ (ลำดับเจ้าของ 8 ต.ค. 2569)
-    expect(cells('bu-row-LBD-main-ai')).toEqual(['ติดตามคนเริ่มงาน', 'AI โทร', '673', '469', '0', '0', '15', '99', '90', '0']);
-    expect(cells('bu-row-LBD-main-manual')).toEqual(['', 'คนโทร', '106', '77', '1', '1', '0', '3', '24', '0']);
+    // เรื่อง · ใครโทร · ทั้งหมด · **โทรแล้ว** (รวม · ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · ล้มเหลว) · ยังไม่ได้โทร (ยกเลิก · รอ)
+    // 8 ต.ค. 2569 เจ้าของ: "ไม่มีบอกว่าโทรไปแล้วเท่าไหร่ แล้วค่อยบอกว่า ไป ไม่ไป" — ทั้งหมด = โทรแล้ว + ยกเลิก + รอ (673 = 583 + 90 + 0)
+    expect(cells('bu-row-LBD-main-ai')).toEqual(['ติดตามคนเริ่มงาน', 'AI โทร', '673', '583', '469', '0', '0', '15', '99', '90', '0']);
+    expect(cells('bu-row-LBD-main-manual')).toEqual(['', 'คนโทร', '106', '82', '77', '1', '1', '0', '3', '24', '0']);
     // ส่งคนแทน AI = 0 ก็ขึ้น (เทียบ AI กับคนได้ทุกเรื่อง)
-    expect(cells('bu-row-LBD-replacement-ai')).toEqual(['ติดตามส่งคนแทน', 'AI โทร', '0', '0', '0', '0', '0', '0', '0', '0']);
+    expect(cells('bu-row-LBD-replacement-ai')).toEqual(['ติดตามส่งคนแทน', 'AI โทร', '0', '0', '0', '0', '0', '0', '0', '0', '0']);
+    expect(within(lbd).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(
+      expect.arrayContaining(['โทรแล้ว', 'รวม', 'ยังไม่ได้โทร']),
+    );
     expect(cells('bu-row-LBD-total')[1]).toBe('1,417');
     expect(within(lbd).getAllByText('673').length).toBeGreaterThan(0);
     expect(within(box).getByTestId('bu-block-LBA')).toBeTruthy();
