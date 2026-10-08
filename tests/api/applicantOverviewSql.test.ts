@@ -88,7 +88,7 @@ describe.skipIf(!hasDb)('sum-check + bucket-parity กับฐานจริ�
     expect(Number(o.uncalled_age_0_3) + Number(o.uncalled_age_4_7) + Number(o.uncalled_age_over7)).toBe(
       Number(o.total) - Number(o.called),
     );
-  }, 60_000); // อ่านฐานจริง · ช้าเพราะไม่มีดัชนีเบอร์ในคิว (5–8 ต.ค. 2569 ตก timeout ซ้ำ ~17 วิ) → migration 139 เหลือ ~0.1 วิ
+  }, 20_000); // อ่านฐานจริง · เคยช้าเพราะไม่มีดัชนีเบอร์ในคิว (5–8 ต.ค. 2569 ~17 วิ) → migration 139 เหลือ ~0.1 วิ
 
   it('เลขบนกล่อง = จำนวนแถวจาก bucketCondition เดียวกัน (parity ทุกถัง)', async () => {
     const { dbQuery } = await import('../../api/_lib/postgres.js');
@@ -114,8 +114,7 @@ describe.skipIf(!hasDb)('sum-check + bucket-parity กับฐานจริ�
       );
       expect(`${bucket}=${cnt[0].n}`).toBe(`${bucket}=${want}`);
     }
-  }, 90_000); // อ่านฐานจริงทุกถัง · 8 ต.ค. 2569 ใช้ ~17 วิ ต่อคิวรีจนชนเพดาน → ดัชนีเบอร์ในคิว (migration 139) เหลือ ~0.1 วิ
-  // (ลดเพดานกลับหลัง migration 139 ขึ้นฐานจริงแล้ว)
+  }, 20_000); // อ่านฐานจริงทุกถัง · 8 ต.ค. 2569 เคยใช้ ~17 วิ ต่อคิวรี → ดัชนีเบอร์ในคิว (migration 139) เหลือ ~0.1 วิ (วัดบนฐานจริงหลัง deploy)
 
   it('claimed_idle breakdown รวมเท่ากับถัง claimed_idle', async () => {
     const { dbQuery } = await import('../../api/_lib/postgres.js');
