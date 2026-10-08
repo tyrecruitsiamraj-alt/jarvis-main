@@ -309,6 +309,12 @@ const FollowPage: React.FC = () => {
    * เช่น เคยตามไปแล้ว 2 ครั้ง ชุดใหม่เลือก 3 → วันถัดไปนับ 4, 5 … · 1 = นับใหม่ตามเดิม (ไม่ส่งค่า)
    */
   const [planDayStart, setPlanDayStart] = useState(1);
+  /**
+   * "ติดตามครั้งที่" รายวันของตารางหลายวัน (140 · เจ้าของ 8 ต.ค. 2569: *"ย้ายให้มันอยู่ตรงหน้าของวันที่เลือกติดตามได้มั้ย
+   * พฤหัส เลือกติดตามครั้งที่ 1 · ศุกร์ ครั้งที่ 2 · เสาร์ ครั้งที่ 3 ไปเรื่อย ๆ จนถึงครั้งที่ 7"*)
+   * ไม่ได้เลือก = นับต่อจากวันแรกของช่วง (วันแรก 1) · โหมดระบุเวลาเองยังใช้ `planDayStart` ช่องเดียว
+   */
+  const [dayNos, setDayNos] = useState<Record<string, number>>({});
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [roundTimes, setRoundTimes] = useState<string[]>(() => ['07:00']);
@@ -678,6 +684,7 @@ const FollowPage: React.FC = () => {
     setCallModes(['ai']);
     setDateFrom('');
     setPlanDayStart(1);
+    setDayNos({});
     setDateTo('');
     setRoundTimes(['07:00']);
     setSkippedDays(new Set());
@@ -777,6 +784,14 @@ const FollowPage: React.FC = () => {
       byDay: staffPhoneByDay,
       shared: staffPhoneAll,
     });
+  /** ติดตามครั้งที่ของวันนี้ — เลือกไว้ หรือนับต่อจากวันแรกของช่วง (ตัวเดียวทั้งจอและตอนส่ง) */
+  const dayNoOf = (ymd: string): number => {
+    const picked = dayNos[ymd];
+    if (picked) return picked;
+    const off = Math.round((Date.parse(`${ymd}T00:00:00Z`) - Date.parse(`${dateFrom}T00:00:00Z`)) / 86_400_000);
+    return Number.isFinite(off) && off >= 0 ? Math.min(99, off + 1) : 1;
+  };
+
   /** วันนี้ใครโทร (AI · คนโทร · ไม่โทร) — ตัวเดียวที่ตัดสินทั้งจอและตอนส่ง */
   const modeOfScheduleDay = (day: string): ScheduleDayMode =>
     skippedDays.has(day) ? 'off' : manualDays.has(day) ? 'manual' : 'ai';
@@ -1097,7 +1112,7 @@ const FollowPage: React.FC = () => {
                 call_mode: first.callMode,
                 time_tbd: first.timeTbd || undefined,
                 group_id: groupId,
-                plan_day_start: planDayStart > 1 ? planDayStart : undefined,
+                // ตารางหลายวัน = ครั้งที่รายวัน (plan_day_no) แทนเลขวันแรกช่องเดียว
                 unit_name: unitName.trim() || undefined,
                 site_code: siteCode.trim() || undefined,
                 rounds: dayCalls.map((c) => ({
@@ -1106,6 +1121,7 @@ const FollowPage: React.FC = () => {
                   call_round: c.callRound,
                   call_mode: c.callMode,
                   time_tbd: c.timeTbd || undefined,
+                  plan_day_no: dayNoOf(c.day),
                 })),
               });
               for (const createdEntry of createdEntries) {
@@ -2456,7 +2472,8 @@ const FollowPage: React.FC = () => {
               </button>
             </div>
 
-            {/* ติดตามครั้งที่ (เจ้าของ 6 ต.ค. 2569) — ใช้ทั้งสองโหมด · เลขวันแรกของชุด วันถัดไปนับต่อ */}
+            {/* ติดตามครั้งที่ (เจ้าของ 6 ต.ค. 2569) — โหมดระบุเวลาเอง · ตารางหลายวันย้ายไปหน้าแต่ละวัน (8 ต.ค. 2569) */}
+            {scheduleMode ? null : (
             <div className="flex items-center gap-2">
               <span className="ml-1 text-xs font-medium text-muted-foreground">ติดตามครั้งที่</span>
               <ChoiceDropdown<string>
@@ -2466,6 +2483,7 @@ const FollowPage: React.FC = () => {
                 ariaLabel="ติดตามครั้งที่"
               />
             </div>
+            )}
 
             {scheduleMode ? (
               /* ตารางโทร: ช่วงวัน × รอบเวลา/วัน (เจ้าของสั่ง 16 ส.ค. — เช่น 1-7 วันละ 2 รอบ) */
@@ -2587,6 +2605,17 @@ const FollowPage: React.FC = () => {
                               >
                                 {dayLabel(d)}
                               </span>
+                              {mode === 'off' ? null : (
+                                <span className="flex items-center gap-1.5" data-testid={`day-no-${d}`}>
+                                  <span className="text-xs text-muted-foreground">ติดตามครั้งที่</span>
+                                  <ChoiceDropdown<string>
+                                    value={String(dayNoOf(d))}
+                                    options={Array.from({ length: 10 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
+                                    onChange={(v) => setDayNos((prev) => ({ ...prev, [d]: Number(v) }))}
+                                    ariaLabel={`${dayLabel(d)} — ติดตามครั้งที่`}
+                                  />
+                                </span>
+                              )}
                               {choices.map((c) => (
                                 <label key={c.value} className="flex cursor-pointer items-center gap-1.5">
                                   <Checkbox

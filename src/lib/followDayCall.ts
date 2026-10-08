@@ -23,7 +23,7 @@ export type FollowDayCallPos = {
 };
 
 type DayCallRow = Pick<FollowEntry, 'id' | 'group_id' | 'scheduled_at' | 'call_round' | 'cancelled'> &
-  Partial<Pick<FollowEntry, 'source_ref' | 'plan_day_start'>>;
+  Partial<Pick<FollowEntry, 'source_ref' | 'plan_day_start' | 'plan_day_no'>>;
 
 /**
  * "ติดตามครั้งที่" ที่ตั้งตอนเพิ่ม (137 · เจ้าของ 6 ต.ค. 2569) — เลขวันแรกของชุด · ไม่ตั้ง/1 = นับ 1 ตามเดิม
@@ -105,7 +105,13 @@ export function followDayCallPositions(entries: readonly DayCallRow[]): Map<stri
     const multiDay = days.length > 1;
     const start = startOf(rows);
     for (const [ymd, list] of byDay) {
-      const day = first && (multiDay || start !== null) ? daysBetween(first, ymd) + (start ?? 1) : null;
+      /** เลือกเลขรายวันไว้ (140 · เจ้าของ 8 ต.ค. 2569 "พฤหัส ครั้งที่ 1 · ศุกร์ ครั้งที่ 2 …") = ใช้ตรง ๆ */
+      const explicit = list.reduce<number | null>(
+        (m, r) => (typeof r.plan_day_no === 'number' && r.plan_day_no >= 1 && (m === null || r.plan_day_no < m) ? r.plan_day_no : m),
+        null,
+      );
+      const day =
+        explicit ?? (first && (multiDay || start !== null) ? daysBetween(first, ymd) + (start ?? 1) : null);
       const all = [...list].sort(byRoundThenTime);
       const live = all.filter((r) => !r.cancelled);
       for (const r of all) {

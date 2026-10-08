@@ -54,6 +54,8 @@ export type FollowEntry = {
   time_tbd?: boolean;
   /** "ติดตามครั้งที่" ของวันแรกในชุด (137 · 6 ต.ค. 2569) — null/1 = นับ 1 ตามเดิม · เลขวันคิดที่ `followDayCall.ts` */
   plan_day_start?: number | null;
+  /** "ติดตามครั้งที่" ของวันของสายนี้ (140 · เลือกรายวันในตารางหลายวัน 8 ต.ค. 2569) — มีค่า = เลขวันบนจอใช้ค่านี้ */
+  plan_day_no?: number | null;
   /** ประเภทใบส่งคนแทนจาก iRecruit (136) — 'EX' = คนนอก · ค่าอื่น = คนใน · null = ไม่รู้ */
   replace_type?: string | null;
   /** ที่มาของแถว (133) — `irecruit-replace:<ใบ>:<ช่อง>:<คน>` = ดึงจาก iRecruit · null = คีย์เอง */
@@ -160,6 +162,8 @@ export type NewFollowEntry = {
     call_mode?: 'ai' | 'manual';
     /** ยังไม่กำหนดเวลา (134) — เวลาใน scheduled_at เป็นค่าแทน · ฝั่ง API บังคับเป็นคนโทร */
     time_tbd?: boolean;
+    /** "ติดตามครั้งที่" ของวันนี้ (140) */
+    plan_day_no?: number;
   }>;
   /**
    * ใครโทร (121 · เจ้าของสั่ง 20 ก.ย. 2569) — `'manual'` = **ไม่ส่งเข้าคิว AI เลย**

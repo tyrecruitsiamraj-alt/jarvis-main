@@ -86,6 +86,7 @@ type FollowRow = {
   time_tbd?: boolean | null;
   /** ติดตามครั้งที่ของวันแรกในชุด (137) */
   plan_day_start?: number | null;
+  plan_day_no?: number | null;
   replace_type?: string | null;
   source_ref?: string | null;
   /** หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (migration 096) — snapshot ตอนกรอก ไม่ใช่ FK */
@@ -164,6 +165,7 @@ function toResponse(r: FollowRow) {
     /** ยังไม่กำหนดเวลา (134) — จอโชว์ "ยังไม่ระบุเวลา" แทนเวลา */
     time_tbd: r.time_tbd === true,
     plan_day_start: typeof r.plan_day_start === 'number' && r.plan_day_start > 1 ? r.plan_day_start : null,
+    plan_day_no: typeof r.plan_day_no === 'number' && r.plan_day_no >= 1 ? r.plan_day_no : null,
     /** ประเภทใบส่งคนแทนจาก iRecruit (136) — EX = คนนอก · อื่น ๆ = คนใน · null = ไม่รู้ */
     replace_type: r.replace_type?.trim() || null,
     /** ที่มาของแถว (133) — หน้าจออ่านสายที่ 1/2/3 ของแถวจาก iRecruit จากตรงนี้ */
@@ -484,6 +486,8 @@ export type FollowRoundInput = {
   note?: string | null;
   /** คีย์ของสาย (ส่งคนแทนคีย์เอง `manual-replace:<ใบ>:<สาย>:m`) */
   sourceRef?: string | null;
+  /** "ติดตามครั้งที่" ของวันของสายนี้ (140 · เลือกรายวันในตารางหลายวัน 8 ต.ค. 2569) */
+  planDayNo?: number | null;
 };
 
 /**
@@ -510,6 +514,7 @@ export function parseFollowRounds(raw: unknown, primary: FollowRoundInput): Foll
     const roundRaw = Number(o.call_round);
     const modeRaw = typeof o.call_mode === 'string' ? o.call_mode.trim() : '';
     const timeTbd = o.time_tbd === true;
+    const dayNoRaw = Number(o.plan_day_no);
     out.push({
       when: at,
       staffPhone: phoneRaw || primary.staffPhone,
@@ -518,6 +523,7 @@ export function parseFollowRounds(raw: unknown, primary: FollowRoundInput): Foll
       // 🔴 ยังไม่ชัวร์เวลา = คนโทรเสมอ (ห้ามส่ง AI โดยไม่มีเวลาจริง)
       callMode: timeTbd ? 'manual' : modeRaw === 'ai' || modeRaw === 'manual' ? modeRaw : undefined,
       timeTbd,
+      planDayNo: Number.isInteger(dayNoRaw) && dayNoRaw >= 1 && dayNoRaw <= 99 ? dayNoRaw : null,
     });
   }
   if (out.length === 0) return [primary];
@@ -635,6 +641,15 @@ async function insertFollowRow(
     } catch (e) {
       if (!isUndefinedColumn(e)) throw e;
       logWarn('follow.plan_day_start: ฐานยังไม่รัน 137 — ไม่ได้เก็บเลขติดตามครั้งที่', { id: row.id });
+    }
+  }
+  if (row && round.planDayNo) {
+    try {
+      await dbQuery(`update ${followTable} set plan_day_no = $2 where id = $1`, [row.id, round.planDayNo]);
+      (row as FollowRow & { plan_day_no?: number }).plan_day_no = round.planDayNo;
+    } catch (e) {
+      if (!isUndefinedColumn(e)) throw e;
+      logWarn('follow.plan_day_no: ฐานยังไม่รัน 140 — ไม่ได้เก็บเลขติดตามครั้งที่รายวัน', { id: row.id });
     }
   }
   return row;
@@ -792,6 +807,8 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
     when,
     staffPhone,
     callRound,
+    // วันที่มีสายเดียวของตารางหลายวัน — เลขครั้งที่รายวันมากับ rounds[0] (140)
+    planDayNo: rounds[0]?.planDayNo ?? null,
   });
   if (!created) return sendError(res, 500, 'Failed to create follow entry');
 

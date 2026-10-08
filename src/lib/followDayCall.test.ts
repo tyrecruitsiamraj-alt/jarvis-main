@@ -157,3 +157,21 @@ describe('ติดตามครั้งที่ (plan_day_start)', () => {
     expect(pos.get('y')?.day).toBeNull();
   });
 });
+
+/** 🔴 "ติดตามครั้งที่" เลือกรายวัน (140 · เจ้าของ 8 ต.ค. 2569 "พฤหัส ครั้งที่ 1 · ศุกร์ ครั้งที่ 2 … จนถึงครั้งที่ 7") */
+describe('ติดตามครั้งที่รายวัน (plan_day_no)', () => {
+  it('เลือกรายวันไว้ = ใช้ตรง ๆ แม้ข้ามวัน · วันที่ไม่ได้เลือก = นับแบบเดิม', () => {
+    const pos = followDayCallPositions([
+      row({ id: 'a', scheduled_at: at(1, 9), call_round: 1, plan_day_no: 1 }),
+      row({ id: 'b', scheduled_at: at(2, 9), call_round: 2, plan_day_no: 2 }),
+      // เสาร์ข้าม (ไม่โทร) แต่เจ้าหน้าที่เลือกอาทิตย์ = ครั้งที่ 3
+      row({ id: 'c', scheduled_at: at(4, 9), call_round: 3, plan_day_no: 3 }),
+      row({ id: 'd', scheduled_at: at(5, 9), call_round: 4 }),
+    ]);
+    expect([pos.get('a')?.day, pos.get('b')?.day, pos.get('c')?.day, pos.get('d')?.day]).toEqual([1, 2, 3, 5]);
+  });
+  it('ชุดวันเดียวเลือกครั้งที่ 6 ⇒ "วันที่ 6 · สายที่ N"', () => {
+    const pos = followDayCallPositions([row({ id: 'a', scheduled_at: at(1, 9), call_round: 1, plan_day_no: 6 })]);
+    expect(followDayCallLabel(pos.get('a')!)).toBe('วันที่ 6 · สายที่ 1');
+  });
+});
