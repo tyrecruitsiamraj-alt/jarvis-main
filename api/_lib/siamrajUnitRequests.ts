@@ -1,4 +1,4 @@
-import { readThroughCache } from './unitRequestCache.js';
+import { readThroughCache, type CacheOutcome } from './unitRequestCache.js';
 import { attachLeadRules } from './siamrajUnitNotes.js';
 import { dbQuery } from './postgres.js';
 import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
@@ -14,11 +14,7 @@ import {
   type ResignationUnitRank,
 } from './siamrajSqlServerThroughput.js';
 import { listSiamrajSqlServerClosedRequests } from './siamrajSqlServerClosed.js';
-import {
-  getSiamrajSqlServerPrequestById,
-  isPrequestId,
-  listSiamrajSqlServerPrequests,
-} from './siamrajSqlServerPrequests.js';
+import { getSiamrajSqlServerPrequestById, isPrequestId, listSiamrajSqlServerPrequests } from './siamrajSqlServerPrequests.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 import { toBangkokYmd } from './businessDate.js';
 import { listSiamrajSqlServerUnits } from './siamrajSqlServerUnits.js';
@@ -260,16 +256,11 @@ export async function listSiamrajUnitRequests(options: {
   /** ข้ามสำเนา ไปถามระบบงานหลักสด ๆ */
   fresh?: boolean;
 }) {
-  const cacheKey = `unit-requests:${JSON.stringify({
-    limit: options.limit ?? null,
-    mode: options.mode ?? null,
-    scope: options.departmentScope ?? null,
-  })}`;
-  const outcome = await readThroughCache(
-    cacheKey,
-    () => loadSiamrajUnitRequests(options),
-    { fresh: options.fresh },
-  );
+  const keyOf = (scope: DepartmentScope | null) =>
+    `unit-requests:${JSON.stringify({ limit: options.limit ?? null, mode: options.mode ?? null, scope })}`;
+  const cacheKey = keyOf(options.departmentScope ?? null);
+  const load = () => loadSiamrajUnitRequests(options);
+  const outcome = (await readScopedFromAll(options, keyOf)) ?? (await readThroughCache(cacheKey, load, { fresh: options.fresh }));
   /**
    * เกณฑ์ความเร่งเฉพาะใบ — แนบ**หลัง** cache เสมอ (เจ้าของสั่ง 10 ก.ย. 2569 ให้มีผลทุกที่)
    * แนบตรงนี้จุดเดียวทำให้ทุกผู้เรียก (หน้าแรก · Matching · office-team · worker) ใช้เกณฑ์
@@ -279,11 +270,34 @@ export async function listSiamrajUnitRequests(options: {
   return outcome.value;
 }
 
-async function loadSiamrajUnitRequests(options: {
-  limit?: number;
-  mode?: string;
-  departmentScope?: DepartmentScope;
-}) {
+/**
+ * ═══ แผนกเดียว = กรองจากสำเนาของทุกแผนก (เจ้าของ 8 ต.ค. 2569 "หน้าอื่นที่ช้าไล่แก้ให้เร็วด้วย") ═══
+ * เดิมสำเนาแยกคีย์ตามแผนก ⇒ คนของแผนกที่เปิดไม่บ่อยเจอสำเนาว่าง รอระบบงานหลัก 4–6 วิ ทุกครั้ง
+ * ระบบงานหลักกรองแผนกด้วย `RTRIM(department_code) = @scopeDept` ก่อน TOP ⇒ ถ้าชุดรวมได้ไม่ถึงเพดาน (ครบทุกใบ)
+ * การกรองเอง (`jobAllowedByDepartmentScope` ตัวเดียวกับทาง Postgres) ได้ชุดเดียวกันทุกใบ
+ * วัดจริง 8 ต.ค. 2569: 358 ใบ (จริง 342 · ล่วงหน้า 16) · LBD 220 / LBA 40 / LM 94 / DS 1 / SN 3 ตรงกันทุกใบ
+ * (ลำดับต่างเฉพาะใบที่เวลาส่งเท่ากัน — ระบบงานหลักเองก็เรียงกลุ่มนี้ไม่ตายตัว)
+ * 🔴 ไม่ครบ (ชนเพดาน) / ปุ่มรีเฟรช (`fresh`) / ทุกแผนก ⇒ คืน null ให้ไปทางเดิม
+ */
+type UnitRequestList = Awaited<ReturnType<typeof loadSiamrajUnitRequests>>;
+
+async function readScopedFromAll(
+  options: { limit?: number; mode?: string; departmentScope?: DepartmentScope; fresh?: boolean },
+  keyOf: (scope: DepartmentScope | null) => string,
+): Promise<CacheOutcome<UnitRequestList> | null> {
+  const scope = options.departmentScope;
+  if (options.fresh || !scope || scope.mode === 'all') return null;
+  const allScope: DepartmentScope = { mode: 'all' };
+  const base = await readThroughCache(keyOf(allScope), () => loadSiamrajUnitRequests({ ...options, departmentScope: allScope }));
+  const list = (Array.isArray(base.value) ? base.value : []) as Array<{ is_prequest?: unknown; department_code?: string | null }>;
+  const cap = Math.min(Math.max(options.limit ?? 200, 1), SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT);
+  const real = list.filter((j) => !j.is_prequest).length;
+  if (real >= cap || list.length - real >= cap) return null;
+  const value = (base.value as unknown[]).filter((j) => jobAllowedByDepartmentScope(j as { department_code?: string | null }, scope));
+  return { ...base, value: value as UnitRequestList };
+}
+
+async function loadSiamrajUnitRequests(options: { limit?: number; mode?: string; departmentScope?: DepartmentScope }) {
   const source = getSiamrajDbSource();
   if (!source) return [];
 
@@ -346,10 +360,7 @@ export async function getSiamrajUnitRequestById(
   const source = getSiamrajDbSource();
   if (!source) return null;
 
-  let item:
-    | Awaited<ReturnType<typeof getSiamrajSqlServerUnitRequestById>>
-    | ReturnType<typeof mapSiamrajRow>
-    | null =
+  let item: Awaited<ReturnType<typeof getSiamrajSqlServerUnitRequestById>> | ReturnType<typeof mapSiamrajRow> | null =
     source === 'sqlserver'
       ? // ใบขอล่วงหน้ามี id คนละ prefix — ต้องแยกไปอ่านคนละตาราง ไม่งั้นเปิดใบไม่เจอ
         isPrequestId(id)
@@ -515,10 +526,7 @@ export async function listSiamrajResignationUnitRanking(options: {
  * รายชื่อ **หน่วยงานทั้งชุด** สำหรับกล่องเลือกหน่วยงานของหน้า Follow (18 ส.ค. 2569)
  * — [] เมื่อไม่ได้ต่อ SQL Server (กล่องจะถอยไปใช้ชุดจากใบขอเปิดเหมือนเดิม)
  */
-export async function listSiamrajUnits(options: {
-  sinceYear?: number;
-  departmentScope?: DepartmentScope;
-}) {
+export async function listSiamrajUnits(options: { sinceYear?: number; departmentScope?: DepartmentScope }) {
   const source = getSiamrajDbSource();
   if (source === 'sqlserver') {
     return listSiamrajSqlServerUnits(options);
@@ -527,12 +535,7 @@ export async function listSiamrajUnits(options: {
 }
 
 /** รายการใบขอที่ปิด/แจ้งเข้าในช่วง — สำหรับ drill-down การ์ด "ปิดใบขอ" (เลขตรงกับ throughput) */
-export async function listSiamrajClosedRequests(options: {
-  from: string;
-  to: string;
-  limit?: number;
-  departmentScope?: DepartmentScope;
-}) {
+export async function listSiamrajClosedRequests(options: { from: string; to: string; limit?: number; departmentScope?: DepartmentScope }) {
   const source = getSiamrajDbSource();
   if (source === 'sqlserver') {
     return listSiamrajSqlServerClosedRequests(options);

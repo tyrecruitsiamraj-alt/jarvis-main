@@ -20,6 +20,7 @@ import { startClaimGuardWorker } from '../api/_lib/callChoiceWorker.ts';
 import { startFollowPushRetryWorker } from '../api/_lib/followPushRetryWorker.ts';
 import { startIrecruitReplaceSyncWorker } from '../api/_lib/irecruitReplaceSyncWorker.ts';
 import { startLumosPushRetryWorker } from '../api/_lib/lumosPushRetryWorker.ts';
+import { startUnitRequestKeepWarm } from '../api/_lib/unitRequestCache.ts';
 import { preferIpv4 } from '../api/_lib/netPreferIpv4.ts';
 import { warmUnitRequestListCache } from '../api/_handlers/siamraj-unit-requests.ts';
 import type { ApiReq } from '../api/_lib/http.ts';
@@ -216,6 +217,11 @@ server.listen(port, '127.0.0.1', () => {
    * LUMOS_PUSH_RETRY_ENABLED=false · เคารพช่วงห้ามโทรของนโยบายกลาง · เกิน 24 ชม. โยนให้เจ้าหน้าที่ · ไม่มีคีย์ push = ไม่ทำอะไร
    */
   startLumosPushRetryWorker();
+  /**
+   * อุ่นสำเนาใบขอไว้ก่อนหมดอายุ ระหว่างที่มีคนใช้งาน (เจ้าของ 8 ต.ค. 2569 "หน้าอื่นที่ช้าไล่แก้ให้เร็วด้วย")
+   * ไม่มีคนใช้เกินครึ่งชั่วโมง = หยุดถามระบบงานหลัก · ปิดด้วย UNIT_REQUEST_KEEP_WARM_ENABLED=false
+   */
+  if ((process.env.UNIT_REQUEST_KEEP_WARM_ENABLED || '').trim().toLowerCase() !== 'false') startUnitRequestKeepWarm();
   /**
    * อุ่นสำเนาใบขอทันทีหลังเปิดรับ request แล้ว (Wave 3.1 · 5 ก.ย. 2569)
    *

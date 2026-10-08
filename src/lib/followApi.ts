@@ -203,20 +203,36 @@ const FOLLOW_MAX_PAGES = 20;
  * ⇒ ป้ายแท็บ · ปฏิทิน · ตาราง Planning คิดจากของไม่ครบ **แบบเงียบ ๆ**
  * (เจ้าของจับได้ว่าเลขบนหน้าไม่สอดคล้องกัน) · ตอนนี้ไล่ดึงจนครบตาม `total`
  */
+/**
+ * ทั้งชุด — หน้าแรกบอกยอดจริง (`total`) แล้วโหลดหน้าที่เหลือ **พร้อมกัน**
+ * เจ้าของ 8 ต.ค. 2569 "หน้าอื่นที่ช้าไล่แก้ให้เร็วด้วย" — วัดจริง: 4,208 แถว = 9 หน้า โหลดต่อกันทีละหน้ารวม ~2.4 วิ
+ * ลำดับแถวเหมือนเดิม (ต่อหน้าตาม offset) · เส้นเก่าที่ไม่ส่ง has_more/total = หน้าเดียวจบ
+ */
+async function fetchFollowPage(offset: number): Promise<{ items: FollowEntry[]; total?: number; has_more?: boolean }> {
+  const r = await apiFetch(`/api/follow?limit=${FOLLOW_PAGE_SIZE}&offset=${offset}`);
+  if (!r.ok) throw new Error(await readError(r));
+  const data = (await r.json()) as { items?: FollowEntry[]; total?: number; has_more?: boolean };
+  return { items: data.items ?? [], total: data.total, has_more: data.has_more };
+}
+
 export async function listFollowEntries(): Promise<FollowEntry[]> {
-  const all: FollowEntry[] = [];
-  for (let page = 0; page < FOLLOW_MAX_PAGES; page += 1) {
-    const r = await apiFetch(`/api/follow?limit=${FOLLOW_PAGE_SIZE}&offset=${all.length}`);
-    if (!r.ok) throw new Error(await readError(r));
-    const data = (await r.json()) as {
-      items?: FollowEntry[];
-      total?: number;
-      has_more?: boolean;
-    };
-    const items = data.items ?? [];
-    all.push(...items);
-    // เส้นเก่า (ยังไม่มี has_more) หรือหน้าสุดท้าย ⇒ จบ · หน้าว่างก็จบ กันวนซ้ำ
-    if (items.length === 0 || data.has_more !== true) break;
+  const first = await fetchFollowPage(0);
+  const all: FollowEntry[] = [...first.items];
+  if (first.items.length > 0 && first.has_more === true) {
+    const total = Number(first.total);
+    if (Number.isFinite(total) && total > all.length) {
+      const offsets: number[] = [];
+      for (let off = all.length; off < total && offsets.length < FOLLOW_MAX_PAGES - 1; off += FOLLOW_PAGE_SIZE) offsets.push(off);
+      const pages = await Promise.all(offsets.map((o) => fetchFollowPage(o)));
+      for (const p of pages) all.push(...p.items);
+    } else {
+      // ไม่รู้ยอดรวม — ไล่ทีละหน้าแบบเดิม
+      for (let page = 1; page < FOLLOW_MAX_PAGES; page += 1) {
+        const p = await fetchFollowPage(all.length);
+        all.push(...p.items);
+        if (p.items.length === 0 || p.has_more !== true) break;
+      }
+    }
   }
   // เลข "วันที่ · สายที่" ต้องคิดจากทั้งชุด — ที่เดียวตอนโหลด ทุกจอที่อ่านรายการนี้เห็นเลขเดียวกัน
   return withFollowDayCalls(all);
@@ -242,9 +258,7 @@ export async function createFollowRounds(
   if (!r.ok) throw new Error(await readError(r));
   const data = (await r.json()) as { items?: FollowEntry[] } | FollowEntry;
   // เส้นเดิมคืนแถวเดียว (ตอนส่งรอบเดียว) — รองรับทั้งสองรูปเพื่อไม่ผูกกับลำดับ deploy
-  return Array.isArray((data as { items?: FollowEntry[] }).items)
-    ? ((data as { items: FollowEntry[] }).items)
-    : [data as FollowEntry];
+  return Array.isArray((data as { items?: FollowEntry[] }).items) ? (data as { items: FollowEntry[] }).items : [data as FollowEntry];
 }
 
 /**
@@ -313,7 +327,9 @@ export type FollowLumosResync = {
 export async function updateFollowEntry(
   id: string,
   input: EditFollowEntry,
-): Promise<FollowEntry & { queue_refreshed?: number; lumos_resync?: FollowLumosResync; phone_applied?: number; lumos_other_failed?: number }> {
+): Promise<
+  FollowEntry & { queue_refreshed?: number; lumos_resync?: FollowLumosResync; phone_applied?: number; lumos_other_failed?: number }
+> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ ...input, action: 'update' }),
@@ -334,10 +350,7 @@ export async function cancelFollowEntry(id: string): Promise<void> {
 
 /** ยกเลิกทั้งวัน / เลิกตามคนนี้ (7 ต.ค. 2569) — เฉพาะสายที่ยังไม่มีผล · `lumos_failed` > 0 = ต้องบอกจอ */
 export type FollowCancelScope = 'day' | 'person';
-export async function cancelFollowScope(
-  id: string,
-  scope: FollowCancelScope,
-): Promise<{ cancelled: number; lumos_failed: number }> {
+export async function cancelFollowScope(id: string, scope: FollowCancelScope): Promise<{ cancelled: number; lumos_failed: number }> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}&scope=${scope}`, { method: 'DELETE' });
   if (!r.ok) throw new Error(await readError(r));
   return (await r.json()) as { cancelled: number; lumos_failed: number };
@@ -428,9 +441,7 @@ export const FOLLOW_STATUS_BAR: Record<FollowCallStatus, string> = {
  * ⚠️ ไม่แตะคิวโทร · รายการที่ยกเลิกไปแล้วย้อนทางนี้ไม่ได้
  */
 /** ย้อนสถานะ = คืนสายที่การปิดครั้งนั้นหยุดไว้ด้วย (7 ต.ค. 2569) — `restore_error` = คืนไม่ครบ ต้องบอกจอ */
-export async function reopenFollowEntry(
-  id: string,
-): Promise<FollowEntry & { restored_rounds?: number; restore_error?: string | null }> {
+export async function reopenFollowEntry(id: string): Promise<FollowEntry & { restored_rounds?: number; restore_error?: string | null }> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ action: 'reopen' }),
@@ -443,11 +454,7 @@ export async function reopenFollowEntry(
  * **ลงผลโทรของรอบคนโทร** (130 · เจ้าของเคาะ 30 ก.ย. 2569) — ลงซ้ำ = แก้ผลเดิม
  * ⚠️ เฉพาะรอบที่ตั้งเป็นคนโทร (server ปฏิเสธรอบของ AI) · ไม่แตะคิวโทร ไม่แตะการปิดงาน
  */
-export async function recordFollowStaffCall(
-  id: string,
-  outcome: FollowStaffCallOutcome,
-  note?: string,
-): Promise<FollowEntry> {
+export async function recordFollowStaffCall(id: string, outcome: FollowStaffCallOutcome, note?: string): Promise<FollowEntry> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ action: 'staff_call', outcome, note: note?.trim() || undefined }),

@@ -33,9 +33,7 @@ beforeEach(() => apiFetch.mockReset());
 
 describe('listFollowEntries', () => {
   it('🔴 ของมี 257 แถว ⇒ ต้องได้ครบ 257 ไม่ใช่ 200', async () => {
-    apiFetch
-      .mockResolvedValueOnce(page(500, 257, false))
-      .mockResolvedValueOnce(page(0, 257, false));
+    apiFetch.mockResolvedValueOnce(page(500, 257, false)).mockResolvedValueOnce(page(0, 257, false));
     const items = await listFollowEntries();
     expect(apiFetch).toHaveBeenCalledTimes(1);
     // ขอทีละ 500 ⇒ 257 แถวมาในหน้าเดียว และต้องไม่ถูกตัดเหลือ 200
@@ -44,13 +42,37 @@ describe('listFollowEntries', () => {
   });
 
   it('ของเกินหนึ่งหน้า ⇒ ไล่ดึงต่อจนครบ แล้วหยุด', async () => {
-    apiFetch
-      .mockResolvedValueOnce(page(500, 700, true))
-      .mockResolvedValueOnce(page(200, 700, false));
+    apiFetch.mockResolvedValueOnce(page(500, 700, true)).mockResolvedValueOnce(page(200, 700, false));
     const items = await listFollowEntries();
     expect(items).toHaveLength(700);
     expect(apiFetch).toHaveBeenCalledTimes(2);
     expect(String(apiFetch.mock.calls[1][0])).toContain('offset=500');
+  });
+
+  it('🔴 8 ต.ค. 2569: หน้าที่เหลือโหลดพร้อมกัน (ไม่รอทีละหน้า) · ลำดับแถวตาม offset เดิม', async () => {
+    const order: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    apiFetch.mockImplementation(async (url: string) => {
+      const off = Number(/offset=(\d+)/.exec(url)?.[1] ?? 0);
+      order.push(String(off));
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((r) => setTimeout(r, off === 0 ? 0 : 20 - off / 100));
+      inFlight -= 1;
+      const n = off < 1500 ? 500 : 108;
+      return {
+        ok: true,
+        json: async () => ({ items: Array.from({ length: n }, (_, i) => ({ id: `${off}-${i}` })), total: 1608, has_more: off + n < 1608 }),
+      };
+    });
+    const items = await listFollowEntries();
+    expect(items).toHaveLength(1608);
+    expect(order).toEqual(['0', '500', '1000', '1500']);
+    expect(maxInFlight).toBeGreaterThan(1);
+    // ลำดับแถวต่อกันตาม offset แม้หน้าหลังจะกลับมาก่อน
+    expect((items[500] as { id: string }).id).toBe('500-0');
+    expect((items[1500] as { id: string }).id).toBe('1500-0');
   });
 
   it('🔴 เส้นเก่าที่ไม่ส่ง has_more ⇒ หยุดที่หน้าแรก ไม่วนซ้ำ', async () => {

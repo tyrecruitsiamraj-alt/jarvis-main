@@ -73,6 +73,10 @@ type Entry = {
 
 const store = new Map<string, Entry>();
 
+/** คีย์ที่มีคนอ่านล่าสุดเมื่อไหร่ + ตัวโหลดของคีย์นั้น — ให้ตัวอุ่นสำเนารู้ว่าต้องเตรียมอะไร (8 ต.ค. 2569) */
+const lastRead = new Map<string, number>();
+const loaders = new Map<string, () => Promise<unknown>>();
+
 /** ผลของการไปถามระบบงานหลักหนึ่งรอบ — **ไม่มีวัน reject** ผลอยู่ในค่าที่คืน */
 type LoadResult = { ok: true; entry: Entry } | { ok: false; error: unknown };
 
@@ -116,11 +120,7 @@ function remember(key: string, value: unknown, at: number): void {
  * @param injectedNow เวลาที่เทสต์ยัดเข้ามา (`opts.now`) · ของจริงเป็น `undefined`
  *   ⇒ เวลาที่บันทึกว่า "ถามมาได้เมื่อไหร่" ใช้เวลาตอนโหลดเสร็จจริง
  */
-function startLoad<T>(
-  key: string,
-  load: () => Promise<T>,
-  injectedNow: number | undefined,
-): Promise<LoadResult> {
+function startLoad<T>(key: string, load: () => Promise<T>, injectedNow: number | undefined): Promise<LoadResult> {
   const startedAt = injectedNow ?? Date.now();
   const running = refreshing.get(key);
   // มีตัวหนึ่งวิ่งอยู่แล้วและยังไม่เกินเพดานเวลา ⇒ เกาะตัวนั้น ไม่ยิงซ้อน
@@ -155,12 +155,7 @@ function startLoad<T>(
 }
 
 /** ทางลงของกติกาข้อ 2 กับข้อ 3 — มีสำเนาเก่า ⇒ ส่งไปพร้อมบอกอายุ · ไม่มี ⇒ พังให้เห็น */
-function serveStaleOrThrow<T>(
-  key: string,
-  hit: Entry | undefined,
-  error: unknown,
-  now: number,
-): CacheOutcome<T> {
+function serveStaleOrThrow<T>(key: string, hit: Entry | undefined, error: unknown, now: number): CacheOutcome<T> {
   if (hit) {
     // ข้อ 2: ของเก่าที่บอกอายุ ดีกว่าจอพัง
     logWarn('unitRequestCache.serveStale', {
@@ -186,6 +181,8 @@ export async function readThroughCache<T>(
 ): Promise<CacheOutcome<T>> {
   const now = opts.now ?? Date.now();
   const hit = store.get(key);
+  lastRead.set(key, now);
+  loaders.set(key, load);
 
   if (opts.fresh) {
     // ปุ่มรีเฟรชต้องได้ของสดของตัวเอง — ห้ามเกาะคิวของคนอื่นที่เริ่มไปก่อนแล้ว
@@ -219,10 +216,55 @@ export async function readThroughCache<T>(
   return serveStaleOrThrow<T>(key, store.get(key) ?? hit, result.error, now);
 }
 
+/**
+ * ═══ ข้อ 5 — อุ่นสำเนาไว้ก่อนหมดอายุ ระหว่างที่มีคนใช้งาน (เจ้าของ 8 ต.ค. 2569 "หน้าอื่นที่ช้าไล่แก้ให้เร็วด้วย") ═══
+ * วัดจริง: เปิดหน้าติดตาม/จับคู่งานตอนสำเนาว่างหรือเกินเพดาน = รอระบบงานหลัก 5.9–6.0 วิ (ข้อ 4 ช่วยได้เฉพาะตอนยังมีสำเนา)
+ * ตัวนี้ทุก `intervalMs` ไล่คีย์ที่มีคนอ่านภายใน `activeWithinMs` แล้วสำเนาอายุเกิน `refreshAfterMs` ⇒ โหลดใหม่เบื้องหลัง
+ * (ใช้ `startLoad` ตัวเดียวกัน — ไม่ยิงซ้อน · ล้ม = ไม่แตะสำเนาเดิม) · ไม่มีคนใช้เกินครึ่งชั่วโมง = หยุดถาม (ไม่กวนระบบงานหลักตอนกลางคืน)
+ * คืนฟังก์ชันหยุด · ตัวจับเวลา `unref` ไม่ค้าง process
+ */
+export function warmActiveKeysOnce(opts: { activeWithinMs: number; refreshAfterMs: number; now?: number }): number {
+  const now = opts.now ?? Date.now();
+  let started = 0;
+  for (const [key, readAt] of lastRead) {
+    if (now - readAt > opts.activeWithinMs) {
+      lastRead.delete(key);
+      loaders.delete(key);
+      continue;
+    }
+    const hit = store.get(key);
+    const load = loaders.get(key);
+    if (!load || refreshing.has(key)) continue;
+    if (hit && now - hit.fetchedAt < opts.refreshAfterMs) continue;
+    void startLoad(key, load, undefined);
+    started += 1;
+  }
+  return started;
+}
+
+export function startUnitRequestKeepWarm(opts: { intervalMs?: number; activeWithinMs?: number; refreshAfterMs?: number } = {}): () => void {
+  const intervalMs = opts.intervalMs ?? 30_000;
+  const activeWithinMs = opts.activeWithinMs ?? 30 * 60_000;
+  // ก่อน TTL (90 วิ) — คนอ่านเจอสำเนาสดเสมอ ไม่ต้องตกไปทางของเก่า
+  const refreshAfterMs = opts.refreshAfterMs ?? 60_000;
+  const t = setInterval(() => {
+    try {
+      warmActiveKeysOnce({ activeWithinMs, refreshAfterMs });
+    } catch (e) {
+      logWarn('unitRequestCache.keepWarm.failed', { message: e instanceof Error ? e.message : String(e) });
+    }
+  }, intervalMs);
+  if (typeof t.unref === 'function') t.unref();
+  logInfo('unitRequestCache.keepWarm.start', { intervalMs, activeWithinMs, refreshAfterMs });
+  return () => clearInterval(t);
+}
+
 /** ล้างสำเนาทั้งหมด — ใช้ในเทสต์เท่านั้น */
 export function clearUnitRequestCache(): void {
   store.clear();
   refreshing.clear();
+  lastRead.clear();
+  loaders.clear();
   logInfo('unitRequestCache.cleared');
 }
 

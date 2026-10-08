@@ -12783,3 +12783,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · ⚠️ `src/lib/homeOverview.ts` เป็นของหน้า v3 คนละไฟล์ อย่าเขียนทับ
 - (8 ต.ค. 2569) migration 139 ดัชนี `lumos_dispatch_queue` บนนิพจน์เบอร์ `coalesce(payload->>'recipient_phone', payload->>'phone')` + `person_ref`
   — คิวรีภาพรวมผู้สมัคร (`buildOverviewSql`) 16.7 วิ → 0.1 วิ (เลขเดิมทุกตัว) · แก้ `QUEUE_PHONE` เมื่อไหร่ต้องแก้ดัชนีตาม (เทสต์คุม)
+- (8 ต.ค. 2569 · ไล่หน้าช้า) ไล่เปิด 16 หน้า วัดทุกเส้น API — ที่ช้าจริงคือ ERP ใบขอตอนสำเนาว่าง (5.9–6.0 วิ) + หน้าติดตามโหลด 9 หน้าต่อกัน
+  · `siamrajUnitRequests.readScopedFromAll`: แผนกเดียว = กรองจากสำเนาทุกแผนก (ครบไม่ถึงเพดานเท่านั้น · fresh = ทางเดิม · วัดแล้วตรงทุกใบ)
+  · `unitRequestCache.startUnitRequestKeepWarm` (บูตใน server/local-api.ts · ปิด UNIT_REQUEST_KEEP_WARM_ENABLED=false): คีย์ที่มีคนอ่านใน 30 นาที อุ่นก่อนหมดอายุ
+  · `followApi.listFollowEntries`: หน้าแรกบอก total แล้วโหลดหน้าที่เหลือพร้อมกัน (2.4 → 1.3 วิ)
