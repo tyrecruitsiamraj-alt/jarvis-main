@@ -97,12 +97,17 @@ export function SplitBars({
         return (
           <li
             key={r.key}
-            className="grid grid-cols-[6.5rem_1fr_3.5rem] items-center gap-x-3 gap-y-1"
+            className={cn(
+              'grid grid-cols-[6.5rem_1fr_3.5rem] items-center gap-x-3 gap-y-1',
+              // ก้อน: เส้นคั่นก่อนก้อนใหม่ · ผลย่อยของโทรแล้วย่อหน้ามีเส้นนำด้านซ้าย
+              r.divider && 'border-t border-foreground/10 pt-3',
+              r.child && 'ml-2 border-l-2 border-foreground/15 pl-3',
+            )}
             data-testid={testId ? `${testId}-${r.key}` : undefined}
           >
             <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
               {dot ? <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', dot)} aria-hidden /> : null}
-              <span className={cn('truncate', r.key === 'all' && 'font-medium')}>{r.label}</span>
+              <span className={cn('truncate', (r.key === 'all' || r.key === 'called') && 'font-medium')}>{r.label}</span>
             </span>
             <span className="flex h-6 overflow-hidden rounded-md bg-muted" aria-hidden>
               {parts.map((p) => {

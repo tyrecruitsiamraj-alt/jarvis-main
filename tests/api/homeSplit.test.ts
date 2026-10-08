@@ -3,7 +3,17 @@
  * (เจ้าของ "ไม่เอาแค่ไปเท่าไหร่ แต่ต้องบอกได้ว่าไปเนี่ย Ai โทร คนโทรเท่าไหร่ Bu ไหนใช้เยอะ")
  */
 import { describe, expect, it } from 'vitest';
-import { followBuSplit, followResultSplit, followTeamTotals, reportBuSplit, reportResultSplit, splitRowsTotal, splitTotalRow } from '@/lib/homeSplit';
+import {
+  followBuSplit,
+  followResultSplit,
+  followTeamTotals,
+  groupResultRows,
+  reportBuSplit,
+  reportResultSplit,
+  splitCalledRow,
+  splitRowsTotal,
+  splitTotalRow,
+} from '@/lib/homeSplit';
 import { FOLLOW_BUCKET_KEYS, type FollowBuCell } from '@/lib/homeLumosSummary';
 import { buildApplicantsReport, type ReportSourceRow } from '@/lib/homeTopicReport';
 
@@ -23,6 +33,22 @@ describe('ติดตาม', () => {
     expect(splitRowsTotal(rows)).toBe(21);
     // แถวบนสุด "โทรทั้งหมด" = ทุกแถวรวม แยก AI/คน
     expect(splitTotalRow(rows, 'โทรทั้งหมด')).toMatchObject({ key: 'all', total: 21, parts: { ai: 12, staff: 9 } });
+    // โทรแล้ว = ไป/ไม่ไป/ขอเลื่อน/สรุปไม่ได้/ล้มเหลว (ไม่นับยกเลิก 1 · รอ 5)
+    expect(splitCalledRow(rows, 'โทรแล้ว', { keys: ['went', 'notWent', 'reschedule', 'unclear', 'failed'] })).toMatchObject({
+      key: 'called',
+      total: 15,
+      parts: { ai: 12, staff: 3 },
+    });
+    // ก้อน: ทั้งหมด │ โทรแล้ว + ผลย่อย (ย่อหน้า) │ ยกเลิก · รอ (เส้นคั่นก่อนก้อน)
+    const keys = ['went', 'notWent', 'reschedule', 'unclear', 'failed'];
+    const g = groupResultRows(splitTotalRow(rows, 'โทรทั้งหมด'), splitCalledRow(rows, 'โทรแล้ว', { keys }), rows, keys);
+    expect(g.map((r) => [r.key, !!r.child, !!r.divider])).toEqual([
+      ['all', false, false],
+      ['called', false, true],
+      ...keys.map((k) => [k, true, false]),
+      ['waiting', false, true],
+      ['cancelled', false, false],
+    ]);
   });
   it('BU มากไปน้อย ไม่ระบุไว้ท้าย · รวม = ทั้งหมด · ทีม', () => {
     const bu = followBuSplit(cells);
@@ -62,6 +88,8 @@ describe('หัวข้ออื่น', () => {
     expect(res.find((x) => x.key === 'interested')).toMatchObject({ total: 2, parts: { ai: 1, staff: 1, both: 0, notCalled: 0 } });
     for (const x of res) expect(Object.values(x.parts).reduce((n, v) => n + (v ?? 0), 0)).toBe(x.total);
     expect(splitRowsTotal(res)).toBe(3);
+    // โทรแล้ว = ตัดก้อนยังไม่โทร ⇒ AI 1 + คน 1
+    expect(splitCalledRow(res, 'โทรแล้ว', { dropSeg: 'notCalled' })).toMatchObject({ total: 2, parts: { ai: 1, staff: 1, both: 0 } });
     const bu = reportBuSplit(r);
     expect(bu.map((x) => [x.label, x.total])).toEqual([
       ['LBD', 2],

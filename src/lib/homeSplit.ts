@@ -9,7 +9,17 @@ import { followBuTable, type FollowBuCell, type FollowBucketKey } from '@/lib/ho
 import { REPORT_SEGS, reportBuBlocks, type TopicReport } from '@/lib/homeTopicReport';
 
 /** `note` = คำขยายใต้ชื่อแถว (เช่น ล้มเหลวคืออะไร) */
-export type SplitRow = { key: string; label: string; total: number; parts: Partial<Record<AiShareSegment, number>>; note?: string };
+export type SplitRow = {
+  key: string;
+  label: string;
+  total: number;
+  parts: Partial<Record<AiShareSegment, number>>;
+  note?: string;
+  /** ผลย่อยของ "โทรแล้ว" — จอย่อหน้า + เส้นนำ (เจ้าของ 8 ต.ค. 2569 "รอโทรกับยกเลิกและโทรไปแยกก้อนให้ดูแล้วรู้") */
+  child?: boolean;
+  /** เส้นคั่นก้อนก่อนแถวนี้ */
+  divider?: boolean;
+};
 
 const sumParts = (p: Partial<Record<AiShareSegment, number>>) => Object.values(p).reduce((n, v) => n + (v ?? 0), 0);
 
@@ -68,6 +78,32 @@ export function splitTotalRow(rows: readonly SplitRow[], label: string): SplitRo
   for (const r of rows)
     for (const [k, v] of Object.entries(r.parts)) parts[k as AiShareSegment] = (parts[k as AiShareSegment] ?? 0) + (v ?? 0);
   return { key: 'all', label, total: sumParts(parts), parts };
+}
+
+/**
+ * แถว "โทรแล้ว" ต่อจากทั้งหมด (เจ้าของ 8 ต.ค. 2569 "ผลโทร โทรทั้งหมด แล้วไหนอะที่บอกว่าโทรไปแล้วเท่าไหร่")
+ * - `keys` = รวมเฉพาะผลที่โทรไปแล้ว (ติดตาม: ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · ล้มเหลว — ไม่นับยกเลิก/รอ ⇒ เท่าบรรทัด "โทรแล้ว" ในกล่อง)
+ * - `dropSeg` = ตัดก้อนที่ยังไม่โทรออก (งานสรรหา/จับคู่งาน นับก้อนตามหลักฐานโทร ⇒ เท่ากล่อง AI + คน + ทั้งสองทาง)
+ */
+export function splitCalledRow(
+  rows: readonly SplitRow[],
+  label: string,
+  opts: { keys?: readonly string[]; dropSeg?: AiShareSegment },
+): SplitRow {
+  const picked = opts.keys ? rows.filter((r) => opts.keys!.includes(r.key)) : rows;
+  const base = splitTotalRow(picked, label);
+  if (opts.dropSeg) delete base.parts[opts.dropSeg];
+  return { ...base, key: 'called', total: sumParts(base.parts) };
+}
+
+/**
+ * จัดแท่งผลเป็นก้อน: ทั้งหมด │ โทรแล้ว + ผลย่อย (ย่อหน้า) │ ที่ยังไม่ได้โทร (ยกเลิก · รอ)
+ * `calledKeys` = ผลที่นับเป็นโทรแล้ว · ที่เหลือไปก้อนท้ายตามลำดับเดิม
+ */
+export function groupResultRows(total: SplitRow, called: SplitRow, cols: readonly SplitRow[], calledKeys: readonly string[]): SplitRow[] {
+  const inCalled = cols.filter((r) => calledKeys.includes(r.key)).map((r) => ({ ...r, child: true }));
+  const rest = cols.filter((r) => !calledKeys.includes(r.key)).map((r, i) => (i === 0 ? { ...r, divider: true } : r));
+  return [total, { ...called, divider: true }, ...inCalled, ...rest];
 }
 
 export const splitRowsTotal = (rows: readonly SplitRow[]) => rows.reduce((n, r) => n + r.total, 0);

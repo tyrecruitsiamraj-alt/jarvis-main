@@ -47,7 +47,16 @@ import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
 import FollowCallerDialog from '@/components/home-ai-share/FollowCallerDialog';
 import AiShareLumosStats, { FOLLOW_RESULT_COLS, useHomeLumosSummary } from '@/components/home-ai-share/AiShareLumosStats';
-import { followBuSplit, followResultSplit, followTeamTotals, reportBuSplit, reportResultSplit, splitTotalRow } from '@/lib/homeSplit';
+import {
+  followBuSplit,
+  followResultSplit,
+  followTeamTotals,
+  reportBuSplit,
+  reportResultSplit,
+  groupResultRows,
+  splitCalledRow,
+  splitTotalRow,
+} from '@/lib/homeSplit';
 import {
   buildAftercareReport,
   buildApplicantsReport,
@@ -569,7 +578,22 @@ const HomeAiSharePage: React.FC = () => {
   const followCells = meta.key === 'follow' ? (lumos.current?.followByBu ?? null) : null;
   const resultCols = followCells ? followResultSplit(followCells, FOLLOW_RESULT_COLS) : report ? reportResultSplit(report) : [];
   // แถวบนสุด = ทั้งหมด (เจ้าของ 8 ต.ค. 2569 "ผลโทรต้องไล่เป็น โทรทั้งหมด ไป ไม่ไป ขอเลื่อน สรุปไม่ได้ ล้มเหลว ยกเลิก รอดำเนินการ")
-  const resultRows = resultCols.length ? [splitTotalRow(resultCols, meta.key === 'follow' ? 'โทรทั้งหมด' : 'ทั้งหมด'), ...resultCols] : [];
+  // ก้อน (8 ต.ค. 2569 "รอโทรกับยกเลิกและโทรไปแยกก้อนให้ดูแล้วรู้"): ทั้งหมด │ โทรแล้ว + ผลย่อย │ ยกเลิก · รอ
+  // ติดตาม/ดูแลนับตามผล (ไม่นับยกเลิก/รอ/ยังไม่มีผล) · งานสรรหา/จับคู่งานโทรแล้ว = ตัดก้อนยังไม่โทร (เท่ากล่อง AI + คน + สองทาง)
+  const calledKeys =
+    meta.key === 'follow'
+      ? ['went', 'notWent', 'reschedule', 'unclear', 'failed']
+      : resultCols.map((r) => r.key).filter((k) => k !== 'noResult');
+  const resultRows = resultCols.length
+    ? groupResultRows(
+        splitTotalRow(resultCols, meta.key === 'follow' ? 'โทรทั้งหมด' : 'ทั้งหมด'),
+        meta.key === 'follow' || meta.key === 'aftercare'
+          ? splitCalledRow(resultCols, 'โทรแล้ว', { keys: calledKeys })
+          : splitCalledRow(resultCols, 'โทรแล้ว', { dropSeg: 'notCalled' }),
+        resultCols,
+        calledKeys,
+      )
+    : [];
   const buRows = followCells ? followBuSplit(followCells) : report ? reportBuSplit(report) : [];
   const barsLoading = meta.key === 'follow' ? !followCells : !report;
   const failed = meta.key === 'follow' ? lumos.failed : topic.failed;

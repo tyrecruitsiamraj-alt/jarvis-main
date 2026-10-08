@@ -671,7 +671,8 @@ describe('หน้าหลักอ่านไล่บนลงล่าง 
     const order = [...screen.getByTestId('home-result-bars').querySelectorAll('[data-testid^="home-result-bars-"]')].map((e) =>
       e.getAttribute('data-testid')!.replace('home-result-bars-', ''),
     );
-    expect(order).toEqual(['all', 'went', 'notWent', 'reschedule', 'unclear', 'failed', 'cancelled', 'waiting']);
+    expect(order).toEqual(['all', 'called', 'went', 'notWent', 'reschedule', 'unclear', 'failed', 'cancelled', 'waiting']);
+    expect(screen.getByTestId('home-result-bars-called').textContent).toContain('โทรแล้ว');
     expect(screen.getByTestId('home-result-bars-all').textContent).toContain('โทรทั้งหมด');
     expect(screen.getByTestId('home-result-bars-failed').textContent).toContain('ไม่รับสาย');
     expect(screen.getByTestId('home-bu-bars-LBD').textContent).toMatch(/AI โทร \d[\d,]*คนโทร \d/);

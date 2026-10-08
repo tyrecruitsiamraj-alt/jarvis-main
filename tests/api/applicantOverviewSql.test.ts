@@ -77,7 +77,7 @@ describe.skipIf(!hasDb)('sum-check + bucket-parity กับฐานจริ�
     expect(Number(o.uncalled_age_0_3) + Number(o.uncalled_age_4_7) + Number(o.uncalled_age_over7)).toBe(
       Number(o.total) - Number(o.called),
     );
-  }, 20_000); // อ่านฐานจริง ~5 วิ ตอนฐานช้า (5 ต.ค. 2569 ตก timeout ซ้ำ — เลขตรงทุกครั้ง)
+  }, 60_000); // อ่านฐานจริง ~17 วิ (8 ต.ค. 2569) · เดิม ~5 วิ (5 ต.ค. ตก timeout ซ้ำ — เลขตรงทุกครั้ง)
 
   it('เลขบนกล่อง = จำนวนแถวจาก bucketCondition เดียวกัน (parity ทุกถัง)', async () => {
     const { dbQuery } = await import('../../api/_lib/postgres.js');
@@ -103,7 +103,8 @@ describe.skipIf(!hasDb)('sum-check + bucket-parity กับฐานจริ�
       );
       expect(`${bucket}=${cnt[0].n}`).toBe(`${bucket}=${want}`);
     }
-  }, 20_000); // อ่านฐานจริงทุกถัง ~4–5 วิ — ชนเพดาน 5 วิตอนฐานช้า (ตก timeout ไม่ใช่เลขเพี้ยน · 4–5 ต.ค. 2569)
+  }, 90_000); // อ่านฐานจริงทุกถัง — 8 ต.ค. 2569 คิวรีภาพรวมเดียวใช้ ~17 วิ (ใบ 341 · คิว 2,145 แถว) ⇒ ชนเพดาน 20 วิ ทั้งที่เลขตรง
+  // เทสต์นี้คุมว่า "เลขตรง" ไม่ได้คุมความเร็ว · ความช้าแยกไปแก้ต่างหาก (คิวรีจับเบอร์ใน jsonb แบบซ้อนกัน)
 
   it('claimed_idle breakdown รวมเท่ากับถัง claimed_idle', async () => {
     const { dbQuery } = await import('../../api/_lib/postgres.js');
