@@ -37,7 +37,7 @@ describe('parseFollowInput', () => {
     }
   });
 
-  it('ตารางโทร (092): group_id uuid + call_times กรอง HH:MM + dedupe + เพดาน 5 รอบ', () => {
+  it('ตารางโทร (092): group_id uuid + call_times กรอง HH:MM + dedupe', () => {
     const gid = 'a506aa87-7502-4886-8607-ccbb799b215c';
     const r = parseFollowInput(
       {
@@ -54,24 +54,24 @@ describe('parseFollowInput', () => {
     expect(r.value!.callTimes).toEqual(['07:00', '08:00']); // dedupe + กรองรูปผิด
   });
 
-  it('ตารางโทร: group_id ผิดรูป → error · call_times เกิน 5 → error', () => {
+  it('ตารางโทร: group_id ผิดรูป → error · 🔴 วันละกี่สายก็ได้ (เจ้าของ 8 ต.ค. 2569 เลิกเพดาน 5)', () => {
     expect(
       parseFollowInput(
         { recipient_name: 'ก', recipient_phone: '0800000000', topic: 'ข', group_id: 'not-uuid' },
         NOW,
       ).error,
     ).toBeTruthy();
-    expect(
-      parseFollowInput(
-        {
-          recipient_name: 'ก',
-          recipient_phone: '0800000000',
-          topic: 'ข',
-          call_times: ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00'],
-        },
-        NOW,
-      ).error,
-    ).toBeTruthy();
+    const many = parseFollowInput(
+      {
+        recipient_name: 'ก',
+        recipient_phone: '0800000000',
+        topic: 'ข',
+        call_times: ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00'],
+      },
+      NOW,
+    );
+    expect(many.error).toBeNull();
+    expect(many.value!.callTimes).toHaveLength(7);
   });
 
   it('ไม่ส่ง group_id/call_times → null ทั้งคู่ (รอบเดี่ยวแบบเดิม)', () => {

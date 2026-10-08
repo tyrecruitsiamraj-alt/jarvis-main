@@ -394,7 +394,7 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
       .filter((t) => HHMM_RE.test(t));
     const uniq = [...new Set(times)];
     if (uniq.length === 0) return fail('รอบเวลาโทรไม่ถูกต้อง (เช่น 07:00)');
-    if (uniq.length > 5) return fail('รอบโทรต่อวันมากสุด 5 รอบ');
+    // วันละกี่สายก็ได้ (เจ้าของ 8 ต.ค. 2569 "ไม่ต้องกำหนดว่าห้ามเกิน 5 สาย") — เวลาไม่ซ้ำกันอยู่แล้ว (uniq)
     callTimes = uniq;
   }
 
@@ -1386,8 +1386,8 @@ export type FollowScheduleReplace = {
   rounds: Array<{ id: string | null; when: Date; callMode: 'ai' | 'manual' }>;
 };
 
-/** 92 วัน × 5 สาย (7 ต.ค. 2569 · เดิม 160 = แก้ตาราง 31 วันเต็ม) */
-const MAX_SCHEDULE_ROUNDS = 460;
+/** เพดานกันคำขอผิดปกติเท่านั้น — 92 วัน × วันละ 24 สาย (8 ต.ค. 2569 เลิกจำกัด 5 สาย/วัน · เดิม 460) */
+const MAX_SCHEDULE_ROUNDS = 2208;
 
 export function parseFollowScheduleReplace(
   raw: unknown,

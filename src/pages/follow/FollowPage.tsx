@@ -149,7 +149,7 @@ function nowForInput(): string {
  * คำนำหน้าที่ให้เลือก — เก็บเป็นข้อความติดหน้าชื่อตามธรรมเนียมไทย ("นายสมชาย ใจดี")
  * ค่าว่าง = ไม่ระบุ (บางเคสมีแค่ชื่อเล่น/ชื่อที่คนแนะนำมา)
  */
-/** ตั้งตารางได้ยาวสุดกี่วันต่อครั้ง (7 ต.ค. 2569 · เดิม 31 ตัดเงียบ) — server แก้ตารางรับได้ 92 × 5 สาย */
+/** ตั้งตารางได้ยาวสุดกี่วันต่อครั้ง (7 ต.ค. 2569 · เดิม 31 ตัดเงียบ) · วันละกี่สายก็ได้ (เจ้าของ 8 ต.ค. 2569 "ไม่ต้องกำหนดว่าห้ามเกิน 5 สาย") */
 const MAX_FOLLOW_DAYS = 92;
 
 const NAME_PREFIXES = ['', 'นาย', 'นาง', 'นางสาว'] as const;
@@ -738,7 +738,6 @@ const FollowPage: React.FC = () => {
   const padModes = (m: ReadonlyArray<'ai' | 'manual'> | undefined, n: number): Array<'ai' | 'manual'> =>
     Array.from({ length: n }, (_, i) => m?.[i] ?? 'ai');
   const addRound = () => {
-    if (roundTimes.length >= 5) return;
     setRoundModes([...padModes(roundModes, roundTimes.length), 'ai']);
     setRoundTimes([...roundTimes, '08:00']);
   };
@@ -827,7 +826,6 @@ const FollowPage: React.FC = () => {
     });
   const addDayTime = (day: string) => {
     const list = timesOfScheduleDay(day);
-    if (list.length >= 5) return;
     setRoundModesByDay((prev) => ({ ...prev, [day]: [...modesOfScheduleDay(day), 'ai'] }));
     setRoundTimesByDay((prev) => ({ ...prev, [day]: [...list, '08:00'] }));
   };
@@ -2686,7 +2684,7 @@ const FollowPage: React.FC = () => {
                       ปิดอยู่ = ชุดเดียวทุกวันเหมือนเดิม · เปิดครั้งแรกลอกชุดเดียวลงทุกวันให้ก่อน */}
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="ml-1 text-xs font-medium text-muted-foreground">
-                      {perDayTimes ? 'เวลารายวัน (วันละไม่เกิน 5 สาย)' : 'เวลาต่อวัน (สูงสุด 5 สาย)'}
+                      {perDayTimes ? 'เวลารายวัน' : 'เวลาต่อวัน'}
                     </span>
                     {sendDaysPreview > 1 ? (
                       <Button
@@ -2757,11 +2755,9 @@ const FollowPage: React.FC = () => {
                                 )}
                               </div>
                             ))}
-                            {list.length < 5 ? (
-                              <Button type="button" variant="outline" size="xs" onClick={() => addDayTime(d)}>
+                            <Button type="button" variant="outline" size="xs" onClick={() => addDayTime(d)}>
                                 <Plus aria-hidden /> เพิ่มสายของวันนั้น
                               </Button>
-                            ) : null}
                           </div>
                         );
                       })
@@ -2812,15 +2808,13 @@ const FollowPage: React.FC = () => {
                       )}
                     </div>
                   ))}
-                  {roundTimes.length < 5 ? (
-                    <button
+                  <button
                       type="button"
                       onClick={addRound}
                       className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-white/70 bg-white/60 px-4 py-1.5 text-xs font-medium text-slate-600 hover:text-foreground dark:border-white/15 dark:bg-white/10 dark:text-slate-300"
                     >
                       <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มสายต่อวัน
                     </button>
-                  ) : null}
                     </>
                   )}
                 </div>

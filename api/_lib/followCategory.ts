@@ -57,7 +57,7 @@ function toEntry(r: Record<string, unknown>): FollowEntry {
     topic: clean(r.topic) ?? '',
     group_id: clean(r.group_id),
     source_ref: clean(r.source_ref),
-    // หมายเหตุของสายส่งคนแทน = วันเข้างาน (`replaceWorkYmd`) — ผลที่คนกดของวันต้องอยู่วันเดียวกับจอ
+    // หมายเหตุของสายส่งคนแทน (วันเข้างาน) — ตารางใช้วันที่โทรแล้ว (8 ต.ค. 2569) เก็บไว้ให้จออ่านต่อ
     note: clean(r.note),
     scheduled_at: iso(r.scheduled_at),
     completed_at: iso(r.completed_at),

@@ -53,10 +53,14 @@ export function declineOrphanSql(): string {
           join ${queueTable} x on x.channel = 'reminder' and x.job_ref = 'follow' and x.person_ref = 'follow-' || g.id::text
          where g.group_id = f.group_id and x.last_outcome = 'declined'
            and (g.scheduled_at at time zone 'Asia/Bangkok')::date < (f.scheduled_at at time zone 'Asia/Bangkok')::date
+           -- ส่งคนแทน: "วันนั้น" = ใบงานนั้น (SQT เดียวกัน) — สายคอนเฟิร์ม 16:00 อยู่วันก่อนเข้างาน
+           -- ตอบไม่ไปตอนคอนเฟิร์ม ⇒ สายก่อน 1 ชม./15 นาทีของใบเดียวกัน (วันถัดไป) ต้องหยุดด้วย ห้ามส่งคืน
+           and not (coalesce(f.source_ref, '') like 'irecruit-replace:%'
+                    and split_part(f.source_ref, ':', 2) = split_part(coalesce(g.source_ref, ''), ':', 2))
       ) d on d.declined_at is not null
      where f.cancelled_at is null and f.completed_at is null
        and coalesce(f.call_mode, 'ai') = 'ai'
-       and coalesce(f.follow_team, '') <> 'replacement'
+       -- ส่งคนแทนด้วย (เจ้าของ 8 ต.ค. 2569 "ต้องหยุดวันนั้น พรุ่งนี้โทรต่อ เหมือนกัน") — เดิมตัดทิ้ง
        and f.group_id is not null
        and f.scheduled_at > now() + interval '${MIN_LEAD_MINUTES} minutes'
        and (

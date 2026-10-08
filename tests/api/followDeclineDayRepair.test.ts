@@ -16,7 +16,7 @@ vi.mock('../../api/_lib/followStaffName.js', () => ({ staffNameOfPhone: vi.fn() 
 const mod = await import('../../api/_lib/followDeclineDayRepair');
 
 describe('หาแถวที่ค้าง', () => {
-  it('AI · เปิดอยู่ · คิวยกเลิกหมด · ชุดเดียวกันตอบ declined วันก่อนหน้า (วันเดียวกันไม่แตะ) · ไม่ใช่ส่งคนแทน', () => {
+  it('AI · เปิดอยู่ · คิวยกเลิกหมด · ชุดเดียวกันตอบ declined วันก่อนหน้า (วันเดียวกันไม่แตะ) · รวมส่งคนแทน', () => {
     const sql = mod.declineOrphanSql();
     expect(sql).toContain("coalesce(f.call_mode, 'ai') = 'ai'");
     expect(sql).toContain("y.status <> 'cancelled'");
@@ -25,7 +25,10 @@ describe('หาแถวที่ค้าง', () => {
     expect(sql).toContain('coalesce(q.plan_ref, q.person_ref) as plan');
     expect(sql).toContain("x.last_outcome = 'declined'");
     expect(sql).toContain("(g.scheduled_at at time zone 'Asia/Bangkok')::date < (f.scheduled_at at time zone 'Asia/Bangkok')::date");
-    expect(sql).toContain("<> 'replacement'");
+    // 🔴 8 ต.ค. 2569: ส่งคนแทนตอบไม่ไป ก็หยุดแค่วันนั้นเหมือนกัน — ห้ามตัดทีมส่งคนแทนทิ้ง
+    expect(sql).not.toContain("<> 'replacement'");
+    // ตอบไม่ไปตอนคอนเฟิร์ม (วันก่อนเข้างาน) ⇒ สายก่อน 1 ชม./15 นาทีของใบเดียวกันไม่ถูกส่งคืน
+    expect(sql).toContain("split_part(f.source_ref, ':', 2) = split_part(coalesce(g.source_ref, ''), ':', 2)");
     // 🔴 ข้อ 3 (7 ต.ค. 2569): เลยเวลาแล้วไม่แตะ — ไม่สลับเป็นคนโทรเอง
     expect(sql).toContain("f.scheduled_at > now() + interval '3 minutes'");
   });

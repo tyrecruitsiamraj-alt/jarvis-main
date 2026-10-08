@@ -453,7 +453,7 @@ describe('แก้ล่าสุดชนะ (เจ้าของ 7 ต.ค.
   });
 });
 
-describe('🔴 ส่งคนแทน: 3 สายอยู่วันเข้างาน (เจ้าของ 7 ต.ค. 2569 "ต้องมี 3 สายนะทุกคนเลย" · Choice "วันเข้างาน")', () => {
+describe('🔴 ส่งคนแทน: 3 สายของใบงาน (เจ้าของ 7 ต.ค. 2569 "ต้องมี 3 สายนะทุกคนเลย" · ตารางอยู่วันที่โทรตั้งแต่ 8 ต.ค.)', () => {
   it('สาย 2/3 = เวลาโทร + 60/15 นาที · สาย 1 = วันในหมายเหตุ · ข้ามปี · คีย์เอง = null', async () => {
     const { replaceWorkYmd } = await import('../../src/lib/irecruitReplaceSync');
     expect(replaceWorkYmd({ source_ref: 'irecruit-replace:J1:confirm:p', scheduled_at: '2026-10-07T09:00:00.000Z', note: 'ยืนยันเวลาเข้างาน 8/10 06:00 น.' })).toBe('2026-10-08');
@@ -464,13 +464,12 @@ describe('🔴 ส่งคนแทน: 3 สายอยู่วันเข�
     expect(replaceWorkYmd({ source_ref: 'irecruit-replace:J1:confirm:p', scheduled_at: '2026-12-31T09:00:00.000Z', note: 'ยืนยันเวลาเข้างาน 1/1 08:00 น.' })).toBe('2027-01-01');
     expect(replaceWorkYmd({ source_ref: null, scheduled_at: '2026-10-07T09:00:00.000Z' })).toBeNull();
   });
-  it('ตาราง/แผง/ตัวกรองวัน/ผลที่คนกด ใช้วันเดียวกัน', async () => {
+  it('ตาราง/แผง/ตัวกรองวัน/ผลที่คนกด ใช้วันเดียวกัน = 🔴 วันที่โทร (เจ้าของ 8 ต.ค. 2569 "วันที่โทร ไม่งั้นงงตาย" · แทนวันเข้างาน 7 ต.ค.)', async () => {
     const { followEntryYmd } = await import('../../src/lib/followPlanning');
-    expect(followEntryYmd({ source_ref: 'irecruit-replace:J1:confirm:p', scheduled_at: '2026-10-07T09:00:00.000Z', note: 'ยืนยันเวลาเข้างาน 8/10 06:00 น.' })).toBe('2026-10-08');
     expect(followEntryYmd({ scheduled_at: '2026-10-07T09:00:00.000Z' })).toBe('2026-10-07');
     const page = readFileSync(new URL('../../src/pages/follow/FollowPage.tsx', import.meta.url), 'utf8');
     expect(page).toContain('const ymd = followEntryYmd(e);');
-    expect(readFileSync(new URL('../../src/lib/followListFilter.ts', import.meta.url), 'utf8')).toContain('(replaceWorkYmd(e) ?? bangkokDay(e.scheduled_at)) !== f.date');
+    expect(readFileSync(new URL('../../src/lib/followListFilter.ts', import.meta.url), 'utf8')).toContain('bangkokDay(e.scheduled_at) !== f.date');
     const cal = readFileSync(new URL('../../src/components/follow/FollowPlanningCalendar.tsx', import.meta.url), 'utf8');
     expect(cal).toContain("replaceSlot === 1 ? 'คอนเฟิร์ม' : lead != null && lead > 0 ? leadText(lead) : 'ก่อนเข้างาน'");
   });

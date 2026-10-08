@@ -12787,3 +12787,6 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · `siamrajUnitRequests.readScopedFromAll`: แผนกเดียว = กรองจากสำเนาทุกแผนก (ครบไม่ถึงเพดานเท่านั้น · fresh = ทางเดิม · วัดแล้วตรงทุกใบ)
   · `unitRequestCache.startUnitRequestKeepWarm` (บูตใน server/local-api.ts · ปิด UNIT_REQUEST_KEEP_WARM_ENABLED=false): คีย์ที่มีคนอ่านใน 30 นาที อุ่นก่อนหมดอายุ
   · `followApi.listFollowEntries`: หน้าแรกบอก total แล้วโหลดหน้าที่เหลือพร้อมกัน (2.4 → 1.3 วิ)
+- (8 ต.ค. 2569 · Journey ติดตามรอบ 2) วันละกี่สายก็ได้ (ถอดเพดาน 5 · server MAX_SCHEDULE_ROUNDS 2208) · แก้ตารางทั้งชุดเลือกหลายสายเปลี่ยน AI/คน (`FollowScheduleEditor`)
+  · `followEntryYmd` = วันที่โทรทุกแท็บ (ถอยจากวันเข้างานของส่งคนแทน 7 ต.ค.) · ส่งคนแทน+คนโทร+เลยเวลา = state overdue (แท็บคนเริ่มงานคงเดิม)
+  · ตอบไม่ไป หยุดวันนั้นรวมส่งคนแทน (`followDeclineDayRepair` · "วันนั้น" ของส่งคนแทน = SQT เดียวกัน กันคอนเฟิร์มวันก่อนแล้วสายก่อน 1 ชม./15 นาทีถูกส่งคืน)

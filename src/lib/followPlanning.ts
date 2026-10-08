@@ -7,7 +7,6 @@ import { isVoicemailReply } from '@/lib/callMicroOutcome';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { effectiveCallOutcome, followStaffCallText, isStaffCallResult } from '@/lib/followStaffCall';
 import { UNREACHED_CALL_OUTCOMES } from '@/lib/callOutcomeBuckets';
-import { replaceWorkYmd } from '@/lib/irecruitReplaceSync';
 import type { ToneKey } from '@/lib/designTokens';
 import {
   FOLLOW_OUTCOME_LABEL,
@@ -96,7 +95,18 @@ export function followRoundState(entry: FollowEntry, now: Date = new Date()): Fo
    * 🔴 ไม่เคยเข้าคิวเลย = **ไม่ได้ส่ง** ไม่ใช่ "เลยเวลา/รอโทร"
    * (`call_status` เป็น null เมื่อไม่มีแถวในคิว — เหตุผลอยู่ที่ `dispatch_state`)
    */
-  if (!entry.call_status) return 'notSent';
+  if (!entry.call_status) {
+    /**
+     * 🔴 ส่งคนแทน · สายคนโทรที่เลยเวลาแล้ว = **เลยเวลานัด** (เจ้าของ 8 ต.ค. 2569 "ขึ้นว่าเลยเวลาบอกไว้ละกัน")
+     * เดิมขึ้น "ไม่ได้ส่งให้ AI" ตลอดไป — ใบที่ลงย้อนหลัง/สายที่คนยังไม่ได้โทร ไม่มีอะไรบอกว่าเลยเวลา
+     * แท็บคนเริ่มงานคงเดิม (เจ้าของ "ฝั่งติดตามคนเริ่มงานไม่ต้องทำไร")
+     */
+    if (entry.follow_team === 'replacement' && entry.call_mode === 'manual') {
+      const due = ms(entry.scheduled_at);
+      return due !== null && due < now.getTime() ? 'overdue' : 'sent';
+    }
+    return 'notSent';
+  }
   const at = ms(entry.scheduled_at);
   // ไม่มีเวลานัดที่อ่านได้ = ยังไม่ถึงคิวใคร — ห้ามเดาว่าเลยเวลา
   if (at !== null && at < now.getTime()) return 'overdue';
@@ -144,15 +154,12 @@ export function closedCallCategory(outcomeCode: string | null | undefined): Foll
 }
 
 /**
- * วันที่สายนี้อยู่บนตาราง (YYYY-MM-DD เวลาไทย) — ปกติ = วันที่โทร
- * 🔴 สายส่งคนแทนจาก iRecruit = **วันเข้างาน** (7 ต.ค. 2569 · 3 สายของใบงานอยู่วันเดียวกัน — `replaceWorkYmd`)
+ * วันที่สายนี้อยู่บนตาราง (YYYY-MM-DD เวลาไทย) = **วันที่โทร** ทุกแท็บ
+ * 🔴 8 ต.ค. 2569 เจ้าของ: *"วันที่โทร ไม่งั้นงงตาย"* — ถอยจาก 7 ต.ค. ที่ให้สายส่งคนแทนอยู่วันเข้างาน
+ * (สายคอนเฟิร์ม 16:00 วันก่อนจึงอยู่ตารางวันก่อน ตรงกับเวลาที่ต้องโทรจริง)
  */
-export function followEntryYmd(e: {
-  scheduled_at?: string | null;
-  source_ref?: string | null;
-  note?: string | null;
-}): string | null {
-  return replaceWorkYmd(e) ?? (e.scheduled_at ? bangkokYmd(e.scheduled_at) : null);
+export function followEntryYmd(e: { scheduled_at?: string | null }): string | null {
+  return e.scheduled_at ? bangkokYmd(e.scheduled_at) : null;
 }
 
 /**

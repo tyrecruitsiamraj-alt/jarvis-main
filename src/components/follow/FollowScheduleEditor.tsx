@@ -4,6 +4,7 @@
  * 🔴 ไม่ใช่ Dialog ใหม่ (ห้ามซ้อน Dialog ใน Dialog) — กล่องแก้ไขสลับเนื้อในมาเป็นตัวนี้ (แพตเทิร์น `embedded`)
  * หนึ่งแถว = หนึ่งสาย: วันเวลา · AI โทร/คนโทร · เอาออก · ปุ่มเพิ่มสาย · สายที่โทรไปแล้ว/เลยเวลา = อ่านอย่างเดียว
  * ตรรกะอยู่ `src/lib/followScheduleEdit.ts` · ฝั่ง API ตรวจซ้ำทุกข้อแล้วส่งแผนใหม่ให้ Lumos
+ * เลือกหลายสายแล้วเปลี่ยน AI/คนทีเดียว (เจ้าของ 8 ต.ค. 2569 "เลือกเปลี่ยนทีละหลายสายได้ไหมแบบมี Checkbox")
  */
 import React, { useMemo, useRef, useState } from 'react';
 import { ChevronLeft, LoaderCircle, Plus, X } from 'lucide-react';
@@ -60,6 +61,18 @@ export default function FollowScheduleEditor({
   const newKey = useRef(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** สายที่ติ๊กเลือกไว้ (คีย์แถว) — เปลี่ยนคนโทรทีเดียว */
+  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
+  const pickedKeys = draft.filter((d) => picked.has(d.key)).map((d) => d.key);
+  const allPicked = draft.length > 0 && pickedKeys.length === draft.length;
+  const togglePick = (key: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const setPickedMode = (mode: ScheduleDraftRow['mode']) => setDraft((prev) => prev.map((d) => (picked.has(d.key) ? { ...d, mode } : d)));
 
   const check = validateScheduleDraft(draft, new Date());
   const changed = scheduleDraftChanged(initial, draft);
@@ -119,12 +132,39 @@ export default function FollowScheduleEditor({
 
       <div className="space-y-2">
         <p className="ml-1 text-xs font-medium text-foreground">สายที่ยังไม่ถึงเวลา</p>
+        {draft.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary/40 px-2.5 py-2" data-testid="schedule-bulk">
+            <label className="flex cursor-pointer items-center gap-1.5">
+              <Checkbox
+                checked={allPicked ? true : pickedKeys.length > 0 ? 'indeterminate' : false}
+                onCheckedChange={() => setPicked(allPicked ? new Set() : new Set(draft.map((d) => d.key)))}
+                aria-label="เลือกทุกสาย"
+              />
+              <span className="text-xs font-medium text-foreground">
+                {pickedKeys.length > 0 ? `เลือก ${pickedKeys.length.toLocaleString('th-TH')} สาย` : 'เลือกทุกสาย'}
+              </span>
+            </label>
+            <span className="ml-auto flex gap-2">
+              <Button type="button" variant="outline" size="xs" disabled={pickedKeys.length === 0} onClick={() => setPickedMode('ai')}>
+                เปลี่ยนเป็น AI โทร
+              </Button>
+              <Button type="button" variant="outline" size="xs" disabled={pickedKeys.length === 0} onClick={() => setPickedMode('manual')}>
+                เปลี่ยนเป็นคนโทร
+              </Button>
+            </span>
+          </div>
+        ) : null}
         {draft.length === 0 ? (
           <p className="ml-1 text-[11px] text-muted-foreground">ไม่เหลือสาย — กดบันทึกแล้วสายที่เหลือของชุดนี้จะถูกยกเลิก</p>
         ) : null}
         {draft.map((d, i) => (
           <div key={d.key} className="space-y-1.5 rounded-xl border border-border/70 p-2.5">
             <div className="flex items-center gap-2">
+              <Checkbox
+                checked={picked.has(d.key)}
+                onCheckedChange={() => togglePick(d.key)}
+                aria-label={`เลือก${labelOf(d.key, `สายที่ ${i + 1}`)}`}
+              />
               <DateTimeField24
                 value={d.when}
                 onChange={(next) => patch(d.key, { when: next })}
@@ -177,9 +217,7 @@ export default function FollowScheduleEditor({
         {removed > 0 ? ` · เอาออก ${removed.toLocaleString('th-TH')}` : ''}
       </p>
 
-      {error ? (
-        <p className={cn('rounded-lg px-3 py-2 text-xs', TONE.danger.soft, TONE.danger.value)}>{error}</p>
-      ) : null}
+      {error ? <p className={cn('rounded-lg px-3 py-2 text-xs', TONE.danger.soft, TONE.danger.value)}>{error}</p> : null}
 
       <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="outline" onClick={onBack} disabled={busy}>
