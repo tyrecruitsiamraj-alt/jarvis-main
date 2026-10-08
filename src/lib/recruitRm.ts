@@ -168,20 +168,29 @@ export function isRmListView(v: string | null | undefined): v is RmListView {
  * เครื่องมือ Lead บนแถวเครื่องมือถูกถอดแล้ว (ผู้สมัครเหลือ 5 ปุ่ม) — ที่เคยเป็น `rmTabHasLeadTools`
  * "โทรแล้ว" = มีเวลากดโทรจริง (095) หรือมีผลโทร — ลำดับความจริงเดียวกับคอลัมน์ "โทรล่าสุด" ใน RmTable
  */
-export type ContactChip = 'all' | 'uncalled' | 'called';
+export type ContactChip = 'all' | 'uncalled' | 'called' | 'ok' | 'fail';
 
+/**
+ * ชิปแท็บการติดต่อ — สำเร็จ / ไม่สำเร็จ เติมต่อท้าย (เจ้าของ 8 ต.ค. 2569 Choice "เติมต่อท้าย")
+ * = ผลติดต่อล่าสุดที่เจ้าหน้าที่กดในป๊อป (`last_contact_ok` · ขั้นการติดต่อแบบ iRecruit ใน `applicantProcess.ts`)
+ */
 export const CONTACT_CHIPS: readonly { id: ContactChip; label: string }[] = [
   { id: 'all', label: 'ทั้งหมด' },
   { id: 'uncalled', label: 'ยังไม่โทร' },
   { id: 'called', label: 'โทรแล้ว' },
+  { id: 'ok', label: 'สำเร็จ' },
+  { id: 'fail', label: 'ไม่สำเร็จ' },
 ];
 
 export function isInContactChip(
-  r: { dialed_last_at?: string | null; last_call_at?: string | null },
+  r: { dialed_last_at?: string | null; last_call_at?: string | null; last_contact_ok?: boolean | null },
   chip: ContactChip,
 ): boolean {
   if (chip === 'all') return true;
-  const called = Boolean(r.dialed_last_at || r.last_call_at);
+  if (chip === 'ok') return r.last_contact_ok === true;
+  if (chip === 'fail') return r.last_contact_ok === false;
+  // ลงผลติดต่อแล้ว = โทรแล้ว (สำเร็จ/ไม่สำเร็จต้องอยู่ในโทรแล้วเสมอ ห้ามโผล่ในยังไม่โทร)
+  const called = Boolean(r.dialed_last_at || r.last_call_at) || typeof r.last_contact_ok === 'boolean';
   return chip === 'called' ? called : !called;
 }
 

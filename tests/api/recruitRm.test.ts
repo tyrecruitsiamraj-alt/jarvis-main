@@ -102,11 +102,20 @@ describe('แท็บ = สถานะใบสมัคร (ข้อมู�
   });
 
   it('ชิปการติดต่อ (5 ต.ค. 2569): ยังไม่โทร + โทรแล้ว = ทั้งหมด · โทรแล้ว = กดโทรจริงหรือมีผลโทร', () => {
-    expect(CONTACT_CHIPS.map((c) => c.label)).toEqual(['ทั้งหมด', 'ยังไม่โทร', 'โทรแล้ว']);
+    expect(CONTACT_CHIPS.slice(0, 3).map((c) => c.label)).toEqual(['ทั้งหมด', 'ยังไม่โทร', 'โทรแล้ว']);
     const rows = [{ dialed_last_at: '2026-10-01T07:00:00Z' }, { last_call_at: '2026-10-01T07:00:00Z' }, {}];
     expect(rows.filter((r) => isInContactChip(r, 'called'))).toHaveLength(2);
     expect(rows.filter((r) => isInContactChip(r, 'uncalled'))).toHaveLength(1);
     expect(rows.filter((r) => isInContactChip(r, 'all'))).toHaveLength(3);
+  });
+
+  it('สำเร็จ / ไม่สำเร็จ เติมต่อท้าย (8 ต.ค. 2569) — ลงผลแล้วนับเป็นโทรแล้วเสมอ', () => {
+    expect(CONTACT_CHIPS.map((c) => c.label)).toEqual(['ทั้งหมด', 'ยังไม่โทร', 'โทรแล้ว', 'สำเร็จ', 'ไม่สำเร็จ']);
+    const rows = [{ last_contact_ok: true }, { last_contact_ok: false }, { dialed_last_at: '2026-10-01T07:00:00Z' }, {}];
+    expect(rows.filter((r) => isInContactChip(r, 'ok'))).toHaveLength(1);
+    expect(rows.filter((r) => isInContactChip(r, 'fail'))).toHaveLength(1);
+    expect(rows.filter((r) => isInContactChip(r, 'called'))).toHaveLength(3);
+    expect(rows.filter((r) => isInContactChip(r, 'uncalled'))).toHaveLength(1);
   });
 });
 

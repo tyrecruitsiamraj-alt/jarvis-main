@@ -82,7 +82,13 @@ const DUE_SOON_MS = 2 * 60 * 60 * 1000;
  * ⚠️ ยอด "วันนี้" ในแผนผังปลายทางเป็นยอดรวมของคนคนนั้น ไม่แยกเลน (เป็นสถิติส่วนตัว
  * ไม่ใช่ของเลน) — แยกเมื่อไหร่ต้องแยกที่ server เพราะ tally นับจากผลที่บันทึกแล้ว
  */
-export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
+/**
+ * `skipApplications` = ไม่โชว์ล็อกที่มาจากใบสมัคร (แท็บการติดต่อของงานสรรหา · เจ้าของ 8 ต.ค. 2569
+ * *"ไม่ต้องแยกกล่องแบบนี้ในหน้าการติดต่อ"*) — ใบสมัครที่เก็บไปโทรเองอยู่ในตารางการติดต่อแล้ว
+ * (วัดจริง 8 ต.ค.: ล็อกค้าง 27 รายการ เป็นใบสมัครที่คนเดียวกันเก็บไว้ครบ 27 = ชื่อขึ้นซ้ำสองที่)
+ * เหลือแค่ล็อกจาก iRecruit ที่ไม่มีแถวในตาราง · ไม่มีเหลือ = ซ่อนทั้งก้อน
+ */
+export const MyCallsSection: React.FC<{ lane?: CallLane; skipApplications?: boolean }> = ({ lane, skipApplications = false }) => {
   /**
    * เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: **ทุกคนเห็นถังของตัวเอง** (ของใครของมัน)
    * ⚠️ "ภาระงานโทรของทีม" (บอร์ดหัวหน้า) ถูกเอาออก 14 ส.ค. 2569 (เจ้าของสั่ง) —
@@ -117,11 +123,12 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
     setLoading(true);
     void fetchMyCallQueue().then((data) => {
       // กรองที่จุดโหลดจุดเดียว — ทุกยอด/ทุกกลุ่มข้างล่างจะเป็นของเลนนี้โดยอัตโนมัติ
-      setHolds(filterHoldsByLane(data.holds, lane));
+      const inLane = filterHoldsByLane(data.holds, lane);
+      setHolds(skipApplications ? inLane.filter((h) => h.source !== 'application') : inLane);
       setTally(data.tally);
       setLoading(false);
     });
-  }, [lane]);
+  }, [lane, skipApplications]);
 
   useEffect(() => {
     load();
@@ -291,6 +298,7 @@ export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
   // มีของค่อยโผล่ทั้งแผง · หัวหน้าเห็นบอร์ดทีมเสมอ (งานของลูกทีมไม่ใช่ของตัวเอง)
   // ไม่มีงานค้างและไม่มียอดวันนี้ = ซ่อนตัวเอง ไม่กินที่ (ทุก role เท่ากันหลังตัดบอร์ดทีม)
   if (!loading && holds.length === 0 && tally.total === 0) return null;
+  if (skipApplications && holds.length === 0) return null;
 
   return (
     <div className="space-y-4">
