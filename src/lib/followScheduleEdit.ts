@@ -11,11 +11,18 @@
  */
 import type { FollowEntry } from '@/lib/followApi';
 
-/** สายนี้ยังแก้ได้ไหม — ยังไม่ยกเลิก/ปิดงาน · เวลาอนาคต · AI ยังไม่ได้โทร / คนโทรยังไม่ได้ลงผล */
+/**
+ * สายที่จะถึงเวลาภายในกี่นาทีถือว่าแก้ไม่ได้แล้ว (8 ต.ค. 2569) — ตารางที่ส่งไปบันทึกมีทุกสายที่ยังแก้ได้ของชุด
+ * ฝั่ง API ไม่รับสายที่เหลือไม่ถึง 1 นาที ⇒ สายคอนเฟิร์ม 16:00 ตอน 15:59 ทำให้ทั้งชุดถูกตีกลับ (ทีมสลับสายพรุ่งนี้เป็น AI ไม่ได้)
+ * เผื่อเวลาเปิดป๊อปจนกดบันทึก · สายที่ไม่ได้ส่งไป = คงเดิมทุกอย่าง
+ */
+export const EDIT_LOCK_BEFORE_MS = 3 * 60_000;
+
+/** สายนี้ยังแก้ได้ไหม — ยังไม่ยกเลิก/ปิดงาน · อีกเกิน 3 นาทีถึงเวลา · AI ยังไม่ได้โทร / คนโทรยังไม่ได้ลงผล */
 export function isEditableFollowRound(e: FollowEntry, now: Date): boolean {
   if (e.cancelled || e.completed_at) return false;
   const at = Date.parse(e.scheduled_at ?? '');
-  if (!Number.isFinite(at) || at <= now.getTime()) return false;
+  if (!Number.isFinite(at) || at <= now.getTime() + EDIT_LOCK_BEFORE_MS) return false;
   if (e.call_mode === 'manual') return !e.staff_call_outcome;
   return (e.call_status == null || e.call_status === 'pending') && !e.call_outcome && !e.called_at;
 }

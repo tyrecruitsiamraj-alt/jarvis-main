@@ -45,6 +45,11 @@ describe('isEditableFollowRound', () => {
     expect(isEditableFollowRound(row({ cancelled: true }), NOW)).toBe(false);
     expect(isEditableFollowRound(row({ completed_at: '2026-10-01T02:00:00.000Z' }), NOW)).toBe(false);
   });
+  it('🔴 อีกไม่ถึง 3 นาทีถึงเวลา = แก้ไม่ได้ (ไม่ส่งไปกับตาราง · API ตีกลับทั้งชุด 8 ต.ค. 2569)', () => {
+    const inMin = (m: number) => new Date(NOW.getTime() + m * 60_000).toISOString();
+    expect(isEditableFollowRound(row({ scheduled_at: inMin(2) }), NOW)).toBe(false);
+    expect(isEditableFollowRound(row({ scheduled_at: inMin(4) }), NOW)).toBe(true);
+  });
   it('คนโทร: แก้ได้จนกว่าจะลงผล', () => {
     expect(isEditableFollowRound(row({ call_mode: 'manual', call_status: null }), NOW)).toBe(true);
     expect(isEditableFollowRound(row({ call_mode: 'manual', call_status: null, staff_call_outcome: 'went' }), NOW)).toBe(false);
