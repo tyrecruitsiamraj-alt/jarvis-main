@@ -12777,3 +12777,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   ชั้น 1 ถาม Lumos `GET /events/{id}` ทุกแผนจน imported · failed/discarded = ส่งแผนใหม่ 1 ครั้ง · ยังล้ม = dispatch_state `not_imported` ("Lumos ไม่รับแผน") + แจ้งเตือน
   · ถามไม่ได้ ≠ ล้ม · pending ค้าง = log อย่างเดียว · ส่งใหม่ ≤ 10 แผน/รอบ
   ชั้น 2 สาย AI เลยเวลา 15 นาทีไม่มีผล = แจ้งคนเพิ่ม + admin/supervisor ครั้งเดียว (`overdue_alerted_at`) · ไม่สลับเป็นคนโทร
+- (8 ต.ค. 2569) หน้าหลักโฉมแบบ Codex: `HomeSections.tsx` (การ์ดหัวข้อ · `SplitBars` แท่งแยก AI/คน เขียนเลขทุกชิ้น · `StatStrip`)
+  · `src/lib/homeSplit.ts` (ผล/BU แบ่งก้อน — แหล่งเดียวกับตารางราย BU) · `TopicReportCard` = `useTopicReport` + ตารางราย BU
+  · ตัวเลือก BU บนหัวหน้า (ส่ง `bu` ทุกเส้น · บัญชีล็อก BU ไม่เห็น) · กล่องติดตาม/ดูแลบอก โทรแล้ว · รอโทร · ยกเลิก (นับตามแผน)
+  · ⚠️ `src/lib/homeOverview.ts` เป็นของหน้า v3 คนละไฟล์ อย่าเขียนทับ

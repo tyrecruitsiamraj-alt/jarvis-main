@@ -63,9 +63,7 @@ vi.mock('@/lib/homeAiShareApi', () => ({
           { bu: 'LBA', seg: 'ai', col: 'noResult', n: 2 },
           { bu: null, seg: 'notCalled', col: 'noResult', n: 4 },
         ],
-        extra: [
-          { title: 'ส่งต่อให้คน', items: [{ key: 'handoff', label: 'AI โทรแล้ว คนรับต่อ', value: 3 }] },
-        ],
+        extra: [{ title: 'ส่งต่อให้คน', items: [{ key: 'handoff', label: 'AI โทรแล้ว คนรับต่อ', value: 3 }] }],
       },
     }),
   // สรุปแบบบอท Lumos (7 ต.ค. 2569)
@@ -106,8 +104,34 @@ vi.mock('@/lib/homeAiShareApi', () => ({
       events: [],
       error: null,
       rows: [
-        { id: 'j1', person: 'p1', name: 'คนทดสอบ', unit: null, bu: null, at: '2026-10-07T02:00:00.000Z', ymd: '2026-10-07', team: 'main', caller: 'ai', result: 'agreed', job: null, replaceType: null },
-        { id: 'j2', person: 'p1', name: 'คนทดสอบ', unit: null, bu: null, at: '2026-10-07T03:00:00.000Z', ymd: '2026-10-07', team: 'main', caller: 'manual', result: 'waiting', job: null, replaceType: null },
+        {
+          id: 'j1',
+          person: 'p1',
+          name: 'คนทดสอบ',
+          unit: null,
+          bu: null,
+          at: '2026-10-07T02:00:00.000Z',
+          ymd: '2026-10-07',
+          team: 'main',
+          caller: 'ai',
+          result: 'agreed',
+          job: null,
+          replaceType: null,
+        },
+        {
+          id: 'j2',
+          person: 'p1',
+          name: 'คนทดสอบ',
+          unit: null,
+          bu: null,
+          at: '2026-10-07T03:00:00.000Z',
+          ymd: '2026-10-07',
+          team: 'main',
+          caller: 'manual',
+          result: 'waiting',
+          job: null,
+          replaceType: null,
+        },
       ],
     }),
 }));
@@ -149,6 +173,8 @@ const BLOCK_STORE = 'jarvis:home-ai-share:block';
 /** หัวข้อติดตามใช้ชื่อเดียวกับเมนู (4 ต.ค. 2569) */
 const FOLLOW_TITLE = 'ติดตามคนเริ่มงาน / ติดตามส่งคนแทน';
 const win = defaultAiShareWindow();
+/** หน้าส่งช่วง + BU ไปทุกเส้น (โฉมแบบ Codex 8 ต.ค. 2569 · ตัวเลือก BU · ทุก BU = null) */
+const winQ = { ...win, bu: null };
 
 function body(over: Partial<AiShareResponse> = {}): AiShareResponse {
   return {
@@ -210,8 +236,6 @@ function list(block: AiShareListResponse['block'], key: AiShareListKey, page: nu
   };
 }
 
-
-
 /** กล่องหนึ่งก้อน (Visual Control รอบ 8 · รอบ 17 เป็นปุ่ม ชื่อปุ่ม = ป้าย + เลข เช่น "AI โทร 205") */
 const tileOf = (label: string) => screen.getByRole('button', { name: new RegExp(`^${label} [\\d,]+( \\S+)?$`) });
 /** ข้อความของกล่อง (ป้าย + ชิป + เลข + แถบ/บรรทัดท้าย) */
@@ -240,7 +264,9 @@ beforeEach(() => {
   fetchHomeAiShareDetail.mockReset().mockImplementation((block: AiShareDetailResponse['block']) => Promise.resolve(detail(block)));
   fetchHomeAiShareList
     .mockReset()
-    .mockImplementation((block: AiShareListResponse['block'], key: AiShareListKey, page: number) => Promise.resolve(list(block, key, page)));
+    .mockImplementation((block: AiShareListResponse['block'], key: AiShareListKey, page: number) =>
+      Promise.resolve(list(block, key, page)),
+    );
 });
 afterEach(() => cleanup());
 
@@ -248,7 +274,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   it('เริ่มที่ติดตาม · 7 วันล่าสุด · เลขตามที่เส้นส่งมา · กราฟของหัวข้อนั้นขึ้นเลย', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     expect(await screen.findByRole('heading', { name: FOLLOW_TITLE })).toBeTruthy();
-    expect(fetchHomeAiShare).toHaveBeenCalledWith(win);
+    expect(fetchHomeAiShare).toHaveBeenCalledWith(winQ);
     expect(screen.getByRole('button', { name: /ช่วงเวลา 7 วันล่าสุด/ })).toBeTruthy();
     // หัวข้อเป็นปุ่มเม็ดยาวเรียงกัน (7 ต.ค. 2569) — ติดตามถูกเลือกอยู่
     const picker = screen.getByRole('tablist', { name: 'เลือกหัวข้อ' });
@@ -265,7 +291,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(screen.queryByRole('button', { name: /^ทั้งสองทาง/ })).toBeNull();
     // รอบ 16: ป้าย "หนักไปทาง AI" ถอดแล้ว
     expect(screen.queryByText('หนักไปทาง AI')).toBeNull();
-    await waitFor(() => expect(fetchHomeAiShareDetail).toHaveBeenCalledWith('follow', win));
+    await waitFor(() => expect(fetchHomeAiShareDetail).toHaveBeenCalledWith('follow', winQ));
     expect(await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` })).toBeTruthy();
     // รอบ 17: หัวกราฟบอกเดือน + ช่วงวันที่กำลังดู (แกนล่างเหลือเลขวัน)
     expect(screen.getByText(rangeTextFull(win.from!, win.to!))).toBeTruthy();
@@ -282,7 +308,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(stat('ทั้งหมด')).toContain('43 รายชื่อ');
     // จับคู่งานมีช่อง "ทั้งสองทาง"
     expect(stat('ทั้งสองทาง')).toContain('0');
-    await waitFor(() => expect(fetchHomeAiShareDetail).toHaveBeenCalledWith('matching', win));
+    await waitFor(() => expect(fetchHomeAiShareDetail).toHaveBeenCalledWith('matching', winQ));
     expect(window.localStorage.getItem(BLOCK_STORE)).toBe('matching');
   });
 
@@ -330,13 +356,19 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     window.localStorage.setItem(BLOCK_STORE, 'aftercare');
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('0 รายชื่อ'));
-    expect(stat('AI โทร')).toContain('0%');
+    // ดูแลหลังเริ่มงานนับตามแผน ⇒ กล่องบอกในตัวว่าโทรแล้ว/รอโทร (เจ้าของ 8 ต.ค. 2569 "AI โทร 162 โทรหมดเลยใช่ไหม")
+    expect(stat('AI โทร')).toMatch(/โทรแล้ว.*รอโทร/);
     expect(screen.queryByText('ยังไม่มีงาน')).toBeNull();
   });
 
   it('ฐานยังไม่มีช่องลงผลของคนโทร = บอกบนจอ (ดูแลหลังเริ่มงาน · ติดตามนับแบบแผนไม่พึ่งช่องนี้)', async () => {
     window.localStorage.setItem(BLOCK_STORE, 'aftercare');
-    fetchHomeAiShare.mockResolvedValue(body({ follow_staff_ready: false, aftercare: { total: 205, ai: 205, staff: 0, both: 0, notCalled: 0, waitingAi: 0, waitingStaff: 0 } }));
+    fetchHomeAiShare.mockResolvedValue(
+      body({
+        follow_staff_ready: false,
+        aftercare: { total: 205, ai: 205, staff: 0, both: 0, notCalled: 0, waitingAi: 0, waitingStaff: 0 },
+      }),
+    );
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     expect(await screen.findByText(/ยังนับรายชื่อที่คนโทรไม่ได้/)).toBeTruthy();
   });
@@ -355,9 +387,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
   it('หัวข้อที่ล้มบอกเหตุ · ตัวเลือกของหัวข้อนั้นบอกว่าโหลดไม่ขึ้น', async () => {
     window.localStorage.setItem(BLOCK_STORE, 'applicants');
-    fetchHomeAiShare.mockResolvedValue(
-      body({ applicants: null, errors: { applicants: 'โหลดตัวเลขส่วนนี้ไม่ขึ้น ลองรีเฟรชอีกครั้ง' } }),
-    );
+    fetchHomeAiShare.mockResolvedValue(body({ applicants: null, errors: { applicants: 'โหลดตัวเลขส่วนนี้ไม่ขึ้น ลองรีเฟรชอีกครั้ง' } }));
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     expect(await screen.findByText('โหลดตัวเลขส่วนนี้ไม่ขึ้น ลองรีเฟรชอีกครั้ง')).toBeTruthy();
     expect(topicTab(/งานสรรหา/).getAttribute('title')).toContain('โหลดไม่ขึ้น');
@@ -428,17 +458,21 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('43 รายชื่อ'));
     fireEvent.click(tileOf('AI โทร'));
     const dlg = await screen.findByRole('dialog');
-    expect(fetchHomeAiShareList).toHaveBeenCalledWith('matching', 'ai', 0, win);
+    expect(fetchHomeAiShareList).toHaveBeenCalledWith('matching', 'ai', 0, winQ);
     expect(within(dlg).getByText('จับคู่งาน · 7 วันล่าสุด')).toBeTruthy();
     expect(await within(dlg).findByText('ผู้รับสาย 1')).toBeTruthy();
     // กล่องก้อนเดียว = ไม่ต้องมีคอลัมน์สถานะ · ไม่มีชื่อ/ไม่รู้ BU บอกตรง ๆ
-    expect(within(dlg).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['ชื่อ', 'BU', 'วันที่']);
+    expect(
+      within(dlg)
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent),
+    ).toEqual(['ชื่อ', 'BU', 'วันที่']);
     expect(within(dlg).getByText('ไม่มีชื่อ')).toBeTruthy();
     expect(within(dlg).getByText('ไม่ระบุ')).toBeTruthy();
     expect(within(dlg).getByText('แสดง 1–20 จาก 45 รายชื่อ')).toBeTruthy();
     expect(within(dlg).getByText('หน้า 1 / 3')).toBeTruthy();
     fireEvent.click(within(dlg).getByRole('button', { name: 'ถัดไป' }));
-    await waitFor(() => expect(fetchHomeAiShareList).toHaveBeenLastCalledWith('matching', 'ai', 1, win));
+    await waitFor(() => expect(fetchHomeAiShareList).toHaveBeenLastCalledWith('matching', 'ai', 1, winQ));
     expect(await within(dlg).findByText('ผู้รับสาย 21')).toBeTruthy();
     expect(within(dlg).getByText('หน้า 2 / 3')).toBeTruthy();
     // 🔴 ไม่มีเบอร์โทรในป๊อป
@@ -450,9 +484,13 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     fireEvent.click(tileOf('ทั้งหมด'));
     let dlg = await screen.findByRole('dialog');
-    expect(fetchHomeAiShareList).toHaveBeenLastCalledWith('follow', 'total', 0, win);
+    expect(fetchHomeAiShareList).toHaveBeenLastCalledWith('follow', 'total', 0, winQ);
     await within(dlg).findByText('ผู้รับสาย 1');
-    expect(within(dlg).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['ชื่อ', 'BU', 'วันที่', 'สถานะ']);
+    expect(
+      within(dlg)
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent),
+    ).toEqual(['ชื่อ', 'BU', 'วันที่', 'สถานะ']);
     expect(within(dlg).getAllByText('AI โทร').length).toBeGreaterThan(0);
     expect(within(dlg).getAllByText('ยังไม่โทร').length).toBeGreaterThan(0);
     fireEvent.click(within(dlg).getByRole('button', { name: 'ถัดไป' }));
@@ -462,7 +500,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     fireEvent.click(tileOf('ทั้งหมด'));
     dlg = await screen.findByRole('dialog');
     expect(await within(dlg).findByText('หน้า 1 / 3')).toBeTruthy();
-    expect(fetchHomeAiShareList).toHaveBeenLastCalledWith('follow', 'total', 0, win);
+    expect(fetchHomeAiShareList).toHaveBeenLastCalledWith('follow', 'total', 0, winQ);
   });
 
   it('รอบ 17: ไม่มีสิทธิ์ดูรายชื่อ = Popup บอกเหตุ ไม่ใช่หน้าว่าง', async () => {
@@ -479,9 +517,9 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
     expect(screen.queryByText('AI 100%')).toBeNull();
     expect(screen.queryByText('ของสายที่โทรแล้ว')).toBeNull();
-    // ติดตาม 205 สาย AI โทรทั้งหมด ⇒ แถบ AI 100% · คน 0% · ไม่มีกล่องยังไม่โทร (นับแบบแผน)
-    expect(stat('AI โทร')).toContain('100%');
-    expect(stat('คนโทร')).toContain('0%');
+    // ติดตามนับแบบแผน ⇒ กล่องบอกโทรแล้ว / รอโทร / ยกเลิก แทนแถบ % (เจ้าของ 8 ต.ค. 2569 "คน 302 คือต้องโทร หรือโทรไปแล้ว")
+    expect(stat('AI โทร')).toMatch(/โทรแล้ว \d.*รอโทร \d.*ยกเลิก \d/);
+    expect(stat('คนโทร')).toMatch(/ลงผลแล้ว \d.*รอโทร \d.*ยกเลิก \d/);
     expect(screen.queryByRole('button', { name: /^ยังไม่โทร \d/ })).toBeNull();
     // ไม่มีช่วงก่อน ⇒ ไม่มีชิปเทียบ
     expect(stat('AI โทร')).not.toContain('ใหม่');
@@ -489,7 +527,9 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
   it('รอบ 18: เลือกหลายเดือนบนปฏิทิน (กดยืนยันก่อน) = หนึ่งแท่งต่อเดือน · กดแท่งลงไปดูรายวัน · ปุ่มกลับขึ้นชั้นเดิม', async () => {
     // เส้นตอบตามช่วงที่ขอ (หน้าใช้เลขเฉพาะชุดที่ตรงกับช่วงที่เลือก)
-    fetchHomeAiShare.mockImplementation((w: { from: string | null; to: string | null }) => Promise.resolve(body({ from: w.from, to: w.to })));
+    fetchHomeAiShare.mockImplementation((w: { from: string | null; to: string | null }) =>
+      Promise.resolve(body({ from: w.from, to: w.to })),
+    );
     fetchHomeAiShareDetail.mockImplementation((block: AiShareDetailResponse['block'], w: { from: string | null; to: string | null }) =>
       Promise.resolve({ ...detail(block), from: w.from, to: w.to }),
     );
@@ -502,10 +542,16 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     // ยังไม่ยืนยัน = ยังไม่โหลดช่วงใหม่
     expect(fetchHomeAiShare).not.toHaveBeenCalledWith(expect.objectContaining({ from: '2026-08-01' }));
     fireEvent.click(screen.getByRole('button', { name: 'ยืนยัน' }));
-    await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith({ from: '2026-08-01', to: '2026-09-30', unit: 'month' }));
+    await waitFor(() =>
+      expect(fetchHomeAiShare).toHaveBeenLastCalledWith({ from: '2026-08-01', to: '2026-09-30', unit: 'month', bu: null }),
+    );
     const monthly = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายเดือน` });
     expect(monthly.getAttribute('data-clickable')).toBe('yes');
-    expect(within(monthly).getAllByRole('button').map((b) => b.textContent)).toEqual(['แท่ง 2026-08-01', 'แท่ง 2026-09-01']);
+    expect(
+      within(monthly)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['แท่ง 2026-08-01', 'แท่ง 2026-09-01']);
     expect(screen.getByText(rangeTextFull('2026-08-01', '2026-09-30'))).toBeTruthy();
     // กดแท่งกันยายน = ลงไปดูรายวันของกันยายน
     fireEvent.click(within(monthly).getByRole('button', { name: 'แท่ง 2026-09-01' }));
@@ -542,11 +588,11 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     for (const c of EVEN_TYPE.split(' ')) expect(dlg.classList.contains(c)).toBe(true);
   });
 
-
-
   it('🔴 หัวข้อติดตาม: ไม่มีกล่องแยกทีมบนแถวตัวเลขแล้ว (มีกล่องแยกใต้กราฟแทน · 4 ต.ค. 2569)', async () => {
     fetchHomeAiShare.mockResolvedValue(
-      body({ follow: { total: 58, ai: 31, staff: 27, both: 0, notCalled: 0, waitingAi: 0, waitingStaff: 0, teamReplacement: 27 } as never }),
+      body({
+        follow: { total: 58, ai: 31, staff: 27, both: 0, notCalled: 0, waitingAi: 0, waitingStaff: 0, teamReplacement: 27 } as never,
+      }),
     );
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('58 รายชื่อ'));
@@ -558,12 +604,12 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   it('🔴 กดแท่งวันไหน ตัวเลขด้านบนวิ่งตามวันนั้น · กดซ้ำ/ดูทั้งช่วง = กลับช่วงเดิม (4 ต.ค. 2569)', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const chart = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
-    await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith(win));
+    await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith(winQ));
     fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
-    await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith({ from: win.to, to: win.to }));
+    await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith({ from: win.to, to: win.to, bu: null }));
     // กดแท่งเดิมซ้ำ = กลับทั้งช่วง
     fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
-    await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith(win));
+    await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith(winQ));
   });
 
   it('🔴 คำในตัวเลือกหัวข้อ = คำในเมนู (เจ้าของสั่ง 4 ต.ค. 2569)', async () => {
@@ -572,7 +618,10 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
       .filter((t) => t.closest('[aria-label="เลือกหัวข้อ"]'))
       .map((o) => o.textContent ?? '');
     for (const label of [conveyorLabel('follow'), conveyorLabel('aftercare'), 'งานสรรหา', conveyorLabel('matching')]) {
-      expect(names.some((n) => n.startsWith(label)), label).toBe(true);
+      expect(
+        names.some((n) => n.startsWith(label)),
+        label,
+      ).toBe(true);
     }
     expect(names.some((n) => n.includes('ผู้สมัครในกล่องงาน'))).toBe(false);
     expect(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')?.label).toBe('งานสรรหา');
@@ -615,12 +664,25 @@ describe('หน้าหลักอ่านไล่บนลงล่าง 
   it('ทั้งหมด → AI → คน → กราฟรายวัน → ผลโทรก้อนละ BU (เรื่อง × ใครโทรครบ 4 แถว) · BU ไม่มีงานไม่ขึ้น · ทุก BU รวม = ทั้งหมด', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
     const box = await screen.findByTestId('lumos-stats-follow');
-    expect(within(box).getByRole('heading', { name: 'ผลโทร' })).toBeTruthy();
+    expect(within(box).getByRole('heading', { name: 'ผลโทรราย BU' })).toBeTruthy();
+    // 🔴 8 ต.ค. 2569 "ไปเนี่ย Ai โทร คนโทรเท่าไหร่ Bu ไหนใช้เยอะ" — แท่งผล/แท่ง BU เขียนเลข AI โทร · คนโทร ทุกแถว
+    await waitFor(() => expect(screen.getByTestId('home-result-bars-went').textContent).toMatch(/AI โทร \d[\d,]*คนโทร \d/));
+    // ลำดับ: โทรทั้งหมด → ไป → ไม่ไป → ขอเลื่อน → สรุปไม่ได้ → ล้มเหลว (บอกว่าคืออะไร) → ยกเลิก → รอดำเนินการ
+    const order = [...screen.getByTestId('home-result-bars').querySelectorAll('[data-testid^="home-result-bars-"]')].map((e) =>
+      e.getAttribute('data-testid')!.replace('home-result-bars-', ''),
+    );
+    expect(order).toEqual(['all', 'went', 'notWent', 'reschedule', 'unclear', 'failed', 'cancelled', 'waiting']);
+    expect(screen.getByTestId('home-result-bars-all').textContent).toContain('โทรทั้งหมด');
+    expect(screen.getByTestId('home-result-bars-failed').textContent).toContain('ไม่รับสาย');
+    expect(screen.getByTestId('home-bu-bars-LBD').textContent).toMatch(/AI โทร \d[\d,]*คนโทร \d/);
     const lbd = await within(box).findByTestId('bu-block-LBD');
-    const cells = (key: string) => within(within(box).getByTestId(key)).getAllByRole('cell').map((c) => c.textContent);
-    // เรื่อง · ใครโทร · ทั้งหมด · ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · รอ · ล้มเหลว · ยกเลิก
-    expect(cells('bu-row-LBD-main-ai')).toEqual(['ติดตามคนเริ่มงาน', 'AI โทร', '673', '469', '0', '0', '15', '0', '99', '90']);
-    expect(cells('bu-row-LBD-main-manual')).toEqual(['', 'คนโทร', '106', '77', '1', '1', '0', '0', '3', '24']);
+    const cells = (key: string) =>
+      within(within(box).getByTestId(key))
+        .getAllByRole('cell')
+        .map((c) => c.textContent);
+    // เรื่อง · ใครโทร · ทั้งหมด · ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · ล้มเหลว · ยกเลิก · รอ (ลำดับเจ้าของ 8 ต.ค. 2569)
+    expect(cells('bu-row-LBD-main-ai')).toEqual(['ติดตามคนเริ่มงาน', 'AI โทร', '673', '469', '0', '0', '15', '99', '90', '0']);
+    expect(cells('bu-row-LBD-main-manual')).toEqual(['', 'คนโทร', '106', '77', '1', '1', '0', '3', '24', '0']);
     // ส่งคนแทน AI = 0 ก็ขึ้น (เทียบ AI กับคนได้ทุกเรื่อง)
     expect(cells('bu-row-LBD-replacement-ai')).toEqual(['ติดตามส่งคนแทน', 'AI โทร', '0', '0', '0', '0', '0', '0', '0', '0']);
     expect(cells('bu-row-LBD-total')[1]).toBe('1,417');
@@ -635,15 +697,20 @@ describe('หน้าหลักอ่านไล่บนลงล่าง 
     // งานสรรหา = เส้นทาง → ก้อนละ BU (ครบ 4 ก้อน) → ส่งต่อให้คน / ใบที่ยังรอ (7 ต.ค. 2569)
     pickTopic(new RegExp(CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')!.label));
     const rep = await screen.findByTestId('topic-report-applicants');
-    await waitFor(() => expect(within(rep).getByTestId('report-funnel').textContent).toContain('ประกาศ34'));
-    expect(within(rep).getByTestId('report-funnel').textContent).toContain('ติดต่อแล้ว188');
-    const rcells = (key: string) => within(within(rep).getByTestId(key)).getAllByRole('cell').map((c) => c.textContent);
+    // โฉมแบบ Codex (8 ต.ค. 2569): ขั้นอยู่ในการ์ดของหน้า · ทุกผล/ทุก BU แยกตัวเลข AI/คน · การ์ดนี้เหลือตารางราย BU
+    await waitFor(() => expect(screen.getByTestId('report-funnel').textContent).toContain('ประกาศ34'));
+    expect(screen.getByTestId('home-result-bars').textContent).toMatch(/AI โทร \d/);
+    expect(screen.getByTestId('home-bu-bars-LBD').textContent).toContain('196');
+    const rcells = (key: string) =>
+      within(within(rep).getByTestId(key))
+        .getAllByRole('cell')
+        .map((c) => c.textContent);
     expect(rcells('report-row-LBD-ai')).toEqual(['AI โทร', '184', '104', '80']);
     expect(rcells('report-row-LBD-staff')).toEqual(['คนโทร', '0', '0', '0']);
     expect(rcells('report-row-LBD-total')).toEqual(['รวม LBD', '196', '104', '92']);
     expect(within(rep).getByTestId('report-sum').textContent).toBe('LBD 196 + LBA 4 + ไม่ระบุ 4 = 204 รายชื่อ');
-    expect(within(rep).getByTestId('report-extra-ส่งต่อให้คน').textContent).toContain('3');
-    expect(within(rep).queryByTestId('report-extra-ใบที่ยังรอ')).toBeNull();
+    expect(screen.getByTestId('report-extra-ส่งต่อให้คน').textContent).toContain('3');
+    expect(screen.queryByTestId('report-extra-ใบที่ยังรอ')).toBeNull();
     pickTopic(/จับคู่งาน/);
     await screen.findByRole('heading', { name: 'จับคู่งาน' });
     expect(screen.queryByTestId('lumos-stats-matching')).toBeNull();

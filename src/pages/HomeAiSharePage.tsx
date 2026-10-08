@@ -31,19 +31,31 @@
  * 🔴 ห้ามหยิบของหน้าหลักเดิม (deck · 3 ก้อน · ยอด Lumos) กลับมาใส่เอง — เจ้าของจะสั่งเพิ่มทีละเรื่อง
  * 🔴 โฉมกระจกไม่เบลอของที่เลื่อนจอ (เคยทำเว็บกระตุก 5 ก.ย. 2569) — แสงนวลข้างหลังเบลอมาแล้ว การ์ดแค่โปร่ง
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Bot, Clock, FileText, Link2, Phone, Repeat, Users, type LucideIcon } from 'lucide-react';
 import { useLiveTick } from '@/hooks/useLiveTick';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { KpiTile } from '@/components/home-ai-share/HomeKpis';
-import TopicReportCard from '@/components/home-ai-share/TopicReportCard';
-import { segmentDotClass, segmentFillClass } from '@/components/home-ai-share/segmentStyle';
+import TopicReportCard, { useTopicReport } from '@/components/home-ai-share/TopicReportCard';
+import { HomeSection, SegLegend, SplitBars, StatStrip, type StatItem } from '@/components/home-ai-share/HomeSections';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { segmentFillClass } from '@/components/home-ai-share/segmentStyle';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { metricHelp, type MetricKey } from '@/lib/metricDictionary';
 import { countPill } from '@/lib/teamOnline';
 import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
 import FollowCallerDialog from '@/components/home-ai-share/FollowCallerDialog';
-import AiShareLumosStats, { useHomeLumosSummary } from '@/components/home-ai-share/AiShareLumosStats';
+import AiShareLumosStats, { FOLLOW_RESULT_COLS, useHomeLumosSummary } from '@/components/home-ai-share/AiShareLumosStats';
+import { followBuSplit, followResultSplit, followTeamTotals, reportBuSplit, reportResultSplit, splitTotalRow } from '@/lib/homeSplit';
+import {
+  buildAftercareReport,
+  buildApplicantsReport,
+  buildMatchingReport,
+  emptyMatchingFlow,
+  type ReportItem,
+  type TopicReport,
+} from '@/lib/homeTopicReport';
 import PeriodPicker from '@/components/shared/PeriodPicker';
 import { Card } from '@/components/ui/card';
 import {
@@ -65,8 +77,8 @@ import {
 import { fetchHomeAiShare, fetchHomeAiShareDetail } from '@/lib/homeAiShareApi';
 import { rangeText } from '@/lib/periodPick';
 import { CONVEYOR_VAULT, conveyorLabel } from '@/lib/soRecruitNav';
-import { trendBuLabel } from '@/lib/trends/bu';
-import { EVEN_TYPE, TONE } from '@/lib/designTokens';
+import { SITE_BU_TO_DEPT, trendBuLabel } from '@/lib/trends/bu';
+import { EVEN_TYPE, TONE, type ToneKey } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 
 const NUM = new Intl.NumberFormat('th-TH');
@@ -92,6 +104,29 @@ const restOf = (c: AiShareCounts, ...known: number[]) => Math.max(0, c.notCalled
 
 const STAFF_NOT_READY = 'ยังนับรายชื่อที่คนโทรไม่ได้ ต้องรออัปเดตระบบก่อน';
 
+/** ตัวเลือก BU (โฉมแบบ Codex 8 ต.ค. 2569) — รหัสแผนกชุดเดียวของทั้งระบบ · บัญชีที่ถูกล็อก BU ไม่เห็นตัวเลือกนี้ */
+const BU_OPTIONS = [...new Set(Object.values(SITE_BU_TO_DEPT))];
+
+/** สี + ไอคอนของกล่องแต่ละก้อน — สีชุดเดียวกับแท่ง (`AI_SHARE_CALLED_TONE`) */
+const SEG_TILE: Record<AiShareSegment, { tone: ToneKey; icon: LucideIcon }> = {
+  ai: { tone: 'primary', icon: Bot },
+  staff: { tone: 'violet', icon: Users },
+  both: { tone: 'teal', icon: Repeat },
+  notCalled: { tone: 'neutral', icon: Clock },
+};
+const TOTAL_ICON: Record<AiShareBlockKey, LucideIcon> = { follow: Phone, aftercare: Phone, applicants: FileText, matching: Link2 };
+
+/** รายงานว่าง (ชื่อขั้นครบ เลข 0) — ระหว่างโหลดการ์ดยังอยู่ครบ ไม่หุบ/ไม่ขึ้นคีย์ดิบ (กติกา "ว่างแล้วห้ามหาย") */
+const EMPTY_REPORT: Record<'applicants' | 'matching' | 'aftercare', TopicReport> = {
+  applicants: buildApplicantsReport([], 0, 0),
+  matching: buildMatchingReport([], emptyMatchingFlow()),
+  aftercare: buildAftercareReport([]),
+};
+
+/** ขั้นของรายงาน (`funnel`) ตามคีย์ — ไม่มี = 0 */
+const stepOf = (r: TopicReport | null, key: string): ReportItem => r?.funnel.find((f) => f.key === key) ?? { key, label: key, value: 0 };
+const extraOf = (r: TopicReport | null, title: string): StatItem[] => r?.extra.find((x) => x.title === title)?.items ?? [];
+
 type BlockMeta = {
   key: AiShareBlockKey;
   title: string;
@@ -110,7 +145,13 @@ const BLOCKS: readonly BlockMeta[] = [
     title: conveyorLabel('follow'),
     unit: AI_SHARE_UNIT,
     withBoth: false,
-    metrics: { total: 'aiShare.followTotal', ai: 'aiShare.followAi', staff: 'aiShare.followStaff', both: null, notCalled: 'aiShare.followNotCalled' },
+    metrics: {
+      total: 'aiShare.followTotal',
+      ai: 'aiShare.followAi',
+      staff: 'aiShare.followStaff',
+      both: null,
+      notCalled: 'aiShare.followNotCalled',
+    },
   },
   {
     key: 'aftercare',
@@ -130,14 +171,26 @@ const BLOCKS: readonly BlockMeta[] = [
     title: vaultLabel('job-boxes'),
     unit: AI_SHARE_UNIT,
     withBoth: true,
-    metrics: { total: 'aiShare.appsTotal', ai: 'aiShare.appsAi', staff: 'aiShare.appsStaff', both: 'aiShare.appsBoth', notCalled: 'aiShare.appsNotCalled' },
+    metrics: {
+      total: 'aiShare.appsTotal',
+      ai: 'aiShare.appsAi',
+      staff: 'aiShare.appsStaff',
+      both: 'aiShare.appsBoth',
+      notCalled: 'aiShare.appsNotCalled',
+    },
   },
   {
     key: 'matching',
     title: conveyorLabel('matching'),
     unit: AI_SHARE_UNIT,
     withBoth: true,
-    metrics: { total: 'aiShare.matchTotal', ai: 'aiShare.matchAi', staff: 'aiShare.matchStaff', both: 'aiShare.matchBoth', notCalled: 'aiShare.matchNotCalled' },
+    metrics: {
+      total: 'aiShare.matchTotal',
+      ai: 'aiShare.matchAi',
+      staff: 'aiShare.matchStaff',
+      both: 'aiShare.matchBoth',
+      notCalled: 'aiShare.matchNotCalled',
+    },
   },
 ];
 
@@ -165,6 +218,8 @@ const HomeAiSharePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [block, setBlock] = useState<AiShareBlockKey>(readBlock);
+  /** BU ที่เลือก (null = ทุก BU) — ส่งไปทุกเส้นของหน้า · บัญชีที่ถูกล็อก BU เซิร์ฟเวอร์บังคับเอง */
+  const [bu, setBu] = useState<string | null>(null);
   /**
    * วันที่กดแท่งในกราฟ (หัวข้อติดตาม · 4 ต.ค. 2569) — กล่องตัวเลข/รายชื่อ/ผลโทร วิ่งตามวันนั้น
    * เหมือนเลือกวันนั้นบนปฏิทิน · null = ช่วงบนปฏิทิน · เปลี่ยนช่วง/หัวข้อแล้วล้าง
@@ -177,6 +232,9 @@ const HomeAiSharePage: React.FC = () => {
     setFocus(null);
   }, [win, block]);
   const cardWin = focus ?? win;
+  // ช่วง + BU เป็นก้อนเดียว (memo — ของใหม่ทุกครั้ง = ดึงซ้ำไม่จบ)
+  const winQ = useMemo(() => ({ ...win, bu }), [win, bu]);
+  const cardQ = useMemo(() => ({ ...cardWin, bu }), [cardWin, bu]);
   const choose = (v: string) => {
     if (!isAiShareBlock(v)) return;
     setBlock(v);
@@ -200,16 +258,18 @@ const HomeAiSharePage: React.FC = () => {
   const live = isLiveWindow(cardWin);
   const tick = useLiveTick(live, LIVE_MS);
   /** ผลโทร (การ์ดผลโทร + กล่องเลือกผล) — โหลดครั้งเดียวทั้งหน้า */
-  const lumos = useHomeLumosSummary(block, cardWin, tick);
+  const lumos = useHomeLumosSummary(block, cardQ, tick);
+  /** รายงานของหัวข้ออื่น (ขั้น · ผลแยกก้อน · BU) — โหลดครั้งเดียวทั้งหน้า */
+  const topic = useTopicReport(block === 'follow' ? null : block, cardQ, tick);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
-  const cardWinRef = useRef(cardWin);
-  cardWinRef.current = cardWin;
+  const cardWinRef = useRef(cardQ);
+  cardWinRef.current = cardQ;
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setError(null);
-    fetchHomeAiShare(cardWin)
+    fetchHomeAiShare(cardQ)
       .then((d) => {
         if (alive) {
           setData(d);
@@ -225,7 +285,7 @@ const HomeAiSharePage: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, [cardWin]);
+  }, [cardQ]);
 
   // รอบอัปเดตสด — โหลดเงียบ ๆ เลขเดิมค้างไว้จนเลขใหม่มา · ล้มก็เงียบ (รอบหน้าลองใหม่ ห้ามล้างจอเป็น error)
   useEffect(() => {
@@ -256,7 +316,7 @@ const HomeAiSharePage: React.FC = () => {
     let alive = true;
     setDetailLoading(true);
     setDetailError(null);
-    fetchHomeAiShareDetail(block, win)
+    fetchHomeAiShareDetail(block, winQ)
       .then((d) => {
         if (alive) setDetail(d);
       })
@@ -269,11 +329,11 @@ const HomeAiSharePage: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, [block, win]);
+  }, [block, winQ]);
 
   // กราฟอัปเดตสดด้วยรอบเดียวกัน — โหลดเงียบ (ไม่ขึ้นโครงโหลด กราฟไม่กระพริบ)
-  const blockWinRef = useRef({ block, win });
-  blockWinRef.current = { block, win };
+  const blockWinRef = useRef({ block, win: winQ });
+  blockWinRef.current = { block, win: winQ };
   useEffect(() => {
     if (tick === 0) return;
     let alive = true;
@@ -290,7 +350,8 @@ const HomeAiSharePage: React.FC = () => {
   }, [tick]);
 
   // เปลี่ยนช่วงแล้วเลขเก่าห้ามค้างให้อ่านผิดช่วง — ใช้ข้อมูลเฉพาะเมื่อตรงกับช่วงที่เลือก
-  const current = data && data.from === cardWin.from && data.to === cardWin.to ? data : null;
+  const current =
+    data && data.from === cardWin.from && data.to === cardWin.to && (data.forced_bu || (data.bu ?? null) === bu) ? data : null;
   const detailNow = detail && detail.block === block && detail.from === win.from && detail.to === win.to ? detail : null;
   const meta = BLOCKS.find((b) => b.key === block) ?? BLOCKS[0];
   const counts: AiShareCounts | null = current?.[meta.key] ?? null;
@@ -335,7 +396,6 @@ const HomeAiSharePage: React.FC = () => {
     meta.key === 'follow' && listKey === 'ai' ? 'ai' : meta.key === 'follow' && listKey === 'staff' ? 'manual' : null;
   const flag = meta.key === 'aftercare' ? (counts && counts.total > 0 ? staffFlag : null) : null;
 
-
   /** เลขท้ายของแต่ละตัวเลือก — ดูเทียบทั้ง 4 หัวข้อได้โดยไม่ต้องกดสลับ */
   const noteOf = (key: AiShareBlockKey) => {
     if (!current) return '';
@@ -367,7 +427,7 @@ const HomeAiSharePage: React.FC = () => {
     </Tabs>
   );
 
-  // ── กล่องตัวเลข (โฉมผู้บริหาร 7 ต.ค. 2569 · `HomeKpis`) ──
+  // ── กล่องตัวเลข (โฉมแบบ Codex 8 ต.ค. 2569 · `HomeKpis`) ──
   const showBoth = meta.withBoth || (counts?.both ?? 0) > 0;
   const segs = AI_SHARE_SEGMENTS.filter((k) => (k !== 'both' || showBoth) && (k !== 'notCalled' || meta.key !== 'follow'));
   const shareOf = counts ? new Map(segmentsOfTotal(counts).map((x) => [x.key, x.pct])) : null;
@@ -375,110 +435,387 @@ const HomeAiSharePage: React.FC = () => {
   const pillOf = (cur: number, p: number | undefined) => (prevCounts && p !== undefined ? countPill(cur, p, null) : null);
   const compareTitle = prev ? `เทียบกับ ${rangeText(prev.from, prev.to)} ช่วงเวลาเดียวกัน` : undefined;
   // เลขมาถึงครั้งแรก = ขึ้นทันที ไม่วิ่งจาก 0 (คีย์เปลี่ยนตอนมีข้อมูล) · อัปเดตสดรอบต่อไปจึงค่อยวิ่ง
-  const liveKey = `${meta.key}|${cardWin.from ?? ''}|${cardWin.to ?? ''}|${counts ? 'on' : 'off'}`;
+  const liveKey = `${meta.key}|${cardWin.from ?? ''}|${cardWin.to ?? ''}|${bu ?? ''}|${counts ? 'on' : 'off'}`;
   const total = counts?.total ?? 0;
   const helpOf = (k: AiShareSegment) => {
     const key = meta.metrics[k];
     const help = key ? metricHelp(key) : undefined;
     return k === 'notCalled' && hint ? [help, hint].filter(Boolean).join('\n') : help;
   };
+  /** ช่วง · BU ใต้ชื่อการ์ด */
+  const sub = `${cardWin.from && cardWin.to ? rangeText(cardWin.from, cardWin.to) : 'ทุกวัน'} · ${
+    current?.bu ? trendBuLabel(current.bu) : bu ? trendBuLabel(bu) : 'ทุก BU'
+  }`;
+  /** ก้อนที่โชว์ในแท่ง — ติดตามตั้งได้ทางเดียว (AI / คน) · หัวข้ออื่นครบ 4 ก้อนแบบกล่อง */
+  const barSegs: AiShareSegment[] =
+    meta.key === 'follow' ? ['ai', 'staff'] : showBoth ? ['ai', 'staff', 'both', 'notCalled'] : ['ai', 'staff', 'notCalled'];
 
-  return (
-    // ช่องไฟ + ระยะบรรทัดเท่ากันทั้งหน้า (รอบ 18 · `EVEN_TYPE`) — ป๊อป/แผงที่ลอยออกนอกหน้าใส่ของตัวเองอีกที
-    <div className={cn('relative isolate space-y-6 py-6 md:py-8', EVEN_TYPE)}>
-      {/* แสงนวลกรมท่า/เบอร์กันดีข้างหลังการ์ดกระจก (ภาษาเดียวกับหน้า Login) — เบลอที่ตัวแสงครั้งเดียว ไม่เบลอตอนเลื่อนจอ */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
-        {/* ความเข้มเทียบกับแสงของหน้า Login (`LOGIN_SCENE.auraNavy` .16 · `auraBurgundy` .12) */}
-        <div className="absolute right-0 top-0 h-80 w-80 rounded-full bg-primary/15 blur-3xl dark:bg-primary/20" />
-        <div className="absolute left-0 top-1/4 h-96 w-96 rounded-full bg-foreground/15 blur-3xl dark:bg-foreground/5" />
-        <div className="absolute bottom-10 right-1/4 h-72 w-72 rounded-full bg-primary/10 blur-3xl dark:bg-primary/10" />
-      </div>
+  /**
+   * กล่องบอกในตัวว่าโทรแล้ว/ยังรอ/ยกเลิก (เจ้าของ 8 ต.ค. 2569 "AI โทร 162 โทรหมดเลยใช่ไหม หรือแค่บอกว่าสายที่จะต้องโทร")
+   * ติดตาม/ดูแลหลังเริ่มงาน นับตามแผน (ตั้งให้ใครโทร) ⇒ เลขใหญ่ = สายที่ตั้งไว้ · หัวข้ออื่นนับเมื่อโทรแล้วจริง (มีกล่องยังไม่โทรแยก)
+   * ติดตาม: ผลจากการ์ดผลโทร (`FollowBucket` — AI/คนเท่ากล่องพอดี ตัวตรวจเลขคุม) · ดูแล: ยังไม่มีผล = รอโทร
+   */
+  const report = meta.key === 'follow' ? null : topic.report;
+  /** ขั้น/ส่วนท้าย ใช้รายงานว่างระหว่างโหลด · แท่งใช้ `report` จริง (ระหว่างโหลดขึ้นโครง) */
+  const steps = meta.key === 'follow' ? null : (topic.report ?? EMPTY_REPORT[meta.key]);
+  type Breakdown = Array<{ key: string; label: string; value: number; tone?: ToneKey }>;
+  const followSplit = meta.key === 'follow' ? (lumos.current?.follow ?? null) : null;
+  const fromFollowBucket = (b: { total: number; waiting: number; cancelled: number } | null, doneLabel: string): Breakdown | null =>
+    b
+      ? [
+          { key: 'done', label: doneLabel, value: b.total - b.waiting - b.cancelled, tone: 'success' },
+          { key: 'waiting', label: 'รอโทร', value: b.waiting, tone: 'info' },
+          { key: 'cancelled', label: 'ยกเลิก', value: b.cancelled, tone: 'neutral' },
+        ]
+      : null;
+  const fromReach = (seg: AiShareSegment | 'all'): Breakdown | null => {
+    if (meta.key !== 'aftercare' || !report) return null;
+    let waiting = 0;
+    let all = 0;
+    for (const c of report.cells) {
+      if (seg !== 'all' && c.seg !== seg) continue;
+      all += c.n;
+      if (c.col === 'noResult') waiting += c.n;
+    }
+    return [
+      { key: 'done', label: 'โทรแล้ว', value: all - waiting, tone: 'success' },
+      { key: 'waiting', label: 'รอโทร', value: waiting, tone: 'info' },
+    ];
+  };
+  const breakdownOf = (k: AiShareSegment | 'all'): Breakdown | null => {
+    if (meta.key === 'follow' && followSplit) {
+      if (k === 'ai') return fromFollowBucket(followSplit.ai, 'โทรแล้ว');
+      if (k === 'staff') return fromFollowBucket(followSplit.staff, 'ลงผลแล้ว');
+      if (k === 'all')
+        return fromFollowBucket(
+          {
+            total: followSplit.ai.total + followSplit.staff.total,
+            waiting: followSplit.ai.waiting + followSplit.staff.waiting,
+            cancelled: followSplit.ai.cancelled + followSplit.staff.cancelled,
+          },
+          'โทรแล้ว',
+        );
+    }
+    if (meta.key === 'aftercare' && k !== 'notCalled') return fromReach(k);
+    return null;
+  };
 
-      {/* หัวหน้า (เจ้าของ 7 ต.ค. 2569 ภาพอ้างอิง): ชื่อหน้าใหญ่ → แถวปฏิทิน + ปุ่มหัวข้อ */}
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-4xl font-light text-foreground">หน้าหลัก</h1>
-          {/* จุดเขียวกระพริบ = กำลังอัปเดตสด · เวลาที่เลขชุดนี้มาถึง (ช่วงที่จบไปแล้ว = ไม่มีจุด) */}
-          {updatedAt ? (
-            <span className="inline-flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" data-testid="home-live">
-              {live ? <span className={cn('h-2 w-2 animate-pulse rounded-full', TONE.success.dot)} aria-hidden /> : null}
-              {live ? 'สด · ' : ''}อัปเดต {CLOCK.format(updatedAt)}
-            </span>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {/* ปุ่มปฏิทินเป็นไอคอนอย่างเดียว ไม่มีคำนำหน้า (เจ้าของสั่งถอดทั้ง "7 วันล่าสุด" และ "ช่วง" 30 ก.ย. 2569) */}
-          <PeriodPicker value={win} onChange={setWin} />
-          {picker}
-          {current?.forced_bu && current.bu ? (
-            <span className="text-sm text-muted-foreground">{trendBuLabel(current.bu)}</span>
-          ) : null}
-        </div>
-      </div>
-
-      {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
-
-      {/*
-        อ่านไล่บนลงล่าง ซ้ายไปขวา (เจ้าของ 7 ต.ค. 2569 ดึก "มันดูยากเกินไป"):
-        1–3 ทั้งหมด · AI โทร · คนโทร (แถวเดียว) → 4 ยอดใช้งานรายวัน → 5 ผลโทรก้อนละ BU (เรื่อง × ใครโทร × ผล · BU ไม่มีงานไม่ขึ้น)
-        ถอดแล้ว: เกจ AI ทำงาน · รวมทั้งช่วง · การ์ดแยก BU · กราฟแท่งผลโทร
-      */}
-      <h2 className="sr-only">{meta.title}</h2>
-      <div className={cn('grid grid-cols-1 gap-4 [&>*]:min-w-0', segs.length > 2 ? 'sm:grid-cols-2 xl:grid-cols-5' : 'sm:grid-cols-3')}>
+  const tiles = (
+    <div
+      className={cn(
+        'grid grid-cols-1 gap-3 [&>*]:min-w-0',
+        segs.length + 1 === 3
+          ? 'sm:grid-cols-3'
+          : segs.length + 1 === 4
+            ? 'sm:grid-cols-2 lg:grid-cols-4'
+            : 'sm:grid-cols-3 lg:grid-cols-5',
+      )}
+    >
+      <KpiTile
+        emphasis
+        icon={TOTAL_ICON[meta.key]}
+        label="ทั้งหมด"
+        value={total}
+        unit={meta.unit}
+        liveKey={liveKey}
+        loading={loading && !counts}
+        pill={pillOf(total, prevCounts?.total)}
+        pillTitle={compareTitle}
+        foot={prevCounts && prev?.label ? `${prev.label} ${NUM.format(prevCounts.total)}` : null}
+        hint={metricHelp(meta.metrics.total)}
+        breakdown={breakdownOf('all')}
+        onClick={() => openList('total')}
+      />
+      {segs.map((k) => (
         <KpiTile
-          emphasis
-          label="ทั้งหมด"
-          value={total}
-          unit={meta.unit}
+          key={k}
+          tone={SEG_TILE[k].tone}
+          icon={SEG_TILE[k].icon}
+          label={AI_SHARE_SEGMENT_LABEL[k]}
+          value={counts ? counts[k] : 0}
           liveKey={liveKey}
           loading={loading && !counts}
-          pill={pillOf(total, prevCounts?.total)}
+          share={shareOf?.get(k) ?? 0}
+          shareClass={segmentFillClass(k)}
+          pill={counts ? pillOf(counts[k], prevCounts?.[k]) : null}
           pillTitle={compareTitle}
-          foot={prevCounts && prev?.label ? `${prev.label} ${NUM.format(prevCounts.total)}` : null}
-          hint={metricHelp(meta.metrics.total)}
-          onClick={() => openList('total')}
+          hint={helpOf(k)}
+          breakdown={breakdownOf(k)}
+          onClick={() => openList(k)}
         />
-        {segs.map((k) => (
-          <KpiTile
-            key={k}
-            label={AI_SHARE_SEGMENT_LABEL[k]}
-            value={counts ? counts[k] : 0}
-            liveKey={liveKey}
-            loading={loading && !counts}
-            dotClass={segmentDotClass(k)}
-            share={shareOf?.get(k) ?? 0}
-            shareClass={segmentFillClass(k)}
-            pill={counts ? pillOf(counts[k], prevCounts?.[k]) : null}
-            pillTitle={compareTitle}
-            hint={helpOf(k)}
-            onClick={() => openList(k)}
+      ))}
+    </div>
+  );
+
+  const chart = (
+    <Card variant="solid" className="min-w-0 p-5 sm:p-6 lg:col-span-3">
+      <AiShareDetail
+        withTeams={meta.key === 'follow'}
+        hideNotCalled={meta.key === 'follow'}
+        onFocusDay={onFocusDay}
+        unit={meta.unit}
+        title={meta.title}
+        win={win}
+        withBoth={meta.withBoth}
+        data={detailNow}
+        loading={detailLoading}
+        error={detailError}
+        hideBreakdown
+      />
+    </Card>
+  );
+
+  // ── ข้อมูลของแท่ง (ทุกแท่งแยก AI/คน · เจ้าของ "ไปเนี่ย AI โทร คนโทรเท่าไหร่ Bu ไหนใช้เยอะ") ──
+  const followCells = meta.key === 'follow' ? (lumos.current?.followByBu ?? null) : null;
+  const resultCols = followCells ? followResultSplit(followCells, FOLLOW_RESULT_COLS) : report ? reportResultSplit(report) : [];
+  // แถวบนสุด = ทั้งหมด (เจ้าของ 8 ต.ค. 2569 "ผลโทรต้องไล่เป็น โทรทั้งหมด ไป ไม่ไป ขอเลื่อน สรุปไม่ได้ ล้มเหลว ยกเลิก รอดำเนินการ")
+  const resultRows = resultCols.length ? [splitTotalRow(resultCols, meta.key === 'follow' ? 'โทรทั้งหมด' : 'ทั้งหมด'), ...resultCols] : [];
+  const buRows = followCells ? followBuSplit(followCells) : report ? reportBuSplit(report) : [];
+  const barsLoading = meta.key === 'follow' ? !followCells : !report;
+  const failed = meta.key === 'follow' ? lumos.failed : topic.failed;
+  const resultTone = new Map<string, ToneKey>(
+    (meta.key === 'follow' ? FOLLOW_RESULT_COLS : (report?.cols ?? [])).map((c): [string, ToneKey] => [c.key, c.tone]),
+  );
+  const teams = followCells ? followTeamTotals(followCells) : null;
+
+  const resultsCard = (
+    <HomeSection
+      title={meta.key === 'aftercare' ? 'ผลการติดต่อ' : 'ผลโทร'}
+      sub={sub}
+      className="lg:col-span-2"
+      testId="home-results"
+      right={<SegLegend segs={barSegs} />}
+    >
+      {failed ? <p className={cn('text-sm', TONE.danger.value)}>{failed}</p> : null}
+      {meta.key === 'aftercare' ? (
+        <StatStrip arrows testId="home-reach" items={[stepOf(steps, 'total'), stepOf(steps, 'called'), stepOf(steps, 'reached')]} />
+      ) : null}
+      <SplitBars
+        rows={resultRows}
+        segs={barSegs}
+        loading={barsLoading && !failed}
+        emptyText="ไม่มีรายชื่อ"
+        testId="home-result-bars"
+        dotOf={(k) => {
+          const t = resultTone.get(k);
+          return t ? TONE[t].dot : null;
+        }}
+      />
+      {meta.key === 'aftercare' ? <StatStrip testId="home-waiting" items={extraOf(steps, 'ที่ยังรอ')} /> : null}
+    </HomeSection>
+  );
+
+  const buCard = (
+    <HomeSection title="แต่ละ BU ใช้เท่าไหร่" sub={sub} testId="home-bu" right={<SegLegend segs={barSegs} />}>
+      <SplitBars rows={buRows} segs={barSegs} loading={barsLoading && !failed} emptyText="ไม่มีรายชื่อ" testId="home-bu-bars" />
+    </HomeSection>
+  );
+
+  /** คู่ที่จับไว้รอ — แท่งเขียว/เหลือง/แดง (จับคู่งาน) */
+  const matched = stepOf(steps, 'matched');
+  const tierBar = (
+    <div className="space-y-3 rounded-xl border border-foreground/10 p-4" data-testid="home-matched">
+      <p className="flex items-baseline gap-2">
+        <span className="text-sm text-muted-foreground">{matched.label === 'matched' ? 'คนที่จับคู่รอ' : matched.label}</span>
+        <span className="text-2xl font-medium tabular-nums text-foreground">{NUM.format(matched.value)}</span>
+      </p>
+      <div className="flex h-4 overflow-hidden rounded-full bg-muted" aria-hidden>
+        {(matched.parts ?? []).map((p) => (
+          <span
+            key={p.key}
+            className={cn('h-full', TONE[p.tone ?? 'neutral'].dot)}
+            style={{ width: `${matched.value > 0 ? (p.value / matched.value) * 100 : 0}%` }}
           />
         ))}
       </div>
+      <p className="flex flex-wrap gap-x-5 gap-y-1 text-sm tabular-nums">
+        {(matched.parts ?? []).map((p) => (
+          <span key={p.key} className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <span className={cn('h-2.5 w-2.5 rounded-full', TONE[p.tone ?? 'neutral'].dot)} aria-hidden />
+            {p.label} <span className="font-medium text-foreground">{NUM.format(p.value)}</span>
+          </span>
+        ))}
+      </p>
+    </div>
+  );
+
+  const todoList = (title: string) => (
+    <div className="space-y-2 rounded-xl border border-foreground/10 p-4" data-testid={`report-extra-${title}`}>
+      <h3 className="text-sm font-medium text-foreground">{title}</h3>
+      <ul className="divide-y divide-foreground/10">
+        {extraOf(steps, title).map((it) => (
+          <li key={it.key} className="flex items-center justify-between gap-3 py-2 text-sm">
+            <span className="flex items-center gap-2 text-foreground">
+              {it.tone ? <span className={cn('h-2.5 w-2.5 rounded-full', TONE[it.tone].dot)} aria-hidden /> : null}
+              {it.label}
+            </span>
+            <span className="text-base font-medium tabular-nums text-foreground">{NUM.format(it.value)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  return (
+    // ช่องไฟ + ระยะบรรทัดเท่ากันทั้งหน้า (รอบ 18 · `EVEN_TYPE`) — ป๊อป/แผงที่ลอยออกนอกหน้าใส่ของตัวเองอีกที
+    <div className={cn('relative isolate space-y-5 py-6 md:py-8', EVEN_TYPE)}>
+      {/* หัวหน้า (โฉมแบบ Codex 8 ต.ค. 2569): ชื่อหน้า + สด · ปฏิทิน + BU ขวา → แถบหัวข้อเต็มแถว */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-baseline gap-3">
+            <h1 className="text-3xl font-medium text-foreground">หน้าหลัก</h1>
+            {/* จุดเขียวกระพริบ = กำลังอัปเดตสด · เวลาที่เลขชุดนี้มาถึง (ช่วงที่จบไปแล้ว = ไม่มีจุด) */}
+            {updatedAt ? (
+              <span className="inline-flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" data-testid="home-live">
+                {live ? <span className={cn('h-2 w-2 animate-pulse rounded-full', TONE.success.dot)} aria-hidden /> : null}
+                {live ? 'สด · ' : ''}อัปเดต {CLOCK.format(updatedAt)}
+              </span>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* ปุ่มปฏิทินเป็นไอคอนอย่างเดียว ไม่มีคำนำหน้า (เจ้าของสั่งถอดทั้ง "7 วันล่าสุด" และ "ช่วง" 30 ก.ย. 2569) */}
+            <PeriodPicker value={win} onChange={setWin} />
+            {current?.forced_bu && current.bu ? (
+              <span className="text-sm text-muted-foreground">{trendBuLabel(current.bu)}</span>
+            ) : (
+              <Select value={bu ?? 'all'} onValueChange={(v) => setBu(v === 'all' ? null : v)}>
+                <SelectTrigger className="h-10 w-44 bg-card" aria-label="เลือก BU">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทุก BU</SelectItem>
+                  {BU_OPTIONS.map((b) => (
+                    <SelectItem key={b} value={b}>
+                      {trendBuLabel(b)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        </div>
+        {picker}
+      </div>
+
+      {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
       {blockError ? <p className={cn('text-xs', TONE.danger.value)}>{blockError}</p> : null}
       {flag ? <p className={cn('text-xs', TONE.warn.value)}>{flag}</p> : null}
 
-      <Card variant="solid" className="min-w-0 p-6 sm:p-7">
-        <AiShareDetail
-          withTeams={meta.key === 'follow'}
-          hideNotCalled={meta.key === 'follow'}
-          onFocusDay={onFocusDay}
-          unit={meta.unit}
-          title={meta.title}
-          win={win}
-          withBoth={meta.withBoth}
-          data={detailNow}
-          loading={detailLoading}
-          error={detailError}
-          hideBreakdown
-        />
-      </Card>
+      {/* ชื่อหัวข้อสำหรับโปรแกรมอ่านจอ — งานสรรหา/จับคู่งาน การ์ดแรกใช้ชื่อส่วน (ติดตาม/ดูแล การ์ดแรกคือชื่อหัวข้อเอง) */}
+      {meta.key === 'applicants' || meta.key === 'matching' ? <h2 className="sr-only">{meta.title}</h2> : null}
 
-      {/* ผลโทร — ติดตามแบ่งก้อนละ BU · หัวข้ออื่น = เส้นทาง → เทียบ AI/คน ก้อนละ BU → ส่งต่อให้คน + ที่ยังรอ (7 ต.ค. 2569) · ช่วงตามแท่งที่กด */}
+      {/* ── ติดตาม ── */}
+      {meta.key === 'follow' ? (
+        <HomeSection
+          title={meta.title}
+          sub={sub}
+          testId="home-intro"
+          right={
+            <div className="flex gap-2" data-testid="home-teams">
+              {(
+                [
+                  ['main', 'คนเริ่มงาน'],
+                  ['replacement', 'ส่งคนแทน'],
+                ] as const
+              ).map(([k, label]) => (
+                <span key={k} className={cn('rounded-xl px-4 py-2', k === 'main' ? TONE.info.wash : TONE.teal.wash)}>
+                  <span className="block text-xs text-muted-foreground">{label}</span>
+                  <span className="block text-xl font-medium tabular-nums text-foreground">{teams ? NUM.format(teams[k]) : '—'}</span>
+                </span>
+              ))}
+            </div>
+          }
+        >
+          {tiles}
+        </HomeSection>
+      ) : null}
+
+      {/* ── งานสรรหา ── */}
+      {meta.key === 'applicants' ? (
+        <>
+          <HomeSection title="ใบขอและการประกาศ" sub={sub} testId="home-intro">
+            <StatStrip
+              testId="report-funnel"
+              items={[
+                { ...stepOf(steps, 'jobsIn'), unit: 'ใบ' },
+                { ...stepOf(steps, 'published'), unit: 'ใบ' },
+              ]}
+            />
+          </HomeSection>
+          <HomeSection title="ผู้สมัครและผลโทร" sub={sub}>
+            {tiles}
+            <StatStrip
+              testId="report-steps"
+              items={[
+                { ...stepOf(steps, 'total'), unit: meta.unit },
+                { ...stepOf(steps, 'fast'), unit: meta.unit },
+              ]}
+            />
+          </HomeSection>
+        </>
+      ) : null}
+
+      {/* ── จับคู่งาน ── */}
+      {meta.key === 'matching' ? (
+        <>
+          <HomeSection title="ใบขอและการจับคู่" sub={sub} testId="home-intro">
+            <StatStrip
+              arrows
+              testId="report-funnel"
+              items={['jobsIn', 'jobsMatched', 'jobsRecommend'].map((k) => ({ ...stepOf(steps, k), unit: 'ใบ' }))}
+            />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {tierBar}
+              {todoList('ต้องสั่งงาน')}
+            </div>
+          </HomeSection>
+          <HomeSection title="การโทรและผลลัพธ์" sub={sub}>
+            {tiles}
+            <StatStrip
+              arrows
+              testId="report-steps"
+              items={['total', 'called', 'interested', 'reserved', 'placed'].map((k) => stepOf(steps, k))}
+            />
+          </HomeSection>
+        </>
+      ) : null}
+
+      {/* ── ดูแลหลังเริ่มงาน ── */}
+      {meta.key === 'aftercare' ? (
+        <HomeSection title={meta.title} sub={sub} testId="home-intro">
+          {tiles}
+        </HomeSection>
+      ) : null}
+
+      {/* กราฟรายวัน + ผล (แท่งแยก AI/คน) · ช่วงตามแท่งที่กด */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-5 [&>*]:min-w-0">
+        {chart}
+        {resultsCard}
+      </div>
+
+      {buCard}
+
+      {/* งานสรรหา: นัดหมาย (แยกใครโทรคนแรก) + ส่งต่อให้คน */}
+      {meta.key === 'applicants' ? (
+        <HomeSection title="การนัดหมาย" sub={sub} testId="home-appointment">
+          <StatStrip arrows testId="report-appointment" items={['interested', 'appointment', 'showed'].map((k) => stepOf(steps, k))} />
+          <div className="space-y-2" data-testid="report-extra-ส่งต่อให้คน">
+            <h3 className="text-sm font-medium text-foreground">ส่งต่อให้คน</h3>
+            <StatStrip items={extraOf(steps, 'ส่งต่อให้คน')} />
+          </div>
+        </HomeSection>
+      ) : null}
+      {meta.key === 'matching' ? (
+        <HomeSection title="ส่งต่อให้คน" sub={sub} testId="report-extra-ส่งต่อให้คน">
+          <StatStrip items={extraOf(steps, 'ส่งต่อให้คน')} />
+        </HomeSection>
+      ) : null}
+
+      {/* ตารางราย BU — เรื่อง/ก้อน × ผล (ของเดิมครบ · เจ้าของ "ห้ามเพิ่ม หรือเอาข้อมูลอะไรฉันออก") */}
       {meta.key === 'follow' ? (
         <AiShareLumosStats block={meta.key} unit={meta.unit} data={lumos.current} failed={lumos.failed} />
       ) : (
-        <TopicReportCard block={meta.key} win={cardWin} tick={tick} unit={meta.unit} />
+        <TopicReportCard block={meta.key} report={report} failed={topic.failed} unit={meta.unit} />
       )}
 
       {/* หัวข้อติดตาม กด AI โทร / คนโทร = แยกเรื่อง → ผล → รายชื่อ (เจ้าของ 7 ต.ค. 2569 "ป๊อปเดิม เปลี่ยนข้างใน") */}
@@ -489,7 +826,7 @@ const HomeAiSharePage: React.FC = () => {
         caller={callerList ?? 'ai'}
         blockTitle={meta.title}
         unit={meta.unit}
-        win={cardWin}
+        win={cardQ}
         count={counts ? counts[listKey] : null}
       />
 
@@ -501,10 +838,9 @@ const HomeAiSharePage: React.FC = () => {
         blockTitle={meta.title}
         listKey={listKey}
         unit={meta.unit}
-        win={cardWin}
+        win={cardQ}
         count={counts ? counts[listKey] : null}
       />
-
     </div>
   );
 };

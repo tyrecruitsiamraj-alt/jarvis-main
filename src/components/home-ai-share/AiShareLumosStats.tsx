@@ -35,15 +35,25 @@ const NUM = new Intl.NumberFormat('th-TH');
 export type ToneKey = keyof typeof TONE;
 export type ResultSlice = { key: string; label: string; tone: ToneKey; value: number };
 
-/** ผลของติดตาม — ชื่อ/สีชุดเดียวกับหน้าติดตาม (ขอเลื่อน = ส้ม แยกจากสรุปไม่ได้) */
-export const FOLLOW_RESULT_COLS: ReadonlyArray<{ key: FollowBucketKey; label: string; tone: ToneKey }> = [
+/**
+ * ผลของติดตาม — ชื่อ/สีชุดเดียวกับหน้าติดตาม (ขอเลื่อน = ส้ม แยกจากสรุปไม่ได้)
+ * ลำดับ (เจ้าของ 8 ต.ค. 2569): ไป → ไม่ไป → ขอเลื่อน → สรุปไม่ได้ → ล้มเหลว → ยกเลิก → รอดำเนินการ
+ * ล้มเหลว (เจ้าของ "ล้มเหลวคือไรบอกด้วย") = โทรแล้วติดต่อไม่ได้ — คิว Lumos `failed` (วัด 14 วัน: ไม่รับสาย 65 · รับแต่ไม่พูด 27 ·
+ * สายไม่ว่าง 21 · โทรไม่ออก 18) + ผลที่หน้าติดตามนับไม่รับสาย + คนลงผล "ติดต่อไม่ได้"
+ */
+export const FOLLOW_RESULT_COLS: ReadonlyArray<{ key: FollowBucketKey; label: string; tone: ToneKey; note?: string }> = [
   { key: 'went', label: 'ไป', tone: FOLLOW_MATRIX_COL_TONE.went },
   { key: 'notWent', label: 'ไม่ไป', tone: FOLLOW_MATRIX_COL_TONE.notWent },
   { key: 'reschedule', label: 'ขอเลื่อน', tone: 'orange' },
   { key: 'unclear', label: 'สรุปไม่ได้', tone: FOLLOW_MATRIX_COL_TONE.unclear },
-  { key: 'waiting', label: 'รอดำเนินการ', tone: FOLLOW_MATRIX_COL_TONE.waiting },
-  { key: 'failed', label: 'ล้มเหลว', tone: FOLLOW_MATRIX_COL_TONE.noAnswer },
+  {
+    key: 'failed',
+    label: 'ล้มเหลว',
+    tone: FOLLOW_MATRIX_COL_TONE.noAnswer,
+    note: 'ติดต่อไม่ได้ · ไม่รับสาย · สายไม่ว่าง · รับแต่ไม่พูด · โทรไม่ออก',
+  },
   { key: 'cancelled', label: 'ยกเลิก', tone: FOLLOW_MATRIX_COL_TONE.cancelled },
+  { key: 'waiting', label: 'รอดำเนินการ', tone: FOLLOW_MATRIX_COL_TONE.waiting },
 ];
 
 export const hasLumosResults = (block: AiShareBlockKey) => block === 'follow';
@@ -101,8 +111,8 @@ const AiShareLumosStats: React.FC<{
 }> = ({ block, unit, data, failed, className }) => {
   if (!hasLumosResults(block)) return null;
   return (
-    <Card variant="solid" className={cn('space-y-6 p-6 sm:p-7', className)} data-testid={`lumos-stats-${block}`}>
-      <h2 className="text-xl font-medium text-foreground">ผลโทร</h2>
+    <Card variant="solid" className={cn('space-y-6 p-5 sm:p-6', className)} data-testid={`lumos-stats-${block}`}>
+      <h2 className="text-lg font-medium text-foreground">ผลโทรราย BU</h2>
       {failed ? <p className={cn('text-sm', TONE.danger.value)}>{failed}</p> : null}
       <FollowResults split={data?.follow ?? null} cells={data?.followByBu ?? null} unit={unit} />
     </Card>
