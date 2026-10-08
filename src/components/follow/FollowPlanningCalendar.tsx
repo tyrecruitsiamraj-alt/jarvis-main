@@ -919,7 +919,7 @@ const FollowPlanningCalendar: React.FC<{
                                               'ส่งไปหา Lumos ไม่สำเร็จ — ไม่มีสายไหนกำลังจะออก กดปุ่มโทรข้างชื่อเพื่อโทรเอง'
                                             }
                                           >
-                                            ส่งไม่ถึง Lumos
+                                            {round.entry.dispatch_state === 'not_imported' ? 'Lumos ไม่รับแผน' : 'ส่งไม่ถึง Lumos'}
                                           </span>
                                         ) : null}
                                       </span>

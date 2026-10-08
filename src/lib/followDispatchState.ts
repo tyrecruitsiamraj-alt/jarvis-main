@@ -33,6 +33,12 @@ export const FOLLOW_DISPATCH_STATES = [
    * ซึ่งเป็นคนละปัญหาและแก้คนละทาง (เจอตอนสอบสวนสายรอบ 1 ที่ค้าง 51 รายการ)
    */
   'push_failed',
+  /**
+   * ส่งถึง Lumos แล้ว แต่ **Lumos นำแผนเข้าระบบไม่สำเร็จ** (8 ต.ค. 2569 · `api/_lib/followLumosWatch.ts`)
+   * ระบบส่งแผนใหม่ให้แล้ว 1 ครั้งยังไม่ผ่าน ⇒ AI จะไม่โทร ต้องให้คนโทรแทน
+   * (อิทธิชัย 8 ต.ค.: Lumos ตอบรับคำขอแต่ไม่โทร — เดิมจอขึ้น "ส่งให้ AI แล้ว")
+   */
+  'not_imported',
 ] as const;
 export type FollowDispatchState = (typeof FOLLOW_DISPATCH_STATES)[number];
 
@@ -108,6 +114,12 @@ export const FOLLOW_DISPATCH_META: Record<FollowDispatchState, FollowDispatchMet
     needsAction: true,
     retryable: true,
   },
+  not_imported: {
+    label: 'Lumos ไม่รับแผน',
+    hint: 'ส่งถึง Lumos แล้วแต่ Lumos เอาเข้าระบบไม่ได้ ระบบส่งใหม่ให้แล้วก็ยังไม่ผ่าน AI จะไม่โทรสายนี้ · กดปุ่มโทรข้างชื่อเพื่อโทรเอง',
+    needsAction: true,
+    retryable: false,
+  },
 };
 
 /**
@@ -129,8 +141,13 @@ export function followDispatchLabel(input: {
    * "ส่งให้ AI แล้ว" ทั้งที่ยังไม่ถึงเขา = กลับไปเงียบแบบเดิม
    * ⚠️ แต่ `delivered`/`completed` แปลว่าเขาได้ไปแล้ว (ดึงเองทีหลังได้) ⇒ ของสดชนะ
    */
-  if (input.state === 'push_failed' && status !== 'delivered' && status !== 'completed' && status !== 'cancelled') {
-    return FOLLOW_DISPATCH_META.push_failed;
+  if (
+    (input.state === 'push_failed' || input.state === 'not_imported') &&
+    status !== 'delivered' &&
+    status !== 'completed' &&
+    status !== 'cancelled'
+  ) {
+    return FOLLOW_DISPATCH_META[input.state];
   }
   if (status) {
     if (status === 'cancelled') {

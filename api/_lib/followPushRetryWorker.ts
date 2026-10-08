@@ -31,6 +31,7 @@ import {
 import type { LumosReminderPayload } from './lumosDispatch.js';
 import { staffNameOfPhone } from './followStaffName.js';
 import { repairDeclinedFollowDays } from './followDeclineDayRepair.js';
+import { alertOverdueAiFollow, checkFollowPlanImports } from './followLumosWatch.js';
 import { resendFollowCancels } from './followCancelResend.js';
 import {
   readFollowPushRetryConfig,
@@ -323,6 +324,18 @@ export function startFollowPushRetryWorker(): boolean {
         await repairDeclinedFollowDays();
       } catch (e) {
         logError('follow.declineDayRepair: รอบนี้ล้ม', e);
+      }
+      // กัน AI ไม่โทรแบบเงียบ ๆ (เจ้าของ 8 ต.ค. 2569 "ทำทั้งสองชั้น") — ชั้น 1 ถาม Lumos ว่าแผนเข้าระบบจริงไหม
+      try {
+        await checkFollowPlanImports();
+      } catch (e) {
+        logError('follow.importCheck: รอบนี้ล้ม', e);
+      }
+      // ชั้น 2 สาย AI เลยเวลา 15 นาทียังไม่มีผล → แจ้งทีม (ไม่สลับเป็นคนโทรเอง)
+      try {
+        await alertOverdueAiFollow();
+      } catch (e) {
+        logError('follow.overdueAlert: รอบนี้ล้ม', e);
       }
       await sleepInterruptible(nowCfg.intervalMs);
     }

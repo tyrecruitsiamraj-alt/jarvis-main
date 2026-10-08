@@ -467,7 +467,8 @@ export function roundTone(round: FollowPlanningRound): ToneKey {
  * ตัวนี้เป็น **ป้ายเสริมบนแถว** เท่านั้น
  */
 export function roundPushFailed(round: FollowPlanningRound): boolean {
-  if (round.entry.dispatch_state !== 'push_failed') return false;
+  // 'not_imported' (8 ต.ค. 2569) = ถึง Lumos แต่เขาเอาเข้าระบบไม่ได้ — ผลเหมือนกัน: สายไม่ออก
+  if (round.entry.dispatch_state !== 'push_failed' && round.entry.dispatch_state !== 'not_imported') return false;
   // ได้ผลแล้ว/ปิดแล้ว/ยกเลิกแล้ว = เรื่องจบไปแล้ว ไม่ต้องเตือนย้อนหลัง
   return round.state !== 'result' && round.state !== 'closed' && round.state !== 'cancelled';
 }
