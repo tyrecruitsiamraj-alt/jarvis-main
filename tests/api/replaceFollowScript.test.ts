@@ -36,12 +36,20 @@ describe('บทติดตามส่งคนแทน', () => {
     expect(p.steps[0].message).toContain('คุณสมชาย ใจดี วันนี้มีไปทำงานที่ krungsri เวลา 8:00 น. คอนเฟิร์มไหมคะ');
   });
 
-  it('สาย 2 และ 3 ใช้บทก่อนเข้างานเดียวกัน', () => {
-    for (const [slot, at, round] of [['lead60', '2026-10-09T07:00:00+07:00', 2], ['lead15', '2026-10-09T07:45:00+07:00', 3]] as const) {
-      const msg = buildFollowReminderPayload(entry(replaceSlotNote(slot, wall), at, round)).steps[0].message;
-      expect(msg).toContain('คุณสมชาย ใจดี วันนี้เข้างานที่ krungsri เวลา 8:00 น. ออกเดินทางแล้วใช่ไหมคะ');
-      expect(msg).not.toContain('คอนเฟิร์ม');
-    }
+  // 8 ต.ค. 2569 เจ้าของ: "บทพูดอะ แยกเป็น สาย 1 2 3" (เดิม 2 กับ 3 ใช้บทเดียวกัน)
+  it('สาย 2 ก่อน 1 ชม. กับสาย 3 ก่อน 15 นาที พูดคนละบท', () => {
+    const msg2 = buildFollowReminderPayload(entry(replaceSlotNote('lead60', wall), '2026-10-09T07:00:00+07:00', 2)).steps[0].message;
+    const msg3 = buildFollowReminderPayload(entry(replaceSlotNote('lead15', wall), '2026-10-09T07:45:00+07:00', 3)).steps[0].message;
+    expect(msg2).toContain('คุณสมชาย ใจดี วันนี้เข้างานที่ krungsri เวลา 8:00 น. ออกเดินทางแล้วใช่ไหมคะ');
+    expect(msg3).toContain('คุณสมชาย ใจดี ถึงหน่วยงาน krungsri แล้วใช่ไหมคะ ใกล้เวลาเข้างาน 8:00 น. แล้วค่ะ');
+    for (const m of [msg2, msg3]) expect(m).not.toContain('คอนเฟิร์ม');
+  });
+
+  it('สายที่เพิ่มจากแก้ตาราง (ไม่มีเลขสาย) = ดูเวลาที่เหลือก่อนเข้างาน', () => {
+    const of = (iso: string) =>
+      replaceScriptOf({ topic: REPLACE_FOLLOW_TOPIC, note: 'เข้างาน 08:00 น.', callRound: null, callAtMs: Date.parse(iso) })?.kind;
+    expect(of('2026-10-09T07:00:00+07:00')).toBe('call2');
+    expect(of('2026-10-09T07:40:00+07:00')).toBe('call3');
   });
 
   it('งานติดตามหน้าหลักยังพูดบทเดิม', () => {
@@ -57,12 +65,12 @@ describe('บทติดตามส่งคนแทน', () => {
     expect(replaceScriptOf({ topic: REPLACE_FOLLOW_TOPIC, note: 'ยืนยันเวลาเข้างาน 1/1 07:30 น.', callRound: 1, callAtMs: Date.parse('2026-12-31T16:00:00+07:00') }))
       .toEqual({ kind: 'confirm', workYmd: '2027-01-01', startTime: '7:30 น.' });
     // หมายเหตุถูกแก้จนอ่านไม่ออก = ดูสายที่
-    expect(replaceScriptOf({ topic: REPLACE_FOLLOW_TOPIC, note: 'โทรได้', callRound: 2, callAtMs: 0 })?.kind).toBe('before');
+    expect(replaceScriptOf({ topic: REPLACE_FOLLOW_TOPIC, note: 'โทรได้', callRound: 2, callAtMs: 0 })?.kind).toBe('call2');
     expect(replaceScriptOf({ topic: 'อื่น', note: 'เข้างาน 08:00 น.', callRound: 2, callAtMs: 0 })).toBeNull();
   });
 
   it('บทใหม่แก้ได้จากหน้าตั้งค่า', () => {
-    expect(EDITABLE_SCRIPT_KEYS).toEqual(expect.arrayContaining(['replace_confirm', 'replace_before']));
+    expect(EDITABLE_SCRIPT_KEYS).toEqual(expect.arrayContaining(['replace_confirm', 'replace_call2', 'replace_call3']));
     expect(EDITABLE_SCRIPT_DEFAULTS.replace_confirm.join(' ')).toContain('{วัน}');
   });
 });

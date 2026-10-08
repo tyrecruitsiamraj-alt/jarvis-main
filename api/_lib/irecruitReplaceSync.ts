@@ -525,8 +525,9 @@ export async function runIrecruitReplaceSync(
         const row = rowById.get(ex.id);
         const wasAi = row?.mode === 'ai';
         if (wasAi) await cancelFollowReminder(ex.id, staffNameOfPhone);
-        // เจ้าหน้าที่เคยสลับคน → AI เอง = คงที่เขาเลือก (iRecruit เปลี่ยนแค่เวลา ไม่ได้เปลี่ยนใครโทร) · พัก AI ยังบังคับทับอยู่
-        const mode = wasAi ? (row?.staff_edited && !settings.rule.aiPaused ? 'ai' : meta.mode) : 'manual';
+        // เจ้าหน้าที่เคยสลับคน → AI เอง = คงที่เขาเลือก (iRecruit เปลี่ยนแค่เวลา ไม่ได้เปลี่ยนใครโทร)
+        // พัก AI อยู่ก็คง (เจ้าของ 8 ต.ค. 2569 Choice "เลือก AI รายสายได้" — พักแค่สายที่ระบบตั้งให้)
+        const mode = wasAi ? (row?.staff_edited ? 'ai' : meta.mode) : 'manual';
         await dbQuery(`update ${followTable} set scheduled_at = $2, note = $3, call_mode = $4 where id = $1`, [
           ex.id,
           meta.at.toISOString(),
@@ -805,6 +806,8 @@ export async function enforceReplaceAiFrom(aiFrom: string | null): Promise<{ con
  * สาย AI ที่ **ยังไม่ถึงเวลาโทร** (`scheduled_at` หลังตอนนี้) · ยังไม่ยกเลิก/ปิด → คนโทร + ยกเลิกแผนที่ Lumos
  * สายที่ถึงเวลาไปแล้ว = AI โทรไปแล้ว/กำลังโทร — คงเป็นของ AI (Choice "หยุดสายที่ยังไม่โทร + ของใหม่")
  * 🔴 ไม่มีคีย์ push (เครื่อง dev) = ไม่ทำอะไร · เรียกจาก worker ทุกรอบ + ตอนกดพักบนจอ
+ * 🔴 ข้ามสายที่เจ้าหน้าที่เลือก AI เอง (`updated_by` มีค่า · เจ้าของ 8 ต.ค. 2569 Choice "เลือก AI รายสายได้"
+ *    — พักแค่สายที่ระบบตั้งให้ ไม่งั้นรอบนี้เปลี่ยนสายที่คนกดเลือกกลับเป็นคนโทรทุก 5 นาที)
  */
 export async function enforceReplaceAiPaused(now: Date = new Date()): Promise<{ converted: number; plansCancelled: number; errors: number }> {
   const out = { converted: 0, plansCancelled: 0, errors: 0 };
@@ -812,7 +815,8 @@ export async function enforceReplaceAiPaused(now: Date = new Date()): Promise<{ 
   const { rows: aff } = await dbQuery<{ id: string }>(
     `select id from ${followTable}
       where follow_team = $1 and cancelled_at is null and completed_at is null
-        and coalesce(call_mode, 'ai') = 'ai' and scheduled_at > $2`,
+        and coalesce(call_mode, 'ai') = 'ai' and scheduled_at > $2
+        and updated_by is null`,
     [FOLLOW_TEAM_REPLACEMENT, now.toISOString()],
   );
   if (aff.length === 0) return out;

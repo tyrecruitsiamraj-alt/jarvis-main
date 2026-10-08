@@ -118,6 +118,11 @@ export default function FollowEditDialog({
    */
   const [mode, setMode] = useState<'ai' | 'manual'>('ai');
   /**
+   * ใครโทรของสายอื่นในชุด แก้จากรายการ "สายของคนนี้" ได้เลย (เจ้าของ 8 ต.ค. 2569: *"มันต้องแก้ได้สิ่ว่าคนหรือ Ai"*)
+   * id → โหมดที่เลือก · บันทึกพร้อมปุ่มบันทึกผ่านเส้นแก้ตารางทั้งชุด (เส้นเดียวกับสลับสายนี้)
+   */
+  const [otherModes, setOtherModes] = useState<Record<string, 'ai' | 'manual'>>({});
+  /**
    * 🔴 เปลี่ยนเบอร์แล้วใช้กับสายที่เหลือในชุดด้วย (เจ้าของสั่ง 4 ต.ค. 2569 — เคยแก้ทีละแถวแล้วหลุด 1 สาย
    * AI เกือบโทรหาเจ้าหน้าที่แทนผู้สมัคร) · ค่าเริ่มต้น = ใช้ทั้งชุด (เคสแก้เบอร์ผิดคือเคสหลัก)
    */
@@ -147,6 +152,7 @@ export default function FollowEditDialog({
       }
     }
     setMode(entry.call_mode === 'manual' ? 'manual' : 'ai');
+    setOtherModes({});
     setError(null);
     setExtraWhen([]);
     setExtraModes([]);
@@ -189,6 +195,21 @@ export default function FollowEditDialog({
   const withChosenTime = (r: FollowEntry): FollowEntry => (r.id === entry.id ? { ...r, scheduled_at: chosenIso } : r);
   const modeEditable = isEditableFollowRound(withChosenTime(entry), new Date());
   const beforeMode: 'ai' | 'manual' = entry.call_mode === 'manual' ? 'manual' : 'ai';
+  /**
+   * สายอื่นของคนนี้ที่ยังสลับคนโทรได้ (ยังไม่ถึงเวลา ไม่ปิด) — **ทุกชุด** ไม่ใช่แค่ชุดที่เปิด
+   * (ส่งคนแทน 1 ใบงาน = 1 ชุด · คนเดียวไปหลายวัน = หลายชุด · เจ้าของ 8 ต.ค. 2569 "แก้ได้แบบหน้าติดตามคนเริ่มงาน")
+   * สายที่ผ่านไปแล้วเป็นประวัติ
+   */
+  const otherEditableIds = new Set(
+    otherRounds.filter((r) => isEditableFollowRound(r, new Date())).map((r) => r.id),
+  );
+  const baseModeOf = (r: FollowEntry): 'ai' | 'manual' => (r.call_mode === 'manual' ? 'manual' : 'ai');
+  const modeOfRow = (r: FollowEntry): 'ai' | 'manual' => otherModes[r.id] ?? baseModeOf(r);
+  const changedOthers = otherRounds.filter((r) => otherEditableIds.has(r.id) && modeOfRow(r) !== baseModeOf(r));
+  const setIds = new Set(setRows.map((r) => r.id));
+  /** สลับในชุดที่เปิด = ไปกับตารางของชุดนี้ · ชุดอื่น = ส่งตารางของชุดนั้นแยก (ห้ามผูกข้ามชุด) */
+  const otherChangedIds = changedOthers.filter((r) => setIds.has(r.id)).map((r) => r.id);
+  const foreignChanged = changedOthers.filter((r) => !setIds.has(r.id));
   /** สายอื่นในชุดที่ยังไม่ถึงเวลา ไม่ปิด ไม่ยกเลิก — กติกาเดียวกับ server (สายที่ผ่านไปแล้วเป็นประวัติ ไม่เปลี่ยนเบอร์ย้อน) */
   const pendingSetRows = entry.group_id
     ? setRows.filter(
@@ -204,7 +225,8 @@ export default function FollowEditDialog({
     const now = new Date();
     const newIso = when ? new Date(when).toISOString() : entry.scheduled_at;
     const minuteOf = (iso: string | null | undefined) => Math.floor(Date.parse(iso ?? '') / 60_000);
-    const modeChanged = modeEditable && mode !== beforeMode;
+    const thisModeChanged = modeEditable && mode !== beforeMode;
+    const modeChanged = thisModeChanged || otherChangedIds.length > 0;
     const fieldsChanged =
       name !== (entry.recipient_name ?? '') ||
       phone !== (entry.recipient_phone ?? '') ||
@@ -230,7 +252,11 @@ export default function FollowEditDialog({
     // สายที่เปิดแก้นับด้วยเวลาที่เลือก (กติกาเดียวกับ modeEditable) — ไม่งั้นสายยังไม่ชัวร์เวลาหลุดจากตารางที่ส่ง
     const editable = setRows.map(withChosenTime).filter((r) => isEditableFollowRound(r, now));
     const draft = draftFromRows(editable).map((d) =>
-      d.id === entry.id ? { ...d, mode, when: isoToBangkokInput(newIso) } : d,
+      d.id === entry.id
+        ? { ...d, mode, when: isoToBangkokInput(newIso) }
+        : d.id && otherModes[d.id]
+          ? { ...d, mode: otherModes[d.id] }
+          : d,
     );
     if (modeChanged) {
       const check = validateScheduleDraft(draft, now);
@@ -241,9 +267,33 @@ export default function FollowEditDialog({
     }
     setBusy(true);
     try {
+      /** สลับคนโทรของชุดอื่น — ตารางของชุดนั้นทีละชุด (สายที่เหลือของชุดคงเดิม) */
+      let foreignMsg = '';
+      if (foreignChanged.length > 0) {
+        const byGroup = new Map<string, FollowEntry[]>();
+        for (const r of foreignChanged) byGroup.set(r.group_id ?? r.id, [...(byGroup.get(r.group_id ?? r.id) ?? []), r]);
+        let failed = 0;
+        for (const rows of byGroup.values()) {
+          const anchor = rows[0];
+          const groupEditable = followSetRows(anchor, siblings).filter((r) => isEditableFollowRound(r, now));
+          const groupDraft = draftFromRows(groupEditable).map((d) => (d.id && otherModes[d.id] ? { ...d, mode: otherModes[d.id] } : d));
+          const out = await replaceFollowSchedule(anchor.id, scheduleReplaceBody(groupEditable, groupDraft));
+          if (!out.lumos.pushed) failed += 1;
+        }
+        foreignMsg = otherModesMessage(foreignChanged.length, { pushed: failed === 0, reason: failed > 0 ? `${failed} ชุด` : null });
+        if (!modeChanged && !fieldsChanged && rounds.isoTimes.length === 0) {
+          onSaved(foreignMsg);
+          onClose();
+          return;
+        }
+      }
       if (modeChanged && !fieldsChanged && rounds.isoTimes.length === 0) {
         const out = await replaceFollowSchedule(entry.id, scheduleReplaceBody(editable, draft));
-        onSaved(modeChangedMessage(mode, out.lumos));
+        onSaved(
+          [thisModeChanged ? modeChangedMessage(mode, out.lumos) : otherModesMessage(otherChangedIds.length, out.lumos), foreignMsg]
+            .filter(Boolean)
+            .join(' · '),
+        );
         onClose();
         return;
       }
@@ -284,8 +334,10 @@ export default function FollowEditDialog({
       if (modeChanged || added > 0) {
         const out = await replaceFollowSchedule(entry.id, scheduleReplaceBody(editable, [...draft, ...addedRows]));
         const parts = ['แก้ไขแล้ว' + phoneMsg];
-        if (modeChanged) parts.push(modeChangedMessage(mode, out.lumos));
+        if (thisModeChanged) parts.push(modeChangedMessage(mode, out.lumos));
+        else if (modeChanged) parts.push(otherModesMessage(otherChangedIds.length, out.lumos));
         if (added > 0) parts.push(`เพิ่มอีก ${added} สาย`);
+        if (foreignMsg) parts.push(foreignMsg);
         onSaved(parts.join(' · '));
         onClose();
         return;
@@ -299,7 +351,7 @@ export default function FollowEditDialog({
           : (saved.queue_refreshed ?? 0) > 0
             ? `แก้ไขแล้ว — อัปเดตบทพูดในคิว ${saved.queue_refreshed} สายด้วย`
             : 'แก้ไขแล้ว — แต่สายที่ AI รับไปแล้วยังใช้ข้อมูลเดิม (เรียกคืนไม่ได้)';
-      onSaved(`${queueMsg}${phoneMsg}`);
+      onSaved(`${queueMsg}${phoneMsg}${foreignMsg ? ` · ${foreignMsg}` : ''}`);
       onClose();
     } catch (err) {
       setError(friendlyErrorText(err, 'แก้ไขไม่สำเร็จ'));
@@ -514,22 +566,36 @@ export default function FollowEditDialog({
 
             {otherRounds.length > 0 ? (
               <ul className="space-y-1">
-                {otherRounds.map((s) => (
+                {[...otherRounds]
+                  .sort((a, b) => Date.parse(a.scheduled_at ?? '') - Date.parse(b.scheduled_at ?? ''))
+                  .map((s) => (
                   <li
                     key={s.id}
                     className="flex items-center justify-between gap-2 rounded-lg bg-background/60 px-2 py-1 text-[11px]"
                   >
                     <span className="text-muted-foreground">
-                      {s.scheduled_at
-                        ? new Date(s.scheduled_at).toLocaleString('th-TH', {
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                          })
-                        : '—'}
+                      {roundLabel(s.scheduled_at)}
                     </span>
-                    <span className="text-muted-foreground">
-                      {s.call_mode === 'manual' ? 'คนโทร' : s.call_status === 'pending' ? 'รอโทร' : 'ส่ง AI แล้ว'}
-                    </span>
+{otherEditableIds.has(s.id) ? (
+                      <span className="flex items-center gap-3" data-testid={`round-mode-${s.id}`}>
+                        {(['ai', 'manual'] as const).map((m) => (
+                          <label key={m} className="flex cursor-pointer items-center gap-1.5">
+                            <Checkbox
+                              checked={modeOfRow(s) === m}
+                              onCheckedChange={() => setOtherModes((prev) => ({ ...prev, [s.id]: m }))}
+                              aria-label={`ใครโทรสาย ${roundLabel(s.scheduled_at)} — ${m === 'ai' ? 'AI โทร' : 'คนโทร'}`}
+                            />
+                            <span className={cn('font-medium', modeOfRow(s) === m ? 'text-foreground' : 'text-muted-foreground')}>
+                              {m === 'ai' ? 'AI โทร' : 'คนโทร'}
+                            </span>
+                          </label>
+                        ))}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {s.call_mode === 'manual' ? 'คนโทร' : s.call_status === 'pending' ? 'รอโทร' : 'ส่ง AI แล้ว'}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -715,6 +781,18 @@ export default function FollowEditDialog({
 }
 
 /** ข้อความหลังสลับคนโทร — บอกผลกับ AI ตรง ๆ ห้ามเงียบ (ส่งไม่สำเร็จ = AI อาจยังถือแผนเดิม) */
+/** วันเวลาของสายในรายการ "สายของคนนี้" (ใช้เป็นชื่อช่องติ๊กด้วย — หลายสายในป๊อปเดียวต้องแยกชื่อกันได้) */
+function roundLabel(iso: string | null | undefined): string {
+  return iso ? new Date(iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+}
+
+/** สลับคนโทรของสายอื่นในชุด (ไม่ใช่สายที่เปิดอยู่) */
+function otherModesMessage(n: number, lumos: { pushed: boolean; reason?: string | null }): string {
+  return lumos.pushed
+    ? `เปลี่ยนคนโทรอีก ${n.toLocaleString('th-TH')} สายแล้ว`
+    : `เปลี่ยนคนโทรอีก ${n.toLocaleString('th-TH')} สายแล้ว — แต่ส่งแผนให้ AI ไม่สำเร็จ (${lumos.reason ?? 'ไม่ทราบเหตุ'})`;
+}
+
 function modeChangedMessage(
   mode: 'ai' | 'manual',
   lumos: { pushed: boolean; reason?: string | null },

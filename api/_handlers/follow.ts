@@ -1441,16 +1441,8 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
   const anchor = anchorRows[0];
   if (!anchor) return sendError(res, 404, 'Not found', 'ไม่พบรายการติดตาม');
   if (anchor.cancelled_at != null) return sendError(res, 409, 'Conflict', 'รายการนี้ยกเลิกไปแล้ว แก้ตารางไม่ได้');
-  // พัก AI ของส่งคนแทนอยู่ = สลับ/เพิ่มเป็น AI ไม่ได้ (ตัวเดียวกับตอนสร้าง · 7 ต.ค. 2569)
-  if (anchor.follow_team === FOLLOW_TEAM_REPLACEMENT && rounds.some((r) => r.callMode === 'ai')) {
-    try {
-      if ((await getReplaceSyncSettings()).rule.aiPaused) {
-        return sendError(res, 409, 'Conflict', 'ส่งคนแทนพัก AI อยู่ — ตั้งเป็นคนโทร หรือเปิด AI ก่อน');
-      }
-    } catch (e) {
-      logWarn('follow.replaceSchedule.replaceAiPausedCheckFailed', { error: String(e) });
-    }
-  }
+  // พัก AI ของส่งคนแทน = พักแค่สายที่ระบบตั้งให้ · เจ้าหน้าที่เลือก AI รายสายเองได้ (เจ้าของ 8 ต.ค. 2569
+  // Choice "เลือก AI รายสายได้" · เดิม 7 ต.ค. ตอบ 409) — `updated_by` ที่เส้นนี้เขียน = ตัวบอก `enforceReplaceAiPaused` ให้ข้าม
 
   // สายที่จะแก้ต้องยังแก้ได้จริง — คนเดียวกัน ชุดเดียวกัน อนาคต ยังไม่ถูกโทร (คนอื่นอาจแก้/สายอาจออกไประหว่างเปิดจอ)
   type ReplaceRow = FollowRow & { q_status: string | null; q_result_at: string | Date | null };

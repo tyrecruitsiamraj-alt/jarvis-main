@@ -440,16 +440,18 @@ describe('แก้ล่าสุดชนะ (เจ้าของ 7 ต.ค.
     expect(irecruitChangedSinceSync(note, replaceSlotNote('confirm' as never, { ymd: '2026-10-08', hhmm: '09:00' } as never))).toBe(true);
     expect(irecruitChangedSinceSync(null, note)).toBe(true);
   });
-  it('🔴 รอบดึงกรองการย้ายเวลาของแถวที่เจ้าหน้าที่แก้ · คงโหมด AI ที่เขาเลือก (ยกเว้นพัก AI)', () => {
+  it('🔴 รอบดึงกรองการย้ายเวลาของแถวที่เจ้าหน้าที่แก้ · คงโหมด AI ที่เขาเลือก (พัก AI อยู่ก็คง · 8 ต.ค. 2569)', () => {
     const src = readFileSync(new URL('../../api/_lib/irecruitReplaceSync.ts', import.meta.url), 'utf8');
     expect(src).toContain('(updated_by is not null) as staff_edited, note');
     expect(src).toContain('return irecruitChangedSinceSync(row.note, replaceSlotNote(meta.slot, meta.wall));');
-    expect(src).toContain("row?.staff_edited && !settings.rule.aiPaused ? 'ai' : meta.mode");
+    expect(src).toContain("const mode = wasAi ? (row?.staff_edited ? 'ai' : meta.mode) : 'manual';");
+    // รอบบังคับพัก AI ข้ามสายที่เจ้าหน้าที่เลือก AI เอง (Choice "เลือก AI รายสายได้")
+    expect(src).toMatch(/scheduled_at > \$2\s+and updated_by is null/);
   });
-  it('🔴 พัก AI อยู่ = สายที่เพิ่มเองในแท็บส่งคนแทนเป็นคนโทรตั้งแต่สร้าง · แก้ตารางเป็น AI ไม่ได้', () => {
+  it('🔴 พัก AI อยู่ = สายที่เพิ่มเองในแท็บส่งคนแทนเป็นคนโทรตั้งแต่สร้าง · แก้ตารางเลือก AI รายสายได้ (8 ต.ค. 2569)', () => {
     const h = readFileSync(new URL('../../api/_handlers/follow.ts', import.meta.url), 'utf8');
     expect(h).toContain("base = { ...inputBase, callMode: 'manual' };");
-    expect(h).toContain('ส่งคนแทนพัก AI อยู่');
+    expect(h).not.toContain('ส่งคนแทนพัก AI อยู่ — ตั้งเป็นคนโทร');
   });
 });
 

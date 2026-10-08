@@ -192,3 +192,38 @@ describe('เปลี่ยนเบอร์ทั้งชุด + เตื�
     await waitFor(() => expect(updateFollowEntry).toHaveBeenCalledTimes(1));
   });
 });
+
+// 8 ต.ค. 2569 เจ้าของ: "มันต้องแก้ได้สิ่ว่าคนหรือ Ai" (รายการ "สายของคนนี้") · "แก้ได้แบบหน้าติดตามคนเริ่มงาน"
+describe('สลับใครโทรของสายอื่นจากรายการสายของคนนี้', () => {
+  const lumosOk = { group_id: 'g1', kept: 2, cancelled: 0, created: 0, lumos: { pushed: true, plans: 1, rounds: 1, reason: null } };
+
+  it('สายในชุดเดียวกัน ⇒ ตารางชุดนี้ครั้งเดียว เปลี่ยนแค่สายนั้น · สายที่ผ่านไปแล้วติ๊กไม่ได้', async () => {
+    replaceFollowSchedule.mockResolvedValue(lumosOk);
+    const onSaved = open(row({}));
+    expect(screen.getAllByRole('checkbox', { name: /^ใครโทรสาย .+ — AI โทร$/ })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('checkbox', { name: /^ใครโทรสาย .+ — คนโทร$/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึกการแก้ไข' }));
+    await waitFor(() => expect(replaceFollowSchedule).toHaveBeenCalledTimes(1));
+    expect(updateFollowEntry).not.toHaveBeenCalled();
+    const [anchorId, body] = replaceFollowSchedule.mock.calls[0] as [string, { rounds: Array<{ id?: string; call_mode: string }> }];
+    expect(anchorId).toBe('a');
+    expect(body.rounds.map((r) => [r.id, r.call_mode])).toEqual([['a', 'ai'], ['b', 'manual']]);
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith('เปลี่ยนคนโทรอีก 1 สายแล้ว'));
+  });
+
+  it('สายของชุดอื่น (ส่งคนแทนอีกใบงาน) ⇒ ส่งตารางของชุดนั้นแยก ไม่ผูกข้ามชุด', async () => {
+    replaceFollowSchedule.mockResolvedValue(lumosOk);
+    const entry = row({});
+    const other = row({ id: 'x', group_id: 'g2', scheduled_at: inHours(40), call_mode: 'manual', call_status: null });
+    const onSaved = vi.fn();
+    render(<FollowEditDialog entry={entry} unitOptions={[]} siblings={[entry, other]} onClose={() => {}} onSaved={onSaved} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: /^ใครโทรสาย .+ — AI โทร$/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึกการแก้ไข' }));
+    await waitFor(() => expect(replaceFollowSchedule).toHaveBeenCalledTimes(1));
+    const [anchorId, body] = replaceFollowSchedule.mock.calls[0] as [string, { replace_ids: string[]; rounds: Array<{ id?: string; call_mode: string }> }];
+    expect(anchorId).toBe('x');
+    expect(body.replace_ids).toEqual(['x']);
+    expect(body.rounds.map((r) => [r.id, r.call_mode])).toEqual([['x', 'ai']]);
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith('เปลี่ยนคนโทรอีก 1 สายแล้ว'));
+  });
+});

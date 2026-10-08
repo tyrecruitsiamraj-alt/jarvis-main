@@ -63,7 +63,8 @@ export type EditableScriptKey =
   | 'follow'
   | 'follow_repeat'
   | 'replace_confirm'
-  | 'replace_before';
+  | 'replace_call2'
+  | 'replace_call3';
 
 export const EDITABLE_SCRIPT_DEFAULTS: Record<EditableScriptKey, readonly string[]> = {
   interview: T.สัมภาษณ์เบื้องต้น,
@@ -73,7 +74,8 @@ export const EDITABLE_SCRIPT_DEFAULTS: Record<EditableScriptKey, readonly string
   follow: T.ติดตาม,
   follow_repeat: T.ติดตามรอบถัดไป,
   replace_confirm: T.ส่งคนแทนคอนเฟิร์ม,
-  replace_before: T.ส่งคนแทนก่อนเข้างาน,
+  replace_call2: T.ส่งคนแทนสาย2,
+  replace_call3: T.ส่งคนแทนสาย3,
 };
 
 let scriptOverrides: Partial<Record<EditableScriptKey, readonly string[]>> = {};
@@ -600,6 +602,14 @@ export function buildFollowMessage(
   ).join(' ');
 }
 
+/** สายของส่งคนแทน → คีย์บท (แก้ได้ในตั้งค่า แท็บติดตามส่งคนแทน) */
+export type ReplaceScriptKind = 'confirm' | 'call2' | 'call3';
+const REPLACE_SCRIPT_KEY: Record<ReplaceScriptKind, EditableScriptKey> = {
+  confirm: 'replace_confirm',
+  call2: 'replace_call2',
+  call3: 'replace_call3',
+};
+
 const TH_MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
@@ -621,15 +631,15 @@ export function replaceDayWord(callYmd: string, workYmd: string): string {
 }
 
 /**
- * บทติดตามส่งคนแทน (เจ้าของสั่ง 8 ต.ค. 2569) — สาย 1 คอนเฟิร์ม · สาย 2–3 ก่อนเข้างาน (บทเดียวกัน)
+ * บทติดตามส่งคนแทน (เจ้าของสั่ง 8 ต.ค. 2569) — สาย 1 คอนเฟิร์ม · สาย 2 ก่อน 1 ชม. · สาย 3 ก่อน 15 นาที (คนละบท)
  * `dayWord`/`startTime` ไม่มี = ค่าแทนที่ยังพูดได้ ห้ามทิ้งบรรทัดคำถามหลัก (กติกาเดียวกับ `หน่วยงาน` ข้างบน)
  */
 export function buildReplaceFollowMessage(
   input: Pick<FollowMessageInput, 'recipientName' | 'staffName' | 'unitName'>,
-  kind: 'confirm' | 'before',
+  kind: ReplaceScriptKind,
   when: { dayWord?: string | null; startTime?: string | null },
 ): string {
-  const lines = activeScriptLines(kind === 'confirm' ? 'replace_confirm' : 'replace_before');
+  const lines = activeScriptLines(REPLACE_SCRIPT_KEY[kind]);
   const day = clean(when.dayWord);
   return renderLines(
     lines,

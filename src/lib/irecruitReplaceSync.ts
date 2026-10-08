@@ -375,10 +375,12 @@ export function parseReplaceRef(ref: string): { jobId: string; slot: ReplaceSlot
 }
 
 /**
- * สายนี้ต้องพูดบทส่งคนแทนแบบไหน (เจ้าของสั่ง 8 ต.ค. 2569) — อ่านจากหัวเรื่อง + หมายเหตุที่ระบบเขียนเอง (`replaceSlotNote`)
- * ใช้ได้ทั้งสายที่ดึงจาก iRecruit · คีย์เองในแท็บ · แก้ตารางทีหลัง เพราะทุกทางเขียนหมายเหตุตัวเดียวกัน
- * - "ยืนยันเวลาเข้างาน d/m HH:MM น." = คอนเฟิร์ม · "เข้างาน HH:MM น." = ก่อนเข้างาน
- * - หมายเหตุอ่านไม่ออก = ดูสายที่ (สาย 1 = คอนเฟิร์ม) · ไม่รู้วัน/เวลา = null (บทใช้คำแทน)
+ * สายนี้ต้องพูดบทส่งคนแทนแบบไหน (เจ้าของสั่ง 8 ต.ค. 2569 · แยกบท สาย 1 / 2 / 3) — อ่านจากหัวเรื่อง + หมายเหตุที่ระบบเขียนเอง (`replaceSlotNote`)
+ * ใช้ได้ทั้งสายที่ดึงจาก iRecruit · คีย์เอง · แก้ตารางทีหลัง เพราะทุกทางเขียนหมายเหตุตัวเดียวกัน
+ * - "ยืนยันเวลาเข้างาน d/m HH:MM น." = สาย 1 คอนเฟิร์ม
+ * - "เข้างาน HH:MM น." = สาย 2 หรือ 3 — หมายเหตุสองสายนี้เหมือนกัน ⇒ ดูสายที่ (`call_round` 2/3 ของรอบดึง/คีย์เอง)
+ *   ไม่มีเลขสาย (เพิ่มจากแก้ตาราง) = ดูเวลาที่เหลือก่อนเข้างาน ไม่เกิน 30 นาที = สาย 3
+ * - หมายเหตุอ่านไม่ออก = ดูสายที่ · ไม่รู้วัน/เวลา = null (บทใช้คำแทน)
  * null = ไม่ใช่สายส่งคนแทน (ใช้บทติดตามเดิม)
  */
 export function replaceScriptOf(e: {
@@ -386,7 +388,7 @@ export function replaceScriptOf(e: {
   note: string | null | undefined;
   callRound: number | null | undefined;
   callAtMs: number;
-}): { kind: 'confirm' | 'before'; workYmd: string | null; startTime: string | null } | null {
+}): { kind: 'confirm' | 'call2' | 'call3'; workYmd: string | null; startTime: string | null } | null {
   if ((e.topic ?? '').trim() !== REPLACE_FOLLOW_TOPIC) return null;
   const note = e.note ?? '';
   const speak = (h: string, m: string) => `${Number(h)}:${m} น.`;
@@ -406,9 +408,15 @@ export function replaceScriptOf(e: {
   const l = /เข้างาน\s+(\d{1,2}):(\d{2})/.exec(note);
   if (l) {
     const start = replaceLeadStart(e.callAtMs, note);
-    return { kind: 'before', workYmd: start == null ? null : BKK_YMD_FMT.format(new Date(start)), startTime: speak(l[1], l[2]) };
+    const kind =
+      e.callRound === 2 ? 'call2'
+        : e.callRound === 3 ? 'call3'
+          : start != null && start - e.callAtMs <= 30 * 60_000 ? 'call3'
+            : 'call2';
+    return { kind, workYmd: start == null ? null : BKK_YMD_FMT.format(new Date(start)), startTime: speak(l[1], l[2]) };
   }
-  return { kind: (e.callRound ?? 1) <= 1 ? 'confirm' : 'before', workYmd: null, startTime: null };
+  const round = e.callRound ?? 1;
+  return { kind: round <= 1 ? 'confirm' : round >= 3 ? 'call3' : 'call2', workYmd: null, startTime: null };
 }
 
 /** หมายเหตุบนสาย (AI พูดด้วย) — สายคอนเฟิร์มบอกวันด้วย */
