@@ -257,6 +257,11 @@ export async function listSiamrajSqlServerThroughput(options: {
   from: string;
   to: string;
   departmentScope?: DepartmentScope;
+  /**
+   * วันที่ใช้กรองช่วง — ไม่ส่ง/`cohort` = วันที่ต้องการคน (fallback วันกรอก · หน้า Dashboard · ห้ามเปลี่ยนค่าเริ่ม)
+   * `submitted` = วันที่ใบส่งเข้ามา (`request_date`) — แท็บทีม Online (เจ้าของ 8 ต.ค. 2569 Choice "วันที่ใบส่งเข้ามา")
+   */
+  dateBasis?: 'cohort' | 'submitted';
 }): Promise<SiamrajThroughputRecord[]> {
   const { from, to } = options;
   if (!isDateYmd(from) || !isDateYmd(to)) {
@@ -267,7 +272,7 @@ export async function listSiamrajSqlServerThroughput(options: {
   const clsExclude = excludeClsContractTypeWhere('SS');
   const deptScope = sqlServerDepartmentScopeClause(options.departmentScope ?? { mode: 'all' });
 
-  const openDate = effectiveRequestDateSql('A');
+  const openDate = options.dateBasis === 'submitted' ? `CONVERT(date, A.request_date)` : effectiveRequestDateSql('A');
   // สรุป inform เฉพาะใบในช่วง — เลี่ยง correlated COUNT ต่อแถว และเลี่ยงสแกน inform ทั้งตาราง
   const rows = await siamrajSqlQuery<SqlThroughputRow>(
     `

@@ -12823,7 +12823,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · แผนต่อ: หน้าหลัก 5 แท็บ — ทีม Online (ใบขอ→ประกาศ→ใบสมัคร→AI คัดกรอง) · ทีมสรรหา (หลัง AI คัดกรอง→โทร→นัด→มา) · ติดตาม · ดูแล · จับคู่ — ทุกเลขแตกจนลงตัว · ปิดแล้ว = ปิดครบใบขอ
 - (8 ต.ค. 2569 ดึก) หน้าหลัก **แท็บทีม Online** (ปุ่มแรกในแถบหัวข้อ · `ONLINE_TAB` แยกจาก `block`) — `HomeOnlineTab.tsx`
   · ตัวคิด `src/lib/homeOnline.ts` (pure · `buildOnlineReport` · `onlineReportAddsUp` · เทสต์ `tests/api/homeOnline.test.ts`)
-  · ตัวโหลด `api/_lib/homeOnlineSql.ts` = `listSiamrajThroughput` (ตัวเดียวกับ Dashboard · งวด = วันที่ต้องการคน) → รวมใบละแถว
+  · ตัวโหลด `api/_lib/homeOnlineSql.ts` = `listSiamrajThroughput({ dateBasis: 'submitted' })` — **นับตามวันที่ใบส่งเข้ามา** (Choice เจ้าของ) · Dashboard ยังวันที่ต้องการคน (ค่าเริ่ม `cohort` ห้ามเปลี่ยน) → รวมใบละแถว
     + ERP กลุ่มอุตสาหกรรม (`ms_industry_group`) + ตำแหน่ง (`primaryJobRoleLabel`) + ราชการ/เอกชน (`unit_sector`) + ประกาศ (`job_public_releases`) + ใบสมัคร (ไม่นับยกเลิกข้อมูล)
   · เส้น = โหมด `?online=1` ของ `/api/home-ai-share` (ไม่เพิ่ม route) · ช่วงทั้งหมด = ย้อน 365 วัน
   · ใบขอเข้า = เปิดอยู่ + ปิดครบใบขอ + ยกเลิกทั้งใบ + หาได้บางส่วน·ยกเลิกที่เหลือ (ไม่ใช้ `sumCohortStockByRequestDate` นับใบ — ใบหาได้บางส่วนอยู่สองกอง)

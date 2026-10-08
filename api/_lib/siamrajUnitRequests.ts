@@ -500,6 +500,8 @@ export async function listSiamrajThroughput(options: {
   from: string;
   to: string;
   departmentScope?: DepartmentScope;
+  /** ไม่ส่ง = วันที่ต้องการคน (Dashboard) · `submitted` = วันที่ใบส่งเข้ามา (แท็บทีม Online) */
+  dateBasis?: 'cohort' | 'submitted';
 }): Promise<SiamrajThroughputRecord[]> {
   const source = getSiamrajDbSource();
   if (source === 'sqlserver') {

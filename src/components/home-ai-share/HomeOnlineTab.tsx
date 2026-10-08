@@ -118,7 +118,7 @@ const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: 
   const report = data?.report ?? null;
   const thDay = (ymd: string) => FULL_DAY.format(new Date(`${ymd}T00:00:00Z`));
   const sub = data
-    ? `${data.from === data.to ? thDay(data.from) : `${thDay(data.from)} – ${thDay(data.to)}`} · นับตามวันที่ต้องการคน${data.bu ? ` · ${trendBuLabel(data.bu)}` : ' · ทุก BU'}`
+    ? `${data.from === data.to ? thDay(data.from) : `${thDay(data.from)} – ${thDay(data.to)}`} · นับตามวันที่ใบส่งเข้ามา${data.bu ? ` · ${trendBuLabel(data.bu)}` : ' · ทุก BU'}`
     : null;
   if (error) return <p className={cn('text-sm', TONE.danger.value)}>{error}</p>;
   if (!report) return <Skeleton className="h-96 w-full rounded-2xl" />;

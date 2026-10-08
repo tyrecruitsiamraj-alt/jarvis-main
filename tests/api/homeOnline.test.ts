@@ -70,3 +70,14 @@ describe('buildOnlineReport', () => {
     expect(r.bu.map((b) => [b.bu, b.total])).toEqual([['LBD', 3], ['LBA', 1]]);
   });
 });
+
+describe('วันที่นับ (เจ้าของ 8 ต.ค. 2569 Choice "วันที่ใบส่งเข้ามา")', () => {
+  it('แท็บ Online กรองวันที่ใบส่งเข้ามา · ตัวดึงของ Dashboard ค่าเริ่มยังเป็นวันที่ต้องการคน', async () => {
+    const { readFileSync } = await import('node:fs');
+    const sql = readFileSync(`${process.cwd()}/api/_lib/homeOnlineSql.ts`, 'utf8');
+    expect(sql).toContain("dateBasis: 'submitted'");
+    expect(sql).toContain('r.submittedDate || r.requestDate');
+    const th = readFileSync(`${process.cwd()}/api/_lib/siamrajSqlServerThroughput.ts`, 'utf8');
+    expect(th).toContain("options.dateBasis === 'submitted' ? `CONVERT(date, A.request_date)` : effectiveRequestDateSql('A')");
+  });
+});

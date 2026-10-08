@@ -1,7 +1,7 @@
 /**
  * ═══ หน้าหลัก แท็บ "ทีม Online" — ตัวโหลดข้อมูล (อ่านอย่างเดียว · 8 ต.ค. 2569) ═══
  * ชั้นคู่ขนาน — ไม่แก้ตัวดึงของหน้า Dashboard (กติกา "ห้ามเขียนทับแดชบอร์ดเดิม")
- * - ใบขอ = `listSiamrajThroughput` ตัวเดียวกับการ์ด เข้ามา/ปิด/ยกเลิก ของหน้า Dashboard → รวมเป็นใบละแถว
+ * - ใบขอ = `listSiamrajThroughput` (ตัวเดียวกับการ์ด เข้ามา/ปิด/ยกเลิก ของหน้า Dashboard) แต่กรอง**วันที่ใบส่งเข้ามา** → รวมเป็นใบละแถว
  * - กลุ่มอุตสาหกรรม + ตำแหน่ง = ERP (`ms_site.industry_group_code` · ตำแหน่งตัวเดียวกับใบขอ `primaryJobRoleLabel`)
  * - ราชการ/เอกชน = ที่ทีมระบุเอง (`unit_sector`) · ประกาศ = `job_public_releases` · ใบสมัคร = ไม่นับที่ยกเลิกข้อมูล
  * นับต่อที่ `src/lib/homeOnline.ts` (pure)
@@ -50,8 +50,16 @@ export async function loadOnlineRequestRows(opts: {
   bu: string | null;
   departmentScope: DepartmentScope;
 }): Promise<OnlineRequestRow[]> {
-  const records = await listSiamrajThroughput({ from: opts.from, to: opts.to, departmentScope: opts.departmentScope });
-  const grouped = groupThroughputByRequest(records).filter((g) => g.day >= opts.from && g.day <= opts.to);
+  // 🔴 นับตามวันที่ใบส่งเข้ามา (เจ้าของ 8 ต.ค. 2569 Choice) — หน้า Dashboard ยังนับตามวันที่ต้องการคน (ค่าเริ่มของตัวดึง)
+  const records = await listSiamrajThroughput({
+    from: opts.from,
+    to: opts.to,
+    departmentScope: opts.departmentScope,
+    dateBasis: 'submitted',
+  });
+  const grouped = groupThroughputByRequest(
+    records.map((r) => ({ ...r, requestDate: r.submittedDate || r.requestDate })),
+  ).filter((g) => g.day >= opts.from && g.day <= opts.to);
   const withBu = grouped
     .map((g) => ({ ...g, bu: trendBuFromSiteCode(g.siteCode) }))
     .filter((g) => !opts.bu || g.bu === opts.bu);

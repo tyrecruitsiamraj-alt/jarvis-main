@@ -7,7 +7,7 @@
  *
  * 🔴 ทุกก้อนบวกกันได้เท่ากับยอดบนสุด (ตัวตรวจ `onlineReportAddsUp`)
  * - ใบขอเข้า = เปิดอยู่ + ปิดครบใบขอ + ยกเลิกทั้งใบ + หาได้บางส่วน·ยกเลิกที่เหลือ (กติกา "ยกเลิกไม่ใช่หาได้แล้ว")
- * - งวดของใบขอ = วันที่ต้องการคน (fallback วันกรอก) ตัวเดียวกับหน้า Dashboard (`listSiamrajThroughput`)
+ * - งวดของใบขอ = **วันที่ใบส่งเข้ามา** (Choice เจ้าของ 8 ต.ค. 2569) — หน้า Dashboard ยังนับวันที่ต้องการคน (คนละแบบ บอกบนจอ)
  * - ประเภทงาน 3 มุม (Choice "แยก 3 มุม") แต่ละมุมรวมได้เท่าใบขอเข้า · ไม่มีข้อมูล = "ไม่ระบุ" (ห้ามหาย)
  */
 
@@ -24,7 +24,7 @@ export const ONLINE_REQUEST_STATES: ReadonlyArray<{ key: OnlineRequestState; lab
 export type OnlineRequestRow = {
   requestNo: string;
   jobId: string | null;
-  /** วันของงวด (YYYY-MM-DD · วันที่ต้องการคน) */
+  /** วันของงวด (YYYY-MM-DD · วันที่ใบส่งเข้ามา) */
   day: string;
   bu: string | null;
   requested: number;
@@ -74,7 +74,7 @@ export type OnlineReport = {
 
 export type OnlineReportResponse = {
   generated_at: string;
-  /** ช่วงที่ใช้จริง (YYYY-MM-DD · วันที่ต้องการคน) */
+  /** ช่วงที่ใช้จริง (YYYY-MM-DD · วันที่ใบส่งเข้ามา) */
   from: string;
   to: string;
   bu: string | null;
