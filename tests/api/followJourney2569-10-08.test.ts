@@ -28,3 +28,13 @@ describe('ส่งคนแทน · สายคนโทรเลยเวล
     expect(followRoundState(e({ follow_team: 'replacement', call_mode: 'ai' }), NOW)).toBe('notSent');
   });
 });
+
+describe('เก็บไปโทรเอง: ใบไม่ผูกใบขอ/ไม่มีเบอร์ ไม่ต้องบอก (เจ้าของ 8 ต.ค. 2569 "เอาออกไม่ต้องบอก")', () => {
+  it('ไม่มีคำเตือน "ไม่ผูกใบขอ ล็อกเบอร์ไม่ได้" · ยังนับเป็นเก็บแล้ว', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('api/_handlers/application-call-choice.ts', 'utf8');
+    expect(src).not.toContain('ใบไม่ผูกใบขอ ล็อกเบอร์ไม่ได้');
+    expect(src).not.toContain('ไม่มีเบอร์ให้ล็อก');
+    expect(src).toMatch(/if \(!r\.phone\?\.trim\(\) \|\| !r\.job_id\?\.trim\(\)\) \{\s*okIds\.push\(r\.id\);\s*continue;/);
+  });
+});
