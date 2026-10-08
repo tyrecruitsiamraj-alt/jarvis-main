@@ -549,7 +549,8 @@ export async function runIrecruitReplaceSync(
     //    ถ้าเจอคนในที่เป็น AI = เจ้าหน้าที่สลับเอง (เจ้าของ: "ถ้าคนจะโทรให้แก้") ⇒ เดิมรอบ 5 นาทีสลับกลับทุกครั้ง ห้ามแล้ว
     const rescheduledIds = new Set(plan.reschedule.map((r) => r.existing.id));
     for (const x of existingRows) {
-      if (!x.pending || x.mode !== 'ai' || rescheduledIds.has(x.id) || !x.before_type_rule) continue;
+      // เจ้าหน้าที่สลับเป็น AI เอง = ห้ามทับ (8 ต.ค. 2569 — แถวรุ่นก่อน 6 ต.ค. เดิมโดนสลับกลับทุก 5 นาที)
+      if (!x.pending || x.mode !== 'ai' || rescheduledIds.has(x.id) || !x.before_type_rule || x.staff_edited) continue;
       const meta = metaByRef.get(x.source_ref);
       if (!meta || meta.mode !== 'manual') continue;
       try {
@@ -806,8 +807,9 @@ export async function enforceReplaceAiFrom(aiFrom: string | null): Promise<{ con
  * สาย AI ที่ **ยังไม่ถึงเวลาโทร** (`scheduled_at` หลังตอนนี้) · ยังไม่ยกเลิก/ปิด → คนโทร + ยกเลิกแผนที่ Lumos
  * สายที่ถึงเวลาไปแล้ว = AI โทรไปแล้ว/กำลังโทร — คงเป็นของ AI (Choice "หยุดสายที่ยังไม่โทร + ของใหม่")
  * 🔴 ไม่มีคีย์ push (เครื่อง dev) = ไม่ทำอะไร · เรียกจาก worker ทุกรอบ + ตอนกดพักบนจอ
- * 🔴 ข้ามสายที่เจ้าหน้าที่เลือก AI เอง (`updated_by` มีค่า · เจ้าของ 8 ต.ค. 2569 Choice "เลือก AI รายสายได้"
- *    — พักแค่สายที่ระบบตั้งให้ ไม่งั้นรอบนี้เปลี่ยนสายที่คนกดเลือกกลับเป็นคนโทรทุก 5 นาที)
+ * 🔴 พักแค่สายที่ระบบตั้งให้ (เจ้าของ 8 ต.ค. 2569 Choice "เลือก AI รายสายได้") — ข้ามสายที่เจ้าหน้าที่เลือก AI เอง
+ *    (`updated_by` มีค่า) และสายที่เพิ่มเอง (ไม่ใช่ `irecruit-replace:` — ฟอร์มเพิ่มคน · เพิ่มสายในป๊อป)
+ *    ไม่งั้นรอบนี้เปลี่ยนสายที่คนเลือกกลับเป็นคนโทรทุก 5 นาที
  */
 export async function enforceReplaceAiPaused(now: Date = new Date()): Promise<{ converted: number; plansCancelled: number; errors: number }> {
   const out = { converted: 0, plansCancelled: 0, errors: 0 };
@@ -816,7 +818,7 @@ export async function enforceReplaceAiPaused(now: Date = new Date()): Promise<{ 
     `select id from ${followTable}
       where follow_team = $1 and cancelled_at is null and completed_at is null
         and coalesce(call_mode, 'ai') = 'ai' and scheduled_at > $2
-        and updated_by is null`,
+        and updated_by is null and coalesce(source_ref, '') like 'irecruit-replace:%'`,
     [FOLLOW_TEAM_REPLACEMENT, now.toISOString()],
   );
   if (aff.length === 0) return out;

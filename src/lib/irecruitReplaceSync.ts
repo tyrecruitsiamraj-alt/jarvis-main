@@ -378,8 +378,9 @@ export function parseReplaceRef(ref: string): { jobId: string; slot: ReplaceSlot
  * สายนี้ต้องพูดบทส่งคนแทนแบบไหน (เจ้าของสั่ง 8 ต.ค. 2569 · แยกบท สาย 1 / 2 / 3) — อ่านจากหัวเรื่อง + หมายเหตุที่ระบบเขียนเอง (`replaceSlotNote`)
  * ใช้ได้ทั้งสายที่ดึงจาก iRecruit · คีย์เอง · แก้ตารางทีหลัง เพราะทุกทางเขียนหมายเหตุตัวเดียวกัน
  * - "ยืนยันเวลาเข้างาน d/m HH:MM น." = สาย 1 คอนเฟิร์ม
- * - "เข้างาน HH:MM น." = สาย 2 หรือ 3 — หมายเหตุสองสายนี้เหมือนกัน ⇒ ดูสายที่ (`call_round` 2/3 ของรอบดึง/คีย์เอง)
- *   ไม่มีเลขสาย (เพิ่มจากแก้ตาราง) = ดูเวลาที่เหลือก่อนเข้างาน ไม่เกิน 30 นาที = สาย 3
+ * - "เข้างาน HH:MM น." = สาย 2 หรือ 3 — หมายเหตุสองสายนี้เหมือนกัน ⇒ ดูเวลาที่เหลือก่อนเข้างาน
+ *   ใกล้ค่าก่อนเข้างานของสาย 3 มากกว่าสาย 2 (ค่าตั้ง 60/15 นาที ⇒ เส้นแบ่ง 37.5 นาที) = สาย 3
+ *   🔴 ห้ามใช้ `call_round` — แก้ตารางทั้งชุดเรียงเลขสายใหม่ (วัดจริง 8 ต.ค.: สาย 2 กลายเป็น 4) บทจะผิดสาย
  * - หมายเหตุอ่านไม่ออก = ดูสายที่ · ไม่รู้วัน/เวลา = null (บทใช้คำแทน)
  * null = ไม่ใช่สายส่งคนแทน (ใช้บทติดตามเดิม)
  */
@@ -407,12 +408,14 @@ export function replaceScriptOf(e: {
   }
   const l = /เข้างาน\s+(\d{1,2}):(\d{2})/.exec(note);
   if (l) {
-    const start = replaceLeadStart(e.callAtMs, note);
-    const kind =
-      e.callRound === 2 ? 'call2'
-        : e.callRound === 3 ? 'call3'
-          : start != null && start - e.callAtMs <= 30 * 60_000 ? 'call3'
-            : 'call2';
+    let start = replaceLeadStart(e.callAtMs, note);
+    // โทรหลังเวลาเข้างานของวันเดียวกัน (สายคนโทรที่เลยเวลาแล้วส่งให้ AI · 8 ต.ค. 2569) — `replaceLeadStart` จะเลื่อนไปพรุ่งนี้
+    // ⇒ บท "พรุ่งนี้เข้างาน…" ผิด · ห่างเกิน 12 ชม. = เข้างานวันนี้ที่ผ่านไปแล้ว (นับเป็นสาย 3 "ถึงหน่วยงานแล้วใช่ไหม")
+    if (start != null && start - e.callAtMs > 12 * 3_600_000) start -= 86_400_000;
+    const [lead2, lead3] = DEFAULT_REPLACE_CALL_RULE.leadMinutes;
+    const splitMs = ((lead2 + lead3) / 2) * 60_000;
+    const kind: 'call2' | 'call3' =
+      start != null ? (start - e.callAtMs <= splitMs ? 'call3' : 'call2') : e.callRound === 3 ? 'call3' : 'call2';
     return { kind, workYmd: start == null ? null : BKK_YMD_FMT.format(new Date(start)), startTime: speak(l[1], l[2]) };
   }
   const round = e.callRound ?? 1;

@@ -448,9 +448,9 @@ describe('แก้ล่าสุดชนะ (เจ้าของ 7 ต.ค.
     // รอบบังคับพัก AI ข้ามสายที่เจ้าหน้าที่เลือก AI เอง (Choice "เลือก AI รายสายได้")
     expect(src).toMatch(/scheduled_at > \$2\s+and updated_by is null/);
   });
-  it('🔴 พัก AI อยู่ = สายที่เพิ่มเองในแท็บส่งคนแทนเป็นคนโทรตั้งแต่สร้าง · แก้ตารางเลือก AI รายสายได้ (8 ต.ค. 2569)', () => {
+  it('🔴 พัก AI อยู่ = พักแค่สายที่ดึงจาก iRecruit · ฟอร์มเพิ่มคน/แก้ตารางเลือก AI รายสายได้ (8 ต.ค. 2569)', () => {
     const h = readFileSync(new URL('../../api/_handlers/follow.ts', import.meta.url), 'utf8');
-    expect(h).toContain("base = { ...inputBase, callMode: 'manual' };");
+    expect(h).not.toContain("base = { ...inputBase, callMode: 'manual' };");
     expect(h).not.toContain('ส่งคนแทนพัก AI อยู่ — ตั้งเป็นคนโทร');
   });
 });

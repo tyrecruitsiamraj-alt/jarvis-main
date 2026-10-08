@@ -67,12 +67,13 @@ const tbd = {
 } as unknown as FollowEntry;
 
 describe('ยังไม่ชัวร์เวลา → เลือกเวลาจริงแล้วสลับใครโทรได้', () => {
-  it('เวลาแทนเลยแล้ว = ยังไม่มีตัวเลือก · เลือกเวลาอนาคต = มี · บันทึกแก้เวลาก่อนแล้วส่งตารางที่มีสายนี้เป็น AI', async () => {
+  // 8 ต.ค. 2569: สายคนโทรที่เลยเวลา (ยังไม่ลงผล) มีตัวเลือกเสมอ — ติ๊ก AI = เลื่อนเวลาให้ AI โทรอีก 10 นาที (เทสต์ถัดไป)
+  it('เวลาแทนเลยแล้วก็มีตัวเลือก · เลือกเวลาอนาคต = มี · บันทึกแก้เวลาก่อนแล้วส่งตารางที่มีสายนี้เป็น AI', async () => {
     updateFollowEntry.mockResolvedValue({ ...tbd, time_tbd: false, queue_refreshed: 0, lumos_resync: null });
     replaceFollowSchedule.mockResolvedValue({ group_id: 'g1', kept: 1, cancelled: 0, created: 0, lumos: { pushed: true, plans: 1, rounds: 1, reason: null } });
     const onSaved = vi.fn();
     render(<FollowEditDialog entry={tbd} unitOptions={[]} siblings={[tbd]} onClose={() => {}} onSaved={onSaved} />);
-    expect(screen.queryByText('ใครโทรสายนี้')).toBeNull();
+    expect(screen.getByText('ใครโทรสายนี้')).toBeTruthy();
 
     const future = inHours(6);
     fireEvent.change(screen.getByLabelText('เวลานัด'), { target: { value: isoToBangkokInput(future) } });
@@ -87,3 +88,29 @@ describe('ยังไม่ชัวร์เวลา → เลือกเ�
     expect(body.rounds.find((r) => r.id === 'a')?.call_mode).toBe('ai');
   });
 });
+
+// เจ้าของ 8 ต.ค. 2569: "คนโทรแล้วทำไมแก้เป็น Ai ไม่ได้อะ" — วัดจริง: ทีมแก้สายนัด 13:10 ตอน 14:05 ช่องเลือกใครโทรหาย
+describe('สายคนโทรที่เลยเวลา → ส่งให้ AI โทรแทน', () => {
+  it('ติ๊ก AI = เลื่อนเวลาเป็นอีก ~10 นาที แล้วบันทึกแก้เวลาก่อน ส่งตารางสายนี้เป็น AI · กลับเป็นคนโทร = คืนเวลาเดิม', async () => {
+    const overdue = { ...tbd, time_tbd: false, scheduled_at: inHours(-1) } as unknown as FollowEntry;
+    updateFollowEntry.mockResolvedValue({ ...overdue, queue_refreshed: 0, lumos_resync: null });
+    replaceFollowSchedule.mockResolvedValue({ group_id: 'g1', kept: 1, cancelled: 0, created: 0, lumos: { pushed: true, plans: 1, rounds: 1, reason: null } });
+    render(<FollowEditDialog entry={overdue} unitOptions={[]} siblings={[overdue]} onClose={() => {}} onSaved={vi.fn()} />);
+    const timeBox = screen.getByLabelText('เวลานัด') as HTMLInputElement;
+    const before = timeBox.value;
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ใครโทรสายนี้ — AI โทร' }));
+    expect(timeBox.value).not.toBe(before);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ใครโทรสายนี้ — คนโทร' }));
+    expect(timeBox.value).toBe(before);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ใครโทรสายนี้ — AI โทร' }));
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึกการแก้ไข' }));
+    await waitFor(() => expect(replaceFollowSchedule).toHaveBeenCalledTimes(1));
+    const patch = updateFollowEntry.mock.calls[0][1] as { scheduled_at: string };
+    const ahead = Date.parse(patch.scheduled_at) - Date.now();
+    expect(ahead).toBeGreaterThan(5 * 60_000);
+    expect(ahead).toBeLessThanOrEqual(11 * 60_000);
+    const body = replaceFollowSchedule.mock.calls[0][1] as { rounds: Array<{ id?: string; call_mode: string }> };
+    expect(body.rounds.find((r) => r.id === 'a')?.call_mode).toBe('ai');
+  });
+});
+

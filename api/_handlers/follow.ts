@@ -540,18 +540,10 @@ async function createFollowRounds(
    * 🔴 พัก AI ของส่งคนแทนอยู่ (เจ้าของ 6 ต.ค. 2569 "อย่าพึ่งส่งให้ Ai โทร") — สายที่เพิ่มเองในแท็บนั้นเป็นคนโทรตั้งแต่สร้าง
    * (ตรวจ Journey 7 ต.ค.: เดิมส่ง Lumos ไปก่อน แล้วรอบดึง 5 นาทีค่อยเปลี่ยนเป็นคนโทร — สายที่นัดในช่วงนั้นโดน AI โทรได้)
    */
-  let base = inputBase;
-  let rounds = inputRounds;
-  if (inputBase.team === FOLLOW_TEAM_REPLACEMENT) {
-    try {
-      if ((await getReplaceSyncSettings()).rule.aiPaused) {
-        base = { ...inputBase, callMode: 'manual' };
-        rounds = inputRounds.map((r) => ({ ...r, callMode: 'manual' as const }));
-      }
-    } catch (e) {
-      logWarn('follow.create.replaceAiPausedCheckFailed', { error: String(e) });
-    }
-  }
+  // 🔴 8 ต.ค. 2569: พัก AI ไม่บังคับสายที่เพิ่มเองแล้ว (เจ้าของ "ฟอร์มเพิ่มคนให้เลือก AI รายสายได้ด้วย")
+  //    — ใครโทรตามที่ติ๊กในฟอร์ม (ค่าเริ่มเป็นคนโทร) · พักแค่สายที่ระบบดึงจาก iRecruit (`enforceReplaceAiPaused`)
+  const base = inputBase;
+  const rounds = inputRounds;
   const createdRows: FollowRow[] = [];
   for (const r of rounds) {
     const row = await insertFollowRow(req, base, r);
@@ -1449,10 +1441,16 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
   let targets: ReplaceRow[] = [];
   if (replaceIds.length > 0) {
     ({ rows: targets } = await dbQuery<ReplaceRow>(
+      /* 🔴 แถวคิวต่อสายมีได้หลายแถว (ยกเลิกแล้วส่งใหม่ · พัก AI เปลี่ยนเป็นคนโทร) — join ตรง ๆ ได้แถวซ้ำ
+         ⇒ นับไม่ตรง = "บางสายโทรไปแล้ว" ทั้งที่ยังไม่โทร (8 ต.ค. 2569) · เลือกแถวที่ไม่ใช่ยกเลิกก่อน ล่าสุดก่อน */
       `select f.*, q.status as q_status, q.first_result_at as q_result_at
          from ${followTable} f
-         left join ${queueTable} q
-           on q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref = 'follow-' || f.id::text
+         left join lateral (
+           select q.status, q.first_result_at from ${queueTable} q
+            where q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref = 'follow-' || f.id::text
+            order by (q.status = 'cancelled'), q.id desc
+            limit 1
+         ) q on true
         where f.id = any($1::uuid[])`,
       [replaceIds],
     ));
@@ -1464,7 +1462,9 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
     new Date(String(t.scheduled_at)).getTime() <= now ||
     phoneDigits(t.recipient_phone) !== phoneDigits(anchor.recipient_phone) ||
     (anchor.group_id != null && t.group_id !== anchor.group_id) ||
-    (t.q_status != null && (t.q_status !== 'pending' || t.q_result_at != null)),
+    // คิวที่ยกเลิกแล้ว (ไม่มีผล) = ไม่เคยถูกโทร ⇒ ไม่กัน (สายคนโทรที่เคยเป็น AI)
+    (t.q_status != null && t.q_status !== 'cancelled' && (t.q_status !== 'pending' || t.q_result_at != null)) ||
+    (t.q_status === 'cancelled' && t.q_result_at != null),
   );
   if (stale) {
     return sendError(res, 409, 'Conflict', 'บางสายโทรไปแล้วหรือถูกแก้ไปแล้ว — ปิดแล้วเปิดแก้ใหม่อีกครั้ง');

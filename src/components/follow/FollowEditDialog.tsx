@@ -122,6 +122,8 @@ export default function FollowEditDialog({
    * id → โหมดที่เลือก · บันทึกพร้อมปุ่มบันทึกผ่านเส้นแก้ตารางทั้งชุด (เส้นเดียวกับสลับสายนี้)
    */
   const [otherModes, setOtherModes] = useState<Record<string, 'ai' | 'manual'>>({});
+  /** เวลาเดิมก่อนเลื่อนให้ AI (สายคนโทรที่เลยเวลา) — กลับเป็นคนโทร = คืนค่านี้ */
+  const [bumpedFrom, setBumpedFrom] = useState<string | null>(null);
   /**
    * 🔴 เปลี่ยนเบอร์แล้วใช้กับสายที่เหลือในชุดด้วย (เจ้าของสั่ง 4 ต.ค. 2569 — เคยแก้ทีละแถวแล้วหลุด 1 สาย
    * AI เกือบโทรหาเจ้าหน้าที่แทนผู้สมัคร) · ค่าเริ่มต้น = ใช้ทั้งชุด (เคสแก้เบอร์ผิดคือเคสหลัก)
@@ -153,6 +155,7 @@ export default function FollowEditDialog({
     }
     setMode(entry.call_mode === 'manual' ? 'manual' : 'ai');
     setOtherModes({});
+    setBumpedFrom(null);
     setError(null);
     setExtraWhen([]);
     setExtraModes([]);
@@ -195,6 +198,25 @@ export default function FollowEditDialog({
   const withChosenTime = (r: FollowEntry): FollowEntry => (r.id === entry.id ? { ...r, scheduled_at: chosenIso } : r);
   const modeEditable = isEditableFollowRound(withChosenTime(entry), new Date());
   const beforeMode: 'ai' | 'manual' = entry.call_mode === 'manual' ? 'manual' : 'ai';
+  /**
+   * สายคนโทรที่เลยเวลาแล้ว ยังไม่ลงผล = ส่งให้ AI โทรแทนได้ (เจ้าของ 8 ต.ค. 2569: *"คนโทรแล้วทำไมแก้เป็น Ai ไม่ได้อะ"*
+   * — วัดจริง: ทีมแก้สายนัด 13:10 ตอน 14:05 ช่องเลือกใครโทรหาย เพราะเวลาเลยแล้ว) · ติ๊ก AI = เลื่อนเวลาเป็นอีก
+   * `OVERDUE_TO_AI_MINUTES` นาที (ให้แผนไปถึง Lumos ทัน) แล้วบันทึกตามทางเดิม (แก้เวลาก่อน แล้วส่งตาราง)
+   */
+  const overdueManual =
+    !modeEditable && beforeMode === 'manual' && !entry.cancelled && !entry.completed_at && !entry.staff_call_outcome;
+  const pickMode = (m: 'ai' | 'manual') => {
+    if (m === 'ai' && overdueManual) {
+      setBumpedFrom(when);
+      setWhen(localInputOf(new Date(Date.now() + OVERDUE_TO_AI_MINUTES * 60_000)));
+    }
+    if (m === 'manual' && bumpedFrom != null) {
+      // กลับเป็นคนโทร = คืนเวลาเดิม (เวลาที่เลื่อนให้ AI ไม่ใช่ของคนโทร)
+      setWhen(bumpedFrom);
+      setBumpedFrom(null);
+    }
+    setMode(m);
+  };
   /**
    * สายอื่นของคนนี้ที่ยังสลับคนโทรได้ (ยังไม่ถึงเวลา ไม่ปิด) — **ทุกชุด** ไม่ใช่แค่ชุดที่เปิด
    * (ส่งคนแทน 1 ใบงาน = 1 ชุด · คนเดียวไปหลายวัน = หลายชุด · เจ้าของ 8 ต.ค. 2569 "แก้ได้แบบหน้าติดตามคนเริ่มงาน")
@@ -527,7 +549,7 @@ export default function FollowEditDialog({
               </p>
             ) : null}
           </div>
-          {modeEditable ? (
+          {modeEditable || overdueManual ? (
             <div className="space-y-1.5">
               <p className="ml-1 text-xs font-medium text-muted-foreground">ใครโทรสายนี้</p>
               <div className="ml-1 flex flex-wrap items-center gap-3">
@@ -535,7 +557,7 @@ export default function FollowEditDialog({
                   <label key={m} className="flex cursor-pointer items-center gap-1.5">
                     <Checkbox
                       checked={mode === m}
-                      onCheckedChange={() => setMode(m)}
+                      onCheckedChange={() => pickMode(m)}
                       aria-label={`ใครโทรสายนี้ — ${m === 'ai' ? 'AI โทร' : 'คนโทร'}`}
                     />
                     <span className={cn('text-xs font-medium', mode === m ? 'text-foreground' : 'text-muted-foreground')}>
@@ -781,6 +803,15 @@ export default function FollowEditDialog({
 }
 
 /** ข้อความหลังสลับคนโทร — บอกผลกับ AI ตรง ๆ ห้ามเงียบ (ส่งไม่สำเร็จ = AI อาจยังถือแผนเดิม) */
+/** สายคนโทรที่เลยเวลาแล้วส่งให้ AI = โทรอีกกี่นาที (เท่ากับคิวคอนเฟิร์มส่งคนแทน `REPLACE_ASAP_MINUTES`) */
+const OVERDUE_TO_AI_MINUTES = 10;
+
+/** ค่าช่อง datetime-local (เวลาเครื่อง) */
+function localInputOf(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /** วันเวลาของสายในรายการ "สายของคนนี้" (ใช้เป็นชื่อช่องติ๊กด้วย — หลายสายในป๊อปเดียวต้องแยกชื่อกันได้) */
 function roundLabel(iso: string | null | undefined): string {
   return iso ? new Date(iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : '—';

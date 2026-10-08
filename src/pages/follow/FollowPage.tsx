@@ -957,9 +957,9 @@ const FollowPage: React.FC = () => {
         return;
       }
       const recipientName = composeRecipientName(prefix, firstName, lastName);
-      // สายที่เลยเวลาแล้ว = คนโทร (AI ไม่โทรย้อนหลัง) · พัก AI = คนโทรทุกสาย
+      // สายที่เลยเวลาแล้ว = คนโทร (AI ไม่โทรย้อนหลัง) · พัก AI ไม่ทับที่เลือก (เจ้าของ 8 ต.ค. 2569 เลือก AI รายสายได้)
       const modes: ReplaceSlotModes = { ...replaceModes };
-      for (const p of plans) if (p.past || replaceAiOn === false) modes[p.slot] = 'manual';
+      for (const p of plans) if (p.past) modes[p.slot] = 'manual';
       const mode = Object.values(modes).includes('ai') ? 'ai' : 'manual';
       setSubmitting(true);
       try {

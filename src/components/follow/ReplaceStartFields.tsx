@@ -40,12 +40,15 @@ const ReplaceStartFields: React.FC<{
   onChange: (v: string) => void;
   modes: ReplaceSlotModes;
   onModesChange: (m: ReplaceSlotModes) => void;
-  /** พัก AI ของแท็บนี้อยู่ = คนโทรเท่านั้น */
-  aiPaused: boolean;
+  /**
+   * พัก AI ของแท็บนี้อยู่ — ไม่ล็อกแล้ว (เจ้าของ 8 ต.ค. 2569 "ฟอร์มเพิ่มคนให้เลือก AI รายสายได้ด้วย")
+   * พักแค่สายที่ระบบตั้งให้ (ดึง iRecruit) · ค่าเริ่มของฟอร์มยังเป็นคนโทร
+   */
+  aiPaused?: boolean;
   timing?: ReplaceTiming;
   now?: Date;
   children?: React.ReactNode;
-}> = ({ value, onChange, modes, onModesChange, aiPaused, timing = DEFAULT_REPLACE_CALL_RULE, now = new Date(), children }) => {
+}> = ({ value, onChange, modes, onModesChange, timing = DEFAULT_REPLACE_CALL_RULE, now = new Date(), children }) => {
   const start = replaceStartOf(value);
   // 3 สายเสมอ — สายที่เลยเวลาแล้วยังลง แต่เป็นคนโทร (เจ้าของ 7 ต.ค. 2569 ลงย้อนหลัง "ขึ้น แต่ไม่โทร")
   const plans = start ? planReplaceCallsFull(start, now, timing) : [];
@@ -64,7 +67,7 @@ const ReplaceStartFields: React.FC<{
       <ul className="space-y-2 rounded-xl border border-border/70 p-3 text-sm" data-testid="replace-start-preview">
         {(['confirm', 'lead60', 'lead15'] as const).map((slot) => {
           const p = plans.find((x) => x.slot === slot);
-          const mode = aiPaused ? 'manual' : modes[slot];
+          const mode = modes[slot];
           return (
             <li key={slot} className="space-y-1">
               <span className="flex flex-wrap items-center justify-between gap-2">
@@ -84,14 +87,12 @@ const ReplaceStartFields: React.FC<{
                     <label key={c.value} className="flex cursor-pointer items-center gap-1.5">
                       <Checkbox
                         checked={mode === c.value}
-                        disabled={aiPaused && c.value === 'ai'}
                         onCheckedChange={() => onModesChange({ ...modes, [slot]: c.value })}
                         aria-label={`${slotLabel[slot]} — ${c.label}`}
                       />
                       <span className={cn('text-xs font-medium', mode === c.value ? c.on : 'text-muted-foreground')}>{c.label}</span>
                     </label>
                   ))}
-                  {aiPaused ? <span className="text-xs text-muted-foreground">พัก AI อยู่</span> : null}
                 </span>
               ) : null}
             </li>

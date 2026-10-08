@@ -203,7 +203,7 @@ describe('พัก AI (aiPaused)', () => {
     const { readFileSync } = await import('node:fs');
     const lib = readFileSync(`${process.cwd()}/api/_lib/irecruitReplaceSync.ts`, 'utf8');
     // สายที่เจ้าหน้าที่เลือก AI เอง (updated_by) ไม่โดนพัก — Choice "เลือก AI รายสายได้" 8 ต.ค. 2569
-    expect(lib).toContain("and coalesce(call_mode, 'ai') = 'ai' and scheduled_at > $2\n        and updated_by is null`");
+    expect(lib).toContain("and coalesce(call_mode, 'ai') = 'ai' and scheduled_at > $2\n        and updated_by is null and coalesce(source_ref, '') like 'irecruit-replace:%'`");
     expect(lib).toContain('replaceCallModeFor(p.at, settings.rule.aiFrom, settings.rule.aiPaused)');
     const worker = readFileSync(`${process.cwd()}/api/_lib/irecruitReplaceSyncWorker.ts`, 'utf8');
     expect(worker).toContain('if (settings.rule.aiPaused) {');

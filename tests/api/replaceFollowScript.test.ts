@@ -45,11 +45,23 @@ describe('บทติดตามส่งคนแทน', () => {
     for (const m of [msg2, msg3]) expect(m).not.toContain('คอนเฟิร์ม');
   });
 
-  it('สายที่เพิ่มจากแก้ตาราง (ไม่มีเลขสาย) = ดูเวลาที่เหลือก่อนเข้างาน', () => {
-    const of = (iso: string) =>
-      replaceScriptOf({ topic: REPLACE_FOLLOW_TOPIC, note: 'เข้างาน 08:00 น.', callRound: null, callAtMs: Date.parse(iso) })?.kind;
-    expect(of('2026-10-09T07:00:00+07:00')).toBe('call2');
-    expect(of('2026-10-09T07:40:00+07:00')).toBe('call3');
+  // แก้ตารางทั้งชุดเรียงเลขสายใหม่ (สาย 2 กลายเป็น 4) ⇒ แยกสาย 2/3 ด้วยเวลาที่เหลือก่อนเข้างาน ไม่ใช่เลขสาย
+  it('สาย 2/3 ดูจากเวลาที่เหลือก่อนเข้างาน — เลขสายถูกเรียงใหม่ก็ไม่ผิดบท', () => {
+    const of = (iso: string, callRound: number | null) =>
+      replaceScriptOf({ topic: REPLACE_FOLLOW_TOPIC, note: 'เข้างาน 08:00 น.', callRound, callAtMs: Date.parse(iso) })?.kind;
+    expect(of('2026-10-09T07:00:00+07:00', null)).toBe('call2');
+    expect(of('2026-10-09T07:40:00+07:00', null)).toBe('call3');
+    expect(of('2026-10-09T07:45:00+07:00', 2)).toBe('call3');
+    expect(of('2026-10-09T07:00:00+07:00', 4)).toBe('call2');
+  });
+
+  it('สายคนโทรที่เลยเวลาเข้างานแล้วส่งให้ AI = วันนี้ · บทสาย 3 (ไม่ใช่ "พรุ่งนี้เข้างาน")', () => {
+    const at = '2026-10-08T15:37:00+07:00';
+    expect(replaceScriptOf({ topic: REPLACE_FOLLOW_TOPIC, note: 'เข้างาน 14:10 น.', callRound: 2, callAtMs: Date.parse(at) }))
+      .toEqual({ kind: 'call3', workYmd: '2026-10-08', startTime: '14:10 น.' });
+    const msg = buildFollowReminderPayload(entry('เข้างาน 14:10 น.', at, 2)).steps[0].message;
+    expect(msg).not.toContain('พรุ่งนี้');
+    expect(msg).toContain('ถึงหน่วยงาน krungsri แล้วใช่ไหมคะ');
   });
 
   it('งานติดตามหน้าหลักยังพูดบทเดิม', () => {
