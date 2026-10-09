@@ -19,7 +19,7 @@ import { boardProvinceOf } from '../../src/lib/boardFilters.js';
 import { UNSPECIFIED } from '../../src/lib/facetEngine.js';
 import type { JobRequest } from '../../src/types/index.js';
 import { speakableAgeRange, speakableWorkArea, speakableWorkTime, type ApplyScriptFacts } from './lumosCallScript.js';
-import { logError } from './logger.js';
+import { logError, logWarn } from './logger.js';
 
 export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'monthlyIncome' | 'benefitLine' | 'workSchedule'> & {
   /**
@@ -34,6 +34,8 @@ export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'mo
 };
 
 const DEFAULT_TIMEOUT_MS = 4000;
+/** อ่านกล่องงาน (ฐานเรา) — เผื่อเวลาหลัง ERP ไม่ทัน */
+const BOX_TIMEOUT_MS = 2000;
 
 function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   return new Promise((resolve) => {
@@ -109,9 +111,37 @@ async function loadFacts(jobId: string): Promise<ApplyJobFacts> {
   return out;
 }
 
-/** ข้อมูลงานของบทผู้สมัครผ่านลิงก์ — ล้ม/เกินเวลา = `{}` (บทยังโทรได้ แค่สั้นลง) */
+/**
+ * ข้อมูลจาก **กล่องงานอย่างเดียว** (ค่าที่ทีม Online ตั้งในป๊อปประกาศ · ฐานเราเอง ไม่ยิง ERP)
+ * 🔴 เจ้าของ 9 ต.ค. 2569: *"erp ไม่ตอบสนอง ทำไมมันไม่แนบตามกล่องอะ ในเมื่อฉันใช้กล่องงานเป็น script"*
+ * เดิม ERP ช้าเกิน 4 วิ = ไม่ส่ง AI ทั้งที่รายได้ตั้งไว้ในกล่องแล้ว ⇒ ERP ไม่ทัน ให้ใช้ค่าจากกล่อง
+ * มีรายได้ในกล่อง (ต่อเดือน) เท่านั้นถึงนับว่าใช้ได้ — ไม่มี = คืน null (ตัวส่งบอกเหตุ "อ่านไม่ทัน" ตามเดิม)
+ * บรรทัดที่ต้องใช้ ERP (สวัสดิการจากอัตราเงิน · ชื่อจุดทำงาน · ชื่อตำแหน่ง) หายจากบทเอง ไม่พูดเลขที่ไม่รู้
+ */
+async function loadBoxFacts(jobId: string): Promise<ApplyJobFacts | null> {
+  const job: Record<string, unknown> = { id: jobId, request_no: requestNoFromJobRef(jobId) ?? undefined };
+  await attachNotes([job]);
+  const income = manualMonthlyIncome(job);
+  if (!income) return null;
+  const province = String(job.override_province ?? '').trim();
+  return {
+    loaded: true,
+    monthlyIncome: income,
+    workArea: speakableWorkArea(publicSafeAddressParts(job as never)) || (province ? speakableWorkArea({ province }) : '') || null,
+    workSchedule: speakableWorkTime(job.work_schedule as string | null | undefined) || null,
+    ageRange:
+      speakableAgeRange(job.age_range_min as number | null | undefined, job.age_range_max as number | null | undefined) || null,
+  };
+}
+
+/** ข้อมูลงานของบทผู้สมัครผ่านลิงก์ — ล้ม/เกินเวลา = ใช้ค่าจากกล่องงาน (ถ้ามีรายได้) · ไม่มีเลย = `{}` */
 export async function loadApplyScriptFacts(jobId: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<ApplyJobFacts> {
-  return withTimeout(
+  // อ่านกล่องงานไปพร้อมกัน (ฐานเรา เร็ว) — ERP ไม่ทันจะได้ไม่ต้องรอเพิ่ม
+  const box = loadBoxFacts(jobId).catch((e) => {
+    logError('apply-script.facts.box_failed', e, { jobId });
+    return null;
+  });
+  const full = await withTimeout(
     loadFacts(jobId).catch((e) => {
       logError('apply-script.facts.failed', e, { jobId });
       return {} as ApplyJobFacts;
@@ -119,4 +149,11 @@ export async function loadApplyScriptFacts(jobId: string, timeoutMs = DEFAULT_TI
     timeoutMs,
     {},
   );
+  if (full.loaded) return full;
+  const fromBox = await withTimeout(box, BOX_TIMEOUT_MS, null);
+  if (fromBox) {
+    logWarn('apply-script.facts.box_only', { jobId });
+    return fromBox;
+  }
+  return full;
 }
