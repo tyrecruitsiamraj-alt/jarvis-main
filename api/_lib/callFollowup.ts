@@ -183,7 +183,10 @@ export async function applyCallFollowupToQueueRow(input: {
 
   // แถวตั้งตาราง: retry ของ policy → ปิดแทน (ไม่โทรซ้ำนอกตาราง) · ผลอื่นคงเดิม
   const scheduledFollow = followSchedule.scheduled;
-  const effectiveRetry = decision.action === 'retry' && !scheduledFollow;
+  // งานติดตามขอให้โทรกลับ = ตั้งเป็นสายใหม่ (`followCallback` · 9 ต.ค. 2569) ไม่ใช่ retry แถวเดิม
+  // (แถวเดิมที่ตั้ง retry ไม่มีตัวส่งให้ Lumos — ค้าง "รอโทร" ตลอดไป)
+  const followCallback = input.outcome === 'reschedule_requested' && String(row.person_ref ?? '').startsWith('follow-');
+  const effectiveRetry = decision.action === 'retry' && !scheduledFollow && !followCallback;
 
   try {
     if (effectiveRetry) {
