@@ -55,7 +55,7 @@ function isThaiMobile(raw: string): boolean {
  */
 export function followStepError(step: FollowWizardStep, v: FollowWizardValues): string | null {
   if (step === 1) {
-    if (!v.firstName.trim()) return 'กรอกชื่อ หรือกดเลือกชื่อจากบอร์ด';
+    if (!v.firstName.trim()) return 'กรอกชื่อ หรือกดเลือกชื่อจาก ERP';
     if (!v.phone.trim()) return 'กรอกเบอร์โทรของคนที่จะติดตาม';
     if (!isThaiMobile(v.phone)) return 'เบอร์โทรต้องเป็นมือถือ 10 หลัก ขึ้นต้นด้วย 0';
     if (!v.topic.trim()) return 'กรอกเรื่องที่จะให้โทรติดตาม';

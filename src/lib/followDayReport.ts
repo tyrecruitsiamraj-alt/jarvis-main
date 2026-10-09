@@ -12,6 +12,7 @@ import { groupFollowEntries } from '@/lib/followGrouping';
 import { buildFollowDayCalls, buildFollowPlanningRows, callCategory, followRoundLabel } from '@/lib/followPlanning';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { followDayCallLabel } from '@/lib/followDayCall';
+import { followDayNoText } from '@/lib/followDayNo';
 import { followCallerOf, FOLLOW_CALLER_LABEL } from '@/lib/followListFilter';
 
 export type FollowDayReportRow = {
@@ -135,7 +136,8 @@ export function buildFollowDayReport(
   const scope = [
     filter.caller === 'all' ? null : filter.caller === 'ai' ? 'เฉพาะ AI โทร' : 'เฉพาะคนโทร',
     filter.call === 'all' ? null : `สายที่ ${filter.call}`,
-    planDay === 'all' ? null : `วันที่ ${planDay} ของแผน`,
+    // "ติดตามครั้งที่" แทน "วันที่ของแผน" (เจ้าของ 9 ต.ค. 2569) · ขั้นที่มีชื่อขึ้นชื่อ
+    planDay === 'all' ? null : `ติดตามครั้งที่ ${followDayNoText(planDay)}`,
   ]
     .filter(Boolean)
     .join(' · ');

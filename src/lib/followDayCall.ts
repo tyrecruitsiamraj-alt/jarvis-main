@@ -14,6 +14,7 @@
  */
 import type { FollowEntry } from '@/lib/followApi';
 import { replaceSlotRoundOfRef } from '@/lib/irecruitReplaceSync';
+import { followNamedDayLabel, isFollowNamedDay } from '@/lib/followDayNo';
 
 export type FollowDayCallPos = {
   /** วันที่เท่าไหร่ของชุด — null = ชุดวันเดียว / แถวเก่าไม่มีชุด */
@@ -110,8 +111,14 @@ export function followDayCallPositions(entries: readonly DayCallRow[]): Map<stri
         (m, r) => (typeof r.plan_day_no === 'number' && r.plan_day_no >= 1 && (m === null || r.plan_day_no < m) ? r.plan_day_no : m),
         null,
       );
+      // วันแรกเป็นขั้นที่มีชื่อ (91+) = ทุกวันของชุดใช้ชื่อนั้น ไม่นับต่อ (นับต่อ = กลายเป็นชื่อขั้นถัดไปผิด ๆ)
       const day =
-        explicit ?? (first && (multiDay || start !== null) ? daysBetween(first, ymd) + (start ?? 1) : null);
+        explicit ??
+        (first && (multiDay || start !== null)
+          ? start !== null && isFollowNamedDay(start)
+            ? start
+            : daysBetween(first, ymd) + (start ?? 1)
+          : null);
       const all = [...list].sort(byRoundThenTime);
       const live = all.filter((r) => !r.cancelled);
       for (const r of all) {
@@ -135,6 +142,9 @@ export function withFollowDayCalls<T extends DayCallRow>(entries: readonly T[]):
 /** ป้ายของสายเดียว — "วันที่ 2 · สายที่ 1" (ชุดหลายวัน) / "สายที่ 2" / null = ไม่รู้ลำดับ */
 export function followDayCallLabel(pos: { day?: number | null; call?: number | null }): string | null {
   if (pos.call == null) return null;
+  // ขั้นที่มีชื่อ (ประเมิน · เบิกเบี้ยเลี้ยง · เรียนงาน · ยกยอด · 9 ต.ค. 2569) ขึ้นชื่อแทน "วันที่"
+  const named = followNamedDayLabel(pos.day);
+  if (named) return `${named} · สายที่ ${pos.call}`;
   return pos.day != null ? `วันที่ ${pos.day} · สายที่ ${pos.call}` : `สายที่ ${pos.call}`;
 }
 

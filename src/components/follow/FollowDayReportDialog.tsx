@@ -25,6 +25,7 @@ import {
   type DayReportPageSize,
 } from '@/lib/followDayReportImage';
 import { FOLLOW_MATRIX_ROW_LABEL } from '@/lib/followCallMatrix';
+import { followDayNoText } from '@/lib/followDayNo';
 
 /**
  * ═══ สรุปแผนติดตามทั้งวัน (เจ้าของสั่ง 2 ต.ค. 2569 · Choice "หน้าสรุปบนจอ") ═══
@@ -149,15 +150,16 @@ export default function FollowDayReportDialog({
             />
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">วันที่ของแผน</span>
+            {/* "ติดตามครั้งที่" แทน "วันที่ของแผน" (เจ้าของ 9 ต.ค. 2569) */}
+            <span className="text-xs text-muted-foreground">ติดตามครั้งที่</span>
             <ChoiceDropdown
               value={planDay}
               options={[
-                { value: 'all', label: 'ทุกวัน' },
-                ...(report?.planDays ?? []).map((n) => ({ value: String(n), label: `วันที่ ${n}` })),
+                { value: 'all', label: 'ทุกครั้ง' },
+                ...(report?.planDays ?? []).map((n) => ({ value: String(n), label: followDayNoText(n) })),
               ]}
               onChange={setPlanDay}
-              ariaLabel="ดูเฉพาะวันที่ของแผน"
+              ariaLabel="ดูเฉพาะติดตามครั้งที่"
               active={planDay !== 'all'}
             />
           </span>

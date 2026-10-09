@@ -124,7 +124,9 @@ describe('ดีไซน์ / มือถือ / สถานะจอ (ก�
     const page = read('src/pages/follow/FollowPage.tsx');
     expect(page).not.toMatch(/<BoardPersonPicker\b/);
     expect(page).not.toMatch(/<BoardUnitPicker\b/);
-    expect(page).toContain('<BoardPersonPickerBody');
+    // ชื่อมาจาก ERP แล้ว (9 ต.ค. 2569 "เอาเป็นจาก Erp แทน") — ยังฝังในป๊อปเดิม ไม่เปิด Dialog ใหม่
+    expect(page).toContain('<ErpPersonPickerBody');
+    expect(read('src/components/follow/ErpPersonPicker.tsx')).not.toMatch(/<Dialog\b/);
     expect(page).toContain('<BoardUnitPickerBody');
   });
   it('แถบขั้นมีป้ายสั้นบนจอแคบ', async () => {

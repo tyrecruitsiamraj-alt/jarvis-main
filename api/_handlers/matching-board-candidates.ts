@@ -8,6 +8,7 @@ import {
 import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
 import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
+import { searchErpPeople } from '../_lib/erpPeopleSearch.js';
 import { type BoardMatchResult } from '../_lib/boardCandidateMatcher.js';
 import { getStoredBoardMatch } from '../_lib/boardMatchStore.js';
 import {
@@ -113,6 +114,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
      * ⚠️ โหมดนี้ใช้ที่กล่องเลือกคนของหน้า Follow ที่เดียว — เลนสรรหา/AI matcher
      *    ใช้เส้นอื่นและยังตัดคนแจ้งเข้าแล้วอยู่เหมือนเดิม (ห้ามเอาคนมีงานไปเสนองานใหม่)
      */
+    /**
+     * โหมด picker=erp (เจ้าของ 9 ต.ค. 2569 "ดึงชื่อพนักงานจาก บอร์ด เอาเป็นจาก Erp แทน รายชื่อเก่าๆมันไม่มา")
+     * ค้นทะเบียนผู้สมัคร/พนักงานของ ERP ฝั่ง server ตามคำค้น — ฟอร์มเพิ่มคนหน้าติดตามใช้แทนบอร์ด
+     * สิทธิ์เดียวกับ picker=1 (ชื่อ+เบอร์ระดับเดียวกัน) · ไม่ส่งเลขบัตรออกไป
+     */
+    if (getQuery(req, 'picker') === 'erp') {
+      const people = await searchErpPeople(getQuery(req, 'q'));
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json({ people });
+    }
+
     if (getQuery(req, 'picker') === '1') {
       const rows = await listBoardReadyCandidates({
         columnIds: [

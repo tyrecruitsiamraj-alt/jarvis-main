@@ -12849,3 +12849,10 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - (9 ต.ค. 2569 บ่าย) **ส่ง AI โทรใบสมัคร: ERP ไม่ทัน → ใช้รายได้จากกล่องงาน** (เจ้าของ *"erp ไม่ตอบสนอง ทำไมมันไม่แนบตามกล่องอะ"*)
   · `api/_lib/applyScriptFacts.ts` `loadBoxFacts` — อ่านค่าที่ทีมตั้งในป๊อปประกาศ (`attachNotes` · ฐานเรา) ไปพร้อมกับทาง ERP · ERP เกิน 4 วิ/ล้ม และกล่องมีรายได้ต่อเดือน = ใช้ค่าจากกล่อง (พื้นที่/อายุ/เวลาทำงานจากกล่องด้วย · สวัสดิการ ERP หาย)
   · กล่องไม่มีรายได้ = ไม่ส่งตามเดิม (`FACTS_UNREAD_REASON`) · เทสต์ `tests/api/applyScriptFactsBox.test.ts`
+- (9 ต.ค. 2569 เย็น) หน้าติดตาม 3 ข้อ (เจ้าของสั่ง)
+  · **ฟอร์มเพิ่มคน: เลือกชื่อจาก ERP แทนบอร์ด** — `api/_lib/erpPeopleSearch.ts` (ค้น `hr_recruitment` ฝั่ง server · มีเบอร์เท่านั้น · ≤30 · คนสมัครหลายรอบเอาแถวล่าสุด · ไม่ส่งเลขบัตร)
+    🔴 ไม่ใช้ `hr_staff` — มีเบอร์แค่ 1,159/73,219 · เส้น = โหมด `?picker=erp&q=` ของ `/api/matching/board-candidates` (สิทธิ์เดียวกับ picker บอร์ด) ·
+    หน้าเว็บ `src/lib/erpPeopleApi.ts` + `src/components/follow/ErpPersonPicker.tsx` · หน้าดูแลหลังเริ่มงานยังใช้ picker บอร์ดเดิม · เทสต์ `tests/api/erpPeopleSearch.test.ts`
+  · **ติดตามครั้งที่ 1–7 + ประเมิน · เบิกเบี้ยเลี้ยง · เรียนงาน · ยกยอด** — `src/lib/followDayNo.ts` (รหัส 91–94 · ห้ามใช้ 8–11: แถวเดิม plan_day_no 8–12 มี 24 แถว = วันที่ของตารางยาว) ·
+    ป้าย "ประเมิน · สายที่ 1" (`followDayCallLabel`) · ชุดที่วันแรกเป็นขั้นมีชื่อ ไม่นับต่อ (`followDayCallPositions`) · เทสต์ `src/lib/followDayNo.test.ts`
+  · **"วันที่ของแผน" → "ติดตามครั้งที่"** ทั้งป๊อปสรุปแผน (`FollowDayReportDialog` · หัวรายงาน `followDayReport`) และตัวกรองบนหน้าติดตาม

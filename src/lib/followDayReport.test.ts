@@ -132,6 +132,6 @@ describe('สรุปแผนเลือกช่วงวัน + วัน�
     const r = buildFollowDayReport(rows, { from: '2026-10-02', to: '2026-10-03' }, NOW, { caller: 'all', call: 'all', planDay: 2 });
     expect(r.planDays).toEqual([1, 2]);
     expect(r.rows.map((x) => x.id)).toEqual(['b']);
-    expect(r.scope).toBe('วันที่ 2 ของแผน');
+    expect(r.scope).toBe('ติดตามครั้งที่ 2'); // ป้ายใหม่ 9 ต.ค. 2569 (เดิม "วันที่ 2 ของแผน")
   });
 });

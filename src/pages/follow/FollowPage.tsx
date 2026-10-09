@@ -58,9 +58,9 @@ import {
 } from '@/lib/followApi';
 import type { FollowStaffCallOutcome } from '@/lib/followStaffCall';
 import { summarizeDispatchResults } from '@/lib/followDispatchState';
-import { BoardPersonPickerBody } from '@/components/follow/BoardPersonPicker';
+import { ErpPersonPickerBody } from '@/components/follow/ErpPersonPicker';
 import { BoardUnitPickerBody } from '@/components/follow/BoardUnitPicker';
-import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
+import { splitErpName, type ErpPerson } from '@/lib/erpPeopleApi';
 import { buildBoardUnitOptions, mergeBoardUnitOptions, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
 import { followGroupKey, followPersonKey, groupFollowEntries } from '@/lib/followGrouping';
@@ -129,6 +129,7 @@ import { type FollowOutcome } from '@/lib/followOutcome';
 import { buildFollowPlanningRows, callCategory, followEntryYmd, type FollowPlanningRound, type FollowRoundFilter } from '@/lib/followPlanning';
 import { toYmdBangkok, formatYmdDmyBe } from '@/lib/dateTh';
 import { tbdPlaceholderAts } from '@/lib/followTbd';
+import { followDayNoOptions, followDayNoText } from '@/lib/followDayNo';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
 import {
@@ -524,13 +525,14 @@ const FollowPage: React.FC = () => {
     setFormOpen(true);
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
-  const pickPerson = (p: BoardPickerPerson) => {
-    const { prefix: pre, first, last } = splitPickerName(p);
+  /** เลือกชื่อจาก ERP (เจ้าของ 9 ต.ค. 2569 "เอาเป็นจาก Erp แทน" — บอร์ดชื่อเก่า ๆ ไม่ขึ้น) */
+  const pickPerson = (p: ErpPerson) => {
+    const { prefix: pre, first, last } = splitErpName(p);
     setPrefix(pre);
     setFirstName(first);
     setLastName(last);
     setPhone((p.mobile || '').trim());
-    setPickedFrom(p.column_label ? `เลือกจากบอร์ด · ถัง ${p.column_label}` : 'เลือกจากบอร์ด');
+    setPickedFrom('เลือกจาก ERP');
     setPickerOpen(false);
     setFormError(null);
   };
@@ -1985,20 +1987,20 @@ const FollowPage: React.FC = () => {
                   active={adderFilter !== 'all'}
                 />
                 </span>
-                {/* ครั้งที่ติดตาม = วันที่ของแผน (เจ้าของ Choice 5 ต.ค. 2569) */}
+                {/* ครั้งที่ติดตาม = วันที่ของแผน (เจ้าของ Choice 5 ต.ค. 2569) · ป้าย "ติดตามครั้งที่" (9 ต.ค. 2569) */}
                 <span className="inline-flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">วันที่ของแผน</span>
+                <span className="text-xs text-muted-foreground">ติดตามครั้งที่</span>
                 <ChoiceDropdown
                   value={planDay}
                   options={[
-                    { value: 'all', label: `ทุกวัน · ${planDayOptions.reduce((n, o) => n + o.count, 0).toLocaleString('th-TH')}` },
+                    { value: 'all', label: `ทุกครั้ง · ${planDayOptions.reduce((n, o) => n + o.count, 0).toLocaleString('th-TH')}` },
                     ...planDayOptions.map((o) => ({
                       value: String(o.day),
-                      label: `วันที่ ${o.day} · ${o.count.toLocaleString('th-TH')}`,
+                      label: `${followDayNoText(o.day)} · ${o.count.toLocaleString('th-TH')}`,
                     })),
                   ]}
                   onChange={(v) => setPlanDay(v)}
-                  ariaLabel="วันที่ของแผน"
+                  ariaLabel="ติดตามครั้งที่"
                   active={planDay !== 'all'}
                 />
                 </span>
@@ -2265,7 +2267,7 @@ const FollowPage: React.FC = () => {
                 )}
               >
                 <Users className="h-3.5 w-3.5" aria-hidden />
-                {pickerOpen ? 'ปิดรายชื่อ' : 'เลือกชื่อจากบอร์ด'}
+                {pickerOpen ? 'ปิดรายชื่อ' : 'เลือกชื่อจาก ERP'}
               </button>
               {pickedFrom ? (
                 <span className="jarvis-chip jarvis-chip-info">{pickedFrom}</span>
@@ -2276,7 +2278,7 @@ const FollowPage: React.FC = () => {
             {/* 🔴 แผงเลือกชื่อ **ฝังในป๊อปเดียวกัน** — ห้าม Dialog ซ้อน Dialog (QA 5 ต.ค. 2569) */}
             {pickerOpen ? (
               <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/30 p-3" data-testid="follow-person-picker">
-                <BoardPersonPickerBody onPick={pickPerson} listClassName="max-h-64 overflow-y-auto" />
+                <ErpPersonPickerBody onPick={pickPerson} listClassName="max-h-64 overflow-y-auto" />
               </div>
             ) : null}
 
@@ -2478,7 +2480,7 @@ const FollowPage: React.FC = () => {
               <span className="ml-1 text-xs font-medium text-muted-foreground">ติดตามครั้งที่</span>
               <ChoiceDropdown<string>
                 value={String(planDayStart)}
-                options={Array.from({ length: 10 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
+                options={followDayNoOptions(planDayStart)}
                 onChange={(v) => setPlanDayStart(Number(v))}
                 ariaLabel="ติดตามครั้งที่"
               />
@@ -2610,7 +2612,7 @@ const FollowPage: React.FC = () => {
                                   <span className="text-xs text-muted-foreground">ติดตามครั้งที่</span>
                                   <ChoiceDropdown<string>
                                     value={String(dayNoOf(d))}
-                                    options={Array.from({ length: 10 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
+                                    options={followDayNoOptions(dayNoOf(d))}
                                     onChange={(v) => setDayNos((prev) => ({ ...prev, [d]: Number(v) }))}
                                     ariaLabel={`${dayLabel(d)} — ติดตามครั้งที่`}
                                   />
