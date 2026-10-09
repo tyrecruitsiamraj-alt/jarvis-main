@@ -12846,11 +12846,3 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
     ข้ามเมื่อ หัวขบวนมี `lumos_plan_closed_at` หรือทุกสายในแผนได้ผลครบ (completed/failed) · ส่งแล้ว/404 = ทำเครื่องหมาย · ส่งแผนรหัสเดิมใหม่ (`recordPushAck` · ตัวส่งซ้ำ) = ล้างเครื่องหมาย
   · migration 141 `lumos_dispatch_queue.lumos_plan_closed_at` + เติมของเดิม (ส่งยกเลิกซ้ำแล้ว · ถึง Lumos ก่อนชุดตอบไม่ไป · ไม่เหลือสายรอโทร+มีสายยกเลิก ยกเว้นที่ตัวส่งยกเลิกซ้ำยังต้องส่ง) — ทดลองบนฐานจริงแบบ rollback: 259 แผน · ไม่โดนแผนที่รอโทร
   · เทสต์ `tests/api/followLumosCancel.test.ts` (มีเล่นซ้ำเคสสมชัย)
-- (9 ต.ค. 2569 บ่าย) **ตอบ AI ว่า "ขอให้โทรกลับ" → ระบบตั้งสายโทรกลับ (AI) เอง** (เจ้าของ "ตั้งสายโทรกลับเองเลย")
-  · เคส ศักดิ์ชาย: `reschedule_requested` · Lumos ไม่ส่งเวลาเป็นช่อง (`next_action.due_at` = null) มีแค่ในข้อความสรุป · สายที่เหลือของแผนไม่โทร
-  · `src/lib/followCallback.ts` (pure): `parseCallbackTimeText` (13:00 · 13.00 น. · อีก N นาที/ชม. · บ่าย N โมง · N โมงเช้า · เที่ยง · ผ่านแล้ว = พรุ่งนี้) ·
-    `resolveCallbackAt` (ช่องเวลา > due_at > ข้อความ > `rescheduleDefaultHours` ของนโยบาย · อย่างน้อย +5 นาที) · `nextCallbackRef` (`callback:<สายแรก>:<n>` · เพดาน 2 ครั้ง)
-  · `api/_lib/followCallback.ts` `scheduleFollowCallbackFromResult` — เรียกจาก `POST /api/lumos/reminder/results` หลังจับคู่ได้ (กลืน error) ·
-    สร้างแถวติดตามใหม่ (ชุด/ทีม/หัวข้อ/หมายเหตุเดิม · AI · "AI · ขอให้โทรกลับ") กันซ้ำด้วย unique `source_ref` → `enqueueFollowReminder` (รวมแผนเบอร์เดียววันเดียวเอง) ·
-    สายที่ยกเลิก/ปิด/ลงผลเองแล้ว = ไม่โทรกลับ · `callFollowup`: งานติดตามขอเลื่อนไม่ตั้ง retry แถวเดิมแล้ว (ไม่มีตัวส่ง — ค้างรอโทรตลอด)
-  · รอบดึง iRecruit ไม่แตะสายโทรกลับ (กรองเฉพาะ `irecruit-replace:%`) · เทสต์ `tests/api/followCallback.test.ts`

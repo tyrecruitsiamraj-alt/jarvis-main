@@ -10,7 +10,6 @@ import { sendError, handleApiError, type ApiReq, type ApiRes } from '../_lib/htt
 import { logInfo, logWarn } from '../_lib/logger.js';
 import { recordLumosResultInbox, readInboxFields } from '../_lib/lumosResultInbox.js';
 import { takePendingLumosItems, applyLumosResult } from '../_lib/lumosDispatch.js';
-import { scheduleFollowCallbackFromResult } from '../_lib/followCallback.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -138,17 +137,6 @@ async function postReminderResults(req: ApiReq, res: ApiRes): Promise<void> {
     for (const item of results as ReminderResult[]) {
       const ok = await applyLumosResult('reminder', item.client_contact_id, item.status, item);
       if (ok) matched += 1;
-      // ขอให้โทรกลับ → ตั้งสายโทรกลับ (AI) ให้เอง (เจ้าของ 9 ต.ค. 2569) · ล้มห้ามทำให้การรับผลล้ม
-      if (ok && item.outcome === 'reschedule_requested') {
-        try {
-          await scheduleFollowCallbackFromResult(item as unknown as Record<string, unknown>);
-        } catch (e) {
-          logWarn('lumos.reminder.results.callback_failed', {
-            client_contact_id: item.client_contact_id,
-            reason: e instanceof Error ? e.message : String(e),
-          });
-        }
-      }
       /**
        * 🔴 **เก็บทุกใบลงกล่องรับ ไม่ว่าจับคู่ได้หรือไม่** — ของเดิมจับคู่ไม่ได้แล้วทิ้งเงียบ
        * ⇒ เวลาผลไม่ขึ้นบนจอ แยกไม่ออกว่า "เขาไม่ส่ง" หรือ "ส่งแล้วเราจับคู่ไม่ได้"
