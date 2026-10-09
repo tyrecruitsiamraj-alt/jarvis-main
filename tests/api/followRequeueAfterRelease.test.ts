@@ -36,7 +36,14 @@ vi.mock('../../api/_lib/lumosPushClient.js', () => ({
 const { requeueSuppressedFollowEntries } = await import('../../api/_lib/lumosDispatch.js');
 
 const staffName = async () => 'ขวัญ';
-const inHours = (h: number) => new Date(Date.now() + h * 3_600_000);
+/**
+ * พรุ่งนี้ HH:00 เวลาไทย — 🔴 สองรอบของคนเดียวกันต้องอยู่ **วันเดียวกัน** ถึงจะเป็นแผนเดียว (1 เบอร์ 1 วัน = 1 แผน · 9 ต.ค. 2569)
+ * (เดิมใช้ +14/+15 ชม. — รันหลัง 09:00 สองรอบข้ามเที่ยงคืน กลายเป็น 2 แผนตามกติกา)
+ */
+const tomorrowAt = (hh: number) => {
+  const ymd = new Date(Date.now() + 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  return new Date(`${ymd}T${String(hh).padStart(2, '0')}:00:00+07:00`);
+};
 
 /** สองรอบของคนเดียวกันที่โดนปัดทิ้งตอนเบอร์ถูกพัก + อีกคนที่เป็นคนละเบอร์ */
 const stuck = [
@@ -48,7 +55,7 @@ const stuck = [
     note: null,
     staff_phone: '+66898888888',
     unit_name: 'บางชัน',
-    scheduled_at: inHours(14).toISOString(),
+    scheduled_at: tomorrowAt(9).toISOString(),
     call_times: null,
     call_round: 1,
   },
@@ -60,7 +67,7 @@ const stuck = [
     note: null,
     staff_phone: '+66898888888',
     unit_name: 'บางชัน',
-    scheduled_at: inHours(15).toISOString(),
+    scheduled_at: tomorrowAt(10).toISOString(),
     call_times: null,
     call_round: 2,
   },
@@ -72,7 +79,7 @@ const stuck = [
     note: null,
     staff_phone: '+66898888888',
     unit_name: 'ลาดกระบัง',
-    scheduled_at: inHours(16).toISOString(),
+    scheduled_at: tomorrowAt(11).toISOString(),
     call_times: null,
     call_round: 1,
   },

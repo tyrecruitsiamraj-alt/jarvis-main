@@ -33,6 +33,7 @@ import { staffNameOfPhone } from './followStaffName.js';
 import { repairDeclinedFollowDays } from './followDeclineDayRepair.js';
 import { alertOverdueAiFollow, checkFollowPlanImports } from './followLumosWatch.js';
 import { resendFollowCancels } from './followCancelResend.js';
+import { mergeSplitFollowPlans } from './followPlanMerge.js';
 import {
   readFollowPushRetryConfig,
   shouldRetryFollowPush,
@@ -324,6 +325,12 @@ export function startFollowPushRetryWorker(): boolean {
         await repairDeclinedFollowDays();
       } catch (e) {
         logError('follow.declineDayRepair: รอบนี้ล้ม', e);
+      }
+      // 1 เบอร์ 1 วัน = 1 แผน (เจ้าของ 9 ต.ค. 2569) — เจอเบอร์ที่มีหลายแผนในวันเดียว รวมเป็นแผนเดียว (ยังเป็น AI ทุกสาย)
+      try {
+        await mergeSplitFollowPlans();
+      } catch (e) {
+        logError('follow.planMerge: รอบนี้ล้ม', e);
       }
       // กัน AI ไม่โทรแบบเงียบ ๆ (เจ้าของ 8 ต.ค. 2569 "ทำทั้งสองชั้น") — ชั้น 1 ถาม Lumos ว่าแผนเข้าระบบจริงไหม
       try {

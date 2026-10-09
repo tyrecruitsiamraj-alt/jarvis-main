@@ -69,6 +69,7 @@ import {
 import { cancelPushedReminder, getLumosPushConfig, pushReminders } from './lumosPushClient.js';
 import type { LumosPushReminderRecord } from './lumosPushClient.js';
 import { resolveInterviewAdminPhone } from './interviewAdminPhone.js';
+import { staffNameOfPhone } from './followStaffName.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 /** ใช้จดผล push กลับลงแถวติดตาม (dispatch_state) — ดู markFollowDispatchState */
@@ -1702,6 +1703,12 @@ export async function enqueueFollowReminderPlan(
 ): Promise<Map<string, FollowDispatchState>> {
   const out = new Map<string, FollowDispatchState>();
   if (entries.length === 0) return out;
+  // 🔴 1 เบอร์ 1 วัน = 1 แผน (9 ต.ค. 2569) — ส่งมาหลายวัน/หลายเบอร์ แบ่งก่อนเสมอ
+  const plans = groupFollowPlans(entries);
+  if (plans.length > 1) {
+    for (const plan of plans) for (const [id, st] of await enqueueFollowReminderPlan(plan)) out.set(id, st);
+    return out;
+  }
   if (entries.length === 1) {
     out.set(entries[0].id, await enqueueFollowReminder(entries[0]));
     return out;
@@ -1757,9 +1764,43 @@ export async function enqueueFollowReminderPlan(
 
   if (sorted.some((e) => out.get(e.id) === 'queued')) {
     // ดันครั้งเดียวทั้งแผน (ไม่รอให้จบ — เหตุผลเดียวกับ enqueueFollowReminder)
-    void pushFollowReminderToLumos(leader.id, planPayload);
+    // เบอร์นี้วันนี้มีแผนอื่นรอโทรอยู่แล้ว ⇒ รวมเป็นแผนเดียวแทนการส่งแผนที่สอง
+    await pushOrMergeFollowPlan(
+      sorted.map((e) => e.id),
+      () => launchFollowPush(leader.id, planPayload),
+    );
   }
   return out;
+}
+
+/**
+ * ส่งแผนใหม่ — หรือถ้าเบอร์เดียวกันวันเดียวกันมีสาย AI อื่นรอโทรอยู่ในแผนอื่น ⇒ `replanFollowSetWithLumos` รวมเป็นแผนเดียว
+ * (ยกเลิกแผนเดิมที่ Lumos ก่อน แล้วส่งใหม่ทั้งก้อน · ตัวรวมรอแผนที่กำลังส่งของเบอร์นั้นให้จบก่อน)
+ */
+async function pushOrMergeFollowPlan(ids: readonly string[], push: () => void): Promise<void> {
+  let others: string[] = [];
+  try {
+    others = (await followPhoneDayMates(ids)).filter((id) => !ids.includes(id));
+  } catch (e) {
+    // อ่านไม่ได้ = ส่งแบบเดิม (ไม่ส่งเลยแย่กว่า) แต่ต้องมีร่องรอย
+    logError('lumos.dispatch.follow: หาสายเบอร์เดียวกันวันเดียวกันไม่สำเร็จ — ส่งแผนแยก', e, { ids });
+  }
+  if (others.length === 0) {
+    push();
+    return;
+  }
+  logInfo('lumos.dispatch.follow.merge', { ids, others });
+  const merge = replanFollowSetWithLumos({ memberIds: [...ids, ...others], cancelledIds: [], resolveStaffName: staffNameOfPhone })
+    .then((r) => {
+      if (r.reason) logWarn('lumos.dispatch.follow.merge: ไม่ครบ', { ids, reason: r.reason });
+    })
+    .catch((e) => logError('lumos.dispatch.follow.merge ล้ม', e, { ids }));
+  void merge;
+}
+
+/** ส่งแผนแบบไม่รอ + จดว่าเบอร์นี้มีแผนกำลังส่งอยู่ (ตัวรวมแผนรอได้) */
+function launchFollowPush(followId: string, payload: LumosReminderPayload): void {
+  trackFollowPush(payload.recipient_phone, pushFollowReminderToLumos(followId, payload));
 }
 
 /**
@@ -1817,7 +1858,7 @@ export async function enqueueFollowReminder(
     // ไม่รอ push ให้จบก่อนตอบ — ผลคืน 'queued' ไม่ได้ขึ้นกับ push สำเร็จอยู่แล้ว
     // (แถวเข้าคิวแล้วเสมอ, retry ใน lumosFetch ใช้เวลาได้ถึงวินาทีกว่า ไม่ควรให้คนกดปุ่มรอ —
     // เจอจริง 8 ก.ย. 2569: เพิ่มติดตามทีละแถวจากหน้าเว็บ 16 แถว รอ push ครบก่อนตอบทุกแถว)
-    void pushFollowReminderToLumos(entry.id, payload);
+    await pushOrMergeFollowPlan([entry.id], () => launchFollowPush(entry.id, payload));
     return 'queued';
   }
   if (held.length > 0) return 'held';
@@ -2223,6 +2264,22 @@ export async function resyncFollowPlanWithLumos(
     };
   }
 
+  /**
+   * 🔴 เบอร์เดียวกันวันเดียวกันมีสาย AI รอโทรอยู่ในแผนอื่น (9 ต.ค. 2569) ⇒ ส่งแผนนี้แผนเดียวจะกลายเป็น 2 แผนในวันเดียว
+   * ⇒ ให้ตัวรวม (`replanFollowSetWithLumos`) ยกเลิกทุกแผนที่เกี่ยวแล้วส่งเป็นแผนเดียวต่อเบอร์ต่อวัน
+   */
+  const memberIdList = members.map((m) => String(m.id));
+  const others = (await followPhoneDayMates(memberIdList)).filter((id) => !memberIdList.includes(id));
+  if (others.length > 0) {
+    const r = await replanFollowSetWithLumos({ memberIds: [...memberIdList, ...others], cancelledIds: [], resolveStaffName });
+    return {
+      rounds: r.rounds,
+      cancelled: r.cancelledOld,
+      pushed: r.plans > 0 && r.pushedPlans === r.plans,
+      reason: r.reason,
+    };
+  }
+
   await ensureCallScriptsFresh();
   const entries: FollowEntryInput[] = [];
   for (const m of members) {
@@ -2330,6 +2387,74 @@ const FOLLOW_PLAN_DAY = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
+/**
+ * ═══ 🔴 1 เบอร์ 1 วัน = 1 แผน (เจ้าของ 9 ต.ค. 2569 "ถ้ามันผิดที่เราก็ต้องแก้ที่เรา") ═══
+ *
+ * เคสจริง 9 ต.ค. 2569: สลับสายส่งคนแทนเป็น AI ทีละสาย ⇒ เบอร์เดียวมี 2 แผนในวันเดียว (07:00 กับ 07:45)
+ * Lumos โทรแค่แผนเดียวไป 7 ใน 10 เบอร์ — อาการเดียวกับ 11 ก.ย. 2569 ("1 รอบ = 1 แผน แผนหลังทับแผนแรก")
+ * ⇒ ทุกทางที่ส่งแผน (สร้าง · แก้ทั้งชุด · ส่งใหม่) ต้องรวม **ทุกสาย AI ที่ยังรอโทรของเบอร์นั้นในวันนั้น** เป็นแผนเดียว
+ * และกลุ่มต้องแยกด้วย **เบอร์ + วัน** ไม่ใช่วันอย่างเดียว (เดิม `replanFollowSetWithLumos` แบ่งแค่วัน —
+ * รอบดึง iRecruit ที่แก้ชื่อหลายคนพร้อมกัน = สายของหลายคนรวมแผนเดียวไปโทรเบอร์หัวขบวน)
+ */
+export function followPlanKey(e: { recipient_phone: string; scheduled_at: Date }): string {
+  return `${e.recipient_phone}|${FOLLOW_PLAN_DAY.format(e.scheduled_at)}`;
+}
+
+/** แบ่งสายเป็นแผน: เบอร์ + วัน (ไทย) · ในแผนเรียงตามเวลา · หัวขบวน = สายแรก */
+export function groupFollowPlans<T extends { recipient_phone: string; scheduled_at: Date }>(entries: readonly T[]): T[][] {
+  const byKey = new Map<string, T[]>();
+  const sorted = [...entries].sort((a, b) => a.scheduled_at.getTime() - b.scheduled_at.getTime());
+  for (const e of sorted) {
+    const key = followPlanKey(e);
+    byKey.set(key, [...(byKey.get(key) ?? []), e]);
+  }
+  return [...byKey.values()].sort((a, b) => a[0].scheduled_at.getTime() - b[0].scheduled_at.getTime());
+}
+
+/**
+ * สาย AI ที่ยังรอโทร (คิว pending · ยังไม่ถึงเวลา · ยังไม่ปิด/ยกเลิก) ที่ **เบอร์เดียวกัน วันเดียวกัน** กับแถวที่ส่งมา
+ * (รวมตัวมันเองถ้าเข้าเงื่อนไข) — ใช้ขยายชุดก่อนส่งแผน ให้เหลือแผนเดียวต่อเบอร์ต่อวัน
+ */
+export async function followPhoneDayMates(ids: readonly string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const { rows } = await dbQuery<{ id: string }>(
+    `select distinct m.id::text as id
+       from ${followEntriesTable} t
+       join ${followEntriesTable} m
+         on m.recipient_phone = t.recipient_phone
+        and (m.scheduled_at at time zone 'Asia/Bangkok')::date = (t.scheduled_at at time zone 'Asia/Bangkok')::date
+       join ${queueTable} mq
+         on mq.channel = 'reminder' and mq.job_ref = 'follow'
+        and mq.person_ref = 'follow-' || m.id::text and mq.status = 'pending'
+      where t.id = any($1::uuid[])
+        and m.cancelled_at is null and m.completed_at is null
+        and coalesce(m.call_mode, 'ai') = 'ai'
+        and m.scheduled_at > now()`,
+    [[...ids]],
+  );
+  return rows.map((r) => r.id);
+}
+
+/**
+ * แผนที่กำลังส่งอยู่ (ยังไม่ได้คำตอบจาก Lumos) แยกตามเบอร์ — ตัวรวมแผนต้องรอให้จบก่อนยกเลิกของเดิม
+ * ไม่งั้น: สร้างสาย A (ส่งแบบไม่รอ) → อีกเสี้ยววิสร้างสาย B เบอร์เดียวกัน → ยกเลิกแผน A ก่อนที่ A จะถึง Lumos
+ * → A ถึงทีหลัง = กลับมาเป็น 2 แผน · เซิร์ฟเวอร์เป็น process เดียว (docker-compose `app`) ⇒ ล็อกในหน่วยความจำพอ
+ */
+const inflightFollowPush = new Map<string, Promise<unknown>>();
+
+function trackFollowPush(phone: string, p: Promise<unknown>): void {
+  const prev = inflightFollowPush.get(phone);
+  const next = Promise.allSettled([prev, p]).then(() => undefined);
+  inflightFollowPush.set(phone, next);
+  void next.then(() => {
+    if (inflightFollowPush.get(phone) === next) inflightFollowPush.delete(phone);
+  });
+}
+
+async function awaitFollowPushes(phones: Iterable<string>): Promise<void> {
+  await Promise.allSettled([...new Set(phones)].map((ph) => inflightFollowPush.get(ph)));
+}
+
 export type FollowSetReplan = {
   /** สายของ AI ที่อยู่ในแผนใหม่ (รอโทรอยู่จริงในคิว) */
   rounds: number;
@@ -2364,7 +2489,13 @@ export async function replanFollowSetWithLumos(input: {
   resolveStaffName: (phone: string | null) => Promise<string | null>;
 }): Promise<FollowSetReplan> {
   const states: Record<string, FollowDispatchState> = {};
-  const touchedRefs = [...input.memberIds, ...input.cancelledIds].map((id) => `follow-${id}`);
+  /**
+   * 🔴 ขยายชุดเป็น "ทุกสาย AI ที่รอโทรของเบอร์เดียวกันวันเดียวกัน" (9 ต.ค. 2569) — แก้ทีละสายแล้วต้องไม่เหลือ 2 แผนในวันเดียว
+   * แถวที่เพิ่งยกเลิก/สลับเป็นคนโทรไม่ถูกดึงกลับ (ตัวหาเพื่อนกรองเฉพาะ AI ที่ยังเปิดอยู่)
+   */
+  const mates = await followPhoneDayMates([...input.memberIds, ...input.cancelledIds]);
+  const memberIds = [...new Set([...input.memberIds, ...mates])].filter((id) => !input.cancelledIds.includes(id));
+  const touchedRefs = [...memberIds, ...input.cancelledIds].map((id) => `follow-${id}`);
 
   // ① รหัสแผนเดิมที่ Lumos รู้จัก
   let oldRefs: string[] = [];
@@ -2406,7 +2537,7 @@ export async function replanFollowSetWithLumos(input: {
           )
         )
       order by f.scheduled_at`,
-    [[...input.memberIds], oldRefs],
+    [memberIds, oldRefs],
   );
   const entries: FollowEntryInput[] = [];
   for (const m of members) {
@@ -2486,18 +2617,16 @@ export async function replanFollowSetWithLumos(input: {
     const pendingSet = new Set(pending.map((r) => r.person_ref));
     live = entries.filter((e) => pendingSet.has(`follow-${e.id}`));
   }
-  const byDay = new Map<string, FollowEntryInput[]>();
-  for (const e of live) {
-    const day = FOLLOW_PLAN_DAY.format(e.scheduled_at);
-    byDay.set(day, [...(byDay.get(day) ?? []), e]);
-  }
-  const dayPlans = [...byDay.keys()].sort().map((d) => byDay.get(d) ?? []);
+  // 🔴 แผน = เบอร์ + วัน (เดิมแบ่งแค่วัน — สายของหลายคนในวันเดียวรวมแผนเดียวไปโทรเบอร์หัวขบวน)
+  const dayPlans = groupFollowPlans(live);
 
   if (!getLumosPushConfig()) {
     return { rounds: live.length, plans: dayPlans.length, cancelledOld: false, pushedPlans: 0, states, reason: 'push ปิดอยู่' };
   }
 
   // ④-ก ยกเลิกแผนเดิมทุกตัวก่อน — ไม่สำเร็จแม้ตัวเดียว = ไม่ส่งใหม่
+  // รอแผนที่กำลังส่งของเบอร์เหล่านี้ให้ถึง Lumos ก่อน (ยกเลิกก่อนมันถึง = มันถึงทีหลังแล้วค้างเป็นแผนที่สอง)
+  await awaitFollowPushes(entries.map((e) => e.recipient_phone));
   for (const ref of oldRefs) {
     try {
       await cancelPushedReminderIgnoringMissing(ref);
