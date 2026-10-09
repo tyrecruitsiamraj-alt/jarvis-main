@@ -11,8 +11,11 @@ import { HomeSection, StatStrip, type StatItem } from '@/components/home-ai-shar
 import { fetchHomeOnline } from '@/lib/homeAiShareApi';
 import type { AiShareWindow } from '@/lib/homeAiShare';
 import {
+  ONLINE_AI_CALLED,
   ONLINE_REQUEST_STATES,
+  onlineApplicantsAddUp,
   onlineReportAddsUp,
+  type OnlineApplicantsReport,
   type OnlineCount,
   type OnlineReport,
   type OnlineReportResponse,
@@ -113,6 +116,65 @@ function DailyBars({ report }: { report: OnlineReport }) {
   );
 }
 
+/** ใบสมัคร → AI คัดกรอง → คนโทรเอง (ข้อ 7–9) — ทุกแถวบวกลบลงตัว (`onlineApplicantsAddUp`) */
+function ApplicantSections({ apps, sub }: { apps: OnlineApplicantsReport; sub: string | null }) {
+  const a = apps.ai;
+  return (
+    <>
+      <HomeSection title="ใบสมัคร" sub={sub} testId="online-apps">
+        <StatStrip
+          testId="online-apps-strip"
+          items={[
+            { key: 'total', label: 'ใบสมัครเข้า', value: apps.total },
+            { key: 'sent', label: 'ส่งให้ AI', value: apps.sent, tone: 'primary' },
+            { key: 'overAge', label: 'อายุเกิน (ไม่ส่ง AI)', value: apps.overAge, tone: 'danger' },
+            { key: 'notSent', label: 'ไม่ได้ส่ง AI', value: apps.notSent, tone: 'neutral' },
+          ]}
+        />
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <CountBars title="BU" rows={apps.bu} total={apps.total} testId="online-apps-bu" />
+          <CountBars title="ตำแหน่ง" rows={apps.position} total={apps.total} testId="online-apps-position" />
+        </div>
+      </HomeSection>
+
+      <HomeSection title="AI คัดกรอง" sub={sub} testId="online-ai">
+        <StatStrip
+          testId="online-ai-sent"
+          items={[
+            { key: 'sent', label: 'AI ต้องโทร', value: apps.sent },
+            { key: 'called', label: 'โทรแล้ว', value: a.called, tone: 'primary' },
+            { key: 'cancelled', label: 'ยกเลิก', value: a.cancelled, tone: 'neutral' },
+            { key: 'waiting', label: 'รอดำเนินการ', value: a.waiting, tone: 'info' },
+          ]}
+        />
+        <StatStrip
+          testId="online-ai-called"
+          items={[
+            { key: 'called', label: 'โทรแล้ว', value: a.called },
+            ...ONLINE_AI_CALLED.map((c) => ({
+              key: c.key,
+              label: c.key === 'failed' ? 'ล้มเหลว (ติดต่อไม่ได้)' : c.label,
+              value: a[c.key],
+              tone: (c.key === 'interested' ? 'success' : c.key === 'notInterested' ? 'danger' : c.key === 'unclear' ? 'violet' : 'warn') as ToneKey,
+            })),
+          ]}
+        />
+      </HomeSection>
+
+      <HomeSection title="คนโทรเอง" sub={sub} testId="online-staff">
+        <StatStrip
+          testId="online-staff-strip"
+          items={[
+            { key: 'total', label: 'คนโทร', value: apps.staff.total },
+            { key: 'afterAi', label: 'หลัง AI โทร', value: apps.staff.afterAi, tone: 'primary' },
+            { key: 'staffOnly', label: 'คนโทรอย่างเดียว', value: apps.staff.staffOnly, tone: 'neutral' },
+          ]}
+        />
+      </HomeSection>
+    </>
+  );
+}
+
 const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: number }> = ({ q, tick }) => {
   const { data, error } = useHomeOnline(q, tick);
   const report = data?.report ?? null;
@@ -122,8 +184,10 @@ const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: 
     : null;
   if (error) return <p className={cn('text-sm', TONE.danger.value)}>{error}</p>;
   if (!report) return <Skeleton className="h-96 w-full rounded-2xl" />;
-  const ok = onlineReportAddsUp(report);
+  const apps = data?.applicants ?? null;
+  const ok = onlineReportAddsUp(report) && (!apps || onlineApplicantsAddUp(apps));
   const r = report.requests;
+  const appSub = sub ? sub.replace('นับตามวันที่ใบส่งเข้ามา', 'นับตามวันสมัคร') : null;
   return (
     <div className="space-y-5" data-testid="home-online">
       {!ok ? (
@@ -208,7 +272,7 @@ const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: 
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs">BU</TableHead>
-                <TableHead className="text-right text-xs">ใบขอเข้า</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ใบขอเข้า</TableHead>
                 {ONLINE_REQUEST_STATES.map((s) => (
                   <TableHead key={s.key} className="whitespace-nowrap text-right text-xs">
                     <span className="inline-flex items-center gap-1.5">
@@ -246,6 +310,8 @@ const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: 
           </Table>
         </div>
       </HomeSection>
+
+      {apps ? <ApplicantSections apps={apps} sub={appSub} /> : null}
     </div>
   );
 };

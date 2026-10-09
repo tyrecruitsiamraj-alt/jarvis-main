@@ -18,8 +18,8 @@
  * ตัวนับล้วน (ไม่มีชื่อ/เบอร์) ⇒ เปิดเท่ากับกล่องตัวเลข · นิยามอยู่ `src/lib/homeCallResults.ts`
  */
 import { withAuth, sendError, type ApiRes, type AuthedReq } from '../_lib/http.js';
-import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
-import { buildOnlineReport, type OnlineReportResponse } from '../../src/lib/homeOnline.js';
+import { loadOnlineApplicantRows, loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
+import { buildOnlineApplicantsReport, buildOnlineReport, type OnlineReportResponse } from '../../src/lib/homeOnline.js';
 import { toYmdBangkok } from '../../src/lib/dateTh.js';
 import { checkApiAccess, type ApiResource } from '../_lib/rbac.js';
 import type { UserRole } from '../_lib/auth.js';
@@ -618,14 +618,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const ymd = (d: Date) => toYmdBangkok(d);
       const from = start ? ymd(start) : ymd(new Date(end.getTime() - 365 * 86_400_000));
       const to = ymd(new Date(end.getTime() - 1));
-      const body: OnlineReportResponse = { generated_at: new Date().toISOString(), from, to, bu, report: null, error: null };
+      const body: OnlineReportResponse = { generated_at: new Date().toISOString(), from, to, bu, report: null, applicants: null, error: null };
       if (scope.mode === 'none') {
         body.error = 'บัญชีนี้ยังไม่ได้ผูกแผนก เลยยังดูข้อมูลทีม Online ไม่ได้';
         return res.status(200).json(body);
       }
       try {
-        const rows = await loadOnlineRequestRows({ from, to, bu, departmentScope: { mode: 'all' } as DepartmentScope });
+        const [rows, apps] = await Promise.all([
+          loadOnlineRequestRows({ from, to, bu, departmentScope: { mode: 'all' } as DepartmentScope }),
+          loadOnlineApplicantRows({ start: start ?? new Date(end.getTime() - 365 * 86_400_000), end, bu }),
+        ]);
         body.report = buildOnlineReport(rows, { from, to });
+        body.applicants = buildOnlineApplicantsReport(apps);
       } catch (e) {
         logWarn('home-ai-share online failed', { error: errText(e) });
         body.error = 'โหลดข้อมูลทีม Online ไม่ขึ้น ลองรีเฟรชอีกครั้ง';

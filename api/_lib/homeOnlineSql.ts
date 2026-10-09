@@ -14,7 +14,15 @@ import { getUnitSectorMap } from './unitSectorStore.js';
 import { primaryJobRoleLabel } from './siamrajJobMapping.js';
 import type { DepartmentScope } from './departmentScope.js';
 import { trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
-import { groupThroughputByRequest, type OnlineRequestRow } from '../../src/lib/homeOnline.js';
+import { groupThroughputByRequest, type OnlineApplicantRow, type OnlineRequestRow } from '../../src/lib/homeOnline.js';
+import {
+  AI_QUEUED_AT_SQL,
+  CALLED_BY_AI_SQL,
+  CALLED_BY_STAFF_SQL,
+  IN_QUEUE_SQL,
+  LATEST_AI_RESULT_LATERAL,
+} from './applicantOverviewSql.js';
+import { appBuJoin, appBuSql } from './homeBuSql.js';
 
 const RELEASES = tableInAppSchema('job_public_releases');
 const APPS = tableInAppSchema('public_job_applications');
@@ -107,3 +115,57 @@ export async function loadOnlineRequestRows(opts: {
     };
   });
 }
+
+/**
+ * ใบสมัครที่เข้ามาในช่วง (วันสมัคร · ไม่นับ Lead · ไม่นับที่ยกเลิกข้อมูล) — ส่วน "ใบสมัคร · AI คัดกรอง · คนโทรเอง"
+ * หลักฐานโทร/คิว = ตัวเดียวกับกล่องงานสรรหา (`CALLED_BY_AI_SQL` · `IN_QUEUE_SQL` · `LATEST_AI_RESULT_LATERAL`)
+ */
+export async function loadOnlineApplicantRows(opts: { start: Date | null; end: Date; bu: string | null }): Promise<OnlineApplicantRow[]> {
+  const { rows } = await dbQuery<Record<string, unknown>>(
+    `select ${appBuSql('a')} as bu,
+            a.job_id,
+            a.age,
+            a.created_at,
+            ${AI_QUEUED_AT_SQL} as ai_queued_at,
+            ${CALLED_BY_AI_SQL} as ai,
+            ${CALLED_BY_STAFF_SQL} as staff,
+            ${IN_QUEUE_SQL} as in_queue,
+            air.outcome as ai_outcome, air.summary as ai_summary, air.reply as ai_reply
+       from ${APPS} a
+       ${appBuJoin('a')}
+       ${LATEST_AI_RESULT_LATERAL}
+      where not coalesce(a.is_lead, false)
+        and not exists (select 1 from ${CANCELLATIONS} c where c.application_id = a.id)
+        and ($1::timestamptz is null or a.created_at >= $1::timestamptz)
+        and a.created_at < $2::timestamptz
+        and ($3::text is null or ${appBuSql('a')} = $3::text)`,
+    [opts.start ? opts.start.toISOString() : null, opts.end.toISOString(), opts.bu],
+  );
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  const bool = (v: unknown) => v === true || v === 't' || v === 'true';
+  /**
+   * ตำแหน่ง = ตำแหน่งของใบขอที่สมัคร (ตัวเดียวกับส่วนใบขอ) — ช่องในใบสมัครเป็นข้อความยาวจากหน้าประกาศ นับรวมไม่ได้
+   * ใบขอล่วงหน้าฝั่งเรา (`siamraj-pre:`) / ไม่มีใบขอ = ไม่ระบุ
+   */
+  const reqNoOf = (jobId: string | null) => (jobId && jobId.startsWith('siamraj-sql:') ? jobId.slice('siamraj-sql:'.length).trim() : null);
+  const reqNos = [...new Set(rows.map((r) => reqNoOf(str(r.job_id))).filter((x): x is string => !!x))];
+  const extras = reqNos.length ? await loadErpExtras(reqNos) : new Map<string, ErpExtra>();
+  const positionOf = (jobId: string | null) => {
+    const no = reqNoOf(jobId);
+    const x = no ? extras.get(no) : undefined;
+    return x ? primaryJobRoleLabel(x.job_name1 ?? undefined, x.staff_title_name ?? undefined, x.job_description_code_1 ?? undefined)?.trim() || null : null;
+  };
+  return rows.map((r) => ({
+    bu: str(r.bu),
+    position: positionOf(str(r.job_id)),
+    age: r.age == null ? null : Number(r.age),
+    queued: r.ai_queued_at != null,
+    ai: bool(r.ai),
+    staff: bool(r.staff),
+    inQueue: bool(r.in_queue),
+    aiOutcome: str(r.ai_outcome),
+    aiSummary: str(r.ai_summary),
+    aiReply: str(r.ai_reply),
+  }));
+}
+

@@ -81,3 +81,27 @@ describe('วันที่นับ (เจ้าของ 8 ต.ค. 2569 Cho
     expect(th).toContain("options.dateBasis === 'submitted' ? `CONVERT(date, A.request_date)` : effectiveRequestDateSql('A')");
   });
 });
+
+describe('ใบสมัคร · AI คัดกรอง · คนโทรเอง (ข้อ 7–9)', () => {
+  const app = (o: Partial<import('../../src/lib/homeOnline').OnlineApplicantRow>) => ({
+    bu: 'LBD', position: 'ขับรถ', age: 30, queued: true, ai: false, staff: false, inQueue: false,
+    aiOutcome: null, aiSummary: null, aiReply: null, ...o,
+  });
+  it('ใบสมัครเข้า = ส่ง AI + อายุเกิน + ไม่ได้ส่ง · ส่ง AI = โทรแล้ว + ยกเลิก + รอ · โทรแล้ว = สนใจ + ไม่สนใจ + สรุปไม่ได้ + ล้มเหลว', async () => {
+    const { buildOnlineApplicantsReport, onlineApplicantsAddUp } = await import('../../src/lib/homeOnline');
+    const a = buildOnlineApplicantsReport([
+      app({ ai: true, aiOutcome: 'confirmed' }),
+      app({ ai: true, aiOutcome: 'declined', staff: true }),
+      app({ ai: true, aiOutcome: 'no_answer' }),
+      app({ inQueue: true }),
+      app({}),
+      app({ queued: false, age: 60 }),
+      app({ queued: false, staff: true, bu: null, position: null }),
+    ]);
+    expect(a).toMatchObject({ total: 7, sent: 5, overAge: 1, notSent: 1 });
+    expect(a.ai).toMatchObject({ called: 3, interested: 1, notInterested: 1, failed: 1, unclear: 0, waiting: 1, cancelled: 1 });
+    expect(a.staff).toEqual({ total: 2, afterAi: 1, staffOnly: 1 });
+    expect(a.bu.at(-1)).toMatchObject({ key: 'ไม่ระบุ', n: 1 });
+    expect(onlineApplicantsAddUp(a)).toBe(true);
+  });
+});
