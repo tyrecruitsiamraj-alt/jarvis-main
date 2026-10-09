@@ -12840,3 +12840,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · `api/_lib/followPlanMerge.ts` (ใหม่) `mergeSplitFollowPlans` เดินทุกนาทีใน `followPushRetryWorker` — เจอเบอร์หลายแผนวันเดียว รวมเป็นแผนเดียว (ยังเป็น AI) · ไม่แตะสาย < 3 นาที / เพิ่งแก้ < 1 นาที · ≤ 10 กลุ่ม/รอบ
   · เทสต์ `tests/api/followOnePlanPerPhoneDay.test.ts`
   · กติกาเจ้าของ: สาย AI เลยเวลาไม่มีผล **ห้ามย้ายให้คน/ส่งซ้ำอัตโนมัติ** — แจ้งเตือนอย่างเดียว (`alertOverdueAiFollow`)
+- (9 ต.ค. 2569 สาย) 🔴 **ห้ามส่งคำสั่งยกเลิกแผนที่จบแล้วซ้ำ** — Lumos ขึ้น "ยกเลิก" ทั้ง 3 เคส (อิทธิชัย · ณัฐพล · สมชัย) แต่ฐานเรายัง "รอโทร"
+  · จังหวะเดียวกัน: DELETE รหัสแผนที่จบไปแล้ว (ตอบไม่ไป / เคยยกเลิกแล้ว / รหัสเก่าค้างที่แถวอื่น) ⇒ แผนใหม่ของเบอร์เดียวกันโดนยกเลิกตาม · ยกเลิกแผนที่วิ่งอยู่ไม่เคยพลาด
+  · `api/_lib/followLumosCancel.ts` (ใหม่) `cancelFollowPlanAtLumos` — ทุก DELETE แผนติดตามผ่านตัวนี้ (`cancelPushedReminderIgnoringMissing` · `cancelFollowReminder` · resync · replan · ตอบไม่ไป `callFollowup` · ส่งยกเลิกซ้ำ · iRecruit)
+    ข้ามเมื่อ หัวขบวนมี `lumos_plan_closed_at` หรือทุกสายในแผนได้ผลครบ (completed/failed) · ส่งแล้ว/404 = ทำเครื่องหมาย · ส่งแผนรหัสเดิมใหม่ (`recordPushAck` · ตัวส่งซ้ำ) = ล้างเครื่องหมาย
+  · migration 141 `lumos_dispatch_queue.lumos_plan_closed_at` + เติมของเดิม (ส่งยกเลิกซ้ำแล้ว · ถึง Lumos ก่อนชุดตอบไม่ไป · ไม่เหลือสายรอโทร+มีสายยกเลิก ยกเว้นที่ตัวส่งยกเลิกซ้ำยังต้องส่ง) — ทดลองบนฐานจริงแบบ rollback: 259 แผน · ไม่โดนแผนที่รอโทร
+  · เทสต์ `tests/api/followLumosCancel.test.ts` (มีเล่นซ้ำเคสสมชัย)

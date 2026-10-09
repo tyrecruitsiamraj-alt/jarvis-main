@@ -21,7 +21,8 @@ import {
   RETRY_TIME_SLOTS_BKK,
 } from '../../src/lib/callFollowupPolicy.js';
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
-import { cancelPushedReminder, getLumosPushConfig } from './lumosPushClient.js';
+import { getLumosPushConfig } from './lumosPushClient.js';
+import { cancelFollowPlanAtLumos } from './followLumosCancel.js';
 import { logError, logInfo } from './logger.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
@@ -372,12 +373,10 @@ export async function cancelFollowSetAfterDecline(personRef: string, groupId: st
     const refs = [...new Set(cancelled.map((r) => r.plan_ref ?? r.person_ref))];
     for (const ref of refs) {
       try {
-        await cancelPushedReminder(ref);
+        // แผนที่จบแล้วไม่ส่งซ้ำ · 404 = ไม่มีของค้าง (ดู followLumosCancel)
+        await cancelFollowPlanAtLumos(ref);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (!/404|not found/i.test(msg)) {
-          logError('lumos.push.follow.decline.cancel failed (คิวฝั่งเรายกเลิกแล้ว)', e, { personRef, ref });
-        }
+        logError('lumos.push.follow.decline.cancel failed (คิวฝั่งเรายกเลิกแล้ว)', e, { personRef, ref });
       }
     }
     logInfo('lumos.push.follow.decline.cancel', { personRef, rounds: cancelled.length, refs: refs.length });

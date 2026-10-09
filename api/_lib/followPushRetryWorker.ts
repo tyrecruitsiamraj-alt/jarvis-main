@@ -221,6 +221,12 @@ export async function runFollowPushRetryOnce(
 
     try {
       await pushReminders(buildFollowPushRecord(row.payload, now), `follow-${row.id}`);
+      // แผนนี้วิ่งอยู่ที่ Lumos อีกครั้ง — ล้างเครื่องหมาย "จบแล้ว" (141 · 9 ต.ค. 2569) ไม่งั้นยกเลิกครั้งหน้าจะถูกข้าม
+      await dbQuery(
+        `update ${queueTable} set lumos_plan_closed_at = null
+          where channel = 'reminder' and job_ref = 'follow' and person_ref = $1`,
+        [`follow-${row.id}`],
+      ).catch(() => undefined);
       await markSent(row.id);
       run.sent += 1;
       logInfo('follow.pushRetry.ok', { followId: row.id });

@@ -70,6 +70,7 @@ import { cancelPushedReminder, getLumosPushConfig, pushReminders } from './lumos
 import type { LumosPushReminderRecord } from './lumosPushClient.js';
 import { resolveInterviewAdminPhone } from './interviewAdminPhone.js';
 import { staffNameOfPhone } from './followStaffName.js';
+import { cancelFollowPlanAtLumos } from './followLumosCancel.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 /** ใช้จดผล push กลับลงแถวติดตาม (dispatch_state) — ดู markFollowDispatchState */
@@ -1971,6 +1972,22 @@ async function recordPushAck(followId: string, ack: unknown): Promise<void> {
     }
     // ยังไม่ได้รัน migration 118 — ข้ามไปเงียบ ๆ (ไม่ใช่เรื่องคอขาดบาดตาย)
   }
+  // ส่งแผนรหัสนี้ใหม่แล้ว = แผนนี้วิ่งอยู่อีกครั้ง — ล้างเครื่องหมาย "จบแล้ว" (141) ไม่งั้นยกเลิกครั้งหน้าจะถูกข้าม
+  try {
+    await dbQuery(
+      `update ${queueTable} set lumos_plan_closed_at = null
+        where channel = 'reminder' and job_ref = 'follow' and person_ref = $1`,
+      [`follow-${followId}`],
+    );
+  } catch (e) {
+    // ยังไม่ได้รัน migration 141 — ข้ามไปเงียบ ๆ
+    if (!isUndefinedColumnError(e)) {
+      logWarn('lumos.push.follow: ล้างเครื่องหมายแผนจบไม่สำเร็จ', {
+        followId,
+        reason: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
 }
 
 function readFirstEventId(ack: unknown): string | null {
@@ -2104,8 +2121,9 @@ export async function cancelFollowReminder(
         if (resync.rounds === 0) await cancelPushedReminderIgnoringMissing(planRef);
         logInfo('lumos.push.follow.cancel.plan', { followId, planRef, ...resync });
       } else {
-        await cancelPushedReminder(planRef ?? ownRef);
-        logInfo('lumos.push.follow.cancel.ok', { followId });
+        // แผนที่จบแล้วไม่ส่งซ้ำ (9 ต.ค. 2569 — ยกเลิกซ้ำแล้วไปโดนแผนใหม่ของเบอร์เดียวกัน)
+        const outcome = await cancelFollowPlanAtLumos(planRef ?? ownRef);
+        logInfo('lumos.push.follow.cancel.ok', { followId, outcome });
       }
     } catch (e) {
       logError('lumos.push.follow.cancel failed (คิวฝั่งเรายกเลิกแล้ว)', e, { followId });
@@ -2114,14 +2132,12 @@ export async function cancelFollowReminder(
   return rows.length > 0;
 }
 
-/** ยกเลิก record ที่ Lumos — 404 (เขาไม่มี record นี้แล้ว/ไม่เคยถึง) ถือว่าสำเร็จ · error อื่นโยนต่อ */
+/**
+ * ยกเลิกแผนติดตามที่ Lumos — 404 (เขาไม่มี record นี้แล้ว/ไม่เคยถึง) ถือว่าสำเร็จ · error อื่นโยนต่อ
+ * 🔴 9 ต.ค. 2569: แผนที่จบแล้ว **ไม่ส่งซ้ำ** — ยกเลิกแผนที่จบแล้วซ้ำ = แผนใหม่ของเบอร์เดียวกันโดนยกเลิกตาม (ดู `followLumosCancel`)
+ */
 export async function cancelPushedReminderIgnoringMissing(clientContactId: string): Promise<void> {
-  try {
-    await cancelPushedReminder(clientContactId);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (!/404|not found/i.test(msg)) throw e;
-  }
+  await cancelFollowPlanAtLumos(clientContactId);
 }
 
 /**
@@ -2308,13 +2324,11 @@ export async function resyncFollowPlanWithLumos(
   // ① ยกเลิกของเดิมก่อนเสมอ — ห้ามให้มีสองแผนวิ่งอยู่ที่เบอร์เดียวกัน
   let cancelled = false;
   try {
-    await cancelPushedReminder(oldPlanRef);
+    // 404 = เขาไม่มี record นี้อยู่แล้ว · แผนที่จบแล้วไม่ส่งซ้ำ (9 ต.ค. 2569) — ทั้งคู่ถือว่าไม่มีของเก่าค้าง
+    await cancelFollowPlanAtLumos(oldPlanRef);
     cancelled = true;
   } catch (e) {
-    // 404 = เขาไม่มี record นี้อยู่แล้ว (ยังไม่เคยถึง Lumos) — ถือว่าไม่มีของเก่าค้าง
-    const msg = e instanceof Error ? e.message : String(e);
-    cancelled = /404|not found/i.test(msg);
-    if (!cancelled) logError('lumos.push.follow.resync: ยกเลิกของเดิมไม่สำเร็จ', e, { oldPlanRef });
+    logError('lumos.push.follow.resync: ยกเลิกของเดิมไม่สำเร็จ', e, { oldPlanRef });
   }
   if (!cancelled) {
     return {
