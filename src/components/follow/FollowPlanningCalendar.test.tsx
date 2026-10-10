@@ -185,7 +185,10 @@ describe('หน้ารายวัน — สายที่ต้องต�
   it('กดแถวสาย ⇒ เปิดรายละเอียดของสายนั้น', () => {
     const onOpenCell = vi.fn();
     renderCalendar(twoRounds(), { onOpenCell });
-    fireEvent.click(within(dayRows()[0]).getByRole('button', { name: 'จัดการ' }));
+    // ปุ่มจัดการมีสองชุดใน DOM (คอลัมน์ขวาบนจอกว้าง · ใต้ชื่อบนมือถือ — CSS ซ่อนทีละชุด) ⇒ กดตัวแรก
+    const manage = within(dayRows()[0]).getAllByRole('button', { name: 'จัดการ' });
+    expect(manage).toHaveLength(2);
+    fireEvent.click(manage[0]);
     expect(onOpenCell).toHaveBeenCalledTimes(1);
     // แถวเดียว = คนเดียว ⇒ ส่ง **ทุกรอบของวันนั้น** ไปให้ป๊อป ไม่ใช่รอบเดียว
     const rounds = onOpenCell.mock.calls[0][2] as Array<{ entry: FollowEntry }>;
@@ -736,11 +739,11 @@ describe('ตารางหลายวัน — "วันที่ D · ส�
       entry({ id: 'd2b', group_id: 'g', call_round: 4, scheduled_at: '2026-09-07T08:00:00Z' }),
     ]);
 
-  it('วันที่ 2 ของชุด ⇒ "วันที่ 2 · สายที่ 1" "วันที่ 2 · สายที่ 2" — ไม่ใช่ 3 กับ 4', () => {
+  it('วันที่ 2 ของชุด ⇒ "ครั้งที่ 2 · สายที่ 1" "ครั้งที่ 2 · สายที่ 2" — ไม่ใช่ 3 กับ 4', () => {
     renderCalendar(twoDays());
     const row = dayRows()[0];
-    expect(within(row).getByText('วันที่ 2 · สายที่ 1')).toBeTruthy();
-    expect(within(row).getByText('วันที่ 2 · สายที่ 2')).toBeTruthy();
+    expect(within(row).getByText('ครั้งที่ 2 · สายที่ 1')).toBeTruthy();
+    expect(within(row).getByText('ครั้งที่ 2 · สายที่ 2')).toBeTruthy();
     expect(within(row).queryByText(/สายที่ [34]/)).toBeNull();
   });
 
@@ -748,7 +751,7 @@ describe('ตารางหลายวัน — "วันที่ D · ส�
     renderCalendar(twoDays(), { roundFilter: 1 });
     const row = dayRows()[0];
     expect(row.getAttribute('data-rounds')).toBe('1');
-    expect(within(row).getByText('วันที่ 2 · สายที่ 1')).toBeTruthy();
+    expect(within(row).getByText('ครั้งที่ 2 · สายที่ 1')).toBeTruthy();
   });
 });
 
@@ -948,5 +951,19 @@ describe('การ์ดจบแล้ว (7 ต.ค. 2569: แท็บตา
     renderCalendar(list(), { splitDone: false });
     expect(screen.queryByTestId('follow-day-done')).toBeNull();
     expect(dayRows().some((r) => (r.textContent ?? '').includes('คนที่สาม'))).toBe(true);
+  });
+});
+
+describe('🔴 มือถือ: ชื่อติดซ้าย · ปุ่มโทร/จัดการอยู่ใต้ชื่อ (QA 10 ต.ค. 2569 ปุ่มอยู่นอกจอ ปัดแล้วชื่อหาย)', () => {
+  it('ช่องชื่อ sticky เฉพาะจอเล็ก · คอลัมน์จัดการซ่อนบนจอเล็ก · ชุดใต้ชื่อซ่อนบนจอกว้าง', () => {
+    renderCalendar(twoRounds());
+    const row = dayRows()[0];
+    const nameCell = row.querySelector('td') as HTMLElement;
+    expect(nameCell.className).toContain('max-md:sticky');
+    expect(nameCell.className).toContain('max-md:left-0');
+    const [underName, column] = within(row).getAllByRole('button', { name: 'จัดการ' });
+    expect(underName.closest('.md\\:hidden')).toBeTruthy();
+    const colCls = (column.closest('td') as HTMLElement).className.split(/\s+/);
+    expect(colCls).toEqual(expect.arrayContaining(['hidden', 'md:table-cell']));
   });
 });

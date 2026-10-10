@@ -27,7 +27,7 @@ describe('followDayNo', () => {
   });
   it('ป้ายบนรายการ: ขั้นที่มีชื่อขึ้นชื่อแทน "วันที่"', () => {
     expect(followDayCallLabel({ day: 92, call: 1 })).toBe('เบิกเบี้ยเลี้ยง · สายที่ 1');
-    expect(followDayCallLabel({ day: 9, call: 2 })).toBe('วันที่ 9 · สายที่ 2');
+    expect(followDayCallLabel({ day: 9, call: 2 })).toBe('ครั้งที่ 9 · สายที่ 2');
   });
   it('🔴 เลือกขั้นที่มีชื่อรายวัน (plan_day_no) ⇒ วันนั้นขึ้นชื่อ · วันอื่นเป็นเลขตามเดิม', () => {
     const rows = [
@@ -36,7 +36,7 @@ describe('followDayNo', () => {
     ];
     const out = withFollowDayCalls(rows);
     expect(out.map((e) => followDayCallLabel({ day: e.call_day, call: e.call_of_day }))).toEqual([
-      'วันที่ 1 · สายที่ 1',
+      'ครั้งที่ 1 · สายที่ 1',
       'ประเมิน · สายที่ 1',
     ]);
   });

@@ -40,8 +40,8 @@ describe('buildFollowDayReport', () => {
     const r = buildFollowDayReport(rows, '2026-10-02', NOW);
     // ชื่อเดียวกันติดกัน (4 ต.ค. 2569): นายทดสอบ 08:00 + 12:00 มาก่อน แล้วค่อยนางอีกคน 10:00
     expect(r.rows.map((x) => [x.time, x.call, x.caller, x.cancelled])).toEqual([
-      ['08:00', 'วันที่ 1 · สายที่ 1', 'AI โทร', false],
-      ['12:00', 'วันที่ 1 · สายที่ 2', 'คนโทร', false],
+      ['08:00', 'ครั้งที่ 1 · สายที่ 1', 'AI โทร', false],
+      ['12:00', 'ครั้งที่ 1 · สายที่ 2', 'คนโทร', false],
       ['10:00', 'สายที่ 1', 'AI โทร', true],
     ]);
     expect(r.rows[2].result).toBe('ยกเลิก');
@@ -87,7 +87,7 @@ describe('buildFollowDayReport', () => {
     expect(manualOnly.callNos).toEqual([1, 2]);
 
     const call1 = buildFollowDayReport(rows, '2026-10-02', NOW, { caller: 'all', call: 1 });
-    expect(call1.rows.map((x) => x.call)).toEqual(['วันที่ 1 · สายที่ 1']);
+    expect(call1.rows.map((x) => x.call)).toEqual(['ครั้งที่ 1 · สายที่ 1']);
     expect(call1.scope).toBe('สายที่ 1');
 
     const both = buildFollowDayReport(rows, '2026-10-02', NOW, { caller: 'ai', call: 2 });

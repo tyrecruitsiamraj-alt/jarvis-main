@@ -76,6 +76,7 @@ import {
   type AiShareSegment,
   defaultAiShareWindow,
   isAiShareBlock,
+  homeQueryKey,
   sharesOfCalled,
   type AiShareBlockKey,
   type AiShareCounts,
@@ -314,10 +315,13 @@ const HomeAiSharePage: React.FC = () => {
     if (tick === 0) return;
     let alive = true;
     const w = cardWinRef.current;
+    const key = homeQueryKey(w);
     fetchHomeAiShare(w)
       .then((d) => {
-        if (alive && d.from === cardWinRef.current.from && d.to === cardWinRef.current.to) {
+        // มาถึงหลังเปลี่ยน BU/ช่วง = ทิ้ง (เดิมเทียบแค่วัน ⇒ เลข BU เก่าทับของใหม่) · สำเร็จ = ล้างแถบล้มด้วย
+        if (alive && homeQueryKey(cardWinRef.current) === key) {
           setData(d);
+          setError(null);
           setUpdatedAt(new Date());
         }
       })
@@ -331,16 +335,18 @@ const HomeAiSharePage: React.FC = () => {
    * แถววัน × BU ของหัวข้อที่เลือก — โหลดที่หน้า ส่งให้กราฟยอดใช้งาน (รอบ 9 ย้ายขึ้นมาจากกราฟ ·
    * รอบ 12 กล่องเลิกพลิกแล้ว เหลือกราฟใช้คนเดียว)
    */
-  const [detail, setDetail] = useState<AiShareDetailResponse | null>(null);
+  /** กราฟผูกกับคีย์คำขอ (หัวข้อ + ช่วงวัน + BU) — เปลี่ยน BU แล้วกราฟ BU เก่าห้ามค้าง (QA 10 ต.ค. 2569) */
+  const [detail, setDetail] = useState<{ key: string; d: AiShareDetailResponse } | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
   const [detailError, setDetailError] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
     setDetailLoading(true);
     setDetailError(null);
+    const key = homeQueryKey(winQ, block);
     fetchHomeAiShareDetail(block, winQ)
       .then((d) => {
-        if (alive) setDetail(d);
+        if (alive) setDetail({ key, d });
       })
       .catch((e: unknown) => {
         if (alive) setDetailError(e instanceof Error && e.message ? e.message : 'โหลดกราฟไม่ขึ้น ลองอีกครั้ง');
@@ -360,10 +366,11 @@ const HomeAiSharePage: React.FC = () => {
     if (tick === 0) return;
     let alive = true;
     const { block: b, win: w } = blockWinRef.current;
+    const key = homeQueryKey(w, b);
     fetchHomeAiShareDetail(b, w)
       .then((d) => {
         const cur = blockWinRef.current;
-        if (alive && d.block === cur.block && d.from === cur.win.from && d.to === cur.win.to) setDetail(d);
+        if (alive && homeQueryKey(cur.win, cur.block) === key) setDetail({ key, d });
       })
       .catch(() => {});
     return () => {
@@ -374,7 +381,7 @@ const HomeAiSharePage: React.FC = () => {
   // เปลี่ยนช่วงแล้วเลขเก่าห้ามค้างให้อ่านผิดช่วง — ใช้ข้อมูลเฉพาะเมื่อตรงกับช่วงที่เลือก
   const current =
     data && data.from === cardWin.from && data.to === cardWin.to && (data.forced_bu || (data.bu ?? null) === bu) ? data : null;
-  const detailNow = detail && detail.block === block && detail.from === win.from && detail.to === win.to ? detail : null;
+  const detailNow = detail && detail.key === homeQueryKey(winQ, block) ? detail.d : null;
   const meta = BLOCKS.find((b) => b.key === block) ?? BLOCKS[0];
   const counts: AiShareCounts | null = current?.[meta.key] ?? null;
   const staffFlag = current && !current.follow_staff_ready ? STAFF_NOT_READY : null;

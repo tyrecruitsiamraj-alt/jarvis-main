@@ -132,7 +132,7 @@ export type BoardPublishSheetProps = {
 
 export const BoardPublishSheet: React.FC<BoardPublishSheetProps> = ({ id, onDone, onSearchAllPools }) => {
   const reg = useJobPublishRegistry(id);
-  const { job, error, latestPosting, linkCount, released, skip } = reg;
+  const { job, error, latestPosting, linkCount, released, skip, postingsFailed } = reg;
 
   const [view, setView] = React.useState<'review' | 'people'>('review');
   /** ค่าที่เพิ่งแก้ — ทับบนใบทันทีโดยไม่ต้องโหลดใบใหม่ (ตัวอย่างซ้ายเปลี่ยนตาม) */
@@ -383,11 +383,26 @@ export const BoardPublishSheet: React.FC<BoardPublishSheetProps> = ({ id, onDone
             {/* ── ลิงก์สมัคร (ไม่บังคับ — Choice 30 ก.ย. 2569) ── */}
             <StepCard title="ลิงก์สมัคร" aside={<span className="text-xs text-muted-foreground">ไม่บังคับ</span>}>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                <p className="text-sm text-foreground">
-                  {linkCount === null ? 'กำลังโหลด…' : linkCount > 0 ? `มีแล้ว ${NUM.format(linkCount)} ลิงก์` : 'ยังไม่มีลิงก์'}
-                </p>
+                {/* 🔴 อ่านทะเบียนลิงก์ไม่ได้ ≠ ยังไม่มีลิงก์ (QA 10 ต.ค. 2569) — ปิด Gen link ไว้จนอ่านได้ กันสร้างลิงก์ซ้ำ */}
+                {postingsFailed ? (
+                  <p className="flex items-center gap-2 text-sm text-destructive">
+                    อ่านลิงก์ไม่ได้
+                    <Button type="button" variant="outline" size="xs" onClick={() => void reg.loadPostings()}>
+                      ลองใหม่
+                    </Button>
+                  </p>
+                ) : (
+                  <p className="text-sm text-foreground">
+                    {linkCount === null ? 'กำลังโหลด…' : linkCount > 0 ? `มีแล้ว ${NUM.format(linkCount)} ลิงก์` : 'ยังไม่มีลิงก์'}
+                  </p>
+                )}
                 <label htmlFor="publish-want-link" className="flex w-fit cursor-pointer items-center gap-3">
-                  <Checkbox id="publish-want-link" checked={wantLink} onCheckedChange={(v) => setWantLink(v === true)} />
+                  <Checkbox
+                    id="publish-want-link"
+                    checked={wantLink}
+                    disabled={postingsFailed}
+                    onCheckedChange={(v) => setWantLink(v === true)}
+                  />
                   <span className="text-sm text-foreground">{linkCount ? 'Gen link เพิ่ม' : 'Gen link'}</span>
                 </label>
               </div>

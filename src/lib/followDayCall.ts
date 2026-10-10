@@ -28,7 +28,7 @@ type DayCallRow = Pick<FollowEntry, 'id' | 'group_id' | 'scheduled_at' | 'call_r
 
 /**
  * "ติดตามครั้งที่" ที่ตั้งตอนเพิ่ม (137 · เจ้าของ 6 ต.ค. 2569) — เลขวันแรกของชุด · ไม่ตั้ง/1 = นับ 1 ตามเดิม
- * ตั้งไว้ (> 1) = ชุดวันเดียวก็ขึ้นเลขวัน (เช่น "วันที่ 3 · สายที่ 1") ไม่งั้นคนอ่านไม่รู้ว่าเป็นครั้งที่เท่าไหร่
+ * ตั้งไว้ (> 1) = ชุดวันเดียวก็ขึ้นเลขวัน (เช่น "ครั้งที่ 3 · สายที่ 1") ไม่งั้นคนอ่านไม่รู้ว่าเป็นครั้งที่เท่าไหร่
  */
 const startOf = (rows: readonly DayCallRow[]): number | null => {
   let best: number | null = null;
@@ -139,13 +139,16 @@ export function withFollowDayCalls<T extends DayCallRow>(entries: readonly T[]):
   });
 }
 
-/** ป้ายของสายเดียว — "วันที่ 2 · สายที่ 1" (ชุดหลายวัน) / "สายที่ 2" / null = ไม่รู้ลำดับ */
+/**
+ * ป้ายของสายเดียว — "ครั้งที่ 2 · สายที่ 1" (ชุดหลายวัน) / "สายที่ 2" / null = ไม่รู้ลำดับ
+ * 🔴 10 ต.ค. 2569 (QA): เดิม "วันที่ 2 · สายที่ 1" ทั้งที่ฟอร์ม/ตัวกรอง/สรุปแผนเปลี่ยนเป็น "ติดตามครั้งที่" แล้ว (เจ้าของ 9 ต.ค.) ⇒ ใช้คำเดียวกัน
+ */
 export function followDayCallLabel(pos: { day?: number | null; call?: number | null }): string | null {
   if (pos.call == null) return null;
-  // ขั้นที่มีชื่อ (ประเมิน · เบิกเบี้ยเลี้ยง · เรียนงาน · ยกยอด · 9 ต.ค. 2569) ขึ้นชื่อแทน "วันที่"
+  // ขั้นที่มีชื่อ (ประเมิน · เบิกเบี้ยเลี้ยง · เรียนงาน · ยกยอด · 9 ต.ค. 2569) ขึ้นชื่อแทน "ครั้งที่"
   const named = followNamedDayLabel(pos.day);
   if (named) return `${named} · สายที่ ${pos.call}`;
-  return pos.day != null ? `วันที่ ${pos.day} · สายที่ ${pos.call}` : `สายที่ ${pos.call}`;
+  return pos.day != null ? `ครั้งที่ ${pos.day} · สายที่ ${pos.call}` : `สายที่ ${pos.call}`;
 }
 
 /**

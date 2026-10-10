@@ -21,6 +21,8 @@ export function useJobPublishRegistry(id: string) {
   const [job, setJob] = React.useState<JobRequest | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
+  /** อ่านทะเบียนลิงก์ไม่ได้ — จอต้องบอกว่าอ่านไม่ได้ ห้ามขึ้น "ยังไม่มีลิงก์" (QA 10 ต.ค. 2569 · เสี่ยง Gen link ซ้ำ) */
+  const [postingsFailed, setPostingsFailed] = React.useState(false);
   const [releases, setReleases] = React.useState<JobRelease[] | null>(null);
   const [skips, setSkips] = React.useState<JobReleaseSkip[] | null>(null);
 
@@ -43,8 +45,10 @@ export function useJobPublishRegistry(id: string) {
   const loadPostings = React.useCallback(async () => {
     try {
       setPostings(await fetchRecruitPostings());
+      setPostingsFailed(false);
     } catch {
       setPostings([]);
+      setPostingsFailed(true);
     }
   }, []);
 
@@ -97,5 +101,5 @@ export function useJobPublishRegistry(id: string) {
     [skips, job],
   );
 
-  return { job, error, postings, jobPostings, latestPosting, linkCount, released, skip, loadPostings, loadReleases, loadSkips };
+  return { job, error, postings, postingsFailed, jobPostings, latestPosting, linkCount, released, skip, loadPostings, loadReleases, loadSkips };
 }

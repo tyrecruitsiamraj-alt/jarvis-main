@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { HomeSection, StatStrip, type StatItem } from '@/components/home-ai-share/HomeSections';
 import { fetchHomeOnline } from '@/lib/homeAiShareApi';
-import type { AiShareWindow } from '@/lib/homeAiShare';
+import { homeQueryKey, type AiShareWindow } from '@/lib/homeAiShare';
 import {
   ONLINE_AI_CALLED,
   ONLINE_REQUEST_STATES,
@@ -38,16 +38,17 @@ const STATE_TONE: Record<OnlineRequestState, ToneKey> = {
 };
 
 function useHomeOnline(q: AiShareWindow & { bu: string | null }, tick: number) {
-  const [data, setData] = useState<OnlineReportResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /** ข้อมูล/ข้อผิดพลาดผูกกับคีย์คำขอ (ช่วงวัน + BU) — ใช้เฉพาะเมื่อตรงกับที่เลือกอยู่ (`homeQueryKey` · QA 10 ต.ค. 2569) */
+  const [data, setData] = useState<{ key: string; d: OnlineReportResponse } | null>(null);
+  const [error, setError] = useState<{ key: string; msg: string } | null>(null);
   const qRef = useRef(q);
   qRef.current = q;
   useEffect(() => {
     let alive = true;
-    setError(null);
+    const key = homeQueryKey(q);
     fetchHomeOnline(q)
-      .then((d) => alive && setData(d))
-      .catch((e: unknown) => alive && setError(e instanceof Error && e.message ? e.message : 'โหลดไม่ขึ้น ลองรีเฟรชอีกครั้ง'));
+      .then((d) => alive && setData({ key, d }))
+      .catch((e: unknown) => alive && setError({ key, msg: e instanceof Error && e.message ? e.message : 'โหลดไม่ขึ้น ลองรีเฟรชอีกครั้ง' }));
     return () => {
       alive = false;
     };
@@ -55,14 +56,23 @@ function useHomeOnline(q: AiShareWindow & { bu: string | null }, tick: number) {
   useEffect(() => {
     if (tick === 0) return;
     let alive = true;
+    const key = homeQueryKey(qRef.current);
     fetchHomeOnline(qRef.current)
-      .then((d) => alive && setData(d))
+      .then((d) => {
+        // รอบสดสำเร็จ = ล้างแถบล้มด้วย · มาถึงหลังเปลี่ยน BU/ช่วง = ทิ้ง
+        if (alive && homeQueryKey(qRef.current) === key) {
+          setData({ key, d });
+          setError(null);
+        }
+      })
       .catch(() => {});
     return () => {
       alive = false;
     };
   }, [tick]);
-  return { data, error: error ?? data?.error ?? null };
+  const key = homeQueryKey(q);
+  const current = data?.key === key ? data.d : null;
+  return { data: current, error: (error?.key === key ? error.msg : null) ?? current?.error ?? null };
 }
 
 const stateItems = (s: Record<OnlineRequestState, number>): StatItem[] =>

@@ -28,12 +28,12 @@ describe('followDayCallPositions', () => {
     ]);
     const enriched = withFollowDayCalls(rows);
     expect(enriched.map((e) => followDayCallLabel({ day: e.call_day, call: e.call_of_day }))).toEqual([
-      'วันที่ 1 · สายที่ 1',
-      'วันที่ 1 · สายที่ 2',
-      'วันที่ 2 · สายที่ 1',
-      'วันที่ 2 · สายที่ 2',
-      'วันที่ 3 · สายที่ 1',
-      'วันที่ 3 · สายที่ 2',
+      'ครั้งที่ 1 · สายที่ 1',
+      'ครั้งที่ 1 · สายที่ 2',
+      'ครั้งที่ 2 · สายที่ 1',
+      'ครั้งที่ 2 · สายที่ 2',
+      'ครั้งที่ 3 · สายที่ 1',
+      'ครั้งที่ 3 · สายที่ 2',
     ]);
     expect(enriched.map((e) => e.call_round)).toEqual([1, 2, 3, 4, 5, 6]);
     // แท็บ "สายที่ 1" = สายแรกของทุกวัน (เดิมวันที่ 2–3 ทั้งหมดไปกอง "3 ขึ้นไป")
@@ -102,9 +102,9 @@ describe('scheduleDraftDayCallLabels (ตัวแก้ตาราง)', () =>
       { key: 'bad', iso: null },
     ]);
     expect([...labels.entries()]).toEqual([
-      ['done', 'วันที่ 1 · สายที่ 1'],
-      ['a', 'วันที่ 1 · สายที่ 2'],
-      ['b', 'วันที่ 3 · สายที่ 1'],
+      ['done', 'ครั้งที่ 1 · สายที่ 1'],
+      ['a', 'ครั้งที่ 1 · สายที่ 2'],
+      ['b', 'ครั้งที่ 3 · สายที่ 1'],
       ['bad', null],
     ]);
   });
@@ -141,12 +141,12 @@ describe('ติดตามครั้งที่ (plan_day_start)', () => {
     ]);
     expect([pos.get('a')?.day, pos.get('b')?.day, pos.get('c')?.day]).toEqual([3, 4, 5]);
   });
-  it('ชุดวันเดียวตั้งครั้งที่ 2 ⇒ ขึ้น "วันที่ 2 · สายที่ N" (ไม่ตั้ง = ไม่มีเลขวันตามเดิม)', () => {
+  it('ชุดวันเดียวตั้งครั้งที่ 2 ⇒ ขึ้น "ครั้งที่ 2 · สายที่ N" (ไม่ตั้ง = ไม่มีเลขวันตามเดิม)', () => {
     const pos = followDayCallPositions([
       row({ id: 'a', scheduled_at: at(1, 9), call_round: 1, plan_day_start: 2 }),
       row({ id: 'b', scheduled_at: at(1, 10), call_round: 2, plan_day_start: 2 }),
     ]);
-    expect(followDayCallLabel(pos.get('b')!)).toBe('วันที่ 2 · สายที่ 2');
+    expect(followDayCallLabel(pos.get('b')!)).toBe('ครั้งที่ 2 · สายที่ 2');
   });
   it('แถวไม่มีชุด ตั้งครั้งที่ 4 ⇒ วันที่ 4 · ตั้ง 1/ไม่ตั้ง = ไม่มีเลขวัน', () => {
     const pos = followDayCallPositions([
@@ -170,8 +170,8 @@ describe('ติดตามครั้งที่รายวัน (plan_day
     ]);
     expect([pos.get('a')?.day, pos.get('b')?.day, pos.get('c')?.day, pos.get('d')?.day]).toEqual([1, 2, 3, 5]);
   });
-  it('ชุดวันเดียวเลือกครั้งที่ 6 ⇒ "วันที่ 6 · สายที่ N"', () => {
+  it('ชุดวันเดียวเลือกครั้งที่ 6 ⇒ "ครั้งที่ 6 · สายที่ N"', () => {
     const pos = followDayCallPositions([row({ id: 'a', scheduled_at: at(1, 9), call_round: 1, plan_day_no: 6 })]);
-    expect(followDayCallLabel(pos.get('a')!)).toBe('วันที่ 6 · สายที่ 1');
+    expect(followDayCallLabel(pos.get('a')!)).toBe('ครั้งที่ 6 · สายที่ 1');
   });
 });

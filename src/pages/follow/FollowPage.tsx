@@ -1491,9 +1491,16 @@ const FollowPage: React.FC = () => {
     () => (planDay === 'all' ? searchedItems : searchedItems.filter((e) => followPlanDayOf(e) === Number(planDay))),
     [searchedItems, planDay],
   );
+  /** ดูรายวัน/รายเดือน — ตัวจริงตัวเดียวของหน้า (ปฏิทินรับค่านี้ไปโชว์ปุ่ม · QA 10 ต.ค. 2569 ปุ่มกับเลขเคยไม่ตรงกัน) */
+  const [panelRange, setPanelRange] = useState<'day' | 'month'>('day');
+  /**
+   * 🔴 รายเดือนห้ามกรองด้วยวันที่เลือก (QA 10 ต.ค. 2569: เลือกวันไว้แล้วสลับเป็นรายเดือน "ทั้งเดือนนี้" เหลือ 14 คน
+   * = เฉพาะคนของวันนั้น · ล้างวันแล้วเป็น 200) — วันที่เลือกมีผลกับรายวันอย่างเดียว
+   */
   const filtered = useMemo(
-    () => filterFollowEntries(planScopedItems, { date: fDate, band: fBand, caller, owner: adderKey }),
-    [planScopedItems, fDate, fBand, caller, adderKey],
+    () =>
+      filterFollowEntries(planScopedItems, { date: panelRange === 'month' ? '' : fDate, band: fBand, caller, owner: adderKey }),
+    [planScopedItems, panelRange, fDate, fBand, caller, adderKey],
   );
   /**
    * แผงรอบโทรนับตาม **วันที่เลือก** และสลับดู **ทั้งเดือน** ได้ (เจ้าของเคาะ 3 ต.ค. 2569:
@@ -1502,7 +1509,6 @@ const FollowPage: React.FC = () => {
    * ⚠️ dropdown "นับช่วง" ถูกถอด (เจ้าของสั่งเย็นวันเดียวกัน "เอาออก") — ช่วงเดินตาม
    * **แท็บ รายวัน/รายเดือน ของปฏิทิน** แทน: ดูรายวัน = นับวันที่เลือก · ดูรายเดือน = นับทั้งเดือน
    */
-  const [panelRange, setPanelRange] = useState<'day' | 'month'>('day');
   const panelDay = fDate || toYmdBangkok(new Date());
   /** สายในช่วงที่แผงดูอยู่ (วันเดียว/ทั้งเดือน) — ก่อนตัวกรองใครโทร */
   const inPanelRange = useCallback(
@@ -1675,7 +1681,8 @@ const FollowPage: React.FC = () => {
 
   /** เลือกวันจากปฏิทิน = ใช้ช่องกรองวันเดิม (`fDate`) — ห้ามมีตัวกรองวันสองตัวในหน้าเดียว */
   const pickCalendarDay = (ymd: string) => {
-    setFDate(ymd);
+    // กลับมาวันนี้ = สภาพเดียวกับเปิดหน้าใหม่ (ไม่มีชิปวันค้าง · QA 10 ต.ค. 2569 เลื่อนวันไปกลับแล้วชิป "10/10 ×" ค้าง)
+    setFDate(ymd === toYmdBangkok(new Date()) ? '' : ymd);
     setCalMonth(ymd ? ymd.slice(0, 7) : calMonth);
   };
 
@@ -1941,6 +1948,7 @@ const FollowPage: React.FC = () => {
           /* คนที่จัดการจบแล้ว → การ์ด "สำเร็จ / ยกเลิก" ใต้ตาราง · กดกล่องตัวเลขอยู่ = ไม่แยก (ตารางคือรายชื่อของกล่องนั้น) */
           splitDone={!resultBox}
           onViewChange={setPanelRange}
+          view={panelRange}
           month={calMonth}
           onMonthChange={setCalMonth}
           selectedYmd={fDate}

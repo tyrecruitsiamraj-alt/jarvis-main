@@ -225,7 +225,7 @@ function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): st
 }
 
 /**
- * ป้ายของสายเดียว — "วันที่ 2 · สายที่ 1" (ตารางหลายวัน) / "สายที่ 2" (เจ้าของสั่ง 1 ต.ค. 2569:
+ * ป้ายของสายเดียว — "ครั้งที่ 2 · สายที่ 1" (ตารางหลายวัน) / "สายที่ 2" (เจ้าของสั่ง 1 ต.ค. 2569:
  * *"วันที่ 1 สายที่ 1 2 วันที่ 2 สายที่ 1 2 ไม่ใช่ 1 2 3 4 5 6"*) · แถวที่ไม่ได้ผ่าน `listFollowEntries` ถอยไปใช้ `call_round`
  */
 function callLabelOf(round: FollowPlanningRound, slot: 1 | 2 | 3 | null): string {
@@ -376,6 +376,11 @@ const FollowPlanningCalendar: React.FC<{
   splitDone?: boolean;
   /** บอกหน้าแม่ว่าดูรายวันหรือรายเดือนอยู่ — แผงรอบโทรนับช่วงตามนี้ (3 ต.ค. 2569) */
   onViewChange?: (view: 'day' | 'month') => void;
+  /**
+   * ค่าจากหน้าแม่ (ตัวจริงตัวเดียว) — 🔴 QA 10 ต.ค. 2569: ปฏิทินถือค่าของตัวเอง พอสลับแท็บ Dashboard แล้วกลับมา
+   * ปฏิทินเกิดใหม่เป็น "รายวัน" แต่หน้าแม่ยังนับ "รายเดือน" ⇒ ปุ่มกับตัวเลขไม่ตรงกัน · ไม่ส่ง = ถือเอง (ของเดิม)
+   */
+  view?: 'day' | 'month';
 }> = ({
   rows,
   summaryRows,
@@ -397,8 +402,10 @@ const FollowPlanningCalendar: React.FC<{
   busyId = null,
   allRows,
   onViewChange,
+  view: viewProp,
 }) => {
-  const [view, setView] = useState<View>('day');
+  const [ownView, setOwnView] = useState<View>('day');
+  const view: View = viewProp ?? ownView;
   /** สายที่กด "ยกเลิก" บนแถวแล้วรอยืนยัน (ยืนยันในที่เดิม ไม่เปิดป๊อป) */
   const today = toYmdBangkok(new Date());
   const dayYmd = selectedYmd || today;
@@ -604,7 +611,7 @@ const FollowPlanningCalendar: React.FC<{
             <Tabs
               value={view}
               onValueChange={(v) => {
-                setView(v as View);
+                setOwnView(v as View);
                 onViewChange?.(v as View);
               }}
             >
@@ -710,7 +717,8 @@ const FollowPlanningCalendar: React.FC<{
                     <table className="min-w-full border-collapse text-left">
                       <thead>
                         <tr className={cn('border-b border-border', DASH.tableHead)}>
-                          <th className="min-w-[210px] px-4 py-2.5 text-[11px] font-medium md:px-5">
+                          {/* 🔴 มือถือ: คอลัมน์ชื่อติดซ้าย (QA 10 ต.ค. 2569 ปัดหาปุ่มแล้วชื่อหาย ไม่รู้ว่าลงผลให้ใคร) */}
+                          <th className="min-w-[210px] px-4 py-2.5 text-[11px] font-medium max-md:sticky max-md:left-0 max-md:z-10 max-md:min-w-40 max-md:bg-card md:px-5">
                             ผู้ที่ต้องติดตาม / ติดต่อ
                           </th>
                           <th className="min-w-[130px] px-3 py-2.5 text-[11px] font-medium">หน่วยงาน</th>
@@ -718,7 +726,7 @@ const FollowPlanningCalendar: React.FC<{
                           <th className="min-w-[140px] px-3 py-2.5 text-[11px] font-medium">สถานะการโทร</th>
                           <th className="min-w-[220px] px-3 py-2.5 text-[11px] font-medium">เขาตอบว่าอะไร</th>
                           <th className="min-w-[150px] px-3 py-2.5 text-[11px] font-medium">เบอร์ฉุกเฉิน</th>
-                          <th className="px-3 py-2.5 text-right text-[11px] font-medium md:px-5">จัดการ</th>
+                          <th className="hidden px-3 py-2.5 text-right text-[11px] font-medium md:table-cell md:px-5">จัดการ</th>
                         </tr>
                       </thead>
                       <tbody data-testid="day-calls">
@@ -758,6 +766,44 @@ const FollowPlanningCalendar: React.FC<{
                             ),
                           ];
                           const anyResult = calls.some((c) => c.round.state === 'result');
+                          /** ปุ่มโทร + จัดการ — จอกว้างอยู่คอลัมน์ขวาสุด · มือถืออยู่ใต้ชื่อ (QA 10 ต.ค. 2569 ปุ่มอยู่นอกจอ) */
+                          const rowActions = (
+                            <span className="inline-flex items-center gap-1.5">
+                              {/* แบบอ้างอิงมีปุ่มโทรในแถว — ของเราลิงก์ tel: ไปแอปโทรของเครื่อง */}
+                              <a
+                                href={`tel:${row.group.phone}`}
+                                aria-label={`โทรหา ${row.group.name}`}
+                                title={`โทรหา ${row.group.name} · ${row.group.phone}`}
+                                className={cn(
+                                  'inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors',
+                                  TONE.info.outline,
+                                )}
+                              >
+                                <Phone className="h-3.5 w-3.5" aria-hidden />
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onOpenCell(
+                                    row,
+                                    calls[0].round.ymd ?? dayYmd,
+                                    calls.map((c) => c.round),
+                                  )
+                                }
+                                title={
+                                  calls.length > 1
+                                    ? `ดูรายละเอียดและจัดการทั้ง ${calls.length} สายของคนนี้`
+                                    : 'ดูรายละเอียดและจัดการสายนี้'
+                                }
+                                className={cn(
+                                  'inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-medium transition-colors',
+                                  TONE.neutral.outline,
+                                )}
+                              >
+                                จัดการ
+                              </button>
+                            </span>
+                          );
                           return (
                             <tr
                               key={row.group.key}
@@ -771,7 +817,7 @@ const FollowPlanningCalendar: React.FC<{
                                 allCancelled && 'opacity-60',
                               )}
                             >
-                              <td className="px-4 py-3 md:px-5">
+                              <td className="px-4 py-3 max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-card md:px-5">
                                 <span className="flex items-start gap-2.5">
                                   {/* วงกลมอักษรย่อถอดแล้ว (เจ้าของ 8 ต.ค. 2569 "มันต้องไม่มีไอรูปหน้าตาพวกนี้ มันรก") */}
                                   <span className="min-w-0">
@@ -806,6 +852,7 @@ const FollowPlanningCalendar: React.FC<{
                                           : `เพิ่มโดย ${row.group.createdByName}`}
                                       </span>
                                     ) : null}
+                                    <span className="mt-2 block md:hidden">{rowActions}</span>
                                   </span>
                                 </span>
                               </td>
@@ -834,7 +881,7 @@ const FollowPlanningCalendar: React.FC<{
                                           {callTimeText(round)}
                                         </span>
                                         <span className="mt-0.5 block whitespace-nowrap text-[10.5px] text-muted-foreground">
-                                          {/* "วันที่ 2 · สายที่ 1" — ลำดับในวัน ไม่ใช่เลขทั้งชุด (1 ต.ค. 2569) */}
+                                          {/* "ครั้งที่ 2 · สายที่ 1" — ลำดับในวัน ไม่ใช่เลขทั้งชุด (1 ต.ค. 2569) */}
                                           {callLabelOf(round, slot)}
                                         </span>
                                       </span>
@@ -1082,42 +1129,8 @@ const FollowPlanningCalendar: React.FC<{
                                 )}
                               </td>
 
-                              <td className="px-3 py-3 text-right md:px-5">
-                                <span className="inline-flex items-center gap-1.5">
-                                  {/* แบบอ้างอิงมีปุ่มโทรในแถว — ของเราลิงก์ tel: ไปแอปโทรของเครื่อง */}
-                                  <a
-                                    href={`tel:${row.group.phone}`}
-                                    aria-label={`โทรหา ${row.group.name}`}
-                                    title={`โทรหา ${row.group.name} · ${row.group.phone}`}
-                                    className={cn(
-                                      'inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors',
-                                      TONE.info.outline,
-                                    )}
-                                  >
-                                    <Phone className="h-3.5 w-3.5" aria-hidden />
-                                  </a>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      onOpenCell(
-                                        row,
-                                        calls[0].round.ymd ?? dayYmd,
-                                        calls.map((c) => c.round),
-                                      )
-                                    }
-                                    title={
-                                      calls.length > 1
-                                        ? `ดูรายละเอียดและจัดการทั้ง ${calls.length} สายของคนนี้`
-                                        : 'ดูรายละเอียดและจัดการสายนี้'
-                                    }
-                                    className={cn(
-                                      'inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-medium transition-colors',
-                                      TONE.neutral.outline,
-                                    )}
-                                  >
-                                    จัดการ
-                                  </button>
-                                </span>
+                              <td className="hidden px-3 py-3 text-right md:table-cell md:px-5">
+                                {rowActions}
                               </td>
                             </tr>
                           );

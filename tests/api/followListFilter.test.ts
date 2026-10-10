@@ -106,7 +106,8 @@ describe('filterFollowEntries — ทุกเงื่อนไข AND', () => 
     const page = fs.readFileSync(path.resolve(process.cwd(), 'src/pages/follow/FollowPage.tsx'), 'utf8');
     // เจ้าของงาน = อีเมลคนเพิ่ม (owner · 5 ต.ค. 2569) — ยังไม่มี tab ล็อก
     // 5 ต.ค. 2569: ผ่านค้นหา + วันที่ของแผนก่อน (planScopedItems) — ยังไม่ล็อกแท็บเหมือนเดิม
-    expect(page).toContain('filterFollowEntries(planScopedItems, { date: fDate, band: fBand, caller, owner: adderKey })');
+    // 10 ต.ค. 2569 (QA): วันที่เลือกกรองเฉพาะรายวัน — รายเดือนไม่กรองด้วยวัน
+    expect(page).toContain("filterFollowEntries(planScopedItems, { date: panelRange === 'month' ? '' : fDate, band: fBand, caller, owner: adderKey })");
     expect(page).not.toContain("const tab: FollowTab = 'active'");
   });
 

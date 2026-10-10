@@ -17,7 +17,7 @@ import { segmentDotClass } from '@/components/home-ai-share/segmentStyle';
 import { trendBuLabel } from '@/lib/trends/bu';
 import { TONE } from '@/lib/designTokens';
 import { FOLLOW_MATRIX_COL_TONE } from '@/lib/followCallMatrix';
-import type { AiShareBlockKey, AiShareWindow } from '@/lib/homeAiShare';
+import { homeQueryKey, type AiShareBlockKey, type AiShareWindow } from '@/lib/homeAiShare';
 import { fetchHomeLumosSummary } from '@/lib/homeAiShareApi';
 import {
   followBucketAddsUp,
@@ -69,23 +69,24 @@ const followCalledOf = (buckets: Record<FollowBucketKey, number>): number =>
 export const hasLumosResults = (block: AiShareBlockKey) => block === 'follow';
 
 /** ตัวโหลดตัวเดียวของหน้า — ช่วงตามแท่งที่กด · อัปเดตสดเงียบ ๆ รอบเดียวกับหน้า */
-export function useHomeLumosSummary(block: AiShareBlockKey, win: AiShareWindow, tick: number) {
+export function useHomeLumosSummary(block: AiShareBlockKey, win: AiShareWindow & { bu?: string | null }, tick: number) {
   const shown = hasLumosResults(block);
-  const [data, setData] = useState<HomeLumosSummaryResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /** ข้อมูล/ข้อผิดพลาดผูกกับคีย์คำขอ (ช่วงวัน + BU) — ใช้เฉพาะเมื่อตรงกับที่เลือกอยู่ (`homeQueryKey`) */
+  const [data, setData] = useState<{ key: string; d: HomeLumosSummaryResponse } | null>(null);
+  const [error, setError] = useState<{ key: string; msg: string } | null>(null);
   const winRef = useRef(win);
   winRef.current = win;
 
   useEffect(() => {
     if (!shown) return;
     let alive = true;
-    setError(null);
+    const key = homeQueryKey(win);
     fetchHomeLumosSummary(win)
       .then((d) => {
-        if (alive) setData(d);
+        if (alive) setData({ key, d });
       })
       .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error && e.message ? e.message : 'โหลดไม่ขึ้น ลองรีเฟรชอีกครั้ง');
+        if (alive) setError({ key, msg: e instanceof Error && e.message ? e.message : 'โหลดไม่ขึ้น ลองรีเฟรชอีกครั้ง' });
       });
     return () => {
       alive = false;
@@ -95,10 +96,12 @@ export function useHomeLumosSummary(block: AiShareBlockKey, win: AiShareWindow, 
   useEffect(() => {
     if (tick === 0 || !shown) return;
     let alive = true;
+    const key = homeQueryKey(winRef.current);
     fetchHomeLumosSummary(winRef.current)
       .then((d) => {
-        if (alive && d.from === winRef.current.from && d.to === winRef.current.to) {
-          setData(d);
+        // รอบสดที่ยิงก่อนเปลี่ยน BU/ช่วง มาถึงทีหลัง = ทิ้ง
+        if (alive && homeQueryKey(winRef.current) === key) {
+          setData({ key, d });
           setError(null);
         }
       })
@@ -108,8 +111,9 @@ export function useHomeLumosSummary(block: AiShareBlockKey, win: AiShareWindow, 
     };
   }, [tick, shown]);
 
-  const current = data && data.from === win.from && data.to === win.to ? data : null;
-  return { current, failed: error ?? current?.error ?? null };
+  const key = homeQueryKey(win);
+  const current = data?.key === key ? data.d : null;
+  return { current, failed: (error?.key === key ? error.msg : null) ?? current?.error ?? null };
 }
 
 const AiShareLumosStats: React.FC<{

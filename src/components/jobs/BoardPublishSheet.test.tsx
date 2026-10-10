@@ -34,9 +34,10 @@ vi.mock('@/lib/siamrajUnitRequestsApi', async (orig) => ({
   ...(await orig<typeof import('@/lib/siamrajUnitRequestsApi')>()),
   fetchSiamrajUnitRequest: vi.fn(async () => currentJob),
 }));
+const fetchRecruitPostings = vi.fn(async (): Promise<unknown[]> => []);
 vi.mock('@/lib/recruitPostingsApi', async (orig) => ({
   ...(await orig<typeof import('@/lib/recruitPostingsApi')>()),
-  fetchRecruitPostings: vi.fn(async () => []),
+  fetchRecruitPostings: () => fetchRecruitPostings(),
 }));
 vi.mock('@/lib/jobPublicReleaseApi', async (orig) => ({
   ...(await orig<typeof import('@/lib/jobPublicReleaseApi')>()),
@@ -79,6 +80,8 @@ beforeEach(() => {
   fetchJobReleases.mockReset();
   unreleaseJobsFromPublic.mockClear();
   releaseJobsToPublic.mockClear();
+  fetchRecruitPostings.mockReset();
+  fetchRecruitPostings.mockResolvedValue([]);
 });
 afterEach(() => cleanup());
 
@@ -155,5 +158,16 @@ describe('BoardPublishSheet — ป๊อปประกาศหน้าเด
     fireEvent.mouseDown(screen.getByRole('tab', { name: /รายชื่อ/ }), { button: 0 });
     fireEvent.click(await screen.findByRole('button', { name: /หาคนทุกกอง/ }));
     expect(onSearch).toHaveBeenCalled();
+  });
+  it('🔴 อ่านทะเบียนลิงก์ไม่ได้ ≠ ยังไม่มีลิงก์ — บอกว่าอ่านไม่ได้ · ปิด Gen link · ลองใหม่แล้วกลับมาปกติ (QA 10 ต.ค. 2569)', async () => {
+    fetchJobReleases.mockResolvedValue([]);
+    fetchRecruitPostings.mockRejectedValueOnce(new Error('HTTP 500'));
+    renderSheet();
+    expect(await screen.findByText('อ่านลิงก์ไม่ได้')).toBeTruthy();
+    expect(screen.queryByText('ยังไม่มีลิงก์')).toBeNull();
+    expect((document.getElementById('publish-want-link') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'ลองใหม่' }));
+    expect(await screen.findByText('ยังไม่มีลิงก์')).toBeTruthy();
+    expect((document.getElementById('publish-want-link') as HTMLButtonElement).disabled).toBe(false);
   });
 });

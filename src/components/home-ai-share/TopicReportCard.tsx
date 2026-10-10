@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, Table
 import { segmentDotClass } from '@/components/home-ai-share/segmentStyle';
 import { toneOfBu } from '@/components/team-online/teamOnlineTones';
 import { TONE } from '@/lib/designTokens';
-import type { AiShareWindow } from '@/lib/homeAiShare';
+import { homeQueryKey, type AiShareWindow } from '@/lib/homeAiShare';
 import { fetchTopicReport } from '@/lib/homeAiShareApi';
 import { REPORT_SEGS, reportBuBlocks, type TopicReport, type TopicReportBlock, type TopicReportResponse } from '@/lib/homeTopicReport';
 import { trendBuLabel } from '@/lib/trends/bu';
@@ -21,39 +21,41 @@ import { cn } from '@/lib/utils';
 
 const NUM = new Intl.NumberFormat('th-TH');
 
-export function useTopicReport(block: TopicReportBlock | null, win: AiShareWindow, tick: number) {
-  const [data, setData] = useState<TopicReportResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export function useTopicReport(block: TopicReportBlock | null, win: AiShareWindow & { bu?: string | null }, tick: number) {
+  /** ข้อมูล/ข้อผิดพลาดผูกกับคีย์คำขอ (หัวข้อ + ช่วงวัน + BU) — ใช้เฉพาะเมื่อตรงกับที่เลือกอยู่ (`homeQueryKey`) */
+  const [data, setData] = useState<{ key: string; d: TopicReportResponse } | null>(null);
+  const [error, setError] = useState<{ key: string; msg: string } | null>(null);
   const keyRef = useRef({ block, win });
   keyRef.current = { block, win };
 
   useEffect(() => {
     if (!block) return;
     let alive = true;
-    setError(null);
+    const key = homeQueryKey(win, block);
     fetchTopicReport(block, win)
       .then((d) => {
-        if (alive) setData(d);
+        if (alive) setData({ key, d });
       })
       .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error && e.message ? e.message : 'โหลดผลโทรไม่ขึ้น ลองรีเฟรชอีกครั้ง');
+        if (alive) setError({ key, msg: e instanceof Error && e.message ? e.message : 'โหลดผลโทรไม่ขึ้น ลองรีเฟรชอีกครั้ง' });
       });
     return () => {
       alive = false;
     };
   }, [block, win]);
 
-  // อัปเดตสดรอบเดียวกับหน้า — โหลดเงียบ เลขเดิมค้างจนเลขใหม่มา
+  // อัปเดตสดรอบเดียวกับหน้า — โหลดเงียบ เลขเดิมค้างจนเลขใหม่มา · มาถึงหลังเปลี่ยน BU/ช่วง = ทิ้ง
   useEffect(() => {
     if (tick === 0) return;
     const { block: b, win: w } = keyRef.current;
     if (!b) return;
     let alive = true;
+    const key = homeQueryKey(w, b);
     fetchTopicReport(b, w)
       .then((d) => {
         const cur = keyRef.current;
-        if (alive && d.block === cur.block && d.from === cur.win.from && d.to === cur.win.to) {
-          setData(d);
+        if (alive && cur.block && homeQueryKey(cur.win, cur.block) === key) {
+          setData({ key, d });
           setError(null);
         }
       })
@@ -63,8 +65,9 @@ export function useTopicReport(block: TopicReportBlock | null, win: AiShareWindo
     };
   }, [tick]);
 
-  const current = block && data && data.block === block && data.from === win.from && data.to === win.to ? data : null;
-  return { report: current?.report ?? null, failed: error ?? current?.error ?? null };
+  const key = block ? homeQueryKey(win, block) : null;
+  const current = key && data?.key === key ? data.d : null;
+  return { report: current?.report ?? null, failed: (key && error?.key === key ? error.msg : null) ?? current?.error ?? null };
 }
 
 const TopicReportCard: React.FC<{ report: TopicReport | null; failed: string | null; block: TopicReportBlock; unit: string }> = ({

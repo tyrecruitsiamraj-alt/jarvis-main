@@ -46,6 +46,15 @@ export type AiShareWindow = PeriodWindow;
  * ค่าตั้งต้น = **7 วันล่าสุดรวมวันนี้** (เจ้าของเปลี่ยน 30 ก.ย. 2569 รอบ 3: *"แค่ default ให้เป็นย้อนหลัง 7 วันพอ"*
  * · รอบแรกเคาะไว้ 30 วัน) — ปุ่มลัดตัวแรกของปฏิทิน (`QUICK_PERIODS`) ตัวเดียวกัน
  */
+/**
+ * คีย์ของคำขอบนหน้าหลัก = ช่วงวัน + BU (+ หัวข้อ) — ข้อมูลที่ถืออยู่ใช้ได้เฉพาะเมื่อคีย์ตรงกับที่เลือกอยู่
+ * 🔴 QA 10 ต.ค. 2569: เปลี่ยน BU แล้วเลขของ BU เก่าค้างใต้ป้าย BU ใหม่ (ตอนโหลด · ตอนล้ม · รอบสดที่ยิงก่อนเปลี่ยนมาถึงทีหลัง)
+ * เดิมเทียบแค่ from/to · ไม่ใช้ `bu` ที่ server ตอบ เพราะคนที่ถูกล็อก BU ได้ค่าที่ server บังคับ ไม่ตรงกับที่จอส่ง
+ */
+export function homeQueryKey(q: { from: string | null; to: string | null; bu?: string | null }, extra = ''): string {
+  return `${q.from ?? ''}|${q.to ?? ''}|${q.bu ?? ''}|${extra}`;
+}
+
 export function defaultAiShareWindow(now: Date = new Date()): AiShareWindow {
   const today = toYmdBangkok(now);
   return { from: addDays(today, -6), to: today };

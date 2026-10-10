@@ -12,6 +12,8 @@ import { friendlyErrorText } from '@/lib/friendlyError';
 
 const SIAMRAJ_POLL_MS = 60_000;
 const UNIT_REQUESTS_FETCH_LIMIT = 500;
+/** เวลาของข้อมูลชุดล่าสุดที่โหลดได้ — ประกาศระดับโมดูล (กติกา `new Intl.*`) */
+const CLOCK_TH = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hour12: false });
 
 async function loadLiveJobs(fresh = false): Promise<{
   jobs: JobRequest[];
@@ -81,6 +83,8 @@ export function useUnitRequestsFeed(options?: { skip?: boolean }): {
   const [dataAgeSeconds, setDataAgeSeconds] = useState<number | null>(null);
   const [calendarRev, setCalendarRev] = useState(0);
   const siamrajPrimaryRef = useRef(false);
+  /** โหลดสำเร็จล่าสุดเมื่อไหร่ — `null` = ยังไม่เคยได้ข้อมูลเลย */
+  const lastOkAtRef = useRef<Date | null>(null);
 
   const jobsWithPenalty = useMemo(() => {
     void calendarRev;
@@ -103,9 +107,18 @@ export function useUnitRequestsFeed(options?: { skip?: boolean }): {
         setDbSource(result.dbSource);
         setDataAgeSeconds(result.ageSeconds);
         siamrajPrimaryRef.current = result.siamrajPrimary;
+        lastOkAtRef.current = new Date();
         setLoadError(null);
         setFeedState('ready');
       } catch (e) {
+        /**
+         * 🔴 **รอบดึงซ้ำล้มครั้งเดียว ห้ามล้างการ์ดทั้งบอร์ด** (QA 10 ต.ค. 2569: ดึงทุก 60 วิล้มรอบเดียว การ์ดใบขอ 363 ใบหายหมด)
+         * เคยโหลดได้แล้ว = คงข้อมูลเดิม เลขยังโชว์ได้ (เป็นของจริงชุดก่อน) + บอกเวลาของข้อมูล · สิทธิ์หลุด (403) ยังล้างตามเดิม
+         */
+        if (lastOkAtRef.current && httpStatusOf(e) !== 403) {
+          setLoadError(`อัปเดตไม่สำเร็จ ยังโชว์ข้อมูลเมื่อ ${CLOCK_TH.format(lastOkAtRef.current)} น.`);
+          return;
+        }
         /**
          * 🔴 **โหลดไม่ได้ ≠ ไม่มีใบขอ** (แก้ 31 ส.ค. 2569)
          * เดิม `setJobs([])` ⇒ หัวกล่องงานคำนวณจากลิสต์ว่างแล้วขึ้น 0 ทุกก้อน
@@ -141,6 +154,8 @@ export function useUnitRequestsFeed(options?: { skip?: boolean }): {
     if (skip) return;
     const id = window.setInterval(() => {
       if (!siamrajPrimaryRef.current) return;
+      // แท็บซ่อนอยู่ไม่ต้องดึง — กลับมาเห็นจอเมื่อไหร่ `visibilitychange` ดึงให้ทันที
+      if (document.visibilityState === 'hidden') return;
       void refetch();
     }, SIAMRAJ_POLL_MS);
 
