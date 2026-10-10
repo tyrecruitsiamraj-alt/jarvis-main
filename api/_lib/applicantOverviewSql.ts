@@ -248,21 +248,38 @@ export const FIRST_STAFF_CALL_AT_SQL = `(
 /** เวลาที่ใบนี้เข้าคิว AI ครั้งแรก (แถว `app-<id>` เท่านั้น — คิวของใบเอง ไม่นับเบอร์เดียวกันจากเลนอื่น) */
 export const AI_QUEUED_AT_SQL = `(select min(q.created_at) from ${QUEUE} q where q.person_ref = 'app-' || a.id::text)`;
 
-/** มีนัดจริง — กติกาเดียวกับ list: contact log (086) ชนะ hold (085 คีย์เบอร์) */
+/**
+ * วันนัดจาก **บันทึกผลติดต่อล่าสุดแถวเดียว** ของใบ (086) — ล่าสุดสำเร็จ+มีวันนัด = วันนัดนั้น · อย่างอื่น = null
+ *
+ * 🔴 QA รอบ 2 ข้อ 4 (10 ต.ค. 2569): เดิมอ่าน "เคยมีแถวไหนก็ได้ที่สำเร็จ+มีวันนัด" แต่ status ของใบขยับตาม
+ * **แถวล่าสุด** (`createContactLog` ใน applicationContacts.ts: ล่าสุดนัดได้ = converted · อย่างอื่น = contacted)
+ * ⇒ ใบ bf01579d นัด 28/8 แล้ว 8 ต.ค. ติดต่อไม่สำเร็จ — status กลับเป็น contacted (หลุดแท็บติดตามนัดหมาย)
+ *    แต่ภาพรวมยังนับเป็น "เลยวันนัดแล้ว ยังไม่บันทึกผล" · ตอนนี้อ่านแถวเดียวกับที่ตั้ง status
+ * ⚠️ ไม่อ่าน `a.status` ตรง ๆ (กติกาข้อ 5 หัวไฟล์) — อ่านเหตุการณ์ตัวที่ตั้ง status แทน
+ */
+const LATEST_CONTACT_APPOINTMENT_AT_SQL = `(
+    select c.appointment_at from (
+      select c.ok, c.appointment_at from ${CONTACTS} c
+       where c.application_id = a.id
+       order by c.created_at desc limit 1
+    ) c where c.ok and c.appointment_at is not null
+  )`;
+
+/**
+ * มีนัดจริง — บันทึกติดต่อล่าสุดนัดได้ (ดูข้างบน) หรือนัดจากคนถือ (hold 085 คีย์เบอร์ · คงเดิม)
+ * contact log ชนะ hold เหมือนเดิม (ลิสต์แนบวันนัดด้วยกติกานี้)
+ */
 export const HAS_APPOINTMENT_SQL = `(
-  exists (select 1 from ${CONTACTS} c
-           where c.application_id = a.id and c.ok and c.appointment_at is not null)
+  ${LATEST_CONTACT_APPOINTMENT_AT_SQL} is not null
   or (a.phone_e164 is not null and exists (
        select 1 from ${HOLDS} h
         where h.phone_e164 = a.phone_e164 and h.appointment_at is not null
           and ${qcol('h', HOLD_EVENT_AT)} >= a.created_at))
 )`;
 
-/** วันนัดล่าสุดของใบ (contact log ชนะ hold — กติกาเดียวกับ HAS_APPOINTMENT_SQL) */
+/** วันนัดของใบ (contact log ล่าสุดชนะ hold — กติกาเดียวกับ HAS_APPOINTMENT_SQL) */
 export const APPOINTMENT_AT_SQL = `coalesce(
-  (select c.appointment_at from ${CONTACTS} c
-    where c.application_id = a.id and c.ok and c.appointment_at is not null
-    order by c.created_at desc limit 1),
+  ${LATEST_CONTACT_APPOINTMENT_AT_SQL},
   (select h.appointment_at from ${HOLDS} h
     where a.phone_e164 is not null and h.phone_e164 = a.phone_e164
       and h.appointment_at is not null and ${qcol('h', HOLD_EVENT_AT)} >= a.created_at
@@ -466,20 +483,15 @@ export function buildAwaitingChoiceSql(): string {
     and ${OVERVIEW_BUCKETS.awaiting_call_choice}`;
 }
 
-/** ผลติดตามนัด (089) — นับแยกเพราะตารางอาจยังไม่ migrate (คืน null + ธง ไม่ใช่ 0) */
+/**
+ * ผลติดตามนัด (089) — นับแยกเพราะตารางอาจยังไม่ migrate (คืน null + ธง ไม่ใช่ 0)
+ * วันนัด = `APPOINTMENT_AT_SQL` ตัวกลาง (10 ต.ค. 2569 · เดิมก๊อปนิพจน์ "แถวไหนก็ได้" ไว้ที่นี่อีกชุด)
+ */
 export function buildAttendanceSummarySql(): string {
   return `
   with sched as (
     select a.id,
-           coalesce(
-             (select c.appointment_at from ${CONTACTS} c
-               where c.application_id = a.id and c.ok and c.appointment_at is not null
-               order by c.created_at desc limit 1),
-             (select h.appointment_at from ${HOLDS} h
-               where h.phone_e164 = a.phone_e164 and h.appointment_at is not null
-                 and ${qcol('h', HOLD_EVENT_AT)} >= a.created_at
-               order by ${qcol('h', HOLD_EVENT_AT)} desc limit 1)
-           ) as appointment_at
+           ${APPOINTMENT_AT_SQL} as appointment_at
     from ${APPS} a
     where ($1::text[] is null or a.job_id = any($1::text[])
            or ($2::text is not null and a.department_code = $2::text))

@@ -127,3 +127,68 @@ describe('คลังกลาง — ใบขอปิดแล้วรา�
     expect(q.params).toHaveLength(highestParamIndex(sql));
   });
 });
+
+/**
+ * แท็บติดตามนัดหมาย ปุ่ม "ทุกคน" (QA รอบ 2 ข้อ 4 · เจ้าของ Choice 10 ต.ค. 2569)
+ * ผ่อน "ของใครของมัน" เฉพาะแถวนัด · สิทธิ์ BU ยังอยู่ครบ · param ยังต้องตรงกับที่ SQL อ้าง (กับดัก 13 ส.ค.)
+ */
+describe('นัดของทุกคน (everyoneAppointments) — param + สิทธิ์ BU', () => {
+  /** แทนครบทุก placeholder แบบที่ queryWithLegacyFallback ทำ */
+  const filled = (q: { sql: string; claimWhere: string; leadWhere: string }) =>
+    q.sql.replace(/\{\{claimWhere\}\}/g, q.claimWhere).replace(/\{\{leadWhere\}\}/g, q.leadWhere);
+
+  it('admin: ไม่มี param เลย (ไม่อ้างผู้ดู) · แถวนัดเท่านั้น · ไม่มีเงื่อนไข claim/Lead', () => {
+    const q = buildApplicationsListQuery({ jobId: null, scopedJobIds: null, viewerId: VIEWER, everyoneAppointments: true });
+    const sql = filled(q);
+    expect(q.params).toEqual([]);
+    expect(q.params).toHaveLength(highestParamIndex(sql));
+    expect(sql).toContain("status = 'converted'");
+    expect(sql).not.toContain('claimed_by');
+    expect(sql).not.toContain('lead_by');
+  });
+
+  it('🔴 ถูกล็อก BU: ยังกรองใบขอ/แผนกเหมือนเดิม — ผ่อนแค่ "ของใครของมัน" ไม่ใช่สิทธิ์ BU', () => {
+    const q = buildApplicationsListQuery({
+      jobId: null,
+      scopedJobIds: new Set(['siamraj-sql:A']),
+      viewerId: VIEWER,
+      viewerDepartment: 'LBD',
+      everyoneAppointments: true,
+    });
+    const sql = filled(q);
+    expect(sql).toMatch(/job_id = any\(\$1::text\[\]\) or department_code = \$2/);
+    expect(q.params).toHaveLength(2);
+    expect(q.params).toHaveLength(highestParamIndex(sql));
+    expect(q.params).not.toContain(VIEWER);
+  });
+
+  it('legacy (schema เก่า) ก็ต้องอ้าง param ครบเท่ากัน', () => {
+    const q = buildApplicationsListQuery({
+      jobId: null,
+      scopedJobIds: new Set(['siamraj-sql:A']),
+      viewerId: VIEWER,
+      everyoneAppointments: true,
+    });
+    const legacy = q.sql.replace(/\{\{claimWhere\}\}/g, q.legacyClaimWhere).replace(/\{\{leadWhere\}\}/g, 'true');
+    expect(q.params).toHaveLength(highestParamIndex(legacy));
+  });
+
+  it('มุมมองรายใบ / คลังสำรอง / ถัง drill-down ไม่รับธงนี้ — ได้คิวรีเดิมทุกตัวอักษร', () => {
+    const cases = [
+      { jobId: 'siamraj-sql:X' },
+      { jobId: null, leadView: true },
+      { jobId: null, bucketWhere: 'a.phone_e164 is null' },
+    ];
+    for (const c of cases) {
+      const base = { scopedJobIds: null, viewerId: VIEWER, ...c };
+      expect(buildApplicationsListQuery({ ...base, everyoneAppointments: true })).toEqual(buildApplicationsListQuery(base));
+    }
+  });
+
+  it('🔴 ไม่ส่งธง = feed เดิม (ยังซ่อนใบที่คนอื่นเก็บ) — ปุ่ม "ของฉัน" คือของเดิมเป๊ะ', () => {
+    const plain = buildApplicationsListQuery({ jobId: null, scopedJobIds: null, viewerId: VIEWER });
+    expect(buildApplicationsListQuery({ jobId: null, scopedJobIds: null, viewerId: VIEWER, everyoneAppointments: false })).toEqual(plain);
+    expect(resolvedSql(plain)).toContain('claimed_by is null');
+    expect(plain.sql).not.toContain("status = 'converted'");
+  });
+});

@@ -78,6 +78,22 @@ describe('buildApplicationsListQuery — Lead ไปแท็บการติ�
     expect(leadFeed.params).toHaveLength(1);
   });
 
+  it('🔴 นัดของทุกคน (ปุ่ม "ทุกคน" · 10 ต.ค. 2569) ข้าม Lead ของใครของมัน **เฉพาะมุมมองนั้น** — ลิสต์ปกติยังซ่อน Lead ของคนอื่น', () => {
+    const all = buildApplicationsListQuery({ ...base, everyoneAppointments: true });
+    expect(all.leadWhere).toBe('true');
+    expect(all.sql).not.toContain('lead_by');
+    expect(all.sql).toContain("status = 'converted'");
+    // ไม่ส่งธง = กติกาเดิม 4 ต.ค. ทุกตัวอักษร
+    expect(buildApplicationsListQuery({ ...base }).leadWhere).toBe('(not is_lead or lead_by::text = $1)');
+    expect(buildApplicationsListQuery({ ...base, everyoneAppointments: false }).leadWhere).toBe(
+      '(not is_lead or lead_by::text = $1)',
+    );
+    // คลังสำรอง (?lead=1) ไม่รับธงนี้ — ยังเห็นแค่ Lead ของตัวเอง
+    expect(buildApplicationsListQuery({ ...base, leadView: true, everyoneAppointments: true }).leadWhere).toBe(
+      '(is_lead and lead_by::text = $1)',
+    );
+  });
+
   it('จำนวน $n สูงสุดที่ SQL อ้าง ต้องเท่ากับจำนวน param ที่ส่ง (ทุกชุดเงื่อนไข)', () => {
     const cases = [
       buildApplicationsListQuery({ ...base }),
@@ -87,6 +103,13 @@ describe('buildApplicationsListQuery — Lead ไปแท็บการติ�
         ...base,
         scopedJobIds: new Set(['a']),
         viewerDepartment: 'LBD',
+      }),
+      buildApplicationsListQuery({ ...base, everyoneAppointments: true }),
+      buildApplicationsListQuery({
+        ...base,
+        scopedJobIds: new Set(['a']),
+        viewerDepartment: 'LBD',
+        everyoneAppointments: true,
       }),
     ];
     for (const q of cases) {

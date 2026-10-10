@@ -13,9 +13,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  APPOINTMENT_AT_SQL,
   CALLED_SQL,
+  HAS_APPOINTMENT_SQL,
   OVERVIEW_BUCKETS,
+  UPCOMING_7D_NO_RESULT_SQL,
   bucketCondition,
+  buildAttendanceSummarySql,
   buildClaimedIdleSql,
   buildOverviewSql,
   isOverviewBucket,
@@ -58,6 +62,49 @@ describe('โครงสร้าง SQL (static — กับดักที�
     expect(isOverviewBucket("1=1; drop table x")).toBe(false);
     expect(isOverviewBucket('')).toBe(false);
     expect(isOverviewBucket(undefined)).toBe(false);
+  });
+});
+
+/**
+ * 🔴 นัด = บันทึกผลติดต่อ **ล่าสุด** ของใบ (QA รอบ 2 ข้อ 4 · 10 ต.ค. 2569)
+ * status ของใบขยับตามแถวล่าสุด (`createContactLog`) — เดิมภาพรวมอ่าน "เคยมีแถวไหนก็ได้ที่นัดได้"
+ * ⇒ ใบ bf01579d นัด 28/8 แล้ว 8 ต.ค. ติดต่อไม่สำเร็จ: status กลับเป็น contacted แต่ภาพรวมยังนับ "เลยวันนัด"
+ */
+describe('นัดอ่านจากบันทึกติดต่อล่าสุดแถวเดียว (ตรงกับ status ของใบ)', () => {
+  const contactPart = (sql: string) => sql.slice(0, sql.indexOf('candidate_call_holds'));
+
+  it('HAS_APPOINTMENT_SQL / APPOINTMENT_AT_SQL เลือกแถวล่าสุดก่อน แล้วค่อยดูว่าสำเร็จ+มีวันนัด', () => {
+    for (const sql of [HAS_APPOINTMENT_SQL, APPOINTMENT_AT_SQL]) {
+      const c = contactPart(sql);
+      // แถวล่าสุดแถวเดียว (ไม่กรอง ok/วันนัดก่อนเลือก — กรองก่อน = กลับไปเป็น "แถวไหนก็ได้")
+      expect(c).toMatch(/where c\.application_id = a\.id\s+order by c\.created_at desc limit 1/);
+      expect(c).toMatch(/\) c where c\.ok and c\.appointment_at is not null/);
+    }
+  });
+
+  it('ห้ามกลับไปใช้ "เคยมีแถวไหนก็ได้" (exists … c.ok and c.appointment_at)', () => {
+    for (const sql of [HAS_APPOINTMENT_SQL, APPOINTMENT_AT_SQL]) {
+      expect(sql).not.toMatch(/exists \(select 1 from \S*application_contact_logs c\s+where c\.application_id = a\.id and c\.ok/);
+      expect(sql).not.toMatch(/where c\.application_id = a\.id and c\.ok and c\.appointment_at is not null/);
+    }
+  });
+
+  it('ถังเลยนัด / นัดใน 7 วัน / สรุปผลนัด ใช้วันนัดตัวกลางตัวเดียว (ไม่ก๊อปนิพจน์ซ้ำ)', () => {
+    expect(OVERVIEW_BUCKETS.overdue_no_result).toContain(APPOINTMENT_AT_SQL);
+    expect(UPCOMING_7D_NO_RESULT_SQL).toContain(APPOINTMENT_AT_SQL);
+    expect(buildAttendanceSummarySql()).toContain(`${APPOINTMENT_AT_SQL} as appointment_at`);
+    expect(buildAttendanceSummarySql()).toContain(HAS_APPOINTMENT_SQL);
+  });
+
+  it('นัดจากคนถือ (hold 085) คงเดิม — ยังมีกิ่ง hold + temporal guard', () => {
+    expect(HAS_APPOINTMENT_SQL).toContain('h.appointment_at is not null');
+    expect(HAS_APPOINTMENT_SQL).toContain('>= a.created_at');
+    expect(APPOINTMENT_AT_SQL).toContain('h.appointment_at is not null');
+  });
+
+  it('ไม่อ่าน status ของใบ (กติกาข้อ 5)', () => {
+    expect(HAS_APPOINTMENT_SQL).not.toMatch(/\bstatus\b/);
+    expect(APPOINTMENT_AT_SQL).not.toMatch(/\bstatus\b/);
   });
 });
 
@@ -115,6 +162,20 @@ describe.skipIf(!hasDb)('sum-check + bucket-parity กับฐานจริ�
       expect(`${bucket}=${cnt[0].n}`).toBe(`${bucket}=${want}`);
     }
   }, 20_000); // อ่านฐานจริงทุกถัง · 8 ต.ค. 2569 เคยใช้ ~17 วิ ต่อคิวรี → ดัชนีเบอร์ในคิว (migration 139) เหลือ ~0.1 วิ (วัดบนฐานจริงหลัง deploy)
+
+  it('มีนัด ⇔ มีวันนัด (HAS_APPOINTMENT_SQL กับ APPOINTMENT_AT_SQL ชี้ใบชุดเดียวกัน) · SQL ใหม่รันได้จริง', async () => {
+    const { dbQuery } = await import('../../api/_lib/postgres.js');
+    const { tableInAppSchema } = await import('../../api/_lib/schema.js');
+    const APPS = tableInAppSchema('public_job_applications');
+    const { rows } = await dbQuery<{ has: number; at: number; both: number }>(
+      `select count(*) filter (where ${HAS_APPOINTMENT_SQL})::int as has,
+              count(*) filter (where ${APPOINTMENT_AT_SQL} is not null)::int as at,
+              count(*) filter (where ${HAS_APPOINTMENT_SQL} and ${APPOINTMENT_AT_SQL} is not null)::int as both
+         from ${APPS} a`,
+    );
+    expect(rows[0].has).toBe(rows[0].at);
+    expect(rows[0].both).toBe(rows[0].has);
+  }, 20_000);
 
   it('claimed_idle breakdown รวมเท่ากับถัง claimed_idle', async () => {
     const { dbQuery } = await import('../../api/_lib/postgres.js');

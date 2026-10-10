@@ -12881,3 +12881,27 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · ข้อ 14 ป๊อปประกาศ: `useJobPublishRegistry` คืน `postingsFailed` · `BoardPublishSheet` ขึ้น "อ่านลิงก์ไม่ได้ · ลองใหม่" และปิด Gen link จนอ่านได้ (เดิมขึ้น "ยังไม่มีลิงก์" เสี่ยงสร้างซ้ำ)
   · ข้อ 29 มือถือ ตารางรายวันหน้าติดตาม: คอลัมน์ชื่อ `max-md:sticky` · ปุ่มโทร/จัดการ (`rowActions`) อยู่ใต้ชื่อบนจอเล็ก คอลัมน์ขวาซ่อน (`hidden md:table-cell`) — DOM มีสองชุด เทสต์ต้องใช้ getAll
   · ข้อ 37 ป้ายแถว "วันที่ N · สายที่ M" → **"ครั้งที่ N · สายที่ M"** (`followDayCallLabel` ที่เดียว) ตรงกับ "ติดตามครั้งที่"
+- (10 ต.ค. 2569 ดึก) **QA รอบ 2 ข้อหนักที่เจ้าของเคาะนิยาม — ข้อ 1 · 3 · 38–39** (ข้อ 4 แยกบรรทัดของตัวเอง)
+  · ข้อ 1 ป๊อปกล่อง AI โทร/คนโทร (หน้าหลัก) = **ช่องของการ์ดผลโทร** (เจ้าของเลือก "นับทีละสายตามผลจริง"): `followLedgerBucket` (`api/_lib/homeLumosSummarySql.ts`) ตัวเดียวของการ์ด · ตาราง BU · ป๊อป
+    `loadFollowJourney` ส่ง `bucket` ทุกแถว · `followCallerBreakdown` จัดด้วย `r.bucket` · `FOLLOW_CALLED_KEYS` ย้ายไป `src/lib/homeLumosSummary.ts` · ป๊อปใช้คำ/สีจาก `FOLLOW_RESULT_COLS`
+    🔴 หน้าติดตามยังนับตามหมวด (`callCategory` · ผลปิดงานทับทุกสายของวัน) — คนละหน้าคนละมุม ห้ามเอาสองตัวนี้มาเทียบกัน · `scripts/follow-numbers-check.ts` ตรวจป๊อป = การ์ดทุกช่อง
+  · ข้อ 3 "ใบขอเข้ามา · ประกาศแล้ว" งานสรรหา = ทีม Online (เจ้าของเลือก "นิยามเดียว"): `loadOnlineRequestCounts` (`api/_lib/homeOnlineSql.ts`) = ใบขอที่ส่งเข้ามาในช่วง ทุกสถานะ · ประกาศ = id ตรงตัว
+    ช่วงวัน `onlineRequestYmdRange` (`src/lib/homeAiShare.ts`) ตัวเดียว · จับคู่งานยังใช้ใบที่ยังเปิด → ป้าย "ใบที่ยังเปิด" · `scripts/home-numbers-check.ts` ตรวจ งานสรรหา = ทีม Online ทุกช่วง × BU (2181 จุดผ่าน)
+  · ข้อ 38–39 ชุดคำ/สีมาตรฐาน (เจ้าของเลือก): รอโทร (เดิม รอดำเนินการ/ยังไม่มีผล) · โทรแล้ว (เดิม ลงผลแล้ว · สีกรมท่า ไม่ใช่เขียว) · ตอบว่าไป/ตอบว่าไม่ไป บนการ์ดผลโทร · ไม่รับสาย (ทีม Online เดิม "ล้มเหลว (ติดต่อไม่ได้)")
+    · ไม่ใช่เจ้าตัว (เดิม ผิดคน/เบอร์ผิด) · รับแล้วเงียบ · หัว "ไม่ได้โทร" (ยกเลิก + รอโทร) · ยังไม่โทร (ภาพรวมสรรหา) · ปิดงานว่าไป · "สาย" แทน "รอบ" ในป๊อปจัดการ/แก้ไข/ตัวเลือกฟอร์ม
+    · สี: รอโทร = ฟ้า (`FOLLOW_CALL_CATEGORY_TONE.waiting` + `roundTone` sent) · เลยเวลานัด = ส้ม · ยกเลิกบน Dashboard = เทา · คนโทรติดต่อได้ = teal · ปุ่มคนโทร = ม่วง
+    · tooltip รายเดือน + ป๊อปจัดการใช้ `followRoundLabel` (คำเดียวกับชิป) · "ไปแล้ว/ถึงแล้ว" (ผลปิดงาน) คงไว้ = คนละเรื่อง
+    · ⚠️ ยังไม่ได้ทำ: เฉดสี AI/คน ของกราฟรายวันในโหมดมืด (`segmentFillClass` ใช้ `.value` สว่างกว่า `.dot`) — ต้องแก้ token กลาง รอเคาะ
+- (10 ต.ค. 2569 ค่ำ) **QA รอบ 2 ข้อ 4 — แท็บติดตามนัดหมาย ปุ่ม "ของฉัน / ทุกคน"** (เจ้าของ Choice "ปุ่ม ของฉัน / ทุกคน")
+  · เจอ: admin เห็นนัด 1 ใบ ภาพรวมนับ 8 — 6 ใบเป็นของหัวหน้าคนหนึ่งที่เก็บไว้ (claim ถูกซ่อนจากคนอื่น) · 1 ใบเป็นนัดค้างจากนิยามเก่า (bf01579d)
+  · server `api/_handlers/job-applications.ts`: `wantsEveryoneAppointments` (supervisor ขึ้นไป + `?view=appointments&scope=all` · ไม่ปนกับ `job_id`/`lead=1`/`bucket`) →
+    `buildApplicationsListQuery({ everyoneAppointments })` ข้าม claimWhere + leadWhere **เฉพาะแถว `status = 'converted'`** (นิยามเดียวกับ `RM_TAB_STATUSES.appointments`) · สิทธิ์ BU ยังอยู่ครบ
+    🔴 staff/opl ส่งมา = ลิสต์เดิมเป๊ะ · ลิสต์ปกติ/แท็บอื่นห้ามผ่อน (ใบที่คนอื่นเก็บจะโผล่แท็บผู้สมัคร แล้ว "เก็บไปโทรเอง" ได้ 409)
+  · หน้าเว็บ: `RmWorkspace` หัวแท็บนัดหมาย = `ToggleGroup` ของ shadcn (เพิ่ม size `xs` ที่ `src/components/ui/toggle.tsx` เท่าปุ่ม xs) · ค่าเริ่ม "ของฉัน" · โผล่เฉพาะ supervisor ขึ้นไป
+    คำ/ตัวตัดสินสิทธิ์อยู่ `src/lib/recruitRm.ts` (`RM_APPOINTMENT_SCOPE_LABEL` · `canSeeEveryoneAppointments`) · `fetchAllJobApplications(…, everyoneAppointments)`
+    ชุด "ทุกคน" มีแต่แถวนัด ⇒ ไม่นับให้แท็บอื่น/กองเลือกวิธีโทร · `load()` มีลำดับคำขอ กันคำตอบเก่าทับเมื่อสลับเร็ว
+  · 🔴 นิยามนัดของภาพรวม (`applicantOverviewSql.ts` `HAS_APPOINTMENT_SQL` / `APPOINTMENT_AT_SQL`) = **บันทึกติดต่อล่าสุดแถวเดียว** สำเร็จ+มีวันนัด
+    (แถวเดียวกับที่ `createContactLog` ใช้ตั้ง status) · เดิม "เคยมีแถวไหนก็ได้" ⇒ ใบที่ติดต่อไม่สำเร็จทีหลังยังค้าง "เลยวันนัด" · นัดจาก hold คงเดิม
+    `buildAttendanceSummarySql` เลิกก๊อปนิพจน์วันนัดเอง ใช้ `APPOINTMENT_AT_SQL` ตัวกลาง
+  · วัดจริง (อ่านอย่างเดียว): admin "ทุกคน" 8 · ภาพรวม "นัดที่รอบันทึกผล" 7 — ต่างกัน 1 ใบ = ใบ Lead ที่นัดแล้ว (ประชากรภาพรวมไม่นับ Lead) · ใบไม่ใช่ Lead: converted 7 = มีนัด 7 ชุดเดียวกัน
+  · เทสต์ `tests/api/appointmentsScopeToggle2569-10-10.test.ts` · `src/components/recruit-rm/RmWorkspace.appointmentScope.test.tsx` (กดปุ่มจริง) + เพิ่มใน `jobApplicationsListParams` · `recruitLead` · `applicantOverviewSql`

@@ -278,11 +278,20 @@ export async function fetchAllJobApplications(
   bucket?: string | null,
   /** true = ดูเฉพาะใบที่ "ยกเลิกข้อมูลผู้สมัคร" (135) — ลิสต์ปกติไม่มีใบเหล่านี้ */
   cancelledView = false,
+  /**
+   * true = นัดหมายของ **ทุกคน** (แท็บติดตามนัดหมาย ปุ่ม "ทุกคน" · 10 ต.ค. 2569) — server ให้เฉพาะ supervisor ขึ้นไป
+   * (ต่ำกว่านั้นได้ลิสต์เดิม) · ได้แต่แถวนัด ห้ามใช้เป็นข้อมูลของแท็บอื่น
+   */
+  everyoneAppointments = false,
 ): Promise<PublicApplication[]> {
   const qs = new URLSearchParams();
   if (leadView) qs.set('lead', '1');
   if (bucket) qs.set('bucket', bucket);
   if (cancelledView) qs.set('cancelled', '1');
+  if (everyoneAppointments) {
+    qs.set('view', 'appointments');
+    qs.set('scope', 'all');
+  }
   const r = await apiFetch(`/api/job-applications${qs.size > 0 ? `?${qs}` : ''}`);
   if (!r.ok) throw new Error('โหลดรายชื่อผู้สมัครไม่สำเร็จ');
   const data = (await r.json()) as { items?: PublicApplication[] };

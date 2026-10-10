@@ -1,6 +1,8 @@
 import { fullDaysSince } from '@/lib/fullDays';
 import { isOverAge } from '@/lib/applicantAge';
 import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
+import { meetsMinimumRole } from '@/lib/rbac';
+import type { UserRole } from '@/types';
 /**
  * งานสรรหา (RM) — นิยามกลางของหน้า `/recruit/rm`
  *
@@ -53,8 +55,31 @@ export const RM_TAB_LABEL: Record<RmTab, string> = {
 export const RM_TAB_STATUSES: Record<RmTab, ApplicationStatus[] | null> = {
   candidates: null,
   contact: ['new', 'contacted'],
+  // 🔴 server ใช้นิยามเดียวกันกับมุมมอง "ทุกคน" (`status = 'converted'` ใน buildApplicationsListQuery) — แก้ที่นี่ต้องแก้ที่นั่น
   appointments: ['converted'],
 };
+
+/**
+ * แท็บติดตามนัดหมาย: ของฉัน / ทุกคน (QA รอบ 2 ข้อ 4 · เจ้าของ Choice 10 ต.ค. 2569 "ปุ่ม ของฉัน / ทุกคน")
+ * ของฉัน = ค่าเริ่ม (ของใครของมัน — กันสองคนโทรหาคนเดียวกัน) · ทุกคน = นัดของทุกคนใน BU ที่เห็นได้
+ * ปุ่มโผล่เฉพาะ supervisor ขึ้นไป — server ตัดสินซ้ำเอง (`wantsEveryoneAppointments`)
+ */
+export const RM_APPOINTMENT_SCOPES = ['mine', 'all'] as const;
+export type RmAppointmentScope = (typeof RM_APPOINTMENT_SCOPES)[number];
+
+export const RM_APPOINTMENT_SCOPE_LABEL: Record<RmAppointmentScope, string> = {
+  mine: 'ของฉัน',
+  all: 'ทุกคน',
+};
+
+export function isRmAppointmentScope(v: unknown): v is RmAppointmentScope {
+  return typeof v === 'string' && (RM_APPOINTMENT_SCOPES as readonly string[]).includes(v);
+}
+
+/** เห็นปุ่ม "ทุกคน" ไหม — supervisor ขึ้นไป (opl ไม่ผ่าน · กติกาเดียวกับ server) */
+export function canSeeEveryoneAppointments(role: UserRole | null | undefined): boolean {
+  return !!role && meetsMinimumRole(role, 'supervisor');
+}
 
 /**
  * ใบนี้อยู่ในแท็บนี้ไหม — นิยามแท็บที่เดียวของทั้งระบบ (ตัวนับบนแท็บ + ตัวกรองใช้ร่วมกัน)

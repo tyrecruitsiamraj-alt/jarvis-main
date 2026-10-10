@@ -8,6 +8,8 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
+import { meetsMinimumRole } from '../_lib/rbac.js';
+import type { UserRole } from '../_lib/auth.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
@@ -362,6 +364,25 @@ function isUndefinedColumn(e: unknown): boolean {
  * เพราะคอลัมน์ยังไม่มีให้อ้าง (ยังไม่มีใครเก็บได้ = ไม่ต้องซ่อนใคร)
  */
 /**
+ * `?view=appointments&scope=all` — แท็บติดตามนัดหมาย ปุ่ม "ทุกคน" (QA รอบ 2 ข้อ 4 · เจ้าของ Choice 10 ต.ค. 2569
+ * "ปุ่ม ของฉัน / ทุกคน") · เจอจริง: admin เห็นนัด 1 ใบ ภาพรวมนับ 8 (6 ใบเป็นของหัวหน้าคนหนึ่งที่เก็บไว้)
+ *
+ * 🔴 "ของใครของมัน" ยังเป็นค่าเริ่มเสมอ (กันสองคนโทรหาคนเดียวกัน) — ผ่อนได้เฉพาะ:
+ * - supervisor ขึ้นไป (`meetsMinimumRole` · opl ไม่ผ่าน) · ต่ำกว่านั้นส่งมาก็ได้ลิสต์เดิมเป๊ะ (ไม่ตอบ 403 — หน้าเว็บไม่พัง)
+ * - ขอมาตรง ๆ ทั้งสองค่า · ไม่ปนกับมุมมองที่มีเงื่อนไขของตัวเอง (`job_id` · `lead=1` · `bucket`)
+ * อ่านอย่างเดียว — ลงผลมา/ไม่มาบนนัดของคนอื่นผ่านอยู่แล้ว (application-attendance เช็คแค่ BU)
+ */
+export function wantsEveryoneAppointments(
+  query: Record<string, unknown> | undefined,
+  role: UserRole | undefined,
+): boolean {
+  if (!role || !meetsMinimumRole(role, 'supervisor')) return false;
+  const q = query ?? {};
+  if (getString(q.view) !== 'appointments' || getString(q.scope) !== 'all') return false;
+  return !getString(q.job_id) && getString(q.lead) !== '1' && !getString(q.bucket);
+}
+
+/**
  * ประกอบคิวรีลิสต์ใบสมัคร — แยกออกมาเป็นฟังก์ชันล้วนเพื่อให้เทสต์จับได้
  *
  * ⚠️ **จำนวน param ที่ส่งลง pg ต้องเท่ากับ `$n` สูงสุดที่ SQL อ้างเสมอ**
@@ -390,6 +411,11 @@ export function buildApplicationsListQuery(input: {
    * — นิยามเดียวกับตัวนับ เลขบนกล่องจึงเท่ากับจำนวนแถวที่กดเข้ามาเห็นเสมอ
    */
   bucketWhere?: string | null;
+  /**
+   * แท็บติดตามนัดหมาย ปุ่ม "ทุกคน" — ผู้เรียกต้องผ่าน `wantsEveryoneAppointments` (เช็คสิทธิ์) มาแล้วเท่านั้น
+   * ดูเหตุผลที่ฟังก์ชันนั้น · ไม่ส่ง/false = ลิสต์เดิมทุกตัวอักษร
+   */
+  everyoneAppointments?: boolean;
 }): {
   sql: string;
   params: unknown[];
@@ -400,6 +426,8 @@ export function buildApplicationsListQuery(input: {
   const { jobId, scopedJobIds, viewerId, viewerDepartment } = input;
   const params: unknown[] = [];
   const conds: string[] = [];
+  const everyone =
+    input.everyoneAppointments === true && !jobId && !input.leadView && !input.bucketWhere;
   if (jobId) {
     params.push(jobId);
     conds.push(`job_id = $${params.length}`);
@@ -417,6 +445,30 @@ export function buildApplicationsListQuery(input: {
     } else {
       conds.push(byJob);
     }
+  }
+  if (everyone) {
+    /**
+     * นัดหมายของทุกคน — ข้ามเงื่อนไข "ของใครของมัน" (claim + Lead) **เฉพาะแถวที่เป็นนัดแล้ว** · สิทธิ์ BU ข้างบนยังอยู่ครบ
+     *
+     * นิยาม "แถวนัด" = `status = 'converted'` — ตัวเดียวกับที่แท็บใช้เอง (`RM_TAB_STATUSES.appointments` ใน
+     * src/lib/recruitRm.ts) ⇒ "ทุกคน" ครอบ "ของฉัน" เสมอ และไม่มีแถวที่ดึงมาแล้วถูกหน้าเว็บทิ้ง
+     * เลขตรงกับภาพรวม (`appointmentBacklogSql` ใน recruit-overview.ts): ภาพรวมห้ามอ่าน status (กติกาข้อ 5 ของ
+     * applicantOverviewSql.ts) จึงอ่าน "บันทึกติดต่อล่าสุดนัดได้" (`HAS_APPOINTMENT_SQL`) ซึ่งคือแถวเดียวกับที่
+     * `createContactLog` ใช้ตั้ง converted ⇒ สองนิยามชี้ใบชุดเดียวกัน ต่างกันได้แค่
+     * (1) ใบ Lead — ประชากรของภาพรวมไม่นับ Lead (หน้านี้นับ เพราะเป็นนัดจริงที่ต้องบันทึกผล)
+     * (2) นัดที่มาจากคนถือ (hold) อย่างเดียว · (3) status ที่คนเปลี่ยนเองผ่าน PATCH
+     * จำกัด 500 แถวยังอยู่ แต่นับเฉพาะแถวนัด — ใบสมัครอื่นเบียดนัดหลุดจากลิสต์ไม่ได้
+     * 🔴 ห้ามเอาไปใช้กับแท็บอื่น/ลิสต์ปกติ — ใบที่คนอื่นเก็บจะโผล่ในแท็บผู้สมัคร แล้วกด "เก็บไปโทรเอง" ได้ 409
+     */
+    conds.push(`status = 'converted'`);
+    return {
+      sql: `select {{cols}} from ${tbl} a ${conds.length ? `where ${conds.join(' and ')}` : ''}
+        order by created_at desc limit 500`,
+      params,
+      claimWhere: 'true',
+      legacyClaimWhere: 'true',
+      leadWhere: 'true',
+    };
   }
   let claimWhere = 'true';
   let legacyClaimWhere = 'true';
@@ -521,6 +573,7 @@ async function queryWithLegacyFallback(
 /** GET /api/job-applications
  *   ?job_id=<id>  → applicants submitted for that job (newest first)
  *   ?counts=1     → { counts: { [job_id]: n } } for badge display on the board
+ *   ?view=appointments&scope=all → นัดหมายของทุกคน (supervisor ขึ้นไป · ดู wantsEveryoneAppointments)
  */
 /**
  * POST /api/job-applications — เจ้าหน้าที่คีย์ใบสมัครเข้ามาเอง (ฟอร์ม "เพิ่มข้อมูลผู้สมัคร")
@@ -1473,6 +1526,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       bucketWhere: isOverviewBucket(getString(req.query?.bucket))
         ? bucketCondition(getString(req.query?.bucket) as OverviewBucket)
         : null,
+      // แท็บติดตามนัดหมาย "ทุกคน" — สิทธิ์ตัดสินที่นี่ (staff ส่งมา = ลิสต์เดิม)
+      everyoneAppointments: wantsEveryoneAppointments(req.query, req.user.role),
     });
     const rows = await queryWithLegacyFallback(
       q.sql,

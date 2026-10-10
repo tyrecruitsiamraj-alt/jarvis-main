@@ -16,6 +16,8 @@ const toggleVariants = cva(
         default: "h-10 px-3",
         sm: "h-9 px-2.5",
         lg: "h-11 px-5",
+        // เท่าปุ่ม `size="xs"` ของ button.tsx — วางข้างชิปกรอง (FilterChips) แล้วสูงเท่ากัน (10 ต.ค. 2569)
+        xs: "h-7 gap-1.5 px-2.5 text-xs [&_svg]:size-3.5",
       },
     },
     defaultVariants: {
