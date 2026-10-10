@@ -209,6 +209,8 @@ describe('งานค้างตอนนี้ — อายุนับว�
   it('นัดที่รอบันทึกผล ใช้ถังเดียวกับกล่องงาน (เลยนัดยังไม่มีผล) + นัดใน 7 วัน', async () => {
     expect(mod.appointmentBacklogSql()).toContain(sql.OVERVIEW_BUCKETS.overdue_no_result);
     expect(mod.appointmentBacklogSql()).toContain(sql.UPCOMING_7D_NO_RESULT_SQL);
+    // นับนัดของใบ Lead ด้วย (เจ้าของ Choice 10 ต.ค. 2569) — ก้อนนี้ห้ามตัด Lead
+    expect(mod.appointmentBacklogSql()).not.toContain('is_lead');
     const body = await build('2026-09');
     expect(body.backlog?.appointments).toEqual({ overdue: 2, next7: 1 });
   });

@@ -115,14 +115,18 @@ export function backlogSql(): string {
    where ${scopeWhere('$1')}`;
 }
 
-/** นัดที่รอบันทึกผล — ถังเดียวกับกล่องงาน (`overdue_no_result`) + นัดใน 7 วันข้างหน้า · $1 = BU */
+/**
+ * นัดที่รอบันทึกผล — ถังเดียวกับกล่องงาน (`overdue_no_result`) + นัดใน 7 วันข้างหน้า · $1 = BU
+ * 🔴 นับนัดของใบ Lead ด้วย (เจ้าของ Choice 10 ต.ค. 2569 "นับด้วย") — นัดของ Lead ก็ต้องบันทึกผลเหมือนกัน
+ * ⇒ เท่ากับปุ่ม "ทุกคน" ของแท็บติดตามนัดหมาย · ก้อนอื่นของภาพรวมยังไม่นับ Lead ตามเดิม (`scopeWhere`)
+ */
 export function appointmentBacklogSql(): string {
   return `
   select count(*) filter (where ${OVERVIEW_BUCKETS.overdue_no_result})::int as overdue,
          count(*) filter (where ${UPCOMING_7D_NO_RESULT_SQL})::int as next7
     from ${APPS} a
     ${appBuJoin('a')}
-   where ${scopeWhere('$1')}`;
+   where ($1::text is null or ${appBuSql('a')} = $1::text)`;
 }
 
 /** ผลงานรายคนของเดือน [$1, $2) · $3 = BU — คืนแถวดิบ (ใบ × คน) ให้นับรายชื่อไม่ซ้ำฝั่ง Node */

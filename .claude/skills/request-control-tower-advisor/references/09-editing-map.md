@@ -12905,3 +12905,4 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
     `buildAttendanceSummarySql` เลิกก๊อปนิพจน์วันนัดเอง ใช้ `APPOINTMENT_AT_SQL` ตัวกลาง
   · วัดจริง (อ่านอย่างเดียว): admin "ทุกคน" 8 · ภาพรวม "นัดที่รอบันทึกผล" 7 — ต่างกัน 1 ใบ = ใบ Lead ที่นัดแล้ว (ประชากรภาพรวมไม่นับ Lead) · ใบไม่ใช่ Lead: converted 7 = มีนัด 7 ชุดเดียวกัน
   · เทสต์ `tests/api/appointmentsScopeToggle2569-10-10.test.ts` · `src/components/recruit-rm/RmWorkspace.appointmentScope.test.tsx` (กดปุ่มจริง) + เพิ่มใน `jobApplicationsListParams` · `recruitLead` · `applicantOverviewSql`
+  · (ต่อ ข้อ 4) ภาพรวม "นัดที่รอบันทึกผล" นับนัดของใบ Lead ด้วย (เจ้าของ Choice "นับด้วย") — `appointmentBacklogSql` กรองแค่ BU · ก้อนอื่นของภาพรวมยังไม่นับ Lead · เลข 8 = ปุ่ม "ทุกคน"
