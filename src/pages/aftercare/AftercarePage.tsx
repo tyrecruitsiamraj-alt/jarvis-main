@@ -18,6 +18,7 @@ import {
 } from '@/lib/aftercareApi';
 import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
 import AftercarePlanningCalendar from '@/components/aftercare/AftercarePlanningCalendar';
+import AftercareContactPanel from '@/components/aftercare/AftercareContactPanel';
 import {
   aftercareMissingStartDate,
   aftercareRealPlanSummary,
@@ -439,6 +440,25 @@ const AftercarePage: React.FC = () => {
                         </span>
                       ) : null}
                     </div>
+
+                    {/* กดโทร + ลงผลบนแถว (เจ้าของ 10 ต.ค. 2569 "ทำคล้ายๆกับหน้าแท็บ การติดต่อ") */}
+                    {!p.closed_at ? (
+                      <AftercareContactPanel
+                        phone={p.phone_e164}
+                        lastContact={p.last_contact}
+                        contactCount={p.contact_count ?? 0}
+                        disabled={busy}
+                        onSaved={(c) =>
+                          setItems((prev) =>
+                            prev.map((x) =>
+                              x.phone_e164 === p.phone_e164
+                                ? { ...x, last_contact: c, contact_count: (x.contact_count ?? 0) + 1 }
+                                : x,
+                            ),
+                          )
+                        }
+                      />
+                    ) : null}
 
                     {rounds.length > 0 ? (
                       <div className="mt-1.5 flex flex-wrap gap-1.5">

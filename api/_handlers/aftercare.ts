@@ -22,8 +22,11 @@ import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
 import { auditFromAuthed } from '../_lib/audit.js';
+import { AFTERCARE_RESULTS, isAftercareResult } from '../../src/lib/aftercareContact.js';
 
 const TABLE = tableInAppSchema('aftercare_people');
+/** ผลการโทรดูแล (142 · 10 ต.ค. 2569) */
+const CONTACTS = tableInAppSchema('aftercare_contacts');
 
 type Row = {
   phone_e164: string;
@@ -70,7 +73,62 @@ function toResponse(r: Row) {
 const COLS = `phone_e164, full_name, unit_name, site_code, start_date, source,
               from_follow_id, note, moved_by_name, closed_at, closed_reason, created_at`;
 
+type ContactRow = {
+  id: string;
+  phone_e164: string;
+  result: string;
+  note: string | null;
+  created_by_name: string | null;
+  created_at: string | Date;
+};
+const toContact = (c: ContactRow) => ({
+  id: String(c.id),
+  phone_e164: c.phone_e164,
+  result: c.result,
+  note: c.note,
+  created_by_name: c.created_by_name,
+  created_at: iso(c.created_at),
+});
+
+/** ผลล่าสุด + จำนวนครั้งที่โทร ต่อเบอร์ — ยังไม่ migrate 142 = ไม่มี (หน้าเดิมยังเปิดได้) */
+async function lastContactsOf(phones: readonly string[]): Promise<Map<string, { last: ReturnType<typeof toContact>; count: number }>> {
+  const out = new Map<string, { last: ReturnType<typeof toContact>; count: number }>();
+  if (phones.length === 0) return out;
+  try {
+    const { rows } = await dbQuery<ContactRow & { n: number }>(
+      `select distinct on (phone_e164) id::text as id, phone_e164, result, note, created_by_name, created_at,
+              count(*) over (partition by phone_e164)::int as n
+         from ${CONTACTS}
+        where phone_e164 = any($1::text[])
+        order by phone_e164, created_at desc`,
+      [[...phones]],
+    );
+    for (const r of rows) out.set(r.phone_e164, { last: toContact(r), count: Number(r.n) });
+  } catch (e) {
+    if (!isPgUndefinedTable(e)) throw e;
+  }
+  return out;
+}
+
 async function handleGet(req: AuthedReq, res: ApiRes) {
+  // ประวัติการโทรของคนเดียว (กด "ดูประวัติ" บนแถว)
+  const historyPhone = getString(req.query?.history);
+  if (historyPhone) {
+    const phone = toE164Thai(historyPhone);
+    if (!phone) return sendError(res, 400, 'Bad request', 'เบอร์ไม่ถูกต้อง');
+    try {
+      const { rows } = await dbQuery<ContactRow>(
+        `select id::text as id, phone_e164, result, note, created_by_name, created_at
+           from ${CONTACTS} where phone_e164 = $1 order by created_at desc limit 100`,
+        [phone],
+      );
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json({ items: rows.map(toContact) });
+    } catch (e) {
+      if (isPgUndefinedTable(e)) return res.status(200).json({ items: [], migrated: false });
+      throw e;
+    }
+  }
   const includeClosed = getString(req.query?.closed) === '1';
   try {
     const { rows } = await dbQuery<Row>(
@@ -78,8 +136,16 @@ async function handleGet(req: AuthedReq, res: ApiRes) {
         ${includeClosed ? '' : 'where closed_at is null'}
         order by created_at desc limit 500`,
     );
+    const contacts = await lastContactsOf(rows.map((r) => r.phone_e164));
     res.setHeader?.('Cache-Control', 'no-store');
-    return res.status(200).json({ items: rows.map(toResponse), total: rows.length });
+    return res.status(200).json({
+      items: rows.map((r) => ({
+        ...toResponse(r),
+        last_contact: contacts.get(r.phone_e164)?.last ?? null,
+        contact_count: contacts.get(r.phone_e164)?.count ?? 0,
+      })),
+      total: rows.length,
+    });
   } catch (e) {
     // ตารางยังไม่ migrate → หน้าใหม่ต้องเปิดได้และบอกตรง ๆ ว่ายังว่าง (ไม่ใช่จอพัง)
     if (isPgUndefinedTable(e)) return res.status(200).json({ items: [], total: 0, migrated: false });
@@ -88,8 +154,42 @@ async function handleGet(req: AuthedReq, res: ApiRes) {
 }
 
 /** ย้ายคนเข้ามาดูแล — กดซ้ำได้ (upsert ต่อเบอร์ · ไม่สร้างซ้ำ) */
+/** ลงผลการโทรดูแล (10 ต.ค. 2569) — ทุกครั้งเป็นแถวใหม่ (เก็บประวัติ) · ไม่ปิดการดูแลเอง */
+async function handleContact(req: AuthedReq, res: ApiRes, raw: Record<string, unknown> | null) {
+  const phone = toE164Thai(getString(raw?.phone) ?? '');
+  if (!phone) return sendError(res, 400, 'Bad request', 'ต้องระบุเบอร์ที่ใช้กับระบบได้');
+  const result = getString(raw?.result);
+  if (!isAftercareResult(result)) {
+    return sendError(res, 400, 'Bad request', `ผลต้องเป็น ${AFTERCARE_RESULTS.join(' / ')}`);
+  }
+  const note = (getString(raw?.note) ?? '').trim().slice(0, 2000) || null;
+  const { rows: known } = await dbQuery<{ n: number }>(`select count(*)::int as n from ${TABLE} where phone_e164 = $1`, [phone]);
+  if (!known[0]?.n) return sendError(res, 404, 'Not found', 'ไม่พบคนนี้ในรายการดูแล');
+  try {
+    const { rows } = await dbQuery<ContactRow>(
+      `insert into ${CONTACTS} (phone_e164, result, note, created_by, created_by_name)
+       values ($1, $2, $3, $4::uuid, $5)
+       returning id::text as id, phone_e164, result, note, created_by_name, created_at`,
+      [phone, result, note, req.user.sub, req.user.email ?? null],
+    );
+    void auditFromAuthed(req, {
+      action: 'aftercare.contact',
+      entityType: 'aftercare',
+      entityId: phone,
+      after: { result, has_note: note !== null },
+    });
+    return res.status(200).json({ item: toContact(rows[0]) });
+  } catch (e) {
+    if (isPgUndefinedTable(e)) {
+      return sendError(res, 503, 'Not ready', 'ระบบลงผลยังไม่พร้อม (ยังไม่ได้อัปเดตฐานข้อมูล) — ลองใหม่หลังอัปเดต');
+    }
+    throw e;
+  }
+}
+
 async function handlePost(req: AuthedReq, res: ApiRes) {
   const raw = (await readJsonBody(req)) as Record<string, unknown> | null;
+  if (getString(raw?.action) === 'contact') return handleContact(req, res, raw);
   const phone = toE164Thai(getString(raw?.phone) ?? '');
   const fullName = (getString(raw?.full_name) ?? '').trim();
   if (!phone) {

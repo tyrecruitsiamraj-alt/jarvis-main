@@ -12856,3 +12856,8 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · **ติดตามครั้งที่ 1–7 + ประเมิน · เบิกเบี้ยเลี้ยง · เรียนงาน · ยกยอด** — `src/lib/followDayNo.ts` (รหัส 91–94 · ห้ามใช้ 8–11: แถวเดิม plan_day_no 8–12 มี 24 แถว = วันที่ของตารางยาว) ·
     ป้าย "ประเมิน · สายที่ 1" (`followDayCallLabel`) · ชุดที่วันแรกเป็นขั้นมีชื่อ ไม่นับต่อ (`followDayCallPositions`) · เทสต์ `src/lib/followDayNo.test.ts`
   · **"วันที่ของแผน" → "ติดตามครั้งที่"** ทั้งป๊อปสรุปแผน (`FollowDayReportDialog` · หัวรายงาน `followDayReport`) และตัวกรองบนหน้าติดตาม
+- (10 ต.ค. 2569) **ดูแลหลังเริ่มงาน: กดโทร + ลงผลบนแถว** (เจ้าของ *"ทำคล้ายๆกับหน้าแท็บ การติดต่อ"* · Choice ผล 4 แบบ)
+  · migration 142 `aftercare_contacts` (เบอร์ E.164 · result working/issue/resigned/unreachable · หมายเหตุ · คนลง · เวลา) — ทุกครั้งแถวใหม่ (ประวัติ) · ไม่ปิดการดูแลเอง
+  · `api/_handlers/aftercare.ts`: GET แนบ `last_contact` + `contact_count` · `?history=<เบอร์>` · POST `action: 'contact'` · ยังไม่ migrate = หน้าเดิมเปิดได้
+  · `src/lib/aftercareContact.ts` (ป้าย/สี) · `src/components/aftercare/AftercareContactPanel.tsx` (ปุ่มโทร tel: · ลงผล 4 ปุ่ม + หมายเหตุ · ประวัติ) ฝังในแถวของ `AftercarePage`
+  · เทสต์ `tests/api/aftercareContact.test.ts`

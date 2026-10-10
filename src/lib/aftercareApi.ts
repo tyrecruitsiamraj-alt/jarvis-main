@@ -6,6 +6,7 @@
  * (ห้ามให้จอพังเพราะยังไม่ได้รัน migration)
  */
 import { apiFetch } from '@/lib/apiFetch';
+import type { AftercareContact, AftercareResult } from '@/lib/aftercareContact';
 
 export type AftercarePerson = {
   phone_e164: string;
@@ -21,6 +22,9 @@ export type AftercarePerson = {
   closed_at: string | null;
   closed_reason: string | null;
   created_at: string | null;
+  /** ผลการโทรดูแลล่าสุด (142 · 10 ต.ค. 2569) — ยังไม่เคยลงผล = null */
+  last_contact?: AftercareContact | null;
+  contact_count?: number;
 };
 
 export type AftercareList = { items: AftercarePerson[]; total: number; migrated?: boolean };
@@ -67,4 +71,20 @@ export async function updateAftercare(input: {
     throw new Error(body?.message || 'บันทึกไม่สำเร็จ');
   }
   return ((await r.json()) as { item: AftercarePerson }).item;
+}
+
+/** ลงผลการโทรดูแล (ทำงานปกติ · มีปัญหา · ลาออก · ติดต่อไม่ได้ + หมายเหตุ) — ทุกครั้งเก็บเป็นประวัติ */
+export async function addAftercareContact(input: { phone: string; result: AftercareResult; note?: string | null }): Promise<AftercareContact> {
+  const r = await apiFetch('/api/aftercare', { method: 'POST', body: JSON.stringify({ action: 'contact', ...input }) });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message || 'ลงผลไม่สำเร็จ');
+  }
+  return ((await r.json()) as { item: AftercareContact }).item;
+}
+
+export async function fetchAftercareHistory(phone: string): Promise<AftercareContact[]> {
+  const r = await apiFetch(`/api/aftercare?history=${encodeURIComponent(phone)}`);
+  if (!r.ok) throw new Error('โหลดประวัติการโทรไม่สำเร็จ');
+  return ((await r.json()) as { items: AftercareContact[] }).items ?? [];
 }
