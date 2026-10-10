@@ -53,6 +53,7 @@ import {
   irecruitChangedSinceSync,
   replaceSlotRef,
   parseReplaceRef,
+  pickReplaceJobPerPhoneTime,
   wantWallFromSqlDate,
   type ReplaceCallRule,
   type ReplaceDesiredCall,
@@ -258,6 +259,8 @@ type ExistingRow = {
   group_id: string | null;
   recipient_phone: string | null;
   pending: boolean;
+  /** ยกเลิกแล้ว — ใบซ้ำต้องรู้ว่าใบไหนยังมีแถวที่ใช้อยู่ (`pickReplaceJobPerPhoneTime`) */
+  cancelled: boolean;
   /** สร้างก่อนกติกา EX = AI · คนใน = คนโทร — เฉพาะแถวพวกนี้ที่รอบดึงเปลี่ยน AI → คนโทรให้เอง */
   before_type_rule: boolean;
   /** เจ้าหน้าที่เคยแก้แถวนี้บนระบบ (`updated_by` — รอบดึงไม่เคยตั้งค่านี้) */
@@ -430,6 +433,7 @@ export async function runIrecruitReplaceSync(
         `select id, source_ref, scheduled_at, coalesce(call_mode, 'ai') as mode, group_id::text as group_id, recipient_phone,
                 (cancelled_at is null and completed_at is null and staff_call_outcome is null
                   and scheduled_at > $1::timestamptz) as pending,
+                (cancelled_at is not null) as cancelled,
                 (created_at < $3::timestamptz) as before_type_rule,
                 (updated_by is not null) as staff_edited, note, recipient_name, unit_name, site_code
            from ${followTable}
@@ -452,7 +456,21 @@ export async function runIrecruitReplaceSync(
       }
       throw e;
     }
-    /** ยกเลิกได้เฉพาะสายที่นัดก่อนวันท้ายของช่วงที่ดึง — ใบที่เข้างานเลยช่วงไป iRecruit ไม่ได้ตอบมารอบนี้ (ไม่ใช่ถูกยกเลิก) */
+    // ── ใบซ้ำ: คนเดียวหลายใบ เวลาเข้างานเดียวกัน = เหลือใบเดียว (เจ้าของ Choice 10 ต.ค. 2569) ──
+    {
+      const activeJobs = new Set<string>();
+      for (const x of existingRows) {
+        const jobId = parseReplaceRef(x.source_ref)?.jobId;
+        if (jobId && !x.cancelled && x.recipient_phone) activeJobs.add(`${jobId}|${x.recipient_phone}`);
+      }
+      const picked = pickReplaceJobPerPhoneTime(desired, activeJobs);
+      if (picked.droppedJobs.length > 0) {
+        summary.duplicateJobs = picked.droppedJobs.length;
+        logInfo('irecruit.replaceSync: ใบซ้ำเวลาเข้างานเดียวกัน เหลือใบเดียว', { dropped: picked.droppedJobs });
+        desired.splice(0, desired.length, ...picked.kept);
+      }
+    }
+        /** ยกเลิกได้เฉพาะสายที่นัดก่อนวันท้ายของช่วงที่ดึง — ใบที่เข้างานเลยช่วงไป iRecruit ไม่ได้ตอบมารอบนี้ (ไม่ใช่ถูกยกเลิก) */
     const cancelCutoff = new Date(`${summary.toYmd}T00:00:00+07:00`).getTime();
     const existing: ReplaceExistingCall[] = existingRows.map((x) => {
       const at = new Date(x.scheduled_at);

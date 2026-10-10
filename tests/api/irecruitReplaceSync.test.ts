@@ -39,12 +39,12 @@ vi.mock('../../api/_lib/lumosPushClient.js', () => ({ getLumosPushConfig: () => 
 vi.mock('../../api/_lib/followStaffName.js', () => ({ staffNameOfPhone: async () => null }));
 
 import { cancelFlaggedFollowRowsAtLumos, enforceReplaceAiFrom, MIGRATION_133_NOT_READY, runIrecruitReplaceSync } from '../../api/_lib/irecruitReplaceSync.js';
-import { REPLACE_FOLLOW_TOPIC } from '../../src/lib/irecruitReplaceSync.js';
+import { pickReplaceJobPerPhoneTime, REPLACE_FOLLOW_TOPIC } from '../../src/lib/irecruitReplaceSync.js';
 import { createHash } from 'node:crypto';
 
 type Call = { sql: string; params: unknown[] };
 let calls: Call[] = [];
-type Existing = { id: string; source_ref: string; scheduled_at: string; mode: string; group_id: string | null; recipient_phone: string | null; pending: boolean; before_type_rule?: boolean; staff_edited?: boolean };
+type Existing = { id: string; source_ref: string; scheduled_at: string; mode: string; group_id: string | null; recipient_phone: string | null; pending: boolean; cancelled?: boolean; before_type_rule?: boolean; staff_edited?: boolean };
 let existingRows: Existing[] = [];
 let settingsRows: unknown[] = [];
 let settingsError: unknown = null;
@@ -614,5 +614,66 @@ describe('🔴 ลงย้อนหลังข้ามวัน (เจ้า
     expect(params.addedSince.toISOString().slice(0, 10)).toBe('2026-10-03');
     expect(inserts().map((c) => c.params[9])).toEqual(['manual', 'manual', 'manual']);
     expect(enqueuePlan).not.toHaveBeenCalled();
+  });
+});
+
+describe('🔴 ใบซ้ำ: คนเดียวหลายใบ เวลาเข้างานเดียวกัน = เหลือใบเดียว (เจ้าของ Choice 10 ต.ค. 2569)', () => {
+  const W = { ymd: '2026-10-06', hhmm: '07:30' };
+  const d = (jobId: string, phone = P1, wall = W) => ({ jobId, phone, wall });
+
+  it('pure: ไม่มีแถวในระบบ = ใบรหัสน้อยสุด · เบอร์อื่น/เวลาอื่นไม่แตะ', () => {
+    const r = pickReplaceJobPerPhoneTime(
+      [d('B'), d('A'), d('C', '+66899999999'), d('D', P1, { ymd: '2026-10-07', hhmm: '07:30' })],
+      new Set(),
+    );
+    expect(r.kept.map((x) => x.jobId)).toEqual(['A', 'C', 'D']);
+    expect(r.droppedJobs).toEqual(['B']);
+  });
+
+  it('🔴 pure: เลือกใบที่ยังมีแถวไม่ถูกยกเลิก (ใบที่คนยกเลิกแล้วห้ามเลือก ไม่งั้นไม่เหลือใครโทร)', () => {
+    const r = pickReplaceJobPerPhoneTime([d('A'), d('B')], new Set([`B|${P1}`]));
+    expect(r.kept.map((x) => x.jobId)).toEqual(['B']);
+    expect(r.droppedJobs).toEqual(['A']);
+  });
+
+  it('รอบดึง: สองใบใหม่เวลาเดียวกัน ⇒ สร้าง 3 สายของใบเดียว', async () => {
+    irecruitSqlQuery.mockResolvedValue([row('B'), row('A')]);
+    const s = await runIrecruitReplaceSync({ now: NOW });
+    expect(s).toMatchObject({ added: 3, duplicateJobs: 1, error: null });
+    expect(inserts().map(insRef).every((r) => r.startsWith('irecruit-replace:A:'))).toBe(true);
+  });
+
+  it('🔴 รอบดึง: ใบหนึ่งคนยกเลิกไปแล้ว อีกใบยังรอโทร ⇒ ไม่สร้างใหม่ ไม่ยกเลิกใบที่เหลือ (เคส 10 ต.ค.)', async () => {
+    const at = '2026-10-05T23:30:00.000Z';
+    existingRows = [
+      ...(['confirm', 'lead60', 'lead15'] as const).map((slot, i) => ({
+        id: `a${i}`, source_ref: `irecruit-replace:A:${slot}:${pk(P1)}`, scheduled_at: at, mode: 'ai',
+        group_id: 'g', recipient_phone: P1, pending: false, cancelled: true,
+      })),
+      ...(['confirm', 'lead60', 'lead15'] as const).map((slot, i) => ({
+        id: `b${i}`, source_ref: `irecruit-replace:B:${slot}:${pk(P1)}`, scheduled_at: at, mode: 'ai',
+        group_id: 'g', recipient_phone: P1, pending: true, cancelled: false,
+      })),
+    ];
+    irecruitSqlQuery.mockResolvedValue([row('A'), row('B')]);
+    const s = await runIrecruitReplaceSync({ now: NOW });
+    expect(s).toMatchObject({ added: 0, cancelled: 0, duplicateJobs: 1, error: null });
+    expect(inserts()).toHaveLength(0);
+    expect(calls.some((c) => /set cancelled_at = now\(\)/.test(c.sql))).toBe(false);
+  });
+
+  it('รอบดึง: สองใบยังรอโทรทั้งคู่ (ซ้ำก่อนมีตัวกัน) ⇒ เก็บใบรหัสน้อยสุด ยกเลิกสายรอโทรของอีกใบ', async () => {
+    existingRows = (['A', 'B'] as const).flatMap((job) =>
+      (['confirm', 'lead60', 'lead15'] as const).map((slot, i) => ({
+        id: `${job}${i}`, source_ref: `irecruit-replace:${job}:${slot}:${pk(P1)}`,
+        scheduled_at: ['2026-10-05T09:00:00.000Z', '2026-10-05T23:30:00.000Z', '2026-10-06T00:15:00.000Z'][i],
+        mode: 'ai', group_id: 'g', recipient_phone: P1, pending: true, cancelled: false,
+      })),
+    );
+    irecruitSqlQuery.mockResolvedValue([row('A'), row('B')]);
+    const s = await runIrecruitReplaceSync({ now: NOW });
+    expect(s).toMatchObject({ added: 0, cancelled: 3, duplicateJobs: 1 });
+    const cancelCall = calls.find((c) => /set cancelled_at = now\(\)/.test(c.sql));
+    expect(cancelCall?.params[0]).toEqual(['B0', 'B1', 'B2']);
   });
 });

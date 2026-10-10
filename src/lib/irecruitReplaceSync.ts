@@ -159,6 +159,8 @@ export type ReplaceSyncSummary = {
   toManual?: number;
   /** ไม่ใช่ WL ที่ระบบเคยตั้งเป็นคนโทร → AI (8 ต.ค. 2569) */
   toAi?: number;
+  /** ใบงานซ้ำที่ไม่ดึง — คนเดียวมีหลายใบเวลาเข้างานเดียวกัน เหลือใบเดียว (10 ต.ค. 2569) */
+  duplicateJobs?: number;
   /** ดึงไม่ได้ทั้งรอบ — เหตุผลไทย · null = ปกติ */
   error: string | null;
 };
@@ -453,6 +455,47 @@ export type ReplaceReconcile = {
   reschedule: Array<{ existing: ReplaceExistingCall; desired: ReplaceDesiredCall }>;
   cancel: ReplaceExistingCall[];
 };
+
+/**
+ * ═══ คนเดียวหลายใบงาน เวลาเข้างานเดียวกัน = เหลือใบเดียว (เจ้าของ Choice 10 ต.ค. 2569 "เบอร์+เวลาเดียวกันเหลือสายเดียว") ═══
+ *
+ * iRecruit มีใบงาน (SQT) 2 ใบของคนเดียวกัน เวลาเข้างานเดียวกัน ⇒ เดิมได้ 3 สาย × 2 ใบ = คนเดียวโดนโทรซ้ำทุกสาย
+ * (เจอจริง 10 ต.ค. 2569 สองเบอร์ · ยกเลิกแถวซ้ำด้วยมือไปแล้ว 6 แถว)
+ *
+ * เลือกใบที่เก็บ: ใบที่มีแถวในระบบที่ยังไม่ถูกยกเลิกก่อน (`activeJobs` คีย์ `ใบ|เบอร์`) — 🔴 ห้ามเลือกใบที่คนยกเลิกไปแล้ว
+ * ไม่งั้นใบที่ยังอยู่ไม่อยู่ใน desired ⇒ ถูกยกเลิกตาม ⇒ ไม่เหลือใครโทรเลย · ไม่มีใบไหนมีแถว = รหัสใบน้อยสุด (ผลเหมือนเดิมทุกรอบ)
+ * ใบที่ไม่ได้เลือก = ไม่อยู่ใน desired ⇒ `reconcileReplaceCalls` ยกเลิกสายที่ยังไม่ถึงเวลาของใบนั้นเอง (ถ้าดึงครบ)
+ */
+export function pickReplaceJobPerPhoneTime<T extends { jobId: string; phone: string; wall: ReplaceWantWall }>(
+  desired: readonly T[],
+  activeJobs: ReadonlySet<string>,
+): { kept: T[]; droppedJobs: string[] } {
+  const keyOf = (d: T) => `${d.phone}|${d.wall.ymd} ${d.wall.hhmm}`;
+  const jobsByKey = new Map<string, Set<string>>();
+  for (const d of desired) {
+    const set = jobsByKey.get(keyOf(d)) ?? new Set<string>();
+    set.add(d.jobId);
+    jobsByKey.set(keyOf(d), set);
+  }
+  const chosen = new Map<string, string>();
+  const dropped = new Set<string>();
+  for (const [key, set] of jobsByKey) {
+    const jobs = [...set].sort();
+    if (jobs.length === 1) continue;
+    const phone = key.slice(0, key.indexOf('|'));
+    const pick = jobs.find((j) => activeJobs.has(`${j}|${phone}`)) ?? jobs[0];
+    chosen.set(key, pick);
+    for (const j of jobs) if (j !== pick) dropped.add(`${j}|${phone}`);
+  }
+  if (chosen.size === 0) return { kept: [...desired], droppedJobs: [] };
+  return {
+    kept: desired.filter((d) => {
+      const pick = chosen.get(keyOf(d));
+      return pick === undefined || pick === d.jobId;
+    }),
+    droppedJobs: [...dropped].map((k) => k.slice(0, k.indexOf('|'))),
+  };
+}
 
 /**
  * เทียบของที่ iRecruit ต้องการ (`desired`) กับสายที่มีอยู่ (`existing`) — ตรรกะล้วน มีเทสต์

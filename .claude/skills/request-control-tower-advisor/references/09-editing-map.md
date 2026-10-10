@@ -12867,3 +12867,8 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · ช่องวันที่ 4 ไฟล์สุดท้ายเปลี่ยนเป็น `DateSelectDmyBe` (โชว์ พ.ศ. · ส่ง ค.ศ. · เลือกจากปฏิทินเท่านั้น): `FollowPage` (ตารางหลายวัน) · `AftercarePage` (วันเริ่มงาน — ของเดิมยิงบันทึกทุกหลักที่พิมพ์ปี) · `CallHoldPanel` · `MyCallsPage` (วันนัดสัมภาษณ์)
     `DateSelectDmyBe` เพิ่ม prop `ariaLabel` · `tests/api/localeSafeInputs.test.ts` หนี้ `type="date"` = ว่าง (ห้ามเพิ่ม)
   · ชั้นสุดท้ายฝั่ง server: `api/_handlers/follow.ts` `isFollowWhenTooFar` (> 2 ปีข้างหน้า = ปฏิเสธ) ใน `parseFollowInput` (สร้าง/แก้) · `rounds[]` ตอนสร้าง · `parseFollowScheduleReplace` · เทสต์ `tests/api/followYearGuard.test.ts`
+- (10 ต.ค. 2569 เย็น) 🔴 **ส่งคนแทน: คนเดียวหลายใบงาน เวลาเข้างานเดียวกัน = เหลือใบเดียว** (เจ้าของ Choice "เบอร์+เวลาเดียวกันเหลือสายเดียว")
+  · ต้นเหตุสายซ้ำ: iRecruit มี SQT 2 ใบของคนเดียวกัน เวลาเข้างานเดียวกัน ⇒ 3 สาย × 2 ใบ (เจอ 2 เบอร์ · ยกเลิกแถวซ้ำด้วยมือ 6 แถว)
+  · `src/lib/irecruitReplaceSync.ts` `pickReplaceJobPerPhoneTime` (pure) — เลือกใบที่ยังมีแถวไม่ถูกยกเลิกก่อน (🔴 ห้ามเลือกใบที่คนยกเลิกแล้ว ไม่งั้นใบที่เหลือโดนยกเลิกตาม ไม่มีใครโทร) · ไม่มีแถว = รหัสใบน้อยสุด
+  · `api/_lib/irecruitReplaceSync.ts` ตัดใบซ้ำออกจาก desired ก่อน `reconcileReplaceCalls` (ใบที่ไม่เลือก = สายรอโทรถูกยกเลิกเองถ้าดึงครบ) · แถวที่มีอยู่อ่าน `cancelled` เพิ่ม · summary `duplicateJobs`
+  · ลองกับข้อมูลจริงแบบอ่านอย่างเดียวก่อนขึ้น: ตัด 3 ใบ (2 ใบที่ยกเลิกแล้ว + 1 ใบไม่มีสายรอโทร) ไม่ยกเลิกอะไรเพิ่ม · เทสต์ใน `tests/api/irecruitReplaceSync.test.ts`
