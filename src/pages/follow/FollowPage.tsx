@@ -116,6 +116,7 @@ import FollowDayReportDialog from '@/components/follow/FollowDayReportDialog';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import FollowCompletedCard from '@/components/follow/FollowCompletedCard';
 import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
+import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
 import DateTimeField24 from '@/components/shared/DateTimeField24';
 import ReplaceTimingDialog from '@/components/follow/ReplaceTimingDialog';
@@ -2499,13 +2500,15 @@ const FollowPage: React.FC = () => {
                     (กางช่วงวันเสร็จก็ติ๊กต่อได้ทันที ไม่ต้องเลื่อนไปอีกหัวข้อ) */}
                 <p className="ml-1 text-xs font-medium text-foreground">1 · เลือกช่วงวัน</p>
                 <div className="grid grid-cols-2 gap-2">
+                  {/* 🔴 ห้าม <input type="date"> — 9 ต.ค. 2569 มีคนพิมพ์ปี 2569 ลงช่องของเบราว์เซอร์ (ช่องรับปี ค.ศ.)
+                      ได้สาย 28 สายปี ค.ศ. 2569 ไม่มีวันถึง · ปฏิทินไทยโชว์ พ.ศ. แต่ส่งค่า ค.ศ. เสมอ */}
                   <div className="space-y-1">
-                    <label htmlFor="followFrom" className="ml-1 text-xs font-medium text-muted-foreground">ตั้งแต่วันที่</label>
-                    <input id="followFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="jarvis-soft-field min-h-[46px] w-full" />
+                    <p className="ml-1 text-xs font-medium text-muted-foreground">ตั้งแต่วันที่</p>
+                    <DateSelectDmyBe value={dateFrom} onChange={setDateFrom} allowEmpty ariaLabel="ตั้งแต่วันที่" />
                   </div>
                   <div className="space-y-1">
-                    <label htmlFor="followTo" className="ml-1 text-xs font-medium text-muted-foreground">ถึงวันที่</label>
-                    <input id="followTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="jarvis-soft-field min-h-[46px] w-full" />
+                    <p className="ml-1 text-xs font-medium text-muted-foreground">ถึงวันที่</p>
+                    <DateSelectDmyBe value={dateTo} onChange={setDateTo} allowEmpty ariaLabel="ถึงวันที่" />
                   </div>
                 </div>
                 {/* เลือกได้ว่าจะส่งให้ Lumos วันไหนบ้าง (เจ้าของสั่ง 17 ส.ค. 2569)

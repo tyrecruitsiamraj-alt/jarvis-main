@@ -10,7 +10,7 @@
  * และสั่งด้วย `lang` ของหน้าไม่ได้ (ลองกับ Chrome แล้ว มันไม่สน)
  *
  * 🔴 เวลา: ใช้ `TimeSelect24` เท่านั้น (24 ชม. + "น." เหมือนกันทุกเครื่อง)
- * 🟡 วันที่: ยังเหลืออยู่ตามรายการข้างล่าง — เพิ่มใหม่ไม่ได้ ต้องใช้ `DayCalendarPicker`
+ * 🔴 วันที่: ใช้ `DateSelectDmyBe` (ช่องในฟอร์ม) หรือ `DayCalendarPicker` (ตัวกรอง) — ห้ามมี `type="date"` อีก
  */
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -27,14 +27,12 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** ไฟล์ที่ยังใช้ `type="date"` / `type="datetime-local"` อยู่ — **ห้ามเพิ่มชื่อใหม่** */
-const DATE_INPUT_DEBT = [
-  'src/components/matching/CallHoldPanel.tsx',
-  // ApplicantContactDialog.tsx ปลดหนี้แล้ว 1 ต.ค. 2569 (ป๊อปรายละเอียดโฉม iRecruit ใช้ DateSelectDmyBe)
-  'src/pages/aftercare/AftercarePage.tsx',
-  'src/pages/follow/FollowPage.tsx',
-  'src/pages/matching/MyCallsPage.tsx',
-];
+/**
+ * ไฟล์ที่ยังใช้ `type="date"` — **ปลดหนี้ครบแล้ว 10 ต.ค. 2569** (เหลือ 4 ไฟล์ · เปลี่ยนเป็น `DateSelectDmyBe` ทั้งหมด)
+ * ต้นเหตุที่ต้องปลด: 9 ต.ค. 2569 มีคนพิมพ์ปี พ.ศ. 2569 ลงช่องวันที่ของเบราว์เซอร์ (ช่องรับปี ค.ศ.)
+ * ⇒ ได้สายโทร 28 สายปี ค.ศ. 2569 ที่ไม่มีวันถึง · ปฏิทินไทยโชว์ พ.ศ. แต่ส่งค่า ค.ศ. เสมอ
+ */
+const DATE_INPUT_DEBT: string[] = [];
 
 const files = walk(SRC);
 const rel = (f: string) => `src/${f.slice(SRC.length)}`;
@@ -64,7 +62,7 @@ describe('ช่องวันที่/เวลาต้องไม่ขึ
     expect(found).toEqual(['src/components/matching/CallHoldPanel.tsx']);
   });
 
-  it('🟡 <input type="date"> มีได้เฉพาะไฟล์เดิมที่ค้างอยู่ — ที่ใหม่ต้องใช้ DayCalendarPicker', () => {
+  it('🔴 ห้ามมี <input type="date"> ที่ไหนอีก — พิมพ์ปี พ.ศ. ลงช่อง ค.ศ. ได้ (สายปี ค.ศ. 2569 · 9 ต.ค. 2569)', () => {
     const found = files
       .filter((f) => /type="date"/.test(codeOf(f)))
       .map(rel)

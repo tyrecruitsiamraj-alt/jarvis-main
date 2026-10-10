@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
+import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { useListPagination } from '@/hooks/useListPagination';
 import { cn } from '@/lib/utils';
@@ -401,19 +402,19 @@ const AftercarePage: React.FC = () => {
                     </div>
 
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                      <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                      {/* 🔴 ห้าม <input type="date"> — พิมพ์ปีทีละหลักแล้ว onChange ยิงบันทึกทุกหลัก (ปี 0002 · 0025 · 0256 · 2569)
+                          และพิมพ์ พ.ศ. ลงช่อง ค.ศ. ได้ (9 ต.ค. 2569 เจอสายปี ค.ศ. 2569 บนหน้าติดตาม) ⇒ ปฏิทินไทย เลือกแล้วบันทึกครั้งเดียว */}
+                      <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                         วันเริ่มงาน
-                        <input
-                          type="date"
-                          defaultValue={p.start_date ?? ''}
+                        <DateSelectDmyBe
+                          value={p.start_date ?? ''}
+                          onChange={(v) => void saveStartDate(p.phone_e164, v)}
+                          allowEmpty
                           disabled={busy || !!p.closed_at}
-                          onChange={(e) => void saveStartDate(p.phone_e164, e.target.value)}
-                          className="jarvis-soft-field min-h-[32px] text-xs disabled:opacity-50"
+                          ariaLabel="วันเริ่มงาน"
+                          className="w-40"
                         />
-                        {p.start_date ? (
-                          <span className={DASH.muted}>({formatYmdDmyBe(p.start_date)})</span>
-                        ) : null}
-                      </label>
+                      </div>
                       <span
                         className={cn(
                           'text-[11px]',

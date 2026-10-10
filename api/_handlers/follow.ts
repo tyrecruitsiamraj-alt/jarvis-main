@@ -337,6 +337,19 @@ export type ParsedFollowInput = {
 };
 
 const HHMM_RE = /^\d{1,2}:\d{2}$/;
+
+/**
+ * 🔴 วันโทรไกลเกิน 2 ปี = ปีผิด (10 ต.ค. 2569)
+ *
+ * 9 ต.ค. 2569 มีคนพิมพ์ปี พ.ศ. 2569 ลงช่องวันที่ของเบราว์เซอร์ (ช่องรับปี ค.ศ.) ⇒ ได้สาย 28 สายปี ค.ศ. 2569
+ * ที่ไม่มีวันถึง · จอแก้ที่ต้นทางแล้ว (ปฏิทินไทย) — ตัวนี้กันชั้นสุดท้ายเผื่อมีทางเข้าอื่น
+ * งานติดตามไม่มีอะไรตั้งล่วงหน้าเกินปี ⇒ 2 ปีเผื่อไว้กว้างแล้ว (พ.ศ.−ค.ศ. = 543 ปี ห่างกันมาก)
+ */
+export const FOLLOW_MAX_AHEAD_MS = 2 * 365 * 24 * 60 * 60_000;
+export const FOLLOW_WHEN_TOO_FAR_MSG = 'ปีของวันที่ไม่ถูก ลองเลือกวันจากปฏิทินอีกครั้ง';
+export function isFollowWhenTooFar(when: Date, now: Date): boolean {
+  return when.getTime() > now.getTime() + FOLLOW_MAX_AHEAD_MS;
+}
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
@@ -381,6 +394,7 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
   if (Number.isNaN(when.getTime())) {
     return fail('วันเวลาที่ให้โทรไม่ถูกต้อง');
   }
+  if (isFollowWhenTooFar(when, now)) return fail(FOLLOW_WHEN_TOO_FAR_MSG);
 
   // ตารางโทร (092): group_id (client gen · 1 คน 1 uuid) + call_times (รอบของวันนั้น)
   let groupId: string | null = null;
@@ -798,6 +812,9 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
   }
 
   const rounds = parseFollowRounds(raw, { when, staffPhone, callRound });
+  if (rounds.some((r) => isFollowWhenTooFar(r.when, new Date()))) {
+    return sendError(res, 400, 'Bad request', FOLLOW_WHEN_TOO_FAR_MSG);
+  }
   if (rounds.length > 1) {
     await createFollowRounds(req, res, parsed.value, rounds);
     return;
@@ -1422,6 +1439,7 @@ export function parseFollowScheduleReplace(
     if (id && seenIds.has(id)) return fail('สายเดียวกันซ้ำสองครั้ง');
     const when = typeof o.scheduled_at === 'string' ? new Date(o.scheduled_at) : null;
     if (!when || Number.isNaN(when.getTime())) return fail('เวลาโทรไม่ถูกต้อง');
+    if (isFollowWhenTooFar(when, now)) return fail(FOLLOW_WHEN_TOO_FAR_MSG);
     // Lumos รับแต่เวลาอนาคต — เวลาที่ผ่านแล้ว = โทรทันที (ให้เวลาเหลือ 1 นาที กันคนกดตรงนาทีนั้นพอดี)
     if (when.getTime() < now.getTime() + 60_000) return fail('เวลาที่ผ่านมาแล้วตั้งไม่ได้ — เลือกเวลาอนาคต');
     const minute = Math.floor(when.getTime() / 60_000);

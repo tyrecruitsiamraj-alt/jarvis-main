@@ -12861,3 +12861,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · `api/_handlers/aftercare.ts`: GET แนบ `last_contact` + `contact_count` · `?history=<เบอร์>` · POST `action: 'contact'` · ยังไม่ migrate = หน้าเดิมเปิดได้
   · `src/lib/aftercareContact.ts` (ป้าย/สี) · `src/components/aftercare/AftercareContactPanel.tsx` (ปุ่มโทร tel: · ลงผล 4 ปุ่ม + หมายเหตุ · ประวัติ) ฝังในแถวของ `AftercarePage`
   · เทสต์ `tests/api/aftercareContact.test.ts`
+- (10 ต.ค. 2569 บ่าย) 🔴 **ปี พ.ศ. หลุดเข้าช่องวันที่ = สายที่ไม่มีวันถึง** — ห้ามมี `<input type="date">` ที่ไหนอีก
+  · เจอ: 9 ต.ค. มีคนพิมพ์ 2569 ลงช่อง "ตั้งแต่วันที่/ถึงวันที่" ของตารางหลายวัน (ช่องของเบราว์เซอร์รับปี ค.ศ.) ⇒ 28 สาย (2 คน × 7 วัน × 2 สาย · คนโทร · ยังไม่ชัวร์เวลา) ได้ปี ค.ศ. 2569 ไม่ขึ้นวันไหนเลย
+    แก้ฐานแล้วด้วย id ทีละแถว (−543 ปี → 12–18 ต.ค. 2569) · สแกนทุกคอลัมน์วันที่ใน `jarvis_rm` (179 คอลัมน์) ไม่เจอที่อื่น
+  · ช่องวันที่ 4 ไฟล์สุดท้ายเปลี่ยนเป็น `DateSelectDmyBe` (โชว์ พ.ศ. · ส่ง ค.ศ. · เลือกจากปฏิทินเท่านั้น): `FollowPage` (ตารางหลายวัน) · `AftercarePage` (วันเริ่มงาน — ของเดิมยิงบันทึกทุกหลักที่พิมพ์ปี) · `CallHoldPanel` · `MyCallsPage` (วันนัดสัมภาษณ์)
+    `DateSelectDmyBe` เพิ่ม prop `ariaLabel` · `tests/api/localeSafeInputs.test.ts` หนี้ `type="date"` = ว่าง (ห้ามเพิ่ม)
+  · ชั้นสุดท้ายฝั่ง server: `api/_handlers/follow.ts` `isFollowWhenTooFar` (> 2 ปีข้างหน้า = ปฏิเสธ) ใน `parseFollowInput` (สร้าง/แก้) · `rounds[]` ตอนสร้าง · `parseFollowScheduleReplace` · เทสต์ `tests/api/followYearGuard.test.ts`

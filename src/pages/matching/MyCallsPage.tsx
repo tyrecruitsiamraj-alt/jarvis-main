@@ -34,6 +34,7 @@ import {
 import { bookingActionFor, bookingTargetFromHold } from '@/lib/callResultBooking';
 import { ProposalConflictError, saveProposal } from '@/lib/candidateProposalsApi';
 import { Phone } from 'lucide-react';
+import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 
 /**
  * หน้า "โทรของฉัน" — ถังงานโทรของเจ้าหน้าที่คนเดียว
@@ -451,20 +452,21 @@ export const MyCallsSection: React.FC<{ lane?: CallLane; skipApplications?: bool
                               </label>
                             ))}
                             {scope === 'scheduled' ? (
-                              <label className="flex flex-wrap items-center gap-2 pt-1">
+                              <div className="flex flex-wrap items-center gap-2 pt-1">
                                 <span className={cn('font-medium', DASH.cellStrong)}>
                                   วันนัดสัมภาษณ์
                                 </span>
-                                <input
-                                  type="date"
+                                <DateSelectDmyBe
                                   value={appointmentAt}
-                                  onChange={(e) => {
-                                    setAppointmentAt(e.target.value);
+                                  onChange={(v) => {
+                                    setAppointmentAt(v);
                                     setError(null);
                                   }}
-                                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                  allowEmpty
+                                  ariaLabel="วันนัดสัมภาษณ์"
+                                  className="w-40"
                                 />
-                              </label>
+                              </div>
                             ) : null}
                           </div>
                         ) : null}

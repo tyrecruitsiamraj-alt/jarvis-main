@@ -12,6 +12,7 @@ import {
   type CallResultScope,
 } from '@/lib/callHoldsApi';
 import { PhoneCall } from 'lucide-react';
+import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 import {
   CONFIRMED_SCOPE_HINT,
@@ -236,13 +237,7 @@ export default function CallHoldPanel({
                 </label>
               ))}
               {scope === 'scheduled' ? (
-                <input
-                  type="date"
-                  value={appointmentAt}
-                  onChange={(e) => setAppointmentAt(e.target.value)}
-                  aria-label="วันนัดสัมภาษณ์"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                />
+                <DateSelectDmyBe value={appointmentAt} onChange={setAppointmentAt} allowEmpty ariaLabel="วันนัดสัมภาษณ์" />
               ) : null}
             </div>
           ) : null}

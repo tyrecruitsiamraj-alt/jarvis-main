@@ -11,6 +11,8 @@ export interface DateSelectDmyBeProps {
   allowEmpty?: boolean;
   disabled?: boolean;
   className?: string;
+  /** ชื่อช่องสำหรับโปรแกรมอ่านหน้าจอ (ปุ่มไม่มี id ให้ `<label htmlFor>` ชี้) */
+  ariaLabel?: string;
 }
 
 /** เลือกวันที่จากปฏิทินแบบคลิกวัน — ค่าที่ส่งออกยังเป็น YYYY-MM-DD สำหรับ API */
@@ -20,6 +22,7 @@ const DateSelectDmyBe: React.FC<DateSelectDmyBeProps> = ({
   allowEmpty = false,
   disabled = false,
   className = '',
+  ariaLabel,
 }) => {
   const [open, setOpen] = useState(false);
 
@@ -43,7 +46,7 @@ const DateSelectDmyBe: React.FC<DateSelectDmyBeProps> = ({
     <div className={className}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" disabled={disabled} className={buttonClass}>
+          <button type="button" disabled={disabled} aria-label={ariaLabel} className={buttonClass}>
             <span className={!displayLabel ? 'text-muted-foreground' : ''}>
               {displayLabel || 'เลือกวันที่'}
             </span>
