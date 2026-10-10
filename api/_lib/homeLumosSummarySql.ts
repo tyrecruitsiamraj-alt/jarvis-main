@@ -22,8 +22,8 @@ import { journeyResultOf } from '../../src/lib/followJourney.js';
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const FOLLOW = tableInAppSchema('follow_entries');
 
-/** ช่องของรายชื่อติดตาม — แยกกันขาด (CASE ลำดับเดียว) ⇒ รวมทุกช่อง = ทั้งหมด */
-const FOLLOW_BUCKET_SQL = `case
+/** ช่องของรายชื่อติดตาม — แยกกันขาด (CASE ลำดับเดียว) ⇒ รวมทุกช่อง = ทั้งหมด · ป๊อปกล่อง AI โทร/คนโทร ใช้ตัวนี้ด้วย */
+export const FOLLOW_BUCKET_SQL = `case
       when f.call_mode is distinct from 'manual' then
         case when q.status = 'completed' then 'done'
              when q.status = 'failed' then 'failed'
@@ -35,6 +35,24 @@ const FOLLOW_BUCKET_SQL = `case
              when f.cancelled_at is not null then 'cancelled'
              else 'waiting' end
     end`;
+
+/**
+ * ช่องของแถวหนึ่ง (แถวต้องมี `FOLLOW_BUCKET_SQL as ledger_bucket` + คอลัมน์ของ `categorizeFollowRows`)
+ * 🔴 ตัวเดียวของการ์ดผลโทร · ตาราง BU · ป๊อปกล่อง AI โทร/คนโทร (QA 10 ต.ค. 2569 ป๊อปเคยนับด้วยหมวดหน้าติดตาม ไป 781 ≠ การ์ด 667 ·
+ * เจ้าของเลือก "นับทีละสายตามผลจริง") — ขั้นแรกตัดด้วยผลคิว/ผลที่คนลง · "มีผล" ค่อยแตกด้วยหมวดของหน้าติดตาม
+ */
+export function followLedgerBucket(
+  r: Record<string, unknown>,
+  derived: ReturnType<typeof categorizeFollowRows>,
+): FollowBucketKey {
+  const first = String(r.ledger_bucket) as 'done' | 'waiting' | 'failed' | 'cancelled';
+  if (first !== 'done') return first;
+  const d = derived.get(String(r.id));
+  const outcome =
+    (typeof r.staff_call_outcome === 'string' && r.staff_call_outcome.trim()) ||
+    (typeof r.call_outcome === 'string' ? r.call_outcome : null);
+  return d ? doneBucketOf(journeyResultOf(d.category, outcome)) : 'unclear';
+}
 
 const BUCKET_COLS = `count(*)::int as total,
          count(*) filter (where q.status = 'completed')::int as done,
@@ -106,13 +124,7 @@ export async function loadHomeLumosSummary(
   const byBuCells = new Map<string, FollowBuCell>();
   for (const r of follow.rows) {
     const b = r.call_mode === 'manual' ? split.staff : split.ai;
-    const first = String(r.ledger_bucket) as 'done' | 'waiting' | 'failed' | 'cancelled';
-    let key: FollowBucketKey = first === 'done' ? 'unclear' : first;
-    if (first === 'done') {
-      const d = derived.get(String(r.id));
-      const outcome = (typeof r.staff_call_outcome === 'string' && r.staff_call_outcome.trim()) || (typeof r.call_outcome === 'string' ? r.call_outcome : null);
-      key = d ? doneBucketOf(journeyResultOf(d.category, outcome)) : 'unclear';
-    }
+    const key = followLedgerBucket(r, derived);
     b[key] += 1;
     b.total += 1;
     // แยก BU — ช่องย่อยเดียวกับข้างบน (รวมทุกช่อง = split พอดี)

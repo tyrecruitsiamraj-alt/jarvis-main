@@ -191,14 +191,15 @@ const FollowDashboard: React.FC = () => {
                 unit="สาย"
                 value={matrixNow[k]}
                 previous={matrixPrev[k]}
-                tone={k === 'total' ? 'primary' : FOLLOW_MATRIX_COL_TONE[k] === 'neutral' ? 'primary' : FOLLOW_MATRIX_COL_TONE[k]}
+                // ยกเลิก = เทา (QA 10 ต.ค. 2569 เดิมเปลี่ยนเป็นกรมท่า สีเดียวกับ "ทั้งหมด")
+                tone={k === 'total' ? 'primary' : FOLLOW_MATRIX_COL_TONE[k]}
               />
             ))}
           </div>
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             <TrendKpiCard label="ลงติดตาม" unit="คน" value={now.registered} previous={prev.registered} tone="violet" spark={reg.map((p) => p.value)} />
-            <TrendKpiCard label="โทรแล้ว" unit="สาย" value={now.called} previous={prev.called} tone="info" spark={called.map((p) => p.value)} />
+            <TrendKpiCard label="โทรแล้ว" unit="สาย" value={now.called} previous={prev.called} tone="primary" spark={called.map((p) => p.value)} />
             <TrendKpiCard label="ติดต่อได้" value={rate(now.connected, now.called)} previous={rate(prev.connected, prev.called)} asRate tone="teal" foot={`${fmt(now.connected)} จาก ${fmt(now.called)} สาย`} />
             <TrendKpiCard label="ปิดงานว่าไปแล้ว" unit="คน" value={now.success} previous={prev.success} tone="success" spark={success.map((p) => p.value)} />
             <TrendKpiCard label="อัตราปิดงานว่าไป" value={rate(now.success, now.completed)} previous={rate(prev.success, prev.completed)} asRate tone="success" foot={`${fmt(now.success)} จาก ${fmt(now.completed)} ที่ปิดงาน`} />
@@ -223,7 +224,8 @@ const FollowDashboard: React.FC = () => {
               unit="สาย"
               value={callerNow.manual.connected}
               previous={callerPrev.manual.connected}
-              tone="warn"
+              // ติดต่อได้ = สีเดียวกับ AI ติดต่อได้ (QA 10 ต.ค. 2569 เดิมเหลือง = สีของไม่รับสาย)
+              tone="teal"
               foot={`จาก ${fmt(callerNow.manual.calls)} สายที่คนลงผล`}
             />
           </div>
@@ -241,7 +243,7 @@ const FollowDashboard: React.FC = () => {
                 }))}
                 series={[
                   { key: 'registered', label: 'ลงติดตาม', kind: 'bar', tone: 'violet' },
-                  { key: 'called', label: 'โทรแล้ว', kind: 'line', tone: 'info' },
+                  { key: 'called', label: 'โทรแล้ว', kind: 'line', tone: 'primary' },
                   { key: 'success', label: FOLLOW_METRIC_LABEL.success, kind: 'line', tone: 'success' },
                   { key: 'dropped', label: FOLLOW_METRIC_LABEL.dropped, kind: 'line', tone: 'danger', dashed: true },
                 ]}

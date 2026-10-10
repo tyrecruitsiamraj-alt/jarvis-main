@@ -10,6 +10,7 @@
  * ไฟล์นี้ pure — เทสต์ที่ `tests/api/followJourney.test.ts`
  */
 import type { FollowCallCategory } from '@/lib/followPlanning';
+import { FOLLOW_CALLED_KEYS, type FollowBucketKey } from '@/lib/homeLumosSummary';
 
 export type FollowJourneyTeam = 'main' | 'replacement';
 export type FollowJourneyView = 'all' | FollowJourneyTeam;
@@ -39,6 +40,8 @@ export type FollowJourneyRow = {
   team: FollowJourneyTeam;
   caller: 'ai' | 'manual';
   result: FollowJourneyResult;
+  /** ช่องของการ์ดผลโทร (ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · ล้มเหลว · ยกเลิก · รอ) — นับทีละสายตามผลจริง (QA 10 ต.ค. 2569) */
+  bucket: FollowBucketKey;
   /** ส่งคนแทน: ใบงานจาก iRecruit (null = คีย์เอง) · ประเภทคนไปแทน (IN = คนใน) */
   job: string | null;
   replaceType: string | null;
@@ -230,10 +233,12 @@ export function journeyResultMatrixCol(
  * ═══ กดกล่อง AI โทร / คนโทร บนหน้าหลัก (เจ้าของ 7 ต.ค. 2569 ค่ำ) ═══
  * *"ถ้ากด Aiโทร … แต่ละเรื่องที่ Ai โทรให้เท่าไหร่ · กดแต่ละเรื่อง = โทรไปเท่าไหร่ · ไป ไม่ไป ไม่รับสาย สรุปไม่ได้ · ยกเลิก · รอโทร"*
  * Choice: เรื่อง = 2 แท็บของติดตามก่อน · คนโทรแบบเดียวกัน · ป๊อปเดิมเปลี่ยนข้างใน
- * ช่อง = ช่องของแผงหน้าติดตาม (`journeyResultMatrixCol` · ขอเลื่อนอยู่ในสรุปไม่ได้) ⇒ รวมทุกช่อง = ทั้งหมดของเรื่องนั้นเสมอ
+ * 🔴 10 ต.ค. 2569 (QA · เจ้าของเลือก "นับทีละสายตามผลจริง"): ช่อง = **ช่องของการ์ดผลโทร** (`r.bucket` จาก `followLedgerBucket`)
+ * เดิมใช้หมวดหน้าติดตาม (ผลปิดงานทับทุกสายของวัน) ⇒ ป๊อปบอกไป 781 แต่การ์ด 667 · ตอนนี้ทุกช่องตรงกับการ์ด/ตาราง BU
+ * รวมทุกช่อง = ทั้งหมดของเรื่องนั้นเสมอ
  */
-export type FollowCallerCol = 'went' | 'notWent' | 'noAnswer' | 'unclear' | 'cancelled' | 'waiting';
-export const FOLLOW_CALLER_CALLED: readonly FollowCallerCol[] = ['went', 'notWent', 'noAnswer', 'unclear'];
+export type FollowCallerCol = FollowBucketKey;
+export const FOLLOW_CALLER_CALLED: readonly FollowCallerCol[] = FOLLOW_CALLED_KEYS;
 export const FOLLOW_CALLER_COLS: readonly FollowCallerCol[] = [...FOLLOW_CALLER_CALLED, 'cancelled', 'waiting'];
 
 export type FollowCallerTopic = {
@@ -250,7 +255,7 @@ export function followCallerBreakdown(rows: readonly FollowJourneyRow[], caller:
       FollowCallerCol,
       FollowJourneyRow[]
     >;
-    for (const r of mine) cols[journeyResultMatrixCol(r.result)].push(r);
+    for (const r of mine) cols[r.bucket].push(r);
     return { team, rows: mine, cols, called: FOLLOW_CALLER_CALLED.flatMap((c) => cols[c]) };
   });
 }

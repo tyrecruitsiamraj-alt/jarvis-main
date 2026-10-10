@@ -348,7 +348,7 @@ export function DailyCard({ rows, icon }: { rows: readonly DailyRow[]; icon: Luc
             <table className="w-full text-sm">
               <thead className={cn('text-xs', DASH.tableHead)}>
                 <tr>
-                  {['วันที่กรอก', 'รายชื่อ', 'โทรภายใน 24 ชม.', '1 วัน', '2 วันขึ้นไป', 'ยังไม่ได้โทร', 'ตอบ AI ว่าสนใจ', 'คนโทรต่อแล้ว'].map((h, i) => (
+                  {['วันที่กรอก', 'รายชื่อ', 'โทรภายใน 24 ชม.', '1 วัน', '2 วันขึ้นไป', 'ยังไม่โทร', 'ตอบ AI ว่าสนใจ', 'คนโทรต่อแล้ว'].map((h, i) => (
                     <th key={h} className={cn('px-2 py-2 font-medium', i === 0 ? 'text-left' : 'text-right')}>
                       {h}
                     </th>

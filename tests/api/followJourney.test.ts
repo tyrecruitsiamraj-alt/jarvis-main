@@ -31,19 +31,21 @@ const row = (p: Partial<FollowJourneyRow> & { id: string }): FollowJourneyRow =>
   team: 'main',
   caller: 'ai',
   result: 'waiting',
+  bucket: 'waiting',
   job: null,
   replaceType: null,
   ...p,
 });
 
+// bucket = ช่องของการ์ดผลโทร (server `followLedgerBucket`)
 const ROWS: FollowJourneyRow[] = [
-  row({ id: '1', person: 'a', result: 'agreed' }),
-  row({ id: '2', person: 'a', result: 'agreed', caller: 'manual' }),
-  row({ id: '3', person: 'b', result: 'lost', ymd: '2026-10-05' }),
-  row({ id: '4', person: 'c', result: 'reschedule' }),
-  row({ id: '5', person: 'd', result: 'other' }),
-  row({ id: '6', person: 'e', result: 'unreachable', caller: 'manual' }),
-  row({ id: '7', person: 'f', result: 'cancelled', team: 'replacement', job: 'J1', replaceType: 'WL' }),
+  row({ id: '1', person: 'a', result: 'agreed', bucket: 'went' }),
+  row({ id: '2', person: 'a', result: 'agreed', caller: 'manual', bucket: 'went' }),
+  row({ id: '3', person: 'b', result: 'lost', ymd: '2026-10-05', bucket: 'notWent' }),
+  row({ id: '4', person: 'c', result: 'reschedule', bucket: 'reschedule' }),
+  row({ id: '5', person: 'd', result: 'other', bucket: 'unclear' }),
+  row({ id: '6', person: 'e', result: 'unreachable', caller: 'manual', bucket: 'failed' }),
+  row({ id: '7', person: 'f', result: 'cancelled', team: 'replacement', job: 'J1', replaceType: 'WL', bucket: 'cancelled' }),
   row({ id: '8', person: 'f', result: 'waiting', team: 'replacement', job: 'J1', replaceType: 'WL' }),
   row({ id: '9', person: 'g', result: 'waiting', team: 'replacement', job: 'J2', replaceType: 'EX' }),
   row({ id: '10', person: 'h', result: 'waiting', team: 'replacement', replaceType: null }),
@@ -118,12 +120,21 @@ describe('followJourney', () => {
     }
     expect([...ai, ...staff].reduce((n, t) => n + t.rows.length, 0)).toBe(ROWS.length);
     const main = ai[0];
-    // แถว 1 ไป · 3 ไม่ไป · 4 ขอเลื่อน + 5 สรุปไม่ได้ = สรุปไม่ได้ 2
+    // 🔴 นับตามช่องของการ์ด (QA 10 ต.ค. 2569): ขอเลื่อนแยกจากสรุปไม่ได้
     expect(main.cols.went.map((r) => r.id)).toEqual(['1']);
     expect(main.cols.notWent.map((r) => r.id)).toEqual(['3']);
-    expect(main.cols.unclear.map((r) => r.id)).toEqual(['4', '5']);
+    expect(main.cols.reschedule.map((r) => r.id)).toEqual(['4']);
+    expect(main.cols.unclear.map((r) => r.id)).toEqual(['5']);
     expect(main.called).toHaveLength(4);
     expect(ai[1].cols.cancelled.map((r) => r.id)).toEqual(['7']);
     expect(ai[1].cols.waiting.map((r) => r.id)).toEqual(['8', '9', '10']);
+  });
+
+  it('🔴 ป๊อปนับตามช่องของการ์ด ไม่ใช่หมวดหน้าติดตาม — ผลปิดงาน "ไป" แต่สาย AI ล้มเหลว = ล้มเหลว (QA 10 ต.ค. 2569 ไป 781 ≠ 667)', () => {
+    const rows = [row({ id: 'x', result: 'agreed', bucket: 'failed' }), row({ id: 'y', result: 'agreed', bucket: 'went' })];
+    const [main] = followCallerBreakdown(rows, 'ai');
+    expect(main.cols.went.map((r) => r.id)).toEqual(['y']);
+    expect(main.cols.failed.map((r) => r.id)).toEqual(['x']);
+    expect(main.called).toHaveLength(2);
   });
 });

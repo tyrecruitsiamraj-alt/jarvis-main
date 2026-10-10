@@ -322,7 +322,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
                 <span className="text-muted-foreground">· ต้องการ {jobPositionUnits(job)} ตำแหน่ง</span>
               ) : null}
               <span className="text-muted-foreground">· สนใจแล้ว {summary.interested}</span>
-              <span className="text-muted-foreground">· ยังไม่ได้โทร {summary.waiting}</span>
+              <span className="text-muted-foreground">· ยังไม่โทร {summary.waiting}</span>
               <button
                 type="button"
                 onClick={() => void reload()}

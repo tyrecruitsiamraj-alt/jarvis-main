@@ -115,6 +115,7 @@ vi.mock('@/lib/homeAiShareApi', () => ({
           team: 'main',
           caller: 'ai',
           result: 'agreed',
+          bucket: 'went',
           job: null,
           replaceType: null,
         },
@@ -129,6 +130,7 @@ vi.mock('@/lib/homeAiShareApi', () => ({
           team: 'main',
           caller: 'manual',
           result: 'waiting',
+          bucket: 'waiting',
           job: null,
           replaceType: null,
         },
@@ -526,7 +528,8 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(screen.queryByText('ของสายที่โทรแล้ว')).toBeNull();
     // ติดตามนับแบบแผน ⇒ กล่องบอกโทรแล้ว / รอโทร / ยกเลิก แทนแถบ % (เจ้าของ 8 ต.ค. 2569 "คน 302 คือต้องโทร หรือโทรไปแล้ว")
     expect(stat('AI โทร')).toMatch(/โทรแล้ว \d.*รอโทร \d.*ยกเลิก \d/);
-    expect(stat('คนโทร')).toMatch(/ลงผลแล้ว \d.*รอโทร \d.*ยกเลิก \d/);
+    // ชุดคำมาตรฐาน (QA 10 ต.ค. 2569): คนโทรก็ "โทรแล้ว" เหมือน AI (เดิม "ลงผลแล้ว")
+    expect(stat('คนโทร')).toMatch(/โทรแล้ว \d.*รอโทร \d.*ยกเลิก \d/);
     expect(screen.queryByRole('button', { name: /^ยังไม่โทร \d/ })).toBeNull();
     // ไม่มีช่วงก่อน ⇒ ไม่มีชิปเทียบ
     expect(stat('AI โทร')).not.toContain('ใหม่');
@@ -688,14 +691,14 @@ describe('หน้าหลักอ่านไล่บนลงล่าง 
       within(within(box).getByTestId(key))
         .getAllByRole('cell')
         .map((c) => c.textContent);
-    // เรื่อง · ใครโทร · ทั้งหมด · **โทรแล้ว** (รวม · ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · ล้มเหลว) · ยังไม่ได้โทร (ยกเลิก · รอ)
+    // เรื่อง · ใครโทร · ทั้งหมด · **โทรแล้ว** (รวม · ตอบว่าไป · ตอบว่าไม่ไป · ขอเลื่อน · สรุปไม่ได้ · ล้มเหลว) · ไม่ได้โทร (ยกเลิก · รอโทร)
     // 8 ต.ค. 2569 เจ้าของ: "ไม่มีบอกว่าโทรไปแล้วเท่าไหร่ แล้วค่อยบอกว่า ไป ไม่ไป" — ทั้งหมด = โทรแล้ว + ยกเลิก + รอ (673 = 583 + 90 + 0)
     expect(cells('bu-row-LBD-main-ai')).toEqual(['ติดตามคนเริ่มงาน', 'AI โทร', '673', '583', '469', '0', '0', '15', '99', '90', '0']);
     expect(cells('bu-row-LBD-main-manual')).toEqual(['', 'คนโทร', '106', '82', '77', '1', '1', '0', '3', '24', '0']);
     // ส่งคนแทน AI = 0 ก็ขึ้น (เทียบ AI กับคนได้ทุกเรื่อง)
     expect(cells('bu-row-LBD-replacement-ai')).toEqual(['ติดตามส่งคนแทน', 'AI โทร', '0', '0', '0', '0', '0', '0', '0', '0', '0']);
     expect(within(lbd).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(
-      expect.arrayContaining(['โทรแล้ว', 'รวม', 'ยังไม่ได้โทร']),
+      expect.arrayContaining(['โทรแล้ว', 'รวม', 'ไม่ได้โทร']),
     );
     expect(cells('bu-row-LBD-total')[1]).toBe('1,417');
     expect(within(lbd).getAllByText('673').length).toBeGreaterThan(0);

@@ -498,7 +498,8 @@ const HomeAiSharePage: React.FC = () => {
   const fromFollowBucket = (b: { total: number; waiting: number; cancelled: number } | null, doneLabel: string): Breakdown | null =>
     b
       ? [
-          { key: 'done', label: doneLabel, value: b.total - b.waiting - b.cancelled, tone: 'success' },
+          // โทรแล้ว = กรมท่า (เขียวสงวนไว้ให้ "ไป/หาได้แล้ว" · QA 10 ต.ค. 2569)
+          { key: 'done', label: doneLabel, value: b.total - b.waiting - b.cancelled, tone: 'primary' },
           { key: 'waiting', label: 'รอโทร', value: b.waiting, tone: 'info' },
           { key: 'cancelled', label: 'ยกเลิก', value: b.cancelled, tone: 'neutral' },
         ]
@@ -513,14 +514,14 @@ const HomeAiSharePage: React.FC = () => {
       if (c.col === 'noResult') waiting += c.n;
     }
     return [
-      { key: 'done', label: 'โทรแล้ว', value: all - waiting, tone: 'success' },
+      { key: 'done', label: 'โทรแล้ว', value: all - waiting, tone: 'primary' },
       { key: 'waiting', label: 'รอโทร', value: waiting, tone: 'info' },
     ];
   };
   const breakdownOf = (k: AiShareSegment | 'all'): Breakdown | null => {
     if (meta.key === 'follow' && followSplit) {
       if (k === 'ai') return fromFollowBucket(followSplit.ai, 'โทรแล้ว');
-      if (k === 'staff') return fromFollowBucket(followSplit.staff, 'ลงผลแล้ว');
+      if (k === 'staff') return fromFollowBucket(followSplit.staff, 'โทรแล้ว');
       if (k === 'all')
         return fromFollowBucket(
           {

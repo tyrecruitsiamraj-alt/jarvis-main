@@ -30,6 +30,9 @@ async function main() {
   const { followBuBlocks, followBucketAddsUp, FOLLOW_BUCKET_KEYS } = await import('../src/lib/homeLumosSummary.js');
   const { reportBuBlocks, REPORT_SEGS } = await import('../src/lib/homeTopicReport.js');
   const { toYmdBangkok } = await import('../src/lib/dateTh.js');
+  const { loadOnlineRequestRows } = await import('../api/_lib/homeOnlineSql.js');
+  const { buildOnlineReport } = await import('../src/lib/homeOnline.js');
+  const { onlineRequestYmdRange } = await import('../src/lib/homeAiShare.js');
 
   const now = new Date();
   const today = toYmdBangkok(now);
@@ -164,6 +167,11 @@ async function main() {
           eq(`${t} · ใบสมัคร (AI ส่งเอง + คนสั่ง + อายุเกิน + ไม่ได้ส่ง) = กล่อง`, fv('total'), c.total);
           checks += 1;
           if (fv('fast') > fv('called')) problems.push(`${t} · โทรภายใน 15 นาที ${fv('fast')} > โทรแล้ว ${fv('called')}`);
+          // 🔴 ใบขอเข้ามา · ประกาศแล้ว = ตัวเดียวกับแท็บทีม Online (QA 10 ต.ค. 2569 เคย 55 · 44 ≠ 54 · 4)
+          const rr = onlineRequestYmdRange(start, end);
+          const online = buildOnlineReport(await loadOnlineRequestRows({ ...rr, bu, departmentScope: scope }), rr);
+          eq(`${t} · ใบขอเข้ามา = ทีม Online`, fv('jobsIn'), online.requests.total);
+          eq(`${t} · ประกาศแล้ว = ทีม Online`, fv('published'), online.posting.released);
         }
         for (const s of REPORT_SEGS) {
           eq(

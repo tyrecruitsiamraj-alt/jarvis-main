@@ -37,7 +37,6 @@ import FollowCallRoundsPanel from '@/components/follow/FollowCallRoundsPanel';
 import FollowFilterGroup from '@/components/follow/FollowFilterGroup';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { roundTabLabel } from '@/lib/followRoundVisual';
 import { conveyorLabel } from '@/lib/soRecruitNav';
 import { ArrowLeft, Settings2, Plus, X, LoaderCircle, PhoneForwarded, Users, UserCog, Building2, ChevronLeft, ChevronRight, RefreshCw, ClipboardList } from 'lucide-react';
 import {
@@ -2980,8 +2979,8 @@ const FollowPage: React.FC = () => {
                           (_, n) => n + 1,
                         ).map((n) => (
                           <option key={n} value={n}>
-                            {roundTabLabel(n)}
-                            {n === 1 ? ' (สายแรก)' : ''}
+                            {/* ถามว่า "สายที่เท่าไหร่" ตัวเลือกก็ต้องเป็น "สายที่" (QA 10 ต.ค. 2569 เดิม "รอบโทรที่ 1 (สายแรก)" ปนสองคำ) */}
+                            สายที่ {n}
                           </option>
                         ))}
                       </select>

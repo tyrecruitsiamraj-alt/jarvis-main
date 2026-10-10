@@ -81,7 +81,8 @@ const ReplaceStartFields: React.FC<{
                   {(
                     [
                       { value: 'ai', label: 'AI โทร', on: 'text-primary' },
-                      { value: 'manual', label: 'คนโทร', on: TONE.warn.value },
+                      // คนโทร = ม่วง ทุกจอ (QA 10 ต.ค. 2569 เดิมเหลือง = สีของไม่รับสาย/เหลือหา)
+                      { value: 'manual', label: 'คนโทร', on: TONE.violet.value },
                     ] as const
                   ).map((c) => (
                     <label key={c.value} className="flex cursor-pointer items-center gap-1.5">

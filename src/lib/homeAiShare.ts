@@ -47,6 +47,17 @@ export type AiShareWindow = PeriodWindow;
  * · รอบแรกเคาะไว้ 30 วัน) — ปุ่มลัดตัวแรกของปฏิทิน (`QUICK_PERIODS`) ตัวเดียวกัน
  */
 /**
+ * ช่วงวันของ "ใบขอเข้ามา" (วันที่ใบส่งเข้ามา · YYYY-MM-DD ไทย) — แท็บทีม Online กับงานสรรหาใช้ตัวเดียวกัน (QA 10 ต.ค. 2569)
+ * ช่วง "ทั้งหมด" (start = null) = ย้อน 365 วัน (ตัวดึงใบขอของ ERP ต้องมีวันเริ่ม)
+ */
+export function onlineRequestYmdRange(start: Date | null, end: Date): { from: string; to: string } {
+  return {
+    from: toYmdBangkok(start ?? new Date(end.getTime() - 365 * 86_400_000)),
+    to: toYmdBangkok(new Date(end.getTime() - 1)),
+  };
+}
+
+/**
  * คีย์ของคำขอบนหน้าหลัก = ช่วงวัน + BU (+ หัวข้อ) — ข้อมูลที่ถืออยู่ใช้ได้เฉพาะเมื่อคีย์ตรงกับที่เลือกอยู่
  * 🔴 QA 10 ต.ค. 2569: เปลี่ยน BU แล้วเลขของ BU เก่าค้างใต้ป้าย BU ใหม่ (ตอนโหลด · ตอนล้ม · รอบสดที่ยิงก่อนเปลี่ยนมาถึงทีหลัง)
  * เดิมเทียบแค่ from/to · ไม่ใช้ `bu` ที่ server ตอบ เพราะคนที่ถูกล็อก BU ได้ค่าที่ server บังคับ ไม่ตรงกับที่จอส่ง

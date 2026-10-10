@@ -85,7 +85,7 @@ export const INTEREST_COLS: ReportCol[] = [
   { key: 'notYet', label: 'ขอคิดก่อน', tone: 'orange' },
   { key: 'noAnswer', label: 'ไม่รับสาย', tone: 'warn' },
   { key: 'unclear', label: 'สรุปไม่ได้', tone: 'violet' },
-  { key: 'noResult', label: 'ยังไม่มีผล', tone: 'info' },
+  { key: 'noResult', label: 'รอโทร', tone: 'info' },
 ];
 
 /** จับคู่งานถามว่าไปไหม (เจ้าของ 7 ต.ค. 2569 "ผลเป็นยังไง ไปไม่ไป") — คีย์เดียวกับ INTEREST_COLS */
@@ -98,9 +98,9 @@ export const MATCH_COLS: ReportCol[] = INTEREST_COLS.map((c) =>
  */
 export const REACH_COLS: ReportCol[] = [
   { key: 'reached', label: 'ติดต่อได้', tone: 'success' },
-  { key: 'wrongPerson', label: 'ผิดคน', tone: 'danger' },
+  { key: 'wrongPerson', label: 'ไม่ใช่เจ้าตัว', tone: 'orange' },
   { key: 'noAnswer', label: 'ไม่รับสาย', tone: 'warn' },
-  { key: 'noResult', label: 'ยังไม่มีผล', tone: 'info' },
+  { key: 'noResult', label: 'รอโทร', tone: 'info' },
 ];
 
 const ms = (v: string | Date | null | undefined) => (v ? new Date(v).getTime() : -1);
@@ -254,8 +254,9 @@ export function buildApplicantsReport(rows: readonly ReportSourceRow[], publishe
   const fastStaff = count(rows, (r) => fastCallerOf(r) === 'staff');
   return {
     funnel: [
+      // ตัวเดียวกับแท็บทีม Online — ใบขอที่ส่งเข้ามาในช่วง (ทุกสถานะ) · ในนั้นประกาศแล้วกี่ใบ (QA 10 ต.ค. 2569)
       { key: 'jobsIn', label: 'ใบขอเข้ามา', value: jobsIn },
-      { key: 'published', label: 'ประกาศ', value: published },
+      { key: 'published', label: 'ประกาศแล้ว', value: published },
       step('total', 'ใบสมัครเข้ามา', [
         { key: 'auto', label: 'AI ส่งเองตอนกรอก', value: kind('auto'), seg: 'ai' },
         { key: 'manual', label: 'เจ้าหน้าที่สั่ง AI', value: kind('manual'), seg: 'staff' },
@@ -352,7 +353,8 @@ export function buildMatchingReport(rows: readonly ReportSourceRow[], f: Matchin
     }));
   return {
     funnel: [
-      { key: 'jobsIn', label: 'ใบขอเข้ามา', value: f.jobsIn },
+      // จับคู่ได้เฉพาะใบที่ยังเปิด ⇒ คนละเลขกับ "ใบขอเข้ามา" ของงานสรรหา/ทีม Online จึงใช้คำต่างกัน (QA 10 ต.ค. 2569)
+      { key: 'jobsIn', label: 'ใบที่ยังเปิด', value: f.jobsIn },
       { key: 'jobsMatched', label: 'AI จับคู่แล้ว', value: f.jobsMatched },
       { key: 'jobsRecommend', label: 'มีคนแนะนำ', value: f.jobsRecommend },
       step('matched', 'คนที่จับคู่รอ', [

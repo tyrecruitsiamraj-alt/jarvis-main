@@ -20,7 +20,7 @@ import { followCallOutcomeText } from '@/lib/callOutcomeTone';
 import type { FollowEntry } from '@/lib/followApi';
 import type { FollowGroup } from '@/lib/followGrouping';
 import {
-  roundResultLabel,
+  followRoundLabel,
   roundTone,
   type FollowPlanningRound,
 } from '@/lib/followPlanning';
@@ -143,7 +143,8 @@ const FollowRoundsDialog: React.FC<{
                     {r.entry.time_tbd ? 'ยังไม่ระบุเวลา' : r.time ? `${r.time} น.` : 'ไม่ได้ตั้งเวลา'}
                   </span>
                   <span className="text-[11px] font-medium text-foreground">
-                    {roundResultLabel(r)}
+                    {/* คำเดียวกับชิปบนตาราง (QA 10 ต.ค. 2569 ป๊อปเคยเขียน "ไป" / "ไม่ได้ส่ง" ขณะตารางเขียน "ตอบว่าไป" / "รอโทร · ไม่ได้ส่งให้ AI") */}
+                    {followRoundLabel(r)}
                   </span>
                   {/* ป้าย "ไม่ได้ส่งให้ AI เพราะอะไร" — call_status เป็น null เมื่อไม่เคยเข้าคิว
                       ไม่มีป้ายนี้จะกลายเป็นช่องว่างเปล่าที่คนอ่านว่าปกติ */}
@@ -213,7 +214,7 @@ const FollowRoundsDialog: React.FC<{
                     เดิมกดเสร็จสิ้นแล้วปุ่มหายหมด เลือกผิดคือแก้ไม่ได้เลย */}
                 {it.completed_at && !it.cancelled ? (
                   <>
-                    <p className="mt-2 text-[10px] font-medium text-muted-foreground">จัดการรอบนี้</p>
+                    <p className="mt-2 text-[10px] font-medium text-muted-foreground">จัดการสายนี้</p>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       <Button
                         type="button"
@@ -232,7 +233,7 @@ const FollowRoundsDialog: React.FC<{
                 ) : null}
                 {canWork || canCancel ? (
                   <>
-                <p className="mt-2 text-[10px] font-medium text-muted-foreground">จัดการรอบนี้</p>
+                <p className="mt-2 text-[10px] font-medium text-muted-foreground">จัดการสายนี้</p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   {canWork ? (
                     <Button
@@ -329,7 +330,7 @@ const FollowRoundsDialog: React.FC<{
                         variant="outline"
                         size="sm"
                         onClick={() => onAskPurge(it.id)}
-                        title="ลบรอบนี้ออกจากระบบถาวร (ผู้ดูแลระบบเท่านั้น)"
+                        title="ลบสายนี้ออกจากระบบถาวร (ผู้ดูแลระบบเท่านั้น)"
                         className={cn('min-h-8 gap-1 px-2.5 text-[11px]', TONE.danger.value)}
                       >
                         <Trash2 aria-hidden />

@@ -254,7 +254,8 @@ export const ONLINE_AI_CALLED: ReadonlyArray<{ key: OnlineAiBucket; label: strin
   { key: 'interested', label: 'สนใจ' },
   { key: 'notInterested', label: 'ไม่สนใจ' },
   { key: 'unclear', label: 'สรุปไม่ได้' },
-  { key: 'failed', label: 'ล้มเหลว' },
+  // ผลไมโคร no_pickup = ตัวเดียวกับ "ไม่รับสาย" ของงานสรรหา (QA 10 ต.ค. 2569 · กลุ่มเดียวกันเคยเรียก 2 คำ)
+  { key: 'failed', label: 'ไม่รับสาย' },
 ];
 
 /** อายุเกินที่ระบบไม่ส่งให้ AI — ตัวเดียวกับ `OVER_AGE_MIN` ของหน้าหลัก */

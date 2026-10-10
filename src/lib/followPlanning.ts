@@ -455,7 +455,8 @@ export function roundTone(round: FollowPlanningRound): ToneKey {
     case 'overdue':
       return FOLLOW_CALL_CATEGORY_TONE.overdue;
     case 'sent':
-      return 'primary';
+      // ส่งแล้วรอผล = หมวดรอโทร ⇒ ฟ้าเหมือนกัน (10 ต.ค. 2569)
+      return 'info';
     default:
       return 'neutral';
   }
@@ -686,9 +687,10 @@ export const FOLLOW_CALL_CATEGORY_TONE: Record<FollowCallCategory, ToneKey> = {
   agreed: 'success',
   unreachable: 'warn',
   lost: 'danger',
-  waiting: 'primary',
-  // ฟ้า (6 ต.ค. 2569) — เหลืองเป็นของ "ไม่รับสาย" แล้ว สองหมวดห้ามสีเดียวกัน
-  overdue: 'info',
+  // 🔴 ชุดสีมาตรฐาน (QA 10 ต.ค. 2569 · เจ้าของเลือก): รอโทร = ฟ้า ทุกหน้า · เลยเวลานัด = ส้ม (ต้องมีคนลงมือ เหมือนไม่ได้ส่ง)
+  //    เดิม waiting = กรมท่า · overdue = ฟ้า ⇒ "รอ" มี 4 สีข้ามหน้า และเลยเวลาแล้วสีเหมือนยังไม่ถึงเวลา
+  waiting: 'info',
+  overdue: 'orange',
   notSent: 'orange',
   cancelled: 'neutral',
   // สรุปไม่ได้ = ม่วง (6 ต.ค. 2569) — ไม่ชนเหลืองของไม่รับสาย · ชุดเดียวกับช่องของแผง

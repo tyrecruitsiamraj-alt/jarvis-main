@@ -52,12 +52,10 @@ async function loadErpExtras(requestNos: readonly string[]): Promise<Map<string,
   return out;
 }
 
-export async function loadOnlineRequestRows(opts: {
-  from: string;
-  to: string;
-  bu: string | null;
-  departmentScope: DepartmentScope;
-}): Promise<OnlineRequestRow[]> {
+type OnlineRequestOpts = { from: string; to: string; bu: string | null; departmentScope: DepartmentScope };
+
+/** ใบขอที่ส่งเข้ามาในช่วง (ทุกสถานะ · ใบละแถว · กรอง BU) + รหัสใบ — ฐานเดียวของ "ใบขอเข้ามา" */
+async function loadOnlineRequestGroups(opts: OnlineRequestOpts) {
   // 🔴 นับตามวันที่ใบส่งเข้ามา (เจ้าของ 8 ต.ค. 2569 Choice) — หน้า Dashboard ยังนับตามวันที่ต้องการคน (ค่าเริ่มของตัวดึง)
   const records = await listSiamrajThroughput({
     from: opts.from,
@@ -71,9 +69,30 @@ export async function loadOnlineRequestRows(opts: {
   const withBu = grouped
     .map((g) => ({ ...g, bu: trendBuFromSiteCode(g.siteCode) }))
     .filter((g) => !opts.bu || g.bu === opts.bu);
+  const jobIds = withBu.map((g) => g.jobId ?? `siamraj-sql:${g.requestNo}`);
+  return { withBu, jobIds };
+}
+
+/**
+ * ═══ "ใบขอเข้ามา · ประกาศแล้ว" ตัวเดียวของหน้าหลัก (QA 10 ต.ค. 2569 · เจ้าของเลือก "ใช้นิยามเดียวทั้งสองแท็บ") ═══
+ * ใบขอ = ใบขอจริงที่ส่งเข้ามาในช่วง ทุกสถานะ (เปิด · ปิดครบ · ยกเลิก) · ประกาศแล้ว = ในชุดนั้นมีแถวประกาศ (จับด้วย id ตรงตัว)
+ * เดิมแท็บงานสรรหานับ "ใบที่ยังเปิด + ใบขอล่วงหน้า" และ "การกดประกาศในช่วง (รวมใบเก่า)" ⇒ 55 · 44 ขณะที่ทีม Online 54 · 4
+ * 🔴 ห้ามจับด้วยเลขที่ใบ — ใบขอล่วงหน้าเลขซ้ำใบจริง (`buildReleaseIndex` จับเลขด้วย)
+ */
+export async function loadOnlineRequestCounts(opts: OnlineRequestOpts): Promise<{ total: number; released: number }> {
+  const { withBu, jobIds } = await loadOnlineRequestGroups(opts);
+  if (withBu.length === 0) return { total: 0, released: 0 };
+  const { rows } = await dbQuery<{ n: number }>(
+    `select count(distinct job_id)::int as n from ${RELEASES} where job_id = any($1::text[])`,
+    [jobIds],
+  );
+  return { total: withBu.length, released: Number(rows[0]?.n ?? 0) };
+}
+
+export async function loadOnlineRequestRows(opts: OnlineRequestOpts): Promise<OnlineRequestRow[]> {
+  const { withBu, jobIds } = await loadOnlineRequestGroups(opts);
   if (withBu.length === 0) return [];
 
-  const jobIds = withBu.map((g) => g.jobId ?? `siamraj-sql:${g.requestNo}`);
   const [extras, sectors, releases, apps] = await Promise.all([
     loadErpExtras(withBu.map((g) => g.requestNo)),
     getUnitSectorMap(),

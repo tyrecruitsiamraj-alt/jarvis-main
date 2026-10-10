@@ -56,6 +56,11 @@ export type FollowBucket = {
 };
 export const FOLLOW_BUCKET_KEYS = ['went', 'notWent', 'reschedule', 'unclear', 'waiting', 'failed', 'cancelled'] as const;
 export type FollowBucketKey = (typeof FOLLOW_BUCKET_KEYS)[number];
+/**
+ * ช่องที่นับว่า "โทรแล้ว" — การ์ดผลโทร · ตาราง BU · ป๊อปกล่อง AI โทร/คนโทร ใช้ตัวเดียวกัน
+ * (QA 10 ต.ค. 2569 ป๊อปกับการ์ดนับคนละแบบ · เจ้าของเลือก "นับทีละสายตามผลจริง")
+ */
+export const FOLLOW_CALLED_KEYS: readonly FollowBucketKey[] = ['went', 'notWent', 'reschedule', 'unclear', 'failed'];
 export const emptyFollowBucket = (): FollowBucket => ({
   total: 0,
   went: 0,

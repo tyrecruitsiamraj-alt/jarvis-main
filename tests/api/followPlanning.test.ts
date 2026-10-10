@@ -212,7 +212,8 @@ describe('roundResultLabel — ช่องปฏิทินต้องบอ�
   it('ผลการโทรเป็นคำไทย (ชุดคำของงานติดตาม — ดู describe ท้ายไฟล์)', () => {
     expect(label({ call_outcome: 'acknowledged' })).toBe('รับสายแล้ว');
     expect(label({ call_outcome: 'declined' })).toBe('ตอบว่าไม่ไป');
-    expect(label({ call_outcome: 'wrong_person' })).toBe('เบอร์ผิด');
+    // ชุดคำมาตรฐาน (QA 10 ต.ค. 2569): ผิดคน/เบอร์ผิด/ไม่ใช่เจ้าตัว = คำเดียว
+    expect(label({ call_outcome: 'wrong_person' })).toBe('ไม่ใช่เจ้าตัว');
   });
 
   it('ปิดงานแล้วโชว์คำปิดงาน · ยกเลิกโชว์ว่ายกเลิก', () => {
@@ -249,7 +250,8 @@ describe('คำผลโทรฉบับงานติดตาม (เจ�
   });
 
   it('คำที่ไม่ได้ทับ ใช้ของตารางกลางเหมือนเดิม', () => {
-    expect(label({ call_outcome: 'wrong_person' })).toBe('เบอร์ผิด');
+    // ชุดคำมาตรฐาน (QA 10 ต.ค. 2569): ผิดคน/เบอร์ผิด/ไม่ใช่เจ้าตัว = คำเดียว
+    expect(label({ call_outcome: 'wrong_person' })).toBe('ไม่ใช่เจ้าตัว');
     expect(label({ call_outcome: 'no_answer' })).toBe('ไม่รับสาย');
   });
 });
@@ -265,8 +267,8 @@ describe('สีของรอบ — ต้องแปลว่า "ดี/�
     expect(tone({ call_outcome: 'declined' })).toBe('danger');
   });
 
-  it('🔴 เลยเวลายังไม่มีผล = ฟ้า (รอโทร · ไม่ชนเหลืองของไม่รับสาย · 6 ต.ค. 2569) ไม่ใช่แดง', () => {
-    expect(tone({ scheduled_at: '2026-09-01T02:00:00Z' })).toBe('info');
+  it('🔴 เลยเวลายังไม่มีผล = ส้ม (ต้องมีคนลงมือ · ชุดสีมาตรฐาน 10 ต.ค. 2569 · เดิมฟ้าเหมือนยังไม่ถึงเวลา) ไม่ใช่แดง', () => {
+    expect(tone({ scheduled_at: '2026-09-01T02:00:00Z' })).toBe('orange');
   });
 
   it('ยืนยันว่าไป/ปิดงานว่าไปแล้ว = เขียว', () => {

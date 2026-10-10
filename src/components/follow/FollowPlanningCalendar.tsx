@@ -37,7 +37,6 @@ import {
   roundPushFailed,
   roundReplyText,
   followRoundLabel,
-  roundResultLabel,
   answeredButMarkedUnreached,
   ANSWERED_UNCLEAR_LABEL,
   roundTone,
@@ -218,7 +217,8 @@ function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): st
     .map((r) => {
       const why = r.state === 'notSent' ? ` (${roundDispatchReason(r)})` : '';
       const ai = roundAiSummary(r);
-      return `${r.time ?? 'ไม่ได้ตั้งเวลา'} — ${roundResultLabel(r)}${why}${ai ? `\n    เขาตอบ: ${ai}` : ''}`;
+      // คำเดียวกับชิปบนตาราง (`followRoundLabel` · QA 10 ต.ค. 2569 tooltip เคยเขียน "ยังไม่มีผล" ขณะชิปเขียน "รอโทร · เลยเวลานัด")
+      return `${r.time ?? 'ไม่ได้ตั้งเวลา'} — ${followRoundLabel(r)}${why}${ai ? `\n    เขาตอบ: ${ai}` : ''}`;
     })
     .join('\n');
   return `${name} · ${formatYmdDmyBe(ymd)}\n${detail}`;

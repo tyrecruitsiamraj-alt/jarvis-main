@@ -6,7 +6,7 @@
  * Choice: เรื่อง = 2 แท็บของติดตามก่อน (เรื่องอื่นทีหลัง) · คนโทรแบบเดียวกัน · **ป๊อปเดิม เปลี่ยนข้างใน** · แผงเส้นทางติดตามถอดแล้ว
  *
  * ชั้น: เรื่อง (2 แท็บ) → ผลของเรื่องนั้น → รายชื่อของช่องที่กด · ปุ่มกลับทุกชั้น
- * ช่อง/คำ = ของแผงหน้าติดตาม (`FOLLOW_MATRIX_COL_LABEL` · ขอเลื่อนอยู่ในสรุปไม่ได้) · ทุกช่องรวมกัน = ทั้งหมดของเรื่อง (ขึ้นบนจอ)
+ * ช่อง/คำ/สี = ของการ์ดผลโทร (`FOLLOW_RESULT_COLS` · นับทีละสายตามผลจริง · QA 10 ต.ค. 2569) · ทุกช่องรวมกัน = ทั้งหมดของเรื่อง (ขึ้นบนจอ)
  * ข้อมูลจาก `/api/home-ai-share?journey=follow` (ชุดแถวเดียวกับการ์ด) · นับที่ `followCallerBreakdown`
  * 🔴 shadcn (Dialog · Button · Table · Skeleton · Pagination) · ไม่ซ้อน Dialog · ไม่มีประโยคอธิบายบนจอ
  */
@@ -20,17 +20,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toneOfBu } from '@/components/team-online/teamOnlineTones';
 import { EVEN_TYPE, TONE } from '@/lib/designTokens';
 import { toYmdBangkok } from '@/lib/dateTh';
-import { FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE } from '@/lib/followCallMatrix';
+import { FOLLOW_RESULT_COLS } from '@/components/home-ai-share/AiShareLumosStats';
+import type { ToneKey } from '@/lib/designTokens';
 import {
   FOLLOW_CALLER_CALLED,
   followCallerBreakdown,
-  journeyResultMatrixCol,
   type FollowCallerCol,
   type FollowJourneyResponse,
   type FollowJourneyRow,
   type FollowJourneyTeam,
 } from '@/lib/followJourney';
-import { AI_SHARE_LIST_PAGE, type AiShareWindow } from '@/lib/homeAiShare';
+import { AI_SHARE_LIST_PAGE, homeQueryKey, type AiShareWindow } from '@/lib/homeAiShare';
 import { fetchFollowJourney } from '@/lib/homeAiShareApi';
 import { periodLabel } from '@/lib/periodPick';
 import { trendBuLabel } from '@/lib/trends/bu';
@@ -51,10 +51,16 @@ const TOPIC_LABEL: Record<FollowJourneyTeam, string> = {
   replacement: 'ติดตามส่งคนแทน',
 };
 
+/** คำ + สีของแต่ละช่อง — ชุดเดียวกับการ์ดผลโทร */
+const COL_META = Object.fromEntries(FOLLOW_RESULT_COLS.map((c) => [c.key, { label: c.label, tone: c.tone }])) as Record<
+  FollowCallerCol,
+  { label: string; tone: ToneKey }
+>;
+
 type NamesKey = FollowCallerCol | 'all' | 'called';
 type Level = { kind: 'topics' } | { kind: 'topic'; team: FollowJourneyTeam } | { kind: 'names'; team: FollowJourneyTeam; key: NamesKey };
 
-const namesLabel = (k: NamesKey) => (k === 'all' ? 'ทั้งหมด' : k === 'called' ? 'โทรแล้ว' : FOLLOW_MATRIX_COL_LABEL[k]);
+const namesLabel = (k: NamesKey) => (k === 'all' ? 'ทั้งหมด' : k === 'called' ? 'โทรแล้ว' : COL_META[k].label);
 
 const FollowCallerDialog: React.FC<{
   open: boolean;
@@ -63,11 +69,12 @@ const FollowCallerDialog: React.FC<{
   /** ชื่อหัวข้อ เช่น "ติดตาม" */
   blockTitle: string;
   unit: string;
-  win: AiShareWindow;
+  win: AiShareWindow & { bu?: string | null };
   /** เลขในกล่องที่กด — ขึ้นบนหัวระหว่างรอ */
   count: number | null;
 }> = ({ open, onOpenChange, caller, blockTitle, unit, win, count }) => {
-  const [data, setData] = useState<FollowJourneyResponse | null>(null);
+  /** ข้อมูลผูกคีย์คำขอ (ช่วงวัน + BU) — เปลี่ยน BU แล้วไม่โชว์ของ BU เก่า (`homeQueryKey`) */
+  const [data, setData] = useState<{ key: string; d: FollowJourneyResponse } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [level, setLevel] = useState<Level>({ kind: 'topics' });
@@ -78,9 +85,10 @@ const FollowCallerDialog: React.FC<{
     let alive = true;
     setLoading(true);
     setError(null);
+    const key = homeQueryKey(win);
     fetchFollowJourney(win)
       .then((d) => {
-        if (alive) setData(d);
+        if (alive) setData({ key, d });
       })
       .catch((e: unknown) => {
         if (alive) setError(e instanceof Error && e.message ? e.message : 'โหลดไม่ขึ้น ลองอีกครั้ง');
@@ -93,7 +101,7 @@ const FollowCallerDialog: React.FC<{
     };
   }, [open, win]);
 
-  const current = data && data.from === win.from && data.to === win.to ? data : null;
+  const current = data?.key === homeQueryKey(win) ? data.d : null;
   const topics = useMemo(() => followCallerBreakdown(current?.rows ?? [], caller), [current, caller]);
   const failed = error ?? current?.error ?? null;
   const callerLabel = caller === 'ai' ? 'AI โทร' : 'คนโทร';
@@ -156,7 +164,7 @@ const FollowCallerDialog: React.FC<{
               <span className="space-y-1">
                 <span className="block text-base font-medium text-foreground">{TOPIC_LABEL[t.team]}</span>
                 <span className="block text-xs font-normal tabular-nums text-muted-foreground">
-                  โทรแล้ว {NUM.format(t.called.length)} · {FOLLOW_MATRIX_COL_LABEL.went} {NUM.format(t.cols.went.length)}
+                  โทรแล้ว {NUM.format(t.called.length)} · {COL_META.went.label} {NUM.format(t.cols.went.length)}
                 </span>
               </span>
               <span className="flex items-center gap-2">
@@ -187,19 +195,19 @@ const FollowCallerDialog: React.FC<{
             </span>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {FOLLOW_CALLER_CALLED.map((c) =>
-                tile(FOLLOW_MATRIX_COL_LABEL[c], t.cols[c].length, () => go({ kind: 'names', team: t.team, key: c }), FOLLOW_MATRIX_COL_TONE[c], `caller-col-${c}`),
+                tile(COL_META[c].label, t.cols[c].length, () => go({ kind: 'names', team: t.team, key: c }), COL_META[c].tone, `caller-col-${c}`),
               )}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {(['cancelled', 'waiting'] as const).map((c) =>
-              tile(FOLLOW_MATRIX_COL_LABEL[c], t.cols[c].length, () => go({ kind: 'names', team: t.team, key: c }), FOLLOW_MATRIX_COL_TONE[c], `caller-col-${c}`),
+              tile(COL_META[c].label, t.cols[c].length, () => go({ kind: 'names', team: t.team, key: c }), COL_META[c].tone, `caller-col-${c}`),
             )}
           </div>
           {/* ตัวเช็ค: ทุกช่องรวมกัน = ทั้งหมดของเรื่องนี้ */}
           <p className="text-sm tabular-nums text-muted-foreground" data-testid="caller-sum">
-            โทรแล้ว {NUM.format(t.called.length)} + {FOLLOW_MATRIX_COL_LABEL.cancelled} {NUM.format(t.cols.cancelled.length)} +{' '}
-            {FOLLOW_MATRIX_COL_LABEL.waiting} {NUM.format(t.cols.waiting.length)} = {NUM.format(t.rows.length)} {unit}
+            โทรแล้ว {NUM.format(t.called.length)} + {COL_META.cancelled.label} {NUM.format(t.cols.cancelled.length)} +{' '}
+            {COL_META.waiting.label} {NUM.format(t.cols.waiting.length)} = {NUM.format(t.rows.length)} {unit}
           </p>
           <Button type="button" variant="outline" size="sm" onClick={() => go({ kind: 'names', team: t.team, key: 'all' })}>
             ดูรายชื่อทั้งหมด
@@ -235,7 +243,7 @@ const FollowCallerDialog: React.FC<{
             </TableHeader>
             <TableBody>
               {shown.map((r) => {
-                const col = journeyResultMatrixCol(r.result);
+                const col = r.bucket;
                 return (
                   <TableRow key={r.id}>
                     <TableCell className="text-sm text-foreground">
@@ -251,8 +259,8 @@ const FollowCallerDialog: React.FC<{
                     <TableCell className="whitespace-nowrap text-xs tabular-nums text-foreground">{WHEN.format(new Date(r.at))}</TableCell>
                     <TableCell className="whitespace-nowrap text-xs">
                       <span className="inline-flex items-center gap-1.5 text-foreground">
-                        <span className={cn('inline-block h-2 w-2 rounded-full', TONE[FOLLOW_MATRIX_COL_TONE[col]].dot)} aria-hidden />
-                        {r.result === 'reschedule' ? 'ขอเลื่อน' : FOLLOW_MATRIX_COL_LABEL[col]}
+                        <span className={cn('inline-block h-2 w-2 rounded-full', TONE[COL_META[col].tone].dot)} aria-hidden />
+                        {COL_META[col].label}
                       </span>
                     </TableCell>
                   </TableRow>

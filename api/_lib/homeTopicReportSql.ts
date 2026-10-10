@@ -6,7 +6,6 @@
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { buildApplicantAiShareSql, buildFollowAiShareSql, buildMatchingAiShareSql } from './homeAiShareSql.js';
-import { siteBuSql, trendBuSql } from './siteBuSql.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
 import { listSiamrajUnitRequests } from './siamrajUnitRequests.js';
 import { loadBoardMatchTierMap } from './boardMatchStore.js';
@@ -16,6 +15,8 @@ import { isBoardCandidateAvailable } from '../../src/lib/boardMatchAvailability.
 import { enrichJobsWithUrgency } from '../../src/lib/jobUrgency.js';
 import { trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
 import { toYmdBangkok } from '../../src/lib/dateTh.js';
+import { onlineRequestYmdRange } from '../../src/lib/homeAiShare.js';
+import { loadOnlineRequestCounts } from './homeOnlineSql.js';
 import type { JobRequest } from '../../src/types/index.js';
 import {
   buildAftercareReport,
@@ -28,8 +29,6 @@ import {
   type TopicReportBlock,
 } from '../../src/lib/homeTopicReport.js';
 
-const RELEASES = tableInAppSchema('job_public_releases');
-const MAP = tableInAppSchema('job_site_map');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const HOLDS = tableInAppSchema('candidate_call_holds');
 const PROPOSALS = tableInAppSchema('candidate_proposals');
@@ -69,20 +68,13 @@ function toRow(r: Record<string, unknown>): ReportSourceRow {
 export async function loadTopicReport(block: TopicReportBlock, start: Date | null, end: Date, bu: string | null): Promise<TopicReport> {
   const params = [start ? start.toISOString() : null, end.toISOString(), bu];
   if (block === 'applicants') {
-    const [{ rows }, pub, jobs] = await Promise.all([
+    // 🔴 ใบขอเข้ามา · ประกาศแล้ว = ตัวเดียวกับแท็บทีม Online (QA 10 ต.ค. 2569 · เจ้าของเลือก "ใช้นิยามเดียวทั้งสองแท็บ")
+    //    เดิม = ใบที่ยังเปิด + ใบขอล่วงหน้า และการกดประกาศในช่วง (รวมใบเก่า) ⇒ 55 · 44 ขณะที่ทีม Online 54 · 4
+    const [{ rows }, reqs] = await Promise.all([
       dbQuery<Record<string, unknown>>(buildApplicantAiShareSql('report'), params),
-      dbQuery<{ n: number }>(
-        `select count(*)::int as n
-           from ${RELEASES} r
-           left join ${MAP} m on m.job_id = r.job_id
-          where ($1::timestamptz is null or r.released_at >= $1::timestamptz)
-            and r.released_at < $2::timestamptz
-            and ($3::text is null or ${trendBuSql(siteBuSql('m.site_code'))} = $3::text)`,
-        params,
-      ),
-      loadJobsInWindow(start, end, bu),
+      loadOnlineRequestCounts({ ...onlineRequestYmdRange(start, end), bu, departmentScope: { mode: 'all' } as DepartmentScope }),
     ]);
-    return buildApplicantsReport(rows.map(toRow), Number(pub.rows[0]?.n ?? 0), jobs.length);
+    return buildApplicantsReport(rows.map(toRow), reqs.released, reqs.total);
   }
   if (block === 'matching') {
     const [{ rows }, flow] = await Promise.all([
@@ -100,7 +92,7 @@ export async function loadTopicReport(block: TopicReportBlock, start: Date | nul
  * ผลจับคู่ = `loadBoardMatchTierMap` (คนที่ยังว่าง = `isBoardCandidateAvailable` ตัวเดียวกับ `matching-flow-summary`)
  * ⚠️ ใบที่เข้ามาแล้วปิดไปแล้วไม่อยู่ในรายการใบเปิด ⇒ ไม่นับ
  */
-/** ใบขอที่เข้ามาในช่วง (ใบที่ยังเปิด · ตามวันส่งใบ) — ตัวเดียวของ "ใบขอเข้ามา" ทั้งงานสรรหาและจับคู่งาน */
+/** ใบที่ยังเปิดที่ส่งเข้ามาในช่วง (ตามวันส่งใบ) — จับคู่งานใช้ (ต้องเป็นใบเปิด) · งานสรรหาใช้ `loadOnlineRequestCounts` แล้ว (10 ต.ค. 2569) */
 async function loadJobsInWindow(start: Date | null, end: Date, bu: string | null): Promise<JobRequest[]> {
   const raw = (await listSiamrajUnitRequests({ limit: 500, departmentScope: { mode: 'all' } as DepartmentScope })) as unknown[];
   const fromYmd = start ? toYmdBangkok(start) : null;

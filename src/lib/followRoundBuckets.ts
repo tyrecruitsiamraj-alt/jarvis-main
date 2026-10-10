@@ -65,7 +65,7 @@ export const FOLLOW_ROUND_BUCKET_LABEL: Record<FollowRoundBucket, string> = {
   calling: 'กำลังโทร',
   connected: 'โทรติด',
   unreached: 'โทรไม่ติด',
-  went: 'ปิดงาน: ไป',
+  went: 'ปิดงานว่าไป',
   not_went: 'ปิดงาน: ไม่ไป',
 };
 

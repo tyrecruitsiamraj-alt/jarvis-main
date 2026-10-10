@@ -154,7 +154,7 @@ function ApplicantSections({ apps, sub }: { apps: OnlineApplicantsReport; sub: s
             { key: 'sent', label: 'AI ต้องโทร', value: apps.sent },
             { key: 'called', label: 'โทรแล้ว', value: a.called, tone: 'primary' },
             { key: 'cancelled', label: 'ยกเลิก', value: a.cancelled, tone: 'neutral' },
-            { key: 'waiting', label: 'รอดำเนินการ', value: a.waiting, tone: 'info' },
+            { key: 'waiting', label: 'รอโทร', value: a.waiting, tone: 'info' },
           ]}
         />
         <StatStrip
@@ -163,7 +163,7 @@ function ApplicantSections({ apps, sub }: { apps: OnlineApplicantsReport; sub: s
             { key: 'called', label: 'โทรแล้ว', value: a.called },
             ...ONLINE_AI_CALLED.map((c) => ({
               key: c.key,
-              label: c.key === 'failed' ? 'ล้มเหลว (ติดต่อไม่ได้)' : c.label,
+              label: c.label,
               value: a[c.key],
               tone: (c.key === 'interested' ? 'success' : c.key === 'notInterested' ? 'danger' : c.key === 'unclear' ? 'violet' : 'warn') as ToneKey,
             })),
@@ -202,14 +202,14 @@ const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: 
     <div className="space-y-5" data-testid="home-online">
       {!ok ? (
         <p className={cn('text-xs', TONE.danger.value)} data-testid="online-mismatch">
-          เลขบางก้อนรวมไม่เท่าใบขอเข้า
+          เลขบางก้อนรวมไม่เท่าใบขอเข้ามา
         </p>
       ) : null}
 
       <HomeSection title="ใบขอ" sub={sub} testId="online-requests">
         <StatStrip
           testId="online-request-states"
-          items={[{ key: 'total', label: 'ใบขอเข้า', value: r.total, unit: `ใบ · ${NUM.format(r.positions)} อัตรา` }, ...stateItems(r.byState)]}
+          items={[{ key: 'total', label: 'ใบขอเข้ามา', value: r.total, unit: `ใบ · ${NUM.format(r.positions)} อัตรา` }, ...stateItems(r.byState)]}
         />
         <DailyBars report={report} />
       </HomeSection>
@@ -218,7 +218,7 @@ const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: 
         <StatStrip
           testId="online-posting-strip"
           items={[
-            { key: 'total', label: 'ใบขอเข้า', value: report.posting.total },
+            { key: 'total', label: 'ใบขอเข้ามา', value: report.posting.total },
             { key: 'released', label: 'ประกาศแล้ว', value: report.posting.released, tone: 'success' },
             { key: 'notReleasedOpen', label: 'ยังไม่ประกาศ (ใบยังเปิด)', value: report.posting.notReleasedOpen, tone: 'warn' },
             { key: 'notReleasedEnded', label: 'ไม่ได้ประกาศ (จบไปแล้ว)', value: report.posting.notReleasedEnded, tone: 'neutral' },
@@ -282,7 +282,7 @@ const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: 
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs">BU</TableHead>
-                <TableHead className="whitespace-nowrap text-right text-xs">ใบขอเข้า</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ใบขอเข้ามา</TableHead>
                 {ONLINE_REQUEST_STATES.map((s) => (
                   <TableHead key={s.key} className="whitespace-nowrap text-right text-xs">
                     <span className="inline-flex items-center gap-1.5">

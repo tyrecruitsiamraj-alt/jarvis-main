@@ -20,6 +20,7 @@ import { FOLLOW_MATRIX_COL_TONE } from '@/lib/followCallMatrix';
 import { homeQueryKey, type AiShareBlockKey, type AiShareWindow } from '@/lib/homeAiShare';
 import { fetchHomeLumosSummary } from '@/lib/homeAiShareApi';
 import {
+  FOLLOW_CALLED_KEYS,
   followBucketAddsUp,
   followBuBlocks,
   type FollowBucket,
@@ -42,8 +43,8 @@ export type ResultSlice = { key: string; label: string; tone: ToneKey; value: nu
  * สายไม่ว่าง 21 · โทรไม่ออก 18) + ผลที่หน้าติดตามนับไม่รับสาย + คนลงผล "ติดต่อไม่ได้"
  */
 export const FOLLOW_RESULT_COLS: ReadonlyArray<{ key: FollowBucketKey; label: string; tone: ToneKey; note?: string }> = [
-  { key: 'went', label: 'ไป', tone: FOLLOW_MATRIX_COL_TONE.went },
-  { key: 'notWent', label: 'ไม่ไป', tone: FOLLOW_MATRIX_COL_TONE.notWent },
+  { key: 'went', label: 'ตอบว่าไป', tone: FOLLOW_MATRIX_COL_TONE.went },
+  { key: 'notWent', label: 'ตอบว่าไม่ไป', tone: FOLLOW_MATRIX_COL_TONE.notWent },
   { key: 'reschedule', label: 'ขอเลื่อน', tone: 'orange' },
   { key: 'unclear', label: 'สรุปไม่ได้', tone: FOLLOW_MATRIX_COL_TONE.unclear },
   {
@@ -53,14 +54,14 @@ export const FOLLOW_RESULT_COLS: ReadonlyArray<{ key: FollowBucketKey; label: st
     note: 'ติดต่อไม่ได้ · ไม่รับสาย · สายไม่ว่าง · รับแต่ไม่พูด · โทรไม่ออก',
   },
   { key: 'cancelled', label: 'ยกเลิก', tone: FOLLOW_MATRIX_COL_TONE.cancelled },
-  { key: 'waiting', label: 'รอดำเนินการ', tone: FOLLOW_MATRIX_COL_TONE.waiting },
+  { key: 'waiting', label: 'รอโทร', tone: FOLLOW_MATRIX_COL_TONE.waiting },
 ];
 
 /**
  * ชั้น "โทรแล้ว" (เจ้าของ 8 ต.ค. 2569: *"บอกว่า Ai โทร ทั้งหมด ไป ไม่ไป ฯลฯ แต่ไม่มีบอกว่าโทรไปแล้วเท่าไหร่ แล้วค่อยบอกว่า ไป ไม่ไป"*)
- * ทั้งหมด = โทรแล้ว (ไป · ไม่ไป · ขอเลื่อน · สรุปไม่ได้ · ล้มเหลว) + ยังไม่ได้โทร (ยกเลิก · รอดำเนินการ) — ทุกแถวต้องลงตัว
+ * ทั้งหมด = โทรแล้ว (ตอบว่าไป · ตอบว่าไม่ไป · ขอเลื่อน · สรุปไม่ได้ · ล้มเหลว) + ไม่ได้โทร (ยกเลิก · รอโทร) — ทุกแถวต้องลงตัว
+ * 10 ต.ค. 2569 (QA · ชุดคำมาตรฐาน): "รอดำเนินการ" → "รอโทร" · หัว "ยังไม่ได้โทร" → "ไม่ได้โทร" (ยกเลิกไม่มีวันถูกโทร ไม่ใช่ "ยัง")
  */
-const FOLLOW_CALLED_KEYS: readonly FollowBucketKey[] = ['went', 'notWent', 'reschedule', 'unclear', 'failed'];
 const CALLED_COLS = FOLLOW_RESULT_COLS.filter((c) => FOLLOW_CALLED_KEYS.includes(c.key));
 const NOT_CALLED_COLS = FOLLOW_RESULT_COLS.filter((c) => !FOLLOW_CALLED_KEYS.includes(c.key));
 const followCalledOf = (buckets: Record<FollowBucketKey, number>): number =>
@@ -138,7 +139,7 @@ const CALLER_LABEL = { ai: 'AI โทร', manual: 'คนโทร' } as const;
 
 /**
  * ติดตาม — ก้อนละ BU (เจ้าของ "Bu เอาไปรวมตรงผลเลย") · หัวก้อน = BU · ทั้งหมด · AI โทร · คนโทร
- * ตาราง = เรื่อง × ใครโทร (เฉพาะที่มีรายชื่อ) × ทั้งหมด → โทรแล้ว (รวม + ผล 5) → ยังไม่ได้โทร (ยกเลิก · รอ) · แถวรวมของ BU · BU ไม่มีงานไม่ขึ้น
+ * ตาราง = เรื่อง × ใครโทร (เฉพาะที่มีรายชื่อ) × ทั้งหมด → โทรแล้ว (รวม + ผล 5) → ไม่ได้โทร (ยกเลิก · รอโทร) · แถวรวมของ BU · BU ไม่มีงานไม่ขึ้น
  * บรรทัดล่าง = ทุก BU บวกกัน = กล่องทั้งหมดด้านบน
  */
 function FollowResults({
@@ -196,7 +197,7 @@ function FollowResults({
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                {/* หัว 2 ชั้น: โทรแล้ว (รวม + ผล 5 แบบ) | ยังไม่ได้โทร (ยกเลิก · รอดำเนินการ) */}
+                {/* หัว 2 ชั้น: โทรแล้ว (รวม + ผล 5 แบบ) | ไม่ได้โทร (ยกเลิก · รอโทร) */}
                 <TableRow className="border-0 hover:bg-transparent">
                   <TableHead className="text-xs" rowSpan={2}>เรื่อง</TableHead>
                   <TableHead className="text-xs" rowSpan={2}>ใครโทร</TableHead>
@@ -205,7 +206,7 @@ function FollowResults({
                     โทรแล้ว
                   </TableHead>
                   <TableHead className="border-l border-foreground/10 text-center text-xs" colSpan={NOT_CALLED_COLS.length}>
-                    ยังไม่ได้โทร
+                    ไม่ได้โทร
                   </TableHead>
                 </TableRow>
                 <TableRow>

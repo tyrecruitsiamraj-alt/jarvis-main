@@ -4,7 +4,8 @@
  *
  * ทำ 2 ทางแล้วเทียบกัน:
  *   ก. SQL ดิบ — นับรายชื่อ ทั้งหมด / AI / คน ตรง ๆ จากตาราง (ใครโทร = call_mode เท่านั้น ไม่ต้องอ่านผล)
- *   ข. ตรรกะของหน้าจอ — `loadFollowJourney` (ชุดแถวเดียวกับการ์ด + จัดผลด้วย `categorizeFollowRows`)
+ *   ข. ตรรกะของหน้าจอ — `loadFollowJourney` (ชุดแถวเดียวกับการ์ด + ช่องของการ์ด `r.bucket` · 10 ต.ค. 2569)
+ *   ค. ช่องของป๊อป = ช่องของการ์ด `loadHomeLumosSummary` ทุกช่อง (QA 10 ต.ค. 2569 เคยไป 781 ≠ 667)
  * แล้วเช็ค: ก = ข · ทุกแถว AI + คน = รวม · ผลทุกช่องรวมกัน = ทั้งหมด (ทั้งคอลัมน์ AI / คน / รวม)
  * ใช้: npx tsx scripts/follow-numbers-check.ts [from YYYY-MM-DD] [to YYYY-MM-DD]   (ไม่ใส่ = ทั้งหมด)
  */
@@ -23,7 +24,7 @@ async function main() {
   const { dbQuery } = await import('../api/_lib/postgres.js');
   const { tableInAppSchema } = await import('../api/_lib/schema.js');
   const { loadFollowJourney } = await import('../api/_handlers/home-ai-share.js');
-  const { journeyResultMatrixCol } = await import('../src/lib/followJourney.js');
+  const { loadHomeLumosSummary } = await import('../api/_lib/homeLumosSummarySql.js');
   const { followPlanBounds } = await import('../src/lib/homeAiShare.js');
   const { AFTERCARE_TOPIC } = await import('../src/lib/aftercareRounds.js');
 
@@ -47,12 +48,13 @@ async function main() {
   // ข. ตรรกะของหน้าจอ
   const { rows } = await loadFollowJourney(params);
 
-  const COLS = ['went', 'notWent', 'noAnswer', 'unclear', 'cancelled', 'waiting'] as const;
+  const COLS = ['went', 'notWent', 'reschedule', 'unclear', 'failed', 'cancelled', 'waiting'] as const;
   const LABEL: Record<(typeof COLS)[number], string> = {
-    went: 'ตอบว่าไป',
-    notWent: 'ตอบว่าไม่ไป',
-    noAnswer: 'ไม่รับสาย',
+    went: 'ไป',
+    notWent: 'ไม่ไป',
+    reschedule: 'ขอเลื่อน',
     unclear: 'สรุปไม่ได้',
+    failed: 'ล้มเหลว',
     cancelled: 'ยกเลิก',
     waiting: 'รอโทร',
   };
@@ -71,7 +73,7 @@ async function main() {
     const rawManual = rawRows.reduce((n, r) => n + Number(r.manual), 0);
 
     const cell = (col: (typeof COLS)[number] | null, caller: 'ai' | 'manual' | null) =>
-      mine.filter((r) => (col === null || journeyResultMatrixCol(r.result) === col) && (caller === null || r.caller === caller)).length;
+      mine.filter((r) => (col === null || r.bucket === col) && (caller === null || r.caller === caller)).length;
 
     console.log(`── ${title} ──`);
     console.log(`${padE('', 14)}${pad('รวม', 8)}${pad('AI', 8)}${pad('คน', 8)}`);
@@ -91,6 +93,16 @@ async function main() {
     if (rawAi !== cell(null, 'ai')) problems.push(`${title} · AI SQL ดิบ ${rawAi} ≠ หน้าจอ ${cell(null, 'ai')}`);
     if (rawManual !== cell(null, 'manual')) problems.push(`${title} · คน SQL ดิบ ${rawManual} ≠ หน้าจอ ${cell(null, 'manual')}`);
     console.log('');
+  }
+
+  // ค. ป๊อป (ข) = การ์ด/ตาราง BU ทุกช่อง × ใครโทร
+  const card = await loadHomeLumosSummary(params[0] ? new Date(params[0]) : null, params[1] ? new Date(params[1]) : null, null);
+  for (const caller of ['ai', 'manual'] as const) {
+    const b = caller === 'ai' ? card.follow.ai : card.follow.staff;
+    for (const c of COLS) {
+      const popup = rows.filter((r) => r.caller === caller && r.bucket === c).length;
+      if (popup !== b[c]) problems.push(`ป๊อป ${caller} · ${LABEL[c]} ${popup} ≠ การ์ด ${b[c]}`);
+    }
   }
 
   if (problems.length) {

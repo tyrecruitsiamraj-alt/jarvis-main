@@ -355,8 +355,9 @@ const BoardDashboard: React.FC<{
                 { key: 'name', label: 'เจ้าหน้าที่' },
                 { key: 'released', label: 'ประกาศ', align: 'right' },
                 { key: 'registered', label: 'ลงติดตาม', align: 'right' },
-                { key: 'success', label: 'ไปถึงแล้ว', align: 'right' },
-                { key: 'rate', label: 'อัตราไปถึง', align: 'right' },
+                // คำเดียวกับ Dashboard ติดตาม (`FOLLOW_METRIC_LABEL` · QA 10 ต.ค. 2569 เดิม "ไปถึงแล้ว")
+                { key: 'success', label: 'ปิดงานว่าไปแล้ว', align: 'right' },
+                { key: 'rate', label: 'อัตราปิดงานว่าไป', align: 'right' },
                 { key: 'delta', label: 'งานเทียบช่วงก่อน', align: 'right' },
               ]}
               rows={staff.map((s) => ({

@@ -574,7 +574,7 @@ export default function FollowEditDialog({
             <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
               <span className="text-xs font-medium text-foreground">สายของคนนี้</span>
               <span className="text-[11px] text-muted-foreground">
-                มีอยู่ {(otherRounds.length + 1).toLocaleString('th-TH')} รอบ
+                มีอยู่ {(otherRounds.length + 1).toLocaleString('th-TH')} สาย
                 {rounds.isoTimes.length > 0
                   ? ` · กำลังเพิ่มอีก ${rounds.isoTimes.length.toLocaleString('th-TH')}`
                   : ''}

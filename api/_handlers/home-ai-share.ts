@@ -20,7 +20,6 @@
 import { withAuth, sendError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { loadOnlineApplicantRows, loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
 import { buildOnlineApplicantsReport, buildOnlineReport, type OnlineReportResponse } from '../../src/lib/homeOnline.js';
-import { toYmdBangkok } from '../../src/lib/dateTh.js';
 import { checkApiAccess, type ApiResource } from '../_lib/rbac.js';
 import type { UserRole } from '../_lib/auth.js';
 import { respondServiceError } from '../_lib/domainErrors.js';
@@ -55,7 +54,7 @@ import { followMatrixColOfCategory } from '../../src/lib/followCallMatrix.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { journeyResultOf, type FollowJourneyEvent, type FollowJourneyResponse, type FollowJourneyRow } from '../../src/lib/followJourney.js';
 import { createHash } from 'node:crypto';
-import { loadHomeLumosSummary } from '../_lib/homeLumosSummarySql.js';
+import { FOLLOW_BUCKET_SQL, followLedgerBucket, loadHomeLumosSummary } from '../_lib/homeLumosSummarySql.js';
 import { loadTopicReport } from '../_lib/homeTopicReportSql.js';
 import type { TopicReportBlock, TopicReportResponse } from '../../src/lib/homeTopicReport.js';
 import type { HomeLumosSummaryResponse } from '../../src/lib/homeLumosSummary.js';
@@ -70,6 +69,7 @@ import {
   parseListPage,
   previousBounds,
   parseAiShareWindow,
+  onlineRequestYmdRange,
   type AiShareApplicants,
   type AiShareBlockKey,
   type AiShareDetailResponse,
@@ -411,6 +411,7 @@ const AUDIT_TABLE = tableInAppSchema('audit_logs');
 export async function loadFollowJourney(params: Params): Promise<{ rows: FollowJourneyRow[]; events: FollowJourneyEvent[] }> {
   const { rows } = await dbQuery<Record<string, unknown>>(
     `select ${FOLLOW_ENTRY_CATEGORY_COLS}, f.call_mode, f.follow_team, f.unit_name, f.replace_type,
+            ${FOLLOW_BUCKET_SQL} as ledger_bucket,
             ${followBuSql('f')} as journey_bu,
             ${FOLLOW_QUEUE_CALL_COLS}
        from ${FOLLOW_TABLE} f
@@ -444,6 +445,8 @@ export async function loadFollowJourney(params: Params): Promise<{ rows: FollowJ
       team,
       caller: d.caller,
       result: journeyResultOf(d.category, outcome),
+      // ช่องของการ์ดผลโทร (นับทีละสายตามผลจริง · QA 10 ต.ค. 2569) — ป๊อปกล่อง AI โทร/คนโทร นับด้วยตัวนี้
+      bucket: followLedgerBucket(r, derived),
       job,
       replaceType: (r.replace_type as string | null) ?? null,
     });
@@ -615,9 +618,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // ช่วง "ทั้งหมด" = ย้อน 365 วัน (ตัวดึงใบขอของ ERP ต้องมีวันเริ่ม)
     if (q.online !== undefined) {
       const { start, end } = aiShareBounds(win, new Date());
-      const ymd = (d: Date) => toYmdBangkok(d);
-      const from = start ? ymd(start) : ymd(new Date(end.getTime() - 365 * 86_400_000));
-      const to = ymd(new Date(end.getTime() - 1));
+      const { from, to } = onlineRequestYmdRange(start, end);
       const body: OnlineReportResponse = { generated_at: new Date().toISOString(), from, to, bu, report: null, applicants: null, error: null };
       if (scope.mode === 'none') {
         body.error = 'บัญชีนี้ยังไม่ได้ผูกแผนก เลยยังดูข้อมูลทีม Online ไม่ได้';
