@@ -5,7 +5,9 @@
  *    เปลี่ยนแค่สายนี้) · สลับอย่างเดียวไม่ยิงเส้นแก้ข้อมูล · ผลกับ AI ต้องขึ้นบนจอ · สายคนโทรไม่ขึ้นคำเตือน "AI รับไปแล้ว"
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, configure } from '@testing-library/react';
+// ป๊อปแก้ไขหนัก — รันเต็มชุดพร้อมกันแล้ว 1 วิไม่พอ (11 ต.ค. 2569 หลุดล้มครั้งหนึ่งตอนรันเต็มชุด)
+configure({ asyncUtilTimeout: 5000 });
 import type { FollowEntry } from '@/lib/followApi';
 
 const replaceFollowSchedule = vi.fn();
