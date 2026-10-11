@@ -80,6 +80,16 @@ describe('filterJobBoardRows', () => {
     expect(out.usedRelatedFallback).toBe(false);
   });
 
+  it('🔴 ค้นคำที่ไม่มีเลย: เจ้าหน้าที่ = 0 ใบ (QA รอบ 2 ข้อ 21) · หน้าสมัครสาธารณะ = ทั้งหมดตามเดิม', () => {
+    const rows = [job({ id: 'a', unit_name: 'โตโยต้า มอเตอร์' }), job({ id: 'b', unit_name: 'ฮอนด้า' })];
+    const staff = filterJobBoardRows(rows, { ...EMPTY, search: 'zzzzqq' });
+    expect(staff.filtered).toEqual([]);
+    expect(staff.usedRelatedFallback).toBe(false);
+    const pub = filterJobBoardRows(rows, { ...EMPTY, search: 'zzzzqq' }, { fallbackAll: true });
+    expect(pub.filtered.map((j) => j.id)).toEqual(['a', 'b']);
+    expect(pub.usedRelatedFallback).toBe(true);
+  });
+
   // ⚠️ ชิป "ด่วน" (+ skipUrgencyChip) ถูกถอดทิ้งทั้งฟีเจอร์ 20 ส.ค. 2569 — เจ้าของสั่ง
   it('🔴 ตัวกรองใช้ได้กับใบที่ปิดแล้วเหมือนใบเปิด (กล่องปิดแล้ว/ยกเลิกกรองในหน้าเดิม)', () => {
     const closed = [

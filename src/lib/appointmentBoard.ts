@@ -75,16 +75,23 @@ export function buildAppointmentBoard(rows: readonly AppointmentBoardRow[]): App
  * แทนกล่องตัวเลข 4 ใบ — กดแล้วตารางกรองตาม · เลขบนชิป = เลขบนบอร์ดเดิม (`buildAppointmentBoard`)
  * "รอผล" รวมเลื่อนนัด (กล่องเดิมก็รวม "รอผล / เลื่อนนัด") ⇒ มา + ไม่มา + รอผล = นัดทั้งหมด
  */
-export type AppointmentChip = 'all' | 'showed' | 'no_show' | 'pending';
+/** `today` = นัดวันนี้ (QA รอบ 3 ข้อ 23 · ไม่มีปุ่มดูนัดวันนี้) — คนละแกนกับผลนัด ไม่อยู่ในสูตร มา + ไม่มา + รอผล = ทั้งหมด */
+export type AppointmentChip = 'all' | 'today' | 'showed' | 'no_show' | 'pending';
 
 export const APPOINTMENT_CHIPS: readonly { id: AppointmentChip; label: string; tone: 'info' | 'success' | 'danger' | 'warn' }[] = [
   { id: 'all', label: 'นัดทั้งหมด', tone: 'info' },
+  { id: 'today', label: 'นัดวันนี้', tone: 'info' },
   { id: 'showed', label: 'มา', tone: 'success' },
   { id: 'no_show', label: 'ไม่มา', tone: 'danger' },
   { id: 'pending', label: 'รอผล', tone: 'warn' },
 ];
 
-export function appointmentChipCount(board: AppointmentBoard, chip: AppointmentChip): number {
+export function appointmentChipCount(
+  board: AppointmentBoard,
+  chip: AppointmentChip,
+  today: string = toYmdBangkok(new Date()),
+): number {
+  if (chip === 'today') return board.days.find((d) => d.date === today)?.total ?? 0;
   const t = board.total;
   if (chip === 'showed') return t.showed;
   if (chip === 'no_show') return t.noShow;
@@ -93,9 +100,14 @@ export function appointmentChipCount(board: AppointmentBoard, chip: AppointmentC
 }
 
 /** แถวนี้อยู่ในชิปไหม — นิยามเดียวกับ `bump` (แถวไม่มีวันนัดอยู่แค่ "นัดทั้งหมด" ไม่ได้ไม่นับ เพื่อไม่ให้แถวหาย) */
-export function isInAppointmentChip(r: AppointmentBoardRow, chip: AppointmentChip): boolean {
+export function isInAppointmentChip(
+  r: AppointmentBoardRow,
+  chip: AppointmentChip,
+  today: string = toYmdBangkok(new Date()),
+): boolean {
   if (chip === 'all') return true;
   if (!r.appointment_at) return false;
+  if (chip === 'today') return toYmdBangkok(new Date(r.appointment_at)) === today;
   const result = isAttendanceResult(r.attendance_result) ? r.attendance_result : null;
   if (chip === 'showed') return result === 'showed';
   if (chip === 'no_show') return result === 'no_show';

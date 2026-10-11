@@ -36,6 +36,11 @@ export type JobBoardRowFilterState = {
 export function filterJobBoardRows(
   rows: readonly JobRequest[],
   state: JobBoardRowFilterState,
+  /**
+   * ไม่เจอทั้งตรงและใกล้เคียง → คืนทั้งหมดไหม · เจ้าหน้าที่ = ไม่ (ค้นคำที่ไม่มีต้องได้ 0 ใบ · QA รอบ 2 ข้อ 21 เดิมโชว์ครบ 363)
+   * หน้าสมัครสาธารณะยังโชว์ทั้งหมดตามเดิม (คนหางานไม่ควรเจอหน้าว่าง)
+   */
+  opts: { fallbackAll?: boolean } = {},
 ): { filtered: JobRequest[]; usedRelatedFallback: boolean } {
   const {
     search,
@@ -85,5 +90,5 @@ export function filterJobBoardRows(
   });
   if (related.length > 0) return { filtered: related, usedRelatedFallback: true };
 
-  return { filtered: baseRows, usedRelatedFallback: true };
+  return opts.fallbackAll ? { filtered: baseRows, usedRelatedFallback: true } : { filtered: [], usedRelatedFallback: false };
 }

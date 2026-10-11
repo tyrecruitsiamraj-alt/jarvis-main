@@ -91,6 +91,7 @@ import { publishReadinessOf, type PublishReadinessFacts } from '@/lib/publishRea
 import { buildSkipIndex, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
 import { boardPostingPath } from '@/lib/jobNavigation';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
+import { scrollIntoViewX } from '@/lib/scrollIntoViewX';
 import { APPLICANT_FILTER_PARAM_PREFIX } from '@/lib/applicantFilters';
 import { STANDALONE_POSTING_KINDS, type RecruitPosting } from '@/lib/recruitPostings';
 import {
@@ -291,6 +292,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     initialPosition: positionPreset?.positionFilter,
     lockPosition: positionPreset?.locked,
     drivingPositionGroup: positionPreset?.isDrivingGroup,
+    searchFallbackAll: variant === 'public',
   });
   const isStaff = variant === 'staff';
 
@@ -1189,6 +1191,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * (หน้าสมัครสาธารณะยังเป็นหัวแบบหน้าปกนิตยสารเหมือนเดิม — คนละกลุ่มคนดู)
    */
   const staffTitle = BOARD_VIEW_TABS.find((t) => t.id === view)?.label ?? 'งานสรรหา';
+  /** แถบแท็บล้นบนมือถือ — เลื่อนให้เห็นแท็บที่เปิดอยู่ (QA รอบ 2 ข้อ 32) */
+  const staffTabsRef = React.useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const bar = staffTabsRef.current;
+    scrollIntoViewX(bar, bar?.querySelector<HTMLElement>('[aria-current="page"]') ?? null);
+  }, [view]);
   /* 🔴 ตัวเลขยังบอกไม่ได้ (กำลังโหลด/พัง/ไม่มีสิทธิ์) = **ไม่พิมพ์อะไรเลย** (บทเรียน 31 ส.ค. 2569)
      บอกหน่วยครบทั้ง "ใบขอ" และ "อัตรา" (บทเรียน "292 ตำแหน่ง") · % ปล่อยประกาศย้ายมาจากแถบบนหัวกล่องงาน */
   const staffSubtitle =
@@ -1209,7 +1217,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    */
   const staffTabs =
     isStaff && onViewChange ? (
-      <div className="flex items-center gap-1 overflow-x-auto" role="tablist" aria-label="มุมมองหน้างานสรรหา">
+      <div ref={staffTabsRef} className="flex items-center gap-1 overflow-x-auto" role="tablist" aria-label="มุมมองหน้างานสรรหา">
         {BOARD_VIEW_TABS.map((v) => {
           const active = view === v.id;
           return (

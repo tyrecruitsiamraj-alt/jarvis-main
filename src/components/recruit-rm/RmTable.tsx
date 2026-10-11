@@ -244,7 +244,8 @@ const RmTable: React.FC<{
               {tab === 'contact' ? (
                 <th className="px-1.5 py-2 font-medium">โทรล่าสุด</th>
               ) : null}
-              <th className="px-1.5 py-2 text-right font-medium">ตัวเลือก</th>
+              {/* มือถือ: คอลัมน์ปุ่มติดขวา ไม่ต้องปัดหา (QA รอบ 2 ข้อ 30) */}
+              <th className="px-1.5 py-2 text-right font-medium max-sm:sticky max-sm:right-0 max-sm:bg-card">ตัวเลือก</th>
             </tr>
           </thead>
           <tbody>
@@ -372,15 +373,19 @@ const RmTable: React.FC<{
                       {/* วันนัดเก็บเป็น ISO เต็ม (เที่ยงวันไทย) — ตัดเอาเฉพาะวันที่ฝั่งไทย
                           ห้าม .slice(0,10) ตรง ๆ เพราะนั่นคือวันที่ฝั่ง UTC */}
                       <span className="flex flex-col gap-0.5">
-                        <span className={cn('whitespace-nowrap tabular-nums', DASH.cell)}>
-                          {r.appointment_at
-                            ? formatYmdDmyBe(
-                                new Date(r.appointment_at).toLocaleDateString('en-CA', {
-                                  timeZone: 'Asia/Bangkok',
-                                }),
-                              )
-                            : EM_DASH}
-                        </span>
+                        {/* เลยวันนัดแล้วยังไม่ลงผล = สีเตือน + "เลยวันนัด" (QA รอบ 3 ข้อ 23 · เดิมหน้าตาเหมือนนัดปกติ) */}
+                        {(() => {
+                          const ymd = r.appointment_at
+                            ? new Date(r.appointment_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+                            : null;
+                          const overdue = Boolean(ymd && ymd < toYmdBangkok(new Date()) && !r.attendance_result);
+                          return (
+                            <span className={cn('whitespace-nowrap tabular-nums', overdue ? TONE.orange.value : DASH.cell)}>
+                              {ymd ? formatYmdDmyBe(ymd) : EM_DASH}
+                              {overdue ? ' · เลยวันนัด' : ''}
+                            </span>
+                          );
+                        })()}
                         <span className={cn('line-clamp-2 min-w-32 break-words text-xs', DASH.cellMuted)}>
                           {r.appointment_place || r.appointment_job
                             ? `${r.appointment_place ?? ''}${r.appointment_place && r.appointment_job ? ' · ' : ''}${r.appointment_job ?? ''}`
@@ -401,7 +406,8 @@ const RmTable: React.FC<{
                                   onClick={() => onAttendance?.(r, k)}
                                   title={`บันทึกว่า${ATTENDANCE_LABEL[k]} — กดซ้ำอันอื่นเพื่อแก้ได้`}
                                   className={cn(
-                                    'whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium',
+                                    // มือถือสูง 36px (เดิม 25px)
+                                    'whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium max-sm:min-h-9 max-sm:px-3',
                                     tone.soft,
                                     tone.value,
                                     active ? 'ring-2 ring-ring' : 'opacity-75 hover:opacity-100',
@@ -444,8 +450,8 @@ const RmTable: React.FC<{
                   {/* คอลัมน์ "สถานะ" (ชิปสถานะใบ + ชิปที่มา) ถูกถอดออกตามชุดคอลัมน์ที่
                       เจ้าของสั่ง 17 ส.ค. 2569 — ⚠️ ถอด <th> แล้วต้องถอด <td> ด้วยเสมอ
                       ไม่งั้นทุกแถวเลื่อนไปหนึ่งช่อง (ข้อมูลไปโผล่ใต้หัวคอลัมน์ผิด) */}
-                  <td className="px-1.5 py-2">
-                    <div className="flex items-center justify-end gap-0.5">
+                  <td className="px-1.5 py-2 max-sm:sticky max-sm:right-0 max-sm:bg-card">
+                    <div className="flex items-center justify-end gap-0.5 max-sm:gap-1">
                       {actions.map((a) => {
                         const Icon = (tab === 'contact' ? CONTACT_ACTION_ICON[a] : undefined) ?? ACTION_ICON[a];
                         let label: string = rmRowActionLabel(tab, a);
@@ -487,7 +493,8 @@ const RmTable: React.FC<{
                             disabled={disabled}
                             title={label}
                             aria-label={`${label} — ${r.full_name}`}
-                            className="rounded-full text-muted-foreground hover:text-foreground"
+                            // มือถือปุ่ม 40px (เดิม 32px ติดกัน กด "ส่ง AI โทร" พลาดโดน "ดูรายละเอียด")
+                            className="rounded-full text-muted-foreground hover:text-foreground max-sm:h-10 max-sm:w-10"
                           >
                             <Icon aria-hidden />
                           </Button>

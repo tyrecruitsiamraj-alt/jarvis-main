@@ -199,6 +199,11 @@ describe('หน้าเว็บ: ปุ่ม ของฉัน / ทุก�
 
   it('สลับเร็ว ๆ แล้วคำตอบเก่ามาทีหลัง ต้องไม่ทับ (ลำดับคำขอ)', () => {
     expect(code).toContain('const seq = ++loadSeq.current;');
-    expect(code).toContain('if (seq === loadSeq.current) setRows(next);');
+    expect(code).toMatch(/if \(seq === loadSeq\.current\) \{\s*setRows\(next\);/);
+  });
+
+  it('🔴 สลับชุดแล้วเส้นล้ม = ไม่ค้างรายชื่อชุดเก่า (QA รอบ 3 ข้อ 23)', () => {
+    expect(code).toContain('if (rowsScopeRef.current !== null && rowsScopeRef.current !== everyoneAppointments) setRows([]);');
+    expect(code).toContain('rowsScopeRef.current = everyoneAppointments;');
   });
 });

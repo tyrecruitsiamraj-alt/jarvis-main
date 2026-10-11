@@ -18,6 +18,8 @@ export type JobBoardFilterOptions = {
   lockPosition?: boolean;
   /** กรองแบบกลุ่มงานขับรถ (พขร / ขับรถ / valet) */
   drivingPositionGroup?: boolean;
+  /** ค้นไม่เจอเลย = คืนทั้งหมด (หน้าสมัครสาธารณะ) · ไม่ส่ง = คืน 0 ใบ (เจ้าหน้าที่) */
+  searchFallbackAll?: boolean;
 };
 
 export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterOptions) {
@@ -143,8 +145,8 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
   );
 
   const { filtered, usedRelatedFallback } = useMemo(
-    () => filterJobBoardRows(visible, rowFilterState),
-    [visible, rowFilterState],
+    () => filterJobBoardRows(visible, rowFilterState, { fallbackAll: options?.searchFallbackAll }),
+    [visible, rowFilterState, options?.searchFallbackAll],
   );
 
   /**
@@ -152,8 +154,9 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
    * 🔴 ต้องเป็นตัวเดียวกับที่กรองใบเปิด — เขียนกรองรอบสองเมื่อไหร่คือรอวันที่สองกล่องไม่ตรงกัน
    */
   const filterRows = useCallback(
-    (rows: readonly JobRequest[]) => filterJobBoardRows(rows, rowFilterState).filtered,
-    [rowFilterState],
+    (rows: readonly JobRequest[]) =>
+      filterJobBoardRows(rows, rowFilterState, { fallbackAll: options?.searchFallbackAll }).filtered,
+    [rowFilterState, options?.searchFallbackAll],
   );
 
   const onProvinceFilterChange = useCallback((next: string) => {

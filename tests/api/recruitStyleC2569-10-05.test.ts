@@ -94,3 +94,21 @@ describe('ชิปกรองหัวแท็บ (แทนกล่อง�
     }
   });
 });
+
+describe('ชิป "นัดวันนี้" + เลยวันนัด (QA รอบ 3 ข้อ 23 · 12 ต.ค. 2569)', () => {
+  it('นับ/กรองเฉพาะนัดวันนี้ (วันไทย) · ไม่ปนสูตร มา + ไม่มา + รอผล', () => {
+    const rows = [
+      { appointment_at: '2026-10-12T05:00:00Z', attendance_result: null },
+      { appointment_at: '2026-10-11T18:30:00Z', attendance_result: 'showed' }, // 01:30 ของ 12 ต.ค. ไทย
+      { appointment_at: '2026-10-11T05:00:00Z', attendance_result: null },
+    ];
+    const board = buildAppointmentBoard(rows);
+    expect(appointmentChipCount(board, 'today', '2026-10-12')).toBe(2);
+    expect(rows.filter((r) => isInAppointmentChip(r, 'today', '2026-10-12')).length).toBe(2);
+  });
+  it('แถวนัดที่เลยวันแล้วยังไม่ลงผล = สีเตือน + "เลยวันนัด"', () => {
+    const table = fs.readFileSync('src/components/recruit-rm/RmTable.tsx', 'utf8');
+    expect(table).toContain("const overdue = Boolean(ymd && ymd < toYmdBangkok(new Date()) && !r.attendance_result);");
+    expect(table).toContain("{overdue ? ' · เลยวันนัด' : ''}");
+  });
+});

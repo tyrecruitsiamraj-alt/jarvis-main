@@ -285,13 +285,19 @@ const RmWorkspace: React.FC<{
 
   /** ลำดับคำขอ — สลับของฉัน/ทุกคนเร็ว ๆ แล้วคำตอบเก่ามาทีหลัง ต้องไม่ทับรายชื่อที่เลือกอยู่ */
   const loadSeq = useRef(0);
+  /** รายชื่อบนจอเป็นของชุดไหน (ของฉัน/ทุกคน) — สลับชุดแล้วเส้นล้ม ห้ามค้างรายชื่อชุดเก่าใต้ปุ่มชุดใหม่ (QA รอบ 3 ข้อ 23) */
+  const rowsScopeRef = useRef<boolean | null>(null);
   const load = () => {
     const seq = ++loadSeq.current;
     setLoading(true);
     setLoadError(null);
+    if (rowsScopeRef.current !== null && rowsScopeRef.current !== everyoneAppointments) setRows([]);
     fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments)
       .then((next) => {
-        if (seq === loadSeq.current) setRows(next);
+        if (seq === loadSeq.current) {
+          setRows(next);
+          rowsScopeRef.current = everyoneAppointments;
+        }
       })
       .catch((e) => {
         if (seq === loadSeq.current) setLoadError(friendlyErrorText(e, 'โหลดรายชื่อผู้สมัครไม่สำเร็จ'));

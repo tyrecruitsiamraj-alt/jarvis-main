@@ -765,7 +765,8 @@ export default function ApplicantContactDialog({
           {error}
         </p>
       ) : null}
-      <div className="flex flex-wrap justify-end gap-2 border-t border-border/70 pt-3">
+      {/* แถบปุ่มติดล่างของป๊อป (QA รอบ 3 ข้อ 26 · เดิมปุ่มบันทึกอยู่หลังประวัติทั้งหน้า ต้องเลื่อน 1,884px) */}
+      <div className="sticky bottom-0 z-10 flex flex-wrap justify-end gap-2 border-t border-border/70 bg-background pb-1 pt-3">
         {/* ปุ่มบันทึกปิดอยู่ต้องบอกเหตุ (QA 5 ต.ค. 2569: กดแล้วเงียบ ไม่รู้ว่าทำไมไม่ไป) */}
         {editing && !dirty ? <span className="self-center text-xs text-muted-foreground">ยังไม่ได้แก้</span> : null}
         {mode !== 'profile' || editing ? (
@@ -785,7 +786,13 @@ export default function ApplicantContactDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && !busy && onClose()}>
-      <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto">{body}</DialogContent>
+      {/* มือถือ: ป๊อปชิดบน (สลับแท็บแล้วไม่กระโดดขึ้นลง) · แตะพื้นหลังไม่ปิด — ปิดด้วยปุ่มปิด/X/Esc (QA รอบ 3 ข้อ 25) */}
+      <DialogContent
+        className="max-h-[88vh] max-w-4xl overflow-y-auto max-sm:top-4 max-sm:translate-y-0"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
+        {body}
+      </DialogContent>
     </Dialog>
   );
 }
