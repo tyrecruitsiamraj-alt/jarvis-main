@@ -12920,3 +12920,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · เทสต์ `tests/api/importResponsibleNames2569-10-11.test.ts` + `applicationImportHandler.test.ts` (ล็อก BU นำเข้าได้ ประทับ LBD · ไม่รู้แผนก 403)
 - (11 ต.ค. 2569 ค่ำ) QA รอบ 3 ข้อสูง 1–2 — **ป๊อปประกาศค่าเริ่ม `src/pages/jobs/BoardPostingPage.tsx`** (รอบก่อนแก้แค่ `BoardPublishSheet` ทางถอย): `postingsFailed` / `releasesFailed`
   อ่านไม่ได้ ≠ ไม่มี · "อ่านลิงก์ไม่ได้" + ลองใหม่ · Gen link กดไม่ได้และไม่กางเอง · "อ่านสถานะประกาศไม่ได้" + ลองใหม่ แทนปุ่มส่งประกาศ/ดึงลง · เทสต์ `tests/api/boardPostingReadFailure2569-10-11.test.ts`
+- (11 ต.ค. 2569 ค่ำ) QA รอบ 3 ข้อสูง 3 — **หน้าหลักตอนเส้นล้ม** (`src/pages/HomeAiSharePage.tsx`): กล่องเลขใช้ `loading={!counts}` (ยังไม่มีเลข = "—" ทั้งตอนโหลดและตอนล้ม · เดิมล้มแล้วกลับเป็น 0) · แถบ % ไม่ขึ้นเมื่อไม่มีเลข
+  · แผงผลโทรล้ม = บรรทัดแดง + "ลองใหม่" (`home-results-failed` · ทุกหัวข้อ) · แท่งไม่ขึ้น "ไม่มีรายชื่อ" ตอนล้ม (ผลโทร "—" · BU "โหลดไม่ขึ้น")
+  · `liveFailed` (รอบสดล้ม) + `staleData` = ก้อนไหนล้มก็ดับจุดเขียว ขึ้น "อัปเดตไม่สำเร็จ · ข้อมูลเมื่อ HH:MM" · จับคู่งาน: คู่ที่จับไว้/ต้องสั่งงาน ขึ้น "—" ระหว่างรอ (`stepsPending`) · ถอด state `loading` ที่ไม่มีใครอ่านแล้ว
+  · เทสต์ใน `src/pages/HomeAiSharePage.test.tsx` (describe "หน้าหลักตอนเส้นล้ม")

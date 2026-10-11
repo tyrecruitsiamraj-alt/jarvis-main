@@ -230,7 +230,6 @@ function saveBlock(k: AiShareBlockKey) {
 const HomeAiSharePage: React.FC = () => {
   const [win, setWin] = useState<AiShareWindow>(() => defaultAiShareWindow());
   const [data, setData] = useState<AiShareResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [block, setBlock] = useState<AiShareBlockKey>(readBlock);
   /**
@@ -290,25 +289,24 @@ const HomeAiSharePage: React.FC = () => {
   /** รายงานของหัวข้ออื่น (ขั้น · ผลแยกก้อน · BU) — โหลดครั้งเดียวทั้งหน้า */
   const topic = useTopicReport(block === 'follow' ? null : block, cardQ, tick);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  /** รอบสดล่าสุดล้ม (เลขเดิมค้างไว้) — ป้าย "สด" ต้องดับ ไม่งั้นดูเหมือนเลขยังสด (QA รอบ 3 ข้อ 3) */
+  const [liveFailed, setLiveFailed] = useState(false);
   const cardWinRef = useRef(cardQ);
   cardWinRef.current = cardQ;
 
   useEffect(() => {
     let alive = true;
-    setLoading(true);
     setError(null);
     fetchHomeAiShare(cardQ)
       .then((d) => {
         if (alive) {
           setData(d);
           setUpdatedAt(new Date());
+          setLiveFailed(false);
         }
       })
       .catch((e: unknown) => {
         if (alive) setError(friendlyErrorText(e, 'โหลดหน้าหลักไม่ขึ้น'));
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
       });
     return () => {
       alive = false;
@@ -328,9 +326,12 @@ const HomeAiSharePage: React.FC = () => {
           setData(d);
           setError(null);
           setUpdatedAt(new Date());
+          setLiveFailed(false);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (alive) setLiveFailed(true);
+      });
     return () => {
       alive = false;
     };
@@ -565,7 +566,8 @@ const HomeAiSharePage: React.FC = () => {
         value={total}
         unit={meta.unit}
         liveKey={liveKey}
-        loading={loading && !counts}
+        // ยังไม่มีเลข (กำลังโหลด หรือโหลดล้ม) = "—" ไม่ใช่ 0 ปลอม (QA รอบ 3 ข้อ 3)
+        loading={!counts}
         pill={pillOf(total, prevCounts?.total)}
         pillTitle={compareTitle}
         foot={prevCounts && prev?.label ? `${prev.label} ${NUM.format(prevCounts.total)}` : null}
@@ -581,8 +583,8 @@ const HomeAiSharePage: React.FC = () => {
           label={AI_SHARE_SEGMENT_LABEL[k]}
           value={counts ? counts[k] : 0}
           liveKey={liveKey}
-          loading={loading && !counts}
-          share={shareOf?.get(k) ?? 0}
+          loading={!counts}
+          share={counts ? (shareOf?.get(k) ?? 0) : null}
           shareClass={segmentFillClass(k)}
           pill={counts ? pillOf(counts[k], prevCounts?.[k]) : null}
           pillTitle={compareTitle}
@@ -635,6 +637,8 @@ const HomeAiSharePage: React.FC = () => {
   const buRows = followCells ? followBuSplit(followCells) : report ? reportBuSplit(report) : [];
   const barsLoading = meta.key === 'follow' ? !followCells : !report;
   const failed = meta.key === 'follow' ? lumos.failed : topic.failed;
+  /** เลขบนจอค้างจากรอบก่อน — ก้อนไหนล้มก็นับ (ป้ายสดต้องดับ) */
+  const staleData = Boolean(error || liveFailed || failed || detailError);
   const resultTone = new Map<string, ToneKey>(
     (meta.key === 'follow' ? FOLLOW_RESULT_COLS : (report?.cols ?? [])).map((c): [string, ToneKey] => [c.key, c.tone]),
   );
@@ -648,7 +652,14 @@ const HomeAiSharePage: React.FC = () => {
       testId="home-results"
       right={<SegLegend segs={barSegs} />}
     >
-      {failed ? <p className={cn('text-sm', TONE.danger.value)}>{failed}</p> : null}
+      {failed ? (
+        <p className={cn('flex flex-wrap items-center gap-2 text-sm', TONE.danger.value)} data-testid="home-results-failed">
+          {failed}
+          <Button type="button" variant="outline" size="xs" onClick={() => setRetrySeq((n) => n + 1)}>
+            ลองใหม่
+          </Button>
+        </p>
+      ) : null}
       {meta.key === 'aftercare' ? (
         <StatStrip loading={stepsPending} arrows testId="home-reach" items={[stepOf(steps, 'total'), stepOf(steps, 'called'), stepOf(steps, 'reached')]} />
       ) : null}
@@ -656,7 +667,8 @@ const HomeAiSharePage: React.FC = () => {
         rows={resultRows}
         segs={barSegs}
         loading={barsLoading && !failed}
-        emptyText="ไม่มีรายชื่อ"
+        // ล้มแล้วห้ามขึ้น "ไม่มีรายชื่อ" เหมือนข้อมูลจริง — บรรทัดบนบอกแล้วพร้อมปุ่มลองใหม่ (QA รอบ 3 ข้อ 3)
+        emptyText={failed && barsLoading ? '—' : 'ไม่มีรายชื่อ'}
         testId="home-result-bars"
         dotOf={(k) => {
           const t = resultTone.get(k);
@@ -669,7 +681,13 @@ const HomeAiSharePage: React.FC = () => {
 
   const buCard = (
     <HomeSection title="แต่ละ BU ใช้เท่าไหร่" sub={sub} testId="home-bu" right={<SegLegend segs={barSegs} />}>
-      <SplitBars rows={buRows} segs={barSegs} loading={barsLoading && !failed} emptyText="ไม่มีรายชื่อ" testId="home-bu-bars" />
+      <SplitBars
+        rows={buRows}
+        segs={barSegs}
+        loading={barsLoading && !failed}
+        emptyText={failed && barsLoading ? 'โหลดไม่ขึ้น' : 'ไม่มีรายชื่อ'}
+        testId="home-bu-bars"
+      />
     </HomeSection>
   );
 
@@ -679,7 +697,7 @@ const HomeAiSharePage: React.FC = () => {
     <div className="space-y-3 rounded-xl border border-foreground/10 p-4" data-testid="home-matched">
       <p className="flex items-baseline gap-2">
         <span className="text-sm text-muted-foreground">{matched.label === 'matched' ? 'คนที่จับคู่รอ' : matched.label}</span>
-        <span className="text-2xl font-medium tabular-nums text-foreground">{NUM.format(matched.value)}</span>
+        <span className="text-2xl font-medium tabular-nums text-foreground">{stepsPending ? '—' : NUM.format(matched.value)}</span>
       </p>
       <div className="flex h-4 overflow-hidden rounded-full bg-muted" aria-hidden>
         {(matched.parts ?? []).map((p) => (
@@ -694,7 +712,7 @@ const HomeAiSharePage: React.FC = () => {
         {(matched.parts ?? []).map((p) => (
           <span key={p.key} className="inline-flex items-center gap-1.5 text-muted-foreground">
             <span className={cn('h-2.5 w-2.5 rounded-full', TONE[p.tone ?? 'neutral'].dot)} aria-hidden />
-            {p.label} <span className="font-medium text-foreground">{NUM.format(p.value)}</span>
+            {p.label} <span className="font-medium text-foreground">{stepsPending ? '—' : NUM.format(p.value)}</span>
           </span>
         ))}
       </p>
@@ -711,7 +729,7 @@ const HomeAiSharePage: React.FC = () => {
               {it.tone ? <span className={cn('h-2.5 w-2.5 rounded-full', TONE[it.tone].dot)} aria-hidden /> : null}
               {it.label}
             </span>
-            <span className="text-base font-medium tabular-nums text-foreground">{NUM.format(it.value)}</span>
+            <span className="text-base font-medium tabular-nums text-foreground">{stepsPending ? '—' : NUM.format(it.value)}</span>
           </li>
         ))}
       </ul>
@@ -727,7 +745,12 @@ const HomeAiSharePage: React.FC = () => {
           <div className="flex flex-wrap items-baseline gap-3">
             <h1 className="text-3xl font-medium text-foreground">หน้าหลัก</h1>
             {/* จุดเขียวกระพริบ = กำลังอัปเดตสด · เวลาที่เลขชุดนี้มาถึง (ช่วงที่จบไปแล้ว = ไม่มีจุด) */}
-            {updatedAt ? (
+            {/* มีก้อนไหนล้ม = ดับจุดเขียว บอกว่าเลขค้างจากเมื่อไหร่ (QA รอบ 3 ข้อ 3 · คำเดียวกับแถบบอร์ด) */}
+            {updatedAt && staleData ? (
+              <span className={cn('text-xs tabular-nums', TONE.danger.value)} data-testid="home-live">
+                อัปเดตไม่สำเร็จ · ข้อมูลเมื่อ {CLOCK.format(updatedAt)}
+              </span>
+            ) : updatedAt ? (
               <span className="inline-flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" data-testid="home-live">
                 {live ? <span className={cn('h-2 w-2 animate-pulse rounded-full', TONE.success.dot)} aria-hidden /> : null}
                 {live ? 'สด · ' : ''}อัปเดต {CLOCK.format(updatedAt)}

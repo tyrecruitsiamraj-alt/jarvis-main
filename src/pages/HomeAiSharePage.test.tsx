@@ -761,3 +761,32 @@ describe('หน้าหลักอัปเดตสด', () => {
     }
   });
 });
+
+describe('หน้าหลักตอนเส้นล้ม (QA รอบ 3 ข้อ 3 · 11 ต.ค. 2569)', () => {
+  it('🔴 โหลดเลขหลักล้ม = กล่องขึ้น "—" ไม่ใช่ 0 · ไม่มีแถบ 0% · แถบล้มมีปุ่มลองใหม่', async () => {
+    fetchHomeAiShare.mockReset().mockRejectedValue(new Error('boom'));
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
+    await waitFor(() => expect(screen.getByTestId('home-error')).toBeTruthy());
+    expect(stat('ทั้งหมด')).toContain('—');
+    expect(stat('ทั้งหมด')).not.toMatch(/\b0 รายชื่อ/);
+    expect(stat('AI โทร')).not.toContain('0%');
+    expect(within(screen.getByTestId('home-error')).getByRole('button', { name: 'ลองใหม่' })).toBeTruthy();
+  });
+
+  it('🔴 รอบสดล้มหลังเคยโหลดได้ = เลขเดิมค้าง · ป้าย "สด" ดับ บอกว่าข้อมูลเมื่อไหร่', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<HomeAiSharePage />, { wrapper: MemoryRouter });
+      await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+      expect(screen.getByTestId('home-live').textContent).toMatch(/^สด · อัปเดต /);
+      fetchHomeAiShare.mockRejectedValue(new Error('boom'));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(31_000);
+      });
+      await waitFor(() => expect(screen.getByTestId('home-live').textContent).toMatch(/^อัปเดตไม่สำเร็จ · ข้อมูลเมื่อ /));
+      expect(stat('ทั้งหมด')).toContain('205 รายชื่อ');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
