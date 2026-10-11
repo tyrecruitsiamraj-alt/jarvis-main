@@ -263,6 +263,12 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
 
   const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
   const [releases, setReleases] = React.useState<JobRelease[] | null>(null);
+  /**
+   * 🔴 อ่านไม่ได้ ≠ ไม่มี (QA รอบ 3 · 11 ต.ค. 2569) — เดิมล้มแล้วตั้งเป็นรายการว่าง จอเลยขึ้น "ยังไม่มีลิงก์" + กางฟอร์ม Gen link
+   * (เสี่ยงสร้างลิงก์ซ้ำ) และใบที่ประกาศอยู่กลับขึ้นปุ่ม "ส่งประกาศ" · ตอนนี้จำว่าล้ม แล้วจอบอกตรง ๆ พร้อมปุ่มลองใหม่
+   */
+  const [postingsFailed, setPostingsFailed] = React.useState(false);
+  const [releasesFailed, setReleasesFailed] = React.useState(false);
   const [releaseBusy, setReleaseBusy] = React.useState(false);
   const [sendError, setSendError] = React.useState<string | null>(null);
   /** ทะเบียน "ไม่ปล่อย + เหตุผล" (29 ก.ย. 2569) — `null` = ยังอ่านไม่ได้ ⇒ ไม่โชว์ปุ่ม (ห้ามเดาว่ายังไม่ได้ตั้ง) */
@@ -287,16 +293,20 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const loadPostings = React.useCallback(async () => {
     try {
       setPostings(await fetchRecruitPostings());
+      setPostingsFailed(false);
     } catch {
-      setPostings([]); // อ่านไม่ได้ = ถือว่ายังไม่มีประกาศ (ฟอร์มสร้างลิงก์ยังใช้ได้)
+      setPostings([]); // ตัวนับขั้นยังถือว่ายังไม่มีประกาศ · จอบอก "อ่านลิงก์ไม่ได้" และปิด Gen link (postingsFailed)
+      setPostingsFailed(true);
     }
   }, []);
 
   const loadReleases = React.useCallback(async () => {
     try {
       setReleases(await fetchJobReleases());
+      setReleasesFailed(false);
     } catch {
-      setReleases([]); // fail-closed เหมือนฝั่ง server — อ่านไม่ได้ = ถือว่ายังไม่ปล่อย
+      setReleases([]); // fail-closed เหมือนฝั่ง server — อ่านไม่ได้ = ถือว่ายังไม่ปล่อย · แต่ซ่อนปุ่มประกาศ/ดึงลง (releasesFailed)
+      setReleasesFailed(true);
     }
   }, []);
 
@@ -438,7 +448,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
     else setOpenStep(k);
   };
   /** โฉม 2 จอ: ใบที่ยังไม่มีลิงก์ = ฟอร์ม Gen link กางรอเลย (จอ 2 คือจอประกาศ + Gen link) */
-  const noLinkYet = linkCount === 0;
+  const noLinkYet = !postingsFailed && linkCount === 0;
   React.useEffect(() => {
     if ((quick || one) && noLinkYet) setWantLink(true);
   }, [quick, one, noLinkYet]);
@@ -514,7 +524,14 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
     <>
                 <StepCard title="ลิงก์สมัคร" aside={<span className="text-xs text-muted-foreground">ไม่บังคับ</span>}>
                   {/* "มีแล้ว N ลิงก์" กดแล้วกางดูทีละลิงก์ว่าเกี่ยวกับอะไร (เจ้าของ 4 ต.ค. 2569 → Choice "ครบ") */}
-                  {linkCount === null ? (
+                  {postingsFailed ? (
+                    <p className={cn('flex flex-wrap items-center gap-2 text-sm', TONE.danger.value)} data-testid="links-failed">
+                      อ่านลิงก์ไม่ได้
+                      <Button type="button" variant="outline" size="xs" onClick={() => void loadPostings()}>
+                        ลองใหม่
+                      </Button>
+                    </p>
+                  ) : linkCount === null ? (
                     <p className="text-sm text-muted-foreground">กำลังโหลด…</p>
                   ) : linkCount > 0 ? (
                     <Collapsible open={linksOpen} onOpenChange={setLinksOpen}>
@@ -534,9 +551,9 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                   {/* 🔴 "Gen link" เป็นปุ่มกางลง (เจ้าของสั่ง 5 ต.ค. 2569: *"สร้างลิงก์ เปลี่ยนเป็น Gen link และพอกดไป
                       ให้มันเป็น Dropdown ไม่ใช่ค้างโชว์ไว้"*) — เดิมเป็นช่องติ๊กที่กางฟอร์มค้างไว้ · กดอีกครั้ง = พับ
                       มีประกาศแล้ว = เลือกช่องทางอย่างเดียว ข้อความเดิม · ยังไม่มี = กรอกข้อความประกาศครั้งแรกครั้งเดียว */}
-                  <Collapsible open={wantLink} onOpenChange={setWantLink}>
+                  <Collapsible open={wantLink && !postingsFailed} onOpenChange={setWantLink}>
                     <CollapsibleTrigger asChild>
-                      <Button type="button" variant="outline" size="sm" data-testid="gen-link-toggle">
+                      <Button type="button" variant="outline" size="sm" data-testid="gen-link-toggle" disabled={postingsFailed}>
                         <Link2 aria-hidden />
                         {linkCount ? 'Gen link เพิ่ม' : 'Gen link'}
                         <ChevronDown className={cn('transition-transform', wantLink && 'rotate-180')} aria-hidden />
@@ -598,7 +615,14 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                   </div>
                 ) : null}
 
-                {released === null ? (
+                {releasesFailed ? (
+                  <p className={cn('flex flex-wrap items-center justify-end gap-2 text-sm', TONE.danger.value)} data-testid="release-failed">
+                    อ่านสถานะประกาศไม่ได้
+                    <Button type="button" variant="outline" size="xs" onClick={() => void loadReleases()}>
+                      ลองใหม่
+                    </Button>
+                  </p>
+                ) : released === null ? (
                   <Loading text="กำลังอ่านทะเบียนการประกาศ…" />
                 ) : released ? (
                   <div className="flex flex-wrap items-center justify-end gap-2">
