@@ -14,6 +14,7 @@ import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { followDayCallLabel } from '@/lib/followDayCall';
 import { followDayNoText } from '@/lib/followDayNo';
 import { followCallerOf, FOLLOW_CALLER_LABEL } from '@/lib/followListFilter';
+import { isStaffCallResult } from '@/lib/followStaffCall';
 
 export type FollowDayReportRow = {
   id: string;
@@ -23,6 +24,8 @@ export type FollowDayReportRow = {
   unit: string;
   call: string;
   caller: string;
+  /** ใครถูกตั้งให้โทร (ใช้นับ AI/คน · ป้าย `caller` อาจเติม "คนโทรต่อ") */
+  callerKey: 'ai' | 'manual';
   result: string;
   cancelled: boolean;
 };
@@ -157,7 +160,12 @@ export function buildFollowDayReport(
       call:
         followDayCallLabel({ day: e.call_day ?? null, call: e.call_of_day ?? e.call_round ?? null }) ??
         (slot ? `สายที่ ${slot}` : '—'),
-      caller: FOLLOW_CALLER_LABEL[followCallerOf(e)],
+      // AI โทรแล้วคนลงผลต่อ (ผล "… · คนโทร") = บอกทั้งสองทาง ไม่ให้ช่องขัดกันเอง (QA รอบ 3 ข้อ 15)
+      caller:
+        followCallerOf(e) === 'ai' && isStaffCallResult(e)
+          ? `${FOLLOW_CALLER_LABEL.ai} · คนโทรต่อ`
+          : FOLLOW_CALLER_LABEL[followCallerOf(e)],
+      callerKey: followCallerOf(e),
       result: followRoundLabel(round),
       cancelled,
     };
@@ -170,8 +178,8 @@ export function buildFollowDayReport(
     rows,
     people: new Set(dayCalls.filter((c) => callCategory(c.round) !== 'cancelled').map((c) => c.row.group.key)).size,
     calls: live.length,
-    ai: live.filter((r) => r.caller === FOLLOW_CALLER_LABEL.ai).length,
-    manual: live.filter((r) => r.caller === FOLLOW_CALLER_LABEL.manual).length,
+    ai: live.filter((r) => r.callerKey === 'ai').length,
+    manual: live.filter((r) => r.callerKey === 'manual').length,
     cancelled: rows.length - live.length,
     callNos,
     scope,

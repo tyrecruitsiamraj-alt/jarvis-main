@@ -42,6 +42,7 @@ import {
 } from '@/lib/followScheduleEdit';
 import type { BoardUnitOption } from '@/lib/boardUnitPicker';
 import { friendlyErrorText } from '@/lib/friendlyError';
+import { followRoundLabel, followRoundState, type FollowPlanningRound } from '@/lib/followPlanning';
 
 /**
  * แก้ไขรายการติดตาม (096 · เจ้าของสั่ง 17 ส.ค. 2569: *"เพิ่มให้แก้ไขได้"*)
@@ -545,7 +546,8 @@ export default function FollowEditDialog({
             {/* สายคนโทรไม่เคยเข้าคิว (call_status = null) — เดิมขึ้นคำเตือนนี้ผิด ๆ ทุกครั้ง */}
             {entry.call_status && entry.call_status !== 'pending' ? (
               <p className={cn('ml-1 rounded-lg px-2 py-1 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
-                AI รับสายนี้ไปแล้ว
+                {/* เดิม "AI รับสายนี้ไปแล้ว" อ่านเหมือนผู้รับรับสาย (QA รอบ 3 ข้อ 14) */}
+                AI โทรสายนี้ไปแล้ว
               </p>
             ) : null}
           </div>
@@ -615,7 +617,8 @@ export default function FollowEditDialog({
                       </span>
                     ) : (
                       <span className="text-muted-foreground">
-                        {s.call_mode === 'manual' ? 'คนโทร' : s.call_status === 'pending' ? 'รอโทร' : 'ส่ง AI แล้ว'}
+                        {/* ผลของสาย คำเดียวกับตาราง (QA รอบ 3 ข้อ 14 · เดิมโชว์สถานะส่งงาน "ส่ง AI แล้ว/รอโทร" ขณะตารางเขียน "ตอบว่าไป") */}
+                        {followRoundLabel({ entry: s, state: followRoundState(s), time: null, ymd: null } as FollowPlanningRound)}
                       </span>
                     )}
                   </li>
@@ -695,11 +698,11 @@ export default function FollowEditDialog({
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground">ตั้งแต่วันที่</p>
-                    <DayCalendarPicker value={rangeFrom} onChange={setRangeFrom} emptyLabel="เลือกวัน" />
+                    <DayCalendarPicker value={rangeFrom} onChange={setRangeFrom} emptyLabel="เลือกวัน" asField />
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground">ถึงวันที่</p>
-                    <DayCalendarPicker value={rangeTo} onChange={setRangeTo} emptyLabel="เลือกวัน" />
+                    <DayCalendarPicker value={rangeTo} onChange={setRangeTo} emptyLabel="เลือกวัน" asField />
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground">เวลาโทร</p>

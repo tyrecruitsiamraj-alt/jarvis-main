@@ -60,13 +60,21 @@ const FollowStaffCallControls: React.FC<{
   /** Popover ของตาราง (`compact`) */
   const [open, setOpen] = useState(false);
 
+  /**
+   * 🔴 ผลที่ต้องถามต่อ "จบเรื่องนี้เลยไหม" = **ยังไม่บันทึก** จนตอบครบ (QA รอบ 2 ข้อ 23 · เจ้าของ Choice "บันทึกหลังตอบครบ")
+   * เดิมบันทึกตั้งแต่คลิกแรก ปิดป๊อปกลางทางแล้วแถวค้างครึ่งเรื่อง · ตอนนี้ปิดกลางทาง = ไม่มีอะไรถูกบันทึก
+   */
   const pick = async (outcome: FollowStaffCallOutcome) => {
+    if (!closed && STAFF_FINISH_OUTCOME[outcome]) {
+      setEditing(false);
+      setAskFinish(outcome);
+      return;
+    }
     const ok = await onRecord(outcome);
     if (ok === false) return;
     setEditing(false);
-    const ask = !closed && STAFF_FINISH_OUTCOME[outcome] ? outcome : null;
-    setAskFinish(ask);
-    if (!ask) setOpen(false);
+    setAskFinish(null);
+    setOpen(false);
   };
 
   const row = cn('flex items-center gap-1', compact ? 'flex-nowrap whitespace-nowrap' : 'flex-wrap');
@@ -90,6 +98,9 @@ const FollowStaffCallControls: React.FC<{
               variant={i === 0 ? 'default' : 'outline'}
               disabled={busy}
               onClick={async () => {
+                // ตอบครบแล้ว — บันทึกผลโทรก่อน แล้วค่อยปิดงาน
+                const ok = await onRecord(ask);
+                if (ok === false) return;
                 await onFinish(o);
                 setAskFinish(null);
                 setOpen(false);
@@ -103,12 +114,18 @@ const FollowStaffCallControls: React.FC<{
             variant="outline"
             size={btnSize}
             disabled={busy}
-            onClick={() => {
+            onClick={async () => {
+              const ok = await onRecord(ask);
+              if (ok === false) return;
               setAskFinish(null);
               setOpen(false);
             }}
           >
             โทรต่อตามแผน
+          </Button>
+          {/* ย้อนกลับไปเลือกผลใหม่ — ยังไม่มีอะไรถูกบันทึก */}
+          <Button type="button" variant="ghost" size={btnSize} disabled={busy} onClick={() => setAskFinish(null)}>
+            ย้อนกลับ
           </Button>
         </span>
       </span>
@@ -142,7 +159,11 @@ const FollowStaffCallControls: React.FC<{
           open={open}
           onOpenChange={(o) => {
             setOpen(o);
-            if (!o) setEditing(false);
+            // ปิดป๊อปกลางทาง = ทิ้งที่ยังไม่ตอบครบ (ยังไม่ได้บันทึกอะไร)
+            if (!o) {
+              setEditing(false);
+              setAskFinish(null);
+            }
           }}
         >
           <PopoverTrigger asChild>
@@ -191,7 +212,14 @@ const FollowStaffCallControls: React.FC<{
     <span className={cn('flex flex-col gap-1', !compact && 'gap-1.5')} data-testid="staff-recorded">
       <span className={cn(row, 'text-xs')}>
         <span className={TONE[CALL_OUTCOME_TONE[recorded] ?? 'warn'].chip}>{followStaffCallText(recorded)}</span>
-        {closed ? <span className="text-muted-foreground">จบแล้ว</span> : null}
+        {/* บอกเหตุที่ปิด (QA รอบ 3 ข้อ 8 · เดิม "จบแล้ว" เฉย ๆ — "ไม่ไป · จบแล้ว" แต่ปิดด้วย "ลา" กล่องไม่นับเป็นไม่ไป) */}
+        {closed ? (
+          <span className="text-muted-foreground">
+            {entry.outcome_code && FOLLOW_OUTCOME_LABEL[entry.outcome_code as FollowOutcome]
+              ? `จบ · ${FOLLOW_OUTCOME_LABEL[entry.outcome_code as FollowOutcome]}`
+              : 'จบแล้ว'}
+          </span>
+        ) : null}
         <span className="tabular-nums text-muted-foreground">
           {[entry.staff_called_by_name, entry.staff_called_at ? `${WHEN.format(new Date(entry.staff_called_at))} น.` : null]
             .filter(Boolean)

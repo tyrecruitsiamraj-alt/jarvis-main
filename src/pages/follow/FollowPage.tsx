@@ -115,6 +115,7 @@ import FollowDayReportDialog from '@/components/follow/FollowDayReportDialog';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import FollowCompletedCard from '@/components/follow/FollowCompletedCard';
 import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
 import DateTimeField24 from '@/components/shared/DateTimeField24';
@@ -140,6 +141,26 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 
 /** ค่าเริ่มต้นช่องวันเวลา = ตอนนี้ (รูปแบบ datetime-local ตามเวลาเครื่อง) */
+/**
+ * เวลาของสายที่กดเพิ่ม = สายสุดท้าย + 1 ชม. (QA รอบ 2 ข้อ 24 · เดิมได้ "ตอนนี้"/08:00 เสมอ สายที่ 2 เลยมาก่อนสายแรก)
+ * `HH:MM` → `HH:MM` ไม่ข้ามเที่ยงคืน (เกิน 23:00 = 23:30) · ค่าที่อ่านไม่ออก = 08:00 ตามเดิม
+ */
+function nextHourHm(last: string | undefined): string {
+  const m = /^(\d{2}):(\d{2})$/.exec(last ?? '');
+  if (!m) return '08:00';
+  const h = Number(m[1]) + 1;
+  return h > 23 ? '23:30' : `${String(h).padStart(2, '0')}:${m[2]}`;
+}
+/** `YYYY-MM-DDTHH:MM` + 1 ชม. (โหมดระบุเวลาเอง) · อ่านไม่ออก = ตอนนี้ */
+function nextHourLocal(last: string | undefined): string {
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(last ?? '');
+  if (!m) return nowForInput();
+  const d = new Date(`${m[1]}T${m[2]}:00`);
+  d.setHours(d.getHours() + 1);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function nowForInput(): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -396,6 +417,10 @@ const FollowPage: React.FC = () => {
   const [purgingId, setPurgingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // เลือกวันเวลาเข้างานแล้ว คำเตือน "ใส่วันเวลาเข้างาน" ต้องหาย (QA รอบ 3 ข้อ 17 เดิมค้างจนกดบันทึกอีกรอบ)
+  useEffect(() => {
+    setFormError((prev) => (prev === 'ใส่วันเวลาเข้างาน' ? null : prev));
+  }, [replaceStartVal]);
   const [okMessage, setOkMessage] = useState<string | null>(null);
   /** เวลาที่ดึงรายการสำเร็จล่าสุด — `null` = ยังไม่เคยโหลดจบ */
   const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
@@ -709,7 +734,7 @@ const FollowPage: React.FC = () => {
    * รอบใหม่ลอกเบอร์ของรอบสุดท้ายมาเป็นค่าตั้งต้น — ปกติทั้งชุดเป็นเจ้าของคนเดียวกัน
    */
   const addScheduledAt = () => {
-    setScheduledAts((prev) => [...prev, nowForInput()]);
+    setScheduledAts((prev) => [...prev, nextHourLocal(prev[prev.length - 1])]);
     setStaffPhones((prev) => [...prev, prev[prev.length - 1] ?? '']);
     // รอบใหม่เดาให้ว่าเป็นสายถัดไป — เปลี่ยนเองได้จาก dropdown
     setCallRounds((prev) => [...prev, (prev[prev.length - 1] ?? prev.length) + 1]);
@@ -748,7 +773,7 @@ const FollowPage: React.FC = () => {
     Array.from({ length: n }, (_, i) => m?.[i] ?? 'ai');
   const addRound = () => {
     setRoundModes([...padModes(roundModes, roundTimes.length), 'ai']);
-    setRoundTimes([...roundTimes, '08:00']);
+    setRoundTimes([...roundTimes, nextHourHm(roundTimes[roundTimes.length - 1])]);
   };
   const removeRound = (i: number) => {
     if (roundTimes.length <= 1) return;
@@ -810,21 +835,46 @@ const FollowPage: React.FC = () => {
   const setDayModeAt = (day: string, i: number, v: 'ai' | 'manual') =>
     setRoundModesByDay((prev) => ({ ...prev, [day]: modesOfScheduleDay(day).map((x, idx) => (idx === i ? v : x)) }));
   /** ช่องเลือกใครโทรของสายหนึ่งในโหมดตาราง — ชุดเดียวกับโหมดระบุเวลาเอง (AI โทร · คนโทร · ยังไม่ชัวร์เวลา) */
-  const slotModeGroup = (current: 'ai' | 'manual' | 'tbd', pick: (v: 'ai' | 'manual' | 'tbd') => void, label: string) => (
-    <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-1" role="group" aria-label={`ใครโทร${label}`}>
+  /**
+   * 🔴 ปุ่มเลือกเดียว สูง 36px (QA รอบ 3 ข้อ 18 · เดิมช่องติ๊ก 18px บนมือถือ แตะพลาดแล้วสายกลายเป็น AI)
+   * ToggleGroup ของ shadcn — กดซ้ำตัวเดิม Radix ส่งค่าว่างมา = ไม่เปลี่ยน
+   */
+  const slotModeGroup = (
+    current: 'ai' | 'manual' | 'tbd',
+    pick: (v: 'ai' | 'manual' | 'tbd') => void,
+    label: string,
+    disabled = false,
+  ) => (
+    <ToggleGroup
+      type="single"
+      size="sm"
+      variant="outline"
+      value={current}
+      disabled={disabled}
+      onValueChange={(v) => {
+        if (v === 'ai' || v === 'manual' || v === 'tbd') pick(v);
+      }}
+      aria-label={`ใครโทร${label}`}
+      className="flex w-full flex-wrap justify-start gap-1.5 px-1"
+    >
       {(
         [
-          { value: 'ai', label: 'AI โทร', on: 'text-primary' },
-          { value: 'manual', label: 'คนโทร', on: TONE.warn.value },
-          { value: 'tbd', label: 'ยังไม่ชัวร์เวลา', on: TONE.warn.value },
+          { value: 'ai', label: 'AI โทร' },
+          { value: 'manual', label: 'คนโทร' },
+          { value: 'tbd', label: 'ยังไม่ชัวร์เวลา' },
         ] as const
       ).map((c) => (
-        <label key={c.value} className="flex cursor-pointer items-center gap-1.5">
-          <Checkbox checked={current === c.value} onCheckedChange={() => pick(c.value)} aria-label={`${label} — ${c.label}`} />
-          <span className={cn('text-xs font-medium', current === c.value ? c.on : 'text-muted-foreground')}>{c.label}</span>
-        </label>
+        <ToggleGroupItem
+          key={c.value}
+          value={c.value}
+          aria-label={`${label} — ${c.label}`}
+          // ตัวที่เลือกต้องเห็นชัดทั้งสองธีม (พื้น accent ของโหมดมืดจางเกิน — เลือกผิดแล้วสายกลายเป็น AI)
+          className="text-xs data-[state=on]:border-primary data-[state=on]:font-medium data-[state=on]:text-primary"
+        >
+          {c.label}
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
   /** สายทั้งชุดของโหมดตาราง (หนึ่งสาย = หนึ่งแถว) — สรุปบนจอกับตอนส่งใช้ตัวเดียวกัน */
   const scheduleCalls = (): ScheduleCall[] =>
@@ -844,7 +894,7 @@ const FollowPage: React.FC = () => {
   const addDayTime = (day: string) => {
     const list = timesOfScheduleDay(day);
     setRoundModesByDay((prev) => ({ ...prev, [day]: [...modesOfScheduleDay(day), 'ai'] }));
-    setRoundTimesByDay((prev) => ({ ...prev, [day]: [...list, '08:00'] }));
+    setRoundTimesByDay((prev) => ({ ...prev, [day]: [...list, nextHourHm(list[list.length - 1])] }));
   };
   const removeDayTime = (day: string, i: number) => {
     const list = timesOfScheduleDay(day);
@@ -2518,6 +2568,12 @@ const FollowPage: React.FC = () => {
                     <DateSelectDmyBe value={dateTo} onChange={setDateTo} allowEmpty ariaLabel="ถึงวันที่" />
                   </div>
                 </div>
+                {/* วันสิ้นสุดก่อนวันเริ่ม = บอกตรงจุด (QA รอบ 3 ข้อ 17 เดิมเงียบ เหลือแค่ "ยังไม่มีสาย") */}
+                {dateFrom && dateTo && dateTo < dateFrom ? (
+                  <p role="alert" className={cn('ml-1 text-[11px] font-medium', TONE.danger.value)}>
+                    ถึงวันที่ต้องไม่ก่อนวันเริ่ม
+                  </p>
+                ) : null}
                 {/* เลือกได้ว่าจะส่งให้ Lumos วันไหนบ้าง (เจ้าของสั่ง 17 ส.ค. 2569)
                     ช่วงวันข้างบนเป็นแค่ตัวกางปฏิทิน · ติ๊กวันไหน วันนั้นถึงกลายเป็นสายจริง
                     เดิมส่งทุกวันในช่วง ข้ามเสาร์อาทิตย์/วันหยุดไม่ได้เลย */}
@@ -2785,14 +2841,20 @@ const FollowPage: React.FC = () => {
                                 >
                                   <X aria-hidden />
                                 </Button>
+                                {/* วันที่ตั้งเป็นคนโทร = ทุกสายคนโทร (ทับรายสาย) — ปุ่มต้องบอกตามจริง (QA รอบ 2 ข้อ 24 เดิมยังขึ้น AI) */}
                                 {slotModeGroup(
-                                  v === SCHEDULE_TBD ? 'tbd' : (modesOfScheduleDay(d)[i] ?? 'ai'),
+                                  v === SCHEDULE_TBD
+                                    ? 'tbd'
+                                    : modeOfScheduleDay(d) === 'manual'
+                                      ? 'manual'
+                                      : (modesOfScheduleDay(d)[i] ?? 'ai'),
                                   (m) => {
                                     if (m === 'tbd') return setDayTimeAt(d, i, SCHEDULE_TBD);
                                     if (v === SCHEDULE_TBD) setDayTimeAt(d, i, '08:00');
                                     setDayModeAt(d, i, m);
                                   },
                                   `${label} สายที่ ${i + 1}`,
+                                  modeOfScheduleDay(d) === 'manual' && v !== SCHEDULE_TBD,
                                 )}
                               </div>
                             ))}
@@ -2865,12 +2927,24 @@ const FollowPage: React.FC = () => {
                      · นับจาก `scheduleCalls` ตัวเดียวกับตอนส่ง (เวลารายวัน + วันที่ไม่โทร)
                      · ถอดท้ายประโยค "รับสายยืนยันแล้ววันนั้นหยุด พรุ่งนี้โทรต่อ" (1 ต.ค. 2569) — ของจริง AI โทรครบทุกสาย */
                   const calls = scheduleCalls();
-                  const ai = calls.filter((c) => c.callMode === 'ai').length;
+                  // สาย AI ที่เวลาเลยมาแล้ว = server ตั้งเป็นคนโทร (AI ไม่โทรย้อนหลัง · QA รอบ 2 ข้อ 24) — นับให้ตรงกับที่จะบันทึก
+                  const pastAi = calls.filter(
+                    (c) => c.callMode === 'ai' && Date.parse(c.scheduledAt) < Date.now() - 10 * 60_000,
+                  ).length;
+                  const ai = calls.filter((c) => c.callMode === 'ai').length - pastAi;
                   const days = new Set(calls.map((c) => c.day)).size;
                   return calls.length > 0 ? (
-                    <p className="ml-1 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] text-primary">
-                      รวม {days} วัน {calls.length} สาย — AI โทร {ai} · เราโทรเอง {calls.length - ai}
-                    </p>
+                    <>
+                      {/* คำมาตรฐาน "คนโทร" · พื้นกลาง (เดิมพื้นเบอร์กันดีอ่านเหมือนคำเตือน — QA รอบ 3 ข้อ 17) */}
+                      <p className={cn('ml-1 rounded-lg px-2.5 py-1 text-[11px]', TONE.neutral.soft, 'text-foreground')}>
+                        รวม {days} วัน {calls.length} สาย — AI โทร {ai} · คนโทร {calls.length - ai}
+                      </p>
+                      {pastAi > 0 ? (
+                        <p className={cn('ml-1 text-[11px] font-medium', TONE.warn.value)}>
+                          เลยเวลาแล้ว {pastAi} สาย — เป็นคนโทร
+                        </p>
+                      ) : null}
+                    </>
                   ) : (
                     <p className="ml-1 text-[11px] text-muted-foreground">ยังไม่มีสาย</p>
                   );
@@ -2900,6 +2974,7 @@ const FollowPage: React.FC = () => {
                             value={/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ''}
                             onChange={(ymd) => setScheduledAtAt(i, ymd)}
                             emptyLabel={`เลือกวันของสายที่ ${i + 1}`}
+                            asField
                           />
                         </span>
                       ) : (
@@ -2928,26 +3003,8 @@ const FollowPage: React.FC = () => {
                     </div>
                     {/* ใครโทรรอบนี้ (เจ้าของสั่ง 2 ต.ค. 2569) + "ยังไม่ชัวร์เวลา" (Journey ข้อ 5 · 3 ต.ค. 2569)
                         ยังไม่ชัวร์เวลา = เลือกแค่วัน แล้วมาเติมเวลาทีหลัง (เป็นคนโทรจนกว่าจะตั้งเวลา) */}
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1" role="group" aria-label={`ใครโทรสายที่ ${i + 1}`}>
-                      {(
-                        [
-                          { value: 'ai', label: 'AI โทร', on: 'text-primary' },
-                          { value: 'manual', label: 'คนโทร', on: TONE.warn.value },
-                          { value: 'tbd', label: 'ยังไม่ชัวร์เวลา', on: TONE.warn.value },
-                        ] as const
-                      ).map((c) => (
-                        <label key={c.value} className="flex cursor-pointer items-center gap-1.5">
-                          <Checkbox
-                            checked={(callModes[i] ?? 'ai') === c.value}
-                            onCheckedChange={() => setCallModeAt(i, c.value)}
-                            aria-label={`สายที่ ${i + 1} — ${c.label}`}
-                          />
-                          <span className={cn('text-xs font-medium', (callModes[i] ?? 'ai') === c.value ? c.on : 'text-muted-foreground')}>
-                            {c.label}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
+                    {/* ปุ่มเลือกเดียว 36px ชุดเดียวกับโหมดตาราง (QA รอบ 3 ข้อ 18 · เดิมช่องติ๊ก 18px) */}
+                    {slotModeGroup(callModes[i] ?? 'ai', (m) => setCallModeAt(i, m), `สายที่ ${i + 1}`)}
                     <StaffContactField
                       id={`followStaffPhone${i}`}
                       label={`เจ้าหน้าที่ที่ติดตามสายที่ ${i + 1}`}
@@ -2987,7 +3044,8 @@ const FollowPage: React.FC = () => {
                     </div>
                     {/* บทที่รอบนี้จะพูด — กางให้เห็นเลย ไม่ต้องกดหา (เจ้าของสั่งให้ "บอกหน่อยว่า Scrip
                         นั้น ๆ จะพูดอะไรบ้าง") */}
-                    <RoundScriptNote callRound={callRounds[i] ?? i + 1} defaultOpen />
+                    {/* บท AI โชว์เฉพาะสายที่ AI โทร — สายคนโทรไม่มีบท (QA รอบ 2 ข้อ 24 เดิมโชว์บทที่มี {ชื่อเจ้าหน้าที่} ค้างอยู่) */}
+                    {(callModes[i] ?? 'ai') === 'ai' ? <RoundScriptNote callRound={callRounds[i] ?? i + 1} defaultOpen /> : null}
                   </div>
                 ))}
               </div>

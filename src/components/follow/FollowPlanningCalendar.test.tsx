@@ -278,7 +278,9 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     for (const word of ['เขียว', 'แดง', 'เหลือง', 'น้ำเงิน', 'ส้ม', 'เทา', '=', '(']) {
       expect(text).not.toContain(word);
     }
-    expect(within(legend).getAllByText(/./).length).toBe(8);
+    // 9 = หมวดกลาง 8 + "รอคนโทร" (สายที่ตั้งให้คนโทร · QA รอบ 3 ข้อ 11)
+    expect(within(legend).getAllByText(/./).length).toBe(9);
+    expect(text).toContain('รอคนโทร');
   });
 });
 
@@ -790,15 +792,16 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
     expect(within(row).queryByRole('button', { name: 'ไม่ไป' })).toBeNull();
     fireEvent.click(within(row).getByRole('button', { name: 'ลงผล' }));
     for (const label of ['ไป', 'ไม่ไป', 'ขอเลื่อน', 'ติดต่อไม่ได้']) {
-      fireEvent.click(await screen.findByRole('button', { name: label }));
+      expect(await screen.findByRole('button', { name: label })).toBeTruthy();
     }
-    await waitFor(() => expect(onStaffResult).toHaveBeenCalledTimes(4));
-    expect(onStaffResult.mock.calls.map((c) => [(c[0] as { entry: FollowEntry }).entry.id, c[1]])).toEqual([
-      ['m1', 'confirmed'],
-      ['m1', 'declined'],
-      ['m1', 'reschedule_requested'],
-      ['m1', 'no_answer'],
-    ]);
+    // ติดต่อไม่ได้ = บันทึกเลย (ไม่ถามจบเรื่อง)
+    fireEvent.click(screen.getByRole('button', { name: 'ติดต่อไม่ได้' }));
+    await waitFor(() => expect(onStaffResult).toHaveBeenCalledTimes(1));
+    expect(onStaffResult.mock.calls.map((c) => [(c[0] as { entry: FollowEntry }).entry.id, c[1]])).toEqual([['m1', 'no_answer']]);
+    // 🔴 ไม่ไป = ถามจบเรื่องก่อน ยังไม่บันทึก (QA รอบ 2 ข้อ 23 · บันทึกหลังตอบครบ)
+    fireEvent.click(screen.getByRole('button', { name: 'ไม่ไป' }));
+    expect(await screen.findByText('จบเรื่องนี้เลยไหม')).toBeTruthy();
+    expect(onStaffResult).toHaveBeenCalledTimes(1);
   });
 
   it('🔴 กด ไม่ไป แล้วถามจบเรื่องในป๊อปเดิม · กดจบ = ปิดงานว่าไม่ไป', async () => {
@@ -844,6 +847,8 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
     expect(within(row).getAllByRole('button', { name: 'ลงผล' })).toHaveLength(1);
     fireEvent.click(within(row).getByRole('button', { name: 'ลงผล' }));
     fireEvent.click(await screen.findByRole('button', { name: 'ไป' }));
+    // ตอบครบ (โทรต่อตามแผน) แล้วถึงบันทึก
+    fireEvent.click(await screen.findByRole('button', { name: 'โทรต่อตามแผน' }));
     await waitFor(() => expect(onStaffResult).toHaveBeenCalled());
     expect((onStaffResult.mock.calls[0][0] as { entry: FollowEntry }).entry.id).toBe('ai-miss');
   });

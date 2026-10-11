@@ -135,3 +135,17 @@ describe('สรุปแผนเลือกช่วงวัน + วัน�
     expect(r.scope).toBe('ติดตามครั้งที่ 2'); // ป้ายใหม่ 9 ต.ค. 2569 (เดิม "วันที่ 2 ของแผน")
   });
 });
+
+describe('ใครโทร: AI โทรแล้วคนลงผลต่อ (QA รอบ 3 ข้อ 15 · 11 ต.ค. 2569)', () => {
+  it('ช่องใครโทรบอก "AI โทร · คนโทรต่อ" ไม่ขัดกับผล "… · คนโทร" · เลขสรุปยังนับเป็น AI', () => {
+    const r = buildFollowDayReport(
+      [entry({ call_status: 'completed', call_outcome: 'no_answer', staff_call_outcome: 'confirmed', call_day: 1, call_of_day: 1 })],
+      '2026-10-02',
+      NOW,
+    );
+    expect(r.rows[0].caller).toBe('AI โทร · คนโทรต่อ');
+    expect(r.rows[0].result).toMatch(/คนโทร$/);
+    expect(r.ai).toBe(1);
+    expect(r.manual).toBe(0);
+  });
+});

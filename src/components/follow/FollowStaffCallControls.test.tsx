@@ -44,15 +44,26 @@ describe('ลงผลสายคนโทร 2 ขั้น (เจ้าข�
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('กด ไม่ไป → บันทึกผล → ถามจบเรื่อง · กดจบ = ปิดงานว่าไม่ไป', async () => {
+  it('🔴 กด ไม่ไป → ถามจบเรื่อง (ยังไม่บันทึก · QA รอบ 2 ข้อ 23) · กดจบ = บันทึกผลแล้วปิดงานว่าไม่ไป', async () => {
     const onRecord = vi.fn().mockResolvedValue(true);
     const onFinish = vi.fn().mockResolvedValue(undefined);
     render(<FollowStaffCallControls entry={entry()} onRecord={onRecord} onFinish={onFinish} />);
     fireEvent.click(screen.getByRole('button', { name: 'ไม่ไป' }));
-    await waitFor(() => expect(onRecord).toHaveBeenCalledWith('declined'));
     expect(await screen.findByText('จบเรื่องนี้เลยไหม')).toBeTruthy();
+    expect(onRecord).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'จบ · ไม่ไป' }));
     await waitFor(() => expect(onFinish).toHaveBeenCalledWith('no_show_start'));
+    expect(onRecord).toHaveBeenCalledWith('declined');
+    expect(onRecord.mock.invocationCallOrder[0]).toBeLessThan(onFinish.mock.invocationCallOrder[0]);
+  });
+
+  it('🔴 ถามจบเรื่องแล้วกด "ย้อนกลับ" = ไม่บันทึกอะไรเลย', async () => {
+    const onRecord = vi.fn().mockResolvedValue(true);
+    render(<FollowStaffCallControls entry={entry()} onRecord={onRecord} onFinish={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ไป' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'ย้อนกลับ' }));
+    expect(screen.queryByText('จบเรื่องนี้เลยไหม')).toBeNull();
+    expect(onRecord).not.toHaveBeenCalled();
   });
 
   it('🔴 ขั้น 2 มี ลา กับ จำวันผิด ด้วย (เจ้าของสั่ง 6 ต.ค. 2569)', async () => {
@@ -65,26 +76,31 @@ describe('ลงผลสายคนโทร 2 ขั้น (เจ้าข�
     await waitFor(() => expect(onFinish).toHaveBeenCalledWith('wrong_date'));
   });
 
-  it('กด ไป → โทรต่อตามแผน = ไม่ปิดงาน', async () => {
+  it('กด ไป → โทรต่อตามแผน = บันทึกผล ไม่ปิดงาน', async () => {
     const onFinish = vi.fn();
-    render(<FollowStaffCallControls entry={entry()} onRecord={vi.fn().mockResolvedValue(true)} onFinish={onFinish} />);
+    const onRecord = vi.fn().mockResolvedValue(true);
+    render(<FollowStaffCallControls entry={entry()} onRecord={onRecord} onFinish={onFinish} />);
     fireEvent.click(screen.getByRole('button', { name: 'ไป' }));
     fireEvent.click(await screen.findByRole('button', { name: 'โทรต่อตามแผน' }));
-    expect(screen.queryByText('จบเรื่องนี้เลยไหม')).toBeNull();
+    await waitFor(() => expect(onRecord).toHaveBeenCalledWith('confirmed'));
+    await waitFor(() => expect(screen.queryByText('จบเรื่องนี้เลยไหม')).toBeNull());
     expect(onFinish).not.toHaveBeenCalled();
   });
 
-  it('ติดต่อไม่ได้ = ไม่ถาม โทรต่อเลย · บันทึกไม่ผ่าน = ไม่ถาม', async () => {
+  it('ติดต่อไม่ได้ = ไม่ถาม บันทึกเลย · บันทึกไม่ผ่านตอนตอบครบ = ไม่ปิดงาน', async () => {
     const onRecord = vi.fn().mockResolvedValue(true);
     const { unmount } = render(<FollowStaffCallControls entry={entry()} onRecord={onRecord} onFinish={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'ติดต่อไม่ได้' }));
     await waitFor(() => expect(onRecord).toHaveBeenCalledWith('no_answer'));
     expect(screen.queryByText('จบเรื่องนี้เลยไหม')).toBeNull();
     unmount();
-    render(<FollowStaffCallControls entry={entry()} onRecord={vi.fn().mockResolvedValue(false)} onFinish={vi.fn()} />);
+    // บันทึกไม่ผ่านตอนตอบครบ = ไม่ปิดงาน (ผลยังไม่ถูกบันทึก)
+    const onFinish = vi.fn();
+    render(<FollowStaffCallControls entry={entry()} onRecord={vi.fn().mockResolvedValue(false)} onFinish={onFinish} />);
     fireEvent.click(screen.getByRole('button', { name: 'ไม่ไป' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'จบ · ไม่ไป' }));
     await new Promise((r) => setTimeout(r, 0));
-    expect(screen.queryByText('จบเรื่องนี้เลยไหม')).toBeNull();
+    expect(onFinish).not.toHaveBeenCalled();
   });
 
   it('ลงแล้ว → เห็นผล + คนลง · แก้ได้ · ล้างต้องยืนยันก่อน', async () => {
@@ -159,8 +175,27 @@ describe('🔴 ตาราง = ปุ่มลงผลปุ่มเดี�
     expect(screen.getByText('ยกเลิกสาย')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'ลงผล' }));
     fireEvent.click(await screen.findByRole('button', { name: 'ไม่ไป' }));
-    await waitFor(() => expect(onRecord).toHaveBeenCalledWith('declined'));
     fireEvent.click(await screen.findByRole('button', { name: 'จบ · ไม่ไป' }));
     await waitFor(() => expect(onFinish).toHaveBeenCalledWith('no_show_start'));
+    expect(onRecord).toHaveBeenCalledWith('declined');
+  });
+});
+
+describe('ปิดแล้วบอกเหตุที่ปิด (QA รอบ 3 ข้อ 8)', () => {
+  it('ไม่ไป แต่ปิดด้วย "ลา" = ขึ้น "จบ · ลา" ไม่ใช่ "จบแล้ว" เฉย ๆ', () => {
+    render(
+      <FollowStaffCallControls
+        entry={entry({
+          staff_call_outcome: 'declined',
+          staff_called_at: '2026-09-30T03:00:00Z',
+          completed_at: '2026-09-30T03:01:00Z',
+          outcome_code: 'leave',
+        })}
+        onRecord={vi.fn()}
+        onFinish={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('จบ · ลา')).toBeTruthy();
+    expect(screen.queryByText('จบแล้ว')).toBeNull();
   });
 });

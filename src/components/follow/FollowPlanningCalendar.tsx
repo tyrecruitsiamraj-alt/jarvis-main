@@ -27,6 +27,9 @@ import {
   callCategoryWashTone,
   FOLLOW_CALL_CATEGORY_LABEL,
   FOLLOW_CALL_CATEGORY_TONE,
+  STAFF_WAITING_LABEL,
+  followRoundShortLabel,
+  roundTimeText,
   filterPlanningRowsByRound,
   isGoodResult,
   monthDayColumns,
@@ -218,7 +221,7 @@ function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): st
       const why = r.state === 'notSent' ? ` (${roundDispatchReason(r)})` : '';
       const ai = roundAiSummary(r);
       // คำเดียวกับชิปบนตาราง (`followRoundLabel` · QA 10 ต.ค. 2569 tooltip เคยเขียน "ยังไม่มีผล" ขณะชิปเขียน "รอโทร · เลยเวลานัด")
-      return `${r.time ?? 'ไม่ได้ตั้งเวลา'} — ${followRoundLabel(r)}${why}${ai ? `\n    เขาตอบ: ${ai}` : ''}`;
+      return `${roundTimeText(r)} — ${followRoundLabel(r)}${why}${ai ? `\n    เขาตอบ: ${ai}` : ''}`;
     })
     .join('\n');
   return `${name} · ${formatYmdDmyBe(ymd)}\n${detail}`;
@@ -268,9 +271,16 @@ const STAFF_AT = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', ho
  *    ห้ามเติมชื่อสี/วงเล็บอธิบายกลับ
  */
 // 🔴 สร้างจากหมวดกลาง (คำ + สี) — คำเดียวกับป้ายในตารางและช่องบนแผง (6 ต.ค. 2569)
-const DAY_LEGEND: ReadonlyArray<[keyof typeof TONE, string]> = (
-  ['agreed', 'lost', 'unreachable', 'other', 'waiting', 'overdue', 'notSent', 'cancelled'] as const
-).map((c) => [FOLLOW_CALL_CATEGORY_TONE[c], FOLLOW_CALL_CATEGORY_LABEL[c]]);
+const DAY_LEGEND: ReadonlyArray<[keyof typeof TONE, string]> = [
+  ...(['agreed', 'lost', 'unreachable', 'other', 'waiting'] as const).map(
+    (c): [keyof typeof TONE, string] => [FOLLOW_CALL_CATEGORY_TONE[c], FOLLOW_CALL_CATEGORY_LABEL[c]],
+  ),
+  // สายที่ตั้งให้คนโทร ยังไม่ถึงเวลา (QA รอบ 3 ข้อ 11) — ฟ้าแบบรอโทร
+  [FOLLOW_CALL_CATEGORY_TONE.waiting, STAFF_WAITING_LABEL],
+  ...(['overdue', 'notSent', 'cancelled'] as const).map(
+    (c): [keyof typeof TONE, string] => [FOLLOW_CALL_CATEGORY_TONE[c], FOLLOW_CALL_CATEGORY_LABEL[c]],
+  ),
+];
 
 const NAV_BTN = cn(
   'inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors',
@@ -1218,7 +1228,7 @@ const FollowPlanningCalendar: React.FC<{
               <table className="min-w-full border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-border/70">
-                    <th className="sticky left-0 z-10 min-w-[210px] max-w-[260px] bg-card px-4 py-2 text-left text-[11px] font-medium text-muted-foreground md:px-5">
+                    <th className="sticky left-0 z-10 min-w-28 max-w-36 bg-card px-2 py-2 text-left text-[11px] font-medium text-muted-foreground sm:min-w-[210px] sm:max-w-[260px] sm:px-4 md:px-5">
                       คนที่ต้องติดตาม · ทั้งเดือนนี้
                     </th>
                     {cols.map((c) => {
@@ -1272,7 +1282,8 @@ const FollowPlanningCalendar: React.FC<{
                       .filter(([, n]) => n > 0);
                     return (
                       <tr key={row.group.key} className="border-b border-border/50 last:border-0">
-                        <td className="sticky left-0 z-10 max-w-[260px] bg-card px-4 py-2 align-top md:px-5">
+                        {/* มือถือ: คอลัมน์ชื่อแคบลง ให้เห็นช่องวัน (QA รอบ 3 ข้อ 19 เดิมกว้างจนไม่เหลือที่) */}
+                        <td className="sticky left-0 z-10 max-w-36 bg-card px-2 py-2 align-top sm:max-w-[260px] sm:px-4 md:px-5">
                           {/* กดชื่อ = แผนทั้งหมดของคนนี้ (เจ้าของ 3 ต.ค. 2569) — ไม่ต้องไล่กดทีละช่องวัน */}
                           <button
                             type="button"
@@ -1330,10 +1341,11 @@ const FollowPlanningCalendar: React.FC<{
                                           'block text-[10px] font-medium tabular-nums',
                                         )}
                                       >
-                                        {r.time ?? '—'}
+                                        {/* ยังไม่ชัวร์เวลา = บอกตรง ๆ ไม่ใช่เวลาแทน 00:00 (QA รอบ 3 ข้อ 12 · กติกาเดียวกับรายวัน) */}
+                                        {r.entry.time_tbd ? 'ยังไม่ระบุเวลา' : (r.time ?? '—')}
                                       </span>
                                       <span className="block truncate text-[9px] font-medium leading-tight">
-                                        {FOLLOW_CALL_CATEGORY_LABEL[callCategory(r)]}
+                                        {followRoundShortLabel(r)}
                                       </span>
                                     </span>
                                   ))}

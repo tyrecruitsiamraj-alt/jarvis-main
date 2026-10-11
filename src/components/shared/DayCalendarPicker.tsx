@@ -34,7 +34,9 @@ const DayCalendarPicker: React.FC<{
   active?: boolean;
   /** ล้างตัวกรองทั้งกล่อง — ไม่ส่ง = ปุ่มล้างจะล้างแค่วัน */
   onClearAll?: () => void;
-}> = ({ value, onChange, className, emptyLabel = 'เลือกวัน', extra, suffix, active, onClearAll }) => {
+  /** ใช้เป็นช่องกรอกในฟอร์ม (ไม่ใช่ตัวกรอง) — ปุ่มล่างเขียน "ล้างวันที่" แทนคำของตัวกรอง (QA รอบ 3 ข้อ 17) */
+  asField?: boolean;
+}> = ({ value, onChange, className, emptyLabel = 'เลือกวัน', extra, suffix, active, onClearAll, asField = false }) => {
   const [open, setOpen] = useState(false);
   const p = parseYmd(value);
   const selected = p ? new Date(p.y, p.m - 1, p.d) : undefined;
@@ -91,6 +93,8 @@ const DayCalendarPicker: React.FC<{
           }}
           /* เลือกเดือน/ปีจาก dropdown — ย้อนดูงานเก่าหรือดูล่วงหน้าโดยไม่ต้องกดลูกศรทีละเดือน */
           captionLayout="dropdown-buttons"
+          // สัปดาห์เริ่มวันจันทร์ ชุดเดียวกับปฏิทินหน้าหลัก (`PeriodPicker`) — QA รอบ 3 ข้อ 17
+          weekStartsOn={1}
           fromYear={thisYear - 2}
           toYear={thisYear + 2}
           /**
@@ -118,7 +122,7 @@ const DayCalendarPicker: React.FC<{
             }}
             className="w-full rounded-lg px-3 py-1.5 text-xs font-medium text-primary hover:bg-secondary"
           >
-            {onClearAll ? 'ล้างตัวกรองทั้งหมด' : 'ดูทุกวัน (ล้างวันที่)'}
+            {onClearAll ? 'ล้างตัวกรองทั้งหมด' : asField ? 'ล้างวันที่' : 'ดูทุกวัน (ล้างวันที่)'}
           </button>
         </div>
       </PopoverContent>

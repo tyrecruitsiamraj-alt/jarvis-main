@@ -25,6 +25,7 @@ import {
   type FollowPlanningRound,
 } from '@/lib/followPlanning';
 import { formatYmdDmyBe } from '@/lib/dateTh';
+import { followDayCallLabel } from '@/lib/followDayCall';
 
 /**
  * ═══ ป๊อปรายละเอียดของ "คนคนนี้ ในวันนี้" (เจ้าของสั่ง 1 ก.ย. 2569) ═══
@@ -142,6 +143,12 @@ const FollowRoundsDialog: React.FC<{
                     {!ymd && r.ymd ? `${formatYmdDmyBe(r.ymd)} · ` : ''}
                     {r.entry.time_tbd ? 'ยังไม่ระบุเวลา' : r.time ? `${r.time} น.` : 'ไม่ได้ตั้งเวลา'}
                   </span>
+                  {/* ครั้งที่ · สายที่ — ป้ายเดียวกับแถวในตาราง (QA รอบ 3 ข้อ 13 ป๊อปไม่บอกว่าเป็นสายไหน) */}
+                  {followDayCallLabel({ day: it.call_day ?? null, call: it.call_of_day ?? it.call_round ?? null }) ? (
+                    <span className="text-[11px] text-muted-foreground">
+                      {followDayCallLabel({ day: it.call_day ?? null, call: it.call_of_day ?? it.call_round ?? null })}
+                    </span>
+                  ) : null}
                   <span className="text-[11px] font-medium text-foreground">
                     {/* คำเดียวกับชิปบนตาราง (QA 10 ต.ค. 2569 ป๊อปเคยเขียน "ไป" / "ไม่ได้ส่ง" ขณะตารางเขียน "ตอบว่าไป" / "รอโทร · ไม่ได้ส่งให้ AI") */}
                     {followRoundLabel(r)}

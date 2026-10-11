@@ -372,9 +372,33 @@ export function answeredButMarkedUnreached(
  * = คำของหมวด (ชุดเดียวกับช่องบนแผง) + รายละเอียดหลังขีด
  * ผลที่คนลงเอง = "… · คนโทร" · ไม่รับสาย/สรุปไม่ได้ บอกผลดิบต่อท้ายเมื่อคำไม่ซ้ำ
  */
+/**
+ * ═══ สายที่ตั้งให้คนโทรเอง (ยังไม่มีผล) — ไม่ใช่ "ไม่ได้ส่งให้ AI" (QA รอบ 3 ข้อ 11 · 11 ต.ค. 2569) ═══
+ * เดิมสายคนโทรทุกสายขึ้น "รอโทร · ไม่ได้ส่งให้ AI" สีส้ม (สีเดียวกับเลยเวลานัด) ⇒ หน้าของพรุ่งนี้ส้มทั้งหน้าเหมือนระบบพัง
+ * ⇒ ยังไม่ถึงเวลา = "รอคนโทร" ฟ้า (ชุดเดียวกับรอโทร) · เลยเวลา = "รอโทร · เลยเวลานัด" ส้ม
+ * 🔴 เปลี่ยนแค่คำ/สีของแถว — หมวด (`callCategory` = notSent) และตัวเลขทุกกล่องเหมือนเดิม
+ * สาย AI ที่ส่งไม่ได้ (บัญชีห้ามโทร/ไม่มีเบอร์ ฯลฯ) ยังเป็น "ไม่ได้ส่งให้ AI" ส้ม — อันนั้นต้องคนจัดการจริง
+ */
+export const STAFF_WAITING_LABEL = 'รอคนโทร';
+function staffPlannedWait(round: FollowPlanningRound): 'waiting' | 'overdue' | null {
+  const e = round.entry;
+  if (round.state !== 'notSent' || e.call_mode !== 'manual' || e.time_tbd === true) return null;
+  const due = ms(e.scheduled_at);
+  return due !== null && due < Date.now() ? 'overdue' : 'waiting';
+}
+
+/** ป้ายสั้นของช่องรายเดือน — คำของหมวด แต่สายคนโทรที่ยังรอใช้คำเดียวกับแถว (สีช่องมาจาก `roundTone` ตัวเดียวกัน) */
+export function followRoundShortLabel(round: FollowPlanningRound): string {
+  const staffWait = staffPlannedWait(round);
+  if (staffWait) return staffWait === 'waiting' ? STAFF_WAITING_LABEL : FOLLOW_CALL_CATEGORY_LABEL.overdue;
+  return FOLLOW_CALL_CATEGORY_LABEL[callCategory(round)];
+}
+
 export function followRoundLabel(round: FollowPlanningRound): string {
   const category = callCategory(round);
   const base = FOLLOW_CALL_CATEGORY_LABEL[category];
+  const staffWait = staffPlannedWait(round);
+  if (staffWait) return staffWait === 'waiting' ? STAFF_WAITING_LABEL : FOLLOW_CALL_CATEGORY_LABEL.overdue;
   if (round.state !== 'result') return base;
   /**
    * 🔴 ขอเลื่อน = บอกตรง ๆ ว่าเลื่อน (เจ้าของ 7 ต.ค. 2569: *"โทรแล้ว บอกขอเลื่อนเวลา ให้บอกว่า นาย ก เลื่อน"*)
@@ -450,8 +474,10 @@ export function roundTone(round: FollowPlanningRound): ToneKey {
     case 'result':
       // 🔴 สีตามหมวดเดียวกับป้าย (6 ต.ค. 2569 — เดิมใช้สีรหัสผล "รับสายแล้ว" เขียวทั้งที่ป้ายบอกสรุปไม่ได้)
       return FOLLOW_CALL_CATEGORY_TONE[callCategory(round)];
-    case 'notSent':
-      return 'orange';
+    case 'notSent': {
+      const staffWait = staffPlannedWait(round);
+      return staffWait === 'waiting' ? FOLLOW_CALL_CATEGORY_TONE.waiting : 'orange';
+    }
     case 'overdue':
       return FOLLOW_CALL_CATEGORY_TONE.overdue;
     case 'sent':

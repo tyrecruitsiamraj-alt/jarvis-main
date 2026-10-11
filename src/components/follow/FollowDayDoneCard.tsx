@@ -118,8 +118,9 @@ export default function FollowDayDoneCard({
             ) : (
               shown.map(({ person }) => (
                 <tr key={person.row.group.key} className="border-b border-border/50 last:border-0">
-                  <td className="px-4 py-2.5 font-medium text-foreground md:px-5">{person.row.group.name}</td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{person.row.group.unitName || '—'}</td>
+                  {/* ชื่อไม่ตัดกลางคำ — จอแคบเลื่อนตารางแทน (QA รอบ 3 ข้อ 19 เดิมชื่อแตก 4–5 บรรทัด) */}
+                  <td className="whitespace-nowrap px-4 py-2.5 font-medium text-foreground md:px-5">{person.row.group.name}</td>
+                  <td className="min-w-32 px-3 py-2.5 text-muted-foreground">{person.row.group.unitName || '—'}</td>
                   <td className={cn('whitespace-nowrap px-3 py-2.5', TONE[FOLLOW_CALL_CATEGORY_TONE[kind]].value)}>{resultOf(person, kind)}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{whoOf(person, kind)}</td>
                   <td className="px-4 py-2.5 text-right md:px-5">

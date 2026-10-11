@@ -212,7 +212,7 @@ export default function FollowScheduleEditor({
       </div>
 
       <p className="ml-1 text-[11px] text-muted-foreground">
-        รวม {draft.length.toLocaleString('th-TH')} สาย — AI โทร {aiCount.toLocaleString('th-TH')} · เราโทรเอง{' '}
+        รวม {draft.length.toLocaleString('th-TH')} สาย — AI โทร {aiCount.toLocaleString('th-TH')} · คนโทร{' '}
         {(draft.length - aiCount).toLocaleString('th-TH')}
         {removed > 0 ? ` · เอาออก ${removed.toLocaleString('th-TH')}` : ''}
       </p>

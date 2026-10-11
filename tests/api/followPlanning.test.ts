@@ -23,6 +23,8 @@ import {
   personMonthSummary,
   FOLLOW_CALL_CATEGORY_LABEL,
   callVerdict,
+  followRoundLabel,
+  type FollowPlanningRound,
 } from '../../src/lib/followPlanning';
 
 const NOW = new Date('2026-09-01T05:00:00Z'); // 12:00 น. เวลาไทย
@@ -244,8 +246,8 @@ describe('คำผลโทรฉบับงานติดตาม (เจ�
     expect(label({ call_outcome: 'declined' })).toBe('ตอบว่าไม่ไป');
   });
 
-  it('confirmed = ยืนยันว่าไป · acknowledged = รับสายแล้ว (ไม่เขียนให้ดูจบดีเกินจริง)', () => {
-    expect(label({ call_outcome: 'confirmed' })).toBe('ยืนยันว่าไป');
+  it('confirmed = ตอบว่าไป (คำมาตรฐาน · QA รอบ 3 ข้อ 13) · acknowledged = รับสายแล้ว (ไม่เขียนให้ดูจบดีเกินจริง)', () => {
+    expect(label({ call_outcome: 'confirmed' })).toBe('ตอบว่าไป');
     expect(label({ call_outcome: 'acknowledged' })).toBe('รับสายแล้ว');
   });
 
@@ -367,7 +369,7 @@ describe('ผลการโทรทุกสาย + สรุปจาก AI'
       NOW,
     )[0].rounds[0];
     expect(roundTone(r)).toBe('success');
-    expect(roundResultLabel(r)).toBe('ยืนยันว่าไป');
+    expect(roundResultLabel(r)).toBe('ตอบว่าไป');
   });
 
   it('ไม่ไปแล้ว (declined) = แดง ห้ามเขียวเพราะแค่ "มีผลแล้ว"', () => {
@@ -834,5 +836,28 @@ describe('🔴 ขอเลื่อน ขึ้นคำว่าเลื่�
     expect(followRoundLabel(staff)).toBe('ขอเลื่อน · คนโทร');
     expect(callCategory(staff)).toBe('other');
     expect(followRoundLabel(mk({ call_outcome: 'reschedule_requested' }))).toBe('ขอเลื่อน');
+  });
+});
+
+describe('สายที่ตั้งให้คนโทร ยังไม่มีผล (QA รอบ 3 ข้อ 11 · 11 ต.ค. 2569)', () => {
+  const base = (over: Partial<FollowEntry>): FollowPlanningRound => {
+    const e = { id: 'x', call_status: null, call_mode: 'manual', time_tbd: false, cancelled: false, completed_at: null, ...over } as FollowEntry;
+    return { entry: e, state: 'notSent', time: '09:00', ymd: '2099-01-01' } as FollowPlanningRound;
+  };
+  it('ยังไม่ถึงเวลา = "รอคนโทร" ฟ้า · หมวดยังเป็น notSent (ตัวเลขกล่องไม่เปลี่ยน)', () => {
+    const r = base({ scheduled_at: '2099-01-01T02:00:00Z' });
+    expect(followRoundLabel(r)).toBe('รอคนโทร');
+    expect(roundTone(r)).toBe('info');
+    expect(callCategory(r)).toBe('notSent');
+  });
+  it('เลยเวลาแล้ว = "รอโทร · เลยเวลานัด" ส้ม', () => {
+    const r = base({ scheduled_at: '2000-01-01T02:00:00Z' });
+    expect(followRoundLabel(r)).toBe('รอโทร · เลยเวลานัด');
+    expect(roundTone(r)).toBe('orange');
+  });
+  it('สาย AI ที่ส่งไม่ได้ ยังเป็น "ไม่ได้ส่งให้ AI" ส้ม', () => {
+    const r = base({ call_mode: 'ai', scheduled_at: '2099-01-01T02:00:00Z' });
+    expect(followRoundLabel(r)).toBe('รอโทร · ไม่ได้ส่งให้ AI');
+    expect(roundTone(r)).toBe('orange');
   });
 });

@@ -556,6 +556,15 @@ export function parseFollowRounds(raw: unknown, primary: FollowRoundInput): Foll
  * 🔴 ยังเป็น **หนึ่งแถวต่อหนึ่งรอบ** เหมือนเดิม — ทั้งหน้าจอผูกกับแถวต่อรอบ
  * (สถานะ · ผล · ปุ่มแก้เวลา) เปลี่ยนแค่สิ่งที่ยิงออกไป ไม่ใช่โครงข้อมูล
  */
+/**
+ * เวลาเลยมาแล้วเกิน 10 นาที = AI ไม่โทรย้อนหลัง (QA รอบ 2 ข้อ 24) — ค่าเริ่มของฟอร์มคือ "ตอนนี้" (โทรเลย)
+ * กรอกช้าไม่กี่นาทียังเป็นโทรเลยเหมือนเดิม · 07:00 ของวันนี้ที่ตั้งตอนบ่าย = คนโทร
+ */
+const FOLLOW_AI_PAST_GRACE_MS = 10 * 60_000;
+export function isFollowAiTimePast(when: Date, now: Date = new Date()): boolean {
+  return when.getTime() < now.getTime() - FOLLOW_AI_PAST_GRACE_MS;
+}
+
 async function createFollowRounds(
   req: AuthedReq,
   res: ApiRes,
@@ -569,7 +578,13 @@ async function createFollowRounds(
   // 🔴 8 ต.ค. 2569: พัก AI ไม่บังคับสายที่เพิ่มเองแล้ว (เจ้าของ "ฟอร์มเพิ่มคนให้เลือก AI รายสายได้ด้วย")
   //    — ใครโทรตามที่ติ๊กในฟอร์ม (ค่าเริ่มเป็นคนโทร) · พักแค่สายที่ระบบดึงจาก iRecruit (`enforceReplaceAiPaused`)
   const base = inputBase;
-  const rounds = inputRounds;
+  /**
+   * 🔴 สาย AI ที่เวลาเลยมาแล้ว = คนโทร (QA รอบ 2 ข้อ 24 · 11 ต.ค. 2569 · กติกาเดียวกับส่งคนแทน "AI ไม่โทรย้อนหลัง")
+   * เคสจริง: ตารางหลายวันเริ่มวันนี้ 07:00 ตอนบ่าย ⇒ เดิมส่งเวลาที่ผ่านไปแล้วให้ Lumos ซึ่งอาจโทรทันที (คนจริงโดนโทรผิดเวลา)
+   */
+  const rounds = inputRounds.map((r) =>
+    (r.callMode ?? base.callMode) === 'ai' && isFollowAiTimePast(r.when) ? { ...r, callMode: 'manual' as const } : r,
+  );
   const createdRows: FollowRow[] = [];
   for (const r of rounds) {
     const row = await insertFollowRow(req, base, r);
@@ -826,6 +841,8 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
     return;
   }
 
+  // สายเดียวที่เวลาเลยมาแล้ว = คนโทร (กติกาเดียวกับหลายสาย · `isFollowAiTimePast`)
+  if (parsed.value.callMode === 'ai' && isFollowAiTimePast(when)) parsed.value.callMode = 'manual';
   let created = await insertFollowRow(req, parsed.value, {
     when,
     staffPhone,
@@ -1039,6 +1056,7 @@ type FollowStopScope = 'day' | 'set';
 
 /**
  * สายที่เหลือของคนนี้ (ชุดเดียวกัน `group_id` หรือแผนเดียวกันที่ Lumos `plan_ref`) ที่ยังไม่ถึงเวลา ไม่ปิด ไม่ยกเลิก
+ * + สายวันเดียวกับสายที่ปิดที่เลยเวลาแล้วแต่ยังไม่มีผล (11 ต.ค. 2569 · QA รอบ 3 ข้อ 8)
  * — `day` = เฉพาะวันเดียวกับสายที่ปิด (เวลาไทย) · `set` = ทุกวัน
  * ⇒ ตั้งยกเลิก (จอขึ้น "ยกเลิก") แล้วยกเลิกคิวฝั่งเรา + ที่ Lumos ด้วย `cancelFollowReminder` ตัวเดียวกับปุ่มยกเลิก
  * (รอบในแผนหลายรอบ = ส่งรอบที่ยังเหลือเป็นแผนใหม่ · ไม่เหลือ = ยกเลิกแผน) · สายที่ปิดเองก็ถอนคิวด้วยถ้ายังไม่ได้โทร
@@ -1067,7 +1085,21 @@ async function stopRemainingFollowRounds(done: FollowRow, scope: FollowStopScope
         set cancelled_at = now()
       where f.id <> $1::uuid
         and f.cancelled_at is null and f.completed_at is null
-        and f.scheduled_at > now()
+        and (
+          f.scheduled_at > now()
+          -- 🔴 สายวันเดียวกันที่เลยเวลาแล้วแต่ยังไม่มีผล = ปิดตาม (QA รอบ 3 ข้อ 8 · เดิมค้าง "สรุปไม่ได้" ในตารางต้องตาม)
+          --    สายที่มีผลแล้ว (AI หรือคนลง) ไม่แตะ — ผลจริงต้องอยู่ครบ
+          or (
+            to_char(timezone('Asia/Bangkok', f.scheduled_at), 'YYYY-MM-DD')
+              = to_char(timezone('Asia/Bangkok', $5::timestamptz), 'YYYY-MM-DD')
+            and coalesce(f.staff_call_outcome, '') = ''
+            and not exists (
+              select 1 from ${tableInAppSchema('lumos_dispatch_queue')} q2
+               where q2.channel = 'reminder' and q2.job_ref = 'follow'
+                 and q2.person_ref = 'follow-' || f.id::text
+                 and (q2.result is not null or q2.last_outcome is not null))
+          )
+        )
         and (
           ($2::uuid is not null and f.group_id = $2::uuid)
           or ($3::text is not null and f.id::text in (

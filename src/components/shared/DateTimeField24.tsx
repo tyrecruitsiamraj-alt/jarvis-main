@@ -54,6 +54,7 @@ const DateTimeField24: React.FC<DateTimeField24Props> = ({ value, onChange, labe
         onChange={(next) => emit(next, time)}
         emptyLabel={label ? `เลือกวัน · ${label}` : 'เลือกวัน'}
         className="min-w-[9.5rem] flex-1"
+        asField
       />
       <TimeSelect24
         value={time || DEFAULT_TIME}
