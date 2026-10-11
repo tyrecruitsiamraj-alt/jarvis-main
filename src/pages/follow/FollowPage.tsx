@@ -560,6 +560,16 @@ const FollowPage: React.FC = () => {
     setFirstName(first);
     setLastName(last);
     setPhone((p.mobile || '').trim());
+    /**
+     * หน่วยงานจาก ERP (QA รอบ 2 ข้อ 20 · เดิมเลือกแล้วไม่เติม) — เติมเฉพาะตอนช่องยังว่าง ไม่ทับที่เลือกไว้
+     * รหัสไซต์เติมเมื่อชื่อตรงหน่วยงานบนบอร์ดเพียงหนึ่งเดียว (ชื่อซ้ำข้ามไซต์ = ให้คนเลือกเองจากปุ่มหน่วยงาน)
+     */
+    const site = (p.site_name ?? '').trim();
+    if (site && !unitName.trim()) {
+      const hits = unitOptions.filter((u) => u.unitName.trim() === site);
+      setUnitName(site);
+      setSiteCode(hits.length === 1 ? hits[0].siteCode : '');
+    }
     setPickedFrom('เลือกจาก ERP');
     setPickerOpen(false);
     setFormError(null);

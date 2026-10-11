@@ -38,6 +38,8 @@ export const ErpPersonPickerBody: React.FC<{
         })
         .catch((e: unknown) => {
           if (ctrl.signal.aborted) return;
+          // ค้นคำใหม่ล้ม = ล้างผลเก่า ห้ามค้างให้กดชื่อของคำค้นเดิม (QA รอบ 2 ข้อ 20)
+          setPeople(null);
           setError(friendlyErrorText(e, 'ค้นรายชื่อไม่สำเร็จ'));
         })
         .finally(() => {
@@ -83,7 +85,8 @@ export const ErpPersonPickerBody: React.FC<{
                     type="button"
                     variant="outline"
                     onClick={() => onPick(p)}
-                    className="h-auto w-full flex-wrap justify-start gap-x-2 gap-y-0.5 rounded-xl px-3 py-2 text-left text-xs font-normal"
+                    // ตัดบรรทัดในกล่อง (ปุ่มตั้งต้นห้ามตัดบรรทัด รายการเลยกว้างเกินกล่อง · QA รอบ 2 ข้อ 20)
+                    className="h-auto w-full min-w-0 flex-wrap justify-start gap-x-2 gap-y-0.5 whitespace-normal break-words rounded-xl px-3 py-2 text-left text-xs font-normal"
                   >
                     <span className="font-medium text-foreground">{erpPersonDisplayName(p)}</span>
                     {p.nick_name ? <span className="text-muted-foreground">({p.nick_name})</span> : null}

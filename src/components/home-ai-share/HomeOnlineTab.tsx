@@ -121,7 +121,18 @@ function DailyBars({ report }: { report: OnlineReport }) {
   const max = Math.max(1, ...days.map((d) => d.total));
   return (
     <div className="space-y-2" data-testid="online-daily">
-      <h3 className="text-sm font-medium text-foreground">เข้ารายวัน</h3>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <h3 className="text-sm font-medium text-foreground">เข้ารายวัน</h3>
+        {/* สีในแท่งคืออะไร (QA รอบ 3 ข้อ 28 · เดิมไม่มีคำอธิบายสี) — ชุดเดียวกับสถานะใบขอของส่วนนี้ */}
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" aria-label="สีในแท่ง" data-testid="online-daily-legend">
+          {ONLINE_REQUEST_STATES.map((s) => (
+            <span key={s.key} className="inline-flex items-center gap-1.5">
+              <span className={cn('h-2.5 w-2.5 rounded-full', TONE[STATE_TONE[s.key]].dot)} aria-hidden />
+              {s.label}
+            </span>
+          ))}
+        </span>
+      </div>
       <ul className="space-y-1">
         {days.map((d) => (
           <li key={d.day} className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-xs">

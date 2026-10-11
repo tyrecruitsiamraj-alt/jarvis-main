@@ -191,6 +191,9 @@ const FollowDashboard: React.FC = () => {
                 unit="สาย"
                 value={matrixNow[k]}
                 previous={matrixPrev[k]}
+                /* ทิศดี/เสียตามความหมายของช่อง (QA รอบ 3 ข้อ 28 · เดิมทุกช่อง "ขึ้น = ดี" รอโทรเพิ่มแล้วลูกศรเขียว)
+                   ไป = ขึ้นดี · ไม่ไป/ไม่รับสาย/สรุปไม่ได้ = ลงดี · ทั้งหมด/รอโทร/ยกเลิก = ไม่ลงสี */
+                polarity={k === 'went' ? 'up-good' : k === 'notWent' || k === 'noAnswer' || k === 'unclear' ? 'down-good' : 'neutral'}
                 // ยกเลิก = เทา (QA 10 ต.ค. 2569 เดิมเปลี่ยนเป็นกรมท่า สีเดียวกับ "ทั้งหมด")
                 tone={k === 'total' ? 'primary' : FOLLOW_MATRIX_COL_TONE[k]}
               />
