@@ -12,6 +12,7 @@ import {
   type FollowDayPerson,
 } from '@/lib/followPlanning';
 import { cn } from '@/lib/utils';
+import { followPersonName } from '@/lib/followApi';
 
 /** 🔴 คำ/สีเดียวกับกล่องบนแผง (7 ต.ค. 2569 — เดิม "สำเร็จ" รวมคนที่ไม่ไปด้วย) */
 const KINDS: readonly FollowDayDoneKind[] = ['agreed', 'lost', 'other', 'cancelled'];
@@ -39,18 +40,21 @@ function resultOf(p: FollowDayPerson, kind: FollowDayDoneKind): string {
 function whoOf(p: FollowDayPerson, kind: FollowDayDoneKind): string {
   for (const c of p.calls) {
     const e = c.round.entry;
-    if (e.completed_by_name) return e.completed_by_name;
+    const who = followPersonName(e.completed_by_display, e.completed_by_name);
+    if (who) return who;
   }
   if (kind !== 'cancelled') {
     for (const c of p.calls) {
       const e = c.round.entry;
-      if (e.staff_called_by_name) return e.staff_called_by_name;
+      const who = followPersonName(e.staff_called_by_display, e.staff_called_by_name);
+      if (who) return who;
     }
     return 'AI';
   }
   for (const c of p.calls) {
     const e = c.round.entry;
-    if (e.updated_by_name) return e.updated_by_name;
+    const who = followPersonName(e.updated_by_display, e.updated_by_name);
+    if (who) return who;
   }
   return '—';
 }

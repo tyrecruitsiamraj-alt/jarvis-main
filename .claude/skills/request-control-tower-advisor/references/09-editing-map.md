@@ -12947,3 +12947,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · รอบ 2 ข้อ 24: `isFollowAiTimePast` (เลยมาเกิน 10 นาที) = คนโทรตั้งแต่สร้าง ทั้งหลายสาย/สายเดียว — เดิมส่งเวลาที่ผ่านแล้วให้ Lumos · สรุปฟอร์มบอก "เลยเวลาแล้ว N สาย — เป็นคนโทร"
     เพิ่มสาย = สายสุดท้าย + 1 ชม. · วันที่ตั้งเป็นคนโทร ปุ่มรายสายขึ้นคนโทร (ล็อก) · บท AI ไม่โชว์ในสายคนโทร
   · เทสต์ `followPlanning.test.ts` · `FollowStaffCallControls.test.tsx` · `FollowPlanningCalendar.test.tsx` · `followDayReport.test.ts` · `tests/api/followAiPastTime2569-10-11.test.ts`
+- (11 ต.ค. 2569 ดึก) QA รอบ 2 ข้อ 40 — **ชื่อคนบนหน้าติดตาม** (เจ้าของ Choice "เพิ่มโดย" + ชื่อเล่นหน้าผู้ใช้งาน → ชื่อจริง · ห้ามอีเมล)
+  · server `listFollow` (`api/_handlers/follow.ts`): CTE `um` (ผู้ใช้ ~60 แถว) hash join ด้วย id ก่อน แล้วถอยจับอีเมลที่เก็บ → `created_by_display` · `updated_by_display` · `completed_by_display` · `staff_called_by_display`
+    🔴 อย่ากลับไปใช้ lateral join — ช้า +850ms/หน้า (รันก่อน offset) · วัดแล้ว 11 หน้า 1.9 วิ · ไม่มีแถวซ้ำ (อีเมลใน users ไม่ซ้ำ 61/61)
+  · `*_by_name` ยังเป็นอีเมล (ค่าของตัวกรองเจ้าของงาน เจ้าของสั่ง 5 ต.ค.) · จออ่านผ่าน `followPersonName` (`src/lib/followApi.ts`) / `createdByLabel` (`followGrouping.ts`)
+  · คำเดียว "เพิ่มโดย" (เดิม คนคีย์ · เจ้าของข้อมูล) — ตาราง · ป๊อปจัดการ · ป๊อปแก้ไข · แผงรอบโทร · การ์ดจบแล้ว "ใครจัดการ" · ผลที่คนลง · ตัวเลือกเจ้าของงานโชว์ชื่อเล่น (ค่าเป็นอีเมล)
+  · เทสต์ `tests/api/followAdderUnit2569-10-05.test.ts` (ข้อ 40)

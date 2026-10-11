@@ -2037,7 +2037,8 @@ const FollowPage: React.FC = () => {
                     ...(user?.email ? [{ value: 'me', label: `ของฉัน · ${myAddedCount.toLocaleString('th-TH')}` }] : []),
                     ...adderOptions.map((o) => ({
                       value: o.value,
-                      label: `${o.value === FOLLOW_ADDER_NONE ? o.label : o.value} · ${o.count.toLocaleString('th-TH')}`,
+                      // ป้าย = ชื่อเล่น/ชื่อจริง (ห้ามอีเมลบนจอ · QA รอบ 2 ข้อ 40) · ค่ายังเป็นอีเมลตามเดิม
+                      label: `${o.label} · ${o.count.toLocaleString('th-TH')}`,
                     })),
                   ]}
                   onChange={(v) => setAdderFilter(v)}

@@ -872,6 +872,7 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
           staff_call_outcome: 'confirmed',
           staff_called_at: '2026-09-07T08:40:00Z',
           staff_called_by_name: 'staff@example.com',
+          staff_called_by_display: 'น้ำหวาน',
         }),
       ],
       { onStaffResult: vi.fn(), onCancelRound: vi.fn() },
@@ -879,7 +880,9 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
     expect(screen.queryByTestId('staff-quick')).toBeNull();
     // ป้ายตัวเดียวกับแผง + "· คนโทร" (6 ต.ค. 2569)
     expect(screen.getByText('ตอบว่าไป · คนโทร')).toBeTruthy();
-    expect(screen.getByText(/staff@example\.com · .*15:40 น\./)).toBeTruthy();
+    // ชื่อเล่นแทนอีเมล (QA รอบ 2 ข้อ 40)
+    expect(screen.getByText(/น้ำหวาน · .*15:40 น\./)).toBeTruthy();
+    expect(screen.queryByText(/staff@example\.com/)).toBeNull();
     expect(screen.getByRole('button', { name: 'แก้' })).toBeTruthy();
   });
 

@@ -60,3 +60,26 @@ describe('เลขบนตัวกรองหน้าติดตาม = �
     expect(src).toContain("{ value: 'all', label: `ทุกคน · ${ownerBase.length.toLocaleString('th-TH')}` }");
   });
 });
+
+describe('ชื่อคนบนจอ (QA รอบ 2 ข้อ 40 · 11 ต.ค. 2569 · Choice "เพิ่มโดย" + ชื่อเล่น → ชื่อจริง · ห้ามอีเมล)', () => {
+  it('ตัวเลือกเจ้าของงานใช้ชื่อที่โชว์ · ค่ายังเป็นอีเมล', () => {
+    const rows2 = [{ ...e('1', 'kunthida.b@siamraj.com'), created_by_display: 'กุ้งนาง' }, e('2', 'kunthida.b@siamraj.com')];
+    expect(followAdderOptions(rows2)).toEqual([{ value: 'kunthida.b@siamraj.com', label: 'กุ้งนาง', count: 2 }]);
+    const src = readFileSync(join(process.cwd(), 'src/pages/follow/FollowPage.tsx'), 'utf8');
+    expect(src).toContain('label: `${o.label} · ${o.count.toLocaleString(');
+  });
+  it('followPersonName: ชื่อที่โชว์ก่อน · ค่าที่ไม่ใช่อีเมลใช้ได้ · อีเมลอย่างเดียว = ไม่โชว์', async () => {
+    const { followPersonName } = await import('../../src/lib/followApi');
+    expect(followPersonName('เนส', 'nes@x.com')).toBe('เนส');
+    expect(followPersonName(null, 'ดึงจาก iRecruit')).toBe('ดึงจาก iRecruit');
+    expect(followPersonName(null, 'a@b.com')).toBeNull();
+  });
+  it('🔴 จอติดตามไม่อ่าน *_by_name ตรง ๆ มาโชว์แล้ว (ผ่าน followPersonName / createdByLabel)', () => {
+    for (const f of ['FollowPlanningCalendar.tsx', 'FollowDayDoneCard.tsx', 'FollowStaffCallControls.tsx', 'FollowEditDialog.tsx', 'FollowCallRoundsPanel.tsx', 'FollowRoundsDialog.tsx']) {
+      const src = readFileSync(join(process.cwd(), 'src/components/follow', f), 'utf8');
+      expect(src, f).not.toMatch(/\{(entry|e|p)\.(created|completed|updated|staff_called)_by_name\}/);
+      expect(src, f).not.toMatch(/return e\.(completed|staff_called|updated)_by_name;/);
+      expect(src, f).not.toContain('group.createdByName}');
+    }
+  });
+});

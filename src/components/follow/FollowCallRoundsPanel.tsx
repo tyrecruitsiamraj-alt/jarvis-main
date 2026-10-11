@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DASH, TONE } from '@/lib/designTokens';
-import { type FollowEntry } from '@/lib/followApi';
+import { followPersonName, type FollowEntry } from '@/lib/followApi';
 import { followCallerOf } from '@/lib/followListFilter';
 import { followCallOutcomeText } from '@/lib/callOutcomeTone';
 
@@ -104,7 +104,9 @@ function PersonRow({ p, onOpen }: { p: FollowEntry; onOpen?: (p: FollowEntry) =>
           ) : null}
           <p className={cn('mt-0.5 text-[10px]', DASH.muted)}>
             ให้โทร {p.scheduled_at ? formatYmdDmyBe(toYmdBangkok(new Date(p.scheduled_at))) : '—'}
-            {p.created_by_name ? ` · เจ้าของข้อมูล ${p.created_by_name}` : ''}
+            {followPersonName(p.created_by_display, p.created_by_name)
+              ? ` · เพิ่มโดย ${followPersonName(p.created_by_display, p.created_by_name)}`
+              : ''}
           </p>
           {p.call_outcome || p.call_summary ? (
             <p className={cn('mt-1 rounded bg-background/60 px-1.5 py-1 text-[10px]', DASH.muted)}>

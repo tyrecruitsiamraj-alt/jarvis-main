@@ -1,4 +1,4 @@
-import type { FollowEntry } from '@/lib/followApi';
+import { followPersonName, type FollowEntry } from '@/lib/followApi';
 import { phoneKey } from '@/lib/followDuplicateGuard';
 
 /**
@@ -34,6 +34,8 @@ export type FollowGroup = {
   siteCode: string | null;
   /** เจ้าของข้อมูล = คนที่คีย์รอบแรกสุดของกลุ่ม */
   createdByName: string | null;
+  /** ชื่อที่โชว์ของคนเพิ่ม (ชื่อเล่น/ชื่อจริง · ไม่มีอีเมล) — `createdByName` ยังเป็นค่าดิบ */
+  createdByLabel: string | null;
   /** ทุกรอบ (รวมยกเลิก/ปิดแล้ว) เรียงตามเวลานัดโทร — ไม่มีเวลาไปท้ายสุด */
   rounds: FollowEntry[];
   /** จำนวนรอบที่ไม่ถูกยกเลิก */
@@ -170,6 +172,7 @@ export function groupFollowEntries(
       unitName: withUnit?.unit_name ?? null,
       siteCode: withUnit?.site_code ?? null,
       createdByName: first.created_by_name ?? null,
+      createdByLabel: followPersonName(first.created_by_display, first.created_by_name),
       rounds,
       activeCount: active.length,
       nextRound,

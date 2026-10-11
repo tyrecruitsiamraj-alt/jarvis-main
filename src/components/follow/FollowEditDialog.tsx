@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Building2, LoaderCircle, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { replaceFollowSchedule, updateFollowEntry, type FollowEntry } from '@/lib/followApi';
+import { followPersonName, replaceFollowSchedule, updateFollowEntry, type FollowEntry } from '@/lib/followApi';
 import {
   EXTRA_ROUNDS_MAX,
   buildExtraRounds,
@@ -396,9 +396,10 @@ export default function FollowEditDialog({
         <DialogHeader>
           <DialogTitle className="text-base">{scheduleEditing ? 'แก้ตารางทั้งชุด' : 'แก้ไขรายการติดตาม'}</DialogTitle>
           <DialogDescription className="text-[11px]">
-            เจ้าของข้อมูล{' '}
+            {/* คำเดียวทั้งระบบ "เพิ่มโดย" + ชื่อเล่น/ชื่อจริง ห้ามอีเมล (QA รอบ 2 ข้อ 40) */}
+            เพิ่มโดย{' '}
             <span className="font-medium text-foreground">
-              {entry.created_by_name || 'ไม่ทราบ'}
+              {followPersonName(entry.created_by_display, entry.created_by_name) || 'ไม่ทราบ'}
             </span>
           </DialogDescription>
         </DialogHeader>

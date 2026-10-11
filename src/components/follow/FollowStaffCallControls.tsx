@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TONE } from '@/lib/designTokens';
 import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
-import type { FollowEntry } from '@/lib/followApi';
+import { followPersonName, type FollowEntry } from '@/lib/followApi';
 import { FOLLOW_OUTCOME_LABEL, type FollowOutcome } from '@/lib/followOutcome';
 import {
   FOLLOW_STAFF_QUICK_RESULTS,
@@ -221,7 +221,7 @@ const FollowStaffCallControls: React.FC<{
           </span>
         ) : null}
         <span className="tabular-nums text-muted-foreground">
-          {[entry.staff_called_by_name, entry.staff_called_at ? `${WHEN.format(new Date(entry.staff_called_at))} น.` : null]
+          {[followPersonName(entry.staff_called_by_display, entry.staff_called_by_name), entry.staff_called_at ? `${WHEN.format(new Date(entry.staff_called_at))} น.` : null]
             .filter(Boolean)
             .join(' · ')}
         </span>

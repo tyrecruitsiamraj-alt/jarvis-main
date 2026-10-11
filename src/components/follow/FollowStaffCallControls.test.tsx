@@ -111,6 +111,7 @@ describe('ลงผลสายคนโทร 2 ขั้น (เจ้าข�
           staff_call_outcome: 'no_answer',
           staff_called_at: '2026-09-30T03:00:00Z',
           staff_called_by_name: 'staff@example.com',
+          staff_called_by_display: 'น้ำหวาน',
         })}
         onRecord={vi.fn()}
         onFinish={vi.fn()}
@@ -118,7 +119,9 @@ describe('ลงผลสายคนโทร 2 ขั้น (เจ้าข�
       />,
     );
     expect(screen.getByText('ติดต่อไม่ได้')).toBeTruthy();
-    expect(screen.getByText(/staff@example\.com/)).toBeTruthy();
+    // ชื่อเล่นแทนอีเมล (QA รอบ 2 ข้อ 40)
+    expect(screen.getByText(/น้ำหวาน/)).toBeTruthy();
+    expect(screen.queryByText(/staff@example\.com/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'ล้างผล' }));
     expect(onClear).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'ล้างเลย' }));

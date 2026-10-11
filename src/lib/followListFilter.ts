@@ -137,12 +137,20 @@ export function followAdderLabel(name: string | null | undefined): string {
 /** ตัวเลือก "ใครเพิ่ม" + จำนวน — เรียงชื่อ · ไม่ระบุไว้ท้าย */
 export function followAdderOptions(entries: readonly FollowEntry[]): Array<{ value: string; label: string; count: number }> {
   const count = new Map<string, number>();
+  /** ชื่อที่โชว์ของคนเพิ่ม (ชื่อเล่น/ชื่อจริงจากหน้าผู้ใช้งาน · QA รอบ 2 ข้อ 40) — ค่าตัวกรองยังเป็นอีเมล (เจ้าของสั่ง 5 ต.ค. 2569) */
+  const display = new Map<string, string>();
   for (const e of entries) {
     const k = (e.created_by_name ?? '').trim() || FOLLOW_ADDER_NONE;
     count.set(k, (count.get(k) ?? 0) + 1);
+    const d = (e.created_by_display ?? '').trim();
+    if (d && !display.has(k)) display.set(k, d);
   }
   return [...count.entries()]
-    .map(([value, n]) => ({ value, label: value === FOLLOW_ADDER_NONE ? 'ไม่ระบุคนเพิ่ม' : followAdderLabel(value), count: n }))
+    .map(([value, n]) => ({
+      value,
+      label: value === FOLLOW_ADDER_NONE ? 'ไม่ระบุคนเพิ่ม' : (display.get(value) ?? followAdderLabel(value)),
+      count: n,
+    }))
     .sort((a, b) => {
       if (a.value === FOLLOW_ADDER_NONE) return 1;
       if (b.value === FOLLOW_ADDER_NONE) return -1;

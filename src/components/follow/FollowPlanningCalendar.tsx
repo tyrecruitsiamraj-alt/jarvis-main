@@ -50,7 +50,7 @@ import {
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { followCallerOf } from '@/lib/followListFilter';
 import FollowDayDoneCard from '@/components/follow/FollowDayDoneCard';
-import type { FollowEntry } from '@/lib/followApi';
+import { followPersonName, type FollowEntry } from '@/lib/followApi';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import { buildFollowCallMatrix, FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE, followMatrixColOfCategory } from '@/lib/followCallMatrix';
 import { DASH } from '@/lib/designTokens';
@@ -855,11 +855,12 @@ const FollowPlanningCalendar: React.FC<{
                                     ) : null}
                                     {/* ใครเพิ่มเข้ามา (Journey ข้อ 8 · เจ้าของสั่ง 3 ต.ค. 2569 "การ์ดในนี้ต้องบอกด้วยว่าใครเพิ่มมา")
                                         — เดิมต้องเปิดป๊อปจัดการถึงรู้ · "ดึงจาก iRecruit" เป็นชื่อแหล่งอยู่แล้ว ไม่เติมคำนำ */}
-                                    {row.group.createdByName ? (
+                                    {/* ชื่อเล่น/ชื่อจริง ไม่ใช่อีเมล (QA รอบ 2 ข้อ 40 · `createdByLabel`) */}
+                                    {row.group.createdByLabel ? (
                                       <span className="mt-0.5 block truncate text-[10.5px] text-muted-foreground">
-                                        {row.group.createdByName.startsWith('ดึงจาก')
-                                          ? row.group.createdByName
-                                          : `เพิ่มโดย ${row.group.createdByName}`}
+                                        {row.group.createdByLabel.startsWith('ดึงจาก')
+                                          ? row.group.createdByLabel
+                                          : `เพิ่มโดย ${row.group.createdByLabel}`}
                                       </span>
                                     ) : null}
                                     <span className="mt-2 block lg:hidden">{rowActions}</span>
@@ -1033,7 +1034,7 @@ const FollowPlanningCalendar: React.FC<{
                                           <span className="text-[12px] leading-snug text-muted-foreground">
                                             {e.staff_call_note ||
                                               [
-                                                e.staff_called_by_name,
+                                                followPersonName(e.staff_called_by_display, e.staff_called_by_name),
                                                 e.staff_called_at ? `${STAFF_AT.format(new Date(e.staff_called_at))} น.` : null,
                                               ]
                                                 .filter(Boolean)

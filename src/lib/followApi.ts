@@ -79,6 +79,14 @@ export type FollowEntry = {
   follow_team?: 'replacement' | null;
   /** 🔴 เจ้าของข้อมูล = **คนที่กรอกครั้งแรก** ไม่เปลี่ยนแม้มีคนอื่นมาแก้ทีหลัง */
   created_by_name: string | null;
+  /**
+   * ชื่อที่โชว์ของคน (QA รอบ 2 ข้อ 40 · เจ้าของ Choice "เพิ่มโดย" + ชื่อเล่นหน้าผู้ใช้งาน → ชื่อจริง · ห้ามอีเมล)
+   * มาจากเส้นรายการเท่านั้น · `*_name` ยังเป็นอีเมล (ค่าของตัวกรองเจ้าของงาน) — จออ่านผ่าน `followPersonName`
+   */
+  created_by_display?: string | null;
+  updated_by_display?: string | null;
+  completed_by_display?: string | null;
+  staff_called_by_display?: string | null;
   created_at: string | null;
   /** คนแก้ล่าสุด — คนละคนกับเจ้าของข้อมูลได้ */
   updated_at?: string | null;
@@ -475,4 +483,12 @@ export async function clearFollowStaffCall(id: string): Promise<FollowEntry> {
   });
   if (!r.ok) throw new Error(await readError(r));
   return (await r.json()) as FollowEntry;
+}
+
+/** ชื่อคนบนจอ — ชื่อที่โชว์ก่อน · ไม่มีก็ใช้ค่าที่เก็บถ้าไม่ใช่อีเมล (ระบบ/ชื่อจริงเก่า) · อีเมลอย่างเดียว = null (ห้ามโชว์อีเมล) */
+export function followPersonName(display: string | null | undefined, raw: string | null | undefined): string | null {
+  const d = (display ?? '').trim();
+  if (d) return d;
+  const r = (raw ?? '').trim();
+  return r && !r.includes('@') ? r : null;
 }

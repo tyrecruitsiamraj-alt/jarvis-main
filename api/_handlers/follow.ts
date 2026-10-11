@@ -51,6 +51,7 @@ import { isAiDecisiveOutcome, validateFollowStaffCall } from '../../src/lib/foll
 
 const followTable = tableInAppSchema('follow_entries');
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
+const usersTable = tableInAppSchema('users');
 
 
 type LumosNextAction = {
@@ -141,6 +142,11 @@ type FollowRow = {
   emergency_phone: string | null;
   /** ทีมของรายการ (131 · 1 ต.ค. 2569) — null = ทีมติดตาม · 'replacement' = ทีมส่งคนแทน · ฐานยังไม่รัน 131 = ไม่มีคีย์ */
   follow_team?: string | null;
+  /** ชื่อที่โชว์จากหน้าผู้ใช้งาน (เฉพาะเส้นรายการ) */
+  created_by_display?: string | null;
+  updated_by_display?: string | null;
+  completed_by_display?: string | null;
+  staff_called_by_display?: string | null;
 };
 
 const iso = (v: string | Date | null): string | null =>
@@ -186,6 +192,11 @@ function toResponse(r: FollowRow) {
     emergency_phone: r.emergency_phone && !isPlaceholderPhone(r.emergency_phone) ? r.emergency_phone : null,
     /** เจ้าของข้อมูล = คนที่กรอกครั้งแรก · ไม่เปลี่ยนแม้มีคนอื่นมาแก้ทีหลัง */
     created_by_name: r.created_by_name,
+    /** ชื่อที่โชว์ (ชื่อเล่น → ชื่อจริง · ไม่มีอีเมล) — `created_by_name` เก็บอีเมลไว้เป็นค่าของตัวกรองเจ้าของงาน */
+    created_by_display: r.created_by_display ?? null,
+    updated_by_display: r.updated_by_display ?? null,
+    completed_by_display: r.completed_by_display ?? null,
+    staff_called_by_display: r.staff_called_by_display ?? null,
     updated_at: iso(r.updated_at ?? null),
     updated_by_name: r.updated_by_name ?? null,
     created_at: iso(r.created_at),
@@ -254,7 +265,11 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
      * ⚠️ **ไม่ส่ง transcript ทั้งก้อน** — บางสาย 24 ตา ถ้าส่งดิบทุกแถว payload บวม
      * และไม่มีจอไหนใช้ · ต่อคำด้วย ' · ' ให้อ่านรวดเดียว ฝั่งจอตัดความยาวเอง
      */
-    `select f.*,
+    `with um as (
+       select id::text as id, lower(btrim(email)) as email,
+              coalesce(nullif(btrim(nickname), ''), nullif(btrim(full_name), '')) as name
+         from ${usersTable})
+     select f.*,
             q.status                                       as call_status,
             coalesce(q.last_outcome, q.result->>'outcome') as call_outcome,
             q.attempt_count                                as call_attempt,
@@ -269,12 +284,26 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
             q.result->'next_action'                        as call_next_action,
             q.updated_at                                   as called_at,
             q.followup_state                               as followup_state,
-            q.payload->>'admin_phone'                      as emergency_phone
+            q.payload->>'admin_phone'                      as emergency_phone,
+            -- ชื่อที่โชว์ของคน (QA รอบ 2 ข้อ 40 · เจ้าของ Choice "เพิ่มโดย" + ชื่อเล่นหน้าผู้ใช้งาน → ชื่อจริง · ห้ามอีเมล)
+            coalesce(umci.name, umce.name) as created_by_display,
+            coalesce(umui.name, umue.name) as updated_by_display,
+            coalesce(umdi.name, umde.name) as completed_by_display,
+            coalesce(umsi.name, umse.name) as staff_called_by_display
        from ${followTable} f
        left join ${queueTable} q
               on q.channel = 'reminder'
              and q.job_ref = 'follow'
              and q.person_ref = 'follow-' || f.id::text
+       -- id ก่อน · ไม่มี id (แถวเก่า/สร้างจากเส้นอื่น) ถอยไปจับอีเมลที่เก็บไว้ · hash join กับตารางผู้ใช้ ~60 แถว (lateral เดิมช้า +850ms/หน้า)
+       left join um umci on umci.id = f.created_by::text
+       left join um umce on umce.email = lower(btrim(f.created_by_name))
+       left join um umui on umui.id = f.updated_by::text
+       left join um umue on umue.email = lower(btrim(f.updated_by_name))
+       left join um umdi on umdi.id = f.completed_by::text
+       left join um umde on umde.email = lower(btrim(f.completed_by_name))
+       left join um umsi on umsi.id = f.staff_called_by::text
+       left join um umse on umse.email = lower(btrim(f.staff_called_by_name))
       order by f.created_at desc
       limit $1 offset $2`,
     [limit, offset],

@@ -114,8 +114,8 @@ const FollowRoundsDialog: React.FC<{
               <span className="font-medium text-foreground">{group.unitName || '—'}</span>
               {group.siteCode ? <span className="font-mono">({group.siteCode})</span> : null}
             </span>
-            {group.createdByName ? (
-              <span className="text-muted-foreground">คนคีย์ {group.createdByName}</span>
+            {group.createdByLabel ? (
+              <span className="text-muted-foreground">เพิ่มโดย {group.createdByLabel}</span>
             ) : null}
           </div>
         ) : null}
