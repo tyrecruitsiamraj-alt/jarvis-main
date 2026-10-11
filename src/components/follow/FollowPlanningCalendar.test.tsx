@@ -954,16 +954,16 @@ describe('การ์ดจบแล้ว (7 ต.ค. 2569: แท็บตา
   });
 });
 
-describe('🔴 มือถือ: ชื่อติดซ้าย · ปุ่มโทร/จัดการอยู่ใต้ชื่อ (QA 10 ต.ค. 2569 ปุ่มอยู่นอกจอ ปัดแล้วชื่อหาย)', () => {
-  it('ช่องชื่อ sticky เฉพาะจอเล็ก · คอลัมน์จัดการซ่อนบนจอเล็ก · ชุดใต้ชื่อซ่อนบนจอกว้าง', () => {
+describe('🔴 มือถือ + แท็บเล็ต: ชื่อติดซ้าย · ปุ่มโทร/จัดการอยู่ใต้ชื่อ (QA 10 ต.ค. 2569 · รอบ 3 ข้อ 6 จอ 768)', () => {
+  it('ช่องชื่อ sticky ต่ำกว่า 1024 (รวม 768) · คอลัมน์จัดการซ่อนต่ำกว่า 1024 · ชุดใต้ชื่อซ่อนบนจอกว้าง', () => {
     renderCalendar(twoRounds());
     const row = dayRows()[0];
     const nameCell = row.querySelector('td') as HTMLElement;
-    expect(nameCell.className).toContain('max-md:sticky');
-    expect(nameCell.className).toContain('max-md:left-0');
+    expect(nameCell.className).toContain('max-lg:sticky');
+    expect(nameCell.className).toContain('max-lg:left-0');
     const [underName, column] = within(row).getAllByRole('button', { name: 'จัดการ' });
-    expect(underName.closest('.md\\:hidden')).toBeTruthy();
+    expect(underName.closest('.lg\\:hidden')).toBeTruthy();
     const colCls = (column.closest('td') as HTMLElement).className.split(/\s+/);
-    expect(colCls).toEqual(expect.arrayContaining(['hidden', 'md:table-cell']));
+    expect(colCls).toEqual(expect.arrayContaining(['hidden', 'lg:table-cell']));
   });
 });

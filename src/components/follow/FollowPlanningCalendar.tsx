@@ -717,8 +717,8 @@ const FollowPlanningCalendar: React.FC<{
                     <table className="min-w-full border-collapse text-left">
                       <thead>
                         <tr className={cn('border-b border-border', DASH.tableHead)}>
-                          {/* 🔴 มือถือ: คอลัมน์ชื่อติดซ้าย (QA 10 ต.ค. 2569 ปัดหาปุ่มแล้วชื่อหาย ไม่รู้ว่าลงผลให้ใคร) */}
-                          <th className="min-w-[210px] px-4 py-2.5 text-[11px] font-medium max-md:sticky max-md:left-0 max-md:z-10 max-md:min-w-40 max-md:bg-card md:px-5">
+                          {/* 🔴 มือถือ + แท็บเล็ต (<1024): คอลัมน์ชื่อติดซ้าย (QA 10 ต.ค. 2569 ปัดหาปุ่มแล้วชื่อหาย · รอบ 3 ข้อ 6 จอ 768 ยังไม่ติด) */}
+                          <th className="min-w-[210px] px-4 py-2.5 text-[11px] font-medium max-lg:sticky max-lg:left-0 max-lg:z-10 max-lg:min-w-40 max-lg:bg-card md:px-5">
                             ผู้ที่ต้องติดตาม / ติดต่อ
                           </th>
                           <th className="min-w-[130px] px-3 py-2.5 text-[11px] font-medium">หน่วยงาน</th>
@@ -726,7 +726,7 @@ const FollowPlanningCalendar: React.FC<{
                           <th className="min-w-[140px] px-3 py-2.5 text-[11px] font-medium">สถานะการโทร</th>
                           <th className="min-w-[220px] px-3 py-2.5 text-[11px] font-medium">เขาตอบว่าอะไร</th>
                           <th className="min-w-[150px] px-3 py-2.5 text-[11px] font-medium">เบอร์ฉุกเฉิน</th>
-                          <th className="hidden px-3 py-2.5 text-right text-[11px] font-medium md:table-cell md:px-5">จัดการ</th>
+                          <th className="hidden px-3 py-2.5 text-right text-[11px] font-medium md:px-5 lg:table-cell">จัดการ</th>
                         </tr>
                       </thead>
                       <tbody data-testid="day-calls">
@@ -766,7 +766,7 @@ const FollowPlanningCalendar: React.FC<{
                             ),
                           ];
                           const anyResult = calls.some((c) => c.round.state === 'result');
-                          /** ปุ่มโทร + จัดการ — จอกว้างอยู่คอลัมน์ขวาสุด · มือถืออยู่ใต้ชื่อ (QA 10 ต.ค. 2569 ปุ่มอยู่นอกจอ) */
+                          /** ปุ่มโทร + จัดการ — จอกว้าง (≥1024) อยู่คอลัมน์ขวาสุด · มือถือ/แท็บเล็ตอยู่ใต้ชื่อ (QA 10 ต.ค. 2569 ปุ่มอยู่นอกจอ · รอบ 3 ข้อ 6) */
                           const rowActions = (
                             <span className="inline-flex items-center gap-1.5">
                               {/* แบบอ้างอิงมีปุ่มโทรในแถว — ของเราลิงก์ tel: ไปแอปโทรของเครื่อง */}
@@ -817,7 +817,7 @@ const FollowPlanningCalendar: React.FC<{
                                 allCancelled && 'opacity-60',
                               )}
                             >
-                              <td className="px-4 py-3 max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-card md:px-5">
+                              <td className="px-4 py-3 max-lg:sticky max-lg:left-0 max-lg:z-10 max-lg:bg-card md:px-5">
                                 <span className="flex items-start gap-2.5">
                                   {/* วงกลมอักษรย่อถอดแล้ว (เจ้าของ 8 ต.ค. 2569 "มันต้องไม่มีไอรูปหน้าตาพวกนี้ มันรก") */}
                                   <span className="min-w-0">
@@ -852,7 +852,7 @@ const FollowPlanningCalendar: React.FC<{
                                           : `เพิ่มโดย ${row.group.createdByName}`}
                                       </span>
                                     ) : null}
-                                    <span className="mt-2 block md:hidden">{rowActions}</span>
+                                    <span className="mt-2 block lg:hidden">{rowActions}</span>
                                   </span>
                                 </span>
                               </td>
@@ -1129,7 +1129,7 @@ const FollowPlanningCalendar: React.FC<{
                                 )}
                               </td>
 
-                              <td className="hidden px-3 py-3 text-right md:table-cell md:px-5">
+                              <td className="hidden px-3 py-3 text-right md:px-5 lg:table-cell">
                                 {rowActions}
                               </td>
                             </tr>
