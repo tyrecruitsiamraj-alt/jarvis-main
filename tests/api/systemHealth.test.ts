@@ -62,18 +62,19 @@ describe('levelFromAge', () => {
 describe('buildHealthChecks', () => {
   it('สถานะปกติ = เขียวหมด', () => {
     const checks = buildHealthChecks(base, NOW);
-    expect(checks.map((c) => c.level)).toEqual(['ok', 'ok', 'ok', 'ok']);
-    expect(checks[0].value).toBe('32 นาทีก่อน');
-    expect(checks[3].value).toBe('290 ใบเปิด');
+    // ไฟ "Lumos ดึงคิว" ถอดแล้ว (Lumos เลิกดึงคิว · QA รอบ 2 ข้อ 48)
+    expect(checks.map((c) => c.level)).toEqual(['ok', 'ok', 'ok']);
+    expect(checks.some((c) => c.key === 'lumosPull')).toBe(false);
+    expect(checks[2].value).toBe('290 ใบเปิด');
   });
 
-  it('🔴 เคสจริงต้น ส.ค.: Lumos หยุดดึงคิว 3 วัน แล้วคิวบวม → แดงทั้งคู่', () => {
+  it('🔴 เคสจริงต้น ส.ค.: คิวบวม → แดง (ไฟดึงคิวถอดแล้ว — ผลโทรไม่กลับ 3 วันก็แดง)', () => {
     const checks = buildHealthChecks(
-      { ...base, lumosPullAt: agoMin(60 * 24 * 3), queueDueNow: 3400 },
+      { ...base, lumosResultAt: agoMin(60 * 24 * 3), queueDueNow: 3400 },
       NOW,
     );
     const byKey = Object.fromEntries(checks.map((c) => [c.key, c.level]));
-    expect(byKey.lumosPull).toBe('down');
+    expect(byKey.lumosResult).toBe('down');
     expect(byKey.queueBacklog).toBe('down');
     expect(worstLevel(checks)).toBe('down');
   });
@@ -117,8 +118,8 @@ describe('worstLevel', () => {
 });
 
 describe('healthAlertFor', () => {
-  const check = buildHealthChecks({ ...base, lumosPullAt: agoMin(60 * 24) }, NOW).find(
-    (c) => c.key === 'lumosPull',
+  const check = buildHealthChecks({ ...base, lumosResultAt: agoMin(60 * 24 * 3) }, NOW).find(
+    (c) => c.key === 'lumosResult',
   )!;
 
   it('เพิ่งพัง → เตือน', () => {
@@ -130,7 +131,7 @@ describe('healthAlertFor', () => {
     expect(healthAlertFor(check, 'down')).toBeNull();
   });
   it('🔴 หายแล้วต้องบอกด้วย', () => {
-    const okCheck = buildHealthChecks(base, NOW).find((c) => c.key === 'lumosPull')!;
+    const okCheck = buildHealthChecks(base, NOW).find((c) => c.key === 'lumosResult')!;
     expect(healthAlertFor(okCheck, 'down')?.kind).toBe('recovered');
     expect(healthAlertFor(okCheck, 'ok')).toBeNull();
   });

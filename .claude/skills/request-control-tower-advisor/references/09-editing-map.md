@@ -12975,3 +12975,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
     สลับ ของฉัน/ทุกคน แล้วเส้นล้ม = ล้างรายชื่อชุดเก่า (`rowsScopeRef`)
   · รอบ 3 ข้อ 25–26 `ApplicantContactDialog`: แถบปุ่มติดล่าง (sticky) · มือถือป๊อปชิดบน (`max-sm:top-4 max-sm:translate-y-0`) · แตะพื้นหลังไม่ปิด (`onInteractOutside` preventDefault)
   · ไม่ได้แก้ (รอเคาะนิยาม): รอบ 2 ข้อ 5 (AI+คน ≠ โทรแล้ว เพราะโทรทั้งสองทาง) · ข้อ 7 (โทรแล้ว 5 ≠ สำเร็จ+ไม่สำเร็จ 2)
+- (12 ต.ค. 2569 ตี 3) QA ทั้งระบบ — รอบ 2 ข้อ 45 · 48 · 49 + รอบ 3 ข้อ 27 · 29
+  · รอบ 3 ข้อ 27 ช่องกรอกมือถือ 18px (`text-base md:text-sm`) — root 18px ทำให้ text-sm = 15.75px iPhone ซูม · แก้ที่ `.jarvis-soft-field` / `.jarvis-filter-select` (utility เดิม ไม่ได้เพิ่มคลาส) + textarea + select trigger + `SearchField`
+  · รอบ 3 ข้อ 29 "ไม่ได้ส่งให้ AI" คำเดียว (`followDispatchState`) · คำขยายแถวล้มเหลว "รับแล้วเงียบ" · ป้าย "ล้มเหลว" บนการ์ดผลโทรคงไว้ (เจ้าของสั่ง 8 ต.ค.)
+  · รอบ 2 ข้อ 45 ป้ายบทบาทในแถบเมนู (`AppLayout`) ใช้ `text-foreground` (เดิม blue-700 บนพื้นมืด 2.14:1) · เลข 0 ในแผงรอบโทรเลิกจาง /50
+  · รอบ 2 ข้อ 48 กระดิ่ง (`callFollowup.ts`): สายติดตาม "ตอบว่าไป" ไม่เด้ง "สนใจงาน" · ลิงก์ตามชนิด (ติดตาม /follow · ผู้สมัคร /jobs/board?view=list) · ไม่มี "ใบขอ follow" ·
+    ไฟ "Lumos ดึงคิว" ถอดจาก `buildHealthChecks` (Lumos เลิกดึงคิว ทุกเส้น push)
+  · รอบ 2 ข้อ 49 ล็อกโทรของเบอร์ชุดหนึ่ง = POST `{ action: 'lookup', phones }` (`matching-call-holds.ts` · `fetchCallHoldsByPhones`) · OPL โดน 403 → ถอยไป GET ?phones= แบบเดิม
+  · เทสต์ `tests/api/notifyFollowWording2569-10-12.test.ts` · `systemHealth.test.ts`

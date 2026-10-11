@@ -22,7 +22,7 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
         type={type}
         className={cn(
           // ทรงเดียวกับช่องค้นหาบน Dashboard — เจ้าของเลือกให้เป็นมาตรฐานของทุกหน้าที่มีการค้นหา
-          'w-full rounded-full border-0 bg-slate-100 text-sm text-slate-900 shadow-inner',
+          'w-full rounded-full border-0 bg-slate-100 text-base text-slate-900 shadow-inner md:text-sm',
           'placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-ring/40',
           'dark:bg-slate-800 dark:text-slate-100 dark:focus:bg-slate-800',
           compact ? 'h-10 min-h-10 py-2 pl-10 pr-3 leading-normal' : 'py-2.5 pl-11 pr-4',

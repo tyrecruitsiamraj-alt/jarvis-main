@@ -237,20 +237,29 @@ export async function applyCallFollowupToQueueRow(input: {
   // dedupe ด้วย queue id + เหตุการณ์ — Lumos ยิงผลเดิมซ้ำจะไม่เด้งซ้ำ
   // ⚠️ ห้าม throw ข้ามจุดนี้ — notifyRoles กลืน error เองอยู่แล้ว
   const who = nameFromPayload(row.payload) || row.person_ref;
-  if (input.outcome === 'confirmed') {
+  /**
+   * 🔴 สายติดตาม (job_ref = 'follow') ไม่ใช่ใบขอ — QA รอบ 2 ข้อ 48 (12 ต.ค. 2569):
+   * เดิมผลติดตามเด้ง "X สนใจงาน — รีบติดต่อกลับ · ใบขอ follow" และลิงก์ไป /follow ทุกรายการแม้เป็นผู้สมัครจริง
+   * ⇒ ติดตาม: "ตอบว่าไป" ไม่ต้องรีบทำอะไร = ไม่เด้ง · ต้องคนตาม = ลิงก์หน้าติดตาม ไม่มีคำว่าใบขอ
+   *   ผู้สมัคร/จับคู่งาน: คำเดิม ลิงก์ไปแท็บผู้สมัคร
+   */
+  const isFollow = row.job_ref === 'follow';
+  const link = isFollow ? '/follow' : '/jobs/board?view=list';
+  const where = isFollow ? 'ติดตามเริ่มงาน' : `ใบขอ ${row.job_ref}`;
+  if (input.outcome === 'confirmed' && !isFollow) {
     await notifyRoles(['admin'], {
       type: 'call_confirmed',
       title: `${who} สนใจงาน — รีบติดต่อกลับ`,
-      body: `ใบขอ ${row.job_ref} · AI โทรแล้วเขาตอบรับ อย่าปล่อยให้เย็นตัว`,
-      link: '/follow',
+      body: `${where} · AI โทรแล้วเขาตอบรับ อย่าปล่อยให้เย็นตัว`,
+      link,
       dedupeKey: `call_confirmed:${row.id}`,
     });
   } else if (decision.action === 'needs_human') {
     await notifyRoles(['admin'], {
       type: 'needs_human',
       title: `${who} ต้องคนตาม — AI โทรจนสุดมือแล้ว`,
-      body: `ใบขอ ${row.job_ref} · ${decision.reason}`,
-      link: '/follow',
+      body: `${where} · ${decision.reason}`,
+      link,
       dedupeKey: `needs_human:${row.id}`,
     });
   }

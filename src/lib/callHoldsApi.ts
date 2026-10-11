@@ -90,8 +90,15 @@ export async function fetchCallHoldsByPhones(
   if (list.length === 0) return out;
   for (let i = 0; i < list.length; i += 300) {
     try {
-      const params = new URLSearchParams({ phones: list.slice(i, i + 300).join(',') });
-      const r = await apiFetch(`/api/matching/call-holds?${params}`);
+      const chunk = list.slice(i, i + 300);
+      // 🔴 เบอร์ไปใน body ไม่ใช่ URL (QA รอบ 2 ข้อ 49) · role อ่านอย่างเดียว (OPL) POST ไม่ได้ = 403 → ถอยไปแบบเดิม
+      let r = await apiFetch('/api/matching/call-holds', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'lookup', phones: chunk }),
+      });
+      if (r.status === 403) {
+        r = await apiFetch(`/api/matching/call-holds?${new URLSearchParams({ phones: chunk.join(',') })}`);
+      }
       if (!r.ok) continue;
       const data = await readJsonSafe<{ holds?: CallHold[] }>(r);
       for (const h of data?.holds ?? []) out.set(h.candidateRef, h);

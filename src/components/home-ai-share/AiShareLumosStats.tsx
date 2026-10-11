@@ -52,7 +52,8 @@ export const FOLLOW_RESULT_COLS: ReadonlyArray<{ key: FollowBucketKey; label: st
     key: 'failed',
     label: 'ล้มเหลว',
     tone: FOLLOW_MATRIX_COL_TONE.noAnswer,
-    note: 'ติดต่อไม่ได้ · ไม่รับสาย · สายไม่ว่าง · รับแต่ไม่พูด · โทรไม่ออก',
+    // คำมาตรฐาน "รับแล้วเงียบ" (QA รอบ 3 ข้อ 29 · เดิม "รับแต่ไม่พูด")
+    note: 'ติดต่อไม่ได้ · ไม่รับสาย · สายไม่ว่าง · รับแล้วเงียบ · โทรไม่ออก',
   },
   { key: 'cancelled', label: 'ยกเลิก', tone: FOLLOW_MATRIX_COL_TONE.cancelled },
   { key: 'waiting', label: 'รอโทร', tone: FOLLOW_MATRIX_COL_TONE.waiting },

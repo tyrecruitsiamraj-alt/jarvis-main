@@ -446,7 +446,7 @@ export default function FollowCallRoundsPanel({
                       <span
                         className={cn(
                           'text-2xl font-medium leading-none tabular-nums sm:text-3xl',
-                          n === 0 ? 'text-muted-foreground/50' : TONE[FOLLOW_MATRIX_COL_TONE[c]].value,
+                          n === 0 ? 'text-muted-foreground' : TONE[FOLLOW_MATRIX_COL_TONE[c]].value,
                         )}
                       >
                         {n.toLocaleString('th-TH')}
@@ -479,7 +479,7 @@ export default function FollowCallRoundsPanel({
                     <span
                       className={cn(
                         'text-2xl font-medium leading-none tabular-nums sm:text-3xl',
-                        list.length === 0 ? 'text-muted-foreground/50' : 'text-foreground',
+                        list.length === 0 ? 'text-muted-foreground' : 'text-foreground',
                       )}
                     >
                       {list.length.toLocaleString('th-TH')}

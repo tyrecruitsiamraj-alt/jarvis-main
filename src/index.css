@@ -306,13 +306,14 @@
   }
 
   .jarvis-soft-field {
-    @apply w-full rounded-xl border border-black/[0.08] px-4 py-2.5 text-sm text-foreground outline-none transition-all;
+    /* มือถือ 16px ขึ้นไป (text-base) ไม่งั้น iPhone ซูมจอตอนแตะช่อง — QA รอบ 3 ข้อ 27 · จอ md ขึ้นไป text-sm เท่าเดิม */
+    @apply w-full rounded-xl border border-black/[0.08] px-4 py-2.5 text-base text-foreground outline-none transition-all md:text-sm;
     background: rgba(255, 255, 255, 0.85);
     box-shadow: 0 1px 2px rgba(17, 17, 26, 0.03);
   }
 
   .jarvis-filter-select {
-    @apply jarvis-soft-field min-h-10 py-2 text-sm leading-normal;
+    @apply jarvis-soft-field min-h-10 py-2 text-base leading-normal md:text-sm;
     line-height: 1.35;
   }
 

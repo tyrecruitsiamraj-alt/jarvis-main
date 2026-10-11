@@ -17,7 +17,7 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "jarvis-soft-field flex h-11 items-center justify-between px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      "jarvis-soft-field flex h-11 items-center justify-between px-4 py-2 text-base md:text-sm disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
       className,
     )}
     {...props}

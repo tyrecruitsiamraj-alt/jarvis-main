@@ -122,14 +122,10 @@ export function buildHealthChecks(signals: HealthSignals, now: Date): HealthChec
   const erpLevel: HealthLevel =
     signals.erpOk === false ? 'down' : signals.erpOk === null ? 'warn' : levelFromAge(erpMin, HEALTH_THRESHOLDS.erpStale);
 
+  // 🔴 ไฟ "Lumos ดึงคิว" ถอดแล้ว (QA รอบ 2 ข้อ 48 · 12 ต.ค. 2569) — Lumos เลิกดึงคิว ทุกเส้น push แล้ว
+  //    ไฟค้าง "ผิดปกติ · 50 วันก่อน" ทั้งที่ระบบปกติ · `pullMin` ยังคิดไว้ (สัญญาณดิบยังส่งมา) แต่ไม่ขึ้นไฟ
+  void pullMin;
   return [
-    {
-      key: 'lumosPull',
-      label: 'Lumos ดึงคิว',
-      level: levelFromAge(pullMin, HEALTH_THRESHOLDS.lumosPull),
-      value: humanAgo(pullMin),
-      hint: `เตือนเมื่อเกิน ${Math.round(HEALTH_THRESHOLDS.lumosPull.warn / 60)} ชม.`,
-    },
     {
       key: 'lumosResult',
       label: 'ผลโทรกลับ',

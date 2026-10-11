@@ -173,8 +173,9 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             ) : null}
           </div>
           <div className="flex 2xl:hidden items-center gap-1.5 px-2 py-1 rounded-full bg-white/55 border border-white/70 dark:bg-white/10 dark:border-white/15">
-            <UserCircle className="w-4 h-4 text-blue-600" />
-            <span className="text-xs font-medium text-blue-700 uppercase">{user?.role}</span>
+            {/* สีจากธีม — เดิม blue-700 บนพื้นมืดอ่านไม่ออก (contrast 2.14:1 · QA รอบ 2 ข้อ 45) */}
+            <UserCircle className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-medium text-foreground uppercase">{user?.role}</span>
             {showSettings ? (
               <Button
                 type="button"

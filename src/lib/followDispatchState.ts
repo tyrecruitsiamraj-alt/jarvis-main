@@ -180,7 +180,8 @@ export function followDispatchLabel(input: {
   if (isFollowDispatchState(input.state)) return FOLLOW_DISPATCH_META[input.state];
 
   return {
-    label: 'ไม่ได้ส่งให้ AI โทร',
+    // คำเดียวทั้งระบบ "ไม่ได้ส่งให้ AI" (QA รอบ 3 ข้อ 29 · เดิมมี 3 แบบ)
+    label: 'ไม่ได้ส่งให้ AI',
     hint: 'ไม่มีบันทึกว่าทำไม (รายการสร้างก่อนระบบจดเหตุผล) — ถ้าต้องการให้ AI โทร ให้สร้างรายการใหม่',
     needsAction: true,
     retryable: true,
@@ -202,5 +203,5 @@ export function summarizeDispatchResults(
   const reasons = [...new Set(bad.map((s) => FOLLOW_DISPATCH_META[s as FollowDispatchState].label))];
   const retryable = bad.every((s) => FOLLOW_DISPATCH_META[s as FollowDispatchState].retryable);
   const scope = bad.length === states.length ? 'ทั้งหมด' : `${bad.length} จาก ${states.length} รายการ`;
-  return { text: `${scope} ยังไม่ได้ส่งให้ AI โทร — ${reasons.join(' · ')}`, retryable };
+  return { text: `${scope} ไม่ได้ส่งให้ AI — ${reasons.join(' · ')}`, retryable };
 }

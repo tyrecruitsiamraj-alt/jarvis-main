@@ -1,7 +1,8 @@
 /**
  * "รับไปโทรเอง" — ล็อกสิทธิ์โทรผู้สมัคร (กันเจ้าหน้าที่โทรชนกัน + กัน AI โทรทับ)
  *
- * GET    ?phones=08x,09x        → { holds: [...] }  ล็อกที่ยังถืออยู่ของเบอร์ชุดนี้ (วาดการ์ด)
+ * POST   { action: 'lookup', phones: [...] } → { holds: [...] }  ล็อกที่ยังถืออยู่ของเบอร์ชุดนี้ (วาดการ์ด · เบอร์ไม่อยู่ใน URL)
+ * GET    ?phones=08x,09x        → แบบเดิม — เหลือไว้ให้ role อ่านอย่างเดียว (POST ไม่ได้)
  * GET    ?mine=1                → { holds: [...] }  ที่ฉันถืออยู่ (แถบหัวหน้า + หน้า "โทรของฉัน")
  * POST   { phone, source, candidateRef, jobId, ... }        → จับล็อก (409 ถ้ามีคนถือ)
  * PATCH  { holdId, outcome, scope?, note?, detail? }        → บันทึกผล + ปล่อยล็อก
@@ -130,6 +131,22 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (method === 'POST') {
       const body = await readJsonBody(req);
       if (!isPlainObject(body)) return sendError(res, 400, 'Bad request');
+
+      /**
+       * ถามล็อกของเบอร์ชุดหนึ่งด้วย body (QA รอบ 2 ข้อ 49 · 12 ต.ค. 2569) — เดิม GET ?phones= เบอร์ผู้สมัครไปอยู่ใน URL
+       * (ติด log ของ proxy/เซิร์ฟเวอร์) · อ่านอย่างเดียว ไม่จับล็อก · GET ?phones= ยังรับอยู่ (role อ่านอย่างเดียว POST ไม่ได้)
+       */
+      if (body.action === 'lookup') {
+        const phones = Array.isArray(body.phones)
+          ? body.phones.filter((p): p is string => typeof p === 'string').map((p) => p.trim()).filter(Boolean)
+          : [];
+        if (phones.length === 0) return res.status(200).json({ holds: [] });
+        if (phones.length > MAX_PHONES) {
+          return sendError(res, 400, 'Bad request', `ขอได้ครั้งละไม่เกิน ${MAX_PHONES} เบอร์`);
+        }
+        const map = await getActiveCallHoldsByPhones(phones);
+        return res.status(200).json({ holds: [...map.values()].map((h) => toWire(h, viewerId)) });
+      }
 
       const source = isCallHoldSource(body.source) ? body.source : null;
       if (!source) {
