@@ -109,6 +109,26 @@ export async function dbTransaction<T>(fn: (client: PoolClient) => Promise<T>): 
   }
 }
 
+/**
+ * งานยาวที่ห้ามวิ่งทับกันข้ามคำขอ/เครื่อง — ล็อก advisory ระดับ session บน connection เฉพาะตัว
+ * (12 ต.ค. 2569 · รอบดึง iRecruit ส่งคนแทน กับปุ่มพัก AI เคยวิ่งทับกัน แล้วส่งแผนของสายที่เพิ่งเปลี่ยนเป็นคนโทรให้ Lumos)
+ * งานข้างในใช้ `dbQuery` ตามปกติได้ (ล็อกถือไว้ที่ connection แยก) · ปลดล็อกเสมอแม้งานล้ม
+ */
+export async function withSessionLock<T>(key: number, fn: () => Promise<T>): Promise<T> {
+  const pool = getOrCreatePool();
+  const client = await pool.connect();
+  try {
+    await client.query('select pg_advisory_lock($1)', [key]);
+    try {
+      return await fn();
+    } finally {
+      await client.query('select pg_advisory_unlock($1)', [key]).catch(() => undefined);
+    }
+  } finally {
+    client.release();
+  }
+}
+
 export function isPgUniqueViolation(e: unknown): boolean {
   return (
     typeof e === 'object' &&

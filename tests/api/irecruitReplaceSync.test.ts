@@ -23,6 +23,7 @@ vi.mock('../../api/_lib/postgres.js', () => ({
   dbQuery: (...a: unknown[]) => dbQuery(...a),
   isPgUndefinedTable: (e: unknown) => (e as { code?: string })?.code === '42P01',
   isPgUniqueViolation: (e: unknown) => (e as { code?: string })?.code === '23505',
+  withSessionLock: (_key: number, fn: () => Promise<unknown>) => fn(),
 }));
 vi.mock('../../api/_lib/lumosDispatchMode.js', () => ({ isAutoDispatchEnabled: () => autoDispatch() }));
 const cancelFollow = vi.fn(async () => true);

@@ -19,7 +19,7 @@
  * ตรรกะเวลาโทร/คีย์/ค่าตั้งอยู่ `src/lib/irecruitReplaceSync.ts` (มีเทสต์) · ไฟล์นี้ต่อฐาน + iRecruit + Lumos
  */
 import { createHash, randomUUID } from 'node:crypto';
-import { dbQuery, isPgUndefinedTable, isPgUniqueViolation } from './postgres.js';
+import { dbQuery, isPgUndefinedTable, isPgUniqueViolation, withSessionLock } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { irecruitSqlQuery, irecruitUnavailableReason } from './irecruitSqlServer.js';
 import { toE164Thai } from './thaiPhone.js';
@@ -335,7 +335,21 @@ async function setDispatchState(id: string, state: FollowDispatchState): Promise
  * ยกเลิก (ใบยกเลิก/เปลี่ยนคน/รุ่นเก่า) · ย้ายเวลา (iRecruit แก้เวลา) · สร้างใหม่ — ส่ง Lumos เฉพาะสาย AI เมื่อสวิตช์ follow_entry เปิด
  * 🔴 ดึงพัง/ได้ 0 ใบทั้งที่มีสายรอโทร = ไม่ยกเลิกอะไรเลย (ห้ามล้างทั้งระบบเพราะรอบเดียวพัง)
  */
+/**
+ * 🔴 ล็อกเดียวของงานที่แตะ "ใครโทร" ของสายส่งคนแทน (12 ต.ค. 2569 — race ที่เจอจริง):
+ * รอบดึง iRecruit อ่านสาย AI ตอนต้นรอบ แล้วส่งแผนให้ Lumos ตอนท้าย · ระหว่างนั้นกดพัก AI เปลี่ยนสายเป็นคนโทร
+ * ⇒ รอบดึงส่งแผนของสายที่เพิ่งเป็นคนโทรไป (AI โทรสายคนโทร) · ล็อกนี้ทำให้ดึง / พัก AI / AI เริ่มโทรตั้งแต่ เดินทีละงาน
+ * ⚠️ ห้ามเรียกซ้อนกันข้างใน (ล็อกระดับ session บนคนละ connection = รอตัวเองจนค้าง)
+ */
+const REPLACE_SYNC_LOCK_KEY = 731_041_210;
+
 export async function runIrecruitReplaceSync(
+  opts: { now?: Date; horizonDays?: number; actorName?: string } = {},
+): Promise<ReplaceSyncSummary> {
+  return withSessionLock(REPLACE_SYNC_LOCK_KEY, () => runIrecruitReplaceSyncUnlocked(opts));
+}
+
+async function runIrecruitReplaceSyncUnlocked(
   opts: { now?: Date; horizonDays?: number; actorName?: string } = {},
 ): Promise<ReplaceSyncSummary> {
   const now = opts.now ?? new Date();
@@ -832,6 +846,10 @@ async function persistLastRun(summary: ReplaceSyncSummary, actorName: string): P
  * เรียกจาก worker ทุกรอบ (5 นาที) — ไม่มีแถวเข้าเงื่อนไขก็จบที่คำถามเดียว
  */
 export async function enforceReplaceAiFrom(aiFrom: string | null): Promise<{ converted: number; plansCancelled: number; errors: number }> {
+  return withSessionLock(REPLACE_SYNC_LOCK_KEY, () => enforceReplaceAiFromUnlocked(aiFrom));
+}
+
+async function enforceReplaceAiFromUnlocked(aiFrom: string | null): Promise<{ converted: number; plansCancelled: number; errors: number }> {
   const out = { converted: 0, plansCancelled: 0, errors: 0 };
   if (!aiFrom || !getLumosPushConfig()) return out;
   const cut = new Date(`${aiFrom}T00:00:00+07:00`);
@@ -858,6 +876,10 @@ export async function enforceReplaceAiFrom(aiFrom: string | null): Promise<{ con
  *    ไม่งั้นรอบนี้เปลี่ยนสายที่คนเลือกกลับเป็นคนโทรทุก 5 นาที
  */
 export async function enforceReplaceAiPaused(now: Date = new Date()): Promise<{ converted: number; plansCancelled: number; errors: number }> {
+  return withSessionLock(REPLACE_SYNC_LOCK_KEY, () => enforceReplaceAiPausedUnlocked(now));
+}
+
+async function enforceReplaceAiPausedUnlocked(now: Date): Promise<{ converted: number; plansCancelled: number; errors: number }> {
   const out = { converted: 0, plansCancelled: 0, errors: 0 };
   if (!getLumosPushConfig()) return out;
   const { rows: aff } = await dbQuery<{ id: string }>(
