@@ -35,6 +35,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bot, Clock, FileText, Link2, Phone, Repeat, Users, type LucideIcon } from 'lucide-react';
 import { useLiveTick } from '@/hooks/useLiveTick';
 import { toYmdBangkok } from '@/lib/dateTh';
+import { Button } from '@/components/ui/button';
 import { KpiTile } from '@/components/home-ai-share/HomeKpis';
 import TopicReportCard, { useTopicReport } from '@/components/home-ai-share/TopicReportCard';
 import { HomeSection, SegLegend, SplitBars, StatStrip, type StatItem } from '@/components/home-ai-share/HomeSections';
@@ -91,6 +92,7 @@ import { CONVEYOR_VAULT, conveyorLabel } from '@/lib/soRecruitNav';
 import { SITE_BU_TO_DEPT, trendBuLabel } from '@/lib/trends/bu';
 import { EVEN_TYPE, TONE, type ToneKey } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 const NUM = new Intl.NumberFormat('th-TH');
 const CLOCK = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Bangkok' });
@@ -279,7 +281,10 @@ const HomeAiSharePage: React.FC = () => {
 
   /** อัปเดตสด — เลขรอบ (ตัวเดียวทั้งหน้า ส่งต่อให้กราฟ/แผงผลโทร) · เวลาที่โหลดสำเร็จล่าสุด */
   const live = isLiveWindow(cardWin);
-  const tick = useLiveTick(live, LIVE_MS);
+  const liveTick = useLiveTick(live, LIVE_MS);
+  /** กด "ลองใหม่" บนแถบล้ม = โหลดเงียบรอบเดียวกับรอบสด ทุกก้อนของหน้า (QA 10 ต.ค. 2569 แถบล้มไม่มีปุ่มลองใหม่) */
+  const [retrySeq, setRetrySeq] = useState(0);
+  const tick = liveTick + retrySeq;
   /** ผลโทร (การ์ดผลโทร + กล่องเลือกผล) — โหลดครั้งเดียวทั้งหน้า */
   const lumos = useHomeLumosSummary(block, cardQ, tick);
   /** รายงานของหัวข้ออื่น (ขั้น · ผลแยกก้อน · BU) — โหลดครั้งเดียวทั้งหน้า */
@@ -300,7 +305,7 @@ const HomeAiSharePage: React.FC = () => {
         }
       })
       .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error && e.message ? e.message : 'โหลดหน้าหลักไม่ขึ้น ลองรีเฟรชอีกครั้ง');
+        if (alive) setError(friendlyErrorText(e, 'โหลดหน้าหลักไม่ขึ้น'));
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -349,7 +354,7 @@ const HomeAiSharePage: React.FC = () => {
         if (alive) setDetail({ key, d });
       })
       .catch((e: unknown) => {
-        if (alive) setDetailError(e instanceof Error && e.message ? e.message : 'โหลดกราฟไม่ขึ้น ลองอีกครั้ง');
+        if (alive) setDetailError(friendlyErrorText(e, 'โหลดกราฟไม่ขึ้น'));
       })
       .finally(() => {
         if (alive) setDetailLoading(false);
@@ -370,7 +375,10 @@ const HomeAiSharePage: React.FC = () => {
     fetchHomeAiShareDetail(b, w)
       .then((d) => {
         const cur = blockWinRef.current;
-        if (alive && homeQueryKey(cur.win, cur.block) === key) setDetail({ key, d });
+        if (alive && homeQueryKey(cur.win, cur.block) === key) {
+          setDetail({ key, d });
+          setDetailError(null);
+        }
       })
       .catch(() => {});
     return () => {
@@ -385,7 +393,8 @@ const HomeAiSharePage: React.FC = () => {
   const meta = BLOCKS.find((b) => b.key === block) ?? BLOCKS[0];
   const counts: AiShareCounts | null = current?.[meta.key] ?? null;
   const staffFlag = current && !current.follow_staff_ready ? STAFF_NOT_READY : null;
-  const blockError = current?.errors[meta.key] ?? (error ? 'โหลดไม่ขึ้น' : null);
+  // ล้มทั้งหน้าบอกที่แถบบนแล้ว — ไม่ซ้อน "โหลดไม่ขึ้น" อีกบรรทัด (QA 10 ต.ค. 2569)
+  const blockError = current?.errors[meta.key] ?? null;
   const prev = current?.previous ?? null;
 
   const hint = (() => {
@@ -493,6 +502,8 @@ const HomeAiSharePage: React.FC = () => {
   const report = meta.key === 'follow' ? null : topic.report;
   /** ขั้น/ส่วนท้าย ใช้รายงานว่างระหว่างโหลด · แท่งใช้ `report` จริง (ระหว่างโหลดขึ้นโครง) */
   const steps = meta.key === 'follow' ? null : (topic.report ?? EMPTY_REPORT[meta.key]);
+  /** รายงานของหัวข้อยังไม่มา — ช่องเลขขึ้น "—" ไม่ใช่ 0 ปลอม (QA 10 ต.ค. 2569) · โครง/ป้ายยังอยู่จาก `EMPTY_REPORT` */
+  const stepsPending = meta.key !== 'follow' && !topic.report;
   type Breakdown = Array<{ key: string; label: string; value: number; tone?: ToneKey }>;
   const followSplit = meta.key === 'follow' ? (lumos.current?.follow ?? null) : null;
   const fromFollowBucket = (b: { total: number; waiting: number; cancelled: number } | null, doneLabel: string): Breakdown | null =>
@@ -639,7 +650,7 @@ const HomeAiSharePage: React.FC = () => {
     >
       {failed ? <p className={cn('text-sm', TONE.danger.value)}>{failed}</p> : null}
       {meta.key === 'aftercare' ? (
-        <StatStrip arrows testId="home-reach" items={[stepOf(steps, 'total'), stepOf(steps, 'called'), stepOf(steps, 'reached')]} />
+        <StatStrip loading={stepsPending} arrows testId="home-reach" items={[stepOf(steps, 'total'), stepOf(steps, 'called'), stepOf(steps, 'reached')]} />
       ) : null}
       <SplitBars
         rows={resultRows}
@@ -652,7 +663,7 @@ const HomeAiSharePage: React.FC = () => {
           return t ? TONE[t].dot : null;
         }}
       />
-      {meta.key === 'aftercare' ? <StatStrip testId="home-waiting" items={extraOf(steps, 'ที่ยังรอ')} /> : null}
+      {meta.key === 'aftercare' ? <StatStrip loading={stepsPending} testId="home-waiting" items={extraOf(steps, 'ที่ยังรอ')} /> : null}
     </HomeSection>
   );
 
@@ -748,11 +759,18 @@ const HomeAiSharePage: React.FC = () => {
         {picker}
       </div>
 
-      {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
+      {error ? (
+        <p className={cn('flex flex-wrap items-center gap-2 text-sm', TONE.danger.value)} data-testid="home-error">
+          {error}
+          <Button type="button" variant="outline" size="xs" onClick={() => setRetrySeq((n) => n + 1)}>
+            ลองใหม่
+          </Button>
+        </p>
+      ) : null}
       {blockError ? <p className={cn('text-xs', TONE.danger.value)}>{blockError}</p> : null}
       {flag ? <p className={cn('text-xs', TONE.warn.value)}>{flag}</p> : null}
 
-      {online ? <HomeOnlineTab q={winQ} tick={tick} /> : null}
+      {online ? <HomeOnlineTab q={winQ} tick={tick} onRetry={() => setRetrySeq((n) => n + 1)} /> : null}
       {online ? null : (
       <>
       {/* ชื่อหัวข้อสำหรับโปรแกรมอ่านจอ — งานสรรหา/จับคู่งาน การ์ดแรกใช้ชื่อส่วน (ติดตาม/ดูแล การ์ดแรกคือชื่อหัวข้อเอง) */}
@@ -788,7 +806,7 @@ const HomeAiSharePage: React.FC = () => {
       {meta.key === 'applicants' ? (
         <>
           <HomeSection title="ใบขอและการประกาศ" sub={sub} testId="home-intro">
-            <StatStrip
+            <StatStrip loading={stepsPending}
               testId="report-funnel"
               items={[
                 { ...stepOf(steps, 'jobsIn'), unit: 'ใบ' },
@@ -798,7 +816,7 @@ const HomeAiSharePage: React.FC = () => {
           </HomeSection>
           <HomeSection title="ผู้สมัครและผลโทร" sub={sub}>
             {tiles}
-            <StatStrip
+            <StatStrip loading={stepsPending}
               testId="report-steps"
               items={[
                 { ...stepOf(steps, 'total'), unit: meta.unit },
@@ -813,7 +831,7 @@ const HomeAiSharePage: React.FC = () => {
       {meta.key === 'matching' ? (
         <>
           <HomeSection title="ใบขอและการจับคู่" sub={sub} testId="home-intro">
-            <StatStrip
+            <StatStrip loading={stepsPending}
               arrows
               testId="report-funnel"
               items={['jobsIn', 'jobsMatched', 'jobsRecommend'].map((k) => ({ ...stepOf(steps, k), unit: 'ใบ' }))}
@@ -825,7 +843,7 @@ const HomeAiSharePage: React.FC = () => {
           </HomeSection>
           <HomeSection title="การโทรและผลลัพธ์" sub={sub}>
             {tiles}
-            <StatStrip
+            <StatStrip loading={stepsPending}
               arrows
               testId="report-steps"
               items={['total', 'called', 'interested', 'reserved', 'placed'].map((k) => stepOf(steps, k))}
@@ -852,16 +870,16 @@ const HomeAiSharePage: React.FC = () => {
       {/* งานสรรหา: นัดหมาย (แยกใครโทรคนแรก) + ส่งต่อให้คน */}
       {meta.key === 'applicants' ? (
         <HomeSection title="การนัดหมาย" sub={sub} testId="home-appointment">
-          <StatStrip arrows testId="report-appointment" items={['interested', 'appointment', 'showed'].map((k) => stepOf(steps, k))} />
+          <StatStrip loading={stepsPending} arrows testId="report-appointment" items={['interested', 'appointment', 'showed'].map((k) => stepOf(steps, k))} />
           <div className="space-y-2" data-testid="report-extra-ส่งต่อให้คน">
             <h3 className="text-sm font-medium text-foreground">ส่งต่อให้คน</h3>
-            <StatStrip items={extraOf(steps, 'ส่งต่อให้คน')} />
+            <StatStrip loading={stepsPending} items={extraOf(steps, 'ส่งต่อให้คน')} />
           </div>
         </HomeSection>
       ) : null}
       {meta.key === 'matching' ? (
         <HomeSection title="ส่งต่อให้คน" sub={sub} testId="report-extra-ส่งต่อให้คน">
-          <StatStrip items={extraOf(steps, 'ส่งต่อให้คน')} />
+          <StatStrip loading={stepsPending} items={extraOf(steps, 'ส่งต่อให้คน')} />
         </HomeSection>
       ) : null}
 

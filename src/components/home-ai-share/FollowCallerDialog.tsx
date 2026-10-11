@@ -35,6 +35,7 @@ import { fetchFollowJourney } from '@/lib/homeAiShareApi';
 import { periodLabel } from '@/lib/periodPick';
 import { trendBuLabel } from '@/lib/trends/bu';
 import { cn } from '@/lib/utils';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 const NUM = new Intl.NumberFormat('th-TH');
 const WHEN = new Intl.DateTimeFormat('th-TH', {
@@ -91,7 +92,7 @@ const FollowCallerDialog: React.FC<{
         if (alive) setData({ key, d });
       })
       .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error && e.message ? e.message : 'โหลดไม่ขึ้น ลองอีกครั้ง');
+        if (alive) setError(friendlyErrorText(e, 'โหลดรายชื่อไม่ขึ้น'));
       })
       .finally(() => {
         if (alive) setLoading(false);

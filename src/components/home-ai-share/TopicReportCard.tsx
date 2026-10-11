@@ -18,6 +18,7 @@ import { fetchTopicReport } from '@/lib/homeAiShareApi';
 import { REPORT_SEGS, reportBuBlocks, type TopicReport, type TopicReportBlock, type TopicReportResponse } from '@/lib/homeTopicReport';
 import { trendBuLabel } from '@/lib/trends/bu';
 import { cn } from '@/lib/utils';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 const NUM = new Intl.NumberFormat('th-TH');
 
@@ -37,7 +38,7 @@ export function useTopicReport(block: TopicReportBlock | null, win: AiShareWindo
         if (alive) setData({ key, d });
       })
       .catch((e: unknown) => {
-        if (alive) setError({ key, msg: e instanceof Error && e.message ? e.message : 'โหลดผลโทรไม่ขึ้น ลองรีเฟรชอีกครั้ง' });
+        if (alive) setError({ key, msg: friendlyErrorText(e, 'โหลดผลโทรไม่ขึ้น') });
       });
     return () => {
       alive = false;

@@ -1,3 +1,9 @@
+/**
+ * เส้นตอบกลับเป็น HTML (500/502 ระหว่าง deploy · nginx) — ข้อความของคน ไม่ใช่ของนักพัฒนา
+ * (QA 10 ต.ค. 2569: จอเคยขึ้น "API endpoint ไม่ได้ส่ง JSON กลับมา กรุณารันผ่าน vercel dev …")
+ */
+export const SERVER_NOT_JSON_TEXT = 'เซิร์ฟเวอร์ขัดข้อง ลองใหม่อีกครั้ง';
+
 export async function readErrorMessage(response: Response, fallback: string) {
     if (response.status === 404) {
       return "API_NOT_READY";
@@ -17,7 +23,7 @@ export async function readErrorMessage(response: Response, fallback: string) {
     const text = await response.text().catch(() => '');
   
     if (text.includes('import ') || text.includes('<!DOCTYPE html') || text.includes('<html')) {
-      return 'API endpoint ไม่ได้ส่ง JSON กลับมา กรุณารันผ่าน vercel dev หรือเช็ก /api route';
+      return SERVER_NOT_JSON_TEXT;
     }
   
     return text || fallback;
@@ -35,7 +41,7 @@ export async function readErrorMessage(response: Response, fallback: string) {
   
       throw new Error(
         text.includes('import ') || text.includes('<!DOCTYPE html') || text.includes('<html')
-          ? 'API endpoint ไม่ได้ส่ง JSON กลับมา กรุณารันผ่าน vercel dev หรือเช็ก /api route'
+          ? SERVER_NOT_JSON_TEXT
           : 'Response ไม่ใช่ JSON',
       );
     }
@@ -46,7 +52,7 @@ export async function readErrorMessage(response: Response, fallback: string) {
   export function isApiUnavailableMessage(message: string) {
     return (
       message.includes('API_NOT_READY') ||
-      message.includes('API endpoint ไม่ได้ส่ง JSON') ||
+      message.includes(SERVER_NOT_JSON_TEXT) ||
       message.includes('Failed to fetch') ||
       message.includes('Response ไม่ใช่ JSON') ||
       message.includes('404')

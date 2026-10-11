@@ -30,6 +30,7 @@ import {
   type HomeLumosSummaryResponse,
 } from '@/lib/homeLumosSummary';
 import { cn } from '@/lib/utils';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 const NUM = new Intl.NumberFormat('th-TH');
 
@@ -87,7 +88,7 @@ export function useHomeLumosSummary(block: AiShareBlockKey, win: AiShareWindow &
         if (alive) setData({ key, d });
       })
       .catch((e: unknown) => {
-        if (alive) setError({ key, msg: e instanceof Error && e.message ? e.message : 'โหลดไม่ขึ้น ลองรีเฟรชอีกครั้ง' });
+        if (alive) setError({ key, msg: friendlyErrorText(e, 'โหลดผลโทรไม่ขึ้น') });
       });
     return () => {
       alive = false;

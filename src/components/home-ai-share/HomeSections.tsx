@@ -147,7 +147,21 @@ export function SplitBars({
 export type StatItem = ReportItem & { unit?: string };
 
 /** แถวตัวเลขคั่นเส้น · `arrows` = ขั้นต่อกัน (ลูกศรระหว่างช่อง) · ตัวแยก (`parts`) เขียนใต้เลข */
-export function StatStrip({ items, arrows = false, testId }: { items: readonly StatItem[]; arrows?: boolean; testId?: string }) {
+/**
+ * `loading` = ยังไม่ได้ข้อมูล — ขึ้น "—" แทนเลข (QA 10 ต.ค. 2569: ระหว่างโหลดขึ้น "ใบขอเข้ามา 0" แล้วค่อยกระโดดเป็น 55)
+ * ป้ายยังอยู่ครบ (กติกา "ว่างแล้วห้ามหาย") · ห้ามใช้ 0 แทนค่าที่ยังไม่รู้
+ */
+export function StatStrip({
+  items,
+  arrows = false,
+  testId,
+  loading = false,
+}: {
+  items: readonly StatItem[];
+  arrows?: boolean;
+  testId?: string;
+  loading?: boolean;
+}) {
   return (
     <ol className="flex flex-wrap items-stretch gap-y-3 rounded-xl border border-foreground/10" data-testid={testId}>
       {items.map((it, i) => (
@@ -162,7 +176,7 @@ export function StatStrip({ items, arrows = false, testId }: { items: readonly S
           <span className="flex min-w-0 flex-1 flex-col gap-1 px-4 py-3">
             <span className="text-xs text-muted-foreground">{it.label}</span>
             <span className="text-2xl font-medium tabular-nums text-foreground">
-              {NUM.format(it.value)}
+              {loading ? '—' : NUM.format(it.value)}
               {it.unit ? <span className="ml-1 text-sm font-normal text-muted-foreground">{it.unit}</span> : null}
             </span>
             {it.parts?.length ? (
@@ -173,7 +187,7 @@ export function StatStrip({ items, arrows = false, testId }: { items: readonly S
                       className={cn('h-2 w-2 rounded-full', p.seg ? segmentDotClass(p.seg) : TONE[p.tone ?? 'neutral'].dot)}
                       aria-hidden
                     />
-                    {p.label} <span className="font-medium text-foreground">{NUM.format(p.value)}</span>
+                    {p.label} <span className="font-medium text-foreground">{loading ? '—' : NUM.format(p.value)}</span>
                   </span>
                 ))}
               </span>

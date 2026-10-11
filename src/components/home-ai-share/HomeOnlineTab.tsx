@@ -5,6 +5,7 @@
  * 🔴 shadcn + Tailwind · สีจาก TONE (เขียว = ปิดครบ · เหลือง = เปิดอยู่/เหลือหา) · ไม่มีประโยคอธิบายบนจอ
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { HomeSection, StatStrip, type StatItem } from '@/components/home-ai-share/HomeSections';
@@ -24,6 +25,7 @@ import {
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import { trendBuLabel } from '@/lib/trends/bu';
 import { cn } from '@/lib/utils';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 const NUM = new Intl.NumberFormat('th-TH');
 const DAY = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -48,7 +50,7 @@ function useHomeOnline(q: AiShareWindow & { bu: string | null }, tick: number) {
     const key = homeQueryKey(q);
     fetchHomeOnline(q)
       .then((d) => alive && setData({ key, d }))
-      .catch((e: unknown) => alive && setError({ key, msg: e instanceof Error && e.message ? e.message : 'โหลดไม่ขึ้น ลองรีเฟรชอีกครั้ง' }));
+      .catch((e: unknown) => alive && setError({ key, msg: friendlyErrorText(e, 'โหลดข้อมูลทีม Online ไม่ขึ้น') }));
     return () => {
       alive = false;
     };
@@ -185,14 +187,25 @@ function ApplicantSections({ apps, sub }: { apps: OnlineApplicantsReport; sub: s
   );
 }
 
-const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: number }> = ({ q, tick }) => {
+const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: number; onRetry?: () => void }> = ({ q, tick, onRetry }) => {
   const { data, error } = useHomeOnline(q, tick);
   const report = data?.report ?? null;
   const thDay = (ymd: string) => FULL_DAY.format(new Date(`${ymd}T00:00:00Z`));
   const sub = data
     ? `${data.from === data.to ? thDay(data.from) : `${thDay(data.from)} – ${thDay(data.to)}`} · นับตามวันที่ใบส่งเข้ามา${data.bu ? ` · ${trendBuLabel(data.bu)}` : ' · ทุก BU'}`
     : null;
-  if (error) return <p className={cn('text-sm', TONE.danger.value)}>{error}</p>;
+  // ล้มแล้วมีปุ่มลองใหม่ (QA 10 ต.ค. 2569) — กดแล้วโหลดเงียบรอบเดียวกับรอบสด · สำเร็จแล้วแถบหายเอง
+  if (error)
+    return (
+      <p className={cn('flex flex-wrap items-center gap-2 text-sm', TONE.danger.value)} data-testid="online-error">
+        {error}
+        {onRetry ? (
+          <Button type="button" variant="outline" size="xs" onClick={onRetry}>
+            ลองใหม่
+          </Button>
+        ) : null}
+      </p>
+    );
   if (!report) return <Skeleton className="h-96 w-full rounded-2xl" />;
   const apps = data?.applicants ?? null;
   const ok = onlineReportAddsUp(report) && (!apps || onlineApplicantsAddUp(apps));
