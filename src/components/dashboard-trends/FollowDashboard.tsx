@@ -230,7 +230,10 @@ const FollowDashboard: React.FC = () => {
             />
           </div>
 
-          <TrendSection title="ติดตามเริ่มงาน · แนวโน้ม">
+          {/* หัวตามทีมที่เลือก (QA รอบ 2 ข้อ 41 · เดิมเลือกส่งคนแทนแล้วยังเขียน "ติดตามเริ่มงาน") */}
+          <TrendSection
+            title={`${team === 'replacement' ? 'ติดตามส่งคนแทน' : team === 'main' ? 'ติดตามคนเริ่มงาน' : 'ติดตามทั้งหมด'} · แนวโน้ม`}
+          >
             <Card className="space-y-4 rounded-2xl p-4">
               <TrendChart
                 ariaLabel="ลงติดตาม โทรแล้ว ปิดงานว่าไปแล้ว และปิดงานว่าไม่ไป ต่องวด"

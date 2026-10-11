@@ -281,7 +281,9 @@ function FollowResults({
         </section>
       ))}
       <p className={cn('text-xs tabular-nums', ok ? 'text-muted-foreground' : TONE.danger.value)} data-testid="lumos-follow-sum">
-        {blocks.map((b) => `${b.bu ?? 'ไม่ระบุ'} ${NUM.format(b.sum.total)}`).join(' + ')} = {NUM.format(sumOfBlocks)} {unit}
+        {blocks.length > 0
+          ? `${blocks.map((b) => `${b.bu ?? 'ไม่ระบุ'} ${NUM.format(b.sum.total)}`).join(' + ')} = ${NUM.format(sumOfBlocks)} ${unit}`
+          : `รวม 0 ${unit}`}
         {ok ? '' : ` · ไม่ตรงกับ ${NUM.format(all)}`}
       </p>
     </div>

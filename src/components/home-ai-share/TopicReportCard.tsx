@@ -171,7 +171,10 @@ const TopicReportCard: React.FC<{ report: TopicReport | null; failed: string | n
             className={cn('text-xs tabular-nums', sumOfBlocks === total ? 'text-muted-foreground' : TONE.danger.value)}
             data-testid="report-sum"
           >
-            {blocks.map((b) => `${b.bu ?? 'ไม่ระบุ'} ${NUM.format(b.total)}`).join(' + ') || '0'} = {NUM.format(sumOfBlocks)} {unit}
+            {/* ไม่มี BU ไหนมีงาน = บอกยอดรวมตรง ๆ (QA รอบ 2 ข้อ 22 เดิม "0 = 0 รายชื่อ") */}
+            {blocks.length > 0
+              ? `${blocks.map((b) => `${b.bu ?? 'ไม่ระบุ'} ${NUM.format(b.total)}`).join(' + ')} = ${NUM.format(sumOfBlocks)} ${unit}`
+              : `รวม 0 ${unit}`}
             {sumOfBlocks === total ? '' : ` · ไม่ตรงกับ ${NUM.format(total)}`}
           </p>
         </>

@@ -80,7 +80,20 @@ function useHomeOnline(q: AiShareWindow & { bu: string | null }, tick: number) {
 const stateItems = (s: Record<OnlineRequestState, number>): StatItem[] =>
   ONLINE_REQUEST_STATES.map((x) => ({ key: x.key, label: x.label, value: s[x.key], tone: STATE_TONE[x.key] }));
 
-function CountBars({ title, rows, total, testId }: { title: string; rows: OnlineCount[]; total: number; testId: string }) {
+/** `unit` = หน่วยของยอดรวม (ส่วนใบสมัครนับใบสมัคร ไม่ใช่ใบขอ — QA รอบ 3 ข้อ 21 เดิมเขียน "= ใบขอ" ทุกส่วน) */
+function CountBars({
+  title,
+  rows,
+  total,
+  testId,
+  unit = 'ใบขอ',
+}: {
+  title: string;
+  rows: OnlineCount[];
+  total: number;
+  testId: string;
+  unit?: 'ใบขอ' | 'ใบสมัคร';
+}) {
   const max = Math.max(1, ...rows.map((r) => r.n));
   return (
     <div className="min-w-0 space-y-2" data-testid={testId}>
@@ -98,7 +111,7 @@ function CountBars({ title, rows, total, testId }: { title: string; rows: Online
           </li>
         ))}
       </ul>
-      <p className="text-xs tabular-nums text-muted-foreground">รวม {NUM.format(rows.reduce((n, r) => n + r.n, 0))} = ใบขอ {NUM.format(total)}</p>
+      <p className="text-xs tabular-nums text-muted-foreground">รวม {NUM.format(rows.reduce((n, r) => n + r.n, 0))} = {unit} {NUM.format(total)}</p>
     </div>
   );
 }
@@ -144,8 +157,8 @@ function ApplicantSections({ apps, sub }: { apps: OnlineApplicantsReport; sub: s
           ]}
         />
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <CountBars title="BU" rows={apps.bu} total={apps.total} testId="online-apps-bu" />
-          <CountBars title="ตำแหน่ง" rows={apps.position} total={apps.total} testId="online-apps-position" />
+          <CountBars title="BU" rows={apps.bu} total={apps.total} unit="ใบสมัคร" testId="online-apps-bu" />
+          <CountBars title="ตำแหน่ง" rows={apps.position} total={apps.total} unit="ใบสมัคร" testId="online-apps-position" />
         </div>
       </HomeSection>
 

@@ -143,10 +143,25 @@ const AiShareUsageChart: React.FC<{
   onPick?: (index: number) => void;
   /** บรรทัดท้ายตอนจี้แท่ง — บอกว่ากดแล้วได้อะไร (รายวัน = แยก BU · หน่วยใหญ่ = ลงไปดูข้างใน) */
   pickHint?: string | null;
+  /** แท่งที่กดเลือกอยู่ (index) — แท่งนี้เข้ม แท่งอื่นจาง (QA รอบ 2 ข้อ 15 · เดิมกดแล้วไม่รู้ว่าเลือกวันไหน) */
+  selectedIndex?: number | null;
   /** ตอนจี้ซ่อนชั้นที่เป็น 0 ของวันนั้น (โหมด BU — BU ที่วันนั้นไม่มีงานไม่ต้องขึ้น) */
   hideZeroInTooltip?: boolean;
   height?: number;
-}> = ({ buckets, stacks, flipKey, grain, unit, today, ariaLabel, onPick, pickHint = null, hideZeroInTooltip = false, height = 260 }) => {
+}> = ({
+  buckets,
+  stacks,
+  flipKey,
+  grain,
+  unit,
+  today,
+  ariaLabel,
+  onPick,
+  pickHint = null,
+  hideZeroInTooltip = false,
+  height = 260,
+  selectedIndex = null,
+}) => {
   const reduced = !!useReducedMotion();
   const n = buckets.length;
   const stagger = n > 1 ? Math.min(FLIP_STAGGER, FLIP_SPREAD / (n - 1)) : 0;
@@ -236,7 +251,7 @@ const AiShareUsageChart: React.FC<{
     return BarShape;
   };
 
-  if (!peak) return <p className="py-16 text-center text-sm text-muted-foreground">ช่วงนี้ยังไม่มีงาน</p>;
+  // 🔴 ว่างแล้วห้ามหาย (QA รอบ 2 ข้อ 22) — ไม่มีงานเลยยังวาดกราฟแท่ง 0 ครบทุกช่วง ไม่สลับเป็นประโยค
 
   return (
     <div className="space-y-3">
@@ -254,7 +269,14 @@ const AiShareUsageChart: React.FC<{
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground tabular-nums">
           <span>
-            มากสุด <span className="text-foreground">{bucketText(peak.bucket, grain)}</span> {NUM.format(peak.value)} {unit}
+            มากสุด{' '}
+            {peak ? (
+              <>
+                <span className="text-foreground">{bucketText(peak.bucket, grain)}</span> {NUM.format(peak.value)} {unit}
+              </>
+            ) : (
+              <>0 {unit}</>
+            )}
           </span>
           {avg !== null ? (
             <span>
@@ -283,10 +305,14 @@ const AiShareUsageChart: React.FC<{
               axisLine={false}
               width={40}
               allowDecimals={false}
+              // ทุกแท่งเป็น 0 = แกนยังมีช่วง (ไม่งั้นเส้นตารางยุบเหลือเส้นเดียว)
+              domain={[0, (max: number) => Math.max(max, 1)]}
               tickFormatter={(v: number) => NUM.format(v)}
             />
             <Tooltip
               cursor={{ fill: 'currentColor', fillOpacity: 0.06 }}
+              // กล่องไม่ดักการแตะ (มือถือแตะแล้วกล่องค้างบังแท่ง — QA รอบ 3 ข้อ 22)
+              wrapperStyle={{ pointerEvents: 'none' }}
               content={(p: TooltipProps<number, string>) => (
                 <UsageTooltip
                   {...p}
@@ -310,7 +336,16 @@ const AiShareUsageChart: React.FC<{
                 isAnimationActive={false}
               >
                 {data.map((d) => (
-                  <Cell key={d.key} fillOpacity={opacityOf(st.muted, d.key === peak.bucket.key)} />
+                  <Cell
+                    key={d.key}
+                    fillOpacity={
+                      selectedIndex === null
+                        ? opacityOf(st.muted, d.key === peak?.bucket.key)
+                        : d.index === selectedIndex
+                          ? opacityOf(st.muted, true)
+                          : 0.25
+                    }
+                  />
                 ))}
               </Bar>
             ))}

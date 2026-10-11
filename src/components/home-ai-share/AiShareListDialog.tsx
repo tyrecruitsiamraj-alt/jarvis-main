@@ -45,7 +45,7 @@ const AiShareListDialog: React.FC<{
   blockTitle: string;
   listKey: AiShareListKey;
   unit: string;
-  win: AiShareWindow;
+  win: AiShareWindow & { bu?: string | null };
   /** เลขในกล่องที่กด — ขึ้นบนหัวระหว่างรอรายชื่อ */
   count: number | null;
 }> = ({ open, onOpenChange, block, blockTitle, listKey, unit, win, count }) => {
@@ -90,7 +90,8 @@ const AiShareListDialog: React.FC<{
         <DialogHeader className="pr-6">
           <DialogTitle className="space-y-1">
             <span className="block text-sm font-normal text-muted-foreground">
-              {blockTitle} · {periodLabel(win, toYmdBangkok(new Date()))}
+              {/* บอก BU ที่กรองอยู่ด้วย (QA รอบ 2 ข้อ 41 · เดิมป๊อปไม่บอก) */}
+              {blockTitle} · {periodLabel(win, toYmdBangkok(new Date()))} · {win.bu ? trendBuLabel(win.bu) : 'ทุก BU'}
             </span>
             <span className="block text-xl font-light">
               {label} <span className="tabular-nums">{NUM.format(total)}</span>{' '}
@@ -120,7 +121,8 @@ const AiShareListDialog: React.FC<{
                   <TableHead className="text-xs">ชื่อ</TableHead>
                   <TableHead className="text-xs">BU</TableHead>
                   <TableHead className="text-xs">วันที่</TableHead>
-                  {showSegment ? <TableHead className="text-xs">สถานะ</TableHead> : null}
+                  {/* ค่าคือ AI โทร / คนโทร / ยังไม่โทร — หัวคอลัมน์ต้องตรง (QA รอบ 2 ข้อ 41 เดิม "สถานะ") */}
+                  {showSegment ? <TableHead className="text-xs">ใครโทร</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -189,6 +189,17 @@ const AiShareDetail: React.FC<{
           ยอดใช้งานราย{per}
           {view?.range ? <span className="font-normal tabular-nums text-muted-foreground">{view.range}</span> : null}
         </p>
+        {/* กดแท่งวันแล้วทั้งหน้าดูวันนั้น — บอกว่าเลือกวันไหน + ทางกลับ (QA รอบ 2 ข้อ 15 · รอบ 3 ข้อ 22 เดิมไม่มีทั้งสองอย่าง) */}
+        {pickedBucket ? (
+          <span className="flex items-center gap-2" data-testid="picked-day">
+            <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums', TONE.primary.chip)}>
+              {rangeTextFull(pickedBucket.from, pickedBucket.to)}
+            </span>
+            <Button type="button" variant="outline" size="xs" onClick={() => setPicked(null)}>
+              ดูทั้งช่วง
+            </Button>
+          </span>
+        ) : null}
         <Tabs value={teamOn ? 'team' : splitBy === 'team' ? 'caller' : splitBy} onValueChange={(v) => setSplitBy(v as typeof splitBy)}>
           <TabsList className="h-9 rounded-full bg-muted p-1" aria-label="แบ่งแท่งตาม">
             <TabsTrigger value="caller" className="rounded-full px-2.5 text-xs sm:px-4">
@@ -221,7 +232,17 @@ const AiShareDetail: React.FC<{
           today={today}
           ariaLabel={`${title} ยอดใช้งานราย${per}${teamOn ? ' แยกทีม' : byBu ? ' แยก BU' : ''}`}
           onPick={view.grain === 'day' ? (withTeams ? pickDay : undefined) : openBucket}
-          pickHint={view.grain === 'day' && withTeams ? 'กดที่แท่งเพื่อดูแยกตามทีม' : PICK_HINT[view.grain]}
+          // คำต้องตรงกับที่เกิดเมื่อกด (QA รอบ 3 ข้อ 22): หน้าหลัก (ไม่มีแผงแยกทีม) = ทั้งหน้าดูวันนั้น
+          pickHint={
+            view.grain === 'day' && withTeams
+              ? picked !== null
+                ? 'กดอีกครั้งเพื่อดูทั้งช่วง'
+                : hideBreakdown
+                  ? 'กดเพื่อดูเฉพาะวันนี้'
+                  : 'กดที่แท่งเพื่อดูแยกตามทีม'
+              : PICK_HINT[view.grain]
+          }
+          selectedIndex={view.grain === 'day' ? picked : null}
         />
       ) : null}
 

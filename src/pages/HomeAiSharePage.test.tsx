@@ -468,7 +468,8 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     fireEvent.click(tileOf('AI โทร'));
     const dlg = await screen.findByRole('dialog');
     expect(fetchHomeAiShareList).toHaveBeenCalledWith('matching', 'ai', 0, winQ);
-    expect(within(dlg).getByText('จับคู่งาน · 7 วันล่าสุด')).toBeTruthy();
+    // บอก BU ที่กรองอยู่ด้วย (QA รอบ 2 ข้อ 41)
+    expect(within(dlg).getByText('จับคู่งาน · 7 วันล่าสุด · ทุก BU')).toBeTruthy();
     expect(await within(dlg).findByText('ผู้รับสาย 1')).toBeTruthy();
     // กล่องก้อนเดียว = ไม่ต้องมีคอลัมน์สถานะ · ไม่มีชื่อ/ไม่รู้ BU บอกตรง ๆ
     expect(
@@ -499,7 +500,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
       within(dlg)
         .getAllByRole('columnheader')
         .map((h) => h.textContent),
-    ).toEqual(['ชื่อ', 'BU', 'วันที่', 'สถานะ']);
+    ).toEqual(['ชื่อ', 'BU', 'วันที่', 'ใครโทร']); // ค่าคือ AI โทร/คนโทร (QA รอบ 2 ข้อ 41 เดิม "สถานะ")
     expect(within(dlg).getAllByText('AI โทร').length).toBeGreaterThan(0);
     expect(within(dlg).getAllByText('ยังไม่โทร').length).toBeGreaterThan(0);
     fireEvent.click(within(dlg).getByRole('button', { name: 'ถัดไป' }));
@@ -620,6 +621,18 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     // กดแท่งเดิมซ้ำ = กลับทั้งช่วง
     fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
     await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith(winQ));
+    expect(screen.queryByTestId('picked-day')).toBeNull();
+  });
+
+  it('🔴 เลือกวันแล้วหัวกราฟบอกวันที่เลือก + ปุ่ม "ดูทั้งช่วง" (QA รอบ 2 ข้อ 15 · หน้าหลักไม่มีแผงแยกทีม)', async () => {
+    render(<HomeAiSharePage />, { wrapper: MemoryRouter });
+    const chart = await screen.findByRole('img', { name: `${FOLLOW_TITLE} ยอดใช้งานรายวัน` });
+    await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith(winQ));
+    fireEvent.click(within(chart).getByRole('button', { name: `แท่ง ${win.to}` }));
+    const picked = await screen.findByTestId('picked-day');
+    fireEvent.click(within(picked).getByRole('button', { name: 'ดูทั้งช่วง' }));
+    await waitFor(() => expect(fetchHomeAiShare).toHaveBeenLastCalledWith(winQ));
+    expect(screen.queryByTestId('picked-day')).toBeNull();
   });
 
   it('🔴 คำในตัวเลือกหัวข้อ = คำในเมนู (เจ้าของสั่ง 4 ต.ค. 2569)', async () => {
