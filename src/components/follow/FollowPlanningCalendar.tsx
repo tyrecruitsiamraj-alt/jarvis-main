@@ -837,19 +837,19 @@ const FollowPlanningCalendar: React.FC<{
                                       onClick={() => onOpenCell(row, '', row.rounds)}
                                       title={`ดูแผนทั้งหมดของ ${row.group.name}`}
                                       className={cn(
-                                        'block max-w-full truncate text-left text-[13.5px] font-medium underline-offset-2 hover:text-primary hover:underline',
+                                        'block max-w-full truncate text-left text-xs font-medium underline-offset-2 hover:text-primary hover:underline',
                                         /* ยกเลิกหมด = สีจาง ไม่ขีดฆ่า (เจ้าของ 6 ต.ค. 2569: "ขีดกลางค่า… ใช้สีไม่ดีกว่าหรอ") */
                                         allCancelled ? 'text-muted-foreground' : 'text-foreground',
                                       )}
                                     >
                                       {row.group.name}
                                     </button>
-                                    <span className="block truncate text-[11.5px] text-muted-foreground">
+                                    <span className="block truncate text-[12px] text-muted-foreground">
                                       {row.group.phone}
                                     </span>
                                     {/* บอกจำนวนสายไว้ใต้ชื่อ — กันคนอ่านว่าแถวนี้มีสายเดียว */}
                                     {calls.length > 1 ? (
-                                      <span className="mt-0.5 block text-[10.5px] text-muted-foreground">
+                                      <span className="mt-0.5 block text-[11px] text-muted-foreground">
                                         {calls.length} สาย
                                       </span>
                                     ) : null}
@@ -857,7 +857,7 @@ const FollowPlanningCalendar: React.FC<{
                                         — เดิมต้องเปิดป๊อปจัดการถึงรู้ · "ดึงจาก iRecruit" เป็นชื่อแหล่งอยู่แล้ว ไม่เติมคำนำ */}
                                     {/* ชื่อเล่น/ชื่อจริง ไม่ใช่อีเมล (QA รอบ 2 ข้อ 40 · `createdByLabel`) */}
                                     {row.group.createdByLabel ? (
-                                      <span className="mt-0.5 block truncate text-[10.5px] text-muted-foreground">
+                                      <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                                         {row.group.createdByLabel.startsWith('ดึงจาก')
                                           ? row.group.createdByLabel
                                           : `เพิ่มโดย ${row.group.createdByLabel}`}
@@ -884,14 +884,14 @@ const FollowPlanningCalendar: React.FC<{
                                       <span className="min-w-0">
                                         <span
                                           className={cn(
-                                            'block text-[15px] font-medium leading-none tabular-nums',
+                                            'block text-sm font-medium leading-none tabular-nums',
                                             // ยกเลิก = สีจาง ไม่ขีดฆ่า (6 ต.ค. 2569) — ป้าย "ยกเลิก" ในช่องสถานะบอกอยู่แล้ว
                                             round.state === 'cancelled' ? 'text-muted-foreground' : 'text-foreground',
                                           )}
                                         >
                                           {callTimeText(round)}
                                         </span>
-                                        <span className="mt-0.5 block whitespace-nowrap text-[10.5px] text-muted-foreground">
+                                        <span className="mt-0.5 block whitespace-nowrap text-[11px] text-muted-foreground">
                                           {/* "ครั้งที่ 2 · สายที่ 1" — ลำดับในวัน ไม่ใช่เลขทั้งชุด (1 ต.ค. 2569) */}
                                           {callLabelOf(round, slot)}
                                         </span>
@@ -954,7 +954,7 @@ const FollowPlanningCalendar: React.FC<{
                                         {failed ? (
                                           <span
                                             className={cn(
-                                              'inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-medium',
+                                              'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
                                               TONE.orange.chip,
                                             )}
                                             title={
@@ -1043,14 +1043,14 @@ const FollowPlanningCalendar: React.FC<{
                                           </span>
                                         ) : pushErr ? (
                                           /* เหตุจริงจาก Lumos — มีค่ากว่าขีดกลางว่าง ๆ */
-                                          <span className={cn('text-[11.5px] leading-snug', TONE.orange.value)} title={pushErr}>
+                                          <span className={cn('text-[12px] leading-snug', TONE.orange.value)} title={pushErr}>
                                             ส่งไม่สำเร็จ: <span className="line-clamp-2">{pushErr}</span>
                                           </span>
                                         ) : reply ? (
                                           <>
                                             {/* คำพูดจริงอย่างเดียว · สรุปของ AI ย้ายไปอยู่ตอนชี้ (QA 5 ต.ค. 2569: ร้อยแก้วทุกแถว) */}
                                             <span
-                                              className="line-clamp-2 text-[12.5px] font-medium leading-snug text-foreground"
+                                              className="line-clamp-2 text-[12px] font-medium leading-snug text-foreground"
                                               title={ai ? `${reply}\n\nAI สรุป: ${ai}` : reply}
                                             >
                                               “{reply}”
@@ -1115,7 +1115,7 @@ const FollowPlanningCalendar: React.FC<{
                                   ข้อมูลมีอยู่ในหน้าแต่ CSS ซ่อนไว้ = เท่ากับไม่มี */}
                               <td className="px-3 py-3">
                                 {emgList.length > 0 ? (
-                                  <span className="block text-[11.5px] text-muted-foreground">
+                                  <span className="block text-[12px] text-muted-foreground">
                                     {emgList.map((p) => (
                                       <span key={p} className="block tabular-nums text-foreground">
                                         {p}
@@ -1129,11 +1129,11 @@ const FollowPlanningCalendar: React.FC<{
                                      * QA 5 ต.ค. 2569: ย่อเหลือสถานะสั้น (เดิม "แนบไปกับสายแล้ว · Lumos ไม่ได้บอกว่าโทรหรือยัง")
                                      * ⚠️ ห้ามถอดทั้งบรรทัด — เจ้าของทัก 10 ก.ย. ว่า "ไม่ยอมบอกว่าโทรหาหรือยัง"
                                      */}
-                                    <span className="block text-[10.5px]">ยังไม่รู้ว่าโทรหรือยัง</span>
+                                    <span className="block text-[11px]">ยังไม่รู้ว่าโทรหรือยัง</span>
                                   </span>
                                 ) : (
                                   <span
-                                    className={cn('inline-block rounded px-1.5 py-0.5 text-[10.5px] font-medium', TONE.warn.chip)}
+                                    className={cn('inline-block rounded px-1.5 py-0.5 text-[11px] font-medium', TONE.warn.chip)}
                                   >
                                     ไม่ได้แนบเบอร์ฉุกเฉิน
                                   </span>
@@ -1152,7 +1152,7 @@ const FollowPlanningCalendar: React.FC<{
 
                   {/* แถบแบ่งหน้า — แบบอ้างอิงมี "แสดง 1 ถึง 4 จากทั้งหมด 48 รายการติดตาม" */}
                   <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-4 py-3 md:px-5">
-                    <span className="text-[11.5px] text-muted-foreground">
+                    <span className="text-[12px] text-muted-foreground">
                       แสดง {dayPeople.length === 0 ? 0 : firstIndex + 1} ถึง {lastIndex} จากทั้งหมด{' '}
                       {dayPeople.length.toLocaleString('th-TH')} คน ·{' '}
                       {/* สายของคนที่ยังอยู่ในตาราง (คนที่จัดการจบแล้วไปอยู่การ์ดข้างล่าง) */}
@@ -1179,7 +1179,7 @@ const FollowPlanningCalendar: React.FC<{
                     <span className="ml-auto flex flex-wrap items-center gap-2">
                     {/* ต่อหน้า 10 / 15 — อยู่เสมอแม้มีหน้าเดียว (หน้าห้ามย่อ/ขยายเองตามจำนวนข้อมูล) */}
                     <span className="flex items-center gap-1.5">
-                      <span className="text-[11.5px] text-muted-foreground">ต่อหน้า</span>
+                      <span className="text-[12px] text-muted-foreground">ต่อหน้า</span>
                       <ChoiceDropdown<string>
                         value={String(dayPageSize)}
                         options={DAY_PAGE_SIZES.map((n) => ({ value: String(n), label: `${n} คน` }))}
@@ -1253,7 +1253,7 @@ const FollowPlanningCalendar: React.FC<{
                               !selected && c.ymd === today && 'underline underline-offset-4',
                             )}
                           >
-                            <span className="text-[9px] leading-none opacity-80">{c.weekday}</span>
+                            <span className="text-[10px] leading-none opacity-80">{c.weekday}</span>
                             <span className="text-[11px] tabular-nums">{c.day}</span>
                           </button>
                         </th>
@@ -1345,13 +1345,13 @@ const FollowPlanningCalendar: React.FC<{
                                         {/* ยังไม่ชัวร์เวลา = บอกตรง ๆ ไม่ใช่เวลาแทน 00:00 (QA รอบ 3 ข้อ 12 · กติกาเดียวกับรายวัน) */}
                                         {r.entry.time_tbd ? 'ยังไม่ระบุเวลา' : (r.time ?? '—')}
                                       </span>
-                                      <span className="block truncate text-[9px] font-medium leading-tight">
+                                      <span className="block truncate text-[10px] font-medium leading-tight">
                                         {followRoundShortLabel(r)}
                                       </span>
                                     </span>
                                   ))}
                                   {rounds.length > 1 ? (
-                                    <span className="text-[9px] font-medium text-primary">
+                                    <span className="text-[10px] font-medium text-primary">
                                       +{rounds.length - 1}
                                     </span>
                                   ) : null}
@@ -1425,7 +1425,7 @@ const FollowPlanningCalendar: React.FC<{
         {/* ── แผงข้างขวา ── */}
         <div className="space-y-4">
           <Card className="rounded-2xl p-5 shadow-sm">
-            <h3 className="text-[13px] font-medium text-foreground">{resultTitle}</h3>
+            <h3 className="text-xs font-medium text-foreground">{resultTitle}</h3>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               {resultSub}
               {roundFilter !== 'all' ? ` · เฉพาะ${roundFilterLabel(roundFilter)}` : ''}
@@ -1474,7 +1474,7 @@ const FollowPlanningCalendar: React.FC<{
           <Card className="overflow-hidden rounded-2xl shadow-sm">
             <div className="flex items-center gap-2 px-4 pt-4">
               <PhoneOff className={cn('h-4 w-4', TONE.warn.value)} aria-hidden />
-              <h3 className="text-[13px] font-medium text-foreground">ต้องตามด่วน · ทั้งเดือน</h3>
+              <h3 className="text-xs font-medium text-foreground">ต้องตามด่วน · ทั้งเดือน</h3>
               <span
                 className={cn('ml-auto rounded-full px-2 py-0.5 text-[11px] font-medium', TONE.warn.chip)}
               >
@@ -1503,7 +1503,7 @@ const FollowPlanningCalendar: React.FC<{
                       className="min-w-0 flex-1 text-left"
                       title="กดเพื่อดูรายละเอียดและจัดการสายนี้"
                     >
-                      <span className="block truncate text-[12.5px] font-medium text-foreground">
+                      <span className="block truncate text-[12px] font-medium text-foreground">
                         {row.group.name}
                       </span>
                       <span className={cn('block text-[11px] font-medium', TONE.warn.value)}>

@@ -84,7 +84,7 @@ export default function FollowDayDoneCard({
   return (
     <Card className="overflow-hidden rounded-2xl shadow-sm" data-testid="follow-day-done">
       <div className="flex flex-wrap items-center gap-2 border-b border-border/70 px-4 py-3 md:px-5">
-        <h3 className="mr-2 text-[13px] font-medium text-foreground">จบแล้ว</h3>
+        <h3 className="mr-2 text-xs font-medium text-foreground">จบแล้ว</h3>
         {KINDS.map((k) => (
           <Button
             key={k}
