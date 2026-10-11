@@ -9,8 +9,8 @@
  * 🔴 เบอร์ที่สมัครเข้ามาภายใน 14 วันข้าม (กติกาสมัครซ้ำ) — ตรวจก่อนเพื่อโชว์ในตัวอย่าง + **ตัดสินอีกชั้นตอนบันทึก**
  *    ในธุรกรรมเดียว ล็อกเบอร์ทีละแถว (เรียงเบอร์ กัน deadlock) · ติดกติกา = ข้ามแถวนั้น · error อื่น = ไม่บันทึกทั้งไฟล์
  * 🔴 นำเข้าแล้ว **AI ยังไม่โทร** — ส่งเองจากแท็บผู้สมัคร (ปุ่มที่ยิงสายต้องมีป๊อปยืนยันรายชื่อ)
- * ⚠️ ใบที่นำเข้าไม่ผูกใบขอ (เหมือนปุ่มเพิ่มข้อมูลผู้สมัครในแท็บผู้สมัคร) ⇒ ผู้ใช้ที่ถูกล็อก BU นำเข้าไม่ได้
- *    (คีย์แล้วจะมองไม่เห็นใบของตัวเอง — กติกาเดียวกับ createByStaff)
+ * ⚠️ ใบที่นำเข้าไม่ผูกใบขอ ⇒ ผู้ใช้ที่ถูกล็อก BU ประทับแผนกตัวเองลงใบ (`staffEntryDepartment` · 11 ต.ค. 2569)
+ *    เดิมกัน 403 ทั้งเส้น = คนล็อก BU (59/61) เลือกไฟล์แล้วขึ้น error ทันที · ล็อกแต่ไม่รู้แผนก ยังกันเหมือนเดิม
  * ⚠️ SheetJS 0.18.5 (ตัวเดียวกับนำเข้า OPL) — เส้นนี้เปิดเฉพาะเจ้าหน้าที่ที่ล็อกอิน · จำกัดขนาด/จำนวนแถว
  */
 import * as XLSX from 'xlsx';
@@ -19,7 +19,7 @@ import { readJsonBody } from '../_lib/body.js';
 import { dbQuery, dbTransaction } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
-import { loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
+import { staffEntryDepartment } from '../_lib/applicationScope.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
 import {
   IMPORT_MAX_ROWS,
@@ -47,8 +47,7 @@ const tbl = tableInAppSchema('public_job_applications');
 /** ~1.5 MB ไฟล์จริง — รายชื่อ 500 แถวใช้ไม่ถึง 100 KB */
 const MAX_BASE64_CHARS = 2 * 1024 * 1024;
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-const BU_LOCKED_MESSAGE =
-  'ใบที่นำเข้ายังไม่ผูกใบขอ ผู้ใช้ที่ถูกล็อก BU จะมองไม่เห็นใบของตัวเอง — ให้แอดมินนำเข้าแทน';
+const NO_DEPARTMENT_MESSAGE = 'บัญชีนี้ยังไม่ได้ตั้งแผนก นำเข้าไม่ได้ — ให้แอดมินตั้งแผนกในหน้าผู้ใช้งานก่อน';
 
 const text = (v: unknown, max = 200): string | null => {
   const t = typeof v === 'string' ? v.trim() : '';
@@ -106,8 +105,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (fileBase64.length > MAX_BASE64_CHARS) return sendError(res, 400, 'Bad request', 'ไฟล์ใหญ่เกินไป');
     const dryRun = raw?.dry_run === true;
 
-    // ผู้ใช้ที่ถูกล็อก BU นำเข้าไม่ได้ (ใบไม่ผูกใบขอ) — กติกาเดียวกับปุ่มเพิ่มข้อมูลผู้สมัคร
-    if (await loadScopedJobIdSet(req.user)) return sendError(res, 403, 'Forbidden', BU_LOCKED_MESSAGE);
+    // ใบไม่ผูกใบขอ ⇒ คนล็อก BU ประทับแผนกตัวเอง (เห็นใบที่นำเข้าผ่าน department_code) — กติกาเดียวกับเพิ่มข้อมูลผู้สมัคร
+    const entryDept = await staffEntryDepartment(req.user);
+    if (!entryDept.ok) return sendError(res, 403, 'Forbidden', NO_DEPARTMENT_MESSAGE);
 
     let rows: unknown[][];
     try {
@@ -204,7 +204,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         }
         const { rows: ins } = await client.query<{ id: string }>(
           `insert into ${tbl} (${STAFF_INSERT_COLUMNS}) values (${STAFF_INSERT_VALUES}) returning id`,
-          staffInsertParams(p.value, staffName),
+          staffInsertParams(p.value, staffName, entryDept.code),
         );
         if (ins[0]?.id) insertedIds.push(ins[0].id);
       }

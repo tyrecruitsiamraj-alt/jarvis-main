@@ -37,6 +37,8 @@ export type ApiResource =
   | 'irecruit-replace-sync'
   | 'job-staff'
   | 'app-users'
+  /** ชื่อผู้ใช้สำหรับช่องผู้รับผิดชอบ (11 ต.ค. 2569) — อ่านทุกคน · ส่งแค่ id + ชื่อ */
+  | 'app-user-names'
   | 'app-nav-preferences'
   | 'audit-logs'
   /** สถานะระบบ (ยามเฝ้า) — ตกไป default = admin เท่านั้น */
@@ -217,6 +219,11 @@ export function minimumRoleFor(
       // staff: ดูผลการโทร + ติ๊กเลือกส่งให้ Lumos โทรเอง (โมเดลเดียวกับ follow)
       // opl ถูกกันที่ checkApiAccess อยู่แล้ว (read-only role ห้าม POST/DELETE)
       return 'staff';
+
+    case 'app-user-names':
+      // ช่อง "ผู้รับผิดชอบ" ในป๊อปนำเข้า Excel / เพิ่มข้อมูลผู้สมัคร — ทุกคนที่ใช้ป๊อปนั้นต้องอ่านได้
+      if (isRead) return 'staff';
+      return 'admin';
 
     case 'job-applications':
       // recruiter pipeline: staff read applicants and update their status/note

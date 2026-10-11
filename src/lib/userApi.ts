@@ -56,3 +56,19 @@ export function parseAppUserList(value: unknown): User[] {
   if (!Array.isArray(value)) return [];
   return value.map(parseAppUser).filter((user): user is User => user !== null);
 }
+
+/**
+ * `/api/app-user-names` → ชื่อให้ช่อง "ผู้รับผิดชอบ" (11 ต.ค. 2569) — ทุก role อ่านได้ · ไม่มีอีเมล
+ * แถวที่ไม่มี id/ชื่อทิ้งเงียบ ๆ · รูปผิดทั้งก้อน = ลิสต์ว่าง
+ */
+export function parseResponsibleNames(value: unknown): Array<{ id: string; name: string }> {
+  const list = isRecord(value) && Array.isArray(value.users) ? value.users : [];
+  const out: Array<{ id: string; name: string }> = [];
+  for (const u of list) {
+    if (!isRecord(u)) continue;
+    const id = typeof u.id === 'string' ? u.id : '';
+    const name = typeof u.name === 'string' ? u.name.trim() : '';
+    if (id && name) out.push({ id, name });
+  }
+  return out;
+}

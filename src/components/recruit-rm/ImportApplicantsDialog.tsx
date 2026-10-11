@@ -15,13 +15,12 @@ import {
 import ChannelPicker from '@/components/shared/ChannelPicker';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
-import { apiFetch } from '@/lib/apiFetch';
-import { parseAppUserList } from '@/lib/userApi';
 import { recruitChannelLabel, type RecruitChannelMatch } from '@/lib/recruitPostings';
 import { importDateTh, importStatusLabel } from '@/lib/applicantImportDuplicates';
 import {
   downloadApplicationImportTemplate,
   downloadImportDuplicates,
+  fetchResponsibleNames,
   readFileAsBase64,
   runApplicationImport,
   type ApplicationImportResult,
@@ -66,16 +65,13 @@ const ImportApplicantsDialog: React.FC<{
     setPreview(null);
     setBusy(null);
     setError(null);
-    void apiFetch('/api/app-users')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) =>
-        setStaff(
-          parseAppUserList(data)
-            .filter((u) => u.is_active)
-            .map((u) => ({ id: u.id, name: u.full_name || u.email })),
-        ),
-      )
-      .catch(() => setStaff([]));
+    // 🔴 ห้ามกลับไปใช้ /api/app-users (admin เท่านั้น — คนอื่นได้ลิสต์ว่าง นำเข้าไม่ได้ · 11 ต.ค. 2569)
+    void fetchResponsibleNames()
+      .then(setStaff)
+      .catch((e) => {
+        setStaff([]);
+        setError(e instanceof Error ? e.message : 'โหลดรายชื่อผู้รับผิดชอบไม่สำเร็จ');
+      });
   }, [open]);
 
   const shared = () => ({

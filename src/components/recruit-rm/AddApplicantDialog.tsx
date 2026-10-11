@@ -8,8 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { apiFetch } from '@/lib/apiFetch';
-import { parseAppUserList } from '@/lib/userApi';
+import { fetchResponsibleNames } from '@/lib/applicationImportApi';
 import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
 import districtsByProvince from '@/data/thaiDistrictsByProvince.json';
 import { recruitChannelLabel, type RecruitChannelMatch } from '@/lib/recruitPostings';
@@ -95,15 +94,9 @@ const AddApplicantDialog: React.FC<{
     setLicenses([]);
     setError(null);
     setSaving(false);
-    void apiFetch('/api/app-users')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) =>
-        setStaff(
-          parseAppUserList(data)
-            .filter((u) => u.is_active)
-            .map((u) => ({ id: u.id, name: u.full_name || u.email })),
-        ),
-      )
+    // 🔴 ห้ามกลับไปใช้ /api/app-users (admin เท่านั้น — คนอื่นได้ลิสต์ว่าง · 11 ต.ค. 2569)
+    void fetchResponsibleNames()
+      .then(setStaff)
       .catch(() => setStaff([]));
     // เปิดจากคนละใบ = ตำแหน่ง prefill คนละค่า
   }, [open, job?.positionLabel]);

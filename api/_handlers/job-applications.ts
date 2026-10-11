@@ -17,6 +17,7 @@ import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import {
   isApplicationInWriteScope,
   loadApplicationScopeRowOrNull,
+  staffEntryDepartment,
 } from '../_lib/applicationScope.js';
 import { bucketCondition, isOverviewBucket, type OverviewBucket } from '../_lib/applicantOverviewSql.js';
 import {
@@ -588,8 +589,8 @@ async function queryWithLegacyFallback(
  * เพิ่มผู้สมัครจากกล่องนั้น ๆ ได้"*):
  * - **ส่งมา** = ใบสมัครผูกใบขอนั้นทันที โผล่ในป๊อป "ดูรายชื่อ" ของใบ · คนที่ถูกล็อก BU
  *   คีย์ได้ถ้าใบขอนั้นอยู่ใน scope ตัวเอง (เช็คกับ scopedJobIds)
- * - **ไม่ส่ง** = พฤติกรรมเดิม: "สมัครทั่วไป" ไม่ผูกงาน · เฉพาะคนเห็นทุก BU เท่านั้นที่คีย์ได้
- *   (ใบ job_id null คนถูกล็อก BU มองไม่เห็น — คีย์แล้วจะหายไปเลย)
+ * - **ไม่ส่ง** = "สมัครทั่วไป" ไม่ผูกงาน · คนล็อก BU คีย์ได้แล้ว (11 ต.ค. 2569) โดยใบจำแผนกของคนคีย์
+ *   (`department_code` · 082) ⇒ คนในแผนกเดียวกันเห็นใบนั้น · ล็อกแต่ไม่รู้แผนก = ยังคีย์ไม่ได้
  * ⚠️ **ไม่ enqueue AI โทร** — เคสนี้คือคนโทรเข้ามาเองแล้ว จะส่ง AI ใช้ปุ่มในกล่องเหมือนเดิม
  */
 async function createByStaff(req: AuthedReq, res: ApiRes) {
@@ -605,16 +606,13 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
   const v = parsed.value;
 
   const scopedJobIds = await loadScopedJobIdSet(req.user);
-  if (scopedJobIds && !v.job_id) {
-    return sendError(
-      res,
-      403,
-      'Forbidden',
-      'ใบที่คีย์เองยังไม่ผูกใบขอ ผู้ใช้ที่ถูกล็อก BU จะมองไม่เห็นใบของตัวเอง — ให้แอดมินคีย์แทน',
-    );
-  }
   if (scopedJobIds && v.job_id && !scopedJobIds.has(v.job_id)) {
     return sendError(res, 403, 'Forbidden', 'ใบขอนี้อยู่นอกแผนกของคุณ');
+  }
+  // คนล็อก BU ประทับแผนกตัวเองลงใบ (11 ต.ค. 2569) — เดิมใบไม่ผูกใบขอโดน 403 เพราะคีย์แล้วมองไม่เห็นใบตัวเอง
+  const entryDept = await staffEntryDepartment(req.user);
+  if (!entryDept.ok) {
+    return sendError(res, 403, 'Forbidden', 'บัญชีนี้ยังไม่ได้ตั้งแผนก คีย์ใบไม่ได้ — ให้แอดมินตั้งแผนกในหน้าผู้ใช้งานก่อน');
   }
 
   const staffName = req.user.email || null;
@@ -636,7 +634,7 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
         `insert into ${tbl} as a (${STAFF_INSERT_COLUMNS})
        values (${STAFF_INSERT_VALUES})
        returning ${LIST_COLUMNS}`,
-        staffInsertParams(v, staffName),
+        staffInsertParams(v, staffName, entryDept.code),
       );
       return inserted;
     });

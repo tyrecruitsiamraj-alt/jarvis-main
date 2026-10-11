@@ -12910,3 +12910,13 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · ติ๊กที่ ตั้งค่า › ผู้ใช้งาน · ช่องเจ้าหน้าที่ (`StaffContactField`) แยกกลุ่ม "เจ้าหน้าที่คัดสรร" / "เจ้าหน้าที่ส่งคนแทน" · `followStaffDirectory` รับสายนี้ · โดนัททีม Online มีประเภท "ส่งคนแทน"
 - (11 ต.ค. 2569) QA ข้อกลาง 16–18 (หน้าหลัก): `StatStrip` มี `loading` = ขึ้น "—" แทน 0 ระหว่างรอรายงาน · error ทุกตัวโหลดของหน้าหลักผ่าน `friendlyErrorText` · แถบล้มมีปุ่ม "ลองใหม่" (`retrySeq` บวกเข้ารอบสด = ทุกก้อนโหลดเงียบอีกรอบ · แท็บทีม Online ด้วย) · ไม่ซ้อน "โหลดไม่ขึ้น" อีกบรรทัด
   · `src/lib/api.ts` เส้นตอบ HTML = `SERVER_NOT_JSON_TEXT` "เซิร์ฟเวอร์ขัดข้อง ลองใหม่อีกครั้ง" (เดิมข้อความนักพัฒนา "รันผ่าน vercel dev")
+- (11 ต.ค. 2569 ค่ำ) **นำเข้า Excel ใช้ไม่ได้** (เจ้าของ "ตรงที่ให้นำเข้าเป็นไฟล์ Excel … น่าจะ Error") — เส้น API/ไฟล์ทำงานปกติ (admin นำเข้าได้) ต้นเหตุเป็นสิทธิ์ 2 ชั้น
+  · ชั้น 1: คนล็อก BU (59 จาก 61 บัญชี) โดน 403 ทันทีที่เลือกไฟล์ (ใบไม่ผูกใบขอ เดิมกลัวมองไม่เห็นใบตัวเอง) → `staffEntryDepartment` (`api/_lib/applicationScope.ts`)
+    ประทับแผนกคนคีย์ลง `department_code` (082 · ด่านอ่าน/เขียนเทียบคอลัมน์นี้อยู่แล้ว) · เห็นทุกแผนก = null เหมือนเดิม · ล็อกแต่ไม่รู้แผนก = 403 "ยังไม่ได้ตั้งแผนก"
+    ใช้ทั้ง `job-applications-import.ts` และ `createByStaff` (ปุ่มเพิ่มข้อมูลผู้สมัคร โดนกันแบบเดียวกัน) · `STAFF_INSERT_COLUMNS` เพิ่ม `department_code` ($21) · `staffInsertParams(v, staffName, departmentCode)`
+  · ชั้น 2: ช่องผู้รับผิดชอบโหลดจาก `/api/app-users` (admin เท่านั้น) ⇒ คนอื่นลิสต์ว่าง ปุ่มนำเข้ากดไม่ได้ตลอด → เส้นใหม่ `api/_handlers/app-user-names.ts` (`GET /api/app-user-names`
+    rbac `app-user-names` อ่านทุก role · ส่งแค่ `{ id, name }` ไม่มีอีเมล · ล็อก BU เห็นแผนกตัวเอง + คนไม่ผูกแผนก) · หน้าเว็บ `fetchResponsibleNames` (`src/lib/applicationImportApi.ts` + `parseResponsibleNames` ใน `userApi.ts`)
+    ทั้ง `ImportApplicantsDialog` และ `AddApplicantDialog` · ชื่อ = `full_name` ค่าเดิมที่เก็บลง `responsible_name`
+  · เทสต์ `tests/api/importResponsibleNames2569-10-11.test.ts` + `applicationImportHandler.test.ts` (ล็อก BU นำเข้าได้ ประทับ LBD · ไม่รู้แผนก 403)
+- (11 ต.ค. 2569 ค่ำ) QA รอบ 3 ข้อสูง 1–2 — **ป๊อปประกาศค่าเริ่ม `src/pages/jobs/BoardPostingPage.tsx`** (รอบก่อนแก้แค่ `BoardPublishSheet` ทางถอย): `postingsFailed` / `releasesFailed`
+  อ่านไม่ได้ ≠ ไม่มี · "อ่านลิงก์ไม่ได้" + ลองใหม่ · Gen link กดไม่ได้และไม่กางเอง · "อ่านสถานะประกาศไม่ได้" + ลองใหม่ แทนปุ่มส่งประกาศ/ดึงลง · เทสต์ `tests/api/boardPostingReadFailure2569-10-11.test.ts`

@@ -3,6 +3,7 @@
  * ไฟล์ตัวอย่างสร้างที่ API (SheetJS อยู่ฝั่ง server ตัวเดียว ไม่ต้องลากเข้าหน้าเว็บ)
  */
 import { apiFetch } from '@/lib/apiFetch';
+import { parseResponsibleNames } from '@/lib/userApi';
 import type { ImportPreviewRow } from '@/lib/applicantImport';
 import type { ImportDuplicate } from '@/lib/applicantImportDuplicates';
 
@@ -23,6 +24,16 @@ export type ApplicationImportResult = {
 async function readError(r: Response, fallback: string): Promise<string> {
   const body = (await r.json().catch(() => null)) as { message?: string } | null;
   return body?.message || fallback;
+}
+
+/**
+ * ชื่อให้ช่อง "ผู้รับผิดชอบ" (ป๊อปนำเข้า Excel + เพิ่มข้อมูลผู้สมัคร) — 11 ต.ค. 2569
+ * 🔴 ห้ามกลับไปใช้ `/api/app-users` — เส้นนั้นเปิดเฉพาะ admin คนอื่นได้ลิสต์ว่าง ปุ่มนำเข้ากดไม่ได้ตลอด
+ */
+export async function fetchResponsibleNames(): Promise<Array<{ id: string; name: string }>> {
+  const r = await apiFetch('/api/app-user-names');
+  if (!r.ok) throw new Error(await readError(r, 'โหลดรายชื่อผู้รับผิดชอบไม่สำเร็จ'));
+  return parseResponsibleNames(await r.json());
 }
 
 /** อ่านไฟล์เป็น base64 (ไม่รวม data: prefix) */

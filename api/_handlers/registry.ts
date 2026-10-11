@@ -15,6 +15,7 @@ import candidateInterviewsHandler from './candidate-interviews.js';
 import candidateWorkHistoryHandler from './candidate-work-history.js';
 import trainingRecordsHandler from './training-records.js';
 import appUsersHandler from './app-users.js';
+import appUserNamesHandler from './app-user-names.js';
 import appNavPreferencesHandler from './app-nav-preferences.js';
 import rolePermissionsHandler from './role-permissions.js';
 import auditLogsHandler from './audit-logs.js';
@@ -133,6 +134,8 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/candidate-work-history': candidateWorkHistoryHandler as ApiHandler,
   '/api/training-records': trainingRecordsHandler as ApiHandler,
   '/api/app-users': appUsersHandler as ApiHandler,
+  // ชื่อผู้ใช้ให้ช่องผู้รับผิดชอบ (11 ต.ค. 2569) — อ่านทุกคน ไม่มีอีเมล
+  '/api/app-user-names': appUserNamesHandler as ApiHandler,
   // เมนูที่แอดมินจัดเอง (093) — GET ทุกคน · PUT เฉพาะ admin
   '/api/app-nav-preferences': appNavPreferencesHandler as ApiHandler,
   '/api/role-permissions': rolePermissionsHandler as ApiHandler,

@@ -39,6 +39,23 @@ export async function isApplicationInWriteScope(
 }
 
 /**
+ * แผนกที่จำไว้บนใบที่เจ้าหน้าที่คีย์/นำเข้าเอง (11 ต.ค. 2569 · เจ้าของแจ้งนำเข้า Excel ไม่ได้)
+ *
+ * เดิมผู้ใช้ที่ถูกล็อก BU (59 จาก 61 คน) โดน 403 ทันทีเพราะใบไม่ผูกใบขอแล้วจะมองไม่เห็นใบตัวเอง ·
+ * ใบจำแผนกไว้ได้อยู่แล้ว (082) และด่านอ่าน/เขียนเทียบ `department_code` ให้ ⇒ ประทับแผนกของคนคีย์แทนการกัน
+ * - เห็นทุกแผนก = null (เหมือนเดิม) · ล็อก BU = แผนกตัวเอง (สิทธิ์ไม่ได้ผ่อน — แผนกเดียวกันเป๊ะ)
+ * - ล็อกแต่ไม่รู้แผนก = ห้ามคีย์ (คีย์แล้วไม่มีใครในแผนกเห็น)
+ */
+export async function staffEntryDepartment(
+  user: ScopeUser,
+): Promise<{ ok: true; code: string | null } | { ok: false }> {
+  const dept = await loadUserDepartmentScope(user);
+  if (dept.mode === 'all') return { ok: true, code: null };
+  if (dept.mode === 'code') return { ok: true, code: dept.code };
+  return { ok: false };
+}
+
+/**
  * โหลดแถวสำหรับตัดสินสิทธิ์ · คืน null ถ้าไม่พบใบ (ให้ handler ตอบ 404 แยกจาก 403)
  * · ตารางหาย (42P01) → null · คอลัมน์ department_code ยังไม่มี (42703) → ถอยอ่าน job_id
  */

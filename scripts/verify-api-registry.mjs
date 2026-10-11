@@ -18,6 +18,8 @@ const required = [
   '/api/recruit-registrations',
   // นำเข้าผู้สมัครจาก Excel (1 ต.ค. 2569)
   '/api/job-applications-import',
+  // ช่องผู้รับผิดชอบของป๊อปนำเข้า — เส้นนี้หาย = คนไม่ใช่แอดมินนำเข้าไม่ได้ (11 ต.ค. 2569)
+  '/api/app-user-names',
   // ผลคัดกรองผู้สมัคร (เกณฑ์เรียงผู้สมัครใช้)
   '/api/matching/candidate-screening',
   // "รับไปโทรเอง" — ล็อกสิทธิ์โทร กันเจ้าหน้าที่โทรชนกัน

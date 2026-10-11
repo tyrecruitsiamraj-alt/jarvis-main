@@ -95,11 +95,16 @@ export const STAFF_INSERT_COLUMNS = `full_name, first_name, last_name, phone, ag
         province, district, education, position_interest,
         line_id, specific_type, responsible_name, channel_id, channel_label,
         license_types, created_by_name, status,
-        job_id, job_title, unit_name`;
+        job_id, job_title, unit_name, department_code`;
 
-export const STAFF_INSERT_VALUES = `$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'new',$18,$19,$20`;
+export const STAFF_INSERT_VALUES = `$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'new',$18,$19,$20,$21`;
 
-export function staffInsertParams(v: StaffApplicationValue, staffName: string | null): unknown[] {
+/** `departmentCode` = แผนกของคนคีย์ที่ถูกล็อก BU (`staffEntryDepartment`) · เห็นทุกแผนก = null */
+export function staffInsertParams(
+  v: StaffApplicationValue,
+  staffName: string | null,
+  departmentCode: string | null = null,
+): unknown[] {
   return [
     v.full_name,
     v.first_name,
@@ -121,5 +126,6 @@ export function staffInsertParams(v: StaffApplicationValue, staffName: string | 
     v.job_id,
     v.job_title,
     v.unit_name,
+    departmentCode,
   ];
 }

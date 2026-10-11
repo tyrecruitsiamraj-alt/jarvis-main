@@ -3,7 +3,8 @@
  * เส้น `/api/job-applications-import` (1 ต.ค. 2569)
  * 🔴 ด่าน: ไฟล์ตัวอย่างอ่านกลับได้หัวเดิม · dry run ไม่เขียนอะไร · เบอร์ที่สมัครภายใน 14 วันโชว์ว่าข้าม + วันที่ได้ ·
  *    บันทึกในธุรกรรมเดียว ล็อกเบอร์ทีละแถวเรียงตามเบอร์ (มีคนสมัครเข้ามาระหว่างดูตัวอย่าง = ข้ามแถวนั้น ที่เหลือบันทึก) ·
- *    ผู้ใช้ที่ถูกล็อก BU นำเข้าไม่ได้ · ขาดคอลัมน์ที่ต้องมี = 400 บอกชื่อคอลัมน์ · AI ไม่ถูกเรียก
+ *    ผู้ใช้ที่ถูกล็อก BU นำเข้าได้ ใบจำแผนกตัวเอง (11 ต.ค. 2569) · ล็อกแต่ไม่รู้แผนก = 403 ·
+ *    ขาดคอลัมน์ที่ต้องมี = 400 บอกชื่อคอลัมน์ · AI ไม่ถูกเรียก
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as XLSX from 'xlsx';
@@ -13,6 +14,8 @@ const dbQuery = vi.fn();
 const txQuery = vi.fn();
 const audit = vi.fn(async () => undefined);
 const scoped = vi.fn(async (): Promise<Set<string> | null> => null);
+type DeptScope = { mode: 'all' } | { mode: 'code'; code: string } | { mode: 'none' };
+const deptScope = vi.fn(async (): Promise<DeptScope> => ({ mode: 'all' }));
 
 vi.mock('../../api/_lib/postgres.js', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../../api/_lib/postgres.js')>();
@@ -26,6 +29,10 @@ vi.mock('../../api/_lib/audit.js', () => ({ auditFromAuthed: (...a: unknown[]) =
 vi.mock('../../api/_lib/siamrajUnitRequests.js', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../../api/_lib/siamrajUnitRequests.js')>();
   return { ...mod, loadScopedJobIdSet: () => scoped() };
+});
+vi.mock('../../api/_lib/departmentScope.js', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../../api/_lib/departmentScope.js')>();
+  return { ...mod, loadUserDepartmentScope: () => deptScope() };
 });
 vi.mock('../../api/_lib/lumosDispatch.js', () => {
   throw new Error('นำเข้าห้ามแตะคิว AI');
@@ -61,6 +68,7 @@ beforeEach(() => {
   txQuery.mockReset();
   audit.mockClear();
   scoped.mockReset().mockResolvedValue(null);
+  deptScope.mockReset().mockResolvedValue({ mode: 'all' });
 });
 
 describe('GET — ไฟล์ตัวอย่าง', () => {
@@ -152,7 +160,8 @@ describe('POST — ตัวอย่างก่อนบันทึก / บ�
       .map((c) => String((c[1] as unknown[])[0]));
     expect(locks).toEqual(['apply-phone:+66811111111', 'apply-phone:+66822222222', 'apply-phone:+66833333333']);
     const insert = txQuery.mock.calls.find((c) => /^insert into/i.test(String(c[0])));
-    expect(String(insert?.[0])).toMatch(/values \(\$1,.*'new',\$18,\$19,\$20\) returning id/);
+    expect(String(insert?.[0])).toMatch(/values \(\$1,.*'new',\$18,\$19,\$20,\$21\) returning id/);
+    expect((insert?.[1] as unknown[])[20]).toBeNull(); // เห็นทุกแผนก = ไม่ประทับแผนก (เหมือนเดิม)
     expect((insert?.[1] as unknown[])[12]).toBe('เจ้าหน้าที่ ก');
     expect((insert?.[1] as unknown[])[16]).toBe('staff@example.com');
     expect(audit.mock.calls[0][1]).toMatchObject({ action: 'job_application.import', after: { inserted: 2, skipped: 1 } });
@@ -175,10 +184,33 @@ describe('POST — ตัวอย่างก่อนบันทึก / บ�
     expect(json.mock.calls[0][0].message).toBe('ไฟล์ไม่มีคอลัมน์: เบอร์โทร, อายุ, เพศ');
   });
 
-  it('🔴 ผู้ใช้ที่ถูกล็อก BU ⇒ 403 (ใบที่นำเข้าไม่ผูกใบขอ จะมองไม่เห็นใบตัวเอง)', async () => {
+  it('🔴 ผู้ใช้ที่ถูกล็อก BU นำเข้าได้ — ใบจำแผนกของคนนำเข้า (เห็นใบตัวเองผ่าน department_code) · 11 ต.ค. 2569', async () => {
     scoped.mockResolvedValue(new Set(['J1']));
-    const { res, status } = mockRes();
+    deptScope.mockResolvedValue({ mode: 'code', code: 'LBD' });
+    txQuery.mockImplementation((sql: string) =>
+      /^insert into/i.test(sql) ? Promise.resolve({ rows: [{ id: 'new-1' }] }) : Promise.resolve({ rows: [] }),
+    );
+    const file = xlsxBase64([H, person('ก', '0811111111')]);
+    const dry = mockRes();
+    await handler(req('POST', { file_base64: file, dry_run: true }) as never, dry.res as never);
+    expect(dry.status).toHaveBeenCalledWith(200);
+    expect(dry.json.mock.calls[0][0].ready).toBe(1);
+
+    const { res, json } = mockRes();
+    await handler(req('POST', { file_base64: file, dry_run: false }) as never, res as never);
+    expect(json.mock.calls[0][0].inserted).toBe(1);
+    const insert = txQuery.mock.calls.find((c) => /^insert into/i.test(String(c[0])));
+    expect(String(insert?.[0])).toMatch(/department_code\)/);
+    expect((insert?.[1] as unknown[])[20]).toBe('LBD');
+  });
+
+  it('ล็อกแต่ไม่รู้แผนก ⇒ 403 บอกให้ตั้งแผนก (คีย์แล้วไม่มีใครในแผนกเห็น)', async () => {
+    scoped.mockResolvedValue(new Set());
+    deptScope.mockResolvedValue({ mode: 'none' });
+    const { res, status, json } = mockRes();
     await handler(req('POST', { file_base64: xlsxBase64([H, person('ก', '0811111111')]), dry_run: true }) as never, res as never);
     expect(status).toHaveBeenCalledWith(403);
+    expect(json.mock.calls[0][0].message).toMatch(/ยังไม่ได้ตั้งแผนก/);
+    expect(txQuery).not.toHaveBeenCalled();
   });
 });

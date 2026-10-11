@@ -22,7 +22,8 @@ const downloadImportDuplicates = vi.fn();
 vi.mock('@/lib/apiFetch', () => ({
   apiFetch: vi.fn(async () => ({
     ok: true,
-    json: async () => [{ id: 'u1', email: 'a@example.com', full_name: 'คุณเอ ทดสอบ', is_active: true, role: 'admin', created_at: '2026-01-01T00:00:00Z' }],
+    // ช่องผู้รับผิดชอบโหลดจาก /api/app-user-names (11 ต.ค. 2569 — ทุก role อ่านได้ · ไม่มีอีเมล)
+    json: async () => ({ users: [{ id: 'u1', name: 'คุณเอ ทดสอบ' }] }),
   })),
 }));
 // ตัวเลือกช่องทางจริงโหลดจาก API — แทนด้วยปุ่มที่เลือก "Facebook Group"
