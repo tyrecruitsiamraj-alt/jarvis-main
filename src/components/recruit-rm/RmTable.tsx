@@ -375,9 +375,7 @@ const RmTable: React.FC<{
                       <span className="flex flex-col gap-0.5">
                         {/* เลยวันนัดแล้วยังไม่ลงผล = สีเตือน + "เลยวันนัด" (QA รอบ 3 ข้อ 23 · เดิมหน้าตาเหมือนนัดปกติ) */}
                         {(() => {
-                          const ymd = r.appointment_at
-                            ? new Date(r.appointment_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
-                            : null;
+                          const ymd = r.appointment_at ? toYmdBangkok(new Date(r.appointment_at)) : null;
                           const overdue = Boolean(ymd && ymd < toYmdBangkok(new Date()) && !r.attendance_result);
                           return (
                             <span className={cn('whitespace-nowrap tabular-nums', overdue ? TONE.orange.value : DASH.cell)}>

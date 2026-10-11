@@ -12983,3 +12983,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
     ไฟ "Lumos ดึงคิว" ถอดจาก `buildHealthChecks` (Lumos เลิกดึงคิว ทุกเส้น push)
   · รอบ 2 ข้อ 49 ล็อกโทรของเบอร์ชุดหนึ่ง = POST `{ action: 'lookup', phones }` (`matching-call-holds.ts` · `fetchCallHoldsByPhones`) · OPL โดน 403 → ถอยไป GET ?phones= แบบเดิม
   · เทสต์ `tests/api/notifyFollowWording2569-10-12.test.ts` · `systemHealth.test.ts`
+- (12 ต.ค. 2569 ตี 3) QA รอบ 3 ข้อ 16 + รอบ 2 ข้อ 50 — **หน้าติดตามสลับแท็บค้าง 3–4 วิ**
+  · ต้นเหตุ: `bangkokYmd`/`bangkokTime` (`followPlanning.ts`) · `bangkokDay` (`followGrouping.ts`) · `bangkokHour`/`bangkokDay` (`followListFilter.ts`) · `aftercarePlanning.ts`
+    ใช้ `toLocale*String(locale, { timeZone… })` ทุกสาย = สร้างตัวจัดรูปใหม่ทุกครั้ง → ย้ายเป็น `Intl.DateTimeFormat` ระดับโมดูล (ผลเท่าเดิมทุกตัวอักษร)
+  · วัดด้วยข้อมูลจริง 5,245 แถว: buildFollowPlanningRows 1,235 → 35 ms · groupFollowEntries 262 → 23 ms · เบราว์เซอร์: long task ตอนสลับแท็บ 4,638 ms → ไม่มีเลย
+  · ข้อ 50 เพดาน 10,000 แถว (`FOLLOW_MAX_PAGES × FOLLOW_PAGE_SIZE`) เกินแล้วขึ้นแถบเตือน "โหลดได้ X จาก Y รายการ" (`followListShortfall`) · รอบสด 25 วิ/หยุดตอนแท็บซ่อน มีอยู่แล้ว
+  · 🔴 กติกา `new Intl.*` ระดับโมดูล ใช้กับ `toLocale*String` ที่ส่ง options ด้วย — เทสต์ `tests/api/followPerf2569-10-12.test.ts`

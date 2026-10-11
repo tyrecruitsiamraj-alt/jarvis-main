@@ -66,12 +66,13 @@ const time = (iso: string | null | undefined): number => {
   return Number.isNaN(t) ? Number.NaN : t;
 };
 
-/** วันตามเวลาไทย — เทียบ "วันนี้" ต้องเทียบวันที่คนเห็น ไม่ใช่วัน UTC */
+/** วันตามเวลาไทย — เทียบ "วันนี้" ต้องเทียบวันที่คนเห็น ไม่ใช่วัน UTC · ตัวจัดรูประดับโมดูล (กติกา `new Intl.*` · ข้อ 16) */
+const BKK_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' });
 const bangkokDay = (iso: string | null | undefined): string | null => {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  return BKK_DAY.format(d);
 };
 
 /**
@@ -121,7 +122,7 @@ export function groupFollowEntries(
     else buckets.set(key, [e]);
   }
 
-  const todayKey = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  const todayKey = BKK_DAY.format(now);
   const groups: FollowGroup[] = [];
 
   for (const [key, list] of buckets) {

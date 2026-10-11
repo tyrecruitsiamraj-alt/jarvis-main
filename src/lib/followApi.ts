@@ -227,8 +227,18 @@ async function fetchFollowPage(offset: number): Promise<{ items: FollowEntry[]; 
   return { items: data.items ?? [], total: data.total, has_more: data.has_more };
 }
 
+/**
+ * รายการชุดล่าสุดโหลดไม่ครบ (ยอดในฐานเกินเพดาน `FOLLOW_MAX_PAGES × FOLLOW_PAGE_SIZE`) — QA รอบ 2 ข้อ 50 (12 ต.ค. 2569)
+ * เดิมตัดทิ้งเงียบ ๆ · หน้าติดตามอ่านค่านี้แล้วขึ้นคำเตือน · null = ครบ
+ */
+let lastFollowListShortfall: { loaded: number; total: number } | null = null;
+export function followListShortfall(): { loaded: number; total: number } | null {
+  return lastFollowListShortfall;
+}
+
 export async function listFollowEntries(): Promise<FollowEntry[]> {
   const first = await fetchFollowPage(0);
+  lastFollowListShortfall = null;
   const all: FollowEntry[] = [...first.items];
   if (first.items.length > 0 && first.has_more === true) {
     const total = Number(first.total);
@@ -237,6 +247,7 @@ export async function listFollowEntries(): Promise<FollowEntry[]> {
       for (let off = all.length; off < total && offsets.length < FOLLOW_MAX_PAGES - 1; off += FOLLOW_PAGE_SIZE) offsets.push(off);
       const pages = await Promise.all(offsets.map((o) => fetchFollowPage(o)));
       for (const p of pages) all.push(...p.items);
+      if (total > all.length) lastFollowListShortfall = { loaded: all.length, total };
     } else {
       // ไม่รู้ยอดรวม — ไล่ทีละหน้าแบบเดิม
       for (let page = 1; page < FOLLOW_MAX_PAGES; page += 1) {

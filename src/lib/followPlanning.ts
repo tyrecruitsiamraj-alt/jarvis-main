@@ -208,20 +208,24 @@ export type FollowPlanningRow = {
   dueAtMs: number | null;
 };
 
+/**
+ * 🔴 ตัวจัดรูปวันเวลาสร้างครั้งเดียวระดับโมดูล (กติกา `new Intl.*`) — QA รอบ 3 ข้อ 16 (12 ต.ค. 2569):
+ * เดิม `toLocaleDateString/TimeString` ทุกสาย = สร้างตัวจัดรูปใหม่ทุกครั้ง · 5,245 แถวใช้ 1.2–1.4 วิต่อรอบ ⇒ สลับแท็บค้าง 3–4 วิ
+ * ผลลัพธ์ตรงกับของเดิมทุกตัวอักษร (locale + options ชุดเดิม)
+ */
+const BKK_YMD = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' });
+const BKK_HM = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
+
 const bangkokYmd = (iso: string): string | null => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  return BKK_YMD.format(d);
 };
 
 const bangkokTime = (iso: string): string | null => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleTimeString('th-TH', {
-    timeZone: 'Asia/Bangkok',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return BKK_HM.format(d);
 };
 
 /**

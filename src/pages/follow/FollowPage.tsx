@@ -41,6 +41,7 @@ import { conveyorLabel } from '@/lib/soRecruitNav';
 import { ArrowLeft, Settings2, Plus, X, LoaderCircle, PhoneForwarded, Users, UserCog, Building2, ChevronLeft, ChevronRight, RefreshCw, ClipboardList } from 'lucide-react';
 import {
   listFollowEntries,
+  followListShortfall,
   createFollowRounds,
   cancelFollowEntry,
   purgeFollowEntry,
@@ -417,6 +418,8 @@ const FollowPage: React.FC = () => {
   const [purgingId, setPurgingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  /** โหลดไม่ครบเพดาน (QA รอบ 2 ข้อ 50 · เดิมตัดทิ้งเงียบ ๆ) — null = ครบ */
+  const [listShortfall, setListShortfall] = useState<{ loaded: number; total: number } | null>(null);
   // เลือกวันเวลาเข้างานแล้ว คำเตือน "ใส่วันเวลาเข้างาน" ต้องหาย (QA รอบ 3 ข้อ 17 เดิมค้างจนกดบันทึกอีกรอบ)
   useEffect(() => {
     setFormError((prev) => (prev === 'ใส่วันเวลาเข้างาน' ? null : prev));
@@ -585,6 +588,7 @@ const FollowPage: React.FC = () => {
     if (!silent) setLoading(true);
     try {
       setItems(await listFollowEntries());
+      setListShortfall(followListShortfall());
       // จดเวลาที่ **ดึงสำเร็จ** — ท้ายตารางเอาไปบอกคนว่าหน้าไม่ได้ค้าง (12 ก.ย. 2569)
       setLastLoadedAt(new Date());
       // 🔴 สำเร็จเมื่อไหร่ (รวมรอบเงียบ) ล้างแถบล้มทิ้ง — QA 5 ต.ค. 2569: แถบ "Failed to fetch" ค้างทั้งที่เลขกลับมาแล้ว
@@ -2021,6 +2025,11 @@ const FollowPage: React.FC = () => {
               ลองใหม่
             </Button>
           </div>
+        ) : null}
+        {listShortfall ? (
+          <p role="alert" className={cn('rounded-xl border px-3.5 py-2.5 text-sm font-medium', TONE.warn.soft, TONE.warn.value)}>
+            โหลดได้ {listShortfall.loaded.toLocaleString('th-TH')} จาก {listShortfall.total.toLocaleString('th-TH')} รายการ — ตัวเลขบนหน้านี้ยังไม่ครบ
+          </p>
         ) : null}
         {/* แถบ iRecruit (ดึงล่าสุด · เวลาโทร · AI เริ่มโทร) ถอดแล้ว — เจ้าของ 6 ต.ค. 2569 "เอาออกไม่ต้องโชว์ เหลือไว้แค่ปุ่ม ดึงตอนนี้" */}
         {/* 🔴 ยังไม่เคยโหลดสำเร็จ = ยังไม่รู้เลข ⇒ ห้ามขึ้น 0 / "ตามครบแล้ว" (QA 5 ต.ค. 2569) · กำลังโหลดขึ้นโครงหน้า · ล้มเหลือแถบข้างบน */}

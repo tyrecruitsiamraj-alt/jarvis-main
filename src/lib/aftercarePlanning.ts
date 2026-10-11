@@ -37,20 +37,20 @@ export type AftercareMonthRow = {
   byDay: Map<string, AftercareCell>;
 };
 
+/** ตัวจัดรูประดับโมดูล (กติกา `new Intl.*` · 12 ต.ค. 2569 แก้คู่กับหน้าติดตาม — เดิมสร้างใหม่ทุกสาย) */
+const BKK_HM = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
+const BKK_YMD = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' });
+
 const bangkokTime = (iso: string): string | null => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleTimeString('th-TH', {
-    timeZone: 'Asia/Bangkok',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return BKK_HM.format(d);
 };
 
 const bangkokYmd = (iso: string): string | null => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  return BKK_YMD.format(d);
 };
 
 /**

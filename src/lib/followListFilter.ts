@@ -71,12 +71,16 @@ const BAND_RANGE: Record<Exclude<TimeBand, ''>, [number, number]> = {
 };
 
 /** ชั่วโมงเวลาไทยของ ISO — null = อ่านไม่ได้ */
+/** ตัวจัดรูประดับโมดูล (กติกา `new Intl.*` · QA รอบ 3 ข้อ 16 เดิมสร้างใหม่ทุกแถว) — ผลเท่าเดิม */
+const BKK_HOUR = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hour12: false });
+const BKK_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' });
+
 function bangkokHour(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   // en-GB ให้ 24 ชม. · ใช้ hour อย่างเดียวพอ
-  const hh = d.toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hour12: false });
+  const hh = BKK_HOUR.format(d);
   const n = Number(hh);
   return Number.isFinite(n) ? n % 24 : null;
 }
@@ -86,7 +90,7 @@ function bangkokDay(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  return BKK_DAY.format(d);
 }
 
 export function inTimeBand(iso: string | null | undefined, band: TimeBand): boolean {
