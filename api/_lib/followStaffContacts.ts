@@ -7,6 +7,7 @@
  */
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
+import { isPlaceholderPhone, PLACEHOLDER_PHONE_ERROR } from '../../src/lib/followPhoneGuard.js';
 
 const contactsTable = tableInAppSchema('follow_staff_contacts');
 
@@ -33,6 +34,7 @@ export function parseStaffContactInput(
   if ((phone.match(/\d/g) ?? []).length < 8) {
     return fail('เบอร์เจ้าหน้าที่ไม่ถูกต้อง — ใส่เบอร์ที่ผู้สมัครโทรกลับได้จริง');
   }
+  if (isPlaceholderPhone(phone)) return fail(PLACEHOLDER_PHONE_ERROR);
   return { error: null, value: { name, phone } };
 }
 

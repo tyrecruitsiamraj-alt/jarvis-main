@@ -23,8 +23,21 @@ describe('resolveInterviewAdminPhone', () => {
   });
 
   it('override เป็นเบอร์ไทยรูปแบบ 0xxxxxxxxx ก็ normalize เป็น +66 ให้เอง', async () => {
-    process.env.LUMOS_ADMIN_PHONE_OVERRIDE = '0812345678';
-    expect(await resolveInterviewAdminPhone(null)).toBe('+66812345678');
+    process.env.LUMOS_ADMIN_PHONE_OVERRIDE = '0899998888';
+    expect(await resolveInterviewAdminPhone(null)).toBe('+66899998888');
+  });
+
+  it('🔴 override เป็นเบอร์ตัวอย่าง 0812345678 = ไม่ส่งเบอร์ · ห้ามถอยไปสุ่มเบอร์หัวหน้า (QA รอบ 3 ข้อ 4)', async () => {
+    for (const v of ['+66812345678', '0812345678', '081-234-5678']) {
+      process.env.LUMOS_ADMIN_PHONE_OVERRIDE = v;
+      expect(await resolveInterviewAdminPhone('DS5812003')).toBeNull();
+    }
+    expect(mockDbQuery).not.toHaveBeenCalled();
+  });
+
+  it('เบอร์หัวหน้าที่สุ่มได้เป็นเบอร์ตัวอย่าง = ไม่ส่งเบอร์', async () => {
+    mockDbQuery.mockResolvedValueOnce({ rows: [{ phone: '0812345678' }] } as never);
+    expect(await resolveInterviewAdminPhone(null)).toBeNull();
   });
 
   it('ไม่มี override: ใช้เบอร์เจ้าหน้าที่สรรหาที่รับผิดชอบใบขอ ถ้ามีเบอร์ในระบบ', async () => {

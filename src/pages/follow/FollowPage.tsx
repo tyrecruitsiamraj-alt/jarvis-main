@@ -2347,7 +2347,7 @@ const FollowPage: React.FC = () => {
                 onChange={(e) => setPhone(e.target.value)}
                 required
                 inputMode="tel"
-                placeholder="0812345678"
+                placeholder="เบอร์มือถือผู้สมัคร"
                 className="jarvis-soft-field min-h-[46px]"
               />
             </div>

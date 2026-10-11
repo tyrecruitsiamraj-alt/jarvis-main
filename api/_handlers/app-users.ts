@@ -5,6 +5,7 @@ import { tableInAppSchema } from '../_lib/schema.js';
 import { readJsonBody, getString } from '../_lib/body.js';
 import { isAllowedDepartmentCode, normalizeDepartmentCode } from '../_lib/departmentScope.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
+import { isPlaceholderPhone, PLACEHOLDER_PHONE_ERROR } from '../../src/lib/followPhoneGuard.js';
 
 const usersTable = tableInAppSchema('users');
 
@@ -195,6 +196,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
           if (!e164) {
             return sendError(res, 400, 'Bad request', 'phone ต้องเป็นเบอร์มือถือไทยที่ถูกต้อง');
           }
+          // เบอร์ตัวอย่างห้ามลงเป็นเบอร์จริง — เบอร์นี้ถูกใช้เป็นเบอร์ฉุกเฉินของ AI (QA รอบ 3 ข้อ 4)
+          if (isPlaceholderPhone(e164)) return sendError(res, 400, 'Bad request', PLACEHOLDER_PHONE_ERROR);
           phone = e164;
         } else {
           return sendError(res, 400, 'Bad request', 'phone must be a string');

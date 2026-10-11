@@ -10,9 +10,10 @@ import { checkApiAccess } from '../../api/_lib/rbac';
 
 describe('parseStaffContactInput', () => {
   it('ชื่อ+เบอร์ปกติผ่าน และ trim ให้', () => {
-    const r = parseStaffContactInput({ name: '  คุณคิว ทีมสรรหา ', phone: ' 0812345678 ' });
+    // เบอร์ตัวอย่าง 0812345678 ห้ามลงแล้ว (QA รอบ 3 ข้อ 4) — เทสต์ placeholderPhone2569-10-11
+    const r = parseStaffContactInput({ name: '  คุณคิว ทีมสรรหา ', phone: ' 0891234567 ' });
     expect(r.error).toBeNull();
-    expect(r.value).toEqual({ name: 'คุณคิว ทีมสรรหา', phone: '0812345678' });
+    expect(r.value).toEqual({ name: 'คุณคิว ทีมสรรหา', phone: '0891234567' });
   });
 
   it('เบอร์บ้าน+ต่อภายในผ่าน — กติกาเดียวกับ staff_phone (ไม่บังคับ E.164)', () => {

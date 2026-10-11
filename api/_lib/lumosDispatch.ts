@@ -69,6 +69,7 @@ import {
 import { cancelPushedReminder, getLumosPushConfig, pushReminders } from './lumosPushClient.js';
 import type { LumosPushReminderRecord } from './lumosPushClient.js';
 import { resolveInterviewAdminPhone } from './interviewAdminPhone.js';
+import { isPlaceholderPhone } from '../../src/lib/followPhoneGuard.js';
 import { staffNameOfPhone } from './followStaffName.js';
 import { cancelFollowPlanAtLumos } from './followLumosCancel.js';
 
@@ -1555,9 +1556,12 @@ function dayAtTime(day: Date, hhmm: string): string {
 }
 
 export function buildFollowReminderPayload(
-  entry: FollowEntryInput,
-  adminPhone?: string | null,
+  rawEntry: FollowEntryInput,
+  rawAdminPhone?: string | null,
 ): LumosReminderPayload {
+  // 🔴 เบอร์ตัวอย่าง 0812345678 ห้ามถึงหู/ถึงมือ AI ทั้งเบอร์ที่พูดและเบอร์ฉุกเฉิน (QA รอบ 3 ข้อ 4) — ทุกเส้นของ Follow ผ่านตรงนี้
+  const entry = isPlaceholderPhone(rawEntry.staffPhone) ? { ...rawEntry, staffPhone: null } : rawEntry;
+  const adminPhone = rawAdminPhone && !isPlaceholderPhone(rawAdminPhone) ? rawAdminPhone : null;
   // ⚠️ เบอร์ที่ AI **พูด** ให้ผู้สมัครโทรกลับ ไปได้ทางเดียวคือ `steps[].message`
   // (ช่องนั้นคือสิ่งที่ถึงหูผู้รับ) — ส่วน `admin_phone` เป็นเบอร์ที่ **AI โทรไปหา**
   // เมื่อติดต่อผู้รับไม่ได้ คนละเรื่องกัน จึงต้องมีทั้งสองทาง

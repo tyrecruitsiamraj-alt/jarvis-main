@@ -16,6 +16,7 @@
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { toE164Thai } from './thaiPhone.js';
+import { isPlaceholderPhone } from '../../src/lib/followPhoneGuard.js';
 
 const usersTable = tableInAppSchema('users');
 const assignmentsTable = tableInAppSchema('siamraj_unit_assignments');
@@ -65,9 +66,14 @@ async function assignedResponsiblePhone(requestNo: string): Promise<string | nul
 /** เบอร์เจ้าหน้าที่สำหรับ `admin_phone` ของคิวสัมภาษณ์ — ดูคอมเมนต์หัวไฟล์ */
 export async function resolveInterviewAdminPhone(requestNo: string | null): Promise<string | null> {
   const override = testOverridePhone();
-  if (override) return override;
+  /**
+   * 🔴 ค่าทดสอบเป็นเบอร์ตัวอย่าง 0812345678 = **ไม่ส่งเบอร์** (QA รอบ 3 ข้อ 4 · 11 ต.ค. 2569)
+   * ตั้งค่าทดสอบไว้แปลว่า "ห้ามโทรหาคนจริง" ⇒ ห้ามถอยไปสุ่มเบอร์หัวหน้า — คืน null ให้ไม่มีคีย์ admin_phone เลย
+   */
+  if (override) return isPlaceholderPhone(override) ? null : override;
 
   const key = (requestNo || '').trim();
   const assigned = key ? await assignedResponsiblePhone(key) : null;
-  return assigned || randomSupervisorPhone();
+  const picked = assigned || (await randomSupervisorPhone());
+  return picked && !isPlaceholderPhone(picked) ? picked : null;
 }

@@ -11,6 +11,7 @@ import { dbQuery } from '../_lib/postgres.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { planReplaceCallsFull, replaceSlotNote, replaceSlotRoundOfRef } from '../../src/lib/irecruitReplaceSync.js';
 import { FOLLOW_CALL_ROUND_MAX } from '../../src/lib/followCallRound.js';
+import { isPlaceholderPhone, PLACEHOLDER_PHONE_ERROR } from '../../src/lib/followPhoneGuard.js';
 
 /** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 092 (group_id/call_times) */
 function isUndefinedColumn(e: unknown): boolean {
@@ -181,7 +182,8 @@ function toResponse(r: FollowRow) {
     /** ชุดตาราง (092) — จอ "แก้ตารางทั้งชุด" ใช้เลือกสายของชุดเดียวกัน (1 ต.ค. 2569) · null = แถวเก่า/รอบเดี่ยว */
     group_id: r.group_id ?? null,
     /** เบอร์ฉุกเฉินที่ส่งไปกับสายนั้น — null = ไม่เคยเข้าคิว หรือไม่มีเบอร์ให้ส่ง */
-    emergency_phone: r.emergency_phone ?? null,
+    // เบอร์ตัวอย่างที่เคยค้างในคิว (ค่าทดสอบบนเซิร์ฟเวอร์) ไม่ใช่เบอร์จริง — ห้ามโชว์เหมือนเบอร์จริง (QA รอบ 3 ข้อ 4)
+    emergency_phone: r.emergency_phone && !isPlaceholderPhone(r.emergency_phone) ? r.emergency_phone : null,
     /** เจ้าของข้อมูล = คนที่กรอกครั้งแรก · ไม่เปลี่ยนแม้มีคนอื่นมาแก้ทีหลัง */
     created_by_name: r.created_by_name,
     updated_at: iso(r.updated_at ?? null),
@@ -387,6 +389,8 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
     if ((staffPhoneRaw.match(/\d/g) ?? []).length < 8) {
       return fail('เบอร์เจ้าหน้าที่ไม่ถูกต้อง — ใส่เบอร์ที่ผู้สมัครโทรกลับได้จริง');
     }
+    // เบอร์ตัวอย่างห้ามลง — เคยค้างเป็นเบอร์ฉุกเฉิน 1,049 สาย (QA รอบ 3 ข้อ 4 · 11 ต.ค. 2569)
+    if (isPlaceholderPhone(staffPhoneRaw)) return fail(PLACEHOLDER_PHONE_ERROR);
     staffPhone = staffPhoneRaw;
   }
 
@@ -524,7 +528,9 @@ export function parseFollowRounds(raw: unknown, primary: FollowRoundInput): Foll
     if (!at || Number.isNaN(at.getTime())) continue;
     if (seen.has(at.getTime())) continue;
     seen.add(at.getTime());
-    const phoneRaw = typeof o.staff_phone === 'string' ? o.staff_phone.trim() : '';
+    const phoneTyped = typeof o.staff_phone === 'string' ? o.staff_phone.trim() : '';
+    // เบอร์ตัวอย่างรายรอบ = ใช้เบอร์ของทั้งคำขอแทน (เบอร์หลักผ่านด่านปฏิเสธมาแล้ว)
+    const phoneRaw = isPlaceholderPhone(phoneTyped) ? '' : phoneTyped;
     const roundRaw = Number(o.call_round);
     const modeRaw = typeof o.call_mode === 'string' ? o.call_mode.trim() : '';
     const timeTbd = o.time_tbd === true;

@@ -31,3 +31,16 @@ export function staffPhoneAckKey(
 ): string {
   return [localPhoneDigits(applicantPhone), ...staffPhones.map(localPhoneDigits)].join('|');
 }
+
+/**
+ * ═══ เบอร์ตัวอย่าง 0812345678 ห้ามใช้เป็นเบอร์จริง (QA รอบ 3 ข้อ 4 · 11 ต.ค. 2569 · เจ้าของ Choice "ล้างออก + กันไม่ให้ลงอีก") ═══
+ *
+ * เจอเป็นเบอร์ฉุกเฉิน (`admin_phone` = เบอร์ที่ AI โทรหาเมื่อติดต่อผู้รับไม่ได้) 1,049 สาย — มาจากค่าทดสอบ
+ * `LUMOS_ADMIN_PHONE_OVERRIDE` (ค่าตัวอย่างใน .env.example) ที่ค้างบนเซิร์ฟเวอร์ · ช่องกรอกยังมี placeholder เป็นเบอร์นี้
+ * ⇒ ฝั่งส่ง: เจอเบอร์นี้ = ไม่ส่งเบอร์ (ไม่ถอยไปสุ่มเบอร์คนจริง) · ฝั่งรับ: ช่องเบอร์เจ้าหน้าที่ปฏิเสธเบอร์นี้
+ */
+export function isPlaceholderPhone(p: string | null | undefined): boolean {
+  return localPhoneDigits(p) === '0812345678';
+}
+
+export const PLACEHOLDER_PHONE_ERROR = 'เบอร์นี้เป็นเบอร์ตัวอย่าง ใส่เบอร์จริงของเจ้าหน้าที่';
