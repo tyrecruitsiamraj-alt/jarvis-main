@@ -125,7 +125,7 @@ import ReplaceStartFields, {
   replaceStartOf,
   type ReplaceSlotModes,
 } from '@/components/follow/ReplaceStartFields';
-import { DEFAULT_REPLACE_CALL_RULE, planReplaceCallsFull, type ReplaceTiming } from '@/lib/irecruitReplaceSync';
+import { DEFAULT_REPLACE_CALL_RULE, planReplaceCallsFull, REPLACE_FOLLOW_TOPIC, type ReplaceTiming } from '@/lib/irecruitReplaceSync';
 import { type FollowOutcome } from '@/lib/followOutcome';
 import { buildFollowPlanningRows, callCategory, followEntryYmd, type FollowPlanningRound, type FollowRoundFilter } from '@/lib/followPlanning';
 import { toYmdBangkok, formatYmdDmyBe } from '@/lib/dateTh';
@@ -608,9 +608,15 @@ const FollowPage: React.FC = () => {
    */
   const [replaceAiOn, setReplaceAiOn] = useState<boolean | null>(null);
   const [aiSwitchBusy, setAiSwitchBusy] = useState(false);
+  /** อ่านสถานะ AI ไม่ได้ — บอกบนจอพร้อมลองใหม่ (QA รอบ 2 ข้อ 19 · เดิมสวิตช์/ปุ่มเวลาหายเงียบ) */
+  const [replaceStatusFailed, setReplaceStatusFailed] = useState(false);
+  const [replaceStatusSeq, setReplaceStatusSeq] = useState(0);
+  /** ถามยืนยันก่อนเปิด/พัก AI ทั้งแท็บ (QA รอบ 2 ข้อ 25 · เจ้าของ Choice "คงที่เดิม เพิ่มถามยืนยัน") — null = ไม่ถาม */
+  const [askAiSwitch, setAskAiSwitch] = useState<boolean | null>(null);
   useEffect(() => {
     if (followView !== 'replace') return;
     let alive = true;
+    setReplaceStatusFailed(false);
     fetchReplaceSyncStatus()
       .then((st) => {
         if (alive) {
@@ -619,12 +625,15 @@ const FollowPage: React.FC = () => {
         }
       })
       .catch(() => {
-        if (alive) setReplaceAiOn(null);
+        if (alive) {
+          setReplaceAiOn(null);
+          setReplaceStatusFailed(true);
+        }
       });
     return () => {
       alive = false;
     };
-  }, [followView]);
+  }, [followView, replaceStatusSeq]);
   const toggleReplaceAi = async (on: boolean) => {
     setAiSwitchBusy(true);
     try {
@@ -1753,6 +1762,8 @@ const FollowPage: React.FC = () => {
           setFormOpen(true);
           setFormError(null);
           setReturnTo(null); // เปิดเองจากหน้านี้ = ไม่มีหน้าเดิมให้กลับ
+          // แท็บส่งคนแทน: เติมเรื่อง "ติดตามส่งคนแทน" ให้ (ฟอร์มชุดเดียวกัน แค่ค่าตั้งต้น · QA รอบ 3 ข้อ 10 เดิมคนเลือก "ติดตามเริ่มงาน")
+          if (replaceView) setTopic((t) => t || REPLACE_FOLLOW_TOPIC);
         }}
         className="inline-flex h-8 items-center gap-1 px-2.5 text-[11px] touch-manipulation sm:px-3"
       >
@@ -1893,17 +1904,50 @@ const FollowPage: React.FC = () => {
           {followView === 'replace' ? (
             canManageMasters ? (
               <div className="order-2 flex shrink-0 items-center gap-3 md:order-3">
+                {replaceStatusFailed ? (
+                  <span className={cn('flex items-center gap-2 text-xs', TONE.danger.value)} data-testid="replace-ai-failed">
+                    อ่านสถานะ AI ไม่ได้
+                    <Button type="button" variant="outline" size="xs" onClick={() => setReplaceStatusSeq((n) => n + 1)}>
+                      ลองใหม่
+                    </Button>
+                  </span>
+                ) : null}
                 {replaceAiOn !== null ? (
                   <label className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="replace-ai-switch">
                     <Switch
                       checked={replaceAiOn}
                       disabled={aiSwitchBusy}
-                      onCheckedChange={(v) => void toggleReplaceAi(v)}
+                      onCheckedChange={(v) => setAskAiSwitch(v)}
                       aria-label="AI โทร"
                     />
                     {replaceAiOn ? 'AI โทร' : 'พัก AI'}
                   </label>
                 ) : null}
+                {/* มีผลทั้งแท็บส่งคนแทน — ถามก่อนเสมอ (QA รอบ 2 ข้อ 25) */}
+                <AlertDialog open={askAiSwitch !== null} onOpenChange={(o) => (o ? undefined : setAskAiSwitch(null))}>
+                  <AlertDialogContent className="max-w-sm">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-base">
+                        {askAiSwitch ? 'เปิด AI โทรสายส่งคนแทน?' : 'พัก AI สายส่งคนแทน?'}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="text-xs">
+                        {askAiSwitch ? 'สายใหม่ที่ดึงจาก iRecruit ให้ AI โทร' : 'สายที่ยังไม่โทรเปลี่ยนเป็นคนโทรทั้งหมด'}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={() => setAskAiSwitch(null)}>ยกเลิก</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          const v = askAiSwitch;
+                          setAskAiSwitch(null);
+                          if (v !== null) void toggleReplaceAi(v);
+                        }}
+                      >
+                        {askAiSwitch ? 'เปิด AI โทร' : 'พัก AI'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
                 {/* เวลาโทร 16:00 / ก่อน 1 ชม. / ก่อน 15 นาที ตั้งผ่านจอ (เจ้าของ 7 ต.ค. 2569) */}
                 {replaceAiOn !== null ? <ReplaceTimingDialog timing={replaceTiming} onSaved={setReplaceTiming} /> : null}
                 <Button

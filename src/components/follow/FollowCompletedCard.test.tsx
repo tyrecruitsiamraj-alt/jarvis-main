@@ -5,7 +5,7 @@ import React from 'react';
  * 🔴 ด่าน:
  * - ว่างก็ยังอยู่ (หัวการ์ด 0 คน + แถว "ไม่มี…") — กติกาทั้งระบบวันเดียวกัน
  * - ย้าย = ลงทะเบียนดูแล → ตั้งรอบ **แผนละวัน group_id เดียว** หัวข้อถามความเป็นอยู่ → ปิดชุดเดิมเป็น "ไปแล้ว"
- * - ตั้งรอบล้มกลางทาง ⇒ **ห้ามปิดชุดเดิม** (คนต้องยังอยู่ในกอง) + บอกว่าตั้งไปแล้วกี่สาย
+ * - ตั้งรอบล้ม ⇒ **ห้ามปิดชุดเดิม** (คนต้องยังอยู่ในกอง) + บอกเหตุ · ทุกรอบไปในคำขอเดียว (QA รอบ 2 ข้อ 27)
  * - ไม่ย้าย = เลือกผล 5 แบบ แล้วปิดทุกรอบที่ยังเปิด · หรือ **ติดตามต่อ** อีก N วัน (5 ต.ค. 2569)
  * - 🔴 5 ต.ค. 2569: วันของรอบดูแล = วันติดตามวันสุดท้าย + บวกต่อกัน (ชุดตัวอย่างจบ 30 ก.ย. ⇒ +3 = 3 ต.ค. · +7 = 10 ต.ค.)
  * - บอกว่าไม่ไป ⇒ ไม่มีปุ่มย้าย
@@ -161,8 +161,9 @@ describe('FollowCompletedCard', () => {
       from_follow_id: 'a2',
       source: 'follow_done',
     });
-    expect(createFollowRounds).toHaveBeenCalledTimes(2);
-    const [first, second] = createFollowRounds.mock.calls.map((c) => c[0] as Record<string, unknown>);
+    // 🔴 คำขอเดียวทุกรอบ (QA รอบ 2 ข้อ 27) — server แบ่งแผนละวันเอง · group เดียว
+    expect(createFollowRounds).toHaveBeenCalledTimes(1);
+    const first = createFollowRounds.mock.calls[0][0] as Record<string, unknown> & { rounds: Array<Record<string, unknown>> };
     expect(first).toMatchObject({
       topic: AFTERCARE_TOPIC,
       follow_team: 'replacement',
@@ -173,9 +174,11 @@ describe('FollowCompletedCard', () => {
       call_mode: 'ai',
       unit_name: 'หน่วยงาน ก',
     });
-    expect(second).toMatchObject({ scheduled_at: '2026-10-11T00:00:00.000Z', call_round: 2, call_mode: 'manual' });
+    expect(first.rounds).toEqual([
+      expect.objectContaining({ scheduled_at: '2026-10-04T00:00:00.000Z', call_round: 1, call_mode: 'ai' }),
+      expect.objectContaining({ scheduled_at: '2026-10-11T00:00:00.000Z', call_round: 2, call_mode: 'manual' }),
+    ]);
     expect(first.group_id).toBeTruthy();
-    expect(second.group_id).toBe(first.group_id);
     expect(first.group_id).not.toBe('g-old');
     expect(completeFollowEntry.mock.calls).toEqual([
       ['a1', 'went'],
@@ -184,19 +187,16 @@ describe('FollowCompletedCard', () => {
     expect(await screen.findByRole('status')).toBeTruthy();
   });
 
-  it('🔴 ตั้งรอบล้มกลางทาง ⇒ ไม่ปิดชุดเดิม + บอกว่าตั้งไปแล้วกี่สาย', async () => {
+  it('🔴 ตั้งรอบล้ม ⇒ ไม่ปิดชุดเดิม + บอกเหตุ (คำขอเดียวทั้งชุด — ไม่มีครึ่งชุดแล้ว)', async () => {
     moveToAftercare.mockResolvedValue({});
-    createFollowRounds.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('เส้นล่ม'));
+    createFollowRounds.mockRejectedValueOnce(new Error('เส้นล่ม'));
     const onChanged = vi.fn();
     render(<FollowCompletedCard groups={groupsOf(going)} onChanged={onChanged} now={NOW} />);
     fireEvent.click(screen.getByRole('button', { name: 'ย้ายไปดูแลหลังเริ่มงาน' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: /เพิ่มรอบ/ }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'ย้ายไปดูแลหลังเริ่มงาน' }));
-    expect(await within(dialog).findByRole('alert')).toHaveProperty(
-      'textContent',
-      'เส้นล่ม — ตั้งไปแล้ว 1 จาก 2 สาย',
-    );
+    expect(await within(dialog).findByRole('alert')).toHaveProperty('textContent', 'เส้นล่ม');
     expect(completeFollowEntry).not.toHaveBeenCalled();
     expect(onChanged).not.toHaveBeenCalled();
   });

@@ -290,7 +290,8 @@ const MoveToAftercareDialog: React.FC<{
         phone: g.phone,
         full_name: g.name,
         unit_name: g.unitName,
-        site_code: g.siteCode,
+        // ค่าว่างไม่ส่งเป็นรหัสไซต์ (QA รอบ 2 ข้อ 27)
+        site_code: g.siteCode || null,
         from_follow_id: latest?.id ?? null,
         source: 'follow_done',
       });
@@ -300,30 +301,31 @@ const MoveToAftercareDialog: React.FC<{
       return;
     }
     try {
-      const groupId = crypto.randomUUID();
-      for (const { calls: dayCalls } of scheduleCallsByDay(calls)) {
-        const first = dayCalls[0];
-        await createFollowRounds({
-          recipient_name: g.name,
-          recipient_phone: g.phone,
-          topic: AFTERCARE_TOPIC,
-          follow_team: followTeam,
-          staff_phone: first.staffPhone || undefined,
-          scheduled_at: first.scheduledAt,
-          call_round: first.callRound,
-          call_mode: first.callMode,
-          group_id: groupId,
-          unit_name: g.unitName ?? undefined,
-          site_code: g.siteCode ?? undefined,
-          rounds: dayCalls.map((c) => ({
-            scheduled_at: c.scheduledAt,
-            staff_phone: c.staffPhone || undefined,
-            call_round: c.callRound,
-            call_mode: c.callMode,
-          })),
-        });
-        created += dayCalls.length;
-      }
+      /**
+       * 🔴 คำขอเดียวทุกรอบ (QA รอบ 2 ข้อ 27 · เดิมยิงวันละคำขอ ล้มกลางทางได้ครึ่งชุด)
+       * server แบ่ง "1 เบอร์ 1 วัน = 1 แผน" ให้เองตอนส่ง Lumos (`groupFollowPlans` · 9 ต.ค. 2569) · group_id เดียวกันทั้งชุด
+       */
+      const first = calls[0];
+      await createFollowRounds({
+        recipient_name: g.name,
+        recipient_phone: g.phone,
+        topic: AFTERCARE_TOPIC,
+        follow_team: followTeam,
+        staff_phone: first.staffPhone || undefined,
+        scheduled_at: first.scheduledAt,
+        call_round: first.callRound,
+        call_mode: first.callMode,
+        group_id: crypto.randomUUID(),
+        unit_name: g.unitName || undefined,
+        site_code: g.siteCode || undefined,
+        rounds: calls.map((c) => ({
+          scheduled_at: c.scheduledAt,
+          staff_phone: c.staffPhone || undefined,
+          call_round: c.callRound,
+          call_mode: c.callMode,
+        })),
+      });
+      created = calls.length;
     } catch (e) {
       const why = friendlyErrorText(e, 'ตั้งรอบไม่สำเร็จ');
       setError(created > 0 ? `${why} — ตั้งไปแล้ว ${created} จาก ${calls.length} สาย` : why);

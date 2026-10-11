@@ -173,7 +173,9 @@ export default function StaffContactField({
           {name && !nameOptions.some((n) => n === name) ? (
             <option value="__other__">{name} (ชื่อเดิม)</option>
           ) : null}
+          {/* กลุ่มว่าง = บอกว่ายังไม่มีชื่อ (QA รอบ 3 ข้อ 24 · เดิมหัวกลุ่มลอยเปล่า) — ตั้งสายงานที่ ตั้งค่า › ผู้ใช้งาน */}
           <optgroup label="เจ้าหน้าที่คัดสรร">
+            {screenerNames.length === 0 ? <option disabled>ยังไม่มีชื่อ</option> : null}
             {screenerNames.map((n) => (
               <option key={n} value={n}>
                 {n}
@@ -181,6 +183,7 @@ export default function StaffContactField({
             ))}
           </optgroup>
           <optgroup label="เจ้าหน้าที่ส่งคนแทน">
+            {replacementNames.length === 0 ? <option disabled>ยังไม่มีชื่อ</option> : null}
             {replacementNames.map((n) => (
               <option key={n} value={n}>
                 {n}
