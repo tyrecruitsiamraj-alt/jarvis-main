@@ -12906,3 +12906,5 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · วัดจริง (อ่านอย่างเดียว): admin "ทุกคน" 8 · ภาพรวม "นัดที่รอบันทึกผล" 7 — ต่างกัน 1 ใบ = ใบ Lead ที่นัดแล้ว (ประชากรภาพรวมไม่นับ Lead) · ใบไม่ใช่ Lead: converted 7 = มีนัด 7 ชุดเดียวกัน
   · เทสต์ `tests/api/appointmentsScopeToggle2569-10-10.test.ts` · `src/components/recruit-rm/RmWorkspace.appointmentScope.test.tsx` (กดปุ่มจริง) + เพิ่มใน `jobApplicationsListParams` · `recruitLead` · `applicantOverviewSql`
   · (ต่อ ข้อ 4) ภาพรวม "นัดที่รอบันทึกผล" นับนัดของใบ Lead ด้วย (เจ้าของ Choice "นับด้วย") — `appointmentBacklogSql` กรองแค่ BU · ก้อนอื่นของภาพรวมยังไม่นับ Lead · เลข 8 = ปุ่ม "ทุกคน"
+- (11 ต.ค. 2569) **สายงาน "ส่งคนแทน"** (เจ้าของ "ตอนนี้มีแค่ เจ้าหน้าที่คัดสรร เพิ่มเจ้าหน้าที่ส่งคนแทนด้วย") — `JOB_LANES` เพิ่ม `replacement` (`src/lib/jobLanes.ts` + ตัวตรวจ `api/_handlers/app-users.ts` · ไม่มี CHECK ในฐาน ไม่ต้อง migrate)
+  · ติ๊กที่ ตั้งค่า › ผู้ใช้งาน · ช่องเจ้าหน้าที่ (`StaffContactField`) แยกกลุ่ม "เจ้าหน้าที่คัดสรร" / "เจ้าหน้าที่ส่งคนแทน" · `followStaffDirectory` รับสายนี้ · โดนัททีม Online มีประเภท "ส่งคนแทน"

@@ -142,7 +142,7 @@ export function staffNameOptionsAll(
  * จะเพี้ยนสองที่ (บทเรียนเดิม: หนึ่งเมตริกหนึ่งนิยาม)
  *
  * - ต้อง **มีเบอร์** — จุดประสงค์ของช่องนี้คือ "เลือกชื่อแล้วได้เบอร์"
- * - เอาเฉพาะสาย **สรรหา/คัดสรร** ตามที่เจ้าของระบุ (23 ก.ย. 2569) ไม่รวม opl/online
+ * - เอาเฉพาะสาย **สรรหา/คัดสรร/ส่งคนแทน** (23 ก.ย. 2569 · ส่งคนแทนเพิ่ม 11 ต.ค. 2569) ไม่รวม opl/online
  */
 export function followStaffDirectory(
   all: readonly StaffDirectoryEntry[],
@@ -150,6 +150,6 @@ export function followStaffDirectory(
   return all.filter(
     (d) =>
       d.phone.trim() !== '' &&
-      (d.lanes.includes('recruiter') || d.lanes.includes('screener')),
+      (d.lanes.includes('recruiter') || d.lanes.includes('screener') || d.lanes.includes('replacement')),
   );
 }

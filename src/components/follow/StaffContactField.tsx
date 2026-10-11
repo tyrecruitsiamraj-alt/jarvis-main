@@ -95,6 +95,22 @@ export default function StaffContactField({
     () => staffNameOptionsAll(directory, buildScreenerNameOptions(), contacts),
     [directory, contacts],
   );
+  /**
+   * แยกกลุ่มในรายการ (เจ้าของ 11 ต.ค. 2569 "ตอนนี้มีแค่ เจ้าหน้าที่คัดสรร เพิ่มเจ้าหน้าที่ส่งคนแทนด้วย")
+   * ส่งคนแทน = ติ๊กสายงาน "ส่งคนแทน" ที่ ตั้งค่า › ผู้ใช้งาน (และไม่ได้อยู่สายสรรหา/คัดสรร) · ที่เหลืออยู่กลุ่มคัดสรรเหมือนเดิม
+   */
+  const replacementNames = useMemo(() => {
+    const set = new Set(
+      directory
+        .filter((d) => d.lanes.includes('replacement') && !d.lanes.includes('screener') && !d.lanes.includes('recruiter'))
+        .map((d) => d.name.trim().toLowerCase()),
+    );
+    return nameOptions.filter((n) => set.has(n.trim().toLowerCase()));
+  }, [directory, nameOptions]);
+  const screenerNames = useMemo(
+    () => nameOptions.filter((n) => !replacementNames.includes(n)),
+    [nameOptions, replacementNames],
+  );
 
   // เปิดแก้รายการเก่าที่มีแต่เบอร์ → ย้อนหาชื่อจากความจำ (ถ้าตรง) มาโชว์ให้
   useEffect(() => {
@@ -153,15 +169,24 @@ export default function StaffContactField({
           aria-label={`ชื่อ${label}`}
           className="jarvis-soft-field min-h-[46px] w-full"
         >
-          <option value="">— เลือกชื่อ (คัดสรร) —</option>
+          <option value="">— เลือกชื่อ —</option>
           {name && !nameOptions.some((n) => n === name) ? (
             <option value="__other__">{name} (ชื่อเดิม)</option>
           ) : null}
-          {nameOptions.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
+          <optgroup label="เจ้าหน้าที่คัดสรร">
+            {screenerNames.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="เจ้าหน้าที่ส่งคนแทน">
+            {replacementNames.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </optgroup>
           <option value="__manual__">พิมพ์เบอร์เองไม่ผูกชื่อ</option>
         </select>
         <input

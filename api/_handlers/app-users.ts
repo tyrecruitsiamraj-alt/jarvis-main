@@ -27,7 +27,7 @@ type UserRow = {
  * สายงานที่รับได้ (114) — ชุดเดียวกับ `job_staff_roster.role`
  * ⚠️ ตรวจที่นี่แทน CHECK constraint ในฐาน (บ้านนี้โดน CHECK ล็อกค่าใหม่มาสองรอบ)
  */
-const JOB_LANES = ['recruiter', 'screener', 'opl', 'online'] as const;
+const JOB_LANES = ['recruiter', 'screener', 'opl', 'online', 'replacement'] as const;
 
 type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
 

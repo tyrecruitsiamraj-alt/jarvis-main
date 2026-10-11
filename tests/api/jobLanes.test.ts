@@ -3,8 +3,8 @@ import { JOB_LANES, JOB_LANE_LABEL, isJobLane, jobLanesText } from '../../src/li
 import { parseAppUser } from '../../src/lib/userApi';
 
 describe('สายงานของคนในระบบ (114)', () => {
-  it('มี 4 สาย และมีคำไทยครบทุกสาย', () => {
-    expect(JOB_LANES).toEqual(['recruiter', 'screener', 'opl', 'online']);
+  it('มี 5 สาย (ส่งคนแทนเพิ่ม 11 ต.ค. 2569) และมีคำไทยครบทุกสาย', () => {
+    expect(JOB_LANES).toEqual(['recruiter', 'screener', 'opl', 'online', 'replacement']);
     for (const lane of JOB_LANES) expect(JOB_LANE_LABEL[lane]).toBeTruthy();
   });
 

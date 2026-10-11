@@ -356,6 +356,7 @@ export const PERSON_KINDS: ReadonlyArray<{ key: PersonKind; label: string }> = [
   { key: 'screener', label: `${JOB_LANE_LABEL.screener} (ปิดใบขอ)` },
   { key: 'opl', label: JOB_LANE_LABEL.opl },
   { key: 'online', label: JOB_LANE_LABEL.online },
+  { key: 'replacement', label: JOB_LANE_LABEL.replacement },
   { key: 'admin', label: 'ผู้ดูแลระบบ' },
   { key: 'unset', label: 'ยังไม่ตั้งสายงาน' },
 ];

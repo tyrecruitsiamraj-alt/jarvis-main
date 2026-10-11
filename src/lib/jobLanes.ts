@@ -12,7 +12,8 @@
  * `job_staff_roster` (หน้า "ทีมสรรหา/คัดสรร/OPL/Online") เหมือนเดิม เพราะใบขอที่ใช้งานอยู่
  * อ้างชื่อจากตารางนั้น · ชุดนี้ให้คนทยอยกรอกไว้ก่อน แล้วค่อยย้ายมาอ้างทีหลัง (เจ้าของเคาะเอง)
  */
-export const JOB_LANES = ['recruiter', 'screener', 'opl', 'online'] as const;
+/** `replacement` = เจ้าหน้าที่ส่งคนแทน (เจ้าของสั่ง 11 ต.ค. 2569 "ตอนนี้มีแค่ เจ้าหน้าที่คัดสรร เพิ่มเจ้าหน้าที่ส่งคนแทนด้วย") */
+export const JOB_LANES = ['recruiter', 'screener', 'opl', 'online', 'replacement'] as const;
 export type JobLane = (typeof JOB_LANES)[number];
 
 export const JOB_LANE_LABEL: Record<JobLane, string> = {
@@ -20,6 +21,7 @@ export const JOB_LANE_LABEL: Record<JobLane, string> = {
   screener: 'คัดสรร',
   opl: 'OPL',
   online: 'Online',
+  replacement: 'ส่งคนแทน',
 };
 
 export function isJobLane(v: unknown): v is JobLane {
