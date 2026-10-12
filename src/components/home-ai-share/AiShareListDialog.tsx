@@ -11,7 +11,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
+import { PagePager } from '@/components/shared/PagePager';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { segmentDotClass } from '@/components/home-ai-share/segmentStyle';
@@ -162,39 +162,16 @@ const AiShareListDialog: React.FC<{
           ) : null}
         </div>
 
+        {/* ตัวแบ่งหน้าแบบเดียวทั้งระบบ ‹ 1/N › (`PagePager` · เจ้าของ Choice 12 ต.ค. 2569) · กำลังโหลดหน้าใหม่ = กดไม่ได้ */}
         {rows && rows.length > 0 ? (
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs tabular-nums text-muted-foreground">
-              แสดง {NUM.format(first + 1)}–{NUM.format(first + rows.length)} จาก {NUM.format(total)} {unit}
-            </p>
-            {pages > 1 ? (
-              <Pagination className="mx-0 w-auto justify-end">
-                <PaginationContent>
-                  <PaginationItem>
-                    <Button type="button" size="xs" variant="outline" disabled={page === 0 || loading} onClick={() => setPage(page - 1)}>
-                      ก่อนหน้า
-                    </Button>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <span className="px-2 text-xs tabular-nums text-muted-foreground">
-                      หน้า {NUM.format(page + 1)} / {NUM.format(pages)}
-                    </span>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="outline"
-                      disabled={page >= pages - 1 || loading}
-                      onClick={() => setPage(page + 1)}
-                    >
-                      ถัดไป
-                    </Button>
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            ) : null}
-          </div>
+          <PagePager
+            testId="ai-share-list-pager"
+            page={page + 1}
+            pageCount={pages}
+            disabled={loading}
+            onPageChange={(p) => setPage(p - 1)}
+            summary={`แสดง ${NUM.format(first + 1)}–${NUM.format(first + rows.length)} จาก ${NUM.format(total)} ${unit}`}
+          />
         ) : null}
       </DialogContent>
     </Dialog>

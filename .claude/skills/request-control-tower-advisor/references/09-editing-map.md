@@ -13035,3 +13035,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · ชิป `RecruitLaneDialog` → `TONE.violet.chip`
   · ⚠️ ยังไม่แตะ (นอก 3 หน้า/เสี่ยง): `PublicApplyDialog` (ฟอร์มสาธารณะ พึ่ง `required` ของ select) · `RosterBackedStaffSelect` · `UnitRequestWorkStatusField` · `SelectionProgressControls` · `UnitRequestNoteField` · `ListPaginationBar` ยังอยู่ในหน้าอื่น
   · ภาพ `docs/qa-shots/{pager-recruit,select-recruit-form}-{before,after}-2569-10-12.jpg`
+- (12 ต.ค. 2569 สาย) **QA รอบ 2 ข้อ 43–44 · หน้าหลัก** — ป๊อปรายชื่อของกล่อง (`AiShareListDialog` · แบ่งหน้าฝั่งเซิร์ฟเวอร์ · โหลดอยู่กดไม่ได้) และ `FollowCallerDialog`
+  เดิม shadcn Pagination "ก่อนหน้า · หน้า 1 / 12 · ถัดไป" → `PagePager` ‹ 1/12 › · หน้าหลักไม่มี select ของเบราว์เซอร์/คลาส jarvis-* อยู่แล้ว
+  · ภาพ `docs/qa-shots/pager-home-{before,after}-2569-10-12.jpg`
+  · ข้อ 43 ที่ยังไม่ทำ: ตัวเลือกวันที่ยังมีหลายแบบ (วันเดียว `DayCalendarPicker`/`DayPickerPill` · ช่วงวัน `DateRangeCalendarPicker` · ช่วงหน้าหลัก `PeriodPicker`) — ต่างหน้าที่กัน ยังไม่ยุบ

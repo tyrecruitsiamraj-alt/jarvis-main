@@ -8,13 +8,13 @@
  * ชั้น: เรื่อง (2 แท็บ) → ผลของเรื่องนั้น → รายชื่อของช่องที่กด · ปุ่มกลับทุกชั้น
  * ช่อง/คำ/สี = ของการ์ดผลโทร (`FOLLOW_RESULT_COLS` · นับทีละสายตามผลจริง · QA 10 ต.ค. 2569) · ทุกช่องรวมกัน = ทั้งหมดของเรื่อง (ขึ้นบนจอ)
  * ข้อมูลจาก `/api/home-ai-share?journey=follow` (ชุดแถวเดียวกับการ์ด) · นับที่ `followCallerBreakdown`
- * 🔴 shadcn (Dialog · Button · Table · Skeleton · Pagination) · ไม่ซ้อน Dialog · ไม่มีประโยคอธิบายบนจอ
+ * 🔴 shadcn (Dialog · Button · Table · Skeleton) + PagePager · ไม่ซ้อน Dialog · ไม่มีประโยคอธิบายบนจอ
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
+import { PagePager } from '@/components/shared/PagePager';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toneOfBu } from '@/components/team-online/teamOnlineTones';
@@ -270,33 +270,15 @@ const FollowCallerDialog: React.FC<{
             </TableBody>
           </Table>
         )}
+        {/* ตัวแบ่งหน้าแบบเดียวทั้งระบบ ‹ 1/N › (`PagePager` · เจ้าของ Choice 12 ต.ค. 2569) */}
         {list.length > 0 ? (
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs tabular-nums text-muted-foreground">
-              แสดง {NUM.format(first + 1)}–{NUM.format(first + shown.length)} จาก {NUM.format(list.length)} {unit}
-            </p>
-            {pages > 1 ? (
-              <Pagination className="mx-0 w-auto justify-end">
-                <PaginationContent>
-                  <PaginationItem>
-                    <Button type="button" size="xs" variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>
-                      ก่อนหน้า
-                    </Button>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <span className="px-2 text-xs tabular-nums text-muted-foreground">
-                      หน้า {NUM.format(page + 1)} / {NUM.format(pages)}
-                    </span>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <Button type="button" size="xs" variant="outline" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>
-                      ถัดไป
-                    </Button>
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            ) : null}
-          </div>
+          <PagePager
+            testId="caller-dialog-pager"
+            page={page + 1}
+            pageCount={pages}
+            onPageChange={(p) => setPage(p - 1)}
+            summary={`แสดง ${NUM.format(first + 1)}–${NUM.format(first + shown.length)} จาก ${NUM.format(list.length)} ${unit}`}
+          />
         ) : null}
       </div>
     );

@@ -480,11 +480,12 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(within(dlg).getByText('ไม่มีชื่อ')).toBeTruthy();
     expect(within(dlg).getByText('ไม่ระบุ')).toBeTruthy();
     expect(within(dlg).getByText('แสดง 1–20 จาก 45 รายชื่อ')).toBeTruthy();
-    expect(within(dlg).getByText('หน้า 1 / 3')).toBeTruthy();
-    fireEvent.click(within(dlg).getByRole('button', { name: 'ถัดไป' }));
+    // ตัวแบ่งหน้าแบบเดียวทั้งระบบ ‹ 1/N › (`PagePager` · 12 ต.ค. 2569)
+    expect(within(dlg).getByText('1/3')).toBeTruthy();
+    fireEvent.click(within(dlg).getByRole('button', { name: 'หน้าถัดไป' }));
     await waitFor(() => expect(fetchHomeAiShareList).toHaveBeenLastCalledWith('matching', 'ai', 1, winQ));
     expect(await within(dlg).findByText('ผู้รับสาย 21')).toBeTruthy();
-    expect(within(dlg).getByText('หน้า 2 / 3')).toBeTruthy();
+    expect(within(dlg).getByText('2/3')).toBeTruthy();
     // 🔴 ไม่มีเบอร์โทรในป๊อป
     expect(dlg.textContent ?? '').not.toMatch(/0\d{8,9}|\+66/);
   });
@@ -503,13 +504,13 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     ).toEqual(['ชื่อ', 'BU', 'วันที่', 'ใครโทร']); // ค่าคือ AI โทร/คนโทร (QA รอบ 2 ข้อ 41 เดิม "สถานะ")
     expect(within(dlg).getAllByText('AI โทร').length).toBeGreaterThan(0);
     expect(within(dlg).getAllByText('ยังไม่โทร').length).toBeGreaterThan(0);
-    fireEvent.click(within(dlg).getByRole('button', { name: 'ถัดไป' }));
-    await within(dlg).findByText('หน้า 2 / 3');
+    fireEvent.click(within(dlg).getByRole('button', { name: 'หน้าถัดไป' }));
+    await within(dlg).findByText('2/3');
     fireEvent.keyDown(dlg, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     fireEvent.click(tileOf('ทั้งหมด'));
     dlg = await screen.findByRole('dialog');
-    expect(await within(dlg).findByText('หน้า 1 / 3')).toBeTruthy();
+    expect(await within(dlg).findByText('1/3')).toBeTruthy();
     expect(fetchHomeAiShareList).toHaveBeenLastCalledWith('follow', 'total', 0, winQ);
   });
 
