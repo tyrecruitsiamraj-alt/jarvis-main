@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
  * 4. หน้ารายเดือน: ใต้ชื่อบอกทั้งเดือนกี่ครั้ง/ไป/ไม่ไป (ในคอลัมน์ที่ตรึง) และช่องวันยังอยู่
  * 5. เบอร์ฉุกเฉิน: ห้ามมีคำว่า "โทรแล้ว" (Lumos ไม่ส่งข้อมูลนี้กลับมา)
  */
-import { describe, expect, it, afterEach, vi } from 'vitest';
+import { describe, expect, it, afterEach, beforeEach, vi } from 'vitest';
 import { render, screen, cleanup, within, fireEvent, waitFor } from '@testing-library/react';
 
 import FollowPlanningCalendar from './FollowPlanningCalendar';
@@ -23,6 +23,11 @@ import { withFollowDayCalls } from '@/lib/followDayCall';
 import type { FollowEntry } from '@/lib/followApi';
 import type { FollowRoundFilter } from '@/lib/followPlanning';
 import { TONE } from '@/lib/designTokens';
+
+/** เทสต์ชุดนี้คุมตารางรายวันแบบเดิม — มุมมองค่าเริ่มเป็น "ต้องโทร" แล้ว (12 ต.ค. 2569) จึงเปิดแบบตารางก่อนทุกเทสต์ */
+beforeEach(() => {
+  localStorage.setItem('jarvis:follow-day-layout', 'table');
+});
 
 /** 16:00 น. เวลาไทย ของวันที่ 7 ก.ย. 2569 — เทสต์นี้ยึด "วันนี้" เป็นวันนั้น */
 const NOW = new Date('2026-09-07T09:00:00Z');

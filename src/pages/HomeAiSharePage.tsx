@@ -156,7 +156,8 @@ const BLOCKS: readonly BlockMeta[] = [
   {
     key: 'follow',
     title: conveyorLabel('follow'),
-    unit: AI_SHARE_UNIT,
+    // ติดตาม/ดูแล นับแถวสาย (follow_entries) ไม่ใช่คน — เดิมเขียน "รายชื่อ" (เจ้าของ Choice 12 ต.ค. 2569 "เปลี่ยนคำเป็น สาย")
+    unit: 'สาย',
     withBoth: false,
     metrics: {
       total: 'aiShare.followTotal',
@@ -169,7 +170,8 @@ const BLOCKS: readonly BlockMeta[] = [
   {
     key: 'aftercare',
     title: conveyorLabel('aftercare'),
-    unit: AI_SHARE_UNIT,
+    // ติดตาม/ดูแล นับแถวสาย (follow_entries) ไม่ใช่คน — เดิมเขียน "รายชื่อ" (เจ้าของ Choice 12 ต.ค. 2569 "เปลี่ยนคำเป็น สาย")
+    unit: 'สาย',
     withBoth: false,
     metrics: {
       total: 'aiShare.aftercareTotal',

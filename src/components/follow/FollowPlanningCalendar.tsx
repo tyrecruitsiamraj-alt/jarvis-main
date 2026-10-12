@@ -13,6 +13,8 @@ import {
 } from '@/lib/followStaffCall';
 import type { FollowOutcome } from '@/lib/followOutcome';
 import FollowStaffCallControls from '@/components/follow/FollowStaffCallControls';
+import FollowCallQueue from '@/components/follow/FollowCallQueue';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import FollowCancelMenu, { type FollowCancelChoice } from '@/components/follow/FollowCancelMenu';
 import { leadText, replaceLeadStart, replaceSlotRoundOfRef } from '@/lib/irecruitReplaceSync';
 import { toYmdBangkok, toYmdLocal, parseYmd, THAI_MONTHS, ceToBeYear, formatYmdTh } from '@/lib/dateTh';
@@ -114,6 +116,9 @@ function shiftYmd(ymd: string, days: number): string {
 }
 
 /** ป้ายวันบนปุ่มเลือกวัน "จ. 12 ต.ค. 2569" — รูปวันที่เดียวทั้งระบบ (`thaiDayDate` · เจ้าของ Choice 12 ต.ค. 2569) */
+type DayLayout = 'queue' | 'table';
+const DAY_LAYOUT_KEY = 'jarvis:follow-day-layout';
+
 function dayPillLabel(ymd: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? thaiDayDate(ymd) : ymd;
 }
@@ -432,6 +437,22 @@ const FollowPlanningCalendar: React.FC<{
    * ทันที คำถามขั้น 2 "จบเรื่องนี้เลยไหม" หายไปกับแถว สายที่เหลือของวันนั้นไม่ได้ถูกถาม)
    */
   const [pinnedKeys, setPinnedKeys] = useState<Set<string>>(() => new Set());
+  /** มุมมองรายวัน — จำในเครื่อง (อ่าน/เขียนไม่ได้ = ใช้ค่าเริ่ม "ต้องโทร") */
+  const [dayLayout, setDayLayout] = useState<DayLayout>(() => {
+    try {
+      return localStorage.getItem(DAY_LAYOUT_KEY) === 'table' ? 'table' : 'queue';
+    } catch {
+      return 'queue';
+    }
+  });
+  const pickDayLayout = (v: DayLayout) => {
+    setDayLayout(v);
+    try {
+      localStorage.setItem(DAY_LAYOUT_KEY, v);
+    } catch {
+      /* โหมดส่วนตัว/บล็อก storage — ใช้ได้แค่รอบนี้ */
+    }
+  };
   useEffect(() => setPinnedKeys(new Set()), [dayYmd]);
   const recordStaffResult = (round: FollowPlanningRound, outcome: FollowStaffCallOutcome, row: FollowPlanningRow) => {
     setPinnedKeys((prev) => new Set(prev).add(row.group.key));
@@ -662,7 +683,32 @@ const FollowPlanningCalendar: React.FC<{
                 </div>
               ) : null}
 
-              {/* 🔴 ตาราง + แถบแบ่งหน้าอยู่เสมอ ว่างก็เป็นแถว "ไม่มีสาย" + เลข 0 (เจ้าของสั่ง 1 ต.ค. 2569 — สลับแท็บแล้วหน้าห้ามย่อ/ขยายเอง) */}
+              {/* "ต้องโทร" (ค่าเริ่ม · เจ้าของ Choice 12 ต.ค. 2569 แบบ B) / "ตาราง" (แบบเดิม = ทางถอย) */}
+              <div className="flex items-center gap-2 border-b border-border/70 px-4 py-2 md:px-5">
+                <ToggleGroup
+                  type="single"
+                  size="sm"
+                  value={dayLayout}
+                  onValueChange={(v) => v && pickDayLayout(v as DayLayout)}
+                  aria-label="มุมมองรายวัน"
+                  data-testid="day-layout"
+                >
+                  <ToggleGroupItem value="queue">ต้องโทร</ToggleGroupItem>
+                  <ToggleGroupItem value="table">ตาราง</ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+
+              {dayLayout === 'queue' ? (
+                <FollowCallQueue
+                  people={allDayPeople}
+                  busyId={busyId}
+                  onRecord={onStaffResult ? recordStaffResult : undefined}
+                  onFinish={onFinishRound}
+                  onCancel={onCancelRound}
+                  onOpen={(row, ymd, rounds) => onOpenCell(row, ymd || dayYmd, rounds)}
+                />
+              ) : (
+              /* 🔴 ตาราง + แถบแบ่งหน้าอยู่เสมอ ว่างก็เป็นแถว "ไม่มีสาย" + เลข 0 (เจ้าของสั่ง 1 ต.ค. 2569 — สลับแท็บแล้วหน้าห้ามย่อ/ขยายเอง) */
                 <>
                   {/**
                    * 🔴 **ตารางมีหัวคอลัมน์** ตามแบบอ้างอิง (แก้ 8 ก.ย. 2569 — เจ้าของทักว่า
@@ -1133,6 +1179,7 @@ const FollowPlanningCalendar: React.FC<{
                     }
                   />
                 </>
+              )}
             </>
           ) : (
             <div ref={scrollRef} className="overflow-x-auto">
@@ -1299,7 +1346,7 @@ const FollowPlanningCalendar: React.FC<{
           ) : null}
         </Card>
         {/* คนที่จัดการจบแล้วของวันนั้น — การ์ดแยกใต้ตาราง (เจ้าของ 6 ต.ค. 2569 · Choice "การ์ดแยกใต้ตาราง") */}
-        {view === 'day' && splitDone ? (
+        {view === 'day' && splitDone && dayLayout === 'table' ? (
           <FollowDayDoneCard
             people={donePeople}
             onOpen={(p) => onOpenCell(p.row, p.calls[0]?.round.ymd ?? dayYmd, p.calls.map((c) => c.round))}

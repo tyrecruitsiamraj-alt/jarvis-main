@@ -294,7 +294,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(calendar.compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const h1 = screen.getByRole('heading', { level: 1, name: 'หน้าหลัก' });
     expect(h1.compareDocumentPosition(calendar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 สาย'));
     expect(stat('AI โทร')).toContain('205');
     // ติดตามตั้งได้ทางเดียว ⇒ ไม่มีกล่อง "ทั้งสองทาง"
     expect(screen.queryByRole('button', { name: /^ทั้งสองทาง/ })).toBeNull();
@@ -308,7 +308,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
   it('dropdown บอก AI % ของทุกหัวข้อ · เลือกแล้วตัวเลข + กราฟเปลี่ยนตาม · จำไว้ในเครื่อง', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 สาย'));
     // AI % ของแต่ละหัวข้อขึ้นตอนจี้ปุ่ม
     expect(topicTab(/จับคู่งาน/).getAttribute('title')).toContain('AI 100%');
     expect(topicTab(/ดูแลหลังเริ่มงาน/).getAttribute('title')).toContain('ยังไม่มีงาน');
@@ -364,7 +364,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   it('หัวข้อที่ยังไม่มีสายเลย = กล่องเป็น 0 (ป้ายหนักไปทางไหนถอดแล้ว)', async () => {
     window.localStorage.setItem(BLOCK_STORE, 'aftercare');
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    await waitFor(() => expect(stat('ทั้งหมด')).toContain('0 รายชื่อ'));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('0 สาย'));
     // ดูแลหลังเริ่มงานนับตามแผน ⇒ กล่องบอกในตัวว่าโทรแล้ว/รอโทร (เจ้าของ 8 ต.ค. 2569 "AI โทร 162 โทรหมดเลยใช่ไหม")
     expect(stat('AI โทร')).toMatch(/โทรแล้ว.*รอโทร/);
     expect(screen.queryByText('ยังไม่มีงาน')).toBeNull();
@@ -388,7 +388,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
       body({ aftercare: { total: 3, ai: 0, staff: 0, both: 0, notCalled: 3, waitingAi: 3, waitingStaff: 0 } }),
     );
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    await waitFor(() => expect(stat('ทั้งหมด')).toContain('3 รายชื่อ'));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('3 สาย'));
     // แถบของกล่อง = % ของทั้งหมด ⇒ ยังไม่โทร 100%
     expect(stat('ยังไม่โทร')).toContain('100%');
     expect(topicTab(/ดูแลหลังเริ่มงาน/).getAttribute('title')).toContain('AI —');
@@ -443,14 +443,14 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
   it('รอบ 17: กล่องเรียง ทั้งหมด → AI โทร → คนโทร → (ทั้งสองทาง) → ยังไม่โทร · กล่องที่เป็น 0 กดไม่ได้', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 สาย'));
     const names = () =>
       screen
         .getAllByRole('button')
         .map((b) => b.getAttribute('aria-label') ?? '')
         .filter((n) => /^(ทั้งหมด|AI โทร|คนโทร|ทั้งสองทาง|ยังไม่โทร) \d/.test(n));
     // ติดตามนับแบบแผน (4 ต.ค. 2569): AI + คน = ทั้งหมด ⇒ ไม่มีกล่องยังไม่โทร
-    expect(names()).toEqual(['ทั้งหมด 205 รายชื่อ', 'AI โทร 205', 'คนโทร 0']);
+    expect(names()).toEqual(['ทั้งหมด 205 สาย', 'AI โทร 205', 'คนโทร 0']);
     expect((tileOf('AI โทร') as HTMLButtonElement).disabled).toBe(false);
     expect((tileOf('คนโทร') as HTMLButtonElement).disabled).toBe(true);
     // จับคู่งานมีทั้งสองทาง — อยู่ก่อนยังไม่โทร
@@ -461,7 +461,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
   it('รอบ 17: กดกล่อง = Popup รายชื่อของกล่องนั้น (ช่วงเดียวกับหน้า) · ชื่อ · BU · วันที่ · เปลี่ยนหน้าได้', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 สาย'));
     // หัวข้อติดตาม กด AI โทร = ป๊อปแยกเรื่องแล้ว (7 ต.ค. 2569) ⇒ ป๊อปรายชื่อแบบเดิมดูที่จับคู่งาน
     pickTopic(/จับคู่งาน/);
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('43 รายชื่อ'));
@@ -492,7 +492,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
   it('รอบ 17: กล่อง "ทั้งหมด" = ทุกก้อน + คอลัมน์สถานะว่าอยู่ก้อนไหน · เปิดใหม่เริ่มหน้าแรก', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 สาย'));
     fireEvent.click(tileOf('ทั้งหมด'));
     let dlg = await screen.findByRole('dialog');
     expect(fetchHomeAiShareList).toHaveBeenLastCalledWith('follow', 'total', 0, winQ);
@@ -517,7 +517,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
   it('รอบ 17: ไม่มีสิทธิ์ดูรายชื่อ = Popup บอกเหตุ ไม่ใช่หน้าว่าง', async () => {
     fetchHomeAiShareList.mockRejectedValue(new Error('บัญชีนี้ยังไม่มีสิทธิ์ดูรายชื่อส่วนนี้'));
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 สาย'));
     fireEvent.click(tileOf('ทั้งหมด'));
     const dlg = await screen.findByRole('dialog');
     expect(await within(dlg).findByText('บัญชีนี้ยังไม่มีสิทธิ์ดูรายชื่อส่วนนี้')).toBeTruthy();
@@ -525,7 +525,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
   it('รอบ 8: แถว "AI 100% ของสายที่โทรแล้ว" ถอดแล้ว · ยอดเป็นกล่อง Visual Control มีแถบ % ของทั้งหมด', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 สาย'));
     expect(screen.queryByText('AI 100%')).toBeNull();
     expect(screen.queryByText('ของสายที่โทรแล้ว')).toBeNull();
     // ติดตามนับแบบแผน ⇒ กล่องบอกโทรแล้ว / รอโทร / ยกเลิก แทนแถบ % (เจ้าของ 8 ต.ค. 2569 "คน 302 คือต้องโทร หรือโทรไปแล้ว")
@@ -578,13 +578,14 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
   it('🔴 แผง "ผลโทร" ล่างสุดถอดแล้ว (เจ้าของ 7 ต.ค. 2569 "ผลโทร ล่างสุดเอาออกได้เลย")', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 สาย'));
     expect(screen.queryByRole('button', { name: /^ผลโทร/ })).toBeNull();
   });
 
-  it('รอบ 18: หน่วยเป็น "รายชื่อ" ทุกหัวข้อ — ไม่เหลือ สาย/ใบ/คน บนกล่อง', async () => {
+  // 12 ต.ค. 2569 เจ้าของ Choice "เปลี่ยนคำเป็น สาย": ติดตาม/ดูแล นับแถวสาย ⇒ หน่วย "สาย" · หัวข้ออื่นยัง "รายชื่อ"
+  it('หน่วย: ติดตาม/ดูแล = "สาย" · งานสรรหา/จับคู่งาน = "รายชื่อ"', async () => {
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 สาย'));
     pickTopic(/งานสรรหา/);
     await waitFor(() => expect(stat('ทั้งหมด')).toContain('78 รายชื่อ'));
     expect(stat('ทั้งหมด')).not.toMatch(/\d (สาย|ใบ|คน)\b/);
@@ -592,7 +593,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
 
   it('รอบ 18: ช่องไฟ + ระยะบรรทัดเท่ากันทั้งหน้าและในป๊อปรายชื่อ', async () => {
     const { container } = render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 สาย'));
     const root = container.firstElementChild as HTMLElement;
     for (const c of EVEN_TYPE.split(' ')) expect(root.classList.contains(c)).toBe(true);
     fireEvent.click(tileOf('AI โทร'));
@@ -607,7 +608,7 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
       }),
     );
     render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-    await waitFor(() => expect(stat('ทั้งหมด')).toContain('58 รายชื่อ'));
+    await waitFor(() => expect(stat('ทั้งหมด')).toContain('58 สาย'));
     expect(stat('AI โทร')).toContain('31');
     expect(stat('คนโทร')).toContain('27');
     expect(screen.queryByTestId('ai-share-teams')).toBeNull();
@@ -666,9 +667,9 @@ describe('กดกล่อง AI โทร / คนโทร ของติ�
     expect(fetchHomeAiShareList).not.toHaveBeenCalled();
     const main = await within(dialog).findByTestId('caller-topic-main');
     expect(within(dialog).getByTestId('caller-topic-replacement').textContent).toContain('ติดตามส่งคนแทน');
-    expect(main.getAttribute('aria-label')).toBe('ติดตามคนเริ่มงาน 1 รายชื่อ');
+    expect(main.getAttribute('aria-label')).toBe('ติดตามคนเริ่มงาน 1 สาย');
     fireEvent.click(main);
-    expect(within(dialog).getByTestId('caller-sum').textContent).toBe('โทรแล้ว 1 + ยกเลิก 0 + รอโทร 0 = 1 รายชื่อ');
+    expect(within(dialog).getByTestId('caller-sum').textContent).toBe('โทรแล้ว 1 + ยกเลิก 0 + รอโทร 0 = 1 สาย');
     fireEvent.click(within(dialog).getByTestId('caller-col-went'));
     expect(within(dialog).getByText('คนทดสอบ')).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: /ติดตามคนเริ่มงาน/ }));
@@ -718,7 +719,7 @@ describe('หน้าหลักอ่านไล่บนลงล่าง 
     expect(within(lbd).getAllByText('673').length).toBeGreaterThan(0);
     expect(within(box).getByTestId('bu-block-LBA')).toBeTruthy();
     expect(within(box).queryByTestId('bu-block-LML')).toBeNull();
-    expect(within(box).getByTestId('lumos-follow-sum').textContent).toBe('LBD 1,417 + LBA 61 = 1,478 รายชื่อ');
+    expect(within(box).getByTestId('lumos-follow-sum').textContent).toBe('LBD 1,417 + LBA 61 = 1,478 สาย');
     // ถอดแล้ว
     for (const id of ['kpi-pick', 'ai-gauge', 'bu-breakdown', 'follow-team-breakdown', 'result-bars']) {
       expect(screen.queryByTestId(id)).toBeNull();
@@ -752,7 +753,7 @@ describe('หน้าหลักอัปเดตสด', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-      await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+      await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 สาย'));
       expect(screen.getByTestId('home-live').textContent).toMatch(/^สด · อัปเดต /);
       const cards = fetchHomeAiShare.mock.calls.length;
       const charts = fetchHomeAiShareDetail.mock.calls.length;
@@ -769,7 +770,7 @@ describe('หน้าหลักอัปเดตสด', () => {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1_000);
       });
-      await waitFor(() => expect(stat('ทั้งหมด')).toContain('210 รายชื่อ'));
+      await waitFor(() => expect(stat('ทั้งหมด')).toContain('210 สาย'));
     } finally {
       vi.useRealTimers();
     }
@@ -791,14 +792,14 @@ describe('หน้าหลักตอนเส้นล้ม (QA รอบ 3
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       render(<HomeAiSharePage />, { wrapper: MemoryRouter });
-      await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 รายชื่อ'));
+      await waitFor(() => expect(stat('ทั้งหมด')).toContain('205 สาย'));
       expect(screen.getByTestId('home-live').textContent).toMatch(/^สด · อัปเดต /);
       fetchHomeAiShare.mockRejectedValue(new Error('boom'));
       await act(async () => {
         await vi.advanceTimersByTimeAsync(31_000);
       });
       await waitFor(() => expect(screen.getByTestId('home-live').textContent).toMatch(/^อัปเดตไม่สำเร็จ · ข้อมูลเมื่อ /));
-      expect(stat('ทั้งหมด')).toContain('205 รายชื่อ');
+      expect(stat('ทั้งหมด')).toContain('205 สาย');
     } finally {
       vi.useRealTimers();
     }

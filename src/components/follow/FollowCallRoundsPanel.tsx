@@ -35,9 +35,13 @@ import {
   FOLLOW_MATRIX_COL_TONE,
   FOLLOW_MATRIX_ROWS,
   FOLLOW_MATRIX_ROW_LABEL,
+  FOLLOW_PANEL_LINES,
   buildFollowCallMatrix,
+  followPanelLists,
+  followPeopleCount,
   type FollowMatrixCol,
   type FollowMatrixRowKey,
+  type FollowPanelLine,
 } from '@/lib/followCallMatrix';
 import {
   Dialog,
@@ -413,82 +417,85 @@ export default function FollowCallRoundsPanel({
            * แบบ ทั้งหมด และ แต่ละสาย"*) — นับจากชุดเดียวกับ "ทั้งหมด" ⇒ AI + คน = ทั้งหมดเสมอ
            * แต่ละสาย = เลือกใน dropdown "สายที่" (เลขชุดนี้เปลี่ยนตามเหมือนเลขอื่น)
            */
-          const aiList = row.total.filter((e) => followCallerOf(e) === 'ai');
-          const manualList = row.total.filter((e) => followCallerOf(e) === 'manual');
-          const callerCells: Array<{ key: string; label: string; list: FollowEntry[] }> = [
-            { key: 'ai', label: 'AI โทร', list: aiList },
-            { key: 'manual', label: 'คนโทร', list: manualList },
+          const panel = followPanelLists(row);
+          type Lists = Record<FollowPanelLine, FollowEntry[]>;
+          const callerCols: Array<{ key: 'ai' | 'manual' | 'all'; label: string; pick: (l: Lists[FollowPanelLine]) => FollowEntry[] }> = [
+            { key: 'ai', label: 'AI', pick: (l) => l.filter((e) => followCallerOf(e) === 'ai') },
+            { key: 'manual', label: 'คน', pick: (l) => l.filter((e) => followCallerOf(e) === 'manual') },
+            { key: 'all', label: 'รวม', pick: (l) => l },
           ];
           return (
-            <div className="px-5 pb-5 pt-4" data-testid="call-summary">
-              {/* 9 ช่องแถวเดียว (เจ้าของ 7 ต.ค. 2569 "แถวมันตก ทำให้มันอยู่แถวเดียวกัน") — 7 หมวด + AI โทร + คนโทร */}
-              <div className="grid grid-cols-4 gap-x-2 gap-y-4 md:grid-cols-9">
-                {FOLLOW_MATRIX_COLS.map((c) => {
-                  const n = row[c].length;
-                  /** กล่องที่เลือกอยู่ — "ทั้งหมด" = ไม่ได้เลือกกล่องไหน */
-                  const selected = onResultBoxChange ? (c === 'total' ? resultBox === null : resultBox === c) : false;
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      disabled={n === 0 && !selected}
-                      aria-pressed={onResultBoxChange ? selected : undefined}
-                      data-testid={`result-box-${c}`}
-                      onClick={() => {
-                        if (!onResultBoxChange) return openMatrixDialog(activeRound, c);
-                        onResultBoxChange(c === 'total' || resultBox === c ? null : c);
-                      }}
-                      className={cn(
-                        'flex flex-col items-start rounded-lg px-2 py-1 text-left transition-colors hover:bg-muted/60 disabled:cursor-default disabled:hover:bg-transparent',
-                        selected && 'bg-muted ring-1 ring-border',
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'text-2xl font-medium leading-none tabular-nums sm:text-3xl',
-                          n === 0 ? 'text-muted-foreground' : TONE[FOLLOW_MATRIX_COL_TONE[c]].value,
-                        )}
-                      >
-                        {n.toLocaleString('th-TH')}
-                      </span>
-                      <span className="mt-1.5 whitespace-nowrap text-[11px] text-muted-foreground sm:text-xs">{FOLLOW_MATRIX_COL_LABEL[c]}</span>
-                    </button>
-                  );
-                })}
-                {/* เส้นคั่นบาง ๆ แยก "ผลของสาย" กับ "ใครโทร" — จอแคบตกแถวเอง */}
-                {callerCells.map(({ key, label, list }, i) => (
-                  <button
-                    key={key}
-                    type="button"
-                    disabled={list.length === 0}
-                    data-testid={`caller-${key}`}
-                    onClick={() => {
-                      setPeopleLife('all');
-                      setPeopleDialog({
-                        title: `${FOLLOW_MATRIX_ROW_LABEL[activeRound]} · ${label} (${list.length.toLocaleString('th-TH')} สาย)`,
-                        hint: '',
-                        people: list,
-                        splitByLife: true,
-                      });
-                    }}
-                    className={cn(
-                      'flex flex-col items-start rounded-lg py-1 text-left transition-opacity hover:opacity-80 disabled:cursor-default disabled:hover:opacity-100',
-                      i === 0 && 'md:border-l md:border-border/70 md:pl-4',
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'text-2xl font-medium leading-none tabular-nums sm:text-3xl',
-                        list.length === 0 ? 'text-muted-foreground' : 'text-foreground',
-                      )}
-                    >
-                      {list.length.toLocaleString('th-TH')}
-                    </span>
-                    <span className="mt-1.5 whitespace-nowrap text-[11px] text-muted-foreground sm:text-xs">{label}</span>
-                  </button>
-                ))}
-              </div>
-              {/* แถบสัดส่วนใต้เลขถูกถอด (เจ้าของสั่ง 3 ต.ค. 2569 "เอาหลอดออก") — ห้ามเติมกลับ */}
+            <div className="overflow-x-auto px-5 pb-5 pt-4" data-testid="call-summary">
+              {/**
+               * 🔴 ตาราง AI | คน | รวม (เจ้าของ Choice 12 ต.ค. 2569 "แบบ A" แทนเลขใหญ่ 9 ช่องแถวเดียว)
+               * เรียง โทรทั้งหมด → โทรไปแล้ว (ผล 4 แบบ) → รอโทร → ยกเลิก · แต่ละช่อง "N คน · M สาย" (เจ้าของ "25 คน แต่ 400 สาย")
+               * สายบวกกันลงตัว · คน = คนไม่ซ้ำในช่องนั้น (คนเดียวมีหลายสายคนละผลได้) · กดช่องรวม = กรองตารางข้างล่าง (แบบเดิม) · ช่อง AI/คน = ป๊อปรายชื่อ
+               */}
+              <table className="w-full min-w-[30rem] border-collapse text-sm" data-testid="call-panel">
+                <thead>
+                  <tr className="text-xs text-muted-foreground">
+                    <th className="py-2 text-left font-normal" />
+                    {callerCols.map((c) => (
+                      <th key={c.key} className="py-2 text-right font-normal">
+                        {c.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {FOLLOW_PANEL_LINES.map((line) => {
+                    const lists = panel[line.key];
+                    const tone = line.box && line.box !== 'total' ? TONE[FOLLOW_MATRIX_COL_TONE[line.box]].value : 'text-foreground';
+                    return (
+                      <tr key={line.key} className="border-t border-border/60" data-testid={`panel-${line.key}`}>
+                        <td className={cn('py-2', line.indent === 1 && 'pl-3', line.indent === 2 && 'pl-7')}>
+                          <span className={cn(line.indent === 0 ? 'font-medium' : '', line.indent === 2 ? tone : 'text-foreground')}>
+                            {line.label}
+                          </span>
+                        </td>
+                        {callerCols.map((c) => {
+                          const list = c.pick(lists);
+                          const n = list.length;
+                          const isSum = c.key === 'all';
+                          const selected = isSum && onResultBoxChange && line.box
+                            ? line.box === 'total' ? resultBox === null : resultBox === line.box
+                            : false;
+                          return (
+                            <td key={c.key} className="py-1 text-right">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="xs"
+                                disabled={n === 0 && !selected}
+                                aria-pressed={isSum && onResultBoxChange && line.box ? selected : undefined}
+                                data-testid={`panel-${line.key}-${c.key}`}
+                                className={cn('h-auto flex-col items-end gap-0 py-1 tabular-nums', selected && 'bg-muted ring-1 ring-border')}
+                                onClick={() => {
+                                  if (isSum && line.box && onResultBoxChange) {
+                                    return onResultBoxChange(line.box === 'total' || resultBox === line.box ? null : line.box);
+                                  }
+                                  setPeopleLife('all');
+                                  setPeopleDialog({
+                                    title: `${FOLLOW_MATRIX_ROW_LABEL[activeRound]} · ${line.label} · ${c.label} (${followPeopleCount(list).toLocaleString('th-TH')} คน · ${n.toLocaleString('th-TH')} สาย)`,
+                                    hint: '',
+                                    people: list,
+                                    splitByLife: line.key === 'total',
+                                  });
+                                }}
+                              >
+                                <span className={cn('text-base font-medium', n === 0 ? 'text-muted-foreground' : isSum ? 'text-foreground' : 'text-foreground/90')}>
+                                  {followPeopleCount(list).toLocaleString('th-TH')} คน
+                                </span>
+                                <span className="text-[11px] font-normal text-muted-foreground">{n.toLocaleString('th-TH')} สาย</span>
+                              </Button>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           );
         })()}

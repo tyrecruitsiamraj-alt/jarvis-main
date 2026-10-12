@@ -17,7 +17,7 @@
  */
 import type { FollowEntry } from '@/lib/followApi';
 import { callCategory, dayVerdictOf, followRoundState, staffDayVerdicts, type FollowCallCategory } from '@/lib/followPlanning';
-import { followGroupKey } from '@/lib/followGrouping';
+import { followGroupKey, followPersonKey } from '@/lib/followGrouping';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 
 export type FollowMatrixRowKey = 'all' | 1 | 2 | 3;
@@ -124,4 +124,39 @@ export function buildFollowCallMatrix(entries: readonly FollowEntry[], now: Date
     }
   }
   return m;
+}
+
+/**
+ * ═══ แผงตัวเลขหน้าติดตามแบบตาราง AI | คน | รวม (เจ้าของ Choice 12 ต.ค. 2569 "แบบ A") ═══
+ * เรียง: โทรทั้งหมด → โทรไปแล้ว (= ไป + ไม่ไป + ไม่รับสาย + สรุปไม่ได้) → รอโทร → ยกเลิก · นับเป็นสาย
+ * โทรไปแล้ว + รอโทร + ยกเลิก = โทรทั้งหมด (ช่องของ matrix แบ่งกันพอดีอยู่แล้ว) · AI + คน = รวม (`followCallerOf`)
+ */
+export type FollowPanelLine = 'total' | 'called' | Exclude<FollowMatrixCol, 'total'>;
+export const FOLLOW_PANEL_LINES: ReadonlyArray<{ key: FollowPanelLine; label: string; indent: 0 | 1 | 2; box: FollowMatrixCol | null }> = [
+  { key: 'total', label: 'โทรทั้งหมด', indent: 0, box: 'total' },
+  { key: 'called', label: 'โทรไปแล้ว', indent: 1, box: null },
+  { key: 'went', label: FOLLOW_MATRIX_COL_LABEL.went, indent: 2, box: 'went' },
+  { key: 'notWent', label: FOLLOW_MATRIX_COL_LABEL.notWent, indent: 2, box: 'notWent' },
+  { key: 'noAnswer', label: FOLLOW_MATRIX_COL_LABEL.noAnswer, indent: 2, box: 'noAnswer' },
+  { key: 'unclear', label: FOLLOW_MATRIX_COL_LABEL.unclear, indent: 2, box: 'unclear' },
+  { key: 'waiting', label: FOLLOW_MATRIX_COL_LABEL.waiting, indent: 1, box: 'waiting' },
+  { key: 'cancelled', label: FOLLOW_MATRIX_COL_LABEL.cancelled, indent: 1, box: 'cancelled' },
+];
+
+export function followPanelLists(row: Record<FollowMatrixCol, FollowEntry[]>): Record<FollowPanelLine, FollowEntry[]> {
+  return {
+    total: row.total,
+    called: [...row.went, ...row.notWent, ...row.noAnswer, ...row.unclear],
+    went: row.went,
+    notWent: row.notWent,
+    noAnswer: row.noAnswer,
+    unclear: row.unclear,
+    waiting: row.waiting,
+    cancelled: row.cancelled,
+  };
+}
+
+/** จำนวนคน (ไม่ซ้ำ) ของชุดสาย — "25 คน · 400 สาย" (เจ้าของ 12 ต.ค. 2569) · คนเดียวกัน = `followPersonKey` */
+export function followPeopleCount(list: readonly FollowEntry[]): number {
+  return new Set(list.map(followPersonKey)).size;
 }

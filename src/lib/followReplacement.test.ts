@@ -109,9 +109,11 @@ describe('หน้าการติดตาม: หัวการ์ด Call
     expect(summary.length).toBeGreaterThan(100);
     expect(summary).not.toContain('bg-secondary');
     expect(summary).not.toContain('width: `');
-    // AI โทร / คนโทร ของสายที่เลือก (3 ต.ค. 2569 "บอกเพิ่มด้วยว่า AI เท่าไหร่ คนเท่าไหร่ แบบทั้งหมดและแต่ละสาย")
-    expect(panel).toContain("{ key: 'ai', label: 'AI โทร', list: aiList }");
-    expect(panel).toContain("{ key: 'manual', label: 'คนโทร', list: manualList }");
+    // AI / คน / รวม ของสายที่เลือก — 12 ต.ค. 2569 เป็นตาราง (เจ้าของ Choice "แบบ A") · ทุกช่อง "N คน · M สาย"
+    expect(panel).toContain('data-testid="call-panel"');
+    expect(panel).toContain("{ key: 'ai', label: 'AI', pick:");
+    expect(panel).toContain("{ key: 'manual', label: 'คน', pick:");
+    expect(panel).toMatch(/followPeopleCount\(list\)\.toLocaleString\('th-TH'\)\} คน/);
   });
 
   it('🔴 แถวบนสุด = ย้อนกลับ + แท็บ + ปุ่มของหน้า · ชื่อหน้าไม่โชว์บนจอ (3 ต.ค. 2569)', () => {
