@@ -6,8 +6,8 @@ import { CalendarDays, ChevronDown, ChevronRight, RefreshCw, RotateCcw, X } from
 import FilterChips from '@/components/shared/FilterChips';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
-import ListPaginationBar from '@/components/shared/ListPaginationBar';
-import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
+import { PagePager } from '@/components/shared/PagePager';
+import { getTotalPages, PAGE_SIZE_OPTIONS, type PageSizeOption } from '@/lib/pagination';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import RmSearchBar, { RM_SEARCH_PLACEHOLDER } from '@/components/recruit-rm/RmSearchBar';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
@@ -1260,17 +1260,20 @@ const RmWorkspace: React.FC<{
                 actionsOverride={cancelledView ? ['view', 'restore'] : undefined}
               />
               </div>
-              <ListPaginationBar
+              {/* ตัวแบ่งหน้าแบบเดียวทั้งระบบ ‹ 1/N › (`PagePager` · เจ้าของ Choice 12 ต.ค. 2569) */}
+              <PagePager
+                className="pt-2"
                 page={currentPage}
-                totalPages={totalPages}
-                pageSize={pageSize}
-                totalItems={shown.length}
-                pageFrom={shown.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
-                pageTo={Math.min(currentPage * pageSize, shown.length)}
+                pageCount={totalPages}
                 onPageChange={setPage}
-                onPageSizeChange={(s) => {
-                  setPageSize(s);
-                  setPage(1);
+                summary={`แสดง ${shown.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, shown.length)} จาก ${shown.length}`}
+                size={{
+                  value: pageSize,
+                  options: PAGE_SIZE_OPTIONS,
+                  onChange: (s) => {
+                    setPageSize(s as PageSizeOption);
+                    setPage(1);
+                  },
                 }}
               />
             </>

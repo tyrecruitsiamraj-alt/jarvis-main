@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useMemo, useState } from 'react';
+import { Input } from '@/components/ui/input';
 import { fetchRecruitJobTitles } from '@/lib/recruitJobTitlesApi';
 import {
   isKnownJobTitle,
@@ -28,7 +29,8 @@ const JobTitleField: React.FC<{
   label?: string;
   placeholder?: string;
   /** class ของ input — รับจากฟอร์มเพื่อให้หน้าตาตรงกับช่องอื่นในฟอร์มเดียวกัน */
-  inputClassName: string;
+  /** เพิ่มคลาสให้ช่อง (หน้าตาหลักมาจาก `Input` · 12 ต.ค. 2569) */
+  inputClassName?: string;
   labelClassName: string;
 }> = ({
   value,
@@ -65,7 +67,7 @@ const JobTitleField: React.FC<{
       <label className={labelClassName} htmlFor={`${listId}-input`}>
         {label}
       </label>
-      <input
+      <Input
         id={`${listId}-input`}
         className={inputClassName}
         list={options.length > 0 ? listId : undefined}

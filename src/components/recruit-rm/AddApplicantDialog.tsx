@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { FieldSelect } from '@/components/shared/FieldSelect';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Loader2, UserPlus } from 'lucide-react';
 import {
   Dialog,
@@ -38,8 +40,6 @@ import {
  * ช่องทาง) ไม่ทำ master ซ้ำอีกชุด · ตำแหน่งเป็นช่องพิมพ์เพราะฝั่งเรายังไม่มี master ตำแหน่ง
  */
 
-const fieldCls =
-  'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/30';
 const labelCls = 'text-xs font-medium text-muted-foreground';
 
 const DISTRICTS = districtsByProvince as Record<string, string[]>;
@@ -156,16 +156,15 @@ const AddApplicantDialog: React.FC<{
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label className={labelCls}>ชื่อ *</label>
-              <input className={fieldCls} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+              <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <label className={labelCls}>นามสกุล *</label>
-              <input className={fieldCls} value={lastName} onChange={(e) => setLastName(e.target.value)} />
+              <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <label className={labelCls}>อายุ *</label>
-              <input
-                className={fieldCls}
+              <Input
                 type="number"
                 inputMode="numeric"
                 value={age}
@@ -193,8 +192,7 @@ const AddApplicantDialog: React.FC<{
             </div>
             <div className="space-y-1.5">
               <label className={labelCls}>เบอร์โทรติดต่อ * (10 หลัก)</label>
-              <input
-                className={fieldCls}
+              <Input
                 inputMode="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -203,90 +201,63 @@ const AddApplicantDialog: React.FC<{
             </div>
             <div className="space-y-1.5">
               <label className={labelCls}>LINE ID</label>
-              <input className={fieldCls} value={lineId} onChange={(e) => setLineId(e.target.value)} />
+              <Input value={lineId} onChange={(e) => setLineId(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <label className={labelCls}>จังหวัด</label>
-              <select
-                className={fieldCls}
+              <FieldSelect
+                ariaLabel="จังหวัด"
                 value={province}
-                onChange={(e) => {
-                  setProvince(e.target.value);
+                onChange={(v) => {
+                  setProvince(v);
                   setDistrict(''); // อำเภอของจังหวัดเดิมใช้กับจังหวัดใหม่ไม่ได้
                 }}
-              >
-                <option value="">ไม่ระบุ</option>
-                {THAI_PROVINCE_NAMES_SORTED.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
+                options={[{ value: '', label: 'ไม่ระบุ' }, ...THAI_PROVINCE_NAMES_SORTED.map((p) => ({ value: p, label: p }))]}
+              />
             </div>
             <div className="space-y-1.5">
               <label className={labelCls}>อำเภอ/เขต</label>
-              <select
-                className={fieldCls}
+              <FieldSelect
+                ariaLabel="อำเภอ/เขต"
                 value={district}
-                onChange={(e) => setDistrict(e.target.value)}
+                onChange={setDistrict}
                 disabled={!province}
-              >
-                <option value="">{province ? 'ไม่ระบุ' : 'เลือกจังหวัดก่อน'}</option>
-                {districts.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
+                options={[{ value: '', label: province ? 'ไม่ระบุ' : 'เลือกจังหวัดก่อน' }, ...districts.map((d) => ({ value: d, label: d }))]}
+              />
             </div>
             {/* ฟอร์มนี้ไม่ผูก BU (คนโทรเข้ามาสมัครลอย) — ลิสต์จึงเป็นทุก BU */}
             <JobTitleField
               value={positionInterest}
               onChange={setPositionInterest}
               label="ตำแหน่งงานที่สนใจ"
-              inputClassName={fieldCls}
               labelClassName={labelCls}
             />
             <div className="space-y-1.5">
               <label className={labelCls}>ประเภทเจาะจง</label>
-              <select
-                className={fieldCls}
+              <FieldSelect
+                ariaLabel="ประเภทเจาะจง"
                 value={specificType}
-                onChange={(e) => setSpecificType(e.target.value)}
-              >
-                <option value="">ไม่ระบุ</option>
-                {RM_SPECIFIC_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+                onChange={setSpecificType}
+                options={[{ value: '', label: 'ไม่ระบุ' }, ...RM_SPECIFIC_TYPES.map((t) => ({ value: t, label: t }))]}
+              />
             </div>
             <div className="space-y-1.5">
               <label className={labelCls}>วุฒิการศึกษา</label>
-              <select className={fieldCls} value={education} onChange={(e) => setEducation(e.target.value)}>
-                <option value="">ไม่ระบุ</option>
-                {RM_EDUCATION_LEVELS.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
+              <FieldSelect
+                ariaLabel="วุฒิการศึกษา"
+                value={education}
+                onChange={setEducation}
+                options={[{ value: '', label: 'ไม่ระบุ' }, ...RM_EDUCATION_LEVELS.map((d) => ({ value: d, label: d }))]}
+              />
             </div>
             <div className="space-y-1.5">
               <label className={labelCls}>ผู้รับผิดชอบ</label>
-              <select
-                className={fieldCls}
+              <FieldSelect
+                ariaLabel="ผู้รับผิดชอบ"
                 value={responsible}
-                onChange={(e) => setResponsible(e.target.value)}
-              >
-                <option value="">ไม่ระบุ</option>
-                {staff.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setResponsible}
+                options={[{ value: '', label: 'ไม่ระบุ' }, ...staff.map((u) => ({ value: u.id, label: u.name }))]}
+              />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <label className={labelCls}>ช่องทางการรับสมัคร</label>

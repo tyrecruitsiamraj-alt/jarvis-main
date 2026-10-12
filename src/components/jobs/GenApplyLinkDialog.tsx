@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { FieldSelect } from '@/components/shared/FieldSelect';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import type { JobRequest } from '@/types';
 import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import { buildOnlineNameOptions } from '@/lib/jobStaffNames';
@@ -84,9 +87,6 @@ function LinkRow({ url, label }: { url: string; label?: string | null }) {
     </div>
   );
 }
-
-const fieldCls =
-  'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/30';
 
 /**
  * สร้างประกาศรับสมัคร + ลิงก์ต่อช่องทาง — ทำจบในที่เดียวจากกล่องงาน
@@ -304,7 +304,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                   <label className="text-xs font-medium text-muted-foreground">
                     หัวข้อประกาศ <span className="text-destructive">*</span>
                   </label>
-                  <input className={fieldCls} value={title} onChange={(e) => setTitle(e.target.value)} />
+                  <Input value={title} onChange={(e) => setTitle(e.target.value)} />
                   {/* 🔴 บอกให้รู้ว่าค่านี้ไปโผล่ที่ไหน — คนกรอกจะได้รู้ว่าต้องเขียนให้คนนอกอ่านเข้าใจ */}
                   <p className="text-[11px] leading-4 text-muted-foreground">
                     บรรทัดนี้คือ<span className="font-medium text-foreground">หัวเรื่องตัวใหญ่ที่ผู้สมัครเห็น</span>เมื่อกดลิงก์เข้ามา
@@ -315,8 +315,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                   <label className="text-xs font-medium text-muted-foreground">
                     รายละเอียดที่ผู้สมัครเห็น <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
                   </label>
-                  <textarea
-                    className={`${fieldCls} min-h-[76px]`}
+                  <Textarea
                     value={detail}
                     onChange={(e) => setDetail(e.target.value)}
                     placeholder="เช่น ลักษณะงาน เวลาทำงาน สวัสดิการ"
@@ -327,8 +326,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                     <label className="text-xs font-medium text-muted-foreground">
                       สถานที่ทำงาน <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
                     </label>
-                    <input
-                      className={fieldCls}
+                    <Input
                       value={locationText}
                       onChange={(e) => setLocationText(e.target.value)}
                     />
@@ -337,8 +335,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                     <label className="text-xs font-medium text-muted-foreground">
                       ค่าตอบแทน <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
                     </label>
-                    <input
-                      className={fieldCls}
+                    <Input
                       value={salaryText}
                       onChange={(e) => setSalaryText(e.target.value)}
                       placeholder="เช่น 15,000–18,000 บาท"
@@ -348,8 +345,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                     <label className="text-xs font-medium text-muted-foreground">
                       ผู้ติดต่อ <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
                     </label>
-                    <input
-                      className={fieldCls}
+                    <Input
                       value={contactName}
                       onChange={(e) => setContactName(e.target.value)}
                     />
@@ -358,8 +354,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                     <label className="text-xs font-medium text-muted-foreground">
                       เบอร์ติดต่อ <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
                     </label>
-                    <input
-                      className={fieldCls}
+                    <Input
                       value={contactPhone}
                       onChange={(e) => setContactPhone(e.target.value)}
                     />
@@ -375,34 +370,25 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                     value={positionName}
                     onChange={setPositionName}
                     departmentCode={job?.department_code ?? standalone?.departmentCode ?? null}
-                    inputClassName={fieldCls}
                     labelClassName="text-xs font-medium text-muted-foreground"
                   />
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-muted-foreground">จังหวัด</label>
-                    <select className={fieldCls} value={province} onChange={(e) => setProvince(e.target.value)}>
-                      <option value="">ไม่ระบุ</option>
-                      {THAI_PROVINCE_NAMES_SORTED.map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
+                    <FieldSelect
+                      ariaLabel="จังหวัด"
+                      value={province}
+                      onChange={setProvince}
+                      options={[{ value: '', label: 'ไม่ระบุ' }, ...THAI_PROVINCE_NAMES_SORTED.map((p) => ({ value: p, label: p }))]}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-muted-foreground">ผู้รับผิดชอบ</label>
-                    <select
-                      className={fieldCls}
+                    <FieldSelect
+                      ariaLabel="ผู้รับผิดชอบ"
                       value={responsible}
-                      onChange={(e) => setResponsible(e.target.value)}
-                    >
-                      <option value="">ไม่ระบุ</option>
-                      {onlineNames.map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setResponsible}
+                      options={[{ value: '', label: 'ไม่ระบุ' }, ...onlineNames.map((n) => ({ value: n, label: n }))]}
+                    />
                     <p className="text-[11px] text-muted-foreground">
                       ชื่อมาจากทีม Online (ตั้งค่า → สรรหา / คัดสรร / OPL / Online)
                     </p>

@@ -36,8 +36,8 @@ import {
   fetchJobApplicantBreakdown,
   type ApplicationOrigin,
 } from '@/lib/publicApplicationsApi';
-import ListPaginationBar from '@/components/shared/ListPaginationBar';
-import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
+import { PagePager } from '@/components/shared/PagePager';
+import { getTotalPages, PAGE_SIZE_OPTIONS, type PageSizeOption } from '@/lib/pagination';
 import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
 import { selectSilentLinkRows } from '@/lib/jobLinkSilence';
 import { buildCountIndex, buildJobKeyIndex, countFor } from '@/lib/jobKeyIndex';
@@ -1973,17 +1973,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         {/* 🔴 นับจาก `flowJobs` (ชุดเดียวกับการ์ดที่โชว์ · รวมเลนที่กด) — เดิมใช้ `boxedJobs` เลยไม่เปลี่ยนตามเลน (5 ต.ค. 2569) */}
         {flowJobs.length > 0 ? (
           <div className="pb-10 pt-4">
-            <ListPaginationBar
+            {/* ตัวแบ่งหน้าแบบเดียวทั้งระบบ ‹ 1/N › (`PagePager` · เจ้าของ Choice 12 ต.ค. 2569 · เดิมปุ่มเลข 1 2 3 …) */}
+            <PagePager
               page={currentPage}
-              pageSize={pageSize}
-              totalItems={flowJobs.length}
-              totalPages={totalPages}
-              pageFrom={pageStart + 1}
-              pageTo={pageStart + visibleJobs.length}
+              pageCount={totalPages}
               onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
+              summary={`แสดง ${pageStart + 1}–${pageStart + visibleJobs.length} จาก ${flowJobs.length}`}
+              size={{
+                value: pageSize,
+                options: PAGE_SIZE_OPTIONS,
+                onChange: (size) => {
+                  setPageSize(size as PageSizeOption);
+                  setPage(1);
+                },
               }}
             />
           </div>

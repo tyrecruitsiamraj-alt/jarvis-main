@@ -13029,3 +13029,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · `<select>` → `FieldSelect`: ช่วงเวลา (ตัวกรอง) · คำนำหน้า · สายที่ · `FollowMasterSelect` · `StaffContactField` · `TimeSelect24` (ตัวกลาง ใช้ร่วม AssignDialog ด้วย)
   · `<input className="jarvis-soft-field">` → `Input` · textarea → `Textarea` (ui/textarea หน้าตาเดียวกับ Input แล้ว) · ชิป `jarvis-chip…` → `TONE.x.chip`
   · `ChoiceDropdown` รายการยาวเลื่อนได้ (max-h-72) · ภาพ `docs/qa-shots/{pager-follow,select-follow-form}-{before,after}-2569-10-12.jpg`
+- (12 ต.ค. 2569 สาย) **QA รอบ 2 ข้อ 43–44 · หน้างานสรรหา** (ต่อจากหน้าติดตาม)
+  · `JobBoardView` (การ์ดประกาศ) · `RmWorkspace` (ผู้สมัคร/การติดต่อ/นัด) — `ListPaginationBar` → `PagePager` (ต่อหน้า 10–50 ชุดเดิม `PAGE_SIZE_OPTIONS`)
+  · `<select>`/`fieldCls` → `FieldSelect`/`Input`/`Textarea`: `AddApplicantDialog` · `GenApplyLinkDialog` · ป๊อปประกาศลอย (`RecruitBoardTools` · ปุ่ม → Button) · `JobTitleField` ใช้ `Input` (inputClassName ไม่บังคับแล้ว)
+  · ชิป `RecruitLaneDialog` → `TONE.violet.chip`
+  · ⚠️ ยังไม่แตะ (นอก 3 หน้า/เสี่ยง): `PublicApplyDialog` (ฟอร์มสาธารณะ พึ่ง `required` ของ select) · `RosterBackedStaffSelect` · `UnitRequestWorkStatusField` · `SelectionProgressControls` · `UnitRequestNoteField` · `ListPaginationBar` ยังอยู่ในหน้าอื่น
+  · ภาพ `docs/qa-shots/{pager-recruit,select-recruit-form}-{before,after}-2569-10-12.jpg`

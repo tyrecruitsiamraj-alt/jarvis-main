@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FieldSelect } from '@/components/shared/FieldSelect';
 import { Button } from '@/components/ui/button';
 import { useUiV2 } from '@/lib/uiV2';
 import { useNavigate } from 'react-router-dom';
@@ -24,9 +25,6 @@ import { RM_TOOLBAR_LABEL, type RmToolbarKey } from '@/lib/recruitRm';
 
 const BU_OPTIONS = ['LBD', 'LBA', 'LM', 'DS', 'SN'];
 
-const fieldCls =
-  'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/30';
-
 /** เลือกประเภทกล่องลอย + BU ก่อนเข้าฟอร์มสร้างลิงก์ */
 const StandalonePickerDialog: React.FC<{
   open: boolean;
@@ -48,36 +46,29 @@ const StandalonePickerDialog: React.FC<{
         <div className="space-y-3 px-5 py-4">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">ประเภทกล่อง</label>
-            <select className={fieldCls} value={kind} onChange={(e) => setKind(e.target.value)}>
-              {STANDALONE_POSTING_KINDS.map((k) => (
-                <option key={k.code} value={k.code}>
-                  {k.label}
-                </option>
-              ))}
-            </select>
+            <FieldSelect
+              ariaLabel="ประเภทกล่อง"
+              value={kind}
+              onChange={setKind}
+              options={STANDALONE_POSTING_KINDS.map((k) => ({ value: k.code, label: k.label }))}
+            />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
               BU * <span className="font-normal">(บังคับ — ไม่มีใบขอให้ดึงมา)</span>
             </label>
-            <select className={fieldCls} value={bu} onChange={(e) => setBu(e.target.value)}>
-              {BU_OPTIONS.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
+            <FieldSelect ariaLabel="BU" value={bu} onChange={setBu} options={BU_OPTIONS.map((b) => ({ value: b, label: b }))} />
           </div>
-          <button
+          <Button
             type="button"
+            className="w-full"
             onClick={() => {
               const label = STANDALONE_POSTING_KINDS.find((k) => k.code === kind)?.label ?? kind;
               onPick({ kind, kindLabel: label, departmentCode: bu });
             }}
-            className="w-full rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground"
           >
             ถัดไป — กรอกรายละเอียด
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

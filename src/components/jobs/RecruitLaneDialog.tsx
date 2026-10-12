@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { TONE } from '@/lib/designTokens';
 import { Button } from '@/components/ui/button';
 import type { JobRequest } from '@/types';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
@@ -156,7 +157,7 @@ const RecruitLaneDialog: React.FC<RecruitLaneDialogProps> = ({ open, job, onClos
                     <span className={tierChipClass(m.tier)}>
                       {m.tier === 'green' ? 'เข้าข่ายมาก' : m.tier === 'red' ? 'ห่างไกล' : 'พอได้'}
                     </span>
-                    <span className="jarvis-chip jarvis-chip-violet">{m.source_label}</span>
+                    <span className={TONE.violet.chip}>{m.source_label}</span>
                     <span className="font-medium text-foreground">{m.full_name}</span>
                     <span className="text-muted-foreground">{m.position_text || EM_DASH}</span>
                     {m.location_label ? (
