@@ -64,6 +64,21 @@ export function dmyBeToYmd(day: number, month: number, yearBe: number): string |
   return `${yCe}-${m}-${d}`;
 }
 
+const TH_MONTH_ABBR = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+/**
+ * "12 ต.ค. 2569" — วันที่บนจอแบบเดียว (เจ้าของ Choice 12 ต.ค. 2569 · QA รอบ 2 ข้อ 43 · ตาราง/ข้อความของหน้าหลัก ติดตาม งานสรรหา)
+ * รับค่าแบบเดียวกับ `formatYmdDmyBe` (YYYY-MM-DD หรือ ISO ที่ขึ้นต้นด้วยวันที่ · ว่าง = "-" · อ่านไม่ออก = ค่าเดิม)
+ * `formatYmdDmyBe` (12/10/2569) ยังอยู่สำหรับไฟล์ส่งออก/หน้าอื่น
+ */
+export function formatYmdTh(ymd: string | undefined | null): string {
+  const raw = (ymd ?? '').trim();
+  if (!raw) return '-';
+  const p = parseYmd(raw.slice(0, 10));
+  if (!p) return raw;
+  return `${p.d} ${TH_MONTH_ABBR[p.m - 1]} ${ceToBeYear(p.y)}`;
+}
+
 /** แสดงเป็น วัน/เดือน/ปี พ.ศ. จาก YYYY-MM-DD หรือสตริง ISO ที่ขึ้นต้นด้วยวันที่ */
 export function formatYmdDmyBe(ymd: string | undefined | null): string {
   const raw = (ymd ?? '').trim();

@@ -13046,3 +13046,10 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · รูปวันที่: วันเดียว `thaiDayDate` ("จ. 12 ต.ค. 2569" · ใหม่ใน `periodPick.ts`) · ช่วง `rangeText` ("6–12 ต.ค. 2569") · หัวป๊อป/รูป PNG สรุปแผน (`followDayReportRangeText`) ใช้ `rangeText` แล้ว
   · ⚠️ วันที่ในตาราง/ข้อความอื่น ๆ ยังเป็น `formatYmdDmyBe` (12/10/2569) หลายจุด — เจ้าของเคาะเฉพาะ "บนปุ่ม/ช่อง"
   · ภาพ `docs/qa-shots/datepicker-{1..5}-*-2569-10-12.jpg`
+- (12 ต.ค. 2569 สาย) **วันที่ในตาราง/ข้อความ 3 หน้าเป็นแบบเดียว** (เจ้าของ "ทำวันที่ในตารางให้เป็นแบบเดียวกันด้วย")
+  · `formatYmdTh` ใหม่ใน `src/lib/dateTh.ts` → "12 ต.ค. 2569" (รับค่าแบบเดียวกับ `formatYmdDmyBe`) · แทน `formatYmdDmyBe` ในไฟล์ของหน้าติดตาม/งานสรรหา + `boardFilters` (แถบกำลังดู) + `followAftercareMove`
+  · ช่วงวันใช้ `rangeText` ("2–4 ต.ค. 2569"): การ์ดติดตามครบ · Dashboard ติดตาม/ภาพรวมสรรหา ("13 ก.ย. – 12 ต.ค. 2569 · เทียบ …") · แถบกำลังดู
+  · วัน/เดือนสั้น "12/10" → "12 ต.ค." (`CALL_DM` เวลาสายตารางรายวัน · `ReplaceStartFields` · `followDayReport` shortDay)
+  · `formatDateTimeTh` ("3 ส.ค. 2569 18:08") เป็นรูปเดียวกันอยู่แล้ว ไม่แตะ
+  · 🔴 `formatYmdDmyBe` (12/10/2569) ยังอยู่: ไฟล์ส่งออก Excel (`applicantExport`) · ข้อความฟอร์มสมัครสาธารณะ (`applicationRepeat`) · หน้า Dashboard ผู้บริหาร/หน้าอื่น
+  · ตรวจบนจอ: ผู้สมัคร/การติดต่อ/นัดหมาย/ภาพรวม/โพสต์ประกาศ/ติดตาม (รายวัน·รายเดือน·ส่งคนแทน·Dashboard) ไม่เหลือ d/m/yyyy · ภาพ `docs/qa-shots/date-{table,card}-recruit-{before,after}-2569-10-12.jpg`

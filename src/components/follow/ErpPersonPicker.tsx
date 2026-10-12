@@ -3,7 +3,7 @@ import { LoaderCircle } from 'lucide-react';
 import SearchField from '@/components/shared/SearchField';
 import { Button } from '@/components/ui/button';
 import { friendlyErrorText } from '@/lib/friendlyError';
-import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
+import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
 import { ERP_PEOPLE_MIN_QUERY, erpPersonDisplayName, searchErpPeople, type ErpPerson } from '@/lib/erpPeopleApi';
 
 /**
@@ -52,7 +52,7 @@ export const ErpPersonPickerBody: React.FC<{
     };
   }, [query, ready]);
 
-  const dateOf = (iso: string | null) => (iso ? formatYmdDmyBe(toYmdBangkok(new Date(iso))) : null);
+  const dateOf = (iso: string | null) => (iso ? formatYmdTh(toYmdBangkok(new Date(iso))) : null);
 
   return (
     <>

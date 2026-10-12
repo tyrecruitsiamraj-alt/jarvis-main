@@ -17,7 +17,7 @@ import React from 'react';
 import { UserMinus } from 'lucide-react';
 
 import { Field } from '@/components/jobs/UnitRequestInfoFields';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdTh } from '@/lib/dateTh';
 import { payPeriodKind, resignCutOf, type PayPeriodKind } from '@/lib/resignedIncome';
 import {
   amountText,
@@ -158,7 +158,7 @@ export function ResignedEmployeeBlock({
             (คำเดียวกับช่องใน "ข้อมูลใบขอ" — `UnitRequestInfoFields`) */}
         <Field
           label="ทำงานวันสุดท้าย"
-          value={job.lastWorkingDay ? formatYmdDmyBe(job.lastWorkingDay) : undefined}
+          value={job.lastWorkingDay ? formatYmdTh(job.lastWorkingDay) : undefined}
         />
       </div>
       )}

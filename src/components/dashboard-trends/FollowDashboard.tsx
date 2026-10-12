@@ -18,7 +18,8 @@ import {
   type FollowMetric,
 } from '@/lib/trends/followTrends';
 import { formatTrendNumber as fmt, formatTrendPct as pct } from '@/lib/trends/format';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdTh } from '@/lib/dateTh';
+import { rangeText } from '@/lib/periodPick';
 import { FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE } from '@/lib/followCallMatrix';
 import type { FollowTrendRow } from '@/lib/trends/types';
 import {
@@ -158,9 +159,9 @@ const FollowDashboard: React.FC = () => {
         win={win}
         note={
           <>
-            {formatYmdDmyBe(range.from)} ถึง {formatYmdDmyBe(range.to)} · เทียบ {formatYmdDmyBe(previous.from)} ถึง{' '}
-            {formatYmdDmyBe(previous.to)}
-            {firstYmd && firstYmd > range.from ? ` · ข้อมูลเริ่ม ${formatYmdDmyBe(firstYmd)}` : ''}
+            {/* "6–12 ต.ค. 2569 · เทียบ 29 ก.ย. – 5 ต.ค. 2569" — รูปวันที่เดียวทั้งระบบ (เจ้าของ Choice 12 ต.ค. 2569) */}
+            {rangeText(range.from, range.to)} · เทียบ {rangeText(previous.from, previous.to)}
+            {firstYmd && firstYmd > range.from ? ` · ข้อมูลเริ่ม ${formatYmdTh(firstYmd)}` : ''}
           </>
         }
       />

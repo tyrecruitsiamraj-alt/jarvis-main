@@ -24,7 +24,7 @@ import {
   type JobReleaseSkip,
   type ReleaseSkipReason,
 } from '@/lib/jobReleaseSkips';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdTh } from '@/lib/dateTh';
 import { DASH, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 
@@ -84,7 +84,7 @@ const ReleaseSkipControl: React.FC<{
       <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2.5', TONE.danger.soft)}>
         <div className="min-w-0">
           <p className={cn('text-sm font-medium', TONE.danger.value)}>ไม่ประกาศใบนี้ · {releaseSkipText(skip)}</p>
-          <p className={cn('text-xs', DASH.muted)}>ตั้งเมื่อ {formatYmdDmyBe(BKK_YMD.format(new Date(skip.skipped_at)))}</p>
+          <p className={cn('text-xs', DASH.muted)}>ตั้งเมื่อ {formatYmdTh(BKK_YMD.format(new Date(skip.skipped_at)))}</p>
           {error ? <p className={cn('text-xs', TONE.danger.value)}>{error}</p> : null}
         </div>
         <Button type="button" size="xs" variant="outline" disabled={busy} onClick={() => void clear()}>

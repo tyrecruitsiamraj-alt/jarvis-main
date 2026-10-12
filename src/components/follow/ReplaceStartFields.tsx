@@ -18,7 +18,7 @@ export const REPLACE_SLOT_MODES_MANUAL: ReplaceSlotModes = { confirm: 'manual', 
 const WHEN = new Intl.DateTimeFormat('th-TH', {
   timeZone: 'Asia/Bangkok',
   day: 'numeric',
-  month: 'numeric',
+  month: 'short',
   hour: '2-digit',
   minute: '2-digit',
 });

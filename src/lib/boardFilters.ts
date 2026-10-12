@@ -27,7 +27,8 @@ import { districtMatcherFor } from './districtMatch';
 import { getDistrictOptionsForProvince } from './thaiDistricts';
 import { UNIT_SECTOR_LABEL } from './unitSector';
 import { buildIncomeDisplay } from './incomeBreakdown';
-import { formatYmdDmyBe } from './dateTh';
+import { formatYmdTh } from './dateTh';
+import { rangeText } from './periodPick';
 import { genderLabel } from './genderRequirement';
 import { isDrivingPositionLabel } from './jobBoardPositionPreset';
 import {
@@ -558,10 +559,10 @@ export function describeBoardFilters(state: BoardFilterState): string {
   const parts: string[] = facetText ? [facetText] : [];
   if (state.dates && (state.dates.from || state.dates.to)) {
     const field = state.dates.field === 'request' ? 'วันที่ขอ' : 'วันที่ต้องการ';
-    // รูปวันที่เดียวกับทั้งระบบ (1/10/2569) — ห้ามโชว์ 2026-10-01 ดิบ ๆ (เจอตอนตรวจบนจอ)
-    const from = state.dates.from ? formatYmdDmyBe(state.dates.from) : '…';
-    const to = state.dates.to ? formatYmdDmyBe(state.dates.to) : '…';
-    parts.push(`${field}: ${from} – ${to}`);
+    // รูปวันที่เดียวกับทั้งระบบ (1 ต.ค. 2569 · 12 ต.ค. 2569) — ห้ามโชว์ 2026-10-01 ดิบ ๆ (เจอตอนตรวจบนจอ)
+    const from = state.dates.from ? formatYmdTh(state.dates.from) : '…';
+    const to = state.dates.to ? formatYmdTh(state.dates.to) : '…';
+    parts.push(`${field}: ${state.dates.from && state.dates.to ? rangeText(state.dates.from, state.dates.to) : `${from} – ${to}`}`);
   }
   return parts.join(' · ');
 }

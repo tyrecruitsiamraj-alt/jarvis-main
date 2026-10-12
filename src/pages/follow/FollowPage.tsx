@@ -131,7 +131,7 @@ import ReplaceStartFields, {
 import { DEFAULT_REPLACE_CALL_RULE, planReplaceCallsFull, REPLACE_FOLLOW_TOPIC, type ReplaceTiming } from '@/lib/irecruitReplaceSync';
 import { type FollowOutcome } from '@/lib/followOutcome';
 import { buildFollowPlanningRows, callCategory, followEntryYmd, type FollowPlanningRound, type FollowRoundFilter } from '@/lib/followPlanning';
-import { toYmdBangkok, formatYmdDmyBe } from '@/lib/dateTh';
+import { toYmdBangkok, formatYmdTh } from '@/lib/dateTh';
 import { tbdPlaceholderAts } from '@/lib/followTbd';
 import { followDayNoOptions, followDayNoText } from '@/lib/followDayNo';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
@@ -1139,7 +1139,7 @@ const FollowPage: React.FC = () => {
       /** 🔴 เวลาที่ผ่านไปแล้วจับก่อนส่ง (QA 5 ต.ค. 2569: ค่าเริ่ม = วันนี้ 07:00 · เปิดตอนเย็นกดบันทึก ⇒ server ปฏิเสธวันแรกทีหลัง) */
       const pastCall = calls.find((c) => !c.timeTbd && new Date(c.scheduledAt).getTime() <= Date.now());
       if (pastCall) {
-        setFormError(`${formatYmdDmyBe(pastCall.day)} ${pastCall.time} ผ่านมาแล้ว · เปลี่ยนเวลา หรือเริ่มวันพรุ่งนี้`);
+        setFormError(`${formatYmdTh(pastCall.day)} ${pastCall.time} ผ่านมาแล้ว · เปลี่ยนเวลา หรือเริ่มวันพรุ่งนี้`);
         return;
       }
       const groupId = crypto.randomUUID();
@@ -1232,7 +1232,7 @@ const FollowPage: React.FC = () => {
           if (manualCalls > 0) lines.push(`คนโทร ${manualCalls} สาย`);
           const warnParts = [
             failedDays.length > 0
-              ? `บันทึกไม่สำเร็จ ${failedDays.length} วัน (${failedDays.map((d) => formatYmdDmyBe(d)).join(' · ')})${lastErr ? ` — ${lastErr}` : ''}`
+              ? `บันทึกไม่สำเร็จ ${failedDays.length} วัน (${failedDays.map((d) => formatYmdTh(d)).join(' · ')})${lastErr ? ` — ${lastErr}` : ''}`
               : null,
             warn?.text ?? null,
           ].filter(Boolean);
@@ -2251,7 +2251,7 @@ const FollowPage: React.FC = () => {
                         pickCalendarDay(day);
                       }}
                     >
-                      ดูแผนที่ลง ({formatYmdDmyBe(doneInfo.firstDay)})
+                      ดูแผนที่ลง ({formatYmdTh(doneInfo.firstDay)})
                     </Button>
                   ) : null}
                   {/* วันที่ล้มลองใหม่ได้จากตรงนี้เลย — ไม่ต้องคีย์ทั้งชุดใหม่ (3 ต.ค. 2569) */}
@@ -3140,7 +3140,7 @@ const FollowPage: React.FC = () => {
                         // ส่งคนแทน: จำนวนสายจริงจากวันเวลาเข้างาน (ตัวเดียวกับตอนบันทึก)
                         const st = replaceStartOf(replaceStartVal);
                         const n = st ? planReplaceCallsFull(st, new Date(), replaceTiming).length : 0;
-                        return st ? `เข้างาน ${formatYmdDmyBe(st.ymd)} ${st.hhmm} น. — ${n} สาย` : 'ยังไม่ได้ใส่วันเวลาเข้างาน';
+                        return st ? `เข้างาน ${formatYmdTh(st.ymd)} ${st.hhmm} น. — ${n} สาย` : 'ยังไม่ได้ใส่วันเวลาเข้างาน';
                       })()
                     : scheduleMode
                       ? `ตารางหลายวัน — ${sendDaysPreview} วัน รวม ${scheduleCallsPreview} สาย`

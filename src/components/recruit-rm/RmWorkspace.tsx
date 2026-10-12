@@ -62,7 +62,7 @@ import {
   isRmAppointmentScope,
   type RmAppointmentScope,
 } from '@/lib/recruitRm';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdTh } from '@/lib/dateTh';
 import { RM_BUCKET_LABEL, isRmBucket } from '@/lib/recruitRmOverviewApi';
 import { LEAD_VIEW_LABEL } from '@/lib/recruitLead';
 import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
@@ -1083,7 +1083,7 @@ const RmWorkspace: React.FC<{
                         {appointmentBoard.days.map((d) => (
                           <tr key={d.date} className={cn('border-t', DASH.tableRow)}>
                             <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cellStrong)}>
-                              {formatYmdDmyBe(d.date)}
+                              {formatYmdTh(d.date)}
                             </td>
                             <td className={cn('px-3 py-2 text-center tabular-nums', DASH.cell)}>{d.total}</td>
                             <td className={cn('px-3 py-2 text-center tabular-nums', TONE.success.value)}>{d.showed}</td>

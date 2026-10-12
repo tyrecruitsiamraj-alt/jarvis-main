@@ -26,7 +26,7 @@ import {
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { EM_DASH } from '@/lib/displayFallback';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdTh } from '@/lib/dateTh';
 import {
   fetchApplicantDetailExtras,
   fetchAttendanceLogs,
@@ -523,7 +523,7 @@ export default function ApplicantContactDialog({
             >
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">นัดหมายวันที่</p>
-                <p className="text-sm tabular-nums text-foreground">{formatYmdDmyBe(a.appointment_at)}</p>
+                <p className="text-sm tabular-nums text-foreground">{formatYmdTh(a.appointment_at)}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">สถานที่นัดหมาย</p>
@@ -569,7 +569,7 @@ export default function ApplicantContactDialog({
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">นัดหมายวันที่</p>
             <p className="text-sm tabular-nums text-foreground">
-              {a.appointment_at ? formatYmdDmyBe(a.appointment_at) : EM_DASH}
+              {a.appointment_at ? formatYmdTh(a.appointment_at) : EM_DASH}
             </p>
           </div>
           <div className="space-y-1">

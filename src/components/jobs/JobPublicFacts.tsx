@@ -7,7 +7,7 @@ import { boardCardAge, boardCardGender, boardCardPlace } from '@/lib/boardCardFa
 import { isOtBenefit, publicBenefitList, publicFieldVisible } from '@/lib/publicFieldVisibility';
 import { benefitDisplayLabels, isRetiredBenefit } from '@/lib/extraBenefits';
 import { payCycleCardText, payCyclesOf } from '@/lib/payCycle';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdTh } from '@/lib/dateTh';
 import { benefitWithAmount, jobAverageIncome, jobIncomeLine } from '@/lib/jobPublicFacts';
 
 const NUM = new Intl.NumberFormat('th-TH');
@@ -147,7 +147,7 @@ export default function JobPublicFacts({
           {requiredDate ? (
             <span className="inline-flex items-center gap-1.5">
               <Calendar className="h-4 w-4 shrink-0" aria-hidden />
-              ต้องการ {formatYmdDmyBe(requiredDate)}
+              ต้องการ {formatYmdTh(requiredDate)}
             </span>
           ) : null}
           {boss ? (

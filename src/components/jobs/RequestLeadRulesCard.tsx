@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdTh } from '@/lib/dateTh';
 import { computeJobUrgency, requestStatusLabel } from '@/lib/jobUrgency';
 import { computeJobSla } from '@/lib/jobSla';
 import { positionBreakdownFromJob, resolveRequestControlStatus } from '@/lib/requestControl';
@@ -254,7 +254,7 @@ const RequestLeadRulesCard: React.FC<{
           </span>
           {preview.sla.slaDueDate ? (
             <span className="text-muted-foreground">
-              · ครบกำหนด <span className="tabular-nums">{formatYmdDmyBe(preview.sla.slaDueDate)}</span>
+              · ครบกำหนด <span className="tabular-nums">{formatYmdTh(preview.sla.slaDueDate)}</span>
             </span>
           ) : null}
         </div>

@@ -15,7 +15,7 @@ import type { FollowOutcome } from '@/lib/followOutcome';
 import FollowStaffCallControls from '@/components/follow/FollowStaffCallControls';
 import FollowCancelMenu, { type FollowCancelChoice } from '@/components/follow/FollowCancelMenu';
 import { leadText, replaceLeadStart, replaceSlotRoundOfRef } from '@/lib/irecruitReplaceSync';
-import { toYmdBangkok, toYmdLocal, parseYmd, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
+import { toYmdBangkok, toYmdLocal, parseYmd, THAI_MONTHS, ceToBeYear, formatYmdTh } from '@/lib/dateTh';
 import {
   buildFollowDayCalls,
   buildFollowDayPeople,
@@ -198,7 +198,7 @@ function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): st
       return `${roundTimeText(r)} — ${followRoundLabel(r)}${why}${ai ? `\n    เขาตอบ: ${ai}` : ''}`;
     })
     .join('\n');
-  return `${name} · ${formatYmdDmyBe(ymd)}\n${detail}`;
+  return `${name} · ${formatYmdTh(ymd)}\n${detail}`;
 }
 
 /**
@@ -224,7 +224,7 @@ function callLabelOf(round: FollowPlanningRound, slot: 1 | 2 | 3 | null): string
 
 
 /** วัน/เดือนไทยของเวลานัด — 🔴 `Intl` ระดับโมดูล */
-const CALL_DM = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'numeric' });
+const CALL_DM = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short' }); // "12 ต.ค." รูปวันที่เดียวทั้งระบบ (12 ต.ค. 2569 · เดิม 12/10)
 const CALL_YMD = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' });
 
 /** เวลาของสายบนตารางรายวัน — โทรคนละวันกับแถว (สาย 1 ส่งคนแทน = วันก่อนเข้างาน) ใส่วัน/เดือนนำหน้า */
@@ -657,7 +657,7 @@ const FollowPlanningCalendar: React.FC<{
               {roundFilter !== 'all' && !daySlots.includes(roundFilter) ? (
                 <div className="flex flex-wrap items-center gap-2 border-b border-border/70 px-4 py-2.5 md:px-5">
                   <span className="text-[11px] text-muted-foreground">
-                    วันที่ {formatYmdDmyBe(dayYmd)} ไม่มี{roundFilterLabel(roundFilter)} — กด "ทุกสาย" ข้างบนเพื่อดูสายอื่น
+                    วันที่ {formatYmdTh(dayYmd)} ไม่มี{roundFilterLabel(roundFilter)} — กด "ทุกสาย" ข้างบนเพื่อดูสายอื่น
                   </span>
                 </div>
               ) : null}
@@ -705,7 +705,7 @@ const FollowPlanningCalendar: React.FC<{
                                     onSelect(nextPlannedDay.ymd);
                                   }}
                                 >
-                                  วันถัดไปที่มีแผน · {formatYmdDmyBe(nextPlannedDay.ymd)} ·{' '}
+                                  วันถัดไปที่มีแผน · {formatYmdTh(nextPlannedDay.ymd)} ·{' '}
                                   {nextPlannedDay.calls.toLocaleString('th-TH')} สาย
                                 </Button>
                               ) : null}
@@ -1154,7 +1154,7 @@ const FollowPlanningCalendar: React.FC<{
                             type="button"
                             onClick={() => onSelect(selected ? '' : c.ymd)}
                             aria-pressed={selected}
-                            title={`${formatYmdDmyBe(c.ymd)} — กดเพื่อดูเฉพาะวันนี้`}
+                            title={`${formatYmdTh(c.ymd)} — กดเพื่อดูเฉพาะวันนี้`}
                             className={cn(
                               'flex min-h-10 min-w-[52px] flex-col items-center justify-center rounded-lg px-1 py-1 font-medium transition-colors hover:bg-secondary sm:min-h-0',
                               selected && 'bg-primary text-primary-foreground hover:bg-primary',
@@ -1392,7 +1392,7 @@ const FollowPlanningCalendar: React.FC<{
                         {row.group.name}
                       </span>
                       <span className={cn('block text-[11px] font-medium', TONE.warn.value)}>
-                        {round.ymd ? formatYmdDmyBe(round.ymd) : '—'} {round.time ?? ''}
+                        {round.ymd ? formatYmdTh(round.ymd) : '—'} {round.time ?? ''}
                       </span>
                       <span className="block truncate text-[11px] text-muted-foreground">
                         {row.group.unitName || row.group.phone}

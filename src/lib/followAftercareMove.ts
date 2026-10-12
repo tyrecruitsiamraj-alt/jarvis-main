@@ -19,7 +19,7 @@
 import { AFTERCARE_TOPIC } from '@/lib/aftercareRounds';
 import type { FollowEntry } from '@/lib/followApi';
 import { bangkokInputToIso } from '@/lib/followScheduleEdit';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdTh } from '@/lib/dateTh';
 import type { ScheduleCall } from '@/lib/followWizard';
 
 export type MoveRoundMode = 'ai' | 'manual';
@@ -108,7 +108,7 @@ export function validateMoveRounds(
     const iso = bangkokInputToIso(`${day}T${r.time.trim()}`);
     if (!iso) return `รอบที่ ${i + 1}: เวลาไม่ถูกต้อง`;
     if (Date.parse(iso) <= now.getTime()) {
-      return `รอบที่ ${i + 1}: ${formatYmdDmyBe(day)} ${r.time.trim()} ผ่านมาแล้ว`;
+      return `รอบที่ ${i + 1}: ${formatYmdTh(day)} ${r.time.trim()} ผ่านมาแล้ว`;
     }
   }
   return null;

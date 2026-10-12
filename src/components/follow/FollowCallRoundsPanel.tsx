@@ -27,7 +27,7 @@ import {
   roundSignal,
   roundFilterLabel,
 } from '@/lib/followRoundVisual';
-import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
+import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
 import {
   FOLLOW_MATRIX_COLS,
   followMatrixCol,
@@ -103,7 +103,7 @@ function PersonRow({ p, onOpen }: { p: FollowEntry; onOpen?: (p: FollowEntry) =>
             </p>
           ) : null}
           <p className={cn('mt-0.5 text-[10px]', DASH.muted)}>
-            ให้โทร {p.scheduled_at ? formatYmdDmyBe(toYmdBangkok(new Date(p.scheduled_at))) : '—'}
+            ให้โทร {p.scheduled_at ? formatYmdTh(toYmdBangkok(new Date(p.scheduled_at))) : '—'}
             {followPersonName(p.created_by_display, p.created_by_name)
               ? ` · เพิ่มโดย ${followPersonName(p.created_by_display, p.created_by_name)}`
               : ''}

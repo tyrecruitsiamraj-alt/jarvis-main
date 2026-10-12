@@ -204,7 +204,7 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
       }),
     ).dialog;
     const step = within(withAppt).getByTestId('step-appointment');
-    expect(within(step).getByText('15/9/2569')).toBeTruthy();
+    expect(within(step).getByText('15 ก.ย. 2569')).toBeTruthy();
     expect(within(step).getByText('สาขาลาดพร้าว')).toBeTruthy();
     expect(within(step).getByText('หน่วย ก')).toBeTruthy();
     cleanup();
@@ -224,7 +224,7 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
     recordAppointmentAttendance.mockResolvedValue(undefined);
     const { dialog, onClose } = renderDialog(app({ appointment_at: '2026-09-15T05:00:00.000Z' }), vi.fn(), vi.fn(), 'appointment');
     // แท็บติดตามนัดหมาย = นัดปัจจุบัน + ขั้นติดตามนัด · ไม่มีขั้นติดต่อ/นัดหมาย
-    expect(within(dialog).getByTestId('appointment-summary').textContent).toContain('15/9/2569');
+    expect(within(dialog).getByTestId('appointment-summary').textContent).toContain('15 ก.ย. 2569');
     expect(within(dialog).queryByTestId('step-contact')).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: /ติดตามไม่สำเร็จ/ }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'บันทึก' }));

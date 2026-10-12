@@ -451,9 +451,9 @@ describe('สรุปและปุ่มล้าง', () => {
 
   it('ช่วงวันที่ในแถบ "กำลังดู" ใช้รูปวันที่เดียวกับทั้งระบบ (ไม่ใช่ 2026-10-01)', () => {
     const text = describeBoardFilters(state({}, { field: 'required', from: '2026-10-01', to: '2026-10-31' }));
-    expect(text).toBe('วันที่ต้องการ: 1/10/2569 – 31/10/2569');
+    expect(text).toBe('วันที่ต้องการ: 1–31 ต.ค. 2569');
     expect(describeBoardFilters(state({}, { field: 'request', from: '', to: '2026-09-30' }))).toBe(
-      'วันที่ขอ: … – 30/9/2569',
+      'วันที่ขอ: … – 30 ก.ย. 2569',
     );
   });
 

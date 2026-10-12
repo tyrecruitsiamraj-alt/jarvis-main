@@ -24,7 +24,7 @@ import {
   roundTone,
   type FollowPlanningRound,
 } from '@/lib/followPlanning';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdTh } from '@/lib/dateTh';
 import { followDayCallLabel } from '@/lib/followDayCall';
 
 /**
@@ -94,7 +94,7 @@ const FollowRoundsDialog: React.FC<{
         <DialogHeader>
           <DialogTitle>{group?.name ?? 'รายละเอียดการติดตาม'}</DialogTitle>
           <DialogDescription>
-            {ymd ? `นัดของวันที่ ${formatYmdDmyBe(ymd)} · ` : `แผนทั้งหมด ${rounds.length.toLocaleString('th-TH')} สาย · `}
+            {ymd ? `นัดของวันที่ ${formatYmdTh(ymd)} · ` : `แผนทั้งหมด ${rounds.length.toLocaleString('th-TH')} สาย · `}
             {group?.topic ?? ''}
           </DialogDescription>
         </DialogHeader>
@@ -140,7 +140,7 @@ const FollowRoundsDialog: React.FC<{
                   {/* 🔴 สีตาม "ผลเป็นยังไง" ไม่ใช่ "มีผลหรือยัง" — ชุดเดียวกับช่องในปฏิทิน */}
                   <span className={cn('tabular-nums', TONE[tone].chip)}>
                     {/* โหมดแผนทั้งหมด (ymd ว่าง) ต้องบอกวันด้วย ไม่งั้นทุกสายดูเหมือนวันเดียวกัน */}
-                    {!ymd && r.ymd ? `${formatYmdDmyBe(r.ymd)} · ` : ''}
+                    {!ymd && r.ymd ? `${formatYmdTh(r.ymd)} · ` : ''}
                     {r.entry.time_tbd ? 'ยังไม่ระบุเวลา' : r.time ? `${r.time} น.` : 'ไม่ได้ตั้งเวลา'}
                   </span>
                   {/* ครั้งที่ · สายที่ — ป้ายเดียวกับแถวในตาราง (QA รอบ 3 ข้อ 13 ป๊อปไม่บอกว่าเป็นสายไหน) */}

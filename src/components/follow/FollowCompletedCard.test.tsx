@@ -142,13 +142,13 @@ describe('FollowCompletedCard', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getAllByTestId('move-round')).toHaveLength(1);
     // QA 5 ต.ค. 2569: วันสุดท้าย (30/9) ผ่านมาแล้ว ⇒ นับจากวันนี้ (1/10) ไม่ใช่ตกอดีต
-    expect(within(dialog).getByTestId('move-base-day').textContent).toBe('ติดตามวันสุดท้าย 30/9/2569 · นับจากวันนี้ 1/10/2569');
-    expect(within(dialog).getByText('4/10/2569')).toBeTruthy();
+    expect(within(dialog).getByTestId('move-base-day').textContent).toBe('ติดตามวันสุดท้าย 30 ก.ย. 2569 · นับจากวันนี้ 1 ต.ค. 2569');
+    expect(within(dialog).getByText('4 ต.ค. 2569')).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: /เพิ่มรอบ/ }));
     const rounds = within(dialog).getAllByTestId('move-round');
     expect(rounds).toHaveLength(2);
     // บวกต่อจากรอบแรก: 4 ต.ค. + 7 = 11 ต.ค.
-    expect(within(rounds[1]).getByText('11/10/2569')).toBeTruthy();
+    expect(within(rounds[1]).getByText('11 ต.ค. 2569')).toBeTruthy();
     fireEvent.click(within(rounds[1]).getByRole('button', { name: 'คนโทร' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'ย้ายไปดูแลหลังเริ่มงาน' }));
 
@@ -207,7 +207,7 @@ describe('FollowCompletedCard', () => {
     const dialog = await screen.findByRole('dialog');
     // 30 ก.ย. ผ่านแล้ว ⇒ 1 วัน = 2 ต.ค. (เดิมได้ 1 ต.ค. 07:00 ซึ่งผ่านไปแล้ว)
     fireEvent.change(within(dialog).getByLabelText('จำนวนวันของรอบที่ 1'), { target: { value: '1' } });
-    expect(within(dialog).getByText('2/10/2569')).toBeTruthy();
+    expect(within(dialog).getByText('2 ต.ค. 2569')).toBeTruthy();
     fireEvent.change(within(dialog).getByLabelText('จำนวนวันของรอบที่ 1'), { target: { value: '0' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'ย้ายไปดูแลหลังเริ่มงาน' }));
     expect(await within(dialog).findByRole('alert')).toBeTruthy();
@@ -225,7 +225,7 @@ describe('FollowCompletedCard', () => {
     fireEvent.click(box.getByRole('button', { name: '3' }));
     fireEvent.click(box.getByRole('button', { name: 'คนโทร' }));
     // จบ 30 ก.ย. ⇒ วันถัดไป 1 ต.ค. แต่วันนี้ 1 ต.ค. แล้ว ⇒ เริ่มพรุ่งนี้
-    expect(box.getByTestId('continue-preview').textContent).toBe('2/10/2569 – 4/10/2569 · 3 สาย');
+    expect(box.getByTestId('continue-preview').textContent).toBe('2–4 ต.ค. 2569 · 3 สาย');
     fireEvent.click(box.getByRole('button', { name: 'ติดตามต่อ' }));
 
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));

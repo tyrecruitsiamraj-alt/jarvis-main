@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { rangeText } from '@/lib/periodPick';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -201,8 +201,8 @@ const BoardDashboard: React.FC<{
         win={win}
         note={
           <>
-            {formatYmdDmyBe(range.from)} ถึง {formatYmdDmyBe(range.to)} · เทียบ {formatYmdDmyBe(previous.from)} ถึง{' '}
-            {formatYmdDmyBe(previous.to)}
+            {/* "6–12 ต.ค. 2569 · เทียบ 29 ก.ย. – 5 ต.ค. 2569" — รูปวันที่เดียวทั้งระบบ (เจ้าของ Choice 12 ต.ค. 2569) */}
+            {rangeText(range.from, range.to)} · เทียบ {rangeText(previous.from, previous.to)}
           </>
         }
       />

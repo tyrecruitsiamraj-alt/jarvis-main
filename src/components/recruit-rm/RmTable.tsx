@@ -12,7 +12,7 @@ import {
   canRecordAttendance,
   type AttendanceResult,
 } from '@/lib/appointmentAttendance';
-import { formatDateTimeTh, formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
+import { formatDateTimeTh, formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
 import {
   GENDER_LABEL,
   REFERRAL_SOURCE_LABEL,
@@ -108,7 +108,7 @@ function AiAnswerCell({ r }: { r: PublicApplication }) {
         </span>
         {r.ai_answer.at ? (
           <span className={cn('whitespace-nowrap text-xs tabular-nums', DASH.cellMuted)}>
-            {formatYmdDmyBe(toYmdBangkok(new Date(r.ai_answer.at)))}
+            {formatYmdTh(toYmdBangkok(new Date(r.ai_answer.at)))}
           </span>
         ) : null}
       </span>
@@ -356,7 +356,7 @@ const RmTable: React.FC<{
                       <td className="px-1.5 py-2 whitespace-nowrap">
                         <span className="flex flex-col gap-0.5">
                           <span className={cn('tabular-nums', DASH.cell)}>
-                            {r.created_at ? formatYmdDmyBe(toYmdBangkok(new Date(r.created_at))) : EM_DASH}
+                            {r.created_at ? formatYmdTh(toYmdBangkok(new Date(r.created_at))) : EM_DASH}
                           </span>
                           <span className={cn('text-xs tabular-nums', DASH.cellMuted)}>
                             {daysAppliedText(r.created_at, now)}
@@ -379,7 +379,7 @@ const RmTable: React.FC<{
                           const overdue = Boolean(ymd && ymd < toYmdBangkok(new Date()) && !r.attendance_result);
                           return (
                             <span className={cn('whitespace-nowrap tabular-nums', overdue ? TONE.orange.value : DASH.cell)}>
-                              {ymd ? formatYmdDmyBe(ymd) : EM_DASH}
+                              {ymd ? formatYmdTh(ymd) : EM_DASH}
                               {overdue ? ' · เลยวันนัด' : ''}
                             </span>
                           );

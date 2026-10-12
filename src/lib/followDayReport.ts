@@ -83,7 +83,9 @@ function daysBetweenYmd(from: string, to: string): string[] {
 }
 
 /** "6/10" — วันสั้นหน้าเวลาเมื่อดูหลายวัน */
-const shortDay = (ymd: string) => `${Number(ymd.slice(8, 10))}/${Number(ymd.slice(5, 7))}`;
+const DAY_REPORT_MONTH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+/** "6 ต.ค." — รูปวันที่เดียวทั้งระบบ (เจ้าของ Choice 12 ต.ค. 2569 · เดิม 6/10) */
+const shortDay = (ymd: string) => `${Number(ymd.slice(8, 10))} ${DAY_REPORT_MONTH[Number(ymd.slice(5, 7)) - 1]}`;
 
 export function buildFollowDayReport(
   entries: FollowEntry[],

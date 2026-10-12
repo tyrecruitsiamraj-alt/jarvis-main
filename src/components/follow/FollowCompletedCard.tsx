@@ -19,7 +19,8 @@ import FollowCompleteControls from '@/components/follow/FollowCompleteControls';
 import { useListPagination } from '@/hooks/useListPagination';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdTh } from '@/lib/dateTh';
+import { rangeText } from '@/lib/periodPick';
 import { AFTERCARE_TOPIC } from '@/lib/aftercareRounds';
 import { moveToAftercare } from '@/lib/aftercareApi';
 import { completeFollowEntry, createFollowRounds } from '@/lib/followApi';
@@ -159,7 +160,7 @@ const FollowCompletedCard: React.FC<{
                     {span ? (
                       <span
                         className="block text-[11px] tabular-nums text-muted-foreground"
-                        title={`${formatYmdDmyBe(span.from)}${span.to !== span.from ? ` – ${formatYmdDmyBe(span.to)}` : ''} · ${span.calls.toLocaleString('th-TH')} สาย`}
+                        title={`${rangeText(span.from, span.to)} · ${span.calls.toLocaleString('th-TH')} สาย`}
                       >
                         ติดตามมา {span.days.toLocaleString('th-TH')} วัน · {span.calls.toLocaleString('th-TH')} สาย
                       </span>
@@ -355,10 +356,10 @@ const MoveToAftercareDialog: React.FC<{
 
         {lastYmd && baseYmd ? (
           <p className="text-xs text-muted-foreground" data-testid="move-base-day">
-            ติดตามวันสุดท้าย <span className="tabular-nums text-foreground">{formatYmdDmyBe(lastYmd)}</span>
+            ติดตามวันสุดท้าย <span className="tabular-nums text-foreground">{formatYmdTh(lastYmd)}</span>
             {baseYmd !== lastYmd ? (
               <>
-                {' · '}นับจากวันนี้ <span className="tabular-nums text-foreground">{formatYmdDmyBe(baseYmd)}</span>
+                {' · '}นับจากวันนี้ <span className="tabular-nums text-foreground">{formatYmdTh(baseYmd)}</span>
               </>
             ) : null}
           </p>
@@ -413,7 +414,7 @@ const MoveToAftercareDialog: React.FC<{
                   </div>
                   <span className="text-xs text-muted-foreground">วัน</span>
                   <span className="text-xs tabular-nums text-foreground" data-testid="move-round-day">
-                    {day ? formatYmdDmyBe(day) : '—'}
+                    {day ? formatYmdTh(day) : '—'}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -575,9 +576,7 @@ const NotMovingDialog: React.FC<{
     setBusy(false);
     const last = calls[calls.length - 1];
     onDone(
-      `ติดตาม ${g.name} ต่อ ${calls.length} วัน · ${formatYmdDmyBe(calls[0].day)}${
-        last.day !== calls[0].day ? ` – ${formatYmdDmyBe(last.day)}` : ''
-      }`,
+      `ติดตาม ${g.name} ต่อ ${calls.length} วัน · ${rangeText(calls[0].day, last.day)}`,
     );
   };
 
@@ -657,9 +656,7 @@ const NotMovingDialog: React.FC<{
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs tabular-nums text-foreground" data-testid="continue-preview">
                 {preview.length > 0
-                  ? `${formatYmdDmyBe(preview[0].day)}${
-                      preview.length > 1 ? ` – ${formatYmdDmyBe(preview[preview.length - 1].day)}` : ''
-                    } · ${preview.length.toLocaleString('th-TH')} สาย`
+                  ? `${rangeText(preview[0].day, preview[preview.length - 1].day)} · ${preview.length.toLocaleString('th-TH')} สาย`
                   : '—'}
               </span>
               <Button type="button" size="sm" disabled={busy || preview.length === 0} onClick={() => void continueFollow()}>

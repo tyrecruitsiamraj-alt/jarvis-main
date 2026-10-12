@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DASH, TONE } from '@/lib/designTokens';
 import { EM_DASH } from '@/lib/displayFallback';
-import { formatDateTimeTh, formatYmdDmyBe } from '@/lib/dateTh';
+import { formatDateTimeTh, formatYmdTh } from '@/lib/dateTh';
 import {
   APPLICATION_STATUS_LABEL,
   type ApplicantHistoryItem,
@@ -156,7 +156,7 @@ export const AppointmentsTable: React.FC<{ logs: ContactLog[] }> = ({ logs }) =>
             {failed ? 'นัดหมายไม่สำเร็จ' : 'นัดหมายสำเร็จ'}
             {failed ? <span className="block text-xs font-normal text-muted-foreground">{l.reasonLabel}</span> : null}
           </Td>
-          <Td className="whitespace-nowrap tabular-nums">{failed ? EM_DASH : formatYmdDmyBe(l.appointmentAt)}</Td>
+          <Td className="whitespace-nowrap tabular-nums">{failed ? EM_DASH : formatYmdTh(l.appointmentAt)}</Td>
           <Td>{failed ? EM_DASH : l.appointmentPlace || EM_DASH}</Td>
           <Td>{failed ? EM_DASH : l.jobLabel || 'หาล่วงหน้า'}</Td>
           <Td className="whitespace-nowrap text-muted-foreground">{by(l.createdByName, l.createdAt)}</Td>
@@ -171,7 +171,7 @@ export const AttendanceTable: React.FC<{ logs: AttendanceLogItem[] }> = ({ logs 
   <Table head={['นัดหมายวันที่', 'ผลการติดตามนัด', 'หมายเหตุ', 'บันทึกโดย']} empty="ยังไม่มีผลติดตามนัด" isEmpty={logs.length === 0}>
     {logs.map((l) => (
       <tr key={l.id} className="border-b border-border/50 last:border-0">
-        <Td className="whitespace-nowrap tabular-nums">{formatYmdDmyBe(l.appointmentAt)}</Td>
+        <Td className="whitespace-nowrap tabular-nums">{formatYmdTh(l.appointmentAt)}</Td>
         <Td className={cn('font-medium', TONE[ATTENDANCE_TONE[l.result]].value)}>{attendanceLabel(l)}</Td>
         <Td className="text-muted-foreground">{l.note || EM_DASH}</Td>
         <Td className="whitespace-nowrap text-muted-foreground">{by(l.recordedByName, l.createdAt)}</Td>

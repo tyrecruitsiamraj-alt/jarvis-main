@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
-import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
+import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
 import {
   APPLICATION_ORIGIN_CLASS,
   APPLICATION_ORIGIN_HINT,
@@ -253,7 +253,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
     const d = new Date(iso);
     // ตัดวันตามปฏิทินกรุงเทพ — ห้าม toISOString (UTC) เพราะใบกรอกเที่ยงคืน–07:00 น.
     // ไทยจะโชว์ย้อนไป 1 วัน
-    return Number.isNaN(d.getTime()) ? EM_DASH : formatYmdDmyBe(toYmdBangkok(d));
+    return Number.isNaN(d.getTime()) ? EM_DASH : formatYmdTh(toYmdBangkok(d));
   };
 
   // กติกา "ใครนับว่าสนใจ" อยู่ที่ lib ที่เดียว (ไฟล์หน้าไม่ตัดสินเอง)

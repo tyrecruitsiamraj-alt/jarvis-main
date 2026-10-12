@@ -20,7 +20,7 @@
 import React from 'react';
 import { genderLabel } from '@/lib/genderRequirement';
 
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdTh } from '@/lib/dateTh';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { moneyFieldText } from '@/lib/unitRequestDetail';
 import { postingPositionText } from '@/lib/publicJobTitle';
@@ -51,7 +51,7 @@ const UnitRequestInfoFields: React.FC<{ job: JobRequest }> = ({ job: data }) => 
       label="วัน/เวลาที่ส่ง"
       value={data.submittedAt ? new Date(data.submittedAt).toLocaleString('th-TH') : undefined}
     />
-    <Field label="วันที่ต้องการ" value={formatYmdDmyBe(data.required_date)} />
+    <Field label="วันที่ต้องการ" value={formatYmdTh(data.required_date)} />
     <Field
       label="ขอมา"
       value={
@@ -71,7 +71,7 @@ const UnitRequestInfoFields: React.FC<{ job: JobRequest }> = ({ job: data }) => 
     <Field label="คงเหลือ (ต้องหา)" value={`${jobPositionUnits(data)} ตำแหน่ง`} />
     <Field
       label="ทำงานวันสุดท้าย"
-      value={data.lastWorkingDay ? formatYmdDmyBe(data.lastWorkingDay) : undefined}
+      value={data.lastWorkingDay ? formatYmdTh(data.lastWorkingDay) : undefined}
     />
     {/* ชื่อเดียว = จุดทำงาน (ไม่มีก็ถอยไปชื่อคู่สัญญา) — เจ้าของสั่งไม่ให้ขึ้นสองแถว */}
     <Field label="ชื่อหน่วยงาน" value={data.work_site_name || data.unit_name} />
@@ -119,7 +119,7 @@ export const UnitRequestBriefFields: React.FC<{ job: JobRequest }> = ({ job: dat
     <div className="grid gap-2 sm:grid-cols-2" data-testid="request-brief-fields">
       <Field label="ชื่อหน่วยงาน" value={data.work_site_name || data.unit_name} />
       <Field label="ตำแหน่ง" value={postingPositionText(data)} />
-      <Field label="วันที่ต้องการ" value={formatYmdDmyBe(data.required_date)} />
+      <Field label="วันที่ต้องการ" value={formatYmdTh(data.required_date)} />
       <Field
         label="จำนวนที่ต้องการ"
         value={`${need.toLocaleString('th-TH')} ตำแหน่ง${asked != null && asked !== need ? ` (ขอมา ${asked.toLocaleString('th-TH')})` : ''}`}

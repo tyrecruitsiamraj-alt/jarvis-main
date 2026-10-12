@@ -119,7 +119,7 @@ describe('สรุปแผนเลือกช่วงวัน + วัน�
     expect(one.rows.map((r) => r.time)).toEqual(['08:00']);
     expect(one.toYmd).toBe('2026-10-02');
     const two = buildFollowDayReport(rows, { from: '2026-10-02', to: '2026-10-03' }, NOW);
-    expect(two.rows.map((r) => r.time)).toEqual(['2/10 08:00', '3/10 08:00']);
+    expect(two.rows.map((r) => r.time)).toEqual(['2 ต.ค. 08:00', '3 ต.ค. 08:00']);
     expect(two.toYmd).toBe('2026-10-03');
   });
 
