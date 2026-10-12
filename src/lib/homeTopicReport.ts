@@ -207,6 +207,67 @@ export function fastCallerOf(r: ReportSourceRow): 'ai' | 'staff' | null {
   return firstCallerOf(r);
 }
 
+/**
+ * ═══ "สนใจ" = Journey AI → คน (เจ้าของ 12 ต.ค. 2569 · QA รอบ 3 ข้อ 20) ═══
+ * เจ้าของ: *"Journey มันคือการทำงานต่อกัน 1. เมื่อ Ai โทร Prescreen แล้วคนถึงจะมาโทรต่อ
+ * 2. ตัวเลขเลยจะเป็น กรอกมา 200 สนใจ 100 คนโทร 100 สนใจ 50"*
+ * เดิม: ทีม Online นับ "สนใจ" จากคำตอบกับ AI · งานสรรหานับจากผลล่าสุดของใบ ⇒ 159 กับ 142 ไม่ตรงกัน
+ * ⇒ ขั้นบันไดชุดเดียว ใช้ทั้งสองแท็บ (ตัวนี้ตัวเดียว):
+ *   ใบสมัครเข้ามา → AI โทรแล้ว → สนใจ (คำตอบกับ AI) → คนโทรต่อ (ในกลุ่มที่สนใจกับ AI) → สนใจ (ผลหลังคนโทร)
+ * ทุกขั้นเป็นส่วนหนึ่งของขั้นก่อน (เลขไม่มีทางมากกว่าขั้นก่อน) · วัด 1–12 ต.ค.: 307 → 269 → 159 → 23 → 6
+ * ⚠️ คนที่ AI ไม่ได้บอกว่าสนใจแต่คนโทรต่อ ไม่อยู่ในบันได (วัดจริงยังไม่มีเลย — คนโทรเฉพาะคนที่สนใจกับ AI)
+ */
+export type InterestJourney = {
+  filled: number;
+  aiCalled: number;
+  aiInterested: number;
+  staffFollowed: number;
+  staffInterested: number;
+};
+export const INTEREST_JOURNEY_STEPS: ReadonlyArray<{ key: keyof InterestJourney; label: string }> = [
+  { key: 'filled', label: 'ใบสมัครเข้ามา' },
+  { key: 'aiCalled', label: 'AI โทรแล้ว' },
+  { key: 'aiInterested', label: 'สนใจ (AI)' },
+  { key: 'staffFollowed', label: 'คนโทรต่อ' },
+  { key: 'staffInterested', label: 'สนใจ (หลังคนโทร)' },
+];
+
+/** คำตอบกับ AI (ไม่ปนผลของคน) — ยกเลิก/ไม่มีผล = null */
+export function aiMicroOf(r: ReportSourceRow): CallMicroOutcome | null {
+  const out = (r.ai_outcome ?? '').trim().toLowerCase();
+  if (!out || out === 'cancelled') return null;
+  return classifyCallMicro({ outcome: r.ai_outcome, summary: r.ai_summary, reply: r.ai_reply }, INTEREST_VOCAB);
+}
+
+/** ผลหลังคนโทร = ผลฝั่งคนที่ใหม่สุด — บันทึกติดต่อ (สำเร็จ + นัดได้) หรือผลที่คนลง "สนใจ" */
+export function staffInterestedOf(r: ReportSourceRow): boolean {
+  if (typeof r.log_ok === 'boolean' && (!r.staff_outcome || ms(r.log_at) > ms(r.staff_at))) {
+    return r.log_ok && !!r.appointment;
+  }
+  return !!r.staff_outcome && classifyStaffCallResult(r.staff_outcome, INTEREST_VOCAB) === 'said_yes';
+}
+
+export function buildInterestJourney(rows: readonly ReportSourceRow[]): InterestJourney {
+  const j: InterestJourney = { filled: rows.length, aiCalled: 0, aiInterested: 0, staffFollowed: 0, staffInterested: 0 };
+  for (const r of rows) {
+    const m = aiMicroOf(r);
+    if (!m) continue;
+    j.aiCalled += 1;
+    if (m !== 'said_yes') continue;
+    j.aiInterested += 1;
+    if (!r.staff) continue;
+    j.staffFollowed += 1;
+    if (staffInterestedOf(r)) j.staffInterested += 1;
+  }
+  return j;
+}
+
+/** บันไดลงตัว — แต่ละขั้นไม่เกินขั้นก่อน */
+export function interestJourneyAddsUp(j: InterestJourney): boolean {
+  const v = INTEREST_JOURNEY_STEPS.map((s) => j[s.key]);
+  return v.every((n, i) => n >= 0 && (i === 0 || n <= v[i - 1]));
+}
+
 /** แยก AI / คน ตามใครโทรคนแรก (ไม่มีหลักฐานโทร = คน — นัดทุกนัดคนเป็นคนลง) */
 function byFirstCaller(
   rows: readonly ReportSourceRow[],
@@ -252,6 +313,7 @@ export function buildApplicantsReport(rows: readonly ReportSourceRow[], publishe
   const kind = (k: DispatchKind) => count(rows, (r) => dispatchKindOf(r) === k);
   const fastAi = count(rows, (r) => fastCallerOf(r) === 'ai');
   const fastStaff = count(rows, (r) => fastCallerOf(r) === 'staff');
+  const journey = buildInterestJourney(rows);
   return {
     funnel: [
       // ตัวเดียวกับแท็บทีม Online — ใบขอที่ส่งเข้ามาในช่วง (ทุกสถานะ) · ในนั้นประกาศแล้วกี่ใบ (QA 10 ต.ค. 2569)
@@ -268,10 +330,9 @@ export function buildApplicantsReport(rows: readonly ReportSourceRow[], publishe
         { key: 'ai', label: 'AI', value: fastAi, seg: 'ai' },
         { key: 'staff', label: 'คน', value: fastStaff, seg: 'staff' },
       ]),
-      step(
-        'interested',
-        'สนใจ',
-        byFirstCaller(rows, (r) => col(r) === 'interested'),
+      // "สนใจ" = บันได AI → คน (12 ต.ค. 2569 · `buildInterestJourney` ตัวเดียวกับแท็บทีม Online) แทนผลล่าสุดแยกใครโทรก่อน
+      ...INTEREST_JOURNEY_STEPS.filter((s) => s.key === 'aiInterested' || s.key === 'staffFollowed' || s.key === 'staffInterested').map(
+        (s): ReportItem => ({ key: s.key, label: s.label, value: journey[s.key] }),
       ),
       step(
         'appointment',

@@ -3,9 +3,14 @@
  * ล็อก: ก้อนตรงกติกากล่อง · ผลล่าสุดผลเดียว (ฝั่งใหม่กว่าชนะ) · ทุกช่องรวม = ทั้งหมด · BU ไม่มีงานไม่ขึ้น · ในก้อนครบ 4 แถว
  */
 import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
 import {
   buildAftercareReport,
   buildApplicantsReport,
+  buildInterestJourney,
+  INTEREST_JOURNEY_STEPS,
+  interestJourneyAddsUp,
+  staffInterestedOf,
   buildMatchingReport,
   dispatchKindOf,
   emptyMatchingFlow,
@@ -82,7 +87,10 @@ describe('homeTopicReport', () => {
       ['total', 6],
       ['called', 3],
       ['fast', 0],
-      ['interested', 2],
+      // บันได AI → คน (12 ต.ค. 2569): สนใจกับ AI 2 → คนโทรต่อ 1 → สนใจหลังคนโทร 1
+      ['aiInterested', 2],
+      ['staffFollowed', 1],
+      ['staffInterested', 1],
       ['appointment', 1],
       ['showed', 1],
     ]);
@@ -107,6 +115,38 @@ describe('homeTopicReport', () => {
     expect(r.extra.map((x) => x.title)).toEqual(['ส่งต่อให้คน']);
     const hand = Object.fromEntries(r.extra[0].items.map((i) => [i.key, i.value]));
     expect(hand).toMatchObject({ handoff: 1, staffResult: 1 });
+  });
+
+  it('🔴 สนใจ = บันได AI → คน · ทุกขั้นเป็นส่วนของขั้นก่อน · ผลหลังคนโทรใช้ฝั่งคนที่ใหม่สุด (12 ต.ค. 2569)', () => {
+    const t = (d: number) => `2026-10-0${d}T01:00:00Z`;
+    const rows = [
+      row({ ai: true, ai_outcome: 'confirmed', ai_at: t(1) }), // สนใจกับ AI · คนยังไม่โทร
+      row({ ai: true, staff: true, ai_outcome: 'confirmed', ai_at: t(1), staff_outcome: 'declined', staff_at: t(2) }), // คนโทรแล้วไม่สนใจ
+      row({ ai: true, staff: true, ai_outcome: 'confirmed', ai_at: t(1), staff_outcome: 'confirmed', staff_at: t(2) }), // คนโทรแล้วสนใจ
+      // บันทึกติดต่อใหม่กว่าผลที่คนลง = ใช้บันทึก (สำเร็จ + นัดได้ = สนใจ)
+      row({ ai: true, staff: true, ai_outcome: 'confirmed', ai_at: t(1), staff_outcome: 'declined', staff_at: t(2), log_ok: true, log_at: t(3), appointment: true }),
+      row({ ai: true, staff: true, ai_outcome: 'declined', ai_at: t(1), staff_outcome: 'confirmed', staff_at: t(2) }), // AI ไม่สนใจ = ไม่อยู่ในบันได
+      row({ ai: true, ai_outcome: 'no_answer', ai_at: t(1) }),
+      row({ ai: true, ai_outcome: 'cancelled', ai_at: t(1) }), // ยกเลิก ≠ โทรแล้ว
+      row({}),
+    ];
+    const j = buildInterestJourney(rows);
+    expect(j).toEqual({ filled: 8, aiCalled: 6, aiInterested: 4, staffFollowed: 3, staffInterested: 2 });
+    expect(interestJourneyAddsUp(j)).toBe(true);
+    expect(interestJourneyAddsUp({ ...j, staffFollowed: 5 })).toBe(false);
+    expect(staffInterestedOf(row({ staff: true, log_ok: true, log_at: t(3) }))).toBe(false); // ติดต่อได้แต่ไม่ได้นัด
+    expect(INTEREST_JOURNEY_STEPS.map((s) => s.key)).toEqual(['filled', 'aiCalled', 'aiInterested', 'staffFollowed', 'staffInterested']);
+  });
+
+  it('🔴 สองแท็บหน้าหลักใช้บันไดตัวเดียว: งานสรรหา (buildApplicantsReport) · ทีม Online (loadInterestJourney)', () => {
+    const page = fs.readFileSync('src/pages/HomeAiSharePage.tsx', 'utf8');
+    expect(page).toContain("['aiInterested', 'staffFollowed', 'staffInterested', 'appointment', 'showed']");
+    const online = fs.readFileSync('src/components/home-ai-share/HomeOnlineTab.tsx', 'utf8');
+    expect(online).toMatch(/INTEREST_JOURNEY_STEPS\.map/);
+    const handler = fs.readFileSync('api/_handlers/home-ai-share.ts', 'utf8');
+    expect(handler).toMatch(/loadInterestJourney\(start, end, bu\)/);
+    const sql = fs.readFileSync('api/_lib/homeTopicReportSql.ts', 'utf8');
+    expect(sql).toMatch(/buildApplicantAiShareSql\('report'\)[\s\S]{0,200}return buildInterestJourney/);
   });
 
   it('ส่ง AI เอง/คนสั่ง ดูจากเวลา · โทรทันที 15 นาที · ใครโทรคนแรก', () => {

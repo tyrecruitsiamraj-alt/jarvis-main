@@ -11,6 +11,7 @@
  * - ประเภทงาน 3 มุม (Choice "แยก 3 มุม") แต่ละมุมรวมได้เท่าใบขอเข้า · ไม่มีข้อมูล = "ไม่ระบุ" (ห้ามหาย)
  */
 
+import type { InterestJourney } from '@/lib/homeTopicReport';
 import { classifyCallMicro, INTEREST_VOCAB } from '@/lib/callMicroOutcome';
 
 export type OnlineRequestState = 'open' | 'fullyClosed' | 'cancelledAll' | 'partialCancelled';
@@ -83,6 +84,8 @@ export type OnlineReportResponse = {
   report: OnlineReport | null;
   /** ใบสมัคร · AI คัดกรอง · คนโทรเอง (ตามวันสมัคร ช่วงเดียวกัน) · null = โหลดไม่ขึ้น */
   applicants: OnlineApplicantsReport | null;
+  /** บันได "สนใจ" AI → คน — ตัวเดียวกับแท็บงานสรรหา (`buildInterestJourney` · 12 ต.ค. 2569) · ช่วงเดียวกับปฏิทิน */
+  journey?: InterestJourney | null;
   error: string | null;
 };
 

@@ -55,7 +55,7 @@ import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { journeyResultOf, type FollowJourneyEvent, type FollowJourneyResponse, type FollowJourneyRow } from '../../src/lib/followJourney.js';
 import { createHash } from 'node:crypto';
 import { FOLLOW_BUCKET_SQL, followLedgerBucket, loadHomeLumosSummary } from '../_lib/homeLumosSummarySql.js';
-import { loadTopicReport } from '../_lib/homeTopicReportSql.js';
+import { loadInterestJourney, loadTopicReport } from '../_lib/homeTopicReportSql.js';
 import type { TopicReportBlock, TopicReportResponse } from '../../src/lib/homeTopicReport.js';
 import type { HomeLumosSummaryResponse } from '../../src/lib/homeLumosSummary.js';
 import {
@@ -625,12 +625,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
         return res.status(200).json(body);
       }
       try {
-        const [rows, apps] = await Promise.all([
+        const [rows, apps, journey] = await Promise.all([
           loadOnlineRequestRows({ from, to, bu, departmentScope: { mode: 'all' } as DepartmentScope }),
           loadOnlineApplicantRows({ start: start ?? new Date(end.getTime() - 365 * 86_400_000), end, bu }),
+          // ช่วงเดียวกับแท็บงานสรรหา (start null = ทั้งหมด) — เลขสนใจสองแท็บต้องเท่ากัน
+          loadInterestJourney(start, end, bu),
         ]);
         body.report = buildOnlineReport(rows, { from, to });
         body.applicants = buildOnlineApplicantsReport(apps);
+        body.journey = journey;
       } catch (e) {
         logWarn('home-ai-share online failed', { error: errText(e) });
         body.error = 'โหลดข้อมูลทีม Online ไม่ขึ้น ลองรีเฟรชอีกครั้ง';

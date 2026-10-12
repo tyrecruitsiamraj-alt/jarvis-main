@@ -13012,3 +13012,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · `CALLED_AFTER_CANCEL_LABEL` + `calledAfterCancel()` (`src/lib/followPlanning.ts`) — `followRoundLabel` ต่อท้าย "· ยกเลิกแล้ว AI ยังโทร" ⇒ ตาราง/ป๊อปรอบ/รายงานรายวัน/การ์ดจบแล้ว ได้พร้อมกัน
   · 🔴 หมวด/ตัวเลขยังนับตามผลจริง (กติกา 6 ต.ค. ใน `followRoundState`) — ป้ายบอกอย่างเดียว ห้ามเปลี่ยนเป็นนับยกเลิก
   · `FollowDayDoneCard.resultOf` ติดป้ายเมื่อทั้งวันยกเลิกแต่มีสายที่ AI โทร · เทสต์ใน `tests/api/followPlanning.test.ts` · `followNumbersReconcile` ยอมรับป้ายต่อท้าย
+- (12 ต.ค. 2569 สาย) **"สนใจ" = บันได AI → คน ทั้งสองแท็บหน้าหลัก** (QA รอบ 3 ข้อ 20 · เจ้าของ "กรอกมา 200 สนใจ 100 คนโทร 100 สนใจ 50")
+  · ตัวเดียว: `buildInterestJourney` (`src/lib/homeTopicReport.ts`) — ใบสมัครเข้ามา → AI โทรแล้ว → สนใจ (AI) → คนโทรต่อ (ในกลุ่มที่สนใจกับ AI) → สนใจ (หลังคนโทร)
+    + `aiMicroOf` · `staffInterestedOf` (บันทึกติดต่อใหม่กว่า = สำเร็จ+นัดได้ · ไม่งั้นผลที่คนลง) · `interestJourneyAddsUp` · `INTEREST_JOURNEY_STEPS`
+  · งานสรรหา: `buildApplicantsReport` ขั้น `interested` (ผลล่าสุดแยกใครโทรก่อน) → `aiInterested` · `staffFollowed` · `staffInterested` · การ์ด "สนใจและนัดหมาย" (`HomeAiSharePage`)
+  · ทีม Online: `loadInterestJourney` (`api/_lib/homeTopicReportSql.ts` · แถวโหมด report ชุดเดียวกับงานสรรหา) → `OnlineReportResponse.journey` → ส่วน "สนใจ" (`HomeOnlineTab` · testid `online-journey`)
+  · วัดจริง 1–12 ต.ค.: 307 → 269 → 159 → 23 → 6 สองแท็บเท่ากัน (เดิมงานสรรหา 142 · ทีม Online 159)
+  · ⚠️ ตาราง "ผลโทรราย BU" ยังเป็นผลล่าสุดของแต่ละคน (`interestColOf`) — คนละคำถามกับบันได ยังไม่แตะ
+  · เทสต์ `tests/api/homeTopicReport.test.ts`

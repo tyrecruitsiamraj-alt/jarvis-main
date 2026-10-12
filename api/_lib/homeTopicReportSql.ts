@@ -21,8 +21,10 @@ import type { JobRequest } from '../../src/types/index.js';
 import {
   buildAftercareReport,
   buildApplicantsReport,
+  buildInterestJourney,
   buildMatchingReport,
   emptyMatchingFlow,
+  type InterestJourney,
   type MatchingFlow,
   type ReportSourceRow,
   type TopicReport,
@@ -63,6 +65,16 @@ function toRow(r: Record<string, unknown>): ReportSourceRow {
     holding: bool(r.holding),
     waiting_staff: bool(r.waiting_staff),
   };
+}
+
+/** บันได "สนใจ" AI → คน ของใบสมัคร — แถวชุดเดียวกับรายงานงานสรรหา (แท็บทีม Online ใช้ตัวนี้ · 12 ต.ค. 2569) */
+export async function loadInterestJourney(start: Date | null, end: Date, bu: string | null): Promise<InterestJourney> {
+  const { rows } = await dbQuery<Record<string, unknown>>(buildApplicantAiShareSql('report'), [
+    start ? start.toISOString() : null,
+    end.toISOString(),
+    bu,
+  ]);
+  return buildInterestJourney(rows.map(toRow));
 }
 
 export async function loadTopicReport(block: TopicReportBlock, start: Date | null, end: Date, bu: string | null): Promise<TopicReport> {

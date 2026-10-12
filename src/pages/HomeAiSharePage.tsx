@@ -892,8 +892,14 @@ const HomeAiSharePage: React.FC = () => {
 
       {/* งานสรรหา: นัดหมาย (แยกใครโทรคนแรก) + ส่งต่อให้คน */}
       {meta.key === 'applicants' ? (
-        <HomeSection title="การนัดหมาย" sub={sub} testId="home-appointment">
-          <StatStrip loading={stepsPending} arrows testId="report-appointment" items={['interested', 'appointment', 'showed'].map((k) => stepOf(steps, k))} />
+        <HomeSection title="สนใจและนัดหมาย" sub={sub} testId="home-appointment">
+          {/* บันได AI → คน (12 ต.ค. 2569 · ชุดเดียวกับแท็บทีม Online) แล้วต่อด้วยนัด */}
+          <StatStrip
+            loading={stepsPending}
+            arrows
+            testId="report-appointment"
+            items={['aiInterested', 'staffFollowed', 'staffInterested', 'appointment', 'showed'].map((k) => stepOf(steps, k))}
+          />
           <div className="space-y-2" data-testid="report-extra-ส่งต่อให้คน">
             <h3 className="text-sm font-medium text-foreground">ส่งต่อให้คน</h3>
             <StatStrip loading={stepsPending} items={extraOf(steps, 'ส่งต่อให้คน')} />

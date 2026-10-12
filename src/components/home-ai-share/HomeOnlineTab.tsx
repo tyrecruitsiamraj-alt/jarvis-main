@@ -23,6 +23,7 @@ import {
   type OnlineRequestState,
 } from '@/lib/homeOnline';
 import { TONE, type ToneKey } from '@/lib/designTokens';
+import { INTEREST_JOURNEY_STEPS, interestJourneyAddsUp, type InterestJourney } from '@/lib/homeTopicReport';
 import { trendBuLabel } from '@/lib/trends/bu';
 import { cn } from '@/lib/utils';
 import { friendlyErrorText } from '@/lib/friendlyError';
@@ -153,7 +154,13 @@ function DailyBars({ report }: { report: OnlineReport }) {
 }
 
 /** ใบสมัคร → AI คัดกรอง → คนโทรเอง (ข้อ 7–9) — ทุกแถวบวกลบลงตัว (`onlineApplicantsAddUp`) */
-function ApplicantSections({ apps, sub }: { apps: OnlineApplicantsReport; sub: string | null }) {
+const JOURNEY_TONE: Partial<Record<keyof InterestJourney, ToneKey>> = {
+  aiInterested: 'success',
+  staffFollowed: 'primary',
+  staffInterested: 'success',
+};
+
+function ApplicantSections({ apps, journey, sub }: { apps: OnlineApplicantsReport; journey: InterestJourney | null; sub: string | null }) {
   const a = apps.ai;
   return (
     <>
@@ -207,6 +214,16 @@ function ApplicantSections({ apps, sub }: { apps: OnlineApplicantsReport; sub: s
           ]}
         />
       </HomeSection>
+
+      {/* บันได AI → คน (เจ้าของ 12 ต.ค. 2569) — ตัวเดียวกับแท็บงานสรรหา (`buildInterestJourney`) */}
+      <HomeSection title="สนใจ" sub={sub} testId="online-journey">
+        <StatStrip
+          arrows
+          loading={!journey}
+          testId="online-journey-strip"
+          items={INTEREST_JOURNEY_STEPS.map((st) => ({ key: st.key, label: st.label, value: journey?.[st.key] ?? 0, tone: JOURNEY_TONE[st.key] }))}
+        />
+      </HomeSection>
     </>
   );
 }
@@ -232,7 +249,8 @@ const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: 
     );
   if (!report) return <Skeleton className="h-96 w-full rounded-2xl" />;
   const apps = data?.applicants ?? null;
-  const ok = onlineReportAddsUp(report) && (!apps || onlineApplicantsAddUp(apps));
+  const journey = data?.journey ?? null;
+  const ok = onlineReportAddsUp(report) && (!apps || onlineApplicantsAddUp(apps)) && (!journey || interestJourneyAddsUp(journey));
   const r = report.requests;
   const appSub = sub ? sub.replace('นับตามวันที่ใบส่งเข้ามา', 'นับตามวันสมัคร') : null;
   return (
@@ -358,7 +376,7 @@ const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: 
         </div>
       </HomeSection>
 
-      {apps ? <ApplicantSections apps={apps} sub={appSub} /> : null}
+      {apps ? <ApplicantSections apps={apps} journey={journey} sub={appSub} /> : null}
     </div>
   );
 };
