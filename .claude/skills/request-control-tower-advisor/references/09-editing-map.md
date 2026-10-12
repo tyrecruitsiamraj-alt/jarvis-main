@@ -13059,3 +13059,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · ป๊อปรายละเอียด (`dashboardDetailDialog`) → `formatYmdTh` · ตัวกรองเดือน/ปี/CSV → `FieldSelect`
   · `FilterSelect` (ตัวกลาง · ตัวกรองแผนก/หน่วยงาน/เจ้าหน้าที่ ฯลฯ ใช้ทั้ง Dashboard + JobList + ตัวกรองหน่วยงาน) → `FieldSelect` ข้างใน · ผู้เรียกยังส่ง `<option>` เป็นลูกเหมือนเดิม (`optionsFromChildren`)
   · ตรวจบนจอ: ไม่เหลือปี ค.ศ./วันที่ d/m/yyyy · เลือกแผนก LBA แล้วคงเหลือ 494 → 61 อัตรา (คืนเป็นทั้งหมดแล้ว) · ภาพ `docs/qa-shots/{date-exec-dashboard-{before,after},select-exec-dashboard-filters-after}-2569-10-12.jpg`
+- (12 ต.ค. 2569 บ่าย) **ไฟล์ตัวอย่างนำเข้าผู้สมัครมี Dropdown ในไฟล์** (เจ้าของ "อะไรที่ต้องเลือก ทำ Dropdown ในไฟล์ให้เขาเลือกเลยได้ไหม")
+  · ใหม่ `api/_lib/importTemplate.ts` (`buildImportTemplateBase64`) — แทน `buildTemplateBase64` ใน `job-applications-import.ts` (GET) · ตำแหน่งดึง `listRecruitJobTitles` (อ่านไม่ได้ = ไม่มี Dropdown ตำแหน่ง ไฟล์ยังมา)
+  · Dropdown 7 ช่อง: เพศ · จังหวัด · ประเภทเจาะจง · วุฒิ = เลือกจากรายการเท่านั้น · อำเภอ (เฉพาะของจังหวัดในแถว · OFFSET/MATCH/COUNTIF) · ตำแหน่ง (พิมพ์ใหม่ได้) · ใบขับขี่ (หลายใบคั่น ,) = เตือนแต่ให้ผ่าน
+  · รายการอยู่ชีตซ่อน "รายการ" (จังหวัด · จังหวัด/อำเภอเรียงตามจังหวัด · ตำแหน่ง) · ชีต "ค่าที่ใช้ได้" คงเดิม · หัวคอลัมน์/ตัวอ่านไฟล์ไม่เปลี่ยน
+  · 🔴 SheetJS รุ่นฟรีเขียน Data Validation ไม่ได้ ⇒ แทรก `<dataValidations>` หลัง `</sheetData>` ผ่าน `XLSX.CFB` (ESM อยู่ที่ `default.CFB`) — ไม่เพิ่มไลบรารี
+  · ตรวจแล้ว: openpyxl อ่าน Dropdown ครบ 7 · เจ้าของเปิดใน Excel บนเครื่องแล้ว "เปิดไฟล์ได้ มี Dropdown" · เส้น GET จริงได้ตำแหน่ง 427 รายการ · เทสต์ `tests/api/importTemplateDropdown2569-10-12.test.ts`

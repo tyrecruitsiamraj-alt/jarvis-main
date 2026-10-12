@@ -25,9 +25,6 @@ import {
   IMPORT_MAX_ROWS,
   IMPORT_SHEET_NAME,
   IMPORT_TEMPLATE_FILENAME,
-  IMPORT_VALUES_SHEET_NAME,
-  importTemplateHeaders,
-  importValuesSheet,
   mapImportHeader,
   markBlockedPhones,
   planImportRows,
@@ -42,6 +39,8 @@ import {
 import { repeatImportReason } from '../../src/lib/applicationRepeat.js';
 import { existingApplicationsByPhone, lockAndFindRepeat, recentPhoneApplications } from '../_lib/applicationRepeatGuard.js';
 import { duplicateSheetRows, type ImportDuplicate } from '../../src/lib/applicantImportDuplicates.js';
+import { buildImportTemplateBase64 } from '../_lib/importTemplate.js';
+import { listRecruitJobTitles } from '../_lib/recruitJobTitles.js';
 
 const tbl = tableInAppSchema('public_job_applications');
 /** ~1.5 MB ไฟล์จริง — รายชื่อ 500 แถวใช้ไม่ถึง 100 KB */
@@ -54,16 +53,6 @@ const text = (v: unknown, max = 200): string | null => {
   return t ? t.slice(0, max) : null;
 };
 
-function buildTemplateBase64(): string {
-  const wb = XLSX.utils.book_new();
-  const sheet = XLSX.utils.aoa_to_sheet([importTemplateHeaders()]);
-  sheet['!cols'] = importTemplateHeaders().map((h) => ({ wch: Math.max(12, h.length + 4) }));
-  XLSX.utils.book_append_sheet(wb, sheet, IMPORT_SHEET_NAME);
-  const values = XLSX.utils.aoa_to_sheet(importValuesSheet());
-  values['!cols'] = [{ wch: 10 }, { wch: 36 }, { wch: 32 }, { wch: 34 }];
-  XLSX.utils.book_append_sheet(wb, values, IMPORT_VALUES_SHEET_NAME);
-  return XLSX.write(wb, { type: 'base64', bookType: 'xlsx' }) as string;
-}
 
 /** ไฟล์ → แถว (ชีต "ผู้สมัคร" ถ้ามี ไม่งั้นชีตแรก) · เซลล์เป็นข้อความตามที่ตาเห็นบน Excel */
 /** ไฟล์รายชื่อซ้ำให้ดาวน์โหลด (.xlsx) — สร้างฝั่ง server ตัวเดียวกับไฟล์ตัวอย่าง */
@@ -91,7 +80,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return res.status(200).json({
         filename: IMPORT_TEMPLATE_FILENAME,
         mime: XLSX_MIME,
-        dataBase64: buildTemplateBase64(),
+        // มี Dropdown ในไฟล์ (12 ต.ค. 2569) — ตำแหน่งจากรายชื่อกลาง · อ่านไม่ได้ = ไฟล์ยังมา แค่ไม่มี Dropdown ตำแหน่ง
+        dataBase64: buildImportTemplateBase64(
+          await listRecruitJobTitles()
+            .then((list) => list.map((t) => t.name))
+            .catch(() => []),
+        ),
       });
     }
     if (method !== 'POST') {

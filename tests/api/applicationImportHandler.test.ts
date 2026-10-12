@@ -78,7 +78,8 @@ describe('GET — ไฟล์ตัวอย่าง', () => {
     const body = json.mock.calls[0][0];
     expect(body.filename).toBe('นำเข้าผู้สมัคร.xlsx');
     const wb = XLSX.read(Buffer.from(body.dataBase64, 'base64'), { type: 'buffer' });
-    expect(wb.SheetNames).toEqual(['ผู้สมัคร', 'ค่าที่ใช้ได้']);
+    // + ชีตซ่อน "รายการ" ของ Dropdown ในไฟล์ (12 ต.ค. 2569 · tests/api/importTemplateDropdown2569-10-12.test.ts)
+    expect(wb.SheetNames).toEqual(['ผู้สมัคร', 'ค่าที่ใช้ได้', 'รายการ']);
     const [first] = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets['ผู้สมัคร'], { header: 1 });
     expect(first).toEqual(H);
   });
