@@ -37,14 +37,15 @@ describe('นาฬิกาไทยจาก mssql', () => {
 // 7 ต.ค. 2569: เวลาโทรกลับมาตั้งได้ผ่านจอ (`confirmTime` / `leadMinutes` — เจ้าของ "ต้องปรับผ่าน ui") · ค่าเก่ารูปแบบเดิมยังข้าม
 describe('ค่าตั้ง (aiFrom · aiPaused · เวลาโทร)', () => {
   it('ค่าเริ่ม = ไม่ตั้ง · อ่านวันที่ถูกต้อง · เพี้ยน/ค่าเก่าในฐาน = ข้าม ไม่ throw', () => {
-    expect(DEFAULT_REPLACE_CALL_RULE).toEqual({ aiFrom: null, aiPaused: false, confirmTime: '16:00', leadMinutes: [60, 15] });
+    expect(DEFAULT_REPLACE_CALL_RULE).toEqual({ aiFrom: null, aiPaused: false, confirmTime: '16:00', leadMinutes: [60, 15], aiPhones: [] });
     expect(normalizeReplaceCallRule({ atStart: false, dayOffset: -1, time: '18:00', aiFrom: '2026-10-06' })).toEqual({
       aiFrom: '2026-10-06',
       aiPaused: false,
       confirmTime: '16:00', leadMinutes: [60, 15],
+      aiPhones: [],
     });
-    expect(normalizeReplaceCallRule({ aiFrom: '6/10/2026' })).toEqual({ aiFrom: null, aiPaused: false, confirmTime: '16:00', leadMinutes: [60, 15] });
-    expect(normalizeReplaceCallRule({ aiFrom: '2026-10-06', aiPaused: true })).toEqual({ aiFrom: '2026-10-06', aiPaused: true, confirmTime: '16:00', leadMinutes: [60, 15] });
+    expect(normalizeReplaceCallRule({ aiFrom: '6/10/2026' })).toEqual({ aiFrom: null, aiPaused: false, confirmTime: '16:00', leadMinutes: [60, 15], aiPhones: [] });
+    expect(normalizeReplaceCallRule({ aiFrom: '2026-10-06', aiPaused: true })).toEqual({ aiFrom: '2026-10-06', aiPaused: true, confirmTime: '16:00', leadMinutes: [60, 15], aiPhones: [] });
     expect(normalizeReplaceCallRule({ aiPaused: 'yes' }).aiPaused).toBe(false);
     expect(normalizeReplaceCallRule(null)).toEqual(DEFAULT_REPLACE_CALL_RULE);
     expect(normalizeReplaceCallRule('x')).toEqual(DEFAULT_REPLACE_CALL_RULE);
@@ -204,7 +205,9 @@ describe('พัก AI (aiPaused)', () => {
     const { readFileSync } = await import('node:fs');
     const lib = readFileSync(`${process.cwd()}/api/_lib/irecruitReplaceSync.ts`, 'utf8');
     // สายที่เจ้าหน้าที่เลือก AI เอง (updated_by) ไม่โดนพัก — Choice "เลือก AI รายสายได้" 8 ต.ค. 2569
-    expect(lib).toContain("and coalesce(call_mode, 'ai') = 'ai' and scheduled_at > $2\n        and updated_by is null and coalesce(source_ref, '') like 'irecruit-replace:%'`");
+    expect(lib).toContain("and coalesce(call_mode, 'ai') = 'ai' and scheduled_at > $2\n        and updated_by is null and coalesce(source_ref, '') like 'irecruit-replace:%'\n");
+    // คนในรายชื่อให้ AI โทรไม่โดนพัก (เจ้าของ 12 ต.ค. 2569)
+    expect(lib).toContain('= any($3::text[]))`');
     expect(lib).toContain('replaceCallModeFor(p.at, settings.rule.aiFrom, settings.rule.aiPaused)');
     const worker = readFileSync(`${process.cwd()}/api/_lib/irecruitReplaceSyncWorker.ts`, 'utf8');
     expect(worker).toContain('if (settings.rule.aiPaused) {');

@@ -52,6 +52,7 @@ let settingsError: unknown = null;
 let existingError: unknown = null;
 let insertErrorFor: string | null = null;
 let insertSeq = 0;
+let staffPhoneRows: Array<{ id: string; staff_phone: string | null }> = [];
 
 function fakeDb(sql: string, params: unknown[] = []) {
   calls.push({ sql, params });
@@ -80,6 +81,9 @@ function fakeDb(sql: string, params: unknown[] = []) {
     return { rows: [{ id: `id-${insertSeq}` }] };
   }
   if (/update .*follow_entries set dispatch_state/.test(sql)) return { rows: [] };
+  // 12 ต.ค. 2569: เบอร์ฉุกเฉินของแถวก่อนส่งแผน · คนในรายชื่อให้ AI โทร → AI
+  if (/select id::text as id, staff_phone from/.test(sql)) return { rows: staffPhoneRows };
+  if (/set call_mode = 'ai', staff_phone = coalesce\(\$2, staff_phone\)/.test(sql)) return { rows: [] };
   if (/insert into .*app_irecruit_replace_sync/.test(sql)) return { rows: [] };
   throw new Error(`unexpected sql: ${sql.slice(0, 80)}`);
 }
@@ -113,6 +117,7 @@ beforeEach(() => {
   existingError = null;
   insertErrorFor = null;
   insertSeq = 0;
+  staffPhoneRows = [];
   dbQuery.mockReset();
   dbQuery.mockImplementation(async (sql: string, params?: unknown[]) => fakeDb(sql, params));
   irecruitSqlQuery.mockReset();
@@ -159,6 +164,7 @@ describe('runIrecruitReplaceSync — 3 สายต่อใบ', () => {
     expect(byRef[`irecruit-replace:A:confirm:${pk(P1)}`]).toEqual([
       'ทดสอบ ระบบ', P1, REPLACE_FOLLOW_TOPIC, 'ยืนยันเวลาเข้างาน 6/10 07:30 น.', '2026-10-05T09:00:00.000Z',
       expect.any(String), 'ไซต์ทดสอบ', 'S001', 1, 'ai', 'ดึงจาก iRecruit', 'replacement', `irecruit-replace:A:confirm:${pk(P1)}`,
+      null, // เบอร์ฉุกเฉิน — ไม่อยู่ในรายชื่อให้ AI โทร
     ]);
     expect(byRef[`irecruit-replace:A:lead60:${pk(P1)}`]?.slice(3, 5)).toEqual(['เข้างาน 07:30 น.', '2026-10-05T23:30:00.000Z']);
     expect(byRef[`irecruit-replace:A:lead15:${pk(P1)}`]?.[4]).toBe('2026-10-06T00:15:00.000Z');
@@ -676,5 +682,60 @@ describe('🔴 ใบซ้ำ: คนเดียวหลายใบ เว�
     expect(s).toMatchObject({ added: 0, cancelled: 3, duplicateJobs: 1 });
     const cancelCall = calls.find((c) => /set cancelled_at = now\(\)/.test(c.sql));
     expect(cancelCall?.params[0]).toEqual(['B0', 'B1', 'B2']);
+  });
+});
+
+/**
+ * 🔴 รายชื่อให้ AI โทร (เจ้าของ 12 ต.ค. 2569: "ปิดเป็นคนโทรทั้งหมด เว้น [20 คน] ฉุกเฉินเหมือนเดิม" · Choice "สายที่รอโทร + งานใหม่")
+ * พัก AI อยู่ = คนโทรทั้งหมด ยกเว้นเบอร์ในรายชื่อ → AI + เบอร์ฉุกเฉินตามรายชื่อ · พัก AI ไม่สลับคนในรายชื่อกลับ
+ */
+describe('รายชื่อให้ AI โทร (aiPhones)', () => {
+  const LISTED = { phone: '0812345678', emergency: '0811111111' };
+  const paused = (aiPhones: unknown[]) => [{ payload: { rule: { aiPaused: true, aiPhones } }, updated_at: null, updated_by_name: null }];
+
+  it('ใบใหม่: คนในรายชื่อ = AI + เบอร์ฉุกเฉิน · คนอื่น = คนโทร (พัก AI) · ส่งแผนพร้อมเบอร์ฉุกเฉิน', async () => {
+    settingsRows = paused([LISTED]);
+    irecruitSqlQuery.mockResolvedValue([row('A'), row('B', { mobile: '0899999999' })]);
+    staffPhoneRows = [{ id: 'id-1', staff_phone: LISTED.emergency }];
+    await runIrecruitReplaceSync({ now: NOW });
+    const ins = inserts();
+    const listed = ins.filter((c) => c.params[1] === P1);
+    const other = ins.filter((c) => c.params[1] === '+66899999999');
+    expect(listed.length).toBeGreaterThan(0);
+    expect(listed.every((c) => c.params[9] === 'ai' && c.params[13] === LISTED.emergency)).toBe(true);
+    expect(other.every((c) => c.params[9] === 'manual' && c.params[13] === null)).toBe(true);
+    const sent = enqueuePlan.mock.calls.flatMap((c) => c[0] as Array<{ recipient_phone: string; staffPhone: string | null }>);
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.every((e) => e.recipient_phone === P1 && e.staffPhone === LISTED.emergency)).toBe(true);
+  });
+
+  it('สายเดิมที่ยังเป็นคนโทร → AI + เบอร์ฉุกเฉิน · เจ้าหน้าที่แก้เอง/เลยเวลา/ไม่อยู่ในรายชื่อ = ไม่แตะ', async () => {
+    settingsRows = paused([LISTED]);
+    irecruitSqlQuery.mockResolvedValue([row('A')]);
+    const ref = (slot: string) => `irecruit-replace:A:${slot}:${pk(P1)}`;
+    existingRows = [
+      { id: 'x1', source_ref: ref('confirm'), scheduled_at: '2026-10-05T09:00:00.000Z', mode: 'manual', group_id: 'g', recipient_phone: P1, pending: true },
+      { id: 'x2', source_ref: ref('lead60'), scheduled_at: '2026-10-05T23:30:00.000Z', mode: 'manual', group_id: 'g', recipient_phone: P1, pending: true, staff_edited: true },
+      { id: 'x3', source_ref: ref('lead15'), scheduled_at: '2026-10-06T00:15:00.000Z', mode: 'manual', group_id: 'g', recipient_phone: P1, pending: false },
+    ];
+    await runIrecruitReplaceSync({ now: NOW });
+    const flips = calls.filter((c) => /set call_mode = 'ai', staff_phone/.test(c.sql));
+    expect(flips.map((c) => c.params)).toEqual([['x1', LISTED.emergency]]);
+    expect(enqueuePlan.mock.calls.flatMap((c) => (c[0] as Array<{ id: string }>).map((e) => e.id))).toEqual(['x1']);
+  });
+
+  it('เบอร์ทุกรูปแบบเทียบกันได้ · ซ้ำ/อ่านไม่ออก = ตัดทิ้ง · พัก AI ข้ามคนในรายชื่อ', async () => {
+    const { normalizeReplaceCallRule, replaceAiPhoneOf, replacePhoneKey } = await import('../../src/lib/irecruitReplaceSync.js');
+    expect(replacePhoneKey('+66812345678')).toBe('812345678');
+    expect(replacePhoneKey('081-234-5678')).toBe('812345678');
+    expect(replacePhoneKey('1234')).toBeNull();
+    const rule = normalizeReplaceCallRule({
+      aiPhones: [LISTED, { phone: '+66812345678', emergency: 'x' }, { phone: 'abc' }, { phone: '0899999999', emergency: '' }],
+    });
+    expect(rule.aiPhones).toEqual([LISTED, { phone: '0899999999', emergency: null }]);
+    expect(replaceAiPhoneOf(rule, P1)).toEqual(LISTED);
+    expect(replaceAiPhoneOf(rule, '0800000000')).toBeNull();
+    const lib = readFileSync(`${process.cwd()}/api/_lib/irecruitReplaceSync.ts`, 'utf8');
+    expect(lib).toMatch(/const \{ rule \} = await getReplaceSyncSettings\(\);\n  const listedKeys/);
   });
 });

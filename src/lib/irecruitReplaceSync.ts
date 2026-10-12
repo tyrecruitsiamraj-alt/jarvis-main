@@ -49,9 +49,53 @@ export type ReplaceCallRule = {
    */
   confirmTime: string;
   leadMinutes: [number, number];
+  /**
+   * 🔴 รายชื่อที่ให้ AI โทร แม้พัก AI อยู่ (เจ้าของสั่ง 12 ต.ค. 2569: *"ปิดเป็นคนโทรทั้งหมด เว้น [20 คน] ฉุกเฉินเหมือนเดิม"*
+   * → Choice "สายที่รอโทร + งานใหม่") — เบอร์ในรายชื่อ = AI ทุกสายที่ยังไม่ถึงเวลา (ทับพัก AI / WL) + เบอร์ฉุกเฉินตามรายชื่อ
+   * เก็บในฐาน (`app_irecruit_replace_sync.payload.rule`) ห้ามเขียนเบอร์ลง repo · นอกรายชื่อยังเลือก AI ทีละสายได้ (Choice เดียวกัน)
+   */
+  aiPhones: ReplaceAiPhone[];
 };
 
-export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = { aiFrom: null, aiPaused: false, confirmTime: '16:00', leadMinutes: [60, 15] };
+/** คนหนึ่งในรายชื่อให้ AI โทร — เบอร์ 10 หลักขึ้นต้น 0 · ฉุกเฉิน = เบอร์ที่ AI โทรหาเมื่อติดต่อคนไปแทนไม่ได้ */
+export type ReplaceAiPhone = { phone: string; emergency: string | null };
+
+export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = {
+  aiFrom: null,
+  aiPaused: false,
+  confirmTime: '16:00',
+  leadMinutes: [60, 15],
+  aiPhones: [],
+};
+
+/** เบอร์มือถือไทย → 9 หลักท้าย (ตัด 0 / 66 ข้างหน้า) · อ่านไม่ออก = null — ใช้เทียบเบอร์ทุกรูปแบบ (081… · +6681…) */
+export function replacePhoneKey(raw: string | null | undefined): string | null {
+  const d = String(raw ?? '').replace(/\D/g, '');
+  const nine = d.startsWith('66') && d.length === 11 ? d.slice(2) : d.startsWith('0') && d.length === 10 ? d.slice(1) : d;
+  return /^[1-9]\d{8}$/.test(nine) ? nine : null;
+}
+
+/** เบอร์นี้อยู่ในรายชื่อให้ AI โทรไหม */
+export function replaceAiPhoneOf(rule: Pick<ReplaceCallRule, 'aiPhones'>, phone: string | null | undefined): ReplaceAiPhone | null {
+  const key = replacePhoneKey(phone);
+  if (!key) return null;
+  return rule.aiPhones.find((x) => replacePhoneKey(x.phone) === key) ?? null;
+}
+
+function normalizeAiPhones(raw: unknown): ReplaceAiPhone[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: ReplaceAiPhone[] = [];
+  for (const it of raw) {
+    const o = typeof it === 'object' && it !== null ? (it as Record<string, unknown>) : {};
+    const key = replacePhoneKey(typeof o.phone === 'string' ? o.phone : null);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const em = replacePhoneKey(typeof o.emergency === 'string' ? o.emergency : null);
+    out.push({ phone: `0${key}`, emergency: em ? `0${em}` : null });
+  }
+  return out;
+}
 
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -73,7 +117,7 @@ export function normalizeReplaceCallRule(raw: unknown): ReplaceCallRule {
   const okLead = (n: number) => Number.isInteger(n) && n >= 5 && n <= 600;
   const leadMinutes: [number, number] =
     lm.length === 2 && okLead(lm[0]) && okLead(lm[1]) && lm[0] > lm[1] ? [lm[0], lm[1]] : [...DEFAULT_REPLACE_CALL_RULE.leadMinutes];
-  return { aiFrom, aiPaused: r.aiPaused === true, confirmTime, leadMinutes };
+  return { aiFrom, aiPaused: r.aiPaused === true, confirmTime, leadMinutes, aiPhones: normalizeAiPhones(r.aiPhones) };
 }
 
 /** เวลาโทรของใบงาน — ส่วนของกติกาที่ `planReplaceCalls` ใช้ */

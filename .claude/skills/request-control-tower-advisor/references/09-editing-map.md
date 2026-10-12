@@ -13099,3 +13099,15 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · จอ: แท็บผู้สมัคร มุมมอง "ซ้ำ iRecruit" (`RM_LIST_VIEWS_SHOWN` · `irecruit_dup_at` จาก list API) · ช่องคำตอบกับ AI ขึ้น "ซ้ำ iRecruit · สมัคร 5 ต.ค. 2569"
   · วัดจริง 30 วัน: ผู้สมัครผ่านลิงก์ 371 · สมัคร iRecruit ภายใน 14 วันก่อน 58 (16%) · ไม่อยู่ใน iRecruit เลย 198 (53%) · สองระบบไม่ได้ส่งใบหากัน (ตรงเวลา 1 ใบ)
   · ⚠️ ใบเก่าก่อน 12 ต.ค. ไม่มีป้าย (จดตอนตัวส่งอัตโนมัติวิ่งเท่านั้น) · เทสต์ `tests/api/irecruitDuplicates2569-10-12.test.ts`
+
+## 12 ต.ค. 2569 — ติดตามส่งคนแทน: คนโทรทั้งหมด เว้นรายชื่อให้ AI โทร (`rule.aiPhones`)
+- เจ้าของสั่ง *"ปิดเป็นคนโทรทั้งหมด เว้น [20 คน] ฉุกเฉินเหมือนเดิม"* → Choice: รายชื่อ = AI ทั้งสายที่รอโทร + งานใหม่ ·
+  นอกรายชื่อยังเลือก AI ทีละสายได้ · เบอร์ฉุกเฉินโทรทุกสายที่ไม่ติดเหมือนเดิม
+- รายชื่อเก็บใน `app_irecruit_replace_sync.payload.rule.aiPhones` (`{ phone, emergency }`) — 🔴 ห้ามเขียนเบอร์ลง repo
+  ตัวอ่าน `normalizeReplaceCallRule` / `replaceAiPhoneOf` / `replacePhoneKey` (`src/lib/irecruitReplaceSync.ts`)
+- รอบดึง (`api/_lib/irecruitReplaceSync.ts`): เบอร์ในรายชื่อ = AI ทับพัก AI / WL (สายที่เลยเวลายังเป็นคนโทร) + `staff_phone` = ฉุกเฉินตามรายชื่อ ·
+  ขั้น 2.7 สลับสายเดิมที่ยังเป็นคนโทร → AI (ข้ามสายที่เจ้าหน้าที่แก้เอง) · `enforceReplaceAiPaused` ข้ามคนในรายชื่อ
+- 🔴 `enqueueByPersonDay` เดิมส่ง `staffPhone: null` เสมอ ⇒ Lumos ใช้เบอร์สำรองแทนเบอร์ฉุกเฉินที่ตั้งไว้ — ตอนนี้อ่าน `staff_phone` ของแถวก่อน
+- แก้รายชื่อ: ยังไม่มีช่องบนจอ · เขียน `rule.aiPhones` ผ่าน `saveReplaceSyncSettings` (เขียนทับทั้ง `rule` — อ่านของเดิมมารวมก่อนเสมอ)
+- เทสต์ `tests/api/irecruitReplaceSync.test.ts` หัวข้อ "รายชื่อให้ AI โทร (aiPhones)"
+

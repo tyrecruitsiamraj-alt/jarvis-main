@@ -41,6 +41,8 @@ import type { FollowDispatchState } from '../../src/lib/followDispatchState.js';
 import {
   DEFAULT_REPLACE_CALL_RULE,
   normalizeReplaceCallRule,
+  replaceAiPhoneOf,
+  replacePhoneKey,
   planReplaceCallsFull,
   reconcileReplaceCalls,
   REPLACE_FOLLOW_TOPIC,
@@ -247,6 +249,8 @@ type DesiredMeta = ReplaceDesiredCall & {
   /** "เพิ่มโดย" — อีเมลคนเพิ่มใบใน iRecruit (`replaceAdderLabel`) */
   adder: string | null;
   mode: 'ai' | 'manual';
+  /** เบอร์ฉุกเฉินของคนในรายชื่อให้ AI โทร (`rule.aiPhones`) · ไม่อยู่ในรายชื่อ = null */
+  emergency: string | null;
   /** ประเภทจาก iRecruit (EX · คนใน ฯลฯ) — เก็บลงแถวให้หน้าติดตามกรองได้ (136 · เจ้าของสั่ง 6 ต.ค. 2569) */
   replaceType: string | null;
 };
@@ -298,20 +302,38 @@ async function enqueueByPersonDay(items: Array<{ id: string; meta: DesiredMeta }
     const key = `${it.meta.phone}|${bangkokBusinessDateYmd(it.meta.at)}`;
     groups.set(key, [...(groups.get(key) ?? []), it]);
   }
+  /**
+   * 🔴 เบอร์ฉุกเฉินของแถว (12 ต.ค. 2569) — เดิมส่ง null เสมอ ⇒ Lumos ใช้เบอร์สำรองแทนเบอร์ที่ตั้งไว้
+   * ใช้ของแถวก่อน (เจ้าหน้าที่ตั้งเอง / รายชื่อให้ AI โทร) แล้วค่อยถอยไปเบอร์ในรายชื่อ
+   */
+  const staffPhoneOf = new Map<string, string | null>();
+  try {
+    const { rows } = await dbQuery<{ id: string; staff_phone: string | null }>(
+      `select id::text as id, staff_phone from ${followTable} where id = any($1::uuid[])`,
+      [items.map((it) => it.id)],
+    );
+    for (const r of rows) staffPhoneOf.set(r.id, (r.staff_phone ?? '').trim() || null);
+  } catch (e) {
+    logWarn('irecruit.replaceSync: อ่านเบอร์ฉุกเฉินไม่สำเร็จ', { error: errorSummaryText(e) });
+  }
   for (const list of groups.values()) {
-    const inputs: FollowEntryInput[] = list.map(({ id, meta }) => ({
+    const inputs: FollowEntryInput[] = [];
+    for (const { id, meta } of list) {
+      const staffPhone = staffPhoneOf.get(id) ?? meta.emergency;
+      inputs.push({
       id,
       recipient_name: meta.name,
       recipient_phone: meta.phone,
       topic: REPLACE_FOLLOW_TOPIC,
       note: replaceSlotNote(meta.slot, meta.wall),
-      staffPhone: null,
+      staffPhone,
       scheduled_at: meta.at,
       callTimes: null,
       callRound: meta.round,
-      staffName: null,
+      staffName: staffPhone ? await staffNameOfPhone(staffPhone) : null,
       unitName: meta.siteName,
-    }));
+      });
+    }
     try {
       for (const [id, st] of await enqueueFollowReminderPlan(inputs)) out.set(id, st);
     } catch (e) {
@@ -419,6 +441,8 @@ async function runIrecruitReplaceSyncUnlocked(
       if (plans.every((p) => p.past)) summary.pastDue += 1;
       const name = `${(r.fname ?? '').trim()} ${(r.lname ?? '').trim()}`.trim() || 'คนไปแทนงาน';
       const personKey = personKeyOf(phone);
+      // 🔴 รายชื่อให้ AI โทร (เจ้าของ 12 ต.ค. 2569) — ทับพัก AI / WL · สายที่เลยเวลายังเป็นคนโทร
+      const listed = replaceAiPhoneOf(settings.rule, phone);
       for (const p of plans) {
         desired.push({
           ref: replaceSlotRef(r.job_id, p.slot, personKey),
@@ -434,7 +458,12 @@ async function runIrecruitReplaceSyncUnlocked(
           adder: replaceAdderLabel(r),
           siteCode: r.site_code?.trim() || null,
           // สายที่เลยเวลาแล้ว = คนโทร (AI ไม่โทรย้อนหลัง)
-          mode: p.past ? 'manual' : replaceModeForType(r.replace_type, replaceCallModeFor(p.at, settings.rule.aiFrom, settings.rule.aiPaused)),
+          mode: p.past
+            ? 'manual'
+            : listed
+              ? 'ai'
+              : replaceModeForType(r.replace_type, replaceCallModeFor(p.at, settings.rule.aiFrom, settings.rule.aiPaused)),
+          emergency: listed?.emergency ?? null,
           replaceType: (r.replace_type ?? '').trim() || null,
         });
       }
@@ -671,6 +700,30 @@ async function runIrecruitReplaceSyncUnlocked(
       }
     }
 
+    // ── 2.7) คนในรายชื่อให้ AI โทร ที่ยังเป็นคนโทร → AI + เบอร์ฉุกเฉินตามรายชื่อ (เจ้าของ 12 ต.ค. 2569 Choice "สายที่รอโทร + งานใหม่") ──
+    // เฉพาะสายที่ยังไม่ถึงเวลา · เจ้าหน้าที่แก้เอง (`staff_edited`) = ห้ามทับ · ส่ง Lumos เมื่อสวิตช์ follow_entry เปิด
+    const listedFlips = existingRows.filter((x) => {
+      if (!x.pending || x.mode !== 'manual' || x.staff_edited || rescheduledIds.has(x.id)) return false;
+      const meta = metaByRef.get(x.source_ref);
+      return Boolean(meta && meta.mode === 'ai' && replaceAiPhoneOf(settings.rule, x.recipient_phone));
+    });
+    const autoAiListed = listedFlips.length > 0 ? autoAi || (await isAutoDispatchEnabled('follow_entry')) : false;
+    for (const x of listedFlips) {
+      const meta = metaByRef.get(x.source_ref) as DesiredMeta;
+      try {
+        await dbQuery(
+          `update ${followTable} set call_mode = 'ai', staff_phone = coalesce($2, staff_phone)
+            where id = $1 and call_mode = 'manual'`,
+          [x.id, meta.emergency],
+        );
+        if (autoAiListed) toEnqueue.push({ id: x.id, meta });
+        else await setDispatchState(x.id, 'off');
+        summary.toAi = (summary.toAi ?? 0) + 1;
+      } catch (e) {
+        logError('irecruit.replaceSync: เปลี่ยนคนในรายชื่อเป็น AI ไม่สำเร็จ', e, { id: x.id });
+      }
+    }
+
     // ── 3) สร้างสายใหม่ — คนเดียวกัน (เบอร์เดียว) อยู่ชุดเดียวกัน ใช้ชุดเดิมถ้ามี ──
     const groupOfPhone = new Map<string, string>();
     for (const x of existingRows) if (x.pending && x.recipient_phone && x.group_id) groupOfPhone.set(x.recipient_phone, x.group_id);
@@ -685,10 +738,11 @@ async function runIrecruitReplaceSyncUnlocked(
              (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at,
               group_id, call_times, unit_name, site_code, call_round, call_mode,
               created_by, created_by_name, follow_team, source_ref)
-           values ($1, $2, $3, $4, null, $5, $6, null, $7, $8, $9, $10, null, $11, $12, $13)
+           values ($1, $2, $3, $4, $14, $5, $6, null, $7, $8, $9, $10, null, $11, $12, $13)
            returning id`,
           [meta.name, meta.phone, REPLACE_FOLLOW_TOPIC, replaceSlotNote(meta.slot, meta.wall), meta.at.toISOString(), groupId,
-           meta.siteName, meta.siteCode, meta.round, meta.mode, meta.adder ?? actorName, FOLLOW_TEAM_REPLACEMENT, meta.ref],
+           meta.siteName, meta.siteCode, meta.round, meta.mode, meta.adder ?? actorName, FOLLOW_TEAM_REPLACEMENT, meta.ref,
+           meta.emergency],
         );
         if (!ins[0]) continue;
         summary.added += 1;
@@ -882,12 +936,16 @@ export async function enforceReplaceAiPaused(now: Date = new Date()): Promise<{ 
 async function enforceReplaceAiPausedUnlocked(now: Date): Promise<{ converted: number; plansCancelled: number; errors: number }> {
   const out = { converted: 0, plansCancelled: 0, errors: 0 };
   if (!getLumosPushConfig()) return out;
+  // 🔴 คนในรายชื่อให้ AI โทร (เจ้าของ 12 ต.ค. 2569) ไม่โดนพัก — ไม่งั้นรอบนี้สลับกลับเป็นคนโทรทุก 5 นาที
+  const { rule } = await getReplaceSyncSettings();
+  const listedKeys = rule.aiPhones.map((x) => replacePhoneKey(x.phone)).filter((k): k is string => Boolean(k));
   const { rows: aff } = await dbQuery<{ id: string }>(
     `select id from ${followTable}
       where follow_team = $1 and cancelled_at is null and completed_at is null
         and coalesce(call_mode, 'ai') = 'ai' and scheduled_at > $2
-        and updated_by is null and coalesce(source_ref, '') like 'irecruit-replace:%'`,
-    [FOLLOW_TEAM_REPLACEMENT, now.toISOString()],
+        and updated_by is null and coalesce(source_ref, '') like 'irecruit-replace:%'
+        and not (right(regexp_replace(coalesce(recipient_phone, ''), '\\D', '', 'g'), 9) = any($3::text[]))`,
+    [FOLLOW_TEAM_REPLACEMENT, now.toISOString(), listedKeys],
   );
   if (aff.length === 0) return out;
   const res = await convertReplaceAiRowsToManual(new Set(aff.map((r) => r.id)), 'aiPaused');
