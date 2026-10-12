@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { FieldSelect } from '@/components/shared/FieldSelect';
 import { endOfMonth, startOfMonth } from 'date-fns';
 import UnitRequestFilterFields from '@/components/jobs/UnitRequestFilterFields';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
@@ -197,50 +198,31 @@ const DashboardFilterBar: React.FC<Props> = ({
             <label htmlFor="dashboard-month-select" className="text-[11px] text-slate-600 dark:text-slate-400">
               เดือน
             </label>
-            <select
+            <FieldSelect
               id="dashboard-month-select"
+              ariaLabel="เลือกเดือน"
               value={selectedMonth}
-              onChange={(e) => {
-                const month = e.target.value;
-                const yearBe =
-                  selectedYearBe || String(ceToBeYear(now.getFullYear()));
+              onChange={(month) => {
+                const yearBe = selectedYearBe || String(ceToBeYear(now.getFullYear()));
                 applyMonthYear(month, yearBe);
               }}
-              className="jarvis-filter-select w-full text-sm"
-              aria-label="เลือกเดือน"
-            >
-              <option value="">ทั้งปี</option>
-              {THAI_MONTHS.map((m) => (
-                <option key={m.value} value={String(m.value)}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
+              options={[{ value: '', label: 'ทั้งปี' }, ...THAI_MONTHS.map((m) => ({ value: String(m.value), label: m.label }))]}
+            />
           </div>
           <div className="space-y-1">
             <label htmlFor="dashboard-year-select" className="text-[11px] text-slate-600 dark:text-slate-400">
               ปี (พ.ศ.)
             </label>
-            <select
+            <FieldSelect
               id="dashboard-year-select"
+              ariaLabel="เลือกปี"
               value={selectedYearBe}
-              onChange={(e) => {
-                const yearBe = e.target.value;
-                applyMonthYear(yearBe ? selectedMonth : '', yearBe);
-              }}
-              className="jarvis-filter-select w-full text-sm"
-              aria-label="เลือกปี"
-            >
-              <option value="">ปี…</option>
-              {yearOptionsCe.map((y) => {
-                const be = ceToBeYear(y);
-                return (
-                  <option key={y} value={String(be)}>
-                    {be}
-                  </option>
-                );
-              })}
-            </select>
+              onChange={(yearBe) => applyMonthYear(yearBe ? selectedMonth : '', yearBe)}
+              options={[
+                { value: '', label: 'ปี…' },
+                ...yearOptionsCe.map((y) => ({ value: String(ceToBeYear(y)), label: String(ceToBeYear(y)) })),
+              ]}
+            />
           </div>
           <p className="text-[11px] text-slate-600 dark:text-slate-400 col-span-2">
             เลือกเฉพาะปี = ดูทั้งปี · เลือกเดือน+ปี = เฉพาะเดือนนั้น
@@ -286,17 +268,12 @@ const DashboardFilterBar: React.FC<Props> = ({
           ตัวกรองนี้กับช่องค้นหาด้านบน มีผลกับไฟล์ที่กด <b>Export CSV</b> เท่านั้น —
           ไม่เปลี่ยนตัวเลข/กราฟบนหน้านี้
         </p>
-        <select
+        <FieldSelect
+          ariaLabel="กรองข้อมูลในไฟล์ CSV"
           value={queueStatus}
-          onChange={(e) => onQueueStatusChange(e.target.value as DashboardStatusFilter)}
-          className="jarvis-filter-select w-full text-sm"
-        >
-          {QUEUE_STATUS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => onQueueStatusChange(v as DashboardStatusFilter)}
+          options={QUEUE_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        />
       </div>
     </aside>
   );

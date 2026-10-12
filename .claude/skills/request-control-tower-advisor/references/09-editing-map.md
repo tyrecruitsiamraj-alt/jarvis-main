@@ -13053,3 +13053,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · `formatDateTimeTh` ("3 ส.ค. 2569 18:08") เป็นรูปเดียวกันอยู่แล้ว ไม่แตะ
   · 🔴 `formatYmdDmyBe` (12/10/2569) ยังอยู่: ไฟล์ส่งออก Excel (`applicantExport`) · ข้อความฟอร์มสมัครสาธารณะ (`applicationRepeat`) · หน้า Dashboard ผู้บริหาร/หน้าอื่น
   · ตรวจบนจอ: ผู้สมัคร/การติดต่อ/นัดหมาย/ภาพรวม/โพสต์ประกาศ/ติดตาม (รายวัน·รายเดือน·ส่งคนแทน·Dashboard) ไม่เหลือ d/m/yyyy · ภาพ `docs/qa-shots/date-{table,card}-recruit-{before,after}-2569-10-12.jpg`
+- (12 ต.ค. 2569 บ่าย) **Dashboard ผู้บริหาร (`/dashboard`) แบบเดียวกับ 3 หน้า** (เจ้าของ "ทำ Dashboard ผู้บริหารให้เป็นแบบเดียวกันด้วย")
+  · 🔴 ปีบนจอเป็น ค.ศ.: date-fns `format(d, 'MMM yyyy', { locale: th })` ให้ "พ.ย. 2025" (locale ไทยแปลแค่ชื่อเดือน) — แกนกราฟเข้ารายเดือน + ป้ายช่วง
+    → `monthYearTh` ("ต.ค. 2569") · ป้ายช่วง/ช่วงก่อน = `rangeText` (`src/lib/dashboard/buildDashboardData.ts`) · ห้ามใช้ 'yyyy' ของ date-fns กับข้อความบนจอ
+  · ป๊อปรายละเอียด (`dashboardDetailDialog`) → `formatYmdTh` · ตัวกรองเดือน/ปี/CSV → `FieldSelect`
+  · `FilterSelect` (ตัวกลาง · ตัวกรองแผนก/หน่วยงาน/เจ้าหน้าที่ ฯลฯ ใช้ทั้ง Dashboard + JobList + ตัวกรองหน่วยงาน) → `FieldSelect` ข้างใน · ผู้เรียกยังส่ง `<option>` เป็นลูกเหมือนเดิม (`optionsFromChildren`)
+  · ตรวจบนจอ: ไม่เหลือปี ค.ศ./วันที่ d/m/yyyy · เลือกแผนก LBA แล้วคงเหลือ 494 → 61 อัตรา (คืนเป็นทั้งหมดแล้ว) · ภาพ `docs/qa-shots/{date-exec-dashboard-{before,after},select-exec-dashboard-filters-after}-2569-10-12.jpg`

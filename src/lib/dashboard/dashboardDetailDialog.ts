@@ -1,4 +1,4 @@
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdTh } from '@/lib/dateTh';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { DASHBOARD_STATUS_LABELS, mapJobToTaskStatus } from '@/lib/dashboard/buildDashboardData';
 import { REQUEST_CONTROL_STATUS_LABELS } from '@/lib/requestControl';
@@ -49,7 +49,7 @@ export function controlRecordToDashboardDetailItem(
       lifecycleKindLabel(rec.lifecycleKind, rec.requestActionName),
       rec.requestActionName,
       `ขอ ${rec.requestPositions} · ปิดได้ ${rec.filledPositions} · ยกเลิก ${rec.cancelledPositions} · เหลือ ${rec.remainingPositions}`,
-      rec.slaDueDate ? `SLA ${formatYmdDmyBe(rec.slaDueDate)}` : null,
+      rec.slaDueDate ? `SLA ${formatYmdTh(rec.slaDueDate)}` : null,
       roleLabel,
     ]
       .filter(Boolean)
@@ -80,7 +80,7 @@ export function jobToDashboardDetailItem(
   return {
     id: job.id,
     title: job.request_no ? `${job.unit_name} (${job.request_no})` : job.unit_name,
-    subtitle: `${roleLabel}${actionLabel} • ต้องการ ${formatYmdDmyBe(job.required_date)} • ${jobPositionUnits(job)} ตำแหน่ง`,
+    subtitle: `${roleLabel}${actionLabel} • ต้องการ ${formatYmdTh(job.required_date)} • ${jobPositionUnits(job)} ตำแหน่ง`,
     badge: DASHBOARD_STATUS_LABELS[status],
     badgeVariant: statusBadgeVariant(status),
     onClick: () => onOpen(job),
@@ -122,8 +122,8 @@ export function cohortRowToDashboardDetailItem(
     title: `${row.unitName ?? '—'} (${row.requestNoDisplay})`,
     subtitle: [
       leadLabel,
-      `เข้ามา ${formatYmdDmyBe(row.requestDate)}`,
-      row.requiredDate ? `ต้องการ ${formatYmdDmyBe(row.requiredDate)}` : null,
+      `เข้ามา ${formatYmdTh(row.requestDate)}`,
+      row.requiredDate ? `ต้องการ ${formatYmdTh(row.requiredDate)}` : null,
       row.requestActionName,
       buckets,
       row.siteCode ? `ไซต์ ${row.siteCode}` : null,

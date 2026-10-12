@@ -91,6 +91,7 @@ import {
 } from '@/lib/requestControl';
 import type { SlaStatus } from '@/lib/jobSla';
 import { URGENCY_FILTER_OPTIONS } from '@/lib/jobUrgency';
+import { rangeText, TH_MONTH_SHORT } from '@/lib/periodPick';
 
 export type PeriodRange = {
   from: string;
@@ -368,8 +369,9 @@ export function resolvePeriodRange(
   const previousToDate = subDays(fromDate, 1);
   const previousFromDate = subDays(previousToDate, span - 1);
 
-  const label = `${format(fromDate, 'd MMM yyyy', { locale: th })} – ${format(toDate, 'd MMM yyyy', { locale: th })}`;
-  const previousLabel = `${format(previousFromDate, 'd MMM yyyy', { locale: th })} – ${format(previousToDate, 'd MMM yyyy', { locale: th })}`;
+  // "6–12 ต.ค. 2569" ปี พ.ศ. (เดิม date-fns 'yyyy' ให้ปี ค.ศ. "2026" · รูปวันที่เดียวทั้งระบบ 12 ต.ค. 2569)
+  const label = rangeText(from, toYmdLocal(toDate));
+  const previousLabel = rangeText(toYmdLocal(previousFromDate), toYmdLocal(previousToDate));
 
   const fullYearLabel = (() => {
     if (from !== `${fromDate.getFullYear()}-01-01`) return null;
@@ -397,7 +399,7 @@ export function resolveYearToDateTrendRange(now = new Date()): {
   const toDate = endOfMonth(now);
   const from = toYmdLocal(fromDate);
   const to = toYmdLocal(toDate);
-  const label = `${format(fromDate, 'MMM yyyy', { locale: th })} – ${format(toDate, 'MMM yyyy', { locale: th })}`;
+  const label = `${monthYearTh(fromDate)} – ${monthYearTh(toDate)}`;
   return { from, to, label };
 }
 
@@ -425,7 +427,7 @@ export function resolveOpenStockTrendRange(
   return {
     from: earliest,
     to: ytd.to,
-    label: `${format(fromDate, 'MMM yyyy', { locale: th })} – ${format(toDate, 'MMM yyyy', { locale: th })}`,
+    label: `${monthYearTh(fromDate)} – ${monthYearTh(toDate)}`,
   };
 }
 
@@ -779,11 +781,16 @@ function buildKpis(
   ];
 }
 
+/** "ต.ค. 2569" — เดือน + ปี พ.ศ. (date-fns 'MMM yyyy' ให้ปี ค.ศ. เห็นบนจอเป็น "ต.ค. 2026") */
+function monthYearTh(d: Date): string {
+  return `${TH_MONTH_SHORT[d.getMonth()]} ${d.getFullYear() + 543}`;
+}
+
 function monthTrendLabel(d: Date, from: string, to: string): string {
   const sameYear = from.slice(0, 4) === to.slice(0, 4);
   return sameYear
     ? format(d, 'MMM', { locale: th })
-    : format(d, 'MMM yyyy', { locale: th });
+    : monthYearTh(d);
 }
 
 function buildActivityTrend(jobs: JobRequest[], from: string, to: string, today = new Date()): DashboardActivityTrendPoint[] {
