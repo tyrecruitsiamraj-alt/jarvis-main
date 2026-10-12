@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FollowEntry } from '@/lib/followApi';
 import type { FollowDayCall, FollowDayPerson, FollowPlanningRound } from '@/lib/followPlanning';
-import { buildFollowCallQueue, followQueueGroupOf, followUrgentCalls, lateText } from '@/lib/followCallQueue';
+import { buildFollowCallQueue, clusterQueueByPerson, FOLLOW_QUEUE_PAGE_SIZES, followQueueGroupOf, followUrgentCalls, lateText } from '@/lib/followCallQueue';
 import { groupFollowEntries } from '@/lib/followGrouping';
 import { buildFollowPlanningRows } from '@/lib/followPlanning';
 import { FOLLOW_PANEL_LINES, followPanelLists, followPeopleCount, type FollowMatrixCol } from '@/lib/followCallMatrix';
@@ -112,6 +112,25 @@ describe('QA รอบ 4 (12 ต.ค. 2569) — กติกาจบแล้�
     const rows = buildFollowPlanningRows(groupFollowEntries(entries, now), now);
     const ids = followUrgentCalls(rows, '2026-10', now).map((it) => it.call.round.entry.id);
     expect(ids.sort()).toEqual(['a', 'c']);
+  });
+});
+
+describe('คนต้องโทร: ชื่อเดียวกันติดกัน + แบ่งหน้าเป็นชื่อ (เจ้าของสั่ง 12 ต.ค. 2569)', () => {
+  it('สายของคนเดียวกันอยู่ก้อนเดียว เรียงก้อนตามสายแรกสุด · ในก้อนเรียงตามเวลา · ตัวเลือก 10/20/30/40', () => {
+    const m = (id: string, name: string, phone: string, at: string) =>
+      call(entry({ id, recipient_name: name, recipient_phone: phone, call_mode: 'manual', call_status: null, scheduled_at: at }), 'notSent', 'notSent');
+    const a1 = m('a1', 'ก', '0811111111', '2026-10-12T03:00:00Z');
+    const b1 = m('b1', 'ข', '0822222222', '2026-10-12T01:00:00Z');
+    const a2 = m('a2', 'ก', '0811111111', '2026-10-12T00:30:00Z');
+    const b2 = m('b2', 'ข', '0822222222', '2026-10-12T04:00:00Z');
+    const q = buildFollowCallQueue([person('ก', [a1, a2]), person('ข', [b1, b2])], NOW);
+    // เรียงตามเวลาอย่างเดียว = a2 b1 a1 b2 (ชื่อสลับกัน) → จับก้อน = [a2 a1] [b1 b2]
+    expect(q.staff.map((i) => i.call.round.entry.id)).toEqual(['a2', 'b1', 'a1', 'b2']);
+    expect(clusterQueueByPerson(q.staff).map((c) => c.map((i) => i.call.round.entry.id))).toEqual([
+      ['a2', 'a1'],
+      ['b1', 'b2'],
+    ]);
+    expect([...FOLLOW_QUEUE_PAGE_SIZES]).toEqual([10, 20, 30, 40]);
   });
 });
 

@@ -14,6 +14,7 @@ import type { FollowDayCall, FollowDayPerson, FollowPlanningRow } from './follow
 import { buildFollowDayPeople, followDayPersonDone, followRoundLabel, roundDispatchReason } from './followPlanning';
 import { canRecordStaffCall, isStaffCallResult } from './followStaffCall';
 import { followCallerOf } from './followListFilter';
+import { followPersonKey } from './followGrouping';
 
 export type FollowQueueGroup = 'staff' | 'ai' | 'done';
 export const FOLLOW_QUEUE_GROUPS: ReadonlyArray<{ key: FollowQueueGroup; label: string }> = [
@@ -121,4 +122,27 @@ export function followUrgentCalls(
     for (const it of q.ai) if (it.call.round.state === 'overdue') out.push(it);
   }
   return out.sort((a, b) => (a.at ?? Number.MAX_SAFE_INTEGER) - (b.at ?? Number.MAX_SAFE_INTEGER));
+}
+
+/**
+ * ═══ กองคนต้องโทร: ชื่อเดียวกันอยู่ติดกัน (เจ้าของสั่ง 12 ต.ค. 2569) ═══
+ * *"คนต้องโทร ถ้าชื่อเดียวกันเอาไว้ติดกัน และทำเป็น Pagination เลือกได้จะดูทีละ 10 20 30 40 ชื่อ"*
+ * ก้อนละคน (`followPersonKey` ตัวเดียวกับแผง — เบอร์ + เรื่อง + ชื่อ) · เรียงก้อนตามสายแรกสุดของคนนั้น ในก้อนเรียงตามเวลา
+ * แบ่งหน้านับเป็น "ชื่อ" ไม่ใช่สาย
+ */
+export const FOLLOW_QUEUE_PAGE_SIZES = [10, 20, 30, 40] as const;
+
+export function clusterQueueByPerson(items: readonly FollowQueueItem[]): FollowQueueItem[][] {
+  const byKey = new Map<string, FollowQueueItem[]>();
+  for (const it of items) {
+    const key = followPersonKey(it.call.round.entry);
+    const list = byKey.get(key);
+    if (list) list.push(it);
+    else byKey.set(key, [it]);
+  }
+  const at = (it: FollowQueueItem) => it.at ?? Number.MAX_SAFE_INTEGER;
+  const clusters = [...byKey.values()].map((list) => [...list].sort((a, b) => at(a) - at(b)));
+  return clusters.sort(
+    (a, b) => at(a[0]) - at(b[0]) || a[0].person.row.group.name.localeCompare(b[0].person.row.group.name, 'th'),
+  );
 }

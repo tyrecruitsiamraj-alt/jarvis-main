@@ -700,6 +700,7 @@ const FollowPlanningCalendar: React.FC<{
 
               {dayLayout === 'queue' ? (
                 <FollowCallQueue
+                  key={dayYmd}
                   people={allDayPeople}
                   busyId={busyId}
                   onRecord={onStaffResult ? recordStaffResult : undefined}

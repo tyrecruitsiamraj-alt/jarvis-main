@@ -13087,6 +13087,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
     - หัวกองคนต้องโทรแยก "รอโทร N · AI โทรแล้วไม่ได้คำตอบ M" — รอโทร = แถวรอโทร·คน ของแผงพอดี
     - `FieldSelect` ไม่รับ "" / ค่านอกตัวเลือกจาก Radix (select ที่ซ่อนอยู่รีเซ็ตตัวเองตอนตัวเลือกเปลี่ยน ⇒ ป๊อปแก้ไขเรื่องหาย)
       เทสต์ `src/components/follow/FollowMasterSelect.test.tsx`
+  · เจ้าของสั่ง 12 ต.ค. 2569: กองคนต้องโทร "ชื่อเดียวกันเอาไว้ติดกัน" + แบ่งหน้าเลือก 10/20/30/40 ชื่อ
+    `clusterQueueByPerson` (ก้อนละ `followPersonKey` ตัวเดียวกับแผง · เรียงก้อนตามสายแรกสุด) · `PagePager` นับเป็นชื่อ
+    เปลี่ยนวัน = กลับหน้า 1 (`key={dayYmd}` ที่ FollowPlanningCalendar)
 - (12 ต.ค. 2569 ค่ำ) **ซ้ำกับ iRecruit = AI ไม่โทรเอง ติดป้ายให้คนเลือก** (เจ้าของ Choice: ซ้ำ = 14 วัน · ไม่ส่งเอง ติดป้าย · อ่าน iRecruit ไม่ได้ = ส่งตามเดิม)
   · migration 143 `application_irecruit_dups` (รันแล้ว) · ตัวกลาง `api/_lib/irecruitDuplicates.ts` — `splitIrecruitDuplicates` (จดแล้วไม่ถามซ้ำ · อ่าน iRecruit ไม่ได้ = ส่ง) ·
     `lookupIrecruitByPhones` (recruit_register · phone_number IN 10/9 หลัก · created_at ≥ ใบเรา−14 วัน · เพดาน 3 วิ · วัด 64 ms)

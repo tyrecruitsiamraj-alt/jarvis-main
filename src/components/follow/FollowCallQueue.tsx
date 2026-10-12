@@ -13,7 +13,16 @@ import {
   type FollowPlanningRound,
   type FollowPlanningRow,
 } from '@/lib/followPlanning';
-import { buildFollowCallQueue, FOLLOW_QUEUE_GROUPS, lateText, type FollowQueueGroup, type FollowQueueItem } from '@/lib/followCallQueue';
+import {
+  buildFollowCallQueue,
+  clusterQueueByPerson,
+  FOLLOW_QUEUE_GROUPS,
+  FOLLOW_QUEUE_PAGE_SIZES,
+  lateText,
+  type FollowQueueGroup,
+  type FollowQueueItem,
+} from '@/lib/followCallQueue';
+import { PagePager } from '@/components/shared/PagePager';
 import { canRecordStaffCall, type FollowStaffCallOutcome } from '@/lib/followStaffCall';
 import type { FollowOutcome } from '@/lib/followOutcome';
 
@@ -46,6 +55,13 @@ export default function FollowCallQueue({
 }) {
   const queue = useMemo(() => buildFollowCallQueue(people, now), [people, now]);
   const [showDone, setShowDone] = useState(false);
+  /** คนต้องโทร: ชื่อเดียวกันติดกัน + แบ่งหน้าเป็น "ชื่อ" 10/20/30/40 (เจ้าของสั่ง 12 ต.ค. 2569) */
+  const staffClusters = useMemo(() => clusterQueueByPerson(queue.staff), [queue]);
+  const [staffPageSize, setStaffPageSize] = useState<number>(FOLLOW_QUEUE_PAGE_SIZES[0]);
+  const [staffPage, setStaffPage] = useState(1);
+  const staffPageCount = Math.max(1, Math.ceil(staffClusters.length / staffPageSize));
+  const staffSafePage = Math.min(staffPage, staffPageCount);
+  const staffPageClusters = staffClusters.slice((staffSafePage - 1) * staffPageSize, staffSafePage * staffPageSize);
   /** กองคนต้องโทร = รอโทร (ยังไม่มีผล) + สายที่ AI โทรแล้วแต่ไม่ได้คำตอบ (มีผลแล้ว) */
   const staffSplit = useMemo(() => {
     const afterAi = queue.staff.filter((it) => it.call.round.state === 'result').length;
@@ -141,7 +157,33 @@ export default function FollowCallQueue({
             รอโทร {staffSplit.waiting.toLocaleString('th-TH')} · AI โทรแล้วไม่ได้คำตอบ {staffSplit.afterAi.toLocaleString('th-TH')}
           </span>
         </div>
-        <ul className="space-y-2">{queue.staff.length ? queue.staff.map(rowOf) : empty('ไม่มีสายที่คนต้องโทร')}</ul>
+        <ul className="space-y-2">
+          {staffPageClusters.length
+            ? staffPageClusters.map((cluster) => (
+                <li key={cluster[0].call.round.entry.id} data-testid="queue-staff-person">
+                  <ul className="space-y-1">{cluster.map(rowOf)}</ul>
+                </li>
+              ))
+            : empty('ไม่มีสายที่คนต้องโทร')}
+        </ul>
+        <PagePager
+          testId="queue-staff-pager"
+          indicatorTestId="queue-staff-page"
+          label=" (คนต้องโทร)"
+          page={staffSafePage}
+          pageCount={staffPageCount}
+          onPageChange={setStaffPage}
+          summary={`${staffClusters.length.toLocaleString('th-TH')} ชื่อ · ${queue.staff.length.toLocaleString('th-TH')} สาย`}
+          size={{
+            value: staffPageSize,
+            options: FOLLOW_QUEUE_PAGE_SIZES,
+            unit: 'ชื่อ',
+            onChange: (n) => {
+              setStaffPageSize(n);
+              setStaffPage(1);
+            },
+          }}
+        />
       </section>
 
       <section className="space-y-2">
