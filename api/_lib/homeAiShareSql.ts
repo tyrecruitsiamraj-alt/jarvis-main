@@ -146,9 +146,16 @@ export const FOLLOW_WAITING_AI_SQL = `exists (
        and q.status in ('pending', 'delivered')
        and ${queueOutcome('q')} is null)`;
 
+/**
+ * ตั้งเป็นคนโทร แต่ AI โทรไปแล้วจริง (คิวจบ) และคนยังไม่ลงผล = นับเป็น AI (เจ้าของ Choice 12 ต.ค. 2569 "นับเป็น AI โทร")
+ * ตัวเดียวกับ `FOLLOW_EFFECTIVE_MODE_SQL` (homeLumosSummarySql) และ `followCallerOf` ฝั่งจอ — กล่อง AI/คน ต้องเท่าแผงผลโทร
+ */
+const FOLLOW_MANUAL_BUT_AI_CALLED_SQL = `(f.call_mode = 'manual' and nullif(btrim(f.staff_call_outcome), '') is null
+    and exists (select 1 from ${QUEUE} q where ${FOLLOW_QUEUE_MATCH} and q.status in ('completed', 'failed')))`;
+
 /** หัวข้อติดตามแบบแผน — ตั้งให้ AI โทร (ไม่ระบุ = AI · ตัวเดียวกับ `followCallerOf`) / ตั้งให้คนโทร */
-export const FOLLOW_PLAN_AI_SQL = "(f.call_mode is distinct from 'manual')";
-export const FOLLOW_PLAN_STAFF_SQL = "(f.call_mode = 'manual')";
+export const FOLLOW_PLAN_AI_SQL = `(f.call_mode is distinct from 'manual' or ${FOLLOW_MANUAL_BUT_AI_CALLED_SQL})`;
+export const FOLLOW_PLAN_STAFF_SQL = `(f.call_mode = 'manual' and not ${FOLLOW_MANUAL_BUT_AI_CALLED_SQL})`;
 
 /** คนโทรแล้ว = เจ้าหน้าที่ลงผลของสายนี้ (130) · ฐานยังไม่รัน 130 = `false` (ยังไม่มีทางลงผลเลย) */
 export function followCalledByStaffSql(staffReady: boolean): string {

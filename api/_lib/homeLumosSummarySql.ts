@@ -22,9 +22,19 @@ import { journeyResultOf } from '../../src/lib/followJourney.js';
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const FOLLOW = tableInAppSchema('follow_entries');
 
+/**
+ * ใครโทรจริง (เจ้าของ Choice 12 ต.ค. 2569 "นับเป็น AI โทร") — สายที่ตั้งเป็นคนโทรแต่ AI โทรไปแล้วจริง (คิวจบ completed/failed)
+ * และคนยังไม่ได้ลงผลเอง = นับเป็น AI · เคสจริง: กดพัก AI 11 ต.ค. 17:08 ขณะ AI กำลังโทร 18 สาย (หน้าหลักนับคน 0 · หน้าติดตามนับผลคน)
+ * 🔴 ตัวคู่ฝั่งจอคือ `followCallerOf` (`src/lib/followListFilter.ts`) — ต้องตัดสินแบบเดียวกัน
+ */
+export const FOLLOW_EFFECTIVE_MODE_SQL = `case
+      when f.call_mode = 'manual' and nullif(btrim(f.staff_call_outcome), '') is null
+           and q.status in ('completed', 'failed') then 'ai'
+      else coalesce(f.call_mode, 'ai') end`;
+
 /** ช่องของรายชื่อติดตาม — แยกกันขาด (CASE ลำดับเดียว) ⇒ รวมทุกช่อง = ทั้งหมด · ป๊อปกล่อง AI โทร/คนโทร ใช้ตัวนี้ด้วย */
 export const FOLLOW_BUCKET_SQL = `case
-      when f.call_mode is distinct from 'manual' then
+      when (${FOLLOW_EFFECTIVE_MODE_SQL}) is distinct from 'manual' then
         case when q.status = 'completed' then 'done'
              when q.status = 'failed' then 'failed'
              when q.status = 'cancelled' or f.cancelled_at is not null then 'cancelled'
@@ -82,7 +92,7 @@ export async function loadHomeLumosSummary(
   const p = [start ? start.toISOString() : null, end ? end.toISOString() : null, bu];
   const [follow, apps, backlog] = await Promise.all([
     dbQuery<Record<string, unknown>>(
-      `select ${FOLLOW_ENTRY_CATEGORY_COLS}, f.call_mode, f.follow_team,
+      `select ${FOLLOW_ENTRY_CATEGORY_COLS}, ${FOLLOW_EFFECTIVE_MODE_SQL} as call_mode, f.follow_team,
               ${FOLLOW_BUCKET_SQL} as ledger_bucket,
               ${followBuSql('f')} as summary_bu,
               ${FOLLOW_QUEUE_CALL_COLS}

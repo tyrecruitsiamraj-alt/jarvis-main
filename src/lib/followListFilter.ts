@@ -222,8 +222,16 @@ export const FOLLOW_CALLER_LABEL: Record<FollowCaller, string> = {
   tbd: 'ยังไม่ชัวร์เวลา',
 };
 
-export function followCallerOf(e: Pick<FollowEntry, 'call_mode'>): 'ai' | 'manual' {
-  return e.call_mode === 'manual' ? 'manual' : 'ai';
+/**
+ * ใครโทรจริง — ตั้งเป็นคนโทร แต่ AI โทรไปแล้ว (คิวจบ completed/failed) และคนยังไม่ลงผล = AI
+ * (เจ้าของ Choice 12 ต.ค. 2569 "นับเป็น AI โทร" · เคสกดพัก AI ขณะ AI กำลังโทร) · ตัวคู่ฝั่ง server `FOLLOW_EFFECTIVE_MODE_SQL`
+ */
+export function followCallerOf(
+  e: Pick<FollowEntry, 'call_mode'> & Partial<Pick<FollowEntry, 'call_status' | 'staff_call_outcome'>>,
+): 'ai' | 'manual' {
+  if (e.call_mode !== 'manual') return 'ai';
+  const aiCalled = e.call_status === 'completed' || e.call_status === 'failed';
+  return aiCalled && !(e.staff_call_outcome ?? '').trim() ? 'ai' : 'manual';
 }
 
 /** จำนวน **สาย** ต่อ "ใครโทร" ในแท็บที่เปิดอยู่ (ป้ายบนตัวเลือก) · ยังไม่ระบุเวลาเป็นกองย่อยของคนโทร */

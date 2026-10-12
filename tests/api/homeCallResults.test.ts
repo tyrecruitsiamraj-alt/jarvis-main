@@ -15,6 +15,7 @@ import {
   LATEST_STAFF_RESULT_LATERAL,
 } from '../../api/_lib/applicantOverviewSql.js';
 import {
+  FOLLOW_PLAN_AI_SQL,
   buildApplicantAiShareSql,
   buildFollowAiShareSql,
   buildMatchingAiShareSql,
@@ -67,9 +68,9 @@ describe('SQL โหมดผลโทร — ขอบเขตเดียว�
   it('ติดตาม: แผงผลโทรยังนับแบบเดิม (ไม่นับยกเลิก · ใครโทรไปแล้ว) แม้กล่องตัวเลขนับแบบแผน', () => {
     const results = buildFollowAiShareSql(true, 'follow', 'results');
     expect(results).toContain('f.cancelled_at is null');
-    expect(results).not.toContain("(f.call_mode is distinct from 'manual') as ai");
+    expect(results).not.toContain(`${FOLLOW_PLAN_AI_SQL} as ai`);
     const count = buildFollowAiShareSql(true, 'follow');
-    expect(count).toContain("(f.call_mode is distinct from 'manual') as ai");
+    expect(count).toContain(`${FOLLOW_PLAN_AI_SQL} as ai`);
   });
 
   it('ติดตาม: ผล AI = คิวของรอบนั้น (ไม่นับยกเลิก) · ผลคน = ช่องลงผล 130 (ยังไม่รัน 130 = ไม่อ้างคอลัมน์ใหม่)', () => {

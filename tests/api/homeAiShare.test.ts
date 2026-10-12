@@ -22,6 +22,8 @@ import {
   CALLED_SQL,
 } from '../../api/_lib/applicantOverviewSql.js';
 import {
+  FOLLOW_PLAN_AI_SQL,
+  FOLLOW_PLAN_STAFF_SQL,
   FOLLOW_QUEUE_MATCH,
   MATCH_HOLD_WHERE,
   MATCH_QUEUE_WHERE,
@@ -196,8 +198,9 @@ describe('ติดตาม / ดูแลหลังเริ่มงาน:
    */
   it('ติดตาม: AI/คน = ตั้งให้ใครโทร · รวมยกเลิก (เหมือนเลขทั้งหมดของหน้าติดตาม) · ปลายช่วงเป็น null ได้', () => {
     const sql = buildFollowAiShareSql(true, 'follow');
-    expect(sql).toContain("(f.call_mode is distinct from 'manual') as ai");
-    expect(sql).toContain("(f.call_mode = 'manual') as staff");
+    // ตั้งคนโทรแต่ AI โทรไปแล้ว = AI (12 ต.ค. 2569 · tests/api/followEffectiveCaller2569-10-12.test.ts)
+    expect(sql).toContain(`${FOLLOW_PLAN_AI_SQL} as ai`);
+    expect(sql).toContain(`${FOLLOW_PLAN_STAFF_SQL} as staff`);
     expect(sql).not.toContain('f.cancelled_at is null');
     expect(sql).toContain('($2::timestamptz is null or f.scheduled_at < $2::timestamptz)');
   });
