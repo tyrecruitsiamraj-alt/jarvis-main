@@ -7,6 +7,7 @@
  * จะนำเข้าได้ไหมยังเป็นกติกาเดิม: สมัครภายใน 14 วัน / ซ้ำในไฟล์ = ข้าม · เกิน 14 วัน = นำเข้าได้ (บอกว่าเคยสมัคร)
  * ⚠️ ไฟล์นี้ใช้ทั้งหน้าเว็บและ API — ห้าม import อะไรที่ใช้ `@/` หรือของฝั่ง browser
  */
+import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
 
 export type ImportDuplicate = {
   /** แถวในไฟล์ (ตามที่ Excel นับ) */
@@ -39,15 +40,12 @@ export function importStatusLabel(s: string | null): string {
   return IMPORT_STATUS_LABEL[s] ?? s;
 }
 
-/** วันที่ไทย 4/10/2569 (เวลาไทย) */
+/** วันที่ไทย "4 ต.ค. 2569" (เวลาไทย) — รูปเดียวกับบนจอ (12 ต.ค. 2569 · เดิม 4/10/2569 + สร้าง Intl ทุกครั้ง) */
 export function importDateTh(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'numeric', year: 'numeric' })
-    .formatToParts(d)
-    .reduce<Record<string, string>>((acc, x) => ({ ...acc, [x.type]: x.value }), {});
-  return `${Number(p.day)}/${Number(p.month)}/${Number(p.year) + 543}`;
+  return formatYmdTh(toYmdBangkok(d));
 }
 
 export const DUPLICATE_SHEET_HEADERS = [

@@ -1,4 +1,8 @@
 import type { DashboardWorkItem } from './types';
+import { formatYmdTh } from '@/lib/dateTh';
+
+/** วันที่ในไฟล์ = "12 ต.ค. 2569" รูปเดียวกับบนจอ (เจ้าของ 12 ต.ค. 2569) · ว่าง = ช่องว่าง */
+const day = (ymd: string | null | undefined): string => (ymd ? formatYmdTh(ymd) : '');
 
 function csvCell(value: string | number | boolean | null | undefined): string {
   const s = value == null ? '' : String(value);
@@ -6,7 +10,8 @@ function csvCell(value: string | number | boolean | null | undefined): string {
   return s;
 }
 
-export function exportWorkQueueCsv(items: DashboardWorkItem[], filename = 'work-queue.csv'): void {
+/** ตัวไฟล์ CSV (มี BOM) — แยกจากการดาวน์โหลดให้เทสต์ได้ */
+export function workQueueCsvText(items: DashboardWorkItem[]): string {
   const headers = [
     'requestNo',
     'unitName',
@@ -15,6 +20,8 @@ export function exportWorkQueueCsv(items: DashboardWorkItem[], filename = 'work-
     'screenerName',
     'status',
     'controlStatus',
+    // 🔴 เดิมไม่มีหัวนี้ ทั้งที่แถวส่ง slaStatus ⇒ คอลัมน์ตั้งแต่ช่องนี้เลื่อนไปหนึ่งช่องทั้งไฟล์ (หัว 25 · ค่า 26) — แก้ 12 ต.ค. 2569
+    'slaStatus',
     'fullClosureSlaStatus',
     'dataQuality',
     'requestPositions',
@@ -51,15 +58,15 @@ export function exportWorkQueueCsv(items: DashboardWorkItem[], filename = 'work-
       item.filledPositions,
       item.cancelledPositions,
       item.remainingPositions,
-      item.effectiveRequestDate,
-      item.slaDueDate,
+      day(item.effectiveRequestDate),
+      day(item.slaDueDate),
       item.daysOverdue,
       item.lifecycleKind,
       item.requestKind,
       item.requestAction,
-      item.requestDate,
-      item.requiredDate,
-      item.updatedAt,
+      day(item.requestDate),
+      day(item.requiredDate),
+      day(item.updatedAt),
       item.nextAction,
       item.sendReplacement == null ? '' : item.sendReplacement ? 'yes' : 'no',
       item.resignedName,
@@ -68,8 +75,11 @@ export function exportWorkQueueCsv(items: DashboardWorkItem[], filename = 'work-
       .join(','),
   );
 
-  const csv = [headers.join(','), ...rows].join('\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  return '\uFEFF' + [headers.join(','), ...rows].join('\n');
+}
+
+export function exportWorkQueueCsv(items: DashboardWorkItem[], filename = 'work-queue.csv'): void {
+  const blob = new Blob([workQueueCsvText(items)], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

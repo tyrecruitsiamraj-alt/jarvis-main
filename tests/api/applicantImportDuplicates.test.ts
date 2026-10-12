@@ -4,7 +4,7 @@ import { DUPLICATE_SHEET_HEADERS, duplicateSheetRows, importDateTh, importStatus
 
 describe('applicantImportDuplicates', () => {
   it('วันที่ไทยเวลาไทย ไม่เติมศูนย์', () => {
-    expect(importDateTh('2026-09-30T20:00:00Z')).toBe('1/10/2569');
+    expect(importDateTh('2026-09-30T20:00:00Z')).toBe('1 ต.ค. 2569');
     expect(importDateTh(null)).toBe('—');
   });
   it('สถานะเป็นคำไทย', () => {
@@ -17,7 +17,7 @@ describe('applicantImportDuplicates', () => {
       { row: 5, name: 'ค ง', phone: '0800000001', lastAppliedAt: null, lastStatus: null, lastJob: null, applications: 0, skipped: true, note: 'เบอร์ซ้ำกับแถว 4 ในไฟล์' },
     ]);
     expect(rows[0]).toEqual([...DUPLICATE_SHEET_HEADERS]);
-    expect(rows[1]).toEqual([3, 'ก ข', '0800000000', '10/9/2569', 'ใหม่', 'คนสวน', 2, 'นำเข้า · เคยสมัครแล้ว เกิน 14 วัน นำเข้าได้']);
+    expect(rows[1]).toEqual([3, 'ก ข', '0800000000', '10 ก.ย. 2569', 'ใหม่', 'คนสวน', 2, 'นำเข้า · เคยสมัครแล้ว เกิน 14 วัน นำเข้าได้']);
     expect(rows[2][7]).toBe('ข้าม · เบอร์ซ้ำกับแถว 4 ในไฟล์');
   });
 });

@@ -13,7 +13,7 @@ import {
   applicantContactStateOf,
   applicantProcessOf,
 } from '@/lib/applicantProcess';
-import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
+import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
 
 export const APPLICANT_EXPORT_HEADERS = [
   'ชื่อ-นามสกุล',
@@ -49,7 +49,7 @@ export function applicantExportRows(rows: readonly PublicApplication[]): string[
       r.phone ?? '',
       applicationJobLabel(r) ?? '',
       applicationUnitLabel(r) ?? '',
-      r.created_at ? formatYmdDmyBe(toYmdBangkok(new Date(r.created_at))) : '',
+      r.created_at ? formatYmdTh(toYmdBangkok(new Date(r.created_at))) : '',
       PROCESS_STATE_LABEL[p.state],
       PROCESS_STEP_LABEL[p.step],
       CONTACT_STATE_LABEL[applicantContactStateOf(r)],

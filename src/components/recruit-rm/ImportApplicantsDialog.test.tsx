@@ -140,7 +140,7 @@ describe('ImportApplicantsDialog', () => {
     fireEvent.change(screen.getByLabelText(/ไฟล์ Excel/), { target: { files: [new File(['x'], 'list.xlsx')] } });
     const view = await screen.findByTestId('import-duplicates');
     expect(within(view).getByText('รายชื่อซ้ำ 1 คน')).toBeTruthy();
-    expect(within(view).getByText(/30\/9\/2569/)).toBeTruthy();
+    expect(within(view).getByText(/30 ก\.ย\. 2569/)).toBeTruthy();
     expect(within(view).getByText('ติดต่อแล้ว')).toBeTruthy();
     expect(within(view).getByText('เคยสมัคร 2 ใบ')).toBeTruthy();
     fireEvent.click(within(view).getByRole('button', { name: /ดาวน์โหลดรายชื่อซ้ำ/ }));
