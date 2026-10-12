@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
+import { FieldSelect } from '@/components/shared/FieldSelect';
 
 export type TimeSelect24Props = {
   /** HH:mm เช่น 08:00 */
@@ -24,8 +25,8 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const MINUTES = Array.from({ length: 60 }, (_, i) => i);
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: pad2(h) }));
+const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, m) => ({ value: String(m), label: pad2(m) }));
 
 /** เลือกเวลาแบบ 24 ชม. (ไม่มี AM/PM) */
 const TimeSelect24: React.FC<TimeSelect24Props> = ({
@@ -47,33 +48,24 @@ const TimeSelect24: React.FC<TimeSelect24Props> = ({
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <select
-        value={parsed.hour}
+      {/* ตัวเลือก shadcn แทน select ของเบราว์เซอร์ (QA รอบ 2 ข้อ 44 · 12 ต.ค. 2569) */}
+      <FieldSelect
+        value={String(parsed.hour)}
         disabled={disabled}
-        onChange={(e) => setHour(Number(e.target.value))}
-        className="jarvis-soft-field flex-1 min-w-0"
-        aria-label={label ? `${label} — ชั่วโมง` : 'ชั่วโมง'}
-      >
-        {HOURS.map((h) => (
-          <option key={h} value={h}>
-            {pad2(h)}
-          </option>
-        ))}
-      </select>
+        onChange={(v) => setHour(Number(v))}
+        className="min-w-0 flex-1"
+        ariaLabel={label ? `${label} — ชั่วโมง` : 'ชั่วโมง'}
+        options={HOUR_OPTIONS}
+      />
       <span className="text-muted-foreground font-medium shrink-0">:</span>
-      <select
-        value={parsed.minute}
+      <FieldSelect
+        value={String(parsed.minute)}
         disabled={disabled}
-        onChange={(e) => setMinute(Number(e.target.value))}
-        className="jarvis-soft-field flex-1 min-w-0"
-        aria-label={label ? `${label} — นาที` : 'นาที'}
-      >
-        {MINUTES.map((m) => (
-          <option key={m} value={m}>
-            {pad2(m)}
-          </option>
-        ))}
-      </select>
+        onChange={(v) => setMinute(Number(v))}
+        className="min-w-0 flex-1"
+        ariaLabel={label ? `${label} — นาที` : 'นาที'}
+        options={MINUTE_OPTIONS}
+      />
       <span className="text-xs text-muted-foreground shrink-0">น.</span>
     </div>
   );

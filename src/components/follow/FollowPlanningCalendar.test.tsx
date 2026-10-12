@@ -920,7 +920,10 @@ describe('แถบหน้ารายวันเป็น "1/N" (เจ้�
   it('ไม่มีปุ่มเลขทุกหน้าแล้ว — เหลือ ก่อนหน้า · 1/N · ถัดไป', () => {
     const src = readFileSync('src/components/follow/FollowPlanningCalendar.tsx', 'utf8');
     expect(src).not.toContain('Array.from({ length: pageCount }');
-    expect(src).toContain('data-testid="day-page-indicator"');
+    // ตัวแบ่งหน้าแบบเดียวทั้งระบบ (`PagePager` · 12 ต.ค. 2569) — รูป ‹ 1/N › อยู่ในตัวนั้น
+    expect(src).toContain('indicatorTestId="day-page-indicator"');
+    const pager = readFileSync('src/components/shared/PagePager.tsx', 'utf8');
+    expect(pager).toContain('label: `${i + 1}/${n}`');
   });
 });
 

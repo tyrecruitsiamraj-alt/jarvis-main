@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Input } from '@/components/ui/input';
 import { LoaderCircle, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
@@ -123,7 +124,7 @@ export default function FollowMasterManagerDialog<T>({
             <div className="flex flex-wrap gap-1.5">
               {items.length > 0 ? (
                 items.map((it, i) => (
-                  <span key={i} className="jarvis-chip jarvis-chip-neutral">
+                  <span key={i} className={TONE.neutral.chip}>
                     {toChip(it)}
                   </span>
                 ))
@@ -135,7 +136,7 @@ export default function FollowMasterManagerDialog<T>({
 
           <div className="space-y-2">
             {fields.map((f) => (
-              <input
+              <Input
                 key={f.key}
                 value={form[f.key] ?? ''}
                 onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
@@ -150,7 +151,6 @@ export default function FollowMasterManagerDialog<T>({
                 placeholder={f.placeholder}
                 aria-label={f.placeholder}
                 maxLength={120}
-                className="jarvis-soft-field min-h-[44px] w-full"
               />
             ))}
             <button

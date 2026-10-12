@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { FieldSelect } from '@/components/shared/FieldSelect';
 import { TONE } from '@/lib/designTokens';
 
 /**
@@ -94,13 +96,12 @@ export default function FollowMasterSelect<T>({
 
       {showManualInput ? (
         <>
-          <input
+          <Input
             id={id}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             inputMode={manualInputMode}
             placeholder={manualPlaceholder}
-            className="jarvis-soft-field min-h-[46px] w-full"
           />
           {loaded !== false ? (
             <button
@@ -114,11 +115,10 @@ export default function FollowMasterSelect<T>({
         </>
       ) : (
         <>
-          <select
+          <FieldSelect
             id={id}
             value={matchedIndex >= 0 ? String(matchedIndex) : value ? '__manual__' : ''}
-            onChange={(e) => {
-              const v = e.target.value;
+            onChange={(v) => {
               if (!v) {
                 onChange('');
                 return;
@@ -128,19 +128,14 @@ export default function FollowMasterSelect<T>({
               if (it) onChange(toValue(it));
             }}
             disabled={loaded === null}
-            className="jarvis-soft-field min-h-[46px] w-full disabled:opacity-60"
-          >
-            <option value="">{loaded === null ? 'กำลังโหลด…' : emptyOptionLabel}</option>
-            {/* ค่าเดิมของรายการเก่าที่คีย์ก่อนมีลิสต์กลาง — ห้ามหายเงียบตอนเปิดแก้ */}
-            {value && matchedIndex < 0 ? (
-              <option value="__manual__">ค่าที่กรอกไว้เดิม: {value}</option>
-            ) : null}
-            {items.map((it, i) => (
-              <option key={i} value={String(i)}>
-                {toLabel(it)}
-              </option>
-            ))}
-          </select>
+            placeholder={loaded === null ? 'กำลังโหลด…' : emptyOptionLabel}
+            options={[
+              { value: '', label: loaded === null ? 'กำลังโหลด…' : emptyOptionLabel },
+              // ค่าเดิมของรายการเก่าที่คีย์ก่อนมีลิสต์กลาง — ห้ามหายเงียบตอนเปิดแก้
+              ...(value && matchedIndex < 0 ? [{ value: '__manual__', label: `ค่าที่กรอกไว้เดิม: ${value}` }] : []),
+              ...items.map((it, i) => ({ value: String(i), label: toLabel(it) })),
+            ]}
+          />
           <p className="ml-1 flex flex-wrap items-center gap-x-2 text-[10px] text-muted-foreground">
             {hint}
             <button

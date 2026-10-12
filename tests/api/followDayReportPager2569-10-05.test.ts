@@ -18,7 +18,7 @@ describe('สรุปแผนทั้งวัน แบ่งหน้า', 
     expect(SRC).not.toContain('report.rows.map(');
   });
   it('มีตัวเปลี่ยนหน้าเสมอ · เปลี่ยนตัวกรองแล้วกลับหน้าแรก · คัดลอก/รูป ยังใช้ทุกแถว', () => {
-    expect(SRC).toContain('data-testid="day-report-pager"');
+    expect(SRC).toContain('testId="day-report-pager"');
     expect(SRC).toContain('setPage(0), [open, range, caller, call, planDay, pageSize]');
     expect(SRC).toContain('followDayReportTsv(report)');
     expect(SRC).toContain('downloadFollowDayReportPng(report, pageSize)');
@@ -32,7 +32,8 @@ describe('สรุปแผน: เลือกหน้าละ 10 20 30 40 5
     const rows = Array.from({ length: 45 }, (_, i) => ({ name: `คน ${i}` })) as never[];
     expect(paginateDayReportRows(rows, 10)).toHaveLength(5);
     expect(paginateDayReportRows(rows, 50)).toHaveLength(1);
-    expect(SRC).toContain('ariaLabel="หน้าละกี่แถว"');
+    // ตัวเลือกหน้าละกี่แถวอยู่ใน `PagePager` (12 ต.ค. 2569) — ค่าชุดเดิม DAY_REPORT_PAGE_SIZES
+    expect(SRC).toContain("size={{ value: pageSize, options: DAY_REPORT_PAGE_SIZES, unit: 'แถว'");
     const page = fs.readFileSync(path.resolve(__dirname, '../../src/pages/follow/FollowPage.tsx'), 'utf8');
     expect(page).toContain('title="สรุปแผน"');
     expect(page).not.toContain('>สรุปแผนทั้งวัน<');

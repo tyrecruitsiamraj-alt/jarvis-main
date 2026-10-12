@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { TONE } from '@/lib/designTokens';
 import {
   filterPickerPeople,
   listBoardPickerPeople,
@@ -100,13 +101,13 @@ export const BoardPersonPickerBody: React.FC<{
                     ) : null}
                     <span className="font-mono text-muted-foreground">{p.mobile}</span>
                     {p.column_label ? (
-                      <span className="jarvis-chip jarvis-chip-info">{p.column_label}</span>
+                      <span className={TONE.info.chip}>{p.column_label}</span>
                     ) : null}
                     {/* 🔴 ป้าย "แจ้งเข้าแล้ว" (18 ส.ค. 2569 ค่ำ-2) — คนกลุ่มนี้เพิ่งถูกเอา
                         กลับเข้ากล่องตามที่เจ้าของสั่ง ต้องเห็นชัดว่าเขา **ได้งานแล้ว**
                         ไม่งั้นเผลอตั้งเรื่องหางานให้คนที่มีงานอยู่แล้ว */}
                     {p.is_informed ? (
-                      <span className="jarvis-chip jarvis-chip-success">แจ้งเข้าแล้ว</span>
+                      <span className={TONE.success.chip}>แจ้งเข้าแล้ว</span>
                     ) : null}
                     <span className="w-full text-[11px] text-muted-foreground">
                       {[p.skills, p.area].filter(Boolean).join(' · ') || 'ไม่ระบุสกิล/พื้นที่'}

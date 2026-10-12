@@ -25,6 +25,7 @@ describe('แท็บส่งคนแทน', () => {
     expect(page).toContain('if (replaceView) setTopic((t) => t || REPLACE_FOLLOW_TOPIC);');
   });
   it('กลุ่มเจ้าหน้าที่ว่าง = "ยังไม่มีชื่อ"', () => {
-    expect(staff.match(/Names\.length === 0 \? <option disabled>ยังไม่มีชื่อ<\/option> : null/g)?.length).toBe(2);
+    // ตัวเลือก shadcn (`FieldSelect` · 12 ต.ค. 2569) — กลุ่มว่างเป็นตัวเลือกกดไม่ได้ "ยังไม่มีชื่อ" ทั้ง 2 กลุ่ม
+    expect(staff.match(/Names\.length === 0\s*\? \[\{ value: '__none_\w+__', label: 'ยังไม่มีชื่อ', disabled: true/g)?.length).toBe(2);
   });
 });

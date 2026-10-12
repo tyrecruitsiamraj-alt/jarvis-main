@@ -51,6 +51,7 @@ import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { followCallerOf } from '@/lib/followListFilter';
 import FollowDayDoneCard from '@/components/follow/FollowDayDoneCard';
 import { followPersonName, type FollowEntry } from '@/lib/followApi';
+import { PagePager } from '@/components/shared/PagePager';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import { buildFollowCallMatrix, FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE, followMatrixColOfCategory } from '@/lib/followCallMatrix';
 import { DASH } from '@/lib/designTokens';
@@ -211,10 +212,6 @@ function mobileSoftBg(tone: keyof typeof TONE): string {
 
 /** ข้อความบอกช่อง — ตัวเลขลอย ๆ อ่านไม่ออกว่าคืออะไร ต้องมีคำกำกับตอนเอาเมาส์จ่อ */
 /** ตัวเลือกของ dropdown เลือกหน้า — "1/13" … "13/13" */
-function pageOptions(count: number): Array<{ value: string; label: string }> {
-  return Array.from({ length: count }, (_, i) => ({ value: String(i + 1), label: `${i + 1}/${count}` }));
-}
-
 function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): string {
   const detail = rounds
     .map((r) => {
@@ -281,11 +278,6 @@ const DAY_LEGEND: ReadonlyArray<[keyof typeof TONE, string]> = [
     (c): [keyof typeof TONE, string] => [FOLLOW_CALL_CATEGORY_TONE[c], FOLLOW_CALL_CATEGORY_LABEL[c]],
   ),
 ];
-
-const NAV_BTN = cn(
-  'inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors',
-  TONE.neutral.outline,
-);
 
 /** วงสรุป — SVG ล้วน ไม่มีไลบรารีกราฟ ไม่มี CSS ใหม่ · สีมาจาก `TONE.hex` เท่านั้น */
 const Donut: React.FC<{ percent: number | null; caption: string }> = ({ percent, caption }) => {
@@ -640,53 +632,31 @@ const FollowPlanningCalendar: React.FC<{
             <span className="flex-1" />
             {view === 'day' ? (
               <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  aria-label="วันก่อนหน้า"
-                  className={NAV_BTN}
-                  onClick={() => onSelect(shiftYmd(dayYmd, -1))}
-                >
-                  <ChevronLeft className="h-4 w-4" aria-hidden />
-                </button>
+                <Button type="button" size="iconXs" variant="outline" aria-label="วันก่อนหน้า" onClick={() => onSelect(shiftYmd(dayYmd, -1))}>
+                  <ChevronLeft aria-hidden />
+                </Button>
                 <DayPickerPill value={dayYmd} today={today} onPick={onSelect} />
-                <button
-                  type="button"
-                  aria-label="วันถัดไป"
-                  className={NAV_BTN}
-                  onClick={() => onSelect(shiftYmd(dayYmd, 1))}
-                >
-                  <ChevronRight className="h-4 w-4" aria-hidden />
-                </button>
+                <Button type="button" size="iconXs" variant="outline" aria-label="วันถัดไป" onClick={() => onSelect(shiftYmd(dayYmd, 1))}>
+                  <ChevronRight aria-hidden />
+                </Button>
               </div>
             ) : (
               <div className="flex items-center gap-1">
-                <button
+                <Button type="button" size="iconXs" variant="outline" aria-label="เดือนก่อนหน้า" onClick={() => onMonthChange(shiftMonth(month, -1))}>
+                  <ChevronLeft aria-hidden />
+                </Button>
+                <Button
                   type="button"
-                  aria-label="เดือนก่อนหน้า"
-                  className={NAV_BTN}
-                  onClick={() => onMonthChange(shiftMonth(month, -1))}
-                >
-                  <ChevronLeft className="h-4 w-4" aria-hidden />
-                </button>
-                <button
-                  type="button"
+                  size="xs"
+                  variant="outline"
                   onClick={() => onMonthChange(today.slice(0, 7))}
                   disabled={month === today.slice(0, 7)}
-                  className={cn(
-                    'inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-medium disabled:opacity-50',
-                    TONE.neutral.outline,
-                  )}
                 >
                   เดือนนี้
-                </button>
-                <button
-                  type="button"
-                  aria-label="เดือนถัดไป"
-                  className={NAV_BTN}
-                  onClick={() => onMonthChange(shiftMonth(month, 1))}
-                >
-                  <ChevronRight className="h-4 w-4" aria-hidden />
-                </button>
+                </Button>
+                <Button type="button" size="iconXs" variant="outline" aria-label="เดือนถัดไป" onClick={() => onMonthChange(shiftMonth(month, 1))}>
+                  <ChevronRight aria-hidden />
+                </Button>
               </div>
             )}
           </div>
@@ -1150,78 +1120,41 @@ const FollowPlanningCalendar: React.FC<{
                     </table>
                   </div>
 
-                  {/* แถบแบ่งหน้า — แบบอ้างอิงมี "แสดง 1 ถึง 4 จากทั้งหมด 48 รายการติดตาม" */}
-                  <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-4 py-3 md:px-5">
-                    <span className="text-[12px] text-muted-foreground">
-                      แสดง {dayPeople.length === 0 ? 0 : firstIndex + 1} ถึง {lastIndex} จากทั้งหมด{' '}
-                      {dayPeople.length.toLocaleString('th-TH')} คน ·{' '}
-                      {/* สายของคนที่ยังอยู่ในตาราง (คนที่จัดการจบแล้วไปอยู่การ์ดข้างล่าง) */}
-                      {dayPeople.reduce((n, p) => n + p.calls.length, 0).toLocaleString('th-TH')} สาย
-                      {/**
-                       * 🔴 เหลือแค่เวลาอัปเดต (เจ้าของสั่ง 1 ต.ค. 2569 · Choice "เอาออกทั้ง 2 จุด")
-                       * ประโยคอธิบายเรื่องหน้าดึงเอง/ผลกลับช้าถูกถอดทั้งคู่ — ห้ามเติมกลับ
-                       * (หน้ายัง auto-reload ทุก 25 วิเหมือนเดิม)
-                       */}
-                      {lastLoadedAt ? (
-                        <span className="block text-[11px] text-muted-foreground">
-                          อัปเดตล่าสุด{' '}
-                          <span className="tabular-nums">
-                            {lastLoadedAt.toLocaleTimeString('th-TH', {
-                              timeZone: 'Asia/Bangkok',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>{' '}
-                          น.
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="ml-auto flex flex-wrap items-center gap-2">
-                    {/* ต่อหน้า 10 / 15 — อยู่เสมอแม้มีหน้าเดียว (หน้าห้ามย่อ/ขยายเองตามจำนวนข้อมูล) */}
-                    <span className="flex items-center gap-1.5">
-                      <span className="text-[12px] text-muted-foreground">ต่อหน้า</span>
-                      <ChoiceDropdown<string>
-                        value={String(dayPageSize)}
-                        options={DAY_PAGE_SIZES.map((n) => ({ value: String(n), label: `${n} คน` }))}
-                        onChange={(v) => setDayPageSize(Number(v) as DayPageSize)}
-                        ariaLabel="จำนวนคนต่อหน้า"
-                      />
-                    </span>
-                    {pageCount > 1 ? (
-                      <span className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          aria-label="หน้าก่อนหน้า"
-                          disabled={page <= 1}
-                          onClick={() => setPage((n) => Math.max(1, n - 1))}
-                          className={cn(NAV_BTN, 'disabled:opacity-40')}
-                        >
-                          <ChevronLeft className="h-4 w-4" aria-hidden />
-                        </button>
-                        {/* "1/13" แทนปุ่มเลขทุกหน้า (เจ้าของ 5 ต.ค. 2569: *"แถบหน้า 1 2 3 4 มันเยอะไปทำให้มันแบบเป็น 1/... ได้ไหม"*)
-                            — รูปเดียวกับตัวเปลี่ยนหน้าของมุมมองรายเดือน */}
-                        {/* 🔴 กด "1/13" แล้วเลือกหน้าได้เลย (เจ้าของ 6 ต.ค. 2569 *"เอาเป็น Dropdown ทีมงานบอกขี้เกียจเลื่อนทีละหน้า"*) */}
-                        <span aria-current="page" data-testid="day-page-indicator">
-                          <ChoiceDropdown<string>
-                            value={String(page)}
-                            options={pageOptions(pageCount)}
-                            onChange={(v) => setPage(Number(v))}
-                            ariaLabel="เลือกหน้า"
-                          />
-                        </span>
-                        <button
-                          type="button"
-                          aria-label="หน้าถัดไป"
-                          disabled={page >= pageCount}
-                          onClick={() => setPage((n) => Math.min(pageCount, n + 1))}
-                          className={cn(NAV_BTN, 'disabled:opacity-40')}
-                        >
-                          <ChevronRight className="h-4 w-4" aria-hidden />
-                        </button>
-                      </span>
-                    ) : null}
-                    </span>
-                  </div>
+                  {/* แถบแบ่งหน้า — แบบอ้างอิงมี "แสดง 1 ถึง 4 จากทั้งหมด 48 รายการติดตาม" · ตัวแบ่งหน้าแบบเดียวทั้งระบบ (`PagePager` · 12 ต.ค. 2569) */}
+                  <PagePager
+                    className="border-t border-border/70 px-4 py-3 md:px-5"
+                    page={page}
+                    pageCount={pageCount}
+                    onPageChange={setPage}
+                    indicatorTestId="day-page-indicator"
+                    size={{ value: dayPageSize, options: DAY_PAGE_SIZES, unit: 'คน', onChange: (n) => setDayPageSize(n as DayPageSize) }}
+                    summary={
+                      <>
+                        แสดง {dayPeople.length === 0 ? 0 : firstIndex + 1} ถึง {lastIndex} จากทั้งหมด{' '}
+                        {dayPeople.length.toLocaleString('th-TH')} คน ·{' '}
+                        {/* สายของคนที่ยังอยู่ในตาราง (คนที่จัดการจบแล้วไปอยู่การ์ดข้างล่าง) */}
+                        {dayPeople.reduce((n, p) => n + p.calls.length, 0).toLocaleString('th-TH')} สาย
+                        {/**
+                         * 🔴 เหลือแค่เวลาอัปเดต (เจ้าของสั่ง 1 ต.ค. 2569 · Choice "เอาออกทั้ง 2 จุด")
+                         * ประโยคอธิบายเรื่องหน้าดึงเอง/ผลกลับช้าถูกถอดทั้งคู่ — ห้ามเติมกลับ
+                         * (หน้ายัง auto-reload ทุก 25 วิเหมือนเดิม)
+                         */}
+                        {lastLoadedAt ? (
+                          <span className="block text-[11px] text-muted-foreground">
+                            อัปเดตล่าสุด{' '}
+                            <span className="tabular-nums">
+                              {lastLoadedAt.toLocaleTimeString('th-TH', {
+                                timeZone: 'Asia/Bangkok',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>{' '}
+                            น.
+                          </span>
+                        ) : null}
+                      </>
+                    }
+                  />
                 </>
             </>
           ) : (
@@ -1369,48 +1302,23 @@ const FollowPlanningCalendar: React.FC<{
               </table>
             </div>
           )}
-          {/* ตัวเปลี่ยนหน้ารายเดือน — อยู่เสมอ (หน้าเดียวก็โชว์ 1 / 1 · ว่างแล้วห้ามหาย) */}
+          {/* ตัวเปลี่ยนหน้ารายเดือน — อยู่เสมอ (หน้าเดียวก็โชว์ 1 / 1 · ว่างแล้วห้ามหาย) · `PagePager` ตัวเดียวกับรายวัน */}
           {view === 'month' ? (
-            <div
-              className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 px-4 py-3 md:px-5"
-              data-testid="month-pager"
-            >
-              <span className="text-xs tabular-nums text-muted-foreground">
-                แสดง {monthRows.length === 0 ? 0 : monthFirst + 1} ถึง {monthLast} จากทั้งหมด{' '}
-                {monthRows.length.toLocaleString('th-TH')} คน
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Button
-                  type="button"
-                  size="iconXs"
-                  variant="outline"
-                  aria-label="หน้าก่อนหน้า (รายเดือน)"
-                  disabled={monthSafePage <= 1}
-                  onClick={() => setMonthPage(monthSafePage - 1)}
-                >
-                  <ChevronLeft aria-hidden />
-                </Button>
-                {/* เลือกหน้าได้เลย (6 ต.ค. 2569) — ตัวเดียวกับรายวัน */}
-                <span aria-current="page" data-testid="month-page-indicator">
-                  <ChoiceDropdown<string>
-                    value={String(monthSafePage)}
-                    options={pageOptions(monthPageCount)}
-                    onChange={(v) => setMonthPage(Number(v))}
-                    ariaLabel="เลือกหน้า (รายเดือน)"
-                  />
-                </span>
-                <Button
-                  type="button"
-                  size="iconXs"
-                  variant="outline"
-                  aria-label="หน้าถัดไป (รายเดือน)"
-                  disabled={monthSafePage >= monthPageCount}
-                  onClick={() => setMonthPage(monthSafePage + 1)}
-                >
-                  <ChevronRight aria-hidden />
-                </Button>
-              </span>
-            </div>
+            <PagePager
+              className="border-t border-border/70 px-4 py-3 md:px-5"
+              testId="month-pager"
+              indicatorTestId="month-page-indicator"
+              label=" (รายเดือน)"
+              page={monthSafePage}
+              pageCount={monthPageCount}
+              onPageChange={setMonthPage}
+              summary={
+                <>
+                  แสดง {monthRows.length === 0 ? 0 : monthFirst + 1} ถึง {monthLast} จากทั้งหมด{' '}
+                  {monthRows.length.toLocaleString('th-TH')} คน
+                </>
+              }
+            />
           ) : null}
         </Card>
         {/* คนที่จัดการจบแล้วของวันนั้น — การ์ดแยกใต้ตาราง (เจ้าของ 6 ต.ค. 2569 · Choice "การ์ดแยกใต้ตาราง") */}

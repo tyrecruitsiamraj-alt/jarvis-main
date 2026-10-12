@@ -36,7 +36,7 @@ export function ChoiceDropdown<V extends string>({
           <ChevronDown className="opacity-60" aria-hidden />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-56 space-y-1 p-2">
+      <PopoverContent align="start" className="max-h-72 w-56 space-y-1 overflow-y-auto p-2">
         {options.map((o) => (
           <Button
             key={o.value}

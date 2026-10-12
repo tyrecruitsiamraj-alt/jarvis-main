@@ -1,8 +1,9 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Copy, ImageDown } from 'lucide-react';
+import { Copy, ImageDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PagePager } from '@/components/shared/PagePager';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { cn } from '@/lib/utils';
@@ -214,50 +215,19 @@ export default function FollowDayReportDialog({
           </Table>
         </div>
 
-        {/* ตัวเปลี่ยนหน้า — อยู่เสมอ (1 หน้าก็โชว์ 1 / 1 · ว่างแล้วห้ามหาย) */}
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground" data-testid="day-report-pager">
-          <span className="tabular-nums">
-            {report && report.rows.length > 0
+        {/* ตัวเปลี่ยนหน้า — อยู่เสมอ (1 หน้าก็โชว์ 1 / 1 · ว่างแล้วห้ามหาย) · `PagePager` แบบเดียวทั้งระบบ (12 ต.ค. 2569) */}
+        <PagePager
+          testId="day-report-pager"
+          page={pageIdx + 1}
+          pageCount={pages.length}
+          onPageChange={(p) => setPage(p - 1)}
+          size={{ value: pageSize, options: DAY_REPORT_PAGE_SIZES, unit: 'แถว', onChange: (n) => setPageSize(n as DayReportPageSize) }}
+          summary={
+            report && report.rows.length > 0
               ? `แถว ${NUM.format(rowFrom + 1)}–${NUM.format(rowFrom + pageRows.length)} จาก ${NUM.format(report.rows.length)}`
-              : 'แถว 0 จาก 0'}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">หน้าละ</span>
-            <ChoiceDropdown<string>
-              value={String(pageSize)}
-              options={DAY_REPORT_PAGE_SIZES.map((n) => ({ value: String(n), label: `${n} แถว` }))}
-              onChange={(v) => setPageSize(Number(v) as DayReportPageSize)}
-              ariaLabel="หน้าละกี่แถว"
-            />
-            <Button
-              type="button"
-              size="iconXs"
-              variant="outline"
-              aria-label="หน้าก่อน"
-              disabled={pageIdx === 0}
-              onClick={() => setPage(pageIdx - 1)}
-            >
-              <ChevronLeft aria-hidden />
-            </Button>
-            {/* เลือกหน้าได้เลย (เจ้าของ 6 ต.ค. 2569 "เอาเป็น Dropdown") — รูป "1/13" ชุดเดียวกับตารางรายวัน */}
-            <ChoiceDropdown<string>
-              value={String(pageIdx)}
-              options={pages.map((_, i) => ({ value: String(i), label: `${i + 1}/${pages.length}` }))}
-              onChange={(v) => setPage(Number(v))}
-              ariaLabel="เลือกหน้า"
-            />
-            <Button
-              type="button"
-              size="iconXs"
-              variant="outline"
-              aria-label="หน้าถัดไป"
-              disabled={pageIdx >= pages.length - 1}
-              onClick={() => setPage(pageIdx + 1)}
-            >
-              <ChevronRight aria-hidden />
-            </Button>
-          </span>
-        </div>
+              : 'แถว 0 จาก 0'
+          }
+        />
 
         <div className="flex flex-wrap items-center justify-end gap-2">
           {copied === 'ok' ? <span className={cn('text-xs', TONE.success.value)}>คัดลอกแล้ว วางลง Excel ได้เลย</span> : null}

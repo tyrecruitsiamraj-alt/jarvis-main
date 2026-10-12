@@ -1,9 +1,11 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
+import { FieldSelect } from '@/components/shared/FieldSelect';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
@@ -1817,20 +1819,18 @@ const FollowPage: React.FC = () => {
           setFBand('');
         }}
         extra={
-          <label className="block space-y-1">
+          <div className="space-y-1">
             <span className="text-[11px] font-medium text-muted-foreground">ช่วงเวลา</span>
-            <select
+            <FieldSelect
+              ariaLabel="ช่วงเวลา"
               value={fBand}
-              onChange={(e) => setFBand(e.target.value as TimeBand)}
-              className="jarvis-soft-field min-h-[36px] w-full text-xs"
-            >
-              <option value="">ทุกช่วงเวลา</option>
-              <option value="morning">{TIME_BAND_LABEL.morning}</option>
-              <option value="afternoon">{TIME_BAND_LABEL.afternoon}</option>
-              <option value="evening">{TIME_BAND_LABEL.evening}</option>
-              <option value="night">{TIME_BAND_LABEL.night}</option>
-            </select>
-          </label>
+              onChange={(v) => setFBand(v as TimeBand)}
+              options={[
+                { value: '', label: 'ทุกช่วงเวลา' },
+                ...(['morning', 'afternoon', 'evening', 'night'] as const).map((b) => ({ value: b, label: TIME_BAND_LABEL[b] })),
+              ]}
+            />
+          </div>
         }
       />
       {/**
@@ -2392,7 +2392,7 @@ const FollowPage: React.FC = () => {
                 {pickerOpen ? 'ปิดรายชื่อ' : 'เลือกชื่อจาก ERP'}
               </button>
               {pickedFrom ? (
-                <span className="jarvis-chip jarvis-chip-info">{pickedFrom}</span>
+                <span className={TONE.info.chip}>{pickedFrom}</span>
               ) : (
                 <span className="text-[11px] text-muted-foreground">หรือคีย์ชื่อเองด้านล่าง</span>
               )}
@@ -2411,43 +2411,35 @@ const FollowPage: React.FC = () => {
                 <label htmlFor="followPrefix" className="ml-1 text-xs font-medium text-muted-foreground">
                   คำนำหน้า
                 </label>
-                <select
+                <FieldSelect
                   id="followPrefix"
                   value={prefix}
-                  onChange={(e) => setPrefix(e.target.value)}
-                  className="jarvis-soft-field min-h-[46px]"
-                >
-                  {NAME_PREFIXES.map((p) => (
-                    <option key={p || 'none'} value={p}>
-                      {p || 'ไม่ระบุ'}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setPrefix}
+                  options={NAME_PREFIXES.map((p) => ({ value: p, label: p || 'ไม่ระบุ' }))}
+                />
               </div>
               <div className="space-y-1.5">
                 {/* 🔴 ช่องบังคับต้องรู้ตั้งแต่ก่อนกด (12 ก.ย. 2569) — ของเดิมรู้ตอนโดนเตือนแล้ว */}
                 <label htmlFor="followFirst" className="ml-1 text-xs font-medium text-muted-foreground">
                   ชื่อ <span className={TONE.danger.value}>*</span>
                 </label>
-                <input
+                <Input
                   id="followFirst"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   required
                   placeholder="สมชาย"
-                  className="jarvis-soft-field min-h-[46px]"
                 />
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="followLast" className="ml-1 text-xs font-medium text-muted-foreground">
                   นามสกุล <span className="text-muted-foreground/70">(ถ้ามี)</span>
                 </label>
-                <input
+                <Input
                   id="followLast"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="ใจดี"
-                  className="jarvis-soft-field min-h-[46px]"
                 />
               </div>
             </div>
@@ -2455,14 +2447,13 @@ const FollowPage: React.FC = () => {
               <label htmlFor="followPhone" className="ml-1 text-xs font-medium text-muted-foreground">
                 เบอร์โทร (มือถือ 10 หลัก) <span className={TONE.danger.value}>*</span>
               </label>
-              <input
+              <Input
                 id="followPhone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
                 inputMode="tel"
                 placeholder="เบอร์มือถือผู้สมัคร"
-                className="jarvis-soft-field min-h-[46px]"
               />
             </div>
             {/* เรื่องที่จะให้โทรติดตาม (100 · เจ้าของสั่ง 18 ส.ค. 2569) — dropdown จากลิสต์กลาง
@@ -2489,7 +2480,7 @@ const FollowPage: React.FC = () => {
                 {unitPickerOpen ? 'ปิดรายชื่อหน่วยงาน' : 'เลือกหน่วยงานจากบอร์ด'}
               </button>
               {unitName ? (
-                <span className="jarvis-chip jarvis-chip-info">{unitName}</span>
+                <span className={TONE.info.chip}>{unitName}</span>
               ) : null}
             </div>
             {/* 🔴 แผงเลือกหน่วยงาน **ฝังในป๊อปเดียวกัน** (แพตเทิร์นเดียวกับป๊อปแก้ไข) — ห้าม Dialog ซ้อน Dialog */}
@@ -2512,7 +2503,7 @@ const FollowPage: React.FC = () => {
                   เหตุผลเสริม: การเลือก dropdown ด้วยคีย์บอร์ดกด Enter = ฟอร์มยิง submit เอง
                   ซึ่งทำให้บันทึกทั้งที่ยังไม่ได้ตั้งเวลา · ช่องข้อความไม่มีปัญหานั้น
                   พิมพ์เองได้สำหรับหน่วยงานที่ไม่มีใบขอเปิดบนบอร์ด */}
-              <input
+              <Input
                 id="followUnit"
                 value={unitName}
                 onChange={(e) => {
@@ -2521,7 +2512,6 @@ const FollowPage: React.FC = () => {
                   if (siteCode) setSiteCode('');
                 }}
                 placeholder="ชื่อหน่วยงาน"
-                className="jarvis-soft-field min-h-[46px] w-full"
               />
               {siteCode ? (
                 <p className="ml-1 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -3088,23 +3078,17 @@ const FollowPage: React.FC = () => {
                       >
                         สายนี้คือสายที่เท่าไหร่
                       </label>
-                      <select
+                      <FieldSelect
                         id={`followCallRound${i}`}
-                        value={callRounds[i] ?? i + 1}
-                        onChange={(e) => setCallRoundAt(i, Number(e.target.value))}
-                        className="jarvis-soft-field min-h-[46px] w-full"
-                      >
-                        {Array.from(
+                        value={String(callRounds[i] ?? i + 1)}
+                        onChange={(v) => setCallRoundAt(i, Number(v))}
+                        options={Array.from(
                           /* อย่างน้อย 3 ตัวเลือกเสมอ · ตั้งรอบเกิน 3 ก็ต้องเลือกเลขที่สูงกว่าได้ */
                           { length: Math.max(3, scheduledAts.length) },
                           (_, n) => n + 1,
-                        ).map((n) => (
-                          <option key={n} value={n}>
-                            {/* ถามว่า "สายที่เท่าไหร่" ตัวเลือกก็ต้องเป็น "สายที่" (QA 10 ต.ค. 2569 เดิม "รอบโทรที่ 1 (สายแรก)" ปนสองคำ) */}
-                            สายที่ {n}
-                          </option>
-                        ))}
-                      </select>
+                          // ถามว่า "สายที่เท่าไหร่" ตัวเลือกก็ต้องเป็น "สายที่" (QA 10 ต.ค. 2569 เดิม "รอบโทรที่ 1 (สายแรก)" ปนสองคำ)
+                        ).map((n) => ({ value: String(n), label: `สายที่ ${n}` }))}
+                      />
                     </div>
                     {/* บทที่รอบนี้จะพูด — กางให้เห็นเลย ไม่ต้องกดหา (เจ้าของสั่งให้ "บอกหน่อยว่า Scrip
                         นั้น ๆ จะพูดอะไรบ้าง") */}

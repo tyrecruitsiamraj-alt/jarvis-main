@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { PagePager } from '@/components/shared/PagePager';
 import { TONE } from '@/lib/designTokens';
 import { FOLLOW_OUTCOME_LABEL, type FollowOutcomeAny } from '@/lib/followOutcome';
 import {
@@ -78,12 +79,14 @@ export default function FollowDayDoneCard({
   onOpen: (person: FollowDayPerson) => void;
 }) {
   const [kind, setKind] = React.useState<FollowDayDoneKind>('agreed');
-  /** วันที่จบเยอะ (วัดจริง 6 ต.ค.: 39 คน) — โชว์ 10 คนแรก กดดูทั้งหมดได้ */
-  const [all, setAll] = React.useState(false);
+  /** วันที่จบเยอะ (วัดจริง 6 ต.ค.: 39 คน) — หน้าละ 10 คน */
+  const [page, setPage] = React.useState(1);
   const counts: Record<FollowDayDoneKind, number> = { agreed: 0, lost: 0, other: 0, cancelled: 0 };
   for (const p of people) counts[p.kind] += 1;
   const ofKind = people.filter((p) => p.kind === kind);
-  const shown = all ? ofKind : ofKind.slice(0, PAGE);
+  const pageCount = Math.max(1, Math.ceil(ofKind.length / PAGE));
+  const safePage = Math.min(page, pageCount);
+  const shown = ofKind.slice((safePage - 1) * PAGE, safePage * PAGE);
 
   return (
     <Card className="overflow-hidden rounded-2xl shadow-sm" data-testid="follow-day-done">
@@ -98,7 +101,7 @@ export default function FollowDayDoneCard({
             aria-pressed={kind === k}
             onClick={() => {
               setKind(k);
-              setAll(false);
+              setPage(1);
             }}
           >
             {KIND_LABEL[k]} <span className="tabular-nums">{counts[k].toLocaleString('th-TH')}</span>
@@ -142,13 +145,15 @@ export default function FollowDayDoneCard({
           </tbody>
         </table>
       </div>
-      {ofKind.length > PAGE ? (
-        <div className="border-t border-border/70 px-4 py-2 md:px-5">
-          <Button type="button" size="xs" variant="ghost" onClick={() => setAll((v) => !v)}>
-            {all ? 'ย่อ' : `ดูทั้งหมด ${ofKind.length.toLocaleString('th-TH')} คน`}
-          </Button>
-        </div>
-      ) : null}
+      {/* ตัวแบ่งหน้าแบบเดียวทั้งระบบ (`PagePager` · 12 ต.ค. 2569 — เดิมปุ่ม "ดูทั้งหมด") · หน้าเดียวก็ยังอยู่ */}
+      <PagePager
+        className="border-t border-border/70 px-4 py-2 md:px-5"
+        testId="follow-day-done-pager"
+        page={safePage}
+        pageCount={pageCount}
+        onPageChange={setPage}
+        summary={`${ofKind.length.toLocaleString('th-TH')} คน`}
+      />
     </Card>
   );
 }

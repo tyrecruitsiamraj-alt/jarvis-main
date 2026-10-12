@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { TONE } from '@/lib/designTokens';
 import { filterBoardUnits, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import {
   Dialog,
@@ -75,15 +76,15 @@ export const BoardUnitPickerBody: React.FC<{
                       <span className="font-medium text-foreground">{u.unitName}</span>
                       <span className="font-mono text-muted-foreground">{u.siteCode}</span>
                       {u.openRequests > 0 ? (
-                        <span className="jarvis-chip jarvis-chip-info">
+                        <span className={TONE.info.chip}>
                           ใบขอเปิด {u.openRequests.toLocaleString('th-TH')}
                         </span>
                       ) : (
                         // ไม่มีใบขอเปิด = หน่วยงานที่ปิดใบไปแล้ว (ยังต้องตามคนที่ลงงานไป)
-                        <span className="jarvis-chip jarvis-chip-neutral">ไม่มีใบขอเปิด</span>
+                        <span className={TONE.neutral.chip}>ไม่มีใบขอเปิด</span>
                       )}
                       {u.remainingPositions > 0 ? (
-                        <span className="jarvis-chip jarvis-chip-warn">
+                        <span className={TONE.warn.chip}>
                           ยังต้องหา {u.remainingPositions.toLocaleString('th-TH')}
                         </span>
                       ) : null}

@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Building2, LoaderCircle, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
@@ -424,25 +426,23 @@ export default function FollowEditDialog({
             <label htmlFor="feName" className="ml-1 text-xs font-medium text-muted-foreground">
               ชื่อผู้ที่ต้องติดตาม
             </label>
-            <input
+            <Input
               id="feName"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="jarvis-soft-field min-h-[46px] w-full"
             />
           </div>
           <div className="space-y-1.5">
             <label htmlFor="fePhone" className="ml-1 text-xs font-medium text-muted-foreground">
               เบอร์โทร
             </label>
-            <input
+            <Input
               id="fePhone"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               required
               inputMode="tel"
-              className="jarvis-soft-field min-h-[46px] w-full"
             />
             {askApplyPhone ? (
               <label className="ml-1 flex cursor-pointer items-center gap-1.5" data-testid="apply-phone-to-set">
@@ -480,7 +480,7 @@ export default function FollowEditDialog({
                 {unitPickerOpen ? 'ปิดรายชื่อหน่วยงาน' : 'เลือกหน่วยงานจากบอร์ด'}
               </Button>
             </div>
-            <input
+            <Input
               id="feUnit"
               value={unitName}
               onChange={(e) => {
@@ -489,7 +489,6 @@ export default function FollowEditDialog({
                 if (siteCode) setSiteCode('');
               }}
               placeholder="กดปุ่มด้านบนเพื่อเลือก หรือพิมพ์ชื่อหน่วยงานเอง"
-              className="jarvis-soft-field min-h-[46px] w-full"
             />
             {/* 🔴 แผงเลือกหน่วยงาน **ฝังในฟอร์มเดียวกัน** — ห้ามเปิด Dialog ซ้อน Dialog
                 (ใช้ `BoardUnitPickerBody` ตัวเดียวกับที่ picker แบบเต็มใช้ ตรรกะค้นหาไม่ซ้ำ) */}
@@ -761,13 +760,7 @@ export default function FollowEditDialog({
             <label htmlFor="feNote" className="ml-1 text-xs font-medium text-muted-foreground">
               ข้อความที่อยากให้ AI พูดเพิ่ม
             </label>
-            <textarea
-              id="feNote"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-              className="jarvis-soft-field w-full"
-            />
+            <Textarea id="feNote" value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
           </div>
         </div>
 

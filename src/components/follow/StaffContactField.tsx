@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { FieldSelect } from '@/components/shared/FieldSelect';
 import {
   listStaffContactsCached,
   createStaffContact,
@@ -154,10 +156,9 @@ export default function StaffContactField({
         {label}
       </label>
       <div className="grid gap-2 sm:grid-cols-2">
-        <select
+        <FieldSelect
           value={nameSelectValue}
-          onChange={(e) => {
-            const v = e.target.value;
+          onChange={(v) => {
             if (v === '__manual__') {
               setManualName(true);
               setName('');
@@ -166,40 +167,27 @@ export default function StaffContactField({
             if (v === '__other__') return;
             pickName(v);
           }}
-          aria-label={`ชื่อ${label}`}
-          className="jarvis-soft-field min-h-[46px] w-full"
-        >
-          <option value="">— เลือกชื่อ —</option>
-          {name && !nameOptions.some((n) => n === name) ? (
-            <option value="__other__">{name} (ชื่อเดิม)</option>
-          ) : null}
-          {/* กลุ่มว่าง = บอกว่ายังไม่มีชื่อ (QA รอบ 3 ข้อ 24 · เดิมหัวกลุ่มลอยเปล่า) — ตั้งสายงานที่ ตั้งค่า › ผู้ใช้งาน */}
-          <optgroup label="เจ้าหน้าที่คัดสรร">
-            {screenerNames.length === 0 ? <option disabled>ยังไม่มีชื่อ</option> : null}
-            {screenerNames.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="เจ้าหน้าที่ส่งคนแทน">
-            {replacementNames.length === 0 ? <option disabled>ยังไม่มีชื่อ</option> : null}
-            {replacementNames.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </optgroup>
-          <option value="__manual__">พิมพ์เบอร์เองไม่ผูกชื่อ</option>
-        </select>
-        <input
+          ariaLabel={`ชื่อ${label}`}
+          placeholder="— เลือกชื่อ —"
+          options={[
+            ...(name && !nameOptions.some((n) => n === name) ? [{ value: '__other__', label: `${name} (ชื่อเดิม)` }] : []),
+            // กลุ่มว่าง = บอกว่ายังไม่มีชื่อ (QA รอบ 3 ข้อ 24 · เดิมหัวกลุ่มลอยเปล่า) — ตั้งสายงานที่ ตั้งค่า › ผู้ใช้งาน
+            ...(screenerNames.length === 0
+              ? [{ value: '__none_screener__', label: 'ยังไม่มีชื่อ', disabled: true, group: 'เจ้าหน้าที่คัดสรร' }]
+              : screenerNames.map((n) => ({ value: n, label: n, group: 'เจ้าหน้าที่คัดสรร' }))),
+            ...(replacementNames.length === 0
+              ? [{ value: '__none_replacement__', label: 'ยังไม่มีชื่อ', disabled: true, group: 'เจ้าหน้าที่ส่งคนแทน' }]
+              : replacementNames.map((n) => ({ value: n, label: n, group: 'เจ้าหน้าที่ส่งคนแทน' }))),
+            { value: '__manual__', label: 'พิมพ์เบอร์เองไม่ผูกชื่อ' },
+          ]}
+        />
+        <Input
           id={id}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onBlur={rememberPair}
           inputMode="tel"
           placeholder="เบอร์โทร เช่น 021234567 ต่อ 101"
-          className="jarvis-soft-field min-h-[46px] w-full"
         />
       </div>
       {/* คำใบ้สามท่อนถอดแล้ว (QA 5 ต.ค. 2569) — เหลือป้ายสั้นบอกว่าเบอร์นี้ใช้ทำอะไร */}

@@ -13020,3 +13020,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · วัดจริง 1–12 ต.ค.: 307 → 269 → 159 → 23 → 6 สองแท็บเท่ากัน (เดิมงานสรรหา 142 · ทีม Online 159)
   · ⚠️ ตาราง "ผลโทรราย BU" ยังเป็นผลล่าสุดของแต่ละคน (`interestColOf`) — คนละคำถามกับบันได ยังไม่แตะ
   · เทสต์ `tests/api/homeTopicReport.test.ts`
+- (12 ต.ค. 2569 สาย) **QA รอบ 2 ข้อ 43–44 · หน้าติดตาม** (เจ้าของ Choice "ทำต่อทีละหน้า มีภาพก่อน/หลัง" + ตัวแบ่งหน้า "แบบหน้าติดตาม ‹ 1/13 ›")
+  · ตัวกลางใหม่ 2 ตัว (`src/components/shared/`):
+    - `PagePager` — ตัวแบ่งหน้าแบบเดียว: ซ้าย "แสดง…" + ต่อหน้า · ขวา ‹ [1/N ▾] › · หน้าเดียวก็ยังอยู่ · `indicatorTestId`/`label` สำหรับหลายตัวในจอ
+    - `FieldSelect` — ช่องเลือกในฟอร์มแทน `<select>` ของเบราว์เซอร์ (shadcn Select · แปลงค่า "" ให้ Radix · `group` แทน optgroup)
+      ⚠️ Radix วาด `<select aria-hidden>` ซ่อนไว้ทุกช่อง — นับ select ใน DOM ต้องกรอง `:not([aria-hidden])`
+  · หน้าติดตาม: ตารางรายวัน/รายเดือน/ป๊อปสรุปแผน/การ์ดจบแล้ว (เดิม "ดูทั้งหมด") ใช้ `PagePager` · ปุ่มเลื่อนวัน/เดือน = Button
+  · `<select>` → `FieldSelect`: ช่วงเวลา (ตัวกรอง) · คำนำหน้า · สายที่ · `FollowMasterSelect` · `StaffContactField` · `TimeSelect24` (ตัวกลาง ใช้ร่วม AssignDialog ด้วย)
+  · `<input className="jarvis-soft-field">` → `Input` · textarea → `Textarea` (ui/textarea หน้าตาเดียวกับ Input แล้ว) · ชิป `jarvis-chip…` → `TONE.x.chip`
+  · `ChoiceDropdown` รายการยาวเลื่อนได้ (max-h-72) · ภาพ `docs/qa-shots/{pager-follow,select-follow-form}-{before,after}-2569-10-12.jpg`
