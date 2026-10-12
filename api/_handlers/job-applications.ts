@@ -1,4 +1,5 @@
 import { cancelApplication, isUndefinedTable, loadCancellations, restoreApplication } from '../_lib/applicationCancellations.js';
+import { loadIrecruitDups, type IrecruitDup } from '../_lib/irecruitDuplicates.js';
 import { dbQuery, dbTransaction } from '../_lib/postgres.js';
 import {
   withRbac,
@@ -1541,6 +1542,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const cancels = await loadCancellations(allItems.map((i) => i.id));
     const wantCancelled = getString(req.query?.cancelled) === '1';
     const items = allItems.filter((i) => cancels.has(i.id) === wantCancelled);
+    // ซ้ำกับ iRecruit (143) — ป้าย "ซ้ำ iRecruit" บนแท็บผู้สมัคร · AI ไม่โทรเองใบพวกนี้
+    const irDups = await loadIrecruitDups(items.map((i) => i.id)).catch(() => new Map<string, IrecruitDup>());
+    for (const item of items) {
+      const d = irDups.get(item.id);
+      if (d) (item as Record<string, unknown>).irecruit_dup_at = d.appliedAt;
+    }
     for (const item of items) {
       const c = cancels.get(item.id);
       if (c) {

@@ -12,6 +12,10 @@ vi.mock('../../api/_lib/postgres.js', () => ({ dbQuery: (...a: unknown[]) => dbQ
 vi.mock('../../api/_lib/lumosDispatch.js', () => ({
   enqueueLumosInterviewForApplications: (...a: unknown[]) => enqueue(...a),
 }));
+// ตัวกรองซ้ำ iRecruit มีเทสต์ของตัวเอง (irecruitDuplicates2569-10-12) · ที่นี่ปล่อยผ่านทุกใบ
+vi.mock('../../api/_lib/irecruitDuplicates.js', () => ({
+  splitIrecruitDuplicates: async <T,>(rows: T[]) => ({ send: rows, dups: [] }),
+}));
 vi.mock('../../api/_lib/siamrajUnitRequests.js', () => ({ listSiamrajUnitRequests: vi.fn(async () => []) }));
 
 const mod = await import('../../api/_lib/incomeReadyDispatch');

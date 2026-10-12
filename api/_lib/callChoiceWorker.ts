@@ -28,8 +28,10 @@ import {
   unclaimDedupeKey,
   type UnclaimedItem,
 } from '../../src/lib/callChoiceGuard.js';
+import { splitIrecruitDuplicates } from './irecruitDuplicates.js';
 
 const APPS = tableInAppSchema('public_job_applications');
+const IRECRUIT_DUPS = tableInAppSchema('application_irecruit_dups');
 
 const DEFAULT_INTERVAL_MS = 900_000; // 15 นาที — จังหวะเดียวกับตัวย้ายใบสมัคร
 const MIN_INTERVAL_MS = 60_000;
@@ -127,6 +129,7 @@ async function autoSendToAi(limit: number): Promise<{ queued: number; skipped: n
     position_interest: string | null;
     age: number | null;
     created_by_name: string | null;
+    created_at: Date | string | null;
   }>(
     `with due as (
        select a.id from ${APPS} a
@@ -134,6 +137,8 @@ async function autoSendToAi(limit: number): Promise<{ queued: number; skipped: n
           and a.unclaimed_at < now() - interval '${CALL_CHOICE_HOURS} hours'
           -- อายุเกิน = AI ไม่โทร (5 ต.ค. 2569) — ไม่ปั๊ม auto_ai ให้ ไม่งั้นค้าง "ส่ง AI แล้ว" ทั้งที่ไม่มีสาย
           and (a.age is null or a.age < ${OVER_AGE_MIN})
+          -- ซ้ำกับ iRecruit (143) = ไม่ส่งเอง · ไม่ปั๊ม auto_ai ให้ (ไม่งั้นค้าง "ส่ง AI แล้ว" ทั้งที่ไม่มีสาย)
+          and not exists (select 1 from ${IRECRUIT_DUPS} d where d.application_id = a.id)
         order by a.unclaimed_at asc
         limit $1
      )
@@ -145,7 +150,7 @@ async function autoSendToAi(limit: number): Promise<{ queued: number; skipped: n
        from due
       where a.id = due.id
       returning a.id, a.full_name, a.phone, a.job_id, a.job_title, a.unit_name, a.position_interest, a.age,
-                a.created_by_name`,
+                a.created_by_name, a.created_at`,
     [limit],
   );
   if (rows.length === 0) return { queued: 0, skipped: 0 };
@@ -164,14 +169,25 @@ async function autoSendToAi(limit: number): Promise<{ queued: number; skipped: n
   }
 
   let queued = 0;
-  for (const [jobId, apps] of byJob) {
+  for (const [jobId, all] of byJob) {
     try {
+      // ซ้ำกับ iRecruit ภายใน 14 วัน = ไม่ส่งเอง ติดป้ายให้คนเลือก (143 · 12 ต.ค. 2569)
+      const { send: apps, dups } = await splitIrecruitDuplicates(all);
+      skipped += dups.length;
+      if (dups.length) {
+        // เพิ่งรู้ว่าซ้ำในรอบนี้ — คืนสถานะ "ยังไม่เลือกวิธีโทร" (เพิ่งปั๊ม auto_ai ไปข้างบน) · รอบหน้าไม่หยิบแล้ว (มีแถวใน 143)
+        await dbQuery(
+          `update ${APPS} set call_choice = null, call_choice_at = null, updated_at = now() where id = any($1::uuid[]) and call_choice = 'auto_ai'`,
+          [dups.map((d) => d.app.id)],
+        );
+      }
+      if (apps.length === 0) continue;
       const outcome = await enqueueLumosInterviewForApplications(jobId, apps, { autoPush: true });
       queued += outcome.queued;
       skipped += apps.length - outcome.queued;
     } catch (e) {
-      skipped += apps.length;
-      logError('claimGuard.autoSend.failed', e, { jobId, count: apps.length });
+      skipped += all.length;
+      logError('claimGuard.autoSend.failed', e, { jobId, count: all.length });
     }
   }
   return { queued, skipped };

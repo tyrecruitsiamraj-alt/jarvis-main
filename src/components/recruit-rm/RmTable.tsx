@@ -131,6 +131,17 @@ function AiAnswerCell({ r }: { r: PublicApplication }) {
       </span>
     );
   }
+  // ซ้ำกับ iRecruit ภายใน 14 วัน — AI ไม่โทรเอง เจ้าหน้าที่เลือกส่งเองได้ (143 · 12 ต.ค. 2569)
+  if (r.irecruit_dup_at) {
+    return (
+      <span className="flex flex-col gap-0.5" data-testid="irecruit-dup">
+        <span className={cn('whitespace-nowrap text-xs font-medium', TONE.warn.value)}>ซ้ำ iRecruit</span>
+        <span className={cn('whitespace-nowrap text-xs tabular-nums', DASH.cellMuted)}>
+          สมัคร {formatYmdTh(toYmdBangkok(new Date(r.irecruit_dup_at)))}
+        </span>
+      </span>
+    );
+  }
   return <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>ยังไม่ได้ส่งให้ AI</span>;
 }
 

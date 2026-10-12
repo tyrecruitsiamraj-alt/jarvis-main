@@ -20,6 +20,7 @@ import { enqueueLumosInterviewForApplications } from './lumosDispatch.js';
 import { listSiamrajUnitRequests } from './siamrajUnitRequests.js';
 import { OVER_AGE_MIN } from '../../src/lib/applicantAge.js';
 import { logError, logInfo } from './logger.js';
+import { splitIrecruitDuplicates } from './irecruitDuplicates.js';
 
 const APPS = tableInAppSchema('public_job_applications');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
@@ -59,12 +60,13 @@ type WaitingRow = {
   unit_name: string | null;
   position_interest: string | null;
   age: number | null;
+  created_at: Date | string | null;
 };
 
 /** ใบที่ค้างของใบขอนี้ — แยกออกมาให้เทสต์/ตรวจแบบอ่านอย่างเดียวได้ */
 export function waitingApplicationsSql(): string {
   return `
-    select a.id::text as id, a.full_name, a.phone, a.job_id, a.job_title, a.unit_name, a.position_interest, a.age
+    select a.id::text as id, a.full_name, a.phone, a.job_id, a.job_title, a.unit_name, a.position_interest, a.age, a.created_at
     from ${APPS} a
     where a.job_id = $1
       and a.link_id is not null
@@ -89,11 +91,15 @@ export async function dispatchWaitingApplications(
   } catch {
     /* อุ่นไม่ได้ — ตัวส่งยังลองอ่านเอง */
   }
-  const outcome = await enqueueLumosInterviewForApplications(
-    jobId,
-    rows.map((r) => ({ ...r, created_by_name: null })),
-    { autoPush: true },
-  );
+  // ซ้ำกับ iRecruit ภายใน 14 วัน = ไม่ส่งเอง ติดป้ายให้คนเลือก (143 · 12 ต.ค. 2569)
+  const { send } = await splitIrecruitDuplicates(rows);
+  const outcome = send.length
+    ? await enqueueLumosInterviewForApplications(
+        jobId,
+        send.map((r) => ({ ...r, created_by_name: null })),
+        { autoPush: true },
+      )
+    : { queued: 0, skipped: [] as Array<{ reason: string }> };
   const result = { found: rows.length, queued: outcome.queued, skipped: rows.length - outcome.queued };
   logInfo('incomeReady.dispatch', { jobId, ...result, reasons: outcome.skipped.map((s) => s.reason) });
   return result;

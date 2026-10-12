@@ -97,6 +97,8 @@ export type PublicApplication = {
   cancelled_at?: string;
   cancelled_by_name?: string | null;
   cancel_reason?: string | null;
+  /** เบอร์นี้สมัครใน iRecruit ภายใน 14 วัน (143 · 12 ต.ค. 2569) — AI ไม่โทรเอง ป้าย "ซ้ำ iRecruit" */
+  irecruit_dup_at?: string;
   license_types?: string[];
   /** เจ้าหน้าที่ที่คีย์ใบนี้ — undefined = ผู้สมัครกรอกเองผ่านลิงก์ */
   created_by_name?: string;

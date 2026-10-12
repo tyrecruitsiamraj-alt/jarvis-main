@@ -140,15 +140,16 @@ export function isClosedByCallOutcome(r: PublicApplication): boolean {
  * มุมมองย่อยของแท็บ "รายชื่อผู้สมัคร" (เจ้าของสั่ง 13 ส.ค. 2569: "แบ่ง 3 อัน")
  * ทั้งหมด / คนที่สนใจ / คนที่ไม่สนใจ — แบ่งด้วย **ผลโทร** ไม่ใช่สถานะใบสมัคร
  */
-export const RM_LIST_VIEWS = ['all', 'interested', 'declined', 'over_age', 'collect'] as const;
+export const RM_LIST_VIEWS = ['all', 'interested', 'declined', 'over_age', 'irecruit_dup', 'collect'] as const;
 export type RmListView = (typeof RM_LIST_VIEWS)[number];
 
 /**
  * ปุ่มมุมมองที่โชว์บนแท็บผู้สมัคร — 🔴 "รอเก็บใบสมัคร" ถอดออกจากจอ (เจ้าของสั่ง 5 ต.ค. 2569 "เอารอเก็บใบสมัคร 88 ไรนั่นออก")
  * นิยาม `collect` ยังอยู่ (ตัวนับ/เทสต์ใช้) · ลิงก์เก่า `?list=collect` ถอยไปรายชื่อทั้งหมด (ไม่ค้างมุมมองที่ไม่มีปุ่มกดกลับ)
  */
-/** "อายุเกิน" (5 ต.ค. 2569) — อายุ 58 ปีขึ้นไป AI ไม่โทร ชื่อมารวมที่นี่ (`applicantAge.ts`) */
-export const RM_LIST_VIEWS_SHOWN = ['all', 'interested', 'declined', 'over_age'] as const satisfies readonly RmListView[];
+/** "อายุเกิน" (5 ต.ค. 2569) — อายุ 58 ปีขึ้นไป AI ไม่โทร ชื่อมารวมที่นี่ (`applicantAge.ts`)
+ *  "ซ้ำ iRecruit" (12 ต.ค. 2569 · 143) — เบอร์สมัครใน iRecruit ภายใน 14 วัน AI ไม่โทรเอง ให้คนเลือกส่ง */
+export const RM_LIST_VIEWS_SHOWN = ['all', 'interested', 'declined', 'over_age', 'irecruit_dup'] as const satisfies readonly RmListView[];
 export function isShownRmListView(v: string | null | undefined): v is (typeof RM_LIST_VIEWS_SHOWN)[number] {
   return !!v && (RM_LIST_VIEWS_SHOWN as readonly string[]).includes(v);
 }
@@ -158,6 +159,7 @@ export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
   interested: 'รายชื่อคนที่สนใจ',
   declined: 'รายชื่อคนที่ไม่สนใจ',
   over_age: 'อายุเกิน',
+  irecruit_dup: 'ซ้ำ iRecruit',
   // คิวงานสรรหา (16 ส.ค.): สนใจจริง แต่ยังไม่ขึ้นบอร์ด (= ยังไม่ได้มาสมัคร)
   // "ขึ้นบอร์ดแล้ว" = on_board (server จับคู่เบอร์กับคนบนบอร์ด ERP) → ออกจากคิวเอง
   collect: 'รอเก็บใบสมัคร',
@@ -181,6 +183,7 @@ export function isInRmListView(r: PublicApplication, view: RmListView): boolean 
   // (ชื่อขึ้นบอร์ด) on_board = true → หลุดจากคิวเอง
   if (view === 'collect') return isInterestedApplicant(r) && r.on_board !== true;
   if (view === 'over_age') return isOverAge(r.age);
+  if (view === 'irecruit_dup') return Boolean(r.irecruit_dup_at);
   return true;
 }
 

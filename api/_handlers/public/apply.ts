@@ -7,6 +7,7 @@ import { rateLimitOrReject } from '../../_lib/rateLimit.js';
 import { validatePublicApplication } from '../../_lib/publicApplications.js';
 import { resolveApplicationDepartment } from '../../_lib/applicationDepartment.js';
 import { enqueueLumosInterviewForApplications } from '../../_lib/lumosDispatch.js';
+import { splitIrecruitDuplicates } from '../../_lib/irecruitDuplicates.js';
 import { logError } from '../../_lib/logger.js';
 import { auditFromAnonymous } from '../../_lib/audit.js';
 import { applicantClientIp, lockAndFindRepeat } from '../../_lib/applicationRepeatGuard.js';
@@ -164,7 +165,10 @@ export default async function handler(req: ApiReq, res: ApiRes) {
      */
     if ((process.env.APPLICATION_AUTO_DISPATCH_ENABLED || '').trim().toLowerCase() === 'true') {
       try {
-        if (v.jobId) {
+        // ซ้ำกับ iRecruit ภายใน 14 วัน = ไม่ส่งเอง ติดป้าย "ซ้ำ iRecruit" ให้คนเลือก (143 · เจ้าของ 12 ต.ค. 2569)
+        // อ่าน iRecruit ไม่ได้ = ส่งตามเดิม (เพดาน 3 วิ — ผู้สมัครรอหน้าเว็บอยู่)
+        const { dups } = v.jobId ? await splitIrecruitDuplicates([{ id, phone: v.phone, created_at: new Date() }]) : { dups: [] };
+        if (v.jobId && dups.length === 0) {
           await enqueueLumosInterviewForApplications(v.jobId, [
             {
               id,

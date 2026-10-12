@@ -40,7 +40,9 @@ import { repeatImportReason } from '../../src/lib/applicationRepeat.js';
 import { existingApplicationsByPhone, lockAndFindRepeat, recentPhoneApplications } from '../_lib/applicationRepeatGuard.js';
 import { duplicateSheetRows, type ImportDuplicate } from '../../src/lib/applicantImportDuplicates.js';
 import { buildImportTemplateBase64 } from '../_lib/importTemplate.js';
+import { splitIrecruitDuplicates } from '../_lib/irecruitDuplicates.js';
 import { listRecruitJobTitles } from '../_lib/recruitJobTitles.js';
+import { logError } from '../_lib/logger.js';
 
 const tbl = tableInAppSchema('public_job_applications');
 /** ~1.5 MB ไฟล์จริง — รายชื่อ 500 แถวใช้ไม่ถึง 100 KB */
@@ -183,6 +185,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // แล้วเช็คกติกาสมัครซ้ำอีกรอบ (มีคนสมัครเข้ามาระหว่างดูตัวอย่าง = ข้ามแถวนั้น)
     const staffName = req.user.email || null;
     const insertedIds: string[] = [];
+    const insertedPhones = new Map<string, string>();
     plans = await dbTransaction(async (client) => {
       const out = [...plans];
       const order = out
@@ -200,10 +203,21 @@ async function handler(req: AuthedReq, res: ApiRes) {
           `insert into ${tbl} (${STAFF_INSERT_COLUMNS}) values (${STAFF_INSERT_VALUES}) returning id`,
           staffInsertParams(p.value, staffName, entryDept.code),
         );
-        if (ins[0]?.id) insertedIds.push(ins[0].id);
+        if (ins[0]?.id) {
+          insertedIds.push(ins[0].id);
+          insertedPhones.set(ins[0].id, p.value.phone);
+        }
       }
       return out;
     });
+
+    // จดใบที่ซ้ำกับ iRecruit ภายใน 14 วัน (143 · 12 ต.ค. 2569) — ป้าย "ซ้ำ iRecruit" บนแท็บผู้สมัคร
+    // ใบนำเข้า AI ไม่โทรเองอยู่แล้ว · อ่าน iRecruit ไม่ได้ = ไม่มีป้าย (ไม่ทำให้การนำเข้าล้ม)
+    try {
+      await splitIrecruitDuplicates(insertedIds.map((id) => ({ id, phone: insertedPhones.get(id) ?? null, created_at: new Date() })));
+    } catch (e) {
+      logError('job-applications-import irecruit dup check failed', e, { count: insertedIds.length });
+    }
 
     const result = toPreviewRows(plans);
     await auditFromAuthed(req, {

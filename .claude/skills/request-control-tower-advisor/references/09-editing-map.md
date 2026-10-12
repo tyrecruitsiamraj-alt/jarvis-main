@@ -13079,3 +13079,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
     · เทสต์ตารางเดิมตั้ง `localStorage['jarvis:follow-day-layout']='table'` ใน beforeEach
   · หน้าหลัก: หัวข้อติดตาม/ดูแล หน่วย "สาย" (นับแถว follow_entries) — แทนกติการอบ 18 "รายชื่อทุกหัวข้อ" · งานสรรหา/จับคู่งานยัง "รายชื่อ"
   · เทสต์ `tests/api/followCallQueue2569-10-12.test.ts` · ภาพ `docs/qa-shots/follow-{panel-ai-staff,call-queue}-2569-10-12.jpg`
+- (12 ต.ค. 2569 ค่ำ) **ซ้ำกับ iRecruit = AI ไม่โทรเอง ติดป้ายให้คนเลือก** (เจ้าของ Choice: ซ้ำ = 14 วัน · ไม่ส่งเอง ติดป้าย · อ่าน iRecruit ไม่ได้ = ส่งตามเดิม)
+  · migration 143 `application_irecruit_dups` (รันแล้ว) · ตัวกลาง `api/_lib/irecruitDuplicates.ts` — `splitIrecruitDuplicates` (จดแล้วไม่ถามซ้ำ · อ่าน iRecruit ไม่ได้ = ส่ง) ·
+    `lookupIrecruitByPhones` (recruit_register · phone_number IN 10/9 หลัก · created_at ≥ ใบเรา−14 วัน · เพดาน 3 วิ · วัด 64 ms)
+  · ใช้กับตัวส่ง AI อัตโนมัติ 3 เส้น: `public/apply` (กรอกเสร็จ) · `incomeReadyDispatch` · `callChoiceWorker` (ไม่หยิบใบที่จดว่าซ้ำ + คืน call_choice ของใบที่เพิ่งเจอ)
+    🔴 ปุ่ม "ส่ง AI โทร" ที่คนกด (`application-dispatch` / `application-call-choice`) ไม่ผ่านตัวนี้ — คนเลือกแล้ว
+  · นำเข้า Excel จดซ้ำหลังบันทึก (ป้ายขึ้น · AI ไม่โทรใบนำเข้าเองอยู่แล้ว)
+  · จอ: แท็บผู้สมัคร มุมมอง "ซ้ำ iRecruit" (`RM_LIST_VIEWS_SHOWN` · `irecruit_dup_at` จาก list API) · ช่องคำตอบกับ AI ขึ้น "ซ้ำ iRecruit · สมัคร 5 ต.ค. 2569"
+  · วัดจริง 30 วัน: ผู้สมัครผ่านลิงก์ 371 · สมัคร iRecruit ภายใน 14 วันก่อน 58 (16%) · ไม่อยู่ใน iRecruit เลย 198 (53%) · สองระบบไม่ได้ส่งใบหากัน (ตรงเวลา 1 ใบ)
+  · ⚠️ ใบเก่าก่อน 12 ต.ค. ไม่มีป้าย (จดตอนตัวส่งอัตโนมัติวิ่งเท่านั้น) · เทสต์ `tests/api/irecruitDuplicates2569-10-12.test.ts`
