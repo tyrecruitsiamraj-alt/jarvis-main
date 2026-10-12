@@ -4,8 +4,10 @@ import { Card } from '@/components/ui/card';
 import { TONE } from '@/lib/designTokens';
 import { FOLLOW_OUTCOME_LABEL, type FollowOutcomeAny } from '@/lib/followOutcome';
 import {
+  CALLED_AFTER_CANCEL_LABEL,
   FOLLOW_CALL_CATEGORY_LABEL,
   FOLLOW_CALL_CATEGORY_TONE,
+  calledAfterCancel,
   callCategory,
   followRoundLabel,
   type FollowDayDoneKind,
@@ -33,7 +35,9 @@ function resultOf(p: FollowDayPerson, kind: FollowDayDoneKind): string {
   const code = closed[0]?.outcome_code as FollowOutcomeAny | undefined;
   if (code) return FOLLOW_OUTCOME_LABEL[code] ?? code;
   const decisive = [...p.calls].reverse().find((c) => callCategory(c.round) === kind);
-  return decisive ? followRoundLabel(decisive.round) : KIND_LABEL[kind];
+  if (decisive) return followRoundLabel(decisive.round);
+  // ยกเลิกทั้งวันแต่ AI ยังโทร (12 ต.ค. 2569) — บอกให้รู้ว่าเป็นสายที่ไม่ควรโทร
+  return p.calls.some((c) => calledAfterCancel(c.round)) ? `${KIND_LABEL[kind]} · ${CALLED_AFTER_CANCEL_LABEL}` : KIND_LABEL[kind];
 }
 
 /** ใครจัดการ — คนปิดงาน · ไม่มีคนปิดแต่มีผลจาก AI = "AI" · ยกเลิก = คนแก้ล่าสุด */

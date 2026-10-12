@@ -13001,3 +13001,14 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - (12 ต.ค. 2569 ตี 4) QA รอบ 2 ข้อ 44 (เฉพาะขนาดตัวอักษร หน้าติดตาม · เจ้าของ Choice "ทำเฉพาะ 3 หน้า") — ขนาด 12 แบบ → 3 แบบเล็ก (10/11/12px) + text-xs/sm/base
   ยุบเฉพาะที่ต่างกัน ≤1.5px: 9→10 · 10.5→11 · 11.5/12.5→12 · 13/13.5→text-xs · 15→text-sm · 17→text-base · 24px ในวงกลม SVG คงไว้
   ภาพก่อน/หลัง `docs/qa-shots/follow-font-{before,after}-2569-10-12.jpg` · ที่ยังไม่ทำของข้อ 43–44: ตัวเลือกวันที่ 5 แบบ · แบ่งหน้า 5 แบบ · select ของเบราว์เซอร์ · คลาส jarvis-* · หน้าหลัก/งานสรรหา
+- (12 ต.ค. 2569 เช้า) **ตั้งคนโทร แต่ AI โทรไปแล้ว = นับเป็น AI** (เจ้าของ Choice "นับเป็น AI โทร (แนะนำ)" · 18 สายส่งคนแทนจาก race 11 ต.ค.)
+  · กติกา: `call_mode = 'manual'` + คิวสถานะ completed/failed + ไม่มี `staff_call_outcome` ⇒ AI
+  · สามที่ใช้ตัวเดียวกัน: `followCallerOf` (`src/lib/followListFilter.ts` · ตัวกรอง/รายงาน/`categorizeFollowRows`) ·
+    `FOLLOW_EFFECTIVE_MODE_SQL` (`api/_lib/homeLumosSummarySql.ts` · ถังแผงผลโทร + call_mode ที่ส่งออก) ·
+    `FOLLOW_PLAN_AI_SQL` / `FOLLOW_PLAN_STAFF_SQL` (`api/_lib/homeAiShareSql.ts` · กล่อง AI/คน หน้าหลัก ใช้ `exists` คิว เพราะบางคิวรีไม่ได้ join คิว)
+  · วัดฐานจริง 30 วัน: AI 2,031 + คน 2,559 = 4,590 · คน = โหมดจริงของแผงพอดี (ย้ายไป AI 27 สาย) · เทสต์ `tests/api/followEffectiveCaller2569-10-12.test.ts`
+- (12 ต.ค. 2569 เช้า) **ยกเลิกแล้วแต่ AI ยังโทร** (เจ้าของถาม "ยกเลิกแผนไปแล้วทำไมมันยังโทรอยู่" · Choice "บันทึกให้ Lumos + แก้จอ" → "นับตามผลเดิม + ติดป้าย")
+  · วัดจริง: เราส่ง DELETE ครบ แต่ Lumos ยังโทร 9 จาก 207 สายใน 7 วัน · บันทึกส่งทีม Lumos `docs/lumos/lumos-issues-2569-10-12.md` (รหัสแผนครบ ไม่มีชื่อ/เบอร์)
+  · `CALLED_AFTER_CANCEL_LABEL` + `calledAfterCancel()` (`src/lib/followPlanning.ts`) — `followRoundLabel` ต่อท้าย "· ยกเลิกแล้ว AI ยังโทร" ⇒ ตาราง/ป๊อปรอบ/รายงานรายวัน/การ์ดจบแล้ว ได้พร้อมกัน
+  · 🔴 หมวด/ตัวเลขยังนับตามผลจริง (กติกา 6 ต.ค. ใน `followRoundState`) — ป้ายบอกอย่างเดียว ห้ามเปลี่ยนเป็นนับยกเลิก
+  · `FollowDayDoneCard.resultOf` ติดป้ายเมื่อทั้งวันยกเลิกแต่มีสายที่ AI โทร · เทสต์ใน `tests/api/followPlanning.test.ts` · `followNumbersReconcile` ยอมรับป้ายต่อท้าย

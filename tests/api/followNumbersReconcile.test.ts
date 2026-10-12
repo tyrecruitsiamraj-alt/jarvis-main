@@ -93,7 +93,8 @@ describe('สรุปแผน = แผง (ข้อมูลชุดเด�
   it('คอลัมน์ผลใช้คำของหมวดเดียวกับแผง', () => {
     const words = new Set(Object.values(FOLLOW_CALL_CATEGORY_LABEL));
     for (const r of report.rows) {
-      const head = r.result.split(/ — | · คนโทร/)[0];
+      // ป้าย "· ยกเลิกแล้ว AI ยังโทร" ต่อท้ายได้ (12 ต.ค. 2569) — หัวป้ายยังเป็นคำของหมวด
+      const head = r.result.split(/ — | · คนโทร| · ยกเลิกแล้ว AI ยังโทร/)[0];
       // ข้อยกเว้นเดียว (7 ต.ค. 2569 เจ้าของ "ให้บอกว่า นาย ก เลื่อน"): ขอเลื่อน = หมวดสรุปไม่ได้ แต่ป้ายบอกตรง ๆ
       expect(words.has(head) || head === 'ขอเลื่อน', r.result).toBe(true);
     }

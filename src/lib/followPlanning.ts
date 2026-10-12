@@ -398,7 +398,23 @@ export function followRoundShortLabel(round: FollowPlanningRound): string {
   return FOLLOW_CALL_CATEGORY_LABEL[callCategory(round)];
 }
 
+/**
+ * ═══ ยกเลิกแล้วแต่ AI ยังโทร (เจ้าของ 12 ต.ค. 2569 · Choice "นับตามผลเดิม + ติดป้าย") ═══
+ * เราส่งคำสั่งยกเลิกถึง Lumos ครบ แต่ Lumos ยังโทรออกราว 1 ใน 20 สาย (วัด 7 วัน: 9 จาก 207) ⇒ สายนี้ไม่ควรโทร
+ * หมวด/ตัวเลขยังนับตามผลจริงตามกติกา 6 ต.ค. (`followRoundState`) — ป้ายนี้บอกแค่ว่าเป็นสายที่ยกเลิกไปแล้ว
+ */
+export const CALLED_AFTER_CANCEL_LABEL = 'ยกเลิกแล้ว AI ยังโทร';
+
+export function calledAfterCancel(round: Pick<FollowPlanningRound, 'entry' | 'state'>): boolean {
+  return round.entry.cancelled === true && round.state === 'result';
+}
+
 export function followRoundLabel(round: FollowPlanningRound): string {
+  const label = followRoundBaseLabel(round);
+  return calledAfterCancel(round) ? `${label} · ${CALLED_AFTER_CANCEL_LABEL}` : label;
+}
+
+function followRoundBaseLabel(round: FollowPlanningRound): string {
   const category = callCategory(round);
   const base = FOLLOW_CALL_CATEGORY_LABEL[category];
   const staffWait = staffPlannedWait(round);

@@ -24,6 +24,8 @@ import {
   FOLLOW_CALL_CATEGORY_LABEL,
   callVerdict,
   followRoundLabel,
+  calledAfterCancel,
+  CALLED_AFTER_CANCEL_LABEL,
   type FollowPlanningRound,
 } from '../../src/lib/followPlanning';
 
@@ -55,6 +57,21 @@ describe('followRoundState — สภาพของรอบต้องต่�
     expect(followRoundState(entry({ cancelled: true, call_outcome: 'cancelled' }), NOW)).toBe('cancelled');
     // ยกเลิกแล้วแต่ Lumos ยังโทรและได้ผล = นับตามผล (กล่องขั้นตอน = การ์ดผลของเดือน)
     expect(followRoundState(entry({ cancelled: true, call_outcome: 'confirmed' }), NOW)).toBe('result');
+  });
+
+  it('🔴 ยกเลิกแล้วแต่ AI ยังโทร = นับตามผลเดิม + ติดป้ายบอก (12 ต.ค. 2569)', () => {
+    const r = (over: Partial<FollowEntry>): FollowPlanningRound => {
+      const e = entry(over);
+      return { entry: e, state: followRoundState(e, NOW), time: null, ymd: null } as FollowPlanningRound;
+    };
+    const called = r({ cancelled: true, call_status: 'completed', call_outcome: 'confirmed' });
+    expect(calledAfterCancel(called)).toBe(true);
+    expect(callCategory(called)).toBe('agreed');
+    expect(followRoundLabel(called)).toBe(`${FOLLOW_CALL_CATEGORY_LABEL.agreed} · ${CALLED_AFTER_CANCEL_LABEL}`);
+    // ยกเลิกเฉย ๆ / สายปกติที่มีผล = ไม่มีป้าย
+    expect(calledAfterCancel(r({ cancelled: true }))).toBe(false);
+    expect(followRoundLabel(r({ cancelled: true }))).toBe(FOLLOW_CALL_CATEGORY_LABEL.cancelled);
+    expect(followRoundLabel(r({ call_status: 'completed', call_outcome: 'confirmed' }))).not.toContain(CALLED_AFTER_CANCEL_LABEL);
   });
 
   it('ปิดงานแล้วชนะผลการโทร', () => {
