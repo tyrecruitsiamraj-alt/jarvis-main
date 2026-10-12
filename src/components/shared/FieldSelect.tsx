@@ -49,7 +49,13 @@ export function FieldSelect({
     <Select
       // "" ของ Radix = ยังไม่เลือก (ขึ้น placeholder) · ค่าที่ไม่อยู่ในตัวเลือกก็ขึ้น placeholder เหมือนกัน
       value={value === '' ? (options.some((o) => o.value === '') ? EMPTY : '') : known ? value : ''}
-      onValueChange={(v) => onChange(v === EMPTY ? '' : v)}
+      onValueChange={(v) => {
+        // 🔴 QA รอบ 4 (12 ต.ค. 2569): ตัวเลือกเปลี่ยนทีหลัง (ลิสต์โหลดเสร็จ) → select ที่ซ่อนอยู่ของ Radix รีเซ็ตตัวเอง
+        // แล้วยิง "" มาเหมือนคนเลือก ⇒ ค่าเดิมหาย · คนกดเองได้ค่าจากตัวเลือกเสมอ (ตัวว่างมาเป็น EMPTY ไม่ใช่ "")
+        if (v === EMPTY) return onChange('');
+        if (v === '' || !options.some((o) => o.value === v)) return;
+        onChange(v);
+      }}
       disabled={disabled}
     >
       <SelectTrigger id={id} aria-label={ariaLabel} className={cn('w-full', className)} data-testid={testId}>

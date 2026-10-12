@@ -10,8 +10,8 @@
  *   - `done` จบแล้ว — มีคำตอบ (ไป/ไม่ไป) · คนลงผลแล้ว · ปิดงาน · ยกเลิก
  * ไฟล์นี้ pure — เทสต์ `tests/api/followCallQueue2569-10-12.test.ts`
  */
-import type { FollowDayCall, FollowDayPerson } from './followPlanning';
-import { followRoundLabel, roundDispatchReason } from './followPlanning';
+import type { FollowDayCall, FollowDayPerson, FollowPlanningRow } from './followPlanning';
+import { buildFollowDayPeople, followDayPersonDone, followRoundLabel, roundDispatchReason } from './followPlanning';
 import { canRecordStaffCall, isStaffCallResult } from './followStaffCall';
 import { followCallerOf } from './followListFilter';
 
@@ -49,14 +49,23 @@ export function followQueueGroupOf(call: FollowDayCall, person: FollowDayPerson)
   if (round.state === 'cancelled' || round.state === 'closed' || e.completed_at || isStaffCallResult(e)) {
     return { group: 'done', reason: label };
   }
+  /**
+   * 🔴 QA รอบ 4 (12 ต.ค. 2569) ข้อ 1–2: กติกา "จบแล้ว" ชุดเดียวกับตาราง (`followDayPersonDone`)
+   * - คนนั้นจบวันแล้ว (ไม่มีสายเปิด + มีคำตอบ ไป/ไม่ไป) = ทุกสายของวันนั้นจบ — เดิมสายเช้าที่ AI ไม่ได้คำตอบ
+   *   ค้างแดงให้คนโทรหาคนที่ตอบว่าไปแล้วในสายถัดมา (12 ต.ค. 5 สาย · 9 ต.ค. 14 สาย)
+   * - สายนี้ได้คำตอบ ไป/ไม่ไป หรือถูกยกเลิกแล้ว = จบ — เดิมสายคนโทรที่ยกเลิกแล้วแต่ AI ยังโทรได้ "ไม่ไป"
+   *   ไปอยู่กองคนต้องโทรโดยไม่มีปุ่มลงผล (ส่งคนแทน 249 แถว · ปุ่มลงผล 247)
+   */
+  if (followDayPersonDone(person) !== null) return { group: 'done', reason: label };
+  if (call.category === 'agreed' || call.category === 'lost' || e.cancelled) return { group: 'done', reason: label };
   const caller = followCallerOf(e);
   if (caller === 'manual') return { group: 'staff', reason: 'สายคนโทร' };
   if (round.state === 'notSent') return { group: 'staff', reason: roundDispatchReason(round) };
   if (AI_PENDING.has(round.state)) {
     return { group: 'ai', reason: round.state === 'overdue' ? 'ส่งให้ AI แล้ว ยังไม่มีผลกลับ' : 'AI จะโทรตามเวลา' };
   }
-  // มีผลจาก AI แล้ว — ได้คำตอบ (ไป/ไม่ไป/ขอเลื่อน) = จบ · ไม่ได้คำตอบ = คนโทรต่อได้ ถ้า AI ไม่มีสายรออยู่อีกในวันนั้น
-  if (call.category === 'agreed' || call.category === 'lost' || !canRecordStaffCall(e)) return { group: 'done', reason: label };
+  // มีผลจาก AI แล้ว — ขอเลื่อน/ยกเลิก = จบ · ไม่ได้คำตอบ = คนโทรต่อได้ ถ้า AI ไม่มีสายรออยู่อีกในวันนั้น
+  if (!canRecordStaffCall(e)) return { group: 'done', reason: label };
   const aiStillCalling = person.calls.some(
     (c) => c !== call && !c.round.entry.cancelled && followCallerOf(c.round.entry) === 'ai' && AI_PENDING.has(c.round.state),
   );
@@ -89,4 +98,27 @@ export function lateText(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return m ? `เลย ${h} ชม. ${m} นาที` : `เลย ${h} ชม.`;
+}
+
+/**
+ * ═══ "ต้องตามด่วน · ทั้งเดือน" — กติกาเดียวกับกองของมุมมองต้องโทร (QA รอบ 4 · 12 ต.ค. 2569 ข้อ 3) ═══
+ * เดิมนับแค่ `callCategory === 'overdue'` ⇒ สายคนโทรที่เลยเวลา (แท็บคนเริ่มงาน = 'notSent') ไม่ถูกนับ การ์ดขึ้น 0
+ * ทั้งที่กองคนต้องโทรค้างแดง · และคนที่จบวันแล้ว (ตอบว่าไปในสายถัดมา) ยังถูกนับ
+ * ด่วน = คนต้องโทรที่เลยเวลาแล้ว + ส่ง AI แล้วเลยเวลายังไม่มีผลกลับ (ของเดิมของการ์ด ห้ามหาย)
+ * ทีละวันผ่าน `buildFollowDayPeople` → `buildFollowCallQueue` ตัวเดียวกับจอ
+ */
+export function followUrgentCalls(
+  rows: readonly FollowPlanningRow[],
+  month: string,
+  now: Date = new Date(),
+): FollowQueueItem[] {
+  const days = new Set<string>();
+  for (const row of rows) for (const r of row.rounds) if (r.ymd?.slice(0, 7) === month) days.add(r.ymd);
+  const out: FollowQueueItem[] = [];
+  for (const ymd of days) {
+    const q = buildFollowCallQueue(buildFollowDayPeople(rows, ymd, 'all'), now);
+    for (const it of q.staff) if ((it.lateMinutes ?? 0) > 0) out.push(it);
+    for (const it of q.ai) if (it.call.round.state === 'overdue') out.push(it);
+  }
+  return out.sort((a, b) => (a.at ?? Number.MAX_SAFE_INTEGER) - (b.at ?? Number.MAX_SAFE_INTEGER));
 }

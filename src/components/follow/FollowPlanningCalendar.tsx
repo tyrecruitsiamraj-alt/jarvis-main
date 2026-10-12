@@ -14,6 +14,7 @@ import {
 import type { FollowOutcome } from '@/lib/followOutcome';
 import FollowStaffCallControls from '@/components/follow/FollowStaffCallControls';
 import FollowCallQueue from '@/components/follow/FollowCallQueue';
+import { followUrgentCalls } from '@/lib/followCallQueue';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import FollowCancelMenu, { type FollowCancelChoice } from '@/components/follow/FollowCancelMenu';
 import { leadText, replaceLeadStart, replaceSlotRoundOfRef } from '@/lib/irecruitReplaceSync';
@@ -98,6 +99,8 @@ type View = 'day' | 'month';
 const DAY_PAGE_SIZES = [10, 15] as const;
 /** รายเดือนหน้าละ 10 คน (5 ต.ค. 2569) */
 const MONTH_PAGE_SIZE = 10;
+/** การ์ดต้องตามด่วน หน้าละ 6 สาย (เท่าที่เคยโชว์) */
+const URGENT_PAGE_SIZE = 6;
 type DayPageSize = (typeof DAY_PAGE_SIZES)[number];
 
 /** ชื่อเดือนไทย + ปี พ.ศ. จากคีย์ YYYY-MM */
@@ -561,19 +564,16 @@ const FollowPlanningCalendar: React.FC<{
   const resultTitle = resultIsDay ? (dayYmd === today ? 'ผลของวันนี้' : 'ผลของวันที่เลือก') : 'ผลของเดือนนี้';
   const resultSub = resultIsDay ? dayPillLabel(dayYmd) : monthLabel(month);
 
-  const overdueAll = useMemo(() => {
-    const out: Array<{ row: FollowPlanningRow; round: FollowPlanningRound }> = [];
-    for (const row of summarySource) {
-      for (const round of row.rounds) {
-        // ทั้งเดือนจริง (หัวการ์ดบอก "ทั้งเดือน" · 6 ต.ค. 2569 เดิมไม่กรองเดือน)
-        if (round.ymd?.slice(0, 7) !== month) continue;
-        if (callCategory(round) === 'overdue') out.push({ row, round });
-      }
-    }
-    return out.sort((a, b) =>
-      (a.round.entry.scheduled_at ?? '').localeCompare(b.round.entry.scheduled_at ?? ''),
-    );
-  }, [summarySource, month]);
+  /** ต้องตามด่วน — กติกาเดียวกับกองคนต้องโทร (`followUrgentCalls` · QA รอบ 4 ข้อ 3) */
+  const overdueAll = useMemo(
+    () => followUrgentCalls(summarySource, month).map((it) => ({ row: it.person.row, round: it.call.round })),
+    [summarySource, month],
+  );
+  const [urgentPage, setUrgentPage] = useState(1);
+  useEffect(() => setUrgentPage(1), [month, roundFilter]);
+  const urgentPageCount = Math.max(1, Math.ceil(overdueAll.length / URGENT_PAGE_SIZE));
+  const urgentSafePage = Math.min(urgentPage, urgentPageCount);
+  const urgentRows = overdueAll.slice((urgentSafePage - 1) * URGENT_PAGE_SIZE, urgentSafePage * URGENT_PAGE_SIZE);
 
   /**
    * เดือนหนึ่งมี 30 คอลัมน์ ⇒ เปิดมาเจอต้นเดือนซึ่งมักว่างเปล่า **ดูเหมือนไม่มีงาน**
@@ -1427,7 +1427,7 @@ const FollowPlanningCalendar: React.FC<{
               </p>
             ) : (
               <ul className="divide-y divide-border/60 border-t border-border/70">
-                {overdueAll.slice(0, 6).map(({ row, round }) => (
+                {urgentRows.map(({ row, round }) => (
                   <li key={round.entry.id} className="flex items-center gap-2 px-4 py-2.5">
                     <button
                       type="button"
@@ -1459,13 +1459,19 @@ const FollowPlanningCalendar: React.FC<{
                     </a>
                   </li>
                 ))}
-                {overdueAll.length > 6 ? (
-                  <li className="px-4 py-2 text-[11px] text-muted-foreground">
-                    และอีก {overdueAll.length - 6} สาย — ดูครบในรายการหลัก
-                  </li>
-                ) : null}
               </ul>
             )}
+            {/* เดิม "และอีก N สาย — ดูครบในรายการหลัก" ที่กดไม่ได้ (QA รอบ 4) ⇒ ตัวแบ่งหน้าแบบเดียวทั้งระบบ */}
+            {overdueAll.length > URGENT_PAGE_SIZE ? (
+              <PagePager
+                className="border-t border-border/70 px-4 py-2"
+                testId="follow-urgent-pager"
+                label=" (ต้องตามด่วน)"
+                page={urgentSafePage}
+                pageCount={urgentPageCount}
+                onPageChange={setUrgentPage}
+              />
+            ) : null}
           </Card>
         </div>
       </div>

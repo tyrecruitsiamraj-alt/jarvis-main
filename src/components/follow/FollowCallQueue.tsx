@@ -46,6 +46,11 @@ export default function FollowCallQueue({
 }) {
   const queue = useMemo(() => buildFollowCallQueue(people, now), [people, now]);
   const [showDone, setShowDone] = useState(false);
+  /** กองคนต้องโทร = รอโทร (ยังไม่มีผล) + สายที่ AI โทรแล้วแต่ไม่ได้คำตอบ (มีผลแล้ว) */
+  const staffSplit = useMemo(() => {
+    const afterAi = queue.staff.filter((it) => it.call.round.state === 'result').length;
+    return { waiting: queue.staff.length - afterAi, afterAi };
+  }, [queue]);
 
   const timeOf = (it: FollowQueueItem) =>
     it.call.round.entry.time_tbd ? 'ยังไม่ระบุเวลา' : it.at !== null ? TIME_FMT.format(new Date(it.at)) : '—';
@@ -129,7 +134,13 @@ export default function FollowCallQueue({
       </div>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-medium text-foreground">คนต้องโทร</h3>
+        {/* แยกให้ทานกับแผงได้ (QA รอบ 4 ข้อ 3): รอโทร = แถวรอโทร·คน ของแผง · ที่เหลือคือสาย AI ที่ไม่ได้คำตอบ */}
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <h3 className="text-sm font-medium text-foreground">คนต้องโทร</h3>
+          <span className="text-xs tabular-nums text-muted-foreground" data-testid="queue-staff-split">
+            รอโทร {staffSplit.waiting.toLocaleString('th-TH')} · AI โทรแล้วไม่ได้คำตอบ {staffSplit.afterAi.toLocaleString('th-TH')}
+          </span>
+        </div>
         <ul className="space-y-2">{queue.staff.length ? queue.staff.map(rowOf) : empty('ไม่มีสายที่คนต้องโทร')}</ul>
       </section>
 

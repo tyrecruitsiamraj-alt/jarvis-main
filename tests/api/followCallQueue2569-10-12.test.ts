@@ -4,7 +4,9 @@
 import { describe, expect, it } from 'vitest';
 import type { FollowEntry } from '@/lib/followApi';
 import type { FollowDayCall, FollowDayPerson, FollowPlanningRound } from '@/lib/followPlanning';
-import { buildFollowCallQueue, followQueueGroupOf, lateText } from '@/lib/followCallQueue';
+import { buildFollowCallQueue, followQueueGroupOf, followUrgentCalls, lateText } from '@/lib/followCallQueue';
+import { groupFollowEntries } from '@/lib/followGrouping';
+import { buildFollowPlanningRows } from '@/lib/followPlanning';
 import { FOLLOW_PANEL_LINES, followPanelLists, followPeopleCount, type FollowMatrixCol } from '@/lib/followCallMatrix';
 
 const NOW = new Date('2026-10-12T02:00:00Z'); // 09:00 ไทย
@@ -70,6 +72,46 @@ describe('ต้องโทรวันนี้ — สายละกอง�
     expect(q.staff.length + q.ai.length + q.done.length).toBe(3);
     expect(lateText(40)).toBe('เลย 40 นาที');
     expect(lateText(125)).toBe('เลย 2 ชม. 5 นาที');
+  });
+});
+
+describe('QA รอบ 4 (12 ต.ค. 2569) — กติกาจบแล้วชุดเดียวกับตาราง', () => {
+  it('🔴 ข้อ 1: สายเช้า AI ไม่ได้คำตอบ แต่สายถัดมาวันเดียวกันตอบว่าไปแล้ว = จบ ไม่ใช่คนต้องโทร', () => {
+    const morning = call(entry({ id: 'm', call_status: 'completed', call_outcome: 'no_answer' }), 'result', 'unreachable');
+    const later = call(entry({ id: 'l', call_status: 'completed', call_outcome: 'confirmed' }), 'result', 'agreed');
+    expect(followQueueGroupOf(morning, person('จ', [morning, later])).group).toBe('done');
+    // ยังมีสายเปิดของวันนั้น (กติกาเจ้าของ 8 ต.ค. "ต้องจบของวันนั้นก่อน") = ยังไม่จบทั้งคน
+    const manualOpen = call(entry({ id: 'o', call_mode: 'manual', call_status: null }), 'notSent', 'notSent');
+    expect(followQueueGroupOf(manualOpen, person('จ', [manualOpen, later])).group).toBe('staff');
+  });
+
+  it('🔴 ข้อ 2: สายคนโทรที่ยกเลิกแล้วแต่ AI ยังโทรได้ "ไม่ไป" = จบ (เดิมค้างกองคนต้องโทรไม่มีปุ่มลงผล)', () => {
+    const c = call(
+      entry({ id: 'x', call_mode: 'manual', cancelled: true, call_status: 'cancelled', call_outcome: 'declined' }),
+      'result',
+      'lost',
+    );
+    const open = call(entry({ id: 'y', call_mode: 'manual', call_status: null }), 'notSent', 'notSent');
+    expect(followQueueGroupOf(c, person('ฉ', [c, open])).group).toBe('done');
+  });
+
+  it('🔴 ข้อ 3: ต้องตามด่วน = คนต้องโทรที่เลยเวลา + AI เลยเวลาไม่มีผล · คนที่จบวันแล้วไม่นับ', () => {
+    const now = new Date('2026-10-12T10:00:00Z');
+    const e = (over: Partial<FollowEntry>) => entry({ topic: 'ติดตามเริ่มงาน', created_at: '2026-10-01T00:00:00Z', ...over });
+    const entries = [
+      // ก: สายคนโทรเลยเวลา ยังไม่ได้ลงผล → ด่วน (เดิมการ์ดไม่นับ เพราะหมวดเป็น notSent)
+      e({ id: 'a', recipient_phone: '0811111111', call_mode: 'manual', call_status: null, scheduled_at: '2026-10-12T01:00:00Z' }),
+      // ข: เช้าไม่รับสาย สายถัดมาตอบว่าไป → จบวัน ไม่ด่วน
+      e({ id: 'b1', recipient_phone: '0822222222', call_status: 'completed', call_outcome: 'no_answer', scheduled_at: '2026-10-12T00:00:00Z' }),
+      e({ id: 'b2', recipient_phone: '0822222222', call_status: 'completed', call_outcome: 'confirmed', scheduled_at: '2026-10-12T01:00:00Z' }),
+      // ค: ส่ง AI แล้วเลยเวลา ผลยังไม่กลับ → ด่วน (ของเดิมของการ์ด)
+      e({ id: 'c', recipient_phone: '0833333333', call_status: 'pending', scheduled_at: '2026-10-12T02:00:00Z' }),
+      // ง: สายคนโทรยังไม่ถึงเวลา → ไม่ด่วน
+      e({ id: 'd', recipient_phone: '0844444444', call_mode: 'manual', call_status: null, scheduled_at: '2026-10-12T12:00:00Z' }),
+    ];
+    const rows = buildFollowPlanningRows(groupFollowEntries(entries, now), now);
+    const ids = followUrgentCalls(rows, '2026-10', now).map((it) => it.call.round.entry.id);
+    expect(ids.sort()).toEqual(['a', 'c']);
   });
 });
 

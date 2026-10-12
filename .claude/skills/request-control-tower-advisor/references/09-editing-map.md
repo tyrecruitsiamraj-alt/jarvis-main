@@ -13079,6 +13079,14 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
     · เทสต์ตารางเดิมตั้ง `localStorage['jarvis:follow-day-layout']='table'` ใน beforeEach
   · หน้าหลัก: หัวข้อติดตาม/ดูแล หน่วย "สาย" (นับแถว follow_entries) — แทนกติการอบ 18 "รายชื่อทุกหัวข้อ" · งานสรรหา/จับคู่งานยัง "รายชื่อ"
   · เทสต์ `tests/api/followCallQueue2569-10-12.test.ts` · ภาพ `docs/qa-shots/follow-{panel-ai-staff,call-queue}-2569-10-12.jpg`
+  · 🔴 QA รอบ 4 (12 ต.ค. 2569 · `docs/qa-2569-10-12.md` ข้อสูง 1–4):
+    - กองคนต้องโทรใช้กติกาจบแล้วชุดเดียวกับตาราง (`followDayPersonDone`) + สายที่ได้คำตอบ ไป/ไม่ไป หรือยกเลิกแล้ว = จบ
+      (เดิมให้โทรหาคนที่ตอบว่าไปแล้วในสายถัดมา · สายคนโทรที่ยกเลิกแต่ AI ยังโทรได้ "ไม่ไป" ค้างกองไม่มีปุ่มลงผล)
+    - การ์ด "ต้องตามด่วน · ทั้งเดือน" = `followUrgentCalls` (คนต้องโทรที่เลยเวลา + AI เลยเวลาไม่มีผล) ทีละวันผ่านตัวคิดกองตัวเดียวกัน
+      หน้าละ 6 ด้วย `PagePager` (เดิมนับแค่ `callCategory === 'overdue'` แท็บคนเริ่มงานจึงขึ้น 0)
+    - หัวกองคนต้องโทรแยก "รอโทร N · AI โทรแล้วไม่ได้คำตอบ M" — รอโทร = แถวรอโทร·คน ของแผงพอดี
+    - `FieldSelect` ไม่รับ "" / ค่านอกตัวเลือกจาก Radix (select ที่ซ่อนอยู่รีเซ็ตตัวเองตอนตัวเลือกเปลี่ยน ⇒ ป๊อปแก้ไขเรื่องหาย)
+      เทสต์ `src/components/follow/FollowMasterSelect.test.tsx`
 - (12 ต.ค. 2569 ค่ำ) **ซ้ำกับ iRecruit = AI ไม่โทรเอง ติดป้ายให้คนเลือก** (เจ้าของ Choice: ซ้ำ = 14 วัน · ไม่ส่งเอง ติดป้าย · อ่าน iRecruit ไม่ได้ = ส่งตามเดิม)
   · migration 143 `application_irecruit_dups` (รันแล้ว) · ตัวกลาง `api/_lib/irecruitDuplicates.ts` — `splitIrecruitDuplicates` (จดแล้วไม่ถามซ้ำ · อ่าน iRecruit ไม่ได้ = ส่ง) ·
     `lookupIrecruitByPhones` (recruit_register · phone_number IN 10/9 หลัก · created_at ≥ ใบเรา−14 วัน · เพดาน 3 วิ · วัด 64 ms)
