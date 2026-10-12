@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { CalendarIcon, X } from 'lucide-react';
-import { parseYmd, toYmdLocal, ceToBeYear } from '@/lib/dateTh';
+import { parseYmd, toYmdLocal } from '@/lib/dateTh';
+import { thaiDayDate } from '@/lib/periodPick';
+import { Button } from '@/components/ui/button';
+import { CalendarFooter, CalendarQuickChips } from '@/components/shared/CalendarParts';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 
@@ -25,6 +28,7 @@ const DateSelectDmyBe: React.FC<DateSelectDmyBeProps> = ({
   ariaLabel,
 }) => {
   const [open, setOpen] = useState(false);
+  const todayYmd = toYmdLocal(new Date());
 
   const selectedDate = useMemo(() => {
     const parsed = parseYmd(value);
@@ -34,9 +38,8 @@ const DateSelectDmyBe: React.FC<DateSelectDmyBeProps> = ({
 
   const displayLabel = useMemo(() => {
     if (!value) return allowEmpty ? 'เลือกวันที่' : '';
-    const parsed = parseYmd(value);
-    if (!parsed) return value;
-    return `${parsed.d}/${parsed.m}/${ceToBeYear(parsed.y)}`;
+    // "จ. 12 ต.ค. 2569" — รูปวันที่เดียวทั้งระบบ (เจ้าของ Choice 12 ต.ค. 2569 · เดิม 12/10/2569)
+    return parseYmd(value) ? thaiDayDate(value) : value;
   }, [allowEmpty, value]);
 
   const buttonClass =
@@ -53,10 +56,12 @@ const DateSelectDmyBe: React.FC<DateSelectDmyBeProps> = ({
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        {/* หน้าตาเดียวกับปฏิทินหน้าหลัก (เจ้าของ Choice 12 ต.ค. 2569 "แบบ ④") */}
+        <PopoverContent className="w-auto space-y-3 p-3" align="start">
           <Calendar
             mode="single"
             selected={selectedDate}
+            defaultMonth={selectedDate}
             onSelect={(date) => {
               if (!date) {
                 if (allowEmpty) onChange('');
@@ -67,21 +72,38 @@ const DateSelectDmyBe: React.FC<DateSelectDmyBeProps> = ({
             }}
             initialFocus
           />
-          {allowEmpty && (
-            <div className="border-t border-border p-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  onChange('');
+          <CalendarQuickChips
+            items={[
+              {
+                key: 'today',
+                label: 'วันนี้',
+                active: value === todayYmd,
+                onClick: () => {
+                  onChange(todayYmd);
                   setOpen(false);
-                }}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-secondary hover:bg-secondary/80"
-              >
-                <X className="h-3.5 w-3.5" />
-                ล้างวันที่
-              </button>
-            </div>
-          )}
+                },
+              },
+            ]}
+          />
+          <CalendarFooter
+            label={displayLabel || 'เลือกวันที่'}
+            action={
+              allowEmpty && value ? (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => {
+                    onChange('');
+                    setOpen(false);
+                  }}
+                >
+                  <X aria-hidden />
+                  ล้างวันที่
+                </Button>
+              ) : null
+            }
+          />
         </PopoverContent>
       </Popover>
     </div>

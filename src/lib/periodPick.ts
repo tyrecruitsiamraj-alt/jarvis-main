@@ -134,6 +134,16 @@ export function thaiDate(ymd: string): string {
   return `${dayOf(ymd)} ${TH_MONTH_SHORT[monthIndexOf(ymd)]} ${yearOf(ymd) + 543}`;
 }
 
+/**
+ * "จ. 12 ต.ค. 2569" — วันที่บนปุ่ม/ช่องเลือกวันเดียวทุกจุด (เจ้าของ Choice 12 ต.ค. 2569 "12 ต.ค. 2569" · QA รอบ 2 ข้อ 43)
+ * ช่วงวันใช้ `rangeText` ("6–12 ต.ค. 2569")
+ */
+export function thaiDayDate(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  if (!y || !m || !d) return ymd;
+  return `${TH_WEEKDAY_SHORT[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${thaiDate(ymd)}`;
+}
+
 /** "1–15 ก.ย. 2569" · "25 ส.ค. – 3 ก.ย. 2569" · "25 ธ.ค. 2568 – 3 ม.ค. 2569" */
 export function rangeText(from: string, to: string): string {
   if (from === to) return thaiDate(from);

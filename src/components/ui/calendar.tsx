@@ -29,6 +29,8 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
   return (
     <DayPicker
       locale={th}
+      // สัปดาห์เริ่มวันจันทร์ทุกปฏิทิน — แบบปฏิทินหน้าหลัก (เจ้าของ Choice 12 ต.ค. 2569 · เดิมบางตัวเริ่มอาทิตย์)
+      weekStartsOn={1}
       showOutsideDays={showOutsideDays}
       className={cn("p-3", className)}
       classNames={{

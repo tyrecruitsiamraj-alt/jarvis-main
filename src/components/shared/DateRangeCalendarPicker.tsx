@@ -6,7 +6,10 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { formatYmdDmyBe, parseYmd, toYmdLocal } from '@/lib/dateTh';
+import { parseYmd, toYmdLocal } from '@/lib/dateTh';
+import { rangeText, thaiDate } from '@/lib/periodPick';
+import { Button } from '@/components/ui/button';
+import { CalendarFooter, CalendarQuickChips } from '@/components/shared/CalendarParts';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export type DateRangeYmd = { from: string; to: string };
@@ -32,14 +35,12 @@ function ymdToDate(ymd: string): Date | undefined {
   return new Date(p.y, p.m - 1, p.d);
 }
 
+/** "6–12 ต.ค. 2569" · "12 ต.ค. 2569" — รูปวันที่เดียวทั้งระบบ (`rangeText` · เจ้าของ Choice 12 ต.ค. 2569 · เดิม 12/10/2569) */
 function formatRangeLabel(value: DateRangeYmd | null, emptyLabel = 'ทั้งหมด'): string {
   if (!value?.from && !value?.to) return emptyLabel;
-  if (value.from && value.to && value.from === value.to) return formatYmdDmyBe(value.from);
-  if (value.from && value.to) {
-    return `${formatYmdDmyBe(value.from)} – ${formatYmdDmyBe(value.to)}`;
-  }
-  if (value.from) return `ตั้งแต่ ${formatYmdDmyBe(value.from)}`;
-  if (value.to) return `ถึง ${formatYmdDmyBe(value.to)}`;
+  if (value.from && value.to) return rangeText(value.from, value.to);
+  if (value.from) return `ตั้งแต่ ${thaiDate(value.from)}`;
+  if (value.to) return `ถึง ${thaiDate(value.to)}`;
   return 'เลือกช่วงวันที่';
 }
 
@@ -153,53 +154,42 @@ const DateRangeCalendarPicker: React.FC<DateRangeCalendarPickerProps> = ({
             </button>
           )}
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0 rounded-xl border-border/80 shadow-lg" align="start">
-          <div className="flex flex-wrap gap-1.5 p-2.5 border-b border-border/60">
-            {PRESETS.map((p) => {
+        {/* หน้าตาเดียวกับปฏิทินหน้าหลัก (เจ้าของ Choice 12 ต.ค. 2569 "แบบ ④"): เดือนเดียว · ปุ่มลัดใต้ปฏิทิน · แถบล่างบอกช่วง */}
+        <PopoverContent className="w-auto space-y-3 p-3" align="start">
+          <Calendar mode="range" selected={selected} defaultMonth={selected?.to ?? selected?.from} onSelect={handleSelect} initialFocus />
+          <CalendarQuickChips
+            items={PRESETS.map((p) => {
               const built = p.build();
-              const active = rangesEqual(value, built);
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    onChange(built);
-                    if (p.id === 'all') setOpen(false);
-                  }}
-                  className={cn(
-                    'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
-                    active
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-secondary/80 text-foreground hover:bg-secondary',
-                  )}
-                >
-                  {p.id === 'all' && emptyLabel ? emptyLabel : p.label}
-                </button>
-              );
+              return {
+                key: p.id,
+                label: p.id === 'all' && emptyLabel ? emptyLabel : p.label,
+                active: rangesEqual(value, built),
+                onClick: () => {
+                  onChange(built);
+                  if (p.id === 'all') setOpen(false);
+                },
+              };
             })}
-          </div>
-          <Calendar
-            mode="range"
-            numberOfMonths={isMobile ? 1 : 2}
-            selected={selected}
-            onSelect={handleSelect}
-            initialFocus
           />
-          {value ? (
-            <div className="border-t border-border/60 p-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  onChange(null);
-                  setOpen(false);
-                }}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80"
-              >
-                <X className="h-3.5 w-3.5" />
-                ล้างช่วงวันที่
-              </button>
-            </div>
-          ) : null}
+          <CalendarFooter
+            label={label}
+            action={
+              value ? (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => {
+                    onChange(null);
+                    setOpen(false);
+                  }}
+                >
+                  <X aria-hidden />
+                  ล้างช่วงวันที่
+                </Button>
+              ) : null
+            }
+          />
         </PopoverContent>
       </Popover>
     </div>

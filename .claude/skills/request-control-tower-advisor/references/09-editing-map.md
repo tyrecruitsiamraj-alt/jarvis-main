@@ -13039,3 +13039,10 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   เดิม shadcn Pagination "ก่อนหน้า · หน้า 1 / 12 · ถัดไป" → `PagePager` ‹ 1/12 › · หน้าหลักไม่มี select ของเบราว์เซอร์/คลาส jarvis-* อยู่แล้ว
   · ภาพ `docs/qa-shots/pager-home-{before,after}-2569-10-12.jpg`
   · ข้อ 43 ที่ยังไม่ทำ: ตัวเลือกวันที่ยังมีหลายแบบ (วันเดียว `DayCalendarPicker`/`DayPickerPill` · ช่วงวัน `DateRangeCalendarPicker` · ช่วงหน้าหลัก `PeriodPicker`) — ต่างหน้าที่กัน ยังไม่ยุบ
+- (12 ต.ค. 2569 สาย) **QA รอบ 2 ข้อ 43 · ตัวเลือกวันที่แบบเดียว** (เจ้าของ Choice "แบบ ④ หน้าหลัก" + วันที่เขียน "12 ต.ค. 2569")
+  · หน้าตา = ปฏิทินหน้าหลัก (`PeriodPicker`): หัว "ตุลาคม 2569" + ‹ › (ไม่มี dropdown เดือน/ปีแล้ว) · สัปดาห์เริ่มจันทร์ = ค่าตั้งต้นของ `ui/calendar` · ปุ่มลัดใต้ปฏิทิน · แถบล่างบอกวันที่เลือก
+  · ชิ้นกลาง `src/components/shared/CalendarParts.tsx` (`CalendarQuickChips` · `CalendarFooter`) · กล่อง `PopoverContent className="w-auto space-y-3 p-3"`
+  · ใช้แล้ว: `DayPickerPill` (ตารางรายวัน) · `DayCalendarPicker` (ดูวันอื่น/ช่องวันในฟอร์ม/DateTimeField24) · `DateRangeCalendarPicker` (เดือนเดียว · ปุ่มลัดย้ายลงล่าง) · `DateSelectDmyBe`
+  · รูปวันที่: วันเดียว `thaiDayDate` ("จ. 12 ต.ค. 2569" · ใหม่ใน `periodPick.ts`) · ช่วง `rangeText` ("6–12 ต.ค. 2569") · หัวป๊อป/รูป PNG สรุปแผน (`followDayReportRangeText`) ใช้ `rangeText` แล้ว
+  · ⚠️ วันที่ในตาราง/ข้อความอื่น ๆ ยังเป็น `formatYmdDmyBe` (12/10/2569) หลายจุด — เจ้าของเคาะเฉพาะ "บนปุ่ม/ช่อง"
+  · ภาพ `docs/qa-shots/datepicker-{1..5}-*-2569-10-12.jpg`

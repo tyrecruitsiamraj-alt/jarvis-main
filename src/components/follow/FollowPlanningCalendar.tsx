@@ -52,6 +52,8 @@ import { followCallerOf } from '@/lib/followListFilter';
 import FollowDayDoneCard from '@/components/follow/FollowDayDoneCard';
 import { followPersonName, type FollowEntry } from '@/lib/followApi';
 import { PagePager } from '@/components/shared/PagePager';
+import { CalendarFooter, CalendarQuickChips } from '@/components/shared/CalendarParts';
+import { thaiDayDate } from '@/lib/periodPick';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import { buildFollowCallMatrix, FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE, followMatrixColOfCategory } from '@/lib/followCallMatrix';
 import { DASH } from '@/lib/designTokens';
@@ -111,18 +113,9 @@ function shiftYmd(ymd: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** ป้ายวันบนปุ่มเลือกวัน ("พฤ. 1 ต.ค. 2569") — 🔴 `Intl` ระดับโมดูล · คีย์วันเป็นสตริง จึงคิดเป็น UTC ล้วน */
-const DAY_PILL = new Intl.DateTimeFormat('th-TH', {
-  timeZone: 'UTC',
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-});
+/** ป้ายวันบนปุ่มเลือกวัน "จ. 12 ต.ค. 2569" — รูปวันที่เดียวทั้งระบบ (`thaiDayDate` · เจ้าของ Choice 12 ต.ค. 2569) */
 function dayPillLabel(ymd: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
-  if (!m) return ymd;
-  return DAY_PILL.format(new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))));
+  return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? thaiDayDate(ymd) : ymd;
 }
 
 /**
@@ -138,7 +131,6 @@ const DayPickerPill: React.FC<{ value: string; today: string; onPick: (ymd: stri
   const [open, setOpen] = useState(false);
   const p = parseYmd(value);
   const selected = p ? new Date(p.y, p.m - 1, p.d) : undefined;
-  const thisYear = new Date().getFullYear();
   const pick = (ymd: string) => {
     onPick(ymd);
     setOpen(false);
@@ -159,7 +151,8 @@ const DayPickerPill: React.FC<{ value: string; today: string; onPick: (ymd: stri
           {dayPillLabel(value)}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="end">
+      {/* หน้าตาเดียวกับปฏิทินหน้าหลัก (เจ้าของ Choice 12 ต.ค. 2569 "แบบ ④") */}
+      <PopoverContent className="w-auto space-y-3 p-3" align="end">
         <Calendar
           mode="single"
           selected={selected}
@@ -167,30 +160,14 @@ const DayPickerPill: React.FC<{ value: string; today: string; onPick: (ymd: stri
           onSelect={(d) => {
             if (d) pick(toYmdLocal(d));
           }}
-          captionLayout="dropdown-buttons"
-          fromYear={thisYear - 2}
-          toYear={thisYear + 2}
-          /* ⚠️ โหมด dropdown วาดป้ายเดือน/ปีซ้ำอีกชุด — ซ่อนแบบเดียวกับ `DayCalendarPicker` */
-          classNames={{
-            caption_label: 'sr-only',
-            vhidden: 'sr-only',
-            caption_dropdowns: 'flex items-center gap-1.5',
-            dropdown: 'rounded-lg border border-border bg-background px-2 py-1 text-xs font-medium text-foreground',
-          }}
           initialFocus
         />
-        <div className="border-t p-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="w-full"
-            disabled={value === today}
-            onClick={() => pick(today)}
-          >
-            วันนี้
-          </Button>
-        </div>
+        <CalendarQuickChips
+          items={[
+            { key: 'today', label: 'วันนี้', active: value === today, disabled: value === today, onClick: () => pick(today) },
+          ]}
+        />
+        <CalendarFooter label={thaiDayDate(value)} />
       </PopoverContent>
     </Popover>
   );

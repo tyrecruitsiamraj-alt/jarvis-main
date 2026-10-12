@@ -8,7 +8,7 @@ import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { thaiDate } from '@/lib/periodPick';
 import type { FollowEntry } from '@/lib/followApi';
 import {
   buildFollowDayReport,
@@ -115,7 +115,7 @@ export default function FollowDayReportDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto !bg-background">
         <DialogHeader className="text-left">
-          <DialogTitle>แผนติดตามวันที่ {report ? followDayReportRangeText(report) : selYmd ? formatYmdDmyBe(selYmd) : '—'}</DialogTitle>
+          <DialogTitle>แผนติดตามวันที่ {report ? followDayReportRangeText(report) : selYmd ? thaiDate(selYmd) : '—'}</DialogTitle>
           <DialogDescription className="tabular-nums text-foreground">
             {report ? followDayReportSummaryText(report) : ''}
           </DialogDescription>

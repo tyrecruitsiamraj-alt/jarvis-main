@@ -9,8 +9,8 @@
  * · สีทุกสีมาจาก `TONE.*.hex` หรือชื่อสีมาตรฐาน — ห้าม hex ดิบ
  */
 import { TONE } from '@/lib/designTokens';
-import { formatYmdDmyBe } from '@/lib/dateTh';
 import { FOLLOW_DAY_REPORT_HEADERS, type FollowDayReport } from '@/lib/followDayReport';
+import { rangeText } from '@/lib/periodPick';
 
 type ReportRow = FollowDayReport['rows'][number];
 
@@ -231,5 +231,6 @@ export async function downloadFollowDayReportPng(
 /** "5/10/2569" หรือ "5/10/2569 – 11/10/2569" — หัวรูป/หัวป๊อปเมื่อเลือกช่วงบนปฏิทิน (5 ต.ค. 2569) */
 export function followDayReportRangeText(report: Pick<FollowDayReport, 'ymd' | 'toYmd'>): string {
   const to = report.toYmd || report.ymd;
-  return to === report.ymd ? formatYmdDmyBe(report.ymd) : `${formatYmdDmyBe(report.ymd)} – ${formatYmdDmyBe(to)}`;
+  // "12 ต.ค. 2569" · "6–12 ต.ค. 2569" — รูปเดียวกับปุ่มปฏิทิน (เจ้าของ Choice 12 ต.ค. 2569 · เดิม 12/10/2569)
+  return rangeText(report.ymd, to);
 }
