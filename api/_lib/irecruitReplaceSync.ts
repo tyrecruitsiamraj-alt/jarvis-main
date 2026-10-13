@@ -31,6 +31,7 @@ import {
   replanFollowSetWithLumos,
   type FollowEntryInput,
 } from './lumosDispatch.js';
+import { KEEP_PUSH_FAILED_SQL } from '../../src/lib/followDispatchState.js';
 import { getLumosPushConfig } from './lumosPushClient.js';
 import { staffNameOfPhone } from './followStaffName.js';
 import { bangkokBusinessDateYmd } from './businessDate.js';
@@ -334,7 +335,9 @@ async function enqueueByPersonDay(items: Array<{ id: string; meta: DesiredMeta }
     try {
       for (const [id, st] of await enqueueFollowReminderPlan(inputs)) out.set(id, st);
     } catch (e) {
-      logError('irecruit.replaceSync: ส่งแผนให้ Lumos ไม่สำเร็จ', e, { rows: inputs.length });
+      // 🔴 13 ต.ค. 2569 (A13): เดิมตกเป็น "ปิดส่งอัตโนมัติ" ซึ่งโกหก · `guarded` = ตัวกู้ทุกนาทีส่งให้
+      for (const it of inputs) out.set(it.id, 'guarded');
+      logError('irecruit.replaceSync: ส่งแผนให้ Lumos ไม่สำเร็จ — ตัวกู้จะส่งให้', e, { rows: inputs.length });
     }
   }
   return out;
@@ -342,7 +345,7 @@ async function enqueueByPersonDay(items: Array<{ id: string; meta: DesiredMeta }
 
 async function setDispatchState(id: string, state: FollowDispatchState): Promise<void> {
   try {
-    await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1`, [id, state]);
+    await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1 and ${KEEP_PUSH_FAILED_SQL}`, [id, state]);
   } catch (e) {
     if (!isUndefinedColumn(e)) throw e;
   }

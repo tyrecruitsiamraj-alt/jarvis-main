@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { fetchReplaceSyncStatus, runReplaceSyncNow, setReplaceAiPaused } from '@/lib/irecruitReplaceSyncApi';
+import { followHealthWarnings } from '@/lib/followSystemHealth';
 import { Switch } from '@/components/ui/switch';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import {
@@ -625,6 +626,25 @@ const FollowPage: React.FC = () => {
   const [replaceAiOn, setReplaceAiOn] = useState<boolean | null>(null);
   const [aiSwitchBusy, setAiSwitchBusy] = useState(false);
   /** อ่านสถานะ AI ไม่ได้ — บอกบนจอพร้อมลองใหม่ (QA รอบ 2 ข้อ 19 · เดิมสวิตช์/ปุ่มเวลาหายเงียบ) */
+  /**
+   * เตือนเมื่อระบบเบื้องหลังหยุด (13 ต.ค. 2569 "จะกันให้หมด" รอบ 3) — อ่านสถานะทุก 2 นาที ทุกแท็บ
+   * อ่านไม่ได้ = ไม่เตือน (หน้านี้มีแถบโหลดไม่ได้ของตัวเองอยู่แล้ว)
+   */
+  const [healthStatus, setHealthStatus] = useState<Awaited<ReturnType<typeof fetchReplaceSyncStatus>> | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const tick = () =>
+      fetchReplaceSyncStatus()
+        .then((st) => alive && setHealthStatus(st))
+        .catch(() => alive && setHealthStatus(null));
+    void tick();
+    const t = window.setInterval(() => void tick(), 120_000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, []);
+  const healthWarnings = useMemo(() => followHealthWarnings(healthStatus, followView), [healthStatus, followView]);
   const [replaceStatusFailed, setReplaceStatusFailed] = useState(false);
   const [replaceStatusSeq, setReplaceStatusSeq] = useState(0);
   /** ถามยืนยันก่อนเปิด/พัก AI ทั้งแท็บ (QA รอบ 2 ข้อ 25 · เจ้าของ Choice "คงที่เดิม เพิ่มถามยืนยัน") — null = ไม่ถาม */
@@ -1049,6 +1069,15 @@ const FollowPage: React.FC = () => {
         return;
       }
       const recipientName = composeRecipientName(prefix, firstName, lastName);
+      // 🔴 เบอร์ผู้รับตรงกับเบอร์เจ้าหน้าที่ — ด่านเดียวกับแท็บคนเริ่มงาน (13 ต.ค. 2569 B6 · เดิมแท็บนี้ข้ามไปเลย AI จะโทรหาเจ้าหน้าที่)
+      if (staffPhoneMatchesApplicant(phone, staffPhones)) {
+        const key = staffPhoneAckKey(phone, staffPhones);
+        if (staffPhoneAckRef.current !== key) {
+          staffPhoneAckRef.current = key;
+          setFormError(STAFF_PHONE_SAME_WARNING);
+          return;
+        }
+      }
       // สายที่เลยเวลาแล้ว = คนโทร (AI ไม่โทรย้อนหลัง) · พัก AI ไม่ทับที่เลือก (เจ้าของ 8 ต.ค. 2569 เลือก AI รายสายได้)
       const modes: ReplaceSlotModes = { ...replaceModes };
       for (const p of plans) if (p.past) modes[p.slot] = 'manual';
@@ -1080,7 +1109,11 @@ const FollowPage: React.FC = () => {
             if (created.length - ai > 0) out.push(`คนโทร ${created.length - ai} สาย`);
             return out;
           })(),
-          warn: null,
+          // 🔴 13 ต.ค. 2569 (A1): เดิม null เสมอ ⇒ ส่งไม่ได้ (ปิดส่งอัตโนมัติ ฯลฯ) จอบอกว่าเสร็จสิ้นเฉย ๆ
+          warn:
+            summarizeDispatchResults(
+              created.filter((c) => c.call_mode !== 'manual').map((c) => c.dispatch_state ?? null),
+            )?.text ?? null,
           firstDay: start.ymd,
         });
         await reload();
@@ -2022,6 +2055,15 @@ const FollowPage: React.FC = () => {
         {/* แถบดึงจาก iRecruit — แท็บส่งคนแทนอย่างเดียว (เจ้าของสั่ง 2 ต.ค. 2569 · ข้อยกเว้นเดียวของ "สองแท็บเหมือนกัน")
             ดึงเองทุกเช้า · ปุ่มดึงตอนนี้/แก้เวลาโทร หัวหน้างานขึ้นไป · ดึงได้สายใหม่ = โหลดรายการใหม่ */}
         {/* 🔴 แถบโหลดไม่ได้อยู่บนสุด + ปุ่มลองใหม่ (QA 5 ต.ค. 2569: เดิมอยู่ท้ายหน้าลึก 3 จอ เป็นอังกฤษดิบ) */}
+        {healthWarnings.length > 0 ? (
+          <div
+            role="alert"
+            data-testid="follow-health-warning"
+            className={cn('rounded-xl border px-3.5 py-2.5 text-sm font-medium', TONE.danger.soft, TONE.danger.value)}
+          >
+            {healthWarnings.join(' · ')}
+          </div>
+        ) : null}
         {error ? (
           <div
             role="alert"

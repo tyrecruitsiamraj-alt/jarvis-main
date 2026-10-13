@@ -12,6 +12,8 @@ export type ReplaceSyncStatus = {
   rule: ReplaceCallRule;
   ruleText: string;
   lastRun: ReplaceSyncSummary | null;
+  /** ตัวทำงานทุกนาทีของหน้าติดตามเดินล่าสุด (ISO) · `null` = ยังไม่เดินตั้งแต่เซิร์ฟเวอร์เริ่ม */
+  followWorkerAt?: string | null;
   updatedAt: string | null;
   updatedByName: string | null;
 };

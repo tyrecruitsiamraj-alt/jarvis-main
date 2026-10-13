@@ -9,6 +9,7 @@
  *    ปิดสวิตช์ `IRECRUIT_ENABLED` = รอบนั้นจดเหตุผลแล้วรอ (ไม่พัง) · รอบที่ล้มลองใหม่อีกทีใน 1 ชั่วโมง ไม่ใช่ทุก 5 นาที
  * ⚠️ สายที่สร้างจะ **ส่งให้ AI** เฉพาะเมื่อสวิตช์ส่งอัตโนมัติของงานติดตาม (`follow_entry`) เปิดอยู่ — คุมที่หน้าตั้งค่าเหมือนเดิม
  */
+import { notifyRoles } from './appNotifications.js';
 import { logError, logInfo, logWarn } from './logger.js';
 import {
   getReplaceSyncSettings,
@@ -38,6 +39,16 @@ export function getLastReplaceSyncInMemory(): ReplaceSyncSummary | null {
   return lastRunInMemory;
 }
 
+/** 🔴 `Intl` ระดับโมดูลเท่านั้น — คีย์กันแจ้งซ้ำรายชั่วโมง */
+const SYNC_FAIL_HOUR = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Bangkok',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  hourCycle: 'h23',
+});
+
 /** เดินรอบถ้าถึงเวลา — คืน `null` = ยังไม่ถึง/ดึงวันนี้แล้ว */
 export async function runReplaceSyncIfDue(
   cfg: ReplaceSyncConfig = getReplaceSyncWorkerConfig(),
@@ -55,7 +66,21 @@ export async function runReplaceSyncIfDue(
   const summary = await runIrecruitReplaceSync({ now, horizonDays: cfg.horizonDays, actorName: REPLACE_SYNC_ACTOR_NAME });
   lastRunInMemory = summary;
   lastFailedAt = summary.error ? now.getTime() : null;
-  if (summary.error) logWarn('irecruit.replaceSync.worker.skipped', { reason: summary.error });
+  if (summary.error) {
+    logWarn('irecruit.replaceSync.worker.skipped', { reason: summary.error });
+    // 🔴 13 ต.ค. 2569 (รอบ 3): ดึงไม่ได้ = งานส่งคนแทนใหม่/ที่แก้ไม่เข้า — แจ้งทีมชั่วโมงละครั้ง (เดิมเห็นแค่ใน log)
+    try {
+      await notifyRoles(['admin', 'supervisor'], {
+        type: 'irecruit_replace_sync_failed',
+        title: 'ดึงงานส่งคนแทนจาก iRecruit ไม่ได้',
+        body: String(summary.error).slice(0, 200),
+        link: '/follow?view=replace',
+        dedupeKey: `irecruit_replace_sync_failed:${SYNC_FAIL_HOUR.format(now).replace(/\D/g, '')}`,
+      });
+    } catch (e) {
+      logWarn('irecruit.replaceSync.worker.notifyFailed', { reason: e instanceof Error ? e.message : String(e) });
+    }
+  }
   return summary;
 }
 

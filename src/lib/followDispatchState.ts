@@ -205,3 +205,9 @@ export function summarizeDispatchResults(
   const scope = bad.length === states.length ? 'ทั้งหมด' : `${bad.length} จาก ${states.length} รายการ`;
   return { text: `${scope} ไม่ได้ส่งให้ AI — ${reasons.join(' · ')}`, retryable };
 }
+
+/**
+ * 🔴 เขียน "queued" ห้ามทับ "push_failed" (13 ต.ค. 2569 A9) — push ล้มเร็วติดธงไปแล้ว ผู้เรียกที่จดทีหลังต้องไม่ลบทิ้ง
+ * ใช้ต่อท้าย `where` ของทุกที่ที่เขียน dispatch_state = $2 หลังส่ง (follow.ts · irecruitReplaceSync.ts · replan)
+ */
+export const KEEP_PUSH_FAILED_SQL = `not ($2 = 'queued' and dispatch_state is not distinct from 'push_failed')`;

@@ -31,7 +31,7 @@ import { staffNameOfPhone } from '../_lib/followStaffName.js';
 import { restoreRoundsStoppedByClose, type ReopenRestore } from '../_lib/followReopenRestore.js';
 import { cancelFollowScope, parseCancelScope } from '../_lib/followCancelScope.js';
 import { getReplaceSyncSettings } from '../_lib/irecruitReplaceSync.js';
-import { logWarn } from '../_lib/logger.js';
+import { logError, logWarn } from '../_lib/logger.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import {
   enqueueFollowReminder,
@@ -42,6 +42,7 @@ import {
 } from '../_lib/lumosDispatch.js';
 import { isAutoDispatchEnabled } from '../_lib/lumosDispatchMode.js';
 import { toE164Thai } from '../_lib/lumosDispatch.js';
+import { KEEP_PUSH_FAILED_SQL } from '../../src/lib/followDispatchState.js';
 import {
   FOLLOW_OUTCOME_ALL,
   isFollowOutcome,
@@ -633,7 +634,10 @@ async function createFollowRounds(
   const aiIndexes = createdRows.map((_, i) => i).filter((i) => modeOf(i) === 'ai');
 
   let states = new Map<string, FollowDispatchState>();
-  if (aiIndexes.length > 0 && (await isAutoDispatchEnabled('follow_entry'))) {
+  /** ส่งล้มกลางทาง (ฐาน/เน็ต) — รายการถูกบันทึกไปแล้ว ⇒ จด `guarded` ให้ตัวกู้ทุกนาทีส่งให้ (13 ต.ค. 2569 A12) */
+  let enqueueFailed = false;
+  if (aiIndexes.length > 0) try {
+   if (await isAutoDispatchEnabled('follow_entry')) {
     const staffName = await staffNameOfPhone(base.staffPhone);
     states = await enqueueFollowReminderPlan(
       aiIndexes.map((i) => ({
@@ -650,14 +654,18 @@ async function createFollowRounds(
         callRound: rounds[i]?.callRound ?? null,
       })),
     );
+   }
+  } catch (e) {
+    enqueueFailed = true;
+    logError('follow.create: ส่งให้ AI ล้มหลังบันทึกแล้ว — ตัวกู้จะส่งให้', e, { rows: aiIndexes.length });
   }
 
   const out: FollowRow[] = [];
   for (const [i, row] of createdRows.entries()) {
     const state: FollowDispatchState =
-      modeOf(i) === 'manual' ? 'manual' : (states.get(row.id) ?? 'off');
+      modeOf(i) === 'manual' ? 'manual' : (states.get(row.id) ?? (enqueueFailed ? 'guarded' : 'off'));
     try {
-      await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1`, [row.id, state]);
+      await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1 and ${KEEP_PUSH_FAILED_SQL}`, [row.id, state]);
       out.push({ ...row, dispatch_state: state });
     } catch (e) {
       // ฐานยังไม่รัน 109 → ข้ามการจด (จอถอยไปอ่านสถานะจากคิวเหมือนเดิม)
@@ -893,7 +901,9 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
    */
   // 🔴 โทรเอง = ไม่ส่งเข้าคิว (121) — ดูเหตุผลที่ `createFollowRounds`
   let dispatchState: FollowDispatchState = parsed.value.callMode === 'manual' ? 'manual' : 'off';
-  if (parsed.value.callMode === 'ai' && (await isAutoDispatchEnabled('follow_entry'))) {
+  // ส่งล้มกลางทาง = `guarded` ให้ตัวกู้ทุกนาทีส่งให้ (13 ต.ค. 2569 A12 — เดิมตอบ 500 ทั้งที่บันทึกแล้ว · สถานะค้างว่าง)
+  if (parsed.value.callMode === 'ai') try {
+   if (await isAutoDispatchEnabled('follow_entry')) {
     dispatchState = await enqueueFollowReminder({
       id: created.id,
       recipient_name: name,
@@ -907,9 +917,13 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
       callTimes,
       callRound,
     });
+   }
+  } catch (e) {
+    dispatchState = 'guarded';
+    logError('follow.create: ส่งให้ AI ล้มหลังบันทึกแล้ว — ตัวกู้จะส่งให้', e, { id: created.id });
   }
   try {
-    await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1`, [
+    await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1 and ${KEEP_PUSH_FAILED_SQL}`, [
       created.id,
       dispatchState,
     ]);

@@ -31,6 +31,7 @@ import {
 import type { LumosReminderPayload } from './lumosDispatch.js';
 import { staffNameOfPhone } from './followStaffName.js';
 import { repairDeclinedFollowDays } from './followDeclineDayRepair.js';
+import { isAutoDispatchEnabled } from './lumosDispatchMode.js';
 import { alertFollowAtRiskDigest, alertOverdueAiFollow, checkFollowPlanImports } from './followLumosWatch.js';
 import { resendFollowCancels } from './followCancelResend.js';
 import { mergeSplitFollowPlans } from './followPlanMerge.js';
@@ -256,6 +257,12 @@ export async function runFollowPushRetryOnce(
  * ⚠️ เอาเฉพาะรอบที่ **ยังไม่ถึงเวลานัด** (เงื่อนไขอยู่ในคิวรี) — ห้ามส่งย้อนหลัง
  */
 async function recoverUnsuppressed(): Promise<number> {
+  // ปิดส่งอัตโนมัติอยู่ = ห้ามกู้ (สถานะ guarded จากส่งล้มกลางทางเกิดตอนเปิดอยู่ · 13 ต.ค. 2569)
+  try {
+    if (!(await isAutoDispatchEnabled('follow_entry'))) return 0;
+  } catch {
+    return 0;
+  }
   let phones: string[];
   try {
     phones = await listPhonesWithStuckSuppressedFollows();

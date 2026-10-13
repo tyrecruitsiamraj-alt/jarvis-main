@@ -13125,5 +13125,14 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - แจ้งเตือนชั้น 3 `alertFollowAtRiskDigest` (`api/_lib/followLumosWatch.ts`) ใน worker ทุกนาที — สรุปชั่วโมงละครั้งต่อแท็บ (dedupe รายชั่วโมง)
   คนยังไม่โทรในชั่วโมงที่ผ่านมา + AI ส่งไม่ได้ใน 1 ชม. ข้างหน้า → admin/supervisor · สาย AI เลยเวลายังแจ้งทีละสายที่ชั้น 2
 - วัดตอนขึ้น: คนเริ่มงาน 3 · ส่งคนแทน 1,873 (คนยังไม่โทร 1,864 ตั้งแต่ 31 ส.ค. · AI เลยเวลาไม่มีผล 9 = สายที่ส่งหลังเวลานัดแล้ว Lumos ทิ้ง)
-- รอบ 2 (ต้นเหตุฝั่ง AI) · รอบ 3 (ตัวทำงานหยุด/iRecruit ดึงไม่ได้) ยังไม่ทำ — รายการเต็มอยู่ในรายงานไล่โค้ด 13 ต.ค. (A1–E5)
+- รอบ 2 (ต้นเหตุฝั่ง AI · เทสต์ `tests/api/followNoCallGuards2569-10-13.test.ts`):
+  A9 `KEEP_PUSH_FAILED_SQL` (`src/lib/followDispatchState.ts`) ทุกที่ที่เขียน dispatch_state หลังส่ง + ธง push_failed ติดได้แม้แถวยัง null ·
+  A5/A7 ตัวกู้ (`requeueSuppressedFollowEntries`) ครอบ held + guarded (เดิม suppressed อย่างเดียว) · เดินเฉพาะตอนเปิดส่งอัตโนมัติ ·
+  A12/A13 ส่งล้มกลางทางหลังบันทึก = guarded ให้ตัวกู้ส่ง · B6 แท็บส่งคนแทนเช็กเบอร์ซ้ำเจ้าหน้าที่ · A1 จอเสร็จสิ้นแท็บส่งคนแทนเตือนส่งไม่ได้
+  ยังไม่ทำ: A11 คีย์ส่งซ้ำหลังส่งแผนใหม่ (ต้องมีที่เก็บคีย์ + เสี่ยงโทรซ้ำ) · A2 ไม่ได้ตั้งค่า push แล้วจอบอกส่งแล้ว (เครื่องจริงตั้งไว้แล้ว)
+- รอบ 3: `followHealthWarnings` (`src/lib/followSystemHealth.ts`) แถบแดงบนหน้าติดตาม — ตัวทำงานทุกนาทีไม่เดินเกิน 5 นาที
+  (`followWorkerAt` จาก `getLastFollowPushRetryRun` ใน GET /api/irecruit-replace-sync) · แท็บส่งคนแทน: iRecruit ดึงไม่ได้/ไม่ได้ดึงเกิน 20 นาที ·
+  แจ้งเตือน `irecruit_replace_sync_failed` ชั่วโมงละครั้งเมื่อรอบดึงล้ม (`irecruitReplaceSyncWorker.ts`)
+- 🔴 แก้ข้อมูลที่เคยรายงานผิด: 9 สาย AI (9 · 11 ต.ค.) ส่งถึง Lumos ตรงเวลาและ Lumos นำเข้าแล้ว (`lumos_import_status = imported`)
+  แต่ไม่โทร · ระบบแจ้ง "AI ยังไม่โทร" ไปแล้ว 15 นาทีหลังนัด · ต้นเหตุฝั่ง Lumos
 

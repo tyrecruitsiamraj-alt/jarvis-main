@@ -33,7 +33,7 @@ vi.mock('../../api/_lib/lumosPushClient.js', () => ({
   getEventStatus: vi.fn(),
 }));
 
-const { requeueSuppressedFollowEntries } = await import('../../api/_lib/lumosDispatch.js');
+const { listPhonesWithStuckSuppressedFollows, requeueSuppressedFollowEntries } = await import('../../api/_lib/lumosDispatch.js');
 
 const staffName = async () => 'ขวัญ';
 /**
@@ -91,7 +91,7 @@ beforeEach(() => {
   pushReminders.mockReset().mockResolvedValue({ results: [{ event_id: 'evt' }] });
   dbQuery.mockReset();
   dbQuery.mockImplementation((sql: string) => {
-    if (/dispatch_state = 'suppressed'/.test(sql) && /select f\.id/i.test(sql)) {
+    if (/dispatch_state = any\(\$1::text\[\]\)/.test(sql) && /select f\.id/i.test(sql)) {
       return Promise.resolve({ rows: stuck });
     }
     return Promise.resolve({ rows: [] });
@@ -117,5 +117,26 @@ describe('requeueSuppressedFollowEntries', () => {
     const out = await requeueSuppressedFollowEntries('+66811111111', staffName);
     expect(out.requeued).toBe(0);
     expect(pushReminders).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 🔴 13 ต.ค. 2569 (ไล่ "อะไรที่จะไม่โทร" A5 · A7): กู้ครอบ held (คนรับไปโทรเองแล้วปล่อย) + guarded (ตรวจไม่ได้ตอนนั้น)
+ * เดิมกู้แค่ suppressed ⇒ สองสถานะนี้ค้างไม่มีใครส่งให้
+ */
+describe('ตัวกู้ครอบ held + guarded', () => {
+  it('เบอร์ที่ไม่ได้ถูกถือ/ไม่ได้ถูกพักแล้ว = ได้คิวกู้ · คิวรีขอทั้ง 3 สถานะ', async () => {
+    const rows = [
+      { ...stuck[0], id: 'h1', recipient_phone: '0811111111', dispatch_state: 'held' },
+      { ...stuck[0], id: 'g1', recipient_phone: '0822222222', dispatch_state: 'guarded' },
+    ];
+    dbQuery.mockImplementation((sql: string, params?: unknown[]) => {
+      if (/dispatch_state = any\(\$1::text\[\]\)/.test(sql) && /select f\.id/i.test(sql)) {
+        expect(params?.[0]).toEqual(['suppressed', 'held', 'guarded']);
+        return Promise.resolve({ rows });
+      }
+      return Promise.resolve({ rows: [] }); // ไม่มีใครถือเบอร์ · ไม่มีเบอร์ถูกพัก
+    });
+    expect((await listPhonesWithStuckSuppressedFollows()).sort()).toEqual(['+66811111111', '+66822222222']);
   });
 });

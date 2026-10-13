@@ -16,6 +16,7 @@
  *
  * ทุก enqueue กันซ้ำด้วย unique (channel, job_ref, person_ref) — คนเดิมในใบเดิมส่งครั้งเดียว
  */
+import { KEEP_PUSH_FAILED_SQL } from '../../src/lib/followDispatchState.js';
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { isOverAge, OVER_AGE_REASON } from '../../src/lib/applicantAge.js';
 import { loadApplyScriptFacts, type ApplyJobFacts } from './applyScriptFacts.js';
@@ -1926,7 +1927,7 @@ async function pushFollowReminderToLumos(
      *
      * ⚠️ จดแบบ best-effort — จดไม่ลงก็ห้ามโยนต่อ (ตัวเรียกเป็น `void` ไม่มีใครรับ)
      */
-    await markFollowDispatchState(followId, 'push_failed', 'queued', pushErrorText(e));
+    await markFollowDispatchState(followId, 'push_failed', 'queued', pushErrorText(e), true);
   }
 }
 
@@ -2029,6 +2030,11 @@ async function markFollowDispatchState(
   to: FollowDispatchState,
   from: FollowDispatchState,
   error: string | null = null,
+  /**
+   * 🔴 13 ต.ค. 2569 (ไล่ "อะไรที่จะไม่โทร" A9): push ล้มเร็วกว่าที่ผู้เรียกจดสถานะ (แถวยังเป็น null)
+   * ⇒ เดิมธง push_failed ไม่ติด แล้วผู้เรียกเขียน "queued" ทับ ⇒ ตัวส่งซ้ำไม่เห็น · จอบอกส่งแล้ว
+   */
+  fromNullToo = false,
 ): Promise<void> {
   /**
    * 🔴 **ติดธงทั้งแผน ไม่ใช่แค่แถวหัวขบวน** (แก้ 11 ก.ย. 2569)
@@ -2042,8 +2048,8 @@ async function markFollowDispatchState(
     await dbQuery(
       `update ${followEntriesTable}
           set dispatch_state = $2, dispatch_error = $4
-        where id = any($1::uuid[]) and dispatch_state = $3`,
-      [ids, to, from, error],
+        where id = any($1::uuid[]) and (dispatch_state = $3 or ($5::boolean and dispatch_state is null))`,
+      [ids, to, from, error, fromNullToo],
     );
   } catch (e) {
     /**
@@ -2053,8 +2059,8 @@ async function markFollowDispatchState(
     try {
       await dbQuery(
         `update ${followEntriesTable} set dispatch_state = $2
-          where id = any($1::uuid[]) and dispatch_state = $3`,
-        [ids, to, from],
+          where id = any($1::uuid[]) and (dispatch_state = $3 or ($4::boolean and dispatch_state is null))`,
+        [ids, to, from, fromNullToo],
       );
     } catch (e2) {
       logError('lumos.push.follow: จด dispatch_state ไม่สำเร็จ', e2, { followId, to });
@@ -2386,7 +2392,7 @@ export async function resyncFollowPlanWithLumos(
     });
   } catch (e) {
     logError('lumos.push.follow.resync: ส่งแผนใหม่ไม่สำเร็จ', e, { newPlanRef });
-    await markFollowDispatchState(leader.id, 'push_failed', 'queued', pushErrorText(e));
+    await markFollowDispatchState(leader.id, 'push_failed', 'queued', pushErrorText(e), true);
   }
 
   return {
@@ -2615,7 +2621,7 @@ export async function replanFollowSetWithLumos(input: {
         states[e.id] = state;
         // จดก่อน push — ถ้า push ล้ม `markFollowDispatchState` จะเปลี่ยน queued → push_failed ได้ถูกแถว
         try {
-          await dbQuery(`update ${followEntriesTable} set dispatch_state = $2 where id = $1`, [e.id, state]);
+          await dbQuery(`update ${followEntriesTable} set dispatch_state = $2 where id = $1 and ${KEEP_PUSH_FAILED_SQL}`, [e.id, state]);
         } catch (err) {
           if (!isUndefinedColumnError(err)) throw err;
         }
@@ -2701,7 +2707,7 @@ export async function replanFollowSetWithLumos(input: {
       pushedPlans += 1;
     } catch (e) {
       logError('lumos.push.follow.replan: ส่งแผนใหม่ไม่สำเร็จ', e, { planRef });
-      await markFollowDispatchState(leader.id, 'push_failed', 'queued', pushErrorText(e));
+      await markFollowDispatchState(leader.id, 'push_failed', 'queued', pushErrorText(e), true);
     }
   }
   logInfo('lumos.push.follow.replan', {
@@ -2733,14 +2739,22 @@ export async function replanFollowSetWithLumos(input: {
  * 🔴 เอาเฉพาะรอบที่ `scheduled_at > now()` — รอบที่เลยเวลาแล้วห้ามส่ง
  * (Lumos รับแต่เวลาอนาคต ใส่เวลาที่ผ่านมาแล้วเขาอาจโทรทันที = โทรย้อนหลังใส่คนจริง)
  */
-/** รอบที่ถูกปัดทิ้งตอนเบอร์โดนพัก และยัง **ไม่มีแถวในคิว** เลย — ตัวตั้งต้นของการกู้ */
-async function listSuppressedFollowRows(): Promise<FollowPlanRow[]> {
+/**
+ * 🔴 13 ต.ค. 2569 (ไล่ "อะไรที่จะไม่โทร" A5 · A7): กู้ครอบ 3 สถานะที่ไม่มีแถวคิว — เดิมกู้แค่ `suppressed`
+ *   - `held` เบอร์ถูกคนรับไปโทรเอง → ปล่อยเบอร์แล้วไม่มีอะไรพากลับเข้าคิว
+ *   - `guarded` ตอนนั้นอ่านบัญชีห้ามโทรไม่ได้ → ไม่มีตัวไหนลองใหม่เลย
+ * ตัวส่งจริง (`enqueueFollowReminderPlan`) ตรวจห้ามโทร/รับไปโทรเองซ้ำทุกครั้ง ⇒ ยังติดอยู่ก็ได้สถานะเดิมกลับมา ไม่ส่ง
+ */
+const RECOVERABLE_DISPATCH_STATES = ['suppressed', 'held', 'guarded'] as const;
+
+/** รอบที่ถูกปัดทิ้ง (พักเบอร์ / รับไปโทรเอง / ตรวจไม่ได้) และยัง **ไม่มีแถวในคิว** เลย — ตัวตั้งต้นของการกู้ */
+async function listSuppressedFollowRows(): Promise<Array<FollowPlanRow & { dispatch_state: string }>> {
   try {
-    const { rows } = await dbQuery<FollowPlanRow>(
+    const { rows } = await dbQuery<FollowPlanRow & { dispatch_state: string }>(
       `select f.id, f.recipient_name, f.recipient_phone, f.topic, f.note,
-              f.staff_phone, f.unit_name, f.scheduled_at, f.call_times, f.call_round
+              f.staff_phone, f.unit_name, f.scheduled_at, f.call_times, f.call_round, f.dispatch_state
          from ${followEntriesTable} f
-        where f.dispatch_state = 'suppressed'
+        where f.dispatch_state = any($1::text[])
           and f.cancelled_at is null and f.completed_at is null
           and f.scheduled_at > now()
           -- ไม่มีแถวคิวอยู่แล้วเท่านั้น — มีอยู่แล้วแปลว่าส่งไปแล้ว ห้ามซ้อน
@@ -2750,6 +2764,7 @@ async function listSuppressedFollowRows(): Promise<FollowPlanRow[]> {
                and q.person_ref = 'follow-' || f.id::text
           )
         order by f.scheduled_at`,
+      [[...RECOVERABLE_DISPATCH_STATES]],
     );
     return rows;
   } catch (e) {
@@ -2767,10 +2782,15 @@ export async function listPhonesWithStuckSuppressedFollows(): Promise<string[]> 
   const rows = await listSuppressedFollowRows();
   if (rows.length === 0) return [];
   const blocked = await listSuppressedPhones();
+  const held = await listHeldPhones();
   const out = new Set<string>();
   for (const r of rows) {
     const phone = toE164Thai(r.recipient_phone);
-    if (phone && !blocked.has(phone)) out.add(phone);
+    if (!phone) continue;
+    // ยังติดอยู่ = ข้าม (ไม่ลองส่งทุกนาทีให้เปลือง) · ตรวจไม่ได้ = ลองใหม่ทุกรอบ
+    if (r.dispatch_state === 'suppressed' && blocked.has(phone)) continue;
+    if (r.dispatch_state === 'held' && held.has(phone)) continue;
+    out.add(phone);
   }
   return [...out];
 }
@@ -2815,8 +2835,8 @@ export async function requeueSuppressedFollowEntries(
     try {
       await dbQuery(
         `update ${followEntriesTable} set dispatch_state = $2
-          where id = $1 and dispatch_state = 'suppressed'`,
-        [e.id, state],
+          where id = $1 and dispatch_state = any($3::text[])`,
+        [e.id, state, [...RECOVERABLE_DISPATCH_STATES]],
       );
     } catch (e2) {
       logError('lumos.requeueSuppressed: จด dispatch_state ไม่สำเร็จ', e2, { followId: e.id });

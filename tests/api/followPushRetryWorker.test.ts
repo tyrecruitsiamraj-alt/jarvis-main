@@ -27,6 +27,9 @@ vi.mock('../../api/_lib/lumosDispatch.js', () => ({
   requeueSuppressedFollowEntries: (...a: unknown[]) => requeueSuppressed(...(a as [])),
 }));
 vi.mock('../../api/_lib/followStaffName.js', () => ({ staffNameOfPhone: async () => 'ขวัญ' }));
+// 13 ต.ค. 2569: ตัวกู้เดินเฉพาะตอนเปิดส่งอัตโนมัติ
+const autoDispatch = vi.fn(async () => true);
+vi.mock('../../api/_lib/lumosDispatchMode.js', () => ({ isAutoDispatchEnabled: () => autoDispatch() }));
 
 const { runFollowPushRetryOnce } = await import('../../api/_lib/followPushRetryWorker.js');
 const { FOLLOW_PUSH_RETRY_DEFAULTS } = await import('../../src/lib/followPushRetryPolicy.js');
@@ -145,6 +148,16 @@ describe('กู้สายที่หลุดบล็อก', () => {
 
     expect(requeueSuppressed).toHaveBeenCalledWith('+66654691768', expect.any(Function));
     expect(run.unsuppressed).toBe(2);
+  });
+
+  it('🔴 ปิดส่งอัตโนมัติอยู่ ⇒ ไม่กู้ (13 ต.ค. 2569 — guarded จากส่งล้มกลางทางห้ามหลุดไปส่งตอนปิด)', async () => {
+    stubRows([]);
+    autoDispatch.mockResolvedValueOnce(false);
+    listStuckPhones.mockResolvedValueOnce(['+66654691768']);
+    requeueSuppressed.mockClear();
+    const run = await runFollowPushRetryOnce(cfg, NOW);
+    expect(requeueSuppressed).not.toHaveBeenCalled();
+    expect(run.unsuppressed).toBe(0);
   });
 
   it('ไม่มีเบอร์ไหนหลุดบล็อก ⇒ ไม่เรียกตัวกู้เลย', async () => {

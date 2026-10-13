@@ -22,6 +22,7 @@ import {
 } from '../_lib/irecruitReplaceSync.js';
 import { getLastReplaceSyncInMemory, getReplaceSyncWorkerConfig } from '../_lib/irecruitReplaceSyncWorker.js';
 import { normalizeReplaceCallRule, replaceScheduleText } from '../../src/lib/irecruitReplaceSync.js';
+import { getLastFollowPushRetryRun } from '../_lib/followPushRetryWorker.js';
 
 async function statusPayload() {
   const cfg = getReplaceSyncWorkerConfig();
@@ -35,6 +36,8 @@ async function statusPayload() {
     rule: settings.rule,
     ruleText: replaceScheduleText(settings.rule),
     lastRun: settings.lastRun ?? getLastReplaceSyncInMemory(),
+    /** ตัวทำงานทุกนาทีของหน้าติดตาม (ส่งซ้ำ · ตรวจนำเข้า · แจ้งเตือน) เดินล่าสุดเมื่อไร — จอเตือนเมื่อหยุด (13 ต.ค. 2569 รอบ 3) */
+    followWorkerAt: getLastFollowPushRetryRun()?.at ?? null,
     updatedAt: settings.updatedAt,
     updatedByName: settings.updatedByName,
   };
