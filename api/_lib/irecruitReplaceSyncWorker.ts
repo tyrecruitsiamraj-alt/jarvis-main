@@ -12,6 +12,7 @@
 import { notifyRoles } from './appNotifications.js';
 import { logError, logInfo, logWarn } from './logger.js';
 import {
+  applyReplaceAiPhonesToPending,
   getReplaceSyncSettings,
   runIrecruitReplaceSync,
 } from './irecruitReplaceSync.js';
@@ -55,6 +56,14 @@ export async function runReplaceSyncIfDue(
   now: Date = new Date(),
 ): Promise<ReplaceSyncSummary | null> {
   const settings = await getReplaceSyncSettings();
+  // 🔴 13 ต.ค. 2569: ตั้งรายชื่อให้ AI โทรใหม่ = ใช้กับสายที่มีอยู่ครั้งเดียว (ธง aiPhonesApplyPending) — ทำนอกรอบดึง (ล็อกเดียวกัน)
+  if (settings.rule.aiPhonesApplyPending) {
+    try {
+      await applyReplaceAiPhonesToPending(now);
+    } catch (e) {
+      logError('irecruit.replaceSync.applyAiPhones: รอบนี้ล้ม', e);
+    }
+  }
   // 🔴 13 ต.ค. 2569 เจ้าของ Choice "ตัดสินครั้งเดียวตอนสร้าง": รอบนี้ไม่บังคับ "AI เริ่มโทรตั้งแต่" / "พัก AI" ซ้ำทุกรอบแล้ว
   //    (พัก AI ทำตอนกดสวิตช์ที่เดียว · สายใหม่ตอนพักอยู่สร้างเป็นคนโทรอยู่แล้ว)
   /**

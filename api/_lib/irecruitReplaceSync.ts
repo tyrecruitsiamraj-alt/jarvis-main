@@ -929,3 +929,53 @@ async function convertReplaceAiRowsToManual(
   out.converted = upd.rows.length;
   return out;
 }
+
+/**
+ * ═══ ใช้รายชื่อให้ AI โทรกับสายที่มีอยู่ — ครั้งเดียวตอนตั้งรายชื่อ (เจ้าของ 13 ต.ค. 2569 รายชื่อฝั่งรายวัน) ═══
+ * สายคนโทรของงานส่งคนแทนที่ยังไม่ถึงเวลา (เกิน 2 นาที) ของเบอร์ในรายชื่อ · ระบบตั้ง (ไม่มีคนแก้เอง) → AI + เบอร์ฉุกเฉิน
+ * แล้วส่งแผนด้วยตัวเดียวกับป๊อปแก้ (`replanFollowSetWithLumos` — ยกเลิกแผนเก่าที่ Lumos + ส่งใหม่ทั้งวัน + จดสถานะส่ง)
+ * 🔴 ไม่มีคีย์ push / ปิดส่งอัตโนมัติ = ไม่แตะอะไร (ห้ามสลับเป็น AI ทั้งที่ส่งไม่ได้) · ธงยังค้างไว้ให้รอบหน้า
+ */
+export async function applyReplaceAiPhonesToPending(
+  now: Date = new Date(),
+): Promise<{ converted: number; pushed: boolean; skipped?: string }> {
+  return withSessionLock(REPLACE_SYNC_LOCK_KEY, async () => {
+    const settings = await getReplaceSyncSettings();
+    if (!settings.rule.aiPhonesApplyPending) return { converted: 0, pushed: false, skipped: 'ไม่มีรายชื่อรอใช้' };
+    if (!getLumosPushConfig() || !(await isAutoDispatchEnabled('follow_entry'))) {
+      return { converted: 0, pushed: false, skipped: 'ส่ง AI ไม่ได้ตอนนี้ — รอรอบหน้า' };
+    }
+    const keys = settings.rule.aiPhones.map((x) => replacePhoneKey(x.phone)).filter((k): k is string => Boolean(k));
+    const emOf = new Map(settings.rule.aiPhones.map((x) => [replacePhoneKey(x.phone), x.emergency]));
+    const { rows } = await dbQuery<{ id: string; k: string }>(
+      `select id::text as id, right(regexp_replace(coalesce(recipient_phone, ''), '\\D', '', 'g'), 9) as k
+         from ${followTable}
+        where follow_team = $1 and coalesce(source_ref, '') like 'irecruit-replace:%'
+          and cancelled_at is null and completed_at is null and staff_call_outcome is null
+          and updated_by is null and call_mode = 'manual' and coalesce(time_tbd, false) = false
+          and scheduled_at > $2
+          and right(regexp_replace(coalesce(recipient_phone, ''), '\\D', '', 'g'), 9) = any($3::text[])`,
+      [FOLLOW_TEAM_REPLACEMENT, new Date(now.getTime() + LOCK_AHEAD_MS).toISOString(), keys],
+    );
+    for (const r of rows) {
+      await dbQuery(
+        `update ${followTable} set call_mode = 'ai', staff_phone = coalesce($2, staff_phone) where id = $1 and call_mode = 'manual'`,
+        [r.id, emOf.get(r.k) ?? null],
+      );
+    }
+    let pushed = true;
+    if (rows.length > 0) {
+      const res = await replanFollowSetWithLumos({
+        memberIds: rows.map((r) => r.id),
+        cancelledIds: [],
+        resolveStaffName: staffNameOfPhone,
+      });
+      pushed = res.plans > 0 && res.pushedPlans === res.plans;
+      if (!pushed) logWarn('irecruit.replaceSync.applyAiPhones: ส่งแผนไม่ครบ — ตัวส่งซ้ำจะลองให้', { reason: res.reason });
+    }
+    await saveReplaceSyncSettings({ rule: { ...settings.rule, aiPhonesApplyPending: false } }, REPLACE_SYNC_ACTOR_NAME);
+    logInfo('irecruit.replaceSync.applyAiPhones.done', { converted: rows.length, pushed });
+    return { converted: rows.length, pushed };
+  });
+}
+

@@ -56,6 +56,12 @@ export type ReplaceCallRule = {
    * เก็บในฐาน (`app_irecruit_replace_sync.payload.rule`) ห้ามเขียนเบอร์ลง repo · นอกรายชื่อยังเลือก AI ทีละสายได้ (Choice เดียวกัน)
    */
   aiPhones: ReplaceAiPhone[];
+  /**
+   * 🔴 ใช้รายชื่อกับสายที่มีอยู่แล้ว **ครั้งเดียว** (เจ้าของ 13 ต.ค. 2569 "ของวันพรุ่งนี้อย่าให้เกิดเคสแบบวันนี้อีก" + รายชื่อใหม่)
+   * ตั้งเป็น true ตอนแก้รายชื่อ → ตัวดึงบนเซิร์ฟเวอร์สลับสายคนโทรที่ยังไม่ถึงเวลาของคนในรายชื่อเป็น AI + เบอร์ฉุกเฉิน + ส่ง Lumos แล้วปิดธง
+   * (กติกา "ตัดสินครั้งเดียว" ยังอยู่ — ตัดสินตอนตั้งรายชื่อ ไม่ใช่ทุกรอบ)
+   */
+  aiPhonesApplyPending: boolean;
 };
 
 /** คนหนึ่งในรายชื่อให้ AI โทร — เบอร์ 10 หลักขึ้นต้น 0 · ฉุกเฉิน = เบอร์ที่ AI โทรหาเมื่อติดต่อคนไปแทนไม่ได้ */
@@ -67,6 +73,7 @@ export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = {
   confirmTime: '16:00',
   leadMinutes: [60, 15],
   aiPhones: [],
+  aiPhonesApplyPending: false,
 };
 
 /** เบอร์มือถือไทย → 9 หลักท้าย (ตัด 0 / 66 ข้างหน้า) · อ่านไม่ออก = null — ใช้เทียบเบอร์ทุกรูปแบบ (081… · +6681…) */
@@ -118,7 +125,14 @@ export function normalizeReplaceCallRule(raw: unknown): ReplaceCallRule {
   const okLead = (n: number) => Number.isInteger(n) && n >= 5 && n <= 600;
   const leadMinutes: [number, number] =
     lm.length === 2 && okLead(lm[0]) && okLead(lm[1]) && lm[0] > lm[1] ? [lm[0], lm[1]] : [...DEFAULT_REPLACE_CALL_RULE.leadMinutes];
-  return { aiFrom, aiPaused: r.aiPaused === true, confirmTime, leadMinutes, aiPhones: normalizeAiPhones(r.aiPhones) };
+  return {
+    aiFrom,
+    aiPaused: r.aiPaused === true,
+    confirmTime,
+    leadMinutes,
+    aiPhones: normalizeAiPhones(r.aiPhones),
+    aiPhonesApplyPending: r.aiPhonesApplyPending === true,
+  };
 }
 
 /** เวลาโทรของใบงาน — ส่วนของกติกาที่ `planReplaceCalls` ใช้ */

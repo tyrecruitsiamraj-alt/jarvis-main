@@ -39,7 +39,7 @@ vi.mock('../../api/_lib/lumosDispatch.js', () => ({
 vi.mock('../../api/_lib/lumosPushClient.js', () => ({ getLumosPushConfig: () => pushConfig }));
 vi.mock('../../api/_lib/followStaffName.js', () => ({ staffNameOfPhone: async () => null }));
 
-import { cancelFlaggedFollowRowsAtLumos, MIGRATION_133_NOT_READY, runIrecruitReplaceSync } from '../../api/_lib/irecruitReplaceSync.js';
+import { applyReplaceAiPhonesToPending, cancelFlaggedFollowRowsAtLumos, MIGRATION_133_NOT_READY, runIrecruitReplaceSync } from '../../api/_lib/irecruitReplaceSync.js';
 import { pickReplaceJobPerPhoneTime, REPLACE_FOLLOW_TOPIC } from '../../src/lib/irecruitReplaceSync.js';
 import { createHash } from 'node:crypto';
 
@@ -687,5 +687,49 @@ describe('สาย AI ใกล้ถึงเวลา ห้ามโดน�
     await runIrecruitReplaceSync({ now: new Date('2026-10-06T06:22:00+07:00') });
     expect(calls.some((c) => /set call_mode = 'manual'/.test(c.sql))).toBe(false);
     expect(cancelFollow.mock.calls.some((c) => c[0] === 'L60')).toBe(false);
+  });
+});
+
+/**
+ * 🔴 13 ต.ค. 2569 (เจ้าของส่งรายชื่อฝั่งรายวัน "ของวันพรุ่งนี้อย่าให้เกิดเคสแบบวันนี้อีก"):
+ * ตั้งรายชื่อ = ใช้กับสายที่มีอยู่ครั้งเดียว — สายคนโทรที่ยังไม่ถึงเวลาของคนในรายชื่อ → AI + เบอร์ฉุกเฉิน + ส่งแผน แล้วปิดธง
+ */
+describe('ใช้รายชื่อกับสายที่มีอยู่ครั้งเดียว (aiPhonesApplyPending)', () => {
+  const rule = (pending: boolean) => [
+    { payload: { rule: { aiPaused: true, aiPhonesApplyPending: pending, aiPhones: [{ phone: '0812345678', emergency: '0811111111' }] } }, updated_at: null, updated_by_name: null },
+  ];
+  const withApplyDb = (found: Array<{ id: string; k: string }>) =>
+    dbQuery.mockImplementation(async (sql: string, params?: unknown[]) => {
+      calls.push({ sql, params: params ?? [] });
+      if (/select payload, updated_at, updated_by_name from/.test(sql)) return { rows: settingsRows };
+      if (/and updated_by is null and call_mode = 'manual'/.test(sql)) return { rows: found };
+      if (/set call_mode = 'ai', staff_phone = coalesce\(\$2, staff_phone\)/.test(sql)) return { rows: [] };
+      if (/insert into .*app_irecruit_replace_sync/.test(sql)) return { rows: [] };
+      throw new Error(`unexpected sql: ${sql.slice(0, 80)}`);
+    });
+
+  it('มีธง = สลับสายคนโทรของคนในรายชื่อเป็น AI + ฉุกเฉิน · ส่งแผนตัวเดียวกับป๊อปแก้ · ปิดธง', async () => {
+    settingsRows = rule(true);
+    withApplyDb([{ id: 'x1', k: '812345678' }, { id: 'x2', k: '812345678' }]);
+    replan.mockClear();
+    const r = await applyReplaceAiPhonesToPending(NOW);
+    expect(r).toEqual({ converted: 2, pushed: true });
+    const flips = calls.filter((c) => /set call_mode = 'ai', staff_phone/.test(c.sql)).map((c) => c.params);
+    expect(flips).toEqual([['x1', '0811111111'], ['x2', '0811111111']]);
+    expect(replan).toHaveBeenCalledWith(expect.objectContaining({ memberIds: ['x1', 'x2'], cancelledIds: [] }));
+    const saved = persisted().at(-1) as { rule: { aiPhonesApplyPending: boolean; aiPhones: unknown[] } };
+    expect(saved.rule.aiPhonesApplyPending).toBe(false);
+    expect(saved.rule.aiPhones).toHaveLength(1);
+  });
+
+  it('ไม่มีธง = ไม่แตะ · ไม่มีคีย์ push = ไม่สลับ ธงค้างไว้รอบหน้า', async () => {
+    settingsRows = rule(false);
+    withApplyDb([{ id: 'x1', k: '812345678' }]);
+    expect((await applyReplaceAiPhonesToPending(NOW)).converted).toBe(0);
+    settingsRows = rule(true);
+    pushConfig = null;
+    expect((await applyReplaceAiPhonesToPending(NOW)).converted).toBe(0);
+    expect(calls.some((c) => /set call_mode = 'ai'/.test(c.sql))).toBe(false);
+    expect(persisted()).toHaveLength(0);
   });
 });
