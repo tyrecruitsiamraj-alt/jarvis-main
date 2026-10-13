@@ -249,6 +249,13 @@ type DesiredMeta = ReplaceDesiredCall & {
   /** "เพิ่มโดย" — อีเมลคนเพิ่มใบใน iRecruit (`replaceAdderLabel`) */
   adder: string | null;
   mode: 'ai' | 'manual';
+  /**
+   * ใครโทรตามกติกา (รายชื่อ / พัก AI / WL) **ไม่สนว่าเลยเวลาตามตัวคิดสาย** — ใช้กับแถวที่มีอยู่แล้ว (`existingModeOf`)
+   * 🔴 13 ต.ค. 2569: `mode` เป็นคนโทรเมื่อ `past` · ตัวคิดสายตัดสายก่อนเข้างานที่อยู่ก่อนคอนเฟิร์มตามคิวทิ้ง (`past`)
+   *    ⇒ ใบที่คอนเฟิร์มผ่านไปแล้ว สาย 1 ชม./15 นาที ถูกมองว่าเลยเวลา ~10 นาทีก่อนถึงจริง แล้วขั้น 2.5 สลับเป็นคนโทร
+   *    + ยกเลิกที่ Lumos (สุวัฒน์ชัย 05:00 · 05:45 ไม่ถูกโทร)
+   */
+  typeMode: 'ai' | 'manual';
   /** เบอร์ฉุกเฉินของคนในรายชื่อให้ AI โทร (`rule.aiPhones`) · ไม่อยู่ในรายชื่อ = null */
   emergency: string | null;
   /** ประเภทจาก iRecruit (EX · คนใน ฯลฯ) — เก็บลงแถวให้หน้าติดตามกรองได้ (136 · เจ้าของสั่ง 6 ต.ค. 2569) */
@@ -444,6 +451,9 @@ async function runIrecruitReplaceSyncUnlocked(
       // 🔴 รายชื่อให้ AI โทร (เจ้าของ 12 ต.ค. 2569) — ทับพัก AI / WL · สายที่เลยเวลายังเป็นคนโทร
       const listed = replaceAiPhoneOf(settings.rule, phone);
       for (const p of plans) {
+        const typeMode: 'ai' | 'manual' = listed
+          ? 'ai'
+          : replaceModeForType(r.replace_type, replaceCallModeFor(p.at, settings.rule.aiFrom, settings.rule.aiPaused));
         desired.push({
           ref: replaceSlotRef(r.job_id, p.slot, personKey),
           jobId: String(r.job_id).trim(),
@@ -458,11 +468,8 @@ async function runIrecruitReplaceSyncUnlocked(
           adder: replaceAdderLabel(r),
           siteCode: r.site_code?.trim() || null,
           // สายที่เลยเวลาแล้ว = คนโทร (AI ไม่โทรย้อนหลัง)
-          mode: p.past
-            ? 'manual'
-            : listed
-              ? 'ai'
-              : replaceModeForType(r.replace_type, replaceCallModeFor(p.at, settings.rule.aiFrom, settings.rule.aiPaused)),
+          mode: p.past ? 'manual' : typeMode,
+          typeMode,
           emergency: listed?.emergency ?? null,
           replaceType: (r.replace_type ?? '').trim() || null,
         });
@@ -534,6 +541,9 @@ async function runIrecruitReplaceSyncUnlocked(
     );
     plan.cancel = plan.cancel.filter((c) => !pendingBeyond.has(c.ref));
     const metaByRef = new Map(desired.map((d) => [d.ref, d]));
+    /** ใครโทรของแถวที่มีอยู่แล้ว — ถึงเวลาโทรของสายจริง (ไม่ใช่ `past` ของตัวคิดสาย) = คนโทร · ที่เหลือตามกติกา */
+    const existingModeOf = (m: DesiredMeta): 'ai' | 'manual' =>
+      m.at.getTime() <= now.getTime() + LOCK_AHEAD_MS ? 'manual' : m.typeMode;
     const rowById = new Map(existingRows.map((x) => [x.id, x]));
     /**
      * 🔴 แก้ล่าสุดชนะ (เจ้าของ 7 ต.ค. 2569: *"ถ้าแก้มาจาก irecruit ใช้ irecruit แก้บนระบบใช้บนระบบ อันไหนแก้ล่าสุดใช้อันนั้น"*)
@@ -596,7 +606,7 @@ async function runIrecruitReplaceSyncUnlocked(
         if (wasAi) await cancelFollowReminder(ex.id, staffNameOfPhone);
         // เจ้าหน้าที่เคยสลับคน → AI เอง = คงที่เขาเลือก (iRecruit เปลี่ยนแค่เวลา ไม่ได้เปลี่ยนใครโทร)
         // พัก AI อยู่ก็คง (เจ้าของ 8 ต.ค. 2569 Choice "เลือก AI รายสายได้" — พักแค่สายที่ระบบตั้งให้)
-        const mode = wasAi ? (row?.staff_edited ? 'ai' : meta.mode) : 'manual';
+        const mode = wasAi ? (row?.staff_edited ? 'ai' : existingModeOf(meta)) : 'manual';
         await dbQuery(`update ${followTable} set scheduled_at = $2, note = $3, call_mode = $4 where id = $1`, [
           ex.id,
           meta.at.toISOString(),
@@ -621,7 +631,7 @@ async function runIrecruitReplaceSyncUnlocked(
       // เจ้าหน้าที่สลับเป็น AI เอง = ห้ามทับ (8 ต.ค. 2569 — แถวรุ่นก่อน 6 ต.ค. เดิมโดนสลับกลับทุก 5 นาที)
       if (!x.pending || x.mode !== 'ai' || rescheduledIds.has(x.id) || x.staff_edited) continue;
       const meta = metaByRef.get(x.source_ref);
-      if (!meta || meta.mode !== 'manual') continue;
+      if (!meta || existingModeOf(meta) !== 'manual') continue;
       try {
         await cancelFollowReminder(x.id, staffNameOfPhone);
         await dbQuery(`update ${followTable} set call_mode = 'manual' where id = $1`, [x.id]);
@@ -641,7 +651,7 @@ async function runIrecruitReplaceSyncUnlocked(
     for (const x of flipExistingToAi ? existingRows : []) {
       if (!x.pending || x.mode !== 'manual' || rescheduledIds.has(x.id) || x.staff_edited) continue;
       const meta = metaByRef.get(x.source_ref);
-      if (!meta || meta.mode !== 'ai') continue;
+      if (!meta || existingModeOf(meta) !== 'ai') continue;
       try {
         await dbQuery(`update ${followTable} set call_mode = 'ai' where id = $1 and call_mode = 'manual'`, [x.id]);
         if (autoAi) toEnqueue.push({ id: x.id, meta });
@@ -705,7 +715,7 @@ async function runIrecruitReplaceSyncUnlocked(
     const listedFlips = existingRows.filter((x) => {
       if (!x.pending || x.mode !== 'manual' || x.staff_edited || rescheduledIds.has(x.id)) return false;
       const meta = metaByRef.get(x.source_ref);
-      return Boolean(meta && meta.mode === 'ai' && replaceAiPhoneOf(settings.rule, x.recipient_phone));
+      return Boolean(meta && existingModeOf(meta) === 'ai' && replaceAiPhoneOf(settings.rule, x.recipient_phone));
     });
     const autoAiListed = listedFlips.length > 0 ? autoAi || (await isAutoDispatchEnabled('follow_entry')) : false;
     for (const x of listedFlips) {

@@ -489,7 +489,7 @@ describe('แก้ล่าสุดชนะ (เจ้าของ 7 ต.ค.
     const src = readFileSync(new URL('../../api/_lib/irecruitReplaceSync.ts', import.meta.url), 'utf8');
     expect(src).toContain('(updated_by is not null) as staff_edited, note');
     expect(src).toContain('return irecruitChangedSinceSync(row.note, replaceSlotNote(meta.slot, meta.wall));');
-    expect(src).toContain("const mode = wasAi ? (row?.staff_edited ? 'ai' : meta.mode) : 'manual';");
+    expect(src).toContain("const mode = wasAi ? (row?.staff_edited ? 'ai' : existingModeOf(meta)) : 'manual';");
     // รอบบังคับพัก AI ข้ามสายที่เจ้าหน้าที่เลือก AI เอง (Choice "เลือก AI รายสายได้")
     expect(src).toMatch(/scheduled_at > \$2\s+and updated_by is null/);
   });
@@ -737,5 +737,23 @@ describe('รายชื่อให้ AI โทร (aiPhones)', () => {
     expect(replaceAiPhoneOf(rule, '0800000000')).toBeNull();
     const lib = readFileSync(`${process.cwd()}/api/_lib/irecruitReplaceSync.ts`, 'utf8');
     expect(lib).toMatch(/const \{ rule \} = await getReplaceSyncSettings\(\);\n  const listedKeys/);
+  });
+});
+
+/**
+ * 🔴 13 ต.ค. 2569 (สุวัฒน์ชัย 05:00 · 05:45 ไม่ถูกโทร): คอนเฟิร์ม 16:00 ผ่านไปแล้ว → ตัวคิดสายเห็นคอนเฟิร์มตามคิว (+10 นาที)
+ * แล้วตัดสายก่อนเข้างานที่ถึงก่อนทิ้ง (`past`) ⇒ เดิมขั้น 2.5 สลับสาย AI เป็นคนโทร + ยกเลิกที่ Lumos ~8 นาทีก่อนโทร
+ */
+describe('สาย AI ใกล้ถึงเวลา ห้ามโดนสลับเป็นคนโทร', () => {
+  it('ก่อนเข้างาน 1 ชม. อีก 8 นาทีถึงเวลา (คอนเฟิร์มผ่านไปแล้ว) = คงเป็น AI ไม่ยกเลิก', async () => {
+    settingsRows = [{ payload: { rule: { aiPaused: true, aiPhones: [{ phone: '0812345678', emergency: '0811111111' }] } }, updated_at: null, updated_by_name: null }];
+    irecruitSqlQuery.mockResolvedValue([row('A')]); // เข้างาน 6 ต.ค. 07:30
+    const ref = `irecruit-replace:A:lead60:${pk(P1)}`;
+    existingRows = [
+      { id: 'L60', source_ref: ref, scheduled_at: '2026-10-05T23:30:00.000Z', mode: 'ai', group_id: 'g', recipient_phone: P1, pending: true },
+    ];
+    await runIrecruitReplaceSync({ now: new Date('2026-10-06T06:22:00+07:00') });
+    expect(calls.some((c) => /set call_mode = 'manual'/.test(c.sql))).toBe(false);
+    expect(cancelFollow.mock.calls.some((c) => c[0] === 'L60')).toBe(false);
   });
 });
