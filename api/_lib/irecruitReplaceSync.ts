@@ -938,7 +938,7 @@ async function convertReplaceAiRowsToManual(
  */
 export async function applyReplaceAiPhonesToPending(
   now: Date = new Date(),
-): Promise<{ converted: number; pushed: boolean; skipped?: string }> {
+): Promise<{ converted: number; reverted?: number; pushed: boolean; skipped?: string }> {
   return withSessionLock(REPLACE_SYNC_LOCK_KEY, async () => {
     const settings = await getReplaceSyncSettings();
     if (!settings.rule.aiPhonesApplyPending) return { converted: 0, pushed: false, skipped: 'ไม่มีรายชื่อรอใช้' };
@@ -973,9 +973,25 @@ export async function applyReplaceAiPhonesToPending(
       pushed = res.plans > 0 && res.pushedPlans === res.plans;
       if (!pushed) logWarn('irecruit.replaceSync.applyAiPhones: ส่งแผนไม่ครบ — ตัวส่งซ้ำจะลองให้', { reason: res.reason });
     }
+    /**
+     * 🔴 คนนอกรายชื่อ (เจ้าของ 13 ต.ค. 2569 Choice "เหลือแค่ 15 คนที่ส่งล่าสุด") — พัก AI อยู่ = สาย AI ที่ระบบตั้งให้ของคนที่หลุดจากรายชื่อ
+     * กลับเป็นคนโทร + ยกเลิกแผนที่ Lumos (ตัวเดียวกับสวิตช์พัก AI) · สายที่คนในทีมเลือก AI เองไม่แตะ (Choice 12 ต.ค. "ยังเลือกทีละสายได้")
+     */
+    let reverted = 0;
+    if (settings.rule.aiPaused) {
+      const { rows: off } = await dbQuery<{ id: string }>(
+        `select id::text as id from ${followTable}
+          where follow_team = $1 and coalesce(source_ref, '') like 'irecruit-replace:%'
+            and cancelled_at is null and completed_at is null and staff_call_outcome is null
+            and updated_by is null and coalesce(call_mode, 'ai') = 'ai' and scheduled_at > $2
+            and not (right(regexp_replace(coalesce(recipient_phone, ''), '\\D', '', 'g'), 9) = any($3::text[]))`,
+        [FOLLOW_TEAM_REPLACEMENT, new Date(now.getTime() + LOCK_AHEAD_MS).toISOString(), keys],
+      );
+      if (off.length > 0) reverted = (await convertReplaceAiRowsToManual(new Set(off.map((r) => r.id)), 'aiPaused')).converted;
+    }
     await saveReplaceSyncSettings({ rule: { ...settings.rule, aiPhonesApplyPending: false } }, REPLACE_SYNC_ACTOR_NAME);
-    logInfo('irecruit.replaceSync.applyAiPhones.done', { converted: rows.length, pushed });
-    return { converted: rows.length, pushed };
+    logInfo('irecruit.replaceSync.applyAiPhones.done', { converted: rows.length, reverted, pushed });
+    return { converted: rows.length, reverted, pushed };
   });
 }
 

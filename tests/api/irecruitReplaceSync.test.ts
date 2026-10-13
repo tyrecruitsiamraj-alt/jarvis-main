@@ -698,11 +698,16 @@ describe('ใช้รายชื่อกับสายที่มีอย�
   const rule = (pending: boolean) => [
     { payload: { rule: { aiPaused: true, aiPhonesApplyPending: pending, aiPhones: [{ phone: '0812345678', emergency: '0811111111' }] } }, updated_at: null, updated_by_name: null },
   ];
+  let offList: Array<{ id: string }> = [];
   const withApplyDb = (found: Array<{ id: string; k: string }>) =>
     dbQuery.mockImplementation(async (sql: string, params?: unknown[]) => {
       calls.push({ sql, params: params ?? [] });
       if (/select payload, updated_at, updated_by_name from/.test(sql)) return { rows: settingsRows };
       if (/and updated_by is null and call_mode = 'manual'/.test(sql)) return { rows: found };
+      // คนนอกรายชื่อที่ระบบตั้งเป็น AI (13 ต.ค. 2569 "เหลือแค่ 15 คน") → คนโทร + ยกเลิกที่ Lumos
+      if (/and updated_by is null and coalesce\(call_mode, 'ai'\) = 'ai'/.test(sql)) return { rows: offList };
+      if (/select person_ref, plan_ref from/.test(sql)) return { rows: [] };
+      if (/set call_mode = 'manual', dispatch_state = 'manual'/.test(sql)) return { rows: (params?.[0] as string[]).map((id) => ({ id })) };
       if (/set call_mode = 'ai', staff_phone = coalesce\(\$2, staff_phone\)/.test(sql)) return { rows: [] };
       if (/insert into .*app_irecruit_replace_sync/.test(sql)) return { rows: [] };
       throw new Error(`unexpected sql: ${sql.slice(0, 80)}`);
@@ -713,13 +718,26 @@ describe('ใช้รายชื่อกับสายที่มีอย�
     withApplyDb([{ id: 'x1', k: '812345678' }, { id: 'x2', k: '812345678' }]);
     replan.mockClear();
     const r = await applyReplaceAiPhonesToPending(NOW);
-    expect(r).toEqual({ converted: 2, pushed: true });
+    expect(r).toEqual({ converted: 2, reverted: 0, pushed: true });
     const flips = calls.filter((c) => /set call_mode = 'ai', staff_phone/.test(c.sql)).map((c) => c.params);
     expect(flips).toEqual([['x1', '0811111111'], ['x2', '0811111111']]);
     expect(replan).toHaveBeenCalledWith(expect.objectContaining({ memberIds: ['x1', 'x2'], cancelledIds: [] }));
     const saved = persisted().at(-1) as { rule: { aiPhonesApplyPending: boolean; aiPhones: unknown[] } };
     expect(saved.rule.aiPhonesApplyPending).toBe(false);
     expect(saved.rule.aiPhones).toHaveLength(1);
+  });
+
+  it('🔴 คนนอกรายชื่อที่ระบบตั้งเป็น AI = กลับเป็นคนโทร + ยกเลิกที่ Lumos (พัก AI อยู่)', async () => {
+    settingsRows = rule(true);
+    offList = [{ id: 'o1' }];
+    withApplyDb([]);
+    cancelFollow.mockClear();
+    const r = await applyReplaceAiPhonesToPending(NOW);
+    offList = [];
+    expect(r).toEqual({ converted: 0, reverted: 1, pushed: true });
+    expect(cancelFollow).toHaveBeenCalledWith('o1', expect.any(Function));
+    const sel = calls.find((c) => /and updated_by is null and coalesce\(call_mode, 'ai'\) = 'ai'/.test(c.sql));
+    expect(sel?.params[2]).toEqual(['812345678']);
   });
 
   it('ไม่มีธง = ไม่แตะ · ไม่มีคีย์ push = ไม่สลับ ธงค้างไว้รอบหน้า', async () => {
