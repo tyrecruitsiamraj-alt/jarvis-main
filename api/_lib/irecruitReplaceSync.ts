@@ -43,6 +43,8 @@ import {
   DEFAULT_REPLACE_CALL_RULE,
   normalizeReplaceCallRule,
   replaceAiPhoneOf,
+  replaceAiPhonesCoverYmd,
+  replaceWorkYmd,
   replacePhoneKey,
   planReplaceCallsFull,
   reconcileReplaceCalls,
@@ -442,7 +444,7 @@ async function runIrecruitReplaceSyncUnlocked(
       const name = `${(r.fname ?? '').trim()} ${(r.lname ?? '').trim()}`.trim() || 'คนไปแทนงาน';
       const personKey = personKeyOf(phone);
       // 🔴 รายชื่อให้ AI โทร (เจ้าของ 12 ต.ค. 2569) — ทับพัก AI / WL · สายที่เลยเวลายังเป็นคนโทร
-      const listed = replaceAiPhoneOf(settings.rule, phone);
+      const listed = replaceAiPhonesCoverYmd(settings.rule, wall.ymd) ? replaceAiPhoneOf(settings.rule, phone) : null;
       for (const p of plans) {
         const typeMode: 'ai' | 'manual' = listed
           ? 'ai'
@@ -947,8 +949,9 @@ export async function applyReplaceAiPhonesToPending(
     }
     const keys = settings.rule.aiPhones.map((x) => replacePhoneKey(x.phone)).filter((k): k is string => Boolean(k));
     const emOf = new Map(settings.rule.aiPhones.map((x) => [replacePhoneKey(x.phone), x.emergency]));
-    const { rows } = await dbQuery<{ id: string; k: string }>(
-      `select id::text as id, right(regexp_replace(coalesce(recipient_phone, ''), '\\D', '', 'g'), 9) as k
+    const { rows: flipCandidates } = await dbQuery<{ id: string; k: string; source_ref: string | null; scheduled_at: string; note: string | null }>(
+      `select id::text as id, right(regexp_replace(coalesce(recipient_phone, ''), '\\D', '', 'g'), 9) as k,
+              source_ref, scheduled_at::text as scheduled_at, note
          from ${followTable}
         where follow_team = $1 and coalesce(source_ref, '') like 'irecruit-replace:%'
           and cancelled_at is null and completed_at is null and staff_call_outcome is null
@@ -957,6 +960,8 @@ export async function applyReplaceAiPhonesToPending(
           and right(regexp_replace(coalesce(recipient_phone, ''), '\\D', '', 'g'), 9) = any($3::text[])`,
       [FOLLOW_TEAM_REPLACEMENT, new Date(now.getTime() + LOCK_AHEAD_MS).toISOString(), keys],
     );
+    // รายชื่อกำหนดวันเข้างาน = เฉพาะสายของงานวันนั้น (13 ต.ค. 2569 "เฉพาะงานพรุ่งนี้")
+    const rows = flipCandidates.filter((r) => replaceAiPhonesCoverYmd(settings.rule, replaceWorkYmd(r)));
     for (const r of rows) {
       await dbQuery(
         `update ${followTable} set call_mode = 'ai', staff_phone = coalesce($2, staff_phone) where id = $1 and call_mode = 'manual'`,
@@ -979,14 +984,18 @@ export async function applyReplaceAiPhonesToPending(
      */
     let reverted = 0;
     if (settings.rule.aiPaused) {
-      const { rows: off } = await dbQuery<{ id: string }>(
-        `select id::text as id from ${followTable}
+      const { rows: aiRows } = await dbQuery<{ id: string; k: string; source_ref: string | null; scheduled_at: string; note: string | null }>(
+        `select id::text as id, right(regexp_replace(coalesce(recipient_phone, ''), '\\D', '', 'g'), 9) as k,
+                source_ref, scheduled_at::text as scheduled_at, note
+           from ${followTable}
           where follow_team = $1 and coalesce(source_ref, '') like 'irecruit-replace:%'
             and cancelled_at is null and completed_at is null and staff_call_outcome is null
-            and updated_by is null and coalesce(call_mode, 'ai') = 'ai' and scheduled_at > $2
-            and not (right(regexp_replace(coalesce(recipient_phone, ''), '\\D', '', 'g'), 9) = any($3::text[]))`,
-        [FOLLOW_TEAM_REPLACEMENT, new Date(now.getTime() + LOCK_AHEAD_MS).toISOString(), keys],
+            and updated_by is null and coalesce(call_mode, 'ai') = 'ai' and scheduled_at > $2`,
+        [FOLLOW_TEAM_REPLACEMENT, new Date(now.getTime() + LOCK_AHEAD_MS).toISOString()],
       );
+      // นอกรายชื่อ หรืออยู่ในรายชื่อแต่เป็นงานวันอื่น (รายชื่อกำหนดวัน) = คนโทร
+      const keySet = new Set(keys);
+      const off = aiRows.filter((r) => !keySet.has(r.k) || !replaceAiPhonesCoverYmd(settings.rule, replaceWorkYmd(r)));
       if (off.length > 0) reverted = (await convertReplaceAiRowsToManual(new Set(off.map((r) => r.id)), 'aiPaused')).converted;
     }
     await saveReplaceSyncSettings({ rule: { ...settings.rule, aiPhonesApplyPending: false } }, REPLACE_SYNC_ACTOR_NAME);

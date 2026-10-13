@@ -698,7 +698,7 @@ describe('ใช้รายชื่อกับสายที่มีอย�
   const rule = (pending: boolean) => [
     { payload: { rule: { aiPaused: true, aiPhonesApplyPending: pending, aiPhones: [{ phone: '0812345678', emergency: '0811111111' }] } }, updated_at: null, updated_by_name: null },
   ];
-  let offList: Array<{ id: string }> = [];
+  let offList: Array<{ id: string; k: string; source_ref?: string; scheduled_at?: string; note?: string | null }> = [];
   const withApplyDb = (found: Array<{ id: string; k: string }>) =>
     dbQuery.mockImplementation(async (sql: string, params?: unknown[]) => {
       calls.push({ sql, params: params ?? [] });
@@ -729,15 +729,32 @@ describe('ใช้รายชื่อกับสายที่มีอย�
 
   it('🔴 คนนอกรายชื่อที่ระบบตั้งเป็น AI = กลับเป็นคนโทร + ยกเลิกที่ Lumos (พัก AI อยู่)', async () => {
     settingsRows = rule(true);
-    offList = [{ id: 'o1' }];
+    offList = [{ id: 'o1', k: '899999999' }];
     withApplyDb([]);
     cancelFollow.mockClear();
     const r = await applyReplaceAiPhonesToPending(NOW);
     offList = [];
     expect(r).toEqual({ converted: 0, reverted: 1, pushed: true });
     expect(cancelFollow).toHaveBeenCalledWith('o1', expect.any(Function));
-    const sel = calls.find((c) => /and updated_by is null and coalesce\(call_mode, 'ai'\) = 'ai'/.test(c.sql));
-    expect(sel?.params[2]).toEqual(['812345678']);
+    expect(calls.some((c) => /and updated_by is null and coalesce\(call_mode, 'ai'\) = 'ai'/.test(c.sql))).toBe(true);
+  });
+
+  it('🔴 รายชื่อกำหนดวันเข้างาน (13 ต.ค. 2569 "เฉพาะงานพรุ่งนี้") — สายของงานวันนั้น = AI · คอนเฟิร์มของงานวันถัดไป = คนโทร', async () => {
+    settingsRows = [
+      { payload: { rule: { aiPaused: true, aiPhonesApplyPending: true, aiPhonesWorkYmd: '2026-10-06', aiPhones: [{ phone: '0812345678', emergency: '0811111111' }] } }, updated_at: null, updated_by_name: null },
+    ];
+    // สายเดิมที่เป็นคนโทร: ก่อนเข้างาน 1 ชม. ของงาน 6 ต.ค. (ใช้รายชื่อ) · คอนเฟิร์มของงาน 7 ต.ค. (ไม่ใช้)
+    const lead = { id: 'L', k: '812345678', source_ref: `irecruit-replace:A:lead60:${pk(P1)}`, scheduled_at: '2026-10-05T23:30:00Z', note: 'เข้างาน 07:30 น.' };
+    const conf = { id: 'C', k: '812345678', source_ref: `irecruit-replace:B:confirm:${pk(P1)}`, scheduled_at: '2026-10-06T09:00:00Z', note: 'ยืนยันเวลาเข้างาน 7/10 07:30 น.' };
+    // สาย AI เดิม: คอนเฟิร์มของงาน 7 ต.ค. ของคนในรายชื่อ = กลับเป็นคนโทร
+    offList = [{ id: 'C2', k: '812345678', source_ref: `irecruit-replace:B:confirm:${pk(P1)}`, scheduled_at: '2026-10-06T09:00:00Z', note: 'ยืนยันเวลาเข้างาน 7/10 07:30 น.' }];
+    withApplyDb([lead, conf]);
+    replan.mockClear();
+    const r = await applyReplaceAiPhonesToPending(NOW);
+    offList = [];
+    expect(r).toEqual({ converted: 1, reverted: 1, pushed: true });
+    expect(calls.filter((c) => /set call_mode = 'ai', staff_phone/.test(c.sql)).map((c) => c.params[0])).toEqual(['L']);
+    expect(replan).toHaveBeenCalledWith(expect.objectContaining({ memberIds: ['L'] }));
   });
 
   it('ไม่มีธง = ไม่แตะ · ไม่มีคีย์ push = ไม่สลับ ธงค้างไว้รอบหน้า', async () => {

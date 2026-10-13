@@ -62,6 +62,11 @@ export type ReplaceCallRule = {
    * (กติกา "ตัดสินครั้งเดียว" ยังอยู่ — ตัดสินตอนตั้งรายชื่อ ไม่ใช่ทุกรอบ)
    */
   aiPhonesApplyPending: boolean;
+  /**
+   * 🔴 รายชื่อใช้กับงานวันเข้างานนี้เท่านั้น (YYYY-MM-DD ไทย) — เจ้าของ 13 ต.ค. 2569 Choice "เฉพาะงานพรุ่งนี้ (14 ต.ค.)"
+   * `null` = ทุกวัน · สายของงานวันอื่น (เช่นคอนเฟิร์ม 16:00 ของงานวันถัดไป) = ไม่ใช้รายชื่อ
+   */
+  aiPhonesWorkYmd: string | null;
 };
 
 /** คนหนึ่งในรายชื่อให้ AI โทร — เบอร์ 10 หลักขึ้นต้น 0 · ฉุกเฉิน = เบอร์ที่ AI โทรหาเมื่อติดต่อคนไปแทนไม่ได้ */
@@ -74,6 +79,7 @@ export const DEFAULT_REPLACE_CALL_RULE: ReplaceCallRule = {
   leadMinutes: [60, 15],
   aiPhones: [],
   aiPhonesApplyPending: false,
+  aiPhonesWorkYmd: null,
 };
 
 /** เบอร์มือถือไทย → 9 หลักท้าย (ตัด 0 / 66 ข้างหน้า) · อ่านไม่ออก = null — ใช้เทียบเบอร์ทุกรูปแบบ (081… · +6681…) */
@@ -81,6 +87,11 @@ export function replacePhoneKey(raw: string | null | undefined): string | null {
   const d = String(raw ?? '').replace(/\D/g, '');
   const nine = d.startsWith('66') && d.length === 11 ? d.slice(2) : d.startsWith('0') && d.length === 10 ? d.slice(1) : d;
   return /^[1-9]\d{8}$/.test(nine) ? nine : null;
+}
+
+/** รายชื่อใช้กับงานวันเข้างานนี้ไหม (ไม่ได้กำหนดวัน = ทุกวัน) */
+export function replaceAiPhonesCoverYmd(rule: Pick<ReplaceCallRule, 'aiPhonesWorkYmd'>, workYmd: string | null | undefined): boolean {
+  return !rule.aiPhonesWorkYmd || workYmd === rule.aiPhonesWorkYmd;
 }
 
 /** เบอร์นี้อยู่ในรายชื่อให้ AI โทรไหม */
@@ -132,6 +143,7 @@ export function normalizeReplaceCallRule(raw: unknown): ReplaceCallRule {
     leadMinutes,
     aiPhones: normalizeAiPhones(r.aiPhones),
     aiPhonesApplyPending: r.aiPhonesApplyPending === true,
+    aiPhonesWorkYmd: typeof r.aiPhonesWorkYmd === 'string' && YMD_RE.test(r.aiPhonesWorkYmd.trim()) ? r.aiPhonesWorkYmd.trim() : null,
   };
 }
 
