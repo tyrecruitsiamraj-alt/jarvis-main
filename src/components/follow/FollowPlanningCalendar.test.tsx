@@ -604,9 +604,9 @@ describe('แผน 20/20 — คำตอบต้องอยู่บนจ�
     expect(screen.queryByText('ยังไม่มีผลเดือนนี้')).toBeNull();
   });
 
-  it('"ต้องตามด่วน" บอกขอบเขตบนหัว · ประโยคสอนวิธีใช้ถอดแล้ว (QA 5 ต.ค. 2569)', () => {
+  it('"สายที่จะไม่ถูกโทร" (แทนต้องตามด่วน 13 ต.ค. 2569) · ประโยคสอนวิธีใช้ถอดแล้ว (QA 5 ต.ค. 2569)', () => {
     renderCalendar([entry({ id: 'a', call_round: 1 })]);
-    expect(screen.getByText('ต้องตามด่วน · ทั้งเดือน')).toBeTruthy();
+    expect(screen.getByText('สายที่จะไม่ถูกโทร')).toBeTruthy();
     expect(screen.queryByText(/กดปุ่มโทรข้างชื่อ/)).toBeNull();
   });
 

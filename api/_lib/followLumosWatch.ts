@@ -248,3 +248,69 @@ export async function alertOverdueAiFollow(): Promise<{ alerted: number }> {
   if (out.alerted > 0) logInfo('follow.overdueAlert', out);
   return out;
 }
+
+/**
+ * ═══ แจ้งเตือน "สายที่จะไม่ถูกโทร" สรุปชั่วโมงละครั้งต่อแท็บ (เจ้าของสั่ง 13 ต.ค. 2569 "จะกันให้หมด") ═══
+ * กล่องบนหน้าติดตาม (`followAtRiskCalls`) เห็นทุกสาย · ตัวนี้บอกทีมว่ามี **ของใหม่** ไม่ต้องรอเปิดหน้า
+ *   - คนยังไม่โทร: สายคนโทรที่เลยเวลา 15 นาที – 75 นาที (ชั่วโมงที่ผ่านมา) ยังไม่ลงผล
+ *   - AI ส่งไม่ได้: สาย AI ที่จะถึงเวลาใน 1 ชม. แต่ส่งไม่ได้ (ชุดเดียวกับป้าย "ไม่ได้ส่ง")
+ * สรุปเดียวต่อแท็บต่อชั่วโมง (`dedupeKey`) — สายคนโทรวันละหลายร้อยสาย แจ้งทีละสายจะท่วมกระดิ่ง
+ * สาย AI เลยเวลาไม่มีผลแจ้งทีละสายอยู่แล้ว (`alertOverdueAiFollow`) ไม่นับซ้ำที่นี่
+ */
+export const AT_RISK_AI_NOT_SENT_STATES = ['held', 'suppressed', 'guarded', 'no_phone', 'off', 'push_failed', 'not_imported'] as const;
+
+export function followAtRiskDigestSql(): string {
+  return `
+    select coalesce(f.follow_team, 'main') as team,
+           count(*) filter (
+             where f.call_mode = 'manual' and coalesce(f.time_tbd, false) = false
+               and f.scheduled_at between now() - interval '75 minutes' and now() - interval '${OVERDUE_ALERT_MINUTES} minutes'
+           )::int as staff_late,
+           count(*) filter (
+             where coalesce(f.call_mode, 'ai') = 'ai' and f.dispatch_state = any($1::text[])
+               and f.scheduled_at between now() and now() + interval '60 minutes'
+           )::int as ai_not_sent
+      from ${followTable} f
+     where f.cancelled_at is null and f.completed_at is null and f.staff_call_outcome is null
+       and f.scheduled_at between now() - interval '75 minutes' and now() + interval '60 minutes'
+     group by 1`;
+}
+
+const HOUR_KEY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Bangkok',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  hourCycle: 'h23',
+});
+
+export async function alertFollowAtRiskDigest(now: Date = new Date()): Promise<{ alerted: number }> {
+  const out = { alerted: 0 };
+  let rows: Array<{ team: string; staff_late: number; ai_not_sent: number }>;
+  try {
+    rows = (await dbQuery<{ team: string; staff_late: number; ai_not_sent: number }>(followAtRiskDigestSql(), [[...AT_RISK_AI_NOT_SENT_STATES]])).rows;
+  } catch (e) {
+    if (isUndefinedColumn(e)) return out;
+    throw e;
+  }
+  const hour = HOUR_KEY.format(now).replace(/\D/g, '');
+  for (const r of rows) {
+    if (r.staff_late + r.ai_not_sent === 0) continue;
+    const replace = r.team === 'replacement';
+    const parts = [
+      r.staff_late > 0 ? `คนยังไม่โทร ${r.staff_late} สาย` : null,
+      r.ai_not_sent > 0 ? `AI ส่งไม่ได้ ${r.ai_not_sent} สาย (ใน 1 ชม.)` : null,
+    ].filter(Boolean);
+    await notifyRoles(['admin', 'supervisor'], {
+      type: 'follow_at_risk',
+      title: `สายที่จะไม่ถูกโทร · ${replace ? 'ติดตามส่งคนแทน' : 'ติดตามคนเริ่มงาน'}`,
+      body: parts.join(' · '),
+      link: replace ? '/follow?view=replace' : '/follow',
+      dedupeKey: `follow_at_risk:${r.team}:${hour}`,
+    });
+    out.alerted += 1;
+  }
+  if (out.alerted > 0) logInfo('follow.atRiskDigest', out);
+  return out;
+}

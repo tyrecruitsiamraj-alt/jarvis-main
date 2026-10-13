@@ -31,7 +31,7 @@ import {
 import type { LumosReminderPayload } from './lumosDispatch.js';
 import { staffNameOfPhone } from './followStaffName.js';
 import { repairDeclinedFollowDays } from './followDeclineDayRepair.js';
-import { alertOverdueAiFollow, checkFollowPlanImports } from './followLumosWatch.js';
+import { alertFollowAtRiskDigest, alertOverdueAiFollow, checkFollowPlanImports } from './followLumosWatch.js';
 import { resendFollowCancels } from './followCancelResend.js';
 import { mergeSplitFollowPlans } from './followPlanMerge.js';
 import {
@@ -349,6 +349,12 @@ export function startFollowPushRetryWorker(): boolean {
         await alertOverdueAiFollow();
       } catch (e) {
         logError('follow.overdueAlert: รอบนี้ล้ม', e);
+      }
+      // ชั้น 3 สรุป "สายที่จะไม่ถูกโทร" ชั่วโมงละครั้งต่อแท็บ — คนยังไม่โทร + AI ส่งไม่ได้ (เจ้าของ 13 ต.ค. 2569 "จะกันให้หมด")
+      try {
+        await alertFollowAtRiskDigest();
+      } catch (e) {
+        logError('follow.atRiskDigest: รอบนี้ล้ม', e);
       }
       await sleepInterruptible(nowCfg.intervalMs);
     }

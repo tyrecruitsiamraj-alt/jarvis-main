@@ -14,7 +14,7 @@ import {
 import type { FollowOutcome } from '@/lib/followOutcome';
 import FollowStaffCallControls from '@/components/follow/FollowStaffCallControls';
 import FollowCallQueue from '@/components/follow/FollowCallQueue';
-import { followUrgentCalls } from '@/lib/followCallQueue';
+import { FOLLOW_AT_RISK_KINDS, followAtRiskCalls, type FollowAtRiskKind } from '@/lib/followCallQueue';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import FollowCancelMenu, { type FollowCancelChoice } from '@/components/follow/FollowCancelMenu';
 import { leadText, replaceLeadStart, replaceSlotRoundOfRef } from '@/lib/irecruitReplaceSync';
@@ -564,13 +564,26 @@ const FollowPlanningCalendar: React.FC<{
   const resultTitle = resultIsDay ? (dayYmd === today ? 'ผลของวันนี้' : 'ผลของวันที่เลือก') : 'ผลของเดือนนี้';
   const resultSub = resultIsDay ? dayPillLabel(dayYmd) : monthLabel(month);
 
-  /** ต้องตามด่วน — กติกาเดียวกับกองคนต้องโทร (`followUrgentCalls` · QA รอบ 4 ข้อ 3) */
+  /**
+   * "สายที่จะไม่ถูกโทร" — ทุกวันของแท็บ (เจ้าของ 13 ต.ค. 2569 "จะกันให้หมด" · Choice "ให้ทีมเคลียร์ของเก่าด้วย")
+   * กติกาเดียว `followAtRiskCalls` · ชุดเต็มของแท็บไม่ผ่านตัวกรองวัน (`allRows`) · กดชิปกรองตามเหตุ
+   */
+  const atRiskAll = useMemo(() => followAtRiskCalls(allRows ?? rows), [allRows, rows]);
+  const [riskKind, setRiskKind] = useState<FollowAtRiskKind | 'all'>('all');
+  const riskCounts = useMemo(() => {
+    const c: Record<FollowAtRiskKind, number> = { staff_late: 0, ai_not_sent: 0, ai_late: 0, tbd: 0 };
+    for (const it of atRiskAll) c[it.kind] += 1;
+    return c;
+  }, [atRiskAll]);
   const overdueAll = useMemo(
-    () => followUrgentCalls(summarySource, month).map((it) => ({ row: it.person.row, round: it.call.round })),
-    [summarySource, month],
+    () =>
+      atRiskAll
+        .filter((it) => riskKind === 'all' || it.kind === riskKind)
+        .map((it) => ({ row: it.person.row, round: it.call.round, kind: it.kind })),
+    [atRiskAll, riskKind],
   );
   const [urgentPage, setUrgentPage] = useState(1);
-  useEffect(() => setUrgentPage(1), [month, roundFilter]);
+  useEffect(() => setUrgentPage(1), [riskKind]);
   const urgentPageCount = Math.max(1, Math.ceil(overdueAll.length / URGENT_PAGE_SIZE));
   const urgentSafePage = Math.min(urgentPage, urgentPageCount);
   const urgentRows = overdueAll.slice((urgentSafePage - 1) * URGENT_PAGE_SIZE, urgentSafePage * URGENT_PAGE_SIZE);
@@ -1407,15 +1420,31 @@ const FollowPlanningCalendar: React.FC<{
           <Card className="overflow-hidden rounded-2xl shadow-sm">
             <div className="flex items-center gap-2 px-4 pt-4">
               <PhoneOff className={cn('h-4 w-4', TONE.warn.value)} aria-hidden />
-              <h3 className="text-xs font-medium text-foreground">ต้องตามด่วน · ทั้งเดือน</h3>
+              <h3 className="text-xs font-medium text-foreground">สายที่จะไม่ถูกโทร</h3>
               <span
-                className={cn('ml-auto rounded-full px-2 py-0.5 text-[11px] font-medium', TONE.warn.chip)}
+                className={cn('ml-auto rounded-full px-2 py-0.5 text-xs font-medium tabular-nums', atRiskAll.length ? TONE.danger.chip : TONE.success.chip)}
+                data-testid="follow-at-risk-total"
               >
-                {overdueAll.length}
+                {atRiskAll.length.toLocaleString('th-TH')}
               </span>
             </div>
-            {/* ประโยคสอนวิธีใช้ถอดแล้ว (QA 5 ต.ค. 2569) — ปุ่มโทรอยู่ข้างชื่อทุกแถว · "ทั้งเดือน" อยู่บนหัว */}
-            <div className="pb-3" />
+            <div className="flex flex-wrap gap-1.5 px-4 pb-3 pt-2" role="group" aria-label="กรองตามเหตุ">
+              <Button type="button" size="xs" variant={riskKind === 'all' ? 'secondary' : 'ghost'} onClick={() => setRiskKind('all')}>
+                ทั้งหมด {atRiskAll.length.toLocaleString('th-TH')}
+              </Button>
+              {FOLLOW_AT_RISK_KINDS.map((k) => (
+                <Button
+                  key={k.key}
+                  type="button"
+                  size="xs"
+                  variant={riskKind === k.key ? 'secondary' : 'ghost'}
+                  onClick={() => setRiskKind(k.key)}
+                  data-testid={`follow-at-risk-${k.key}`}
+                >
+                  {k.label} {riskCounts[k.key].toLocaleString('th-TH')}
+                </Button>
+              ))}
+            </div>
             {overdueAll.length === 0 ? (
               <p
                 className={cn(
@@ -1428,7 +1457,7 @@ const FollowPlanningCalendar: React.FC<{
               </p>
             ) : (
               <ul className="divide-y divide-border/60 border-t border-border/70">
-                {urgentRows.map(({ row, round }) => (
+                {urgentRows.map(({ row, round, kind }) => (
                   <li key={round.entry.id} className="flex items-center gap-2 px-4 py-2.5">
                     <button
                       type="button"
@@ -1439,8 +1468,9 @@ const FollowPlanningCalendar: React.FC<{
                       <span className="block truncate text-[12px] font-medium text-foreground">
                         {row.group.name}
                       </span>
-                      <span className={cn('block text-[11px] font-medium', TONE.warn.value)}>
-                        {round.ymd ? formatYmdTh(round.ymd) : '—'} {round.time ?? ''}
+                      <span className={cn('block text-xs font-medium', TONE.warn.value)}>
+                        {round.ymd ? formatYmdTh(round.ymd) : '—'} {kind === 'tbd' ? '' : (round.time ?? '')} ·{' '}
+                        {FOLLOW_AT_RISK_KINDS.find((k) => k.key === kind)?.label}
                       </span>
                       <span className="block truncate text-[11px] text-muted-foreground">
                         {row.group.unitName || row.group.phone}
@@ -1467,7 +1497,7 @@ const FollowPlanningCalendar: React.FC<{
               <PagePager
                 className="border-t border-border/70 px-4 py-2"
                 testId="follow-urgent-pager"
-                label=" (ต้องตามด่วน)"
+                label=" (สายที่จะไม่ถูกโทร)"
                 page={urgentSafePage}
                 pageCount={urgentPageCount}
                 onPageChange={setUrgentPage}

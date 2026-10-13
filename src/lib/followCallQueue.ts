@@ -102,24 +102,55 @@ export function lateText(minutes: number): string {
 }
 
 /**
- * ═══ "ต้องตามด่วน · ทั้งเดือน" — กติกาเดียวกับกองของมุมมองต้องโทร (QA รอบ 4 · 12 ต.ค. 2569 ข้อ 3) ═══
- * เดิมนับแค่ `callCategory === 'overdue'` ⇒ สายคนโทรที่เลยเวลา (แท็บคนเริ่มงาน = 'notSent') ไม่ถูกนับ การ์ดขึ้น 0
- * ทั้งที่กองคนต้องโทรค้างแดง · และคนที่จบวันแล้ว (ตอบว่าไปในสายถัดมา) ยังถูกนับ
- * ด่วน = คนต้องโทรที่เลยเวลาแล้ว + ส่ง AI แล้วเลยเวลายังไม่มีผลกลับ (ของเดิมของการ์ด ห้ามหาย)
- * ทีละวันผ่าน `buildFollowDayPeople` → `buildFollowCallQueue` ตัวเดียวกับจอ
+ * ═══ "สายที่จะไม่ถูกโทร" — กติกาเดียวทุกจอ (เจ้าของสั่ง 13 ต.ค. 2569 "อะไรที่จะไม่โทร และมีโอกาสจะไม่โทร จะกันให้หมด") ═══
+ * แทนการ์ด "ต้องตามด่วน · ทั้งเดือน" เดิม (QA รอบ 4 ข้อ 3) · ทุกวันที่มีในแท็บ ไม่ใช่แค่เดือนที่ดู (Choice "ให้ทีมเคลียร์ของเก่าด้วย")
+ * ทีละวันผ่าน `buildFollowDayPeople` → `buildFollowCallQueue` ตัวเดียวกับกองบนจอ (คนที่จบวันแล้วไม่นับ)
+ *   - `ai_not_sent` AI จะไม่โทร — ส่งไม่ได้ (ปิดส่ง · รับไปโทรเอง · ห้ามโทร · ตรวจไม่ได้ · ไม่มีเบอร์ · ส่งไม่ถึง · Lumos ไม่รับ) ทุกเวลา รวมอนาคต
+ *   - `ai_late`     ส่ง AI แล้ว เลยเวลา 15 นาทียังไม่มีผล
+ *   - `staff_late`  คนต้องโทร เลยเวลา 15 นาทียังไม่ลงผล (สายคนโทร + สาย AI ที่ไม่ได้คำตอบ)
+ *   - `tbd`         ยังไม่ระบุเวลา ถึงวันแล้ว
  */
-export function followUrgentCalls(
-  rows: readonly FollowPlanningRow[],
-  month: string,
-  now: Date = new Date(),
-): FollowQueueItem[] {
+export type FollowAtRiskKind = 'ai_not_sent' | 'ai_late' | 'staff_late' | 'tbd';
+export const FOLLOW_AT_RISK_KINDS: ReadonlyArray<{ key: FollowAtRiskKind; label: string }> = [
+  { key: 'staff_late', label: 'คนยังไม่โทร' },
+  { key: 'ai_not_sent', label: 'AI ส่งไม่ได้' },
+  { key: 'ai_late', label: 'AI เลยเวลาไม่มีผล' },
+  { key: 'tbd', label: 'ยังไม่ระบุเวลา' },
+];
+/** dispatch_state ที่แปลว่า AI จะไม่โทรสายนี้ — ชุดเดียวกับป้าย "ไม่ได้ส่ง" (`followDispatchState.ts`) */
+const AI_NOT_SENT_STATES = new Set(['held', 'suppressed', 'guarded', 'no_phone', 'off', 'push_failed', 'not_imported']);
+const AT_RISK_GRACE_MIN = 15;
+/** 🔴 `Intl` ระดับโมดูลเท่านั้น */
+const BKK_YMD = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' });
+
+export type FollowAtRiskItem = FollowQueueItem & { kind: FollowAtRiskKind };
+
+export function followAtRiskKindOf(it: FollowQueueItem, todayYmd: string): FollowAtRiskKind | null {
+  const e = it.call.round.entry;
+  if (it.group === 'done') return null;
+  const late = it.at !== null ? it.lateMinutes ?? 0 : 0;
+  if (e.call_mode !== 'manual' && AI_NOT_SENT_STATES.has(String(e.dispatch_state ?? ''))) return 'ai_not_sent';
+  if (it.group === 'ai') {
+    return it.call.round.state === 'overdue' && it.at !== null && late >= AT_RISK_GRACE_MIN ? 'ai_late' : null;
+  }
+  if (e.time_tbd) return (it.call.round.ymd ?? '9999') <= todayYmd ? 'tbd' : null;
+  if (e.call_mode !== 'manual' && it.call.round.state === 'notSent') return 'ai_not_sent';
+  return late >= AT_RISK_GRACE_MIN ? 'staff_late' : null;
+}
+
+export function followAtRiskCalls(rows: readonly FollowPlanningRow[], now: Date = new Date()): FollowAtRiskItem[] {
   const days = new Set<string>();
-  for (const row of rows) for (const r of row.rounds) if (r.ymd?.slice(0, 7) === month) days.add(r.ymd);
-  const out: FollowQueueItem[] = [];
+  for (const row of rows) for (const r of row.rounds) if (r.ymd) days.add(r.ymd);
+  const todayYmd = BKK_YMD.format(now);
+  const out: FollowAtRiskItem[] = [];
   for (const ymd of days) {
     const q = buildFollowCallQueue(buildFollowDayPeople(rows, ymd, 'all'), now);
-    for (const it of q.staff) if ((it.lateMinutes ?? 0) > 0) out.push(it);
-    for (const it of q.ai) if (it.call.round.state === 'overdue') out.push(it);
+    for (const it of [...q.staff, ...q.ai]) {
+      // lateMinutes ของกอง AI เป็น null โดยตั้งใจ (ป้ายเลยเวลาบอกเฉพาะกองคน) — คิดเองที่นี่
+      const item = it.group === 'ai' && it.at !== null ? { ...it, lateMinutes: Math.floor((now.getTime() - it.at) / 60_000) } : it;
+      const kind = followAtRiskKindOf(item, todayYmd);
+      if (kind) out.push({ ...item, kind });
+    }
   }
   return out.sort((a, b) => (a.at ?? Number.MAX_SAFE_INTEGER) - (b.at ?? Number.MAX_SAFE_INTEGER));
 }

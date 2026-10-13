@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FollowEntry } from '@/lib/followApi';
 import type { FollowDayCall, FollowDayPerson, FollowPlanningRound } from '@/lib/followPlanning';
-import { buildFollowCallQueue, clusterQueueByPerson, FOLLOW_QUEUE_PAGE_SIZES, followQueueGroupOf, followUrgentCalls, lateText } from '@/lib/followCallQueue';
+import { buildFollowCallQueue, clusterQueueByPerson, FOLLOW_QUEUE_PAGE_SIZES, followAtRiskCalls, followQueueGroupOf, lateText } from '@/lib/followCallQueue';
 import { groupFollowEntries } from '@/lib/followGrouping';
 import { buildFollowPlanningRows } from '@/lib/followPlanning';
 import { FOLLOW_PANEL_LINES, followPanelLists, followPeopleCount, type FollowMatrixCol } from '@/lib/followCallMatrix';
@@ -95,23 +95,31 @@ describe('QA รอบ 4 (12 ต.ค. 2569) — กติกาจบแล้�
     expect(followQueueGroupOf(c, person('ฉ', [c, open])).group).toBe('done');
   });
 
-  it('🔴 ข้อ 3: ต้องตามด่วน = คนต้องโทรที่เลยเวลา + AI เลยเวลาไม่มีผล · คนที่จบวันแล้วไม่นับ', () => {
-    const now = new Date('2026-10-12T10:00:00Z');
+  it('🔴 สายที่จะไม่ถูกโทร (13 ต.ค. 2569): คนยังไม่โทร · AI ส่งไม่ได้ (รวมอนาคต) · AI เลยเวลาไม่มีผล · ยังไม่ระบุเวลา · คนที่จบวันแล้วไม่นับ', () => {
+    const now = new Date('2026-10-12T10:00:00Z'); // 17:00 ไทย
     const e = (over: Partial<FollowEntry>) => entry({ topic: 'ติดตามเริ่มงาน', created_at: '2026-10-01T00:00:00Z', ...over });
     const entries = [
-      // ก: สายคนโทรเลยเวลา ยังไม่ได้ลงผล → ด่วน (เดิมการ์ดไม่นับ เพราะหมวดเป็น notSent)
+      // ก: สายคนโทรเลยเวลา ยังไม่ได้ลงผล → คนยังไม่โทร
       e({ id: 'a', recipient_phone: '0811111111', call_mode: 'manual', call_status: null, scheduled_at: '2026-10-12T01:00:00Z' }),
-      // ข: เช้าไม่รับสาย สายถัดมาตอบว่าไป → จบวัน ไม่ด่วน
+      // ข: เช้าไม่รับสาย สายถัดมาตอบว่าไป → จบวัน ไม่นับ
       e({ id: 'b1', recipient_phone: '0822222222', call_status: 'completed', call_outcome: 'no_answer', scheduled_at: '2026-10-12T00:00:00Z' }),
       e({ id: 'b2', recipient_phone: '0822222222', call_status: 'completed', call_outcome: 'confirmed', scheduled_at: '2026-10-12T01:00:00Z' }),
-      // ค: ส่ง AI แล้วเลยเวลา ผลยังไม่กลับ → ด่วน (ของเดิมของการ์ด)
-      e({ id: 'c', recipient_phone: '0833333333', call_status: 'pending', scheduled_at: '2026-10-12T02:00:00Z' }),
-      // ง: สายคนโทรยังไม่ถึงเวลา → ไม่ด่วน
+      // ค: ส่ง AI แล้วเลยเวลา ผลยังไม่กลับ → AI เลยเวลาไม่มีผล
+      e({ id: 'c', recipient_phone: '0833333333', call_status: 'pending', dispatch_state: 'queued', scheduled_at: '2026-10-12T02:00:00Z' }),
+      // ง: สายคนโทรยังไม่ถึงเวลา → ไม่นับ
       e({ id: 'd', recipient_phone: '0844444444', call_mode: 'manual', call_status: null, scheduled_at: '2026-10-12T12:00:00Z' }),
+      // จ: สาย AI พรุ่งนี้ ส่งไม่ถึง Lumos → AI ส่งไม่ได้ (ยังไม่ถึงเวลาก็นับ)
+      e({ id: 'f', recipient_phone: '0855555555', call_status: 'pending', dispatch_state: 'push_failed', scheduled_at: '2026-10-13T01:00:00Z' }),
+      // ฉ: สาย AI ปิดส่งอัตโนมัติ (ไม่มีคิว) → AI ส่งไม่ได้
+      e({ id: 'g', recipient_phone: '0866666666', call_status: null, dispatch_state: 'off', scheduled_at: '2026-10-14T01:00:00Z' }),
+      // ช: ยังไม่ระบุเวลา ของวันนี้ → ยังไม่ระบุเวลา
+      e({ id: 'h', recipient_phone: '0877777777', call_mode: 'manual', call_status: null, time_tbd: true, scheduled_at: '2026-10-12T05:00:00Z' }),
+      // ซ: AI เพิ่งเลยเวลา 5 นาที → ยังไม่นับ (รอผล 15 นาที)
+      e({ id: 'i', recipient_phone: '0888888888', call_status: 'pending', dispatch_state: 'queued', scheduled_at: '2026-10-12T09:55:00Z' }),
     ];
     const rows = buildFollowPlanningRows(groupFollowEntries(entries, now), now);
-    const ids = followUrgentCalls(rows, '2026-10', now).map((it) => it.call.round.entry.id);
-    expect(ids.sort()).toEqual(['a', 'c']);
+    const got = Object.fromEntries(followAtRiskCalls(rows, now).map((it) => [it.call.round.entry.id, it.kind]));
+    expect(got).toEqual({ a: 'staff_late', c: 'ai_late', f: 'ai_not_sent', g: 'ai_not_sent', h: 'tbd' });
   });
 });
 

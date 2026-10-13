@@ -162,3 +162,38 @@ describe('ผูกเข้าตัวเดินทุกนาที + จ�
     expect(followDispatchLabel({ state: 'not_imported', callStatus: 'completed' }).label).toBe('AI โทรจบแล้ว');
   });
 });
+
+/**
+ * ชั้น 3 (เจ้าของ 13 ต.ค. 2569 "อะไรที่จะไม่โทร และมีโอกาสจะไม่โทร จะกันให้หมด"):
+ * สรุป "สายที่จะไม่ถูกโทร" ชั่วโมงละครั้งต่อแท็บ — คนยังไม่โทร + AI ส่งไม่ได้ · ไม่มี = ไม่แจ้ง
+ */
+describe('สรุปสายที่จะไม่ถูกโทร (ชั้น 3)', () => {
+  it('แจ้งแท็บที่มีของ · แท็บที่เป็น 0 ไม่แจ้ง · คีย์กันซ้ำรายชั่วโมงต่อแท็บ', async () => {
+    dbQuery.mockReset().mockResolvedValue({
+      rows: [
+        { team: 'replacement', staff_late: 12, ai_not_sent: 1 },
+        { team: 'main', staff_late: 0, ai_not_sent: 0 },
+      ],
+    });
+    notifyRoles.mockReset();
+    const r = await mod.alertFollowAtRiskDigest(new Date('2026-10-13T03:20:00Z')); // 10:20 ไทย
+    expect(r.alerted).toBe(1);
+    expect(notifyRoles).toHaveBeenCalledTimes(1);
+    const [roles, input] = notifyRoles.mock.calls[0];
+    expect(roles).toEqual(['admin', 'supervisor']);
+    expect(input).toMatchObject({
+      type: 'follow_at_risk',
+      title: 'สายที่จะไม่ถูกโทร · ติดตามส่งคนแทน',
+      body: 'คนยังไม่โทร 12 สาย · AI ส่งไม่ได้ 1 สาย (ใน 1 ชม.)',
+      link: '/follow?view=replace',
+      dedupeKey: 'follow_at_risk:replacement:2026101310',
+    });
+    // ชุดสถานะ "ส่งไม่ได้" ตัวเดียวกับป้ายบนจอ
+    expect(dbQuery.mock.calls[0][1]).toEqual([['held', 'suppressed', 'guarded', 'no_phone', 'off', 'push_failed', 'not_imported']]);
+  });
+
+  it('ตัวทำงานทุกนาทีเรียกชั้น 3 ต่อจากชั้น 2', () => {
+    const src = readFileSync(new URL('../../api/_lib/followPushRetryWorker.ts', import.meta.url), 'utf8');
+    expect(src).toMatch(/await alertOverdueAiFollow\(\);[\s\S]*await alertFollowAtRiskDigest\(\);/);
+  });
+});
