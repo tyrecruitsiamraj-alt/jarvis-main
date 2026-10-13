@@ -12,7 +12,6 @@ describe('ล็อกรอบดึงส่งคนแทน', () => {
   it('สามงานใช้คีย์ล็อกเดียวกัน', () => {
     expect(src).toContain('return withSessionLock(REPLACE_SYNC_LOCK_KEY, () => runIrecruitReplaceSyncUnlocked(opts));');
     expect(src).toContain('return withSessionLock(REPLACE_SYNC_LOCK_KEY, () => enforceReplaceAiPausedUnlocked(now));');
-    expect(src).toContain('return withSessionLock(REPLACE_SYNC_LOCK_KEY, () => enforceReplaceAiFromUnlocked(aiFrom));');
   });
   it('🔴 ข้างในไม่เรียกตัวที่ล็อกซ้อน (ล็อก session คนละ connection = ค้างรอตัวเอง)', () => {
     const body = src.slice(src.indexOf('async function runIrecruitReplaceSyncUnlocked'));

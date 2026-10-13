@@ -11,8 +11,6 @@
  */
 import { logError, logInfo, logWarn } from './logger.js';
 import {
-  enforceReplaceAiFrom,
-  enforceReplaceAiPaused,
   getReplaceSyncSettings,
   runIrecruitReplaceSync,
 } from './irecruitReplaceSync.js';
@@ -46,22 +44,8 @@ export async function runReplaceSyncIfDue(
   now: Date = new Date(),
 ): Promise<ReplaceSyncSummary | null> {
   const settings = await getReplaceSyncSettings();
-  // "AI เริ่มโทรตั้งแต่" — บังคับทุกรอบ ไม่รอรอบดึงประจำวัน (เจ้าของสั่ง 2 ต.ค. 2569)
-  if (settings.rule.aiFrom) {
-    try {
-      await enforceReplaceAiFrom(settings.rule.aiFrom);
-    } catch (e) {
-      logError('irecruit.replaceSync.aiFrom: รอบนี้ล้ม', e);
-    }
-  }
-  // "พัก AI" (เจ้าของสั่ง 6 ต.ค. 2569 ค่ำ) — บังคับทุกรอบเหมือนกัน · สายใหม่ที่รอบดึงสร้างเป็นคนโทรอยู่แล้ว (`replaceCallModeFor`)
-  if (settings.rule.aiPaused) {
-    try {
-      await enforceReplaceAiPaused(now);
-    } catch (e) {
-      logError('irecruit.replaceSync.aiPaused: รอบนี้ล้ม', e);
-    }
-  }
+  // 🔴 13 ต.ค. 2569 เจ้าของ Choice "ตัดสินครั้งเดียวตอนสร้าง": รอบนี้ไม่บังคับ "AI เริ่มโทรตั้งแต่" / "พัก AI" ซ้ำทุกรอบแล้ว
+  //    (พัก AI ทำตอนกดสวิตช์ที่เดียว · สายใหม่ตอนพักอยู่สร้างเป็นคนโทรอยู่แล้ว)
   /**
    * 🔴 ดึงทุกรอบ (ทุก `tickMs` = 5 นาที) — เจ้าของสั่ง 5 ต.ค. 2569: *"ไม่ต้องดึงทุก 6 โมงแล้ว เป็นมีอัปเดตที่ iRecruit แล้วขึ้นเลย"*
    * (Choice "ทุก 5 นาที") · รอบที่ล้ม = เว้น `RETRY_AFTER_FAIL_MS` ก่อนลองใหม่ (ไม่ถล่ม iRecruit ตอนมันล่ม)

@@ -210,7 +210,8 @@ describe('พัก AI (aiPaused)', () => {
     expect(lib).toContain('= any($3::text[]))`');
     expect(lib).toContain('replaceCallModeFor(p.at, settings.rule.aiFrom, settings.rule.aiPaused)');
     const worker = readFileSync(`${process.cwd()}/api/_lib/irecruitReplaceSyncWorker.ts`, 'utf8');
-    expect(worker).toContain('if (settings.rule.aiPaused) {');
+    // 13 ต.ค. 2569: ไม่บังคับพัก AI ซ้ำทุกรอบแล้ว (ตัดสินครั้งเดียวตอนสร้าง · พักทำตอนกดสวิตช์)
+    expect(worker).not.toContain('enforceReplaceAiPaused');
     const handler = readFileSync(`${process.cwd()}/api/_handlers/irecruit-replace-sync.ts`, 'utf8');
     expect(handler).toContain("if (method === 'PATCH') {");
     expect(handler).toContain('const enforced = hasPause && body.aiPaused ? await enforceReplaceAiPaused() : null;');

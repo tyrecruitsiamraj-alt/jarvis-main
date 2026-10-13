@@ -249,13 +249,6 @@ type DesiredMeta = ReplaceDesiredCall & {
   /** "เพิ่มโดย" — อีเมลคนเพิ่มใบใน iRecruit (`replaceAdderLabel`) */
   adder: string | null;
   mode: 'ai' | 'manual';
-  /**
-   * ใครโทรตามกติกา (รายชื่อ / พัก AI / WL) **ไม่สนว่าเลยเวลาตามตัวคิดสาย** — ใช้กับแถวที่มีอยู่แล้ว (`existingModeOf`)
-   * 🔴 13 ต.ค. 2569: `mode` เป็นคนโทรเมื่อ `past` · ตัวคิดสายตัดสายก่อนเข้างานที่อยู่ก่อนคอนเฟิร์มตามคิวทิ้ง (`past`)
-   *    ⇒ ใบที่คอนเฟิร์มผ่านไปแล้ว สาย 1 ชม./15 นาที ถูกมองว่าเลยเวลา ~10 นาทีก่อนถึงจริง แล้วขั้น 2.5 สลับเป็นคนโทร
-   *    + ยกเลิกที่ Lumos (สุวัฒน์ชัย 05:00 · 05:45 ไม่ถูกโทร)
-   */
-  typeMode: 'ai' | 'manual';
   /** เบอร์ฉุกเฉินของคนในรายชื่อให้ AI โทร (`rule.aiPhones`) · ไม่อยู่ในรายชื่อ = null */
   emergency: string | null;
   /** ประเภทจาก iRecruit (EX · คนใน ฯลฯ) — เก็บลงแถวให้หน้าติดตามกรองได้ (136 · เจ้าของสั่ง 6 ต.ค. 2569) */
@@ -273,7 +266,6 @@ type ExistingRow = {
   /** ยกเลิกแล้ว — ใบซ้ำต้องรู้ว่าใบไหนยังมีแถวที่ใช้อยู่ (`pickReplaceJobPerPhoneTime`) */
   cancelled: boolean;
   /** สร้างก่อนกติกา EX = AI · คนใน = คนโทร — เฉพาะแถวพวกนี้ที่รอบดึงเปลี่ยน AI → คนโทรให้เอง */
-  before_type_rule: boolean;
   /** เจ้าหน้าที่เคยแก้แถวนี้บนระบบ (`updated_by` — รอบดึงไม่เคยตั้งค่านี้) */
   staff_edited: boolean;
   /** หมายเหตุ = เวลาเข้างานของ iRecruit ตอนดึงครั้งล่าสุด (`replaceSlotNote`) */
@@ -291,8 +283,6 @@ function personKeyOf(phone: string): string {
 
 /** ระยะกันชน — สายที่จะโทรภายในนี้ถือว่ากำลังโทร แตะไม่ได้ */
 const LOCK_AHEAD_MS = 2 * 60_000;
-/** วันที่กติกา EX = AI · คนใน = คนโทร มีผลกับแถวที่สร้าง (เที่ยงคืน 6 ต.ค. 2569 เวลาไทย) — ดูขั้น 2.5 */
-const REPLACE_TYPE_RULE_FROM = '2026-10-05T17:00:00.000Z';
 
 let running = false;
 
@@ -469,7 +459,6 @@ async function runIrecruitReplaceSyncUnlocked(
           siteCode: r.site_code?.trim() || null,
           // สายที่เลยเวลาแล้ว = คนโทร (AI ไม่โทรย้อนหลัง)
           mode: p.past ? 'manual' : typeMode,
-          typeMode,
           emergency: listed?.emergency ?? null,
           replaceType: (r.replace_type ?? '').trim() || null,
         });
@@ -484,15 +473,13 @@ async function runIrecruitReplaceSyncUnlocked(
                 (cancelled_at is null and completed_at is null and staff_call_outcome is null
                   and scheduled_at > $1::timestamptz) as pending,
                 (cancelled_at is not null) as cancelled,
-                (created_at < $3::timestamptz) as before_type_rule,
                 (updated_by is not null) as staff_edited, note, recipient_name, unit_name, site_code
            from ${followTable}
           where source_ref like 'irecruit-replace:%'
-            and (scheduled_at >= $2::timestamptz or source_ref = any($4::text[]))`,
+            and (scheduled_at >= $2::timestamptz or source_ref = any($3::text[]))`,
         [
           new Date(now.getTime() + LOCK_AHEAD_MS).toISOString(),
           new Date(now.getTime() - 3 * 86_400_000).toISOString(),
-          REPLACE_TYPE_RULE_FROM,
           // ใบลงย้อนหลัง (วันเข้างานเก่ากว่า 3 วัน) — หาด้วยคีย์ ไม่งั้นทุกรอบพยายามสร้างซ้ำแล้วชนตัวกันซ้ำ
           desired.map((d) => d.ref),
         ],
@@ -541,9 +528,6 @@ async function runIrecruitReplaceSyncUnlocked(
     );
     plan.cancel = plan.cancel.filter((c) => !pendingBeyond.has(c.ref));
     const metaByRef = new Map(desired.map((d) => [d.ref, d]));
-    /** ใครโทรของแถวที่มีอยู่แล้ว — ถึงเวลาโทรของสายจริง (ไม่ใช่ `past` ของตัวคิดสาย) = คนโทร · ที่เหลือตามกติกา */
-    const existingModeOf = (m: DesiredMeta): 'ai' | 'manual' =>
-      m.at.getTime() <= now.getTime() + LOCK_AHEAD_MS ? 'manual' : m.typeMode;
     const rowById = new Map(existingRows.map((x) => [x.id, x]));
     /**
      * 🔴 แก้ล่าสุดชนะ (เจ้าของ 7 ต.ค. 2569: *"ถ้าแก้มาจาก irecruit ใช้ irecruit แก้บนระบบใช้บนระบบ อันไหนแก้ล่าสุดใช้อันนั้น"*)
@@ -604,9 +588,9 @@ async function runIrecruitReplaceSyncUnlocked(
         const row = rowById.get(ex.id);
         const wasAi = row?.mode === 'ai';
         if (wasAi) await cancelFollowReminder(ex.id, staffNameOfPhone);
-        // เจ้าหน้าที่เคยสลับคน → AI เอง = คงที่เขาเลือก (iRecruit เปลี่ยนแค่เวลา ไม่ได้เปลี่ยนใครโทร)
-        // พัก AI อยู่ก็คง (เจ้าของ 8 ต.ค. 2569 Choice "เลือก AI รายสายได้" — พักแค่สายที่ระบบตั้งให้)
-        const mode = wasAi ? (row?.staff_edited ? 'ai' : existingModeOf(meta)) : 'manual';
+        // 🔴 ใครโทรตัดสินครั้งเดียวตอนสร้าง (เจ้าของ Choice 13 ต.ค. 2569) — iRecruit แก้แค่เวลา = คงใครโทรเดิม
+        //    ยกเว้นเวลาใหม่ถึงแล้ว = คนโทร (AI ไม่โทรย้อนหลัง · กติกาเดียวกับฝั่งคนเริ่มงาน)
+        const mode = wasAi && meta.at.getTime() > now.getTime() + LOCK_AHEAD_MS ? 'ai' : 'manual';
         await dbQuery(`update ${followTable} set scheduled_at = $2, note = $3, call_mode = $4 where id = $1`, [
           ex.id,
           meta.at.toISOString(),
@@ -622,45 +606,13 @@ async function runIrecruitReplaceSyncUnlocked(
       }
     }
 
-    // ── 2.5) WL ที่เป็นสาย AI → คนโทร (WL ห้ามโดน AI โทร · เจ้าของ Choice 5 ต.ค. 2569 · 8 ต.ค. แยกด้วยรายชื่อ WL) ──
-    // ไม่ทำกลับทาง (คน → AI) เอง — เจ้าหน้าที่สลับเองได้ที่หน้าติดตาม ห้ามรอบ 5 นาทีไปทับ
-    // 🔴 6 ต.ค. 2569: ทำเฉพาะแถวที่สร้างก่อนกติกานี้ (`before_type_rule`) — แถวใหม่ของคนในสร้างเป็นคนโทรอยู่แล้ว
-    //    ถ้าเจอคนในที่เป็น AI = เจ้าหน้าที่สลับเอง (เจ้าของ: "ถ้าคนจะโทรให้แก้") ⇒ เดิมรอบ 5 นาทีสลับกลับทุกครั้ง ห้ามแล้ว
+    /**
+     * 🔴 13 ต.ค. 2569 เจ้าของ Choice "ตัดสินครั้งเดียวตอนสร้าง": รอบ 5 นาทีแก้แค่ที่ iRecruit แก้ (เวลา · ยกเลิก · ชื่อ/หน่วยงาน)
+     * **ห้ามเปลี่ยนใครโทรของแถวที่มีอยู่แล้ว** — เดิมมีขั้น WL → คนโทร / EX → AI / รายชื่อ → AI ทุกรอบ
+     * ⇒ สาย AI ของคนในรายชื่อโดนสลับเป็นคนโทร + ยกเลิกที่ Lumos ~8 นาทีก่อนโทร (9 สายเช้า 13 ต.ค.)
+     * ใครโทรเปลี่ยนได้ทางเดียว = เจ้าหน้าที่แก้ในป๊อป หรือกดสวิตช์พัก AI (ตอนกดเท่านั้น)
+     */
     const rescheduledIds = new Set(plan.reschedule.map((r) => r.existing.id));
-    for (const x of existingRows) {
-      // เจ้าหน้าที่สลับเป็น AI เอง = ห้ามทับ (8 ต.ค. 2569 — แถวรุ่นก่อน 6 ต.ค. เดิมโดนสลับกลับทุก 5 นาที)
-      if (!x.pending || x.mode !== 'ai' || rescheduledIds.has(x.id) || x.staff_edited) continue;
-      const meta = metaByRef.get(x.source_ref);
-      if (!meta || existingModeOf(meta) !== 'manual') continue;
-      try {
-        await cancelFollowReminder(x.id, staffNameOfPhone);
-        await dbQuery(`update ${followTable} set call_mode = 'manual' where id = $1`, [x.id]);
-        await setDispatchState(x.id, 'manual');
-        summary.toManual = (summary.toManual ?? 0) + 1;
-      } catch (e) {
-        logError('irecruit.replaceSync: เปลี่ยนเป็นคนโทรไม่สำเร็จ', e, { id: x.id });
-      }
-    }
-
-    // ── 2.6) ไม่ใช่ WL ที่ระบบเคยตั้งเป็นคนโทร → AI (เจ้าของ 8 ต.ค. 2569 "แค่ WL ที่คนโทร ที่เหลือ AI เลย") ──
-    // เดิมคนที่ติด IN ในประวัติ iRecruit เป็นคนโทร (ค่าเก่าค้าง เช่นอิศเรศ) · เจ้าหน้าที่แก้เอง (`staff_edited`) = ห้ามทับ
-    // สายที่เลยเวลาไม่แตะ (`pending` = ยังไม่ถึงเวลา) · พัก AI / aiFrom อยู่ = meta.mode เป็นคนโทรอยู่แล้ว ไม่เข้าเงื่อนไข
-    // 🔴 ปิดไว้ก่อน (เจ้าของ 8 ต.ค. 2569 "เดี๋ยวขอเทสก่อนนะ" — สายเดิม 619 สาย · 185 ใน 24 ชม.) — เปิดด้วย env
-    //    `IRECRUIT_REPLACE_EXISTING_TO_AI=true` เมื่อเจ้าของสั่ง · ใบที่ดึงเข้ามาใหม่ใช้กติกาใหม่อยู่แล้ว
-    const flipExistingToAi = (process.env.IRECRUIT_REPLACE_EXISTING_TO_AI || '').trim().toLowerCase() === 'true';
-    for (const x of flipExistingToAi ? existingRows : []) {
-      if (!x.pending || x.mode !== 'manual' || rescheduledIds.has(x.id) || x.staff_edited) continue;
-      const meta = metaByRef.get(x.source_ref);
-      if (!meta || existingModeOf(meta) !== 'ai') continue;
-      try {
-        await dbQuery(`update ${followTable} set call_mode = 'ai' where id = $1 and call_mode = 'manual'`, [x.id]);
-        if (autoAi) toEnqueue.push({ id: x.id, meta });
-        else await setDispatchState(x.id, 'off');
-        summary.toAi = (summary.toAi ?? 0) + 1;
-      } catch (e) {
-        logError('irecruit.replaceSync: เปลี่ยนเป็น AI ไม่สำเร็จ', e, { id: x.id });
-      }
-    }
 
     // ── 2.55) iRecruit แก้ชื่อ/หน่วยงาน → ระบบแก้ตาม แล้วส่งแผนใหม่ให้ Lumos (เจ้าของ 7 ต.ค. 2569:
     //    *"irecruit แก้อะไรระบบนี้แก้ตาม แล้วแก้ทับส่งไป lumos อีกที"*) — เฉพาะสายที่ยังไม่ถึงเวลา
@@ -707,30 +659,6 @@ async function runIrecruitReplaceSyncUnlocked(
         );
       } catch (e) {
         logWarn('irecruit.replaceSync: เติมคนเพิ่มใบไม่สำเร็จ', { error: errorSummaryText(e) });
-      }
-    }
-
-    // ── 2.7) คนในรายชื่อให้ AI โทร ที่ยังเป็นคนโทร → AI + เบอร์ฉุกเฉินตามรายชื่อ (เจ้าของ 12 ต.ค. 2569 Choice "สายที่รอโทร + งานใหม่") ──
-    // เฉพาะสายที่ยังไม่ถึงเวลา · เจ้าหน้าที่แก้เอง (`staff_edited`) = ห้ามทับ · ส่ง Lumos เมื่อสวิตช์ follow_entry เปิด
-    const listedFlips = existingRows.filter((x) => {
-      if (!x.pending || x.mode !== 'manual' || x.staff_edited || rescheduledIds.has(x.id)) return false;
-      const meta = metaByRef.get(x.source_ref);
-      return Boolean(meta && existingModeOf(meta) === 'ai' && replaceAiPhoneOf(settings.rule, x.recipient_phone));
-    });
-    const autoAiListed = listedFlips.length > 0 ? autoAi || (await isAutoDispatchEnabled('follow_entry')) : false;
-    for (const x of listedFlips) {
-      const meta = metaByRef.get(x.source_ref) as DesiredMeta;
-      try {
-        await dbQuery(
-          `update ${followTable} set call_mode = 'ai', staff_phone = coalesce($2, staff_phone)
-            where id = $1 and call_mode = 'manual'`,
-          [x.id, meta.emergency],
-        );
-        if (autoAiListed) toEnqueue.push({ id: x.id, meta });
-        else await setDispatchState(x.id, 'off');
-        summary.toAi = (summary.toAi ?? 0) + 1;
-      } catch (e) {
-        logError('irecruit.replaceSync: เปลี่ยนคนในรายชื่อเป็น AI ไม่สำเร็จ', e, { id: x.id });
       }
     }
 
@@ -897,37 +825,6 @@ async function persistLastRun(summary: ReplaceSyncSummary, actorName: string): P
     if (isPgUndefinedTable(e)) return; // ตาราง 133 ยังไม่มี — worker ถือผลไว้ในหน่วยความจำ
     logWarn('irecruit.replaceSync: จดผลรอบล่าสุดไม่สำเร็จ', { error: errorSummaryText(e) });
   }
-}
-
-/**
- * ═══ บังคับ "AI เริ่มโทรตั้งแต่" กับสายที่มีอยู่แล้ว (เจ้าของสั่ง 2 ต.ค. 2569) ═══
- * > *"ของวันนี้ ไปจนถึงวันจันทร์ เปลี่ยนเป็นคนโทรก่อนให้หมดเลย เพราะจะเริ่มใช้จริงวันจันทร์"*
- *
- * สายทีมส่งคนแทนที่ยังเป็น AI · ยังไม่ยกเลิก/ปิด · นัดก่อนวัน `aiFrom` → คนโทร + ยกเลิกแผนที่ Lumos
- * - แผนที่มีแต่สายในกลุ่มนี้ = ยกเลิกทั้งแผนด้วยรหัสหัวขบวน (`plan_ref`) ครั้งเดียว (ไม่ส่งแผนใหม่ไปกวน Lumos ทีละสาย)
- * - แผนที่มีสายหลังวันนั้นปนอยู่ = ยกเลิกเฉพาะสายในกลุ่ม (`cancelFollowReminder` ส่งสายที่เหลือเป็นแผนใหม่)
- * 🔴 ไม่มีคีย์ push (เครื่อง dev) = ไม่ทำอะไร — ห้ามเปลี่ยนแถวเป็นคนโทรทั้งที่แผนที่ Lumos ยังจะโทรอยู่
- * เรียกจาก worker ทุกรอบ (5 นาที) — ไม่มีแถวเข้าเงื่อนไขก็จบที่คำถามเดียว
- */
-export async function enforceReplaceAiFrom(aiFrom: string | null): Promise<{ converted: number; plansCancelled: number; errors: number }> {
-  return withSessionLock(REPLACE_SYNC_LOCK_KEY, () => enforceReplaceAiFromUnlocked(aiFrom));
-}
-
-async function enforceReplaceAiFromUnlocked(aiFrom: string | null): Promise<{ converted: number; plansCancelled: number; errors: number }> {
-  const out = { converted: 0, plansCancelled: 0, errors: 0 };
-  if (!aiFrom || !getLumosPushConfig()) return out;
-  const cut = new Date(`${aiFrom}T00:00:00+07:00`);
-  if (Number.isNaN(cut.getTime())) return out;
-  const { rows: aff } = await dbQuery<{ id: string }>(
-    `select id from ${followTable}
-      where follow_team = $1 and cancelled_at is null and completed_at is null
-        and coalesce(call_mode, 'ai') = 'ai' and scheduled_at < $2`,
-    [FOLLOW_TEAM_REPLACEMENT, cut.toISOString()],
-  );
-  if (aff.length === 0) return out;
-  const res = await convertReplaceAiRowsToManual(new Set(aff.map((r) => r.id)), 'aiFrom');
-  logInfo('irecruit.replaceSync.aiFrom.done', { aiFrom, ...res });
-  return res;
 }
 
 /**
