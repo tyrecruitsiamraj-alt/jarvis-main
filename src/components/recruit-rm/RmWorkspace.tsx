@@ -44,14 +44,6 @@ import {
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
 import { downloadApplicantExport } from '@/lib/applicantExport';
-import ApplicantBreakdown from '@/components/recruit-rm/ApplicantBreakdown';
-import {
-  countApplicantBreakdown,
-  isApplicantBreakdownKey,
-  isInApplicantBreakdown,
-  type ApplicantBucket,
-  type ApplicantBucketGroup,
-} from '@/lib/applicantBreakdown';
 import { summarizeCallChoice } from '@/lib/callChoiceSummary';
 import CallChoiceConfirmDialog from '@/components/recruit-rm/CallChoiceConfirmDialog';
 import { ATTENDANCE_LABEL, type AttendanceResult } from '@/lib/appointmentAttendance';
@@ -184,9 +176,6 @@ const RmWorkspace: React.FC<{
    */
   const listParam = searchParams.get('list');
   const listView: RmListView = isShownRmListView(listParam) ? listParam : 'all';
-  /** แตกยอดผู้สมัคร (14 ต.ค. 2569 · `applicantBreakdown.ts`) — กลุ่ม/กลุ่มย่อยที่กดอยู่ เก็บใน `?group=` */
-  const groupParam = searchParams.get('group');
-  const breakdownKey = isApplicantBreakdownKey(groupParam) ? groupParam : null;
 
   const [rows, setRows] = useState<PublicApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -479,11 +468,8 @@ const RmWorkspace: React.FC<{
     const base = filterApplications(rows, tab, rmFilters, keyword);
     // มุมมองย่อยใช้เฉพาะแท็บรายชื่อผู้สมัคร — แท็บอื่นมีความหมายของตัวเองอยู่แล้ว
     if (tab !== 'candidates') return base;
-    const nowMs = Date.now();
-    return base.filter(
-      (r) => isInRmListView(r, listView) && (!breakdownKey || isInApplicantBreakdown(r, breakdownKey, nowMs)),
-    );
-  }, [rows, tab, keyword, listView, bucket, rmFilters, breakdownKey]);
+    return base.filter((r) => isInRmListView(r, listView));
+  }, [rows, tab, keyword, listView, bucket, rmFilters]);
 
   const filtered = useMemo(
     () => (bucket ? baseFiltered : applyApplicantFilters(baseFiltered, applicantFilterState, applicantFacts)),
@@ -552,29 +538,8 @@ const RmWorkspace: React.FC<{
     return out;
   }, [rows, keyword, rmFilters, applicantFilterState, applicantFacts]);
 
-  /** แตกยอด — ฐานเดียวกับเลขบนชิป (หลังตัวกรอง/คำค้น ก่อนกดมุมมองย่อย) ทุกชั้นจึงบวกได้เท่า "รายชื่อทั้งหมด" */
-  const breakdownCounts = useMemo(() => {
-    const base = applyApplicantFilters(
-      filterApplications(rows, 'candidates', rmFilters, keyword),
-      applicantFilterState,
-      applicantFacts,
-    );
-    return countApplicantBreakdown(base);
-  }, [rows, keyword, rmFilters, applicantFilterState, applicantFacts]);
-
-  const setBreakdown = (next: ApplicantBucket | ApplicantBucketGroup | null) => {
-    const params = new URLSearchParams(searchParams);
-    params.delete('list');
-    if (next) params.set('group', next);
-    else params.delete('group');
-    setSearchParams(params);
-    setSelectedIds([]);
-    setPage(1);
-  };
-
   const setListView = (next: RmListView) => {
     const params = new URLSearchParams(searchParams);
-    params.delete('group');
     if (next === 'all') params.delete('list');
     else params.set('list', next);
     setSearchParams(params);
@@ -888,7 +853,6 @@ const RmWorkspace: React.FC<{
               count: loading ? null : loadError ? 'unknown' : listViewCounts[v],
             }))}
           />
-          <ApplicantBreakdown counts={loading || loadError ? null : breakdownCounts} value={breakdownKey} onChange={setBreakdown} />
         </div>
       ) : null}
       {!bucket && tab === 'contact' ? (
