@@ -79,6 +79,7 @@ export async function enrichPayloadsWithIncome(payloads: readonly unknown[]): Pr
       if (!rates || rates.length === 0) continue;
       const sentence = buildExtraInfoSentence({
         monthlyIncome: averageByRef.get(jobRefOfPayload(p) ?? '') ?? monthlyGuaranteedIncome(rates).total,
+        baseSalary: monthlyGuaranteedIncome(rates).base,
         benefitLine: speakableBenefitLine(rates),
       });
       if (!sentence) continue;

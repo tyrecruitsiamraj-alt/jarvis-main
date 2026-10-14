@@ -291,6 +291,7 @@ export function buildApplicationInterviewPayload(
           workArea: jobFacts?.workArea,
           ageRange: jobFacts?.ageRange,
           monthlyIncome: jobFacts?.monthlyIncome,
+          baseSalary: jobFacts?.baseSalary,
           benefitLine: jobFacts?.benefitLine,
           workSchedule: jobFacts?.workSchedule,
         }),
@@ -3068,6 +3069,7 @@ export async function takePendingLumosItems(
           if (!rates || rates.length === 0) continue;
           const sentence = buildExtraInfoSentence({
             monthlyIncome: monthlyGuaranteedIncome(rates).total,
+            baseSalary: monthlyGuaranteedIncome(rates).base,
             benefitLine: speakableBenefitLine(rates),
           });
           if (!sentence) continue;

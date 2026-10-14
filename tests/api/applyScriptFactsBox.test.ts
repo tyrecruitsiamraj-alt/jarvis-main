@@ -103,3 +103,13 @@ describe('loadAverageIncomeChoices (เลน Match เติมรายได�
     expect((await loadAverageIncomeChoices(['siamraj-sql:R1'])).size).toBe(0);
   });
 });
+
+describe('ฐานเงินเดือนของบท AI (14 ต.ค. 2569)', () => {
+  it('ทีมตั้งบรรทัด "ฐานเงินเดือน" (ต่อเดือน) ⇒ ใช้ค่านั้น · ไม่ตั้ง ⇒ ใช้ฐานจาก ERP', async () => {
+    erpHangs = false;
+    boxOverrides = { income_display: { period: 'monthly', total: 20000, lines: [{ label: 'ฐานเงินเดือน', amount: 11000 }] } };
+    expect((await loadApplyScriptFacts('siamraj-sql:R1', 500)).baseSalary).toBe(11000);
+    boxOverrides = null;
+    expect((await loadApplyScriptFacts('siamraj-sql:R1', 500)).baseSalary ?? null).toBeNull();
+  });
+});

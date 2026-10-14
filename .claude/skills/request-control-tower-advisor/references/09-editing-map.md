@@ -13187,3 +13187,8 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - AI: บทผู้สมัครผ่านลิงก์ `applyScriptFacts.ts` (`spokenMonthlyIncome`) · เลน Match เติมตอนยิง `lumosPayloadIncome.ts` → `loadAverageIncomeChoices` (import ตอนใช้ กันวงจร)
   · คำในบทไม่เปลี่ยน ("งานนี้รายได้ประมาณเดือนละ {รายได้ต่อเดือน} บาท") — เปลี่ยนแค่เลข · AI ยังไม่พูดฐานเงินเดือน
 - เทสต์: `src/lib/incomeShown.test.ts` · `tests/api/applyScriptFactsBox.test.ts` · `tests/api/lumosPayloadIncome.test.ts`
+- 14 ต.ค. (ต่อ) เจ้าของ *"เติมฐานเงินเดือนในบทโทร AI ด้วย"*: ตัวแปร `{ฐานเงินเดือน}` (`KNOWN_PLACEHOLDERS`) ·
+  บทสมัครผ่านลิงก์ + บทคีย์เอง เพิ่มบรรทัด "ฐานเงินเดือน {ฐานเงินเดือน} บาทครับ" ต่อจากบรรทัดรายได้ (บรรทัดรายได้คำเดิม · เทสต์ offerScript ล็อกไว้) ·
+  ของแถม `T.ของแถม.ฐาน` (เลน Match / บทเสนองาน) · `speakableBaseSalary` ไม่รู้ฐาน/เท่ารายได้ = ไม่พูด ·
+  ฐาน = บรรทัด "ฐานเงินเดือน" ที่ทีมตั้ง (ต่อเดือน) → ERP `monthlyGuaranteedIncome().base` (`applyScriptFacts.ts` `manualMonthlyBase`) ·
+  บท `interview` ที่แอดมินแก้ไว้ในหน้าตั้งค่าไม่ได้แตะ (ไม่มีบรรทัดรายได้ · ได้ฐานผ่านประโยคของแถม) · เทสต์ `tests/api/aiBaseSalary2569-10-14.test.ts`

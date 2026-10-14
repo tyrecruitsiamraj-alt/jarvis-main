@@ -144,6 +144,8 @@ export const KNOWN_PLACEHOLDERS: readonly string[] = [
   'เลขที่ใบขอ',
   'รายละเอียดงาน',
   'รายได้ต่อเดือน',
+  /** ฐานเงินเดือนต่อเดือน (14 ต.ค. 2569) — เท่ารายได้ต่อเดือน = ไม่พูด (บรรทัดหาย) */
+  'ฐานเงินเดือน',
   'สวัสดิการ',
   'เรื่อง',
   'เบอร์เจ้าหน้าที่',
@@ -330,9 +332,20 @@ export type ApplyScriptFacts = CallScriptFacts & {
   ageRange?: string | null;
   /** รายได้ต่อเดือน (สูตรเดียวกับหน้าประกาศ) — ไม่รู้ = ไม่พูดเรื่องเงินเลย ห้ามเดา */
   monthlyIncome?: number | null;
+  /** ฐานเงินเดือนต่อเดือน (14 ต.ค. 2569 · ตัวเดียวกับบรรทัด "ฐานเงินเดือน" บนการ์ด) — ไม่รู้ = บรรทัดหาย */
+  baseSalary?: number | null;
   /** สวัสดิการแบบพูดได้ (`speakableBenefitLine`) */
   benefitLine?: string | null;
 };
+
+/** เลขฐานเงินเดือนที่พูดได้ — ไม่รู้ หรือเท่ารายได้ที่พูด (ไม่มีเงินอื่น) = ไม่พูด ไม่ให้ AI พูดเลขเดิมสองรอบ */
+export function speakableBaseSalary(base: number | null | undefined, income: number | null | undefined): string | undefined {
+  const b = Number(base);
+  if (!Number.isFinite(b) || b <= 0) return undefined;
+  const i = Number(income);
+  if (Number.isFinite(i) && Math.round(i) === Math.round(b)) return undefined;
+  return Math.round(b).toLocaleString('th-TH');
+}
 
 /**
  * บทของคน **กรอกใบสมัครเองผ่านลิงก์** (เจ้าของ 5 ต.ค. 2569) — แยกจากบทเสนองาน (คนที่ฝากใบไว้/อยู่บนบอร์ด)
@@ -367,6 +380,7 @@ function applyValues(f: ApplyScriptFacts): ScriptValues {
     ช่วงอายุ: ageRange,
     ไม่มีช่วงอายุ: flag(!ageRange),
     รายได้ต่อเดือน: Number.isFinite(income) && income > 0 ? Math.round(income).toLocaleString('th-TH') : undefined,
+    ฐานเงินเดือน: speakableBaseSalary(f.baseSalary, f.monthlyIncome),
     สวัสดิการ: orDrop(f.benefitLine),
   };
 }
@@ -474,6 +488,8 @@ export function buildOfferMessage(
  */
 export function buildExtraInfoSentence(input: {
   monthlyIncome?: number | null;
+  /** ฐานเงินเดือนต่อเดือน (14 ต.ค. 2569) — พูดต่อจากรายได้ · เท่ารายได้ = ไม่พูด */
+  baseSalary?: number | null;
   benefitLine?: string | null;
 }): string {
   const parts: string[] = [];
@@ -483,6 +499,10 @@ export function buildExtraInfoSentence(input: {
       รายได้ต่อเดือน: Math.round(income).toLocaleString('th-TH'),
     });
     if (line) parts.push(line);
+    // ฐานเงินเดือนต่อจากรายได้ (14 ต.ค. 2569) — ไม่รู้ฐาน/เท่ารายได้ = ไม่พูด
+    const baseText = speakableBaseSalary(input.baseSalary, input.monthlyIncome);
+    const base = baseText ? renderLine(T.ของแถม.ฐาน, { ฐานเงินเดือน: baseText }) : '';
+    if (base) parts.push(base);
   }
   const benefits = renderLine(T.ของแถม.สวัสดิการ, { สวัสดิการ: orDrop(input.benefitLine) });
   if (benefits) parts.push(benefits);

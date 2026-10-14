@@ -23,7 +23,7 @@ import type { JobRequest, ResignedIncomeMonth } from '../../src/types/index.js';
 import { speakableAgeRange, speakableWorkArea, speakableWorkTime, type ApplyScriptFacts } from './lumosCallScript.js';
 import { logError, logWarn } from './logger.js';
 
-export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'monthlyIncome' | 'benefitLine' | 'workSchedule'> & {
+export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'monthlyIncome' | 'baseSalary' | 'benefitLine' | 'workSchedule'> & {
   /**
    * ชื่อจุดทำงานจากใบขอ (work_site_name → unit_name) — 🔴 ใบสมัครหลายใบไม่ได้เก็บชื่อหน่วยงานไว้
    * เดิม AI จึงพูดว่า "งานนี้ทำที่ หน่วยงานของเรา" (เจอในบทที่ส่งจริง 5 ต.ค. 2569)
@@ -53,6 +53,14 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
       },
     );
   });
+}
+
+/** ฐานเงินเดือนที่ทีมตั้งเอง (บรรทัด "ฐานเงินเดือน" ในรายการรายได้ · ต่อเดือนเท่านั้น) — ชนะของ ERP เหมือนการ์ด (`jobIncomeLine`) */
+function manualMonthlyBase(job: Record<string, unknown>): number | null {
+  const display = job.income_display as { period?: string; lines?: Array<{ label?: string; amount?: number }> } | null | undefined;
+  if (!display || display.period !== 'monthly' || !Array.isArray(display.lines)) return null;
+  const line = display.lines.find((l) => l?.label === 'ฐานเงินเดือน' && typeof l.amount === 'number' && l.amount > 0);
+  return line ? (line.amount as number) : null;
 }
 
 /** ค่ารายได้ที่ทีมตั้งเองบนใบ (ต่อเดือน) — ตั้งแบบรายวัน = ไม่ใช้ (คนละหน่วยกับประโยค "เดือนละ") */
@@ -106,12 +114,16 @@ async function loadFacts(jobId: string): Promise<ApplyJobFacts> {
   if (requestNo) {
     const rates = (await fetchJobBenefitRates([requestNo])).get(requestNo) ?? [];
     if (rates.length > 0) {
-      out.monthlyIncome = spokenMonthlyIncome(shown, manual ?? (monthlyGuaranteedIncome(rates).total || null), average);
+      const erp = monthlyGuaranteedIncome(rates);
+      out.monthlyIncome = spokenMonthlyIncome(shown, manual ?? (erp.total || null), average);
+      // ฐานเงินเดือน (14 ต.ค. 2569 "เติมฐานเงินเดือนในบทโทร AI ด้วย") — ทีมตั้ง → ERP · ตัวเดียวกับการ์ด
+      out.baseSalary = manualMonthlyBase(job) ?? (erp.base || null);
       out.benefitLine = speakableBenefitLine(rates) || null;
       return out;
     }
   }
   out.monthlyIncome = spokenMonthlyIncome(shown, manual, average);
+  out.baseSalary = manualMonthlyBase(job);
   return out;
 }
 
@@ -173,6 +185,7 @@ async function loadBoxFacts(jobId: string): Promise<ApplyJobFacts | null> {
   return {
     loaded: true,
     monthlyIncome: income,
+    baseSalary: manualMonthlyBase(job),
     workArea: speakableWorkArea(publicSafeAddressParts(job as never)) || (province ? speakableWorkArea({ province }) : '') || null,
     workSchedule: speakableWorkTime(job.work_schedule as string | null | undefined) || null,
     ageRange:
