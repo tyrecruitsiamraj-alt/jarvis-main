@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { isFollowLeaveMismatch } from '@/lib/followLeave';
 import { CalendarIcon, Check, ChevronLeft, ChevronRight, Clock, Pencil, Phone, PhoneOff, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
@@ -970,6 +971,16 @@ const FollowPlanningCalendar: React.FC<{
                                             }
                                           >
                                             {round.entry.dispatch_state === 'not_imported' ? 'Lumos ไม่รับแผน' : 'ส่งไม่ถึง Lumos'}
+                                          </span>
+                                        ) : null}
+                                        {/* Lumos ลงผลรับทราบ/ไป แต่เขาบอกว่าลา (14 ต.ค. 2569 · `followLeave.ts`) */}
+                                        {isFollowLeaveMismatch(round.entry) ? (
+                                          <span
+                                            className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', TONE.danger.chip)}
+                                            title={round.entry.call_summary ?? undefined}
+                                            data-testid="follow-leave-chip"
+                                          >
+                                            ลา
                                           </span>
                                         ) : null}
                                       </span>

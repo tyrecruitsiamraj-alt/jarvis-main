@@ -32,7 +32,7 @@ import type { LumosReminderPayload } from './lumosDispatch.js';
 import { staffNameOfPhone } from './followStaffName.js';
 import { repairDeclinedFollowDays } from './followDeclineDayRepair.js';
 import { isAutoDispatchEnabled } from './lumosDispatchMode.js';
-import { alertFollowAtRiskDigest, alertOverdueAiFollow, checkFollowPlanImports } from './followLumosWatch.js';
+import { alertFollowAtRiskDigest, alertFollowLeaveMismatch, alertOverdueAiFollow, checkFollowPlanImports } from './followLumosWatch.js';
 import { resendFollowCancels } from './followCancelResend.js';
 import { mergeSplitFollowPlans } from './followPlanMerge.js';
 import {
@@ -362,6 +362,12 @@ export function startFollowPushRetryWorker(): boolean {
         await alertFollowAtRiskDigest();
       } catch (e) {
         logError('follow.atRiskDigest: รอบนี้ล้ม', e);
+      }
+      // ชั้น 4 AI ลงผลรับทราบ/ไป แต่เขาบอกว่าลา → แจ้งทีมทันที (เจ้าของ 14 ต.ค. 2569 "ป้ายแดง ลา")
+      try {
+        await alertFollowLeaveMismatch();
+      } catch (e) {
+        logError('follow.leaveAlert: รอบนี้ล้ม', e);
       }
       await sleepInterruptible(nowCfg.intervalMs);
     }

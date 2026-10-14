@@ -25,6 +25,8 @@ import { resyncFollowPlanWithLumos } from './lumosDispatch.js';
 import { staffNameOfPhone } from './followStaffName.js';
 import { notifyRoles, notifyUsers } from './appNotifications.js';
 import { errorSummaryText, logError, logInfo, logWarn } from './logger.js';
+import { queueReplySql } from './lumosQueueDefs.js';
+import { FOLLOW_LEAVE_CHECK_OUTCOMES, isFollowLeaveMismatch } from '../../src/lib/followLeave.js';
 
 const followTable = tableInAppSchema('follow_entries');
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
@@ -314,5 +316,59 @@ export async function alertFollowAtRiskDigest(now: Date = new Date()): Promise<{
     out.alerted += 1;
   }
   if (out.alerted > 0) logInfo('follow.atRiskDigest', out);
+  return out;
+}
+
+/**
+ * ═══ ชั้น 4 — Lumos ลงผลรับทราบ/ไป แต่ผู้รับสายบอกว่าลา → แจ้งทีมทันที (เจ้าของสั่ง 14 ต.ค. 2569 "ป้ายแดง ลา") ═══
+ * เคสเชตฐ์ศักดิ์ 14 ต.ค. 07:25: "วันนี้ลากิจ 1 วัน" แต่ผล acknowledged ⇒ Lumos ไม่โทรเบอร์ฉุกเฉิน ทีมรู้ตอนสาย 2
+ * - ดูผลที่กลับมาใน 3 ชม. · ตัดสินด้วยตัวเดียวกับป้ายบนจอ (`isFollowLeaveMismatch`)
+ * - แจ้งคนเพิ่ม + admin/supervisor ครั้งเดียวต่อสาย (dedupe) · 🔴 ไม่แก้ผล ไม่สลับใครโทร (กติกา "AI ก็คือ AI")
+ */
+export function followLeaveMismatchSql(): string {
+  return `
+    select q.id::text as qid, f.created_by::text as created_by, f.recipient_name as name,
+           f.unit_name as unit, f.follow_team as team,
+           q.result->>'outcome' as call_outcome, q.result->>'summary' as call_summary, ${queueReplySql('q')} as call_reply
+      from ${queueTable} q
+      join ${followTable} f on q.person_ref = 'follow-' || f.id::text
+     where q.channel = 'reminder' and q.job_ref = 'follow'
+       and q.result->>'outcome' = any($1::text[])
+       and coalesce(q.last_result_at, q.first_result_at) > now() - interval '3 hours'
+       and f.cancelled_at is null
+     limit 200`;
+}
+
+export async function alertFollowLeaveMismatch(): Promise<{ alerted: number }> {
+  const out = { alerted: 0 };
+  let rows: Array<{
+    qid: string;
+    created_by: string | null;
+    name: string;
+    unit: string | null;
+    team: string | null;
+    call_outcome: string | null;
+    call_summary: string | null;
+    call_reply: string | null;
+  }>;
+  try {
+    rows = (await dbQuery<(typeof rows)[number]>(followLeaveMismatchSql(), [[...FOLLOW_LEAVE_CHECK_OUTCOMES]])).rows;
+  } catch (e) {
+    if (isUndefinedColumn(e)) return out;
+    throw e;
+  }
+  for (const r of rows) {
+    if (!isFollowLeaveMismatch(r)) continue;
+    const input = {
+      type: 'follow_leave',
+      title: `${r.name} บอกว่าลา แต่ AI ลงผลว่า${r.call_outcome === 'confirmed' ? 'ไป' : 'รับทราบ'}`,
+      body: [r.unit?.trim() || null, (r.call_summary ?? '').slice(0, 160) || null].filter(Boolean).join(' · '),
+      link: r.team === 'replacement' ? '/follow?view=replace' : '/follow',
+      dedupeKey: `follow_leave:${r.qid}`,
+    };
+    if (r.created_by) await notifyUsers([r.created_by], input);
+    await notifyRoles(['admin', 'supervisor'], input);
+    out.alerted += 1;
+  }
   return out;
 }

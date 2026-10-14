@@ -13198,3 +13198,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   ⇒ ตัวถาม (`followLumosWatch.ts` `pendingImportSql`) ข้ามแผนนี้ · วัดได้ 44 แผนรอโทรโดนแบบเดียวกัน
 - แก้: `recordPushAck` (`lumosDispatch.ts`) ล้างผลนำเข้าเมื่อจด event ใหม่ · `pendingImportSql` ถามใหม่เมื่อ `lumos_import_checked_at < push_accepted_at`
 - เทสต์ `tests/api/followLumosWatch.test.ts`
+
+## ป้ายแดง "ลา" — AI ลงผลรับทราบ/ไป แต่เขาบอกว่าลา (14 ต.ค. 2569)
+- เจ้าของ *"ทำข้อ 3 ป้ายแดง ลา ด้วย"* · เคสเชตฐ์ศักดิ์ 07:25 "ลากิจ 1 วัน" แต่ acknowledged ⇒ Lumos ไม่โทรเบอร์ฉุกเฉิน
+- ตัวตัดสิน `src/lib/followLeave.ts` (`followLeaveMentioned` · `isFollowLeaveMismatch`) — คำลาที่ชัดเท่านั้น · ตัด "เวลา/ศาลา/ปลา/ลาด…" และ "ไม่ได้ลา/ไม่หยุด" ก่อนหา
+  · วัด 30 วัน: 1,405 สาย ตรง 5 สาย ทุกสายลาจริง (ก่อนตัด "เวลางาน" จับผิด 2)
+- จอ: ป้าย `follow-leave-chip` ใน `FollowPlanningCalendar.tsx` (ตาราง) + `FollowCallQueue.tsx` (ต้องโทร/จบแล้ว)
+- แจ้งเตือน: `alertFollowLeaveMismatch` (`followLumosWatch.ts` · ชั้น 4 ใน `followPushRetryWorker.ts`) ผลใน 3 ชม. · คนเพิ่ม + admin/supervisor · dedupe ต่อสาย
+- 🔴 ไม่แก้ผลของ Lumos ไม่สลับใครโทร · เทสต์ `src/lib/followLeave.test.ts` · `tests/api/followLumosWatch.test.ts`

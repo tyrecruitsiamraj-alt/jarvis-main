@@ -23,6 +23,7 @@ import {
 import { PagePager } from '@/components/shared/PagePager';
 import { canRecordStaffCall, type FollowStaffCallOutcome } from '@/lib/followStaffCall';
 import { followCallerOf } from '@/lib/followListFilter';
+import { isFollowLeaveMismatch } from '@/lib/followLeave';
 import type { FollowOutcome } from '@/lib/followOutcome';
 
 /**
@@ -111,6 +112,16 @@ export default function FollowCallQueue({
             ) : null}
             {person.row.group.name}
             <span className="ml-2 font-normal tabular-nums text-muted-foreground">{localThaiPhone(person.row.group.phone)}</span>
+            {/* Lumos ลงผลรับทราบ/ไป แต่เขาบอกว่าลา (14 ต.ค. 2569 · `followLeave.ts`) */}
+            {isFollowLeaveMismatch(e) ? (
+              <span
+                className={cn('ml-2 align-middle text-xs', TONE.danger.chip)}
+                title={e.call_summary ?? undefined}
+                data-testid="follow-leave-chip"
+              >
+                ลา
+              </span>
+            ) : null}
           </div>
           <div className="truncate text-xs text-muted-foreground">
             {[e.unit_name?.trim() || person.row.group.unitName, callLabel].filter(Boolean).join(' · ')}

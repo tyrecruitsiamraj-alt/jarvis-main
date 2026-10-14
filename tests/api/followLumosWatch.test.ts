@@ -207,3 +207,35 @@ describe('สรุปสายที่จะไม่ถูกโทร (ช�
     expect(src).toMatch(/await alertOverdueAiFollow\(\);[\s\S]*await alertFollowAtRiskDigest\(\);/);
   });
 });
+
+describe('ชั้น 4 — AI ลงผลรับทราบ/ไป แต่เขาบอกว่าลา (เจ้าของสั่ง 14 ต.ค. 2569 "ป้ายแดง ลา")', () => {
+  const row = (over: Record<string, unknown> = {}) => ({
+    qid: '77',
+    created_by: 'u1',
+    name: 'นายทดสอบ',
+    unit: 'หน่วยงานทดสอบ',
+    team: null,
+    call_outcome: 'acknowledged',
+    call_summary: 'ผู้รับสายแจ้งว่าวันนี้ลากิจ 1 วัน จึงยังไม่ได้ไปที่หน่วยงาน',
+    call_reply: null,
+    ...over,
+  });
+
+  it('ดูเฉพาะผลรับทราบ/ไป ที่กลับมาใน 3 ชม. ของงานติดตามที่ไม่ถูกยกเลิก', () => {
+    const sql = mod.followLeaveMismatchSql();
+    expect(sql).toContain("q.result->>'outcome' = any($1::text[])");
+    expect(sql).toContain("interval '3 hours'");
+    expect(sql).toContain('f.cancelled_at is null');
+  });
+
+  it('บอกลา ⇒ แจ้งคนเพิ่ม + หัวหน้า ครั้งเดียวต่อสาย · ไม่ลา/คำว่าเวลางาน ⇒ ไม่แจ้ง · ไม่เขียนฐาน', async () => {
+    dbQuery.mockResolvedValue({
+      rows: [row(), row({ qid: '78', call_summary: 'ถึงหน่วยงานแล้ว แจ้งเรื่องเวลางาน 16:00' })],
+    });
+    const r = await mod.alertFollowLeaveMismatch();
+    expect(r.alerted).toBe(1);
+    expect(notifyUsers).toHaveBeenCalledWith(['u1'], expect.objectContaining({ type: 'follow_leave', dedupeKey: 'follow_leave:77' }));
+    expect(notifyRoles).toHaveBeenCalledWith(['admin', 'supervisor'], expect.objectContaining({ title: 'นายทดสอบ บอกว่าลา แต่ AI ลงผลว่ารับทราบ' }));
+    expect(dbQuery.mock.calls.every((c) => !/update|insert|delete/i.test(String(c[0])))).toBe(true);
+  });
+});
