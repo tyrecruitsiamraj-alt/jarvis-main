@@ -122,3 +122,16 @@ describe('ชิป "AI ไม่ได้ผล" ของแท็บผู้
     expect(isInRmListView(row({ last_call_status: 'pending', last_call_attempts: 1 }), 'ai_at_risk')).toBe(false);
   });
 });
+
+describe('รอบแรกส่งแล้วเงียบ (เจ้าของ 14 ต.ค. 2569 "แก้แบบที่บอกยัง")', () => {
+  it('ส่งเกิน 30 นาทียังไม่มีผล ⇒ แดง + เข้าชิป · ยังไม่ถึง 30 นาที ⇒ รอ AI โทร', () => {
+    const late = aiQueueStatusOf({ last_call_status: 'pending', last_call_attempts: 1, last_call_sent_at: '2026-10-14T03:36:00Z' }, NOW);
+    expect(late).toMatchObject({ kind: 'first_late', label: 'ส่ง AI แล้ว ยังไม่มีผล', tone: 'danger', atRisk: true });
+    expect(late?.sub).toMatch(/^ส่ง 14 ต\.ค\. .*10:36$/);
+    const fresh = aiQueueStatusOf(
+      { last_call_status: 'pending', last_call_attempts: 1, last_call_sent_at: new Date(NOW - 10 * 60_000).toISOString() },
+      NOW,
+    );
+    expect(fresh?.kind).toBe('waiting');
+  });
+});

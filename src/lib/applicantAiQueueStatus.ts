@@ -16,7 +16,7 @@ import type { CallOutcome } from '@/lib/callFollowupPolicy';
  * `attempt_count` = ครั้งที่กำลังจะโทร (ตัวตั้งโทรซ้ำ +1 ตอนตั้ง · `callFollowup.ts`) ⇒ ระหว่างรอ โทรไปแล้ว = attempt − 1
  * ส่วน `needs_human` ที่มาจากผลโทร (ไม่ใช่ส่งแล้วเงียบ) ไม่ +1 ⇒ โทรไปแล้ว = attempt
  */
-export type AiQueueKind = 'waiting' | 'retry' | 'retry_late' | 'needs_human' | 'silent' | 'not_imported';
+export type AiQueueKind = 'waiting' | 'first_late' | 'retry' | 'retry_late' | 'needs_human' | 'silent' | 'not_imported';
 
 export type AiQueueStatus = {
   kind: AiQueueKind;
@@ -35,10 +35,16 @@ export type AiQueueInput = {
   last_call_prev_outcome?: string | null;
   last_call_push_state?: string | null;
   last_call_import_status?: string | null;
+  last_call_sent_at?: string | null;
 };
 
 /** เลยเวลานัดโทรซ้ำกี่นาทีถึงเตือน — ตัวเดียวกับงานติดตาม (`OVERDUE_ALERT_MINUTES`) */
 export const AI_RETRY_LATE_MINUTES = 15;
+/**
+ * รอบแรกส่งถึง Lumos แล้วเงียบกี่นาทีถึงขึ้นแดง (เจ้าของ 14 ต.ค. 2569 "แก้แบบที่บอกยัง" — ยังเห็น "รอ AI โทร" ค้าง)
+ * ปกติรอบแรกโทรภายใน 6 นาที ช้าสุด 10% เกิน 12 นาที (วัด 30 ก.ย.) · เดิมรู้ตัวตอนเงียบครบ 24 ชม. เท่านั้น
+ */
+export const AI_FIRST_LATE_MINUTES = 30;
 
 const DATE_TIME = new Intl.DateTimeFormat('th-TH', {
   timeZone: 'Asia/Bangkok',
@@ -113,5 +119,9 @@ export function aiQueueStatusOf(r: AiQueueInput, now: number = Date.now()): AiQu
     return { kind: 'retry', label, sub: at ? `โทรซ้ำ ${at}` : null, tone: 'warn', atRisk: false };
   }
 
+  const sent = Date.parse(r.last_call_sent_at ?? '');
+  if (Number.isFinite(sent) && sent < now - AI_FIRST_LATE_MINUTES * 60_000) {
+    return { kind: 'first_late', label: 'ส่ง AI แล้ว ยังไม่มีผล', sub: `ส่ง ${whenText(r.last_call_sent_at)}`, tone: 'danger', atRisk: true };
+  }
   return { kind: 'waiting', label: 'รอ AI โทร', sub: null, tone: 'neutral', atRisk: false };
 }

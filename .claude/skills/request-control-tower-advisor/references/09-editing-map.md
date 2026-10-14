@@ -13206,3 +13206,5 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - จอ: ป้าย `follow-leave-chip` ใน `FollowPlanningCalendar.tsx` (ตาราง) + `FollowCallQueue.tsx` (ต้องโทร/จบแล้ว)
 - แจ้งเตือน: `alertFollowLeaveMismatch` (`followLumosWatch.ts` · ชั้น 4 ใน `followPushRetryWorker.ts`) ผลใน 3 ชม. · คนเพิ่ม + admin/supervisor · dedupe ต่อสาย
 - 🔴 ไม่แก้ผลของ Lumos ไม่สลับใครโทร · เทสต์ `src/lib/followLeave.test.ts` · `tests/api/followLumosWatch.test.ts`
+- 14 ต.ค. (ต่อ) เจ้าของ *"แท็บ ผู้สมัคร แก้แบบที่บอกยัง"*: รอบแรกส่งถึง Lumos แล้วเงียบเกิน 30 นาที = `first_late` "ส่ง AI แล้ว ยังไม่มีผล" แดง + เข้าชิป
+  (`AI_FIRST_LATE_MINUTES` · เวลาส่ง `last_call_sent_at` = `push_started_at`) · เดิมขึ้น "รอ AI โทร" จนเงียบครบ 24 ชม.

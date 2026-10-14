@@ -93,6 +93,8 @@ export type ApplicantCallState = {
   lastOutcome?: string | null;
   pushState?: string | null;
   importStatus?: string | null;
+  /** เวลาที่ส่งรอบล่าสุดถึง Lumos — รอบแรกเงียบเกิน 30 นาที = ป้ายแดง (14 ต.ค. 2569) */
+  sentAt?: string | null;
 };
 
 export async function loadLatestCallStateByPhone(
@@ -113,11 +115,12 @@ export async function loadLatestCallStateByPhone(
       last_outcome: string | null;
       push_state: string | null;
       import_status: string | null;
+      sent_at: string | null;
     }>(
       `select distinct on (${QUEUE_PHONE_EXPR})
               ${QUEUE_PHONE_EXPR} as phone, status, updated_at as at,
               attempt_count as attempts, next_attempt_at as next_at, followup_state as followup, last_outcome,
-              push_state, lumos_import_status as import_status
+              push_state, lumos_import_status as import_status, push_started_at as sent_at
          from lumos_dispatch_queue
         where ${QUEUE_PHONE_EXPR} = any($1::text[])
         order by ${QUEUE_PHONE_EXPR}, updated_at desc`,
@@ -133,6 +136,7 @@ export async function loadLatestCallStateByPhone(
         lastOutcome: r.last_outcome,
         pushState: r.push_state,
         importStatus: r.import_status,
+        sentAt: r.sent_at ? new Date(r.sent_at).toISOString() : null,
       });
     }
   } catch (e) {
