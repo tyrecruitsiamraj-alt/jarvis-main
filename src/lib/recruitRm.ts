@@ -211,15 +211,38 @@ export const CONTACT_CHIPS: readonly { id: ContactChip; label: string }[] = [
 ];
 
 export function isInContactChip(
-  r: { dialed_last_at?: string | null; last_call_at?: string | null; last_contact_ok?: boolean | null },
+  r: {
+    dialed_last_at?: string | null;
+    last_call_at?: string | null;
+    last_contact_ok?: boolean | null;
+    claimed_at?: string | null;
+  },
   chip: ContactChip,
 ): boolean {
   if (chip === 'all') return true;
   if (chip === 'ok') return r.last_contact_ok === true;
   if (chip === 'fail') return r.last_contact_ok === false;
-  // ลงผลติดต่อแล้ว = โทรแล้ว (สำเร็จ/ไม่สำเร็จต้องอยู่ในโทรแล้วเสมอ ห้ามโผล่ในยังไม่โทร)
-  const called = Boolean(r.dialed_last_at || r.last_call_at) || typeof r.last_contact_ok === 'boolean';
-  return chip === 'called' ? called : !called;
+  return chip === 'called' ? isContactCalledByStaff(r) : !isContactCalledByStaff(r);
+}
+
+/**
+ * 🔴 "โทรแล้ว" ของแท็บการติดต่อ = **เจ้าหน้าที่ลงมือแล้ว** (เจ้าของ 14 ต.ค. 2569: *"หน้านี้คือหน้าที่คนมา Action ต่อ
+ * เพราะงั้นถ้ายังไม่กดโทรก็ต้องอยู่ยังไม่โทร"*) — เดิมนับเวลาที่ AI โทร (`last_call_at`) ด้วย ⇒ คนที่ AI โทรตอนสมัครผ่านลิงก์
+ * พอเก็บมาก็ไปอยู่ "โทรแล้ว" ทันที
+ * - กดโทร (`dialed_last_at`) **หลังเก็บรายชื่อ** (`claimed_at`) · ไม่มีเวลาเก็บ = กดโทรเมื่อไรก็นับ
+ * - ลงผลติดต่อแล้ว (สำเร็จ/ไม่สำเร็จ) = โทรแล้วเสมอ ห้ามโผล่ในยังไม่โทร
+ * - AI โทร ไม่นับ
+ */
+export function isContactCalledByStaff(r: {
+  dialed_last_at?: string | null;
+  last_contact_ok?: boolean | null;
+  claimed_at?: string | null;
+}): boolean {
+  if (typeof r.last_contact_ok === 'boolean') return true;
+  const dialed = Date.parse(r.dialed_last_at ?? '');
+  if (!Number.isFinite(dialed)) return false;
+  const claimed = Date.parse(r.claimed_at ?? '');
+  return !Number.isFinite(claimed) || dialed >= claimed;
 }
 
 /**
