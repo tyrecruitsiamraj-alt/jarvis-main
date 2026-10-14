@@ -22,6 +22,12 @@ vi.mock('../../api/_lib/siamrajJobBenefits.js', async (orig) => {
   };
 });
 
+// ใบที่ทีมเลือก "รายได้เฉลี่ย" (14 ต.ค. 2569) — X2 เลือกเฉลี่ย 13,400 · ใบอื่นพูดรายได้รวมตามเดิม
+const loadAverageIncomeChoices = vi.fn(async (refs: string[]) => new Map(refs.filter((r) => r === 'siamraj-sql:X2').map((r) => [r, 13400])));
+vi.mock('../../api/_lib/applyScriptFacts.js', () => ({
+  loadAverageIncomeChoices: (refs: string[]) => loadAverageIncomeChoices(refs),
+}));
+
 const { enrichPayloadsWithIncome, jobRefOfPayload, payloadMentionsMoney } = await import(
   '../../api/_lib/lumosPayloadIncome.js'
 );
@@ -55,6 +61,14 @@ describe('เติมรายได้ตอนยิง', () => {
     const follow = { client_contact_id: 'follow::x', steps: [{ message: 'สวัสดีครับ' }] };
     expect(await enrichPayloadsWithIncome([follow])).toBe(0);
     expect(follow.steps[0].message).toBe('สวัสดีครับ');
+  });
+
+  it('ใบที่เลือกรายได้เฉลี่ย ⇒ AI พูดเลขเฉลี่ย · ใบอื่นพูดรายได้รวม (เจ้าของ Choice 14 ต.ค. 2569 "AI ต้องตาม")', async () => {
+    const avg = { client_candidate_id: 'siamraj-sql:X2::card-1', questions: ['สวัสดีครับ'] };
+    const tot = { client_candidate_id: 'siamraj-sql:X3::card-2', questions: ['สวัสดีครับ'] };
+    expect(await enrichPayloadsWithIncome([avg, tot])).toBe(2);
+    expect(avg.questions.at(-1)).toContain('13,400');
+    expect(tot.questions.at(-1)).toContain('12,000');
   });
 
   it('ตัวยิงเรียกเติมก่อนยิงทุกครั้ง (รอบแรก + ส่งซ้ำผ่านตัวเดียวกัน)', async () => {

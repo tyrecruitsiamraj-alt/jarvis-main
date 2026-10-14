@@ -13177,3 +13177,13 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - Choice "ป้าย AI + บอกให้คนตาม": `FollowCallQueue.tsx` `callerOf` (module) = `followCallerOf` ของสาย · ตัวนับ คน/AI นับตามใครโทร ไม่ใช่ตามกอง
   · เหตุผล (`followQueueGroupOf`) = "AI โทรไม่ติด <ผล> · ให้คนตาม" · กติกากองไม่เปลี่ยน (ยังอยู่ในต้องโทร)
 - เทสต์ `src/components/follow/FollowCallQueue.test.tsx`
+
+## รายได้รวม หรือ รายได้เฉลี่ย — เลือกทีละใบขอ + AI พูดตาม (14 ต.ค. 2569)
+- เจ้าของ: *"สามารถเลือกได้ไหมว่าจะให้โชว์ รายได้รวมหรือเฉลี่ย"* · *"ยังไงก็ต้องบอกฐานเงินเดือนนะ"* → Choice "เลือกทีละใบขอ" · "AI ต้องตาม"
+- กติกาเดียว `src/lib/incomeShown.ts` — `field_overrides.income_shown` 'total' | 'average' (ไม่มี = ทั้งสอง) · ตัวที่เลือกไม่มีข้อมูล = ใช้อีกตัว · ฐานเงินเดือนไม่อยู่ในตัวเลือก
+  · sanitizer `api/_lib/siamrajUnitNotes.ts` · type `src/types/index.ts` + `src/lib/siamrajUnitRequestsApi.ts` (ต้องตรงกันสามที่)
+- จอ: `JobPublicFacts.tsx` (การ์ดโพสต์ประกาศ + หน้าสมัคร) · หน้าสาธารณะส่ง `income_shown` ใน field_overrides (`api/_handlers/public/jobs.ts`)
+  · ตัวเลือก `IncomeShownPicker` (`PostingFieldBox.tsx`) ใต้กล่อง "รายได้รวม" ของป๊อปหน้าเดียว (`BoardPostingPage.tsx`) · กดแล้วบันทึกเลย · ไม่มีเฉลี่ย = กดเฉลี่ยไม่ได้
+- AI: บทผู้สมัครผ่านลิงก์ `applyScriptFacts.ts` (`spokenMonthlyIncome`) · เลน Match เติมตอนยิง `lumosPayloadIncome.ts` → `loadAverageIncomeChoices` (import ตอนใช้ กันวงจร)
+  · คำในบทไม่เปลี่ยน ("งานนี้รายได้ประมาณเดือนละ {รายได้ต่อเดือน} บาท") — เปลี่ยนแค่เลข · AI ยังไม่พูดฐานเงินเดือน
+- เทสต์: `src/lib/incomeShown.test.ts` · `tests/api/applyScriptFactsBox.test.ts` · `tests/api/lumosPayloadIncome.test.ts`

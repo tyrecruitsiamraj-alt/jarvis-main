@@ -79,13 +79,13 @@ import { benefitDisplayLabels } from '@/lib/extraBenefits';
 import { boardCardAge } from '@/lib/boardCardFacts';
 import { PUBLISH_GAP_LABEL, publishGapsOf } from '@/lib/publishReadiness';
 import { payCycleText, payCyclesOf } from '@/lib/payCycle';
-import { PostingFieldBox, TotalIncomeField } from '@/components/jobs/PostingFieldBox';
+import { IncomeShownPicker, PostingFieldBox, TotalIncomeField } from '@/components/jobs/PostingFieldBox';
 import { publicIncomeOf } from '@/lib/publishReadiness';
 import { boardCardGender } from '@/lib/boardCardFacts';
 import { isOtBenefit, publicBenefitList } from '@/lib/publicFieldVisibility';
 import { isRetiredBenefit } from '@/lib/extraBenefits';
 import { resignedMonthlyNetAverage } from '@/lib/resignedIncome';
-import { jobIncomeLine } from '@/lib/jobPublicFacts';
+import { jobAverageIncome, jobIncomeLine } from '@/lib/jobPublicFacts';
 import PublicJobCardPreview from '@/components/jobs/PublicJobCardPreview';
 import { EVEN_TYPE, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
@@ -865,6 +865,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             ) : null
           }
           editor={<TotalIncomeField key={k('total')} job={j} onSaved={onFieldsSaved} />}
+          extra={<IncomeShownPicker job={j} hasAverage={jobAverageIncome(src) !== null} onSaved={onFieldsSaved} />}
           {...boxProps('total')}
         />
         <PostingFieldBox

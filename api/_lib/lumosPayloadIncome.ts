@@ -63,17 +63,22 @@ export async function enrichPayloadsWithIncome(payloads: readonly unknown[]): Pr
     .filter((x): x is { p: unknown; no: string } => Boolean(x.no) && !payloadMentionsMoney(x.p));
   if (todo.length === 0) return 0;
   try {
-    const byNo = await withTimeout(
-      fetchJobBenefitRates([...new Set(todo.map((x) => x.no))]),
-      TIMEOUT_MS,
-      new Map(),
-    );
+    const refs = [...new Set(todo.map((x) => jobRefOfPayload(x.p) ?? ''))];
+    // ใบที่ทีมเลือก "รายได้เฉลี่ย" (14 ต.ค. 2569) — import ตอนใช้ กันวงจร import กับตัวยิง · ช้า/ล้ม = พูดรายได้รวมตามเดิม
+    const [byNo, averageByRef] = await Promise.all([
+      withTimeout(fetchJobBenefitRates([...new Set(todo.map((x) => x.no))]), TIMEOUT_MS, new Map()),
+      withTimeout(
+        import('./applyScriptFacts.js').then((m) => m.loadAverageIncomeChoices(refs)),
+        TIMEOUT_MS,
+        new Map<string, number>(),
+      ),
+    ]);
     let added = 0;
     for (const { p, no } of todo) {
       const rates = byNo.get(no);
       if (!rates || rates.length === 0) continue;
       const sentence = buildExtraInfoSentence({
-        monthlyIncome: monthlyGuaranteedIncome(rates).total,
+        monthlyIncome: averageByRef.get(jobRefOfPayload(p) ?? '') ?? monthlyGuaranteedIncome(rates).total,
         benefitLine: speakableBenefitLine(rates),
       });
       if (!sentence) continue;

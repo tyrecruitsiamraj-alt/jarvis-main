@@ -5,6 +5,7 @@ import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { boardCardAge, boardCardGender, boardCardPlace } from '@/lib/boardCardFacts';
 import { isOtBenefit, publicBenefitList, publicFieldVisible } from '@/lib/publicFieldVisibility';
+import { incomeLinesShown, incomeShownOf } from '@/lib/incomeShown';
 import { benefitDisplayLabels, isRetiredBenefit } from '@/lib/extraBenefits';
 import { payCycleCardText, payCyclesOf } from '@/lib/payCycle';
 import { formatYmdTh } from '@/lib/dateTh';
@@ -39,7 +40,14 @@ export default function JobPublicFacts({
   // ฐาน · รายได้รวม แยกช่อง (เจ้าของ 7 ต.ค. 2569 "รายได้รวมยังไม่มีบนกล่องเลย มีแค่ฐานเอง")
   const income = incomeShown ? jobIncomeLine(job) : null;
   const pay = incomeShown ? payCycleCardText(payCyclesOf(job)) : '';
-  const average = publicFieldVisible(job, 'average_income') ? jobAverageIncome(job) : null;
+  const averageAll = publicFieldVisible(job, 'average_income') ? jobAverageIncome(job) : null;
+  // รายได้รวม หรือ เฉลี่ย — เลือกทีละใบขอ (14 ต.ค. 2569 · `incomeShown.ts`) · ฐานเงินเดือนขึ้นเสมอ
+  const pick = incomeLinesShown(incomeShownOf(job.field_overrides), {
+    total: Boolean(income?.total),
+    average: averageAll !== null,
+  });
+  const average = pick.average ? averageAll : null;
+  const totalText = pick.total ? (income?.total ?? null) : null;
   /**
    * สวัสดิการ — 🔴 ไม่มีโอที + ไม่มีรายการที่ถอดแล้ว (เจ้าของ 5 ต.ค. 2569: *"โอที ~75 บาท/ชม. เอาออก"* ·
    * รถรับส่ง · ปรับเงินเดือนประจำปี · โบนัสประจำปี · อาหารกลางวัน · ที่พัก/หอพัก *"เอาออก"*)
@@ -78,14 +86,14 @@ export default function JobPublicFacts({
                     ฐานเงินเดือน {income.base}
                   </span>
                 ) : null}
-                {income.base && income.total ? <span aria-hidden>·</span> : null}
-                {income.total ? <span className="tabular-nums text-foreground">รายได้รวม {income.total}</span> : null}
+                {income.base && totalText ? <span aria-hidden>·</span> : null}
+                {totalText ? <span className="tabular-nums text-foreground">รายได้รวม {totalText}</span> : null}
               </>
             ) : (
               <span className={staff ? TONE.warn.value : undefined}>ยังไม่ตั้งรายได้</span>
             )
           ) : null}
-          {incomeShown && average !== null ? <span aria-hidden>·</span> : null}
+          {incomeShown && (!income || income.base || totalText) && average !== null ? <span aria-hidden>·</span> : null}
           {average !== null ? (
             <span className="tabular-nums">รายได้เฉลี่ย {NUM.format(average)} บาท/เดือน</span>
           ) : null}

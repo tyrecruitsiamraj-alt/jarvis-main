@@ -14,10 +14,12 @@ import {
   speakableBenefitLine,
 } from './siamrajJobBenefits.js';
 import { publicSafeAddressParts } from '../../src/lib/publicJobPrivacy.js';
+import { incomeShownOf, spokenMonthlyIncome, type IncomeShown } from '../../src/lib/incomeShown.js';
+import { resignedMonthlyNetAverage } from '../../src/lib/resignedIncome.js';
 import { publicJobTitle } from '../../src/lib/publicJobTitle.js';
 import { boardProvinceOf } from '../../src/lib/boardFilters.js';
 import { UNSPECIFIED } from '../../src/lib/facetEngine.js';
-import type { JobRequest } from '../../src/types/index.js';
+import type { JobRequest, ResignedIncomeMonth } from '../../src/types/index.js';
 import { speakableAgeRange, speakableWorkArea, speakableWorkTime, type ApplyScriptFacts } from './lumosCallScript.js';
 import { logError, logWarn } from './logger.js';
 
@@ -98,16 +100,60 @@ async function loadFacts(jobId: string): Promise<ApplyJobFacts> {
     null;
 
   const manual = manualMonthlyIncome(job);
+  // รายได้รวม หรือ เฉลี่ย ที่ทีมเลือกทีละใบขอ — AI พูดตาม (เจ้าของ Choice 14 ต.ค. 2569 "AI ต้องตาม")
+  const { shown, average } = spokenIncomeChoiceOf(job);
   const requestNo = requestNoFromJobRef(jobId);
   if (requestNo) {
     const rates = (await fetchJobBenefitRates([requestNo])).get(requestNo) ?? [];
     if (rates.length > 0) {
-      out.monthlyIncome = manual ?? (monthlyGuaranteedIncome(rates).total || null);
+      out.monthlyIncome = spokenMonthlyIncome(shown, manual ?? (monthlyGuaranteedIncome(rates).total || null), average);
       out.benefitLine = speakableBenefitLine(rates) || null;
       return out;
     }
   }
-  out.monthlyIncome = manual;
+  out.monthlyIncome = spokenMonthlyIncome(shown, manual, average);
+  return out;
+}
+
+/** ตัวเลือกรายได้ของใบขอ + รายได้เฉลี่ย (สูตรเดียวกับการ์ด `resignedMonthlyNetAverage`) — job ต้องแนบ notes แล้ว */
+function spokenIncomeChoiceOf(job: Record<string, unknown>): { shown: IncomeShown; average: number | null } {
+  const shown = incomeShownOf(job.field_overrides as { income_shown?: string | null } | null | undefined);
+  const average =
+    shown === 'average'
+      ? (resignedMonthlyNetAverage(
+          job.resigned_income_3m as ResignedIncomeMonth[] | null | undefined,
+          (job.lastWorkingDay as string | null | undefined) ?? null,
+        )?.amount ?? null)
+      : null;
+  return { shown, average };
+}
+
+/**
+ * ใบขอที่ทีมเลือก "รายได้เฉลี่ย" → เลขเฉลี่ยที่ AI ต้องพูด (คีย์ = job ref) · ใบอื่นไม่อยู่ใน map (พูดรายได้รวมตามเดิม)
+ * ใช้กับเส้นเติมรายได้ตอนยิง (`lumosPayloadIncome.ts` · เลน Match) — ล้ม = map ว่าง (พูดแบบเดิม)
+ */
+export async function loadAverageIncomeChoices(jobRefs: readonly string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const refs = [...new Set(jobRefs.filter(Boolean))];
+  if (refs.length === 0) return out;
+  // 1) อ่านตัวเลือกจากฐานเราก่อน — ไม่มีใบไหนเลือกเฉลี่ย = ไม่แตะ feed ใบขอ (ตัวยิงวิ่งทุกนาที ห้ามยิงระบบงานหลักทุกรอบ)
+  const stubs: Array<Record<string, unknown>> = refs.map((ref) => ({ id: ref, request_no: requestNoFromJobRef(ref) ?? undefined }));
+  await attachNotes(stubs);
+  const wanted = new Set(
+    stubs
+      .filter((j) => incomeShownOf(j.field_overrides as { income_shown?: string | null } | null | undefined) === 'average')
+      .map((j) => String(j.id)),
+  );
+  if (wanted.size === 0) return out;
+  // 2) เฉพาะใบที่เลือกเฉลี่ย — หยิบสลิปคนเก่าจากสำเนาใบขอ (ตัวเดียวกับหน้า /apply)
+  const items = (await listSiamrajUnitRequests({ limit: 500, mode: 'all' })) as unknown as Array<Record<string, unknown>>;
+  const jobs = items.filter((j) => wanted.has(String(j.id ?? ''))).map((j) => ({ ...j }));
+  if (jobs.length === 0) return out;
+  await attachNotes(jobs);
+  for (const job of jobs) {
+    const { shown, average } = spokenIncomeChoiceOf(job);
+    if (shown === 'average' && average !== null && average > 0) out.set(String(job.id), average);
+  }
   return out;
 }
 

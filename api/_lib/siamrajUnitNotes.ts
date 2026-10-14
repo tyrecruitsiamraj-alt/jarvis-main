@@ -91,6 +91,11 @@ export type UnitFieldOverrides = {
     /** รายได้เฉลี่ย (ยอดสุทธิของคนเก่าในไซต์นี้ · 5 ต.ค. 2569) */
     average_income?: boolean;
   } | null;
+  /**
+   * รายได้ที่ผู้สมัครเห็น + AI พูด (เจ้าของ Choice 14 ต.ค. 2569 "เลือกทีละใบขอ" · "AI ต้องตาม")
+   * 'total' = รายได้รวม · 'average' = รายได้เฉลี่ย · null/ไม่มี = ทั้งสอง (ค่าเริ่ม) · ฐานเงินเดือนขึ้นเสมอ
+   */
+  income_shown?: 'total' | 'average' | null;
 };
 
 export type UnitNote = {
@@ -325,6 +330,10 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
       }
       out.public_visibility = Object.keys(vis).length > 0 ? vis : null;
     }
+  }
+
+  if ('income_shown' in o) {
+    out.income_shown = o.income_shown === 'total' || o.income_shown === 'average' ? o.income_shown : null;
   }
 
   return Object.keys(out).length > 0 ? out : null;

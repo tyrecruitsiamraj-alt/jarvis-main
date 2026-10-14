@@ -168,18 +168,26 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
      */
     field_overrides: (() => {
       const fo = (r as Record<string, unknown>).field_overrides as
-        | { public_visibility?: Record<string, boolean> | null; gender?: string | null; total_income?: number | null }
+        | {
+            public_visibility?: Record<string, boolean> | null;
+            gender?: string | null;
+            total_income?: number | null;
+            income_shown?: string | null;
+          }
         | undefined;
       const pv = fo?.public_visibility;
       // เพศที่ทีม Online เลือกทับ + รายได้รวมที่พิมพ์เอง (5 ต.ค. 2569) — การ์ดเจ้าหน้าที่กับหน้า /apply ต้องขึ้นค่าเดียวกัน
       // (`publicIncomeOf`/`jobBaseIncome` อ่านจาก field_overrides) · ไม่ใช่ข้อมูลส่วนตัว
       const gender = typeof fo?.gender === 'string' && fo.gender.trim() ? fo.gender.trim() : undefined;
       const total = typeof fo?.total_income === 'number' && fo.total_income > 0 ? fo.total_income : undefined;
-      return pv || gender || total
+      // รายได้รวม หรือ เฉลี่ย ที่ทีมเลือกทีละใบขอ (14 ต.ค. 2569 · `src/lib/incomeShown.ts`) — หน้าสมัครโชว์ตามนี้
+      const shown = fo?.income_shown === 'total' || fo?.income_shown === 'average' ? fo.income_shown : undefined;
+      return pv || gender || total || shown
         ? {
             ...(pv ? { public_visibility: pv } : {}),
             ...(gender ? { gender } : {}),
             ...(total ? { total_income: total } : {}),
+            ...(shown ? { income_shown: shown } : {}),
           }
         : undefined;
     })(),

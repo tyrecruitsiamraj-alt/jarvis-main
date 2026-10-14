@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { INCOME_SHOWN_OPTIONS, incomeShownOf, type IncomeShown } from '@/lib/incomeShown';
 import { saveUnitFieldOverridesPatch, unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
 import { buildIncomeDisplay } from '@/lib/incomeBreakdown';
 import { TONE } from '@/lib/designTokens';
@@ -30,6 +32,7 @@ export function PostingFieldBox({
   open,
   onOpenChange,
   testId,
+  extra,
 }: {
   title: string;
   /** ค่าที่ผู้สมัครเห็นตอนนี้ */
@@ -42,6 +45,8 @@ export function PostingFieldBox({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   testId?: string;
+  /** ส่วนที่โชว์ใต้ค่าเสมอ (ไม่ต้องกด "แก้") — เช่น ตัวเลือกรายได้รวม/เฉลี่ย */
+  extra?: React.ReactNode;
 }) {
   return (
     <Card className={cn('space-y-3 p-4', missing && TONE.danger.soft)} data-testid={testId}>
@@ -51,6 +56,7 @@ export function PostingFieldBox({
           <div className={cn('break-words text-sm', missing ? TONE.danger.value : 'text-foreground')}>
             {missing ? 'ยังไม่ได้ใส่' : value}
           </div>
+          {extra}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {erp !== null ? (
@@ -148,6 +154,71 @@ export function TotalIncomeField({ job, onSaved }: { job: JobRequest; onSaved: (
       {saved ? <span className={cn('text-sm', TONE.success.value)}>บันทึกแล้ว {n != null ? NUM.format(n) : ''}</span> : null}
       {error ? (
         <span role="alert" className={cn('text-sm', TONE.danger.value)}>
+          {error}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * ═══ ผู้สมัครเห็น/AI พูด รายได้รวม หรือ เฉลี่ย — เลือกทีละใบขอ (เจ้าของ Choice 14 ต.ค. 2569) ═══
+ * กดแล้วบันทึกเลย (การกดเลือกคือการตั้งใจเปลี่ยน ไม่ใช่การเปิดดู) · ไม่มีรายได้เฉลี่ย = กดเฉลี่ยไม่ได้
+ * ฐานเงินเดือนไม่อยู่ในตัวเลือก — ขึ้นเสมอ (เจ้าของ *"ยังไงก็ต้องบอกฐานเงินเดือนนะ"*) · กติกาอยู่ `src/lib/incomeShown.ts`
+ */
+export function IncomeShownPicker({
+  job,
+  hasAverage,
+  onSaved,
+}: {
+  job: JobRequest;
+  hasAverage: boolean;
+  onSaved: (patch: Partial<JobRequest>) => void;
+}) {
+  const current = incomeShownOf(job.field_overrides);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const choose = async (next: IncomeShown) => {
+    if (next === current || busy) return;
+    const requestNo = unitRequestNoteKey(job);
+    if (!requestNo) {
+      setError('ใบขอนี้ไม่มีเลขที่ใบขอ บันทึกไม่ได้');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const saved = await saveUnitFieldOverridesPatch(requestNo, { income_shown: next === 'both' ? null : next });
+      onSaved({ field_overrides: saved as JobRequest['field_overrides'] });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 pt-1" data-testid="income-shown-picker">
+      <span className="text-xs text-muted-foreground">โชว์</span>
+      <ToggleGroup
+        type="single"
+        size="sm"
+        variant="outline"
+        value={current}
+        disabled={busy}
+        onValueChange={(v) => {
+          if (v) void choose(v as IncomeShown);
+        }}
+      >
+        {INCOME_SHOWN_OPTIONS.map((o) => (
+          <ToggleGroupItem key={o.value} value={o.value} disabled={o.value === 'average' && !hasAverage} className="text-xs">
+            {o.label}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+      {error ? (
+        <span role="alert" className={cn('text-xs', TONE.danger.value)}>
           {error}
         </span>
       ) : null}

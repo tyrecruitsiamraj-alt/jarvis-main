@@ -443,6 +443,11 @@ export interface JobRequest {
       /** รายได้เฉลี่ย (ยอดของคนเก่า · 5 ต.ค. 2569) */
       average_income?: boolean;
     } | null;
+    /**
+     * รายได้ที่ผู้สมัครเห็น + AI พูด (เจ้าของ Choice 14 ต.ค. 2569 "เลือกทีละใบขอ" · "AI ต้องตาม")
+     * 'total' = รายได้รวม · 'average' = รายได้เฉลี่ย · null/ไม่มี = ทั้งสอง (ค่าเริ่ม) · ฐานเงินเดือนขึ้นเสมอ
+     */
+    income_shown?: 'total' | 'average' | null;
   } | null;
 }
 

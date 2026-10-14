@@ -33,7 +33,7 @@ vi.mock('../../api/_lib/siamrajJobBenefits.js', () => ({
   speakableBenefitLine: () => 'มีเบี้ยขยัน',
 }));
 
-const { loadApplyScriptFacts } = await import('../../api/_lib/applyScriptFacts.js');
+const { loadApplyScriptFacts, loadAverageIncomeChoices } = await import('../../api/_lib/applyScriptFacts.js');
 
 beforeEach(() => {
   erpHangs = true;
@@ -73,5 +73,33 @@ describe('loadApplyScriptFacts — ERP ไม่ทัน', () => {
     expect(f.loaded).toBe(true);
     expect(f.monthlyIncome).toBe(15000);
     expect(f.benefitLine).toBe('มีเบี้ยขยัน');
+  });
+});
+
+describe('รายได้รวม หรือ เฉลี่ย ที่ทีมเลือก — AI พูดตาม (เจ้าของ Choice 14 ต.ค. 2569)', () => {
+  const month = (from: string, to: string, net: number) => ({ from, to, pay: net, deduct: 0, net });
+  it('เลือกเฉลี่ย + มีสลิปคนเก่า ⇒ พูดเลขเฉลี่ย · เลือกรวม/ไม่เลือก ⇒ รายได้รวมเหมือนเดิม', async () => {
+    erpHangs = false;
+    const slips = { resigned_income_3m: [month('2026-07-01', '2026-07-31', 13400), month('2026-08-01', '2026-08-31', 13400)] };
+    boxOverrides = { ...slips, field_overrides: { income_shown: 'average' } };
+    expect((await loadApplyScriptFacts('siamraj-sql:R1', 500)).monthlyIncome).toBe(13400);
+    boxOverrides = { ...slips, field_overrides: { income_shown: 'total' } };
+    expect((await loadApplyScriptFacts('siamraj-sql:R1', 500)).monthlyIncome).toBe(12000);
+    boxOverrides = { ...slips };
+    expect((await loadApplyScriptFacts('siamraj-sql:R1', 500)).monthlyIncome).toBe(12000);
+  });
+
+  it('เลือกเฉลี่ยแต่ไม่มีสลิปคนเก่า ⇒ พูดรายได้รวม (ไม่เงียบเรื่องเงิน)', async () => {
+    erpHangs = false;
+    boxOverrides = { field_overrides: { income_shown: 'average' } };
+    expect((await loadApplyScriptFacts('siamraj-sql:R1', 500)).monthlyIncome).toBe(12000);
+  });
+});
+
+describe('loadAverageIncomeChoices (เลน Match เติมรายได้ตอนยิง)', () => {
+  it('🔴 ไม่มีใบไหนเลือกเฉลี่ย ⇒ ไม่แตะ feed ใบขอ (feed ค้างก็ไม่รอ)', async () => {
+    erpHangs = true;
+    boxOverrides = { field_overrides: { income_shown: 'total' } };
+    expect((await loadAverageIncomeChoices(['siamraj-sql:R1'])).size).toBe(0);
   });
 });

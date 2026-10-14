@@ -152,6 +152,11 @@ export type UnitBranchOverride = {
   geocode_status?: 'unverified' | 'estimated' | 'confirmed' | 'not_found';
 };
 export type UnitFieldOverrides = {
+  /**
+   * รายได้ที่ผู้สมัครเห็น + AI พูด (เจ้าของ Choice 14 ต.ค. 2569 "เลือกทีละใบขอ" · "AI ต้องตาม")
+   * 'total' = รายได้รวม · 'average' = รายได้เฉลี่ย · null/ไม่มี = ทั้งสอง (ค่าเริ่ม) · ฐานเงินเดือนขึ้นเสมอ
+   */
+  income_shown?: 'total' | 'average' | null;
   age_min?: number | null;
   age_max?: number | null;
   gender?: string | null;
