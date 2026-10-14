@@ -35,6 +35,7 @@ import { listSuppressedPhones } from './callFollowup.js';
 import { listHeldPhones } from './candidateCallHolds.js';
 import { releaseDueCallBatches } from './callBatchStore.js';
 import { pushQueueRowsTracked, type LumosPushChannel } from './lumosPushTracking.js';
+import { checkQueueImports } from './lumosQueueImportWatch.js';
 import { listSiamrajUnitRequests } from './siamrajUnitRequests.js';
 import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
@@ -89,6 +90,8 @@ export type LumosPushRetryRun = {
   silentEscalated: number;
   /** ชุดโทรที่อนุมัติแล้วถูกปล่อยเข้าคิว */
   batchesReleased: number;
+  /** ถาม Lumos แล้วได้คำตอบว่าไม่รับสาย (failed/discarded) — 14 ต.ค. 2569 */
+  notImported?: number;
 };
 
 let lastRun: LumosPushRetryRun | null = null;
@@ -597,6 +600,14 @@ export async function runLumosPushRetryOnce(
     }
   }
 
+  // ── 4) ถาม Lumos ว่ารับสายเข้าจริงไหม (14 ต.ค. 2569) — ล้มไม่ขวางรอบ ──
+  try {
+    const imp = await checkQueueImports();
+    run.notImported = imp.notImported;
+  } catch (e) {
+    logError('lumos.pushRetry: ถามผลนำเข้า Lumos ไม่สำเร็จ', e);
+  }
+
   lastRun = run;
   // รอบที่แค่ "รอ" ไม่ต้องจด — ไม่งั้นคืนละหลายร้อยบรรทัด
   if (
@@ -608,7 +619,8 @@ export async function runLumosPushRetryOnce(
     run.retriesClosed ||
     run.retriesReplanned ||
     run.silentEscalated ||
-    run.batchesReleased
+    run.batchesReleased ||
+    run.notImported
   ) {
     logInfo('lumos.pushRetry.run', { ...run });
   }

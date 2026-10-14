@@ -1581,7 +1581,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (stateByPhone.size > 0) {
         for (const item of items) {
           const hit = stateByPhone.get(toE164Thai(item.phone || '') || '');
-          if (hit) (item as Record<string, unknown>).last_call_status = hit.status;
+          if (hit) {
+            const rec = item as Record<string, unknown>;
+            rec.last_call_status = hit.status;
+            // ป้าย "รอ AI โทร" บอกครบ (14 ต.ค. 2569) — โทรไปแล้วกี่ครั้ง · โทรซ้ำเมื่อไร · ผลรอบก่อน
+            rec.last_call_attempts = hit.attempts ?? null;
+            rec.last_call_next_at = hit.nextAt ?? null;
+            rec.last_call_followup = hit.followup ?? null;
+            rec.last_call_prev_outcome = hit.lastOutcome ?? null;
+            rec.last_call_push_state = hit.pushState ?? null;
+            rec.last_call_import_status = hit.importStatus ?? null;
+          }
         }
       }
       // คำตอบที่ผู้สมัครตอบ AI (ถังผล + เวลา · 30 ก.ย. 2569) — คอลัมน์ "คำตอบกับ AI" ของแท็บผู้สมัคร

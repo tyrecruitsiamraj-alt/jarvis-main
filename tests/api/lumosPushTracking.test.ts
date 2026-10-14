@@ -52,6 +52,14 @@ describe('ยิงรอบแรกแบบจดผล', () => {
     expect(states[1]).toMatch(/push_state = 'pushed'/);
   });
 
+  it('ถึงแล้ว ⇒ จดเลข event ของ Lumos ไว้ถามต่อว่านำเข้าจริงไหม + ล้างผลนำเข้ารอบก่อน (14 ต.ค. 2569)', async () => {
+    pushInterviews.mockResolvedValue({ status: 'success', code: 202, accepted: 1, results: [{ event_id: 'ev-77', status: 'pending' }] });
+    await pushQueueRowsTracked('interview', [{ id: '906', payload: { phone: 'x' } }]);
+    const ev = dbQuery.mock.calls.find((c) => /push_event_id = \$2/.test(String(c[0])));
+    expect(ev?.[1]).toEqual(['906', 'ev-77']);
+    expect(String(ev?.[0])).toMatch(/lumos_import_status = null/);
+  });
+
   it('ยิงล้ม ⇒ จด push_failed พร้อมเหตุ (ตัวส่งซ้ำตามต่อ) · ไม่โยน error ใส่ผู้เรียก', async () => {
     pushInterviews.mockRejectedValue(new Error('fetch failed'));
     const r = await pushQueueRowsTracked('interview', [{ id: '902', payload: { phone: 'x' } }]);

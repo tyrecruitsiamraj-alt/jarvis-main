@@ -13154,3 +13154,18 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ชิปสำเร็จ/ไม่สำเร็จ (14 ต.ค. 2569 เจ้าของ "นัดไม่สำเร็จแต่ขึ้นสำเร็จ"): สำเร็จ = `last_contact_ok` และไม่ใช่ `last_appointment_failed` ·
   ไม่สำเร็จ = ติดต่อไม่ได้ หรือนัดไม่สำเร็จ (ok=true + เหตุผล ไม่มีนัด · `isAppointmentFailedLog`) — ตรงกับขั้นใน `applicantProcess.ts`
 
+
+## แท็บผู้สมัคร: ป้าย "รอ AI โทร" บอกครบ + ชิป "AI ไม่ได้ผล" + ถาม Lumos ว่ารับสายจริงไหม (14 ต.ค. 2569)
+- เจ้าของ: *"รอ Ai โทรบางคนผ่านมา 2 วันแล้วนะ"* → Choice "บอกครบ + แก้คนที่ตกหล่น"
+- ป้าย: `src/lib/applicantAiQueueStatus.ts` (`aiQueueStatusOf`) — รอ AI โทร · AI โทรแล้ว N ครั้ง <ผล> + โทรซ้ำ <วัน เวลา> ·
+  เลยนัดโทรซ้ำ 15 นาทียังไม่มีผล (แดง) · AI โทรครบไม่ได้คำตอบ (`needs_human`) · ส่งแล้วเงียบเกิน 24 ชม. (`push_gave_up`) · Lumos ไม่รับสาย
+  · `attempt_count` = ครั้งที่กำลังจะโทร (ตั้งโทรซ้ำแล้ว +1) ⇒ รอโทรซ้ำ: โทรไปแล้ว = attempt − 1 · needs_human จากผลโทร: = attempt
+  · ข้อมูลมาจาก `loadLatestCallStateByPhone` (`api/_lib/applicantCallOutcomes.ts`) → ช่อง `last_call_attempts/next_at/followup/prev_outcome/push_state/import_status`
+  · `RmTable.tsx` `AiAnswerCell`: สถานะคิวที่ไม่ใช่ "รอรอบแรก" มาก่อนคำตอบรอบเก่า
+- ชิป `ai_at_risk` "AI ไม่ได้ผล" (`recruitRm.ts` `RM_LIST_VIEWS_SHOWN`) = `atRisk` ของตัวบน · ลิงก์ `?view=list&list=ai_at_risk`
+- ต้นเหตุฝั่งเรา: ช่องใบสมัคร/Match ไม่เคยจด `push_event_id` (จดแค่งานติดตาม) ⇒ ไม่รู้ว่า Lumos ไม่รับจนเงียบครบ 24 ชม.
+  · `pushQueueRowsTracked` จดเลข event ทุกครั้ง (ตัวอ่าน `api/_lib/lumosEventId.ts` แยกไฟล์เพราะเทสต์ mock ตัว client ทั้งโมดูล)
+  · `api/_lib/lumosQueueImportWatch.ts` `checkQueueImports` — ถามทุกนาทีในรอบ `lumosPushRetryWorker` (ข้อ 4) · failed/discarded = จด + แจ้ง admin/supervisor
+  · 🔴 ไม่ส่งใหม่เอง ไม่ย้ายให้คน (เจ้าของ 9 ต.ค.) · ไม่แตะงานติดตาม (`followLumosWatch.ts` มีของตัวเอง)
+- วัด 14 ต.ค. (14 วันย้อนหลัง): รอบโทรซ้ำเงียบ 14/147 · รอบแรกเงียบ 7/215 — กระจายหลายวัน ไม่ใช่วันเดียวพัง · แถวเก่าไม่มีเลข event ถามย้อนไม่ได้
+- เทสต์: `src/lib/applicantAiQueueStatus.test.ts` · `tests/api/lumosQueueImportWatch.test.ts` · `tests/api/lumosPushTracking.test.ts` (จดเลข event)

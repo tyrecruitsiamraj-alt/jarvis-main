@@ -83,7 +83,17 @@ export async function loadLatestCallOutcomeByPhone(
  *
  * ⚠️ คีย์เป็นเบอร์ E.164 เหมือนกัน · แถวล่าสุดของเบอร์นั้นชนะ (เทียบ `updated_at`)
  */
-export type ApplicantCallState = { status: string | null; at: string | null };
+export type ApplicantCallState = {
+  status: string | null;
+  at: string | null;
+  /** 14 ต.ค. 2569 — ป้าย "รอ AI โทร" บอกครบ: ครั้งที่ (รวมรอบที่รออยู่) · เวลาโทรซ้ำ · ธงโทรซ้ำ · ผลรอบก่อน */
+  attempts?: number | null;
+  nextAt?: string | null;
+  followup?: string | null;
+  lastOutcome?: string | null;
+  pushState?: string | null;
+  importStatus?: string | null;
+};
 
 export async function loadLatestCallStateByPhone(
   phones: Array<string | null | undefined>,
@@ -93,15 +103,38 @@ export async function loadLatestCallStateByPhone(
   if (keys.length === 0) return out;
 
   try {
-    const { rows } = await dbQuery<{ phone: string; status: string | null; at: string }>(
+    const { rows } = await dbQuery<{
+      phone: string;
+      status: string | null;
+      at: string;
+      attempts: number | null;
+      next_at: string | null;
+      followup: string | null;
+      last_outcome: string | null;
+      push_state: string | null;
+      import_status: string | null;
+    }>(
       `select distinct on (${QUEUE_PHONE_EXPR})
-              ${QUEUE_PHONE_EXPR} as phone, status, updated_at as at
+              ${QUEUE_PHONE_EXPR} as phone, status, updated_at as at,
+              attempt_count as attempts, next_attempt_at as next_at, followup_state as followup, last_outcome,
+              push_state, lumos_import_status as import_status
          from lumos_dispatch_queue
         where ${QUEUE_PHONE_EXPR} = any($1::text[])
         order by ${QUEUE_PHONE_EXPR}, updated_at desc`,
       [keys],
     );
-    for (const r of rows) out.set(r.phone, { status: r.status, at: r.at });
+    for (const r of rows) {
+      out.set(r.phone, {
+        status: r.status,
+        at: r.at,
+        attempts: r.attempts,
+        nextAt: r.next_at ? new Date(r.next_at).toISOString() : null,
+        followup: r.followup,
+        lastOutcome: r.last_outcome,
+        pushState: r.push_state,
+        importStatus: r.import_status,
+      });
+    }
   } catch (e) {
     // ตารางยังไม่ migrate = ไม่มีสถานะให้แสดง ไม่ใช่เหตุให้ทั้งลิสต์พัง
     if (!isPgUndefinedTable(e)) throw e;

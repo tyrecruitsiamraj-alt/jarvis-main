@@ -35,6 +35,7 @@ import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { callResultLabel } from '@/lib/homeCallResults';
 import { INTEREST_MICRO_TONE } from '@/lib/trends/lumosPipeline';
 import { FOLLOW_STATUS_LABEL, FOLLOW_STATUS_TONE, isFollowCallStatus } from '@/lib/followApi';
+import { aiQueueStatusOf, type AiQueueStatus } from '@/lib/applicantAiQueueStatus';
 import { PROCESS_STATE_LABEL, PROCESS_STATE_TONE, PROCESS_STEP_LABEL, applicantProcessOf } from '@/lib/applicantProcess';
 
 /** สถานะแบบ iRecruit (เจ้าของ 4 ต.ค. 2569 "เอาสถานะมาเพิ่มพอ") — ชิปสถานะ + ขั้นที่อยู่ */
@@ -99,7 +100,21 @@ function daysAppliedText(createdAt: string | null | undefined, now: Date): strin
  * ถังผลชุดเดียวกับแผงผลโทรหน้าหลัก (server จัดถัง · `ai_answer`) · สีจาก `INTEREST_MICRO_TONE` ชุดเดียวกับ Dashboard ·
  * ยังไม่มีผล = บอกสถานะคิวแบบเดียวกับป๊อปรายชื่อ (รอคิว/กำลังโทร) · เบอร์ใช้ไม่ได้ = บอกตรง ๆ
  */
+function AiQueueCell({ q }: { q: AiQueueStatus }) {
+  return (
+    <span className="flex flex-col gap-0.5" data-testid="ai-queue-status" data-kind={q.kind}>
+      <span className={cn('whitespace-nowrap text-xs font-medium', TONE[q.tone].value)}>{q.label}</span>
+      {q.sub ? (
+        <span className={cn('whitespace-nowrap text-xs tabular-nums', q.atRisk ? TONE[q.tone].value : DASH.cellMuted)}>{q.sub}</span>
+      ) : null}
+    </span>
+  );
+}
+
 function AiAnswerCell({ r }: { r: PublicApplication }) {
+  // ยังรอฝั่ง AI แต่มีเรื่องให้บอก (โทรแล้วกี่ครั้ง · โทรซ้ำเมื่อไร · ให้คนโทร) — มาก่อนคำตอบรอบเก่า (14 ต.ค. 2569)
+  const queue = aiQueueStatusOf(r);
+  if (queue && queue.kind !== 'waiting') return <AiQueueCell q={queue} />;
   if (r.ai_answer) {
     return (
       <span className="flex flex-col gap-0.5">

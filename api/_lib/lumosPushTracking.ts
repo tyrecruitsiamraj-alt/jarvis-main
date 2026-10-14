@@ -17,6 +17,7 @@ import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { errorSummaryText, logError, logInfo, logWarn } from './logger.js';
 import { enrichPayloadsWithIncome } from './lumosPayloadIncome.js';
+import { firstEventIdOf } from './lumosEventId.js';
 import {
   getLumosPushConfig,
   pushInterviews,
@@ -111,6 +112,16 @@ export async function pushQueueRowsTracked(
           where id = $1::bigint`,
         [row.id],
         'pushed',
+      );
+      // เลขอ้างอิงของ Lumos — ตัวตรวจ "Lumos รับเข้าจริงไหม" ถามต่อจากเลขนี้ (`lumosQueueImportWatch.ts` · 14 ต.ค. 2569)
+      // เดิมจดแค่งานติดตาม ⇒ ใบสมัครที่ Lumos ไม่รับ เราไม่รู้จนเงียบครบ 24 ชม. · แยกคำสั่งไว้ คอลัมน์ไม่มี = แค่ไม่จด
+      await mark(
+        `update ${queueTable}
+            set push_event_id = $2, push_accepted_at = now(),
+                lumos_import_status = null, lumos_import_error = null, lumos_import_checked_at = null
+          where id = $1::bigint`,
+        [row.id, firstEventIdOf(res)],
+        'event id',
       );
     } catch (e) {
       out.failed += 1;

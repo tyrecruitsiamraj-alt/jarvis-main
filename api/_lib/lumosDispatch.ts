@@ -68,6 +68,7 @@ import {
   shiftOutOfQuietHours,
 } from '../../src/lib/callFollowupPolicy.js';
 import { cancelPushedReminder, getLumosPushConfig, pushReminders } from './lumosPushClient.js';
+import { firstEventIdOf } from './lumosEventId.js';
 import type { LumosPushReminderRecord } from './lumosPushClient.js';
 import { resolveInterviewAdminPhone } from './interviewAdminPhone.js';
 import { isPlaceholderPhone } from '../../src/lib/followPhoneGuard.js';
@@ -1960,7 +1961,7 @@ async function planMemberIds(followId: string): Promise<string[]> {
 
 /** จด `event_id` ที่ Lumos ตอบกลับลงแถวคิว — best-effort ล้มก็แค่ไม่มีหลักฐาน */
 async function recordPushAck(followId: string, ack: unknown): Promise<void> {
-  const eventId = readFirstEventId(ack);
+  const eventId = firstEventIdOf(ack);
   try {
     await dbQuery(
       `update ${queueTable}
@@ -1995,15 +1996,6 @@ async function recordPushAck(followId: string, ack: unknown): Promise<void> {
   }
 }
 
-function readFirstEventId(ack: unknown): string | null {
-  if (typeof ack !== 'object' || ack === null) return null;
-  const list = (ack as { results?: unknown }).results;
-  if (!Array.isArray(list) || list.length === 0) return null;
-  const first = list[0];
-  if (typeof first !== 'object' || first === null) return null;
-  const id = (first as { event_id?: unknown }).event_id;
-  return typeof id === 'string' && id.trim() ? id.trim() : null;
-}
 
 /**
  * ข้อความสั้นที่เอาไปโชว์บนจอได้ — **ต้องบอกเหตุจริง ไม่ใช่แค่ "fetch failed"**

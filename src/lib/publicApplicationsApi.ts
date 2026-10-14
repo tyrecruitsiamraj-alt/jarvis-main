@@ -18,6 +18,14 @@ export type PublicApplication = {
    * ที่มีเฉพาะสายที่จบแล้ว · ไม่มีค่า = ไม่เคยถูกส่งเข้าคิวเลย
    */
   last_call_status?: string | null;
+  /** คิว AI ล่าสุด (14 ต.ค. 2569 ป้าย "รอ AI โทร" บอกครบ): ครั้งที่ (รวมรอบที่รอ) · เวลาโทรซ้ำ · ธงโทรซ้ำ · ผลรอบก่อน */
+  last_call_attempts?: number | null;
+  last_call_next_at?: string | null;
+  last_call_followup?: string | null;
+  last_call_prev_outcome?: string | null;
+  /** สถานะการส่งถึง Lumos (`push_gave_up` = ส่งแล้วเงียบเกิน 24 ชม.) · ผลนำเข้าที่ Lumos (`failed`/`discarded` = ไม่รับสาย) */
+  last_call_push_state?: string | null;
+  last_call_import_status?: string | null;
   /**
    * คำตอบล่าสุดที่ผู้สมัครตอบ AI (30 ก.ย. 2569 · คอลัมน์ "คำตอบกับ AI") — ถังผลชุดเดียวกับแผงผลโทรหน้าหลัก + เวลาโทร
    * ไม่มี = AI ยังไม่ได้คุยกับใบนี้ (ดู `last_call_status` ว่ารอคิวหรือยังไม่ส่ง)
