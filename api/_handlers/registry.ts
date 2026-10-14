@@ -40,6 +40,7 @@ import publicClickStatsHandler from './public-click-stats.js';
 import recruitChannelsHandler from './recruit-channels.js';
 import recruitPostingsHandler from './recruit-postings.js';
 import recruitReasonsHandler from './recruit-reasons.js';
+import recruitPostingKindsHandler from './recruit-posting-kinds.js';
 import recruitJobTitlesHandler from './recruit-job-titles.js';
 import recruitFunnelHandler from './recruit-funnel.js';
 import jobApplicationsHandler from './job-applications.js';
@@ -218,6 +219,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/recruit/channels': recruitChannelsHandler as ApiHandler,
   '/api/recruit/postings': recruitPostingsHandler as ApiHandler,
   '/api/recruit/reasons': recruitReasonsHandler as ApiHandler,
+  '/api/recruit/posting-kinds': recruitPostingKindsHandler as ApiHandler,
   '/api/recruit/job-titles': recruitJobTitlesHandler as ApiHandler,
   '/api/recruit/funnel': recruitFunnelHandler as ApiHandler,
   '/api/job-applications': jobApplicationsHandler as ApiHandler,

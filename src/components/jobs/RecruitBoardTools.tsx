@@ -3,7 +3,7 @@ import { FieldSelect } from '@/components/shared/FieldSelect';
 import { Button } from '@/components/ui/button';
 import { useUiV2 } from '@/lib/uiV2';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquareWarning, Plus, Settings2 } from 'lucide-react';
+import { Boxes, MessageSquareWarning, Plus, Settings2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -17,8 +17,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { STANDALONE_POSTING_KINDS } from '@/lib/recruitPostings';
+import { useRecruitPostingKinds } from '@/lib/recruitPostingKindsApi';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
+import PostingKindManagerDialog from '@/components/jobs/PostingKindManagerDialog';
 import ReasonManagerDialog from '@/components/recruit-rm/ReasonManagerDialog';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import { RM_TOOLBAR_LABEL, type RmToolbarKey } from '@/lib/recruitRm';
@@ -31,7 +32,10 @@ const StandalonePickerDialog: React.FC<{
   onClose: () => void;
   onPick: (v: { kind: string; kindLabel: string; departmentCode: string }) => void;
 }> = ({ open, onClose, onPick }) => {
-  const [kind, setKind] = useState<string>(STANDALONE_POSTING_KINDS[0].code);
+  // ประเภทที่เปิดใช้อยู่ (แก้ได้ที่ ตั้งค่าบอร์ด › ประเภทกล่อง · 14 ต.ค. 2569)
+  const kinds = useRecruitPostingKinds().filter((k) => k.isActive);
+  const [picked, setKind] = useState<string>('');
+  const kind = kinds.some((k) => k.code === picked) ? picked : (kinds[0]?.code ?? '');
   const [bu, setBu] = useState(BU_OPTIONS[0]);
 
   return (
@@ -50,7 +54,7 @@ const StandalonePickerDialog: React.FC<{
               ariaLabel="ประเภทกล่อง"
               value={kind}
               onChange={setKind}
-              options={STANDALONE_POSTING_KINDS.map((k) => ({ value: k.code, label: k.label }))}
+              options={kinds.map((k) => ({ value: k.code, label: k.label }))}
             />
           </div>
           <div className="space-y-1.5">
@@ -62,8 +66,9 @@ const StandalonePickerDialog: React.FC<{
           <Button
             type="button"
             className="w-full"
+            disabled={!kind}
             onClick={() => {
-              const label = STANDALONE_POSTING_KINDS.find((k) => k.code === kind)?.label ?? kind;
+              const label = kinds.find((k) => k.code === kind)?.label ?? kind;
               onPick({ kind, kindLabel: label, departmentCode: bu });
             }}
           >
@@ -104,6 +109,7 @@ const RecruitBoardTools: React.FC<{
   const { isFunctionEnabled } = useRolePermissions();
   const navigate = useNavigate();
   const [reasonsOpen, setReasonsOpen] = useState(false);
+  const [kindsOpen, setKindsOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [standalone, setStandalone] = useState<
@@ -208,6 +214,11 @@ const RecruitBoardTools: React.FC<{
                   </DropdownMenuItem>
                 );
               })}
+              {canPostings ? (
+                <DropdownMenuItem onClick={() => setKindsOpen(true)}>
+                  <Boxes className="h-3.5 w-3.5" aria-hidden /> ประเภทกล่อง
+                </DropdownMenuItem>
+              ) : null}
               {extraMenuItems.map((item) => (
                 <DropdownMenuItem key={item.key} onClick={item.onSelect}>
                   <item.icon className="h-3.5 w-3.5" aria-hidden /> {item.label}
@@ -230,6 +241,7 @@ const RecruitBoardTools: React.FC<{
       </div>
 
       <ReasonManagerDialog open={reasonsOpen} onClose={() => setReasonsOpen(false)} />
+      <PostingKindManagerDialog open={kindsOpen} onClose={() => setKindsOpen(false)} />
       <StandalonePickerDialog
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}

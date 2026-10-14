@@ -13218,3 +13218,13 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · 🔴 คีย์กลุ่มกับกลุ่มย่อยห้ามซ้ำ (เคยใช้ `not_sent` ทั้งสองชั้น เลขบวกซ้ำเป็น 96 จาก 31)
 - จอ `ApplicantBreakdown.tsx` ใต้ชิปใน `RmWorkspace.tsx` · กด = `?group=` กรองตาราง · กดชิปมุมมองย่อย = ล้าง group
 - เทสต์ `src/lib/applicantBreakdown.test.ts`
+
+## ตั้งค่าบอร์ด › ประเภทกล่อง (14 ต.ค. 2569)
+- เจ้าของ: *"ถ้าจะเพิ่มข้อมูลตรง ประเภทกล่อง เพิ่มยังไงผ่านหน้า ui"* → *"ทำหน้าจัดการประเภทกล่องในตั้งค่าบอร์ด"*
+- ตาราง `recruit_posting_kinds` (migration 144 · รันแล้ว · seed 5 ตัวเดิม) · ปิดแทนลบ · รหัส `k_xxxxxxxx` สร้างเอง ห้ามเปลี่ยน
+- API `/api/recruit/posting-kinds` (`api/_handlers/recruit-posting-kinds.ts` · สิทธิ์ชุดเดียวกับ "เหตุผล") · ตัวคิด `api/_lib/recruitPostingKinds.ts`
+  · สร้างประกาศลอยต้องเป็นประเภทที่เปิดอยู่ (`isActivePostingKind` ใน `createRecruitPosting`) · ยังไม่ migrate = ชุดเดิม
+- จอ: `PostingKindManagerDialog.tsx` (เมนูตั้งค่าบอร์ด) · ชุดกลางในหน้า `useRecruitPostingKinds` (`src/lib/recruitPostingKindsApi.ts`)
+  ใช้ใน `RecruitBoardTools` (ตัวเลือก Gen link เฉพาะที่เปิด) + `JobBoardView` (กล่องลอย · ปิดแล้วแต่ยังมีประกาศ = ยังขึ้น · สีใหม่ = เทา)
+- `STANDALONE_POSTING_KINDS` เหลือเป็นค่าเริ่ม/ทางถอยเท่านั้น · `isStandalonePostingKind` ตรวจรูปรหัส ไม่ใช่รายชื่อ
+- เทสต์ `tests/api/recruitPostingKinds.test.ts`

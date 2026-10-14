@@ -5,7 +5,11 @@
  * (แพตเทิร์นเดียวกับ `matchingListFilter.ts` ที่รัน 2 ฝั่ง)
  */
 
-/** ประเภทของ "กล่องลอย" — ประกาศที่ไม่ได้ผูกกับใบขอจาก ERP */
+/**
+ * ประเภทของ "กล่องลอย" — ประกาศที่ไม่ได้ผูกกับใบขอจาก ERP
+ * 🔴 14 ต.ค. 2569: ย้ายไปตาราง `recruit_posting_kinds` (144) แก้จาก "ตั้งค่าบอร์ด › ประเภทกล่อง" ได้
+ * ชุดนี้เหลือเป็นค่าเริ่ม/ทางถอยตอนยังไม่ migrate · จอใช้ `fetchRecruitPostingKinds` (`recruitPostingKindsApi.ts`)
+ */
 export const STANDALONE_POSTING_KINDS = [
   { code: 'thai_executive', label: 'ผู้บริหารคนไทย' },
   { code: 'foreign_executive', label: 'ผู้บริหารต่างชาติ' },
@@ -14,12 +18,15 @@ export const STANDALONE_POSTING_KINDS = [
   { code: 'government', label: 'ราชการ' },
 ] as const;
 
-export type StandalonePostingKind = (typeof STANDALONE_POSTING_KINDS)[number]['code'];
+/** รหัสประเภทกล่อง — ชุดเริ่ม 5 ตัว + ตัวที่เพิ่มจากหน้าเว็บ (`k_xxxxxxxx`) */
+export type StandalonePostingKind = string;
 
-const KIND_CODES = new Set<string>(STANDALONE_POSTING_KINDS.map((k) => k.code));
+/** ประเภทกล่องหนึ่งแถว (master `recruit_posting_kinds`) */
+export type RecruitPostingKind = { code: string; label: string; sortOrder: number; isActive: boolean };
 
+/** รูปรหัสที่รับ — ตรวจว่ามีจริง/เปิดอยู่ที่ฝั่ง API (`isActivePostingKind`) */
 export function isStandalonePostingKind(value: unknown): value is StandalonePostingKind {
-  return typeof value === 'string' && KIND_CODES.has(value);
+  return typeof value === 'string' && /^[a-z0-9_]{2,64}$/.test(value);
 }
 
 export function standalonePostingKindLabel(code: string | null | undefined): string {

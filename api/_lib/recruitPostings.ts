@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 
 import { dbQuery, isPgUniqueViolation } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
+import { isActivePostingKind } from './recruitPostingKinds.js';
 import {
   isStandalonePostingKind,
   validatePostingInput,
@@ -539,6 +540,10 @@ export type CreatePostingInput = {
 export async function createRecruitPosting(input: CreatePostingInput): Promise<RecruitPosting> {
   const invalid = validatePostingInput(input);
   if (invalid) throw new Error(invalid);
+  // ประเภทกล่องต้องมีจริงและเปิดใช้อยู่ (14 ต.ค. 2569 · แก้จากตั้งค่าบอร์ดได้แล้ว)
+  if (!(input.jobId || '').trim() && !(await isActivePostingKind(input.standaloneKind))) {
+    throw new Error('ประกาศที่ไม่ผูกใบขอ ต้องเลือกประเภทกล่อง');
+  }
 
   const jobId = trimTo(input.jobId, 128);
   let rows: PostingRow[];

@@ -93,7 +93,8 @@ import { boardPostingPath } from '@/lib/jobNavigation';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { scrollIntoViewX } from '@/lib/scrollIntoViewX';
 import { APPLICANT_FILTER_PARAM_PREFIX } from '@/lib/applicantFilters';
-import { STANDALONE_POSTING_KINDS, type RecruitPosting } from '@/lib/recruitPostings';
+import { type RecruitPosting } from '@/lib/recruitPostings';
+import { useRecruitPostingKinds } from '@/lib/recruitPostingKindsApi';
 import {
   CLOSED_BOX_KEYS,
   JOB_BOX_HINT,
@@ -165,7 +166,7 @@ function staffAssigneeLine(j: JobRequest): string | null {
 /** BU ตั้งต้นของกล่องลอยที่ยังไม่มีประกาศ — ผู้ใช้แก้ได้ในฟอร์ม (ชุดเดียวกับ RecruitBoardTools) */
 const BOARD_DEFAULT_BU = 'LBD';
 
-/** สีกล่องลอยต่อประเภท (mockup rev.3 ข้อ 04) — ม่วง/ม่วง/ฟ้า/ส้ม/เขียว ตามลำดับใน STANDALONE_POSTING_KINDS */
+/** สีกล่องลอยต่อประเภท (mockup rev.3 ข้อ 04) — ม่วง/ม่วง/ฟ้า/ส้ม/เขียว · ประเภทที่เพิ่มจากหน้าเว็บ = เทา */
 const STANDALONE_KIND_TONE: Record<string, ToneKey> = {
   thai_executive: 'violet',
   foreign_executive: 'violet',
@@ -1064,6 +1065,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     };
   }, [isStaff, postingsRev]);
 
+  /** ประเภทกล่องลอย (แก้ได้ที่ ตั้งค่าบอร์ด › ประเภทกล่อง · 14 ต.ค. 2569) — ที่ปิดแล้วยังโชว์ถ้ายังมีประกาศอยู่ */
+  const allPostingKinds = useRecruitPostingKinds();
+  const postingKinds = useMemo(
+    () => allPostingKinds.filter((k) => k.isActive || postings.some((p) => p.standaloneKind === k.code)),
+    [allPostingKinds, postings],
+  );
+
   /**
    * ประเภทกล่องลอย → สรุปของจริงต่อประเภท (นับจากประกาศที่ไม่ผูกใบขอเท่านั้น)
    * เก็บชื่อประกาศ/จังหวัด/BU มาด้วย เพราะการ์ดกล่องลอยใช้โครงเดียวกับการ์ดใบขอ
@@ -1074,7 +1082,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       string,
       { postings: number; applicants: number; titles: string[]; provinces: string[]; bus: string[] }
     > = {};
-    for (const k of STANDALONE_POSTING_KINDS) {
+    for (const k of postingKinds) {
       acc[k.code] = { postings: 0, applicants: 0, titles: [], provinces: [], bus: [] };
     }
     for (const p of postings) {
@@ -1090,7 +1098,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       if (bu && !a.bus.includes(bu)) a.bus.push(bu);
     }
     return acc;
-  }, [postings]);
+  }, [postings, postingKinds]);
 
   /**
    * ใบขอ → ประกาศล่าสุดของใบนั้น — ใช้กับปุ่ม "แก้ไข" บนการ์ด (mockup rev.3 ข้อ 04)
@@ -2019,7 +2027,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               {/* คำโปรยใต้หัวถอดแล้ว (QA 5 ต.ค. 2569) — หัว "ไม่ผูกใบขอ" บอกพอแล้ว */}
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {STANDALONE_POSTING_KINDS.map((k) => {
+              {postingKinds.map((k) => {
                 const tone = TONE[STANDALONE_KIND_TONE[k.code] ?? 'neutral'];
                 const s =
                   standaloneSummary[k.code] ??
