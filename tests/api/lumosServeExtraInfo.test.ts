@@ -68,8 +68,9 @@ describe('ช่อง interview', () => {
     // 500/วัน × 30 = 15,000 + ค่าครองชีพ 1,000 = 16,000 (ไม่ใช่ "500 บาท")
     expect(out.questions[1]).toContain('16,000 บาทต่อเดือน');
     expect(out.questions[1]).not.toMatch(/(^|\D)500(\D|$)/);
-    // โอทีบอกเลขได้ (หน่วยต่อชั่วโมงแน่นอน) — ปัดเป็นจำนวนเต็ม
-    expect(out.questions[1]).toContain('94');
+    // 14 ต.ค. 2569: โอทีไม่การันตีห้ามบอกตัวเงิน
+    expect(out.questions[1]).toContain('มีโอที ขึ้นอยู่กับหน่วยงาน');
+    expect(out.questions[1]).not.toContain('94');
   });
 
   it('เสิร์ฟรอบสองไม่เติมซ้ำ (at-least-once ถึง 5 รอบ)', async () => {

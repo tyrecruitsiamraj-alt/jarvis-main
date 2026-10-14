@@ -68,8 +68,9 @@ export function speakableBenefitLine(rates: JobBenefitRate[]): string {
 
   /**
    * โอที — 🔴 เจ้าของ 5 ต.ค. 2569: *"โอทีถ้าไม่การันตีให้พูดว่า ขึ้นอยู่กับหน่วยงาน"*
-   * การันตี = โอทีเหมารายเดือน (หน่วย `M` ใน ERP) ⇒ "มีโอทีเหมาเดือนละ … บาท"
-   * ไม่การันตี = อัตรารายชั่วโมง (`H` · ไม่รู้หน่วย) ⇒ "มีโอทีชั่วโมงละประมาณ … บาท ขึ้นอยู่กับหน่วยงาน"
+   * 🔴 14 ต.ค. 2569 เจ้าของ: *"โอทีไม่ให้บอกตัวเงิน ให้บอกว่าขึ้นอยู่กับหน่วยงาน เว้นแต่ใบขอไหนมีบอกเลยว่า การันตีโอที"*
+   * การันตี = โอทีเหมารายเดือน (หน่วย `M` ใน ERP) ⇒ "มีโอทีเหมาเดือนละ … บาท" (บอกตัวเงินได้)
+   * ไม่การันตี = อัตรารายชั่วโมง (`H` · ไม่รู้หน่วย) ⇒ "มีโอที ขึ้นอยู่กับหน่วยงาน" — **ห้ามมีตัวเลข**
    * (หน่วย `H` แปลงเป็นรายเดือนไม่ได้อยู่แล้ว — `toMonthlyAmount` คืน null)
    */
   const otFixed = rates.find(
@@ -79,8 +80,7 @@ export function speakableBenefitLine(rates: JobBenefitRate[]): string {
   if (otFixed) {
     parts.push(`มีโอทีเหมาเดือนละ ${Math.round(Number(otFixed.fee_rate)).toLocaleString('th-TH')} บาท`);
   } else if (ot) {
-    // ปัดเป็นจำนวนเต็ม — "เจ็ดสิบหกจุดแปดแปดบาท" ฟังทางโทรศัพท์แล้วงง
-    parts.push(`มีโอทีชั่วโมงละประมาณ ${Math.round(Number(ot.fee_rate))} บาท ขึ้นอยู่กับหน่วยงาน`);
+    parts.push('มีโอที ขึ้นอยู่กับหน่วยงาน');
   }
 
   const found: string[] = [];
@@ -103,8 +103,13 @@ export function speakableBenefitLine(rates: JobBenefitRate[]): string {
 export function speakableBenefitChips(rates: JobBenefitRate[]): string[] {
   const chips: string[] = [];
   rates = rates.filter((r) => !r.is_wage); // เหตุผลเดียวกับ speakableBenefitLine
+  // โอทีกติกาเดียวกับประโยค (14 ต.ค. 2569): การันตี (เหมาเดือน) บอกตัวเงิน · ไม่การันตี ไม่มีตัวเลข
+  const otFixed = rates.find(
+    (r) => OT_ANY.test(r.fee_name) && Number(r.fee_rate) > 0 && (r.unit || '').trim().toUpperCase() === 'M',
+  );
   const ot = rates.find((r) => OT_15.test(r.fee_name) && Number(r.fee_rate) > 0);
-  if (ot) chips.push(`โอที ~${Math.round(Number(ot.fee_rate))} บาท/ชม.`);
+  if (otFixed) chips.push(`โอทีเหมา ${Math.round(Number(otFixed.fee_rate)).toLocaleString('th-TH')} บาท/เดือน`);
+  else if (ot) chips.push('มีโอที ขึ้นอยู่กับหน่วยงาน');
   for (const g of SPEAKABLE_GROUPS) {
     if (rates.some((r) => g.test.test(r.fee_name) && Number(r.fee_rate) > 0)) chips.push(g.label);
   }

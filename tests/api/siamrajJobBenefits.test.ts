@@ -32,7 +32,9 @@ const REAL_ROWS = [
 describe('speakableBenefitLine — whitelist เท่านั้น', () => {
   it('ใบจริง: ได้โอทีชม.ละ (ปัดเต็ม) + เบี้ยขยัน + ค่าเดินทาง — ไม่มีค่าปรับ/ชดเชยหลุด', () => {
     const line = speakableBenefitLine(REAL_ROWS);
-    expect(line).toContain('โอทีชั่วโมงละประมาณ 77 บาท');
+    // 14 ต.ค. 2569: โอทีไม่การันตีห้ามบอกตัวเงิน
+    expect(line).toContain('มีโอที ขึ้นอยู่กับหน่วยงาน');
+    expect(line).not.toMatch(/\d+ บาท/);
     expect(line).toContain('เบี้ยขยัน');
     expect(line).toContain('ค่าเดินทาง');
     // 🔴 ของห้ามพูด — หลุดเมื่อไหร่คือหายนะทางโทรศัพท์
@@ -127,7 +129,7 @@ describe('speakableBenefitChips — หน้าสาธารณะ', () => {
         { fee_name: 'ค่าเบี้ยขยัน', fee_rate: 500 },
         { fee_name: 'ค่ารถ/ค่าเดินทาง/TAXI (อัตรา 1)', fee_rate: 50 },
       ]),
-    ).toEqual(['โอที ~77 บาท/ชม.', 'เบี้ยขยัน', 'ค่าเดินทาง']);
+    ).toEqual(['มีโอที ขึ้นอยู่กับหน่วยงาน', 'เบี้ยขยัน', 'ค่าเดินทาง']);
   });
 
   it('ไม่มีอะไรพูดได้ = ชิปว่าง (ไม่ใช่ชิปว่า "ไม่มีสวัสดิการ")', () => {
@@ -266,10 +268,13 @@ describe('monthlyGuaranteedIncome', () => {
 });
 
 describe('โอทีในบทโทร (เจ้าของ 5 ต.ค. 2569: "โอทีถ้าไม่การันตีให้พูดว่า ขึ้นอยู่กับหน่วยงาน")', () => {
-  it('🔴 โอทีรายชั่วโมง = ไม่การันตี ⇒ บอกว่าขึ้นอยู่กับหน่วยงาน', async () => {
-    const { speakableBenefitLine } = await import('../../api/_lib/siamrajJobBenefits');
+  it('🔴 โอทีรายชั่วโมง = ไม่การันตี ⇒ บอกว่าขึ้นอยู่กับหน่วยงาน ไม่บอกตัวเงิน (เจ้าของ 14 ต.ค. 2569)', async () => {
+    const { speakableBenefitLine, speakableBenefitChips } = await import('../../api/_lib/siamrajJobBenefits');
     const line = speakableBenefitLine([{ fee_name: 'ค่าล่วงเวลา 1.5 เท่า', fee_rate: 75.4, unit: 'H' }]);
-    expect(line).toBe('มีโอทีชั่วโมงละประมาณ 75 บาท ขึ้นอยู่กับหน่วยงาน');
+    expect(line).toBe('มีโอที ขึ้นอยู่กับหน่วยงาน');
+    expect(speakableBenefitChips([{ fee_name: 'ค่าล่วงเวลา 1.5 เท่า', fee_rate: 75.4, unit: 'H' }])).toEqual(['มีโอที ขึ้นอยู่กับหน่วยงาน']);
+    // การันตี (เหมาเดือน) ชิปบอกตัวเงินเหมือนประโยค
+    expect(speakableBenefitChips([{ fee_name: 'ค่าล่วงเวลาเหมา', fee_rate: 3000, unit: 'M' }])[0]).toMatch(/^โอทีเหมา 3,000 บาท\/เดือน$/);
   });
   it('โอทีเหมารายเดือน = การันตี ⇒ บอกยอดเหมา ไม่ต้องมีคำว่าขึ้นอยู่กับหน่วยงาน', async () => {
     const { speakableBenefitLine } = await import('../../api/_lib/siamrajJobBenefits');
