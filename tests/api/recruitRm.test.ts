@@ -118,6 +118,9 @@ describe('แท็บ = สถานะใบสมัคร (ข้อมู�
     expect(isInContactChip(aiCalledBefore, 'uncalled')).toBe(true);
     expect(isInContactChip(dialedBefore, 'uncalled')).toBe(true);
     expect(isInContactChip(dialedAfter, 'called')).toBe(true);
+    // เก็บเข้า Lead ก็นับจากเวลาเก็บ Lead
+    expect(isInContactChip({ lead_at: claimed, dialed_last_at: '2026-10-13T03:00:00Z' }, 'uncalled')).toBe(true);
+    expect(isInContactChip({ lead_at: claimed, dialed_last_at: '2026-10-14T02:00:00Z' }, 'called')).toBe(true);
   });
 
   it('สำเร็จ / ไม่สำเร็จ เติมต่อท้าย (8 ต.ค. 2569) — ลงผลแล้วนับเป็นโทรแล้วเสมอ', () => {
