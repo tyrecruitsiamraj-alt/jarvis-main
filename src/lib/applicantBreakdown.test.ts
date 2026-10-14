@@ -24,7 +24,7 @@ const CASES: Array<[string, Partial<PublicApplication>, string]> = [
   ['อายุเกิน', { age: 60 }, 'over_age'],
   ['ซ้ำ iRecruit', { irecruit_dup_at: '2026-10-10T00:00:00Z' }, 'irecruit_dup'],
   ['เบอร์ใช้ไม่ได้', { phone_callable: false }, 'bad_phone'],
-  ['ไม่ได้เลือกงาน', { job_id: null }, 'no_job'],
+  ['ไม่ได้เลือกงาน', { job_id: undefined }, 'no_job'],
   ['มีใบขอ ยังไม่ส่ง', {}, 'not_sent_other'],
 ];
 
