@@ -13234,3 +13234,20 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · หน้าเดี่ยวที่ไม่มีช่องนี้ ปุ่มอยู่แถวปุ่มทำงานตามเดิม
 - 14 ต.ค. (ต่อ) ค่าเริ่มแท็บผู้สมัคร = "รายชื่อคนที่สนใจ" (`RM_LIST_VIEW_DEFAULT`) · "รายชื่อทั้งหมด" = `?list=all`
   · ลิงก์จากตัวเลขที่หมายถึงทุกคน (metricDictionary · nextTask · officeFloor) ส่ง `&list=all` แล้ว — ลิงก์ใหม่ที่ต้องการทุกคนต้องใส่เอง
+
+### ฟอร์มเพิ่มคนติดตาม 4 ขั้น + ผลคนโทร วันหยุด/ลางาน (14 ต.ค. 2569)
+- เจ้าของสั่ง: ขั้น 4 "ประกัน · ลูกค้า" ดึงจากหน่วยงานในขั้น 2 · ขั้น 1 เพิ่มวันที่เริ่มงาน · ปุ่มลงผลเพิ่ม วันหยุด / ลางาน
+  Choice: ขั้น 4 = "เก็บติดรายการ แก้ได้" · วันเริ่มงาน = "เก็บไว้ดูอย่างเดียว" (ไม่ขยับตารางโทร) · วันหยุด/ลางาน = "ผลใหม่แยก ไม่นับไม่ไป"
+- ขั้นของฟอร์ม `src/lib/followWizard.ts` (`FOLLOW_WIZARD_LAST_STEP = 4`) · ขั้น 2 กับ 4 ไม่บังคับ
+  🔴 ปุ่มบันทึก + ด่านคลิกซ้อน (`isSubmitTooSoonAfterStep3`) ผูกกับขั้นสุดท้าย ห้ามกลับไปเขียนเลข 3 ตายตัวใน `FollowPage.tsx`
+  · ส่งคนแทน ขั้น 3 = วันเวลาเข้างาน (ด่านถัดไปตรวจ `replaceStartOf` ไม่ใช่ตารางโทร)
+- ข้อมูลขั้น 4: `GET /api/follow-unit-info?site=&request=` (`api/_handlers/follow-unit-info.ts` → `api/_lib/followUnitInfo.ts`)
+  ERP อ่านอย่างเดียว · ใบขอจากบอร์ด (`sampleRequestNo`) ก่อน ไม่เจอ = ใบล่าสุดของไซต์ · ประกัน `st_request_p2_grantee`×`st_ms_grantee_type` · ผู้ติดต่อ `st_request_p1`
+  · ERP ไม่มี `string_agg` รวมใน JS · ดึงเมื่อเข้าขั้น 4 และเปลี่ยนหน่วยงานเท่านั้น (ย้อนขั้นไม่ทับที่คนแก้)
+- เก็บที่ `follow_entries.start_date / insurance_type / customer_name / customer_contact / customer_phone` (migration 145 · รันแล้ว)
+  ตั้งหลัง insert ใน `insertFollowRow` (ฐานยังไม่รัน = logWarn ไม่ล้ม) · ส่งครบ 3 เส้น (ทั่วไป · ตารางหลายวัน · ส่งคนแทน) ผ่าน `extraPayload()`
+  · โชว์ในป๊อปจัดการ (`FollowRoundsDialog` · ดูอย่างเดียว)
+- ผลคนโทร `day_off` / `on_leave` (`FOLLOW_STAFF_DAY_STOP_OUTCOMES` ใน `followStaffCall.ts`) → หมวด `dayOff` / `leave` (`followPlanning.ts`)
+  นับว่า "โทรไปแล้ว" แต่ไม่ใช่ไป/ไม่ไป · ลงผลแล้วหยุดสายที่เหลือของวันนั้น (`stopRemainingFollowRounds(done,'day')`)
+  · คอลัมน์/แถวเพิ่มที่ `followCallMatrix` · `followJourney` · `followTrends` · `homeCallResults` · `homeLumosSummary` · `AiShareLumosStats` · legend ปฏิทิน
+- เทสต์ `tests/api/followStartInsurance.test.ts` · `src/lib/followWizard.test.ts` · `tests/api/followStaffCall.test.ts`

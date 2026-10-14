@@ -16,7 +16,7 @@ import { toneOfBu } from '@/components/team-online/teamOnlineTones';
 import { segmentDotClass } from '@/components/home-ai-share/segmentStyle';
 import { trendBuLabel } from '@/lib/trends/bu';
 import { TONE } from '@/lib/designTokens';
-import { FOLLOW_MATRIX_COL_TONE } from '@/lib/followCallMatrix';
+import { FOLLOW_MATRIX_COL_LABEL, FOLLOW_MATRIX_COL_TONE } from '@/lib/followCallMatrix';
 import { homeQueryKey, type AiShareBlockKey, type AiShareWindow } from '@/lib/homeAiShare';
 import { fetchHomeLumosSummary } from '@/lib/homeAiShareApi';
 import {
@@ -46,6 +46,9 @@ export type ResultSlice = { key: string; label: string; tone: ToneKey; value: nu
 export const FOLLOW_RESULT_COLS: ReadonlyArray<{ key: FollowBucketKey; label: string; tone: ToneKey; note?: string }> = [
   { key: 'went', label: 'ตอบว่าไป', tone: FOLLOW_MATRIX_COL_TONE.went },
   { key: 'notWent', label: 'ตอบว่าไม่ไป', tone: FOLLOW_MATRIX_COL_TONE.notWent },
+  // วันหยุด · ลางาน (14 ต.ค. 2569 · คนลงผล) — ไม่ปนกับไม่ไป
+  { key: 'dayOff', label: FOLLOW_MATRIX_COL_LABEL.dayOff, tone: FOLLOW_MATRIX_COL_TONE.dayOff },
+  { key: 'leave', label: FOLLOW_MATRIX_COL_LABEL.leave, tone: FOLLOW_MATRIX_COL_TONE.leave },
   { key: 'reschedule', label: 'ขอเลื่อน', tone: 'orange' },
   { key: 'unclear', label: 'สรุปไม่ได้', tone: FOLLOW_MATRIX_COL_TONE.unclear },
   {

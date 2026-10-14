@@ -70,7 +70,8 @@ export function emptyCallResultCounts(): CallResultCounts {
  *   `api/_lib/followCategory.ts`) · แยกแท็บ ติดตามคนเริ่มงาน / ติดตามส่งคนแทน และ AI โทร / คนโทร
  * ทุกช่องรวมกัน = ทั้งหมด (เทสต์คุม `followNumbersReconcile.test.ts`)
  */
-export const FOLLOW_RESULT_KEYS = ['went', 'notWent', 'noAnswer', 'unclear', 'waiting', 'cancelled'] as const;
+// วันหยุด · ลางาน (14 ต.ค. 2569 · คนลงผล) — ช่องเดียวกับแผงขั้นตอนของสาย (`FOLLOW_MATRIX_COLS`)
+export const FOLLOW_RESULT_KEYS = ['went', 'notWent', 'dayOff', 'leave', 'noAnswer', 'unclear', 'waiting', 'cancelled'] as const;
 export type FollowResultKey = (typeof FOLLOW_RESULT_KEYS)[number];
 export type FollowResultCounts = Record<FollowResultKey, number>;
 export type FollowResultTeam = 'main' | 'replacement';
@@ -78,7 +79,7 @@ export type FollowResultTeam = 'main' | 'replacement';
 export type FollowResultsSplit = Record<FollowResultTeam, Record<'ai' | 'staff', FollowResultCounts>>;
 
 export function emptyFollowResultCounts(): FollowResultCounts {
-  return { went: 0, notWent: 0, noAnswer: 0, unclear: 0, waiting: 0, cancelled: 0 };
+  return { went: 0, notWent: 0, dayOff: 0, leave: 0, noAnswer: 0, unclear: 0, waiting: 0, cancelled: 0 };
 }
 export function emptyFollowResultsSplit(): FollowResultsSplit {
   return {

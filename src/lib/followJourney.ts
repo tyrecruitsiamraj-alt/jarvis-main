@@ -16,7 +16,16 @@ export type FollowJourneyTeam = 'main' | 'replacement';
 export type FollowJourneyView = 'all' | FollowJourneyTeam;
 
 /** ผลของสายบนเส้นทาง — หมวดของหน้าติดตาม + ขอเลื่อนแยกออกมา · รอโทร = ยังไม่ถึงเวลา/เลยเวลา/ไม่ได้ส่ง */
-export type FollowJourneyResult = 'agreed' | 'lost' | 'reschedule' | 'unreachable' | 'other' | 'cancelled' | 'waiting';
+export type FollowJourneyResult =
+  | 'agreed'
+  | 'lost'
+  | 'dayOff'
+  | 'leave'
+  | 'reschedule'
+  | 'unreachable'
+  | 'other'
+  | 'cancelled'
+  | 'waiting';
 
 export function journeyResultOf(category: FollowCallCategory, outcome: string | null | undefined): FollowJourneyResult {
   if (category === 'other' && (outcome ?? '').trim() === 'reschedule_requested') return 'reschedule';
@@ -80,6 +89,8 @@ export const FOLLOW_JOURNEY_STAGE_LABEL: Record<FollowJourneyStage, string> = {
   called: 'โทรแล้ว',
   agreed: 'ไป',
   lost: 'ไม่ไป',
+  dayOff: 'วันหยุด',
+  leave: 'ลางาน',
   reschedule: 'ขอเลื่อน',
   unreachable: 'ไม่รับสาย',
   other: 'สรุปไม่ได้',
@@ -92,7 +103,7 @@ export const FOLLOW_JOURNEY_STAGE_LABEL: Record<FollowJourneyStage, string> = {
   irecruitCancel: 'iRecruit ยกเลิก',
 };
 
-const RESULTS_CALLED: readonly FollowJourneyResult[] = ['agreed', 'lost', 'reschedule', 'unreachable', 'other'];
+const RESULTS_CALLED: readonly FollowJourneyResult[] = ['agreed', 'lost', 'dayOff', 'leave', 'reschedule', 'unreachable', 'other'];
 
 /** สายของขั้นนั้น (ขั้นของ iRecruit แก้/ยกเลิก ไม่ใช่สาย — ดู `journeyEventsOf`) */
 export function journeyRowsOf(rows: readonly FollowJourneyRow[], stage: FollowJourneyStage): FollowJourneyRow[] {
@@ -190,6 +201,9 @@ export function journeyPerDay(rows: readonly FollowJourneyRow[]): number {
 export const FOLLOW_JOURNEY_RESULTS: readonly FollowJourneyResult[] = [
   'agreed',
   'lost',
+  // วันหยุด/ลางาน (14 ต.ค. 2569 · คนลงผล)
+  'dayOff',
+  'leave',
   'reschedule',
   'unreachable',
   'other',
@@ -198,9 +212,11 @@ export const FOLLOW_JOURNEY_RESULTS: readonly FollowJourneyResult[] = [
 ];
 
 /** สีของผล — ภาษาเดียวกับหน้าติดตาม (`FOLLOW_MATRIX_COL_TONE`) · ขอเลื่อนอยู่ใต้สรุปไม่ได้บนหน้าติดตาม เลยสีเดียวกัน */
-export const FOLLOW_JOURNEY_RESULT_TONE: Record<FollowJourneyResult, 'neutral' | 'success' | 'danger' | 'warn' | 'info' | 'violet'> = {
+export const FOLLOW_JOURNEY_RESULT_TONE: Record<FollowJourneyResult, 'neutral' | 'success' | 'danger' | 'warn' | 'info' | 'violet' | 'teal'> = {
   agreed: 'success',
   lost: 'danger',
+  dayOff: 'teal',
+  leave: 'teal',
   reschedule: 'violet',
   unreachable: 'warn',
   other: 'violet',
@@ -211,12 +227,16 @@ export const FOLLOW_JOURNEY_RESULT_TONE: Record<FollowJourneyResult, 'neutral' |
 /** ผลบนเส้นทาง → ช่องบนแผงหน้าติดตาม (ขอเลื่อนรวมอยู่ในสรุปไม่ได้) — เทสต์ใช้ล็อกว่าเลขสองหน้าเท่ากัน */
 export function journeyResultMatrixCol(
   r: FollowJourneyResult,
-): 'went' | 'notWent' | 'noAnswer' | 'unclear' | 'waiting' | 'cancelled' {
+): 'went' | 'notWent' | 'dayOff' | 'leave' | 'noAnswer' | 'unclear' | 'waiting' | 'cancelled' {
   switch (r) {
     case 'agreed':
       return 'went';
     case 'lost':
       return 'notWent';
+    case 'dayOff':
+      return 'dayOff';
+    case 'leave':
+      return 'leave';
     case 'unreachable':
       return 'noAnswer';
     case 'reschedule':

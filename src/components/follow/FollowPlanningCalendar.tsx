@@ -255,7 +255,7 @@ const STAFF_AT = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', ho
  */
 // 🔴 สร้างจากหมวดกลาง (คำ + สี) — คำเดียวกับป้ายในตารางและช่องบนแผง (6 ต.ค. 2569)
 const DAY_LEGEND: ReadonlyArray<[keyof typeof TONE, string]> = [
-  ...(['agreed', 'lost', 'unreachable', 'other', 'waiting'] as const).map(
+  ...(['agreed', 'lost', 'dayOff', 'leave', 'unreachable', 'other', 'waiting'] as const).map(
     (c): [keyof typeof TONE, string] => [FOLLOW_CALL_CATEGORY_TONE[c], FOLLOW_CALL_CATEGORY_LABEL[c]],
   ),
   // สายที่ตั้งให้คนโทร ยังไม่ถึงเวลา (QA รอบ 3 ข้อ 11) — ฟ้าแบบรอโทร
@@ -679,7 +679,7 @@ const FollowPlanningCalendar: React.FC<{
             className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border/70 px-4 py-2 text-[11px] text-muted-foreground md:px-5"
           >
             {DAY_LEGEND.map(([tone, label]) => (
-              <span key={tone} className="flex items-center gap-1.5">
+              <span key={label} className="flex items-center gap-1.5">
                 <span className={cn('h-2.5 w-2.5 shrink-0 rounded-sm', TONE[tone].dot)} aria-hidden />
                 {label}
               </span>

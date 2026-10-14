@@ -11,7 +11,13 @@
  * ขั้นที่ 2 จึงข้ามได้เสมอ ห้ามใส่ด่านบังคับเพิ่ม
  */
 
-export type FollowWizardStep = 1 | 2 | 3;
+export type FollowWizardStep = 1 | 2 | 3 | 4;
+
+/**
+ * ขั้นสุดท้าย = ขั้นที่มีปุ่มบันทึก (เจ้าของสั่ง 14 ต.ค. 2569 *"เพิ่มอีกอันเป็น 4 หน้า"* — ขั้น 4 ประกัน · ลูกค้า)
+ * ด่านกันคลิกซ้อนกับปุ่มบันทึกผูกกับค่านี้ ไม่ใช่เลข 3 ตายตัว
+ */
+export const FOLLOW_WIZARD_LAST_STEP: FollowWizardStep = 4;
 
 export const FOLLOW_WIZARD_STEPS: ReadonlyArray<{
   step: FollowWizardStep;
@@ -22,6 +28,7 @@ export const FOLLOW_WIZARD_STEPS: ReadonlyArray<{
   { step: 1, title: 'คนที่จะติดตาม', hint: 'ชื่อ · เบอร์ · เรื่อง' },
   { step: 2, title: 'หน่วยงาน', hint: 'ถ้ามี' },
   { step: 3, title: 'ตั้งเวลา', hint: 'วันเวลาที่โทร' },
+  { step: 4, title: 'ประกัน · ลูกค้า', hint: 'ถ้ามี' },
 ];
 
 export type FollowWizardValues = {
@@ -62,8 +69,8 @@ export function followStepError(step: FollowWizardStep, v: FollowWizardValues): 
     return null;
   }
 
-  // ขั้น 2 = หน่วยงาน — ไม่บังคับ ข้ามได้เสมอ
-  if (step === 2) return null;
+  // ขั้น 2 = หน่วยงาน · ขั้น 4 = ประกัน/ลูกค้า — ไม่บังคับ ข้ามได้เสมอ
+  if (step === 2 || step === 4) return null;
 
   if (v.scheduleMode) {
     if (v.scheduleDays.length === 0) return 'เลือกช่วงวัน แล้วเลือกวันที่จะโทรอย่างน้อย 1 วัน';
@@ -90,9 +97,9 @@ export function firstIncompleteStep(v: FollowWizardValues): FollowWizardStep | n
   return null;
 }
 
-/** ขั้นถัดไป/ก่อนหน้า — ตัดที่ 1 กับ 3 ไม่ให้หลุดกรอบ */
+/** ขั้นถัดไป/ก่อนหน้า — ตัดที่ 1 กับขั้นสุดท้าย ไม่ให้หลุดกรอบ */
 export function nextFollowStep(step: FollowWizardStep): FollowWizardStep {
-  return (step < 3 ? step + 1 : 3) as FollowWizardStep;
+  return (step < FOLLOW_WIZARD_LAST_STEP ? step + 1 : FOLLOW_WIZARD_LAST_STEP) as FollowWizardStep;
 }
 
 export function prevFollowStep(step: FollowWizardStep): FollowWizardStep {
@@ -125,7 +132,8 @@ export function followStepSummary(
  * ที่กดเร็ว/ดับเบิลคลิกจะตกลงบนปุ่มบันทึกพอดี กลายเป็นบันทึก + ส่งคิวโทรโดยไม่ตั้งใจ
  * (ตำแหน่งทับกันหรือไม่ขึ้นกับความสูงจอ/มือถือ — กันด้วยตำแหน่งไม่ได้ ต้องกันด้วยเวลา)
  *
- * คลิกบันทึกภายในช่วงนี้หลังเพิ่งเข้าขั้น 3 = ไม่นับ (เงียบ ๆ เหมือนกดไม่ติด)
+ * คลิกบันทึกภายในช่วงนี้หลังเพิ่งเข้าขั้นสุดท้าย = ไม่นับ (เงียบ ๆ เหมือนกดไม่ติด)
+ * (14 ต.ค. 2569 ปุ่มบันทึกย้ายไปขั้น 4 — ชื่อฟังก์ชันคงเดิม ค่าที่ส่งเข้ามาคือเวลาเข้าขั้นสุดท้าย)
  */
 export const FOLLOW_SUBMIT_GUARD_MS = 800;
 

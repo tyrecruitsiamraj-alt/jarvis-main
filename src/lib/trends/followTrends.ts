@@ -35,9 +35,9 @@ const FOLLOW_DROPPED: readonly string[] = ['cancelled', 'leave', 'job_cancelled'
 const isSuccess = (code: string | null) => Boolean(code && (FOLLOW_OUTCOME_SUCCESS as readonly string[]).includes(code));
 
 /** สายที่โทรแล้วมีผล (ช่องของแผง: ไป · ไม่ไป · ไม่รับสาย · สรุปไม่ได้) */
-const CALLED_CATEGORIES: ReadonlySet<FollowCallCategory> = new Set(['agreed', 'lost', 'unreachable', 'other']);
-/** มีคนรับ = โทรแล้ว ยกเว้นไม่รับสาย */
-const ANSWERED_CATEGORIES: ReadonlySet<FollowCallCategory> = new Set(['agreed', 'lost', 'other']);
+const CALLED_CATEGORIES: ReadonlySet<FollowCallCategory> = new Set(['agreed', 'lost', 'dayOff', 'leave', 'unreachable', 'other']);
+/** มีคนรับ = โทรแล้ว ยกเว้นไม่รับสาย · วันหยุด/ลางาน = คุยได้แล้ว (14 ต.ค. 2569) */
+const ANSWERED_CATEGORIES: ReadonlySet<FollowCallCategory> = new Set(['agreed', 'lost', 'dayOff', 'leave', 'other']);
 
 /**
  * ═══ ช่องของแผงขั้นตอนของสาย ในช่วงที่เลือก (ตามวันนัดโทร) — เลขชุดเดียวกับหน้าติดตาม (6 ต.ค. 2569) ═══
@@ -47,7 +47,7 @@ export function followMatrixInRange(
   rows: readonly FollowTrendRow[],
   range: { from: string; to: string },
 ): Record<Exclude<FollowMatrixCol, 'total'>, number> & { total: number } {
-  const out = { total: 0, went: 0, notWent: 0, noAnswer: 0, unclear: 0, waiting: 0, cancelled: 0 };
+  const out = { total: 0, went: 0, notWent: 0, dayOff: 0, leave: 0, noAnswer: 0, unclear: 0, waiting: 0, cancelled: 0 };
   for (const r of rows) {
     const y = bangkokYmd(r.scheduledAt);
     if (!y || y < range.from || y > range.to) continue;

@@ -58,6 +58,7 @@ import {
   type FollowEntry,
   type FollowStopScope,
   updateFollowEntry,
+  fetchFollowUnitInfo,
 } from '@/lib/followApi';
 import type { FollowStaffCallOutcome } from '@/lib/followStaffCall';
 import { summarizeDispatchResults } from '@/lib/followDispatchState';
@@ -93,6 +94,7 @@ import {
   followStepError,
   followStepSummary,
   FOLLOW_WIZARD_STEPS,
+  FOLLOW_WIZARD_LAST_STEP,
   isSubmitTooSoonAfterStep3,
   nextFollowStep,
   prevFollowStep,
@@ -395,6 +397,19 @@ const FollowPage: React.FC = () => {
    */
   const [unitName, setUnitName] = useState('');
   const [siteCode, setSiteCode] = useState('');
+  /** ใบขอที่เลือกหน่วยงานมา — ใช้ดึงประกัน/ผู้ติดต่อลูกค้าในขั้น 4 */
+  const [unitRequestNo, setUnitRequestNo] = useState('');
+  /**
+   * วันที่เริ่มงาน (ขั้น 1) + ประกัน · ลูกค้า (ขั้น 4) — เจ้าของสั่ง 14 ต.ค. 2569 · 145
+   * Choice "เก็บไว้ดูอย่างเดียว" (วันเริ่มงานไม่ไปขยับตารางโทร) · "เก็บติดรายการ แก้ได้" (ประกัน/ลูกค้า)
+   */
+  const [startDate, setStartDate] = useState('');
+  const [insuranceType, setInsuranceType] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerContact, setCustomerContact] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  /** ดึงของหน่วยงานไหนไปแล้ว — เปลี่ยนหน่วยงานแล้วถึงดึงใหม่ (ไม่ทับที่คนแก้เองซ้ำทุกครั้งที่ย้อนขั้น) */
+  const [unitInfoState, setUnitInfoState] = useState<{ key: string; status: 'loading' | 'done' | 'error' } | null>(null);
   const [openJobs, setOpenJobs] = useState<JobRequest[]>([]);
   /** รายการที่กำลังแก้ไข (096) — null = ไม่ได้เปิดกล่องแก้ */
   const [editing, setEditing] = useState<FollowEntry | null>(null);
@@ -451,7 +466,7 @@ const FollowPage: React.FC = () => {
    * เวลาที่เพิ่งเข้าขั้นตั้งเวลา — กันคลิกเร็วซ้อน: กด "ถัดไป" แล้วปุ่ม "บันทึก"
    * มาเรนเดอร์แถวเดียวกันทันที คลิกที่สองของคนกดเร็วตกลงบนบันทึกพอดี (โดนจริง 18 ส.ค.)
    */
-  const step3EnteredAtRef = useRef(0);
+  const lastStepEnteredAtRef = useRef(0);
   /**
    * popup เตือนลงซ้ำ (เจ้าของสั่ง 18 ส.ค. 2569) — เก็บทั้งกองซ้ำและกองที่ไม่ซ้ำ
    * `null` = ไม่มีเตือนค้าง · ตรรกะเทียบอยู่ที่ `followDuplicateGuard.ts` (pure + เทสต์)
@@ -582,6 +597,7 @@ const FollowPage: React.FC = () => {
   const pickUnit = (u: BoardUnitOption) => {
     setUnitName(u.unitName);
     setSiteCode(u.siteCode);
+    setUnitRequestNo(u.sampleRequestNo ?? '');
     setUnitPickerOpen(false);
     setFormError(null);
   };
@@ -767,6 +783,13 @@ const FollowPage: React.FC = () => {
     setRoundModesByDay({});
     setUnitName('');
     setSiteCode('');
+    setUnitRequestNo('');
+    setStartDate('');
+    setInsuranceType('');
+    setCustomerName('');
+    setCustomerContact('');
+    setCustomerPhone('');
+    setUnitInfoState(null);
     setFormError(null);
     setStep(1);
   };
@@ -1001,21 +1024,64 @@ const FollowPage: React.FC = () => {
     [firstName, phone, topic, scheduleMode, scheduledAts, dateFrom, dateTo, skippedDays, roundTimes, perDayTimes, roundTimesByDay],
   );
 
-  const stepError = followStepError(step, wizardValues);
+  /** ส่งคนแทน: ขั้น 3 คือวันเวลาเข้างาน ไม่ใช่ตารางโทร — ด่านถัดไปต้องตรวจคนละอย่าง */
+  const stepError =
+    replaceView && step === 3
+      ? replaceStartOf(replaceStartVal)
+        ? null
+        : 'ใส่วันเวลาเข้างาน'
+      : followStepError(step, wizardValues);
 
   /**
    * เปลี่ยนขั้นผ่านตัวนี้เสมอ — จับเวลาเข้าขั้น 3 **ตอนคลิก ไม่ใช่หลัง render**
    * (useEffect ตั้งหลัง paint — คลิกซ้อนที่เร็วกว่าเฟรมแรกจะเห็น ref เป็นค่าเก่าแล้วหลุดด่าน)
    */
   const goToStep = (target: FollowWizardStep) => {
-    if (target === 3 && step !== 3) step3EnteredAtRef.current = Date.now();
+    if (target === FOLLOW_WIZARD_LAST_STEP && step !== FOLLOW_WIZARD_LAST_STEP) lastStepEnteredAtRef.current = Date.now();
     setStep(target);
   };
 
   // backstop เผื่อมีทางเปลี่ยนขั้นที่ไม่ผ่าน goToStep
   useEffect(() => {
-    if (step === 3 && step3EnteredAtRef.current === 0) step3EnteredAtRef.current = Date.now();
+    if (step === FOLLOW_WIZARD_LAST_STEP && lastStepEnteredAtRef.current === 0) lastStepEnteredAtRef.current = Date.now();
   }, [step]);
+
+  /**
+   * ขั้น 4 — ดึงประกัน + ผู้ติดต่อลูกค้าของหน่วยงานที่เลือกจากบอร์ด (ERP อ่านอย่างเดียว)
+   * ได้มาแล้วเติมลงช่อง แก้ต่อได้ · ไม่ได้เลือกจากบอร์ด (ไม่มีรหัสไซต์) = กรอกเอง
+   */
+  useEffect(() => {
+    if (step !== FOLLOW_WIZARD_LAST_STEP || !siteCode.trim()) return;
+    const key = `${siteCode.trim()}|${unitRequestNo.trim()}`;
+    if (unitInfoState?.key === key) return;
+    setUnitInfoState({ key, status: 'loading' });
+    let alive = true;
+    fetchFollowUnitInfo({ siteCode: siteCode.trim(), requestNo: unitRequestNo.trim() || undefined })
+      .then((info) => {
+        if (!alive) return;
+        setInsuranceType(info.insurance.join(' / '));
+        setCustomerName(info.customerName ?? '');
+        setCustomerContact([info.contactName, info.contactPosition].filter(Boolean).join(' · '));
+        setCustomerPhone(info.contactPhone ?? '');
+        setUnitInfoState({ key, status: 'done' });
+      })
+      .catch(() => {
+        if (alive) setUnitInfoState({ key, status: 'error' });
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, siteCode, unitRequestNo]);
+
+  /** ช่องวันเริ่มงาน + ขั้น 4 — ส่งไปกับทุกเส้นบันทึก (ทั่วไป · ตารางหลายวัน · ส่งคนแทน) */
+  const extraPayload = () => ({
+    start_date: startDate || undefined,
+    insurance_type: insuranceType.trim() || undefined,
+    customer_name: customerName.trim() || undefined,
+    customer_contact: customerContact.trim() || undefined,
+    customer_phone: customerPhone.trim() || undefined,
+  });
 
   /** กดถัดไป — ไม่ผ่านด่านของขั้นนี้ก็ไม่ให้ไป และบอกว่าติดตรงไหน */
   const goNext = () => {
@@ -1041,9 +1107,8 @@ const FollowPage: React.FC = () => {
      * ด่าน `firstIncompleteStep` จึงไม่ช่วยเลย บันทึกทันทีตั้งแต่ยืนอยู่ขั้น 2
      * → ต้องกันด้วย "อยู่ขั้นไหน" ไม่ใช่ "ข้อมูลครบหรือยัง" · Enter กลายเป็นปุ่มถัดไปแทน
      */
-    if (step !== 3) {
-      const err = followStepError(step, wizardValues);
-      if (err) setFormError(err);
+    if (step !== FOLLOW_WIZARD_LAST_STEP) {
+      if (stepError) setFormError(stepError);
       else goToStep(nextFollowStep(step));
       return;
     }
@@ -1051,7 +1116,7 @@ const FollowPage: React.FC = () => {
      * 🔴 เพิ่งเข้าขั้นตั้งเวลามาไม่ถึงช่วงกัน = คลิกซ้อนจากปุ่มถัดไป ไม่ใช่เจตนาบันทึก
      * กลืนเงียบ ๆ (เหมือนกดไม่ติด) — คนที่ตั้งใจจริงจะกดอีกครั้งหลังอ่านหน้าจอ
      */
-    if (isSubmitTooSoonAfterStep3(step3EnteredAtRef.current, Date.now())) return;
+    if (isSubmitTooSoonAfterStep3(lastStepEnteredAtRef.current, Date.now())) return;
     /** 🔴 แท็บส่งคนแทน = 3 สายจากวันเวลาเข้างาน (7 ต.ค. 2569) — server คิดสายด้วยกติกาเดียวกับรอบดึง iRecruit */
     if (replaceView) {
       for (const st of [1, 2] as const) {
@@ -1065,6 +1130,7 @@ const FollowPage: React.FC = () => {
       const start = replaceStartOf(replaceStartVal);
       const plans = start ? planReplaceCallsFull(start, new Date(), replaceTiming) : [];
       if (!start || plans.length === 0) {
+        setStep(3);
         setFormError('ใส่วันเวลาเข้างาน');
         return;
       }
@@ -1099,6 +1165,7 @@ const FollowPage: React.FC = () => {
           site_code: siteCode.trim() || undefined,
           replace_start: start,
           replace_modes: modes,
+          ...extraPayload(),
         });
         resetForm();
         setDoneInfo({
@@ -1225,6 +1292,7 @@ const FollowPage: React.FC = () => {
                 // ตารางหลายวัน = ครั้งที่รายวัน (plan_day_no) แทนเลขวันแรกช่องเดียว
                 unit_name: unitName.trim() || undefined,
                 site_code: siteCode.trim() || undefined,
+                ...extraPayload(),
                 rounds: dayCalls.map((c) => ({
                   scheduled_at: c.scheduledAt,
                   staff_phone: c.staffPhone || undefined,
@@ -1395,6 +1463,7 @@ const FollowPage: React.FC = () => {
             plan_day_start: planDayStart > 1 ? planDayStart : undefined,
             unit_name: unitName.trim() || undefined,
             site_code: siteCode.trim() || undefined,
+            ...extraPayload(),
             rounds: dayIso.map((t) => ({
               scheduled_at: t,
               staff_phone: phoneByIso.get(t) || undefined,
@@ -2498,6 +2567,14 @@ const FollowPage: React.FC = () => {
                 placeholder="เบอร์มือถือผู้สมัคร"
               />
             </div>
+            {/* วันที่เริ่มงาน (เจ้าของสั่ง 14 ต.ค. 2569 · 145) — เก็บไว้ดูอย่างเดียว ไม่ขยับตารางโทร
+                🔴 ไม่ใช้ <input type="date"> (ช่องรับปี ค.ศ. คนพิมพ์ 2569 แล้วพัง 9 ต.ค.) */}
+            <div className="space-y-1.5">
+              <p className="ml-1 text-xs font-medium text-muted-foreground">
+                วันที่เริ่มงาน <span className="text-muted-foreground/70">(ถ้ามี)</span>
+              </p>
+              <DateSelectDmyBe value={startDate} onChange={setStartDate} allowEmpty ariaLabel="วันที่เริ่มงาน" />
+            </div>
             {/* เรื่องที่จะให้โทรติดตาม (100 · เจ้าของสั่ง 18 ส.ค. 2569) — dropdown จากลิสต์กลาง
                 ที่ supervisor เพิ่มเองได้ · ยังพิมพ์เรื่องใหม่เองได้ถ้าไม่มีในลิสต์ */}
             <TopicField id="followTopic" value={topic} onChange={setTopic} reloadSignal={topicsRev} />
@@ -2552,6 +2629,7 @@ const FollowPage: React.FC = () => {
                   setUnitName(e.target.value);
                   // พิมพ์เองแล้วรหัสไซต์เดิมใช้ไม่ได้ — รหัสไซต์มาจากการ "เลือกจากบอร์ด" เท่านั้น
                   if (siteCode) setSiteCode('');
+                  setUnitRequestNo('');
                 }}
                 placeholder="ชื่อหน่วยงาน"
               />
@@ -2564,6 +2642,7 @@ const FollowPage: React.FC = () => {
                     onClick={() => {
                       setUnitName('');
                       setSiteCode('');
+                      setUnitRequestNo('');
                     }}
                     className="ml-1 underline hover:text-foreground"
                   >
@@ -3164,7 +3243,75 @@ const FollowPage: React.FC = () => {
              * ⚠️ ทวนจากค่าที่กรอกจริงในฟอร์ม **ห้ามคำนวณใหม่แยกทาง** ไม่งั้นสิ่งที่ทวน
              * กับสิ่งที่ส่งจะไม่ใช่ของเดียวกัน
              */}
-            {step === 3 ? (
+            {step === 4 ? (
+              <div className="space-y-3" data-testid="follow-step4">
+                {/* ขั้น 4 ประกัน · ลูกค้า (เจ้าของสั่ง 14 ต.ค. 2569) — ดึงจากใบขอของหน่วยงานในขั้น 2 แล้วแก้ต่อได้ */}
+                {siteCode ? (
+                  <p className="ml-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Building2 className="size-3.5" aria-hidden />
+                    {unitName || siteCode}
+                    {unitInfoState?.status === 'loading' ? (
+                      <>
+                        <LoaderCircle className="size-3.5 animate-spin" aria-hidden /> กำลังดึงจาก ERP
+                      </>
+                    ) : unitInfoState?.status === 'error' ? (
+                      <span className={TONE.danger.value}>ดึงจาก ERP ไม่ได้ กรอกเองได้</span>
+                    ) : null}
+                  </p>
+                ) : (
+                  <p className="ml-1 text-xs text-muted-foreground">ไม่ได้เลือกหน่วยงานจากบอร์ด กรอกเองได้</p>
+                )}
+                <div className="space-y-1.5">
+                  <label htmlFor="followInsurance" className="ml-1 text-xs font-medium text-muted-foreground">
+                    ประเภทประกัน
+                  </label>
+                  <Input
+                    id="followInsurance"
+                    value={insuranceType}
+                    maxLength={300}
+                    onChange={(e) => setInsuranceType(e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label htmlFor="followCustomerName" className="ml-1 text-xs font-medium text-muted-foreground">
+                      ลูกค้า
+                    </label>
+                    <Input
+                      id="followCustomerName"
+                      value={customerName}
+                      maxLength={200}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="followCustomerContact" className="ml-1 text-xs font-medium text-muted-foreground">
+                      ผู้ติดต่อ
+                    </label>
+                    <Input
+                      id="followCustomerContact"
+                      value={customerContact}
+                      maxLength={200}
+                      onChange={(e) => setCustomerContact(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="followCustomerPhone" className="ml-1 text-xs font-medium text-muted-foreground">
+                    เบอร์ลูกค้า
+                  </label>
+                  <Input
+                    id="followCustomerPhone"
+                    value={customerPhone}
+                    maxLength={40}
+                    inputMode="tel"
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {step === FOLLOW_WIZARD_LAST_STEP ? (
               <div className={cn('rounded-xl px-3 py-2.5 text-[12px] leading-snug', TONE.primary.soft)}>
                 <span className="block font-medium text-foreground">ทวนก่อนส่ง</span>
                 <span className="mt-0.5 block text-foreground/80">
@@ -3175,6 +3322,8 @@ const FollowPage: React.FC = () => {
                   เบอร์ <span className="tabular-nums">{phone || '—'}</span>
                   {topic ? <> · เรื่อง “{topic}”</> : null}
                   {unitName ? <> · หน่วยงาน {unitName}</> : null}
+                  {startDate ? <> · เริ่มงาน {formatYmdTh(startDate)}</> : null}
+                  {insuranceType.trim() ? <> · ประกัน {insuranceType.trim()}</> : null}
                 </span>
                 <span className="mt-0.5 block text-muted-foreground">
                   {replaceView
@@ -3212,7 +3361,7 @@ const FollowPage: React.FC = () => {
                 </button>
               ) : null}
 
-              {step < 3 ? (
+              {step < FOLLOW_WIZARD_LAST_STEP ? (
                 <Button size="sm"
                   type="button"
                   onClick={goNext}

@@ -28,6 +28,10 @@ export const FOLLOW_STAFF_CALL_OUTCOMES = [
   'acknowledged',
   'no_answer',
   'wrong_person',
+  // วันหยุด · ลางาน (เจ้าของสั่ง 14 ต.ค. 2569 "ตรงคำว่าลงผล เพิ่มคำว่า วันหยุด, ลางาน") — ผลแยก ไม่นับไม่ไป ·
+  // สายที่เหลือของวันนั้นหยุด วันถัดไปโทรต่อ (`recordStaffCall` → `stopRemainingFollowRounds(day)`)
+  'day_off',
+  'on_leave',
 ] as const;
 export type FollowStaffCallOutcome = (typeof FOLLOW_STAFF_CALL_OUTCOMES)[number];
 
@@ -45,7 +49,12 @@ export const FOLLOW_STAFF_QUICK_RESULTS: ReadonlyArray<{ outcome: FollowStaffCal
   { outcome: 'declined', label: 'ไม่ไป' },
   { outcome: 'reschedule_requested', label: 'ขอเลื่อน' },
   { outcome: 'no_answer', label: 'ติดต่อไม่ได้' },
+  { outcome: 'day_off', label: 'วันหยุด' },
+  { outcome: 'on_leave', label: 'ลางาน' },
 ];
+
+/** ผลที่แปลว่าวันนี้ไม่ต้องไปทำงาน — สายที่เหลือของวันนั้นหยุด วันถัดไปโทรต่อ (14 ต.ค. 2569) */
+export const FOLLOW_STAFF_DAY_STOP_OUTCOMES: readonly FollowStaffCallOutcome[] = ['day_off', 'on_leave'];
 
 /**
  * ผลโทรของคน → ผลปิดงานเมื่อกด "จบเรื่องนี้" (ขั้น 2 · เจ้าของเคาะ 6 ต.ค. 2569: *"ลงผลโทร เสร็จก็ค่อยเลือกว่า เสร็จสิ้นเลยไหม"*)
@@ -69,6 +78,8 @@ const STAFF_WORDS: Partial<Record<FollowStaffCallOutcome, string>> = {
   declined: 'ไม่ไป',
   reschedule_requested: 'ขอเลื่อน',
   no_answer: 'ติดต่อไม่ได้',
+  day_off: 'วันหยุด',
+  on_leave: 'ลางาน',
   // ชุดเก่า (1–5 ต.ค. 2569) — ยังอ่านออก
   acknowledged: 'ติดต่อสำเร็จ',
 };

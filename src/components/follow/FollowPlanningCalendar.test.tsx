@@ -283,8 +283,8 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     for (const word of ['เขียว', 'แดง', 'เหลือง', 'น้ำเงิน', 'ส้ม', 'เทา', '=', '(']) {
       expect(text).not.toContain(word);
     }
-    // 9 = หมวดกลาง 8 + "รอคนโทร" (สายที่ตั้งให้คนโทร · QA รอบ 3 ข้อ 11)
-    expect(within(legend).getAllByText(/./).length).toBe(9);
+    // 11 = หมวดกลาง 10 (+ วันหยุด/ลางาน 14 ต.ค. 2569) + "รอคนโทร" (สายที่ตั้งให้คนโทร · QA รอบ 3 ข้อ 11)
+    expect(within(legend).getAllByText(/./).length).toBe(11);
     expect(text).toContain('รอคนโทร');
   });
 });

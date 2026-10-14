@@ -692,11 +692,11 @@ describe('หน้าหลักอ่านไล่บนลงล่าง 
     expect(within(box).getByRole('heading', { name: 'ผลโทรราย BU' })).toBeTruthy();
     // 🔴 8 ต.ค. 2569 "ไปเนี่ย Ai โทร คนโทรเท่าไหร่ Bu ไหนใช้เยอะ" — แท่งผล/แท่ง BU เขียนเลข AI โทร · คนโทร ทุกแถว
     await waitFor(() => expect(screen.getByTestId('home-result-bars-went').textContent).toMatch(/AI โทร \d[\d,]*คนโทร \d/));
-    // ลำดับ: โทรทั้งหมด → ไป → ไม่ไป → ขอเลื่อน → สรุปไม่ได้ → ล้มเหลว (บอกว่าคืออะไร) → ยกเลิก → รอดำเนินการ
+    // ลำดับ: โทรทั้งหมด → ไป → ไม่ไป → ขอเลื่อน → สรุปไม่ได้ → ล้มเหลว (บอกว่าคืออะไร) → วันหยุด → ลางาน (14 ต.ค.) → ยกเลิก → รอดำเนินการ
     const order = [...screen.getByTestId('home-result-bars').querySelectorAll('[data-testid^="home-result-bars-"]')].map((e) =>
       e.getAttribute('data-testid')!.replace('home-result-bars-', ''),
     );
-    expect(order).toEqual(['all', 'called', 'went', 'notWent', 'reschedule', 'unclear', 'failed', 'cancelled', 'waiting']);
+    expect(order).toEqual(['all', 'called', 'went', 'notWent', 'reschedule', 'unclear', 'failed', 'dayOff', 'leave', 'cancelled', 'waiting']);
     expect(screen.getByTestId('home-result-bars-called').textContent).toContain('โทรแล้ว');
     expect(screen.getByTestId('home-result-bars-all').textContent).toContain('โทรทั้งหมด');
     expect(screen.getByTestId('home-result-bars-failed').textContent).toContain('ไม่รับสาย');
@@ -706,12 +706,12 @@ describe('หน้าหลักอ่านไล่บนลงล่าง 
       within(within(box).getByTestId(key))
         .getAllByRole('cell')
         .map((c) => c.textContent);
-    // เรื่อง · ใครโทร · ทั้งหมด · **โทรแล้ว** (รวม · ตอบว่าไป · ตอบว่าไม่ไป · ขอเลื่อน · สรุปไม่ได้ · ล้มเหลว) · ไม่ได้โทร (ยกเลิก · รอโทร)
+    // เรื่อง · ใครโทร · ทั้งหมด · **โทรแล้ว** (รวม · ตอบว่าไป · ตอบว่าไม่ไป · วันหยุด · ลางาน · ขอเลื่อน · สรุปไม่ได้ · ล้มเหลว) · ไม่ได้โทร (ยกเลิก · รอโทร)
     // 8 ต.ค. 2569 เจ้าของ: "ไม่มีบอกว่าโทรไปแล้วเท่าไหร่ แล้วค่อยบอกว่า ไป ไม่ไป" — ทั้งหมด = โทรแล้ว + ยกเลิก + รอ (673 = 583 + 90 + 0)
-    expect(cells('bu-row-LBD-main-ai')).toEqual(['ติดตามคนเริ่มงาน', 'AI โทร', '673', '583', '469', '0', '0', '15', '99', '90', '0']);
-    expect(cells('bu-row-LBD-main-manual')).toEqual(['', 'คนโทร', '106', '82', '77', '1', '1', '0', '3', '24', '0']);
+    expect(cells('bu-row-LBD-main-ai')).toEqual(['ติดตามคนเริ่มงาน', 'AI โทร', '673', '583', '469', '0', '0', '0', '0', '15', '99', '90', '0']);
+    expect(cells('bu-row-LBD-main-manual')).toEqual(['', 'คนโทร', '106', '82', '77', '1', '0', '0', '1', '0', '3', '24', '0']);
     // ส่งคนแทน AI = 0 ก็ขึ้น (เทียบ AI กับคนได้ทุกเรื่อง)
-    expect(cells('bu-row-LBD-replacement-ai')).toEqual(['ติดตามส่งคนแทน', 'AI โทร', '0', '0', '0', '0', '0', '0', '0', '0', '0']);
+    expect(cells('bu-row-LBD-replacement-ai')).toEqual(['ติดตามส่งคนแทน', 'AI โทร', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']);
     expect(within(lbd).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(
       expect.arrayContaining(['โทรแล้ว', 'รวม', 'ไม่ได้โทร']),
     );

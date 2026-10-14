@@ -148,14 +148,27 @@ describe('แผงตาราง AI | คน | รวม', () => {
     total: [e('1'), e('2'), e('3', '0822222222'), e('4', '0833333333'), e('5', '0844444444')],
     went: [e('1'), e('2')],
     notWent: [],
+    dayOff: [],
+    leave: [],
     noAnswer: [e('3', '0822222222')],
     unclear: [],
     waiting: [e('4', '0833333333')],
     cancelled: [e('5', '0844444444')],
   };
 
-  it('เรียง โทรทั้งหมด → โทรไปแล้ว → ผล 4 แบบ → รอโทร → ยกเลิก · โทรไปแล้ว + รอโทร + ยกเลิก = ทั้งหมด', () => {
-    expect(FOLLOW_PANEL_LINES.map((l) => l.key)).toEqual(['total', 'called', 'went', 'notWent', 'noAnswer', 'unclear', 'waiting', 'cancelled']);
+  it('เรียง โทรทั้งหมด → โทรไปแล้ว → ผล 6 แบบ (+วันหยุด/ลางาน 14 ต.ค.) → รอโทร → ยกเลิก · โทรไปแล้ว + รอโทร + ยกเลิก = ทั้งหมด', () => {
+    expect(FOLLOW_PANEL_LINES.map((l) => l.key)).toEqual([
+      'total',
+      'called',
+      'went',
+      'notWent',
+      'dayOff',
+      'leave',
+      'noAnswer',
+      'unclear',
+      'waiting',
+      'cancelled',
+    ]);
     const p = followPanelLists(row);
     expect(p.called.length + p.waiting.length + p.cancelled.length).toBe(p.total.length);
   });

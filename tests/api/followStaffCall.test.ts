@@ -17,6 +17,7 @@ import { CALL_RESULT_OUTCOMES as SERVER_HOLD_OUTCOMES } from '../../api/_lib/can
 import { CALL_RESULT_OUTCOMES as CLIENT_HOLD_OUTCOMES } from '../../src/lib/callHoldsApi.js';
 import type { FollowEntry } from '../../src/lib/followApi.js';
 import {
+  FOLLOW_STAFF_DAY_STOP_OUTCOMES,
   FOLLOW_STAFF_CALL_NOTE_MAX,
   FOLLOW_STAFF_CALL_OUTCOMES,
   FOLLOW_STAFF_QUICK_RESULTS,
@@ -58,14 +59,21 @@ const round = (e: FollowEntry) => ({ entry: e, state: followRoundState(e, NOW), 
 
 describe('ศัพท์ผลชุดเดียวกับผลที่เจ้าหน้าที่ลงในกล่องงาน (+ ติดต่อสำเร็จ ของงานติดตาม)', () => {
   it('ชุดของกล่องงานอยู่ครบ เรียงเหมือนกัน · เพิ่มแค่ acknowledged (ติดต่อสำเร็จ)', () => {
-    const shared = FOLLOW_STAFF_CALL_OUTCOMES.filter((o) => o !== 'acknowledged');
+    // วันหยุด/ลางาน = ของงานติดตามอย่างเดียว (14 ต.ค. 2569) — กล่องงานไม่มี
+    const shared = FOLLOW_STAFF_CALL_OUTCOMES.filter((o) => o !== 'acknowledged' && !FOLLOW_STAFF_DAY_STOP_OUTCOMES.includes(o));
     expect(shared).toEqual([...SERVER_HOLD_OUTCOMES]);
     expect(shared).toEqual([...CLIENT_HOLD_OUTCOMES]);
     expect(FOLLOW_STAFF_CALL_OUTCOMES).toContain('acknowledged');
   });
 
-  it('🔴 ทุกรหัสเป็นรหัสที่ตารางสี/หมวดรู้จักอยู่แล้ว (ไม่ประดิษฐ์รหัสใหม่)', () => {
-    for (const o of FOLLOW_STAFF_CALL_OUTCOMES) expect(CALL_OUTCOME_TONE[o], o).toBeTruthy();
+  it('🔴 ทุกรหัสเป็นรหัสที่ตารางสี/หมวดรู้จัก · วันหยุด/ลางาน (เจ้าของสั่ง 14 ต.ค. 2569) มีหมวดของตัวเอง ไม่ปนไม่ไป', () => {
+    for (const o of FOLLOW_STAFF_CALL_OUTCOMES) {
+      if (FOLLOW_STAFF_DAY_STOP_OUTCOMES.includes(o)) continue;
+      expect(CALL_OUTCOME_TONE[o], o).toBeTruthy();
+    }
+    expect(FOLLOW_STAFF_DAY_STOP_OUTCOMES).toEqual(['day_off', 'on_leave']);
+    expect(followStaffCallText('day_off')).toBe('วันหยุด');
+    expect(followStaffCallText('on_leave')).toBe('ลางาน');
   });
 
   it('ผลของคนใช้คำของปุ่ม (6 ต.ค. 2569) · ชุดเก่ายังอ่านออก', () => {
@@ -82,6 +90,8 @@ describe('ศัพท์ผลชุดเดียวกับผลที่�
       { outcome: 'declined', label: 'ไม่ไป' },
       { outcome: 'reschedule_requested', label: 'ขอเลื่อน' },
       { outcome: 'no_answer', label: 'ติดต่อไม่ได้' },
+      { outcome: 'day_off', label: 'วันหยุด' },
+      { outcome: 'on_leave', label: 'ลางาน' },
     ]);
     for (const q of FOLLOW_STAFF_QUICK_RESULTS) expect(validateFollowStaffCall({ outcome: q.outcome }).ok).toBe(true);
   });
@@ -166,6 +176,17 @@ describe('ปฏิทิน: ลงผลแล้วช่องต้อง�
     const r = round(entry({ staff_call_outcome: 'no_answer', staff_called_at: '2026-09-30T03:00:00Z' }));
     expect(callCategory(r)).toBe('unreachable');
     expect(roundResultLabel(r)).toBe('ติดต่อไม่ได้');
+  });
+
+  it('ลงผล "วันหยุด" / "ลางาน" (14 ต.ค. 2569) = หมวดของตัวเอง ไม่ใช่ไม่ไป · สีเขียวน้ำทะเล · คำของปุ่ม', () => {
+    const off = round(entry({ staff_call_outcome: 'day_off', staff_called_at: '2026-09-30T03:00:00Z' }));
+    expect(off.state).toBe('result');
+    expect(callCategory(off)).toBe('dayOff');
+    expect(roundResultLabel(off)).toBe('วันหยุด');
+    expect(roundTone(off)).toBe('teal');
+    const lv = round(entry({ staff_call_outcome: 'on_leave', staff_called_at: '2026-09-30T03:00:00Z' }));
+    expect(callCategory(lv)).toBe('leave');
+    expect(roundResultLabel(lv)).toBe('ลางาน');
   });
 
   it('ลงผล "ติดต่อสำเร็จ" (ชุดเก่า) = สรุปไม่ได้ (ไม่บอกว่าไปไหม · 6 ต.ค. 2569) · คำบนจอ "ติดต่อสำเร็จ"', () => {

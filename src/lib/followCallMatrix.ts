@@ -25,11 +25,22 @@ export type FollowMatrixRowKey = 'all' | 1 | 2 | 3;
  * 🔴 "รอโทร" กับ "สรุปไม่ได้" แยกกัน (เจ้าของสั่ง 4 ต.ค. 2569: *"สรุปผลไม่ได้คือโทรไปแล้วแต่ไม่รู้ผล
  * คือไปหรือไม่"*) — เดิมรวมเป็นช่องเดียว "สรุปไม่ได้" ทั้งที่ 30 สายยังไม่ได้โทรเลย
  */
-export type FollowMatrixCol = 'total' | 'went' | 'notWent' | 'noAnswer' | 'unclear' | 'waiting' | 'cancelled';
+export type FollowMatrixCol = 'total' | 'went' | 'notWent' | 'dayOff' | 'leave' | 'noAnswer' | 'unclear' | 'waiting' | 'cancelled';
 
 export const FOLLOW_MATRIX_ROWS: readonly FollowMatrixRowKey[] = ['all', 1, 2, 3];
 /** 🔴 ไป · ไม่ไป · ไม่รับสาย · สรุปไม่ได้ — 4 ช่องตามที่เจ้าของนิยาม (6 ต.ค. 2569) */
-export const FOLLOW_MATRIX_COLS: readonly FollowMatrixCol[] = ['total', 'went', 'notWent', 'noAnswer', 'unclear', 'waiting', 'cancelled'];
+// วันหยุด · ลางาน (14 ต.ค. 2569 · คนลงผล) ต่อจากไม่ไป — ผลแยก ไม่ปนกับไม่ไป
+export const FOLLOW_MATRIX_COLS: readonly FollowMatrixCol[] = [
+  'total',
+  'went',
+  'notWent',
+  'dayOff',
+  'leave',
+  'noAnswer',
+  'unclear',
+  'waiting',
+  'cancelled',
+];
 
 export const FOLLOW_MATRIX_ROW_LABEL: Record<FollowMatrixRowKey, string> = {
   all: 'ทุกสาย',
@@ -42,6 +53,8 @@ export const FOLLOW_MATRIX_COL_LABEL: Record<FollowMatrixCol, string> = {
   total: 'ทั้งหมด',
   went: 'ตอบว่าไป',
   notWent: 'ตอบว่าไม่ไป',
+  dayOff: 'วันหยุด',
+  leave: 'ลางาน',
   noAnswer: 'ไม่รับสาย',
   unclear: 'สรุปไม่ได้',
   waiting: 'รอโทร',
@@ -49,10 +62,13 @@ export const FOLLOW_MATRIX_COL_LABEL: Record<FollowMatrixCol, string> = {
 };
 
 /** สีของคอลัมน์ — สีที่มีความหมายชุดเดิม (เขียว = ไป · แดง = ไม่ไป · เหลือง = ยังไม่รู้) */
-export const FOLLOW_MATRIX_COL_TONE: Record<FollowMatrixCol, 'neutral' | 'success' | 'danger' | 'warn' | 'info' | 'violet'> = {
+export const FOLLOW_MATRIX_COL_TONE: Record<FollowMatrixCol, 'neutral' | 'success' | 'danger' | 'warn' | 'info' | 'violet' | 'teal'> = {
   total: 'neutral',
   went: 'success',
   notWent: 'danger',
+  // วันหยุด/ลางาน = วันนี้ไม่ต้องไป ไม่ต้องหาคนแทน — เขียวน้ำทะเล (เทา = ยกเลิกไปแล้ว)
+  dayOff: 'teal',
+  leave: 'teal',
   noAnswer: 'warn',
   // สีเดียวกับหมวด "สรุปไม่ได้" ของตาราง (FOLLOW_CALL_CATEGORY_TONE.other)
   unclear: 'violet',
@@ -67,6 +83,8 @@ const emptyRow = (): Record<FollowMatrixCol, FollowEntry[]> => ({
   total: [],
   went: [],
   notWent: [],
+  dayOff: [],
+  leave: [],
   noAnswer: [],
   unclear: [],
   waiting: [],
@@ -100,6 +118,10 @@ export function followMatrixColOfCategory(category: FollowCallCategory): Exclude
       return 'went';
     case 'lost':
       return 'notWent';
+    case 'dayOff':
+      return 'dayOff';
+    case 'leave':
+      return 'leave';
     case 'unreachable':
       return 'noAnswer';
     case 'other':
@@ -128,7 +150,7 @@ export function buildFollowCallMatrix(entries: readonly FollowEntry[], now: Date
 
 /**
  * ═══ แผงตัวเลขหน้าติดตามแบบตาราง AI | คน | รวม (เจ้าของ Choice 12 ต.ค. 2569 "แบบ A") ═══
- * เรียง: โทรทั้งหมด → โทรไปแล้ว (= ไป + ไม่ไป + ไม่รับสาย + สรุปไม่ได้) → รอโทร → ยกเลิก · นับเป็นสาย
+ * เรียง: โทรทั้งหมด → โทรไปแล้ว (= ไป + ไม่ไป + วันหยุด + ลางาน + ไม่รับสาย + สรุปไม่ได้) → รอโทร → ยกเลิก · นับเป็นสาย
  * โทรไปแล้ว + รอโทร + ยกเลิก = โทรทั้งหมด (ช่องของ matrix แบ่งกันพอดีอยู่แล้ว) · AI + คน = รวม (`followCallerOf`)
  */
 export type FollowPanelLine = 'total' | 'called' | Exclude<FollowMatrixCol, 'total'>;
@@ -137,6 +159,8 @@ export const FOLLOW_PANEL_LINES: ReadonlyArray<{ key: FollowPanelLine; label: st
   { key: 'called', label: 'โทรไปแล้ว', indent: 1, box: null },
   { key: 'went', label: FOLLOW_MATRIX_COL_LABEL.went, indent: 2, box: 'went' },
   { key: 'notWent', label: FOLLOW_MATRIX_COL_LABEL.notWent, indent: 2, box: 'notWent' },
+  { key: 'dayOff', label: FOLLOW_MATRIX_COL_LABEL.dayOff, indent: 2, box: 'dayOff' },
+  { key: 'leave', label: FOLLOW_MATRIX_COL_LABEL.leave, indent: 2, box: 'leave' },
   { key: 'noAnswer', label: FOLLOW_MATRIX_COL_LABEL.noAnswer, indent: 2, box: 'noAnswer' },
   { key: 'unclear', label: FOLLOW_MATRIX_COL_LABEL.unclear, indent: 2, box: 'unclear' },
   { key: 'waiting', label: FOLLOW_MATRIX_COL_LABEL.waiting, indent: 1, box: 'waiting' },
@@ -146,9 +170,11 @@ export const FOLLOW_PANEL_LINES: ReadonlyArray<{ key: FollowPanelLine; label: st
 export function followPanelLists(row: Record<FollowMatrixCol, FollowEntry[]>): Record<FollowPanelLine, FollowEntry[]> {
   return {
     total: row.total,
-    called: [...row.went, ...row.notWent, ...row.noAnswer, ...row.unclear],
+    called: [...row.went, ...row.notWent, ...row.dayOff, ...row.leave, ...row.noAnswer, ...row.unclear],
     went: row.went,
     notWent: row.notWent,
+    dayOff: row.dayOff,
+    leave: row.leave,
     noAnswer: row.noAnswer,
     unclear: row.unclear,
     waiting: row.waiting,

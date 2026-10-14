@@ -120,6 +120,40 @@ const FollowRoundsDialog: React.FC<{
           </div>
         ) : null}
 
+        {/* วันเริ่มงาน + ประกัน · ลูกค้า (145 · 14 ต.ค. 2569) — ดูอย่างเดียว · ไม่มีค่า = ไม่ขึ้นบรรทัด */}
+        {(() => {
+          const pick = (f: (e: FollowEntry) => string | null | undefined) =>
+            rounds.map((r) => f(r.entry)?.trim()).find(Boolean) ?? '';
+          const start = pick((e) => e.start_date);
+          const insurance = pick((e) => e.insurance_type);
+          const customer = [pick((e) => e.customer_name), pick((e) => e.customer_contact), pick((e) => e.customer_phone)]
+            .filter(Boolean)
+            .join(' · ');
+          if (!start && !insurance && !customer) return null;
+          return (
+            <dl className="grid gap-x-3 gap-y-1 text-[11px] sm:grid-cols-[auto_1fr]" data-testid="follow-entry-extra">
+              {start ? (
+                <>
+                  <dt className="text-muted-foreground">เริ่มงาน</dt>
+                  <dd className="font-medium text-foreground">{formatYmdTh(start)}</dd>
+                </>
+              ) : null}
+              {insurance ? (
+                <>
+                  <dt className="text-muted-foreground">ประกัน</dt>
+                  <dd className="text-foreground">{insurance}</dd>
+                </>
+              ) : null}
+              {customer ? (
+                <>
+                  <dt className="text-muted-foreground">ลูกค้า</dt>
+                  <dd className="text-foreground">{customer}</dd>
+                </>
+              ) : null}
+            </dl>
+          );
+        })()}
+
         <ul className="space-y-2">
           {rounds.map((r) => {
             const it = r.entry;

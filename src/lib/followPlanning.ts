@@ -694,6 +694,10 @@ export type FollowCallCategory =
   | 'notSent'
   /** ยกเลิกทิ้ง */
   | 'cancelled'
+  /** วันหยุด — คนลงผลว่าวันนี้หยุด (14 ต.ค. 2569 · ผลแยก ไม่นับไม่ไป) */
+  | 'dayOff'
+  /** ลางาน — คนลงผลว่าวันนี้ลา (14 ต.ค. 2569 · ผลแยก ไม่นับไม่ไป) */
+  | 'leave'
   /** ปิดงานด้วยผลที่ยังไม่รู้ว่าไปหรือไม่ (ลา/เลื่อน/อื่น ๆ) */
   | 'other';
 
@@ -725,6 +729,8 @@ export const FOLLOW_CALL_CATEGORY_LABEL: Record<FollowCallCategory, string> = {
   overdue: 'รอโทร · เลยเวลานัด',
   notSent: 'รอโทร · ไม่ได้ส่งให้ AI',
   cancelled: 'ยกเลิก',
+  dayOff: 'วันหยุด',
+  leave: 'ลางาน',
   other: 'สรุปไม่ได้',
 };
 
@@ -739,6 +745,9 @@ export const FOLLOW_CALL_CATEGORY_TONE: Record<FollowCallCategory, ToneKey> = {
   overdue: 'orange',
   notSent: 'orange',
   cancelled: 'neutral',
+  // วันหยุด/ลางาน (14 ต.ค. 2569) — สีเดียวกับช่องบนแผง (`FOLLOW_MATRIX_COL_TONE`)
+  dayOff: 'teal',
+  leave: 'teal',
   // สรุปไม่ได้ = ม่วง (6 ต.ค. 2569) — ไม่ชนเหลืองของไม่รับสาย · ชุดเดียวกับช่องของแผง
   other: 'violet',
 };
@@ -761,6 +770,8 @@ function resultCallCategory(e: FollowEntry): FollowCallCategory {
   if (isStaffCallResult(e)) {
     if (code === 'confirmed') return 'agreed';
     if (code === 'declined') return 'lost';
+    if (code === 'day_off') return 'dayOff';
+    if (code === 'on_leave') return 'leave';
     if (UNREACHED_CALL_OUTCOMES.includes(code as (typeof UNREACHED_CALL_OUTCOMES)[number])) return 'unreachable';
     return 'other';
   }
@@ -885,6 +896,9 @@ export type FollowDayPerson = {
 const DAY_HEADLINE_ORDER: FollowCallCategory[] = [
   'lost',
   'agreed',
+  // วันหยุด/ลางาน = มีคำตอบแล้ว (14 ต.ค. 2569)
+  'leave',
+  'dayOff',
   'unreachable',
   'overdue',
   'notSent',
@@ -999,6 +1013,8 @@ export function summarizeFollowCalls(rounds: readonly FollowPlanningRound[]): Fo
     overdue: 0,
     notSent: 0,
     cancelled: 0,
+    dayOff: 0,
+    leave: 0,
     other: 0,
     total: 0,
     went: 0,
@@ -1068,6 +1084,8 @@ export function followDayPersonDone(p: Pick<FollowDayPerson, 'calls'>): FollowDa
   if (cats.some((c) => FOLLOW_OPEN_CATEGORIES.has(c))) return null;
   if (cats.includes('lost')) return 'lost';
   if (cats.includes('agreed')) return 'agreed';
+  // วันหยุด/ลางาน = จบวันนั้นแล้ว (สายที่เหลือของวันถูกหยุด · 14 ต.ค. 2569)
+  if (cats.includes('dayOff') || cats.includes('leave')) return 'other';
   if (cats.every((c) => c === 'cancelled')) return 'cancelled';
   const entries = p.calls.map((c) => c.round.entry);
   if (entries.every((e) => e.cancelled || e.completed_at)) return 'other';

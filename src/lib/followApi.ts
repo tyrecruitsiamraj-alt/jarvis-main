@@ -130,9 +130,34 @@ export type FollowEntry = {
    * ("ผู้รับสายแจ้งว่า…") · ช่อง "เขาตอบว่าอะไร" ต้องใช้ตัวนี้เป็นหลัก
    */
   call_reply?: string | null;
+  /** วันที่เริ่มงาน (YYYY-MM-DD) + ประกัน/ผู้ติดต่อลูกค้า (145 · 14 ต.ค. 2569) — ฟอร์มเพิ่มขั้น 1/4 */
+  start_date?: string | null;
+  insurance_type?: string | null;
+  customer_name?: string | null;
+  customer_contact?: string | null;
+  customer_phone?: string | null;
   next_action: LumosNextAction | null;
   called_at: string | null;
 };
+
+/** ขั้น 4 ของฟอร์มเพิ่ม — ประกัน + ผู้ติดต่อลูกค้า ดึงจากใบขอของหน่วยงาน (GET /api/follow-unit-info) */
+export type FollowUnitInfo = {
+  requestNo: string | null;
+  insurance: string[];
+  customerName: string | null;
+  contactName: string | null;
+  contactPosition: string | null;
+  contactPhone: string | null;
+};
+
+export async function fetchFollowUnitInfo(input: { siteCode?: string | null; requestNo?: string | null }): Promise<FollowUnitInfo> {
+  const q = new URLSearchParams();
+  if (input.siteCode) q.set('site', input.siteCode);
+  if (input.requestNo) q.set('request', input.requestNo);
+  const r = await apiFetch(`/api/follow-unit-info?${q.toString()}`);
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as FollowUnitInfo;
+}
 
 export type NewFollowEntry = {
   recipient_name: string;
@@ -182,6 +207,12 @@ export type NewFollowEntry = {
   time_tbd?: boolean;
   /** "ติดตามครั้งที่" ของวันแรกในชุด (137) — ไม่ส่ง/1 = นับ 1 */
   plan_day_start?: number;
+  /** วันที่เริ่มงาน YYYY-MM-DD + ขั้น 4 ประกัน/ผู้ติดต่อลูกค้า (145 · 14 ต.ค. 2569) — ไม่บังคับ */
+  start_date?: string;
+  insurance_type?: string;
+  customer_name?: string;
+  customer_contact?: string;
+  customer_phone?: string;
 };
 
 /** ฟิลด์ที่แก้ไขได้ (096) — ไม่รวมเจ้าของข้อมูลและตารางโทร (ดูเหตุผลที่ฝั่ง API) */

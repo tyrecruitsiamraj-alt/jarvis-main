@@ -33,14 +33,14 @@ describe('ติดตาม', () => {
     expect(splitRowsTotal(rows)).toBe(21);
     // แถวบนสุด "โทรทั้งหมด" = ทุกแถวรวม แยก AI/คน
     expect(splitTotalRow(rows, 'โทรทั้งหมด')).toMatchObject({ key: 'all', total: 21, parts: { ai: 12, staff: 9 } });
-    // โทรแล้ว = ไป/ไม่ไป/ขอเลื่อน/สรุปไม่ได้/ล้มเหลว (ไม่นับยกเลิก 1 · รอ 5)
-    expect(splitCalledRow(rows, 'โทรแล้ว', { keys: ['went', 'notWent', 'reschedule', 'unclear', 'failed'] })).toMatchObject({
+    // โทรแล้ว = ไป/ไม่ไป/วันหยุด/ลางาน/ขอเลื่อน/สรุปไม่ได้/ล้มเหลว (ไม่นับยกเลิก 1 · รอ 5) — วันหยุด/ลางาน 14 ต.ค. 2569
+    expect(splitCalledRow(rows, 'โทรแล้ว', { keys: ['went', 'notWent', 'dayOff', 'leave', 'reschedule', 'unclear', 'failed'] })).toMatchObject({
       key: 'called',
       total: 15,
       parts: { ai: 12, staff: 3 },
     });
     // ก้อน: ทั้งหมด │ โทรแล้ว + ผลย่อย (ย่อหน้า) │ ยกเลิก · รอ (เส้นคั่นก่อนก้อน)
-    const keys = ['went', 'notWent', 'reschedule', 'unclear', 'failed'];
+    const keys = ['went', 'notWent', 'dayOff', 'leave', 'reschedule', 'unclear', 'failed'];
     const g = groupResultRows(splitTotalRow(rows, 'โทรทั้งหมด'), splitCalledRow(rows, 'โทรแล้ว', { keys }), rows, keys);
     expect(g.map((r) => [r.key, !!r.child, !!r.divider])).toEqual([
       ['all', false, false],

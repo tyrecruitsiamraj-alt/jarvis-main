@@ -48,7 +48,7 @@ import {
   isFollowOutcome,
   requiresNote,
 } from '../../src/lib/followOutcome.js';
-import { isAiDecisiveOutcome, validateFollowStaffCall } from '../../src/lib/followStaffCall.js';
+import { FOLLOW_STAFF_DAY_STOP_OUTCOMES, isAiDecisiveOutcome, validateFollowStaffCall } from '../../src/lib/followStaffCall.js';
 
 const followTable = tableInAppSchema('follow_entries');
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
@@ -64,6 +64,12 @@ type LumosNextAction = {
 
 type FollowRow = {
   id: string;
+  /** วันที่เริ่มงาน + ประกัน/ผู้ติดต่อลูกค้า (145) — ฐานยังไม่รันไม่มีคีย์ */
+  start_date?: Date | string | null;
+  insurance_type?: string | null;
+  customer_name?: string | null;
+  customer_contact?: string | null;
+  customer_phone?: string | null;
   recipient_name: string;
   recipient_phone: string;
   topic: string;
@@ -153,6 +159,20 @@ type FollowRow = {
 const iso = (v: string | Date | null): string | null =>
   v == null ? null : v instanceof Date ? v.toISOString() : String(v);
 
+/**
+ * คอลัมน์ `date` ของ pg — node-postgres แปลงเป็น Date เที่ยงคืนตามเวลาเครื่อง ⇒ อ่านด้วยตัวอ่านเวลาเครื่อง (ห้าม toISOString — เลื่อนวัน)
+ */
+function pgDateYmd(v: unknown): string | null {
+  if (v == null) return null;
+  if (v instanceof Date) {
+    if (Number.isNaN(v.getTime())) return null;
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${v.getFullYear()}-${p(v.getMonth() + 1)}-${p(v.getDate())}`;
+  }
+  const s = String(v).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
 function toResponse(r: FollowRow) {
   return {
     id: r.id,
@@ -178,6 +198,12 @@ function toResponse(r: FollowRow) {
     replace_type: r.replace_type?.trim() || null,
     /** ที่มาของแถว (133) — หน้าจออ่านสายที่ 1/2/3 ของแถวจาก iRecruit จากตรงนี้ */
     source_ref: r.source_ref ?? null,
+    /** วันที่เริ่มงาน + ประกัน/ผู้ติดต่อลูกค้า (145 · 14 ต.ค. 2569) */
+    start_date: pgDateYmd(r.start_date),
+    insurance_type: r.insurance_type ?? null,
+    customer_name: r.customer_name ?? null,
+    customer_contact: r.customer_contact ?? null,
+    customer_phone: r.customer_phone ?? null,
     /** ทีมของรายการ (131) — แท็บ "ติดตามส่งคนแทน" อ่านช่องนี้ · ค่าอื่น/ไม่มี = ทีมติดตาม */
     follow_team: r.follow_team === FOLLOW_TEAM_REPLACEMENT ? FOLLOW_TEAM_REPLACEMENT : null,
     /**
@@ -366,6 +392,20 @@ export type ParsedFollowInput = {
    * null = ทีมติดตาม (ของเดิม · ไม่ส่งคีย์มา) · 'replacement' = ทีมส่งคนแทน
    */
   team: typeof FOLLOW_TEAM_REPLACEMENT | null;
+  /**
+   * วันที่เริ่มงาน + ขั้น 4 ประกัน/ผู้ติดต่อลูกค้า (145 · 14 ต.ค. 2569) — ไม่บังคับ · ตั้งหลัง insert (`insertFollowRow`)
+   * ไม่มีสักช่อง = undefined (ไม่แตะฐาน ⇒ ยังไม่รัน 145 ก็บันทึกได้ตามเดิม)
+   */
+  extra?: FollowExtraFields;
+};
+
+/** ช่องเสริมของฟอร์มเพิ่ม (145) — ข้อความ snapshot */
+export type FollowExtraFields = {
+  startDate: string | null;
+  insuranceType: string | null;
+  customerName: string | null;
+  customerContact: string | null;
+  customerPhone: string | null;
 };
 
 const HHMM_RE = /^\d{1,2}:\d{2}$/;
@@ -499,11 +539,24 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
   }
   const planDayStart = Number.isInteger(startRaw) && startRaw > 1 ? startRaw : null;
 
+  /** วันที่เริ่มงาน + ประกัน/ผู้ติดต่อลูกค้า (145 · 14 ต.ค. 2569) — ไม่บังคับ · วันที่ต้องเป็น YYYY-MM-DD */
+  const startDate = getString(body.start_date) || null;
+  if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return fail('start_date ต้องเป็นวันที่ YYYY-MM-DD');
+  const cut = (v: unknown, max: number) => (getString(v) || '').slice(0, max) || null;
+  const extraFields: FollowExtraFields = {
+    startDate,
+    insuranceType: cut(body.insurance_type, 300),
+    customerName: cut(body.customer_name, 200),
+    customerContact: cut(body.customer_contact, 200),
+    customerPhone: cut(body.customer_phone, 40),
+  };
+  const extra = Object.values(extraFields).some((x) => x !== null) ? extraFields : undefined;
+
   return {
     error: null,
     value: {
       name, phone, topic, note, staffPhone, when, groupId, callTimes, unitName, siteCode, callRound,
-      callMode, team, timeTbd, planDayStart,
+      callMode, team, timeTbd, planDayStart, extra,
     },
   };
 }
@@ -713,6 +766,26 @@ async function insertFollowRow(
     } catch (e) {
       if (!isUndefinedColumn(e)) throw e;
       logWarn('follow.plan_day_start: ฐานยังไม่รัน 137 — ไม่ได้เก็บเลขติดตามครั้งที่', { id: row.id });
+    }
+  }
+  if (row && base.extra) {
+    try {
+      const x = base.extra;
+      await dbQuery(
+        `update ${followTable} set start_date = $2::date, insurance_type = $3, customer_name = $4, customer_contact = $5, customer_phone = $6
+          where id = $1`,
+        [row.id, x.startDate, x.insuranceType, x.customerName, x.customerContact, x.customerPhone],
+      );
+      Object.assign(row, {
+        start_date: x.startDate,
+        insurance_type: x.insuranceType,
+        customer_name: x.customerName,
+        customer_contact: x.customerContact,
+        customer_phone: x.customerPhone,
+      });
+    } catch (e) {
+      if (!isUndefinedColumn(e)) throw e;
+      logWarn('follow.extra: ฐานยังไม่รัน 145 — ไม่ได้เก็บวันเริ่มงาน/ประกัน', { id: row.id });
     }
   }
   if (row && round.planDayNo) {
@@ -1902,15 +1975,28 @@ async function recordStaffCall(req: AuthedReq, res: ApiRes, body: Record<string,
     }
   }
 
+  /**
+   * วันหยุด · ลางาน (เจ้าของสั่ง 14 ต.ค. 2569 · Choice "ผลใหม่แยก ไม่นับไม่ไป") — วันนี้ไม่ต้องไป ⇒ สายที่เหลือของวันนั้นหยุด
+   * วันถัดไปโทรต่อตามแผน · ตัวหยุดเดียวกับปิดงาน (`stopRemainingFollowRounds` แบบ day) · หยุดไม่สำเร็จ = ผลยังบันทึกอยู่ + log
+   */
+  let stoppedIds: string[] = [];
+  if ((FOLLOW_STAFF_DAY_STOP_OUTCOMES as readonly string[]).includes(v.value.outcome)) {
+    try {
+      stoppedIds = await stopRemainingFollowRounds(done, 'day');
+    } catch (e) {
+      logWarn('follow.staffCall.stopDayFailed', { followId: id, error: String(e) });
+    }
+  }
+
   await auditFromAuthed(req, {
     action: 'follow.staff_call',
     entityType: 'follow_entry',
     entityId: id,
     before: { staff_call_outcome: before.staff_call_outcome ?? null, staff_call_note: before.staff_call_note ?? null },
-    after: { staff_call_outcome: v.value.outcome, staff_call_note: v.value.note },
+    after: { staff_call_outcome: v.value.outcome, staff_call_note: v.value.note, stoppedIds },
   });
 
-  return res.status(200).json(toResponse(done));
+  return res.status(200).json({ ...toResponse(done), stopped_rounds: stoppedIds.length });
 }
 
 /**

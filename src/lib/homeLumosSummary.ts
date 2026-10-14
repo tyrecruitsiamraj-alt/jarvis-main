@@ -48,35 +48,41 @@ export type FollowBucket = {
   total: number;
   went: number;
   notWent: number;
+  /** วันหยุด · ลางาน (14 ต.ค. 2569 · คนลงผล) — ไม่ปนกับไม่ไป */
+  dayOff: number;
+  leave: number;
   reschedule: number;
   unclear: number;
   waiting: number;
   failed: number;
   cancelled: number;
 };
-export const FOLLOW_BUCKET_KEYS = ['went', 'notWent', 'reschedule', 'unclear', 'waiting', 'failed', 'cancelled'] as const;
+export const FOLLOW_BUCKET_KEYS = ['went', 'notWent', 'dayOff', 'leave', 'reschedule', 'unclear', 'waiting', 'failed', 'cancelled'] as const;
 export type FollowBucketKey = (typeof FOLLOW_BUCKET_KEYS)[number];
 /**
  * ช่องที่นับว่า "โทรแล้ว" — การ์ดผลโทร · ตาราง BU · ป๊อปกล่อง AI โทร/คนโทร ใช้ตัวเดียวกัน
  * (QA 10 ต.ค. 2569 ป๊อปกับการ์ดนับคนละแบบ · เจ้าของเลือก "นับทีละสายตามผลจริง")
  */
-export const FOLLOW_CALLED_KEYS: readonly FollowBucketKey[] = ['went', 'notWent', 'reschedule', 'unclear', 'failed'];
+export const FOLLOW_CALLED_KEYS: readonly FollowBucketKey[] = ['went', 'notWent', 'dayOff', 'leave', 'reschedule', 'unclear', 'failed'];
 export const emptyFollowBucket = (): FollowBucket => ({
   total: 0,
   went: 0,
   notWent: 0,
+  dayOff: 0,
+  leave: 0,
   reschedule: 0,
   unclear: 0,
   waiting: 0,
   failed: 0,
   cancelled: 0,
 });
-export const followBucketSum = (b: FollowBucket) => FOLLOW_BUCKET_KEYS.reduce((n, k) => n + b[k], 0);
+// `?? 0` — ช่องที่เพิ่มทีหลัง (วันหยุด/ลางาน 14 ต.ค. 2569) ยังไม่มีในคำตอบของ API รุ่นเก่าระหว่าง deploy = 0 ไม่ใช่ NaN
+export const followBucketSum = (b: FollowBucket) => FOLLOW_BUCKET_KEYS.reduce((n, k) => n + (b[k] ?? 0), 0);
 export const followBucketAddsUp = (b: FollowBucket) => followBucketSum(b) === b.total;
 export const sumFollowBuckets = (a: FollowBucket, b: FollowBucket): FollowBucket => {
   const out = emptyFollowBucket();
   out.total = a.total + b.total;
-  for (const k of FOLLOW_BUCKET_KEYS) out[k] = a[k] + b[k];
+  for (const k of FOLLOW_BUCKET_KEYS) out[k] = (a[k] ?? 0) + (b[k] ?? 0);
   return out;
 };
 
@@ -90,6 +96,10 @@ export function doneBucketOf(result: string): FollowBucketKey {
       return 'went';
     case 'lost':
       return 'notWent';
+    case 'dayOff':
+      return 'dayOff';
+    case 'leave':
+      return 'leave';
     case 'reschedule':
       return 'reschedule';
     case 'unreachable':

@@ -41,6 +41,7 @@ import recruitChannelsHandler from './recruit-channels.js';
 import recruitPostingsHandler from './recruit-postings.js';
 import recruitReasonsHandler from './recruit-reasons.js';
 import recruitPostingKindsHandler from './recruit-posting-kinds.js';
+import followUnitInfoHandler from './follow-unit-info.js';
 import recruitJobTitlesHandler from './recruit-job-titles.js';
 import recruitFunnelHandler from './recruit-funnel.js';
 import jobApplicationsHandler from './job-applications.js';
@@ -144,6 +145,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/employees': employeesHandler as ApiHandler,
   '/api/geocode': geocodeHandler as ApiHandler,
   '/api/follow': followHandler as ApiHandler,
+  '/api/follow-unit-info': followUnitInfoHandler as ApiHandler,
   '/api/follow-staff-contacts': followStaffContactsHandler as ApiHandler,
   '/api/follow-topics': followTopicsHandler as ApiHandler,
   '/api/irecruit-replace-sync': irecruitReplaceSyncHandler as ApiHandler,

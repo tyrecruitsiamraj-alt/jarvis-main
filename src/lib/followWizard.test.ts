@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   firstIncompleteStep,
   FOLLOW_SUBMIT_GUARD_MS,
+  FOLLOW_WIZARD_LAST_STEP,
+  FOLLOW_WIZARD_STEPS,
   isSubmitTooSoonAfterStep3,
   followStepError,
   followStepSummary,
@@ -99,12 +101,20 @@ describe('firstIncompleteStep — ด่านตอนกดบันทึก'
 });
 
 describe('เดินขั้น', () => {
-  it('ไม่หลุดกรอบ 1–3', () => {
+  it('ไม่หลุดกรอบ 1–4 (14 ต.ค. 2569 เพิ่มขั้น 4 ประกัน · ลูกค้า)', () => {
     expect(nextFollowStep(1)).toBe(2);
     expect(nextFollowStep(2)).toBe(3);
-    expect(nextFollowStep(3)).toBe(3);
-    expect(prevFollowStep(3)).toBe(2);
+    expect(nextFollowStep(3)).toBe(4);
+    expect(nextFollowStep(4)).toBe(4);
+    expect(prevFollowStep(4)).toBe(3);
     expect(prevFollowStep(1)).toBe(1);
+    expect(FOLLOW_WIZARD_LAST_STEP).toBe(4);
+    expect(FOLLOW_WIZARD_STEPS.map((x) => x.step)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('ขั้น 4 ไม่บังคับ — ว่างทั้งขั้นก็บันทึกได้', () => {
+    expect(followStepError(4, values())).toBeNull();
+    expect(firstIncompleteStep(values())).toBeNull();
   });
 });
 
