@@ -111,6 +111,8 @@ const StaffJobBoardPage: React.FC = () => {
    * *"Filter วันที่ย้ายไปข้างๆปุ่ม Refresh"*) · ค่าเดียวใช้ร่วมสามแท็บ (สลับแท็บแล้วช่วงวันไม่หาย)
    */
   const [applicantDates, setApplicantDates] = useState<DateRangeYmd | null>(null);
+  /** ช่องข้างปุ่มวันที่ — แท็บผู้สมัครวาง "นำเข้า Excel" + "รายงาน" ที่นี่ (เจ้าของสั่ง 14 ต.ค. 2569) */
+  const [headerSlot, setHeaderSlot] = useState<HTMLSpanElement | null>(null);
   const rmView = (RM_VIEWS as readonly string[]).includes(view);
   const setView = (next: BoardViewId) => {
     const params = new URLSearchParams(searchParams);
@@ -154,7 +156,10 @@ const StaffJobBoardPage: React.FC = () => {
         onPublishedTotals={setBoardPublished}
         listHeaderActions={
           rmView ? (
-            <DateRangeCalendarPicker triggerVariant="filter" value={applicantDates} onChange={setApplicantDates} />
+            <>
+              <span ref={setHeaderSlot} className="contents" />
+              <DateRangeCalendarPicker triggerVariant="filter" value={applicantDates} onChange={setApplicantDates} />
+            </>
           ) : null
         }
         listContent={
@@ -169,6 +174,7 @@ const StaffJobBoardPage: React.FC = () => {
               refreshKey={listRev}
               dateRange={applicantDates}
               onDateRangeChange={setApplicantDates}
+              headerActionsSlot={headerSlot}
             />
           )
         }

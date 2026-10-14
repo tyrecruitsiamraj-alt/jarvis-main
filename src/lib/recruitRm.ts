@@ -183,6 +183,9 @@ export const RM_LIST_VIEWS_SHOWN = [
   'bad_data',
   'ai_cancelled',
 ] as const satisfies readonly RmListView[];
+/** มุมมองตอนเปิดแท็บผู้สมัคร (ไม่มี ?list=) — เจ้าของสั่ง 14 ต.ค. 2569 */
+export const RM_LIST_VIEW_DEFAULT = 'interested' as const satisfies RmListView;
+
 export function isShownRmListView(v: string | null | undefined): v is (typeof RM_LIST_VIEWS_SHOWN)[number] {
   return !!v && (RM_LIST_VIEWS_SHOWN as readonly string[]).includes(v);
 }

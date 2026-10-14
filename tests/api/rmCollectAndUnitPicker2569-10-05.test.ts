@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { RM_LIST_VIEWS, RM_LIST_VIEWS_SHOWN, isShownRmListView } from '../../src/lib/recruitRm';
+import { RM_LIST_VIEWS, RM_LIST_VIEWS_SHOWN, RM_LIST_VIEW_DEFAULT, isShownRmListView } from '../../src/lib/recruitRm';
 
 describe('ปุ่มมุมมองแท็บผู้สมัคร', () => {
   it('โชว์ 3 ปุ่ม ไม่มีรอเก็บใบสมัคร · นิยาม collect ยังอยู่', () => {
@@ -16,10 +16,11 @@ describe('ปุ่มมุมมองแท็บผู้สมัคร', (
     expect(isShownRmListView('collect')).toBe(false);
     expect(isShownRmListView('interested')).toBe(true);
   });
-  it('RmWorkspace วาดจากชุดที่โชว์ และ ?list=collect ถอยไปทั้งหมด', () => {
+  it('RmWorkspace วาดจากชุดที่โชว์ และ ?list=collect ถอยไปค่าเริ่ม (รายชื่อคนที่สนใจ · 14 ต.ค. 2569)', () => {
     const src = readFileSync(join(process.cwd(), 'src/components/recruit-rm/RmWorkspace.tsx'), 'utf8');
     expect(src).toContain('RM_LIST_VIEWS_SHOWN.map((v)');
-    expect(src).toContain("isShownRmListView(listParam) ? listParam : 'all'");
+    expect(src).toContain('isShownRmListView(listParam) ? listParam : RM_LIST_VIEW_DEFAULT');
+    expect(RM_LIST_VIEW_DEFAULT).toBe('interested');
   });
 });
 

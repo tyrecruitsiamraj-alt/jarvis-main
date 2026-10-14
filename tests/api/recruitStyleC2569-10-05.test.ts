@@ -41,9 +41,11 @@ describe('แถวเครื่องมือรายแท็บ', () => {
 
   it('ผู้สมัคร = 5 ปุ่ม: เพิ่ม · นำเข้า · เก็บไปโทรเอง · ส่ง AI · รายงาน', () => {
     expect(WS).toContain("onAddApplicant={tab === 'candidates' ?");
-    expect(WS).toContain("onImportApplicants={tab === 'candidates' ?");
+    // นำเข้า Excel + รายงาน ย้ายขึ้นแถวหัวข้างปุ่มวันที่เมื่อมีช่อง (เจ้าของสั่ง 14 ต.ค. 2569) · ไม่มีช่อง = แถวปุ่มทำงานเดิม
+    expect(WS).toContain("onImportApplicants={tab === 'candidates' && !headerActionsSlot ?");
     expect(WS).toContain("onHoldSelected={tab === 'candidates' ?");
-    expect(WS).toContain("onExport={tab === 'candidates' ?");
+    expect(WS).toContain("onExport={tab === 'candidates' && !headerActionsSlot ?");
+    expect(WS).toMatch(/tab === 'candidates' && headerActionsSlot\s*\?\s*createPortal\(/);
     expect(WS).toContain('onSendAiSelected={() => askSendAi(selectedIds)}');
   });
 

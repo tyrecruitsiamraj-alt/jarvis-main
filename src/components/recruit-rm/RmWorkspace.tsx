@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useSearchParams } from 'react-router-dom';
-import { CalendarDays, ChevronDown, ChevronRight, RefreshCw, RotateCcw, X } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronRight, Download, FileSpreadsheet, RefreshCw, RotateCcw, X } from 'lucide-react';
 import FilterChips from '@/components/shared/FilterChips';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -27,6 +28,7 @@ import {
   isShownRmListView,
   RM_LIST_VIEWS,
   RM_LIST_VIEWS_SHOWN,
+  RM_LIST_VIEW_DEFAULT,
   RM_LIST_VIEW_LABEL,
   type RmListView,
   telHref,
@@ -166,7 +168,12 @@ const RmWorkspace: React.FC<{
    */
   dateRange?: DateRangeYmd | null;
   onDateRangeChange?: (next: DateRangeYmd | null) => void;
-}> = ({ tab: controlledTab, jobs, refreshKey = 0, dateRange: controlledDateRange, onDateRangeChange }) => {
+  /**
+   * ช่องบนแถวหัวข้างปุ่มวันที่ (เจ้าของสั่ง 14 ต.ค. 2569 "เอานำเข้า Excel กับ รายงาน ไปไว้แถวเดียวกับ [ปุ่มวันที่] เอาไว้ข้างๆกันเลย")
+   * มี = แท็บผู้สมัครวาง 2 ปุ่มนี้ที่ช่องนี้แทนแถวปุ่มทำงาน · ไม่มี (หน้าเดี่ยว) = อยู่แถวปุ่มทำงานตามเดิม
+   */
+  headerActionsSlot?: HTMLElement | null;
+}> = ({ tab: controlledTab, jobs, refreshKey = 0, dateRange: controlledDateRange, onDateRangeChange, headerActionsSlot = null }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const tab: RmTab = controlledTab ?? (isRmTab(tabParam) ? tabParam : 'candidates');
@@ -175,7 +182,9 @@ const RmWorkspace: React.FC<{
    * เก็บใน `?list=` เพื่อให้ refresh/แชร์ลิงก์แล้วยังอยู่มุมมองเดิม — แพตเทิร์นเดียวกับ ?tab=
    */
   const listParam = searchParams.get('list');
-  const listView: RmListView = isShownRmListView(listParam) ? listParam : 'all';
+  // ค่าเริ่ม = รายชื่อคนที่สนใจ (เจ้าของสั่ง 14 ต.ค. 2569 "Default หน้า ผู้สมัครใน menu งานสรรหา ให้เป็น รายชื่อคนที่สนใจ")
+  // "รายชื่อทั้งหมด" จึงต้องมี ?list=all ชัด ๆ · ลิงก์จากตัวเลขที่ต้องการทุกคน (ยังไม่ถูกโทร ฯลฯ) ส่ง list=all มาเอง
+  const listView: RmListView = isShownRmListView(listParam) ? listParam : RM_LIST_VIEW_DEFAULT;
 
   const [rows, setRows] = useState<PublicApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -540,7 +549,7 @@ const RmWorkspace: React.FC<{
 
   const setListView = (next: RmListView) => {
     const params = new URLSearchParams(searchParams);
-    if (next === 'all') params.delete('list');
+    if (next === RM_LIST_VIEW_DEFAULT) params.delete('list');
     else params.set('list', next);
     setSearchParams(params);
     setSelectedIds([]);
@@ -995,7 +1004,7 @@ const RmWorkspace: React.FC<{
             selectedCount={selectedIds.length}
             /* เพิ่มข้อมูลผู้สมัคร + นำเข้า Excel + รายงาน มีแค่แท็บผู้สมัคร (เจ้าของสั่ง 4–5 ต.ค. 2569) */
             onAddApplicant={tab === 'candidates' ? () => setAddOpen(true) : undefined}
-            onImportApplicants={tab === 'candidates' ? () => setImportOpen(true) : undefined}
+            onImportApplicants={tab === 'candidates' && !headerActionsSlot ? () => setImportOpen(true) : undefined}
             /* "เก็บไปโทรเอง" เหลือแท็บผู้สมัครแท็บเดียว — การติดต่อ: *"ไม่ต้องมีคำว่าเก็บไปโทรเองแล้ว"* (5 ต.ค. 2569) */
             onHoldSelected={tab === 'candidates' ? () => void keepSelectedForSelf() : undefined}
             holdingSelected={holdingSelected}
@@ -1003,11 +1012,33 @@ const RmWorkspace: React.FC<{
             /* "ถอย Lead" — การติดต่อ ติ๊กแล้วโผล่ (5 ต.ค. 2569) · ย้ายกลับแท็บผู้สมัคร */
             onReleaseSelected={tab === 'contact' ? () => void releaseSelected() : undefined}
             releasing={releasing}
-            onExport={tab === 'candidates' ? () => downloadApplicantExport(shown) : undefined}
+            onExport={tab === 'candidates' && !headerActionsSlot ? () => downloadApplicantExport(shown) : undefined}
             exportCount={shown.length}
             /* แท็บติดตามนัดหมาย: "โหลดเป็น PDF" (4 ต.ค. 2569) · window.print + print CSS เฉพาะก้อน rm-print-area */
             onPrintPdf={tab === 'appointments' ? () => window.print() : undefined}
           />
+          {/* นำเข้า Excel + รายงาน ขึ้นแถวหัวข้างปุ่มวันที่ (14 ต.ค. 2569) — หน้าตาเดียวกับปุ่มเดิมใน `RmSearchBar` */}
+          {tab === 'candidates' && headerActionsSlot
+            ? createPortal(
+                <>
+                  <Button variant="secondary" size="xs" type="button" onClick={() => setImportOpen(true)} className="shrink-0">
+                    <FileSpreadsheet aria-hidden /> นำเข้า Excel
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => downloadApplicantExport(shown)}
+                    disabled={shown.length === 0}
+                    title={shown.length === 0 ? 'ไม่มีรายชื่อให้ส่งออก' : `ส่งออก ${shown.length} รายชื่อที่กรองอยู่ เป็นไฟล์ Excel (.csv)`}
+                    className="shrink-0"
+                  >
+                    <Download aria-hidden /> รายงาน
+                  </Button>
+                </>,
+                headerActionsSlot,
+              )
+            : null}
 
           {notice ? (
             <div

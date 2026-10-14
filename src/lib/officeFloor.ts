@@ -235,7 +235,7 @@ function buildIntake(r: OfficeFloorRaw['intake']): Desk {
       ? '/jobs/board?view=list&bucket=awaiting_call_choice'
       : nz(r.claimedIdle) > 0
         ? '/jobs/board?view=list&bucket=claimed_idle'
-        : '/jobs/board?view=list',
+        : '/jobs/board?view=list&list=all',
   };
 }
 

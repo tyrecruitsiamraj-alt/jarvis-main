@@ -26,7 +26,7 @@ describe('buildNextTasks — คิวงานหน้าแรก', () => {
     expect(t.title).toContain('7');
     expect(t.reason).toBeTruthy();
     expect(t.badge).toBeTruthy();
-    expect(t.path).toBe('/jobs/board?view=list');
+    expect(t.path).toBe('/jobs/board?view=list&list=all');
     expect(t.stepKey).toBe('matching');
   });
 
