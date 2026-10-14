@@ -13192,3 +13192,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   ของแถม `T.ของแถม.ฐาน` (เลน Match / บทเสนองาน) · `speakableBaseSalary` ไม่รู้ฐาน/เท่ารายได้ = ไม่พูด ·
   ฐาน = บรรทัด "ฐานเงินเดือน" ที่ทีมตั้ง (ต่อเดือน) → ERP `monthlyGuaranteedIncome().base` (`applyScriptFacts.ts` `manualMonthlyBase`) ·
   บท `interview` ที่แอดมินแก้ไว้ในหน้าตั้งค่าไม่ได้แตะ (ไม่มีบรรทัดรายได้ · ได้ฐานผ่านประโยคของแถม) · เทสต์ `tests/api/aiBaseSalary2569-10-14.test.ts`
+
+## ส่งแผนติดตามใหม่แล้วต้องถามผลนำเข้าใหม่ (14 ต.ค. 2569)
+- เจอตอนทำรายงานส่ง Lumos เคสอภิชาติ: แผนส่งใหม่ 13 ต.ค. 08:03 (event ใหม่) แต่ `lumos_import_status` ยังเป็น imported ของ event เก่า (ถาม 8 ต.ค.)
+  ⇒ ตัวถาม (`followLumosWatch.ts` `pendingImportSql`) ข้ามแผนนี้ · วัดได้ 44 แผนรอโทรโดนแบบเดียวกัน
+- แก้: `recordPushAck` (`lumosDispatch.ts`) ล้างผลนำเข้าเมื่อจด event ใหม่ · `pendingImportSql` ถามใหม่เมื่อ `lumos_import_checked_at < push_accepted_at`
+- เทสต์ `tests/api/followLumosWatch.test.ts`

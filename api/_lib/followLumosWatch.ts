@@ -65,7 +65,9 @@ export function pendingImportSql(): string {
        and q.push_event_id is not null
        and q.push_accepted_at < now() - interval '${IMPORT_CHECK_AFTER_MINUTES} minutes'
        and q.push_accepted_at > now() - interval '3 days'
-       and coalesce(q.lumos_import_status, 'pending') in ('pending', 'processing')
+       -- ผลที่ถามไว้ก่อนส่งแผนรอบล่าสุด = ผลของ event เก่า ถามใหม่ (14 ต.ค. 2569: ส่งแผนใหม่แล้วไม่เคยถาม event ใหม่ 44 แผน)
+       and (coalesce(q.lumos_import_status, 'pending') in ('pending', 'processing')
+            or q.lumos_import_checked_at < q.push_accepted_at)
        and (q.lumos_import_checked_at is null or q.lumos_import_checked_at < now() - interval '1 minute')
        and f.cancelled_at is null and f.completed_at is null
      order by q.push_accepted_at

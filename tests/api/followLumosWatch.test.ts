@@ -64,6 +64,16 @@ describe('ชั้น 1 — แผนเข้า Lumos จริงไหม',
     expect(sql).toContain("interval '2 minutes'");
   });
 
+  it('🔴 ส่งแผนใหม่แล้ว ผลนำเข้าของ event เก่าใช้ไม่ได้ (14 ต.ค. 2569: อภิชาติ 13 ต.ค. + แผนรอโทร 44 แผน)', async () => {
+    // ตัวถาม: ผลที่ถามไว้ก่อนส่งรอบล่าสุด = ถามใหม่
+    expect(mod.pendingImportSql()).toContain('q.lumos_import_checked_at < q.push_accepted_at');
+    // ตอนส่ง: จด event ใหม่พร้อมล้างผลนำเข้าเดิม
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('../../api/_lib/lumosDispatch.ts', import.meta.url), 'utf8');
+    const ack = src.slice(src.indexOf('async function recordPushAck'), src.indexOf('async function recordPushAck') + 900);
+    expect(ack).toMatch(/push_event_id = \$2, push_accepted_at = now\(\),\s*lumos_import_status = null/);
+  });
+
   it('imported = จดไว้ ไม่ทำอะไรต่อ', async () => {
     db([plan()]);
     getEventStatus.mockResolvedValue({ status: 'imported', error: null });

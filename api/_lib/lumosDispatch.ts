@@ -1965,8 +1965,10 @@ async function recordPushAck(followId: string, ack: unknown): Promise<void> {
   const eventId = firstEventIdOf(ack);
   try {
     await dbQuery(
+      // event ใหม่ = ผลนำเข้าเดิมใช้ไม่ได้ ล้างให้ตัวถาม (`followLumosWatch.ts`) ถามใหม่ (14 ต.ค. 2569)
       `update ${queueTable}
-          set push_event_id = $2, push_accepted_at = now()
+          set push_event_id = $2, push_accepted_at = now(),
+              lumos_import_status = null, lumos_import_error = null, lumos_import_checked_at = null
         where channel = 'reminder' and job_ref = 'follow' and person_ref = $1`,
       [`follow-${followId}`, eventId],
     );
