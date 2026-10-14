@@ -141,7 +141,20 @@ export function isClosedByCallOutcome(r: PublicApplication): boolean {
  * มุมมองย่อยของแท็บ "รายชื่อผู้สมัคร" (เจ้าของสั่ง 13 ส.ค. 2569: "แบ่ง 3 อัน")
  * ทั้งหมด / คนที่สนใจ / คนที่ไม่สนใจ — แบ่งด้วย **ผลโทร** ไม่ใช่สถานะใบสมัคร
  */
-export const RM_LIST_VIEWS = ['all', 'interested', 'declined', 'over_age', 'irecruit_dup', 'ai_at_risk', 'collect'] as const;
+export const RM_LIST_VIEWS = [
+  'all',
+  'interested',
+  'declined',
+  'over_age',
+  'irecruit_dup',
+  'ai_at_risk',
+  'no_pickup',
+  'retry_wait',
+  'not_sent',
+  'bad_data',
+  'ai_cancelled',
+  'collect',
+] as const;
 export type RmListView = (typeof RM_LIST_VIEWS)[number];
 
 /**
@@ -152,7 +165,24 @@ export type RmListView = (typeof RM_LIST_VIEWS)[number];
  *  "ซ้ำ iRecruit" (12 ต.ค. 2569 · 143) — เบอร์สมัครใน iRecruit ภายใน 14 วัน AI ไม่โทรเอง ให้คนเลือกส่ง */
 /** "AI ไม่ได้ผล" (14 ต.ค. 2569 · Choice "บอกครบ + แก้คนที่ตกหล่น") — AI โทรครบไม่ได้คำตอบ · ส่งแล้วเงียบ · Lumos ไม่รับ ·
  *  เลยนัดโทรซ้ำแล้วยังไม่มีผล (`applicantAiQueueStatus.ts`) */
-export const RM_LIST_VIEWS_SHOWN = ['all', 'interested', 'declined', 'over_age', 'irecruit_dup', 'ai_at_risk'] as const satisfies readonly RmListView[];
+/**
+ * 14 ต.ค. 2569 เจ้าของ: *"397 แบ่งเป็น สนใจ … Aiไม่ได้ผล 22 หายไปไหน 146"* → *"เพิ่ม ไม่รับสาย รอติดต่อซ้ำ ยังไม่ได้ ข้อมูลผิด ยกเลิก
+ * ไปกะพวก รายชื่อคนสนใจ ฯลฯ อยู่แถวเดียวกัน"* (Choice ยืนยันการนับ) ⇒ 5 ชิปท้ายแถว = คนที่ไม่อยู่ชิปก่อนหน้า
+ * (`rmRestViewOf`) ทุกชิปไม่ทับกัน รวมกัน = รายชื่อทั้งหมด
+ */
+export const RM_LIST_VIEWS_SHOWN = [
+  'all',
+  'interested',
+  'declined',
+  'over_age',
+  'irecruit_dup',
+  'ai_at_risk',
+  'no_pickup',
+  'retry_wait',
+  'not_sent',
+  'bad_data',
+  'ai_cancelled',
+] as const satisfies readonly RmListView[];
 export function isShownRmListView(v: string | null | undefined): v is (typeof RM_LIST_VIEWS_SHOWN)[number] {
   return !!v && (RM_LIST_VIEWS_SHOWN as readonly string[]).includes(v);
 }
@@ -164,6 +194,11 @@ export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
   over_age: 'อายุเกิน',
   irecruit_dup: 'ซ้ำ iRecruit',
   ai_at_risk: 'AI ไม่ได้ผล',
+  no_pickup: 'ไม่รับสาย',
+  retry_wait: 'รอติดต่อซ้ำ',
+  not_sent: 'ยังไม่ได้',
+  bad_data: 'ข้อมูลผิด',
+  ai_cancelled: 'ยกเลิก',
   // คิวงานสรรหา (16 ส.ค.): สนใจจริง แต่ยังไม่ขึ้นบอร์ด (= ยังไม่ได้มาสมัคร)
   // "ขึ้นบอร์ดแล้ว" = on_board (server จับคู่เบอร์กับคนบนบอร์ด ERP) → ออกจากคิวเอง
   collect: 'รอเก็บใบสมัคร',
@@ -189,7 +224,34 @@ export function isInRmListView(r: PublicApplication, view: RmListView): boolean 
   if (view === 'over_age') return isOverAge(r.age);
   if (view === 'irecruit_dup') return Boolean(r.irecruit_dup_at);
   if (view === 'ai_at_risk') return aiQueueStatusOf(r)?.atRisk === true;
+  if (isRmRestView(view)) return rmRestViewOf(r) === view;
   return true;
+}
+
+/** ชิปท้ายแถว (14 ต.ค. 2569) — คนที่ไม่อยู่ชิปก่อนหน้า แบ่งให้ครบทุกคน */
+const RM_REST_VIEWS = ['no_pickup', 'retry_wait', 'not_sent', 'bad_data', 'ai_cancelled'] as const;
+type RmRestView = (typeof RM_REST_VIEWS)[number];
+const RM_PRIMARY_VIEWS = ['interested', 'declined', 'over_age', 'irecruit_dup', 'ai_at_risk'] as const;
+
+function isRmRestView(v: RmListView): v is RmRestView {
+  return (RM_REST_VIEWS as readonly string[]).includes(v);
+}
+
+/**
+ * ใบนี้อยู่ชิปท้ายแถวอันไหน — null = อยู่ชิปก่อนหน้าแล้ว (สนใจ · ไม่สนใจ · อายุเกิน · ซ้ำ · AI ไม่ได้ผล)
+ * ไม่รับสาย = AI เคยโทรแล้วไม่ได้คำตอบ คิวปิดแล้ว · รอติดต่อซ้ำ = ตั้งโทรซ้ำไว้ · ยกเลิก = คิว AI ถูกยกเลิก ·
+ * ข้อมูลผิด = เบอร์ใช้โทรไม่ได้ · ยังไม่ได้ = ยังไม่ได้ส่งให้ AI / รอรอบแรก
+ */
+export function rmRestViewOf(r: PublicApplication): RmRestView | null {
+  if (RM_PRIMARY_VIEWS.some((v) => isInRmListView(r, v))) return null;
+  const q = aiQueueStatusOf(r);
+  if (q?.kind === 'retry') return 'retry_wait';
+  if (r.last_call_status === 'cancelled') return 'ai_cancelled';
+  const aiCalled =
+    Boolean(r.ai_answer) || r.last_call_status === 'completed' || r.last_call_status === 'failed' || Boolean(r.last_call_prev_outcome);
+  if (aiCalled) return 'no_pickup';
+  if (r.phone_callable === false) return 'bad_data';
+  return 'not_sent';
 }
 
 export function isRmListView(v: string | null | undefined): v is RmListView {

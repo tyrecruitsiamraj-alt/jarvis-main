@@ -1,0 +1,35 @@
+import { describe, expect, it } from 'vitest';
+import { isInRmListView, RM_LIST_VIEWS_SHOWN, rmRestViewOf } from '@/lib/recruitRm';
+import type { PublicApplication } from '@/lib/publicApplicationsApi';
+
+/**
+ * 14 ต.ค. 2569 เจ้าของ: "397 แบ่งเป็น สนใจ … หายไปไหน 146" → เพิ่ม ไม่รับสาย · รอติดต่อซ้ำ · ยังไม่ได้ · ข้อมูลผิด · ยกเลิก
+ * 🔴 ทุกชิป (ยกเว้น "ทั้งหมด") ไม่ทับกัน รวมกัน = ทั้งหมด
+ */
+const row = (x: Partial<PublicApplication>) => ({ id: 'a', status: 'new', job_id: 'siamraj-sql:X', ...x }) as PublicApplication;
+const FUTURE = new Date(Date.now() + 86_400_000).toISOString();
+const CASES: Array<[Partial<PublicApplication>, string]> = [
+  [{ last_call_outcome: 'confirmed', last_call_at: '2026-10-13T01:00:00Z' }, 'interested'],
+  [{ last_call_outcome: 'declined', last_call_at: '2026-10-13T01:00:00Z' }, 'declined'],
+  [{ age: 60 }, 'over_age'],
+  [{ irecruit_dup_at: '2026-10-10T00:00:00Z' }, 'irecruit_dup'],
+  [{ last_call_status: 'pending', last_call_followup: 'needs_human', last_call_attempts: 3, last_call_prev_outcome: 'no_answer' }, 'ai_at_risk'],
+  [{ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'no_answer', ai_answer: { micro: 'no_pickup', at: null } }, 'no_pickup'],
+  [{ last_call_status: 'pending', last_call_followup: 'retry_scheduled', last_call_attempts: 2, last_call_prev_outcome: 'busy', last_call_next_at: FUTURE }, 'retry_wait'],
+  [{}, 'not_sent'],
+  [{ job_id: undefined }, 'not_sent'],
+  [{ phone_callable: false }, 'bad_data'],
+  [{ last_call_status: 'cancelled' }, 'ai_cancelled'],
+];
+
+describe('ชิปแท็บผู้สมัคร แบ่งครบไม่ทับกัน', () => {
+  it.each(CASES)('%o → %s', (x, expected) => {
+    const r = row(x);
+    const hits = RM_LIST_VIEWS_SHOWN.filter((v) => v !== 'all' && isInRmListView(r, v));
+    expect(hits).toEqual([expected]);
+  });
+
+  it('ชิปท้ายแถวคืน null เมื่ออยู่ชิปก่อนหน้าแล้ว', () => {
+    expect(rmRestViewOf(row({ age: 60, phone_callable: false }))).toBeNull();
+  });
+});
