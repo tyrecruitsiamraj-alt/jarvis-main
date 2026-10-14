@@ -110,6 +110,16 @@ describe('แท็บ = สถานะใบสมัคร (ข้อมู�
     expect(rows.filter((r) => isInContactChip(r, 'all'))).toHaveLength(3);
   });
 
+  it('🔴 นัดไม่สำเร็จ (ติดต่อได้ + เหตุผล) = ไม่สำเร็จ ไม่ใช่สำเร็จ (เจ้าของ 14 ต.ค. 2569)', () => {
+    const apptFailed = { last_contact_ok: true, last_appointment_failed: true };
+    const booked = { last_contact_ok: true };
+    expect(isInContactChip(apptFailed, 'ok')).toBe(false);
+    expect(isInContactChip(apptFailed, 'fail')).toBe(true);
+    expect(isInContactChip(apptFailed, 'called')).toBe(true);
+    expect(isInContactChip(booked, 'ok')).toBe(true);
+    expect(isInContactChip(booked, 'fail')).toBe(false);
+  });
+
   it('🔴 เพิ่งเก็บจากแท็บผู้สมัคร (เจ้าของ 14 ต.ค. 2569 "ถ้ายังไม่กดโทรก็ต้องอยู่ยังไม่โทร") — AI เคยโทร/กดโทรก่อนเก็บ = ยังไม่โทร', () => {
     const claimed = '2026-10-14T01:00:00Z';
     const aiCalledBefore = { claimed_at: claimed, last_call_at: '2026-10-13T03:00:00Z' };

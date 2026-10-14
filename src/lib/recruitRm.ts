@@ -215,14 +215,17 @@ export function isInContactChip(
     dialed_last_at?: string | null;
     last_call_at?: string | null;
     last_contact_ok?: boolean | null;
+    last_appointment_failed?: boolean | null;
     claimed_at?: string | null;
     lead_at?: string | null;
   },
   chip: ContactChip,
 ): boolean {
   if (chip === 'all') return true;
-  if (chip === 'ok') return r.last_contact_ok === true;
-  if (chip === 'fail') return r.last_contact_ok === false;
+  // 🔴 14 ต.ค. 2569 เจ้าของ: "2 คนล่างนัดไม่สำเร็จแต่ขึ้นสำเร็จ" — นัดไม่สำเร็จเก็บเป็น ok=true + เหตุผล (`last_appointment_failed`)
+  //    ⇒ สำเร็จ = ติดต่อได้และไม่ใช่นัดไม่สำเร็จ · ไม่สำเร็จ = ติดต่อไม่ได้ หรือ นัดไม่สำเร็จ (ตรงกับขั้นใน `applicantProcess.ts`)
+  if (chip === 'ok') return r.last_contact_ok === true && r.last_appointment_failed !== true;
+  if (chip === 'fail') return r.last_contact_ok === false || (r.last_contact_ok === true && r.last_appointment_failed === true);
   return chip === 'called' ? isContactCalledByStaff(r) : !isContactCalledByStaff(r);
 }
 
