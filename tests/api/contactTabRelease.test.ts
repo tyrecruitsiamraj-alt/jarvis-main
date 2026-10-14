@@ -99,7 +99,11 @@ describe('ปุ่มของแท็บการติดตาม', () => {
   });
 
   it('ข้อความหลังกดบอกผล + เหตุผลของใบที่ข้าม', () => {
-    expect(summarizeCallChoice({ choice: 'release', done: 1, skipped: [] })).toBe('ส่งกลับแท็บผู้สมัคร 1 คนแล้ว');
+    // ทำสำเร็จไม่ขึ้นแถบ (เจ้าของ 14 ต.ค. 2569 "เอาออกไปเลยจากทุกหน้า") · ข้ามบางคนบอกเฉพาะคนที่ข้าม
+    expect(summarizeCallChoice({ choice: 'release', done: 6, skipped: [] })).toBe('');
+    expect(
+      summarizeCallChoice({ choice: 'release', done: 2, skipped: [{ name: 'ข', reason: 'มีเจ้าหน้าที่คนอื่นเก็บไว้' }] }),
+    ).toBe('ข้าม 1 คน — ข: มีเจ้าหน้าที่คนอื่นเก็บไว้');
     expect(
       summarizeCallChoice({ choice: 'release', done: 0, skipped: [{ name: 'ก', reason: 'มีเจ้าหน้าที่คนอื่นเก็บไว้' }] }),
     ).toBe('ยังส่งกลับแท็บผู้สมัครไม่ได้เลย · ข้าม 1 คน — ก: มีเจ้าหน้าที่คนอื่นเก็บไว้');

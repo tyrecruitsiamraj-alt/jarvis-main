@@ -17,6 +17,10 @@ export type CallChoiceLike = {
 /** จำนวนชื่อที่พิมพ์ในเหตุผลก่อนยุบเป็น "และอีก N คน" */
 const NAMES_SHOWN = 3;
 
+/**
+ * 🔴 ส่งกลับแท็บผู้สมัคร (ลบออก / ถอย Lead) ทำสำเร็จ = ไม่ขึ้นแถบเลย (เจ้าของ 14 ต.ค. 2569 *"เอาออกไปเลยจากทุกหน้า"*)
+ * คืน '' ⇒ ผู้เรียกส่งเข้า `say()` แล้วแถบไม่ขึ้น · ข้ามบางคนยังบอกเฉพาะคนที่ข้าม (ทำไม่ได้ต้องเห็น)
+ */
 export function summarizeCallChoice(outcome: CallChoiceLike): string {
   const verb =
     outcome.choice === 'release'
@@ -32,7 +36,8 @@ export function summarizeCallChoice(outcome: CallChoiceLike): string {
           ? `${verb} ${outcome.done} คนแล้ว`
           : `${verb} ${outcome.done} คน — เข้าคิวแล้ว`
       : `ยัง${verb}ไม่ได้เลย`;
-  if (outcome.skipped.length === 0) return head;
+  const quietRelease = outcome.choice === 'release' && outcome.done > 0;
+  if (outcome.skipped.length === 0) return quietRelease ? '' : head;
 
   // จัดกลุ่มตามเหตุผล — เหตุผลเดียวกันหลายคนอ่านง่ายกว่ารายคนยาวเป็นพืด
   const byReason = new Map<string, string[]>();
@@ -48,5 +53,6 @@ export function summarizeCallChoice(outcome: CallChoiceLike): string {
       return `${shown}${more}: ${reason}`;
     })
     .join(' · ');
-  return `${head} · ข้าม ${outcome.skipped.length} คน — ${detail}`;
+  const skippedText = `ข้าม ${outcome.skipped.length} คน — ${detail}`;
+  return quietRelease ? skippedText : `${head} · ${skippedText}`;
 }

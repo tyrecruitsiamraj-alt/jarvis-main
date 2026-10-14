@@ -13169,3 +13169,5 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · 🔴 ไม่ส่งใหม่เอง ไม่ย้ายให้คน (เจ้าของ 9 ต.ค.) · ไม่แตะงานติดตาม (`followLumosWatch.ts` มีของตัวเอง)
 - วัด 14 ต.ค. (14 วันย้อนหลัง): รอบโทรซ้ำเงียบ 14/147 · รอบแรกเงียบ 7/215 — กระจายหลายวัน ไม่ใช่วันเดียวพัง · แถวเก่าไม่มีเลข event ถามย้อนไม่ได้
 - เทสต์: `src/lib/applicantAiQueueStatus.test.ts` · `tests/api/lumosQueueImportWatch.test.ts` · `tests/api/lumosPushTracking.test.ts` (จดเลข event)
+- แถบ "ส่งกลับแท็บผู้สมัคร N คนแล้ว" ถอดแล้วทุกหน้า (เจ้าของ 14 ต.ค. 2569 *"เอาออกไปเลยจากทุกหน้า"*) —
+  `summarizeCallChoice` choice=release สำเร็จคืน '' (แถบไม่ขึ้น) · ข้ามบางคนบอกแค่ "ข้าม N คน — …" · เทสต์ `contactTabRelease.test.ts`
