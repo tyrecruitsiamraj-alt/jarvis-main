@@ -49,14 +49,6 @@ export const APPLICANT_BREAKDOWN: ReadonlyArray<{
     ],
   },
   {
-    group: 'staff',
-    label: 'เจ้าหน้าที่ติดต่อเอง',
-    buckets: [
-      { key: 'staff_yes', label: 'สนใจ' },
-      { key: 'staff_no', label: 'ไม่สนใจ' },
-    ],
-  },
-  {
     group: 'waiting',
     label: 'รอ AI โทร',
     buckets: [
@@ -73,6 +65,14 @@ export const APPLICANT_BREAKDOWN: ReadonlyArray<{
       { key: 'bad_phone', label: 'เบอร์ใช้โทรไม่ได้' },
       { key: 'no_job', label: 'ไม่ได้เลือกงาน' },
       { key: 'not_sent_other', label: 'ยังไม่ส่ง' },
+    ],
+  },
+  {
+    group: 'staff',
+    label: 'เจ้าหน้าที่ติดต่อเอง',
+    buckets: [
+      { key: 'staff_yes', label: 'สนใจ' },
+      { key: 'staff_no', label: 'ไม่สนใจ' },
     ],
   },
 ];

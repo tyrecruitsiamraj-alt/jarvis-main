@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   APPLICANT_BREAKDOWN,
+  APPLICANT_BUCKET_GROUPS,
   type ApplicantBreakdownCounts,
   type ApplicantBucket,
   type ApplicantBucketGroup,
@@ -10,8 +12,9 @@ import {
 
 /**
  * ═══ แตกยอดผู้สมัครทั้งหมด (เจ้าของสั่ง 14 ต.ค. 2569) — ตัวคิดอยู่ `src/lib/applicantBreakdown.ts` ═══
- * ทั้งหมด = AI โทรแล้ว + เจ้าหน้าที่ติดต่อเอง + รอ AI โทร + ยังไม่ได้ส่งให้ AI · แต่ละกลุ่มแตกย่อยต่อ · ทุกชั้นบวกลงตัว
- * กดกลุ่มหรือกลุ่มย่อย = กรองตาราง (`?group=`) · กดซ้ำ = ล้าง · ว่าง = 0 (กติกาว่างแล้วห้ามหาย)
+ * ปกติพับเหลือบรรทัดเดียว (เจ้าของ "รกไป" → Choice "เหลือบรรทัดเดียว กดกางดู")
+ * ทั้งหมด = AI โทรแล้ว · รอ AI โทร · ยังไม่ได้ส่งให้ AI · เจ้าหน้าที่ติดต่อเอง · "ดูแยก" = กลุ่มย่อย
+ * กดกลุ่ม/กลุ่มย่อย = กรองตาราง (`?group=`) · กดซ้ำ = ล้าง · ว่าง = 0
  */
 type Key = ApplicantBucket | ApplicantBucketGroup;
 
@@ -27,59 +30,55 @@ export default function ApplicantBreakdown({
   value: Key | null;
   onChange: (next: Key | null) => void;
 }) {
+  // เลือกกลุ่มย่อยอยู่ = กางไว้ให้เห็นว่ากดอะไร
+  const leafPicked = value !== null && !(APPLICANT_BUCKET_GROUPS as readonly string[]).includes(value);
+  const [open, setOpen] = useState(leafPicked);
+  const shown = open || leafPicked;
   const n = (k: Key | 'total') => (counts ? NUM.format(counts[k]) : '…');
   const pick = (k: Key) => onChange(value === k ? null : k);
+  const chip = (k: Key, label: string, testId: string, strong = false) => (
+    <Button
+      key={k}
+      type="button"
+      size="xs"
+      variant={value === k ? 'default' : 'ghost'}
+      aria-pressed={value === k}
+      onClick={() => pick(k)}
+      className={cn(value !== k && !strong && 'text-muted-foreground')}
+      data-testid={testId}
+    >
+      {label} <span className="tabular-nums text-foreground">{n(k)}</span>
+    </Button>
+  );
 
   return (
-    <div className="mt-3 space-y-2 rounded-xl border border-border/70 px-3 py-3" data-testid="applicant-breakdown">
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+    <div className="mt-2 space-y-1.5" data-testid="applicant-breakdown">
+      <div className="flex flex-wrap items-center gap-1 text-xs">
+        <span className="tabular-nums text-muted-foreground" data-testid="applicant-breakdown-total">
+          ทั้งหมด {n('total')} =
+        </span>
+        {APPLICANT_BREAKDOWN.map((g) => chip(g.group, g.label, `breakdown-${g.group}`, true))}
         <Button
           type="button"
           size="xs"
-          variant={value === null ? 'default' : 'outline'}
-          aria-pressed={value === null}
-          onClick={() => onChange(null)}
+          variant="ghost"
+          aria-expanded={shown}
+          onClick={() => setOpen((v) => !v)}
+          data-testid="applicant-breakdown-toggle"
         >
-          ทั้งหมด <span className="tabular-nums">{n('total')}</span>
+          ดูแยก {shown ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
         </Button>
-        <span className="text-xs tabular-nums text-muted-foreground" data-testid="applicant-breakdown-sum">
-          = {APPLICANT_BREAKDOWN.map((g) => `${g.label} ${n(g.group)}`).join(' + ')}
-        </span>
       </div>
-      <div className="space-y-1.5">
-        {APPLICANT_BREAKDOWN.map((g) => (
-          <div key={g.group} className="grid items-start gap-1.5 md:grid-cols-[13rem_minmax(0,1fr)]">
-            <div>
-              <Button
-                type="button"
-                size="xs"
-                variant={value === g.group ? 'default' : 'outline'}
-                aria-pressed={value === g.group}
-                onClick={() => pick(g.group)}
-                data-testid={`breakdown-${g.group}`}
-              >
-                {g.label} <span className="tabular-nums">{n(g.group)}</span>
-              </Button>
+      {shown ? (
+        <div className="space-y-1 border-l border-border/70 pl-3" data-testid="applicant-breakdown-detail">
+          {APPLICANT_BREAKDOWN.map((g) => (
+            <div key={g.group} className="flex flex-wrap items-center gap-1 text-xs">
+              <span className="w-36 shrink-0 text-muted-foreground">{g.label}</span>
+              {g.buckets.map((b) => chip(b.key, b.label, `breakdown-${b.key}`))}
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {g.buckets.map((b) => (
-                <Button
-                  key={b.key}
-                  type="button"
-                  size="xs"
-                  variant={value === b.key ? 'default' : 'ghost'}
-                  aria-pressed={value === b.key}
-                  onClick={() => pick(b.key)}
-                  className={cn(value !== b.key && 'text-muted-foreground')}
-                  data-testid={`breakdown-${b.key}`}
-                >
-                  {b.label} <span className="tabular-nums text-foreground">{n(b.key)}</span>
-                </Button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
