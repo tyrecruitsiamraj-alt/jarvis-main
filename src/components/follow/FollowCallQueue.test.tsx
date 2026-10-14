@@ -42,3 +42,27 @@ describe('ต้องโทร: คนกับ AI กองเดียว', (
     expect(persons.map((p) => within(p).getByTestId('queue-caller').textContent)).toEqual(['AI', 'คน']);
   });
 });
+
+describe('สาย AI ที่โทรไม่ติด (เจ้าของ Choice 14 ต.ค. 2569 กรณีกันตพงศ์)', () => {
+  it('อยู่ในต้องโทรให้คนตาม แต่ป้ายเป็น AI · นับในตัวเลข AI ไม่ใช่คน', () => {
+    const entries = [
+      entry({
+        id: 'x',
+        recipient_name: 'ไม่ติด หนึ่ง',
+        recipient_phone: '0833333333',
+        call_mode: 'ai',
+        dispatch_state: 'queued',
+        call_status: 'failed',
+        call_outcome: 'no_answer',
+        scheduled_at: '2026-10-13T23:30:00Z',
+      }),
+    ];
+    const rows = buildFollowPlanningRows(groupFollowEntries(entries, NOW), NOW);
+    render(<FollowCallQueue people={buildFollowDayPeople(rows, '2026-10-14')} now={NOW} onOpen={() => undefined} />);
+    const row = screen.getByTestId('queue-staff');
+    expect(within(row).getByTestId('queue-caller').textContent).toBe('AI');
+    expect(row.textContent).toContain('ให้คนตาม');
+    expect(screen.getByTestId('queue-count-ai').textContent).toBe('AI 1');
+    expect(screen.getByTestId('queue-count-staff').textContent).toBe('คน 0');
+  });
+});

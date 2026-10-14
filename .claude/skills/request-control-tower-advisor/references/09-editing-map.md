@@ -13171,3 +13171,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - เทสต์: `src/lib/applicantAiQueueStatus.test.ts` · `tests/api/lumosQueueImportWatch.test.ts` · `tests/api/lumosPushTracking.test.ts` (จดเลข event)
 - แถบ "ส่งกลับแท็บผู้สมัคร N คนแล้ว" ถอดแล้วทุกหน้า (เจ้าของ 14 ต.ค. 2569 *"เอาออกไปเลยจากทุกหน้า"*) —
   `summarizeCallChoice` choice=release สำเร็จคืน '' (แถบไม่ขึ้น) · ข้ามบางคนบอกแค่ "ข้าม N คน — …" · เทสต์ `contactTabRelease.test.ts`
+
+## หน้าติดตาม "ต้องโทร": ป้ายหน้าแถว = ใครโทรจริง (14 ต.ค. 2569 · กรณีกันตพงศ์)
+- เจ้าของ: *"เมื่อวาน ai โทรแต่พอไม่รับสายทำไมสลับเป็นคนโทร"* — ระบบไม่ได้สลับ (call_mode ยัง ai) แต่กอง staff มีสาย AI ที่โทรไม่ติด ป้ายเลยขึ้น "คน"
+- Choice "ป้าย AI + บอกให้คนตาม": `FollowCallQueue.tsx` `callerOf` (module) = `followCallerOf` ของสาย · ตัวนับ คน/AI นับตามใครโทร ไม่ใช่ตามกอง
+  · เหตุผล (`followQueueGroupOf`) = "AI โทรไม่ติด <ผล> · ให้คนตาม" · กติกากองไม่เปลี่ยน (ยังอยู่ในต้องโทร)
+- เทสต์ `src/components/follow/FollowCallQueue.test.tsx`

@@ -22,6 +22,7 @@ import {
 } from '@/lib/followCallQueue';
 import { PagePager } from '@/components/shared/PagePager';
 import { canRecordStaffCall, type FollowStaffCallOutcome } from '@/lib/followStaffCall';
+import { followCallerOf } from '@/lib/followListFilter';
 import type { FollowOutcome } from '@/lib/followOutcome';
 
 /**
@@ -32,6 +33,9 @@ import type { FollowOutcome } from '@/lib/followOutcome';
  * ปุ่มลงผล/ยกเลิก/จัดการ = ตัวเดียวกับตารางเดิม (`FollowStaffCallControls` · `FollowCancelMenu` · ป๊อปจัดการ)
  * ตารางเดิมยังเปิดได้จากปุ่มสลับ "ตาราง" (ทางถอย) · ว่าง = กองยังอยู่ + แถว "ไม่มี" (กติกาว่างแล้วห้ามหาย)
  */
+/** ใครโทรสายนี้จริง — สาย AI ที่โทรไม่ติดอยู่กองคนตาม แต่ยังเป็นของ AI */
+const callerOf = (it: FollowQueueItem): 'ai' | 'manual' => (it.group === 'ai' ? 'ai' : followCallerOf(it.call.round.entry));
+
 const TIME_FMT = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
 
 export default function FollowCallQueue({
@@ -61,10 +65,15 @@ export default function FollowCallQueue({
   const staffPageCount = Math.max(1, Math.ceil(staffClusters.length / staffPageSize));
   const staffSafePage = Math.min(staffPage, staffPageCount);
   const staffPageClusters = staffClusters.slice((staffSafePage - 1) * staffPageSize, staffSafePage * staffPageSize);
-  /** กองคนต้องโทร = รอโทร (ยังไม่มีผล) + สายที่ AI โทรแล้วแต่ไม่ได้คำตอบ (มีผลแล้ว) */
-  const staffSplit = useMemo(() => {
-    const afterAi = queue.staff.filter((it) => it.call.round.state === 'result').length;
-    return { waiting: queue.staff.length - afterAi, afterAi };
+  /**
+   * ป้าย/ตัวนับ "คน"/"AI" = ใครโทรสายนั้นจริง (`followCallerOf`) ไม่ใช่กองที่อยู่ (เจ้าของ Choice 14 ต.ค. 2569 กรณีกันตพงศ์):
+   * สาย AI ที่โทรไม่ติดยังเป็นของ AI · อยู่ในต้องโทรเพื่อให้คนตาม · ป้ายต้องบอก AI ไม่ใช่ "คน"
+   */
+  const todoSplit = useMemo(() => {
+    const todo = [...queue.staff, ...queue.ai];
+    const manual = todo.filter((it) => callerOf(it) === 'manual').length;
+    const aiFollow = queue.staff.filter((it) => callerOf(it) === 'ai').length;
+    return { manual, ai: todo.length - manual, aiFollow };
   }, [queue]);
 
   const timeOf = (it: FollowQueueItem) =>
@@ -94,10 +103,10 @@ export default function FollowCallQueue({
           <div className="truncate text-sm font-medium text-foreground">
             {it.group !== 'done' ? (
               <span
-                className={cn('mr-2 align-middle text-xs', it.group === 'ai' ? TONE.info.chip : TONE.neutral.chip)}
+                className={cn('mr-2 align-middle text-xs', callerOf(it) === 'ai' ? TONE.info.chip : TONE.neutral.chip)}
                 data-testid="queue-caller"
               >
-                {it.group === 'ai' ? 'AI' : 'คน'}
+                {callerOf(it) === 'ai' ? 'AI' : 'คน'}
               </span>
             ) : null}
             {person.row.group.name}
@@ -153,10 +162,10 @@ export default function FollowCallQueue({
           ต้องโทร {todoCount.toLocaleString('th-TH')}
         </span>
         <span className={cn(TONE.neutral.chip, 'tabular-nums')} data-testid="queue-count-staff">
-          คน {queue.staff.length.toLocaleString('th-TH')}
+          คน {todoSplit.manual.toLocaleString('th-TH')}
         </span>
         <span className={cn(TONE.info.chip, 'tabular-nums')} data-testid="queue-count-ai">
-          AI {queue.ai.length.toLocaleString('th-TH')}
+          AI {todoSplit.ai.toLocaleString('th-TH')}
         </span>
         <span className={cn(TONE.neutral.chip, 'tabular-nums')} data-testid="queue-count-done">
           จบแล้ว {queue.done.length.toLocaleString('th-TH')}
@@ -168,8 +177,8 @@ export default function FollowCallQueue({
         <div className="flex flex-wrap items-baseline gap-x-2">
           <h3 className="text-sm font-medium text-foreground">ต้องโทร</h3>
           <span className="text-xs tabular-nums text-muted-foreground" data-testid="queue-staff-split">
-            คน {queue.staff.length.toLocaleString('th-TH')} (รอโทร {staffSplit.waiting.toLocaleString('th-TH')} · AI โทรแล้วไม่ได้คำตอบ{' '}
-            {staffSplit.afterAi.toLocaleString('th-TH')}) · AI {queue.ai.length.toLocaleString('th-TH')}
+            คน {todoSplit.manual.toLocaleString('th-TH')} · AI {todoSplit.ai.toLocaleString('th-TH')} (AI โทรไม่ติด ให้คนตาม{' '}
+            {todoSplit.aiFollow.toLocaleString('th-TH')})
           </span>
         </div>
         <ul className="space-y-2">

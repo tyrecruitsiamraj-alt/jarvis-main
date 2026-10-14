@@ -71,7 +71,8 @@ export function followQueueGroupOf(call: FollowDayCall, person: FollowDayPerson)
     (c) => c !== call && !c.round.entry.cancelled && followCallerOf(c.round.entry) === 'ai' && AI_PENDING.has(c.round.state),
   );
   if (aiStillCalling) return { group: 'done', reason: label };
-  return { group: 'staff', reason: `AI โทรแล้ว ${label} → คนโทรต่อ` };
+  // 🔴 สายยังเป็นของ AI (call_mode ไม่เปลี่ยน · กติกา 9 ต.ค. "ส่ง AI แล้วต้อง AI") — แค่ขึ้นให้คนตาม · ป้ายหน้าแถว = AI (14 ต.ค. 2569)
+  return { group: 'staff', reason: `AI โทรไม่ติด ${label} · ให้คนตาม` };
 }
 
 export function buildFollowCallQueue(
