@@ -138,3 +138,16 @@ describe("🔴 เห็นคนเดียว", () => {
     );
   });
 });
+
+describe('ทางเข้าจากเมนู ☰ (15 ต.ค. 2569 "เข้าจากหน้า ui ยังไงหล่ะ")', () => {
+  const drawer = readFileSync('src/components/layout/AppNavDrawer.tsx', 'utf8');
+  it('ความคุ้มค่าระบบ โผล่เมื่อ API ตอบว่าเปิดได้เท่านั้น · API มี probe ที่ไม่อ่านฐาน', () => {
+    expect(drawer).toContain('{valueCaseOk ? (');
+    expect(drawer).toContain("go('/value')");
+    expect(readFileSync('api/_handlers/value-case.ts', 'utf8')).toMatch(/probe === "1"\) return res\.status\(200\)\.json\(\{ ok: true \}\)/);
+  });
+  it('จับคู่งานไม่อยู่ในเมนู (อยู่แท็บในหน้าใบขอ) · อยู่หน้าจับคู่ = เมนูใบขอติดไฮไลต์', () => {
+    expect(drawer).toContain("s.key !== 'matching' &&");
+    expect(drawer).toContain("(step.key === 'requests' && matchingPaths.some((p) => location.pathname.startsWith(p)))");
+  });
+});

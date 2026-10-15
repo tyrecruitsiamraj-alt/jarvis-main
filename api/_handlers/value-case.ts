@@ -24,6 +24,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || "GET").toUpperCase();
   try {
     if (method === "GET") {
+      // ?probe=1 = เช็กสิทธิ์อย่างเดียว (เมนู ☰ ใช้ตัดสินว่าจะโชว์ทางเข้าไหม) — ไม่อ่านฐาน
+      if (req.query?.probe === "1") return res.status(200).json({ ok: true });
       const [saved, months] = await Promise.all([
         loadValueCaseInputs(req.user.sub),
         loadValueCaseMonths(),

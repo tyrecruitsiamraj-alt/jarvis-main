@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -7,7 +7,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ExternalLink, KeyRound, ListChecks, LogOut, Settings } from 'lucide-react';
+import { ExternalLink, KeyRound, ListChecks, LogOut, Scale, Settings } from 'lucide-react';
+import { fetchValueCaseAccess } from '@/lib/valueCaseApi';
 import { cn } from '@/lib/utils';
 import { consumeBackMarkerForNavigation } from '@/hooks/useCloseOnBack';
 import { useUiV2 } from '@/lib/uiV2';
@@ -75,9 +76,18 @@ const AppNavDrawer: React.FC<Props> = ({
     const owner = OWNER_DOCK_PATH[key];
     return owner === undefined || visiblePaths.has(owner);
   };
+  /**
+   * 🔴 "จับคู่งาน" ไม่อยู่ในเมนู (เจ้าของ 15 ต.ค. 2569: *"จับคู่งานอยู่ในแท็บ ใบขอ งั้น menu ก็เอา จับคู่งานออก"*)
+   * ขั้นยังอยู่ใน CONVEYOR_STEPS (ชื่อหัวหน้า/แถบ "ต่อไป:"/หน้าหลักใช้) · เข้าได้จากแท็บ "จับคู่กับงาน" ในหน้าใบขอ
+   * อยู่หน้าจับคู่งาน = เมนู "ใบขอ" ติดไฮไลต์แทน
+   */
   const visibleSteps = CONVEYOR_STEPS.filter(
-    (s) => shown(s.key) && (s.key === 'requests' || !s.path.startsWith('/jobs/board') || showJobBoard),
+    (s) =>
+      s.key !== 'matching' &&
+      shown(s.key) &&
+      (s.key === 'requests' || !s.path.startsWith('/jobs/board') || showJobBoard),
   );
+  const matchingPaths = CONVEYOR_STEPS.find((s) => s.key === 'matching')?.match ?? [];
   const visibleVault = CONVEYOR_VAULT.filter((v) => shown(v.key));
 
   useEffect(() => {
@@ -88,6 +98,19 @@ const AppNavDrawer: React.FC<Props> = ({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
+
+  /** ทางเข้าหน้าความคุ้มค่าระบบ — โผล่เฉพาะบัญชีที่ API อนุญาต (15 ต.ค. 2569) */
+  const [valueCaseOk, setValueCaseOk] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    void fetchValueCaseAccess().then((ok) => {
+      if (alive) setValueCaseOk(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [open]);
 
   const go = (path: string) => {
     /**
@@ -174,7 +197,9 @@ const AppNavDrawer: React.FC<Props> = ({
 
           <div className={groupLabelClass}>สายพานงาน</div>
           {visibleSteps.map((step) => {
-            const active = isStepActive(step, location.pathname, location.search);
+            const active =
+              isStepActive(step, location.pathname, location.search) ||
+              (step.key === 'requests' && matchingPaths.some((p) => location.pathname.startsWith(p)));
             return (
               <button
                 key={step.key}
@@ -225,6 +250,17 @@ const AppNavDrawer: React.FC<Props> = ({
         </nav>
 
         <div className="space-y-1 border-t border-white/60 p-3 dark:border-slate-700/70">
+          {/* หน้าความคุ้มค่าระบบ (15 ต.ค. 2569) — คนอื่นไม่เห็นทางเข้า และ API ตอบ 404 */}
+          {valueCaseOk ? (
+            <button
+              type="button"
+              onClick={() => go('/value')}
+              className={rowClass(location.pathname.startsWith('/value'))}
+            >
+              <Scale className="h-4 w-4 shrink-0" />
+              <span className="truncate">ความคุ้มค่าระบบ</span>
+            </button>
+          ) : null}
           {showSettings ? (
             <button
               type="button"
