@@ -67,7 +67,7 @@ import { loadContactAppointments, loadLatestContactResults } from '../_lib/appli
 import { loadLatestAttendanceByApplication } from '../_lib/applicationAttendance.js';
 import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
-import { logError } from '../_lib/logger.js';
+import { logError, logWarn } from '../_lib/logger.js';
 
 const tbl = tableInAppSchema('public_job_applications');
 const queueTbl = tableInAppSchema('lumos_dispatch_queue');
@@ -399,6 +399,14 @@ export function wantsEveryoneAppointments(
  * กติกาที่ต้องคงไว้: feed รวมซ่อนใบที่ **คนอื่น** เก็บไปแล้ว · มุมมองรายใบ **ไม่ซ่อน**
  * (dialog ต้องนับได้ว่า "ถูกเก็บแล้ว N คน" — ชื่อคนเก็บถูกตัดที่ toApplication อยู่แล้ว)
  */
+/**
+ * 🔴 ดึงครบทุกใบ ไม่ตัดที่ 500 (เจ้าของ 15 ต.ค. 2569 "แก้เลย ให้ดึงครบทุกใบ ไม่ตัดที่ 500")
+ * เดิม `limit 500` แถวล่าสุด — ระบบมี 894 ใบ (ดึง iRecruit 311 ใบวันเดียว) ⇒ ~394 ใบเก่าหายจากแท็บผู้สมัคร
+ * ทั้งที่การ์ดยังนับ (เจอจริง: KYE "ผู้สมัคร 1 คน" กดเข้าไปไม่เจอใบ) · หน้าเว็บกรอง/แบ่งหน้าเองจากก้อนเดียว
+ * ตัวเลขนี้คือ **ราวกันตกเท่านั้น** (กันคิวรีหนีจนเครื่องค้าง) ไม่ใช่การตัดรายชื่อ — ถึงเมื่อไหร่ล็อกเตือน (ดูที่ผู้เรียก)
+ */
+export const APPLICATIONS_LIST_MAX = 20000;
+
 export function buildApplicationsListQuery(input: {
   jobId?: string | null;
   scopedJobIds: Set<string> | null;
@@ -468,7 +476,7 @@ export function buildApplicationsListQuery(input: {
     conds.push(`status = 'converted'`);
     return {
       sql: `select {{cols}} from ${tbl} a ${conds.length ? `where ${conds.join(' and ')}` : ''}
-        order by created_at desc limit 500`,
+        order by created_at desc limit ${APPLICATIONS_LIST_MAX}`,
       params,
       claimWhere: 'true',
       legacyClaimWhere: 'true',
@@ -515,7 +523,7 @@ export function buildApplicationsListQuery(input: {
   if (input.bucketWhere) conds.push(input.bucketWhere);
   return {
     sql: `select {{cols}} from ${tbl} a ${conds.length ? `where ${conds.join(' and ')}` : ''}
-        order by created_at desc limit 500`,
+        order by created_at desc limit ${APPLICATIONS_LIST_MAX}`,
     params,
     claimWhere,
     legacyClaimWhere,
@@ -1558,6 +1566,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
     /**
      * ใบที่ "ยกเลิกข้อมูลผู้สมัคร" (135) — ไม่อยู่ในรายชื่อหลักทุกแท็บ · `?cancelled=1` = ดูเฉพาะที่ยกเลิก (กู้คืนได้)
      */
+    if (rows.length >= APPLICATIONS_LIST_MAX) {
+      logWarn('job-applications.list ถึงราวกันตก — รายชื่อเก่าสุดไม่ได้ถูกส่ง', { max: APPLICATIONS_LIST_MAX });
+    }
     const allItems = rows.map((r) => toApplication(r, req.user.sub));
     const cancels = await loadCancellations(allItems.map((i) => i.id));
     const wantCancelled = getString(req.query?.cancelled) === '1';

@@ -69,3 +69,12 @@ describe('🔴 ใบที่ยกเลิกข้อมูลไม่ถ�
   });
 });
 
+describe('🔴 แท็บผู้สมัครดึงครบทุกใบ ไม่ตัดที่ 500 (เจ้าของ 15 ต.ค. 2569)', () => {
+  it('ลิสต์ไม่มี limit 500 · ใช้ราวกันตก APPLICATIONS_LIST_MAX (สูงกว่าจำนวนใบจริงมาก) + ล็อกเตือนเมื่อถึง', () => {
+    expect(HANDLER).not.toMatch(/order by created_at desc limit 500/);
+    expect((HANDLER.match(/order by created_at desc limit \$\{APPLICATIONS_LIST_MAX\}/g) ?? []).length).toBe(2);
+    expect(HANDLER).toMatch(/export const APPLICATIONS_LIST_MAX = 20000;/);
+    expect(HANDLER).toContain('if (rows.length >= APPLICATIONS_LIST_MAX) {');
+  });
+});
+

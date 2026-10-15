@@ -52,8 +52,8 @@ function mockRes() {
   const status = vi.fn(() => ({ json }));
   return { res: { status, json, setHeader: vi.fn() }, status, json };
 }
-/** คิวรีลิสต์ที่ยิงจริง (ตัวแรกที่อ่านจากตารางใบสมัครแล้ว limit 500) */
-const listCall = () => dbQuery.mock.calls.find((c) => /order by created_at desc limit 500/.test(String(c[0])));
+/** คิวรีลิสต์ที่ยิงจริง (ตัวแรกที่อ่านจากตารางใบสมัครแล้ว limit ราวกันตก · เลิกตัด 500 แล้ว 15 ต.ค. 2569) */
+const listCall = () => dbQuery.mock.calls.find((c) => /order by created_at desc limit 20000/.test(String(c[0])));
 
 async function get(role: UserRole, query: Record<string, string>) {
   const { res, status } = mockRes();
