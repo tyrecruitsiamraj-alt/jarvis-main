@@ -27,9 +27,19 @@ export function jobAverageIncome(
 const norm = (s: string) => s.replace(/\s+/g, '').trim();
 
 /**
- * ชิปสวัสดิการ + ยอดต่อเดือนถ้ารู้ ("ค่าเดินทาง 6,000 บาท/เดือน") — ยอดมาจาก `monthly_income_items` ของ ERP
- * ชิปที่มีตัวเลขอยู่แล้ว (เช่น "โอที ~75 บาท/ชม.") หรือไม่รู้ยอด = คงเดิม
+ * ชิปสวัสดิการ + ยอดต่อเดือนถ้ารู้ ("ค่าเดินทาง 6,000 บาท/เดือน") · ชิปที่มีตัวเลขอยู่แล้ว (เช่น "โอที ~75 บาท/ชม.") หรือไม่รู้ยอด = คงเดิม
+ * 🔴 15 ต.ค. 2569 (เจ้าของ Choice "โชว์ชื่อ ไม่โชว์ยอด"): การ์ดส่งยอดเฉพาะที่ทีมตั้งเองในป๊อป (`teamBenefitAmounts`)
+ *    ยอดจากอัตรา ERP (ต่อวัน × 30) ไม่ใช้แล้ว — "ค่ารถ/ค่าเดินทาง/TAXI 100 บาท/วัน" กลายเป็น "3,000 บาท/เดือน" ซึ่งไม่ตรงของจริง
  */
+/** ยอดที่ทีม Online ตั้งเองในป๊อป (รายได้แบบแยกส่วน · รายเดือนเท่านั้น) — ใช้คู่กับ `benefitWithAmount` */
+export function teamBenefitAmounts(
+  job: Pick<JobRequest, 'income_display'>,
+): Array<{ label: string; monthly: number }> {
+  const d = job.income_display;
+  if (!d || d.period !== 'monthly') return [];
+  return d.lines.filter((l) => l.amount > 0).map((l) => ({ label: l.label, monthly: l.amount }));
+}
+
 export function benefitWithAmount(
   label: string,
   items: JobRequest['monthly_income_items'] | null | undefined,

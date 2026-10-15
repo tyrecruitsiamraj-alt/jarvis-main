@@ -8,7 +8,7 @@ import { isOtBenefit, publicBenefitList, publicFieldVisible } from '@/lib/public
 import { incomeLinesShown, incomeShownOf } from '@/lib/incomeShown';
 import { benefitDisplayLabels, isRetiredBenefit } from '@/lib/extraBenefits';
 import { payCycleCardText, payCyclesOf } from '@/lib/payCycle';
-import { benefitWithAmount, jobAverageIncome, jobIncomeLine } from '@/lib/jobPublicFacts';
+import { benefitWithAmount, jobAverageIncome, jobIncomeLine, teamBenefitAmounts } from '@/lib/jobPublicFacts';
 
 const NUM = new Intl.NumberFormat('th-TH');
 
@@ -53,7 +53,7 @@ export default function JobPublicFacts({
    */
   const benefits = publicBenefitList(job, benefitDisplayLabels(job.extra_benefits))
     .filter((b) => !isOtBenefit(b) && !isRetiredBenefit(b))
-    .map((b) => benefitWithAmount(b, job.monthly_income_items));
+    .map((b) => benefitWithAmount(b, teamBenefitAmounts(job)));
   const gender = boardCardGender(job);
   const requirements = job.requirements ?? [];
   const details = job.job_details ?? [];

@@ -65,8 +65,9 @@ describe('JobPublicFacts', () => {
       'จันทร์ - เสาร์ • 08.00 - 17.00 น.',
       'ฐานเงินเดือน 12,000 บาท/เดือน',
       'รายได้เฉลี่ย 15,500 บาท/เดือน',
-      'ค่าเดินทาง 6,000 บาท/เดือน',
-      'ค่าโทรศัพท์ 300 บาท/เดือน',
+      // 15 ต.ค. 2569: ยอดจากอัตรา ERP ไม่ขึ้นแล้ว (โชว์ชื่ออย่างเดียว)
+      'ค่าเดินทาง',
+      'ค่าโทรศัพท์',
       'เบี้ยขยัน',
       'ชาย',
       'อายุ 20–55 ปี',
@@ -99,7 +100,7 @@ describe('JobPublicFacts', () => {
     } as unknown as JobRequest;
     render(<JobPublicFacts job={old} />);
     const items = [...screen.getByTestId('job-public-benefits').querySelectorAll('li')].map((li) => li.textContent);
-    expect(items).toEqual(['เบี้ยขยัน', 'ค่าเดินทาง 6,000 บาท/เดือน', 'ค่าโทรศัพท์ 300 บาท/เดือน', 'ประกันสังคม']);
+    expect(items).toEqual(['เบี้ยขยัน', 'ค่าเดินทาง', 'ค่าโทรศัพท์', 'ประกันสังคม']);
   });
 
   it('รอบรับเงินหลายแบบ = บอกว่าเลือกได้ · แบบเดียว = รับเงินแบบนั้น', async () => {
@@ -152,5 +153,22 @@ describe('หมายเหตุใบขอบนการ์ดโพสต�
     expect(card).toContain('data-testid="board-card-note"');
     expect(card).toContain('job.list_note');
     expect(readFileSync(`${process.cwd()}/src/components/jobs/JobPublicFacts.tsx`, 'utf8')).not.toContain('list_note');
+  });
+});
+
+describe('ยอดสวัสดิการบนการ์ด (เจ้าของ 15 ต.ค. 2569 "โชว์ชื่อ ไม่โชว์ยอด")', () => {
+  it('ยอดจากอัตรา ERP ไม่ขึ้น · ยอดที่ทีมตั้งเองรายเดือนขึ้น · รายวันไม่เดา', async () => {
+    const { teamBenefitAmounts } = await import('@/lib/jobPublicFacts');
+    render(<JobPublicFacts job={JOB} />);
+    expect(screen.getByTestId('job-public-facts').textContent).not.toContain('6,000');
+    cleanup();
+    const team = {
+      ...JOB,
+      income_display: { period: 'monthly', total: 15000, lines: [{ label: 'ค่าเดินทาง', amount: 1500 }] },
+    } as unknown as JobRequest;
+    render(<JobPublicFacts job={team} />);
+    const items = [...screen.getByTestId('job-public-benefits').querySelectorAll('li')].map((li) => li.textContent);
+    expect(items).toContain('ค่าเดินทาง 1,500 บาท/เดือน');
+    expect(teamBenefitAmounts({ income_display: { period: 'daily', total: 500, lines: [{ label: 'ค่าเดินทาง', amount: 100 }] } } as never)).toEqual([]);
   });
 });
