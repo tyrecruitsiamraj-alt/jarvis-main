@@ -20,7 +20,6 @@ import {
 } from '@/components/ui/dialog';
 import { aiCallFlowCells, type CallFlowCell } from '@/lib/aiCallFlowCells';
 import { RefreshCw, Bot, UserRound } from 'lucide-react';
-import PageHeroStrip from '@/components/shared/PageHeroStrip';
 import { useUiV2 } from '@/lib/uiV2';
 
 /**
@@ -44,10 +43,11 @@ const SOURCE_TABS: Array<{ id: CallFunnelSource; label: string; hint: string }> 
 ];
 
 /**
- * 1 ช่องสถานะบนพื้นเข้ม — เล็กกว่า FlowStage ของ funnel เพราะมี 8 ช่อง/แถว
- * เน้นความหมายด้วย **ขีดบน (bar) + สีตัวเลข** ไม่ใช่พื้นสว่าง (หลัก "หมึกกับกระดาษ")
+ * ═══ ชิปตัวเลข 1 ช่อง — โฉมแถวชิปแบบหน้าโพสต์ประกาศ (เจ้าของสั่ง 15 ต.ค. 2569 "หน้าจับคู่งานไม่เข้ากับอันอื่นเลย") ═══
+ * เดิมเป็นกล่อง 16 ใบ (2 แถว × 8 ช่อง) ขีดสีบน ตัวหนังสือเล็ก · ตอนนี้แถวละหนึ่งบรรทัด
+ * ตัวเลข/ป้าย/สีมาจาก `aiCallFlowCells.ts` ที่เดียวเหมือนเดิม · ฝั่ง AI กดดูรายชื่อได้เหมือนเดิม
  */
-function CallCell({
+function FlowChip({
   cell,
   side,
   onOpen,
@@ -57,82 +57,36 @@ function CallCell({
   /** กดเพื่อดูรายชื่อ — `null` = ช่องนี้ยังกดดูชื่อไม่ได้ (ฝั่งคนยังไม่มีเส้น) */
   onOpen: (() => void) | null;
 }) {
-  const t = TONE[cell.tone];
-  /**
-   * 🔴 โฉมใหม่ (5 ก.ย. 2569): แผงนี้ย้ายมาอยู่บน **พื้นขาว** ⇒ สีที่เขียนไว้สำหรับพื้นเข้ม
-   * (`t.onDark` · `bg-white/[0.07]` · `text-slate-400`) จะจมหายไปกับพื้น
-   * ⇒ สลับเป็นสีของธีม · **ตัวเลข/ความหมาย/การกดดูรายชื่อ เหมือนเดิมทุกอย่าง**
-   */
-  const v2 = useUiV2();
   const value = side === 'ai' ? cell.ai : cell.human;
   const body = (
     <>
-      <div
-        className={cn(
-          'truncate text-[10px] font-medium leading-tight',
-          v2 ? 'text-muted-foreground' : 'text-slate-400',
-        )}
-        title={cell.label}
-      >
-        {cell.label}
-      </div>
-      <div
-        className={cn(
-          'mt-0.5 text-xl font-medium leading-none tabular-nums tracking-tight',
-          v2 ? t.value : t.onDark,
-        )}
-      >
-        {/* null = ฝั่งนั้นไม่มีข้อมูลช่องนี้ → ขีด (ต่างจาก 0 ที่เป็นคำตอบจริง) */}
-        {value === null ? (
-          <span className={v2 ? 'text-muted-foreground' : 'text-slate-500'}>—</span>
-        ) : (
-          value.toLocaleString('th-TH')
-        )}
-      </div>
+      <span className="text-muted-foreground">{cell.label}</span>
+      {/* null = ฝั่งนั้นไม่มีข้อมูลช่องนี้ → ขีด (ต่างจาก 0 ที่เป็นคำตอบจริง) */}
+      <span className={cn('font-medium tabular-nums', value ? TONE[cell.tone].value : 'text-muted-foreground')}>
+        {value === null ? '—' : value.toLocaleString('th-TH')}
+      </span>
     </>
   );
-  const shell = cn(
-    'min-w-0 rounded-xl border px-2.5 py-2 !border-t-[3px] text-left',
-    v2 ? 'border-border bg-background/60' : 'border-white/[0.14] bg-white/[0.07]',
-    t.bar,
-  );
-  /**
-   * 🔴 **เลขต้องกดดูชื่อได้** (เจ้าของสั่ง 3 ก.ย. 2569 ให้ดันทุกหน้าถึง 8 คะแนน)
-   * พนักงานใหม่ให้หน้านี้ 4/10 ด้วยเหตุผลว่า *"ไม่เห็นรายชื่อจริง แค่ตัวเลขรวม"*
-   * — เลขที่พิสูจน์ไม่ได้ คนก็ไม่เชื่อ (ท่าเดียวกับหน้าติดตามที่กดกล่องแล้วเห็นชื่อ)
-   */
+  // 🔴 เลขต้องกดดูชื่อได้ (เจ้าของสั่ง 3 ก.ย. 2569) — ช่องที่เป็น 0/ไม่มีข้อมูล ไม่มีอะไรให้ดู
   if (!onOpen || value === null || value === 0) {
-    return <div className={shell}>{body}</div>;
+    return (
+      <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-transparent px-2 text-xs">
+        {body}
+      </span>
+    );
   }
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={cn(shell, 'transition', v2 ? 'hover:bg-accent' : 'hover:bg-white/[0.14]')}
-    >
+    <Button type="button" size="xs" variant="ghost" onClick={onOpen} title="กดดูรายชื่อ" className="shrink-0">
       {body}
-      <span className={cn('mt-0.5 block text-[9px]', v2 ? 'text-muted-foreground' : 'text-slate-500')}>
-        กดดูรายชื่อ (เปิดในหน้านี้)
-      </span>
-    </button>
+    </Button>
   );
 }
 
 /**
- * ช่องจัดเป็น **สองกลุ่มติดหัว** (แผนแก้จุดงงข้อ 1 · 2 ก.ย. 2569) — Haiku ทดสอบแล้ว
- * เอาทุกช่องมาบวกเทียบ "ทั้งหมด" แล้วเลิกเชื่อ · กลุ่มบอกว่าตอบคนละคำถาม
- * คอลัมน์สองแถว (AI/คน) ยังตรงกันเพราะ template เดียวกันต่อกลุ่ม
+ * แถวหนึ่งฝั่ง (AI หรือ คน) — "สายไปถึงไหน" | "ผลจากคนที่คุยแล้ว" คั่นด้วยเส้นตั้ง
+ * 🔴 ช่องนับคนซ้ำกันได้ (Haiku เคยบวกเทียบ "ทั้งหมด" แล้วเลิกเชื่อ · 2 ก.ย. 2569) — บอกไว้ที่ title ของแถว
  */
-/**
- * Wave 2.2 (5 ก.ย. 2569): บนจอ < sm ทั้งสองกลุ่มเรียง **2 คอลัมน์** ช่องจึงกว้างพอ
- * ให้ป้ายอ่านจบ (เดิมกลุ่มซ้ายบังคับ 3 คอลัมน์ตลอด บน 375px ป้ายถูกตัดเป็น
- * "กำลังโทร / ถึ…") · จำนวนช่อง/ตัวเลข/ปุ่มกดดูรายชื่อ เท่าเดิมทุกช่อง
- */
-const WHERE_GRID = 'grid grid-cols-2 gap-1.5 sm:grid-cols-3';
-const RESULT_GRID = 'grid grid-cols-2 gap-1.5 sm:grid-cols-5';
-
-/** แถวหนึ่งฝั่ง (AI หรือ คน) — สองกลุ่มวางคู่กัน จอแคบซ้อนเป็นสองชั้น */
-function CellRow({
+function ChipRow({
   cells,
   side,
   onOpenCell,
@@ -143,44 +97,22 @@ function CellRow({
 }) {
   const where = cells.filter((c) => c.group === 'where');
   const result = cells.filter((c) => c.group === 'result');
-  const v2 = useUiV2();
-  const groupLabel = cn('mb-1 text-[10px] font-medium', v2 ? 'text-muted-foreground' : 'text-slate-400');
-  /**
-   * ใจความกันบวกผิด ย้ายมาติดหัวกลุ่มตัวเลข (ตำหนิ QA รอบสอง 6 ก.ย. 2569: คำเตือน
-   * เดิมอยู่ท้ายแผงไกลตัวเลขเกินไป) — ประโยคเต็มด้านล่างแผงยังคงไว้เหมือนเดิม
-   */
-  const inlineWarn = cn('mb-1 text-[9px] font-normal', v2 ? 'text-muted-foreground/80' : 'text-slate-500');
+  const chip = (c: CallFlowCell) => (
+    <FlowChip key={`${side}-${c.key}`} cell={c} side={side} onOpen={side === 'ai' ? () => onOpenCell(c) : null} />
+  );
   return (
-    <div className="mt-2 grid gap-2 lg:grid-cols-[3fr_5fr]">
-      <div>
-        <p className={groupLabel}>ตอนนี้สายไปถึงขั้นไหน</p>
-        <p className={inlineWarn}>นับซ้ำกันได้ ห้ามบวกรวม</p>
-        <div className={WHERE_GRID}>
-          {cells.length === 0
-            ? null
-            : where.map((c) => (
-                <CallCell
-                  key={`${side}-${c.key}`}
-                  cell={c}
-                  side={side}
-                  onOpen={side === 'ai' ? () => onOpenCell(c) : null}
-                />
-              ))}
-        </div>
-      </div>
-      <div>
-        <p className={groupLabel}>ผลจากคนที่คุยแล้ว</p>
-        <div className={RESULT_GRID}>
-          {result.map((c) => (
-            <CallCell
-              key={`${side}-${c.key}`}
-              cell={c}
-              side={side}
-              onOpen={side === 'ai' ? () => onOpenCell(c) : null}
-            />
-          ))}
-        </div>
-      </div>
+    <div
+      className="flex flex-wrap items-center gap-1"
+      title="ทุกช่องนับคนซ้ำกันได้ ห้ามบวกรวมเทียบ ทั้งหมด (ทั้งหมด = จำนวนคนที่ส่งเข้าคิว นับหัวละครั้ง)"
+      data-testid={`ai-call-flow-${side}`}
+    >
+      <span className="inline-flex w-28 shrink-0 items-center gap-1.5 text-xs font-medium text-foreground">
+        {side === 'ai' ? <Bot className="size-3.5" aria-hidden /> : <UserRound className="size-3.5" aria-hidden />}
+        {side === 'ai' ? 'ส่ง AI โทร' : 'เก็บไปโทรเอง'}
+      </span>
+      {where.map(chip)}
+      <span className="mx-1 hidden h-5 border-l border-border sm:block" aria-hidden />
+      {result.map(chip)}
     </div>
   );
 }
@@ -223,64 +155,35 @@ export default function AiCallFlowPanel({
   }, [load]);
 
   const cells = aiCallFlowCells(funnel);
-  /** โฉมใหม่: แผงย้ายมาอยู่บนพื้นขาว ⇒ ตัวหนังสือ/เส้นคั่นที่เขียนไว้สำหรับพื้นเข้มต้องสลับ */
   const v2 = useUiV2();
-  const rowHead = cn(
-    'mt-3 flex items-center gap-1.5 text-[11px] font-medium',
-    v2 ? 'text-foreground' : 'text-slate-300',
-  );
 
   return (
-    <PageHeroStrip
-      eyebrow={`AI โทร · ${SOURCE_TABS.find((t) => t.id === source)?.label ?? 'ทั้งหมด'}`}
-      actions={
-        <div className="flex flex-wrap items-center gap-1.5">
+    <div className="space-y-1.5" data-testid="ai-call-flow">
+      <ChipRow cells={cells} side="ai" onOpenCell={openPeople} />
+      {/* แถวคนเก็บไปโทร — ช่องเดียวกันเป๊ะ (template เดียวกัน) · ปุ่มต้นทางชิดขวาแถวนี้ (แถวสั้นกว่า) */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <ChipRow cells={cells} side="human" onOpenCell={openPeople} />
+        <div className="flex flex-wrap items-center gap-1">
           {SOURCE_TABS.map((t) => (
             <Button
               key={t.id}
               type="button"
-              variant="hero"
-              size="sm"
+              variant="outline"
+              size="xs"
               title={t.hint}
               onClick={() => setSource(t.id)}
               aria-pressed={source === t.id}
-              /* 🔴 ตัวที่ถูกเลือกต้องแยกจากตัวที่ไม่ถูกเลือกให้ออก (audit 7 ก.ย. 2569 · งง-5)
-                 เดิมโฉมใหม่ใช้ `bg-accent` จาง ๆ อย่างเดียว กวาดตาแล้วดูเหมือนกันหมด
-                 ⇒ ใช้สีเน้นสีเดียวของโฉมใหม่ (เบอร์กันดี = `primary`) ทั้งขอบ พื้นจาง และตัวหนังสือ */
-              className={cn(
-                source === t.id &&
-                  (v2 ? 'border-primary/50 bg-primary/10 font-medium text-primary' : 'bg-white/25'),
-              )}
+              /* 🔴 ตัวที่ถูกเลือกต้องแยกจากตัวที่ไม่ถูกเลือกให้ออก (audit 7 ก.ย. 2569 · งง-5) */
+              className={cn(source === t.id && (v2 ? 'border-primary/50 bg-primary/10 font-medium text-primary' : 'bg-accent font-medium text-foreground'))}
             >
               {t.label}
             </Button>
           ))}
-          <Button type="button" variant="hero" size="sm" onClick={load} disabled={loading}>
-            <RefreshCw className={cn(loading && 'animate-spin')} /> รีเฟรช
+          <Button type="button" variant="ghost" size="iconXs" onClick={load} disabled={loading} aria-label="รีเฟรช" title="รีเฟรช">
+            <RefreshCw className={cn(loading && 'animate-spin')} />
           </Button>
         </div>
-      }
-    >
-      {/* แถว AI */}
-      <div className={rowHead}>
-        <Bot className="h-3.5 w-3.5" aria-hidden /> ส่ง AI โทร
       </div>
-      <CellRow cells={cells} side="ai" onOpenCell={openPeople} />
-
-      {/* แถวคนเก็บไปโทร — กลุ่ม/คอลัมน์เดียวกันเป๊ะ (template เดียวกัน) */}
-      <div className={cn(rowHead, 'border-t pt-3', v2 ? 'border-border' : 'border-white/10')}>
-        <UserRound className="h-3.5 w-3.5" aria-hidden /> คนเก็บไปโทรเอง
-      </div>
-      <CellRow cells={cells} side="human" onOpenCell={openPeople} />
-
-      {/* 🔴 บรรทัดกันคนบวกเลขเอง — ต้องครอบ **ทุก** ช่อง ไม่ใช่ยกตัวอย่างเดียว
-          (Haiku รอบสองยังบวก "กำลังโทร 40 + รอใหม่ 39 = 79 ≠ 77" เพราะตัวอย่างเดิม
-          พูดถึงแต่ฝั่งผล เลยเข้าใจว่าฝั่ง "ตอนนี้สายไปถึงขั้นไหน" ต้องบวกลงตัว) */}
-      <p className={cn('mt-2 text-[10px]', v2 ? 'text-muted-foreground' : 'text-slate-500')}>
-        ทุกช่องนับคนซ้ำกันได้ — กำลังโทรอยู่ก็ถูกนัดให้ AI โทรใหม่ได้ · รับสายแล้ว
-        &ldquo;สนใจ&rdquo; นับทั้งสองช่อง ⇒ <b>ห้ามเอาช่องไหนบวกกันเทียบ &ldquo;ทั้งหมด&rdquo;</b>{' '}
-        (ทั้งหมด = จำนวนคนที่ส่งเข้าคิว นับหัวละครั้ง)
-      </p>
       <Dialog open={Boolean(peopleCell)} onOpenChange={(o) => (o ? undefined : setPeopleCell(null))}>
         <DialogContent className="max-h-[80vh] max-w-lg overflow-y-auto">
           <DialogHeader>
@@ -322,6 +225,6 @@ export default function AiCallFlowPanel({
           )}
         </DialogContent>
       </Dialog>
-    </PageHeroStrip>
+    </div>
   );
 }

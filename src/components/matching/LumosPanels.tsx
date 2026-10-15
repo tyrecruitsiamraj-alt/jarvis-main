@@ -108,12 +108,28 @@ export function LumosJobSummaryStats({
   /** ไม่มีแถวสรุป (ใบที่ยังไม่เคยเข้าคิว) ก็ส่ง undefined มาได้ — ได้ 6 ช่องเป็น 0 */
   s?: LumosJobCallSummaryRow;
   className?: string;
-  /** pill = ก้อนลอยพื้นจาง (ในใบขอ/หน้ารายละเอียด) · column = เต็มความกว้างคอลัมน์ขวาของการ์ด */
-  variant?: 'pill' | 'column';
+  /**
+   * pill = ก้อนลอยพื้นจาง (ในใบขอ/หน้ารายละเอียด) · column = เต็มความกว้างคอลัมน์ขวาของการ์ด ·
+   * inline = บรรทัดเดียว "ป้าย เลข" (การ์ดกริดหน้าจับคู่งาน 15 ต.ค. 2569) — 6 ช่องเท่าเดิม ช่องที่เป็น 0 จาง
+   */
+  variant?: 'pill' | 'column' | 'inline';
 }) {
   // สีของแต่ละช่องมาจาก token กลางผ่าน tone key: ส่ง=กลาง · โทรแล้ว=กำลังดำเนินการ ·
   // เหลือ/ไม่รับ=รอคนทำต่อ · โอเค=สนใจงาน (หาได้แล้ว) · ไม่ไป=ติดขัด
   const cells = lumosFixedStatCells(s);
+  if (variant === 'inline') {
+    return (
+      <div className={cn('flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs', className)} data-testid="lumos-job-stats-inline">
+        <span className={DASH.muted}>ผลโทร</span>
+        {cells.map((c) => (
+          <span key={c.key} title={c.title} className={cn('inline-flex items-center gap-1', c.value === 0 && 'opacity-50')}>
+            <span className={DASH.muted}>{c.label}</span>
+            <span className={cn('font-medium tabular-nums', c.value === 0 ? DASH.muted : TONE[c.tone].value)}>{c.value}</span>
+          </span>
+        ))}
+      </div>
+    );
+  }
   // สไตล์เรียบแบบ Apple: พื้นจางชิ้นเดียว ไม่มีเส้นแบ่ง เลขน้ำหนักกลางตัวใหญ่ขึ้นเล็กน้อย
   // ป้ายตัวจิ๋วโทนเทา ค่า 0 จางลงทั้งช่องให้ตาไหลผ่านไปหาช่องที่มีค่า
   return (

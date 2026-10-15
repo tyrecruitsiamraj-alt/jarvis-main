@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ToneDot from '@/components/shared/ToneDot';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { unitOneLine } from '@/lib/unitDisplay';
 import { conveyorLabel } from '@/lib/soRecruitNav';
 import Term from '@/components/shared/Term';
@@ -14,7 +15,7 @@ import SelectionRecallButton from '@/components/matching/SelectionRecallButton';
 import SearchField from '@/components/shared/SearchField';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle } from 'lucide-react';
+import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle, Banknote, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   SEARCH_LEGACY_POOL,
@@ -25,7 +26,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { JobRequest } from '@/types';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
-import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, publicJobCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
+import { publicJobTitle } from '@/lib/publicJobTitle';
 import { unitRequestPath } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { apiFetch } from '@/lib/apiFetch';
@@ -44,11 +46,7 @@ import {
   type MatchingListSort,
 } from '@/lib/matchingListFilter';
 import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
-import {
-  getJobRequestAgeDays,
-  ageUrgencyLevelFromDays,
-  JOB_AGE_URGENCY_META,
-} from '@/lib/jobUrgency';
+import { getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   saveProposal,
@@ -2408,30 +2406,24 @@ const MatchingPage: React.FC = () => {
             ⚠️ หน้า Follow ยังใช้ CallFunnelPanel อยู่ — แผงนี้เฉพาะหน้า Matching */}
         <AiCallFlowPanel defaultSource="all" />
 
-        {/* แถบชิปกรองรายการ — แทน "ขั้น 1 ฝั่งงาน" เดิม (ทางกรองทางเดียวที่เหลือ ห้ามทำหาย) */}
-        <div className="flex flex-wrap items-center gap-1.5 px-1">
-          {filterChips.map((c) => {
-            const t = TONE[c.tone];
-            return (
-              <button
-                key={c.key}
-                type="button"
-                onClick={c.on}
-                disabled={serverListLoading}
-                aria-pressed={c.active}
-                className={cn(
-                  // Wave 2.2: มือถือให้สูงอย่างน้อย 36px (min-h-9) แตะติดง่าย · เดสก์ท็อปเท่าเดิม
-                  'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 sm:min-h-0',
-                  c.active ? cn(t.soft, t.value, 'ring-2 ring-ring') : cn(t.soft, t.value, t.softHover),
-                )}
-              >
-                <span>{c.label}</span>
-                <span className={cn('tabular-nums font-medium', t.num)}>
-                  {c.count.toLocaleString('th-TH')}
-                </span>
-              </button>
-            );
-          })}
+        {/* แถบชิปกรองรายการ — แทน "ขั้น 1 ฝั่งงาน" เดิม (ทางกรองทางเดียวที่เหลือ ห้ามทำหาย)
+            โฉมเดียวกับชิปเลนหน้าโพสต์ประกาศ (15 ต.ค. 2569): ปุ่ม xs · ทึบเมื่อเลือก · เลขต่อท้าย */}
+        <div className="flex flex-wrap items-center gap-1.5" data-testid="matching-filter-chips">
+          {filterChips.map((c) => (
+            <Button
+              key={c.key}
+              type="button"
+              size="xs"
+              variant={c.active ? 'default' : 'outline'}
+              onClick={c.on}
+              disabled={serverListLoading}
+              aria-pressed={c.active}
+              className="shrink-0"
+            >
+              {c.label}
+              <span className={cn('tabular-nums', !c.active && TONE[c.tone].value)}>{c.count.toLocaleString('th-TH')}</span>
+            </Button>
+          ))}
         </div>
 
         {/* ⚠️ MyCallsSection ("โทรของฉัน") เคยอยู่ตรงนี้ (14 ส.ค. เช้า) — เจ้าของสั่งย้าย
@@ -2568,7 +2560,17 @@ const MatchingPage: React.FC = () => {
               <p className="text-sm font-medium text-foreground">ไม่พบใบขอตามเงื่อนไข</p>
             </div>
           ) : null}
-          <div className={cn('space-y-2.5 transition-opacity duration-200', rows.length > 0 && serverListLoading && 'pointer-events-none opacity-50')}>
+          {/* ═══ การ์ดใบขอ — กริด 3 คอลัมน์แบบการ์ดหน้าโพสต์ประกาศ (เจ้าของ Choice 15 ต.ค. 2569 "แบบโพสต์ประกาศ") ═══
+              เดิมการ์ดยาวเต็มแถว + แถบสีซ้าย + แถบผลโทร 6 ช่อง (ส่วนใหญ่ 0) · ตอนนี้: ชื่อ/ตำแหน่ง · ป้ายอายุมุมขวา ·
+              ชิปทำต่อ · ที่อยู่/เงิน/วันที่ · ผลโทรบรรทัดเดียว · ก้นการ์ด = เหลือหา + ปุ่ม
+              🔴 ป้ายอายุใช้ getJobAgeChipInfo ตัวเดียวกับโพสต์ประกาศ (ห้ามสเกลสีอายุชุดที่สอง) */}
+          <div
+            className={cn(
+              'grid gap-3 transition-opacity duration-200 sm:grid-cols-2 lg:grid-cols-3',
+              rows.length > 0 && serverListLoading && 'pointer-events-none opacity-50',
+            )}
+            data-testid="matching-job-grid"
+          >
           {visibleRows.map((j) => {
             const matchCount = boardMatchById[j.id]
               ? recommendedCandidateCount(boardMatchById[j.id].matches)
@@ -2578,195 +2580,130 @@ const MatchingPage: React.FC = () => {
             const progress = proposalCounts(proposalsByJobId[j.id]);
             const requested = requestPositionCount(j);
             const remaining = officialRemainingCount(j);
-            // สีบอกความด่วนจากอายุใบขอ: ≤7 วันยังไม่ด่วน · 8–30 เริ่มด่วน · 31–60 ด่วน · 60+ ด่วนมาก
-            const ageDays = getJobRequestAgeDays(j);
-            const ageLevel = ageUrgencyLevelFromDays(ageDays);
-            const ageMeta = JOB_AGE_URGENCY_META[ageLevel];
+            const age = getJobAgeChipInfo(j);
+            const subtitle = publicJobCardSubtitle(j);
+            const inc = incomeDisplay({
+              totalIncome: j.total_income,
+              monthlyIncome: j.monthly_income,
+              displayPeriod: j.income_display?.period ?? null,
+            });
+            const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
+            const progressChip = lumosProgressChip(progress);
             return (
-              <div
+              <Card
                 key={j.id}
                 role="button"
                 tabIndex={0}
                 onClick={() => openJob(j)}
-                onKeyDown={(e) => e.key === 'Enter' && openJob(j)}
-                className="glass-card relative overflow-hidden rounded-2xl border border-white/70 py-2.5 pl-4 pr-3 cursor-pointer hover:border-primary/40 transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openJob(j);
+                  }
+                }}
+                className="group flex h-full cursor-pointer flex-col gap-2 rounded-2xl p-3 shadow-sm transition-colors hover:border-primary/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
-                {/* แถบสีซ้ายการ์ด — กวาดตาแล้วรู้ทันทีว่าใบไหนค้างนาน */}
-                <span
-                  aria-hidden
-                  className={cn('absolute inset-y-0 left-0 w-1.5', ageMeta.barCls)}
-                />
-                {/*
-                  บรรทัดแรก = "สิ่งที่ต้องตัดสินใจ" ตามหลักคนอ่านบนลงล่างที่เจ้าของยึด
-                  ด่วนแค่ไหน → ต้องทำอะไรต่อ → เหลือหากี่คน
-                  ชื่อหน่วยงาน/ตำแหน่ง/ที่อยู่เป็นของประกอบ ลงไปอยู่บรรทัดถัดไป
-
-                  ⚠️ แถวนี้ nowrap — ชิปด่วนหดได้ (truncate) ส่วน "เหลือหา" ไม่หด
-                  ถ้าปล่อย wrap ใบที่ข้อความยาวจะตกบรรทัดแล้วการ์ดสูงกระโดดใบเดียว
-                */}
-                <div className="flex flex-nowrap items-center gap-x-2">
-                  <span
-                    title={
-                      ageDays == null
-                        ? 'ไม่ทราบอายุใบขอ'
-                        : `ใบขอนี้ค้างมา ${ageDays} วัน · เกณฑ์: ≤7 ยังไม่ด่วน · 8–30 เริ่มด่วน · 31–60 ด่วน · 60+ ด่วนมาก`
-                    }
-                    className={cn(
-                      'inline-flex min-w-0 items-center gap-1 truncate rounded-full border px-2.5 py-0.5 text-[11px] font-medium tabular-nums',
-                      ageMeta.chipCls,
-                    )}
-                  >
-                    <span className={cn('h-1.5 w-1.5 rounded-full', ageMeta.dotCls)} aria-hidden />
-                    {ageMeta.label}
-                    {ageDays != null ? ` · ค้าง ${ageDays} วัน` : ''}
-                  </span>
-                  <span className="ml-auto shrink-0 text-[11px] text-slate-600 dark:text-slate-300">
-                    เหลือหา <b className={cn('text-[15px] tabular-nums', TONE.warn.value)}>{remaining}</b>
-                    <span className="text-muted-foreground"> / {requested} อัตรา</span>
-                  </span>
+                {/* ── ชื่อ + ตำแหน่ง · มุมขวา = ด่วน / ผ่านมากี่วัน ── */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 space-y-0.5">
+                    {/* ชื่อ/ตำแหน่ง/บรรทัดรอง — ตัวเดียวกับการ์ดโพสต์ประกาศ (BoardJobCard) */}
+                    <h2 className="line-clamp-2 text-lg font-medium text-foreground group-hover:text-primary">
+                      {jobBoardCardTitle(j)}
+                    </h2>
+                    <p className="line-clamp-1 text-base font-medium text-primary">{publicJobTitle(j)}</p>
+                    {subtitle ? <p className={cn('line-clamp-2 text-sm', DASH.muted)}>{subtitle}</p> : null}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {j.urgency === 'urgent' ? (
+                      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-sm font-medium text-destructive">ด่วน</span>
+                    ) : null}
+                    <span className={cn('rounded-md border px-1.5 py-0.5 text-sm font-medium', JOB_AGE_CHIP_META[age.level].chipCls)} title={age.title}>
+                      {age.cardText}
+                    </span>
+                  </div>
                 </div>
 
-                {/*
-                  แถวชิป — **จองที่ไว้เสมอแม้ไม่มีชิปสักอัน** (เจ้าของเคาะ 13 ส.ค. 2569:
-                  "ข้อมูลไม่เท่ากันก็ขยับเอง คงมันไว้ให้ตรงกัน") ทุกอย่างที่โผล่ ๆ หาย ๆ
-                  มากองอยู่แถวนี้แถวเดียว การ์ดจึงสูงเท่ากันไม่ว่าใบไหนจะมีชิปกี่อัน
-                */}
-                <div className="mt-1 flex flex-nowrap items-center gap-x-1.5 overflow-hidden">
-                  {/* ตัวตั้งความสูงของแถว — เป็นชิปจริงที่มองไม่เห็นและกว้าง 0
-                      ใช้แทน min-h ค่าคงที่ เพราะความสูงจะเดินตามชิปจริงเองถ้าวันหลัง
-                      ขนาดชิปเปลี่ยน (วัดเจอ: min-h-[22px] ต่างจากชิปจริง 23px อยู่ 1px) */}
-                  <span aria-hidden className={cn(TONE.neutral.chip, 'invisible w-0 overflow-hidden px-0')}>
-                    0
-                  </span>
-                  {(() => {
-                    const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
-                    return action ? (
-                      <span title={action.text} className={cn(TONE[action.tone].chip, 'min-w-0 truncate')}>
-                        → {action.text}
-                      </span>
-                    ) : null;
-                  })()}
+                {/* ── ทำอะไรต่อ + AI แนะนำ + ชิปพิเศษของผลโทร ── */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {action ? (
+                    <span title={action.text} className={cn(TONE[action.tone].chip, 'max-w-full truncate')}>
+                      {action.text}
+                    </span>
+                  ) : null}
+                  {matchCount != null ? (
+                    <span
+                      title="จำนวนที่ AI แนะนำจากคนของเรา — ยังไม่ใช่การยืนยันว่าพร้อมลงงาน"
+                      className={cn(TONE.success.chip, 'shrink-0')}
+                    >
+                      AI แนะนำ {matchCount}
+                    </span>
+                  ) : quickCounts[j.id] ? (
+                    /* เลข "ประมาณ" ต้องต่างจากเลข "ยืนยันแล้ว" ด้วยตา — เส้นประ = ยังไม่ผ่าน AI */
+                    <span
+                      title="ประมาณการเบื้องต้นจากสกิล (ยังไม่ผ่าน AI) — กดเพื่อให้ AI คัดจริง"
+                      className={cn(TONE.neutral.chip, 'shrink-0 border-dashed')}
+                    >
+                      ~{quickCounts[j.id]} (ยังไม่ผ่าน AI)
+                    </span>
+                  ) : null}
                   <LumosJobStatChips s={serverLumosSummary[j.id]} />
-                  {(() => {
-                    // ยอดคนในใบ — เดิมเป็นแถบที่มาแทนที่ผลโทร (จึงโชว์เฉพาะใบที่ยังไม่มีการโทร
-                    // ซึ่งกลับด้านกับความจริง) ตอนนี้เป็นชิปที่ขึ้นเมื่อมีค่าจริงเท่านั้น
-                    const chip = lumosProgressChip(progress);
-                    return chip ? (
-                      <span className={cn(TONE[chip.tone].chip, 'shrink-0 whitespace-nowrap tabular-nums')}>
-                        {chip.text}
-                      </span>
-                    ) : null;
-                  })()}
+                  {progressChip ? (
+                    <span className={cn(TONE[progressChip.tone].chip, 'shrink-0 whitespace-nowrap tabular-nums')}>
+                      {progressChip.text}
+                    </span>
+                  ) : null}
                 </div>
 
-                <div className="mt-1 flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    {/* ชื่อหน่วยงาน + ป้ายผลคัดคน — ของประกอบการตัดสินใจ ไม่ใช่ตัวตัดสินใจเอง
-                        nowrap: ชื่อยาวให้ truncate ไม่ใช่ดันป้ายตกบรรทัด */}
-                    <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
-                      <span className="truncate text-sm font-medium text-blue-600 dark:text-blue-300">{unitRequestCardTitle(j)}</span>
-                      {matchCount != null ? (
-                        <span
-                          title="จำนวนที่ AI แนะนำจากคนของเรา — ยังไม่ใช่การยืนยันว่าพร้อมลงงาน"
-                          className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium', TONE.success.soft, TONE.success.value)}
-                        >
-                          AI แนะนำ {matchCount}
-                        </span>
-                      ) : quickCounts[j.id] ? (
-                        /* เลข "ประมาณ" ต้องต่างจากเลข "ยืนยันแล้ว" ด้วยตา ไม่ใช่แค่ตัวหนอน —
-                           เส้นประ + ไม่มีพื้น = ยังไม่ผ่าน AI · ทึบ + มีเครื่องหมายถูก = ยืนยันแล้ว */
-                        <span
-                          title="ประมาณการเบื้องต้นจากสกิล (ยังไม่ผ่าน AI) — กดเพื่อให้ AI คัดจริง"
-                          className="shrink-0 rounded-full border border-dashed border-slate-400 px-2 py-0.5 text-[10px] text-slate-600 dark:border-slate-500 dark:text-slate-300"
-                        >
-                          ~{quickCounts[j.id]} (ยังไม่ผ่าน AI)
-                        </span>
-                      ) : null}
-                    </div>
-                    {/* ไม่มี subtitle ก็ต้องกินที่บรรทัดเดิม — ไม่งั้นที่อยู่เลื่อนขึ้นมาใบเดียว */}
-                    <div className="truncate text-[11px] leading-4 text-muted-foreground">
-                      {unitRequestCardSubtitle(j) || EM_DASH}
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                      <MapPin className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{j.location_address}</span>
-                    </div>
-                  </div>
+                {/* ── ที่ไหน · เงินเท่าไหร่ · ต้องการเมื่อไหร่ (หน่วยติดเลขเสมอ — lib/incomeLabel) ── */}
+                <div className={cn('space-y-1 text-sm', DASH.muted)}>
+                  <p className="flex min-w-0 items-start gap-1.5">
+                    <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
+                    <span className="line-clamp-2 min-w-0">{j.location_address || EM_DASH}</span>
+                  </p>
+                  <p className="flex min-w-0 items-center gap-1.5" title={inc?.hint ?? undefined}>
+                    <Banknote className="size-4 shrink-0" aria-hidden />
+                    <span className="truncate">{inc ? inc.text : '— บาท'}</span>
+                  </p>
+                  <p className="flex min-w-0 items-center gap-1.5">
+                    <CalendarDays className="size-4 shrink-0" aria-hidden />
+                    <span className="truncate">ต้องการ {formatYmdDmyBe(j.required_date)}</span>
+                    <span className="ml-auto shrink-0 font-mono text-xs">{dashIfEmpty(j.request_no)}</span>
+                  </p>
                 </div>
-                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-                  {/* ในกล่องแบ่งสองคอลัมน์: ซ้าย = รายละเอียดงาน · ขวา = สรุปว่ามีใครกี่คนแล้ว */}
-                  {/* แบ่งครึ่งตามที่เจ้าของสั่ง: ซ้าย = รายละเอียดงาน + ยอดอัตราทางการ
-                      ขวา = แถบผลโทร 6 ช่อง (ใบที่ยังไม่ได้ส่งโทร ใช้ยอดคนบนบอร์ดแทน ไม่ปล่อยว่าง) */}
-                  <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
-                    <div className="min-w-0">
-                      {/* 🔴 หน่วยต้องติดมากับเลขเสมอ — "400 บาท" ข้าง ๆ "45,000 บาท"
-                          โดยไม่มีหน่วย ทำให้คนใหม่อ่านว่าเงินเดือน 400 บาท
-                          (ใบรายวันมีจริง วัดเจอ 20 จาก 200 ใบ) · ไม่รู้หน่วย = ไม่เดา
-                          แต่ติดคำเตือนไว้ใน tooltip แทน (ดู lib/incomeLabel) */}
-                      {(() => {
-                        const inc = incomeDisplay({
-                          totalIncome: j.total_income,
-                          monthlyIncome: j.monthly_income,
-                          displayPeriod: j.income_display?.period ?? null,
-                        });
-                        return (
-                          <span
-                            className="block truncate text-[11px] text-muted-foreground"
-                            title={inc?.hint ?? undefined}
-                          >
-                            {inc ? inc.text : '— บาท'}
-                            {' · '}ต้องการ{' '}
-                            {formatYmdDmyBe(j.required_date)}
-                          </span>
-                        );
-                      })()}
-                      {/* ยอด ขอมา/เหลือหา ย้ายขึ้นบรรทัดแรกแล้ว ตรงนี้เหลือเลขที่ใบขอ
-                          ซึ่งเป็นของอ้างอิง — ตามหลักบนลงล่าง ของอ้างอิงอยู่ล่างสุด
-                          ใบที่ไม่มีเลขที่ก็ต้องกินที่บรรทัดเดิม (คงไว้ให้ตรงกัน) */}
-                      <span className="mt-0.5 block font-mono text-[10px] leading-4 text-muted-foreground">
-                        {dashIfEmpty(j.request_no)}
-                      </span>
-                    </div>
-                    {/* หัวข้อกับจำนวนช่องคงที่ทุกใบ — ใบที่ยังไม่เคยส่งโทรได้ 0 ทั้งแถว
-                        (เจ้าของสั่ง: ข้อมูลไม่เท่ากันก็คงไว้ให้ตรงกัน อย่าให้มันขยับเอง)
-                        ยอด ติดต่อ/จอง/ลงงาน ที่เคยแทนที่แถบนี้ ย้ายไปเป็นชิปในแถวบน */}
-                    <div className="min-w-0 border-slate-100 dark:border-slate-700/60 sm:border-l sm:pl-2.5">
-                      <p className="text-[9px] font-medium uppercase text-slate-400">
-                        ผลโทรในใบนี้
-                      </p>
-                      <LumosJobSummaryStats s={serverLumosSummary[j.id]} variant="column" />
-                    </div>
-                  </div>
-                  {/* ⚠️ ความกว้างคงที่ — ป้ายปุ่มยาวไม่เท่ากัน ("ดูคนของเรา (0)" กับ
-                      "AI กำลังคิดที่หลังบ้าน…") ถ้าปล่อยให้กว้างตามข้อความ มันจะไปบีบ
-                      กล่องซ้ายคนละขนาด แล้วเลขในแถบ 6 ช่องของแต่ละใบไม่ตรงคอลัมน์กัน
-                      (วัดเจอจริง: แถบกว้าง 544.9–549.1px ต่างกันข้ามใบ) */}
-                  <div className="flex w-[168px] shrink-0 flex-col items-end justify-start gap-1.5">
-                    <Button variant="secondary" size="sm"
+
+                {/* ── ผลโทรในใบนี้ — บรรทัดเดียว 6 ช่องเท่าเดิม (ใบที่ยังไม่ส่งโทร = 0 ทุกช่อง ไม่หาย) ── */}
+                <LumosJobSummaryStats s={serverLumosSummary[j.id]} variant="inline" />
+
+                {/* ── ก้นการ์ด: เหลือหา + ปุ่มทำต่อ ── */}
+                <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2">
+                  <p className="text-sm text-foreground">
+                    เหลือหา <b className={cn('tabular-nums', TONE.warn.value)}>{remaining}</b>
+                    <span className={DASH.muted}> / {requested} อัตรา</span>
+                  </p>
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    <SelectionRecallButton jobId={j.id} />
+                    <Button
                       type="button"
+                      size="xs"
+                      variant="outline"
                       onClick={(e) => {
                         e.stopPropagation();
                         openJob(j);
                       }}
-                      className="w-full justify-center"
+                      className="shrink-0 rounded-lg"
                     >
-                      <Users className="shrink-0" />
-                      <span className="truncate">
-                        {matchCount != null
-                          ? `ดูคนของเรา (${matchCount})`
-                          : boardLoadingId === j.id
-                            ? 'กำลังโหลดผล…'
-                            : boardWaitingById[j.id]
-                              ? 'AI กำลังคิดที่หลังบ้าน…'
-                              : 'หาคนของเรา'}
-                      </span>
+                      <Users aria-hidden />
+                      {matchCount != null
+                        ? `ดูคนของเรา (${matchCount})`
+                        : boardLoadingId === j.id
+                          ? 'กำลังโหลดผล…'
+                          : boardWaitingById[j.id]
+                            ? 'AI กำลังคิดที่หลังบ้าน…'
+                            : 'หาคนของเรา'}
                     </Button>
-                    {/* ข้อ 4 ของงานคัดสรร (17 ส.ค. 2569): หมดรายชื่อแล้วกดหาคนจาก
-                        กองคนที่เคยตอบไม่สนใจงานอื่น — เดิมมีแต่หลังบ้าน ไม่มีปุ่ม */}
-                    <SelectionRecallButton jobId={j.id} />
                   </div>
                 </div>
-              </div>
+              </Card>
             );
           })}
           </div>

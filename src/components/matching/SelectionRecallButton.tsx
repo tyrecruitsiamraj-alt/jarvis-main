@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import React, { useState } from 'react';
 import { UserSearch } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -38,26 +39,25 @@ const SelectionRecallButton: React.FC<{
   };
 
   return (
-    <div className="flex w-full flex-col items-end gap-1">
-      <button
+    <div className="flex flex-col items-end gap-1">
+      {/* shadcn Button ขนาด xs เท่าปุ่มอื่นบนการ์ด (15 ต.ค. 2569 การ์ดกริดหน้าจับคู่งาน) */}
+      <Button
         type="button"
+        size="xs"
+        variant="outline"
         disabled={busy}
         onClick={(e) => {
           e.stopPropagation();
           void run();
         }}
         title="ค้นจากคนที่สมัครไว้แล้วแต่เคยตอบไม่สนใจงานอื่น แล้วส่ง AI โทรทันที"
-        className={cn(
-          // Wave 2.2: มือถือสูงอย่างน้อย 36px (min-h-9) แตะติดง่าย · เดสก์ท็อปเท่าเดิม
-          'inline-flex min-h-9 w-full items-center justify-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-medium disabled:opacity-50 sm:min-h-0',
-          TONE.violet.outline,
-        )}
+        className={cn('shrink-0 rounded-lg', TONE.violet.value)}
       >
-        <UserSearch className="h-3 w-3 shrink-0" />
-        <span className="truncate">{busy ? 'กำลังค้น…' : 'หาคนจากกองไม่สนใจ'}</span>
-      </button>
+        <UserSearch aria-hidden />
+        {busy ? 'กำลังค้น…' : 'หาคนจากกองไม่สนใจ'}
+      </Button>
       {result ? (
-        <p className="text-right text-[10px] leading-tight text-muted-foreground">{result}</p>
+        <p className="text-right text-xs leading-tight text-muted-foreground">{result}</p>
       ) : null}
     </div>
   );

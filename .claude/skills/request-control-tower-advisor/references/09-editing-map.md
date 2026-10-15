@@ -13267,3 +13267,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - 🔴 `RETRY_SINCE` = 15 ต.ค. 09:00 — ใบที่หลุดก่อนนั้นรอเจ้าของสั่ง ห้ามขยับเวลานี้ย้อนหลังเอง
 - 🔴 ไม่มีคีย์ push Lumos / `APPLICATION_AUTO_DISPATCH_ENABLED` ไม่ใช่ true = ไม่ทำงาน (เครื่องนักพัฒนาไม่ยิงสายจริง) · ปิดเฉพาะตัวนี้ `APPLICATION_DISPATCH_RETRY_ENABLED=false`
 - เทสต์ `tests/api/applicationDispatchRetry.test.ts`
+
+### หน้าจับคู่งาน โฉมโพสต์ประกาศ (15 ต.ค. 2569)
+- เจ้าของ: "ไม่สวยเลย ไม่เข้ากับอันอื่นๆเลย" · Choice "แบบโพสต์ประกาศ"
+- `AiCallFlowPanel` (ใช้หน้าจับคู่งานหน้าเดียว): กล่อง 16 ใบ → แถวชิป 2 แถว (ส่ง AI โทร · เก็บไปโทรเอง) · ฝั่ง AI กดดูรายชื่อได้เหมือนเดิม · ปุ่มต้นทาง+รีเฟรชชิดขวาแถวสอง · คำเตือน "ห้ามบวกรวม" ย้ายไปเป็น title ของแถว
+- `MatchingPage` ชิปกรอง 4 อัน = Button xs (default เมื่อเลือก / outline) แบบ `LaneChip` · การ์ดใบขอ = `Card` กริด `sm:grid-cols-2 lg:grid-cols-3`
+  ชื่อ/ตำแหน่ง/บรรทัดรอง = `jobBoardCardTitle` · `publicJobTitle` · `publicJobCardSubtitle` · ป้ายอายุ `getJobAgeChipInfo` (ตัวเดียวกับ `BoardJobCard`) · ถอดแถบสีซ้าย
+- ผลโทรในการ์ด `LumosJobSummaryStats variant="inline"` (6 ช่องเท่าเดิม) · `SelectionRecallButton` เป็น shadcn Button xs
+- เทสต์ `tests/api/matchingPageBoardLook.test.ts`
