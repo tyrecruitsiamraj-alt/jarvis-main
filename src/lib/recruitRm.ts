@@ -300,25 +300,16 @@ export function isInContactChip(
 }
 
 /**
- * 🔴 "โทรแล้ว" ของแท็บการติดต่อ = **เจ้าหน้าที่ลงมือแล้ว** (เจ้าของ 14 ต.ค. 2569: *"หน้านี้คือหน้าที่คนมา Action ต่อ
- * เพราะงั้นถ้ายังไม่กดโทรก็ต้องอยู่ยังไม่โทร"*) — เดิมนับเวลาที่ AI โทร (`last_call_at`) ด้วย ⇒ คนที่ AI โทรตอนสมัครผ่านลิงก์
- * พอเก็บมาก็ไปอยู่ "โทรแล้ว" ทันที
- * - กดโทร (`dialed_last_at`) **หลังเก็บรายชื่อ** — เวลาเข้าแท็บนี้ครั้งแรก = เก็บไปโทรเอง (`claimed_at`) หรือเก็บ Lead (`lead_at`)
- *   ที่มาก่อน · ไม่มีเวลาเก็บเลย = กดโทรเมื่อไรก็นับ
- * - ลงผลติดต่อแล้ว (สำเร็จ/ไม่สำเร็จ) = โทรแล้วเสมอ ห้ามโผล่ในยังไม่โทร
- * - AI โทร ไม่นับ
+ * 🔴 "โทรแล้ว" ของแท็บการติดต่อ = **ลงผลติดต่อแล้ว** (สำเร็จ หรือ ไม่สำเร็จ) เท่านั้น
+ * เจ้าของ 15 ต.ค. 2569: *"พอกดปุ่มโทร มันย้ายไปอยู่โทรแล้วเลย ไม่ได้อยากให้ย้าย ต้องการย้ายแค่ตอนลงผลว่า
+ * ติดต่อสำเร็จ หรือ ไม่สำเร็จ กดปุ่มนั้นมันแค่ Stamp เวลา หรือ ย้ายไปปุ่มโทรออกบนมือถือเท่านั้น"*
+ * - ปุ่มโทรบนแถว = บันทึกเวลากดโทร (`dialed_last_at`) + เปิดโทรออก — **ไม่ย้ายชิป**
+ * - AI โทร ไม่นับ (14 ต.ค. 2569)
+ * ⇒ โทรแล้ว = สำเร็จ + ไม่สำเร็จ · ทั้งหมด = ยังไม่โทร + โทรแล้ว
+ * (14 ต.ค. เคยนับ "กดโทรหลังเก็บรายชื่อ" ด้วย — ถอดแล้ว)
  */
-export function isContactCalledByStaff(r: {
-  dialed_last_at?: string | null;
-  last_contact_ok?: boolean | null;
-  claimed_at?: string | null;
-  lead_at?: string | null;
-}): boolean {
-  if (typeof r.last_contact_ok === 'boolean') return true;
-  const dialed = Date.parse(r.dialed_last_at ?? '');
-  if (!Number.isFinite(dialed)) return false;
-  const kept = [Date.parse(r.claimed_at ?? ''), Date.parse(r.lead_at ?? '')].filter(Number.isFinite);
-  return kept.length === 0 || dialed >= Math.min(...kept);
+export function isContactCalledByStaff(r: { last_contact_ok?: boolean | null }): boolean {
+  return typeof r.last_contact_ok === 'boolean';
 }
 
 /**
