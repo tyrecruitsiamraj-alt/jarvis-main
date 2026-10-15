@@ -8,6 +8,7 @@ import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { MapPin, ClipboardCheck, Navigation, Users, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { normalizeAppDepartmentCode } from '@/lib/departmentCodes';
 import { TONE } from '@/lib/designTokens';
 import { JOB_URGENCY_TONE } from '@/lib/jobUrgency';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -17,6 +18,7 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import { haversineKm } from '@/lib/geo';
 import { jobLatLng } from '@/lib/jobCoords';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
+import { useAuth } from '@/contexts/AuthContext';
 import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
 import { unitRequestPath } from '@/lib/jobNavigation';
 import { buildErpBranchDemandInput, parseErpBranchDemand } from '@/lib/erpBranchDemandParser';
@@ -116,6 +118,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
   });
   const [apiClients, setApiClients] = useState<ClientWorkplace[]>([]);
   const { jobs: feedJobs, loading: loadingJobs, loadError: jobsLoadError, refetch: refetchJobs } = useUnitRequestsFeed();
+  const { user } = useAuth();
   const [searching, setSearching] = useState(false);
   const [hint, setHint] = useState('');
   const [appliedCenter, setAppliedCenter] = useState<Center | null>(null);
@@ -283,7 +286,16 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
     };
   }, []);
 
-  const allJobs = feedJobs;
+  /**
+   * 🔴 เห็นเฉพาะ BU ของบัญชีตัวเอง (เจ้าของสั่ง 15 ต.ค. 2569 "หน้า Precheck ขอให้เห็นแบบ Bu ใคร Bu มันก่อน")
+   * ตรรกะเดียวกับหน้าจับคู่งาน (`loadMatchingBuScope` — ล็อก BU ตัวเองแม้เป็น admin) · บัญชีไม่ได้ตั้ง BU = เห็นทุกใบ
+   * BU ของใบขอ = `department_code` จาก ERP (SN · DS · LM · LBA · LBD)
+   */
+  const myBu = normalizeAppDepartmentCode(user?.department_code);
+  const allJobs = useMemo(
+    () => (myBu ? feedJobs.filter((j) => normalizeAppDepartmentCode(j.department_code) === myBu) : feedJobs),
+    [feedJobs, myBu],
+  );
 
   /**
    * ปิดรายละเอียด — เราเป็นคน push `?jobId=` มาเอง ⇒ **ถอยประวัติ** แทนการลบทิ้ง

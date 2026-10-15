@@ -65,3 +65,12 @@ describe('แท็บงานสรรหา', () => {
     );
   });
 });
+
+describe('Pre-Check เห็นเฉพาะ BU ของบัญชี (เจ้าของ 15 ต.ค. 2569 "Bu ใคร Bu มัน")', () => {
+  it('กรองใบขอด้วย department_code ของผู้ใช้ · ไม่มี BU = เห็นทุกใบ (แบบหน้าจับคู่งาน)', () => {
+    const src = readFileSync('src/pages/matching/PreCheckPage.tsx', 'utf8');
+    expect(src).toContain('const myBu = normalizeAppDepartmentCode(user?.department_code);');
+    expect(src).toContain('feedJobs.filter((j) => normalizeAppDepartmentCode(j.department_code) === myBu)');
+    expect(src).toContain(': feedJobs');
+  });
+});
