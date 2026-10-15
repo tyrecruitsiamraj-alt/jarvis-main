@@ -20,6 +20,7 @@ import { startClaimGuardWorker } from '../api/_lib/callChoiceWorker.ts';
 import { startFollowPushRetryWorker } from '../api/_lib/followPushRetryWorker.ts';
 import { startIrecruitReplaceSyncWorker } from '../api/_lib/irecruitReplaceSyncWorker.ts';
 import { startLumosPushRetryWorker } from '../api/_lib/lumosPushRetryWorker.ts';
+import { startApplicationDispatchRetryWorker } from '../api/_lib/applicationDispatchRetry.ts';
 import { startUnitRequestKeepWarm } from '../api/_lib/unitRequestCache.ts';
 import { preferIpv4 } from '../api/_lib/netPreferIpv4.ts';
 import { warmUnitRequestListCache } from '../api/_handlers/siamraj-unit-requests.ts';
@@ -217,6 +218,11 @@ server.listen(port, '127.0.0.1', () => {
    * LUMOS_PUSH_RETRY_ENABLED=false · เคารพช่วงห้ามโทรของนโยบายกลาง · เกิน 24 ชม. โยนให้เจ้าหน้าที่ · ไม่มีคีย์ push = ไม่ทำอะไร
    */
   startLumosPushRetryWorker();
+  /**
+   * ใบสมัครที่ส่ง AI ไม่สำเร็จตอนกรอก (อ่านรายได้ใบขอไม่ทัน) → ลองส่งใหม่ทุก 5 นาที (เจ้าของสั่ง 15 ต.ค. 2569)
+   * ไม่มีคีย์ push / ปิดส่งอัตโนมัติ = ไม่ทำอะไร · ปิดเฉพาะตัวนี้ด้วย APPLICATION_DISPATCH_RETRY_ENABLED=false
+   */
+  startApplicationDispatchRetryWorker();
   /**
    * อุ่นสำเนาใบขอไว้ก่อนหมดอายุ ระหว่างที่มีคนใช้งาน (เจ้าของ 8 ต.ค. 2569 "หน้าอื่นที่ช้าไล่แก้ให้เร็วด้วย")
    * ไม่มีคนใช้เกินครึ่งชั่วโมง = หยุดถามระบบงานหลัก · ปิดด้วย UNIT_REQUEST_KEEP_WARM_ENABLED=false

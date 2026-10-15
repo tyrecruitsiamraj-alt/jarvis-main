@@ -1,0 +1,83 @@
+import { readFileSync } from 'node:fs';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const pushCfg = vi.hoisted(() => ({ value: null as null | object }));
+vi.mock('../../api/_lib/lumosPushClient.js', () => ({ getLumosPushConfig: () => pushCfg.value }));
+const db = vi.hoisted(() => ({ calls: 0 }));
+vi.mock('../../api/_lib/postgres.js', () => ({
+  dbQuery: async () => {
+    db.calls += 1;
+    return { rows: [] };
+  },
+}));
+
+import {
+  RETRY_SINCE,
+  isApplicationDispatchRetryEnabled,
+  runApplicationDispatchRetryOnce,
+  unsentApplicationsSql,
+} from '../../api/_lib/applicationDispatchRetry';
+
+/**
+ * ใบสมัครที่ส่ง AI ไม่สำเร็จตอนกรอก → ลองส่งใหม่เอง (เจ้าของสั่ง 15 ต.ค. 2569 "ทำข้อ 1 กันไม่ให้หลุดอีก")
+ */
+describe('ตัวลองส่งใบสมัครเข้า AI ซ้ำ', () => {
+  const env = { ...process.env };
+  afterEach(() => {
+    process.env = { ...env };
+    pushCfg.value = null;
+    db.calls = 0;
+  });
+
+  it('หยิบเฉพาะใบที่ควรถูกส่งตอนกรอก — ด่านเดียวกับเส้นกรอกเสร็จ + ไม่แย่งงานคน', () => {
+    const sql = unsentApplicationsSql();
+    for (const guard of [
+      'a.job_id is not null',
+      'a.created_by_name is null',
+      "a.created_at >= $1::timestamptz",
+      "interval '3 minutes'",
+      "interval '7 days'",
+      'a.claimed_by is null',
+      'a.unclaimed_at is null',
+      'coalesce(a.is_lead, false) = false',
+      "a.call_choice in ('ai', 'auto_ai')",
+      "q.person_ref = 'app-' || a.id::text",
+      'application_cancellations',
+      'application_irecruit_dups',
+    ]) {
+      expect(sql).toContain(guard);
+    }
+  });
+
+  it('🔴 ใบที่หลุดก่อนแก้ (17 ใบ) ไม่ถูกหยิบ — เจ้าของยังไม่สั่งส่ง', () => {
+    expect(RETRY_SINCE).toBe('2026-10-15T09:00:00+07:00');
+  });
+
+  it('🔴 ไม่มีคีย์ push (เครื่องนักพัฒนา) หรือปิดส่งอัตโนมัติ = ไม่ทำอะไร ไม่แตะฐาน', async () => {
+    process.env.APPLICATION_AUTO_DISPATCH_ENABLED = 'true';
+    pushCfg.value = null;
+    expect(isApplicationDispatchRetryEnabled()).toBe(false);
+    expect(await runApplicationDispatchRetryOnce()).toMatchObject({ found: 0, queued: 0 });
+    expect(db.calls).toBe(0);
+
+    pushCfg.value = { baseUrl: 'x' };
+    process.env.APPLICATION_AUTO_DISPATCH_ENABLED = 'false';
+    expect(isApplicationDispatchRetryEnabled()).toBe(false);
+
+    process.env.APPLICATION_AUTO_DISPATCH_ENABLED = 'true';
+    expect(isApplicationDispatchRetryEnabled()).toBe(true);
+    process.env.APPLICATION_DISPATCH_RETRY_ENABLED = 'false';
+    expect(isApplicationDispatchRetryEnabled()).toBe(false);
+  });
+
+  it('เปิดแล้วแต่ไม่มีใบค้าง = อ่านฐานครั้งเดียว ไม่ส่งอะไร', async () => {
+    process.env.APPLICATION_AUTO_DISPATCH_ENABLED = 'true';
+    pushCfg.value = { baseUrl: 'x' };
+    expect(await runApplicationDispatchRetryOnce()).toMatchObject({ found: 0, queued: 0 });
+    expect(db.calls).toBe(1);
+  });
+
+  it('server เปิดตัวนี้ตอนบูต', () => {
+    expect(readFileSync('server/local-api.ts', 'utf8')).toContain('startApplicationDispatchRetryWorker();');
+  });
+});

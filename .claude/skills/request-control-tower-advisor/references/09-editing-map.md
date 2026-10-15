@@ -13259,3 +13259,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ถอด ข้อมูลผู้สรรหา · ใบขับขี่ · อำเภอ จาก 2 แท็บนี้ (`available: notRecruitTab`) — Choice "ถอดทั้ง 3"
 - 🔴 "หน่วยงาน" ยังคีย์ `job_id` (ปุ่ม "ดูรายชื่อ" จากการ์ดกล่องงานติ๊กให้) · คำบนจอ = `unit_name` (ไม่มี = ชื่องาน · หน่วยงานเดียวหลายใบขอ = ต่อเลขที่ใบขอ)
 - เทสต์ `src/lib/applicantFilters.test.ts`
+
+### ใบสมัครส่ง AI ไม่สำเร็จตอนกรอก → ลองส่งใหม่เอง (15 ต.ค. 2569)
+- ต้นเหตุ: `loadApplyScriptFacts` เพดาน 4 วิ · สำเนาใบขอเย็นโหลด ~4.25 วิ ⇒ นับว่าไม่มีรายได้ ⇒ ไม่ส่ง ไม่จดเหตุ ไม่ลองใหม่ (7–14 ต.ค. หลุด 1–11 ใบ/วัน)
+- `api/_lib/applicationDispatchRetry.ts` (worker ทุก 5 นาที · เปิดใน `server/local-api.ts`) — อุ่นสำเนาใบขอก่อน แล้วส่งผ่าน `enqueueLumosInterviewForApplications`
+  ด่าน SQL `unsentApplicationsSql`: ผูกใบขอ · ไม่มีคนคีย์ · ไม่มีคิว · ไม่ยกเลิก · ไม่ซ้ำ iRecruit · ไม่มีคนเก็บ/Lead · ไม่อยู่กองรอเลือกวิธีโทร · กรอก ≥3 นาที ≤7 วัน
+- 🔴 `RETRY_SINCE` = 15 ต.ค. 09:00 — ใบที่หลุดก่อนนั้นรอเจ้าของสั่ง ห้ามขยับเวลานี้ย้อนหลังเอง
+- 🔴 ไม่มีคีย์ push Lumos / `APPLICATION_AUTO_DISPATCH_ENABLED` ไม่ใช่ true = ไม่ทำงาน (เครื่องนักพัฒนาไม่ยิงสายจริง) · ปิดเฉพาะตัวนี้ `APPLICATION_DISPATCH_RETRY_ENABLED=false`
+- เทสต์ `tests/api/applicationDispatchRetry.test.ts`
