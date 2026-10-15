@@ -336,6 +336,11 @@ export type ApplyScriptFacts = CallScriptFacts & {
   baseSalary?: number | null;
   /** สวัสดิการแบบพูดได้ (`speakableBenefitLine`) */
   benefitLine?: string | null;
+  /**
+   * รายได้มาจาก ERP ล้วน (ทีมไม่ได้ตั้งเอง) = พูดแค่ "ฐานเงินเดือน" ไม่พูด "รายได้ประมาณ…"
+   * (เจ้าของ Choice 15 ต.ค. 2569 "ใบที่ทีมไม่ได้ตั้ง: การ์ด+AI บอกแค่ฐาน" — รายได้รวมของ ERP บวกค่าเดินทาง/โทรศัพท์ต่อวัน×30 ซึ่งไม่ตรงของจริง)
+   */
+  baseOnly?: boolean;
 };
 
 /** เลขฐานเงินเดือนที่พูดได้ — ไม่รู้ หรือเท่ารายได้ที่พูด (ไม่มีเงินอื่น) = ไม่พูด ไม่ให้ AI พูดเลขเดิมสองรอบ */
@@ -379,8 +384,14 @@ function applyValues(f: ApplyScriptFacts): ScriptValues {
     พื้นที่ทำงาน: orDrop(f.workArea) ?? orDrop(f.placeForTravel) ?? orDrop(f.unit),
     ช่วงอายุ: ageRange,
     ไม่มีช่วงอายุ: flag(!ageRange),
-    รายได้ต่อเดือน: Number.isFinite(income) && income > 0 ? Math.round(income).toLocaleString('th-TH') : undefined,
-    ฐานเงินเดือน: speakableBaseSalary(f.baseSalary, f.monthlyIncome),
+    // baseOnly = ไม่พูดบรรทัด "รายได้ประมาณ" · พูดบรรทัด "ฐานเงินเดือน" แทน (ไม่ตัดทิ้งแม้เลขเท่ากัน)
+    รายได้ต่อเดือน:
+      !f.baseOnly && Number.isFinite(income) && income > 0 ? Math.round(income).toLocaleString('th-TH') : undefined,
+    ฐานเงินเดือน: f.baseOnly
+      ? Number(f.baseSalary) > 0
+        ? Math.round(Number(f.baseSalary)).toLocaleString('th-TH')
+        : undefined
+      : speakableBaseSalary(f.baseSalary, f.monthlyIncome),
     สวัสดิการ: orDrop(f.benefitLine),
   };
 }
@@ -491,10 +502,15 @@ export function buildExtraInfoSentence(input: {
   /** ฐานเงินเดือนต่อเดือน (14 ต.ค. 2569) — พูดต่อจากรายได้ · เท่ารายได้ = ไม่พูด */
   baseSalary?: number | null;
   benefitLine?: string | null;
+  /** อัตรา ERP ล้วน = พูดแค่ฐาน ไม่พูด "รายได้ประมาณ" (15 ต.ค. 2569) */
+  baseOnly?: boolean;
 }): string {
   const parts: string[] = [];
   const income = Number(input.monthlyIncome);
-  if (Number.isFinite(income) && income > 0) {
+  if (input.baseOnly && Number(input.baseSalary) > 0) {
+    const base = renderLine(T.ของแถม.ฐาน, { ฐานเงินเดือน: Math.round(Number(input.baseSalary)).toLocaleString('th-TH') });
+    if (base) parts.push(base);
+  } else if (Number.isFinite(income) && income > 0) {
     const line = renderLine(T.ของแถม.รายได้, {
       รายได้ต่อเดือน: Math.round(income).toLocaleString('th-TH'),
     });

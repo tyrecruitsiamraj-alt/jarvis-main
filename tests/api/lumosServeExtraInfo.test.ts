@@ -65,8 +65,9 @@ describe('ช่อง interview', () => {
     ]);
     const [out] = (await takePendingLumosItems('interview', 10)) as Array<{ questions: string[] }>;
     expect(out.questions).toHaveLength(2);
-    // 500/วัน × 30 = 15,000 + ค่าครองชีพ 1,000 = 16,000 (ไม่ใช่ "500 บาท")
-    expect(out.questions[1]).toContain('16,000 บาทต่อเดือน');
+    // 500/วัน × 30 = ฐาน 15,000 (ไม่ใช่ "500 บาท") · 15 ต.ค. 2569 อัตรา ERP ล้วน = บอกแค่ฐาน ไม่บอกยอดรวม 16,000
+    expect(out.questions[1]).toContain('ฐานเงินเดือน 15,000 บาท');
+    expect(out.questions[1]).not.toContain('16,000');
     expect(out.questions[1]).not.toMatch(/(^|\D)500(\D|$)/);
     // 14 ต.ค. 2569: โอทีไม่การันตีห้ามบอกตัวเงิน
     expect(out.questions[1]).toContain('มีโอที ขึ้นอยู่กับหน่วยงาน');
@@ -92,7 +93,8 @@ describe('ช่อง reminder', () => {
       },
     ]);
     const [out] = (await takePendingLumosItems('reminder', 10)) as Array<{ steps: Array<{ message: string }> }>;
-    expect(out.steps[0].message).toContain('16,000 บาทต่อเดือน');
+    expect(out.steps[0].message).toContain('ฐานเงินเดือน 15,000 บาท');
+    expect(out.steps[0].message).not.toContain('16,000');
   });
 
   it('แถว Follow (job_ref = follow) ไม่มีเลขที่ใบขอ → ไม่มีอะไรให้ถาม ERP', async () => {

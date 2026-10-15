@@ -114,15 +114,14 @@ describe('JobPublicFacts', () => {
 /** เจ้าของ 7 ต.ค. 2569: "รายได้รวมยังไม่มีบนกล่องเลย มีแค่ฐานเอง" — ฐาน · รายได้รวม แยกช่องบนการ์ด */
 describe('jobIncomeLine — ฐาน · รายได้รวม (ขึ้นทั้งคู่เสมอ)', async () => {
   const { jobIncomeLine } = await import('@/lib/jobPublicFacts');
-  it('ERP: ฐาน + รายได้รวม (รวมมากกว่าฐาน) · รวมเท่าฐาน = ไม่ขึ้นซ้ำ', () => {
+  it('🔴 ERP ล้วน (ทีมไม่ได้ตั้ง) = ฐานอย่างเดียว (เจ้าของ Choice 15 ต.ค. 2569) · ไม่รู้ฐาน = ยอดรวมเดิม', () => {
     expect(jobIncomeLine({ monthly_income_base: 13000, monthly_income: 17500 } as never)).toEqual({
       base: '13,000 บาท/เดือน',
-      total: '17,500 บาท/เดือน',
+      total: null,
       hint: null,
     });
-    // 7 ต.ค. รอบ 2: "ต้องโชว์ทั้ง ฐานเงินเดือน และ รายได้รวม" — เท่ากันก็ขึ้นทั้งคู่
-    expect(jobIncomeLine({ monthly_income_base: 13000, monthly_income: 13000 } as never)?.total).toBe('13,000 บาท/เดือน');
-    expect(jobIncomeLine({ monthly_income_base: 13000 } as never)).toEqual({ base: '13,000 บาท/เดือน', total: '13,000 บาท/เดือน', hint: null });
+    expect(jobIncomeLine({ monthly_income_base: 13000 } as never)).toEqual({ base: '13,000 บาท/เดือน', total: null, hint: null });
+    expect(jobIncomeLine({ monthly_income: 17500 } as never)?.total).toBe('17,500 บาท/เดือน');
     // ยอดเดี่ยวที่ทีมตั้งต่ำกว่าฐาน (ค่าแรงรายวันใส่ผิดช่อง · LMO6801013) = ไม่โชว์ "รายได้รวม 400 บาท/เดือน"
     const wrong = jobIncomeLine({ field_overrides: { total_income: 400 }, monthly_income_base: 11700, monthly_income: 11700 } as never);
     expect(wrong?.total).toBe('11,700 บาท/เดือน');
@@ -138,11 +137,16 @@ describe('jobIncomeLine — ฐาน · รายได้รวม (ขึ้�
     const daily = { income_display: { period: 'daily', lines: [{ label: 'ค่าแรง', amount: 400 }], total: 400 }, monthly_income_base: 12000 };
     expect(jobIncomeLine(daily as never)?.base).toBeNull();
   });
-  it('การ์ดขึ้นทั้งสองช่อง', () => {
+  it('การ์ด ERP ล้วนขึ้นแค่ฐาน · ทีมตั้งเองขึ้นทั้งสองช่อง', () => {
     render(<JobPublicFacts job={{ ...JOB, monthly_income_base: 13000, monthly_income: 17500 } as never} />);
     const t = screen.getByTestId('job-public-facts').textContent ?? '';
     expect(t).toContain('ฐานเงินเดือน 13,000 บาท/เดือน');
-    expect(t).toContain('รายได้รวม 17,500 บาท/เดือน');
+    expect(t).not.toContain('รายได้รวม 17,500');
+    cleanup();
+    const team = { ...JOB, income_display: { period: 'monthly', lines: [{ label: 'ฐานเงินเดือน', amount: 13000 }, { label: 'ค่าตำแหน่ง', amount: 3000 }], total: 16000 } };
+    render(<JobPublicFacts job={team as never} />);
+    const t2 = screen.getByTestId('job-public-facts').textContent ?? '';
+    expect(t2).toContain('รายได้รวม 16,000 บาท/เดือน');
   });
 });
 

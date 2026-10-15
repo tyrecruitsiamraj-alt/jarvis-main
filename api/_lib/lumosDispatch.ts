@@ -292,6 +292,7 @@ export function buildApplicationInterviewPayload(
           ageRange: jobFacts?.ageRange,
           monthlyIncome: jobFacts?.monthlyIncome,
           baseSalary: jobFacts?.baseSalary,
+          baseOnly: jobFacts?.baseOnly,
           benefitLine: jobFacts?.benefitLine,
           workSchedule: jobFacts?.workSchedule,
         }),
@@ -3070,8 +3071,10 @@ export async function takePendingLumosItems(
           const rates = no ? byNo.get(no) : undefined;
           if (!rates || rates.length === 0) continue;
           const sentence = buildExtraInfoSentence({
-            monthlyIncome: monthlyGuaranteedIncome(rates).total,
+            // อัตรา ERP ล้วน = บอกแค่ฐาน (เจ้าของ Choice 15 ต.ค. 2569) — ไม่มีฐาน = ถอยไปยอดรวมเดิม
+            monthlyIncome: monthlyGuaranteedIncome(rates).base || monthlyGuaranteedIncome(rates).total,
             baseSalary: monthlyGuaranteedIncome(rates).base,
+            baseOnly: monthlyGuaranteedIncome(rates).base > 0,
             benefitLine: speakableBenefitLine(rates),
           });
           if (!sentence) continue;

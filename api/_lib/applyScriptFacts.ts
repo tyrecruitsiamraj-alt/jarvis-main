@@ -23,7 +23,7 @@ import type { JobRequest, ResignedIncomeMonth } from '../../src/types/index.js';
 import { speakableAgeRange, speakableWorkArea, speakableWorkTime, type ApplyScriptFacts } from './lumosCallScript.js';
 import { logError, logWarn } from './logger.js';
 
-export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'monthlyIncome' | 'baseSalary' | 'benefitLine' | 'workSchedule'> & {
+export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'monthlyIncome' | 'baseSalary' | 'benefitLine' | 'workSchedule' | 'baseOnly'> & {
   /**
    * ชื่อจุดทำงานจากใบขอ (work_site_name → unit_name) — 🔴 ใบสมัครหลายใบไม่ได้เก็บชื่อหน่วยงานไว้
    * เดิม AI จึงพูดว่า "งานนี้ทำที่ หน่วยงานของเรา" (เจอในบทที่ส่งจริง 5 ต.ค. 2569)
@@ -115,7 +115,14 @@ async function loadFacts(jobId: string): Promise<ApplyJobFacts> {
     const rates = (await fetchJobBenefitRates([requestNo])).get(requestNo) ?? [];
     if (rates.length > 0) {
       const erp = monthlyGuaranteedIncome(rates);
-      out.monthlyIncome = spokenMonthlyIncome(shown, manual ?? (erp.total || null), average);
+      /**
+       * 🔴 ทีมไม่ได้ตั้งรายได้เอง = บอกแค่ฐานจาก ERP (เจ้าของ Choice 15 ต.ค. 2569) — ยอดรวมของ ERP บวกค่าเดินทาง/ค่าโทรศัพท์
+       *    ต่อวัน×30 ซึ่งไม่ตรงของจริง · เลือก "เฉลี่ย" ไว้ = พูดเฉลี่ยตามเดิม · ไม่มีฐาน = ถอยไปยอดรวมเดิม
+       */
+      const erpOnly = manual === null || manual === undefined;
+      const useBaseOnly = erpOnly && erp.base > 0 && !(shown === 'average' && average !== null && average > 0);
+      out.monthlyIncome = useBaseOnly ? erp.base : spokenMonthlyIncome(shown, manual ?? (erp.total || null), average);
+      if (useBaseOnly) out.baseOnly = true;
       // ฐานเงินเดือน (14 ต.ค. 2569 "เติมฐานเงินเดือนในบทโทร AI ด้วย") — ทีมตั้ง → ERP · ตัวเดียวกับการ์ด
       out.baseSalary = manualMonthlyBase(job) ?? (erp.base || null);
       out.benefitLine = speakableBenefitLine(rates) || null;

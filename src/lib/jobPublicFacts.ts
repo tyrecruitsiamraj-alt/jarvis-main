@@ -129,9 +129,14 @@ export function jobIncomeLine(
     return { base: erpBase ? fmt(erpBase) : null, total: pub.text, hint: null };
   }
   if (erpBase || erpTotal) {
+    /**
+     * 🔴 ทีมไม่ได้ตั้งรายได้เอง = บอกแค่ฐาน (เจ้าของ Choice 15 ต.ค. 2569 "ใบที่ทีมไม่ได้ตั้ง: การ์ด+AI บอกแค่ฐาน")
+     *    ยอดรวมของ ERP บวกค่าเดินทาง/ค่าโทรศัพท์ต่อวัน×30 ซึ่งไม่ตรงของจริง · ไม่รู้ฐาน = ถอยไปยอดรวมเดิม (ไม่ปล่อยว่าง)
+     *    แทนกติกา 7 ต.ค. "ต้องโชว์ทั้งสองช่อง" เฉพาะกรณีรายได้มาจาก ERP ล้วน
+     */
     return {
       base: erpBase ? fmt(erpBase) : null,
-      total: fmt((erpTotal ?? erpBase) as number),
+      total: erpBase ? null : fmt(erpTotal as number),
       hint: null,
     };
   }

@@ -13306,3 +13306,5 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - 15 ต.ค. (ต่อ) Pre-Check ถอดช่องละติจูด/ลองจิจูดจากจอ (พิกัดยังได้จากค้นที่อยู่) · การ์ดงาน (`JobPublicFacts` · โพสต์ประกาศ + /apply) ถอด "ต้องการ (วันที่)" ทุกใบ + ถอด checkbox `required_date` ออกจาก `PUBLIC_TOGGLE_FIELDS`
 - 15 ต.ค. (ต่อ) สวัสดิการบนการ์ด (`JobPublicFacts`) = ชื่ออย่างเดียว · ยอดขึ้นเฉพาะที่ทีมตั้งในป๊อปแบบรายเดือน (`teamBenefitAmounts`) — ยอดจากอัตรา ERP ต่อวัน×30 ไม่ใช้แล้ว (Choice "โชว์ชื่อ ไม่โชว์ยอด")
   ⚠️ ยังค้าง: "รายได้รวม" ของ ERP (`monthly_income`) ยังรวมค่าเดินทาง/ค่าโทรศัพท์ (ต่อวัน×30) อยู่ — รอเจ้าของเลือก
+- 15 ต.ค. (ต่อ) รายได้ ERP ล้วน (ทีมไม่ได้ตั้งเอง) = การ์ดขึ้น "ฐานเงินเดือน" อย่างเดียว (`jobIncomeLine` total=null) · AI พูดบรรทัดฐาน ไม่พูด "รายได้ประมาณ"
+  (`ApplyScriptFacts.baseOnly` ตั้งที่ `applyScriptFacts.ts` · `buildExtraInfoSentence({baseOnly})` ทาง serve) · ทีมตั้งเอง/เลือกเฉลี่ย = ตามเดิม · เทสต์ `tests/api/incomeBaseOnly.test.ts`
