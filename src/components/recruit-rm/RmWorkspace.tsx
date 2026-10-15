@@ -66,6 +66,7 @@ import {
 } from '@/lib/recruitRm';
 import { formatYmdTh } from '@/lib/dateTh';
 import { RM_BUCKET_LABEL, isRmBucket } from '@/lib/recruitRmOverviewApi';
+import RecruitDailyPanel from '@/components/recruit-rm/RecruitDailyPanel';
 import { LEAD_VIEW_LABEL } from '@/lib/recruitLead';
 import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { canHoldApplication } from '@/lib/recruitRm';
@@ -849,6 +850,8 @@ const RmWorkspace: React.FC<{
       {/* แบบ C (เจ้าของเคาะ 5 ต.ค. 2569 · ทุกแท็บ): หัวแต่ละแท็บ = แถวชิปกรองมีตัวเลข ไม่มีกล่องตัวเลขใหญ่
           · ผู้สมัคร = มุมมองย่อย 3 อัน (URL ?list=) · การติดต่อ = ยังไม่โทร/โทรแล้ว · ติดตามนัดหมาย = มา/ไม่มา/รอผล
           · โหมด drill-down (?bucket=) ไม่มีชิป — เลขต้องเท่ากล่องที่กดมา */}
+      {/* ตัวเลขรายวัน พับได้ (เจ้าของสั่ง 15 ต.ค. 2569 · Choice "พับได้บนแท็บผู้สมัคร") — เหนือแถวชิปมุมมอง */}
+      {!bucket && tab === 'candidates' ? <RecruitDailyPanel refreshKey={refreshKey} /> : null}
       {!bucket && tab === 'candidates' ? (
         <div className="mt-3">
           <FilterChips

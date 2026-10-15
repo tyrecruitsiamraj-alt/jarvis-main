@@ -98,8 +98,9 @@ describe('ส่วน รายชื่อ → Lumos → ผลโทร — �
 });
 
 describe('แท็บ Dashboard อยู่ในสองหน้า และไม่พาออกไปหน้าอื่น', () => {
-  it('กล่องงานมีแท็บภาพรวม (30 ก.ย. 2569 เปลี่ยนชื่อจาก Dashboard) และโหลดแบบ lazy (ไม่ถ่วงหน้าสมัครสาธารณะ)', () => {
-    expect(code('src/components/jobs/JobBoardView.tsx')).toContain("{ id: 'dashboard', label: 'ภาพรวม' }");
+  it('ภาพรวมของกล่องงานยังเปิดได้ที่ ?view=dashboard (15 ต.ค. 2569 แท็บเปลี่ยนเป็น Pre-Check) และโหลดแบบ lazy (ไม่ถ่วงหน้าสมัครสาธารณะ)', () => {
+    expect(code('src/components/jobs/JobBoardView.tsx')).toContain("{ id: 'precheck', label: 'Pre-Check' }");
+    expect(code('src/pages/jobs/StaffJobBoardPage.tsx')).toContain("const EXTRA_VIEWS = ['dashboard', 'precheck'] as const;");
     const page = code('src/pages/jobs/StaffJobBoardPage.tsx');
     expect(page).toContain("lazy(() => import('@/components/dashboard-trends/BoardDashboard'))");
     expect(code('src/components/jobs/JobBoardView.tsx')).not.toContain('dashboard-trends');

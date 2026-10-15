@@ -18,6 +18,8 @@ import type { BoardPublishedTotals } from '@/lib/boardRelease';
  */
 const BoardDashboard = lazy(() => import('@/components/dashboard-trends/BoardDashboard'));
 const RecruitOverview = lazy(() => import('@/components/dashboard-trends/RecruitOverview'));
+/** แท็บ Pre-Check (15 ต.ค. 2569 แทนแท็บภาพรวม) — หน้าเดิมแบบฝัง */
+const PreCheckPage = lazy(() => import('@/pages/matching/PreCheckPage'));
 
 /**
  * บอร์ดรับสมัครฝั่งเจ้าหน้าที่ — สี่มุมมองในหน้าเดียว
@@ -39,7 +41,7 @@ const RecruitOverview = lazy(() => import('@/components/dashboard-trends/Recruit
 
 const RM_VIEWS = ['list', 'contact', 'appointments'] as const;
 /** มุมที่ไม่ใช่กล่องงานและไม่ใช่ RM — แท็บ Dashboard */
-const EXTRA_VIEWS = ['dashboard'] as const;
+const EXTRA_VIEWS = ['dashboard', 'precheck'] as const;
 
 /**
  * แท็บที่ถูกถอดออกแล้ว — ลิงก์เก่ามาถึงให้เปิดกล่องงานแทน แล้วล้าง `?view=` ทิ้ง
@@ -163,7 +165,11 @@ const StaffJobBoardPage: React.FC = () => {
           ) : null
         }
         listContent={
-          view === 'board' ? null : view === 'dashboard' ? (
+          view === 'board' ? null : view === 'precheck' ? (
+            <Suspense key={listRev} fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิด Pre-Check…</p>}>
+              <PreCheckPage embedded />
+            </Suspense>
+          ) : view === 'dashboard' ? (
             <Suspense key={listRev} fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิดภาพรวม…</p>}>
               {classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview published={boardPublished} />}
             </Suspense>

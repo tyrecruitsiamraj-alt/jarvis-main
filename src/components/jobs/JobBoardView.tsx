@@ -228,7 +228,7 @@ export type JobBoardViewProps = {
  * **กล่องบนหน้ากล่องงาน** ที่กดแล้วกรองในหน้าเดิม เหมือนกล่องอื่นทุกกล่อง
  * ลิงก์เก่า `?view=closed` / `?view=cancelled` ถูกแปลงเป็นกล่องที่ `StaffJobBoardPage`
  */
-export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'dashboard';
+export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'dashboard' | 'precheck';
 
 /**
  * แท็บระดับบอร์ด + ชื่อหัวหน้าจอ — **ชุดเดียวใช้ทั้งแถบแท็บและหัวหน้าจอ**
@@ -244,9 +244,11 @@ export const BOARD_VIEW_TABS: ReadonlyArray<{ id: BoardViewId; label: string }> 
   { id: 'list', label: 'ผู้สมัคร' },
   { id: 'contact', label: 'การติดต่อ' },
   { id: 'appointments', label: 'ติดตามนัดหมาย' },
-  // แท็บภาพรวม = มุมผู้บริหาร (28 ก.ย. 2569 ชื่อ "Dashboard" → เจ้าของเปลี่ยนเป็น "ภาพรวม" 30 ก.ย.) · `?view=dashboard` คงเดิม
-  // เนื้อมาจาก StaffJobBoardPage (lazy · ห้าม import ในไฟล์นี้ — หน้าสมัครสาธารณะใช้ไฟล์นี้ร่วม)
-  { id: 'dashboard', label: 'ภาพรวม' },
+  // 🔴 แท็บ "ภาพรวม" → "Pre-Check" (เจ้าของสั่ง 15 ต.ค. 2569 "Pre check ย้ายมาไว้แทนหน้าภาพรวม" ·
+  // แท็บ = โพสต์ประกาศ ผู้สมัคร การติดต่อ ติดตามนัดหมาย Precheck) · ภาพรวมเดิมไม่มีแท็บแล้ว แต่ยังเปิดได้ที่
+  // `?view=dashboard` (ทางถอย — แดชบอร์ดเดิมต้องใช้ได้เสมอ) · เนื้อทั้งสองมาจาก StaffJobBoardPage (lazy ·
+  // ห้าม import ในไฟล์นี้ — หน้าสมัครสาธารณะใช้ไฟล์นี้ร่วม)
+  { id: 'precheck', label: 'Pre-Check' },
   // 🔴 แท็บ "คำขอโพสต์งานใหม่" ถูกถอดทั้งแท็บ 27 ก.ย. 2569 (เจ้าของสั่ง — ทีม Online
   // ดูทีละกล่องแล้วเอาขึ้นเลย ไม่ต้องมีคิวคำขอ) · ลิงก์เก่า ?view=postings เปิดกล่องงานแทน
   // ⚠️ **ไม่มี "ปิดแล้ว"/"ยกเลิก" บนแท็บแล้ว** (เจ้าของสั่ง 19 ส.ค. 2569:

@@ -90,7 +90,11 @@ function preCheckReturnPath(jobId?: string | null): string {
     : '/matching/pre-check';
 }
 
-const PreCheckPage: React.FC = () => {
+/**
+ * `embedded` = ฝังเป็นแท็บ "Pre-Check" ในหน้างานสรรหา (เจ้าของสั่ง 15 ต.ค. 2569 "Pre check ย้ายมาไว้แทนหน้าภาพรวม")
+ * ไม่มีหัวหน้า/ขอบซ้ายขวาของตัวเอง (หน้าแม่มีแล้ว) · route /matching/pre-check ยังเปิดเต็มหน้าได้เหมือนเดิม
+ */
+const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [erpSearchQuery, setErpSearchQuery] = useState('');
@@ -703,8 +707,10 @@ const PreCheckPage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader title="Pre-Check" subtitle="พิมพ์ที่อยู่ผู้สมัครแล้วขึ้นงานใกล้สุดก่อน" backPath="/matching" />
-      <div className="px-4 md:px-6 space-y-4">
+      {embedded ? null : (
+        <PageHeader title="Pre-Check" subtitle="พิมพ์ที่อยู่ผู้สมัครแล้วขึ้นงานใกล้สุดก่อน" backPath="/matching" />
+      )}
+      <div className={cn('space-y-4', !embedded && 'px-4 md:px-6')}>
         <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,1fr] gap-4">
           <section className="glass-card rounded-3xl p-4 md:p-5 border border-white/70 space-y-4">
             <div className="flex items-center gap-2">
