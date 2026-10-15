@@ -13322,7 +13322,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 
 ### นำเข้า Excel ตามกล่อง + ส่ง AI โทรเลย · เลือกใบขอตอนส่ง AI (15 ต.ค. 2569)
 - เจ้าของ: "นำเข้าตามกล่องๆแล้วให้ Ai โทรเลย เอาแค่ชื่อ นามสกุล เบอร์โทร อายุ เพศ" + "ทุกอย่างต้องเพิ่มผ่านหน้า UI ได้ด้วย"
-- ทางเข้า: ไอคอน Excel ท้ายการ์ดใบขอ (`BoardJobCard` prop `onImport` · ไอคอนอย่างเดียวเพราะการ์ด 3 คอลัมน์แคบ)
+- ทางเข้า: ปุ่ม "นำเข้า Excel" ท้ายการ์ดใบขอ (`BoardJobCard` prop `onImport`) · 🔴 เดิมเป็นไอคอนเปล่า เจ้าของหาไม่เจอ ⇒ ปุ่มมีคำ+ขอบ แถวปุ่มแยกใต้ "ผู้สมัคร N คน" (ทุกใบเหมือนกัน การ์ดสูงเท่ากัน)
   → `JobBoardView` prop `onImportJob` (ไฟล์ใช้ร่วมหน้าสาธารณะ ห้าม import ป๊อป RM) → `StaffJobBoardPage` ถือ `importJob` + วาด `ImportApplicantsDialog job=…`
 - `ImportApplicantsDialog` prop `job` = ผูกใบนั้น + ปุ่ม "นำเข้าแล้วส่ง AI โทร N คน" · ตารางตัวอย่าง = รายชื่อที่จะโทร · ใบยังไม่ตั้งรายได้ = บอกก่อนกด (`ai_block`) · หลังบันทึกโชว์ ส่ง AI โทร N / AI ไม่โทร M + เหตุผลรายคน
 - `api/_handlers/job-applications-import.ts`: `job_id` (เช็ค BU `loadScopedJobIdSet` + ใบยังเปิด `getSiamrajUnitRequestById`) · `send_ai` → `enqueueLumosInterviewForApplications(autoPush)`

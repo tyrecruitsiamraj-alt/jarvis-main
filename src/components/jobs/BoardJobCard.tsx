@@ -139,9 +139,10 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
       ) : null}
 
       {/* ── ผู้สมัคร + ปุ่มทำต่อ — ตรึงก้นการ์ด ──
-          🔴 ปุ่มอยู่ขวาแถวเดียวกันเสมอ (ไม่ตกบรรทัด) — "ส่ง AI แล้ว x/y" อยู่บรรทัดใต้จำนวนผู้สมัคร
-          (หลังขยายตัวอักษร 27 ก.ย. 2569 ข้อความยาวขึ้น ปุ่มของบางใบตกบรรทัด การ์ดเลยสูงไม่เท่ากัน) */}
-      <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/70 pt-2">
+          🔴 15 ต.ค. 2569: ปุ่มย้ายลงแถวของตัวเอง (ทุกใบเหมือนกัน การ์ดจึงสูงเท่ากัน) — เจ้าของหาปุ่ม Excel ไม่เจอ
+          ("แต่ละกล่องไม่เห็นมีให้นำเข้าด้วย excel เลย") ตอนเป็นไอคอนเปล่า · ใส่คำแล้วแถวเดียวกับ "ผู้สมัคร N คน" ไม่พอที่จอ 3 คอลัมน์
+          "ส่ง AI แล้ว x/y" อยู่บรรทัดใต้จำนวนผู้สมัครเหมือนเดิม */}
+      <div className="mt-auto space-y-2 border-t border-border/70 pt-2">
         <div className="min-w-0">
           {applicants === null ? (
             <Skeleton className="h-5 w-28" aria-label="กำลังโหลดผู้สมัคร" />
@@ -176,15 +177,13 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
           ) : null}
         </div>
         {closed ? null : (
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex flex-wrap items-center justify-end gap-1">
             {onImport ? (
-              /* ไอคอนอย่างเดียว — การ์ด 3 คอลัมน์แคบ ใส่คำแล้ว "ผู้สมัคร N คน" ตกบรรทัด (ตรวจที่จอ 800/1024) */
               <Button
                 type="button"
-                size="iconXs"
-                variant="ghost"
+                size="xs"
+                variant="outline"
                 title="นำเข้า Excel แล้วส่ง AI โทร"
-                aria-label="นำเข้า Excel แล้วส่ง AI โทร"
                 data-testid="board-card-import"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -193,6 +192,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
                 className="rounded-lg"
               >
                 <FileSpreadsheet aria-hidden />
+                นำเข้า Excel
               </Button>
             ) : null}
             <Button

@@ -333,3 +333,15 @@ describe('POST — นำเข้าตามกล่อง + ส่ง AI โ
     expect(enqueue).not.toHaveBeenCalled();
   });
 });
+
+describe('ทางเข้าบนการ์ด (15 ต.ค. 2569 · เจ้าของ "แต่ละกล่องไม่เห็นมีให้นำเข้าด้วย excel เลย")', () => {
+  it('🔴 ปุ่มบนการ์ดมีคำ "นำเข้า Excel" + ขอบ — ไม่ใช่ไอคอนเปล่า (เคยหาไม่เจอ)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const card = readFileSync('src/components/jobs/BoardJobCard.tsx', 'utf8');
+    const btn = card.slice(card.indexOf('data-testid="board-card-import"') - 200, card.indexOf('data-testid="board-card-import"') + 400);
+    expect(btn).toContain('variant="outline"');
+    expect(btn).toContain('นำเข้า Excel');
+    expect(btn).not.toContain('iconXs');
+  });
+});
+
