@@ -74,3 +74,15 @@ describe('Pre-Check เห็นเฉพาะ BU ของบัญชี (เ
     expect(src).toContain(': feedJobs');
   });
 });
+
+it('Pre-Check ไม่มีช่องละติจูด/ลองจิจูดบนจอ (เจ้าของ 15 ต.ค. 2569)', () => {
+  const src = readFileSync('src/pages/matching/PreCheckPage.tsx', 'utf8');
+  expect(src).not.toContain('ละติจูด (ไม่บังคับ)');
+  expect(src).not.toContain('ลองจิจูด (ไม่บังคับ)');
+});
+
+it('การ์ดไม่โชว์ "ต้องการ (วันที่)" แล้ว และไม่มี checkbox วันที่ต้องการ (เจ้าของ 15 ต.ค. 2569)', () => {
+  const facts = readFileSync('src/components/jobs/JobPublicFacts.tsx', 'utf8');
+  expect(facts).not.toContain('ต้องการ {');
+  expect(readFileSync('src/lib/publicFieldVisibility.ts', 'utf8')).not.toContain("required_date: 'วันที่ต้องการ'");
+});

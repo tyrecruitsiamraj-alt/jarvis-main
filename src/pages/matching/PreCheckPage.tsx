@@ -771,16 +771,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">ละติจูด (ไม่บังคับ)</label>
-                <Input value={latText} onChange={(e) => setLatText(e.target.value)} placeholder="13.6900" className="jarvis-soft-field" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">ลองจิจูด (ไม่บังคับ)</label>
-                <Input value={lngText} onChange={(e) => setLngText(e.target.value)} placeholder="100.7501" className="jarvis-soft-field" />
-              </div>
-            </div>
+            {/* ช่องละติจูด/ลองจิจูด ถอดจากจอ (เจ้าของ 15 ต.ค. 2569 "ซ่อน ละติจูด ลองจิจูด") — พิกัดยังได้จากการค้นที่อยู่ (state เดิม) */}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Banknote, Calendar, Car, Clock, Flag, Gift, ListChecks, MapPin, UserRound, Wallet } from 'lucide-react';
+import { Banknote, Car, Clock, Flag, Gift, ListChecks, MapPin, UserRound, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
@@ -8,7 +8,6 @@ import { isOtBenefit, publicBenefitList, publicFieldVisible } from '@/lib/public
 import { incomeLinesShown, incomeShownOf } from '@/lib/incomeShown';
 import { benefitDisplayLabels, isRetiredBenefit } from '@/lib/extraBenefits';
 import { payCycleCardText, payCyclesOf } from '@/lib/payCycle';
-import { formatYmdTh } from '@/lib/dateTh';
 import { benefitWithAmount, jobAverageIncome, jobIncomeLine } from '@/lib/jobPublicFacts';
 
 const NUM = new Intl.NumberFormat('th-TH');
@@ -59,7 +58,7 @@ export default function JobPublicFacts({
   const requirements = job.requirements ?? [];
   const details = job.job_details ?? [];
   const schedule = (job.work_schedule ?? '').trim();
-  const requiredDate = publicFieldVisible(job, 'required_date') && job.required_date ? job.required_date : null;
+  // 🔴 "ต้องการ (วันที่)" ถอดจากการ์ดทุกใบ (เจ้าของ 15 ต.ค. 2569: *"อันนี้ไม่ต้องโชว์ไง ผู้สมัครจะอยากรู้ไปทำไม"*)
   const boss = publicFieldVisible(job, 'boss_nationality') ? (job.boss_nationality ?? '').trim() : '';
 
   const row = cn('flex min-w-0 items-start gap-1.5 text-sm', DASH.muted);
@@ -150,14 +149,8 @@ export default function JobPublicFacts({
           </ul>
         </div>
       ) : null}
-      {requiredDate || boss ? (
+      {boss ? (
         <p className={cn(row, 'flex-wrap gap-x-3 gap-y-0.5')}>
-          {requiredDate ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Calendar className="h-4 w-4 shrink-0" aria-hidden />
-              ต้องการ {formatYmdTh(requiredDate)}
-            </span>
-          ) : null}
           {boss ? (
             <span className="inline-flex items-center gap-1.5">
               <Flag className="h-4 w-4 shrink-0" aria-hidden />

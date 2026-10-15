@@ -325,7 +325,7 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
       const src = pv as Record<string, unknown>;
       const vis: NonNullable<UnitFieldOverrides['public_visibility']> = {};
       // เก็บเฉพาะคีย์ที่รู้จัก และเฉพาะที่เป็น false (true = ค่าเริ่ม ไม่ต้องเก็บ กันบวม)
-      for (const key of ['income', 'benefits', 'ot', 'boss_nationality', 'required_date', 'average_income'] as const) {
+      for (const key of ['income', 'benefits', 'ot', 'boss_nationality', 'average_income'] as const) {
         if (key in src && src[key] === false) vis[key] = false;
       }
       out.public_visibility = Object.keys(vis).length > 0 ? vis : null;

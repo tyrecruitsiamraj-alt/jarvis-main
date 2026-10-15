@@ -21,7 +21,7 @@ export const PUBLIC_TOGGLE_FIELDS = [
   'benefits',
   'ot',
   'boss_nationality',
-  'required_date',
+  // 'required_date' ถอดแล้ว 15 ต.ค. 2569 — การ์ดไม่โชว์วันที่ต้องการเลย (ไม่มีอะไรให้ติ๊ก)
   // รายได้เฉลี่ย = สุทธิเฉลี่ยต่อเดือนของคนเก่าในไซต์นี้ (เจ้าของ 5 ต.ค. 2569 · Choice "โชว์ ติ๊กซ่อนได้ในขั้น 3")
   'average_income',
 ] as const;
@@ -34,7 +34,6 @@ export const PUBLIC_FIELD_LABEL: Record<PublicToggleField, string> = {
   benefits: 'สวัสดิการ',
   ot: 'โอที',
   boss_nationality: 'สัญชาตินายจ้าง',
-  required_date: 'วันที่ต้องการ',
   average_income: 'รายได้เฉลี่ย',
 };
 
