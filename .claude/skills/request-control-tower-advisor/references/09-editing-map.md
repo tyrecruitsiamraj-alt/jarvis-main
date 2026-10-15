@@ -13315,7 +13315,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   iRecruit `recruit_register` RM · status A · ไม่ลบ · 30 วัน · ไม่มี `recruit_logs_call`/`recruit_contact` (คีย์ `register_id` = `recruit_register.uuid` ไม่ใช่ id)
   → `public_job_applications` source `irecruit` · created_by_name 'iRecruit' (= ใบนำเข้า ตัวส่ง AI อัตโนมัติไม่หยิบ) · ช่องทาง "iRecruit · …" · วันสมัคร = ของ iRecruit · ไม่ผูกใบขอ
   กันซ้ำ `app_irecruit_imports` (147 · PK register_uuid) · อายุนอก 15–80 = null (CHECK) · ใบขับขี่/วุฒิ ไม่ดึง
-- ~~ใบไม่ผูกใบขอ กดส่ง AI = ขึ้น "ใบไม่ผูกใบขอ — ส่งเข้าคิวโทรไม่ได้"~~ → ขั้น 2 ทำแล้ว (ดูหัวข้อถัดไป) · ขั้น 3 บททักทายทั่วไปรอเจ้าของตรวจบท
+- ~~ใบไม่ผูกใบขอ กดส่ง AI = ขึ้น "ใบไม่ผูกใบขอ — ส่งเข้าคิวโทรไม่ได้"~~ → ขั้น 2 เลือกใบขอ + ขั้น 3 บททักทายทั่วไป ทำแล้ว (ดูหัวข้อถัดไป)
 - เทสต์ `tests/api/irecruitApplicantImport.test.ts`
 - 🔴 15 ต.ค. (ต่อ) เวลาใน iRecruit = นาฬิกาไทยไม่มีโซน · driver อ่านเป็น UTC ⇒ `irecruitInstant` ลบ 7 ชม. (แบบเดียวกับ `wantWallFromSqlDate`)
   รอบแรก (308 ใบ) ไม่ได้ลบ วันสมัครเกินไป 7 ชม. — แก้ข้อมูลเฉพาะแถวใน `app_irecruit_imports` ที่ `imported_at` ก่อน deploy ตัวแก้
@@ -13333,3 +13333,19 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   `application-call-choice.ts` `choice:'ai'` + `job_id` = ผูกเฉพาะใบที่ `job_id is null` (ใบที่ผูกแล้วไม่ย้าย) · นอก BU 403 · ใบปิด 404 · audit `application.bind_job`
   ⚠️ "เก็บไปโทรเอง" ใบไม่ผูกใบขอยังกดไม่ได้ (`canHoldApplication` — ล็อกเบอร์ต้องเช็ค BU จากใบขอ · ตั้งใจ)
 - เทสต์ `tests/api/applicationImportHandler.test.ts` (ตามกล่อง 5 เคส) · `tests/api/bindJobOnSendAi2569-10-15.test.ts`
+
+### บท AI ทักทายทั่วไป — คนที่ยังไม่รู้ใบขอ (15 ต.ค. 2569)
+- เจ้าของเลือก "เอาตามร่าง" + บอกงานเดิม + ถามยืนยันจังหวัดเดิม · คำตอบ = ป้าย "บอก AI" บนแถว **ไม่เขียนทับใบ ไม่ต้องยืนยัน** (เจ้าของ: "ไม่แก้เอง ไม่ยืนยันเสียเวลาคน")
+- บท `ทักทายทั่วไป` (`lumosCallScript.templates.ts`) · คีย์แก้ได้ `greet` (`EDITABLE_SCRIPT_KEYS` + `SCRIPT_META` ใน `call-scripts.ts`) · `buildGreetingQuestions`
+  ตัวแปรใหม่ `{ตำแหน่งที่สนใจ}` (ชื่องาน iRecruit ยาวเกิน 20 ตัวอักษร = คำแรก) · `{จังหวัด}` ("จังหวัดชลบุรี" / "กรุงเทพ") + ธง `{ไม่มี…}`
+- `src/lib/greetingCall.ts`: `GREETING_JOB_REF = 'greet'` (job_ref ไม่ใช่ใบขอ แบบ `'follow'`) · `parseGreetingAnswers(transcript, asked)` · `greetingHeardText`
+  Lumos ไม่ส่งคำตอบแยกช่อง (มีแค่ outcome · summary · transcript role agent/candidate) ⇒ อ่านจากคำตอบถัดจากคำถาม · อายุเฉพาะตัวเลข 15–80 · จังหวัดต้องเป็นชื่อจริง · ตอบรับเฉย ๆ = ค่าเดิมที่ถามยืนยัน · อ่านไม่ออก = ไม่ขึ้น
+- ส่ง: ป๊อปส่ง AI ตัวเดิม (`RmWorkspace`) ตัวเลือกบนสุด "ให้ AI ทักทายถามก่อน ไม่ระบุงาน" (`GREET_OPTION`) → `chooseApplicationCall(ids,'ai','greet')`
+  → `application-call-choice` `greeting:true` → `enqueueLumosGreetingForApplications` (`lumosDispatch.ts` · `insertQueueItems('interview','greet')` · push ทันที · อายุเกินไม่ส่ง · ไม่มีด่านรายได้)
+  ใบที่ผูกใบขออยู่แล้วในชุดเดียวกัน ส่งบทใบขอตามเดิม · ป้ายบทในคิว `script_key = 'greet'` (`scriptKeyFor`)
+- ผล: ตอบไม่สนใจ (= ไม่หางานแล้ว) → `callFollowup.ts` `declinedScope 'all'` = พักเบอร์ทุกใบขอ · แจ้งเตือนใช้คำ "AI ทักทาย (ยังไม่ผูกใบขอ)" แทน "ใบขอ greet"
+  สนใจ/ไม่สนใจ/ไม่รับสาย ขึ้นชิปแท็บผู้สมัครเหมือนสายอื่น (จับด้วยเบอร์/ใบ ไม่ใช่ใบขอ)
+- ป้าย: `loadGreetingHeard` (`applicantCallOutcomes.ts`) แนบ `ai_heard` ในรายชื่อ `/api/job-applications` → `RmTable` ใต้ที่อยู่ "บอก AI: ระยอง · 38 ปี · ขับรถ" (`data-testid="ai-heard"`)
+  ช่องเลือกใบขอเรียงด้วยจังหวัด/งานที่บอก AI ก่อนค่าในใบ
+- เทสต์ `tests/api/greetingCall2569-10-15.test.ts`
+

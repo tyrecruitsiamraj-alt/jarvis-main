@@ -57,6 +57,7 @@ import {
 import {
   loadAppointmentByPhone,
   loadLatestAiAnswerByApplication,
+  loadGreetingHeard,
   loadLatestCallOutcomeByPhone,
   loadLatestCallStateByPhone,
 } from '../_lib/applicantCallOutcomes.js';
@@ -1600,6 +1601,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
       for (const item of items) {
         const hit = answers.get(item.id);
         if (hit) (item as Record<string, unknown>).ai_answer = hit;
+      }
+      // "บอก AI" จากสายทักทายทั่วไป (15 ต.ค. 2569) — ป้ายบนแถว ไม่เขียนทับใบ
+      const heard = await loadGreetingHeard(items);
+      for (const item of items) {
+        const hit = heard.get(item.id);
+        if (hit) (item as Record<string, unknown>).ai_heard = hit;
       }
       // วันนัดสัมภาษณ์ — มาได้ 2 ทาง (แท็บติดตามนัดหมายโชว์คอลัมน์นี้):
       // 1) ตกลงตอนโทร (call hold · migration 085 · คีย์เบอร์)

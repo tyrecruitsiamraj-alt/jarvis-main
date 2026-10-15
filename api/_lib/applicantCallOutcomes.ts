@@ -3,6 +3,7 @@ import { toE164Thai } from './thaiPhone.js';
 import { tableInAppSchema } from './schema.js';
 import { LATEST_AI_RESULT_LATERAL } from './applicantOverviewSql.js';
 import { INTEREST_VOCAB, classifyCallMicro, type CallMicroOutcome } from '../../src/lib/callMicroOutcome.js';
+import { GREETING_JOB_REF, parseGreetingAnswers, type GreetingHeard } from '../../src/lib/greetingCall.js';
 
 /**
  * ผลโทรล่าสุดของ "หลายเบอร์" ในคิวรีเดียว — ใช้ทำแท็บ "รายชื่อที่สนใจ" ของกล่องงาน
@@ -228,6 +229,38 @@ export async function loadLatestAiAnswerByApplication(ids: readonly string[]): P
     }
   } catch (e) {
     // ตารางคิวยังไม่ migrate = ไม่มีคำตอบให้แสดง ไม่ใช่เหตุให้ทั้งลิสต์พัง
+    if (!isPgUndefinedTable(e)) throw e;
+  }
+  return out;
+}
+
+/**
+ * "บอก AI" จากสายทักทายทั่วไป (15 ต.ค. 2569) — อ่านจากบทสนทนาสายทักทายล่าสุดที่มีผล
+ * 🔴 ไม่เขียนทับใบ (เจ้าของ: "เอาป้ายบอกว่า เขาอยู่จังหวัดนี้ ไม่แก้เอง ไม่ยืนยัน") · อ่านไม่ออก = ไม่มีป้าย
+ * `asked` = ค่าในใบที่ AI ถามยืนยัน (ตอบรับเฉย ๆ = ค่าเดิม)
+ */
+export async function loadGreetingHeard(
+  apps: ReadonlyArray<{ id: string; province?: string | null; position_interest?: string | null }>,
+): Promise<Map<string, GreetingHeard>> {
+  const out = new Map<string, GreetingHeard>();
+  const byRef = new Map(apps.filter((a) => /^[0-9a-f-]{36}$/i.test(a.id)).map((a) => [`app-${a.id}`, a]));
+  if (byRef.size === 0) return out;
+  try {
+    const { rows } = await dbQuery<{ person_ref: string; transcript: unknown }>(
+      `select distinct on (person_ref) person_ref, result->'transcript' as transcript
+         from ${tableInAppSchema('lumos_dispatch_queue')}
+        where channel = 'interview' and job_ref = $1 and person_ref = any($2::text[])
+          and jsonb_typeof(result->'transcript') = 'array'
+        order by person_ref, updated_at desc`,
+      [GREETING_JOB_REF, [...byRef.keys()]],
+    );
+    for (const r of rows) {
+      const app = byRef.get(r.person_ref);
+      if (!app) continue;
+      const heard = parseGreetingAnswers(r.transcript, { province: app.province, positionInterest: app.position_interest });
+      if (heard.province || heard.age != null || heard.job) out.set(app.id, heard);
+    }
+  } catch (e) {
     if (!isPgUndefinedTable(e)) throw e;
   }
   return out;

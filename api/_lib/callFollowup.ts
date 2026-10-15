@@ -10,6 +10,7 @@
  * ทั้งสองทางใช้ศัพท์ outcome ชุดเดียวกัน จึงเดินนโยบายเดียวกันได้
  */
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
+import { GREETING_JOB_REF } from '../../src/lib/greetingCall.js';
 import { tableInAppSchema } from './schema.js';
 import { toE164Thai } from './thaiPhone.js';
 import { notifyRoles } from './appNotifications.js';
@@ -174,7 +175,8 @@ export async function applyCallFollowupToQueueRow(input: {
     attemptCount: Number(row.attempt_count) || 1,
     now: input.now ?? new Date(),
     requestedCallbackAt: pickRequestedCallbackAt(input.result),
-    declinedScope: input.declinedScope ?? null,
+    // สายทักทายทั่วไป (15 ต.ค. 2569): คำถามเดียวที่ตัดสินคือ "ยังหางานอยู่ไหม" ⇒ ไม่สนใจ = ไม่หางานแล้ว = พักเบอร์ทุกใบขอ
+    declinedScope: input.declinedScope ?? (row.job_ref === GREETING_JOB_REF ? 'all' : null),
     // นโยบายที่เจ้าของตั้งจากหน้า Follow (migration 073) — ตารางยังไม่ migrate = ค่าเดิมในโค้ด
     policy: await getCallFollowupPolicy(),
     // ใบสมัคร: โทรซ้ำคละช่วงเวลา (เจ้าของเคาะ 29 ก.ย. 2569) · เลนอื่น = วันถัดไปเวลาเดิมตามนโยบาย
@@ -245,7 +247,11 @@ export async function applyCallFollowupToQueueRow(input: {
    */
   const isFollow = row.job_ref === 'follow';
   const link = isFollow ? '/follow' : '/jobs/board?view=list';
-  const where = isFollow ? 'ติดตามเริ่มงาน' : `ใบขอ ${row.job_ref}`;
+  const where = isFollow
+    ? 'ติดตามเริ่มงาน'
+    : row.job_ref === GREETING_JOB_REF
+      ? 'AI ทักทาย (ยังไม่ผูกใบขอ)'
+      : `ใบขอ ${row.job_ref}`;
   if (input.outcome === 'confirmed' && !isFollow) {
     await notifyRoles(['admin'], {
       type: 'call_confirmed',

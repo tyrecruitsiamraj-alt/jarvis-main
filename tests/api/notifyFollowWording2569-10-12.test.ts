@@ -16,7 +16,8 @@ describe('กระดิ่งผลโทร', () => {
   });
   it('ลิงก์ตามชนิด · ไม่มีคำ "ใบขอ follow"', () => {
     expect(src).toContain("const link = isFollow ? '/follow' : '/jobs/board?view=list';");
-    expect(src).toContain("const where = isFollow ? 'ติดตามเริ่มงาน' : `ใบขอ ${row.job_ref}`;");
+    // + สายทักทายทั่วไป (job_ref 'greet' · 15 ต.ค. 2569) ไม่พูด "ใบขอ greet"
+    expect(src).toMatch(/const where = isFollow\s*\?\s*'ติดตามเริ่มงาน'\s*:\s*row\.job_ref === GREETING_JOB_REF\s*\?\s*'AI ทักทาย \(ยังไม่ผูกใบขอ\)'\s*:\s*`ใบขอ \$\{row\.job_ref\}`;/);
     expect(src).not.toContain("body: `ใบขอ ${row.job_ref}");
   });
 });

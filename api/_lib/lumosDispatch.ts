@@ -19,6 +19,7 @@
 import { KEEP_PUSH_FAILED_SQL } from '../../src/lib/followDispatchState.js';
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { isOverAge, OVER_AGE_REASON } from '../../src/lib/applicantAge.js';
+import { GREETING_JOB_REF } from '../../src/lib/greetingCall.js';
 import { loadApplyScriptFacts, type ApplyJobFacts } from './applyScriptFacts.js';
 import { tableInAppSchema } from './schema.js';
 import { errorSummaryText, logWarn, logInfo, logError } from './logger.js';
@@ -58,6 +59,7 @@ import {
   buildOfferQuestions,
   buildApplyQuestions,
   buildAppliedQuestions,
+  buildGreetingQuestions,
   buildScreeningQuestions,
   type EditableScriptKey,
 } from './lumosCallScript.js';
@@ -451,6 +453,87 @@ export async function enqueueLumosInterviewForApplications(
   return { queued: added.length, duplicated, skipped };
 }
 
+// ─── ทักทายทั่วไป: ใบที่ไม่ผูกใบขอ (เจ้าของ 15 ต.ค. 2569) ───────────────────
+
+// job_ref 'greet' (ไม่ใช่ใบขอ · `src/lib/greetingCall.ts`) — ไม่มีรายได้/พื้นที่งานให้พูด ⇒ ไม่ผ่านด่านรายได้
+// ตอบ "ไม่หางานแล้ว" = พักเบอร์ทุกใบขอ (`callFollowup.ts`)
+export { GREETING_JOB_REF };
+
+export function buildGreetingPayload(
+  app: { id: string; full_name: string; phone: string | null; position_interest?: string | null; province?: string | null },
+  now = new Date(),
+): LumosInterviewPayload | null {
+  const phone = toE164Thai(app.phone);
+  if (!phone || !app.full_name?.trim()) return null;
+  return {
+    client_candidate_id: `${GREETING_JOB_REF}::app-${app.id}`,
+    client_interview_id: `${GREETING_JOB_REF}::app-${app.id}::interview`,
+    candidate_name: app.full_name.trim(),
+    phone,
+    position: speechText(app.position_interest || '') || 'งานที่เปิดรับ',
+    scheduled_at: now.toISOString(),
+    questions: buildGreetingQuestions({
+      candidateName: app.full_name,
+      positionInterest: app.position_interest,
+      province: app.province,
+    }),
+    type: 'phone',
+    language: 'th',
+    tone: 'professional',
+  };
+}
+
+/**
+ * ส่งบททักทายทั่วไปเข้าคิว AI (ปุ่มส่ง AI → เลือก "ให้ AI ทักทายถามก่อน") — คอขวด `insertQueueItems` ตัวเดิม
+ * (ด่านคนถือเบอร์ · เบอร์ที่พัก · ปฏิเสธ ครบ) · อายุเกิน = ไม่ส่ง
+ */
+export async function enqueueLumosGreetingForApplications(
+  applications: Array<{
+    id: string;
+    full_name: string;
+    phone: string | null;
+    position_interest?: string | null;
+    province?: string | null;
+    age?: number | null;
+  }>,
+  opts?: { autoPush?: boolean },
+): Promise<LumosDispatchOutcome> {
+  await ensureCallScriptsFresh();
+  const skipped: LumosDispatchOutcome['skipped'] = [];
+  const items: Array<{ personRef: string; payload: LumosInterviewPayload; matchRank: number | null }> = [];
+  for (const app of applications) {
+    if (isOverAge(app.age)) {
+      skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: OVER_AGE_REASON });
+      continue;
+    }
+    const payload = buildGreetingPayload(app);
+    if (!payload) {
+      skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: NO_PHONE_REASON });
+      continue;
+    }
+    items.push({ personRef: `app-${app.id}`, payload, matchRank: null });
+  }
+  await attachInterviewAdminPhone(items, null);
+  const { added, held, suppressed, declined, guarded } = await insertQueueItems('interview', GREETING_JOB_REF, items);
+  const nameByRef = new Map(applications.map((a) => [`app-${a.id}`, a.full_name]));
+  const reasons: Array<[readonly string[], string]> = [
+    [held, HELD_REASON],
+    [suppressed, SUPPRESSED_REASON],
+    [declined, DECLINED_REASON],
+    [guarded, GUARDED_REASON],
+  ];
+  for (const [refs, reason] of reasons) {
+    for (const ref of refs) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason });
+  }
+  const done = new Set([...added, ...held, ...suppressed, ...declined, ...guarded]);
+  const duplicated = items.map((i) => i.personRef).filter((ref) => !done.has(ref));
+  logInfo('lumos.dispatch.greeting', { requested: applications.length, queued: added.length, skipped: skipped.length });
+  if (opts?.autoPush && added.length > 0 && getLumosPushConfig()) {
+    void pushQueuedRows('interview', GREETING_JOB_REF, added);
+  }
+  return { queued: added.length, duplicated, skipped };
+}
+
 // ─── Enqueue (คนกดส่งเอง — ต้องรายงานผลกลับให้ผู้ใช้) ───────────────────────
 
 /**
@@ -530,7 +613,7 @@ const REVIVE_CANCELLED_ON_CONFLICT_NO_RANK = `on conflict (channel, job_ref, per
  * เปลี่ยนค่านั้นเมื่อไหร่ ต้องแก้ที่นี่ด้วย
  */
 function scriptKeyFor(channel: 'reminder' | 'interview', jobRef: string): EditableScriptKey {
-  if (channel === 'interview') return 'interview';
+  if (channel === 'interview') return jobRef === GREETING_JOB_REF ? 'greet' : 'interview';
   return jobRef === 'follow' ? 'follow' : 'offer';
 }
 

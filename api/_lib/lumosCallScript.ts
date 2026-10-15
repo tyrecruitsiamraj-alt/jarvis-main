@@ -60,6 +60,7 @@ export type EditableScriptKey =
   | 'offer'
   | 'apply'
   | 'applied'
+  | 'greet'
   | 'follow'
   | 'follow_repeat'
   | 'replace_confirm'
@@ -71,6 +72,7 @@ export const EDITABLE_SCRIPT_DEFAULTS: Record<EditableScriptKey, readonly string
   offer: T.เสนองาน,
   apply: T.สมัครผ่านลิงก์,
   applied: T.ผู้สมัครคีย์เอง,
+  greet: T.ทักทายทั่วไป,
   follow: T.ติดตาม,
   follow_repeat: T.ติดตามรอบถัดไป,
   replace_confirm: T.ส่งคนแทนคอนเฟิร์ม,
@@ -163,6 +165,11 @@ export const KNOWN_PLACEHOLDERS: readonly string[] = [
   /** ติดตามส่งคนแทน (8 ต.ค. 2569) — "พรุ่งนี้" / "วันนี้" / "วันที่ 9 ตุลาคม" · "8:00 น." */
   'วัน',
   'เวลาเข้างาน',
+  /** บททักทายทั่วไป (15 ต.ค. 2569) — งานที่เคยสนใจ (ตัดสั้นพูดได้) · "จังหวัดชลบุรี" / "กรุงเทพ" */
+  'ตำแหน่งที่สนใจ',
+  'ไม่มีตำแหน่งที่สนใจ',
+  'จังหวัด',
+  'ไม่มีจังหวัด',
 ];
 
 const PLACEHOLDER = /\{([^{}]+)\}/g;
@@ -366,6 +373,47 @@ export function buildApplyQuestions(f: ApplyScriptFacts): string[] {
  */
 export function buildAppliedQuestions(f: ApplyScriptFacts): string[] {
   return renderLines(activeScriptLines('applied'), applyValues(f));
+}
+
+// ─── บทที่ 2.3 · ทักทายทั่วไป (ไม่มีใบขอ) ────────────────────────────────────
+
+export type GreetingScriptFacts = {
+  candidateName: string;
+  /** ตำแหน่งที่เคยสนใจ (iRecruit `job_name` / ใบสมัคร) — ว่าง = ถามเปล่า */
+  positionInterest?: string | null;
+  /** จังหวัดที่มีในใบ — ว่าง/ไม่ใช่ชื่อจังหวัด = ถามเปล่า */
+  province?: string | null;
+};
+
+/**
+ * งานที่เคยสนใจแบบพูดได้ — ชื่องานใน iRecruit มักพ่วงลูกค้า+ที่อยู่
+ * ("ขับรถส่วนกลาง เอ็มจี เซลส์ (ประเทศไทย) บ้านบึง …") ⇒ ยาวเกิน 20 ตัวอักษรเอาแค่คำแรก ("ขับรถส่วนกลาง")
+ */
+export function speakablePositionInterest(raw?: string | null): string | undefined {
+  const s = clean(raw).replace(/\s+/gu, ' ');
+  if (!s) return undefined;
+  return s.length > 20 ? s.split(' ')[0] : s;
+}
+
+/** "จังหวัดชลบุรี" · กรุงเทพ = "กรุงเทพ" (ไม่พูด "จังหวัดกรุงเทพมหานคร") */
+export function speakableProvince(raw?: string | null): string | undefined {
+  const p = clean(raw).replace(/^จังหวัด/u, '').trim();
+  if (!p) return undefined;
+  return /^(กรุงเทพ|กทม)/u.test(p) ? 'กรุงเทพ' : `จังหวัด${p}`;
+}
+
+/** บททักทายทั่วไป — คนที่ยังไม่รู้ใบขอ (ข้อมูลไหนไม่มี ถามเปล่าแทน) */
+export function buildGreetingQuestions(f: GreetingScriptFacts): string[] {
+  const interest = speakablePositionInterest(f.positionInterest);
+  const province = speakableProvince(f.province);
+  return renderLines(activeScriptLines('greet'), {
+    ผู้โทร: CALLER_ORG,
+    ชื่อผู้รับ: polite(f.candidateName),
+    ตำแหน่งที่สนใจ: interest,
+    ไม่มีตำแหน่งที่สนใจ: flag(!interest),
+    จังหวัด: province,
+    ไม่มีจังหวัด: flag(!province),
+  });
 }
 
 /**

@@ -1,3 +1,4 @@
+import type { GreetingHeard } from '@/lib/greetingCall';
 import { apiFetch } from '@/lib/apiFetch';
 import type { PrepChecklist, SelectionStatus } from '@/lib/selectionProgress';
 import type { CallChoice } from '@/lib/callChoiceGuard';
@@ -109,6 +110,8 @@ export type PublicApplication = {
   cancel_reason?: string | null;
   /** เบอร์นี้สมัครใน iRecruit ภายใน 14 วัน (143 · 12 ต.ค. 2569) — AI ไม่โทรเอง ป้าย "ซ้ำ iRecruit" */
   irecruit_dup_at?: string;
+  /** สิ่งที่บอก AI ในสายทักทายทั่วไป (15 ต.ค. 2569) — ป้าย "บอก AI" บนแถว · ไม่ได้เขียนทับช่องในใบ */
+  ai_heard?: GreetingHeard;
   license_types?: string[];
   /** เจ้าหน้าที่ที่คีย์ใบนี้ — undefined = ผู้สมัครกรอกเองผ่านลิงก์ */
   created_by_name?: string;
@@ -623,15 +626,22 @@ export async function chooseApplicationCall(
   ids: string[],
   /** `release` = ปุ่ม "ลบออก" ในแท็บการติดตาม — ส่งกลับเป็นใบว่าง (ปลดจอง + ถอด Lead + คืนล็อกเบอร์ · 1 ต.ค. 2569) */
   choice: 'manual' | 'ai' | 'release',
-  /** ส่ง AI: ใบที่ยังไม่ผูกใบขอ ผูกใบนี้ก่อนส่ง (รายชื่อ iRecruit ฯลฯ · 15 ต.ค. 2569) */
-  bindJob?: { id: string; title?: string | null; unitName?: string | null } | null,
+  /**
+   * ส่ง AI ใบที่ยังไม่ผูกใบขอ (รายชื่อ iRecruit ฯลฯ · 15 ต.ค. 2569):
+   * ใบขอ = ผูกใบนี้ก่อนส่ง · `'greet'` = ส่งบททักทายทั่วไป ไม่ผูกใบขอ
+   */
+  bindJob?: { id: string; title?: string | null; unitName?: string | null } | 'greet' | null,
 ): Promise<CallChoiceOutcome> {
   const r = await apiFetch('/api/application-call-choice', {
     method: 'POST',
     body: JSON.stringify({
       ids,
       choice,
-      ...(bindJob ? { job_id: bindJob.id, job_title: bindJob.title ?? null, unit_name: bindJob.unitName ?? null } : {}),
+      ...(bindJob === 'greet'
+        ? { greeting: true }
+        : bindJob
+          ? { job_id: bindJob.id, job_title: bindJob.title ?? null, unit_name: bindJob.unitName ?? null }
+          : {}),
     }),
   });
   if (!r.ok) {

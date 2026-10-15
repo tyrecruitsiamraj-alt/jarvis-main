@@ -32,6 +32,7 @@ import {
 } from '@/lib/recruitRm';
 import type { CallHold } from '@/lib/callHoldsApi';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
+import { greetingHeardText } from '@/lib/greetingCall';
 import { callResultLabel } from '@/lib/homeCallResults';
 import { INTEREST_MICRO_TONE } from '@/lib/trends/lumosPipeline';
 import { FOLLOW_STATUS_LABEL, FOLLOW_STATUS_TONE, isFollowCallStatus } from '@/lib/followApi';
@@ -287,9 +288,19 @@ const RmTable: React.FC<{
               const { firstName, lastName } = splitApplicantName(r);
               const name = [firstName, lastName].map((s) => (s || '').trim()).filter(Boolean).join(' ');
               const address = applicationAddressLabel(r);
+              // สิ่งที่บอก AI ในสายทักทายทั่วไป (15 ต.ค. 2569) — ป้ายอย่างเดียว ไม่แก้ช่องในใบ (เจ้าของ "ไม่แก้เอง ไม่ยืนยัน")
+              const heard = greetingHeardText(r.ai_heard);
               const addressCell = (
                 <td className={cn('px-1.5 py-2', DASH.cell)} title={address || undefined}>
                   <span className="line-clamp-3 min-w-28 break-words">{dashIfEmpty(address)}</span>
+                  {heard ? (
+                    <span
+                      className={cn('mt-1 block w-fit rounded-md px-1.5 py-0.5 text-xs', TONE.info.chip)}
+                      data-testid="ai-heard"
+                    >
+                      บอก AI: {heard}
+                    </span>
+                  ) : null}
                 </td>
               );
               // ใส่ title ไว้ให้อ่านเต็มตอน hover — ข้อความยาวเกิน 2 บรรทัดถูกตัด แต่ข้อมูลไม่หาย

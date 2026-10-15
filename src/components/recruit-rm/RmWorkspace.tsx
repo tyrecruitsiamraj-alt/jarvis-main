@@ -82,6 +82,9 @@ import { buildJobKeyIndex } from '@/lib/jobKeyIndex';
 import type { JobRequest } from '@/types';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { bindJobOptions } from '@/lib/bindJobPicker';
+
+/** ค่าในช่องเลือกใบขอ = ส่งบททักทายทั่วไปแทนการผูกใบขอ */
+const GREET_OPTION = '__greet__';
 import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import {
   APPLICANT_FACET_ATTACH,
@@ -668,7 +671,11 @@ const RmWorkspace: React.FC<{
       const outcome: CallChoiceOutcome = await chooseApplicationCall(
         aiConfirmIds,
         'ai',
-        bindJob ? { id: bindJob.id, title: publicJobPositionLabel(bindJob), unitName: bindJob.unit_name } : null,
+        aiUnbound.length > 0 && bindJobId === GREET_OPTION
+          ? 'greet'
+          : bindJob
+            ? { id: bindJob.id, title: publicJobPositionLabel(bindJob), unitName: bindJob.unit_name }
+            : null,
       );
       say(summarizeCallChoice(outcome));
       setAiConfirmIds(null);
@@ -695,8 +702,17 @@ const RmWorkspace: React.FC<{
   );
   const bindGroups = useMemo(() => {
     if (aiUnbound.length === 0) return [];
-    const { both, province, others } = bindJobOptions(jobs ?? [], aiUnbound);
+    // จังหวัด/งานที่บอก AI ในสายทักทาย (ถ้ามี) ใช้เรียงก่อนค่าในใบ — ใบไม่ถูกแก้ แต่ของที่เพิ่งบอกใหม่กว่า
+    const { both, province, others } = bindJobOptions(
+      jobs ?? [],
+      aiUnbound.map((r) => ({
+        province: r.ai_heard?.province ?? r.province,
+        position_interest: r.ai_heard?.job ?? r.position_interest,
+      })),
+    );
     return [
+      // บททักทายทั่วไป (15 ต.ค. 2569) — ยังไม่รู้จะผูกใบขอไหน
+      { heading: 'ยังไม่รู้ใบขอ', options: [{ value: GREET_OPTION, label: 'ให้ AI ทักทายถามก่อน ไม่ระบุงาน', keywords: 'ทักทาย' }] },
       { heading: 'ตรงจังหวัดและตำแหน่ง', options: both },
       { heading: 'ตรงจังหวัด', options: province },
       { heading: 'ใบขออื่น', options: others },
@@ -1373,8 +1389,8 @@ const RmWorkspace: React.FC<{
             <div className="space-y-1.5" data-testid="ai-bind-job">
               <p className="text-sm font-medium text-foreground">
                 {aiUnbound.length === aiConfirmNames.length
-                  ? 'ยังไม่มีใบขอ เลือกใบขอให้ AI ใช้ตอนโทร'
-                  : `${aiUnbound.length} คนยังไม่มีใบขอ เลือกใบขอให้ AI ใช้ตอนโทร`}
+                  ? 'ยังไม่มีใบขอ เลือกใบขอ หรือให้ AI ทักทายถามก่อน'
+                  : `${aiUnbound.length} คนยังไม่มีใบขอ เลือกใบขอ หรือให้ AI ทักทายถามก่อน`}
               </p>
               <SearchableSelect
                 value={bindJobId}

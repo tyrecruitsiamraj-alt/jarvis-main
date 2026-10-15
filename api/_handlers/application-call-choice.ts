@@ -3,6 +3,8 @@
  *
  * `job_id` (เฉพาะ `ai` · เจ้าของ 15 ต.ค. 2569) = ใบที่ยังไม่ผูกใบขอ (รายชื่อ iRecruit · นำเข้าไม่ผูกงาน) ผูกใบขอนี้ก่อนส่ง
  *   คนเลือกใบขอเองในป๊อปยืนยัน · ใบที่ผูกอยู่แล้วไม่ย้าย · ใบขอต้องอยู่ใน BU ตัวเองและยังเปิดอยู่
+ * `greeting: true` (เฉพาะ `ai` · 15 ต.ค. 2569) = ใบที่ยังไม่ผูกใบขอ ส่ง **บททักทายทั่วไป** (ยังหางานไหม · งาน · จังหวัด · อายุ)
+ *   ใบที่ผูกใบขออยู่แล้วส่งบทของใบขอตามเดิม · ไม่ผูกใบขอให้ ไม่แก้ข้อมูลในใบ
  *
  * เส้นเดียวของ **"ใครจะโทรหาคนนี้"** — ใช้สองที่ที่เจ้าของเคาะให้เป็นเรื่องเดียวกัน:
  *
@@ -44,7 +46,7 @@ import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { isApplicationInWriteScope } from '../_lib/applicationScope.js';
 import { acquireCallHold, releaseApplicationCallHolds } from '../_lib/candidateCallHolds.js';
-import { enqueueLumosInterviewForApplications } from '../_lib/lumosDispatch.js';
+import { enqueueLumosGreetingForApplications, enqueueLumosInterviewForApplications } from '../_lib/lumosDispatch.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { logError } from '../_lib/logger.js';
 import { getSiamrajUnitRequestById, loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
@@ -63,6 +65,7 @@ type Row = {
   job_title: string | null;
   unit_name: string | null;
   position_interest: string | null;
+  province?: string | null;
   claimed_by: string | null;
   claimed_by_name: string | null;
   age: number | null;
@@ -197,12 +200,14 @@ async function chooseRelease(req: AuthedReq, rows: Row[]): Promise<CallChoiceRes
 }
 
 /** ส่ง AI = ปั๊มก่อนแล้วเข้าคิวผ่านคอขวดเดิม (ด่านกันซ้ำ/กันเบอร์ที่คนถือทำงานครบ) */
-async function chooseAi(req: AuthedReq, rows: Row[]): Promise<CallChoiceResult> {
+async function chooseAi(req: AuthedReq, rows: Row[], greeting = false): Promise<CallChoiceResult> {
   const skipped: CallChoiceResult['skipped'] = [];
   const byJob = new Map<string, Row[]>();
+  const greet: Row[] = [];
   for (const r of rows) {
     if (!r.job_id?.trim()) {
-      skipped.push({ name: r.full_name, reason: 'ใบไม่ผูกใบขอ — ส่งเข้าคิวโทรไม่ได้' });
+      if (greeting && r.phone?.trim()) greet.push(r);
+      else skipped.push({ name: r.full_name, reason: r.phone?.trim() ? 'ใบไม่ผูกใบขอ — ส่งเข้าคิวโทรไม่ได้' : 'ไม่มีเบอร์โทร' });
       continue;
     }
     if (!r.phone?.trim()) {
@@ -234,6 +239,17 @@ async function chooseAi(req: AuthedReq, rows: Row[]): Promise<CallChoiceResult> 
       if (app) skipped.push({ name: app.full_name, reason: 'อยู่ในคิว AI อยู่แล้ว' });
     }
   }
+  // บททักทายทั่วไป — ใบที่ไม่ผูกใบขอ (อายุเกิน/เบอร์ใช้ไม่ได้ ตัวส่งข้ามพร้อมเหตุผลเอง)
+  if (greet.length > 0) {
+    await stampChoice(greet.filter((a) => !isOverAge(a.age)).map((a) => a.id), 'ai', req.user.email || null);
+    const outcome = await enqueueLumosGreetingForApplications(greet, { autoPush: true });
+    done += outcome.queued;
+    for (const s of outcome.skipped) skipped.push({ name: s.name, reason: s.reason });
+    for (const ref of outcome.duplicated) {
+      const app = greet.find((a) => `app-${a.id}` === ref);
+      if (app) skipped.push({ name: app.full_name, reason: 'อยู่ในคิว AI อยู่แล้ว' });
+    }
+  }
   return { choice: 'ai', done, skipped };
 }
 
@@ -258,7 +274,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     const { rows } = await dbQuery<Row>(
       `select a.id, a.full_name, a.phone, a.job_id, a.department_code,
-              a.job_title, a.unit_name, a.position_interest, a.claimed_by, a.claimed_by_name, a.age,
+              a.job_title, a.unit_name, a.position_interest, a.province, a.claimed_by, a.claimed_by_name, a.age,
               a.created_by_name
          from ${tbl} a
         where a.id = any($1::uuid[])`,
@@ -316,7 +332,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         ? await chooseManual(req, allowed)
         : choice === 'release'
           ? await chooseRelease(req, allowed)
-          : await chooseAi(req, allowed);
+          : await chooseAi(req, allowed, choice === 'ai' && raw?.greeting === true && !bindJobId);
     result.skipped = [...skippedScope, ...result.skipped];
 
     void auditFromAuthed(req, {
