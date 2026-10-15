@@ -1,5 +1,8 @@
 /**
- * POST /api/application-call-choice { ids: string[], choice: 'manual' | 'ai' | 'release' }
+ * POST /api/application-call-choice { ids: string[], choice: 'manual' | 'ai' | 'release', job_id?, job_title?, unit_name? }
+ *
+ * `job_id` (เฉพาะ `ai` · เจ้าของ 15 ต.ค. 2569) = ใบที่ยังไม่ผูกใบขอ (รายชื่อ iRecruit · นำเข้าไม่ผูกงาน) ผูกใบขอนี้ก่อนส่ง
+ *   คนเลือกใบขอเองในป๊อปยืนยัน · ใบที่ผูกอยู่แล้วไม่ย้าย · ใบขอต้องอยู่ใน BU ตัวเองและยังเปิดอยู่
  *
  * เส้นเดียวของ **"ใครจะโทรหาคนนี้"** — ใช้สองที่ที่เจ้าของเคาะให้เป็นเรื่องเดียวกัน:
  *
@@ -44,6 +47,7 @@ import { acquireCallHold, releaseApplicationCallHolds } from '../_lib/candidateC
 import { enqueueLumosInterviewForApplications } from '../_lib/lumosDispatch.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { logError } from '../_lib/logger.js';
+import { getSiamrajUnitRequestById, loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 
 const tbl = tableInAppSchema('public_job_applications');
 
@@ -271,6 +275,40 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
     if (allowed.length === 0) {
       return sendError(res, 403, 'Forbidden', 'ใบสมัครที่เลือกอยู่นอกแผนกของคุณ');
+    }
+
+    // ผูกใบขอให้ใบที่ยังไม่ผูก (ส่ง AI เท่านั้น) — DB ตัดสินด้วย `job_id is null` (ใบที่ผูกแล้วไม่ถูกย้าย)
+    const bindJobId = choice === 'ai' && typeof raw?.job_id === 'string' ? raw.job_id.trim().slice(0, 120) : '';
+    if (bindJobId && allowed.some((r) => !r.job_id?.trim())) {
+      const scopedJobIds = await loadScopedJobIdSet(req.user);
+      if (scopedJobIds && !scopedJobIds.has(bindJobId)) {
+        return sendError(res, 403, 'Forbidden', 'ใบขอนี้อยู่นอกแผนกของคุณ');
+      }
+      const job = (await getSiamrajUnitRequestById(bindJobId, { mode: 'all' })) as { unit_name?: string | null } | null;
+      if (!job) return sendError(res, 404, 'Not found', 'ไม่เจอใบขอนี้ หรือใบปิดไปแล้ว');
+      const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 200) : null);
+      const jobTitle = str(raw?.job_title);
+      const unitName = str(raw?.unit_name) ?? str(job.unit_name);
+      const { rows: bound } = await dbQuery<{ id: string }>(
+        `update ${tbl}
+            set job_id = $2, job_title = $3, unit_name = $4, updated_at = now()
+          where id = any($1::uuid[]) and job_id is null
+          returning id`,
+        [allowed.filter((r) => !r.job_id?.trim()).map((r) => r.id), bindJobId, jobTitle, unitName],
+      );
+      const boundIds = new Set(bound.map((b) => b.id));
+      for (const r of allowed) {
+        if (!boundIds.has(r.id)) continue;
+        r.job_id = bindJobId;
+        r.job_title = jobTitle;
+        r.unit_name = unitName;
+      }
+      void auditFromAuthed(req, {
+        action: 'application.bind_job',
+        entityType: 'job_application',
+        entityId: bindJobId,
+        after: { bound: boundIds.size },
+      });
     }
 
     const result =

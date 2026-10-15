@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Ban, EyeOff, StickyNote, Users } from 'lucide-react';
+import { ArrowRight, Ban, EyeOff, FileSpreadsheet, StickyNote, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -53,10 +53,12 @@ export type BoardJobCardProps = {
   onApplicants: (job: JobRequest) => void;
   /** ทีม Online ตั้ง "ไม่ปล่อย + เหตุผล" ไว้ (29 ก.ย. 2569) — ใบที่ปล่อยแล้วไม่โชว์ (เซิร์ฟเวอร์ก็ไม่รับ) */
   skip?: JobReleaseSkip | null;
+  /** ปุ่ม "Excel" = นำเข้ารายชื่อเข้าใบนี้แล้วส่ง AI โทรเลย (เจ้าของ 15 ต.ค. 2569) · ไม่ส่ง = ไม่มีปุ่ม */
+  onImport?: (job: JobRequest) => void;
 };
 
 /** "บางพลี สมุทรปราการ" — อำเภอที่ทีม Online กรอก + จังหวัด · ไม่รู้ = บอกตรง ๆ (ไม่เดาจากจังหวัดไซต์) */
-const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip }) => {
+const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip, onImport }) => {
   const age = getJobAgeChipInfo(job);
   const subtitle = publicJobCardSubtitle(job);
   const hidden = isUnitRequestWorkStatus(job.work_status) && isHiddenFromPublicByWorkStatus(job.work_status);
@@ -156,13 +158,13 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
                 e.stopPropagation();
                 onApplicants(job);
               }}
-              className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-foreground hover:text-primary hover:underline"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium text-foreground hover:text-primary hover:underline"
             >
               <Users className="h-4 w-4 shrink-0" aria-hidden />
               ผู้สมัคร {applicants.toLocaleString('th-TH')} คน
             </button>
           ) : (
-            <span className={cn('inline-flex items-center gap-1.5 text-sm', DASH.muted)}>
+            <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap text-sm', DASH.muted)}>
               <Users className="h-4 w-4 shrink-0" aria-hidden />
               ยังไม่มีผู้สมัคร
             </span>
@@ -174,19 +176,39 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
           ) : null}
         </div>
         {closed ? null : (
-          <Button
-            type="button"
-            size="xs"
-            variant="outline"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpen(job);
-            }}
-            className="shrink-0 rounded-lg"
-          >
-            {readinessActionText(readiness)}
-            <ArrowRight aria-hidden />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            {onImport ? (
+              /* ไอคอนอย่างเดียว — การ์ด 3 คอลัมน์แคบ ใส่คำแล้ว "ผู้สมัคร N คน" ตกบรรทัด (ตรวจที่จอ 800/1024) */
+              <Button
+                type="button"
+                size="iconXs"
+                variant="ghost"
+                title="นำเข้า Excel แล้วส่ง AI โทร"
+                aria-label="นำเข้า Excel แล้วส่ง AI โทร"
+                data-testid="board-card-import"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onImport(job);
+                }}
+                className="rounded-lg"
+              >
+                <FileSpreadsheet aria-hidden />
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen(job);
+              }}
+              className="rounded-lg"
+            >
+              {readinessActionText(readiness)}
+              <ArrowRight aria-hidden />
+            </Button>
+          </div>
         )}
       </div>
     </Card>

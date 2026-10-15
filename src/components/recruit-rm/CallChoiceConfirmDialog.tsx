@@ -32,6 +32,10 @@ export type CallChoiceConfirmDialogProps = {
   onConfirm: () => void;
   /** ฝังในป๊อปที่เปิดอยู่แล้ว — คืนเนื้อล้วน ไม่ห่อ AlertDialog (ห้าม Dialog ซ้อน Dialog) */
   embedded?: boolean;
+  /** ช่องเพิ่มเหนือรายชื่อ — เลือกใบขอให้ใบที่ยังไม่ผูก (15 ต.ค. 2569) */
+  extra?: React.ReactNode;
+  /** ยังกดยืนยันไม่ได้ (เช่น ยังไม่เลือกใบขอ) */
+  confirmDisabled?: boolean;
 };
 
 /** จำนวนชื่อที่โชว์ก่อนยุบ — ยาวกว่านี้ป๊อปสูงเกินจอมือถือ */
@@ -44,6 +48,8 @@ const CallChoiceConfirmDialog: React.FC<CallChoiceConfirmDialogProps> = ({
   onCancel,
   onConfirm,
   embedded = false,
+  extra = null,
+  confirmDisabled = false,
 }) => {
   const shown = names.slice(0, NAMES_SHOWN);
   const more = names.length - shown.length;
@@ -74,6 +80,7 @@ const CallChoiceConfirmDialog: React.FC<CallChoiceConfirmDialogProps> = ({
         <p className={cn('text-xs', DASH.muted)}>
           AI โทรออกจริงทันที · ข้ามคนที่เจ้าหน้าที่ถือไว้ เบอร์ที่พักไว้ และคนที่เคยปฏิเสธใบนี้
         </p>
+        {extra}
         {namesBlock}
         <div className="flex flex-wrap justify-end gap-2">
           <button
@@ -86,7 +93,7 @@ const CallChoiceConfirmDialog: React.FC<CallChoiceConfirmDialogProps> = ({
           </button>
           <button
             type="button"
-            disabled={busy || names.length === 0}
+            disabled={busy || names.length === 0 || confirmDisabled}
             onClick={onConfirm}
             className={cn(
               'inline-flex min-h-9 items-center rounded-lg px-3 text-xs font-medium disabled:opacity-50',
@@ -110,13 +117,14 @@ const CallChoiceConfirmDialog: React.FC<CallChoiceConfirmDialogProps> = ({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
+        {extra}
         {/* รายชื่อ — กล่องเลื่อนของตัวเอง ไม่ให้ป๊อปยืดจนปุ่มหลุดจอ */}
         {namesBlock}
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>ยกเลิก</AlertDialogCancel>
           <AlertDialogAction
-            disabled={busy || names.length === 0}
+            disabled={busy || names.length === 0 || confirmDisabled}
             onClick={onConfirm}
             className={TONE.primary.solid}
           >

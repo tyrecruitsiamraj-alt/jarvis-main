@@ -19,6 +19,10 @@ export type ApplicationImportResult = {
   duplicates?: ImportDuplicate[];
   /** ไฟล์ .xlsx ของรายชื่อซ้ำ (base64) — มีเมื่อมีรายชื่อซ้ำ */
   duplicatesFileBase64?: string;
+  /** นำเข้าตามกล่อง (dry run) — AI โทรใบนี้ไม่ได้เพราะอะไร · `null` = โทรได้ */
+  ai_block?: string | null;
+  /** นำเข้าตามกล่อง (บันทึกจริง) — ผลส่ง AI โทร */
+  ai?: { queued: number; skipped: Array<{ name: string; reason: string }>; error?: string };
 };
 
 async function readError(r: Response, fallback: string): Promise<string> {
@@ -86,6 +90,8 @@ export async function runApplicationImport(input: {
   responsibleName?: string | null;
   channelId?: string | null;
   channelLabel?: string | null;
+  /** นำเข้าตามกล่อง (15 ต.ค. 2569) — ทุกแถวผูกใบขอนี้ + ส่ง AI โทรเลย */
+  job?: { id: string; title?: string | null; unitName?: string | null } | null;
 }): Promise<ApplicationImportResult> {
   const r = await apiFetch('/api/job-applications-import', {
     method: 'POST',
@@ -95,6 +101,9 @@ export async function runApplicationImport(input: {
       responsible_name: input.responsibleName ?? null,
       channel_id: input.channelId ?? null,
       channel_label: input.channelLabel ?? null,
+      ...(input.job
+        ? { job_id: input.job.id, job_title: input.job.title ?? null, unit_name: input.job.unitName ?? null, send_ai: true }
+        : {}),
     }),
   });
   if (!r.ok) throw new Error(await readError(r, input.dryRun ? 'อ่านไฟล์ไม่สำเร็จ' : 'นำเข้าไม่สำเร็จ'));

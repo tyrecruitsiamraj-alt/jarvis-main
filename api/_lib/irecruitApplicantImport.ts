@@ -95,6 +95,21 @@ export type ImportValue = {
   created_at: string | null;
 };
 
+/**
+ * เวลาใน iRecruit = นาฬิกาไทยไม่มีโซน — driver อ่านเป็น UTC (แบบเดียวกับ `wantWallFromSqlDate`) ⇒ ต้องลบ 7 ชม.
+ * 🔴 เดิมไม่ลบ (15 ต.ค. 2569) วันสมัครของรายชื่อ iRecruit เกินเวลาจริงไป 7 ชม. (บางใบเป็นเวลาในอนาคต)
+ */
+export function irecruitInstant(v: Date | string | null | undefined): Date | null {
+  if (!v) return null;
+  const d =
+    v instanceof Date
+      ? new Date(v.getTime() - 7 * 3_600_000)
+      : /[zZ]|[+-]\d{2}:?\d{2}$/.test(v.trim())
+        ? new Date(new Date(v).getTime() - 7 * 3_600_000)
+        : new Date(`${v.trim().replace(' ', 'T')}+07:00`);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
 /** แถว iRecruit → ใบสมัคร jarvis (pure · เทสต์คุม) — ไม่มีชื่อหรือเบอร์ใช้ไม่ได้ = null */
 export function toImportValue(r: IrecruitRegisterRow): ImportValue | null {
   const phone = thaiMobile(r.phone_number);
@@ -104,7 +119,7 @@ export function toImportValue(r: IrecruitRegisterRow): ImportValue | null {
   if (!phone || !full) return null;
   const age = Number(r.age);
   const sex = (r.sex ?? '').trim().toUpperCase();
-  const created = r.created_at ? new Date(r.created_at) : null;
+  const created = irecruitInstant(r.created_at);
   const channel = clean(r.channel_name);
   return {
     full_name: full,

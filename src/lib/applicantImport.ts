@@ -125,6 +125,10 @@ export type ImportShared = {
   responsible_name?: string | null;
   channel_id?: string | null;
   channel_label?: string | null;
+  /** นำเข้าตามกล่อง (15 ต.ค. 2569) — ทุกแถวผูกใบขอนี้ · ไม่ส่ง = ใบไม่ผูกงานแบบเดิม */
+  job_id?: string | null;
+  job_title?: string | null;
+  unit_name?: string | null;
 };
 
 /**
@@ -171,6 +175,9 @@ export function planImportRows(
       responsible_name: shared.responsible_name ?? null,
       channel_id: shared.channel_id ?? null,
       channel_label: shared.channel_label ?? null,
+      job_id: shared.job_id ?? null,
+      job_title: shared.job_title ?? null,
+      unit_name: shared.unit_name ?? null,
     });
     if ('message' in parsed) return fail(parsed.message);
 

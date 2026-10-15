@@ -3,6 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import JobBoardView, { BOARD_VIEW_TABS, type BoardViewId } from '@/components/jobs/JobBoardView';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import RmWorkspace from '@/components/recruit-rm/RmWorkspace';
+import ImportApplicantsDialog from '@/components/recruit-rm/ImportApplicantsDialog';
+import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import type { JobRequest } from '@/types';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { useClosedRequestsFeed } from '@/hooks/useClosedRequestsFeed';
@@ -116,6 +119,8 @@ const StaffJobBoardPage: React.FC = () => {
   /** ช่องข้างปุ่มวันที่ — แท็บผู้สมัครวาง "นำเข้า Excel" + "รายงาน" ที่นี่ (เจ้าของสั่ง 14 ต.ค. 2569) */
   const [headerSlot, setHeaderSlot] = useState<HTMLSpanElement | null>(null);
   const rmView = (RM_VIEWS as readonly string[]).includes(view);
+  /** ใบขอที่กดปุ่ม "Excel" บนการ์ด — นำเข้ารายชื่อเข้าใบนี้แล้วส่ง AI โทรเลย (เจ้าของ 15 ต.ค. 2569) */
+  const [importJob, setImportJob] = useState<JobRequest | null>(null);
   const setView = (next: BoardViewId) => {
     const params = new URLSearchParams(searchParams);
     if (next === 'board') params.delete('view');
@@ -156,6 +161,7 @@ const StaffJobBoardPage: React.FC = () => {
         onReloadClosed={closed.reload}
         initialBox={legacyBox}
         onPublishedTotals={setBoardPublished}
+        onImportJob={setImportJob}
         listHeaderActions={
           rmView ? (
             <>
@@ -184,6 +190,25 @@ const StaffJobBoardPage: React.FC = () => {
             />
           )
         }
+      />
+      <ImportApplicantsDialog
+        open={importJob !== null}
+        job={
+          importJob
+            ? {
+                id: importJob.id,
+                title: publicJobPositionLabel(importJob),
+                unitName: importJob.unit_name,
+                label: `${jobBoardCardTitle(importJob)} · ${publicJobPositionLabel(importJob)}`,
+              }
+            : null
+        }
+        onClose={() => setImportJob(null)}
+        // ยอดผู้สมัครบนการ์ด + แท็บผู้สมัคร ต้องเห็นคนที่เพิ่งนำเข้า
+        onSaved={() => {
+          refetch();
+          setListRev((n) => n + 1);
+        }}
       />
     </div>
   );

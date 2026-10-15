@@ -202,6 +202,11 @@ export type JobBoardViewProps = {
   /** ของแท็บ RM ที่วางข้างปุ่มรีเฟรชบนแถวหัวหน้า (ปฏิทินวันที่สมัคร · 5 ต.ค. 2569) — แท็บโพสต์ประกาศไม่ใช้ */
   listHeaderActions?: React.ReactNode;
   /**
+   * ปุ่ม "Excel" บนการ์ดใบขอ (เจ้าของ 15 ต.ค. 2569: นำเข้าตามกล่องแล้วส่ง AI โทรเลย)
+   * ป๊อปนำเข้าอยู่ที่ StaffJobBoardPage — ไฟล์นี้ใช้ร่วมกับหน้าสาธารณะ ห้ามลากโค้ด RM เข้ามา
+   */
+  onImportJob?: (job: JobRequest) => void;
+  /**
    * ชุดใบที่ปิดแล้ว/ยกเลิก (คนละ feed กับกล่องงาน) — ส่งมาจาก `StaffJobBoardPage`
    * เจ้าของสั่ง 19 ส.ค. 2569: *"ปิดแล้วกับยกเลิกในหน้ากล่องงานมันต้องกดแล้วดูได้
    * แบบกล่องอื่น ๆ สิ กดแล้วเด้งไปหน้าอื่นทำไม ทำไมไม่ทำให้มันเหมือนกัน"*
@@ -271,6 +276,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   onViewChange,
   listContent,
   listHeaderActions,
+  onImportJob,
   closedJobs,
   closedLoading = false,
   closedError = null,
@@ -1632,6 +1638,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 onOpen={setPostingJob}
                 onApplicants={openApplicantsOf}
                 skip={skipIdx.get(job.id) ?? null}
+                onImport={onImportJob}
               />
             ) : (
             <Card

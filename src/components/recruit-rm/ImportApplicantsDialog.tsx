@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, FileDown, LoaderCircle, Upload, Users } from 'lucide-react';
+import { ArrowLeft, Bot, FileDown, LoaderCircle, Upload, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +35,10 @@ import {
  *    ดาวน์โหลดเป็นไฟล์ได้) · กลับมาทำต่อได้ · ห้ามซ้อน Dialog ⇒ สลับเนื้อในป๊อปเดิม
  * 🔴 เบอร์ที่สมัครเข้ามาภายใน 14 วัน/ซ้ำในไฟล์ = ข้าม (กติกาสมัครซ้ำ · เหตุผลมาจาก API) · นำเข้าแล้ว AI ยังไม่โทร
  * 🔴 ตารางตัวอย่างอยู่เสมอ ว่าง = แถว "ยังไม่ได้เลือกไฟล์" (กติกาว่างแล้วห้ามหาย)
+ *
+ * ═══ นำเข้าตามกล่อง (เจ้าของสั่ง 15 ต.ค. 2569) ═══ — เปิดจากปุ่ม "Excel" บนการ์ดใบขอ (แท็บโพสต์ประกาศ)
+ * ส่ง `job` มา = ทุกแถวผูกใบนั้น + บันทึกแล้วส่ง AI โทรเลย · ตารางตัวอย่างคือรายชื่อที่จะโทร (กติกาปุ่มยิงสายต้องเห็นรายชื่อ)
+ * ใบยังไม่ตั้งรายได้ = บอกก่อนกดว่า AI ยังไม่โทร (นำเข้าได้ ส่งทีหลังได้)
  */
 const NO_STAFF = '__none__';
 
@@ -43,7 +47,9 @@ const ImportApplicantsDialog: React.FC<{
   onClose: () => void;
   /** บันทึกแล้ว — หน้าแม่โหลดรายชื่อใหม่ + ขึ้นข้อความ */
   onSaved: (inserted: number) => void;
-}> = ({ open, onClose, onSaved }) => {
+  /** นำเข้าตามกล่อง — ผูกใบขอนี้ + ส่ง AI โทรเลย · ไม่ส่ง = นำเข้าแบบเดิม (AI ยังไม่โทร) */
+  job?: { id: string; title?: string | null; unitName?: string | null; label?: string | null } | null;
+}> = ({ open, onClose, onSaved, job = null }) => {
   const [staff, setStaff] = useState<Array<{ id: string; name: string }>>([]);
   const [responsible, setResponsible] = useState(NO_STAFF);
   const [channel, setChannel] = useState<RecruitChannelMatch | null>(null);
@@ -78,6 +84,7 @@ const ImportApplicantsDialog: React.FC<{
     responsibleName: staff.find((u) => u.id === responsible)?.name ?? null,
     channelId: channel?.id ?? null,
     channelLabel: channel ? recruitChannelLabel(channel) : null,
+    job,
   });
 
   const pickFile = async (f: File | null) => {
@@ -129,15 +136,23 @@ const ImportApplicantsDialog: React.FC<{
   const dupes = preview?.duplicates ?? [];
   /** ต้องเลือกทั้งผู้รับผิดชอบและช่องทางก่อนนำเข้า (เจ้าของ 4 ต.ค. 2569) */
   const sharedPicked = responsible !== NO_STAFF && channel !== null;
+  const aiBlock = job && preview?.dryRun ? (preview.ai_block ?? null) : null;
+  const ai = saved ? preview?.ai : undefined;
 
   return (
     <Dialog open={open} onOpenChange={(o) => (!o && busy !== 'saving' ? onClose() : undefined)}>
       <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>นำเข้าผู้สมัครจาก Excel</DialogTitle>
-          <DialogDescription className="sr-only">
-            ดาวน์โหลดไฟล์ตัวอย่าง กรอก แล้วเลือกไฟล์เพื่อดูตัวอย่างก่อนนำเข้า
-          </DialogDescription>
+          <DialogTitle>{job ? 'นำเข้า Excel แล้วส่ง AI โทร' : 'นำเข้าผู้สมัครจาก Excel'}</DialogTitle>
+          {job ? (
+            <DialogDescription data-testid="import-job">
+              {job.label || [job.unitName, job.title].filter(Boolean).join(' · ')}
+            </DialogDescription>
+          ) : (
+            <DialogDescription className="sr-only">
+              ดาวน์โหลดไฟล์ตัวอย่าง กรอก แล้วเลือกไฟล์เพื่อดูตัวอย่างก่อนนำเข้า
+            </DialogDescription>
+          )}
         </DialogHeader>
         {showDupes ? (
           /* ═══ รายชื่อซ้ำ (เจ้าของ 4 ต.ค. 2569) — สมัครล่าสุด · สถานะล่าสุด · โหลดเป็นไฟล์ได้ · กลับไปทำต่อ ═══ */
@@ -279,10 +294,40 @@ const ImportApplicantsDialog: React.FC<{
                   ซ้ำ {dupes.length} คน
                 </Button>
               ) : null}
+              {ai ? (
+                <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums', TONE.info.chip)}>
+                  ส่ง AI โทร {ai.queued}
+                </span>
+              ) : null}
+              {ai && ai.skipped.length > 0 ? (
+                <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums', TONE.warn.chip)}>
+                  AI ไม่โทร {ai.skipped.length}
+                </span>
+              ) : null}
               {busy === 'reading' ? (
                 <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground" aria-label="กำลังอ่านไฟล์" />
               ) : null}
             </div>
+
+            {aiBlock ? (
+              <p role="status" className={cn('text-xs font-medium', TONE.warn.value)} data-testid="import-ai-block">
+                AI ยังโทรใบนี้ไม่ได้: {aiBlock}
+              </p>
+            ) : null}
+            {ai?.error ? (
+              <p role="alert" className={cn('text-xs font-medium', TONE.danger.value)}>
+                {ai.error}
+              </p>
+            ) : null}
+            {ai && ai.skipped.length > 0 ? (
+              <ul className="space-y-0.5 text-xs" data-testid="import-ai-skipped">
+                {ai.skipped.map((x, i) => (
+                  <li key={`${x.name}-${i}`} className="text-foreground">
+                    {x.name || '—'} <span className="text-muted-foreground">· {x.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
 
             <div className="overflow-x-auto rounded-xl border border-border/70">
               <table className="min-w-full border-collapse text-left" aria-label="ตัวอย่างก่อนนำเข้า">
@@ -340,8 +385,18 @@ const ImportApplicantsDialog: React.FC<{
                   title={!sharedPicked && fileBase64 ? 'เลือกผู้รับผิดชอบและช่องทางก่อน' : undefined}
                   onClick={() => void save()}
                 >
-                  {busy === 'saving' ? <LoaderCircle className="animate-spin" aria-hidden /> : <Upload aria-hidden />}
-                  {busy === 'saving' ? 'กำลังนำเข้า…' : `นำเข้า ${ready} คน`}
+                  {busy === 'saving' ? (
+                    <LoaderCircle className="animate-spin" aria-hidden />
+                  ) : job && !aiBlock ? (
+                    <Bot aria-hidden />
+                  ) : (
+                    <Upload aria-hidden />
+                  )}
+                  {busy === 'saving'
+                    ? 'กำลังนำเข้า…'
+                    : job && !aiBlock
+                      ? `นำเข้าแล้วส่ง AI โทร ${ready} คน`
+                      : `นำเข้า ${ready} คน`}
                 </Button>
               )}
             </DialogFooter>

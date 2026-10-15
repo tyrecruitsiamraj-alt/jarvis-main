@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   IRECRUIT_IMPORT_CREATED_BY,
+  irecruitInstant,
   irecruitUncalledSql,
   isIrecruitImportEnabled,
   thaiMobile,
@@ -38,9 +39,14 @@ describe('ดึงชื่อจาก iRecruit', () => {
     });
     expect(v).toMatchObject({
       full_name: 'ทดสอบ ระบบ', phone: '0812345678', age: null, gender: 'male', province: 'กรุงเทพมหานคร',
-      position_interest: 'พนักงานขับรถ', line_id: null, channel_label: 'iRecruit · Facebook', created_at: '2026-10-10T03:00:00.000Z',
+      position_interest: 'พนักงานขับรถ', line_id: null, channel_label: 'iRecruit · Facebook',
+      // 🔴 นาฬิกาไทย 03:00 ที่ driver อ่านเป็น UTC = 20:00 UTC ของวันก่อน (15 ต.ค. 2569 เดิมเกินไป 7 ชม.)
+      created_at: '2026-10-09T20:00:00.000Z',
     });
     expect(toImportValue({ uuid: 'u2', first_name: null, last_name: null, phone_number: '0812345678' } as never)).toBeNull();
+    expect(irecruitInstant(new Date('2026-10-15T16:31:46Z'))?.toISOString()).toBe('2026-10-15T09:31:46.000Z');
+    expect(irecruitInstant('2026-10-15 16:31:46')?.toISOString()).toBe('2026-10-15T09:31:46.000Z');
+    expect(irecruitInstant(null)).toBeNull();
     expect(thaiMobile('66812345678')).toBe('0812345678');
     expect(thaiMobile('021234567')).toBeNull();
   });

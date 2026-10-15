@@ -623,10 +623,16 @@ export async function chooseApplicationCall(
   ids: string[],
   /** `release` = ปุ่ม "ลบออก" ในแท็บการติดตาม — ส่งกลับเป็นใบว่าง (ปลดจอง + ถอด Lead + คืนล็อกเบอร์ · 1 ต.ค. 2569) */
   choice: 'manual' | 'ai' | 'release',
+  /** ส่ง AI: ใบที่ยังไม่ผูกใบขอ ผูกใบนี้ก่อนส่ง (รายชื่อ iRecruit ฯลฯ · 15 ต.ค. 2569) */
+  bindJob?: { id: string; title?: string | null; unitName?: string | null } | null,
 ): Promise<CallChoiceOutcome> {
   const r = await apiFetch('/api/application-call-choice', {
     method: 'POST',
-    body: JSON.stringify({ ids, choice }),
+    body: JSON.stringify({
+      ids,
+      choice,
+      ...(bindJob ? { job_id: bindJob.id, job_title: bindJob.title ?? null, unit_name: bindJob.unitName ?? null } : {}),
+    }),
   });
   if (!r.ok) {
     const body = (await r.json().catch(() => null)) as { message?: string } | null;

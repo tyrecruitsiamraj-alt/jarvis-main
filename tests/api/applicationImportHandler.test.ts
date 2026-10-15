@@ -4,7 +4,10 @@
  * 🔴 ด่าน: ไฟล์ตัวอย่างอ่านกลับได้หัวเดิม · dry run ไม่เขียนอะไร · เบอร์ที่สมัครภายใน 14 วันโชว์ว่าข้าม + วันที่ได้ ·
  *    บันทึกในธุรกรรมเดียว ล็อกเบอร์ทีละแถวเรียงตามเบอร์ (มีคนสมัครเข้ามาระหว่างดูตัวอย่าง = ข้ามแถวนั้น ที่เหลือบันทึก) ·
  *    ผู้ใช้ที่ถูกล็อก BU นำเข้าได้ ใบจำแผนกตัวเอง (11 ต.ค. 2569) · ล็อกแต่ไม่รู้แผนก = 403 ·
- *    ขาดคอลัมน์ที่ต้องมี = 400 บอกชื่อคอลัมน์ · AI ไม่ถูกเรียก
+ *    ขาดคอลัมน์ที่ต้องมี = 400 บอกชื่อคอลัมน์ · AI ไม่ถูกเรียก (นำเข้าจากแท็บผู้สมัคร)
+ * 🔴 นำเข้าตามกล่อง (15 ต.ค. 2569): `job_id` ผูกทุกแถว + `send_ai` ส่งเข้าคิว AI เส้นเดียวกับปุ่มส่ง AI ·
+ *    ใบนอก BU = 403 · ใบปิด/ไม่เจอ = 404 · ซ้ำ iRecruit ไม่ส่ง · ส่งล้ม = นำเข้ายังสำเร็จ + บอกให้ส่งเอง ·
+ *    dry run บอกล่วงหน้าเมื่อใบยังไม่ตั้งรายได้
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as XLSX from 'xlsx';
@@ -26,17 +29,33 @@ vi.mock('../../api/_lib/postgres.js', async (importOriginal) => {
   };
 });
 vi.mock('../../api/_lib/audit.js', () => ({ auditFromAuthed: (...a: unknown[]) => audit(...(a as [])) }));
+const jobById = vi.fn(async (): Promise<Record<string, unknown> | null> => ({ id: 'J1', unit_name: 'ไซต์ ก' }));
 vi.mock('../../api/_lib/siamrajUnitRequests.js', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../../api/_lib/siamrajUnitRequests.js')>();
-  return { ...mod, loadScopedJobIdSet: () => scoped() };
+  return { ...mod, loadScopedJobIdSet: () => scoped(), getSiamrajUnitRequestById: () => jobById() };
 });
 vi.mock('../../api/_lib/departmentScope.js', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../../api/_lib/departmentScope.js')>();
   return { ...mod, loadUserDepartmentScope: () => deptScope() };
 });
-vi.mock('../../api/_lib/lumosDispatch.js', () => {
-  throw new Error('นำเข้าห้ามแตะคิว AI');
-});
+const enqueue = vi.fn(async (_jobId: string, apps: Array<{ id: string }>) => ({
+  queued: apps.length,
+  duplicated: [] as string[],
+  skipped: [] as Array<{ ref: string; name: string; reason: string }>,
+}));
+vi.mock('../../api/_lib/lumosDispatch.js', () => ({
+  enqueueLumosInterviewForApplications: (...a: unknown[]) => enqueue(...(a as [string, Array<{ id: string }>])),
+  NO_INCOME_REASON: 'ใบขอยังไม่ตั้งรายได้',
+}));
+const facts = vi.fn(async (): Promise<{ loaded?: boolean; monthlyIncome?: number | null }> => ({ loaded: true, monthlyIncome: 12000 }));
+vi.mock('../../api/_lib/applyScriptFacts.js', () => ({ loadApplyScriptFacts: () => facts() }));
+const dupIds = new Set<string>();
+vi.mock('../../api/_lib/irecruitDuplicates.js', () => ({
+  splitIrecruitDuplicates: async (apps: Array<{ id: string }>) => ({
+    send: apps.filter((a) => !dupIds.has(a.id)),
+    dups: apps.filter((a) => dupIds.has(a.id)).map((app) => ({ app, dup: { irecruitId: 1, appliedAt: '' } })),
+  }),
+}));
 
 import { signAuthToken, AUTH_COOKIE_NAME } from '../../api/_lib/auth.js';
 import handler from '../../api/_handlers/job-applications-import.js';
@@ -69,6 +88,10 @@ beforeEach(() => {
   audit.mockClear();
   scoped.mockReset().mockResolvedValue(null);
   deptScope.mockReset().mockResolvedValue({ mode: 'all' });
+  enqueue.mockClear();
+  jobById.mockReset().mockResolvedValue({ id: 'J1', unit_name: 'ไซต์ ก' });
+  facts.mockReset().mockResolvedValue({ loaded: true, monthlyIncome: 12000 });
+  dupIds.clear();
 });
 
 describe('GET — ไฟล์ตัวอย่าง', () => {
@@ -166,6 +189,10 @@ describe('POST — ตัวอย่างก่อนบันทึก / บ�
     expect((insert?.[1] as unknown[])[12]).toBe('เจ้าหน้าที่ ก');
     expect((insert?.[1] as unknown[])[16]).toBe('staff@example.com');
     expect(audit.mock.calls[0][1]).toMatchObject({ action: 'job_application.import', after: { inserted: 2, skipped: 1 } });
+    // นำเข้าจากแท็บผู้สมัคร (ไม่มี job_id) — AI ยังไม่โทร ใบไม่ผูกงาน
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(body.ai).toBeUndefined();
+    expect((insert?.[1] as unknown[])[17]).toBeNull();
   });
 
   it('error อื่นตอนบันทึก ⇒ ไม่บันทึกทั้งไฟล์ (ธุรกรรมล้ม)', async () => {
@@ -213,5 +240,96 @@ describe('POST — ตัวอย่างก่อนบันทึก / บ�
     expect(status).toHaveBeenCalledWith(403);
     expect(json.mock.calls[0][0].message).toMatch(/ยังไม่ได้ตั้งแผนก/);
     expect(txQuery).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST — นำเข้าตามกล่อง + ส่ง AI โทรเลย (15 ต.ค. 2569)', () => {
+  const insertOk = () => {
+    let n = 0;
+    txQuery.mockImplementation((sql: string) => {
+      if (/^insert into/i.test(sql)) {
+        n += 1;
+        return Promise.resolve({ rows: [{ id: `new-${n}` }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+  };
+  const file = () => xlsxBase64([H, person('ก', '0811111111'), person('ข', '0822222222')]);
+  const boxBody = (extra: Record<string, unknown> = {}) => ({
+    file_base64: file(),
+    dry_run: false,
+    job_id: 'J1',
+    job_title: 'คนสวน',
+    send_ai: true,
+    ...extra,
+  });
+
+  it('🔴 ทุกแถวผูกใบขอ + ส่งเข้าคิว AI ทันที (push) ด้วยชื่อคนนำเข้า', async () => {
+    insertOk();
+    const { res, json } = mockRes();
+    await handler(req('POST', boxBody()) as never, res as never);
+    const body = json.mock.calls[0][0];
+    expect(body.inserted).toBe(2);
+    const insert = txQuery.mock.calls.find((c) => /^insert into/i.test(String(c[0])));
+    expect((insert?.[1] as unknown[]).slice(17, 20)).toEqual(['J1', 'คนสวน', 'ไซต์ ก']);
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    const [jobId, apps, opts] = enqueue.mock.calls[0] as unknown as [string, Array<Record<string, unknown>>, unknown];
+    expect(jobId).toBe('J1');
+    expect(opts).toEqual({ autoPush: true });
+    expect(apps.map((a) => [a.id, a.job_id, a.created_by_name])).toEqual([
+      ['new-1', 'J1', 'staff@example.com'],
+      ['new-2', 'J1', 'staff@example.com'],
+    ]);
+    expect(body.ai).toEqual({ queued: 2, skipped: [] });
+    expect(audit.mock.calls[0][1]).toMatchObject({ after: { job_id: 'J1', ai_queued: 2, ai_skipped: 0 } });
+  });
+
+  it('ซ้ำ iRecruit ภายใน 14 วัน = ไม่ส่ง AI (ให้คนเลือก) · บอกชื่อ + เหตุผล', async () => {
+    insertOk();
+    dupIds.add('new-2');
+    const { res, json } = mockRes();
+    await handler(req('POST', boxBody()) as never, res as never);
+    const apps = (enqueue.mock.calls[0] as unknown as [string, Array<{ id: string }>])[1];
+    expect(apps.map((a) => a.id)).toEqual(['new-1']);
+    expect(json.mock.calls[0][0].ai.skipped).toEqual([{ name: 'ข ใจดี', reason: expect.stringMatching(/iRecruit/) }]);
+  });
+
+  it('ส่ง AI ล้ม = นำเข้ายังสำเร็จ + บอกให้กดส่งเองจากแท็บผู้สมัคร', async () => {
+    insertOk();
+    enqueue.mockRejectedValueOnce(new Error('lumos down'));
+    const { res, status, json } = mockRes();
+    await handler(req('POST', boxBody()) as never, res as never);
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json.mock.calls[0][0].inserted).toBe(2);
+    expect(json.mock.calls[0][0].ai).toMatchObject({ queued: 0, error: expect.stringMatching(/แท็บผู้สมัคร/) });
+  });
+
+  it('ใบขอนอก BU = 403 · ใบปิด/ไม่เจอ = 404 — ไม่บันทึกอะไร', async () => {
+    scoped.mockResolvedValue(new Set(['J2']));
+    const a = mockRes();
+    await handler(req('POST', boxBody()) as never, a.res as never);
+    expect(a.status).toHaveBeenCalledWith(403);
+
+    scoped.mockResolvedValue(null);
+    jobById.mockResolvedValue(null);
+    const b = mockRes();
+    await handler(req('POST', boxBody()) as never, b.res as never);
+    expect(b.status).toHaveBeenCalledWith(404);
+    expect(txQuery).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it('dry run บอกล่วงหน้าเมื่อใบยังไม่ตั้งรายได้ (AI ไม่โทร) · ตั้งแล้ว = null · ไม่เขียนอะไร', async () => {
+    facts.mockResolvedValue({ loaded: true, monthlyIncome: null });
+    const a = mockRes();
+    await handler(req('POST', boxBody({ dry_run: true })) as never, a.res as never);
+    expect(a.json.mock.calls[0][0].ai_block).toBe('ใบขอยังไม่ตั้งรายได้');
+
+    facts.mockResolvedValue({ loaded: true, monthlyIncome: 15000 });
+    const b = mockRes();
+    await handler(req('POST', boxBody({ dry_run: true })) as never, b.res as never);
+    expect(b.json.mock.calls[0][0].ai_block).toBeNull();
+    expect(txQuery).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
   });
 });

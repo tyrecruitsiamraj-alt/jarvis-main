@@ -80,6 +80,9 @@ import {
 } from '@/components/jobs/BoardFilterPanel';
 import { buildJobKeyIndex } from '@/lib/jobKeyIndex';
 import type { JobRequest } from '@/types';
+import SearchableSelect from '@/components/shared/SearchableSelect';
+import { bindJobOptions } from '@/lib/bindJobPicker';
+import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import {
   APPLICANT_FACET_ATTACH,
   applicantPrimaryFacets,
@@ -646,16 +649,27 @@ const RmWorkspace: React.FC<{
    */
   const [aiConfirmIds, setAiConfirmIds] = useState<string[] | null>(null);
   const [aiSending, setAiSending] = useState(false);
+  /**
+   * ใบขอที่เลือกให้ใบที่ยังไม่ผูก (รายชื่อ iRecruit · นำเข้าไม่ผูกงาน — เจ้าของ 15 ต.ค. 2569)
+   * AI โทรได้เฉพาะใบที่มีใบขอ ⇒ ต้องเลือกก่อนถึงกดส่งได้ · ใบที่ผูกอยู่แล้วไม่ถูกย้าย (server เช็คอีกชั้น)
+   */
+  const [bindJobId, setBindJobId] = useState('');
   const askSendAi = (ids: string[]) => {
     if (ids.length === 0) return;
     say(null);
+    setBindJobId('');
     setAiConfirmIds(ids);
   };
   const confirmSendAi = async () => {
     if (!aiConfirmIds || aiSending) return;
     setAiSending(true);
     try {
-      const outcome: CallChoiceOutcome = await chooseApplicationCall(aiConfirmIds, 'ai');
+      const bindJob = aiUnbound.length > 0 ? (jobs ?? []).find((j) => j.id === bindJobId) : undefined;
+      const outcome: CallChoiceOutcome = await chooseApplicationCall(
+        aiConfirmIds,
+        'ai',
+        bindJob ? { id: bindJob.id, title: publicJobPositionLabel(bindJob), unitName: bindJob.unit_name } : null,
+      );
       say(summarizeCallChoice(outcome));
       setAiConfirmIds(null);
       setSelectedIds([]);
@@ -675,6 +689,19 @@ const RmWorkspace: React.FC<{
         .filter((n): n is string => Boolean(n)),
     [aiConfirmIds, rows],
   );
+  const aiUnbound = useMemo(
+    () => rows.filter((r) => (aiConfirmIds ?? []).includes(r.id) && !r.job_id?.trim()),
+    [aiConfirmIds, rows],
+  );
+  const bindGroups = useMemo(() => {
+    if (aiUnbound.length === 0) return [];
+    const { both, province, others } = bindJobOptions(jobs ?? [], aiUnbound);
+    return [
+      { heading: 'ตรงจังหวัดและตำแหน่ง', options: both },
+      { heading: 'ตรงจังหวัด', options: province },
+      { heading: 'ใบขออื่น', options: others },
+    ].filter((g) => g.options.length > 0);
+  }, [aiUnbound, jobs]);
 
   const onRowAction = (action: RmRowAction, row: PublicApplication) => {
     // ส่ง AI โทรทีละแถว (4 ต.ค. 2569) — ผ่านป๊อปยืนยันรายชื่อเหมือนปุ่มรวม (ยิงสายจริง)
@@ -1340,6 +1367,26 @@ const RmWorkspace: React.FC<{
         busy={aiSending}
         onCancel={() => setAiConfirmIds(null)}
         onConfirm={() => void confirmSendAi()}
+        confirmDisabled={aiUnbound.length > 0 && !bindJobId}
+        extra={
+          aiUnbound.length > 0 ? (
+            <div className="space-y-1.5" data-testid="ai-bind-job">
+              <p className="text-sm font-medium text-foreground">
+                {aiUnbound.length === aiConfirmNames.length
+                  ? 'ยังไม่มีใบขอ เลือกใบขอให้ AI ใช้ตอนโทร'
+                  : `${aiUnbound.length} คนยังไม่มีใบขอ เลือกใบขอให้ AI ใช้ตอนโทร`}
+              </p>
+              <SearchableSelect
+                value={bindJobId}
+                onChange={setBindJobId}
+                groups={bindGroups}
+                placeholder="เลือกใบขอ"
+                searchPlaceholder="ค้นหาหน่วยงาน ตำแหน่ง จังหวัด"
+                emptyText="ไม่เจอใบขอ"
+              />
+            </div>
+          ) : null
+        }
       />
 
       {/* ดูข้อมูลของแท็บผู้สมัคร = ป๊อปแบบรูป iRecruit (4 ต.ค. 2569): แท็บ 6 อัน ไม่มีขั้นตอน 3 ขั้น + ยกเลิกข้อมูลผู้สมัคร

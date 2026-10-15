@@ -13315,5 +13315,21 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   iRecruit `recruit_register` RM · status A · ไม่ลบ · 30 วัน · ไม่มี `recruit_logs_call`/`recruit_contact` (คีย์ `register_id` = `recruit_register.uuid` ไม่ใช่ id)
   → `public_job_applications` source `irecruit` · created_by_name 'iRecruit' (= ใบนำเข้า ตัวส่ง AI อัตโนมัติไม่หยิบ) · ช่องทาง "iRecruit · …" · วันสมัคร = ของ iRecruit · ไม่ผูกใบขอ
   กันซ้ำ `app_irecruit_imports` (147 · PK register_uuid) · อายุนอก 15–80 = null (CHECK) · ใบขับขี่/วุฒิ ไม่ดึง
-- ใบไม่ผูกใบขอ กดส่ง AI = ขึ้น "ใบไม่ผูกใบขอ — ส่งเข้าคิวโทรไม่ได้" (ขั้น 2 จะเพิ่มเลือกใบขอตอนส่ง · ขั้น 3 บททักทายทั่วไปรอเจ้าของตรวจบท)
+- ~~ใบไม่ผูกใบขอ กดส่ง AI = ขึ้น "ใบไม่ผูกใบขอ — ส่งเข้าคิวโทรไม่ได้"~~ → ขั้น 2 ทำแล้ว (ดูหัวข้อถัดไป) · ขั้น 3 บททักทายทั่วไปรอเจ้าของตรวจบท
 - เทสต์ `tests/api/irecruitApplicantImport.test.ts`
+- 🔴 15 ต.ค. (ต่อ) เวลาใน iRecruit = นาฬิกาไทยไม่มีโซน · driver อ่านเป็น UTC ⇒ `irecruitInstant` ลบ 7 ชม. (แบบเดียวกับ `wantWallFromSqlDate`)
+  รอบแรก (308 ใบ) ไม่ได้ลบ วันสมัครเกินไป 7 ชม. — แก้ข้อมูลเฉพาะแถวใน `app_irecruit_imports` ที่ `imported_at` ก่อน deploy ตัวแก้
+
+### นำเข้า Excel ตามกล่อง + ส่ง AI โทรเลย · เลือกใบขอตอนส่ง AI (15 ต.ค. 2569)
+- เจ้าของ: "นำเข้าตามกล่องๆแล้วให้ Ai โทรเลย เอาแค่ชื่อ นามสกุล เบอร์โทร อายุ เพศ" + "ทุกอย่างต้องเพิ่มผ่านหน้า UI ได้ด้วย"
+- ทางเข้า: ไอคอน Excel ท้ายการ์ดใบขอ (`BoardJobCard` prop `onImport` · ไอคอนอย่างเดียวเพราะการ์ด 3 คอลัมน์แคบ)
+  → `JobBoardView` prop `onImportJob` (ไฟล์ใช้ร่วมหน้าสาธารณะ ห้าม import ป๊อป RM) → `StaffJobBoardPage` ถือ `importJob` + วาด `ImportApplicantsDialog job=…`
+- `ImportApplicantsDialog` prop `job` = ผูกใบนั้น + ปุ่ม "นำเข้าแล้วส่ง AI โทร N คน" · ตารางตัวอย่าง = รายชื่อที่จะโทร · ใบยังไม่ตั้งรายได้ = บอกก่อนกด (`ai_block`) · หลังบันทึกโชว์ ส่ง AI โทร N / AI ไม่โทร M + เหตุผลรายคน
+- `api/_handlers/job-applications-import.ts`: `job_id` (เช็ค BU `loadScopedJobIdSet` + ใบยังเปิด `getSiamrajUnitRequestById`) · `send_ai` → `enqueueLumosInterviewForApplications(autoPush)`
+  ซ้ำ iRecruit 14 วัน = ไม่ส่ง (`IRECRUIT_DUP_AI_REASON`) · ส่งล้ม = นำเข้ายังสำเร็จ + `ai.error` · ไม่ส่ง `job_id` = แบบเดิม (AI ไม่โทร)
+  `ImportShared` (`applicantImport.ts`) เพิ่ม `job_id/job_title/unit_name` ผ่าน `parseStaffApplication` ตัวเดิม
+- เลือกใบขอตอนส่ง AI (ใบไม่ผูก เช่น รายชื่อ iRecruit): `CallChoiceConfirmDialog` prop `extra` + `confirmDisabled` · `RmWorkspace` ช่อง `SearchableSelect` (`data-testid="ai-bind-job"`)
+  รายการ `src/lib/bindJobPicker.ts` 3 กลุ่ม: ตรงจังหวัดและตำแหน่ง · ตรงจังหวัด · ใบขออื่น (ตรงตำแหน่งอย่างเดียวไม่นับว่าตรง — "ขับรถ" ตรงทั้งประเทศ)
+  `application-call-choice.ts` `choice:'ai'` + `job_id` = ผูกเฉพาะใบที่ `job_id is null` (ใบที่ผูกแล้วไม่ย้าย) · นอก BU 403 · ใบปิด 404 · audit `application.bind_job`
+  ⚠️ "เก็บไปโทรเอง" ใบไม่ผูกใบขอยังกดไม่ได้ (`canHoldApplication` — ล็อกเบอร์ต้องเช็ค BU จากใบขอ · ตั้งใจ)
+- เทสต์ `tests/api/applicationImportHandler.test.ts` (ตามกล่อง 5 เคส) · `tests/api/bindJobOnSendAi2569-10-15.test.ts`
