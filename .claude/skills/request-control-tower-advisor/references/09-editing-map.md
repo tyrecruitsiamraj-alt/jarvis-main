@@ -13360,4 +13360,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   Choice "ผ่านศูนย์งาน api-scraper เดิม" = `createJobPostingRequest` type content (ตัวเดียวกับหน้าจับคู่งาน · `composeJobSnapshot` ย้ายมา `jobPostingRequestsApi.ts`) · มีคำขอ content ค้าง = กดไม่ได้ บอกสถานะ
 - กล่องรายได้รวม: `IncomeShownPicker` ปุ่ม "รายได้รวม 20,000 บาท/เดือน" · "รายได้เฉลี่ย …" (ไม่มีเลข = — กดไม่ได้) · ถอด "ทั้งสอง" · ไม่เคยเลือก = รายได้รวม (`incomeShown.ts`)
 - เทสต์ `tests/api/pdpaOrderPostIncome2569-10-15.test.ts` · `applicationImportHandler.test.ts` (PDPA 2 เคส)
+- 15 ต.ค. (ต่อ) ยอดบนการ์ดไม่นับใบที่ยกเลิกข้อมูล ทุกตัว: `?counts=1` ใน `job-applications.ts` — `aiCounts` (ส่ง AI แล้ว x/y) · `countsByOrigin` · `leadCounts`
+  ผ่าน `withoutCancelled` (ตัวกรอง `application_cancellations` เดียวกับ `counts` · ยังไม่รัน 135 = นับแบบเดิม) · เทสต์ `boardAiSentCounts.test.ts`
+  (เจอตอนทดสอบนำเข้า Excel จริง: ยกเลิกใบทดสอบแล้วการ์ด KYE ยัง "ส่ง AI แล้ว 2/2")
 

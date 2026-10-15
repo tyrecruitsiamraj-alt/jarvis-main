@@ -54,3 +54,18 @@ describe('ฝั่ง client ต้องรับ aiCounts และมี def
     expect(fn.slice(0, 400)).not.toContain('if (!r.ok) return {');
   });
 });
+
+describe('🔴 ใบที่ยกเลิกข้อมูลไม่ถูกนับบนการ์ด (เจ้าของ 15 ต.ค. 2569 "ไม่นับใบที่ยกเลิกแล้ว")', () => {
+  it('ส่ง AI แล้ว x/y · แยกที่มา · Lead กรองใบยกเลิกด้วยตัวกรองเดียวกับยอดผู้สมัคร', () => {
+    const start = HANDLER.indexOf("if (getString(req.query?.counts) === '1')");
+    const end = HANDLER.indexOf('...(aiCounts ? { aiCounts } : {}),');
+    const block = HANDLER.slice(start, end);
+    expect(block).toContain('application_cancellations');
+    for (const name of ['originRows', 'leadRows', 'aiRows']) {
+      expect(block).toMatch(new RegExp(`const ${name} = await withoutCancelled<`));
+    }
+    // ทุก query ของยอดบนการ์ดต้องต่อท้ายตัวกรอง \${f}
+    expect((block.match(/\$\{f\}/g) ?? []).length).toBe(3);
+  });
+});
+

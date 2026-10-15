@@ -1404,6 +1404,20 @@ async function handler(req: AuthedReq, res: ApiRes) {
       // ฐานที่ยังไม่รัน 083 (ไม่มีคอลัมน์ is_lead) → ถอยเป็นนับทั้งหมด (42703)
       // ไม่นับใบที่ "ยกเลิกข้อมูลผู้สมัคร" (135) — เลขบนการ์ดต้องเท่ารายชื่อที่กดเข้าไปเห็น
       const NOT_CANCELLED = `and not exists (select 1 from ${tableInAppSchema('application_cancellations')} x where x.application_id = ${tbl}.id)`;
+      /**
+       * 🔴 15 ต.ค. 2569 (เจ้าของ "ไม่นับใบที่ยกเลิกแล้ว"): ยอดอื่นบนการ์ดต้องไม่นับใบที่ยกเลิกข้อมูลเหมือน `counts`
+       * เดิมกรองแค่ `counts` → ยกเลิกใบทดสอบแล้วการ์ดยัง "ส่ง AI แล้ว 2/2" (aiCounts/ที่มา/Lead นับใบที่ยกเลิกด้วย)
+       * ยังไม่รัน 135 (ไม่มีตารางยกเลิก) = นับแบบเดิม
+       */
+      const notCancelledA = `and not exists (select 1 from ${tableInAppSchema('application_cancellations')} x where x.application_id = a.id)`;
+      const withoutCancelled = async <T extends Record<string, unknown>>(sql: (f: string) => string): Promise<T[]> => {
+        try {
+          return (await dbQuery<T>(sql(notCancelledA))).rows;
+        } catch (e) {
+          if (!isUndefinedTable(e)) throw e;
+          return (await dbQuery<T>(sql(''))).rows;
+        }
+      };
       const countsSql = (leadFilter: string, cancelFilter = NOT_CANCELLED) =>
         `select job_id, count(*)::text as n from ${tbl}
           where job_id is not null ${leadFilter} ${cancelFilter} group by job_id`;
@@ -1432,10 +1446,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
        */
       let countsByOrigin: Record<string, Record<string, number>> | undefined;
       try {
-        const { rows: originRows } = await dbQuery<{ job_id: string; origin: string; n: string }>(
-          `select a.job_id, ${applicationOriginExpr('a')} as origin, count(*)::text as n
+        const originRows = await withoutCancelled<{ job_id: string; origin: string; n: string }>(
+          (f) => `select a.job_id, ${applicationOriginExpr('a')} as origin, count(*)::text as n
              from ${tbl} a
-            where a.job_id is not null and not a.is_lead
+            where a.job_id is not null and not a.is_lead ${f}
             group by a.job_id, ${applicationOriginExpr('a')}`,
         );
         countsByOrigin = {};
@@ -1460,9 +1474,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
        */
       let leadCounts: Record<string, number> | undefined;
       try {
-        const { rows: leadRows } = await dbQuery<{ job_id: string; n: string }>(
-          `select job_id, count(*)::text as n from ${tbl}
-            where job_id is not null and is_lead group by job_id`,
+        const leadRows = await withoutCancelled<{ job_id: string; n: string }>(
+          (f) => `select a.job_id, count(*)::text as n from ${tbl} a
+            where a.job_id is not null and a.is_lead ${f} group by a.job_id`,
         );
         leadCounts = {};
         for (const r of leadRows) {
@@ -1485,14 +1499,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
        */
       let aiCounts: Record<string, { sent: number; total: number }> | undefined;
       try {
-        const { rows: aiRows } = await dbQuery<{ job_id: string; total: string; sent: string }>(
-          `select a.job_id,
+        const aiRows = await withoutCancelled<{ job_id: string; total: string; sent: string }>(
+          (f) => `select a.job_id,
                   count(*)::text as total,
                   count(*) filter (where exists (
                     select 1 from ${queueTbl} q where q.person_ref = 'app-' || a.id::text
                   ))::text as sent
              from ${tbl} a
-            where a.job_id is not null and not a.is_lead
+            where a.job_id is not null and not a.is_lead ${f}
             group by a.job_id`,
         );
         aiCounts = {};
