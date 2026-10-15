@@ -40,12 +40,16 @@ import {
  * ตั้งชื่อเล่น + สายงาน + เบอร์ ที่ **ตั้งค่า → ผู้ใช้งาน** แล้วชื่อนั้นโผล่ที่นี่พร้อมเบอร์
  * · ชื่อที่ยังไม่ได้ตั้งค่ายังใช้ความจำเดิมไปก่อน (ดู followStaffMemory)
  */
+/** หัวกลุ่มในรายการชื่อ (เจ้าของ 15 ต.ค. 2569: ส่งคนแทน = "ทีมรายวัน" · ถอดคำว่า "เจ้าหน้าที่ส่งคนแทน") */
+const STAFF_GROUP_LABEL = { screener: 'เจ้าหน้าที่คัดสรร', replacement: 'ทีมรายวัน' } as const;
+
 export default function StaffContactField({
   id,
   value,
   onChange,
   label = 'เจ้าหน้าที่ที่ติดตาม (ถ้ามี)',
   reloadSignal,
+  group,
 }: {
   id: string;
   /** เบอร์ที่เก็บใน staff_phone */
@@ -54,6 +58,12 @@ export default function StaffContactField({
   label?: string;
   /** bump เมื่อ roster/ความจำเปลี่ยน (เพิ่มจาก dialog จัดการ) — โหลดใหม่ */
   reloadSignal?: number;
+  /**
+   * โชว์ชื่อกลุ่มเดียวตามแท็บ (เจ้าของ Choice 15 ต.ค. 2569 "แยกตามแท็บ")
+   * `screener` = แท็บคนเริ่มงาน → "เจ้าหน้าที่คัดสรร" · `replacement` = แท็บส่งคนแทน → "ทีมรายวัน"
+   * ไม่ส่ง = ทั้งสองกลุ่ม
+   */
+  group?: 'screener' | 'replacement';
 }) {
   const [contacts, setContacts] = useState<FollowStaffContact[]>([]);
   const [rosterRev, setRosterRev] = useState(0);
@@ -172,12 +182,16 @@ export default function StaffContactField({
           options={[
             ...(name && !nameOptions.some((n) => n === name) ? [{ value: '__other__', label: `${name} (ชื่อเดิม)` }] : []),
             // กลุ่มว่าง = บอกว่ายังไม่มีชื่อ (QA รอบ 3 ข้อ 24 · เดิมหัวกลุ่มลอยเปล่า) — ตั้งสายงานที่ ตั้งค่า › ผู้ใช้งาน
-            ...(screenerNames.length === 0
-              ? [{ value: '__none_screener__', label: 'ยังไม่มีชื่อ', disabled: true, group: 'เจ้าหน้าที่คัดสรร' }]
-              : screenerNames.map((n) => ({ value: n, label: n, group: 'เจ้าหน้าที่คัดสรร' }))),
-            ...(replacementNames.length === 0
-              ? [{ value: '__none_replacement__', label: 'ยังไม่มีชื่อ', disabled: true, group: 'เจ้าหน้าที่ส่งคนแทน' }]
-              : replacementNames.map((n) => ({ value: n, label: n, group: 'เจ้าหน้าที่ส่งคนแทน' }))),
+            ...(group === 'replacement'
+              ? []
+              : screenerNames.length === 0
+                ? [{ value: '__none_screener__', label: 'ยังไม่มีชื่อ', disabled: true, group: STAFF_GROUP_LABEL.screener }]
+                : screenerNames.map((n) => ({ value: n, label: n, group: STAFF_GROUP_LABEL.screener }))),
+            ...(group === 'screener'
+              ? []
+              : replacementNames.length === 0
+                ? [{ value: '__none_replacement__', label: 'ยังไม่มีชื่อ', disabled: true, group: STAFF_GROUP_LABEL.replacement }]
+                : replacementNames.map((n) => ({ value: n, label: n, group: STAFF_GROUP_LABEL.replacement }))),
             { value: '__manual__', label: 'พิมพ์เบอร์เองไม่ผูกชื่อ' },
           ]}
         />

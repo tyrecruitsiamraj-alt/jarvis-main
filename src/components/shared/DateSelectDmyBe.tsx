@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CalendarIcon, X } from 'lucide-react';
-import { parseYmd, toYmdLocal } from '@/lib/dateTh';
+import { formatYmdTh, parseYmd, toYmdLocal } from '@/lib/dateTh';
 import { thaiDayDate } from '@/lib/periodPick';
 import { Button } from '@/components/ui/button';
 import { CalendarFooter, CalendarQuickChips } from '@/components/shared/CalendarParts';
@@ -16,6 +16,11 @@ export interface DateSelectDmyBeProps {
   className?: string;
   /** ชื่อช่องสำหรับโปรแกรมอ่านหน้าจอ (ปุ่มไม่มี id ให้ `<label htmlFor>` ชี้) */
   ariaLabel?: string;
+  /**
+   * `false` = ไม่มีตัวย่อวัน → "16 ต.ค. 2569" (เจ้าของ Choice 15 ต.ค. 2569 เฉพาะช่องวันที่เริ่มงานหน้าติดตาม)
+   * ค่าตั้งต้น `true` = "ศ. 16 ต.ค. 2569" รูปเดียวทั้งระบบ
+   */
+  withWeekday?: boolean;
 }
 
 /** เลือกวันที่จากปฏิทินแบบคลิกวัน — ค่าที่ส่งออกยังเป็น YYYY-MM-DD สำหรับ API */
@@ -26,6 +31,7 @@ const DateSelectDmyBe: React.FC<DateSelectDmyBeProps> = ({
   disabled = false,
   className = '',
   ariaLabel,
+  withWeekday = true,
 }) => {
   const [open, setOpen] = useState(false);
   const todayYmd = toYmdLocal(new Date());
@@ -39,8 +45,9 @@ const DateSelectDmyBe: React.FC<DateSelectDmyBeProps> = ({
   const displayLabel = useMemo(() => {
     if (!value) return allowEmpty ? 'เลือกวันที่' : '';
     // "จ. 12 ต.ค. 2569" — รูปวันที่เดียวทั้งระบบ (เจ้าของ Choice 12 ต.ค. 2569 · เดิม 12/10/2569)
-    return parseYmd(value) ? thaiDayDate(value) : value;
-  }, [allowEmpty, value]);
+    if (!parseYmd(value)) return value;
+    return withWeekday ? thaiDayDate(value) : formatYmdTh(value);
+  }, [allowEmpty, value, withWeekday]);
 
   const buttonClass =
     'jarvis-soft-field w-full h-10 flex items-center justify-between disabled:opacity-50 text-left';

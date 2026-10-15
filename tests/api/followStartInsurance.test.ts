@@ -58,3 +58,21 @@ describe('ต่อสายครบ', () => {
     expect(page).not.toMatch(/step !== 3\)/);
   });
 });
+
+describe('ปรับคำ 15 ต.ค. 2569', () => {
+  const read = (p: string) => readFileSync(p, 'utf8');
+  it('วันที่เริ่มงานไม่มีตัวย่อวัน ("16 ต.ค. 2569") · ช่องวันที่อื่นยังมี', () => {
+    const page = read('src/pages/follow/FollowPage.tsx');
+    expect(page).toMatch(/value=\{startDate\}[^>]*withWeekday=\{false\}/);
+    expect(read('src/components/shared/DateSelectDmyBe.tsx')).toContain('withWeekday = true');
+  });
+  it('ชื่อเจ้าหน้าที่แยกตามแท็บ: คนเริ่มงาน = คัดสรร · ส่งคนแทน = ทีมรายวัน · ไม่มีคำ "เจ้าหน้าที่ส่งคนแทน" บนจอ', () => {
+    const field = read('src/components/follow/StaffContactField.tsx');
+    expect(field).toContain("replacement: 'ทีมรายวัน'");
+    expect(field).not.toMatch(/group: 'เจ้าหน้าที่ส่งคนแทน'/);
+    const page = read('src/pages/follow/FollowPage.tsx');
+    expect(page).toMatch(/id="followStaffPhoneReplace"\s+group="replacement"/);
+    expect(page.match(/group="screener"/g)?.length).toBe(3);
+    expect(read('src/components/follow/FollowEditDialog.tsx')).toContain("entry?.follow_team === 'replacement' ? 'replacement' : 'screener'");
+  });
+});

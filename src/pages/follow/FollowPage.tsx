@@ -2573,7 +2573,7 @@ const FollowPage: React.FC = () => {
               <p className="ml-1 text-xs font-medium text-muted-foreground">
                 วันที่เริ่มงาน <span className="text-muted-foreground/70">(ถ้ามี)</span>
               </p>
-              <DateSelectDmyBe value={startDate} onChange={setStartDate} allowEmpty ariaLabel="วันที่เริ่มงาน" />
+              <DateSelectDmyBe value={startDate} onChange={setStartDate} allowEmpty withWeekday={false} ariaLabel="วันที่เริ่มงาน" />
             </div>
             {/* เรื่องที่จะให้โทรติดตาม (100 · เจ้าของสั่ง 18 ส.ค. 2569) — dropdown จากลิสต์กลาง
                 ที่ supervisor เพิ่มเองได้ · ยังพิมพ์เรื่องใหม่เองได้ถ้าไม่มีในลิสต์ */}
@@ -2670,6 +2670,7 @@ const FollowPage: React.FC = () => {
               >
                 <StaffContactField
                   id="followStaffPhoneReplace"
+                  group="replacement"
                   label="เจ้าหน้าที่ที่ติดตาม (ถ้ามี)"
                   value={staffPhones[0] ?? ''}
                   onChange={(next) => setStaffPhoneAt(0, next)}
@@ -2924,6 +2925,7 @@ const FollowPage: React.FC = () => {
                                 >
                                   <StaffContactField
                                     id={`followStaffPhoneDay${d}`}
+                                    group="screener"
                                     label={`เจ้าหน้าที่ที่ติดตาม · ${dayLabel(d)}`}
                                     value={staffPhoneByDay[d] ?? ''}
                                     onChange={(next) =>
@@ -2937,6 +2939,7 @@ const FollowPage: React.FC = () => {
                               <div className="rounded-xl border border-white/70 bg-white/40 p-2.5 dark:border-white/15 dark:bg-white/5">
                                 <StaffContactField
                                   id="followStaffPhoneAll"
+                                  group="screener"
                                   label="เจ้าหน้าที่ที่ติดตาม (ถ้ามี)"
                                   value={staffPhoneAll}
                                   onChange={setStaffPhoneAll}
@@ -3182,6 +3185,7 @@ const FollowPage: React.FC = () => {
                     {slotModeGroup(callModes[i] ?? 'ai', (m) => setCallModeAt(i, m), `สายที่ ${i + 1}`)}
                     <StaffContactField
                       id={`followStaffPhone${i}`}
+                      group="screener"
                       label={`เจ้าหน้าที่ที่ติดตามสายที่ ${i + 1}`}
                       value={staffPhones[i] ?? ''}
                       onChange={(next) => setStaffPhoneAt(i, next)}

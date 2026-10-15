@@ -527,6 +527,7 @@ export default function FollowEditDialog({
               ฟอร์มแก้ไข Enter = บันทึกการแก้ อยู่แล้วทุกช่อง (ไม่ใช่ฟอร์มเพิ่มที่เคยพัง) */}
           <StaffContactField
             id="feStaffPhone"
+            group={entry?.follow_team === 'replacement' ? 'replacement' : 'screener'}
             value={staffPhone}
             onChange={setStaffPhone}
             reloadSignal={contactsRev}
