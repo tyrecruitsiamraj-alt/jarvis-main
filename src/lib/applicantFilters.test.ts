@@ -3,6 +3,8 @@ import type { PublicApplication } from '@/lib/publicApplicationsApi';
 import {
   APPLICANT_FACET_ATTACH,
   APPLICANT_PRIMARY_FACETS,
+  RECRUIT_TAB_FACETS,
+  applicantPrimaryFacets,
   applicantCallValue,
   applicantFacetValueLabel,
   applicantJobLabels,
@@ -116,9 +118,11 @@ describe('จังหวัด → อำเภอ', () => {
   const lop = app({ province: 'ลพบุรี', district: 'ชัยบาดาล' });
   const bkk = app({ province: 'กรุงเทพมหานคร', district: 'บางรัก' });
 
+  // อำเภอเหลือแค่แท็บติดตามนัดหมาย (15 ต.ค. 2569 ถอดจากแท็บผู้สมัคร/การติดต่อ)
   it('ยังไม่เลือกจังหวัด = ไม่มีหัวข้ออำเภอ · เลือกแล้วโผล่เฉพาะอำเภอของจังหวัดนั้น', () => {
-    expect(buildApplicantFacets([lop, bkk], EMPTY_APPLICANT_FILTER_STATE, facts()).some((f) => f.key === 'district')).toBe(false);
-    const d = buildApplicantFacets([lop, bkk], state({ province: ['ลพบุรี'] }), facts()).find((f) => f.key === 'district')!;
+    const appt = facts({ tab: 'appointments' });
+    expect(buildApplicantFacets([lop, bkk], EMPTY_APPLICANT_FILTER_STATE, appt).some((f) => f.key === 'district')).toBe(false);
+    const d = buildApplicantFacets([lop, bkk], state({ province: ['ลพบุรี'] }), appt).find((f) => f.key === 'district')!;
     expect(d.options.map((o) => o.value)).toEqual(['ชัยบาดาล']);
   });
 
@@ -244,7 +248,12 @@ describe('🔴 เจ้าหน้าที่สรรหา — ดูเป
 
   it('ตัวเลือกบอกจำนวนต่อคน · ใบขอที่ยังไม่ตั้งเจ้าหน้าที่ = "ไม่ระบุเจ้าหน้าที่"', () => {
     const facet = buildApplicantFacets(rows, EMPTY_APPLICANT_FILTER_STATE, facts({ recruiterOf })).find((x) => x.key === 'recruiter');
-    expect(facet?.label).toBe('เจ้าหน้าที่สรรหา');
+    // แท็บผู้สมัคร/การติดต่อ = "เจ้าหน้าที่" (15 ต.ค. 2569) · แท็บติดตามนัดหมายคงคำเดิม
+    expect(facet?.label).toBe('เจ้าหน้าที่');
+    expect(
+      buildApplicantFacets(rows, EMPTY_APPLICANT_FILTER_STATE, facts({ recruiterOf, tab: 'appointments' })).find((x) => x.key === 'recruiter')
+        ?.label,
+    ).toBe('เจ้าหน้าที่สรรหา');
     const counts = Object.fromEntries((facet?.options ?? []).map((o) => [o.label, o.count]));
     expect(counts).toMatchObject({ แบงค์: 2, คิว: 1, ไม่ระบุเจ้าหน้าที่: 1 });
     expect(applicantFacetValueLabel('recruiter', UNSPECIFIED)).toBe('ไม่ระบุเจ้าหน้าที่');
@@ -260,5 +269,34 @@ describe('🔴 เจ้าหน้าที่สรรหา — ดูเป
     const params = writeApplicantFilterState(new URLSearchParams('view=list'), state({ recruiter: ['แบงค์'] }));
     expect(params.get('view')).toBe('list');
     expect(readApplicantFilterState(params).selection.recruiter).toEqual(['แบงค์']);
+  });
+});
+
+describe('ตัวกรองแท็บผู้สมัคร + การติดต่อ (เจ้าของสั่ง 15 ต.ค. 2569)', () => {
+  const rows = [
+    app({ province: 'ลพบุรี', district: 'ชัยบาดาล', license_types: ['ท.1'], specific_type: 'ทดสอบ', unit_name: 'หน่วยงานก', job_id: 'siamraj-sql:T1', job_title: 'ขับรถ' }),
+    app({ province: 'กรุงเทพมหานคร', district: 'บางรัก', license_types: ['ท.2'], specific_type: 'ทดสอบ2', unit_name: 'หน่วยงานข', job_id: 'siamraj-sql:T2', job_title: 'ขับรถ' }),
+  ];
+  it('ลำดับ 13 หัวข้อ + คำตามเจ้าของ · โพสต์ประกาศไม่เกี่ยว ติดตามนัดหมายคงเดิม', () => {
+    expect(applicantPrimaryFacets('candidates')).toEqual(RECRUIT_TAB_FACETS);
+    expect(applicantPrimaryFacets('contact')).toEqual(RECRUIT_TAB_FACETS);
+    expect(applicantPrimaryFacets('appointments')).toEqual(APPLICANT_PRIMARY_FACETS);
+    expect(RECRUIT_TAB_FACETS).toEqual([
+      'recruiter', 'step', 'status', 'contactState', 'call', 'job', 'province', 'days', 'position', 'age', 'education', 'channel', 'gender',
+    ]);
+    for (const tab of ['candidates', 'contact'] as const) {
+      const f = buildApplicantFacets(rows, state({ province: ['ลพบุรี'] }), facts({ tab }));
+      const label = (k: string) => f.find((x) => x.key === k)?.label;
+      expect([label('job'), label('province'), label('days'), label('position'), label('age')]).toEqual([
+        'หน่วยงาน', 'จังหวัด', 'จำนวนวันที่ผ่านมา', 'ตำแหน่ง', 'อายุ',
+      ]);
+      // ถอด 3 หัวข้อ (Choice "ถอดทั้ง 3")
+      expect(f.some((x) => ['specific', 'license', 'district'].includes(x.key))).toBe(false);
+      // หน่วยงาน = ชื่อหน่วยงาน ไม่ใช่ชื่องาน
+      expect(f.find((x) => x.key === 'job')!.options.map((o) => o.label).sort()).toEqual(['หน่วยงานก', 'หน่วยงานข']);
+    }
+    const appt = buildApplicantFacets(rows, state({ province: ['ลพบุรี'] }), facts({ tab: 'appointments' }));
+    expect(appt.find((x) => x.key === 'job')?.label).toBe('ใบขอที่สมัคร');
+    expect(appt.some((x) => x.key === 'license')).toBe(true);
   });
 });

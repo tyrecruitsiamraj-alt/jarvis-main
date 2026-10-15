@@ -39,9 +39,15 @@ describe('ตัวกรองที่เติมจาก iRecruit', () => {
   ];
   it('ขั้นตอน/สถานะ/สถานะการติดต่อ/ใบขับขี่/ข้อมูลผู้สรรหา มีเลขต่อท้าย · กรองได้', () => {
     const keys = buildApplicantFacets(rows, EMPTY_APPLICANT_FILTER_STATE, facts).map((f) => f.key);
-    for (const k of ['step', 'status', 'contactState', 'license', 'specific']) expect(keys).toContain(k);
+    for (const k of ['step', 'status', 'contactState']) expect(keys).toContain(k);
     expect(applyApplicantFilters(rows, { selection: { step: ['appointment'] } }, facts).map((r) => r.id)).toEqual(['b']);
-    expect(applyApplicantFilters(rows, { selection: { license: ['ใบขับขี่ ท.2'] } }, facts).map((r) => r.id)).toEqual(['b']);
+    // 15 ต.ค. 2569 ใบขับขี่/ข้อมูลผู้สรรหา ถอดจากแท็บผู้สมัคร/การติดต่อ (เจ้าของ Choice "ถอดทั้ง 3") — เหลือแท็บติดตามนัดหมาย
+    expect(keys).not.toContain('license');
+    expect(keys).not.toContain('specific');
+    const appt = { ...facts, tab: 'appointments' as const };
+    const apptKeys = buildApplicantFacets(rows, EMPTY_APPLICANT_FILTER_STATE, appt).map((f) => f.key);
+    for (const k of ['license', 'specific']) expect(apptKeys).toContain(k);
+    expect(applyApplicantFilters(rows, { selection: { license: ['ใบขับขี่ ท.2'] } }, appt).map((r) => r.id)).toEqual(['b']);
   });
 });
 

@@ -81,7 +81,7 @@ import { buildJobKeyIndex } from '@/lib/jobKeyIndex';
 import type { JobRequest } from '@/types';
 import {
   APPLICANT_FACET_ATTACH,
-  APPLICANT_PRIMARY_FACETS,
+  applicantPrimaryFacets,
   EMPTY_APPLICANT_FILTER_STATE,
   applyApplicantFilters,
   buildApplicantFacets,
@@ -953,7 +953,7 @@ const RmWorkspace: React.FC<{
         <div className="mt-3 flex flex-wrap items-center gap-2 sm:hidden">
           <FilterSheetButton
             facets={applicantFacets}
-            primary={APPLICANT_PRIMARY_FACETS}
+            primary={applicantPrimaryFacets(tab)}
             attach={APPLICANT_FACET_ATTACH}
             onToggle={toggleApplicantFacet}
             sections={applicantPanelSections}
@@ -979,7 +979,7 @@ const RmWorkspace: React.FC<{
         {!bucket && filterOpen ? (
           <FilterSidebar
             facets={applicantFacets}
-            primary={APPLICANT_PRIMARY_FACETS}
+            primary={applicantPrimaryFacets(tab)}
             attach={APPLICANT_FACET_ATTACH}
             onToggle={toggleApplicantFacet}
             sections={applicantPanelSections}

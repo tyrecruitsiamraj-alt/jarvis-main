@@ -149,6 +149,12 @@ function unspecifiedLabel(key: ApplicantFacetKey): string {
 }
 
 const onlyAppointments = (facts: ApplicantFacetFacts) => facts.tab === 'appointments';
+/**
+ * แท็บที่ใช้ตัวกรองชุด 13 หัวข้อ (เจ้าของสั่ง 15 ต.ค. 2569 "เอาแค่หน้า ผู้สมัคร กับ การติดต่อ")
+ * ติดตามนัดหมายคงแบบเดิม · โพสต์ประกาศเป็นตัวกรองกล่องงานคนละชุด (`boardFilters`) ไม่เกี่ยว
+ */
+export const isRecruitFilterTab = (tab: RmTab): boolean => tab === 'candidates' || tab === 'contact';
+const notRecruitTab = (facts: ApplicantFacetFacts) => !isRecruitFilterTab(facts.tab);
 
 /**
  * หัวข้อตามลำดับบนจอ (ตามแบบร่างที่เจ้าของเคาะ) — หัวข้อนัดหมายขึ้นก่อนในแท็บนัด
@@ -209,6 +215,8 @@ const FACETS: readonly Def[] = [
     label: 'ข้อมูลผู้สรรหา',
     ui: 'check',
     searchable: true,
+    // 15 ต.ค. 2569 ถอดจากแท็บผู้สมัคร/การติดต่อ (เจ้าของ Choice "ถอดทั้ง 3")
+    available: notRecruitTab,
     values: (r) => [trimOr(r.specific_type)],
   },
   {
@@ -281,6 +289,7 @@ const FACETS: readonly Def[] = [
     label: 'อำเภอผู้สมัคร',
     ui: 'check',
     searchable: true,
+    available: notRecruitTab,
     values: (r, _facts, state) => {
       const provinces = (state.selection.province ?? []).filter((p) => p !== UNSPECIFIED);
       if (provinces.length === 0) return [];
@@ -304,6 +313,7 @@ const FACETS: readonly Def[] = [
     key: 'license',
     label: 'ใบขับขี่',
     ui: 'check',
+    available: notRecruitTab,
     order: [...RM_LICENSE_TYPES],
     values: (r) => {
       const list = (r.license_types ?? []).filter((t) => typeof t === 'string' && t.trim());
@@ -379,11 +389,16 @@ export function applicantJobValue(r: PublicApplication): string {
  * คำบนจอของหัวข้อ "ใบขอที่สมัคร" — ค่าเป็น `job_id` จึงต้องแปลงเป็นชื่องานจากแถวจริง
  * ชื่อซ้ำกันคนละใบ = ต่อท้ายเลขที่ใบขอให้แยกออก · ไม่มีแถวของใบนั้นเลย = บอกเลขที่ใบขอ
  */
-export function applicantJobLabels(rows: readonly PublicApplication[]): (value: string) => string {
+export function applicantJobLabels(
+  rows: readonly PublicApplication[],
+  opts: { byUnit?: boolean } = {},
+): (value: string) => string {
   const titleById = new Map<string, string>();
   for (const r of rows) {
     const id = (r.job_id ?? '').trim();
-    if (id && !titleById.has(id)) titleById.set(id, applicantFacetValueLabel('job', trimOr(r.job_title || r.unit_name)));
+    // byUnit = หัวข้อ "หน่วยงาน" (15 ต.ค. 2569) — ชื่อหน่วยงานก่อน ไม่มีค่อยชื่องาน (ประกาศลอยไม่มีหน่วยงาน)
+    const name = opts.byUnit ? r.unit_name?.replace(/\s+/g, ' ') || r.job_title : r.job_title || r.unit_name;
+    if (id && !titleById.has(id)) titleById.set(id, applicantFacetValueLabel('job', trimOr(name)));
   }
   const idsPerTitle = new Map<string, number>();
   for (const t of titleById.values()) idsPerTitle.set(t, (idsPerTitle.get(t) ?? 0) + 1);
@@ -401,10 +416,48 @@ export function buildApplicantFacets(
   state: ApplicantFilterState,
   facts: ApplicantFacetFacts,
 ): FacetView<ApplicantFacetKey>[] {
-  const jobLabel = applicantJobLabels(rows);
-  return buildFacetViews(rows, FACETS, state, facts, (key, value) =>
+  const recruitTabs = isRecruitFilterTab(facts.tab);
+  const jobLabel = applicantJobLabels(rows, { byUnit: recruitTabs });
+  const views = buildFacetViews(rows, FACETS, state, facts, (key, value) =>
     key === 'job' ? jobLabel(value) : applicantFacetValueLabel(key, value),
   );
+  if (!recruitTabs) return views;
+  return views.map((v) => ({ ...v, label: RECRUIT_TAB_FACET_LABEL[v.key] ?? v.label }));
+}
+
+/**
+ * ═══ ตัวกรองแท็บผู้สมัคร + การติดต่อ (เจ้าของสั่ง 15 ต.ค. 2569 "เอาคำตามนี้" · "เอาแค่หน้า ผู้สมัคร กับ การติดต่อ") ═══
+ * 13 หัวข้อตามลำดับนี้ · คำบนจอตามเจ้าของ · ข้อมูลผู้สรรหา/ใบขับขี่/อำเภอ ถอด (Choice "ถอดทั้ง 3")
+ * แท็บติดตามนัดหมายคงแบบเดิม (`APPLICANT_PRIMARY_FACETS` + คำเดิม)
+ * ⚠️ "หน่วยงาน" ยังคีย์ด้วย `job_id` (ปุ่ม "ดูรายชื่อ" จากการ์ดกล่องงานติ๊กใบขอให้) — แค่คำบนจอเป็นชื่อหน่วยงาน
+ */
+export const RECRUIT_TAB_FACETS: readonly ApplicantFacetKey[] = [
+  'recruiter',
+  'step',
+  'status',
+  'contactState',
+  'call',
+  'job',
+  'province',
+  'days',
+  'position',
+  'age',
+  'education',
+  'channel',
+  'gender',
+];
+const RECRUIT_TAB_FACET_LABEL: Partial<Record<ApplicantFacetKey, string>> = {
+  recruiter: 'เจ้าหน้าที่',
+  job: 'หน่วยงาน',
+  province: 'จังหวัด',
+  days: 'จำนวนวันที่ผ่านมา',
+  position: 'ตำแหน่ง',
+  age: 'อายุ',
+};
+
+/** ลำดับหัวข้อของแถบกรองตามแท็บ */
+export function applicantPrimaryFacets(tab: RmTab): readonly ApplicantFacetKey[] {
+  return isRecruitFilterTab(tab) ? RECRUIT_TAB_FACETS : APPLICANT_PRIMARY_FACETS;
 }
 
 /**

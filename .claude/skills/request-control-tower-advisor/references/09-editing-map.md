@@ -13251,3 +13251,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   นับว่า "โทรไปแล้ว" แต่ไม่ใช่ไป/ไม่ไป · ลงผลแล้วหยุดสายที่เหลือของวันนั้น (`stopRemainingFollowRounds(done,'day')`)
   · คอลัมน์/แถวเพิ่มที่ `followCallMatrix` · `followJourney` · `followTrends` · `homeCallResults` · `homeLumosSummary` · `AiShareLumosStats` · legend ปฏิทิน
 - เทสต์ `tests/api/followStartInsurance.test.ts` · `src/lib/followWizard.test.ts` · `tests/api/followStaffCall.test.ts`
+
+### ตัวกรองแท็บผู้สมัคร + การติดต่อ 13 หัวข้อ (15 ต.ค. 2569)
+- เจ้าของสั่ง "เอาคำตามนี้" เฉพาะแท็บผู้สมัคร + การติดต่อ (โพสต์ประกาศ · ติดตามนัดหมาย คงเดิม)
+- `src/lib/applicantFilters.ts`: `isRecruitFilterTab` · `RECRUIT_TAB_FACETS` (ลำดับ) · `RECRUIT_TAB_FACET_LABEL` (คำ) · `applicantPrimaryFacets(tab)` (RmWorkspace ส่งเข้าแถบกรอง)
+  เจ้าหน้าที่ · ขั้นตอน · สถานะ · สถานะการติดต่อ · ผลโทรล่าสุด · หน่วยงาน · จังหวัด · จำนวนวันที่ผ่านมา · ตำแหน่ง · อายุ · วุฒิการศึกษา · ช่องทาง · เพศ
+- ถอด ข้อมูลผู้สรรหา · ใบขับขี่ · อำเภอ จาก 2 แท็บนี้ (`available: notRecruitTab`) — Choice "ถอดทั้ง 3"
+- 🔴 "หน่วยงาน" ยังคีย์ `job_id` (ปุ่ม "ดูรายชื่อ" จากการ์ดกล่องงานติ๊กให้) · คำบนจอ = `unit_name` (ไม่มี = ชื่องาน · หน่วยงานเดียวหลายใบขอ = ต่อเลขที่ใบขอ)
+- เทสต์ `src/lib/applicantFilters.test.ts`
