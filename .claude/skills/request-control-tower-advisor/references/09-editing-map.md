@@ -13279,3 +13279,13 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   แผง AI โทรพับเป็นปุ่ม "AI โทร N" ท้ายแถวชิปกรอง (`AiCallFlowPanel open/onTotal` — พับอยู่ก็ยังโหลดยอด) ·
   การ์ด = ชื่อ · ตำแหน่ง · ด่วน/ผ่านมา N วัน · ที่อยู่ · เหลือหา + ปุ่มเดียว "ดูคน N" ·
   ชิปทำต่อ · AI แนะนำ · ผลโทร 6 ช่อง · หาคนจากกองไม่สนใจ ย้ายไปหัวป๊อปรายละเอียด (`matching-detail-moved`)
+
+### หน้าความคุ้มค่าระบบ `/value` (15 ต.ค. 2569)
+- เจ้าของ: "ขอสักหน้าเอาไว้ดูคนเดียว เพื่อเอาไว้ Defend ผู้บริหาร" · Choice "ใน jarvis เห็นคนเดียว" + "ดึงจากระบบ + กรอกเอง"
+- ไม่มีในเมนู · route `/value` → `src/pages/value/ValueCasePage.tsx` · ตัวคิด `src/lib/valueCase.ts` (pure) · เรียก API `src/lib/valueCaseApi.ts`
+- API `GET/PUT /api/value-case` (`api/_handlers/value-case.ts` · `api/_lib/valueCaseStore.ts`) — ไม่มีสิทธิ์ = 404
+  🔴 สิทธิ์ = อีเมลใน `VALUE_CASE_EMAILS` (ไม่ตั้ง = บัญชีเจ้าของ) · เครื่องนักพัฒนาให้ admin เข้าตรวจงานได้ · production admin คนอื่นเข้าไม่ได้
+- ที่เก็บ `app_value_case` (migration 146 · แถวละบัญชี `user_sub`) · บันทึกเมื่อกดปุ่มเท่านั้น
+- ตัวเลขระบบรายเดือน 6 เดือน: ผู้สมัครเข้า (`public_job_applications.created_at`) · AI โทรจบ (`lumos_dispatch_queue.first_result_at` · interview = สรรหา · reminder = ติดตาม)
+- ฐานเทียบ = เดือนที่กดเลือกในตาราง (ค่าเริ่ม = เดือนเต็มล่าสุด · เดือนนี้ = คาดทั้งเดือน) · เงินเดือนตอนนี้ว่าง = เท่าก่อนมีระบบ
+- เทสต์ `tests/api/valueCase.test.ts`
