@@ -13308,3 +13308,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   ⚠️ ยังค้าง: "รายได้รวม" ของ ERP (`monthly_income`) ยังรวมค่าเดินทาง/ค่าโทรศัพท์ (ต่อวัน×30) อยู่ — รอเจ้าของเลือก
 - 15 ต.ค. (ต่อ) รายได้ ERP ล้วน (ทีมไม่ได้ตั้งเอง) = การ์ดขึ้น "ฐานเงินเดือน" อย่างเดียว (`jobIncomeLine` total=null) · AI พูดบรรทัดฐาน ไม่พูด "รายได้ประมาณ"
   (`ApplyScriptFacts.baseOnly` ตั้งที่ `applyScriptFacts.ts` · `buildExtraInfoSentence({baseOnly})` ทาง serve) · ทีมตั้งเอง/เลือกเฉลี่ย = ตามเดิม · เทสต์ `tests/api/incomeBaseOnly.test.ts`
+
+### ดึงชื่อผู้สมัครจาก iRecruit เข้าแท็บผู้สมัคร (15 ต.ค. 2569)
+- เจ้าของ: ย้อน 30 วันที่ยังไม่ถูกโทร · ดึงทุก 15 นาที · คนกดส่ง AI เอง · เบอร์ที่มีใน jarvis ไม่ดึงซ้ำ (ใช้ใบ jarvis)
+- `api/_lib/irecruitApplicantImport.ts` (worker · เปิดใน `server/local-api.ts` · **เฉพาะเซิร์ฟเวอร์จริง** · ปิด `IRECRUIT_APPLICANT_IMPORT_ENABLED=false` · สวิตช์ iRecruit ปิด = ไม่ทำ)
+  iRecruit `recruit_register` RM · status A · ไม่ลบ · 30 วัน · ไม่มี `recruit_logs_call`/`recruit_contact` (คีย์ `register_id` = `recruit_register.uuid` ไม่ใช่ id)
+  → `public_job_applications` source `irecruit` · created_by_name 'iRecruit' (= ใบนำเข้า ตัวส่ง AI อัตโนมัติไม่หยิบ) · ช่องทาง "iRecruit · …" · วันสมัคร = ของ iRecruit · ไม่ผูกใบขอ
+  กันซ้ำ `app_irecruit_imports` (147 · PK register_uuid) · อายุนอก 15–80 = null (CHECK) · ใบขับขี่/วุฒิ ไม่ดึง
+- ใบไม่ผูกใบขอ กดส่ง AI = ขึ้น "ใบไม่ผูกใบขอ — ส่งเข้าคิวโทรไม่ได้" (ขั้น 2 จะเพิ่มเลือกใบขอตอนส่ง · ขั้น 3 บททักทายทั่วไปรอเจ้าของตรวจบท)
+- เทสต์ `tests/api/irecruitApplicantImport.test.ts`
