@@ -13,6 +13,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import ChannelPicker from '@/components/shared/ChannelPicker';
+import PdpaConsentCheck from '@/components/shared/PdpaConsentCheck';
+import { PDPA_CONSENT_REQUIRED_MESSAGE, PDPA_CONSENT_TEXT_STAFF } from '@/lib/pdpaConsent';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { recruitChannelLabel, type RecruitChannelMatch } from '@/lib/recruitPostings';
@@ -60,10 +62,13 @@ const ImportApplicantsDialog: React.FC<{
   const [error, setError] = useState<string | null>(null);
   /** หน้ารายชื่อซ้ำ — เด้งเองเมื่ออ่านไฟล์แล้วมีคนซ้ำ · กด "ทำต่อ" กลับหน้านำเข้า */
   const [showDupes, setShowDupes] = useState(false);
+  /** PDPA (15 ต.ค. 2569) — ยืนยันว่าผู้สมัครในไฟล์ยินยอมแล้วก่อนนำเข้า */
+  const [consent, setConsent] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setShowDupes(false);
+    setConsent(false);
     setResponsible(NO_STAFF);
     setChannel(null);
     setFileName(null);
@@ -120,6 +125,7 @@ const ImportApplicantsDialog: React.FC<{
         fileBase64,
         dryRun: false,
         ...shared(),
+        pdpaConsent: consent,
       });
       setPreview(result);
       onSaved(result.inserted ?? 0);
@@ -281,6 +287,15 @@ const ImportApplicantsDialog: React.FC<{
               </div>
             ) : null}
 
+            {fileBase64 ? (
+              <PdpaConsentCheck
+                checked={consent}
+                onChange={setConsent}
+                text={PDPA_CONSENT_TEXT_STAFF}
+                disabled={saved || busy === 'saving'}
+              />
+            ) : null}
+
             <div className="flex flex-wrap items-center gap-2" data-testid="import-summary">
               <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums', TONE.success.chip)}>
                 {saved ? `นำเข้าแล้ว ${preview?.inserted ?? 0}` : `พร้อมนำเข้า ${ready}`}
@@ -381,8 +396,14 @@ const ImportApplicantsDialog: React.FC<{
                 <Button
                   type="button"
                   size="sm"
-                  disabled={ready === 0 || busy !== null || !sharedPicked}
-                  title={!sharedPicked && fileBase64 ? 'เลือกผู้รับผิดชอบและช่องทางก่อน' : undefined}
+                  disabled={ready === 0 || busy !== null || !sharedPicked || !consent}
+                  title={
+                    !sharedPicked && fileBase64
+                      ? 'เลือกผู้รับผิดชอบและช่องทางก่อน'
+                      : !consent && fileBase64
+                        ? PDPA_CONSENT_REQUIRED_MESSAGE
+                        : undefined
+                  }
                   onClick={() => void save()}
                 >
                   {busy === 'saving' ? (

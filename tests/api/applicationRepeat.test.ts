@@ -210,7 +210,7 @@ describe('ปุ่มเพิ่มข้อมูลผู้สมัคร 
     stubTx({ phoneLast: LAST });
     const { res, status, json } = mockRes();
     await jobApplicationsHandler(
-      staffReq('POST', { first_name: 'ก', last_name: 'ข', phone: '0812345678', age: 30, gender: 'female' }) as never,
+      staffReq('POST', { first_name: 'ก', last_name: 'ข', phone: '0812345678', age: 30, gender: 'female', pdpa_consent: true }) as never,
       res as never,
     );
     expect(status).toHaveBeenCalledWith(409);

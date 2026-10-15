@@ -18,6 +18,7 @@ import JobPublicFacts from '@/components/jobs/JobPublicFacts';
  *
  * `onApply` (6 ต.ค. 2569) — หน้าที่เปิดจาก Gen link ใช้การ์ดนี้เป็นของจริง (เจ้าของ "มันต้องเห็นแบบหน้า apply สิ่")
  * ⇒ ปุ่ม "สมัครงาน" กดได้ · ไม่ส่ง = ป้ายตัวอย่างเหมือนเดิม
+ * `action` (15 ต.ค. 2569) — ป๊อปประกาศวางปุ่ม "สั่งโพสต์" แทนป้าย "สมัครงาน" (เจ้าของ "ขอคำว่าสั่งโพสต์")
  */
 export default function PublicJobCardPreview({
   job,
@@ -25,6 +26,7 @@ export default function PublicJobCardPreview({
   onApply,
   placeText,
   note,
+  action,
 }: {
   job: JobRequest;
   className?: string;
@@ -33,6 +35,8 @@ export default function PublicJobCardPreview({
   placeText?: string | null;
   /** รายละเอียดที่เจ้าหน้าที่เขียนในประกาศ */
   note?: string | null;
+  /** ปุ่มของเจ้าหน้าที่แทนป้ายตัวอย่าง (ป๊อปประกาศ = "สั่งโพสต์") */
+  action?: React.ReactNode;
 }) {
   // ตัวเดียวกับการ์ดหน้าประกาศจริง — ไม่มีสาเหตุที่ขอ/ชื่อคนเก่า (5 ต.ค. 2569)
   const subtitle = publicJobCardSubtitle(job);
@@ -52,6 +56,8 @@ export default function PublicJobCardPreview({
           สมัครงาน
           <Send className="opacity-90" />
         </Button>
+      ) : action ? (
+        action
       ) : (
         /* ปุ่มของหน้าสาธารณะ — ในตัวอย่างเป็นแค่ป้าย (กดไม่ได้) */
         <p className="rounded-full bg-primary py-2 text-center text-sm font-medium text-primary-foreground" aria-hidden>

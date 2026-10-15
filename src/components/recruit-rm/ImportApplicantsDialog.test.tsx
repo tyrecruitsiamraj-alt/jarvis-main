@@ -92,6 +92,10 @@ describe('ImportApplicantsDialog', () => {
     fireEvent.click(screen.getByRole('combobox', { name: 'ผู้รับผิดชอบ' }));
     fireEvent.click(await screen.findByRole('option', { name: 'คุณเอ ทดสอบ' }));
     fireEvent.click(await screen.findByText('เลือกช่องทางทดสอบ'));
+    // 🔴 PDPA (15 ต.ค. 2569) — ยังไม่ติ๊กยินยอม = กดนำเข้าไม่ได้
+    await new Promise((r) => setTimeout(r, 50));
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('checkbox', { name: /ผู้สมัครยินยอม/ }));
     await waitFor(() => expect((save as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(save);
 
@@ -100,6 +104,7 @@ describe('ImportApplicantsDialog', () => {
       dryRun: false,
       responsibleName: 'คุณเอ ทดสอบ',
       channelLabel: 'Facebook Group',
+      pdpaConsent: true,
     });
     expect(await screen.findByText('นำเข้าแล้ว')).toBeTruthy();
     expect(screen.getByText('นำเข้าแล้ว 1')).toBeTruthy();

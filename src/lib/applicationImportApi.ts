@@ -92,6 +92,8 @@ export async function runApplicationImport(input: {
   channelLabel?: string | null;
   /** นำเข้าตามกล่อง (15 ต.ค. 2569) — ทุกแถวผูกใบขอนี้ + ส่ง AI โทรเลย */
   job?: { id: string; title?: string | null; unitName?: string | null } | null;
+  /** PDPA (15 ต.ค. 2569) — บันทึกจริงต้องเป็น true (ยืนยันว่าผู้สมัครในไฟล์ยินยอมแล้ว) */
+  pdpaConsent?: boolean;
 }): Promise<ApplicationImportResult> {
   const r = await apiFetch('/api/job-applications-import', {
     method: 'POST',
@@ -101,6 +103,7 @@ export async function runApplicationImport(input: {
       responsible_name: input.responsibleName ?? null,
       channel_id: input.channelId ?? null,
       channel_label: input.channelLabel ?? null,
+      pdpa_consent: input.pdpaConsent === true,
       ...(input.job
         ? { job_id: input.job.id, job_title: input.job.title ?? null, unit_name: input.job.unitName ?? null, send_ai: true }
         : {}),

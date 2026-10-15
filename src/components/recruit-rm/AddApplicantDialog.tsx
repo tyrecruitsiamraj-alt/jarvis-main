@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FieldSelect } from '@/components/shared/FieldSelect';
+import PdpaConsentCheck from '@/components/shared/PdpaConsentCheck';
+import { PDPA_CONSENT_REQUIRED_MESSAGE, PDPA_CONSENT_TEXT_STAFF } from '@/lib/pdpaConsent';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, UserPlus } from 'lucide-react';
@@ -62,6 +64,8 @@ const AddApplicantDialog: React.FC<{
   const [gender, setGender] = useState<string>('');
   const [phone, setPhone] = useState('');
   const [lineId, setLineId] = useState('');
+  /** PDPA (15 ต.ค. 2569) — ยืนยันว่าผู้สมัครยินยอมแล้วก่อนบันทึก */
+  const [consent, setConsent] = useState(false);
   const [province, setProvince] = useState('');
   const [district, setDistrict] = useState('');
   const [positionInterest, setPositionInterest] = useState('');
@@ -92,6 +96,7 @@ const AddApplicantDialog: React.FC<{
     setResponsible('');
     setChannel(null);
     setLicenses([]);
+    setConsent(false);
     setError(null);
     setSaving(false);
     // 🔴 ห้ามกลับไปใช้ /api/app-users (admin เท่านั้น — คนอื่นได้ลิสต์ว่าง · 11 ต.ค. 2569)
@@ -117,6 +122,7 @@ const AddApplicantDialog: React.FC<{
     if (!Number.isFinite(ageNum) || ageNum < 15 || ageNum > 80) {
       return setError('อายุต้องอยู่ระหว่าง 15–80 ปี');
     }
+    if (!consent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE);
 
     setSaving(true);
     try {
@@ -140,6 +146,7 @@ const AddApplicantDialog: React.FC<{
         channel_id: channel?.id ?? null,
         channel_label: channel ? recruitChannelLabel(channel) : null,
         license_types: licenses,
+        pdpa_consent: true,
       });
       onSaved();
       onClose();
@@ -284,6 +291,8 @@ const AddApplicantDialog: React.FC<{
               ))}
             </div>
           </div>
+
+          <PdpaConsentCheck checked={consent} onChange={setConsent} text={PDPA_CONSENT_TEXT_STAFF} />
 
           {error ? <p className="text-xs font-medium text-red-600 dark:text-red-400">{error}</p> : null}
         </div>

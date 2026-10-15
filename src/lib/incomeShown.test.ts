@@ -3,15 +3,15 @@ import { incomeLinesShown, incomeShownOf, spokenMonthlyIncome } from '@/lib/inco
 
 /** รายได้รวม หรือ เฉลี่ย — เลือกทีละใบขอ (เจ้าของ Choice 14 ต.ค. 2569) */
 describe('incomeShown', () => {
-  it('ไม่ตั้ง/ค่าแปลก = ทั้งสอง (ใบเก่าไม่เปลี่ยน)', () => {
-    expect(incomeShownOf(null)).toBe('both');
-    expect(incomeShownOf({ income_shown: 'x' })).toBe('both');
+  it('ไม่ตั้ง/ค่าแปลก = รายได้รวม (15 ต.ค. 2569 ถอด "ทั้งสอง" · Choice ค่าเริ่ม = รายได้รวม)', () => {
+    expect(incomeShownOf(null)).toBe('total');
+    expect(incomeShownOf({ income_shown: 'x' })).toBe('total');
+    expect(incomeShownOf({ income_shown: 'both' })).toBe('total');
     expect(incomeShownOf({ income_shown: 'average' })).toBe('average');
   });
 
   it('เลือกตัวไหนขึ้นตัวนั้น · ตัวที่เลือกไม่มีข้อมูล = ใช้อีกตัว', () => {
     const has = { total: true, average: true };
-    expect(incomeLinesShown('both', has)).toEqual({ total: true, average: true });
     expect(incomeLinesShown('total', has)).toEqual({ total: true, average: false });
     expect(incomeLinesShown('average', has)).toEqual({ total: false, average: true });
     expect(incomeLinesShown('average', { total: true, average: false })).toEqual({ total: true, average: false });
@@ -21,7 +21,6 @@ describe('incomeShown', () => {
   it('AI พูดเฉลี่ยเฉพาะเมื่อเลือกเฉลี่ยและมีเลข', () => {
     expect(spokenMonthlyIncome('average', 20000, 12700)).toBe(12700);
     expect(spokenMonthlyIncome('average', 20000, null)).toBe(20000);
-    expect(spokenMonthlyIncome('both', 20000, 12700)).toBe(20000);
     expect(spokenMonthlyIncome('total', 20000, 12700)).toBe(20000);
   });
 });

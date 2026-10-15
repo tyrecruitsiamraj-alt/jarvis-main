@@ -12,6 +12,7 @@ import { logError } from '../../_lib/logger.js';
 import { auditFromAnonymous } from '../../_lib/audit.js';
 import { applicantClientIp, lockAndFindRepeat } from '../../_lib/applicationRepeatGuard.js';
 import { repeatPublicMessage } from '../../../src/lib/applicationRepeat.js';
+import { recordApplicationConsent } from '../../_lib/applicationConsent.js';
 
 /** คอลัมน์ที่ยังไม่ถูก migrate — pg ตอบ 42703 */
 function isUndefinedColumn(e: unknown): boolean {
@@ -48,7 +49,11 @@ export default async function handler(req: ApiReq, res: ApiRes) {
   if (!rateLimitOrReject(req, res, 'public-apply', 5, 10 * 60 * 1000)) return;
 
   try {
-    const parsed = validatePublicApplication(await readJsonBody(req));
+    const raw = await readJsonBody(req);
+    const parsed = validatePublicApplication(raw);
+    // PDPA (148 · 15 ต.ค. 2569) — หน้าสมัครบังคับติ๊กก่อนส่ง · server จดเมื่อได้ true
+    // ไม่ปฏิเสธใบที่ไม่ส่งช่องนี้: หน้าเว็บเวอร์ชันเก่าที่ค้างในเครื่องคนไม่มีช่องติ๊ก — ใบไม่ควรหายเพราะเรื่องนี้ (แค่ไม่มีบันทึกยินยอม)
+    const consented = (raw as Record<string, unknown> | null)?.pdpa_consent === true;
     if (!parsed.ok) return sendError(res, 400, 'Bad request', parsed.message);
     const v = parsed.value;
 
@@ -154,6 +159,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     const id = 'id' in outcome ? outcome.id : null;
     if (!id) return sendError(res, 500, 'Failed to submit application');
     logPublicApply(req, 'public_application.submit', id, v);
+    if (consented) await recordApplicationConsent([id], 'apply', null);
 
     /**
      * ส่งเข้าคิว AI โทร **อัตโนมัติทันทีที่กรอก** (เจ้าของเคาะ 15 ส.ค. 2569)

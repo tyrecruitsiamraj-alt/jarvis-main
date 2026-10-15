@@ -27,6 +27,8 @@ import {
 } from '@/components/ui/dialog';
 import { CheckCircle2, ClipboardList, Loader2, Lock, MapPin, Paperclip, PhoneCall, Send, UserRound, X } from 'lucide-react';
 import { referralSourceOfChannel } from '@/lib/referralChannel';
+import PdpaConsentCheck from '@/components/shared/PdpaConsentCheck';
+import { PDPA_CONSENT_REQUIRED_MESSAGE, PDPA_CONSENT_TEXT_APPLICANT } from '@/lib/pdpaConsent';
 
 const MAX_DOC_MB = 3;
 const DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png';
@@ -100,6 +102,8 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
    */
   const [titlePrefix, setTitlePrefix] = useState('นาย');
   const [firstName, setFirstName] = useState('');
+  /** PDPA (15 ต.ค. 2569) — ต้องติ๊กก่อนส่งใบสมัคร · ข้อความ `src/lib/pdpaConsent.ts` */
+  const [consent, setConsent] = useState(false);
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [age, setAge] = useState('');
@@ -138,6 +142,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
   }, [open]);
 
   const resetForm = () => {
+    setConsent(false);
     setTitlePrefix('นาย');
     setFirstName('');
     setLastName('');
@@ -190,6 +195,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
     if (!province) return setError('กรุณาเลือกจังหวัด');
     if (!district) return setError('กรุณาเลือกอำเภอ/เขต');
     if (!subdistrict) return setError('กรุณาเลือกตำบล/แขวง');
+    if (!consent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE);
 
     setSubmitting(true);
     try {
@@ -234,6 +240,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
            */
           position_interest: (job ? publicJobPositionLabel(job) : posting?.title) || null,
           note: note.trim() || null,
+          pdpa_consent: true,
         }),
       });
       if (!res.ok) {
@@ -575,6 +582,8 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                   />
                 </Field>
               </section>
+
+              <PdpaConsentCheck checked={consent} onChange={setConsent} text={PDPA_CONSENT_TEXT_APPLICANT} />
 
               {error ? (
                 <p className={cn('rounded-xl border px-3.5 py-2.5 text-xs font-medium', TONE.danger.soft, TONE.danger.value)}>

@@ -50,6 +50,8 @@ import { buildImportTemplateBase64 } from '../_lib/importTemplate.js';
 import { splitIrecruitDuplicates } from '../_lib/irecruitDuplicates.js';
 import { listRecruitJobTitles } from '../_lib/recruitJobTitles.js';
 import { logError } from '../_lib/logger.js';
+import { recordApplicationConsent } from '../_lib/applicationConsent.js';
+import { PDPA_CONSENT_REQUIRED_MESSAGE } from '../../src/lib/pdpaConsent.js';
 import { getSiamrajUnitRequestById, loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 import { enqueueLumosInterviewForApplications, NO_INCOME_REASON } from '../_lib/lumosDispatch.js';
 import { loadApplyScriptFacts } from '../_lib/applyScriptFacts.js';
@@ -232,6 +234,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       });
     }
 
+    // PDPA (148 · 15 ต.ค. 2569) — บันทึกจริงต้องยืนยันว่าผู้สมัครในไฟล์ยินยอมแล้ว (ตัวอย่างก่อนบันทึกไม่ต้อง)
+    if (raw?.pdpa_consent !== true) return sendError(res, 400, 'Bad request', PDPA_CONSENT_REQUIRED_MESSAGE);
+
     // บันทึก — ทั้งไฟล์ในธุรกรรมเดียว · ล็อกเบอร์ทีละแถว **เรียงตามเบอร์** (คนนำเข้าพร้อมกันสองไฟล์ไม่ deadlock)
     // แล้วเช็คกติกาสมัครซ้ำอีกรอบ (มีคนสมัครเข้ามาระหว่างดูตัวอย่าง = ข้ามแถวนั้น)
     const staffName = req.user.email || null;
@@ -263,6 +268,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
       return out;
     });
+
+    await recordApplicationConsent(insertedIds, 'import', staffName);
 
     // จดใบที่ซ้ำกับ iRecruit ภายใน 14 วัน (143 · 12 ต.ค. 2569) — ป้าย "ซ้ำ iRecruit" บนแท็บผู้สมัคร
     // อ่าน iRecruit ไม่ได้ = ไม่มีป้าย (ไม่ทำให้การนำเข้าล้ม) · นำเข้าตามกล่อง: ใบซ้ำไม่ส่ง AI (ให้คนเลือก เหมือนตัวส่งอัตโนมัติ)

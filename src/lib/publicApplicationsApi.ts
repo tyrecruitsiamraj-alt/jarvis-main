@@ -337,6 +337,8 @@ export async function createApplicationByStaff(input: {
   channel_id?: string | null;
   channel_label?: string | null;
   license_types?: string[];
+  /** PDPA (15 ต.ค. 2569) — เจ้าหน้าที่ยืนยันว่าผู้สมัครยินยอมแล้ว · server ไม่รับใบถ้าไม่ใช่ true */
+  pdpa_consent: boolean;
 }): Promise<PublicApplication> {
   const r = await apiFetch('/api/job-applications', {
     method: 'POST',

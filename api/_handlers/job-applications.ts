@@ -1,5 +1,7 @@
 import { cancelApplication, isUndefinedTable, loadCancellations, restoreApplication } from '../_lib/applicationCancellations.js';
 import { loadIrecruitDups, type IrecruitDup } from '../_lib/irecruitDuplicates.js';
+import { recordApplicationConsent } from '../_lib/applicationConsent.js';
+import { PDPA_CONSENT_REQUIRED_MESSAGE } from '../../src/lib/pdpaConsent.js';
 import { dbQuery, dbTransaction } from '../_lib/postgres.js';
 import {
   withRbac,
@@ -606,6 +608,8 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
   const parsed = parseStaffApplication(b);
   if (!parsed.ok) return sendError(res, 400, 'Bad request', parsed.message);
   const v = parsed.value;
+  // PDPA (148 · 15 ต.ค. 2569) — เจ้าหน้าที่ต้องยืนยันว่าผู้สมัครยินยอมแล้วก่อนคีย์
+  if (b.pdpa_consent !== true) return sendError(res, 400, 'Bad request', PDPA_CONSENT_REQUIRED_MESSAGE);
 
   const scopedJobIds = await loadScopedJobIdSet(req.user);
   if (scopedJobIds && v.job_id && !scopedJobIds.has(v.job_id)) {
@@ -656,6 +660,7 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
   if (repeat) return sendError(res, 409, 'Conflict', repeatStaffMessage(repeat));
   const row = rows[0];
   if (!row) return sendError(res, 500, 'Server error', 'บันทึกไม่สำเร็จ');
+  await recordApplicationConsent([String(row.id)], 'staff', staffName);
 
   await auditFromAuthed(req, {
     action: 'job_application.create_by_staff',

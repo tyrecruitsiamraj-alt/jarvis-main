@@ -164,15 +164,20 @@ export function TotalIncomeField({ job, onSaved }: { job: JobRequest; onSaved: (
 /**
  * ═══ ผู้สมัครเห็น/AI พูด รายได้รวม หรือ เฉลี่ย — เลือกทีละใบขอ (เจ้าของ Choice 14 ต.ค. 2569) ═══
  * กดแล้วบันทึกเลย (การกดเลือกคือการตั้งใจเปลี่ยน ไม่ใช่การเปิดดู) · ไม่มีรายได้เฉลี่ย = กดเฉลี่ยไม่ได้
+ * 15 ต.ค. 2569: ปุ่มบอกตัวเลขเลย ("รายได้รวม 20,000 บาท/เดือน" · "รายได้เฉลี่ย 18,500 บาท/เดือน") · ไม่มี "ทั้งสอง" แล้ว
  * ฐานเงินเดือนไม่อยู่ในตัวเลือก — ขึ้นเสมอ (เจ้าของ *"ยังไงก็ต้องบอกฐานเงินเดือนนะ"*) · กติกาอยู่ `src/lib/incomeShown.ts`
  */
 export function IncomeShownPicker({
   job,
-  hasAverage,
+  totalText,
+  averageText,
   onSaved,
 }: {
   job: JobRequest;
-  hasAverage: boolean;
+  /** "20,000 บาท/เดือน" — ตัวเดียวกับค่าในกล่อง · ไม่มี = "—" กดไม่ได้ */
+  totalText: string | null;
+  /** "18,500 บาท/เดือน" (เฉลี่ยคนเก่า/ที่ทีมตั้ง) · ไม่มี = "—" กดไม่ได้ */
+  averageText: string | null;
   onSaved: (patch: Partial<JobRequest>) => void;
 }) {
   const current = incomeShownOf(job.field_overrides);
@@ -189,7 +194,7 @@ export function IncomeShownPicker({
     setBusy(true);
     setError(null);
     try {
-      const saved = await saveUnitFieldOverridesPatch(requestNo, { income_shown: next === 'both' ? null : next });
+      const saved = await saveUnitFieldOverridesPatch(requestNo, { income_shown: next });
       onSaved({ field_overrides: saved as JobRequest['field_overrides'] });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
@@ -211,11 +216,14 @@ export function IncomeShownPicker({
           if (v) void choose(v as IncomeShown);
         }}
       >
-        {INCOME_SHOWN_OPTIONS.map((o) => (
-          <ToggleGroupItem key={o.value} value={o.value} disabled={o.value === 'average' && !hasAverage} className="text-xs">
-            {o.label}
-          </ToggleGroupItem>
-        ))}
+        {INCOME_SHOWN_OPTIONS.map((o) => {
+          const amount = o.value === 'average' ? averageText : totalText;
+          return (
+            <ToggleGroupItem key={o.value} value={o.value} disabled={!amount} className="text-xs">
+              {o.label} <span className="tabular-nums">{amount ?? '—'}</span>
+            </ToggleGroupItem>
+          );
+        })}
       </ToggleGroup>
       {error ? (
         <span role="alert" className={cn('text-xs', TONE.danger.value)}>

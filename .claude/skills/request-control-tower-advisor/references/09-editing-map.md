@@ -13349,3 +13349,15 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   ช่องเลือกใบขอเรียงด้วยจังหวัด/งานที่บอก AI ก่อนค่าในใบ
 - เทสต์ `tests/api/greetingCall2569-10-15.test.ts`
 
+### PDPA ช่องยินยอม · ปุ่มสั่งโพสต์ · กล่องรายได้รวมบอกตัวเลข (15 ต.ค. 2569 ค่ำ)
+- PDPA: เจ้าของถาม "มีเรื่อง Pdpa ไหม" (ไม่มีเลย) → Choice "ทำช่องยินยอม รอข้อความจากบริษัท"
+  ข้อความ/ฉบับ/ลิงก์นโยบาย ที่เดียว `src/lib/pdpaConsent.ts` (ฉบับชั่วคราว `draft-2569-10-15` · `PDPA_POLICY_URL = null` รอบริษัท)
+  ช่องติ๊ก `src/components/shared/PdpaConsentCheck.tsx` ใน `PublicApplyDialog` · `AddApplicantDialog` · `ImportApplicantsDialog` (ไม่ติ๊ก = ส่ง/บันทึกไม่ได้)
+  server: `job-applications.ts` createByStaff + `job-applications-import.ts` (บันทึกจริง) ไม่ใช่ true = 400 · `public/apply.ts` จดเมื่อ true (ไม่ปฏิเสธ — หน้าเก่าที่ค้างไม่มีช่อง)
+  จด `app_application_consents` (148 · แถวละใบ · `recordApplicationConsent` `api/_lib/applicationConsent.ts` · จดไม่ได้ไม่ทำให้ใบล้ม)
+  ⚠️ รายชื่อ iRecruit ที่ดึงมาไม่มีบันทึกยินยอมในระบบเรา
+- สั่งโพสต์: `OrderPostButton` (`src/components/jobs/`) แทนป้าย "สมัครงาน" ในการ์ดตัวอย่าง (`PublicJobCardPreview` prop `action`) ทั้ง `BoardPostingPage` และ `BoardPublishSheet`
+  Choice "ผ่านศูนย์งาน api-scraper เดิม" = `createJobPostingRequest` type content (ตัวเดียวกับหน้าจับคู่งาน · `composeJobSnapshot` ย้ายมา `jobPostingRequestsApi.ts`) · มีคำขอ content ค้าง = กดไม่ได้ บอกสถานะ
+- กล่องรายได้รวม: `IncomeShownPicker` ปุ่ม "รายได้รวม 20,000 บาท/เดือน" · "รายได้เฉลี่ย …" (ไม่มีเลข = — กดไม่ได้) · ถอด "ทั้งสอง" · ไม่เคยเลือก = รายได้รวม (`incomeShown.ts`)
+- เทสต์ `tests/api/pdpaOrderPostIncome2569-10-15.test.ts` · `applicationImportHandler.test.ts` (PDPA 2 เคส)
+

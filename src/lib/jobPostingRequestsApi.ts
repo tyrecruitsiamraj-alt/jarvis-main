@@ -1,5 +1,6 @@
 import { apiFetch } from '@/lib/apiFetch';
 import { TONE, type ToneKey } from '@/lib/designTokens';
+import type { JobRequest } from '@/types';
 
 /**
  * คำขอ "โพสหางานใหม่" — สร้าง ID ให้ทีมอื่นรับไปทำคอนเทนต์/โพสหาคนต่อ
@@ -125,3 +126,26 @@ export async function createJobPostingRequest(input: {
   if (!r.ok) return readError(r, 'สร้างคำขอไม่สำเร็จ');
   return (await r.json()) as JobPostingRequest;
 }
+
+/**
+ * ข้อมูลใบขอที่ทีมคอนเทนต์ต้องใช้ (ตำแหน่ง/พื้นที่/รายได้ ฯลฯ) — แนบไปกับคำขอ ปลายทาง (api-scraper) จะได้ไม่เห็นแค่เลขใบขอ
+ * ใช้ทั้งปุ่มในหน้าจับคู่งาน และปุ่ม "สั่งโพสต์" ในป๊อปประกาศ (15 ต.ค. 2569)
+ */
+export function composeJobSnapshot(job: JobRequest): Record<string, unknown> {
+  return {
+    position: job.staff_title_name || job.request_action_name || null,
+    unit_name: job.unit_name || null,
+    location: job.location_address || null,
+    income: job.total_income || null,
+    qty: job.request_positions ?? job.position_units ?? null,
+    gender: job.gender_requirement || null,
+    age_min: job.age_range_min ?? null,
+    age_max: job.age_range_max ?? null,
+    work_schedule: job.work_schedule || null,
+    department: job.department_name || null,
+    urgency: job.urgency || null,
+    required_date: job.required_date || null,
+    note: job.list_note || null,
+  };
+}
+
