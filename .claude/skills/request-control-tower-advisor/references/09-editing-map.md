@@ -13275,3 +13275,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   ชื่อ/ตำแหน่ง/บรรทัดรอง = `jobBoardCardTitle` · `publicJobTitle` · `publicJobCardSubtitle` · ป้ายอายุ `getJobAgeChipInfo` (ตัวเดียวกับ `BoardJobCard`) · ถอดแถบสีซ้าย
 - ผลโทรในการ์ด `LumosJobSummaryStats variant="inline"` (6 ช่องเท่าเดิม) · `SelectionRecallButton` เป็น shadcn Button xs
 - เทสต์ `tests/api/matchingPageBoardLook.test.ts`
+- 15 ต.ค. (ต่อ) เจ้าของ "หน้าจับคู่ก็รก ดูไม่เป็นมืออาชีพ" · Choice "ตัดหนัก เหลือเท่าที่ต้องใช้"
+  แผง AI โทรพับเป็นปุ่ม "AI โทร N" ท้ายแถวชิปกรอง (`AiCallFlowPanel open/onTotal` — พับอยู่ก็ยังโหลดยอด) ·
+  การ์ด = ชื่อ · ตำแหน่ง · ด่วน/ผ่านมา N วัน · ที่อยู่ · เหลือหา + ปุ่มเดียว "ดูคน N" ·
+  ชิปทำต่อ · AI แนะนำ · ผลโทร 6 ช่อง · หาคนจากกองไม่สนใจ ย้ายไปหัวป๊อปรายละเอียด (`matching-detail-moved`)

@@ -119,8 +119,16 @@ function ChipRow({
 
 export default function AiCallFlowPanel({
   defaultSource = 'all',
+  open = true,
+  onTotal,
 }: {
   defaultSource?: CallFunnelSource;
+  /**
+   * `false` = พับอยู่ ไม่วาดอะไร แต่ยังโหลดตัวเลข (ส่งยอดรวมให้ปุ่ม "AI โทร N" ผ่าน `onTotal`)
+   * (เจ้าของ 15 ต.ค. 2569 หน้าจับคู่งาน "ตัดหนัก" — แผงตัวเลขพับเป็นปุ่มเดียว กดแล้วกาง)
+   */
+  open?: boolean;
+  onTotal?: (aiTotal: number | null) => void;
 }) {
   const [source, setSource] = useState<CallFunnelSource>(defaultSource);
   const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
@@ -156,6 +164,12 @@ export default function AiCallFlowPanel({
 
   const cells = aiCallFlowCells(funnel);
   const v2 = useUiV2();
+  const aiTotal = cells.find((c) => c.key === 'total')?.ai ?? null;
+  useEffect(() => {
+    onTotal?.(aiTotal);
+  }, [aiTotal, onTotal]);
+
+  if (!open) return null;
 
   return (
     <div className="space-y-1.5" data-testid="ai-call-flow">

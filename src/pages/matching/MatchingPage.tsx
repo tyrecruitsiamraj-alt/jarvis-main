@@ -5,7 +5,6 @@ import { Card } from '@/components/ui/card';
 import { unitOneLine } from '@/lib/unitDisplay';
 import { conveyorLabel } from '@/lib/soRecruitNav';
 import Term from '@/components/shared/Term';
-import { incomeDisplay } from '@/lib/incomeLabel';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { useUrlDialogHistory } from '@/hooks/useUrlDialogHistory';
@@ -15,7 +14,7 @@ import SelectionRecallButton from '@/components/matching/SelectionRecallButton';
 import SearchField from '@/components/shared/SearchField';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle, Banknote, CalendarDays } from 'lucide-react';
+import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   SEARCH_LEGACY_POOL,
@@ -26,7 +25,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { JobRequest } from '@/types';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
-import { jobBoardCardTitle, publicJobCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import { unitRequestPath } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
@@ -104,7 +103,7 @@ import {
 } from '@/components/matching/LumosPanels';
 import { cardNextAction } from '@/lib/matchingCardAction';
 import { lumosProgressChip } from '@/lib/lumosStatCells';
-import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
+import { EM_DASH } from '@/lib/displayFallback';
 import TierCriteriaTooltip from '@/components/matching/TierCriteriaTooltip';
 import AiEvaluationStatus from '@/components/matching/AiEvaluationStatus';
 import { TIER_CRITERIA } from '@/lib/matchTierCriteria';
@@ -2297,6 +2296,9 @@ const MatchingPage: React.FC = () => {
    * ⚠️ นี่คือ **ทางกรองรายการทางเดียวที่เหลือ** (กล่องตัวกรองถูกถอด 10 ส.ค.) — ห้ามทำหาย
    * "มีคนแนะนำ" ตั้ง sort=green_desc อัตโนมัติ (เรียงเขียวมากสุดตามที่เจ้าของสั่ง)
    */
+  /** แผง AI โทร พับอยู่เป็นค่าเริ่ม (15 ต.ค. 2569) · ยอดรวมมาจากแผงเอง */
+  const [aiFlowOpen, setAiFlowOpen] = useState(false);
+  const [aiFlowTotal, setAiFlowTotal] = useState<number | null>(null);
   const filterChips = useMemo(() => {
     const withRecommend =
       (serverSummary?.withGreen ?? urgentSummary.greenSuggested) + (serverSummary?.withYellow ?? 0);
@@ -2404,7 +2406,6 @@ const MatchingPage: React.FC = () => {
         {/* แผง "AI โทร" — 2 แถวสถานะเดียวกัน (AI · คนเก็บไปโทร) ในกรอบเดียว
             (เจ้าของสั่ง 14 ส.ค. 2569 · แทน CallFunnelPanel เดิมที่เป็น funnel 4 ช่อง)
             ⚠️ หน้า Follow ยังใช้ CallFunnelPanel อยู่ — แผงนี้เฉพาะหน้า Matching */}
-        <AiCallFlowPanel defaultSource="all" />
 
         {/* แถบชิปกรองรายการ — แทน "ขั้น 1 ฝั่งงาน" เดิม (ทางกรองทางเดียวที่เหลือ ห้ามทำหาย)
             โฉมเดียวกับชิปเลนหน้าโพสต์ประกาศ (15 ต.ค. 2569): ปุ่ม xs · ทึบเมื่อเลือก · เลขต่อท้าย */}
@@ -2424,7 +2425,21 @@ const MatchingPage: React.FC = () => {
               <span className={cn('tabular-nums', !c.active && TONE[c.tone].value)}>{c.count.toLocaleString('th-TH')}</span>
             </Button>
           ))}
+          {/* แผง AI โทร พับเป็นปุ่มเดียว (15 ต.ค. 2569 ตัดหนัก) — กดแล้วกางแถวตัวเลข 2 แถวใต้แถบนี้ */}
+          <Button
+            type="button"
+            size="xs"
+            variant={aiFlowOpen ? 'secondary' : 'ghost'}
+            onClick={() => setAiFlowOpen((v) => !v)}
+            aria-expanded={aiFlowOpen}
+            className="ml-auto shrink-0"
+          >
+            AI โทร
+            <span className="tabular-nums">{aiFlowTotal === null ? '…' : aiFlowTotal.toLocaleString('th-TH')}</span>
+            <ChevronDown className={cn('transition-transform', aiFlowOpen && 'rotate-180')} aria-hidden />
+          </Button>
         </div>
+        <AiCallFlowPanel defaultSource="all" open={aiFlowOpen} onTotal={setAiFlowTotal} />
 
         {/* ⚠️ MyCallsSection ("โทรของฉัน") เคยอยู่ตรงนี้ (14 ส.ค. เช้า) — เจ้าของสั่งย้าย
             (14 ส.ค.): "เก็บไปโทรเองแล้วไปอยู่ไหนหาไม่เจอ · ให้ไปอยู่หน้าการติดต่อ"
@@ -2577,18 +2592,9 @@ const MatchingPage: React.FC = () => {
               : serverStoredMatches[j.id]
                 ? serverStoredMatches[j.id].recommended
                 : undefined;
-            const progress = proposalCounts(proposalsByJobId[j.id]);
             const requested = requestPositionCount(j);
             const remaining = officialRemainingCount(j);
             const age = getJobAgeChipInfo(j);
-            const subtitle = publicJobCardSubtitle(j);
-            const inc = incomeDisplay({
-              totalIncome: j.total_income,
-              monthlyIncome: j.monthly_income,
-              displayPeriod: j.income_display?.period ?? null,
-            });
-            const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
-            const progressChip = lumosProgressChip(progress);
             return (
               <Card
                 key={j.id}
@@ -2611,7 +2617,6 @@ const MatchingPage: React.FC = () => {
                       {jobBoardCardTitle(j)}
                     </h2>
                     <p className="line-clamp-1 text-base font-medium text-primary">{publicJobTitle(j)}</p>
-                    {subtitle ? <p className={cn('line-clamp-2 text-sm', DASH.muted)}>{subtitle}</p> : null}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     {j.urgency === 'urgent' ? (
@@ -2623,56 +2628,12 @@ const MatchingPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* ── ทำอะไรต่อ + AI แนะนำ + ชิปพิเศษของผลโทร ── */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {action ? (
-                    <span title={action.text} className={cn(TONE[action.tone].chip, 'max-w-full truncate')}>
-                      {action.text}
-                    </span>
-                  ) : null}
-                  {matchCount != null ? (
-                    <span
-                      title="จำนวนที่ AI แนะนำจากคนของเรา — ยังไม่ใช่การยืนยันว่าพร้อมลงงาน"
-                      className={cn(TONE.success.chip, 'shrink-0')}
-                    >
-                      AI แนะนำ {matchCount}
-                    </span>
-                  ) : quickCounts[j.id] ? (
-                    /* เลข "ประมาณ" ต้องต่างจากเลข "ยืนยันแล้ว" ด้วยตา — เส้นประ = ยังไม่ผ่าน AI */
-                    <span
-                      title="ประมาณการเบื้องต้นจากสกิล (ยังไม่ผ่าน AI) — กดเพื่อให้ AI คัดจริง"
-                      className={cn(TONE.neutral.chip, 'shrink-0 border-dashed')}
-                    >
-                      ~{quickCounts[j.id]} (ยังไม่ผ่าน AI)
-                    </span>
-                  ) : null}
-                  <LumosJobStatChips s={serverLumosSummary[j.id]} />
-                  {progressChip ? (
-                    <span className={cn(TONE[progressChip.tone].chip, 'shrink-0 whitespace-nowrap tabular-nums')}>
-                      {progressChip.text}
-                    </span>
-                  ) : null}
-                </div>
-
-                {/* ── ที่ไหน · เงินเท่าไหร่ · ต้องการเมื่อไหร่ (หน่วยติดเลขเสมอ — lib/incomeLabel) ── */}
-                <div className={cn('space-y-1 text-sm', DASH.muted)}>
-                  <p className="flex min-w-0 items-start gap-1.5">
-                    <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
-                    <span className="line-clamp-2 min-w-0">{j.location_address || EM_DASH}</span>
-                  </p>
-                  <p className="flex min-w-0 items-center gap-1.5" title={inc?.hint ?? undefined}>
-                    <Banknote className="size-4 shrink-0" aria-hidden />
-                    <span className="truncate">{inc ? inc.text : '— บาท'}</span>
-                  </p>
-                  <p className="flex min-w-0 items-center gap-1.5">
-                    <CalendarDays className="size-4 shrink-0" aria-hidden />
-                    <span className="truncate">ต้องการ {formatYmdDmyBe(j.required_date)}</span>
-                    <span className="ml-auto shrink-0 font-mono text-xs">{dashIfEmpty(j.request_no)}</span>
-                  </p>
-                </div>
-
-                {/* ── ผลโทรในใบนี้ — บรรทัดเดียว 6 ช่องเท่าเดิม (ใบที่ยังไม่ส่งโทร = 0 ทุกช่อง ไม่หาย) ── */}
-                <LumosJobSummaryStats s={serverLumosSummary[j.id]} variant="inline" />
+                {/* ── ที่ไหน — ของอื่น (ชิปทำต่อ · AI แนะนำ · เงิน/วันที่ · ผลโทร · หาคนจากกองไม่สนใจ) อยู่ในป๊อปรายละเอียด
+                    (เจ้าของ 15 ต.ค. 2569 "หน้าจับคู่ก็รก ดูไม่เป็นมืออาชีพ" · Choice "ตัดหนัก เหลือเท่าที่ต้องใช้") ── */}
+                <p className={cn('flex min-w-0 items-start gap-1.5 text-sm', DASH.muted)}>
+                  <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <span className="line-clamp-2 min-w-0">{j.location_address || EM_DASH}</span>
+                </p>
 
                 {/* ── ก้นการ์ด: เหลือหา + ปุ่มทำต่อ ── */}
                 <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2">
@@ -2680,28 +2641,19 @@ const MatchingPage: React.FC = () => {
                     เหลือหา <b className={cn('tabular-nums', TONE.warn.value)}>{remaining}</b>
                     <span className={DASH.muted}> / {requested} อัตรา</span>
                   </p>
-                  <div className="flex flex-wrap items-center justify-end gap-1.5">
-                    <SelectionRecallButton jobId={j.id} />
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openJob(j);
-                      }}
-                      className="shrink-0 rounded-lg"
-                    >
-                      <Users aria-hidden />
-                      {matchCount != null
-                        ? `ดูคนของเรา (${matchCount})`
-                        : boardLoadingId === j.id
-                          ? 'กำลังโหลดผล…'
-                          : boardWaitingById[j.id]
-                            ? 'AI กำลังคิดที่หลังบ้าน…'
-                            : 'หาคนของเรา'}
-                    </Button>
-                  </div>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openJob(j);
+                    }}
+                    className="shrink-0 rounded-lg"
+                  >
+                    <Users aria-hidden />
+                    {boardLoadingId === j.id ? 'กำลังโหลด…' : matchCount != null ? `ดูคน ${matchCount}` : 'ดูคน'}
+                  </Button>
                 </div>
               </Card>
             );
@@ -2854,6 +2806,30 @@ const MatchingPage: React.FC = () => {
                     {jobDetail.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
                   </span>
                 </div>
+                {/* ย้ายมาจากการ์ด (15 ต.ค. 2569 ตัดหนัก): ทำอะไรต่อ · AI แนะนำ · ผลโทรในใบนี้ · หาคนจากกองไม่สนใจ */}
+                {(() => {
+                  const mc = boardMatchById[jobDetail.id]
+                    ? recommendedCandidateCount(boardMatchById[jobDetail.id].matches)
+                    : serverStoredMatches[jobDetail.id]?.recommended;
+                  const action = cardNextAction(mc, serverLumosSummary[jobDetail.id]);
+                  const progressChip = lumosProgressChip(proposalCounts(proposalsByJobId[jobDetail.id]));
+                  return (
+                    <div className="space-y-2 border-t border-border/70 pt-2" data-testid="matching-detail-moved">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {action ? <span className={cn(TONE[action.tone].chip, 'max-w-full truncate')}>{action.text}</span> : null}
+                        {mc != null ? <span className={cn(TONE.success.chip, 'shrink-0')}>AI แนะนำ {mc}</span> : null}
+                        <LumosJobStatChips s={serverLumosSummary[jobDetail.id]} />
+                        {progressChip ? (
+                          <span className={cn(TONE[progressChip.tone].chip, 'shrink-0 whitespace-nowrap tabular-nums')}>{progressChip.text}</span>
+                        ) : null}
+                      </div>
+                      <LumosJobSummaryStats s={serverLumosSummary[jobDetail.id]} variant="inline" />
+                      <div className="flex justify-end">
+                        <SelectionRecallButton jobId={jobDetail.id} />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {(() => {

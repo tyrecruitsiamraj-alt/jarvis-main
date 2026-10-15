@@ -29,8 +29,17 @@ describe('หน้าจับคู่งาน = โฉมโพสต์ป�
     expect(page).not.toContain("'absolute inset-y-0 left-0 w-1.5'");
   });
 
-  it('ผลโทรในการ์ด บรรทัดเดียว 6 ช่องเท่าเดิม (ว่าง = 0 ไม่หาย)', () => {
-    expect(page).toContain('<LumosJobSummaryStats s={serverLumosSummary[j.id]} variant="inline" />');
+  it('ตัดหนัก (15 ต.ค. 2569): แผง AI โทรพับเป็นปุ่ม · การ์ดปุ่มเดียว · ของที่ตัดย้ายไปป๊อปรายละเอียด', () => {
+    expect(page).toContain('<AiCallFlowPanel defaultSource="all" open={aiFlowOpen} onTotal={setAiFlowTotal} />');
+    expect(page).toContain('useState(false);\n  const [aiFlowTotal');
+    expect(panel).toContain('if (!open) return null;');
+    const grid = page.slice(page.indexOf('data-testid="matching-job-grid"'), page.indexOf('data-testid="matching-job-grid"') + 6000);
+    expect(grid).not.toContain('<SelectionRecallButton');
+    expect(grid).not.toContain('LumosJobSummaryStats');
+    const moved = page.slice(page.indexOf('data-testid="matching-detail-moved"') - 2000);
+    expect(moved).toContain('cardNextAction(mc, serverLumosSummary[jobDetail.id])');
+    expect(moved).toContain('<LumosJobSummaryStats s={serverLumosSummary[jobDetail.id]} variant="inline" />');
+    expect(moved).toContain('<SelectionRecallButton jobId={jobDetail.id} />');
     expect(stats).toContain("if (variant === 'inline')");
   });
 });
