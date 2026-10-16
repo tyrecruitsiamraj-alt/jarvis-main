@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
+import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import FollowCompleteControls from '@/components/follow/FollowCompleteControls';
 import { useListPagination } from '@/hooks/useListPagination';
 import { cn } from '@/lib/utils';
@@ -45,11 +46,12 @@ import {
   buildMoveCalls,
   continueStartYmd,
   firstContinueDraft,
-  firstMoveRound,
+  firstMoveRoundFor,
   isAftercareTopic,
+  isMoveDayPast,
   lastFollowYmd,
-  moveBaseYmd,
   moveRoundDays,
+  startYmdOfRounds,
   nextMoveRound,
   openFollowRounds,
   validateContinue,
@@ -258,24 +260,32 @@ const MoveToAftercareDialog: React.FC<{
   onDone: (notice: string) => void;
 }> = ({ person, followTeam, now, onClose, onDone }) => {
   // เปิดคนใหม่ = ฟอร์มเริ่มใหม่ — หน้าแม่ใส่ `key` ตามคน (remount) ห้ามค้างรอบของคนก่อน
-  const [rounds, setRounds] = useState<MoveRoundDraft[]>(() => [firstMoveRound()]);
+  const g = person?.group ?? null;
+  /**
+   * 🔴 วันฐาน = วันเริ่มงาน (เจ้าของ 16 ต.ค. 2569 "นับจากวันที่เริ่มงานแทน ปรับจากหน้า UI ให้ได้ด้วย")
+   * ค่าเริ่มจากวันเริ่มงานที่กรอกไว้ในชุด · แก้ได้ในป๊อป · ไม่มี = ว่าง ต้องเลือกก่อนกด (ห้ามเดา)
+   * รอบแรกนับจากวันเริ่มงาน รอบถัดไปบวกต่อจากรอบก่อน (กติกา 5 ต.ค. เดิม)
+   */
+  const [startYmd, setStartYmd] = useState<string>(() => (g ? startYmdOfRounds(g.rounds) : null) ?? '');
+  const [rounds, setRounds] = useState<MoveRoundDraft[]>(() => [firstMoveRoundFor(startYmd || null, now())]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const g = person?.group ?? null;
   const aftercare = isAftercareTopic(g?.topic);
   const title = aftercare ? 'ตามต่อ' : 'ย้ายไปดูแลหลังเริ่มงาน';
   const today = now();
-  /** วันฐาน = วันติดตามวันสุดท้ายของชุด (ไม่ย้อนหลังวันนี้) · รอบแรกนับจากวันฐาน รอบถัดไปบวกต่อจากรอบก่อน */
-  const lastYmd = g ? lastFollowYmd(g.rounds, today) : null;
-  const baseYmd = lastYmd ? moveBaseYmd(lastYmd, today) : null;
+  const baseYmd = startYmd || null;
   const roundDays = baseYmd ? moveRoundDays(rounds, baseYmd) : rounds.map(() => null);
 
   const patch = (i: number, next: Partial<MoveRoundDraft>) =>
     setRounds((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...next } : r)));
 
   const submit = async () => {
-    if (!g || !baseYmd || busy) return;
+    if (!g || busy) return;
+    if (!baseYmd) {
+      setError('เลือกวันเริ่มงานก่อน');
+      return;
+    }
     const invalid = validateMoveRounds(rounds, baseYmd, now());
     if (invalid) {
       setError(invalid);
@@ -293,6 +303,8 @@ const MoveToAftercareDialog: React.FC<{
         unit_name: g.unitName,
         // ค่าว่างไม่ส่งเป็นรหัสไซต์ (QA รอบ 2 ข้อ 27)
         site_code: g.siteCode || null,
+        // หน้าดูแลหลังเริ่มงานได้วันเริ่มงานเดียวกัน (เดิมย้ายมาแล้ววันเริ่มงานว่าง)
+        start_date: baseYmd,
         from_follow_id: latest?.id ?? null,
         source: 'follow_done',
       });
@@ -319,6 +331,8 @@ const MoveToAftercareDialog: React.FC<{
         group_id: crypto.randomUUID(),
         unit_name: g.unitName || undefined,
         site_code: g.siteCode || undefined,
+        // รอบถามความเป็นอยู่ถือวันเริ่มงานไว้ด้วย — กด "ตามต่อ" ครั้งหน้าได้ค่าเริ่มเดิม
+        start_date: baseYmd,
         rounds: calls.map((c) => ({
           scheduled_at: c.scheduledAt,
           staff_phone: c.staffPhone || undefined,
@@ -354,16 +368,20 @@ const MoveToAftercareDialog: React.FC<{
           </DialogDescription>
         </DialogHeader>
 
-        {lastYmd && baseYmd ? (
-          <p className="text-xs text-muted-foreground" data-testid="move-base-day">
-            ติดตามวันสุดท้าย <span className="tabular-nums text-foreground">{formatYmdTh(lastYmd)}</span>
-            {baseYmd !== lastYmd ? (
-              <>
-                {' · '}นับจากวันนี้ <span className="tabular-nums text-foreground">{formatYmdTh(baseYmd)}</span>
-              </>
-            ) : null}
-          </p>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2" data-testid="move-base-day">
+          <span className="text-xs font-medium text-muted-foreground">นับจากวันเริ่มงาน</span>
+          <DateSelectDmyBe
+            value={startYmd}
+            onChange={(v) => {
+              setStartYmd(v);
+              setError(null);
+            }}
+            allowEmpty
+            withWeekday={false}
+            disabled={busy}
+            ariaLabel="วันเริ่มงาน"
+          />
+        </div>
 
         <ol className="space-y-2" aria-label="รอบโทร">
           {rounds.map((r, i) => {
@@ -416,6 +434,9 @@ const MoveToAftercareDialog: React.FC<{
                   <span className="text-xs tabular-nums text-foreground" data-testid="move-round-day">
                     {day ? formatYmdTh(day) : '—'}
                   </span>
+                  {isMoveDayPast(day, r.time, today) ? (
+                    <span className={cn('text-xs font-medium', TONE.danger.value)}>ผ่านมาแล้ว</span>
+                  ) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <TimeSelect24

@@ -13422,3 +13422,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - 🔴 ถอดเส้นดึง ERP ทั้งเส้น: `/api/follow-unit-info` · `api/_lib/followUnitInfo.ts` · `src/lib/followInsurance.ts` (บรรทัดประกันแบบใบขอ 16 ต.ค. เช้า) · `fetchFollowUnitInfo`
   · `follow_entries.insurance_type` ยังเป็น text (ไม่ผูก FK) — รายการเก่าที่ดึงจาก ERP ยังอ่านได้ในป๊อปรอบโทร
 - เทสต์ `tests/api/followInsuranceDropdown2569-10-16.test.ts` · `followStartInsurance.test.ts`
+
+### ติดตามครบ → ย้ายไปดูแลหลังเริ่มงาน นับจากวันเริ่มงาน (16 ต.ค. 2569)
+- เจ้าของ: "เปลี่ยนการติดตามดูแลหลังเริ่มงานนับจากวันที่เริ่มงานแทน ปรับจากหน้า UI ให้ได้ด้วย" (เดิม 5 ต.ค. = วันติดตามวันสุดท้าย)
+- `src/lib/followAftercareMove.ts`: `startYmdOfRounds` (วันเริ่มงานล่าสุดที่กรอกในชุด · 145) · `firstMoveRoundFor` (ปุ่มลัดอันแรกที่ยังไม่ผ่าน) · `isMoveDayPast` · ถอด `moveBaseYmd`
+  · รอบยังบวกต่อกัน (3 → 7 → 15 → 30) จากวันเริ่มงาน · `validateMoveRounds` ยังกันรอบที่ผ่านแล้ว
+- `FollowCompletedCard.tsx` ป๊อปย้าย/ตามต่อ: ช่อง "นับจากวันเริ่มงาน" (`DateSelectDmyBe` แก้ได้) · ไม่มี = ว่าง ต้องเลือก ("เลือกวันเริ่มงานก่อน" · ห้ามเดา) · ป้าย "ผ่านมาแล้ว" ข้างวันของรอบ
+  · ส่ง `start_date` ไปทั้ง `/api/aftercare` (หน้าดูแลได้วันเริ่มงานเดียวกัน — ปิดค้างเดิม "ย้ายแล้ววันเริ่มงานว่าง") และรอบถามความเป็นอยู่
+- "ไม่ย้าย › ติดตามต่อ" ยังนับจากวันติดตามวันสุดท้ายเหมือนเดิม (`continueStartYmd`)
+- เทสต์ `tests/api/followAftercareMove.test.ts` · `src/components/follow/FollowCompletedCard.test.tsx`

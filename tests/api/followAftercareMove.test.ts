@@ -21,8 +21,10 @@ import {
   continueStartYmd,
   firstContinueDraft,
   lastFollowYmd,
-  moveBaseYmd,
   moveRoundDays,
+  firstMoveRoundFor,
+  isMoveDayPast,
+  startYmdOfRounds,
   parseContinueDays,
   validateContinue,
   MOVE_DAY_PRESETS,
@@ -228,13 +230,28 @@ describe('อื่น ๆ', () => {
   });
 });
 
-describe('วันฐานไม่ย้อนหลังวันนี้ (QA 5 ต.ค. 2569)', () => {
-  const today = new Date('2026-10-05T03:00:00Z'); // 10:00 ไทย
-  it('วันสุดท้ายผ่านมาแล้ว (23/9) ⇒ นับจากวันนี้ · รอบแรก 3 วัน = 8/10 ไม่ใช่ 26/9', () => {
-    expect(moveBaseYmd('2026-09-23', today)).toBe('2026-10-05');
-    expect(moveRoundDays([{ days: '3', time: '09:00', mode: 'ai' }], moveBaseYmd('2026-09-23', today))[0]).toBe('2026-10-08');
+describe('🔴 วันฐาน = วันเริ่มงาน (เจ้าของ 16 ต.ค. 2569 "นับจากวันที่เริ่มงานแทน ปรับจากหน้า UI ให้ได้ด้วย")', () => {
+  const now = new Date('2026-10-05T03:00:00Z'); // 5 ต.ค. 10:00 ไทย
+  it('ค่าเริ่ม = วันเริ่มงานล่าสุดที่กรอกไว้ในชุด · ไม่มี = null (ให้คนเลือก ห้ามเดา)', () => {
+    expect(startYmdOfRounds([{ start_date: null }, { start_date: '2026-09-28' }, { start_date: '2026-09-20' }])).toBe('2026-09-28');
+    expect(startYmdOfRounds([{ start_date: '2026-09-28T00:00:00.000Z' }])).toBe('2026-09-28');
+    expect(startYmdOfRounds([{ start_date: null }, { start_date: 'มั่ว' }])).toBeNull();
   });
-  it('วันสุดท้ายยังไม่ถึง ⇒ บวกจากวันสุดท้ายตามที่เจ้าของสั่ง', () => {
-    expect(moveBaseYmd('2026-10-07', today)).toBe('2026-10-07');
+  it('บวกต่อกันจากวันเริ่มงาน: เริ่ม 28 ก.ย. · 7 → 15 = 5 ต.ค. / 20 ต.ค.', () => {
+    expect(moveRoundDays([r('7'), r('15')], '2026-09-28')).toEqual(['2026-10-05', '2026-10-20']);
+  });
+  it('รอบแรกตอนเปิด = ปุ่มลัดอันแรกที่ยังไม่ผ่าน (บทเรียน QA 5 ต.ค.: ฐานในอดีต + 3 ตกวันที่ผ่านแล้ว)', () => {
+    // 28 ก.ย. + 3 = 1 ต.ค. ผ่านแล้ว · + 7 = 5 ต.ค. 07:00 ผ่านแล้ว (ตอนนี้ 10:00) · + 15 = 13 ต.ค.
+    expect(firstMoveRoundFor('2026-09-28', now)).toEqual({ days: '15', time: MOVE_DEFAULT_TIME, mode: 'ai' });
+    expect(firstMoveRoundFor('2026-10-04', now).days).toBe('3');
+    // ผ่านหมด = ปุ่มท้าย (ป้าย "ผ่านมาแล้ว" บอกเอง) · ไม่มีวันเริ่มงาน = ค่าเริ่มเดิม
+    expect(firstMoveRoundFor('2026-01-01', now).days).toBe('30');
+    expect(firstMoveRoundFor(null, now)).toEqual(firstMoveRound());
+  });
+  it('ป้ายผ่านมาแล้ว: วัน + เวลาไทย เทียบกับตอนนี้', () => {
+    expect(isMoveDayPast('2026-10-05', '07:00', now)).toBe(true);
+    expect(isMoveDayPast('2026-10-05', '11:00', now)).toBe(false);
+    expect(isMoveDayPast(null, '07:00', now)).toBe(false);
   });
 });
+

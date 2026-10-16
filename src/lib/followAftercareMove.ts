@@ -8,7 +8,7 @@
  *
  * 🔴 5 ต.ค. 2569 (เจ้าของ): *"ติดตาม 5/ตค ดูแลหลังเริ่มงาน 3 ก็บวกไป พอเลือก 7 ก็บวกต่อจากของ 3
  * เป็นวันที่ 15"* + Choice "นับจากวันติดตามวันสุดท้าย" ⇒
- *   · วันฐาน = วันติดตามวันสุดท้ายของชุด (ไม่ใช่วันที่กดปุ่ม)
+ *   · วันฐาน = วันติดตามวันสุดท้ายของชุด (ไม่ใช่วันที่กดปุ่ม) — ⚠️ 16 ต.ค. 2569 เปลี่ยนเป็นวันเริ่มงาน (`startYmdOfRounds`)
  *   · จำนวนวันของแต่ละรอบ = **บวกต่อจากรอบก่อนหน้า** (3 → 7 → 15 → 30 = 8 / 15 / 30 ต.ค. / 29 พ.ย.)
  *   · ปุ่มลัดเพิ่ม 15 · รอบที่ตกวันเวลาที่ผ่านมาแล้วกดไม่ได้ (บอกรอบไหน)
  * "ไม่ย้าย" มีทาง **ติดตามต่อ** อีก N วัน (Choice เดียวกัน) — `buildContinueCalls`
@@ -26,7 +26,7 @@ export type MoveRoundMode = 'ai' | 'manual';
 
 /** หนึ่งรอบบนฟอร์ม — เก็บเป็นข้อความตามช่อง (ช่องตัวเลขพิมพ์ค้างได้ระหว่างแก้) */
 export type MoveRoundDraft = {
-  /** อีกกี่วันนับต่อจากรอบก่อนหน้า (รอบแรก = นับจากวันติดตามวันสุดท้าย) */
+  /** อีกกี่วันนับต่อจากรอบก่อนหน้า (รอบแรก = นับจากวันเริ่มงาน · 16 ต.ค. 2569) */
   days: string;
   /** HH:MM เวลาไทย */
   time: string;
@@ -86,7 +86,7 @@ function isTime24(value: string): boolean {
 
 /**
  * ผิดตรงไหน (ข้อความขึ้นบนจอ) · ถูกหมด = null
- * `baseYmd` = วันติดตามวันสุดท้าย · `now` = กันตั้งรอบในวันเวลาที่ผ่านมาแล้ว
+ * `baseYmd` = วันเริ่มงาน (16 ต.ค. 2569 · เดิมวันติดตามวันสุดท้าย) · `now` = กันตั้งรอบในวันเวลาที่ผ่านมาแล้ว
  * (บวกต่อกัน ⇒ วันของรอบหลังมากกว่ารอบก่อนเสมอ ซ้ำกันไม่ได้อยู่แล้ว)
  */
 export function validateMoveRounds(
@@ -220,13 +220,37 @@ export function parseContinueDays(value: string): number | null {
 }
 
 /**
- * วันฐานของ "ย้ายไปดูแลหลังเริ่มงาน" = วันติดตามวันสุดท้าย **แต่ไม่ย้อนหลังวันนี้**
- * (QA 5 ต.ค. 2569: ติดตามวันสุดท้าย 23/9 + 3 = 26/9 ซึ่งผ่านมาแล้ว ⇒ กดยืนยันขึ้น "ผ่านมาแล้ว" ทุกคน ต้องแก้วันเองทุกครั้ง)
- * ชุดที่ยังไม่ถึงวันสุดท้าย ⇒ บวกจากวันสุดท้ายตามที่เจ้าของสั่ง (5 ต.ค. 2569) เหมือนเดิม
+ * 🔴 16 ต.ค. 2569 เจ้าของ: *"เปลี่ยนการติดตามดูแลหลังเริ่มงานนับจากวันที่เริ่มงานแทน ปรับจากหน้า UI ให้ได้ด้วย"*
+ * วันฐานของ "ย้ายไปดูแลหลังเริ่มงาน" / "ตามต่อ" = **วันเริ่มงาน** (เดิม = วันติดตามวันสุดท้าย 5 ต.ค.) · รอบยังบวกต่อกันเหมือนเดิม
+ * ค่าเริ่ม = วันเริ่มงานที่กรอกไว้ในรายการของชุด (ฟอร์มเพิ่มคน ขั้น 1 · 145) · ไม่มี = ว่าง ให้คนเลือกในป๊อป (ห้ามเดา)
  */
-export function moveBaseYmd(lastYmd: string, today: Date): string {
-  const t = bangkokYmd(today);
-  return lastYmd > t ? lastYmd : t;
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function startYmdOfRounds(rounds: readonly Pick<FollowEntry, 'start_date'>[]): string | null {
+  let best: string | null = null;
+  for (const r of rounds) {
+    const v = (r.start_date ?? '').trim().slice(0, 10);
+    if (YMD_RE.test(v) && (!best || v > best)) best = v;
+  }
+  return best;
+}
+
+/** รอบนี้ (วัน + เวลาไทย) ผ่านมาแล้วหรือยัง — ใช้ขึ้นป้ายข้างวันที่ก่อนกดยืนยัน */
+export function isMoveDayPast(day: string | null, time: string, now: Date): boolean {
+  if (!day || !isTime24(time)) return false;
+  const iso = bangkokInputToIso(`${day}T${time.trim()}`);
+  return Boolean(iso) && Date.parse(iso as string) <= now.getTime();
+}
+
+/**
+ * รอบแรกตอนเปิดป๊อป — ปุ่มลัดอันแรกที่วันยังไม่ผ่าน (นับจากวันเริ่มงาน)
+ * (บทเรียน QA 5 ต.ค.: ฐานในอดีต + 3 วัน ตกวันที่ผ่านแล้วทุกคน) · ผ่านหมด = ปุ่มท้าย (ป้ายผ่านมาแล้วบอกเอง)
+ */
+export function firstMoveRoundFor(startYmd: string | null, now: Date): MoveRoundDraft {
+  const base = firstMoveRound();
+  if (!startYmd) return base;
+  const days = MOVE_DAY_PRESETS.find((d) => !isMoveDayPast(addDaysToYmd(startYmd, d), base.time, now));
+  return { ...base, days: String(days ?? MOVE_DAY_PRESETS[MOVE_DAY_PRESETS.length - 1]) };
 }
 
 /**
