@@ -87,6 +87,9 @@ describe('ทุกจุดใช้ความหมายเดียวก�
     expect(src.match(/\$\{POSTING_OWNER_SQL\},/g)?.length).toBe(2);
     expect(src).toContain("coalesce(nullif(btrim(p.responsible_name), ''), nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''))");
     expect(src).toContain('posting_owner_name: r.posting_owner_name || undefined,');
+    // สมัครผ่านหน้าประกาศโดยไม่ผ่านลิงก์ = คนที่กดประกาศใบขอนั้น (เจ้าของ "หน้าประกาศก็ดูสิ่ใครส่งขึ้นไป")
+    expect(src).toContain("left join ${tableInAppSchema('users')} ru on ru.id::text = r.released_by::text");
+    expect(src).toContain('where a.posting_id is null and r.job_id = a.job_id)');
   });
 
   it('หน้าแม่ส่งชื่อผู้สรรหาเข้าป๊อปทุกทาง (แท็บผู้สมัคร · การติดต่อ · ป๊อปการ์ดใบขอ)', () => {

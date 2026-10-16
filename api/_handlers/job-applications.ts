@@ -265,12 +265,19 @@ const CHANNEL_LABEL_SQL = `coalesce(nullif(a.channel_label, ''), (select l.chann
 /**
  * ผู้รับผิดชอบของลิงก์ที่คนนี้สมัครเข้ามา = ทีม Online (เจ้าของ 16 ต.ค. 2569: *"ผู้รับผิดชอบ ก็ทีม online อะ ว่าน เจมส์"*)
  * ผู้รับผิดชอบที่ตั้งไว้ตอน Gen link → ไม่ได้ตั้ง = คนสร้างลิงก์ (ชื่อเล่นหน้าผู้ใช้งาน · ช่องเดียวกับ "ผู้สร้างช่องทาง" ของ iRecruit)
- * ใบที่ไม่ได้มาทางลิงก์ (iRecruit · คีย์เอง · นำเข้า) = null · ⚠️ อ้าง `a.posting_id` (มีตั้งแต่ 063 ทุกฐาน)
+ * 🔴 สมัครผ่านหน้าประกาศโดยไม่ผ่านลิงก์ = คนที่กดประกาศใบขอนั้น (`job_public_releases.released_by` · เจ้าของ "หน้าประกาศก็ดูสิ่ใครส่งขึ้นไป")
+ * ใบที่ไม่รู้ทั้งคู่ (iRecruit/คีย์เองใช้ `responsible_name` ของใบ) = null · ⚠️ อ้าง `a.posting_id` / `a.job_id` (มีตั้งแต่ 063 ทุกฐาน)
  */
-const POSTING_OWNER_SQL = `(select coalesce(nullif(btrim(p.responsible_name), ''), nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''))
-     from ${tableInAppSchema('recruit_postings')} p
-     left join ${tableInAppSchema('users')} u on u.id::text = p.created_by_user_id::text
-    where p.id = a.posting_id) as posting_owner_name`;
+const POSTING_OWNER_SQL = `coalesce(
+    (select coalesce(nullif(btrim(p.responsible_name), ''), nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''))
+       from ${tableInAppSchema('recruit_postings')} p
+       left join ${tableInAppSchema('users')} u on u.id::text = p.created_by_user_id::text
+      where p.id = a.posting_id),
+    (select coalesce(nullif(btrim(ru.nickname), ''), nullif(btrim(ru.full_name), ''))
+       from ${tableInAppSchema('job_public_releases')} r
+       left join ${tableInAppSchema('users')} ru on ru.id::text = r.released_by::text
+      where a.posting_id is null and r.job_id = a.job_id)
+  ) as posting_owner_name`;
 
 const LIST_COLUMNS = `
   id, full_name, title_prefix, first_name, last_name, phone, age, gender,
