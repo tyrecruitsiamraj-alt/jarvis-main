@@ -545,7 +545,8 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
   const cut = (v: unknown, max: number) => (getString(v) || '').slice(0, max) || null;
   const extraFields: FollowExtraFields = {
     startDate,
-    insuranceType: cut(body.insurance_type, 300),
+    // 1500 (16 ต.ค. 2569) — บรรทัดประกันแบบใบขอ + ความคุ้มครอง P/A ยาวเกิน 300
+    insuranceType: cut(body.insurance_type, 1500),
     customerName: cut(body.customer_name, 200),
     customerContact: cut(body.customer_contact, 200),
     customerPhone: cut(body.customer_phone, 40),

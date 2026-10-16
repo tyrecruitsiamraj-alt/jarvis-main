@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -1059,7 +1060,8 @@ const FollowPage: React.FC = () => {
     fetchFollowUnitInfo({ siteCode: siteCode.trim(), requestNo: unitRequestNo.trim() || undefined })
       .then((info) => {
         if (!alive) return;
-        setInsuranceType(info.insurance.join(' / '));
+        // บรรทัดละรายการแบบใบขอที่พิมพ์ (16 ต.ค. 2569 · `src/lib/followInsurance.ts`)
+        setInsuranceType(info.insurance.join('\n'));
         setCustomerName(info.customerName ?? '');
         setCustomerContact([info.contactName, info.contactPosition].filter(Boolean).join(' · '));
         setCustomerPhone(info.contactPhone ?? '');
@@ -2429,7 +2431,7 @@ const FollowPage: React.FC = () => {
               ) : null}
               <DialogTitle>เพิ่มคนที่ต้องการติดตาม</DialogTitle>
               {/* QA 5 ต.ค. 2569: คำโปรยพูดซ้ำแถบขั้น 1·2·3 ⇒ เหลือไว้ให้โปรแกรมอ่านจอเท่านั้น */}
-              <DialogDescription className="sr-only">เพิ่มคนที่ต้องการติดตาม 3 ขั้น</DialogDescription>
+              <DialogDescription className="sr-only">เพิ่มคนที่ต้องการติดตาม 4 ขั้น</DialogDescription>
             </DialogHeader>
           <form
             /**
@@ -3269,10 +3271,12 @@ const FollowPage: React.FC = () => {
                   <label htmlFor="followInsurance" className="ml-1 text-xs font-medium text-muted-foreground">
                     ประเภทประกัน
                   </label>
-                  <Input
+                  {/* หลายบรรทัด (16 ต.ค. 2569) — ใครจ่าย · ยอด/ครั้ง · ความคุ้มครอง P/A ยาวเกินช่องบรรทัดเดียว */}
+                  <Textarea
                     id="followInsurance"
                     value={insuranceType}
-                    maxLength={300}
+                    maxLength={1500}
+                    rows={6}
                     onChange={(e) => setInsuranceType(e.target.value)}
                   />
                 </div>
@@ -3327,7 +3331,7 @@ const FollowPage: React.FC = () => {
                   {topic ? <> · เรื่อง “{topic}”</> : null}
                   {unitName ? <> · หน่วยงาน {unitName}</> : null}
                   {startDate ? <> · เริ่มงาน {formatYmdTh(startDate)}</> : null}
-                  {insuranceType.trim() ? <> · ประกัน {insuranceType.trim()}</> : null}
+                  {insuranceType.trim() ? <> · ประกัน {insuranceType.trim().replace(/\s*\n+\s*/g, ' / ')}</> : null}
                 </span>
                 <span className="mt-0.5 block text-muted-foreground">
                   {replaceView

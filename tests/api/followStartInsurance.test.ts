@@ -36,8 +36,9 @@ describe('parseFollowInput — วันเริ่มงาน + ประก�
       customerContact: 'ฝ่ายบุคคล',
       customerPhone: '020000000',
     });
-    const long = parseFollowInput({ ...base, insurance_type: 'ก'.repeat(500) }, NOW);
-    expect(long.value!.extra!.insuranceType).toHaveLength(300);
+    // 1500 (16 ต.ค. 2569) — บรรทัดประกันแบบใบขอ + ความคุ้มครอง P/A ยาวเกิน 300
+    const long = parseFollowInput({ ...base, insurance_type: 'ก'.repeat(2000) }, NOW);
+    expect(long.value!.extra!.insuranceType).toHaveLength(1500);
   });
 
   it('วันเริ่มงานรูปผิด = ไม่ผ่าน (กันปี/รูปแบบมั่วเข้าฐาน)', () => {

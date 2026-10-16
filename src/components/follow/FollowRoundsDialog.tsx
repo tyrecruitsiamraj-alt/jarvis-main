@@ -141,7 +141,7 @@ const FollowRoundsDialog: React.FC<{
               {insurance ? (
                 <>
                   <dt className="text-muted-foreground">ประกัน</dt>
-                  <dd className="text-foreground">{insurance}</dd>
+                  <dd className="whitespace-pre-line text-foreground">{insurance}</dd>
                 </>
               ) : null}
               {customer ? (
