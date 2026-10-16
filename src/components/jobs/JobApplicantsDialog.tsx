@@ -583,6 +583,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
             <ApplicantContactDialog
               embedded
               application={processing}
+              recruiterName={job?.recruiter_name?.trim() || null}
               onClose={() => setProcessing(null)}
               onSaved={() => {
                 setProcessing(null);

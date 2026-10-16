@@ -110,6 +110,8 @@ type Row = {
   line_id: string | null;
   specific_type: string | null;
   responsible_name: string | null;
+  /** ผู้รับผิดชอบของลิงก์ที่สมัครเข้ามา (ทีม Online · `POSTING_OWNER_SQL`) · schema เก่า = undefined */
+  posting_owner_name?: string | null;
   channel_label: string | null;
   license_types: string[] | null;
   created_by_name: string | null;
@@ -205,6 +207,7 @@ function toApplication(r: Row, viewerId?: string) {
     line_id: r.line_id || undefined,
     specific_type: r.specific_type || undefined,
     responsible_name: r.responsible_name || undefined,
+    posting_owner_name: r.posting_owner_name || undefined,
     channel_label: r.channel_label || undefined,
     license_types: r.license_types && r.license_types.length > 0 ? r.license_types : undefined,
     created_by_name: r.created_by_name || undefined,
@@ -259,6 +262,16 @@ function toApplication(r: Row, viewerId?: string) {
  */
 const CHANNEL_LABEL_SQL = `coalesce(nullif(a.channel_label, ''), (select l.channel_label from ${tableInAppSchema('recruit_posting_links')} l where l.id = a.link_id)) as channel_label`;
 
+/**
+ * ผู้รับผิดชอบของลิงก์ที่คนนี้สมัครเข้ามา = ทีม Online (เจ้าของ 16 ต.ค. 2569: *"ผู้รับผิดชอบ ก็ทีม online อะ ว่าน เจมส์"*)
+ * ผู้รับผิดชอบที่ตั้งไว้ตอน Gen link → ไม่ได้ตั้ง = คนสร้างลิงก์ (ชื่อเล่นหน้าผู้ใช้งาน · ช่องเดียวกับ "ผู้สร้างช่องทาง" ของ iRecruit)
+ * ใบที่ไม่ได้มาทางลิงก์ (iRecruit · คีย์เอง · นำเข้า) = null · ⚠️ อ้าง `a.posting_id` (มีตั้งแต่ 063 ทุกฐาน)
+ */
+const POSTING_OWNER_SQL = `(select coalesce(nullif(btrim(p.responsible_name), ''), nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''))
+     from ${tableInAppSchema('recruit_postings')} p
+     left join ${tableInAppSchema('users')} u on u.id::text = p.created_by_user_id::text
+    where p.id = a.posting_id) as posting_owner_name`;
+
 const LIST_COLUMNS = `
   id, full_name, title_prefix, first_name, last_name, phone, age, gender,
   province, district, subdistrict, postal_code,
@@ -272,6 +285,7 @@ const LIST_COLUMNS = `
   selection_status, prep_checklist,
   dialed_first_at, dialed_last_at, dial_count,
   unclaimed_at, unclaimed_from_name, call_choice, call_choice_at, call_choice_by_name,
+  ${POSTING_OWNER_SQL},
   ${applicationOriginColumn('a')}
 `;
 
@@ -296,6 +310,7 @@ const LIST_COLUMNS_NO_CHOICE = `
   null::timestamptz as unclaimed_at, null::text as unclaimed_from_name,
   null::text as call_choice, null::timestamptz as call_choice_at,
   null::text as call_choice_by_name,
+  ${POSTING_OWNER_SQL},
   ${applicationOriginColumn('a')}
 `;
 

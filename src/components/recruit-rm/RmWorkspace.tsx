@@ -1058,7 +1058,7 @@ const RmWorkspace: React.FC<{
             /* "ถอย Lead" — การติดต่อ ติ๊กแล้วโผล่ (5 ต.ค. 2569) · ย้ายกลับแท็บผู้สมัคร */
             onReleaseSelected={tab === 'contact' ? () => void releaseSelected() : undefined}
             releasing={releasing}
-            onExport={tab === 'candidates' && !headerActionsSlot ? () => downloadApplicantExport(shown) : undefined}
+            onExport={tab === 'candidates' && !headerActionsSlot ? () => downloadApplicantExport(shown, { recruiterOf }) : undefined}
             exportCount={shown.length}
             /* แท็บติดตามนัดหมาย: "โหลดเป็น PDF" (4 ต.ค. 2569) · window.print + print CSS เฉพาะก้อน rm-print-area */
             onPrintPdf={tab === 'appointments' ? () => window.print() : undefined}
@@ -1074,7 +1074,7 @@ const RmWorkspace: React.FC<{
                     type="button"
                     variant="outline"
                     size="xs"
-                    onClick={() => downloadApplicantExport(shown)}
+                    onClick={() => downloadApplicantExport(shown, { recruiterOf })}
                     disabled={shown.length === 0}
                     title={shown.length === 0 ? 'ไม่มีรายชื่อให้ส่งออก' : `ส่งออก ${shown.length} รายชื่อที่กรองอยู่ เป็นไฟล์ Excel (.csv)`}
                     className="shrink-0"
@@ -1411,6 +1411,7 @@ const RmWorkspace: React.FC<{
         <ApplicantContactDialog
           mode="profile"
           application={profileApp}
+          recruiterName={recruiterOf?.(profileApp) ?? null}
           onClose={() => setProfileApp(null)}
           onSaved={() => {
             say('บันทึกข้อมูลผู้สมัครแล้ว');
@@ -1427,6 +1428,7 @@ const RmWorkspace: React.FC<{
       {/* dialog รายละเอียด + ติดต่อสำเร็จ/ไม่สำเร็จ + นัด (ลิสต์ข้อ 7 · 14 ส.ค. 2569) */}
       <ApplicantContactDialog
         application={contactApp}
+        recruiterName={contactApp ? (recruiterOf?.(contactApp) ?? null) : null}
         /* แท็บติดตามนัดหมาย = ป๊อปติดตามนัด · แท็บการติดต่อ = ติดต่อ→นัดหมาย (4 ต.ค. 2569) */
         mode={tab === 'appointments' ? 'appointment' : 'contact'}
         onClose={() => setContactApp(null)}

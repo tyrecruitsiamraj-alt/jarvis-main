@@ -5,7 +5,7 @@
  */
 import type { PublicApplication } from '@/lib/publicApplicationsApi';
 import { GENDER_LABEL, REFERRAL_SOURCE_LABEL } from '@/lib/publicApplicationsApi';
-import { applicationJobLabel, applicationUnitLabel } from '@/lib/recruitRm';
+import { applicantResponsibleName, applicationJobLabel, applicationUnitLabel } from '@/lib/recruitRm';
 import {
   CONTACT_STATE_LABEL,
   PROCESS_STATE_LABEL,
@@ -31,6 +31,7 @@ export const APPLICANT_EXPORT_HEADERS = [
   'เพศ',
   'ข้อมูลผู้สรรหา',
   'ผู้รับผิดชอบ',
+  'ประเภทเจาะจง',
 ] as const;
 
 /** BOM ให้ Excel อ่านไทยถูก */
@@ -41,7 +42,14 @@ function cell(v: string | number | null | undefined): string {
   return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
 }
 
-export function applicantExportRows(rows: readonly PublicApplication[]): string[][] {
+/**
+ * `recruiterOf` = เจ้าหน้าที่สรรหาของใบขอ (คอลัมน์ "เจ้าของงาน" · หน้าแม่ส่งมา) — ช่อง "ข้อมูลผู้สรรหา"
+ * 🔴 16 ต.ค. 2569: เดิมช่องนี้เป็น `specific_type` (ประเภทเจาะจง) ผูกผิดความหมาย — ย้ายไปคอลัมน์ท้าย "ประเภทเจาะจง"
+ */
+export function applicantExportRows(
+  rows: readonly PublicApplication[],
+  opts: { recruiterOf?: (r: PublicApplication) => string | null } = {},
+): string[][] {
   return rows.map((r) => {
     const p = applicantProcessOf(r);
     return [
@@ -58,20 +66,28 @@ export function applicantExportRows(rows: readonly PublicApplication[]): string[
       r.district ?? '',
       typeof r.age === 'number' ? String(r.age) : '',
       r.gender ? (GENDER_LABEL[r.gender] ?? '') : '',
+      opts.recruiterOf?.(r) ?? '',
+      applicantResponsibleName(r) ?? '',
       r.specific_type ?? '',
-      r.responsible_name ?? '',
     ];
   });
 }
 
-export function applicantExportCsv(rows: readonly PublicApplication[]): string {
-  const lines = [[...APPLICANT_EXPORT_HEADERS], ...applicantExportRows(rows)].map((l) => l.map(cell).join(','));
+export function applicantExportCsv(
+  rows: readonly PublicApplication[],
+  opts: { recruiterOf?: (r: PublicApplication) => string | null } = {},
+): string {
+  const lines = [[...APPLICANT_EXPORT_HEADERS], ...applicantExportRows(rows, opts)].map((l) => l.map(cell).join(','));
   return `${BOM}${lines.join('\r\n')}`;
 }
 
 /** ดาวน์โหลดไฟล์ — ชื่อไฟล์บอกวันที่ (เวลาไทย) */
-export function downloadApplicantExport(rows: readonly PublicApplication[], now: Date = new Date()): void {
-  const url = URL.createObjectURL(new Blob([applicantExportCsv(rows)], { type: 'text/csv;charset=utf-8' }));
+export function downloadApplicantExport(
+  rows: readonly PublicApplication[],
+  opts: { recruiterOf?: (r: PublicApplication) => string | null; now?: Date } = {},
+): void {
+  const now = opts.now ?? new Date();
+  const url = URL.createObjectURL(new Blob([applicantExportCsv(rows, opts)], { type: 'text/csv;charset=utf-8' }));
   try {
     const a = document.createElement('a');
     a.href = url;

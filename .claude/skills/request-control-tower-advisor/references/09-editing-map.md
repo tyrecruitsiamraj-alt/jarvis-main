@@ -13401,3 +13401,13 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · 🔴 เพิ่ม/ถอดคอลัมน์ต้องแก้ `colCount` (ownerColumns 11) ให้แถวว่างกว้างเท่าหัว
 - เทสต์ `tests/api/applicantPhoneDate2569-10-16.test.ts`
 - ป้ายผลโทรงานสรรหา (`metricDictionary` `lumos.result.interested/not_interested`) = "สนใจ" / "ไม่สนใจ" (เจ้าของ "คำว่า ตอบว่า ไม่เอา เอาแค่ สนใจ") · แก้ที่พจนานุกรมที่เดียว ทุกจอเปลี่ยนตาม
+
+### ป๊อปผู้สมัคร: ข้อมูลผู้สรรหา = เจ้าของงาน · ผู้รับผิดชอบ = ทีม Online (16 ต.ค. 2569)
+- เจ้าของ: "เจ้าของงาน มีชื่อ แต่ ข้อมูลผู้สรรหา ไม่ขึ้น … ผู้รับผิดชอบ ก็ไม่มี" → "ผู้สรรหาก็พวก คิว แบงค์" · "ผู้รับผิดชอบ ก็ทีม online อะ ว่าน เจมส์"
+- 🔴 เดิม "ข้อมูลผู้สรรหา" อ่าน `specific_type` (= ประเภทเจาะจง: เจาะจง (ฟรี) / พนักงานทดแทน WL …) ผูกผิดความหมายตั้งแต่ 4 ต.ค. · วัดจริง 0/963 ใบมีค่า · `responsible_name` 2/963
+- ข้อมูลผู้สรรหา = เจ้าหน้าที่สรรหาของใบขอ (`recruiterOf` ใน `RmWorkspace` / `job.recruiter_name` ในป๊อปการ์ด) → prop `recruiterName` ของ `ApplicantContactDialog` → `ApplicantInfoPanel`
+- ผู้รับผิดชอบ = `applicantResponsibleName` (`src/lib/recruitRm.ts`): `responsible_name` (คีย์/นำเข้า) → `posting_owner_name`
+  · `posting_owner_name` = `POSTING_OWNER_SQL` ใน `api/_handlers/job-applications.ts` (ชุดคอลัมน์ 2 ชั้นบน): ผู้รับผิดชอบของลิงก์ (`recruit_postings.responsible_name`) → ไม่ได้ตั้ง = ชื่อเล่น/ชื่อจริงของคนสร้างลิงก์ (`created_by_user_id` → users)
+  · วัด 16 ต.ค.: ใบผ่านลิงก์ 370/453 ได้ชื่อ · ใบ iRecruit/คีย์เอง 380 ใบยังไม่มี (sync iRecruit ไม่ได้ดึง "ผู้สร้างช่องทาง")
+- `specific_type` ย้ายไปช่อง "ประเภทเจาะจง" ทั้งป๊อป · ตัวกรอง `specific` (ป้ายใหม่ คีย์ URL เดิม) · ไฟล์รายงาน (คอลัมน์ท้าย · `applicantExportRows(rows, { recruiterOf })`)
+- เทสต์ `src/components/recruit-rm/ApplicantInfoPanel.recruiter.test.tsx`

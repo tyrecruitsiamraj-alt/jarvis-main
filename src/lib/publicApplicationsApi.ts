@@ -100,8 +100,11 @@ export type PublicApplication = {
   admin_note?: string;
   /** ช่องที่ระบบเดิม (RM) เก็บ — เติมมาที่ migration 074 · ใบเก่าเป็น undefined */
   line_id?: string;
+  /** ประเภทเจาะจง (เจาะจง (ฟรี) · พนักงานทดแทน WL …) — คีย์เอง/นำเข้าเท่านั้น */
   specific_type?: string;
   responsible_name?: string;
+  /** ผู้รับผิดชอบของลิงก์ที่สมัครเข้ามา (ทีม Online · server `POSTING_OWNER_SQL` · 16 ต.ค. 2569) */
+  posting_owner_name?: string;
   /** ช่องทางจาก master recruit_channels — แม่นกว่า referral_source ที่ผู้สมัครเลือกเอง */
   channel_label?: string;
   /** ยกเลิกข้อมูลผู้สมัคร (135 · 4 ต.ค. 2569) — มีค่า = ซ่อนจากรายชื่อหลัก (มาเฉพาะมุมมอง "ที่ยกเลิก") */

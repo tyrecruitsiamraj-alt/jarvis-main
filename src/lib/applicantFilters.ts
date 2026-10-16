@@ -210,9 +210,13 @@ const FACETS: readonly Def[] = [
     values: (r, facts) => [trimOr(facts.recruiterOf?.(r))],
   },
   {
-    /** ข้อมูลผู้สรรหา (ช่องเดียวกับ iRecruit · `specific_type`) — 4 ต.ค. 2569 เติมจาก iRecruit */
+    /**
+     * ประเภทเจาะจง (`specific_type` · เจาะจง (ฟรี) / พนักงานทดแทน WL …) — 4 ต.ค. 2569 เติมจาก iRecruit
+     * 🔴 16 ต.ค. 2569 เปลี่ยนป้ายจาก "ข้อมูลผู้สรรหา": ใน iRecruit ช่องนั้นคือชื่อผู้สรรหา (คิว แบงค์ · เจ้าของ)
+     *    = ตัวกรอง "เจ้าหน้าที่สรรหา" ข้างบน · คีย์ URL `specific` คงเดิม
+     */
     key: 'specific',
-    label: 'ข้อมูลผู้สรรหา',
+    label: 'ประเภทเจาะจง',
     ui: 'check',
     searchable: true,
     // 15 ต.ค. 2569 ถอดจากแท็บผู้สมัคร/การติดต่อ (เจ้าของ Choice "ถอดทั้ง 3")

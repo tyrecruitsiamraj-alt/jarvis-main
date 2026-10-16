@@ -125,6 +125,7 @@ export default function ApplicantContactDialog({
   embedded = false,
   mode = 'contact',
   onCancelled,
+  recruiterName = null,
 }: {
   application: PublicApplication | null;
   onClose: () => void;
@@ -141,6 +142,8 @@ export default function ApplicantContactDialog({
   mode?: 'contact' | 'appointment' | 'profile';
   /** ยกเลิกข้อมูลผู้สมัครสำเร็จ (โหมด profile) — หน้าแม่ปิดป๊อป + โหลดใหม่ (ใบหายจากรายชื่อหลัก) */
   onCancelled?: () => void;
+  /** ข้อมูลผู้สรรหา = เจ้าหน้าที่สรรหาของใบขอ (ชื่อเดียวกับคอลัมน์ "เจ้าของงาน") — หน้าแม่หาให้ · 16 ต.ค. 2569 */
+  recruiterName?: string | null;
 }) {
   const a = application;
   const [tab, setTab] = useState<DetailTab>('info');
@@ -684,6 +687,7 @@ export default function ApplicantContactDialog({
             onDraft={setDraft}
             disabled={busy}
             phoneFixSlot={phoneFixSlot}
+            recruiterName={recruiterName}
           />
           {/* ยกเลิกข้อมูลผู้สมัคร (รูป iRecruit · Choice "ซ่อนจากรายชื่อหลัก กู้คืนได้" 4 ต.ค. 2569) */}
           {mode === 'profile' && !a.cancelled_at ? (
