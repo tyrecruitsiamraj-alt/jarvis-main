@@ -1,7 +1,6 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -59,7 +58,6 @@ import {
   type FollowEntry,
   type FollowStopScope,
   updateFollowEntry,
-  fetchFollowUnitInfo,
 } from '@/lib/followApi';
 import type { FollowStaffCallOutcome } from '@/lib/followStaffCall';
 import { summarizeDispatchResults } from '@/lib/followDispatchState';
@@ -140,6 +138,12 @@ import { tbdPlaceholderAts } from '@/lib/followTbd';
 import { followDayNoOptions, followDayNoText } from '@/lib/followDayNo';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
+import {
+  createFollowInsuranceType,
+  insuranceTypeOptions,
+  listFollowInsuranceTypes,
+  type FollowInsuranceType,
+} from '@/lib/followInsuranceTypesApi';
 import {
   listStaffContacts,
   createStaffContact,
@@ -410,7 +414,6 @@ const FollowPage: React.FC = () => {
   const [customerContact, setCustomerContact] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   /** ดึงของหน่วยงานไหนไปแล้ว — เปลี่ยนหน่วยงานแล้วถึงดึงใหม่ (ไม่ทับที่คนแก้เองซ้ำทุกครั้งที่ย้อนขั้น) */
-  const [unitInfoState, setUnitInfoState] = useState<{ key: string; status: 'loading' | 'done' | 'error' } | null>(null);
   const [openJobs, setOpenJobs] = useState<JobRequest[]>([]);
   /** รายการที่กำลังแก้ไข (096) — null = ไม่ได้เปิดกล่องแก้ */
   const [editing, setEditing] = useState<FollowEntry | null>(null);
@@ -424,6 +427,9 @@ const FollowPage: React.FC = () => {
   const [contactsRev, setContactsRev] = useState(0);
   /** dialog จัดการเรื่อง / เจ้าหน้าที่ — เปิดจากปุ่มข้างปฏิทิน (supervisor+ เท่านั้น) */
   const [topicManagerOpen, setTopicManagerOpen] = useState(false);
+  /** ตั้งค่าตัวเลือก › ประเภทประกัน (149 · 16 ต.ค. 2569) */
+  const [insuranceManagerOpen, setInsuranceManagerOpen] = useState(false);
+  const [insuranceTypesRev, setInsuranceTypesRev] = useState(0);
   const [staffManagerOpen, setStaffManagerOpen] = useState(false);
   const { user } = useAuth();
   const adderKey = adderFilter === 'all' ? '' : adderFilter === 'me' ? (user?.email ?? '') : adderFilter;
@@ -790,7 +796,6 @@ const FollowPage: React.FC = () => {
     setCustomerName('');
     setCustomerContact('');
     setCustomerPhone('');
-    setUnitInfoState(null);
     setFormError(null);
     setStep(1);
   };
@@ -1048,33 +1053,27 @@ const FollowPage: React.FC = () => {
   }, [step]);
 
   /**
-   * ขั้น 4 — ดึงประกัน + ผู้ติดต่อลูกค้าของหน่วยงานที่เลือกจากบอร์ด (ERP อ่านอย่างเดียว)
-   * ได้มาแล้วเติมลงช่อง แก้ต่อได้ · ไม่ได้เลือกจากบอร์ด (ไม่มีรหัสไซต์) = กรอกเอง
+   * ขั้น 4 ประเภทประกัน = dropdown จากรายการที่ตั้งได้ (149 · เจ้าของ 16 ต.ค. 2569)
+   * > *"ประเภทประกัน ทำเป็น Dropdown"* · *"ไม่เอาดึงจากเงื่อนไซด์แล้ว"* · ลูกค้า *"ขอพิมพ์ชื่อ-เบอร์โทรเอง"*
+   * ⇒ เลิกดึงประกัน/ลูกค้าจาก ERP · โหลดรายการตอนเข้าขั้น 4 · เพิ่มประเภทใหม่ที่ ตั้งค่าตัวเลือก แล้วโหลดใหม่
    */
+  const [insuranceTypes, setInsuranceTypes] = useState<FollowInsuranceType[] | null>(null);
+  const [insuranceTypesError, setInsuranceTypesError] = useState(false);
   useEffect(() => {
-    if (step !== FOLLOW_WIZARD_LAST_STEP || !siteCode.trim()) return;
-    const key = `${siteCode.trim()}|${unitRequestNo.trim()}`;
-    if (unitInfoState?.key === key) return;
-    setUnitInfoState({ key, status: 'loading' });
+    if (step !== FOLLOW_WIZARD_LAST_STEP) return;
     let alive = true;
-    fetchFollowUnitInfo({ siteCode: siteCode.trim(), requestNo: unitRequestNo.trim() || undefined })
-      .then((info) => {
-        if (!alive) return;
-        // บรรทัดละรายการแบบใบขอที่พิมพ์ (16 ต.ค. 2569 · `src/lib/followInsurance.ts`)
-        setInsuranceType(info.insurance.join('\n'));
-        setCustomerName(info.customerName ?? '');
-        setCustomerContact([info.contactName, info.contactPosition].filter(Boolean).join(' · '));
-        setCustomerPhone(info.contactPhone ?? '');
-        setUnitInfoState({ key, status: 'done' });
+    setInsuranceTypesError(false);
+    listFollowInsuranceTypes()
+      .then((types) => {
+        if (alive) setInsuranceTypes(types);
       })
       .catch(() => {
-        if (alive) setUnitInfoState({ key, status: 'error' });
+        if (alive) setInsuranceTypesError(true);
       });
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, siteCode, unitRequestNo]);
+  }, [step, insuranceTypesRev]);
 
   /** ช่องวันเริ่มงาน + ขั้น 4 — ส่งไปกับทุกเส้นบันทึก (ทั่วไป · ตารางหลายวัน · ส่งคนแทน) */
   const extraPayload = () => ({
@@ -1965,6 +1964,9 @@ const FollowPage: React.FC = () => {
             </DropdownMenuLabel>
             <DropdownMenuItem onSelect={() => setTopicManagerOpen(true)}>
               <Plus aria-hidden /> เพิ่มเรื่องที่ให้โทรติดตาม
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setInsuranceManagerOpen(true)}>
+              <Plus aria-hidden /> เพิ่มประเภทประกัน
             </DropdownMenuItem>
             {/* 🔴 **ตัวจริงของเบอร์เจ้าหน้าที่ = หน้าผู้ใช้งาน** (เจ้าของเคาะ 23 ก.ย. 2569
                 ย้ำคำสั่งเดิม 1 ก.ย.: *"กำหนดทั้ง Role คัดสรร ชื่อเล่น และเบอร์โทรทีเดียว"*)
@@ -3251,34 +3253,30 @@ const FollowPage: React.FC = () => {
              */}
             {step === 4 ? (
               <div className="space-y-3" data-testid="follow-step4">
-                {/* ขั้น 4 ประกัน · ลูกค้า (เจ้าของสั่ง 14 ต.ค. 2569) — ดึงจากใบขอของหน่วยงานในขั้น 2 แล้วแก้ต่อได้ */}
-                {siteCode ? (
-                  <p className="ml-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Building2 className="size-3.5" aria-hidden />
-                    {unitName || siteCode}
-                    {unitInfoState?.status === 'loading' ? (
-                      <>
-                        <LoaderCircle className="size-3.5 animate-spin" aria-hidden /> กำลังดึงจาก ERP
-                      </>
-                    ) : unitInfoState?.status === 'error' ? (
-                      <span className={TONE.danger.value}>ดึงจาก ERP ไม่ได้ กรอกเองได้</span>
-                    ) : null}
-                  </p>
-                ) : (
-                  <p className="ml-1 text-xs text-muted-foreground">ไม่ได้เลือกหน่วยงานจากบอร์ด กรอกเองได้</p>
-                )}
+                {/* ขั้น 4 ประกัน · ลูกค้า (เจ้าของสั่ง 14 ต.ค. 2569)
+                    🔴 16 ต.ค. 2569 เลิกดึงจาก ERP — ประกันเลือกจากรายการ (ตั้งค่าตัวเลือก › เพิ่มประเภทประกัน) · ลูกค้าพิมพ์เอง */}
                 <div className="space-y-1.5">
                   <label htmlFor="followInsurance" className="ml-1 text-xs font-medium text-muted-foreground">
                     ประเภทประกัน
                   </label>
-                  {/* หลายบรรทัด (16 ต.ค. 2569) — ใครจ่าย · ยอด/ครั้ง · ความคุ้มครอง P/A ยาวเกินช่องบรรทัดเดียว */}
-                  <Textarea
+                  <FieldSelect
                     id="followInsurance"
                     value={insuranceType}
-                    maxLength={1500}
-                    rows={6}
-                    onChange={(e) => setInsuranceType(e.target.value)}
+                    onChange={setInsuranceType}
+                    placeholder="เลือกประเภทประกัน"
+                    options={[
+                      { value: '', label: 'ไม่ระบุ' },
+                      ...insuranceTypeOptions(insuranceTypes ?? [], insuranceType).map((name) => ({ value: name, label: name })),
+                    ]}
                   />
+                  {insuranceTypesError ? (
+                    <p role="alert" className={cn('ml-1 flex items-center gap-2 text-xs', TONE.danger.value)}>
+                      โหลดรายการประกันไม่ได้
+                      <Button type="button" variant="outline" size="sm" onClick={() => setInsuranceTypesRev((r) => r + 1)}>
+                        ลองใหม่
+                      </Button>
+                    </p>
+                  ) : null}
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -3545,6 +3543,18 @@ const FollowPage: React.FC = () => {
         create={(f) => createFollowTopic(f.name ?? '')}
         toChip={(t) => t.name}
         onChanged={() => setTopicsRev((r) => r + 1)}
+      />
+      {/* ประเภทประกัน ขั้น 4 (149 · เจ้าของ 16 ต.ค. 2569 "ขอหน้า Ui ไว้เพิ่มในอนาคตด้วย") */}
+      <FollowMasterManagerDialog<FollowInsuranceType>
+        open={insuranceManagerOpen}
+        onClose={() => setInsuranceManagerOpen(false)}
+        title="ประเภทประกัน"
+        description=""
+        fields={[{ key: 'name', placeholder: 'เพิ่มประเภทประกันใหม่' }]}
+        load={listFollowInsuranceTypes}
+        create={(f) => createFollowInsuranceType(f.name ?? '')}
+        toChip={(t) => t.name}
+        onChanged={() => setInsuranceTypesRev((r) => r + 1)}
       />
       <FollowMasterManagerDialog<FollowStaffContact>
         open={staffManagerOpen}

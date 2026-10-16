@@ -4,7 +4,8 @@ import { parseFollowInput } from '../../api/_handlers/follow';
 
 /**
  * ฟอร์มเพิ่มคนติดตาม 4 ขั้น (เจ้าของสั่ง 14 ต.ค. 2569 · 145)
- * ขั้น 1 วันที่เริ่มงาน (เก็บไว้ดู) · ขั้น 4 ประกัน + ผู้ติดต่อลูกค้า (ดึงจากหน่วยงานในขั้น 2 แก้ได้)
+ * ขั้น 1 วันที่เริ่มงาน (เก็บไว้ดู) · ขั้น 4 ประกัน + ผู้ติดต่อลูกค้า
+ * 🔴 16 ต.ค. 2569 เจ้าของ "ไม่เอาดึงจากเงื่อนไซด์แล้ว" — ประกัน = dropdown (149) · ลูกค้าพิมพ์เอง · ถอดเส้นดึงจาก ERP
  */
 const NOW = new Date('2026-10-14T10:00:00+07:00');
 const base = { recipient_name: 'ทดสอบ ระบบ', recipient_phone: '0800000000', topic: 'ตามเริ่มงาน' };
@@ -48,8 +49,11 @@ describe('parseFollowInput — วันเริ่มงาน + ประก�
 
 describe('ต่อสายครบ', () => {
   const read = (p: string) => readFileSync(p, 'utf8');
-  it('เส้น /api/follow-unit-info ลงทะเบียนแล้ว', () => {
-    expect(read('api/_handlers/registry.ts')).toContain("'/api/follow-unit-info'");
+  it('เส้นประเภทประกันลงทะเบียนแล้ว · เส้นดึงจาก ERP (/api/follow-unit-info) ถอดออกทั้งเส้น', () => {
+    const registry = read('api/_handlers/registry.ts');
+    expect(registry).toContain("'/api/follow-insurance-types'");
+    expect(registry).not.toContain("'/api/follow-unit-info'");
+    expect(read('src/pages/follow/FollowPage.tsx')).not.toContain('fetchFollowUnitInfo');
   });
   it('ทุกเส้นบันทึกของฟอร์มส่งช่องใหม่ (ทั่วไป · ตารางหลายวัน · ส่งคนแทน)', () => {
     const page = read('src/pages/follow/FollowPage.tsx');

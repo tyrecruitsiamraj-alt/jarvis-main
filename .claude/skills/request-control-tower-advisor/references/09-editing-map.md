@@ -13411,3 +13411,14 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · วัด 16 ต.ค.: ใบผ่านลิงก์ 370/453 ได้ชื่อ · ใบ iRecruit/คีย์เอง 380 ใบยังไม่มี (sync iRecruit ไม่ได้ดึง "ผู้สร้างช่องทาง")
 - `specific_type` ย้ายไปช่อง "ประเภทเจาะจง" ทั้งป๊อป · ตัวกรอง `specific` (ป้ายใหม่ คีย์ URL เดิม) · ไฟล์รายงาน (คอลัมน์ท้าย · `applicantExportRows(rows, { recruiterOf })`)
 - เทสต์ `src/components/recruit-rm/ApplicantInfoPanel.recruiter.test.tsx`
+
+### ขั้น 4 ฟอร์มเพิ่มคนติดตาม: ประกัน = dropdown · ลูกค้าพิมพ์เอง · เลิกดึงจาก ERP (16 ต.ค. 2569)
+- เจ้าของ: "ประเภทประกัน ทำเป็น Dropdown … ขอหน้า Ui ไว้เพิ่มในอนาคตด้วย ณ ตอนนี้เอาแค่นี้" · "ไม่เอาดึงจากเงื่อนไซด์แล้ว" · ลูกค้า "ขอพิมพ์ชื่อ-เบอร์โทรเอง"
+- ตาราง `follow_insurance_types` (migration 149 · seed PA · PA+PL · PA+PL+ทิพยะ · PA+ทิพยะ) · แพตเทิร์น follow_topics (100)
+  · `api/_lib/followInsuranceTypes.ts` (ฐานยังไม่รัน 149 = ถอยไป `DEFAULT_FOLLOW_INSURANCE_TYPES` · dropdown ไม่ว่าง)
+  · `api/_handlers/follow-insurance-types.ts` GET ทุกคน · POST supervisor+ (rbac `follow-insurance-types`) · ชื่อซ้ำ 409 · ไม่มีลบ/แก้
+  · client `src/lib/followInsuranceTypesApi.ts` (`insuranceTypeOptions` = ค่าเก่านอกลิสต์ยังเลือกค้างได้)
+- หน้าติดตาม: ขั้น 4 `FieldSelect id="followInsurance"` (+ "ไม่ระบุ") · ตั้งค่าตัวเลือก › "เพิ่มประเภทประกัน" = `FollowMasterManagerDialog<FollowInsuranceType>`
+- 🔴 ถอดเส้นดึง ERP ทั้งเส้น: `/api/follow-unit-info` · `api/_lib/followUnitInfo.ts` · `src/lib/followInsurance.ts` (บรรทัดประกันแบบใบขอ 16 ต.ค. เช้า) · `fetchFollowUnitInfo`
+  · `follow_entries.insurance_type` ยังเป็น text (ไม่ผูก FK) — รายการเก่าที่ดึงจาก ERP ยังอ่านได้ในป๊อปรอบโทร
+- เทสต์ `tests/api/followInsuranceDropdown2569-10-16.test.ts` · `followStartInsurance.test.ts`

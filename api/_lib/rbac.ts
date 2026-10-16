@@ -33,6 +33,8 @@ export type ApiResource =
   | 'follow'
   | 'follow-staff-contacts'
   | 'follow-topics'
+  /** ประเภทประกัน ขั้น 4 ฟอร์มติดตาม (149 · 16 ต.ค. 2569) — อ่านทุกคน · เพิ่มเฉพาะหัวหน้างานขึ้นไป */
+  | 'follow-insurance-types'
   /** ดึงส่งคนแทนจาก iRecruit (2 ต.ค. 2569) — อ่านทุกคน · ดึงตอนนี้/ตั้งเวลาโทร หัวหน้างานขึ้นไป */
   | 'irecruit-replace-sync'
   | 'job-staff'
@@ -124,6 +126,7 @@ export function minimumRoleFor(
 
     case 'follow-staff-contacts':
     case 'follow-topics':
+    case 'follow-insurance-types':
     case 'irecruit-replace-sync':
       // อ่านได้ทุกคน (dropdown เบอร์เจ้าหน้าที่ / เรื่องที่จะให้โทรติดตาม บนหน้า Follow ใช้)
       // เพิ่มค่าใหม่เฉพาะหัวหน้างานขึ้นไป (เจ้าของสั่ง 18 ส.ค. 2569)

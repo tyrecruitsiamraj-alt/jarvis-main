@@ -140,24 +140,10 @@ export type FollowEntry = {
   called_at: string | null;
 };
 
-/** ขั้น 4 ของฟอร์มเพิ่ม — ประกัน + ผู้ติดต่อลูกค้า ดึงจากใบขอของหน่วยงาน (GET /api/follow-unit-info) */
-export type FollowUnitInfo = {
-  requestNo: string | null;
-  insurance: string[];
-  customerName: string | null;
-  contactName: string | null;
-  contactPosition: string | null;
-  contactPhone: string | null;
-};
-
-export async function fetchFollowUnitInfo(input: { siteCode?: string | null; requestNo?: string | null }): Promise<FollowUnitInfo> {
-  const q = new URLSearchParams();
-  if (input.siteCode) q.set('site', input.siteCode);
-  if (input.requestNo) q.set('request', input.requestNo);
-  const r = await apiFetch(`/api/follow-unit-info?${q.toString()}`);
-  if (!r.ok) throw new Error(await readError(r));
-  return (await r.json()) as FollowUnitInfo;
-}
+/**
+ * ขั้น 4 ของฟอร์มเพิ่ม — ประกัน (dropdown · `followInsuranceTypesApi`) + ลูกค้า พิมพ์เอง
+ * 🔴 16 ต.ค. 2569 เจ้าของ: *"ไม่เอาดึงจากเงื่อนไซด์แล้ว"* — ถอดเส้น /api/follow-unit-info (ดึงจาก ERP) ออกทั้งเส้น
+ */
 
 export type NewFollowEntry = {
   recipient_name: string;
