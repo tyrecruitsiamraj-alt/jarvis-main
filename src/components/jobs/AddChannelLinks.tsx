@@ -73,7 +73,7 @@ const AddChannelLinks: React.FC<{
         setDone(made);
         setPicked([]);
         onCreated?.();
-        window.setTimeout(() => resultRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
+        window.setTimeout(() => resultRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), 50);
       }
     }
   };

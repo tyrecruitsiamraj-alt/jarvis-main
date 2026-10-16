@@ -45,6 +45,9 @@ export type IrecruitRegisterRow = {
   channel_name: string | null;
   line_id: string | null;
   created_at: Date | string | null;
+  /** ผู้รับผิดชอบใน iRecruit (`responsible_id` = `admins.staff_id`) — ทีม Online · 16 ต.ค. 2569 */
+  responsible_email?: string | null;
+  responsible_name?: string | null;
 };
 
 /** iRecruit ที่ยังไม่ถูกโทร ภายใน 30 วัน (ใหม่สุดก่อน) */
@@ -53,8 +56,10 @@ export function irecruitUncalledSql(): string {
     SELECT TOP ${LIMIT}
       rr.uuid, rr.first_name, rr.last_name, rr.phone_number, rr.age, rr.sex,
       p.pro_thname AS province_name, d.district_thlist AS district_name,
-      rmj.name_th AS job_name, ch.name AS channel_name, rr.line_id, rr.created_at
+      rmj.name_th AS job_name, ch.name AS channel_name, rr.line_id, rr.created_at,
+      adm.email AS responsible_email, adm.name AS responsible_name
     FROM recruit_register rr
+    LEFT JOIN admins adm ON adm.staff_id = rr.responsible_id
     LEFT JOIN recruit_master_job rmj ON rmj.id = rr.job_interest_id
     LEFT JOIN recruit_master_channel ch ON ch.id = rr.channel_id
     LEFT JOIN z_ms_province p ON p.pro_id = rr.province_cerrently_id
@@ -93,6 +98,8 @@ export type ImportValue = {
   line_id: string | null;
   channel_label: string;
   created_at: string | null;
+  /** ผู้รับผิดชอบ (ทีม Online) — ชื่อเล่นหน้าผู้ใช้งานของ jarvis ก่อน · ไม่มีบัญชี = ชื่อใน iRecruit */
+  responsible_name: string | null;
 };
 
 /**
@@ -110,8 +117,23 @@ export function irecruitInstant(v: Date | string | null | undefined): Date | nul
   return Number.isFinite(d.getTime()) ? d : null;
 }
 
+/**
+ * ผู้รับผิดชอบของใบจาก iRecruit (เจ้าของ 16 ต.ค. 2569 "ผู้รับผิดชอบ ก็ทีม online อะ ว่าน เจมส์" · Choice ดึงมาด้วย + เติมใบเก่า)
+ * อีเมลตรงกับผู้ใช้ jarvis = ชื่อเล่น (หรือชื่อจริง) หน้าผู้ใช้งาน · ไม่มีบัญชี = ชื่อใน iRecruit · ไม่มีทั้งคู่ = null
+ */
+export function irecruitResponsibleName(
+  r: Pick<IrecruitRegisterRow, 'responsible_email' | 'responsible_name'>,
+  displayOfEmail: (email: string) => string | null = () => null,
+): string | null {
+  const email = clean(r.responsible_email)?.toLowerCase();
+  return (email ? displayOfEmail(email) : null) ?? clean(r.responsible_name);
+}
+
 /** แถว iRecruit → ใบสมัคร jarvis (pure · เทสต์คุม) — ไม่มีชื่อหรือเบอร์ใช้ไม่ได้ = null */
-export function toImportValue(r: IrecruitRegisterRow): ImportValue | null {
+export function toImportValue(
+  r: IrecruitRegisterRow,
+  displayOfEmail: (email: string) => string | null = () => null,
+): ImportValue | null {
   const phone = thaiMobile(r.phone_number);
   const first = clean(r.first_name);
   const last = clean(r.last_name);
@@ -135,6 +157,7 @@ export function toImportValue(r: IrecruitRegisterRow): ImportValue | null {
     line_id: clean(r.line_id),
     channel_label: channel ? `iRecruit · ${channel}` : 'iRecruit',
     created_at: created && Number.isFinite(created.getTime()) ? created.toISOString() : null,
+    responsible_name: irecruitResponsibleName(r, displayOfEmail),
   };
 }
 
@@ -143,13 +166,28 @@ export function isIrecruitImportEnabled(production = isProductionRuntime()): boo
   return production && irecruitUnavailableReason() === null;
 }
 
-export type IrecruitImportRun = { found: number; imported: number; skippedJarvisPhone: number; skippedBad: number; already: number };
+export type IrecruitImportRun = {
+  found: number;
+  imported: number;
+  skippedJarvisPhone: number;
+  skippedBad: number;
+  already: number;
+  /** ใบเก่าที่เติมผู้รับผิดชอบรอบนี้ */
+  responsibleFilled?: number;
+};
 
 export async function runIrecruitImportOnce(): Promise<IrecruitImportRun> {
   const out: IrecruitImportRun = { found: 0, imported: 0, skippedJarvisPhone: 0, skippedBad: 0, already: 0 };
+  // ใบเก่าที่ยังไม่มีผู้รับผิดชอบ — เติมทุกรอบ (กลืน error · ห้ามทำให้รอบดึงล้ม)
+  try {
+    out.responsibleFilled = await backfillIrecruitResponsible();
+  } catch (e) {
+    logError('irecruitImport.backfillResponsible failed', e);
+  }
   const rows = await irecruitSqlQuery<IrecruitRegisterRow>(irecruitUncalledSql(), {});
   out.found = rows.length;
   if (rows.length === 0) return out;
+  const displayOfEmail = await loadUserDisplayByEmail();
 
   const uuids = rows.map((r) => String(r.uuid));
   const { rows: done } = await dbQuery<{ register_uuid: string }>(
@@ -163,7 +201,7 @@ export async function runIrecruitImportOnce(): Promise<IrecruitImportRun> {
       out.already += 1;
       continue;
     }
-    const v = toImportValue(r);
+    const v = toImportValue(r, displayOfEmail);
     if (!v) {
       out.skippedBad += 1;
       continue;
@@ -191,12 +229,12 @@ export async function runIrecruitImportOnce(): Promise<IrecruitImportRun> {
       seen.add(key);
       const { rows: ins } = await client.query<{ id: string }>(
         `insert into ${APPS} (full_name, first_name, last_name, phone, age, gender, province, district, position_interest,
-                              line_id, channel_label, created_by_name, source, status, created_at, updated_at)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'new', coalesce($14::timestamptz, now()), now())
+                              line_id, channel_label, created_by_name, source, status, created_at, updated_at, responsible_name)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'new', coalesce($14::timestamptz, now()), now(), $15)
          returning id`,
         [
           v.full_name, v.first_name, v.last_name, v.phone, v.age, v.gender, v.province, v.district, v.position_interest,
-          v.line_id, v.channel_label, IRECRUIT_IMPORT_CREATED_BY, IRECRUIT_IMPORT_SOURCE, v.created_at,
+          v.line_id, v.channel_label, IRECRUIT_IMPORT_CREATED_BY, IRECRUIT_IMPORT_SOURCE, v.created_at, v.responsible_name,
         ],
       );
       const id = ins[0]?.id;
@@ -211,6 +249,56 @@ export async function runIrecruitImportOnce(): Promise<IrecruitImportRun> {
   });
   logInfo('irecruitImport.run', out);
   return out;
+}
+
+/** อีเมล (ตัวเล็ก) → ชื่อที่โชว์ของผู้ใช้ jarvis (ชื่อเล่น → ชื่อจริง) — กติกาเดียวกับ created_by_display */
+async function loadUserDisplayByEmail(): Promise<(email: string) => string | null> {
+  const { rows } = await dbQuery<{ email: string; name: string | null }>(
+    `select lower(btrim(email)) as email, coalesce(nullif(btrim(nickname), ''), nullif(btrim(full_name), '')) as name
+       from ${tableInAppSchema('users')} where email is not null`,
+  );
+  const map = new Map(rows.map((r) => [r.email, r.name]));
+  return (email) => map.get(email) ?? null;
+}
+
+/** รหัสใบของ iRecruit (`recruit_register.uuid`) = ตัวอักษร/ตัวเลข 15 ตัว — ตรวจก่อนต่อเป็นข้อความใน IN (กันอักขระแปลก) */
+const UUID_TEXT_RE = /^[0-9A-Za-z-]{6,64}$/;
+const BACKFILL_LIMIT = 500;
+
+/**
+ * เติมผู้รับผิดชอบให้ใบที่ดึงจาก iRecruit ไปแล้วแต่ยังว่าง (เจ้าของ Choice 16 ต.ค. 2569 "ดึงชื่อมาด้วย + เติม 382 ใบเก่า")
+ * อ่าน iRecruit ตาม `register_uuid` ของ `app_irecruit_imports` · เขียนเฉพาะช่อง `responsible_name` ที่ยังว่าง (ตาม id)
+ */
+export async function backfillIrecruitResponsible(): Promise<number> {
+  const { rows: todo } = await dbQuery<{ id: string; register_uuid: string }>(
+    `select a.id::text as id, i.register_uuid
+       from ${IMPORTS} i join ${APPS} a on a.id = i.application_id
+      where nullif(btrim(a.responsible_name), '') is null
+      order by i.irecruit_created_at desc nulls last
+      limit ${BACKFILL_LIMIT}`,
+  );
+  const safe = todo.filter((t) => UUID_TEXT_RE.test(t.register_uuid));
+  if (safe.length === 0) return 0;
+  const found = await irecruitSqlQuery<{ uuid: string; responsible_email: string | null; responsible_name: string | null }>(
+    `SELECT CAST(rr.uuid AS varchar(64)) AS uuid, adm.email AS responsible_email, adm.name AS responsible_name
+       FROM recruit_register rr LEFT JOIN admins adm ON adm.staff_id = rr.responsible_id
+      WHERE CAST(rr.uuid AS varchar(64)) IN (${safe.map((t) => `'${t.register_uuid}'`).join(',')})`,
+    {},
+  );
+  const displayOfEmail = await loadUserDisplayByEmail();
+  const nameByUuid = new Map(found.map((f) => [String(f.uuid).toLowerCase(), irecruitResponsibleName(f, displayOfEmail)]));
+  let filled = 0;
+  for (const t of safe) {
+    const name = nameByUuid.get(t.register_uuid.toLowerCase());
+    if (!name) continue;
+    const { rowCount } = await dbQuery(
+      `update ${APPS} set responsible_name = $2 where id = $1::uuid and nullif(btrim(responsible_name), '') is null`,
+      [t.id, name],
+    );
+    filled += rowCount ?? 0;
+  }
+  if (filled > 0) logInfo('irecruitImport.responsibleFilled', { filled, checked: safe.length });
+  return filled;
 }
 
 let running = false;

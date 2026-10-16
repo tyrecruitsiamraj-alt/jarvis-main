@@ -13441,3 +13441,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `api/_handlers/follow.ts` PATCH `action: 'uncancel'` (audit `follow.uncancel`) · client `uncancelFollowEntry` · ปุ่มใน `FollowRoundsDialog` (`it.cancelled && !it.completed_at`)
 - ⚠️ เครื่อง dev ไม่มีคีย์ push = คืนแถว+คิวอย่างเดียว ไม่ส่ง Lumos — กดจริงบนเว็บจริงเท่านั้น
 - เทสต์ `tests/api/followUncancel2569-10-16.test.ts`
+
+### ผู้รับผิดชอบของใบที่ดึงจาก iRecruit (16 ต.ค. 2569)
+- เจ้าของ: "ผู้รับผิดชอบยังไม่ขึ้นเลย" → Choice "ดึงชื่อมาด้วย + เติม 382 ใบเก่า"
+- iRecruit: `recruit_register.responsible_id` = `admins.staff_id` (17/18 คนตรง) · `api/_lib/irecruitApplicantImport.ts`
+  · SQL ดึง `adm.email/adm.name` · `irecruitResponsibleName`: อีเมลตรงผู้ใช้ jarvis = ชื่อเล่น (→ ชื่อจริง) · ไม่มีบัญชี = ชื่อใน iRecruit
+  · ใบใหม่ insert `responsible_name` · ใบเก่า `backfillIrecruitResponsible` ทุกรอบดึง (≤ 500 · เขียนตาม id เฉพาะช่องที่ว่าง · error ไม่ทำรอบล้ม)
+  · ⚠️ `register_uuid` เป็นรหัสตัวอักษร 15 ตัว ไม่ใช่ uuid (ตัวกรอง `UUID_TEXT_RE`)
+  · วัด 16 ต.ค.: 382/382 เติมได้ (377 ได้ชื่อเล่น jarvis · 6 คน) · ทำงานเฉพาะเซิร์ฟเวอร์จริง (worker)
+- เทสต์ `tests/api/irecruitResponsible2569-10-16.test.ts`
