@@ -20,8 +20,9 @@ describe('หาแถวที่ค้าง', () => {
     const sql = mod.declineOrphanSql();
     expect(sql).toContain("coalesce(f.call_mode, 'ai') = 'ai'");
     expect(sql).toContain("y.status <> 'cancelled'");
-    // 🔴 8 ต.ค. 2569: คิว pending แต่แผนถึง Lumos ก่อนคำตอบไม่ไป = แผนโดนยกเลิกที่ Lumos แล้ว ต้องส่งใหม่ด้วย
-    expect(sql).toContain('l.push_accepted_at < d.declined_at');
+    // 🔴 16 ต.ค. 2569: ข้อ B (pending แต่แผนถึง Lumos ก่อนคำตอบไม่ไป → ส่งใหม่) ถอดแล้ว — ตอบไม่ไปไม่ยกเลิกแผนวันอื่นแล้ว
+    //    ถ้าคงไว้ จะ DELETE แล้วส่งใหม่ทันทีทุกครั้งที่มีคนตอบไม่ไป = Lumos รับแต่ไม่โทร (อภิชาติ/เชษฐ์ศักดิ์)
+    expect(sql).not.toContain('l.push_accepted_at < d.declined_at');
     expect(sql).toContain('coalesce(q.plan_ref, q.person_ref) as plan');
     expect(sql).toContain("x.last_outcome = 'declined'");
     expect(sql).toContain("(g.scheduled_at at time zone 'Asia/Bangkok')::date < (f.scheduled_at at time zone 'Asia/Bangkok')::date");

@@ -270,8 +270,9 @@ export async function applyCallFollowupToQueueRow(input: {
     });
   }
 
-  // Follow ตั้งตาราง + **เจ้าตัวบอกว่าไม่เอา** → ยกเลิกทั้งชุด แล้ว `repairDeclinedFollowDays` ส่งวันถัดไปกลับให้ Lumos
-  // (เจ้าของ 7 ต.ค. 2569: "หยุดแค่วันนั้น วันถัดไปโทรต่อ" — แทนข้อเคาะ 16 ส.ค. ด้านล่าง)
+  // Follow ตั้งตาราง + **เจ้าตัวบอกว่าไม่เอา** → หยุดเฉพาะสายที่เหลือของ **วันนั้น** (เจ้าของ 7 ต.ค. "หยุดแค่วันนั้น วันถัดไปโทรต่อ")
+  // 🔴 16 ต.ค. 2569 (เจ้าของ Choice "หยุดแค่วันนั้น ไม่แตะวันอื่น"): เดิมยกเลิกทั้งชุดทุกวันแล้วให้ตัวซ่อมส่งวันถัดไปกลับ
+  //    ⇒ ส่งกลับไม่กี่วิหลัง DELETE = Lumos รับแต่ไม่โทร (อภิชาติ 14–16 ต.ค. · เชษฐ์ศักดิ์ 15–16 ต.ค.) · ตอนนี้แผนวันอื่นไม่ถูกแตะเลย
   // (เจ้าของเคาะ 16 ส.ค.: "บอกยกเลิก = หยุดทั้งชุด") · confirmed ไม่ยกเลิกชุด — วันถัดไป
   // ยังอาจต้องยืนยันซ้ำตามเดิม (stop_early ของ Lumos หยุดแค่วันนั้น)
   //
@@ -374,6 +375,17 @@ export async function cancelFollowSetAfterDecline(personRef: string, groupId: st
                where me.channel = 'reminder' and me.job_ref = 'follow' and me.person_ref = $1
                limit 1
             )
+          )
+          -- เฉพาะ "วันนั้น" (16 ต.ค. 2569): วันเดียวกับสายที่ตอบ (เวลาไทย) · ส่งคนแทน = ใบงานเดียวกัน (SQT)
+          -- สายคอนเฟิร์ม 16:00 อยู่วันก่อนเข้างาน — ตอบไม่ไปตอนคอนเฟิร์ม สายเช้าของใบเดียวกันต้องหยุดด้วย
+          and exists (
+            select 1 from ${followTable} f, ${followTable} me
+             where q.person_ref = 'follow-' || f.id::text and $1 = 'follow-' || me.id::text
+               and (
+                 (f.scheduled_at at time zone 'Asia/Bangkok')::date = (me.scheduled_at at time zone 'Asia/Bangkok')::date
+                 or (coalesce(f.source_ref, '') like 'irecruit-replace:%'
+                     and split_part(f.source_ref, ':', 2) = split_part(coalesce(me.source_ref, ''), ':', 2))
+               )
           )
         returning q.person_ref, q.plan_ref`,
       [personRef, groupId],

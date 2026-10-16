@@ -668,7 +668,7 @@ describe('รายชื่อให้ AI โทร (aiPhones)', () => {
     expect(replaceAiPhoneOf(rule, P1)).toEqual(LISTED);
     expect(replaceAiPhoneOf(rule, '0800000000')).toBeNull();
     const lib = readFileSync(`${process.cwd()}/api/_lib/irecruitReplaceSync.ts`, 'utf8');
-    expect(lib).toMatch(/const \{ rule \} = await getReplaceSyncSettings\(\);\n  const listedKeys/);
+    expect(lib).toMatch(/const \{ rule \} = await getReplaceSyncSettings\(\);\n {2}const listedKeys/);
   });
 });
 

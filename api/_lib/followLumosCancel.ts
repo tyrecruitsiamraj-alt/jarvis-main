@@ -12,6 +12,11 @@
  *   ข้าม (ไม่ส่ง) เมื่อ ① หัวขบวนของแผนถูกทำเครื่องหมายว่าจบแล้ว (`lumos_plan_closed_at` · migration 141)
  *                    หรือ ② ทุกสายในแผนได้ผลครบแล้ว (completed/failed — Lumos โทรจบแผนแล้ว)
  *   ส่งแล้ว (สำเร็จ/404) ⇒ ทำเครื่องหมายว่าจบ · ส่งแผนรหัสเดิมใหม่ ⇒ `recordPushAck` ล้างเครื่องหมาย
+ *                    หรือ ③ 🔴 แผนที่ "ตายตั้งแต่ส่ง" (16 ต.ค. 2569) — หัวขบวนถูกส่งภายใน 10 นาทีหลังคำตอบไม่ไปของชุดเดียวกัน
+ *                       และยังไม่มีผลสักสาย: ตัวซ่อม (`repairDeclinedFollowDays`) เคยส่งแผนกลับไม่กี่วิหลัง DELETE ชุดเดิม
+ *                       ⇒ Lumos รับ (202/imported) แต่ไม่เคยโทร (เคสจริง อภิชาติ 14–16 ต.ค. · เชษฐ์ศักดิ์ 15–16 ต.ค. ·
+ *                       ปัญหาเดียวกับ docs/lumos/lumos-issues-2569-10-12.md "รับแล้วไม่โทร") · DELETE แผนพวกนี้ซ้ำ =
+ *                       เสี่ยงข้อ 9 ต.ค. (DELETE แผนที่จบแล้ว → แผนอื่นของเบอร์เดียวกันหาย) ⇒ ข้าม ส่งแผนใหม่ได้เลย
  * 🔴 ยังไม่ migrate 141 = ทำแบบเดิม (ส่งทุกครั้ง) · อ่านฐานไม่ได้อย่างอื่น = ส่งตามเดิม (ไม่ยกเลิกเลยแย่กว่า: คนที่ยกเลิกแล้วโดนโทร)
  */
 import { dbQuery } from './postgres.js';
@@ -20,6 +25,9 @@ import { cancelPushedReminder } from './lumosPushClient.js';
 import { logInfo, logWarn } from './logger.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
+const followTable = tableInAppSchema('follow_entries');
+/** แผนที่ถูกส่งภายในกี่นาทีหลังคำตอบไม่ไป ถือว่า "ตายตั้งแต่ส่ง" (ดูข้อ ③) */
+export const DEAD_AFTER_DECLINE_MINUTES = 10;
 
 function isUndefinedColumn(e: unknown): boolean {
   return typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '42703';
@@ -46,6 +54,22 @@ export async function isFollowPlanClosed(ref: string): Promise<boolean | null> {
                where y.channel = 'reminder' and y.job_ref = 'follow'
                  and coalesce(y.plan_ref, y.person_ref) = $1
                  and y.status not in ('completed', 'failed'))
+          )
+          or exists (
+            select 1 from ${queueTable} h
+              join ${followTable} hf on 'follow-' || hf.id::text = h.person_ref
+             where h.channel = 'reminder' and h.job_ref = 'follow' and h.person_ref = $1
+               and h.push_accepted_at is not null and hf.group_id is not null
+               and not exists (
+                 select 1 from ${queueTable} y
+                  where y.channel = 'reminder' and y.job_ref = 'follow'
+                    and coalesce(y.plan_ref, y.person_ref) = $1 and y.result is not null)
+               and exists (
+                 select 1 from ${followTable} g
+                   join ${queueTable} x on x.channel = 'reminder' and x.job_ref = 'follow' and x.person_ref = 'follow-' || g.id::text
+                  where g.group_id = hf.group_id and x.last_outcome = 'declined'
+                    and coalesce(x.last_result_at, x.updated_at) between h.push_accepted_at - interval '${DEAD_AFTER_DECLINE_MINUTES} minutes'
+                                                                    and h.push_accepted_at)
           )
         ) as closed`,
       [ref],

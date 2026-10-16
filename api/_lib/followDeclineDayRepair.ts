@@ -63,18 +63,12 @@ export function declineOrphanSql(): string {
        -- ส่งคนแทนด้วย (เจ้าของ 8 ต.ค. 2569 "ต้องหยุดวันนั้น พรุ่งนี้โทรต่อ เหมือนกัน") — เดิมตัดทิ้ง
        and f.group_id is not null
        and f.scheduled_at > now() + interval '${MIN_LEAD_MINUTES} minutes'
-       and (
-         -- A. คิวทุกแถวถูกยกเลิก
-         not exists (select 1 from ${queueTable} y
-                      where y.channel = 'reminder' and y.job_ref = 'follow' and y.person_ref = 'follow-' || f.id::text
-                        and y.status <> 'cancelled')
-         -- B. รอโทรอยู่ แต่หัวขบวนของแผนถึง Lumos ก่อนคำตอบไม่ไป (แผนโดนยกเลิกที่ Lumos แล้ว)
-         or (q.status = 'pending' and q.result is null and exists (
-               select 1 from ${queueTable} l
-                where l.channel = 'reminder' and l.job_ref = 'follow'
-                  and l.person_ref = coalesce(q.plan_ref, q.person_ref)
-                  and l.push_accepted_at < d.declined_at))
-       )
+       -- A. คิวทุกแถวถูกยกเลิก (ของเก่าก่อน 16 ต.ค. 2569 ที่ตอบไม่ไปแล้วยกเลิกทั้งชุด)
+       -- 🔴 ข้อ B เดิม ("รอโทรอยู่ แต่แผนถึง Lumos ก่อนคำตอบไม่ไป") ถอดแล้ว 16 ต.ค. 2569 — ตอบไม่ไปไม่ยกเลิกแผนวันอื่นแล้ว
+       --    แผนวันอื่นที่ส่งไว้ก่อนยังวิ่งอยู่ปกติ · ข้อ B จะไป DELETE แล้วส่งใหม่ทันที = Lumos รับแต่ไม่โทร (ต้นเหตุที่แก้รอบนี้)
+       and not exists (select 1 from ${queueTable} y
+                        where y.channel = 'reminder' and y.job_ref = 'follow' and y.person_ref = 'follow-' || f.id::text
+                          and y.status <> 'cancelled')
      order by f.group_id, f.scheduled_at
      limit 200`;
 }
