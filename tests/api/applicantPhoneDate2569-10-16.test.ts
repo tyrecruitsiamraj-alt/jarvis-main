@@ -22,3 +22,11 @@ describe('ตารางผู้สมัคร: เบอร์โทร + �
     expect(src).toContain("<span className={cn('text-xs tabular-nums', DASH.cellMuted)}>{daysAppliedText(r.created_at, now)}</span>");
   });
 });
+
+describe('ป้ายคำตอบกับ AI: "สนใจ" ไม่มีคำว่า "ตอบว่า" (เจ้าของ 16 ต.ค. 2569)', () => {
+  it('พจนานุกรมกลาง = สนใจ / ไม่สนใจ · ตารางอ่านจากตัวเดียวกัน', async () => {
+    const { callResultLabel } = await import('../../src/lib/homeCallResults');
+    expect(callResultLabel('interest', 'said_yes')).toBe('สนใจ');
+    expect(callResultLabel('interest', 'said_no')).toBe('ไม่สนใจ');
+  });
+});
