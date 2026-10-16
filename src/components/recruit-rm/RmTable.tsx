@@ -212,7 +212,7 @@ const RmTable: React.FC<{
    * 🔴 ว่างแล้วตารางห้ามหาย (กติกา 1 ต.ค. 2569 · QA 5 ต.ค. 2569 เจอว่าตารางหายเหลือย่อหน้า)
    * ⇒ หัวตารางอยู่เสมอ + แถวเดียว "ไม่พบใบสมัคร" · จำนวนคอลัมน์ต้องตรงกับหัวข้างล่าง
    */
-  const colCount = 1 + (ownerColumns ? 10 : 4) + (tab === 'appointments' ? 1 : 0) + (tab === 'contact' ? 1 : 0) + 1;
+  const colCount = 1 + (ownerColumns ? 11 : 4) + (tab === 'appointments' ? 1 : 0) + (tab === 'contact' ? 1 : 0) + 1;
 
   return (
     <div className={cn('overflow-hidden rounded-xl border', DASH.card)}>
@@ -242,12 +242,13 @@ const RmTable: React.FC<{
                 <>
                   <th className={cn(STICKY_NAME, 'px-1.5 py-2 font-medium', DASH.stickyHead)}>ชื่อ</th>
                   <th className="px-1.5 py-2 font-medium">นามสกุล</th>
+                  <th className="px-1.5 py-2 font-medium">เบอร์โทร</th>
                   <th className="px-1.5 py-2 font-medium">ที่อยู่</th>
                   <th className="px-1.5 py-2 font-medium">หน่วยงาน</th>
                   <th className="px-1.5 py-2 font-medium">เจ้าของงาน</th>
                   <th className="px-1.5 py-2 font-medium">เพศ</th>
                   <th className="px-1.5 py-2 text-right font-medium">อายุ</th>
-                  <th className="px-1.5 py-2 font-medium">สมัครมาแล้ว</th>
+                  <th className="px-1.5 py-2 font-medium">วันที่สมัคร</th>
                   <th className="px-1.5 py-2 font-medium">คำตอบกับ AI</th>
                   <th className="px-1.5 py-2 font-medium">สถานะ</th>
                 </>
@@ -340,6 +341,20 @@ const RmTable: React.FC<{
                       <td className="px-1.5 py-2">
                         <span className={cn('line-clamp-2 min-w-14 break-words font-medium', DASH.cellStrong)}>{dashIfEmpty(lastName)}</span>
                       </td>
+                      {/* เบอร์โทร (เจ้าของ 16 ต.ค. 2569 "เอาเบอร์โทรมาโชว์ด้วย") · เบอร์แปลง E.164 ไม่ได้ = ป้ายเตือนแบบตารางอีกโฉม */}
+                      <td className="px-1.5 py-2">
+                        <span className="flex flex-col items-start gap-0.5">
+                          <span className={cn('whitespace-nowrap tabular-nums', DASH.cell)}>{dashIfEmpty(r.phone)}</span>
+                          {r.phone_callable === false ? (
+                            <span
+                              className={cn('w-fit whitespace-nowrap rounded-full border px-1.5 py-0.5 text-xs font-medium', TONE.danger.soft, TONE.danger.value)}
+                              title="เบอร์นี้ใช้กับระบบโทรไม่ได้ (ไม่ใช่มือถือ 10 หลัก) — กดดูรายละเอียดเพื่อแก้เบอร์"
+                            >
+                              เบอร์ใช้โทรไม่ได้
+                            </span>
+                          ) : null}
+                        </span>
+                      </td>
                       {addressCell}
                       {unitCell}
                       <td className={cn('px-1.5 py-2 whitespace-nowrap', DASH.cell)}>{dashIfEmpty(recruiterOf?.(r) ?? '')}</td>
@@ -350,7 +365,15 @@ const RmTable: React.FC<{
                       <td className={cn('px-1.5 py-2 text-right tabular-nums', DASH.cell)}>
                         {typeof r.age === 'number' ? r.age : EM_DASH}
                       </td>
-                      <td className={cn('px-1.5 py-2 whitespace-nowrap tabular-nums', DASH.cell)}>{daysAppliedText(r.created_at, now)}</td>
+                      {/* วันที่สมัคร + ผ่านมาแล้วกี่วัน (เจ้าของ 16 ต.ค. 2569 "เอาวันที่สมัครมาด้วย") · วันที่ตามปฏิทินกรุงเทพ ห้าม .slice ตรง ๆ */}
+                      <td className="px-1.5 py-2 whitespace-nowrap">
+                        <span className="flex flex-col gap-0.5">
+                          <span className={cn('tabular-nums', DASH.cell)}>
+                            {r.created_at ? formatYmdTh(toYmdBangkok(new Date(r.created_at))) : EM_DASH}
+                          </span>
+                          <span className={cn('text-xs tabular-nums', DASH.cellMuted)}>{daysAppliedText(r.created_at, now)}</span>
+                        </span>
+                      </td>
                       <td className="px-1.5 py-2">
                         <AiAnswerCell r={r} />
                       </td>
