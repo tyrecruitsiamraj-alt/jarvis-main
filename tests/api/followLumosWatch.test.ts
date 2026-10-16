@@ -64,7 +64,7 @@ describe('ชั้น 1 — แผนเข้า Lumos จริงไหม',
     expect(sql).toContain("interval '2 minutes'");
   });
 
-  it('🔴 ส่งแผนใหม่แล้ว ผลนำเข้าของ event เก่าใช้ไม่ได้ (14 ต.ค. 2569: อภิชาติ 13 ต.ค. + แผนรอโทร 44 แผน)', async () => {
+  it('🔴 ส่งแผนใหม่แล้ว ผลนำเข้าของ event เก่าใช้ไม่ได้ (14 ต.ค. 2569: พนักงาน A 13 ต.ค. + แผนรอโทร 44 แผน)', async () => {
     // ตัวถาม: ผลที่ถามไว้ก่อนส่งรอบล่าสุด = ถามใหม่
     expect(mod.pendingImportSql()).toContain('q.lumos_import_checked_at < q.push_accepted_at');
     // ตอนส่ง: จด event ใหม่พร้อมล้างผลนำเข้าเดิม

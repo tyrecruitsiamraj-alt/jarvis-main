@@ -21,6 +21,7 @@ import {
   type FollowPlanningRound,
 } from '../../src/lib/followPlanning.js';
 import { followRoundSlot } from '../../src/lib/followRoundBuckets.js';
+import { followStoppedEntries } from '../../src/lib/followCallMatrix.js';
 
 /** ช่องของคิว Lumos ที่การจัดหมวดต้องใช้ — ต่อ `left join <queue> q on <FOLLOW_QUEUE_MATCH>` */
 export const FOLLOW_QUEUE_CALL_COLS = `q.status as call_status,
@@ -82,14 +83,17 @@ export function categorizeFollowRows(
 ): Map<string, { category: FollowCallCategory; slot: 1 | 2 | 3; caller: 'ai' | 'manual' }> {
   const entries = withFollowDayCalls(rows.map(toEntry));
   const verdicts = staffDayVerdicts(entries, followGroupKey);
+  // ระบบหยุดสายเองเพราะสายก่อนหน้าวันเดียวกันได้คำตอบแล้ว = ยกเลิก ไม่ใช่เลยเวลา (ตัวเดียวกับแผง/ตาราง · 16 ต.ค. 2569)
+  const stopped = followStoppedEntries(entries, now);
   return new Map(
     entries.map((e) => {
+      const verdict = dayVerdictOf(verdicts, followGroupKey(e), e);
       const round = {
         entry: e,
-        state: followRoundState(e, now),
+        state: stopped.has(e) && !verdict ? 'cancelled' : followRoundState(e, now),
         time: null,
         ymd: null,
-        dayVerdict: dayVerdictOf(verdicts, followGroupKey(e), e),
+        dayVerdict: verdict,
       } as FollowPlanningRound;
       return [e.id, { category: callCategory(round), slot: followRoundSlot(e) ?? 1, caller: followCallerOf(e) }] as const;
     }),

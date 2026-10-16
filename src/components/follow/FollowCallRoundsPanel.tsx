@@ -31,6 +31,7 @@ import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
 import {
   FOLLOW_MATRIX_COLS,
   followMatrixCol,
+  followStoppedEntries,
   FOLLOW_MATRIX_COL_LABEL,
   FOLLOW_MATRIX_COL_TONE,
   FOLLOW_MATRIX_ROWS,
@@ -161,8 +162,12 @@ const PEOPLE_LIFE_LABEL: Record<PeopleLife, string> = {
   cancelled: 'ยกเลิก',
 };
 /** ยกเลิก = ช่องยกเลิกของแผง (`followMatrixCol`) ไม่ใช่ธงยกเลิกดิบ — สายที่ยกเลิกแต่โทรแล้วมีผลนับตามผล (6 ต.ค. 2569) */
-const lifeOf = (e: FollowEntry): Exclude<PeopleLife, 'all'> =>
-  followMatrixCol(e) === 'cancelled' ? 'cancelled' : e.completed_at || e.cancelled ? 'closed' : 'remaining';
+const lifeOf = (e: FollowEntry, stopped: ReadonlySet<FollowEntry>): Exclude<PeopleLife, 'all'> =>
+  followMatrixCol(e, undefined, null, stopped.has(e)) === 'cancelled'
+    ? 'cancelled'
+    : e.completed_at || e.cancelled
+      ? 'closed'
+      : 'remaining';
 
 export default function FollowCallRoundsPanel({
   headerExtras,
@@ -272,6 +277,7 @@ export default function FollowCallRoundsPanel({
 
   /** ตารางสายก้อนเดียว (3 ต.ค. 2569) — แต่ละช่องถือรายชื่อจริง เลข = ความยาวลิสต์ */
   const matrix = useMemo(() => buildFollowCallMatrix(entries), [entries]);
+  const stopped = useMemo(() => followStoppedEntries(entries), [entries]);
   const openMatrixDialog = (r: FollowMatrixRowKey, c: FollowMatrixCol) => {
     const list = matrix[r][c];
     setPeopleLife('all');
@@ -318,7 +324,7 @@ export default function FollowCallRoundsPanel({
                 const n =
                   lf === 'all'
                     ? peopleDialog.people.length
-                    : peopleDialog.people.filter((p) => lifeOf(p) === lf).length;
+                    : peopleDialog.people.filter((p) => lifeOf(p, stopped) === lf).length;
                 const on = peopleLife === lf;
                 return (
                   <button
@@ -341,7 +347,7 @@ export default function FollowCallRoundsPanel({
             {(() => {
               const shown =
                 peopleDialog?.splitByLife && peopleLife !== 'all'
-                  ? (peopleDialog?.people ?? []).filter((p) => lifeOf(p) === peopleLife)
+                  ? (peopleDialog?.people ?? []).filter((p) => lifeOf(p, stopped) === peopleLife)
                   : (peopleDialog?.people ?? []);
               return peopleDialog && shown.length > 0 ? (
                 <ul className="space-y-1.5">

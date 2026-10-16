@@ -16,7 +16,17 @@
  *   · สายที่ไม่มีเลขสาย (ยังไม่เคยเข้าคิวและยังไม่มีผล) ไม่อยู่สายไหน — นิยามเดิมของแผง
  */
 import type { FollowEntry } from '@/lib/followApi';
-import { callCategory, dayVerdictOf, followRoundState, staffDayVerdicts, type FollowCallCategory } from '@/lib/followPlanning';
+import {
+  bangkokTime,
+  callCategory,
+  dayVerdictOf,
+  followEntryYmd,
+  followRoundState,
+  staffDayVerdicts,
+  stoppedByEarlierAnswer,
+  type FollowCallCategory,
+  type FollowPlanningRound,
+} from '@/lib/followPlanning';
 import { followGroupKey, followPersonKey } from '@/lib/followGrouping';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 
@@ -101,7 +111,10 @@ export function followMatrixCol(
   now: Date = new Date(),
   /** ผลที่คนกดจัดการของคน+วันนี้ (`staffDayVerdicts`) — มีค่า = ทับหมวดของสาย (5 ต.ค. 2569) */
   dayVerdict: FollowCallCategory | null = null,
+  /** ระบบหยุดสายนี้เองเพราะสายก่อนหน้าวันเดียวกันได้คำตอบแล้ว (`followStoppedEntries`) = ช่องยกเลิก ไม่ใช่รอโทร (16 ต.ค. 2569) */
+  stopped = false,
 ): Exclude<FollowMatrixCol, 'total'> {
+  if (stopped && !dayVerdict) return 'cancelled';
   const round = { entry, state: followRoundState(entry, now), time: null, ymd: null, dayVerdict };
   return followMatrixColOfCategory(callCategory(round));
 }
@@ -131,15 +144,40 @@ export function followMatrixColOfCategory(category: FollowCallCategory): Exclude
   }
 }
 
+/**
+ * สายที่ระบบหยุดเองเพราะสายก่อนหน้าของคน+วันเดียวกันได้คำตอบแล้ว — กติกาเดียวกับป้าย
+ * "ไม่โทร · สาย 07:00 ตอบ…แล้ว" ในตาราง (`stoppedByEarlierAnswer`) · เจ้าของ 16 ต.ค. 2569 "แก้ป้ายตามนี้เลย"
+ */
+export function followStoppedEntries(entries: readonly FollowEntry[], now: Date = new Date()): Set<FollowEntry> {
+  const byGroup = new Map<string, FollowPlanningRound[]>();
+  for (const entry of entries) {
+    const key = followGroupKey(entry);
+    const list = byGroup.get(key) ?? [];
+    list.push({
+      entry,
+      state: followRoundState(entry, now),
+      time: entry.scheduled_at ? bangkokTime(entry.scheduled_at) : null,
+      ymd: followEntryYmd(entry),
+    });
+    byGroup.set(key, list);
+  }
+  const out = new Set<FollowEntry>();
+  for (const rounds of byGroup.values()) {
+    for (const r of rounds) if (stoppedByEarlierAnswer(r, rounds)) out.add(r.entry);
+  }
+  return out;
+}
+
 /** ตารางเต็ม — แต่ละช่องถือรายชื่อจริง (กดดูรายชื่อได้ · เลข = ความยาวลิสต์ ไม่มีตัวนับแยก) */
 export function buildFollowCallMatrix(entries: readonly FollowEntry[], now: Date = new Date()): FollowMatrix {
   const m: FollowMatrix = { all: emptyRow(), 1: emptyRow(), 2: emptyRow(), 3: emptyRow() };
   // คนกดจัดการแล้ว = ทุกสายของคนนั้นในวันนั้นย้ายไปถังที่กด (ตัวเดียวกับตารางรายวัน — คีย์กลุ่มเดียวกัน)
   const verdicts = staffDayVerdicts(entries, followGroupKey);
+  const stopped = followStoppedEntries(entries, now);
   for (const e of entries) {
     const slot = followRoundSlot(e);
     if (slot === null) continue;
-    const col = followMatrixCol(e, now, dayVerdictOf(verdicts, followGroupKey(e), e));
+    const col = followMatrixCol(e, now, dayVerdictOf(verdicts, followGroupKey(e), e), stopped.has(e));
     for (const key of ['all', slot] as const) {
       m[key].total.push(e);
       m[key][col].push(e);

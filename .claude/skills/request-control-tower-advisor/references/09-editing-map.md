@@ -13194,7 +13194,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   บท `interview` ที่แอดมินแก้ไว้ในหน้าตั้งค่าไม่ได้แตะ (ไม่มีบรรทัดรายได้ · ได้ฐานผ่านประโยคของแถม) · เทสต์ `tests/api/aiBaseSalary2569-10-14.test.ts`
 
 ## ส่งแผนติดตามใหม่แล้วต้องถามผลนำเข้าใหม่ (14 ต.ค. 2569)
-- เจอตอนทำรายงานส่ง Lumos เคสอภิชาติ: แผนส่งใหม่ 13 ต.ค. 08:03 (event ใหม่) แต่ `lumos_import_status` ยังเป็น imported ของ event เก่า (ถาม 8 ต.ค.)
+- เจอตอนทำรายงานส่ง Lumos เคสพนักงานคนหนึ่ง: แผนส่งใหม่ 13 ต.ค. 08:03 (event ใหม่) แต่ `lumos_import_status` ยังเป็น imported ของ event เก่า (ถาม 8 ต.ค.)
   ⇒ ตัวถาม (`followLumosWatch.ts` `pendingImportSql`) ข้ามแผนนี้ · วัดได้ 44 แผนรอโทรโดนแบบเดียวกัน
 - แก้: `recordPushAck` (`lumosDispatch.ts`) ล้างผลนำเข้าเมื่อจด event ใหม่ · `pendingImportSql` ถามใหม่เมื่อ `lumos_import_checked_at < push_accepted_at`
 - เทสต์ `tests/api/followLumosWatch.test.ts`
@@ -13376,7 +13376,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - เทสต์ `tests/api/followInsurance2569-10-16.test.ts` · `followStartInsurance.test.ts` (เพดาน 1500)
 
 ### ตอบ AI ว่า "ไม่ไป" = หยุดแค่วันนั้น ไม่แตะแผนวันอื่น (16 ต.ค. 2569)
-- เจ้าของ: "ทำไมถึงไม่โทรหาพนักงาน" — อภิชาติ (ไม่ไป 13 ต.ค. 08:02) ไม่ถูกโทร 14–16 ต.ค. · เชษฐ์ศักดิ์ (14 ต.ค. 08:28) ไม่ถูกโทร 15–16 ต.ค.
+- เจ้าของ: "ทำไมถึงไม่โทรหาพนักงาน" — พนักงาน A (ไม่ไป 13 ต.ค. 08:02) ไม่ถูกโทร 14–16 ต.ค. · พนักงาน B (14 ต.ค. 08:28) ไม่ถูกโทร 15–16 ต.ค.
 - ต้นเหตุ: `cancelFollowSetAfterDecline` ยกเลิกทั้งชุดทุกวัน (DELETE ที่ Lumos) → `repairDeclinedFollowDays` ส่งกลับ 1 นาทีหลัง
   ⇒ Lumos รับ (imported) แต่ไม่โทร — ตรงกับ docs/lumos/lumos-issues-2569-10-12.md "ส่งไม่กี่วิหลัง DELETE แผนเก่าของเบอร์เดียวกัน"
 - แก้ (Choice "หยุดแค่วันนั้น ไม่แตะวันอื่น"): `callFollowup.ts` ยกเลิกเฉพาะแถววันเดียวกัน (เวลาไทย) · ส่งคนแทน = ใบงานเดียวกัน (SQT)
@@ -13384,3 +13384,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · `followLumosCancel.isFollowPlanClosed` ข้อ ③ แผน "ตายตั้งแต่ส่ง" (หัวขบวนส่งภายใน `DEAD_AFTER_DECLINE_MINUTES` = 10 นาทีหลังคำตอบไม่ไปของชุด + ยังไม่มีผล) = ถือว่าจบ ⇒ ไม่ DELETE ซ้ำ ส่งแผนใหม่ได้เลย
 - เทสต์ `tests/api/followDeclineSameDay2569-10-16.test.ts` · `followDeclineDayRepair.test.ts`
 
+
+### สายที่ระบบหยุดเพราะสายก่อนหน้าวันเดียวกันตอบแล้ว = "ไม่โทร" ไม่ใช่เลยเวลา (16 ต.ค. 2569)
+- เคสจริง 15 ต.ค. (พนักงานคนหนึ่ง): 07:00 ตอบ AI แล้ว → ระบบถอนคิว 08:00 (ถูก) แต่จอขึ้น "AI เลยเวลาไม่มีผล" + อยู่กองสายที่จะไม่ถูกโทร + แผงวันนั้นนับ "รอโทร"
+- กติกาเดียว `followPlanning.stoppedByEarlierAnswer` (คิว `cancelled` + รายการยังเปิด + มีสายก่อนหน้าวันเดียวกันได้คำตอบ ไป/ไม่ไป/วันหยุด/ลางาน)
+  · ตาราง: `buildFollowPlanningRows` ตั้ง `stoppedBy` + state `cancelled` · ป้าย `stoppedLabel` "ไม่โทร · สาย 07:00 ตอบ…แล้ว"
+  · แผงสาย: `followCallMatrix.followStoppedEntries` → ช่องยกเลิก (`FollowCallRoundsPanel.lifeOf` ใช้ชุดเดียวกัน)
+  · เซิร์ฟเวอร์: `api/_lib/followCategory.categorizeFollowRows` (หน้าหลัก/Dashboard) ใช้ `followStoppedEntries` ตัวเดียวกัน
+- 🔴 คิวยกเลิกที่ไม่มีคำตอบก่อนหน้า = ยังเลยเวลา/รอโทรตามเดิม (สายที่เสียจริงห้ามซ่อน)
+- เทสต์ `tests/api/followStoppedByAnswer2569-10-16.test.ts`

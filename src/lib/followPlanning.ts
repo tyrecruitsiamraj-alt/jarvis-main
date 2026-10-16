@@ -139,7 +139,46 @@ export type FollowPlanningRound = {
    * (เจ้าของ Choice 5 ต.ค. 2569 "ทุกสายของวันนั้นย้ายตามที่คนกด") · ตั้งใน `buildFollowPlanningRows`
    */
   dayVerdict?: FollowCallCategory | null;
+  /**
+   * สายที่ระบบหยุดเองเพราะสายก่อนหน้าของวันเดียวกันได้คำตอบแล้ว (16 ต.ค. 2569 · เจ้าของ "แก้ป้ายตามนี้เลย")
+   * เช่น เคสจริง 15 ต.ค.: 07:00 ตอบวันหยุด → ระบบถอนคิว 08:00 · เดิมจอขึ้น "เลยเวลานัด" + อยู่กองสายที่จะไม่ถูกโทร
+   * มีค่า = สายนี้ `state` เป็น `cancelled` (จบ) · ป้าย "ไม่โทร · สาย 07:00 ตอบวันหยุดแล้ว" · ตั้งใน `buildFollowPlanningRows`
+   */
+  stoppedBy?: { time: string | null; category: FollowCallCategory } | null;
 };
+
+/** หมวดคำตอบที่ทำให้ระบบหยุดสายที่เหลือของวัน (ตัวหยุดคือ `cancelFollowSetAfterDecline` / ลงผลวันหยุด-ลางาน) */
+const DAY_STOP_ANSWERS: ReadonlySet<FollowCallCategory> = new Set(['agreed', 'lost', 'dayOff', 'leave']);
+
+/**
+ * สายที่ระบบถอนคิวเอง (คิว `cancelled` แต่รายการยังเปิด ไม่มีผล) และมีสายก่อนหน้าวันเดียวกันได้คำตอบแล้ว
+ * ⇒ คืนสายที่ตอบ (ใช้ทำป้าย) · ไม่เข้าเงื่อนไข = null (ยังเป็นเลยเวลา/รอโทรตามเดิม — สายที่เสียจริงต้องยังเห็น)
+ */
+export function stoppedByEarlierAnswer(
+  round: FollowPlanningRound,
+  sameDay: readonly FollowPlanningRound[],
+): FollowPlanningRound | null {
+  const e = round.entry;
+  if (e.cancelled || e.completed_at || round.state === 'result' || round.state === 'cancelled') return null;
+  if (String(e.call_status ?? '') !== 'cancelled' || !round.ymd) return null;
+  const at = ms(e.scheduled_at);
+  let best: FollowPlanningRound | null = null;
+  for (const r of sameDay) {
+    if (r === round || r.ymd !== round.ymd || r.state !== 'result') continue;
+    const t = ms(r.entry.scheduled_at);
+    if (at !== null && t !== null && t >= at) continue;
+    if (!DAY_STOP_ANSWERS.has(callCategory(r))) continue;
+    if (!best || (ms(best.entry.scheduled_at) ?? 0) < (t ?? 0)) best = r;
+  }
+  return best;
+}
+
+/** "ไม่โทร · สาย 07:00 ตอบวันหยุดแล้ว" */
+export function stoppedLabel(stopped: NonNullable<FollowPlanningRound['stoppedBy']>): string {
+  const ans = FOLLOW_CALL_CATEGORY_LABEL[stopped.category];
+  const said = ans.startsWith('ตอบ') ? ans : `ตอบ${ans}`;
+  return `ไม่โทร · ${stopped.time ? `สาย ${stopped.time} ` : 'สายก่อนหน้า'}${said}แล้ว`;
+}
 
 /**
  * หมวดของสายที่**ปิดงานแล้ว**ตามผลที่คนกด — ไป · ไม่ไป · ยกเลิก · ที่เหลือ (ลา/เลื่อน/จำวันผิด) = ยังไม่รู้ผล
@@ -222,7 +261,7 @@ const bangkokYmd = (iso: string): string | null => {
   return BKK_YMD.format(d);
 };
 
-const bangkokTime = (iso: string): string | null => {
+export const bangkokTime = (iso: string): string | null => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   return BKK_HM.format(d);
@@ -247,6 +286,13 @@ export function buildFollowPlanningRows(
       ymd: followEntryYmd(entry),
       dayVerdict: dayVerdictOf(verdicts, group.key, entry),
     }));
+    // สายที่ระบบหยุดเองเพราะสายก่อนหน้าวันเดียวกันได้คำตอบแล้ว = จบ (ไม่ใช่เลยเวลา) · 16 ต.ค. 2569
+    for (const r of rounds) {
+      const by = stoppedByEarlierAnswer(r, rounds);
+      if (!by) continue;
+      r.stoppedBy = { time: by.time, category: callCategory(by) };
+      r.state = 'cancelled';
+    }
 
     const days: string[] = [];
     for (const r of rounds) {
@@ -415,6 +461,7 @@ export function followRoundLabel(round: FollowPlanningRound): string {
 }
 
 function followRoundBaseLabel(round: FollowPlanningRound): string {
+  if (round.stoppedBy) return stoppedLabel(round.stoppedBy);
   const category = callCategory(round);
   const base = FOLLOW_CALL_CATEGORY_LABEL[category];
   const staffWait = staffPlannedWait(round);
