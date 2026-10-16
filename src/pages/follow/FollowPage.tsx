@@ -50,6 +50,7 @@ import {
   purgeFollowEntry,
   completeFollowEntry,
   reopenFollowEntry,
+  uncancelFollowEntry,
   recordFollowStaffCall,
   createReplaceFollow,
   cancelFollowScope,
@@ -1597,6 +1598,21 @@ const FollowPage: React.FC = () => {
       await reload();
     } catch (err) {
       toast.error(friendlyErrorText(err, 'ย้อนสถานะไม่สำเร็จ'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /** ย้อนยกเลิก (เจ้าของ 16 ต.ค. 2569) — server คืนทุกสายที่ยกเลิกในการกดครั้งเดียวกัน + ส่งแผนให้ Lumos ใหม่ */
+  const doUncancel = async (id: string) => {
+    setBusyId(id);
+    try {
+      const out = await uncancelFollowEntry(id);
+      if (out.restore_error) toast.error(out.restore_error);
+      else toast.success(`ย้อนยกเลิกแล้ว ${out.restored} สาย`);
+      await reload();
+    } catch (err) {
+      toast.error(friendlyErrorText(err, 'ย้อนยกเลิกไม่สำเร็จ'));
     } finally {
       setBusyId(null);
     }
@@ -3466,6 +3482,7 @@ const FollowPage: React.FC = () => {
         }}
         onComplete={doComplete}
         onReopen={(id) => void doReopen(id)}
+        onUncancel={(id) => void doUncancel(id)}
         onStaffCall={(id, outcome, note) => doStaffCall(id, outcome, note)}
         onStaffCallClear={doStaffCallClear}
         onPurge={canPurge ? (id) => void doPurge(id) : null}

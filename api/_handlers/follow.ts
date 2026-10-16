@@ -28,7 +28,7 @@ import { readJsonBody, getString } from '../_lib/body.js';
 import type { FollowDispatchState } from '@/lib/followDispatchState';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { staffNameOfPhone } from '../_lib/followStaffName.js';
-import { restoreRoundsStoppedByClose, type ReopenRestore } from '../_lib/followReopenRestore.js';
+import { restoreCancelledFollow, restoreRoundsStoppedByClose, type ReopenRestore } from '../_lib/followReopenRestore.js';
 import { cancelFollowScope, parseCancelScope } from '../_lib/followCancelScope.js';
 import { getReplaceSyncSettings } from '../_lib/irecruitReplaceSync.js';
 import { logError, logWarn } from '../_lib/logger.js';
@@ -1909,6 +1909,30 @@ async function reopenFollow(req: AuthedReq, res: ApiRes) {
   return res.status(200).json({ ...toResponse(done), restored_rounds: restore.restored, restore_error: restore.error ?? null });
 }
 
+/**
+ * PATCH action=uncancel — ย้อนยกเลิก (เจ้าของ 16 ต.ค. 2569 "กดผิดอะแก้ไขจากหน้า Ui ได้ไหม")
+ * คืนทุกสายที่ยกเลิกในการกดครั้งเดียวกัน + ส่งแผนให้ Lumos ใหม่ (`restoreCancelledFollow`) · ปิดงานแล้วใช้ "ย้อนสถานะ" แทน
+ */
+async function uncancelFollow(req: AuthedReq, res: ApiRes) {
+  const id = typeof req.query?.id === 'string' ? req.query.id.trim() : '';
+  if (!UUID_RE.test(id)) return sendError(res, 400, 'Bad request', 'ต้องระบุ id ของรายการติดตาม');
+  const { rows } = await dbQuery<FollowRow>(`select * from ${followTable} where id = $1 limit 1`, [id]);
+  const before = rows[0];
+  if (!before) return sendError(res, 404, 'Not found', 'ไม่พบรายการ');
+  if (!before.cancelled_at) return sendError(res, 400, 'Bad request', 'สายนี้ไม่ได้ถูกยกเลิก');
+  if (before.completed_at) return sendError(res, 400, 'Bad request', 'สายนี้ปิดงานแล้ว ใช้ย้อนสถานะแทน');
+
+  const out = await restoreCancelledFollow(id);
+  if (out.tooSoon) return sendError(res, 409, 'Conflict', 'เพิ่งยกเลิกไป รอสัก 2 นาทีแล้วกดใหม่');
+  await auditFromAuthed(req, {
+    action: 'follow.uncancel',
+    entityType: 'follow_entry',
+    entityId: id,
+    after: { restored: out.restored, resent: out.resent, error: out.error ?? null },
+  });
+  return res.status(200).json({ restored: out.restored, resent: out.resent, restore_error: out.error ?? null });
+}
+
 /** ฐานยังไม่รัน migration 130 — บอกตรง ๆ แทนจะปล่อย error ดิบของ Postgres */
 const STAFF_CALL_NOT_READY =
   'ยังลงผลโทรไม่ได้ ต้องรออัปเดตระบบก่อน';
@@ -2061,6 +2085,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (action === 'update') return await updateFollow(req, res, body);
       if (action === 'replace_schedule') return await replaceFollowSchedule(req, res, body);
       if (action === 'reopen') return await reopenFollow(req, res);
+      if (action === 'uncancel') return await uncancelFollow(req, res);
       if (action === 'staff_call') return await recordStaffCall(req, res, body);
       if (action === 'staff_call_clear') return await clearStaffCall(req, res);
       return await completeFollow(req, res, body);

@@ -480,6 +480,19 @@ export const FOLLOW_STATUS_BAR: Record<FollowCallStatus, string> = {
  * **ย้อนสถานะปิดงาน** (feedback 2 ก.ย. 2569) — ล้างผลปิดงานให้กลับมาแก้ต่อได้
  * ⚠️ ไม่แตะคิวโทร · รายการที่ยกเลิกไปแล้วย้อนทางนี้ไม่ได้
  */
+/**
+ * ย้อนยกเลิก (16 ต.ค. 2569) — คืนทุกสายที่ยกเลิกในการกดครั้งเดียวกัน + ส่งแผนให้ Lumos ใหม่
+ * 409 = เพิ่งยกเลิก (ต้องรอ 2 นาที กติกา Lumos) · `restore_error` = ส่ง Lumos ไม่ครบ ต้องบอกจอ
+ */
+export async function uncancelFollowEntry(id: string): Promise<{ restored: number; resent: number; restore_error: string | null }> {
+  const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'uncancel' }),
+  });
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as { restored: number; resent: number; restore_error: string | null };
+}
+
 /** ย้อนสถานะ = คืนสายที่การปิดครั้งนั้นหยุดไว้ด้วย (7 ต.ค. 2569) — `restore_error` = คืนไม่ครบ ต้องบอกจอ */
 export async function reopenFollowEntry(id: string): Promise<FollowEntry & { restored_rounds?: number; restore_error?: string | null }> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {

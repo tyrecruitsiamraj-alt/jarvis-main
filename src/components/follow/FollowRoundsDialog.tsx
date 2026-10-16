@@ -57,6 +57,8 @@ const FollowRoundsDialog: React.FC<{
    * ย้อนสถานะปิดงาน (feedback 2 ก.ย. 2569) — เลือกผลผิดแล้วแก้ต่อได้ ไม่ต้องสร้างใหม่
    */
   onReopen: (id: string) => void | Promise<void>;
+  /** ย้อนยกเลิก (16 ต.ค. 2569 "กดผิดอะแก้ไขจากหน้า Ui ได้ไหม") — คืนทุกสายที่ยกเลิกในการกดครั้งเดียวกัน */
+  onUncancel: (id: string) => void | Promise<void>;
   onComplete: (id: string, outcome: FollowOutcome, note?: string, stopScope?: FollowStopScope) => void | Promise<void>;
   /** ลง/ล้างผลโทรของรอบคนโทร (130 · 30 ก.ย. 2569) — โชว์เฉพาะรอบที่ตั้งเป็นคนโทร */
   onStaffCall: (id: string, outcome: FollowStaffCallOutcome, note?: string) => boolean | void | Promise<boolean | void>;
@@ -82,6 +84,7 @@ const FollowRoundsDialog: React.FC<{
   onEdit,
   onComplete,
   onReopen,
+  onUncancel,
   onStaffCall,
   onStaffCallClear,
   onPurge,
@@ -268,6 +271,26 @@ const FollowRoundsDialog: React.FC<{
                       >
                         <RotateCcw aria-hidden />
                         {busy ? 'กำลังย้อน…' : 'ย้อนสถานะ'}
+                      </Button>
+                    </div>
+                  </>
+                ) : null}
+                {/* 🔴 ยกเลิกแล้วต้องมีทางย้อน (เจ้าของ 16 ต.ค. 2569 "กดผิดอะแก้ไขจากหน้า Ui ได้ไหม")
+                    คืนทุกสายที่ยกเลิกในการกดครั้งเดียวกัน (ทั้งชุด/ทั้งวัน/สายเดียว) + ส่งแผนให้ Lumos ใหม่ */}
+                {it.cancelled && !it.completed_at ? (
+                  <>
+                    <p className="mt-2 text-[10px] font-medium text-muted-foreground">จัดการสายนี้</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => onUncancel(it.id)}
+                        className={cn('min-h-8 gap-1 px-2.5 text-[11px]', TONE.warn.value)}
+                      >
+                        <RotateCcw aria-hidden />
+                        {busy ? 'กำลังย้อน…' : 'ย้อนยกเลิก'}
                       </Button>
                     </div>
                   </>

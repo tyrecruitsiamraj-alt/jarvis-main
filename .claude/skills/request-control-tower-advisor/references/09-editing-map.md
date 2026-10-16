@@ -13431,3 +13431,13 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · ส่ง `start_date` ไปทั้ง `/api/aftercare` (หน้าดูแลได้วันเริ่มงานเดียวกัน — ปิดค้างเดิม "ย้ายแล้ววันเริ่มงานว่าง") และรอบถามความเป็นอยู่
 - "ไม่ย้าย › ติดตามต่อ" ยังนับจากวันติดตามวันสุดท้ายเหมือนเดิม (`continueStartYmd`)
 - เทสต์ `tests/api/followAftercareMove.test.ts` · `src/components/follow/FollowCompletedCard.test.tsx`
+
+### ย้อนยกเลิก ในป๊อปจัดการ (16 ต.ค. 2569)
+- เจ้าของ: "กดผิดอะแก้ไขจากหน้า Ui ได้ไหม" (กดยกเลิกทั้งชุด 14 สายผิด) → Choice ปุ่ม "ย้อนยกเลิก" · เดิมย้อนได้แค่ปิดงาน (`reopen`)
+- `api/_lib/followReopenRestore.ts`: `restoreCancelledFollow` อ่าน audit `follow.cancel` ล่าสุดที่มีสายนี้ (`cancelledIds` ของการกดครั้งนั้น)
+  → คืนเฉพาะแถวที่ยังยกเลิก + ยกเลิกห่างจาก audit ≤ 2 นาที + ยังไม่ปิดงาน · ไม่มี audit = คืนสายนั้นสายเดียว
+  · `requeueAndResyncFollow` (ใช้ร่วมกับย้อนสถานะปิดงาน): AI อนาคต = คิว pending + `resyncFollowPlanWithLumos` · AI เลยเวลา/คนโทร = เปิดแถวอย่างเดียว
+  · 🔴 ยกเลิกไม่ถึง 2 นาที = 409 รอก่อน (กติกา Lumos: ส่งแผนเบอร์เดิมไม่กี่วิหลัง DELETE = รับแต่ไม่โทร)
+- `api/_handlers/follow.ts` PATCH `action: 'uncancel'` (audit `follow.uncancel`) · client `uncancelFollowEntry` · ปุ่มใน `FollowRoundsDialog` (`it.cancelled && !it.completed_at`)
+- ⚠️ เครื่อง dev ไม่มีคีย์ push = คืนแถว+คิวอย่างเดียว ไม่ส่ง Lumos — กดจริงบนเว็บจริงเท่านั้น
+- เทสต์ `tests/api/followUncancel2569-10-16.test.ts`

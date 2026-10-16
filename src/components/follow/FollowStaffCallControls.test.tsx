@@ -142,6 +142,7 @@ describe('ป๊อปของรอบ: ปุ่มลงผลโชว์�
     onCancel: vi.fn(),
     onEdit: vi.fn(),
     onReopen: vi.fn(),
+    onUncancel: vi.fn(),
     onComplete: vi.fn(),
     onStaffCall: vi.fn(),
     onStaffCallClear: vi.fn(),
