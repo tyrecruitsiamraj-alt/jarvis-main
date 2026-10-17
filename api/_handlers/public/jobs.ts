@@ -1,5 +1,5 @@
 import { buildIncomeDisplay, type IncomeDisplay } from '../../../src/lib/incomeBreakdown.js';
-import { publicSafeAddress } from '../../../src/lib/publicJobPrivacy.js';
+import { publicSafeAddress, publicWorkSchedule } from '../../../src/lib/publicJobPrivacy.js';
 import { payCyclesOf } from '../../../src/lib/payCycle.js';
 import { resignedMonthlyNetAverage } from '../../../src/lib/resignedIncome.js';
 import type { ResignedIncomeMonth } from '../../../src/types/index.js';
@@ -106,7 +106,8 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
     age_range_max: r.age_range_max === null || r.age_range_max === undefined ? undefined : r.age_range_max,
     gender_requirement: r.gender_requirement || undefined,
     vehicle_required: r.vehicle_required || undefined,
-    work_schedule: r.work_schedule || undefined,
+    // 🔴 ตัดคำสั่งงานภายใน ("ขอให้แผนก OPL…") ก่อนออกหน้าสาธารณะ — QA 17 ต.ค. 2569
+    work_schedule: publicWorkSchedule(r.work_schedule) || undefined,
     requirements: Array.isArray(r.requirements) && r.requirements.length > 0 ? r.requirements : undefined,
     job_details: Array.isArray(r.job_details) && r.job_details.length > 0 ? r.job_details : undefined,
     /**

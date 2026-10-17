@@ -399,16 +399,29 @@ const OurPeoplePage: React.FC = () => {
                               {p.required_salary ? (
                                 <span>ขอ {p.required_salary.toLocaleString()} บ.</span>
                               ) : null}
+                              {p.mobile ? (
+                                <a
+                                  href={`tel:${p.mobile}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className={cn('font-medium tabular-nums hover:underline sm:hidden', TONE.info.value)}
+                                >
+                                  {p.mobile}
+                                </a>
+                              ) : null}
                             </div>
                           </div>
                           {p.mobile ? (
-                            <a
-                              href={`tel:${p.mobile}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className={cn(TONE.info.chip, 'shrink-0 hover:underline')}
-                            >
-                              <Phone className="h-2.5 w-2.5" /> {p.mobile}
-                            </a>
+                            // จอแคบซ่อนชิปนี้ — เคยกินที่จนชื่อเหลือ 2 ตัวอักษร แยกคนไม่ออก (QA 17 ต.ค. 2569) · เบอร์ย้ายไปบรรทัดข้อมูลแทน
+                            // ⚠️ ซ่อนที่ตัวครอบ: คลาส jarvis-chip กำหนด display เอง ใส่ hidden ที่ตัวชิปแล้วไม่มีผล
+                            <span className="hidden shrink-0 sm:inline-flex">
+                              <a
+                                href={`tel:${p.mobile}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className={cn(TONE.info.chip, 'hover:underline')}
+                              >
+                                <Phone className="h-2.5 w-2.5" /> {p.mobile}
+                              </a>
+                            </span>
                           ) : null}
                           <ChevronRight className="h-4 w-4 shrink-0 text-blue-500" aria-hidden />
                         </div>

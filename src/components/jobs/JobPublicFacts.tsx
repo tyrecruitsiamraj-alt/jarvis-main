@@ -9,6 +9,7 @@ import { incomeLinesShown, incomeShownOf } from '@/lib/incomeShown';
 import { benefitDisplayLabels, isRetiredBenefit } from '@/lib/extraBenefits';
 import { payCycleCardText, payCyclesOf } from '@/lib/payCycle';
 import { benefitWithAmount, jobAverageIncome, jobIncomeLine, teamBenefitAmounts } from '@/lib/jobPublicFacts';
+import { publicWorkSchedule } from '@/lib/publicJobPrivacy';
 
 const NUM = new Intl.NumberFormat('th-TH');
 
@@ -57,7 +58,8 @@ export default function JobPublicFacts({
   const gender = boardCardGender(job);
   const requirements = job.requirements ?? [];
   const details = job.job_details ?? [];
-  const schedule = (job.work_schedule ?? '').trim();
+  // ตัวอย่าง "ผู้สมัครจะเห็นแบบนี้" ต้องตรงกับหน้าสาธารณะ — ตัดคำสั่งงานภายในแบบเดียวกับ API (QA 17 ต.ค. 2569)
+  const schedule = publicWorkSchedule(job.work_schedule);
   // 🔴 "ต้องการ (วันที่)" ถอดจากการ์ดทุกใบ (เจ้าของ 15 ต.ค. 2569: *"อันนี้ไม่ต้องโชว์ไง ผู้สมัครจะอยากรู้ไปทำไม"*)
   const boss = publicFieldVisible(job, 'boss_nationality') ? (job.boss_nationality ?? '').trim() : '';
 

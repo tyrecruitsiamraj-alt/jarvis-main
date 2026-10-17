@@ -57,13 +57,20 @@ describe('ปฏิทินดูแลหลังเริ่มงาน', (
     expect(rows[0].byDay.has('2026-10-01')).toBe(false);
   });
 
-  it('🔴 "ถึงกำหนด" กับ "สายจริง" อยู่คนละชั้น — ถึงกำหนดแล้วไม่ได้แปลว่าโทรแล้ว', () => {
+  /**
+   * 🔴 QA 17 ต.ค. 2569 (ตามกติกา 3 ต.ค. "มีแผนจริงใช้แผนจริง"): คนที่ตั้งสายไว้แล้ว ปฏิทินโชว์แค่สายจริง
+   * ไม่วาดรอบ preset ซ้อน — เดิมวาด "ครบ 7 วัน · เลยกำหนด · ยังไม่ได้ตั้งสาย" ให้ 11 คนที่ตั้งสายไว้แล้ว
+   * ขณะที่การ์ดบนหัว (ใช้แผนจริง) นับเลยรอบ 1 คน เลขสองที่ในหน้าเดียวไม่ตรงกัน
+   */
+  it('🔴 มีสายจริงแล้ว = ใช้แผนจริง ไม่วาดรอบ preset ซ้อน · สายที่ยกเลิกไม่นับเป็นแผน', () => {
     const rows = buildAftercareMonthRows([person()], [call()], '2026-09', NOW);
     const cell = rows[0].byDay.get('2026-09-04');
-    expect(cell?.round?.days).toBe(3);
+    expect(cell?.round).toBeNull();
     expect(cell?.calls).toHaveLength(1);
-    // วันครบ 7 วันยังไม่มีใครตั้งสาย — ช่องต้องบอกว่าค้าง
-    expect(rows[0].byDay.get('2026-09-08')?.calls).toHaveLength(0);
+    expect(rows[0].byDay.has('2026-09-08')).toBe(false);
+    // สายถูกยกเลิกหมด = ไม่มีแผนจริง ⇒ ถอยไปรอบ preset ตามเดิม
+    const back = buildAftercareMonthRows([person()], [call({ cancelled: true })], '2026-09', NOW);
+    expect(back[0].byDay.get('2026-09-08')?.round?.days).toBe(7);
   });
 
   it('จับคู่สายด้วยเลข 9 ตัวท้าย — เบอร์คนละรูปแบบก็ต้องเจอ', () => {
@@ -80,6 +87,9 @@ describe('ปฏิทินดูแลหลังเริ่มงาน', (
     const people = [person({ start_date: null })];
     expect(buildAftercareMonthRows(people, [], '2026-09', NOW)).toHaveLength(0);
     expect(aftercareMissingStartDate(people)).toHaveLength(1);
+    // 🔴 QA 17 ต.ค. 2569: ตั้งสายไว้แล้ว = ไม่ติดเรื่องวันเริ่มงาน (นิยามเดียวกับการ์ดบนหัว)
+    expect(aftercareMissingStartDate(people, [call()])).toHaveLength(0);
+    expect(aftercareMissingStartDate(people, [call({ cancelled: true })])).toHaveLength(1);
   });
 
   it('คนที่มีของเร็วสุดในเดือนอยู่แถวบน', () => {

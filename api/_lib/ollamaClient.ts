@@ -37,7 +37,8 @@ export async function checkOllamaReachable(timeoutMs = 8_000): Promise<{ ok: tru
     if (message === 'fetch failed' || /timeout|ETIMEDOUT|ECONNREFUSED/i.test(message)) {
       return {
         ok: false,
-        error: `เชื่อมต่อ Ollama ไม่ได้ที่ ${cfg.baseUrl}`,
+        // ที่อยู่เซิร์ฟเวอร์ภายในห้ามขึ้นจอ (QA 17 ต.ค. 2569) — อยู่ใน log แทน
+        error: 'เชื่อมต่อ AI ไม่ได้',
       };
     }
     return { ok: false, error: message };
@@ -114,9 +115,8 @@ export async function ollamaChat(options: {
       message === 'fetch failed' ||
       /ECONNREFUSED|ETIMEDOUT|ENOTFOUND|ECONNRESET|network/i.test(message)
     ) {
-      throw new Error(
-        `เชื่อมต่อ Ollama ไม่ได้ที่ ${cfg.baseUrl} — ตรวจสอบว่าเครื่องรัน API เข้าถึงพอร์ต 11434 ได้ (VPN/ไฟร์วอลล์) หรือลอง OLLAMA_BASE_URL=http://127.0.0.1:11434 ถ้ารัน Ollama บนเครื่องนี้`,
-      );
+      // 🔴 QA 17 ต.ค. 2569: ข้อความเดิมโชว์ที่อยู่เซิร์ฟเวอร์ภายใน + วิธีตั้งค่า env บนจอผู้ใช้ · ที่อยู่ยังอยู่ใน log ข้างบน
+      throw new Error('AI ค้นหาไม่ตอบตอนนี้ (อาจกำลังทำงานหนัก) — ลองใหม่อีกสักครู่');
     }
     throw e instanceof Error ? e : new Error(message);
   } finally {

@@ -76,7 +76,14 @@ export function buildAftercareMonthRows(
 
   const out: AftercareMonthRow[] = [];
   for (const person of people) {
-    const rounds = buildAftercareRounds(person.start_date, now);
+    /**
+     * 🔴 QA 17 ต.ค. 2569: คนที่มีสายจริงแล้ว (ไม่นับที่ยกเลิก) = ใช้แผนจริง ไม่วาดรอบ preset ซ้อน
+     * เดิมวาด "ครบ 3/7 วัน · เลยกำหนด · ยังไม่ได้ตั้งสาย" ให้ 11 คนที่ตั้งสายไว้แล้ว ขณะที่การ์ดบนหัวนับ "เลยรอบ 1 คน"
+     * — กติกาเดียวกับการ์ด (`realPlanOf` ใน AftercarePage: มีแผนจริงใช้แผนจริง ไม่มีค่อยถอยไป preset)
+     */
+    const personKey = phoneKey(person.phone_e164);
+    const hasRealPlan = Boolean(personKey && (callsByPhone.get(personKey) ?? []).some((c) => !c.cancelled));
+    const rounds = hasRealPlan ? [] : buildAftercareRounds(person.start_date, now);
     const byDay = new Map<string, AftercareCell>();
     const touch = (ymd: string): AftercareCell => {
       const cur = byDay.get(ymd) ?? { round: null, calls: [] };
@@ -115,9 +122,18 @@ export function buildAftercareMonthRows(
   return out.sort((a, b) => firstDay(a).localeCompare(firstDay(b)));
 }
 
-/** คนที่ยังไม่รู้วันเริ่มงาน — ขึ้นปฏิทินไม่ได้ ต้องบอกแยกว่าค้างอยู่กี่คน */
-export function aftercareMissingStartDate(people: readonly AftercarePerson[]): AftercarePerson[] {
-  return people.filter((p) => !p.start_date && !p.closed_at);
+/**
+ * คนที่ยังไม่รู้วันเริ่มงาน **และยังไม่มีสายจริง** — ขึ้นปฏิทินไม่ได้ ต้องบอกแยกว่าค้างอยู่กี่คน
+ * 🔴 QA 17 ต.ค. 2569: เดิมนับคนที่ตั้งสายไว้แล้วด้วย ⇒ ปฏิทินบอก 1 คน การ์ดบนหัวบอก 0 · ส่ง `calls` = นิยามเดียวกับการ์ด
+ */
+export function aftercareMissingStartDate(
+  people: readonly AftercarePerson[],
+  calls: readonly FollowEntry[] = [],
+): AftercarePerson[] {
+  const planned = new Set(
+    calls.filter((c) => !c.cancelled).map((c) => phoneKey(c.recipient_phone)).filter(Boolean),
+  );
+  return people.filter((p) => !p.start_date && !p.closed_at && !planned.has(phoneKey(p.phone_e164)));
 }
 
 /**

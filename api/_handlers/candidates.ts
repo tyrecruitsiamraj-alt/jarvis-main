@@ -9,6 +9,7 @@ import {
 import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
+import { PDPA_CONSENT_REQUIRED_MESSAGE, PDPA_CONSENT_VERSION } from '../../src/lib/pdpaConsent.js';
 
 const candidatesTable = tableInAppSchema('candidates');
 
@@ -209,6 +210,8 @@ async function candidatesHandler(req: AuthedReq, res: ApiRes) {
           fields: requiredMissing,
         });
       }
+      // 🔴 PDPA (QA 17 ต.ค. 2569) — ฟอร์มนี้รับชื่อ/เบอร์/ที่อยู่ผู้สมัครแต่ไม่เคยมีช่องยินยอม · กติกาเดียวกับคีย์ใบสมัคร
+      if (raw.pdpa_consent !== true) return sendError(res, 400, 'Bad request', PDPA_CONSENT_REQUIRED_MESSAGE);
 
       const drinking = isYesNo(raw.drinking) ? raw.drinking : 'no';
       const smoking = isYesNo(raw.smoking) ? raw.smoking : 'no';
@@ -291,7 +294,8 @@ async function candidatesHandler(req: AuthedReq, res: ApiRes) {
         action: 'candidate.create',
         entityType: 'candidate',
         entityId: created.id,
-        after: toCandidateResponse(created),
+        // ตาราง candidates ไม่มีตารางยินยอมของตัวเอง — จดฉบับข้อความที่ยินยอมไว้ในบันทึกการใช้งาน
+        after: { ...toCandidateResponse(created), pdpa_consent: { source: 'staff', version: PDPA_CONSENT_VERSION } },
       });
       return res.status(201).json(toCandidateResponse(created));
     } catch (e) {

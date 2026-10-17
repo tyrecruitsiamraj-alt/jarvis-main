@@ -24,6 +24,8 @@ export const FOLLOW_PREFILL_KEYS = {
    */
   back: 'pf_back',
   backLabel: 'pf_back_label',
+  /** วันเริ่มงาน YYYY-MM-DD (QA 17 ต.ค. 2569 — มาจากดูแลหลังเริ่มงานแล้วช่องวันเริ่มงานว่าง ต้องเลือกซ้ำ) */
+  startDate: 'pf_start',
 } as const;
 
 export type FollowPrefill = {
@@ -35,7 +37,22 @@ export type FollowPrefill = {
   back?: string;
   /** ชื่อหน้าที่จะกลับ เช่น "ดูแลหลังเริ่มงาน" — ปุ่มเขียนว่า "กลับหน้า…" */
   backLabel?: string;
+  /** วันเริ่มงาน YYYY-MM-DD */
+  startDate?: string;
 };
+
+/**
+ * เบอร์ที่ส่งเข้าฟอร์มต้องเป็นรูป 0xxxxxxxxx — ฟอร์มขั้น 1 รับแค่มือถือ 10 หลักขึ้นต้น 0
+ * QA 17 ต.ค. 2569: หน้าดูแลหลังเริ่มงานส่ง `phone_e164` (+66…) มา ⇒ กดถัดไปไม่ผ่านทั้ง 12 คน
+ */
+export function prefillPhone(raw: string | undefined): string | undefined {
+  const t = (raw ?? '').replace(/[\s-]/g, '');
+  if (!t) return undefined;
+  const m = t.match(/^\+?66(\d{8,9})$/);
+  return m ? `0${m[1]}` : t;
+}
+
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** รับเฉพาะ path ภายในระบบ — "/x" ได้ · "//evil" / "http:" / ว่าง ไม่ได้ */
 export function safeFollowBackPath(v: string | undefined): string | undefined {
@@ -49,7 +66,9 @@ export function safeFollowBackPath(v: string | undefined): string | undefined {
 export function buildFollowPrefillPath(prefill: FollowPrefill): string {
   const params = new URLSearchParams();
   if (prefill.name?.trim()) params.set(FOLLOW_PREFILL_KEYS.name, prefill.name.trim().slice(0, 200));
-  if (prefill.phone?.trim()) params.set(FOLLOW_PREFILL_KEYS.phone, prefill.phone.trim().slice(0, 20));
+  const phone = prefillPhone(prefill.phone);
+  if (phone) params.set(FOLLOW_PREFILL_KEYS.phone, phone.slice(0, 20));
+  if (prefill.startDate && YMD_RE.test(prefill.startDate)) params.set(FOLLOW_PREFILL_KEYS.startDate, prefill.startDate);
   if (prefill.topic?.trim()) params.set(FOLLOW_PREFILL_KEYS.topic, prefill.topic.trim().slice(0, 200));
   if (prefill.unitName?.trim()) {
     params.set(FOLLOW_PREFILL_KEYS.unitName, prefill.unitName.trim().slice(0, 200));
@@ -72,11 +91,12 @@ export function readFollowPrefill(search: string | URLSearchParams): FollowPrefi
   };
   return {
     name: pick(FOLLOW_PREFILL_KEYS.name),
-    phone: pick(FOLLOW_PREFILL_KEYS.phone),
+    phone: prefillPhone(pick(FOLLOW_PREFILL_KEYS.phone)),
     topic: pick(FOLLOW_PREFILL_KEYS.topic),
     unitName: pick(FOLLOW_PREFILL_KEYS.unitName),
     back: safeFollowBackPath(pick(FOLLOW_PREFILL_KEYS.back)),
     backLabel: pick(FOLLOW_PREFILL_KEYS.backLabel)?.slice(0, 40),
+    startDate: ((v) => (v && YMD_RE.test(v) ? v : undefined))(pick(FOLLOW_PREFILL_KEYS.startDate)),
   };
 }
 

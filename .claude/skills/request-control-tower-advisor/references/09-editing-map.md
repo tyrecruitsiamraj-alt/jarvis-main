@@ -13480,3 +13480,15 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · marker ของแถมเป็น "แจ้งเพิ่มเติมค่ะ" · `LEGACY_EXTRA_INFO_PREFIX` ("แจ้งเพิ่มเติมครับ") ยังกันเติมซ้ำให้คิวที่ประกอบไว้ก่อนเปลี่ยน
   · ฉบับแก้ `interview` ใน `call_script_overrides` (คำที่เจ้าของแก้ 8 ต.ค.) แก้เป็นค่ะผ่านหน้าตั้งค่า › บทพูดของ AI แล้ว — ไม่ได้ล้างทิ้ง
   · เทสต์ `lumosCallScript.test.ts` คุม: ทั้งไฟล์ template ห้ามมี ครับ/ผมติดต่อ
+
+### แก้ 9 ข้อจาก QA ทั้งระบบ (17 ต.ค. 2569 · เจ้าของ "แก้ 9 ข้อนี้")
+1. แท็บผู้สมัคร/การติดต่อของใบขอ: `applicationsJobKey()` (`siamrajUnitRequestsApi.ts`) — ค้นใบสมัครด้วย `job.id` เต็ม ไม่ใช่เลขเปล่าจาก URL (เดิม 0 ทุกใบ)
+2. AI Match: หัว "(ไม่มีงาน · Re Use · Drop)" · `withCurrentColumnLabels()` (`boardMatchAvailability.ts`) ทับป้ายถังเก่าในผลแมทด้วยถังปัจจุบัน (`columnLabelByCardId` จาก `loadBoardAvailabilityContext`)
+3. ดูแลหลังเริ่มงาน: `prefillPhone()` +66 → 0 · `pf_start` ส่งวันเริ่มงานเข้าฟอร์มติดตาม · `listTopicsWithSystem()` ให้เรื่อง "ถามความเป็นอยู่หลังเริ่มงาน" อยู่ในตัวเลือก · ปฏิทินใช้แผนจริงเมื่อมีสาย (ไม่วาด preset ซ้อน) + `aftercareMissingStartDate(people, calls)` นิยามเดียวกับการ์ด
+4. Dashboard: `workStatusPercentBase()` ตัวหาร % ไม่รวมการ์ด "ทั้งหมด"
+5. `publicWorkSchedule()` (`publicJobPrivacy.ts`) ตัด "( …OPL… )" / "ขอให้แผนก…" ออกจากวันเวลาทำงานก่อนออกหน้าสาธารณะ (API `public/jobs.ts` + `JobPublicFacts`) · ห้ามจับ "แผนก" เดี่ยว (แผนการ)
+6. `/matching/candidates/add`: PdpaConsentCheck บังคับติ๊ก · API `candidates.ts` POST 400 ถ้าไม่มี `pdpa_consent` · จดฉบับใน audit `candidate.create`
+7. `/api/follow` limit ต่อหน้า 500 → 2000 · `followApi.ts` หน้า 2000 × เพดาน 30 · ก้าว offset ตามขนาดหน้าที่ได้จริง · ยิงพร้อมกันทีละ 4
+8. `ollamaClient.ts` ข้อความล้มไม่โชว์ที่อยู่เซิร์ฟเวอร์ (อยู่ใน log) · Pre-Check "ลองใหม่" ไม่บังคับ refresh
+9. มือถือ: ป๊อปคนของเรา (MatchingPage) เรียงซ้อนที่ <sm · ช่องน้ำหนัก `shrink-0` · หน้าคนของเราซ่อนชิปเบอร์ที่ <sm ย้ายไปบรรทัดข้อมูล
+- เทสต์ `tests/api/qaFixes2569-10-17.test.ts` · แก้ `aftercarePlanning.test.ts` · `followListPaging.test.ts`

@@ -573,6 +573,7 @@ const FollowPage: React.FC = () => {
     // หน่วยงานที่เลือกไว้แล้วตอนตั้งขั้น (Phase 6.6/6.9) — เติมให้ ไม่ต้องเลือกซ้ำ
     // ⚠️ เติมแค่ชื่อ · รหัสไซต์ให้คนยืนยันจาก picker เอง (ชื่ออาจซ้ำข้ามไซต์)
     if (prefill.unitName) setUnitName(prefill.unitName);
+    if (prefill.startDate) setStartDate(prefill.startDate);
     // ทางกลับหน้าเดิม (4 ต.ค. 2569 "ต้องมีทางเข้า และทางเอากลับ")
     setReturnTo(prefill.back ? { path: prefill.back, label: prefill.backLabel || 'หน้าเดิม' } : null);
     setPickedFrom(prefill.backLabel ? `มาจากหน้า${prefill.backLabel} — เหลือเลือกวันและเวลา` : 'มาจากหน้าคัดสรร — เหลือเลือกวันและเวลา');

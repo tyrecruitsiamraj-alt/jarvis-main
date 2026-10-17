@@ -36,9 +36,9 @@ describe('listFollowEntries', () => {
     apiFetch.mockResolvedValueOnce(page(500, 257, false)).mockResolvedValueOnce(page(0, 257, false));
     const items = await listFollowEntries();
     expect(apiFetch).toHaveBeenCalledTimes(1);
-    // ขอทีละ 500 ⇒ 257 แถวมาในหน้าเดียว และต้องไม่ถูกตัดเหลือ 200
+    // ขอทีละ 2,000 (17 ต.ค. 2569 · เดิม 500) ⇒ 257 แถวมาในหน้าเดียว และต้องไม่ถูกตัดเหลือ 200
     expect(items).toHaveLength(500);
-    expect(String(apiFetch.mock.calls[0][0])).toContain('limit=500');
+    expect(String(apiFetch.mock.calls[0][0])).toContain('limit=2000');
   });
 
   it('ของเกินหนึ่งหน้า ⇒ ไล่ดึงต่อจนครบ แล้วหยุด', async () => {
@@ -80,5 +80,31 @@ describe('listFollowEntries', () => {
     const items = await listFollowEntries();
     expect(items).toHaveLength(1);
     expect(apiFetch).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * 🔴 QA 17 ต.ค. 2569: ฐาน 7,438 แถว +394/วัน · เพดานเดิม 10,000 จะชนราว 23 ต.ค. แล้วรายการขาดเงียบ ๆ
+   * เซิร์ฟเวอร์รุ่นเก่าตัดหน้าละ 500 ⇒ ก้าว offset ต้องใช้ขนาดหน้าที่ได้จริง ไม่ใช่ขนาดที่ขอ
+   */
+  it('12,000 แถว (เกินเพดานเดิม 10,000) โหลดครบ · ก้าวตามขนาดหน้าที่เซิร์ฟเวอร์ให้จริง · ยิงพร้อมกันไม่เกิน 4', async () => {
+    const TOTAL = 12_000;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    apiFetch.mockImplementation(async (url: string) => {
+      const off = Number(/offset=(\d+)/.exec(url)?.[1] ?? 0);
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((r) => setTimeout(r, 1));
+      inFlight -= 1;
+      const n = Math.max(0, Math.min(500, TOTAL - off));
+      return {
+        ok: true,
+        json: async () => ({ items: Array.from({ length: n }, (_, i) => ({ id: `${off}-${i}` })), total: TOTAL, has_more: off + n < TOTAL }),
+      };
+    });
+    const items = await listFollowEntries();
+    expect(items).toHaveLength(TOTAL);
+    expect(new Set(items.map((x) => (x as { id: string }).id)).size).toBe(TOTAL);
+    expect(maxInFlight).toBeLessThanOrEqual(4);
   });
 });

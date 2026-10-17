@@ -3366,7 +3366,9 @@ const MatchingPage: React.FC = () => {
                     <span className={cn('h-px flex-1', DASH.divider, 'border-t')} aria-hidden />
                   </div>
                 <div className="rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-3 space-y-2 dark:border-blue-800 dark:bg-blue-950/50">
-                  <div className="flex items-center justify-between gap-2">
+                  {/* QA 17 ต.ค. 2569: จอ 375 แถวนี้ล้น (ปุ่ม shrink-0 กินที่ ข้อความเหลือ 2–4 ตัวต่อบรรทัด ปุ่มหลุดนอกจอ)
+                      ⇒ จอแคบเรียงซ้อนลงมา · ตั้งแต่ sm ขึ้นไปเป็นแถวเดียวเหมือนเดิม */}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     {/* เจ้าของสั่ง 13 ส.ค. 2569: เลิกเรียกชื่อระบบ ("iRecruit") มาเป็นคำที่บอก
                         ว่าได้อะไร — คนกลุ่มนี้คือคนในฐานที่ **ยังไม่ได้สมัครใบขอนี้** */}
                     <p className="text-xs font-medium text-blue-900 dark:text-blue-200">
@@ -3374,7 +3376,7 @@ const MatchingPage: React.FC = () => {
                         ? `คนที่ยังไม่สมัคร → แนะนำ ${recommendedCandidateCount(irMatchById[jobDetail.id].matches)}`
                         : 'ไม่พอ? หาคนที่ยังไม่สมัครงานนี้'}
                     </p>
-                    <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                    <div className="flex flex-wrap gap-1.5 sm:shrink-0 sm:justify-end">
                       <Button variant="ghost" size="sm"
                         type="button"
                         disabled={irLoadingId === jobDetail.id}

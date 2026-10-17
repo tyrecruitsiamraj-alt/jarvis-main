@@ -220,10 +220,16 @@ async function readError(r: Response): Promise<string> {
   return data.message || data.error || `ไม่สำเร็จ (HTTP ${r.status})`;
 }
 
-/** หนึ่งหน้าเต็ม ๆ ของเส้น `/api/follow` — ฝั่ง API จำกัดไว้ที่ 500 ต่อครั้ง */
-const FOLLOW_PAGE_SIZE = 500;
-/** กันวนไม่รู้จบถ้าเส้นตอบเพี้ยน — 20 หน้า = 10,000 รอบ มากกว่าของจริงหลายเท่า */
-const FOLLOW_MAX_PAGES = 20;
+/**
+ * หนึ่งหน้าของเส้น `/api/follow` — ฝั่ง API รับได้ถึง 2,000 ต่อครั้ง (เดิม 500)
+ * 🔴 QA 17 ต.ค. 2569: ฐานมี 7,438 แถว เพิ่มวันละ ~394 · เพดานเดิม 20 หน้า × 500 = 10,000 จะชนราว 23 ต.ค.
+ *    แล้วรายการโหลดไม่ครบ ⇒ หน้าใหญ่ขึ้น (2,000) + เพดาน 30 หน้า = 60,000 แถว · ยิงพร้อมกันทีละ 4 หน้า
+ */
+const FOLLOW_PAGE_SIZE = 2000;
+/** กันวนไม่รู้จบถ้าเส้นตอบเพี้ยน */
+const FOLLOW_MAX_PAGES = 30;
+/** ยิงพร้อมกันได้ทีละกี่หน้า — กันฐานโดนถล่มตอนทุกคนเปิดหน้าติดตามพร้อมกัน */
+const FOLLOW_PAGE_CONCURRENCY = 4;
 
 /**
  * 🔴 **ต้องดึงให้ครบทุกแถว ห้ามหยุดที่หน้าแรก** (20 ก.ย. 2569)
@@ -260,10 +266,14 @@ export async function listFollowEntries(): Promise<FollowEntry[]> {
   if (first.items.length > 0 && first.has_more === true) {
     const total = Number(first.total);
     if (Number.isFinite(total) && total > all.length) {
+      // ขนาดหน้าจริงที่เซิร์ฟเวอร์ให้มา (เซิร์ฟเวอร์รุ่นเก่าตัดที่ 500) — ห้ามใช้ค่าที่ขอ ไม่งั้นข้ามแถว
+      const step = first.items.length;
       const offsets: number[] = [];
-      for (let off = all.length; off < total && offsets.length < FOLLOW_MAX_PAGES - 1; off += FOLLOW_PAGE_SIZE) offsets.push(off);
-      const pages = await Promise.all(offsets.map((o) => fetchFollowPage(o)));
-      for (const p of pages) all.push(...p.items);
+      for (let off = all.length; off < total && offsets.length < FOLLOW_MAX_PAGES - 1; off += step) offsets.push(off);
+      for (let i = 0; i < offsets.length; i += FOLLOW_PAGE_CONCURRENCY) {
+        const pages = await Promise.all(offsets.slice(i, i + FOLLOW_PAGE_CONCURRENCY).map((o) => fetchFollowPage(o)));
+        for (const p of pages) all.push(...p.items);
+      }
       if (total > all.length) lastFollowListShortfall = { loaded: all.length, total };
     } else {
       // ไม่รู้ยอดรวม — ไล่ทีละหน้าแบบเดิม

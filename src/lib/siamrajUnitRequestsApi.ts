@@ -333,6 +333,18 @@ export function siamrajExternalId(job: JobRequest): string | null {
   return null;
 }
 
+/**
+ * คีย์ใบขอที่ใบสมัครเก็บไว้ (`job_applications.job_id`) — ใบสมัครเก็บด้วย id เต็ม `siamraj-sql:OPL…`
+ * แต่ route หน้ารายละเอียดใบขอเป็นเลขเปล่า · มี id จากใบขอที่โหลดได้ = ใช้ตัวนั้น · ไม่มี = เติม prefix ให้เลขเปล่า
+ * (QA 17 ต.ค. 2569: แท็บผู้สมัคร/การติดต่อขึ้น 0 ทุกใบเพราะส่งเลขเปล่าไปค้น)
+ */
+export function applicationsJobKey(routeId: string, loadedJobId?: string | null): string {
+  const loaded = (loadedJobId || '').trim();
+  if (loaded) return loaded;
+  const raw = (routeId || '').trim();
+  return raw.includes(':') ? raw : `siamraj-sql:${raw}`;
+}
+
 /** ผู้รับผิดชอบของ **ทุกใบ** — Dashboard ใช้กรองกราฟ/การ์ดตามเจ้าหน้าที่ (18 ส.ค. 2569) */
 export async function fetchAllUnitAssignees(): Promise<
   Array<{

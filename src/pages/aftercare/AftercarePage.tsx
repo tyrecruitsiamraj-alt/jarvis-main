@@ -267,12 +267,13 @@ const AftercarePage: React.FC = () => {
             calls={calls}
             month={calMonth}
             onMonthChange={setCalMonth}
-            missingStartDate={aftercareMissingStartDate(open).length}
+            missingStartDate={aftercareMissingStartDate(open, calls).length}
             onOpenCell={(row) =>
               navigate(
                 buildFollowPrefillPath({
                   name: row.person.full_name,
                   phone: row.person.phone_e164,
+                  startDate: row.person.start_date ?? undefined,
                   topic: AFTERCARE_TOPIC,
                   unitName: row.person.unit_name ?? undefined,
                   back: '/aftercare',
@@ -372,6 +373,7 @@ const AftercarePage: React.FC = () => {
                                 buildFollowPrefillPath({
                                   name: p.full_name,
                                   phone: p.phone_e164,
+                                  startDate: p.start_date ?? undefined,
                                   topic: AFTERCARE_TOPIC,
                                   unitName: p.unit_name ?? undefined,
                                   back: '/aftercare',

@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import type { DrivingResult, Gender, YesNo } from '@/types';
 import { TITLE_PREFIX_OPTIONS } from '@/lib/titlePrefixOptions';
+import PdpaConsentCheck from '@/components/shared/PdpaConsentCheck';
+import { PDPA_CONSENT_REQUIRED_MESSAGE, PDPA_CONSENT_TEXT_STAFF } from '@/lib/pdpaConsent';
 
 const AddCandidatePage: React.FC = () => {
   const navigate = useNavigate();
@@ -18,6 +20,8 @@ const AddCandidatePage: React.FC = () => {
   const selectionReason = searchParams.get('reason') || '';
 
   const [titlePrefix, setTitlePrefix] = useState('');
+  /** PDPA (QA 17 ต.ค. 2569) — ฟอร์มนี้รับข้อมูลผู้สมัคร ต้องยืนยันว่าผู้สมัครยินยอมแล้ว แบบเดียวกับป๊อปเพิ่มผู้สมัคร */
+  const [pdpaConsent, setPdpaConsent] = useState(false);
   const [firstName, setFirstName] = useState(() => searchParams.get('first_name') || '');
   const [lastName, setLastName] = useState(() => searchParams.get('last_name') || '');
   const [phone, setPhone] = useState(() => searchParams.get('phone') || '');
@@ -82,6 +86,7 @@ const AddCandidatePage: React.FC = () => {
     if (!subdistrict.trim()) return setError('กรุณากรอกตำบล/แขวง');
     if (!district.trim()) return setError('กรุณากรอกอำเภอ/เขต');
     if (!province.trim()) return setError('กรุณากรอกจังหวัด');
+    if (!pdpaConsent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE);
 
     const payload = {
       ...(titlePrefix.trim() ? { title_prefix: titlePrefix.trim() } : {}),
@@ -99,6 +104,7 @@ const AddCandidatePage: React.FC = () => {
       application_date: applicationDate || undefined,
       first_contact_date: firstContactDate || undefined,
       first_work_date: firstWorkDate || undefined,
+      pdpa_consent: true,
     };
 
     try {
@@ -145,7 +151,7 @@ const AddCandidatePage: React.FC = () => {
 
       <div className="px-4 md:px-6">
         <div className="glass-card rounded-3xl p-4 md:p-6 border border-white/70 max-w-3xl space-y-4">
-          {error && <div className="text-sm text-destructive">{error}</div>}
+          {/* ข้อความเตือนย้ายไปอยู่ติดปุ่มบันทึก (QA 17 ต.ค. 2569: เดิมขึ้นบนหัว ห่างปุ่ม ~2,000px มองไม่เห็นตอนกด) */}
 
           {selectionReason ? (
             <div className="rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2.5">
@@ -393,6 +399,9 @@ const AddCandidatePage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          <PdpaConsentCheck checked={pdpaConsent} onChange={setPdpaConsent} text={PDPA_CONSENT_TEXT_STAFF} />
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           <div className="flex gap-3 pt-4">
             <Button size="sm"

@@ -30,7 +30,7 @@ import {
   boardChecklistColumnId,
 } from '../_lib/boardCandidatesSql.js';
 import { loadBoardAvailabilityContext } from '../_lib/boardAvailability.js';
-import { filterAvailableBoardMatches } from '@/lib/boardMatchAvailability';
+import { filterAvailableBoardMatches, withCurrentColumnLabels } from '@/lib/boardMatchAvailability';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -222,7 +222,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       extra: Record<string, unknown> = {},
     ) => {
       const availCtx = await loadBoardAvailabilityContext();
-      const matches = filterAvailableBoardMatches(result.matches, jobId, availCtx);
+      const matches = withCurrentColumnLabels(filterAvailableBoardMatches(result.matches, jobId, availCtx), availCtx);
       res.setHeader?.('Cache-Control', 'no-store');
       return res.status(200).json({
         ...result,

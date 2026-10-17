@@ -1231,3 +1231,11 @@ export function buildDashboardData(
     activityTrendLabel,
   };
 }
+
+/**
+ * ตัวหารของแถบสัดส่วนการ์ดสถานะทำงาน = ผลรวมของ **สถานะย่อย** เท่านั้น
+ * 🔴 QA 17 ต.ค. 2569: การ์ด "ทั้งหมด" (`work_status_total`) อยู่ในลิสต์เดียวกัน เดิมถูกบวกรวม ⇒ ทุก % เหลือครึ่ง
+ */
+export function workStatusPercentBase(list: ReadonlyArray<{ id: string; value: number }>): number {
+  return list.filter((k) => k.id !== 'work_status_total').reduce((sum, k) => sum + (k.value || 0), 0);
+}

@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/apiFetch';
+import { AFTERCARE_TOPIC } from '@/lib/aftercareRounds';
 
 /**
  * "เรื่องที่จะให้โทรติดตาม" (migration 100 · เจ้าของสั่ง 18 ส.ค. 2569)
@@ -51,4 +52,15 @@ export async function createFollowTopic(name: string): Promise<FollowTopic> {
   if (!r.ok) throw new Error(await readError(r));
   invalidateFollowTopicsCache();
   return (await r.json()) as FollowTopic;
+}
+
+/**
+ * เรื่องของระบบที่ต้องเลือกได้เสมอ แม้ไม่มีในลิสต์กลาง — QA 17 ต.ค. 2569: มาจากดูแลหลังเริ่มงาน
+ * ช่องเรื่องขึ้น "ค่าที่กรอกไว้เดิม: ถามความเป็นอยู่หลังเริ่มงาน" เพราะเรื่องนี้ไม่อยู่ในตาราง follow_topics
+ */
+export async function listTopicsWithSystem(): Promise<FollowTopic[]> {
+  const list = await listFollowTopicsCached();
+  if (list.some((t) => t.name.trim() === AFTERCARE_TOPIC)) return list;
+  const sys: FollowTopic = { id: 'system-aftercare', name: AFTERCARE_TOPIC, sort_order: 9999, created_by_name: null, created_at: '' };
+  return [...list, sys];
 }

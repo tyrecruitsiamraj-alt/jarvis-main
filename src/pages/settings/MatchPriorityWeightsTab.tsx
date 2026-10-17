@@ -213,15 +213,19 @@ const MatchPriorityWeightsTab: React.FC<{
                   aria-label={`น้ำหนักของ ${PRIORITY_LABELS[key]}`}
                   className="h-1.5 flex-1 cursor-pointer accent-blue-600"
                 />
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={weight}
-                  onChange={(e) => setWeight(key, Number(e.target.value))}
-                  aria-label={`น้ำหนักตัวเลขของ ${PRIORITY_LABELS[key]}`}
-                  className="jarvis-soft-field w-[72px] text-center text-sm"
-                />
+                {/* QA 17 ต.ค. 2569: จอ 375 ช่องถูกบีบเหลือ 46px เลข 2 หลักเห็นหลักเดียว (30 → "3")
+                    ⇒ ห่อด้วยกล่องกว้างคงที่ที่ไม่หด · ห้ามใส่ shrink-0 ที่ตัว input: jarvis-soft-field กำหนดกว้าง 100% ช่องจะยืดเต็มแถว */}
+                <span className="w-[72px] shrink-0">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={weight}
+                    onChange={(e) => setWeight(key, Number(e.target.value))}
+                    aria-label={`น้ำหนักตัวเลขของ ${PRIORITY_LABELS[key]}`}
+                    className="jarvis-soft-field w-full text-center text-sm"
+                  />
+                </span>
                 <span className="w-16 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                   {share}%
                 </span>

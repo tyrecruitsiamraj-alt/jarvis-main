@@ -1,6 +1,6 @@
 import React from 'react';
 import FollowMasterSelect from '@/components/follow/FollowMasterSelect';
-import { listFollowTopicsCached, type FollowTopic } from '@/lib/followTopicsApi';
+import { listTopicsWithSystem, type FollowTopic } from '@/lib/followTopicsApi';
 
 /**
  * ช่อง "เรื่องที่จะให้โทรติดตาม" — dropdown จากลิสต์กลาง (100 · เจ้าของสั่ง 18 ส.ค. 2569:
@@ -36,7 +36,7 @@ export default function TopicField({
       reloadSignal={reloadSignal}
       emptyOptionLabel="— เลือกเรื่อง —"
       manualPlaceholder="เช่น ยืนยันวันเริ่มงาน 15 ส.ค."
-      load={listFollowTopicsCached}
+      load={listTopicsWithSystem}
       toValue={(t) => t.name}
       /**
        * 🔴 ต่อคำอธิบายท้ายชื่อในตัวเลือก (12 ก.ย. 2569) — ตาใหม่เห็น 3 เรื่องแล้วถามว่า

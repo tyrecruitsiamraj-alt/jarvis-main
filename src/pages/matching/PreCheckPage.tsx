@@ -167,10 +167,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
       setJobMatchById((prev) => ({ ...prev, [jobId]: data }));
     } catch (e) {
       const raw = e instanceof Error ? e.message : 'ค้นหาผู้สมัครไม่สำเร็จ';
-      const hint =
-        raw === 'fetch failed'
-          ? 'เชื่อมต่อ API ไม่ได้ — ตรวจสอบว่า npm run dev ยังรันอยู่ หรือ Ollama/iRecruit เข้าถึงได้'
-          : raw;
+      const hint = raw === 'fetch failed' ? 'เชื่อมต่อระบบไม่ได้ — ลองใหม่อีกสักครู่' : raw;
       setJobMatchErrorById((prev) => ({ ...prev, [jobId]: hint }));
     } finally {
       setJobMatchLoadingId((current) => (current === jobId ? null : current));
@@ -1400,13 +1397,15 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                                 <p className="text-xs text-destructive">
                                   ค้นหาไม่สำเร็จ: {jobMatchErrorById[jobDetail.id]}
                                 </p>
-                                <button
+                                {/* ลองใหม่ = ค้นตามปกติ (ใช้ผลที่เก็บไว้ถ้ามี) — เดิมบังคับคิดใหม่ (refresh) ผลจึงแย่กว่าเปิดครั้งแรก (QA 17 ต.ค. 2569) */}
+                                <Button
                                   type="button"
-                                  onClick={() => void fetchIrecruitMatch(jobDetail.id, true)}
-                                  className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/50"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void fetchIrecruitMatch(jobDetail.id, false)}
                                 >
                                   ลองใหม่
-                                </button>
+                                </Button>
                               </div>
                             ) : singleZoneMatches.length > 0 ? (
                               <div className="space-y-1.5">

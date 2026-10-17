@@ -25,6 +25,7 @@ import DashboardCohortSummaryCard from './DashboardCohortSummary';
 import DashboardClosedBreakdownCard from './DashboardClosedBreakdown';
 import type { DashboardWorkItem } from '@/lib/dashboard/types';
 import type { LeadKindBreakdown } from '@/lib/dashboard/leadKindBreakdown';
+import { workStatusPercentBase } from '@/lib/dashboard/buildDashboardData';
 import type { RequestLeadKind } from '@/lib/requestLeadKind';
 import type { SlaByLeadKind, SlaCellKey } from '@/lib/dashboard/slaByLeadKind';
 
@@ -412,7 +413,9 @@ const DashboardShell: React.FC<Props> = ({
                   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
                     {(() => {
                       const list = data.workStatusKpis ?? [];
-                      const total = list.reduce((sum, k) => sum + (k.value || 0), 0);
+                      // 🔴 QA 17 ต.ค. 2569: การ์ด "ทั้งหมด" (work_status_total) อยู่ในลิสต์เดียวกัน เดิมถูกบวกเป็นตัวหารด้วย
+                      // ⇒ ตัวหาร 2 เท่า ทุก % เหลือครึ่ง ("ทั้งหมด" ขึ้น 50% · ดำเนินการสรรหา 329/482 ขึ้น 34% แทน 68%)
+                      const total = workStatusPercentBase(list);
                       return list.map((kpi) => (
                         <DashboardKpiCard
                           key={kpi.id}

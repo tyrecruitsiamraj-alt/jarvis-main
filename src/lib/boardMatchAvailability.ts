@@ -15,7 +15,25 @@ export type BoardAvailabilityContext = {
   availableCardIds: ReadonlySet<number>;
   /** card_id → job_id ของใบขอที่คนนั้นถูกจอง/ติดต่อ/ลงงานอยู่ (active) */
   activeJobByCardId: ReadonlyMap<number, string>;
+  /**
+   * card_id → ถังปัจจุบันบนบอร์ด (ไม่มีงาน / Re Use / Drop) — ป้ายถังในผลแมทเป็นค่าตอนคิด (snapshot)
+   * QA 17 ต.ค. 2569: ผลแมท 3 ก.ย. ติดป้าย "To do" ทั้งที่คนนั้นอยู่ Drop แล้ว ⇒ ทับด้วยถังปัจจุบันตอนเสิร์ฟ
+   */
+  columnLabelByCardId?: ReadonlyMap<number, string>;
 };
+
+/** ทับป้ายถังในผลแมทด้วยถังปัจจุบัน (pure) — ไม่รู้ถังปัจจุบัน = คงค่าเดิม */
+export function withCurrentColumnLabels<T extends { card_id: number; column_label?: string | null }>(
+  matches: readonly T[],
+  ctx: BoardAvailabilityContext,
+): T[] {
+  const labels = ctx.columnLabelByCardId;
+  if (!labels || labels.size === 0) return [...matches];
+  return matches.map((m) => {
+    const now = labels.get(m.card_id);
+    return now && now !== m.column_label ? { ...m, column_label: now } : m;
+  });
+}
 
 /** คนนี้ยังพร้อมสำหรับใบขอ jobId ไหม (pure) */
 export function isBoardCandidateAvailable(

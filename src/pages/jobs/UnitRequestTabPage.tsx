@@ -5,7 +5,7 @@ import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 import { backLabelFor } from '@/lib/stageOrigin';
 import UnitRequestTabs, { type UnitRequestTabId } from '@/components/jobs/UnitRequestTabs';
 import { MyCallsSection } from '@/pages/matching/MyCallsPage';
-import { fetchAllUnitOptions, fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
+import { applicationsJobKey, fetchAllUnitOptions, fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
 import type { BoardUnitOption } from '@/lib/boardUnitPicker';
 import { fetchJobApplications, type PublicApplication } from '@/lib/publicApplicationsApi';
 import { fetchRecruitLaneCandidates, tierChipClass, type RecruitLaneMatch } from '@/lib/recruitLaneApi';
@@ -205,10 +205,10 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
   const reload = useCallback(async () => {
     setError(null);
     try {
-      const [j, apps] = await Promise.all([
-        fetchSiamrajUnitRequest(id).catch(() => null),
-        fetchJobApplications(id),
-      ]);
+      // 🔴 QA 17 ต.ค. 2569: เดิมค้นใบสมัครด้วย `id` จาก URL (เลขใบขอเปล่า `OPL6909071`) แต่ใบสมัครเก็บด้วย
+      // คีย์เต็ม `siamraj-sql:OPL6909071` ⇒ แท็บผู้สมัคร/การติดต่อขึ้น 0 ทุกใบ (ของจริง 44 คน) · ใช้ `job.id` แบบ loadBoardMatch
+      const j = await fetchSiamrajUnitRequest(id).catch(() => null);
+      const apps = await fetchJobApplications(applicationsJobKey(id, j?.id));
       setJob((j as JobRequest | null) ?? null);
       setItems(apps);
     } catch (e) {
@@ -413,7 +413,9 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
               </span>
               <span className="text-xs text-muted-foreground">
                 {board
-                  ? `· จากกอง ${board.pool_size.toLocaleString('th-TH')} คน (To do · ไม่มีงาน)`
+                  ? boardWaiting
+                    ? '· กำลังแมทใหม่จากถังไม่มีงาน · Re Use · Drop (ที่เห็นคือผลเดิมที่ยังอยู่ในถัง)'
+                    : `· จากกอง ${board.pool_size.toLocaleString('th-TH')} คน (ไม่มีงาน · Re Use · Drop)`
                   : '· ยังไม่ใช่ใบสมัคร — ต้องโทรถามก่อน'}
               </span>
               <button

@@ -269,7 +269,8 @@ function toResponse(r: FollowRow) {
 
 async function listFollow(req: AuthedReq, res: ApiRes) {
   const rawLimit = typeof req.query?.limit === 'string' ? Number(req.query.limit) : NaN;
-  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 200;
+  // QA 17 ต.ค. 2569: เพดานต่อหน้า 500 → 2,000 (หน้าติดตามโหลดทั้งชุด 7,000+ แถว · ลดจำนวนคำขอ ไม่ชนเพดานฝั่งหน้าเว็บ)
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 2000) : 200;
   const rawOffset = typeof req.query?.offset === 'string' ? Number(req.query.offset) : NaN;
   const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
 

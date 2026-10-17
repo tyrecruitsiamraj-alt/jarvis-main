@@ -12,6 +12,7 @@ import type { BoardAvailabilityContext } from '@/lib/boardMatchAvailability';
 export async function loadBoardAvailabilityContext(): Promise<BoardAvailabilityContext> {
   const availableCardIds = new Set<number>();
   const activeJobByCardId = new Map<number, string>();
+  const columnLabelByCardId = new Map<number, string>();
   try {
     const [pool, active] = await Promise.all([
       listBoardMatchPool(5000),
@@ -19,6 +20,7 @@ export async function loadBoardAvailabilityContext(): Promise<BoardAvailabilityC
     ]);
     for (const c of pool) {
       if (Number.isFinite(c.card_id)) availableCardIds.add(c.card_id);
+      if (Number.isFinite(c.card_id) && c.column_label) columnLabelByCardId.set(c.card_id, c.column_label);
     }
     for (const p of active) {
       if (p.source !== 'board') continue;
@@ -28,5 +30,5 @@ export async function loadBoardAvailabilityContext(): Promise<BoardAvailabilityC
   } catch (e) {
     logError('board-availability.load.fail', { message: e instanceof Error ? e.message : String(e) });
   }
-  return { availableCardIds, activeJobByCardId };
+  return { availableCardIds, activeJobByCardId, columnLabelByCardId };
 }
