@@ -352,7 +352,7 @@ describe('PDPA (15 ต.ค. 2569)', () => {
     const a = mockRes();
     await handler(req('POST', { file_base64: file, dry_run: false }) as never, a.res as never);
     expect(a.status).toHaveBeenCalledWith(400);
-    expect(a.json.mock.calls[0][0].message).toBe('กรุณาติ๊กยินยอมก่อน');
+    expect(a.json.mock.calls[0][0].message).toBe('กรุณายอมรับข้อตกลงและเงื่อนไขก่อนดำเนินการต่อ');
     expect(txQuery).not.toHaveBeenCalled();
     const b = mockRes();
     await handler(req('POST', { file_base64: file, dry_run: true }) as never, b.res as never);
@@ -366,7 +366,7 @@ describe('PDPA (15 ต.ค. 2569)', () => {
     const { res } = mockRes();
     await handler(req('POST', { file_base64: xlsxBase64([H, person('ก', '0811111111')]), dry_run: false, pdpa_consent: true }) as never, res as never);
     const c = dbQuery.mock.calls.find((x) => /app_application_consents/.test(String(x[0])));
-    expect(c?.[1]).toEqual([['11111111-1111-4111-8111-111111111111'], 'import', 'draft-2569-10-15', 'staff@example.com']);
+    expect(c?.[1]).toEqual([['11111111-1111-4111-8111-111111111111'], 'import', 'v1-2569-10-17', 'staff@example.com']);
   });
 });
 

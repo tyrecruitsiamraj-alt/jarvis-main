@@ -95,7 +95,7 @@ describe('ImportApplicantsDialog', () => {
     // 🔴 PDPA (15 ต.ค. 2569) — ยังไม่ติ๊กยินยอม = กดนำเข้าไม่ได้
     await new Promise((r) => setTimeout(r, 50));
     expect((save as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole('checkbox', { name: /ผู้สมัครยินยอม/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /ผู้สมัครได้อ่านและยอมรับ/ }));
     await waitFor(() => expect((save as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(save);
 

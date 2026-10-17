@@ -37,7 +37,7 @@ describe('PDPA — ช่องยินยอมครบทุกทางเ�
     expect(pub).toContain("if (consented) await recordApplicationConsent([id], 'apply', null);");
     expect(read('api/_lib/applicationConsent.ts')).toContain('on conflict (application_id) do nothing');
     expect(read('migrations/148_application_consents.sql')).toContain('create table if not exists app_application_consents');
-    expect(PDPA_CONSENT_VERSION).toBe('draft-2569-10-15');
+    expect(PDPA_CONSENT_VERSION).toBe('v1-2569-10-17');
   });
 });
 
