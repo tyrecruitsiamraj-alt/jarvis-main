@@ -40,6 +40,9 @@ export const DECLINE_REASON_CHOICES: readonly string[] = T.เหตุผลท
 /** ขึ้นต้นด้วยคำนี้เสมอ = marker กันเติมซ้ำตอน Lumos ดึงคิวรอบที่สอง */
 export const EXTRA_INFO_PREFIX: string = T.ของแถม.ขึ้นต้น;
 
+/** marker เดิม (ผม/ครับ) — payload ที่อยู่ในคิวก่อน 17 ต.ค. 2569 ยังใช้คำนี้ */
+export const LEGACY_EXTRA_INFO_PREFIX = 'แจ้งเพิ่มเติมครับ';
+
 /**
  * เพดานคำถามต่อบท — schema ของ Lumos รับ 1–15 ข้อ กันไว้ 1 ข้อให้ประโยครายได้
  * ที่เติมตอนเสิร์ฟ · เกินแล้วตัดท้ายทิ้ง (payload ที่ schema ไม่ผ่าน = Lumos ปัดทิ้ง
@@ -601,7 +604,9 @@ export function buildExtraInfoSentence(input: {
 export function appendExtraInfoToPayload(payload: unknown, sentence: string): void {
   if (!sentence || typeof payload !== 'object' || payload === null) return;
   const p = payload as { questions?: unknown; steps?: unknown };
-  const hasMarker = (s: unknown) => typeof s === 'string' && s.includes(EXTRA_INFO_PREFIX);
+  // "แจ้งเพิ่มเติมครับ" = marker เดิมก่อน 17 ต.ค. 2569 — คิวที่ประกอบไว้ก่อนเปลี่ยนเป็น ค่ะ ต้องไม่ถูกเติมซ้ำ
+  const hasMarker = (s: unknown) =>
+    typeof s === 'string' && (s.includes(EXTRA_INFO_PREFIX) || s.includes(LEGACY_EXTRA_INFO_PREFIX));
 
   if (Array.isArray(p.questions)) {
     if (p.questions.length >= 15 || p.questions.some(hasMarker)) return;

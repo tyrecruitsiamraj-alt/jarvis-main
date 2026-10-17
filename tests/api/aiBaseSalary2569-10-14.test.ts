@@ -46,7 +46,7 @@ describe('ฐานเงินเดือนในบท AI', () => {
 
   it('ประโยคของแถม: ฐานต่อจากรายได้ · ไม่มีรายได้ = ไม่พูดฐานลอย ๆ', () => {
     const s = buildExtraInfoSentence({ monthlyIncome: 20000, baseSalary: 12000, benefitLine: null });
-    expect(s).toBe('แจ้งเพิ่มเติมครับ งานนี้รายได้ประมาณ 20,000 บาทต่อเดือน และฐานเงินเดือน 12,000 บาท');
+    expect(s).toBe('แจ้งเพิ่มเติมค่ะ งานนี้รายได้ประมาณ 20,000 บาทต่อเดือน และฐานเงินเดือน 12,000 บาท');
     expect(buildExtraInfoSentence({ monthlyIncome: null, baseSalary: 12000 })).toBe('');
   });
 });
