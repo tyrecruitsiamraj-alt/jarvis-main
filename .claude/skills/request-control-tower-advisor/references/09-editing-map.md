@@ -13492,3 +13492,16 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 8. `ollamaClient.ts` ข้อความล้มไม่โชว์ที่อยู่เซิร์ฟเวอร์ (อยู่ใน log) · Pre-Check "ลองใหม่" ไม่บังคับ refresh
 9. มือถือ: ป๊อปคนของเรา (MatchingPage) เรียงซ้อนที่ <sm · ช่องน้ำหนัก `shrink-0` · หน้าคนของเราซ่อนชิปเบอร์ที่ <sm ย้ายไปบรรทัดข้อมูล
 - เทสต์ `tests/api/qaFixes2569-10-17.test.ts` · แก้ `aftercarePlanning.test.ts` · `followListPaging.test.ts`
+
+### เลือก AI ที่ใช้คิดงานจากหน้าตั้งค่า (17 ต.ค. 2569)
+- เจ้าของ: "ต้องเปลี่ยนจากหน้า Ui ได้" · Choice: Ollama + เจ้าแบบ OpenAI + Claude · เลือกแยกได้ต่องาน · admin เท่านั้น
+- `migrations/150_ai_settings.sql`: `ai_connections` (key เข้ารหัส `api_key_enc` + `api_key_hint` 4 ตัวท้าย) · `ai_task_routes` (task → connection/model · FK on delete set null)
+- `src/lib/aiSettings.ts` (pure): 5 งาน `AI_TASKS` · ชนิดเจ้า · ที่อยู่ตั้งต้น · ตรวจค่า
+- `api/_lib/aiSettingsStore.ts`: อ่าน+จำ 30 วิ · `resolveAiTarget(task)` ไม่ได้ตั้ง/ไม่มีตาราง/การเชื่อมต่อหาย = Ollama จากไฟล์ตั้งค่า (ทางถอย) · AES-256-GCM กุญแจจาก `AUTH_JWT_SECRET` (เปลี่ยน secret = ถอดไม่ออก → จอขอ key ใหม่)
+- `api/_lib/aiClient.ts`: **`aiChat({ task, ... })` ตัวเดียวของงานคิด** · ollama/openai(`/chat/completions`)/anthropic(`/v1/messages`) · ข้อความ error ไม่มีที่อยู่/key · `isAiConfigured(task)` แทน `getOllamaConfig()` · `listProviderModels`
+- ผู้เรียก: boardCandidateMatcher (`board_match`) · irecruitCandidateMatcher · recruitLaneMatcher · selectionRecallMatcher · candidateSpecAnalyzer · matchPrecomputeWorker gate · handler matching-* เช็ก `isAiConfigured`
+- ⚠️ ห้ามเรียก `ollamaChat` ตรงจากงานใหม่ — ผ่าน `aiChat` เท่านั้น (เทสต์คุม) · `ollamaChat(options, target?)` เหลือเป็นตัวเชื่อมชั้นล่าง
+- API `/api/ai-settings` (rbac `ai-settings` = admin): GET · POST save_connection / delete_connection / save_routes / test / models · ไม่ส่ง key กลับ · audit จดแค่ `api_key_changed`
+- จอ: `src/pages/settings/AiSettingsTab.tsx` (ตั้งค่า › ระบบอัตโนมัติ › AI ที่ใช้คิดงาน) · `src/lib/aiSettingsApi.ts`
+- ⚠️ AI ที่โทร (Lumos) ไม่อยู่ในระบบนี้
+- เทสต์ `tests/api/aiSettings2569-10-17.test.ts` · `boardMatchPool` mock ย้ายไป aiClient

@@ -14,7 +14,7 @@
  * ปิดโดยค่าเริ่มต้น เปิดด้วย MATCH_PRECOMPUTE_ENABLED=true เท่านั้น
  */
 import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
-import { getOllamaConfig } from './ollamaClient.js';
+import { isAiConfigured } from './aiClient.js';
 import { listSiamrajUnitRequests, isSiamrajUnitRequestsEnabled } from './siamrajUnitRequests.js';
 import { APP_DEPARTMENT_CODES } from './departmentScope.js';
 import { loadBoardMatchTierMap, getStoredBoardMatch, type BoardMatchTierEntry } from './boardMatchStore.js';
@@ -228,8 +228,9 @@ function readConfig(): WorkerConfig {
   };
 }
 
-function gatesOk(): boolean {
-  return isSiamrajUnitRequestsEnabled() && !!getSiamrajSqlServerConfig() && !!getOllamaConfig();
+/** 17 ต.ค. 2569: AI ของงานแมทเลือกได้จากหน้าตั้งค่า — เช็กว่ามี AI ให้ใช้ (ไม่ใช่ Ollama จากไฟล์ตั้งค่าอย่างเดียวแล้ว) */
+async function gatesOk(): Promise<boolean> {
+  return isSiamrajUnitRequestsEnabled() && !!getSiamrajSqlServerConfig() && (await isAiConfigured('board_match'));
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -280,7 +281,7 @@ async function scanAllDepartments(limit: number): Promise<PrecomputeJob[]> {
 
 // ─── Scanner loop ─────────────────────────────────────────────────────────────
 async function runScan(cfg: WorkerConfig): Promise<void> {
-  if (!gatesOk()) {
+  if (!(await gatesOk())) {
     logWarn('match-precompute.scan.skip');
     return;
   }
@@ -356,7 +357,7 @@ async function consumerLoop(cfg: WorkerConfig, isStopped: () => boolean): Promis
     }
     loggedIdle = false;
 
-    if (!gatesOk()) {
+    if (!(await gatesOk())) {
       await sleep(10_000);
       continue;
     }

@@ -18,7 +18,7 @@ import {
 } from '../_lib/http.js';
 import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
 import { loadMatchingBuScope } from '../_lib/departmentScope.js';
-import { getOllamaConfig } from '../_lib/ollamaClient.js';
+import { AI_NOT_CONFIGURED_MESSAGE, isAiConfigured } from '../_lib/aiClient.js';
 import { matchRecruitLaneCandidatesForJob } from '../_lib/recruitLaneMatcher.js';
 import { enqueueLumosInterviewForRecruitLane } from '../_lib/lumosDispatch.js';
 
@@ -38,8 +38,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
     // ⚠️ ไม่บังคับ iRecruit config เหมือนเลนคัดสรร — เลนนี้มี 3 แหล่ง
     // iRecruit ล่ม/ไม่ได้ตั้งค่า ต้องยังค้นจากฐานใหม่ + Checklist ได้ (ธงบอกอยู่ใน sources[])
-    if (!getOllamaConfig()) {
-      return sendError(res, 503, 'Service unavailable', 'ตั้งค่า OLLAMA_BASE_URL / OLLAMA_MODEL ก่อน');
+    if (!(await isAiConfigured('recruit_lane'))) {
+      return sendError(res, 503, 'Service unavailable', AI_NOT_CONFIGURED_MESSAGE);
     }
 
     const jobId = getQuery(req, 'jobId') || getQuery(req, 'job_id');

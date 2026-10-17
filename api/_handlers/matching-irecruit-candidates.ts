@@ -8,7 +8,7 @@ import {
 import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
 import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { irecruitUnavailableReason } from '../_lib/irecruitSqlServer.js';
-import { getOllamaConfig } from '../_lib/ollamaClient.js';
+import { AI_NOT_CONFIGURED_MESSAGE, isAiConfigured } from '../_lib/aiClient.js';
 import { matchIrecruitCandidatesForJob } from '../_lib/irecruitCandidateMatcher.js';
 import { enqueueLumosInterviewForIrecruit } from '../_lib/lumosDispatch.js';
 import { isAutoDispatchEnabled } from '../_lib/lumosDispatchMode.js';
@@ -33,8 +33,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (unavailable) {
       return sendError(res, 503, 'Service unavailable', unavailable);
     }
-    if (!getOllamaConfig()) {
-      return sendError(res, 503, 'Service unavailable', 'ตั้งค่า OLLAMA_BASE_URL / OLLAMA_MODEL ก่อน');
+    if (!(await isAiConfigured('irecruit_match'))) {
+      return sendError(res, 503, 'Service unavailable', AI_NOT_CONFIGURED_MESSAGE);
     }
 
     const jobId = getQuery(req, 'jobId') || getQuery(req, 'job_id');

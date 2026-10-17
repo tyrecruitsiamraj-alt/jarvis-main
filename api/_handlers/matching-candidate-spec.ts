@@ -9,6 +9,7 @@ import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
 import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { analyzeCandidateSpecForJob } from '../_lib/candidateSpecAnalyzer.js';
 import { getOllamaConfig, checkOllamaReachable } from '../_lib/ollamaClient.js';
+import { AI_NOT_CONFIGURED_MESSAGE, isAiConfigured } from '../_lib/aiClient.js';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -25,13 +26,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return sendError(res, 405, 'Method not allowed');
     }
 
-    if (!getOllamaConfig()) {
-      return sendError(
-        res,
-        503,
-        'Service unavailable',
-        'ตั้งค่า OLLAMA_BASE_URL และ OLLAMA_MODEL ใน .env.local ก่อน',
-      );
+    if (!(await isAiConfigured('candidate_spec'))) {
+      return sendError(res, 503, 'Service unavailable', AI_NOT_CONFIGURED_MESSAGE);
     }
 
     const ping = getQuery(req, 'ping') === '1';

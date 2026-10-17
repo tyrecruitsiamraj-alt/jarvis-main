@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { ollamaChat, checkOllamaReachable } from './ollamaClient.js';
+import { aiChat, AI_NOT_CONFIGURED_MESSAGE, isAiConfigured } from './aiClient.js';
+import type { OllamaMessage } from './ollamaClient.js';
 import { logError } from './logger.js';
 import { parseLenientJson } from './jsonRepair.js';
 
@@ -225,12 +226,10 @@ export async function analyzeCandidateSpecForJob(
     if (cached) return cached;
   }
 
-  const reach = await checkOllamaReachable();
-  if (!reach.ok) {
-    throw new Error(reach.error);
-  }
+  // 17 ต.ค. 2569: เลือก AI ได้จากหน้าตั้งค่า — เช็กแค่ว่ามี AI ให้ใช้ (เดิมยิง /api/tags ของ Ollama ซึ่งเจ้าอื่นไม่มี)
+  if (!(await isAiConfigured('candidate_spec'))) throw new Error(AI_NOT_CONFIGURED_MESSAGE);
 
-  const messages: Parameters<typeof ollamaChat>[0]['messages'] = [
+  const messages: OllamaMessage[] = [
     { role: 'system', content: buildSystemPrompt() },
     { role: 'user', content: jobToPromptText(job) },
   ];
@@ -239,7 +238,8 @@ export async function analyzeCandidateSpecForJob(
   const maxAttempts = 2;
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const content = await ollamaChat({
+    const content = await aiChat({
+      task: 'candidate_spec',
       format: 'json',
       timeoutMs: 180_000,
       think: false,

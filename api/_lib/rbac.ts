@@ -35,6 +35,7 @@ export type ApiResource =
   | 'follow-topics'
   /** ประเภทประกัน ขั้น 4 ฟอร์มติดตาม (149 · 16 ต.ค. 2569) — อ่านทุกคน · เพิ่มเฉพาะหัวหน้างานขึ้นไป */
   | 'follow-insurance-types'
+  | 'ai-settings'
   /** ดึงส่งคนแทนจาก iRecruit (2 ต.ค. 2569) — อ่านทุกคน · ดึงตอนนี้/ตั้งเวลาโทร หัวหน้างานขึ้นไป */
   | 'irecruit-replace-sync'
   | 'job-staff'
@@ -137,9 +138,11 @@ export function minimumRoleFor(
       if (isRead) return 'staff';
       return 'supervisor';
 
+    // ai-settings = เลือก AI ที่ใช้คิดงาน (17 ต.ค. 2569 · Choice "admin เท่านั้น") — เปลี่ยนแล้วกระทบทุกงาน + มี API key
     case 'app-users':
     case 'audit-logs':
     case 'branding':
+    case 'ai-settings':
       return 'admin';
 
     case 'app-nav-preferences':

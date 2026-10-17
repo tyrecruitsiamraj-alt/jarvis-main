@@ -1,4 +1,4 @@
-import { ollamaChat } from './ollamaClient.js';
+import { aiChat } from './aiClient.js';
 import { logError } from './logger.js';
 import { parseLenientJson } from './jsonRepair.js';
 import {
@@ -255,7 +255,8 @@ export async function matchIrecruitCandidatesForJob(
   for (let attempt = 1; attempt <= 2; attempt++) {
     let content = '';
     try {
-      content = await ollamaChat({
+      content = await aiChat({
+        task: 'irecruit_match',
         format: 'json',
         think: false,
         timeoutMs: 180_000,

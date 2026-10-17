@@ -12,7 +12,7 @@
  * - AI อ้างถึงคนด้วย **เลขลำดับในรายการ** ไม่ใช่ id ของฐาน — id ข้ามฐานชนกันได้
  *   (iRecruit id 1234 กับ card_id 1234 คนละคน) แล้ว join กลับผิดตัวแบบเงียบ ๆ
  */
-import { ollamaChat } from './ollamaClient.js';
+import { aiChat } from './aiClient.js';
 import { logError, logInfo } from './logger.js';
 import { parseLenientJson } from './jsonRepair.js';
 import { listRecruitCandidatesByKeywords, listRecruitCandidatesForMatch } from './recruitRegisterSql.js';
@@ -386,7 +386,8 @@ export async function matchRecruitLaneCandidatesForJob(
   for (let attempt = 1; attempt <= 2; attempt++) {
     let content = '';
     try {
-      content = await ollamaChat({
+      content = await aiChat({
+        task: 'recruit_lane',
         format: 'json',
         think: false,
         timeoutMs: 180_000,

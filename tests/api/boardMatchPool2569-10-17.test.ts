@@ -32,9 +32,9 @@ vi.mock('../../api/_lib/boardCandidatesSql.js', async (orig) => {
     }),
   };
 });
-vi.mock('../../api/_lib/ollamaClient.js', () => ({
-  // ตอบ green ให้ทุกคนที่อยู่ใน prompt — เทสต์นี้ดูลำดับถัง ไม่ได้ดูคุณภาพ AI
-  ollamaChat: vi.fn(async ({ messages }: { messages: Array<{ content: string }> }) => {
+vi.mock('../../api/_lib/aiClient.js', () => ({
+  // ตอบ green ให้ทุกคนที่อยู่ใน prompt — เทสต์นี้ดูลำดับถัง ไม่ได้ดูคุณภาพ AI (17 ต.ค. 2569: เรียกผ่าน aiChat แล้ว)
+  aiChat: vi.fn(async ({ messages }: { messages: Array<{ content: string }> }) => {
     const ids = [...messages[1].content.matchAll(/^#(\d+) \|/gm)].map((m) => Number(m[1]));
     return JSON.stringify({ matches: ids.map((id) => ({ id, tier: 'green', reason: '' })) });
   }),

@@ -58,8 +58,9 @@ export async function ollamaChat(options: {
   think?: boolean;
   /** ต่ำ = ตอบสม่ำเสมอขึ้นในแต่ละครั้ง — ใช้กับงาน classify/JSON ที่ต้องการความนิ่ง (ไม่ใช่งานสร้างสรรค์) */
   temperature?: number;
-}): Promise<string> {
-  const cfg = getOllamaConfig();
+}, target?: { baseUrl: string; model: string }): Promise<string> {
+  // target = Ollama ที่เลือกจากหน้าตั้งค่า (aiClient · 17 ต.ค. 2569) · ไม่ส่ง = ไฟล์ตั้งค่าเซิร์ฟเวอร์แบบเดิม
+  const cfg = target ?? getOllamaConfig();
   if (!cfg) {
     throw new Error('ตั้งค่า OLLAMA_BASE_URL และ OLLAMA_MODEL ใน .env.local ก่อน');
   }

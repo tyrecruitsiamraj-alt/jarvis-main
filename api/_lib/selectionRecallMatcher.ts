@@ -10,7 +10,7 @@
  * เพื่อไม่เขียนสองชุด แต่กองคนละกองและ endpoint คนละเส้น
  * ⚠️ **คนที่ปฏิเสธใบขอใบนี้เอง ถูกตัดตั้งแต่คิวรี** ไม่ใช่มาหวังพึ่ง cooldown
  */
-import { ollamaChat } from './ollamaClient.js';
+import { aiChat } from './aiClient.js';
 import { logError, logInfo } from './logger.js';
 import { listDeclinedApplicantsForJob } from './declinedApplicantsSql.js';
 import { toE164Thai } from './thaiPhone.js';
@@ -143,7 +143,8 @@ export async function matchDeclinedApplicantsForJob(
   for (let attempt = 1; attempt <= 2; attempt++) {
     let content = '';
     try {
-      content = await ollamaChat({
+      content = await aiChat({
+        task: 'selection_recall',
         format: 'json',
         think: false,
         timeoutMs: 180_000,

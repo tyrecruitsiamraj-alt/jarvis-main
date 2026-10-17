@@ -23,6 +23,7 @@ export const SETTINGS_TAB_IDS = [
   'matchWeights',
   'lumosMode',
   'callScripts',
+  'aiSettings',
   'callSuppression',
   'autoMove',
   'health',
@@ -46,6 +47,7 @@ export const SETTINGS_TAB_LABEL: Record<SettingsTabId, string> = {
   matchWeights: 'น้ำหนักเรียงผู้สมัคร',
   lumosMode: 'โหมดส่งงานให้ Lumos',
   callScripts: 'บทพูดของ AI',
+  aiSettings: 'AI ที่ใช้คิดงาน',
   callSuppression: 'บัญชีห้ามโทร',
   autoMove: 'ย้ายใบสมัครอัตโนมัติ',
   health: 'สถานะระบบ',
@@ -64,6 +66,7 @@ export const SETTINGS_TAB_HINT: Record<SettingsTabId, string> = {
   matchWeights: 'เกณฑ์เรียงลำดับผู้สมัครที่ AI แนะนำ',
   lumosMode: 'ให้ AI โทรเอง / ช่วยโทร / โทรมือ',
   callScripts: 'แก้บทที่ AI พูดตอนโทร — มีผลกับสายใหม่ทันที',
+  aiSettings: 'เลือกเจ้า AI และโมเดลที่ใช้จับคู่งานและอ่านใบขอ',
   callSuppression: 'เบอร์ที่ AI ไม่โทรถึงชั่วคราว — ดูเหตุผลและปลดได้',
   autoMove: 'ย้ายใบสมัครตามผลโทรอัตโนมัติ',
   health: 'ไฟสถานะ · สวิตช์ที่เปิดอยู่ · ของค้าง',
@@ -89,7 +92,7 @@ export const SETTINGS_GROUP_LABEL: Record<SettingsGroupId, string> = {
 export const SETTINGS_GROUP_TABS: Record<SettingsGroupId, readonly SettingsTabId[]> = {
   people: ['users', 'roles', 'jobStaff'],
   look: ['appearance', 'navMenu'],
-  automation: ['lumosMode', 'callScripts', 'callSuppression', 'autoMove', 'matchWeights'],
+  automation: ['lumosMode', 'callScripts', 'aiSettings', 'callSuppression', 'autoMove', 'matchWeights'],
   data: ['workStatus', 'reference'],
   monitor: ['health', 'audit'],
 };

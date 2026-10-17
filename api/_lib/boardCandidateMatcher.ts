@@ -1,4 +1,4 @@
-import { ollamaChat } from './ollamaClient.js';
+import { aiChat } from './aiClient.js';
 import { logInfo, logError } from './logger.js';
 import { parseLenientJson } from './jsonRepair.js';
 import {
@@ -232,7 +232,8 @@ async function rankPool(
   for (let attempt = 1; attempt <= 1; attempt++) {
     let content = '';
     try {
-      content = await ollamaChat({
+      content = await aiChat({
+        task: 'board_match',
         format: 'json',
         think: false,
         timeoutMs: 180_000,

@@ -7,6 +7,7 @@ import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
 import { Users, Shield, Database, FileText, Palette, UserCog, ListChecks, ListOrdered, SlidersHorizontal, PhoneForwarded, MoveRight, Activity,
   MessageSquareText,
+  Cpu,
   PhoneOff,
   Trash2,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ import WorkStatusMasterTab from '@/pages/settings/WorkStatusMasterTab';
 import MatchPriorityWeightsTab from '@/pages/settings/MatchPriorityWeightsTab';
 import LumosDispatchModeTab from '@/pages/settings/LumosDispatchModeTab';
 import CallScriptsTab from '@/pages/settings/CallScriptsTab';
+import AiSettingsTab from '@/pages/settings/AiSettingsTab';
 import CallSuppressionTab from '@/pages/settings/CallSuppressionTab';
 import ApplicationAutoMoveTab from '@/pages/settings/ApplicationAutoMoveTab';
 import SystemHealthTab from '@/pages/settings/SystemHealthTab';
@@ -100,6 +102,7 @@ const TAB_ICON: Record<SettingsTab, React.ElementType> = {
   matchWeights: SlidersHorizontal,
   lumosMode: PhoneForwarded,
   callScripts: MessageSquareText,
+  aiSettings: Cpu,
   callSuppression: PhoneOff,
   autoMove: MoveRight,
   health: Activity,
@@ -799,6 +802,7 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'matchWeights' && <MatchPriorityWeightsTab />}
         {activeTab === 'lumosMode' && <LumosDispatchModeTab />}
         {activeTab === 'callScripts' && <CallScriptsTab />}
+        {activeTab === 'aiSettings' && <AiSettingsTab />}
         {activeTab === 'callSuppression' && <CallSuppressionTab />}
         {activeTab === 'autoMove' && <ApplicationAutoMoveTab />}
         {activeTab === 'health' && <SystemHealthTab />}
