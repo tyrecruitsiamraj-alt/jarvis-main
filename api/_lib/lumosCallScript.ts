@@ -162,6 +162,10 @@ export const KNOWN_PLACEHOLDERS: readonly string[] = [
   'เคยปฏิเสธงานอื่น',
   /** ใบไม่ระบุช่วงอายุ — ถามอายุตรง ๆ แทนการตัดบรรทัดทิ้ง (6 ต.ค. 2569) */
   'ไม่มีช่วงอายุ',
+  /** มีเลขรายได้หรือฐานเงินเดือนให้พูด — บรรทัดเกริ่น "ขอแจ้งรายละเอียดรายได้" (17 ต.ค. 2569) */
+  'มีรายได้',
+  /** อ่านเวลาทำงานไม่ได้ — ถามแค่เรื่องเดินทาง ไม่พูดถึงเวลาที่ไม่ได้บอก (17 ต.ค. 2569) */
+  'ไม่มีเวลาทำงาน',
   /** ติดตามส่งคนแทน (8 ต.ค. 2569) — "พรุ่งนี้" / "วันนี้" / "วันที่ 9 ตุลาคม" · "8:00 น." */
   'วัน',
   'เวลาเข้างาน',
@@ -426,7 +430,7 @@ function applyValues(f: ApplyScriptFacts): ScriptValues {
   const income = Number(f.monthlyIncome);
   const base = jobValues(f);
   const ageRange = orDrop(f.ageRange);
-  return {
+  const out: ScriptValues = {
     ...base,
     // ชื่อหน่วยงานจริงเท่านั้น — ห้ามถอยไปพูด "หน่วยงานของเรา" เป็นสถานที่
     พื้นที่ทำงาน: orDrop(f.workArea) ?? orDrop(f.placeForTravel) ?? orDrop(f.unit),
@@ -442,11 +446,16 @@ function applyValues(f: ApplyScriptFacts): ScriptValues {
       : speakableBaseSalary(f.baseSalary, f.monthlyIncome),
     สวัสดิการ: orDrop(f.benefitLine),
   };
+  out.มีรายได้ = flag(out.รายได้ต่อเดือน != null || out.ฐานเงินเดือน != null);
+  out.ไม่มีเวลาทำงาน = flag(out.เวลาทำงาน == null);
+  return out;
 }
 
 const DAY_NAME = '(จันทร์|จันทร|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์|อาทิตย์)';
 const DAY_RANGE_RE = new RegExp(`(?:วัน)?${DAY_NAME}\\s*(?:-|–|ถึง)\\s*(?:วัน)?${DAY_NAME}`, 'u');
 const TIME_RANGE_RE = /(\d{1,2})[.:](\d{2})\s*(?:น\.?)?\s*(?:-|–|ถึง)\s*(\d{1,2})[.:](\d{2})/gu;
+/** เวลาที่ติดกับคำว่า "กะที่ N" เท่านั้น — กรอบรวม ("ในช่วง 08.30 - 20.00") ไม่นับ */
+const SHIFT_RANGE_RE = /กะ(?:ที่)?\s*\d+\s*(?:เวลา\s*)?(\d{1,2})[.:](\d{2})\s*(?:น\.?)?\s*(?:-|–|ถึง)\s*(\d{1,2})[.:](\d{2})/gu;
 const fullDay = (d: string) => (d === 'จันทร' ? 'จันทร์' : d === 'พฤหัส' ? 'พฤหัสบดี' : d);
 const hhmm = (h: string, m: string) => `${h.padStart(2, '0')}:${m}`;
 
@@ -475,8 +484,15 @@ export function speakableWorkTime(raw?: string | null): string {
   }
   const times = [...new Set([...s.matchAll(TIME_RANGE_RE)].map((m) => `${hhmm(m[1], m[2])} ถึง ${hhmm(m[3], m[4])} น.`))];
   // พูดถึงกะ = ช่วงเวลาบนใบคือกรอบรวมทุกกะ ("9 ชม. ตามตารางกะ ในช่วง 08.30 - 20.00") อ่านแล้วเข้าใจผิด
+  // 🔴 17 ต.ค. 2569 เจ้าของ "แจ้ง วันเวลา ทำงานเลยไม่ต้องรอเขาถาม" (สายจริงผู้สมัครต้องถามเองว่าเข้ากี่โมง)
+  //    ⇒ ใบที่เขียนเวลาแยกรายกะ ("กะที่ 1 11.00 - 20.00 น.") หรือมีหลายช่วงเวลา ("3 กะ เวลา 09.30-18.30 , 11.00-19.00") อ่านทุกกะ
+  //    · มีช่วงเดียวไม่ติดคำว่ากะที่ = กรอบรวม → "ทำงานเป็นกะ" เหมือนเดิม
   let hours = '';
-  if (/กะ/u.test(s)) hours = 'ทำงานเป็นกะ';
+  if (/กะ/u.test(s)) {
+    const labeled = [...new Set([...s.matchAll(SHIFT_RANGE_RE)].map((m) => `${hhmm(m[1], m[2])} ถึง ${hhmm(m[3], m[4])} น.`))];
+    const shifts = labeled.length ? labeled : times.length >= 2 ? times : [];
+    hours = shifts.length ? `ทำงานเป็นกะ ${shifts.join(' หรือ ')}` : 'ทำงานเป็นกะ';
+  }
   else if (times.length === 1) hours = times[0];
   return [days, hours].filter(Boolean).join(' ');
 }

@@ -28,7 +28,7 @@ describe('ฐานเงินเดือนในบท AI', () => {
       const incomeAt = q.findIndex((x) => x.includes('เดือนละ 20,000 บาท'));
       expect(baseAt).toBeGreaterThan(-1);
       expect(baseAt).toBe(incomeAt + 1);
-      expect(q[incomeAt]).toBe('งานนี้รายได้ประมาณเดือนละ 20,000 บาทครับ');
+      expect(q[incomeAt]).toBe('งานนี้รายได้ประมาณเดือนละ 20,000 บาทค่ะ'); // 17 ต.ค. 2569 เสียง AI ผู้หญิง ⇒ ค่ะ
     }
   });
 
