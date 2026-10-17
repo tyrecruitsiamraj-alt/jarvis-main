@@ -17,6 +17,8 @@ import {
 } from '../_lib/matchPrecomputeWorker.js';
 import {
   listBoardReadyCandidates,
+  listBoardMatchPool,
+  isBoardMatchFromOldPool,
   countBoardCandidatesByColumn,
   boardPrimaryColumnId,
   boardFallbackColumnId,
@@ -183,7 +185,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     // โหมด pool: คืน "คนของเรา" แบบเบา (สกิล+พื้นที่) ให้ client นับเบื้องต้นต่อใบขอ — ไม่เรียก AI, ไม่ส่งข้อมูลติดต่อ
     if (getQuery(req, 'pool') === '1') {
-      const pool = await listBoardReadyCandidates({ limit: 2000 });
+      const pool = await listBoardMatchPool(2000); // ถังเดียวกับ AI แมท (ไม่มีงาน/Re Use/Drop)
       return res.status(200).json({
         pool_size: pool.length,
         pool: pool.map((c) => ({
@@ -207,7 +209,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return sendError(res, 404, 'Not found', 'ไม่พบใบขอ ERP');
     }
 
+    const stored = await getStoredBoardMatch(jobId);
+    // ผลที่คิดจากกองเดิม (ก่อน 17 ต.ค. 2569) = สั่งแมทใหม่ไว้หัวคิว · ระหว่างรอโชว์ผลเดิมที่ยังพร้อมไปก่อน
     const refresh = getQuery(req, 'refresh') === '1';
+    const rematch = !refresh && stored != null && isBoardMatchFromOldPool(stored.computedAt);
 
     // กรองผล (snapshot) ให้เหลือเฉพาะคนที่ "ยังพร้อม" ณ ตอนนี้ — ไม่คิด AI ใหม่, ไม่แตะ snapshot
     // คนที่ถูกจอง/ลงงานที่ใบอื่น หรือหลุดจาก pool รอลงงานแล้ว จะหายจากผลไปเอง
@@ -231,9 +236,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     // นโยบาย: request จากหน้าเว็บไม่รัน AI เอง — เสิร์ฟเฉพาะผลที่ worker หลังบ้านค้นเสร็จแล้ว
     // ใบที่ยังไม่มีผล (หรือสั่งค้นหาใหม่) ส่งเข้าหัวคิว worker แล้วตอบ pending ให้หน้าเว็บรอ
-    const stored = await getStoredBoardMatch(jobId);
-
-    if (stored && !refresh) {
+    if (stored && !refresh && !rematch) {
       return withAvailability(stored.result, stored.computedAt);
     }
 
@@ -241,6 +244,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (workerActive) {
       enqueuePrecomputeJobs([{ ...(job as Record<string, unknown>), id: jobId }], {
         refresh,
+        rematch,
         front: true,
       });
     }

@@ -47,7 +47,7 @@ export type LumosPoolCandidate = {
   age: number | null;
   required_salary: number | null;
   last_activity_at: string | null;
-  /** ถังบนบอร์ด: 'To do' / 'ไม่มีงาน' / 'Re Use' */
+  /** ถังบนบอร์ด: 'ไม่มีงาน' / 'Re Use' / 'Drop' (17 ต.ค. 2569 — ถังจับคู่งาน) */
   column_label?: string | null;
   already_sent: boolean;
 };

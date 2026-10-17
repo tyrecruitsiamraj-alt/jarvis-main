@@ -13457,3 +13457,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `src/lib/pdpaConsent.ts`: `PDPA_POLICY` (คัดตามต้นฉบับทุกคำ ห้ามเกลา) · `PDPA_POLICY_TITLE` · ฉบับ `v1-2569-10-17` · ข้อความเตือน "กรุณายอมรับข้อตกลงและเงื่อนไขก่อนดำเนินการต่อ"
 - `PdpaConsentCheck`: "ข้าพเจ้าได้อ่านและยอมรับ" (ผู้สมัคร) / "ผู้สมัครได้อ่านและยอมรับ" (เจ้าหน้าที่) + ปุ่มชื่อข้อตกลง → **กางอ่านในฟอร์ม** (3 ฟอร์มอยู่ในป๊อปแล้ว ห้ามป๊อปซ้อน) · ปุ่มอยู่นอก label กดอ่านไม่ติ๊กให้
 - เทสต์ `tests/api/pdpaPolicyText2569-10-17.test.ts`
+
+### ถังที่เอามาจับคู่งาน = ไม่มีงาน · Re Use · Drop (17 ต.ค. 2569)
+- เจ้าของ: "เอาแค่ ไม่มีงาน reuse Drop ก็พอสำหรับการ match" — เดิม AI แมท To do → ไม่มีงาน · เลือกส่งเอง To do/ไม่มีงาน/Re Use/In process
+- `api/_lib/boardCandidatesSql.ts`: **`boardMatchColumnIds()` = [7, 6, 5] ที่เดียว** + `listBoardMatchPool(limit)` (ตัดคนแจ้งเข้าแล้วเสมอ) · วัดจริง: ไม่มีงาน 120 · Re Use 74 · Drop 417 · แจ้งเข้าแล้ว 12 ⇒ 599 คน
+- ผู้ใช้กองนี้: `boardCandidateMatcher.matchBoardCandidatesForJob` (ค้นทีละถัง ไม่มีงาน → Re Use → Drop หยุดเมื่อถึงเป้า × 3 · ถังแรกพัง = พังทั้งรอบ ถังถัดไปพังผลเดิมไม่หาย) · `lumos-dispatch` (`pickerPool` + `pickerColumnRank`) · `callBatchDispatcher` · `matching-board-candidates ?pool=1` · `boardAvailability` (ผลแมทเก่าที่มีคน To do จะถูกกรองออกเอง)
+- ⚠️ ไม่ใช่การแมท ห้ามเปลี่ยนตาม: `?people=1` (หน้าผู้สมัคร 6 ถัง) · `?picker=1` (กล่องเลือกคนหน้าติดตาม) · `?buckets=1` (ยอดต่อถัง) · `recruitLaneMatcher` (Checklist เลนสรรหา)
+- คำบนจอ: `OurPeoplePage` desc ต่อถัง · กล่อง "หาคนไม่พอ" ใน `MatchingPage` · prompt AI แมทเปลี่ยนเป็น "ยังไม่มีงานลง"
+- ผลแมทเก่า: `BOARD_MATCH_POOL_SINCE` + `isBoardMatchFromOldPool()` (boardCandidatesSql) — คิดก่อนเวลานี้ = worker สแกนแล้วแมทใหม่ (`refresh:false` ไม่วิเคราะห์สเปคซ้ำ) · เปิดใบดู = `rematch` ดันหัวคิว โชว์ผลเดิมระหว่างรอ (`enqueuePrecomputeJobs({ rematch })`) · **เปลี่ยนชุดถังอีกเมื่อไหร่ต้องเลื่อนเวลานี้**
+- เทสต์ `tests/api/boardMatchPool2569-10-17.test.ts` (ลำดับถัง + ตัดคนแจ้งเข้า + ทุกเส้นใช้กองเดียวกัน + ผลเก่าแมทใหม่) · แก้ `lumosDispatchSelection.test.ts`

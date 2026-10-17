@@ -19,6 +19,7 @@ import { listSiamrajUnitRequests, isSiamrajUnitRequestsEnabled } from './siamraj
 import { APP_DEPARTMENT_CODES } from './departmentScope.js';
 import { loadBoardMatchTierMap, getStoredBoardMatch, type BoardMatchTierEntry } from './boardMatchStore.js';
 import { matchBoardCandidatesForJob } from './boardCandidateMatcher.js';
+import { isBoardMatchFromOldPool } from './boardCandidatesSql.js';
 import { logInfo, logWarn, logError } from './logger.js';
 
 export type PrecomputeJob = Record<string, unknown> & { id: string };
@@ -117,14 +118,15 @@ export function enqueuePrecomputeJobs(
   // รับแค่ { id } — interface อย่าง JobRequest ไม่มี index signature จึง assign เข้า
   // Record<string, unknown> ตรง ๆ ไม่ได้ · ฟิลด์อื่นถูกอ่านแบบ dynamic ผ่าน PrecomputeJob อยู่แล้ว
   jobs: Array<{ id: string }>,
-  opts: { refresh?: boolean; front?: boolean } = {},
+  opts: { refresh?: boolean; front?: boolean; rematch?: boolean } = {},
 ): void {
   if (!workerStarted) return;
   const isRefresh = opts.refresh === true;
 
   // กรองงานที่มีผลแล้วออก เพื่อไม่วนซ้ำเมื่อ user refresh หน้า
   // refresh:true = user สั่ง re-match ใหม่ → ไม่กรอง
-  const eligible = isRefresh
+  // rematch:true = ผลเดิมคิดจากกองเก่า (isBoardMatchFromOldPool) → ไม่กรอง แต่ไม่ต้องวิเคราะห์สเปคใหม่
+  const eligible = isRefresh || opts.rematch === true
     ? jobs
     : jobs.filter((job) => {
         const id = typeof job.id === 'string' ? job.id.trim() : '';
@@ -300,6 +302,10 @@ async function runScan(cfg: WorkerConfig): Promise<void> {
       if (!id) continue;
       const entry = tierMap.get(id);
       if (!entry) {
+        items.push({ job, refresh: false });
+      } else if (isBoardMatchFromOldPool(entry.computedAt)) {
+        // 17 ต.ค. 2569 เปลี่ยนกองจับคู่งานเป็น ไม่มีงาน/Re Use/Drop — ผลที่คิดจากกองเดิมต้องแมทใหม่
+        // refresh:false = แมทใหม่โดยใช้สเปคใบขอเดิม (สเปคไม่ขึ้นกับกองคน ไม่ต้องให้ AI วิเคราะห์ซ้ำ)
         items.push({ job, refresh: false });
       } else if (cfg.staleMs > 0) {
         const age = nowMs - new Date(entry.computedAt).getTime();

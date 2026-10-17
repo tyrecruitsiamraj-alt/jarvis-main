@@ -63,7 +63,7 @@ const BUCKETS = [
     key: 'todo',
     match: 'to do',
     title: 'รอลงงาน (To do)',
-    desc: 'ผ่านสัมภาษณ์ พร้อมลงงานทันที — AI แมทถังนี้ก่อนเสมอ',
+    desc: 'ผ่านสัมภาษณ์ พร้อมลงงาน — ไม่เอาไปจับคู่งาน',
     headCls: TONE.success.value,
     boxCls: TONE.success.soft,
     /** สีแถบสัดส่วน — ใช้ token `dot` เพราะเป็นคลาส bg จริง ประกอบชื่อคลาสเองไม่ได้ (Tailwind purge ไม่เห็น) */
@@ -73,7 +73,7 @@ const BUCKETS = [
     key: 'no_job',
     match: 'ไม่มีงาน',
     title: 'รองาน (ไม่มีงาน)',
-    desc: 'ผ่านคัดเลือกแต่ยังไม่มีตำแหน่งให้ลง — AI ค้นต่อเมื่อ To do ไม่ถึงเป้า',
+    desc: 'ผ่านคัดเลือก ยังไม่มีตำแหน่งให้ลง — จับคู่งานถังนี้ก่อน',
     headCls: TONE.warn.value,
     boxCls: TONE.warn.soft,
     /** สีแถบสัดส่วน — ใช้ token `dot` เพราะเป็นคลาส bg จริง ประกอบชื่อคลาสเองไม่ได้ (Tailwind purge ไม่เห็น) */
@@ -83,7 +83,7 @@ const BUCKETS = [
     key: 'reuse',
     match: 're use',
     title: 'คนเก่า (Re Use)',
-    desc: 'เคยผ่านงานมาแล้ว — เลือกส่ง AI โทรเองได้ ไม่เข้า auto (เช็คสถานะก่อนส่ง)',
+    desc: 'เคยผ่านงานมาแล้ว — จับคู่งานต่อจากถังไม่มีงาน',
     headCls: TONE.violet.value,
     boxCls: TONE.violet.soft,
     /** สีแถบสัดส่วน — ใช้ token `dot` เพราะเป็นคลาส bg จริง ประกอบชื่อคลาสเองไม่ได้ (Tailwind purge ไม่เห็น) */
@@ -93,14 +93,15 @@ const BUCKETS = [
     key: 'in_process',
     match: 'in process',
     title: 'กำลังเสนอใบอื่น (In process)',
-    desc: 'ถูกเสนอกับใบขออื่นอยู่ — เลือกส่งเองได้ ไม่เข้า auto (เช็คก่อนว่าใบเดิมจบแล้วหรือยัง)',
+    desc: 'กำลังเสนอกับใบขออื่น — ไม่เอาไปจับคู่งาน',
     headCls: TONE.info.value,
     boxCls: TONE.info.soft,
     /** สีแถบสัดส่วน — ใช้ token `dot` เพราะเป็นคลาส bg จริง ประกอบชื่อคลาสเองไม่ได้ (Tailwind purge ไม่เห็น) */
     barCls: TONE.info.dot,
   },
   // สองถังปลายทาง — เจ้าของสั่งเอามาโชว์ด้วย 10 ส.ค. 2569
-  // ⚠️ ทั้งคู่ "จบเรื่องแล้ว" ไม่ถูกเอาไปแมท/ส่งโทร — มีไว้ให้เห็นภาพรวมว่าคนไหลไปไหน
+  // 🔴 17 ต.ค. 2569 เจ้าของ "เอาแค่ ไม่มีงาน reuse Drop ก็พอสำหรับการ match" ⇒ Drop เข้าการจับคู่งานแล้ว · Done ยังไม่เข้า
+  //    (ถังที่จับคู่ได้มาจาก boardMatchColumnIds ที่เดียว · desc ของแต่ละถังต้องพูดตรงกับตัวนั้น)
   {
     key: 'done',
     match: 'done',
@@ -115,7 +116,7 @@ const BUCKETS = [
     key: 'drop',
     match: 'drop',
     title: 'ตกไป (Drop)',
-    desc: 'ไม่ไปต่อแล้ว — เก็บไว้ดูสัดส่วนว่าหลุดไปเท่าไหร่',
+    desc: 'ไม่ไปต่อกับใบเดิม — จับคู่งานเป็นถังสุดท้าย',
     headCls: TONE.danger.value,
     boxCls: TONE.danger.soft,
     /** สีแถบสัดส่วน — ใช้ token `dot` เพราะเป็นคลาส bg จริง ประกอบชื่อคลาสเองไม่ได้ (Tailwind purge ไม่เห็น) */

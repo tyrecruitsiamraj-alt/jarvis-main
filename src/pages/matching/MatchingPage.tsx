@@ -191,7 +191,7 @@ type BoardMatchResult = {
   job_family_label: string;
   pool_size: number;
   matches: BoardCandidateMatch[];
-  /** เป้า = อัตราที่ขอ × 3 — ต่ำกว่านี้ระบบค้นถัง "ไม่มีงาน" เพิ่มให้แล้ว */
+  /** เป้า = อัตราที่ขอ × 3 — ต่ำกว่านี้ระบบค้นถังถัดไป (ไม่มีงาน → Re Use → Drop) */
   recommended_target?: number;
   fallback_used?: boolean;
   fallback_pool_size?: number;
@@ -2713,8 +2713,8 @@ const MatchingPage: React.FC = () => {
           className="matching-sheet-scroll w-full overflow-y-auto [scrollbar-gutter:stable] sm:max-w-xl"
         >
           <SheetHeader>
-            <SheetTitle className="text-foreground">คนของเรา — ผ่านสัมภาษณ์ รอลงงาน</SheetTitle>
-            <SheetDescription className="sr-only">ผู้สมัครที่พร้อมลงงานซึ่งสกิลตรงกับใบขอ</SheetDescription>
+            <SheetTitle className="text-foreground">คนของเรา — ไม่มีงาน · Re Use · Drop</SheetTitle>
+            <SheetDescription className="sr-only">คนของเราที่สกิลตรงกับใบขอ</SheetDescription>
           </SheetHeader>
           {jobDetail ? (
             <div className="space-y-3 mt-2">
@@ -3683,10 +3683,10 @@ const MatchingPage: React.FC = () => {
                             : `หาได้ครบเป้าแล้ว ${got} คน — กดดูรายละเอียด`}
                         </summary>
                         <p className="mt-1.5 text-muted-foreground">
-                          เป้าคือ “อัตราที่ขอ × 3” · ระบบค้นถัง “ไม่มีงาน” เพิ่มให้แล้ว
+                          เป้าคือ “อัตราที่ขอ × 3” ·{' '}
                           {short
-                            ? ` ก็ยังได้ ${got} คน · ทางไปต่อ: ค้นหาคนที่ยังไม่สมัคร (หัวข้อ 2) · ดูคนเก่า Re Use ใน “เลือกคนส่ง AI โทร”`
-                            : ` → รวมแนะนำ ${got} คน`}
+                            ? `ค้นครบ 3 ถังแล้ว (ไม่มีงาน · Re Use · Drop) ได้ ${got} คน · ทางไปต่อ: ค้นหาคนที่ยังไม่สมัคร (หัวข้อ 2)`
+                            : `ค้นถังถัดไปให้แล้ว → รวมแนะนำ ${got} คน`}
                         </p>
                       </details>
                     );
@@ -4657,7 +4657,7 @@ const MatchingPage: React.FC = () => {
               (() => {
                 const rows = filterLumosPool(lumosPool, lumosPoolSearch);
                 if (lumosPool.length === 0) {
-                  return <p className="py-6 text-center text-xs text-muted-foreground">ไม่มีคนของเราใน pool รอลงงาน</p>;
+                  return <p className="py-6 text-center text-xs text-muted-foreground">ไม่มีคนในถังไม่มีงาน · Re Use · Drop</p>;
                 }
                 if (rows.length === 0) {
                   return <p className="py-6 text-center text-xs text-muted-foreground">ไม่พบคนที่ตรงกับคำค้น</p>;
@@ -4665,7 +4665,7 @@ const MatchingPage: React.FC = () => {
                 return (
                   <>
                     <p className="text-[10px] text-muted-foreground">
-                      pool {lumosPool.length} คน (รอลงงาน + รองาน + คนเก่า Re Use + กำลังเสนอใบอื่น) · แสดง {rows.length} ·
+                      pool {lumosPool.length} คน (ไม่มีงาน + Re Use + Drop) · แสดง {rows.length} ·
                       คนที่ส่งไปแล้วหรือไม่มีเบอร์เลือกไม่ได้
                     </p>
                     <div className="max-h-72 space-y-1.5 overflow-y-auto pr-0.5">

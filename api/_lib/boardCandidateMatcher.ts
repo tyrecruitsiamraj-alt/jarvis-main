@@ -3,8 +3,7 @@ import { logInfo, logError } from './logger.js';
 import { parseLenientJson } from './jsonRepair.js';
 import {
   listBoardReadyCandidates,
-  boardPrimaryColumnId,
-  boardFallbackColumnId,
+  boardMatchColumnIds,
   type BoardReadyCandidate,
 } from './boardCandidatesSql.js';
 import {
@@ -38,7 +37,7 @@ export type BoardMatchResult = {
   matches: BoardCandidateMatch[];
   /** เป้าที่ต้องหาให้ได้ = อัตราที่ขอ × 3 (กติกา 3 ส.ค. 2569) */
   recommended_target?: number;
-  /** true = To do หาได้ต่ำกว่าเป้า จึงค้นถัง "ไม่มีงาน" เพิ่มแล้ว */
+  /** true = ถังแรก (ไม่มีงาน) หาได้ต่ำกว่าเป้า จึงค้นถังถัดไป (Re Use → Drop) เพิ่มแล้ว */
   fallback_used?: boolean;
   fallback_pool_size?: number;
 };
@@ -55,7 +54,7 @@ export function recommendedCount(matches: Array<{ tier: 'green' | 'yellow' | 're
 
 /**
  * เป้าจำนวนคนแนะนำต่อใบขอ = อัตราที่ขอ × 3 (ขอ 3 ต้องมีอย่างน้อย 9)
- * ต่ำกว่านี้ให้ค้นถังถัดไป (To do → ไม่มีงาน) — อัตราอ่านแบบเดียวกับหน้าจอ (ขั้นต่ำ 1)
+ * ต่ำกว่านี้ให้ค้นถังถัดไป (ไม่มีงาน → Re Use → Drop) — อัตราอ่านแบบเดียวกับหน้าจอ (ขั้นต่ำ 1)
  */
 export function recommendedTarget(job: Record<string, unknown>): number {
   const raw = Number(job.request_positions ?? job.position_units ?? 1);
@@ -140,8 +139,8 @@ function buildMatchPrompt(
     .map((a) => `- [${a.tier}] ${a.title}${a.note ? ` (${a.note})` : ''}`)
     .join('\n');
 
-  const system = `คุณคือผู้ช่วยจับคู่ "คนของเรา" (ผู้สมัครที่ผ่านสัมภาษณ์แล้ว รอลงงาน) กับใบขอกำลังคน (Outsource Service).
-คนกลุ่มนี้ผ่านการคัดเลือกแล้ว — สกิล/ตำแหน่ง (job1/job2) เชื่อถือได้ ให้น้ำหนักการแมทสกิลเป็นหลัก รองลงมาคือพื้นที่และเงินเดือนที่ขอ
+  const system = `คุณคือผู้ช่วยจับคู่ "คนของเรา" (ผู้สมัครบนบอร์ดที่ยังไม่มีงานลง) กับใบขอกำลังคน (Outsource Service).
+คนกลุ่มนี้เคยผ่านการคัดเลือกแล้ว — สกิล/ตำแหน่ง (job1/job2) เชื่อถือได้ ให้น้ำหนักการแมทสกิลเป็นหลัก รองลงมาคือพื้นที่และเงินเดือนที่ขอ
 เกณฑ์ tier:
 - green = สกิลตรงหรือใกล้มาก ลงงานได้ทันที
 - yellow = พอเป็นไปได้ ต้องเช็ค (สกิลข้างเคียง/พื้นที่ไกล/เงินเดือนขอสูงกว่า)
@@ -173,7 +172,7 @@ Job Family: ${spec.job_family_code} ${spec.job_family_label}
 ตำแหน่งใกล้เคียงที่รับได้:
 ${adjacent || '-'}
 
-รายชื่อคนของเราที่รอลงงาน (id | สกิล | ข้อมูล):
+รายชื่อคนของเราที่ยังไม่มีงานลง (id | สกิล | ข้อมูล):
 ${cand}
 
 จัดอันดับคนที่เหมาะที่สุดก่อน ตอบ JSON เท่านั้น:
@@ -278,9 +277,10 @@ async function rankPool(
 }
 
 /**
- * Waterfall (กติกา 3 ส.ค. 2569): ค้น "To do" (ข้อมูลใหม่สุด) ก่อนเสมอ —
- * ถ้าแนะนำ (เขียว+เหลือง) ได้น้อยกว่า อัตราที่ขอ × 3 ค่อยค้นถัง "ไม่มีงาน" เพิ่ม
- * ผลรอบแรกอยู่หน้าเสมอ (การ์ดพก column_label บอกที่มา) · Re Use ไม่เข้า auto — เลือกส่งเองเท่านั้น
+ * Waterfall (กติกา 3 ส.ค. 2569) ทีละถังตาม `boardMatchColumnIds()` — ถังแรกค้นเสมอ
+ * ถ้าแนะนำ (เขียว+เหลือง) ยังน้อยกว่า อัตราที่ขอ × 3 ค่อยค้นถังถัดไป · ผลถังก่อนอยู่หน้าเสมอ (การ์ดพก column_label)
+ * 🔴 17 ต.ค. 2569 เจ้าของ *"เอาแค่ ไม่มีงาน reuse Drop ก็พอสำหรับการ match"* — เดิม To do → ไม่มีงาน
+ *    ตอนนี้ ไม่มีงาน → Re Use → Drop · ตัดคนแจ้งเข้าแล้ว (ได้งานแล้วห้ามเสนองานใหม่)
  */
 export async function matchBoardCandidatesForJob(
   jobId: string,
@@ -294,42 +294,41 @@ export async function matchBoardCandidatesForJob(
   const jobTitle = buildJobTitle(job) || spec.job_family_label || '';
   const target = recommendedTarget(job);
 
-  // ถังหลัก: To do — pool เล็ก (~ร้อยคน) ดึงทั้งหมดแล้ว pre-rank ในโค้ด
-  const primaryPool = await listBoardReadyCandidates({ columnId: boardPrimaryColumnId(), limit: 1000 });
-  const primary = await rankPool(jobId, job, spec, jobTitle, primaryPool);
-
-  let matches = primary.matches;
-  let shortlisted = primary.shortlisted;
-  let poolSize = primaryPool.length;
+  let matches: BoardCandidateMatch[] = [];
+  let shortlisted = 0;
+  let poolSize = 0;
   let fallbackUsed = false;
   let fallbackPoolSize = 0;
 
-  if (recommendedCount(primary.matches) < target) {
-    // To do หาได้ต่ำกว่าเป้า → ค้นถัง "ไม่มีงาน" ต่อ (รอบนี้พังไม่ทำให้ผลรอบแรกหาย)
+  for (const [i, columnId] of boardMatchColumnIds().entries()) {
+    if (i > 0 && recommendedCount(matches) >= target) break;
+    // ถังแรกพัง = พังทั้งรอบ (เหมือนเดิม) · ถังถัดไปพังไม่ทำให้ผลถังก่อนหาย
     try {
-      const fallbackPool = await listBoardReadyCandidates({
-        columnId: boardFallbackColumnId(),
-        limit: 1000,
-      });
-      fallbackPoolSize = fallbackPool.length;
-      if (fallbackPool.length > 0) {
-        const fallback = await rankPool(jobId, job, spec, jobTitle, fallbackPool);
-        const already = new Set(matches.map((m) => m.card_id));
-        matches = [...matches, ...fallback.matches.filter((m) => !already.has(m.card_id))];
-        shortlisted += fallback.shortlisted;
-        poolSize += fallbackPool.length;
+      const pool = await listBoardReadyCandidates({ columnId, excludeInformed: true, limit: 1000 });
+      poolSize += pool.length;
+      if (i > 0) {
+        fallbackUsed = true;
+        fallbackPoolSize += pool.length;
       }
-      fallbackUsed = true;
-      logInfo('board-match.fallback', {
-        jobId,
-        target,
-        primaryRecommended: recommendedCount(primary.matches),
-        fallbackPool: fallbackPoolSize,
-        totalRecommended: recommendedCount(matches),
-      });
+      if (pool.length === 0) continue;
+      const ranked = await rankPool(jobId, job, spec, jobTitle, pool);
+      const already = new Set(matches.map((m) => m.card_id));
+      matches = [...matches, ...ranked.matches.filter((m) => !already.has(m.card_id))];
+      shortlisted += ranked.shortlisted;
+      if (i > 0) {
+        logInfo('board-match.fallback', {
+          jobId,
+          target,
+          columnId,
+          pool: pool.length,
+          totalRecommended: recommendedCount(matches),
+        });
+      }
     } catch (e) {
+      if (i === 0) throw e;
       logError('board-match.fallback.fail', {
         jobId,
+        columnId,
         message: e instanceof Error ? e.message : String(e),
       });
     }

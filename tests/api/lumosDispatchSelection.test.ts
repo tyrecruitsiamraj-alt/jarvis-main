@@ -119,7 +119,8 @@ describe('เส้นทางส่งเข้าคิว Lumos', () => {
     const dispatch = read('api/_handlers/lumos-dispatch.ts');
     // body รับได้แค่ jobId + id list · ห้ามมีการอ่านชื่อ/เบอร์จาก body เข้า payload
     expect(dispatch).not.toMatch(/body\.(recipient_phone|phone|mobile|recipient_name|full_name)/);
-    expect(dispatch).toMatch(/listBoardReadyCandidates/);
+    // 17 ต.ค. 2569: กองจับคู่งานกลาง (ไม่มีงาน/Re Use/Drop) — อ่านสดจากบอร์ดผ่าน listBoardMatchPool
+    expect(dispatch).toMatch(/listBoardMatchPool/);
     expect(dispatch).toMatch(/listRecruitCandidatesByIds/);
   });
 

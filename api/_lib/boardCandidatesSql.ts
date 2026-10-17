@@ -133,12 +133,12 @@ export function boardPrimaryColumnId(): number {
   return Number(process.env.BOARD_READY_COLUMN_ID || 2);
 }
 
-/** คอลัมน์ "ไม่มีงาน" — ผ่านคัดเลือกแต่ยังไม่มีตำแหน่งให้ลง (ถังสำรองเมื่อ To do หาได้ไม่พอ) */
+/** คอลัมน์ "ไม่มีงาน" — ผ่านคัดเลือกแต่ยังไม่มีตำแหน่งให้ลง · ถังแรกของกองจับคู่งาน (`boardMatchColumnIds`) */
 export function boardFallbackColumnId(): number {
   return Number(process.env.BOARD_FALLBACK_COLUMN_ID || 7);
 }
 
-/** คอลัมน์ "Re Use" — คนเก่าเคยผ่านงาน (ให้เลือกส่งเองเท่านั้น ห้ามเข้า auto) */
+/** คอลัมน์ "Re Use" — คนเก่าเคยผ่านงาน · 17 ต.ค. 2569 เข้ากองจับคู่งานแล้ว (`boardMatchColumnIds`) */
 export function boardReuseColumnId(): number {
   return Number(process.env.BOARD_REUSE_COLUMN_ID || 6);
 }
@@ -156,7 +156,7 @@ export function boardInProcessColumnId(): number {
  * ถังปลายทางของบอร์ด — "Done" (ได้งานแล้ว) กับ "Drop" (ตกไป)
  * ค่าเริ่มต้นอ่านจากบอร์ดจริงเมื่อ 10 ส.ค. 2569: 1 Checklist · 2 To do · 3 In process ·
  * **4 Done · 5 Drop** · 6 Re Use · 7 ไม่มีงาน
- * ⚠️ สองถังนี้ใช้ "โชว์ยอด" อย่างเดียว ไม่ถูกเอาไปแมท/ส่งโทร (คนจบเรื่องไปแล้ว)
+ * Done = โชว์ยอดอย่างเดียว ไม่เอาไปแมท · 🔴 Drop เข้ากองจับคู่งานแล้ว 17 ต.ค. 2569 (`boardMatchColumnIds`)
  */
 export function boardDoneColumnId(): number {
   return Number(process.env.BOARD_DONE_COLUMN_ID || 4);
@@ -177,6 +177,38 @@ export function boardDailyWorkColumnId(): number {
  */
 export function boardChecklistColumnId(): number {
   return Number(process.env.BOARD_CHECKLIST_COLUMN_ID || 1);
+}
+
+/**
+ * ═══ ถังที่เอามาจับคู่งาน — ที่เดียวของทั้งระบบ ═══
+ * 🔴 17 ต.ค. 2569 เจ้าของ: *"เอาแค่ ไม่มีงาน reuse Drop ก็พอสำหรับการ match"*
+ * = ไม่มีงาน (7) · Re Use (6) · Drop (5) เท่านั้น — To do / In process **ไม่เอามาแมทแล้ว**
+ * ใช้ร่วมกัน: AI แมทใบขอ (`boardCandidateMatcher`) · เลือกคนส่ง AI โทร (`lumos-dispatch`) ·
+ * ชุดโทร (`callBatchDispatcher`) · นับเบื้องต้นต่อใบขอ (`?pool=1`) · กรองผลแมทที่เก็บไว้ (`boardAvailability`)
+ * ⚠️ หน้าผู้สมัคร (`?people=1`) · กล่องเลือกคนหน้าติดตาม (`?picker=1`) · ยอดต่อถัง ไม่ใช่การแมท ห้ามใช้ตัวนี้
+ */
+export function boardMatchColumnIds(): number[] {
+  return [...new Set([boardFallbackColumnId(), boardReuseColumnId(), boardDropColumnId()])];
+}
+
+/**
+ * กองคนสำหรับจับคู่งาน — 3 ถังข้างบน **ตัดคนที่แจ้งเข้าแล้ว** (ได้งานแล้วห้ามเสนองานใหม่)
+ * วัดจริง 17 ต.ค. 2569: ไม่มีงาน 120 · Re Use 74 · Drop 417 · แจ้งเข้าแล้ว 12 ⇒ เหลือ 599 คน
+ */
+export function listBoardMatchPool(limit = 5000): Promise<BoardReadyCandidate[]> {
+  return listBoardReadyCandidates({ columnIds: boardMatchColumnIds(), excludeInformed: true, limit });
+}
+
+/**
+ * ผลแมทที่คิด **ก่อนเปลี่ยนกอง** (ยังเป็นคน To do) = ถือว่าเก่า ให้ worker แมทใหม่ 1 รอบ
+ * ไม่งั้นผลเดิมโดนกรองคน To do ออกจนเหลือ "ดูคน 0" ทั้งที่กองใหม่มีคนตรง
+ * เปลี่ยนชุดถังใน `boardMatchColumnIds` อีกเมื่อไหร่ ให้เลื่อนเวลานี้ตาม
+ */
+export const BOARD_MATCH_POOL_SINCE = '2026-10-17T17:00:00+07:00';
+
+export function isBoardMatchFromOldPool(computedAt: string | null | undefined): boolean {
+  const t = new Date(String(computedAt ?? '')).getTime();
+  return !Number.isFinite(t) || t < new Date(BOARD_MATCH_POOL_SINCE).getTime();
 }
 
 export type BoardColumnCount = { column_id: number; label: string | null; count: number };

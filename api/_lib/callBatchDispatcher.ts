@@ -12,7 +12,7 @@
 import { logInfo, logError } from './logger.js';
 import { setCallBatchDispatcher } from './callBatchStore.js';
 import { enqueueLumosReminderForSelected, enqueueLumosInterviewForSelected } from './lumosDispatch.js';
-import { listBoardReadyCandidates, boardPrimaryColumnId, boardFallbackColumnId } from './boardCandidatesSql.js';
+import { listBoardMatchPool } from './boardCandidatesSql.js';
 import { listRecruitCandidatesByIds } from './recruitRegisterSql.js';
 import { getSiamrajUnitRequestById } from './siamrajUnitRequests.js';
 import { getStoredBoardMatch } from './boardMatchStore.js';
@@ -20,13 +20,6 @@ import type { CallBatch } from '../../src/lib/callBatch.js';
 
 const BOARD_POOL_LIMIT = 4000;
 
-/** ถังที่อนุญาตให้ส่งได้ — ชุดเดียวกับหน้า Matching */
-function pickerColumnIds(): number[] {
-  const ids = [boardPrimaryColumnId(), boardFallbackColumnId()].filter(
-    (v): v is number => typeof v === 'number' && Number.isFinite(v),
-  );
-  return [...new Set(ids)];
-}
 
 async function dispatchBatch(batch: CallBatch): Promise<void> {
   const active = batch.items.filter((i) => !i.removed);
@@ -45,7 +38,7 @@ async function dispatchBatch(batch: CallBatch): Promise<void> {
 
   if (batch.channel === 'reminder') {
     const wanted = new Set(active.map((i) => Number(i.candidateRef)).filter(Number.isFinite));
-    const pool = await listBoardReadyCandidates({ columnIds: pickerColumnIds(), limit: BOARD_POOL_LIMIT });
+    const pool = await listBoardMatchPool(BOARD_POOL_LIMIT) // ถังที่ส่งได้ = ชุดเดียวกับหน้า Matching (ไม่มีงาน/Re Use/Drop);
     const selected = pool
       .filter((c) => wanted.has(c.card_id))
       .map((c) => ({
