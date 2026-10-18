@@ -22,7 +22,7 @@ const BUCKET_TONE: Record<DashboardAgeDaysBreakdown['bucket'], { urgency: string
   advance: { urgency: 'รอได้', tone: REQUEST_LEAD_KIND_TONE.advance },
   '1-7': { urgency: 'ยังไม่ด่วน', tone: 'success' },
   '8-15': { urgency: 'เริ่มด่วน', tone: 'warn' },
-  '16-30': { urgency: 'เริ่มด่วน', tone: 'orange' },
+  '16-30': { urgency: 'ด่วน', tone: 'orange' },
   '30+': { urgency: 'ด่วนมาก', tone: 'danger', solid: true },
 };
 

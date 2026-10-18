@@ -81,7 +81,7 @@ describe('isRoundSettled', () => {
 });
 
 describe('เลือกคนที่โทรครบแล้ว', () => {
-  it('ทุกรอบจบ + ไม่มีนัดข้างหน้า + ปิดงานว่าไปแล้ว → เข้ากอง (closed_success)', () => {
+  it('ทุกรอบจบ + ไม่มีนัดข้างหน้า + ไปแล้ว → เข้ากอง (closed_success)', () => {
     const people = selectCompletedFollowPeople([
       group('ก', [round({ completed_at: 'x', outcome_code: 'went' })]),
     ]);
@@ -130,7 +130,7 @@ describe('เลือกคนที่โทรครบแล้ว', () => {
    * 🔴 AI ได้คำตอบว่า "ไม่ไป" ต้องขึ้นกองนี้ (เดิมตกหายเงียบ ๆ เพราะเช็คแต่
    * `outcome_code` ที่คนกรอก) แต่ต้องติดป้ายว่า**ไม่ต้องส่งต่อ**
    */
-  it('🔴 AI ได้คำตอบว่าไม่ไป = เข้ากองแต่ห้ามมีปุ่มย้ายไปดูแลหลังเริ่มงาน', () => {
+  it('🔴 AI ได้คำไม่ไป = เข้ากองแต่ห้ามมีปุ่มย้ายไปดูแลหลังเริ่มงาน', () => {
     const people = selectCompletedFollowPeople([
       group('ค4', [round({ call_outcome: 'declined' })]),
     ]);
@@ -197,7 +197,7 @@ describe('🔴 สายที่คนโทรลงผลเอง (130) น�
     expect(p?.reason).toBe('ai_going');
   });
 
-  it('คนลง "ยกเลิก — ไม่ไปแล้ว" ⇒ บอกว่าไม่ไป (ปุ่มย้ายไม่ขึ้น) · "ติดต่อสำเร็จ" อย่างเดียว = ยังไม่ได้คำตอบว่าไปไหม', () => {
+  it('คนลง "ยกเลิก — ไม่ไปแล้ว" ⇒ บอกว่าไม่ไป (ปุ่มย้ายไม่ขึ้น) · "ติดต่อสำเร็จ" อย่างเดียว = ยังไม่ได้คำไปไหม', () => {
     const [notGoing] = selectCompletedFollowPeople([group('ไม่ไป', [round({ staff_call_outcome: 'declined' })])]);
     expect(notGoing?.reason).toBe('ai_not_going');
     const [reached] = selectCompletedFollowPeople([group('ติดต่อได้', [round({ staff_call_outcome: 'acknowledged' })])]);
@@ -279,8 +279,8 @@ describe('การ์ดติดตามครบ — เฉพาะคน�
 
   it('ป้ายสั้นใช้คำชุดเดียวกับถังผลโทร + มีสีครบทุกเหตุผล', () => {
     // คำเดียวกับช่องของแผงขั้นตอน (6 ต.ค. 2569)
-    expect(COMPLETION_REASON_SHORT.ai_going).toBe('ตอบว่าไป');
-    expect(COMPLETION_REASON_SHORT.ai_not_going).toBe('ตอบว่าไม่ไป');
+    expect(COMPLETION_REASON_SHORT.ai_going).toBe('ไป');
+    expect(COMPLETION_REASON_SHORT.ai_not_going).toBe('ไม่ไป');
     expect(COMPLETION_REASON_SHORT.no_answer).toBe('ไม่รับสาย');
     expect(COMPLETION_REASON_SHORT.called_no_close).toBe('สรุปไม่ได้');
     for (const k of Object.keys(COMPLETION_REASON_LABEL)) {

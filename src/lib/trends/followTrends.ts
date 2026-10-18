@@ -24,7 +24,7 @@ export const FOLLOW_METRIC_LABEL: Record<FollowMetric, string> = {
   connected: 'ติดต่อได้',
   completed: 'ปิดงาน',
   // 🔴 คำของ "ปิดงาน" (ต่อคน) แยกจากคำของผลโทร (ต่อสาย: ตอบว่าไป…) — 6 ต.ค. 2569 ไม่ให้ต้องเดาว่าตัวไหนคือตัวไหน
-  success: 'ปิดงานว่าไปแล้ว',
+  success: 'ไปแล้ว',
   dropped: 'ปิดงานว่าไม่ไป · ยกเลิก · ลา',
   cancelledEntry: 'ยกเลิกการติดตาม',
 };

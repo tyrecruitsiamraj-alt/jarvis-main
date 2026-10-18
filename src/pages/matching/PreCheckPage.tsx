@@ -918,7 +918,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                       TONE[JOB_URGENCY_TONE[j.urgency]].value,
                     )}
                   >
-                    {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
+                    {j.urgency === 'urgent' ? 'ฉุกเฉิน' : 'ล่วงหน้า'}
                   </span>
                   <div className="flex items-center gap-1">
                     {jobMatchById[j.id] ? (

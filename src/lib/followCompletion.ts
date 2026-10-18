@@ -192,9 +192,9 @@ export function selectAwaitingDecision(groups: FollowGroup[]): CompletedFollowPe
 /** ป้ายสั้นบนแถวของการ์ด — คำชุดเดียวกับถังผลโทร (บอกว่าไป / บอกว่าไม่ไป) */
 /** 🔴 คำเดียวกับช่องของแผงขั้นตอน (6 ต.ค. 2569 "เอาคำให้ตรงกันไปเลย") */
 export const COMPLETION_REASON_SHORT: Record<CompletionReason, string> = {
-  closed_success: 'ปิดงานว่าไปแล้ว',
-  ai_going: 'ตอบว่าไป',
-  ai_not_going: 'ตอบว่าไม่ไป',
+  closed_success: 'ไปแล้ว',
+  ai_going: 'ไป',
+  ai_not_going: 'ไม่ไป',
   needs_human: 'ต้องคนตาม',
   no_answer: 'ไม่รับสาย',
   called_no_close: 'สรุปไม่ได้',

@@ -145,7 +145,7 @@ describe('หน้ารายวัน — สายที่ต้องต�
     expect(within(items[0]).getByText('สายที่ 1')).toBeTruthy();
     expect(within(items[0]).getByText('สายที่ 2')).toBeTruthy();
     // 🔴 ผลของสาย 1 ต้องไม่ลามไปทับสาย 2 — ช่องคำตอบมีข้อความของสาย 1 ช่องเดียว
-    expect(within(items[0]).getByText('ตอบว่าไป')).toBeTruthy();
+    expect(within(items[0]).getByText('ไป')).toBeTruthy();
     expect(within(items[0]).getByText('รอโทร · เลยเวลานัด')).toBeTruthy();
     expect(within(items[0]).getAllByText(/ผู้รับสายบอกว่าไปแน่นอน/)).toHaveLength(1);
     // บรรทัดของทั้งสามคอลัมน์ต้องเท่ากัน (บรรทัดที่ N = สายเดียวกัน)
@@ -157,7 +157,7 @@ describe('หน้ารายวัน — สายที่ต้องต�
       twoRounds({ call_status: 'completed', call_outcome: 'declined', call_summary: 'ได้งานที่อื่นใกล้บ้านกว่าแล้ว' }),
     );
     const first = dayRows()[0];
-    expect(within(first).getByText('ตอบว่าไม่ไป')).toBeTruthy();
+    expect(within(first).getByText('ไม่ไป')).toBeTruthy();
     expect(within(first).getByText(/ได้งานที่อื่นใกล้บ้านกว่าแล้ว/)).toBeTruthy();
   });
 
@@ -250,8 +250,8 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     showMonthView();
     const monthCell = screen.getAllByRole('cell')[0];
     expect(within(monthCell).getByText('3 สาย')).toBeTruthy();
-    expect(within(monthCell).getByText('ตอบว่าไป 1')).toBeTruthy();
-    expect(within(monthCell).getByText('ตอบว่าไม่ไป 1')).toBeTruthy();
+    expect(within(monthCell).getByText('ไป 1')).toBeTruthy();
+    expect(within(monthCell).getByText('ไม่ไป 1')).toBeTruthy();
     expect(within(monthCell).getByText('ไม่รับสาย 1')).toBeTruthy();
   });
 
@@ -261,7 +261,7 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     ]);
     showMonthView();
     const dayCells = screen.getAllByRole('cell').slice(1);
-    expect(dayCells.some((c) => within(c).queryByText('ตอบว่าไม่ไป'))).toBe(true);
+    expect(dayCells.some((c) => within(c).queryByText('ไม่ไป'))).toBe(true);
     expect(dayCells.some((c) => within(c).queryByText(/ยกเลิก — ไม่ไปแล้ว/))).toBe(false);
   });
 
@@ -269,7 +269,7 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     renderCalendar(twoRounds());
     showMonthView();
     const legend = within(screen.getByRole('group', { name: 'ความหมายของสี' }));
-    for (const w of ['ตอบว่าไป', 'ตอบว่าไม่ไป', 'ไม่รับสาย', 'สรุปไม่ได้', 'รอโทร · เลยเวลานัด', 'ยกเลิก']) {
+    for (const w of ['ไป', 'ไม่ไป', 'ไม่รับสาย', 'สรุปไม่ได้', 'รอโทร · เลยเวลานัด', 'ยกเลิก']) {
       expect(legend.getByText(w)).toBeTruthy();
     }
   });
@@ -514,8 +514,8 @@ describe('ตำหนิ 11 ก.ย. 2569 — รวมสายของคน
     expect(row.getAttribute('data-category')).toBe('lost');
     expect(row.className).toContain(TONE.danger.wash.split(' ')[0]);
     // แต่ผลของทั้งสองรอบยังอ่านได้ในแถว
-    expect(within(row).getByText('ตอบว่าไป')).toBeTruthy();
-    expect(within(row).getByText('ตอบว่าไม่ไป')).toBeTruthy();
+    expect(within(row).getByText('ไป')).toBeTruthy();
+    expect(within(row).getByText('ไม่ไป')).toBeTruthy();
   });
 
   it('กรองรอบแล้วแถวเหลือเฉพาะรอบนั้น', () => {
@@ -587,7 +587,7 @@ describe('แผน 20/20 — คำตอบต้องอยู่บนจ�
   it('🔴 ยังไม่มีผลเดือนนี้ ⇒ วงกลมยังอยู่ ขึ้น 0% · ไม่มีกล่อง "ยังไม่มีผลเดือนนี้"', () => {
     renderCalendar([entry({ id: 'a', call_round: 1 })]);
     expect(screen.queryByText('ยังไม่มีผลเดือนนี้')).toBeNull();
-    expect(screen.getByRole('img', { name: 'ตอบว่าไป' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'ไป' })).toBeTruthy();
     expect(screen.getByText('0%')).toBeTruthy();
   });
 
@@ -600,7 +600,7 @@ describe('แผน 20/20 — คำตอบต้องอยู่บนจ�
 
   it('มีผลแล้ว ⇒ วงกลมกลับมา', () => {
     renderCalendar([entry({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' })]);
-    expect(screen.getByRole('img', { name: 'ตอบว่าไป' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'ไป' })).toBeTruthy();
     expect(screen.queryByText('ยังไม่มีผลเดือนนี้')).toBeNull();
   });
 
@@ -652,13 +652,13 @@ describe('ช่องว่างที่เหลือจากรอบว�
  * ของเดิมนับ `acknowledged` เป็น "ตอบว่าไป" ทั้งกอง ⇒ วงโกหก
  */
 describe('ผลของเดือน = นิยามเดียวกับกล่องขั้นตอนของสาย (เจ้าของ 6 ต.ค. 2569)', () => {
-  it('🔴 4 ช่อง ตอบว่าไป / ตอบว่าไม่ไป / ไม่รับสาย / สรุปไม่ได้ · ไม่มีถังละเอียด 7 ถัง', () => {
+  it('🔴 4 ช่อง ไป / ไม่ไป / ไม่รับสาย / สรุปไม่ได้ · ไม่มีถังละเอียด 7 ถัง', () => {
     renderCalendar([
       entry({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' }),
       entry({ id: 'b', call_round: 1, recipient_phone: '0899999998', recipient_name: 'คนที่สอง', call_status: 'failed', call_outcome: 'no_answer' }),
     ]);
     const box = screen.getByTestId('month-result-boxes');
-    expect(within(box).getByText('ตอบว่าไป').closest('div')!.textContent).toContain('1');
+    expect(within(box).getByText('ไป').closest('div')!.textContent).toContain('1');
     expect(within(box).getByText('ไม่รับสาย').closest('div')!.textContent).toContain('1');
     expect(within(box).getByText('สรุปไม่ได้').closest('div')!.textContent).toContain('0');
     expect(screen.getByText('จาก 2 สายที่มีผล')).toBeTruthy();
@@ -884,7 +884,7 @@ describe('ปุ่มลงผลของสายที่คนโทร (�
     );
     expect(screen.queryByTestId('staff-quick')).toBeNull();
     // ป้ายตัวเดียวกับแผง + "· คนโทร" (6 ต.ค. 2569)
-    expect(screen.getByText('ตอบว่าไป · คนโทร')).toBeTruthy();
+    expect(screen.getByText('ไป · คนโทร')).toBeTruthy();
     // ชื่อเล่นแทนอีเมล (QA รอบ 2 ข้อ 40)
     expect(screen.getByText(/น้ำหวาน · .*15:40 น\./)).toBeTruthy();
     expect(screen.queryByText(/staff@example\.com/)).toBeNull();
@@ -952,12 +952,12 @@ describe('การ์ดจบแล้ว (7 ต.ค. 2569: แท็บตา
     expect(names.some((t) => t.includes('คนที่สาม'))).toBe(false);
     expect(names.some((t) => t.includes('คนที่สี่'))).toBe(false);
     const card = screen.getByTestId('follow-day-done');
-    expect(within(card).getByRole('button', { name: /ตอบว่าไป 1/ })).toBeTruthy();
-    expect(within(card).getByRole('button', { name: /ตอบว่าไม่ไป 1/ })).toBeTruthy();
+    expect(within(card).getByRole('button', { name: /^ไป 1/ })).toBeTruthy();
+    expect(within(card).getByRole('button', { name: /ไม่ไป 1/ })).toBeTruthy();
     expect(within(card).getByRole('button', { name: /ยกเลิก 1/ })).toBeTruthy();
     expect(card.textContent).toContain('ไปแล้ว');
     expect(card.textContent).toContain('คนปิดงาน');
-    fireEvent.click(within(card).getByRole('button', { name: /ตอบว่าไม่ไป 1/ }));
+    fireEvent.click(within(card).getByRole('button', { name: /ไม่ไป 1/ }));
     expect(card.textContent).toContain('คนที่สี่');
     expect(card.textContent).toContain('AI');
     fireEvent.click(within(card).getByRole('button', { name: /ยกเลิก 1/ }));

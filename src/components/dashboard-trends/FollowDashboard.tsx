@@ -212,7 +212,7 @@ const FollowDashboard: React.FC<{ refreshKey?: number }> = ({ refreshKey = 0 }) 
             <TrendKpiCard label="ลงติดตาม" unit="คน" value={now.registered} previous={prev.registered} tone="violet" spark={reg.map((p) => p.value)} />
             <TrendKpiCard label="โทรแล้ว" unit="สาย" value={now.called} previous={prev.called} tone="primary" spark={called.map((p) => p.value)} />
             <TrendKpiCard label="ติดต่อได้" value={rate(now.connected, now.called)} previous={rate(prev.connected, prev.called)} asRate tone="teal" foot={`${fmt(now.connected)} จาก ${fmt(now.called)} สาย`} />
-            <TrendKpiCard label="ปิดงานว่าไปแล้ว" unit="คน" value={now.success} previous={prev.success} tone="success" spark={success.map((p) => p.value)} />
+            <TrendKpiCard label="ไปแล้ว" unit="คน" value={now.success} previous={prev.success} tone="success" spark={success.map((p) => p.value)} />
             <TrendKpiCard label="อัตราปิดงานว่าไป" value={rate(now.success, now.completed)} previous={rate(prev.success, prev.completed)} asRate tone="success" foot={`${fmt(now.success)} จาก ${fmt(now.completed)} ที่ปิดงาน`} />
             <TrendKpiCard label="ปิดงานว่าไม่ไป · ยกเลิก · ลา" unit="คน" value={now.dropped} previous={prev.dropped} polarity="down-good" tone="danger" spark={dropped.map((p) => p.value)} />
           </div>
@@ -247,7 +247,7 @@ const FollowDashboard: React.FC<{ refreshKey?: number }> = ({ refreshKey = 0 }) 
           >
             <Card className="space-y-4 rounded-2xl p-4">
               <TrendChart
-                ariaLabel="ลงติดตาม โทรแล้ว ปิดงานว่าไปแล้ว และปิดงานว่าไม่ไป ต่องวด"
+                ariaLabel="ลงติดตาม โทรแล้ว ไปแล้ว และไม่ไป ต่องวด"
                 data={reg.map((p, i) => ({
                   label: p.label,
                   registered: p.value,

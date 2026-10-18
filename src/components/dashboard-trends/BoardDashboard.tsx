@@ -356,7 +356,7 @@ const BoardDashboard: React.FC<{
                 { key: 'released', label: 'ประกาศ', align: 'right' },
                 { key: 'registered', label: 'ลงติดตาม', align: 'right' },
                 // คำเดียวกับ Dashboard ติดตาม (`FOLLOW_METRIC_LABEL` · QA 10 ต.ค. 2569 เดิม "ไปถึงแล้ว")
-                { key: 'success', label: 'ปิดงานว่าไปแล้ว', align: 'right' },
+                { key: 'success', label: 'ไปแล้ว', align: 'right' },
                 { key: 'rate', label: 'อัตราปิดงานว่าไป', align: 'right' },
                 { key: 'delta', label: 'งานเทียบช่วงก่อน', align: 'right' },
               ]}

@@ -34,7 +34,7 @@ describe('🔴 สายที่ระบบหยุดเพราะสา�
   const answered = entry({ id: 'a', scheduled_at: '2026-10-15T00:00:00Z', call_status: 'completed', call_outcome: 'declined' });
   const stopped = entry({ id: 'b', scheduled_at: '2026-10-15T01:00:00Z', call_status: 'cancelled' });
 
-  it('ป้าย "ไม่โทร · สาย 07:00 ตอบว่าไม่ไปแล้ว" · state จบ (ยกเลิก)', () => {
+  it('ป้าย "ไม่โทร · สาย 07:00 ไม่ไปแล้ว" · state จบ (ยกเลิก)', () => {
     const [row] = rowsOf([answered, stopped]);
     const r = row.rounds.find((x) => x.entry.id === 'b')!;
     expect(r.state).toBe('cancelled');

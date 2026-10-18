@@ -34,6 +34,7 @@ import {
   periodLabel,
   periodModeOf,
   quickKeyOf,
+  rangeText,
   unitSpan,
   type PeriodUnit,
   type PeriodWindow,
@@ -129,8 +130,10 @@ const PeriodPicker: React.FC<{
       <PopoverTrigger asChild>
         {/* ไอคอนปฏิทินอย่างเดียว (เจ้าของสั่ง 30 ก.ย. 2569: *"ไม่เอาคำว่า 7 วันล่าสุด เอาเป็นไอคอน calendar"*)
             ช่วงที่เลือกอยู่ยังบอกได้ตอนจี้ (`title`) และในชื่อของปุ่มสำหรับโปรแกรมอ่านจอ · หัวกราฟบอกช่วงวันจริงอีกที่ */}
-        <Button type="button" variant="outline" size="icon" aria-label={`ช่วงเวลา ${label}`} title={label}>
+        {/* 18 ต.ค. 2569 เจ้าของเคาะ: ไอคอน + ช่วงวันที่ (กฎปุ่มต้องมีคำ 15 ต.ค. แทนคำสั่งไอคอนอย่างเดียว 30 ก.ย.) */}
+        <Button type="button" variant="outline" size="sm" aria-label={`ช่วงเวลา ${label}`} title={label}>
           <CalendarDays aria-hidden />
+          <span className="tabular-nums">{value.from && value.to ? rangeText(value.from, value.to) : label}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className={cn('w-auto max-w-[calc(100vw-2rem)] space-y-3 p-3', EVEN_TYPE)}>

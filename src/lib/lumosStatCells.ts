@@ -56,9 +56,9 @@ export function lumosFixedStatCells(s?: LumosJobCallSummaryRow): LumosStatCell[]
     { key: 'sent', label: 'ส่ง', value: sent, tone: 'neutral', title: 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)' },
     { key: 'called', label: 'โทรแล้ว', value: called, tone: 'primary', title: 'มีผลโทรกลับมาจริง' },
     { key: 'waiting', label: 'เหลือ', value: waiting, tone: 'warn', title: 'รอ AI โทร (ส่งแล้วยังไม่มีผลกลับ)' },
-    { key: 'confirmed', label: 'โอเค', value: s?.confirmed ?? 0, tone: 'success', title: 'สนใจงาน' },
+    { key: 'confirmed', label: 'ไป', value: s?.confirmed ?? 0, tone: 'success', title: 'สนใจงาน' },
     { key: 'declined', label: 'ไม่ไป', value: s?.declined ?? 0, tone: 'danger', title: 'ไม่สนใจ/ปฏิเสธ' },
-    { key: 'no_answer', label: 'ไม่รับ', value: s?.no_answer ?? 0, tone: 'warn', title: 'ไม่รับสาย — ควรโทรซ้ำ' },
+    { key: 'no_answer', label: 'ไม่รับสาย', value: s?.no_answer ?? 0, tone: 'warn', title: 'ไม่รับสาย — ควรโทรซ้ำ' },
   ];
 }
 

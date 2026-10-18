@@ -44,8 +44,8 @@ export type ResultSlice = { key: string; label: string; tone: ToneKey; value: nu
  * สายไม่ว่าง 21 · โทรไม่ออก 18) + ผลที่หน้าติดตามนับไม่รับสาย + คนลงผล "ติดต่อไม่ได้"
  */
 export const FOLLOW_RESULT_COLS: ReadonlyArray<{ key: FollowBucketKey; label: string; tone: ToneKey; note?: string }> = [
-  { key: 'went', label: 'ตอบว่าไป', tone: FOLLOW_MATRIX_COL_TONE.went },
-  { key: 'notWent', label: 'ตอบว่าไม่ไป', tone: FOLLOW_MATRIX_COL_TONE.notWent },
+  { key: 'went', label: 'ไป', tone: FOLLOW_MATRIX_COL_TONE.went },
+  { key: 'notWent', label: 'ไม่ไป', tone: FOLLOW_MATRIX_COL_TONE.notWent },
   // วันหยุด · ลางาน (14 ต.ค. 2569 · คนลงผล) — ไม่ปนกับไม่ไป
   { key: 'dayOff', label: FOLLOW_MATRIX_COL_LABEL.dayOff, tone: FOLLOW_MATRIX_COL_TONE.dayOff },
   { key: 'leave', label: FOLLOW_MATRIX_COL_LABEL.leave, tone: FOLLOW_MATRIX_COL_TONE.leave },
@@ -53,7 +53,7 @@ export const FOLLOW_RESULT_COLS: ReadonlyArray<{ key: FollowBucketKey; label: st
   { key: 'unclear', label: 'สรุปไม่ได้', tone: FOLLOW_MATRIX_COL_TONE.unclear },
   {
     key: 'failed',
-    label: 'ล้มเหลว',
+    label: 'ไม่รับสาย',
     tone: FOLLOW_MATRIX_COL_TONE.noAnswer,
     // คำมาตรฐาน "รับแล้วเงียบ" (QA รอบ 3 ข้อ 29 · เดิม "รับแต่ไม่พูด")
     note: 'ติดต่อไม่ได้ · ไม่รับสาย · สายไม่ว่าง · รับแล้วเงียบ · โทรไม่ออก',

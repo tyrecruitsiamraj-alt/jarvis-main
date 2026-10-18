@@ -200,7 +200,7 @@ const BrandingAppearanceTab: React.FC = () => {
                   setSyncing(false);
                   setSyncFeedback({
                     ok: r.ok,
-                    message: r.message || (r.ok ? 'สำเร็จ' : 'ล้มเหลว'),
+                    message: r.message || (r.ok ? 'สำเร็จ' : 'ไม่สำเร็จ'),
                   });
                 });
               }}

@@ -230,7 +230,7 @@ describe('roundResultLabel — ช่องปฏิทินต้องบอ�
 
   it('ผลการโทรเป็นคำไทย (ชุดคำของงานติดตาม — ดู describe ท้ายไฟล์)', () => {
     expect(label({ call_outcome: 'acknowledged' })).toBe('รับสายแล้ว');
-    expect(label({ call_outcome: 'declined' })).toBe('ตอบว่าไม่ไป');
+    expect(label({ call_outcome: 'declined' })).toBe('ไม่ไป');
     // ชุดคำมาตรฐาน (QA 10 ต.ค. 2569): ผิดคน/เบอร์ผิด/ไม่ใช่เจ้าตัว = คำเดียว
     expect(label({ call_outcome: 'wrong_person' })).toBe('ไม่ใช่เจ้าตัว');
   });
@@ -259,12 +259,12 @@ describe('คำผลโทรฉบับงานติดตาม (เจ�
     return roundResultLabel(rows[0].rounds[0]);
   };
 
-  it('🔴 declined ในงานติดตาม = ตอบว่าไม่ไป ไม่ใช่ "ไม่สนใจ" (คำของงานหาคน) · ไม่ใช่ "ยกเลิก" (ชนช่องยกเลิก · 6 ต.ค. 2569)', () => {
-    expect(label({ call_outcome: 'declined' })).toBe('ตอบว่าไม่ไป');
+  it('🔴 declined ในงานติดตาม = ไม่ไป ไม่ใช่ "ไม่สนใจ" (คำของงานหาคน) · ไม่ใช่ "ยกเลิก" (ชนช่องยกเลิก · 6 ต.ค. 2569)', () => {
+    expect(label({ call_outcome: 'declined' })).toBe('ไม่ไป');
   });
 
-  it('confirmed = ตอบว่าไป (คำมาตรฐาน · QA รอบ 3 ข้อ 13) · acknowledged = รับสายแล้ว (ไม่เขียนให้ดูจบดีเกินจริง)', () => {
-    expect(label({ call_outcome: 'confirmed' })).toBe('ตอบว่าไป');
+  it('confirmed = ไป (คำมาตรฐาน · QA รอบ 3 ข้อ 13) · acknowledged = รับสายแล้ว (ไม่เขียนให้ดูจบดีเกินจริง)', () => {
+    expect(label({ call_outcome: 'confirmed' })).toBe('ไป');
     expect(label({ call_outcome: 'acknowledged' })).toBe('รับสายแล้ว');
   });
 
@@ -290,7 +290,7 @@ describe('สีของรอบ — ต้องแปลว่า "ดี/�
     expect(tone({ scheduled_at: '2026-09-01T02:00:00Z' })).toBe('orange');
   });
 
-  it('ยืนยันว่าไป/ปิดงานว่าไปแล้ว = เขียว', () => {
+  it('ยืนยันว่าไป/ไปแล้ว = เขียว', () => {
     expect(tone({ call_outcome: 'confirmed' })).toBe('success');
     expect(tone({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'went' })).toBe('success');
   });
@@ -386,7 +386,7 @@ describe('ผลการโทรทุกสาย + สรุปจาก AI'
       NOW,
     )[0].rounds[0];
     expect(roundTone(r)).toBe('success');
-    expect(roundResultLabel(r)).toBe('ตอบว่าไป');
+    expect(roundResultLabel(r)).toBe('ไป');
   });
 
   it('ไม่ไปแล้ว (declined) = แดง ห้ามเขียวเพราะแค่ "มีผลแล้ว"', () => {
@@ -395,7 +395,7 @@ describe('ผลการโทรทุกสาย + สรุปจาก AI'
       NOW,
     )[0].rounds[0];
     expect(roundTone(r)).toBe('danger');
-    expect(roundResultLabel(r)).toBe('ตอบว่าไม่ไป');
+    expect(roundResultLabel(r)).toBe('ไม่ไป');
   });
 
   it('roundAiSummary คืนสรุปที่ AI เขียน · ว่าง/ช่องว่างล้วน = null (ห้ามขึ้นกล่องเปล่า)', () => {
@@ -425,7 +425,7 @@ describe('ผลการโทรทุกสาย + สรุปจาก AI'
             scheduled_at: '2026-09-01T02:00:00Z',
             call_status: 'completed',
             call_outcome: 'confirmed',
-            call_summary: 'ตอบว่าไปแน่นอน',
+            call_summary: 'ไปแน่นอน',
           }),
           entry({
             id: 'r2',
@@ -443,7 +443,7 @@ describe('ผลการโทรทุกสาย + สรุปจาก AI'
     // ทั้งสองสายอยู่ในแถวเดียวกัน เรียงตามเวลานัด
     expect(row.rounds).toHaveLength(2);
     expect(roundTone(row.rounds[0])).toBe('success');
-    expect(roundAiSummary(row.rounds[0])).toBe('ตอบว่าไปแน่นอน');
+    expect(roundAiSummary(row.rounds[0])).toBe('ไปแน่นอน');
     // สายที่ 2 ยังไม่มีผล — ต้องไม่ลบผลของสายที่ 1 ทิ้ง และต้องไม่แต่งสรุปให้
     expect(roundAiSummary(row.rounds[1])).toBeNull();
     expect(roundTone(row.rounds[1])).not.toBe('success');
@@ -609,13 +609,13 @@ describe('🔴 คำของหมวดผล ต้องไม่ชนก�
     }
   });
 
-  it('หมวด "ตอบว่าไป" กว้างกว่าช่อง "ไป" ของ Pipeline จริง — จึงต้องคนละคำ', () => {
+  it('หมวด "ไป" กว้างกว่าช่อง "ไป" ของ Pipeline จริง — จึงต้องคนละคำ', () => {
     // ผลโทรว่ายืนยันจะไป แต่ยังไม่ได้ปิดงาน
     const r = buildFollowPlanningRows(
       groupFollowEntries([entry({ call_status: 'completed', call_outcome: 'confirmed' })], NOW),
       NOW,
     )[0].rounds[0];
-    expect(callCategory(r)).toBe('agreed'); // นับใน "ตอบว่าไป"
+    expect(callCategory(r)).toBe('agreed'); // นับใน "ไป"
     expect(inFollowRoundBucket(r.entry, 'went')).toBe(false); // แต่ไม่นับในช่อง "ไป"
   });
 
@@ -671,7 +671,7 @@ describe('callVerdict / summarize — สามคำตอบบนหัวห
  * (ตัวประกอบทั้งสองเป็น pure function จึงคุมที่นี่ ส่วนการวาดจอคุมใน .test.tsx)
  */
 describe('callCategoryWashTone — สีทั้งแถว', () => {
-  it('เขียว=ตอบว่าไป · แดง=ตอบว่าไม่ไป · เหลือง=ไม่ได้คำตอบ (คำของเจ้าของ 7 ก.ย. 2569)', () => {
+  it('เขียว=ไป · แดง=ไม่ไป · เหลือง=ไม่ได้คำตอบ (คำของเจ้าของ 7 ก.ย. 2569)', () => {
     expect(callCategoryWashTone('agreed')).toBe('success');
     expect(callCategoryWashTone('lost')).toBe('danger');
     expect(callCategoryWashTone('unreachable')).toBe('warn');

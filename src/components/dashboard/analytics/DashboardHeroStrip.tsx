@@ -39,7 +39,7 @@ const HERO_BUCKET: Record<
   { urgency: string; num: string; numLight: string }
 > = {
   '30+': { urgency: 'ด่วนมาก', num: 'text-red-400', numLight: 'text-red-700' },
-  '16-30': { urgency: 'เริ่มด่วน', num: 'text-orange-300', numLight: 'text-orange-700' },
+  '16-30': { urgency: 'ด่วน', num: 'text-orange-300', numLight: 'text-orange-700' },
   '8-15': { urgency: 'เริ่มด่วน', num: 'text-amber-300', numLight: 'text-amber-700' },
   '1-7': { urgency: 'ยังไม่ด่วน', num: 'text-emerald-300', numLight: 'text-emerald-700' },
   advance: { urgency: 'รอได้', num: 'text-sky-300', numLight: 'text-sky-700' },

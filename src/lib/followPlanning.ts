@@ -176,7 +176,8 @@ export function stoppedByEarlierAnswer(
 /** "ไม่โทร · สาย 07:00 ตอบวันหยุดแล้ว" */
 export function stoppedLabel(stopped: NonNullable<FollowPlanningRound['stoppedBy']>): string {
   const ans = FOLLOW_CALL_CATEGORY_LABEL[stopped.category];
-  const said = ans.startsWith('ตอบ') ? ans : `ตอบ${ans}`;
+  // ไป/ไม่ไป (คำชุดเดียวทั้งระบบ 18 ต.ค. 2569) อ่านเป็น "ตอบว่าไม่ไปแล้ว" · อื่น ๆ "ตอบวันหยุดแล้ว"
+  const said = ans.startsWith('ตอบ') ? ans : ans === 'ไป' || ans === 'ไม่ไป' ? `ตอบว่า${ans}` : `ตอบ${ans}`;
   return `ไม่โทร · ${stopped.time ? `สาย ${stopped.time} ` : 'สายก่อนหน้า'}${said}แล้ว`;
 }
 
@@ -768,8 +769,8 @@ export type FollowCallCategory =
  * มีด่านเทสต์บังคับความต่างที่ `tests/api/followPlanning.test.ts`
  */
 export const FOLLOW_CALL_CATEGORY_LABEL: Record<FollowCallCategory, string> = {
-  agreed: 'ตอบว่าไป',
-  lost: 'ตอบว่าไม่ไป',
+  agreed: 'ไป',
+  lost: 'ไม่ไป',
   unreachable: 'ไม่รับสาย',
   // 🔴 ขึ้นต้นด้วย "รอโทร" = คำของช่องบนแผง (ช่องรอโทร = สามหมวดนี้รวมกัน · 6 ต.ค. 2569)
   waiting: 'รอโทร · ยังไม่ถึงเวลา',

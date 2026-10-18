@@ -94,7 +94,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {job.urgency === 'urgent' ? (
-            <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-sm font-medium text-destructive">ด่วน</span>
+            <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-sm font-medium text-destructive">ฉุกเฉิน</span>
           ) : null}
           {/* 🔴 ข้อความ/สีอายุจาก getJobAgeChipInfo ที่เดียว (ห้ามสเกลสีอายุชุดที่สอง) */}
           <span className={cn('rounded-md border px-1.5 py-0.5 text-sm font-medium', JOB_AGE_CHIP_META[age.level].chipCls)} title={age.title}>

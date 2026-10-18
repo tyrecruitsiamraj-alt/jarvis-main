@@ -280,7 +280,8 @@ const FACETS: readonly FacetDef[] = [
     label: 'ความเร่งด่วน',
     ui: 'check',
     order: ['urgent', 'advance'],
-    labelOf: (v) => (v === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'),
+    // ชนิดใบขอ = ฉุกเฉิน/ล่วงหน้า (คำเดียวทั้งระบบ · 18 ต.ค. 2569 — "ด่วน" เป็นคำของอายุใบขอ)
+    labelOf: (v) => (v === 'urgent' ? 'ฉุกเฉิน' : 'ล่วงหน้า'),
     values: (job) => [job.urgency === 'urgent' ? 'urgent' : 'advance'],
   },
   {

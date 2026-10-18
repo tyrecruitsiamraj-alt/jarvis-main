@@ -75,7 +75,9 @@ import {
 import { cleanedAddressSummary } from '@/lib/districtMatch';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
+import { fetchSiamrajClosedRequests, fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
+import { friendlyErrorText } from '@/lib/friendlyError';
+import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
 import { requestNoMatchesSearch } from '@/lib/siamrajRequestNo';
 import { getTotalPages } from '@/lib/pagination';
 import {
@@ -246,7 +248,36 @@ const JobListPage: React.FC = () => {
   const [staffRosterRev, setStaffRosterRev] = useState(0);
 
   const [lookupJob, setLookupJob] = useState<JobRequest | null>(null);
-  const { jobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
+  const { jobs: openJobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
+  /**
+   * ใบที่ปิดแล้ว 30 วันล่าสุด — โหลดเมื่อเลือก "ปิดแล้ว"/"ทั้งหมด" (เจ้าของเคาะ 18 ต.ค. 2569 "เลือกปิดแล้วก็ต้องโชว์ปิดแล้วมาสิ่")
+   * เดิมฟีดมีแต่ใบเปิด ⇒ ตัวกรองปิดแล้วได้ 0 ทุกครั้ง · เส้นเดียวกับที่ Dashboard ใช้ (`?closed=1`)
+   */
+  const [closedJobs, setClosedJobs] = useState<JobRequest[] | null>(null);
+  const [closedLoading, setClosedLoading] = useState(false);
+  const [closedError, setClosedError] = useState<string | null>(null);
+  const [closedRev, setClosedRev] = useState(0);
+  const wantClosed = siamrajPrimary && filter !== 'active';
+  useEffect(() => {
+    if (!wantClosed) return;
+    let alive = true;
+    const to = toYmdBangkok(new Date());
+    const from = toYmdBangkok(new Date(Date.now() - 29 * 86_400_000));
+    setClosedLoading(true);
+    setClosedError(null);
+    fetchSiamrajClosedRequests(from, to)
+      .then((rows) => alive && setClosedJobs(rows))
+      .catch((e: unknown) => alive && setClosedError(friendlyErrorText(e, 'โหลดใบที่ปิดแล้วไม่สำเร็จ')))
+      .finally(() => alive && setClosedLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [wantClosed, closedRev]);
+  const jobs = useMemo(() => {
+    if (!wantClosed || !closedJobs) return openJobs;
+    const seen = new Set(openJobs.map((j) => j.id));
+    return [...openJobs, ...closedJobs.filter((j) => !seen.has(j.id))];
+  }, [openJobs, closedJobs, wantClosed]);
 
   useEffect(() => {
     saveUnitLastPath('/jobs/list');
@@ -526,6 +557,8 @@ const JobListPage: React.FC = () => {
       </div>
 
       <div className="px-4 md:px-6 space-y-4">
+        {wantClosed && closedLoading ? <p className="text-sm text-muted-foreground">กำลังโหลดใบที่ปิดแล้ว…</p> : null}
+        {wantClosed && closedError ? <LoadErrorNotice message={closedError} onRetry={() => setClosedRev((n) => n + 1)} /> : null}
         {loadError && (
           <div className="text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
             {loadError}
@@ -575,7 +608,7 @@ const JobListPage: React.FC = () => {
           >
             <option value="all">ทั้งหมด</option>
             <option value="active">ยังดำเนินการอยู่</option>
-            <option value="closed">ปิดแล้ว</option>
+            <option value="closed">ปิดแล้ว (30 วันล่าสุด)</option>
           </FilterSelect>
 
           {siamrajPrimary ? (

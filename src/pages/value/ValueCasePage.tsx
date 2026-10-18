@@ -55,6 +55,9 @@ const SAVED_AT = new Intl.DateTimeFormat("th-TH", {
 });
 
 const baht = (n: number) => `${NUM.format(Math.round(n))} บาท`;
+/** ส่วนต่าง: ติดลบ = เขียนเป็นคำ ไม่ใช่เครื่องหมายลบ (เจ้าของเคาะ 18 ต.ค. 2569 "คงตัวเลขจริง + เติมคำว่า ต้นทุนสูงกว่าเดิม") */
+const savingText = (n: number) =>
+  Math.round(n) < 0 ? `ต้นทุนสูงกว่าเดิม ${NUM.format(Math.abs(Math.round(n)))} บาท` : baht(n);
 const monthLabel = (ym: string) =>
   MONTH.format(new Date(`${ym}-15T00:00:00+07:00`));
 
@@ -247,7 +250,7 @@ const ValueCasePage: React.FC = () => {
               <p
                 className={cn("text-2xl font-medium tabular-nums", savingTone)}
               >
-                {baht(result.savingMonthly)}
+                {savingText(result.savingMonthly)}
               </p>
             )}
             <Formula>
@@ -263,7 +266,7 @@ const ValueCasePage: React.FC = () => {
               <p
                 className={cn("text-2xl font-medium tabular-nums", savingTone)}
               >
-                {baht(result.savingYearly)}
+                {savingText(result.savingYearly)}
               </p>
             )}
             <Formula>ต่อเดือน × 12</Formula>

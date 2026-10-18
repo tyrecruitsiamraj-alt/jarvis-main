@@ -61,8 +61,8 @@ export const FOLLOW_MATRIX_ROW_LABEL: Record<FollowMatrixRowKey, string> = {
 
 export const FOLLOW_MATRIX_COL_LABEL: Record<FollowMatrixCol, string> = {
   total: 'ทั้งหมด',
-  went: 'ตอบว่าไป',
-  notWent: 'ตอบว่าไม่ไป',
+  went: 'ไป',
+  notWent: 'ไม่ไป',
   dayOff: 'วันหยุด',
   leave: 'ลางาน',
   noAnswer: 'ไม่รับสาย',

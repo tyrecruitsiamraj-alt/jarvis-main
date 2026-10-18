@@ -1405,7 +1405,7 @@ const FollowPlanningCalendar: React.FC<{
              * แทนของ 12 ก.ย. ที่สลับวงกลมไปเป็นกล่องข้อความ + ประโยคอธิบาย (สูงไม่เท่าวงกลม)
              */}
             <div className="mt-3">
-              <Donut percent={monthWithResult > 0 ? (monthBoxes.went / monthWithResult) * 100 : 0} caption="ตอบว่าไป" />
+              <Donut percent={monthWithResult > 0 ? (monthBoxes.went / monthWithResult) * 100 : 0} caption="ไป" />
             </div>
             <p className="mt-2 text-[11px] leading-snug text-muted-foreground">{`จาก ${monthWithResult.toLocaleString('th-TH')} สายที่มีผล`}</p>
 

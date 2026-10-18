@@ -174,7 +174,7 @@ describe('🔴 ห้ามปุ่มหลอก · หัวข้อตา�
     const rows = [job(), job(), job()];
     const v = buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).find((x) => x.key === 'urgency')!;
     expect(v.options.map((o) => [o.label, o.count])).toEqual([
-      ['ด่วน', 0],
+      ['ฉุกเฉิน', 0],
       ['ล่วงหน้า', 3],
     ]);
   });
