@@ -235,7 +235,7 @@ export default function LumosPipelineSection({
                 {INTEREST_MICRO_LABEL.said_yes} {ofBase(rates.interest, now.micro.said_yes, now.micro.talked, 'สายที่ได้คุย')}
               </TrendBadge>
               <TrendBadge>
-                ได้นัด {fmt(now.appointment)} · มาตามนัด {fmt(now.showed)}
+                ได้นัด {fmt(now.appointment)} · มา {fmt(now.showed)}
               </TrendBadge>
             </div>
           </Card>

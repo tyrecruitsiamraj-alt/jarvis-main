@@ -444,6 +444,15 @@ const RmWorkspace: React.FC<{
     );
     return (r: PublicApplication) => (r.job_id ? (idx.get(r.job_id) ?? null) : null);
   }, [jobs]);
+  /** หน่วยงานจากใบขอ — ใบสมัครที่ไม่มี unit_name เคยโชว์ชื่อประกาศ/ตำแหน่งในคอลัมน์หน่วยงาน (QA 18 ต.ค. 2569) */
+  const unitOf = useMemo(() => {
+    if (!jobs || jobs.length === 0) return undefined;
+    const idx = buildJobKeyIndex(
+      jobs.map((j) => [j.id, (j.unit_name ?? '').trim() || null] as const),
+      (existing) => existing,
+    );
+    return (r: PublicApplication) => (r.job_id ? (idx.get(r.job_id) ?? null) : null);
+  }, [jobs]);
   const applicantFacts = useMemo<ApplicantFacetFacts>(
     () => ({ tab, now: new Date(), recruiterOf }),
     [tab, recruiterOf],
@@ -1064,6 +1073,7 @@ const RmWorkspace: React.FC<{
             exportCount={shown.length}
             /* แท็บติดตามนัดหมาย: "โหลดเป็น PDF" (4 ต.ค. 2569) · window.print + print CSS เฉพาะก้อน rm-print-area */
             onPrintPdf={tab === 'appointments' ? () => window.print() : undefined}
+            printDisabled={Boolean(loadError) || loading || rows.length === 0}
           />
           {/* นำเข้า Excel + รายงาน ขึ้นแถวหัวข้างปุ่มวันที่ (14 ต.ค. 2569) — หน้าตาเดียวกับปุ่มเดิมใน `RmSearchBar` */}
           {tab === 'candidates' && headerActionsSlot
@@ -1145,30 +1155,42 @@ const RmWorkspace: React.FC<{
                         <tr className={cn('text-left', DASH.tableHead)}>
                           <th className="px-3 py-2 font-medium">วันนัด</th>
                           <th className="px-3 py-2 text-center font-medium">นัดทั้งหมด</th>
+                          {/* รอผลมาก่อน — มือถือเห็นโดยไม่ต้องปัด (QA 18 ต.ค. 2569) */}
+                          <th className="px-3 py-2 text-center font-medium">รอผล</th>
                           <th className="px-3 py-2 text-center font-medium">มา</th>
                           <th className="px-3 py-2 text-center font-medium">ไม่มา</th>
                           <th className="px-3 py-2 text-center font-medium">เลื่อนนัด</th>
-                          <th className="px-3 py-2 text-center font-medium">รอผล</th>
+                          <th className="px-3 py-2 text-center font-medium">ผ่าน</th>
+                          <th className="px-3 py-2 text-center font-medium">ไม่ผ่าน</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {appointmentBoard.days.length === 0 ? (
+                        {/* โหลดล้ม = ไม่โชว์เลขรอบก่อน (QA 18 ต.ค. 2569) */}
+                        {loadError ? (
                           <tr className={cn('border-t', DASH.tableRow)}>
-                            <td colSpan={6} className={cn('px-3 py-3 text-center', DASH.cellMuted)}>
+                            <td colSpan={8} className={cn('px-3 py-3 text-center', DASH.cellMuted)}>
+                              โหลดไม่สำเร็จ
+                            </td>
+                          </tr>
+                        ) : appointmentBoard.days.length === 0 ? (
+                          <tr className={cn('border-t', DASH.tableRow)}>
+                            <td colSpan={8} className={cn('px-3 py-3 text-center', DASH.cellMuted)}>
                               ไม่มีนัด
                             </td>
                           </tr>
                         ) : null}
-                        {appointmentBoard.days.map((d) => (
+                        {(loadError ? [] : appointmentBoard.days).map((d) => (
                           <tr key={d.date} className={cn('border-t', DASH.tableRow)}>
                             <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cellStrong)}>
                               {formatYmdTh(d.date)}
                             </td>
                             <td className={cn('px-3 py-2 text-center tabular-nums', DASH.cell)}>{d.total}</td>
+                            <td className={cn('px-3 py-2 text-center tabular-nums', DASH.cellMuted)}>{d.pending}</td>
                             <td className={cn('px-3 py-2 text-center tabular-nums', TONE.success.value)}>{d.showed}</td>
                             <td className={cn('px-3 py-2 text-center tabular-nums', TONE.danger.value)}>{d.noShow}</td>
                             <td className={cn('px-3 py-2 text-center tabular-nums', TONE.warn.value)}>{d.rescheduled}</td>
-                            <td className={cn('px-3 py-2 text-center tabular-nums', DASH.cellMuted)}>{d.pending}</td>
+                            <td className={cn('px-3 py-2 text-center tabular-nums', TONE.success.value)}>{d.passed}</td>
+                            <td className={cn('px-3 py-2 text-center tabular-nums', TONE.danger.value)}>{d.notPassed}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1335,6 +1357,7 @@ const RmWorkspace: React.FC<{
                 onAction={onRowAction}
                 holdByRef={holdByRef}
                 onAttendance={onAttendance}
+                unitOf={unitOf}
                 recruiterOf={recruiterOf}
                 actionsOverride={cancelledView ? ['view', 'restore'] : undefined}
               />

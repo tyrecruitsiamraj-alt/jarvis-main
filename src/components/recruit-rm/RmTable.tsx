@@ -192,11 +192,13 @@ const RmTable: React.FC<{
   holdByRef?: Record<string, CallHold>;
   /** บันทึกผลติดตามนัด มา/ไม่มา (แท็บนัดหมาย · migration 089) */
   onAttendance?: (row: PublicApplication, result: AttendanceResult | ScreeningResult) => void;
+  /** หน่วยงานจากใบขอ (ใช้เมื่อใบสมัครไม่มี unit_name) */
+  unitOf?: (r: PublicApplication) => string | null;
   /** เจ้าของงาน = เจ้าหน้าที่สรรหาของใบขอที่สมัคร (ตัวเดียวกับหัวข้อกรอง "เจ้าหน้าที่สรรหา") */
   recruiterOf?: (r: PublicApplication) => string | null;
   /** ปุ่มต่อแถวแทนชุดของแท็บ — มุมมอง "ดูที่ยกเลิก" ใช้ ดูรายละเอียด + กู้คืน (4 ต.ค. 2569) */
   actionsOverride?: RmRowAction[];
-}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, holdByRef = {}, onAttendance, recruiterOf, actionsOverride }) => {
+}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, holdByRef = {}, onAttendance, recruiterOf, actionsOverride, unitOf }) => {
   const actions = actionsOverride ?? RM_ROW_ACTIONS[tab];
   /**
    * 🔴 แท็บผู้สมัครใช้ชุดคอลัมน์ที่เจ้าของสั่งเอง (30 ก.ย. 2569 · Choice "เอาตามที่ฉันสั่ง"):
@@ -226,7 +228,7 @@ const RmTable: React.FC<{
                 active ? 'ring-2 ring-ring' : 'opacity-75 hover:opacity-100',
               )}
             >
-              {k === 'showed' ? 'มาแล้ว' : 'ไม่มา'}
+              {ATTENDANCE_LABEL[k]}
             </button>
           );
         })}
@@ -317,7 +319,7 @@ const RmTable: React.FC<{
                   "นัด" = วันนัด + นัดที่ไหน/ลงใบไหน (ลิสต์ข้อ 9) ในช่องเดียว */}
               {/* ผลติดตามนัด มา/ไม่มา (migration 089) อยู่บรรทัดล่างของช่องเดียวกัน — เดิมเป็นคอลัมน์แยก
                   (แท็บนี้กว้างเกินช่องข้างแถบกรอง ~180px ที่จอ 1280 · 28 ก.ย. 2569) */}
-              {tab === 'appointments' ? <th className="px-1.5 py-2 font-medium">นัด · มาตามนัด</th> : null}
+              {tab === 'appointments' ? <th className="px-1.5 py-2 font-medium">นัด · มา/ไม่มา</th> : null}
               {/* stamp "โทรตอนไหน" — เฉพาะแท็บการติดต่อ (เจ้าของสั่ง 14 ส.ค. 2569:
                   "ปุ่มโทร เพื่อ Stamp ว่าโทรตอนไหน") · กดปุ่มโทร = จับ hold (heldAt =
                   เวลาที่กด) · มีผลแล้ว = last_call_at (เวลาบันทึกผลล่าสุด) */}
@@ -360,7 +362,9 @@ const RmTable: React.FC<{
               const unitCell = (
                 <td className={cn('px-1.5 py-2', DASH.cell)} title={applicationJobLabel(r)}>
                   <span className="flex min-w-32 items-start gap-1.5">
-                    <span className="line-clamp-3 break-words">{dashIfEmpty(applicationUnitLabel(r))}</span>
+                    <span className="line-clamp-3 break-words">
+                      {dashIfEmpty((r.unit_name ?? '').trim() ? applicationUnitLabel(r) : (unitOf?.(r) ?? applicationUnitLabel(r)))}
+                    </span>
                     {r.has_document ? (
                       <FileText className={cn('h-3.5 w-3.5 shrink-0', DASH.muted)} aria-label="มีเอกสารแนบ" />
                     ) : null}
@@ -510,8 +514,9 @@ const RmTable: React.FC<{
                           );
                         })()}
                         <span className={cn('line-clamp-2 min-w-32 break-words text-xs', DASH.cellMuted)}>
+                          {/* "ลงงาน …" นำหน้า — เดิม "หาล่วงหน้า" ลอยใต้วันที่ไม่รู้ว่าคืออะไร (QA 18 ต.ค. 2569) */}
                           {r.appointment_place || r.appointment_job
-                            ? `${r.appointment_place ?? ''}${r.appointment_place && r.appointment_job ? ' · ' : ''}${r.appointment_job ?? ''}`
+                            ? `${r.appointment_place ?? ''}${r.appointment_place && r.appointment_job ? ' · ' : ''}${r.appointment_job ? `ลงงาน ${r.appointment_job}` : ''}`
                             : EM_DASH}
                         </span>
                         {/* ผลติดตามนัด (089): ปุ่มคู่โผล่ตั้งแต่วันนัด (เวลาไทย) เป็นต้นไป
@@ -583,21 +588,28 @@ const RmTable: React.FC<{
                             label = 'มีคนเก็บไปโทรอยู่ · AI จะไม่โทรทับ';
                           }
                         }
+                        // แท็บนัดหมาย: ปุ่มเปิดบันทึกผลมีคำ (QA 18 ต.ค. 2569 — กฎปุ่มต้องมีคำ)
+                        const worded = tab === 'appointments' && a === 'rule';
                         // ปุ่มกลมไม่มีกรอบ สีเทา แบบ iRecruit (rm-action-btn) — ใช้ Button ของ shadcn
                         return (
                           <Button
                             key={a}
                             type="button"
-                            variant="ghost"
-                            size="iconXs"
+                            variant={worded ? 'outline' : 'ghost'}
+                            size={worded ? 'xs' : 'iconXs'}
                             onClick={() => onAction(a, r)}
                             disabled={disabled}
                             title={label}
                             aria-label={`${label} — ${r.full_name}`}
                             // มือถือปุ่ม 40px (เดิม 32px ติดกัน กด "ส่ง AI โทร" พลาดโดน "ดูรายละเอียด")
-                            className="rounded-full text-muted-foreground hover:text-foreground max-sm:h-10 max-sm:w-10"
+                            className={
+                              worded
+                                ? 'rounded-full max-sm:min-h-9'
+                                : 'rounded-full text-muted-foreground hover:text-foreground max-sm:h-10 max-sm:w-10'
+                            }
                           >
                             <Icon aria-hidden />
+                            {worded ? 'บันทึกผล' : null}
                           </Button>
                         );
                       })}

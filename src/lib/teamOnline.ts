@@ -715,7 +715,7 @@ export const FUNNEL_STAGES = [
   { key: 'aiCalled', label: 'AI โทรแล้ว' },
   { key: 'interested', label: 'มีคนสนใจ' },
   { key: 'appointed', label: 'มีนัด' },
-  { key: 'showed', label: 'มาตามนัด' },
+  { key: 'showed', label: 'มา' },
 ] as const;
 
 export type FunnelStageKey = (typeof FUNNEL_STAGES)[number]['key'];

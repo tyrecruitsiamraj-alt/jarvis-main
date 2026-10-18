@@ -601,7 +601,7 @@ const STAFF_COLS: { key: StaffSortKey; label: string }[] = [
   { key: 'called', label: 'โทรแล้ว' },
   { key: 'reached', label: 'ติดต่อสำเร็จ' },
   { key: 'appointed', label: 'นัดได้' },
-  { key: 'showed', label: 'มาตามนัด' },
+  { key: 'showed', label: 'มา' },
 ];
 
 export function StaffTable({ staff, ai }: { staff: readonly RecruitStaffRow[]; ai: RecruitAiRow | null }) {
@@ -629,7 +629,7 @@ export function StaffTable({ staff, ai }: { staff: readonly RecruitStaffRow[]; a
                 </Button>
               </th>
             ))}
-            <th className="px-2 py-2 text-right font-medium">อัตรามาตามนัด</th>
+            <th className="px-2 py-2 text-right font-medium">อัตรามา</th>
           </tr>
         </thead>
         <tbody>

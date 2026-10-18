@@ -1213,8 +1213,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   /** แถบแท็บล้นบนมือถือ — เลื่อนให้เห็นแท็บที่เปิดอยู่ (QA รอบ 2 ข้อ 32) */
   const staffTabsRef = React.useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const bar = staffTabsRef.current;
-    scrollIntoViewX(bar, bar?.querySelector<HTMLElement>('[aria-current="page"]') ?? null);
+    // เลื่อนแถบแท็บให้เห็นแท็บที่เปิดอยู่ — ทำซ้ำหลังจัดหน้าเสร็จ (QA 18 ต.ค. 2569: เปิดลิงก์ตรงบนมือถือ แท็บปัจจุบันอยู่นอกจอ
+    // เพราะตอนเอฟเฟกต์รันครั้งแรกแถบยังไม่มีความกว้างจริง)
+    const run = () => {
+      const bar = staffTabsRef.current;
+      scrollIntoViewX(bar, bar?.querySelector<HTMLElement>('[aria-current="page"]') ?? null);
+    };
+    run();
+    const raf = requestAnimationFrame(run);
+    const t = window.setTimeout(run, 400);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t);
+    };
   }, [view]);
   /* 🔴 ตัวเลขยังบอกไม่ได้ (กำลังโหลด/พัง/ไม่มีสิทธิ์) = **ไม่พิมพ์อะไรเลย** (บทเรียน 31 ส.ค. 2569)
      บอกหน่วยครบทั้ง "ใบขอ" และ "อัตรา" (บทเรียน "292 ตำแหน่ง") · % ปล่อยประกาศย้ายมาจากแถบบนหัวกล่องงาน */
@@ -1304,15 +1315,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                  · `listHeaderActions` = ของแท็บนั้นที่วางข้างรีเฟรช (ปฏิทินวันที่สมัคร · 5 ต.ค. 2569) */
               <>
                 {listHeaderActions}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="iconXs"
-                  onClick={() => void onRefresh()}
-                  aria-label="รีเฟรชข้อมูล"
-                  title="รีเฟรชข้อมูล"
-                >
-                  <RefreshCw />
+                {/* ปุ่มมีคำ (QA 18 ต.ค. 2569 — กฎปุ่มต้องมีคำ 15 ต.ค.) */}
+                <Button type="button" variant="outline" size="xs" onClick={() => void onRefresh()}>
+                  <RefreshCw aria-hidden /> รีเฟรช
                 </Button>
               </>
             ) : undefined

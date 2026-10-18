@@ -341,7 +341,7 @@ export function buildApplicantsReport(rows: readonly ReportSourceRow[], publishe
       ),
       step(
         'showed',
-        'มาตามนัด',
+        'มา',
         byFirstCaller(rows, (r) => r.attendance === 'showed'),
       ),
     ],
@@ -353,7 +353,7 @@ export function buildApplicantsReport(rows: readonly ReportSourceRow[], publishe
         items: [
           { key: 'handoff', label: 'AI โทรแล้ว คนรับต่อ', value: count(rows, (r) => r.ai && r.staff) },
           { key: 'staffResult', label: 'คนลงผลแล้ว', value: count(rows, (r) => r.staff && staffResult(r)) },
-          { key: 'noShow', label: 'ไม่มาตามนัด', value: count(rows, (r) => r.attendance === 'no_show'), tone: 'danger' },
+          { key: 'noShow', label: 'ไม่มา', value: count(rows, (r) => r.attendance === 'no_show'), tone: 'danger' },
         ],
       },
     ],

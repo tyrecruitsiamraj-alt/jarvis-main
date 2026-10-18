@@ -151,8 +151,8 @@ export function funnelSteps(t: RecruitTotals, opts: { attendanceEverRecorded: bo
     step('staffFollowed', 'คนโทรต่อแล้ว', t.staffFollowed),
     step('appointed', 'นัดได้', t.appointed),
     opts.attendanceEverRecorded
-      ? step('showed', 'มาตามนัด', t.showed)
-      : step('showed', 'มาตามนัด', null, 'ยังไม่มีใครบันทึกมา/ไม่มา'),
+      ? step('showed', 'มา', t.showed)
+      : step('showed', 'มา', null, 'ยังไม่มีใครบันทึกมา/ไม่มา'),
     t.onBoard === null
       ? step('onBoard', 'ได้ใบสมัคร', null, 'อ่านบอร์ด ERP ไม่ได้')
       : step('onBoard', 'ได้ใบสมัคร', t.onBoard),
@@ -318,7 +318,7 @@ export type ReasonGroupKey = 'contact' | 'appoint' | 'attend';
 export const REASON_GROUP_LABEL: Record<ReasonGroupKey, string> = {
   contact: 'ติดต่อไม่สำเร็จ',
   appoint: 'นัดหมายไม่สำเร็จ',
-  attend: 'ไม่มาตามนัด',
+  attend: 'ไม่มา',
 };
 
 export type ReasonGroup = { key: ReasonGroupKey; label: string; total: number; reasons: { label: string; count: number }[] };
@@ -348,7 +348,7 @@ export function reasonGroups(cohort: readonly RecruitAppFact[]): ReasonGroup[] {
   const add = (g: ReasonGroupKey, label: string) => groups[g].set(label, (groups[g].get(label) ?? 0) + 1);
   for (const f of cohort) {
     if (f.attendance === 'no_show') {
-      add('attend', 'ไม่มาตามนัด');
+      add('attend', 'ไม่มา');
       continue;
     }
     if (f.attendance === 'rescheduled') {

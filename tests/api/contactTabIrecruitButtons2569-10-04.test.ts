@@ -37,7 +37,8 @@ describe('แท็บการติดต่อ — ปุ่มแบบ iRec
   it('ปุ่มบนแถวเป็น Button ของ shadcn แบบ ghost กลม (ไม่ปั้น <button> เอง)', () => {
     const t = read('../../src/components/recruit-rm/RmTable.tsx');
     const block = t.slice(t.indexOf('{actions.map((a) => {'), t.indexOf('</tbody>'));
-    expect(block).toContain('variant="ghost"');
+    // แท็บนัดหมาย: ปุ่มบันทึกผลมีคำ (outline · 18 ต.ค. 2569) ที่เหลือ ghost กลม
+    expect(block).toContain("variant={worded ? 'outline' : 'ghost'}");
     expect(block).toContain('rounded-full');
     expect(block).not.toContain('<button');
   });

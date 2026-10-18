@@ -58,7 +58,7 @@ describe('buildRecruitJourney', () => {
   });
   it('แต่ละขั้นนับถูก', () => {
     expect(steps.map((s) => s.total)).toEqual([15, 12, 9, 7, 5, 3]);
-    expect(steps.map((s) => s.label)).toEqual(['รายชื่อเข้ามาทั้งหมด', 'AI โทรแล้ว', 'คนโทรต่อคนที่สนใจ', 'นัดได้ไหม', 'มาตามนัดไหม', 'ผ่านไหม']);
+    expect(steps.map((s) => s.label)).toEqual(['รายชื่อเข้ามาทั้งหมด', 'AI โทรแล้ว', 'คนโทรต่อคนที่สนใจ', 'นัดได้ไหม', 'มาไหม', 'ผ่านไหม']);
     expect([part('names', 'badData'), part('names', 'aiQueued'), part('names', 'notSent')]).toEqual([1, 1, 1]);
     expect([part('ai', 'yes'), part('ai', 'no'), part('ai', 'thinking'), part('ai', 'unreached')]).toEqual([9, 1, 1, 1]);
     expect([part('staff', 'ok'), part('staff', 'fail'), part('staff', 'waiting')]).toEqual([7, 1, 1]);

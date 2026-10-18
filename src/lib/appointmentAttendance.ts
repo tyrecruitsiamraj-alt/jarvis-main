@@ -13,7 +13,8 @@ export function isAttendanceResult(v: unknown): v is AttendanceResult {
 }
 
 export const ATTENDANCE_LABEL: Record<AttendanceResult, string> = {
-  showed: 'มาตามนัด',
+  // คำเดียวทั้งระบบ "มา / ไม่มา" (เจ้าของเลือก 18 ต.ค. 2569)
+  showed: 'มา',
   no_show: 'ไม่มา',
   rescheduled: 'เลื่อนนัด',
 };

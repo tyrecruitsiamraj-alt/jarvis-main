@@ -24,6 +24,8 @@ import {
   type RecordLoadState,
 } from '@/components/recruit-rm/ApplicantRecordTables';
 import { cn } from '@/lib/utils';
+import { ATTENDANCE_LABEL } from '@/lib/appointmentAttendance';
+import { SCREENING_LABEL, SCREENING_RESULTS, type ScreeningResult } from '@/lib/appointmentScreening';
 import { TONE } from '@/lib/designTokens';
 import { EM_DASH } from '@/lib/displayFallback';
 import { formatYmdTh } from '@/lib/dateTh';
@@ -56,13 +58,11 @@ import {
   APPOINTMENT_PLACES,
   APPOINTMENT_PLACE_OTHER,
   DETAIL_TABS,
-  FOLLOW_UP_FAIL_OPTIONS,
   PROCESS_STEPS,
   appointmentPlaceValue,
   contactChoiceOf,
   detailCallRows,
   followUpChoiceOf,
-  followUpSide,
   type ContactChoice,
   type DetailTab,
   type FollowUpChoice,
@@ -160,6 +160,8 @@ export default function ApplicantContactDialog({
   const [apptReasonId, setApptReasonId] = useState('');
   // ── ขั้น 3 การติดตามนัด — 'fail' ที่ยังไม่เลือกไม่มา/เลื่อนนัด = ค้างให้เลือก
   const [followPicked, setFollowPicked] = useState<FollowUpChoice | 'fail' | null>(null);
+  /** ผ่าน/ไม่ผ่าน หลังมา (151 · QA 18 ต.ค. 2569 — เดิมลงได้แค่บนแถว) */
+  const [screenPicked, setScreenPicked] = useState<ScreeningResult | null>(null);
   // ── แท็บข้อมูลผู้สมัคร
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ProfileDraft | null>(null);
@@ -254,7 +256,6 @@ export default function ApplicantContactDialog({
   const now = new Date();
   const contactShown = contactPicked ?? contactChoiceOf(a);
   const followInitial = followUpChoiceOf(a);
-  const followShownSide = followPicked === 'fail' ? 'fail' : followUpSide(followPicked ?? followInitial);
   const followShownValue = followPicked && followPicked !== 'fail' ? followPicked : followPicked ? null : followInitial;
   const contactFailPicked = contactPicked === 'fail';
   const followBlocked = !a.appointment_at
@@ -336,7 +337,10 @@ export default function ApplicantContactDialog({
   const apptUnlocked = contactShown === 'ok';
   const profile = editing && draft ? profilePatchFromDraft(baseDraft, draft) : { patch: {}, error: null };
   const profileDirty = Object.keys(profile.patch).length > 0 || Boolean(profile.error);
-  const dirty = profileDirty || contactPicked !== null || apptPick !== null || followPicked !== null;
+  const dirty = profileDirty || contactPicked !== null || apptPick !== null || followPicked !== null || screenPicked !== null;
+  /** ผลนัดที่โชว์อยู่ (ที่เพิ่งกด หรือของเดิม) — ผ่าน/ไม่ผ่าน เปิดเมื่อเป็น "มา" */
+  const followNow = followPicked && followPicked !== 'fail' ? followPicked : followPicked ? null : followInitial;
+  const screenShown = screenPicked ?? (a.screening_result ?? null);
 
   const save = async () => {
     if (busy) return;
@@ -381,6 +385,9 @@ export default function ApplicantContactDialog({
         });
         saved.push(booked ? 'นัดหมาย' : apptFailed ? 'ผลนัดหมาย' : 'ผลการติดต่อ');
       }
+      if (screenPicked && followNow !== 'showed') {
+        throw new Error('ลงผ่าน/ไม่ผ่านได้เมื่อเลือก "มา" แล้ว');
+      }
       if (followPicked && a.appointment_at) {
         await recordAppointmentAttendance({
           applicationId: a.id,
@@ -404,6 +411,15 @@ export default function ApplicantContactDialog({
           });
           saved.push('นัดใหม่');
         }
+      }
+      // ผ่าน/ไม่ผ่าน — หลังบันทึก "มา" (server ตรวจซ้ำว่าผลนัดล่าสุดเป็นมา)
+      if (screenPicked && a.appointment_at) {
+        await recordAppointmentAttendance({
+          applicationId: a.id,
+          appointmentAt: a.appointment_at,
+          result: screenPicked,
+        });
+        saved.push('ผ่าน/ไม่ผ่าน');
       }
       onSaved();
       onClose();
@@ -586,50 +602,46 @@ export default function ApplicantContactDialog({
         </div>
         <div className="rounded-xl border border-border/70" data-testid="step-follow-up">
           <StepHead index={2} done={followInitial !== null}>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              aria-pressed={followShownSide === 'ok'}
-              disabled={busy || Boolean(followBlocked)}
-              title={followBlocked ?? undefined}
-              onClick={() => {
-                setFollowPicked('showed');
-                setError(null);
-              }}
-              className={cn(followShownSide === 'ok' && TONE.success.solid)}
-            >
-              <Check aria-hidden /> ติดตามสำเร็จ
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              aria-pressed={followShownSide === 'fail'}
-              disabled={busy || Boolean(followBlocked)}
-              title={followBlocked ?? undefined}
-              onClick={() => {
-                setFollowPicked('fail');
-                setError(null);
-              }}
-              className={cn(followShownSide === 'fail' && TONE.danger.solid)}
-            >
-              <X aria-hidden /> ติดตามไม่สำเร็จ
-            </Button>
-          </StepHead>
-          {followPicked !== null && followShownSide === 'fail' ? (
-            <div className="flex flex-wrap gap-1.5 border-t border-border/70 p-3" role="group" aria-label="ติดตามไม่สำเร็จเพราะ">
-              {FOLLOW_UP_FAIL_OPTIONS.map((o) => (
+            {/* มา · ไม่มา · เลื่อนนัด กดได้ตรง ๆ (QA 18 ต.ค. 2569 — คำเดียวกับปุ่มบนแถวและชิป · เจ้าของเลือก "มา / ไม่มา") */}
+            {(['showed', 'no_show', 'rescheduled'] as const).map((k) => {
+              const on = followShownValue === k;
+              const tone = k === 'showed' ? TONE.success.solid : k === 'no_show' ? TONE.danger.solid : TONE.warn.solid;
+              return (
                 <Button
-                  key={o.value}
+                  key={k}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  aria-pressed={on}
+                  disabled={busy || Boolean(followBlocked)}
+                  title={followBlocked ?? undefined}
+                  onClick={() => {
+                    setFollowPicked(k);
+                    if (k !== 'showed') setScreenPicked(null);
+                    setError(null);
+                  }}
+                  className={cn(on && tone)}
+                >
+                  {k === 'showed' ? <Check aria-hidden /> : k === 'no_show' ? <X aria-hidden /> : null}
+                  {ATTENDANCE_LABEL[k]}
+                </Button>
+              );
+            })}
+          </StepHead>
+          {followNow === 'showed' ? (
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-border/70 p-3" role="group" aria-label="ผ่านไหม" data-testid="step-screening">
+              <span className="text-xs text-muted-foreground">ผ่านไหม</span>
+              {SCREENING_RESULTS.map((k) => (
+                <Button
+                  key={k}
                   type="button"
                   size="xs"
-                  variant={followShownValue === o.value ? 'default' : 'outline'}
-                  aria-pressed={followShownValue === o.value}
+                  variant={screenShown === k ? 'default' : 'outline'}
+                  aria-pressed={screenShown === k}
                   disabled={busy}
-                  onClick={() => setFollowPicked(o.value)}
+                  onClick={() => setScreenPicked(k)}
                 >
-                  {o.label}
+                  {SCREENING_LABEL[k]}
                 </Button>
               ))}
             </div>

@@ -13,6 +13,8 @@ import { toYmdBangkok } from './dateTh';
 export type AppointmentBoardRow = {
   appointment_at?: string | null;
   attendance_result?: string | null;
+  /** ผ่าน/ไม่ผ่าน หลังมา (151 · 18 ต.ค. 2569) */
+  screening_result?: string | null;
 };
 
 export type AppointmentDaySummary = {
@@ -24,6 +26,9 @@ export type AppointmentDaySummary = {
   rescheduled: number;
   /** นัดแล้วแต่ยังไม่มีผลมา/ไม่มา */
   pending: number;
+  /** ในคนที่มา: ผ่าน / ไม่ผ่าน (ส่วนย่อยของ showed — ไม่อยู่ในสูตรรวม) */
+  passed: number;
+  notPassed: number;
 };
 
 export type AppointmentBoard = {
@@ -34,11 +39,15 @@ export type AppointmentBoard = {
 };
 
 function emptyDay(date: string): AppointmentDaySummary {
-  return { date, total: 0, showed: 0, noShow: 0, rescheduled: 0, pending: 0 };
+  return { date, total: 0, showed: 0, noShow: 0, rescheduled: 0, pending: 0, passed: 0, notPassed: 0 };
 }
 
-function bump(day: AppointmentDaySummary, result: AttendanceResult | null): void {
+function bump(day: AppointmentDaySummary, result: AttendanceResult | null, screening: string | null | undefined): void {
   day.total += 1;
+  if (result === 'showed') {
+    if (screening === 'passed') day.passed += 1;
+    else if (screening === 'not_passed') day.notPassed += 1;
+  }
   if (result === 'showed') day.showed += 1;
   else if (result === 'no_show') day.noShow += 1;
   else if (result === 'rescheduled') day.rescheduled += 1;
@@ -60,8 +69,8 @@ export function buildAppointmentBoard(rows: readonly AppointmentBoardRow[]): App
     const result = isAttendanceResult(r.attendance_result) ? r.attendance_result : null;
     const day = byDay.get(ymd) ?? emptyDay(ymd);
     byDay.set(ymd, day);
-    bump(day, result);
-    bump(total, result);
+    bump(day, result, r.screening_result);
+    bump(total, result, r.screening_result);
   }
 
   return {
@@ -76,7 +85,8 @@ export function buildAppointmentBoard(rows: readonly AppointmentBoardRow[]): App
  * "รอผล" รวมเลื่อนนัด (กล่องเดิมก็รวม "รอผล / เลื่อนนัด") ⇒ มา + ไม่มา + รอผล = นัดทั้งหมด
  */
 /** `today` = นัดวันนี้ (QA รอบ 3 ข้อ 23 · ไม่มีปุ่มดูนัดวันนี้) — คนละแกนกับผลนัด ไม่อยู่ในสูตร มา + ไม่มา + รอผล = ทั้งหมด */
-export type AppointmentChip = 'all' | 'today' | 'showed' | 'no_show' | 'pending';
+/** `passed` / `not_passed` = ส่วนย่อยของ "มา" (18 ต.ค. 2569) — ไม่อยู่ในสูตร มา + ไม่มา + รอผล = ทั้งหมด */
+export type AppointmentChip = 'all' | 'today' | 'showed' | 'no_show' | 'pending' | 'passed' | 'not_passed';
 
 export const APPOINTMENT_CHIPS: readonly { id: AppointmentChip; label: string; tone: 'info' | 'success' | 'danger' | 'warn' }[] = [
   { id: 'all', label: 'นัดทั้งหมด', tone: 'info' },
@@ -84,6 +94,8 @@ export const APPOINTMENT_CHIPS: readonly { id: AppointmentChip; label: string; t
   { id: 'showed', label: 'มา', tone: 'success' },
   { id: 'no_show', label: 'ไม่มา', tone: 'danger' },
   { id: 'pending', label: 'รอผล', tone: 'warn' },
+  { id: 'passed', label: 'ผ่าน', tone: 'success' },
+  { id: 'not_passed', label: 'ไม่ผ่าน', tone: 'danger' },
 ];
 
 export function appointmentChipCount(
@@ -96,6 +108,8 @@ export function appointmentChipCount(
   if (chip === 'showed') return t.showed;
   if (chip === 'no_show') return t.noShow;
   if (chip === 'pending') return t.pending + t.rescheduled;
+  if (chip === 'passed') return t.passed;
+  if (chip === 'not_passed') return t.notPassed;
   return t.total;
 }
 
@@ -111,5 +125,7 @@ export function isInAppointmentChip(
   const result = isAttendanceResult(r.attendance_result) ? r.attendance_result : null;
   if (chip === 'showed') return result === 'showed';
   if (chip === 'no_show') return result === 'no_show';
+  if (chip === 'passed') return result === 'showed' && r.screening_result === 'passed';
+  if (chip === 'not_passed') return result === 'showed' && r.screening_result === 'not_passed';
   return result === null || result === 'rescheduled';
 }

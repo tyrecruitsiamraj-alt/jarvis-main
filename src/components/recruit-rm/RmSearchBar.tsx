@@ -39,6 +39,8 @@ const RmSearchBar: React.FC<{
   onImportApplicants?: () => void;
   /** "โหลดเป็น PDF" ของแท็บติดตามนัดหมาย (ย้ายมาแถวนี้ 4 ต.ค. 2569) — ไม่ส่ง = ไม่มีปุ่ม */
   onPrintPdf?: () => void;
+  /** ไม่มีรายชื่อให้พิมพ์ (โหลดล้ม/ว่าง) — QA 18 ต.ค. 2569 */
+  printDisabled?: boolean;
   /**
    * "เก็บไปโทรเอง" ทีละหลายคน — **ปุ่มรวม** ของเดิมสองปุ่ม (เจ้าของเคาะ 22 ส.ค. 2569)
    * กดทีเดียว = จองใบ (claim) + ล็อกเบอร์กัน AI โทรทับ (call hold)
@@ -62,6 +64,7 @@ const RmSearchBar: React.FC<{
   onAddApplicant,
   onImportApplicants,
   onPrintPdf,
+  printDisabled = false,
   onHoldSelected,
   holdingSelected = false,
   onSendAiSelected,
@@ -104,7 +107,7 @@ const RmSearchBar: React.FC<{
     ) : null}
 
     {onPrintPdf ? (
-      <Button variant="secondary" size="xs" type="button" onClick={onPrintPdf} className="shrink-0">
+      <Button variant="secondary" size="xs" type="button" onClick={onPrintPdf} disabled={printDisabled} className="shrink-0">
         <Printer aria-hidden /> โหลดเป็น PDF
       </Button>
     ) : null}

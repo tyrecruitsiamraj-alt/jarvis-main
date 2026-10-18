@@ -180,7 +180,7 @@ describe('เส้นทางของรายชื่อ', () => {
 
   it('ลำดับตามที่เจ้าของไล่ + คิดเพิ่ม (นัด · มาตามนัด · ได้ใบสมัคร) · % ของรายชื่อที่เข้ามา', () => {
     const steps = funnelSteps(t, { attendanceEverRecorded: true });
-    expect(steps.map((s) => s.label)).toEqual(['รายชื่อเข้ามา', 'AI โทรแล้ว', 'ตอบ AI ว่าสนใจ', 'คนโทรต่อแล้ว', 'นัดได้', 'มาตามนัด', 'ได้ใบสมัคร']);
+    expect(steps.map((s) => s.label)).toEqual(['รายชื่อเข้ามา', 'AI โทรแล้ว', 'ตอบ AI ว่าสนใจ', 'คนโทรต่อแล้ว', 'นัดได้', 'มา', 'ได้ใบสมัคร']);
     expect(steps.map((s) => s.value)).toEqual([4, 3, 2, 1, 1, 0, 1]);
     expect(steps.map((s) => s.pct)).toEqual([100, 75, 50, 25, 25, 0, 25]);
   });
@@ -249,7 +249,7 @@ describe('เหตุผลที่ไม่สำเร็จ — หนึ�
     expect(by.contact.reasons[0]).toEqual({ label: 'ไม่รับสาย', count: 2 });
     expect(by.contact.reasons).toContainEqual({ label: 'ปิดเครื่อง', count: 1 });
     expect(by.appoint).toMatchObject({ total: 1 });
-    expect(by.attend.reasons).toEqual([{ label: 'ไม่มาตามนัด', count: 1 }]);
+    expect(by.attend.reasons).toEqual([{ label: 'ไม่มา', count: 1 }]);
   });
 });
 

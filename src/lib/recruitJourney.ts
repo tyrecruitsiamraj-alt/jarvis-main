@@ -100,7 +100,7 @@ export function buildRecruitJourney(list: readonly RecruitAppFact[]): JourneySte
     },
     {
       key: 'attendance',
-      label: 'มาตามนัดไหม',
+      label: 'มาไหม',
       total: appointed.length,
       parts: [
         part('showed', 'มา', showed, 'success'),

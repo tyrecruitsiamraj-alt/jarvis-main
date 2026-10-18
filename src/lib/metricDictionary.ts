@@ -126,14 +126,14 @@ export const METRICS = {
     landing: 'แท็บ "ติดตามนัดหมาย" บนบอร์ดรับสมัคร',
   },
   'recruit.showed': {
-    label: 'มาตามนัด',
+    label: 'มา',
     unit: 'คน',
     what: 'ผู้สมัครที่มาสัมภาษณ์จริงตามวันเวลาที่นัดไว้',
     href: '/jobs/board?view=appointments',
     landing: 'แท็บ "ติดตามนัดหมาย" ผลนัด "มา"',
   },
   'recruit.no_show': {
-    label: 'ไม่มาตามนัด',
+    label: 'ไม่มา',
     unit: 'คน',
     what: 'ผู้สมัครที่นัดแล้วแต่ไม่มาและไม่ได้แจ้งเลื่อน',
     href: '/jobs/board?view=appointments',

@@ -734,7 +734,7 @@ export function FunnelSection({ data, loading }: { data: Data | null; loading: b
       title="ติดตรงไหน · ใบขอที่เข้ามาในช่วงนี้ ตอนนี้ไปถึงขั้นไหน"
       buBadge={buBadgeOf(data)}
       foot={`นับใบที่มีอย่างน้อยหนึ่งคนถึงขั้นนั้น (ถึงตอนนี้) · นัด = บันทึกนัดของเจ้าหน้าที่ (ไม่ใช่ผลสายสัมภาษณ์ AI) · ช่องสีแดง = ขั้นที่หายมากสุด · ใบที่เพิ่งเข้ายังมีเวลาเดินน้อยกว่า${
-        funnel.length > 0 && funnel.every((r) => r.counts.showed === null) ? ' · มาตามนัด “—” = ระบบยังไม่มีการบันทึกผลมาตามนัด' : ''
+        funnel.length > 0 && funnel.every((r) => r.counts.showed === null) ? ' · มา “—” = ระบบยังไม่มีการบันทึกผลมา/ไม่มา' : ''
       }`}
     >
       {!data?.funnel ? (
