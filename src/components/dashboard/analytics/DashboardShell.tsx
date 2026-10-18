@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, Download, RefreshCw, Search, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -61,6 +62,8 @@ type Props = {
    * 🔴 QA 5 ต.ค. 2569: เดิมไม่ดู error เลย โหลดพัง = ทุกการ์ดขึ้น 0 เหมือนไม่มีงานค้าง
    */
   loadError?: string | null;
+  /** เส้นเสริมล้ม (ยอดตามช่วง/ใบปิด) — ใบเปิดยังโหลดได้ จึงยังวาดหน้า แต่ต้องบอกบนสุด (QA 17 ต.ค. 2569) */
+  partialError?: string | null;
   refreshing?: boolean;
   onRefresh?: () => void;
   onExport?: () => void;
@@ -116,6 +119,7 @@ const DashboardShell: React.FC<Props> = ({
   lockedDepartmentCode = null,
   loading,
   loadError,
+  partialError = null,
   refreshing,
   onRefresh,
   onExport,
@@ -303,6 +307,8 @@ const DashboardShell: React.FC<Props> = ({
             ) : null}
           </div>
         ) : (
+          <>
+          {partialError ? <LoadErrorNotice message={partialError} onRetry={onRefresh} className="mb-4" /> : null}
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] gap-5">
             {isMobile ? (
               <Collapsible open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
@@ -570,6 +576,7 @@ const DashboardShell: React.FC<Props> = ({
               {extraPanels}
             </div>
           </div>
+          </>
         )}
       </div>
     </div>

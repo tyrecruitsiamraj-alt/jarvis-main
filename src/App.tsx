@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, useParams, useLocation } from "react-router-dom";
 import PublicApplyLayout from "@/components/layout/PublicApplyLayout";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -10,6 +10,7 @@ import { RolePermissionsProvider } from "@/contexts/RolePermissionsContext";
 import { BrandingProvider } from "@/contexts/BrandingContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import AppLayout from "@/components/layout/AppLayout";
+import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
 import LoginPage from "@/pages/LoginPage";
 import RequireDepartment from "@/components/auth/RequireDepartment";
 import ViewAsRoleBanner from "@/components/layout/ViewAsRoleBanner";
@@ -81,12 +82,13 @@ const PageLoadingFallback = () => (
 
 const ProtectedRoutes = () => {
   const { isAuthenticated, bootstrapping } = useAuth();
+  const location = useLocation();
   if (bootstrapping) {
     return (
       <div className="jarvis-warm-bg min-h-screen flex items-center justify-center text-muted-foreground text-sm">
         <div className="jarvis-frost px-8 py-6 text-center">
           <div className="mx-auto mb-3 h-8 w-8 rounded-full border-2 border-blue-400/40 border-t-blue-500 animate-spin" aria-hidden />
-          กำลังโหลด session…
+          กำลังเข้าสู่ระบบ…
         </div>
       </div>
     );
@@ -101,6 +103,7 @@ const ProtectedRoutes = () => {
       <ViewAsRoleBanner />
       <AppLayout>
         <RequireRole>
+          <PageErrorBoundary resetKey={location.pathname}>
           <Suspense fallback={<PageLoadingFallback />}>
             <Routes>
             <Route path="/" element={<HomePage />} />
@@ -168,6 +171,7 @@ const ProtectedRoutes = () => {
             <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+          </PageErrorBoundary>
         </RequireRole>
       </AppLayout>
     </RequireDepartment>

@@ -843,6 +843,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
         </div>
 
         {loadingJobs && <div className="text-sm text-muted-foreground">กำลังโหลดรายการงาน…</div>}
+        {/* ยังไม่มีใบในมือ (โหลด/ล้ม) — ห้ามขึ้น "0 รายการ · ยังไม่พบใบงาน" (QA 17 ต.ค. 2569) */}
         {jobsLoadError ? (
           <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <span>{jobsLoadError}</span>
@@ -859,7 +860,10 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
           <MapPin className="w-4 h-4 text-blue-600 shrink-0 dark:text-blue-300" />
           <p className="text-sm text-muted-foreground">
             {appliedCenter || appliedTextQuery ? 'งานที่ใกล้/เกี่ยวข้อง' : 'งานเปิดจาก ERP'}{' '}
-            <span className="text-blue-600 font-medium tabular-nums dark:text-blue-300">{filteredRows.length}</span> รายการ
+            <span className="text-blue-600 font-medium tabular-nums dark:text-blue-300">
+              {feedJobs.length === 0 && (loadingJobs || jobsLoadError) ? '—' : filteredRows.length}
+            </span>{' '}
+            รายการ
             {appliedCenter ? (
               <span className="text-muted-foreground"> · รัศมี {radius} กม.</span>
             ) : null}
@@ -876,7 +880,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
             </div>
           )}
 
-          {!appliedCenter && !appliedTextQuery && filteredRows.length === 0 && (
+          {!appliedCenter && !appliedTextQuery && filteredRows.length === 0 && !(feedJobs.length === 0 && (loadingJobs || jobsLoadError)) && (
             <div className="glass-card rounded-3xl p-8 border border-white/70 text-center">
               <ClipboardCheck className="w-8 h-8 text-amber-500/50 mx-auto mb-2" />
               <p className="text-sm font-medium text-foreground">ยังไม่พบใบงาน</p>

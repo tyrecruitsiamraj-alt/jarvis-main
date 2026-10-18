@@ -30,6 +30,7 @@ import { publicJobTitle } from '@/lib/publicJobTitle';
 import { unitRequestPath } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { apiFetch } from '@/lib/apiFetch';
+import { friendlyErrorText } from '@/lib/friendlyError';
 import {
   distantCandidateCount,
   isRecommendedTier,
@@ -668,7 +669,7 @@ const MatchingPage: React.FC = () => {
       }
     } catch (e) {
       if (seq === serverFetchSeq.current) {
-        setServerListError(e instanceof Error ? e.message : 'โหลดรายการไม่สำเร็จ');
+        setServerListError(friendlyErrorText(e, 'โหลดรายการไม่สำเร็จ'));
       }
     } finally {
       if (seq === serverFetchSeq.current) setServerListLoading(false);
@@ -1101,7 +1102,7 @@ const MatchingPage: React.FC = () => {
       setLumosStatusByRef(indexLumosCallStatus(items));
       setLumosPool(pool);
     } catch (e) {
-      setLumosError(e instanceof Error ? e.message : 'โหลดรายชื่อคนของเราไม่สำเร็จ');
+      setLumosError(friendlyErrorText(e, 'โหลดรายชื่อคนของเราไม่สำเร็จ'));
     } finally {
       setLumosPoolLoading(false);
     }
@@ -1163,7 +1164,7 @@ const MatchingPage: React.FC = () => {
         `ตั้งคิวโทรแล้ว — ${done.join(' · ')} · เข้าคิวจริงในอีก ${CALL_BATCH_UNDO_MINUTES} นาที ยกเลิกได้จากแถบด้านล่าง`,
       );
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'ตั้งคิวไม่สำเร็จ';
+      const msg = friendlyErrorText(e, 'ตั้งคิวไม่สำเร็จ');
       setLumosError(done.length > 0 ? `${msg} (ที่ตั้งคิวสำเร็จแล้ว: ${done.join(' · ')})` : msg);
     } finally {
       // ชุดที่สร้างทันก่อนล้มต้องเข้าแถบถอนคำด้วย ไม่งั้นของที่ยิงไปแล้วไม่มีทางถอน
@@ -1181,7 +1182,7 @@ const MatchingPage: React.FC = () => {
       setPendingBatches((prev) => prev.filter((b) => b.id !== batchId));
       setLumosNotice('ยกเลิกชุดแล้ว — ไม่มีใครถูกโทรจากชุดนี้');
     } catch (e) {
-      setLumosError(e instanceof Error ? e.message : 'ยกเลิกไม่สำเร็จ');
+      setLumosError(friendlyErrorText(e, 'ยกเลิกไม่สำเร็จ'));
     } finally {
       setBatchCancellingId(null);
     }
@@ -1266,7 +1267,7 @@ const MatchingPage: React.FC = () => {
       if (extraFailed.length > 0) parts.push(`ส่งไปงาน ${extraFailed.join(', ')} ไม่สำเร็จ`);
       setLumosNotice(parts.join(' · '));
     } catch (e) {
-      setLumosError(e instanceof Error ? e.message : 'ส่ง AI โทรไม่สำเร็จ');
+      setLumosError(friendlyErrorText(e, 'ส่ง AI โทรไม่สำเร็จ'));
     } finally {
       setLumosSending(false);
     }
@@ -1334,7 +1335,7 @@ const MatchingPage: React.FC = () => {
       });
       setLumosNotice(`${summary} — ไปโทร+บันทึกผลที่หน้า "โทรของฉัน"`);
     } catch (e) {
-      setLumosError(e instanceof Error ? e.message : 'เก็บเข้าถังโทรไม่สำเร็จ');
+      setLumosError(friendlyErrorText(e, 'เก็บเข้าถังโทรไม่สำเร็จ'));
     } finally {
       setHoldingSelf(false);
     }
@@ -1353,7 +1354,7 @@ const MatchingPage: React.FC = () => {
       setLumosStatusByRef(indexLumosCallStatus(items));
       setLumosNotice('ยกเลิกการส่งแล้ว');
     } catch (e) {
-      setLumosError(e instanceof Error ? e.message : 'ยกเลิกไม่สำเร็จ');
+      setLumosError(friendlyErrorText(e, 'ยกเลิกไม่สำเร็จ'));
     } finally {
       setLumosCancellingRef((cur) => (cur === row.person_ref ? null : cur));
     }
@@ -1489,7 +1490,7 @@ const MatchingPage: React.FC = () => {
         clearBoardWaiting(jobId);
       }
     } catch (e) {
-      setBoardErrorById((prev) => ({ ...prev, [jobId]: e instanceof Error ? e.message : 'ค้นหาไม่สำเร็จ' }));
+      setBoardErrorById((prev) => ({ ...prev, [jobId]: friendlyErrorText(e, 'ค้นหาไม่สำเร็จ') }));
     } finally {
       setBoardLoadingId((current) => (current === jobId ? null : current));
     }
@@ -1656,7 +1657,7 @@ const MatchingPage: React.FC = () => {
           retry: () => proposeBoard(job, m, status, operatorName, decisionReason),
         });
       } else {
-        setProposeError(e instanceof Error ? e.message : 'บันทึกการเสนอไม่สำเร็จ');
+        setProposeError(friendlyErrorText(e, 'บันทึกการเสนอไม่สำเร็จ'));
       }
     } finally {
       setProposingKey((cur) => (cur === key ? null : cur));
@@ -1673,7 +1674,7 @@ const MatchingPage: React.FC = () => {
       const cancelled = await cancelProposal(ref.id, { operatorName, reason: decisionReason });
       syncSavedProposal(cancelled);
     } catch (e) {
-      setProposeError(e instanceof Error ? e.message : 'ยกเลิกไม่สำเร็จ');
+      setProposeError(friendlyErrorText(e, 'ยกเลิกไม่สำเร็จ'));
     } finally {
       setProposingKey((cur) => (cur === key ? null : cur));
     }
@@ -1691,7 +1692,7 @@ const MatchingPage: React.FC = () => {
       await conflictInfo.retry();
       setConflictInfo(null);
     } catch (e) {
-      setProposeError(e instanceof Error ? e.message : 'ยกเลิกไม่สำเร็จ');
+      setProposeError(friendlyErrorText(e, 'ยกเลิกไม่สำเร็จ'));
     } finally {
       setResolvingConflict(false);
     }
@@ -1723,7 +1724,7 @@ const MatchingPage: React.FC = () => {
         return { ...prev, [job.id]: [item, ...list.filter((p) => p.id !== item.id)] };
       });
     } catch (e) {
-      setPostingError(e instanceof Error ? e.message : 'สร้างคำขอไม่สำเร็จ');
+      setPostingError(friendlyErrorText(e, 'สร้างคำขอไม่สำเร็จ'));
     } finally {
       setCreatingPosting(false);
     }
@@ -1765,7 +1766,7 @@ const MatchingPage: React.FC = () => {
         setIrSendNotice((prev) => ({ ...prev, [jobId]: parts.join(' · ') }));
       }
     } catch (e) {
-      setIrErrorById((prev) => ({ ...prev, [jobId]: e instanceof Error ? e.message : 'ค้นหาไม่สำเร็จ' }));
+      setIrErrorById((prev) => ({ ...prev, [jobId]: friendlyErrorText(e, 'ค้นหาไม่สำเร็จ') }));
     } finally {
       setIrLoadingId((current) => (current === jobId ? null : current));
     }
@@ -1811,7 +1812,7 @@ const MatchingPage: React.FC = () => {
           retry: () => proposeIrecruit(job, m, status, operatorName, decisionReason, branchId, branchName),
         });
       } else {
-        setProposeError(e instanceof Error ? e.message : 'บันทึกการเสนอไม่สำเร็จ');
+        setProposeError(friendlyErrorText(e, 'บันทึกการเสนอไม่สำเร็จ'));
       }
     } finally {
       setProposingKey((cur) => (cur === key ? null : cur));
@@ -2405,7 +2406,10 @@ const MatchingPage: React.FC = () => {
               className="shrink-0"
             >
               {c.label}
-              <span className={cn('tabular-nums', !c.active && TONE[c.tone].value)}>{c.count.toLocaleString('th-TH')}</span>
+              {/* ระหว่างโหลดยังไม่รู้เลข — ห้ามขึ้น 0 (QA 17 ต.ค. 2569) */}
+              <span className={cn('tabular-nums', !c.active && TONE[c.tone].value)}>
+                {(loadingJobs || serverListLoading) && c.count === 0 ? '…' : c.count.toLocaleString('th-TH')}
+              </span>
             </Button>
           ))}
           {/* แผง AI โทร พับเป็นปุ่มเดียว (15 ต.ค. 2569 ตัดหนัก) — กดแล้วกางแถวตัวเลข 2 แถวใต้แถบนี้ */}

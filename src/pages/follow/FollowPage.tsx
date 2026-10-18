@@ -2126,8 +2126,9 @@ const FollowPage: React.FC = () => {
 
       {followView === 'dashboard' ? (
         <div className="px-4 md:px-6 py-4">
-          <Suspense key={dashRev} fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิด Dashboard…</p>}>
-            <FollowDashboard />
+          {/* รีเฟรชส่งเป็น prop ไม่ใช่ key — key ทำให้ช่วงที่เลือกเด้งกลับเป็น "วัน" (QA 17 ต.ค. 2569) */}
+          <Suspense fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิด Dashboard…</p>}>
+            <FollowDashboard refreshKey={dashRev} />
           </Suspense>
         </div>
       ) : (

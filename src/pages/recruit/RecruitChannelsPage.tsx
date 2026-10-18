@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
+import { friendlyErrorText } from '@/lib/friendlyError';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import {
   createRecruitChannel,
@@ -173,6 +174,8 @@ const RecruitChannelsPage: React.FC = () => {
   const [counts, setCounts] = useState<{ roots: number; children: number }>({ roots: 0, children: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  /** รายการโหลดล้ม — QA 17 ต.ค. 2569: เดิมยังกด "เพิ่ม" ได้ และตารางบอกว่ายังไม่มีช่องทาง */
+  const [listFailed, setListFailed] = useState(false);
   const [okMsg, setOkMsg] = useState('');
 
   /** พ่อทั้ง 43 ตัวสำหรับ dropdown — โหลดครั้งเดียว รีเฟรชเมื่อรายการพ่อเปลี่ยน */
@@ -249,6 +252,7 @@ const RecruitChannelsPage: React.FC = () => {
       setRows(res.items);
       setTotal(res.total);
       setError('');
+      setListFailed(false);
       // จำนวนรวมของแท็บ — อัปเดตเฉพาะตอนไม่ได้กรอง ไม่งั้นเลขบนแท็บกลายเป็นจำนวนผลค้น
       if (!debounced && (view === 'roots' || !parentFilter)) {
         setCounts((c) => ({ ...c, [view]: res.total }));
@@ -257,7 +261,8 @@ const RecruitChannelsPage: React.FC = () => {
       if (seqRef.current !== seq) return;
       setRows([]);
       setTotal(0);
-      setError(e instanceof Error ? e.message : 'โหลดช่องทางไม่สำเร็จ');
+      setListFailed(true);
+      setError(friendlyErrorText(e, 'โหลดช่องทางไม่สำเร็จ'));
     } finally {
       if (seqRef.current === seq) setLoading(false);
     }
@@ -495,7 +500,7 @@ const RecruitChannelsPage: React.FC = () => {
             <button
               type="button"
               onClick={() => void onAdd()}
-              disabled={saving}
+              disabled={saving || listFailed}
               className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
             >
               {saving ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
@@ -559,7 +564,7 @@ const RecruitChannelsPage: React.FC = () => {
             </p>
           ) : rows.length === 0 ? (
             <p className="px-4 py-6 text-sm text-muted-foreground">
-              {debounced ? 'ไม่เจอช่องทางที่ตรงกับคำค้น' : 'ยังไม่มีช่องทางในมุมมองนี้'}
+              {listFailed ? 'โหลดไม่สำเร็จ' : debounced ? 'ไม่เจอช่องทางที่ตรงกับคำค้น' : 'ยังไม่มีช่องทางในมุมมองนี้'}
             </p>
           ) : (
             <>

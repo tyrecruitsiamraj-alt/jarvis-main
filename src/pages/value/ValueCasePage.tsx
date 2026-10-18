@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/table";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
+import LoadErrorNotice from "@/components/shared/LoadErrorNotice";
+import { friendlyErrorText } from "@/lib/friendlyError";
 import { DASH, TONE } from "@/lib/designTokens";
 import {
   EMPTY_VALUE_CASE,
@@ -113,9 +115,11 @@ const ValueCasePage: React.FC = () => {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [rev, setRev] = useState(0);
 
   useEffect(() => {
     let alive = true;
+    setState("loading");
     fetchValueCase()
       .then((d) => {
         if (!alive) return;
@@ -136,7 +140,7 @@ const ValueCasePage: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [rev]);
 
   const set = <K extends keyof ValueCaseInputs>(
     key: K,
@@ -152,14 +156,19 @@ const ValueCasePage: React.FC = () => {
   );
 
   const save = async () => {
-    setSaving(true);
     setSaveError(null);
+    // 0 ชั่วโมง เซิร์ฟเวอร์เปลี่ยนเป็น 176 เงียบ ๆ ตอนอ่านกลับ (QA 17 ต.ค. 2569) — กันตั้งแต่ตอนกด
+    if (!(inputs.hoursPerStaffMonth > 0)) {
+      setSaveError("ชั่วโมงทำงานต่อคนต้องมากกว่า 0");
+      return;
+    }
+    setSaving(true);
     try {
       const r = await saveValueCase(inputs);
       setSavedAt(r.updatedAt);
       setDirty(false);
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ");
+      setSaveError(friendlyErrorText(e, "บันทึกไม่สำเร็จ"));
     } finally {
       setSaving(false);
     }
@@ -216,12 +225,14 @@ const ValueCasePage: React.FC = () => {
         }
       />
 
+      {/* ล้ม = ไม่วาดตัวเลข (เดิมขึ้น "0 บาท" ทั้งหน้าใต้ข้อความล้ม · QA 17 ต.ค. 2569) */}
       {state === "error" ? (
-        <p role="alert" className={cn("mt-4 text-sm", TONE.danger.value)}>
-          โหลดไม่สำเร็จ ลองรีเฟรชหน้า
-        </p>
-      ) : null}
-
+        <LoadErrorNotice
+          className="mt-4"
+          message="โหลดข้อมูลไม่สำเร็จ"
+          onRetry={() => setRev((n) => n + 1)}
+        />
+      ) : (
       <div className="mt-4 space-y-4" data-testid="value-case">
         {/* ── สรุปบนสุด: ส่วนต่างต่อเดือน/ปี + AI ทำแทนกี่คน ── */}
         <div className="grid gap-3 sm:grid-cols-3">
@@ -629,6 +640,7 @@ const ValueCasePage: React.FC = () => {
           </Card>
         </div>
       </div>
+      )}
     </div>
   );
 };

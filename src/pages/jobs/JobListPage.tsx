@@ -475,7 +475,12 @@ const JobListPage: React.FC = () => {
         /* 🔴 ชื่อหัวหน้าต้อง = ชื่อเมนู เสมอ (audit คนใหม่ 26 ส.ค. 2569) */
         title={conveyorLabel('requests')}
         subtitle={
-          siamrajPrimary
+          // ระหว่างโหลด/ล้ม ห้ามขึ้น "0 งาน" (QA 17 ต.ค. 2569)
+          loading && jobs.length === 0
+            ? 'กำลังโหลด…'
+            : loadError && jobs.length === 0
+              ? 'โหลดไม่สำเร็จ'
+              : siamrajPrimary
             ? filtered.length > 0
               ? `${filtered.length} ใบขอจาก Siamraj · แสดง ${pageFrom}–${pageTo}`
               : '0 ใบขอจาก Siamraj'
@@ -547,7 +552,7 @@ const JobListPage: React.FC = () => {
                 เลือกอยู่ {activeFilterCount}
               </span>
             ) : (
-              <span className="text-xs font-normal text-muted-foreground">แสดงทุกใบอยู่</span>
+              <span className="text-xs font-normal text-muted-foreground">{search.trim() ? 'กรองด้วยคำค้นอยู่' : 'แสดงทุกใบอยู่'}</span>
             )}
             <ChevronRight
               className={cn('ml-auto h-4 w-4 shrink-0 transition-transform', filtersOpen && 'rotate-90')}

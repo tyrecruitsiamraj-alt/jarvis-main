@@ -7,6 +7,8 @@ import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { useListPagination } from '@/hooks/useListPagination';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
+import { friendlyErrorText } from '@/lib/friendlyError';
+import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
 import { Sheet2, SheetHead2, StatRow2, Stat2 } from '@/components/shared/ui-v2/Sheet2';
 import { useUiV2 } from '@/lib/uiV2';
 import { EM_DASH } from '@/lib/displayFallback';
@@ -89,20 +91,27 @@ const AftercarePage: React.FC = () => {
   const [calls, setCalls] = useState<FollowEntry[]>([]);
   const [calMonth, setCalMonth] = useState(() => toYmdBangkok(new Date()).slice(0, 7));
 
+  /** สายจริงโหลดไม่ได้ — ปฏิทินยังขึ้น แต่ต้องบอก (QA 17 ต.ค. 2569: เดิมกลืนเงียบ ชั้นสายจริงหายไม่มีใครรู้) */
+  const [callsError, setCallsError] = useState(false);
+
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
+    setCallsError(false);
     fetchAftercarePeople(includeClosed)
       .then((d) => {
         setItems(d.items);
         setMigrated(d.migrated !== false);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'โหลดรายชื่อไม่สำเร็จ'))
+      .catch((e) => setError(friendlyErrorText(e, 'โหลดรายชื่อไม่สำเร็จ')))
       .finally(() => setLoading(false));
     /* สายจริงของหัวข้อนี้ — พลาดแล้วปฏิทินยังขึ้นได้ (แค่ไม่มีชั้น "สายจริง") จึงกลืน error */
     listFollowEntries()
       .then((rows) => setCalls(rows.filter((r) => r.topic === AFTERCARE_TOPIC)))
-      .catch(() => setCalls([]));
+      .catch(() => {
+        setCalls([]);
+        setCallsError(true);
+      });
   }, [includeClosed]);
 
   useEffect(load, [load]);
@@ -186,6 +195,9 @@ const AftercarePage: React.FC = () => {
     }
   };
 
+  /** เลขสรุปบนหัว — ระหว่างโหลด "…" · โหลดล้ม "—" (ห้ามขึ้น 0 ปลอม · QA 17 ต.ค. 2569) */
+  const countText = (n: number) => (loading ? '…' : error ? '—' : `${n.toLocaleString('th-TH')} คน`);
+
   return (
     <div>
       <PageHeader
@@ -203,18 +215,18 @@ const AftercarePage: React.FC = () => {
             {/* คอลัมน์ที่ 3 ยืดเต็มแถวบนมือถือ — ไม่งั้นเหลือช่องว่างครึ่งแถว */}
             <StatRow2 className="mt-3 sm:grid-cols-3 max-sm:[&>*:last-child]:col-span-2">
               <Stat2
-                value={`${open.length.toLocaleString('th-TH')} คน`}
+                value={countText(open.length)}
                 label="กำลังดูแล"
                 valueClassName={TONE.info.value}
               />
               <Stat2
-                value={`${needStartDate.length.toLocaleString('th-TH')} คน`}
+                value={countText(needStartDate.length)}
                 label="ยังไม่ระบุวันเริ่มงาน"
                 hint="ตั้งรอบโทรไม่ได้จนกรอกวัน"
                 valueClassName={needStartDate.length > 0 ? TONE.warn.value : TONE.success.value}
               />
               <Stat2
-                value={`${overdueCount.toLocaleString('th-TH')} คน`}
+                value={countText(overdueCount)}
                 label="เลยรอบที่ควรโทร"
                 valueClassName={overdueCount > 0 ? TONE.danger.value : TONE.success.value}
               />
@@ -225,20 +237,20 @@ const AftercarePage: React.FC = () => {
           <div className={cn('rounded-xl border px-3 py-2', TONE.info.soft)}>
             <p className={cn('text-[11px] font-medium', DASH.muted)}>กำลังดูแล</p>
             <p className={cn('text-xl font-medium tabular-nums', TONE.info.num)}>
-              {open.length.toLocaleString('th-TH')} คน
+              {countText(open.length)}
             </p>
           </div>
           <div className={cn('rounded-xl border px-3 py-2', needStartDate.length > 0 ? TONE.warn.soft : TONE.neutral.soft)}>
             <p className={cn('text-[11px] font-medium', DASH.muted)}>ยังไม่ระบุวันเริ่มงาน</p>
             <p className={cn('text-xl font-medium tabular-nums', needStartDate.length > 0 ? TONE.warn.num : TONE.success.value)}>
-              {needStartDate.length.toLocaleString('th-TH')} คน
+              {countText(needStartDate.length)}
             </p>
             <p className={cn('text-[10px]', DASH.muted)}>ตั้งรอบโทรไม่ได้จนกรอกวัน</p>
           </div>
           <div className={cn('rounded-xl border px-3 py-2', overdueCount > 0 ? TONE.danger.soft : TONE.neutral.soft)}>
             <p className={cn('text-[11px] font-medium', DASH.muted)}>เลยรอบที่ควรโทร</p>
             <p className={cn('text-xl font-medium tabular-nums', overdueCount > 0 ? TONE.danger.num : TONE.success.value)}>
-              {overdueCount.toLocaleString('th-TH')} คน
+              {countText(overdueCount)}
             </p>
           </div>
         </div>
@@ -275,8 +287,13 @@ const AftercarePage: React.FC = () => {
         {/* ═══ ปฏิทิน Planning (เจ้าของสั่ง 1 ก.ย. 2569) ═══
             *"ขอเป็นภาพแบบ Planning ให้เห็นว่าแต่ละวันต้องโทรหาใครอะไรยังไงบ้าง"*
             รูปเดียวกับหน้าติดตาม — แถว = คน · คอลัมน์ = วัน */}
-        {/* 🔴 ปฏิทินอยู่เสมอ (ยังไม่มีใครก็เป็นตารางว่าง) — เจ้าของสั่ง 1 ต.ค. 2569 "ถ้าไม่มีข้อมูลก็เป็น 0 ไป" */}
-        {!loading ? (
+        {/* โหลดล้มบอกก่อนปฏิทิน (เดิมอยู่ท้ายหน้า · QA 17 ต.ค. 2569) */}
+        {error ? <LoadErrorNotice message={error} onRetry={load} /> : null}
+        {callsError && !error ? (
+          <LoadErrorNotice message="โหลดสายที่โทรจริงไม่สำเร็จ ปฏิทินยังไม่มีผลโทร" onRetry={load} />
+        ) : null}
+        {/* 🔴 ปฏิทินอยู่เสมอ (ยังไม่มีใครก็เป็นตารางว่าง) — เจ้าของสั่ง 1 ต.ค. 2569 "ถ้าไม่มีข้อมูลก็เป็น 0 ไป" · ล้ม = ไม่วาดตารางว่างหลอก */}
+        {!loading && !error ? (
           <AftercarePlanningCalendar
             people={open}
             calls={calls}
@@ -305,14 +322,7 @@ const AftercarePage: React.FC = () => {
           </p>
         ) : null}
 
-        {error ? (
-          <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.danger.soft, TONE.danger.value)}>
-            {error} —{' '}
-            <button type="button" onClick={load} className="underline">
-              ลองใหม่
-            </button>
-          </p>
-        ) : loading ? (
+        {error ? null : loading ? (
           <p className={cn('rounded-xl border px-3 py-6 text-center text-sm', DASH.card, DASH.muted)}>
             <LoaderCircle className="mr-1.5 inline h-4 w-4 animate-spin" /> กำลังโหลด…
           </p>

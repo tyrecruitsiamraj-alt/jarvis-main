@@ -135,6 +135,12 @@ const SupervisorDashboard: React.FC = () => {
 
   const { jobs, loading, refreshing, refetch, siamrajPrimary, dbSource, loadError, feedState } = useUnitRequestsFeed();
   /** เส้นใบขอพัง/ไม่มีสิทธิ์ = ห้ามคิดเลขจาก jobs ว่าง (จะขึ้น 0 ทั้งหน้า) · QA 5 ต.ค. 2569 */
+  /**
+   * เส้นเสริม (ยอดตามช่วง · ใบปิด) ล้ม — QA 17 ต.ค. 2569: เดิมกลืนเงียบเป็นชุดว่าง ⇒ เลขเป็น 0/เลขเก่าค้างเหมือนยังสด
+   * `sideRev` = ปุ่มรีเฟรชโหลดเส้นเสริมใหม่ด้วย (เดิมโหลดใหม่แค่ใบเปิด)
+   */
+  const [sideFailed, setSideFailed] = useState<{ throughput: boolean; closed: boolean }>({ throughput: false, closed: false });
+  const [sideRev, setSideRev] = useState(0);
   const feedProblem =
     !DEMO_MODE && (feedState === 'failed' || feedState === 'forbidden')
       ? feedState === 'forbidden'
@@ -192,15 +198,19 @@ const SupervisorDashboard: React.FC = () => {
     let cancelled = false;
     void fetchSiamrajThroughput(throughputFrom, throughputTo)
       .then((rows) => {
-        if (!cancelled) setThroughputRecords(rows);
+        if (cancelled) return;
+        setThroughputRecords(rows);
+        setSideFailed((s) => ({ ...s, throughput: false }));
       })
       .catch(() => {
-        if (!cancelled) setThroughputRecords([]);
+        if (cancelled) return;
+        setThroughputRecords([]);
+        setSideFailed((s) => ({ ...s, throughput: true }));
       });
     return () => {
       cancelled = true;
     };
-  }, [siamrajPrimary, dbSource, throughputFrom, throughputTo]);
+  }, [siamrajPrimary, dbSource, throughputFrom, throughputTo, sideRev]);
 
   useEffect(() => {
     if (DEMO_MODE) return;
@@ -227,15 +237,19 @@ const SupervisorDashboard: React.FC = () => {
     let cancelled = false;
     void fetchSiamrajClosedRequests(period.from, period.to)
       .then((rows) => {
-        if (!cancelled) setClosedJobs(rows);
+        if (cancelled) return;
+        setClosedJobs(rows);
+        setSideFailed((s) => ({ ...s, closed: false }));
       })
       .catch(() => {
-        if (!cancelled) setClosedJobs([]);
+        if (cancelled) return;
+        setClosedJobs([]);
+        setSideFailed((s) => ({ ...s, closed: true }));
       });
     return () => {
       cancelled = true;
     };
-  }, [siamrajPrimary, dbSource, period]);
+  }, [siamrajPrimary, dbSource, period, sideRev]);
 
   /** กางแผง "ภาระงานตามผู้รับผิดชอบ" ในโหมดทั้งหมด → ค่อยดึงใบปิดของช่วงเดียวกับ throughput */
   const requestClosedTotals = useCallback(() => {
@@ -243,8 +257,14 @@ const SupervisorDashboard: React.FC = () => {
     if (!(siamrajPrimary && dbSource === 'sqlserver')) return;
     setClosedAllLoading(true);
     void fetchSiamrajClosedRequests(throughputFrom, throughputTo)
-      .then((rows) => setClosedAllJobs(rows))
-      .catch(() => setClosedAllJobs([]))
+      .then((rows) => {
+        setClosedAllJobs(rows);
+        setSideFailed((s) => ({ ...s, closed: false }));
+      })
+      .catch(() => {
+        setClosedAllJobs([]);
+        setSideFailed((s) => ({ ...s, closed: true }));
+      })
       .finally(() => setClosedAllLoading(false));
   }, [period, closedAllJobs, closedAllLoading, siamrajPrimary, dbSource, throughputFrom, throughputTo]);
 
@@ -911,8 +931,17 @@ const SupervisorDashboard: React.FC = () => {
       }}
       loading={loading && !DEMO_MODE}
       loadError={feedProblem}
+      partialError={
+        [sideFailed.throughput ? 'โหลดยอดตามช่วงไม่สำเร็จ' : null, sideFailed.closed ? 'โหลดใบที่ปิดแล้วไม่สำเร็จ' : null]
+          .filter(Boolean)
+          .join(' · ') || null
+      }
       refreshing={refreshing}
-      onRefresh={() => void refetch()}
+      onRefresh={() => {
+        void refetch();
+        setSideRev((n) => n + 1);
+        setClosedAllJobs(null);
+      }}
       onExport={handleExport}
       onViewItem={handleView}
       onKpiClick={DEMO_MODE ? undefined : handleKpiClick}

@@ -7,6 +7,8 @@ import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { Phone, LoaderCircle, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
+import { friendlyErrorText } from '@/lib/friendlyError';
+import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
 import {
   Dialog,
   DialogContent,
@@ -178,6 +180,7 @@ const OurPeoplePage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [people, setPeople] = useState<BoardPerson[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rev, setRev] = useState(0);
   const [query, setQuery] = useState('');
   /** หน้าปัจจุบันของแต่ละถัง (คีย์ = bucket key) — ค้นหาเมื่อไหร่รีเซ็ตทุกถัง */
   const [pageByBucket, setPageByBucket] = useState<Record<string, number>>({});
@@ -200,14 +203,22 @@ const OurPeoplePage: React.FC = () => {
   });
 
   useEffect(() => {
+    let cancelled = false;
+    setError(null);
     apiFetch('/api/matching/board-candidates?people=1')
       .then(async (r) => {
-        if (!r.ok) throw new Error(`โหลดรายชื่อไม่สำเร็จ (HTTP ${r.status})`);
+        // QA 17 ต.ค. 2569: เดิมขึ้น "(HTTP 500)" ไม่มีปุ่มลองใหม่ · ข้อความคนอ่านผ่าน friendlyErrorText
+        if (!r.ok) throw new Error('โหลดรายชื่อไม่สำเร็จ');
         const d = (await r.json()) as { people?: BoardPerson[] };
-        setPeople(d.people ?? []);
+        if (!cancelled) setPeople(d.people ?? []);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'โหลดรายชื่อไม่สำเร็จ'));
-  }, []);
+      .catch((e) => {
+        if (!cancelled) setError(friendlyErrorText(e, 'โหลดรายชื่อไม่สำเร็จ'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rev]);
 
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -257,7 +268,7 @@ const OurPeoplePage: React.FC = () => {
       />
       <div className="px-4 md:px-6 space-y-4 pb-8">
 
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? <LoadErrorNotice message={error} onRetry={() => setRev((n) => n + 1)} /> : null}
         {!people && !error ? (
           <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
             <LoaderCircle className="h-4 w-4 animate-spin text-blue-500" aria-hidden /> กำลังโหลดรายชื่อ…
@@ -321,7 +332,8 @@ const OurPeoplePage: React.FC = () => {
           </div>
         ) : null}
 
-        {grouped
+        {/* ยังไม่ได้รายชื่อ (โหลด/ล้ม) = ไม่วาดการ์ดถัง — เดิมขึ้น "0 คน · ไม่มีคนในถังนี้" ระหว่างโหลด (QA 17 ต.ค. 2569) */}
+        {(people ? grouped : [])
           .filter((bucket) => bucket.key === activeBucket)
           .map((bucket) => {
             const totalPages = getTotalPages(bucket.items.length, pageSize);

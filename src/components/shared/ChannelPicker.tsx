@@ -40,6 +40,8 @@ const ChannelPicker: React.FC<{
   /** จำนวนลูกของแต่ละพ่อ — ตัวตัดสินว่ากดแล้ว "เข้าไปเลือกต่อ" หรือ "เลือกเลย" */
   const [childCounts, setChildCounts] = useState<Record<string, number>>({});
   const [failed, setFailed] = useState(false);
+  /** โหลดช่องทางรอบแรกอยู่ — QA 17 ต.ค. 2569: เดิมขึ้น "ยังไม่มีช่องทาง" ระหว่างโหลด */
+  const [rootsLoading, setRootsLoading] = useState(true);
 
   /** พ่อที่กำลังกางลูกอยู่ — null = ยังอยู่หน้าช่องทางหลัก */
   const [parent, setParent] = useState<RecruitChannelMatch | null>(null);
@@ -61,6 +63,7 @@ const ChannelPicker: React.FC<{
     setParent(null);
     setChildQ('');
     let alive = true;
+    setRootsLoading(true);
     fetchRecruitChannelRoots()
       .then((list) => {
         if (!alive) return;
@@ -74,6 +77,9 @@ const ChannelPicker: React.FC<{
         if (!alive) return;
         setRoots([]);
         setFailed(true);
+      })
+      .finally(() => {
+        if (alive) setRootsLoading(false);
       });
     return () => {
       alive = false;
@@ -259,6 +265,8 @@ const ChannelPicker: React.FC<{
         <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
           {searching
             ? 'กำลังค้นหา…'
+            : rootsLoading && !query.trim()
+              ? 'กำลังโหลดช่องทาง…'
             : query.trim()
               ? 'ไม่เจอช่องทางที่ตรงกับคำค้น'
               : 'ยังไม่มีช่องทาง — เพิ่มได้ที่ปุ่ม "ช่องทาง" หน้าบอร์ด'}

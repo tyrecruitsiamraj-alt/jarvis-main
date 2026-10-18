@@ -962,7 +962,8 @@ const RmWorkspace: React.FC<{
             chips={APPOINTMENT_CHIPS.map((c) => ({
               id: c.id,
               label: c.label,
-              count: loading ? null : appointmentChipCount(appointmentBoard, c.id),
+              // โหลดล้ม = "—" เหมือนแท็บอื่น (QA 17 ต.ค. 2569: เดิมขึ้น 0)
+              count: loading ? null : loadError ? 'unknown' : appointmentChipCount(appointmentBoard, c.id),
             }))}
           />
           {/* ตารางรายวัน (ข้อ 12 · 20 ส.ค. 2569) ยังอยู่ — กางจากปุ่มนี้แทนการวางค้างไว้หัวแท็บ */}

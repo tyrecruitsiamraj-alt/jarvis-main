@@ -50,7 +50,8 @@ const BREAKDOWN_METRICS: readonly { value: FollowMetric; label: string }[] = (
   ['registered', 'success', 'dropped', 'called'] as FollowMetric[]
 ).map((value) => ({ value, label: FOLLOW_METRIC_LABEL[value] }));
 
-const FollowDashboard: React.FC = () => {
+/** `refreshKey` — ปุ่มรีเฟรชของหน้าติดตาม (โหลดใหม่โดยไม่ล้างช่วง/ตัวเลือกบนจอ) */
+const FollowDashboard: React.FC<{ refreshKey?: number }> = ({ refreshKey = 0 }) => {
   const win = useTrendWindow('day');
   const { range, previous, grain } = win;
 
@@ -64,12 +65,17 @@ const FollowDashboard: React.FC = () => {
     setError(null);
     fetchFollowTrendRows(win.fetchFrom, win.today)
       .then((r) => !cancelled && setRows(r))
-      .catch((e: unknown) => !cancelled && setError(friendlyErrorText(e, 'โหลดไม่สำเร็จ')))
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        // ล้มแล้วห้ามค้างเลขของช่วงเก่าไว้ใต้หัวช่วงใหม่ (QA 17 ต.ค. 2569)
+        setRows(null);
+        setError(friendlyErrorText(e, 'โหลดไม่สำเร็จ'));
+      })
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [win.fetchFrom, win.today, rev]);
+  }, [win.fetchFrom, win.today, rev, refreshKey]);
 
   const [dim, setDim] = useState<FollowDim>('unit');
   const [metric, setMetric] = useState<FollowMetric>('registered');
