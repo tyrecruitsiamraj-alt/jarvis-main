@@ -108,3 +108,19 @@ describe('รอบ 2 (18 ต.ค. 2569)', () => {
     expect(read('src/pages/matching/PreCheckPage.tsx')).toContain('aria-label="อายุต่ำสุด"');
   });
 });
+
+describe('3 ข้อสุดท้าย (18 ต.ค. 2569)', () => {
+  it('ชื่องาน/หน่วยงานบนจอไม่มีอิโมจิ (📍)', async () => {
+    const { withoutEmoji, applicationUnitLabel } = await import('../../src/lib/recruitRm');
+    expect(withoutEmoji('📍 ธนาคารกรุงศรี ✅')).toBe('ธนาคารกรุงศรี');
+    expect(applicationUnitLabel({ unit_name: null, job_title: '📍 KYE บางนา', position_interest: null } as never)).toBe('KYE บางนา');
+  });
+  it('ปุ่มลองใหม่: รายชื่อในป๊อป/หน้าใบ · บทโทร · กราฟรายวันหน้าหลัก', () => {
+    expect(read('src/components/jobs/JobApplicantsDialog.tsx')).toContain('<LoadErrorNotice message={error} onRetry={() => setReloadSeq((n) => n + 1)} />');
+    expect(read('src/pages/settings/CallScriptsTab.tsx')).toContain('<LoadErrorNotice message={error} onRetry={() => void load()} />');
+    expect(read('src/components/home-ai-share/AiShareDetail.tsx')).toContain('<LoadErrorNotice message={failed} onRetry={onRetry} />');
+  });
+  it('ตารางผลโทรราย BU มือถือ: เรื่อง/ใครโทร ติดซ้าย', () => {
+    expect(read('src/components/home-ai-share/AiShareLumosStats.tsx')).toContain('max-sm:sticky max-sm:left-20');
+  });
+});

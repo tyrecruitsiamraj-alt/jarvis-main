@@ -21,6 +21,7 @@ import {
 import { summarizeCallChoice } from '@/lib/callChoiceSummary';
 import { FOLLOW_STATUS_LABEL, FOLLOW_STATUS_TONE, isFollowCallStatus } from '@/lib/followApi';
 import { cn } from '@/lib/utils';
+import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import { applicantAddressLine, applicantFactLine } from '@/lib/applicantDisplay';
 import { isKnownOutcome, splitInterested } from '@/lib/applicantCallOutcome';
@@ -220,6 +221,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
     }
   };
 
+  const [reloadSeq, setReloadSeq] = useState(0);
   useEffect(() => {
     if (!open || !job) return;
     let cancelled = false;
@@ -229,6 +231,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
     setLoading(true);
     setError(null);
     setActionError(null);
+    // deps มี `reloadSeq` = ปุ่มลองใหม่ (QA 17 ต.ค. 2569: เดิมล้มแล้วต้องปิดป๊อปเปิดใหม่)
     fetchJobApplications(job.id)
       .then((data) => {
         if (!cancelled) setItems(data);
@@ -242,7 +245,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [open, job]);
+  }, [open, job, reloadSeq]);
 
   /**
    * ⚠️ อ่านวันที่ไม่ได้ต้องคืนขีด ไม่ใช่สตริงว่าง — ว่างแล้ว span สูง 0
@@ -615,7 +618,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
               กำลังโหลดรายชื่อ...
             </div>
           ) : error ? (
-            <p className={cn('rounded-xl border px-3.5 py-3 text-sm', TONE.danger.soft, TONE.danger.value)}>{error}</p>
+            <LoadErrorNotice message={error} onRetry={() => setReloadSeq((n) => n + 1)} />
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <span className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">

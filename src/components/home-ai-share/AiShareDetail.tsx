@@ -46,6 +46,7 @@ import {
 } from '@/lib/homeAiShare';
 import { rangeTextFull } from '@/lib/periodPick';
 import { cn } from '@/lib/utils';
+import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
 
 /** บรรทัดท้ายตอนจี้แท่ง — เฉพาะแท่งที่กดลงไปดูข้างในได้ (แท่งรายวันไม่มี) */
 const PICK_HINT: Record<AiShareGrain, string | null> = {
@@ -64,6 +65,8 @@ const AiShareDetail: React.FC<{
   data: AiShareDetailResponse | null;
   loading: boolean;
   error: string | null;
+  /** ปุ่มลองใหม่ตอนกราฟโหลดล้ม (QA 17 ต.ค. 2569: เดิมมีแต่ข้อความ) */
+  onRetry?: () => void;
   /**
    * หัวข้อนี้แยกทีมได้ไหม (เฉพาะติดตาม · 4 ต.ค. 2569 "ติดตามคนเริ่มงาน กับ ติดตามส่งคนแทน แยกแล้วอย่างละเท่าไหร่")
    * true = มีสวิตช์ "แยกทีม" ข้างสวิตช์แยก BU
@@ -86,6 +89,7 @@ const AiShareDetail: React.FC<{
   data,
   loading,
   error,
+  onRetry,
   withTeams = false,
   hideNotCalled = false,
   onFocusDay,
@@ -220,7 +224,7 @@ const AiShareDetail: React.FC<{
       {loading && !view ? (
         <Skeleton className="h-64 w-full rounded-2xl" aria-label={`กำลังโหลดกราฟ${title}`} />
       ) : failed && !view ? (
-        <p className={cn('text-sm', TONE.danger.value)}>{failed}</p>
+        <LoadErrorNotice message={failed} onRetry={onRetry} />
       ) : view ? (
         <AiShareUsageChart
           buckets={view.buckets}

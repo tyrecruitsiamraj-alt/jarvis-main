@@ -204,8 +204,9 @@ function FollowResults({
               <TableHeader>
                 {/* หัว 2 ชั้น: โทรแล้ว (รวม + ผล 5 แบบ) | ไม่ได้โทร (ยกเลิก · รอโทร) */}
                 <TableRow className="border-0 hover:bg-transparent">
-                  <TableHead className="text-xs" rowSpan={2}>เรื่อง</TableHead>
-                  <TableHead className="text-xs" rowSpan={2}>ใครโทร</TableHead>
+                  {/* มือถือ: เรื่อง + ใครโทร ติดซ้าย เลื่อนดูผลแล้วยังรู้ว่าแถวไหน (QA 17 ต.ค. 2569: เห็นแค่ 2 จาก 15 คอลัมน์) */}
+                  <TableHead className="text-xs max-sm:sticky max-sm:left-0 max-sm:z-10 max-sm:w-20 max-sm:min-w-20 max-sm:whitespace-normal max-sm:bg-card max-sm:px-1 max-sm:text-xs" rowSpan={2}>เรื่อง</TableHead>
+                  <TableHead className="text-xs max-sm:sticky max-sm:left-20 max-sm:z-10 max-sm:min-w-14 max-sm:bg-card max-sm:px-1 max-sm:text-xs" rowSpan={2}>ใครโทร</TableHead>
                   <TableHead className="whitespace-nowrap text-right text-xs" rowSpan={2}>ทั้งหมด</TableHead>
                   <TableHead className="border-l border-foreground/10 text-center text-xs" colSpan={1 + CALLED_COLS.length}>
                     โทรแล้ว
@@ -240,10 +241,10 @@ function FollowResults({
               <TableBody>
                 {b.rows.map((r, i) => (
                   <TableRow key={`${r.team}:${r.caller}`} data-testid={`bu-row-${b.bu ?? 'none'}-${r.team}-${r.caller}`}>
-                    <TableCell className="whitespace-nowrap text-sm text-foreground">
+                    <TableCell className="whitespace-nowrap text-sm text-foreground max-sm:sticky max-sm:left-0 max-sm:z-10 max-sm:w-20 max-sm:min-w-20 max-sm:whitespace-normal max-sm:bg-card max-sm:px-1 max-sm:text-xs">
                       {i === 0 || b.rows[i - 1].team !== r.team ? TEAM_LABEL[r.team] : ''}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm text-foreground">{CALLER_LABEL[r.caller]}</TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-foreground max-sm:sticky max-sm:left-20 max-sm:z-10 max-sm:min-w-14 max-sm:bg-card max-sm:px-1 max-sm:text-xs">{CALLER_LABEL[r.caller]}</TableCell>
                     <TableCell className="text-right font-medium">{num(r.total)}</TableCell>
                     <TableCell className="border-l border-foreground/10 text-right font-medium" data-testid="bu-cell-called">
                       {num(followCalledOf(r.buckets))}
@@ -263,7 +264,7 @@ function FollowResults({
               </TableBody>
               <TableFooter>
                 <TableRow data-testid={`bu-row-${b.bu ?? 'none'}-total`} className="border-0 bg-muted/60 font-medium hover:bg-muted/60">
-                  <TableCell className="whitespace-nowrap text-sm text-foreground" colSpan={2}>
+                  <TableCell className="whitespace-nowrap text-sm text-foreground max-sm:sticky max-sm:left-0 max-sm:z-10 max-sm:bg-muted" colSpan={2}>
                     รวม {b.bu ?? 'ไม่ระบุ BU'}
                   </TableCell>
                   <TableCell className="text-right">{num(b.sum.total)}</TableCell>

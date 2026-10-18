@@ -615,6 +615,7 @@ const HomeAiSharePage: React.FC = () => {
         data={detailNow}
         loading={detailLoading}
         error={detailError}
+        onRetry={() => setRetrySeq((n) => n + 1)}
         hideBreakdown
       />
     </Card>

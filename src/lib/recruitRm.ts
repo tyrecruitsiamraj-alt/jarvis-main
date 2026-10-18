@@ -380,9 +380,17 @@ export function splitApplicantName(r: PublicApplication): { firstName: string; l
 }
 
 /** ป้าย "สมัครงานไหน" — หัวใจของหน้านี้ · ใบที่สมัครแบบไม่ระบุงานต้องบอกตรง ๆ ไม่ปล่อยว่าง */
+/**
+ * ตัดอิโมจิออกจากชื่องาน/หน่วยงานบนจอ — ชื่อประกาศที่ทีมพิมพ์เองมี 📍 ฯลฯ ติดมา (QA 17 ต.ค. 2569: คอลัมน์หน่วยงานปน 📍)
+ * กติกาเดียวกับ `lumosDispatch` ที่ตัดก่อนส่งให้ AI พูด
+ */
+export function withoutEmoji(v: string | null | undefined): string {
+  return (v || '').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export function applicationJobLabel(r: PublicApplication): string {
-  const job = (r.job_title || '').trim() || (r.position_interest || '').trim();
-  const unit = (r.unit_name || '').trim();
+  const job = withoutEmoji(r.job_title) || withoutEmoji(r.position_interest);
+  const unit = withoutEmoji(r.unit_name);
   if (job && unit) return `${job} — ${unit}`;
   return job || unit || 'สมัครทั่วไป (ไม่ระบุงาน)';
 }
@@ -395,9 +403,9 @@ export function applicationJobLabel(r: PublicApplication): string {
  * ไม่มีหน่วยงานค่อยถอยไปใช้ชื่องานที่สมัคร
  */
 export function applicationUnitLabel(r: PublicApplication): string {
-  const unit = (r.unit_name || '').trim();
+  const unit = withoutEmoji(r.unit_name);
   if (unit) return unit;
-  return (r.job_title || '').trim() || (r.position_interest || '').trim() || '';
+  return withoutEmoji(r.job_title) || withoutEmoji(r.position_interest) || '';
 }
 
 /**

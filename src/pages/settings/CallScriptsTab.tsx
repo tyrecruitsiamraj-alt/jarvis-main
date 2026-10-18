@@ -18,6 +18,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { apiFetch } from '@/lib/apiFetch';
 import { DASH, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
+import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
+import { friendlyErrorText } from '@/lib/friendlyError';
 
 type ScriptItem = {
   key: string;
@@ -94,7 +96,7 @@ const CallScriptsTab: React.FC = () => {
       setData(body);
       setDraft(Object.fromEntries(body.scripts.map((s) => [s.key, [...s.lines]])));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'โหลดบทไม่สำเร็จ');
+      setError(friendlyErrorText(e, 'โหลดบทไม่สำเร็จ'));
     }
   }, []);
 
@@ -145,8 +147,9 @@ const CallScriptsTab: React.FC = () => {
     setDraft((d) => ({ ...d, [key]: d[key].map((l, j) => (j === i ? value : l)) }));
 
   if (!data) {
+    // โหลดบทล้ม = มีปุ่มลองใหม่ (QA 17 ต.ค. 2569)
     return error ? (
-      <p className={cn('text-sm', TONE.danger.value)}>{error}</p>
+      <LoadErrorNotice message={error} onRetry={() => void load()} />
     ) : (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> กำลังโหลดบท…
