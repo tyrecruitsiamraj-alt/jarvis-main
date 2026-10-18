@@ -785,27 +785,25 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">รัศมี (กม.)</label>
                 <div className="flex flex-wrap gap-1.5">
+                  {/* shadcn Button (QA 17 ต.ค. 2569: เดิม blue-600 ดิบ โหมดมืดอ่านได้ 1.34:1) */}
                   {[5, 10, 15, 20].map((r) => (
-                    <button
+                    <Button
                       key={r}
                       type="button"
+                      size="xs"
+                      variant={radius === r ? 'default' : 'outline'}
+                      aria-pressed={radius === r}
                       onClick={() => setRadius(r)}
-                      className={cn(
-                        'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-                        radius === r
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'bg-white/50 text-muted-foreground border border-white/70 hover:border-blue-300/50 dark:hover:border-blue-700/50',
-                      )}
                     >
                       {r} กม.
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
             </div>
 
             {hint ? (
-              <p className="text-xs text-muted-foreground rounded-xl bg-white/40 border border-white/70 px-3 py-2">{hint}</p>
+              <p className="text-xs text-muted-foreground rounded-xl bg-white/40 dark:border-slate-700/60 dark:bg-slate-800/40 border border-white/70 px-3 py-2">{hint}</p>
             ) : null}
           </section>
 
@@ -821,7 +819,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
             </div>
             {appliedCenter ? (
               <div className="space-y-2">
-                <div className="text-xs text-muted-foreground rounded-xl bg-white/40 border border-white/70 px-3 py-2">
+                <div className="text-xs text-muted-foreground rounded-xl bg-white/40 dark:border-slate-700/60 dark:bg-slate-800/40 border border-white/70 px-3 py-2">
                   <MapPin className="w-3 h-3 inline mr-1 text-blue-600 dark:text-blue-300" />
                   {appliedCenter.label}
                 </div>
@@ -833,7 +831,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                 />
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-white/70 bg-white/30 p-8 text-center">
+              <div className="rounded-2xl border border-dashed border-white/70 bg-white/30 dark:border-slate-700/60 dark:bg-slate-800/40 p-8 text-center">
                 <MapPin className="w-8 h-8 text-blue-400/50 mx-auto mb-2" />
                 <p className="text-sm font-medium text-foreground">ยังไม่มีตำแหน่งบนแผนที่</p>
                 <p className="mt-1 text-xs text-muted-foreground">พิมพ์ที่อยู่ผู้สมัครแล้วกดค้นหา</p>
@@ -1000,7 +998,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                       ดูใบขอ →
                     </Link>
                   </div>
-                  <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
+                  <div className="rounded-xl border border-white/70 bg-white/40 dark:border-slate-700/60 dark:bg-slate-800/40 px-3 py-3 space-y-2">
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-300" />
                       <p className="text-sm font-medium text-foreground">สถานที่ทำงาน</p>
@@ -1075,13 +1073,9 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                       <div className="mt-3 rounded-xl border border-violet-200/70 bg-violet-50/30 px-3 py-3 space-y-2 dark:border-violet-800/70 dark:bg-violet-950/50">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-medium text-violet-900 dark:text-violet-200">แก้ไขใบขอ (บันทึกถาวร)</p>
-                          <button
-                            type="button"
-                            onClick={toggleEditJob}
-                            className="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950/50"
-                          >
+                          <Button type="button" size="xs" variant="outline" onClick={toggleEditJob}>
                             {editOpen ? 'ยกเลิก' : 'แก้ไข อายุ/เพศ/สาขา'}
-                          </button>
+                          </Button>
                         </div>
                         {editOpen ? (
                           <div className="space-y-2.5 pt-1">
@@ -1091,14 +1085,14 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                                 value={editAgeMin}
                                 onChange={(e) => setEditAgeMin(e.target.value.replace(/[^0-9]/g, ''))}
                                 placeholder="ต่ำสุด"
-                                className="w-20 bg-white/80"
+                                className="w-20 bg-white/80 dark:bg-slate-900"
                               />
                               <span>–</span>
                               <Input
                                 value={editAgeMax}
                                 onChange={(e) => setEditAgeMax(e.target.value.replace(/[^0-9]/g, ''))}
                                 placeholder="สูงสุด"
-                                className="w-20 bg-white/80"
+                                className="w-20 bg-white/80 dark:bg-slate-900"
                               />
                             </div>
                             <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -1106,7 +1100,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                               <select
                                 value={editGender}
                                 onChange={(e) => setEditGender(e.target.value)}
-                                className="rounded-md border border-input bg-white/80 px-2 py-1.5 text-sm"
+                                className="rounded-md border border-input bg-white/80 dark:bg-slate-900 px-2 py-1.5 text-sm"
                               >
                                 <option value="">ไม่ระบุ</option>
                                 <option value="ชาย">ชาย</option>
@@ -1139,7 +1133,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                                       )
                                     }
                                     placeholder="ชื่อสาขา"
-                                    className="flex-1 min-w-[110px] bg-white/80"
+                                    className="flex-1 min-w-[110px] bg-white/80 dark:bg-slate-900"
                                   />
                                   <Input
                                     value={String(b.requested_qty)}
@@ -1153,7 +1147,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                                       )
                                     }
                                     placeholder="จำนวน"
-                                    className="w-16 bg-white/80"
+                                    className="w-16 bg-white/80 dark:bg-slate-900"
                                   />
                                   <Input
                                     value={b.district_hint}
@@ -1163,7 +1157,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                                       )
                                     }
                                     placeholder="เขต/อำเภอ"
-                                    className="w-28 bg-white/80"
+                                    className="w-28 bg-white/80 dark:bg-slate-900"
                                   />
                                   <button
                                     type="button"
@@ -1198,7 +1192,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
 
                       <div className="mt-3">
                         {branchParseData?.parsed.items?.length ? (
-                      <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
+                      <div className="rounded-xl border border-white/70 bg-white/40 dark:border-slate-700/60 dark:bg-slate-800/40 px-3 py-3 space-y-2">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-medium text-foreground">แตกสาขาจากข้อความ ERP</p>
                       <div className="flex items-center gap-1.5">
@@ -1233,7 +1227,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                           value={branchParserOverride}
                           onChange={(e) => setBranchParserOverride(e.target.value)}
                           placeholder={branchParseData?.parser_input || 'ถ้าวางข้อความเอง ระบบจะใช้ข้อความนี้แทนการ parse อัตโนมัติ'}
-                          className="min-h-[84px] bg-white/70"
+                          className="min-h-[84px] bg-white/70 dark:bg-slate-900"
                         />
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-[11px] text-muted-foreground">
@@ -1371,7 +1365,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                     )}
                       </div>
                         ) : (
-                          <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
+                          <div className="rounded-xl border border-white/70 bg-white/40 dark:border-slate-700/60 dark:bg-slate-800/40 px-3 py-3 space-y-2">
                             <div className="flex items-center justify-between gap-2">
                               <p className="text-sm font-medium text-foreground">
                                 ผู้สมัครที่แมทกับใบขอนี้

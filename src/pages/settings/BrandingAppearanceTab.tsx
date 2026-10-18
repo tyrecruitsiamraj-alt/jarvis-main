@@ -212,8 +212,7 @@ const BrandingAppearanceTab: React.FC = () => {
           ) : null}
         </div>
         <p className="text-xs text-muted-foreground">
-          การแก้ในแท็บนี้บันทึกในเบราว์เซอร์ของคุณทันที — ผู้ใช้คนอื่นจะเห็นโลโก้/ธีมเดียวกันเมื่อ Admin กด &quot;เผยแพร่ให้ทุกคน&quot;
-          และรัน migration ตาราง <code className="text-[10px]">app_branding</code> บน PostgreSQL แล้ว
+          แก้แล้วเห็นในเครื่องนี้ทันที — คนอื่นเห็นเมื่อกด &quot;เผยแพร่ให้ทุกคน&quot;
         </p>
         {syncFeedback ? (
           <p className={syncFeedback.ok ? 'text-xs text-muted-foreground' : 'text-xs text-destructive'}>

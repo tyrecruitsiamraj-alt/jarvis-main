@@ -397,7 +397,7 @@ const AdminSettings: React.FC = () => {
 
   return (
     <div>
-      <PageHeader title="Settings" subtitle="ตั้งค่าระบบ" />
+      <PageHeader title="ตั้งค่า" />
       <div className="px-4 md:px-6 space-y-4">
         {/**
          * เมนูซ้ายแบ่งกลุ่ม (เจ้าของเคาะ 20 ส.ค. 2569 — เดิมเป็นแท็บ 12 อันแถวเดียว
@@ -723,21 +723,21 @@ const AdminSettings: React.FC = () => {
                         {user?.id === u.id ? (
                           'คุณ'
                         ) : savingUserId === u.id ? (
-                          'saving…'
+                          'กำลังบันทึก…'
                         ) : (
+                          // ปุ่มต้องมีคำ (กฎ 15 ต.ค. 2569 · QA 17 ต.ค.)
                           <Button
                             type="button"
                             variant="ghost"
-                            size="iconXs"
+                            size="xs"
                             aria-label={`ลบบัญชี ${u.full_name}`}
-                            title="ลบบัญชี"
                             className={TONE.danger.value}
                             onClick={() => {
                               setDeleteError('');
                               setDeleteTarget(u);
                             }}
                           >
-                            <Trash2 aria-hidden />
+                            <Trash2 aria-hidden /> ลบ
                           </Button>
                         )}
                       </td>

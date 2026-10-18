@@ -99,7 +99,8 @@ export async function readSwitches(): Promise<SwitchRow[]> {
       label: 'ใบสมัครหน้าสาธารณะ → AI โทร',
       state: truthyEnv(process.env.APPLICATION_AUTO_DISPATCH_ENABLED) ? 'on' : 'off',
       stateLabel: truthyEnv(process.env.APPLICATION_AUTO_DISPATCH_ENABLED) ? 'เปิด' : 'ปิด',
-      note: 'ตั้งที่ APPLICATION_AUTO_DISPATCH_ENABLED',
+      // คำบนจอห้ามมีชื่อตัวแปรระบบ (QA 17 ต.ค. 2569)
+      note: 'เปิด/ปิดที่ไฟล์ตั้งค่าเซิร์ฟเวอร์',
     },
     {
       key: 'applicationAutoMove',
@@ -120,7 +121,7 @@ export async function readSwitches(): Promise<SwitchRow[]> {
       label: 'คิดผล AI ล่วงหน้า',
       state: truthyEnv(process.env.MATCH_PRECOMPUTE_ENABLED) ? 'on' : 'off',
       stateLabel: truthyEnv(process.env.MATCH_PRECOMPUTE_ENABLED) ? 'เปิด' : 'ปิด',
-      note: 'ตั้งที่ MATCH_PRECOMPUTE_ENABLED',
+      note: 'เปิด/ปิดที่ไฟล์ตั้งค่าเซิร์ฟเวอร์',
     },
   ];
 }

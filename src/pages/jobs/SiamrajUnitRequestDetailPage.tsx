@@ -44,7 +44,7 @@ function Field({ label, value }: { label: string; value?: string | number | null
   const display =
     value === undefined || value === null || value === '' ? '—' : value;
   return (
-    <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-2">
+    <div className="rounded-xl border border-white/70 bg-white/40 dark:border-slate-700/60 dark:bg-slate-800/40 px-3 py-2">
       <div className="text-[10px] text-muted-foreground">{label}</div>
       <div className="text-sm text-foreground mt-0.5 whitespace-pre-wrap">{display}</div>
     </div>
@@ -239,7 +239,8 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
             <PrequestBadge job={data ?? { id }} />
             <span className={cn('inline-flex items-center gap-1', TONE.primary.chip)}>
               <Database className="w-3.5 h-3.5" />
-              Siamraj · อ่านอย่างเดียว
+              {/* QA 17 ต.ค. 2569: เดิม "อ่านอย่างเดียว" ทั้งที่หน้านี้มีปุ่มบันทึก (ส่วนที่ทีมแก้เก็บที่ฝั่งเรา) */}
+              ข้อมูลจาก ERP
             </span>
           </>
         }
@@ -502,9 +503,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 ทำแบบเดิม เคยไม่มีก็ไม่ต้องมี"*) — ดูที่ JobBoardView แท็บรายละเอียดงาน */}
 
 
-            <p className="text-xs text-muted-foreground">
-              ข้อมูลมาจาก schema so-operation บน Siamraj — Jarvis อ่านอย่างเดียว แก้ไขที่ระบบต้นทาง
-            </p>
+            <p className="text-xs text-muted-foreground">ข้อมูลใบขอมาจาก ERP — แก้ที่ ERP</p>
 
             <Button size="sm"
               type="button"

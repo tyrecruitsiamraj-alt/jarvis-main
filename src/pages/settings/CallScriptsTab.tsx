@@ -222,14 +222,16 @@ const CallScriptsTab: React.FC = () => {
                     rows={Math.max(1, Math.ceil(line.length / 90))}
                     className="jarvis-soft-field min-h-[38px] w-full resize-y text-sm leading-relaxed"
                   />
-                  <button
+                  {/* ปุ่มต้องมีคำ (กฎ 15 ต.ค. 2569 · QA 17 ต.ค.) · shadcn Button */}
+                  <Button
                     type="button"
-                    title="ลบประโยคนี้"
+                    variant="ghost"
+                    size="xs"
+                    className="mt-1.5 shrink-0 text-muted-foreground"
                     onClick={() => setDraft((d) => ({ ...d, [s.key]: d[s.key].filter((_, j) => j !== i) }))}
-                    className="mt-1.5 shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
                   >
-                    <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                  </button>
+                    <Trash2 aria-hidden /> ลบ
+                  </Button>
                 </li>
               ))}
             </ol>

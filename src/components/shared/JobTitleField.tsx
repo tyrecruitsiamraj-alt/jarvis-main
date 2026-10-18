@@ -1,11 +1,7 @@
 import React, { useEffect, useId, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { fetchRecruitJobTitles } from '@/lib/recruitJobTitlesApi';
-import {
-  isKnownJobTitle,
-  jobTitleOptions,
-  type RecruitJobTitle,
-} from '@/lib/recruitJobTitles';
+import { jobTitleOptions, type RecruitJobTitle } from '@/lib/recruitJobTitles';
 
 /**
  * ช่อง "ตำแหน่งงาน" — พิมพ์เองได้ + เติมคำจาก master ที่ยกมาจากระบบเดิม
@@ -59,8 +55,6 @@ const JobTitleField: React.FC<{
   }, [departmentCode]);
 
   const options = useMemo(() => jobTitleOptions(titles), [titles]);
-  const typed = value.trim();
-  const isNew = typed.length > 0 && titles.length > 0 && !isKnownJobTitle(titles, typed);
 
   return (
     <div className="space-y-1.5">
@@ -83,13 +77,7 @@ const JobTitleField: React.FC<{
           ))}
         </datalist>
       ) : null}
-      {options.length > 0 ? (
-        <p className="text-[11px] text-muted-foreground">
-          {isNew
-            ? 'ตำแหน่งใหม่ — ยังไม่มีในรายชื่อจากระบบเดิม (บันทึกได้ตามปกติ)'
-            : `พิมพ์เพื่อค้นจาก ${options.length.toLocaleString('th-TH')} ตำแหน่งที่ยกมาจากระบบเดิม หรือพิมพ์ชื่อใหม่ได้`}
-        </p>
-      ) : null}
+      {/* ถอดบรรทัดอธิบายใต้ช่อง (QA 17 ต.ค. 2569: ขึ้น "ตำแหน่งใหม่ — ยังไม่มีในรายชื่อ…" ทั้งที่ค่ามาจากใบขอ · กติกาห้ามประโยคอธิบายบนจอ) */}
     </div>
   );
 };

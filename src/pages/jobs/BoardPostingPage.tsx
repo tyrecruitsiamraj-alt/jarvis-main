@@ -237,12 +237,19 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   /** ปุ่มย้อนกลับของโหมดหน้า = กลับหน้าที่พามา · โหมด popup ใช้ `onDone` */
+  /**
+   * ไม่มีหน้าที่พามา (เปิดจากลิงก์ตรง) = กลับกล่องงาน — QA 17 ต.ค. 2569: เดิมถอยไป /jobs/list (ใบขอ) ทั้งที่หน้านี้เป็นงานของกล่องงาน
+   */
+  const explicitReturn =
+    (location.state as { returnTo?: string } | null)?.returnTo || new URLSearchParams(location.search).get('returnTo');
   const backPath =
     backPathProp ??
-    resolveUnitDetailBackPath({
-      stateReturnTo: (location.state as { returnTo?: string } | null)?.returnTo,
-      search: location.search,
-    });
+    (explicitReturn
+      ? resolveUnitDetailBackPath({
+          stateReturnTo: (location.state as { returnTo?: string } | null)?.returnTo,
+          search: location.search,
+        })
+      : '/jobs/board');
   /**
    * จบงานในป๊อป (บันทึกแบบร่าง / ส่งประกาศ / ปิด) = กลับกล่องงาน
    * 🔴 ห้ามพาไปหน้าใบขอ — เจ้าของสั่ง 27 ก.ย. 2569 ของในกล่องงานห้ามเด้งออกไปหน้าอื่น

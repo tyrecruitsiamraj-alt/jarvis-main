@@ -138,7 +138,7 @@ const AftercarePlanningCalendar: React.FC<{
             <thead>
               <tr className="border-b border-border">
                 {/* ชื่อคนตรึงซ้าย — เลื่อนดูวันท้ายเดือนแล้วต้องยังรู้ว่าแถวนี้ใคร */}
-                <th className="sticky left-0 z-10 min-w-[190px] max-w-[260px] bg-card px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">
+                <th className="sticky left-0 z-10 min-w-28 max-w-32 bg-card px-3 py-2 sm:min-w-[190px] sm:max-w-[260px] text-left text-[11px] font-medium text-muted-foreground">
                   คนที่ดูแลอยู่
                 </th>
                 {cols.map((c) => (
@@ -149,7 +149,7 @@ const AftercarePlanningCalendar: React.FC<{
                   >
                     <span
                       className={cn(
-                        'flex min-w-[64px] flex-col items-center rounded-lg px-1 py-1 font-medium',
+                        'flex min-w-12 flex-col items-center rounded-lg px-1 py-1 font-medium sm:min-w-[64px]',
                         c.isSunday ? 'text-rose-800 dark:text-red-300' : 'text-muted-foreground',
                         c.ymd === today && 'underline underline-offset-4',
                       )}
@@ -171,7 +171,7 @@ const AftercarePlanningCalendar: React.FC<{
               ) : null}
               {rows.map((row) => (
                 <tr key={row.person.phone_e164} className="border-b border-border/50 last:border-0">
-                  <td className="sticky left-0 z-10 max-w-[260px] bg-card px-3 py-1.5 align-middle">
+                  <td className="sticky left-0 z-10 max-w-32 bg-card px-3 py-1.5 align-middle sm:max-w-[260px]">
                     <span className="block truncate text-[11px] font-medium text-foreground">
                       {row.person.full_name}
                     </span>

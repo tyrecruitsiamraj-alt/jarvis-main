@@ -204,7 +204,7 @@ const AftercarePage: React.FC = () => {
         /* ย้อนกลับไปหน้าติดตาม (4 ต.ค. 2569 ไล่ Journey — คนมาจากการ์ดติดตามครบ แต่ไม่มีทางกลับ) */
         backPath="/follow"
         title="ดูแลหลังเริ่มงาน"
-        subtitle="คนที่ตามครบแล้วและเริ่มงานจริง — ตั้งรอบโทรถามความเป็นอยู่ 3 / 7 / 30 วัน"
+        subtitle="คนที่ตามครบแล้วและเริ่มงานจริง — โทรถามความเป็นอยู่ตามรอบ"
       />
 
       <div className="mt-4 space-y-3">
@@ -318,7 +318,7 @@ const AftercarePage: React.FC = () => {
 
         {!migrated ? (
           <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.warn.soft, TONE.warn.value)}>
-            ยังไม่ได้รัน migration 107 บนฐานนี้ — หน้านี้จะว่างจนรัน (`node scripts/migrate.mjs`)
+            ฐานข้อมูลของหน้านี้ยังไม่พร้อม — แจ้งผู้ดูแลระบบ
           </p>
         ) : null}
 

@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import { cn } from '@/lib/utils';
+import { TONE, type ToneKey } from '@/lib/designTokens';
 import { saveUnitRequestWorkStatus } from '@/lib/siamrajUnitRequestsApi';
 import {
   UNIT_REQUEST_WORK_STATUS_DATE_LABELS,
@@ -94,16 +95,20 @@ export function UnitRequestWorkStatusBadge({
   const { labelOf } = useWorkStatusOptions();
   const label = labelOf(resolved) || UNIT_REQUEST_WORK_STATUS_LABELS[resolved];
   const person = formatWorkPersonsSummary(persons, firstName, lastName);
-  const tone =
+  // สีจาก TONE (มีคู่โหมดมืด) — QA 17 ต.ค. 2569: เดิมสีสดไม่มี dark: อ่านได้ 2.3:1 · "ชะลอ" เคยเป็นเขียว (เขียว = หาได้แล้ว)
+  const toneKey: ToneKey =
     resolved === 'in_progress'
-      ? 'bg-amber-500/12 text-amber-800 border-amber-300/40'
+      ? 'warn'
       : resolved === 'evaluating'
-        ? 'bg-orange-500/12 text-orange-800 border-orange-300/40'
+        ? 'orange'
         : resolved === 'waiting_inform'
-          ? 'bg-sky-500/12 text-sky-800 border-sky-300/40'
+          ? 'info'
           : resolved === 'waiting_interview'
-            ? 'bg-violet-500/12 text-violet-800 border-violet-300/40'
-            : 'bg-emerald-500/12 text-emerald-800 border-emerald-300/40';
+            ? 'violet'
+            : resolved === 'on_hold'
+              ? 'neutral'
+              : 'success';
+  const tone = cn(TONE[toneKey].soft, TONE[toneKey].value);
 
   return (
     <span
@@ -282,7 +287,7 @@ export const UnitRequestWorkStatusEditor: React.FC<Props> = ({
       {needsPerson ? (
         <div className="space-y-3">
           {persons.map((p, idx) => (
-            <div key={p.key} className="space-y-3 rounded-xl border border-white/70 bg-white/40 p-3">
+            <div key={p.key} className="space-y-3 rounded-xl border border-white/70 bg-white/40 dark:border-slate-700/60 dark:bg-slate-800/40 p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-medium text-slate-600">คนที่ {idx + 1}</p>
                 {!readOnly && persons.length > 1 ? (

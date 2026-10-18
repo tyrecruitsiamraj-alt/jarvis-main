@@ -62,7 +62,7 @@ function DayInput({
   disabled?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-2">
+    <div className="rounded-xl border border-white/70 bg-white/40 dark:border-slate-700/60 dark:bg-slate-800/40 px-3 py-2">
       <Label htmlFor={id} className="text-[11px] font-medium text-foreground">
         {label}
       </Label>
@@ -243,7 +243,7 @@ const RequestLeadRulesCard: React.FC<{
       </div>
 
       {/* ตัวอย่างผลลัพธ์ — บอกให้เห็นก่อนกดบันทึกว่าใบนี้จะกลายเป็นอะไร */}
-      <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-2 text-xs">
+      <div className="rounded-xl border border-white/70 bg-white/40 dark:border-slate-700/60 dark:bg-slate-800/40 px-3 py-2 text-xs">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-muted-foreground">ใช้เกณฑ์ชุดนี้แล้ว ใบนี้คือ</span>
           <span className={cn('font-medium', TONE[REQUEST_LEAD_KIND_TONE[preview.kind]].value)}>

@@ -112,7 +112,9 @@ const ValueCasePage: React.FC = () => {
   const [state, setState] = useState<
     "loading" | "ready" | "not_allowed" | "error"
   >("loading");
-  const [dirty, setDirty] = useState(false);
+  /** ค่าที่บันทึกล่าสุด — แก้แล้วคืนค่าเดิม = ไม่ค้าง "ยังไม่ได้บันทึก" (QA 17 ต.ค. 2569) */
+  const [savedInputs, setSavedInputs] = useState<ValueCaseInputs>(EMPTY_VALUE_CASE);
+  const dirty = useMemo(() => JSON.stringify(inputs) !== JSON.stringify(savedInputs), [inputs, savedInputs]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [rev, setRev] = useState(0);
@@ -123,7 +125,9 @@ const ValueCasePage: React.FC = () => {
     fetchValueCase()
       .then((d) => {
         if (!alive) return;
-        setInputs(normalizeValueCase(d.inputs));
+        const loaded = normalizeValueCase(d.inputs);
+        setInputs(loaded);
+        setSavedInputs(loaded);
         setMonths(d.months);
         setCurrentYm(d.currentYm);
         setSavedAt(d.updatedAt);
@@ -147,7 +151,6 @@ const ValueCasePage: React.FC = () => {
     value: ValueCaseInputs[K],
   ) => {
     setInputs((p) => ({ ...p, [key]: value }));
-    setDirty(true);
   };
 
   const result = useMemo(
@@ -166,7 +169,7 @@ const ValueCasePage: React.FC = () => {
     try {
       const r = await saveValueCase(inputs);
       setSavedAt(r.updatedAt);
-      setDirty(false);
+      setSavedInputs(inputs);
     } catch (e) {
       setSaveError(friendlyErrorText(e, "บันทึกไม่สำเร็จ"));
     } finally {

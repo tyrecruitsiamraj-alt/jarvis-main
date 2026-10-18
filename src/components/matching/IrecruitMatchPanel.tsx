@@ -85,7 +85,7 @@ function CandidateDetailDialog({
               </div>
             ) : null}
 
-            <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-1.5">
+            <div className="rounded-xl border border-white/70 bg-white/40 dark:border-slate-700/60 dark:bg-slate-800/40 px-3 py-3 space-y-1.5">
               <DetailRow label="ตำแหน่งที่สมัคร" value={match.position_name || match.job_name_th || 'ไม่ระบุ'} />
               <DetailRow label="เพศ / อายุ" value={[sexLabel(match.sex), match.age ? `${match.age} ปี` : ''].filter(Boolean).join(' · ') || null} />
               <DetailRow

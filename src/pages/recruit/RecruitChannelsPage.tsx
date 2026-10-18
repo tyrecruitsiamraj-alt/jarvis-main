@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { friendlyErrorText } from '@/lib/friendlyError';
+import { TONE } from '@/lib/designTokens';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import {
   createRecruitChannel,
@@ -359,9 +360,11 @@ const RecruitChannelsPage: React.FC = () => {
     }
   };
 
+  /** ลบทีละแถว — ยืนยันด้วย AlertDialog แบบเดียวกับลบหลายแถว (เดิมใช้กล่องของเบราว์เซอร์ · QA 17 ต.ค. 2569) */
+  const [deleteAsk, setDeleteAsk] = useState<RecruitChannel | null>(null);
   const onDelete = async (row: RecruitChannel) => {
-    // 🔴 FK เป็น cascade — ลบพ่อคือลบลูกทั้งกอง ต้องให้เห็นจำนวนก่อนเสมอ
-    if (!window.confirm(channelDeleteWarning(row))) return;
+    // 🔴 FK เป็น cascade — ลบพ่อคือลบลูกทั้งกอง ต้องให้เห็นจำนวนก่อนเสมอ (ข้อความอยู่ในป๊อปยืนยัน)
+    setDeleteAsk(null);
     setBusyId(row.id);
     setError('');
     try {
@@ -616,28 +619,21 @@ const RecruitChannelsPage: React.FC = () => {
                             if (e.key === 'Escape') setEditingId(null);
                           }}
                         />
-                        <button
-                          type="button"
-                          onClick={() => void onSaveName(row)}
-                          className="shrink-0 rounded-xl bg-primary px-3 text-xs font-medium text-primary-foreground"
-                        >
+                        <Button type="button" size="sm" className="shrink-0" onClick={() => void onSaveName(row)}>
                           บันทึก
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingId(null)}
-                          className="shrink-0 rounded-xl border border-border px-3 text-xs font-medium"
-                        >
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => setEditingId(null)}>
                           ยกเลิก
-                        </button>
+                        </Button>
                       </div>
                     ) : (
                       <>
                         <p className="truncate text-sm font-medium text-foreground">
                           {row.name}
                           {row.isActive ? null : (
+                            // ป้ายสถานะ "ปิดอยู่" — ไม่ใช้คำเดียวกับปุ่ม "ปิดใช้งาน" (QA 17 ต.ค. 2569)
                             <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                              ปิดใช้งาน
+                              ปิดอยู่
                             </span>
                           )}
                         </p>
@@ -655,34 +651,32 @@ const RecruitChannelsPage: React.FC = () => {
                       {busyId === row.id ? (
                         <LoaderCircle className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
                       ) : null}
-                      <button
+                      {/* ปุ่มมีคำทุกปุ่ม + shadcn Button (QA 17 ต.ค. 2569: เดิมไอคอนเปล่า 52 ปุ่ม) */}
+                      <Button
                         type="button"
+                        size="xs"
+                        variant="ghost"
+                        aria-label={`แก้ชื่อ ${row.name}`}
                         onClick={() => {
                           setEditingId(row.id);
                           setEditName(row.name);
                         }}
-                        title="แก้ชื่อ"
-                        aria-label={`แก้ชื่อ ${row.name}`}
-                        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
                       >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void onToggleActive(row)}
-                        className="rounded-full border border-border px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-secondary"
-                      >
+                        <Pencil aria-hidden /> แก้ชื่อ
+                      </Button>
+                      <Button type="button" size="xs" variant="outline" onClick={() => void onToggleActive(row)}>
                         {row.isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        onClick={() => void onDelete(row)}
-                        title="ลบช่องทางนี้"
+                        size="xs"
+                        variant="ghost"
                         aria-label={`ลบ ${row.name}`}
-                        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-red-600"
+                        className={TONE.danger.value}
+                        onClick={() => setDeleteAsk(row)}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                        <Trash2 aria-hidden /> ลบ
+                      </Button>
                     </div>
                   )}
                 </li>
@@ -691,6 +685,26 @@ const RecruitChannelsPage: React.FC = () => {
             </>
           )}
         </div>
+
+        <AlertDialog open={deleteAsk !== null} onOpenChange={(v) => !v && setDeleteAsk(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>ลบ {deleteAsk?.name}</AlertDialogTitle>
+              <AlertDialogDescription>{deleteAsk ? channelDeleteWarning(deleteAsk) : ''}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (deleteAsk) void onDelete(deleteAsk);
+                }}
+              >
+                ลบ
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={bulkAsk} onOpenChange={(v) => !bulkBusy && setBulkAsk(v)}>
           <AlertDialogContent>
