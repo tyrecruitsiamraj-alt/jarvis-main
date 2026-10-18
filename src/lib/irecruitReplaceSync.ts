@@ -105,25 +105,29 @@ export function replaceAiPhoneOf(rule: Pick<ReplaceCallRule, 'aiPhones'>, phone:
  * ═══ อ่านรายชื่อให้ AI โทรจากข้อความที่วาง (เจ้าของ 18 ต.ค. 2569 เลือกทำ "ช่องตั้งรายชื่อ AI โทร") ═══
  * บรรทัดละคน · เบอร์แรกในบรรทัด = เบอร์คนไปแทน · เบอร์ที่สอง = เบอร์ฉุกเฉิน · ชื่อ/คำอื่นข้ามไป
  * วางแบบที่ส่งกันในแชตได้เลย เช่น "สมชาย ใจดี 081-234-5678 ฉุกเฉิน พี่เอ 089 876 5432"
- * บรรทัดที่ไม่มีเบอร์มือถือ = `bad` (บอกบนจอ ห้ามทิ้งเงียบ) · เบอร์ซ้ำเก็บอันแรก
+ * บรรทัดที่ไม่มีเบอร์คนไปแทน = `bad` (บอกบนจอ ห้ามทิ้งเงียบ) · เบอร์ซ้ำเก็บอันแรก
  */
 export function parseAiPhoneLines(text: string): { phones: ReplaceAiPhone[]; bad: string[] } {
   const phones: ReplaceAiPhone[] = [];
   const bad: string[] = [];
   const seen = new Set<string>();
+  const phonesIn = (part: string) =>
+    (part.match(/(?:\+?66|0)(?:[\s-]?\d){8,9}/g) ?? []).map((m) => replacePhoneKey(m)).filter((k): k is string => Boolean(k));
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
-    const keys = (line.match(/(?:\+?66|0)(?:[\s-]?\d){8,9}/g) ?? [])
-      .map((m) => replacePhoneKey(m))
-      .filter((k): k is string => Boolean(k));
-    if (keys.length === 0) {
+    // มีคำว่า "ฉุกเฉิน" = เบอร์หลังคำนี้เป็นเบอร์ฉุกเฉินเสมอ (18 ต.ค. 2569 รายชื่อจริง: "สราวุธ … ฉุกเฉิน พี่แป้ง 06…"
+    // ไม่มีเบอร์ตัวเอง — เดิมอ่านเบอร์ฉุกเฉินเป็นเบอร์คนไปแทน) · ไม่มีคำนี้ = เบอร์แรกคนไปแทน เบอร์สองฉุกเฉิน
+    const at = line.indexOf('ฉุกเฉิน');
+    const own = phonesIn(at >= 0 ? line.slice(0, at) : line);
+    const emKeys = at >= 0 ? phonesIn(line.slice(at)) : own.slice(1);
+    if (own.length === 0) {
       bad.push(line.trim());
       continue;
     }
-    if (seen.has(keys[0])) continue;
-    seen.add(keys[0]);
-    const em = keys.find((k, i) => i > 0 && k !== keys[0]);
-    phones.push({ phone: `0${keys[0]}`, emergency: em ? `0${em}` : null });
+    if (seen.has(own[0])) continue;
+    seen.add(own[0]);
+    const em = emKeys.find((k) => k !== own[0]);
+    phones.push({ phone: `0${own[0]}`, emergency: em ? `0${em}` : null });
   }
   return { phones, bad };
 }

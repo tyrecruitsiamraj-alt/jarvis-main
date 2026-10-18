@@ -68,7 +68,7 @@ const ReplaceAiPhonesDialog: React.FC<{
 
   const save = async () => {
     if (parsed.bad.length > 0) {
-      setError(`มี ${parsed.bad.length} บรรทัดที่ไม่มีเบอร์มือถือ แก้หรือลบออกก่อน`);
+      setError(`มี ${parsed.bad.length} บรรทัดที่ไม่มีเบอร์คนไปแทน เติมเบอร์หรือลบบรรทัดออกก่อน`);
       return;
     }
     setBusy(true);
@@ -135,7 +135,7 @@ const ReplaceAiPhonesDialog: React.FC<{
                 ))}
                 {parsed.bad.map((line, i) => (
                   <li key={`bad-${i}`} className={cn('break-all', TONE.danger.value)}>
-                    อ่านไม่ออก: {line}
+                    ไม่มีเบอร์คนไปแทน: {line}
                   </li>
                 ))}
               </ul>
