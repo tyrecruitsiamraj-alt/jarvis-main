@@ -9,6 +9,7 @@ import { Users, Shield, Database, FileText, Palette, UserCog, ListChecks, ListOr
   MessageSquareText,
   Cpu,
   PhoneOff,
+  ShieldCheck,
   Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,6 +22,7 @@ import LumosDispatchModeTab from '@/pages/settings/LumosDispatchModeTab';
 import CallScriptsTab from '@/pages/settings/CallScriptsTab';
 import AiSettingsTab from '@/pages/settings/AiSettingsTab';
 import CallSuppressionTab from '@/pages/settings/CallSuppressionTab';
+import PdpaRequestsTab from '@/pages/settings/PdpaRequestsTab';
 import ApplicationAutoMoveTab from '@/pages/settings/ApplicationAutoMoveTab';
 import SystemHealthTab from '@/pages/settings/SystemHealthTab';
 import NavMenuTab from '@/pages/settings/NavMenuTab';
@@ -104,6 +106,7 @@ const TAB_ICON: Record<SettingsTab, React.ElementType> = {
   callScripts: MessageSquareText,
   aiSettings: Cpu,
   callSuppression: PhoneOff,
+  pdpaRequests: ShieldCheck,
   autoMove: MoveRight,
   health: Activity,
   reference: Database,
@@ -805,6 +808,7 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'callScripts' && <CallScriptsTab />}
         {activeTab === 'aiSettings' && <AiSettingsTab />}
         {activeTab === 'callSuppression' && <CallSuppressionTab />}
+        {activeTab === 'pdpaRequests' && <PdpaRequestsTab />}
         {activeTab === 'autoMove' && <ApplicationAutoMoveTab />}
         {activeTab === 'health' && <SystemHealthTab />}
 

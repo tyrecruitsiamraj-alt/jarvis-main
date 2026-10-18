@@ -68,7 +68,7 @@ import { splitErpName, type ErpPerson } from '@/lib/erpPeopleApi';
 import { buildBoardUnitOptions, mergeBoardUnitOptions, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
 import { followGroupKey, followPersonKey, groupFollowEntries } from '@/lib/followGrouping';
-import { countReplaceKinds, REPLACE_KIND_FILTERS, REPLACE_KIND_LABEL, replaceKindOf, type ReplaceKindFilter, followScopeEntries, followTeamForScope } from '@/lib/followReplacement';
+import { countReplaceKinds, FOLLOW_TEAM_REPLACEMENT, REPLACE_KIND_FILTERS, REPLACE_KIND_LABEL, replaceKindOf, type ReplaceKindFilter, followScopeEntries, followTeamForScope } from '@/lib/followReplacement';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { followMatrixColOfCategory, type FollowMatrixCol } from '@/lib/followCallMatrix';
 import {
@@ -126,6 +126,7 @@ import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
 import DateTimeField24 from '@/components/shared/DateTimeField24';
 import ReplaceTimingDialog from '@/components/follow/ReplaceTimingDialog';
+import ReplaceAiPhonesDialog, { buildReplaceNameOfPhone, type ReplaceAiPhonesState } from '@/components/follow/ReplaceAiPhonesDialog';
 import ReplaceStartFields, {
   REPLACE_SLOT_MODES_MANUAL,
   replaceStartOf,
@@ -649,6 +650,12 @@ const FollowPage: React.FC = () => {
    * Choice "หยุดสายที่ยังไม่โทร + ของใหม่" · "จนกว่าจะสั่งเปิด") — ปิด = พัก AI · `null` = ยังอ่านไม่ได้ (ไม่โชว์สวิตช์ ห้ามเดา)
    */
   const [replaceAiOn, setReplaceAiOn] = useState<boolean | null>(null);
+  /** รายชื่อให้ AI โทร (`rule.aiPhones`) — ตั้งผ่านจอ (เจ้าของเลือกทำ 18 ต.ค. 2569 · เดิมตั้งในฐานตรง ๆ) */
+  const [replaceAiPhones, setReplaceAiPhonesState] = useState<ReplaceAiPhonesState>({ aiPhones: [], aiPhonesWorkYmd: null, pending: false });
+  const replaceNameOfPhone = useMemo(
+    () => buildReplaceNameOfPhone(items.filter((e) => e.follow_team === FOLLOW_TEAM_REPLACEMENT)),
+    [items],
+  );
   const [aiSwitchBusy, setAiSwitchBusy] = useState(false);
   /** อ่านสถานะ AI ไม่ได้ — บอกบนจอพร้อมลองใหม่ (QA รอบ 2 ข้อ 19 · เดิมสวิตช์/ปุ่มเวลาหายเงียบ) */
   /**
@@ -683,6 +690,11 @@ const FollowPage: React.FC = () => {
         if (alive) {
           setReplaceAiOn(!st.rule.aiPaused);
           setReplaceTiming({ confirmTime: st.rule.confirmTime ?? '16:00', leadMinutes: st.rule.leadMinutes ?? [60, 15] });
+          setReplaceAiPhonesState({
+            aiPhones: st.rule.aiPhones ?? [],
+            aiPhonesWorkYmd: st.rule.aiPhonesWorkYmd ?? null,
+            pending: st.rule.aiPhonesApplyPending === true,
+          });
         }
       })
       .catch(() => {
@@ -2091,6 +2103,17 @@ const FollowPage: React.FC = () => {
                 </AlertDialog>
                 {/* เวลาโทร 16:00 / ก่อน 1 ชม. / ก่อน 15 นาที ตั้งผ่านจอ (เจ้าของ 7 ต.ค. 2569) */}
                 {replaceAiOn !== null ? <ReplaceTimingDialog timing={replaceTiming} onSaved={setReplaceTiming} /> : null}
+                {/* รายชื่อให้ AI โทร — บันทึกแล้วตัวดึงทุก 5 นาทีสลับสายให้ (เจ้าของเลือกทำ 18 ต.ค. 2569) */}
+                {replaceAiOn !== null ? (
+                  <ReplaceAiPhonesDialog
+                    value={replaceAiPhones}
+                    nameOfPhone={replaceNameOfPhone}
+                    onSaved={(v) => {
+                      setReplaceAiPhonesState(v);
+                      void reload(true);
+                    }}
+                  />
+                ) : null}
                 <Button
                   type="button"
                   variant="outline"

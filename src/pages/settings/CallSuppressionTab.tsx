@@ -112,9 +112,13 @@ const CallSuppressionTab: React.FC = () => {
                 <b className="font-mono text-sm text-foreground">{it.phone}</b>
                 <span className={cn('block text-xs', DASH.muted)}>
                   {it.reason_label}
-                  {it.until ? ` · พักถึง ${formatDateTimeTh(it.until)}` : ''}
+                  {it.reason === 'pdpa' ? ' · ถาวร' : it.until ? ` · พักถึง ${formatDateTimeTh(it.until)}` : ''}
                 </span>
               </span>
+              {/* เจ้าตัวขอให้หยุดติดต่อตาม PDPA (18 ต.ค. 2569) — ปลดไม่ได้ (เซิร์ฟเวอร์กันอีกชั้น) */}
+              {it.reason === 'pdpa' ? (
+                <span className={cn('text-xs', DASH.muted)}>ปลดไม่ได้</span>
+              ) : (
               <button
                 type="button"
                 disabled={busy === it.phone}
@@ -128,6 +132,7 @@ const CallSuppressionTab: React.FC = () => {
                 <RotateCcw className="h-3.5 w-3.5" aria-hidden />
                 {busy === it.phone ? 'กำลังปลด…' : 'ปลดเบอร์นี้'}
               </button>
+              )}
             </li>
           ))}
         </ul>

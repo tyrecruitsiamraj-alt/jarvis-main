@@ -28,7 +28,7 @@ afterEach(() => setCallScriptOverrides({}));
 describe('ฉบับแก้ทับบทมาตรฐาน', () => {
   it('ไม่มีฉบับแก้ = ใช้บทในไฟล์เป๊ะ', () => {
     const q = buildScreeningQuestions(FACTS);
-    expect(q[0]).toContain('สยามราชธานี');
+    expect(q[0]).toContain('อยากเรียนเสนอ'); // บทมาตรฐาน (ไม่ทักแล้ว — Lumos ทักเอง · 18 ต.ค. 2569)
   });
 
   it('วางฉบับแก้แล้ว บทเปลี่ยนทันที · ล้างแล้วกลับเป็นเดิม', () => {
@@ -36,7 +36,7 @@ describe('ฉบับแก้ทับบทมาตรฐาน', () => {
     expect(buildScreeningQuestions(FACTS)).toEqual(['สวัสดีครับ คุณสมชาย นี่คือบททดสอบครับ']);
 
     setCallScriptOverrides({});
-    expect(buildScreeningQuestions(FACTS)[0]).toContain('สยามราชธานี');
+    expect(buildScreeningQuestions(FACTS)[0]).toContain('อยากเรียนเสนอ');
   });
 
   it('ฉบับแก้ของบทหนึ่ง ไม่กระทบบทอื่น', () => {
@@ -52,7 +52,7 @@ describe('ฉบับแก้ทับบทมาตรฐาน', () => {
 
   it('ฉบับแก้ที่เป็นลิสต์ว่าง = ไม่ทับ (กันพลาดวางค่าว่างแล้วสายเงียบ)', () => {
     setCallScriptOverrides({ interview: [] });
-    expect(buildScreeningQuestions(FACTS)[0]).toContain('สยามราชธานี');
+    expect(buildScreeningQuestions(FACTS)[0]).toContain('อยากเรียนเสนอ');
   });
 
   it('บทมาตรฐานที่ export ไปให้หน้าตั้งค่า ตรงกับที่ระบบใช้จริง', () => {

@@ -86,7 +86,7 @@ describe('🔴 API key', () => {
     const h = read('api/_handlers/ai-settings.ts');
     expect(h).toContain('const { api_key: key, ...safe } = parsed.value;');
     expect(h).toContain('api_key_changed: Boolean(key)');
-    expect(read('api/_lib/rbac.ts')).toMatch(/case 'ai-settings':\s*return 'admin';/);
+    expect(read('api/_lib/rbac.ts')).toMatch(/case 'ai-settings':\s*(case 'pdpa-requests':\s*)?return 'admin';/);
   });
 });
 

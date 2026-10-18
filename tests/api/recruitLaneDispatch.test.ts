@@ -51,9 +51,9 @@ describe('buildRecruitLaneInterviewPayload', () => {
       { ref: 'ir-1', full_name: 'สมชาย', phone_number: '0812345678', position_text: '' },
       at,
     );
-    // บท Part 1 (16 ส.ค. 2569): แนะนำตัวว่าโทรจากไหนก่อน แล้วค่อยเสนองาน
+    // บท Part 1: เสนองานเลย (18 ต.ค. 2569 ตัดคำทัก — Lumos ทักและแนะนำตัวเองแล้ว)
     // ห้ามมีคำว่า "ใบสมัคร" — คนกลุ่มนี้ยังไม่เคยสมัคร พูดแล้วเขางงว่าไปเอาเบอร์มาจากไหน
-    expect(p?.questions[0]).toContain('สยามราชธานี');
+    expect(p?.questions[0]).not.toContain('สวัสดี');
     expect(p?.questions[0]).toContain('มีงานตำแหน่ง');
     expect(p?.questions[0]).toContain('ศูนย์กระจายสินค้าชลบุรี');
     expect(p?.questions[0]).not.toContain('ใบสมัคร');

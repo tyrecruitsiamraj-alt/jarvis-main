@@ -1,0 +1,63 @@
+// @vitest-environment node
+/**
+ * รายชื่อให้ AI โทร ตั้งผ่านจอ (เจ้าของเลือกทำ 18 ต.ค. 2569 — เดิมตั้งในฐานข้อมูลตรง ๆ)
+ */
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { aiPhonesToText, normalizeReplaceCallRule, parseAiPhoneLines } from '../../src/lib/irecruitReplaceSync';
+import { buildReplaceNameOfPhone } from '../../src/components/follow/ReplaceAiPhonesDialog';
+
+const read = (p: string) => readFileSync(p, 'utf8');
+
+describe('parseAiPhoneLines — วางแบบที่ส่งกันในแชตได้เลย', () => {
+  it('บรรทัดละคน · เบอร์แรก = คนไปแทน · เบอร์สอง = ฉุกเฉิน · ชื่อข้าม · ขีด/เว้นวรรคในเบอร์ได้', () => {
+    const out = parseAiPhoneLines(
+      ['ทดสอบ หนึ่ง 081-234-5678 ฉุกเฉิน พี่เอ 089 876 5432', '', '  0823456789  ', '+66834567890'].join('\n'),
+    );
+    expect(out.bad).toEqual([]);
+    expect(out.phones).toEqual([
+      { phone: '0812345678', emergency: '0898765432' },
+      { phone: '0823456789', emergency: null },
+      { phone: '0834567890', emergency: null },
+    ]);
+  });
+  it('บรรทัดไม่มีเบอร์มือถือ = อ่านไม่ออก (ห้ามทิ้งเงียบ) · เบอร์ซ้ำเก็บอันแรก', () => {
+    const out = parseAiPhoneLines('ทดสอบ ไม่มีเบอร์\n0812345678\n081 234 5678 ฉุกเฉิน 0898765432\n12345');
+    expect(out.bad).toEqual(['ทดสอบ ไม่มีเบอร์', '12345']);
+    expect(out.phones).toEqual([{ phone: '0812345678', emergency: null }]);
+  });
+  it('เบอร์ฉุกเฉินซ้ำเบอร์ตัวเอง = ไม่มีฉุกเฉิน', () => {
+    expect(parseAiPhoneLines('0812345678 0812345678').phones).toEqual([{ phone: '0812345678', emergency: null }]);
+  });
+  it('กลับไปกลับมาได้ค่าเดิม (ข้อความในช่อง ↔ รายชื่อที่เก็บ)', () => {
+    const list = [
+      { phone: '0812345678', emergency: '0898765432' },
+      { phone: '0823456789', emergency: null },
+    ];
+    expect(parseAiPhoneLines(aiPhonesToText(list)).phones).toEqual(list);
+    expect(normalizeReplaceCallRule({ aiPhones: list }).aiPhones).toEqual(list);
+  });
+});
+
+describe('ชื่อคนไปแทนในตัวอย่าง', () => {
+  it('เทียบเบอร์ 9 หลักท้าย', () => {
+    const nameOf = buildReplaceNameOfPhone([{ recipient_phone: '+66812345678', recipient_name: 'ทดสอบ หนึ่ง' }]);
+    expect(nameOf('0812345678')).toBe('ทดสอบ หนึ่ง');
+    expect(nameOf('0899999999')).toBeNull();
+  });
+});
+
+describe('PATCH /api/irecruit-replace-sync รับรายชื่อ', () => {
+  const src = read('api/_handlers/irecruit-replace-sync.ts');
+  it('ตั้งธงใช้กับสายที่มีอยู่ครั้งเดียว + ปฏิเสธเบอร์อ่านไม่ออก/วันผิดรูป + audit แยก', () => {
+    expect(src).toContain('...(hasPhones ? { aiPhonesApplyPending: true } : {})');
+    expect(src).toContain("'มีเบอร์ที่อ่านไม่ออกหรือซ้ำกันในรายชื่อ'");
+    expect(src).toContain("'วันเข้างานต้องเป็น YYYY-MM-DD'");
+    expect(src).toContain("'irecruit_replace_sync.ai_phones'");
+  });
+  it('ปุ่มอยู่หัวแท็บส่งคนแทน ข้างปุ่มเวลาโทร (หัวหน้างานขึ้นไป)', () => {
+    const page = read('src/pages/follow/FollowPage.tsx');
+    expect(page).toContain('<ReplaceAiPhonesDialog');
+    expect(read('src/components/follow/ReplaceAiPhonesDialog.tsx')).toContain('รายชื่อ AI โทร {value.aiPhones.length}');
+  });
+});

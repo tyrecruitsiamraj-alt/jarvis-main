@@ -88,7 +88,8 @@ export async function listSuppressedPhones(): Promise<Set<string>> {
 export async function suppressPhone(input: {
   phone: string | null | undefined;
   until: string;
-  reason: 'not_looking' | 'wrong_number' | 'manual';
+  /** pdpa = เจ้าตัวขอลบ/ขอให้หยุดติดต่อ (18 ต.ค. 2569) — หน้าบัญชีห้ามโทรปลดไม่ได้ */
+  reason: 'not_looking' | 'wrong_number' | 'manual' | 'pdpa';
   note?: string | null;
   byName?: string | null;
 }): Promise<boolean> {

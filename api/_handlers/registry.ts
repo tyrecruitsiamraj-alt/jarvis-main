@@ -36,6 +36,8 @@ import publicJobsHandler from './public/jobs.js';
 import publicApplyHandler from './public/apply.js';
 import publicApplyLinkHandler from './public/apply-link.js';
 import publicClickHandler from './public/click.js';
+import publicPrivacyRequestHandler from './public/privacy-request.js';
+import pdpaRequestsHandler from './pdpa-requests.js';
 import publicClickStatsHandler from './public-click-stats.js';
 import recruitChannelsHandler from './recruit-channels.js';
 import recruitPostingsHandler from './recruit-postings.js';
@@ -223,6 +225,9 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/public/apply-link': publicApplyLinkHandler as ApiHandler,
   // นับคลิกหน้าสาธารณะ — ไม่ต้องล็อกอิน · คืน 204 เสมอ (ดู public/click.ts)
   '/api/public/click': publicClickHandler as ApiHandler,
+  // คำขอใช้สิทธิ์ PDPA — ผู้สมัครยื่นเอง (ไม่ต้องล็อกอิน · 18 ต.ค. 2569) · ฝั่งเจ้าหน้าที่ /api/pdpa-requests (admin)
+  '/api/public/privacy-request': publicPrivacyRequestHandler as ApiHandler,
+  '/api/pdpa-requests': pdpaRequestsHandler as ApiHandler,
   '/api/public-click-stats': publicClickStatsHandler as ApiHandler,
   '/api/recruit/channels': recruitChannelsHandler as ApiHandler,
   '/api/recruit/postings': recruitPostingsHandler as ApiHandler,

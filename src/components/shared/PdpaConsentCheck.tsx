@@ -75,9 +75,17 @@ export default function PdpaConsentCheck({
               {s.outro ? <p className="leading-relaxed">{s.outro}</p> : null}
             </section>
           ))}
-          <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
-            ย่อข้อตกลง
-          </Button>
+          {/* ทางใช้สิทธิ์ตามหัวข้อ 4 (18 ต.ค. 2569) — อยู่นอกข้อความบริษัท ห้ามแทรกในข้อความ */}
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
+              ย่อข้อตกลง
+            </Button>
+            <Button asChild variant="link" size="sm">
+              <a href="/privacy-request" target="_blank" rel="noreferrer">
+                ขอดู ขอแก้ หรือขอลบข้อมูล
+              </a>
+            </Button>
+          </div>
         </div>
       ) : null}
     </div>

@@ -41,7 +41,7 @@ const SCRIPT_META: Record<EditableScriptKey, { topic: string; label: string; hin
   interview: {
     topic: 'งานจับคู่ · ชวนกลับ',
     label: 'สัมภาษณ์เบื้องต้น',
-    hint: 'โทรหาคนที่ยังไม่ได้สมัครงานใบนี้ — เราไปหาเขาเอง ต้องแนะนำตัวก่อนเสมอ',
+    hint: 'โทรหาคนที่ยังไม่ได้สมัครงานใบนี้ — เราไปหาเขาเอง · Lumos ทักและแนะนำตัวให้แล้ว ประโยคแรกเข้าเรื่องเลย',
   },
   offer: {
     topic: 'งานจับคู่ · ชวนกลับ',
@@ -71,7 +71,7 @@ const SCRIPT_META: Record<EditableScriptKey, { topic: string; label: string; hin
   follow_repeat: {
     topic: 'ติดตามคนเริ่มงาน',
     label: 'สายที่ 2 เป็นต้นไป',
-    hint: 'สายถัดไปของคนเดิม ไม่ต้องแนะนำตัวใหม่',
+    hint: 'สายถัดไปของคนเดิม — ทักด้วยชื่อเจ้าหน้าที่แล้วถามว่าถึงหน่วยงานหรือยัง',
   },
   replace_confirm: {
     topic: 'ติดตามส่งคนแทน',

@@ -25,6 +25,7 @@ export const SETTINGS_TAB_IDS = [
   'callScripts',
   'aiSettings',
   'callSuppression',
+  'pdpaRequests',
   'autoMove',
   'health',
   'reference',
@@ -49,6 +50,7 @@ export const SETTINGS_TAB_LABEL: Record<SettingsTabId, string> = {
   callScripts: 'บทพูดของ AI',
   aiSettings: 'AI ที่ใช้คิดงาน',
   callSuppression: 'บัญชีห้ามโทร',
+  pdpaRequests: 'คำขอข้อมูลส่วนบุคคล',
   autoMove: 'ย้ายใบสมัครอัตโนมัติ',
   health: 'สถานะระบบ',
   reference: 'ข้อมูลอ้างอิง',
@@ -68,6 +70,7 @@ export const SETTINGS_TAB_HINT: Record<SettingsTabId, string> = {
   callScripts: 'แก้บทที่ AI พูดตอนโทร — มีผลกับสายใหม่ทันที',
   aiSettings: 'เลือกเจ้า AI และโมเดลที่ใช้จับคู่งานและอ่านใบขอ',
   callSuppression: 'เบอร์ที่ AI ไม่โทรถึงชั่วคราว — ดูเหตุผลและปลดได้',
+  pdpaRequests: 'ขอดู ขอแก้ ขอลบข้อมูล (PDPA) · โทรยืนยันตัวตนแล้วทำต่อ',
   autoMove: 'ย้ายใบสมัครตามผลโทรอัตโนมัติ',
   health: 'ไฟสถานะ · สวิตช์ที่เปิดอยู่ · ของค้าง',
   reference: 'ตัวเลือกในดรอปดาวน์ต่าง ๆ',
@@ -93,7 +96,7 @@ export const SETTINGS_GROUP_TABS: Record<SettingsGroupId, readonly SettingsTabId
   people: ['users', 'roles', 'jobStaff'],
   look: ['appearance', 'navMenu'],
   automation: ['lumosMode', 'callScripts', 'aiSettings', 'callSuppression', 'autoMove', 'matchWeights'],
-  data: ['workStatus', 'reference'],
+  data: ['workStatus', 'reference', 'pdpaRequests'],
   monitor: ['health', 'audit'],
 };
 

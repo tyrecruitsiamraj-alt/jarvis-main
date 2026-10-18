@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/apiFetch';
-import type { ReplaceCallRule, ReplaceSyncSummary } from '@/lib/irecruitReplaceSync';
+import type { ReplaceAiPhone, ReplaceCallRule, ReplaceSyncSummary } from '@/lib/irecruitReplaceSync';
 
 /** สภาพการดึงส่งคนแทนจาก iRecruit — `GET /api/irecruit-replace-sync` */
 export type ReplaceSyncStatus = {
@@ -53,6 +53,17 @@ export async function setReplaceTiming(timing: { confirmTime: string; leadMinute
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(timing),
+  });
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as ReplaceSyncStatus;
+}
+
+/** ตั้งรายชื่อให้ AI โทร (18 ต.ค. 2569) — บันทึกแล้วตัวดึงทุก 5 นาทีสลับสายที่ยังไม่ถึงเวลาของคนในรายชื่อเป็น AI ครั้งเดียว */
+export async function setReplaceAiPhones(input: { aiPhones: ReplaceAiPhone[]; aiPhonesWorkYmd: string | null }): Promise<ReplaceSyncStatus> {
+  const r = await apiFetch('/api/irecruit-replace-sync', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
   });
   if (!r.ok) throw new Error(await readError(r));
   return (await r.json()) as ReplaceSyncStatus;

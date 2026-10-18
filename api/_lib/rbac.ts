@@ -40,6 +40,8 @@ export type ApiResource =
   | 'erp-inform-dates'
   /** ดึงส่งคนแทนจาก iRecruit (2 ต.ค. 2569) — อ่านทุกคน · ดึงตอนนี้/ตั้งเวลาโทร หัวหน้างานขึ้นไป */
   | 'irecruit-replace-sync'
+  /** คำขอใช้สิทธิ์ PDPA ฝั่งเจ้าหน้าที่ (18 ต.ค. 2569) — admin (หน้าตั้งค่า · ลบข้อมูลย้อนไม่ได้) */
+  | 'pdpa-requests'
   | 'job-staff'
   | 'app-users'
   /** ชื่อผู้ใช้สำหรับช่องผู้รับผิดชอบ (11 ต.ค. 2569) — อ่านทุกคน · ส่งแค่ id + ชื่อ */
@@ -149,6 +151,7 @@ export function minimumRoleFor(
     case 'audit-logs':
     case 'branding':
     case 'ai-settings':
+    case 'pdpa-requests':
       return 'admin';
 
     case 'app-nav-preferences':

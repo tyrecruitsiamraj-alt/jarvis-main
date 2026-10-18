@@ -5,7 +5,9 @@
  * POST  → ดึงตอนนี้หนึ่งรอบ (ตัวเดียวกับที่ worker เดินทุก 5 นาที)                                  (supervisor+)
  * PATCH → `{ aiPaused: boolean }` พัก/เปิด AI ของงานส่งคนแทน (เจ้าของสั่ง 6 ต.ค. 2569 ค่ำ "อย่าพึ่งส่งให้ Ai โทร")  (supervisor+)
  *         พัก = เปลี่ยนสาย AI ที่ยังไม่ถึงเวลาเป็นคนโทร + ยกเลิกแผนที่ Lumos ทันที (worker บังคับซ้ำทุก 5 นาที)
- * (PATCH ตั้งกติกาเวลาโทร ถอดแล้ว 5 ต.ค. 2569 — เวลาโทรตายตัวตาม Journey ของเจ้าของ)
+ * PATCH → `{ confirmTime, leadMinutes }` เวลาโทร (7 ต.ค. 2569)                                              (supervisor+)
+ * PATCH → `{ aiPhones, aiPhonesWorkYmd }` รายชื่อให้ AI โทร (18 ต.ค. 2569 ช่องบนจอแทนการตั้งในฐานตรง ๆ)            (supervisor+)
+ *         บันทึกแล้วตั้งธง `aiPhonesApplyPending` → ตัวดึงทุก 5 นาทีสลับสายที่ยังไม่ถึงเวลาให้ครั้งเดียว
  *
  * 🔴 เส้นนี้ไม่สร้างสายเอง — ทุกอย่างผ่าน `runIrecruitReplaceSync` ที่เดียว (กันซ้ำที่ฐาน · ส่ง AI ตามสวิตช์เดิม)
  */
@@ -74,7 +76,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const hasPause = typeof body.aiPaused === 'boolean';
       /** เวลาโทร (7 ต.ค. 2569 เจ้าของ "ต้องปรับผ่าน ui") — `confirmTime` "HH:MM" · `leadMinutes` [สาย 2, สาย 3] นาที */
       const hasTiming = body.confirmTime !== undefined || body.leadMinutes !== undefined;
-      if (!hasPause && !hasTiming) return sendError(res, 400, 'Bad request', 'ส่ง aiPaused หรือเวลาโทรมาอย่างน้อยหนึ่งอย่าง');
+      /** รายชื่อให้ AI โทร (18 ต.ค. 2569) — `aiPhones` [{ phone, emergency }] · `aiPhonesWorkYmd` "YYYY-MM-DD" หรือ null = ทุกวัน */
+      const hasPhones = body.aiPhones !== undefined || body.aiPhonesWorkYmd !== undefined;
+      if (!hasPause && !hasTiming && !hasPhones) {
+        return sendError(res, 400, 'Bad request', 'ส่ง aiPaused เวลาโทร หรือรายชื่อให้ AI โทรมาอย่างน้อยหนึ่งอย่าง');
+      }
+      if (body.aiPhones !== undefined && !Array.isArray(body.aiPhones)) {
+        return sendError(res, 400, 'Bad request', 'aiPhones ต้องเป็นรายการ');
+      }
       const settings = await getReplaceSyncSettings();
       if (!settings.tableReady) return sendError(res, 409, 'Conflict', 'ยังไม่มีตารางค่าตั้ง (migration 133)');
       const rule = normalizeReplaceCallRule({
@@ -82,7 +91,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
         ...(hasPause ? { aiPaused: body.aiPaused } : {}),
         ...(body.confirmTime !== undefined ? { confirmTime: body.confirmTime } : {}),
         ...(body.leadMinutes !== undefined ? { leadMinutes: body.leadMinutes } : {}),
+        ...(body.aiPhones !== undefined ? { aiPhones: body.aiPhones } : {}),
+        ...(body.aiPhonesWorkYmd !== undefined ? { aiPhonesWorkYmd: body.aiPhonesWorkYmd } : {}),
+        // ตั้งรายชื่อใหม่ = ใช้กับสายที่มีอยู่ครั้งเดียว (ตัวดึงปิดธงเองหลังทำ)
+        ...(hasPhones ? { aiPhonesApplyPending: true } : {}),
       });
+      if (Array.isArray(body.aiPhones) && rule.aiPhones.length !== body.aiPhones.length) {
+        return sendError(res, 400, 'Bad request', 'มีเบอร์ที่อ่านไม่ออกหรือซ้ำกันในรายชื่อ');
+      }
+      if (body.aiPhonesWorkYmd !== undefined && body.aiPhonesWorkYmd !== null && rule.aiPhonesWorkYmd !== body.aiPhonesWorkYmd) {
+        return sendError(res, 400, 'Bad request', 'วันเข้างานต้องเป็น YYYY-MM-DD');
+      }
       // ค่าที่ส่งมาอ่านไม่ออก = ปฏิเสธ (ห้ามถอยไปค่าเริ่มเงียบ ๆ)
       if (body.confirmTime !== undefined && rule.confirmTime !== body.confirmTime) {
         return sendError(res, 400, 'Bad request', 'เวลาคอนเฟิร์มต้องเป็น HH:MM');
@@ -93,7 +112,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       await saveReplaceSyncSettings({ rule }, req.user.email || req.user.sub);
       const enforced = hasPause && body.aiPaused ? await enforceReplaceAiPaused() : null;
       await auditFromAuthed(req, {
-        action: hasTiming ? 'irecruit_replace_sync.timing' : 'irecruit_replace_sync.ai_paused',
+        action: hasPhones ? 'irecruit_replace_sync.ai_phones' : hasTiming ? 'irecruit_replace_sync.timing' : 'irecruit_replace_sync.ai_paused',
         entityType: 'irecruit_replace_sync',
         entityId: 'default',
         before: { rule: settings.rule },

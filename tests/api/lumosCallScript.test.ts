@@ -111,10 +111,12 @@ describe('กฎการประกอบบท', () => {
 });
 
 describe('Part 1 · สัมภาษณ์เบื้องต้น (เลนสรรหา)', () => {
-  it('แนะนำตัวว่าโทรจากไหน + เรียกชื่อ + บอกตำแหน่งกับหน่วยงานในข้อแรก', () => {
+  // 🔴 18 ต.ค. 2569 เจ้าของเลือก "ตัดคำทักในบทชวนงาน" — Lumos ทัก/แนะนำตัว/ถามว่าสะดวกคุยไหมเองทุกสาย
+  it('ข้อแรกเข้าเรื่องเลย: ไม่ทักซ้ำ ไม่ขอเวลา 2-3 นาที · บอกตำแหน่งกับหน่วยงาน', () => {
     const q = buildScreeningQuestions(FACTS);
-    expect(q[0]).toContain(CALLER_ORG);
-    expect(q[0]).toContain('คุณสมชาย ใจดี');
+    expect(q[0]).not.toContain('สวัสดี');
+    expect(q[0]).not.toContain(CALLER_ORG);
+    expect(q[0]).not.toContain('2-3 นาที');
     expect(q[0]).toContain('พนักงานขับรถ');
     expect(q[0]).toContain('บริษัท ก จำกัด');
   });
@@ -165,7 +167,7 @@ describe('Part 2 · เสนองานให้คนที่สมัคร
   it('อ้างใบสมัครที่เขาเคยฝากไว้ ไม่ใช่บทโทรหาคนแปลกหน้า', () => {
     const q = buildOfferQuestions(FACTS);
     expect(q[0]).toContain('ใบสมัคร');
-    expect(q[0]).toContain(CALLER_ORG);
+    expect(q[0]).not.toContain('สวัสดี'); // Lumos ทักเอง (18 ต.ค. 2569)
   });
 
   it('ไม่ถามค่าแรงที่คาดหวัง (เห็นเงื่อนไขงานตอนสมัครแล้ว)', () => {

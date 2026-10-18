@@ -25,6 +25,7 @@ const REASON_LABEL: Record<string, string> = {
   wrong_number: 'ผลโทรบอกว่าเบอร์ผิด (ไม่ใช่เจ้าตัว)',
   not_looking: 'เจ้าตัวบอกว่าไม่หางานแล้ว',
   manual: 'เจ้าหน้าที่สั่งพักเอง',
+  pdpa: 'เจ้าตัวขอลบข้อมูล / ขอให้หยุดติดต่อ (PDPA)',
 };
 
 type Row = {
@@ -72,6 +73,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const raw = typeof req.query?.phone === 'string' ? req.query.phone : '';
       const phone = toE164Thai(raw) || raw.trim();
       if (!phone) return sendError(res, 400, 'Bad request', 'ต้องระบุเบอร์ที่จะปลด');
+      // 🔴 เจ้าตัวใช้สิทธิ์ PDPA ขอหยุดติดต่อ (18 ต.ค. 2569) — ปลดจากหน้านี้ไม่ได้ (เผลอปลด = โทรหาคนที่ขอให้หยุดแล้ว)
+      const { rows: pdpa } = await dbQuery<{ reason: string }>(`select reason from ${tbl} where phone_e164 = $1 and reason = 'pdpa'`, [phone]);
+      if (pdpa.length > 0) return sendError(res, 409, 'Conflict', 'เบอร์นี้เจ้าตัวขอให้หยุดติดต่อตาม PDPA ปลดไม่ได้');
       const { rows } = await dbQuery<{ phone_e164: string }>(
         `delete from ${tbl} where phone_e164 = $1 returning phone_e164`,
         [phone],
