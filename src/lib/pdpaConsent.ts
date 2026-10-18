@@ -22,6 +22,12 @@ export const PDPA_CONSENT_TEXT_STAFF = 'ผู้สมัครได้อ่�
 
 export const PDPA_CONSENT_REQUIRED_MESSAGE = 'กรุณายอมรับข้อตกลงและเงื่อนไขก่อนดำเนินการต่อ';
 
+/**
+ * คำเตือนในฟอร์มของเจ้าหน้าที่ (คีย์ใบ · นำเข้า Excel · เพิ่มคน) — คนยอมรับคือผู้สมัคร ไม่ใช่เจ้าหน้าที่
+ * (QA 17 ต.ค. 2569 · เจ้าของเลือก "แก้คำเตือน PDPA" · ข้อความบริษัทใน PDPA_POLICY ไม่แตะ)
+ */
+export const PDPA_CONSENT_REQUIRED_MESSAGE_STAFF = 'ติ๊กว่าผู้สมัครยอมรับข้อตกลงก่อน';
+
 export type PdpaConsentSource = 'apply' | 'staff' | 'import';
 
 export type PdpaPolicySection = { title: string; intro?: string; bullets?: readonly string[]; outro?: string };

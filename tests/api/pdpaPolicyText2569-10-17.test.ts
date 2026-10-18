@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   PDPA_CONSENT_REQUIRED_MESSAGE,
+  PDPA_CONSENT_REQUIRED_MESSAGE_STAFF,
   PDPA_CONSENT_TEXT_APPLICANT,
   PDPA_CONSENT_VERSION,
   PDPA_POLICY,
@@ -16,6 +17,8 @@ describe('ข้อความยินยอม', () => {
   it('คำตามแบบที่เจ้าของส่ง · ฉบับใหม่', () => {
     expect(`${PDPA_CONSENT_TEXT_APPLICANT} ${PDPA_POLICY_TITLE}`).toBe('ข้าพเจ้าได้อ่านและยอมรับ ข้อตกลงและคำยินยอมในการใช้ข้อมูลส่วนบุคคล');
     expect(PDPA_CONSENT_REQUIRED_MESSAGE).toBe('กรุณายอมรับข้อตกลงและเงื่อนไขก่อนดำเนินการต่อ');
+    // ฟอร์มเจ้าหน้าที่ใช้คำของตัวเอง — คนยอมรับคือผู้สมัคร (QA 17 ต.ค. 2569)
+    expect(PDPA_CONSENT_REQUIRED_MESSAGE_STAFF).toBe('ติ๊กว่าผู้สมัครยอมรับข้อตกลงก่อน');
     expect(PDPA_CONSENT_VERSION).toBe('v1-2569-10-17');
   });
   it('ข้อตกลงครบ 5 หัวข้อ · มีเบอร์ติดต่อบริษัท', () => {

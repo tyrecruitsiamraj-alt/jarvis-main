@@ -21,7 +21,7 @@ describe('PDPA — ช่องยินยอมครบทุกทางเ�
 
     const add = read('src/components/recruit-rm/AddApplicantDialog.tsx');
     expect(add).toContain('<PdpaConsentCheck checked={consent} onChange={setConsent} text={PDPA_CONSENT_TEXT_STAFF} />');
-    expect(add).toContain('if (!consent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE);');
+    expect(add).toContain('if (!consent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE_STAFF);');
 
     const imp = read('src/components/recruit-rm/ImportApplicantsDialog.tsx');
     expect(imp).toContain('text={PDPA_CONSENT_TEXT_STAFF}');
@@ -30,7 +30,7 @@ describe('PDPA — ช่องยินยอมครบทุกทางเ�
 
   it('server: คีย์เอง/นำเข้า ไม่ยินยอม = 400 · หน้าสมัครจดเมื่อได้ true (หน้าเก่าที่ค้างไม่ทำใบหาย) · ทุกทางจดฉบับข้อความ', () => {
     expect(read('api/_handlers/job-applications.ts')).toContain(
-      "if (b.pdpa_consent !== true) return sendError(res, 400, 'Bad request', PDPA_CONSENT_REQUIRED_MESSAGE);",
+      "if (b.pdpa_consent !== true) return sendError(res, 400, 'Bad request', PDPA_CONSENT_REQUIRED_MESSAGE_STAFF);",
     );
     expect(read('api/_handlers/job-applications.ts')).toContain("await recordApplicationConsent([String(row.id)], 'staff', staffName);");
     const pub = read('api/_handlers/public/apply.ts');

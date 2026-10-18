@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FieldSelect } from '@/components/shared/FieldSelect';
 import PdpaConsentCheck from '@/components/shared/PdpaConsentCheck';
-import { PDPA_CONSENT_REQUIRED_MESSAGE, PDPA_CONSENT_TEXT_STAFF } from '@/lib/pdpaConsent';
+import { PDPA_CONSENT_REQUIRED_MESSAGE_STAFF, PDPA_CONSENT_TEXT_STAFF } from '@/lib/pdpaConsent';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, UserPlus } from 'lucide-react';
@@ -122,7 +122,7 @@ const AddApplicantDialog: React.FC<{
     if (!Number.isFinite(ageNum) || ageNum < 15 || ageNum > 80) {
       return setError('อายุต้องอยู่ระหว่าง 15–80 ปี');
     }
-    if (!consent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE);
+    if (!consent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE_STAFF);
 
     setSaving(true);
     try {

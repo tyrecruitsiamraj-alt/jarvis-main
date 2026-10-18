@@ -98,10 +98,10 @@ describe('6 · ฟอร์มเพิ่มคน (/matching/candidates/add) �
   it('หน้าจอมีช่องติ๊ก + บังคับก่อนบันทึก · API ตอบ 400 ถ้าไม่ยินยอม และจดฉบับข้อความไว้', () => {
     const page = read('src/pages/matching/AddCandidatePage.tsx');
     expect(page).toContain('<PdpaConsentCheck checked={pdpaConsent} onChange={setPdpaConsent} text={PDPA_CONSENT_TEXT_STAFF} />');
-    expect(page).toContain('if (!pdpaConsent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE);');
+    expect(page).toContain('if (!pdpaConsent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE_STAFF);');
     expect(page).toContain('pdpa_consent: true,');
     const api = read('api/_handlers/candidates.ts');
-    expect(api).toContain("if (raw.pdpa_consent !== true) return sendError(res, 400, 'Bad request', PDPA_CONSENT_REQUIRED_MESSAGE);");
+    expect(api).toContain("if (raw.pdpa_consent !== true) return sendError(res, 400, 'Bad request', PDPA_CONSENT_REQUIRED_MESSAGE_STAFF);");
     expect(api).toContain("pdpa_consent: { source: 'staff', version: PDPA_CONSENT_VERSION }");
   });
 });

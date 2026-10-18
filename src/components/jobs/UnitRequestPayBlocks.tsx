@@ -73,6 +73,8 @@ export function RequestRateLinesBlock({
 }) {
   const lines = posting ? postingRateLines(job) : visibleRateLines(job);
   if (lines.length === 0) return null;
+  // อัตราเบิกเห็นเฉพาะ supervisor ขึ้นไป — เซิร์ฟเวอร์ล้างเป็น null ให้คนอื่น ⇒ ไม่มีสักบรรทัด = ไม่วาดคอลัมน์ (17 ต.ค. 2569)
+  const showDraw = lines.some((l) => l.draw_rate != null);
   return (
     <div className={boxCls}>
       <div className="text-xs font-medium text-foreground">อัตราตามใบขอ (ERP)</div>
@@ -82,9 +84,9 @@ export function RequestRateLinesBlock({
             <tr className="text-left text-[10px] text-muted-foreground">
               {/* table-fixed + ความกว้างคงที่ — บนมือถือ 375px ตัวเลขทั้งสองคอลัมน์
                   ต้องเห็นครบโดยไม่ต้องเลื่อนแนวนอน (ชื่อรายการตัดบรรทัดเอา) */}
-              <th className="w-1/2 pb-1 pr-2 font-medium">รายการ</th>
-              <th className="w-1/4 pb-1 pr-2 text-right font-medium">อัตราจ่าย (บาท)</th>
-              <th className="w-1/4 pb-1 text-right font-medium">อัตราเบิก (บาท)</th>
+              <th className={cn(showDraw ? 'w-1/2' : 'w-2/3', 'pb-1 pr-2 font-medium')}>รายการ</th>
+              <th className={cn(showDraw ? 'w-1/4' : 'w-1/3', 'pb-1 pr-2 text-right font-medium')}>อัตราจ่าย (บาท)</th>
+              {showDraw ? <th className="w-1/4 pb-1 text-right font-medium">อัตราเบิก (บาท)</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -101,9 +103,11 @@ export function RequestRateLinesBlock({
                 <td className="whitespace-nowrap py-1 pr-2 text-right tabular-nums">
                   {amountText(l.payment_rate) ?? '—'}
                 </td>
-                <td className="whitespace-nowrap py-1 text-right tabular-nums">
-                  {amountText(l.draw_rate) ?? '—'}
-                </td>
+                {showDraw ? (
+                  <td className="whitespace-nowrap py-1 text-right tabular-nums">
+                    {amountText(l.draw_rate) ?? '—'}
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -168,7 +172,10 @@ export function ResignedEmployeeBlock({
       {brief ? null : (
       <div className="grid gap-2 sm:grid-cols-3">
         <Field label="อัตราตามเงื่อนไข (ฝั่งจ่าย)" value={moneyFieldText(job.resigned_wage_fee_rate)} />
-        <Field label="อัตราตามเงื่อนไข (ฝั่งเบิก)" value={moneyFieldText(job.resigned_wage_draw_rate)} />
+        {/* ฝั่งเบิกเห็นเฉพาะ supervisor ขึ้นไป (เซิร์ฟเวอร์ล้างเป็น null ให้คนอื่น · 17 ต.ค. 2569) */}
+        {job.resigned_wage_draw_rate != null ? (
+          <Field label="อัตราตามเงื่อนไข (ฝั่งเบิก)" value={moneyFieldText(job.resigned_wage_draw_rate)} />
+        ) : null}
         <Field label="อัตรานี้มีผลตั้งแต่" value={job.resigned_wage_effective_date} />
       </div>
       )}

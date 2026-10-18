@@ -9,7 +9,7 @@ import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import type { DrivingResult, Gender, YesNo } from '@/types';
 import { TITLE_PREFIX_OPTIONS } from '@/lib/titlePrefixOptions';
 import PdpaConsentCheck from '@/components/shared/PdpaConsentCheck';
-import { PDPA_CONSENT_REQUIRED_MESSAGE, PDPA_CONSENT_TEXT_STAFF } from '@/lib/pdpaConsent';
+import { PDPA_CONSENT_REQUIRED_MESSAGE_STAFF, PDPA_CONSENT_TEXT_STAFF } from '@/lib/pdpaConsent';
 
 const AddCandidatePage: React.FC = () => {
   const navigate = useNavigate();
@@ -86,7 +86,7 @@ const AddCandidatePage: React.FC = () => {
     if (!subdistrict.trim()) return setError('กรุณากรอกตำบล/แขวง');
     if (!district.trim()) return setError('กรุณากรอกอำเภอ/เขต');
     if (!province.trim()) return setError('กรุณากรอกจังหวัด');
-    if (!pdpaConsent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE);
+    if (!pdpaConsent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE_STAFF);
 
     const payload = {
       ...(titlePrefix.trim() ? { title_prefix: titlePrefix.trim() } : {}),

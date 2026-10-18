@@ -28,6 +28,7 @@ import { loadUserDepartmentScope, type DepartmentScope } from '../_lib/departmen
 import { enqueuePrecomputeJobs } from '../_lib/matchPrecomputeWorker.js';
 import { logInfo, logWarn } from '../_lib/logger.js';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
+import { canSeeDrawRate, hideDrawRateOnLines, hideDrawRateOnRequests } from '../_lib/drawRateVisibility.js';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -415,7 +416,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
        * (`src/lib/siamrajUnitRequestsApi.ts` → `fetchSiamrajUnitRequest`) — แก้ทั้งสองฝั่ง
        */
       res.setHeader?.('Cache-Control', 'no-store, no-cache, must-revalidate');
-      return res.status(200).json({ ...(item as object), rate_lines: rateLines });
+      // อัตราเบิกเห็นเฉพาะ supervisor ขึ้นไป (17 ต.ค. 2569) — ตัดที่นี่ ไม่ใช่ซ่อนบนจอ
+      const seeDraw = canSeeDrawRate(req.user.role);
+      const [shown] = seeDraw ? [item] : hideDrawRateOnRequests([item]);
+      return res.status(200).json({ ...(shown as object), rate_lines: seeDraw ? rateLines : hideDrawRateOnLines(rateLines) });
     }
 
     /**
@@ -456,7 +460,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       // ภาระงานตามผู้รับผิดชอบ (buildRecruiterOverview) จะเป็น 0 เพราะยอดไปกองที่ "ยังไม่มอบหมาย"
       await attachAssignments(items);
       await attachUnitSector(items);
-      return res.status(200).json(items);
+      return res.status(200).json(canSeeDrawRate(req.user.role) ? items : hideDrawRateOnRequests(items));
     }
 
     const limit = Number(getQuery(req, 'limit') || '200');
@@ -475,7 +479,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     res.setHeader?.('x-data-source', outcome.source);
     // Push ให้ precompute worker — urgency ต้องคิดก่อนเพื่อให้ priority sort ถูกต้อง
     enqueuePrecomputeJobs(enrichJobsWithUrgency(items as Parameters<typeof enrichJobsWithUrgency>[0]));
-    return res.status(200).json(items);
+    return res.status(200).json(canSeeDrawRate(req.user.role) ? items : hideDrawRateOnRequests(items));
   } catch (e) {
     return handleApiError(res, e, 'siamraj-unit-requests');
   }

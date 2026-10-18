@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import ChannelPicker from '@/components/shared/ChannelPicker';
 import PdpaConsentCheck from '@/components/shared/PdpaConsentCheck';
-import { PDPA_CONSENT_REQUIRED_MESSAGE, PDPA_CONSENT_TEXT_STAFF } from '@/lib/pdpaConsent';
+import { PDPA_CONSENT_REQUIRED_MESSAGE_STAFF, PDPA_CONSENT_TEXT_STAFF } from '@/lib/pdpaConsent';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { recruitChannelLabel, type RecruitChannelMatch } from '@/lib/recruitPostings';
@@ -401,7 +401,7 @@ const ImportApplicantsDialog: React.FC<{
                     !sharedPicked && fileBase64
                       ? 'เลือกผู้รับผิดชอบและช่องทางก่อน'
                       : !consent && fileBase64
-                        ? PDPA_CONSENT_REQUIRED_MESSAGE
+                        ? PDPA_CONSENT_REQUIRED_MESSAGE_STAFF
                         : undefined
                   }
                   onClick={() => void save()}

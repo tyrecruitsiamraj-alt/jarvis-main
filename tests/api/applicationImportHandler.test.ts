@@ -352,7 +352,7 @@ describe('PDPA (15 ต.ค. 2569)', () => {
     const a = mockRes();
     await handler(req('POST', { file_base64: file, dry_run: false }) as never, a.res as never);
     expect(a.status).toHaveBeenCalledWith(400);
-    expect(a.json.mock.calls[0][0].message).toBe('กรุณายอมรับข้อตกลงและเงื่อนไขก่อนดำเนินการต่อ');
+    expect(a.json.mock.calls[0][0].message).toBe('ติ๊กว่าผู้สมัครยอมรับข้อตกลงก่อน'); // 17 ต.ค. 2569 คำเตือนฝั่งเจ้าหน้าที่
     expect(txQuery).not.toHaveBeenCalled();
     const b = mockRes();
     await handler(req('POST', { file_base64: file, dry_run: true }) as never, b.res as never);

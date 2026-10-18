@@ -13505,3 +13505,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - จอ: `src/pages/settings/AiSettingsTab.tsx` (ตั้งค่า › ระบบอัตโนมัติ › AI ที่ใช้คิดงาน) · `src/lib/aiSettingsApi.ts`
 - ⚠️ AI ที่โทร (Lumos) ไม่อยู่ในระบบนี้
 - เทสต์ `tests/api/aiSettings2569-10-17.test.ts` · `boardMatchPool` mock ย้ายไป aiClient
+
+### เรื่องเล็กที่เจ้าของเคาะ (17–18 ต.ค. 2569)
+- PDPA: `PDPA_CONSENT_REQUIRED_MESSAGE_STAFF` = "ติ๊กว่าผู้สมัครยอมรับข้อตกลงก่อน" ใช้ในฟอร์ม/API ฝั่งเจ้าหน้าที่ (คีย์ใบ · นำเข้า · เพิ่มคน) · หน้าสมัครสาธารณะใช้ข้อความเดิม · ข้อความบริษัท `PDPA_POLICY` ไม่แตะ
+- อัตราเบิก: `api/_lib/drawRateVisibility.ts` — ต่ำกว่า supervisor ล้าง `draw_rate`/`resigned_wage_draw_rate` เป็น null ที่ `siamraj-unit-requests` (รายละเอียด + รายการ + ใบปิด) · ห้ามแก้ object ในสำเนา · `UnitRequestPayBlocks` ไม่วาดคอลัมน์เมื่อไม่มีค่า
+- ลบข้อมูลทดสอบ (ลบด้วย id): พนักงาน WL `test test` · สายคิว 21754 "ทดสอบ ระบบ" (ใบสมัครต้นทางยังอยู่)
+- เทสต์ `tests/api/drawRateHidden2569-10-17.test.ts`

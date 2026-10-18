@@ -51,7 +51,7 @@ import { splitIrecruitDuplicates } from '../_lib/irecruitDuplicates.js';
 import { listRecruitJobTitles } from '../_lib/recruitJobTitles.js';
 import { logError } from '../_lib/logger.js';
 import { recordApplicationConsent } from '../_lib/applicationConsent.js';
-import { PDPA_CONSENT_REQUIRED_MESSAGE } from '../../src/lib/pdpaConsent.js';
+import { PDPA_CONSENT_REQUIRED_MESSAGE_STAFF } from '../../src/lib/pdpaConsent.js';
 import { getSiamrajUnitRequestById, loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 import { enqueueLumosInterviewForApplications, NO_INCOME_REASON } from '../_lib/lumosDispatch.js';
 import { loadApplyScriptFacts } from '../_lib/applyScriptFacts.js';
@@ -235,7 +235,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
 
     // PDPA (148 · 15 ต.ค. 2569) — บันทึกจริงต้องยืนยันว่าผู้สมัครในไฟล์ยินยอมแล้ว (ตัวอย่างก่อนบันทึกไม่ต้อง)
-    if (raw?.pdpa_consent !== true) return sendError(res, 400, 'Bad request', PDPA_CONSENT_REQUIRED_MESSAGE);
+    if (raw?.pdpa_consent !== true) return sendError(res, 400, 'Bad request', PDPA_CONSENT_REQUIRED_MESSAGE_STAFF);
 
     // บันทึก — ทั้งไฟล์ในธุรกรรมเดียว · ล็อกเบอร์ทีละแถว **เรียงตามเบอร์** (คนนำเข้าพร้อมกันสองไฟล์ไม่ deadlock)
     // แล้วเช็คกติกาสมัครซ้ำอีกรอบ (มีคนสมัครเข้ามาระหว่างดูตัวอย่าง = ข้ามแถวนั้น)
