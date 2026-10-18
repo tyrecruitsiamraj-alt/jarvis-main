@@ -13511,3 +13511,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - อัตราเบิก: `api/_lib/drawRateVisibility.ts` — ต่ำกว่า supervisor ล้าง `draw_rate`/`resigned_wage_draw_rate` เป็น null ที่ `siamraj-unit-requests` (รายละเอียด + รายการ + ใบปิด) · ห้ามแก้ object ในสำเนา · `UnitRequestPayBlocks` ไม่วาดคอลัมน์เมื่อไม่มีค่า
 - ลบข้อมูลทดสอบ (ลบด้วย id): พนักงาน WL `test test` · สายคิว 21754 "ทดสอบ ระบบ" (ใบสมัครต้นทางยังอยู่)
 - เทสต์ `tests/api/drawRateHidden2569-10-17.test.ts`
+
+### วันเริ่มงานจากวันแจ้งเข้า ERP (17–18 ต.ค. 2569 · เจ้าของเคาะ "วันแจ้งเข้าใน ERP")
+- `api/_lib/erpInformDates.ts`: `hr_recruitment.mobile` → `inform_no` → `st_inform_head` (status A · ภายใน 120 วัน) · MAX(inform_date) ต่อเบอร์ 9 ตัวท้าย
+  ⚠️ ไม่ใช้ `st_inform_detail.begin_date` — ส่วนใหญ่เป็นวันที่ 1 ของเดือน (วันเริ่มสัญญา)
+- API `POST /api/erp-inform-dates` (staff · อ่านอย่างเดียว) · `src/lib/erpInformDatesApi.ts`
+- จอ: ป๊อปย้ายไปดูแลหลังเริ่มงาน (`FollowCompletedCard`) เติมให้ + ป้าย "วันแจ้งเข้าจาก ERP" · หน้าดูแลหลังเริ่มงานมีปุ่ม "ใช้วันแจ้งเข้า ERP …" (คนกด ระบบไม่เขียนเอง)
+- ป๊อปย้าย: เปลี่ยนวันเริ่มงานแล้วรอบแรกคิดใหม่ถ้ายังไม่แตะรอบ (`roundsTouched`) · ป้ายรอบแรก "ครบ" (เดิม "อีก") · "ผ่านมาแล้ว" สีเหลือง
+- เทสต์ `tests/api/erpInformStartDate2569-10-17.test.ts`

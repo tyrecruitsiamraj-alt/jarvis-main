@@ -36,6 +36,8 @@ export type ApiResource =
   /** ประเภทประกัน ขั้น 4 ฟอร์มติดตาม (149 · 16 ต.ค. 2569) — อ่านทุกคน · เพิ่มเฉพาะหัวหน้างานขึ้นไป */
   | 'follow-insurance-types'
   | 'ai-settings'
+  /** วันแจ้งเข้าจาก ERP ต่อเบอร์ (อ่านอย่างเดียว · ใช้ POST เพราะส่งเบอร์เยอะ) — 17 ต.ค. 2569 */
+  | 'erp-inform-dates'
   /** ดึงส่งคนแทนจาก iRecruit (2 ต.ค. 2569) — อ่านทุกคน · ดึงตอนนี้/ตั้งเวลาโทร หัวหน้างานขึ้นไป */
   | 'irecruit-replace-sync'
   | 'job-staff'
@@ -120,6 +122,10 @@ export function minimumRoleFor(
     case 'candidate-work-history':
       if (isRead || m === 'POST') return 'staff';
       return 'supervisor';
+
+    case 'erp-inform-dates':
+      // อ่านอย่างเดียวแม้เป็น POST — ทุกคนที่ใช้หน้าติดตาม/ดูแลหลังเริ่มงานได้
+      return 'staff';
 
     case 'follow':
       // staff: ดู + เพิ่ม/ยกเลิกรายชื่อที่ต้องติดตามเอง

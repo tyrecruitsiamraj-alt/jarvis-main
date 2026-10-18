@@ -43,6 +43,7 @@ import recruitReasonsHandler from './recruit-reasons.js';
 import recruitPostingKindsHandler from './recruit-posting-kinds.js';
 import followInsuranceTypesHandler from './follow-insurance-types.js';
 import aiSettingsHandler from './ai-settings.js';
+import erpInformDatesHandler from './erp-inform-dates.js';
 import valueCaseHandler from './value-case.js';
 import recruitJobTitlesHandler from './recruit-job-titles.js';
 import recruitFunnelHandler from './recruit-funnel.js';
@@ -149,6 +150,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/follow': followHandler as ApiHandler,
   '/api/follow-insurance-types': followInsuranceTypesHandler as ApiHandler,
   '/api/ai-settings': aiSettingsHandler as ApiHandler,
+  '/api/erp-inform-dates': erpInformDatesHandler as ApiHandler,
   '/api/value-case': valueCaseHandler as ApiHandler,
   '/api/follow-staff-contacts': followStaffContactsHandler as ApiHandler,
   '/api/follow-topics': followTopicsHandler as ApiHandler,

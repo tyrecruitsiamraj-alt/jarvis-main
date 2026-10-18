@@ -36,6 +36,8 @@ import {
 } from '@/lib/aftercareRounds';
 import { buildFollowPrefillPath } from '@/lib/followPrefill';
 import { LoaderCircle, RefreshCw, UserCheck, Users } from 'lucide-react';
+import { erpInformDateOf, fetchErpInformDates } from '@/lib/erpInformDatesApi';
+import { formatYmdTh } from '@/lib/dateTh';
 
 /**
  * หน้า **"ดูแลหลังเริ่มงาน"** (Phase 7.3-7.5 · ชื่อหน้าเจ้าของเคาะเอง)
@@ -142,6 +144,19 @@ const AftercarePage: React.FC = () => {
   );
 
   const { pageItems, bar } = useListPagination(items);
+  /** วันแจ้งเข้าจาก ERP ของคนที่ยังไม่มีวันเริ่มงาน (เจ้าของเคาะ 17 ต.ค. 2569) — ปุ่มให้กดใช้ ไม่เขียนเอง */
+  const [erpDates, setErpDates] = useState<ReadonlyMap<string, string>>(() => new Map());
+  useEffect(() => {
+    const phones = open.filter((p) => !p.start_date).map((p) => p.phone_e164);
+    if (phones.length === 0) return;
+    let alive = true;
+    void fetchErpInformDates(phones).then((m) => {
+      if (alive) setErpDates(m);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [open]);
 
   const saveStartDate = async (phone: string, value: string) => {
     setSavingPhone(phone);
@@ -417,6 +432,17 @@ const AftercarePage: React.FC = () => {
                           className="w-40"
                         />
                       </div>
+                      {!p.start_date && erpInformDateOf(erpDates, p.phone_e164) && !p.closed_at ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => void saveStartDate(p.phone_e164, erpInformDateOf(erpDates, p.phone_e164)!)}
+                        >
+                          ใช้วันแจ้งเข้า ERP {formatYmdTh(erpInformDateOf(erpDates, p.phone_e164)!)}
+                        </Button>
+                      ) : null}
                       <span
                         className={cn(
                           'text-[11px]',

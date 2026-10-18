@@ -1,5 +1,5 @@
 import type { FollowStopScope } from '@/lib/followApi';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoaderCircle, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -62,6 +62,7 @@ import {
 } from '@/lib/followAftercareMove';
 import type { ScheduleCall } from '@/lib/followWizard';
 import { friendlyErrorText } from '@/lib/friendlyError';
+import { erpInformDateOf, fetchErpInformDates } from '@/lib/erpInformDatesApi';
 
 /**
  * การ์ด **"ติดตามครบ"** บนหน้าติดตาม (เจ้าของสั่ง 1 ต.ค. 2569)
@@ -268,6 +269,29 @@ const MoveToAftercareDialog: React.FC<{
    */
   const [startYmd, setStartYmd] = useState<string>(() => (g ? startYmdOfRounds(g.rounds) : null) ?? '');
   const [rounds, setRounds] = useState<MoveRoundDraft[]>(() => [firstMoveRoundFor(startYmd || null, now())]);
+  /** คนแก้รอบเองแล้วหรือยัง — ยังไม่แตะ = เปลี่ยนวันเริ่มงานแล้วรอบแรกคิดใหม่ให้ (QA 17 ต.ค. 2569: เดิมค้าง 3 วันที่ผ่านไปแล้ว) */
+  const [roundsTouched, setRoundsTouched] = useState(false);
+  /** วันเริ่มงานที่เติมจากวันแจ้งเข้า ERP (เจ้าของเคาะ 17 ต.ค. 2569) — แก้ได้ · ไม่เจอ = ว่างให้เลือกเอง */
+  const [fromErp, setFromErp] = useState(false);
+  const changeStart = (v: string, erp = false) => {
+    setStartYmd(v);
+    setFromErp(erp);
+    setError(null);
+    if (!roundsTouched) setRounds([firstMoveRoundFor(v || null, now())]);
+  };
+  useEffect(() => {
+    if (!g || startYmd) return;
+    let alive = true;
+    void fetchErpInformDates([g.phone]).then((m) => {
+      const d = erpInformDateOf(m, g.phone);
+      if (alive && d) changeStart(d, true);
+    });
+    return () => {
+      alive = false;
+    };
+    // โหลดครั้งเดียวตอนเปิดป๊อป (หน้าแม่ remount ต่อคน)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -277,8 +301,10 @@ const MoveToAftercareDialog: React.FC<{
   const baseYmd = startYmd || null;
   const roundDays = baseYmd ? moveRoundDays(rounds, baseYmd) : rounds.map(() => null);
 
-  const patch = (i: number, next: Partial<MoveRoundDraft>) =>
+  const patch = (i: number, next: Partial<MoveRoundDraft>) => {
+    setRoundsTouched(true);
     setRounds((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...next } : r)));
+  };
 
   const submit = async () => {
     if (!g || busy) return;
@@ -372,15 +398,13 @@ const MoveToAftercareDialog: React.FC<{
           <span className="text-xs font-medium text-muted-foreground">นับจากวันเริ่มงาน</span>
           <DateSelectDmyBe
             value={startYmd}
-            onChange={(v) => {
-              setStartYmd(v);
-              setError(null);
-            }}
+            onChange={(v) => changeStart(v)}
             allowEmpty
             withWeekday={false}
             disabled={busy}
             ariaLabel="วันเริ่มงาน"
           />
+          {fromErp ? <span className="text-[11px] text-muted-foreground">วันแจ้งเข้าจาก ERP</span> : null}
         </div>
 
         <ol className="space-y-2" aria-label="รอบโทร">
@@ -395,14 +419,18 @@ const MoveToAftercareDialog: React.FC<{
                     variant="ghost"
                     size="iconXs"
                     disabled={rounds.length <= 1 || busy}
-                    onClick={() => setRounds((prev) => prev.filter((_, idx) => idx !== i))}
+                    onClick={() => {
+                      setRoundsTouched(true);
+                      setRounds((prev) => prev.filter((_, idx) => idx !== i));
+                    }}
                     aria-label={`เอารอบที่ ${i + 1} ออก`}
                   >
                     <X aria-hidden />
                   </Button>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground">{i === 0 ? 'อีก' : 'ต่ออีก'}</span>
+                  {/* รอบแรกนับจากวันเริ่มงาน ⇒ "ครบ N วัน" (เดิม "อีก" อ่านเหมือนนับจากวันนี้ แล้วขึ้น "ผ่านมาแล้ว" ขัดกัน · QA 17 ต.ค. 2569) */}
+                  <span className="text-xs text-muted-foreground">{i === 0 ? 'ครบ' : 'ต่ออีก'}</span>
                   {MOVE_DAY_PRESETS.map((d) => (
                     <Button
                       key={d}
@@ -435,7 +463,7 @@ const MoveToAftercareDialog: React.FC<{
                     {day ? formatYmdTh(day) : '—'}
                   </span>
                   {isMoveDayPast(day, r.time, today) ? (
-                    <span className={cn('text-xs font-medium', TONE.danger.value)}>ผ่านมาแล้ว</span>
+                    <span className={cn('text-xs font-medium', TONE.warn.value)}>ผ่านมาแล้ว</span>
                   ) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -473,7 +501,10 @@ const MoveToAftercareDialog: React.FC<{
           variant="outline"
           className="w-fit"
           disabled={rounds.length >= MOVE_MAX_ROUNDS || busy}
-          onClick={() => setRounds((prev) => [...prev, nextMoveRound(prev)])}
+          onClick={() => {
+            setRoundsTouched(true);
+            setRounds((prev) => [...prev, nextMoveRound(prev)]);
+          }}
         >
           <Plus aria-hidden /> เพิ่มรอบ
         </Button>
