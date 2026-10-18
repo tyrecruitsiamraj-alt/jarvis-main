@@ -29,6 +29,7 @@ const FOLLOW = tableInAppSchema('follow_entries');
  */
 export const FOLLOW_EFFECTIVE_MODE_SQL = `case
       when f.call_mode = 'manual' and nullif(btrim(f.staff_call_outcome), '') is null
+           and f.cancelled_at is null
            and q.status in ('completed', 'failed') then 'ai'
       else coalesce(f.call_mode, 'ai') end`;
 

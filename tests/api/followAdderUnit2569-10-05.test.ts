@@ -54,7 +54,7 @@ describe('หน่วยงานโชว์ทุกจอ', () => {
 describe('เลขบนตัวกรองหน้าติดตาม = ชุดเดียวกับ "สายที่ · ทั้งหมด" (เจ้าของสั่ง 5 ต.ค. 2569)', () => {
   it('ใครโทร/เจ้าของงาน นับจากช่วงที่ปฏิทินดูอยู่ + เฉพาะสายที่มีเลขสาย ไม่ใช่ทั้งแท็บ', () => {
     const src = readFileSync(join(process.cwd(), 'src/pages/follow/FollowPage.tsx'), 'utf8');
-    expect(src).toContain('countFollowCallers(panelByOwner.filter((e) => followRoundSlot(e) !== null))');
+    expect(src).toContain("filterFollowEntries(panelByOwner, { date: '', band: fBand, caller: 'all' }).filter((e) => followRoundSlot(e) !== null)");
     expect(src).not.toContain('countFollowCallers(scopeItems)');
     expect(src).toContain('followAdderOptions(ownerBase)');
     expect(src).toContain("{ value: 'all', label: `ทุกคน · ${ownerBase.length.toLocaleString('th-TH')}` }");

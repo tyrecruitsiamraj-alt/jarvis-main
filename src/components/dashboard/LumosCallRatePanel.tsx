@@ -45,6 +45,7 @@ const SOURCE_TABS: Array<{ id: CallFunnelSource; label: string; hint: string }> 
   { id: 'board', label: 'Job Offer', hint: 'ที่ส่งจากหน้าจับคู่งาน (คนบนบอร์ด)' },
   { id: 'follow', label: 'งานติดตาม', hint: 'ที่ส่งจากหน้าติดตาม' },
   { id: 'irecruit', label: 'iRecruit', hint: 'ที่ส่งจากผลค้นหาคนที่ยังไม่สมัคร' },
+  { id: 'applicant', label: 'ผู้สมัคร', hint: 'คนที่กรอกใบสมัครหรือนำเข้า' },
 ];
 
 /**
@@ -215,7 +216,7 @@ const StuckStrip: React.FC<{ stuck: CallStuck | null }> = ({ stuck }) => {
         ) : null}
       </div>
       <p className={cn('mt-1 text-[10px]', DASH.muted)}>
-        สายค้างทั้งหมดตอนนี้ ไม่ขึ้นกับช่วงที่เลือก
+        สายค้างทั้งหมดตอนนี้ ไม่ขึ้นกับช่วงที่เลือก · นัดโทรทีหลัง {fmtN(stuck.scheduledLater ?? 0)} สาย ไม่นับเป็นค้าง
       </p>
     </div>
   );
@@ -416,14 +417,14 @@ const LumosCallRatePanel: React.FC = () => {
                   value={trend.current.connected}
                   pct={trend.current.connectedPct}
                   tone="info"
-                  sub="รวมสายที่คุยแล้วปฏิเสธ"
+                  sub="ตามรหัส Lumos · รวมที่ปฏิเสธ"
                 />
                 <StatBox
                   label="สำเร็จ"
                   value={trend.current.confirmed}
                   pct={trend.current.confirmedPct}
                   tone="success"
-                  sub="ตอบยืนยัน/สนใจ — % จากสายที่มีผลทั้งหมด"
+                  sub="ตามรหัส Lumos · % จากสายที่มีผลทั้งหมด"
                 />
                 {/* 🔴 **Success Rate — ฐานคือสายที่ได้คุยจริง** (เจ้าของสั่ง 4 ก.ย. 2569
                     · เปลี่ยนตัวตั้ง 15 ก.ย. 2569)
@@ -436,7 +437,7 @@ const LumosCallRatePanel: React.FC = () => {
                   value={trend.current.saidYes}
                   pct={trend.current.successRatePct}
                   tone="success"
-                  sub={`% จากสายที่ได้คุยจริง ${fmtN(trend.current.talked)} สาย`}
+                  sub={`อ่านจากคำพูด · % จากสายที่ได้คุยจริง ${fmtN(trend.current.talked)} สาย`}
                 />
                 <StatBox
                   label="ปฏิเสธ"

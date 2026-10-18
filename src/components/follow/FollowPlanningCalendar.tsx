@@ -265,6 +265,10 @@ const DAY_LEGEND: ReadonlyArray<[keyof typeof TONE, string]> = [
   ),
 ];
 
+/** ช่องของการ์ดผลของวัน/เดือน — ชุดเดียวกับแผงขั้นตอนของสาย (รวมวันหยุด/ลางาน · 17 ต.ค. 2569) */
+const MONTH_COLS = ['went', 'notWent', 'dayOff', 'leave', 'noAnswer', 'unclear', 'waiting', 'cancelled'] as const;
+type MonthCol = (typeof MONTH_COLS)[number];
+
 /** วงสรุป — SVG ล้วน ไม่มีไลบรารีกราฟ ไม่มี CSS ใหม่ · สีมาจาก `TONE.hex` เท่านั้น */
 const Donut: React.FC<{ percent: number | null; caption: string }> = ({ percent, caption }) => {
   const r = 52;
@@ -293,7 +297,8 @@ const Donut: React.FC<{ percent: number | null; caption: string }> = ({ percent,
         className="fill-foreground text-[24px] font-medium"
         style={{ fontVariantNumeric: 'tabular-nums' }}
       >
-        {percent == null ? '—' : `${percent.toFixed(1)}%`}
+        {/* 0 ไม่ต้องมีทศนิยม ("0.0%" · QA 17 ต.ค. 2569) */}
+        {percent == null ? '—' : percent === 0 ? '0%' : `${percent.toFixed(1)}%`}
       </text>
       <text x="65" y="82" textAnchor="middle" className="fill-muted-foreground text-[11px]">
         {caption}
@@ -534,13 +539,14 @@ const FollowPlanningCalendar: React.FC<{
    * ตัวเดียวกับตัวกรองใครโทร ⇒ AI + คน = รวม ทุกแถว
    */
   const monthBoxes = useMemo(() => {
-    type Cols = Record<'went' | 'notWent' | 'noAnswer' | 'unclear' | 'waiting' | 'cancelled', number>;
-    const zero = (): Cols => ({ went: 0, notWent: 0, noAnswer: 0, unclear: 0, waiting: 0, cancelled: 0 });
+    // 🔴 QA 17 ต.ค. 2569: เดิมไม่มีวันหยุด/ลางาน ⇒ การ์ด 15 สาย แผงขั้นตอน 16 · ทั้งเดือน 1,911 กับ 1,914 — ใช้ช่องครบชุดเดียวกับแผง
+    type Cols = Record<MonthCol, number>;
+    const zero = (): Cols => ({ went: 0, notWent: 0, dayOff: 0, leave: 0, noAnswer: 0, unclear: 0, waiting: 0, cancelled: 0 });
     const out = { ...zero(), ai: zero(), manual: zero() };
     if (resultEntries) {
       // ชุดเดียวกับกล่องขั้นตอนของสาย — แถวตามแท็บสายที่เลือก (ทุกสาย / สายที่ 1 / 2 / 3 ขึ้นไป)
       const row = buildFollowCallMatrix(resultEntries)[roundFilter];
-      for (const k of ['went', 'notWent', 'noAnswer', 'unclear', 'waiting', 'cancelled'] as const) {
+      for (const k of MONTH_COLS) {
         for (const e of row[k]) {
           out[k] += 1;
           out[followCallerOf(e)][k] += 1;
@@ -558,7 +564,8 @@ const FollowPlanningCalendar: React.FC<{
     }
     return out;
   }, [resultEntries, roundFilter, summarySource, month]);
-  const monthWithResult = monthBoxes.went + monthBoxes.notWent + monthBoxes.noAnswer + monthBoxes.unclear;
+  const monthWithResult =
+    monthBoxes.went + monthBoxes.notWent + monthBoxes.dayOff + monthBoxes.leave + monthBoxes.noAnswer + monthBoxes.unclear;
   const monthTotal = monthWithResult + monthBoxes.waiting + monthBoxes.cancelled;
   /** หัวการ์ด — ตามช่วงที่กล่องขั้นตอนของสายนับอยู่ (มีชุดของหน้า) · ไม่มีชุด = ทั้งเดือนแบบเดิม */
   const resultIsDay = !!resultEntries && view === 'day';
@@ -1394,7 +1401,7 @@ const FollowPlanningCalendar: React.FC<{
             <div className="mt-3">
               <Donut percent={monthWithResult > 0 ? (monthBoxes.went / monthWithResult) * 100 : 0} caption="ตอบว่าไป" />
             </div>
-            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">{`จาก ${monthWithResult} สายที่มีผล`}</p>
+            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">{`จาก ${monthWithResult.toLocaleString('th-TH')} สายที่มีผล`}</p>
 
             {/* 4 ช่องชุดเดียวกับกล่องขั้นตอนของสาย แยก AI โทร / คนโทร (6 ต.ค. 2569) — AI + คน = รวม */}
             <div className="mt-3 border-t border-border/70 pt-3 text-[12px]" data-testid="month-result-boxes">
@@ -1403,26 +1410,26 @@ const FollowPlanningCalendar: React.FC<{
                 <span className="text-right text-[11px] text-muted-foreground">AI โทร</span>
                 <span className="text-right text-[11px] text-muted-foreground">คนโทร</span>
                 <span className="text-right text-[11px] text-muted-foreground">รวม</span>
-                {(['went', 'notWent', 'noAnswer', 'unclear', 'waiting', 'cancelled'] as const).map((k) => (
+                {MONTH_COLS.map((k) => (
                   <React.Fragment key={k}>
                     <span className="flex items-center gap-1.5 text-muted-foreground">
                       <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', TONE[FOLLOW_MATRIX_COL_TONE[k]].dot)} aria-hidden />
                       {FOLLOW_MATRIX_COL_LABEL[k]}
                     </span>
-                    <span className="text-right tabular-nums text-foreground" data-testid={`month-${k}-ai`}>{monthBoxes.ai[k]}</span>
-                    <span className="text-right tabular-nums text-foreground" data-testid={`month-${k}-manual`}>{monthBoxes.manual[k]}</span>
-                    <span className={cn('text-right font-medium tabular-nums', TONE[FOLLOW_MATRIX_COL_TONE[k]].value)}>{monthBoxes[k]}</span>
+                    <span className="text-right tabular-nums text-foreground" data-testid={`month-${k}-ai`}>{monthBoxes.ai[k].toLocaleString('th-TH')}</span>
+                    <span className="text-right tabular-nums text-foreground" data-testid={`month-${k}-manual`}>{monthBoxes.manual[k].toLocaleString('th-TH')}</span>
+                    <span className={cn('text-right font-medium tabular-nums', TONE[FOLLOW_MATRIX_COL_TONE[k]].value)}>{monthBoxes[k].toLocaleString('th-TH')}</span>
                   </React.Fragment>
                 ))}
                 {/* แถวทั้งหมด = เลข "ทั้งหมด" ของกล่องขั้นตอนของสาย */}
                 <span className="border-t border-border/70 pt-1.5 font-medium text-foreground">{FOLLOW_MATRIX_COL_LABEL.total}</span>
                 {(['ai', 'manual'] as const).map((c) => (
                   <span key={c} className="border-t border-border/70 pt-1.5 text-right tabular-nums text-foreground" data-testid={`month-total-${c}`}>
-                    {Object.values(monthBoxes[c]).reduce((a, b) => a + b, 0)}
+                    {Object.values(monthBoxes[c]).reduce((a, b) => a + b, 0).toLocaleString('th-TH')}
                   </span>
                 ))}
                 <span className="border-t border-border/70 pt-1.5 text-right font-medium tabular-nums text-foreground" data-testid="month-total">
-                  {monthTotal}
+                  {monthTotal.toLocaleString('th-TH')}
                 </span>
               </div>
             </div>

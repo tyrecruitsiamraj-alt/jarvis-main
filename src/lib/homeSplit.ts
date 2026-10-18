@@ -101,7 +101,11 @@ export function splitCalledRow(
  * `calledKeys` = ผลที่นับเป็นโทรแล้ว · ที่เหลือไปก้อนท้ายตามลำดับเดิม
  */
 export function groupResultRows(total: SplitRow, called: SplitRow, cols: readonly SplitRow[], calledKeys: readonly string[]): SplitRow[] {
-  const inCalled = cols.filter((r) => calledKeys.includes(r.key)).map((r) => ({ ...r, child: true }));
+  // ลำดับตาม calledKeys (ติดตาม: วันหยุด/ลางานต่อท้ายล้มเหลว — เจ้าของ 14 ต.ค. 2569) · หัวข้ออื่นส่งตามลำดับช่องอยู่แล้ว
+  const inCalled = calledKeys
+    .map((k) => cols.find((r) => r.key === k))
+    .filter((r): r is SplitRow => Boolean(r))
+    .map((r) => ({ ...r, child: true }));
   const rest = cols.filter((r) => !calledKeys.includes(r.key)).map((r, i) => (i === 0 ? { ...r, divider: true } : r));
   return [total, { ...called, divider: true }, ...inCalled, ...rest];
 }

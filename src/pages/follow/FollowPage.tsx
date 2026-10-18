@@ -1762,9 +1762,13 @@ const FollowPage: React.FC = () => {
    * (วัน/เดือน) และนับเฉพาะสายที่มีเลขสาย (นิยามเดียวกับแผง `buildFollowCallMatrix`) ⇒ ทั้งหมด = AI + คน = เลขสายที่
    * · ตัวเลือกแต่ละตัวนับหลังตัวกรองอีกตัว (เลือกเจ้าของงานแล้ว เลขใครโทรเหลือของคนนั้น)
    */
+  // QA 17 ต.ค. 2569: ตารางกรองช่วงเวลา (fBand) แต่เลขบนตัวเลือกไม่กรอง ⇒ "คนโทร · 4" แต่ตาราง 0 แถว · หน่วยคือ "สาย" ไม่ใช่แถวคน
   const callerCounts = useMemo(
-    () => countFollowCallers(panelByOwner.filter((e) => followRoundSlot(e) !== null)),
-    [panelByOwner],
+    () =>
+      countFollowCallers(
+        filterFollowEntries(panelByOwner, { date: '', band: fBand, caller: 'all' }).filter((e) => followRoundSlot(e) !== null),
+      ),
+    [panelByOwner, fBand],
   );
   const ownerBase = useMemo(
     () => filterFollowEntries(panelScope, { date: '', band: '', caller }).filter((e) => followRoundSlot(e) !== null),
@@ -2215,7 +2219,7 @@ const FollowPage: React.FC = () => {
                   value={caller}
                   options={FOLLOW_CALLERS.map((c) => ({
                     value: c,
-                    label: `${FOLLOW_CALLER_LABEL[c]} · ${callerCounts[c].toLocaleString('th-TH')}`,
+                    label: `${FOLLOW_CALLER_LABEL[c]} · ${callerCounts[c].toLocaleString('th-TH')} สาย`,
                   }))}
                   onChange={(v) => setCaller(v)}
                   ariaLabel="ใครโทร"

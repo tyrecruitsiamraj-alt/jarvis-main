@@ -20,7 +20,7 @@ type Props = {
 
 const SERIES_LABELS: Record<string, string> = {
   requested: 'เข้ามา',
-  filled: 'ปิดแล้ว',
+  filled: 'หาได้แล้ว',
   cancelled: 'ยกเลิก',
   remaining: 'คงเหลือ',
 };
@@ -56,17 +56,16 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
     <div className={cn(DASH.card, 'p-4 xl:col-span-2')}>
       <div className="mb-3">
         <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">
-          แนวโน้มรายเดือน — เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ
+          แนวโน้มรายเดือน — เข้ามา / หาได้แล้ว / ยกเลิก / คงเหลือ
         </h3>
         <p className="text-xs text-slate-600 dark:text-slate-400">
-          นับเป็นอัตรา · ตามเดือนที่กรอก/เปิดใบ · เข้ามา/ปิด/ยกเลิกจาก cohort · คงเหลือ = ใบเปิดที่ต้องหา (เท่าการ์ดคงเหลือ) ·{' '}
+          นับเป็นอัตรา · ตามเดือนที่กรอก/เปิดใบ · เข้ามา/หาได้/ยกเลิกจาก cohort · คงเหลือ = ใบเปิดที่ต้องหา ·{' '}
           {periodLabel}
         </p>
         <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-          รวมช่วง เข้ามา {totals.requested.toLocaleString('th-TH')} · ปิดแล้ว{' '}
+          รวมช่วง เข้ามา {totals.requested.toLocaleString('th-TH')} · หาได้แล้ว{' '}
           {totals.filled.toLocaleString('th-TH')} · ยกเลิก {totals.cancelled.toLocaleString('th-TH')} ·
           คงเหลือ {totals.remaining.toLocaleString('th-TH')}
-          {totals.remaining > 0 ? ' (= การ์ดคงเหลือ)' : ''}
         </p>
       </div>
       {/* div ครอบพากสีตัวหนังสือ (DASH.sub) ไปให้แกนกราฟผ่าน currentColor — สลับตามธีมเอง */}

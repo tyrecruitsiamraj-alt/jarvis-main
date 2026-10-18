@@ -184,8 +184,9 @@ const FollowDashboard: React.FC = () => {
           </div>
 
           {/* 🔴 ช่องเดียวกับแผง "ขั้นตอนของสาย" บนหน้าติดตาม — นับตามวันนัดโทรในช่วง · คำเดียวกัน (6 ต.ค. 2569) */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7" data-testid="follow-dashboard-matrix">
-            {(['total', 'went', 'notWent', 'noAnswer', 'unclear', 'waiting', 'cancelled'] as const).map((k) => (
+          {/* QA 17 ต.ค. 2569: เพิ่มวันหยุด/ลางาน — เดิมไม่มี ช่องย่อยรวมได้ 5,677 แต่ "ทั้งหมด" 5,682 */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5" data-testid="follow-dashboard-matrix">
+            {(['total', 'went', 'notWent', 'dayOff', 'leave', 'noAnswer', 'unclear', 'waiting', 'cancelled'] as const).map((k) => (
               <TrendKpiCard
                 key={k}
                 label={FOLLOW_MATRIX_COL_LABEL[k]}

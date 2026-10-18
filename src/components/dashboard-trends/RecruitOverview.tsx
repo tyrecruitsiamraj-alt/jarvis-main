@@ -40,6 +40,7 @@ import {
   positionRows,
   reasonGroups,
   totalsOf,
+  trimLastDayToNow,
 } from '@/lib/recruitOverview';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import type { BoardPublishedTotals } from '@/lib/boardRelease';
@@ -155,7 +156,8 @@ const RecruitOverview: React.FC<{
      * เพราะข้อมูลเพิ่งเริ่มกลางช่วงก่อน) — ข้อมูลเริ่มกลางเดือนก่อน/ยังไม่มีเลย = ไม่เทียบ แล้วบอกเหตุบนหัว
      */
     const prevFull = !!data.firstDay && data.firstDay <= win.prevFrom;
-    const prev = prevFull ? totalsOf(list, win.prevFrom, win.prevTo) : null;
+    const prevList = win.isCurrent ? trimLastDayToNow(list, win.prevTo, data.generatedAt) : list;
+    const prev = prevFull ? totalsOf(prevList, win.prevFrom, win.prevTo) : null;
     const cohort = cohortOf(list, win.from, win.to);
     return {
       cur,

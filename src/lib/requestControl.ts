@@ -3,6 +3,7 @@ import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { effectiveRequestDateYmd } from '@/lib/jobUrgency';
 import { classifyLifecycleKind, type LifecycleKind } from '@/lib/dashboard/lifecycle';
 import { computeJobSla, effectiveRequestKind, type SlaStatus } from '@/lib/jobSla';
+import { isPrequestJob } from '@/lib/publicJobVisibility';
 
 export type RequestControlStatus =
   | 'fully_closed'
@@ -216,7 +217,9 @@ function inYmdRange(ymd: string, from: string, to: string): boolean {
 
 export function mergeRequestControlJobs(openJobs: JobRequest[], extraJobs: JobRequest[] = []): JobRequest[] {
   const map = new Map<string, JobRequest>();
-  const keyOf = (j: JobRequest) => j.request_no?.trim() || j.externalId || j.id;
+  // ใบขอชั่วคราว (siamraj-pre:) เลขซ้ำใบขอจริงได้ — คีย์ด้วย id ของมันเอง ห้ามรวมกับใบจริง
+  // (QA 17 ต.ค. 2569: ตาราง SLA รวมใบเปิดได้ 341 ทั้งที่ใบเปิดมี 344)
+  const keyOf = (j: JobRequest) => (isPrequestJob(j) ? j.id : j.request_no?.trim() || j.externalId || j.id);
   for (const j of [...openJobs, ...extraJobs]) {
     const key = keyOf(j);
     const prev = map.get(key);

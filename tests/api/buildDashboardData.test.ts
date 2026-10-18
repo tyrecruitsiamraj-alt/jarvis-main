@@ -343,7 +343,7 @@ describe('buildDashboardData', () => {
     const data = buildDashboardData(jobs, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'), undefined, closed);
     expect(data.kpis.find((k) => k.id === 'total_requests')?.value).toBe(5);
     expect(data.kpis.find((k) => k.id === 'closed')?.value).toBe(3);
-    expect(data.kpis.find((k) => k.id === 'closed')?.label).toBe('ปิดแล้ว');
+    expect(data.kpis.find((k) => k.id === 'closed')?.label).toBe('หาได้แล้ว');
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(2);
     // ใบ 'a' ยังเหลือ 2 อัตรา → ต้องขึ้นใน "ต้องแก้วันนี้" · ใบที่ปิดแล้วต้องไม่ขึ้น
     expect(data.priorityWorkQueue).toHaveLength(1);

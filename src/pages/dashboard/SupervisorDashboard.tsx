@@ -309,7 +309,9 @@ const SupervisorDashboard: React.FC = () => {
    * แต่คอลัมน์ ปิดทัน/ไม่ทัน ไม่โผล่ เพราะข้อมูลไม่ได้ไหลเข้าตาราง
    */
   const slaControlRecords = useMemo(() => {
-    if (period) return controlRecords;
+    // QA 17 ต.ค. 2569: เลือกช่วงแล้ว ช่อง "ยังไม่ปิด" เคยนับใบเปิดทั้งระบบ (เดือนนี้ได้ 393 ทั้งที่ใบเข้าเดือนนี้ 143)
+    // ⇒ ใบเปิดต้องตัดตามวันขอในช่วงเหมือนการ์ดอื่น (`scopedJobs`)
+    if (period) return jobsToRequestControlRecords(mergeRequestControlJobs(scopedJobs, scopedClosedJobs));
     if (!closedAllJobs) return controlRecords;
     const scopedAll = filterUnitRequests(closedAllJobs, siamrajPrimary, unitFilters, {
       statusFilter: true,
@@ -317,7 +319,7 @@ const SupervisorDashboard: React.FC = () => {
       urgencyFilter: true,
     });
     return jobsToRequestControlRecords(mergeRequestControlJobs(jobsWithoutAgeFilter, scopedAll));
-  }, [period, controlRecords, closedAllJobs, siamrajPrimary, unitFilters, jobsWithoutAgeFilter]);
+  }, [period, controlRecords, closedAllJobs, siamrajPrimary, unitFilters, jobsWithoutAgeFilter, scopedJobs, scopedClosedJobs]);
 
   useEffect(() => {
     saveDashboardFilters(filters);

@@ -40,6 +40,24 @@ export function cohortOf(apps: readonly RecruitAppFact[], from: string, to: stri
   });
 }
 
+/**
+ * ช่วงที่ยังไม่จบ (ถึงวันนี้) เทียบกับช่วงก่อน — วันท้ายของช่วงก่อนนับแค่ถึงเวลาเดียวกับตอนนี้
+ * QA 17 ต.ค. 2569: ดู "วันนี้" ตอนเที่ยงเอาครึ่งวันไปเทียบทั้งวันของเมื่อวาน ขึ้น −81.9%
+ */
+const BKK_OFFSET_MS = 7 * 3_600_000;
+const DAY_MS_LOCAL = 86_400_000;
+const bkkTimeOfDay = (ms: number) => (((ms + BKK_OFFSET_MS) % DAY_MS_LOCAL) + DAY_MS_LOCAL) % DAY_MS_LOCAL;
+export function trimLastDayToNow(apps: readonly RecruitAppFact[], lastDay: string, nowIso: string): RecruitAppFact[] {
+  const now = Date.parse(nowIso);
+  if (Number.isNaN(now)) return [...apps];
+  const cut = bkkTimeOfDay(now);
+  return apps.filter((f) => {
+    if (appliedYmd(f) !== lastDay) return true;
+    const t = Date.parse(f.createdAt);
+    return Number.isNaN(t) || bkkTimeOfDay(t) <= cut;
+  });
+}
+
 export const isCalled = (f: RecruitAppFact) => f.calledByAi || f.calledByStaff;
 export const isAiSaidYes = (f: RecruitAppFact) => f.aiAnswer === 'said_yes';
 /** ตอบ AI ว่าสนใจ แล้วเจ้าหน้าที่ลงมือหลังเวลาที่ AI ได้คำตอบ */

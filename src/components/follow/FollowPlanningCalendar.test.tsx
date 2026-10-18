@@ -588,7 +588,7 @@ describe('แผน 20/20 — คำตอบต้องอยู่บนจ�
     renderCalendar([entry({ id: 'a', call_round: 1 })]);
     expect(screen.queryByText('ยังไม่มีผลเดือนนี้')).toBeNull();
     expect(screen.getByRole('img', { name: 'ตอบว่าไป' })).toBeTruthy();
-    expect(screen.getByText('0.0%')).toBeTruthy();
+    expect(screen.getByText('0%')).toBeTruthy();
   });
 
   it('🔴 ไม่มีสายเลย ⇒ ตารางรายวันยังมีหัวคอลัมน์ + แถว "ไม่มีสายที่ต้องตาม" + แถบแบ่งหน้าเป็น 0', () => {

@@ -267,7 +267,7 @@ export function buildLifecycleBoardFromStockSources(input: {
 
   const rows: LifecycleBoardRow[] = [
     rowFromKinds('requested', 'เข้ามา', requested),
-    rowFromKinds('filled', 'ปิดแล้ว', filled),
+    rowFromKinds('filled', 'หาได้แล้ว', filled),
     rowFromKinds('cancelled', 'ยกเลิก', cancelled),
     rowFromKinds('remaining', 'คงเหลือ', remaining),
   ];

@@ -49,6 +49,7 @@ const FOLLOW = tableInAppSchema('follow_entries');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const HOLDS = tableInAppSchema('candidate_call_holds');
 const CONTACTS = tableInAppSchema('application_contact_logs');
+const CANCELLATIONS = tableInAppSchema('application_cancellations');
 
 /**
  * รูปผลลัพธ์ — `total` = ยอดรวมก้อนเดียว (การ์ด) · `byDayBu` = แยกวัน (เวลาไทย) × BU (กราฟ) ·
@@ -150,7 +151,10 @@ export const FOLLOW_WAITING_AI_SQL = `exists (
  * ตั้งเป็นคนโทร แต่ AI โทรไปแล้วจริง (คิวจบ) และคนยังไม่ลงผล = นับเป็น AI (เจ้าของ Choice 12 ต.ค. 2569 "นับเป็น AI โทร")
  * ตัวเดียวกับ `FOLLOW_EFFECTIVE_MODE_SQL` (homeLumosSummarySql) และ `followCallerOf` ฝั่งจอ — กล่อง AI/คน ต้องเท่าแผงผลโทร
  */
+// 🔴 QA 17 ต.ค. 2569: สายที่ยกเลิกแล้ว `followCallerOf` ถือเป็นคนโทร (call_status = cancelled) — เดิม SQL นี้ไม่ดู
+// ⇒ กล่อง AI โทร 584 แต่ป๊อป 526 (ต่าง 58 สายที่ AI โทรแล้วค่อยยกเลิก) · ต้องตัดยกเลิกเหมือนจอ
 const FOLLOW_MANUAL_BUT_AI_CALLED_SQL = `(f.call_mode = 'manual' and nullif(btrim(f.staff_call_outcome), '') is null
+    and f.cancelled_at is null
     and exists (select 1 from ${QUEUE} q where ${FOLLOW_QUEUE_MATCH} and q.status in ('completed', 'failed')))`;
 
 /** หัวข้อติดตามแบบแผน — ตั้งให้ AI โทร (ไม่ระบุ = AI · ตัวเดียวกับ `followCallerOf`) / ตั้งให้คนโทร */
@@ -273,6 +277,8 @@ export function buildApplicantAiShareSql(mode: AiShareSqlMode = 'total', list?: 
       from ${APPS} a
       ${appBuJoin('a')}${resultJoins(mode, `${LATEST_AI_RESULT_LATERAL}\n      ${LATEST_STAFF_RESULT_LATERAL}`)}
      where not coalesce(a.is_lead, false)
+       -- ใบที่ยกเลิกข้อมูลแล้วไม่นับ — กติกาเดียวกับแท็บทีม Online (QA 17 ต.ค. 2569: 405 กับ 403 ในแท็บเดียวกัน)
+       and not exists (select 1 from ${CANCELLATIONS} c where c.application_id = a.id)
        and ($1::timestamptz is null or a.created_at >= $1::timestamptz)
        and a.created_at < $2::timestamptz
        and ($3::text is null or ${appBuSql('a')} = $3::text)

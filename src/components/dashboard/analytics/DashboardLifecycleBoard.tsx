@@ -143,7 +143,7 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
           <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 px-3 py-2 space-y-1.5">
             <p className="text-xs text-slate-800 dark:text-slate-200 font-medium">
               ข้อสรุป {periodLabel}: เข้ามา{' '}
-              <span className="tabular-nums">{fmt(summary.inPos)}</span> · ปิดแล้ว{' '}
+              <span className="tabular-nums">{fmt(summary.inPos)}</span> · หาได้แล้ว{' '}
               <span className="tabular-nums">{fmt(summary.closedPos)}</span>
               {summary.fillPct != null ? ` (${summary.fillPct}%)` : ''} · ยกเลิก{' '}
               <span className="tabular-nums">{fmt(summary.cancelPos)}</span> · คงเหลือหาอยู่{' '}
@@ -154,7 +154,7 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
               เข้ามาแยกประเภท — {summary.intakeByType}
             </p>
             <p className="text-[11px] text-slate-600 dark:text-slate-400">
-              คงเหลือแยกประเภท (= การ์ดคงเหลือ) — {summary.remainingByType}
+              คงเหลือแยกประเภท — {summary.remainingByType}
             </p>
             {summary.weak ? (
               <p className="text-[11px] text-slate-600 dark:text-slate-400">

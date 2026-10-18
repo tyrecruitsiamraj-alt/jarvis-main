@@ -201,7 +201,9 @@ describe('ติดตาม / ดูแลหลังเริ่มงาน:
     // ตั้งคนโทรแต่ AI โทรไปแล้ว = AI (12 ต.ค. 2569 · tests/api/followEffectiveCaller2569-10-12.test.ts)
     expect(sql).toContain(`${FOLLOW_PLAN_AI_SQL} as ai`);
     expect(sql).toContain(`${FOLLOW_PLAN_STAFF_SQL} as staff`);
-    expect(sql).not.toContain('f.cancelled_at is null');
+    // รวมยกเลิก = ไม่ตัดยกเลิกที่ where (ใน FOLLOW_MANUAL_BUT_AI_CALLED_SQL มี cancelled_at ได้ — แยกว่าใครโทร ไม่ได้ตัดแถว · QA 17 ต.ค. 2569)
+    expect(sql).toContain('where true');
+    expect(sql).not.toContain('where f.cancelled_at is null');
     expect(sql).toContain('($2::timestamptz is null or f.scheduled_at < $2::timestamptz)');
   });
 

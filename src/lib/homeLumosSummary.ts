@@ -64,6 +64,8 @@ export type FollowBucketKey = (typeof FOLLOW_BUCKET_KEYS)[number];
  * (QA 10 ต.ค. 2569 ป๊อปกับการ์ดนับคนละแบบ · เจ้าของเลือก "นับทีละสายตามผลจริง")
  */
 export const FOLLOW_CALLED_KEYS: readonly FollowBucketKey[] = ['went', 'notWent', 'dayOff', 'leave', 'reschedule', 'unclear', 'failed'];
+/** ชุดเดียวกับ `FOLLOW_CALLED_KEYS` ตามลำดับแถวผลโทรบนหน้าหลัก (วันหยุด/ลางานต่อท้ายล้มเหลว · เจ้าของ 14 ต.ค. 2569) — เทสต์คุมว่าสมาชิกครบ */
+export const FOLLOW_CALLED_DISPLAY_ORDER: readonly FollowBucketKey[] = ['went', 'notWent', 'reschedule', 'unclear', 'failed', 'dayOff', 'leave'];
 export const emptyFollowBucket = (): FollowBucket => ({
   total: 0,
   went: 0,

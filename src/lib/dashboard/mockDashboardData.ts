@@ -136,7 +136,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
       },
       {
         id: 'filled',
-        label: 'ปิดแล้ว',
+        label: 'หาได้แล้ว',
         total: { positions: 24, requests: 12 },
         resignation: { positions: 8, requests: 4 },
         replacement: { positions: 7, requests: 3 },

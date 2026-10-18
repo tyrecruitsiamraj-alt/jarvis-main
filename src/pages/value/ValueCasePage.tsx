@@ -574,8 +574,9 @@ const ValueCasePage: React.FC = () => {
               <b className="tabular-nums">{baht(result.aiFteValue)}</b>
               <span className={DASH.muted}>
                 {" "}
-                ต่อเดือน ({NUM1.format(result.aiFte)} คน ×{" "}
-                {NUM.format(inputs.beforeSalary)})
+                ต่อเดือน ({NUM1.format(result.aiFte)} คน ={" "}
+                {NUM.format(result.basisCalls)} สาย × {NUM1.format(inputs.minutesPerCall)} นาที ÷ 60 ÷{" "}
+                {NUM.format(inputs.hoursPerStaffMonth)} ชม. × {NUM.format(inputs.beforeSalary)})
               </span>
             </p>
             <p>

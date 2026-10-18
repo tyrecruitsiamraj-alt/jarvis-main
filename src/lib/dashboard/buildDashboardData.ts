@@ -587,8 +587,8 @@ function buildWorkStatusKpis(
   const total = totalOverride?.positions ?? Object.values(counts).reduce((s, n) => s + n, 0);
   const totalRequests = totalOverride?.requests ?? Object.values(requestCounts).reduce((s, n) => s + n, 0);
   const scopeHint = periodLabel
-    ? `เท่าการ์ดคงเหลือในช่วงที่เลือก`
-    : `เท่าการ์ดคงเหลือ`;
+    ? `ใบเปิดในช่วงที่เลือก`
+    : `ใบเปิดทั้งหมด`;
   const leaf = (id: string, label: string, status: UnitRequestWorkStatus): DashboardKpi => ({
     id,
     label,
@@ -606,7 +606,7 @@ function buildWorkStatusKpis(
       value: total,
       secondaryCount: totalRequests,
       secondaryLabel: 'ใบขอ',
-      description: `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ (= การ์ดคงเหลือ)`,
+      description: `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`,
       trendPercent: null,
     },
     leaf('work_status_in_progress', 'กำลังดำเนินการสรรหา', 'in_progress'),
@@ -659,11 +659,11 @@ function buildStockKpis(jobs: JobRequest[], _periodLabel?: string | null): Dashb
     },
     {
       id: 'closed',
-      label: 'ปิดแล้ว',
+      label: 'หาได้แล้ว',
       value: filledPositions,
       secondaryCount: filledRequestCount,
       secondaryLabel: 'ใบขอที่มีการหาได้',
-      description: `หาได้แล้ว · ${posReq(filledPositions, filledRequestCount)}`,
+      description: posReq(filledPositions, filledRequestCount),
       trendPercent: null,
     },
     {

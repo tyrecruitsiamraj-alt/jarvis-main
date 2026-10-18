@@ -40,6 +40,8 @@ export type CallRateDay = {
 export type CallStuck = {
   notDelivered: number;
   notDeliveredHours: number | null;
+  /** รอคิวแต่นัดโทรไว้ทีหลัง — ไม่ใช่ของค้าง (API เก่าไม่ส่ง = 0) */
+  scheduledLater?: number;
   deliveredSilent: number;
   deliveredSilentHours: number | null;
 };

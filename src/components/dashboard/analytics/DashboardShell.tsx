@@ -164,7 +164,18 @@ const DashboardShell: React.FC<Props> = ({
 
   const activeSiteCount = data.unitOverview.filter((u) => u.open > 0).length;
   const siteOpenTotal = data.unitOverview.reduce((sum, u) => sum + u.open, 0);
-  const recruiterRemainingTotal = data.recruiterOverview.reduce((sum, r) => sum + r.remaining, 0);
+  /**
+   * หัวแผงภาระงานแยกสรรหา/คัดสรร — QA 17 ต.ค. 2569: เดิมรวมสองหน้าที่ ใบเดียวนับสองรอบ (คงเหลือ 964 = 482 × 2)
+   * และนับแถว (คน × หน้าที่) เป็น "คน" ⇒ หัวกับตอนกางไม่ตรงกัน
+   */
+  const recruiterRoleSummary = (['recruiter', 'screener'] as const).map((role) => {
+    const rows = data.recruiterOverview.filter((r) => r.role === role);
+    return {
+      label: role === 'recruiter' ? 'สรรหา' : 'คัดสรร',
+      people: rows.length,
+      remaining: rows.reduce((sum, r) => sum + r.remaining, 0),
+    };
+  });
   const remainingKpiValue = data.kpis.find((k) => k.id === 'remaining')?.value ?? 0;
 
   /**
@@ -355,7 +366,7 @@ const DashboardShell: React.FC<Props> = ({
                         const stillOpen = intake - closed - cancelled;
                         return (
                           <>
-                            เข้ามา − ปิดแล้ว − ยกเลิก = <b>ยังเปิดหาอยู่ {stillOpen.toLocaleString('th-TH')} อัตรา</b>{' '}
+                            เข้ามา − หาได้แล้ว − ยกเลิก = <b>ยังเปิดหาอยู่ {stillOpen.toLocaleString('th-TH')} อัตรา</b>{' '}
                             ({intake.toLocaleString('th-TH')} − {closed.toLocaleString('th-TH')} −{' '}
                             {cancelled.toLocaleString('th-TH')}) · สามตัวนี้นับเฉพาะใบในช่วงแนวโน้ม —
                             ส่วน <span className="font-medium">คงเหลือ = ใบเปิดทั้งหมดทั้งระบบ</span> จึงเป็นคนละเลขกัน
@@ -370,7 +381,7 @@ const DashboardShell: React.FC<Props> = ({
                         const remaining = data.kpis.find((k) => k.id === 'remaining')?.value ?? 0;
                         return (
                           <>
-                            เข้ามา − ปิดแล้ว − ยกเลิก = คงเหลือ · ตอนนี้ {intake.toLocaleString('th-TH')} −{' '}
+                            เข้ามา − หาได้แล้ว − ยกเลิก = คงเหลือ · ตอนนี้ {intake.toLocaleString('th-TH')} −{' '}
                             {closed.toLocaleString('th-TH')} − {cancelled.toLocaleString('th-TH')} ={' '}
                             {remaining.toLocaleString('th-TH')}
                           </>
@@ -527,7 +538,9 @@ const DashboardShell: React.FC<Props> = ({
                 title="ภาระงานตามผู้รับผิดชอบ"
                 subtitle={
                   data.recruiterOverview.length > 0
-                    ? `${data.recruiterOverview.length.toLocaleString('th-TH')} คน · คงเหลือ ${recruiterRemainingTotal.toLocaleString('th-TH')} · กดเพื่อดู`
+                    ? `${recruiterRoleSummary
+                        .map((r) => `${r.label} ${r.people.toLocaleString('th-TH')} คน คงเหลือ ${r.remaining.toLocaleString('th-TH')}`)
+                        .join(' · ')} · กดเพื่อดู`
                     : 'กดเพื่อดูรายละเอียด'
                 }
                 open={showRecruiterOverview}
@@ -546,7 +559,7 @@ const DashboardShell: React.FC<Props> = ({
               </DashboardExpandablePanel>
               <DashboardExpandablePanel
                 title="แนวโน้มรายเดือน"
-                subtitle="เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ — กดเพื่อดู"
+                subtitle="เข้ามา / หาได้แล้ว / ยกเลิก / คงเหลือ — กดเพื่อดู"
                 open={showLifecycle}
                 onOpenChange={setShowLifecycle}
               >

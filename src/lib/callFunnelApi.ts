@@ -88,7 +88,7 @@ export const EMPTY_FUNNEL: CallFunnel = {
  * ต้นทางของงานโทร — 'follow' = ที่ส่งจากหน้า Follow เท่านั้น
  * (หน้า Follow เคยโชว์ยอดทั้งระบบ ทั้งที่หน้านั้นส่งเองแค่ 1 คน)
  */
-export type CallFunnelSource = 'all' | 'follow' | 'board' | 'irecruit';
+export type CallFunnelSource = 'all' | 'follow' | 'board' | 'irecruit' | 'applicant';
 
 /**
  * ยอดโทรรายวันย้อนหลัง (นับตามวันที่ส่ง โซนไทย) — เส้นเดียวกับ funnel แค่ขอมิติเวลาเพิ่ม

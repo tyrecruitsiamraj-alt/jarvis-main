@@ -49,6 +49,7 @@ import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
 import FollowCallerDialog from '@/components/home-ai-share/FollowCallerDialog';
 import HomeOnlineTab from '@/components/home-ai-share/HomeOnlineTab';
 import AiShareLumosStats, { FOLLOW_RESULT_COLS, useHomeLumosSummary } from '@/components/home-ai-share/AiShareLumosStats';
+import { FOLLOW_CALLED_DISPLAY_ORDER } from '@/lib/homeLumosSummary';
 import {
   followBuSplit,
   followResultSplit,
@@ -492,6 +493,9 @@ const HomeAiSharePage: React.FC = () => {
   /** ช่วง · BU ใต้ชื่อการ์ด */
   const sub = `${cardWin.from && cardWin.to ? rangeText(cardWin.from, cardWin.to) : 'ทุกวัน'} · ${
     current?.bu ? trendBuLabel(current.bu) : bu ? trendBuLabel(bu) : 'ทุก BU'
+  }${
+    // QA 17 ต.ค. 2569: 7 วันเดียวกันหน้านี้ 663 · Dashboard 306 — หน้านี้นับตามวันนัดโทร (scheduled_at) ต้องบอกบนจอ
+    meta.key === 'follow' || meta.key === 'aftercare' ? ' · นับตามวันนัดโทร' : ''
   }`;
   /** ก้อนที่โชว์ในแท่ง — ติดตามตั้งได้ทางเดียว (AI / คน) · หัวข้ออื่นครบ 4 ก้อนแบบกล่อง */
   const barSegs: AiShareSegment[] =
@@ -624,7 +628,9 @@ const HomeAiSharePage: React.FC = () => {
   // ติดตาม/ดูแลนับตามผล (ไม่นับยกเลิก/รอ/ยังไม่มีผล) · งานสรรหา/จับคู่งานโทรแล้ว = ตัดก้อนยังไม่โทร (เท่ากล่อง AI + คน + สองทาง)
   const calledKeys =
     meta.key === 'follow'
-      ? ['went', 'notWent', 'reschedule', 'unclear', 'failed']
+      ? // 🔴 QA 17 ต.ค. 2569: เดิมขาดวันหยุด/ลางาน ⇒ แผงผลโทร 655 แต่กล่องบน 659 (ต่างเท่าวันหยุด 4) · ใช้ชุดกลางชุดเดียว
+        // ลำดับบนจอ: วันหยุด/ลางานต่อท้ายล้มเหลว (เจ้าของ 14 ต.ค. 2569) · สมาชิกต้องครบเท่าชุดกลาง (เทสต์คุม)
+        [...FOLLOW_CALLED_DISPLAY_ORDER]
       : resultCols.map((r) => r.key).filter((k) => k !== 'noResult');
   const resultRows = resultCols.length
     ? groupResultRows(

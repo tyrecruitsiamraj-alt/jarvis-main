@@ -112,13 +112,15 @@ export type HumanCallSummary = {
  * ทำไมต้องมี: หน้า Follow เคยโชว์ยอดรวมทั้งระบบ (5,307) ทั้งที่หน้านั้นส่งเองแค่ 1 คน
  * เจ้าของทักว่า "ส่ง 1 คนเองทำไมขึ้นตั้ง 5307" — ตัวเลขถูกแต่ตอบคนละคำถาม
  */
-export type CallFunnelSource = 'all' | 'follow' | 'board' | 'irecruit';
+/** `applicant` = ผู้สมัครจากลิงก์/นำเข้า (`app-`) — QA 17 ต.ค. 2569: เดิมไม่มีชิป ชิปรวมกันได้ 306 จาก 461 */
+export type CallFunnelSource = 'all' | 'follow' | 'board' | 'irecruit' | 'applicant';
 
 /** ⚠️ ระบุ alias `q.` ให้ครบ — query นี้ join กับตารางติดตามแล้ว (2 ก.ย. 2569) คอลัมน์ชื่อซ้ำกันได้ */
 const SOURCE_WHERE: Record<Exclude<CallFunnelSource, 'all'>, string> = {
   follow: `q.person_ref like 'follow-%'`,
   board: `q.person_ref like 'card-%'`,
   irecruit: `q.person_ref like 'ir-%'`,
+  applicant: `q.person_ref like 'app-%'`,
 };
 
 /**
@@ -201,7 +203,7 @@ async function loadCellPeople(
 }
 
 function isCallFunnelSource(v: string): v is CallFunnelSource {
-  return v === 'all' || v === 'follow' || v === 'board' || v === 'irecruit';
+  return v === 'all' || v === 'follow' || v === 'board' || v === 'irecruit' || v === 'applicant';
 }
 
 function emptyFunnel(): CallFunnel {
@@ -228,6 +230,7 @@ const holdsTable = tableInAppSchema('candidate_call_holds');
 const HOLD_SOURCE_WHERE: Record<Exclude<CallFunnelSource, 'all'>, string | null> = {
   board: `source in ('board','application')`,
   irecruit: `source = 'irecruit'`,
+  applicant: `source = 'application'`,
   follow: null, // งาน Follow ไม่ผ่านล็อก "รับไปโทรเอง"
 };
 
@@ -456,8 +459,13 @@ export type CallRateDay = {
  * ถ้ากรองด้วยช่วง 7 วัน ของเก่าจะหายจากจอเงียบ ๆ ซึ่งคือสิ่งที่กติกานี้ห้าม
  */
 export type CallStuck = {
-  /** ยังไม่ถึงมือ Lumos (status=pending, ไม่มีผล) */
+  /** ยังไม่ถึงมือ Lumos (status=pending, ไม่มีผล) — **ถึงเวลาโทรแล้ว** เท่านั้น */
   notDelivered: number;
+  /**
+   * รอคิว แต่นัดโทรไว้ทีหลัง (next_attempt_at ยังไม่ถึง) — ไม่ใช่ของค้าง
+   * QA 17 ต.ค. 2569: เดิมนับรวมใน notDelivered ได้ 281 ทั้งที่ค้างจริง 80
+   */
+  scheduledLater: number;
   /** ค้างนานสุดกี่ชั่วโมง — null เมื่อไม่มีตัวค้าง */
   notDeliveredHours: number | null;
   /** Lumos รับไปแล้วแต่ยังไม่ส่งผลกลับ */
@@ -470,16 +478,19 @@ async function loadStuck(source: CallFunnelSource): Promise<CallStuck | null> {
   const where = conds.length ? `where ${conds.join(' and ')}` : '';
   const pend = queuePending('q');
   const wait = queueWaiting('q');
+  const due = `coalesce(q.next_attempt_at, q.created_at) <= now()`;
   try {
     const { rows } = await dbQuery<{
       not_delivered: string;
+      scheduled_later: string;
       not_delivered_s: string | null;
       delivered_silent: string;
       delivered_silent_s: string | null;
     }>(
-      `select count(*) filter (where ${pend})::text as not_delivered,
+      `select count(*) filter (where ${pend} and ${due})::text as not_delivered,
+              count(*) filter (where ${pend} and not (${due}))::text as scheduled_later,
               max(extract(epoch from (now() - coalesce(q.next_attempt_at, q.created_at))))
-                filter (where ${pend})::text as not_delivered_s,
+                filter (where ${pend} and ${due})::text as not_delivered_s,
               count(*) filter (where ${wait})::text as delivered_silent,
               max(extract(epoch from (now() - ${queueSentAt('q')})))
                 filter (where ${wait})::text as delivered_silent_s
@@ -494,6 +505,7 @@ async function loadStuck(source: CallFunnelSource): Promise<CallStuck | null> {
     return {
       notDelivered: Number(r.not_delivered) || 0,
       notDeliveredHours: hrs(r.not_delivered_s),
+      scheduledLater: Number(r.scheduled_later) || 0,
       deliveredSilent: Number(r.delivered_silent) || 0,
       deliveredSilentHours: hrs(r.delivered_silent_s),
     };

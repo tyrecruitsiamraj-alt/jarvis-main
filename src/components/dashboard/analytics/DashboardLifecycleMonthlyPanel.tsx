@@ -160,7 +160,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
             <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
               <th className="text-left font-medium px-2 py-2 whitespace-nowrap">เดือน</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">เข้ามา</th>
-              <th className="text-right font-medium px-2 py-2 whitespace-nowrap">ปิดแล้ว</th>
+              <th className="text-right font-medium px-2 py-2 whitespace-nowrap">หาได้แล้ว</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">ยกเลิก</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">คงเหลือ</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">ลาออก</th>

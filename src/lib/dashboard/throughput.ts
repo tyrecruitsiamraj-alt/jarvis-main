@@ -311,11 +311,11 @@ export function buildStockKpisFromCohort(
     },
     {
       id: 'closed',
-      label: 'ปิดแล้ว',
+      label: 'หาได้แล้ว',
       value: summary.filledPositions,
       secondaryCount: summary.filledRequestCount,
       secondaryLabel: 'ใบขอที่มีการหาได้',
-      description: `หาได้แล้ว · ${posReq(summary.filledPositions, summary.filledRequestCount)}`,
+      description: posReq(summary.filledPositions, summary.filledRequestCount),
       trendPercent: null,
     },
     {
