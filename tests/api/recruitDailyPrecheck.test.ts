@@ -49,8 +49,9 @@ describe('ตัวเลขรายวัน (นับตามวันท�
 });
 
 describe('แท็บงานสรรหา', () => {
-  it('โพสต์ประกาศ · ผู้สมัคร · การติดต่อ · ติดตามนัดหมาย · Pre-Check (ไม่มีแท็บภาพรวม)', () => {
-    expect(BOARD_VIEW_TABS.map((t) => t.label)).toEqual(['โพสต์ประกาศ', 'ผู้สมัคร', 'การติดต่อ', 'ติดตามนัดหมาย', 'Pre-Check']);
+  // 18 ต.ค. 2569 เจ้าของสั่งเพิ่ม "ภาพรวม" ต่อจาก Pre-Check (Journey ทั้งเส้น)
+  it('โพสต์ประกาศ · ผู้สมัคร · การติดต่อ · ติดตามนัดหมาย · Pre-Check · ภาพรวม', () => {
+    expect(BOARD_VIEW_TABS.map((t) => t.label)).toEqual(['โพสต์ประกาศ', 'ผู้สมัคร', 'การติดต่อ', 'ติดตามนัดหมาย', 'Pre-Check', 'ภาพรวม']);
   });
   it('🔴 ภาพรวมเดิมยังเปิดได้ที่ ?view=dashboard (ทางถอย) · Pre-Check ฝังแบบไม่มีหัวซ้อน', () => {
     const page = readFileSync('src/pages/jobs/StaffJobBoardPage.tsx', 'utf8');

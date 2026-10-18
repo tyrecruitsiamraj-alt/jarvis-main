@@ -3,6 +3,7 @@
  * (เจ้าของสั่ง 15 ส.ค. 2569 · migration 089)
  *
  * POST { applicationId, appointmentAt, result: 'showed'|'no_show'|'rescheduled', note? }
+ * POST { …, result: 'passed'|'not_passed' } — ผ่าน/ไม่ผ่าน หลังมาตามนัด (migration 151 · 18 ต.ค. 2569) · ต้องมีผลนัดล่าสุดเป็น "มาตามนัด"
  * GET  ?applicationId= → { items }
  *
  * กติกา (ตรวจฝั่ง server ห้ามเชื่อฟอร์ม):
@@ -19,7 +20,13 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
-import { createAttendanceResult, listAttendanceLogs } from '../_lib/applicationAttendance.js';
+import {
+  createAttendanceResult,
+  listAttendanceLogs,
+  loadLatestAttendanceByApplication,
+} from '../_lib/applicationAttendance.js';
+import { createScreeningResult } from '../_lib/applicationScreening.js';
+import { canRecordScreening, isScreeningResult } from '../../src/lib/appointmentScreening.js';
 import { isApplicationInWriteScope, loadApplicationScopeRowOrNull } from '../_lib/applicationScope.js';
 import { canRecordAttendance, isAttendanceResult } from '../../src/lib/appointmentAttendance.js';
 import { auditFromAuthed } from '../_lib/audit.js';
@@ -61,8 +68,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       };
       const applicationId = (body.applicationId ?? '').trim();
       if (!applicationId) return sendError(res, 400, 'Bad request', 'applicationId จำเป็น');
-      if (!isAttendanceResult(body.result)) {
-        return sendError(res, 400, 'Bad request', 'result ต้องเป็น showed, no_show หรือ rescheduled');
+      const screening = isScreeningResult(body.result);
+      if (!isAttendanceResult(body.result) && !screening) {
+        return sendError(res, 400, 'Bad request', 'result ต้องเป็น showed, no_show, rescheduled, passed หรือ not_passed');
       }
       const appointmentAt = (body.appointmentAt ?? '').trim();
       const appt = new Date(appointmentAt);
@@ -75,12 +83,43 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
       if (!(await guardScope(req, res, applicationId))) return;
 
+      // ผ่าน/ไม่ผ่าน — ต้องมาตามนัดก่อน (server ตัดสิน ไม่เชื่อปุ่ม)
+      if (screening) {
+        const latest = (await loadLatestAttendanceByApplication([applicationId])).get(applicationId);
+        if (!canRecordScreening(latest?.result)) {
+          return sendError(res, 400, 'Bad request', 'ลงผลผ่าน/ไม่ผ่านได้หลังบันทึกว่ามาตามนัดแล้ว');
+        }
+        let item;
+        try {
+          item = await createScreeningResult({
+            applicationId,
+            appointmentAt,
+            result: body.result as 'passed' | 'not_passed',
+            note: body.note,
+            recordedBy: req.user?.sub ?? null,
+            recordedByName: req.user?.email ?? null,
+          });
+        } catch (e) {
+          if ((e as { code?: string })?.code === '42P01') {
+            return sendError(res, 503, 'Migration required', 'ระบบกำลังอัปเดตฐานข้อมูล ลองใหม่อีกครั้งในอีกสักครู่');
+          }
+          throw e;
+        }
+        void auditFromAuthed(req, {
+          action: 'application-screening.log',
+          entityType: 'application_screening_result',
+          entityId: item.id,
+          after: { applicationId, appointmentAt: item.appointmentAt, result: item.result },
+        });
+        return res.status(201).json({ item });
+      }
+
       let log;
       try {
         log = await createAttendanceResult({
           applicationId,
           appointmentAt,
-          result: body.result,
+          result: body.result as 'showed' | 'no_show' | 'rescheduled',
           note: body.note,
           recordedBy: req.user?.sub ?? null,
           recordedByName: req.user?.email ?? null,

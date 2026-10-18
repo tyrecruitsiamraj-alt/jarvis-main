@@ -62,6 +62,14 @@ const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const HOLDS = tableInAppSchema('candidate_call_holds');
 const CONTACTS = tableInAppSchema('application_contact_logs');
 const ATTEND = tableInAppSchema('application_appointment_results');
+const SCREEN = tableInAppSchema('application_screening_results');
+
+/** ผ่าน/ไม่ผ่าน ล่าสุดของใบ (151 · 18 ต.ค. 2569) */
+export const LATEST_SCREENING_SQL = `(
+    select s.result from ${SCREEN} s
+     where s.application_id = a.id
+     order by s.appointment_at desc nulls last, s.created_at desc limit 1
+  )`;
 
 /** จุดเริ่มของวันไทย (รวม) / วันถัดไป (ไม่รวม) */
 const startOfBkk = (ymd: string) => `${ymd}T00:00:00+07:00`;
@@ -70,7 +78,7 @@ const startOfBkk = (ymd: string) => `${ymd}T00:00:00+07:00`;
 const scopeWhere = (bu: string) => `not coalesce(a.is_lead, false) and (${bu}::text is null or ${appBuSql('a')} = ${bu}::text)`;
 
 /** ข้อเท็จจริงต่อใบของช่วง [$1, $2) · $3 = BU · `attendance` = นิพจน์ผลนัด (ตารางยังไม่มี = null) */
-export function factsSql(attendance: string = LATEST_ATTENDANCE_SQL): string {
+export function factsSql(attendance: string = LATEST_ATTENDANCE_SQL, screening: string = LATEST_SCREENING_SQL): string {
   return `
   select a.created_at, a.job_id,
          nullif(btrim(a.channel_label), '') as channel_label,
@@ -85,15 +93,18 @@ export function factsSql(attendance: string = LATEST_ATTENDANCE_SQL): string {
          ${STAFF_LAST_AT_SQL} as staff_last_at,
          lc.cls as contact_class, lc.src as contact_src,
          lcl.ok as log_ok, lcl.reason_label as log_reason, lcl.created_at as log_at,
+         lcl.appointment_at as log_appointment_at,
+         ${IN_QUEUE_SQL} as in_queue,
          ${APPOINTMENT_AT_SQL} as appointment_at,
-         ${attendance} as attendance
+         ${attendance} as attendance,
+         ${screening} as screening
     from ${APPS} a
     ${appBuJoin('a')}
     ${LATEST_AI_RESULT_LATERAL}
     ${LATEST_STAFF_RESULT_LATERAL}
     ${LATEST_CONTACT_LATERAL}
     left join lateral (
-      select c.ok, nullif(btrim(c.reason_label), '') as reason_label, c.created_at
+      select c.ok, nullif(btrim(c.reason_label), '') as reason_label, c.created_at, c.appointment_at
         from ${CONTACTS} c where c.application_id = a.id
        order by c.created_at desc limit 1
     ) lcl on true
@@ -239,6 +250,10 @@ export function toFact(r: Row, boardPhones: Set<string> | null): RecruitAppFact 
     logAt: iso(r.log_at),
     appointmentAt: iso(r.appointment_at),
     attendance: att,
+    aiQueued: bool(r.in_queue),
+    // นัดไม่สำเร็จ = บันทึกติดต่อสำเร็จ + เหตุผล + ไม่มีวันนัด (ตัวเดียวกับ `isAppointmentFailedLog`)
+    appointmentFailed: r.log_ok === true && Boolean(text(r.log_reason)) && !r.log_appointment_at,
+    screening: r.screening === 'passed' || r.screening === 'not_passed' ? r.screening : null,
     onBoard: boardPhones ? Boolean(phone && boardPhones.has(phone)) : null,
   };
 }
@@ -338,7 +353,13 @@ async function loadFacts(params: unknown[]): Promise<Row[]> {
     return (await dbQuery<Row>(factsSql(), params)).rows;
   } catch (e) {
     if (!isPgUndefinedTable(e)) throw e;
-    return (await dbQuery<Row>(factsSql('null::text'), params)).rows;
+    // ผลนัด (089) หรือผ่าน/ไม่ผ่าน (151) ยังไม่ migrate — ลองตัดทีละอย่าง
+    try {
+      return (await dbQuery<Row>(factsSql(LATEST_ATTENDANCE_SQL, 'null::text'), params)).rows;
+    } catch (e2) {
+      if (!isPgUndefinedTable(e2)) throw e2;
+      return (await dbQuery<Row>(factsSql('null::text', 'null::text'), params)).rows;
+    }
   }
 }
 

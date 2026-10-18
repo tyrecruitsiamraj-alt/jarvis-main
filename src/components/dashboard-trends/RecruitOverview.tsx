@@ -20,6 +20,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
@@ -42,6 +43,7 @@ import {
   totalsOf,
   trimLastDayToNow,
 } from '@/lib/recruitOverview';
+import { WEEKDAY_CHOICES, buildRecruitJourney, filterByWeekdays } from '@/lib/recruitJourney';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import type { BoardPublishedTotals } from '@/lib/boardRelease';
 import {
@@ -50,7 +52,7 @@ import {
   DailyCard,
   DelayList,
   EmptyNote,
-  FunnelList,
+  JourneyList,
   OverviewCard,
   OverviewKpi,
   PositionList,
@@ -147,9 +149,12 @@ const RecruitOverview: React.FC<{
   const win = data?.window ?? null;
   const apps = data?.apps ?? null;
 
+  /** เฉพาะวันในสัปดาห์ (เจ้าของสั่ง 18 ต.ค. 2569 "เฉพาะวันจันทร์") — ว่าง = ทุกวัน · กรองตามวันที่กรอกใบ (เวลาไทย) */
+  const [weekdays, setWeekdays] = useState<number[]>([]);
+
   const view = useMemo(() => {
     if (!data || !win) return null;
-    const list = apps ?? [];
+    const list = filterByWeekdays(apps ?? [], weekdays);
     const cur = totalsOf(list, win.from, win.to);
     /**
      * 🔴 เทียบเดือนก่อน **เฉพาะตอนข้อมูลมีครบทั้งช่วงก่อน** (กับดักเดียวกับหน้าทีม Online: เคยขึ้น "เพิ่ม 1,400%"
@@ -165,13 +170,14 @@ const RecruitOverview: React.FC<{
       /** ข้อมูลเริ่มกลางช่วงก่อน (ไม่ใช่ไม่มีเลย) */
       prevPartial: !prevFull && !!data.firstDay && data.firstDay <= win.prevTo,
       steps: funnelSteps(cur, { attendanceEverRecorded: data.attendanceEverRecorded }),
+      journey: buildRecruitJourney(cohort),
       delay: delayRows(cohort),
       daily: dailyRows(cohort, win.from, win.to),
       channels: channelRows(cohort),
       positions: positionRows(cohort),
       reasons: reasonGroups(cohort),
     };
-  }, [data, win, apps]);
+  }, [data, win, apps, weekdays]);
 
   if (!data || !win || !view) {
     // ล้มแล้วมีปุ่มลองใหม่ (QA 5 ต.ค. 2569: เดิมเหลือข้อความอังกฤษดิบบรรทัดเดียว กดอะไรต่อไม่ได้)
@@ -266,6 +272,31 @@ const RecruitOverview: React.FC<{
         <span className="tabular-nums">{compareNote}</span>
       </div>
 
+      {/* เฉพาะวันในสัปดาห์ (เจ้าของสั่ง 18 ต.ค. 2569) — เลือกได้หลายวัน · ไม่เลือก = ทุกวัน · มีผลทั้งหน้า */}
+      <div className="flex flex-wrap items-center gap-2" data-testid="recruit-weekdays">
+        <span className={cn('text-xs', DASH.sub)}>เฉพาะวัน</span>
+        <ToggleGroup
+          type="multiple"
+          size="xs"
+          variant="outline"
+          value={weekdays.map(String)}
+          onValueChange={(v) => setWeekdays(v.map(Number))}
+          aria-label="เฉพาะวันในสัปดาห์"
+          className="flex-wrap justify-start"
+        >
+          {WEEKDAY_CHOICES.map((d) => (
+            <ToggleGroupItem key={d.day} value={String(d.day)}>
+              {d.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        {weekdays.length > 0 ? (
+          <Button type="button" size="xs" variant="ghost" onClick={() => setWeekdays([])}>
+            ทุกวัน
+          </Button>
+        ) : null}
+      </div>
+
       {state.error ? <SectionError message={state.error} /> : null}
       {appsError ? <SectionError message={appsError} /> : null}
 
@@ -322,8 +353,9 @@ const RecruitOverview: React.FC<{
           title="เส้นทางของรายชื่อ"
           className="lg:col-span-2"
         >
-          {/* 🔴 เดือนที่ยังไม่มีรายชื่อ = ขั้นครบเป็น 0 (เจ้าของสั่ง 1 ต.ค. 2569 — สลับเดือนแล้วการ์ดห้ามย่อ/ขยายเอง) */}
-          {apps ? <FunnelList steps={view.steps} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
+          {/* 🔴 Journey ทีละขั้น (เจ้าของสั่ง 18 ต.ค. 2569) แทนบันไดเดิมที่ "มาตามนัด 0 → ได้ใบสมัคร 21" ·
+              เดือนที่ยังไม่มีรายชื่อ = ขั้นครบเป็น 0 (กติกา 1 ต.ค.) */}
+          {apps ? <JourneyList steps={view.journey} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
           {data.errors.board ? <p className={cn('text-xs', TONE.warn.value)}>{data.errors.board}</p> : null}
         </OverviewCard>
         <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">

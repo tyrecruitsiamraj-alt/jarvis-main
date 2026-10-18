@@ -62,6 +62,8 @@ export type PublicApplication = {
   appointment_job?: string | null;
   /** ผลติดตามนัดล่าสุด (migration 089) — 'showed' | 'no_show' | 'rescheduled' */
   attendance_result?: string | null;
+  /** ผ่าน/ไม่ผ่าน หลังมาตามนัด (151 · 18 ต.ค. 2569) */
+  screening_result?: 'passed' | 'not_passed' | null;
   attendance_at?: string | null;
   /**
    * ชื่อขึ้นถังบนบอร์ด ERP แล้ว = "ได้ใบสมัครแล้ว" (16 ส.ค. · จับคู่ด้วยเบอร์)
@@ -475,7 +477,7 @@ export async function updateJobApplication(
 export async function recordAppointmentAttendance(input: {
   applicationId: string;
   appointmentAt: string;
-  result: 'showed' | 'no_show' | 'rescheduled';
+  result: 'showed' | 'no_show' | 'rescheduled' | 'passed' | 'not_passed';
   note?: string | null;
 }): Promise<void> {
   const r = await apiFetch('/api/application-attendance', {

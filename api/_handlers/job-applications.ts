@@ -65,6 +65,7 @@ import {
 } from '../_lib/applicantCallOutcomes.js';
 import { loadContactAppointments, loadLatestContactResults } from '../_lib/applicationContacts.js';
 import { loadLatestAttendanceByApplication } from '../_lib/applicationAttendance.js';
+import { loadLatestScreeningByApplication } from '../_lib/applicationScreening.js';
 import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
 import { logError, logWarn } from '../_lib/logger.js';
@@ -1723,6 +1724,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
           (item as Record<string, unknown>).attendance_result = hit.result;
           (item as Record<string, unknown>).attendance_at = hit.createdAt;
         }
+      }
+      // ผ่าน/ไม่ผ่าน หลังมาตามนัด (151 · 18 ต.ค. 2569) — แท็บนัดหมายโชว์ปุ่ม/ชิป
+      const screening = await loadLatestScreeningByApplication(items.map((i) => i.id));
+      for (const item of items) {
+        const hit = screening.get(item.id);
+        if (hit) (item as Record<string, unknown>).screening_result = hit.result;
       }
       // "ได้ใบสมัครแล้ว" = ชื่อขึ้นบอร์ด ERP (16 ส.ค. · เส้นแบ่งสรรหา→คัดสรร)
       // จับคู่ด้วยเบอร์ E.164 · ERP อ่านไม่ได้ = null → ไม่แนบ flag (หน้าถือว่า "ยังไม่รู้")

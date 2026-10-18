@@ -13578,3 +13578,13 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ปุ่มปฏิทินหน้าหลัก = ไอคอน + ช่วงวันที่ · สีหลักโหมดมืดคงเบอร์กันดี · ชิปการติดต่อคงแบบเดิม · "บันทึกแบบร่าง" คงคำเดิม
 - /value ส่วนต่างติดลบ = "ต้นทุนสูงกว่าเดิม N บาท" · ใบขอ "ปิดแล้ว (30 วันล่าสุด)" ดึงใบปิดจริง (`fetchSiamrajClosedRequests`)
 - เทสต์ `tests/api/ownerDecisions2569-10-18.test.ts`
+
+### Journey งานสรรหาทีละขั้น + ผ่าน/ไม่ผ่าน (18 ต.ค. 2569 · เจ้าของสั่ง "มันต้อง Scale ได้ระดับนี้เลย")
+- แท็บ **ภาพรวม** กลับมาต่อจาก Pre-Check (`BOARD_VIEW_TABS`) · การ์ด "เส้นทางของรายชื่อ" = `JourneyList` (RecruitOverviewParts) จาก `src/lib/recruitJourney.ts` (`buildRecruitJourney`)
+  - 6 ขั้น: รายชื่อ (AI โทรแล้ว/AI รอโทร/ข้อมูลผิด/ยังไม่ส่ง AI) → AI (สนใจ/ไม่สนใจ/พิจารณา/ติดต่อไม่ได้) → คนโทรกล่องสนใจ (สำเร็จ/ไม่สำเร็จ/รอโทร) → นัด (นัดได้/นัดไม่ได้/ยังไม่ลงผล) → มาไหม (มา/ไม่มา/รอผล) → ผ่านไหม (ผ่าน/ไม่ผ่าน/รอผล)
+  - 🔴 ลูกรวม = แม่ทุกขั้น (เทสต์คุม) · ฟังก์ชันเก่า `funnelSteps`/`FunnelList` ยังอยู่แต่หน้าไม่ใช้
+- ตัวเลือก "เฉพาะวัน" (ToggleGroup หลายวัน) กรองตามวันที่กรอกใบ (เวลาไทย) ทั้งหน้า · `filterByWeekdays`
+- facts เพิ่ม `aiQueued` (`IN_QUEUE_SQL`) · `appointmentFailed` (log ok + เหตุผล + ไม่มีวันนัด) · `screening`
+- **ผ่าน/ไม่ผ่าน**: `migrations/151_application_screening_results.sql` (append-only · ไม่มี CHECK) · `src/lib/appointmentScreening.ts` · `api/_lib/applicationScreening.ts` · POST `/api/application-attendance` result `passed|not_passed` (server บังคับว่าผลนัดล่าสุด = มาตามนัด) · `job-applications` แนบ `screening_result` · ปุ่มบนแถวแท็บติดตามนัดหมายโผล่หลังกด "มาแล้ว"
+  - ⚠️ แยกตารางจากผลนัด 089 โดยตั้งใจ — ห้ามเพิ่ม passed ลงตาราง 089 (จุดนับ 'showed' หลายสิบจุดจะตกหล่น)
+- เทสต์ `tests/api/recruitJourney2569-10-18.test.ts`

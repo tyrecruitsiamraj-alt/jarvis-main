@@ -49,6 +49,7 @@ import { downloadApplicantExport } from '@/lib/applicantExport';
 import { summarizeCallChoice } from '@/lib/callChoiceSummary';
 import CallChoiceConfirmDialog from '@/components/recruit-rm/CallChoiceConfirmDialog';
 import { ATTENDANCE_LABEL, type AttendanceResult } from '@/lib/appointmentAttendance';
+import { SCREENING_LABEL, isScreeningResult, type ScreeningResult } from '@/lib/appointmentScreening';
 import {
   APPOINTMENT_CHIPS,
   appointmentChipCount,
@@ -369,7 +370,7 @@ const RmWorkspace: React.FC<{
    * บันทึกผลติดตามนัด มา/ไม่มา (แท็บนัดหมาย · migration 089) — append-only ล่าสุดชนะ
    * server เป็นด่านตัดสิน (ก่อนวันนัด = 400) · เสร็จแล้ว reload ให้ชิปบนแถวอัปเดต
    */
-  const onAttendance = (row: PublicApplication, result: AttendanceResult) => {
+  const onAttendance = (row: PublicApplication, result: AttendanceResult | ScreeningResult) => {
     if (!row.appointment_at) return;
     say(null);
     void recordAppointmentAttendance({
@@ -378,7 +379,7 @@ const RmWorkspace: React.FC<{
       result,
     })
       .then(() => {
-        say(`บันทึกผลนัดของ ${row.full_name}: ${ATTENDANCE_LABEL[result]} แล้ว`);
+        say(`บันทึกผลนัดของ ${row.full_name}: ${isScreeningResult(result) ? SCREENING_LABEL[result] : ATTENDANCE_LABEL[result]} แล้ว`);
         load();
       })
       .catch((e) => say(friendlyErrorText(e, 'บันทึกผลนัดไม่สำเร็จ')));

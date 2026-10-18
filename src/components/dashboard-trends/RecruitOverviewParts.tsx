@@ -37,6 +37,7 @@ import {
   type StaffSortKey,
 } from '@/lib/recruitOverview';
 import type { RecruitAiRow, RecruitBacklog, RecruitStaffRow } from '@/lib/recruitOverviewTypes';
+import type { JourneyStep } from '@/lib/recruitJourney';
 import { DeltaChip } from './TrendParts';
 
 /**
@@ -169,6 +170,47 @@ export function FunnelList({ steps }: { steps: readonly FunnelStep[] }) {
           </div>
           <RatioBar pct={s.pct} tone={FUNNEL_TONE[s.key]} />
           {s.note ? <p className={cn('text-xs', DASH.sub)}>{s.note}</p> : null}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/* ─────────── Journey ทีละขั้น (18 ต.ค. 2569) ─────────── */
+
+/**
+ * เส้นทางรายชื่อแบบแตกทุกขั้น — แต่ละขั้นมีตัวแม่ + ลูกที่รวมกันเท่าแม่ (`buildRecruitJourney`)
+ * แท่งสีเรียงตามลูก · ใต้แท่งเป็นชิป "ชื่อ จำนวน (%)" · % = ของตัวแม่ในขั้นนั้น
+ */
+export function JourneyList({ steps }: { steps: readonly JourneyStep[] }) {
+  return (
+    <ol className="space-y-4" data-testid="recruit-journey">
+      {steps.map((s, i) => (
+        <li key={s.key} className="space-y-1.5">
+          <div className="flex items-baseline justify-between gap-2 text-sm">
+            <span className="text-foreground">
+              <span className={cn('mr-1.5 tabular-nums', DASH.sub)}>{i + 1}.</span>
+              {s.label}
+            </span>
+            <span className="font-medium tabular-nums text-foreground">{num(s.total)} คน</span>
+          </div>
+          <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
+            {s.total > 0
+              ? s.parts
+                  .filter((p) => p.value > 0)
+                  .map((p) => <span key={p.key} className={TONE[p.tone].dot} style={{ width: `${(p.value / s.total) * 100}%` }} />)
+              : null}
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            {s.parts.map((p) => (
+              <span key={p.key} className="inline-flex items-center gap-1.5" data-testid={`journey-${s.key}-${p.key}`}>
+                <span className={cn('h-2 w-2 rounded-full', TONE[p.tone].dot)} aria-hidden />
+                <span className={DASH.sub}>{p.label}</span>
+                <span className="font-medium tabular-nums text-foreground">{num(p.value)}</span>
+                <span className={cn('tabular-nums', DASH.sub)}>{s.total > 0 ? `(${Math.round((p.value / s.total) * 100)}%)` : ''}</span>
+              </span>
+            ))}
+          </div>
         </li>
       ))}
     </ol>

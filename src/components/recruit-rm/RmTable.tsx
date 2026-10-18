@@ -1,4 +1,5 @@
 import React from 'react';
+import { SCREENING_LABEL, SCREENING_RESULTS, SCREENING_TONE, canRecordScreening, type ScreeningResult } from '@/lib/appointmentScreening';
 import { BookmarkPlus, Bot, Phone, PhoneCall, Eye, ClipboardCheck, ListChecks, UserMinus, Undo2, FileText, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -190,7 +191,7 @@ const RmTable: React.FC<{
   /** ล็อกโทรที่มีอยู่ (คีย์ = application id) — ไว้โชว์ 🔒 และกันกด "โทร" ซ้ำ */
   holdByRef?: Record<string, CallHold>;
   /** บันทึกผลติดตามนัด มา/ไม่มา (แท็บนัดหมาย · migration 089) */
-  onAttendance?: (row: PublicApplication, result: AttendanceResult) => void;
+  onAttendance?: (row: PublicApplication, result: AttendanceResult | ScreeningResult) => void;
   /** เจ้าของงาน = เจ้าหน้าที่สรรหาของใบขอที่สมัคร (ตัวเดียวกับหัวข้อกรอง "เจ้าหน้าที่สรรหา") */
   recruiterOf?: (r: PublicApplication) => string | null;
   /** ปุ่มต่อแถวแทนชุดของแท็บ — มุมมอง "ดูที่ยกเลิก" ใช้ ดูรายละเอียด + กู้คืน (4 ต.ค. 2569) */
@@ -207,7 +208,7 @@ const RmTable: React.FC<{
   /** ปุ่มบันทึกผลนัด มาแล้ว/ไม่มา — ตั้งแต่วันนัด (เวลาไทย) เป็นต้นไป · กดซ้ำเพื่อแก้ได้ (append-only ล่าสุดชนะ) */
   const attendanceButtons = (r: PublicApplication, stacked = false) =>
     r.appointment_at && canRecordAttendance(r.appointment_at, new Date()) ? (
-      <span className={cn('inline-flex items-center gap-1 pt-0.5', stacked && 'flex-col items-stretch')}>
+      <span className={cn('inline-flex flex-wrap items-center gap-1 pt-0.5', stacked && 'flex-col flex-nowrap items-stretch')}>
         {ATTENDANCE_RESULTS.filter((k) => k !== 'rescheduled').map((k) => {
           const tone = TONE[ATTENDANCE_TONE[k]];
           const active = r.attendance_result === k;
@@ -229,6 +230,29 @@ const RmTable: React.FC<{
             </button>
           );
         })}
+        {/* มาแล้ว → ผ่าน / ไม่ผ่าน (151 · เจ้าของสั่ง 18 ต.ค. 2569 "มาแล้วผ่านเท่าไหร่ ไม่ผ่านเท่าไหร่") */}
+        {canRecordScreening(r.attendance_result)
+          ? SCREENING_RESULTS.map((k) => {
+              const tone = TONE[SCREENING_TONE[k]];
+              const active = r.screening_result === k;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => onAttendance?.(r, k)}
+                  title={`บันทึกว่า${SCREENING_LABEL[k]} — กดซ้ำอันอื่นเพื่อแก้ได้`}
+                  className={cn(
+                    'whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium max-sm:min-h-9 max-sm:px-3',
+                    tone.soft,
+                    tone.value,
+                    active ? 'ring-2 ring-ring' : 'opacity-75 hover:opacity-100',
+                  )}
+                >
+                  {SCREENING_LABEL[k]}
+                </button>
+              );
+            })
+          : null}
       </span>
     ) : null;
 

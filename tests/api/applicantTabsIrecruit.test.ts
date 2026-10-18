@@ -35,7 +35,8 @@ describe('แท็บ: กล่องงาน > ผู้สมัคร > �
   it('🔴 ลำดับและชื่อตามที่เจ้าของเรียงเอง', () => {
     const tabs = [...BOARD.matchAll(/\{ id: '(\w+)', label: '([^']+)' \}/g)].map((m) => `${m[1]}:${m[2]}`);
     // 15 ต.ค. 2569 แท็บภาพรวม → Pre-Check (เจ้าของสั่ง) · ภาพรวมเดิมยังเปิดได้ที่ ?view=dashboard
-    expect(tabs).toEqual(['board:โพสต์ประกาศ', 'list:ผู้สมัคร', 'contact:การติดต่อ', 'appointments:ติดตามนัดหมาย', 'precheck:Pre-Check']);
+    // 18 ต.ค. 2569 เจ้าของสั่งเพิ่ม "ภาพรวม" ต่อจาก Pre-Check
+    expect(tabs).toEqual(['board:โพสต์ประกาศ', 'list:ผู้สมัคร', 'contact:การติดต่อ', 'appointments:ติดตามนัดหมาย', 'precheck:Pre-Check', 'dashboard:ภาพรวม']);
   });
 
   it('ชื่อสามแท็บกลางเป็นชุดเดียวกับ RM_TAB_LABEL (ปุ่ม/ข้อความในแท็บผู้สมัครใช้ชื่อเดียวกับแถบแท็บ)', () => {

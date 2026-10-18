@@ -50,6 +50,12 @@ export type RecruitAppFact = {
   attendance: RecruitAttendance | null;
   /** ชื่อขึ้นบอร์ด ERP แล้ว (จับคู่ด้วยเบอร์) — null = อ่านบอร์ดไม่ได้ */
   onBoard: boolean | null;
+  /** อยู่ในคิว AI รอโทร (ยังไม่มีผล) — `IN_QUEUE_SQL` (18 ต.ค. 2569 Journey) */
+  aiQueued?: boolean;
+  /** บันทึกติดต่อสำเร็จแต่นัดไม่ได้ (ok + เหตุผล + ไม่มีวันนัด) */
+  appointmentFailed?: boolean;
+  /** ผ่าน/ไม่ผ่าน หลังมาตามนัด (151) */
+  screening?: 'passed' | 'not_passed' | null;
 };
 
 /** งานค้างตอนนี้ — สถานะวันนี้ ไม่ขึ้นกับเดือนที่เลือก · อายุนับเป็นวันเต็ม (ครบ 24 ชม. = 1 วัน) */
