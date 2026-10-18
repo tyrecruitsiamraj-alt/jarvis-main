@@ -349,6 +349,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   /** ประกาศที่ยังเปิดล่าสุด — สร้างลิงก์เพิ่มใต้ประกาศนี้ (ไม่สร้างประกาศใหม่ซ้ำ) */
   const openPosting = jobPostings?.find((p) => p.status === 'open') ?? null;
   /** ลิงก์สมัครที่ยังใช้ได้ (ประกาศที่ยังเปิด) */
+  const openPostingCount = jobPostings ? jobPostings.filter((p) => p.status === 'open').length : 0;
   const linkCount = jobPostings
     ? jobPostings.filter((p) => p.status === 'open').reduce((sum, p) => sum + p.links.length, 0)
     : null;
@@ -546,6 +547,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                       <CollapsibleTrigger asChild>
                         <Button type="button" variant="ghost" size="sm" className="-ml-2">
                           มีแล้ว {NUM.format(linkCount)} ลิงก์
+                          {/* หลายชุดประกาศ = บอกจำนวนชุด (QA 17 ต.ค. 2569: หัว 4 ลิงก์ แต่ชุดที่เปิดดูบอก 3) */}
+                          {openPostingCount > 1 ? ` · ${NUM.format(openPostingCount)} ชุด` : ''}
                           <ChevronDown className={cn('transition-transform', linksOpen && 'rotate-180')} aria-hidden />
                         </Button>
                       </CollapsibleTrigger>

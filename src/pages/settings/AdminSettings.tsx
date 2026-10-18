@@ -523,7 +523,7 @@ const AdminSettings: React.FC = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-secondary/30">
-                    <th className="px-4 py-3 text-left text-muted-foreground font-medium">ชื่อ</th>
+                    <th className="px-4 py-3 text-left text-muted-foreground font-medium max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-card">ชื่อ</th>
                     {/* ชื่อเล่น + สายงาน (114 · เจ้าของสั่ง 1 ก.ย. 2569) — ตั้งทุกอย่างของคนคนนี้ในแถวเดียว */}
                     <th className="px-4 py-3 text-left text-muted-foreground font-medium">ชื่อเล่น</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">สายงาน</th>
@@ -542,10 +542,10 @@ const AdminSettings: React.FC = () => {
                     <th className="hidden px-4 py-3 text-left text-muted-foreground font-medium lg:table-cell">
                       Email
                     </th>
-                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">Role</th>
+                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">บทบาท</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">แผนก</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">สถานะ</th>
-                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">Actions</th>
+                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -564,7 +564,8 @@ const AdminSettings: React.FC = () => {
                   ) : null}
                   {visibleUsers.map((u) => (
                     <tr key={u.id} className="border-b border-border/50 hover:bg-secondary/20">
-                      <td className="px-4 py-3 font-medium text-foreground">
+                      {/* มือถือ: ชื่อตรึงซ้าย เลื่อนดูคอลัมน์อื่นแล้วยังรู้ว่าแถวนี้ใคร (QA 17 ต.ค. 2569) */}
+                      <td className="px-4 py-3 font-medium text-foreground max-md:sticky max-md:left-0 max-md:z-10 max-md:max-w-40 max-md:bg-card">
                         {u.full_name}
                         {/* ใครอยู่ในระบบ (ย้ายมาจากหน้าหลัก 30 ก.ย. 2569) — Online / Offline / ยังไม่เข้าระบบ ใต้ชื่อ */}
                         <PresenceLine person={presenceById.get(u.id)} now={presenceNow} />

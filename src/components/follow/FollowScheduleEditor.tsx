@@ -174,11 +174,11 @@ export default function FollowScheduleEditor({
               <Button
                 type="button"
                 variant="outline"
-                size="icon"
+                size="sm"
                 onClick={() => setDraft((prev) => prev.filter((x) => x.key !== d.key))}
                 aria-label={`เอา${labelOf(d.key, `สายที่ ${i + 1}`)} ออก`}
               >
-                <X aria-hidden />
+                <X aria-hidden /> เอาออก
               </Button>
             </div>
             <div className="flex flex-wrap items-center gap-3">

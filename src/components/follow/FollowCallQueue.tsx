@@ -131,9 +131,9 @@ export default function FollowCallQueue({
         </div>
         <div className="col-span-2 flex flex-wrap items-center gap-1.5 md:col-span-1 md:justify-end">
           {it.group === 'staff' ? (
-            <Button asChild type="button" size="iconXs" variant="outline">
+            <Button asChild type="button" size="xs" variant="outline">
               <a href={`tel:${person.row.group.phone}`} aria-label={`โทรหา ${person.row.group.name}`}>
-                <Phone aria-hidden />
+                <Phone aria-hidden /> โทร
               </a>
             </Button>
           ) : null}

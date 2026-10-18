@@ -6,6 +6,7 @@ import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { useListPagination } from '@/hooks/useListPagination';
 import { cn } from '@/lib/utils';
+import { localThaiPhone } from '@/lib/followDayReport';
 import { DASH, TONE } from '@/lib/designTokens';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
@@ -345,13 +346,9 @@ const AftercarePage: React.FC = () => {
                 เพิ่มคนจากบอร์ด ERP
               </Button>
             </div>
-            <button
-              type="button"
-              onClick={() => navigate('/follow')}
-              className="mt-3 text-xs font-medium text-primary underline underline-offset-2"
-            >
+            <Button type="button" variant="link" size="sm" className="mt-3" onClick={() => navigate('/follow')}>
               ไปดูคนที่กำลังติดตาม →
-            </button>
+            </Button>
           </div>
         ) : (
           <>
@@ -369,7 +366,7 @@ const AftercarePage: React.FC = () => {
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <span className="min-w-0">
                         <b className={DASH.cellStrong}>{p.full_name}</b>
-                        <span className={cn('ml-1.5 font-mono text-[11px]', DASH.muted)}>{p.phone_e164}</span>
+                        <span className={cn('ml-1.5 text-[11px] tabular-nums', DASH.muted)}>{localThaiPhone(p.phone_e164)}</span>
                         {p.closed_at ? (
                           <span className={cn('ml-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium', TONE.neutral.chip)}>
                             ปิดการดูแลแล้ว
@@ -383,8 +380,11 @@ const AftercarePage: React.FC = () => {
                       </span>
                       {!p.closed_at ? (
                         <span className="flex shrink-0 flex-wrap items-center gap-1.5">
-                          <button
+                          {/* shadcn Button (QA 17 ต.ค. 2569: เดิมปุ่มเขียนเอง) */}
+                          <Button
                             type="button"
+                            size="sm"
+                            variant="outline"
                             disabled={busy || (rounds.length === 0 && !plan)}
                             title={
                               plan
@@ -406,24 +406,12 @@ const AftercarePage: React.FC = () => {
                                 }),
                               )
                             }
-                            className={cn(
-                              'inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium disabled:opacity-40',
-                              TONE.primary.outline,
-                            )}
                           >
                             ตั้งรอบโทรถามความเป็นอยู่
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void closeCare(p)}
-                            className={cn(
-                              'inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium disabled:opacity-40',
-                              TONE.neutral.outline,
-                            )}
-                          >
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void closeCare(p)}>
                             ปิดการดูแล
-                          </button>
+                          </Button>
                         </span>
                       ) : null}
                     </div>

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { isFollowLeaveMismatch } from '@/lib/followLeave';
 import { CalendarIcon, Check, ChevronLeft, ChevronRight, Clock, Pencil, Phone, PhoneOff, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { localThaiPhone } from '@/lib/followDayReport';
 import { TONE } from '@/lib/designTokens';
 import { shiftMonth } from '@/lib/followCallCalendar';
 import { dayCallTabLabel, roundFilterLabel } from '@/lib/followRoundVisual';
@@ -743,12 +744,12 @@ const FollowPlanningCalendar: React.FC<{
                       <thead>
                         <tr className={cn('border-b border-border', DASH.tableHead)}>
                           {/* 🔴 มือถือ + แท็บเล็ต (<1024): คอลัมน์ชื่อติดซ้าย (QA 10 ต.ค. 2569 ปัดหาปุ่มแล้วชื่อหาย · รอบ 3 ข้อ 6 จอ 768 ยังไม่ติด) */}
-                          <th className="min-w-[210px] px-4 py-2.5 text-[11px] font-medium max-lg:sticky max-lg:left-0 max-lg:z-10 max-lg:min-w-40 max-lg:bg-card md:px-5">
+                          <th className="min-w-[210px] px-4 py-2.5 text-[11px] font-medium max-lg:sticky max-lg:left-0 max-lg:z-10 max-lg:min-w-40 max-lg:bg-card max-sm:min-w-28 max-sm:max-w-32 max-sm:px-2 md:px-5">
                             ผู้ที่ต้องติดตาม / ติดต่อ
                           </th>
-                          <th className="min-w-[130px] px-3 py-2.5 text-[11px] font-medium">หน่วยงาน</th>
-                          <th className="min-w-[110px] px-3 py-2.5 text-[11px] font-medium">เวลานัด / รอบ</th>
-                          <th className="min-w-[140px] px-3 py-2.5 text-[11px] font-medium">สถานะการโทร</th>
+                          <th className="min-w-[130px] px-3 py-2.5 text-[11px] font-medium max-sm:hidden">หน่วยงาน</th>
+                          <th className="min-w-[110px] px-3 py-2.5 text-[11px] font-medium max-sm:min-w-20 max-sm:px-2">เวลานัด / รอบ</th>
+                          <th className="min-w-[140px] px-3 py-2.5 text-[11px] font-medium max-sm:min-w-28 max-sm:px-2">สถานะการโทร</th>
                           <th className="min-w-[220px] px-3 py-2.5 text-[11px] font-medium">เขาตอบว่าอะไร</th>
                           <th className="min-w-[150px] px-3 py-2.5 text-[11px] font-medium">เบอร์ฉุกเฉิน</th>
                           <th className="hidden px-3 py-2.5 text-right text-[11px] font-medium md:px-5 lg:table-cell">จัดการ</th>
@@ -842,7 +843,7 @@ const FollowPlanningCalendar: React.FC<{
                                 allCancelled && 'opacity-60',
                               )}
                             >
-                              <td className="px-4 py-3 max-lg:sticky max-lg:left-0 max-lg:z-10 max-lg:bg-card md:px-5">
+                              <td className="px-4 py-3 max-lg:sticky max-lg:left-0 max-lg:z-10 max-lg:bg-card max-sm:max-w-32 max-sm:px-2 md:px-5">
                                 <span className="flex items-start gap-2.5">
                                   {/* วงกลมอักษรย่อถอดแล้ว (เจ้าของ 8 ต.ค. 2569 "มันต้องไม่มีไอรูปหน้าตาพวกนี้ มันรก") */}
                                   <span className="min-w-0">
@@ -859,8 +860,13 @@ const FollowPlanningCalendar: React.FC<{
                                     >
                                       {row.group.name}
                                     </button>
-                                    <span className="block truncate text-[12px] text-muted-foreground">
-                                      {row.group.phone}
+                                    {/* เบอร์แบบ 0… ทุกที่ (QA 17 ต.ค. 2569: เดิมปน 09… กับ +669…) */}
+                                    <span className="block truncate text-[12px] tabular-nums text-muted-foreground">
+                                      {localThaiPhone(row.group.phone)}
+                                    </span>
+                                    {/* มือถือ: หน่วยงานอยู่ใต้ชื่อแทนคอลัมน์ — ยังเห็นทุกจอ (กติกา 5 ต.ค.) แต่สถานะการโทรไม่ต้องปัดหา (QA 17 ต.ค. 2569) */}
+                                    <span className="block truncate text-[12px] text-muted-foreground sm:hidden">
+                                      {row.group.unitName || '—'}
                                     </span>
                                     {/* บอกจำนวนสายไว้ใต้ชื่อ — กันคนอ่านว่าแถวนี้มีสายเดียว */}
                                     {calls.length > 1 ? (
@@ -883,7 +889,7 @@ const FollowPlanningCalendar: React.FC<{
                                 </span>
                               </td>
                               {/* 🔴 หน่วยงานโชว์ทุกจอ (5 ต.ค. 2569 เจ้าของเจอ "ชื่อหน่วยงานหาย" บนมือถือ — ตารางกลับเป็นแบบเดิมแล้วคอลัมน์นี้ยังซ่อนต่ำกว่า lg) */}
-                              <td className="px-3 py-3 text-[12px] text-muted-foreground">
+                              <td className="px-3 py-3 text-[12px] text-muted-foreground max-sm:hidden">
                                 {row.group.unitName || '—'}
                               </td>
 
@@ -916,13 +922,13 @@ const FollowPlanningCalendar: React.FC<{
                                         <Button
                                           type="button"
                                           variant="ghost"
-                                          size="icon"
+                                          size="xs"
                                           onClick={() => onEditRound(round)}
-                                          title={`แก้ไขวัน/เวลาของสายนี้ · ${row.group.name}`}
                                           aria-label={`แก้ไขวันเวลาของ ${row.group.name} ${callLabelOf(round, slot)}`}
-                                          className="h-7 w-7 shrink-0 rounded-full"
+                                          className="shrink-0"
                                         >
-                                          <Pencil aria-hidden />
+                                          {/* ปุ่มมีคำ (กฎ 15 ต.ค. 2569 · QA 17 ต.ค.) */}
+                                          <Pencil aria-hidden /> แก้
                                         </Button>
                                       ) : null}
                                     </span>

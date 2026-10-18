@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import React, { useEffect, useMemo, useRef } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -74,39 +75,20 @@ const AftercarePlanningCalendar: React.FC<{
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <CalendarDays className="h-4 w-4 text-muted-foreground" aria-hidden />
         <span className="text-sm font-medium text-foreground">ปฏิทินดูแลหลังเริ่มงาน</span>
-        <span className="text-[11px] text-muted-foreground">
-          แถว = คน · คอลัมน์ = วัน · ช่องบอกว่าวันนั้นถึงกำหนดโทรรอบไหน และตั้งสายไว้หรือยัง
-        </span>
         <div className="ml-auto flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onMonthChange(shiftMonth(month, -1))}
-            aria-label="เดือนก่อนหน้า"
-            className={cn('inline-flex h-8 w-8 items-center justify-center rounded-full border', TONE.neutral.outline)}
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden />
-          </button>
+          {/* shadcn Button (QA 17 ต.ค. 2569: เดิมปุ่มเขียนเอง) */}
+          <Button type="button" variant="outline" size="iconXs" aria-label="เดือนก่อนหน้า" onClick={() => onMonthChange(shiftMonth(month, -1))}>
+            <ChevronLeft aria-hidden />
+          </Button>
           <span className="min-w-[110px] text-center text-sm font-medium text-foreground">
             {monthLabel(month)}
           </span>
-          <button
-            type="button"
-            onClick={() => onMonthChange(shiftMonth(month, 1))}
-            aria-label="เดือนถัดไป"
-            className={cn('inline-flex h-8 w-8 items-center justify-center rounded-full border', TONE.neutral.outline)}
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden />
-          </button>
-          <button
-            type="button"
-            onClick={() => onMonthChange(today.slice(0, 7))}
-            className={cn(
-              'ml-1 inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-medium',
-              TONE.info.outline,
-            )}
-          >
+          <Button type="button" variant="outline" size="iconXs" aria-label="เดือนถัดไป" onClick={() => onMonthChange(shiftMonth(month, 1))}>
+            <ChevronRight aria-hidden />
+          </Button>
+          <Button type="button" variant="outline" size="xs" className="ml-1" onClick={() => onMonthChange(today.slice(0, 7))}>
             เดือนนี้
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -154,7 +136,7 @@ const AftercarePlanningCalendar: React.FC<{
                         c.ymd === today && 'underline underline-offset-4',
                       )}
                     >
-                      <span className="text-[9px] leading-none opacity-80">{c.weekday}</span>
+                      <span className="text-[10px] leading-none opacity-80">{c.weekday}</span>
                       <span className="text-[11px] tabular-nums">{c.day}</span>
                     </span>
                   </th>
@@ -199,7 +181,7 @@ const AftercarePlanningCalendar: React.FC<{
                             {cell.round ? (
                               <span
                                 className={cn(
-                                  'block rounded px-0.5 py-0.5 text-[9px] font-medium leading-tight',
+                                  'block rounded px-0.5 py-0.5 text-[10px] font-medium leading-tight',
                                   cell.round.overdue && cell.calls.length === 0
                                     ? TONE.warn.chip
                                     : TONE.neutral.chip,
@@ -214,16 +196,16 @@ const AftercarePlanningCalendar: React.FC<{
                                 key={call.entry.id}
                                 className={cn('block rounded px-0.5 py-0.5 leading-tight', TONE[roundTone(call)].chip)}
                               >
-                                <span className="block text-[9px] font-medium tabular-nums">
+                                <span className="block text-[10px] font-medium tabular-nums">
                                   {call.time ?? '—'}
                                 </span>
-                                <span className="block truncate text-[8px] font-medium leading-tight">
+                                <span className="block truncate text-[10px] font-medium leading-tight">
                                   {roundResultLabel(call)}
                                 </span>
                               </span>
                             ))}
                             {cell.calls.length > 2 ? (
-                              <span className="text-[9px] font-medium text-primary">
+                              <span className="text-[10px] font-medium text-primary">
                                 +{cell.calls.length - 2}
                               </span>
                             ) : null}
@@ -233,11 +215,11 @@ const AftercarePlanningCalendar: React.FC<{
                                 บนหัวหน้า — จอขัดกันเองแล้วคนเลิกเชื่อ) */}
                             {cell.round && cell.calls.length === 0 ? (
                               cell.round.overdue ? (
-                                <span className="block truncate text-[8px] font-medium text-amber-700 dark:text-amber-300">
+                                <span className="block truncate text-[10px] font-medium text-amber-700 dark:text-amber-300">
                                   เลยกำหนด · ยังไม่ได้ตั้งสาย
                                 </span>
                               ) : (
-                                <span className="block truncate text-[8px] text-muted-foreground">
+                                <span className="block truncate text-[10px] text-muted-foreground">
                                   ยังไม่ถึงกำหนด
                                 </span>
                               )

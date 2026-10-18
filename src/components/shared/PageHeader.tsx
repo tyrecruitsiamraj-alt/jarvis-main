@@ -73,9 +73,10 @@ const PageHeader: React.FC<PageHeaderProps> = ({
       </div>
       {/* แท็บต่อท้ายชื่อ: จอคอม = แถวเดียวกับ ← และปุ่ม · มือถือ = ลงแถวถัดไปเต็มกว้าง (แถวแรกเหลือ ← กับปุ่ม)
           ไม่งั้นจอ 375 เห็นแท็บแค่ 1–2 อัน (4 ต.ค. 2569) */}
-      {afterTitle ? <div className="order-3 min-w-0 basis-full md:order-2 md:basis-0 md:flex-1">{afterTitle}</div> : null}
+      {/* 18 ต.ค. 2569: จอ 768 แท็บโดนปุ่มเบียดเหลือ "การ" (QA 17 ต.ค.) ⇒ แถวเดียวกันเริ่มที่ lg */}
+      {afterTitle ? <div className="order-3 min-w-0 basis-full lg:order-2 lg:basis-0 lg:flex-1">{afterTitle}</div> : null}
       {actions && (
-        <div className={cn('flex min-w-0 max-w-full flex-wrap items-center gap-2', afterTitle && 'order-2 md:order-3')}>
+        <div className={cn('flex min-w-0 max-w-full flex-wrap items-center gap-2', afterTitle && 'order-2 lg:order-3')}>
           {actions}
         </div>
       )}

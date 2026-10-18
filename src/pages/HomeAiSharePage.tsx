@@ -693,7 +693,8 @@ const HomeAiSharePage: React.FC = () => {
         rows={buRows}
         segs={barSegs}
         loading={barsLoading && !failed}
-        emptyText={failed && barsLoading ? 'โหลดไม่ขึ้น' : 'ไม่มีรายชื่อ'}
+        // ล้มแล้วขึ้น "—" แบบเดียวกับการ์ดผลโทร (QA 17 ต.ค. 2569: สองก้อนเคยบอกคนละแบบ)
+        emptyText={failed && barsLoading ? '—' : 'ไม่มีรายชื่อ'}
         testId="home-bu-bars"
       />
     </HomeSection>
@@ -798,7 +799,14 @@ const HomeAiSharePage: React.FC = () => {
           </Button>
         </p>
       ) : null}
-      {blockError ? <p className={cn('text-xs', TONE.danger.value)}>{blockError}</p> : null}
+      {blockError ? (
+        <p className={cn('flex flex-wrap items-center gap-2 text-sm', TONE.danger.value)} data-testid="home-block-error">
+          {blockError}
+          <Button type="button" variant="outline" size="xs" onClick={() => setRetrySeq((n) => n + 1)}>
+            ลองใหม่
+          </Button>
+        </p>
+      ) : null}
       {flag ? <p className={cn('text-xs', TONE.warn.value)}>{flag}</p> : null}
 
       {online ? <HomeOnlineTab q={winQ} tick={tick} onRetry={() => setRetrySeq((n) => n + 1)} /> : null}

@@ -44,9 +44,11 @@ describe('ใครเพิ่ม', () => {
 });
 
 describe('หน่วยงานโชว์ทุกจอ', () => {
-  it('คอลัมน์หน่วยงานของตารางรายวันไม่ซ่อนบนจอเล็ก', () => {
+  // 18 ต.ค. 2569: มือถือ (<sm) ย้ายหน่วยงานไปใต้ชื่อแทนคอลัมน์ — ยังเห็นทุกจอ แต่สถานะการโทรไม่ต้องปัดหา (QA 17 ต.ค.)
+  it('หน่วยงานของตารางรายวันเห็นทุกจอ (จอเล็กอยู่ใต้ชื่อ)', () => {
     const src = readFileSync(join(process.cwd(), 'src/components/follow/FollowPlanningCalendar.tsx'), 'utf8');
-    expect(src).toContain('<th className="min-w-[130px] px-3 py-2.5 text-[11px] font-medium">หน่วยงาน</th>');
+    expect(src).toContain('<th className="min-w-[130px] px-3 py-2.5 text-[11px] font-medium max-sm:hidden">หน่วยงาน</th>');
+    expect(src).toContain('<span className="block truncate text-[12px] text-muted-foreground sm:hidden">');
     expect(src).not.toContain('font-medium lg:table-cell">หน่วยงาน');
   });
 });

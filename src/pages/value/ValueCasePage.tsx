@@ -292,7 +292,7 @@ const ValueCasePage: React.FC = () => {
             <h2 className="text-base font-medium text-foreground">
               ก่อนมีระบบ
             </h2>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
               <NumberField
                 id="vcBeforeStaff"
                 label="จำนวนคน"
@@ -330,7 +330,7 @@ const ValueCasePage: React.FC = () => {
 
           <Card className="space-y-3 rounded-2xl p-4">
             <h2 className="text-base font-medium text-foreground">ตอนนี้</h2>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
               <NumberField
                 id="vcNowStaff"
                 label="จำนวนคน"
@@ -641,6 +641,13 @@ const ValueCasePage: React.FC = () => {
               onChange={(e) => set("notesAdd", e.target.value)}
             />
           </Card>
+        </div>
+        {/* ปุ่มบันทึกท้ายหน้าด้วย — หน้ายาวราว 3,000px ปุ่มบนหัวมองไม่เห็นตอนกรอกช่องล่าง (QA 17 ต.ค. 2569) */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {saveError ? <span className={cn("text-xs", TONE.danger.value)}>{saveError}</span> : null}
+          <Button type="button" size="sm" onClick={() => void save()} disabled={saving || state !== "ready" || !dirty}>
+            <Save aria-hidden /> {saving ? "กำลังบันทึก…" : "บันทึก"}
+          </Button>
         </div>
       </div>
       )}

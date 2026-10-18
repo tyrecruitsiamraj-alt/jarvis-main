@@ -1081,19 +1081,26 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                           <div className="space-y-2.5 pt-1">
                             <div className="flex flex-wrap items-center gap-2 text-xs">
                               <span className="w-12 text-muted-foreground">อายุ</span>
-                              <Input
-                                value={editAgeMin}
-                                onChange={(e) => setEditAgeMin(e.target.value.replace(/[^0-9]/g, ''))}
-                                placeholder="ต่ำสุด"
-                                className="w-20 bg-white/80 dark:bg-slate-900"
-                              />
-                              <span>–</span>
-                              <Input
-                                value={editAgeMax}
-                                onChange={(e) => setEditAgeMax(e.target.value.replace(/[^0-9]/g, ''))}
-                                placeholder="สูงสุด"
-                                className="w-20 bg-white/80 dark:bg-slate-900"
-                              />
+                              {/* ต่ำสุด–สูงสุดอยู่แถวเดียวกัน + คีย์บอร์ดตัวเลข (QA 17 ต.ค. 2569: มือถือแตกคนละบรรทัด ขึ้นคีย์บอร์ดตัวอักษร) */}
+                              <span className="inline-flex items-center gap-2">
+                                <Input
+                                  value={editAgeMin}
+                                  onChange={(e) => setEditAgeMin(e.target.value.replace(/[^0-9]/g, ''))}
+                                  placeholder="ต่ำสุด"
+                                  inputMode="numeric"
+                                  aria-label="อายุต่ำสุด"
+                                  className="w-20 bg-white/80 dark:bg-slate-900"
+                                />
+                                <span>–</span>
+                                <Input
+                                  value={editAgeMax}
+                                  onChange={(e) => setEditAgeMax(e.target.value.replace(/[^0-9]/g, ''))}
+                                  placeholder="สูงสุด"
+                                  inputMode="numeric"
+                                  aria-label="อายุสูงสุด"
+                                  className="w-20 bg-white/80 dark:bg-slate-900"
+                                />
+                              </span>
                             </div>
                             <div className="flex flex-wrap items-center gap-2 text-xs">
                               <span className="w-12 text-muted-foreground">เพศ</span>

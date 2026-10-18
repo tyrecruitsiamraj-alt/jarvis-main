@@ -204,6 +204,34 @@ const RmTable: React.FC<{
    * แท็บการติดตาม/ติดตามนัดหมายยังชุดเดิม (ต้องเห็นเบอร์ตอนโทร)
    */
   const ownerColumns = tab === 'candidates';
+  /** ปุ่มบันทึกผลนัด มาแล้ว/ไม่มา — ตั้งแต่วันนัด (เวลาไทย) เป็นต้นไป · กดซ้ำเพื่อแก้ได้ (append-only ล่าสุดชนะ) */
+  const attendanceButtons = (r: PublicApplication, stacked = false) =>
+    r.appointment_at && canRecordAttendance(r.appointment_at, new Date()) ? (
+      <span className={cn('inline-flex items-center gap-1 pt-0.5', stacked && 'flex-col items-stretch')}>
+        {ATTENDANCE_RESULTS.filter((k) => k !== 'rescheduled').map((k) => {
+          const tone = TONE[ATTENDANCE_TONE[k]];
+          const active = r.attendance_result === k;
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => onAttendance?.(r, k)}
+              title={`บันทึกว่า${ATTENDANCE_LABEL[k]} — กดซ้ำอันอื่นเพื่อแก้ได้`}
+              className={cn(
+                // มือถือสูง 36px (เดิม 25px)
+                'whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium max-sm:min-h-9 max-sm:px-3',
+                tone.soft,
+                tone.value,
+                active ? 'ring-2 ring-ring' : 'opacity-75 hover:opacity-100',
+              )}
+            >
+              {k === 'showed' ? 'มาแล้ว' : 'ไม่มา'}
+            </button>
+          );
+        })}
+      </span>
+    ) : null;
+
   /** จับเวลาครั้งเดียวต่อการ render — ทุกแถวจึงนับ "ผ่านมาแล้วกี่วัน" จากหมุดเดียวกัน */
   const now = new Date();
   const allChecked = rows.length > 0 && rows.every((r) => selectedIds.includes(r.id));
@@ -273,7 +301,7 @@ const RmTable: React.FC<{
                 <th className="px-1.5 py-2 font-medium">โทรล่าสุด</th>
               ) : null}
               {/* มือถือ: คอลัมน์ปุ่มติดขวา ไม่ต้องปัดหา (QA รอบ 2 ข้อ 30) */}
-              <th className="px-1.5 py-2 text-right font-medium max-sm:sticky max-sm:right-0 max-sm:bg-card">ตัวเลือก</th>
+              <th className="px-1.5 py-2 text-right font-medium max-lg:sticky max-lg:right-0 max-lg:bg-card">ตัวเลือก</th>
             </tr>
           </thead>
           <tbody>
@@ -332,9 +360,16 @@ const RmTable: React.FC<{
                     <>
                       <td className={cn(STICKY_NAME, 'px-1.5 py-2', DASH.stickyCell)}>
                         <span className="flex flex-col gap-0.5">
-                          <span className={cn('line-clamp-2 min-w-14 break-words font-medium', DASH.cellStrong)} title={r.full_name || undefined}>
-                            {dashIfEmpty(firstName)}
-                          </span>
+                          {/* กดชื่อ = เปิดรายละเอียด (QA 17 ต.ค. 2569: เดิมกดชื่อแล้วไม่เปิด ต้องหาไอคอนตา) */}
+                          <Button
+                            type="button"
+                            variant="link"
+                            className={cn('h-auto justify-start whitespace-normal p-0 text-left', DASH.cellStrong)}
+                            title={r.full_name || undefined}
+                            onClick={() => onAction('view', r)}
+                          >
+                            <span className="line-clamp-2 min-w-14 break-words font-medium">{dashIfEmpty(firstName)}</span>
+                          </Button>
                           <ChoiceCountdownChip r={r} now={now} />
                         </span>
                       </td>
@@ -387,9 +422,15 @@ const RmTable: React.FC<{
                           อายุ/เพศ ไม่ได้กรอกมา = ขีด (ห้ามเดาหรือใส่ 0) */}
                       <td className={cn(STICKY_NAME, 'px-1.5 py-2', DASH.stickyCell)}>
                         <span className="flex flex-col gap-0.5">
-                          <span className={cn('line-clamp-2 min-w-32 break-words font-medium', DASH.cellStrong)} title={r.full_name || undefined}>
-                            {dashIfEmpty(name)}
-                          </span>
+                          <Button
+                            type="button"
+                            variant="link"
+                            className={cn('h-auto justify-start whitespace-normal p-0 text-left', DASH.cellStrong)}
+                            title={r.full_name || undefined}
+                            onClick={() => onAction('view', r)}
+                          >
+                            <span className="line-clamp-2 min-w-32 break-words font-medium">{dashIfEmpty(name)}</span>
+                          </Button>
                           <span className={cn('whitespace-nowrap text-xs tabular-nums', DASH.cellMuted)}>
                             {dashIfEmpty(r.phone)} · {typeof r.age === 'number' ? `${r.age} ปี` : `อายุ ${EM_DASH}`} ·{' '}
                             {r.gender ? (GENDER_LABEL[r.gender] ?? EM_DASH) : `เพศ ${EM_DASH}`}
@@ -452,31 +493,8 @@ const RmTable: React.FC<{
                         {/* ผลติดตามนัด (089): ปุ่มคู่โผล่ตั้งแต่วันนัด (เวลาไทย) เป็นต้นไป
                             กดซ้ำเพื่อแก้ได้ (append-only ล่าสุดชนะ) — ปุ่มที่เลือกอยู่ติดสีเต็ม
                             ยังไม่ถึงวันนัด = ไม่มีบรรทัดนี้ */}
-                        {r.appointment_at && canRecordAttendance(r.appointment_at, new Date()) ? (
-                          <span className="inline-flex items-center gap-1 pt-0.5">
-                            {ATTENDANCE_RESULTS.filter((k) => k !== 'rescheduled').map((k) => {
-                              const tone = TONE[ATTENDANCE_TONE[k]];
-                              const active = r.attendance_result === k;
-                              return (
-                                <button
-                                  key={k}
-                                  type="button"
-                                  onClick={() => onAttendance?.(r, k)}
-                                  title={`บันทึกว่า${ATTENDANCE_LABEL[k]} — กดซ้ำอันอื่นเพื่อแก้ได้`}
-                                  className={cn(
-                                    // มือถือสูง 36px (เดิม 25px)
-                                    'whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium max-sm:min-h-9 max-sm:px-3',
-                                    tone.soft,
-                                    tone.value,
-                                    active ? 'ring-2 ring-ring' : 'opacity-75 hover:opacity-100',
-                                  )}
-                                >
-                                  {k === 'showed' ? 'มาแล้ว' : 'ไม่มา'}
-                                </button>
-                              );
-                            })}
-                          </span>
-                        ) : null}
+                        {/* มือถือย้ายปุ่มคู่ไปช่องตัวเลือก (ติดขวา) — เดิมต้องปัดจอถึงเห็น (QA 17 ต.ค. 2569) */}
+                        <span className="max-sm:hidden">{attendanceButtons(r)}</span>
                       </span>
                     </td>
                   ) : null}
@@ -508,7 +526,8 @@ const RmTable: React.FC<{
                   {/* คอลัมน์ "สถานะ" (ชิปสถานะใบ + ชิปที่มา) ถูกถอดออกตามชุดคอลัมน์ที่
                       เจ้าของสั่ง 17 ส.ค. 2569 — ⚠️ ถอด <th> แล้วต้องถอด <td> ด้วยเสมอ
                       ไม่งั้นทุกแถวเลื่อนไปหนึ่งช่อง (ข้อมูลไปโผล่ใต้หัวคอลัมน์ผิด) */}
-                  <td className="px-1.5 py-2 max-sm:sticky max-sm:right-0 max-sm:bg-card">
+                  <td className="px-1.5 py-2 max-lg:sticky max-lg:right-0 max-lg:bg-card">
+                    {tab === 'appointments' ? <div className="mb-1 flex justify-end sm:hidden">{attendanceButtons(r, true)}</div> : null}
                     <div className="flex items-center justify-end gap-0.5 max-sm:gap-1">
                       {actions.map((a) => {
                         const Icon = (tab === 'contact' ? CONTACT_ACTION_ICON[a] : undefined) ?? ACTION_ICON[a];

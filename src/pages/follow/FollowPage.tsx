@@ -3038,12 +3038,12 @@ const FollowPage: React.FC = () => {
                                 <Button
                                   type="button"
                                   variant="outline"
-                                  size="icon"
+                                  size="sm"
                                   onClick={() => removeDayTime(d, i)}
                                   disabled={list.length <= 1}
                                   aria-label={`เอาสายที่ ${i + 1} ของ${label}ออก`}
                                 >
-                                  <X aria-hidden />
+                                  <X aria-hidden /> เอาออก
                                 </Button>
                                 {/* วันที่ตั้งเป็นคนโทร = ทุกสายคนโทร (ทับรายสาย) — ปุ่มต้องบอกตามจริง (QA รอบ 2 ข้อ 24 เดิมยังขึ้น AI) */}
                                 {slotModeGroup(

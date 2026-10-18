@@ -72,3 +72,39 @@ describe('มือถือ + พฤติกรรม', () => {
     expect(read('src/pages/value/ValueCasePage.tsx')).toContain('JSON.stringify(inputs) !== JSON.stringify(savedInputs)');
   });
 });
+
+describe('รอบ 2 (18 ต.ค. 2569)', () => {
+  it('มือถือ: ปุ่มมาแล้ว/ไม่มาอยู่ช่องตัวเลือกที่ติดขวา · ช่องตัวเลือกติดขวาถึงจอ 768', () => {
+    const src = read('src/components/recruit-rm/RmTable.tsx');
+    expect(src).toContain("{tab === 'appointments' ? <div className=\"mb-1 flex justify-end sm:hidden\">{attendanceButtons(r, true)}</div> : null}");
+    expect(src).toContain('max-lg:sticky max-lg:right-0 max-lg:bg-card');
+  });
+  it('กดชื่อผู้สมัครเปิดรายละเอียด', () => {
+    expect(read('src/components/recruit-rm/RmTable.tsx')).toContain("onClick={() => onAction('view', r)}");
+  });
+  it('แท็บหัวหน้าแถวเดียวกับปุ่มเริ่มที่ lg (จอ 768 ไม่โดนตัด)', () => {
+    expect(read('src/components/shared/PageHeader.tsx')).toContain('lg:order-2 lg:basis-0 lg:flex-1');
+  });
+  it('ตารางติดตามมือถือ: หน่วยงานใต้ชื่อ · เบอร์แบบ 0…', () => {
+    const src = read('src/components/follow/FollowPlanningCalendar.tsx');
+    expect(src).toContain('{localThaiPhone(row.group.phone)}');
+    expect(read('src/pages/aftercare/AftercarePage.tsx')).toContain('{localThaiPhone(p.phone_e164)}');
+  });
+  it('ปฏิทินดูแลหลังเริ่มงาน: ไม่มีตัวหนังสือ 8–9px · ปุ่ม shadcn', () => {
+    const src = read('src/components/aftercare/AftercarePlanningCalendar.tsx');
+    expect(src).not.toMatch(/text-\[(8|9)px\]/);
+    expect(src).not.toContain('<button\n            type="button"\n            onClick={() => onMonthChange');
+  });
+  it('ปุ่มมีคำ: แก้วันเวลา · โทร · เอาออก', () => {
+    expect(read('src/components/follow/FollowPlanningCalendar.tsx')).toContain('<Pencil aria-hidden /> แก้');
+    expect(read('src/components/follow/FollowCallQueue.tsx')).toContain('<Phone aria-hidden /> โทร');
+    expect(read('src/components/follow/FollowScheduleEditor.tsx')).toContain('<X aria-hidden /> เอาออก');
+  });
+  it('ตั้งค่า › ผู้ใช้งาน หัวไทย · /value มีปุ่มบันทึกท้ายหน้า · Pre-Check อายุคีย์บอร์ดตัวเลข', () => {
+    const a = read('src/pages/settings/AdminSettings.tsx');
+    expect(a).toContain('>บทบาท</th>');
+    expect(a).toContain('>จัดการ</th>');
+    expect(read('src/pages/value/ValueCasePage.tsx').match(/void save\(\)/g)?.length).toBe(2);
+    expect(read('src/pages/matching/PreCheckPage.tsx')).toContain('aria-label="อายุต่ำสุด"');
+  });
+});
