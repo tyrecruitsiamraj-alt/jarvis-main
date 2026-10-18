@@ -81,6 +81,8 @@ export type RecruitTotals = {
   called: number;
   calledByAi: number;
   calledByStaff: number;
+  /** โทรทั้ง AI และคน — ให้บรรทัด AI + คน − ทั้งสองทาง = โทรแล้ว (QA 18 ต.ค. 2569) */
+  calledBoth: number;
   reached: number;
   reachedByAi: number;
   reachedByStaff: number;
@@ -101,6 +103,7 @@ export function totalsOf(apps: readonly RecruitAppFact[], from: string, to: stri
     called: count(isCalled),
     calledByAi: count((f) => f.calledByAi),
     calledByStaff: count((f) => f.calledByStaff),
+    calledBoth: count((f) => f.calledByAi && f.calledByStaff),
     reached: count((f) => f.contact === 'success'),
     reachedByAi: count((f) => f.contact === 'success' && f.contactBy === 'ai'),
     reachedByStaff: count((f) => f.contact === 'success' && f.contactBy === 'staff'),

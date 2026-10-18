@@ -11,14 +11,27 @@
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import type { ToneKey } from '@/lib/designTokens';
 
-export type JourneyPart = { key: string; label: string; value: number; tone: ToneKey };
+/** `ids` = id ใบของช่องนี้ — กดเลขแล้วเปิดรายชื่อ (QA 18 ต.ค. 2569) */
+export type JourneyPart = { key: string; label: string; value: number; tone: ToneKey; ids: string[] };
 export type JourneyStep = { key: string; label: string; total: number; parts: JourneyPart[] };
 
-const count = (list: readonly RecruitAppFact[], p: (f: RecruitAppFact) => boolean) => list.filter(p).length;
+const idsOf = (list: readonly RecruitAppFact[]) => list.map((f) => f.id).filter((v): v is string => Boolean(v));
+/** ช่องหนึ่งของขั้น — เลข + id ของใบในช่อง */
+const part = (key: string, label: string, list: readonly RecruitAppFact[], tone: ToneKey): JourneyPart => ({
+  key,
+  label,
+  value: list.length,
+  tone,
+  ids: idsOf(list),
+});
 
-/** ขั้น AI: ข้อมูลผิด (เบอร์ใช้โทรไม่ได้) → AI โทรแล้ว → AI รอโทร → ยังไม่ส่ง AI */
-const aiStage = (f: RecruitAppFact): 'bad' | 'called' | 'queued' | 'notSent' =>
-  !f.phoneOk ? 'bad' : f.calledByAi ? 'called' : f.aiQueued ? 'queued' : 'notSent';
+/** ใบจาก iRecruit — AI ไม่โทรเอง (ใบซ้ำ/นำเข้า) แยกออกจาก "ยังไม่ส่ง AI" (QA 18 ต.ค. 2569: 309 ใบทำให้ดูเหมือนระบบค้าง) */
+export const isFromIrecruit = (f: Pick<RecruitAppFact, 'channelLabel' | 'referralSource'>): boolean =>
+  /^irecruit/i.test((f.channelLabel ?? '').trim()) || /^irecruit/i.test((f.referralSource ?? '').trim());
+
+/** ขั้น AI: ข้อมูลผิด (เบอร์ใช้โทรไม่ได้) → AI โทรแล้ว → AI รอโทร → มาจาก iRecruit → ยังไม่ส่ง AI */
+const aiStage = (f: RecruitAppFact): 'bad' | 'called' | 'queued' | 'irecruit' | 'notSent' =>
+  !f.phoneOk ? 'bad' : f.calledByAi ? 'called' : f.aiQueued ? 'queued' : isFromIrecruit(f) ? 'irecruit' : 'notSent';
 
 const aiAnswerOf = (f: RecruitAppFact): 'yes' | 'no' | 'thinking' | 'unreached' =>
   f.aiAnswer === 'said_yes' ? 'yes' : f.aiAnswer === 'said_no' ? 'no' : f.aiAnswer === 'not_yet' ? 'thinking' : 'unreached';
@@ -33,22 +46,25 @@ const staffResultOf = (f: RecruitAppFact): 'ok' | 'fail' | 'waiting' => {
 };
 
 export function buildRecruitJourney(list: readonly RecruitAppFact[]): JourneyStep[] {
-  const called = list.filter((f) => aiStage(f) === 'called');
-  const interested = called.filter((f) => aiAnswerOf(f) === 'yes');
-  const staffOk = interested.filter((f) => staffResultOf(f) === 'ok');
+  const by = <T extends string>(src: readonly RecruitAppFact[], key: (f: RecruitAppFact) => T, v: T) => src.filter((f) => key(f) === v);
+  const called = by(list, aiStage, 'called');
+  const interested = by(called, aiAnswerOf, 'yes');
+  const staffOk = by(interested, staffResultOf, 'ok');
   const appointed = staffOk.filter((f) => Boolean(f.appointmentAt));
   const showed = appointed.filter((f) => f.attendance === 'showed');
 
+  // 🔴 คำ (QA 18 ต.ค. 2569): ยังไม่มีผล = "รอผล" คำเดียวทุกขั้น · ไม่มีศัพท์ภายใน/ลูกศรบนหัวขั้น
   return [
     {
       key: 'names',
       label: 'รายชื่อเข้ามาทั้งหมด',
       total: list.length,
       parts: [
-        { key: 'aiCalled', label: 'AI โทรแล้ว', value: called.length, tone: 'info' },
-        { key: 'aiQueued', label: 'AI รอโทร', value: count(list, (f) => aiStage(f) === 'queued'), tone: 'neutral' },
-        { key: 'badData', label: 'ข้อมูลผิด', value: count(list, (f) => aiStage(f) === 'bad'), tone: 'danger' },
-        { key: 'notSent', label: 'ยังไม่ส่ง AI', value: count(list, (f) => aiStage(f) === 'notSent'), tone: 'neutral' },
+        part('aiCalled', 'AI โทรแล้ว', called, 'info'),
+        part('aiQueued', 'AI รอโทร', by(list, aiStage, 'queued'), 'neutral'),
+        part('badData', 'ข้อมูลผิด', by(list, aiStage, 'bad'), 'danger'),
+        part('irecruit', 'มาจาก iRecruit', by(list, aiStage, 'irecruit'), 'violet'),
+        part('notSent', 'ยังไม่ส่ง AI', by(list, aiStage, 'notSent'), 'neutral'),
       ],
     },
     {
@@ -56,68 +72,60 @@ export function buildRecruitJourney(list: readonly RecruitAppFact[]): JourneySte
       label: 'AI โทรแล้ว',
       total: called.length,
       parts: [
-        { key: 'yes', label: 'สนใจ', value: interested.length, tone: 'success' },
-        { key: 'no', label: 'ไม่สนใจ', value: count(called, (f) => aiAnswerOf(f) === 'no'), tone: 'danger' },
-        { key: 'thinking', label: 'พิจารณา', value: count(called, (f) => aiAnswerOf(f) === 'thinking'), tone: 'warn' },
-        { key: 'unreached', label: 'ติดต่อไม่ได้', value: count(called, (f) => aiAnswerOf(f) === 'unreached'), tone: 'neutral' },
+        part('yes', 'สนใจ', interested, 'success'),
+        part('no', 'ไม่สนใจ', by(called, aiAnswerOf, 'no'), 'danger'),
+        part('thinking', 'พิจารณา', by(called, aiAnswerOf, 'thinking'), 'warn'),
+        part('unreached', 'ติดต่อไม่ได้', by(called, aiAnswerOf, 'unreached'), 'neutral'),
       ],
     },
     {
       key: 'staff',
-      label: 'คนโทรต่อ (กล่องสนใจ)',
+      label: 'คนโทรต่อคนที่สนใจ',
       total: interested.length,
       parts: [
-        { key: 'ok', label: 'โทรสำเร็จ', value: staffOk.length, tone: 'success' },
-        { key: 'fail', label: 'ไม่สำเร็จ', value: count(interested, (f) => staffResultOf(f) === 'fail'), tone: 'danger' },
-        { key: 'waiting', label: 'รอโทร', value: count(interested, (f) => staffResultOf(f) === 'waiting'), tone: 'neutral' },
+        part('ok', 'โทรสำเร็จ', staffOk, 'success'),
+        part('fail', 'ไม่สำเร็จ', by(interested, staffResultOf, 'fail'), 'danger'),
+        part('waiting', 'รอโทร', by(interested, staffResultOf, 'waiting'), 'neutral'),
       ],
     },
     {
       key: 'appointment',
-      label: 'โทรสำเร็จ → นัด',
+      label: 'นัดได้ไหม',
       total: staffOk.length,
       parts: [
-        { key: 'booked', label: 'นัดได้', value: appointed.length, tone: 'success' },
-        {
-          key: 'failed',
-          label: 'นัดไม่ได้',
-          value: count(staffOk, (f) => !f.appointmentAt && f.appointmentFailed === true),
-          tone: 'danger',
-        },
-        {
-          key: 'pending',
-          label: 'ยังไม่ลงผล',
-          value: count(staffOk, (f) => !f.appointmentAt && f.appointmentFailed !== true),
-          tone: 'neutral',
-        },
+        part('booked', 'นัดได้', appointed, 'success'),
+        part('failed', 'นัดไม่ได้', staffOk.filter((f) => !f.appointmentAt && f.appointmentFailed === true), 'danger'),
+        part('pending', 'รอผล', staffOk.filter((f) => !f.appointmentAt && f.appointmentFailed !== true), 'neutral'),
       ],
     },
     {
       key: 'attendance',
-      label: 'นัดได้ → มาไหม',
+      label: 'มาตามนัดไหม',
       total: appointed.length,
       parts: [
-        { key: 'showed', label: 'มา', value: showed.length, tone: 'success' },
-        { key: 'noShow', label: 'ไม่มา', value: count(appointed, (f) => f.attendance === 'no_show'), tone: 'danger' },
-        {
-          key: 'pending',
-          label: 'รอผล',
-          value: count(appointed, (f) => f.attendance !== 'showed' && f.attendance !== 'no_show'),
-          tone: 'neutral',
-        },
+        part('showed', 'มา', showed, 'success'),
+        part('noShow', 'ไม่มา', appointed.filter((f) => f.attendance === 'no_show'), 'danger'),
+        part('pending', 'รอผล', appointed.filter((f) => f.attendance !== 'showed' && f.attendance !== 'no_show'), 'neutral'),
       ],
     },
     {
       key: 'screening',
-      label: 'มาแล้ว → ผ่านไหม',
+      label: 'ผ่านไหม',
       total: showed.length,
       parts: [
-        { key: 'passed', label: 'ผ่าน', value: count(showed, (f) => f.screening === 'passed'), tone: 'success' },
-        { key: 'notPassed', label: 'ไม่ผ่าน', value: count(showed, (f) => f.screening === 'not_passed'), tone: 'danger' },
-        { key: 'pending', label: 'รอผล', value: count(showed, (f) => !f.screening), tone: 'neutral' },
+        part('passed', 'ผ่าน', showed.filter((f) => f.screening === 'passed'), 'success'),
+        part('notPassed', 'ไม่ผ่าน', showed.filter((f) => f.screening === 'not_passed'), 'danger'),
+        part('pending', 'รอผล', showed.filter((f) => !f.screening), 'neutral'),
       ],
     },
   ];
+}
+
+/** % ของตัวแม่ — มีจริงแต่ไม่ถึง 1% เขียน "<1%" (QA 18 ต.ค. 2569: ข้อมูลผิด 1 จาก 780 เคยขึ้น 0%) */
+export function journeyPctText(value: number, total: number): string {
+  if (total <= 0) return '';
+  if (value > 0 && (value / total) * 100 < 0.5) return '<1%';
+  return `${Math.round((value / total) * 100)}%`;
 }
 
 /** วันในสัปดาห์ (เวลาไทย) ของเวลากรอกใบ · 0 = อาทิตย์ … 6 = เสาร์ */
@@ -130,14 +138,14 @@ export function bangkokWeekday(iso: string): number | null {
 }
 
 /** ปุ่มเลือกวันในสัปดาห์ — เรียงจันทร์ก่อนแบบปฏิทินไทยที่ทีมใช้ */
-export const WEEKDAY_CHOICES: ReadonlyArray<{ day: number; label: string }> = [
-  { day: 1, label: 'จันทร์' },
-  { day: 2, label: 'อังคาร' },
-  { day: 3, label: 'พุธ' },
-  { day: 4, label: 'พฤหัส' },
-  { day: 5, label: 'ศุกร์' },
-  { day: 6, label: 'เสาร์' },
-  { day: 0, label: 'อาทิตย์' },
+export const WEEKDAY_CHOICES: ReadonlyArray<{ day: number; label: string; short: string }> = [
+  { day: 1, label: 'จันทร์', short: 'จ.' },
+  { day: 2, label: 'อังคาร', short: 'อ.' },
+  { day: 3, label: 'พุธ', short: 'พ.' },
+  { day: 4, label: 'พฤหัส', short: 'พฤ.' },
+  { day: 5, label: 'ศุกร์', short: 'ศ.' },
+  { day: 6, label: 'เสาร์', short: 'ส.' },
+  { day: 0, label: 'อาทิตย์', short: 'อา.' },
 ];
 
 /** กรองเฉพาะวันในสัปดาห์ที่เลือก (ว่าง = ทุกวัน) */

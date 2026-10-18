@@ -58,6 +58,7 @@ describe('buildRecruitJourney', () => {
   });
   it('แต่ละขั้นนับถูก', () => {
     expect(steps.map((s) => s.total)).toEqual([15, 12, 9, 7, 5, 3]);
+    expect(steps.map((s) => s.label)).toEqual(['รายชื่อเข้ามาทั้งหมด', 'AI โทรแล้ว', 'คนโทรต่อคนที่สนใจ', 'นัดได้ไหม', 'มาตามนัดไหม', 'ผ่านไหม']);
     expect([part('names', 'badData'), part('names', 'aiQueued'), part('names', 'notSent')]).toEqual([1, 1, 1]);
     expect([part('ai', 'yes'), part('ai', 'no'), part('ai', 'thinking'), part('ai', 'unreached')]).toEqual([9, 1, 1, 1]);
     expect([part('staff', 'ok'), part('staff', 'fail'), part('staff', 'waiting')]).toEqual([7, 1, 1]);
@@ -89,6 +90,37 @@ describe('ผ่าน/ไม่ผ่าน ลงผ่านหน้าจ�
   });
   it('แท็บภาพรวมอยู่ต่อจาก Pre-Check + มีตัวเลือกวัน', () => {
     expect(readFileSync('src/components/jobs/JobBoardView.tsx', 'utf8')).toContain("{ id: 'dashboard', label: 'ภาพรวม' }");
-    expect(readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8')).toContain('<JourneyList steps={view.journey} />');
+    expect(readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8')).toContain('<JourneyList steps={view.journey} onOpenPart=');
+  });
+});
+
+describe('QA หน้าภาพรวม 18 ต.ค. 2569 (แก้ทั้งหมด)', () => {
+  it('ใบจาก iRecruit แยกจาก ยังไม่ส่ง AI · ช่องมี id ให้กดดูชื่อ', () => {
+    const steps = buildRecruitJourney([
+      f({ id: 'a', channelLabel: 'iRecruit · Line' }),
+      f({ id: 'b' }),
+    ]);
+    const names = steps[0].parts;
+    expect(names.find((p) => p.key === 'irecruit')!.ids).toEqual(['a']);
+    expect(names.find((p) => p.key === 'notSent')!.ids).toEqual(['b']);
+  });
+  it('% มีจริงแต่ไม่ถึง 1% = <1%', async () => {
+    const { journeyPctText } = await import('../../src/lib/recruitJourney');
+    expect(journeyPctText(1, 780)).toBe('<1%');
+    expect(journeyPctText(0, 780)).toBe('0%');
+    expect(journeyPctText(400, 780)).toBe('51%');
+  });
+  it('ล้มไม่ค้างเลขเก่า · โหลดใหม่มีคำ · ผลงานรายคนใช้ชื่อเล่น · ตัดใบยกเลิกข้อมูล · % พุ่งบอกเลขช่วงก่อน', () => {
+    const ov = readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8');
+    expect(ov).toContain("setState({ data: null, loading: false, error: friendlyErrorText(e, 'โหลดภาพรวมไม่ได้') })");
+    expect(ov).toContain('<RefreshCw className={cn(state.loading && \'animate-spin\')} aria-hidden /> โหลดใหม่');
+    const api = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');
+    expect(api).toContain('toStaffRows(staffR.value, showedR.value, await loadStaffDisplay())');
+    expect(api).toContain("tableInAppSchema('application_cancellations')");
+    expect(readFileSync('src/components/dashboard-trends/TrendParts.tsx', 'utf8')).toContain('const big = Math.abs(d) > 300;');
+  });
+  it('คำว่าพิจารณา: "ขอพิจารณาก่อน" = not_yet', async () => {
+    const { classifyCallMicro, INTEREST_VOCAB } = await import('../../src/lib/callMicroOutcome');
+    expect(classifyCallMicro({ outcome: 'acknowledged', summary: 'ผู้สมัครสนใจแต่ยังไม่ยืนยัน โดยขอพิจารณาก่อน', reply: null }, INTEREST_VOCAB)).toBe('not_yet');
   });
 });

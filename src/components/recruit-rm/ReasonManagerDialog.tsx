@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Plus, RotateCcw, Ban } from 'lucide-react';
+import { Loader2, Plus, RotateCcw, Ban, Pencil } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 import {
   Dialog,
@@ -38,6 +40,8 @@ const ReasonManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = ({
   /** ช่องเพิ่มเหตุผลแยกรายกลุ่ม — คีย์คือ `${process}:${outcome}` */
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  /** แก้ชื่อเหตุผล (QA 18 ต.ค. 2569 — ชื่อสะกดผิดแก้จากหน้าจอได้ · ผลเก่าที่ภาพรวมแสดงชื่อปัจจุบันตาม) */
+  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
 
   const reload = async () => {
     setLoading(true);
@@ -84,6 +88,23 @@ const ReasonManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = ({
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'เปลี่ยนสถานะไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rename = async () => {
+    if (!editing || busy) return;
+    const name = editing.name.trim();
+    if (!name) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await updateRecruitReason(editing.id, { name });
+      setEditing(null);
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'แก้ชื่อไม่สำเร็จ');
     } finally {
       setBusy(false);
     }
@@ -140,29 +161,60 @@ const ReasonManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = ({
                           key={r.id}
                           className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 hover:bg-secondary"
                         >
-                          <span
-                            className={
-                              r.isActive
-                                ? 'min-w-0 flex-1 truncate text-xs text-foreground'
-                                : 'min-w-0 flex-1 truncate text-xs text-muted-foreground'
-                            }
-                          >
-                            {r.name}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => void toggleActive(r)}
-                            disabled={busy}
-                            title={r.isActive ? 'ปิดการใช้งาน (ไม่ลบทิ้ง)' : 'เปิดใช้งานอีกครั้ง'}
-                            aria-label={`${r.isActive ? 'ปิด' : 'เปิด'} ${r.name}`}
-                            className="shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-40"
-                          >
-                            {r.isActive ? (
-                              <Ban className="h-3.5 w-3.5" />
-                            ) : (
-                              <RotateCcw className="h-3.5 w-3.5" />
-                            )}
-                          </button>
+                          {editing?.id === r.id ? (
+                            <>
+                              <Input
+                                value={editing.name}
+                                autoFocus
+                                aria-label={`ชื่อใหม่ของ ${r.name}`}
+                                onChange={(e) => setEditing({ id: r.id, name: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') void rename();
+                                  if (e.key === 'Escape') setEditing(null);
+                                }}
+                                className="h-8 min-w-0 flex-1 text-xs"
+                              />
+                              <Button type="button" size="xs" onClick={() => void rename()} disabled={busy || !editing.name.trim()}>
+                                บันทึก
+                              </Button>
+                              <Button type="button" size="xs" variant="ghost" onClick={() => setEditing(null)}>
+                                ยกเลิก
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <span
+                                className={
+                                  r.isActive
+                                    ? 'min-w-0 flex-1 truncate text-xs text-foreground'
+                                    : 'min-w-0 flex-1 truncate text-xs text-muted-foreground'
+                                }
+                              >
+                                {r.name}
+                              </span>
+                              <Button
+                                type="button"
+                                size="xs"
+                                variant="ghost"
+                                disabled={busy}
+                                aria-label={`แก้ชื่อ ${r.name}`}
+                                onClick={() => setEditing({ id: r.id, name: r.name })}
+                              >
+                                <Pencil aria-hidden /> แก้ชื่อ
+                              </Button>
+                              <Button
+                                type="button"
+                                size="xs"
+                                variant="ghost"
+                                onClick={() => void toggleActive(r)}
+                                disabled={busy}
+                                aria-label={`${r.isActive ? 'ปิด' : 'เปิด'} ${r.name}`}
+                              >
+                                {r.isActive ? <Ban aria-hidden /> : <RotateCcw aria-hidden />}
+                                {r.isActive ? 'ปิด' : 'เปิด'}
+                              </Button>
+                            </>
+                          )}
                         </li>
                       ))}
                     </ul>

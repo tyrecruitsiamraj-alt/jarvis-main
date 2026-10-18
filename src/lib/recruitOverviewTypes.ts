@@ -13,6 +13,8 @@ export type RecruitAttendance = 'showed' | 'no_show' | 'rescheduled';
 
 /** ข้อเท็จจริงต่อใบสมัคร (ไม่นับ Lead) — นิยามทุกช่องมาจาก `api/_lib/applicantOverviewSql.ts` */
 export type RecruitAppFact = {
+  /** id ใบ (ไม่ใช่ชื่อ/เบอร์) — ใช้เปิดรายชื่อตอนกดเลข (18 ต.ค. 2569) */
+  id?: string;
   /** เวลากรอกใบ (ISO) */
   createdAt: string;
   jobId: string | null;

@@ -37,7 +37,7 @@ import {
   type StaffSortKey,
 } from '@/lib/recruitOverview';
 import type { RecruitAiRow, RecruitBacklog, RecruitStaffRow } from '@/lib/recruitOverviewTypes';
-import type { JourneyStep } from '@/lib/recruitJourney';
+import { journeyPctText, type JourneyStep } from '@/lib/recruitJourney';
 import { DeltaChip } from './TrendParts';
 
 /**
@@ -103,8 +103,18 @@ export function OverviewCard({
 }
 
 /** อ่านก้อนนี้ไม่ได้ — บอกตรง ๆ ไม่โชว์ 0 */
-export function SectionError({ message }: { message: string }) {
-  return <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.danger.soft, TONE.danger.value)}>{message}</p>;
+export function SectionError({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <p className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs', TONE.danger.soft, TONE.danger.value)}>
+      {message}
+      {/* ลองใหม่ได้ทันที (QA 18 ต.ค. 2569) */}
+      {onRetry ? (
+        <Button type="button" size="xs" variant="outline" onClick={onRetry}>
+          ลองใหม่
+        </Button>
+      ) : null}
+    </p>
+  );
 }
 
 export function EmptyNote({ children }: { children: React.ReactNode }) {
@@ -133,7 +143,8 @@ export function OverviewKpi({
         <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
           <Icon className="size-3.5" aria-hidden />
         </span>
-        <span className="truncate">{label}</span>
+        {/* ไม่ตัดชื่อการ์ดบนมือถือ ("ตอบ AI ว่าสน…" · QA 18 ต.ค. 2569) */}
+        <span className="min-w-0 break-words">{label}</span>
       </p>
       <div className="flex flex-wrap items-baseline gap-2">
         <span className="text-2xl font-medium tabular-nums text-foreground">{num(value)}</span>
@@ -182,7 +193,14 @@ export function FunnelList({ steps }: { steps: readonly FunnelStep[] }) {
  * เส้นทางรายชื่อแบบแตกทุกขั้น — แต่ละขั้นมีตัวแม่ + ลูกที่รวมกันเท่าแม่ (`buildRecruitJourney`)
  * แท่งสีเรียงตามลูก · ใต้แท่งเป็นชิป "ชื่อ จำนวน (%)" · % = ของตัวแม่ในขั้นนั้น
  */
-export function JourneyList({ steps }: { steps: readonly JourneyStep[] }) {
+export function JourneyList({
+  steps,
+  onOpenPart,
+}: {
+  steps: readonly JourneyStep[];
+  /** กดเลขของช่อง = เปิดรายชื่อ (QA 18 ต.ค. 2569) */
+  onOpenPart?: (title: string, ids: readonly string[]) => void;
+}) {
   return (
     <ol className="space-y-4" data-testid="recruit-journey">
       {steps.map((s, i) => (
@@ -201,14 +219,23 @@ export function JourneyList({ steps }: { steps: readonly JourneyStep[] }) {
                   .map((p) => <span key={p.key} className={TONE[p.tone].dot} style={{ width: `${(p.value / s.total) * 100}%` }} />)
               : null}
           </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+          <div className="flex flex-wrap gap-x-1 gap-y-1 text-xs">
             {s.parts.map((p) => (
-              <span key={p.key} className="inline-flex items-center gap-1.5" data-testid={`journey-${s.key}-${p.key}`}>
+              <Button
+                key={p.key}
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="h-auto gap-1.5 px-1.5 py-0.5 font-normal"
+                disabled={p.value === 0 || !onOpenPart}
+                onClick={() => onOpenPart?.(`${s.label} · ${p.label}`, p.ids)}
+                data-testid={`journey-${s.key}-${p.key}`}
+              >
                 <span className={cn('h-2 w-2 rounded-full', TONE[p.tone].dot)} aria-hidden />
                 <span className={DASH.sub}>{p.label}</span>
                 <span className="font-medium tabular-nums text-foreground">{num(p.value)}</span>
-                <span className={cn('tabular-nums', DASH.sub)}>{s.total > 0 ? `(${Math.round((p.value / s.total) * 100)}%)` : ''}</span>
-              </span>
+                <span className={cn('tabular-nums', DASH.sub)}>{s.total > 0 ? `(${journeyPctText(p.value, s.total)})` : ''}</span>
+              </Button>
             ))}
           </div>
         </li>

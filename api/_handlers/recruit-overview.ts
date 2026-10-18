@@ -63,6 +63,7 @@ const HOLDS = tableInAppSchema('candidate_call_holds');
 const CONTACTS = tableInAppSchema('application_contact_logs');
 const ATTEND = tableInAppSchema('application_appointment_results');
 const SCREEN = tableInAppSchema('application_screening_results');
+const REASONS = tableInAppSchema('recruit_reasons');
 
 /** ผ่าน/ไม่ผ่าน ล่าสุดของใบ (151 · 18 ต.ค. 2569) */
 export const LATEST_SCREENING_SQL = `(
@@ -75,12 +76,15 @@ export const LATEST_SCREENING_SQL = `(
 const startOfBkk = (ymd: string) => `${ymd}T00:00:00+07:00`;
 
 /** ประชากรของทุกก้อน — ไม่ใช่ Lead + BU (ถ้าล็อก) · `$bu` = ตำแหน่งพารามิเตอร์ของ BU */
-const scopeWhere = (bu: string) => `not coalesce(a.is_lead, false) and (${bu}::text is null or ${appBuSql('a')} = ${bu}::text)`;
+// ใบที่ยกเลิกข้อมูลแล้วไม่นับ (135) — กติกาเดียวกับหน้าหลัก/รายชื่อผู้สมัคร · กดเลขแล้วเปิดชื่อได้ครบ (QA 18 ต.ค. 2569)
+const CANCELLATIONS = tableInAppSchema('application_cancellations');
+const scopeWhere = (bu: string) =>
+  `not coalesce(a.is_lead, false) and not exists (select 1 from ${CANCELLATIONS} cx where cx.application_id = a.id) and (${bu}::text is null or ${appBuSql('a')} = ${bu}::text)`;
 
 /** ข้อเท็จจริงต่อใบของช่วง [$1, $2) · $3 = BU · `attendance` = นิพจน์ผลนัด (ตารางยังไม่มี = null) */
 export function factsSql(attendance: string = LATEST_ATTENDANCE_SQL, screening: string = LATEST_SCREENING_SQL): string {
   return `
-  select a.created_at, a.job_id,
+  select a.id::text as id, a.created_at, a.job_id,
          nullif(btrim(a.channel_label), '') as channel_label,
          nullif(btrim(a.referral_source), '') as referral_source,
          nullif(btrim(a.position_interest), '') as position,
@@ -104,8 +108,11 @@ export function factsSql(attendance: string = LATEST_ATTENDANCE_SQL, screening: 
     ${LATEST_STAFF_RESULT_LATERAL}
     ${LATEST_CONTACT_LATERAL}
     left join lateral (
-      select c.ok, nullif(btrim(c.reason_label), '') as reason_label, c.created_at, c.appointment_at
-        from ${CONTACTS} c where c.application_id = a.id
+      -- ชื่อเหตุผลปัจจุบันจาก master (แก้ชื่อที่ตั้งค่าแล้วการ์ดเปลี่ยนตาม · QA 18 ต.ค. 2569) · ไม่มี master = ชื่อที่จดไว้ตอนบันทึก
+      select c.ok, coalesce(nullif(btrim(rr.name), ''), nullif(btrim(c.reason_label), '')) as reason_label, c.created_at, c.appointment_at
+        from ${CONTACTS} c
+        left join ${REASONS} rr on rr.id = c.reason_id
+       where c.application_id = a.id
        order by c.created_at desc limit 1
     ) lcl on true
    where a.created_at >= $1::timestamptz and a.created_at < $2::timestamptz
@@ -229,6 +236,8 @@ export function toFact(r: Row, boardPhones: Set<string> | null): RecruitAppFact 
   const src = r.contact_src === 'ai' || r.contact_src === 'staff' ? r.contact_src : null;
   const att = ATTENDANCE_VALUES.find((v) => v === r.attendance) ?? null;
   return {
+    // id ใบ (ไม่ใช่ชื่อ/เบอร์) — ให้หน้าเปิดรายชื่อของเลขที่กดได้ (QA 18 ต.ค. 2569 · ชื่อดึงจากเส้นรายชื่อผู้สมัครที่มีสิทธิ์อยู่แล้ว)
+    id: text(r.id) ?? undefined,
     createdAt: iso(r.created_at) ?? '',
     jobId: text(r.job_id),
     channelLabel: text(r.channel_label),
@@ -287,13 +296,37 @@ export function toBacklog(rows: Row[], appointments: RecruitBacklog['appointment
 }
 
 const NO_NAME = 'ไม่ระบุชื่อ';
+const USERS = tableInAppSchema('users');
+
+/** อีเมล (ตัวเล็ก) → ชื่อเล่น → ชื่อจริง (กติกาเดียวกับ created_by_display หน้าติดตาม) · อ่านไม่ได้ = ใช้อีเมลเดิม */
+async function loadStaffDisplay(): Promise<(email: string) => string | null> {
+  try {
+    const { rows } = await dbQuery<{ email: string; name: string | null }>(
+      `select lower(btrim(email)) as email, coalesce(nullif(btrim(nickname), ''), nullif(btrim(full_name), '')) as name
+         from ${USERS} where email is not null`,
+    );
+    const map = new Map(rows.map((r) => [r.email, r.name]));
+    return (email) => map.get(email) ?? null;
+  } catch (e) {
+    logError('recruit-overview: users', e);
+    return () => null;
+  }
+}
 
 /** แถวดิบ (ใบ × คน) → ยอดรายชื่อไม่ซ้ำต่อคน เรียงนัดได้มากสุดก่อน */
-export function toStaffRows(events: Row[], showed: ReadonlySet<string>): RecruitStaffRow[] {
+/**
+ * @param displayOf อีเมลของเจ้าหน้าที่ → ชื่อเล่น/ชื่อจริง (QA 18 ต.ค. 2569: ตารางเคยขึ้นอีเมล) · ไม่รู้จัก = คงค่าเดิม
+ */
+export function toStaffRows(
+  events: Row[],
+  showed: ReadonlySet<string>,
+  displayOf: (email: string) => string | null = () => null,
+): RecruitStaffRow[] {
   type Acc = { claimed: Set<string>; called: Set<string>; reached: Set<string>; appointed: Set<string> };
   const by = new Map<string, Acc>();
   for (const e of events) {
-    const name = text(e.name) ?? NO_NAME;
+    const raw = text(e.name);
+    const name = raw ? (raw.includes('@') ? (displayOf(raw.toLowerCase()) ?? raw) : raw) : NO_NAME;
     const id = String(e.app_id);
     const acc = by.get(name) ?? { claimed: new Set(), called: new Set(), reached: new Set(), appointed: new Set() };
     if (e.kind === 'claim') acc.claimed.add(id);
@@ -440,7 +473,7 @@ export async function buildRecruitOverview(
   if (backlogR.ok && apptR.ok) body.backlog = toBacklog(backlogR.value, apptR.value, nowMs);
   else body.errors.backlog = !backlogR.ok ? backlogR.error : (apptR as { error: string }).error;
 
-  if (staffR.ok && showedR.ok) body.staff = toStaffRows(staffR.value, showedR.value);
+  if (staffR.ok && showedR.ok) body.staff = toStaffRows(staffR.value, showedR.value, await loadStaffDisplay());
   else {
     body.staff = null;
     body.errors.staff = !staffR.ok ? staffR.error : (showedR as { error: string }).error;

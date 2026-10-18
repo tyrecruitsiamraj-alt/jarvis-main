@@ -74,11 +74,12 @@ function DeltaChip({ current, previous, polarity }: { current: number; previous:
   const good = polarity === 'neutral' ? null : polarity === 'up-good' ? up : !up;
   const tone: ToneKey = flat || good === null ? 'neutral' : good ? 'success' : 'danger';
   const Icon = flat ? Minus : up ? ArrowUpRight : ArrowDownRight;
+  // ช่วงก่อนน้อยมาก % จะพุ่งเป็นพัน ("+2416.1%" · QA 18 ต.ค. 2569) ⇒ เกิน 300% บอกเลขช่วงก่อนตรง ๆ
+  const big = Math.abs(d) > 300;
   return (
     <span className={cn('inline-flex items-center gap-0.5 text-xs font-medium tabular-nums', TONE[tone].value)}>
       <Icon className="h-3.5 w-3.5" aria-hidden />
-      {up ? '+' : ''}
-      {d}%
+      {big ? `จาก ${previous.toLocaleString('th-TH')}` : `${up ? '+' : ''}${d}%`}
     </span>
   );
 }

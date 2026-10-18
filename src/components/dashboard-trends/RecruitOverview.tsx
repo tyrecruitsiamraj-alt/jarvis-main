@@ -62,6 +62,7 @@ import {
 } from './RecruitOverviewParts';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import { TrendState } from './TrendParts';
+import JourneyNamesDialog from './JourneyNamesDialog';
 
 /**
  * ═══ แท็บ "ภาพรวม" ของกล่องงาน = ภาพรวมงานสรรหาแบบ iRecruit (เจ้าของสั่ง 30 ก.ย. 2569) ═══
@@ -89,6 +90,7 @@ function HowToRead() {
       <PopoverContent align="end" className="w-80 space-y-3 p-4 text-xs">
         <ul className={cn('list-disc space-y-1.5 pl-4', DASH.muted)}>
           <li>ตัวเลขเป็นของรายชื่อที่กรอกเข้ามาในเดือนที่เลือก ว่าตอนนี้ไปถึงขั้นไหนแล้ว</li>
+          <li>เส้นทางของรายชื่อ: แต่ละขั้นแตกจากขั้นก่อน เลขย่อยรวมกันเท่าเลขของขั้น · % เทียบกับเลขของขั้นนั้น</li>
           <li>ยกเว้น "ใบที่ประกาศ" กับ "งานค้างตอนนี้" เป็นสถานะวันนี้ (ใบที่ประกาศ = เลขเดียวกับหน้างานสรรหา) · "ผลงานรายคน" นับงานที่ลงผลในเดือน</li>
           <li>เขียวเพิ่ม แดงลด เทียบเดือนก่อนช่วงวันเดียวกัน</li>
           <li>นับวันแบบครบ 24 ชม. ถึงเป็น 1 วัน</li>
@@ -99,8 +101,14 @@ function HowToRead() {
             ['ติดต่อสำเร็จ', 'ผลล่าสุดคุยถึงตัว รวมคนที่ปฏิเสธ'],
             ['ตอบ AI ว่าสนใจ', 'คำตอบล่าสุดที่ให้ AI (ตัวเดียวกับคอลัมน์คำตอบกับ AI)'],
             ['คนโทรต่อแล้ว', 'ตอบ AI ว่าสนใจ แล้วเจ้าหน้าที่โทรหรือบันทึกผลหลังจากนั้น'],
-            ['นัดได้', 'มีวันนัดจากบันทึกผลติดต่อหรือผลโทรของเจ้าหน้าที่'],
             ['ได้ใบสมัคร', 'ชื่อขึ้นบอร์ด ERP แล้ว (จับคู่ด้วยเบอร์)'],
+            // เส้นทางของรายชื่อ 6 ขั้น (18 ต.ค. 2569) — กดเลขในเส้นทางเพื่อดูรายชื่อ
+            ['ข้อมูลผิด', 'เบอร์ใช้กับระบบโทรไม่ได้'],
+            ['มาจาก iRecruit', 'ใบที่ดึงมาจาก iRecruit — AI ไม่โทรเอง เจ้าหน้าที่เลือกส่งเอง'],
+            ['ยังไม่ส่ง AI', 'เบอร์ใช้ได้ แต่ยังไม่เข้าคิว AI (เช่น เก็บไปโทรเอง)'],
+            ['พิจารณา', 'ตอบ AI ว่าขอคิดดูก่อน'],
+            ['นัดได้ไหม', 'จากบันทึกผลติดต่อของเจ้าหน้าที่ · นัดไม่ได้ = บันทึกพร้อมเหตุผล'],
+            ['มาตามนัดไหม · ผ่านไหม', 'กดที่แท็บติดตามนัดหมาย (มาแล้ว / ไม่มา แล้วจึง ผ่าน / ไม่ผ่าน)'],
           ].map(([k, v]) => (
             <div key={k}>
               <dt className="font-medium text-foreground">{k}</dt>
@@ -139,7 +147,8 @@ const RecruitOverview: React.FC<{
     setState((s) => ({ ...s, loading: true, error: null }));
     fetchRecruitOverview(month, range)
       .then((data) => !cancelled && setState({ data, loading: false, error: null }))
-      .catch((e: unknown) => !cancelled && setState((s) => ({ ...s, loading: false, error: friendlyErrorText(e, 'โหลดภาพรวมไม่ได้') })));
+      // ล้มแล้วห้ามค้างเลขรอบก่อนพร้อม "ข้อมูล ณ …" (QA 18 ต.ค. 2569) ⇒ ล้างแล้วขึ้นกล่องล้ม + ลองใหม่
+      .catch((e: unknown) => !cancelled && setState({ data: null, loading: false, error: friendlyErrorText(e, 'โหลดภาพรวมไม่ได้') }));
     return () => {
       cancelled = true;
     };
@@ -151,6 +160,8 @@ const RecruitOverview: React.FC<{
 
   /** เฉพาะวันในสัปดาห์ (เจ้าของสั่ง 18 ต.ค. 2569 "เฉพาะวันจันทร์") — ว่าง = ทุกวัน · กรองตามวันที่กรอกใบ (เวลาไทย) */
   const [weekdays, setWeekdays] = useState<number[]>([]);
+  /** ป๊อปรายชื่อของเลขที่กดในเส้นทาง */
+  const [names, setNames] = useState<{ title: string; ids: readonly string[] } | null>(null);
 
   const view = useMemo(() => {
     if (!data || !win) return null;
@@ -260,8 +271,8 @@ const RecruitOverview: React.FC<{
             value={isRange ? { from: win.from, to: win.to } : null}
             onChange={setRange}
           />
-          <Button type="button" size="iconXs" variant="outline" aria-label="โหลดใหม่" onClick={() => setRev((n) => n + 1)}>
-            <RefreshCw className={cn(state.loading && 'animate-spin')} aria-hidden />
+          <Button type="button" size="xs" variant="outline" onClick={() => setRev((n) => n + 1)}>
+            <RefreshCw className={cn(state.loading && 'animate-spin')} aria-hidden /> โหลดใหม่
           </Button>
           <HowToRead />
         </div>
@@ -285,8 +296,10 @@ const RecruitOverview: React.FC<{
           className="flex-wrap justify-start"
         >
           {WEEKDAY_CHOICES.map((d) => (
-            <ToggleGroupItem key={d.day} value={String(d.day)}>
-              {d.label}
+            <ToggleGroupItem key={d.day} value={String(d.day)} aria-label={d.label}>
+              {/* มือถือใช้ชื่อย่อ ปุ่มอยู่แถวเดียว (QA 18 ต.ค. 2569) */}
+              <span className="sm:hidden">{d.short}</span>
+              <span className="max-sm:hidden">{d.label}</span>
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
@@ -297,7 +310,7 @@ const RecruitOverview: React.FC<{
         ) : null}
       </div>
 
-      {state.error ? <SectionError message={state.error} /> : null}
+      {state.error ? <SectionError message={state.error} onRetry={() => setRev((n) => n + 1)} /> : null}
       {appsError ? <SectionError message={appsError} /> : null}
 
       {/* ─── การ์ด 6 ใบ ─── */}
@@ -321,7 +334,8 @@ const RecruitOverview: React.FC<{
           label="โทรแล้ว"
           value={apps ? cur.called : null}
           previous={apps ? (prev?.called ?? null) : null}
-          foot={apps ? `AI ${fmt(cur.calledByAi)} · คน ${fmt(cur.calledByStaff)}` : null}
+          // AI + คน − ทั้งสองทาง = โทรแล้ว (QA 18 ต.ค. 2569: เดิม AI 400 · คน 56 บวกได้ 456 ≠ 402)
+          foot={apps ? `AI ${fmt(cur.calledByAi)} · คน ${fmt(cur.calledByStaff)}${cur.calledBoth > 0 ? ` · โทรทั้งสองทาง ${fmt(cur.calledBoth)}` : ''}` : null}
         />
         <OverviewKpi
           icon={PhoneCall}
@@ -355,10 +369,10 @@ const RecruitOverview: React.FC<{
         >
           {/* 🔴 Journey ทีละขั้น (เจ้าของสั่ง 18 ต.ค. 2569) แทนบันไดเดิมที่ "มาตามนัด 0 → ได้ใบสมัคร 21" ·
               เดือนที่ยังไม่มีรายชื่อ = ขั้นครบเป็น 0 (กติกา 1 ต.ค.) */}
-          {apps ? <JourneyList steps={view.journey} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
+          {apps ? <JourneyList steps={view.journey} onOpenPart={(title, ids) => setNames({ title, ids })} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
           {data.errors.board ? <p className={cn('text-xs', TONE.warn.value)}>{data.errors.board}</p> : null}
         </OverviewCard>
-        <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">
+        <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={weekdays.length > 0 ? 'ณ วันนี้ · ไม่กรองตามวัน' : 'ณ วันนี้'}>
           {data.backlog ? <BacklogBody backlog={data.backlog} /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
         </OverviewCard>
       </div>
@@ -384,12 +398,20 @@ const RecruitOverview: React.FC<{
       </div>
 
       {/* ─── เหตุผลที่ไม่สำเร็จ ─── */}
-      <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ">
+      {/* ฐาน = ทุกรายชื่อของช่วง (เส้นทางขั้น 4 นับเฉพาะคนที่ตอบ AI ว่าสนใจ — QA 18 ต.ค. 2569 เลขเลยต่างกัน) */}
+      <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub="ทุกรายชื่อของช่วงนี้">
         <ReasonColumns groups={view.reasons} />
       </OverviewCard>
 
+      <JourneyNamesDialog
+        open={names !== null}
+        onOpenChange={(o) => !o && setNames(null)}
+        title={names?.title ?? ''}
+        ids={names?.ids ?? []}
+      />
+
       {/* ─── ผลงานรายคน ─── */}
-      <OverviewCard icon={Users} title="ผลงานรายคน">
+      <OverviewCard icon={Users} title="ผลงานรายคน" sub={weekdays.length > 0 ? 'งานที่ลงผลในช่วงนี้ · ไม่กรองตามวัน' : 'งานที่ลงผลในช่วงนี้'}>
         {data.staff ? <StaffTable staff={data.staff} ai={data.ai} /> : <SectionError message={data.errors.staff ?? 'อ่านผลงานรายคนไม่ได้'} />}
       </OverviewCard>
     </div>

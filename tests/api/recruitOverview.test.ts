@@ -113,6 +113,8 @@ describe('เส้นอ่านอย่างเดียว + ขอบเ�
     expect(body.bu).toBe('LBD');
     for (const [text, params] of dbQuery.mock.calls as [string, unknown[] | undefined][]) {
       if (text.includes('any_row')) continue;
+      // ตารางผู้ใช้ (อีเมล → ชื่อเล่น ของผลงานรายคน · 18 ต.ค. 2569) ไม่ใช่ข้อมูลใบสมัคร ไม่ผูก BU
+      if (text.includes('nickname')) continue;
       expect(params?.[params.length - 1], text.slice(0, 60)).toBe('LBD');
     }
   });
@@ -141,10 +143,11 @@ describe('เส้นอ่านอย่างเดียว + ขอบเ�
 });
 
 describe('ข้อเท็จจริงต่อใบ — ไม่มีข้อมูลบุคคล · นิยามจากตัวกลาง', () => {
-  it('🔴 ไม่คืนชื่อ/เบอร์/รหัสใบ — มีแต่ข้อเท็จจริงที่ใช้นับ', async () => {
+  // 18 ต.ค. 2569: คืน id ใบ (uuid ไม่ใช่ข้อมูลบุคคล) ให้กดเลขแล้วเปิดรายชื่อได้ — ชื่อ/เบอร์ดึงจากเส้นรายชื่อที่มีสิทธิ์อยู่แล้ว
+  it('🔴 ไม่คืนชื่อ/เบอร์ — มีแต่ข้อเท็จจริงที่ใช้นับ + id ใบ', async () => {
     const body = await build('2026-09');
     const keys = Object.keys(body.apps![0]);
-    for (const bad of ['id', 'phone', 'phone_e164', 'full_name', 'name', 'address']) expect(keys).not.toContain(bad);
+    for (const bad of ['phone', 'phone_e164', 'full_name', 'name', 'address']) expect(keys).not.toContain(bad);
     expect(JSON.stringify(body)).not.toContain('+668');
   });
 
