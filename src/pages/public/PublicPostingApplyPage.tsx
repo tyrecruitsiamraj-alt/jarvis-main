@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { fetchPublicPostingByCode, type PublicPostingInfo } from '@/lib/recruitPostingsApi';
 import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
 import PublicPostingPreview from '@/components/jobs/PublicPostingPreview';
@@ -20,12 +21,16 @@ const PublicPostingApplyPage: React.FC = () => {
   const [info, setInfo] = useState<PublicPostingInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  /** โหลดล้ม (เน็ต/เซิร์ฟเวอร์) — คนละเรื่องกับลิงก์ใช้ไม่ได้ (QA 17 ต.ค. 2569: เดิมบอกผู้สมัครว่าลิงก์ใช้ไม่ได้แล้ว) */
+  const [failed, setFailed] = useState(false);
+  const [rev, setRev] = useState(0);
   const [applyOpen, setApplyOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setNotFound(false);
+    setFailed(false);
     void fetchPublicPostingByCode(code)
       .then((data) => {
         if (cancelled) return;
@@ -33,7 +38,7 @@ const PublicPostingApplyPage: React.FC = () => {
         else setInfo(data);
       })
       .catch(() => {
-        if (!cancelled) setNotFound(true);
+        if (!cancelled) setFailed(true);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -41,13 +46,25 @@ const PublicPostingApplyPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [code]);
+  }, [code, rev]);
 
   if (loading) {
     return (
       <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-3 px-6 text-center">
         <Loader2 className="h-8 w-8 animate-spin text-sky-500" aria-hidden />
         <p className="text-sm text-muted-foreground">กำลังเปิดลิงก์…</p>
+      </div>
+    );
+  }
+
+  if (failed) {
+    return (
+      <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="text-base font-medium text-foreground">เปิดประกาศไม่สำเร็จ</p>
+        <p className="text-sm text-muted-foreground">เน็ตอาจหลุดหรือระบบช้า ลองอีกครั้งได้เลย</p>
+        <Button type="button" variant="outline" onClick={() => setRev((n) => n + 1)}>
+          ลองอีกครั้ง
+        </Button>
       </div>
     );
   }
@@ -98,7 +115,7 @@ const PublicPostingApplyPage: React.FC = () => {
                 onClick={() => setApplyOpen(true)}
                 className="mt-6 w-full rounded-full bg-night py-3 text-sm font-medium text-white transition-colors hover:bg-night-hover dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
               >
-                กรอกใบสมัคร
+                สมัครงาน
               </button>
               <p className="mt-2.5 text-center text-xs text-muted-foreground">
                 ทีมสรรหาติดต่อกลับภายใน 2 วันทำการ

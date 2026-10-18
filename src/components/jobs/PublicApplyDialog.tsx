@@ -107,7 +107,8 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [age, setAge] = useState('');
-  const [gender, setGender] = useState<Gender>('male');
+  // ไม่เลือกไว้ล่วงหน้า (QA 17 ต.ค. 2569: เดิมตั้ง "ชาย" ไว้ คนรีบกรอกส่งเพศผิดได้)
+  const [gender, setGender] = useState<Gender | ''>('');
   const [province, setProvince] = useState('');
   const [district, setDistrict] = useState('');
   const [subdistrict, setSubdistrict] = useState('');
@@ -148,7 +149,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
     setLastName('');
     setPhone('');
     setAge('');
-    setGender('male');
+    setGender('');
     setProvince('');
     setDistrict('');
     setSubdistrict('');
@@ -185,13 +186,15 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
     if (firstName.trim().length < 1) return setError('กรุณากรอกชื่อ');
     if (lastName.trim().length < 1) return setError('กรุณากรอกนามสกุล');
     const phoneDigits = phone.replace(/\D/g, '');
-    if (phoneDigits.length < 9 || phoneDigits.length > 11) {
+    // เบอร์ไทย: ขึ้นต้น 0 · 9–10 หลัก (บ้าน/มือถือ)
+    if (!/^0\d{8,9}$/.test(phoneDigits)) {
       return setError('กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (เช่น 0812345678)');
     }
     const ageNum = Number(age.trim());
     if (!Number.isFinite(ageNum) || ageNum < 15 || ageNum > 80) {
       return setError('กรุณากรอกอายุให้ถูกต้อง (15–80 ปี)');
     }
+    if (!gender) return setError('กรุณาเลือกเพศ');
     if (!province) return setError('กรุณาเลือกจังหวัด');
     if (!district) return setError('กรุณาเลือกอำเภอ/เขต');
     if (!subdistrict) return setError('กรุณาเลือกตำบล/แขวง');
@@ -330,7 +333,8 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                       onChange={(e) => setTitlePrefix(e.target.value)}
                       className="jarvis-soft-field"
                     >
-                      {TITLE_PREFIX_OPTIONS.filter((o) => o.value).map((opt) => (
+                      {/* ผู้สมัครงานอายุ 15 ขึ้นไป — ไม่มีเด็กชาย/เด็กหญิง */}
+                      {TITLE_PREFIX_OPTIONS.filter((o) => o.value && !o.value.startsWith('เด็ก')).map((opt) => (
                         <option key={opt.value} value={opt.value}>
                           {opt.label}
                         </option>
@@ -370,6 +374,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                       placeholder="เช่น 0812345678"
                       autoComplete="tel"
                       inputMode="tel"
+                      maxLength={12}
                       required
                       className="jarvis-soft-field"
                     />
@@ -390,9 +395,13 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                   <Field label="เพศ" required>
                     <select
                       value={gender}
-                      onChange={(e) => setGender(e.target.value as Gender)}
+                      onChange={(e) => setGender(e.target.value as Gender | '')}
+                      required
                       className="jarvis-soft-field"
                     >
+                      <option value="" disabled>
+                        เลือก
+                      </option>
                       <option value="male">ชาย</option>
                       <option value="female">หญิง</option>
                       <option value="other">อื่นๆ</option>

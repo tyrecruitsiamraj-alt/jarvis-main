@@ -88,6 +88,13 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
      */
     request_date: toYmd(r.request_date),
     required_date: toYmd(r.required_date),
+    /**
+     * อัตราที่ยังรับ (เหลือหา) — QA 17 ต.ค. 2569: เดิมไม่ส่ง ทุกใบนับเป็น 1 ⇒ หัวหน้า /apply "อัตราที่รับ 59" = จำนวนประกาศ (ของจริง 69)
+     */
+    position_units: (() => {
+      const n = (r as Record<string, unknown>).position_units;
+      return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
+    })(),
     urgency: r.urgency,
     total_income: r.total_income,
     /**
@@ -255,7 +262,9 @@ async function withBenefits(jobs: PublicJob[]): Promise<PublicJobOut[]> {
         ...rest,
         ...(found && found.length > 0 ? { benefits: found } : {}),
         // ยอดต่อเดือนของสวัสดิการแต่ละตัว (ค่าเดินทาง 3,000 ฯลฯ) — การ์ดเจ้าหน้าที่โชว์ ⇒ หน้า /apply ต้องโชว์เหมือนกัน (5 ต.ค. 2569)
-        // ไม่ส่ง monthly_income_base — ฐานใช้ยอดที่ทีมตั้งเอง (income_display) ตามเดิม
+        // ฐานจาก ERP ส่งด้วย — `jobIncomeLine` ใช้บรรทัด "ฐานเงินเดือน" ที่ทีมตั้งก่อน ไม่มีค่อยใช้ ERP
+        // (QA 17 ต.ค. 2569: OPL6909030 หน้าสาธารณะขึ้นแค่รายได้รวม แต่กล่องตัวอย่างฝั่งเจ้าหน้าที่ขึ้นฐาน 11,160 · กติกา 14 ต.ค. ฐานขึ้นเสมอ)
+        ...(income?.base != null ? { monthly_income_base: income.base } : {}),
         ...(income?.items ? { monthly_income_items: income.items } : {}),
         ...(rest.income_display.period === 'monthly'
           ? { monthly_income: rest.income_display.total }

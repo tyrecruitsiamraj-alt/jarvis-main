@@ -2,6 +2,7 @@ import { dbQuery } from '../_lib/postgres.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../_lib/http.js';
 import { getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
+import { isSignedInViewer } from '../_lib/auth.js';
 
 const tbl = tableInAppSchema('short_links');
 
@@ -14,8 +15,11 @@ export default async function handler(req: ApiReq, res: ApiRes) {
   if (!code) return sendError(res, 400, 'Bad request', 'code required');
 
   try {
+    // เจ้าหน้าที่ที่ล็อกอินอยู่เปิดดูไม่นับคลิก (QA 17 ต.ค. 2569 — ยอด "ประกาศไหนดังจริง" สูงเกิน)
     const { rows } = await dbQuery<{ target_path: string }>(
-      `update ${tbl} set hit_count = hit_count + 1 where code = $1 returning target_path`,
+      isSignedInViewer(req)
+        ? `select target_path from ${tbl} where code = $1`
+        : `update ${tbl} set hit_count = hit_count + 1 where code = $1 returning target_path`,
       [code],
     );
     if (!rows[0]) return sendError(res, 404, 'Not found', 'ลิงก์ไม่ถูกต้องหรือหมดอายุ');

@@ -52,7 +52,8 @@ const PublicApplyLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
       <footer className="relative z-10 border-t border-border bg-background/90 py-6 text-center text-xs text-muted-foreground">
         <p className="px-4">
-          หน้านี้สำหรับผู้สมัครงานเท่านั้น ข้อมูลตำแหน่งแสดงตามที่บริษัทประกาศ หากมีข้อสงสัยโปรดใช้ช่องทางสมัครที่ระบุ
+          {/* QA 17 ต.ค. 2569: เดิมบอกให้ "ใช้ช่องทางสมัครที่ระบุ" ซึ่งไม่มีบนหน้า */}
+          ข้อมูลตำแหน่งงานตามที่บริษัทประกาศ
         </p>
       </footer>
     </div>

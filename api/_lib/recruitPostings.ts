@@ -496,6 +496,7 @@ export async function getRecruitPosting(id: string): Promise<RecruitPosting | nu
 /** resolve ลิงก์สาธารณะ — คืนประกาศ + ลิงก์ที่ใช้เข้ามา */
 export async function getPostingByLinkCode(
   code: string,
+  opts: { countHit?: boolean } = {},
 ): Promise<{ posting: RecruitPosting; link: RecruitPostingLink } | null> {
   const clean = (code || '').trim().toLowerCase();
   if (!clean) return null;
@@ -508,8 +509,8 @@ export async function getPostingByLinkCode(
   const link = rows[0];
   const posting = await getRecruitPosting(link.posting_id);
   if (!posting) return null;
-  // นับคลิก — พลาดไม่เป็นไร ไม่ให้ล้มการเปิดหน้า
-  void dbQuery(`UPDATE ${linksTable} SET hit_count = hit_count + 1 WHERE id = $1`, [link.id]).catch(
+  // นับคลิก — พลาดไม่เป็นไร ไม่ให้ล้มการเปิดหน้า · เจ้าหน้าที่เปิดดูไม่นับ (`countHit: false`)
+  if (opts.countHit !== false) void dbQuery(`UPDATE ${linksTable} SET hit_count = hit_count + 1 WHERE id = $1`, [link.id]).catch(
     () => undefined,
   );
   return { posting, link: mapLink(link) };

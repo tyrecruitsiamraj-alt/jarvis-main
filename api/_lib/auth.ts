@@ -79,6 +79,21 @@ export function getTokenFromReq(req: { headers?: Record<string, string | string[
   return t && t.trim() ? t.trim() : null;
 }
 
+/**
+ * คนเปิดหน้าสาธารณะเป็นเจ้าหน้าที่ที่ล็อกอินอยู่ไหม — ใช้ตัดยอดคลิกลิงก์สมัคร (QA 17 ต.ค. 2569: เจ้าหน้าที่เปิดดูก็นับคลิก)
+ * โทเคนผิด/หมดอายุ/ไม่มี = ไม่ใช่ (นับตามปกติ)
+ */
+export function isSignedInViewer(req: { headers?: Record<string, string | string[] | undefined> }): boolean {
+  const token = getTokenFromReq(req);
+  if (!token) return false;
+  try {
+    verifyAuthToken(token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function getTokenFromAuthHeader(
   req: { headers?: Record<string, string | string[] | undefined> },
 ): string | null {

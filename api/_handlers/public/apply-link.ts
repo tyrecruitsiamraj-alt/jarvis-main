@@ -2,6 +2,7 @@ import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/
 import { rateLimitOrReject } from '../../_lib/rateLimit.js';
 import { getPostingByLinkCode } from '../../_lib/recruitPostings.js';
 import { logWarn } from '../../_lib/logger.js';
+import { isSignedInViewer } from '../../_lib/auth.js';
 import { getLinkedPublicJob } from './jobs.js';
 
 function getQuery(req: ApiReq, key: string): string {
@@ -26,7 +27,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     const code = getQuery(req, 'code');
     if (!code) return sendError(res, 400, 'Bad request', 'ต้องระบุ code');
 
-    const found = await getPostingByLinkCode(code);
+    const found = await getPostingByLinkCode(code, { countHit: !isSignedInViewer(req) });
     if (!found) return sendError(res, 404, 'Not found', 'ลิงก์นี้ใช้ไม่ได้แล้ว');
 
     const { posting, link } = found;
