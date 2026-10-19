@@ -88,8 +88,8 @@ const DashboardKpiCard: React.FC<Props> = ({
           solid ? 'text-white' : (tone?.num ?? NEUTRAL_NUM),
         )}
       >
-        {kpi.format === 'percent' ? `${kpi.value}%` : kpi.value.toLocaleString('th-TH')}
-        {kpi.secondaryCount != null ? (
+        {kpi.unavailable ? '—' : kpi.format === 'percent' ? `${kpi.value}%` : kpi.value.toLocaleString('th-TH')}
+        {kpi.secondaryCount != null && !kpi.unavailable ? (
           <span
             className={cn('ml-1.5 text-sm font-normal', solid ? 'text-white/80' : 'text-slate-600 dark:text-slate-400')}
           >

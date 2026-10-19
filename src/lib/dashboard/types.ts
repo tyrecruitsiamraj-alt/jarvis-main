@@ -68,6 +68,8 @@ export type DashboardKpi = {
   /** จำนวนใบขอรอง — แสดงคู่กับตำแหน่งหลัก */
   secondaryCount?: number;
   secondaryLabel?: string;
+  /** โหลดยอดไม่สำเร็จ — การ์ดขึ้น "—" ห้ามโชว์เลขสำรอง (QA 19 ต.ค. 2569: เคยขึ้น ยกเลิก 0) */
+  unavailable?: boolean;
 };
 
 export type DashboardWorkItem = {

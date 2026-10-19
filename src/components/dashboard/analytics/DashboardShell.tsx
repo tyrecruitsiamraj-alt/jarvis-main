@@ -358,7 +358,9 @@ const DashboardShell: React.FC<Props> = ({
                 <div>
                   <p className={cn(DASH.eyebrow, 'mb-1')}>สรุปอัตราในช่วงที่เลือก</p>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mb-2">
-                    {dateRange == null ? (
+                    {data.kpis.some((k) => k.unavailable) ? (
+                      <span>โหลดยอดตามช่วงไม่สำเร็จ</span>
+                    ) : dateRange == null ? (
                       /**
                        * 🔴 สมการต้องขึ้นเสมอ ไม่ใช่เฉพาะตอนเลือกช่วงวัน (แผนแก้จุดงงข้อ 2
                        * · 2 ก.ย. 2569) — Haiku ทดสอบแล้วเอา เข้ามา−ปิด−ยกเลิก ได้ 350

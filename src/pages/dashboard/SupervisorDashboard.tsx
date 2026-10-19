@@ -87,6 +87,9 @@ import type { JobRequest } from '@/types';
 
 const DEMO_MODE = import.meta.env.VITE_DASHBOARD_DEMO === 'true';
 
+/** การ์ดที่คิดจากยอดตามช่วง (throughput) — โหลดไม่ขึ้นแล้วต้องขึ้น "—" */
+const THROUGHPUT_KPI_IDS = new Set(['total_requests', 'closed', 'cancelled']);
+
 const SupervisorDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -204,7 +207,7 @@ const SupervisorDashboard: React.FC = () => {
       })
       .catch(() => {
         if (cancelled) return;
-        setThroughputRecords([]);
+        // 🔴 ห้ามล้างเป็น [] (QA 19 ต.ค. 2569) — การ์ดจะไปคิดจากใบที่เปิดอยู่แทน ขึ้น "ยกเลิก 0" ปลอม · คงชุดเดิมไว้
         setSideFailed((s) => ({ ...s, throughput: true }));
       });
     return () => {
@@ -503,13 +506,18 @@ const SupervisorDashboard: React.FC = () => {
       scopedClosedJobs,
       jobsWithoutAgeFilter,
     );
+    /** โหลดยอดตามช่วงไม่ขึ้นตั้งแต่ครั้งแรก = สามการ์ดที่มาจากยอดนั้นขึ้น "—" (QA 19 ต.ค. 2569 · ห้ามเลขสำรอง) */
+    const throughputMissing = siamrajPrimary && dbSource === 'sqlserver' && sideFailed.throughput && throughputRecords.length === 0;
     return {
       ...built,
+      kpis: throughputMissing
+        ? built.kpis.map((k) => (THROUGHPUT_KPI_IDS.has(k.id) ? { ...k, unavailable: true } : k))
+        : built.kpis,
       workQueue: sortWorkQueue(built.workQueue, sortKey, sortDir),
       // โหมดทั้งหมด: ทับด้วยชุดที่รวมใบปิดที่โหลด on-demand แล้ว (ถ้ายังไม่โหลดก็ใช้ของเดิม)
       recruiterOverview: recruiterOverviewAllMode ?? built.recruiterOverview,
     };
-  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, cohortScope, scopedClosedJobs, jobsWithoutAgeFilter, trendMeta, recruiterOverviewAllMode]);
+  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, cohortScope, scopedClosedJobs, jobsWithoutAgeFilter, trendMeta, recruiterOverviewAllMode, dbSource, sideFailed.throughput, throughputRecords.length]);
 
   const handleSort = useCallback(
     (key: DashboardSortKey) => {

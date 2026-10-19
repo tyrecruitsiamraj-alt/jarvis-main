@@ -215,11 +215,13 @@ export function IncomeShownPicker({
         onValueChange={(v) => {
           if (v) void choose(v as IncomeShown);
         }}
+        // มือถือ: ปุ่มยาว ("รายได้รวม 12,000 บาท/เดือน") ขึ้นบรรทัดใหม่ทั้งปุ่ม ไม่บีบจนตัวหนังสือซ้อน (QA 19 ต.ค. 2569)
+        className="flex-wrap justify-start"
       >
         {INCOME_SHOWN_OPTIONS.map((o) => {
           const amount = o.value === 'average' ? averageText : totalText;
           return (
-            <ToggleGroupItem key={o.value} value={o.value} disabled={!amount} className="text-xs">
+            <ToggleGroupItem key={o.value} value={o.value} disabled={!amount} className="shrink-0 whitespace-nowrap text-xs">
               {o.label} <span className="tabular-nums">{amount ?? '—'}</span>
             </ToggleGroupItem>
           );

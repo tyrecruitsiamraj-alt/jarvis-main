@@ -8,12 +8,14 @@
  * - ช่องทาง = การลงทะเบียนล่าสุด **ก่อนหรือวันเดียวกับ** วันแจ้งเข้า (ย้อนไม่เกิน 365 วัน) จับคู่ด้วยเบอร์ 9 ตัวท้าย
  *   แหล่งลงทะเบียน: iRecruit (ช่องทาง/กลุ่มย่อยของ RM) + ใบสมัครผ่านลิงก์ของระบบเรา
  * - ลงทะเบียน = จำนวนเบอร์ที่ลงทะเบียนในช่วงเดียวกัน (ตามวันลงทะเบียน)
- * - ไม่เจอการลงทะเบียน = "ไม่รู้ช่องทาง" (บอกเลขเสมอ ห้ามทิ้ง — ทุกแถวรวมกัน = แจ้งเข้าทั้งหมด)
+ * - ไม่เจอการลงทะเบียน = ใช้ช่อง "ทราบข่าวจาก" ของ ERP (`erpChannelOf` · 19 ต.ค. 2569) · ไม่มีอีก = "ไม่รู้ช่องทาง"
+ *   (บอกเลขเสมอ ห้ามทิ้ง — ทุกแถวรวมกัน = แจ้งเข้าทั้งหมด)
  * ไฟล์นี้ pure — เทสต์ `tests/api/channelPlacement2569-10-19.test.ts`
  */
 
 export type ChannelRegistration = { phone9: string; at: string; channel: string | null; sub: string | null };
-export type ChannelInform = { phone9: string; at: string };
+/** `erpNews` = ช่อง "ทราบข่าวจาก" ใน ERP (รหัส + ชื่อ) — ใช้เมื่อหาการลงทะเบียนไม่เจอ (19 ต.ค. 2569) */
+export type ChannelInform = { phone9: string; at: string; erpNews?: { code: string | null; name: string | null } | null };
 
 export type ChannelSubRow = { name: string; registered: number; placed: number };
 export type ChannelRow = { channel: string; registered: number; placed: number; subs: ChannelSubRow[] };
@@ -46,6 +48,29 @@ export function mainChannelOf(channel: string | null, sub: string | null): strin
 }
 
 const subName = (sub: string | null, channel: string) => (sub ?? '').trim() || channel;
+
+/**
+ * ช่องทางจากช่อง "ทราบข่าวจาก" ของ ERP (เจ้าของ 19 ต.ค. 2569 "ไม่รู้ช่องทางมันเยอะมากนี่แหละช่องโหว่")
+ * ใบที่ส่งมาจาก iRecruit ใช้รหัสของ iRecruit (1 = Facebook · 4 = พนักงานแนะนำ · 54 = tiktok) ซึ่งชนกับรหัส ERP
+ * (54 ของ ERP = JOB DB) ⇒ 54 บอกไม่ได้ว่าอันไหน · ว่าง/ไม่ระบุ = null (ไม่รู้ช่องทาง)
+ */
+const ERP_CODE_FALLBACK: Record<string, string> = { '1': 'Facebook', '3': 'Internet', '4': 'พนักงานแนะนำ', '0': '' };
+export const ERP_FACEBOOK = 'Facebook (ไม่รู้ว่ากลุ่ม/Ads/เพจ)';
+export function erpChannelOf(news: { code: string | null; name: string | null } | null | undefined): string | null {
+  if (!news) return null;
+  const code = (news.code ?? '').trim();
+  if (code === '54') return 'TikTok หรือ JOB DB';
+  const name = ((news.name ?? '').trim() || ERP_CODE_FALLBACK[code.replace(/^0+(?=\d)/, '')] || '').trim();
+  if (!name || /^ไม่ระบุ$/.test(name)) return null;
+  if (/^facebook$/i.test(name)) return ERP_FACEBOOK;
+  if (/พนักงานเก่า|พนง\.?\s*โอนมา/.test(name)) return 'พนักงานเก่า/โอนมา';
+  if (/^tiktok$/i.test(name)) return 'TikTok';
+  // "Jobthai.com" ของ ERP = "Jobthai" ของ iRecruit — ชื่อเดียวกันแถวเดียว
+  return name.replace(/\.com$/i, '');
+}
+
+/** ชื่อกลุ่มย่อยของแถวที่ได้ช่องทางจาก ERP */
+export const ERP_SUB = 'ตาม ERP (ไม่ได้ลงทะเบียน iRecruit)';
 
 export function buildChannelPlacement(
   regs: readonly ChannelRegistration[],
@@ -92,11 +117,15 @@ export function buildChannelPlacement(
 
   // ลงงาน — คนละครั้ง (แจ้งเข้าแรกในช่วง)
   const firstInform = new Map<string, number>();
+  const erpNewsOf = new Map<string, ChannelInform['erpNews']>();
   for (const i of informs) {
     const t = Date.parse(i.at);
     if (!(t >= fromMs && t < toMs) || !/^\d{9}$/.test(i.phone9)) continue;
     const prev = firstInform.get(i.phone9);
-    if (prev === undefined || t < prev) firstInform.set(i.phone9, t);
+    if (prev === undefined || t < prev) {
+      firstInform.set(i.phone9, t);
+      erpNewsOf.set(i.phone9, i.erpNews ?? null);
+    }
   }
   let matched = 0;
   for (const [phone, t] of firstInform) {
@@ -106,7 +135,15 @@ export function buildChannelPlacement(
       return at < t + 86_400_000 && t - at <= LOOKBACK_MS;
     });
     if (cands.length === 0) {
-      rowOf(UNKNOWN_CHANNEL).placed += 1;
+      const erp = erpChannelOf(erpNewsOf.get(phone));
+      if (!erp) {
+        rowOf(UNKNOWN_CHANNEL).placed += 1;
+        continue;
+      }
+      const row = rowOf(erp);
+      row.placed += 1;
+      subOf(row, ERP_SUB).placed += 1;
+      matched += 1;
       continue;
     }
     const last = cands.reduce((a, b) => (Date.parse(b.at) > Date.parse(a.at) ? b : a));

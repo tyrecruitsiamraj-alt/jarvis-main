@@ -26,8 +26,8 @@ const ChannelPlacementTable: React.FC<{ data: ChannelPlacement }> = ({ data }) =
             <TableRow>
               <TableHead className="text-xs">ช่องทาง</TableHead>
               <TableHead className="whitespace-nowrap text-right text-xs">ลงทะเบียน</TableHead>
-              <TableHead className="whitespace-nowrap text-right text-xs">ลงงาน</TableHead>
-              <TableHead className="whitespace-nowrap text-right text-xs">ได้งาน %</TableHead>
+              <TableHead className="whitespace-nowrap text-right text-xs">แจ้งเข้า</TableHead>
+              <TableHead className="whitespace-nowrap text-right text-xs">% แจ้งเข้า</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

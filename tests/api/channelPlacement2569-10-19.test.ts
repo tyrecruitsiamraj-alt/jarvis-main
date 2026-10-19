@@ -58,3 +58,21 @@ describe('หน้าภาพรวม', () => {
     expect(sql).toContain("not ilike 'irecruit%'");
   });
 });
+
+describe('ไม่เจอการลงทะเบียน = ใช้ช่อง "ทราบข่าวจาก" ของ ERP (เจ้าของ 19 ต.ค. 2569 "ไม่รู้ช่องทางมันเยอะ")', () => {
+  it('แปลงรหัส/ชื่อ ERP · รหัสของ iRecruit ที่ติดมา · 54 บอกไม่ได้ · ไม่ระบุ = ไม่รู้ช่องทาง', async () => {
+    const { erpChannelOf, ERP_FACEBOOK, ERP_SUB } = await import('../../src/lib/channelPlacement');
+    expect(erpChannelOf({ code: '01', name: 'Facebook' })).toBe(ERP_FACEBOOK);
+    expect(erpChannelOf({ code: '1', name: null })).toBe(ERP_FACEBOOK);
+    expect(erpChannelOf({ code: '4', name: null })).toBe('พนักงานแนะนำ');
+    expect(erpChannelOf({ code: '15', name: 'พนง.โอนมา' })).toBe('พนักงานเก่า/โอนมา');
+    expect(erpChannelOf({ code: '54', name: 'JOB DB' })).toBe('TikTok หรือ JOB DB');
+    expect(erpChannelOf({ code: '00', name: 'ไม่ระบุ' })).toBeNull();
+    expect(erpChannelOf(null)).toBeNull();
+    const out = buildChannelPlacement([], [{ phone9: '811111111', at: '2026-10-10T00:00:00Z', erpNews: { code: '1', name: null } }], W);
+    const fb = out.rows.find((r) => r.channel === ERP_FACEBOOK)!;
+    expect(fb.placed).toBe(1);
+    expect(fb.subs[0].name).toBe(ERP_SUB);
+    expect(out.rows.find((r) => r.channel === UNKNOWN_CHANNEL)!.placed).toBe(0);
+  });
+});

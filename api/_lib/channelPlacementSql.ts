@@ -55,13 +55,15 @@ export async function loadChannelPlacement(window: { from: string; to: string })
           and created_at >= $1::date and created_at < $2::date`,
       [regFrom, regTo],
     ),
-    siamrajSqlQuery<{ k: string; at: Date | string }>(
-      `SELECT RIGHT(REPLACE(REPLACE(RTRIM(r.mobile), '-', ''), ' ', ''), 9) AS k, MIN(IH.inform_date) AS at
+    // ช่อง "ทราบข่าวจาก" (news_code) ติดมาด้วย — ใช้เมื่อหาการลงทะเบียนไม่เจอ (19 ต.ค. 2569)
+    siamrajSqlQuery<{ k: string; at: Date | string; nc: string | null; nn: string | null }>(
+      `SELECT RIGHT(REPLACE(REPLACE(RTRIM(r.mobile), '-', ''), ' ', ''), 9) AS k, IH.inform_date AS at,
+              RTRIM(r.news_code) AS nc, RTRIM(N.news_name) AS nn
          FROM hr_recruitment r
          INNER JOIN st_inform_head IH ON IH.inform_no = r.inform_no
+         LEFT JOIN hr_ms_news N ON RTRIM(N.news_code) = RTRIM(r.news_code)
         WHERE r.mobile IS NOT NULL AND ${activeInformWhereSql('IH')}
-          AND IH.inform_date >= @from AND IH.inform_date < @to
-        GROUP BY RIGHT(REPLACE(REPLACE(RTRIM(r.mobile), '-', ''), ' ', ''), 9)`,
+          AND IH.inform_date >= @from AND IH.inform_date < @to`,
       { from: window.from, to: shiftYmd(window.to, 1) },
     ),
   ]);
@@ -69,7 +71,11 @@ export async function loadChannelPlacement(window: { from: string; to: string })
     ...irec.map((r) => ({ phone9: String(r.k ?? '').trim(), at: iso(r.at), channel: r.ch, sub: r.sub })),
     ...apps.rows.map((r) => ({ phone9: String(r.k ?? '').trim(), at: iso(r.at), channel: r.ch, sub: r.sub })),
   ];
-  const inf: ChannelInform[] = informs.map((r) => ({ phone9: String(r.k ?? '').trim(), at: iso(r.at) }));
+  const inf: ChannelInform[] = informs.map((r) => ({
+    phone9: String(r.k ?? '').trim(),
+    at: iso(r.at),
+    erpNews: { code: r.nc ?? null, name: r.nn ?? null },
+  }));
   const value = buildChannelPlacement(regs, inf, window);
   cache.set(key, { at: Date.now(), value });
   return value;

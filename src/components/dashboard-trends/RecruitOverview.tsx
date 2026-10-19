@@ -299,7 +299,7 @@ const RecruitOverview: React.FC<{
             )}
           </OverviewCard>
           {/* ช่องทางที่ได้คนลงงาน (เจ้าของ 19 ต.ค. 2569 — ทีม Online ดูว่าเด็กมาจากไหน ลงงานจากช่องทางไหนเยอะ) */}
-          <OverviewCard icon={Megaphone} title="ช่องทางที่ได้คนลงงาน" sub={`นับตามวันแจ้งเข้า · ทุก BU${weekdays.length > 0 ? ' · ไม่กรองตามวัน' : ''}`}>
+          <OverviewCard icon={Megaphone} title="คนแจ้งเข้าในช่วงนี้ มาจากช่องทางไหน" sub={`นับตามวันแจ้งเข้า · ทุก BU${weekdays.length > 0 ? ' · ไม่กรองตามวัน' : ''}`}>
             {data.channelPlacement ? (
               <ChannelPlacementTable data={data.channelPlacement} />
             ) : (
@@ -327,7 +327,7 @@ const RecruitOverview: React.FC<{
         {/* ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "facebook ad 200 สนใจ 100 … มา 10" + "จับได้ถึงแจ้งเข้า") */}
         <OverviewCard
           icon={Megaphone}
-          title="ช่องทางการสมัคร"
+          title="รายชื่อที่กรอกในช่วงนี้ ไปถึงไหนแยกช่องทาง"
           sub={data.errors.informs ? 'อ่านแจ้งเข้า ERP ไม่ได้' : 'แจ้งเข้า = มีใบแจ้งเข้า ERP หลังวันกรอก'}
           className="lg:col-span-2"
         >

@@ -596,7 +596,8 @@ const RecruitChannelsPage: React.FC = () => {
             </div>
             <ul className="divide-y divide-border">
               {rows.map((row) => (
-                <li key={row.id} className="flex items-center gap-2 px-3 py-2.5">
+                // มือถือ: ปุ่มลงบรรทัดใต้ชื่อ ชื่อช่องทางไม่ถูกบีบเหลือตัวเดียว (QA 19 ต.ค. 2569)
+                <li key={row.id} className="flex flex-wrap items-center gap-2 px-3 py-2.5">
                   <Checkbox
                     checked={selected.has(row.id)}
                     onCheckedChange={(v) => toggleRow(row, v === true)}
@@ -647,7 +648,7 @@ const RecruitChannelsPage: React.FC = () => {
                   </div>
 
                   {editingId === row.id ? null : (
-                    <div className="flex shrink-0 items-center gap-1">
+                    <div className="flex shrink-0 items-center gap-1 max-sm:basis-full max-sm:justify-end">
                       {busyId === row.id ? (
                         <LoaderCircle className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
                       ) : null}
