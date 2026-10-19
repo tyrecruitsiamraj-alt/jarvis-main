@@ -1,6 +1,6 @@
 /**
  * ═══ หน้าหลัก แท็บ "ทีม Online" (เจ้าของ 8 ต.ค. 2569) ═══
- * ใบขอ → ส่งไปประกาศ → ผลประกาศ → งานอะไรเยอะ (3 มุม) → แต่ละ BU · ทุกก้อนรวมได้เท่าใบขอเข้า (`onlineReportAddsUp`)
+ * ใบขอ → ส่งไปประกาศ → ผลประกาศ → แต่ละ BU (การ์ด "งานอะไรเยอะ" ถอด 19 ต.ค. 2569) · ทุกก้อนรวมได้เท่าใบขอเข้า (`onlineReportAddsUp`)
  * ตัวคิด `src/lib/homeOnline.ts` · ตัวโหลด `api/_lib/homeOnlineSql.ts` (โหมด `?online=1` ของ `/api/home-ai-share`)
  * 🔴 shadcn + Tailwind · สีจาก TONE (เขียว = ปิดครบ · เหลือง = เปิดอยู่/เหลือหา) · ไม่มีประโยคอธิบายบนจอ
  */
@@ -323,13 +323,7 @@ const HomeOnlineTab: React.FC<{ q: AiShareWindow & { bu: string | null }; tick: 
         </div>
       </HomeSection>
 
-      <HomeSection title="งานอะไรเยอะ" sub={sub} testId="online-types">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <CountBars title="อุตสาหกรรมลูกค้า" rows={report.types.industry} total={r.total} testId="online-type-industry" />
-          <CountBars title="ราชการ / เอกชน" rows={report.types.sector} total={r.total} testId="online-type-sector" />
-          <CountBars title="ตำแหน่ง" rows={report.types.position} total={r.total} testId="online-type-position" />
-        </div>
-      </HomeSection>
+      {/* การ์ด "งานอะไรเยอะ" (อุตสาหกรรม · ราชการ/เอกชน · ตำแหน่ง) ถอดแล้ว — เจ้าของ 19 ต.ค. 2569 "งานอะไรเยอะ เอาออก" */}
 
       <HomeSection title="แต่ละ BU" sub={sub} testId="online-bu">
         <div className="overflow-x-auto">

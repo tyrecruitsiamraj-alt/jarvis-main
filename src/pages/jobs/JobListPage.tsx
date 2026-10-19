@@ -517,8 +517,8 @@ const JobListPage: React.FC = () => {
               ? 'โหลดไม่สำเร็จ'
               : siamrajPrimary
             ? filtered.length > 0
-              ? `${filtered.length} ใบขอจาก Siamraj · แสดง ${pageFrom}–${pageTo}`
-              : '0 ใบขอจาก Siamraj'
+              ? `${filtered.length} ใบขอ · แสดง ${pageFrom}–${pageTo}`
+              : '0 ใบขอ'
             : filtered.length > 0
               ? `${filtered.length} งาน · แสดง ${pageFrom}–${pageTo}`
               : '0 งาน'

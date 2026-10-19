@@ -1,5 +1,5 @@
 import React from 'react';
-import { glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
+import { GlassTabIndicator, glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +26,7 @@ const UnitSectionTabs: React.FC<{ active: UnitSectionId }> = ({ active }) => {
   return (
     /* แถบกระจก (เจ้าของ 19 ต.ค. 2569 "เปลี่ยนเป็นกระจกทั้งหมด") — เดิมขีดเส้นใต้ */
     <div className={cn(glassTabsListClass, 'h-auto flex-wrap justify-start rounded-2xl')} role="tablist">
+        <GlassTabIndicator />
       {TABS.map((t) => (
         <button
           key={t.id}

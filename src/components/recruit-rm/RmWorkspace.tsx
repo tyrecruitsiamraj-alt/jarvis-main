@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
+import { GlassTabIndicator, glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -875,6 +875,7 @@ const RmWorkspace: React.FC<{
         <div className="flex flex-wrap items-center gap-2">
           {/* แถบกระจก (เจ้าของ 19 ต.ค. 2569 "เปลี่ยนเป็นกระจกทั้งหมด") — เดิมขีดเส้นใต้ */}
           <div className={cn(glassTabsListClass, 'h-auto flex-wrap justify-start rounded-2xl')} role="tablist">
+        <GlassTabIndicator />
           {RM_TABS.map((t) => {
             const active = t === tab;
             return (
@@ -913,7 +914,7 @@ const RmWorkspace: React.FC<{
       {/* ตัวเลขรายวัน พับได้ (เจ้าของสั่ง 15 ต.ค. 2569 · Choice "พับได้บนแท็บผู้สมัคร") — เหนือแถวชิปมุมมอง */}
       {!bucket && tab === 'candidates' ? <RecruitDailyPanel refreshKey={refreshKey} /> : null}
       {!bucket && tab === 'candidates' ? (
-        <div className="mt-3">
+        <div className="mt-4">
           <FilterChips
             ariaLabel="มุมมองผู้สมัคร"
             value={listView}
@@ -928,7 +929,7 @@ const RmWorkspace: React.FC<{
         </div>
       ) : null}
       {!bucket && tab === 'contact' ? (
-        <div className="mt-3">
+        <div className="mt-4">
           <FilterChips
             ariaLabel="กรองการติดต่อ"
             value={contactChip}
@@ -942,7 +943,7 @@ const RmWorkspace: React.FC<{
         </div>
       ) : null}
       {!bucket && tab === 'appointments' ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           {/* ของฉัน / ทุกคน (QA รอบ 2 ข้อ 4 · Choice 10 ต.ค. 2569) — supervisor ขึ้นไปเท่านั้น · ToggleGroup ของ shadcn
               ขนาด xs เท่าชิปข้าง ๆ · มุมมอง Lead/ยกเลิก มีเงื่อนไขของตัวเอง ไม่มีปุ่มนี้ */}
           {canSeeEveryoneAppointments(user?.role) && !leadView && !cancelledView ? (
@@ -1038,7 +1039,7 @@ const RmWorkspace: React.FC<{
       ) : null}
       {/* แถบ "กำลังดู: … — N คนข้างล่าง" ถูกถอด 27 ก.ย. 2569 (Clean — ไม่มีประโยคอธิบาย) */}
       {/* จอ sm ขึ้นไป: แถบกรองอยู่ข้างรายชื่อเสมอ — พับ = ปุ่มไอคอน (`FilterRail`) · กาง = แถบเต็ม ตารางยังเห็นข้าง ๆ */}
-      <div className={cn('mt-4', !bucket && 'sm:flex sm:items-start sm:gap-3')}>
+      <div className={cn('mt-5', !bucket && 'sm:flex sm:items-start sm:gap-3')}>
         {!bucket && !filterOpen ? <FilterRail selected={panelSelected} onExpand={() => changeFilterOpen(true)} /> : null}
         {!bucket && filterOpen ? (
           <FilterSidebar
@@ -1052,7 +1053,7 @@ const RmWorkspace: React.FC<{
             onCollapse={() => changeFilterOpen(false)}
           />
         ) : null}
-        <div className="min-w-0 flex-1 space-y-3">
+        <div className="min-w-0 flex-1 space-y-4">
           {/* ⚠️ RmToolbar (ช่องทาง/สร้างลิงก์/เหตุผล) ถูกเอาออก (เจ้าของสั่ง 14 ส.ค. 2569:
               "กล่องช่องทาง ฯลฯ มีแค่หน้ากล่องงาน") — เครื่องมือพวกนี้เหลือที่ RecruitBoardTools
               บนกล่องงาน (view=board) เท่านั้น · เหลือแค่ค้นหา + เพิ่มผู้สมัคร + Lead */}

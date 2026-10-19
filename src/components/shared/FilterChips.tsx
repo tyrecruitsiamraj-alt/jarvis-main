@@ -21,7 +21,7 @@ export default function FilterChips<T extends string>({
   ariaLabel: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={ariaLabel}>
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label={ariaLabel}>
       {chips.map((c) => {
         const active = c.id === value;
         return (

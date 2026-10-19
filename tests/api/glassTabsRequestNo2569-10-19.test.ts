@@ -62,3 +62,30 @@ describe('รอบ 2: กระจกทั้งระบบ + หน้าไ
     expect(read('src/pages/jobs/UnitRequestTabPage.tsx')).toContain('className="space-y-4 px-4 pb-4 md:px-6"');
   });
 });
+
+describe('รอบ 4 (เจ้าของ 19 ต.ค. 2569)', () => {
+  it('แถบไม่มีพื้นหลัง เหลือเม็ดกระจกที่วิ่งตามแท็บที่เลือก', () => {
+    const tabs = read('src/components/ui/tabs.tsx');
+    expect(tabs).toContain('export function GlassTabIndicator()');
+    expect(tabs).toContain('{variant === "glass" ? <GlassTabIndicator /> : null}');
+    for (const f of ['src/components/jobs/UnitRequestTabs.tsx', 'src/components/jobs/UnitSectionTabs.tsx', 'src/components/jobs/JobBoardView.tsx', 'src/components/recruit-rm/RmWorkspace.tsx']) {
+      expect(read(f), f).toContain('<GlassTabIndicator />');
+    }
+  });
+  it('แถบเลื่อนอยู่ตลอด (กดทีม Online แล้วปุ่มไม่เด้ง)', () => {
+    expect(read('src/main.tsx')).toContain('document.documentElement.classList.add("overflow-y-scroll")');
+  });
+  it('ถอดการ์ด "งานอะไรเยอะ" · หัวหน้าใบขอไม่มีคำว่า จาก Siamraj', () => {
+    expect(read('src/components/home-ai-share/HomeOnlineTab.tsx')).not.toContain('testId="online-types"');
+    expect(read('src/pages/jobs/JobListPage.tsx')).not.toContain('ใบขอจาก Siamraj');
+  });
+});
+
+describe('ป๊อปผู้สมัคร: รายชื่อผู้สรรหา/ผู้รับผิดชอบมาจากหน้าผู้ใช้งาน (เจ้าของ 19 ต.ค. 2569)', () => {
+  it('ไม่อ่านรายชื่อทีมชุดเก่า — ลบบัญชี ต่อ แล้วต้องหาย · เพิ่ม ไอซ์ แล้วต้องขึ้น', () => {
+    const src = read('src/components/recruit-rm/ApplicantInfoPanel.tsx');
+    expect(src).toContain("withCurrent(lane('recruiter'), draft.recruiter_name)");
+    expect(src).toContain("withCurrent(lane('online'), draft.responsible_name)");
+    expect(src).not.toContain('roster?.recruiters');
+  });
+});

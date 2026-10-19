@@ -81,8 +81,11 @@ const ApplicantInfoPanel: React.FC<{
     const list = [...new Set((names ?? []).map((n) => n.trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'th'));
     return current && !list.includes(current) ? [current, ...list] : list;
   };
-  const recruiterOptions = withCurrent(roster?.recruiters, draft.recruiter_name);
-  const responsibleOptions = withCurrent(roster?.onlines, draft.responsible_name);
+  // 🔴 19 ต.ค. 2569 เจ้าของ: "ลบ Account ต่อ ออกแล้ว เพิ่ม ไอซ์ … ทำไมยังมีชื่อ ต่อ" — เดิมอ่านรายชื่อทีมชุดเก่า (job_staff_roster)
+  // ⇒ อ่านจากหน้าผู้ใช้งาน (ชื่อเล่น + สายงาน) ที่เดียว · ลบบัญชี/ถอดสายงาน = หายจากลิสต์
+  const lane = (l: string) => (roster?.directory ?? []).filter((d) => d.lanes.includes(l)).map((d) => d.name);
+  const recruiterOptions = withCurrent(lane('recruiter'), draft.recruiter_name);
+  const responsibleOptions = withCurrent(lane('online'), draft.responsible_name);
   const specificOptions = draft.specific_type && !PROFILE_SPECIFIC_TYPE_OPTIONS.includes(draft.specific_type)
     ? [draft.specific_type, ...PROFILE_SPECIFIC_TYPE_OPTIONS]
     : PROFILE_SPECIFIC_TYPE_OPTIONS;

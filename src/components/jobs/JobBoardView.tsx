@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { lazyPage } from '@/lib/staleChunkReload';
-import { glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
+import { GlassTabIndicator, glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
 import { trackPublicClick } from '@/lib/publicClickApi';
 import { useSearchParams } from 'react-router-dom';
 import type { JobRequest } from '@/types';
@@ -1251,6 +1251,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     isStaff && onViewChange ? (
       /* แถบกระจก (เจ้าของ 19 ต.ค. 2569 "เปลี่ยนเป็นกระจกทั้งหมด") — เดิมขีดเส้นใต้ */
       <div ref={staffTabsRef} className={cn(glassTabsListClass, 'max-w-full justify-start overflow-x-auto')} role="tablist" aria-label="มุมมองหน้างานสรรหา">
+        <GlassTabIndicator />
         {BOARD_VIEW_TABS.map((v) => {
           const active = view === v.id;
           return (

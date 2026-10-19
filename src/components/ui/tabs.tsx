@@ -16,14 +16,60 @@ type TabsVariant = "default" | "glass";
 const TabsVariantContext = React.createContext<TabsVariant>("default");
 
 function TABS_LIST_CLASS_GLASS(): string {
-  // รอบ 2 (เจ้าของ 19 ต.ค. 2569 "มันดูไม่ออกเลย" · "โหมดมืดก็ดูไม่ออก"): กระจกต้องเห็นชัด —
-  // แสงสะท้อนครึ่งบน (before) · ขอบใสสว่าง · เงาลอย · พื้นขาวโปร่งไล่เฉด (มืด = ขาวจางบนพื้นเข้ม)
-  return [
-    "relative isolate inline-flex h-11 items-center justify-center gap-1 overflow-hidden rounded-full p-1 text-muted-foreground",
-    "border border-white/80 bg-gradient-to-b from-white/90 via-white/60 to-white/40 shadow-xl shadow-foreground/15 ring-1 ring-foreground/5",
-    "before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:-z-10 before:h-1/2 before:rounded-full before:bg-gradient-to-b before:from-white before:to-transparent",
-    "dark:border-white/20 dark:from-white/20 dark:via-white/10 dark:to-white/5 dark:shadow-black/50 dark:ring-white/10 dark:before:from-white/25",
-  ].join(" ");
+  // รอบ 4 (เจ้าของ 19 ต.ค. 2569 "เอาแค่ปุ่มแต่พื้นหลังไม่ต้อง"): แถบไม่มีพื้น — เหลือเม็ดกระจกของแท็บที่เลือก (`GlassTabIndicator`)
+  return "relative inline-flex h-11 items-center justify-center gap-1 rounded-full p-1 text-muted-foreground";
+}
+
+/** เม็ดกระจกแบบ A (เจ้าของเลือก 19 ต.ค. 2569) — กระจกสีเบอร์กันดี · เส้นขอบบนสว่างบาง ๆ · เงาลอย */
+const GLASS_PILL = [
+  "rounded-full border border-white/25 bg-gradient-to-b from-primary/80 to-primary/55 shadow-md shadow-primary/40",
+  "before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/70 before:to-transparent",
+].join(" ");
+
+/**
+ * เม็ดกระจกที่ "วิ่งตาม" แท็บที่เลือก (เจ้าของ 19 ต.ค. 2569: *"เวลากด menu อื่นให้ไอปุ่มที่เป็น glass มันวิ่งตาม"*)
+ * วางเป็นลูกตัวแรกของแถบ (แถบต้อง `relative`) · หาแท็บที่เลือกจาก data-state=active / aria-selected / aria-current
+ * แล้วเลื่อนไปทับด้วย transition · แถบเลื่อนแนวนอนได้ (offsetLeft อยู่ในกรอบเดียวกัน) · ตัดแอนิเมชันเมื่อเครื่องตั้งลดการเคลื่อนไหว
+ */
+export function GlassTabIndicator() {
+  const ref = React.useRef<HTMLSpanElement | null>(null);
+  const [box, setBox] = React.useState<{ l: number; t: number; w: number; h: number } | null>(null);
+  React.useLayoutEffect(() => {
+    const parent = ref.current?.parentElement;
+    if (!parent) return;
+    const measure = () => {
+      const active = parent.querySelector<HTMLElement>(
+        '[role="tab"][data-state="active"], [aria-selected="true"], [aria-current="page"]',
+      );
+      setBox((prev) => {
+        if (!active) return null;
+        const next = { l: active.offsetLeft, t: active.offsetTop, w: active.offsetWidth, h: active.offsetHeight };
+        return prev && prev.l === next.l && prev.t === next.t && prev.w === next.w && prev.h === next.h ? prev : next;
+      });
+    };
+    measure();
+    const mo = new MutationObserver(measure);
+    mo.observe(parent, { attributes: true, subtree: true, attributeFilter: ["data-state", "aria-selected", "aria-current"] });
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    ro?.observe(parent);
+    for (const child of Array.from(parent.children)) ro?.observe(child);
+    return () => {
+      mo.disconnect();
+      ro?.disconnect();
+    };
+  }, []);
+  return (
+    <span
+      ref={ref}
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute z-0 transition-all duration-300 ease-out motion-reduce:transition-none",
+        GLASS_PILL,
+        !box && "opacity-0",
+      )}
+      style={box ? { left: box.l, top: box.t, width: box.w, height: box.h } : undefined}
+    />
+  );
 }
 
 const TABS_LIST_CLASS: Record<TabsVariant, string> = {
@@ -35,11 +81,8 @@ const TABS_TRIGGER_CLASS: Record<TabsVariant, string> = {
   default:
     "rounded-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
   glass: [
-    "relative isolate h-full gap-1.5 overflow-hidden rounded-full border border-transparent hover:text-foreground",
-    "data-[state=active]:border-primary/30 data-[state=active]:bg-gradient-to-b data-[state=active]:from-primary/25 data-[state=active]:to-primary/10",
-    "data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:shadow-primary/25",
-    "data-[state=active]:before:pointer-events-none data-[state=active]:before:absolute data-[state=active]:before:inset-x-2 data-[state=active]:before:top-0 data-[state=active]:before:-z-10 data-[state=active]:before:h-1/2 data-[state=active]:before:rounded-full data-[state=active]:before:bg-gradient-to-b data-[state=active]:before:from-white/70 data-[state=active]:before:to-transparent",
-    "dark:data-[state=active]:border-primary/60 dark:data-[state=active]:from-primary/70 dark:data-[state=active]:to-primary/35 dark:data-[state=active]:text-primary-foreground dark:data-[state=active]:shadow-primary/40 dark:data-[state=active]:before:from-white/25",
+    "relative z-10 h-full gap-1.5 rounded-full transition-colors duration-300 hover:text-foreground",
+    "data-[state=active]:text-white data-[state=active]:hover:text-white",
   ].join(" "),
 };
 
@@ -50,15 +93,9 @@ const TABS_TRIGGER_CLASS: Record<TabsVariant, string> = {
 export const glassTabsListClass = TABS_LIST_CLASS_GLASS();
 export function glassTabClass(active: boolean): string {
   return cn(
-    "relative isolate inline-flex shrink-0 items-center justify-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition-all",
+    "relative z-10 inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-300",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-    active
-      ? [
-          "border-primary/30 bg-gradient-to-b from-primary/25 to-primary/10 text-primary shadow-md shadow-primary/25",
-          "before:pointer-events-none before:absolute before:inset-x-2 before:top-0 before:-z-10 before:h-1/2 before:rounded-full before:bg-gradient-to-b before:from-white/70 before:to-transparent",
-          "dark:border-primary/60 dark:from-primary/70 dark:to-primary/35 dark:text-primary-foreground dark:shadow-primary/40 dark:before:from-white/25",
-        ].join(" ")
-      : "border-transparent text-muted-foreground hover:text-foreground",
+    active ? "text-white" : "text-muted-foreground hover:text-foreground",
   );
 }
 
@@ -67,7 +104,10 @@ const TabsList = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List> & { variant?: TabsVariant }
 >(({ className, variant = "default", ...props }, ref) => (
   <TabsVariantContext.Provider value={variant}>
-    <TabsPrimitive.List ref={ref} className={cn(TABS_LIST_CLASS[variant], className)} {...props} />
+    <TabsPrimitive.List ref={ref} className={cn(TABS_LIST_CLASS[variant], className)} {...props}>
+      {variant === "glass" ? <GlassTabIndicator /> : null}
+      {props.children}
+    </TabsPrimitive.List>
   </TabsVariantContext.Provider>
 ));
 TabsList.displayName = TabsPrimitive.List.displayName;
