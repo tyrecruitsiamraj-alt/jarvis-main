@@ -29,8 +29,11 @@ vi.mock('../../api/_lib/audit.js', () => ({ auditFromAuthed: vi.fn(async () => u
 vi.mock('../../api/_lib/applicationScope.js', () => ({ isApplicationInWriteScope: vi.fn(async () => true) }));
 vi.mock('../../api/_lib/candidateCallHolds.js', () => ({ acquireCallHold: vi.fn(), releaseApplicationCallHolds: vi.fn() }));
 vi.mock('../../api/_lib/lumosDispatch.js', () => ({
+  REQUEST_CLOSED_REASON: 'ใบขอปิดแล้ว',
   enqueueLumosInterviewForApplications: (...a: unknown[]) => enqueue(...a),
 }));
+// ใบขอปิดแล้ว (19 ต.ค. 2569) — เทสต์นี้ใบเปิดทุกใบ
+vi.mock('../../api/_lib/requestClosedForApply.js', () => ({ isRequestClosedForApply: vi.fn(async () => false) }));
 vi.mock('../../api/_lib/siamrajUnitRequests.js', () => ({
   loadScopedJobIdSet: () => scoped(),
   getSiamrajUnitRequestById: () => jobById(),
@@ -86,8 +89,9 @@ describe('API — ผูกใบขอตอนส่ง AI', () => {
     const { res, json } = mockRes();
     await handler(req({ ids: [FREE, BOUND], choice: 'ai', job_id: 'J9', job_title: 'รปภ.' }) as never, res as never);
     const [sql, params] = bindCalls()[0] as [string, unknown[]];
-    expect(sql).toMatch(/and job_id is null/);
-    expect(params).toEqual([[FREE], 'J9', 'รปภ.', 'ไซต์ เก้า']);
+    // 19 ต.ค. 2569 — ผูกได้ทั้งใบที่ยังไม่ผูก และใบที่ใบขอปิดแล้ว ($5 = ใบขอปิด · เทสต์นี้ไม่มี)
+    expect(sql).toMatch(/and \(job_id is null or job_id = any\(\$5::text\[\]\)\)/);
+    expect(params).toEqual([[FREE], 'J9', 'รปภ.', 'ไซต์ เก้า', []]);
     const sent = enqueue.mock.calls.map((c) => [c[0], (c[1] as Array<{ id: string }>).map((a) => a.id)]);
     expect(sent).toEqual(
       expect.arrayContaining([

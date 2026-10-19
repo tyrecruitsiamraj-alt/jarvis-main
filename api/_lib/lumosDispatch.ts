@@ -20,6 +20,7 @@ import { KEEP_PUSH_FAILED_SQL } from '../../src/lib/followDispatchState.js';
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { isOverAge, OVER_AGE_REASON } from '../../src/lib/applicantAge.js';
 import { GREETING_JOB_REF } from '../../src/lib/greetingCall.js';
+import { isRequestClosedForApply } from './requestClosedForApply.js';
 import { loadApplyScriptFacts, type ApplyJobFacts } from './applyScriptFacts.js';
 import { tableInAppSchema } from './schema.js';
 import { errorSummaryText, logWarn, logInfo, logError } from './logger.js';
@@ -380,6 +381,7 @@ export async function enqueueLumosInterviewForApplications(
   const items: Array<{ personRef: string; payload: LumosInterviewPayload; matchRank: number | null }> = [];
   // ข้อมูลใบขอ (ชื่อจุดทำงาน · พื้นที่ · อายุ · รายได้) — อ่านครั้งเดียวต่อใบขอ มีเพดานเวลา (ล้ม = บทสั้นลง ไม่ทำให้ส่งไม่ได้)
   const applyFacts = applications.some((a) => !isOverAge(a.age)) ? await loadApplyScriptFacts(jobId) : null;
+  const requestClosed = applyFacts?.found === false ? await isRequestClosedForApply(jobId) : false;
   for (const app of applications) {
     // 🔴 อายุเกิน = ไม่เข้าคิวเลย ทุกเส้น (กรอกเสร็จ · ปุ่มส่ง AI · ตัวส่งเองหลังรอเลือกวิธีโทร) — ชื่อไปกล่อง "อายุเกิน" บนแท็บผู้สมัคร
     if (isOverAge(app.age)) {
@@ -389,6 +391,11 @@ export async function enqueueLumosInterviewForApplications(
     // 🔴 ไม่มีรายได้ = ไม่ส่ง AI (6 ต.ค. 2569) · อ่านใบขอไม่ทัน = ไม่ส่งเหมือนกัน (fail-safe ไปทางไม่ส่ง) แต่บอกคนละเหตุ
     if (!applyFacts?.loaded) {
       skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: FACTS_UNREAD_REASON });
+      continue;
+    }
+    // ใบขอปิดแล้ว (19 ต.ค. 2569) — เดิมตกด่านรายได้แล้วบอกผิดว่า "ยังไม่ตั้งรายได้" ทั้งที่ใบปิดไปเป็นเดือน
+    if (requestClosed) {
+      skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: REQUEST_CLOSED_REASON });
       continue;
     }
     if (!(Number(applyFacts.monthlyIncome) > 0)) {
@@ -829,6 +836,7 @@ const NO_PHONE_REASON = 'ไม่มีเบอร์มือถือที�
  */
 export const NO_INCOME_REASON = 'ใบขอยังไม่ตั้งรายได้ — ตั้งรายได้ในป๊อปโพสต์ประกาศ (กล่องรายได้) ก่อน แล้วค่อยส่ง AI';
 export const FACTS_UNREAD_REASON = 'อ่านรายได้ของใบขอไม่ทัน — ลองกดส่ง AI ใหม่อีกครั้ง';
+export const REQUEST_CLOSED_REASON = 'ใบขอปิดแล้ว — เลือกใบขอที่ยังเปิด หรือให้ AI ทักทายถามก่อน';
 const HELD_REASON = 'เจ้าหน้าที่รับไปโทรเองอยู่ — AI ไม่โทรทับ';
 const SUPPRESSED_REASON = 'เบอร์นี้ถูกพักอยู่ (แจ้งว่าไม่หางานแล้ว / เบอร์เสีย)';
 const DECLINED_REASON = 'เคยปฏิเสธงานนี้ไปแล้ว — ไม่เสนอซ้ำ';

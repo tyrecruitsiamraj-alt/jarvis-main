@@ -716,9 +716,21 @@ const RmWorkspace: React.FC<{
         .filter((n): n is string => Boolean(n)),
     [aiConfirmIds, rows],
   );
+  /**
+   * ใบที่ต้องเลือกใบขอก่อนส่ง AI = ยังไม่ผูก หรือ **ใบขอปิดแล้ว** (19 ต.ค. 2569 · คนกรอกลิงก์ของใบที่ปิดไปเป็นเดือน)
+   * ใบปิด = ไม่อยู่ในใบขอที่ยังเปิดของกล่องงาน (โหลดไม่ขึ้น = ไม่เดา) · server เช็กกับ ERP อีกชั้นก่อนย้ายใบ
+   */
+  const openJobIds = useMemo(
+    () => (jobs && jobs.length > 0 ? new Set(jobs.filter((j) => j.status !== 'closed').map((j) => j.id)) : null),
+    [jobs],
+  );
   const aiUnbound = useMemo(
-    () => rows.filter((r) => (aiConfirmIds ?? []).includes(r.id) && !r.job_id?.trim()),
-    [aiConfirmIds, rows],
+    () =>
+      rows.filter(
+        (r) =>
+          (aiConfirmIds ?? []).includes(r.id) && (!r.job_id?.trim() || (openJobIds !== null && !openJobIds.has(r.job_id.trim()))),
+      ),
+    [aiConfirmIds, rows, openJobIds],
   );
   const bindGroups = useMemo(() => {
     if (aiUnbound.length === 0) return [];
@@ -1424,8 +1436,8 @@ const RmWorkspace: React.FC<{
             <div className="space-y-1.5" data-testid="ai-bind-job">
               <p className="text-sm font-medium text-foreground">
                 {aiUnbound.length === aiConfirmNames.length
-                  ? 'ยังไม่มีใบขอ เลือกใบขอ หรือให้ AI ทักทายถามก่อน'
-                  : `${aiUnbound.length} คนยังไม่มีใบขอ เลือกใบขอ หรือให้ AI ทักทายถามก่อน`}
+                  ? 'ยังไม่มีใบขอหรือใบขอปิดแล้ว เลือกใบขอ หรือให้ AI ทักทายถามก่อน'
+                  : `${aiUnbound.length} คนยังไม่มีใบขอหรือใบขอปิดแล้ว เลือกใบขอ หรือให้ AI ทักทายถามก่อน`}
               </p>
               <SearchableSelect
                 value={bindJobId}

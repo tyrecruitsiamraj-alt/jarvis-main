@@ -29,6 +29,8 @@ export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'mo
    * เดิม AI จึงพูดว่า "งานนี้ทำที่ หน่วยงานของเรา" (เจอในบทที่ส่งจริง 5 ต.ค. 2569)
    */
   unitName?: string | null;
+  /** false = ใบขอไม่อยู่ในชุดใบเปิด (ปิดแล้ว/ไม่เจอ) — ตัวส่งเช็กว่าปิดจริงไหมแล้วบอกเหตุให้ถูก (19 ต.ค. 2569) */
+  found?: boolean;
   /** ชื่อตำแหน่งสั้นแบบหน้าประกาศ (`publicJobTitle` เช่น "พนักงานขับรถ ผู้บริหาร") — แทนหัวข้อประกาศยาว ๆ (6 ต.ค. 2569) */
   positionTitle?: string | null;
   /** อ่านใบขอได้จริงไหม — false = ล้ม/เกินเวลา (แยกจาก "ใบไม่มีรายได้" · ตัวส่งใช้ตัดสินว่าไม่ส่งเพราะอะไร) */
@@ -78,7 +80,7 @@ async function loadFacts(jobId: string): Promise<ApplyJobFacts> {
   const out: ApplyJobFacts = { loaded: true };
   const items = (await listSiamrajUnitRequests({ limit: 500, mode: 'all' })) as unknown as Array<Record<string, unknown>>;
   const found = items.find((j) => String(j.id ?? '') === jobId);
-  if (!found) return out;
+  if (!found) return { ...out, found: false };
   // สำเนาเป็นของกลาง — แนบค่าที่ทีมตั้งลงสำเนาของเราเอง ห้ามแตะ object ในแคช
   const job = { ...found };
   await attachNotes([job]);

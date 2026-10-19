@@ -6,6 +6,7 @@
  * PATCH → `{ aiPaused: boolean }` พัก/เปิด AI ของงานส่งคนแทน (เจ้าของสั่ง 6 ต.ค. 2569 ค่ำ "อย่าพึ่งส่งให้ Ai โทร")  (supervisor+)
  *         พัก = เปลี่ยนสาย AI ที่ยังไม่ถึงเวลาเป็นคนโทร + ยกเลิกแผนที่ Lumos ทันที (worker บังคับซ้ำทุก 5 นาที)
  * PATCH → `{ confirmTime, leadMinutes }` เวลาโทร (7 ต.ค. 2569)                                              (supervisor+)
+ * PATCH → `{ action: 'all_ai' | 'cancel_past' }` ปุ่มสลับเป็น AI (เว้น WL) · ยกเลิกสายที่เลยเวลา (19 ต.ค. 2569)          (supervisor+)
  * PATCH → `{ aiPhones, aiPhonesWorkYmd }` รายชื่อให้ AI โทร (18 ต.ค. 2569 ช่องบนจอแทนการตั้งในฐานตรง ๆ)            (supervisor+)
  *         บันทึกแล้วตั้งธง `aiPhonesApplyPending` → ตัวดึงทุก 5 นาทีสลับสายที่ยังไม่ถึงเวลาให้ครั้งเดียว
  *
@@ -14,8 +15,11 @@
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { readJsonBody } from '../_lib/body.js';
 import { auditFromAuthed } from '../_lib/audit.js';
+import { logError } from '../_lib/logger.js';
 import { irecruitUnavailableReason } from '../_lib/irecruitSqlServer.js';
 import {
+  cancelPastReplaceCalls,
+  convertReplaceManualToAi,
   enforceReplaceAiPaused,
   getReplaceSyncSettings,
   isReplaceSyncRunning,
@@ -73,6 +77,24 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (method === 'PATCH') {
       const raw = await readJsonBody(req);
       const body = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+      /**
+       * ปุ่มบนแท็บส่งคนแทน (เจ้าของ 19 ต.ค. 2569) — `action: 'all_ai'` สลับสายคนโทรที่ยังไม่ถึงเวลาเป็น AI (เว้น WL) ·
+       * `action: 'cancel_past'` ยกเลิกสายที่เลยเวลาและไม่มีผล (เว้น AI ที่โทรจริง)
+       */
+      if (body.action === 'all_ai') {
+        // ส่งแผนหลายร้อยสายใช้เวลาหลายนาที ⇒ ทำเบื้องหลัง ตอบทันที (จอโหลดรายการใหม่ดูผล)
+        void convertReplaceManualToAi()
+          .then((out) =>
+            auditFromAuthed(req, { action: 'irecruit_replace_sync.all_ai', entityType: 'irecruit_replace_sync', entityId: 'default', after: out }),
+          )
+          .catch((e) => logError('irecruit-replace-sync: สลับเป็น AI ล้ม', e));
+        return res.status(202).json({ allAi: { started: true }, ...(await statusPayload()) });
+      }
+      if (body.action === 'cancel_past') {
+        const out = await cancelPastReplaceCalls({ id: req.user.sub || null, name: req.user.email || null });
+        await auditFromAuthed(req, { action: 'irecruit_replace_sync.cancel_past', entityType: 'irecruit_replace_sync', entityId: 'default', after: out });
+        return res.status(200).json({ cancelPast: out, ...(await statusPayload()) });
+      }
       const hasPause = typeof body.aiPaused === 'boolean';
       /** เวลาโทร (7 ต.ค. 2569 เจ้าของ "ต้องปรับผ่าน ui") — `confirmTime` "HH:MM" · `leadMinutes` [สาย 2, สาย 3] นาที */
       const hasTiming = body.confirmTime !== undefined || body.leadMinutes !== undefined;

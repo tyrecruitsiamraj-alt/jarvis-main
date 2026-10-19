@@ -559,6 +559,7 @@ const RmTable: React.FC<{
                     {tab === 'appointments' ? <div className="mb-1 flex justify-end sm:hidden">{attendanceButtons(r, true)}</div> : null}
                     <div className="flex items-center justify-end gap-0.5 max-sm:gap-1">
                       {actions.map((a) => {
+                        const silentAi = aiQueueStatusOf(r)?.kind === 'silent';
                         const Icon = (tab === 'contact' ? CONTACT_ACTION_ICON[a] : undefined) ?? ACTION_ICON[a];
                         let label: string = rmRowActionLabel(tab, a);
                         let disabled = false;
@@ -586,10 +587,14 @@ const RmTable: React.FC<{
                           } else if (held || r.claimed) {
                             disabled = true;
                             label = 'มีคนเก็บไปโทรอยู่ · AI จะไม่โทรทับ';
+                          } else if (silentAi) {
+                            label = 'ส่ง AI ใหม่';
                           }
                         }
                         // แท็บนัดหมาย: ปุ่มเปิดบันทึกผลมีคำ (QA 18 ต.ค. 2569 — กฎปุ่มต้องมีคำ)
-                        const worded = tab === 'appointments' && a === 'rule';
+                        // ส่ง AI ใหม่ (19 ต.ค. 2569) — สายเดิมเงียบเกิน 24 ชม. ปุ่มมีคำให้เห็นชัด
+                        const resend = a === 'ai' && silentAi && !disabled;
+                        const worded = (tab === 'appointments' && a === 'rule') || resend;
                         // ปุ่มกลมไม่มีกรอบ สีเทา แบบ iRecruit (rm-action-btn) — ใช้ Button ของ shadcn
                         return (
                           <Button
@@ -609,7 +614,7 @@ const RmTable: React.FC<{
                             }
                           >
                             <Icon aria-hidden />
-                            {worded ? 'บันทึกผล' : null}
+                            {worded ? (resend ? 'ส่ง AI ใหม่' : 'บันทึกผล') : null}
                           </Button>
                         );
                       })}

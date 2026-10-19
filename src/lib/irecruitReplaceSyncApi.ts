@@ -68,3 +68,16 @@ export async function setReplaceAiPhones(input: { aiPhones: ReplaceAiPhone[]; ai
   if (!r.ok) throw new Error(await readError(r));
   return (await r.json()) as ReplaceSyncStatus;
 }
+
+/** ปุ่มบนแท็บส่งคนแทน (19 ต.ค. 2569) — สลับสายคนโทรที่ยังไม่ถึงเวลาเป็น AI (เว้น WL) · ทำเบื้องหลัง */
+export async function startReplaceAllAi(): Promise<void> {
+  const r = await apiFetch('/api/irecruit-replace-sync', { method: 'PATCH', body: JSON.stringify({ action: 'all_ai' }) });
+  if (!r.ok) throw new Error(await readError(r));
+}
+
+/** ปุ่มบนแท็บส่งคนแทน (19 ต.ค. 2569) — ยกเลิกสายที่เลยเวลาและไม่มีผล (เว้น AI ที่โทรจริง) */
+export async function cancelPastReplaceCalls(): Promise<{ cancelled: number }> {
+  const r = await apiFetch('/api/irecruit-replace-sync', { method: 'PATCH', body: JSON.stringify({ action: 'cancel_past' }) });
+  if (!r.ok) throw new Error(await readError(r));
+  return ((await r.json()) as { cancelPast: { cancelled: number } }).cancelPast;
+}

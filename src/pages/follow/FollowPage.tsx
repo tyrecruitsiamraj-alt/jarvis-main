@@ -127,6 +127,7 @@ import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
 import DateTimeField24 from '@/components/shared/DateTimeField24';
 import ReplaceTimingDialog from '@/components/follow/ReplaceTimingDialog';
+import ReplaceBulkActions from '@/components/follow/ReplaceBulkActions';
 import ReplaceAiPhonesDialog, { buildReplaceNameOfPhone, type ReplaceAiPhonesState } from '@/components/follow/ReplaceAiPhonesDialog';
 import ReplaceStartFields, {
   REPLACE_SLOT_MODES_MANUAL,
@@ -2099,6 +2100,8 @@ const FollowPage: React.FC = () => {
                 </AlertDialog>
                 {/* เวลาโทร 16:00 / ก่อน 1 ชม. / ก่อน 15 นาที ตั้งผ่านจอ (เจ้าของ 7 ต.ค. 2569) */}
                 {replaceAiOn !== null ? <ReplaceTimingDialog timing={replaceTiming} onSaved={setReplaceTiming} /> : null}
+                {/* สลับเป็น AI (เว้น WL) · ยกเลิกสายเลยเวลา (เจ้าของ 19 ต.ค. 2569) */}
+                {replaceAiOn !== null ? <ReplaceBulkActions items={items} onDone={() => void reload(true)} /> : null}
                 {/* รายชื่อให้ AI โทร — บันทึกแล้วตัวดึงทุก 5 นาทีสลับสายให้ (เจ้าของเลือกทำ 18 ต.ค. 2569) */}
                 {replaceAiOn !== null ? (
                   <ReplaceAiPhonesDialog

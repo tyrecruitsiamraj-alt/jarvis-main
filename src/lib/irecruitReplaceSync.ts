@@ -678,3 +678,41 @@ export function replaceModeForType(replaceType: string | null | undefined, byDat
   if (byDate === 'manual') return 'manual';
   return (replaceType ?? '').trim().toUpperCase() === 'WL' ? 'manual' : 'ai';
 }
+
+/**
+ * ═══ นับสายของสองปุ่มบนแท็บส่งคนแทน (เจ้าของ 19 ต.ค. 2569) — นิยามเดียวกับฝั่งเซิร์ฟเวอร์ ═══
+ * (`cancelPastReplaceCalls` · `convertReplaceManualToAi` ใน `api/_lib/irecruitReplaceSync.ts`)
+ */
+type ReplaceBulkRow = {
+  follow_team?: string | null;
+  source_ref?: string | null;
+  cancelled?: boolean;
+  completed_at?: string | null;
+  staff_call_outcome?: string | null;
+  call_outcome?: string | null;
+  call_mode?: string | null;
+  replace_type?: string | null;
+  time_tbd?: boolean | null;
+  scheduled_at?: string | null;
+};
+const REPLACE_AI_RESULT_GRACE_MS = 3 * 3_600_000;
+const openReplaceRow = (e: ReplaceBulkRow) =>
+  e.follow_team === 'replacement' && !e.cancelled && !e.completed_at && !e.staff_call_outcome;
+
+/** เลยเวลาแล้วและไม่มีผล — สาย AI เว้น 3 ชม. ล่าสุด (ผลกลับช้าได้) */
+export function isReplacePastCancelable(e: ReplaceBulkRow, now: Date = new Date()): boolean {
+  if (!openReplaceRow(e) || e.call_outcome) return false;
+  const at = Date.parse(e.scheduled_at ?? '');
+  if (!Number.isFinite(at)) return false;
+  const manual = (e.call_mode ?? 'ai') === 'manual';
+  return manual ? at < now.getTime() : at < now.getTime() - REPLACE_AI_RESULT_GRACE_MS;
+}
+
+/** ยังเป็นคนโทร · ยังไม่ถึงเวลา · ดึงจาก iRecruit · ไม่ใช่ WL · ไม่ใช่ "ยังไม่ชัวร์เวลา" */
+export function isReplaceAllAiCandidate(e: ReplaceBulkRow, now: Date = new Date()): boolean {
+  if (!openReplaceRow(e) || e.call_mode !== 'manual' || e.time_tbd) return false;
+  if (!(e.source_ref ?? '').startsWith('irecruit-replace:')) return false;
+  if ((e.replace_type ?? '').trim().toUpperCase() === 'WL') return false;
+  const at = Date.parse(e.scheduled_at ?? '');
+  return Number.isFinite(at) && at > now.getTime() + 2 * 60_000;
+}

@@ -118,9 +118,12 @@ vi.mock('../../api/_lib/audit.js', () => ({ auditFromAuthed: vi.fn(async () => u
 vi.mock('../../api/_lib/applicationScope.js', () => ({ isApplicationInWriteScope: vi.fn(async () => true) }));
 vi.mock('../../api/_lib/candidateCallHolds.js', () => ({ acquireCallHold: vi.fn(), releaseApplicationCallHolds: vi.fn() }));
 vi.mock('../../api/_lib/lumosDispatch.js', () => ({
+  REQUEST_CLOSED_REASON: 'ใบขอปิดแล้ว',
   enqueueLumosInterviewForApplications: (...a: unknown[]) => enqueueJob(...a),
   enqueueLumosGreetingForApplications: (...a: unknown[]) => enqueueGreet(...a),
 }));
+// ใบขอปิดแล้ว (19 ต.ค. 2569) — เทสต์นี้ใบเปิดทุกใบ
+vi.mock('../../api/_lib/requestClosedForApply.js', () => ({ isRequestClosedForApply: vi.fn(async () => false) }));
 vi.mock('../../api/_lib/siamrajUnitRequests.js', () => ({
   loadScopedJobIdSet: async () => null,
   getSiamrajUnitRequestById: async () => null,

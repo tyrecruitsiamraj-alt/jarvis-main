@@ -93,7 +93,8 @@ export function aiQueueStatusOf(r: AiQueueInput, now: number = Date.now()): AiQu
       return {
         kind: 'silent',
         label: done > 0 ? calledText(done, r.last_call_prev_outcome) : 'ส่ง AI แล้วไม่มีผล',
-        sub: done > 0 ? `รอบที่ ${attempts} ไม่มีผลเกิน 24 ชม. ให้เจ้าหน้าที่โทร` : 'เกิน 24 ชม. ให้เจ้าหน้าที่โทร',
+        // 19 ต.ค. 2569 — กติกา "ส่ง AI แล้วต้อง AI" ⇒ ไม่บอกให้คนโทร · กดส่ง AI ใหม่บนแถวได้ (รอบใหม่ที่ Lumos)
+        sub: done > 0 ? `รอบที่ ${attempts} ไม่มีผลเกิน 24 ชม. กดส่ง AI ใหม่ได้` : 'เกิน 24 ชม. กดส่ง AI ใหม่ได้',
         tone: 'danger',
         atRisk: true,
       };

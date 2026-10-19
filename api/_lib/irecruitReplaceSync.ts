@@ -1006,3 +1006,78 @@ export async function applyReplaceAiPhonesToPending(
   });
 }
 
+
+/**
+ * ═══ ปุ่ม "สลับเป็น AI (เว้น WL)" บนแท็บส่งคนแทน (เจ้าของ 19 ต.ค. 2569 Choice "สลับเป็น AI ทั้งหมด เว้น WL") ═══
+ * สายที่ระบบดึงจาก iRecruit ที่ยังเป็นคนโทร (ส่วนใหญ่ถูกเปลี่ยนตอนพัก AI) และยังไม่ถึงเวลา → AI + ส่งแผนให้ Lumos
+ * เว้น: WL (กติกา 8 ต.ค. "แค่ WL ที่คนโทร") · สายที่เจ้าหน้าที่ลงผลแล้ว · ยังไม่ชัวร์เวลา · ใกล้เวลาโทรเกิน 2 นาที
+ * 🔴 คนกดเท่านั้น (ไม่มีรอบอัตโนมัติ) · ไม่มีคีย์ push / ปิดส่งอัตโนมัติ = ไม่แตะอะไร (ห้ามสลับเป็น AI ทั้งที่ส่งไม่ได้)
+ */
+export async function convertReplaceManualToAi(
+  now: Date = new Date(),
+): Promise<{ converted: number; pushed: boolean; skipped?: string }> {
+  return withSessionLock(REPLACE_SYNC_LOCK_KEY, async () => {
+    if (!getLumosPushConfig() || !(await isAutoDispatchEnabled('follow_entry'))) {
+      return { converted: 0, pushed: false, skipped: 'ส่ง AI ไม่ได้ตอนนี้ — ลองใหม่ภายหลัง' };
+    }
+    const { rows } = await dbQuery<{ id: string }>(
+      `update ${followTable} set call_mode = 'ai', updated_at = now()
+        where follow_team = $1 and coalesce(source_ref, '') like 'irecruit-replace:%'
+          and cancelled_at is null and completed_at is null and staff_call_outcome is null
+          and call_mode = 'manual' and coalesce(time_tbd, false) = false
+          and upper(coalesce(replace_type, '')) <> 'WL'
+          and scheduled_at > $2
+        returning id::text as id`,
+      [FOLLOW_TEAM_REPLACEMENT, new Date(now.getTime() + LOCK_AHEAD_MS).toISOString()],
+    );
+    let pushed = true;
+    if (rows.length > 0) {
+      const res = await replanFollowSetWithLumos({
+        memberIds: rows.map((r) => r.id),
+        cancelledIds: [],
+        resolveStaffName: staffNameOfPhone,
+      });
+      pushed = res.plans > 0 && res.pushedPlans === res.plans;
+      if (!pushed) logWarn('irecruit.replaceSync.allAi: ส่งแผนไม่ครบ — ตัวส่งซ้ำจะลองให้', { reason: res.reason });
+    }
+    logInfo('irecruit.replaceSync.allAi.done', { converted: rows.length, pushed });
+    return { converted: rows.length, pushed };
+  });
+}
+
+/**
+ * ═══ ปุ่ม "ยกเลิกสายที่เลยเวลา" บนแท็บส่งคนแทน (เจ้าของ 19 ต.ค. 2569 "อะไรที่ผ่านมาแล้วใส่เป็นยกเลิกให้หมดเว้น ai ที่โทรจริง"
+ * → Choice "ยกเลิก 2,186 สายที่ไม่มีผล") ═══
+ * สายที่เลยเวลาแล้ว · ยังไม่ปิด · ไม่มีผลจาก AI และเจ้าหน้าที่ยังไม่ลงผล ⇒ ยกเลิก (ฐาน + คิวฝั่งเรา) · สาย AI เว้น 3 ชม. ล่าสุด
+ * 🔴 ไม่ยิงยกเลิกไป Lumos — สายเลยเวลาแล้ว และการลบแผนที่จบแล้วที่ Lumos ลากแผนอื่นของเบอร์เดียวกันหายด้วย (9 ต.ค. 2569)
+ */
+export async function cancelPastReplaceCalls(
+  actor: { id: string | null; name: string | null },
+  now: Date = new Date(),
+): Promise<{ cancelled: number }> {
+  const { rows } = await dbQuery<{ id: string }>(
+    `update ${followTable} f
+        set cancelled_at = now(), updated_at = now(), updated_by = $3::uuid, updated_by_name = $4
+      where f.follow_team = $1 and f.cancelled_at is null and f.completed_at is null
+        and f.staff_call_outcome is null
+        -- สาย AI ผลกลับช้าได้ถึง ~2 ชม. (วัดจริง 134 นาที) ⇒ เว้นสาย AI 3 ชม. ล่าสุดไว้ ไม่งั้นผลจริงมาถึงแถวที่ยกเลิกไปแล้ว
+        and ((coalesce(f.call_mode, 'ai') = 'manual' and f.scheduled_at < $2)
+             or f.scheduled_at < $2::timestamptz - interval '3 hours')
+        and not exists (
+          select 1 from ${queueTable} q
+           where q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref = 'follow-' || f.id::text
+             and coalesce(q.last_outcome, q.result->>'outcome') is not null)
+      returning f.id::text as id`,
+    [FOLLOW_TEAM_REPLACEMENT, now.toISOString(), actor.id, actor.name],
+  );
+  if (rows.length > 0) {
+    await dbQuery(
+      `update ${queueTable} set status = 'cancelled', updated_at = now()
+        where channel = 'reminder' and job_ref = 'follow' and status in ('pending', 'delivered')
+          and person_ref = any($1::text[])`,
+      [rows.map((r) => `follow-${r.id}`)],
+    );
+  }
+  logInfo('irecruit.replaceSync.cancelPast.done', { cancelled: rows.length });
+  return { cancelled: rows.length };
+}

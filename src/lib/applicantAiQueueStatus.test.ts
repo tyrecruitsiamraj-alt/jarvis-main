@@ -91,7 +91,7 @@ describe('aiQueueStatusOf', () => {
         },
         NOW,
       ),
-    ).toMatchObject({ kind: 'silent', label: 'AI โทรแล้ว 1 ครั้ง ไม่รับสาย', sub: 'รอบที่ 2 ไม่มีผลเกิน 24 ชม. ให้เจ้าหน้าที่โทร' });
+    ).toMatchObject({ kind: 'silent', label: 'AI โทรแล้ว 1 ครั้ง ไม่รับสาย', sub: 'รอบที่ 2 ไม่มีผลเกิน 24 ชม. กดส่ง AI ใหม่ได้' });
   });
 
   it('Lumos ไม่รับสาย (failed/discarded) ⇒ แดง มาก่อนทุกแบบ', () => {

@@ -46,12 +46,14 @@ import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { isApplicationInWriteScope } from '../_lib/applicationScope.js';
 import { acquireCallHold, releaseApplicationCallHolds } from '../_lib/candidateCallHolds.js';
-import { enqueueLumosGreetingForApplications, enqueueLumosInterviewForApplications } from '../_lib/lumosDispatch.js';
+import { enqueueLumosGreetingForApplications, enqueueLumosInterviewForApplications, REQUEST_CLOSED_REASON } from '../_lib/lumosDispatch.js';
+import { isRequestClosedForApply } from '../_lib/requestClosedForApply.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { logError } from '../_lib/logger.js';
 import { getSiamrajUnitRequestById, loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 
 const tbl = tableInAppSchema('public_job_applications');
+const queueTbl = tableInAppSchema('lumos_dispatch_queue');
 
 /** เพดานต่อครั้ง — ปุ่ม "ทั้งหมด" ในแท็บไม่สนใจกดทีเดียวได้หลายสิบคน แต่ไม่ควรเป็นพัน */
 const MAX_IDS = 200;
@@ -199,15 +201,45 @@ async function chooseRelease(req: AuthedReq, rows: Row[]): Promise<CallChoiceRes
   return { choice: 'release', done, skipped };
 }
 
+/** แถวคิวที่ส่งถึง Lumos แล้วเงียบ → ตั้งโทรซ้ำตอนนี้ (ตัวส่งซ้ำทุกนาทีหยิบไปยิงเป็นรอบใหม่) · คืน id ใบสมัครที่ตั้งได้ */
+async function resendSilentAiCalls(appIds: string[]): Promise<Set<string>> {
+  if (appIds.length === 0) return new Set();
+  const { rows } = await dbQuery<{ app_id: string }>(
+    `update ${queueTbl}
+        set followup_state = 'retry_scheduled', next_attempt_at = now(), push_error = null, updated_at = now()
+      where channel = 'interview'
+        and person_ref = any($1::text[])
+        and push_state = 'push_gave_up' and followup_state = 'needs_human'
+        and status = 'pending' and result is null
+      returning substring(person_ref from 5) as app_id`,
+    [appIds.map((id) => `app-${id}`)],
+  );
+  return new Set(rows.map((r) => r.app_id));
+}
+
 /** ส่ง AI = ปั๊มก่อนแล้วเข้าคิวผ่านคอขวดเดิม (ด่านกันซ้ำ/กันเบอร์ที่คนถือทำงานครบ) */
-async function chooseAi(req: AuthedReq, rows: Row[], greeting = false): Promise<CallChoiceResult> {
+async function chooseAi(
+  req: AuthedReq,
+  rows: Row[],
+  greeting = false,
+  /** ใบขอที่ปิดแล้ว (19 ต.ค. 2569) — ใบสมัครของใบพวกนี้นับเหมือนยังไม่ผูกใบขอ (ทักทาย/เลือกใบใหม่) */
+  closedJobIds: ReadonlySet<string> = new Set(),
+): Promise<CallChoiceResult> {
   const skipped: CallChoiceResult['skipped'] = [];
   const byJob = new Map<string, Row[]>();
   const greet: Row[] = [];
   for (const r of rows) {
-    if (!r.job_id?.trim()) {
+    if (!r.job_id?.trim() || closedJobIds.has(r.job_id.trim())) {
       if (greeting && r.phone?.trim()) greet.push(r);
-      else skipped.push({ name: r.full_name, reason: r.phone?.trim() ? 'ใบไม่ผูกใบขอ — ส่งเข้าคิวโทรไม่ได้' : 'ไม่มีเบอร์โทร' });
+      else
+        skipped.push({
+          name: r.full_name,
+          reason: !r.phone?.trim()
+            ? 'ไม่มีเบอร์โทร'
+            : r.job_id?.trim()
+              ? REQUEST_CLOSED_REASON
+              : 'ใบไม่ผูกใบขอ — ส่งเข้าคิวโทรไม่ได้',
+        });
       continue;
     }
     if (!r.phone?.trim()) {
@@ -225,6 +257,20 @@ async function chooseAi(req: AuthedReq, rows: Row[], greeting = false): Promise<
   }
 
   let done = 0;
+  /**
+   * ส่ง AI ใหม่ (เจ้าของ 19 ต.ค. 2569 · Choice "ปุ่ม ส่ง AI ใหม่ + ส่งหลักฐานให้ Lumos") — สายเดิมส่งถึง Lumos แล้วเงียบเกิน 24 ชม.
+   * (`push_gave_up` + `needs_human`) ⇒ ตั้งเป็นโทรซ้ำ "ตอนนี้" ให้ตัวส่งซ้ำยิงเป็นงานรอบใหม่ที่ Lumos (รหัสรอบใหม่ ไม่ชนงานเดิม)
+   * 🔴 คนกดเองเท่านั้น — ไม่มีการส่งซ้ำอัตโนมัติ (กติกา 9 ต.ค. "ส่ง AI แล้วต้อง AI · ไม่แก้ชุ่ย")
+   */
+  const silentIds = await resendSilentAiCalls([...byJob.values()].flat().map((a) => a.id));
+  if (silentIds.size > 0) {
+    done += silentIds.size;
+    for (const [jobId, apps] of byJob) {
+      const rest = apps.filter((a) => !silentIds.has(a.id));
+      if (rest.length > 0) byJob.set(jobId, rest);
+      else byJob.delete(jobId);
+    }
+  }
   for (const [jobId, apps] of byJob) {
     // ปั๊มก่อนส่ง — ล้มกลางทางแล้วใบยังออกจากกองรอ ดีกว่ารอบถัดไปยิงซ้ำคนเดิม
     await stampChoice(apps.map((a) => a.id), 'ai', req.user.email || null);
@@ -293,9 +339,21 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return sendError(res, 403, 'Forbidden', 'ใบสมัครที่เลือกอยู่นอกแผนกของคุณ');
     }
 
-    // ผูกใบขอให้ใบที่ยังไม่ผูก (ส่ง AI เท่านั้น) — DB ตัดสินด้วย `job_id is null` (ใบที่ผูกแล้วไม่ถูกย้าย)
+    /**
+     * ใบขอปิดแล้ว (19 ต.ค. 2569 · Choice "ปิดลิงก์ + AI โทรบททักทาย" + เสนองานใกล้เคียง) — ใบสมัครของใบที่ปิด
+     * นับเหมือนยังไม่ผูก: เลือกใบขอที่ยังเปิด (ย้ายใบให้) หรือให้ AI ทักทายถามก่อน · อ่านไม่ได้ = ถือว่ายังเปิด (ไม่ย้าย)
+     */
+    const closedJobIds = new Set<string>();
+    if (choice === 'ai') {
+      for (const jobId of new Set(allowed.map((r) => r.job_id?.trim()).filter((j): j is string => Boolean(j)))) {
+        if (await isRequestClosedForApply(jobId)) closedJobIds.add(jobId);
+      }
+    }
+    const needsJob = (r: Row) => !r.job_id?.trim() || closedJobIds.has(r.job_id.trim());
+
+    // ผูกใบขอให้ใบที่ยังไม่ผูก/ใบขอปิดแล้ว (ส่ง AI เท่านั้น) — DB ตัดสินด้วย job_id เดิม (ใบที่ผูกใบเปิดอยู่ไม่ถูกย้าย)
     const bindJobId = choice === 'ai' && typeof raw?.job_id === 'string' ? raw.job_id.trim().slice(0, 120) : '';
-    if (bindJobId && allowed.some((r) => !r.job_id?.trim())) {
+    if (bindJobId && allowed.some(needsJob)) {
       const scopedJobIds = await loadScopedJobIdSet(req.user);
       if (scopedJobIds && !scopedJobIds.has(bindJobId)) {
         return sendError(res, 403, 'Forbidden', 'ใบขอนี้อยู่นอกแผนกของคุณ');
@@ -308,9 +366,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const { rows: bound } = await dbQuery<{ id: string }>(
         `update ${tbl}
             set job_id = $2, job_title = $3, unit_name = $4, updated_at = now()
-          where id = any($1::uuid[]) and job_id is null
+          where id = any($1::uuid[]) and (job_id is null or job_id = any($5::text[]))
           returning id`,
-        [allowed.filter((r) => !r.job_id?.trim()).map((r) => r.id), bindJobId, jobTitle, unitName],
+        [allowed.filter(needsJob).map((r) => r.id), bindJobId, jobTitle, unitName, [...closedJobIds]],
       );
       const boundIds = new Set(bound.map((b) => b.id));
       for (const r of allowed) {
@@ -332,7 +390,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         ? await chooseManual(req, allowed)
         : choice === 'release'
           ? await chooseRelease(req, allowed)
-          : await chooseAi(req, allowed, choice === 'ai' && raw?.greeting === true && !bindJobId);
+          : await chooseAi(req, allowed, choice === 'ai' && raw?.greeting === true && !bindJobId, closedJobIds);
     result.skipped = [...skippedScope, ...result.skipped];
 
     void auditFromAuthed(req, {

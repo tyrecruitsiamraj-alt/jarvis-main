@@ -1,6 +1,7 @@
 import { dbQuery, dbTransaction } from '../../_lib/postgres.js';
 import { referralSourceOfChannel } from '../../../src/lib/referralChannel.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
+import { isRequestClosedForApply, REQUEST_CLOSED_APPLY_MESSAGE } from '../../_lib/requestClosedForApply.js';
 import { readJsonBody } from '../../_lib/body.js';
 import { tableInAppSchema } from '../../_lib/schema.js';
 import { rateLimitOrReject } from '../../_lib/rateLimit.js';
@@ -56,6 +57,8 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     const consented = (raw as Record<string, unknown> | null)?.pdpa_consent === true;
     if (!parsed.ok) return sendError(res, 400, 'Bad request', parsed.message);
     const v = parsed.value;
+    // ใบขอปิดแล้ว = ไม่รับใบ (หน้าเว็บขึ้น "ปิดรับสมัครแล้ว" อยู่แล้ว · ฝั่งนี้กันคนที่เปิดหน้าค้างไว้/ยิงตรง)
+    if (await isRequestClosedForApply(v.jobId)) return sendError(res, 409, 'Conflict', REQUEST_CLOSED_APPLY_MESSAGE);
 
     /**
      * 🔴 ลิงก์ที่ Gen มีช่องทาง = บันทึกช่องทางตามลิงก์เสมอ (เจ้าของ 6 ต.ค. 2569 "Link ที่ Gen ต้อง Lock ช่องทางด้วยสิ่")

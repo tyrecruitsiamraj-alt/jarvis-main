@@ -4,6 +4,7 @@ import { getPostingByLinkCode } from '../../_lib/recruitPostings.js';
 import { logWarn } from '../../_lib/logger.js';
 import { isSignedInViewer } from '../../_lib/auth.js';
 import { getLinkedPublicJob } from './jobs.js';
+import { isRequestClosedForApply } from '../../_lib/requestClosedForApply.js';
 
 function getQuery(req: ApiReq, key: string): string {
   const v = (req as { query?: Record<string, unknown> }).query?.[key];
@@ -31,12 +32,14 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     if (!found) return sendError(res, 404, 'Not found', 'ลิงก์นี้ใช้ไม่ได้แล้ว');
 
     const { posting, link } = found;
+    // ใบขอใน ERP ปิดแล้ว = ปิดรับ แม้ประกาศยังไม่ได้กดปิด (19 ต.ค. 2569 · คนกรอกใบขอที่ปิดไปเป็นเดือน)
+    const status = posting.status !== 'closed' && (await isRequestClosedForApply(posting.jobId)) ? 'closed' : posting.status;
     /**
      * ใบงานแบบการ์ดหน้า /apply (6 ต.ค. 2569 · เจ้าของ "มันต้องเห็นแบบหน้า apply สิ่") — ช่องสาธารณะชุดเดียวกับหน้ารวม
      * โหลดไม่ขึ้น/ไม่ผ่านด่าน = null ⇒ หน้าใช้การ์ดประกาศเดิม · ห้ามทำให้ลิงก์ล่ม (คนจริงกำลังจะสมัคร)
      */
     let job: Awaited<ReturnType<typeof getLinkedPublicJob>> | null = null;
-    if (posting.jobId && posting.status !== 'closed') {
+    if (posting.jobId && status !== 'closed') {
       try {
         job = await getLinkedPublicJob(posting.jobId);
       } catch (e) {
@@ -54,7 +57,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       salaryText: posting.salaryText,
       contactName: posting.contactName,
       contactPhone: posting.contactPhone,
-      status: posting.status,
+      status,
       channelLabel: link.channelLabel,
     });
   } catch (e) {

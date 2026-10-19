@@ -48,7 +48,7 @@ describe('สถานะจอ + มือถือ + ปุ่ม', () => {
     expect(read('src/components/jobs/JobBoardView.tsx')).toContain('const t = window.setTimeout(run, 400);');
   });
   it('ปุ่มบันทึกผล/รีเฟรชมีคำ · ของฉัน/ทุกคน ตัวที่เลือกทึบ', () => {
-    expect(read('src/components/recruit-rm/RmTable.tsx')).toContain("const worded = tab === 'appointments' && a === 'rule';");
+    expect(read('src/components/recruit-rm/RmTable.tsx')).toContain("const worded = (tab === 'appointments' && a === 'rule') || resend;");
     expect(read('src/components/jobs/JobBoardView.tsx')).toContain('<RefreshCw aria-hidden /> รีเฟรช');
     expect(read('src/components/ui/toggle.tsx')).toContain('data-[state=on]:bg-primary');
   });

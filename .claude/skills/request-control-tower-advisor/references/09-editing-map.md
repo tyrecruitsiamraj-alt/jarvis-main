@@ -13631,3 +13631,14 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ถอดแท็บตั้งค่า "ทีมสรรหา / คัดสรร / OPL / Online" (`JobStaffRosterTab.tsx` ลบแล้ว · `settingsNav.ts`)
   และกล่อง "จัดการรายชื่อ (Admin)" ใน `RosterBackedStaffSelect.tsx`
 - ⚠️ เส้น `/api/job-staff` ยังคืน `recruiters/screeners/...` ของตารางเก่า (ไม่มีจอไหนใช้แล้ว) + `directory` ที่ใช้จริง
+
+## ส่งคนแทน: ปุ่มสลับเป็น AI · ยกเลิกสายเลยเวลา + ใบขอปิด + ส่ง AI ใหม่ (19 ต.ค. 2569)
+
+- แท็บส่งคนแทน: `src/components/follow/ReplaceBulkActions.tsx` (นับด้วย `isReplaceAllAiCandidate` / `isReplacePastCancelable`
+  ใน `src/lib/irecruitReplaceSync.ts`) → `PATCH /api/irecruit-replace-sync { action: 'all_ai' | 'cancel_past' }`
+  → `convertReplaceManualToAi` (เบื้องหลัง · เว้น WL · ส่งแผน Lumos) / `cancelPastReplaceCalls` (ไม่ยิง Lumos · เว้น AI มีผล + AI 3 ชม. ล่าสุด)
+- รายชื่อ AI โทร (`applyReplaceAiPhonesToPending`) สลับสายที่เจ้าหน้าที่แก้เองด้วยแล้ว
+- ใบขอปิด = ลิงก์สมัครปิดรับ: `api/_lib/requestClosedForApply.ts` (`apply-link` / `apply`) · ตัวส่ง AI เหตุ `REQUEST_CLOSED_REASON`
+  · ป๊อปส่ง AI นับใบขอปิดเหมือนยังไม่ผูก (เลือกใบขอใหม่/ทักทาย) — `application-call-choice.ts` ย้ายใบให้เมื่อใบเดิมปิดจริง
+- ส่ง AI ใหม่: แถวเงียบ (`push_gave_up` + `needs_human`) กด "ส่ง AI โทร" = ตั้งโทรซ้ำตอนนี้ (`resendSilentAiCalls`) ตัวส่งซ้ำยิงรอบใหม่
+- เทสต์ `tests/api/replaceBulkClosedResend2569-10-19.test.ts`
