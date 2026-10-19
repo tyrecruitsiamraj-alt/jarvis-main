@@ -141,6 +141,7 @@ const AppNavDrawer: React.FC<Props> = ({
     <Sheet open={open} onOpenChange={(o) => (o ? undefined : onClose())}>
       <SheetContent
         side="left"
+        surface="frosted" /* แผงเมนูกระจก (เจ้าของ 19 ต.ค. 2569 "เนี่ยเอาเนี่ยเป็น Glass") */
         className="flex w-[17rem] max-w-[85vw] flex-col gap-0 p-0 sm:max-w-[17rem]"
       >
         <SheetHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b border-white/60 px-4 py-3 text-left dark:border-slate-700/70">

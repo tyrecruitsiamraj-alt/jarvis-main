@@ -76,6 +76,12 @@ const sheetVariants = cva(
         solid: "bg-background",
         glass:
           "border-foreground/10 bg-gradient-to-b from-card/95 to-card/85 shadow-2xl shadow-foreground/10 dark:from-card/90 dark:to-card/80 dark:shadow-background/50",
+        /**
+         * กระจกฝ้าโปร่งกว่า `glass` — แผงเมนูหลัก (เจ้าของ 19 ต.ค. 2569 ชี้ลิ้นชักเมนู: *"เนี่ยเอาเนี่ยเป็น Glass"*)
+         * ตัวแผงไม่เบลอเอง: ม่านข้างหลัง (`SHEET_OVERLAY_GLASS`) เบลอหน้าให้แล้ว แผงโปร่งจึงเห็นหน้าเบลอทะลุมา
+         */
+        frosted:
+          "border-foreground/10 bg-gradient-to-b from-card/85 to-card/65 shadow-2xl shadow-foreground/15 ring-1 ring-inset ring-card/50 dark:from-card/80 dark:to-card/60 dark:shadow-background/60 dark:ring-foreground/5",
       },
     },
     defaultVariants: {
@@ -94,7 +100,7 @@ interface SheetContentProps
 const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Content>, SheetContentProps>(
   ({ side = "right", surface = "solid", className, children, ...props }, ref) => (
     <SheetPortal>
-      <SheetOverlay className={surface === "glass" ? SHEET_OVERLAY_GLASS : undefined} />
+      <SheetOverlay className={surface === "glass" || surface === "frosted" ? SHEET_OVERLAY_GLASS : undefined} />
       <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side, surface }), className)} {...props}>
         {children}
         <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">

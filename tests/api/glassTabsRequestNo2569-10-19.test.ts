@@ -29,3 +29,12 @@ describe('ui/tabs: variant glass', () => {
     expect(src).not.toMatch(/#[0-9a-fA-F]{3,6}\b/);
   });
 });
+
+describe('แผงเมนูหลักเป็นกระจก (เจ้าของ 19 ต.ค. 2569 "เนี่ยเอาเนี่ยเป็น Glass")', () => {
+  it('ui/sheet มี surface frosted (ม่านเบลอให้ ตัวแผงไม่เบลอเอง) · ลิ้นชักเมนูใช้', () => {
+    const sheet = read('src/components/ui/sheet.tsx');
+    expect(sheet).toContain('frosted:');
+    expect(sheet).toContain('surface === "glass" || surface === "frosted" ? SHEET_OVERLAY_GLASS');
+    expect(read('src/components/layout/AppNavDrawer.tsx')).toContain('surface="frosted"');
+  });
+});
