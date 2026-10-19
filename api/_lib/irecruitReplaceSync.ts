@@ -68,6 +68,7 @@ import {
 } from '../../src/lib/irecruitReplaceSync.js';
 
 const followTable = tableInAppSchema('follow_entries');
+const REPLACE_QUEUE_TABLE = tableInAppSchema('lumos_dispatch_queue');
 const settingsTable = tableInAppSchema('app_irecruit_replace_sync');
 
 /** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 133 (`source_ref`) */
@@ -1064,7 +1065,7 @@ export async function cancelPastReplaceCalls(
         and ((coalesce(f.call_mode, 'ai') = 'manual' and f.scheduled_at < $2)
              or f.scheduled_at < $2::timestamptz - interval '3 hours')
         and not exists (
-          select 1 from ${queueTable} q
+          select 1 from ${REPLACE_QUEUE_TABLE} q
            where q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref = 'follow-' || f.id::text
              and coalesce(q.last_outcome, q.result->>'outcome') is not null)
       returning f.id::text as id`,
@@ -1072,7 +1073,7 @@ export async function cancelPastReplaceCalls(
   );
   if (rows.length > 0) {
     await dbQuery(
-      `update ${queueTable} set status = 'cancelled', updated_at = now()
+      `update ${REPLACE_QUEUE_TABLE} set status = 'cancelled', updated_at = now()
         where channel = 'reminder' and job_ref = 'follow' and status in ('pending', 'delivered')
           and person_ref = any($1::text[])`,
       [rows.map((r) => `follow-${r.id}`)],
