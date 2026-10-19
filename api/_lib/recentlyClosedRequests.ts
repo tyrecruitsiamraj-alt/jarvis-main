@@ -5,12 +5,12 @@
  * ⇒ OPL6909079 Stop ตอน 18:43 แต่ยังโชว์ต่ออีกพักหนึ่ง
  * แก้: ทุกครั้งที่ตอบจากสำเนา ถาม ERP สั้น ๆ เฉพาะสถานะของใบในสำเนา (คีย์หลัก request_no) แล้วตัดใบที่ปิดออก
  * กติกาปิดชุดเดียวกับ `isOpenStaffingRow` ส่วนที่ไม่ต้องนับใบแจ้งเข้า: status ≠ A · is_stop ≠ N · มี stop_no · แจ้งเข้าครบ (Y)
- * ผลจำไว้ 15 วิ (หลายคนเปิดพร้อมกันไม่ยิง ERP ซ้ำ) · ถาม ERP ไม่ได้ = ไม่ตัด (ตอบสำเนาตามเดิม ไม่ทำให้จอว่าง)
+ * ผลจำไว้ 5 วิ (หลายคนเปิดพร้อมกันไม่ยิง ERP ซ้ำ) · ถาม ERP ไม่ได้ = ไม่ตัด (ตอบสำเนาตามเดิม ไม่ทำให้จอว่าง)
  */
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { logWarn } from './logger.js';
 
-const MEMO_MS = 15_000;
+const MEMO_MS = 5_000;
 const SAFE_NO = /^[A-Za-z0-9-]{3,32}$/;
 let memo: { at: number; key: string; closed: Set<string> } | null = null;
 
@@ -50,4 +50,23 @@ export async function loadClosedRequestNos(requestNos: readonly string[]): Promi
     logWarn('recentlyClosedRequests.failed', { message: e instanceof Error ? e.message : String(e) });
     return new Set();
   }
+}
+
+/* ─────────── ตัวบอกหน้าที่จำผลไว้เอง (หน้าทีม Online · หน้าหลักแบบเดิม) ว่ามีใบเพิ่งปิด ─────────── */
+
+/** ใบที่เปิดอยู่ชุดล่าสุดที่ระบบเห็น — จดตอนตอบรายการใบขอ (`dropClosedFromCache`) */
+let knownOpen: string[] = [];
+export function rememberOpenRequestNos(nos: readonly string[]): void {
+  if (nos.length > 0) knownOpen = [...new Set(nos.map((n) => n.trim()).filter(Boolean))];
+}
+
+/**
+ * ลายนิ้วมือของ "ใบที่ปิดไปแล้วในชุดที่เปิดอยู่" — หน้าที่จำผลไว้เก็บค่านี้คู่กับผล
+ * ค่าเปลี่ยน = มีใบเพิ่งปิด ⇒ ทิ้งผลที่จำไว้แล้วคำนวณใหม่ (เจ้าของ 19 ต.ค. 2569 "แก้หน้าหลักกับทีม Online ให้หายทันทีด้วย")
+ * ยังไม่เคยเห็นรายการ / ถาม ERP ไม่ได้ = '' (ไม่บังคับคำนวณใหม่)
+ */
+export async function closedRequestStamp(): Promise<string> {
+  if (knownOpen.length === 0) return '';
+  const closed = await loadClosedRequestNos(knownOpen);
+  return [...closed].sort().join(',');
 }

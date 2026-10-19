@@ -13678,5 +13678,5 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 
 - `api/_lib/recentlyClosedRequests.ts` — ถาม ERP สถานะหัวใบขอของใบในสำเนา (request_no IN …) ~0.1 วิ · จำผล 15 วิ · ถามไม่ได้ = ไม่ตัด
 - `dropClosedFromCache` ใน `api/_lib/siamrajUnitRequests.ts` ใช้สองชั้น: ท้าย `listSiamrajUnitRequests` และ `readUnitRequestListThroughCache` (หน้าใบขอ)
-- ⚠️ สำเนาของหน้าอื่น (team-online 60 วิ · home-overview 30 วิ) ยังหน่วงได้ตามอายุของมันเอง
+- หน้าทีม Online (`team-online.ts`) + หน้าหลักแบบเดิม (`home-overview.ts`) เก็บ `closedRequestStamp()` คู่กับผลที่จำไว้ — ค่าเปลี่ยน = มีใบเพิ่งปิด ⇒ คำนวณใหม่ทันที (ผล ERP จำ 5 วิ)
 - เทสต์ `tests/api/closedRequestInstant2569-10-19.test.ts`

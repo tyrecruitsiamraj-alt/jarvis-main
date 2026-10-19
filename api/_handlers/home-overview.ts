@@ -42,6 +42,7 @@ import {
   type HomeTodayFunnel,
 } from '../../src/lib/homeOverview.js';
 import type { JobRequest } from '@/types';
+import { closedRequestStamp } from '../_lib/recentlyClosedRequests.js';
 
 const APPS = tableInAppSchema('public_job_applications');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
@@ -49,7 +50,8 @@ const CONTACTS = tableInAppSchema('application_contact_logs');
 const FOLLOW = tableInAppSchema('follow_entries');
 
 const CACHE_MS = 30_000;
-const cache = new Map<string, { at: number; body: HomeOverview }>();
+/** `stamp` = ใบที่ปิดแล้วตอนคำนวณ — เปลี่ยน = มีใบเพิ่งปิด ⇒ คำนวณใหม่ทันที (19 ต.ค. 2569 "ถ้าปิดก็คือปิด") */
+const cache = new Map<string, { at: number; body: HomeOverview; stamp: string }>();
 
 const addDaysYmd = (ymd: string, days: number): string =>
   new Date(Date.parse(`${ymd}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
@@ -169,7 +171,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const bu = scope.mode === 'code' ? forcedBu : parseBuParam(req.query?.bu);
     const cacheKey = JSON.stringify([scope, bu]);
     const hit = cache.get(cacheKey);
-    if (hit && Date.now() - hit.at < CACHE_MS) return res.status(200).json(hit.body);
+    const stamp = await closedRequestStamp();
+    if (hit && Date.now() - hit.at < CACHE_MS && hit.stamp === stamp) return res.status(200).json(hit.body);
 
     const base: HomeOverview = {
       generated_at: new Date().toISOString(),
@@ -208,7 +211,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       body.errors.today = 'อ่านตัวเลขวันนี้ไม่ได้';
       logWarn('home-overview: ก้อนวันนี้อ่านไม่ได้', { reason: todayR.e instanceof Error ? todayR.e.message : String(todayR.e) });
     }
-    cache.set(cacheKey, { at: Date.now(), body });
+    cache.set(cacheKey, { at: Date.now(), body, stamp: await closedRequestStamp() });
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json(body);
   } catch (e) {

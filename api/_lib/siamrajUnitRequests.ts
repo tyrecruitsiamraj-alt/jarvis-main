@@ -1,5 +1,5 @@
 import { readThroughCache, type CacheOutcome } from './unitRequestCache.js';
-import { loadClosedRequestNos } from './recentlyClosedRequests.js';
+import { loadClosedRequestNos, rememberOpenRequestNos } from './recentlyClosedRequests.js';
 import { attachLeadRules } from './siamrajUnitNotes.js';
 import { dbQuery } from './postgres.js';
 import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
@@ -278,10 +278,11 @@ export async function listSiamrajUnitRequests(options: {
 export async function dropClosedFromCache<T>(outcome: CacheOutcome<T>): Promise<T> {
   const list = outcome.value as unknown;
   if (!Array.isArray(list) || list.length === 0) return outcome.value;
-  if (outcome.source === 'live' && Date.now() - outcome.fetchedAt < 5_000) return outcome.value;
   const nos = (list as Array<{ is_prequest?: unknown; request_no?: unknown }>)
     .filter((j) => !j.is_prequest && typeof j.request_no === 'string')
     .map((j) => String(j.request_no));
+  rememberOpenRequestNos(nos);
+  if (outcome.source === 'live' && Date.now() - outcome.fetchedAt < 5_000) return outcome.value;
   const closed = await loadClosedRequestNos(nos);
   if (closed.size === 0) return outcome.value;
   return (list as Array<{ is_prequest?: unknown; request_no?: unknown }>).filter(

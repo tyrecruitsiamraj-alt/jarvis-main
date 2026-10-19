@@ -22,4 +22,12 @@ describe('ธงปิดในหัวใบขอ', () => {
       '.then(async (outcome) => ({ ...outcome, value: await dropClosedFromCache(outcome) }));',
     );
   });
+  it('หน้าทีม Online + หน้าหลักแบบเดิม: ผลที่จำไว้ทิ้งทันทีเมื่อมีใบเพิ่งปิด', () => {
+    for (const f of ['api/_handlers/team-online.ts', 'api/_handlers/home-overview.ts']) {
+      const src = readFileSync(f, 'utf8');
+      expect(src, f).toContain('hit.stamp === stamp');
+      expect(src, f).toContain("import { closedRequestStamp } from '../_lib/recentlyClosedRequests.js';");
+    }
+    expect(readFileSync('api/_lib/siamrajUnitRequests.ts', 'utf8')).toContain('rememberOpenRequestNos(nos);');
+  });
 });

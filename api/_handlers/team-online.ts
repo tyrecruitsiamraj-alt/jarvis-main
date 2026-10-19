@@ -74,6 +74,7 @@ import {
   type TeamWindow,
 } from '../../src/lib/teamOnline.js';
 import type { JobRequest } from '@/types';
+import { closedRequestStamp } from '../_lib/recentlyClosedRequests.js';
 
 const USERS = tableInAppSchema('users');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
@@ -86,7 +87,8 @@ const MAP = tableInAppSchema('job_site_map');
 const AUDIT = tableInAppSchema('audit_logs');
 
 const CACHE_MS = 60_000;
-const cache = new Map<string, { at: number; body: TeamOnlineResponse }>();
+/** `stamp` = ใบที่ปิดแล้วตอนคำนวณ — เปลี่ยน = มีใบเพิ่งปิด ⇒ คำนวณใหม่ทันที (19 ต.ค. 2569 "ถ้าปิดก็คือปิด") */
+const cache = new Map<string, { at: number; body: TeamOnlineResponse; stamp: string }>();
 
 /** ร่องรอยการใช้งาน / บัญชี / เข้าระบบล่าสุด — ย้ายไป `api/_lib/userActivitySql.ts` (ตัวเดียวกับหน้าหลัก) · ส่งต่อชื่อเดิมไว้ */
 export { ACTIVITY_SOURCES, accountsSql, lastLoginSql };
@@ -747,11 +749,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const bu = scope.mode === 'code' ? normalizeTrendBu(scope.code) : parseBuParam(q.bu);
     const cacheKey = JSON.stringify([scope, query, bu, req.user.role]);
     const hit = cache.get(cacheKey);
-    if (hit && Date.now() - hit.at < CACHE_MS) return res.status(200).json(hit.body);
+    const stamp = await closedRequestStamp();
+    if (hit && Date.now() - hit.at < CACHE_MS && hit.stamp === stamp) return res.status(200).json(hit.body);
 
     const canSeePeople = req.user.role === 'admin' || req.user.role === 'supervisor';
     const body = await buildTeamOnline(query, scope, bu, new Date(), canSeePeople);
-    cache.set(cacheKey, { at: Date.now(), body });
+    cache.set(cacheKey, { at: Date.now(), body, stamp: await closedRequestStamp() });
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json(body);
   } catch (e) {
