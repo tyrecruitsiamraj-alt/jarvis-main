@@ -89,3 +89,15 @@ describe('ป๊อปผู้สมัคร: รายชื่อผู้�
     expect(src).not.toContain('roster?.recruiters');
   });
 });
+
+describe('ภาพรวมงานสรรหา: ถอดปุ่ม วิธีอ่าน (เจ้าของ 19 ต.ค. 2569 "เอาออก")', () => {
+  it('ไม่มีปุ่ม/ป๊อปวิธีอ่าน', () => {
+    const src = read('src/components/dashboard-trends/RecruitOverview.tsx');
+    expect(src).not.toContain('function HowToRead');
+    expect(src).not.toContain('<HowToRead />');
+  });
+  it('หน้าหลัก งานสรรหา: ใบไม่ผูก BU ใช้คำว่า รอดำเนินการ', () => {
+    expect(read('src/components/home-ai-share/TopicReportCard.tsx')).toContain("block === 'applicants' ? NO_BU_LABEL : 'ไม่ระบุ BU'");
+    expect(read('src/lib/homeTopicReport.ts')).toContain("export const NO_BU_LABEL = 'รอดำเนินการ'");
+  });
+});

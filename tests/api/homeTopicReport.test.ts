@@ -115,6 +115,14 @@ describe('homeTopicReport', () => {
     expect(r.extra.map((x) => x.title)).toEqual(['ส่งต่อให้คน']);
     const hand = Object.fromEntries(r.extra[0].items.map((i) => [i.key, i.value]));
     expect(hand).toMatchObject({ handoff: 1, staffResult: 1 });
+    // 19 ต.ค. 2569 เจ้าของ "ตัวเลขขัดแย้งกันมาก" — ใช้คำเดียวกับตาราง · สนใจ (AI) แยก BU · คนลงผลแยกคนโทร/ทั้งสองทาง
+    expect(r.extra[0].items.find((i) => i.key === 'handoff')?.label).toBe('ทั้งสองทาง');
+    const staffRes = r.extra[0].items.find((i) => i.key === 'staffResult');
+    expect(staffRes?.parts?.reduce((n, p) => n + p.value, 0)).toBe(staffRes?.value);
+    const aiYes = r.funnel.find((f) => f.key === 'aiInterested');
+    expect(aiYes?.parts?.map((p) => p.key)).toEqual(['LBA', 'LBD']);
+    expect(aiYes?.parts?.reduce((n, p) => n + p.value, 0)).toBe(aiYes?.value);
+    expect(r.funnel.find((f) => f.key === 'staffFollowed')?.label).toBe('คนโทรต่อ (ที่สนใจกับ AI)');
   });
 
   it('🔴 สนใจ = บันได AI → คน · ทุกขั้นเป็นส่วนของขั้นก่อน · ผลหลังคนโทรใช้ฝั่งคนที่ใหม่สุด (12 ต.ค. 2569)', () => {

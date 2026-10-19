@@ -738,7 +738,7 @@ describe('หน้าหลักอ่านไล่บนลงล่าง 
     expect(rcells('report-row-LBD-ai')).toEqual(['AI โทร', '184', '104', '80']);
     expect(rcells('report-row-LBD-staff')).toEqual(['คนโทร', '0', '0', '0']);
     expect(rcells('report-row-LBD-total')).toEqual(['รวม LBD', '196', '104', '92']);
-    expect(within(rep).getByTestId('report-sum').textContent).toBe('LBD 196 + LBA 4 + ไม่ระบุ 4 = 204 รายชื่อ');
+    expect(within(rep).getByTestId('report-sum').textContent).toBe('LBD 196 + LBA 4 + รอดำเนินการ 4 = 204 รายชื่อ');
     expect(screen.getByTestId('report-extra-ส่งต่อให้คน').textContent).toContain('3');
     expect(screen.queryByTestId('report-extra-ใบที่ยังรอ')).toBeNull();
     pickTopic(/จับคู่งาน/);

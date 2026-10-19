@@ -15,7 +15,7 @@ import { toneOfBu } from '@/components/team-online/teamOnlineTones';
 import { TONE } from '@/lib/designTokens';
 import { homeQueryKey, type AiShareWindow } from '@/lib/homeAiShare';
 import { fetchTopicReport } from '@/lib/homeAiShareApi';
-import { REPORT_SEGS, reportBuBlocks, type TopicReport, type TopicReportBlock, type TopicReportResponse } from '@/lib/homeTopicReport';
+import { NO_BU_LABEL, REPORT_SEGS, reportBuBlocks, type TopicReport, type TopicReportBlock, type TopicReportResponse } from '@/lib/homeTopicReport';
 import { trendBuLabel } from '@/lib/trends/bu';
 import { cn } from '@/lib/utils';
 import { friendlyErrorText } from '@/lib/friendlyError';
@@ -78,6 +78,8 @@ const TopicReportCard: React.FC<{ report: TopicReport | null; failed: string | n
   unit,
 }) => {
   const blocks = report ? reportBuBlocks(report) : [];
+  // งานสรรหา: ใบไม่ผูก BU = ใบจาก iRecruit ที่รอผูกใบขอ (เจ้าของ 19 ต.ค. 2569) · หัวข้ออื่นคงคำเดิม
+  const noBu = block === 'applicants' ? NO_BU_LABEL : 'ไม่ระบุ BU';
   const total = report?.funnel.find((f) => f.key === 'total')?.value ?? 0;
   const sumOfBlocks = blocks.reduce((n, b) => n + b.total, 0);
   const num = (n: number) => (
@@ -106,7 +108,7 @@ const TopicReportCard: React.FC<{ report: TopicReport | null; failed: string | n
                     className={cn('h-3 w-3 self-center rounded-full bg-current', TONE[b.bu ? toneOfBu(b.bu) : 'neutral'].value)}
                     aria-hidden
                   />
-                  {b.bu ?? 'ไม่ระบุ BU'}
+                  {b.bu ?? noBu}
                   <span className="text-2xl tabular-nums">{NUM.format(b.total)}</span>
                   <span className="text-sm font-normal text-muted-foreground">{unit}</span>
                 </h3>
@@ -154,7 +156,7 @@ const TopicReportCard: React.FC<{ report: TopicReport | null; failed: string | n
                       data-testid={`report-row-${b.bu ?? 'none'}-total`}
                       className="border-0 bg-muted/60 font-medium hover:bg-muted/60"
                     >
-                      <TableCell className="whitespace-nowrap text-sm text-foreground">รวม {b.bu ?? 'ไม่ระบุ BU'}</TableCell>
+                      <TableCell className="whitespace-nowrap text-sm text-foreground">รวม {b.bu ?? noBu}</TableCell>
                       <TableCell className="text-right">{num(b.total)}</TableCell>
                       {report.cols.map((c) => (
                         <TableCell key={c.key} className="text-right">
@@ -173,7 +175,7 @@ const TopicReportCard: React.FC<{ report: TopicReport | null; failed: string | n
           >
             {/* ไม่มี BU ไหนมีงาน = บอกยอดรวมตรง ๆ (QA รอบ 2 ข้อ 22 เดิม "0 = 0 รายชื่อ") */}
             {blocks.length > 0
-              ? `${blocks.map((b) => `${b.bu ?? 'ไม่ระบุ'} ${NUM.format(b.total)}`).join(' + ')} = ${NUM.format(sumOfBlocks)} ${unit}`
+              ? `${blocks.map((b) => `${b.bu ?? noBu} ${NUM.format(b.total)}`).join(' + ')} = ${NUM.format(sumOfBlocks)} ${unit}`
               : `รวม 0 ${unit}`}
             {sumOfBlocks === total ? '' : ` · ไม่ตรงกับ ${NUM.format(total)}`}
           </p>

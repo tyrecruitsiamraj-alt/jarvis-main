@@ -228,7 +228,8 @@ export const INTEREST_JOURNEY_STEPS: ReadonlyArray<{ key: keyof InterestJourney;
   { key: 'filled', label: 'ใบสมัครเข้ามา' },
   { key: 'aiCalled', label: 'AI โทรแล้ว' },
   { key: 'aiInterested', label: 'สนใจ (AI)' },
-  { key: 'staffFollowed', label: 'คนโทรต่อ' },
+  // 19 ต.ค. 2569 เจ้าของ "ตัวเลขขัดแย้งกัน" — ชื่อเดิมคล้าย "AI โทรแล้ว คนรับต่อ" แต่นับเฉพาะคนที่สนใจกับ AI
+  { key: 'staffFollowed', label: 'คนโทรต่อ (ที่สนใจกับ AI)' },
   { key: 'staffInterested', label: 'สนใจ (หลังคนโทร)' },
 ];
 
@@ -266,6 +267,22 @@ export function buildInterestJourney(rows: readonly ReportSourceRow[]): Interest
 export function interestJourneyAddsUp(j: InterestJourney): boolean {
   const v = INTEREST_JOURNEY_STEPS.map((s) => j[s.key]);
   return v.every((n, i) => n >= 0 && (i === 0 || n <= v[i - 1]));
+}
+
+/** ป้ายของใบที่ยังไม่ผูก BU (ใบจาก iRecruit ที่ไม่ผูกใบขอ) — เจ้าของ 19 ต.ค. 2569 "ไม่เอาคำว่าไม่ระบุ Bu เอาเป็นรอดำเนินการ" */
+export const NO_BU_LABEL = 'รอดำเนินการ';
+
+/** สนใจ (AI) แยก BU — นับแบบบันไดเดียวกัน · BU ที่มีรายชื่อขึ้นทุกตัว (0 ก็ขึ้น) · ไม่ผูก BU ขึ้นเมื่อมีเลข */
+function aiInterestedByBu(rows: readonly ReportSourceRow[]): ReportItem[] {
+  const bus = [...new Set(rows.map((r) => r.bu).filter((b): b is string => !!b))].sort();
+  const parts: ReportItem[] = bus.map((bu) => ({
+    key: bu,
+    label: bu,
+    value: buildInterestJourney(rows.filter((r) => r.bu === bu)).aiInterested,
+  }));
+  const none = buildInterestJourney(rows.filter((r) => !r.bu)).aiInterested;
+  if (none > 0) parts.push({ key: 'none', label: NO_BU_LABEL, value: none });
+  return parts;
 }
 
 /** แยก AI / คน ตามใครโทรคนแรก (ไม่มีหลักฐานโทร = คน — นัดทุกนัดคนเป็นคนลง) */
@@ -331,8 +348,12 @@ export function buildApplicantsReport(rows: readonly ReportSourceRow[], publishe
         { key: 'staff', label: 'คน', value: fastStaff, seg: 'staff' },
       ]),
       // "สนใจ" = บันได AI → คน (12 ต.ค. 2569 · `buildInterestJourney` ตัวเดียวกับแท็บทีม Online) แทนผลล่าสุดแยกใครโทรก่อน
+      // สนใจ (AI) แยก BU ให้บวกเห็นกับตารางราย BU (เจ้าของ 19 ต.ค. 2569 "ตัวเลขขัดแย้งกันมาก ไม่เท่ากัน")
       ...INTEREST_JOURNEY_STEPS.filter((s) => s.key === 'aiInterested' || s.key === 'staffFollowed' || s.key === 'staffInterested').map(
-        (s): ReportItem => ({ key: s.key, label: s.label, value: journey[s.key] }),
+        (s): ReportItem =>
+          s.key === 'aiInterested'
+            ? step(s.key, s.label, aiInterestedByBu(rows))
+            : { key: s.key, label: s.label, value: journey[s.key] },
       ),
       step(
         'appointment',
@@ -351,8 +372,12 @@ export function buildApplicantsReport(rows: readonly ReportSourceRow[], publishe
       {
         title: 'ส่งต่อให้คน',
         items: [
-          { key: 'handoff', label: 'AI โทรแล้ว คนรับต่อ', value: count(rows, (r) => r.ai && r.staff) },
-          { key: 'staffResult', label: 'คนลงผลแล้ว', value: count(rows, (r) => r.staff && staffResult(r)) },
+          // คำเดียวกับชิปในตารางราย BU (19 ต.ค. 2569) · คนลงผลแล้ว = คนโทร + ทั้งสองทาง
+          { key: 'handoff', label: 'ทั้งสองทาง', value: count(rows, (r) => r.ai && r.staff), seg: 'both' },
+          step('staffResult', 'คนลงผลแล้ว', [
+            { key: 'staff', label: 'คนโทร', value: count(rows, (r) => segOf(r) === 'staff' && staffResult(r)), seg: 'staff' },
+            { key: 'both', label: 'ทั้งสองทาง', value: count(rows, (r) => segOf(r) === 'both' && staffResult(r)), seg: 'both' },
+          ]),
           { key: 'noShow', label: 'ไม่มา', value: count(rows, (r) => r.attendance === 'no_show'), tone: 'danger' },
         ],
       },
@@ -447,7 +472,7 @@ export function buildMatchingReport(rows: readonly ReportSourceRow[], f: Matchin
       {
         title: 'ส่งต่อให้คน',
         items: [
-          { key: 'handoff', label: 'AI โทรแล้ว คนรับต่อ', value: count(rows, (r) => r.ai && r.staff) },
+          { key: 'handoff', label: 'ทั้งสองทาง', value: count(rows, (r) => r.ai && r.staff), seg: 'both' },
           { key: 'staffResult', label: 'คนลงผลแล้ว', value: count(rows, (r) => r.staff) },
         ],
       },

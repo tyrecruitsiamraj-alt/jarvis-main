@@ -8,7 +8,6 @@ import {
   ClipboardList,
   FileCheck,
   Filter,
-  Info,
   Link2,
   Megaphone,
   PhoneCall,
@@ -21,7 +20,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import { cn } from '@/lib/utils';
@@ -73,53 +71,11 @@ import JourneyNamesDialog from './JourneyNamesDialog';
  * > จะนับเป็นวันต้องครบ 24 ชม นะถึงจะนับเป็น 1 วัน"*
  *
  * วางตามภาพ iRecruit: การ์ด 6 ใบ · เส้นทาง (ของเราคือเส้นทางของรายชื่อ) + งานค้างตอนนี้ · รายวัน · ช่องทาง + ตำแหน่ง ·
- * เหตุผลที่ไม่สำเร็จ · ผลงานรายคน · "วิธีอ่าน" ย้ายไปอยู่หลังปุ่ม (ไม่มีประโยคอธิบายบนหน้า)
+ * เหตุผลที่ไม่สำเร็จ · ผลงานรายคน · ปุ่ม "วิธีอ่าน" ถอดแล้ว (เจ้าของ 19 ต.ค. 2569 "เอาออก")
  * 🔴 ตัวเลขทุกตัวมาจาก `src/lib/recruitOverview.ts` (มีเทสต์) · แผงเดิม (`BoardDashboard`) ยังเปิดได้ที่ `?dash=classic` (ทางถอย)
  */
 
 type Load = { data: RecruitOverviewResponse | null; loading: boolean; error: string | null };
-
-function HowToRead() {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button type="button" size="xs" variant="outline">
-          <Info aria-hidden /> วิธีอ่าน
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 space-y-3 p-4 text-xs">
-        <ul className={cn('list-disc space-y-1.5 pl-4', DASH.muted)}>
-          <li>ตัวเลขเป็นของรายชื่อที่กรอกเข้ามาในเดือนที่เลือก ว่าตอนนี้ไปถึงขั้นไหนแล้ว</li>
-          <li>เส้นทางของรายชื่อ: แต่ละขั้นแตกจากขั้นก่อน เลขย่อยรวมกันเท่าเลขของขั้น · % เทียบกับเลขของขั้นนั้น</li>
-          <li>ยกเว้น "ใบที่ประกาศ" กับ "งานค้างตอนนี้" เป็นสถานะวันนี้ (ใบที่ประกาศ = เลขเดียวกับหน้างานสรรหา) · "ผลงานรายคน" นับงานที่ลงผลในเดือน</li>
-          <li>เขียวเพิ่ม แดงลด เทียบเดือนก่อนช่วงวันเดียวกัน</li>
-          <li>นับวันแบบครบ 24 ชม. ถึงเป็น 1 วัน</li>
-        </ul>
-        <dl className="space-y-1.5">
-          {[
-            ['โทรแล้ว', 'AI หรือเจ้าหน้าที่โทรแล้วมีผล'],
-            ['ติดต่อสำเร็จ', 'ผลล่าสุดคุยถึงตัว รวมคนที่ปฏิเสธ'],
-            ['ตอบ AI ว่าสนใจ', 'คำตอบล่าสุดที่ให้ AI (ตัวเดียวกับคอลัมน์คำตอบกับ AI)'],
-            ['คนโทรต่อแล้ว', 'ตอบ AI ว่าสนใจ แล้วเจ้าหน้าที่โทรหรือบันทึกผลหลังจากนั้น'],
-            ['ได้ใบสมัคร', 'ชื่อขึ้นบอร์ด ERP แล้ว (จับคู่ด้วยเบอร์)'],
-            // เส้นทางของรายชื่อ 6 ขั้น (18 ต.ค. 2569) — กดเลขในเส้นทางเพื่อดูรายชื่อ
-            ['ข้อมูลผิด', 'เบอร์ใช้กับระบบโทรไม่ได้'],
-            ['มาจาก iRecruit', 'ใบที่ดึงมาจาก iRecruit — AI ไม่โทรเอง เจ้าหน้าที่เลือกส่งเอง'],
-            ['ยังไม่ส่ง AI', 'เบอร์ใช้ได้ แต่ยังไม่เข้าคิว AI (เช่น เก็บไปโทรเอง)'],
-            ['พิจารณา', 'ตอบ AI ว่าขอคิดดูก่อน'],
-            ['นัดได้ไหม', 'จากบันทึกผลติดต่อของเจ้าหน้าที่ · นัดไม่ได้ = บันทึกพร้อมเหตุผล'],
-            ['มาไหม · ผ่านไหม', 'กดที่แท็บติดตามนัดหมาย (มา / ไม่มา แล้วจึง ผ่าน / ไม่ผ่าน)'],
-          ].map(([k, v]) => (
-            <div key={k}>
-              <dt className="font-medium text-foreground">{k}</dt>
-              <dd className={DASH.muted}>{v}</dd>
-            </div>
-          ))}
-        </dl>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 const RecruitOverview: React.FC<{
   /**
@@ -274,7 +230,6 @@ const RecruitOverview: React.FC<{
           <Button type="button" size="xs" variant="outline" onClick={() => setRev((n) => n + 1)}>
             <RefreshCw className={cn(state.loading && 'animate-spin')} aria-hidden /> โหลดใหม่
           </Button>
-          <HowToRead />
         </div>
       </div>
 
@@ -360,7 +315,7 @@ const RecruitOverview: React.FC<{
         />
       </div>
 
-      {/* ─── เส้นทางของรายชื่อ + งานค้างตอนนี้ ─── (คำโปรยใต้หัวถอดเกือบหมด QA 5 ต.ค. 2569 · มีปุ่ม "วิธีอ่าน" แล้ว) */}
+      {/* ─── เส้นทางของรายชื่อ + งานค้างตอนนี้ ─── (คำโปรยใต้หัวถอดเกือบหมด QA 5 ต.ค. 2569) */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <OverviewCard
           icon={Filter}
