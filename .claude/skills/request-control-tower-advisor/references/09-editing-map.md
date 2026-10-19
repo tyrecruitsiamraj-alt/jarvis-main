@@ -13642,3 +13642,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · ป๊อปส่ง AI นับใบขอปิดเหมือนยังไม่ผูก (เลือกใบขอใหม่/ทักทาย) — `application-call-choice.ts` ย้ายใบให้เมื่อใบเดิมปิดจริง
 - ส่ง AI ใหม่: แถวเงียบ (`push_gave_up` + `needs_human`) กด "ส่ง AI โทร" = ตั้งโทรซ้ำตอนนี้ (`resendSilentAiCalls`) ตัวส่งซ้ำยิงรอบใหม่
 - เทสต์ `tests/api/replaceBulkClosedResend2569-10-19.test.ts`
+
+## ภาพรวมงานสรรหา: ช่องทางที่ได้คนลงงาน (เจ้าของ 19 ต.ค. 2569)
+
+- ตัวคิด `src/lib/channelPlacement.ts` (`buildChannelPlacement` · `mainChannelOf`) · อ่านข้อมูล `api/_lib/channelPlacementSql.ts` (แคช 10 นาที)
+  แหล่ง: iRecruit `recruit_register` + ช่องทาง/กลุ่มย่อย RM · ใบสมัครผ่านลิงก์ระบบเรา · ERP แจ้งเข้าที่ไม่ยกเลิก (จับเบอร์ 9 ตัวท้าย)
+- นับตามวันแจ้งเข้าในช่วงที่เลือก · ช่องทาง = ลงทะเบียนล่าสุดก่อนแจ้งเข้า (ย้อน 365 วัน) · ไม่เจอ = "ไม่รู้ช่องทาง" (ลงงานรวมทุกแถว = แจ้งเข้า)
+- จอ `src/components/dashboard-trends/ChannelPlacementTable.tsx` ในการ์ด "ช่องทางที่ได้คนลงงาน" ของ `RecruitOverview.tsx`
+- ⚠️ `recruit-overview.ts` เรียง settle() กับชื่อตัวแปรต้องตรงกัน — เคยสลับ ใบขอ/ช่องทาง 19 ต.ค. · เทสต์ `tests/api/channelPlacement2569-10-19.test.ts`

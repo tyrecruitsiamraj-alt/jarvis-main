@@ -18,6 +18,8 @@ vi.mock('../../api/_lib/http.js', async (orig) => ({ ...(await orig<typeof impor
 vi.mock('../../api/_lib/departmentScope.js', () => ({ loadMatchingBuScope: (...a: unknown[]) => loadMatchingBuScope(...a) }));
 vi.mock('../../api/_lib/applicationBoardLink.js', () => ({ loadBoardPhoneSet: (...a: unknown[]) => loadBoardPhoneSet(...a) }));
 vi.mock('../../api/_lib/logger.js', () => ({ logError: vi.fn(), logWarn: vi.fn() }));
+// ช่องทางที่ได้คนลงงาน (19 ต.ค. 2569) — ยอดรวมทุก BU ไม่มีข้อมูลรายใบ อ่าน iRecruit/ERP แยก · เทสต์ของมันอยู่ channelPlacement2569-10-19
+vi.mock('../../api/_lib/channelPlacementSql.js', () => ({ loadChannelPlacement: vi.fn(async () => ({ informed: 0, matched: 0, rows: [] })) }));
 
 const mod = await import('../../api/_handlers/recruit-overview.js');
 const sql = await import('../../api/_lib/applicantOverviewSql.js');

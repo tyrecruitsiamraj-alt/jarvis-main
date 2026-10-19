@@ -56,6 +56,7 @@ import {
 import { friendlyErrorText } from '@/lib/friendlyError';
 import { TrendState } from './TrendParts';
 import JourneyNamesDialog from './JourneyNamesDialog';
+import ChannelPlacementTable from './ChannelPlacementTable';
 
 /**
  * ═══ แท็บ "ภาพรวม" ของกล่องงาน = ภาพรวมงานสรรหาแบบ iRecruit (เจ้าของสั่ง 30 ก.ย. 2569) ═══
@@ -295,6 +296,14 @@ const RecruitOverview: React.FC<{
               <JourneyList steps={view.journey} onOpenPart={(title, ids) => setNames({ title, ids })} />
             ) : (
               <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>
+            )}
+          </OverviewCard>
+          {/* ช่องทางที่ได้คนลงงาน (เจ้าของ 19 ต.ค. 2569 — ทีม Online ดูว่าเด็กมาจากไหน ลงงานจากช่องทางไหนเยอะ) */}
+          <OverviewCard icon={Megaphone} title="ช่องทางที่ได้คนลงงาน" sub={`นับตามวันแจ้งเข้า · ทุก BU${weekdays.length > 0 ? ' · ไม่กรองตามวัน' : ''}`}>
+            {data.channelPlacement ? (
+              <ChannelPlacementTable data={data.channelPlacement} />
+            ) : (
+              <SectionError message={data.errors.channels ?? 'อ่านช่องทางไม่ได้'} />
             )}
           </OverviewCard>
         </div>

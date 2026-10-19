@@ -51,6 +51,7 @@ import { fullDaysSince } from '../../src/lib/fullDays.js';
 import { isOverAge } from '../../src/lib/applicantAge.js';
 import { isOutOfAreaAnswer } from '../../src/lib/outOfAreaAnswer.js';
 import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
+import { loadChannelPlacement } from '../_lib/channelPlacementSql.js';
 import type {
   RecruitAiRow,
   RecruitAppFact,
@@ -446,7 +447,7 @@ export async function buildRecruitOverview(
   const monthRange = [startOfBkk(window.from), startOfBkk(addDays(window.to, 1)), bu];
   const nowMs = now.getTime();
 
-  const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, reqR] = await Promise.all([
+  const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, chR, reqR] = await Promise.all([
     settle('รายชื่อบนบอร์ด', loadBoardPhoneSet),
     settle('ใบสมัคร', () => loadFacts(bothRange)),
     settle('งานค้าง', async () => (await dbQuery<Row>(backlogSql(), [bu])).rows),
@@ -479,6 +480,8 @@ export async function buildRecruitOverview(
       }
     }),
     // ใบขอที่เข้ามาในช่วง (เจ้าของ 19 ต.ค. 2569 ภาพรวมข้อ 1) — ฐานเดียวกับ "ใบขอเข้ามา · ประกาศแล้ว" ของหน้าหลัก
+    // ช่องทางที่ได้คนลงงาน (เจ้าของ 19 ต.ค. 2569) — นับตามวันแจ้งเข้า · ไม่กรอง BU/วันในสัปดาห์
+    settle('ช่องทางลงงาน', () => loadChannelPlacement({ from: window.from, to: window.to })),
     settle('ใบขอ', async () =>
       toRequestSummary(
         await loadOnlineRequestRows({ from: window.from, to: window.to, bu, departmentScope: scope }),
@@ -510,6 +513,11 @@ export async function buildRecruitOverview(
     body.errors.staff = body.errors.staff ?? aiR.error;
   }
 
+  if (chR.ok) body.channelPlacement = chR.value;
+  else {
+    body.channelPlacement = null;
+    body.errors.channels = chR.error;
+  }
   if (reqR.ok) body.requests = reqR.value;
   else {
     body.requests = null;

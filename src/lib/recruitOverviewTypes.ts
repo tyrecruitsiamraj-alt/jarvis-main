@@ -137,8 +137,10 @@ export type RecruitOverviewResponse = {
   ai: RecruitAiRow | null;
   /** เคยมีใครบันทึกผลมา/ไม่มาไหม — ยังไม่เคย = ขั้นมาตามนัดขึ้น "—" (ห้ามโชว์ 0 ที่แปลว่ายังไม่เคยบันทึก) */
   attendanceEverRecorded: boolean;
+  /** ช่องทางที่ได้คนลงงาน (19 ต.ค. 2569) · null = อ่านไม่ได้ (ดู errors.channels) */
+  channelPlacement?: import('@/lib/channelPlacement').ChannelPlacement | null;
   /** ใบขอที่เข้ามาในช่วง · null = อ่านไม่ได้ (ดู errors.requests) · ไม่มี = เส้นรุ่นเก่า */
   requests?: RecruitRequestSummary | null;
   /** ก้อนที่อ่านไม่ได้ + เหตุ (ก้อนล้มแยกกัน — ห้ามโชว์ 0 แทน) */
-  errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board' | 'requests', string>>;
+  errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board' | 'requests' | 'channels', string>>;
 };
