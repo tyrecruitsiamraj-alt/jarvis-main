@@ -29,9 +29,11 @@ describe('ปุ่มปฏิทิน · /value · ตัวกรองป�
   it('/value ติดลบเขียนเป็นคำ', () => {
     expect(read('src/pages/value/ValueCasePage.tsx')).toContain('ต้นทุนสูงกว่าเดิม');
   });
-  it('ใบขอ: เลือกปิดแล้ว/ทั้งหมด = ดึงใบปิด 30 วันล่าสุดมาด้วย', () => {
+  // 🔴 19 ต.ค. 2569 เจ้าของ "ใบขอที่ถูกปิดไปแล้วทำไมมันเด้งกลับมา" — "ทั้งหมด" (ค่าเริ่ม) ห้ามดึงใบปิด
+  it('ใบขอ: ดึงใบปิด 30 วันล่าสุดเฉพาะตอนเลือก "ปิดแล้ว" · ค่าเริ่ม "ทั้งหมด" ไม่ดึง', () => {
     const s = read('src/pages/jobs/JobListPage.tsx');
-    expect(s).toContain("const wantClosed = siamrajPrimary && filter !== 'active';");
+    expect(s).toContain("const wantClosed = siamrajPrimary && filter === 'closed';");
+    expect(s).not.toContain("filter !== 'active';");
     expect(s).toContain('fetchSiamrajClosedRequests(from, to)');
   });
 });

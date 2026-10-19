@@ -250,14 +250,18 @@ const JobListPage: React.FC = () => {
   const [lookupJob, setLookupJob] = useState<JobRequest | null>(null);
   const { jobs: openJobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
   /**
-   * ใบที่ปิดแล้ว 30 วันล่าสุด — โหลดเมื่อเลือก "ปิดแล้ว"/"ทั้งหมด" (เจ้าของเคาะ 18 ต.ค. 2569 "เลือกปิดแล้วก็ต้องโชว์ปิดแล้วมาสิ่")
+   * ใบที่ปิดแล้ว 30 วันล่าสุด — โหลดเมื่อเลือก "ปิดแล้ว" เท่านั้น (เจ้าของเคาะ 18 ต.ค. 2569 "เลือกปิดแล้วก็ต้องโชว์ปิดแล้วมาสิ่")
    * เดิมฟีดมีแต่ใบเปิด ⇒ ตัวกรองปิดแล้วได้ 0 ทุกครั้ง · เส้นเดียวกับที่ Dashboard ใช้ (`?closed=1`)
    */
   const [closedJobs, setClosedJobs] = useState<JobRequest[] | null>(null);
   const [closedLoading, setClosedLoading] = useState(false);
   const [closedError, setClosedError] = useState<string | null>(null);
   const [closedRev, setClosedRev] = useState(0);
-  const wantClosed = siamrajPrimary && filter !== 'active';
+  /**
+   * 🔴 ดึงใบปิดเฉพาะตอนเลือก "ปิดแล้ว" (เจ้าของ 19 ต.ค. 2569 *"ใบขอที่ถูกปิดไปแล้วทำไมมันเด้งกลับมา"*)
+   * เดิม (18 ต.ค.) ดึงทุกครั้งที่ไม่ใช่ "เปิดอยู่" ⇒ ค่าเริ่ม "ทั้งหมด" ขึ้น 445 = เปิด 344 + ใบปิด 101 ใบเด้งกลับมา
+   */
+  const wantClosed = siamrajPrimary && filter === 'closed';
   useEffect(() => {
     if (!wantClosed) return;
     let alive = true;
