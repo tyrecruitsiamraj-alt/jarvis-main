@@ -742,6 +742,12 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
           ))}
         </>
       )}
+      {/* เลขที่ใบขอ (เจ้าของ 19 ต.ค. 2569 "หาพื้นที่จากตรงนี้เอาเลขที่ใบขอมาโชว์หน่อย") — ชิดขวาแถวเดียวกับป้ายช่องที่ขาด */}
+      {job?.request_no ? (
+        <span className="ml-auto text-xs text-muted-foreground" data-testid="quick-request-no">
+          ใบขอ <span className="font-medium tabular-nums text-foreground">{job.request_no}</span>
+        </span>
+      ) : null}
     </div>
   );
 
@@ -1051,7 +1057,8 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
          * 🔴 **ห้ามเอารายชื่อไปต่อท้ายขั้นตอน** (เคยทำแบบนั้นแล้วเจ้าของตีกลับ) — สองช่องแยกกันที่กดสลับ
          */}
         <Tabs value={view} onValueChange={(v) => setView(v as 'review' | 'people')}>
-          <TabsList className="w-full">
+          {/* แถบกระจก (เจ้าของ 19 ต.ค. 2569 "อยากได้แบบ Glass Menu") */}
+          <TabsList variant="glass" className="w-full">
             <TabsTrigger value="review" className="flex-1">
               <ClipboardCheck aria-hidden /> ตรวจสอบ
             </TabsTrigger>
