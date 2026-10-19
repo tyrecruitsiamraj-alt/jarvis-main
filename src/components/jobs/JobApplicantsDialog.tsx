@@ -63,7 +63,7 @@ export type JobApplicantsDialogProps = {
  *   ไปแยกตามกล่อง สนใจ ไม่สนใจ"* — ไม่สนใจ = declined/wrong_person เท่านั้น
  *   (โทรไม่ติด/ไม่รับ ยังอยู่แค่ "ทั้งหมด" เพราะต้องตามต่อ)
  */
-type ApplicantTab = 'all' | 'interested' | 'not_interested';
+type ApplicantTab = 'all' | 'interested' | 'not_interested' | 'unknown';
 
 const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
   open,
@@ -264,9 +264,9 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
   // เปลี่ยนตามจนกดกลับไม่ได้
   // ไม่มีตัวกรองที่มาแล้ว — "รายชื่อทั้งหมด" คือทั้งหมดจริง ๆ
   const shownItems = items;
-  const { interested, notInterested } = splitInterested(shownItems);
+  const { interested, notInterested, unknown } = splitInterested(shownItems);
   const visible =
-    tab === 'interested' ? interested : tab === 'not_interested' ? notInterested : shownItems;
+    tab === 'interested' ? interested : tab === 'not_interested' ? notInterested : tab === 'unknown' ? unknown : shownItems;
 
   /** การ์ดผู้สมัคร 1 ใบ — ใช้ทั้งสองแท็บ (19 ส.ค. 2569: เลิกมุมมอง 2 คอลัมน์ของจอใหญ่) */
   const renderCard = (a: PublicApplication, inInterestedColumn: boolean) => (
@@ -550,6 +550,8 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
                 ['all', 'รายชื่อทั้งหมด', shownItems.length],
                 ['interested', 'รายชื่อที่สนใจ', interested.length],
                 ['not_interested', 'รายชื่อที่ไม่สนใจ', notInterested.length],
+                /* 19 ต.ค. 2569 เจ้าของ "ผลรวมได้ 7 อีก 3 หายไปไหน" — สามชิปหลังรวมกัน = ทั้งหมดเสมอ */
+                ['unknown', 'ยังไม่รู้ผล', unknown.length],
               ] as Array<[ApplicantTab, string, number]>
             ).map(([id, label, n]) => (
               <button
@@ -644,7 +646,9 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
                       ? 'ยังไม่มีใครตอบว่าสนใจ — เมื่อโทรแล้วได้ผล “สนใจ” ชื่อจะมาอยู่ที่นี่'
                       : tab === 'not_interested'
                         ? 'ยังไม่มีใครปฏิเสธ — คนที่ตอบ “ไม่สนใจ” ตอนโทรจะมาอยู่ที่นี่'
-                        : 'ยังไม่มีผู้สมัคร'}
+                        : tab === 'unknown'
+                          ? 'ทุกคนมีคำตอบแล้ว'
+                          : 'ยังไม่มีผู้สมัคร'}
                   </p>
                 ) : (
                   <ul className="space-y-2.5">{visible.map((a) => renderCard(a, tab === 'interested'))}</ul>

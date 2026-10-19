@@ -75,7 +75,13 @@ describe('splitInterested — แบ่งลิสต์ตามแท็บ',
   });
 
   it('ลิสต์ว่างไม่พัง', () => {
-    expect(splitInterested([])).toEqual({ all: [], interested: [], notInterested: [] });
+    expect(splitInterested([])).toEqual({ all: [], interested: [], notInterested: [], unknown: [] });
+  });
+
+  it('🔴 ยังไม่รู้ผล = ที่เหลือ · สนใจ + ไม่สนใจ + ยังไม่รู้ผล = ทั้งหมด (19 ต.ค. 2569)', () => {
+    const s = splitInterested([...items, { id: '6', last_call_outcome: 'no_answer' }, { id: '7', last_call_outcome: 'reschedule_requested' }]);
+    expect(s.unknown.map((i) => i.id)).toEqual(['3', '4', '6', '7']);
+    expect(s.interested.length + s.notInterested.length + s.unknown.length).toBe(s.all.length);
   });
 
   it('ไม่มีใครสนใจ → ได้ลิสต์ว่าง ไม่ใช่ทั้งลิสต์', () => {

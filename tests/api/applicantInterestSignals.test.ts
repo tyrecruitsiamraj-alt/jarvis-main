@@ -100,15 +100,16 @@ describe('มุมมองรายชื่อใช้กติกาเด�
     expect(isInRmListView(row({ ...base, on_board: true }), 'collect')).toBe(false);
   });
 
-  it('splitInterested: สนใจ + ไม่สนใจ ≠ ทั้งหมด (คนที่ยังไม่ถูกโทรอยู่แค่ "ทั้งหมด")', () => {
+  it('splitInterested: คนที่ยังไม่ถูกโทรอยู่ใน "ยังไม่รู้ผล" (19 ต.ค. 2569 — เดิมอยู่แค่ "ทั้งหมด")', () => {
     const items = [
       { last_call_outcome: 'confirmed', last_call_at: '2026-08-22T00:00:00Z' },
       { last_contact_ok: false, last_contact_at: '2026-08-22T00:00:00Z' },
       {},
     ];
-    const { all, interested, notInterested } = splitInterested(items);
+    const { all, interested, notInterested, unknown } = splitInterested(items);
     expect(all).toHaveLength(3);
     expect(interested).toHaveLength(1);
     expect(notInterested).toHaveLength(1);
+    expect(unknown).toHaveLength(1);
   });
 });

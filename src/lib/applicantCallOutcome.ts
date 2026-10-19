@@ -105,10 +105,17 @@ export function isNotInterestedApplicant(a: ApplicantInterestSignals): boolean {
  */
 export function splitInterested<T extends ApplicantInterestSignals>(
   items: T[],
-): { all: T[]; interested: T[]; notInterested: T[] } {
+): { all: T[]; interested: T[]; notInterested: T[]; unknown: T[] } {
+  const interested = items.filter(isInterestedApplicant);
+  const notInterested = items.filter(isNotInterestedApplicant);
   return {
     all: items,
-    interested: items.filter(isInterestedApplicant),
-    notInterested: items.filter(isNotInterestedApplicant),
+    interested,
+    notInterested,
+    /**
+     * 🔴 ยังไม่รู้ผล (เจ้าของ 19 ต.ค. 2569: *"ผลรวมได้ 7 อีก 3 หายไปไหน"* → Choice "เพิ่มชิป ยังไม่รู้ผล")
+     * ยังไม่โทร · โทรไม่ติด · ขอคิดก่อน — ทุกคนที่ไม่ใช่สนใจ/ไม่สนใจ ⇒ สนใจ + ไม่สนใจ + ยังไม่รู้ผล = ทั้งหมดเสมอ
+     */
+    unknown: items.filter((a) => !isInterestedApplicant(a) && !isNotInterestedApplicant(a)),
   };
 }
