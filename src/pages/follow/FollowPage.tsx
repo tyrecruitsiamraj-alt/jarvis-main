@@ -1,4 +1,5 @@
-import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazyPage } from '@/lib/staleChunkReload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -207,7 +208,7 @@ function composeRecipientName(prefix: string, first: string, last: string): stri
  * แท็บ Dashboard ของหน้าติดตาม (เจ้าของสั่ง 28 ก.ย. 2569 — "ขอคำว่า dashboard") · โหลดเมื่อกดเท่านั้น
  * (กราฟ + ข้อมูลย้อนหลังไม่ควรถ่วงหน้ารายการที่เปิดทั้งวันและรีเฟรชทุก 25 วิ)
  */
-const FollowDashboard = lazy(() => import('@/components/dashboard-trends/FollowDashboard'));
+const FollowDashboard = lazyPage(() => import('@/components/dashboard-trends/FollowDashboard'));
 
 const FollowPage: React.FC = () => {
   const [items, setItems] = useState<FollowEntry[]>([]);
@@ -2020,13 +2021,8 @@ const FollowPage: React.FC = () => {
   );
 
   /** แท็บขีดเส้นใต้ชุดเดียวกับหน้างานสรรหา · มือถือย่อคำ/ช่องไฟ (4 ต.ค. 2569) */
-  const followTabClass = (value: typeof followView) =>
-    cn(
-      'shrink-0 rounded-none border-b-2 bg-transparent px-2 py-2 text-xs font-medium shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:px-3 sm:text-sm',
-      followView === value
-        ? cn(TONE.primary.value, 'border-current')
-        : 'border-transparent text-muted-foreground hover:text-foreground',
-    );
+  /** แท็บกระจก (เจ้าของ 19 ต.ค. 2569 "เปลี่ยนเป็นกระจกทั้งหมด") — เดิมขีดเส้นใต้ · ไม่ใช้ค่า value แล้ว */
+  const followTabClass = (_value: typeof followView) => 'shrink-0 px-3 text-xs sm:px-4 sm:text-sm';
 
   return (
     <div className="relative">
@@ -2046,7 +2042,7 @@ const FollowPage: React.FC = () => {
             onValueChange={(v) => setFollowView(v === 'dashboard' ? 'dashboard' : v === 'replace' ? 'replace' : 'list')}
             className="order-3 min-w-0 basis-full md:order-2 md:basis-0 md:flex-1"
           >
-            <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none bg-transparent p-0">
+            <TabsList variant="glass" className="max-w-full justify-start overflow-x-auto">
               <TabsTrigger value="list" className={followTabClass('list')}>ติดตามคนเริ่มงาน</TabsTrigger>
               <TabsTrigger value="replace" className={followTabClass('replace')}>ติดตามส่งคนแทน</TabsTrigger>
               <TabsTrigger value="dashboard" className={followTabClass('dashboard')}>Dashboard</TabsTrigger>

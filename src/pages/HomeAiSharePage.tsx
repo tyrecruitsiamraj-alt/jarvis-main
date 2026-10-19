@@ -454,10 +454,10 @@ const HomeAiSharePage: React.FC = () => {
    */
   const picker = (
     <Tabs value={online ? ONLINE_TAB : meta.key} onValueChange={choose}>
-      <TabsList aria-label="เลือกหัวข้อ" className="h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+      <TabsList variant="glass" aria-label="เลือกหัวข้อ" className="h-auto flex-wrap justify-start gap-1 rounded-2xl">
         <TabsTrigger
           value={ONLINE_TAB}
-          className="h-10 rounded-full border border-foreground/10 bg-card px-5 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+          className="h-10 px-5 text-sm" /* แถบกระจก (เจ้าของ 19 ต.ค. 2569 "เปลี่ยนเป็นกระจกทั้งหมด") */
         >
           ทีม Online
         </TabsTrigger>
@@ -466,7 +466,7 @@ const HomeAiSharePage: React.FC = () => {
             key={b.key}
             value={b.key}
             title={noteOf(b.key)}
-            className="h-10 rounded-full border border-foreground/10 bg-card px-5 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+            className="h-10 px-5 text-sm" /* แถบกระจก (เจ้าของ 19 ต.ค. 2569 "เปลี่ยนเป็นกระจกทั้งหมด") */
           >
             {b.title}
           </TabsTrigger>

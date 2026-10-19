@@ -638,7 +638,7 @@ const FollowPlanningCalendar: React.FC<{
               }}
             >
               {/* จอ 375 ปุ่มรายเดือนล้นการ์ด 16px (QA 5 ต.ค. 2569) ⇒ ช่องไฟแคบลงบนจอเล็ก */}
-              <TabsList className="h-9 rounded-full bg-muted p-1">
+              <TabsList variant="glass" className="h-9">
                 <TabsTrigger value="day" className="rounded-full px-2.5 text-xs sm:px-4">
                   รายวัน · สายที่ต้องตาม
                 </TabsTrigger>

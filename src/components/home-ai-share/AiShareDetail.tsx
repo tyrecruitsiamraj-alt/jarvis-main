@@ -205,7 +205,7 @@ const AiShareDetail: React.FC<{
           </span>
         ) : null}
         <Tabs value={teamOn ? 'team' : splitBy === 'team' ? 'caller' : splitBy} onValueChange={(v) => setSplitBy(v as typeof splitBy)}>
-          <TabsList className="h-9 rounded-full bg-muted p-1" aria-label="แบ่งแท่งตาม">
+          <TabsList variant="glass" className="h-9" aria-label="แบ่งแท่งตาม">
             <TabsTrigger value="caller" className="rounded-full px-2.5 text-xs sm:px-4">
               ใครโทร
             </TabsTrigger>

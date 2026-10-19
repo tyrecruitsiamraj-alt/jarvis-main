@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { lazyPage } from '@/lib/staleChunkReload';
+import { glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
 import { trackPublicClick } from '@/lib/publicClickApi';
 import { useSearchParams } from 'react-router-dom';
 import type { JobRequest } from '@/types';
@@ -54,11 +56,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-const BoardPostingSteps = React.lazy(() =>
+const BoardPostingSteps = lazyPage(() =>
   import('@/pages/jobs/BoardPostingPage').then((m) => ({ default: m.BoardPostingSteps })),
 );
 /** ป๊อปประกาศหน้าเดียว (เจ้าของเลือก B 2 ต.ค. 2569) — ตั้งแต่ 4 ต.ค. เป็นทางถอยที่ `?popup=sheet` (ค่าเริ่ม = ป๊อป 4 หน้า) */
-const BoardPublishSheet = React.lazy(() => import('@/components/jobs/BoardPublishSheet'));
+const BoardPublishSheet = lazyPage(() => import('@/components/jobs/BoardPublishSheet'));
 
 /**
  * id ที่หน้าไล่งานต้องใช้ — 🔴 ต้องเป็นรูปเดียวกับที่ URL ของใบขอใช้
@@ -142,7 +144,7 @@ import { compareJobsByAgeDaysDesc, getJobAgeChipInfo, JOB_AGE_CHIP_META } from '
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { MapPin, Briefcase, RefreshCw, Send, Users, Link2, Pencil, Search, EyeOff, LoaderCircle } from 'lucide-react';
-const RecruitLaneDialog = React.lazy(() => import('@/components/jobs/RecruitLaneDialog'));
+const RecruitLaneDialog = lazyPage(() => import('@/components/jobs/RecruitLaneDialog'));
 import {
   isUnitRequestWorkStatus,
   UNIT_REQUEST_WORK_STATUS_LABELS,
@@ -1247,7 +1249,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    */
   const staffTabs =
     isStaff && onViewChange ? (
-      <div ref={staffTabsRef} className="flex items-center gap-1 overflow-x-auto" role="tablist" aria-label="มุมมองหน้างานสรรหา">
+      /* แถบกระจก (เจ้าของ 19 ต.ค. 2569 "เปลี่ยนเป็นกระจกทั้งหมด") — เดิมขีดเส้นใต้ */
+      <div ref={staffTabsRef} className={cn(glassTabsListClass, 'max-w-full justify-start overflow-x-auto')} role="tablist" aria-label="มุมมองหน้างานสรรหา">
         {BOARD_VIEW_TABS.map((v) => {
           const active = view === v.id;
           return (
@@ -1256,12 +1259,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               type="button"
               onClick={() => onViewChange(v.id)}
               aria-current={active ? 'page' : undefined}
-              className={cn(
-                'shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors',
-                active
-                  ? cn(TONE.primary.value, 'border-b-2 border-current')
-                  : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
-              )}
+              className={glassTabClass(active)}
             >
               {v.label}
             </button>

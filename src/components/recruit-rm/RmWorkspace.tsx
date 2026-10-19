@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -871,7 +872,9 @@ const RmWorkspace: React.FC<{
           ซ้ำกับ tab bar ระดับบอร์ดที่มีชื่อแท็บ+จำนวนอยู่แล้ว · เหลือแค่ปุ่มรีเฟรช */}
       {/* คุมจากข้างนอก (บอร์ด) = ปุ่มรีเฟรชอยู่แถวหัวหน้าแล้ว (4 ต.ค. 2569) — ไม่มีแถวนี้ */}
       {controlledTab ? null : (
-        <div className={cn('flex flex-wrap items-center gap-1 border-b', DASH.divider)}>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* แถบกระจก (เจ้าของ 19 ต.ค. 2569 "เปลี่ยนเป็นกระจกทั้งหมด") — เดิมขีดเส้นใต้ */}
+          <div className={cn(glassTabsListClass, 'h-auto flex-wrap justify-start rounded-2xl')} role="tablist">
           {RM_TABS.map((t) => {
             const active = t === tab;
             return (
@@ -880,12 +883,7 @@ const RmWorkspace: React.FC<{
                 type="button"
                 onClick={() => setTab(t)}
                 aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'relative px-4 py-2.5 text-sm font-medium transition-colors',
-                  active
-                    ? cn(TONE.primary.value, 'border-b-2 border-current')
-                    : cn(DASH.muted, 'border-b-2 border-transparent hover:text-foreground'),
-                )}
+                className={glassTabClass(active)}
               >
                 {RM_TAB_LABEL[t]}
                 <span className={cn('ml-1.5 text-xs tabular-nums', active ? '' : DASH.muted)}>
@@ -894,6 +892,7 @@ const RmWorkspace: React.FC<{
               </button>
             );
           })}
+          </div>
           <Button variant="secondary" size="sm"
             type="button"
             onClick={load}

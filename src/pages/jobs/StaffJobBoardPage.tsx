@@ -1,4 +1,5 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import { lazyPage } from '@/lib/staleChunkReload';
 import { useSearchParams } from 'react-router-dom';
 import JobBoardView, { BOARD_VIEW_TABS, type BoardViewId } from '@/components/jobs/JobBoardView';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -19,10 +20,10 @@ import type { BoardPublishedTotals } from '@/lib/boardRelease';
  * 🔴 30 ก.ย. 2569 แท็บภาพรวม = **ภาพรวมงานสรรหาแบบ iRecruit** (`RecruitOverview` · เจ้าของ Choice "ทั้งหน้าเป็น iRecruit")
  * แผงเดิม (`BoardDashboard`) เก็บไว้เป็นทางถอยที่ `?dash=classic` — ห้ามลบจนกว่าเจ้าของจะสั่ง
  */
-const BoardDashboard = lazy(() => import('@/components/dashboard-trends/BoardDashboard'));
-const RecruitOverview = lazy(() => import('@/components/dashboard-trends/RecruitOverview'));
+const BoardDashboard = lazyPage(() => import('@/components/dashboard-trends/BoardDashboard'));
+const RecruitOverview = lazyPage(() => import('@/components/dashboard-trends/RecruitOverview'));
 /** แท็บ Pre-Check (15 ต.ค. 2569 แทนแท็บภาพรวม) — หน้าเดิมแบบฝัง */
-const PreCheckPage = lazy(() => import('@/pages/matching/PreCheckPage'));
+const PreCheckPage = lazyPage(() => import('@/pages/matching/PreCheckPage'));
 
 /**
  * บอร์ดรับสมัครฝั่งเจ้าหน้าที่ — สี่มุมมองในหน้าเดียว

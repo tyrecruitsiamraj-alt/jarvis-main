@@ -102,7 +102,7 @@ describe('แท็บ Dashboard อยู่ในสองหน้า แล�
     expect(code('src/components/jobs/JobBoardView.tsx')).toContain("{ id: 'precheck', label: 'Pre-Check' }");
     expect(code('src/pages/jobs/StaffJobBoardPage.tsx')).toContain("const EXTRA_VIEWS = ['dashboard', 'precheck'] as const;");
     const page = code('src/pages/jobs/StaffJobBoardPage.tsx');
-    expect(page).toContain("lazy(() => import('@/components/dashboard-trends/BoardDashboard'))");
+    expect(page).toContain("lazyPage(() => import('@/components/dashboard-trends/BoardDashboard'))"); // 19 ต.ค. 2569 lazy → lazyPage (โหลดใหม่เองเมื่อไฟล์เก่าหาย)
     expect(code('src/components/jobs/JobBoardView.tsx')).not.toContain('dashboard-trends');
   });
   it('หน้าติดตามมีแท็บ Dashboard (?view=dashboard · กดเปลี่ยน = push) — 1 ต.ค. 2569 มีแท็บ ติดตามส่งคนแทน (?view=replace) คั่นกลาง', () => {
@@ -128,7 +128,7 @@ describe('แท็บ Dashboard อยู่ในสองหน้า แล�
   });
   it('🔴 แท็บภาพรวม = ภาพรวมงานสรรหาแบบ iRecruit (30 ก.ย. 2569) · แผงเดิมเป็นทางถอยที่ ?dash=classic (lazy ทั้งคู่)', () => {
     const page = code('src/pages/jobs/StaffJobBoardPage.tsx');
-    expect(page).toContain("lazy(() => import('@/components/dashboard-trends/RecruitOverview'))");
+    expect(page).toContain("lazyPage(() => import('@/components/dashboard-trends/RecruitOverview'))");
     expect(page).toContain("const classicDashboard = searchParams.get('dash') === 'classic';");
     expect(page).toContain('{classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview published={boardPublished} />}');
   });

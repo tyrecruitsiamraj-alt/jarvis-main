@@ -659,7 +659,7 @@ export default function ApplicantContactDialog({
 
       {/* ── แท็บรายละเอียด ── */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as DetailTab)}>
-        <TabsList className="h-auto flex-wrap justify-start gap-1">
+        <TabsList variant="glass" className="h-auto flex-wrap justify-start gap-1 rounded-2xl">
           {DETAIL_TABS.map((t) => (
             <TabsTrigger key={t.value} value={t.value} className="text-xs">
               {t.label}

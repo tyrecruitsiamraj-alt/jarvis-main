@@ -1,4 +1,5 @@
-import React, { lazy, Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
+import { lazyPage } from '@/lib/staleChunkReload';
 import { useHomeVariant } from '@/lib/homeV3';
 import { fetchCallRateSeries } from '@/lib/callFunnelApi';
 import { bangkokTodayYmd, compareCallRate } from '@/lib/lumosCallRate';
@@ -410,9 +411,9 @@ const HomePageClassic: React.FC = () => {
  * *"หน้าหลักเริ่มใหม่เลย โละทิ้ง…ลืมหน้าหลักไปเลยว่าเคยต้องการอะไร"* แล้วสั่งเรื่องแรก AI โทร vs คนโทร)
  * 🔴 ของเดิม (`HomePageClassic` ด้านบน) **ไม่ลบ** — ยังเรียกได้ที่ `?home=classic` เป็นทางถอย จนเจ้าของเคาะ
  */
-const HomeAiSharePage = lazy(() => import('@/pages/HomeAiSharePage'));
-const HomeV3Page = lazy(() => import('@/pages/HomeV3Page'));
-const TeamOnlinePage = lazy(() => import('@/pages/TeamOnlinePage'));
+const HomeAiSharePage = lazyPage(() => import('@/pages/HomeAiSharePage'));
+const HomeV3Page = lazyPage(() => import('@/pages/HomeV3Page'));
+const TeamOnlinePage = lazyPage(() => import('@/pages/TeamOnlinePage'));
 
 const HomePage: React.FC = () => {
   const variant = useHomeVariant();

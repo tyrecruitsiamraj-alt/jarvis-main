@@ -27,6 +27,7 @@
  *   ทางถอย: `?popup=steps` = 4 หน้าแบบ 4 ต.ค. (`flow="steps"` — ค่าเริ่มของ component นี้ เทสต์เดิมยังวิ่งทางนี้)
  */
 import React from 'react';
+import { lazyPage } from '@/lib/staleChunkReload';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Link2, Send, UserMinus, Users } from 'lucide-react';
 
@@ -94,7 +95,7 @@ import { SEARCH_ALL_POOLS_AND_CALL } from '@/lib/candidateSearchLabels';
 import type { JobRequest } from '@/types';
 import { friendlyErrorText } from '@/lib/friendlyError';
 
-const EditPublicJobFieldsDialog = React.lazy(
+const EditPublicJobFieldsDialog = lazyPage(
   () => import('@/components/jobs/EditPublicJobFieldsDialog'),
 );
 

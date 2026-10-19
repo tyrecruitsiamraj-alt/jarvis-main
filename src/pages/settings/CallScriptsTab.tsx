@@ -175,7 +175,7 @@ const CallScriptsTab: React.FC = () => {
       {notice ? <p className={cn('text-sm', TONE.success.value)}>{notice}</p> : null}
 
       <Tabs defaultValue={groups[0]?.topic}>
-        <TabsList className="h-auto flex-wrap justify-start">
+        <TabsList variant="glass" className="h-auto flex-wrap justify-start rounded-2xl">
           {groups.map((g) => (
             <TabsTrigger key={g.topic} value={g.topic} data-testid={`script-topic-${g.topic}`}>
               {g.topic}

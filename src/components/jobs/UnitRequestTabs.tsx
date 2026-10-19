@@ -1,4 +1,5 @@
 import React from 'react';
+import { glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -47,7 +48,8 @@ export type UnitRequestTabsProps = {
 const UnitRequestTabs: React.FC<UnitRequestTabsProps> = ({ jobId, active, counts }) => {
   const navigate = useNavigate();
   return (
-    <div className="flex flex-wrap gap-1 border-b-2 border-border/70" role="tablist">
+    /* แถบกระจก (เจ้าของ 19 ต.ค. 2569 "เปลี่ยนเป็นกระจกทั้งหมด") — เดิมขีดเส้นใต้ */
+    <div className={cn(glassTabsListClass, 'h-auto flex-wrap justify-start rounded-2xl')} role="tablist">
       {UNIT_TAB_IDS.map((id) => {
         const n = counts?.[id];
         return (
@@ -57,12 +59,7 @@ const UnitRequestTabs: React.FC<UnitRequestTabsProps> = ({ jobId, active, counts
             role="tab"
             aria-selected={active === id}
             onClick={() => active !== id && navigate(unitTabPath(jobId, id))}
-            className={cn(
-              '-mb-0.5 border-b-2 px-3.5 py-2 text-sm font-medium transition-colors',
-              active === id
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
+            className={glassTabClass(active === id)}
           >
             {TAB_LABEL[id]}
             {typeof n === 'number' ? (

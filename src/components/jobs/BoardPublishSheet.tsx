@@ -204,7 +204,7 @@ export const BoardPublishSheet: React.FC<BoardPublishSheetProps> = ({ id, onDone
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
         <Tabs value={view} onValueChange={(v) => setView(v as 'review' | 'people')}>
-          <TabsList className="w-full">
+          <TabsList variant="glass" className="w-full">
             <TabsTrigger value="review" className="flex-1">
               <ClipboardCheck aria-hidden /> ตรวจสอบ
             </TabsTrigger>

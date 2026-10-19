@@ -301,7 +301,8 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
         backLabel={backLabelFor(backPath)}
       />
 
-      <div className="space-y-4 px-4 py-4 md:px-6">
+      {/* ไม่มีขอบบน — แถบแท็บต้องอยู่ระดับเดียวกับหน้ารายละเอียดใบขอ (เจ้าของ 19 ต.ค. 2569 "กดสลับแล้วหน้ากระโดด") */}
+      <div className="space-y-4 px-4 pb-4 md:px-6">
         <UnitRequestTabs
           jobId={id}
           active={tab}

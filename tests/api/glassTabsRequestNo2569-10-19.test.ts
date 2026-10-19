@@ -38,3 +38,27 @@ describe('แผงเมนูหลักเป็นกระจก (เจ�
     expect(read('src/components/layout/AppNavDrawer.tsx')).toContain('surface="frosted"');
   });
 });
+
+describe('รอบ 2: กระจกทั้งระบบ + หน้าไม่กระโดด (เจ้าของ 19 ต.ค. 2569)', () => {
+  it('แถบแท็บทุกจุดเป็นกระจก (Radix 7 จุด + แถบทำมือ 4 จุด)', () => {
+    for (const f of [
+      'src/components/follow/FollowPlanningCalendar.tsx',
+      'src/components/home-ai-share/AiShareDetail.tsx',
+      'src/components/recruit-rm/ApplicantContactDialog.tsx',
+      'src/components/jobs/BoardPublishSheet.tsx',
+      'src/pages/HomeAiSharePage.tsx',
+      'src/pages/follow/FollowPage.tsx',
+      'src/pages/settings/CallScriptsTab.tsx',
+    ]) expect(read(f), f).toContain('<TabsList variant="glass"');
+    for (const f of [
+      'src/components/jobs/UnitRequestTabs.tsx',
+      'src/components/jobs/UnitSectionTabs.tsx',
+      'src/components/jobs/JobBoardView.tsx',
+      'src/components/recruit-rm/RmWorkspace.tsx',
+    ]) expect(read(f), f).toContain('glassTabClass(');
+  });
+  it('หัวหน้าเว้นบรรทัดย่อยเมื่อส่ง subtitle="" · แท็บใบขอไม่มีขอบบนเกิน', () => {
+    expect(read('src/components/shared/PageHeader.tsx')).toContain('subtitle !== undefined ?');
+    expect(read('src/pages/jobs/UnitRequestTabPage.tsx')).toContain('className="space-y-4 px-4 pb-4 md:px-6"');
+  });
+});

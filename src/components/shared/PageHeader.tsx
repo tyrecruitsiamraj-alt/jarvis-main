@@ -67,7 +67,9 @@ const PageHeader: React.FC<PageHeaderProps> = ({
         ) : (
           <div className={afterTitle ? 'shrink-0' : 'min-w-0'}>
             <h1 className="text-lg md:text-xl font-medium tracking-tight text-foreground truncate">{title}</h1>
-            {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
+            {/* subtitle="" = เว้นที่บรรทัดย่อยไว้ (เจ้าของ 19 ต.ค. 2569 "กดสลับแล้วหน้ามันกระโดดไปมา ทำให้มันนิ่ง ๆ") —
+                หน้าใบขอ ↔ จับคู่กับงาน ใช้แถบแท็บเดียวกัน หัวหน้าต้องสูงเท่ากัน แถบจึงไม่ขยับ */}
+            {subtitle !== undefined ? <p className="mt-0.5 min-h-5 text-sm text-muted-foreground">{subtitle}</p> : null}
           </div>
         )}
       </div>

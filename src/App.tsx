@@ -1,4 +1,5 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
+import { lazyPage } from "@/lib/staleChunkReload";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate, useParams, useLocation } from "react-router-dom";
 import PublicApplyLayout from "@/components/layout/PublicApplyLayout";
@@ -17,39 +18,39 @@ import ViewAsRoleBanner from "@/components/layout/ViewAsRoleBanner";
 import RequireRole from "@/components/auth/RequireRole";
 
 /** โหลดทีละหน้าเมื่อถูกเรียกใช้ (code-split) — ลดขนาด JS ก้อนแรกให้เปิดแอปเร็วขึ้น */
-const PublicJobBoardPage = lazy(() => import("@/pages/public/PublicJobBoardPage"));
-const PublicPostingApplyPage = lazy(() => import("@/pages/public/PublicPostingApplyPage"));
-const PrivacyRequestPage = lazy(() => import("@/pages/public/PrivacyRequestPage"));
-const ShortLinkRedirectPage = lazy(() => import("@/pages/public/ShortLinkRedirectPage"));
-const MagicLinkVerifyPage = lazy(() => import("@/pages/MagicLinkVerifyPage"));
-const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
-const HomePage = lazy(() => import("@/pages/HomePage"));
-const WorkQueuePage = lazy(() => import("@/pages/work/WorkQueuePage"));
-const WLDashboard = lazy(() => import("@/pages/wl/WLDashboard"));
-const MonthlyPlanner = lazy(() => import("@/pages/wl/MonthlyPlanner"));
-const DailyAssignment = lazy(() => import("@/pages/wl/DailyAssignment"));
-const GlobalCalendar = lazy(() => import("@/pages/wl/GlobalCalendar"));
-const WLEmployees = lazy(() => import("@/pages/wl/WLEmployees"));
-const EmployeeProfile = lazy(() => import("@/pages/wl/EmployeeProfile"));
-const AddEmployeePage = lazy(() => import("@/pages/wl/AddEmployeePage"));
-const MatchingDashboard = lazy(() => import("@/pages/matching/MatchingDashboard"));
-const CandidateProfile = lazy(() => import("@/pages/matching/CandidateProfile"));
-const AddCandidatePage = lazy(() => import("@/pages/matching/AddCandidatePage"));
-const MatchingPage = lazy(() => import("@/pages/matching/MatchingPage"));
-const SelectionContactPage = lazy(() => import("@/pages/matching/SelectionContactPage"));
-const PreCheckPage = lazy(() => import("@/pages/matching/PreCheckPage"));
-const RecruitRmPage = lazy(() => import("@/pages/recruit/RecruitRmPage"));
-const RecruitChannelsPage = lazy(() => import("@/pages/recruit/RecruitChannelsPage"));
-const ReservationsPage = lazy(() => import("@/pages/matching/ReservationsPage"));
-const OurPeoplePage = lazy(() => import("@/pages/matching/OurPeoplePage"));
-const JobDashboard = lazy(() => import("@/pages/jobs/JobDashboard"));
-const JobListPage = lazy(() => import("@/pages/jobs/JobListPage"));
-const StaffJobBoardPage = lazy(() => import("@/pages/jobs/StaffJobBoardPage"));
-const JobDetailPage = lazy(() => import("@/pages/jobs/JobDetailPage"));
-const SiamrajUnitRequestDetailPage = lazy(() => import("@/pages/jobs/SiamrajUnitRequestDetailPage"));
+const PublicJobBoardPage = lazyPage(() => import("@/pages/public/PublicJobBoardPage"));
+const PublicPostingApplyPage = lazyPage(() => import("@/pages/public/PublicPostingApplyPage"));
+const PrivacyRequestPage = lazyPage(() => import("@/pages/public/PrivacyRequestPage"));
+const ShortLinkRedirectPage = lazyPage(() => import("@/pages/public/ShortLinkRedirectPage"));
+const MagicLinkVerifyPage = lazyPage(() => import("@/pages/MagicLinkVerifyPage"));
+const ResetPasswordPage = lazyPage(() => import("@/pages/ResetPasswordPage"));
+const HomePage = lazyPage(() => import("@/pages/HomePage"));
+const WorkQueuePage = lazyPage(() => import("@/pages/work/WorkQueuePage"));
+const WLDashboard = lazyPage(() => import("@/pages/wl/WLDashboard"));
+const MonthlyPlanner = lazyPage(() => import("@/pages/wl/MonthlyPlanner"));
+const DailyAssignment = lazyPage(() => import("@/pages/wl/DailyAssignment"));
+const GlobalCalendar = lazyPage(() => import("@/pages/wl/GlobalCalendar"));
+const WLEmployees = lazyPage(() => import("@/pages/wl/WLEmployees"));
+const EmployeeProfile = lazyPage(() => import("@/pages/wl/EmployeeProfile"));
+const AddEmployeePage = lazyPage(() => import("@/pages/wl/AddEmployeePage"));
+const MatchingDashboard = lazyPage(() => import("@/pages/matching/MatchingDashboard"));
+const CandidateProfile = lazyPage(() => import("@/pages/matching/CandidateProfile"));
+const AddCandidatePage = lazyPage(() => import("@/pages/matching/AddCandidatePage"));
+const MatchingPage = lazyPage(() => import("@/pages/matching/MatchingPage"));
+const SelectionContactPage = lazyPage(() => import("@/pages/matching/SelectionContactPage"));
+const PreCheckPage = lazyPage(() => import("@/pages/matching/PreCheckPage"));
+const RecruitRmPage = lazyPage(() => import("@/pages/recruit/RecruitRmPage"));
+const RecruitChannelsPage = lazyPage(() => import("@/pages/recruit/RecruitChannelsPage"));
+const ReservationsPage = lazyPage(() => import("@/pages/matching/ReservationsPage"));
+const OurPeoplePage = lazyPage(() => import("@/pages/matching/OurPeoplePage"));
+const JobDashboard = lazyPage(() => import("@/pages/jobs/JobDashboard"));
+const JobListPage = lazyPage(() => import("@/pages/jobs/JobListPage"));
+const StaffJobBoardPage = lazyPage(() => import("@/pages/jobs/StaffJobBoardPage"));
+const JobDetailPage = lazyPage(() => import("@/pages/jobs/JobDetailPage"));
+const SiamrajUnitRequestDetailPage = lazyPage(() => import("@/pages/jobs/SiamrajUnitRequestDetailPage"));
 // แท็บย่อยของใบขอ (16 ส.ค. 2569 เย็น) — ผู้สมัคร / AI Match / การติดต่อ
-const UnitRequestTabPage = lazy(() => import("@/pages/jobs/UnitRequestTabPage"));
-const BoardPostingPage = lazy(() => import("@/pages/jobs/BoardPostingPage"));
+const UnitRequestTabPage = lazyPage(() => import("@/pages/jobs/UnitRequestTabPage"));
+const BoardPostingPage = lazyPage(() => import("@/pages/jobs/BoardPostingPage"));
 
 /**
  * ลิงก์เก่า `/jobs/siamraj/:id/posting` → `/jobs/board/:id/posting`
@@ -60,15 +61,15 @@ function LegacyPostingRedirect() {
   const { id = '' } = useParams();
   return <Navigate to={`/jobs/board/${encodeURIComponent(id)}/posting`} replace />;
 }
-const FollowPage = lazy(() => import("@/pages/follow/FollowPage"));
-const AftercarePage = lazy(() => import("@/pages/aftercare/AftercarePage"));
+const FollowPage = lazyPage(() => import("@/pages/follow/FollowPage"));
+const AftercarePage = lazyPage(() => import("@/pages/aftercare/AftercarePage"));
 /** หน้าความคุ้มค่าระบบ (15 ต.ค. 2569) — ไม่มีในเมนู เปิดได้เฉพาะบัญชีที่ API อนุญาต */
-const ValueCasePage = lazy(() => import("@/pages/value/ValueCasePage"));
-const SupervisorDashboard = lazy(() => import("@/pages/dashboard/SupervisorDashboard"));
-const AdminSettings = lazy(() => import("@/pages/settings/AdminSettings"));
-const ChangePasswordPage = lazy(() => import("@/pages/ChangePasswordPage"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const RoleHubPage = lazy(() => import("./pages/RoleHubPage"));
+const ValueCasePage = lazyPage(() => import("@/pages/value/ValueCasePage"));
+const SupervisorDashboard = lazyPage(() => import("@/pages/dashboard/SupervisorDashboard"));
+const AdminSettings = lazyPage(() => import("@/pages/settings/AdminSettings"));
+const ChangePasswordPage = lazyPage(() => import("@/pages/ChangePasswordPage"));
+const NotFound = lazyPage(() => import("./pages/NotFound"));
+const RoleHubPage = lazyPage(() => import("./pages/RoleHubPage"));
 
 const queryClient = new QueryClient();
 

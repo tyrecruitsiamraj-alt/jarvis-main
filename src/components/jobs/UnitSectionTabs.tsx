@@ -1,4 +1,5 @@
 import React from 'react';
+import { glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -23,7 +24,8 @@ const TABS: Array<{ id: UnitSectionId; label: string; to: string }> = [
 const UnitSectionTabs: React.FC<{ active: UnitSectionId }> = ({ active }) => {
   const navigate = useNavigate();
   return (
-    <div className="flex flex-wrap gap-1 border-b-2 border-border/70" role="tablist">
+    /* แถบกระจก (เจ้าของ 19 ต.ค. 2569 "เปลี่ยนเป็นกระจกทั้งหมด") — เดิมขีดเส้นใต้ */
+    <div className={cn(glassTabsListClass, 'h-auto flex-wrap justify-start rounded-2xl')} role="tablist">
       {TABS.map((t) => (
         <button
           key={t.id}
@@ -31,12 +33,7 @@ const UnitSectionTabs: React.FC<{ active: UnitSectionId }> = ({ active }) => {
           role="tab"
           aria-selected={active === t.id}
           onClick={() => active !== t.id && navigate(t.to)}
-          className={cn(
-            '-mb-0.5 border-b-2 px-3.5 py-2 text-sm font-medium transition-colors',
-            active === t.id
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground',
-          )}
+          className={glassTabClass(active === t.id)}
         >
           {t.label}
         </button>
