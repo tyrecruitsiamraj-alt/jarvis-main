@@ -43,8 +43,7 @@ describe('ทั้งระบบ: ว่างแล้วทรงเดิ�
     const o = read('src/components/dashboard-trends/RecruitOverview.tsx');
     expect(o).not.toContain('apps && cur.names > 0 ?');
     const parts = read('src/components/dashboard-trends/RecruitOverviewParts.tsx');
-    const channelFn = parts.slice(parts.indexOf('export function ChannelTable'), parts.indexOf('export function PositionList'));
-    expect(channelFn).not.toContain('return <EmptyNote>');
+    expect(read('src/components/dashboard-trends/ChannelFunnelTable.tsx')).not.toContain('<EmptyNote>');
     expect(parts).not.toContain('withNames.length === 0 ? (\n          <EmptyNote>');
   });
 

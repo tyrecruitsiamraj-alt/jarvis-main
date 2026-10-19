@@ -62,6 +62,10 @@ export type RecruitAppFact = {
   overAge?: boolean;
   /** คำตอบกับ AI บอกว่าอยู่ไกล/เดินทางไม่สะดวก (`isOutOfAreaAnswer` · เจ้าของ 19 ต.ค. 2569 "AI ตอนถามที่อยู่") */
   aiOutOfArea?: boolean;
+  /** เบอร์นี้มีใบแจ้งเข้า ERP ที่ไม่ยกเลิกตั้งแต่วันกรอกใบ (19 ต.ค. 2569 "จับได้ถึงแจ้งเข้า") · null = อ่าน ERP ไม่ได้ */
+  informed?: boolean | null;
+  /** ใบที่ดึงจาก iRecruit: ช่องทางที่ลงทะเบียนใน iRecruit (`mainChannelOf`) · null = หาไม่เจอ/ไม่ใช่ใบ iRecruit */
+  sourceChannel?: string | null;
 };
 
 /**
@@ -142,5 +146,5 @@ export type RecruitOverviewResponse = {
   /** ใบขอที่เข้ามาในช่วง · null = อ่านไม่ได้ (ดู errors.requests) · ไม่มี = เส้นรุ่นเก่า */
   requests?: RecruitRequestSummary | null;
   /** ก้อนที่อ่านไม่ได้ + เหตุ (ก้อนล้มแยกกัน — ห้ามโชว์ 0 แทน) */
-  errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board' | 'requests' | 'channels', string>>;
+  errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board' | 'requests' | 'channels' | 'informs', string>>;
 };

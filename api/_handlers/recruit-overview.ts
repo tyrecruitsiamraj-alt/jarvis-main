@@ -52,6 +52,8 @@ import { isOverAge } from '../../src/lib/applicantAge.js';
 import { isOutOfAreaAnswer } from '../../src/lib/outOfAreaAnswer.js';
 import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
 import { loadChannelPlacement } from '../_lib/channelPlacementSql.js';
+import { loadInformDaysByPhone, loadIrecruitRegsByPhone } from '../_lib/applicantSourceSql.js';
+import { informedSince, irecruitChannelAt, phone9Of } from '../../src/lib/applicantSourceMatch.js';
 import type {
   RecruitAiRow,
   RecruitAppFact,
@@ -235,8 +237,19 @@ const fullDays = (fromIso: string | null, now: number) => fullDaysSince(fromIso,
 
 type Row = Record<string, unknown>;
 
-export function toFact(r: Row, boardPhones: Set<string> | null): RecruitAppFact {
+/** แจ้งเข้า ERP + ช่องทาง iRecruit ต่อเบอร์ (19 ต.ค. 2569) — null = อ่านไม่ได้ */
+export type AppSourceMaps = {
+  informDays: ReadonlyMap<string, readonly string[]> | null;
+  irecruitRegs: ReadonlyMap<string, ReadonlyArray<{ at: string; channel: string }>> | null;
+};
+
+const IRECRUIT_LABEL = /^irecruit/i;
+
+export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSourceMaps): RecruitAppFact {
   const phone = text(r.phone_e164);
+  const p9 = phone9Of(phone);
+  const createdAt = iso(r.created_at) ?? '';
+  const fromIrecruit = IRECRUIT_LABEL.test(text(r.channel_label) ?? '') || IRECRUIT_LABEL.test(text(r.referral_source) ?? '');
   const contact = r.contact_class === 'success' || r.contact_class === 'failed' ? r.contact_class : null;
   const src = r.contact_src === 'ai' || r.contact_src === 'staff' ? r.contact_src : null;
   const att = ATTENDANCE_VALUES.find((v) => v === r.attendance) ?? null;
@@ -271,6 +284,8 @@ export function toFact(r: Row, boardPhones: Set<string> | null): RecruitAppFact 
     overAge: isOverAge(r.age as number | string | null),
     aiOutOfArea: Boolean(r.ai_outcome) && isOutOfAreaAnswer(text(r.ai_summary), text(r.ai_reply)),
     onBoard: boardPhones ? Boolean(phone && boardPhones.has(phone)) : null,
+    informed: sources ? informedSince(sources.informDays, p9, createdAt) : null,
+    sourceChannel: sources && fromIrecruit ? irecruitChannelAt(sources.irecruitRegs, p9, createdAt) : null,
   };
 }
 
@@ -447,7 +462,7 @@ export async function buildRecruitOverview(
   const monthRange = [startOfBkk(window.from), startOfBkk(addDays(window.to, 1)), bu];
   const nowMs = now.getTime();
 
-  const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, chR, reqR] = await Promise.all([
+  const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, chR, reqR, informR, irecR] = await Promise.all([
     settle('รายชื่อบนบอร์ด', loadBoardPhoneSet),
     settle('ใบสมัคร', () => loadFacts(bothRange)),
     settle('งานค้าง', async () => (await dbQuery<Row>(backlogSql(), [bu])).rows),
@@ -487,13 +502,18 @@ export async function buildRecruitOverview(
         await loadOnlineRequestRows({ from: window.from, to: window.to, bu, departmentScope: scope }),
       ),
     ),
+    // ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "จับได้ถึงแจ้งเข้า") — แจ้งเข้าตั้งแต่ต้นช่วงเทียบ · iRecruit ย้อน 60 วัน
+    settle('ใบแจ้งเข้า ERP', () => loadInformDaysByPhone(window.prevFrom)),
+    settle('ช่องทาง iRecruit', () => loadIrecruitRegsByPhone(window.prevFrom, window.to)),
   ]);
 
   // บอร์ด ERP อ่านไม่ได้ = ไม่รู้ว่าได้ใบสมัครหรือยัง (null) — ไม่ใช่ "ยังไม่ได้"
   const boardPhones = boardR.ok ? boardR.value : null;
   if (!boardR.ok || boardPhones === null) body.errors.board = 'อ่านรายชื่อบนบอร์ด ERP ไม่ได้ — ยอดได้ใบสมัครเช็คไม่ได้ชั่วคราว';
 
-  if (factsR.ok) body.apps = factsR.value.map((r) => toFact(r, boardPhones));
+  const sources: AppSourceMaps = { informDays: informR.ok ? informR.value : null, irecruitRegs: irecR.ok ? irecR.value : null };
+  if (!informR.ok) body.errors.informs = informR.error;
+  if (factsR.ok) body.apps = factsR.value.map((r) => toFact(r, boardPhones, sources));
   else {
     body.apps = null;
     body.errors.apps = factsR.error;

@@ -28,7 +28,6 @@ import { fetchRecruitOverview } from '@/lib/recruitOverviewApi';
 import { monthLabel, monthOptions, shiftMonth, shiftRange } from '@/lib/recruitOverviewWindow';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import {
-  channelRows,
   cohortOf,
   dailyRows,
   delayRows,
@@ -42,7 +41,6 @@ import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import type { BoardPublishedTotals } from '@/lib/boardRelease';
 import {
   BacklogBody,
-  ChannelTable,
   DailyCard,
   DelayList,
   EmptyNote,
@@ -57,6 +55,8 @@ import { friendlyErrorText } from '@/lib/friendlyError';
 import { TrendState } from './TrendParts';
 import JourneyNamesDialog from './JourneyNamesDialog';
 import ChannelPlacementTable from './ChannelPlacementTable';
+import ChannelFunnelTable from './ChannelFunnelTable';
+import { buildChannelFunnel } from '@/lib/channelFunnel';
 
 /**
  * ═══ แท็บ "ภาพรวม" ของกล่องงาน = ภาพรวมงานสรรหาแบบ iRecruit (เจ้าของสั่ง 30 ก.ย. 2569) ═══
@@ -135,7 +135,7 @@ const RecruitOverview: React.FC<{
       journey: buildRecruitJourney(cohort),
       delay: delayRows(cohort),
       daily: dailyRows(cohort, win.from, win.to),
-      channels: channelRows(cohort),
+      channels: buildChannelFunnel(cohort),
       positions: positionRows(cohort),
       reasons: reasonGroups(cohort),
     };
@@ -324,8 +324,14 @@ const RecruitOverview: React.FC<{
 
       {/* ─── ช่องทาง + ตำแหน่ง ─── */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <OverviewCard icon={Megaphone} title="ช่องทางการสมัคร" className="lg:col-span-2">
-          <ChannelTable rows={view.channels.rows} total={view.channels.total} />
+        {/* ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "facebook ad 200 สนใจ 100 … มา 10" + "จับได้ถึงแจ้งเข้า") */}
+        <OverviewCard
+          icon={Megaphone}
+          title="ช่องทางการสมัคร"
+          sub={data.errors.informs ? 'อ่านแจ้งเข้า ERP ไม่ได้' : 'แจ้งเข้า = มีใบแจ้งเข้า ERP หลังวันกรอก'}
+          className="lg:col-span-2"
+        >
+          <ChannelFunnelTable rows={view.channels.rows} total={view.channels.total} onOpen={(title, ids) => setNames({ title, ids })} />
         </OverviewCard>
         <OverviewCard icon={Briefcase} title="ตำแหน่งที่สมัคร" sub="10 อันดับ">
           <PositionList rows={view.positions} />

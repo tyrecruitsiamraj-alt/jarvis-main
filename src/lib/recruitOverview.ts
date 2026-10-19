@@ -262,41 +262,6 @@ export function dailySummary(rows: readonly DailyRow[], metric: DailyMetric): {
 
 /* ─────────── ช่องทาง · ตำแหน่ง ─────────── */
 
-export type ChannelRow = {
-  channel: string;
-  names: number;
-  called: number;
-  aiSaidYes: number;
-  /** null = อ่านบอร์ด ERP ไม่ได้ */
-  onBoard: number | null;
-  /** ตอบ AI ว่าสนใจ ÷ รายชื่อ */
-  interestRate: number | null;
-};
-
-function channelRowOf(channel: string, list: readonly RecruitAppFact[]): ChannelRow {
-  const saidYes = list.filter(isAiSaidYes).length;
-  return {
-    channel,
-    names: list.length,
-    called: list.filter(isCalled).length,
-    aiSaidYes: saidYes,
-    onBoard: list.some((f) => f.onBoard === null) ? null : list.filter((f) => f.onBoard === true).length,
-    interestRate: pctOf(saidYes, list.length),
-  };
-}
-
-/** แถวต่อช่องทาง เรียงรายชื่อมากสุดก่อน + แถวรวม */
-export function channelRows(cohort: readonly RecruitAppFact[]): { rows: ChannelRow[]; total: ChannelRow } {
-  const by = new Map<string, RecruitAppFact[]>();
-  for (const f of cohort) {
-    const k = channelOf(f);
-    by.set(k, [...(by.get(k) ?? []), f]);
-  }
-  const rows = [...by.entries()]
-    .map(([k, list]) => channelRowOf(k, list))
-    .sort((a, b) => b.names - a.names || a.channel.localeCompare(b.channel, 'th'));
-  return { rows, total: channelRowOf('รวม', cohort) };
-}
 
 export type PositionRow = { position: string; names: number; pct: number | null; other?: boolean };
 

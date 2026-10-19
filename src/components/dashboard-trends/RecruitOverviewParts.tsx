@@ -27,7 +27,6 @@ import {
   DAILY_METRIC_LABEL,
   dailySummary,
   staffTableRows,
-  type ChannelRow,
   type DailyMetric,
   type DailyRow,
   type DelayRow,
@@ -509,57 +508,6 @@ export function DailyCard({ rows, icon }: { rows: readonly DailyRow[]; icon: Luc
 }
 
 /* ─────────── ช่องทาง · ตำแหน่ง ─────────── */
-
-export function ChannelTable({ rows, total }: { rows: readonly ChannelRow[]; total: ChannelRow }) {
-  // 🔴 ไม่มีรายชื่อ = ตารางยังอยู่ (หัว + แถวรวม 0) ไม่สลับเป็นข้อความ (เจ้าของสั่ง 1 ต.ค. 2569)
-  const max = Math.max(...rows.map((r) => r.names), 1);
-  const head = ['ช่องทาง', 'รายชื่อ', 'โทรแล้ว', 'ตอบ AI ว่าสนใจ', 'ได้ใบสมัคร', 'อัตราสนใจ'];
-  const cells = (r: ChannelRow) => [num(r.called), num(r.aiSaidYes), num(r.onBoard), pctText(r.interestRate)];
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className={cn('text-xs', DASH.tableHead)}>
-          <tr>
-            {head.map((h, i) => (
-              <th key={h} className={cn('px-2 py-2 font-medium', i === 0 ? 'text-left' : 'text-right')}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.channel} className={cn('border-t', DASH.tableRow)}>
-              <td className={cn('px-2 py-2', DASH.cellStrong)}>{r.channel}</td>
-              <td className="px-2 py-2">
-                <span className="flex items-center justify-end gap-2">
-                  <span className="hidden w-24 sm:block">
-                    <RatioBar pct={(r.names / max) * 100} />
-                  </span>
-                  <span className={cn('tabular-nums', DASH.cell)}>{fmt(r.names)}</span>
-                </span>
-              </td>
-              {cells(r).map((v, i) => (
-                <td key={i} className={cn('px-2 py-2 text-right tabular-nums', DASH.cell)}>
-                  {v}
-                </td>
-              ))}
-            </tr>
-          ))}
-          <tr className={cn('border-t', DASH.tableRow)}>
-            <td className={cn('px-2 py-2', DASH.cellStrong)}>รวม</td>
-            <td className={cn('px-2 py-2 text-right tabular-nums', DASH.cellStrong)}>{fmt(total.names)}</td>
-            {cells(total).map((v, i) => (
-              <td key={i} className={cn('px-2 py-2 text-right tabular-nums', DASH.cellStrong)}>
-                {v}
-              </td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 export function PositionList({ rows }: { rows: readonly PositionRow[] }) {
   if (rows.length === 0) return <EmptyNote>ยังไม่มีรายชื่อในช่วงนี้</EmptyNote>;

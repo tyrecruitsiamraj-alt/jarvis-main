@@ -13650,3 +13650,14 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - นับตามวันแจ้งเข้าในช่วงที่เลือก · ช่องทาง = ลงทะเบียนล่าสุดก่อนแจ้งเข้า (ย้อน 365 วัน) · ไม่เจอ = "ไม่รู้ช่องทาง" (ลงงานรวมทุกแถว = แจ้งเข้า)
 - จอ `src/components/dashboard-trends/ChannelPlacementTable.tsx` ในการ์ด "ช่องทางที่ได้คนลงงาน" ของ `RecruitOverview.tsx`
 - ⚠️ `recruit-overview.ts` เรียง settle() กับชื่อตัวแปรต้องตรงกัน — เคยสลับ ใบขอ/ช่องทาง 19 ต.ค. · เทสต์ `tests/api/channelPlacement2569-10-19.test.ts`
+
+## ช่องทาง → แจ้งเข้า บนภาพรวมงานสรรหา (19 ต.ค. 2569)
+
+เจ้าของ: "facebook ad 200 สนใจ 100 คนโทรต่อสนใจ 50 นัดได้ 25 มา 10" + "จับได้ถึงแจ้งเข้า"
+- `src/lib/channelFunnel.ts` — `buildChannelFunnel` แถว = ช่องทาง · คอลัมน์ใช้ `buildRecruitJourney` (แถวรวมเลขเดียวกับการ์ดรายชื่อ) + แจ้งเข้า
+- `src/lib/applicantSourceMatch.ts` — pure ฝั่ง API: `phone9Of` · `informedSince` (แจ้งเข้าตั้งแต่วันกรอก เวลาไทย) · `irecruitChannelAt` (ลงทะเบียน iRecruit ล่าสุดก่อนใบเข้าระบบ ย้อน 60 วัน)
+- `api/_lib/applicantSourceSql.ts` — อ่าน ERP แจ้งเข้าที่ไม่ยกเลิก + iRecruit `recruit_register` ต่อเบอร์ (แคช 10 นาที)
+- `api/_handlers/recruit-overview.ts` — `toFact(r, boardPhones, sources)` เติม `informed` / `sourceChannel` · `errors.informs`
+- `src/components/dashboard-trends/ChannelFunnelTable.tsx` — แทน `ChannelTable` เดิม (ถอดแล้ว) · กดเลขเปิดรายชื่อ
+- ⚠️ ใบที่ดึงจาก iRecruit ไม่มีช่องทางในใบเรา ⇒ ใช้ช่องทางลงทะเบียนใน iRecruit · ไม่เจอ = "iRecruit ไม่รู้ช่องทาง"
+- เทสต์ `tests/api/channelFunnel2569-10-19.test.ts`

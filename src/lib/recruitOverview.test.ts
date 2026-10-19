@@ -6,7 +6,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   channelOf,
-  channelRows,
   cohortOf,
   dailyRows,
   dailySummary,
@@ -207,14 +206,10 @@ describe('รายวัน · ช่องทาง · ตำแหน่ง',
     expect(dailySummary(rows, 'names')).toEqual({ total: 3, peak: { ymd: '2026-09-01', value: 2 }, avg: 1 });
   });
 
-  it('ช่องทาง: ตารางช่องทางของลิงก์ก่อน แล้วค่อยที่ผู้สมัครเลือก · ไม่มีทั้งคู่ = ไม่ระบุ · แถวรวมเท่าทุกแถว', () => {
+  it('ช่องทาง: ตารางช่องทางของลิงก์ก่อน แล้วค่อยที่ผู้สมัครเลือก · ไม่มีทั้งคู่ = ไม่ระบุ', () => {
     expect(channelOf({ channelLabel: 'Facebook Group', referralSource: 'facebook' })).toBe('Facebook Group');
     expect(channelOf({ channelLabel: null, referralSource: 'flyer' })).toBe('ใบปลิว');
     expect(channelOf({ channelLabel: null, referralSource: null })).toBe('ไม่ระบุ');
-    const { rows, total } = channelRows(apps);
-    expect(rows.map((r) => [r.channel, r.names])).toEqual([['Facebook', 2], ['Facebook Group', 1]]);
-    expect(total.names).toBe(rows.reduce((s, r) => s + r.names, 0));
-    expect(rows[0].interestRate).toBe(50);
   });
 
   it('ตำแหน่ง: 10 อันดับแรก + ตำแหน่งอื่นๆ รวมที่เหลือ', () => {
