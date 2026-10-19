@@ -21,9 +21,11 @@ function TABS_LIST_CLASS_GLASS(): string {
 }
 
 /** เม็ดกระจกแบบ A (เจ้าของเลือก 19 ต.ค. 2569) — กระจกสีเบอร์กันดี · เส้นขอบบนสว่างบาง ๆ · เงาลอย */
+// 19 ต.ค. 2569 เจ้าของเลือก "C กรมท่าทึบ" ในโหมดสว่าง (เบอร์กันดีโปร่งดูออกชมพู) · โหมดมืดคงเม็ดกระจกเบอร์กันดีเดิม
 const GLASS_PILL = [
-  "rounded-full border border-white/25 bg-gradient-to-b from-primary/80 to-primary/55 shadow-md shadow-primary/40",
-  "before:pointer-events-none before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/70 before:to-transparent",
+  "rounded-full border border-foreground bg-foreground shadow-md shadow-foreground/20",
+  "dark:border-white/25 dark:bg-transparent dark:bg-gradient-to-b dark:from-primary/80 dark:to-primary/55 dark:shadow-primary/40",
+  "dark:before:pointer-events-none dark:before:absolute dark:before:inset-x-3 dark:before:top-0 dark:before:h-px dark:before:bg-gradient-to-r dark:before:from-transparent dark:before:via-white/70 dark:before:to-transparent",
 ].join(" ");
 
 /**

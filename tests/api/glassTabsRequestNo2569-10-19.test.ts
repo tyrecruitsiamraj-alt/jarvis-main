@@ -101,3 +101,11 @@ describe('ภาพรวมงานสรรหา: ถอดปุ่ม ว�
     expect(read('src/lib/homeTopicReport.ts')).toContain("export const NO_BU_LABEL = 'รอดำเนินการ'");
   });
 });
+
+describe('เม็ดแท็บโหมดสว่าง = กรมท่าทึบ (เจ้าของ 19 ต.ค. 2569 เลือก C)', () => {
+  it('สว่าง bg-foreground · มืดคงเม็ดกระจกเบอร์กันดี', () => {
+    const tabs = read('src/components/ui/tabs.tsx');
+    expect(tabs).toContain('"rounded-full border border-foreground bg-foreground shadow-md shadow-foreground/20"');
+    expect(tabs).toContain('dark:from-primary/80 dark:to-primary/55');
+  });
+});
