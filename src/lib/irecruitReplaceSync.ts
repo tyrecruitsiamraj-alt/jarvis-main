@@ -107,7 +107,19 @@ export function replaceAiPhoneOf(rule: Pick<ReplaceCallRule, 'aiPhones'>, phone:
  * วางแบบที่ส่งกันในแชตได้เลย เช่น "สมชาย ใจดี 081-234-5678 ฉุกเฉิน พี่เอ 089 876 5432"
  * บรรทัดที่ไม่มีเบอร์คนไปแทน = `bad` (บอกบนจอ ห้ามทิ้งเงียบ) · เบอร์ซ้ำเก็บอันแรก
  */
-export function parseAiPhoneLines(text: string): { phones: ReplaceAiPhone[]; bad: string[] } {
+export function parseAiPhoneLines(
+  text: string,
+  /**
+   * เจ้าหน้าที่จากหน้าผู้ใช้งาน (ชื่อเล่น + เบอร์) — เจ้าของ 19 ต.ค. 2569 "หลักการเหมือนส่งคนเริ่มงาน"
+   * หลังคำว่า "ฉุกเฉิน" ไม่มีเบอร์ แต่มีชื่อเล่น (มี/ไม่มีคำว่า "พี่") = ใช้เบอร์ของคนนั้น
+   */
+  staff: readonly { name: string; phone: string }[] = [],
+): { phones: ReplaceAiPhone[]; bad: string[] } {
+  const byLongest = [...staff].filter((x) => x.name.trim() && replacePhoneKey(x.phone)).sort((a, b) => b.name.trim().length - a.name.trim().length);
+  const staffKeyIn = (part: string): string | null => {
+    const hit = byLongest.find((x) => part.includes(x.name.trim()));
+    return hit ? replacePhoneKey(hit.phone) : null;
+  };
   const phones: ReplaceAiPhone[] = [];
   const bad: string[] = [];
   const seen = new Set<string>();
@@ -119,7 +131,10 @@ export function parseAiPhoneLines(text: string): { phones: ReplaceAiPhone[]; bad
     // ไม่มีเบอร์ตัวเอง — เดิมอ่านเบอร์ฉุกเฉินเป็นเบอร์คนไปแทน) · ไม่มีคำนี้ = เบอร์แรกคนไปแทน เบอร์สองฉุกเฉิน
     const at = line.indexOf('ฉุกเฉิน');
     const own = phonesIn(at >= 0 ? line.slice(0, at) : line);
-    const emKeys = at >= 0 ? phonesIn(line.slice(at)) : own.slice(1);
+    const emPart = at >= 0 ? line.slice(at) : '';
+    const emDigits = at >= 0 ? phonesIn(emPart) : own.slice(1);
+    const emByName = at >= 0 && emDigits.length === 0 ? staffKeyIn(emPart) : null;
+    const emKeys = emByName ? [emByName] : emDigits;
     if (own.length === 0) {
       bad.push(line.trim());
       continue;

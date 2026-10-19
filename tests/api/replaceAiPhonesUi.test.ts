@@ -47,6 +47,31 @@ describe('มีคำว่า ฉุกเฉิน = เบอร์หลั
   });
 });
 
+describe('หลังคำว่า ฉุกเฉิน ใส่ชื่อเจ้าหน้าที่แทนเบอร์ได้ (เจ้าของ 19 ต.ค. 2569)', () => {
+  const staff = [
+    { name: 'อ๋อม', phone: '+66812340001' },
+    { name: 'แป้ง', phone: '+66812340002' },
+  ];
+  it('มี/ไม่มีคำว่า พี่ ก็ได้ · มีเบอร์อยู่แล้วใช้เบอร์ก่อน · ไม่เจอชื่อ = ไม่มีฉุกเฉิน', () => {
+    const out = parseAiPhoneLines(
+      ['ทดสอบ หนึ่ง 0812345678 ฉุกเฉิน พี่อ๋อม', '0823456789 ฉุกเฉิน แป้ง', '0834567890 ฉุกเฉิน แป้ง 0899999999', '0845678901 ฉุกเฉิน ใครก็ไม่รู้'].join('\n'),
+      staff,
+    );
+    expect(out.phones).toEqual([
+      { phone: '0812345678', emergency: '0812340001' },
+      { phone: '0823456789', emergency: '0812340002' },
+      { phone: '0834567890', emergency: '0899999999' },
+      { phone: '0845678901', emergency: null },
+    ]);
+  });
+  it('ช่องเลือกในฟอร์มคนเริ่มงานใช้คำว่า "เจ้าหน้าที่" (เดิม "เจ้าหน้าที่ที่ติดตามสายที่ N")', () => {
+    const page = read('src/pages/follow/FollowPage.tsx');
+    expect(page).not.toContain('label={`เจ้าหน้าที่ที่ติดตามสายที่');
+    expect(page).toContain('label="เจ้าหน้าที่"');
+    expect(read('src/components/follow/ReplaceAiPhonesDialog.tsx')).toContain('<FieldSelect');
+  });
+});
+
 describe('ชื่อคนไปแทนในตัวอย่าง', () => {
   it('เทียบเบอร์ 9 หลักท้าย', () => {
     const nameOf = buildReplaceNameOfPhone([{ recipient_phone: '+66812345678', recipient_name: 'ทดสอบ หนึ่ง' }]);

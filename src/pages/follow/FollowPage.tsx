@@ -3235,7 +3235,7 @@ const FollowPage: React.FC = () => {
                     <StaffContactField
                       id={`followStaffPhone${i}`}
                       group="screener"
-                      label={`เจ้าหน้าที่ที่ติดตามสายที่ ${i + 1}`}
+                      label="เจ้าหน้าที่" /* เจ้าของ 19 ต.ค. 2569: เปลี่ยนจาก "เจ้าหน้าที่ที่ติดตามสายที่ N" */
                       value={staffPhones[i] ?? ''}
                       onChange={(next) => setStaffPhoneAt(i, next)}
                       reloadSignal={contactsRev}
