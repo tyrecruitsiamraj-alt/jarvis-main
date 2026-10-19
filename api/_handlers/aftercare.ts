@@ -22,9 +22,18 @@ import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
 import { auditFromAuthed } from '../_lib/audit.js';
-import { AFTERCARE_RESULTS, isAftercareResult } from '../../src/lib/aftercareContact.js';
+import {
+  AFTERCARE_RESULTS,
+  AFTERCARE_SCORE_TOPICS,
+  aftercareResultNeedsScores,
+  isAftercareResult,
+  isAftercareScore,
+} from '../../src/lib/aftercareContact.js';
 
 const TABLE = tableInAppSchema('aftercare_people');
+/** แผนติดตามเดิมของคนที่ย้ายมา — เจ้าของงาน = คนเพิ่มแผนนั้น (ตัวกรอง 19 ต.ค. 2569) · ย้อนกลับเปิดสายของชุดนั้นคืน */
+const FOLLOW = tableInAppSchema('follow_entries');
+const USERS = tableInAppSchema('users');
 /** ผลการโทรดูแล (142 · 10 ต.ค. 2569) */
 const CONTACTS = tableInAppSchema('aftercare_contacts');
 
@@ -41,7 +50,12 @@ type Row = {
   closed_at: string | Date | null;
   closed_reason: string | null;
   created_at: string | Date;
+  owner_name?: string | null;
+  follow_group_id?: string | null;
 };
+
+/** คะแนน 3 หัวข้อ (155 · 19 ต.ค. 2569) */
+const SCORE_COLS = 'expectation, supervisor, escalation';
 
 const iso = (v: string | Date | null): string | null =>
   v == null ? null : v instanceof Date ? v.toISOString() : String(v);
@@ -67,17 +81,24 @@ function toResponse(r: Row) {
     closed_at: iso(r.closed_at),
     closed_reason: r.closed_reason,
     created_at: iso(r.created_at),
+    /** เจ้าของงาน = คนเพิ่มแผนติดตามเดิม (ชื่อเล่น/ชื่อจริงจากหน้าผู้ใช้งาน → อีเมล) · เพิ่มเอง = คนย้าย */
+    owner_name: r.owner_name ?? r.moved_by_name ?? null,
+    follow_group_id: r.follow_group_id ?? null,
   };
 }
 
 const COLS = `phone_e164, full_name, unit_name, site_code, start_date, source,
               from_follow_id, note, moved_by_name, closed_at, closed_reason, created_at`;
+const COLS_A = COLS.split(',').map((c) => `a.${c.trim()}`).join(', ');
 
 type ContactRow = {
   id: string;
   phone_e164: string;
   result: string;
   note: string | null;
+  expectation?: string | null;
+  supervisor?: string | null;
+  escalation?: string | null;
   created_by_name: string | null;
   created_at: string | Date;
 };
@@ -86,6 +107,9 @@ const toContact = (c: ContactRow) => ({
   phone_e164: c.phone_e164,
   result: c.result,
   note: c.note,
+  expectation: c.expectation ?? null,
+  supervisor: c.supervisor ?? null,
+  escalation: c.escalation ?? null,
   created_by_name: c.created_by_name,
   created_at: iso(c.created_at),
 });
@@ -96,7 +120,7 @@ async function lastContactsOf(phones: readonly string[]): Promise<Map<string, { 
   if (phones.length === 0) return out;
   try {
     const { rows } = await dbQuery<ContactRow & { n: number }>(
-      `select distinct on (phone_e164) id::text as id, phone_e164, result, note, created_by_name, created_at,
+      `select distinct on (phone_e164) id::text as id, phone_e164, result, note, ${SCORE_COLS}, created_by_name, created_at,
               count(*) over (partition by phone_e164)::int as n
          from ${CONTACTS}
         where phone_e164 = any($1::text[])
@@ -118,7 +142,7 @@ async function handleGet(req: AuthedReq, res: ApiRes) {
     if (!phone) return sendError(res, 400, 'Bad request', 'เบอร์ไม่ถูกต้อง');
     try {
       const { rows } = await dbQuery<ContactRow>(
-        `select id::text as id, phone_e164, result, note, created_by_name, created_at
+        `select id::text as id, phone_e164, result, note, ${SCORE_COLS}, created_by_name, created_at
            from ${CONTACTS} where phone_e164 = $1 order by created_at desc limit 100`,
         [phone],
       );
@@ -132,9 +156,20 @@ async function handleGet(req: AuthedReq, res: ApiRes) {
   const includeClosed = getString(req.query?.closed) === '1';
   try {
     const { rows } = await dbQuery<Row>(
-      `select ${COLS} from ${TABLE}
-        ${includeClosed ? '' : 'where closed_at is null'}
-        order by created_at desc limit 500`,
+      `select ${COLS_A},
+              coalesce(u.name, f.created_by_name) as owner_name,
+              f.group_id::text as follow_group_id
+         from ${TABLE} a
+         left join ${FOLLOW} f on f.id = a.from_follow_id
+         left join lateral (
+           select coalesce(nullif(btrim(x.nickname), ''), nullif(btrim(x.full_name), '')) as name
+             from ${USERS} x
+            where x.id = f.created_by or lower(btrim(x.email)) = lower(btrim(f.created_by_name))
+            order by (x.id = f.created_by) desc
+            limit 1
+         ) u on true
+        ${includeClosed ? '' : 'where a.closed_at is null'}
+        order by a.created_at desc limit 500`,
     );
     const contacts = await lastContactsOf(rows.map((r) => r.phone_e164));
     res.setHeader?.('Cache-Control', 'no-store');
@@ -163,20 +198,29 @@ async function handleContact(req: AuthedReq, res: ApiRes, raw: Record<string, un
     return sendError(res, 400, 'Bad request', `ผลต้องเป็น ${AFTERCARE_RESULTS.join(' / ')}`);
   }
   const note = (getString(raw?.note) ?? '').trim().slice(0, 2000) || null;
+  /** คะแนน 3 หัวข้อ — คุยถึงตัว (ทำงานปกติ/มีปัญหา) ต้องครบ · ผลอื่นไม่เก็บ */
+  const scores = AFTERCARE_SCORE_TOPICS.map((t) => {
+    const v = getString(raw?.[t.key]);
+    return isAftercareScore(v) ? v : null;
+  });
+  if (aftercareResultNeedsScores(result) && scores.some((v) => v === null)) {
+    return sendError(res, 400, 'Bad request', 'เลือกผลให้ครบทั้ง 3 หัวข้อ');
+  }
+  const [expectation, supervisor, escalation] = aftercareResultNeedsScores(result) ? scores : [null, null, null];
   const { rows: known } = await dbQuery<{ n: number }>(`select count(*)::int as n from ${TABLE} where phone_e164 = $1`, [phone]);
   if (!known[0]?.n) return sendError(res, 404, 'Not found', 'ไม่พบคนนี้ในรายการดูแล');
   try {
     const { rows } = await dbQuery<ContactRow>(
-      `insert into ${CONTACTS} (phone_e164, result, note, created_by, created_by_name)
-       values ($1, $2, $3, $4::uuid, $5)
-       returning id::text as id, phone_e164, result, note, created_by_name, created_at`,
-      [phone, result, note, req.user.sub, req.user.email ?? null],
+      `insert into ${CONTACTS} (phone_e164, result, note, created_by, created_by_name, expectation, supervisor, escalation)
+       values ($1, $2, $3, $4::uuid, $5, $6, $7, $8)
+       returning id::text as id, phone_e164, result, note, ${SCORE_COLS}, created_by_name, created_at`,
+      [phone, result, note, req.user.sub, req.user.email ?? null, expectation, supervisor, escalation],
     );
     void auditFromAuthed(req, {
       action: 'aftercare.contact',
       entityType: 'aftercare',
       entityId: phone,
-      after: { result, has_note: note !== null },
+      after: { result, has_note: note !== null, expectation, supervisor, escalation },
     });
     return res.status(200).json({ item: toContact(rows[0]) });
   } catch (e) {
@@ -245,6 +289,26 @@ async function handlePatch(req: AuthedReq, res: ApiRes) {
   const raw = (await readJsonBody(req)) as Record<string, unknown> | null;
   const phone = toE164Thai(getString(raw?.phone) ?? '');
   if (!phone) return sendError(res, 400, 'Bad request', 'ต้องระบุเบอร์ที่ใช้กับระบบได้');
+
+  /**
+   * ย้อนกลับไปการ์ด "ติดตามครบ" (เจ้าของ 19 ต.ค. 2569 "เผื่อย้ายผิด") — ลบแถวดูแล (ประวัติลงผลอยู่ต่อ · คีย์เบอร์)
+   * หน้าเว็บเปิดสายของแผนเดิมที่ปิดเป็น "ไปแล้ว" คืนก่อน (`reopen`) แล้วค่อยเรียกเส้นนี้ · รอบถามความเป็นอยู่ไม่แตะ (Choice "เก็บสายไว้")
+   * เฉพาะคนที่ย้ายมาจากหน้าติดตาม — เพิ่มเองไม่มีที่ให้ย้อน
+   */
+  if (raw?.revert === true) {
+    const { rows } = await dbQuery<Row>(
+      `delete from ${TABLE} where phone_e164 = $1 and from_follow_id is not null and closed_at is null returning ${COLS}`,
+      [phone],
+    );
+    if (rows.length === 0) return sendError(res, 404, 'Not found', 'ย้อนกลับไม่ได้ — ไม่ได้ย้ายมาจากหน้าติดตาม หรือปิดการดูแลไปแล้ว');
+    void auditFromAuthed(req, {
+      action: 'aftercare.revert',
+      entityType: 'aftercare',
+      entityId: phone,
+      before: { from_follow_id: rows[0].from_follow_id, start_date: ymd(rows[0].start_date) },
+    });
+    return res.status(200).json({ item: toResponse(rows[0]), reverted: true });
+  }
 
   const hasStart = raw?.start_date !== undefined;
   const startDate = getString(raw?.start_date);

@@ -22,6 +22,8 @@ export type FollowDayReportRow = {
   name: string;
   phone: string;
   unit: string;
+  /** ประเภทประกัน (149 · ต่อจากหน่วยงาน — เจ้าของ 19 ต.ค. 2569) · ไม่มี = "—" */
+  insurance: string;
   call: string;
   caller: string;
   /** ใครถูกตั้งให้โทร (ใช้นับ AI/คน · ป้าย `caller` อาจเติม "คนโทรต่อ") */
@@ -159,6 +161,8 @@ export function buildFollowDayReport(
       name: row.group.name,
       phone: localThaiPhone(row.group.phone),
       unit: e.unit_name?.trim() || row.group.unitName || '—',
+      // หลายบรรทัด (ข้อมูลเก่าจาก ERP) = บรรทัดเดียวคั่น " / " ให้ตาราง/รูป/คัดลอกไม่แตกแถว
+      insurance: insuranceOfRow(row.group.rounds, e),
       call:
         followDayCallLabel({ day: e.call_day ?? null, call: e.call_of_day ?? e.call_round ?? null }) ??
         (slot ? `สายที่ ${slot}` : '—'),
@@ -188,14 +192,23 @@ export function buildFollowDayReport(
   };
 }
 
-export const FOLLOW_DAY_REPORT_HEADERS = ['เวลา', 'ชื่อ', 'เบอร์', 'หน่วยงาน', 'สาย', 'ใครโทร', 'ผล'] as const;
+/** ประเภทประกันของแถว — ของสายนั้นก่อน ไม่มี = สายอื่นของชุดเดียวกัน (กรอกครั้งเดียวตอนเพิ่มคน) · ไม่มีเลย = "—" */
+export function insuranceOfRow(
+  rounds: readonly Pick<FollowEntry, 'insurance_type'>[],
+  entry: Pick<FollowEntry, 'insurance_type'>,
+): string {
+  const pick = (v: string | null | undefined) => (v ?? '').trim().replace(/\s*\n+\s*/g, ' / ');
+  return pick(entry.insurance_type) || rounds.map((r) => pick(r.insurance_type)).find(Boolean) || '—';
+}
+
+export const FOLLOW_DAY_REPORT_HEADERS = ['เวลา', 'ชื่อ', 'เบอร์', 'หน่วยงาน', 'ประกัน', 'สาย', 'ใครโทร', 'ผล'] as const;
 
 /** คั่นแท็บ — วางลง Excel ได้เป็นคอลัมน์ · แท็บ/ขึ้นบรรทัดในค่าแปลงเป็นเว้นวรรค */
 export function followDayReportTsv(report: FollowDayReport): string {
   const cell = (v: string) => v.replace(/[\t\r\n]+/g, ' ').trim();
   const lines = [FOLLOW_DAY_REPORT_HEADERS.join('\t')];
   for (const r of report.rows) {
-    lines.push([r.time, r.name, r.phone, r.unit, r.call, r.caller, r.result].map(cell).join('\t'));
+    lines.push([r.time, r.name, r.phone, r.unit, r.insurance, r.call, r.caller, r.result].map(cell).join('\t'));
   }
   return lines.join('\n');
 }

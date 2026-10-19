@@ -55,7 +55,8 @@ describe('3 · ดูแลหลังเริ่มงาน → ฟอร์
     expect(readFollowPrefill('pf_start=1/10/2569').startDate).toBeUndefined();
   });
   it('หน้าดูแลส่ง start_date · ฟอร์มรับวันเริ่มงาน · เรื่อง "ถามความเป็นอยู่หลังเริ่มงาน" อยู่ในตัวเลือก', () => {
-    expect(read('src/pages/aftercare/AftercarePage.tsx').match(/startDate: (?:row\.person|p)\.start_date \?\? undefined/g)).toHaveLength(2);
+    // 19 ต.ค. 2569 ตั้งรอบในป๊อปบนหน้าดูแล — วันเริ่มงานของแถวเป็นค่าเริ่มของป๊อป
+    expect(read('src/components/aftercare/AftercareScheduleDialog.tsx')).toContain('person?.start_date ?? startYmdOfRounds(pending)');
     expect(read('src/pages/follow/FollowPage.tsx')).toContain('if (prefill.startDate) setStartDate(prefill.startDate);');
     expect(read('src/components/follow/TopicField.tsx')).toContain('load={listTopicsWithSystem}');
     expect(read('src/pages/aftercare/AftercarePage.tsx')).toContain('aftercareMissingStartDate(open, calls)');

@@ -90,7 +90,8 @@ describe('ทางกลับหน้าเดิมหลังตั้ง�
   it('ต้นทางที่พามาหน้าติดตามส่งทางกลับมาด้วย · หน้าติดตามมีปุ่มกลับในฟอร์มและหน้าเสร็จสิ้น', () => {
     const read = (rel: string) => fs.readFileSync(path.resolve(process.cwd(), rel), 'utf8');
     const aftercare = read('src/pages/aftercare/AftercarePage.tsx');
-    expect(aftercare.match(/back: '\/aftercare'/g)?.length).toBe(2);
+    // 19 ต.ค. 2569 ตั้งรอบในป๊อปบนหน้าดูแลเอง (ไม่พาไปฟอร์มหน้าติดตามแล้ว)
+    expect(aftercare).toContain('<AftercareScheduleDialog');
     expect(aftercare).toContain('backPath="/follow"');
     expect(read('src/components/recruit-rm/SelectionProgressControls.tsx')).toContain('back: `${location.pathname}${location.search}`');
     const page = read('src/pages/follow/FollowPage.tsx');

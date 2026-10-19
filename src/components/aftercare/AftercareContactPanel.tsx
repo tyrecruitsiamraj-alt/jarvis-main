@@ -3,6 +3,7 @@ import { LoaderCircle, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { FieldSelect } from '@/components/shared/FieldSelect';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
@@ -12,8 +13,15 @@ import {
   AFTERCARE_RESULTS,
   AFTERCARE_RESULT_LABEL,
   AFTERCARE_RESULT_TONE,
+  AFTERCARE_SCORES,
+  AFTERCARE_SCORE_LABEL,
+  AFTERCARE_SCORE_TONE,
+  AFTERCARE_SCORE_TOPICS,
+  aftercareResultNeedsScores,
+  isAftercareScore,
   type AftercareContact,
   type AftercareResult,
+  type AftercareScores,
 } from '@/lib/aftercareContact';
 
 /**
@@ -31,6 +39,22 @@ export const AftercareResultChip: React.FC<{ contact: AftercareContact }> = ({ c
   </span>
 );
 
+/** คะแนน 3 หัวข้อของครั้งนั้น (155 · 19 ต.ค. 2569) — ไม่มี = ไม่ขึ้น */
+export const AftercareScoreChips: React.FC<{ contact: AftercareContact }> = ({ contact }) => (
+  <>
+    {AFTERCARE_SCORE_TOPICS.map((t) => {
+      const v = contact[t.key];
+      return v ? (
+        <span key={t.key} className={cn('rounded-full border px-2 py-0.5 text-xs', TONE[AFTERCARE_SCORE_TONE[v]].outline)}>
+          {t.short} {AFTERCARE_SCORE_LABEL[v]}
+        </span>
+      ) : null;
+    })}
+  </>
+);
+
+const NO_SCORES: AftercareScores = { expectation: null, supervisor: null, escalation: null };
+
 const AftercareContactPanel: React.FC<{
   phone: string;
   lastContact: AftercareContact | null | undefined;
@@ -41,6 +65,10 @@ const AftercareContactPanel: React.FC<{
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<AftercareResult | null>(null);
   const [note, setNote] = useState('');
+  /** คะแนน 3 หัวข้อ — ต้องครบเมื่อผล = ทำงานปกติ/มีปัญหา (เจ้าของ 19 ต.ค. 2569) */
+  const [scores, setScores] = useState<AftercareScores>(NO_SCORES);
+  const needScores = result !== null && aftercareResultNeedsScores(result);
+  const scoresDone = AFTERCARE_SCORE_TOPICS.every((t) => scores[t.key] !== null);
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState<AftercareContact[] | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -50,11 +78,12 @@ const AftercareContactPanel: React.FC<{
     if (!result) return;
     setSaving(true);
     try {
-      const saved = await addAftercareContact({ phone, result, note: note.trim() || null });
+      const saved = await addAftercareContact({ phone, result, note: note.trim() || null, ...(needScores ? scores : {}) });
       toast.success(`ลงผลแล้ว: ${AFTERCARE_RESULT_LABEL[saved.result]}`);
       setOpen(false);
       setResult(null);
       setNote('');
+      setScores(NO_SCORES);
       setHistory((h) => (h ? [saved, ...h] : h));
       onSaved(saved);
     } catch (e) {
@@ -102,6 +131,7 @@ const AftercareContactPanel: React.FC<{
         {lastContact ? (
           <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             ล่าสุด <AftercareResultChip contact={lastContact} />
+            <AftercareScoreChips contact={lastContact} />
             {when(lastContact.created_at)}
             {lastContact.created_by_name ? ` · ${lastContact.created_by_name}` : ''}
           </span>
@@ -133,6 +163,24 @@ const AftercareContactPanel: React.FC<{
               </Button>
             ))}
           </div>
+          {needScores ? (
+            <div className="space-y-2" data-testid="aftercare-scores">
+              {AFTERCARE_SCORE_TOPICS.map((t) => (
+                <div key={t.key} className="grid gap-1 sm:grid-cols-2 sm:items-center sm:gap-2">
+                  <span className="text-sm text-foreground">{t.label}</span>
+                  <FieldSelect
+                    value={scores[t.key] ?? ''}
+                    onChange={(v) => setScores((cur) => ({ ...cur, [t.key]: isAftercareScore(v) ? v : null }))}
+                    options={AFTERCARE_SCORES.map((v) => ({ value: v, label: AFTERCARE_SCORE_LABEL[v] }))}
+                    placeholder="เลือกผล"
+                    ariaLabel={t.label}
+                    disabled={saving}
+                    testId={`aftercare-score-${t.key}`}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
           <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -141,7 +189,7 @@ const AftercareContactPanel: React.FC<{
             maxLength={2000}
           />
           <div className="flex gap-2">
-            <Button type="button" size="sm" disabled={!result || saving} onClick={() => void save()}>
+            <Button type="button" size="sm" disabled={!result || (needScores && !scoresDone) || saving} onClick={() => void save()}>
               {saving ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
               บันทึกผล
             </Button>
@@ -163,6 +211,7 @@ const AftercareContactPanel: React.FC<{
             {(history ?? []).map((c) => (
               <li key={c.id} className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                 <AftercareResultChip contact={c} />
+                <AftercareScoreChips contact={c} />
                 <span>{when(c.created_at)}</span>
                 {c.created_by_name ? <span>· {c.created_by_name}</span> : null}
                 {c.note ? <span className="w-full pl-1 text-foreground">{c.note}</span> : null}

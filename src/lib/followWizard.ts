@@ -48,6 +48,9 @@ export type FollowWizardValues = {
    * ส่งมาเมื่อเปิดสวิตช์ตั้งเวลารายวัน · `null`/ไม่ส่ง = ทุกวันใช้ `roundTimes`
    */
   timesByDay?: Record<string, string[]> | null;
+  /** ขั้น 4 ประเภทประกัน — บังคับเมื่อ `requireInsurance` (ติดตามคนเริ่มงาน · เจ้าของ 19 ต.ค. 2569) */
+  insuranceType?: string;
+  requireInsurance?: boolean;
 };
 
 /** เบอร์มือถือไทย 10 หลักขึ้นต้น 0 — ตัวเว้นวรรค/ขีดตัดออกก่อนตรวจ */
@@ -69,8 +72,10 @@ export function followStepError(step: FollowWizardStep, v: FollowWizardValues): 
     return null;
   }
 
-  // ขั้น 2 = หน่วยงาน · ขั้น 4 = ประกัน/ลูกค้า — ไม่บังคับ ข้ามได้เสมอ
-  if (step === 2 || step === 4) return null;
+  // ขั้น 2 = หน่วยงาน — ไม่บังคับ ข้ามได้เสมอ
+  if (step === 2) return null;
+  // ขั้น 4 = ประกัน/ลูกค้า — ติดตามคนเริ่มงานต้องเลือกประกันถึงบันทึกได้ (เจ้าของ 19 ต.ค. 2569 "ล็อคให้หน่อย") · ลูกค้าไม่บังคับ
+  if (step === 4) return v.requireInsurance && !(v.insuranceType ?? '').trim() ? 'เลือกประเภทประกันก่อนบันทึก' : null;
 
   if (v.scheduleMode) {
     if (v.scheduleDays.length === 0) return 'เลือกช่วงวัน แล้วเลือกวันที่จะโทรอย่างน้อย 1 วัน';

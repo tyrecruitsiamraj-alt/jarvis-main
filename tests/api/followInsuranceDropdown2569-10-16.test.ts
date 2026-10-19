@@ -57,7 +57,8 @@ describe('ฟอร์มขั้น 4', () => {
   it('ประกันเป็น dropdown (FieldSelect) ไม่ใช่ช่องพิมพ์ · มีตัวเลือก "ไม่ระบุ"', () => {
     expect(page).toMatch(/<FieldSelect\s+id="followInsurance"/);
     expect(page).not.toMatch(/<Textarea\s+id="followInsurance"/);
-    expect(page).toContain("{ value: '', label: 'ไม่ระบุ' },");
+    // 19 ต.ค. 2569: "ไม่ระบุ" เหลือเฉพาะส่งคนแทน — ติดตามคนเริ่มงานต้องเลือกประกัน
+    expect(page).toContain("...(replaceView ? [{ value: '', label: 'ไม่ระบุ' }] : []),");
   });
 
   it('🔴 ไม่ดึงประกัน/ลูกค้าจาก ERP แล้ว · ช่องลูกค้าพิมพ์เอง', () => {

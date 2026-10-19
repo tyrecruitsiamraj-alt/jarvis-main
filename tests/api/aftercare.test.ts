@@ -104,9 +104,12 @@ describe('หน้าใหม่ + ทางเข้า', () => {
     expect(rf).toMatch(/path\.startsWith\('\/aftercare'\)/);
   });
 
-  it('🔴 ไม่สร้างระบบโทรใหม่ — ปุ่มตั้งรอบพาไปหน้า Follow', () => {
+  it('🔴 ไม่สร้างระบบโทรใหม่ — ป๊อปตั้งรอบใช้โครง Follow เดิม (19 ต.ค. 2569 เลิกพาไปหน้า Follow)', () => {
     const page = stripComments(read('src/pages/aftercare/AftercarePage.tsx'));
-    expect(page).toContain('buildFollowPrefillPath');
+    const dialog = read('src/components/aftercare/AftercareScheduleDialog.tsx');
+    expect(page).toContain('<AftercareScheduleDialog');
+    expect(dialog).toContain('createFollowRounds(');
+    expect(dialog).toContain('replaceFollowSchedule(');
     expect(page).toContain('AFTERCARE_TOPIC');
     // ห้ามยิงคิว/สายจากหน้านี้เอง
     expect(page).not.toMatch(/dispatchLumos|insertQueue|acquireCallHold/);

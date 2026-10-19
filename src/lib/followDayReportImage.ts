@@ -59,6 +59,9 @@ export function followDayReportSummaryText(report: FollowDayReport): string {
   return report.scope ? `${report.scope} — ${base}` : base;
 }
 
+/** ประกันในรูปยาวได้ไม่เกินกี่ตัวอักษร (19 ต.ค. 2569) */
+const INSURANCE_MAX = 40;
+
 /**
  * วาดรายงานลง canvas (แยกจากการดาวน์โหลด เผื่อเอาไป preview)
  * `page` = วาดเฉพาะแถวของหน้านั้น + หัวบอก "หน้า i/n" (ไม่ส่ง = ทั้งวันรูปเดียวเหมือนเดิม)
@@ -69,7 +72,9 @@ export function drawFollowDayReport(
 ): HTMLCanvasElement {
   const headers = FOLLOW_DAY_REPORT_HEADERS;
   const pageRows = page ? page.rows : report.rows;
-  const cells = pageRows.map((r) => [r.time, r.name, r.phone, r.unit, r.call, r.caller, r.result]);
+  // ประกันเก่าที่ดึงจาก ERP ยาวเป็นย่อหน้า — ตัดในรูปไม่ให้รูปกว้างหลายพันพิกเซล (ตารางบนจอ/คัดลอกยังได้เต็ม)
+  const clip = (v: string) => (v.length > INSURANCE_MAX ? `${v.slice(0, INSURANCE_MAX)}…` : v);
+  const cells = pageRows.map((r) => [r.time, r.name, r.phone, r.unit, clip(r.insurance), r.call, r.caller, r.result]);
   const rowCount = Math.max(1, cells.length); // ว่าง = แถว "ไม่มีแผนติดตาม" (ตารางไม่หาย)
 
   const measurer = document.createElement('canvas').getContext('2d');

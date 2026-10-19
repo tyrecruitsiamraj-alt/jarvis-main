@@ -17,9 +17,24 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
   fetchAftercarePeople,
   moveToAftercare,
+  revertAftercare,
   updateAftercare,
   type AftercarePerson,
 } from '@/lib/aftercareApi';
+import AftercareScheduleDialog from '@/components/aftercare/AftercareScheduleDialog';
+import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { aftercareOwnerOptions, filterAftercareByOwner, revertReopenIds } from '@/lib/aftercareSchedule';
+import { reopenFollowEntry } from '@/lib/followApi';
 import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
 import AftercarePlanningCalendar from '@/components/aftercare/AftercarePlanningCalendar';
 import AftercareContactPanel from '@/components/aftercare/AftercareContactPanel';
@@ -37,7 +52,6 @@ import {
   aftercareRoundsSummary,
   buildAftercareRounds,
 } from '@/lib/aftercareRounds';
-import { buildFollowPrefillPath } from '@/lib/followPrefill';
 import { LoaderCircle, RefreshCw, UserCheck, Users } from 'lucide-react';
 import { erpInformDateOf, fetchErpInformDates } from '@/lib/erpInformDatesApi';
 import { formatYmdTh } from '@/lib/dateTh';
@@ -90,6 +104,14 @@ const AftercarePage: React.FC = () => {
    * ⚠️ โหลดไม่ได้ = ปฏิทินยังขึ้นได้ แค่ไม่มีชั้น "สายจริง" · ห้ามทำให้หน้าพังทั้งหน้า
    */
   const [calls, setCalls] = useState<FollowEntry[]>([]);
+  /** ทุกสาย (ทุกหัวข้อ) — ย้อนกลับต้องหาสายของแผนติดตามเดิม */
+  const [allEntries, setAllEntries] = useState<FollowEntry[]>([]);
+  /** ตัวกรองเจ้าของงาน (เจ้าของ 19 ต.ค. 2569) — '' = ทุกคน */
+  const [owner, setOwner] = useState('');
+  /** ป๊อปตั้งรอบ (หน้าต่างแบบป๊อปย้าย · 19 ต.ค. 2569) */
+  const [scheduling, setScheduling] = useState<AftercarePerson | null>(null);
+  /** ยืนยันย้อนกลับไปติดตามครบ */
+  const [reverting, setReverting] = useState<AftercarePerson | null>(null);
   const [calMonth, setCalMonth] = useState(() => toYmdBangkok(new Date()).slice(0, 7));
 
   /** สายจริงโหลดไม่ได้ — ปฏิทินยังขึ้น แต่ต้องบอก (QA 17 ต.ค. 2569: เดิมกลืนเงียบ ชั้นสายจริงหายไม่มีใครรู้) */
@@ -108,8 +130,12 @@ const AftercarePage: React.FC = () => {
       .finally(() => setLoading(false));
     /* สายจริงของหัวข้อนี้ — พลาดแล้วปฏิทินยังขึ้นได้ (แค่ไม่มีชั้น "สายจริง") จึงกลืน error */
     listFollowEntries()
-      .then((rows) => setCalls(rows.filter((r) => r.topic === AFTERCARE_TOPIC)))
+      .then((rows) => {
+        setAllEntries(rows);
+        setCalls(rows.filter((r) => r.topic === AFTERCARE_TOPIC));
+      })
       .catch(() => {
+        setAllEntries([]);
         setCalls([]);
         setCallsError(true);
       });
@@ -120,7 +146,10 @@ const AftercarePage: React.FC = () => {
   /** หมุดเวลาเดียวต่อ render — ทุกแถวคิด "เลยกำหนดไหม" จากจุดเดียวกัน */
   const now = new Date();
 
-  const open = useMemo(() => items.filter((p) => !p.closed_at), [items]);
+  const ownerOptions = useMemo(() => aftercareOwnerOptions(items), [items]);
+  /** ทั้งหน้า (เลข · ปฏิทิน · รายชื่อ) ใช้ชุดที่กรองเจ้าของงานแล้ว */
+  const shown = useMemo(() => filterAftercareByOwner(items, owner), [items, owner]);
+  const open = useMemo(() => shown.filter((p) => !p.closed_at), [shown]);
   /**
    * แผนจริงจากตอนกดย้าย (การ์ดติดตามครบ) — แหล่งเดียวกับหน้าติดตาม (3 ต.ค. 2569)
    * มีแผนจริง = เลข/ปุ่ม/สรุปใช้แผนจริง · ไม่มี = ถอยไปรอบ preset จากวันเริ่มงาน
@@ -153,7 +182,7 @@ const AftercarePage: React.FC = () => {
     [open, realPlanOf],
   );
 
-  const { pageItems, bar } = useListPagination(items);
+  const { pageItems, bar } = useListPagination(shown);
   /** วันแจ้งเข้าจาก ERP ของคนที่ยังไม่มีวันเริ่มงาน (เจ้าของเคาะ 17 ต.ค. 2569) — ปุ่มให้กดใช้ ไม่เขียนเอง */
   const [erpDates, setErpDates] = useState<ReadonlyMap<string, string>>(() => new Map());
   useEffect(() => {
@@ -193,6 +222,28 @@ const AftercarePage: React.FC = () => {
       setNotice(e instanceof Error ? e.message : 'ปิดการดูแลไม่สำเร็จ');
     } finally {
       setSavingPhone(null);
+    }
+  };
+
+  /**
+   * ย้อนกลับไปการ์ด "ติดตามครบ" (เจ้าของ 19 ต.ค. 2569 "เผื่อย้ายผิด" · Choice "เก็บสายไว้")
+   * ① เปิดสายของแผนเดิมที่ปิดเป็น "ไปแล้ว" ตอนย้ายคืน ② ลบแถวดูแล — ① ไม่ครบ = หยุด (ห้ามให้คนหายจากทั้งสองที่)
+   */
+  const revert = async (p: AftercarePerson) => {
+    setSavingPhone(p.phone_e164);
+    setNotice(null);
+    try {
+      const ids = revertReopenIds(allEntries, p);
+      if (ids.length === 0) throw new Error('ไม่เจอสายติดตามที่ปิดตอนย้าย — ย้อนกลับเองไม่ได้');
+      for (const id of ids) await reopenFollowEntry(id);
+      await revertAftercare(p.phone_e164);
+      setNotice(`ย้าย ${p.full_name} กลับไปการ์ดติดตามครบแล้ว`);
+      load();
+    } catch (e) {
+      setNotice(friendlyErrorText(e, 'ย้อนกลับไม่สำเร็จ'));
+    } finally {
+      setSavingPhone(null);
+      setReverting(null);
     }
   };
 
@@ -270,6 +321,13 @@ const AftercarePage: React.FC = () => {
           <Button variant="secondary" size="sm" type="button" onClick={load} disabled={loading} >
             <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden /> รีเฟรช
           </Button>
+          <ChoiceDropdown
+            value={owner}
+            options={[{ value: '', label: 'เจ้าของงาน: ทุกคน' }, ...ownerOptions.map((o) => ({ value: o, label: o }))]}
+            onChange={setOwner}
+            ariaLabel="เจ้าของงาน"
+            active={owner !== ''}
+          />
           <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <input
               type="checkbox"
@@ -301,19 +359,7 @@ const AftercarePage: React.FC = () => {
             month={calMonth}
             onMonthChange={setCalMonth}
             missingStartDate={aftercareMissingStartDate(open, calls).length}
-            onOpenCell={(row) =>
-              navigate(
-                buildFollowPrefillPath({
-                  name: row.person.full_name,
-                  phone: row.person.phone_e164,
-                  startDate: row.person.start_date ?? undefined,
-                  topic: AFTERCARE_TOPIC,
-                  unitName: row.person.unit_name ?? undefined,
-                  back: '/aftercare',
-                  backLabel: 'ดูแลหลังเริ่มงาน',
-                }),
-              )
-            }
+            onOpenCell={(row) => setScheduling(row.person)}
           />
         ) : null}
 
@@ -327,6 +373,8 @@ const AftercarePage: React.FC = () => {
           <p className={cn('rounded-xl border px-3 py-6 text-center text-sm', DASH.card, DASH.muted)}>
             <LoaderCircle className="mr-1.5 inline h-4 w-4 animate-spin" /> กำลังโหลด…
           </p>
+        ) : shown.length === 0 && items.length > 0 ? (
+          <p className={cn('rounded-xl border px-3 py-6 text-center text-sm', DASH.card, DASH.muted)}>ไม่มีคนของเจ้าของงานนี้</p>
         ) : items.length === 0 ? (
           /**
            * หน้าว่างต้องบอกทางต่อ (Wave 1 ของ docs/plan-quality-100-2569-09-05.md
@@ -375,40 +423,22 @@ const AftercarePage: React.FC = () => {
                         <span className={cn('block text-xs', DASH.muted)}>
                           {p.unit_name || EM_DASH}
                           {p.site_code ? ` · ${p.site_code}` : ''}
+                          {p.owner_name ? ` · เจ้าของงาน ${p.owner_name}` : ''}
                           {p.moved_by_name ? ` · ย้ายโดย ${p.moved_by_name}` : ''}
                         </span>
                       </span>
                       {!p.closed_at ? (
                         <span className="flex shrink-0 flex-wrap items-center gap-1.5">
                           {/* shadcn Button (QA 17 ต.ค. 2569: เดิมปุ่มเขียนเอง) */}
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={busy || (rounds.length === 0 && !plan)}
-                            title={
-                              plan
-                                ? 'ดู/เพิ่มสายของคนนี้ที่หน้าติดตาม'
-                                : rounds.length === 0
-                                  ? 'กรอกวันเริ่มงานก่อนจึงตั้งรอบโทรได้'
-                                  : 'ไปตั้งตารางโทรที่หน้า Follow พร้อมชื่อ/เบอร์/เรื่อง'
-                            }
-                            onClick={() =>
-                              navigate(
-                                buildFollowPrefillPath({
-                                  name: p.full_name,
-                                  phone: p.phone_e164,
-                                  startDate: p.start_date ?? undefined,
-                                  topic: AFTERCARE_TOPIC,
-                                  unitName: p.unit_name ?? undefined,
-                                  back: '/aftercare',
-                                  backLabel: 'ดูแลหลังเริ่มงาน',
-                                }),
-                              )
-                            }
-                          >
+                          {/* หน้าต่างแบบป๊อปย้าย แก้รอบที่ตั้งไว้ได้ (เจ้าของ 19 ต.ค. 2569 · เดิมพาไปฟอร์มหน้าติดตาม) */}
+                          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setScheduling(p)}>
                             ตั้งรอบโทรถามความเป็นอยู่
                           </Button>
+                          {p.from_follow_id ? (
+                            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setReverting(p)}>
+                              ย้อนกลับไปติดตามครบ
+                            </Button>
+                          ) : null}
                           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void closeCare(p)}>
                             ปิดการดูแล
                           </Button>
@@ -511,6 +541,41 @@ const AftercarePage: React.FC = () => {
           </>
         )}
       </div>
+
+      <AftercareScheduleDialog
+        key={`schedule-${scheduling?.phone_e164 ?? 'none'}`}
+        person={scheduling}
+        calls={calls}
+        onClose={() => setScheduling(null)}
+        onDone={(text) => {
+          setScheduling(null);
+          setNotice(text);
+          load();
+        }}
+      />
+
+      <AlertDialog open={reverting !== null} onOpenChange={(o) => !o && savingPhone === null && setReverting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ย้อนกลับไปติดตามครบ</AlertDialogTitle>
+            <AlertDialogDescription>
+              {reverting ? `${reverting.full_name} จะกลับไปอยู่การ์ดติดตามครบบนหน้าติดตาม · รอบถามความเป็นอยู่ที่ตั้งไว้ยังอยู่` : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingPhone !== null}>ปิด</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={savingPhone !== null}
+              onClick={(e) => {
+                e.preventDefault();
+                if (reverting) void revert(reverting);
+              }}
+            >
+              ย้อนกลับ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* เลือกชื่อจากบอร์ด ERP — ตัวเดียวกับหน้าติดตาม (เจ้าของสั่ง 1 ก.ย. 2569)
           ⚠️ เพิ่มแล้ว **ยังไม่รู้วันเริ่มงาน** ⇒ ตั้งรอบโทรไม่ได้จนกว่าจะกรอกวัน

@@ -31,6 +31,8 @@ export type MoveRoundDraft = {
   /** HH:MM เวลาไทย */
   time: string;
   mode: MoveRoundMode;
+  /** สายเดิมที่ตั้งไว้แล้ว (ป๊อปตั้งรอบของหน้าดูแลหลังเริ่มงาน · 19 ต.ค. 2569) — ไม่มี = รอบใหม่ */
+  id?: string;
 };
 
 /**
@@ -291,4 +293,50 @@ export function buildContinueCalls(
     out.push({ day, time, scheduledAt, callMode: d.mode, staffPhone, callRound: lastCallRound + out.length + 1 });
   }
   return out;
+}
+
+/* ─────────── แก้รอบที่ตั้งไว้แล้ว (หน้าดูแลหลังเริ่มงาน · เจ้าของ 19 ต.ค. 2569) ───────────
+ * "ปุ่มตั้งรอบโทรถามความเป็นอยู่ … ต้องการหน้าต่างเหมือนก่อนกดย้ายไปดูแลหลังเริ่มงาน ที่สามารถแก้ไขได้"
+ * + Choice "เปิดมาเห็นรอบที่ตั้งไว้ แก้ได้" ⇒ สายที่ยังไม่โทร → รอบบนฟอร์ม (บวกต่อกันจากวันเริ่มงานแบบเดียวกับป๊อปย้าย)
+ */
+const BKK_HM = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hour12: false });
+
+const ymdDiff = (from: string, to: string): number => {
+  const [y1, m1, d1] = from.split('-').map(Number);
+  const [y2, m2, d2] = to.split('-').map(Number);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86_400_000);
+};
+
+/** สายที่ยังไม่โทร → รอบบนฟอร์ม (เรียงเวลา · วันนับต่อจากรอบก่อน · รอบแรกนับจากวันเริ่มงาน) */
+export function draftsFromPending(
+  pending: ReadonlyArray<{ id: string; scheduled_at: string | null; call_mode?: string | null }>,
+  baseYmd: string,
+): MoveRoundDraft[] {
+  const rows = pending
+    .filter((r) => r.scheduled_at && !Number.isNaN(Date.parse(r.scheduled_at)))
+    .sort((a, b) => Date.parse(a.scheduled_at as string) - Date.parse(b.scheduled_at as string));
+  let prev = baseYmd;
+  return rows.map((r) => {
+    const at = new Date(r.scheduled_at as string);
+    const day = bangkokYmd(at);
+    const days = ymdDiff(prev, day);
+    prev = day;
+    return { id: r.id, days: String(days), time: BKK_HM.format(at), mode: r.call_mode === 'manual' ? 'manual' : 'ai' };
+  });
+}
+
+/** ฟอร์ม → ตารางใหม่ของ `replaceFollowSchedule` (มี id = สายเดิม · ไม่มี = สายใหม่) — เรียกหลัง validate ผ่านแล้ว */
+export function buildScheduleReplaceRounds(
+  rounds: readonly MoveRoundDraft[],
+  baseYmd: string,
+): Array<{ id?: string; scheduled_at: string; call_mode: MoveRoundMode }> {
+  const days = moveRoundDays(rounds, baseYmd);
+  const out: Array<{ id?: string; scheduled_at: string; call_mode: MoveRoundMode }> = [];
+  rounds.forEach((r, i) => {
+    const day = days[i];
+    const at = day && isTime24(r.time) ? bangkokInputToIso(`${day}T${r.time.trim()}`) : null;
+    if (!at) return;
+    out.push({ ...(r.id ? { id: r.id } : {}), scheduled_at: at, call_mode: r.mode });
+  });
+  return out.sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
 }

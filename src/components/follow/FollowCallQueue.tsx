@@ -21,6 +21,7 @@ import {
   type FollowQueueItem,
 } from '@/lib/followCallQueue';
 import { PagePager } from '@/components/shared/PagePager';
+import { followCustomerOf } from '@/lib/followCustomer';
 import { canRecordStaffCall, type FollowStaffCallOutcome } from '@/lib/followStaffCall';
 import { followCallerOf } from '@/lib/followListFilter';
 import { isFollowLeaveMismatch } from '@/lib/followLeave';
@@ -87,6 +88,8 @@ export default function FollowCallQueue({
     const late = it.lateMinutes !== null && it.lateMinutes > 0;
     const callLabel = followDayCallLabel({ day: e.call_day ?? null, call: e.call_of_day ?? e.call_round ?? null });
     const canRecord = it.group === 'staff' && Boolean(onRecord) && canRecordStaffCall(e);
+    /** สายที่จบด้วยคำตอบ "ไป" เท่านั้น (Choice เจ้าของ 19 ต.ค. 2569 "เฉพาะแท็บตอบว่าไป") */
+    const customer = it.group === 'done' && call.category === 'agreed' ? followCustomerOf(person.row.group.rounds) : null;
     return (
       <li
         key={e.id}
@@ -123,6 +126,13 @@ export default function FollowCallQueue({
               </span>
             ) : null}
           </div>
+          {/* ลูกค้า (จบแล้ว · ตอบว่าไป — เจ้าของ 19 ต.ค. 2569: เจ้าของแผนต้องโทรหาลูกค้าตอนพนักงานเริ่มงานครั้งแรก) */}
+          {customer ? (
+            <div className="truncate text-xs text-foreground" data-testid="queue-customer">
+              ลูกค้า {customer.name ?? customer.contact ?? '—'}
+              {customer.name && customer.contact ? <span className="text-muted-foreground"> · {customer.contact}</span> : null}
+            </div>
+          ) : null}
           <div className="truncate text-xs text-muted-foreground">
             {[e.unit_name?.trim() || person.row.group.unitName, callLabel].filter(Boolean).join(' · ')}
             {' · '}
@@ -134,6 +144,13 @@ export default function FollowCallQueue({
             <Button asChild type="button" size="xs" variant="outline">
               <a href={`tel:${person.row.group.phone}`} aria-label={`โทรหา ${person.row.group.name}`}>
                 <Phone aria-hidden /> โทร
+              </a>
+            </Button>
+          ) : null}
+          {customer?.tel ? (
+            <Button asChild type="button" size="xs" variant="outline">
+              <a href={`tel:${customer.tel}`} aria-label={`โทรหาลูกค้า ${customer.phone}`}>
+                <Phone aria-hidden /> โทรลูกค้า
               </a>
             </Button>
           ) : null}

@@ -6,7 +6,7 @@
  * (ห้ามให้จอพังเพราะยังไม่ได้รัน migration)
  */
 import { apiFetch } from '@/lib/apiFetch';
-import type { AftercareContact, AftercareResult } from '@/lib/aftercareContact';
+import type { AftercareContact, AftercareResult, AftercareScores } from '@/lib/aftercareContact';
 
 export type AftercarePerson = {
   phone_e164: string;
@@ -25,6 +25,10 @@ export type AftercarePerson = {
   /** ผลการโทรดูแลล่าสุด (142 · 10 ต.ค. 2569) — ยังไม่เคยลงผล = null */
   last_contact?: AftercareContact | null;
   contact_count?: number;
+  /** เจ้าของงาน = คนเพิ่มแผนติดตามเดิม · เพิ่มเอง = คนย้าย (19 ต.ค. 2569) */
+  owner_name?: string | null;
+  /** ชุดของแผนติดตามเดิม — ย้อนกลับใช้หาสายที่ปิดตอนย้าย */
+  follow_group_id?: string | null;
 };
 
 export type AftercareList = { items: AftercarePerson[]; total: number; migrated?: boolean };
@@ -74,7 +78,9 @@ export async function updateAftercare(input: {
 }
 
 /** ลงผลการโทรดูแล (ทำงานปกติ · มีปัญหา · ลาออก · ติดต่อไม่ได้ + หมายเหตุ) — ทุกครั้งเก็บเป็นประวัติ */
-export async function addAftercareContact(input: { phone: string; result: AftercareResult; note?: string | null }): Promise<AftercareContact> {
+export async function addAftercareContact(
+  input: { phone: string; result: AftercareResult; note?: string | null } & Partial<AftercareScores>,
+): Promise<AftercareContact> {
   const r = await apiFetch('/api/aftercare', { method: 'POST', body: JSON.stringify({ action: 'contact', ...input }) });
   if (!r.ok) {
     const body = (await r.json().catch(() => null)) as { message?: string } | null;
@@ -87,4 +93,13 @@ export async function fetchAftercareHistory(phone: string): Promise<AftercareCon
   const r = await apiFetch(`/api/aftercare?history=${encodeURIComponent(phone)}`);
   if (!r.ok) throw new Error('โหลดประวัติการโทรไม่สำเร็จ');
   return ((await r.json()) as { items: AftercareContact[] }).items ?? [];
+}
+
+/** ย้อนกลับไปการ์ดติดตามครบ — ลบแถวดูแล (เปิดสายของแผนเดิมคืนก่อนเรียก · 19 ต.ค. 2569) */
+export async function revertAftercare(phone: string): Promise<void> {
+  const r = await apiFetch('/api/aftercare', { method: 'PATCH', body: JSON.stringify({ phone, revert: true }) });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message || 'ย้อนกลับไม่สำเร็จ');
+  }
 }

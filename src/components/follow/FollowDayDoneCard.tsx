@@ -16,6 +16,8 @@ import {
 } from '@/lib/followPlanning';
 import { cn } from '@/lib/utils';
 import { followPersonName } from '@/lib/followApi';
+import { followCustomerOf } from '@/lib/followCustomer';
+import { Phone } from 'lucide-react';
 
 /** 🔴 คำ/สีเดียวกับกล่องบนแผง (7 ต.ค. 2569 — เดิม "สำเร็จ" รวมคนที่ไม่ไปด้วย) */
 const KINDS: readonly FollowDayDoneKind[] = ['agreed', 'lost', 'other', 'cancelled'];
@@ -87,6 +89,9 @@ export default function FollowDayDoneCard({
   const pageCount = Math.max(1, Math.ceil(ofKind.length / PAGE));
   const safePage = Math.min(page, pageCount);
   const shown = ofKind.slice((safePage - 1) * PAGE, safePage * PAGE);
+  /** ลูกค้า + ปุ่มโทร เฉพาะแท็บตอบว่าไป (เจ้าของ 19 ต.ค. 2569 Choice) — เจ้าของแผนโทรบอกลูกค้าตอนพนักงานเริ่มงานครั้งแรก */
+  const withCustomer = kind === 'agreed';
+  const cols = withCustomer ? 6 : 5;
 
   return (
     <Card className="overflow-hidden rounded-2xl shadow-sm" data-testid="follow-day-done">
@@ -114,6 +119,7 @@ export default function FollowDayDoneCard({
             <tr className="border-b border-border/70 text-left text-[11px] text-muted-foreground">
               <th className="px-4 py-2 font-medium md:px-5">ชื่อ</th>
               <th className="px-3 py-2 font-medium">หน่วยงาน</th>
+              {withCustomer ? <th className="px-3 py-2 font-medium">ลูกค้า</th> : null}
               <th className="px-3 py-2 font-medium">ผล</th>
               <th className="px-3 py-2 font-medium">ใครจัดการ</th>
               <th className="px-4 py-2 md:px-5" />
@@ -122,7 +128,7 @@ export default function FollowDayDoneCard({
           <tbody>
             {shown.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground md:px-5">
+                <td colSpan={cols} className="px-4 py-6 text-center text-muted-foreground md:px-5">
                   ยังไม่มีใคร
                 </td>
               </tr>
@@ -132,6 +138,7 @@ export default function FollowDayDoneCard({
                   {/* ชื่อไม่ตัดกลางคำ — จอแคบเลื่อนตารางแทน (QA รอบ 3 ข้อ 19 เดิมชื่อแตก 4–5 บรรทัด) */}
                   <td className="whitespace-nowrap px-4 py-2.5 font-medium text-foreground md:px-5">{person.row.group.name}</td>
                   <td className="min-w-32 px-3 py-2.5 text-muted-foreground">{person.row.group.unitName || '—'}</td>
+                  {withCustomer ? <CustomerCell rounds={person.row.group.rounds} /> : null}
                   <td className={cn('whitespace-nowrap px-3 py-2.5', TONE[FOLLOW_CALL_CATEGORY_TONE[kind]].value)}>{resultOf(person, kind)}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{whoOf(person, kind)}</td>
                   <td className="px-4 py-2.5 text-right md:px-5">
@@ -155,5 +162,28 @@ export default function FollowDayDoneCard({
         summary={`${ofKind.length.toLocaleString('th-TH')} คน`}
       />
     </Card>
+  );
+}
+
+function CustomerCell({ rounds }: { rounds: Parameters<typeof followCustomerOf>[0] }) {
+  const c = followCustomerOf(rounds);
+  if (!c) return <td className="px-3 py-2.5 text-muted-foreground">—</td>;
+  return (
+    <td className="min-w-40 px-3 py-2.5" data-testid="follow-done-customer">
+      <span className="flex flex-wrap items-center gap-2">
+        <span className="text-foreground">
+          {c.name ?? c.contact ?? '—'}
+          {c.name && c.contact ? <span className="text-muted-foreground"> · {c.contact}</span> : null}
+        </span>
+        {c.tel ? (
+          <Button asChild size="xs" variant="outline">
+            <a href={`tel:${c.tel}`} aria-label={`โทรหาลูกค้า ${c.phone}`}>
+              <Phone aria-hidden />
+              โทร
+            </a>
+          </Button>
+        ) : null}
+      </span>
+    </td>
   );
 }

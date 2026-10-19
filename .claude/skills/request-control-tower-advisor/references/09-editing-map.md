@@ -13661,3 +13661,15 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `src/components/dashboard-trends/ChannelFunnelTable.tsx` — แทน `ChannelTable` เดิม (ถอดแล้ว) · กดเลขเปิดรายชื่อ
 - ⚠️ ใบที่ดึงจาก iRecruit ไม่มีช่องทางในใบเรา ⇒ ใช้ช่องทางลงทะเบียนใน iRecruit · ไม่เจอ = "iRecruit ไม่รู้ช่องทาง"
 - เทสต์ `tests/api/channelFunnel2569-10-19.test.ts`
+
+## หน้าติดตาม ส่งคนเริ่มงาน + ดูแลหลังเริ่มงาน (19 ต.ค. 2569)
+
+- สรุปแผนติดตาม: คอลัมน์ "ประกัน" ต่อจากหน่วยงาน — `insuranceOfRow` ใน `src/lib/followDayReport.ts` · รูป PNG ตัดที่ 40 ตัว (`followDayReportImage.ts`)
+- ฟอร์มเพิ่มคน ขั้น 4: ติดตามคนเริ่มงานต้องเลือกประกัน (`followStepError` + `requireInsurance: !replaceView`) · "ไม่ระบุ" เหลือเฉพาะส่งคนแทน
+- ลูกค้า + ปุ่มโทร: `src/lib/followCustomer.ts` · แสดงที่ `FollowCallQueue.tsx` (ช่องจบแล้ว สายที่ตอบว่าไป) และ `FollowDayDoneCard.tsx` (แท็บตอบว่าไป)
+- ดูแลหลังเริ่มงาน:
+  - ตัวกรองเจ้าของงาน = คนเพิ่มแผนติดตามเดิม (`owner_name` จาก `api/_handlers/aftercare.ts` join follow_entries + users) · ตรรกะ `src/lib/aftercareSchedule.ts`
+  - ป๊อปตั้งรอบ `src/components/aftercare/AftercareScheduleDialog.tsx` — ฟอร์ม `src/components/follow/MoveRoundsEditor.tsx` ตัวเดียวกับป๊อปย้าย · มีสายเดิม = `replaceFollowSchedule` (ชุดเดียว · `pendingAftercareRounds`) · ไม่มี = `createFollowRounds`
+  - ลงผล 3 หัวข้อ Healthy/Warning/High Risk (migration 155 · `AFTERCARE_SCORE_TOPICS` ใน `aftercareContact.ts`) — บังคับเมื่อผล ทำงานปกติ/มีปัญหา · ผลเดิม 4 แบบอยู่ต่อ
+  - ย้อนกลับไปติดตามครบ: หน้าเปิดสายที่ปิด "ไปแล้ว" ตอนย้ายคืน (`revertReopenIds` → `reopenFollowEntry`) แล้วค่อย PATCH `{revert:true}` ลบแถวดูแล · รอบถามความเป็นอยู่ไม่ยกเลิก (Choice เจ้าของ)
+- เทสต์ `tests/api/aftercareRework2569-10-19.test.ts`

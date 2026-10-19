@@ -101,9 +101,10 @@ describe('buildFollowDayReport', () => {
   it('ข้อความคัดลอก: หัวตาราง + แถวละสาย คั่นแท็บ · แท็บในค่ากลายเป็นเว้นวรรค', () => {
     const r = buildFollowDayReport([entry({ unit_name: 'ไซต์\tA' })], '2026-10-02', NOW);
     const lines = followDayReportTsv(r).split('\n');
-    expect(lines[0]).toBe('เวลา\tชื่อ\tเบอร์\tหน่วยงาน\tสาย\tใครโทร\tผล');
+    // ประกันต่อจากหน่วยงาน (เจ้าของ 19 ต.ค. 2569)
+    expect(lines[0]).toBe('เวลา\tชื่อ\tเบอร์\tหน่วยงาน\tประกัน\tสาย\tใครโทร\tผล');
     expect(lines).toHaveLength(2);
-    expect(lines[1].split('\t')).toHaveLength(7);
+    expect(lines[1].split('\t')).toHaveLength(8);
     expect(lines[1]).toContain('ไซต์ A');
     expect(lines[1].split('\t')[2]).toBe('0812345678');
   });

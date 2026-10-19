@@ -1042,8 +1042,11 @@ const FollowPage: React.FC = () => {
               .map((d) => [d, roundTimesByDay[d] ?? roundTimes]),
           )
         : null,
+      insuranceType,
+      // ส่งคนแทนบันทึกทางอื่น (ขั้น 3 = วันเวลาเข้างาน) — บังคับประกันเฉพาะติดตามคนเริ่มงาน
+      requireInsurance: !replaceView,
     }),
-    [firstName, phone, topic, scheduleMode, scheduledAts, dateFrom, dateTo, skippedDays, roundTimes, perDayTimes, roundTimesByDay],
+    [firstName, phone, topic, scheduleMode, scheduledAts, dateFrom, dateTo, skippedDays, roundTimes, perDayTimes, roundTimesByDay, insuranceType, replaceView],
   );
 
   /** ส่งคนแทน: ขั้น 3 คือวันเวลาเข้างาน ไม่ใช่ตารางโทร — ด่านถัดไปต้องตรวจคนละอย่าง */
@@ -3301,7 +3304,8 @@ const FollowPage: React.FC = () => {
                     🔴 16 ต.ค. 2569 เลิกดึงจาก ERP — ประกันเลือกจากรายการ (ตั้งค่าตัวเลือก › เพิ่มประเภทประกัน) · ลูกค้าพิมพ์เอง */}
                 <div className="space-y-1.5">
                   <label htmlFor="followInsurance" className="ml-1 text-xs font-medium text-muted-foreground">
-                    ประเภทประกัน
+                    {/* ติดตามคนเริ่มงานต้องเลือกถึงบันทึกได้ (เจ้าของ 19 ต.ค. 2569) — ไม่มี "ไม่ระบุ" ให้เลือก */}
+                    ประเภทประกัน{replaceView ? '' : ' *'}
                   </label>
                   <FieldSelect
                     id="followInsurance"
@@ -3309,7 +3313,7 @@ const FollowPage: React.FC = () => {
                     onChange={setInsuranceType}
                     placeholder="เลือกประเภทประกัน"
                     options={[
-                      { value: '', label: 'ไม่ระบุ' },
+                      ...(replaceView ? [{ value: '', label: 'ไม่ระบุ' }] : []),
                       ...insuranceTypeOptions(insuranceTypes ?? [], insuranceType).map((name) => ({ value: name, label: name })),
                     ]}
                   />

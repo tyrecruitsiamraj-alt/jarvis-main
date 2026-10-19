@@ -48,9 +48,11 @@ beforeEach(() => {
   });
 });
 
+const SCORES = { expectation: 'healthy', supervisor: 'warning', escalation: 'high_risk' };
+
 describe('POST action=contact', () => {
   it('ลงผล "มีปัญหา" + หมายเหตุ ⇒ เพิ่มแถวใหม่ (ไม่ update) · ไม่แตะ closed_at', async () => {
-    const out = await call(req('POST', { action: 'contact', phone: '0812345678', result: 'issue', note: ' ไม่ได้รับชุด ' }));
+    const out = await call(req('POST', { action: 'contact', phone: '0812345678', result: 'issue', note: ' ไม่ได้รับชุด ', ...SCORES }));
     expect(out.code).toBe(200);
     expect(out.body.item).toMatchObject({ result: 'issue', note: 'ไม่ได้รับชุด' });
     const sqls = dbQuery.mock.calls.map((c) => String(c[0]));
@@ -67,7 +69,7 @@ describe('POST action=contact', () => {
 
   it('🔴 คนที่ไม่อยู่ในรายการดูแล ⇒ 404', async () => {
     dbQuery.mockImplementation(() => Promise.resolve({ rows: [{ n: 0 }] }));
-    const out = await call(req('POST', { action: 'contact', phone: '0812345678', result: 'working' }));
+    const out = await call(req('POST', { action: 'contact', phone: '0812345678', result: 'working', ...SCORES }));
     expect(out.code).toBe(404);
   });
 
@@ -79,7 +81,7 @@ describe('POST action=contact', () => {
 describe('GET', () => {
   it('รายชื่อแนบผลล่าสุด + จำนวนครั้ง', async () => {
     dbQuery.mockImplementation((sql: string) => {
-      if (/from .*aftercare_people/i.test(sql) && /select phone_e164/i.test(sql)) {
+      if (/from .*aftercare_people/i.test(sql) && /select a\.phone_e164/i.test(sql)) {
         return Promise.resolve({ rows: [{ phone_e164: PHONE, full_name: 'ก', unit_name: null, site_code: null, start_date: null, source: 'manual', from_follow_id: null, note: null, moved_by_name: null, closed_at: null, closed_reason: null, created_at: '2026-10-01T00:00:00Z' }] });
       }
       if (/distinct on \(phone_e164\)/i.test(sql)) {
