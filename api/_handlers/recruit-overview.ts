@@ -85,6 +85,8 @@ const startOfBkk = (ymd: string) => `${ymd}T00:00:00+07:00`;
 /** ประชากรของทุกก้อน — ไม่ใช่ Lead + BU (ถ้าล็อก) · `$bu` = ตำแหน่งพารามิเตอร์ของ BU */
 // ใบที่ยกเลิกข้อมูลแล้วไม่นับ (135) — กติกาเดียวกับหน้าหลัก/รายชื่อผู้สมัคร · กดเลขแล้วเปิดชื่อได้ครบ (QA 18 ต.ค. 2569)
 const CANCELLATIONS = tableInAppSchema('application_cancellations');
+/** ลิงก์รับสมัคร — ช่องทาง/กลุ่มติดที่ลิงก์ ไม่ได้คัดลอกลงใบสมัคร (19 ต.ค. 2569 · 383 จาก 502 ใบ) */
+const POSTING_LINKS = tableInAppSchema('recruit_posting_links');
 const scopeWhere = (bu: string) =>
   `not coalesce(a.is_lead, false) and not exists (select 1 from ${CANCELLATIONS} cx where cx.application_id = a.id) and (${bu}::text is null or ${appBuSql('a')} = ${bu}::text)`;
 
@@ -92,7 +94,9 @@ const scopeWhere = (bu: string) =>
 export function factsSql(attendance: string = LATEST_ATTENDANCE_SQL, screening: string = LATEST_SCREENING_SQL): string {
   return `
   select a.id::text as id, a.created_at, a.job_id,
-         nullif(btrim(a.channel_label), '') as channel_label,
+         -- ช่องทางของใบ → ไม่มี = ช่องทางของลิงก์ที่กรอกผ่าน (19 ต.ค. 2569)
+         coalesce(nullif(btrim(a.channel_label), ''),
+                  (select nullif(btrim(l.channel_label), '') from ${POSTING_LINKS} l where l.id = a.link_id)) as channel_label,
          nullif(btrim(a.referral_source), '') as referral_source,
          nullif(btrim(a.position_interest), '') as position,
          a.phone_e164, a.age,

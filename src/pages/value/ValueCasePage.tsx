@@ -30,6 +30,16 @@ import {
   type ValueCaseMonth,
 } from "@/lib/valueCase";
 import { fetchValueCase, saveValueCase } from "@/lib/valueCaseApi";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChoiceDropdown } from "@/components/shared/ChoiceDropdown";
+import {
+  ValueBottleneckTab,
+  ValueGapsTab,
+  ValueOutcomeSection,
+  ValueRequestTab,
+} from "@/components/value/ValuePipelineTabs";
+
+type ValueTab = "outcome" | "bottleneck" | "request" | "gaps";
 
 /**
  * ═══ หน้าความคุ้มค่าระบบ (เจ้าของสั่ง 15 ต.ค. 2569 · เปิดได้คนเดียว ไม่มีในเมนู · /value) ═══
@@ -108,6 +118,19 @@ function Formula({ children }: { children: React.ReactNode }) {
 
 const ValueCasePage: React.FC = () => {
   usePageTitle("ความคุ้มค่าระบบ");
+  const [tab, setTab] = useState<ValueTab>("outcome");
+  /** เดือนของแท็บใบขอครบเส้น — เดือนนี้ + 3 เดือนก่อน (ระบบเริ่มใช้ ส.ค. 2569) */
+  const pipeMonthOptions = useMemo(() => {
+    const cur = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 7);
+    return [0, 1, 2, 3].map((i) => {
+      const d = new Date(`${cur}-15T00:00:00Z`);
+      d.setUTCMonth(d.getUTCMonth() - i);
+      const ym = d.toISOString().slice(0, 7);
+      return { value: ym, label: monthLabel(ym) };
+    });
+  }, []);
+  const [pipeMonth, setPipeMonth] = useState(() => pipeMonthOptions[0].value);
+  const [pipeJob, setPipeJob] = useState("");
   const [inputs, setInputs] = useState<ValueCaseInputs>(EMPTY_VALUE_CASE);
   const [months, setMonths] = useState<ValueCaseMonth[]>([]);
   const [currentYm, setCurrentYm] = useState("");
@@ -231,6 +254,21 @@ const ValueCasePage: React.FC = () => {
         }
       />
 
+      {/* ═══ 4 แท็บ (เจ้าของ 19 ต.ค. 2569 "ทำไว้ที่หน้าความคุ้มค่าก่อน" · Choice "ทั้ง 4 แบบเป็นแท็บ") ═══ */}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as ValueTab)} className="mt-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <TabsList>
+            <TabsTrigger value="outcome">คุ้มไหม</TabsTrigger>
+            <TabsTrigger value="bottleneck">ช้าที่ตรงไหน</TabsTrigger>
+            <TabsTrigger value="request">ใบขอนี้ติดอะไร</TabsTrigger>
+            <TabsTrigger value="gaps">จุดบอด</TabsTrigger>
+          </TabsList>
+          {tab !== 'request' ? (
+            <ChoiceDropdown value={pipeMonth} options={pipeMonthOptions} onChange={setPipeMonth} ariaLabel="เดือน" />
+          ) : null}
+        </div>
+        <TabsContent value="outcome" className="space-y-4">
+          <ValueOutcomeSection month={pipeMonth} />
       {/* ล้ม = ไม่วาดตัวเลข (เดิมขึ้น "0 บาท" ทั้งหน้าใต้ข้อความล้ม · QA 17 ต.ค. 2569) */}
       {state === "error" ? (
         <LoadErrorNotice
@@ -654,6 +692,23 @@ const ValueCasePage: React.FC = () => {
         </div>
       </div>
       )}
+        </TabsContent>
+        <TabsContent value="bottleneck">
+          <ValueBottleneckTab
+            month={pipeMonth}
+            onOpenJob={(id) => {
+              setPipeJob(id);
+              setTab('request');
+            }}
+          />
+        </TabsContent>
+        <TabsContent value="request">
+          <ValueRequestTab jobId={pipeJob} onPick={setPipeJob} />
+        </TabsContent>
+        <TabsContent value="gaps">
+          <ValueGapsTab month={pipeMonth} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

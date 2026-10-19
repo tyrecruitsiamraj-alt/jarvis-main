@@ -19,6 +19,7 @@ import {
 } from '../../src/lib/channelPlacement.js';
 
 const APPS = tableInAppSchema('public_job_applications');
+const LINKS = tableInAppSchema('recruit_posting_links');
 const CACHE_MS = 10 * 60_000;
 const cache = new Map<string, { at: number; value: ChannelPlacement }>();
 
@@ -46,13 +47,15 @@ export async function loadChannelPlacement(window: { from: string; to: string })
       { from: regFrom, to: regTo },
     ),
     dbQuery<{ k: string; at: Date | string; ch: string | null; sub: string | null }>(
-      `select right(regexp_replace(coalesce(phone_e164, phone, ''), '\\D', '', 'g'), 9) as k, created_at as at,
-              coalesce(nullif(btrim(referral_source), ''), nullif(btrim(channel_label), '')) as ch,
-              coalesce(nullif(btrim(channel_label), ''), 'ลิงก์ระบบเรา') as sub
-         from ${APPS}
-        where link_id is not null and created_by_name is null
-          and coalesce(channel_label, '') not ilike 'irecruit%'
-          and created_at >= $1::date and created_at < $2::date`,
+      // ช่องทางของลิงก์ก่อน ("Facebook Group · กลุ่มหางานจังหวัด" → หลัก · กลุ่มย่อย) — ลิงก์ส่วนใหญ่มีช่องทาง แต่ไม่ได้คัดลอกลงใบ (19 ต.ค. 2569)
+      `select right(regexp_replace(coalesce(a.phone_e164, a.phone, ''), '\\D', '', 'g'), 9) as k, a.created_at as at,
+              coalesce(nullif(btrim(split_part(l.channel_label, ' · ', 1)), ''), nullif(btrim(a.referral_source), ''), nullif(btrim(a.channel_label), '')) as ch,
+              coalesce(nullif(btrim(split_part(l.channel_label, ' · ', 2)), ''), nullif(btrim(l.channel_label), ''), nullif(btrim(a.channel_label), ''), 'ลิงก์ระบบเรา') as sub
+         from ${APPS} a
+         left join ${LINKS} l on l.id = a.link_id
+        where a.link_id is not null and a.created_by_name is null
+          and coalesce(a.channel_label, '') not ilike 'irecruit%'
+          and a.created_at >= $1::date and a.created_at < $2::date`,
       [regFrom, regTo],
     ),
     // ช่อง "ทราบข่าวจาก" (news_code) ติดมาด้วย — ใช้เมื่อหาการลงทะเบียนไม่เจอ (19 ต.ค. 2569)

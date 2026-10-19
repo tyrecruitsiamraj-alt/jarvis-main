@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
-import { UNKNOWN_CHANNEL, type ChannelPlacement } from '@/lib/channelPlacement';
+import { ERP_SUB, UNKNOWN_CHANNEL, type ChannelPlacement } from '@/lib/channelPlacement';
 
 /**
  * ═══ ตาราง "ช่องทางที่ได้คนลงงาน" (เจ้าของ 19 ต.ค. 2569 · Choice "ช่องทางหลัก กดดูย่อยได้") ═══
@@ -35,6 +35,8 @@ const ChannelPlacementTable: React.FC<{ data: ChannelPlacement }> = ({ data }) =
               const expandable = r.subs.length > 1 || (r.subs.length === 1 && r.subs[0].name !== r.channel);
               const isOpen = open === r.channel;
               const unknown = r.channel === UNKNOWN_CHANNEL;
+              // % แจ้งเข้า = เฉพาะคนที่มาจากการลงทะเบียน (คนที่ได้ช่องทางจาก ERP ไม่ได้ลงทะเบียน · เคยขึ้น 167%)
+              const fromReg = r.placed - (r.subs.find((s) => s.name === ERP_SUB)?.placed ?? 0);
               return (
                 <React.Fragment key={r.channel}>
                   <TableRow data-testid={`channel-row-${r.channel}`}>
@@ -58,7 +60,7 @@ const ChannelPlacementTable: React.FC<{ data: ChannelPlacement }> = ({ data }) =
                     <TableCell className="text-right text-sm tabular-nums">{unknown ? '—' : fmt(r.registered)}</TableCell>
                     <TableCell className="text-right text-sm font-medium tabular-nums">{fmt(r.placed)}</TableCell>
                     <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                      {unknown ? '—' : pct(r.placed, r.registered)}
+                      {unknown ? '—' : pct(fromReg, r.registered)}
                     </TableCell>
                   </TableRow>
                   {isOpen

@@ -13684,3 +13684,10 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 ## หน้าสมัครงานสาธารณะ: ของที่คนนอกไม่ควรเห็น (QA 19 ต.ค. 2569)
 - `src/lib/publicJobSafety.ts` ใช้ใน `api/_handlers/public/jobs.ts` — ชื่อไซต์ไม่มีอักษรไทย (รหัสย่อ HRSA/ADLC) ไม่ส่ง ⇒ หัวการ์ดใช้ชื่อบริษัทเต็ม · ตัดบรรทัดบ้าน/คอนโด/หมู่บ้านของนาย
 - ช่องทางที่ได้คนลงงาน: หาการลงทะเบียนไม่เจอใช้ "ทราบข่าวจาก" ERP (`erpChannelOf` ใน `channelPlacement.ts`) · Dashboard ยอดตามช่วงล้ม = การ์ด "—" (`DashboardKpi.unavailable`)
+
+## หน้าความคุ้มค่า: ใบขอครบเส้น 4 แท็บ (19 ต.ค. 2569 · เห็นคนเดียว)
+- หน้า `src/pages/value/ValueCasePage.tsx` → แท็บ คุ้มไหม · ช้าที่ตรงไหน · ใบขอนี้ติดอะไร · จุดบอด (`src/components/value/ValuePipelineTabs.tsx`)
+- ตัวคิด `src/lib/valuePipeline.ts` — `informedAfterAi` (AI เคยโทรภายใน 60 วันก่อนแจ้งเข้า) · `buildStageSla` (ช้า = เกิน 24 ชม. · ขั้นที่ยังไม่มีข้อมูล = null + เหตุ ห้าม 0) · `stuckByOwner`
+- API `api/_handlers/value-pipeline.ts` (`view=outcome|bottleneck|request|gaps`) สิทธิ์เดียวกับ /api/value-case · ใบขอปิดไม่นับค้าง
+- ช่องทางของใบสมัครผ่านลิงก์ = `recruit_posting_links.channel_label` (ไม่ได้คัดลอกลงใบ) — factsSql + channelPlacementSql ดึงจากลิงก์แล้ว
+- เทสต์ `tests/api/valuePipeline2569-10-19.test.ts`
