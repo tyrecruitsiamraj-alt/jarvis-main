@@ -94,8 +94,11 @@ describe('ทุกจุดใช้ความหมายเดียวก�
 
   it('หน้าแม่ส่งชื่อผู้สรรหาเข้าป๊อปทุกทาง (แท็บผู้สมัคร · การติดต่อ · ป๊อปการ์ดใบขอ)', () => {
     const ws = readFileSync('src/components/recruit-rm/RmWorkspace.tsx', 'utf8');
-    expect(ws).toContain('recruiterName={recruiterOf?.(profileApp) ?? null}');
-    expect(ws).toContain('recruiterName={contactApp ? (recruiterOf?.(contactApp) ?? null) : null}');
+    // 19 ต.ค. 2569: ผู้สรรหาแก้รายคนได้ — recruiterOf = ที่แก้ก่อน ไม่มีค่อยใช้ของใบขอ · jobRecruiterOf = ของใบขอ (ตัวเลือก "ตามใบขอ")
+    expect(ws).toContain('recruiterName={recruiterOf(profileApp)}');
+    expect(ws).toContain('jobRecruiterName={jobRecruiterOf?.(profileApp) ?? null}');
+    expect(ws).toContain('recruiterName={contactApp ? recruiterOf(contactApp) : null}');
+    expect(ws).toContain("(r.recruiter_name ?? '').trim() || jobRecruiterOf?.(r) || null");
     expect(ws.match(/downloadApplicantExport\(shown, \{ recruiterOf \}\)/g)?.length).toBe(2);
     expect(readFileSync('src/components/jobs/JobApplicantsDialog.tsx', 'utf8')).toContain(
       'recruiterName={job?.recruiter_name?.trim() || null}',

@@ -1208,10 +1208,14 @@ async function patchProfile(req: AuthedReq, res: ApiRes, id: string, raw: unknow
     note: string | null;
     job_id: string | null;
     department_code: string | null;
+    recruiter_name: string | null;
+    responsible_name: string | null;
+    specific_type: string | null;
   };
   const { rows: beforeRows } = await dbQuery<Before>(
     `select title_prefix, first_name, last_name, full_name, gender, age, line_id, province, district,
-            education, license_types, weight_kg, height_cm, note, job_id, department_code
+            education, license_types, weight_kg, height_cm, note, job_id, department_code,
+            recruiter_name, responsible_name, specific_type
        from ${tbl} where id = $1 limit 1`,
     [id],
   );
@@ -1724,6 +1728,22 @@ async function handler(req: AuthedReq, res: ApiRes) {
           (item as Record<string, unknown>).attendance_result = hit.result;
           (item as Record<string, unknown>).attendance_at = hit.createdAt;
         }
+      }
+      // ผู้สรรหาของผู้สมัครรายคน (154 · 19 ต.ค. 2569 "ข้อมูลผู้สรรหา ทำให้แก้ไขได้") — ว่าง = ใช้ของใบขอ
+      // แนบแยกจากชุดคอลัมน์หลัก (มีชั้นสำรองหลายรุ่นฐาน) · ยังไม่รัน 154 = ไม่แนบ ไม่ล้ม
+      try {
+        const { rows: rec } = await dbQuery<{ id: string; recruiter_name: string }>(
+          `select id::text as id, recruiter_name from ${tbl}
+            where id = any($1::uuid[]) and coalesce(btrim(recruiter_name), '') <> ''`,
+          [items.map((i) => i.id)],
+        );
+        const recOf = new Map(rec.map((r) => [r.id, r.recruiter_name.trim()]));
+        for (const item of items) {
+          const hit = recOf.get(item.id);
+          if (hit) (item as Record<string, unknown>).recruiter_name = hit;
+        }
+      } catch (e) {
+        if (!isUndefinedColumn(e)) throw e;
       }
       // ผ่าน/ไม่ผ่าน หลังมาตามนัด (151 · 18 ต.ค. 2569) — แท็บนัดหมายโชว์ปุ่ม/ชิป
       const screening = await loadLatestScreeningByApplication(items.map((i) => i.id));

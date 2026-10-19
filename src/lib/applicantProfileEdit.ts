@@ -9,7 +9,7 @@
  * ⚠️ **เบอร์โทรไม่อยู่ในนี้** — เป็นคีย์ของล็อกโทร/คิว AI แก้ได้ที่เส้นแก้เบอร์เดิมเท่านั้น
  * ⚠️ ช่วงอายุ/น้ำหนัก/ส่วนสูง ชุดเดียวกับฟอร์มสมัครสาธารณะ (`api/_lib/publicApplications.ts`)
  */
-import { RM_EDUCATION_LEVELS, RM_LICENSE_TYPES } from './recruitRmMasters';
+import { RM_EDUCATION_LEVELS, RM_LICENSE_TYPES, RM_SPECIFIC_TYPES } from './recruitRmMasters';
 
 export type ProfileGender = 'male' | 'female' | 'other';
 
@@ -28,6 +28,13 @@ export type ProfileDraft = {
   weight_kg: string;
   height_cm: string;
   note: string;
+  /**
+   * 🔴 19 ต.ค. 2569 เจ้าของ "ข้อมูลผู้สรรหา ทำให้แก้ไขได้ด้วยสิ่" (Choice "เฉพาะผู้สมัครคนนี้" + ผู้รับผิดชอบ + ประเภทเจาะจง)
+   * recruiter_name ว่าง = ใช้ผู้สรรหาของใบขอ (154) · responsible_name ว่าง = ใช้ผู้รับผิดชอบของลิงก์
+   */
+  recruiter_name: string;
+  responsible_name: string;
+  specific_type: string;
 };
 
 /** ค่าที่ส่งเข้า API (เฉพาะช่องที่เปลี่ยน) — `null` = ล้างค่า */
@@ -45,6 +52,9 @@ export type ProfilePatch = Partial<{
   weight_kg: number | null;
   height_cm: number | null;
   note: string | null;
+  recruiter_name: string | null;
+  responsible_name: string | null;
+  specific_type: string | null;
 }>;
 
 export type ProfileKey = keyof ProfileDraft;
@@ -64,7 +74,13 @@ export const PROFILE_KEYS: readonly ProfileKey[] = [
   'weight_kg',
   'height_cm',
   'note',
+  'recruiter_name',
+  'responsible_name',
+  'specific_type',
 ];
+
+/** ตัวเลือกประเภทเจาะจง — ชุดเดียวกับฟอร์มเพิ่มผู้สมัคร/ลิงก์ (`RM_SPECIFIC_TYPES`) */
+export const PROFILE_SPECIFIC_TYPE_OPTIONS: readonly string[] = RM_SPECIFIC_TYPES;
 
 export const PROFILE_LIMITS = {
   age: [15, 80],
@@ -98,6 +114,9 @@ type Source = {
   weight_kg?: number | string | null;
   height_cm?: number | string | null;
   note?: string | null;
+  recruiter_name?: string | null;
+  responsible_name?: string | null;
+  specific_type?: string | null;
 };
 
 const str = (v: unknown): string => (v === null || v === undefined ? '' : String(v));
@@ -126,6 +145,9 @@ export function profileDraftOf(a: Source): ProfileDraft {
     weight_kg: str(a.weight_kg),
     height_cm: str(a.height_cm),
     note: str(a.note),
+    recruiter_name: str(a.recruiter_name).trim(),
+    responsible_name: str(a.responsible_name).trim(),
+    specific_type: str(a.specific_type).trim(),
   };
 }
 
@@ -143,6 +165,8 @@ const TEXT_MAX: Partial<Record<ProfileKey, number>> = {
   district: 128,
   education: 128,
   note: 2000,
+  recruiter_name: 120,
+  responsible_name: 120,
 };
 
 const LABEL: Record<ProfileKey, string> = {
@@ -159,6 +183,9 @@ const LABEL: Record<ProfileKey, string> = {
   weight_kg: 'น้ำหนัก',
   height_cm: 'ส่วนสูง',
   note: 'ความคิดเห็น',
+  recruiter_name: 'ข้อมูลผู้สรรหา',
+  responsible_name: 'ผู้รับผิดชอบ',
+  specific_type: 'ประเภทเจาะจง',
 };
 
 function numberIn(raw: unknown, [min, max]: readonly [number, number], integer: boolean): number | null | 'bad' {
@@ -186,7 +213,7 @@ export function parseProfilePatch(raw: unknown, existingLicenses: readonly strin
   if (unknownKey) return { ok: false, message: `แก้ช่อง ${unknownKey} จากที่นี่ไม่ได้` };
   const patch: ProfilePatch = {};
 
-  for (const key of ['title_prefix', 'line_id', 'province', 'district', 'education', 'note'] as const) {
+  for (const key of ['title_prefix', 'line_id', 'province', 'district', 'education', 'note', 'recruiter_name', 'responsible_name'] as const) {
     if (!(key in b)) continue;
     const v = b[key];
     if (v !== null && typeof v !== 'string') return { ok: false, message: `${LABEL[key]}ไม่ถูกต้อง` };
@@ -199,6 +226,12 @@ export function parseProfilePatch(raw: unknown, existingLicenses: readonly strin
     const t = typeof v === 'string' ? v.trim().slice(0, TEXT_MAX[key]) : '';
     if (!t) return { ok: false, message: `กรุณากรอก${LABEL[key]}` };
     patch[key] = t;
+  }
+  if ('specific_type' in b) {
+    const v = b.specific_type;
+    if (v === null || v === '') patch.specific_type = null;
+    else if (typeof v === 'string' && PROFILE_SPECIFIC_TYPE_OPTIONS.includes(v.trim())) patch.specific_type = v.trim();
+    else return { ok: false, message: 'ประเภทเจาะจงไม่ถูกต้อง' };
   }
   if ('gender' in b) {
     const g = b.gender;

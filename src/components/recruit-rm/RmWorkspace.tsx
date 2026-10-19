@@ -436,7 +436,7 @@ const RmWorkspace: React.FC<{
    * เจ้าหน้าที่สรรหาของใบขอที่คนนี้สมัคร — จากช่องผู้รับผิดชอบของใบขอ (ชุดเดียวกับการ์ดกล่องงาน)
    * 🔴 จับใบด้วย `buildJobKeyIndex` (id ใบขอมี 3 รูป) · ใบที่ไม่อยู่ในชุดที่โหลด = ไม่ระบุ
    */
-  const recruiterOf = useMemo(() => {
+  const jobRecruiterOf = useMemo(() => {
     if (!jobs || jobs.length === 0) return undefined;
     const idx = buildJobKeyIndex(
       jobs.map((j) => [j.id, (j.recruiter_name ?? '').trim() || null] as const),
@@ -444,6 +444,14 @@ const RmWorkspace: React.FC<{
     );
     return (r: PublicApplication) => (r.job_id ? (idx.get(r.job_id) ?? null) : null);
   }, [jobs]);
+  /**
+   * ผู้สรรหาที่ใช้จริง = ที่แก้รายคน (154 · เจ้าของ 19 ต.ค. 2569 "ข้อมูลผู้สรรหา ทำให้แก้ไขได้") ก่อน ไม่มีค่อยใช้ของใบขอ
+   * ใช้กับคอลัมน์เจ้าของงาน · ไฟล์รายงาน · ป๊อป
+   */
+  const recruiterOf = useMemo(
+    () => (r: PublicApplication) => (r.recruiter_name ?? '').trim() || jobRecruiterOf?.(r) || null,
+    [jobRecruiterOf],
+  );
   /** หน่วยงานจากใบขอ — ใบสมัครที่ไม่มี unit_name เคยโชว์ชื่อประกาศ/ตำแหน่งในคอลัมน์หน่วยงาน (QA 18 ต.ค. 2569) */
   const unitOf = useMemo(() => {
     if (!jobs || jobs.length === 0) return undefined;
@@ -1436,7 +1444,8 @@ const RmWorkspace: React.FC<{
         <ApplicantContactDialog
           mode="profile"
           application={profileApp}
-          recruiterName={recruiterOf?.(profileApp) ?? null}
+          recruiterName={recruiterOf(profileApp)}
+          jobRecruiterName={jobRecruiterOf?.(profileApp) ?? null}
           onClose={() => setProfileApp(null)}
           onSaved={() => {
             say('บันทึกข้อมูลผู้สมัครแล้ว');
@@ -1453,7 +1462,8 @@ const RmWorkspace: React.FC<{
       {/* dialog รายละเอียด + ติดต่อสำเร็จ/ไม่สำเร็จ + นัด (ลิสต์ข้อ 7 · 14 ส.ค. 2569) */}
       <ApplicantContactDialog
         application={contactApp}
-        recruiterName={contactApp ? (recruiterOf?.(contactApp) ?? null) : null}
+        recruiterName={contactApp ? recruiterOf(contactApp) : null}
+        jobRecruiterName={contactApp ? (jobRecruiterOf?.(contactApp) ?? null) : null}
         /* แท็บติดตามนัดหมาย = ป๊อปติดตามนัด · แท็บการติดต่อ = ติดต่อ→นัดหมาย (4 ต.ค. 2569) */
         mode={tab === 'appointments' ? 'appointment' : 'contact'}
         onClose={() => setContactApp(null)}

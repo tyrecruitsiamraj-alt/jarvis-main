@@ -52,7 +52,20 @@ describe('ค่าตั้งต้นของฟอร์ม', () => {
       weight_kg: '70.0',
       height_cm: '172',
       note: '',
+      recruiter_name: '',
+      responsible_name: '',
+      specific_type: '',
     });
+  });
+
+  // 🔴 19 ต.ค. 2569 เจ้าของ "ข้อมูลผู้สรรหา ทำให้แก้ไขได้ด้วยสิ่" → เฉพาะผู้สมัครคนนี้ + ผู้รับผิดชอบ + ประเภทเจาะจง
+  it('ผู้สรรหา/ผู้รับผิดชอบ/ประเภทเจาะจง แก้ได้ · ว่าง = ล้าง (ใช้ของใบขอ/ลิงก์) · ประเภทเจาะจงต้องอยู่ในรายการ', () => {
+    expect(parseProfilePatch({ recruiter_name: '  คิว ', responsible_name: '', specific_type: 'เจาะจง (ฟรี)' })).toEqual({
+      ok: true,
+      patch: { recruiter_name: 'คิว', responsible_name: null, specific_type: 'เจาะจง (ฟรี)' },
+    });
+    expect(parseProfilePatch({ specific_type: 'อะไรก็ได้' })).toMatchObject({ ok: false });
+    expect(parseProfilePatch({ specific_type: '' })).toEqual({ ok: true, patch: { specific_type: null } });
   });
 
   it('ใบเก่าไม่มีชื่อ/นามสกุลแยก ⇒ แตกจากชื่อเต็ม', () => {

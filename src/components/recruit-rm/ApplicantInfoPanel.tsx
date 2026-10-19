@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,10 +9,12 @@ import { cn } from '@/lib/utils';
 import { EM_DASH } from '@/lib/displayFallback';
 import { APPLICATION_ORIGIN_LABEL, type PublicApplication, REFERRAL_SOURCE_LABEL } from '@/lib/publicApplicationsApi';
 import { applicantResponsibleName, applicationJobLabel } from '@/lib/recruitRm';
+import { getJobStaffApiCache, JOB_STAFF_ROSTER_CHANGED_EVENT, refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import {
   PROFILE_EDUCATION_OPTIONS,
   PROFILE_GENDER_LABEL,
   PROFILE_LICENSE_OPTIONS,
+  PROFILE_SPECIFIC_TYPE_OPTIONS,
   PROFILE_TITLE_PREFIXES,
   type ProfileDraft,
   type ProfileGender,
@@ -22,7 +24,7 @@ import {
  * แท็บ "ข้อมูลผู้สมัคร" ในป๊อปรายละเอียด (แบบรูป iRecruit · เจ้าของสั่ง 1 ต.ค. 2569)
  *
  * ตารางสามคอลัมน์ ป้ายเล็กด้านบน ค่าอยู่ใต้ป้าย · กด "แก้ไขข้อมูล" แล้วช่องที่แก้ได้กลายเป็นช่องกรอก
- * ช่องที่แก้ไม่ได้ (เบอร์ · ตำแหน่งงาน · ช่องทาง · ข้อมูลผู้สรรหา · ผู้รับผิดชอบ · ประเภทเจาะจง · ที่มา) ยังเป็นข้อความเหมือนเดิม
+ * ช่องที่แก้ไม่ได้ (เบอร์ · ตำแหน่งงาน · ช่องทาง · ที่มา) ยังเป็นข้อความ · ผู้สรรหา/ผู้รับผิดชอบ/ประเภทเจาะจง แก้ได้ตั้งแต่ 19 ต.ค. 2569
  * ⚠️ เบอร์แก้ที่ช่องแก้เบอร์เดิม (เป็นคีย์ของล็อกโทร) · ค่าที่ส่งคือฟอร์มทั้งก้อน หน้าแม่เป็นคนหาช่องที่เปลี่ยน
  * ⚠️ "ผู้สร้างช่องทาง" ในรูปเดิม → ใช้ "ผู้รับผิดชอบ" — jarvis ไม่ได้เก็บคนสร้างช่องทางไว้กับใบสมัคร
  *    "โพสต์ประกาศงาน" → ใช้ "ที่มา" (สมัครใหม่ / AI หาให้ / เจ้าหน้าที่คีย์) ด้วยเหตุผลเดียวกัน
@@ -58,7 +60,34 @@ const ApplicantInfoPanel: React.FC<{
    * หน้าแม่หาให้จากใบขอที่โหลดไว้ (`recruiterOf` / ใบขอของป๊อปการ์ด) · ไม่รู้ = ขีด
    */
   recruiterName?: string | null;
-}> = ({ application: a, editing, draft, onDraft, disabled = false, phoneFixSlot, recruiterName = null }) => {
+  /** ผู้สรรหาของใบขอ (ไม่นับที่แก้รายคน) — ตัวเลือก "ตามใบขอ" ตอนแก้ · ไม่ส่ง = ใช้ recruiterName */
+  jobRecruiterName?: string | null;
+}> = ({ application: a, editing, draft, onDraft, disabled = false, phoneFixSlot, recruiterName = null, jobRecruiterName }) => {
+  /**
+   * รายชื่อให้เลือกตอนแก้ (เจ้าของ 19 ต.ค. 2569 "ข้อมูลผู้สรรหา ทำให้แก้ไขได้" + ผู้รับผิดชอบ + ประเภทเจาะจง)
+   * ผู้สรรหา = สายงานสรรหา · ผู้รับผิดชอบ = ทีม Online (ตั้ง ตั้งค่า › ผู้ใช้งาน) · ค่าเดิมนอกรายการยังเลือกค้างไว้ได้
+   */
+  const [rosterRev, setRosterRev] = useState(0);
+  useEffect(() => {
+    if (!editing) return;
+    void refreshJobStaffFromApi();
+    const on = () => setRosterRev((n) => n + 1);
+    window.addEventListener(JOB_STAFF_ROSTER_CHANGED_EVENT, on);
+    return () => window.removeEventListener(JOB_STAFF_ROSTER_CHANGED_EVENT, on);
+  }, [editing]);
+  void rosterRev;
+  const roster = getJobStaffApiCache();
+  const withCurrent = (names: readonly string[] | undefined, current: string) => {
+    const list = [...new Set((names ?? []).map((n) => n.trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'th'));
+    return current && !list.includes(current) ? [current, ...list] : list;
+  };
+  const recruiterOptions = withCurrent(roster?.recruiters, draft.recruiter_name);
+  const responsibleOptions = withCurrent(roster?.onlines, draft.responsible_name);
+  const specificOptions = draft.specific_type && !PROFILE_SPECIFIC_TYPE_OPTIONS.includes(draft.specific_type)
+    ? [draft.specific_type, ...PROFILE_SPECIFIC_TYPE_OPTIONS]
+    : PROFILE_SPECIFIC_TYPE_OPTIONS;
+  const jobRecruiter = (jobRecruiterName === undefined ? recruiterName : jobRecruiterName)?.trim() || null;
+  const linkOwner = (a.posting_owner_name ?? '').trim() || null;
   const set = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) => onDraft({ ...draft, [key]: value });
   const educationOptions = draft.education && !PROFILE_EDUCATION_OPTIONS.includes(draft.education)
     ? [draft.education, ...PROFILE_EDUCATION_OPTIONS]
@@ -204,9 +233,75 @@ const ApplicantInfoPanel: React.FC<{
       <Field label="ช่องทาง">{show(a.channel_label?.trim() || (a.referral_source ? REFERRAL_SOURCE_LABEL[a.referral_source] : null))}</Field>
       {/* 🔴 16 ต.ค. 2569 เจ้าของ: "ผู้สรรหาก็พวก คิว แบงค์" · "ผู้รับผิดชอบ ก็ทีม online อะ ว่าน เจมส์"
           เดิมช่องแรกอ่าน `specific_type` (ประเภทเจาะจง) ซึ่งผูกผิดความหมาย และยังไม่มีใบไหนกรอก (0/963) — ย้ายไปช่องของตัวเองข้างล่าง */}
-      <Field label="ข้อมูลผู้สรรหา">{show(recruiterName)}</Field>
-      <Field label="ผู้รับผิดชอบ">{show(applicantResponsibleName(a))}</Field>
-      <Field label="ประเภทเจาะจง">{show(a.specific_type)}</Field>
+      <Field label="ข้อมูลผู้สรรหา">
+        {editing ? (
+          <Select
+            value={draft.recruiter_name || NO_PREFIX}
+            onValueChange={(v) => set('recruiter_name', v === NO_PREFIX ? '' : v)}
+            disabled={disabled}
+          >
+            <SelectTrigger className="h-9 text-sm" aria-label="ข้อมูลผู้สรรหา">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_PREFIX}>{jobRecruiter ? `ตามใบขอ (${jobRecruiter})` : 'ตามใบขอ'}</SelectItem>
+              {recruiterOptions.map((n) => (
+                <SelectItem key={n} value={n}>
+                  {n}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          show((a.recruiter_name ?? '').trim() || recruiterName)
+        )}
+      </Field>
+      <Field label="ผู้รับผิดชอบ">
+        {editing ? (
+          <Select
+            value={draft.responsible_name || NO_PREFIX}
+            onValueChange={(v) => set('responsible_name', v === NO_PREFIX ? '' : v)}
+            disabled={disabled}
+          >
+            <SelectTrigger className="h-9 text-sm" aria-label="ผู้รับผิดชอบ">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_PREFIX}>{linkOwner ? `ตามลิงก์ (${linkOwner})` : 'ไม่ระบุ'}</SelectItem>
+              {responsibleOptions.map((n) => (
+                <SelectItem key={n} value={n}>
+                  {n}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          show(applicantResponsibleName(a))
+        )}
+      </Field>
+      <Field label="ประเภทเจาะจง">
+        {editing ? (
+          <Select
+            value={draft.specific_type || NO_PREFIX}
+            onValueChange={(v) => set('specific_type', v === NO_PREFIX ? '' : v)}
+            disabled={disabled}
+          >
+            <SelectTrigger className="h-9 text-sm" aria-label="ประเภทเจาะจง">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_PREFIX}>ไม่ระบุ</SelectItem>
+              {specificOptions.map((n) => (
+                <SelectItem key={n} value={n}>
+                  {n}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          show(a.specific_type)
+        )}
+      </Field>
 
       <Field label="วุฒิการศึกษา">
         {editing ? (

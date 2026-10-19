@@ -105,6 +105,8 @@ export type PublicApplication = {
   /** ประเภทเจาะจง (เจาะจง (ฟรี) · พนักงานทดแทน WL …) — คีย์เอง/นำเข้าเท่านั้น */
   specific_type?: string;
   responsible_name?: string;
+  /** ผู้สรรหาของผู้สมัครรายคน (154 · 19 ต.ค. 2569) — ไม่มี = ใช้ผู้สรรหาของใบขอ */
+  recruiter_name?: string;
   /** ผู้รับผิดชอบของลิงก์ที่สมัครเข้ามา (ทีม Online · server `POSTING_OWNER_SQL` · 16 ต.ค. 2569) */
   posting_owner_name?: string;
   /** ช่องทางจาก master recruit_channels — แม่นกว่า referral_source ที่ผู้สมัครเลือกเอง */
