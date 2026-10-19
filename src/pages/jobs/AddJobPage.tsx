@@ -406,8 +406,6 @@ const AddJobPage: React.FC = () => {
               value={recruiterName}
               onChange={setRecruiterName}
               optionNames={recruiterOptions}
-              canManageRoster={canManageStaffRoster}
-              rosterRev={staffRosterRev}
             />
 
             <RosterBackedStaffSelect
@@ -416,8 +414,6 @@ const AddJobPage: React.FC = () => {
               value={screenerName}
               onChange={setScreenerName}
               optionNames={screenerOptions}
-              canManageRoster={canManageStaffRoster}
-              rosterRev={staffRosterRev}
             />
 
             <div>

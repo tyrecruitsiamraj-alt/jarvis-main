@@ -1,19 +1,13 @@
-import React, { useMemo, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { getJobStaffApiCache, mutateJobStaffRemote } from '@/lib/jobStaffRemote';
-
-type Role = 'recruiter' | 'screener' | 'opl' | 'online';
+import React from 'react';
 
 export type RosterBackedStaffSelectProps = {
-  role: Role;
+  /** สายงานของช่อง (ใช้อ่านง่ายตอนเรียก) */
+  role: 'recruiter' | 'screener' | 'opl' | 'online';
   label: string;
   value: string;
   onChange: (next: string) => void;
-  /** รายชื่อใน dropdown (รวม roster + จากงาน) */
+  /** รายชื่อใน dropdown — หน้าผู้ใช้งานที่เดียว (19 ต.ค. 2569 · กล่องจัดการรายชื่อ Admin ถอดแล้ว) */
   optionNames: string[];
-  canManageRoster: boolean;
-  /** bump เมื่อ roster เปลี่ยน (ฟัง event ที่ parent แล้วส่ง rev) */
-  rosterRev: number;
 };
 
 function nameMatch(a: string, b: string): boolean {
@@ -21,64 +15,14 @@ function nameMatch(a: string, b: string): boolean {
 }
 
 export const RosterBackedStaffSelect: React.FC<RosterBackedStaffSelectProps> = ({
-  role,
   label,
   value,
   onChange,
   optionNames,
-  canManageRoster,
-  rosterRev,
 }) => {
-  const rosterOnly = useMemo(() => {
-    void rosterRev;
-    const c = getJobStaffApiCache();
-    switch (role) {
-      case 'recruiter':
-        return c?.recruiters ?? [];
-      case 'screener':
-        return c?.screeners ?? [];
-      case 'opl':
-        return c?.opls ?? [];
-      case 'online':
-        return c?.onlines ?? [];
-    }
-  }, [role, rosterRev]);
-
-  const [addDraft, setAddDraft] = useState('');
-  const [removePick, setRemovePick] = useState('');
-  const [staffMutating, setStaffMutating] = useState(false);
-
   const trimmed = value.trim();
   const inOptions =
     trimmed === '' || optionNames.some((n) => nameMatch(n, trimmed));
-
-  const tryAdd = async () => {
-    const t = addDraft.trim();
-    if (!t || staffMutating) return;
-    setStaffMutating(true);
-    const res = await mutateJobStaffRemote({ op: 'add', role, name: t });
-    setStaffMutating(false);
-    if (!res.ok) {
-      window.alert(res.message ?? 'บันทึกไม่สำเร็จ');
-      return;
-    }
-    setAddDraft('');
-    onChange(t);
-  };
-
-  const tryRemove = async () => {
-    if (!removePick || staffMutating) return;
-    if (!window.confirm(`ลบ «${removePick}» ออกจากรายการหลัก?\nงานเดิมที่มอบหมายชื่อนี้ยังคงแสดงตามข้อมูลงาน`)) return;
-    setStaffMutating(true);
-    const res = await mutateJobStaffRemote({ op: 'remove', role, name: removePick });
-    setStaffMutating(false);
-    if (!res.ok) {
-      window.alert(res.message ?? 'บันทึกไม่สำเร็จ');
-      return;
-    }
-    if (nameMatch(value, removePick)) onChange('');
-    setRemovePick('');
-  };
 
   const selectValue = inOptions ? value : trimmed ? value : '';
 
@@ -100,54 +44,6 @@ export const RosterBackedStaffSelect: React.FC<RosterBackedStaffSelectProps> = (
           </option>
         ))}
       </select>
-
-      {canManageRoster && (
-        <div className="mt-1.5 space-y-1.5 rounded-lg border border-border/70 bg-secondary/25 p-2">
-          <p className="text-[10px] font-medium text-muted-foreground uppercase">
-            จัดการรายชื่อในรายการ (Admin)
-          </p>
-          <div className="flex flex-wrap gap-1.5 items-center">
-            <input
-              type="text"
-              value={addDraft}
-              onChange={(e) => setAddDraft(e.target.value)}
-              placeholder="ชื่อใหม่"
-              className="flex-1 min-w-[120px] bg-background border border-border rounded-lg px-2 py-1.5 text-xs"
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), tryAdd())}
-            />
-            <Button size="sm"
-              type="button"
-              disabled={staffMutating}
-              onClick={() => void tryAdd()}
-              className="shrink-0 text-xs px-2.5 py-1.5"
-            >
-              {staffMutating ? '…' : 'เพิ่ม'}
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-1.5 items-center">
-            <select
-              value={removePick}
-              onChange={(e) => setRemovePick(e.target.value)}
-              className="flex-1 min-w-[140px] bg-background border border-border rounded-lg px-2 py-1.5 text-xs text-foreground"
-            >
-              <option value="">เลือกชื่อที่จะลบจากรายการ…</option>
-              {rosterOnly.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              disabled={!removePick || staffMutating}
-              onClick={() => void tryRemove()}
-              className="shrink-0 text-xs px-2.5 py-1.5 rounded-lg bg-destructive/15 text-destructive disabled:opacity-40"
-            >
-              ลบ
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -75,7 +75,8 @@ describe('settingsNav', () => {
   it('กลุ่มที่ตั้งไว้ตรงกับที่เจ้าของเคาะ', () => {
     const of = (t: SettingsTabId) => groupOfSettingsTab(t);
     expect(of('users')).toBe('people');
-    expect(of('jobStaff')).toBe('people');
+    // ทีมสรรหา/คัดสรร/OPL/Online ถอดแล้ว 19 ต.ค. 2569 (รายชื่อเจ้าหน้าที่มาจากหน้าผู้ใช้งาน)
+    expect((SETTINGS_TAB_IDS as readonly string[]).includes('jobStaff')).toBe(false);
     expect(of('appearance')).toBe('look');
     expect(of('lumosMode')).toBe('automation');
     expect(of('reference')).toBe('data');

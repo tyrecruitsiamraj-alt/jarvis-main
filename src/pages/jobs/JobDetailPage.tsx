@@ -762,8 +762,6 @@ const JobDetailPage: React.FC = () => {
                   value={editForm.recruiter_name}
                   onChange={(v) => setEditForm({ ...editForm, recruiter_name: v })}
                   optionNames={recruiterNameOptions}
-                  canManageRoster={hasPermission('supervisor')}
-                  rosterRev={staffRosterRev}
                 />
                 <RosterBackedStaffSelect
                   role="screener"
@@ -771,8 +769,6 @@ const JobDetailPage: React.FC = () => {
                   value={editForm.screener_name}
                   onChange={(v) => setEditForm({ ...editForm, screener_name: v })}
                   optionNames={screenerNameOptions}
-                  canManageRoster={hasPermission('supervisor')}
-                  rosterRev={staffRosterRev}
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">

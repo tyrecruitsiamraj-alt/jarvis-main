@@ -13623,3 +13623,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - อายุเกิน = `overAge` (`isOverAge` 58+) ในข้อเท็จจริงต่อใบ
 - ปุ่มช่วงเวลาปุ่มเดียว (`data-testid="recruit-period"`) — เดือน · ช่วงวัน · เฉพาะวัน อยู่ในป๊อปเดียว ("รวมกันเลย")
 - เทสต์ `tests/api/recruitOverviewReadable2569-10-19.test.ts`
+
+## รายชื่อเจ้าหน้าที่ = หน้าผู้ใช้งานที่เดียว (เจ้าของ 19 ต.ค. 2569)
+
+- `src/lib/jobStaffNames.ts` (`build*NameOptions`) ไม่อ่าน `job_staff_roster` แล้ว — ชื่อเล่น + สายงานจากหน้าผู้ใช้งาน (`directory`)
+  + ชื่อที่ติดบนใบขอจริงเฉพาะตัวกรอง (ส่ง `extraJobs`) จนกว่าจะเปลี่ยนคน
+- ถอดแท็บตั้งค่า "ทีมสรรหา / คัดสรร / OPL / Online" (`JobStaffRosterTab.tsx` ลบแล้ว · `settingsNav.ts`)
+  และกล่อง "จัดการรายชื่อ (Admin)" ใน `RosterBackedStaffSelect.tsx`
+- ⚠️ เส้น `/api/job-staff` ยังคืน `recruiters/screeners/...` ของตารางเก่า (ไม่มีจอไหนใช้แล้ว) + `directory` ที่ใช้จริง

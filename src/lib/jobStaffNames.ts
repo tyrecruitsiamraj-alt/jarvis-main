@@ -22,6 +22,12 @@ import { getJobStaffApiCache, type StaffDirectoryEntry } from '@/lib/jobStaffRem
  *    ไม่งั้นชื่อที่ตั้งใจซ่อนจะกลับมาทางประตูหลัง
  */
 
+/**
+ * 🔴 19 ต.ค. 2569 เจ้าของ: *"รายชื่อพวกเจ้าหน้าที่ก็ต้องมาจาก หน้าตั้งค่า ผู้ใช้งานอะ"* — ปิดขั้นย้ายแล้ว
+ * ⇒ ตัวเลือก = หน้าผู้ใช้งาน (ชื่อเล่น + สายงาน) **ที่เดียว** · รายชื่อทีมชุดเก่า (`job_staff_roster`) ไม่ใช้แล้ว
+ * ชื่อที่ติดอยู่บนใบขอจริง (ส่ง `extraJobs`) ยังขึ้นในตัวกรอง — Choice "ยังกรองชื่อนี้ได้ จนกว่าจะเปลี่ยนคน"
+ * (ไม่ส่ง `extraJobs` = ช่องเลือกผู้รับผิดชอบ ได้แค่ชื่อจากหน้าผู้ใช้งาน)
+ */
 /** ชื่อคนที่ตั้งสายงานนี้ไว้ในหน้าผู้ใช้งาน */
 function directoryNames(lane: 'recruiter' | 'screener' | 'opl' | 'online'): string[] {
   const dir: StaffDirectoryEntry[] = getJobStaffApiCache()?.directory ?? [];
@@ -52,9 +58,8 @@ export function buildRecruiterNameOptions(extraJobs?: JobRequest[]): string[] {
     .map((j) => j.recruiter_name)
     .filter((n): n is string => Boolean(n?.trim()));
   const api = getJobStaffApiCache();
-  const roster = api?.recruiters ?? [];
   const ex = new Set((api?.pickerExcludedRecruiters ?? []).map((s) => s.toLowerCase()));
-  return uniqueSorted([...roster, ...directoryNames('recruiter'), ...fromJobs]).filter(
+  return uniqueSorted([...directoryNames('recruiter'), ...fromJobs]).filter(
     (n) => !ex.has(n.trim().toLowerCase()),
   );
 }
@@ -64,9 +69,8 @@ export function buildScreenerNameOptions(extraJobs?: JobRequest[]): string[] {
     .map((j) => j.screener_name)
     .filter((n): n is string => Boolean(n?.trim()));
   const api = getJobStaffApiCache();
-  const roster = api?.screeners ?? [];
   const ex = new Set((api?.pickerExcludedScreeners ?? []).map((s) => s.toLowerCase()));
-  return uniqueSorted([...roster, ...directoryNames('screener'), ...fromJobs]).filter(
+  return uniqueSorted([...directoryNames('screener'), ...fromJobs]).filter(
     (n) => !ex.has(n.trim().toLowerCase()),
   );
 }
@@ -80,9 +84,8 @@ export function buildOnlineNameOptions(extraJobs?: JobRequest[]): string[] {
     .map((j) => j.online_name)
     .filter((n): n is string => Boolean(n?.trim()));
   const api = getJobStaffApiCache();
-  const roster = api?.onlines ?? [];
   const ex = new Set((api?.pickerExcludedOnlines ?? []).map((s) => s.toLowerCase()));
-  return uniqueSorted([...roster, ...directoryNames('online'), ...fromJobs]).filter(
+  return uniqueSorted([...directoryNames('online'), ...fromJobs]).filter(
     (n) => !ex.has(n.trim().toLowerCase()),
   );
 }
@@ -92,9 +95,8 @@ export function buildOplNameOptions(extraJobs?: JobRequest[]): string[] {
     .map((j) => j.opl_name)
     .filter((n): n is string => Boolean(n?.trim()));
   const api = getJobStaffApiCache();
-  const roster = api?.opls ?? [];
   const ex = new Set((api?.pickerExcludedOpls ?? []).map((s) => s.toLowerCase()));
-  return uniqueSorted([...roster, ...directoryNames('opl'), ...fromJobs]).filter(
+  return uniqueSorted([...directoryNames('opl'), ...fromJobs]).filter(
     (n) => !ex.has(n.trim().toLowerCase()),
   );
 }

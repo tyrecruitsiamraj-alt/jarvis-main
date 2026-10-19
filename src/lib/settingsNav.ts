@@ -18,7 +18,6 @@ export const SETTINGS_TAB_IDS = [
   'navMenu',
   'users',
   'roles',
-  'jobStaff',
   'workStatus',
   'matchWeights',
   'lumosMode',
@@ -43,7 +42,6 @@ export const SETTINGS_TAB_LABEL: Record<SettingsTabId, string> = {
   navMenu: 'จัดเมนู',
   users: 'ผู้ใช้งาน',
   roles: 'บทบาทและสิทธิ์',
-  jobStaff: 'ทีมสรรหา / คัดสรร / OPL / Online',
   workStatus: 'สถานะทำงาน',
   matchWeights: 'น้ำหนักเรียงผู้สมัคร',
   lumosMode: 'โหมดส่งงานให้ Lumos',
@@ -63,7 +61,6 @@ export const SETTINGS_TAB_HINT: Record<SettingsTabId, string> = {
   navMenu: 'เลือกเมนูที่แต่ละบทบาทเห็น',
   users: 'เพิ่ม/แก้ผู้ใช้ · บทบาท · แผนก',
   roles: 'สิทธิ์เข้าถึงของแต่ละบทบาท',
-  jobStaff: 'รายชื่อทีมที่ใช้เลือกผู้รับผิดชอบใบขอ',
   workStatus: 'สถานะของใบขอที่ใช้ทั้งระบบ',
   matchWeights: 'เกณฑ์เรียงลำดับผู้สมัครที่ AI แนะนำ',
   lumosMode: 'ให้ AI โทรเอง / ช่วยโทร / โทรมือ',
@@ -93,7 +90,8 @@ export const SETTINGS_GROUP_LABEL: Record<SettingsGroupId, string> = {
  * 🔴 แก้ที่นี่ที่เดียว · ห้ามเขียนลำดับซ้ำในไฟล์หน้า
  */
 export const SETTINGS_GROUP_TABS: Record<SettingsGroupId, readonly SettingsTabId[]> = {
-  people: ['users', 'roles', 'jobStaff'],
+  // ทีมสรรหา/คัดสรร/OPL/Online ถอดแล้ว (เจ้าของ 19 ต.ค. 2569) — รายชื่อเจ้าหน้าที่มาจากหน้าผู้ใช้งานที่เดียว
+  people: ['users', 'roles'],
   look: ['appearance', 'navMenu'],
   automation: ['lumosMode', 'callScripts', 'aiSettings', 'callSuppression', 'autoMove', 'matchWeights'],
   data: ['workStatus', 'reference', 'pdpaRequests'],

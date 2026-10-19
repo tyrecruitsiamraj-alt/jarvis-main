@@ -340,8 +340,6 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                       value={recruiter}
                       onChange={setRecruiter}
                       optionNames={recruiterOptions}
-                      canManageRoster={false}
-                      rosterRev={rosterRev}
                     />
                     <RosterBackedStaffSelect
                       role="screener"
@@ -349,8 +347,6 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                       value={screener}
                       onChange={setScreener}
                       optionNames={screenerOptions}
-                      canManageRoster={false}
-                      rosterRev={rosterRev}
                     />
                     <RosterBackedStaffSelect
                       role="opl"
@@ -358,8 +354,6 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                       value={opl}
                       onChange={setOpl}
                       optionNames={oplOptions}
-                      canManageRoster={false}
-                      rosterRev={rosterRev}
                     />
                     {/* ⚠️ ช่อง "ทีม Online (ผู้รับผิดชอบ)" ถูกถอดออก (เจ้าของสั่ง 21 ส.ค. 2569:
                         *"ทีม Online (ผู้รับผิดชอบ) มีแค่กล่องงาน"*) — ตั้งค่าได้ที่ Gen link

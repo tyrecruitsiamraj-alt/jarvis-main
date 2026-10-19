@@ -5,7 +5,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
-import { Users, Shield, Database, FileText, Palette, UserCog, ListChecks, ListOrdered, SlidersHorizontal, PhoneForwarded, MoveRight, Activity,
+import { Users, Shield, Database, FileText, Palette, ListChecks, ListOrdered, SlidersHorizontal, PhoneForwarded, MoveRight, Activity,
   MessageSquareText,
   Cpu,
   PhoneOff,
@@ -14,7 +14,6 @@ import { Users, Shield, Database, FileText, Palette, UserCog, ListChecks, ListOr
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
-import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
 import RolePermissionsTab from '@/pages/settings/RolePermissionsTab';
 import WorkStatusMasterTab from '@/pages/settings/WorkStatusMasterTab';
 import MatchPriorityWeightsTab from '@/pages/settings/MatchPriorityWeightsTab';
@@ -99,7 +98,6 @@ const TAB_ICON: Record<SettingsTab, React.ElementType> = {
   navMenu: ListOrdered,
   users: Users,
   roles: Shield,
-  jobStaff: UserCog,
   workStatus: ListChecks,
   matchWeights: SlidersHorizontal,
   lumosMode: PhoneForwarded,
@@ -798,7 +796,6 @@ const AdminSettings: React.FC = () => {
             </div>
           ))}
 
-        {activeTab === 'jobStaff' && <JobStaffRosterTab />}
 
         {activeTab === 'roles' && <RolePermissionsTab />}
 
