@@ -934,6 +934,8 @@ async function convertReplaceAiRowsToManual(
 
 /**
  * ═══ ใช้รายชื่อให้ AI โทรกับสายที่มีอยู่ — ครั้งเดียวตอนตั้งรายชื่อ (เจ้าของ 13 ต.ค. 2569 รายชื่อฝั่งรายวัน) ═══
+ * 🔴 19 ต.ค. 2569 เจ้าของ Choice "สลับเป็น AI ด้วย" — สายที่เจ้าหน้าที่แก้เอง (updated_by) ก็สลับด้วย เพราะรายชื่อคือคำสั่งตรงของคนตั้ง
+ *    (เดิมข้าม ⇒ 42 จาก 65 สายคอนเฟิร์ม 16:00 ยังเป็นคนโทร) · เปลี่ยนแค่คนโทร + เบอร์ฉุกเฉิน — เวลาที่เจ้าหน้าที่แก้ไว้คงเดิม
  * สายคนโทรของงานส่งคนแทนที่ยังไม่ถึงเวลา (เกิน 2 นาที) ของเบอร์ในรายชื่อ · ระบบตั้ง (ไม่มีคนแก้เอง) → AI + เบอร์ฉุกเฉิน
  * แล้วส่งแผนด้วยตัวเดียวกับป๊อปแก้ (`replanFollowSetWithLumos` — ยกเลิกแผนเก่าที่ Lumos + ส่งใหม่ทั้งวัน + จดสถานะส่ง)
  * 🔴 ไม่มีคีย์ push / ปิดส่งอัตโนมัติ = ไม่แตะอะไร (ห้ามสลับเป็น AI ทั้งที่ส่งไม่ได้) · ธงยังค้างไว้ให้รอบหน้า
@@ -955,7 +957,7 @@ export async function applyReplaceAiPhonesToPending(
          from ${followTable}
         where follow_team = $1 and coalesce(source_ref, '') like 'irecruit-replace:%'
           and cancelled_at is null and completed_at is null and staff_call_outcome is null
-          and updated_by is null and call_mode = 'manual' and coalesce(time_tbd, false) = false
+          and call_mode = 'manual' and coalesce(time_tbd, false) = false
           and scheduled_at > $2
           and right(regexp_replace(coalesce(recipient_phone, ''), '\\D', '', 'g'), 9) = any($3::text[])`,
       [FOLLOW_TEAM_REPLACEMENT, new Date(now.getTime() + LOCK_AHEAD_MS).toISOString(), keys],

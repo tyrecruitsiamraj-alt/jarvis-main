@@ -703,7 +703,8 @@ describe('ใช้รายชื่อกับสายที่มีอย�
     dbQuery.mockImplementation(async (sql: string, params?: unknown[]) => {
       calls.push({ sql, params: params ?? [] });
       if (/select payload, updated_at, updated_by_name from/.test(sql)) return { rows: settingsRows };
-      if (/and updated_by is null and call_mode = 'manual'/.test(sql)) return { rows: found };
+      // 19 ต.ค. 2569 — รายชื่อสลับสายที่เจ้าหน้าที่แก้เองด้วย (ไม่มีเงื่อนไข updated_by แล้ว)
+      if (/and call_mode = 'manual' and coalesce\(time_tbd, false\) = false/.test(sql)) return { rows: found };
       // คนนอกรายชื่อที่ระบบตั้งเป็น AI (13 ต.ค. 2569 "เหลือแค่ 15 คน") → คนโทร + ยกเลิกที่ Lumos
       if (/and updated_by is null and coalesce\(call_mode, 'ai'\) = 'ai'/.test(sql)) return { rows: offList };
       if (/select person_ref, plan_ref from/.test(sql)) return { rows: [] };
@@ -766,5 +767,16 @@ describe('ใช้รายชื่อกับสายที่มีอย�
     expect((await applyReplaceAiPhonesToPending(NOW)).converted).toBe(0);
     expect(calls.some((c) => /set call_mode = 'ai'/.test(c.sql))).toBe(false);
     expect(persisted()).toHaveLength(0);
+  });
+});
+
+describe('รายชื่อ AI โทร สลับสายที่เจ้าหน้าที่แก้เองด้วย (เจ้าของ 19 ต.ค. 2569 Choice "สลับเป็น AI ด้วย")', () => {
+  it('คิวรีหาสายของรายชื่อไม่กรอง updated_by แล้ว · ยังกรองเวลา/สายที่มีผลแล้วเหมือนเดิม', () => {
+    const src = readFileSync(new URL('../../api/_lib/irecruitReplaceSync.ts', import.meta.url), 'utf8');
+    const i = src.indexOf('const { rows: flipCandidates }');
+    const q = src.slice(i, src.indexOf('`,', i));
+    expect(q).not.toContain('updated_by is null');
+    expect(q).toContain("staff_call_outcome is null");
+    expect(q).toContain("call_mode = 'manual' and coalesce(time_tbd, false) = false");
   });
 });
