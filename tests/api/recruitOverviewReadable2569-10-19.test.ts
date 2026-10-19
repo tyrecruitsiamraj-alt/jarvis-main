@@ -110,3 +110,16 @@ describe('หน้าจอ', () => {
     expect(api).toContain('await loadOnlineRequestRows({ from: window.from, to: window.to, bu, departmentScope: scope })');
   });
 });
+
+describe('รอบ 2 (เจ้าของ 19 ต.ค. 2569)', () => {
+  it('ภาพรวม: ช่องเป็นกล่องเลขใหญ่ ไม่จาง (ช่องที่กดไม่ได้เป็น div ไม่ใช่ปุ่ม disabled)', () => {
+    const parts = readFileSync('src/components/dashboard-trends/RecruitOverviewParts.tsx', 'utf8');
+    expect(parts).toContain('const canOpen = p.value > 0 && !!onOpenPart && p.ids.length > 0;');
+    expect(parts).toContain('text-xl font-medium tabular-nums text-foreground');
+    expect(parts).not.toContain('disabled={p.value === 0 || !onOpenPart');
+  });
+  it('แท็บผู้สมัคร: มุมมองเป็น Dropdown ("ทำเป็น Dropdown")', () => {
+    const ws = readFileSync('src/components/recruit-rm/RmWorkspace.tsx', 'utf8');
+    expect(ws).toMatch(/<FilterChipsDropdown\s+ariaLabel="มุมมองผู้สมัคร"/);
+  });
+});

@@ -6,6 +6,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarDays, ChevronDown, ChevronRight, Download, FileSpreadsheet, RefreshCw, RotateCcw, X } from 'lucide-react';
 import FilterChips from '@/components/shared/FilterChips';
+import FilterChipsDropdown from '@/components/shared/FilterChipsDropdown';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { PagePager } from '@/components/shared/PagePager';
@@ -915,7 +916,8 @@ const RmWorkspace: React.FC<{
       {!bucket && tab === 'candidates' ? <RecruitDailyPanel refreshKey={refreshKey} /> : null}
       {!bucket && tab === 'candidates' ? (
         <div className="mt-4">
-          <FilterChips
+          {/* 19 ต.ค. 2569 เจ้าของ "ทำเป็น Dropdown" — 11 ชิปล้น 2 แถว ⇒ ปุ่มเดียวกางดูครบพร้อมเลข */}
+          <FilterChipsDropdown
             ariaLabel="มุมมองผู้สมัคร"
             value={listView}
             onChange={setListView}

@@ -221,25 +221,40 @@ export function JourneyList({
                   .map((p) => <span key={p.key} className={TONE[p.tone].dot} style={{ width: `${(p.value / s.total) * 100}%` }} />)
               : null}
           </div>
-          <div className="flex flex-wrap gap-x-1 gap-y-1 text-xs">
-            {s.parts.map((p) => (
-              <Button
-                key={p.key}
-                type="button"
-                variant="ghost"
-                size="xs"
-                className="h-auto gap-1.5 px-1.5 py-0.5 font-normal"
-                disabled={p.value === 0 || !onOpenPart || p.ids.length === 0}
-                onClick={() => onOpenPart?.(`${s.label} · ${p.label}`, p.ids)}
-                data-testid={`journey-${s.key}-${p.key}`}
-              >
-                <span className={cn('h-2 w-2 rounded-full', TONE[p.tone].dot)} aria-hidden />
-                <span className={DASH.sub}>{p.label}</span>
-                <span className="font-medium tabular-nums text-foreground">{num(p.value)}</span>
-                <span className={cn('tabular-nums', DASH.sub)}>{s.total > 0 ? `(${journeyPctText(p.value, s.total)})` : ''}</span>
-                {p.note ? <span className={cn('tabular-nums', DASH.sub)}>· {p.note}</span> : null}
-              </Button>
-            ))}
+          {/* 19 ต.ค. 2569 เจ้าของ "แบบนี้ดูยาก" — เดิมเป็นชิปตัวเล็ก ช่องที่กดไม่ได้จางทั้งแถว ⇒ กล่องเลขใหญ่ สีเต็มเสมอ */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+            {s.parts.map((p) => {
+              const body = (
+                <>
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className={cn('h-2 w-2 shrink-0 rounded-full', TONE[p.tone].dot)} aria-hidden />
+                    {p.label}
+                  </span>
+                  <span className="flex items-baseline gap-1.5">
+                    <span className="text-xl font-medium tabular-nums text-foreground">{num(p.value)}</span>
+                    <span className="text-xs tabular-nums text-muted-foreground">{s.total > 0 ? journeyPctText(p.value, s.total) : ''}</span>
+                  </span>
+                  {p.note ? <span className="text-xs tabular-nums text-muted-foreground">{p.note}</span> : null}
+                </>
+              );
+              const canOpen = p.value > 0 && !!onOpenPart && p.ids.length > 0;
+              return canOpen ? (
+                <Button
+                  key={p.key}
+                  type="button"
+                  variant="outline"
+                  className="h-auto flex-col items-start justify-start gap-1 rounded-xl p-3 text-left font-normal"
+                  onClick={() => onOpenPart?.(`${s.label} · ${p.label}`, p.ids)}
+                  data-testid={`journey-${s.key}-${p.key}`}
+                >
+                  {body}
+                </Button>
+              ) : (
+                <div key={p.key} className="flex flex-col gap-1 rounded-xl border border-border p-3" data-testid={`journey-${s.key}-${p.key}`}>
+                  {body}
+                </div>
+              );
+            })}
           </div>
         </li>
       ))}
