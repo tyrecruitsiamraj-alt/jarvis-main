@@ -199,7 +199,7 @@ export default function FollowDayReportDialog({
                     <TableCell className="whitespace-nowrap">{r.name}</TableCell>
                     <TableCell className="whitespace-nowrap tabular-nums">{r.phone}</TableCell>
                     <TableCell>{r.unit}</TableCell>
-                    <TableCell>{r.insurance}</TableCell>
+                    <TableCell className="min-w-28">{r.insurance}</TableCell>
                     <TableCell className="whitespace-nowrap">{r.call}</TableCell>
                     <TableCell className={cn('whitespace-nowrap', r.caller === 'คนโทร' && !r.cancelled && TONE.warn.value)}>{r.caller}</TableCell>
                     <TableCell className="whitespace-nowrap">{r.result}</TableCell>

@@ -28,7 +28,7 @@ export const FOLLOW_WIZARD_STEPS: ReadonlyArray<{
   { step: 1, title: 'คนที่จะติดตาม', hint: 'ชื่อ · เบอร์ · เรื่อง' },
   { step: 2, title: 'หน่วยงาน', hint: 'ถ้ามี' },
   { step: 3, title: 'ตั้งเวลา', hint: 'วันเวลาที่โทร' },
-  { step: 4, title: 'ประกัน · ลูกค้า', hint: 'ถ้ามี' },
+  { step: 4, title: 'ประกัน · ลูกค้า', hint: 'เลือกประกัน' },
 ];
 
 export type FollowWizardValues = {

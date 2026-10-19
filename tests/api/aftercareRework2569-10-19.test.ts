@@ -22,7 +22,7 @@ describe('1 · สรุปแผนติดตาม: ประกันต่
     expect(insuranceOfRow([{ insurance_type: 'ประกัน 7 วัน' }], { insurance_type: null })).toBe('ประกัน 7 วัน');
     expect(insuranceOfRow([], { insurance_type: 'ก\nข' })).toBe('ก / ข');
     expect(insuranceOfRow([], { insurance_type: null })).toBe('—');
-    expect(read('src/components/follow/FollowDayReportDialog.tsx')).toContain('<TableCell>{r.insurance}</TableCell>');
+    expect(read('src/components/follow/FollowDayReportDialog.tsx')).toContain('{r.insurance}</TableCell>');
   });
 });
 
