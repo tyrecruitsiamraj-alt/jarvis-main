@@ -57,14 +57,14 @@ describe('buildRecruitJourney', () => {
     for (const s of steps) expect(s.parts.reduce((n, p) => n + p.value, 0), s.key).toBe(s.total);
   });
   it('แต่ละขั้นนับถูก', () => {
-    expect(steps.map((s) => s.total)).toEqual([15, 12, 9, 7, 5, 3]);
-    expect(steps.map((s) => s.label)).toEqual(['รายชื่อเข้ามาทั้งหมด', 'AI โทรแล้ว', 'คนโทรต่อคนที่สนใจ', 'นัดได้ไหม', 'มาไหม', 'ผ่านไหม']);
+    // 19 ต.ค. 2569 เจ้าของเรียงใหม่ — ขั้นผ่าน/ไม่ผ่าน ไปอยู่แท็บ Pre-Check
+    expect(steps.map((s) => s.total)).toEqual([15, 12, 9, 7, 5]);
+    expect(steps.map((s) => s.label)).toEqual(['รายชื่อที่กรอกมา', 'AI โทรแล้ว', 'รายชื่อสนใจ · คนโทรต่อ', 'นัดหมาย', 'นัดแล้วมาไหม']);
     expect([part('names', 'badData'), part('names', 'aiQueued'), part('names', 'notSent')]).toEqual([1, 1, 1]);
     expect([part('ai', 'yes'), part('ai', 'no'), part('ai', 'thinking'), part('ai', 'unreached')]).toEqual([9, 1, 1, 1]);
     expect([part('staff', 'ok'), part('staff', 'fail'), part('staff', 'waiting')]).toEqual([7, 1, 1]);
     expect([part('appointment', 'booked'), part('appointment', 'failed'), part('appointment', 'pending')]).toEqual([5, 1, 1]);
     expect([part('attendance', 'showed'), part('attendance', 'noShow'), part('attendance', 'pending')]).toEqual([3, 1, 1]);
-    expect([part('screening', 'passed'), part('screening', 'notPassed'), part('screening', 'pending')]).toEqual([1, 1, 1]);
   });
   it('เฉพาะวันในสัปดาห์ (เวลาไทย)', () => {
     const mon = f({ createdAt: '2026-10-12T03:00:00Z' });

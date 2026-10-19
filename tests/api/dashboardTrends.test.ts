@@ -141,8 +141,10 @@ describe('แท็บ Dashboard อยู่ในสองหน้า แล�
     const page = code('src/pages/jobs/StaffJobBoardPage.tsx');
     expect(page).toContain('onPublishedTotals={setBoardPublished}');
     expect(page).toContain('<RecruitOverview published={boardPublished} />');
+    // 19 ต.ค. 2569 เจ้าของเรียงภาพรวมใหม่ (Choice "ใบขอที่เข้ามาในเดือนที่เลือก") — การ์ด "ใบที่ประกาศ" ถอดแล้ว
+    // ก้อนใบขอนับ "ประกาศแล้ว" ในใบที่เข้ามาในเดือน (ตัวเดียวกับหน้าหลัก) · ตัวเลขหัวกล่องงานยังส่งมาเหมือนเดิม
     const overview = code('src/components/dashboard-trends/RecruitOverview.tsx');
-    expect(overview).toContain('value={published ? published.published : null}');
+    expect(overview).toContain('<JourneyList steps={buildRequestSteps(data.requests)} />');
   });
   it.each([
     'src/components/dashboard-trends/RecruitOverview.tsx',

@@ -48,12 +48,16 @@ import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
 import { addDays } from '../../src/lib/trends/timeBuckets.js';
 import { monthWindow, rangeWindow } from '../../src/lib/recruitOverviewWindow.js';
 import { fullDaysSince } from '../../src/lib/fullDays.js';
+import { isOverAge } from '../../src/lib/applicantAge.js';
+import { isOutOfAreaAnswer } from '../../src/lib/outOfAreaAnswer.js';
+import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
 import type {
   RecruitAiRow,
   RecruitAppFact,
   RecruitAttendance,
   RecruitBacklog,
   RecruitOverviewResponse,
+  RecruitRequestSummary,
   RecruitStaffRow,
 } from '../../src/lib/recruitOverviewTypes.js';
 
@@ -88,7 +92,7 @@ export function factsSql(attendance: string = LATEST_ATTENDANCE_SQL, screening: 
          nullif(btrim(a.channel_label), '') as channel_label,
          nullif(btrim(a.referral_source), '') as referral_source,
          nullif(btrim(a.position_interest), '') as position,
-         a.phone_e164,
+         a.phone_e164, a.age,
          ${CALLED_BY_AI_SQL} as by_ai,
          ${CALLED_BY_STAFF_SQL} as by_staff,
          ${FIRST_CALLED_AT_SQL} as first_called_at,
@@ -263,7 +267,23 @@ export function toFact(r: Row, boardPhones: Set<string> | null): RecruitAppFact 
     // นัดไม่สำเร็จ = บันทึกติดต่อสำเร็จ + เหตุผล + ไม่มีวันนัด (ตัวเดียวกับ `isAppointmentFailedLog`)
     appointmentFailed: r.log_ok === true && Boolean(text(r.log_reason)) && !r.log_appointment_at,
     screening: r.screening === 'passed' || r.screening === 'not_passed' ? r.screening : null,
+    overAge: isOverAge(r.age as number | string | null),
+    aiOutOfArea: Boolean(r.ai_outcome) && isOutOfAreaAnswer(text(r.ai_summary), text(r.ai_reply)),
     onBoard: boardPhones ? Boolean(phone && boardPhones.has(phone)) : null,
+  };
+}
+
+/** สรุปใบขอ — ประกาศแล้ว/ยังไม่ประกาศ · ในใบที่ประกาศ มีคนสมัครกี่ใบ กรอกมากี่คน */
+export function toRequestSummary(rows: ReadonlyArray<{ releasedAt: string | null; applications: number }>): RecruitRequestSummary {
+  const released = rows.filter((r) => r.releasedAt);
+  const withApps = released.filter((r) => r.applications > 0);
+  return {
+    total: rows.length,
+    released: released.length,
+    notReleased: rows.length - released.length,
+    releasedWithApps: withApps.length,
+    releasedNoApps: released.length - withApps.length,
+    appsOnReleased: withApps.reduce((n, r) => n + r.applications, 0),
   };
 }
 
@@ -426,7 +446,7 @@ export async function buildRecruitOverview(
   const monthRange = [startOfBkk(window.from), startOfBkk(addDays(window.to, 1)), bu];
   const nowMs = now.getTime();
 
-  const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR] = await Promise.all([
+  const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, reqR] = await Promise.all([
     settle('รายชื่อบนบอร์ด', loadBoardPhoneSet),
     settle('ใบสมัคร', () => loadFacts(bothRange)),
     settle('งานค้าง', async () => (await dbQuery<Row>(backlogSql(), [bu])).rows),
@@ -458,6 +478,12 @@ export async function buildRecruitOverview(
         throw e;
       }
     }),
+    // ใบขอที่เข้ามาในช่วง (เจ้าของ 19 ต.ค. 2569 ภาพรวมข้อ 1) — ฐานเดียวกับ "ใบขอเข้ามา · ประกาศแล้ว" ของหน้าหลัก
+    settle('ใบขอ', async () =>
+      toRequestSummary(
+        await loadOnlineRequestRows({ from: window.from, to: window.to, bu, departmentScope: scope }),
+      ),
+    ),
   ]);
 
   // บอร์ด ERP อ่านไม่ได้ = ไม่รู้ว่าได้ใบสมัครหรือยัง (null) — ไม่ใช่ "ยังไม่ได้"
@@ -482,6 +508,12 @@ export async function buildRecruitOverview(
   else {
     body.ai = null;
     body.errors.staff = body.errors.staff ?? aiR.error;
+  }
+
+  if (reqR.ok) body.requests = reqR.value;
+  else {
+    body.requests = null;
+    body.errors.requests = reqR.error;
   }
 
   body.firstDay = firstR.ok ? firstR.value : null;

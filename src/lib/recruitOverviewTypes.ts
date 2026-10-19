@@ -58,6 +58,25 @@ export type RecruitAppFact = {
   appointmentFailed?: boolean;
   /** ผ่าน/ไม่ผ่าน หลังมาตามนัด (151) */
   screening?: 'passed' | 'not_passed' | null;
+  /** อายุ 58 ปีขึ้นไป — ระบบไม่ส่งให้ AI (`isOverAge` · 19 ต.ค. 2569) */
+  overAge?: boolean;
+  /** คำตอบกับ AI บอกว่าอยู่ไกล/เดินทางไม่สะดวก (`isOutOfAreaAnswer` · เจ้าของ 19 ต.ค. 2569 "AI ตอนถามที่อยู่") */
+  aiOutOfArea?: boolean;
+};
+
+/**
+ * ใบขอที่เข้ามาในช่วง (เจ้าของ 19 ต.ค. 2569 ภาพรวมข้อ 1) — ฐานเดียวกับ "ใบขอเข้ามา · ประกาศแล้ว" ของหน้าหลัก
+ * (`loadOnlineRequestRows`) · ไม่กรองตามวันในสัปดาห์
+ */
+export type RecruitRequestSummary = {
+  total: number;
+  released: number;
+  notReleased: number;
+  /** ประกาศแล้วมีคนสมัคร (นับใบสมัครที่ไม่ได้ยกเลิกข้อมูล ทุกช่วงเวลา) */
+  releasedWithApps: number;
+  releasedNoApps: number;
+  /** คนที่กรอกมาในใบที่ประกาศแล้วมีคนสมัคร */
+  appsOnReleased: number;
 };
 
 /** งานค้างตอนนี้ — สถานะวันนี้ ไม่ขึ้นกับเดือนที่เลือก · อายุนับเป็นวันเต็ม (ครบ 24 ชม. = 1 วัน) */
@@ -118,6 +137,8 @@ export type RecruitOverviewResponse = {
   ai: RecruitAiRow | null;
   /** เคยมีใครบันทึกผลมา/ไม่มาไหม — ยังไม่เคย = ขั้นมาตามนัดขึ้น "—" (ห้ามโชว์ 0 ที่แปลว่ายังไม่เคยบันทึก) */
   attendanceEverRecorded: boolean;
+  /** ใบขอที่เข้ามาในช่วง · null = อ่านไม่ได้ (ดู errors.requests) · ไม่มี = เส้นรุ่นเก่า */
+  requests?: RecruitRequestSummary | null;
   /** ก้อนที่อ่านไม่ได้ + เหตุ (ก้อนล้มแยกกัน — ห้ามโชว์ 0 แทน) */
-  errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board', string>>;
+  errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board' | 'requests', string>>;
 };

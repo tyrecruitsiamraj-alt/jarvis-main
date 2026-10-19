@@ -210,7 +210,9 @@ export function JourneyList({
               <span className={cn('mr-1.5 tabular-nums', DASH.sub)}>{i + 1}.</span>
               {s.label}
             </span>
-            <span className="font-medium tabular-nums text-foreground">{num(s.total)} คน</span>
+            <span className="font-medium tabular-nums text-foreground">
+              {num(s.total)} {s.unit ?? 'คน'}
+            </span>
           </div>
           <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
             {s.total > 0
@@ -227,7 +229,7 @@ export function JourneyList({
                 variant="ghost"
                 size="xs"
                 className="h-auto gap-1.5 px-1.5 py-0.5 font-normal"
-                disabled={p.value === 0 || !onOpenPart}
+                disabled={p.value === 0 || !onOpenPart || p.ids.length === 0}
                 onClick={() => onOpenPart?.(`${s.label} · ${p.label}`, p.ids)}
                 data-testid={`journey-${s.key}-${p.key}`}
               >
@@ -235,6 +237,7 @@ export function JourneyList({
                 <span className={DASH.sub}>{p.label}</span>
                 <span className="font-medium tabular-nums text-foreground">{num(p.value)}</span>
                 <span className={cn('tabular-nums', DASH.sub)}>{s.total > 0 ? `(${journeyPctText(p.value, s.total)})` : ''}</span>
+                {p.note ? <span className={cn('tabular-nums', DASH.sub)}>· {p.note}</span> : null}
               </Button>
             ))}
           </div>
