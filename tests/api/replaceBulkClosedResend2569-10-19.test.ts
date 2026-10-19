@@ -50,7 +50,7 @@ describe('ยกเลิกสายเลยเวลา', () => {
 describe('สลับเป็น AI (เว้น WL)', () => {
   it('เฉพาะสายคนโทรที่ยังไม่ถึงเวลา ดึงจาก iRecruit ไม่ใช่ WL', () => {
     expect(isReplaceAllAiCandidate(row({}), NOW)).toBe(true);
-    expect(isReplaceAllAiCandidate(row({ replace_type: 'WL' }), NOW)).toBe(false);
+    expect(isReplaceAllAiCandidate(row({ replace_type: 'WL' }), NOW)).toBe(true); // WL รวมด้วย (19 ต.ค. 2569)
     expect(isReplaceAllAiCandidate(row({ call_mode: 'ai' }), NOW)).toBe(false);
     expect(isReplaceAllAiCandidate(row({ scheduled_at: '2026-10-19T06:59:00Z' }), NOW)).toBe(false);
     expect(isReplaceAllAiCandidate(row({ source_ref: 'manual-replace:x' }), NOW)).toBe(false);
@@ -65,7 +65,7 @@ describe('สลับเป็น AI (เว้น WL)', () => {
     expect(api).toContain("body.action === 'cancel_past'");
     const lib = read('api/_lib/irecruitReplaceSync.ts');
     const fn = lib.slice(lib.indexOf('export async function convertReplaceManualToAi'));
-    expect(fn).toContain("upper(coalesce(replace_type, '')) <> 'WL'");
+    expect(fn).not.toContain("<> 'WL'");
     expect(fn).toContain('replanFollowSetWithLumos');
   });
 });

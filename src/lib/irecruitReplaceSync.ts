@@ -674,9 +674,9 @@ export function reconcileReplaceCalls(
  * 🔴 8 ต.ค. 2569 เจ้าของ: *"แค่ WL ที่คนโทร ที่เหลือ AI เลย"* — กลุ่มมาจากรายชื่อ WL ของ iRecruit (รอบดึงใส่ 'WL' / 'EX')
  * ⇒ **WL = คนโทร · ที่เหลือ = AI** · ช่อง IN/EX ในประวัติ iRecruit ไม่ใช้แล้ว (ค่าเก่าค้าง) · แก้รายสายได้เสมอ · พัก AI / aiFrom ทับ (`byDate`)
  */
-export function replaceModeForType(replaceType: string | null | undefined, byDate: 'ai' | 'manual'): 'ai' | 'manual' {
-  if (byDate === 'manual') return 'manual';
-  return (replaceType ?? '').trim().toUpperCase() === 'WL' ? 'manual' : 'ai';
+export function replaceModeForType(_replaceType: string | null | undefined, byDate: 'ai' | 'manual'): 'ai' | 'manual' {
+  // 🔴 19 ต.ค. 2569 เจ้าของ: *"wl เปลี่ยนเป็น Ai โทรเลย … พรุ่งนี้จะไม่มีคนโทรเลย"* — WL ไม่แยกเป็นคนโทรแล้ว (ยังเก็บ replace_type ไว้ดู)
+  return byDate;
 }
 
 /**
@@ -708,11 +708,10 @@ export function isReplacePastCancelable(e: ReplaceBulkRow, now: Date = new Date(
   return manual ? at < now.getTime() : at < now.getTime() - REPLACE_AI_RESULT_GRACE_MS;
 }
 
-/** ยังเป็นคนโทร · ยังไม่ถึงเวลา · ดึงจาก iRecruit · ไม่ใช่ WL · ไม่ใช่ "ยังไม่ชัวร์เวลา" */
+/** ยังเป็นคนโทร · ยังไม่ถึงเวลา · ดึงจาก iRecruit · ไม่ใช่ "ยังไม่ชัวร์เวลา" (WL รวมด้วยตั้งแต่ 19 ต.ค. 2569) */
 export function isReplaceAllAiCandidate(e: ReplaceBulkRow, now: Date = new Date()): boolean {
   if (!openReplaceRow(e) || e.call_mode !== 'manual' || e.time_tbd) return false;
   if (!(e.source_ref ?? '').startsWith('irecruit-replace:')) return false;
-  if ((e.replace_type ?? '').trim().toUpperCase() === 'WL') return false;
   const at = Date.parse(e.scheduled_at ?? '');
   return Number.isFinite(at) && at > now.getTime() + 2 * 60_000;
 }

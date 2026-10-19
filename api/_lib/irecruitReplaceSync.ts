@@ -1011,7 +1011,7 @@ export async function applyReplaceAiPhonesToPending(
 /**
  * ═══ ปุ่ม "สลับเป็น AI (เว้น WL)" บนแท็บส่งคนแทน (เจ้าของ 19 ต.ค. 2569 Choice "สลับเป็น AI ทั้งหมด เว้น WL") ═══
  * สายที่ระบบดึงจาก iRecruit ที่ยังเป็นคนโทร (ส่วนใหญ่ถูกเปลี่ยนตอนพัก AI) และยังไม่ถึงเวลา → AI + ส่งแผนให้ Lumos
- * เว้น: WL (กติกา 8 ต.ค. "แค่ WL ที่คนโทร") · สายที่เจ้าหน้าที่ลงผลแล้ว · ยังไม่ชัวร์เวลา · ใกล้เวลาโทรเกิน 2 นาที
+ * 🔴 19 ต.ค. 2569 เจ้าของ "wl เปลี่ยนเป็น Ai โทรเลย" — รวม WL ด้วยแล้ว · เว้น: สายที่เจ้าหน้าที่ลงผลแล้ว · ยังไม่ชัวร์เวลา · ใกล้เวลาโทรเกิน 2 นาที
  * 🔴 คนกดเท่านั้น (ไม่มีรอบอัตโนมัติ) · ไม่มีคีย์ push / ปิดส่งอัตโนมัติ = ไม่แตะอะไร (ห้ามสลับเป็น AI ทั้งที่ส่งไม่ได้)
  */
 export async function convertReplaceManualToAi(
@@ -1026,7 +1026,6 @@ export async function convertReplaceManualToAi(
         where follow_team = $1 and coalesce(source_ref, '') like 'irecruit-replace:%'
           and cancelled_at is null and completed_at is null and staff_call_outcome is null
           and call_mode = 'manual' and coalesce(time_tbd, false) = false
-          and upper(coalesce(replace_type, '')) <> 'WL'
           and scheduled_at > $2
         returning id::text as id`,
       [FOLLOW_TEAM_REPLACEMENT, new Date(now.getTime() + LOCK_AHEAD_MS).toISOString()],

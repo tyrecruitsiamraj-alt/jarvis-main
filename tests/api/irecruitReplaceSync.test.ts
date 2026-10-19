@@ -245,7 +245,8 @@ describe('🔴 ใครโทร: WL = คนโทร · ที่เหลื
     expect(src).not.toContain('z.mobile, z.replace_type');
   });
 
-  it('WL = 3 สายคนโทร ไม่ส่ง Lumos · ไม่ระบุ/EX = AI', async () => {
+  // 🔴 19 ต.ค. 2569 เจ้าของ "wl เปลี่ยนเป็น Ai โทรเลย" — WL ก็ AI (เดิม WL = คนโทร ไม่ส่ง Lumos)
+  it('WL · ไม่ระบุ · EX = AI ทั้งหมด', async () => {
     irecruitSqlQuery.mockResolvedValue([
       row('I', { replace_type: 'WL' }),
       row('N', { mobile: '0877777777', replace_type: null }),
@@ -257,11 +258,10 @@ describe('🔴 ใครโทร: WL = คนโทร · ที่เหลื
       const job = String(c.params[12]).split(':')[1];
       modeByJob.set(job, new Set([...(modeByJob.get(job) ?? []), c.params[9]]));
     }
-    expect([...(modeByJob.get('I') ?? [])]).toEqual(['manual']);
+    expect([...(modeByJob.get('I') ?? [])]).toEqual(['ai']);
     expect([...(modeByJob.get('N') ?? [])]).toEqual(['ai']);
     expect([...(modeByJob.get('E') ?? [])]).toEqual(['ai']);
-    expect((enqueuePlan.mock.calls as Array<[Array<{ recipient_phone: string }>]>).every((c) => c[0].every((e) => e.recipient_phone !== P1))).toBe(true);
-    expect(s).toMatchObject({ added: 9, queued: 6 });
+    expect(s).toMatchObject({ added: 9, queued: 9 });
   });
 
   // 🔴 13 ต.ค. 2569 เจ้าของ Choice "ตัดสินครั้งเดียวตอนสร้าง" — รอบดึงไม่เปลี่ยนใครโทรของแถวที่มีอยู่ (เดิม WL AI → คนโทร)
