@@ -1,4 +1,5 @@
 import { readThroughCache, type CacheOutcome } from './unitRequestCache.js';
+import { loadClosedRequestNos } from './recentlyClosedRequests.js';
 import { attachLeadRules } from './siamrajUnitNotes.js';
 import { dbQuery } from './postgres.js';
 import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
@@ -267,7 +268,25 @@ export async function listSiamrajUnitRequests(options: {
    * ชุดเดียวกัน — ไม่ต้องไปไล่แนบทีละ handler แล้วลืมไปสักตัว
    */
   await attachLeadRules(outcome.value as unknown[]);
-  return outcome.value;
+  return dropClosedFromCache(outcome);
+}
+
+/**
+ * ตอบจากสำเนา = ตัดใบที่เพิ่งปิดใน ERP ออกก่อน (เจ้าของ 19 ต.ค. 2569 "ถ้าปิดก็คือปิด") — `recentlyClosedRequests.ts`
+ * โหลดสดเมื่อกี้ (อายุ < 5 วิ) ไม่ต้องถามซ้ำ · ใบขอล่วงหน้าไม่อยู่ใน st_request_head ⇒ ไม่แตะ
+ */
+export async function dropClosedFromCache<T>(outcome: CacheOutcome<T>): Promise<T> {
+  const list = outcome.value as unknown;
+  if (!Array.isArray(list) || list.length === 0) return outcome.value;
+  if (outcome.source === 'live' && Date.now() - outcome.fetchedAt < 5_000) return outcome.value;
+  const nos = (list as Array<{ is_prequest?: unknown; request_no?: unknown }>)
+    .filter((j) => !j.is_prequest && typeof j.request_no === 'string')
+    .map((j) => String(j.request_no));
+  const closed = await loadClosedRequestNos(nos);
+  if (closed.size === 0) return outcome.value;
+  return (list as Array<{ is_prequest?: unknown; request_no?: unknown }>).filter(
+    (j) => j.is_prequest || !closed.has(String(j.request_no ?? '').trim()),
+  ) as T;
 }
 
 /**

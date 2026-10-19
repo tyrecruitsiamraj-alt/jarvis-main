@@ -13673,3 +13673,10 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   - ลงผล 3 หัวข้อ Healthy/Warning/High Risk (migration 155 · `AFTERCARE_SCORE_TOPICS` ใน `aftercareContact.ts`) — บังคับเมื่อผล ทำงานปกติ/มีปัญหา · ผลเดิม 4 แบบอยู่ต่อ
   - ย้อนกลับไปติดตามครบ: หน้าเปิดสายที่ปิด "ไปแล้ว" ตอนย้ายคืน (`revertReopenIds` → `reopenFollowEntry`) แล้วค่อย PATCH `{revert:true}` ลบแถวดูแล · รอบถามความเป็นอยู่ไม่ยกเลิก (Choice เจ้าของ)
 - เทสต์ `tests/api/aftercareRework2569-10-19.test.ts`
+
+## ใบขอปิดแล้วต้องหายทันที (19 ต.ค. 2569 · เจ้าของ "ถ้าปิดก็คือปิด")
+
+- `api/_lib/recentlyClosedRequests.ts` — ถาม ERP สถานะหัวใบขอของใบในสำเนา (request_no IN …) ~0.1 วิ · จำผล 15 วิ · ถามไม่ได้ = ไม่ตัด
+- `dropClosedFromCache` ใน `api/_lib/siamrajUnitRequests.ts` ใช้สองชั้น: ท้าย `listSiamrajUnitRequests` และ `readUnitRequestListThroughCache` (หน้าใบขอ)
+- ⚠️ สำเนาของหน้าอื่น (team-online 60 วิ · home-overview 30 วิ) ยังหน่วงได้ตามอายุของมันเอง
+- เทสต์ `tests/api/closedRequestInstant2569-10-19.test.ts`

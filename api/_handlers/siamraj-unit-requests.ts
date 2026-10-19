@@ -10,6 +10,7 @@ import {
   getSiamrajDbSource,
   isSiamrajUnitRequestsEnabled,
   listSiamrajUnitRequests,
+  dropClosedFromCache,
   listSiamrajThroughput,
   listSiamrajUnits,
   listSiamrajClosedRequests,
@@ -274,6 +275,7 @@ export function readUnitRequestListThroughCache(opts: {
 }) {
   const { limit, mode, departmentScope, fresh } = opts;
   const cacheKey = JSON.stringify(['list', limit, mode ?? '', departmentScope ?? null]);
+  // ชั้นนอกก็ตัดใบที่เพิ่งปิดใน ERP ออกทุกครั้งที่ตอบ (เจ้าของ 19 ต.ค. 2569 "ถ้าปิดก็คือปิด" — `dropClosedFromCache`)
   return readThroughCache(
     cacheKey,
     async () => {
@@ -302,7 +304,7 @@ export function readUnitRequestListThroughCache(opts: {
       return rows;
     },
     { fresh },
-  );
+  ).then(async (outcome) => ({ ...outcome, value: await dropClosedFromCache(outcome) }));
 }
 
 /**
