@@ -22,6 +22,7 @@ import {
   isPublicPrequestEnabled,
   isPublicVisibleByPrequest,
 } from '../../../src/lib/publicJobVisibility.js';
+import { publicJobDetails, publicWorkSiteName } from '../../../src/lib/publicJobSafety.js';
 
 type JobRow = {
   id: string;
@@ -78,7 +79,8 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
      * ชื่อจุดทำงาน (เช่น KYE · ENCO) — หัวการ์ดฝั่งเจ้าหน้าที่ใช้ชื่อนี้ (`unitLabel`) ⇒ หน้า /apply ต้องหัวเดียวกัน
      * (เจ้าของ 5 ต.ค. 2569: "หน้า Apply … หน้า โพสต์ประกาศ ก็เห็นเหมือนกัน") · ระดับเดียวกับ unit_name ที่ส่งอยู่แล้ว
      */
-    work_site_name: ((r as Record<string, unknown>).work_site_name as string | null | undefined) || undefined,
+    // รหัสย่อไซต์ (HRSA · ADLC) ไม่ส่ง ⇒ หัวการ์ดใช้ชื่อบริษัทเต็ม (QA 19 ต.ค. 2569 · `publicJobSafety.ts`)
+    work_site_name: publicWorkSiteName((r as Record<string, unknown>).work_site_name as string | null | undefined),
     request_no: r.request_no ?? undefined,
     request_action_name: r.request_action_name ?? undefined,
     /**
@@ -116,7 +118,8 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
     // 🔴 ตัดคำสั่งงานภายใน ("ขอให้แผนก OPL…") ก่อนออกหน้าสาธารณะ — QA 17 ต.ค. 2569
     work_schedule: publicWorkSchedule(r.work_schedule) || undefined,
     requirements: Array.isArray(r.requirements) && r.requirements.length > 0 ? r.requirements : undefined,
-    job_details: Array.isArray(r.job_details) && r.job_details.length > 0 ? r.job_details : undefined,
+    // ตัดบรรทัดที่อยู่บ้าน/คอนโดของนาย (QA 19 ต.ค. 2569) — เจ้าหน้าที่ยังเห็นครบในระบบ
+    job_details: publicJobDetails(r.job_details),
     /**
      * สัญชาติเจ้านาย (เจ้าของสั่ง 17 ส.ค. 2569 — เอาขึ้นทั้งกล่องงานและหน้าสาธารณะ)
      * ⚠️ ERP กรอกมาแค่ ~40% ของใบขอ · ค่าที่เป็นขีด/ว่างถูกล้างเป็น undefined ตั้งแต่

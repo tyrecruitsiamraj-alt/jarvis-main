@@ -13680,3 +13680,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `dropClosedFromCache` ใน `api/_lib/siamrajUnitRequests.ts` ใช้สองชั้น: ท้าย `listSiamrajUnitRequests` และ `readUnitRequestListThroughCache` (หน้าใบขอ)
 - หน้าทีม Online (`team-online.ts`) + หน้าหลักแบบเดิม (`home-overview.ts`) เก็บ `closedRequestStamp()` คู่กับผลที่จำไว้ — ค่าเปลี่ยน = มีใบเพิ่งปิด ⇒ คำนวณใหม่ทันที (ผล ERP จำ 5 วิ)
 - เทสต์ `tests/api/closedRequestInstant2569-10-19.test.ts`
+
+## หน้าสมัครงานสาธารณะ: ของที่คนนอกไม่ควรเห็น (QA 19 ต.ค. 2569)
+- `src/lib/publicJobSafety.ts` ใช้ใน `api/_handlers/public/jobs.ts` — ชื่อไซต์ไม่มีอักษรไทย (รหัสย่อ HRSA/ADLC) ไม่ส่ง ⇒ หัวการ์ดใช้ชื่อบริษัทเต็ม · ตัดบรรทัดบ้าน/คอนโด/หมู่บ้านของนาย
+- ช่องทางที่ได้คนลงงาน: หาการลงทะเบียนไม่เจอใช้ "ทราบข่าวจาก" ERP (`erpChannelOf` ใน `channelPlacement.ts`) · Dashboard ยอดตามช่วงล้ม = การ์ด "—" (`DashboardKpi.unavailable`)
