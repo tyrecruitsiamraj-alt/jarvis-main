@@ -172,7 +172,11 @@ export default function JobPublicFacts({
         // ฝั่งเจ้าหน้าที่: ไม่มีเบอร์ = ผู้สมัครไม่เห็นบรรทัดติดต่อ ⇒ เตือนให้เห็น (ตั้งเบอร์ที่หน้าผู้ใช้งาน)
         <p className={row} data-testid="job-public-contact-missing">
           <Phone className={icon} aria-hidden />
-          <span className={TONE.warn.value}>ยังไม่มีเบอร์เจ้าหน้าที่สรรหา</span>
+          <span className={TONE.warn.value}>
+            {(job.recruiter_name ?? '').trim()
+              ? `${(job.recruiter_name ?? '').trim()} ยังไม่มีเบอร์ในหน้าผู้ใช้งาน`
+              : 'ยังไม่ได้ตั้งเจ้าหน้าที่สรรหา'}
+          </span>
         </p>
       ) : null}
       {boss ? (

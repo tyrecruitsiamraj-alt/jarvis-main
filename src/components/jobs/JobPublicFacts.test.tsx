@@ -183,7 +183,11 @@ describe('เบอร์เจ้าหน้าที่สรรหาบน�
     expect(screen.getByTestId('job-public-contact').textContent).toContain('081-234-5678');
     cleanup();
     render(<JobPublicFacts job={JOB} staff />);
-    expect(screen.getByTestId('job-public-contact-missing').textContent).toBe('ยังไม่มีเบอร์เจ้าหน้าที่สรรหา');
+    // ไม่มีเจ้าหน้าที่ ≠ ไม่มีเบอร์ (วัดจริง 20 ต.ค.: 102/323 ใบยังไม่ตั้งเจ้าหน้าที่สรรหา)
+    expect(screen.getByTestId('job-public-contact-missing').textContent).toBe('ยังไม่ได้ตั้งเจ้าหน้าที่สรรหา');
+    cleanup();
+    render(<JobPublicFacts job={{ ...JOB, recruiter_name: 'ไอซ์' } as JobRequest} staff />);
+    expect(screen.getByTestId('job-public-contact-missing').textContent).toBe('ไอซ์ ยังไม่มีเบอร์ในหน้าผู้ใช้งาน');
     cleanup();
     render(<JobPublicFacts job={JOB} />);
     expect(screen.queryByTestId('job-public-contact-missing')).toBeNull();
