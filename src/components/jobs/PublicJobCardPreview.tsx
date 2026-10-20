@@ -7,6 +7,7 @@ import type { JobRequest } from '@/types';
 import { jobBoardCardTitle, publicJobCardSubtitle } from '@/lib/unitRequestDisplay';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import JobPublicFacts from '@/components/jobs/JobPublicFacts';
+import { useRecruiterContact } from '@/hooks/useRecruiterContact';
 
 /**
  * ═══ "คนนอกจะเห็นแบบนี้" — การ์ดใบงานบนหน้าสมัครสาธารณะ (/apply) แบบย่อ สำหรับป๊อปประกาศ (2 ต.ค. 2569) ═══
@@ -40,6 +41,9 @@ export default function PublicJobCardPreview({
 }) {
   // ตัวเดียวกับการ์ดหน้าประกาศจริง — ไม่มีสาเหตุที่ขอ/ชื่อคนเก่า (5 ต.ค. 2569)
   const subtitle = publicJobCardSubtitle(job);
+  // เบอร์เจ้าหน้าที่สรรหา — ตัวอย่างต้องตรงกับหน้า /apply (20 ต.ค. 2569)
+  const lookedUp = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
+  const contact = job.recruiter_contact ?? lookedUp;
   return (
     <Card className={cn('space-y-3 rounded-2xl p-4', className)} data-testid="public-job-preview">
       <div className="space-y-1">
@@ -48,7 +52,7 @@ export default function PublicJobCardPreview({
         {subtitle ? <p className="line-clamp-2 text-xs text-muted-foreground">{subtitle}</p> : null}
       </div>
       {/* ตัวเดียวกับการ์ดหน้า /apply และการ์ดโพสต์ประกาศ (5 ต.ค. 2569) */}
-      <JobPublicFacts job={job} placeText={placeText} />
+      <JobPublicFacts job={job} placeText={placeText} contact={contact} />
       {note?.trim() ? <p className="whitespace-pre-line text-sm text-muted-foreground">{note.trim()}</p> : null}
       {onApply ? (
         /* ปุ่มเดียวกับการ์ดหน้า /apply */

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Banknote, Car, Clock, Flag, Gift, ListChecks, MapPin, UserRound, Wallet } from 'lucide-react';
+import { Banknote, Car, Clock, Flag, Gift, ListChecks, MapPin, Phone, UserRound, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
@@ -29,13 +29,20 @@ export default function JobPublicFacts({
   staff = false,
   className,
   placeText,
+  contact,
 }: {
   job: JobRequest;
   staff?: boolean;
   className?: string;
   /** สถานที่ที่เจ้าหน้าที่พิมพ์ตอน Gen link — หน้าลิงก์ส่งมาเมื่อใบขอไม่มีที่อยู่ (6 ต.ค. 2569) */
   placeText?: string | null;
+  /**
+   * เจ้าหน้าที่สรรหา + เบอร์ (เจ้าของ 20 ต.ค. 2569 "โชว์เบอร์โทรเจ้าหน้าที่สรรหาด้วย")
+   * หน้า /apply ได้จาก API (`recruiter_contact`) · ตัวอย่างในป๊อปประกาศส่งเข้ามาเอง · ไม่มี = ไม่มีบรรทัด
+   */
+  contact?: { name: string; phone: string } | null;
 }) {
+  const recruiter = contact ?? job.recruiter_contact ?? null;
   const incomeShown = publicFieldVisible(job, 'income');
   // ฐาน · รายได้รวม แยกช่อง (เจ้าของ 7 ต.ค. 2569 "รายได้รวมยังไม่มีบนกล่องเลย มีแค่ฐานเอง")
   const income = incomeShown ? jobIncomeLine(job) : null;
@@ -150,6 +157,17 @@ export default function JobPublicFacts({
             ))}
           </ul>
         </div>
+      ) : null}
+      {recruiter ? (
+        <p className={row} data-testid="job-public-contact">
+          <Phone className={icon} aria-hidden />
+          <span className="min-w-0">
+            ติดต่อ {recruiter.name}{' '}
+            <a href={`tel:${recruiter.phone.replace(/-/g, '')}`} className="font-medium tabular-nums text-foreground underline-offset-2 hover:underline">
+              {recruiter.phone}
+            </a>
+          </span>
+        </p>
       ) : null}
       {boss ? (
         <p className={cn(row, 'flex-wrap gap-x-3 gap-y-0.5')}>

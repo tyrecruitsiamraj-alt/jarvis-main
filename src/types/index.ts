@@ -290,6 +290,8 @@ export interface JobRequest {
   unit_sector?: UnitSector | null;
   recruiter_id?: string;
   recruiter_name?: string;
+  /** เจ้าหน้าที่สรรหา + เบอร์ (หน้า /apply · API สาธารณะแนบให้ · 20 ต.ค. 2569) */
+  recruiter_contact?: { name: string; phone: string };
   screener_id?: string;
   screener_name?: string;
   /** เจ้าหน้าที่ OPL (แยกจากสรรหา/คัดสรร) */

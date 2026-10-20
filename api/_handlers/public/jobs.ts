@@ -1,3 +1,4 @@
+import { loadRecruiterContacts, recruiterContactOf, type RecruiterContact } from '../../_lib/recruiterContact.js';
 import { buildIncomeDisplay, type IncomeDisplay } from '../../../src/lib/incomeBreakdown.js';
 import { publicSafeAddress, publicWorkSchedule } from '../../../src/lib/publicJobPrivacy.js';
 import { payCyclesOf } from '../../../src/lib/payCycle.js';
@@ -16,7 +17,7 @@ import {
   fetchMonthlyIncomesById,
   type MonthlyIncomeItem,
 } from '../../_lib/siamrajJobBenefits.js';
-import { attachNotes } from '../siamraj-unit-requests.js';
+import { attachAssignments, attachNotes } from '../siamraj-unit-requests.js';
 import { isReleased, loadReleasedJobKeys } from '../../_lib/jobPublicReleases.js';
 import {
   isPublicPrequestEnabled,
@@ -58,6 +59,12 @@ type JobRow = {
 };
 
 type PublicJob = ReturnType<typeof toPublicJob>;
+
+/** ตัดฟิลด์ส่งต่อภายในก่อนตอบ (เส้นที่ไม่ผ่าน withBenefits) */
+function stripInternal(j: PublicJob) {
+  const { manual_income: _m, recruiter_name_internal: _r, ...out } = j;
+  return out;
+}
 
 function toYmd(value: string | Date): string {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -142,6 +149,8 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
      * ต้องพกมาทางนี้เพราะ `withBenefits` ทำงานบนก้อนที่ map แล้ว ซึ่งไม่มี
      * `field_overrides` ติดมาด้วย (toPublicJob หยิบเฉพาะฟิลด์ที่ระบุชื่อ)
      */
+    /** ⚠️ ส่งต่อภายใน — `withBenefits()` แปลงเป็น `recruiter_contact` (ชื่อเล่น + เบอร์) แล้วลบทิ้ง */
+    recruiter_name_internal: (r.recruiter_name ?? null) as string | null,
     manual_income: ((r as Record<string, unknown>).field_overrides as
       | { total_income?: number | null }
       | undefined)?.total_income ?? undefined,
@@ -227,7 +236,7 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
  * ⚠️ error-safe อยู่แล้วที่ `fetchJobBenefitChipsById` — ERP ล่ม = ประกาศงานยังขึ้นครบ
  * แค่ไม่มีชิป (หน้านี้เป็นเส้นสาธารณะที่คนจริงกำลังจะสมัคร ห้ามล่มเพราะข้อมูลเสริม)
  */
-type PublicJobOut = Omit<PublicJob, 'manual_income'>;
+type PublicJobOut = Omit<PublicJob, 'manual_income' | 'recruiter_name_internal'> & { recruiter_contact?: RecruiterContact };
 
 async function withBenefits(jobs: PublicJob[]): Promise<PublicJobOut[]> {
   /**
@@ -238,9 +247,11 @@ async function withBenefits(jobs: PublicJob[]): Promise<PublicJobOut[]> {
   const ids = jobs.map((j) => String(j.id || '')).filter(Boolean);
   // ⚠️ ต้องเดินต่อแม้ไม่มีข้อมูล ERP — ยังต้องตัด manual_income ออกจากผลลัพธ์
   // (เดิม early-return คืนก้อนเดิม ซึ่งตอนนี้มีฟิลด์ภายในติดไปด้วย)
-  const [chips, incomes] = await Promise.all([
+  const [chips, incomes, contacts] = await Promise.all([
     fetchJobBenefitChipsById(ids),
     fetchMonthlyIncomesById(ids),
+    // เบอร์เจ้าหน้าที่สรรหา (เจ้าของ 20 ต.ค. 2569 "โชว์เบอร์โทรเจ้าหน้าที่สรรหาด้วย")
+    loadRecruiterContacts(jobs.map((j) => j.recruiter_name_internal)),
   ]);
   return jobs.map((j) => {
     const key = String(j.id || '');
@@ -253,7 +264,9 @@ async function withBenefits(jobs: PublicJob[]): Promise<PublicJobOut[]> {
      * `overridden` มาจาก attachNotes (ทับ `total_income` ไว้แล้วตอนแนบ override)
      */
     const manualIncome = typeof j.manual_income === 'number' ? j.manual_income : null;
-    const { manual_income: _drop, ...rest } = j;
+    const { manual_income: _drop, recruiter_name_internal: recruiterName, ...base } = j;
+    const contact = recruiterContactOf(contacts, recruiterName);
+    const rest = contact ? { ...base, recruiter_contact: contact } : base;
     /**
      * 🔴 breakdown ที่เจ้าหน้าที่ตั้งเอง (income_display) **ชนะของอัตโนมัติจาก ERP**
      * — ถ้ามี ไม่ต้องส่ง monthly_income_base/items ของ ERP ไปสับสนซ้ำ
@@ -353,6 +366,8 @@ async function listPublicSiamrajJobs(limit: number): Promise<PublicJob[]> {
   ) as unknown as Array<Record<string, unknown>>;
   const released = await onlyReleasedJobs(open);
   const stillHiring = await withStaffOverrides(released);
+  // ผู้รับผิดชอบใบขอ (เจ้าหน้าที่สรรหา) — ใช้หาเบอร์ติดต่อบนการ์ด (20 ต.ค. 2569) · ไม่ออกหน้าสาธารณะเป็นชื่อดิบ
+  await attachAssignments(stillHiring);
   return stillHiring.map((j) => toPublicJob(j as unknown as JobRow));
 }
 
@@ -370,6 +385,7 @@ async function getPublicSiamrajJob(id: string): Promise<PublicJob | null> {
   // ด่านได้คนแล้วถอดแล้ว (7 ต.ค. 2569) — ส่งประกาศแล้ว = ขึ้น
   const visible = await withStaffOverrides([item as unknown as Record<string, unknown>]);
   if (visible.length === 0) return null;
+  await attachAssignments(visible);
   return toPublicJob(visible[0] as unknown as JobRow);
 }
 
@@ -400,7 +416,7 @@ export async function getLinkedPublicJob(id: string): Promise<PublicJobOut | nul
     [id],
   );
   if (rows.length === 0) return null;
-  const { manual_income: _drop, ...out } = toPublicJob(rows[0]);
+  const { manual_income: _drop, recruiter_name_internal: _rn, ...out } = toPublicJob(rows[0]);
   return out;
 }
 
@@ -434,14 +450,14 @@ export default async function handler(req: ApiReq, res: ApiRes) {
         [id],
       );
       if (rows.length === 0) return sendError(res, 404, 'Not found', 'Job not found');
-      return res.status(200).json(toPublicJob(rows[0]));
+      return res.status(200).json(stripInternal(toPublicJob(rows[0])));
     }
 
     const { rows } = await dbQuery<JobRow>(
       `select * from jarvis_rm.jobs where status in ('open', 'in_progress') order by created_at desc limit $1`,
       [limit],
     );
-    return res.status(200).json(rows.map(toPublicJob));
+    return res.status(200).json(rows.map((row) => stripInternal(toPublicJob(row))));
   } catch (e) {
     return handleApiError(res, e, 'public/jobs');
   }
