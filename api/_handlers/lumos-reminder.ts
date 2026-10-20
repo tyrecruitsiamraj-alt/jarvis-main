@@ -8,7 +8,7 @@ import { withLumosAuth } from '../_lib/lumos-auth.js';
 import { readJsonBody } from '../_lib/body.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../_lib/http.js';
 import { logInfo, logWarn } from '../_lib/logger.js';
-import { recordLumosResultInbox, readInboxFields } from '../_lib/lumosResultInbox.js';
+import { recordLumosResultInbox, readInboxFields, splitLumosResults } from '../_lib/lumosResultInbox.js';
 import { takePendingLumosItems, applyLumosResult } from '../_lib/lumosDispatch.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -105,13 +105,20 @@ async function postReminderResults(req: ApiReq, res: ApiRes): Promise<void> {
       return sendError(res, 400, 'Bad Request', 'Body must be a non-empty array of reminder results');
     }
 
-    for (const [i, item] of results.entries()) {
-      if (!isValidReminderResult(item)) {
-        return sendError(
-          res, 400, 'Bad Request',
-          `Item[${i}] is invalid — required: plan_id (string), step_id (string), client_contact_id (string), status (${VALID_STATUSES.join('|')}), outcome (${VALID_OUTCOMES.join('|')})`,
-        );
-      }
+    // ใบผิดรูปไม่ลากใบอื่นในชุดหายไปด้วย — จดลงกล่องรับให้เห็น (20 ต.ค. 2569)
+    const { valid, invalid } = splitLumosResults(results, isValidReminderResult);
+    const invalidReason = `ข้อมูลไม่ครบหรือผลไม่รู้จัก — ต้องมี plan_id, step_id, client_contact_id, status (${VALID_STATUSES.join('|')}), outcome (${VALID_OUTCOMES.join('|')})`;
+    for (const bad of invalid) {
+      await recordLumosResultInbox({ channel: 'reminder', ...readInboxFields(bad.item), matched: false, unmatchedReason: invalidReason, payload: bad.item });
+    }
+    if (invalid.length > 0) {
+      logWarn('lumos.reminder.results.invalid', {
+        received: results.length,
+        invalid: invalid.map((x) => ({ index: x.index, ...readInboxFields(x.item) })),
+      });
+    }
+    if (valid.length === 0) {
+      return sendError(res, 400, 'Bad Request', `All items are invalid — ${invalidReason}`);
     }
 
     /**
@@ -120,8 +127,8 @@ async function postReminderResults(req: ApiReq, res: ApiRes): Promise<void> {
      * ใบนั้นเข้ามาถึงเราหรือเปล่า และเข้ามาหน้าตาแบบไหน
      */
     logInfo('lumos.reminder.results', {
-      count: results.length,
-      items: (results as ReminderResult[]).map((r) => ({
+      count: valid.length,
+      items: valid.map((r) => ({
         client_contact_id: r.client_contact_id,
         plan_id: r.plan_id,
         step_id: r.step_id,
@@ -134,7 +141,7 @@ async function postReminderResults(req: ApiReq, res: ApiRes): Promise<void> {
 
     // ผูกผลกลับเข้าคิว dispatch (match ด้วย client_contact_id + step_position)
     let matched = 0;
-    for (const item of results as ReminderResult[]) {
+    for (const item of valid) {
       const ok = await applyLumosResult('reminder', item.client_contact_id, item.status, item);
       if (ok) matched += 1;
       /**
@@ -152,18 +159,19 @@ async function postReminderResults(req: ApiReq, res: ApiRes): Promise<void> {
         payload: item,
       });
     }
-    if (matched < results.length) {
+    if (matched < valid.length) {
       // ผลที่จับคู่ไม่ได้ = ไม่ได้ขึ้นจอที่ไหนเลย ต้องเห็นชัดใน log ไม่ใช่ซ่อนในตัวเลข
       logWarn('lumos.reminder.results.unmatched', {
-        received: results.length,
+        received: valid.length,
         matched,
-        unmatched: results.length - matched,
+        unmatched: valid.length - matched,
       });
     }
 
     return res.status(200).json({
       ok: true,
       received: results.length,
+      invalid: invalid.map((x) => x.index),
       matched,
       message: 'Reminder results accepted',
     });

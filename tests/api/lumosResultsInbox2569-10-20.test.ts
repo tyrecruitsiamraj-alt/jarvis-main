@@ -1,0 +1,33 @@
+// @vitest-environment node
+/**
+ * เจ้าของ 20 ต.ค. 2569: "Lumos บอกไม่รับสาย ทำไมระบบเราบอกว่าส่ง AI แล้ว ยังไม่มีผล … จะเชื่อถือระบบเราได้ไง"
+ * ช่องใบสมัครไม่เคยจดผลขาเข้า + ใบเดียวผิดรูป = ปฏิเสธทั้งชุด ⇒ ผลหายแล้วพิสูจน์ไม่ได้ว่าใครพลาด
+ */
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { splitLumosResults } from '../../api/_lib/lumosResultInbox';
+
+const read = (p: string) => readFileSync(p, 'utf8');
+const isOk = (v: unknown): v is { outcome: string } =>
+  typeof v === 'object' && v !== null && ['completed', 'unresponsive'].includes(String((v as { outcome?: unknown }).outcome));
+
+describe('ผลจาก Lumos: ใบผิดรูปไม่ลากใบอื่นหาย', () => {
+  it('แยกใบดี/ใบผิดรูป พร้อมลำดับ', () => {
+    const r = splitLumosResults([{ outcome: 'completed' }, { outcome: 'voicemail' }, null, { outcome: 'unresponsive' }], isOk);
+    expect(r.valid).toHaveLength(2);
+    expect(r.invalid.map((x) => x.index)).toEqual([1, 2]);
+  });
+  it('ทั้งสองช่องจดทุกใบลงกล่องรับ (ใบผิดรูป = matched false) และไม่ตอบ 400 ทั้งชุดเพราะใบเดียว', () => {
+    for (const [file, channel] of [
+      ['api/_handlers/lumos-interview.ts', 'interview'],
+      ['api/_handlers/lumos-reminder.ts', 'reminder'],
+    ] as const) {
+      const src = read(file);
+      expect(src).toContain('splitLumosResults(results,');
+      expect(src).toContain(`recordLumosResultInbox({ channel: '${channel}', ...readInboxFields(bad.item), matched: false`);
+      expect(src).not.toMatch(/Item\[\$\{i\}\] is invalid/);
+      expect(src).toContain('if (valid.length === 0)');
+    }
+    expect(read('api/_handlers/lumos-interview.ts')).toMatch(/recordLumosResultInbox\(\{\s*channel: 'interview',\s*\.\.\.readInboxFields\(r\),\s*matched: ok/);
+  });
+});

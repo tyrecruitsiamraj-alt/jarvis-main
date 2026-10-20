@@ -81,3 +81,19 @@ export async function recordLumosResultInbox(rec: LumosInboxRecord): Promise<voi
     logError('lumos.inbox: จดผลขาเข้าไม่สำเร็จ', e, { clientRef: rec.clientRef });
   }
 }
+
+/**
+ * ═══ ผลที่ผิดรูปแบบห้ามทำให้ผลอื่นในชุดหาย (เจ้าของ 20 ต.ค. 2569 "แบบนี้จะเชื่อถือระบบเราได้ไง") ═══
+ * เคส: Lumos ขึ้น "ไม่รับสาย" แต่ระบบเรายังเป็น "ส่ง AI แล้ว ยังไม่มีผล" — ช่องใบสมัครไม่เคยจดขาเข้า
+ * และของเดิมเจอใบเดียวผิดรูป = ตอบ 400 ทั้งชุด ⇒ ผลที่ถูกในชุดเดียวกันหายไปด้วยโดยไม่มีหลักฐาน
+ * ⇒ แยกใบดีไปบันทึกตามปกติ · ใบผิดรูปจดลงกล่องรับ (matched = false + เหตุ) ให้เห็นและตามได้
+ */
+export function splitLumosResults<T>(
+  items: readonly unknown[],
+  isValid: (v: unknown) => v is T,
+): { valid: T[]; invalid: Array<{ index: number; item: unknown }> } {
+  const valid: T[] = [];
+  const invalid: Array<{ index: number; item: unknown }> = [];
+  items.forEach((item, index) => (isValid(item) ? valid.push(item) : invalid.push({ index, item })));
+  return { valid, invalid };
+}

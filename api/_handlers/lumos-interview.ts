@@ -9,7 +9,8 @@ import { tableInAppSchema } from '../_lib/schema.js';
 import { withLumosAuth } from '../_lib/lumos-auth.js';
 import { readJsonBody } from '../_lib/body.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../_lib/http.js';
-import { logInfo } from '../_lib/logger.js';
+import { logInfo, logWarn } from '../_lib/logger.js';
+import { readInboxFields, recordLumosResultInbox, splitLumosResults } from '../_lib/lumosResultInbox.js';
 import { takePendingLumosItems, applyLumosResult } from '../_lib/lumosDispatch.js';
 import { normalizeInterviewOutcome } from '../_lib/lumosInterviewOutcome.js';
 
@@ -349,22 +350,29 @@ async function postInterviewResults(req: ApiReq, res: ApiRes): Promise<void> {
       return sendError(res, 400, 'Bad Request', 'Body must be a non-empty array of interview results');
     }
 
-    for (const [i, item] of results.entries()) {
-      if (!isValidInterviewResult(item)) {
-        return sendError(
-          res, 400, 'Bad Request',
-          `Item[${i}] is invalid — required: interview_id (string), client_candidate_id (string), outcome (one of: ${VALID_OUTCOMES.join(', ')})`,
-        );
-      }
+    // ใบผิดรูปไม่ลากใบอื่นในชุดหายไปด้วย — จดลงกล่องรับให้เห็น (20 ต.ค. 2569)
+    const { valid, invalid } = splitLumosResults(results, isValidInterviewResult);
+    const invalidReason = `ข้อมูลไม่ครบหรือผลไม่รู้จัก — ต้องมี interview_id, client_candidate_id, outcome (${VALID_OUTCOMES.join('|')})`;
+    for (const bad of invalid) {
+      await recordLumosResultInbox({ channel: 'interview', ...readInboxFields(bad.item), matched: false, unmatchedReason: invalidReason, payload: bad.item });
+    }
+    if (invalid.length > 0) {
+      logWarn('lumos.interview.results.invalid', {
+        received: results.length,
+        invalid: invalid.map((b) => ({ index: b.index, ...readInboxFields(b.item) })),
+      });
+    }
+    if (valid.length === 0) {
+      return sendError(res, 400, 'Bad Request', `All items are invalid — ${invalidReason}`);
     }
 
     logInfo('lumos.interview.results', {
-      count: results.length,
-      interview_ids: results.map((r) => (r as InterviewResult).interview_id),
+      count: valid.length,
+      items: valid.map((r) => ({ interview_id: r.interview_id, client_candidate_id: r.client_candidate_id, outcome: r.outcome })),
     });
 
     const settled = await Promise.allSettled(
-      (results as InterviewResult[]).map((r) => persistInterviewResult(r)),
+      valid.map((r) => persistInterviewResult(r)),
     );
     const failed = settled.filter((s) => s.status === 'rejected').length;
 
@@ -382,7 +390,7 @@ async function postInterviewResults(req: ApiReq, res: ApiRes): Promise<void> {
      * (ดู `normalizeInterviewOutcome`) ไม่งั้น "สนใจ" จะไม่เด้งแจ้งเตือนและไม่บังใบอื่น
      */
     let matched = 0;
-    for (const r of results as InterviewResult[]) {
+    for (const r of valid) {
       const queueStatus =
         r.outcome === 'completed' ? 'completed' : r.status === 'ยกเลิก' ? 'cancelled' : 'failed';
       const ok = await applyLumosResult(
@@ -393,18 +401,30 @@ async function postInterviewResults(req: ApiReq, res: ApiRes): Promise<void> {
         normalizeInterviewOutcome(r.outcome),
       ).catch(() => false);
       if (ok) matched += 1;
+      // จดทุกใบลงกล่องรับ (ช่องติดตามจดมาตั้งแต่ 11 ก.ย. · ช่องนี้ไม่เคยจด ⇒ ผลหายแล้วพิสูจน์ไม่ได้ว่าใครพลาด)
+      await recordLumosResultInbox({
+        channel: 'interview',
+        ...readInboxFields(r),
+        matched: ok,
+        unmatchedReason: ok ? null : 'ไม่พบแถวคิวที่ตรงกับ client_candidate_id ที่ส่งมา',
+        payload: r,
+      });
+    }
+    if (matched < valid.length) {
+      logWarn('lumos.interview.results.unmatched', { received: valid.length, matched, unmatched: valid.length - matched });
     }
 
     return res.status(200).json({
       ok: true,
       received: results.length,
+      invalid: invalid.map((b) => b.index),
       // ⚠️ ตัวเลขต้องบอกความจริง — เดิมตอบ persisted = จำนวนที่รับมา ทั้งที่ไม่ได้เขียนอะไร
       matched,
-      persisted: results.length - failed,
+      persisted: valid.length - failed,
       failed,
       message: failed === 0
         ? `Interview results accepted — matched ${matched}/${results.length} queue rows`
-        : `Accepted ${results.length - failed}/${results.length} — ${failed} failed to save`,
+        : `Accepted ${valid.length - failed}/${results.length} — ${failed} failed to save`,
     });
   } catch (e) {
     return handleApiError(res, e, 'lumos.interview.results');
