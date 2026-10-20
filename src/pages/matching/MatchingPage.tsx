@@ -1333,7 +1333,7 @@ const MatchingPage: React.FC = () => {
         skippedNoPhone: noPhone.length,
         skippedNoJob: noJob.length,
       });
-      setLumosNotice(`${summary} — ไปโทร+บันทึกผลที่หน้า "โทรของฉัน"`);
+      setLumosNotice(`${summary} — ไปโทร+บันทึกผลที่แท็บ "การติดต่อ" ของกล่องงาน`);
     } catch (e) {
       setLumosError(friendlyErrorText(e, 'เก็บเข้าถังโทรไม่สำเร็จ'));
     } finally {
