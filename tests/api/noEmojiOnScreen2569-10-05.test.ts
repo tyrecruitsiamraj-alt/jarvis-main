@@ -27,13 +27,19 @@ const stripComments = (s: string) =>
 
 describe('ไม่มีอิโมจิบนจอ', () => {
   it('src/ ทั้งหมด + ข้อความแจ้งเตือนจาก api/_lib (ไปขึ้นกระดิ่ง)', () => {
+    /**
+     * ยกเว้น: แคปชั่น Autopost = เนื้อหาโพสต์ Facebook ตามแบบที่เจ้าของส่ง 20 ต.ค. 2569 (📍 💰 ⏰) ไม่ใช่ป้าย/ปุ่มบนจอ
+     * ยกเว้นเฉพาะ 3 ตัวนี้ในไฟล์นั้น — อิโมจิอื่นในไฟล์นั้นยังตก
+     */
+    const CAPTION_FILE = path.join('src', 'lib', 'autopostCaption.ts');
     const targets = [...files(path.join(ROOT, 'src')), path.join(ROOT, 'api/_lib/callFollowup.ts'), path.join(ROOT, 'api/_lib/callBatchStore.ts')];
     const hits: string[] = [];
     for (const f of targets) {
       stripComments(fs.readFileSync(f, 'utf8'))
         .split('\n')
         .forEach((line) => {
-          if (EMOJI.test(line)) hits.push(`${path.relative(ROOT, f)}: ${line.trim().slice(0, 80)}`);
+          const checked = path.relative(ROOT, f) === CAPTION_FILE ? line.replace(/[📍💰⏰]/gu, '') : line;
+          if (EMOJI.test(checked)) hits.push(`${path.relative(ROOT, f)}: ${line.trim().slice(0, 80)}`);
         });
     }
     expect(hits).toEqual([]);

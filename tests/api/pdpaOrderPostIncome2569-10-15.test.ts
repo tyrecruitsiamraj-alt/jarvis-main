@@ -54,10 +54,12 @@ describe('สั่งโพสต์ — ผ่านศูนย์งาน a
   });
 
   it('🔴 คำขอโพสต์มีข้อความ/แบบโพสต์/กลุ่ม · ยังรอ/กำลังทำ = กดซ้ำไม่ได้ · ขอ Scrap อยู่ที่นี่ที่เดียว', () => {
+    // 20 ต.ค. 2569 (Choice "บนการ์ดกล่องงาน"): สั่งโพสต์ย้ายไปป๊อป Autopost · ป๊อปประกาศเหลือสถานะ + ขอ Scrap
+    const dlg = read('src/components/jobs/AutopostDialog.tsx');
+    expect(dlg).toContain("soPostSnapshot({ ...composeJobSnapshot(job), position: publicJobTitle(job) }, { mode, caption, groupIds: picked })");
     const btn = read('src/components/jobs/OrderPostButton.tsx');
-    expect(btn).toContain('soPostSnapshot(composeJobSnapshot(job), { mode, caption, groupIds: picked })');
-    expect(btn).toContain('disabled={latest === null || Boolean(contentView?.open)}');
-    expect(btn).toContain(': soScrapSnapshot(job),');
+    expect(btn).not.toContain('soPostSnapshot(');
+    expect(btn).toContain('jobSnapshot: soScrapSnapshot(job, title),');
     // 20 ต.ค. 2569 Choice "เอาออก สั่งจากป๊อปประกาศที่เดียว" — ทั้งปุ่ม Content และ Scraping ในจับคู่งาน
     expect(read('src/pages/matching/MatchingPage.tsx')).not.toContain('createPosting(');
     expect(read('src/pages/matching/MatchingPage.tsx')).not.toContain('ให้สร้าง Content');

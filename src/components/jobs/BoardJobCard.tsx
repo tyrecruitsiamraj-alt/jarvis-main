@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Ban, EyeOff, FileSpreadsheet, StickyNote, Users } from 'lucide-react';
+import { ArrowRight, Ban, EyeOff, FileSpreadsheet, Megaphone, StickyNote, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -64,10 +64,12 @@ export type BoardJobCardProps = {
    * ไม่มี = ไม่มีป้าย
    */
   so?: readonly JobPostingRequest[] | null;
+  /** ปุ่ม Autopost (เจ้าของ 20 ต.ค. 2569 Choice "บนการ์ดกล่องงาน") — เปิดป๊อปของตัวเอง · ไม่ส่ง = ไม่มีปุ่ม */
+  onAutopost?: (job: JobRequest) => void;
 };
 
 /** "บางพลี สมุทรปราการ" — อำเภอที่ทีม Online กรอก + จังหวัด · ไม่รู้ = บอกตรง ๆ (ไม่เดาจากจังหวัดไซต์) */
-const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip, onImport, so }) => {
+const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip, onImport, so, onAutopost }) => {
   // เบอร์เจ้าหน้าที่สรรหาบรรทัดเดียวกับหน้า /apply (เจ้าของ 20 ต.ค. 2569 "ไหนเบอร์โทรเจ้าหน้าที่สรรหา")
   const contact = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
   const age = getJobAgeChipInfo(job);
@@ -205,6 +207,22 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
         </div>
         {closed ? null : (
           <div className="flex flex-wrap items-center justify-end gap-1">
+            {onAutopost ? (
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                data-testid="board-card-autopost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAutopost(job);
+                }}
+                className="rounded-lg"
+              >
+                <Megaphone aria-hidden />
+                Autopost
+              </Button>
+            ) : null}
             {onImport ? (
               <Button
                 type="button"

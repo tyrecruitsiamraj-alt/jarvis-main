@@ -91,8 +91,8 @@ describe('ขอ Scrap', () => {
     });
   });
   it('ปุ่มอยู่ป๊อปประกาศที่เดียว · reason ตามสเปก', () => {
-    const btn = read('src/components/jobs/OrderPostButton.tsx');
-    expect(btn).toContain("reason: type === 'content' ? SO_POST_REASON : SO_SCRAP_REASON");
+    expect(read('src/components/jobs/OrderPostButton.tsx')).toContain('reason: SO_SCRAP_REASON,');
+    expect(read('src/components/jobs/AutopostDialog.tsx')).toContain('reason: SO_POST_REASON,');
     expect(read('src/lib/soScraping.ts')).toContain("export const SO_SCRAP_REASON = 'ขอ Scrap จาก Jarvis';");
     expect(read('src/pages/matching/MatchingPage.tsx')).not.toContain("'Scraping งาน'");
   });

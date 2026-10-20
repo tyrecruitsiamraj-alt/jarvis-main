@@ -53,8 +53,13 @@ export function jobQtyOf(job: Pick<JobRequest, 'request_positions' | 'position_u
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
 }
 
-export function jobPositionOf(job: Pick<JobRequest, 'staff_title_name' | 'request_action_name'>): string | null {
-  return (job.staff_title_name || job.request_action_name || '').trim() || null;
+/**
+ * ชื่อตำแหน่งที่ส่งให้ Scrap = ชื่อที่โชว์บนประกาศ (`publicJobTitle`) ไม่ใช่ชื่อตำแหน่ง ERP
+ * (20 ต.ค. 2569 — ERP ส่วนใหญ่เป็น "พนักงาน" เฉย ๆ หา Resume ไม่ได้)
+ */
+export function jobPositionOf(job: Pick<JobRequest, 'staff_title_name' | 'request_action_name'>, publicTitle?: string | null): string | null {
+  // ไม่ import publicJobTitle ตรงนี้ (boardFilters → soScraping → publicJobTitle → boardFilters วนกัน) — ผู้เรียกส่งมา
+  return (publicTitle ?? '').trim() || (job.staff_title_name || job.request_action_name || '').trim() || null;
 }
 
 /** จังหวัดของใบขอ — กติกาเดียวกับตัวกรองกล่องงาน (`boardProvinceOf`) · ไม่รู้ = null */
@@ -63,18 +68,18 @@ export function jobProvinceOf(job: Pick<JobRequest, 'override_province' | 'locat
 }
 
 /** ขอ Scrap ได้ไหม — ขาดอะไรบ้าง (ว่าง = ครบ) */
-export function soScrapMissing(job: JobRequest): string[] {
+export function soScrapMissing(job: JobRequest, publicTitle?: string | null): string[] {
   const out: string[] = [];
-  if (!jobPositionOf(job)) out.push('ตำแหน่ง');
+  if (!jobPositionOf(job, publicTitle)) out.push('ตำแหน่ง');
   if (!jobProvinceOf(job)) out.push('จังหวัด');
   if (jobQtyOf(job) == null) out.push('จำนวนคน');
   return out;
 }
 
 /** snapshot ของคำขอ Scrap — บังคับ 3 ช่อง ที่เหลือใส่เมื่อมี */
-export function soScrapSnapshot(job: JobRequest): Record<string, unknown> {
+export function soScrapSnapshot(job: JobRequest, publicTitle?: string | null): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    position: jobPositionOf(job),
+    position: jobPositionOf(job, publicTitle),
     location: jobProvinceOf(job),
     qty: jobQtyOf(job),
   };
@@ -98,11 +103,21 @@ export function soSnapshotError(type: 'content' | 'scraping', snap: Record<strin
   // คำขอโพสต์รุ่นเก่า (ไม่มี post_mode) ยังรับเหมือนเดิม
   if (snap?.post_mode === undefined) return null;
   const groups = Array.isArray(snap.group_ids) ? snap.group_ids.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : [];
-  return soPostOrderError({
+  const caption = typeof snap.caption === 'string' ? snap.caption : '';
+  const base = soPostOrderError({
     mode: (typeof snap.post_mode === 'string' ? snap.post_mode : null) as SoPostMode | null,
-    caption: typeof snap.caption === 'string' ? snap.caption : '',
+    caption,
     groupIds: groups,
   });
+  if (base) return base;
+  // Autopost (มีบัญชี) — ทุกโพสต์ต้องมีลิงก์สมัคร และข้อความต้องมีลิงก์นั้น (20 ต.ค. 2569)
+  if (snap.account_id !== undefined) {
+    if (typeof snap.account_id !== 'string' || !snap.account_id) return 'เลือกบัญชี Facebook ก่อนส่ง';
+    const link = typeof snap.apply_link === 'string' ? snap.apply_link : '';
+    if (!/\/apply\/p\/[A-Za-z0-9_-]+$/.test(link)) return 'เลือกลิงก์สมัครก่อนส่ง';
+    if (snap.post_mode !== 'image_only' && !caption.includes(link)) return 'ข้อความประกาศต้องมีลิงก์สมัครที่เลือก';
+  }
+  return null;
 }
 
 /** กลุ่มจังหวัดเดียวกับใบขอขึ้นก่อน (แล้วเรียงชื่อ) */

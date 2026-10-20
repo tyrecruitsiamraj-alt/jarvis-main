@@ -49,6 +49,13 @@ export type JobSnapshot = {
   post_mode?: 'caption_only' | 'caption_image' | 'image_only';
   caption?: string;
   group_ids?: string[];
+  /** Autopost (20 ต.ค. 2569) — บัญชี · worker (null = อัตโนมัติ) · ลิงก์สมัครที่อยู่ในข้อความ */
+  account_id?: string;
+  account_name?: string;
+  worker_id?: string | null;
+  apply_link?: string;
+  link_code?: string;
+  channel_label?: string | null;
 };
 
 /** คำบนจอ = ชุดเดียวกับ So Scraping (`SO_STATUS_LABEL` · เจ้าของ 20 ต.ค. 2569) */
@@ -120,6 +127,35 @@ export async function fetchBoardJobPostings(): Promise<JobPostingRequest[]> {
   if (!r.ok) return readError(r, 'โหลดสถานะคำขอไม่ได้');
   const d = (await r.json().catch(() => ({}))) as { items?: JobPostingRequest[] };
   return d.items ?? [];
+}
+
+/** คำขอล่าสุดต่อประเภท + กลุ่มที่ใบนี้เพิ่งสั่งโพสต์ใน 3 วัน (ป๊อป Autopost เตือนโพสต์ซ้ำ) */
+export async function fetchJobPostingState(jobId: string): Promise<{ latest: JobPostingRequest[]; recentGroups: string[] }> {
+  const r = await apiFetch(`/api/matching/job-postings?jobId=${encodeURIComponent(jobId)}`);
+  if (!r.ok) return readError(r, 'โหลดสถานะคำขอไม่ได้');
+  const d = (await r.json().catch(() => ({}))) as { latest?: JobPostingRequest[]; active?: JobPostingRequest[]; recent_groups?: string[] };
+  return { latest: d.latest ?? d.active ?? [], recentGroups: d.recent_groups ?? [] };
+}
+
+export type SoAccount = {
+  id: string;
+  name: string;
+  groupIds: string[];
+  dailyCap: number | null;
+  postedToday: number;
+  pausedUntil: string | null;
+  pauseReason: string | null;
+  preferredWorker: string | null;
+};
+export type SoWorker = { name: string; lastSeen: string | null; online: boolean };
+export type AutopostOptions = { accounts: SoAccount[]; groups: SoGroup[]; workers: SoWorker[] };
+
+/** บัญชี · กลุ่ม · worker ของ So Scraping (อ่านอย่างเดียว) — ป๊อป Autopost */
+export async function fetchAutopostOptions(): Promise<AutopostOptions> {
+  const r = await apiFetch('/api/matching/job-postings?autopost=1');
+  if (!r.ok) return readError(r, 'โหลดบัญชี/กลุ่มของ So Scraping ไม่ได้');
+  const d = (await r.json().catch(() => ({}))) as Partial<AutopostOptions>;
+  return { accounts: d.accounts ?? [], groups: d.groups ?? [], workers: d.workers ?? [] };
 }
 
 /** กลุ่ม Facebook ของ So Scraping ที่มีบัญชีผูก (อ่านอย่างเดียว) */

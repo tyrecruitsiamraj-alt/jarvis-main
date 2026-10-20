@@ -152,6 +152,7 @@ import {
 import { isHiddenFromPublicByWorkStatus } from '@/lib/publicJobVisibility';
 import { cn } from '@/lib/utils';
 import { fetchBoardJobPostings, type JobPostingRequest } from '@/lib/jobPostingRequestsApi';
+import AutopostDialog from '@/components/jobs/AutopostDialog';
 import { SEARCH_ALL_POOLS_AND_CALL } from '@/lib/candidateSearchLabels';
 import { Button } from '@/components/ui/button';
 
@@ -1074,6 +1075,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ทำเสร็จต้องได้อยู่ที่กล่องงานต่อ ไม่ต้องเดินกลับ
    */
   const [postingJob, setPostingJob] = useState<JobRequest | null>(null);
+  /** ใบที่เปิดป๊อป Autopost อยู่ (20 ต.ค. 2569) — เปิดจากปุ่มบนการ์ด · ป๊อปอยู่นอกการ์ด (คลิกในป๊อปไม่ทะลุไปเปิดการ์ด) */
+  const [autopostJob, setAutopostJob] = useState<JobRequest | null>(null);
   // เจ้าหน้าที่: สร้างลิงก์รับสมัครของงาน (Gen Link)
   /** ใบขอที่กำลังกด "หาคนเพิ่ม + ส่ง AI โทร" ของเลนสรรหา (R2b) */
   /** สร้างลิงก์ของกล่องลอย — กดจากการ์ดกล่องลอยตรง ๆ ไม่ต้องผ่านตัวเลือกประเภทอีกชั้น */
@@ -1697,6 +1700,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 skip={skipIdx.get(job.id) ?? null}
                 onImport={onImportJob}
                 so={soByJob?.get(job.id) ?? null}
+                onAutopost={setAutopostJob}
               />
             ) : (
             <Card
@@ -2215,6 +2219,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           (ปล่อยหน้าสาธารณะ · แก้ข้อความประกาศ · แก้ข้อมูลที่จะขึ้นประกาศ · Gen link ·
           ประวัติการแก้ไข) ย้ายไปแท็บ "ประกาศ / ลิงก์สมัคร" ของใบขอครบแล้ว
           ⇒ `/jobs/siamraj/:id/posting` (`UnitRequestPostingTabPage`) */}
+
+      {isStaff ? (
+        <AutopostDialog
+          job={autopostJob}
+          onClose={() => setAutopostJob(null)}
+          onSent={() => setPostingsRev((n) => n + 1)}
+        />
+      ) : null}
 
       {/* ── 🔴 popup ไล่งาน 4 ขั้น — ทำเสร็จปิดแล้วอยู่ที่กล่องงานต่อ ──
           เนื้อในเป็น component เดียวกับหน้า deep-link `/jobs/board/:id/posting`
