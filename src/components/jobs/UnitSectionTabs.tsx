@@ -14,11 +14,13 @@ import { cn } from '@/lib/utils';
  * (ปุ่มบนการ์ด · เมนูเดิม · ลิงก์ที่คนแชร์กันไว้) ย้าย path = ของเก่าพังเงียบทั้งหมด
  * แท็บนี้ทำหน้าที่ "ทางเข้าคู่กัน" ให้สองหน้ารู้สึกเป็นที่เดียวกันพอ
  */
-export type UnitSectionId = 'units' | 'matching';
+export type UnitSectionId = 'units' | 'matching' | 'contact';
 
 const TABS: Array<{ id: UnitSectionId; label: string; to: string }> = [
   { id: 'units', label: 'หน่วยงาน', to: '/jobs/list' },
   { id: 'matching', label: 'จับคู่กับงาน', to: '/matching/match' },
+  // คนของเราที่กด "เก็บไปโทรเอง" บนหน้าจับคู่ ไปโทร+ลงผลที่นี่ (20 ต.ค. 2569 — เดิมไม่มีทางเข้าบนจอ)
+  { id: 'contact', label: 'การติดต่อ', to: '/matching/contact' },
 ];
 
 const UnitSectionTabs: React.FC<{ active: UnitSectionId }> = ({ active }) => {

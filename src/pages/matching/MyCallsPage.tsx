@@ -89,7 +89,12 @@ const DUE_SOON_MS = 2 * 60 * 60 * 1000;
  * (วัดจริง 8 ต.ค.: ล็อกค้าง 27 รายการ เป็นใบสมัครที่คนเดียวกันเก็บไว้ครบ 27 = ชื่อขึ้นซ้ำสองที่)
  * เหลือแค่ล็อกจาก iRecruit ที่ไม่มีแถวในตาราง · ไม่มีเหลือ = ซ่อนทั้งก้อน
  */
-export const MyCallsSection: React.FC<{ lane?: CallLane; skipApplications?: boolean }> = ({ lane, skipApplications = false }) => {
+export const MyCallsSection: React.FC<{
+  lane?: CallLane;
+  skipApplications?: boolean;
+  /** หน้าที่ตั้งใจเปิดมาดู (แท็บการติดต่อของหน้าจับคู่) — ว่างแล้วห้ามหาย (กติกา 1 ต.ค. 2569) */
+  showEmpty?: boolean;
+}> = ({ lane, skipApplications = false, showEmpty = false }) => {
   /**
    * เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: **ทุกคนเห็นถังของตัวเอง** (ของใครของมัน)
    * ⚠️ "ภาระงานโทรของทีม" (บอร์ดหัวหน้า) ถูกเอาออก 14 ส.ค. 2569 (เจ้าของสั่ง) —
@@ -298,8 +303,8 @@ export const MyCallsSection: React.FC<{ lane?: CallLane; skipApplications?: bool
   // ไม่มีงานค้างและไม่มียอดวันนี้ = ไม่กินที่บนหน้าหลักเลย (เจ้าของสั่งว่าห้ามรก)
   // มีของค่อยโผล่ทั้งแผง · หัวหน้าเห็นบอร์ดทีมเสมอ (งานของลูกทีมไม่ใช่ของตัวเอง)
   // ไม่มีงานค้างและไม่มียอดวันนี้ = ซ่อนตัวเอง ไม่กินที่ (ทุก role เท่ากันหลังตัดบอร์ดทีม)
-  if (!loading && holds.length === 0 && tally.total === 0) return null;
-  if (skipApplications && holds.length === 0) return null;
+  if (!showEmpty && !loading && holds.length === 0 && tally.total === 0) return null;
+  if (!showEmpty && skipApplications && holds.length === 0) return null;
 
   return (
     <div className="space-y-4">
@@ -319,13 +324,12 @@ export const MyCallsSection: React.FC<{ lane?: CallLane; skipApplications?: bool
         <p className={cn('px-1 text-sm', DASH.muted)}>กำลังโหลดงานโทร…</p>
       ) : holds.length === 0 ? (
         <div className={cn('rounded-2xl border p-6 text-center', DASH.card)}>
-          <p className={cn('text-sm font-medium', DASH.cellStrong)}>ยังไม่มีงานโทรที่ถืออยู่</p>
+          <p className={cn('text-sm font-medium', DASH.cellStrong)}>ยังไม่มีคนที่เก็บไปโทรเอง</p>
           <p className={cn('mt-1 text-xs', DASH.muted)}>
-            ไปที่{' '}
+            เก็บได้จาก{' '}
             <Link to="/matching/match" className={cn('font-medium underline', TONE.primary.value)}>
-              หน้า Matching
-            </Link>{' '}
-            แล้วกด “รับไปโทรเอง” บนการ์ดผู้สมัคร
+              จับคู่กับงาน
+            </Link>
           </p>
         </div>
       ) : (

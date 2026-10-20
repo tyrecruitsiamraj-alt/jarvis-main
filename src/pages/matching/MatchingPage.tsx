@@ -1336,7 +1336,12 @@ const MatchingPage: React.FC = () => {
         skippedNoPhone: noPhone.length,
         skippedNoJob: noJob.length,
       });
-      setLumosNotice(`${summary} — ไปโทร+บันทึกผลที่แท็บ "การติดต่อ" ของกล่องงาน`);
+      // คนของเรา (บอร์ด) = แท็บการติดต่อของหน้านี้ · คนที่ยังไม่สมัคร (iRecruit) = แท็บการติดต่อของกล่องงาน (แยกเลนตามกติกา 16 ส.ค.)
+      const where = [
+        ready.some((t) => t.source === 'board') ? 'คนของเราอยู่แท็บ "การติดต่อ" ข้างจับคู่กับงาน' : null,
+        ready.some((t) => t.source === 'irecruit') ? 'คนที่ยังไม่สมัครอยู่แท็บ "การติดต่อ" ของกล่องงาน' : null,
+      ].filter(Boolean);
+      setLumosNotice(where.length ? `${summary} — ${where.join(' · ')}` : summary);
     } catch (e) {
       setLumosError(friendlyErrorText(e, 'เก็บเข้าถังโทรไม่สำเร็จ'));
     } finally {
