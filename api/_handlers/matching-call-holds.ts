@@ -26,6 +26,8 @@ import { applyHumanCallFollowup } from '../_lib/callFollowup.js';
 import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
 import { isApplicationInWriteScope, loadApplicationScopeRow } from '../_lib/applicationScope.js';
 import { bangkokBusinessDateYmd } from '../_lib/businessDate.js';
+import { listSelectionContacts } from '../_lib/selectionContacts.js';
+import { readUnitRequestListThroughCache } from './siamraj-unit-requests.js';
 import {
   acquireCallHold,
   getActiveCallHoldsByPhones,
@@ -92,6 +94,25 @@ async function handler(req: AuthedReq, res: ApiRes) {
   try {
     if (method === 'GET') {
       res.setHeader?.('Cache-Control', 'no-store');
+
+      // หน้าการติดต่อของจับคู่งาน (20 ต.ค. 2569) — คนของเราที่ฉันเก็บไปโทรเอง + ที่ลงผลแล้ว 30 วัน แบบตาราง
+      if (getQuery(req, 'view') === 'selection') {
+        if (!viewerId) return res.status(200).json({ rows: [] });
+        const labels = new Map<string, string>();
+        try {
+          const list = (await readUnitRequestListThroughCache({ limit: 500, departmentScope: { mode: 'all' } }))
+            .value as Array<Record<string, unknown>>;
+          for (const j of list) {
+            const id = String(j.id ?? '');
+            const site = String(j.work_site_name ?? j.unit_name ?? '').trim();
+            if (id && site) labels.set(id, site);
+          }
+        } catch {
+          /* อ่านรายการใบขอไม่ได้ — ใช้เลขใบขอ */
+        }
+        const rows = await listSelectionContacts(viewerId, (jobId) => labels.get(jobId) ?? null);
+        return res.status(200).json({ rows });
+      }
 
       if (getQuery(req, 'mine') === '1') {
         if (!viewerId) return res.status(200).json({ holds: [], tally: null });
