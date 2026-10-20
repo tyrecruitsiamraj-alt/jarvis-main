@@ -129,8 +129,7 @@ export default function FollowCallQueue({
           {/* ลูกค้า (จบแล้ว · ตอบว่าไป — เจ้าของ 19 ต.ค. 2569: เจ้าของแผนต้องโทรหาลูกค้าตอนพนักงานเริ่มงานครั้งแรก) */}
           {customer ? (
             <div className="truncate text-xs text-foreground" data-testid="queue-customer">
-              ลูกค้า {customer.name ?? customer.contact ?? '—'}
-              {customer.name && customer.contact ? <span className="text-muted-foreground"> · {customer.contact}</span> : null}
+              ลูกค้า {customer.name ?? '—'}
             </div>
           ) : null}
           <div className="truncate text-xs text-muted-foreground">

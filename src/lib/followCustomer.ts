@@ -5,18 +5,18 @@
  */
 import type { FollowEntry } from '@/lib/followApi';
 
-export type FollowCustomer = { name: string | null; contact: string | null; phone: string | null; tel: string | null };
+/** ไม่มี "ผู้ติดต่อ" แล้ว (ถอดช่องทั้งช่อง 20 ต.ค. 2569) */
+export type FollowCustomer = { name: string | null; phone: string | null; tel: string | null };
 
 const clean = (v: string | null | undefined) => (v ?? '').trim() || null;
 
 export function followCustomerOf(
-  rounds: readonly Pick<FollowEntry, 'customer_name' | 'customer_contact' | 'customer_phone'>[],
+  rounds: readonly Pick<FollowEntry, 'customer_name' | 'customer_phone'>[],
 ): FollowCustomer | null {
-  const first = (k: 'customer_name' | 'customer_contact' | 'customer_phone') => rounds.map((r) => clean(r[k])).find(Boolean) ?? null;
+  const first = (k: 'customer_name' | 'customer_phone') => rounds.map((r) => clean(r[k])).find(Boolean) ?? null;
   const name = first('customer_name');
-  const contact = first('customer_contact');
   const phone = first('customer_phone');
-  if (!name && !contact && !phone) return null;
+  if (!name && !phone) return null;
   const digits = (phone ?? '').replace(/[^\d+]/g, '');
-  return { name, contact, phone, tel: digits.replace(/\D/g, '').length >= 9 ? digits : null };
+  return { name, phone, tel: digits.replace(/\D/g, '').length >= 9 ? digits : null };
 }

@@ -441,7 +441,6 @@ const FollowPage: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [insuranceType, setInsuranceType] = useState('');
   const [customerName, setCustomerName] = useState('');
-  const [customerContact, setCustomerContact] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   /** ดึงของหน่วยงานไหนไปแล้ว — เปลี่ยนหน่วยงานแล้วถึงดึงใหม่ (ไม่ทับที่คนแก้เองซ้ำทุกครั้งที่ย้อนขั้น) */
   const [openJobs, setOpenJobs] = useState<JobRequest[]>([]);
@@ -838,7 +837,6 @@ const FollowPage: React.FC = () => {
     setStartDate('');
     setInsuranceType('');
     setCustomerName('');
-    setCustomerContact('');
     setCustomerPhone('');
     setFormError(null);
     setStep(1);
@@ -870,7 +868,6 @@ const FollowPage: React.FC = () => {
     setStartDate(entry.start_date ?? '');
     setInsuranceType(entry.insurance_type ?? '');
     setCustomerName(entry.customer_name ?? '');
-    setCustomerContact(entry.customer_contact ?? '');
     setCustomerPhone(entry.customer_phone ?? '');
     setScheduleMode(false);
     if (editable.length > 0) {
@@ -1207,7 +1204,6 @@ const FollowPage: React.FC = () => {
     start_date: startDate || undefined,
     insurance_type: insuranceType.trim() || undefined,
     customer_name: customerName.trim() || undefined,
-    customer_contact: customerContact.trim() || undefined,
     customer_phone: customerPhone.trim() || undefined,
   });
 
@@ -3623,29 +3619,17 @@ const FollowPage: React.FC = () => {
                     </p>
                   ) : null}
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label htmlFor="followCustomerName" className="ml-1 text-xs font-medium text-muted-foreground">
-                      ลูกค้า
-                    </label>
-                    <Input
-                      id="followCustomerName"
-                      value={customerName}
-                      maxLength={200}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="followCustomerContact" className="ml-1 text-xs font-medium text-muted-foreground">
-                      ผู้ติดต่อ
-                    </label>
-                    <Input
-                      id="followCustomerContact"
-                      value={customerContact}
-                      maxLength={200}
-                      onChange={(e) => setCustomerContact(e.target.value)}
-                    />
-                  </div>
+                {/* ช่อง "ผู้ติดต่อ" ถอดแล้ว (เจ้าของ 20 ต.ค. 2569 Choice "ถอดช่องผู้ติดต่อทั้งช่อง") — ค่าเดิมในฐานไม่ลบ */}
+                <div className="space-y-1.5">
+                  <label htmlFor="followCustomerName" className="ml-1 text-xs font-medium text-muted-foreground">
+                    ลูกค้า
+                  </label>
+                  <Input
+                    id="followCustomerName"
+                    value={customerName}
+                    maxLength={200}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label htmlFor="followCustomerPhone" className="ml-1 text-xs font-medium text-muted-foreground">

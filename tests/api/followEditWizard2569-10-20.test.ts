@@ -50,3 +50,16 @@ describe('หน้าติดตาม: ปุ่มแก้ไขเปิ�
     expect(page).toContain('setRoundIds((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));');
   });
 });
+
+describe('ขั้น 4 ถอดช่อง "ผู้ติดต่อ" (เจ้าของ 20 ต.ค. 2569 Choice "ถอดช่องผู้ติดต่อทั้งช่อง")', () => {
+  it('ไม่มีช่อง/ไม่ส่งค่า/ไม่โชว์ · ลูกค้า + เบอร์ลูกค้ายังอยู่', () => {
+    const page = read('src/pages/follow/FollowPage.tsx');
+    expect(page).not.toContain('followCustomerContact');
+    expect(page).not.toContain('customer_contact:');
+    expect(page).toContain('id="followCustomerName"');
+    expect(page).toContain('id="followCustomerPhone"');
+    for (const f of ['src/components/follow/FollowDayDoneCard.tsx', 'src/components/follow/FollowCallQueue.tsx', 'src/components/follow/FollowRoundsDialog.tsx']) {
+      expect(read(f)).not.toMatch(/customer_contact|\.contact\b/);
+    }
+  });
+});

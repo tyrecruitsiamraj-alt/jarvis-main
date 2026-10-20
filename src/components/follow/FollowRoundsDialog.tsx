@@ -129,7 +129,7 @@ const FollowRoundsDialog: React.FC<{
             rounds.map((r) => f(r.entry)?.trim()).find(Boolean) ?? '';
           const start = pick((e) => e.start_date);
           const insurance = pick((e) => e.insurance_type);
-          const customer = [pick((e) => e.customer_name), pick((e) => e.customer_contact), pick((e) => e.customer_phone)]
+          const customer = [pick((e) => e.customer_name), pick((e) => e.customer_phone)]
             .filter(Boolean)
             .join(' · ');
           if (!start && !insurance && !customer) return null;

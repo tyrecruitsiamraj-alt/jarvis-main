@@ -39,7 +39,8 @@ describe('2 · เพิ่มคนติดตาม: ต้องเลือ
 describe('3 · การ์ดจบแล้ว: ลูกค้า + ปุ่มโทร (แท็บตอบว่าไป)', () => {
   it('ค่าแรกที่มีของชุด · เบอร์ใช้โทรได้ = มีปุ่ม', () => {
     const c = followCustomerOf([{ customer_name: null }, { customer_name: 'บริษัท ก', customer_contact: 'คุณเอ', customer_phone: '081-234-5678' }]);
-    expect(c).toEqual({ name: 'บริษัท ก', contact: 'คุณเอ', phone: '081-234-5678', tel: '0812345678' });
+    // ผู้ติดต่อถอดแล้ว (20 ต.ค. 2569) — ค่าเดิมในฐานไม่โชว์
+    expect(c).toEqual({ name: 'บริษัท ก', phone: '081-234-5678', tel: '0812345678' });
     expect(followCustomerOf([{ customer_name: ' ' }])).toBeNull();
     expect(followCustomerOf([{ customer_name: 'ก', customer_phone: 'ไม่มี' }])?.tel).toBeNull();
     const card = read('src/components/follow/FollowDayDoneCard.tsx');
