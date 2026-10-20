@@ -958,8 +958,9 @@ const FollowPage: React.FC = () => {
           key={c.value}
           value={c.value}
           aria-label={`${label} — ${c.label}`}
-          // ตัวที่เลือกต้องเห็นชัดทั้งสองธีม (พื้น accent ของโหมดมืดจางเกิน — เลือกผิดแล้วสายกลายเป็น AI)
-          className="text-xs data-[state=on]:border-primary data-[state=on]:font-medium data-[state=on]:text-primary"
+          // ตัวที่เลือก = พื้นสีหลัก ตัวหนังสือขาว (ตามปุ่มเลือกกลาง) · 🔴 ห้ามตั้ง text-primary ทับ — 20 ต.ค. 2569
+          // ปุ่มเลือกกลางเปลี่ยนเป็นพื้นสีหลัก (18 ต.ค.) แล้วคำ "AI โทร" สีเดียวกับพื้น หายไปทั้งปุ่ม
+          className="text-xs data-[state=on]:border-primary data-[state=on]:font-medium"
         >
           {c.label}
         </ToggleGroupItem>

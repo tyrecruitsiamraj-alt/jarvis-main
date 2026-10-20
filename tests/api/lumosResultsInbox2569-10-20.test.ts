@@ -67,3 +67,10 @@ describe('ลิงก์สมัคร: ปุ่มแก้ข้อคว�
     expect(src.indexOf('แก้ข้อความประกาศ\n')).toBeLessThan(src.indexOf('<LinkRow key={l.id}'));
   });
 });
+
+describe('ปุ่มเลือกใครโทร: ตัวที่เลือกต้องอ่านออก (เจ้าของ 20 ต.ค. 2569 "เกิดไรขึ้น")', () => {
+  it('ห้ามทับสีตัวหนังสือเป็นสีหลัก เพราะพื้นตัวที่เลือกเป็นสีหลักแล้ว', () => {
+    expect(read('src/components/ui/toggle.tsx')).toContain('data-[state=on]:bg-primary data-[state=on]:text-primary-foreground');
+    for (const f of ['src/pages/follow/FollowPage.tsx']) expect(read(f)).not.toMatch(/state=on\]:text-primary(?!-)/);
+  });
+});
