@@ -41,21 +41,24 @@ describe('PDPA — ช่องยินยอมครบทุกทางเ�
   });
 });
 
-describe('สั่งโพสต์ — ผ่านศูนย์งาน api-scraper เดิม', () => {
+describe('สั่งโพสต์ — ผ่านศูนย์งาน api-scraper เดิม (20 ต.ค. 2569: ส่งข้อความ/แบบโพสต์/กลุ่มไป So Scraping)', () => {
   it('การ์ดตัวอย่างในป๊อปประกาศ (ทั้งสองโฉม) ใช้ปุ่มสั่งโพสต์แทนป้ายสมัครงาน', () => {
-    for (const p of ['src/pages/jobs/BoardPostingPage.tsx', 'src/components/jobs/BoardPublishSheet.tsx']) {
-      expect(read(p)).toContain('<PublicJobCardPreview job={jobWithPatch} action={<OrderPostButton job={jobWithPatch} />} />');
-    }
+    expect(read('src/pages/jobs/BoardPostingPage.tsx')).toContain(
+      '<PublicJobCardPreview job={jobWithPatch} action={<OrderPostButton job={jobWithPatch} caption={postText} />} />',
+    );
+    expect(read('src/components/jobs/BoardPublishSheet.tsx')).toContain(
+      '<PublicJobCardPreview job={jobWithPatch} action={<OrderPostButton job={jobWithPatch} />} />',
+    );
     // หน้าสมัครจริง (onApply) ไม่โดน — ยังเป็นปุ่มสมัครงาน
     expect(read('src/components/jobs/PublicJobCardPreview.tsx')).toMatch(/onApply \? \([\s\S]*สมัครงาน[\s\S]*\) : action \? \(/);
   });
 
-  it('🔴 สร้างคำขอ Content (ตัวเดียวกับปุ่มในหน้าจับคู่งาน) · มีคำขอค้างอยู่ = กดซ้ำไม่ได้ บอกสถานะ', () => {
+  it('🔴 คำขอโพสต์มีข้อความ/แบบโพสต์/กลุ่ม · ยังรอ/กำลังทำ = กดซ้ำไม่ได้ · ขอ Scrap อยู่ที่นี่ที่เดียว', () => {
     const btn = read('src/components/jobs/OrderPostButton.tsx');
-    expect(btn).toContain("requestType: 'content'");
-    expect(btn).toContain('jobSnapshot: composeJobSnapshot(job)');
-    expect(btn).toContain('disabled={!loaded || busy || active !== null}');
-    expect(btn).toContain('`สั่งโพสต์แล้ว · ${jobPostingStatusLabel(active.status)}`');
+    expect(btn).toContain('soPostSnapshot(composeJobSnapshot(job), { mode, caption, groupIds: picked })');
+    expect(btn).toContain('disabled={latest === null || Boolean(contentView?.open)}');
+    expect(btn).toContain(': soScrapSnapshot(job),');
+    expect(read('src/pages/matching/MatchingPage.tsx')).not.toContain("createPosting(jobDetail, 'scraping')");
     expect(read('src/pages/matching/MatchingPage.tsx')).not.toContain('const composeJobSnapshot =');
   });
 });

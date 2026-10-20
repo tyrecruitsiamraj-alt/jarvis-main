@@ -23,6 +23,7 @@ import { startAppointmentReminderWorker } from '../api/_lib/appointmentResultRem
 import { startLumosPushRetryWorker } from '../api/_lib/lumosPushRetryWorker.ts';
 import { startApplicationDispatchRetryWorker } from '../api/_lib/applicationDispatchRetry.ts';
 import { startIrecruitImportWorker } from '../api/_lib/irecruitApplicantImport.ts';
+import { startSoScrapingNoticeWorker } from '../api/_lib/soScrapingNotices.ts';
 import { startUnitRequestKeepWarm } from '../api/_lib/unitRequestCache.ts';
 import { preferIpv4 } from '../api/_lib/netPreferIpv4.ts';
 import { warmUnitRequestListCache } from '../api/_handlers/siamraj-unit-requests.ts';
@@ -235,6 +236,11 @@ server.listen(port, '127.0.0.1', () => {
    * เฉพาะเซิร์ฟเวอร์จริง · ปิดด้วย IRECRUIT_APPLICANT_IMPORT_ENABLED=false
    */
   startIrecruitImportWorker();
+  /**
+   * แจ้งคนกดสั่งโพสต์/ขอ Scrap เมื่อ So Scraping เปลี่ยนเป็น โพสต์แล้ว/เสร็จ/ไม่รับงาน ทุก 5 นาที (เจ้าของ 20 ต.ค. 2569)
+   * ปิดด้วย SO_SCRAPING_NOTICE_ENABLED=false · แจ้งครั้งเดียวต่อคำขอต่อสถานะ (dedupe_key)
+   */
+  startSoScrapingNoticeWorker();
   /**
    * อุ่นสำเนาใบขอไว้ก่อนหมดอายุ ระหว่างที่มีคนใช้งาน (เจ้าของ 8 ต.ค. 2569 "หน้าอื่นที่ช้าไล่แก้ให้เร็วด้วย")
    * ไม่มีคนใช้เกินครึ่งชั่วโมง = หยุดถามระบบงานหลัก · ปิดด้วย UNIT_REQUEST_KEEP_WARM_ENABLED=false

@@ -10,6 +10,8 @@ import { auditFromAuthed } from '../_lib/audit.js';
 import {
   listJobPostingRequests,
   listActiveJobPostingsForJob,
+  listLatestJobPostingsForJob,
+  listLatestJobPostingsForBoard,
   getJobPostingRequestById,
   createJobPostingRequest,
   updateJobPostingRequest,
@@ -17,6 +19,8 @@ import {
   normalizeJobPostingRequestType,
 } from '../_lib/jobPostingRequests.js';
 import { isSiamrajRequestInScope, loadScopedRequestNoSet } from '../_lib/siamrajUnitRequests.js';
+import { listLinkedSoGroups, unknownSoGroupIds } from '../_lib/soScrapingGroups.js';
+import { soSnapshotError } from '../../src/lib/soScraping.js';
 
 const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น';
 
@@ -53,7 +57,19 @@ async function handler(req: AuthedReq, res: ApiRes) {
         // `active` = คำขอ active ทุกประเภทของใบนี้ (ตั้งแต่ 080 มีได้ทั้ง Content และ Scraping)
         // — คง `item` ไว้ด้วยเพื่อไม่ให้ client เดิมพัง (อ่านตัวล่าสุดเหมือนเคย)
         const active = await listActiveJobPostingsForJob(jobId);
-        return res.status(200).json({ item: active[0] ?? null, active });
+        // `latest` = คำขอล่าสุดต่อประเภท ทุกสถานะ — ป๊อปโชว์ผลที่ So Scraping เขียนกลับ (20 ต.ค. 2569)
+        const latest = await listLatestJobPostingsForJob(jobId);
+        return res.status(200).json({ item: active[0] ?? null, active, latest });
+      }
+      // กลุ่ม Facebook ของ So Scraping ที่มีบัญชีผูก — อ่านอย่างเดียว (ป๊อปสั่งโพสต์ · 20 ต.ค. 2569)
+      if (getQuery(req, 'groups') === '1') {
+        return res.status(200).json({ groups: await listLinkedSoGroups() });
+      }
+      // ป้ายสถานะบนการ์ดกล่องงาน + ตัวกรอง (20 ต.ค. 2569) — ล่าสุดต่อ (ใบ, ประเภท) ของใบที่ผู้ใช้เห็นได้
+      if (getQuery(req, 'board') === '1') {
+        const scoped = await loadScopedRequestNoSet(req.user);
+        const items = scopePostings(await listLatestJobPostingsForBoard(), scoped);
+        return res.status(200).json({ items });
       }
       const status = normalizeJobPostingStatus(getQuery(req, 'status'));
       const scoped = await loadScopedRequestNoSet(req.user);
@@ -81,18 +97,26 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
 
       const rawSnapshot = body.job_snapshot ?? body.jobSnapshot;
+      const requestType = normalizeJobPostingRequestType(body.request_type ?? body.requestType) ?? 'content';
+      const jobSnapshot =
+        rawSnapshot && typeof rawSnapshot === 'object' && !Array.isArray(rawSnapshot)
+          ? (rawSnapshot as Record<string, unknown>)
+          : null;
+      // ตรวจซ้ำฝั่ง server ด้วยกติกาเดียวกับจอ (So Scraping · 20 ต.ค. 2569) — ข้อความบอกว่าต้องทำอะไร
+      const snapError = soSnapshotError(requestType, jobSnapshot);
+      if (snapError) return sendError(res, 400, 'Bad request', snapError);
+      if (requestType === 'content' && Array.isArray(jobSnapshot?.group_ids)) {
+        const unknown = await unknownSoGroupIds(jobSnapshot.group_ids.filter((x): x is string => typeof x === 'string'));
+        if (unknown.length > 0) return sendError(res, 400, 'Bad request', 'มีกลุ่มที่ไม่อยู่ในระบบ So Scraping แล้ว — ปิดป๊อปแล้วเลือกใหม่');
+      }
       const item = await createJobPostingRequest({
         jobId,
         requestNo: getString(body.request_no) ?? getString(body.requestNo),
-        requestType:
-          normalizeJobPostingRequestType(body.request_type ?? body.requestType) ?? 'content',
+        requestType,
         reason: body.reason,
         userId: req.user.sub,
         userName: req.user.email,
-        jobSnapshot:
-          rawSnapshot && typeof rawSnapshot === 'object' && !Array.isArray(rawSnapshot)
-            ? (rawSnapshot as Record<string, unknown>)
-            : null,
+        jobSnapshot,
       });
 
       await auditFromAuthed(req, {

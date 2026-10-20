@@ -5,12 +5,16 @@ const table = tableInAppSchema('job_posting_requests');
 const MAX_TEXT = 400;
 const MAX_LONG_TEXT = 2000;
 
-export type JobPostingStatus = 'pending' | 'in_progress' | 'posted' | 'completed' | 'filled' | 'cancelled';
+export type JobPostingStatus = 'pending' | 'in_progress' | 'posted' | 'completed' | 'filled' | 'cancelled' | 'rejected';
 export type JobPostingRequestType = 'content' | 'scraping';
-const STATUSES: JobPostingStatus[] = ['pending', 'in_progress', 'posted', 'completed', 'filled', 'cancelled'];
+/** `rejected` = So Scraping ไม่รับงาน (157 · เจ้าของ 20 ต.ค. 2569) */
+const STATUSES: JobPostingStatus[] = ['pending', 'in_progress', 'posted', 'completed', 'filled', 'cancelled', 'rejected'];
 const REQUEST_TYPES: JobPostingRequestType[] = ['content', 'scraping'];
-/** สถานะที่ถือว่า "ยังเปิดอยู่" — กันสร้างคำขอซ้ำต่อใบขอเดียวกัน (ตรงกับ partial unique index) */
-const ACTIVE_STATUSES: JobPostingStatus[] = ['pending', 'in_progress', 'posted'];
+/**
+ * สถานะที่ถือว่า "ยังเปิดอยู่" — กันสร้างคำขอซ้ำต่อใบขอเดียวกัน (ตรงกับ partial unique index 157)
+ * 🔴 20 ต.ค. 2569 เจ้าของ Choice "ได้ หลังโพสต์แล้ว" ⇒ ถอด posted ออก (เดิม 080 รวม posted = โพสต์แล้วสั่งรอบใหม่ไม่ได้)
+ */
+const ACTIVE_STATUSES: JobPostingStatus[] = ['pending', 'in_progress'];
 
 export type JobPostingRequest = {
   id: string;
@@ -154,6 +158,66 @@ export async function listActiveJobPostingsForJob(jobId: string): Promise<JobPos
     return await selectPostings(
       `where job_id = $1 and status = ANY($2::text[]) order by created_at desc`,
       [key, ACTIVE_STATUSES],
+    );
+  } catch (e) {
+    if (isMissingTable(e)) return [];
+    throw e;
+  }
+}
+
+/**
+ * คำขอล่าสุดต่อประเภทของใบนี้ (ทุกสถานะ) — ป๊อปประกาศโชว์ผลที่ So Scraping เขียนกลับ (โพสต์แล้ว / เสร็จ / ไม่รับงาน)
+ * ไม่ใช่แค่ที่ยังเปิด (20 ต.ค. 2569 เจ้าของ: "สั่งแล้วดูไม่ได้จะตามงานยังไง")
+ */
+export async function listLatestJobPostingsForJob(jobId: string): Promise<JobPostingRequest[]> {
+  const key = jobId.trim();
+  if (!key) return [];
+  try {
+    const rows = await selectPostings(`where job_id = $1 order by created_at desc limit 50`, [key]);
+    return latestPerType(rows);
+  } catch (e) {
+    if (isMissingTable(e)) return [];
+    throw e;
+  }
+}
+
+function latestPerType(rows: JobPostingRequest[]): JobPostingRequest[] {
+  const seen = new Set<string>();
+  const out: JobPostingRequest[] = [];
+  for (const r of rows) {
+    const k = `${r.job_id}|${r.request_type}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(r);
+  }
+  return out;
+}
+
+/** ป้ายสถานะบนการ์ดกล่องงาน — คำขอล่าสุดต่อ (ใบ, ประเภท) ย้อน `days` วัน */
+export async function listLatestJobPostingsForBoard(days = 90): Promise<JobPostingRequest[]> {
+  try {
+    const rows = await selectPostings(
+      `where created_at > now() - make_interval(days => $1::int) order by created_at desc limit 5000`,
+      [days],
+    );
+    return latestPerType(rows);
+  } catch (e) {
+    if (isMissingTable(e)) return [];
+    throw e;
+  }
+}
+
+/**
+ * คำขอที่สถานะเพิ่งเปลี่ยนเป็น โพสต์แล้ว / เสร็จ / ไม่รับงาน — ตัวแจ้งเตือนคนสั่ง (กันซ้ำด้วย dedupe_key ของแจ้งเตือน)
+ */
+export async function listRecentlyResolvedJobPostings(hours = 48): Promise<JobPostingRequest[]> {
+  try {
+    return await selectPostings(
+      `where status in ('posted', 'completed', 'rejected') and requested_by_user_id is not null
+         and (updated_at > now() - make_interval(hours => $1::int) or created_at > now() - interval '14 days')
+       order by updated_at desc limit 500`,
+      // So Scraping อาจไม่แตะ updated_at ตอนเปลี่ยนสถานะ ⇒ ดูคำขอ 14 วันล่าสุดด้วย (แจ้งครั้งเดียวด้วย dedupe_key)
+      [hours],
     );
   } catch (e) {
     if (isMissingTable(e)) return [];

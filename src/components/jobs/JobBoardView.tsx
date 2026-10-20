@@ -151,6 +151,7 @@ import {
 } from '@/lib/unitRequestWorkStatus';
 import { isHiddenFromPublicByWorkStatus } from '@/lib/publicJobVisibility';
 import { cn } from '@/lib/utils';
+import { fetchBoardJobPostings, type JobPostingRequest } from '@/lib/jobPostingRequestsApi';
 import { SEARCH_ALL_POOLS_AND_CALL } from '@/lib/candidateSearchLabels';
 import { Button } from '@/components/ui/button';
 
@@ -526,6 +527,33 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   /** บวกหนึ่งเพื่อสั่งโหลดประกาศใหม่ — ใช้หลังสร้าง/แก้ประกาศ ไม่งั้นชิปช่องทางกับปุ่มแก้ไขไม่อัปเดตจนรีเฟรชหน้า */
   const [postingsRev, setPostingsRev] = useState(0);
   /**
+   * คำขอล่าสุดไป So Scraping ต่อใบ (เจ้าของ 20 ต.ค. 2569: *"สั่งแล้วดูไม่ได้จะตามงานยังไง"*) — ป้ายบนการ์ด + หัวข้อกรอง
+   * `null` = ยังโหลดไม่มา/โหลดไม่ได้ (หัวข้อกรองไม่โผล่ · การ์ดไม่มีป้าย) · ปิดป๊อปแล้วโหลดใหม่ (ตาม postingsRev)
+   */
+  const [soByJob, setSoByJob] = useState<Map<string, JobPostingRequest[]> | null>(null);
+  useEffect(() => {
+    if (!isStaff) return;
+    let alive = true;
+    const load = () =>
+      fetchBoardJobPostings()
+        .then((items) => {
+          if (!alive) return;
+          const m = new Map<string, JobPostingRequest[]>();
+          for (const it of items) m.set(it.job_id, [...(m.get(it.job_id) ?? []), it]);
+          setSoByJob(m);
+        })
+        .catch(() => {
+          /* ป้ายเป็นของแถม — โหลดไม่ได้ = ไม่มีป้าย (ป๊อปยังโชว์สถานะของใบนั้นเอง) */
+        });
+    void load();
+    // So Scraping เขียนสถานะกลับเมื่อไหร่ก็ได้ — โหลดใหม่ทุก 5 นาทีระหว่างเปิดหน้า
+    const t = window.setInterval(() => void load(), 5 * 60_000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, [isStaff, postingsRev]);
+  /**
    * 🔴 **โหลดประกาศเสร็จหรือยัง — ไม่ใช่ `postings.length > 0`**
    * ต้องรู้แน่ ๆ เพราะเลขบนหัวหน้าจอพึ่ง "ใบนี้มีลิงก์ไหม" · ยังไม่รู้ = ห้ามโชว์เลข
    */
@@ -673,8 +701,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       aiSent: breakdownLoaded ? (j) => aiCounts[j.id]?.sent ?? 0 : null,
       // พร้อมประกาศไหม (2 ต.ค. 2569 — แทนติดขั้น) — ตัวเดียวกับชิปบนการ์ด
       readinessOf: ledgerReady ? (j) => publishReadinessOf(j, readinessFacts) : null,
+      // สั่งโพสต์ / Scrap (20 ต.ค. 2569) — ตัวเดียวกับป้ายบนการ์ด
+      soOf: soByJob ? (j) => soByJob.get(j.id) ?? [] : null,
     }),
-    [breakdownLoaded, applicantIdx, leadIdx, ledgerReady, releaseIdx, aiCounts, readinessFacts],
+    [breakdownLoaded, applicantIdx, leadIdx, ledgerReady, releaseIdx, aiCounts, readinessFacts, soByJob],
   );
   /** ใบเปิดหลังแถบซ้าย — ตัวแทน `filters.filtered` ของทุกตัวเลขข้างล่าง */
   const openRows = useMemo(
@@ -1196,6 +1226,26 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     };
   }, [isStaff, jobs]);
 
+  /**
+   * ลิงก์จากแจ้งเตือน So Scraping (`?posting=<ใบ>` · 20 ต.ค. 2569) — เปิดป๊อปประกาศของใบนั้นในกล่องงาน แล้วลบพารามิเตอร์
+   * ใบที่ไม่อยู่ในรายการ (ปิดไปแล้ว) = ไม่เปิดอะไร
+   */
+  useEffect(() => {
+    if (!isStaff || loading) return;
+    const jobId = searchParams.get('posting');
+    if (!jobId) return;
+    const match = jobs.find((j) => j.id === jobId);
+    if (match) setPostingJob(match);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('posting');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [isStaff, loading, searchParams, jobs, setSearchParams]);
+
   useEffect(() => {
     if (isStaff || deepLinkHandled || loading) return;
     const jobId = searchParams.get('job');
@@ -1646,6 +1696,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 onApplicants={openApplicantsOf}
                 skip={skipIdx.get(job.id) ?? null}
                 onImport={onImportJob}
+                so={soByJob?.get(job.id) ?? null}
               />
             ) : (
             <Card

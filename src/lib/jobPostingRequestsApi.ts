@@ -1,6 +1,7 @@
 import { apiFetch } from '@/lib/apiFetch';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
+import { SO_STATUS_LABEL, type SoGroup } from '@/lib/soScraping';
 
 /**
  * คำขอ "โพสหางานใหม่" — สร้าง ID ให้ทีมอื่นรับไปทำคอนเทนต์/โพสหาคนต่อ
@@ -9,7 +10,7 @@ import type { JobRequest } from '@/types';
  * + ชิปสถานะในหน้าจับคู่งาน · หน้ารวม `/matching/job-postings` (ลิสต์ + เปลี่ยนสถานะ)
  * และตัวเลขคำขอบนหน้าแรกถูกถอด ⇒ ตัวเรียกลิสต์ทั้งหมด/เปลี่ยนสถานะฝั่งหน้าเว็บถูกลบตามไปด้วย
  */
-export type JobPostingStatus = 'pending' | 'in_progress' | 'posted' | 'completed' | 'filled' | 'cancelled';
+export type JobPostingStatus = 'pending' | 'in_progress' | 'posted' | 'completed' | 'filled' | 'cancelled' | 'rejected';
 export type JobPostingRequestType = 'content' | 'scraping';
 
 export type JobPostingRequest = {
@@ -43,16 +44,14 @@ export type JobSnapshot = {
   urgency?: string | null;
   required_date?: string | null;
   note?: string | null;
+  /** So Scraping (20 ต.ค. 2569) — แบบโพสต์ · ข้อความฉบับสุดท้าย · กลุ่ม Facebook ที่เลือก */
+  post_mode?: 'caption_only' | 'caption_image' | 'image_only';
+  caption?: string;
+  group_ids?: string[];
 };
 
-const STATUS_LABEL: Record<JobPostingStatus, string> = {
-  pending: 'รอดำเนินการ',
-  in_progress: 'กำลังทำ',
-  posted: 'โพสแล้ว',
-  completed: 'ตรวจรับแล้ว',
-  filled: 'ได้คนแล้ว',
-  cancelled: 'ยกเลิก',
-};
+/** คำบนจอ = ชุดเดียวกับ So Scraping (`SO_STATUS_LABEL` · เจ้าของ 20 ต.ค. 2569) */
+const STATUS_LABEL: Record<JobPostingStatus, string> = { ...SO_STATUS_LABEL, filled: 'ได้คนแล้ว' };
 
 /**
  * สีของสถานะคำขอโพสหางาน — ผูกกับ token กลาง (เดิมเป็นชุด `/15` ของหน้าเดียว ไม่มีคู่ dark)
@@ -66,6 +65,7 @@ export const JOB_POSTING_STATUS_TONE: Record<JobPostingStatus, ToneKey> = {
   completed: 'success',
   filled: 'success',
   cancelled: 'neutral',
+  rejected: 'danger',
 };
 
 /** ชิปสถานะพร้อมใช้ (class กลางใน index.css — มีคู่ dark ครบ) */
@@ -103,6 +103,30 @@ export async function listActiveJobPostingsForJob(jobId: string): Promise<JobPos
   };
   // server เก่ายังไม่มี `active` → ถอยไปใช้ `item` เดี่ยว ๆ (หน้าเว็บไม่พังระหว่าง deploy)
   return d.active ?? (d.item ? [d.item] : []);
+}
+
+/** คำขอล่าสุดต่อประเภทของใบนี้ (ทุกสถานะ) — ป๊อปประกาศโชว์ผลที่ So Scraping เขียนกลับ */
+export async function listLatestJobPostingsForJob(jobId: string): Promise<JobPostingRequest[]> {
+  const r = await apiFetch(`/api/matching/job-postings?jobId=${encodeURIComponent(jobId)}`);
+  if (!r.ok) return readError(r, 'โหลดสถานะคำขอไม่ได้');
+  const d = (await r.json().catch(() => ({}))) as { latest?: JobPostingRequest[]; active?: JobPostingRequest[] };
+  return d.latest ?? d.active ?? [];
+}
+
+/** ป้ายบนการ์ดกล่องงาน — คำขอล่าสุดต่อ (ใบ, ประเภท) ของทุกใบที่เห็นได้ */
+export async function fetchBoardJobPostings(): Promise<JobPostingRequest[]> {
+  const r = await apiFetch('/api/matching/job-postings?board=1');
+  if (!r.ok) return readError(r, 'โหลดสถานะคำขอไม่ได้');
+  const d = (await r.json().catch(() => ({}))) as { items?: JobPostingRequest[] };
+  return d.items ?? [];
+}
+
+/** กลุ่ม Facebook ของ So Scraping ที่มีบัญชีผูก (อ่านอย่างเดียว) */
+export async function fetchSoGroups(): Promise<SoGroup[]> {
+  const r = await apiFetch('/api/matching/job-postings?groups=1');
+  if (!r.ok) return readError(r, 'โหลดกลุ่ม Facebook ไม่ได้');
+  const d = (await r.json().catch(() => ({}))) as { groups?: SoGroup[] };
+  return d.groups ?? [];
 }
 
 export async function createJobPostingRequest(input: {

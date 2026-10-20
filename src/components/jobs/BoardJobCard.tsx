@@ -11,6 +11,9 @@ import { jobBoardCardTitle, publicJobCardSubtitle } from '@/lib/unitRequestDispl
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import JobPublicFacts from '@/components/jobs/JobPublicFacts';
 import { useRecruiterContact } from '@/hooks/useRecruiterContact';
+import { Badge } from '@/components/ui/badge';
+import { soStatusView } from '@/lib/soScraping';
+import type { JobPostingRequest } from '@/lib/jobPostingRequestsApi';
 import { getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import PublishReadinessChip from '@/components/jobs/PublishReadinessChip';
 import { readinessActionText, type PublishReadiness } from '@/lib/publishReadiness';
@@ -56,10 +59,15 @@ export type BoardJobCardProps = {
   skip?: JobReleaseSkip | null;
   /** ปุ่ม "Excel" = นำเข้ารายชื่อเข้าใบนี้แล้วส่ง AI โทรเลย (เจ้าของ 15 ต.ค. 2569) · ไม่ส่ง = ไม่มีปุ่ม */
   onImport?: (job: JobRequest) => void;
+  /**
+   * คำขอล่าสุดไป So Scraping ของใบนี้ (โพสต์ / Scrap · เจ้าของ 20 ต.ค. 2569 "สั่งแล้วดูไม่ได้จะตามงานยังไง")
+   * ไม่มี = ไม่มีป้าย
+   */
+  so?: readonly JobPostingRequest[] | null;
 };
 
 /** "บางพลี สมุทรปราการ" — อำเภอที่ทีม Online กรอก + จังหวัด · ไม่รู้ = บอกตรง ๆ (ไม่เดาจากจังหวัดไซต์) */
-const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip, onImport }) => {
+const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip, onImport, so }) => {
   // เบอร์เจ้าหน้าที่สรรหาบรรทัดเดียวกับหน้า /apply (เจ้าของ 20 ต.ค. 2569 "ไหนเบอร์โทรเจ้าหน้าที่สรรหา")
   const contact = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
   const age = getJobAgeChipInfo(job);
@@ -108,6 +116,22 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
 
       {/* ── พร้อมประกาศไหม / ขาดอะไร (2 ต.ค. 2569 — แทน "ติดขั้น N" + จุด 4 ขั้น) ── */}
       {showReadiness && readiness ? <PublishReadinessChip readiness={readiness} /> : null}
+
+      {/* ── สถานะที่ So Scraping เขียนกลับ (20 ต.ค. 2569) — เหลือง รอ/กำลังทำ · เขียว โพสต์แล้ว/เสร็จ · แดง ไม่รับงาน/รอนาน ── */}
+      {so && so.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5" data-testid="board-card-so">
+          {(['content', 'scraping'] as const).map((type) => {
+            const req = so.find((r) => r.request_type === type);
+            if (!req) return null;
+            const view = soStatusView(req);
+            return (
+              <Badge key={type} variant="outline" className={cn('font-medium', TONE[view.tone].outline)}>
+                {type === 'content' ? 'โพสต์' : 'Scrap'} · {view.label}
+              </Badge>
+            );
+          })}
+        </div>
+      ) : null}
 
       {/* ── ข้อมูลงาน: ตัวเดียวกับการ์ดหน้า /apply (`JobPublicFacts`) — ติ๊กซ่อนในขั้น 3 แล้วที่นี่ก็หายด้วย
           (เจ้าของ 5 ต.ค. 2569: *"ไม่งั้นจะเช็คยังไงหล่ะว่าถูกต้องหรือเปล่า"*) ── */}

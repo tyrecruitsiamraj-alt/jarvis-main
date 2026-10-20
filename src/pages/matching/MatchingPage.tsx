@@ -3632,7 +3632,6 @@ const MatchingPage: React.FC = () => {
                   {(() => {
                     const active = jobPostingsByJobId[jobDetail.id] ?? [];
                     const sentContent = active.some((x) => x.request_type !== 'scraping');
-                    const sentScraping = active.some((x) => x.request_type === 'scraping');
                     return (
                       <>
                         {active.length > 0 ? (
@@ -3655,39 +3654,24 @@ const MatchingPage: React.FC = () => {
                             ))}
                           </div>
                         ) : null}
-                        {!sentContent || !sentScraping ? (
+                        {/* 🔴 ขอ Scrap ย้ายไปป๊อปประกาศที่เดียว (เจ้าของ 20 ต.ค. 2569 "ย้ายมาไว้หน้านี้เท่านั้นสั่งจากหน้าเดียวพอ") */}
+                        {!sentContent ? (
                           <div className="flex flex-wrap items-center gap-2">
                             {active.length > 0 ? (
                               <span className="text-xs text-muted-foreground">ส่งเพิ่มได้</span>
                             ) : null}
-                            {!sentContent ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={creatingPosting}
-                                onClick={() => void createPosting(jobDetail, 'content')}
-                              >
-                                <Megaphone aria-hidden />
-                                {creatingPosting ? 'กำลังสร้าง…' : 'ให้สร้าง Content'}
-                              </Button>
-                            ) : null}
-                            {!sentScraping ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={creatingPosting}
-                                onClick={() => void createPosting(jobDetail, 'scraping')}
-                              >
-                                <Search aria-hidden />
-                                {creatingPosting ? 'กำลังสร้าง…' : 'Scraping งาน'}
-                              </Button>
-                            ) : null}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={creatingPosting}
+                              onClick={() => void createPosting(jobDetail, 'content')}
+                            >
+                              <Megaphone aria-hidden />
+                              {creatingPosting ? 'กำลังสร้าง…' : 'ให้สร้าง Content'}
+                            </Button>
                           </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">ส่ง Content และ Scraping แล้ว รอทีมรับงาน</p>
-                        )}
+                        ) : null}
                       </>
                     );
                   })()}

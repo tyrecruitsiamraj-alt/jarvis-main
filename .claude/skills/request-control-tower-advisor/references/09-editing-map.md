@@ -13357,6 +13357,10 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   จด `app_application_consents` (148 · แถวละใบ · `recordApplicationConsent` `api/_lib/applicationConsent.ts` · จดไม่ได้ไม่ทำให้ใบล้ม)
   ⚠️ รายชื่อ iRecruit ที่ดึงมาไม่มีบันทึกยินยอมในระบบเรา
 - สั่งโพสต์: `OrderPostButton` (`src/components/jobs/`) แทนป้าย "สมัครงาน" ในการ์ดตัวอย่าง (`PublicJobCardPreview` prop `action`) ทั้ง `BoardPostingPage` และ `BoardPublishSheet`
+- So Scraping (20 ต.ค. 2569): `OrderPostButton` = สั่งโพสต์ (แบบโพสต์ · ข้อความประกาศ · กลุ่ม Facebook) + ขอ Scrap (ที่นี่ที่เดียว — ถอดปุ่ม Scraping ในหน้าจับคู่แล้ว) + สถานะล่าสุดต่อประเภท · กติกาล้วน `src/lib/soScraping.ts` (จอ + server ใช้ตัวเดียวกัน) · ข้อมูลใหม่อยู่ `job_snapshot` (post_mode/caption/group_ids · position/location/qty)
+  - API `/api/matching/job-postings`: GET `?jobId` คืน `latest` · `?board=1` ป้ายบนการ์ด · `?groups=1` กลุ่มที่มีบัญชีผูก (`api/_lib/soScrapingGroups.ts` — อ่าน `so_autopost_apiscraper.groups` + `users.group_ids` เท่านั้น 🔴 ห้ามเลือกคอลัมน์อื่นของ users) · POST ตรวจซ้ำ `soSnapshotError`
+  - migration 157: เพิ่มสถานะ `rejected` · กันซ้ำเฉพาะ pending/in_progress (โพสต์แล้วสั่งใหม่ได้)
+  - ตามงาน: ป้าย `board-card-so` บน `BoardJobCard` · หัวข้อกรอง `so` ใน `boardFilters.ts` · แจ้งเตือนคนสั่ง `api/_lib/soScrapingNotices.ts` (worker 5 นาที · dedupe ต่อคำขอต่อสถานะ) · ลิงก์ `/jobs/board?posting=<ใบ>` เปิดป๊อปใบนั้น · เทสต์ `tests/api/soScrapingOrders2569-10-20.test.ts`
   Choice "ผ่านศูนย์งาน api-scraper เดิม" = `createJobPostingRequest` type content (ตัวเดียวกับหน้าจับคู่งาน · `composeJobSnapshot` ย้ายมา `jobPostingRequestsApi.ts`) · มีคำขอ content ค้าง = กดไม่ได้ บอกสถานะ
 - กล่องรายได้รวม: `IncomeShownPicker` ปุ่ม "รายได้รวม 20,000 บาท/เดือน" · "รายได้เฉลี่ย …" (ไม่มีเลข = — กดไม่ได้) · ถอด "ทั้งสอง" · ไม่เคยเลือก = รายได้รวม (`incomeShown.ts`)
 - เทสต์ `tests/api/pdpaOrderPostIncome2569-10-15.test.ts` · `applicationImportHandler.test.ts` (PDPA 2 เคส)

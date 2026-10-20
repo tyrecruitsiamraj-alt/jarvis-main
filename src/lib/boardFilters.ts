@@ -21,6 +21,7 @@
  * ทะเบียนปล่อย + ยอดส่ง AI) ผ่าน `BoardFacetFacts`
  */
 import type { JobRequest } from '@/types';
+import { SO_FACET_LABEL, soFacetValues, type SoFacetValue } from './soScraping';
 import { publicJobPositionLabel } from './unitRequestDisplay';
 import { inferProvinceFromAddress } from './parseThaiJobAddress';
 import { districtMatcherFor } from './districtMatch';
@@ -60,6 +61,7 @@ export { UNSPECIFIED, visibleFacetOptions } from './facetEngine';
 
 export type BoardFacetKey =
   | 'ready'
+  | 'so'
   | 'applicants'
   | 'release'
   | 'urgency'
@@ -97,6 +99,8 @@ export type BoardFacetFacts = {
    * 🔴 `null` ทั้งตัว = ทะเบียนการประกาศยังโหลดไม่ครบ (ทุกใบจะดู "ยังไม่ประกาศ" ปลอม ๆ) ⇒ หัวข้อต้องไม่โผล่
    */
   readinessOf?: ((job: JobRequest) => PublishReadiness) | null;
+  /** คำขอล่าสุดไป So Scraping ต่อใบ (20 ต.ค. 2569) — `null` = ยังโหลดไม่มา (หัวข้อไม่โผล่) */
+  soOf?: ((job: JobRequest) => ReadonlyArray<{ status: string }>) | null;
 };
 
 export type BoardDateField = 'required' | 'request';
@@ -251,6 +255,16 @@ const FACETS: readonly FacetDef[] = [
       const r = facts.readinessOf?.(job);
       return r ? readinessFacetValues(r) : [];
     },
+  },
+  {
+    /** สั่งโพสต์ / Scrap ไป So Scraping (เจ้าของ 20 ต.ค. 2569 "สั่งแล้วดูไม่ได้จะตามงานยังไง") */
+    key: 'so',
+    label: 'สั่งโพสต์ / Scrap',
+    ui: 'check',
+    order: ['open', 'done', 'rejected'],
+    labelOf: (v) => SO_FACET_LABEL[v as SoFacetValue] ?? v,
+    available: (facts) => Boolean(facts.soOf),
+    values: (job, facts) => soFacetValues(facts.soOf?.(job) ?? []),
   },
   {
     key: 'applicants',

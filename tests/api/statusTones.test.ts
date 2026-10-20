@@ -41,6 +41,8 @@ const POSTING_STATUSES: JobPostingStatus[] = [
   'completed',
   'filled',
   'cancelled',
+  // So Scraping ไม่รับงาน (157 · 20 ต.ค. 2569)
+  'rejected',
 ];
 
 /** ชิปต้องเป็น class กลางที่มีอยู่จริงใน index.css ไม่ใช่สีที่เขียนสดตรงหน้า */
