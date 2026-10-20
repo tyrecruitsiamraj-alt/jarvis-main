@@ -38,7 +38,9 @@ describe('หน้าจับคู่งาน = โฉมโพสต์ป�
     expect(grid).not.toContain('LumosJobSummaryStats');
     const moved = page.slice(page.indexOf('data-testid="matching-detail-moved"') - 2000);
     expect(moved).toContain('cardNextAction(mc, serverLumosSummary[jobDetail.id])');
-    expect(moved).toContain('<LumosJobSummaryStats s={serverLumosSummary[jobDetail.id]} variant="inline" />');
+    // 20 ต.ค. 2569: ชุดเดียวของหน้าต่าง — ใช้ชุดรายคนเมื่อชุดจากรายการใบขอตามไม่ทัน
+    expect(moved).toContain('<LumosJobSummaryStats s={s} variant="inline" />');
+    expect(moved).toContain('const server = serverLumosSummary[jobDetail.id];');
     expect(moved).toContain('<SelectionRecallButton jobId={jobDetail.id} />');
     expect(stats).toContain("if (variant === 'inline')");
   });

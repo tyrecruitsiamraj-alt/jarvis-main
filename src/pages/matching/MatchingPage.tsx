@@ -2791,7 +2791,17 @@ const MatchingPage: React.FC = () => {
                         ) : null}
                       </div>
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <LumosJobSummaryStats s={serverLumosSummary[jobDetail.id]} variant="inline" />
+                        {/* ผลโทรชุดเดียวของหน้าต่าง (20 ต.ค. 2569 ตัดชุดซ้ำ) — ตัวสรุปจากรายการใบขอยังไม่มา/ตามไม่ทัน
+                            (เปิดจากลิงก์ตรงได้ 0 ทั้งที่โทรไปแล้ว 3) ⇒ ใช้ชุดที่นับจากสายรายคนของใบนี้เมื่อมากกว่า */}
+                        {(() => {
+                          const server = serverLumosSummary[jobDetail.id];
+                          const live = summarizeLumosCallStatus(Object.values(lumosStatusByRef));
+                          const s =
+                            !server || live.sent > server.sent
+                              ? { ...live, pendingApproval: server?.pendingApproval ?? 0, needsHuman: server?.needsHuman ?? 0 }
+                              : server;
+                          return <LumosJobSummaryStats s={s} variant="inline" />;
+                        })()}
                         <SelectionRecallButton jobId={jobDetail.id} />
                       </div>
                     </div>
