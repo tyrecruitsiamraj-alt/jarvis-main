@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { Notification } from '@/types/notification';
 import { MAX_NOTIFICATIONS } from '@/hooks/useJobFeedNotifications';
 import { apiFetch } from '@/lib/apiFetch';
+import { capKeepingPinned } from '@/lib/notificationTabs';
 
 interface NotificationContextType {
   notifications: Notification[];
@@ -58,8 +59,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setNotifications((prev) => {
       const clientOnly = prev.filter((n) => !n.id.startsWith(SERVER_PREFIX));
       const merged = [...clientOnly, ...items.map(fromServer)];
-      merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      return merged.slice(0, MAX_NOTIFICATIONS);
+      // ชนิดที่ปักไว้ (So Scraping) ไม่โดนตัด — แท็บของมันต้องเห็นครบ (20 ต.ค. 2569)
+      return capKeepingPinned(merged, MAX_NOTIFICATIONS);
     });
   }, []);
 
@@ -119,7 +120,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         timestamp: new Date().toISOString(),
         read: false,
       };
-      return [item, ...prev].slice(0, MAX_NOTIFICATIONS);
+      return capKeepingPinned([item, ...prev], MAX_NOTIFICATIONS);
     });
   }, []);
 

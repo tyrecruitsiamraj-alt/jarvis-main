@@ -1,7 +1,13 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Briefcase, CheckCircle2, CheckCheck, PhoneCall, Flag, ClipboardCheck } from 'lucide-react';
+import { Bell, Briefcase, CheckCircle2, CheckCheck, PhoneCall, Flag, ClipboardCheck, Megaphone } from 'lucide-react';
+import {
+  NOTIFICATION_TAB_LABEL,
+  SO_NOTIFICATION_TYPE,
+  notificationsOfTab,
+  type NotificationTab,
+} from '@/lib/notificationTabs';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { NotificationType } from '@/types/notification';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -16,6 +22,7 @@ const typeConfig: Partial<Record<NotificationType, { icon: React.ElementType; co
   call_confirmed: { icon: PhoneCall, color: 'text-success bg-success/10' },
   needs_human: { icon: Flag, color: 'text-destructive bg-destructive/10' },
   batch_pending: { icon: ClipboardCheck, color: 'text-amber-600 bg-amber-500/10 dark:text-amber-300' },
+  [SO_NOTIFICATION_TYPE]: { icon: Megaphone, color: 'text-primary bg-primary/10' },
 };
 
 const fallbackType = { icon: Bell, color: 'text-muted-foreground bg-secondary' };
@@ -24,6 +31,10 @@ const NotificationPanel: React.FC = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const navigate = useNavigate();
   const [open, setOpen] = React.useState(false);
+  /** แท็บ "สั่งโพสต์ · Scrap" แยกแจ้งเตือน So Scraping ไม่ให้จมใต้ "AI ยังไม่โทร" (เจ้าของ 20 ต.ค. 2569) */
+  const [tab, setTab] = React.useState<NotificationTab>('all');
+  const shown = notificationsOfTab(notifications, tab);
+  const unreadOf = (t: NotificationTab) => notificationsOfTab(notifications, t).filter((n) => !n.read).length;
 
   /**
    * 🔴 ปิดแผงก่อนพาไป (20 ต.ค. 2569) — เดิมแผงค้างเปิด แล้วตอนป๊อปปลายทาง (เช่น ป๊อปประกาศจาก `?posting=`) เปิด
@@ -73,13 +84,33 @@ const NotificationPanel: React.FC = () => {
             </button>
           )}
         </div>
+        <div className="flex gap-2 border-b border-border px-4 py-2" role="tablist" aria-label="ชนิดการแจ้งเตือน">
+          {(['all', 'so'] as const).map((t) => {
+            const unread = unreadOf(t);
+            return (
+              <Button
+                key={t}
+                type="button"
+                size="xs"
+                role="tab"
+                aria-selected={tab === t}
+                variant={tab === t ? 'default' : 'outline'}
+                onClick={() => setTab(t)}
+                data-testid={`notif-tab-${t}`}
+              >
+                {NOTIFICATION_TAB_LABEL[t]}
+                {unread > 0 ? <span className="tabular-nums">{unread}</span> : null}
+              </Button>
+            );
+          })}
+        </div>
         <div className="max-h-80 overflow-y-auto">
-          {notifications.length === 0 ? (
+          {shown.length === 0 ? (
             <div className="p-6 text-center text-muted-foreground text-sm">
-              ไม่มีการแจ้งเตือน — จะแจ้งเมื่อมีใบขอใหม่หรืองานปิดแล้ว
+              {tab === 'so' ? 'ยังไม่มีแจ้งเตือนจาก So Scraping' : 'ไม่มีการแจ้งเตือน — จะแจ้งเมื่อมีใบขอใหม่หรืองานปิดแล้ว'}
             </div>
           ) : (
-            notifications.map((n) => {
+            shown.map((n) => {
               const config = typeConfig[n.type] ?? fallbackType;
               const Icon = config.icon;
               return (

@@ -148,3 +148,26 @@ describe('กดแจ้งเตือนแล้วป๊อปใบนั�
     expect(panel).toContain('onCloseAutoFocus={(e) => e.preventDefault()}');
   });
 });
+
+describe('กระดิ่งแยกแจ้งเตือน So Scraping ไม่ให้ตกหาย (เจ้าของ 20 ต.ค. 2569)', () => {
+  it('รวมรายการแล้วตัดเหลือ N โดยไม่ทิ้งของ So Scraping · แท็บกรองเฉพาะชนิดนั้น', async () => {
+    const { capKeepingPinned, notificationsOfTab } = await import('@/lib/notificationTabs');
+    const ai = Array.from({ length: 40 }, (_, i) => ({ type: 'follow_ai_overdue', timestamp: `2026-10-20T10:${String(i).padStart(2, '0')}:00Z` }));
+    const so = { type: 'so_scraping_status', timestamp: '2026-10-20T09:00:00Z' };
+    const capped = capKeepingPinned([...ai, so], 30);
+    expect(capped).toHaveLength(31);
+    expect(capped).toContain(so);
+    expect(capped.at(-1)).toBe(so);
+    expect(notificationsOfTab(capped, 'so')).toEqual([so]);
+    expect(notificationsOfTab(capped, 'all')).toHaveLength(31);
+  });
+  it('server ดึงชนิดที่ปักไว้แยก 14 วัน · แผงมีแท็บ', () => {
+    const lib = read('api/_lib/appNotifications.ts');
+    expect(lib).toContain("type = any($3::text[]) and created_at > now() - interval '14 days'");
+    expect(lib).toContain('[...PINNED_NOTIFICATION_TYPES]');
+    const panel = read('src/components/notifications/NotificationPanel.tsx');
+    expect(panel).toContain("const shown = notificationsOfTab(notifications, tab);");
+    expect(panel).toContain("'ยังไม่มีแจ้งเตือนจาก So Scraping'");
+    expect(read('src/contexts/NotificationContext.tsx')).toContain('return capKeepingPinned(merged, MAX_NOTIFICATIONS);');
+  });
+});

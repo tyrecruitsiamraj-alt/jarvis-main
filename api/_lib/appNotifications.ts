@@ -7,6 +7,7 @@
  */
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
+import { PINNED_NOTIFICATION_TYPES } from '../../src/lib/notificationTabs.js';
 
 const notifTable = tableInAppSchema('app_notifications');
 const usersTable = tableInAppSchema('users');
@@ -75,12 +76,25 @@ export async function listMyNotifications(
       created_at: string;
       read_at: string | null;
     }>(
-      `select id, type, title, body, link, created_at, read_at
-         from ${notifTable}
-        where recipient_user_id = $1
-        order by created_at desc
-        limit $2`,
-      [userId, Math.min(Math.max(limit, 1), 100)],
+      /**
+       * 🔴 แจ้งเตือนที่ต้องตามงาน (So Scraping · เจ้าของ 20 ต.ค. 2569 "ให้กระดิ่งแยกแจ้งเตือน So Scraping ไม่ให้ตกหาย")
+       * ดึงแยกอีกชุด 14 วันล่าสุด — เดิมแจ้งเตือน "AI ยังไม่โทร" เด้งทีละหลายสิบ ดัน 30 อันล่าสุดจนของ So Scraping หลุดไปในไม่กี่นาที
+       */
+      `select id, type, title, body, link, created_at, read_at from (
+         (select id, type, title, body, link, created_at, read_at
+            from ${notifTable}
+           where recipient_user_id = $1
+           order by created_at desc
+           limit $2)
+         union
+         (select id, type, title, body, link, created_at, read_at
+            from ${notifTable}
+           where recipient_user_id = $1 and type = any($3::text[]) and created_at > now() - interval '14 days'
+           order by created_at desc
+           limit 50)
+       ) x
+       order by created_at desc`,
+      [userId, Math.min(Math.max(limit, 1), 100), [...PINNED_NOTIFICATION_TYPES]],
     );
     const items = rows.map((r) => ({
       id: r.id,
