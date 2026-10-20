@@ -47,3 +47,23 @@ describe('แท็บติดตามนัดหมาย: เจ้าห�
     expect(read('src/components/recruit-rm/RmTable.tsx')).toContain('นัดโดย {r.appointment_by || EM_DASH}');
   });
 });
+
+describe('ของรกบนจอ (เจ้าของ 20 ต.ค. 2569)', () => {
+  it('แถบแจ้งผลกดปุ่มหายเมื่อเปลี่ยนแท็บ/กล่อง ไม่ค้างทุกกล่อง', () => {
+    expect(read('src/components/recruit-rm/RmWorkspace.tsx')).toMatch(
+      /say\(null\);[\s\S]{0,120}\}, \[tab, listView, contactChip, appointmentChip\]\);/,
+    );
+  });
+  it('เกณฑ์ความเร่งของใบนี้ พับไว้ กดถึงกาง', () => {
+    const src = read('src/components/jobs/RequestLeadRulesCard.tsx');
+    expect(src).toContain('defaultOpen = false');
+    expect(src).toContain('<CollapsibleContent');
+  });
+});
+
+describe('ลิงก์สมัคร: ปุ่มแก้ข้อความอยู่ข้างหัวข้อประกาศ ไม่ใช่ใต้ลิงก์สุดท้าย (เจ้าของ 20 ต.ค. 2569)', () => {
+  it('ปุ่มมาก่อนรายการลิงก์', () => {
+    const src = read('src/components/jobs/PostingLinksList.tsx');
+    expect(src.indexOf('แก้ข้อความประกาศ\n')).toBeLessThan(src.indexOf('<LinkRow key={l.id}'));
+  });
+});

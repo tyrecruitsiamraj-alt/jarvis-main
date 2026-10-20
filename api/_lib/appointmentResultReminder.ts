@@ -4,6 +4,7 @@
  * เหตุ: นัดที่เลยวันแล้ว ต.ค. 2569 ไม่มีใครลงผลเลย (8 จาก 8) ⇒ ระบบตอบไม่ได้ว่าคนมาจริงไหม ตัวเลขคุ้มไหมตันที่ขั้นนี้
  * - นัด = บันทึกติดต่อล่าสุดของใบที่ "สำเร็จ + มีวันนัด" (ตัวเดียวกับ `LATEST_CONTACT_APPOINTMENT_AT_SQL`)
  * - ยังไม่ลงผล = ผลนัดล่าสุดว่าง หรือ "เลื่อนนัด" (กติกาเดียวกับ `OVERDUE_NO_RESULT_SQL`)
+ * - นับ Lead ด้วย — แท็บติดตามนัดหมายโชว์นัดของ Lead (ชิป "เลยวันนัด" ต้องเท่าแถบแดง · 20 ต.ค. 2569)
  * - ช้า = เลยเวลานัดเกิน 24 ชม. (กติกาเจ้าของ "ทุกอย่างต้องภายใน 24 ชม.") · ย้อนไม่เกิน 30 วัน (นัดเก่ากว่านั้นไม่เตือนแล้ว)
  * - เจ้าของนัด = คนที่บันทึกนัด (`created_by`) · แจ้งวันละครั้งต่อคน (dedupe ตามวัน) ตั้งแต่ 08:00 เวลาไทย
  * แจ้งเตือนเป็นของแถม — ล้มแล้วกลืน ห้ามทำงานหลักล้ม
@@ -34,7 +35,6 @@ export function overdueAppointmentsSql(): string {
     ) c on c.ok and c.appointment_at is not null
    where c.appointment_at < now() - interval '${OVERDUE_HOURS} hours'
      and c.appointment_at > now() - interval '${LOOKBACK_DAYS} days'
-     and not coalesce(a.is_lead, false)
      and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)
      and coalesce((select r.result from ${ATTENDANCE} r where r.application_id = a.id
                     order by r.appointment_at desc nulls last, r.created_at desc limit 1), 'rescheduled') = 'rescheduled'

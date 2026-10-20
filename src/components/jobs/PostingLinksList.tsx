@@ -79,28 +79,25 @@ const PostingLinksList: React.FC<{
   return (
     <div className="space-y-3" data-testid="posting-links-list">
       {postings.map((p) => (
-        <div key={p.id} className="rounded-xl border border-border/70 px-3 py-2">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0 space-y-0.5">
-              <p className="text-sm font-medium text-foreground">{p.title}</p>
-              <p className="text-xs text-muted-foreground">
-                {p.createdByName ? `สร้างโดย ${p.createdByName} · ` : ''}
-                {formatDateTimeTh(p.createdAt)} · {NUM.format(p.links.length)} ลิงก์
-              </p>
+        // ปุ่มแก้ข้อความอยู่ข้างหัวข้อประกาศ (เจ้าของ 20 ต.ค. 2569: เดิมอยู่ใต้ลิงก์สุดท้าย อ่านเหมือนแก้ของลิงก์ Facebook Group นั้น
+        // ทั้งที่เป็นข้อความของทั้งประกาศ ใช้ร่วมทุกลิงก์)
+        <Collapsible key={p.id} open={editing === p.id} onOpenChange={(o) => setEditing(o ? p.id : null)} asChild>
+          <div className="rounded-xl border border-border/70 px-3 py-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0 space-y-0.5">
+                <p className="text-sm font-medium text-foreground">{p.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {p.createdByName ? `สร้างโดย ${p.createdByName} · ` : ''}
+                  {formatDateTimeTh(p.createdAt)} · {NUM.format(p.links.length)} ลิงก์
+                </p>
+              </div>
+              <CollapsibleTrigger asChild>
+                <Button type="button" variant="outline" size="xs">
+                  แก้ข้อความประกาศ
+                  <ChevronDown className={cn('transition-transform', editing === p.id && 'rotate-180')} aria-hidden />
+                </Button>
+              </CollapsibleTrigger>
             </div>
-          </div>
-          <ul className={cn('divide-y divide-border/60')}>
-            {p.links.map((l) => (
-              <LinkRow key={l.id} link={l} />
-            ))}
-          </ul>
-          <Collapsible open={editing === p.id} onOpenChange={(o) => setEditing(o ? p.id : null)}>
-            <CollapsibleTrigger asChild>
-              <Button type="button" variant="ghost" size="xs" className="-ml-2">
-                แก้ข้อความประกาศ
-                <ChevronDown className={cn('transition-transform', editing === p.id && 'rotate-180')} aria-hidden />
-              </Button>
-            </CollapsibleTrigger>
             <CollapsibleContent className="pt-2">
               <EditPostingDialog
                 embedded
@@ -112,8 +109,13 @@ const PostingLinksList: React.FC<{
                 }}
               />
             </CollapsibleContent>
-          </Collapsible>
-        </div>
+            <ul className={cn('divide-y divide-border/60')}>
+              {p.links.map((l) => (
+                <LinkRow key={l.id} link={l} />
+              ))}
+            </ul>
+          </div>
+        </Collapsible>
       ))}
     </div>
   );

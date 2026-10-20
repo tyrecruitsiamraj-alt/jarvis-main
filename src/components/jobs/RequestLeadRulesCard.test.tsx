@@ -45,8 +45,16 @@ beforeEach(() => saveUnitRequestMeta.mockClear());
 afterEach(cleanup);
 
 describe('กล่องเกณฑ์ความเร่งของใบ', () => {
-  it('ใบที่ไม่ได้ตั้ง — บอกว่าใช้ค่ากลาง และ placeholder บอกเลขกลางไว้', () => {
+  it('พับไว้ก่อน — เห็นหัวข้อกับป้าย กดหัวข้อแล้วกาง (เจ้าของ 20 ต.ค. 2569)', () => {
     render(<RequestLeadRulesCard job={job()} />);
+    expect(screen.getByText('ใช้ค่ากลาง')).toBeTruthy();
+    expect(screen.queryByLabelText('เส้นแบ่ง ฉุกเฉิน ↔ ล่วงหน้า')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /เกณฑ์ความเร่งของใบนี้/ }));
+    expect(thresholdInput()).toBeTruthy();
+  });
+
+  it('ใบที่ไม่ได้ตั้ง — บอกว่าใช้ค่ากลาง และ placeholder บอกเลขกลางไว้', () => {
+    render(<RequestLeadRulesCard defaultOpen job={job()} />);
     expect(screen.getByText('ใช้ค่ากลาง')).toBeTruthy();
     expect(thresholdInput().value).toBe('');
     expect(thresholdInput().placeholder).toBe('7');
@@ -56,7 +64,7 @@ describe('กล่องเกณฑ์ความเร่งของใบ'
   });
 
   it('🔴 พิมพ์เส้นแบ่ง 3 → ตัวอย่างเปลี่ยนเป็น "ล่วงหน้า" ทันที ยังไม่ต้องกดบันทึก', () => {
-    render(<RequestLeadRulesCard job={job()} />);
+    render(<RequestLeadRulesCard defaultOpen job={job()} />);
     expect(screen.getByText('ฉุกเฉิน')).toBeTruthy();
     fireEvent.change(thresholdInput(), { target: { value: '3' } });
     expect(screen.getByText('ล่วงหน้า')).toBeTruthy();
@@ -65,7 +73,7 @@ describe('กล่องเกณฑ์ความเร่งของใบ'
   });
 
   it('ยังไม่แก้อะไร ปุ่มบันทึกกดไม่ได้ (กันบันทึกทับของเดิมโดยไม่ตั้งใจ)', () => {
-    render(<RequestLeadRulesCard job={job()} />);
+    render(<RequestLeadRulesCard defaultOpen job={job()} />);
     const btn = screen.getByRole('button', { name: 'บันทึกเกณฑ์ของใบนี้' }) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
@@ -74,7 +82,7 @@ describe('กล่องเกณฑ์ความเร่งของใบ'
     const j = job({
       field_overrides: { total_income: 18000, benefits: ['ที่พักฟรี'] },
     } as Partial<JobRequest>);
-    render(<RequestLeadRulesCard job={j} />);
+    render(<RequestLeadRulesCard defaultOpen job={j} />);
     fireEvent.change(thresholdInput(), { target: { value: '3' } });
     fireEvent.click(screen.getByRole('button', { name: 'บันทึกเกณฑ์ของใบนี้' }));
 
@@ -91,7 +99,7 @@ describe('กล่องเกณฑ์ความเร่งของใบ'
 
   it('ใบที่ตั้งไว้แล้ว — ป้ายบอก "ตั้งเองเฉพาะใบนี้" · ช่องมีค่าเดิม · มีปุ่มกลับไปใช้ค่ากลาง', async () => {
     const j = job({ lead_rules: { urgent_threshold_days: 3, sla_days: { urgent: 30 } } });
-    render(<RequestLeadRulesCard job={j} />);
+    render(<RequestLeadRulesCard defaultOpen job={j} />);
     expect(screen.getByText('ตั้งเองเฉพาะใบนี้')).toBeTruthy();
     expect(thresholdInput().value).toBe('3');
     // ตั้งเส้นแบ่ง 3 แล้วใบห่าง 4 วันกลายเป็นล่วงหน้า ⇒ ใช้เวลาของล่วงหน้า (ค่ากลาง 15)
@@ -107,18 +115,18 @@ describe('กล่องเกณฑ์ความเร่งของใบ'
   });
 
   it('ใบที่ตั้งให้เวลาหาคนไว้ 30 วัน — ตัวอย่างบอกวันครบกำหนดตามเลขของใบ', () => {
-    render(<RequestLeadRulesCard job={job({ lead_rules: { sla_days: { urgent: 30 } } })} />);
+    render(<RequestLeadRulesCard defaultOpen job={job({ lead_rules: { sla_days: { urgent: 30 } } })} />);
     expect(screen.getByText('ฉุกเฉิน')).toBeTruthy();
     expect(screen.getByText('30')).toBeTruthy();
   });
 
   it('ดูอย่างเดียว — ไม่มีปุ่มบันทึก', () => {
-    render(<RequestLeadRulesCard job={job()} canEdit={false} />);
+    render(<RequestLeadRulesCard defaultOpen job={job()} canEdit={false} />);
     expect(screen.queryByRole('button', { name: 'บันทึกเกณฑ์ของใบนี้' })).toBeNull();
     expect(thresholdInput().disabled).toBe(true);
   });
   it('🔴 ใบขอล่วงหน้าต้องบันทึกด้วยคีย์ของตัวเอง — ห้ามไปทับใบขอจริงที่เลขเดียวกัน', async () => {
-    render(<RequestLeadRulesCard job={job({ id: 'siamraj-pre:R-1' } as Partial<JobRequest>)} />);
+    render(<RequestLeadRulesCard defaultOpen job={job({ id: 'siamraj-pre:R-1' } as Partial<JobRequest>)} />);
     fireEvent.change(thresholdInput(), { target: { value: '3' } });
     fireEvent.click(screen.getByRole('button', { name: 'บันทึกเกณฑ์ของใบนี้' }));
 

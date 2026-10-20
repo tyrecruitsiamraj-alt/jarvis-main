@@ -1,6 +1,7 @@
 import React from 'react';
-import { Gauge, RotateCcw } from 'lucide-react';
+import { ChevronDown, Gauge, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -135,11 +136,14 @@ const RequestLeadRulesCard: React.FC<{
   job: JobRequest;
   canEdit?: boolean;
   onSaved?: (rules: RequestLeadRulesOverride | null) => void;
-}> = ({ job, canEdit = true, onSaved }) => {
+  /** กางไว้ตั้งแต่แรก (ค่าเริ่ม = พับ) */
+  defaultOpen?: boolean;
+}> = ({ job, canEdit = true, onSaved, defaultOpen = false }) => {
   const [draft, setDraft] = React.useState<Draft>(() => draftFromJob(job));
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState<string | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
+  const [open, setOpen] = React.useState(defaultOpen);
 
   // ใบเปลี่ยน (โหลดเสร็จ/สลับใบ) → ตั้งช่องใหม่จากค่าที่บันทึกไว้
   const savedKey = JSON.stringify(job.lead_rules ?? null);
@@ -195,20 +199,26 @@ const RequestLeadRulesCard: React.FC<{
     }
   };
 
+  // พับไว้ก่อน กดหัวข้อถึงกาง (เจ้าของ 20 ต.ค. 2569 "คือไรเอามาโชว์ทำไม" → Choice "พับไว้ กดถึงเห็น")
   return (
+    <Collapsible open={open} onOpenChange={setOpen} asChild>
     <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Gauge className={cn('h-4 w-4', TONE.primary.value)} />
-        <h2 className="text-sm font-medium">เกณฑ์ความเร่งของใบนี้</h2>
-        <span
-          className={cn(
-            'text-[10px]',
-            hasCustomLeadRules(job.lead_rules) ? TONE.warn.chip : TONE.neutral.chip,
-          )}
-        >
-          {hasCustomLeadRules(job.lead_rules) ? 'ตั้งเองเฉพาะใบนี้' : 'ใช้ค่ากลาง'}
-        </span>
-      </div>
+      <CollapsibleTrigger asChild>
+        <Button type="button" variant="ghost" className="h-auto w-full justify-start gap-2 p-0 hover:bg-transparent">
+          <Gauge className={cn('h-4 w-4', TONE.primary.value)} />
+          <span className="text-sm font-medium">เกณฑ์ความเร่งของใบนี้</span>
+          <span
+            className={cn(
+              'text-[10px]',
+              hasCustomLeadRules(job.lead_rules) ? TONE.warn.chip : TONE.neutral.chip,
+            )}
+          >
+            {hasCustomLeadRules(job.lead_rules) ? 'ตั้งเองเฉพาะใบนี้' : 'ใช้ค่ากลาง'}
+          </span>
+          <ChevronDown aria-hidden className={cn('ml-auto h-4 w-4 transition-transform', open ? 'rotate-180' : '')} />
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-3">
 
       <p className="text-xs text-muted-foreground">
         ช่องไหนไม่กรอก = ใช้ค่ากลางของระบบ · ค่าที่ตั้งไว้มีผลทุกที่ ทั้งหน้ารายการใบขอและแดชบอร์ด SLA
@@ -289,7 +299,9 @@ const RequestLeadRulesCard: React.FC<{
       ) : (
         <p className="text-xs text-muted-foreground">ดูอย่างเดียว — ไม่มีสิทธิ์แก้เกณฑ์ใบขอ</p>
       )}
+      </CollapsibleContent>
     </section>
+    </Collapsible>
   );
 };
 

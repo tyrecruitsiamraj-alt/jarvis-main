@@ -15,12 +15,13 @@ import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes';
 const read = (p: string) => readFileSync(p, 'utf8');
 
 describe('เตือนนัดที่ยังไม่ลงผล', () => {
-  it('เลยนัดเกิน 24 ชม. · ย้อนไม่เกิน 30 วัน · ไม่มีผลหรือเลื่อนนัด = ยังไม่ลง · ไม่นับ Lead/ใบที่ยกเลิกข้อมูล', () => {
+  it('เลยนัดเกิน 24 ชม. · ย้อนไม่เกิน 30 วัน · ไม่มีผลหรือเลื่อนนัด = ยังไม่ลง · ไม่นับใบที่ยกเลิกข้อมูล', () => {
     const sql = overdueAppointmentsSql();
     expect(sql).toContain("now() - interval '24 hours'");
     expect(sql).toContain("now() - interval '30 days'");
     expect(sql).toContain("'rescheduled') = 'rescheduled'");
-    expect(sql).toContain('not coalesce(a.is_lead, false)');
+    // นับ Lead ด้วย — ให้เท่าชิป "เลยวันนัด" ของแท็บติดตามนัดหมาย (เจ้าของ 20 ต.ค. 2569)
+    expect(sql).not.toContain('is_lead');
   });
   it('เตือนตั้งแต่ 08:00 เวลาไทย วันละครั้ง · จัดกลุ่มตามคนบันทึกนัด', () => {
     const at = (iso: string) => new Date(iso);
@@ -34,7 +35,9 @@ describe('เตือนนัดที่ยังไม่ลงผล', () =
     expect(read('server/local-api.ts')).toContain('startAppointmentReminderWorker();');
   });
   it('แถบแดงบนหัวกล่องงาน กดแล้วไปแท็บติดตามนัดหมาย', () => {
-    expect(read('src/pages/jobs/StaffJobBoardPage.tsx')).toContain("<AppointmentOverdueBar onOpen={() => setView('appointments')}");
+    const page = read('src/pages/jobs/StaffJobBoardPage.tsx');
+    expect(page).toContain('<AppointmentOverdueBar');
+    expect(page).toContain("params.set('appt', 'overdue');");
     expect(read('api/_handlers/registry.ts')).toContain("'/api/appointment-overdue': appointmentOverdueHandler");
   });
 });
@@ -93,5 +96,21 @@ describe('ค้างอยู่ที่ใคร = คนที่ต้อ�
     expect(sql).toContain('coalesce(a.posting_id, l.posting_id)');
     expect(sql).toContain("q.status in ('pending', 'delivered')");
     expect(sql).not.toMatch(/full_name as|phone/);
+  });
+});
+
+describe('ชิป "เลยวันนัด" = เกณฑ์เดียวกับแถบแดง (เจ้าของ 20 ต.ค. 2569 "มันไม่ตรงกันปะ")', () => {
+  it('ยังไม่ลงผล/เลื่อนนัด · เลยเกิน 24 ชม. · ไม่เกิน 30 วัน · นัดวันนี้ยังไม่นับ', async () => {
+    const { isInAppointmentChip, APPOINTMENT_CHIPS } = await import('../../src/lib/appointmentBoard');
+    const NOW = Date.parse('2026-10-20T03:00:00Z');
+    const at = (iso: string, result: string | null = null) => ({ appointment_at: iso, attendance_result: result });
+    const today = '2026-10-20';
+    expect(isInAppointmentChip(at('2026-10-16T05:00:00Z'), 'overdue', today, NOW)).toBe(true);
+    expect(isInAppointmentChip(at('2026-10-16T05:00:00Z', 'rescheduled'), 'overdue', today, NOW)).toBe(true);
+    expect(isInAppointmentChip(at('2026-10-16T05:00:00Z', 'showed'), 'overdue', today, NOW)).toBe(false);
+    expect(isInAppointmentChip(at('2026-10-20T05:00:00Z'), 'overdue', today, NOW)).toBe(false);
+    expect(isInAppointmentChip(at('2026-09-01T05:00:00Z'), 'overdue', today, NOW)).toBe(false);
+    expect(APPOINTMENT_CHIPS.map((c) => c.label)).toContain('เลยวันนัด');
+    expect(read('src/components/recruit-rm/RmWorkspace.tsx')).toContain("searchParams.get('appt') === 'overdue'");
   });
 });

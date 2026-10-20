@@ -228,10 +228,6 @@ const RmWorkspace: React.FC<{
     setNotice(text);
     setNoticeGoContact(goContact);
   };
-  // ย้ายแท็บแล้ว ปุ่ม "ไปการติดตาม" ไม่มีความหมาย (ข้อความยังอยู่ให้อ่าน)
-  useEffect(() => {
-    setNoticeGoContact(false);
-  }, [tab]);
   /** แถบกรองซ้าย (จอ xl) กางอยู่ไหม — ค่าตั้งต้นพับ */
   const [filterOpen, setFilterOpen] = useState<boolean>(readFilterOpen);
   const changeFilterOpen = (open: boolean) => {
@@ -264,7 +260,18 @@ const RmWorkspace: React.FC<{
    * ติดตามนัดหมาย: นัดทั้งหมด/มา/ไม่มา/รอผล (แทนกล่องตัวเลข 4 ใบ) · ไม่ผูก URL (ของคนที่นั่งดู)
    */
   const [contactChip, setContactChip] = useState<ContactChip>('all');
-  const [appointmentChip, setAppointmentChip] = useState<AppointmentChip>('all');
+  // ?appt=overdue = มาจากปุ่ม "ไปลงผล" บนแถบแดง (20 ต.ค. 2569) เปิดชิปเลยวันนัดเลย
+  const [appointmentChip, setAppointmentChip] = useState<AppointmentChip>(() =>
+    searchParams.get('appt') === 'overdue' ? 'overdue' : 'all',
+  );
+  const apptParam = searchParams.get('appt');
+  useEffect(() => {
+    if (apptParam === 'overdue') setAppointmentChip('overdue');
+  }, [apptParam]);
+  // ย้ายแท็บ/กดกล่องอื่นแล้ว ข้อความแจ้งหายไปด้วย (เจ้าของ 20 ต.ค. 2569 "ไม่ต้องโชว์ทุกกล่อง" — เดิมค้างตามไปทุกกล่อง)
+  useEffect(() => {
+    say(null);
+  }, [tab, listView, contactChip, appointmentChip]);
   const [showAppointmentDays, setShowAppointmentDays] = useState(false);
   /**
    * แท็บติดตามนัดหมาย: ของฉัน / ทุกคน (QA รอบ 2 ข้อ 4 · เจ้าของ Choice 10 ต.ค. 2569) — ค่าเริ่ม "ของฉัน" = ของใครของมันแบบเดิม

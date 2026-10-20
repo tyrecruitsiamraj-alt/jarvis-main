@@ -140,7 +140,16 @@ const StaffJobBoardPage: React.FC = () => {
        27 ก.ย. 2569 (เจ้าของ: "หน้ากล่องงานไม่เข้ากับหน้าอื่นๆเลย" → แบบ A หัว PageHeader ชุดเดียวกัน) */
     <div className="relative">
       {/* นัดเลยวันเกิน 24 ชม. ยังไม่ลงผล (เจ้าของ 20 ต.ค. 2569) — กดแล้วไปแท็บติดตามนัดหมาย */}
-      <AppointmentOverdueBar onOpen={() => setView('appointments')} refreshKey={listRev} />
+      <AppointmentOverdueBar
+        onOpen={() => {
+          const params = new URLSearchParams(searchParams);
+          params.set('view', 'appointments');
+          params.delete('tab');
+          params.set('appt', 'overdue');
+          setSearchParams(params);
+        }}
+        refreshKey={listRev}
+      />
       <JobBoardView
         jobs={jobs}
         loading={loading}

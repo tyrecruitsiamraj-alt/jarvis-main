@@ -26,6 +26,8 @@ export type AppointmentDaySummary = {
   rescheduled: number;
   /** นัดแล้วแต่ยังไม่มีผลมา/ไม่มา */
   pending: number;
+  /** ในรอผล+เลื่อนนัด: เลยวันนัดเกิน 24 ชม. (ไม่เกิน 30 วัน) — ชิป "เลยวันนัด" */
+  overdue: number;
   /** ในคนที่มา: ผ่าน / ไม่ผ่าน (ส่วนย่อยของ showed — ไม่อยู่ในสูตรรวม) */
   passed: number;
   notPassed: number;
@@ -39,7 +41,7 @@ export type AppointmentBoard = {
 };
 
 function emptyDay(date: string): AppointmentDaySummary {
-  return { date, total: 0, showed: 0, noShow: 0, rescheduled: 0, pending: 0, passed: 0, notPassed: 0 };
+  return { date, total: 0, showed: 0, noShow: 0, rescheduled: 0, pending: 0, overdue: 0, passed: 0, notPassed: 0 };
 }
 
 function bump(day: AppointmentDaySummary, result: AttendanceResult | null, screening: string | null | undefined): void {
@@ -58,7 +60,7 @@ function bump(day: AppointmentDaySummary, result: AttendanceResult | null, scree
  * สรุปนัดต่อวันจากแถวใบสมัคร — แถวที่ไม่มีวันนัดไม่นับ (ยังไม่ได้นัด ไม่ใช่นัดแล้วรอผล)
  * ⚠️ ผลรวม showed+noShow+rescheduled+pending ต้อง = total เสมอ (มีเทสต์คุม)
  */
-export function buildAppointmentBoard(rows: readonly AppointmentBoardRow[]): AppointmentBoard {
+export function buildAppointmentBoard(rows: readonly AppointmentBoardRow[], nowMs: number = Date.now()): AppointmentBoard {
   const total = emptyDay('');
   const byDay = new Map<string, AppointmentDaySummary>();
 
@@ -71,6 +73,10 @@ export function buildAppointmentBoard(rows: readonly AppointmentBoardRow[]): App
     byDay.set(ymd, day);
     bump(day, result, r.screening_result);
     bump(total, result, r.screening_result);
+    if (isInAppointmentChip(r, 'overdue', ymd, nowMs)) {
+      day.overdue += 1;
+      total.overdue += 1;
+    }
   }
 
   return {
@@ -86,7 +92,12 @@ export function buildAppointmentBoard(rows: readonly AppointmentBoardRow[]): App
  */
 /** `today` = นัดวันนี้ (QA รอบ 3 ข้อ 23 · ไม่มีปุ่มดูนัดวันนี้) — คนละแกนกับผลนัด ไม่อยู่ในสูตร มา + ไม่มา + รอผล = ทั้งหมด */
 /** `passed` / `not_passed` = ส่วนย่อยของ "มา" (18 ต.ค. 2569) — ไม่อยู่ในสูตร มา + ไม่มา + รอผล = ทั้งหมด */
-export type AppointmentChip = 'all' | 'today' | 'showed' | 'no_show' | 'pending' | 'passed' | 'not_passed';
+/** `overdue` = เลยวันนัดเกิน 24 ชม. ยังไม่ลงผล ย้อนไม่เกิน 30 วัน — เกณฑ์เดียวกับแถบแดงหัวกล่องงาน
+ *  (`appointmentResultReminder.ts` · เจ้าของ 20 ต.ค. 2569 "มันไม่ตรงกันปะ" → Choice เพิ่มชิป) · ส่วนย่อยของ "รอผล" */
+export type AppointmentChip = 'all' | 'today' | 'showed' | 'no_show' | 'pending' | 'overdue' | 'passed' | 'not_passed';
+
+export const OVERDUE_AFTER_MS = 24 * 3_600_000;
+export const OVERDUE_LOOKBACK_MS = 30 * 86_400_000;
 
 export const APPOINTMENT_CHIPS: readonly { id: AppointmentChip; label: string; tone: 'info' | 'success' | 'danger' | 'warn' }[] = [
   { id: 'all', label: 'นัดทั้งหมด', tone: 'info' },
@@ -94,6 +105,7 @@ export const APPOINTMENT_CHIPS: readonly { id: AppointmentChip; label: string; t
   { id: 'showed', label: 'มา', tone: 'success' },
   { id: 'no_show', label: 'ไม่มา', tone: 'danger' },
   { id: 'pending', label: 'รอผล', tone: 'warn' },
+  { id: 'overdue', label: 'เลยวันนัด', tone: 'danger' },
   { id: 'passed', label: 'ผ่าน', tone: 'success' },
   { id: 'not_passed', label: 'ไม่ผ่าน', tone: 'danger' },
 ];
@@ -108,6 +120,7 @@ export function appointmentChipCount(
   if (chip === 'showed') return t.showed;
   if (chip === 'no_show') return t.noShow;
   if (chip === 'pending') return t.pending + t.rescheduled;
+  if (chip === 'overdue') return t.overdue;
   if (chip === 'passed') return t.passed;
   if (chip === 'not_passed') return t.notPassed;
   return t.total;
@@ -118,11 +131,16 @@ export function isInAppointmentChip(
   r: AppointmentBoardRow,
   chip: AppointmentChip,
   today: string = toYmdBangkok(new Date()),
+  nowMs: number = Date.now(),
 ): boolean {
   if (chip === 'all') return true;
   if (!r.appointment_at) return false;
   if (chip === 'today') return toYmdBangkok(new Date(r.appointment_at)) === today;
   const result = isAttendanceResult(r.attendance_result) ? r.attendance_result : null;
+  if (chip === 'overdue') {
+    const at = Date.parse(r.appointment_at);
+    return (result === null || result === 'rescheduled') && at < nowMs - OVERDUE_AFTER_MS && at > nowMs - OVERDUE_LOOKBACK_MS;
+  }
   if (chip === 'showed') return result === 'showed';
   if (chip === 'no_show') return result === 'no_show';
   if (chip === 'passed') return result === 'showed' && r.screening_result === 'passed';

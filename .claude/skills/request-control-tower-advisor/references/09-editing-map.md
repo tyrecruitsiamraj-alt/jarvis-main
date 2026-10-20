@@ -13704,3 +13704,5 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ใบคีย์เอง/นำเข้า Excel ที่ผูกใบขอ ⇒ AI โทรเองผ่าน `applicationDispatchRetry.ts` (ตั้งแต่ `KEYED_AUTO_SINCE` · บทเสนองาน · ใบดึงจาก iRecruit ไม่หยิบ)
 - "คำตอบกับ AI" (`classifyCallMicro`): Lumos ส่ง `unresponsive` = เชื่อ Lumos ไม่อ่านคำพูดเป็นสนใจ/ไม่สนใจ (มีคำพูด = talked_unclear) — เจ้าของ 20 ต.ค. 2569 Choice "ยึดผลจาก Lumos"
 - แท็บติดตามนัดหมาย "นัดโดย" = บัญชีที่บันทึกนัด (`loadContactAppointments` → `appointment_by`) ไม่ใช่เจ้าหน้าที่ของใบขอ
+- แท็บติดตามนัดหมาย ชิป "เลยวันนัด" (`appointmentBoard.ts` · `overdue`) = เกณฑ์เดียวกับแถบแดง (นับ Lead ด้วย) · ปุ่ม "ไปลงผล" ส่ง `?appt=overdue`
+- แถบแจ้งผลกดปุ่มในแท็บผู้สมัคร (`notice` ใน RmWorkspace) หายเมื่อเปลี่ยนแท็บ/กล่อง · กล่องเกณฑ์ความเร่งของใบ (`RequestLeadRulesCard`) พับไว้ (`defaultOpen`) · ลิงก์สมัคร: ปุ่มแก้ข้อความประกาศอยู่หัวประกาศ
