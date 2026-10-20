@@ -1681,6 +1681,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           (item as Record<string, unknown>).appointment_at = at;
           if (fromLog?.place) (item as Record<string, unknown>).appointment_place = fromLog.place;
           if (fromLog?.jobLabel) (item as Record<string, unknown>).appointment_job = fromLog.jobLabel;
+          if (fromLog?.by) (item as Record<string, unknown>).appointment_by = fromLog.by;
         }
       }
       /**

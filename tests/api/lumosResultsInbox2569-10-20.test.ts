@@ -37,3 +37,13 @@ describe('มือถือ: ปุ่มช่องตัวเลือก�
     expect(read('src/components/recruit-rm/RmTable.tsx')).toContain('max-sm:grid max-sm:w-max max-sm:grid-cols-2');
   });
 });
+
+describe('แท็บติดตามนัดหมาย: เจ้าหน้าที่คนไหนนัด (เจ้าของ 20 ต.ค. 2569 "ยึดตามเมล์ที่เขา Login")', () => {
+  it('อ่านจากบัญชีที่บันทึกนัด (ชื่อเล่น → ชื่อเต็ม → ชื่อที่จด → อีเมล) แล้วโชว์ใต้สถานที่นัด', () => {
+    const sql = read('api/_lib/applicationContacts.ts');
+    expect(sql).toContain('left join ${usersTable} u on u.id = c.created_by');
+    expect(sql).toContain("nullif(btrim(u.nickname), '')");
+    expect(read('api/_handlers/job-applications.ts')).toContain('appointment_by = fromLog.by');
+    expect(read('src/components/recruit-rm/RmTable.tsx')).toContain('นัดโดย {r.appointment_by || EM_DASH}');
+  });
+});

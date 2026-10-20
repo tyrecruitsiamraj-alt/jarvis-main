@@ -19,6 +19,12 @@ const CASES: Array<[Partial<PublicApplication>, string]> = [
   [{}, 'not_sent'],
   [{ job_id: undefined }, 'not_sent'],
   [{ phone_callable: false }, 'bad_data'],
+  // 20 ต.ค. 2569: ดึงจาก iRecruit ยังไม่มีใครส่ง AI = กล่อง iRecruit แยกจาก "ยังไม่ส่ง AI"
+  [{ created_by_name: 'iRecruit', job_id: undefined }, 'irecruit_pull'],
+  [{ created_by_name: 'สมชาย', job_id: undefined }, 'not_sent'],
+  // ซ้ำ iRecruit แล้วกดส่ง AI จนตอบสนใจ = อยู่ "สนใจ" กล่องเดียว (เดิมอยู่สองกล่อง)
+  [{ irecruit_dup_at: '2026-10-10T00:00:00Z', last_call_outcome: 'confirmed', last_call_at: '2026-10-13T01:00:00Z' }, 'interested'],
+  [{ age: 60, irecruit_dup_at: '2026-10-10T00:00:00Z' }, 'over_age'],
   [{ last_call_status: 'cancelled' }, 'ai_cancelled'],
 ];
 

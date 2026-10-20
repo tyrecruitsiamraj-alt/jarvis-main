@@ -60,6 +60,8 @@ export type PublicApplication = {
   /** สถานที่นัด + ใบขอที่จะลง — มีเฉพาะนัดจากบันทึกผลติดต่อ (migration 086) */
   appointment_place?: string | null;
   appointment_job?: string | null;
+  /** เจ้าหน้าที่ที่บันทึกนัด (บัญชีที่ล็อกอิน · 20 ต.ค. 2569) — นัดจากบันทึกผลติดต่อเท่านั้น */
+  appointment_by?: string | null;
   /** ผลติดตามนัดล่าสุด (migration 089) — 'showed' | 'no_show' | 'rescheduled' */
   attendance_result?: string | null;
   /** ผ่าน/ไม่ผ่าน หลังมาตามนัด (151 · 18 ต.ค. 2569) */

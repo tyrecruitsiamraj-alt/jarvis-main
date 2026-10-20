@@ -16,6 +16,7 @@ import {
   isApplicationDispatchRetryEnabled,
   runApplicationDispatchRetryOnce,
   unsentApplicationsSql,
+  KEYED_AUTO_SINCE,
 } from '../../api/_lib/applicationDispatchRetry';
 
 /**
@@ -47,6 +48,12 @@ describe('ตัวลองส่งใบสมัครเข้า AI ซ้
     ]) {
       expect(sql).toContain(guard);
     }
+  });
+
+  it('ใบคีย์เอง/นำเข้า Excel ที่ผูกใบขอ = AI โทรเอง (เจ้าของ 20 ต.ค. 2569) · ใบดึงจาก iRecruit ไม่หยิบ · ใบคีย์เก่าไม่โทรเงียบ', () => {
+    const sql = unsentApplicationsSql();
+    expect(sql).toContain("a.created_by_name <> 'iRecruit' and a.created_at >= $2::timestamptz");
+    expect(KEYED_AUTO_SINCE).toBe('2026-10-20T10:00:00+07:00');
   });
 
   it('🔴 ใบที่หลุดก่อนแก้ (17 ใบ) ไม่ถูกหยิบ — เจ้าของยังไม่สั่งส่ง', () => {

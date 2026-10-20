@@ -150,6 +150,7 @@ export const RM_LIST_VIEWS = [
   'ai_at_risk',
   'no_pickup',
   'retry_wait',
+  'irecruit_pull',
   'not_sent',
   'bad_data',
   'ai_cancelled',
@@ -179,6 +180,7 @@ export const RM_LIST_VIEWS_SHOWN = [
   'ai_at_risk',
   'no_pickup',
   'retry_wait',
+  'irecruit_pull',
   'not_sent',
   'bad_data',
   'ai_cancelled',
@@ -199,7 +201,9 @@ export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
   ai_at_risk: 'AI ไม่ได้ผล',
   no_pickup: 'ไม่รับสาย',
   retry_wait: 'รอติดต่อซ้ำ',
-  not_sent: 'ยังไม่ได้',
+  // 20 ต.ค. 2569 เจ้าของ: "แก้คำ ยังไม่ได้ เป็น iRecruit" + Choice แยกกล่อง — ดึงจาก iRecruit (คนกดส่ง AI เอง) แยกจากที่ยังไม่ส่ง AI
+  irecruit_pull: 'iRecruit',
+  not_sent: 'ยังไม่ส่ง AI',
   bad_data: 'ข้อมูลผิด',
   ai_cancelled: 'ยกเลิก',
   // คิวงานสรรหา (16 ส.ค.): สนใจจริง แต่ยังไม่ขึ้นบอร์ด (= ยังไม่ได้มาสมัคร)
@@ -219,22 +223,36 @@ export function isInRmListView(r: PublicApplication, view: RmListView): boolean 
    * (เดิมไฟล์นี้เทียบ `=== 'confirmed'` / `=== 'declined'` เองตรง ๆ → พอเจ้าของสั่งให้
    * ผลติดต่อ `ok=false` นับเป็นไม่สนใจด้วย (Phase 5.11) กล่องกับแท็บจะตอบไม่เหมือนกัน)
    */
-  if (view === 'interested') return isInterestedApplicant(r);
-  if (view === 'declined') return isNotInterestedApplicant(r);
+  // 🔴 ชิปแถวบนห้ามทับกัน (เจ้าของ 20 ต.ค. 2569 "แยกกล่องอย่าให้ซ้ำกัน") — คนเดียวอยู่ชิปแรกที่เข้าเกณฑ์ตามลำดับ RM_PRIMARY_VIEWS
+  if ((RM_PRIMARY_VIEWS as readonly string[]).includes(view)) return rmPrimaryViewOf(r) === view;
   // คิวสรรหา: ตอบสนใจตอนโทร แต่ยังไม่ขึ้นบอร์ด (ยังไม่มาสมัคร) — พอสรรหาเก็บใบสมัคร
   // (ชื่อขึ้นบอร์ด) on_board = true → หลุดจากคิวเอง
   if (view === 'collect') return isInterestedApplicant(r) && r.on_board !== true;
-  if (view === 'over_age') return isOverAge(r.age);
-  if (view === 'irecruit_dup') return Boolean(r.irecruit_dup_at);
-  if (view === 'ai_at_risk') return aiQueueStatusOf(r)?.atRisk === true;
   if (isRmRestView(view)) return rmRestViewOf(r) === view;
   return true;
 }
 
 /** ชิปท้ายแถว (14 ต.ค. 2569) — คนที่ไม่อยู่ชิปก่อนหน้า แบ่งให้ครบทุกคน */
-const RM_REST_VIEWS = ['no_pickup', 'retry_wait', 'not_sent', 'bad_data', 'ai_cancelled'] as const;
+const RM_REST_VIEWS = ['no_pickup', 'retry_wait', 'irecruit_pull', 'not_sent', 'bad_data', 'ai_cancelled'] as const;
 type RmRestView = (typeof RM_REST_VIEWS)[number];
 const RM_PRIMARY_VIEWS = ['interested', 'declined', 'over_age', 'irecruit_dup', 'ai_at_risk'] as const;
+type RmPrimaryView = (typeof RM_PRIMARY_VIEWS)[number];
+
+/** ใบที่ระบบดึงจาก iRecruit เอง (`irecruitApplicantImport.ts` · created_by_name = 'iRecruit') */
+export const IRECRUIT_PULL_CREATED_BY = 'iRecruit';
+
+/**
+ * ชิปแถวบนของใบนี้ — ชิปแรกที่เข้าเกณฑ์ตามลำดับ · null = ไปชิปท้ายแถว
+ * เดิมแต่ละชิปเช็กแยกกัน ⇒ คนที่ซ้ำ iRecruit แล้วกดส่ง AI จนตอบสนใจ อยู่ทั้ง "สนใจ" และ "ซ้ำ iRecruit" (20 ต.ค. 2569 เจอ 1 คน)
+ */
+export function rmPrimaryViewOf(r: PublicApplication): RmPrimaryView | null {
+  if (isInterestedApplicant(r)) return 'interested';
+  if (isNotInterestedApplicant(r)) return 'declined';
+  if (isOverAge(r.age)) return 'over_age';
+  if (r.irecruit_dup_at) return 'irecruit_dup';
+  if (aiQueueStatusOf(r)?.atRisk === true) return 'ai_at_risk';
+  return null;
+}
 
 function isRmRestView(v: RmListView): v is RmRestView {
   return (RM_REST_VIEWS as readonly string[]).includes(v);
@@ -243,10 +261,10 @@ function isRmRestView(v: RmListView): v is RmRestView {
 /**
  * ใบนี้อยู่ชิปท้ายแถวอันไหน — null = อยู่ชิปก่อนหน้าแล้ว (สนใจ · ไม่สนใจ · อายุเกิน · ซ้ำ · AI ไม่ได้ผล)
  * ไม่รับสาย = AI เคยโทรแล้วไม่ได้คำตอบ คิวปิดแล้ว · รอติดต่อซ้ำ = ตั้งโทรซ้ำไว้ · ยกเลิก = คิว AI ถูกยกเลิก ·
- * ข้อมูลผิด = เบอร์ใช้โทรไม่ได้ · ยังไม่ได้ = ยังไม่ได้ส่งให้ AI / รอรอบแรก
+ * ข้อมูลผิด = เบอร์ใช้โทรไม่ได้ · iRecruit = ดึงจาก iRecruit ยังไม่มีใครส่ง AI · ยังไม่ส่ง AI = ยังไม่ได้ส่งให้ AI / รอรอบแรก
  */
 export function rmRestViewOf(r: PublicApplication): RmRestView | null {
-  if (RM_PRIMARY_VIEWS.some((v) => isInRmListView(r, v))) return null;
+  if (rmPrimaryViewOf(r) !== null) return null;
   const q = aiQueueStatusOf(r);
   if (q?.kind === 'retry') return 'retry_wait';
   if (r.last_call_status === 'cancelled') return 'ai_cancelled';
@@ -254,6 +272,7 @@ export function rmRestViewOf(r: PublicApplication): RmRestView | null {
     Boolean(r.ai_answer) || r.last_call_status === 'completed' || r.last_call_status === 'failed' || Boolean(r.last_call_prev_outcome);
   if (aiCalled) return 'no_pickup';
   if (r.phone_callable === false) return 'bad_data';
+  if (r.created_by_name === IRECRUIT_PULL_CREATED_BY) return 'irecruit_pull';
   return 'not_sent';
 }
 

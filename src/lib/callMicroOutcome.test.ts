@@ -119,3 +119,11 @@ describe('อัตราทั้งสาม', () => {
     expect(r.successRate).toBeNull();
   });
 });
+
+describe('ยึดผลจาก Lumos เมื่อ unresponsive (เจ้าของ 20 ต.ค. 2569)', () => {
+  it('สายหลุดกลางคันแม้มีคำว่า "สะดวก" ⇒ ไม่ขึ้นสนใจ', () => {
+    const r = classifyCallMicro({ outcome: 'unresponsive', summary: null, reply: 'ฮัลโหลครับ · วัน ไหน ครับ วัน ไหน สะดวก วัน ไหน ครับ' }, INTEREST_VOCAB);
+    expect(r).toBe('talked_unclear');
+    expect(classifyCallMicro({ outcome: 'unresponsive', summary: null, reply: null }, INTEREST_VOCAB)).toBe('no_pickup');
+  });
+});

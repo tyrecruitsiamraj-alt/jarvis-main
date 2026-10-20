@@ -519,6 +519,10 @@ const RmTable: React.FC<{
                             ? `${r.appointment_place ?? ''}${r.appointment_place && r.appointment_job ? ' · ' : ''}${r.appointment_job ? `ลงงาน ${r.appointment_job}` : ''}`
                             : EM_DASH}
                         </span>
+                        {/* คนนัด = บัญชีที่ล็อกอินตอนบันทึกนัด (เจ้าของ 20 ต.ค. 2569 — เจ้าของใบขออาจไม่ใช่คนนัด) */}
+                        {r.appointment_at ? (
+                          <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>นัดโดย {r.appointment_by || EM_DASH}</span>
+                        ) : null}
                         {/* ผลติดตามนัด (089): ปุ่มคู่โผล่ตั้งแต่วันนัด (เวลาไทย) เป็นต้นไป
                             กดซ้ำเพื่อแก้ได้ (append-only ล่าสุดชนะ) — ปุ่มที่เลือกอยู่ติดสีเต็ม
                             ยังไม่ถึงวันนัด = ไม่มีบรรทัดนี้ */}

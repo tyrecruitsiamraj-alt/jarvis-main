@@ -2,6 +2,7 @@ import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 
 const table = tableInAppSchema('application_contact_logs');
+const usersTable = tableInAppSchema('users');
 const appsTable = tableInAppSchema('public_job_applications');
 
 const MAX_TEXT = 300;
@@ -195,19 +196,24 @@ export async function loadLatestContactResults(
  */
 export async function loadContactAppointments(
   applicationIds: string[],
-): Promise<Map<string, { at: string; place: string | null; jobLabel: string | null }>> {
-  const out = new Map<string, { at: string; place: string | null; jobLabel: string | null }>();
+): Promise<Map<string, { at: string; place: string | null; jobLabel: string | null; by: string | null }>> {
+  const out = new Map<string, { at: string; place: string | null; jobLabel: string | null; by: string | null }>();
   if (applicationIds.length === 0) return out;
   try {
+    // คนนัด = บัญชีที่ล็อกอินตอนบันทึกนัด (เจ้าของ 20 ต.ค. 2569 "ยึดตามเมล์ที่เขา Login" — เจ้าของใบขออาจไม่ใช่คนนัด)
+    // ชื่อเล่นจากหน้าผู้ใช้งาน → ชื่อเต็ม → ชื่อที่จดไว้ตอนบันทึก → อีเมล
     const { rows } = await dbQuery<{
       application_id: string;
       appointment_at: string;
       appointment_place: string | null;
       job_label: string | null;
+      by_name: string | null;
     }>(
       `select distinct on (application_id)
-              application_id, appointment_at, appointment_place, job_label
-         from ${table}
+              application_id, appointment_at, appointment_place, job_label, by_name
+         from (select c.*, coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''),
+                                    nullif(btrim(c.created_by_name), ''), u.email) as by_name
+                 from ${table} c left join ${usersTable} u on u.id = c.created_by) x
         where application_id = any($1::uuid[]) and appointment_at is not null
         order by application_id, created_at desc`,
       [applicationIds],
@@ -217,6 +223,7 @@ export async function loadContactAppointments(
         at: r.appointment_at,
         place: r.appointment_place,
         jobLabel: r.job_label,
+        by: r.by_name ?? null,
       });
     }
     return out;

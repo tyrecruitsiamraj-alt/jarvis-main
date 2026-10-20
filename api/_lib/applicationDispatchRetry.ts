@@ -10,7 +10,7 @@
  * อุ่นสำเนาใบขอก่อนทุกรอบ ⇒ อ่านรายได้ทัน · ใบขอไม่มีรายได้จริง = ยังไม่ส่ง รอบหน้าลองใหม่ (ตั้งรายได้แล้วไปเอง)
  *
  * ใบที่หยิบ (ตรงกับเส้นกรอกเสร็จ):
- *   ผูกใบขอ · ไม่มีคนคีย์ (`created_by_name` ว่าง) · ไม่มีแถวในคิวโทร · ไม่ถูกยกเลิกข้อมูล · ไม่ติดป้ายซ้ำ iRecruit ·
+ *   ผูกใบขอ · ไม่มีคนคีย์ (`created_by_name` ว่าง) หรือคีย์/นำเข้าตั้งแต่ `KEYED_AUTO_SINCE` (ไม่ใช่ใบดึงจาก iRecruit) · ไม่มีแถวในคิวโทร · ไม่ถูกยกเลิกข้อมูล · ไม่ติดป้ายซ้ำ iRecruit ·
  *   อายุไม่เกิน · ไม่มีคนเก็บไปโทรเอง/เก็บ Lead · ไม่อยู่กองรอเลือกวิธีโทร (`unclaimed_at` — ของ callChoiceWorker) ·
  *   วิธีโทรว่างหรือเลือก AI · กรอกมาแล้ว ≥ 3 นาที (ไม่ชนเส้นกรอกเสร็จ) และไม่เกิน 7 วัน
  * 🔴 กรอกตั้งแต่ `RETRY_SINCE` เท่านั้น — 17 ใบที่หลุดก่อนหน้านี้ เจ้าของยังไม่สั่งส่ง (ข้อ 2) ห้ามโทรเงียบ ๆ
@@ -34,6 +34,13 @@ const IRECRUIT_DUPS = tableInAppSchema('application_irecruit_dups');
 
 /** เริ่มนับจากตอนแก้ขึ้นเว็บ — ใบก่อนหน้านี้รอเจ้าของสั่ง (ข้อ 2) */
 export const RETRY_SINCE = '2026-10-15T09:00:00+07:00';
+/**
+ * ใบที่เจ้าหน้าที่คีย์เอง/นำเข้า Excel แล้วผูกใบขอ ⇒ AI โทรเองเหมือนกรอกผ่านลิงก์ (เจ้าของ 20 ต.ค. 2569 Choice "AI โทรเองเฉพาะที่ผูกใบขอ")
+ * ใช้บทเสนองานของใบคีย์เดิม (`created_by_name` ส่งต่อ) · ใบที่ระบบดึงจาก iRecruit ยังให้คนกดส่ง (กัน iRecruit โทรซ้ำ)
+ * 🔴 นับเฉพาะใบที่คีย์ตั้งแต่เวลานี้ — ใบคีย์เก่าไม่ถูกโทรเงียบ ๆ
+ */
+export const KEYED_AUTO_SINCE = '2026-10-20T10:00:00+07:00';
+const IRECRUIT_PULL_CREATED_BY = 'iRecruit';
 const MIN_AGE_MINUTES = 3;
 const MAX_AGE_DAYS = 7;
 const LIMIT = 100;
@@ -50,15 +57,18 @@ export type RetryRow = {
   position_interest: string | null;
   age: number | null;
   created_at: Date | string | null;
+  created_by_name: string | null;
 };
 
-/** ใบที่ควรถูกส่งตอนกรอกแต่ยังไม่มีสาย — แยกออกมาให้เทสต์/ตรวจแบบอ่านอย่างเดียวได้ · $1 = RETRY_SINCE */
+/** ใบที่ควรถูกส่งตอนกรอกแต่ยังไม่มีสาย — แยกออกมาให้เทสต์/ตรวจแบบอ่านอย่างเดียวได้ · $1 = RETRY_SINCE · $2 = KEYED_AUTO_SINCE */
 export function unsentApplicationsSql(): string {
   return `
-    select a.id::text as id, a.full_name, a.phone, a.job_id, a.job_title, a.unit_name, a.position_interest, a.age, a.created_at
+    select a.id::text as id, a.full_name, a.phone, a.job_id, a.job_title, a.unit_name, a.position_interest, a.age, a.created_at,
+           a.created_by_name
     from ${APPS} a
     where a.job_id is not null
-      and a.created_by_name is null
+      and (a.created_by_name is null
+           or (a.created_by_name <> '${IRECRUIT_PULL_CREATED_BY}' and a.created_at >= $2::timestamptz))
       and a.phone is not null
       and a.created_at >= $1::timestamptz
       and a.created_at <= now() - interval '${MIN_AGE_MINUTES} minutes'
@@ -85,7 +95,7 @@ export type DispatchRetryRun = { found: number; queued: number; skipped: number;
 export async function runApplicationDispatchRetryOnce(): Promise<DispatchRetryRun> {
   const out: DispatchRetryRun = { found: 0, queued: 0, skipped: 0, reasons: {} };
   if (!isApplicationDispatchRetryEnabled()) return out;
-  const { rows } = await dbQuery<RetryRow>(unsentApplicationsSql(), [RETRY_SINCE]);
+  const { rows } = await dbQuery<RetryRow>(unsentApplicationsSql(), [RETRY_SINCE, KEYED_AUTO_SINCE]);
   if (rows.length === 0) return out;
   out.found = rows.length;
   // อุ่นสำเนาใบขอก่อน — ต้นเหตุเดิมคืออ่านรายได้ไม่ทันเพราะสำเนาเย็น
@@ -104,7 +114,8 @@ export async function runApplicationDispatchRetryOnce(): Promise<DispatchRetryRu
       if (send.length === 0) continue;
       const res = await enqueueLumosInterviewForApplications(
         jobId,
-        send.map((r) => ({ ...r, created_by_name: null })),
+        // กรอกผ่านลิงก์ = บทผู้สมัครผ่านลิงก์ · ใบคีย์/นำเข้า = บทเสนองาน (ส่งชื่อคนคีย์ต่อ)
+        send.map((r) => ({ ...r, created_by_name: r.created_by_name ?? null })),
         { autoPush: true },
       );
       out.queued += res.queued;

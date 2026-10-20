@@ -222,6 +222,10 @@ export function classifyCallMicro(
   // พูดแต่คำทักทาย/คำรับสั้น ๆ แล้วจบ ⇒ ยังไม่ได้ตอบคำถาม
   if (rawSummary === '' && GREETING_ONLY.test(reply.replace(/\s+/g, ' '))) return 'picked_silent';
 
+  // 🔴 Lumos ส่ง unresponsive (สายหลุด/ไม่ตอบให้จบ) = เชื่อ Lumos ห้ามอ่านคำพูดแล้วตัดสินเป็นสนใจ/ไม่สนใจ
+  //    (เจ้าของ 20 ต.ค. 2569 Choice "ยึดผลจาก Lumos" — เคสถามว่า "วันไหนสะดวก" แล้วสายหลุด ช่องคำตอบขึ้นสนใจ แต่กล่องอยู่ไม่รับสาย)
+  if (code === 'unresponsive') return 'talked_unclear';
+
   // AI บอกเองว่าฟังไม่ออก ⇒ จบตรงนี้ (อ่านฉบับเต็ม — คำนี้มักติดท่อนคำถาม)
   if (has(`${rawSummary} ${reply}`, UNCLEAR_WORDS)) return 'talked_unclear';
   if (has(text, vocab.no)) return 'said_no';
