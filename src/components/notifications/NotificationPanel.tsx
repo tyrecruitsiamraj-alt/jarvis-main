@@ -23,14 +23,20 @@ const fallbackType = { icon: Bell, color: 'text-muted-foreground bg-secondary' }
 const NotificationPanel: React.FC = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const navigate = useNavigate();
+  const [open, setOpen] = React.useState(false);
 
+  /**
+   * 🔴 ปิดแผงก่อนพาไป (20 ต.ค. 2569) — เดิมแผงค้างเปิด แล้วตอนป๊อปปลายทาง (เช่น ป๊อปประกาศจาก `?posting=`) เปิด
+   * แผงปิดตามแล้วคืนโฟกัสไปที่ปุ่มกระดิ่ง = "แตะนอกป๊อป" ⇒ ป๊อปปลายทางปิดทันที (เจอตอนกดแจ้งเตือน So Scraping บนเว็บจริง)
+   */
   const handleClick = (id: string, link?: string) => {
     markAsRead(id);
+    setOpen(false);
     if (link) navigate(link);
   };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {/* ปุ่มกระดิ่งใช้ Button ทรง icon — ขนาดเท่ากับปุ่มไอคอนอื่นบนแถบหัว (4 ก.ย. 2569) */}
         <Button
@@ -48,7 +54,13 @@ const NotificationPanel: React.FC = () => {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 md:w-96 p-0" align="end" sideOffset={8}>
+      <PopoverContent
+        className="w-80 md:w-96 p-0"
+        align="end"
+        sideOffset={8}
+        // ไม่คืนโฟกัสไปที่กระดิ่งตอนปิด — ไม่งั้นป๊อปที่เพิ่งเปิดจากลิงก์แจ้งเตือนจะนับว่าโดนแตะนอกกรอบแล้วปิด
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h3 className="font-medium text-sm text-foreground">การแจ้งเตือน</h3>
           {unreadCount > 0 && (

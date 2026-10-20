@@ -139,3 +139,12 @@ describe('ตามงานได้โดยไม่ต้องเปิด�
     expect(read('src/components/jobs/JobBoardView.tsx')).toContain("const jobId = searchParams.get('posting');");
   });
 });
+
+describe('กดแจ้งเตือนแล้วป๊อปใบนั้นต้องเปิดค้าง (เจอบนเว็บจริง 20 ต.ค. 2569)', () => {
+  it('แผงแจ้งเตือนปิดก่อนพาไป · ไม่คืนโฟกัสไปที่กระดิ่ง (ไม่งั้นป๊อปปลายทางนับว่าโดนแตะนอกกรอบแล้วปิด)', () => {
+    const panel = read('src/components/notifications/NotificationPanel.tsx');
+    expect(panel).toContain('<Popover open={open} onOpenChange={setOpen}>');
+    expect(panel).toContain('setOpen(false);\n    if (link) navigate(link);');
+    expect(panel).toContain('onCloseAutoFocus={(e) => e.preventDefault()}');
+  });
+});
