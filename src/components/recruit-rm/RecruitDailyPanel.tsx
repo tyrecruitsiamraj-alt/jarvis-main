@@ -9,8 +9,9 @@ import { CHART, DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import { fetchRecruitOverview } from '@/lib/recruitOverviewApi';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import {
-  RECRUIT_DAILY_KEYS,
+  RECRUIT_DAILY_ANSWERS,
   RECRUIT_DAILY_LABEL,
+  RECRUIT_DAILY_TOP,
   RECRUIT_DAILY_WINDOW_LABEL,
   addDaysYmd,
   recruitDailyRows,
@@ -22,31 +23,43 @@ import {
 
 /**
  * ═══ ตัวเลขรายวันงานสรรหา — พับได้บนแท็บผู้สมัคร (เจ้าของสั่ง 15 ต.ค. 2569) ═══
- * พับอยู่ = แถวเดียว "วันนี้ กรอกมา N · AI โทรแล้ว N · สนใจ N" · กดกาง = 5 กล่อง (วัน + เฉลี่ยต่อวัน) + กราฟแท่งรายวัน
+ * พับอยู่ = แถวเดียว "วันนี้ กรอกมา N · AI โทรแล้ว N · สนใจ N" · กดกาง = กล่องที่บวกกันลงตัว (วัน + เฉลี่ยต่อวัน) + กราฟแท่งรายวัน
+ * 🔴 20 ต.ค. 2569 เจ้าของ: *"กรอกมา 42 แต่แยกย่อยแล้วได้แค่ 22"* ⇒ แถวบน กรอกมา = ยังไม่โทร + AI โทรแล้ว ·
+ *    แถวล่าง AI โทรแล้ว = สนใจ + ไม่สนใจ + ไม่รับสาย + ยังไม่รู้ผล (มีเครื่องหมาย = + ให้เห็นบนจอ)
  * กดแท่ง = ดูวันนั้นในกล่อง · ตัวคิด `src/lib/recruitDaily.ts` · ข้อมูลชุดเดียวกับภาพรวมงานสรรหา (`/api/recruit-overview`)
  */
 
 const TONE_OF: Record<RecruitDailyKey, ToneKey> = {
   names: 'primary',
+  notCalled: 'neutral',
   aiCalled: 'info',
   saidYes: 'success',
   saidNo: 'danger',
   noPickup: 'warn',
+  aiOther: 'info',
 };
 const WINDOWS: readonly RecruitDailyWindow[] = ['7d', '30d', 'month'];
 const NUM = new Intl.NumberFormat('th-TH');
 const MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 const dayMonth = (ymd: string) => `${Number(ymd.slice(8, 10))} ${MONTHS[Number(ymd.slice(5, 7)) - 1]}`;
 
-/** กราฟซ้อน: สนใจ · ไม่สนใจ · ไม่รับสาย · ที่เหลือของกรอกมา (ยังไม่มีคำตอบ) — ความสูงรวม = กรอกมา */
+/** กราฟซ้อน: สนใจ · ไม่สนใจ · ไม่รับสาย · ยังไม่รู้ผล · ยังไม่โทร — ความสูงรวม = กรอกมา (ชุดเดียวกับกล่อง) */
 const chartRowOf = (r: RecruitDailyRow) => ({
   ymd: r.ymd,
   label: String(Number(r.ymd.slice(8, 10))),
   saidYes: r.saidYes,
   saidNo: r.saidNo,
   noPickup: r.noPickup,
-  rest: Math.max(0, r.names - r.saidYes - r.saidNo - r.noPickup),
+  aiOther: r.aiOther,
+  notCalled: r.notCalled,
 });
+
+/** เครื่องหมายระหว่างกล่อง — ให้เห็นว่าบวกกันได้เท่าไหร่ */
+const Sign: React.FC<{ children: string }> = ({ children }) => (
+  <span aria-hidden className={cn('self-center text-center text-lg font-medium', DASH.muted)}>
+    {children}
+  </span>
+);
 
 const RecruitDailyPanel: React.FC<{ refreshKey?: number }> = ({ refreshKey }) => {
   const [open, setOpen] = useState(false);
@@ -140,10 +153,10 @@ const RecruitDailyPanel: React.FC<{ refreshKey?: number }> = ({ refreshKey }) =>
             </p>
           ) : null}
 
-          {/* 5 กล่อง: วันที่เลือก + เฉลี่ยต่อวันของช่วง (ไม่นับวันนี้) */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {RECRUIT_DAILY_KEYS.map((k) => (
-              <div key={k} className="rounded-xl border border-border/70 px-3 py-2">
+          {/* กล่องที่บวกกันลงตัว: วันที่เลือก + เฉลี่ยต่อวันของช่วง (ไม่นับวันนี้) */}
+          {(() => {
+            const box = (k: RecruitDailyKey) => (
+              <div key={k} className="min-w-0 rounded-xl border border-border/70 px-3 py-2" data-testid={`recruit-daily-${k}`}>
                 <p className={cn('text-xs', DASH.muted)}>{RECRUIT_DAILY_LABEL[k]}</p>
                 {shownDay ? (
                   <p className={cn('text-2xl font-medium tabular-nums', TONE[TONE_OF[k]].value)}>{NUM.format(shownDay[k])}</p>
@@ -154,8 +167,26 @@ const RecruitDailyPanel: React.FC<{ refreshKey?: number }> = ({ refreshKey }) =>
                   เฉลี่ย {sum?.avg ? NUM.format(sum.avg[k]) : '—'}/วัน
                 </p>
               </div>
-            ))}
-          </div>
+            );
+            const [names, notCalled, aiCalled] = RECRUIT_DAILY_TOP;
+            return (
+              <div className="space-y-2">
+                <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] gap-2">
+                  {box(names)}
+                  <Sign>=</Sign>
+                  {box(notCalled)}
+                  <Sign>+</Sign>
+                  {box(aiCalled)}
+                </div>
+                <div className="space-y-1">
+                  <p className={cn('text-xs', DASH.muted)}>
+                    AI โทรแล้ว {shownDay ? NUM.format(shownDay.aiCalled) : '—'} แยกเป็น
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{RECRUIT_DAILY_ANSWERS.map(box)}</div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* กราฟรายวัน — ความสูง = กรอกมา · สีซ้อน = สนใจ/ไม่สนใจ/ไม่รับสาย · กดแท่ง = ดูวันนั้น */}
           <div className={cn('h-52 w-full', DASH.sub)} role="img" aria-label="กรอกมารายวัน">
@@ -185,7 +216,8 @@ const RecruitDailyPanel: React.FC<{ refreshKey?: number }> = ({ refreshKey }) =>
                   <Bar dataKey="saidYes" name="สนใจ" stackId="d" fill={TONE.success.hex} isAnimationActive={false} />
                   <Bar dataKey="saidNo" name="ไม่สนใจ" stackId="d" fill={TONE.danger.hex} isAnimationActive={false} />
                   <Bar dataKey="noPickup" name="ไม่รับสาย" stackId="d" fill={TONE.warn.hex} isAnimationActive={false} />
-                  <Bar dataKey="rest" name="ยังไม่มีคำตอบ" stackId="d" fill={TONE.neutral.hex} maxBarSize={24} isAnimationActive={false}>
+                  <Bar dataKey="aiOther" name="ยังไม่รู้ผล" stackId="d" fill={TONE.info.hex} isAnimationActive={false} />
+                  <Bar dataKey="notCalled" name="ยังไม่โทร" stackId="d" fill={TONE.neutral.hex} maxBarSize={24} isAnimationActive={false}>
                     {sum.chart.map((r) => (
                       <Cell key={r.ymd} fillOpacity={r.ymd === (picked ?? today) ? 1 : 0.55} />
                     ))}

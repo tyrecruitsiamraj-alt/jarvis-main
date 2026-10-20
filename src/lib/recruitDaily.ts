@@ -12,16 +12,27 @@
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import { appliedYmd } from '@/lib/recruitOverview';
 
-export type RecruitDailyKey = 'names' | 'aiCalled' | 'saidYes' | 'saidNo' | 'noPickup';
+/**
+ * 🔴 เลขต้องลงตัว (เจ้าของ 20 ต.ค. 2569: *"กรอกมา 42 แต่แยกย่อยแล้วได้แค่ 22 เอง"*)
+ *   กรอกมา = ยังไม่โทร + AI โทรแล้ว · AI โทรแล้ว = สนใจ + ไม่สนใจ + ไม่รับสาย + ยังไม่รู้ผล
+ *   (เดิมไม่มีช่อง "ยังไม่โทร" / "ยังไม่รู้ผล" ⇒ คนบวก 5 กล่องแล้วไม่เท่ากรอกมา)
+ */
+export type RecruitDailyKey = 'names' | 'notCalled' | 'aiCalled' | 'saidYes' | 'saidNo' | 'noPickup' | 'aiOther';
 
-export const RECRUIT_DAILY_KEYS: readonly RecruitDailyKey[] = ['names', 'aiCalled', 'saidYes', 'saidNo', 'noPickup'];
+export const RECRUIT_DAILY_KEYS: readonly RecruitDailyKey[] = ['names', 'notCalled', 'aiCalled', 'saidYes', 'saidNo', 'noPickup', 'aiOther'];
+/** แถวบน: กรอกมา = ยังไม่โทร + AI โทรแล้ว */
+export const RECRUIT_DAILY_TOP: readonly RecruitDailyKey[] = ['names', 'notCalled', 'aiCalled'];
+/** แถวล่าง: AI โทรแล้ว แยกตามคำตอบ */
+export const RECRUIT_DAILY_ANSWERS: readonly RecruitDailyKey[] = ['saidYes', 'saidNo', 'noPickup', 'aiOther'];
 
 export const RECRUIT_DAILY_LABEL: Record<RecruitDailyKey, string> = {
   names: 'กรอกมา',
+  notCalled: 'ยังไม่โทร',
   aiCalled: 'AI โทรแล้ว',
   saidYes: 'สนใจ',
   saidNo: 'ไม่สนใจ',
   noPickup: 'ไม่รับสาย',
+  aiOther: 'ยังไม่รู้ผล',
 };
 
 export type RecruitDailyRow = { ymd: string } & Record<RecruitDailyKey, number>;
@@ -38,21 +49,35 @@ const DAY_MS = 86_400_000;
 export const addDaysYmd = (ymd: string, n: number) =>
   new Date(Date.parse(`${ymd}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
 
+const emptyRow = (ymd: string): RecruitDailyRow => ({
+  ymd,
+  names: 0,
+  notCalled: 0,
+  aiCalled: 0,
+  saidYes: 0,
+  saidNo: 0,
+  noPickup: 0,
+  aiOther: 0,
+});
+
 /** ทุกวันใน [from, to] — วันที่ไม่มีใคร = แถว 0 (กราฟไม่ขาดช่วง) */
 export function recruitDailyRows(apps: readonly RecruitAppFact[], from: string, to: string): RecruitDailyRow[] {
   const rows = new Map<string, RecruitDailyRow>();
   for (let d = from; d <= to && rows.size < 62; d = addDaysYmd(d, 1)) {
-    rows.set(d, { ymd: d, names: 0, aiCalled: 0, saidYes: 0, saidNo: 0, noPickup: 0 });
+    rows.set(d, emptyRow(d));
   }
   for (const f of apps) {
     const r = rows.get(appliedYmd(f) ?? '');
     if (!r) continue;
     r.names += 1;
-    if (f.calledByAi) r.aiCalled += 1;
+    // มีคำตอบ = โทรแล้วแน่ ๆ (กันเลขติดลบเมื่อธงโทรกับคำตอบมาไม่พร้อมกัน)
     if (f.aiAnswer === 'said_yes') r.saidYes += 1;
     else if (f.aiAnswer === 'said_no') r.saidNo += 1;
     else if (f.aiAnswer === 'no_pickup') r.noPickup += 1;
+    else if (f.calledByAi) r.aiOther += 1;
+    else r.notCalled += 1;
   }
+  for (const r of rows.values()) r.aiCalled = r.saidYes + r.saidNo + r.noPickup + r.aiOther;
   return [...rows.values()];
 }
 
@@ -82,8 +107,7 @@ export function recruitDailySummary(
   const windowFrom = recruitDailyWindowFrom(win, today);
   const from = firstDay && firstDay > windowFrom ? firstDay : windowFrom;
   const past = rows.filter((r) => r.ymd >= from && r.ymd < today);
-  const todayRow =
-    rows.find((r) => r.ymd === today) ?? { ymd: today, names: 0, aiCalled: 0, saidYes: 0, saidNo: 0, noPickup: 0 };
+  const todayRow = rows.find((r) => r.ymd === today) ?? emptyRow(today);
   const avg =
     past.length === 0
       ? null

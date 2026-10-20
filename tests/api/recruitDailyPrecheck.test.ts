@@ -29,6 +29,28 @@ describe('ตัวเลขรายวัน (นับตามวันท�
     for (const r of rows) expect(r.saidYes + r.saidNo + r.noPickup).toBeLessThanOrEqual(r.names);
   });
 
+  it('🔴 เลขลงตัว (เจ้าของ 20 ต.ค. 2569 "กรอกมา 42 แต่แยกย่อยแล้วได้แค่ 22"): กรอกมา = ยังไม่โทร + AI โทรแล้ว · AI โทรแล้ว = 4 คำตอบ', () => {
+    const more = recruitDailyRows(
+      [
+        ...apps,
+        fact('2026-10-15T05:00:00Z', { calledByAi: true, aiAnswer: null }),
+        // คำตอบมาก่อนธงโทร — ยังนับเป็นโทรแล้ว ไม่ติดลบ
+        fact('2026-10-15T06:00:00Z', { calledByAi: false, aiAnswer: 'said_yes' }),
+      ],
+      '2026-10-12',
+      '2026-10-15',
+    );
+    const d = more.find((r) => r.ymd === '2026-10-15')!;
+    expect(d).toMatchObject({ names: 5, notCalled: 1, aiCalled: 4, saidYes: 2, noPickup: 1, aiOther: 1 });
+    for (const r of more) {
+      expect(r.notCalled + r.aiCalled).toBe(r.names);
+      expect(r.saidYes + r.saidNo + r.noPickup + r.aiOther).toBe(r.aiCalled);
+    }
+    const panel = readFileSync('src/components/recruit-rm/RecruitDailyPanel.tsx', 'utf8');
+    expect(panel).toContain('<Sign>=</Sign>');
+    expect(panel).toContain('<Bar dataKey="notCalled" name="ยังไม่โทร"');
+  });
+
   it('เฉลี่ยไม่นับวันนี้ · ไม่นับวันก่อนมีใบแรก', () => {
     const s = recruitDailySummary(rows, '2026-10-15', '7d');
     expect(s.today.names).toBe(3);
