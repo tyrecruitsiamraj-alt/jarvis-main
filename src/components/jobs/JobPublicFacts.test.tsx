@@ -176,3 +176,17 @@ describe('ยอดสวัสดิการบนการ์ด (เจ้�
     expect(teamBenefitAmounts({ income_display: { period: 'daily', total: 500, lines: [{ label: 'ค่าเดินทาง', amount: 100 }] } } as never)).toEqual([]);
   });
 });
+
+describe('เบอร์เจ้าหน้าที่สรรหาบนการ์ด (เจ้าของ 20 ต.ค. 2569 "ไหนเบอร์โทรเจ้าหน้าที่สรรหา")', () => {
+  it('มีเบอร์ = บรรทัดติดต่อทั้งสองฝั่ง · ไม่มีเบอร์ = ฝั่งเจ้าหน้าที่เตือน ฝั่งผู้สมัครไม่มีบรรทัด', () => {
+    render(<JobPublicFacts job={JOB} staff contact={{ name: 'เล็ก', phone: '081-234-5678' }} />);
+    expect(screen.getByTestId('job-public-contact').textContent).toContain('081-234-5678');
+    cleanup();
+    render(<JobPublicFacts job={JOB} staff />);
+    expect(screen.getByTestId('job-public-contact-missing').textContent).toBe('ยังไม่มีเบอร์เจ้าหน้าที่สรรหา');
+    cleanup();
+    render(<JobPublicFacts job={JOB} />);
+    expect(screen.queryByTestId('job-public-contact-missing')).toBeNull();
+    expect(screen.queryByTestId('job-public-contact')).toBeNull();
+  });
+});

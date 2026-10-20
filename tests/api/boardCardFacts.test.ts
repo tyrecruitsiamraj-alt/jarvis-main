@@ -42,7 +42,7 @@ describe('ชื่อหน่วยงาน', () => {
   /** 5 ต.ค. 2569: ข้อมูลงานย้ายไป `JobPublicFacts` ตัวเดียวกับหน้า /apply · ชื่อคู่สัญญาถอดจากการ์ด (หน้า /apply ไม่มี) */
   it('การ์ดใช้ส่วนข้อมูลตัวเดียวกับหน้า /apply · ส่วนนั้นใช้ตัวกลางครบ', () => {
     const card = readFileSync('src/components/jobs/BoardJobCard.tsx', 'utf8');
-    expect(card).toContain('<JobPublicFacts job={job} staff />');
+    expect(card).toContain('<JobPublicFacts job={job} staff contact={contact} />');
     expect(card).not.toContain('boardCardUnitName(job)');
     const facts = readFileSync('src/components/jobs/JobPublicFacts.tsx', 'utf8');
     for (const f of ['boardCardPlace(job)', 'boardCardAge(job)', 'boardCardGender(job)', 'jobIncomeLine(job)', 'jobAverageIncome(job)']) {

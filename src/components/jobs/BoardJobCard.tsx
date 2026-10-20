@@ -10,6 +10,7 @@ import type { JobRequest } from '@/types';
 import { jobBoardCardTitle, publicJobCardSubtitle } from '@/lib/unitRequestDisplay';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import JobPublicFacts from '@/components/jobs/JobPublicFacts';
+import { useRecruiterContact } from '@/hooks/useRecruiterContact';
 import { getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import PublishReadinessChip from '@/components/jobs/PublishReadinessChip';
 import { readinessActionText, type PublishReadiness } from '@/lib/publishReadiness';
@@ -59,6 +60,8 @@ export type BoardJobCardProps = {
 
 /** "บางพลี สมุทรปราการ" — อำเภอที่ทีม Online กรอก + จังหวัด · ไม่รู้ = บอกตรง ๆ (ไม่เดาจากจังหวัดไซต์) */
 const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip, onImport }) => {
+  // เบอร์เจ้าหน้าที่สรรหาบรรทัดเดียวกับหน้า /apply (เจ้าของ 20 ต.ค. 2569 "ไหนเบอร์โทรเจ้าหน้าที่สรรหา")
+  const contact = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
   const age = getJobAgeChipInfo(job);
   const subtitle = publicJobCardSubtitle(job);
   const hidden = isUnitRequestWorkStatus(job.work_status) && isHiddenFromPublicByWorkStatus(job.work_status);
@@ -108,7 +111,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
 
       {/* ── ข้อมูลงาน: ตัวเดียวกับการ์ดหน้า /apply (`JobPublicFacts`) — ติ๊กซ่อนในขั้น 3 แล้วที่นี่ก็หายด้วย
           (เจ้าของ 5 ต.ค. 2569: *"ไม่งั้นจะเช็คยังไงหล่ะว่าถูกต้องหรือเปล่า"*) ── */}
-      <JobPublicFacts job={job} staff />
+      <JobPublicFacts job={job} staff contact={contact} />
 
       {/* หมายเหตุใบขอ (เจ้าของ 7 ต.ค. 2569: *"หมายเหตุ เอามาโชว์ที่หน้า โพสต์ประกาศ ของแต่ละงานด้วย"*) —
           `list_note` ช่องเดียวกับหน้าใบขอ · การ์ดนี้เจ้าหน้าที่เห็นคนเดียว ไม่ขึ้นหน้า /apply */}
