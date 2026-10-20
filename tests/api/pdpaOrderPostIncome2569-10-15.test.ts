@@ -58,7 +58,9 @@ describe('สั่งโพสต์ — ผ่านศูนย์งาน a
     expect(btn).toContain('soPostSnapshot(composeJobSnapshot(job), { mode, caption, groupIds: picked })');
     expect(btn).toContain('disabled={latest === null || Boolean(contentView?.open)}');
     expect(btn).toContain(': soScrapSnapshot(job),');
-    expect(read('src/pages/matching/MatchingPage.tsx')).not.toContain("createPosting(jobDetail, 'scraping')");
+    // 20 ต.ค. 2569 Choice "เอาออก สั่งจากป๊อปประกาศที่เดียว" — ทั้งปุ่ม Content และ Scraping ในจับคู่งาน
+    expect(read('src/pages/matching/MatchingPage.tsx')).not.toContain('createPosting(');
+    expect(read('src/pages/matching/MatchingPage.tsx')).not.toContain('ให้สร้าง Content');
     expect(read('src/pages/matching/MatchingPage.tsx')).not.toContain('const composeJobSnapshot =');
   });
 });

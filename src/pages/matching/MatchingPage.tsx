@@ -90,7 +90,7 @@ import {
    ยังอยู่ครบใน callHoldsApi.ts และยังถูกใช้ที่ถัง "ต้องคนตาม" ในแถบการไหลของงาน */
 import { acquireCallHold, fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { partitionHoldTargets, summarizeAcquireResults, type HoldTarget } from '@/lib/callHoldsBulk';
-import { CheckCircle2, Megaphone, X, PhoneCall, PhoneForwarded, UserCheck, UserX, SlidersHorizontal } from 'lucide-react';
+import { CheckCircle2, X, PhoneCall, PhoneForwarded, UserCheck, UserX, SlidersHorizontal } from 'lucide-react';
 import { cancelCallBatch, createCallBatch } from '@/lib/callBatchApi';
 import { CALL_BATCH_UNDO_MINUTES, type CallBatch } from '@/lib/callBatch';
 import ContactHistoryStrip from '@/components/matching/ContactHistoryStrip';
@@ -126,12 +126,9 @@ import {
 } from '@/lib/irecruitMatchTypes';
 import {
   listActiveJobPostingsForJob,
-  composeJobSnapshot,
-  createJobPostingRequest,
   jobPostingStatusChip,
   jobPostingStatusLabel,
   type JobPostingRequest,
-  type JobPostingRequestType,
 } from '@/lib/jobPostingRequestsApi';
 import { buildErpBranchDemandInput, parseErpBranchDemand } from '@/lib/erpBranchDemandParser';
 import {
@@ -885,8 +882,6 @@ const MatchingPage: React.FC = () => {
   const [jobPostingByJobId, setJobPostingByJobId] = useState<Record<string, JobPostingRequest>>({});
   /** คำขอ active ทุกประเภทต่อใบ — ใบเดียวมีได้ทั้ง Content และ Scraping (migration 080) */
   const [jobPostingsByJobId, setJobPostingsByJobId] = useState<Record<string, JobPostingRequest[]>>({});
-  const [creatingPosting, setCreatingPosting] = useState(false);
-  const [postingError, setPostingError] = useState<string | null>(null);
   // ยืนยันก่อน "ค้นหาใหม่" (Rematching) — กันกดโดนแล้วสั่งคิดใหม่ทับผลเดิมโดยไม่ตั้งใจ
   const [rematchConfirmJobId, setRematchConfirmJobId] = useState<string | null>(null);
   /**
@@ -1538,7 +1533,6 @@ const MatchingPage: React.FC = () => {
     setJobDetail({ ...j, ...(localJobEditsById[j.id] || {}) });
     setShowDistantCandidates(true);
     setProposeError(null);
-    setPostingError(null);
     // Lumos: เริ่มใหม่ทุกครั้งที่เปิดใบขอ (การเลือกผูกกับใบขอที่เปิดอยู่ใบเดียว)
     clearLumosSelection();
     setLumosStatusByRef({});
@@ -1703,38 +1697,6 @@ const MatchingPage: React.FC = () => {
       setProposeError(friendlyErrorText(e, 'ยกเลิกไม่สำเร็จ'));
     } finally {
       setResolvingConflict(false);
-    }
-  };
-
-  // #1 สร้างคำขอโพสหางานใหม่ (สร้าง ID ให้ทีมคอนเทนต์/สรรหารับไปทำต่อ)
-  const composePostingReason = (job: JobRequest): string => {
-    const bm = boardMatchById[job.id];
-    const recommended = recommendedCandidateCount(bm?.matches);
-    if (!bm || recommended === 0) return 'ไม่มีคนของเราที่สกิลตรงกับใบขอนี้';
-    return `มีคนของเราเข้าข่าย ${recommended} คน (จาก pool ${bm.pool_size}) แต่ยังไม่โอเค/ไม่เพียงพอ`;
-  };
-
-  const createPosting = async (job: JobRequest, requestType: JobPostingRequestType) => {
-    setCreatingPosting(true);
-    setPostingError(null);
-    try {
-      const item = await createJobPostingRequest({
-        jobId: job.id,
-        requestNo: job.request_no,
-        reason: composePostingReason(job),
-        requestType,
-        jobSnapshot: composeJobSnapshot(job),
-      });
-      setJobPostingByJobId((prev) => ({ ...prev, [job.id]: item }));
-      // เก็บรายประเภทด้วย — ปุ่มอีกทางต้องยังกดได้ ปุ่มที่เพิ่งส่งต้องหายทันที
-      setJobPostingsByJobId((prev) => {
-        const list = prev[job.id] ?? [];
-        return { ...prev, [job.id]: [item, ...list.filter((p) => p.id !== item.id)] };
-      });
-    } catch (e) {
-      setPostingError(friendlyErrorText(e, 'สร้างคำขอไม่สำเร็จ'));
-    } finally {
-      setCreatingPosting(false);
     }
   };
 
@@ -3600,7 +3562,7 @@ const MatchingPage: React.FC = () => {
                   และมีปุ่มส่งคำขอโพสคนละชุดจนไม่รู้ว่าอันไหนใช้ทำอะไร */}
               {boardMatchById[jobDetail.id] ? (
                 <Card className="space-y-3 rounded-2xl p-4">
-                  <h3 className="text-sm font-medium text-foreground">หาคนไม่พอ ส่งต่อทีมอื่น</h3>
+                  <h3 className="text-sm font-medium text-foreground">หาคนไม่พอ</h3>
 
                   {/* สรุปว่าตอนนี้ได้เท่าไหร่จากเป้า — รายละเอียดพับเก็บ */}
                   {(() => {
@@ -3631,7 +3593,6 @@ const MatchingPage: React.FC = () => {
                       (ไม่มีหน้าให้เปลี่ยนสถานะแล้ว — เจ้าของรับทราบว่าคำขอจะค้าง "รอดำเนินการ") */}
                   {(() => {
                     const active = jobPostingsByJobId[jobDetail.id] ?? [];
-                    const sentContent = active.some((x) => x.request_type !== 'scraping');
                     return (
                       <>
                         {active.length > 0 ? (
@@ -3654,28 +3615,11 @@ const MatchingPage: React.FC = () => {
                             ))}
                           </div>
                         ) : null}
-                        {/* 🔴 ขอ Scrap ย้ายไปป๊อปประกาศที่เดียว (เจ้าของ 20 ต.ค. 2569 "ย้ายมาไว้หน้านี้เท่านั้นสั่งจากหน้าเดียวพอ") */}
-                        {!sentContent ? (
-                          <div className="flex flex-wrap items-center gap-2">
-                            {active.length > 0 ? (
-                              <span className="text-xs text-muted-foreground">ส่งเพิ่มได้</span>
-                            ) : null}
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={creatingPosting}
-                              onClick={() => void createPosting(jobDetail, 'content')}
-                            >
-                              <Megaphone aria-hidden />
-                              {creatingPosting ? 'กำลังสร้าง…' : 'ให้สร้าง Content'}
-                            </Button>
-                          </div>
-                        ) : null}
+                        {/* 🔴 สั่งโพสต์ + ขอ Scrap ย้ายไปป๊อปประกาศที่เดียว (เจ้าของ 20 ต.ค. 2569 Choice
+                            "เอาออก สั่งจากป๊อปประกาศที่เดียว") — ที่นี่เหลือแค่สถานะของคำขอที่ส่งไปแล้ว */}
                       </>
                     );
                   })()}
-                  {postingError ? <p className="text-xs text-destructive">{postingError}</p> : null}
                 </Card>
               ) : null}
 
