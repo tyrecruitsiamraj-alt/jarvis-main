@@ -51,7 +51,9 @@ describe('แก้ตาราง: หมายเหตุรายสาย (
     const src = read('api/_handlers/follow.ts');
     expect(src).toContain('const slotRound = replaceSlotRoundOfRef(byId.get(r.id)?.source_ref);');
     expect(src).toContain('const keepNote = anchor.follow_team === FOLLOW_TEAM_REPLACEMENT;');
-    expect(src).toContain("note = ${keepNote ? 'note' : '$4'}");
+    // 🔴 เดิมตัด $4 ออกจาก SQL แต่ยังส่งค่า ⇒ Postgres 500 (เจอตอนทดสอบผ่านหน้าจอจริง 20 ต.ค. 2569)
+    expect(src).toContain('note = case when $10::boolean then note else $4::text end');
+    expect(src).toContain('phone, ...actor, keepNote],');
   });
 });
 

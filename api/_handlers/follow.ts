@@ -1655,12 +1655,13 @@ async function updateFollowSet(req: AuthedReq, res: ApiRes, body: Record<string,
   const keepNote = anchor.follow_team === FOLLOW_TEAM_REPLACEMENT;
   const { rows: updated } = await dbQuery<FollowRow>(
     `update ${followTable}
-        set recipient_name = $2, topic = $3, note = ${keepNote ? 'note' : '$4'}, unit_name = $5, site_code = $6,
+        set recipient_name = $2, topic = $3, note = case when $10::boolean then note else $4::text end, unit_name = $5, site_code = $6,
             recipient_phone = case when scheduled_at > now() then $7 else recipient_phone end,
             updated_at = now(), updated_by = $8, updated_by_name = $9
       where ${setWhere} and cancelled_at is null and completed_at is null
       returning *`,
-    [setKey, name, topic, cut(body.note, 2000), cut(body.unit_name, 300), cut(body.site_code, 40), phone, ...actor],
+    // 🔴 ทุก $n ต้องอยู่ใน SQL — ตัดทิ้งจาก SQL แต่ยังส่งค่า = Postgres ตอบ 500 (เจอบนเว็บจริง 20 ต.ค. 2569)
+    [setKey, name, topic, cut(body.note, 2000), cut(body.unit_name, 300), cut(body.site_code, 40), phone, ...actor, keepNote],
   );
   if (updated.length === 0) return sendError(res, 409, 'Conflict', 'สายของชุดนี้ปิดหรือยกเลิกไปหมดแล้ว');
   try {
