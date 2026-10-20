@@ -508,7 +508,8 @@ describe('🔴 ส่งคนแทน 7 ต.ค. 2569 รอบบ่าย (�
     expect(replaceAdderLabel({ adder_email: null, adder_name: ' สมชาย ใจดี ' })).toBe('สมชาย ใจดี');
     expect(replaceAdderLabel({ adder_email: '', adder_name: '' })).toBeNull();
     const src = readFileSync(new URL('../../api/_lib/irecruitReplaceSync.ts', import.meta.url), 'utf8');
-    expect(src).toContain("where f.source_ref = v.ref and f.created_by_name like 'ดึงจาก iRecruit%'");
+    // 20 ต.ค. 2569: แถวที่ขึ้นแค่ชื่อ (ไม่มีอีเมล) ก็เติมอีเมลให้ด้วย
+    expect(src).toContain("and (f.created_by_name like 'ดึงจาก iRecruit%' or f.created_by_name not like '%@%')");
   });
   it('แก้เวลาสายคอนเฟิร์มที่โทรแล้ว ไม่ส่งโทรใหม่ · ตั้งเวลาโทรผ่าน API ค่าเพี้ยน = 400', () => {
     const h = readFileSync(new URL('../../api/_handlers/follow.ts', import.meta.url), 'utf8');
@@ -778,5 +779,20 @@ describe('รายชื่อ AI โทร สลับสายที่เ�
     expect(q).not.toContain('updated_by is null');
     expect(q).toContain("staff_call_outcome is null");
     expect(q).toContain("call_mode = 'manual' and coalesce(time_tbd, false) = false");
+  });
+});
+
+describe('คนเพิ่มแผน + เบอร์ฉุกเฉิน (เจ้าของ 20 ต.ค. 2569 "ทำไมเจอแค่ nusara")', () => {
+  it('อีเมลมาจาก admins ด้วย (เจ้าหน้าที่หลังบ้านไม่อยู่ users) · เบอร์ฉุกเฉิน = เบอร์คนเพิ่มแผนจากหน้าผู้ใช้งาน', async () => {
+    const src = readFileSync('api/_lib/irecruitReplaceSync.ts', 'utf8');
+    expect(src).toContain('FROM admins a WHERE a.staff_id = h.user_add');
+    expect(src).toContain('COALESCE(ua.email, ad.email) AS adder_email');
+    expect(src).toContain("emergency: listed?.emergency ?? adderPhones.get(");
+    // สายเดิม: เติมเฉพาะที่ยังว่าง ไม่ทับเบอร์ที่ตั้งไว้
+    expect(src).toContain("coalesce(btrim(f.staff_phone), '') = ''");
+    const { localThaiPhoneOf } = await import('../../api/_lib/irecruitReplaceSync');
+    expect(localThaiPhoneOf('+66612345678')).toBe('0612345678');
+    expect(localThaiPhoneOf('061-234-5678')).toBe('0612345678');
+    expect(localThaiPhoneOf('')).toBeNull();
   });
 });

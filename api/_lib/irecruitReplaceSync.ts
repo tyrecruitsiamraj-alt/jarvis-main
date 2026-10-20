@@ -107,6 +107,36 @@ export function replaceAdderLabel(r: Pick<IrecruitReplaceRow, 'adder_email' | 'a
   return name || null;
 }
 
+/** +66XXXXXXXXX → 0XXXXXXXXX (รูปเดียวกับ staff_phone ของงานติดตาม) */
+export function localThaiPhoneOf(raw: string | null | undefined): string | null {
+  const e164 = toE164Thai(raw ?? '');
+  return e164 ? `0${e164.slice(3)}` : null;
+}
+
+/**
+ * เบอร์ฉุกเฉิน = เบอร์ของคนเพิ่มแผนใน iRecruit จากหน้าผู้ใช้งาน (จับด้วยอีเมล · เจ้าของ 20 ต.ค. 2569
+ * "ถ้าดึงมาจะได้ match ชื่อเบอร์ฉุกเฉินเข้าไปเลย") · อ่านไม่ได้ = Map ว่าง (สายยังสร้างได้ตามเดิม)
+ */
+async function loadAdderPhones(emails: ReadonlyArray<string | null | undefined>): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const keys = [...new Set(emails.map((e) => (e ?? '').trim().toLowerCase()).filter((e) => e.includes('@')))];
+  if (keys.length === 0) return out;
+  try {
+    const { rows } = await dbQuery<{ e: string; phone: string | null }>(
+      `select lower(btrim(email)) as e, phone from ${tableInAppSchema('users')}
+        where lower(btrim(email)) = any($1::text[]) and coalesce(btrim(phone), '') <> ''`,
+      [keys],
+    );
+    for (const r of rows) {
+      const local = localThaiPhoneOf(r.phone);
+      if (local) out.set(r.e, local);
+    }
+  } catch (e) {
+    logWarn('irecruit.replaceSync: อ่านเบอร์คนเพิ่มแผนไม่สำเร็จ', { error: errorSummaryText(e) });
+  }
+  return out;
+}
+
 function shiftYmd(ymd: string, days: number): string {
   const d = new Date(`${ymd}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
@@ -147,10 +177,12 @@ export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): 
     `SELECT h.job_id, h.replace_no, z.fname, z.lname, z.mobile,
             CASE WHEN wl.staff_id IS NOT NULL THEN 'WL' ELSE 'EX' END AS replace_type,
             s.site_name, h.site_code, h.want_date,
-            ua.email AS adder_email, hs.nm AS adder_name
+            COALESCE(ua.email, ad.email) AS adder_email, COALESCE(hs.nm, ad.name) AS adder_name
        FROM ir_job_header h
        -- คนที่เพิ่มใบใน iRecruit (7 ต.ค. 2569 เจ้าของ "ดึงเมล์คนเพิ่มแผนมาด้วย") — users.staff_id = เลขบัตรใน user_add
        OUTER APPLY (SELECT TOP 1 u.email FROM users u WHERE u.staff_id = h.user_add) ua
+       -- 🔴 เจ้าหน้าที่หลังบ้านอยู่ตาราง admins ไม่ใช่ users (20 ต.ค. 2569 — เดิมเห็นแค่ชื่อนุศรา · 1,010 ใบของพลอยขึ้น "ดึงจาก iRecruit")
+       OUTER APPLY (SELECT TOP 1 LTRIM(RTRIM(a.email)) AS email, LTRIM(RTRIM(a.name)) AS name FROM admins a WHERE a.staff_id = h.user_add) ad
        OUTER APPLY (
          SELECT TOP 1 LTRIM(RTRIM(CONCAT(LTRIM(RTRIM(st.fname)), N' ', LTRIM(RTRIM(st.lname))))) AS nm FROM hr_staff st WHERE st.staff_id = h.user_add
        ) hs
@@ -425,6 +457,7 @@ async function runIrecruitReplaceSyncUnlocked(
       return summary;
     }
     summary.fetched = rows.length;
+    const adderPhones = await loadAdderPhones(rows.map((r) => r.adder_email));
 
     // ── สายที่ iRecruit ต้องการตอนนี้ ──
     const desired: DesiredMeta[] = [];
@@ -465,7 +498,8 @@ async function runIrecruitReplaceSyncUnlocked(
           siteCode: r.site_code?.trim() || null,
           // สายที่เลยเวลาแล้ว = คนโทร (AI ไม่โทรย้อนหลัง)
           mode: p.past ? 'manual' : typeMode,
-          emergency: listed?.emergency ?? null,
+          // รายชื่อให้ AI โทรตั้งเบอร์ไว้ = ใช้ก่อน · ไม่มี = เบอร์คนเพิ่มแผน (หน้าผู้ใช้งาน)
+          emergency: listed?.emergency ?? adderPhones.get((r.adder_email ?? '').trim().toLowerCase()) ?? null,
           replaceType: (r.replace_type ?? '').trim() || null,
         });
       }
@@ -660,11 +694,29 @@ async function runIrecruitReplaceSyncUnlocked(
         await dbQuery(
           `update ${followTable} f set created_by_name = v.adder
              from unnest($1::text[], $2::text[]) as v(ref, adder)
-            where f.source_ref = v.ref and f.created_by_name like 'ดึงจาก iRecruit%'`,
+            where f.source_ref = v.ref
+              and (f.created_by_name like 'ดึงจาก iRecruit%' or f.created_by_name not like '%@%')
+              and f.created_by_name is distinct from v.adder`,
           [adderRefs.map((a) => a[0]), adderRefs.map((a) => a[1])],
         );
       } catch (e) {
         logWarn('irecruit.replaceSync: เติมคนเพิ่มใบไม่สำเร็จ', { error: errorSummaryText(e) });
+      }
+    }
+    // เบอร์ฉุกเฉินของสายเดิมที่ยังว่าง (20 ต.ค. 2569) — เติมในฐานเท่านั้น ไม่แตะเบอร์ที่มีอยู่แล้ว
+    // ⚠️ แผนที่ส่ง Lumos ไปแล้วยังถือของเดิม จนกว่าจะส่งแผนใหม่
+    const emRefs = desired.filter((d) => d.emergency).map((d) => [d.ref, d.emergency as string] as const);
+    if (emRefs.length > 0) {
+      try {
+        await dbQuery(
+          `update ${followTable} f set staff_phone = v.phone
+             from unnest($1::text[], $2::text[]) as v(ref, phone)
+            where f.source_ref = v.ref and coalesce(btrim(f.staff_phone), '') = ''
+              and f.completed_at is null and f.cancelled_at is null`,
+          [emRefs.map((a) => a[0]), emRefs.map((a) => a[1])],
+        );
+      } catch (e) {
+        logWarn('irecruit.replaceSync: เติมเบอร์ฉุกเฉินไม่สำเร็จ', { error: errorSummaryText(e) });
       }
     }
 
