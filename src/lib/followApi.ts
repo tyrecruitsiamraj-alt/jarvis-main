@@ -344,7 +344,10 @@ export type FollowScheduleReplaceResult = {
  */
 export async function replaceFollowSchedule(
   anchorId: string,
-  body: { replace_ids: string[]; rounds: Array<{ id?: string; scheduled_at: string; call_mode: 'ai' | 'manual' }> },
+  body: {
+    replace_ids: string[];
+    rounds: Array<{ id?: string; scheduled_at: string; call_mode: 'ai' | 'manual'; staff_phone?: string | null }>;
+  },
 ): Promise<FollowScheduleReplaceResult> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(anchorId)}`, {
     method: 'PATCH',
@@ -352,6 +355,35 @@ export async function replaceFollowSchedule(
   });
   if (!r.ok) throw new Error(await readError(r));
   return (await r.json()) as FollowScheduleReplaceResult;
+}
+
+/**
+ * แก้ข้อมูลคนทั้งชุด (ป๊อปแก้ไข 4 หน้า · เจ้าของ 20 ต.ค. 2569 Choice "ทั้งชุดของคนนั้น")
+ * `replan: false` = จะแก้ตารางต่อ (เส้นแก้ตารางส่งแผนใหม่ให้ Lumos เอง)
+ */
+export async function updateFollowSet(
+  anchorId: string,
+  body: {
+    recipient_name: string;
+    recipient_phone: string;
+    topic: string;
+    note?: string;
+    unit_name?: string;
+    site_code?: string;
+    start_date?: string;
+    insurance_type?: string;
+    customer_name?: string;
+    customer_contact?: string;
+    customer_phone?: string;
+    replan?: boolean;
+  },
+): Promise<{ updated: number; lumos: { pushed: boolean; reason: string | null } }> {
+  const r = await apiFetch(`/api/follow?id=${encodeURIComponent(anchorId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'update_set', ...body }),
+  });
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as { updated: number; lumos: { pushed: boolean; reason: string | null } };
 }
 
 /**

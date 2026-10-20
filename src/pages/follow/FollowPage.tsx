@@ -60,7 +60,10 @@ import {
   type FollowEntry,
   type FollowStopScope,
   updateFollowEntry,
+  updateFollowSet,
+  replaceFollowSchedule,
 } from '@/lib/followApi';
+import { followSetRows, isEditableFollowRound, isoToBangkokInput } from '@/lib/followScheduleEdit';
 import type { FollowStaffCallOutcome } from '@/lib/followStaffCall';
 import { summarizeDispatchResults } from '@/lib/followDispatchState';
 import { ErpPersonPickerBody } from '@/components/follow/ErpPersonPicker';
@@ -114,7 +117,7 @@ import type { JobRequest } from '@/types';
 import FollowEditDialog from '@/components/follow/FollowEditDialog';
 import RoundScriptNote from '@/components/follow/RoundScriptNote';
 import StaffContactField from '@/components/follow/StaffContactField';
-import { STAFF_PHONE_SAME_WARNING, staffPhoneAckKey, staffPhoneMatchesApplicant } from '@/lib/followPhoneGuard';
+import { STAFF_PHONE_SAME_WARNING, localPhoneDigits, staffPhoneAckKey, staffPhoneMatchesApplicant } from '@/lib/followPhoneGuard';
 import TopicField from '@/components/follow/TopicField';
 import FollowMasterManagerDialog from '@/components/follow/FollowMasterManagerDialog';
 import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
@@ -318,6 +321,13 @@ const FollowPage: React.FC = () => {
    * 🔴 ขยับคู่กับ `scheduledAts` เสมอ (กับดักเดียวกับอาร์เรย์เบอร์/เลขสาย) · ค่าเริ่ม = AI โทร (พฤติกรรมเดิม)
    */
   const [callModes, setCallModes] = useState<Array<'ai' | 'manual' | 'tbd'>>(() => ['ai']);
+  /**
+   * แก้ไขด้วยป๊อป 4 หน้าเดียวกับตอนเพิ่ม (เจ้าของ 20 ต.ค. 2569 · Choice "ทั้งชุดของคนนั้น")
+   * `roundIds[i]` = สายเดิมของรอบ i (null = รอบที่เพิ่มใหม่) — 🔴 ขยับคู่กับ `scheduledAts` เสมอ
+   * `editSet` = ชุดที่กำลังแก้ (null = โหมดเพิ่ม) · `editableIds` = สายที่ยังแก้ได้ตอนเปิด (อนาคต · ยังไม่ถูกโทร)
+   */
+  const [roundIds, setRoundIds] = useState<Array<string | null>>(() => [null]);
+  const [editSet, setEditSet] = useState<{ anchorId: string; editableIds: string[]; lockedCount: number } | null>(null);
   /**
    * บันทึกเสร็จแล้ว = ป๊อปเปลี่ยนเป็นหน้า "เสร็จสิ้น" (เจ้าของสั่ง 2 ต.ค. 2569: *"บันทึกแล้วไม่เด้งเสร็จสิ้น"*)
    * 🔴 เดิมปิดป๊อปทันทีแล้วบอกผลที่แถบบนหน้า (เลื่อนจอแล้วมองไม่เห็น) · ถ้ามีสายที่ไม่ได้ส่ง AI
@@ -793,6 +803,8 @@ const FollowPage: React.FC = () => {
     setScheduledAts([nowForInput()]);
     setCallRounds([1]);
     setCallModes(['ai']);
+    setRoundIds([null]);
+    setEditSet(null);
     setDateFrom('');
     setPlanDayStart(1);
     setDayNos({});
@@ -816,6 +828,55 @@ const FollowPage: React.FC = () => {
     setStep(1);
   };
 
+  /**
+   * เปิดป๊อป 4 หน้าแบบแก้ไข (เจ้าของ 20 ต.ค. 2569: *"ทำให้มันแก้ไขได้แบบตอนเพิ่มเลย"* · Choice "ทั้งชุดของคนนั้น")
+   * เติมข้อมูลเดิมของทั้งชุด · ขั้น 3 = สายที่ยังแก้ได้ (อนาคต · ยังไม่ถูกโทร) · สายที่โทรไปแล้วเป็นประวัติ ไม่อยู่ในฟอร์ม
+   * ชุด = group เดียวกัน (ไม่มี group = เบอร์ + เรื่องเดียวกัน · กติกาเดียวกับกล่องแก้ไขเดิม)
+   */
+  const openEditWizard = (entry: FollowEntry) => {
+    const siblings = items.filter((x) => x.recipient_phone === entry.recipient_phone && x.topic === entry.topic);
+    const rows = followSetRows(entry, siblings).sort((a, b) => Date.parse(a.scheduled_at ?? '') - Date.parse(b.scheduled_at ?? ''));
+    const now = new Date();
+    const editable = rows.filter((r) => isEditableFollowRound(r, now));
+    resetForm();
+    const full = (entry.recipient_name ?? '').trim();
+    const pre = [...NAME_PREFIXES].filter(Boolean).sort((a, b) => b.length - a.length).find((x) => full.startsWith(x)) ?? '';
+    const rest = full.slice(pre.length).trim();
+    const sp = rest.indexOf(' ');
+    setPrefix(pre);
+    setFirstName(sp < 0 ? rest : rest.slice(0, sp));
+    setLastName(sp < 0 ? '' : rest.slice(sp + 1).trim());
+    setPhone(localPhoneDigits(entry.recipient_phone));
+    setTopic(entry.topic ?? '');
+    setNote(entry.note ?? '');
+    setUnitName(entry.unit_name ?? '');
+    setSiteCode(entry.site_code ?? '');
+    setStartDate(entry.start_date ?? '');
+    setInsuranceType(entry.insurance_type ?? '');
+    setCustomerName(entry.customer_name ?? '');
+    setCustomerContact(entry.customer_contact ?? '');
+    setCustomerPhone(entry.customer_phone ?? '');
+    setScheduleMode(false);
+    if (editable.length > 0) {
+      setScheduledAts(editable.map((r) => isoToBangkokInput(r.scheduled_at)));
+      setStaffPhones(editable.map((r) => r.staff_phone ?? ''));
+      setCallRounds(editable.map((r, i) => r.call_round ?? i + 1));
+      setCallModes(editable.map((r) => (r.time_tbd ? 'tbd' : r.call_mode === 'manual' ? 'manual' : 'ai')));
+      setRoundIds(editable.map((r) => r.id));
+    } else {
+      // ไม่มีสายที่ยังแก้ได้ — ขั้น 3 เริ่มที่รอบใหม่หนึ่งรอบ (ไม่แตะ = ไม่เพิ่ม · ดู submitEdit)
+      setStaffPhones([entry.staff_phone ?? '']);
+      setRoundIds([null]);
+    }
+    setEditSet({ anchorId: entry.id, editableIds: editable.map((r) => r.id), lockedCount: rows.length - editable.length });
+    setFormOpen(true);
+  };
+  /** ปุ่ม "แก้ไข" ทุกจุด — ส่งคนแทนยังใช้กล่องแก้ไขเดิม (ขั้น 3 เป็นวันเวลาเข้างาน คนละแบบ) */
+  const startEdit = (entry: FollowEntry) => {
+    if (entry.follow_team === 'replacement' || replaceView) setEditing(entry);
+    else openEditWizard(entry);
+  };
+
   const setScheduledAtAt = (i: number, v: string) =>
     setScheduledAts((prev) => prev.map((x, idx) => (idx === i ? v : x)));
   /**
@@ -830,12 +891,14 @@ const FollowPage: React.FC = () => {
     setCallRounds((prev) => [...prev, (prev[prev.length - 1] ?? prev.length) + 1]);
     // ใครโทร: ลอกจากรอบสุดท้าย (ปกติทั้งชุดคนเดียวกันโทร)
     setCallModes((prev) => [...prev, prev[prev.length - 1] ?? 'ai']);
+    setRoundIds((prev) => [...prev, null]);
   };
   const removeScheduledAt = (i: number) => {
     setScheduledAts((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
     setStaffPhones((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
     setCallRounds((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
     setCallModes((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
+    setRoundIds((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
   };
   const setCallModeAt = (i: number, v: 'ai' | 'manual' | 'tbd') =>
     setCallModes((prev) => {
@@ -1116,9 +1179,96 @@ const FollowPage: React.FC = () => {
 
   /** ยืนยันแล้วว่าเบอร์ผู้สมัครเท่ากับเบอร์เจ้าหน้าที่จริง (กดบันทึกซ้ำ) — ดู followPhoneGuard */
   const staffPhoneAckRef = useRef('');
+  /** ค่าขั้น 3 ตอนเปิดแก้ — เทียบตอนบันทึกว่าตารางเปลี่ยนไหม (ไม่เปลี่ยน = ไม่แตะตาราง ส่งแค่ข้อมูลคน) */
+  const editScheduleSnapshotRef = useRef('');
+  const scheduleSnapshot = () => JSON.stringify([scheduledAts, callModes, staffPhones, roundIds]);
+  useEffect(() => {
+    if (editSet && formOpen) editScheduleSnapshotRef.current = scheduleSnapshot();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- จับค่าครั้งเดียวตอนเปิดแก้
+  }, [editSet?.anchorId, formOpen]);
+
+  /**
+   * บันทึกการแก้ไข (ป๊อป 4 หน้า · 20 ต.ค. 2569) — ① ข้อมูลคนทั้งชุด (`update_set`) ② ตาราง (ถ้าเปลี่ยน · `replace_schedule`)
+   * ส่งแผนให้ Lumos ครั้งเดียว: ตารางเปลี่ยน = เส้นตารางส่ง · ไม่เปลี่ยน = เส้นข้อมูลคนส่ง
+   */
+  const submitEdit = async () => {
+    if (!editSet || submitting) return;
+    setFormError(null);
+    for (const st of [1, 2, 4] as const) {
+      const err = followStepError(st, wizardValues);
+      if (err) {
+        setStep(st);
+        setFormError(err);
+        return;
+      }
+    }
+    if (staffPhoneMatchesApplicant(phone, staffPhones)) {
+      const key = staffPhoneAckKey(phone, staffPhones);
+      if (staffPhoneAckRef.current !== key) {
+        staffPhoneAckRef.current = key;
+        setFormError(STAFF_PHONE_SAME_WARNING);
+        return;
+      }
+    }
+    const scheduleChanged = scheduleSnapshot() !== editScheduleSnapshotRef.current;
+    const rounds = scheduledAts.map((at, i) => ({
+      id: roundIds[i] ?? undefined,
+      iso: at ? new Date(at).toISOString() : '',
+      mode: callModes[i] === 'ai' ? ('ai' as const) : ('manual' as const),
+      staff: (staffPhones[i] ?? '').trim(),
+    }));
+    if (scheduleChanged) {
+      const bad = rounds.find((r) => !r.iso || Date.parse(r.iso) <= Date.now() + 60_000);
+      if (bad) {
+        setStep(3);
+        setFormError('เวลาที่ผ่านมาแล้วตั้งไม่ได้ — เลือกเวลาอนาคต');
+        return;
+      }
+    }
+    const fields = {
+      recipient_name: composeRecipientName(prefix, firstName, lastName),
+      recipient_phone: phone,
+      topic,
+      note: note || undefined,
+      unit_name: unitName.trim() || undefined,
+      site_code: siteCode.trim() || undefined,
+      ...extraPayload(),
+    };
+    setSubmitting(true);
+    try {
+      const up = await updateFollowSet(editSet.anchorId, { ...fields, replan: !scheduleChanged });
+      const parts = [`แก้ไขแล้ว ${up.updated.toLocaleString('th-TH')} สาย`];
+      if (scheduleChanged) {
+        // สายที่ยังแก้ได้เป็นหัว (เบอร์เพิ่งเปลี่ยนทั้งชุดอนาคต) · ไม่มีเลย = สายที่กดแก้
+        const anchor = editSet.editableIds[0] ?? editSet.anchorId;
+        const out = await replaceFollowSchedule(anchor, {
+          replace_ids: editSet.editableIds,
+          rounds: rounds.map((r) => ({ id: r.id, scheduled_at: r.iso, call_mode: r.mode, staff_phone: r.staff || null })),
+        });
+        // ชุดที่ไม่มีสายเหลือ แล้วเพิ่มสายใหม่ = สายใหม่ลอกข้อมูลจากสายเก่า ⇒ ตั้งข้อมูลคนซ้ำอีกรอบ (เบอร์ใหม่ + ส่งแผน)
+        if (editSet.editableIds.length === 0 && out.created > 0) await updateFollowSet(editSet.anchorId, { ...fields, replan: true });
+        if (out.lumos && out.lumos.pushed === false) parts.push(`ส่งตารางใหม่ให้ AI ไม่สำเร็จ${out.lumos.reason ? ` (${out.lumos.reason})` : ''}`);
+      } else if (!up.lumos.pushed && up.lumos.reason) {
+        parts.push(up.lumos.reason);
+      }
+      setFormOpen(false);
+      resetForm();
+      setOkMessage(parts.join(' · '));
+      await reload();
+    } catch (err) {
+      setFormError(friendlyErrorText(err, 'แก้ไขไม่สำเร็จ'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const submit = async (e?: React.SyntheticEvent) => {
     e?.preventDefault();
     setFormError(null);
+    if (editSet) {
+      await submitEdit();
+      return;
+    }
     /**
      * 🔴 **ยังไม่ถึงขั้นตั้งเวลา = ห้ามบันทึกเด็ดขาด** (เจ้าของแจ้ง 18 ส.ค. 2569:
      * *"พอเลือกหน่วยงานแล้วจะกดไปตั้งเวลามันบันทึกเองเลย"*)
@@ -2232,7 +2382,7 @@ const FollowPage: React.FC = () => {
           /* ดินสอบนแถว = เปิดกล่องแก้ไขของสายนั้นตรง ๆ (เจ้าของทัก 10 ก.ย. 2569 ว่าหาไม่เจอ
              เพราะของเดิมซ่อนอยู่ในป๊อป "จัดการ" อีกชั้น) · ไม่ต้องจำ cellToReopen
              เพราะไม่ได้เปิดมาจากป๊อป จึงไม่มีป๊อปให้กลับไป */
-          onEditRound={(round) => setEditing(round.entry)}
+          onEditRound={(round) => startEdit(round.entry)}
           /* 🔴 แถวตัวกรอง (สายที่ · ใครโทร · เจ้าของงาน · ใครเพิ่ม) อยู่แถวเดียวกับแท็บรายวัน/รายเดือน
              (เจ้าของสั่ง 5 ต.ค. 2569 — เดิมอยู่หัวการ์ดขั้นตอนของสาย) · "ใครโทร" เป็นตัวกรองเดียวของหัวแผงเดิม
              (3 ต.ค. 2569 ถอด นับช่วง · งานจบหรือยัง · บรรทัดแยก AI/คน) ห้ามเติมกลับโดยไม่ได้สั่งใหม่ */
@@ -2479,7 +2629,7 @@ const FollowPage: React.FC = () => {
                   <ArrowLeft aria-hidden /> กลับหน้า{returnTo.label}
                 </Button>
               ) : null}
-              <DialogTitle>เพิ่มคนที่ต้องการติดตาม</DialogTitle>
+              <DialogTitle>{editSet ? 'แก้ไขรายการติดตาม' : 'เพิ่มคนที่ต้องการติดตาม'}</DialogTitle>
               {/* QA 5 ต.ค. 2569: คำโปรยพูดซ้ำแถบขั้น 1·2·3 ⇒ เหลือไว้ให้โปรแกรมอ่านจอเท่านั้น */}
               <DialogDescription className="sr-only">เพิ่มคนที่ต้องการติดตาม 4 ขั้น</DialogDescription>
             </DialogHeader>
@@ -2509,7 +2659,8 @@ const FollowPage: React.FC = () => {
                   <li key={s.step} className="min-w-0 flex-1">
                     <button
                       type="button"
-                      disabled={s.step > step}
+                      // แก้ไข = ข้อมูลครบอยู่แล้ว กดไปหน้าไหนก็ได้ (20 ต.ค. 2569)
+                      disabled={!editSet && s.step > step}
                       onClick={() => goToStep(s.step)}
                       className={cn(
                         'flex w-full flex-col gap-0.5 rounded-xl border px-2.5 py-2 text-left transition-colors',
@@ -2731,6 +2882,14 @@ const FollowPage: React.FC = () => {
               </ReplaceStartFields>
             ) : step === 3 ? (
             <>
+            {/* แก้ไข (20 ต.ค. 2569): ขั้น 3 = สายที่ยังไม่โทรของชุด · ไม่มีสลับโหมด/ติดตามครั้งที่ (ใช้ตอนตั้งชุดใหม่) */}
+            {editSet ? (
+              <p className="text-xs text-muted-foreground">
+                สายที่ยังไม่โทร {editSet.editableIds.length.toLocaleString('th-TH')} สาย
+                {editSet.lockedCount > 0 ? ` · โทรไปแล้ว ${editSet.lockedCount.toLocaleString('th-TH')} สาย แก้ไม่ได้` : ''}
+              </p>
+            ) : (
+            <>
             {/* สลับโหมด: รอบเดี่ยว/หลายรอบ (เวลาเจาะจง) vs ตารางหลายวัน (ช่วงวัน × รอบ/วัน) */}
             <div className="flex items-center gap-2 rounded-full border border-white/70 bg-white/40 p-1 text-xs dark:border-white/15 dark:bg-white/5">
               <button
@@ -2771,6 +2930,8 @@ const FollowPage: React.FC = () => {
                 ariaLabel="ติดตามครั้งที่"
               />
             </div>
+            )}
+            </>
             )}
 
             {scheduleMode ? (
@@ -3416,7 +3577,19 @@ const FollowPage: React.FC = () => {
                 </button>
               ) : null}
 
-              {step < FOLLOW_WIZARD_LAST_STEP ? (
+              {editSet ? (
+                <>
+                  {step < FOLLOW_WIZARD_LAST_STEP ? (
+                    <Button size="sm" type="button" variant="outline" onClick={goNext} className="min-h-[46px] px-5 text-sm">
+                      ถัดไป <ChevronRight aria-hidden />
+                    </Button>
+                  ) : null}
+                  <Button size="sm" type="button" onClick={() => void submitEdit()} disabled={submitting} className="min-h-[46px] px-6 text-sm">
+                    {submitting ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
+                    {submitting ? 'กำลังบันทึก…' : 'บันทึกการแก้ไข'}
+                  </Button>
+                </>
+              ) : step < FOLLOW_WIZARD_LAST_STEP ? (
                 <Button size="sm"
                   type="button"
                   onClick={goNext}
@@ -3511,7 +3684,7 @@ const FollowPage: React.FC = () => {
         onEdit={(entry) => {
           setCellToReopen(openCell);
           setOpenCell(null);
-          setEditing(entry);
+          startEdit(entry);
         }}
         onComplete={doComplete}
         onReopen={(id) => void doReopen(id)}
