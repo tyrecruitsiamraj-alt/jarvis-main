@@ -1348,6 +1348,8 @@ const FollowPage: React.FC = () => {
         unit_name: unitName.trim() || undefined,
         site_code: siteCode.trim() || undefined,
         ...extraPayload(),
+        // เบอร์เจ้าหน้าที่ไปกับเส้นข้อมูลคนด้วย — ชุดที่ทุกสายเลยเวลาแล้วไม่มีสายให้แก้ตาราง เดิมเลือกชื่อแล้วบันทึกไม่ติด (20 ต.ค. 2569)
+        staff_phone: (staffPhones[0] ?? '').trim(),
         replan: !touchSchedule,
       });
       const parts = [`แก้ไขแล้ว ${up.updated.toLocaleString('th-TH')} สาย`];

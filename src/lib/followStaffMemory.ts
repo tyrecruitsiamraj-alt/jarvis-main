@@ -45,11 +45,26 @@ export function rememberedPhoneForName(
 }
 
 /** ชื่อที่จับคู่กับเบอร์นี้ (เทียบตรงตัว) — ใช้ย้อนหาชื่อตอนเปิดแก้รายการเก่าที่มีแต่เบอร์ */
+/**
+ * เทียบเบอร์ด้วยตัวเลข 9 หลักท้าย (20 ต.ค. 2569) — หน้าผู้ใช้งานเก็บ "+66633235024" แต่รายการติดตามเก็บ "0633235024"
+ * เดิมเทียบตัวอักษรตรง ๆ ⇒ เปิดแก้แล้วช่องชื่อว่าง ทั้งที่เป็นเบอร์ของคนในสมุดเบอร์ (เจ้าของทัก "กดเข้าไปก็ไม่ขึ้นชื่อที่แก้ไป")
+ * เบอร์สั้น (ต่อภายใน ฯลฯ ไม่ถึง 9 หลัก) = เทียบทั้งสตริงเหมือนเดิม
+ */
+export function samePhone(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = (a ?? '').trim();
+  const y = (b ?? '').trim();
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const dx = x.replace(/\D/g, '');
+  const dy = y.replace(/\D/g, '');
+  return dx.length >= 9 && dy.length >= 9 && dx.slice(-9) === dy.slice(-9);
+}
+
 export function nameForPhone(phone: string, contacts: FollowStaffContact[]): string | null {
   const key = (phone ?? '').trim();
   if (!key) return null;
   for (const c of contacts) {
-    if (c.phone.trim() === key && c.name.trim()) return c.name.trim();
+    if (samePhone(c.phone, key) && c.name.trim()) return c.name.trim();
   }
   return null;
 }
@@ -117,7 +132,7 @@ export function staffNameForPhone(
   const key = (phone ?? '').trim();
   if (!key) return null;
   for (const d of directory) {
-    if (d.phone.trim() === key && d.name.trim()) return d.name.trim();
+    if (samePhone(d.phone, key) && d.name.trim()) return d.name.trim();
   }
   return nameForPhone(key, contacts);
 }

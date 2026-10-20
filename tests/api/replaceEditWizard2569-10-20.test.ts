@@ -79,3 +79,12 @@ describe('หน้าติดตาม: แท็บส่งคนแทน�
     expect(page).toContain('...(sameStart ? {} : { note: replaceSlotNote(slot, start) }),');
   });
 });
+
+describe('เบอร์เจ้าหน้าที่บันทึกติดแม้ทุกสายเลยเวลา (เจ้าของ 20 ต.ค. 2569)', () => {
+  it('update_set รับ staff_phone · แท็บส่งคนแทนส่งไปทุกครั้ง', () => {
+    const src = read('api/_handlers/follow.ts');
+    expect(src).toContain("const staffRaw = typeof body.staff_phone === 'string' ? body.staff_phone.trim() : undefined;");
+    expect(src).toContain('and cancelled_at is null and completed_at is null and staff_call_outcome is null`,\n      [setKey, staffRaw || null],');
+    expect(read('src/pages/follow/FollowPage.tsx')).toContain("staff_phone: (staffPhones[0] ?? '').trim(),");
+  });
+});

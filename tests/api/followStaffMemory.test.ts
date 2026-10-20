@@ -144,3 +144,16 @@ describe('followStaffDirectory — ช่อง "เจ้าหน้าที�
     expect(followStaffDirectory(all).some((x) => x.name === 'เจมส์')).toBe(false);
   });
 });
+
+describe('เบอร์คนละรูปแบบยังหาชื่อเจอ (เจ้าของ 20 ต.ค. 2569 "กดเข้าไปก็ไม่ขึ้นชื่อที่แก้ไป")', () => {
+  it('หน้าผู้ใช้งาน +66… กับรายการ 0… = คนเดียวกัน · เบอร์สั้นยังเทียบตรง ๆ', async () => {
+    const { samePhone, staffNameForPhone } = await import('@/lib/followStaffMemory');
+    expect(samePhone('+66633235024', '0633235024')).toBe(true);
+    expect(samePhone('063-323-5024', '+66633235024')).toBe(true);
+    expect(samePhone('0633235024', '0633235025')).toBe(false);
+    expect(samePhone('101', '101')).toBe(true);
+    expect(samePhone('', '')).toBe(false);
+    const dir = [{ name: 'แป้ง', phone: '+66633235024', lanes: ['replacement'] }] as never;
+    expect(staffNameForPhone('0633235024', dir, [])).toBe('แป้ง');
+  });
+});

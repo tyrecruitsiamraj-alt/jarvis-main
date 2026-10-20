@@ -1644,6 +1644,15 @@ async function updateFollowSet(req: AuthedReq, res: ApiRes, body: Record<string,
   const startDate = getString(body.start_date) || null;
   if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return sendError(res, 400, 'Bad request', 'start_date ต้องเป็นวันที่ YYYY-MM-DD');
   const cut = (v: unknown, max: number) => (getString(v) || '').trim().slice(0, max) || null;
+  /**
+   * เบอร์เจ้าหน้าที่ทั้งชุด (ส่งคนแทน · 20 ต.ค. 2569) — ไม่ส่ง = คงเดิม · ว่าง = ล้าง
+   * เดิมเบอร์เจ้าหน้าที่ไปกับเส้นแก้ตารางเท่านั้น ⇒ ชุดที่ทุกสายเลยเวลาแล้ว (ไม่มีสายให้แก้ตาราง) กดเลือกชื่อแล้วบันทึกไม่ติด
+   */
+  const staffRaw = typeof body.staff_phone === 'string' ? body.staff_phone.trim() : undefined;
+  if (staffRaw && (staffRaw.match(/\d/g) ?? []).length < 8) {
+    return sendError(res, 400, 'Bad request', 'เบอร์เจ้าหน้าที่ไม่ถูกต้อง — ใส่เบอร์ที่ผู้สมัครโทรกลับได้จริง');
+  }
+  if (staffRaw && isPlaceholderPhone(staffRaw)) return sendError(res, 400, 'Bad request', PLACEHOLDER_PHONE_ERROR);
 
   const { rows: anchorRows } = await dbQuery<FollowRow>(`select * from ${followTable} where id = $1`, [anchorId]);
   const anchor = anchorRows[0];
@@ -1664,6 +1673,15 @@ async function updateFollowSet(req: AuthedReq, res: ApiRes, body: Record<string,
     [setKey, name, topic, cut(body.note, 2000), cut(body.unit_name, 300), cut(body.site_code, 40), phone, ...actor, keepNote],
   );
   if (updated.length === 0) return sendError(res, 409, 'Conflict', 'สายของชุดนี้ปิดหรือยกเลิกไปหมดแล้ว');
+  if (staffRaw !== undefined) {
+    // สายที่ยังไม่ปิด/ไม่ยกเลิก/ยังไม่มีผลคนลง — สายที่ลงผลแล้วเป็นประวัติว่าตอนนั้นใช้เบอร์ไหน
+    await dbQuery(
+      `update ${followTable} set staff_phone = $2
+        where ${setWhere} and cancelled_at is null and completed_at is null and staff_call_outcome is null`,
+      [setKey, staffRaw || null],
+    );
+    for (const r of updated) if (r.staff_call_outcome == null) r.staff_phone = staffRaw || null;
+  }
   try {
     await dbQuery(
       `update ${followTable}
