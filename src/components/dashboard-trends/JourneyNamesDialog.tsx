@@ -21,12 +21,16 @@ export default function JourneyNamesDialog({
   onOpenChange,
   title,
   ids,
+  notes,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   ids: readonly string[];
+  /** คอลัมน์ "ค้างที่" ต่อราย (หน้าความคุ้มค่า · ค้างอยู่ที่ใคร) */
+  notes?: ReadonlyMap<string, string>;
 }) {
+  const cols = notes ? 5 : 4;
   const [all, setAll] = useState<PublicApplication[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rev, setRev] = useState(0);
@@ -74,22 +78,24 @@ export default function JourneyNamesDialog({
                   <TableHead>ชื่อ</TableHead>
                   <TableHead>เบอร์</TableHead>
                   <TableHead>หน่วยงาน</TableHead>
+                  {notes ? <TableHead>ค้างที่</TableHead> : null}
                   <TableHead className="text-right">วันที่กรอก</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    <TableCell colSpan={cols} className="text-center text-muted-foreground">
                       ไม่มีรายชื่อ
                     </TableCell>
                   </TableRow>
                 ) : (
                   rows.map((a) => (
                     <TableRow key={a.id}>
-                      <TableCell className="font-medium">{a.full_name || '—'}</TableCell>
+                      <TableCell className="min-w-32 font-medium">{a.full_name || '—'}</TableCell>
                       <TableCell className="whitespace-nowrap tabular-nums">{a.phone ? localThaiPhone(a.phone) : '—'}</TableCell>
                       <TableCell className="max-w-56 truncate">{applicationUnitLabel(a) || '—'}</TableCell>
+                      {notes ? <TableCell className="min-w-32">{notes.get(a.id) ?? '—'}</TableCell> : null}
                       <TableCell className="whitespace-nowrap text-right tabular-nums">
                         {a.created_at ? formatYmdTh(toYmdBangkok(new Date(a.created_at))) : '—'}
                       </TableCell>

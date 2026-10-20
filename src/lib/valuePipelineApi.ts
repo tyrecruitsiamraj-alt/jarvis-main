@@ -1,7 +1,7 @@
 /** ตัวดึง `/api/value-pipeline` — หน้าความคุ้มค่า 4 แท็บ (19 ต.ค. 2569) */
 import { apiFetch } from '@/lib/apiFetch';
 import type { ChannelPlacement } from '@/lib/channelPlacement';
-import type { StageSla, ValueOutcome } from '@/lib/valuePipeline';
+import type { StageSla, StuckOwnerRow, ValueOutcome } from '@/lib/valuePipeline';
 
 export type OutcomeResponse = {
   outcome: ValueOutcome;
@@ -24,7 +24,7 @@ export type BottleneckResponse = {
   month: string;
   openRequests: number;
   stages: StageSla[];
-  owners: Array<{ owner: string; stuck: number }>;
+  owners: StuckOwnerRow[];
   worstJobs: Array<{ jobId: string; label: string; stuck: number; stage: string; owner: string | null }>;
 };
 

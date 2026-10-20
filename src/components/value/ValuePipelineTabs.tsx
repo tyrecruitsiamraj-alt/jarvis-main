@@ -188,7 +188,7 @@ function StageTable({ stages, onOpen }: { stages: readonly StageSla[]; onOpen: (
 
 export function ValueBottleneckTab({ month, onOpenJob }: { month: string; onOpenJob: (jobId: string) => void }) {
   const { data, error, loading, retry } = useLoad<BottleneckResponse>(() => fetchValueBottleneck(month), [month]);
-  const [names, setNames] = useState<{ title: string; ids: readonly string[] } | null>(null);
+  const [names, setNames] = useState<{ title: string; ids: readonly string[]; notes?: ReadonlyMap<string, string> } | null>(null);
   if (error) return <LoadErrorNotice message={error} onRetry={retry} />;
   if (loading || !data) return <Loading />;
   const measured = data.stages.filter((s) => s.done != null && s.done > 0);
@@ -211,8 +211,22 @@ export function ValueBottleneckTab({ month, onOpenJob }: { month: string; onOpen
           <ul className="space-y-2 text-sm">
             {data.owners.length === 0 ? <li className={DASH.muted}>ไม่มีงานค้าง</li> : null}
             {data.owners.map((o) => (
-              <li key={o.owner} className="flex justify-between gap-3">
-                <span>{o.owner}</span>
+              <li key={o.owner} className="flex items-center justify-between gap-3">
+                <Button
+                  type="button"
+                  variant="link"
+                  size="xs"
+                  className="h-auto p-0 text-sm"
+                  onClick={() =>
+                    setNames({
+                      title: `ค้างที่ ${o.owner}`,
+                      ids: o.items.map((i) => i.id),
+                      notes: new Map(o.items.map((i) => [i.id, i.why])),
+                    })
+                  }
+                >
+                  {o.owner}
+                </Button>
                 <span className={cn('tabular-nums', TONE.danger.value)}>{n(o.stuck)} ราย</span>
               </li>
             ))}
@@ -235,7 +249,13 @@ export function ValueBottleneckTab({ month, onOpenJob }: { month: string; onOpen
           </ul>
         </Card>
       </div>
-      <JourneyNamesDialog open={names !== null} onOpenChange={(o) => !o && setNames(null)} title={names?.title ?? ''} ids={names?.ids ?? []} />
+      <JourneyNamesDialog
+        open={names !== null}
+        onOpenChange={(o) => !o && setNames(null)}
+        title={names?.title ?? ''}
+        ids={names?.ids ?? []}
+        notes={names?.notes}
+      />
     </div>
   );
 }

@@ -24,7 +24,9 @@ import {
   computeOutcome,
   informedAfterAi,
   stuckByOwner,
+  type StuckExtra,
 } from '../../src/lib/valuePipeline.js';
+import { logError } from '../_lib/logger.js';
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes.js';
 
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
@@ -32,6 +34,8 @@ const APPS = tableInAppSchema('public_job_applications');
 const POSTINGS = tableInAppSchema('recruit_postings');
 const LINKS = tableInAppSchema('recruit_posting_links');
 const FOLLOW = tableInAppSchema('follow_entries');
+const USERS = tableInAppSchema('users');
+const IRECRUIT_DUPS = tableInAppSchema('application_irecruit_dups');
 const K9 = (col: string) => `RIGHT(REPLACE(REPLACE(RTRIM(${col}), '-', ''), ' ', ''), 9)`;
 const ALL = { mode: 'all' } as const;
 
@@ -132,6 +136,42 @@ async function outcomeView(userSub: string, monthParam: unknown, now: Date) {
   };
 }
 
+/**
+ * ค้างอยู่ที่ใคร: ข้อมูลเสริมต่อรายที่ค้าง (ไม่มีชื่อ/เบอร์) — คนเก็บ · ผู้รับผิดชอบของใบ/โพสต์ · อยู่ในคิว AI ไม่มีผล · ซ้ำ iRecruit
+ * อ่านไม่ได้ = ว่าง (ตกไปที่เจ้าหน้าที่ใบขอเหมือนเดิม)
+ */
+export function stuckExtrasSql(): string {
+  return `
+  select a.id::text as id,
+         coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), '')) as claimer,
+         coalesce(nullif(btrim(a.responsible_name), ''), nullif(btrim(p.responsible_name), '')) as posting_owner,
+         exists (select 1 from ${QUEUE} q where q.person_ref = 'app-' || a.id::text
+                  and q.status in ('pending', 'delivered') and coalesce(q.last_outcome, q.result->>'outcome') is null) as ai_waiting,
+         exists (select 1 from ${IRECRUIT_DUPS} d where d.application_id = a.id) as irecruit_dup
+    from ${APPS} a
+    left join ${USERS} u on u.id = a.claimed_by
+    left join ${LINKS} l on l.id = a.link_id
+    left join ${POSTINGS} p on p.id = coalesce(a.posting_id, l.posting_id)
+   where a.id::text = any($1)`;
+}
+
+async function loadStuckExtras(ids: readonly string[]): Promise<Map<string, StuckExtra>> {
+  const out = new Map<string, StuckExtra>();
+  if (ids.length === 0) return out;
+  try {
+    const { rows } = await dbQuery<{ id: string; claimer: string | null; posting_owner: string | null; ai_waiting: boolean; irecruit_dup: boolean }>(
+      stuckExtrasSql(),
+      [[...ids]],
+    );
+    for (const r of rows) {
+      out.set(r.id, { claimer: r.claimer, postingOwner: r.posting_owner, aiWaiting: r.ai_waiting === true, irecruitDup: r.irecruit_dup === true });
+    }
+  } catch (e) {
+    logError('valuePipeline.stuckExtras', e);
+  }
+  return out;
+}
+
 async function bottleneckView(monthParam: unknown, now: Date) {
   const { month, from, to } = monthOf(monthParam, now);
   const [overview, requests, list] = await Promise.all([
@@ -180,7 +220,7 @@ async function bottleneckView(monthParam: unknown, now: Date) {
     month,
     openRequests: list.filter((j) => !j.is_prequest).length,
     stages: stages.map(({ stuckIds, ...s }) => ({ ...s, stuckIds: stuckIds.slice(0, 500) })),
-    owners: stuckByOwner(stages, facts, ownerOfJob),
+    owners: stuckByOwner(stages, facts, ownerOfJob, await loadStuckExtras(stages.flatMap((st) => st.stuckIds))),
     worstJobs,
   };
 }

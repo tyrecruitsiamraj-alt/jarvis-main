@@ -202,23 +202,69 @@ export function onTimePct(s: Pick<StageSla, 'done' | 'onTime'>): number | null {
   return Math.round((s.onTime / s.done) * 100);
 }
 
-/** ค้างอยู่ที่ใคร — นับใบสมัครที่ค้างเกิน 24 ชม. ตามเจ้าของงานของใบขอ (ไม่มี = "ยังไม่มีเจ้าของ") */
+/**
+ * ═══ ค้างอยู่ที่ใคร (เจ้าของ 20 ต.ค. 2569 "ทำทั้งคู่") ═══
+ * เดิมยกทุกรายให้เจ้าหน้าที่สรรหาของใบขอ ⇒ เจ้าของเห็นชื่อเล็ก แต่ไปหาในแท็บการติดต่อไม่เจอ (ไม่มีใครเก็บ · ค้างที่ AI)
+ * ตอนนี้ให้ชื่อ "คนที่ต้องลงมือจริง" ต่อราย · คนเดียวค้างหลายขั้นนับครั้งเดียว (ขั้นแรกสุด)
+ *   ขั้น AI โทรคัดกรอง: ส่ง AI แล้วไม่มีผลโทร = แถว AI · ซ้ำ iRecruit = รอคนเลือกวิธีโทร · มีคนเก็บ = คนเก็บ · นอกนั้น = ยังไม่ส่ง AI
+ *   ขั้นอื่น: คนเก็บ → เจ้าหน้าที่สรรหาของใบขอ → ผู้รับผิดชอบโพสต์ (โพสต์ส่วนกลางไม่มีใบขอ) → "ยังไม่มีเจ้าของ"
+ */
 export const NO_OWNER = 'ยังไม่มีเจ้าของ';
+export const AI_OWNER = 'AI';
+
+/** ข้อมูลเสริมต่อรายที่ค้าง — server อ่านจากฐาน (ไม่มีชื่อ/เบอร์) */
+export type StuckExtra = {
+  /** ชื่อเล่นคนที่กดเก็บไปโทรเอง/เก็บ Lead */
+  claimer: string | null;
+  /** ผู้รับผิดชอบโพสต์ (ใบที่ไม่ผูกใบขอ) */
+  postingOwner: string | null;
+  /** อยู่ในคิว AI แล้ว ยังไม่มีผลโทร */
+  aiWaiting: boolean;
+  /** ติดป้ายซ้ำ iRecruit 14 วัน — AI ไม่โทรเอง รอคนเลือก */
+  irecruitDup: boolean;
+};
+
+export type StuckItem = { id: string; why: string };
+export type StuckOwnerRow = { owner: string; kind: 'ai' | 'person' | 'none'; stuck: number; items: StuckItem[] };
+
+export function stuckWho(
+  stageKey: StageKey,
+  stageLabel: string,
+  extra: StuckExtra | undefined,
+  recruiter: string | null,
+): { owner: string; kind: StuckOwnerRow['kind']; why: string } {
+  const person = extra?.claimer || recruiter || extra?.postingOwner || null;
+  const who = (why: string) => (person ? { owner: person, kind: 'person' as const, why } : { owner: NO_OWNER, kind: 'none' as const, why });
+  if (stageKey !== 'aiCall') return who(stageLabel);
+  if (extra?.aiWaiting) return { owner: AI_OWNER, kind: 'ai', why: 'ส่ง AI แล้ว ยังไม่มีผลโทร' };
+  if (extra?.irecruitDup) return who('ซ้ำ iRecruit รอเลือกวิธีโทร');
+  if (extra?.claimer) return who('เก็บไปโทรเองแล้ว ยังไม่โทร');
+  return who('ยังไม่ส่ง AI');
+}
+
 export function stuckByOwner(
   stages: readonly StageSla[],
   facts: readonly RecruitAppFact[],
   ownerOfJob: ReadonlyMap<string, string>,
-): Array<{ owner: string; stuck: number }> {
+  extras: ReadonlyMap<string, StuckExtra> = new Map(),
+): StuckOwnerRow[] {
   const jobOf = new Map(facts.map((f) => [f.id ?? '', f.jobId]));
-  const counts = new Map<string, number>();
+  const seen = new Set<string>();
+  const rows = new Map<string, StuckOwnerRow>();
   for (const s of stages) {
     for (const id of s.stuckIds) {
+      if (seen.has(id)) continue;
+      seen.add(id);
       const job = jobOf.get(id);
-      const owner = (job && ownerOfJob.get(job)) || NO_OWNER;
-      counts.set(owner, (counts.get(owner) ?? 0) + 1);
+      const w = stuckWho(s.key, s.label, extras.get(id), (job && ownerOfJob.get(job)) || null);
+      const row = rows.get(w.owner) ?? { owner: w.owner, kind: w.kind, stuck: 0, items: [] };
+      row.stuck += 1;
+      row.items.push({ id, why: w.why });
+      rows.set(w.owner, row);
     }
   }
-  return [...counts.entries()]
-    .map(([owner, stuck]) => ({ owner, stuck }))
-    .sort((a, b) => b.stuck - a.stuck || a.owner.localeCompare(b.owner, 'th'));
+  const rank = { ai: 0, person: 1, none: 2 } as const;
+  return [...rows.values()].sort(
+    (a, b) => rank[a.kind] - rank[b.kind] || b.stuck - a.stuck || a.owner.localeCompare(b.owner, 'th'),
+  );
 }
