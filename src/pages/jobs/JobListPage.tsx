@@ -429,6 +429,13 @@ const JobListPage: React.FC = () => {
       if (!lookupJob || !q) return scopedJobs;
       const lookupNo = (lookupJob.request_no || '').toLowerCase();
       if (!requestNoMatchesSearch(q, lookupJob.request_no)) return scopedJobs;
+      /**
+       * 🔴 ใบที่ปิดแล้ว (ยกเลิก/หยุด/หาได้ครบ) ห้ามโผล่ในรายการใบเปิด (เจ้าของ 20 ต.ค. 2569:
+       * *"LBM6910003 LBM6910004 ยกเลิกแล้วทำไมไม่หาย … ฉันยังเห็นอยู่เลยหน้าใบขอ"* · กติกา "ถ้าปิดก็คือปิด")
+       * เดิมค้นด้วยเลขใบขอ = ดึงใบนั้นตรงจาก ERP มาต่อท้ายเสมอ ตัวกรองตั้งต้น "ทั้งหมด" จึงไม่กันใบปิด
+       * ⇒ ใบปิดขึ้นเฉพาะตอนเลือก "ปิดแล้ว"
+       */
+      if (lookupJob.status === 'closed' && filter !== 'closed') return scopedJobs;
       if (scopedJobs.some((j) => (j.request_no || '').toLowerCase() === lookupNo)) {
         return scopedJobs;
       }
