@@ -115,3 +115,30 @@ describe('ขาดแล้วกดส่งไม่ได้', () => {
     expect(read('src/components/jobs/JobBoardView.tsx')).toContain('onAutopost={setAutopostJob}');
   });
 });
+
+describe('ข้อมูลจริงที่ทีมวางมา (OPL6910006 · 20 ต.ค. 2569)', () => {
+  const real = {
+    ...JOB,
+    income_display: null,
+    monthly_income_base: 13000,
+    benefits: ['ค่าเดินทาง', 'ค่าโทรศัพท์', 'ประกันสังคม'],
+    extra_benefits: ['ค่าตำแหน่ง 3,000 บาท', 'ค่าโทรศัพท์ 1,000 บาท'],
+    requirements: ['คุณสมบัติ', '- เพศชายอายุ 25-50 ปี', '- มีประสบการณ์ขับรถ 2 ปีขึ้นไป', '- มีประสบการณ์ขับรถ 2 ปีขึ้นไป'],
+  } as unknown as JobRequest;
+  const cap = buildAutopostCaption(real, { contact: CONTACT, link: LINK });
+  it('สวัสดิการที่มียอดเงิน = รายการรายได้ (บวกเข้ายอดรวม) · ไม่ซ้ำในสวัสดิการ', () => {
+    expect(cap).toContain('💰 รายได้ 17,000++ บาท/เดือน');
+    expect(cap).toContain('- ค่าตำแหน่ง 3,000 บาท/เดือน');
+    expect(cap).toContain('- ค่าโทรศัพท์ 1,000 บาท/เดือน');
+    const benefits = cap.split('สวัสดิการเพิ่มเติม')[1].split('โทรติดต่อ')[0];
+    expect(benefits).not.toContain('ค่าโทรศัพท์');
+    expect(benefits).not.toContain('ค่าตำแหน่ง');
+    expect(benefits).toContain('- ค่าเดินทาง');
+  });
+  it('คุณสมบัติ: ตัดหัว · ตัด "- " ซ้อน · ตัดเพศ/อายุซ้ำ · ตัดบรรทัดซ้ำ', () => {
+    const part = cap.split('คุณสมบัติ\n')[1].split('สวัสดิการเพิ่มเติม')[0];
+    expect(part).not.toMatch(/- -|- คุณสมบัติ/);
+    expect(part.match(/มีประสบการณ์ขับรถ/g)).toHaveLength(1);
+    expect(part).not.toContain('เพศชายอายุ 25-50');
+  });
+});

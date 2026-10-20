@@ -62,6 +62,23 @@ export type AutopostIncome = {
  * ฐาน: บรรทัด "ฐานเงินเดือน" ที่ทีมตั้ง → ฐาน ERP (`monthly_income_base` · รายเดือนเท่านั้น)
  * ซ่อนรายได้จากหน้าสาธารณะ = null (ไม่บอกในโพสต์)
  */
+/**
+ * สวัสดิการที่มียอดเงินต่อเดือน ("ค่าตำแหน่ง 3,000 บาท" · "ค่าโทรศัพท์ 1,000 บาท/เดือน") = รายการรายได้ ไม่ใช่สวัสดิการ
+ * (เจ้าของ 20 ต.ค. 2569: รายการรายได้ขึ้นแค่ในส่วนรายได้ ห้ามซ้ำในสวัสดิการ) · ยอดต่อวัน/ชม. ไม่ย้าย (คนละหน่วย)
+ */
+const MONEY_BENEFIT = /^(.+?)\s*([\d,]{3,})\s*บาท\s*(?:\/\s*เดือน|ต่อเดือน)?\s*$/;
+function benefitIncomeItems(job: JobRequest): Array<{ label: string; amount: number; raw: string }> {
+  if (!publicFieldVisible(job, 'benefits')) return [];
+  const out: Array<{ label: string; amount: number; raw: string }> = [];
+  for (const b of publicBenefitList(job, benefitDisplayLabels(job.extra_benefits))) {
+    const m = MONEY_BENEFIT.exec(b.trim());
+    if (!m) continue;
+    const amount = Number(m[2].replace(/,/g, ''));
+    if (Number.isFinite(amount) && amount > 0) out.push({ label: m[1].trim(), amount, raw: b });
+  }
+  return out;
+}
+
 export function autopostIncome(job: JobRequest): AutopostIncome | null {
   if (!publicFieldVisible(job, 'income')) return null;
   const d = job.income_display;
@@ -73,11 +90,36 @@ export function autopostIncome(job: JobRequest): AutopostIncome | null {
     const unit = d.period === 'daily' ? 'วัน' : 'เดือน';
     const baseLine = d.lines.find((l) => l.label === 'ฐานเงินเดือน' && l.amount > 0);
     const base = baseLine ? baseLine.amount : unit === 'เดือน' ? erpBase : null;
-    const items = d.lines.filter((l) => l !== baseLine && l.amount > 0);
+    const items = d.lines.filter((l) => l !== baseLine && l.amount > 0).map((l) => ({ label: l.label, amount: l.amount }));
+    if (unit === 'เดือน') {
+      const have = new Set(items.map((i) => squash(i.label)));
+      for (const b of benefitIncomeItems(job)) if (!have.has(squash(b.label))) items.push({ label: b.label, amount: b.amount });
+    }
     const total = (base ?? 0) + items.reduce((s, l) => s + l.amount, 0);
     return { unit, base, items, total: total > 0 ? total : null };
   }
-  return erpBase ? { unit: 'เดือน', base: erpBase, items: [], total: erpBase } : null;
+  if (!erpBase) return null;
+  const items = benefitIncomeItems(job).map((b) => ({ label: b.label, amount: b.amount }));
+  return { unit: 'เดือน', base: erpBase, items, total: erpBase + items.reduce((s, l) => s + l.amount, 0) };
+}
+
+/**
+ * คุณสมบัติที่ทีมวางมาจากโพสต์เก่า — ตัดหัว "คุณสมบัติ" · ตัดสัญลักษณ์หน้าบรรทัด (- • *) · ตัดบรรทัดเพศ+อายุ ถ้ามีบรรทัดเพศ/อายุของระบบแล้ว ·
+ * ตัดซ้ำ (ของจริง OPL6910006: "- - เพศชายอายุ 25-50 ปี" ซ้ำกับบรรทัดระบบ)
+ */
+function cleanRequirementLines(lines: readonly string[], hasWho: boolean): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of lines) {
+    const t = raw.replace(/^[\s\-–•*·]+/, '').trim();
+    if (!t || /^คุณสมบัติ\s*:?$/.test(t)) continue;
+    if (hasWho && /เพศ/.test(t) && /อายุ/.test(t)) continue;
+    const k = squash(t);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(t);
+  }
+  return out;
 }
 
 /** เบอร์ในแคปชั่น = ตัวเลขล้วน (ตามตัวอย่างของทีม "0901978522") */
@@ -116,7 +158,7 @@ export function buildAutopostCaption(job: JobRequest, opts: { contact: AutopostC
   ]
     .filter(Boolean)
     .join(' ');
-  const reqs = (job.requirements ?? []).map((r) => r.trim()).filter(Boolean);
+  const reqs = cleanRequirementLines(job.requirements ?? [], Boolean(who));
   if (who || reqs.length > 0) {
     out.push('คุณสมบัติ');
     if (who) out.push(`- ${who}`);
@@ -125,9 +167,17 @@ export function buildAutopostCaption(job: JobRequest, opts: { contact: AutopostC
 
   // สวัสดิการ — ไม่ซ้ำกับรายการรายได้ (ค่าโทรศัพท์ ฯลฯ ขึ้นในส่วนรายได้แล้ว) · ไม่มีโอที/รายการที่ถอดแล้ว
   const incomeLabels = new Set((income?.items ?? []).map((i) => squash(i.label)));
+  const seen = new Set<string>();
   const benefits = publicBenefitList(job, benefitDisplayLabels(job.extra_benefits))
     .filter((b) => !isOtBenefit(b) && !isRetiredBenefit(b))
-    .filter((b) => ![...incomeLabels].some((l) => squash(b).includes(l) || l.includes(squash(b))));
+    .filter((b) => !MONEY_BENEFIT.test(b.trim()))
+    .filter((b) => ![...incomeLabels].some((l) => squash(b).includes(l) || l.includes(squash(b))))
+    .filter((b) => {
+      const k = squash(b);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
   if (benefits.length > 0) {
     out.push('สวัสดิการเพิ่มเติม');
     for (const b of benefits) out.push(`- ${b}`);
