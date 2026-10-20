@@ -71,7 +71,7 @@ describe('หน้าติดตาม: แท็บส่งคนแทน�
   it('ขั้น 3 = วันเวลาเข้างานเดิม + ใครโทรรายสาย · สายที่โทรแล้วล็อก', () => {
     expect(page).toContain("if (entry.follow_team === 'replacement') {");
     expect(page).toContain('setReplaceStartVal(startInit);');
-    expect(page).toContain("return [slot, row ? (row.editable ? 'editable' : 'locked') : 'none'];");
+    expect(page).toContain("return [slot, row ? (row.editable ? 'editable' : row.called ? 'locked' : 'past') : 'none'];");
     expect(page).toContain('await submitReplaceEdit(editSet.replace, scheduleChanged);');
   });
   it('วันเวลาเข้างานเปลี่ยน = เวลาโทร + หมายเหตุใหม่ · ไม่เปลี่ยน = คงเวลาโทรเดิม', () => {

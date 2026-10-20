@@ -51,7 +51,7 @@ const ReplaceStartFields: React.FC<{
    * ตอนแก้ไข (20 ต.ค. 2569): สายของชุดเดิม — `locked` = โทรไปแล้ว/เลยเวลา แก้ไม่ได้ · `none` = ไม่มีสายนี้ในชุด
    * ไม่ส่ง = ตอนเพิ่ม (ทุกสายตามวันเวลาเข้างาน)
    */
-  slotState?: Partial<Record<ReplaceSlot, 'editable' | 'locked' | 'none'>>;
+  slotState?: Partial<Record<ReplaceSlot, 'editable' | 'locked' | 'past' | 'none'>>;
   /** ตอนแก้ไขที่ยังไม่เปลี่ยนวันเวลาเข้างาน: เวลาโทรจริงของสายเดิม (สายคอนเฟิร์มที่ต่อคิวไว้ไม่ขยับ) */
   atOverride?: Partial<Record<ReplaceSlot, Date>>;
   children?: React.ReactNode;
@@ -85,6 +85,8 @@ const ReplaceStartFields: React.FC<{
                 <span className={cn('tabular-nums', p ? 'text-foreground' : 'text-muted-foreground')}>
                   {state === 'locked'
                     ? 'โทรไปแล้ว แก้ไม่ได้'
+                    : state === 'past'
+                      ? 'เลยเวลาแล้ว แก้ไม่ได้'
                     : state === 'none'
                       ? '—'
                       : !start || !p

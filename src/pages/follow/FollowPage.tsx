@@ -342,7 +342,7 @@ const FollowPage: React.FC = () => {
     editableIds: string[];
     lockedCount: number;
     /** แท็บส่งคนแทน: สายเดิมรายช่อง + วันเวลาเข้างานตอนเปิด (ขั้น 3 = วันเวลาเข้างาน ไม่ใช่ตารางโทร) */
-    replace?: { slots: Partial<Record<ReplaceSlot, { id: string; at: string; editable: boolean }>>; startInit: string };
+    replace?: { slots: Partial<Record<ReplaceSlot, { id: string; at: string; editable: boolean; called: boolean }>>; startInit: string };
   } | null>(null);
   /**
    * บันทึกเสร็จแล้ว = ป๊อปเปลี่ยนเป็นหน้า "เสร็จสิ้น" (เจ้าของสั่ง 2 ต.ค. 2569: *"บันทึกแล้วไม่เด้งเสร็จสิ้น"*)
@@ -894,7 +894,13 @@ const FollowPage: React.FC = () => {
       for (const r of rows) {
         const slot = replaceSlotOfEntry(r);
         if (!slot || r.cancelled || slots[slot]?.editable) continue;
-        slots[slot] = { id: r.id, at: r.scheduled_at ?? '', editable: isEditableFollowRound(r, now) };
+        slots[slot] = {
+          id: r.id,
+          at: r.scheduled_at ?? '',
+          editable: isEditableFollowRound(r, now),
+          // โทรแล้ว/มีผลแล้ว ≠ แค่เลยเวลา (20 ต.ค. 2569 — เดิมสายที่เลยเวลาแต่ไม่เคยโทรขึ้น "โทรไปแล้ว")
+          called: Boolean(r.staff_call_outcome || r.call_outcome || r.called_at || r.completed_at),
+        };
       }
       const startInit =
         [...editable, ...rows].map((r) => replaceStartInputOf(r)).find((v): v is string => Boolean(v)) ?? defaultReplaceStart();
@@ -2984,7 +2990,7 @@ const FollowPage: React.FC = () => {
                     ? Object.fromEntries(
                         REPLACE_SLOTS.map((slot) => {
                           const row = editSet.replace?.slots[slot];
-                          return [slot, row ? (row.editable ? 'editable' : 'locked') : 'none'];
+                          return [slot, row ? (row.editable ? 'editable' : row.called ? 'locked' : 'past') : 'none'];
                         }),
                       )
                     : undefined
