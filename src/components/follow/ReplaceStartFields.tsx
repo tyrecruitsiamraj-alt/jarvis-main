@@ -47,8 +47,15 @@ const ReplaceStartFields: React.FC<{
   aiPaused?: boolean;
   timing?: ReplaceTiming;
   now?: Date;
+  /**
+   * ตอนแก้ไข (20 ต.ค. 2569): สายของชุดเดิม — `locked` = โทรไปแล้ว/เลยเวลา แก้ไม่ได้ · `none` = ไม่มีสายนี้ในชุด
+   * ไม่ส่ง = ตอนเพิ่ม (ทุกสายตามวันเวลาเข้างาน)
+   */
+  slotState?: Partial<Record<ReplaceSlot, 'editable' | 'locked' | 'none'>>;
+  /** ตอนแก้ไขที่ยังไม่เปลี่ยนวันเวลาเข้างาน: เวลาโทรจริงของสายเดิม (สายคอนเฟิร์มที่ต่อคิวไว้ไม่ขยับ) */
+  atOverride?: Partial<Record<ReplaceSlot, Date>>;
   children?: React.ReactNode;
-}> = ({ value, onChange, modes, onModesChange, timing = DEFAULT_REPLACE_CALL_RULE, now = new Date(), children }) => {
+}> = ({ value, onChange, modes, onModesChange, timing = DEFAULT_REPLACE_CALL_RULE, now = new Date(), slotState, atOverride, children }) => {
   const start = replaceStartOf(value);
   // 3 สายเสมอ — สายที่เลยเวลาแล้วยังลง แต่เป็นคนโทร (เจ้าของ 7 ต.ค. 2569 ลงย้อนหลัง "ขึ้น แต่ไม่โทร")
   const plans = start ? planReplaceCallsFull(start, now, timing) : [];
@@ -66,17 +73,28 @@ const ReplaceStartFields: React.FC<{
       {children}
       <ul className="space-y-2 rounded-xl border border-border/70 p-3 text-sm" data-testid="replace-start-preview">
         {(['confirm', 'lead60', 'lead15'] as const).map((slot) => {
-          const p = plans.find((x) => x.slot === slot);
+          const state = slotState?.[slot] ?? 'editable';
+          const planned = plans.find((x) => x.slot === slot);
+          const fixed = atOverride?.[slot];
+          const p = planned && fixed ? { ...planned, at: fixed, asap: false } : planned;
           const mode = modes[slot];
           return (
             <li key={slot} className="space-y-1">
               <span className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium">{slotLabel[slot]}</span>
                 <span className={cn('tabular-nums', p ? 'text-foreground' : 'text-muted-foreground')}>
-                  {!start || !p ? '—' : p.asap ? 'ต่อคิวโทรทันที' : `${WHEN.format(p.at)} น.${p.past ? ' · เลยเวลาแล้ว คนโทร' : ''}`}
+                  {state === 'locked'
+                    ? 'โทรไปแล้ว แก้ไม่ได้'
+                    : state === 'none'
+                      ? '—'
+                      : !start || !p
+                        ? '—'
+                        : p.asap
+                          ? 'ต่อคิวโทรทันที'
+                          : `${WHEN.format(p.at)} น.${p.past ? (slotState ? ' · เลยเวลาแล้ว เอาออก' : ' · เลยเวลาแล้ว คนโทร') : ''}`}
                 </span>
               </span>
-              {p && !p.past ? (
+              {state === 'editable' && p && !p.past ? (
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1" role="group" aria-label={`ใครโทร${slotLabel[slot]}`}>
                   {(
                     [

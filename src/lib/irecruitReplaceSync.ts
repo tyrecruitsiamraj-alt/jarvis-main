@@ -383,6 +383,39 @@ export function replaceLeadStart(callAtMs: number, note: string | null | undefin
 
 /** 🔴 `Intl` ระดับโมดูลเท่านั้น */
 const BKK_YMD_FMT = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' });
+const BKK_HHMM_FMT = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+
+/**
+ * ═══ ป๊อปแก้ไขของแท็บส่งคนแทน (เจ้าของ 20 ต.ค. 2569 "ทำแท็บส่งคนแทนให้แก้ไขแบบ 4 หน้าด้วย") ═══
+ * ช่องของสาย: คีย์ก่อน (`irecruit|manual-replace:…:<ช่อง>:…`) · ไม่มีคีย์ = หมายเหตุ ("ยืนยันเวลาเข้างาน" = คอนเฟิร์ม)
+ * แล้วค่อยสายที่ 1/2/3 · อ่านไม่ออก = null
+ */
+export function replaceSlotOfEntry(e: { source_ref?: string | null; note?: string | null; call_round?: number | null }): ReplaceSlot | null {
+  const m = /^(?:irecruit|manual)-replace:[^:]+:(confirm|lead60|lead15)(?::|$)/.exec(e.source_ref ?? '');
+  if (m) return m[1] as ReplaceSlot;
+  if (/ยืนยันเวลาเข้างาน/.test(e.note ?? '')) return 'confirm';
+  const r = e.call_round ?? null;
+  return r === 1 ? 'confirm' : r === 2 ? 'lead60' : r === 3 ? 'lead15' : null;
+}
+
+/** วันเวลาเข้างานของสาย "YYYY-MM-DDTHH:MM" (นาฬิกาไทย) จากหมายเหตุ + เวลาโทร — ค่าเริ่มของขั้น 3 ตอนแก้ · อ่านไม่ออก = null */
+export function replaceStartInputOf(e: { scheduled_at?: string | null; note?: string | null }): string | null {
+  const at = Date.parse(e.scheduled_at ?? '');
+  if (!Number.isFinite(at)) return null;
+  const note = e.note ?? '';
+  const c = /ยืนยันเวลาเข้างาน\s+(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/.exec(note);
+  if (c) {
+    const [y, mo] = BKK_YMD_FMT.format(new Date(at)).split('-').map(Number);
+    const d = Number(c[1]);
+    const mm = Number(c[2]);
+    if (mm < 1 || mm > 12 || d < 1 || d > 31) return null;
+    const year = mm < mo ? y + 1 : y;
+    return `${year}-${String(mm).padStart(2, '0')}-${String(d).padStart(2, '0')}T${c[3].padStart(2, '0')}:${c[4]}`;
+  }
+  const start = replaceLeadStart(at, note);
+  if (start == null) return null;
+  return `${BKK_YMD_FMT.format(new Date(start))}T${BKK_HHMM_FMT.format(new Date(start))}`;
+}
 
 /**
  * ═══ วันเข้างานของสายส่งคนแทน (เจ้าของ 7 ต.ค. 2569 Choice "วันเข้างาน") ═══
@@ -564,6 +597,21 @@ export type ReplaceDesiredCall = { ref: string; jobId: string; slot: ReplaceSlot
  */
 export function irecruitChangedSinceSync(syncedNote: string | null | undefined, irecruitNote: string): boolean {
   return (syncedNote ?? '').trim() !== irecruitNote.trim();
+}
+
+/**
+ * ชื่อ/หน่วยงานของ iRecruit เปลี่ยนจากที่ดึงครั้งก่อนไหม (156 · 20 ต.ค. 2569 "แก้อันไหนล่าสุดเอาอันนั้น")
+ * `last*` = ค่าของ iRecruit ตอนดึงล่าสุด (ไม่ใช่ค่าที่เจ้าหน้าที่แก้บนจอ) · เทียบแบบเดียวกับ `irecruitChangedSinceSync`
+ */
+export function irecruitLabelChanged(
+  last: { irecruit_name?: string | null; irecruit_unit_name?: string | null; irecruit_site_code?: string | null },
+  now: { name: string; siteName: string | null; siteCode: string | null },
+): boolean {
+  return (
+    (last.irecruit_name ?? '') !== now.name ||
+    (last.irecruit_unit_name ?? null) !== now.siteName ||
+    (last.irecruit_site_code ?? null) !== now.siteCode
+  );
 }
 export type ReplaceExistingCall = {
   id: string;

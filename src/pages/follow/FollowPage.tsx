@@ -137,7 +137,17 @@ import ReplaceStartFields, {
   replaceStartOf,
   type ReplaceSlotModes,
 } from '@/components/follow/ReplaceStartFields';
-import { DEFAULT_REPLACE_CALL_RULE, planReplaceCallsFull, REPLACE_FOLLOW_TOPIC, type ReplaceTiming } from '@/lib/irecruitReplaceSync';
+import {
+  DEFAULT_REPLACE_CALL_RULE,
+  planReplaceCallsFull,
+  REPLACE_FOLLOW_TOPIC,
+  REPLACE_SLOTS,
+  replaceSlotNote,
+  replaceSlotOfEntry,
+  replaceStartInputOf,
+  type ReplaceSlot,
+  type ReplaceTiming,
+} from '@/lib/irecruitReplaceSync';
 import { type FollowOutcome } from '@/lib/followOutcome';
 import { buildFollowPlanningRows, callCategory, followEntryYmd, type FollowPlanningRound, type FollowRoundFilter } from '@/lib/followPlanning';
 import { toYmdBangkok, formatYmdTh } from '@/lib/dateTh';
@@ -327,7 +337,13 @@ const FollowPage: React.FC = () => {
    * `editSet` = ชุดที่กำลังแก้ (null = โหมดเพิ่ม) · `editableIds` = สายที่ยังแก้ได้ตอนเปิด (อนาคต · ยังไม่ถูกโทร)
    */
   const [roundIds, setRoundIds] = useState<Array<string | null>>(() => [null]);
-  const [editSet, setEditSet] = useState<{ anchorId: string; editableIds: string[]; lockedCount: number } | null>(null);
+  const [editSet, setEditSet] = useState<{
+    anchorId: string;
+    editableIds: string[];
+    lockedCount: number;
+    /** แท็บส่งคนแทน: สายเดิมรายช่อง + วันเวลาเข้างานตอนเปิด (ขั้น 3 = วันเวลาเข้างาน ไม่ใช่ตารางโทร) */
+    replace?: { slots: Partial<Record<ReplaceSlot, { id: string; at: string; editable: boolean }>>; startInit: string };
+  } | null>(null);
   /**
    * บันทึกเสร็จแล้ว = ป๊อปเปลี่ยนเป็นหน้า "เสร็จสิ้น" (เจ้าของสั่ง 2 ต.ค. 2569: *"บันทึกแล้วไม่เด้งเสร็จสิ้น"*)
    * 🔴 เดิมปิดป๊อปทันทีแล้วบอกผลที่แถบบนหน้า (เลื่อนจอแล้วมองไม่เห็น) · ถ้ามีสายที่ไม่ได้ส่ง AI
@@ -868,14 +884,36 @@ const FollowPage: React.FC = () => {
       setStaffPhones([entry.staff_phone ?? '']);
       setRoundIds([null]);
     }
-    setEditSet({ anchorId: entry.id, editableIds: editable.map((r) => r.id), lockedCount: rows.length - editable.length });
+    /**
+     * ส่งคนแทน (เจ้าของ 20 ต.ค. 2569 "ทำแท็บส่งคนแทนให้แก้ไขแบบ 4 หน้าด้วย") — ขั้น 3 = วันเวลาเข้างาน + ใครโทรรายสาย
+     * หมายเหตุของสายเป็นเวลาเข้างานที่ระบบเขียนให้บทพูด ⇒ ไม่เอามาใส่ช่องหมายเหตุ
+     */
+    let replace: NonNullable<typeof editSet>['replace'];
+    if (entry.follow_team === 'replacement') {
+      const slots: NonNullable<typeof replace>['slots'] = {};
+      for (const r of rows) {
+        const slot = replaceSlotOfEntry(r);
+        if (!slot || r.cancelled || slots[slot]?.editable) continue;
+        slots[slot] = { id: r.id, at: r.scheduled_at ?? '', editable: isEditableFollowRound(r, now) };
+      }
+      const startInit =
+        [...editable, ...rows].map((r) => replaceStartInputOf(r)).find((v): v is string => Boolean(v)) ?? defaultReplaceStart();
+      const modes = { ...REPLACE_SLOT_MODES_MANUAL };
+      for (const slot of REPLACE_SLOTS) {
+        const row = rows.find((r) => r.id === slots[slot]?.id);
+        if (row) modes[slot] = row.call_mode === 'manual' ? 'manual' : 'ai';
+      }
+      replace = { slots, startInit };
+      setNote('');
+      setReplaceStartVal(startInit);
+      setReplaceModes(modes);
+      setStaffPhones([editable[0]?.staff_phone ?? entry.staff_phone ?? '']);
+    }
+    setEditSet({ anchorId: entry.id, editableIds: editable.map((r) => r.id), lockedCount: rows.length - editable.length, replace });
     setFormOpen(true);
   };
-  /** ปุ่ม "แก้ไข" ทุกจุด — ส่งคนแทนยังใช้กล่องแก้ไขเดิม (ขั้น 3 เป็นวันเวลาเข้างาน คนละแบบ) */
-  const startEdit = (entry: FollowEntry) => {
-    if (entry.follow_team === 'replacement' || replaceView) setEditing(entry);
-    else openEditWizard(entry);
-  };
+  /** ปุ่ม "แก้ไข" ทุกจุด = ป๊อป 4 หน้า (ส่งคนแทนด้วยตั้งแต่ 20 ต.ค. 2569) */
+  const startEdit = (entry: FollowEntry) => openEditWizard(entry);
 
   const setScheduledAtAt = (i: number, v: string) =>
     setScheduledAts((prev) => prev.map((x, idx) => (idx === i ? v : x)));
@@ -1181,7 +1219,7 @@ const FollowPage: React.FC = () => {
   const staffPhoneAckRef = useRef('');
   /** ค่าขั้น 3 ตอนเปิดแก้ — เทียบตอนบันทึกว่าตารางเปลี่ยนไหม (ไม่เปลี่ยน = ไม่แตะตาราง ส่งแค่ข้อมูลคน) */
   const editScheduleSnapshotRef = useRef('');
-  const scheduleSnapshot = () => JSON.stringify([scheduledAts, callModes, staffPhones, roundIds]);
+  const scheduleSnapshot = () => JSON.stringify([scheduledAts, callModes, staffPhones, roundIds, replaceStartVal, replaceModes]);
   useEffect(() => {
     if (editSet && formOpen) editScheduleSnapshotRef.current = scheduleSnapshot();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- จับค่าครั้งเดียวตอนเปิดแก้
@@ -1211,6 +1249,10 @@ const FollowPage: React.FC = () => {
       }
     }
     const scheduleChanged = scheduleSnapshot() !== editScheduleSnapshotRef.current;
+    if (editSet.replace) {
+      await submitReplaceEdit(editSet.replace, scheduleChanged);
+      return;
+    }
     const rounds = scheduledAts.map((at, i) => ({
       id: roundIds[i] ?? undefined,
       iso: at ? new Date(at).toISOString() : '',
@@ -1248,6 +1290,71 @@ const FollowPage: React.FC = () => {
         // ชุดที่ไม่มีสายเหลือ แล้วเพิ่มสายใหม่ = สายใหม่ลอกข้อมูลจากสายเก่า ⇒ ตั้งข้อมูลคนซ้ำอีกรอบ (เบอร์ใหม่ + ส่งแผน)
         if (editSet.editableIds.length === 0 && out.created > 0) await updateFollowSet(editSet.anchorId, { ...fields, replan: true });
         if (out.lumos && out.lumos.pushed === false) parts.push(`ส่งตารางใหม่ให้ AI ไม่สำเร็จ${out.lumos.reason ? ` (${out.lumos.reason})` : ''}`);
+      } else if (!up.lumos.pushed && up.lumos.reason) {
+        parts.push(up.lumos.reason);
+      }
+      setFormOpen(false);
+      resetForm();
+      setOkMessage(parts.join(' · '));
+      await reload();
+    } catch (err) {
+      setFormError(friendlyErrorText(err, 'แก้ไขไม่สำเร็จ'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /**
+   * บันทึกการแก้ไขของแท็บส่งคนแทน — ข้อมูลคนทั้งชุด แล้วถ้าวันเวลาเข้างาน/ใครโทร/เจ้าหน้าที่เปลี่ยน = แก้สายที่ยังไม่โทรรายช่อง
+   * วันเวลาเข้างานเปลี่ยน = เวลาโทร + หมายเหตุใหม่ตามกติกาเดียวกับตอนเพิ่ม · สายที่เวลาใหม่เลยไปแล้ว = เอาออก
+   * 🔴 แก้ล่าสุดชนะ (เจ้าของ Choice 20 ต.ค. 2569): แก้ตรงนี้แล้ว รอบดึง iRecruit ไม่ทับ จนกว่า iRecruit แก้ใบนี้ทีหลัง
+   */
+  const submitReplaceEdit = async (rep: NonNullable<NonNullable<typeof editSet>['replace']>, scheduleChanged: boolean) => {
+    if (!editSet) return;
+    const ids: string[] = [];
+    const rounds: Array<{ id: string; scheduled_at: string; call_mode: 'ai' | 'manual'; staff_phone: string | null; note?: string }> = [];
+    if (scheduleChanged) {
+      const start = replaceStartOf(replaceStartVal);
+      if (!start) {
+        setStep(3);
+        setFormError('ใส่วันเวลาเข้างาน');
+        return;
+      }
+      const sameStart = replaceStartVal === rep.startInit;
+      const plans = planReplaceCallsFull(start, new Date(), replaceTiming);
+      for (const slot of REPLACE_SLOTS) {
+        const row = rep.slots[slot];
+        if (!row?.editable) continue;
+        ids.push(row.id);
+        const p = plans.find((x) => x.slot === slot);
+        const at = sameStart ? row.at : p && !p.past ? p.at.toISOString() : null;
+        if (!at) continue;
+        rounds.push({
+          id: row.id,
+          scheduled_at: new Date(at).toISOString(),
+          call_mode: replaceModes[slot],
+          staff_phone: (staffPhones[0] ?? '').trim() || null,
+          ...(sameStart ? {} : { note: replaceSlotNote(slot, start) }),
+        });
+      }
+    }
+    const touchSchedule = ids.length > 0;
+    setSubmitting(true);
+    try {
+      const up = await updateFollowSet(editSet.anchorId, {
+        recipient_name: composeRecipientName(prefix, firstName, lastName),
+        recipient_phone: phone,
+        topic,
+        unit_name: unitName.trim() || undefined,
+        site_code: siteCode.trim() || undefined,
+        ...extraPayload(),
+        replan: !touchSchedule,
+      });
+      const parts = [`แก้ไขแล้ว ${up.updated.toLocaleString('th-TH')} สาย`];
+      if (touchSchedule) {
+        const out = await replaceFollowSchedule(ids[0], { replace_ids: ids, rounds });
+        if (out.cancelled > 0) parts.push(`เอาออก ${out.cancelled.toLocaleString('th-TH')} สาย (เลยเวลาแล้ว)`);
+        if (out.lumos && out.lumos.pushed === false && out.lumos.reason) parts.push(`ส่งให้ AI ไม่สำเร็จ (${out.lumos.reason})`);
       } else if (!up.lumos.pushed && up.lumos.reason) {
         parts.push(up.lumos.reason);
       }
@@ -2870,6 +2977,26 @@ const FollowPage: React.FC = () => {
                 onModesChange={setReplaceModes}
                 timing={replaceTiming}
                 aiPaused={replaceAiOn === false}
+                slotState={
+                  editSet?.replace
+                    ? Object.fromEntries(
+                        REPLACE_SLOTS.map((slot) => {
+                          const row = editSet.replace?.slots[slot];
+                          return [slot, row ? (row.editable ? 'editable' : 'locked') : 'none'];
+                        }),
+                      )
+                    : undefined
+                }
+                atOverride={
+                  editSet?.replace && replaceStartVal === editSet.replace.startInit
+                    ? Object.fromEntries(
+                        REPLACE_SLOTS.flatMap((slot) => {
+                          const row = editSet.replace?.slots[slot];
+                          return row?.editable && row.at ? [[slot, new Date(row.at)]] : [];
+                        }),
+                      )
+                    : undefined
+                }
               >
                 <StaffContactField
                   id="followStaffPhoneReplace"

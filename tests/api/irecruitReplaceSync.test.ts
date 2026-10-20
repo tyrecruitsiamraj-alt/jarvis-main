@@ -73,6 +73,8 @@ function fakeDb(sql: string, params: unknown[] = []) {
   if (/update .*follow_entries set scheduled_at/.test(sql)) return { rows: [] };
   // 7 ต.ค. 2569: iRecruit แก้ชื่อ/หน่วยงาน · เติม "เพิ่มโดย"
   if (/update .*follow_entries set recipient_name = \$2, unit_name/.test(sql)) return { rows: [] };
+  // 156 (20 ต.ค. 2569): จำชื่อ/หน่วยงานของ iRecruit
+  if (/update .*follow_entries set irecruit_name = \$2/.test(sql)) return { rows: [] };
   if (/set created_by_name = v\.adder/.test(sql)) return { rows: [] };
   if (/insert into .*follow_entries/.test(sql)) {
     const ref = String(params[12]);
@@ -420,7 +422,8 @@ describe('แก้ล่าสุดชนะ (เจ้าของ 7 ต.ค.
   });
   it('🔴 รอบดึงกรองการย้ายเวลาของแถวที่เจ้าหน้าที่แก้ · คงโหมด AI ที่เขาเลือก (พัก AI อยู่ก็คง · 8 ต.ค. 2569)', () => {
     const src = readFileSync(new URL('../../api/_lib/irecruitReplaceSync.ts', import.meta.url), 'utf8');
-    expect(src).toContain('(updated_by is not null) as staff_edited, note');
+    // 156 (20 ต.ค. 2569): เทียบกับค่าของ iRecruit ตอนดึงล่าสุด ไม่ใช่หมายเหตุที่เจ้าหน้าที่แก้บนจอ
+    expect(src).toContain('(updated_by is not null) as staff_edited, coalesce(irecruit_note, note) as note');
     expect(src).toContain('return irecruitChangedSinceSync(row.note, replaceSlotNote(meta.slot, meta.wall));');
     expect(src).toContain("const mode = wasAi && meta.at.getTime() > now.getTime() + LOCK_AHEAD_MS ? 'ai' : 'manual';");
     // รอบบังคับพัก AI ข้ามสายที่เจ้าหน้าที่เลือก AI เอง (Choice "เลือก AI รายสายได้")
@@ -531,6 +534,52 @@ describe('🔴 iRecruit แก้อะไร ระบบแก้ตาม แ
     expect(upd?.params?.[0]).toBe('n1');
     expect(upd?.params?.[1]).not.toBe('ชื่อเก่า');
     expect(replan).toHaveBeenCalledWith(expect.objectContaining({ memberIds: ['n1'] }));
+  });
+});
+
+describe('🔴 แก้ล่าสุดชนะ ชื่อ/หน่วยงาน (เจ้าของ Choice 20 ต.ค. 2569 "jarvis แก้ 13.00 แต่ irecruit แก้ 13.01 เอา irecruit")', () => {
+  const base = { source_ref: `irecruit-replace:A:lead15:${pk(P1)}`, scheduled_at: '2026-10-06T00:15:00Z', mode: 'ai', group_id: 'g', recipient_phone: P1, pending: true, before_type_rule: false, note: 'เข้างาน 07:30 น.' };
+  const nameUpdates = () => calls.filter((c) => /set recipient_name = \$2, unit_name = \$3, site_code = \$4/.test(c.sql));
+  const irecruitNow = async () => {
+    existingRows = [{ id: 'z0', ...base, staff_edited: false, recipient_name: 'ชื่อเก่า', unit_name: 'หน่วยเก่า', site_code: 'OLD' } as never];
+    irecruitSqlQuery.mockResolvedValue([row('A')]);
+    await runIrecruitReplaceSync({ now: NOW });
+    const p = nameUpdates()[0]?.params ?? [];
+    calls = [];
+    return { name: p[1] as string, unit: p[2] as string, site: p[3] as string };
+  };
+  it('เจ้าหน้าที่แก้ชื่อบน jarvis ทีหลัง · iRecruit ไม่ได้เปลี่ยน = ไม่ทับ', async () => {
+    const ir = await irecruitNow();
+    existingRows = [
+      { id: 'e1', ...base, staff_edited: true, recipient_name: 'ชื่อที่แก้บนจอ', unit_name: 'หน่วยที่แก้', site_code: 'EDIT',
+        irecruit_name: ir.name, irecruit_unit_name: ir.unit, irecruit_site_code: ir.site } as never,
+    ];
+    irecruitSqlQuery.mockResolvedValue([row('A')]);
+    await runIrecruitReplaceSync({ now: NOW });
+    expect(nameUpdates()).toHaveLength(0);
+  });
+  it('iRecruit แก้ทีหลัง = ทับค่าที่แก้บน jarvis + จำค่าใหม่ของ iRecruit', async () => {
+    const ir = await irecruitNow();
+    existingRows = [
+      { id: 'e2', ...base, staff_edited: true, recipient_name: 'ชื่อที่แก้บนจอ', unit_name: 'หน่วยที่แก้', site_code: 'EDIT',
+        irecruit_name: 'ชื่อ iRecruit เดิม', irecruit_unit_name: ir.unit, irecruit_site_code: ir.site } as never,
+    ];
+    irecruitSqlQuery.mockResolvedValue([row('A')]);
+    await runIrecruitReplaceSync({ now: NOW });
+    const upd = nameUpdates();
+    expect(upd).toHaveLength(1);
+    expect(upd[0].params[0]).toBe('e2');
+    expect(upd[0].params[1]).toBe(ir.name);
+    expect(upd[0].sql).toContain('irecruit_name = $2, irecruit_unit_name = $3, irecruit_site_code = $4');
+  });
+  it('สายที่ดึงใหม่จำค่าของ iRecruit ตั้งแต่ตอนสร้าง · ย้ายเวลาตาม iRecruit = จำหมายเหตุของ iRecruit', () => {
+    const src = readFileSync(new URL('../../api/_lib/irecruitReplaceSync.ts', import.meta.url), 'utf8');
+    expect(src).toContain('irecruit_note,\n              irecruit_name, irecruit_unit_name, irecruit_site_code)');
+    expect(src).toContain('set scheduled_at = $2, note = $3, irecruit_note = $3, call_mode = $4 where id = $1');
+    const mig = readFileSync(new URL('../../migrations/156_follow_irecruit_note.sql', import.meta.url), 'utf8');
+    for (const c of ['irecruit_note', 'irecruit_name', 'irecruit_unit_name', 'irecruit_site_code']) {
+      expect(mig).toContain(`add column if not exists ${c} text null`);
+    }
   });
 });
 

@@ -55,9 +55,9 @@ describe('ต่อสายครบ', () => {
     expect(registry).not.toContain("'/api/follow-unit-info'");
     expect(read('src/pages/follow/FollowPage.tsx')).not.toContain('fetchFollowUnitInfo');
   });
-  it('ทุกเส้นบันทึกของฟอร์มส่งช่องใหม่ (ทั่วไป · ตารางหลายวัน · ส่งคนแทน · แก้ไขทั้งชุด 20 ต.ค. 2569)', () => {
+  it('ทุกเส้นบันทึกของฟอร์มส่งช่องใหม่ (ทั่วไป · ตารางหลายวัน · ส่งคนแทน · แก้ไขทั้งชุด · แก้ไขส่งคนแทน 20 ต.ค. 2569)', () => {
     const page = read('src/pages/follow/FollowPage.tsx');
-    expect(page.match(/\.\.\.extraPayload\(\)/g)?.length).toBe(4);
+    expect(page.match(/\.\.\.extraPayload\(\)/g)?.length).toBe(5);
     // ปุ่มบันทึก/ด่านคลิกซ้อนผูกกับขั้นสุดท้าย ไม่ใช่เลข 3 ตายตัว
     expect(page).toContain('step !== FOLLOW_WIZARD_LAST_STEP');
     expect(page).not.toMatch(/step !== 3\)/);

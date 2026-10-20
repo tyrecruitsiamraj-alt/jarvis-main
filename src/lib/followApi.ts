@@ -346,7 +346,7 @@ export async function replaceFollowSchedule(
   anchorId: string,
   body: {
     replace_ids: string[];
-    rounds: Array<{ id?: string; scheduled_at: string; call_mode: 'ai' | 'manual'; staff_phone?: string | null }>;
+    rounds: Array<{ id?: string; scheduled_at: string; call_mode: 'ai' | 'manual'; staff_phone?: string | null; note?: string }>;
   },
 ): Promise<FollowScheduleReplaceResult> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(anchorId)}`, {

@@ -56,6 +56,7 @@ import {
   replaceSlotNote,
   replaceSiteShortName,
   irecruitChangedSinceSync,
+  irecruitLabelChanged,
   replaceSlotRef,
   parseReplaceRef,
   pickReplaceJobPerPhoneTime,
@@ -304,12 +305,16 @@ type ExistingRow = {
   /** สร้างก่อนกติกา EX = AI · คนใน = คนโทร — เฉพาะแถวพวกนี้ที่รอบดึงเปลี่ยน AI → คนโทรให้เอง */
   /** เจ้าหน้าที่เคยแก้แถวนี้บนระบบ (`updated_by` — รอบดึงไม่เคยตั้งค่านี้) */
   staff_edited: boolean;
-  /** หมายเหตุ = เวลาเข้างานของ iRecruit ตอนดึงครั้งล่าสุด (`replaceSlotNote`) */
+  /** เวลาเข้างานของ iRecruit ตอนดึงครั้งล่าสุด (`irecruit_note` 156 · ไม่มี = หมายเหตุเดิม) — ไม่ใช่หมายเหตุที่เจ้าหน้าที่แก้ */
   note: string | null;
   /** ชื่อ/หน่วยงานปัจจุบันในแถว — iRecruit แก้แล้วต้องตาม (7 ต.ค. 2569) */
   recipient_name: string | null;
   unit_name: string | null;
   site_code: string | null;
+  /** ชื่อ/หน่วยงานของ iRecruit ตอนดึงล่าสุด (156 · ไม่มี = ค่าในแถว) — ตัดสิน "แก้ล่าสุดชนะ" */
+  irecruit_name?: string | null;
+  irecruit_unit_name?: string | null;
+  irecruit_site_code?: string | null;
 };
 
 /** คีย์คนไปแทน — แฮชเบอร์ (ไม่เก็บเบอร์ดิบในคีย์) · เปลี่ยนคน = คีย์ใหม่ */
@@ -376,6 +381,18 @@ async function enqueueByPersonDay(items: Array<{ id: string; meta: DesiredMeta }
     }
   }
   return out;
+}
+
+/** จำชื่อ/หน่วยงานของ iRecruit (156) — ค่าบนจอตรงอยู่แล้ว แต่ iRecruit เพิ่งเปลี่ยนมาเท่ากัน · ฐานยังไม่รัน 156 = ข้าม */
+async function rememberIrecruitLabel(id: string, meta: { name: string; siteName: string | null; siteCode: string | null }): Promise<void> {
+  try {
+    await dbQuery(
+      `update ${followTable} set irecruit_name = $2, irecruit_unit_name = $3, irecruit_site_code = $4 where id = $1`,
+      [id, meta.name, meta.siteName, meta.siteCode],
+    );
+  } catch (e) {
+    if (!isUndefinedColumn(e)) logWarn('irecruit.replaceSync: จำชื่อ/หน่วยงานของ iRecruit ไม่สำเร็จ', { id, error: errorSummaryText(e) });
+  }
 }
 
 async function setDispatchState(id: string, state: FollowDispatchState): Promise<void> {
@@ -513,7 +530,10 @@ async function runIrecruitReplaceSyncUnlocked(
                 (cancelled_at is null and completed_at is null and staff_call_outcome is null
                   and scheduled_at > $1::timestamptz) as pending,
                 (cancelled_at is not null) as cancelled,
-                (updated_by is not null) as staff_edited, note, recipient_name, unit_name, site_code
+                (updated_by is not null) as staff_edited, coalesce(irecruit_note, note) as note, recipient_name, unit_name, site_code,
+                coalesce(irecruit_name, recipient_name) as irecruit_name,
+                coalesce(irecruit_unit_name, unit_name) as irecruit_unit_name,
+                coalesce(irecruit_site_code, site_code) as irecruit_site_code
            from ${followTable}
           where source_ref like 'irecruit-replace:%'
             and (scheduled_at >= $2::timestamptz or source_ref = any($3::text[]))`,
@@ -631,7 +651,8 @@ async function runIrecruitReplaceSyncUnlocked(
         // 🔴 ใครโทรตัดสินครั้งเดียวตอนสร้าง (เจ้าของ Choice 13 ต.ค. 2569) — iRecruit แก้แค่เวลา = คงใครโทรเดิม
         //    ยกเว้นเวลาใหม่ถึงแล้ว = คนโทร (AI ไม่โทรย้อนหลัง · กติกาเดียวกับฝั่งคนเริ่มงาน)
         const mode = wasAi && meta.at.getTime() > now.getTime() + LOCK_AHEAD_MS ? 'ai' : 'manual';
-        await dbQuery(`update ${followTable} set scheduled_at = $2, note = $3, call_mode = $4 where id = $1`, [
+        // iRecruit ย้ายเวลา = จำค่าของ iRecruit ไว้ด้วย (156) — ตัวตัดสิน "แก้ล่าสุดชนะ" รอบหน้า
+        await dbQuery(`update ${followTable} set scheduled_at = $2, note = $3, irecruit_note = $3, call_mode = $4 where id = $1`, [
           ex.id,
           meta.at.toISOString(),
           replaceSlotNote(meta.slot, meta.wall),
@@ -664,9 +685,17 @@ async function runIrecruitReplaceSyncUnlocked(
       if (!meta) continue;
       const nameChanged = (x.recipient_name ?? '') !== meta.name;
       const siteChanged = (x.unit_name ?? null) !== meta.siteName || (x.site_code ?? null) !== meta.siteCode;
-      if (!nameChanged && !siteChanged) continue;
+      /** iRecruit เปลี่ยนจากที่ดึงครั้งก่อนไหม (156) — แถวที่เจ้าหน้าที่แก้แล้ว ทับเฉพาะตอน iRecruit แก้ทีหลัง (แก้ล่าสุดชนะ · 20 ต.ค. 2569) */
+      const irecruitChanged = irecruitLabelChanged(x, meta);
+      if (!nameChanged && !siteChanged) {
+        if (irecruitChanged) await rememberIrecruitLabel(x.id, meta);
+        continue;
+      }
+      if (x.staff_edited && !irecruitChanged) continue;
       try {
-        await dbQuery(`update ${followTable} set recipient_name = $2, unit_name = $3, site_code = $4 where id = $1`, [
+        await dbQuery(
+          `update ${followTable} set recipient_name = $2, unit_name = $3, site_code = $4,
+                  irecruit_name = $2, irecruit_unit_name = $3, irecruit_site_code = $4 where id = $1`, [
           x.id,
           meta.name,
           meta.siteName,
@@ -733,8 +762,9 @@ async function runIrecruitReplaceSyncUnlocked(
           `insert into ${followTable}
              (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at,
               group_id, call_times, unit_name, site_code, call_round, call_mode,
-              created_by, created_by_name, follow_team, source_ref)
-           values ($1, $2, $3, $4, $14, $5, $6, null, $7, $8, $9, $10, null, $11, $12, $13)
+              created_by, created_by_name, follow_team, source_ref, irecruit_note,
+              irecruit_name, irecruit_unit_name, irecruit_site_code)
+           values ($1, $2, $3, $4, $14, $5, $6, null, $7, $8, $9, $10, null, $11, $12, $13, $4, $1, $7, $8)
            returning id`,
           [meta.name, meta.phone, REPLACE_FOLLOW_TOPIC, replaceSlotNote(meta.slot, meta.wall), meta.at.toISOString(), groupId,
            meta.siteName, meta.siteCode, meta.round, meta.mode, meta.adder ?? actorName, FOLLOW_TEAM_REPLACEMENT, meta.ref,

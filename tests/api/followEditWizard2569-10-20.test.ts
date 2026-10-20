@@ -37,10 +37,10 @@ describe('แก้ข้อมูลคนทั้งชุด (update_set)', 
 
 describe('หน้าติดตาม: ปุ่มแก้ไขเปิดป๊อป 4 หน้า', () => {
   const page = read('src/pages/follow/FollowPage.tsx');
-  it('ทุกปุ่มแก้ไขผ่าน startEdit · ส่งคนแทนยังใช้กล่องเดิม · หัวป๊อปเป็นแก้ไข · ขั้นกดข้ามได้ · บันทึกได้ทุกขั้น', () => {
+  it('ทุกปุ่มแก้ไขผ่าน startEdit (ส่งคนแทนด้วย 20 ต.ค. 2569) · หัวป๊อปเป็นแก้ไข · ขั้นกดข้ามได้ · บันทึกได้ทุกขั้น', () => {
     expect(page).not.toMatch(/onEditRound=\{\(round\) => setEditing\(/);
     expect(page).toContain('startEdit(entry);');
-    expect(page).toContain("if (entry.follow_team === 'replacement' || replaceView) setEditing(entry);");
+    expect(page).toContain('const startEdit = (entry: FollowEntry) => openEditWizard(entry);');
     expect(page).toContain("{editSet ? 'แก้ไขรายการติดตาม' : 'เพิ่มคนที่ต้องการติดตาม'}");
     expect(page).toContain('disabled={!editSet && s.step > step}');
     expect(page).toContain("'บันทึกการแก้ไข'");

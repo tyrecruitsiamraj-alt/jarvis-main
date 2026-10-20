@@ -1565,7 +1565,7 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
  */
 export type FollowScheduleReplace = {
   replaceIds: string[];
-  rounds: Array<{ id: string | null; when: Date; callMode: 'ai' | 'manual'; staffPhone?: string | null }>;
+  rounds: Array<{ id: string | null; when: Date; callMode: 'ai' | 'manual'; staffPhone?: string | null; note?: string | null }>;
 };
 
 /** เพดานกันคำขอผิดปกติเท่านั้น — 92 วัน × วันละ 24 สาย (8 ต.ค. 2569 เลิกจำกัด 5 สาย/วัน · เดิม 460) */
@@ -1606,9 +1606,17 @@ export function parseFollowScheduleReplace(
     const staffRaw = typeof o.staff_phone === 'string' ? o.staff_phone.trim() : undefined;
     if (staffRaw && (staffRaw.match(/\d/g) ?? []).length < 8) return fail('เบอร์เจ้าหน้าที่ไม่ถูกต้อง — ใส่เบอร์ที่ผู้สมัครโทรกลับได้จริง');
     if (staffRaw && isPlaceholderPhone(staffRaw)) return fail(PLACEHOLDER_PHONE_ERROR);
+    // หมายเหตุรายสาย (ส่งคนแทนแก้วันเวลาเข้างาน · 20 ต.ค. 2569 — บทพูดอ่านเวลาเข้างานจากหมายเหตุ) — ไม่ส่ง = คงเดิม
+    const noteRaw = typeof o.note === 'string' ? o.note.trim().slice(0, 500) : undefined;
     if (id) seenIds.add(id);
     seenMinutes.add(minute);
-    rounds.push({ id, when, callMode: modeRaw, ...(staffRaw !== undefined ? { staffPhone: staffRaw || null } : {}) });
+    rounds.push({
+      id,
+      when,
+      callMode: modeRaw,
+      ...(staffRaw !== undefined ? { staffPhone: staffRaw || null } : {}),
+      ...(noteRaw !== undefined ? { note: noteRaw || null } : {}),
+    });
   }
   if (replaceIds.length === 0 && rounds.length === 0) return fail('ไม่มีอะไรให้แก้');
   rounds.sort((a, b) => a.when.getTime() - b.when.getTime());
@@ -1643,9 +1651,11 @@ async function updateFollowSet(req: AuthedReq, res: ApiRes, body: Record<string,
   const actor = [req.user.sub, req.user.email ?? null] as const;
   const setWhere = anchor.group_id ? `group_id = $1` : `id = $1`;
   const setKey = anchor.group_id ?? anchor.id;
+  // ส่งคนแทน: หมายเหตุของแต่ละสาย = เวลาเข้างานที่บทพูดอ่าน (ระบบเขียนเอง) ⇒ เส้นนี้ไม่แตะ · แก้ผ่านตาราง (`replace_schedule`)
+  const keepNote = anchor.follow_team === FOLLOW_TEAM_REPLACEMENT;
   const { rows: updated } = await dbQuery<FollowRow>(
     `update ${followTable}
-        set recipient_name = $2, topic = $3, note = $4, unit_name = $5, site_code = $6,
+        set recipient_name = $2, topic = $3, note = ${keepNote ? 'note' : '$4'}, unit_name = $5, site_code = $6,
             recipient_phone = case when scheduled_at > now() then $7 else recipient_phone end,
             updated_at = now(), updated_by = $8, updated_by_name = $9
       where ${setWhere} and cancelled_at is null and completed_at is null
@@ -1779,6 +1789,9 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
     if (r.staffPhone !== undefined && (r.staffPhone ?? null) !== (before.staff_phone ?? null)) {
       await dbQuery(`update ${followTable} set staff_phone = $2 where id = $1`, [r.id, r.staffPhone ?? null]);
     }
+    if (r.note !== undefined && (r.note ?? null) !== (before.note ?? null)) {
+      await dbQuery(`update ${followTable} set note = $2 where id = $1`, [r.id, r.note ?? null]);
+    }
     if (!moved && beforeMode === r.callMode && before.group_id === groupId) continue;
     await dbQuery(
       `update ${followTable}
@@ -1847,6 +1860,7 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
       staffPhone: r.staffPhone !== undefined ? r.staffPhone : base.staffPhone,
       callRound: null,
       callMode: r.callMode,
+      ...(r.note !== undefined ? { note: r.note } : {}),
     });
     if (!row) continue;
     createdIds.push(row.id);
@@ -1869,6 +1883,12 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
   let next = Math.max(Number(locked[0]?.max_round ?? 0), Number(locked[0]?.n ?? 0)) + 1;
   for (const r of rounds) {
     if (!r.id) continue;
+    // ส่งคนแทน 3 สาย: สายที่ = ช่องของใบงาน (คอนเฟิร์ม 1 · ก่อน 1 ชม. 2 · ก่อน 15 นาที 3) ห้ามนับต่อ (20 ต.ค. 2569)
+    const slotRound = replaceSlotRoundOfRef(byId.get(r.id)?.source_ref);
+    if (slotRound != null) {
+      await dbQuery(`update ${followTable} set call_round = $2 where id = $1`, [r.id, slotRound]);
+      continue;
+    }
     await dbQuery(`update ${followTable} set call_round = $2 where id = $1`, [r.id, next]);
     next += 1;
   }
