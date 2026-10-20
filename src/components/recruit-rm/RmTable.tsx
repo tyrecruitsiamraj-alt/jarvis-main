@@ -557,8 +557,9 @@ const RmTable: React.FC<{
                       ไม่งั้นทุกแถวเลื่อนไปหนึ่งช่อง (ข้อมูลไปโผล่ใต้หัวคอลัมน์ผิด) */}
                   <td className="px-1.5 py-2 max-lg:sticky max-lg:right-0 max-lg:bg-card">
                     {tab === 'appointments' ? <div className="mb-1 flex justify-end sm:hidden">{attendanceButtons(r, true)}</div> : null}
-                    {/* มือถือ: ปุ่ม 2×2 ให้คอลัมน์ที่ติดขวาแคบลง ไม่บังข้อมูลทั้งแถว (QA 19 ต.ค. 2569: เดิมกว้าง 207px บังหมด) */}
-                    <div className="flex items-center justify-end gap-0.5 max-sm:grid max-sm:grid-cols-2 max-sm:gap-1">
+                    {/* มือถือ: ปุ่ม 2×2 ให้คอลัมน์ที่ติดขวาแคบลง ไม่บังข้อมูลทั้งแถว (QA 19 ต.ค. 2569: เดิมกว้าง 207px บังหมด)
+                        w-max: ตารางบีบช่องนี้เหลือ 42px ⇒ ปุ่ม 40px ซ้อนกันจนกดยาก (เจ้าของ 20 ต.ค. 2569 แท็บการติดต่อ) */}
+                    <div className="flex items-center justify-end gap-0.5 max-sm:grid max-sm:w-max max-sm:grid-cols-2 max-sm:gap-1">
                       {actions.map((a) => {
                         const silentAi = aiQueueStatusOf(r)?.kind === 'silent';
                         const Icon = (tab === 'contact' ? CONTACT_ACTION_ICON[a] : undefined) ?? ACTION_ICON[a];

@@ -31,3 +31,9 @@ describe('ผลจาก Lumos: ใบผิดรูปไม่ลากใ�
     expect(read('api/_handlers/lumos-interview.ts')).toMatch(/recordLumosResultInbox\(\{\s*channel: 'interview',\s*\.\.\.readInboxFields\(r\),\s*matched: ok/);
   });
 });
+
+describe('มือถือ: ปุ่มช่องตัวเลือกห้ามซ้อนกัน (เจ้าของ 20 ต.ค. 2569 แท็บการติดต่อ)', () => {
+  it('กล่องปุ่ม 2 คอลัมน์กว้างตามปุ่ม ไม่ให้ตารางบีบเหลือ 42px', () => {
+    expect(read('src/components/recruit-rm/RmTable.tsx')).toContain('max-sm:grid max-sm:w-max max-sm:grid-cols-2');
+  });
+});
