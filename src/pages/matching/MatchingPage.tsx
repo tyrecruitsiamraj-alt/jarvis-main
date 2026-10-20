@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ToneDot from '@/components/shared/ToneDot';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 import { unitOneLine } from '@/lib/unitDisplay';
 import { conveyorLabel } from '@/lib/soRecruitNav';
 import Term from '@/components/shared/Term';
@@ -2716,82 +2719,59 @@ const MatchingPage: React.FC = () => {
           side="right"
           className="matching-sheet-scroll w-full overflow-y-auto [scrollbar-gutter:stable] sm:max-w-xl"
         >
-          <SheetHeader>
-            <SheetTitle className="text-foreground">คนของเรา — ไม่มีงาน · Re Use · Drop</SheetTitle>
-            <SheetDescription className="sr-only">คนของเราที่สกิลตรงกับใบขอ</SheetDescription>
+          {/* 20 ต.ค. 2569 เจ้าของ: "แก้หน้านี้ให้ดูสวย ดูง่าย ลดความเป็น AI · ใช้ shadcn · ระยะห่างเท่ากัน"
+              ⇒ หัวใบขอเป็น Card เดียว · ป้ายเงื่อนไขเป็น Badge · ปุ่มเป็น Button · ตัดเลขใบขอที่ขึ้นซ้ำ */}
+          <SheetHeader className="space-y-1">
+            <SheetTitle className="text-foreground">จับคู่คนกับใบขอ</SheetTitle>
+            <SheetDescription>จากกล่อง ไม่มีงาน · Re Use · Drop</SheetDescription>
           </SheetHeader>
           {jobDetail ? (
-            <div className="space-y-3 mt-2">
-              <div className="rounded-xl border border-white/70 bg-white/40 dark:border-white/10 dark:bg-white/5 px-3 py-3 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0">
-                      <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-300" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-medium text-foreground truncate">{unitRequestCardTitle(jobDetail)}</div>
-                      {jobDetail.request_no ? (
-                        <div className="text-[11px] text-muted-foreground">{jobDetail.request_no}</div>
-                      ) : null}
-                    </div>
+            <div className="mt-4 space-y-4">
+              <Card className="space-y-3 rounded-2xl p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-base font-medium text-foreground">{unitRequestCardTitle(jobDetail)}</p>
+                    {[jobDetail.staff_title_name, jobDetail.job_description_code_1, jobDetail.job_description_code_2]
+                      .filter((v) => v && v !== 'ไม่ระบุ').length ? (
+                      <p className="text-sm text-foreground">
+                        {[jobDetail.staff_title_name, jobDetail.job_description_code_1, jobDetail.job_description_code_2]
+                          .filter((v) => v && v !== 'ไม่ระบุ')
+                          .join(' · ')}
+                      </p>
+                    ) : null}
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row">
-                    <button
-                      type="button"
-                      onClick={() => openBranchEditor(jobDetail)}
-                      className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-300 dark:hover:bg-violet-900/40"
-                    >
-                      <MapPin className="h-3 w-3" /> แก้ไขเงื่อนไข/สาขา
-                    </button>
-                    <Link
-                      to={unitRequestPath(jobDetail)}
-                      state={{ returnTo: '/matching/match' }}
-                      onClick={() => setJobDetail(null)}
-                      className={cn(
-                        'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium',
-                        TONE.primary.outline,
-                      )}
-                    >
-                      ดูใบขอ <ExternalLink className="h-3 w-3" />
-                    </Link>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => openBranchEditor(jobDetail)}>
+                      <MapPin aria-hidden /> แก้เงื่อนไข/สาขา
+                    </Button>
+                    <Button asChild variant="outline" size="sm">
+                      <Link to={unitRequestPath(jobDetail)} state={{ returnTo: '/matching/match' }} onClick={() => setJobDetail(null)}>
+                        ดูใบขอ <ExternalLink aria-hidden />
+                      </Link>
+                    </Button>
                   </div>
                 </div>
-                {[jobDetail.staff_title_name, jobDetail.job_description_code_1, jobDetail.job_description_code_2]
-                  .filter((v) => v && v !== 'ไม่ระบุ').length ? (
-                  <p className="text-xs text-foreground">
-                    ตำแหน่ง:{' '}
-                    {[jobDetail.staff_title_name, jobDetail.job_description_code_1, jobDetail.job_description_code_2]
-                      .filter((v) => v && v !== 'ไม่ระบุ')
-                      .join(' · ')}
-                  </p>
+                {jobDetail.location_address ? (
+                  <p className="text-xs leading-relaxed text-muted-foreground">{jobDetail.location_address}</p>
                 ) : null}
-                <div className="text-[11px] text-muted-foreground">{jobDetail.location_address}</div>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    เพศ: {jobDetail.gender_requirement || 'ไม่ระบุ'}
-                  </span>
-                  <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    อายุ:{' '}
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="font-normal">เพศ {jobDetail.gender_requirement || 'ไม่ระบุ'}</Badge>
+                  <Badge variant="outline" className="font-normal">
+                    อายุ{' '}
                     {jobDetail.age_range_min != null || jobDetail.age_range_max != null
                       ? `${jobDetail.age_range_min ?? '—'}–${jobDetail.age_range_max ?? '—'}`
                       : 'ไม่ระบุ'}
-                  </span>
-                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                  </Badge>
+                  <Badge variant="outline" className="font-normal tabular-nums">
                     {jobDetail.total_income.toLocaleString()} บาท
-                  </span>
-                  <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    ต้องการ: {formatYmdDmyBe(jobDetail.required_date)}
-                  </span>
-                  <span
-                    className={cn(
-                      'rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                      jobDetail.urgency === 'urgent'
-                        ? cn(TONE.danger.soft, TONE.danger.value)
-                        : cn(TONE.info.soft, TONE.info.value),
-                    )}
+                  </Badge>
+                  <Badge variant="outline" className="font-normal">ต้องการ {formatYmdDmyBe(jobDetail.required_date)}</Badge>
+                  <Badge
+                    variant="outline"
+                    className={cn(jobDetail.urgency === 'urgent' ? cn(TONE.danger.soft, TONE.danger.value) : 'font-normal')}
                   >
                     {jobDetail.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
-                  </span>
+                  </Badge>
                 </div>
                 {/* ย้ายมาจากการ์ด (15 ต.ค. 2569 ตัดหนัก): ทำอะไรต่อ · AI แนะนำ · ผลโทรในใบนี้ · หาคนจากกองไม่สนใจ */}
                 {(() => {
@@ -2801,8 +2781,8 @@ const MatchingPage: React.FC = () => {
                   const action = cardNextAction(mc, serverLumosSummary[jobDetail.id]);
                   const progressChip = lumosProgressChip(proposalCounts(proposalsByJobId[jobDetail.id]));
                   return (
-                    <div className="space-y-2 border-t border-border/70 pt-2" data-testid="matching-detail-moved">
-                      <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="space-y-3 border-t border-border pt-3" data-testid="matching-detail-moved">
+                      <div className="flex flex-wrap items-center gap-2">
                         {action ? <span className={cn(TONE[action.tone].chip, 'max-w-full truncate')}>{action.text}</span> : null}
                         {mc != null ? <span className={cn(TONE.success.chip, 'shrink-0')}>AI แนะนำ {mc}</span> : null}
                         <LumosJobStatChips s={serverLumosSummary[jobDetail.id]} />
@@ -2810,14 +2790,14 @@ const MatchingPage: React.FC = () => {
                           <span className={cn(TONE[progressChip.tone].chip, 'shrink-0 whitespace-nowrap tabular-nums')}>{progressChip.text}</span>
                         ) : null}
                       </div>
-                      <LumosJobSummaryStats s={serverLumosSummary[jobDetail.id]} variant="inline" />
-                      <div className="flex justify-end">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <LumosJobSummaryStats s={serverLumosSummary[jobDetail.id]} variant="inline" />
                         <SelectionRecallButton jobId={jobDetail.id} />
                       </div>
                     </div>
                   );
                 })()}
-              </div>
+              </Card>
 
               {(() => {
                 const branches = branchDemandItems(jobDetail);
@@ -2838,53 +2818,39 @@ const MatchingPage: React.FC = () => {
                   }
                 }
                 return (
-                  <div className="rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-3 dark:border-violet-800 dark:bg-violet-950/50">
+                  <Card className="space-y-3 rounded-2xl p-4">
                     <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-xs font-medium text-violet-900 dark:text-violet-200">สาขาที่ระบบแยกได้ ({branches.length})</p>
-                        <p className="text-[10px] text-violet-700 dark:text-violet-300">กรุณาตรวจสอบ เพราะข้อความต้นทางอาจแยกคลาดเคลื่อนได้</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => openBranchEditor(jobDetail)}
-                        className={cn(
-                          'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium',
-                          TONE.violet.outline,
-                        )}
-                      >
+                      <p className="text-sm font-medium text-foreground">สาขา {branches.length} แห่ง</p>
+                      <Button type="button" variant="outline" size="sm" onClick={() => openBranchEditor(jobDetail)}>
                         แก้ไข
-                      </button>
+                      </Button>
                     </div>
-                    <div className="mt-2 space-y-1.5">
+                    <div className="divide-y divide-border">
                       {branches.map((branch, index) => (
                         <div
                           key={branch.branch_id || `${branch.branch_name_clean}-${index}`}
-                          className="flex items-start justify-between gap-3 rounded-lg border border-white/80 bg-white/80 dark:border-white/10 dark:bg-white/5 px-2.5 py-2 text-[11px]"
+                          className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0"
                         >
-                          <div className="min-w-0">
-                            <p className="font-medium text-slate-800 dark:text-slate-200">{branch.branch_name_clean || `สาขา ${index + 1}`}</p>
-                            <p className="text-slate-600 dark:text-slate-300">
+                          <div className="min-w-0 space-y-1">
+                            <p className="text-sm font-medium text-foreground">{branch.branch_name_clean || `สาขา ${index + 1}`}</p>
+                            <p className="text-xs text-muted-foreground">
                               {[branch.road, branch.subdistrict, branch.district_hint, branch.province_hint]
                                 .filter(Boolean)
-                                .join(' · ') || branch.address_raw || 'ยังไม่มีรายละเอียดที่อยู่'}
+                                .join(' · ') || branch.address_raw || 'ยังไม่มีที่อยู่'}
                             </p>
                           </div>
-                          <div className="flex shrink-0 flex-col items-end gap-1">
-                            <span className="rounded-full bg-violet-100 px-2 py-0.5 font-medium text-violet-800 dark:bg-violet-900/40 dark:text-violet-200">
-                              ต้องการ {branch.requested_qty} คน
+                          <div className="flex shrink-0 flex-col items-end gap-1 text-xs tabular-nums">
+                            <span className="font-medium text-foreground">ต้องการ {branch.requested_qty} คน</span>
+                            <span className="text-muted-foreground">
+                              {boardMatchById[jobDetail.id]
+                                ? `ใกล้สาขา ${nearbyCounts.get(branch.branch_id || branch.branch_name_clean) || 0} คน`
+                                : 'รอประเมิน'}
                             </span>
-                            {boardMatchById[jobDetail.id] ? (
-                              <span className={cn('rounded-full border px-2 py-0.5 font-medium', TONE.success.soft, TONE.success.value)}>
-                                คนของเราใกล้ {nearbyCounts.get(branch.branch_id || branch.branch_name_clean) || 0} คน
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-slate-500">รอประเมินคนใกล้สาขา</span>
-                            )}
                           </div>
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </Card>
                 );
               })()}
 
@@ -2900,24 +2866,18 @@ const MatchingPage: React.FC = () => {
                   { label: 'AI แนะนำ', value: recommended, cls: TONE.info.value },
                   { label: 'ติดต่อ', value: progress.contacted, cls: TONE[PROPOSAL_STATUS_TONE.contacted].value },
                   { label: 'จอง', value: progress.reserved, cls: TONE[PROPOSAL_STATUS_TONE.reserved].value },
-                  { label: 'ลงงาน Matching', value: progress.placed, cls: TONE[PROPOSAL_STATUS_TONE.placed].value },
-                  { label: 'เหลือหาทางการ', value: officialRemainingCount(jobDetail), cls: TONE.warn.value },
+                  { label: 'ลงงาน', value: progress.placed, cls: TONE[PROPOSAL_STATUS_TONE.placed].value },
+                  { label: 'เหลือหา', value: officialRemainingCount(jobDetail), cls: TONE.warn.value },
                 ];
+                // ตัวเลข 6 ช่องเรียงแถวเดียว ตัวเลขใหญ่ป้ายเล็ก · ตัดประโยคอธิบายใต้ช่องออก (20 ต.ค. 2569)
                 return (
-                  // พื้นอ่อนตัวนี้เดิมไม่มีคู่มืด — โหมดมืดกล่องยังสว่างแต่ตัวหนังสือเปลี่ยนเป็นสีจาง
-                  // วัดได้ contrast 1.27 คือแทบมองไม่เห็น
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 dark:border-slate-700 dark:bg-slate-900/60">
-                    <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
-                      {cells.map((cell) => (
-                        <div key={cell.label} className="rounded-lg bg-white px-1.5 py-1.5 text-center dark:bg-slate-900">
-                          <div className={cn('text-sm font-medium tabular-nums', cell.cls)}>{cell.value}</div>
-                          <div className="text-[9px] leading-tight text-muted-foreground">{cell.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-1.5 text-[9px] leading-relaxed text-muted-foreground">
-                      สถานะ Matching ใช้ติดตามการทำงานของทีมเท่านั้น ส่วน “เหลือหาทางการ” อิงข้อมูลหาได้แล้วและยกเลิกจากใบขอ
-                    </p>
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                    {cells.map((cell) => (
+                      <div key={cell.label} className="space-y-1 rounded-xl border border-border bg-card px-2 py-3 text-center">
+                        <p className={cn('text-lg font-medium leading-none tabular-nums', cell.cls)}>{cell.value}</p>
+                        <p className="text-xs text-muted-foreground">{cell.label}</p>
+                      </div>
+                    ))}
                   </div>
                 );
               })()}
@@ -2929,39 +2889,34 @@ const MatchingPage: React.FC = () => {
                   (ปุ่มลงมืออยู่ในแถบก้น drawer ที่เห็นตลอด ไม่เป็นหัวข้อของตัวเอง)
                   ⚠️ ใช้ "1./2./3./4." ไม่ใช่ "ขั้น N" — แถบการไหลของงานด้านบนของหน้า
                   ใช้คำว่า "ขั้น 1 · ฝั่งงาน / ขั้น 2 · ฝั่งการโทร" อยู่แล้ว ซ้ำกันแล้วสับสน */}
-              <div className={cn('flex items-center gap-2 border-t pt-3', DASH.divider)}>
-                <span className={cn('shrink-0 text-[11px] font-medium', TONE.primary.value)}>
-                  1. คนของเรา — ติ๊กเลือกได้
-                </span>
-                <span className={cn('h-px flex-1', DASH.divider, 'border-t')} aria-hidden />
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
-                  {boardMatchById[jobDetail.id]
-                    ? `AI แมทสกิล · จาก pool ${boardMatchById[jobDetail.id].pool_size} คน → แนะนำ ${recommendedCandidateCount(boardMatchById[jobDetail.id].matches)}` +
-                      (boardMatchById[jobDetail.id].recommended_target
-                        ? ` / เป้า ${boardMatchById[jobDetail.id].recommended_target}`
-                        : '')
-                    : 'ผู้สมัครที่พร้อมลงงานทันที'}
-                </p>
-                <div className="flex items-center gap-1.5">
+              <Separator />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium text-foreground">คนของเรา</h3>
+                  <p className="text-xs text-muted-foreground tabular-nums">
+                    {boardMatchById[jobDetail.id]
+                      ? `แนะนำ ${recommendedCandidateCount(boardMatchById[jobDetail.id].matches)} จาก ${boardMatchById[jobDetail.id].pool_size} คน` +
+                        (boardMatchById[jobDetail.id].recommended_target
+                          ? ` · เป้า ${boardMatchById[jobDetail.id].recommended_target}`
+                          : '')
+                      : 'พร้อมลงงานทันที'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
                   {(() => {
                     const proposedCount = (boardMatchById[jobDetail.id]?.matches ?? []).filter(
                       (m) => proposedByKey[proposalKey('board', m.card_id)],
                     ).length;
                     return proposedCount > 0 ? (
-                      <button
+                      <Button
                         type="button"
+                        size="sm"
+                        variant={hideProposed ? 'secondary' : 'outline'}
+                        aria-pressed={hideProposed}
                         onClick={() => setHideProposed((v) => !v)}
-                        className={cn(
-                          'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
-                          hideProposed
-                            ? cn(TONE.success.soft, TONE.success.value)
-                            : cn(TONE.neutral.outline, 'hover:border-emerald-300 dark:hover:border-emerald-700'),
-                        )}
                       >
-                        {hideProposed ? `แสดงทั้งหมด` : `ซ่อนที่เสนอแล้ว (${proposedCount})`}
-                      </button>
+                        {hideProposed ? 'แสดงทั้งหมด' : `ซ่อนที่เสนอแล้ว (${proposedCount})`}
+                      </Button>
                     ) : null;
                   })()}
                   {(() => {
@@ -2969,23 +2924,18 @@ const MatchingPage: React.FC = () => {
                       distantCandidateCount(boardMatchById[jobDetail.id]?.matches) +
                       distantCandidateCount(irMatchById[jobDetail.id]?.matches);
                     return distant > 0 ? (
-                      <button
+                      <Button
                         type="button"
+                        size="sm"
+                        variant={showDistantCandidates ? 'secondary' : 'outline'}
+                        aria-pressed={showDistantCandidates}
                         onClick={() => setShowDistantCandidates((current) => !current)}
-                        className={cn(
-                          'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
-                          showDistantCandidates
-                            ? cn(TONE.danger.soft, TONE.danger.value)
-                            : cn(TONE.neutral.outline, 'hover:border-red-200 dark:hover:border-red-800'),
-                        )}
                       >
-                        {showDistantCandidates
-                          ? 'ซ่อนคนนอกพื้นที่/ห่างไกล'
-                          : `แสดงคนนอกพื้นที่/ห่างไกล (${distant})`}
-                      </button>
+                        {showDistantCandidates ? 'ซ่อนคนที่อยู่ไกล' : `คนที่อยู่ไกล (${distant})`}
+                      </Button>
                     ) : null;
                   })()}
-                  <Button variant="secondary" size="sm"
+                  <Button variant="outline" size="sm"
                     type="button"
                     disabled={boardLoadingId === jobDetail.id || !!boardWaitingById[jobDetail.id]}
                     onClick={() => setRematchConfirmJobId(jobDetail.id)}
@@ -2993,14 +2943,13 @@ const MatchingPage: React.FC = () => {
                   >
                     <RefreshCw
                       className={cn(
-                        'h-3 w-3',
                         (boardLoadingId === jobDetail.id || boardWaitingById[jobDetail.id]) && 'animate-spin',
                       )}
                     />
                     {boardWaitingById[jobDetail.id]
-                      ? 'AI กำลังคิดที่หลังบ้าน…'
+                      ? 'กำลังค้นหา…'
                       : boardLoadingId === jobDetail.id
-                        ? 'กำลังโหลดผล…'
+                        ? 'กำลังโหลด…'
                         : 'ค้นหาใหม่'}
                   </Button>
                 </div>
@@ -3010,8 +2959,8 @@ const MatchingPage: React.FC = () => {
               distantCandidateCount(boardMatchById[jobDetail.id]?.matches) +
                 distantCandidateCount(irMatchById[jobDetail.id]?.matches) >
                 0 ? (
-                <p className={cn('rounded-lg border px-2.5 py-1.5 text-[10px]', TONE.danger.soft, TONE.danger.value)}>
-                  กำลังแสดงคนนอกพื้นที่/ห่างไกลด้วยเพื่อเป็นทางเลือกสำรอง — กลุ่มนี้ไม่ถูกนับรวมในยอด AI แนะนำ
+                <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.warn.soft, TONE.warn.value)}>
+                  รวมคนที่อยู่ไกลด้วย ไม่นับในยอดแนะนำ
                 </p>
               ) : null}
 
@@ -3021,12 +2970,12 @@ const MatchingPage: React.FC = () => {
                   ห่างกันครึ่งหน้าจอ และมีปุ่มส่งคำขอโพสคนละชุด */}
 
               {lumosNotice ? (
-                <p className={cn('rounded-lg border px-2.5 py-1.5 text-[11px]', TONE.success.soft, TONE.success.num)}>
+                <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.success.soft, TONE.success.num)}>
                   {lumosNotice}
                 </p>
               ) : null}
               {lumosError ? (
-                <p className={cn('rounded-lg border px-2.5 py-1.5 text-[11px] text-destructive', TONE.danger.soft)}>
+                <p className={cn('rounded-xl border px-3 py-2 text-xs text-destructive', TONE.danger.soft)}>
                   {lumosError}
                 </p>
               ) : null}
@@ -3035,21 +2984,12 @@ const MatchingPage: React.FC = () => {
                   ⚠️ ข้อความเดิมบอกว่า "ถูกส่ง AI โทรอัตโนมัติแล้ว" ซึ่งไม่จริง —
                   โหมด auto ปิดอยู่ทุกจุด (manual ทุกทางตามที่เจ้าของเคาะ) ไม่มีใครถูกโทร
                   จนกว่าจะมีคนกดส่งเอง · ตัวเลขข้างล่างคือ 6 ช่องชุดเดียวกับบนการ์ด */}
-              <div className="space-y-1.5 rounded-xl border border-sky-200 bg-white/70 dark:bg-white/5 px-3 py-2 dark:border-sky-800">
-                <LumosJobSummaryStats s={summarizeLumosCallStatus(Object.values(lumosStatusByRef))} />
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[11px] text-slate-600 dark:text-slate-300">
-                  รายชื่อด้านล่างคือผลแมทรอบล่าสุด — คนที่เพิ่งเข้าฐานทีหลังยังไม่อยู่ในนั้น
-                  กดปุ่มนี้เพื่อค้นจากคนของเราทั้งหมดแล้วเลือกส่งเอง
-                </p>
-                <Button variant="secondary" size="sm"
-                  type="button"
-                  onClick={() => void openLumosPicker()}
-                  className="shrink-0"
-                >
-                  <PhoneCall aria-hidden /> เลือกคนส่ง AI โทร
+              {/* ผลโทรของใบนี้อยู่หัวใบขอแล้ว (ตัดชุดซ้ำ) · คนที่เพิ่งเข้าฐานหลังแมทรอบล่าสุด หาได้จากปุ่มนี้ */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2">
+                <p className="text-xs text-muted-foreground">คนที่เพิ่งเข้าฐานยังไม่อยู่ในผลแมท</p>
+                <Button variant="outline" size="sm" type="button" onClick={() => void openLumosPicker()}>
+                  <PhoneCall aria-hidden /> เลือกจากคนของเราทั้งหมด
                 </Button>
-                </div>
               </div>
 
               {/* ปุ่ม "อนุมัติทั้งใบ" เดิมย้ายไปอยู่ในแถบส่งโทรใต้ลิสต์แล้ว (ชื่อใหม่
@@ -3060,17 +3000,12 @@ const MatchingPage: React.FC = () => {
                   ⚠️ ห้ามซ่อนแบบไม่บอก: เจ้าหน้าที่ต้องตอบได้ว่า "คนที่หายไปคือใคร"
                   ไม่งั้นจะกลายเป็นข้อมูลหายเงียบ ซึ่งเป็นสิ่งที่โปรเจกต์นี้กันมาตลอด */}
               {hiddenDeclinedCount > 0 ? (
-                <div className={cn('flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2', TONE.neutral.soft)}>
-                  <span className={cn('text-[11px]', DASH.cell)}>
-                    ปฏิเสธใบขอนี้ไปแล้ว {hiddenDeclinedCount.toLocaleString('th-TH')} คน —{' '}
-                    {showDeclined ? 'กำลังแสดงอยู่ในรายการ' : 'ซ่อนไว้ ไม่เสนอใบนี้ให้เขาอีก'}
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2">
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    ปฏิเสธใบนี้แล้ว {hiddenDeclinedCount.toLocaleString('th-TH')} คน{showDeclined ? '' : ' · ซ่อนไว้'}
                   </span>
-                  <Button variant="ghost" size="sm"
-                    type="button"
-                    onClick={() => setShowDeclined((v) => !v)}
-                    className="ml-auto shrink-0"
-                  >
-                    {showDeclined ? 'ซ่อนอีกครั้ง' : 'ดูว่าใครบ้าง'}
+                  <Button variant="ghost" size="sm" type="button" onClick={() => setShowDeclined((v) => !v)}>
+                    {showDeclined ? 'ซ่อน' : 'ดูรายชื่อ'}
                   </Button>
                 </div>
               ) : null}
@@ -3082,38 +3017,27 @@ const MatchingPage: React.FC = () => {
               ) : boardMatchById[jobDetail.id] ? (
                 <>
                 {boardWaitingById[jobDetail.id] ? (
-                  <p className="flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-[11px] text-sky-800 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200">
-                    <RefreshCw className="h-3 w-3 shrink-0 animate-spin" />
-                    สั่งค้นหาใหม่แล้ว — AI กำลังคิดอยู่หลังบ้าน ผลใหม่จะมาแทนที่อัตโนมัติ (ที่เห็นตอนนี้คือผลเดิม)
+                  <p className={cn('flex items-center gap-2 rounded-xl border px-3 py-2 text-xs', TONE.info.soft, TONE.info.value)}>
+                    <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+                    กำลังค้นหาใหม่ · ที่เห็นอยู่เป็นผลรอบก่อน
                   </p>
                 ) : null}
                 {recommendedCandidateCount(boardMatchById[jobDetail.id].matches) === 0 &&
                 !(showDistantCandidates && distantCandidateCount(boardMatchById[jobDetail.id].matches) > 0) ? (
-                  <p className={cn('rounded-xl border px-3 py-3 text-xs', TONE.warn.soft, TONE.warn.num)}>
-                    ยังไม่มีคนของเราที่เข้าข่ายกับใบขอนี้ — ลองค้นหาคนที่ยังไม่สมัครด้านล่าง แล้วเสนอได้เลย
+                  <p className="rounded-xl border border-border bg-card px-3 py-3 text-xs text-muted-foreground">
+                    ยังไม่มีคนของเราที่ตรงกับใบนี้
                   </p>
                 ) : (
                   <div className="space-y-2">
                     {/* น้ำหนักที่ใช้เรียงลิสต์นี้ — ใบไหนตั้งเองได้ (เจ้าของสั่ง 17 ส.ค. 2569)
                         ต้องบอกให้เห็นว่ากำลังเรียงด้วยน้ำหนักชุดไหน ไม่งั้นเรียงเปลี่ยนแล้วไม่รู้ว่าทำไม */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-muted/30 px-3 py-1.5">
-                      <span className="text-[11px] text-muted-foreground">
-                        เรียงด้วยน้ำหนัก{' '}
-                        <b className="text-foreground">
-                          {priorityOverridden ? 'ของใบนี้' : 'ค่ากลาง'}
-                        </b>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        เรียงตามน้ำหนัก<span className="font-medium text-foreground">{priorityOverridden ? 'ของใบนี้' : 'ค่ากลาง'}</span>
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setWeightsDialogOpen(true)}
-                        className={cn(
-                          'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium',
-                          TONE.info.outline,
-                        )}
-                      >
-                        <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-                        น้ำหนักของใบนี้
-                      </button>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setWeightsDialogOpen(true)}>
+                        <SlidersHorizontal aria-hidden /> ตั้งน้ำหนัก
+                      </Button>
                     </div>
                     {/* เรียงตามลำดับความสำคัญของเจ้าของ: อายุ → ที่อยู่ → ประสบการณ์ → รายได้
                         (เกณฑ์แข็งพังตกท้าย · คะแนนเท่ากันคงลำดับจาก AI — sort ของ JS เป็น stable) */}
@@ -3160,17 +3084,17 @@ const MatchingPage: React.FC = () => {
                         <div
                           key={m.card_id}
                           className={cn(
-                            'matching-candidate-card rounded-xl border px-3 py-2',
-                            TONE[meta.tone].soft,
+                            // การ์ดพื้นเรียบ สีระดับความตรงเหลือที่จุดหน้าชื่อจุดเดียว (20 ต.ค. 2569 — เดิมพื้นทั้งการ์ดเป็นสี)
+                            'matching-candidate-card rounded-xl border border-border bg-card p-3',
+                            lumosSelectedBoard.includes(m.card_id) && 'border-primary',
                             proposed ? 'opacity-70' : '',
                           )}
                         >
-                        <div className="flex items-start gap-2">
-                          <input
-                            type="checkbox"
+                        <div className="flex items-start gap-3">
+                          <Checkbox
                             checked={lumosSelectedBoard.includes(m.card_id)}
                             disabled={!canPickForLumos}
-                            onChange={() => toggleLumosBoard(m.card_id)}
+                            onCheckedChange={() => toggleLumosBoard(m.card_id)}
                             aria-label={`เลือก ${m.full_name} ให้ AI โทร`}
                             title={
                               !m.mobile
@@ -3179,7 +3103,7 @@ const MatchingPage: React.FC = () => {
                                   ? 'ส่ง AI โทรไปแล้ว — ติ๊กได้ เผื่อเก็บไปโทรเอง'
                                   : 'เลือกให้ AI โทร'
                             }
-                            className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-40"
+                            className="mt-0.5 shrink-0"
                           />
                         <button
                           type="button"
@@ -3203,7 +3127,7 @@ const MatchingPage: React.FC = () => {
                               {m.nick_name ? ` (${m.nick_name})` : ''}{' '}
                               <LumosUrgentBadge nextAction={lumosRow?.next_action} />
                             </span>
-                            <div className="flex shrink-0 items-center gap-1">
+                            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
                               {/* ป้าย "แมทอยู่ N งาน" — เฉพาะคนที่แมทเกิน 1 ใบ (เจ้าของสั่ง 12 ส.ค. 2569)
                                   hover เห็นเลขใบขอทั้งหมด · N นับเฉพาะใบเปิดใน BU + tier เขียว/เหลือง */}
                               {(() => {
@@ -3215,7 +3139,7 @@ const MatchingPage: React.FC = () => {
                                       .map((j) => j.requestNo || j.jobId)
                                       .join(' · ')}`}
                                     className={cn(
-                                      'rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                                      'rounded-full border px-2 py-0.5 text-xs font-medium',
                                       TONE.violet.soft,
                                       TONE.violet.value,
                                     )}
@@ -3229,7 +3153,7 @@ const MatchingPage: React.FC = () => {
                                 return colBadge ? (
                                   <span
                                     className={cn(
-                                      'rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                                      'rounded-full border px-2 py-0.5 text-xs font-medium',
                                       colBadge.cls,
                                     )}
                                   >
@@ -3240,29 +3164,29 @@ const MatchingPage: React.FC = () => {
                               {proposed ? (
                                 <span
                                   className={cn(
-                                    'inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                                    'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
                                     proposalStatusClass(proposed.status),
                                   )}
                                 >
-                                  <CheckCircle2 className="h-2.5 w-2.5" /> {proposalStatusLabel(proposed.status)}
+                                  <CheckCircle2 className="h-3 w-3" aria-hidden /> {proposalStatusLabel(proposed.status)}
                                 </span>
                               ) : null}
                               {activeElsewhere ? (
-                                <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', TONE.violet.soft, TONE.violet.value)}>
+                                <span className={cn('rounded-full border px-2 py-0.5 text-xs font-medium', TONE.violet.soft, TONE.violet.value)}>
                                   ติดใบขอ {activeElsewhere.request_no || activeElsewhere.job_id.slice(0, 8)}
                                 </span>
                               ) : null}
                               <TierCriteriaTooltip tier={m.tier}>
                                 <span
                                   tabIndex={0}
-                                  className="cursor-help rounded-full border border-white/80 bg-white/80 dark:border-white/10 dark:bg-white/5 px-2 py-0.5 text-[10px] text-slate-600 dark:text-slate-300 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  className="cursor-help rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 >
                                   {meta.label}
                                 </span>
                               </TierCriteriaTooltip>
                             </div>
                           </div>
-                          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             <span>สกิล: {[m.job1_name, m.job2_name].filter(Boolean).join(' / ') || 'ไม่ระบุ'}</span>
                             {m.amphur_name || m.province_name ? (
                               <span>{[m.amphur_name, m.province_name].filter(Boolean).join(' ')}</span>
@@ -3276,29 +3200,29 @@ const MatchingPage: React.FC = () => {
                                * (เดิมแตะเบอร์แล้วจับล็อก + ต่อสายให้ทันที)
                                */
                               <span className={cn('inline-flex items-center gap-1 font-medium', DASH.cell)}>
-                                <Phone className="h-3 w-3" aria-hidden /> {m.mobile}
+                                <Phone className="h-3.5 w-3.5" aria-hidden /> {m.mobile}
                               </span>
                             ) : null}
                           </div>
                           {branchProximity ? (
-                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
                               <span
                                 title={branchAssignment?.proximity_reason || undefined}
                                 className={cn(
-                                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
                                   branchProximity.cls,
                                 )}
                               >
-                                <MapPin className="h-2.5 w-2.5" /> {branchProximity.label}
+                                <MapPin className="h-3 w-3" aria-hidden /> {branchProximity.label}
                               </span>
                             </div>
                           ) : null}
-                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
                             {/* คะแนนที่ใช้เรียงลิสต์นี้ — ชี้เมาส์ดูที่มาของคะแนนรายเกณฑ์ */}
                             <span
                               title={describePriorityScore(priority, priorityConfig).join('\n')}
                               className={cn(
-                                'cursor-help rounded-full border px-2 py-0.5 text-[10px] font-medium tabular-nums',
+                                'cursor-help rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums',
                                 priority.hardFails > 0
                                   ? cn(TONE.danger.soft, TONE.danger.value)
                                   : cn(TONE.neutral.soft, TONE.neutral.value),
@@ -3316,7 +3240,7 @@ const MatchingPage: React.FC = () => {
                               screening={screeningByRef[String(m.card_id)]}
                             />
                           </div>
-                          {m.reason ? <p className="mt-1 text-[11px] italic text-slate-600 dark:text-slate-300 line-clamp-1">— {m.reason}</p> : null}
+                          {m.reason ? <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{m.reason}</p> : null}
                           </button>
                         </div>
                         {lumosRow ? (
@@ -3339,7 +3263,7 @@ const MatchingPage: React.FC = () => {
                             ⚠️ ตัวล็อกฝั่ง API ยังอยู่ครบและยังกรองที่ insertQueueItems เหมือนเดิม
                             (ถังต้องคนตามในหน้า Follow ยังกด "รับไปตาม" ได้) เอาออกแค่หน้านี้ */}
                         {heldByOther || heldByMe ? (
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
                             <span className={TONE.neutral.chip}>
                               {heldByMe ? 'คุณ' : heldByOther?.heldByName || 'เจ้าหน้าที่อีกคน'}
                               {' '}รับไปตามอยู่ · AI จะไม่โทรทับ
@@ -3353,35 +3277,32 @@ const MatchingPage: React.FC = () => {
                 )}
                 </>
               ) : boardWaitingById[jobDetail.id] ? (
-                <p className="flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-3 text-xs text-sky-800 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200">
-                  <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                  AI กำลังค้นหาใบนี้อยู่ที่หลังบ้าน — ผลจะแสดงอัตโนมัติเมื่อค้นหาเสร็จ
+                <p className={cn('flex items-center gap-2 rounded-xl border px-3 py-3 text-xs', TONE.info.soft, TONE.info.value)}>
+                  <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+                  กำลังค้นหาคนให้ใบนี้ ผลจะขึ้นเองเมื่อเสร็จ
                 </p>
               ) : null}
 
               {/* #2 (ยุบ) — ไม่พอ? หาผู้สมัครจากฐาน iRecruit แล้วเสนอในหน้านี้เลย */}
               {boardMatchById[jobDetail.id] && !boardErrorById[jobDetail.id] ? (
-                <div className="space-y-2.5">
-                  {/* ── ขั้น 3 · คนที่ยังไม่สมัครงานนี้ ───────────────────────────── */}
-                  <div className={cn('flex items-center gap-2 border-t pt-3', DASH.divider)}>
-                    <span className={cn('shrink-0 text-[11px] font-medium', TONE.primary.value)}>
-                      2. คนที่ยังไม่สมัครงานนี้ — ติ๊กเลือกได้
-                    </span>
-                    <span className={cn('h-px flex-1', DASH.divider, 'border-t')} aria-hidden />
-                  </div>
-                <div className="rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-3 space-y-2 dark:border-blue-800 dark:bg-blue-950/50">
+                <div className="space-y-3">
+                  <Separator />
+                <div className="space-y-3">
                   {/* QA 17 ต.ค. 2569: จอ 375 แถวนี้ล้น (ปุ่ม shrink-0 กินที่ ข้อความเหลือ 2–4 ตัวต่อบรรทัด ปุ่มหลุดนอกจอ)
                       ⇒ จอแคบเรียงซ้อนลงมา · ตั้งแต่ sm ขึ้นไปเป็นแถวเดียวเหมือนเดิม */}
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     {/* เจ้าของสั่ง 13 ส.ค. 2569: เลิกเรียกชื่อระบบ ("iRecruit") มาเป็นคำที่บอก
                         ว่าได้อะไร — คนกลุ่มนี้คือคนในฐานที่ **ยังไม่ได้สมัครใบขอนี้** */}
-                    <p className="text-xs font-medium text-blue-900 dark:text-blue-200">
-                      {irMatchById[jobDetail.id]
-                        ? `คนที่ยังไม่สมัคร → แนะนำ ${recommendedCandidateCount(irMatchById[jobDetail.id].matches)}`
-                        : 'ไม่พอ? หาคนที่ยังไม่สมัครงานนี้'}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5 sm:shrink-0 sm:justify-end">
-                      <Button variant="ghost" size="sm"
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-medium text-foreground">คนที่ยังไม่สมัคร</h3>
+                      <p className="text-xs text-muted-foreground tabular-nums">
+                        {irMatchById[jobDetail.id]
+                          ? `แนะนำ ${recommendedCandidateCount(irMatchById[jobDetail.id].matches)} คน`
+                          : 'ค้นจากคนในฐานที่ยังไม่ได้สมัครใบนี้'}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
+                      <Button variant="outline" size="sm"
                         type="button"
                         disabled={irLoadingId === jobDetail.id}
                         onClick={() => void fetchIrecruit(jobDetail.id, !!irMatchById[jobDetail.id])}
@@ -3412,7 +3333,7 @@ const MatchingPage: React.FC = () => {
                     </div>
                   </div>
                   {irSendNotice[jobDetail.id] ? (
-                    <p className="mt-1 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] text-primary">
+                    <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.success.soft, TONE.success.num)}>
                       {irSendNotice[jobDetail.id]}
                     </p>
                   ) : null}
@@ -3420,11 +3341,11 @@ const MatchingPage: React.FC = () => {
                   {irLoadingId === jobDetail.id ? (
                     <AiEvaluationStatus source="irecruit" />
                   ) : irErrorById[jobDetail.id] ? (
-                    <p className="text-[11px] text-destructive">{irErrorById[jobDetail.id]}</p>
+                    <p className="text-xs text-destructive">{irErrorById[jobDetail.id]}</p>
                   ) : irMatchById[jobDetail.id] ? (
                     recommendedCandidateCount(irMatchById[jobDetail.id].matches) === 0 &&
                     !(showDistantCandidates && distantCandidateCount(irMatchById[jobDetail.id].matches) > 0) ? (
-                      <p className="text-[11px] text-muted-foreground">ไม่พบคนที่ยังไม่สมัครที่ใกล้เคียงกับใบขอนี้</p>
+                      <p className="rounded-xl border border-border bg-card px-3 py-3 text-xs text-muted-foreground">ไม่พบคนที่ตรงกับใบนี้</p>
                     ) : (
                       <div className="space-y-2">
                         {buildIrecruitDisplayRows(
@@ -3440,21 +3361,19 @@ const MatchingPage: React.FC = () => {
                               return (
                                 <div
                                   key={row.key}
-                                  className="mt-3 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2 first:mt-0 dark:border-blue-800 dark:bg-blue-950/50"
+                                  className="mt-3 rounded-xl bg-muted px-3 py-2 first:mt-0"
                                 >
                                   <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <p className="text-sm font-medium text-blue-950 dark:text-blue-200">{row.branch.branch_name_clean}</p>
-                                      <p className="mt-0.5 text-[11px] text-blue-700 dark:text-blue-300">
+                                    <div className="space-y-1">
+                                      <p className="text-sm font-medium text-foreground">{row.branch.branch_name_clean}</p>
+                                      <p className="text-xs text-muted-foreground">
                                         {[row.branch.district_hint, row.branch.province_hint].filter(Boolean).join(' · ') ||
                                           row.branch.branch_name_raw}
                                       </p>
                                     </div>
-                                    <div className="shrink-0 text-right">
-                                      <p className="text-xs font-medium text-blue-800 dark:text-blue-200">
-                                        ต้องการ {row.branch.requested_qty} คน
-                                      </p>
-                                      <p className="text-[10px] text-blue-600 dark:text-blue-300">พบใกล้สาขา {row.candidateCount} คน</p>
+                                    <div className="shrink-0 space-y-1 text-right text-xs tabular-nums">
+                                      <p className="font-medium text-foreground">ต้องการ {row.branch.requested_qty} คน</p>
+                                      <p className="text-muted-foreground">ใกล้สาขา {row.candidateCount} คน</p>
                                     </div>
                                   </div>
                                 </div>
@@ -3476,17 +3395,17 @@ const MatchingPage: React.FC = () => {
                               <div
                                 key={row.key}
                                 className={cn(
-                                  'matching-candidate-card space-y-1 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900',
+                                  'matching-candidate-card space-y-2 rounded-xl border border-border bg-card p-3',
+                                  lumosSelectedIrecruit.includes(m.id) && 'border-primary',
                                   proposed ? 'opacity-70' : '',
                                 )}
                               >
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-300">
-                                    <input
-                                      type="checkbox"
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
+                                    <Checkbox
                                       checked={lumosSelectedIrecruit.includes(m.id)}
                                       disabled={!canPickForLumos}
-                                      onChange={() => toggleLumosIrecruit(m.id)}
+                                      onCheckedChange={() => toggleLumosIrecruit(m.id)}
                                       aria-label={`เลือก ${m.full_name} ให้ AI โทรสัมภาษณ์`}
                                       title={
                                         !m.phone_number
@@ -3495,7 +3414,7 @@ const MatchingPage: React.FC = () => {
                                             ? 'ส่ง AI โทรไปแล้ว'
                                             : 'เลือกให้ AI โทรสัมภาษณ์'
                                       }
-                                      className="h-4 w-4 shrink-0 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-40"
+                                      className="shrink-0"
                                     />
                                     <TierCriteriaTooltip tier={m.tier}>
                                       <span
@@ -3509,42 +3428,42 @@ const MatchingPage: React.FC = () => {
                                     {m.full_name}{' '}
                                     <LumosUrgentBadge nextAction={lumosRow?.next_action} />
                                   </span>
-                                  <div className="flex shrink-0 items-center gap-1">
+                                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
                                     {proposed ? (
                                       <span
                                         className={cn(
-                                          'inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                                          'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
                                           proposalStatusClass(proposed.status),
                                         )}
                                       >
-                                        <CheckCircle2 className="h-2.5 w-2.5" /> {proposalStatusLabel(proposed.status)}
+                                        <CheckCircle2 className="h-3 w-3" aria-hidden /> {proposalStatusLabel(proposed.status)}
                                       </span>
                                     ) : null}
                                     {activeElsewhere ? (
-                                      <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', TONE.violet.soft, TONE.violet.value)}>
+                                      <span className={cn('rounded-full border px-2 py-0.5 text-xs font-medium', TONE.violet.soft, TONE.violet.value)}>
                                         ติดใบขอ {activeElsewhere.request_no || activeElsewhere.job_id.slice(0, 8)}
                                       </span>
                                     ) : null}
                                     <TierCriteriaTooltip tier={m.tier}>
                                       <span
                                         tabIndex={0}
-                                        className="cursor-help rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        className="cursor-help rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                       >
                                         {matchTierLabel(m.tier)}
                                       </span>
                                     </TierCriteriaTooltip>
                                   </div>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                   <span>{m.position_name || m.job_name_th || 'ไม่ระบุตำแหน่ง'}</span>
                                   {m.location_label ? <span>{m.location_label}</span> : null}
                                   {m.age != null ? <span>อายุ {m.age}</span> : null}
                                   {m.phone_number ? (
                                     <a
                                       href={`tel:${m.phone_number}`}
-                                      className="inline-flex items-center gap-1 font-medium text-sky-700 hover:underline dark:text-sky-300"
+                                      className={cn('inline-flex items-center gap-1 font-medium hover:underline', DASH.cell)}
                                     >
-                                      <Phone className="h-3 w-3" /> {m.phone_number}
+                                      <Phone className="h-3.5 w-3.5" aria-hidden /> {m.phone_number}
                                     </a>
                                   ) : null}
                                 </div>
@@ -3561,7 +3480,7 @@ const MatchingPage: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => setScreeningOpenIrId((prev) => (prev === m.id ? null : m.id))}
-                                    className="text-[10px] font-medium text-slate-500 underline-offset-2 hover:underline dark:text-slate-400"
+                                    className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"
                                   >
                                     {screeningOpenIrId === m.id ? 'ปิดผลคัดกรอง' : 'ผลคัดกรอง เหล้า-บุหรี่ / คดี'}
                                   </button>
@@ -3580,15 +3499,13 @@ const MatchingPage: React.FC = () => {
                                   ) : null}
                                 </div>
                                 {m.reason ? (
-                                  <p className="text-[11px] italic text-slate-600 dark:text-slate-300 line-clamp-2">— {m.reason}</p>
+                                  <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{m.reason}</p>
                                 ) : null}
                                 {proposed ? (
-                                  <div className="rounded-lg border border-slate-200 bg-white/80 dark:border-white/10 dark:bg-white/5 px-2.5 py-1.5 text-[10px] text-slate-700 dark:text-slate-200">
-                                     <p className="font-medium">
-                                       ผู้ดำเนินการ: {proposed.proposedByName || 'ไม่ระบุ'}
-                                     </p>
-                                     {proposed.branchName ? <p className="mt-0.5 text-blue-700 dark:text-blue-300">สาขา: {proposed.branchName}</p> : null}
-                                     <p className="mt-0.5 text-slate-600 dark:text-slate-300">เหตุผล: {proposed.reason || 'ไม่ระบุ'}</p>
+                                  <div className="space-y-1 rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
+                                    <p className="font-medium text-foreground">ผู้ดำเนินการ {proposed.proposedByName || 'ไม่ระบุ'}</p>
+                                    {proposed.branchName ? <p>สาขา {proposed.branchName}</p> : null}
+                                    <p>เหตุผล {proposed.reason || 'ไม่ระบุ'}</p>
                                   </div>
                                 ) : null}
                                 {/* ⚠️ แถบปุ่มต่อแถว (เพิ่มรายละเอียดผู้สมัคร · ติดต่อแล้ว · จองตัว ·
@@ -3617,9 +3534,7 @@ const MatchingPage: React.FC = () => {
                       </div>
                     )
                   ) : (
-                    <p className="text-[11px] text-muted-foreground">
-                      กดค้นหาเพื่อดึงคนที่ยังไม่สมัครแต่คุณสมบัติตรง แล้วติ๊กเลือกส่ง AI โทรได้เลย
-                    </p>
+                    <p className="rounded-xl border border-dashed border-border px-3 py-3 text-xs text-muted-foreground">ยังไม่ได้ค้น</p>
                   )}
                   {/* ⚠️ แถบเดียวกับข้างบนเป๊ะ — props ต้องเหมือนกันทุกตัว
                       เดิมตัวนี้ส่ง onSend={() => setLumosConfirmOpen(true)} ซึ่งข้าม
@@ -3630,7 +3545,7 @@ const MatchingPage: React.FC = () => {
                       เดิมมีแถบเดียวกันสองที่ ใช้ selection ก้อนเดียวกันและ handler ชุดเดียวกัน
                       → ติ๊กที่ไหนก็ขยับทั้งคู่ แต่ตัวเลขคนละชุดเพราะแถบล่างไม่ได้รับยอดที่แยกแล้ว
                       ตอนนี้เหลือ **แถบเดียวติดก้น drawer** เห็นตลอดไม่ว่าจะติ๊กจากลิสต์ไหน */}
-                  {proposeError ? <p className="text-[11px] text-destructive">{proposeError}</p> : null}
+                  {proposeError ? <p className="text-xs text-destructive">{proposeError}</p> : null}
                 </div>
                 </div>
               ) : null}
@@ -3641,7 +3556,7 @@ const MatchingPage: React.FC = () => {
                      ก้อนเดียวกันแต่เลขคนละชุด → ยุบเหลือแถบเดียว
                   2) "ไม่ต้องตึง" — เคยทำ sticky ติดก้นจอแล้วเจ้าของไม่เอา
                      ตอนนี้เป็นกล่องธรรมดาไหลตามเนื้อหา อยู่เหนือกล่อง "หาคนไม่พอ" */}
-              <div className="mt-1 space-y-1.5 border-t border-border/60 pt-2.5">
+              <div className="space-y-2 border-t border-border pt-4">
                 <LumosSendBar
                   count={lumosSelectedCount}
                   allCount={approveAllCount}
@@ -3669,10 +3584,8 @@ const MatchingPage: React.FC = () => {
                   ("ไปไว้ด้วยกัน") — เดิมแยกกันอยู่คนละที่ทั้งที่พูดเรื่องเดียวกัน
                   และมีปุ่มส่งคำขอโพสคนละชุดจนไม่รู้ว่าอันไหนใช้ทำอะไร */}
               {boardMatchById[jobDetail.id] ? (
-                <div className={cn('rounded-xl border px-3 py-3 space-y-2.5', TONE.danger.soft)}>
-                  <p className={cn('text-xs font-medium', TONE.danger.num)}>
-                    3. หาคนไม่พอ — ส่งต่อทีมอื่น
-                  </p>
+                <Card className="space-y-3 rounded-2xl p-4">
+                  <h3 className="text-sm font-medium text-foreground">หาคนไม่พอ ส่งต่อทีมอื่น</h3>
 
                   {/* สรุปว่าตอนนี้ได้เท่าไหร่จากเป้า — รายละเอียดพับเก็บ */}
                   {(() => {
@@ -3682,16 +3595,14 @@ const MatchingPage: React.FC = () => {
                     const short = got < bm.recommended_target;
                     if (!short && !bm.fallback_used) return null;
                     return (
-                      <details className="text-[11px]">
-                        <summary className="cursor-pointer list-none font-medium marker:hidden">
-                          {short
-                            ? `หาได้ ${got} คน จากเป้า ${bm.recommended_target} คน — กดดูว่าทำอะไรต่อได้`
-                            : `หาได้ครบเป้าแล้ว ${got} คน — กดดูรายละเอียด`}
+                      <details className="text-xs">
+                        <summary className="cursor-pointer list-none font-medium text-foreground marker:hidden tabular-nums">
+                          {short ? `ได้ ${got} จากเป้า ${bm.recommended_target} คน` : `ได้ครบเป้า ${got} คน`}
                         </summary>
-                        <p className="mt-1.5 text-muted-foreground">
+                        <p className="mt-2 leading-relaxed text-muted-foreground">
                           เป้าคือ “อัตราที่ขอ × 3” ·{' '}
                           {short
-                            ? `ค้นครบ 3 ถังแล้ว (ไม่มีงาน · Re Use · Drop) ได้ ${got} คน · ทางไปต่อ: ค้นหาคนที่ยังไม่สมัคร (หัวข้อ 2)`
+                            ? `ค้นครบ 3 ถังแล้ว (ไม่มีงาน · Re Use · Drop) ได้ ${got} คน · หาเพิ่มได้ที่ "คนที่ยังไม่สมัคร"`
                             : `ค้นถังถัดไปให้แล้ว → รวมแนะนำ ${got} คน`}
                         </p>
                       </details>
@@ -3710,16 +3621,13 @@ const MatchingPage: React.FC = () => {
                     return (
                       <>
                         {active.length > 0 ? (
-                          <div className="flex flex-wrap items-center gap-1.5">
+                          <div className="flex flex-wrap items-center gap-2">
                             {active.map((x) => (
                               <span key={x.id} className="inline-flex items-center gap-1">
                                 <span
                                   title={x.id}
                                   className={cn(
-                                    'rounded-full border px-2 py-0.5 text-[10px] font-mono',
-                                    TONE.danger.soft,
-                                    TONE.danger.value,
-                                    'bg-white dark:bg-transparent',
+                                    'rounded-full border border-border px-2 py-0.5 text-xs tabular-nums text-muted-foreground',
                                   )}
                                 >
                                   {x.id.slice(0, 8)}
@@ -3735,49 +3643,41 @@ const MatchingPage: React.FC = () => {
                         {!sentContent || !sentScraping ? (
                           <div className="flex flex-wrap items-center gap-2">
                             {active.length > 0 ? (
-                              <span className="text-[11px] font-medium text-muted-foreground">
-                                ส่งอีกทางเพิ่มได้:
-                              </span>
+                              <span className="text-xs text-muted-foreground">ส่งเพิ่มได้</span>
                             ) : null}
                             {!sentContent ? (
-                              <button
+                              <Button
                                 type="button"
+                                variant="outline"
+                                size="sm"
                                 disabled={creatingPosting}
                                 onClick={() => void createPosting(jobDetail, 'content')}
-                                className={cn(
-                                  'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium disabled:opacity-60',
-                                  TONE.orange.solid,
-                                )}
                               >
-                                <Megaphone className="h-3.5 w-3.5" />
+                                <Megaphone aria-hidden />
                                 {creatingPosting ? 'กำลังสร้าง…' : 'ให้สร้าง Content'}
-                              </button>
+                              </Button>
                             ) : null}
                             {!sentScraping ? (
-                              <button
+                              <Button
                                 type="button"
+                                variant="outline"
+                                size="sm"
                                 disabled={creatingPosting}
                                 onClick={() => void createPosting(jobDetail, 'scraping')}
-                                className={cn(
-                                  'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium disabled:opacity-60',
-                                  TONE.teal.solid,
-                                )}
                               >
-                                <Search className="h-3.5 w-3.5" />
+                                <Search aria-hidden />
                                 {creatingPosting ? 'กำลังสร้าง…' : 'Scraping งาน'}
-                              </button>
+                              </Button>
                             ) : null}
                           </div>
                         ) : (
-                          <p className="text-[11px] font-medium text-muted-foreground">
-                            ส่งครบทั้ง Content และ Scraping แล้ว — รอทีมรับไปทำ
-                          </p>
+                          <p className="text-xs text-muted-foreground">ส่ง Content และ Scraping แล้ว รอทีมรับงาน</p>
                         )}
                       </>
                     );
                   })()}
-                  {postingError ? <p className="text-[11px] text-destructive">{postingError}</p> : null}
-                </div>
+                  {postingError ? <p className="text-xs text-destructive">{postingError}</p> : null}
+                </Card>
               ) : null}
 
             </div>

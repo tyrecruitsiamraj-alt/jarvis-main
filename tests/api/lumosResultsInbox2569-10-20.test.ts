@@ -74,3 +74,17 @@ describe('ปุ่มเลือกใครโทร: ตัวที่เ�
     for (const f of ['src/pages/follow/FollowPage.tsx']) expect(read(f)).not.toMatch(/state=on\]:text-primary(?!-)/);
   });
 });
+
+describe('หน้าต่างจับคู่งาน: shadcn + ขนาดตัวอักษรเท่ากัน (เจ้าของ 20 ต.ค. 2569)', () => {
+  it('ช่องติ๊กเป็น Checkbox ของ shadcn · ไม่มีขนาดตัวอักษรสุ่ม 9–11px ในหน้าต่าง · ไม่มีประโยคอธิบายเดิม', () => {
+    const src = read('src/pages/matching/MatchingPage.tsx');
+    const a = src.indexOf('<SheetContent');
+    const sheet = src.slice(a, src.indexOf('</SheetContent>', a));
+    expect(sheet).not.toContain('type="checkbox"');
+    expect(sheet).toContain('<Checkbox');
+    expect(sheet).not.toMatch(/text-\[(9|10|11)px\]/);
+    for (const old of ['สถานะ Matching ใช้ติดตามการทำงาน', 'รายชื่อด้านล่างคือผลแมทรอบล่าสุด', '1. คนของเรา', '2. คนที่ยังไม่สมัคร']) {
+      expect(sheet).not.toContain(old);
+    }
+  });
+});
