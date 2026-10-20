@@ -43,3 +43,19 @@ export function irecruitChannelAt(
   }
   return best?.channel ?? null;
 }
+
+/**
+ * วันแรก (YYYY-MM-DD) ที่เบอร์นี้โผล่ในชุดวัน ตั้งแต่วันกรอกใบ (เวลาไทย) — ใช้กับวันแจ้งเข้า ERP / วันเป็นผู้สมัคร iRecruit
+ * `days` null = อ่านแหล่งนั้นไม่ได้ ⇒ undefined (ไม่รู้) · ไม่เจอ = null
+ */
+export function firstDaySince(
+  days: ReadonlyMap<string, readonly string[]> | null,
+  phone9: string | null,
+  createdAt: string,
+): string | null | undefined {
+  if (!days) return undefined;
+  const day = bkkYmd(createdAt);
+  if (!phone9 || !day) return null;
+  const hits = (days.get(phone9) ?? []).filter((d) => d >= day).sort();
+  return hits[0] ?? null;
+}

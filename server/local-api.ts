@@ -19,6 +19,7 @@ import { startSystemHealthWorker } from '../api/_lib/systemHealthWorker.ts';
 import { startClaimGuardWorker } from '../api/_lib/callChoiceWorker.ts';
 import { startFollowPushRetryWorker } from '../api/_lib/followPushRetryWorker.ts';
 import { startIrecruitReplaceSyncWorker } from '../api/_lib/irecruitReplaceSyncWorker.ts';
+import { startAppointmentReminderWorker } from '../api/_lib/appointmentResultReminder.ts';
 import { startLumosPushRetryWorker } from '../api/_lib/lumosPushRetryWorker.ts';
 import { startApplicationDispatchRetryWorker } from '../api/_lib/applicationDispatchRetry.ts';
 import { startIrecruitImportWorker } from '../api/_lib/irecruitApplicantImport.ts';
@@ -214,6 +215,11 @@ server.listen(port, '127.0.0.1', () => {
    * ปิดด้วย IRECRUIT_REPLACE_SYNC_ENABLED=false · ส่ง AI ตามสวิตช์ follow_entry เดิม · กันซ้ำที่ฐาน (source_ref)
    */
   startIrecruitReplaceSyncWorker();
+  /**
+   * เตือนเจ้าของนัดที่เลยวันเกิน 24 ชม. ยังไม่ลงผลมา/ไม่มา วันละครั้งตั้งแต่ 08:00 (เจ้าของ 20 ต.ค. 2569) ·
+   * **เปิดโดยดีฟอลต์** ปิดด้วย APPOINTMENT_REMINDER_ENABLED=false · กันแจ้งซ้ำต่อคนต่อวันที่ฐาน
+   */
+  startAppointmentReminderWorker();
   /**
    * ส่งซ้ำสายที่ส่งไม่ถึง Lumos — ใบสมัคร + เลน Match (เจ้าของเคาะ 28 ก.ย. 2569) · **เปิดโดยดีฟอลต์** ปิดด้วย
    * LUMOS_PUSH_RETRY_ENABLED=false · เคารพช่วงห้ามโทรของนโยบายกลาง · เกิน 24 ชม. โยนให้เจ้าหน้าที่ · ไม่มีคีย์ push = ไม่ทำอะไร

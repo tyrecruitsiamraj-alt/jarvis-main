@@ -13691,3 +13691,10 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - API `api/_handlers/value-pipeline.ts` (`view=outcome|bottleneck|request|gaps`) สิทธิ์เดียวกับ /api/value-case · ใบขอปิดไม่นับค้าง
 - ช่องทางของใบสมัครผ่านลิงก์ = `recruit_posting_links.channel_label` (ไม่ได้คัดลอกลงใบ) — factsSql + channelPlacementSql ดึงจากลิงก์แล้ว
 - เทสต์ `tests/api/valuePipeline2569-10-19.test.ts`
+
+## นัดเลยวันยังไม่ลงผล + ผูก iRecruit/ERP (20 ต.ค. 2569 · เจ้าของ "ทำเลย")
+- `api/_lib/appointmentResultReminder.ts` — นัด = บันทึกติดต่อล่าสุดที่สำเร็จ+มีวันนัด · เลยนัดเกิน 24 ชม. (ย้อน 30 วัน) ไม่มีผลหรือเลื่อนนัด = ค้าง · เตือนคนบันทึกนัดวันละครั้งตั้งแต่ 08:00 (worker ใน `server/local-api.ts` · ปิดด้วย `APPOINTMENT_REMINDER_ENABLED=false`)
+- แถบแดงบนหัวกล่องงาน `src/components/recruit-rm/AppointmentOverdueBar.tsx` ← `/api/appointment-overdue` (`{all, mine}`) · กด "ไปลงผล" = แท็บติดตามนัดหมาย
+- ป๊อปผู้สมัคร ช่อง "ไปถึงไหนแล้ว" `src/components/recruit-rm/ApplicantTraceField.tsx` ← `/api/application-trace?id=` (เบอร์ 9 หลักเทียบผู้สมัคร iRecruit + แจ้งเข้า ERP ตั้งแต่วันกรอก) · ช่องทางว่าง = ใช้ช่องทางของลิงก์
+- หน้าความคุ้มค่า ขั้น 8 = คนที่มาตามนัดไปโผล่ผู้สมัคร iRecruit (`irecruitAt` จาก `loadIrecruitApplicantDays` + `firstDaySince`) · อ่าน iRecruit ไม่ได้ = null ห้าม 0 · จุดบอดมี "นัดไม่ลงผลแต่เบอร์ไปโผล่ iRecruit"
+- เทสต์ `tests/api/appointmentResultTrace2569-10-20.test.ts`

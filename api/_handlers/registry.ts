@@ -48,6 +48,8 @@ import aiSettingsHandler from './ai-settings.js';
 import erpInformDatesHandler from './erp-inform-dates.js';
 import valueCaseHandler from './value-case.js';
 import valuePipelineHandler from './value-pipeline.js';
+import appointmentOverdueHandler from './appointment-overdue.js';
+import applicationTraceHandler from './application-trace.js';
 import recruitJobTitlesHandler from './recruit-job-titles.js';
 import recruitFunnelHandler from './recruit-funnel.js';
 import jobApplicationsHandler from './job-applications.js';
@@ -156,6 +158,8 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/erp-inform-dates': erpInformDatesHandler as ApiHandler,
   '/api/value-case': valueCaseHandler as ApiHandler,
   '/api/value-pipeline': valuePipelineHandler as ApiHandler,
+  '/api/appointment-overdue': appointmentOverdueHandler as ApiHandler,
+  '/api/application-trace': applicationTraceHandler as ApiHandler,
   '/api/follow-staff-contacts': followStaffContactsHandler as ApiHandler,
   '/api/follow-topics': followTopicsHandler as ApiHandler,
   '/api/irecruit-replace-sync': irecruitReplaceSyncHandler as ApiHandler,

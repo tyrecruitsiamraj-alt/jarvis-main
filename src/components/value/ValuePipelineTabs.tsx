@@ -353,6 +353,11 @@ export function ValueGapsTab({ month }: { month: string }) {
       bad: data.appointmentsNoResult > 0,
     },
     {
+      label: 'ในนั้นเบอร์ไปโผล่ใน iRecruit แล้ว (น่าจะมาแต่ไม่มีคนลงผล)',
+      value: `${n(data.appointmentsLikelyCame)} นัด`,
+      bad: data.appointmentsLikelyCame > 0,
+    },
+    {
       label: 'คนที่มาแล้วยังไม่ลงผลผ่าน/ไม่ผ่าน',
       value: `${n(data.showed - data.screened)} จาก ${n(data.showed)} คน`,
       bad: data.showed - data.screened > 0,

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ApplicantAttachmentPanel from '@/components/recruit-rm/ApplicantAttachmentPanel';
 import { cn } from '@/lib/utils';
+import ApplicantTraceField, { useApplicantTrace } from '@/components/recruit-rm/ApplicantTraceField';
 import { EM_DASH } from '@/lib/displayFallback';
 import { APPLICATION_ORIGIN_LABEL, type PublicApplication, REFERRAL_SOURCE_LABEL } from '@/lib/publicApplicationsApi';
 import { applicantResponsibleName, applicationJobLabel } from '@/lib/recruitRm';
@@ -100,6 +101,8 @@ const ApplicantInfoPanel: React.FC<{
     ...draft.license_types.filter((x) => !PROFILE_LICENSE_OPTIONS.includes(x)),
   ];
   const genderLabel = a.gender ? PROFILE_GENDER_LABEL[a.gender as ProfileGender] ?? a.gender : null;
+  /** iRecruit · ERP · ช่องทางของลิงก์ — ระบบหาเองด้วยเบอร์ (20 ต.ค. 2569) */
+  const trace = useApplicantTrace(a.id);
 
   return (
     <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
@@ -233,7 +236,10 @@ const ApplicantInfoPanel: React.FC<{
       <Field label="ตำแหน่งงาน">{applicationJobLabel(a)}</Field>
 
       {/* ช่องทางอ่านแบบเดียวกับตาราง — ตารางช่องทางของลิงก์ก่อน ไม่มีค่อยใช้ที่ผู้สมัครเลือกเอง (QA 18 ต.ค. 2569: ป๊อปขึ้น "—" แต่ตารางขึ้น TikTok) */}
-      <Field label="ช่องทาง">{show(a.channel_label?.trim() || (a.referral_source ? REFERRAL_SOURCE_LABEL[a.referral_source] : null))}</Field>
+      {/* ช่องทางของใบ → ไม่มี = ช่องทางของลิงก์ที่กรอกผ่าน (ไม่ได้คัดลอกลงใบ · 19 ต.ค. 2569) → ที่ผู้สมัครเลือกเอง */}
+      <Field label="ช่องทาง">
+        {show(a.channel_label?.trim() || trace?.linkChannel || (a.referral_source ? REFERRAL_SOURCE_LABEL[a.referral_source] : null))}
+      </Field>
       {/* 🔴 16 ต.ค. 2569 เจ้าของ: "ผู้สรรหาก็พวก คิว แบงค์" · "ผู้รับผิดชอบ ก็ทีม online อะ ว่าน เจมส์"
           เดิมช่องแรกอ่าน `specific_type` (ประเภทเจาะจง) ซึ่งผูกผิดความหมาย และยังไม่มีใบไหนกรอก (0/963) — ย้ายไปช่องของตัวเองข้างล่าง */}
       <Field label="ข้อมูลผู้สรรหา">
@@ -415,6 +421,9 @@ const ApplicantInfoPanel: React.FC<{
         )}
       </Field>
       <Field label="ที่มา">{a.origin ? APPLICATION_ORIGIN_LABEL[a.origin] : EM_DASH}</Field>
+      <Field label="ไปถึงไหนแล้ว">
+        <ApplicantTraceField trace={trace} />
+      </Field>
     </div>
   );
 };

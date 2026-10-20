@@ -14,6 +14,7 @@ import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
 import { buildRecruitOverview, factsSql, toFact } from './recruit-overview.js';
 import { readUnitRequestListThroughCache } from './siamraj-unit-requests.js';
 import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
+import { loadInformDaysByPhone, loadIrecruitApplicantDays } from '../_lib/applicantSourceSql.js';
 import { effectiveNowSalary } from '../../src/lib/valueCase.js';
 import { monthWindow } from '../../src/lib/recruitOverviewWindow.js';
 import { buildRecruitJourney } from '../../src/lib/recruitJourney.js';
@@ -205,7 +206,14 @@ async function requestView(jobId: string, now: Date) {
       [jobId],
     ).catch(() => ({ rows: [] as Array<{ label: string | null; created_at: Date | string; apps: number }> })),
   ]);
-  const facts: RecruitAppFact[] = factsR.rows.map((r) => toFact(r, null));
+  // ผูก iRecruit/ERP ด้วยเบอร์ (20 ต.ค. 2569) — อ่านไม่ได้ = ไม่รู้ (ไม่ล้มทั้งหน้า)
+  const [informDays, irApplicants] = await Promise.all([
+    loadInformDaysByPhone('2025-01-01').catch(() => null),
+    loadIrecruitApplicantDays('2025-01-01').catch(() => null),
+  ]);
+  const facts: RecruitAppFact[] = factsR.rows.map((r) =>
+    toFact(r, null, { informDays, irecruitRegs: null, irecruitApplicants: irApplicants }),
+  );
   const firstLink = links.rows[0] ? new Date(links.rows[0].created_at).toISOString() : null;
   const requestDay = String(job.request_date ?? '').slice(0, 10);
   const stages = buildStageSla(
@@ -258,6 +266,8 @@ async function gapsView(monthParam: unknown, now: Date) {
     linksWithChannel: links.rows[0]?.with_channel ?? 0,
     appointmentsDue: due.length,
     appointmentsNoResult: due.filter((f) => f.attendance !== 'showed' && f.attendance !== 'no_show').length,
+    // นัดเลยวันแล้วยังไม่ลงผล แต่เบอร์ไปโผล่เป็นผู้สมัครใน iRecruit = น่าจะมาแล้ว แค่ไม่มีคนลงผล
+    appointmentsLikelyCame: due.filter((f) => f.attendance !== 'showed' && f.attendance !== 'no_show' && f.irecruitAt).length,
     showed: facts.filter((f) => f.attendance === 'showed').length,
     screened: facts.filter((f) => f.screening === 'passed' || f.screening === 'not_passed').length,
     applicants: facts.length,

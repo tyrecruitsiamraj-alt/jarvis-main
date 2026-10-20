@@ -52,8 +52,8 @@ import { isOverAge } from '../../src/lib/applicantAge.js';
 import { isOutOfAreaAnswer } from '../../src/lib/outOfAreaAnswer.js';
 import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
 import { loadChannelPlacement } from '../_lib/channelPlacementSql.js';
-import { loadInformDaysByPhone, loadIrecruitRegsByPhone } from '../_lib/applicantSourceSql.js';
-import { informedSince, irecruitChannelAt, phone9Of } from '../../src/lib/applicantSourceMatch.js';
+import { loadInformDaysByPhone, loadIrecruitApplicantDays, loadIrecruitRegsByPhone } from '../_lib/applicantSourceSql.js';
+import { firstDaySince, informedSince, irecruitChannelAt, phone9Of } from '../../src/lib/applicantSourceMatch.js';
 import type {
   RecruitAiRow,
   RecruitAppFact,
@@ -245,6 +245,8 @@ type Row = Record<string, unknown>;
 export type AppSourceMaps = {
   informDays: ReadonlyMap<string, readonly string[]> | null;
   irecruitRegs: ReadonlyMap<string, ReadonlyArray<{ at: string; channel: string }>> | null;
+  /** วันเป็นผู้สมัครใน iRecruit ต่อเบอร์ (20 ต.ค. 2569) */
+  irecruitApplicants?: ReadonlyMap<string, readonly string[]> | null;
 };
 
 const IRECRUIT_LABEL = /^irecruit/i;
@@ -290,6 +292,8 @@ export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSou
     onBoard: boardPhones ? Boolean(phone && boardPhones.has(phone)) : null,
     informed: sources ? informedSince(sources.informDays, p9, createdAt) : null,
     sourceChannel: sources && fromIrecruit ? irecruitChannelAt(sources.irecruitRegs, p9, createdAt) : null,
+    irecruitAt: sources ? firstDaySince(sources.irecruitApplicants ?? null, p9, createdAt) : undefined,
+    informedAt: sources ? firstDaySince(sources.informDays, p9, createdAt) : undefined,
   };
 }
 
@@ -466,7 +470,7 @@ export async function buildRecruitOverview(
   const monthRange = [startOfBkk(window.from), startOfBkk(addDays(window.to, 1)), bu];
   const nowMs = now.getTime();
 
-  const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, chR, reqR, informR, irecR] = await Promise.all([
+  const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, chR, reqR, informR, irecR, irAppR] = await Promise.all([
     settle('รายชื่อบนบอร์ด', loadBoardPhoneSet),
     settle('ใบสมัคร', () => loadFacts(bothRange)),
     settle('งานค้าง', async () => (await dbQuery<Row>(backlogSql(), [bu])).rows),
@@ -509,13 +513,19 @@ export async function buildRecruitOverview(
     // ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "จับได้ถึงแจ้งเข้า") — แจ้งเข้าตั้งแต่ต้นช่วงเทียบ · iRecruit ย้อน 60 วัน
     settle('ใบแจ้งเข้า ERP', () => loadInformDaysByPhone(window.prevFrom)),
     settle('ช่องทาง iRecruit', () => loadIrecruitRegsByPhone(window.prevFrom, window.to)),
+    // ผู้สมัครใน iRecruit (ขั้นคีย์เข้า iRecruit หลังมาตามนัด · 20 ต.ค. 2569)
+    settle('ผู้สมัคร iRecruit', () => loadIrecruitApplicantDays(window.prevFrom)),
   ]);
 
   // บอร์ด ERP อ่านไม่ได้ = ไม่รู้ว่าได้ใบสมัครหรือยัง (null) — ไม่ใช่ "ยังไม่ได้"
   const boardPhones = boardR.ok ? boardR.value : null;
   if (!boardR.ok || boardPhones === null) body.errors.board = 'อ่านรายชื่อบนบอร์ด ERP ไม่ได้ — ยอดได้ใบสมัครเช็คไม่ได้ชั่วคราว';
 
-  const sources: AppSourceMaps = { informDays: informR.ok ? informR.value : null, irecruitRegs: irecR.ok ? irecR.value : null };
+  const sources: AppSourceMaps = {
+    informDays: informR.ok ? informR.value : null,
+    irecruitRegs: irecR.ok ? irecR.value : null,
+    irecruitApplicants: irAppR.ok ? irAppR.value : null,
+  };
   if (!informR.ok) body.errors.informs = informR.error;
   if (factsR.ok) body.apps = factsR.value.map((r) => toFact(r, boardPhones, sources));
   else {

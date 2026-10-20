@@ -169,8 +169,14 @@ export function buildStageSla(facts: readonly RecruitAppFact[], requests: readon
   const showed = facts.filter((f) => f.attendance === 'showed');
   const screened = showed.filter((f) => f.screening === 'passed' || f.screening === 'not_passed');
 
-  const passed = facts.filter((f) => f.screening === 'passed');
-  const informedPassed = passed.filter((f) => f.informed === true);
+  // ขั้น 8 (20 ต.ค. 2569): คนที่มาตามนัดต้องไปโผล่เป็นผู้สมัครใน iRecruit (จับด้วยเบอร์) · ทัน = ภายในวันถัดจากวันนัด
+  const irecruitKnown = facts.some((f) => f.irecruitAt !== undefined);
+  const keyed = showed.filter((f) => f.irecruitAt);
+  const keyedOnTime = keyed.filter((f) => {
+    const appt = ms(f.appointmentAt);
+    return Number.isFinite(appt) && Date.parse(`${f.irecruitAt}T00:00:00+07:00`) <= appt + SLA_MS;
+  });
+  const keyStuck = showed.filter((f) => f.irecruitAt === null && olderThan(f.appointmentAt, now));
 
   return [
     none('match', 'ยังไม่จดเวลาที่จับคู่ได้'),
@@ -181,9 +187,9 @@ export function buildStageSla(facts: readonly RecruitAppFact[], requests: readon
     // มา/ไม่มา: ทัน = ลงผลแล้ว (ยังไม่มีเวลาที่ลงผล) · ค้าง = เลยวันนัดเกิน 24 ชม. ยังไม่ลง
     stage('attendance', due, recorded.length, attendStuck),
     stage('screening', showed, screened.length, showed.filter((f) => !screened.includes(f))),
-    passed.length > 0
-      ? stage('inform', passed, informedPassed.length, passed.filter((f) => f.informed !== true))
-      : none('inform', 'ยังไม่มีคนที่ลงผลผ่าน · ระบบยังผูกคนที่ผ่านกับ iRecruit ไม่ได้'),
+    irecruitKnown
+      ? { ...stage('inform', keyed, keyedOnTime.length, keyStuck), done: keyed.length }
+      : none('inform', 'อ่านผู้สมัครใน iRecruit ไม่ได้'),
     none('follow', 'หน้าติดตามยังไม่ผูกกับใบสมัคร'),
     none('replace', 'ยังไม่จดเวลาที่ต้องหาคนแทน'),
     none('aftercare', 'ยังไม่จดเวลาที่ควรโทรกับที่โทรจริงเทียบกัน'),

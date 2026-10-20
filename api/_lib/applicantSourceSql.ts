@@ -67,3 +67,28 @@ export async function loadIrecruitRegsByPhone(from: string, to: string): Promise
   regCache.set(key, { at: Date.now(), value });
   return value;
 }
+
+const irApplicantCache = new Map<string, { at: number; value: Map<string, string[]> }>();
+
+/**
+ * วันที่เป็นผู้สมัครใน iRecruit (`hr_recruitment.application_date`) ต่อเบอร์ — ตั้งแต่ `from` (20 ต.ค. 2569)
+ * ขั้น "ผ่านแล้วคีย์เข้า iRecruit → ERP" ของเจ้าของ: คนที่มาตามนัดต้องไปโผล่ที่นี่ · จับด้วยเบอร์ 9 ตัวท้าย
+ */
+export async function loadIrecruitApplicantDays(from: string): Promise<Map<string, string[]>> {
+  const hit = irApplicantCache.get(from);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
+  const rows = await irecruitSqlQuery<{ k: string; d: Date | string }>(
+    `SELECT ${K9('mobile')} AS k, application_date AS d FROM hr_recruitment WHERE mobile IS NOT NULL AND application_date >= @from`,
+    { from },
+  );
+  const value = new Map<string, string[]>();
+  for (const r of rows) {
+    const k = String(r.k ?? '').trim();
+    if (!/^\d{9}$/.test(k)) continue;
+    const list = value.get(k) ?? [];
+    list.push(iso(r.d).slice(0, 10));
+    value.set(k, list);
+  }
+  irApplicantCache.set(from, { at: Date.now(), value });
+  return value;
+}

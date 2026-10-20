@@ -42,6 +42,7 @@ export type GapsResponse = {
   linksWithChannel: number;
   appointmentsDue: number;
   appointmentsNoResult: number;
+  appointmentsLikelyCame: number;
   showed: number;
   screened: number;
   applicants: number;
