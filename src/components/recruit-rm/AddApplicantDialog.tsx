@@ -24,7 +24,7 @@ import { jobPickKeywords, jobPickLabel } from '@/lib/jobPickLabel';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import type { JobRequest } from '@/types';
-import { createApplicationByStaff } from '@/lib/publicApplicationsApi';
+import { createApplicationByStaff, type PublicApplication } from '@/lib/publicApplicationsApi';
 import {
   RM_EDUCATION_LEVELS,
   RM_LICENSE_TYPES,
@@ -65,7 +65,8 @@ type CallMode = 'ai' | 'manual';
 const AddApplicantDialog: React.FC<{
   open: boolean;
   onClose: () => void;
-  onSaved: () => void;
+  /** ใบที่เพิ่งบันทึก (มี `apply_count` — เคยสมัครมากี่ครั้ง) */
+  onSaved: (created?: PublicApplication) => void;
   /**
    * ใบขอที่จะผูกใบสมัครให้เลย (20 ส.ค. 2569 — เจ้าของสั่ง: *"กรณีโทรมาไม่ได้กรอก
    * ในกล่องงานสามารถเพิ่มผู้สมัครจากกล่องนั้น ๆ ได้"*) · ไม่ส่ง = สมัครทั่วไปแบบเดิม
@@ -154,7 +155,7 @@ const AddApplicantDialog: React.FC<{
 
     setSaving(true);
     try {
-      await createApplicationByStaff({
+      const created = await createApplicationByStaff({
         // ผูกใบขอเมื่อเปิดจากป๊อปของใบ (ดู prop `job` ข้างบน)
         job_id: picked?.id ?? fromProp?.id ?? null,
         job_title: picked ? publicJobPositionLabel(picked) : (fromProp?.title ?? null),
@@ -177,7 +178,7 @@ const AddApplicantDialog: React.FC<{
         call_mode: callMode,
         pdpa_consent: true,
       });
-      onSaved();
+      onSaved(created);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');

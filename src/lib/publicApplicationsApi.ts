@@ -82,6 +82,8 @@ export type PublicApplication = {
    * undefined = server รุ่นเก่ายังไม่ส่งมา — อย่าเดาว่าผิด
    */
   phone_callable?: boolean;
+  /** ใบสมัครทั้งหมดของเบอร์นี้ (รวมใบนี้) — 2 ขึ้นไป = เคยสมัครมาก่อน (21 ต.ค. 2569) */
+  apply_count?: number;
   age?: number;
   gender?: 'male' | 'female' | 'other';
   province?: string;

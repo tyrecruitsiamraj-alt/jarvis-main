@@ -41,6 +41,7 @@ import {
   staffInsertParams,
 } from '../../src/lib/staffApplicationInput.js';
 import { repeatStaffMessage } from '../../src/lib/applicationRepeat.js';
+import { loadApplyCounts } from '../_lib/applicationApplyCount.js';
 import { lockAndFindRepeat } from '../_lib/applicationRepeatGuard.js';
 import {
   PROFILE_KEYS,
@@ -725,7 +726,9 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
     after: { phone: v.phone, specific_type: v.specific_type, license_types: v.license_types, call_mode: callMode },
   });
 
-  return res.status(201).json({ item: toApplication(row, req.user.sub) });
+  // บอกคนคีย์ว่าเบอร์นี้สมัครมาแล้วกี่ครั้ง (21 ต.ค. 2569) — รับใบตามกติกา 14 วันเหมือนเดิม
+  const applyCount = (await loadApplyCounts([String(row.id)])).get(String(row.id)) ?? 1;
+  return res.status(201).json({ item: { ...toApplication(row, req.user.sub), apply_count: applyCount } });
 }
 
 /**
@@ -1708,6 +1711,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
       for (const item of items) {
         const st = irStatus.get(item.id);
         if (st) (item as Record<string, unknown>).irecruit_status = st;
+      }
+      // เคยสมัครมากี่ครั้ง (เบอร์เดียวกัน · 21 ต.ค. 2569 เจ้าของ "บอกเลยคนนี้เคยสมัครมากี่ครั้ง") — ป้ายบนแถว
+      const applyCounts = await loadApplyCounts(items.map((i) => i.id));
+      for (const item of items) {
+        const n = applyCounts.get(item.id);
+        if (n) (item as Record<string, unknown>).apply_count = n;
       }
       // "บอก AI" จากสายทักทายทั่วไป (15 ต.ค. 2569) — ป้ายบนแถว ไม่เขียนทับใบ
       const heard = await loadGreetingHeard(items);

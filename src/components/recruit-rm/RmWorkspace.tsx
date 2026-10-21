@@ -1482,8 +1482,10 @@ const RmWorkspace: React.FC<{
       <AddApplicantDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        onSaved={() => {
-          say('บันทึกผู้สมัครแล้ว');
+        onSaved={(created) => {
+          // เบอร์เดิมเคยสมัคร = บอกเลยว่ากี่ครั้ง (21 ต.ค. 2569)
+          const n = created?.apply_count ?? 1;
+          say(n > 1 ? `บันทึกผู้สมัครแล้ว · เบอร์นี้สมัครมาแล้ว ${n} ครั้ง` : 'บันทึกผู้สมัครแล้ว');
           load(); // ใบใหม่ต้องโผล่ในตารางทันที ไม่ต้องให้กดรีเฟรชเอง
         }}
       />

@@ -423,6 +423,15 @@ const RmTable: React.FC<{
                       <td className="px-1.5 py-2">
                         <span className="flex flex-col items-start gap-0.5">
                           <span className={cn('whitespace-nowrap tabular-nums', DASH.cell)}>{dashIfEmpty(r.phone)}</span>
+                          {/* เคยสมัครมากี่ครั้ง (เบอร์เดียวกัน · 21 ต.ค. 2569) */}
+                          {(r.apply_count ?? 0) > 1 ? (
+                            <span
+                              className={cn('w-fit whitespace-nowrap rounded-full border px-1.5 py-0.5 text-xs font-medium', TONE.info.soft, TONE.info.value)}
+                              data-testid="apply-count"
+                            >
+                              สมัคร {r.apply_count} ครั้ง
+                            </span>
+                          ) : null}
                           {r.phone_callable === false ? (
                             <span
                               className={cn('w-fit whitespace-nowrap rounded-full border px-1.5 py-0.5 text-xs font-medium', TONE.danger.soft, TONE.danger.value)}
@@ -478,6 +487,15 @@ const RmTable: React.FC<{
                             {dashIfEmpty(r.phone)} · {typeof r.age === 'number' ? `${r.age} ปี` : `อายุ ${EM_DASH}`} ·{' '}
                             {r.gender ? (GENDER_LABEL[r.gender] ?? EM_DASH) : `เพศ ${EM_DASH}`}
                           </span>
+                          {/* เคยสมัครมากี่ครั้ง (เบอร์เดียวกัน · 21 ต.ค. 2569) */}
+                          {(r.apply_count ?? 0) > 1 ? (
+                            <span
+                              className={cn('w-fit whitespace-nowrap rounded-full border px-1.5 py-0.5 text-xs font-medium', TONE.info.soft, TONE.info.value)}
+                              data-testid="apply-count"
+                            >
+                              สมัคร {r.apply_count} ครั้ง
+                            </span>
+                          ) : null}
                           {/* เบอร์แปลง E.164 ไม่ได้ (087) — ส่ง AI/เก็บไปโทร/จับผลโทรไม่ได้
                               แก้ได้ที่ปุ่มดูรายละเอียด · เช็ค === false เพราะ server เก่าไม่ส่ง field */}
                           {r.phone_callable === false ? (
