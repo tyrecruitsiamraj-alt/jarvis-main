@@ -1,10 +1,10 @@
 /**
  * แท็บติดตามนัดหมาย ปุ่ม "ของฉัน / ทุกคน" (QA รอบ 2 ข้อ 4 · เจ้าของ Choice 10 ต.ค. 2569)
  *
- * 🔴 ด่าน:
- * 1. ค่าเริ่ม "ของฉัน" = ยิงเส้นเดิม (ไม่มีธงนัดของทุกคน)
- * 2. กด "ทุกคน" = ยิงใหม่พร้อมธง · กดกลับ "ของฉัน" = กลับเส้นเดิม
- * 3. staff / opl ไม่เห็นปุ่ม · แท็บอื่นไม่มีปุ่ม
+ * 🔴 ด่าน (เปลี่ยน 21 ต.ค. 2569 เจ้าของ "ให้เห็นไปหมดเลย" · Choice "ทุกคนเห็นหมด ค่าเริ่ม = ทุกคน"):
+ * 1. ค่าเริ่ม "ทุกคน" = ยิงพร้อมธงนัดของทุกคน
+ * 2. กด "ของฉัน" = กลับเส้นเดิม · กด "ทุกคน" = ยิงพร้อมธงอีกครั้ง
+ * 3. ทุก role เห็นปุ่ม · แท็บอื่นไม่มีปุ่ม
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -48,29 +48,29 @@ beforeEach(() => {
 });
 
 describe('ปุ่ม ของฉัน / ทุกคน', () => {
-  it('supervisor: ค่าเริ่ม "ของฉัน" ยิงเส้นเดิม · กด "ทุกคน" ยิงใหม่พร้อมธง · กดกลับได้', async () => {
+  it('supervisor: ค่าเริ่ม "ทุกคน" ยิงพร้อมธง · กด "ของฉัน" กลับเส้นเดิม · กดกลับได้', async () => {
     renderTab('appointments');
     await waitFor(() => expect(fetchAll).toHaveBeenCalled());
-    expect(lastFlag()).toBe(false);
+    expect(lastFlag()).toBe(true);
 
     const mine = screen.getByRole('radio', { name: 'ของฉัน' });
     const all = screen.getByRole('radio', { name: 'ทุกคน' });
-    expect(mine).toHaveAttribute('aria-checked', 'true');
-    expect(all).toHaveAttribute('aria-checked', 'false');
+    expect(all).toHaveAttribute('aria-checked', 'true');
+    expect(mine).toHaveAttribute('aria-checked', 'false');
 
-    fireEvent.click(all);
-    await waitFor(() => expect(lastFlag()).toBe(true));
-    expect(screen.getByRole('radio', { name: 'ทุกคน' })).toHaveAttribute('aria-checked', 'true');
-
-    fireEvent.click(screen.getByRole('radio', { name: 'ของฉัน' }));
+    fireEvent.click(mine);
     await waitFor(() => expect(lastFlag()).toBe(false));
+    expect(screen.getByRole('radio', { name: 'ของฉัน' })).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'ทุกคน' }));
+    await waitFor(() => expect(lastFlag()).toBe(true));
   });
 
   it('กดซ้ำตัวที่เลือกอยู่ ไม่หลุดเป็นไม่มีตัวเลือก และไม่ยิงซ้ำ', async () => {
     renderTab('appointments');
     await waitFor(() => expect(fetchAll).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('radio', { name: 'ของฉัน' }));
-    expect(screen.getByRole('radio', { name: 'ของฉัน' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('radio', { name: 'ทุกคน' }));
+    expect(screen.getByRole('radio', { name: 'ทุกคน' })).toHaveAttribute('aria-checked', 'true');
     expect(fetchAll).toHaveBeenCalledTimes(1);
   });
 
@@ -81,13 +81,12 @@ describe('ปุ่ม ของฉัน / ทุกคน', () => {
     expect(screen.getByRole('radio', { name: 'ทุกคน' })).toBeInTheDocument();
   });
 
-  it.each<UserRole>(['staff', 'opl'])('%s ไม่เห็นปุ่ม และยิงเส้นเดิมเสมอ', async (r) => {
+  it.each<UserRole>(['staff', 'opl'])('%s เห็นปุ่ม ค่าเริ่มทุกคน (21 ต.ค. 2569)', async (r) => {
     role = r;
     renderTab('appointments');
     await waitFor(() => expect(fetchAll).toHaveBeenCalled());
-    expect(screen.queryByRole('radio', { name: 'ทุกคน' })).toBeNull();
-    expect(screen.queryByRole('radio', { name: 'ของฉัน' })).toBeNull();
-    expect(lastFlag()).toBe(false);
+    expect(screen.getByRole('radio', { name: 'ทุกคน' })).toHaveAttribute('aria-checked', 'true');
+    expect(lastFlag()).toBe(true);
   });
 
   it.each(['contact', 'candidates'] as const)('แท็บ %s ไม่มีปุ่มนี้', async (tab) => {

@@ -2,7 +2,6 @@ import { fullDaysSince } from '@/lib/fullDays';
 import { isOverAge } from '@/lib/applicantAge';
 import { aiQueueStatusOf } from '@/lib/applicantAiQueueStatus';
 import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
-import { meetsMinimumRole } from '@/lib/rbac';
 import type { UserRole } from '@/types';
 /**
  * งานสรรหา (RM) — นิยามกลางของหน้า `/recruit/rm`
@@ -77,9 +76,12 @@ export function isRmAppointmentScope(v: unknown): v is RmAppointmentScope {
   return typeof v === 'string' && (RM_APPOINTMENT_SCOPES as readonly string[]).includes(v);
 }
 
-/** เห็นปุ่ม "ทุกคน" ไหม — supervisor ขึ้นไป (opl ไม่ผ่าน · กติกาเดียวกับ server) */
+/**
+ * เห็นปุ่ม "ทุกคน" ไหม — ทุกบัญชีที่ล็อกอิน (เจ้าของ 21 ต.ค. 2569 "ให้เห็นไปหมดเลย" · Choice "ทุกคนเห็นหมด ค่าเริ่ม = ทุกคน")
+ * เดิม supervisor ขึ้นไป (10 ต.ค.) · กติกาเดียวกับ server (`wantsEveryoneAppointments`) · สิทธิ์ BU ยังอยู่
+ */
 export function canSeeEveryoneAppointments(role: UserRole | null | undefined): boolean {
-  return !!role && meetsMinimumRole(role, 'supervisor');
+  return !!role;
 }
 
 /**

@@ -74,11 +74,12 @@ beforeEach(() => {
 describe('สิทธิ์ของ ?view=appointments&scope=all', () => {
   const all = { view: 'appointments', scope: 'all' };
 
-  it('supervisor / admin ผ่าน · staff / opl / ไม่รู้ role ไม่ผ่าน', () => {
+  // 21 ต.ค. 2569 เจ้าของ "ให้เห็นไปหมดเลย" — ทุกบัญชีที่ล็อกอิน (เดิม supervisor ขึ้นไป)
+  it('ทุก role ผ่าน · ไม่รู้ role ไม่ผ่าน', () => {
     expect(wantsEveryoneAppointments(all, 'admin')).toBe(true);
     expect(wantsEveryoneAppointments(all, 'supervisor')).toBe(true);
-    expect(wantsEveryoneAppointments(all, 'staff')).toBe(false);
-    expect(wantsEveryoneAppointments(all, 'opl')).toBe(false);
+    expect(wantsEveryoneAppointments(all, 'staff')).toBe(true);
+    expect(wantsEveryoneAppointments(all, 'opl')).toBe(true);
     expect(wantsEveryoneAppointments(all, undefined)).toBe(false);
   });
 
@@ -98,21 +99,16 @@ describe('สิทธิ์ของ ?view=appointments&scope=all', () => {
 });
 
 describe('GET /api/job-applications — คิวรีที่ยิงจริง', () => {
-  it('🔴 staff ส่ง scope=all มา = ลิสต์เดิมเป๊ะ (ยังซ่อนใบที่คนอื่นเก็บ + Lead ของคนอื่น)', async () => {
-    const plain = await get('staff', {});
-    dbQuery.mockReset().mockResolvedValue({ rows: [] });
+  it('🔴 staff ส่ง scope=all มา = นัดของทุกคน (แถวนัดเท่านั้น · 21 ต.ค. 2569)', async () => {
     const asked = await get('staff', { view: 'appointments', scope: 'all' });
-    expect(asked.sql).toBe(plain.sql);
-    expect(asked.params).toEqual(plain.params);
-    expect(asked.sql).toContain('claimed_by is null or claimed_by::text = $1');
-    expect(asked.sql).toContain('not is_lead or lead_by::text = $1');
-    expect(asked.sql).not.toContain("status = 'converted'");
+    expect(asked.sql).toContain("status = 'converted'");
+    expect(asked.sql).not.toContain('claimed_by is null or claimed_by::text');
   });
 
-  it('opl ส่ง scope=all มา = ลิสต์เดิม', async () => {
-    const asked = await get('opl', { view: 'appointments', scope: 'all' });
-    expect(asked.sql).toContain('claimed_by is null');
-    expect(asked.sql).not.toContain("status = 'converted'");
+  it('staff ไม่ส่ง scope = ลิสต์เดิม (ยังซ่อนใบที่คนอื่นเก็บ)', async () => {
+    const plain = await get('staff', {});
+    expect(plain.sql).toContain('claimed_by is null or claimed_by::text = $1');
+    expect(plain.sql).not.toContain("status = 'converted'");
   });
 
   it('🔴 admin เรียกแบบเดิม (ไม่ส่ง param) = ยังของใครของมัน', async () => {
@@ -149,19 +145,19 @@ describe('หน้าเว็บ: ปุ่ม ของฉัน / ทุก�
   const code = ws.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
   const block = code.slice(code.indexOf('<ToggleGroup'), code.indexOf('</ToggleGroup>'));
 
-  it('คำบนปุ่มตรงตามที่เจ้าของเคาะ · ค่าเริ่ม = ของฉัน', () => {
+  it('คำบนปุ่มตรงตามที่เจ้าของเคาะ · ค่าเริ่ม = ทุกคน (21 ต.ค. 2569)', () => {
     expect(RM_APPOINTMENT_SCOPES).toEqual(['mine', 'all']);
     expect(RM_APPOINTMENT_SCOPE_LABEL).toEqual({ mine: 'ของฉัน', all: 'ทุกคน' });
-    expect(code).toContain("useState<RmAppointmentScope>('mine')");
+    expect(code).toContain("useState<RmAppointmentScope>('all')");
     expect(isRmAppointmentScope('all')).toBe(true);
     expect(isRmAppointmentScope('')).toBe(false);
   });
 
-  it('เห็นปุ่มเฉพาะ supervisor ขึ้นไป (opl ไม่เห็น) — กติกาเดียวกับ server', () => {
+  it('ทุกบัญชีเห็นปุ่ม (21 ต.ค. 2569) — กติกาเดียวกับ server', () => {
     expect(canSeeEveryoneAppointments('admin')).toBe(true);
     expect(canSeeEveryoneAppointments('supervisor')).toBe(true);
-    expect(canSeeEveryoneAppointments('staff')).toBe(false);
-    expect(canSeeEveryoneAppointments('opl')).toBe(false);
+    expect(canSeeEveryoneAppointments('staff')).toBe(true);
+    expect(canSeeEveryoneAppointments('opl')).toBe(true);
     expect(canSeeEveryoneAppointments(null)).toBe(false);
     expect(code).toMatch(/canSeeEveryoneAppointments\(user\?\.role\) && !leadView && !cancelledView \?\s*\(\s*<ToggleGroup/);
   });

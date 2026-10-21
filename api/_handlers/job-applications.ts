@@ -12,7 +12,6 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
-import { meetsMinimumRole } from '../_lib/rbac.js';
 import type { UserRole } from '../_lib/auth.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
@@ -397,7 +396,7 @@ function isUndefinedColumn(e: unknown): boolean {
  * "ปุ่ม ของฉัน / ทุกคน") · เจอจริง: admin เห็นนัด 1 ใบ ภาพรวมนับ 8 (6 ใบเป็นของหัวหน้าคนหนึ่งที่เก็บไว้)
  *
  * 🔴 "ของใครของมัน" ยังเป็นค่าเริ่มเสมอ (กันสองคนโทรหาคนเดียวกัน) — ผ่อนได้เฉพาะ:
- * - supervisor ขึ้นไป (`meetsMinimumRole` · opl ไม่ผ่าน) · ต่ำกว่านั้นส่งมาก็ได้ลิสต์เดิมเป๊ะ (ไม่ตอบ 403 — หน้าเว็บไม่พัง)
+ * - ทุกบัญชีที่ล็อกอิน (21 ต.ค. 2569 · เดิม supervisor ขึ้นไป) · ไม่ส่ง role = ลิสต์เดิม
  * - ขอมาตรง ๆ ทั้งสองค่า · ไม่ปนกับมุมมองที่มีเงื่อนไขของตัวเอง (`job_id` · `lead=1` · `bucket`)
  * อ่านอย่างเดียว — ลงผลมา/ไม่มาบนนัดของคนอื่นผ่านอยู่แล้ว (application-attendance เช็คแค่ BU)
  */
@@ -405,7 +404,8 @@ export function wantsEveryoneAppointments(
   query: Record<string, unknown> | undefined,
   role: UserRole | undefined,
 ): boolean {
-  if (!role || !meetsMinimumRole(role, 'supervisor')) return false;
+  // ทุกบัญชีที่ล็อกอิน (เจ้าของ 21 ต.ค. 2569 "ให้เห็นไปหมดเลย") — เดิม supervisor ขึ้นไป · สิทธิ์ BU ข้างในยังอยู่
+  if (!role) return false;
   const q = query ?? {};
   if (getString(q.view) !== 'appointments' || getString(q.scope) !== 'all') return false;
   return !getString(q.job_id) && getString(q.lead) !== '1' && !getString(q.bucket);

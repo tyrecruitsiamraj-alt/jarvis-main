@@ -67,7 +67,9 @@ import {
   isRmAppointmentScope,
   type RmAppointmentScope,
 } from '@/lib/recruitRm';
-import { formatYmdTh } from '@/lib/dateTh';
+import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
+import { buildAppointmentPlaces, isInAppointmentPlace, shiftYmd } from '@/lib/appointmentPlaces';
+import AppointmentPlacesCard from '@/components/recruit-rm/AppointmentPlacesCard';
 import { RM_BUCKET_LABEL, isRmBucket } from '@/lib/recruitRmOverviewApi';
 import RecruitDailyPanel from '@/components/recruit-rm/RecruitDailyPanel';
 import { LEAD_VIEW_LABEL } from '@/lib/recruitLead';
@@ -277,7 +279,12 @@ const RmWorkspace: React.FC<{
    * แท็บติดตามนัดหมาย: ของฉัน / ทุกคน (QA รอบ 2 ข้อ 4 · เจ้าของ Choice 10 ต.ค. 2569) — ค่าเริ่ม "ของฉัน" = ของใครของมันแบบเดิม
    * ปุ่มโผล่เฉพาะ supervisor ขึ้นไป · ไม่ผูก URL (ของคนที่นั่งดู) · ออกจากแท็บนี้ = กลับไปลิสต์เดิมเอง
    */
-  const [appointmentScope, setAppointmentScope] = useState<RmAppointmentScope>('mine');
+  // 21 ต.ค. 2569 เจ้าของ "ให้เห็นไปหมดเลยว่า นัดมาทั้งหมดเท่าไหร่ ใครนัดมา" · Choice "ทุกคนเห็นหมด ค่าเริ่ม = ทุกคน"
+  const [appointmentScope, setAppointmentScope] = useState<RmAppointmentScope>('all');
+  /** ตารางนัดของวันแยกสถานที่ (แบบ iRecruit · 21 ต.ค. 2569) — วันที่ดู + สถานที่ที่กด (null = ไม่กรองรายชื่อ) */
+  const todayYmd = toYmdBangkok(new Date());
+  const [placeDay, setPlaceDay] = useState<string>(todayYmd);
+  const [placePick, setPlacePick] = useState<{ ymd: string; place: string | null } | null>(null);
 
   /**
    * drill-down จากกล่อง Dashboard (`?bucket=` — S6) · เงื่อนไขกรองอยู่ฝั่ง server
@@ -550,6 +557,8 @@ const RmWorkspace: React.FC<{
 
   /** บอร์ดสรุปนัดต่อวัน (ข้อ 12 · 20 ส.ค. 2569) — คิดจากชุดเดียวกับตาราง เลขจึงตรงกันเสมอ */
   const appointmentBoard = useMemo(() => buildAppointmentBoard(filtered), [filtered]);
+  /** ตารางนัดรายสถานที่ของวันที่ดู — ชุดเดียวกับตาราง (ไม่ผ่านชิป) */
+  const appointmentPlaces = useMemo(() => buildAppointmentPlaces(filtered, placeDay), [filtered, placeDay]);
 
   /**
    * ใบที่รออยู่ในกอง "เลือกวิธีโทร" (Phase 5.9) — คิดจาก **ชุดที่โหลดมาทั้งก้อน** ไม่ใช่
@@ -601,9 +610,12 @@ const RmWorkspace: React.FC<{
   const shown = useMemo(() => {
     if (bucket) return filtered;
     if (tab === 'contact') return filtered.filter((r) => isInContactChip(r, contactChip));
-    if (tab === 'appointments') return filtered.filter((r) => isInAppointmentChip(r, appointmentChip));
+    if (tab === 'appointments') {
+      const byChip = filtered.filter((r) => isInAppointmentChip(r, appointmentChip));
+      return placePick ? byChip.filter((r) => isInAppointmentPlace(r, placePick.ymd, placePick.place)) : byChip;
+    }
     return filtered;
-  }, [bucket, filtered, tab, contactChip, appointmentChip]);
+  }, [bucket, filtered, tab, contactChip, appointmentChip, placePick]);
 
   const totalPages = getTotalPages(shown.length, pageSize);
   const currentPage = Math.min(page, totalPages);
@@ -1165,6 +1177,33 @@ const RmWorkspace: React.FC<{
 
           {tab === 'appointments' ? (
             <div className="space-y-2 rm-appointments-head">
+              {/* วันนี้ใครนัดไปที่ไหน (เจ้าของ 21 ต.ค. 2569 · แบบ iRecruit "ติดตามนัด") — กดแถวกรองรายชื่อข้างล่าง */}
+              {!bucket ? (
+                <AppointmentPlacesCard
+                  ymd={placeDay}
+                  isToday={placeDay === todayYmd}
+                  total={appointmentPlaces.total}
+                  places={appointmentPlaces.places}
+                  picked={placePick && placePick.ymd === placeDay ? placePick.place : null}
+                  loading={loading && rows.length === 0}
+                  failed={Boolean(loadError)}
+                  onShiftDay={(n) => {
+                    setPlaceDay((d) => shiftYmd(d, n));
+                    setPlacePick(null);
+                    setPage(1);
+                  }}
+                  onToday={() => {
+                    setPlaceDay(todayYmd);
+                    setPlacePick(null);
+                    setPage(1);
+                  }}
+                  onPick={(place) => {
+                    setPlacePick(place === null ? null : { ymd: placeDay, place });
+                    setPage(1);
+                    setSelectedIds([]);
+                  }}
+                />
+              ) : null}
               {/* 🔴 ประโยคสรุป "นัดสัมภาษณ์ N คน จากทั้งหมด…" ถอดออก · ปุ่ม "โหลดเป็น PDF" ย้ายไปแถวเครื่องมือ
                   คู่กับเพิ่มข้อมูลผู้สมัคร (RmSearchBar `onPrintPdf`) — เจ้าของสั่ง 4 ต.ค. 2569 */}
 
