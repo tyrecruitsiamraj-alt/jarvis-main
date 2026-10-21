@@ -100,7 +100,7 @@ const BuDonut: React.FC<{
               outerRadius="92%"
               paddingAngle={!emptyRing && drawn.length > 1 ? 1 : 0}
               stroke="none"
-              isAnimationActive={false}
+              animationDuration={CHART.animationDuration}
             >
               {emptyRing ? (
                 <Cell key="empty" fill="currentColor" className={TONE.neutral.value} fillOpacity={0.15} />

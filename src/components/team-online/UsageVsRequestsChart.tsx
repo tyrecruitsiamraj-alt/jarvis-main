@@ -100,6 +100,7 @@ const UsageVsRequestsChart: React.FC<{
                 contentStyle={CHART.tooltipLight.contentStyle}
                 labelStyle={CHART.tooltipLight.labelStyle}
                 itemStyle={CHART.tooltipLight.itemStyle}
+                cursor={positions ? CHART.cursorBar : CHART.cursorLine}
                 formatter={(v: number | null, name: string) =>
                   name === 'usage'
                     ? [v === null ? '—' : fmtPct(Number(v)), 'คนใช้งาน']
@@ -115,7 +116,7 @@ const UsageVsRequestsChart: React.FC<{
                   className={TONE.neutral.value}
                   fillOpacity={0.3}
                   maxBarSize={28}
-                  isAnimationActive={false}
+                  animationDuration={CHART.animationDuration}
                 />
               ) : null}
               {usage ? (
@@ -129,7 +130,8 @@ const UsageVsRequestsChart: React.FC<{
                   strokeWidth={2}
                   dot={buckets.length <= 16}
                   connectNulls
-                  isAnimationActive={false}
+                  activeDot={CHART.activeDot}
+                  animationDuration={CHART.animationDuration}
                 />
               ) : null}
             </ComposedChart>

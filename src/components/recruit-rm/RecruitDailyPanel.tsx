@@ -207,17 +207,18 @@ const RecruitDailyPanel: React.FC<{ refreshKey?: number }> = ({ refreshKey }) =>
                     contentStyle={CHART.tooltip.contentStyle}
                     labelStyle={CHART.tooltip.labelStyle}
                     itemStyle={CHART.tooltip.itemStyle}
+                    cursor={CHART.cursorBar}
                     labelFormatter={(_, p) => {
                       const ymd = (p?.[0]?.payload as { ymd?: string } | undefined)?.ymd;
                       return ymd ? dayMonth(ymd) : '';
                     }}
                     formatter={(v: number, name: string) => [NUM.format(Number(v)), name]}
                   />
-                  <Bar dataKey="saidYes" name="สนใจ" stackId="d" fill={TONE.success.hex} isAnimationActive={false} />
-                  <Bar dataKey="saidNo" name="ไม่สนใจ" stackId="d" fill={TONE.danger.hex} isAnimationActive={false} />
-                  <Bar dataKey="noPickup" name="ไม่รับสาย" stackId="d" fill={TONE.warn.hex} isAnimationActive={false} />
-                  <Bar dataKey="aiOther" name="ยังไม่รู้ผล" stackId="d" fill={TONE.info.hex} isAnimationActive={false} />
-                  <Bar dataKey="notCalled" name="ยังไม่โทร" stackId="d" fill={TONE.neutral.hex} maxBarSize={24} isAnimationActive={false}>
+                  <Bar dataKey="saidYes" name="สนใจ" stackId="d" fill={TONE.success.hex} animationDuration={CHART.animationDuration} />
+                  <Bar dataKey="saidNo" name="ไม่สนใจ" stackId="d" fill={TONE.danger.hex} animationDuration={CHART.animationDuration} />
+                  <Bar dataKey="noPickup" name="ไม่รับสาย" stackId="d" fill={TONE.warn.hex} animationDuration={CHART.animationDuration} />
+                  <Bar dataKey="aiOther" name="ยังไม่รู้ผล" stackId="d" fill={TONE.info.hex} animationDuration={CHART.animationDuration} />
+                  <Bar dataKey="notCalled" name="ยังไม่โทร" stackId="d" fill={TONE.neutral.hex} maxBarSize={24} animationDuration={CHART.animationDuration}>
                     {sum.chart.map((r) => (
                       <Cell key={r.ymd} fillOpacity={r.ymd === (picked ?? today) ? 1 : 0.55} />
                     ))}

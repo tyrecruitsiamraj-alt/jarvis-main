@@ -178,16 +178,15 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
               <XAxis dataKey="ประเภท" tick={{ fontSize: 11, fill: CHART.axisFill }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 11, fill: CHART.axisFill }} tickLine={false} axisLine={false} width={48} />
               <Tooltip
-                contentStyle={CHART.tooltip.contentStyle}
-                labelStyle={CHART.tooltip.labelStyle}
-                itemStyle={{ fontSize: 12 }}
-                formatter={(v: number) => [`${fmt(v)} อัตรา`, '']}
+                {...CHART.tooltip}
+                cursor={CHART.cursorBar}
+                formatter={(v: number, name: string) => [`${fmt(v)} อัตรา`, name]}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
-              <Bar dataKey="เข้ามา" fill={TONE.info.hex} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="ปิดแล้ว" fill={TONE.success.hex} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="ยกเลิก" fill={TONE.danger.hex} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="คงเหลือ" fill={TONE.warn.hex} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="เข้ามา" fill={TONE.info.hex} radius={[4, 4, 0, 0]} animationDuration={CHART.animationDuration} />
+              <Bar dataKey="ปิดแล้ว" fill={TONE.success.hex} radius={[4, 4, 0, 0]} animationDuration={CHART.animationDuration} />
+              <Bar dataKey="ยกเลิก" fill={TONE.danger.hex} radius={[4, 4, 0, 0]} animationDuration={CHART.animationDuration} />
+              <Bar dataKey="คงเหลือ" fill={TONE.warn.hex} radius={[4, 4, 0, 0]} animationDuration={CHART.animationDuration} />
             </BarChart>
           </ResponsiveContainer>
         </div>

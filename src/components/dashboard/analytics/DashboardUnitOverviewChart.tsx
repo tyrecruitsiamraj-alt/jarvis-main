@@ -92,6 +92,7 @@ const DashboardUnitOverviewChart: React.FC<Props> = ({ items, periodLabel, onSit
             />
             <Tooltip
               {...CHART.tooltip}
+              cursor={CHART.cursorBar}
               formatter={(value: number, key: string) => [
                 value.toLocaleString('th-TH'),
                 key === 'open' ? 'รอดำเนินการ' : key,
@@ -108,6 +109,7 @@ const DashboardUnitOverviewChart: React.FC<Props> = ({ items, periodLabel, onSit
               name="รอดำเนินการ"
               fill={TONE.primary.hex}
               radius={[0, 4, 4, 0]}
+              animationDuration={CHART.animationDuration}
               cursor={onSiteClick ? 'pointer' : 'default'}
               onClick={(entry) => {
                 const row = entry?.payload as (typeof chartData)[number] | undefined;

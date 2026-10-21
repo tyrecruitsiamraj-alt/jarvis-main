@@ -352,7 +352,29 @@ export const CHART = {
     labelStyle: { color: 'hsl(var(--muted-foreground))', fontSize: 11, marginBottom: 2 },
     itemStyle: { color: 'hsl(var(--popover-foreground))' },
   },
+  /*
+   * ═══ กราฟทุกตัวของระบบเป็น Interactive chart (เจ้าของ 21 ต.ค. 2569 · Choice "ครบชุดเหมือนกราฟเส้นนี้") ═══
+   * ชี้แล้วขึ้นกล่องตัวเลข + เส้นแนวตั้ง/แถบไฮไลต์ + จุดเด่น + เส้น/แท่งค่อย ๆ ขึ้น · ห้ามปิดการเคลื่อนไหว
+   * เทสต์คุม `tests/api/chartsInteractive2569-10-21.test.ts`
+   */
+  /** เส้นแนวตั้งตามเมาส์ — กราฟเส้น */
+  cursorLine: { stroke: 'currentColor', strokeOpacity: 0.35, strokeDasharray: '4 4' },
+  /** แถบไฮไลต์ตามเมาส์ — กราฟแท่ง */
+  cursorBar: { fill: 'currentColor', fillOpacity: 0.06 },
+  /** จุดเด่นตรงที่ชี้ — กราฟเส้น */
+  activeDot: { r: 5, strokeWidth: 2 },
+  /** ความเร็วตอนเส้น/แท่งขึ้น (ms) */
+  animationDuration: 600,
 } as const;
+
+/** ป้ายวันที่ในกล่องตัวเลข — "2026-10-16" → "16 ต.ค. 2569" · ค่าที่ไม่ใช่วันที่ส่งคืนตามเดิม */
+export function chartDayLabel(v: unknown): string {
+  const s = String(v ?? '');
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return s;
+  return `${Number(m[3])} ${CHART_TH_MONTH[Number(m[2]) - 1] ?? ''} ${Number(m[1]) + 543}`;
+}
+const CHART_TH_MONTH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
 /**
  * ═══ Jarvis HUD — ภาษาออกแบบ "แผงควบคุมล้ำ ๆ" (เจ้าของสั่ง 22 ส.ค. 2569) ═══

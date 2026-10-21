@@ -114,10 +114,11 @@ function HourBars({
             contentStyle={CHART.tooltip.contentStyle}
             labelStyle={CHART.tooltip.labelStyle}
             itemStyle={CHART.tooltip.itemStyle}
+            cursor={CHART.cursorBar}
             labelFormatter={(l) => `${hh(Number(l))} น.`}
             formatter={(v: number, _n: string, item: { payload?: Record<string, number | string | null> }) => format(Number(v), item.payload ?? {})}
           />
-          <Bar dataKey={dataKey} fill={TONE[tone].hex} maxBarSize={18} isAnimationActive={false} />
+          <Bar dataKey={dataKey} fill={TONE[tone].hex} maxBarSize={18} animationDuration={CHART.animationDuration} />
         </BarChart>
       </ResponsiveContainer>
     </div>

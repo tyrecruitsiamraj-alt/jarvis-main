@@ -483,6 +483,7 @@ export function DailyCard({ rows, icon }: { rows: readonly DailyRow[]; icon: Luc
                 contentStyle={CHART.tooltip.contentStyle}
                 labelStyle={CHART.tooltip.labelStyle}
                 itemStyle={CHART.tooltip.itemStyle}
+                cursor={CHART.cursorBar}
                 labelFormatter={(_, p) => {
                   const ymd = (p?.[0]?.payload as { ymd?: string } | undefined)?.ymd;
                   return ymd ? dayMonthText(ymd) : '';
@@ -497,7 +498,7 @@ export function DailyCard({ rows, icon }: { rows: readonly DailyRow[]; icon: Luc
                   label={{ value: `เฉลี่ย ${fmt(s.avg)}/วัน`, position: 'insideTopRight', fontSize: 11, fill: CHART.axisFill }}
                 />
               ) : null}
-              <Bar dataKey="value" name={label} maxBarSize={24} isAnimationActive={false}>
+              <Bar dataKey="value" name={label} maxBarSize={24} animationDuration={CHART.animationDuration}>
                 {rows.map((r) => (
                   <Cell key={r.ymd} fill={s.peak && r.ymd === s.peak.ymd ? TONE.primary.hex : TONE.info.hex} />
                 ))}

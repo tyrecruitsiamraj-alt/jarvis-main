@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import DateRangeCalendarPicker from '@/components/shared/DateRangeCalendarPicker';
 import { ChoiceDropdown } from '@/components/jobs/BoardFilterPanel';
 import { cn } from '@/lib/utils';
-import { CHART, DASH, TONE, type ToneKey } from '@/lib/designTokens';
+import { CHART, chartDayLabel, DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import { deltaPct, TREND_GRAIN_LABEL, TREND_GRAINS, type DimRow } from '@/lib/trends/timeBuckets';
 import { TREND_COMPARE_OPTIONS, type TrendWindow } from '@/hooks/useTrendWindow';
 import { formatTrendNumber, formatTrendPct } from '@/lib/trends/format';
@@ -131,7 +131,7 @@ export function TrendKpiCard({
           <div className="hidden h-6 w-20 shrink-0 sm:block" aria-hidden>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={spark.map((v, i) => ({ i, v }))}>
-                <Line type="monotone" dataKey="v" stroke={TONE[tone].hex} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                <Line type="monotone" dataKey="v" stroke={TONE[tone].hex} strokeWidth={1.5} dot={false} animationDuration={CHART.animationDuration} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -192,6 +192,8 @@ export function TrendChart({
               contentStyle={CHART.tooltip.contentStyle}
               labelStyle={CHART.tooltip.labelStyle}
               itemStyle={CHART.tooltip.itemStyle}
+              cursor={series.some((x) => x.kind === 'bar') ? CHART.cursorBar : CHART.cursorLine}
+              labelFormatter={chartDayLabel}
               formatter={(v: number, name: string) => [fmt(Number(v)), name]}
             />
             {series.map((s) =>
@@ -203,7 +205,7 @@ export function TrendChart({
                   fill={TONE[s.tone].hex}
                   stackId={s.stack}
                   maxBarSize={28}
-                  isAnimationActive={false}
+                  animationDuration={CHART.animationDuration}
                 />
               ) : (
                 <Line
@@ -215,7 +217,8 @@ export function TrendChart({
                   strokeWidth={2}
                   strokeDasharray={s.dashed ? '5 4' : undefined}
                   dot={data.length <= 16}
-                  isAnimationActive={false}
+                  activeDot={CHART.activeDot}
+                  animationDuration={CHART.animationDuration}
                 />
               ),
             )}

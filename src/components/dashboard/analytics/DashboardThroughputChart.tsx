@@ -77,6 +77,7 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
             <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: CHART.axisFill }} />
             <Tooltip
               {...CHART.tooltip}
+              cursor={CHART.cursorLine}
               formatter={(value: number, name: string) => [
                 `${Number(value).toLocaleString('th-TH')} อัตรา`,
                 SERIES_LABELS[name] ?? name,
@@ -90,7 +91,7 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
               stroke={TONE.info.hex}
               strokeWidth={2}
               dot={{ r: 3 }}
-              activeDot={{ r: 5 }}
+              activeDot={CHART.activeDot}
             />
             <Line
               type="monotone"
@@ -99,7 +100,7 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
               stroke={TONE.success.hex}
               strokeWidth={2}
               dot={{ r: 3 }}
-              activeDot={{ r: 5 }}
+              activeDot={CHART.activeDot}
             />
             <Line
               type="monotone"
@@ -108,7 +109,7 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
               stroke={TONE.neutral.hex}
               strokeWidth={2}
               dot={{ r: 3 }}
-              activeDot={{ r: 5 }}
+              activeDot={CHART.activeDot}
             />
             <Line
               type="monotone"
@@ -117,7 +118,7 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
               stroke={TONE.warn.hex}
               strokeWidth={2}
               dot={{ r: 3 }}
-              activeDot={{ r: 5 }}
+              activeDot={CHART.activeDot}
             />
           </LineChart>
         </ResponsiveContainer>

@@ -310,7 +310,7 @@ const AiShareUsageChart: React.FC<{
               tickFormatter={(v: number) => NUM.format(v)}
             />
             <Tooltip
-              cursor={{ fill: 'currentColor', fillOpacity: 0.06 }}
+              cursor={CHART.cursorBar}
               // กล่องไม่ดักการแตะ (มือถือแตะแล้วกล่องค้างบังแท่ง — QA รอบ 3 ข้อ 22)
               wrapperStyle={{ pointerEvents: 'none' }}
               content={(p: TooltipProps<number, string>) => (
@@ -333,7 +333,7 @@ const AiShareUsageChart: React.FC<{
                 fill="currentColor"
                 className={st.fill}
                 shape={shapeOf(si)}
-                isAnimationActive={false}
+                animationDuration={CHART.animationDuration}
               >
                 {data.map((d) => (
                   <Cell

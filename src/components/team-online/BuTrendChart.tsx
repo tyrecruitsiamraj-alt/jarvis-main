@@ -96,6 +96,7 @@ const BuTrendChart: React.FC<{
                 contentStyle={CHART.tooltipLight.contentStyle}
                 labelStyle={CHART.tooltipLight.labelStyle}
                 itemStyle={CHART.tooltipLight.itemStyle}
+                cursor={CHART.cursorBar}
                 formatter={(v: number | null, name: string) => [v === null ? '—' : format(Number(v)), name]}
               />
               {series.map((s) => (
@@ -107,7 +108,7 @@ const BuTrendChart: React.FC<{
                   className={TONE[toneOfBu(s.bu)].value}
                   fillOpacity={faded(s.bu) ? 0.3 : 0.9}
                   maxBarSize={22}
-                  isAnimationActive={false}
+                  animationDuration={CHART.animationDuration}
                 />
               ))}
               {multi
@@ -124,10 +125,11 @@ const BuTrendChart: React.FC<{
                         strokeWidth={1.5}
                         strokeDasharray="5 4"
                         dot={false}
+                        /* เส้นแนวโน้ม (ไม่ใช่ค่าจริง) — ไม่มีจุดเด่น ไม่ขึ้นในกล่องตัวเลข */
                         activeDot={false}
                         legendType="none"
                         tooltipType="none"
-                        isAnimationActive={false}
+                        animationDuration={CHART.animationDuration}
                       />
                     ),
                   )

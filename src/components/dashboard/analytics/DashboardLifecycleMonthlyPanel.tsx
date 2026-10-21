@@ -244,17 +244,18 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
               <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: CHART.axisFill }} />
               <Tooltip
                 {...CHART.tooltip}
+                cursor={CHART.cursorLine}
                 formatter={(value: number, name: string) => [
                   `${fmt(Number(value))} อัตรา`,
                   name,
                 ]}
               />
               <Legend />
-              <Line type="monotone" dataKey="resignations" name="ลาออก" stroke={TONE.warn.hex} strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="replacements" name="เปลี่ยนตัว" stroke={TONE.primary.hex} strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="increaseHeadcount" name="เพิ่มอัตรา" stroke={TONE.violet.hex} strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="newSite" name="เปิดไซต์" stroke={TONE.success.hex} strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="other" name="อื่นๆ" stroke={TONE.neutral.hex} strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="resignations" name="ลาออก" stroke={TONE.warn.hex} strokeWidth={2} dot={{ r: 3 }} activeDot={CHART.activeDot} animationDuration={CHART.animationDuration} />
+              <Line type="monotone" dataKey="replacements" name="เปลี่ยนตัว" stroke={TONE.primary.hex} strokeWidth={2} dot={{ r: 3 }} activeDot={CHART.activeDot} animationDuration={CHART.animationDuration} />
+              <Line type="monotone" dataKey="increaseHeadcount" name="เพิ่มอัตรา" stroke={TONE.violet.hex} strokeWidth={2} dot={{ r: 3 }} activeDot={CHART.activeDot} animationDuration={CHART.animationDuration} />
+              <Line type="monotone" dataKey="newSite" name="เปิดไซต์" stroke={TONE.success.hex} strokeWidth={2} dot={{ r: 3 }} activeDot={CHART.activeDot} animationDuration={CHART.animationDuration} />
+              <Line type="monotone" dataKey="other" name="อื่นๆ" stroke={TONE.neutral.hex} strokeWidth={2} dot={{ r: 3 }} activeDot={CHART.activeDot} animationDuration={CHART.animationDuration} />
             </LineChart>
           </ResponsiveContainer>
         </div>

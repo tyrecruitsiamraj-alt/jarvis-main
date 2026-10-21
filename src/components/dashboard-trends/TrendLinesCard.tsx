@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, LineChart as LineIcon } from 'lucide-react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { CHART, DASH, TONE, type ToneKey } from '@/lib/designTokens';
+import { CHART, chartDayLabel, DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import { deltaOf, type CompareRow } from '@/lib/recruitCompare';
 import { OverviewCard } from './RecruitOverviewParts';
@@ -106,7 +106,8 @@ export default function TrendLinesCard({
             <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: CHART.axisFill }} />
             <Tooltip
               {...CHART.tooltip}
-              labelFormatter={(_l, p) => String((p?.[0]?.payload as { day?: string } | undefined)?.day ?? '')}
+              cursor={CHART.cursorLine}
+              labelFormatter={(_l, p) => chartDayLabel((p?.[0]?.payload as { day?: string } | undefined)?.day ?? '')}
               formatter={(value: number, name: string) => [fmt(Number(value)), labelOf.get(name) ?? name]}
             />
             {rows.map((r, i) => (
@@ -118,7 +119,7 @@ export default function TrendLinesCard({
                 stroke={TONE[LINE_TONES[i % LINE_TONES.length]].hex}
                 strokeWidth={2}
                 dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
+                activeDot={CHART.activeDot}
               />
             ))}
           </LineChart>
