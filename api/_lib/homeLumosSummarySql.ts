@@ -47,6 +47,35 @@ export const FOLLOW_BUCKET_SQL = `case
              else 'waiting' end
     end`;
 
+/** แถวสายติดตามของช่วง (ไม่รวมดูแลหลังเริ่มงาน) — ตัวเดียวของการ์ดผลโทร · ตาราง BU · รายการสายยกเลิกของกล่อง */
+async function loadFollowLedgerRows(start: Date | null, end: Date | null, bu: string | null): Promise<Record<string, unknown>[]> {
+  const { rows } = await dbQuery<Record<string, unknown>>(
+    `select ${FOLLOW_ENTRY_CATEGORY_COLS}, ${FOLLOW_EFFECTIVE_MODE_SQL} as call_mode, f.follow_team,
+            ${FOLLOW_BUCKET_SQL} as ledger_bucket,
+            ${followBuSql('f')} as summary_bu,
+            ${FOLLOW_QUEUE_CALL_COLS}
+       from ${FOLLOW} f
+       ${followBuJoin('f')}
+       left join ${QUEUE} q on ${FOLLOW_QUEUE_MATCH}
+      where f.topic is distinct from $4::text
+        and ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
+        and ($2::timestamptz is null or f.scheduled_at < $2::timestamptz)
+        and ($3::text is null or ${followBuSql('f')} = $3::text)`,
+    [start ? start.toISOString() : null, end ? end.toISOString() : null, bu, AFTERCARE_TOPIC],
+  );
+  return rows;
+}
+
+/**
+ * id ของสายที่การ์ดผลโทรจัดเป็น "ยกเลิก" (เจ้าของ 21 ต.ค. 2569 "บวกลบกันแล้วมันต้องเท่ากัน")
+ * กล่อง/กราฟ/รายชื่อของหัวข้อติดตามตัดสายพวกนี้ออก (`buildFollowAiShareSql` `$5`) ⇒ ทุกก้อนบนหน้าหลักใช้ชุดยกเลิกชุดเดียว
+ */
+export async function loadFollowCancelledIds(start: Date | null, end: Date | null, bu: string | null): Promise<string[]> {
+  const rows = await loadFollowLedgerRows(start, end, bu);
+  const derived = categorizeFollowRows(rows);
+  return rows.filter((r) => followLedgerBucket(r, derived) === 'cancelled').map((r) => String(r.id));
+}
+
 /**
  * ช่องของแถวหนึ่ง (แถวต้องมี `FOLLOW_BUCKET_SQL as ledger_bucket` + คอลัมน์ของ `categorizeFollowRows`)
  * 🔴 ตัวเดียวของการ์ดผลโทร · ตาราง BU · ป๊อปกล่อง AI โทร/คนโทร (QA 10 ต.ค. 2569 ป๊อปเคยนับด้วยหมวดหน้าติดตาม ไป 781 ≠ การ์ด 667 ·
@@ -92,20 +121,7 @@ export async function loadHomeLumosSummary(
 }> {
   const p = [start ? start.toISOString() : null, end ? end.toISOString() : null, bu];
   const [follow, apps, backlog] = await Promise.all([
-    dbQuery<Record<string, unknown>>(
-      `select ${FOLLOW_ENTRY_CATEGORY_COLS}, ${FOLLOW_EFFECTIVE_MODE_SQL} as call_mode, f.follow_team,
-              ${FOLLOW_BUCKET_SQL} as ledger_bucket,
-              ${followBuSql('f')} as summary_bu,
-              ${FOLLOW_QUEUE_CALL_COLS}
-         from ${FOLLOW} f
-         ${followBuJoin('f')}
-         left join ${QUEUE} q on ${FOLLOW_QUEUE_MATCH}
-        where f.topic is distinct from $4::text
-          and ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
-          and ($2::timestamptz is null or f.scheduled_at < $2::timestamptz)
-          and ($3::text is null or ${followBuSql('f')} = $3::text)`,
-      [...p, AFTERCARE_TOPIC],
-    ),
+    loadFollowLedgerRows(start, end, bu),
     dbQuery<Row>(
       `select ${BUCKET_COLS}
          from ${QUEUE} q
@@ -130,10 +146,10 @@ export async function loadHomeLumosSummary(
       : Promise.resolve({ rows: [{ n: 0 }] }),
   ]);
   // หมวดของหน้าติดตาม — ใช้แตก "มีผล" เท่านั้น (รอ/ล้มเหลว/ยกเลิก ตัดด้วย CASE เดียวกับเดิม)
-  const derived = categorizeFollowRows(follow.rows);
+  const derived = categorizeFollowRows(follow);
   const split = { ai: emptyFollowBucket(), staff: emptyFollowBucket() };
   const byBuCells = new Map<string, FollowBuCell>();
-  for (const r of follow.rows) {
+  for (const r of follow) {
     const b = r.call_mode === 'manual' ? split.staff : split.ai;
     const key = followLedgerBucket(r, derived);
     b[key] += 1;

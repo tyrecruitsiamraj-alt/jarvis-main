@@ -48,6 +48,7 @@ import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
 import FollowCallerDialog from '@/components/home-ai-share/FollowCallerDialog';
 import HomeOnlineTab from '@/components/home-ai-share/HomeOnlineTab';
+import HomeTodoStrip, { type TodoTab } from '@/components/home-ai-share/HomeTodoStrip';
 import AiShareLumosStats, { FOLLOW_RESULT_COLS, useHomeLumosSummary } from '@/components/home-ai-share/AiShareLumosStats';
 import { FOLLOW_CALLED_DISPLAY_ORDER } from '@/lib/homeLumosSummary';
 import {
@@ -268,6 +269,14 @@ const HomeAiSharePage: React.FC = () => {
     saveBlock(v);
   };
 
+  /** กดเลขบนแถบต้องทำ = เปิดแท็บนั้น แล้วเลื่อนไปส่วนที่มีเลขเดียวกัน (รอส่วนนั้นขึ้นจอก่อน) */
+  const goTodo = (tab: TodoTab, target: string) => {
+    choose(tab === 'online' ? ONLINE_TAB : tab);
+    window.setTimeout(() => {
+      document.querySelector(`[data-testid="${target}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 400);
+  };
+
   /**
    * Popup รายชื่อตอนกดกล่อง (รอบ 17) — เปิด/ปิดแยกจากกล่องที่โชว์ (ปิดแล้วชื่อชุดเดิมยังอยู่จนป๊อปจางหาย ไม่วูบเป็นหน้าว่าง) ·
    * `listSeq` เปลี่ยนทุกครั้งที่เปิด = Popup เริ่มใหม่ที่หน้าแรก ไม่ค้างหน้าของรอบก่อน
@@ -480,7 +489,14 @@ const HomeAiSharePage: React.FC = () => {
   const segs = AI_SHARE_SEGMENTS.filter((k) => (k !== 'both' || showBoth) && (k !== 'notCalled' || meta.key !== 'follow'));
   const shareOf = counts ? new Map(segmentsOfTotal(counts).map((x) => [x.key, x.pct])) : null;
   const prevCounts = prev ? prev[meta.key] : null;
-  const pillOf = (cur: number, p: number | undefined) => (prevCounts && p !== undefined ? countPill(cur, p, null) : null);
+  /**
+   * ชิปเทียบช่วงก่อน ลงสีดี/แย่ (เจ้าของ 21 ต.ค. 2569 โหวตข้อ C) — AI โทรเพิ่ม = ดี · ยังไม่โทรเพิ่ม = แย่ · ที่เหลือไม่ลงสี
+   * ทุกกล่องที่มีชิปมีบรรทัด "7 วันก่อนหน้า N" กำกับ ให้รู้ว่าเทียบกับอะไร
+   */
+  const UP_IS_GOOD: Record<AiShareSegment | 'total', boolean | null> = { total: null, ai: true, staff: null, both: null, notCalled: false };
+  const pillOf = (cur: number, p: number | undefined, k: AiShareSegment | 'total') =>
+    prevCounts && p !== undefined ? countPill(cur, p, UP_IS_GOOD[k]) : null;
+  const prevFoot = (p: number | undefined) => (prevCounts && prev?.label && p !== undefined ? `${prev.label} ${NUM.format(p)}` : null);
   const compareTitle = prev ? `เทียบกับ ${rangeText(prev.from, prev.to)} ช่วงเวลาเดียวกัน` : undefined;
   // เลขมาถึงครั้งแรก = ขึ้นทันที ไม่วิ่งจาก 0 (คีย์เปลี่ยนตอนมีข้อมูล) · อัปเดตสดรอบต่อไปจึงค่อยวิ่ง
   const liveKey = `${meta.key}|${cardWin.from ?? ''}|${cardWin.to ?? ''}|${bu ?? ''}|${counts ? 'on' : 'off'}`;
@@ -513,13 +529,17 @@ const HomeAiSharePage: React.FC = () => {
   const stepsPending = meta.key !== 'follow' && !topic.report;
   type Breakdown = Array<{ key: string; label: string; value: number; tone?: ToneKey }>;
   const followSplit = meta.key === 'follow' ? (lumos.current?.follow ?? null) : null;
+  /**
+   * เลขใหญ่ = โทรแล้ว + รอโทร (ยกเลิกไม่นับ — เจ้าของ 21 ต.ค. 2569 โหวตเอกฉันท์ · ตัวนับฝั่งเซิร์ฟเวอร์ตัดชุดเดียวกัน)
+   * ยกเลิกยังบอกไว้ท้ายสุดพร้อมคำว่า "ไม่นับ" ให้รู้ว่าไม่อยู่ในเลขใหญ่
+   */
   const fromFollowBucket = (b: { total: number; waiting: number; cancelled: number } | null, doneLabel: string): Breakdown | null =>
     b
       ? [
           // โทรแล้ว = กรมท่า (เขียวสงวนไว้ให้ "ไป/หาได้แล้ว" · QA 10 ต.ค. 2569)
           { key: 'done', label: doneLabel, value: b.total - b.waiting - b.cancelled, tone: 'primary' },
           { key: 'waiting', label: 'รอโทร', value: b.waiting, tone: 'info' },
-          { key: 'cancelled', label: 'ยกเลิก', value: b.cancelled, tone: 'neutral' },
+          { key: 'cancelled', label: 'ยกเลิก · ไม่นับ', value: b.cancelled, tone: 'neutral' },
         ]
       : null;
   const fromReach = (seg: AiShareSegment | 'all'): Breakdown | null => {
@@ -574,9 +594,9 @@ const HomeAiSharePage: React.FC = () => {
         liveKey={liveKey}
         // ยังไม่มีเลข (กำลังโหลด หรือโหลดล้ม) = "—" ไม่ใช่ 0 ปลอม (QA รอบ 3 ข้อ 3)
         loading={!counts}
-        pill={pillOf(total, prevCounts?.total)}
+        pill={pillOf(total, prevCounts?.total, 'total')}
         pillTitle={compareTitle}
-        foot={prevCounts && prev?.label ? `${prev.label} ${NUM.format(prevCounts.total)}` : null}
+        foot={prevFoot(prevCounts?.total)}
         hint={metricHelp(meta.metrics.total)}
         breakdown={breakdownOf('all')}
         onClick={() => openList('total')}
@@ -592,8 +612,9 @@ const HomeAiSharePage: React.FC = () => {
           loading={!counts}
           share={counts ? (shareOf?.get(k) ?? 0) : null}
           shareClass={segmentFillClass(k)}
-          pill={counts ? pillOf(counts[k], prevCounts?.[k]) : null}
+          pill={counts ? pillOf(counts[k], prevCounts?.[k], k) : null}
           pillTitle={compareTitle}
+          foot={prevFoot(prevCounts?.[k])}
           hint={helpOf(k)}
           breakdown={breakdownOf(k)}
           onClick={() => openList(k)}
@@ -622,8 +643,15 @@ const HomeAiSharePage: React.FC = () => {
   );
 
   // ── ข้อมูลของแท่ง (ทุกแท่งแยก AI/คน · เจ้าของ "ไปเนี่ย AI โทร คนโทรเท่าไหร่ Bu ไหนใช้เยอะ") ──
-  const followCells = meta.key === 'follow' ? (lumos.current?.followByBu ?? null) : null;
-  const resultCols = followCells ? followResultSplit(followCells, FOLLOW_RESULT_COLS) : report ? reportResultSplit(report) : [];
+  const followAllCells = meta.key === 'follow' ? (lumos.current?.followByBu ?? null) : null;
+  /** สายที่ไม่ยกเลิก — ยอด/ทีม/BU/ผลโทร นับจากชุดนี้ (21 ต.ค. 2569 ยกเลิกไม่นับในยอด) · ยกเลิกบอกแยกบรรทัดเดียว */
+  const followCells = followAllCells ? followAllCells.filter((c) => c.bucket !== 'cancelled') : null;
+  const followCancelled = followAllCells ? followAllCells.reduce((n, c) => n + (c.bucket === 'cancelled' ? c.n : 0), 0) : null;
+  const resultCols = followCells
+    ? followResultSplit(followCells, FOLLOW_RESULT_COLS.filter((c) => c.key !== 'cancelled'))
+    : report
+      ? reportResultSplit(report)
+      : [];
   // แถวบนสุด = ทั้งหมด (เจ้าของ 8 ต.ค. 2569 "ผลโทรต้องไล่เป็น โทรทั้งหมด ไป ไม่ไป ขอเลื่อน สรุปไม่ได้ ล้มเหลว ยกเลิก รอดำเนินการ")
   // ก้อน (8 ต.ค. 2569 "รอโทรกับยกเลิกและโทรไปแยกก้อนให้ดูแล้วรู้"): ทั้งหมด │ โทรแล้ว + ผลย่อย │ ยกเลิก · รอ
   // ติดตาม/ดูแลนับตามผล (ไม่นับยกเลิก/รอ/ยังไม่มีผล) · งานสรรหา/จับคู่งานโทรแล้ว = ตัดก้อนยังไม่โทร (เท่ากล่อง AI + คน + สองทาง)
@@ -684,6 +712,12 @@ const HomeAiSharePage: React.FC = () => {
           return t ? TONE[t].dot : null;
         }}
       />
+      {meta.key === 'follow' && followCancelled !== null ? (
+        <p className="flex items-center gap-2 text-sm tabular-nums text-muted-foreground" data-testid="home-results-cancelled">
+          <span className={cn('h-2.5 w-2.5 rounded-full', TONE.neutral.dot)} aria-hidden />
+          ยกเลิก {NUM.format(followCancelled)} {meta.unit} · ไม่นับในยอด
+        </p>
+      ) : null}
       {meta.key === 'aftercare' ? <StatStrip loading={stepsPending} testId="home-waiting" items={extraOf(steps, 'ที่ยังรอ')} /> : null}
     </HomeSection>
   );
@@ -789,6 +823,8 @@ const HomeAiSharePage: React.FC = () => {
             )}
           </div>
         </div>
+        {/* แถบต้องทำเหนือแท็บ (21 ต.ค. 2569) — ใบขอ/ประกาศ + งานค้างของทุกแท็บ กดแล้วเปิดแท็บนั้น */}
+        <HomeTodoStrip q={winQ} tick={tick} onGo={goTodo} />
         {picker}
       </div>
 

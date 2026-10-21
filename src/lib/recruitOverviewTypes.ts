@@ -95,6 +95,8 @@ export type RecruitRequestItem = {
   position: string | null;
   day: string;
   released: boolean;
+  /** ใบยังเปิด (`onlineRequestStateOf` = open · ตัวเดียวกับทีม Online) — จบแล้ว = ไม่โชว์ในรายการ "ยังไม่ประกาศ" */
+  open: boolean;
   /** ใบสมัครของใบนี้ (ไม่นับที่ยกเลิกข้อมูล · ทุกช่วงเวลา) */
   applications: number;
   /** id ใบสมัคร — กดดูรายชื่อ */

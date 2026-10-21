@@ -32,6 +32,8 @@ const fetchHomeAiShare = vi.fn();
 const fetchHomeAiShareDetail = vi.fn();
 const fetchHomeAiShareList = vi.fn();
 vi.mock('@/lib/homeAiShareApi', () => ({
+  // แถบต้องทำเหนือแท็บ (21 ต.ค. 2569) — เทสต์ชุดนี้ไม่ได้ดูแถบ ตอบว่างไว้
+  fetchHomeTodo: () => new Promise(() => {}),
   fetchHomeAiShare: (...a: unknown[]) => fetchHomeAiShare(...a),
   fetchHomeAiShareDetail: (...a: unknown[]) => fetchHomeAiShareDetail(...a),
   fetchHomeAiShareList: (...a: unknown[]) => fetchHomeAiShareList(...a),
@@ -529,9 +531,10 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(screen.queryByText('AI 100%')).toBeNull();
     expect(screen.queryByText('ของสายที่โทรแล้ว')).toBeNull();
     // ติดตามนับแบบแผน ⇒ กล่องบอกโทรแล้ว / รอโทร / ยกเลิก แทนแถบ % (เจ้าของ 8 ต.ค. 2569 "คน 302 คือต้องโทร หรือโทรไปแล้ว")
-    expect(stat('AI โทร')).toMatch(/โทรแล้ว \d.*รอโทร \d.*ยกเลิก \d/);
+    // 21 ต.ค. 2569 ยกเลิกไม่นับในเลขใหญ่ — บอกท้ายสุดว่า "ยกเลิก · ไม่นับ"
+    expect(stat('AI โทร')).toMatch(/โทรแล้ว \d.*รอโทร \d.*ยกเลิก · ไม่นับ \d/);
     // ชุดคำมาตรฐาน (QA 10 ต.ค. 2569): คนโทรก็ "โทรแล้ว" เหมือน AI (เดิม "ลงผลแล้ว")
-    expect(stat('คนโทร')).toMatch(/โทรแล้ว \d.*รอโทร \d.*ยกเลิก \d/);
+    expect(stat('คนโทร')).toMatch(/โทรแล้ว \d.*รอโทร \d.*ยกเลิก · ไม่นับ \d/);
     expect(screen.queryByRole('button', { name: /^ยังไม่โทร \d/ })).toBeNull();
     // ไม่มีช่วงก่อน ⇒ ไม่มีชิปเทียบ
     expect(stat('AI โทร')).not.toContain('ใหม่');
@@ -669,7 +672,7 @@ describe('กดกล่อง AI โทร / คนโทร ของติ�
     expect(within(dialog).getByTestId('caller-topic-replacement').textContent).toContain('ติดตามส่งคนแทน');
     expect(main.getAttribute('aria-label')).toBe('ติดตามคนเริ่มงาน 1 สาย');
     fireEvent.click(main);
-    expect(within(dialog).getByTestId('caller-sum').textContent).toBe('โทรแล้ว 1 + ยกเลิก 0 + รอโทร 0 = 1 สาย');
+    expect(within(dialog).getByTestId('caller-sum').textContent).toBe('โทรแล้ว 1 + รอโทร 0 = 1 สาย · ยกเลิก 0 ไม่นับ');
     fireEvent.click(within(dialog).getByTestId('caller-col-went'));
     expect(within(dialog).getByText('คนทดสอบ')).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: /ติดตามคนเริ่มงาน/ }));
@@ -696,7 +699,8 @@ describe('หน้าหลักอ่านไล่บนลงล่าง 
     const order = [...screen.getByTestId('home-result-bars').querySelectorAll('[data-testid^="home-result-bars-"]')].map((e) =>
       e.getAttribute('data-testid')!.replace('home-result-bars-', ''),
     );
-    expect(order).toEqual(['all', 'called', 'went', 'notWent', 'reschedule', 'unclear', 'failed', 'dayOff', 'leave', 'cancelled', 'waiting']);
+    // 21 ต.ค. 2569 ยกเลิกไม่อยู่ในแท่ง (บอกแยกบรรทัด `home-results-cancelled`)
+    expect(order).toEqual(['all', 'called', 'went', 'notWent', 'reschedule', 'unclear', 'failed', 'dayOff', 'leave', 'waiting']);
     expect(screen.getByTestId('home-result-bars-called').textContent).toContain('โทรแล้ว');
     expect(screen.getByTestId('home-result-bars-all').textContent).toContain('โทรทั้งหมด');
     expect(screen.getByTestId('home-result-bars-failed').textContent).toContain('ไม่รับสาย');
@@ -708,18 +712,19 @@ describe('หน้าหลักอ่านไล่บนลงล่าง 
         .map((c) => c.textContent);
     // เรื่อง · ใครโทร · ทั้งหมด · **โทรแล้ว** (รวม · ตอบว่าไป · ตอบว่าไม่ไป · วันหยุด · ลางาน · ขอเลื่อน · สรุปไม่ได้ · ล้มเหลว) · ไม่ได้โทร (ยกเลิก · รอโทร)
     // 8 ต.ค. 2569 เจ้าของ: "ไม่มีบอกว่าโทรไปแล้วเท่าไหร่ แล้วค่อยบอกว่า ไป ไม่ไป" — ทั้งหมด = โทรแล้ว + ยกเลิก + รอ (673 = 583 + 90 + 0)
-    expect(cells('bu-row-LBD-main-ai')).toEqual(['ติดตามคนเริ่มงาน', 'AI โทร', '673', '583', '469', '0', '0', '0', '0', '15', '99', '90', '0']);
-    expect(cells('bu-row-LBD-main-manual')).toEqual(['', 'คนโทร', '106', '82', '77', '1', '0', '0', '1', '0', '3', '24', '0']);
+    // 21 ต.ค. 2569 ยกเลิกไม่นับในทั้งหมด ย้ายไปคอลัมน์ท้าย "ยกเลิก · ไม่นับ" ⇒ ทั้งหมด = โทรแล้ว + รอโทร (583 = 583 + 0 · ยกเลิก 90)
+    expect(cells('bu-row-LBD-main-ai')).toEqual(['ติดตามคนเริ่มงาน', 'AI โทร', '583', '583', '469', '0', '0', '0', '0', '15', '99', '0', '90']);
+    expect(cells('bu-row-LBD-main-manual')).toEqual(['', 'คนโทร', '82', '82', '77', '1', '0', '0', '1', '0', '3', '0', '24']);
     // ส่งคนแทน AI = 0 ก็ขึ้น (เทียบ AI กับคนได้ทุกเรื่อง)
     expect(cells('bu-row-LBD-replacement-ai')).toEqual(['ติดตามส่งคนแทน', 'AI โทร', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']);
     expect(within(lbd).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(
       expect.arrayContaining(['โทรแล้ว', 'รวม', 'ไม่ได้โทร']),
     );
-    expect(cells('bu-row-LBD-total')[1]).toBe('1,417');
-    expect(within(lbd).getAllByText('673').length).toBeGreaterThan(0);
+    expect(cells('bu-row-LBD-total')[1]).toBe('1,303');
+    expect(within(lbd).getAllByText('583').length).toBeGreaterThan(0);
     expect(within(box).getByTestId('bu-block-LBA')).toBeTruthy();
     expect(within(box).queryByTestId('bu-block-LML')).toBeNull();
-    expect(within(box).getByTestId('lumos-follow-sum').textContent).toBe('LBD 1,417 + LBA 61 = 1,478 สาย');
+    expect(within(box).getByTestId('lumos-follow-sum').textContent).toBe('LBD 1,303 + LBA 61 = 1,364 สาย · ยกเลิก 114 ไม่นับ');
     // ถอดแล้ว
     for (const id of ['kpi-pick', 'ai-gauge', 'bu-breakdown', 'follow-team-breakdown', 'result-bars']) {
       expect(screen.queryByTestId(id)).toBeNull();

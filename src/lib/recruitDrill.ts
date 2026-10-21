@@ -22,6 +22,8 @@ export type DrillNode = {
   ids?: string[];
   /** ปลายทางใบขอ */
   requests?: RecruitRequestItem[];
+  /** นับอย่างเดียว กดไม่ได้ — ใบที่จบแล้ว ("ถ้าปิดก็คือปิด" ห้ามโชว์รายการ) */
+  countOnly?: boolean;
   children?: DrillNode[];
 };
 
@@ -47,14 +49,17 @@ export function drillTreeOf(tab: OverviewTabId, cohort: readonly RecruitAppFact[
   switch (tab) {
     case 'requests': {
       if (!requests) return null;
+      // ชุดเดียวกับทีม Online "ส่งไปประกาศ" (21 ต.ค. 2569 เจ้าของโหวตข้อ B): ประกาศแล้ว + ยังไม่ประกาศ (ใบยังเปิด) + ไม่ได้ประกาศ (จบไปแล้ว)
       const [released, notReleased] = split(requests, (r) => r.released);
+      const [stillOpen, ended] = split(notReleased, (r) => r.open);
       const [withApps, noApps] = split(released, (r) => r.applications > 0);
       return reqs('total', 'ใบขอเข้ามา', 'neutral', requests, [
         reqs('released', 'ประกาศแล้ว', 'success', released, [
           reqs('withApps', 'มีคนกรอก', 'info', withApps),
           reqs('noApps', 'ยังไม่มีคนกรอก', 'danger', noApps),
         ]),
-        reqs('notReleased', 'ยังไม่ประกาศ', 'neutral', notReleased),
+        reqs('notReleased', 'ยังไม่ประกาศ (ใบยังเปิด)', 'warn', stillOpen),
+        { key: 'ended', label: 'ไม่ได้ประกาศ (จบไปแล้ว)', tone: 'neutral', unit: 'ใบ', count: ended.length, countOnly: true },
       ]);
     }
     case 'apps': {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronRight, ListTree, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
@@ -63,7 +64,9 @@ export default function DrillDownCard({
               key={c.key}
               type="button"
               variant="outline"
-              className="h-auto flex-col items-start justify-start gap-1 rounded-xl p-3 text-left font-normal"
+              className="h-auto flex-col items-start justify-start gap-1 rounded-xl p-3 text-left font-normal disabled:opacity-100"
+              // ใบที่จบแล้วนับอย่างเดียว ไม่เปิดรายการ (เจ้าของ "ถ้าปิดก็คือปิด")
+              disabled={c.countOnly}
               onClick={() => setPath([...path, c.key])}
               data-testid={`drill-${c.key}`}
             >
@@ -120,7 +123,10 @@ export default function DrillDownCard({
                   <tr key={`${r.requestNo}-${r.jobId}`} className={cn('border-t', DASH.tableRow)}>
                     <td className={cn('px-3 py-2', DASH.cell)}>
                       <span className="block text-foreground">{[r.unitName, r.position].filter(Boolean).join(' · ') || r.requestNo}</span>
-                      <span className="text-xs tabular-nums text-muted-foreground">{r.requestNo}</span>
+                      <span className="flex items-center gap-2 text-xs tabular-nums text-muted-foreground">
+                        {r.requestNo}
+                        {r.open ? null : <Badge variant="secondary">จบแล้ว</Badge>}
+                      </span>
                     </td>
                     <td className={cn('whitespace-nowrap px-3 py-2 tabular-nums', DASH.cell)}>{formatYmdTh(r.day)}</td>
                     <td className="px-3 py-2 text-right">

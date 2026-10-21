@@ -15,7 +15,7 @@ const facts: RecruitAppFact[] = [
   f('c', { calledByAi: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-10-20T04:00:00Z', appointmentAt: '2026-10-23T04:00:00Z' }),
   f('d', {}),
 ];
-const req = (no: string, released: boolean, apps: number): RecruitRequestItem => ({ jobId: `j-${no}`, requestNo: no, unitName: 'หน่วย', position: 'ขับรถ', day: '2026-10-20', released, applications: apps, appIds: Array.from({ length: apps }, (_, i) => `${no}-${i}`) });
+const req = (no: string, released: boolean, apps: number, open = true): RecruitRequestItem => ({ jobId: `j-${no}`, requestNo: no, unitName: 'หน่วย', position: 'ขับรถ', day: '2026-10-20', released, open, applications: apps, appIds: Array.from({ length: apps }, (_, i) => `${no}-${i}`) });
 
 function sumsMatch(n: DrillNode): void {
   if (!n.children) return;
@@ -26,7 +26,7 @@ function sumsMatch(n: DrillNode): void {
 
 describe('drillTreeOf', () => {
   it('🔴 ทุกแท็บ ลูกรวมกันเท่าแม่ทุกชั้น', () => {
-    const requests = [req('A', true, 2), req('B', true, 0), req('C', false, 0)];
+    const requests = [req('A', true, 2), req('B', true, 0), req('C', false, 0), req('D', false, 0, false)];
     for (const t of ['requests', 'apps', 'staff', 'appt'] as const) {
       const root = drillTreeOf(t, facts, requests)!;
       sumsMatch(root);
@@ -80,14 +80,24 @@ describe('เลขกราฟ = เลขการ์ด (21 ต.ค. 2569 เ
   });
 });
 
-describe('ใบที่ปิดใน ERP ไม่อยู่ในแท็บใบขอ (เจ้าของ 21 ต.ค. 2569 LBM6910003 Stop · LBM6910004 แจ้งเข้าครบ)', () => {
-  it('ตัดใบปิดก่อนนับ ใบขอเข้ามา / รายวัน / รายการใบขอ', () => {
+describe('ใบขอเข้ามา = เลขเดียวกับหน้าหลัก แตกแบบทีม Online (เจ้าของ 21 ต.ค. 2569 โหวตข้อ B)', () => {
+  it('ทั้งหมด = ประกาศแล้ว + ยังไม่ประกาศ (ใบยังเปิด) + ไม่ได้ประกาศ (จบไปแล้ว) · ใบจบนับอย่างเดียว ไม่เปิดรายการ', () => {
+    const root = drillTreeOf('requests', [], [req('A', true, 1), req('B', false, 0), req('LBM6910003', false, 0, false), req('LBM6910004', false, 0, false)])!;
+    expect(root.count).toBe(4);
+    expect(root.children!.map((c) => [c.key, c.label, c.count])).toEqual([
+      ['released', 'ประกาศแล้ว', 1],
+      ['notReleased', 'ยังไม่ประกาศ (ใบยังเปิด)', 1],
+      ['ended', 'ไม่ได้ประกาศ (จบไปแล้ว)', 2],
+    ]);
+    const ended = nodeAt(root, ['ended']).node;
+    expect(ended.countOnly).toBe(true);
+    expect(ended.requests).toBeUndefined();
+    expect(nodeAt(root, ['notReleased']).node.requests!.map((r) => r.requestNo)).toEqual(['B']);
+  });
+  it('API นับทุกใบที่เข้ามา + ส่งธงเปิด/จบ (ตัวตัดสินเดียวกับทีม Online)', () => {
     const api = fs.readFileSync(path.join(process.cwd(), 'api/_handlers/recruit-overview.ts'), 'utf8');
-    const at = api.indexOf('const closed = await loadClosedRequestNos(reqR.value.map((r) => r.requestNo));');
-    expect(at).toBeGreaterThan(0);
-    for (const k of ['body.requests = toRequestSummary(inRange(', 'body.requestDays = toRequestDays(openRows)', 'body.requestList = await loadRequestList(inRange(']) {
-      expect(api.indexOf(k)).toBeGreaterThan(at);
-    }
-    expect(api).toContain('openRows.filter((r) => r.day >= from && r.day <= to)');
+    expect(api).toContain("open: onlineRequestStateOf(r) === 'open'");
+    expect(api).not.toContain('loadClosedRequestNos');
+    expect(api).toContain('body.requestDays = toRequestDays(reqR.value)');
   });
 });

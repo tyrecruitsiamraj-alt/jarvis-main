@@ -127,7 +127,8 @@ export function KpiTile({
           <span className="block h-1.5 flex-1 overflow-hidden rounded-full bg-card" aria-hidden>
             <span className={cn('block h-full rounded-full bg-current', shareClass)} style={{ width: `${share}%` }} />
           </span>
-          <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">{NUM.format(share)}%</span>
+          {/* บอกว่าเป็นสัดส่วนของอะไร — แยกจากชิปเทียบช่วงก่อน (เจ้าของ 21 ต.ค. 2569 โหวตข้อ C) */}
+          <span className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">{NUM.format(share)}% ของทั้งหมด</span>
         </span>
       ) : null}
       {foot ? (

@@ -294,7 +294,8 @@ describe('รายชื่อหลังเลขในกล่อง (ร�
   it('🔴 เงื่อนไขของแต่ละก้อนเป็นตัวเดียวกันทั้งตัวนับและรายชื่อ · 4 ก้อนไม่ทับกัน', () => {
     for (const [count] of pairs()) {
       for (const k of ['ai', 'staff', 'both', 'notCalled'] as const) {
-        expect(count).toContain(`count(*) filter (where ${SEGMENT_WHERE[k]})::int`);
+        // 21 ต.ค. 2569 หัวข้อติดตามตัดสายยกเลิก (`where not is_cancelled and …`) · ที่เหลือ `where true and …`
+        expect(count).toMatch(new RegExp(`count\\(\\*\\) filter \\(where ((true|not is_cancelled) and )?${SEGMENT_WHERE[k]}\\)::int`));
       }
     }
     for (const k of AI_SHARE_LIST_KEYS) {

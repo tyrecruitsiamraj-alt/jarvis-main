@@ -18,7 +18,7 @@
  * ตัวนับล้วน (ไม่มีชื่อ/เบอร์) ⇒ เปิดเท่ากับกล่องตัวเลข · นิยามอยู่ `src/lib/homeCallResults.ts`
  */
 import { withAuth, sendError, type ApiRes, type AuthedReq } from '../_lib/http.js';
-import { loadOnlineApplicantRows, loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
+import { loadOnlineApplicantRows, loadOnlineRequestPosting, loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
 import { buildOnlineApplicantsReport, buildOnlineReport, type OnlineReportResponse } from '../../src/lib/homeOnline.js';
 import { checkApiAccess, type ApiResource } from '../_lib/rbac.js';
 import type { UserRole } from '../_lib/auth.js';
@@ -54,7 +54,7 @@ import { followMatrixColOfCategory } from '../../src/lib/followCallMatrix.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { journeyResultOf, type FollowJourneyEvent, type FollowJourneyResponse, type FollowJourneyRow } from '../../src/lib/followJourney.js';
 import { createHash } from 'node:crypto';
-import { FOLLOW_BUCKET_SQL, followLedgerBucket, loadHomeLumosSummary } from '../_lib/homeLumosSummarySql.js';
+import { FOLLOW_BUCKET_SQL, followLedgerBucket, loadFollowCancelledIds, loadHomeLumosSummary } from '../_lib/homeLumosSummarySql.js';
 import { loadInterestJourney, loadTopicReport } from '../_lib/homeTopicReportSql.js';
 import type { TopicReportBlock, TopicReportResponse } from '../../src/lib/homeTopicReport.js';
 import type { HomeLumosSummaryResponse } from '../../src/lib/homeLumosSummary.js';
@@ -81,6 +81,7 @@ import {
   type AiShareMatching,
   type AiSharePrevious,
   type AiShareResponse,
+  type HomeTodoResponse,
   type AiShareWindow,
 } from '../../src/lib/homeAiShare.js';
 
@@ -88,7 +89,7 @@ const FOLLOW_TABLE = tableInAppSchema('follow_entries');
 const QUEUE_TABLE = tableInAppSchema('lumos_dispatch_queue');
 
 const CACHE_MS = 30_000;
-const cache = new Map<string, { at: number; body: AiShareResponse }>();
+const cache = new Map<string, { at: number; body: AiShareResponse | HomeTodoResponse }>();
 
 /** 42703 undefined_column — ฐานยังไม่รัน 130 (ช่องผลของคนโทร) */
 function isUndefinedColumn(e: unknown): boolean {
@@ -116,12 +117,23 @@ const base = (r: CountRow | undefined) => ({
   notCalled: num(r?.not_called),
 });
 
+/**
+ * พารามิเตอร์ท้ายของ `buildFollowAiShareSql` — หัวข้อติดตามส่ง id สายยกเลิก (`$5`) ไปตัดออกจากยอด (21 ต.ค. 2569)
+ * ใช้กับโหมดยอด/รายวัน/รายชื่อเท่านั้น (โหมดผลโทรไม่มี `$5`)
+ */
+async function followTail(params: Params, lane: FollowLane): Promise<unknown[]> {
+  if (lane !== 'follow') return [AFTERCARE_TOPIC];
+  const [s, e, bu] = params;
+  return [AFTERCARE_TOPIC, await loadFollowCancelledIds(s ? new Date(s) : null, e ? new Date(e) : null, bu)];
+}
+
 export async function loadFollowAiShare(
   params: Params,
   lane: FollowLane,
 ): Promise<{ counts: AiShareFollow; staffReady: boolean }> {
+  const tail = await followTail(params, lane);
   const read = async (staffReady: boolean): Promise<AiShareFollow> => {
-    const { rows } = await dbQuery<CountRow>(buildFollowAiShareSql(staffReady, lane), [...params, AFTERCARE_TOPIC]);
+    const { rows } = await dbQuery<CountRow>(buildFollowAiShareSql(staffReady, lane), [...params, ...tail]);
     const r = rows[0];
     return {
       ...base(r),
@@ -129,7 +141,12 @@ export async function loadFollowAiShare(
       waitingStaff: num(r?.waiting_staff),
       // แยกทีมเฉพาะหัวข้อติดตาม (ดูแลหลังเริ่มงานไม่มีทีม)
       ...(lane === 'follow'
-        ? { teamReplacement: num(r?.team_replacement), teamReplacementAi: num(r?.team_replacement_ai) }
+        ? {
+            teamReplacement: num(r?.team_replacement),
+            teamReplacementAi: num(r?.team_replacement_ai),
+            // ยกเลิก — ไม่นับในยอด โชว์แยก (21 ต.ค. 2569)
+            cancelled: num(r?.cancelled),
+          }
         : {}),
     };
   };
@@ -171,11 +188,12 @@ export async function loadAiShareDetail(
     }));
   };
   if (block === 'follow' || block === 'aftercare') {
+    const tail = await followTail(params, block);
     try {
-      return { rows: await run(buildFollowAiShareSql(true, block, mode), [AFTERCARE_TOPIC]), staffReady: true };
+      return { rows: await run(buildFollowAiShareSql(true, block, mode), tail), staffReady: true };
     } catch (e) {
       if (!isUndefinedColumn(e)) throw e;
-      return { rows: await run(buildFollowAiShareSql(false, block, mode), [AFTERCARE_TOPIC]), staffReady: false };
+      return { rows: await run(buildFollowAiShareSql(false, block, mode), tail), staffReady: false };
     }
   }
   if (block === 'applicants') return { rows: await run(buildApplicantAiShareSql(mode)), staffReady: true };
@@ -202,11 +220,12 @@ export async function loadAiShareList(
     };
   };
   if (block === 'follow' || block === 'aftercare') {
+    const tail = await followTail(params, block);
     try {
-      return { ...(await run(buildFollowAiShareSql(true, block, 'list', list), [AFTERCARE_TOPIC])), staffReady: true };
+      return { ...(await run(buildFollowAiShareSql(true, block, 'list', list), tail)), staffReady: true };
     } catch (e) {
       if (!isUndefinedColumn(e)) throw e;
-      return { ...(await run(buildFollowAiShareSql(false, block, 'list', list), [AFTERCARE_TOPIC])), staffReady: false };
+      return { ...(await run(buildFollowAiShareSql(false, block, 'list', list), tail)), staffReady: false };
     }
   }
   if (block === 'applicants') return { ...(await run(buildApplicantAiShareSql('list', list))), staffReady: true };
@@ -610,6 +629,56 @@ async function handler(req: AuthedReq, res: ApiRes) {
         logWarn('home-ai-share report failed', { block, error: errText(e) });
         body.error = 'โหลดผลโทรไม่ขึ้น ลองรีเฟรชอีกครั้ง';
       }
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json(body);
+    }
+
+    // `?todo=1` = แถบ "ต้องทำ" เหนือแท็บ (21 ต.ค. 2569) — เรียกตัวนับชุดเดียวกับแต่ละแท็บ ⇒ เลขตรงกับในแท็บพอดี
+    if (q.todo !== undefined) {
+      const body: HomeTodoResponse = {
+        generated_at: new Date().toISOString(),
+        from: win.from,
+        to: win.to,
+        bu,
+        requests: null,
+        followWaitingStaff: null,
+        aftercareWaiting: null,
+        applicantsNotSent: null,
+        matchingGreenFree: null,
+      };
+      if (scope.mode === 'none') return res.status(200).json(body);
+      const todoKey = JSON.stringify(['todo', scope, win, bu]);
+      const todoHit = cache.get(todoKey);
+      if (todoHit && Date.now() - todoHit.at < CACHE_MS) return res.status(200).json(todoHit.body);
+      const { start, end } = aiShareBounds(win, new Date());
+      const plan = followPlanBounds(win);
+      const safe = async <T,>(what: string, f: () => Promise<T>): Promise<T | null> => {
+        try {
+          return await f();
+        } catch (e) {
+          logWarn('home-ai-share todo failed', { what, error: errText(e) });
+          return null;
+        }
+      };
+      const [posting, lumos, apps, match, care] = await Promise.all([
+        safe('requests', () =>
+          loadOnlineRequestPosting({ ...onlineRequestYmdRange(start, end), bu, departmentScope: { mode: 'all' } as DepartmentScope }),
+        ),
+        safe('follow', () => loadHomeLumosSummary(plan.start, plan.end, bu)),
+        safe('applicants', () => loadTopicReport('applicants', start, end, bu)),
+        safe('matching', () => loadTopicReport('matching', start, end, bu)),
+        safe('aftercare', () => loadTopicReport('aftercare', start, end, bu)),
+      ]);
+      body.requests = posting;
+      body.followWaitingStaff = lumos ? lumos.follow.staff.waiting : null;
+      body.applicantsNotSent = apps ? (apps.funnel.find((f) => f.key === 'total')?.parts?.find((p) => p.key === 'notSent')?.value ?? 0) : null;
+      body.matchingGreenFree = match
+        ? (match.extra.find((x) => x.title === 'ต้องสั่งงาน')?.items.find((i) => i.key === 'greenUncontacted')?.value ?? 0)
+        : null;
+      // รอโทรของดูแลหลังเริ่มงาน = ช่องยังไม่มีผล (ตัวเดียวกับกล่องทั้งหมด `fromReach` บนหน้า)
+      body.aftercareWaiting = care ? care.cells.reduce((n, c) => n + (c.col === 'noResult' ? c.n : 0), 0) : null;
+      const allOk = posting && lumos && apps && match && care;
+      if (allOk) cache.set(todoKey, { at: Date.now(), body });
       res.setHeader?.('Cache-Control', 'no-store');
       return res.status(200).json(body);
     }

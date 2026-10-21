@@ -68,7 +68,11 @@ export const FOLLOW_RESULT_COLS: ReadonlyArray<{ key: FollowBucketKey; label: st
  * 10 ต.ค. 2569 (QA · ชุดคำมาตรฐาน): "รอดำเนินการ" → "รอโทร" · หัว "ยังไม่ได้โทร" → "ไม่ได้โทร" (ยกเลิกไม่มีวันถูกโทร ไม่ใช่ "ยัง")
  */
 const CALLED_COLS = FOLLOW_RESULT_COLS.filter((c) => FOLLOW_CALLED_KEYS.includes(c.key));
-const NOT_CALLED_COLS = FOLLOW_RESULT_COLS.filter((c) => !FOLLOW_CALLED_KEYS.includes(c.key));
+/** ไม่ได้โทร = รอโทร · ยกเลิกแยกคอลัมน์ท้าย "ไม่นับ" (เจ้าของ 21 ต.ค. 2569 ยกเลิกไม่นับในยอด) */
+const NOT_CALLED_COLS = FOLLOW_RESULT_COLS.filter((c) => !FOLLOW_CALLED_KEYS.includes(c.key) && c.key !== 'cancelled');
+const CANCELLED_COL = FOLLOW_RESULT_COLS.find((c) => c.key === 'cancelled')!;
+/** ทั้งหมดของแถว/ก้อน = ไม่นับยกเลิก ⇒ ทั้งหมด = โทรแล้ว + รอโทร */
+const liveOf = (r: { total: number; buckets: Record<FollowBucketKey, number> }) => r.total - (r.buckets.cancelled ?? 0);
 const followCalledOf = (buckets: Record<FollowBucketKey, number>): number =>
   FOLLOW_CALLED_KEYS.reduce((n, k) => n + (buckets[k] ?? 0), 0);
 
@@ -144,7 +148,8 @@ const CALLER_LABEL = { ai: 'AI โทร', manual: 'คนโทร' } as const;
 
 /**
  * ติดตาม — ก้อนละ BU (เจ้าของ "Bu เอาไปรวมตรงผลเลย") · หัวก้อน = BU · ทั้งหมด · AI โทร · คนโทร
- * ตาราง = เรื่อง × ใครโทร (เฉพาะที่มีรายชื่อ) × ทั้งหมด → โทรแล้ว (รวม + ผล 5) → ไม่ได้โทร (ยกเลิก · รอโทร) · แถวรวมของ BU · BU ไม่มีงานไม่ขึ้น
+ * ตาราง = เรื่อง × ใครโทร (เฉพาะที่มีรายชื่อ) × ทั้งหมด → โทรแล้ว (รวม + ผล 5) → ไม่ได้โทร (รอโทร) → ยกเลิก · ไม่นับ · แถวรวมของ BU · BU ไม่มีงานไม่ขึ้น
+ * ทั้งหมด = โทรแล้ว + รอโทร (ยกเลิกไม่นับ · 21 ต.ค. 2569) ⇒ บรรทัดล่าง = กล่องทั้งหมดด้านบนพอดี
  * บรรทัดล่าง = ทุก BU บวกกัน = กล่องทั้งหมดด้านบน
  */
 function FollowResults({
@@ -158,8 +163,12 @@ function FollowResults({
 }) {
   if (!split || !cells) return <Skeleton className="h-48 w-full rounded-xl" />;
   const blocks = followBuBlocks(cells);
-  const all = split.ai.total + split.staff.total;
-  const sumOfBlocks = blocks.reduce((n, b) => n + b.sum.total, 0);
+  const all = split.ai.total - split.ai.cancelled + split.staff.total - split.staff.cancelled;
+  const cancelledAll = split.ai.cancelled + split.staff.cancelled;
+  const sumOfBlocks = blocks.reduce((n, b) => n + liveOf(b.sum), 0);
+  /** AI โทร / คนโทร ของก้อน (ไม่นับยกเลิก) */
+  const callerLive = (b: (typeof blocks)[number], caller: 'ai' | 'manual') =>
+    b.rows.filter((r) => r.caller === caller).reduce((n, r) => n + liveOf(r), 0);
   const ok = sumOfBlocks === all && followBucketAddsUp(split.ai) && followBucketAddsUp(split.staff);
   const num = (n: number) => (
     <span className={cn('tabular-nums', n > 0 ? 'text-foreground' : 'text-muted-foreground')}>{NUM.format(n)}</span>
@@ -181,14 +190,14 @@ function FollowResults({
                 aria-hidden
               />
               {b.bu ?? 'ไม่ระบุ BU'}
-              <span className="text-2xl tabular-nums">{NUM.format(b.sum.total)}</span>
+              <span className="text-2xl tabular-nums">{NUM.format(liveOf(b.sum))}</span>
               <span className="text-sm font-normal text-muted-foreground">{unit}</span>
             </h3>
             <p className="flex flex-wrap gap-2 text-sm tabular-nums">
               {(
                 [
-                  ['ai', 'AI โทร', b.sum.ai],
-                  ['staff', 'คนโทร', b.sum.staff],
+                  ['ai', 'AI โทร', callerLive(b, 'ai')],
+                  ['staff', 'คนโทร', callerLive(b, 'manual')],
                 ] as const
               ).map(([k, label, n]) => (
                 <span key={k} className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-muted-foreground">
@@ -213,6 +222,12 @@ function FollowResults({
                   </TableHead>
                   <TableHead className="border-l border-foreground/10 text-center text-xs" colSpan={NOT_CALLED_COLS.length}>
                     ไม่ได้โทร
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap border-l border-foreground/10 text-right text-xs" rowSpan={2}>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className={cn('h-2 w-2 rounded-full', TONE[CANCELLED_COL.tone].dot)} aria-hidden />
+                      {CANCELLED_COL.label} · ไม่นับ
+                    </span>
                   </TableHead>
                 </TableRow>
                 <TableRow>
@@ -245,7 +260,7 @@ function FollowResults({
                       {i === 0 || b.rows[i - 1].team !== r.team ? TEAM_LABEL[r.team] : ''}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm text-foreground max-sm:sticky max-sm:left-20 max-sm:z-10 max-sm:min-w-14 max-sm:bg-card max-sm:px-1 max-sm:text-xs">{CALLER_LABEL[r.caller]}</TableCell>
-                    <TableCell className="text-right font-medium">{num(r.total)}</TableCell>
+                    <TableCell className="text-right font-medium">{num(liveOf(r))}</TableCell>
                     <TableCell className="border-l border-foreground/10 text-right font-medium" data-testid="bu-cell-called">
                       {num(followCalledOf(r.buckets))}
                     </TableCell>
@@ -259,6 +274,9 @@ function FollowResults({
                         {num(r.buckets[c.key])}
                       </TableCell>
                     ))}
+                    <TableCell className="border-l border-foreground/10 text-right text-muted-foreground" data-testid="bu-cell-cancelled">
+                      {NUM.format(r.buckets.cancelled)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -267,7 +285,7 @@ function FollowResults({
                   <TableCell className="whitespace-nowrap text-sm text-foreground max-sm:sticky max-sm:left-0 max-sm:z-10 max-sm:bg-muted" colSpan={2}>
                     รวม {b.bu ?? 'ไม่ระบุ BU'}
                   </TableCell>
-                  <TableCell className="text-right">{num(b.sum.total)}</TableCell>
+                  <TableCell className="text-right">{num(liveOf(b.sum))}</TableCell>
                   <TableCell className="border-l border-foreground/10 text-right">{num(followCalledOf(b.sum.buckets))}</TableCell>
                   {CALLED_COLS.map((c) => (
                     <TableCell key={c.key} className="text-right">
@@ -279,6 +297,9 @@ function FollowResults({
                       {num(b.sum.buckets[c.key])}
                     </TableCell>
                   ))}
+                  <TableCell className="border-l border-foreground/10 text-right text-muted-foreground">
+                    {NUM.format(b.sum.buckets.cancelled)}
+                  </TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
@@ -287,8 +308,9 @@ function FollowResults({
       ))}
       <p className={cn('text-xs tabular-nums', ok ? 'text-muted-foreground' : TONE.danger.value)} data-testid="lumos-follow-sum">
         {blocks.length > 0
-          ? `${blocks.map((b) => `${b.bu ?? 'ไม่ระบุ'} ${NUM.format(b.sum.total)}`).join(' + ')} = ${NUM.format(sumOfBlocks)} ${unit}`
+          ? `${blocks.map((b) => `${b.bu ?? 'ไม่ระบุ'} ${NUM.format(liveOf(b.sum))}`).join(' + ')} = ${NUM.format(sumOfBlocks)} ${unit}`
           : `รวม 0 ${unit}`}
+        {` · ยกเลิก ${NUM.format(cancelledAll)} ไม่นับ`}
         {ok ? '' : ` · ไม่ตรงกับ ${NUM.format(all)}`}
       </p>
     </div>

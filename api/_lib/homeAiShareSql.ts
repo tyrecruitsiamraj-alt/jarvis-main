@@ -193,6 +193,12 @@ export function buildFollowAiShareSql(
    * ดูแลหลังเริ่มงาน + แผงผลโทร ยังนับแบบเดิม (ใครโทรไปแล้ว)
    */
   const plan = lane === 'follow' && mode !== 'results';
+  /**
+   * 🔴 สายที่ยกเลิกไม่นับในยอด (เจ้าของ 21 ต.ค. 2569 โหวต "ยอดหลักและกราฟไม่นับสายที่ยกเลิก" · 2,490 สายเคยเป็นยกเลิก 1,298)
+   * `$5` = id ของสายยกเลิกจาก `loadFollowCancelledIds` (ตัวจัดช่องเดียวกับการ์ดผลโทร/ตาราง BU/ป๊อป — `followLedgerBucket`)
+   * ⇒ กล่อง = ผลโทร − ยกเลิก พอดีทุกสาย · ยกเลิกส่งแยกในช่อง `cancelled` · 🔴 หัวข้อติดตาม (ยกเว้นผลโทร) ต้องส่ง `$5` ทุกครั้ง
+   */
+  const keep = plan ? 'not is_cancelled' : 'true';
   return `
   with f0 as (
     select f.call_mode,
@@ -202,6 +208,7 @@ export function buildFollowAiShareSql(
            ${plan ? FOLLOW_PLAN_STAFF_SQL : followCalledByStaffSql(staffReady)} as staff,
            ${FOLLOW_WAITING_AI_SQL} as waiting_ai,
            ${bkkDay('f.scheduled_at')} as day,
+           ${plan ? '(f.id::text = any($5::text[]))' : 'false'} as is_cancelled,
            ${followBuSql('f')} as bu${listCols(mode, "f.id::text as id,\n           nullif(btrim(f.recipient_name), '') as name,\n           f.scheduled_at as at")}${resultCols(
              mode,
              `air.outcome as ai_outcome, air.summary as ai_summary, air.reply as ai_reply, air.at as ai_at,\n           case when ${followCalledByStaffSql(staffReady)} then nullif(btrim(${staffReady ? 'f.staff_call_outcome' : 'null::text'}), '') end as staff_outcome,\n           ${staffReady ? 'f.staff_called_at' : 'null::timestamptz'} as staff_at`,
@@ -230,17 +237,18 @@ export function buildFollowAiShareSql(
       : mode === 'results'
       ? resultsSelect('f0')
       : mode === 'list'
-      ? listSelect('f0', list)
+      ? listSelect(`(select * from f0 where ${keep}) f1`, list)
       : `
-  select ${outCols(mode)}count(*)::int                                                         as total,
-         count(*) filter (where ${SEGMENT_WHERE.ai})::int                                      as ai,
-         count(*) filter (where ${SEGMENT_WHERE.staff})::int                                   as staff,
-         count(*) filter (where ${SEGMENT_WHERE.both})::int                                    as both,
-         count(*) filter (where ${SEGMENT_WHERE.notCalled})::int                               as not_called,
-         count(*) filter (where ${SEGMENT_WHERE.notCalled} and waiting_ai)::int                as waiting_ai,
-         count(*) filter (where ${SEGMENT_WHERE.notCalled} and call_mode = 'manual')::int      as waiting_staff,
-         count(*) filter (where replacement)::int                                              as team_replacement,
-         count(*) filter (where replacement and ${SEGMENT_WHERE.ai})::int                      as team_replacement_ai
+  select ${outCols(mode)}count(*) filter (where ${keep})::int                                  as total,
+         count(*) filter (where ${keep} and ${SEGMENT_WHERE.ai})::int                          as ai,
+         count(*) filter (where ${keep} and ${SEGMENT_WHERE.staff})::int                       as staff,
+         count(*) filter (where ${keep} and ${SEGMENT_WHERE.both})::int                        as both,
+         count(*) filter (where ${keep} and ${SEGMENT_WHERE.notCalled})::int                   as not_called,
+         count(*) filter (where ${keep} and ${SEGMENT_WHERE.notCalled} and waiting_ai)::int    as waiting_ai,
+         count(*) filter (where ${keep} and ${SEGMENT_WHERE.notCalled} and call_mode = 'manual')::int as waiting_staff,
+         count(*) filter (where ${keep} and replacement)::int                                  as team_replacement,
+         count(*) filter (where ${keep} and replacement and ${SEGMENT_WHERE.ai})::int          as team_replacement_ai,
+         count(*) filter (where is_cancelled)::int                                             as cancelled
     from f0${outGroup(mode)}`
   }`;
 }

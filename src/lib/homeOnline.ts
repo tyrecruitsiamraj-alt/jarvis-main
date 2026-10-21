@@ -266,8 +266,12 @@ const ONLINE_OVER_AGE = 58;
 
 export type OnlineApplicantKind = 'sent' | 'overAge' | 'notSent';
 
+/**
+ * ส่งให้ AI = ใบนี้เข้าคิว AI แล้ว — นิยามเดียวกับแท็บงานสรรหา (`dispatchKindOf` ดู `ai_queued_at`)
+ * 21 ต.ค. 2569: เดิมนับ "AI เคยโทรเบอร์นี้จากใบอื่น" เป็นส่งแล้วด้วย ⇒ ทีม Online 185 / งานสรรหา 184 (เจ้าของ "บวกลบกันแล้วมันต้องเท่ากัน")
+ */
 export function onlineApplicantKindOf(r: OnlineApplicantRow): OnlineApplicantKind {
-  if (r.queued || r.ai) return 'sent';
+  if (r.queued) return 'sent';
   return (r.age ?? 0) >= ONLINE_OVER_AGE ? 'overAge' : 'notSent';
 }
 

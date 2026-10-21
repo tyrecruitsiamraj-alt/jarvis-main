@@ -106,7 +106,9 @@ const FollowCallerDialog: React.FC<{
   const topics = useMemo(() => followCallerBreakdown(current?.rows ?? [], caller), [current, caller]);
   const failed = error ?? current?.error ?? null;
   const callerLabel = caller === 'ai' ? 'AI โทร' : 'คนโทร';
-  const total = current ? topics.reduce((n, t) => n + t.rows.length, 0) : (count ?? 0);
+  /** สายของเรื่องที่ไม่นับยกเลิก — เท่าเลขบนกล่องหน้าหลัก (21 ต.ค. 2569 ยกเลิกไม่นับในยอด) */
+  const liveOf = (t: (typeof topics)[number]) => t.rows.length - t.cols.cancelled.length;
+  const total = current ? topics.reduce((n, t) => n + liveOf(t), 0) : (count ?? 0);
   const go = (l: Level) => {
     setLevel(l);
     setPage(0);
@@ -159,7 +161,7 @@ const FollowCallerDialog: React.FC<{
               variant="outline"
               onClick={() => go({ kind: 'topic', team: t.team })}
               className="h-auto w-full justify-between gap-4 rounded-xl px-4 py-3 text-left"
-              aria-label={`${TOPIC_LABEL[t.team]} ${t.rows.length} ${unit}`}
+              aria-label={`${TOPIC_LABEL[t.team]} ${liveOf(t)} ${unit}`}
               data-testid={`caller-topic-${t.team}`}
             >
               <span className="space-y-1">
@@ -169,7 +171,7 @@ const FollowCallerDialog: React.FC<{
                 </span>
               </span>
               <span className="flex items-center gap-2">
-                <span className="text-xl font-light tabular-nums text-foreground">{NUM.format(t.rows.length)}</span>
+                <span className="text-xl font-light tabular-nums text-foreground">{NUM.format(liveOf(t))}</span>
                 <ChevronRight aria-hidden />
               </span>
             </Button>
@@ -187,7 +189,7 @@ const FollowCallerDialog: React.FC<{
           <div className="flex flex-wrap items-baseline gap-x-3">
             <span className="text-base font-medium text-foreground">{TOPIC_LABEL[t.team]}</span>
             <span className="text-sm tabular-nums text-muted-foreground">
-              {callerLabel} {NUM.format(t.rows.length)} {unit}
+              {callerLabel} {NUM.format(liveOf(t))} {unit}
             </span>
           </div>
           <div className="space-y-2">
@@ -207,8 +209,8 @@ const FollowCallerDialog: React.FC<{
           </div>
           {/* ตัวเช็ค: ทุกช่องรวมกัน = ทั้งหมดของเรื่องนี้ */}
           <p className="text-sm tabular-nums text-muted-foreground" data-testid="caller-sum">
-            โทรแล้ว {NUM.format(t.called.length)} + {COL_META.cancelled.label} {NUM.format(t.cols.cancelled.length)} +{' '}
-            {COL_META.waiting.label} {NUM.format(t.cols.waiting.length)} = {NUM.format(t.rows.length)} {unit}
+            โทรแล้ว {NUM.format(t.called.length)} + {COL_META.waiting.label} {NUM.format(t.cols.waiting.length)} ={' '}
+            {NUM.format(liveOf(t))} {unit} · {COL_META.cancelled.label} {NUM.format(t.cols.cancelled.length)} ไม่นับ
           </p>
           <Button type="button" variant="outline" size="sm" onClick={() => go({ kind: 'names', team: t.team, key: 'all' })}>
             ดูรายชื่อทั้งหมด
@@ -217,7 +219,7 @@ const FollowCallerDialog: React.FC<{
       );
     }
 
-    const list: FollowJourneyRow[] = (level.key === 'all' ? t.rows : level.key === 'called' ? t.called : t.cols[level.key])
+    const list: FollowJourneyRow[] = (level.key === 'all' ? t.rows.filter((r) => r.bucket !== 'cancelled') : level.key === 'called' ? t.called : t.cols[level.key])
       .slice()
       .sort((a, b) => b.at.localeCompare(a.at));
     const pages = Math.max(1, Math.ceil(list.length / AI_SHARE_LIST_PAGE));

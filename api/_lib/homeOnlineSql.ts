@@ -14,7 +14,7 @@ import { getUnitSectorMap } from './unitSectorStore.js';
 import { primaryJobRoleLabel } from './siamrajJobMapping.js';
 import type { DepartmentScope } from './departmentScope.js';
 import { trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
-import { groupThroughputByRequest, type OnlineApplicantRow, type OnlineRequestRow } from '../../src/lib/homeOnline.js';
+import { groupThroughputByRequest, onlineRequestStateOf, type OnlineApplicantRow, type OnlineRequestRow } from '../../src/lib/homeOnline.js';
 import {
   AI_QUEUED_AT_SQL,
   CALLED_BY_AI_SQL,
@@ -87,6 +87,26 @@ export async function loadOnlineRequestCounts(opts: OnlineRequestOpts): Promise<
     [jobIds],
   );
   return { total: withBu.length, released: Number(rows[0]?.n ?? 0) };
+}
+
+/**
+ * ใบขอ · ประกาศ แบบเบา — แถบ "ต้องทำ" บนหน้าหลัก (21 ต.ค. 2569) · กติกาเดียวกับ `buildOnlineReport().posting` ของแท็บทีม Online
+ * ใบขอเข้า = ประกาศแล้ว + ยังไม่ประกาศ (ใบยังเปิด) + ไม่ได้ประกาศ (จบไปแล้ว)
+ */
+export async function loadOnlineRequestPosting(
+  opts: OnlineRequestOpts,
+): Promise<{ total: number; released: number; notReleasedOpen: number; notReleasedEnded: number }> {
+  const { withBu, jobIds } = await loadOnlineRequestGroups(opts);
+  const out = { total: withBu.length, released: 0, notReleasedOpen: 0, notReleasedEnded: 0 };
+  if (withBu.length === 0) return out;
+  const { rows } = await dbQuery<{ job_id: string }>(`select distinct job_id from ${RELEASES} where job_id = any($1::text[])`, [jobIds]);
+  const released = new Set(rows.map((r) => r.job_id));
+  withBu.forEach((g, i) => {
+    if (released.has(jobIds[i])) out.released += 1;
+    else if (onlineRequestStateOf(g) === 'open') out.notReleasedOpen += 1;
+    else out.notReleasedEnded += 1;
+  });
+  return out;
 }
 
 export async function loadOnlineRequestRows(opts: OnlineRequestOpts): Promise<OnlineRequestRow[]> {

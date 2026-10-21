@@ -209,6 +209,11 @@ export type AiShareFollow = AiShareCounts & {
   teamReplacement?: number;
   /** ในส่งคนแทน ตั้งให้ AI โทรกี่สาย (ที่เหลือของส่งคนแทน = คนโทร) */
   teamReplacementAi?: number;
+  /**
+   * สายที่ยกเลิก — **ไม่อยู่ใน total/ai/staff** (เจ้าของ 21 ต.ค. 2569 โหวต "ยอดหลักไม่นับยกเลิก")
+   * สูตรเดียวกับช่อง "ยกเลิก" ของการ์ดผลโทร (`FOLLOW_BUCKET_SQL`) ⇒ total + cancelled = ทุกสายของผลโทร
+   */
+  cancelled?: number;
 };
 
 /** ผู้สมัคร — ยังไม่โทรแยกแบบเดียวกับถังของกล่องงาน: รอคิว AI · มีคนเก็บไว้ · ยังไม่มีใครแตะ */
@@ -676,3 +681,25 @@ export function detailAverage(buckets: ReadonlyArray<AiShareBucket>, totals: rea
   }
   return n > 0 ? sum / n : null;
 }
+
+/**
+ * ═══ แถบ "ต้องทำ" เหนือแท็บหน้าหลัก (เจ้าของ 21 ต.ค. 2569 โหวตข้อ D+E · Choice "แถบเดียวเหนือแท็บ") ═══
+ * เลขทุกตัวมาจากตัวนับเดียวกับส่วนในแท็บ (ช่วง/BU เดียวกับหน้า) ⇒ กดแล้วไปเจอเลขเดียวกันในแท็บ
+ * null = ก้อนนั้นอ่านไม่ได้ (ขึ้น "—" ไม่ใช่ 0)
+ */
+export type HomeTodoResponse = {
+  generated_at: string;
+  from: string | null;
+  to: string | null;
+  bu: string | null;
+  /** แท็บทีม Online "ส่งไปประกาศ" — ใบขอเข้ามา = ประกาศแล้ว + ยังไม่ประกาศ (ใบยังเปิด) + ไม่ได้ประกาศ (จบไปแล้ว) */
+  requests: { total: number; released: number; notReleasedOpen: number; notReleasedEnded: number } | null;
+  /** แท็บติดตาม — กล่องคนโทร "รอโทร" */
+  followWaitingStaff: number | null;
+  /** แท็บดูแลหลังเริ่มงาน — กล่องทั้งหมด "รอโทร" */
+  aftercareWaiting: number | null;
+  /** แท็บงานสรรหา — ใบสมัครเข้ามา "ไม่ได้ส่ง AI" */
+  applicantsNotSent: number | null;
+  /** แท็บจับคู่งาน — ต้องสั่งงาน "เขียวที่ยังว่าง ยังไม่มีใครโทร" */
+  matchingGreenFree: number | null;
+};
