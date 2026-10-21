@@ -100,8 +100,9 @@ describe('หน้าจอ', () => {
   });
   it('การ์ด 6 ใบถอดแล้ว · มีก้อนใบขอ + รายชื่อที่กรอกมา', () => {
     expect(ov).not.toContain('<OverviewKpi');
-    expect(ov).toContain('<JourneyList steps={buildRequestSteps(data.requests)} />');
-    expect(ov).toContain('title="รายชื่อที่กรอกมา"');
+    // 21 ต.ค. 2569 เป็นการ์ดกดลงลึกทุกแท็บ
+    expect(ov).toContain("drillCard('requests', 'ใบขอ')");
+    expect(ov).toContain("drillCard('apps', 'รายชื่อที่กรอกมา')");
   });
   it('API ส่งอายุ + คนละพื้นที่ + ใบขอ', () => {
     const api = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');

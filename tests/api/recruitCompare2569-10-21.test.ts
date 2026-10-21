@@ -75,8 +75,9 @@ describe('หน้าจอ', () => {
     expect(src).toContain('useState<DateRangeYmd | null>(() => lastDays(7))');
     expect(src).toContain('data-testid="recruit-last7"');
     for (const t of ['requests', 'apps', 'staff', 'appt']) expect(src).toContain(`{compareCard('${t}')}`);
-    const card = read('src/components/dashboard-trends/CompareBarsCard.tsx');
-    expect(card).toContain('data-testid={`compare-period-${p}`}');
-    expect(card).toContain('data-testid="compare-daily"');
+    // 21 ต.ค. 2569 ค่ำ: แท่งคู่ → กราฟเส้นรายวัน (เจ้าของ "อยากให้มันวิ่งแบบอันนี้")
+    const card = read('src/components/dashboard-trends/TrendLinesCard.tsx');
+    expect(card).toContain('data-testid={`trend-period-${p}`}');
+    expect(card).toContain('data-testid="trend-chart"');
   });
 });

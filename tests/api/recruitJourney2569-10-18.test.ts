@@ -90,7 +90,7 @@ describe('ผ่าน/ไม่ผ่าน ลงผ่านหน้าจ�
   });
   it('แท็บภาพรวมอยู่ต่อจาก Pre-Check + มีตัวเลือกวัน', () => {
     expect(readFileSync('src/components/jobs/JobBoardView.tsx', 'utf8')).toContain("{ id: 'dashboard', label: 'ภาพรวม' }");
-    expect(readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8')).toContain("<JourneyList {...journeyStepsOfTab(view.journey, 'apps')} onOpenPart="); // 21 ต.ค. 2569 แยกแท็บตามขั้น
+    expect(readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8')).toContain("{drillCard('apps', 'รายชื่อที่กรอกมา')}"); // 21 ต.ค. 2569 แยกแท็บ → การ์ดกดลงลึก
   });
 });
 

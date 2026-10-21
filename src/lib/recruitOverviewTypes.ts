@@ -87,6 +87,20 @@ export type RecruitRequestSummary = {
   appsOnReleased: number;
 };
 
+/** ใบขอรายใบของช่วงนี้ (21 ต.ค. 2569 — การ์ดกดลงลึก "ใบขอ → ประกาศ → มีคนกรอก → รายชื่อ") */
+export type RecruitRequestItem = {
+  jobId: string | null;
+  requestNo: string;
+  unitName: string | null;
+  position: string | null;
+  day: string;
+  released: boolean;
+  /** ใบสมัครของใบนี้ (ไม่นับที่ยกเลิกข้อมูล · ทุกช่วงเวลา) */
+  applications: number;
+  /** id ใบสมัคร — กดดูรายชื่อ */
+  appIds: string[];
+};
+
 /** ใบขอของวันหนึ่ง (21 ต.ค. 2569 — กราฟรายวัน) */
 export type RecruitRequestDay = { day: string; total: number; released: number; releasedWithApps: number };
 
@@ -156,6 +170,8 @@ export type RecruitOverviewResponse = {
   requestsPrev?: RecruitRequestSummary | null;
   /** ใบขอรายวัน prevFrom–to (วันที่ใบเข้ามา) — กราฟรายวันของแท็บใบขอ · null = อ่านไม่ได้ */
   requestDays?: RecruitRequestDay[] | null;
+  /** ใบขอของช่วงนี้รายใบ + ผู้สมัครของใบ — การ์ดกดลงลึก (21 ต.ค. 2569) · null = อ่านไม่ได้ */
+  requestList?: RecruitRequestItem[] | null;
   /** ก้อนที่อ่านไม่ได้ + เหตุ (ก้อนล้มแยกกัน — ห้ามโชว์ 0 แทน) */
   errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board' | 'requests' | 'channels' | 'informs', string>>;
 };

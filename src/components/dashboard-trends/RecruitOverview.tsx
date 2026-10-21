@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
-  FileText,
   Megaphone,
   RefreshCw,
   Timer,
@@ -38,7 +37,7 @@ import {
   totalsOf,
   trimLastDayToNow,
 } from '@/lib/recruitOverview';
-import { WEEKDAY_CHOICES, buildRecruitJourney, buildRequestSteps, filterByWeekdays } from '@/lib/recruitJourney';
+import { WEEKDAY_CHOICES, buildRecruitJourney, filterByWeekdays } from '@/lib/recruitJourney';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import type { BoardPublishedTotals } from '@/lib/boardRelease';
 import {
@@ -46,7 +45,6 @@ import {
   DailyCard,
   DelayList,
   EmptyNote,
-  JourneyList,
   OverviewCard,
   PositionList,
   ReasonColumns,
@@ -59,9 +57,11 @@ import JourneyNamesDialog from './JourneyNamesDialog';
 import ChannelPlacementTable from './ChannelPlacementTable';
 import ChannelFunnelTable from './ChannelFunnelTable';
 import { buildChannelFunnel } from '@/lib/channelFunnel';
-import { OVERVIEW_TABS, overviewTabOf, journeyStepsOfTab } from '@/lib/recruitOverviewTabs';
+import { OVERVIEW_TABS, overviewTabOf } from '@/lib/recruitOverviewTabs';
 import { compareRowsOf, dailySeriesOf } from '@/lib/recruitCompare';
-import CompareBarsCard, { type ComparePeriod } from './CompareBarsCard';
+import TrendLinesCard, { type ComparePeriod } from './TrendLinesCard';
+import DrillDownCard from './DrillDownCard';
+import { drillTreeOf } from '@/lib/recruitDrill';
 import { toYmdBangkok } from '@/lib/dateTh';
 
 /**
@@ -161,6 +161,8 @@ const RecruitOverview: React.FC<{
       /** รายชื่อของช่วงนี้/ช่วงก่อน — กราฟรายวันในการ์ดเทียบ (21 ต.ค. 2569) */
       list,
       prevList,
+      /** รายชื่อที่กรอกในช่วง — ต้นไม้กดลงลึก (21 ต.ค. 2569) */
+      cohort,
       /** ข้อมูลเริ่มกลางช่วงก่อน (ไม่ใช่ไม่มีเลย) */
       prevPartial: !prevFull && !!data.firstDay && data.firstDay <= win.prevTo,
       journey: buildRecruitJourney(cohort),
@@ -208,7 +210,7 @@ const RecruitOverview: React.FC<{
   const curPeriodLabel = isRange ? rangeText({ from: win.from, to: win.to }) : monthLabel(win.month);
   const prevPeriodLabel = isRange ? rangeText({ from: win.prevFrom, to: win.prevTo }) : monthLabel(shiftMonth(win.month, -1));
   const compareCard = (t: (typeof OVERVIEW_TABS)[number]['id']) => (
-    <CompareBarsCard
+    <TrendLinesCard
       key={`${t}-${win.from}-${win.to}`}
       rows={compareRowsOf(t, view.cur, view.prev, data.requests, data.requestsPrev)}
       curLabel={curPeriodLabel}
@@ -227,6 +229,16 @@ const RecruitOverview: React.FC<{
           ? dailySeriesOf(key, win.from, win.to, view.list, data.requestDays)
           : dailySeriesOf(key, win.prevFrom, win.prevTo, view.prevList, data.requestDays)
       }
+    />
+  );
+
+  /** การ์ดกดลงลึก (ไอเดียเพื่อนเจ้าของ · 21 ต.ค. 2569) — key ผูกช่วง+วันในสัปดาห์ เปลี่ยนแล้วกลับชั้นบนสุด */
+  const drillCard = (t: (typeof OVERVIEW_TABS)[number]['id'], title: string) => (
+    <DrillDownCard
+      key={`drill-${t}-${win.from}-${win.to}-${weekdays.join('')}`}
+      title={title}
+      root={drillTreeOf(t, view.cohort, data.requestList)}
+      onOpenNames={(title2, ids) => setNames({ title: title2, ids })}
     />
   );
 
@@ -353,13 +365,7 @@ const RecruitOverview: React.FC<{
         <TabsContent value="requests" className="mt-3 space-y-3">
           {compareCard('requests')}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <OverviewCard icon={FileText} title="ใบขอ" sub={weekdays.length > 0 ? 'ไม่กรองตามวัน' : undefined} className="lg:col-span-2">
-              {data.requests ? (
-                <JourneyList steps={buildRequestSteps(data.requests)} />
-              ) : (
-                <SectionError message={data.errors.requests ?? 'อ่านใบขอไม่ได้'} />
-              )}
-            </OverviewCard>
+            <div className="min-w-0 lg:col-span-2">{drillCard('requests', 'ใบขอ')}</div>
             <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={weekdays.length > 0 ? 'ณ วันนี้ · ไม่กรองตามวัน' : 'ณ วันนี้'}>
               {data.backlog ? <BacklogBody backlog={data.backlog} /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
             </OverviewCard>
@@ -369,14 +375,7 @@ const RecruitOverview: React.FC<{
         {/* ─── กรอกเข้ามา: กรอก + AI โทร · โทรวันไหน · รายวัน · ช่องทาง · ตำแหน่ง · เหตุผล ─── */}
         <TabsContent value="apps" className="mt-3 space-y-3">
           {compareCard('apps')}
-          <OverviewCard icon={Users} title="รายชื่อที่กรอกมา">
-            {/* เดือนที่ยังไม่มีรายชื่อ = ขั้นครบเป็น 0 (กติกา 1 ต.ค.) · กดเลขเปิดรายชื่อ (18 ต.ค.) */}
-            {apps ? (
-              <JourneyList {...journeyStepsOfTab(view.journey, 'apps')} onOpenPart={(title, ids) => setNames({ title, ids })} />
-            ) : (
-              <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>
-            )}
-          </OverviewCard>
+          {drillCard('apps', 'รายชื่อที่กรอกมา')}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <OverviewCard icon={Timer} title="กรอกแล้วโทรวันไหน">
               {apps ? <DelayList rows={view.delay} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
@@ -408,13 +407,7 @@ const RecruitOverview: React.FC<{
         {/* ─── การติดต่อ: ขั้นสนใจ·คนโทรต่อ + ผลงานรายคน ─── */}
         <TabsContent value="staff" className="mt-3 space-y-3">
           {compareCard('staff')}
-          <OverviewCard icon={Users} title="การติดต่อ">
-            {apps ? (
-              <JourneyList {...journeyStepsOfTab(view.journey, 'staff')} onOpenPart={(title, ids) => setNames({ title, ids })} />
-            ) : (
-              <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>
-            )}
-          </OverviewCard>
+          {drillCard('staff', 'การติดต่อ')}
           <OverviewCard icon={Users} title="ผลงานรายคน" sub={weekdays.length > 0 ? 'งานที่ลงผลในช่วงนี้ · ไม่กรองตามวัน' : 'งานที่ลงผลในช่วงนี้'}>
             {data.staff ? <StaffTable staff={data.staff} ai={data.ai} /> : <SectionError message={data.errors.staff ?? 'อ่านผลงานรายคนไม่ได้'} />}
           </OverviewCard>
@@ -423,13 +416,7 @@ const RecruitOverview: React.FC<{
         {/* ─── นัดหมาย: นัด · มาไหม + คนแจ้งเข้ามาจากช่องทางไหน ─── */}
         <TabsContent value="appt" className="mt-3 space-y-3">
           {compareCard('appt')}
-          <OverviewCard icon={CalendarDays} title="นัดหมาย">
-            {apps ? (
-              <JourneyList {...journeyStepsOfTab(view.journey, 'appt')} onOpenPart={(title, ids) => setNames({ title, ids })} />
-            ) : (
-              <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>
-            )}
-          </OverviewCard>
+          {drillCard('appt', 'นัดหมาย')}
           {/* ช่องทางที่ได้คนลงงาน (เจ้าของ 19 ต.ค. 2569 — ทีม Online ดูว่าเด็กมาจากไหน ลงงานจากช่องทางไหนเยอะ) */}
           <OverviewCard icon={Megaphone} title="คนแจ้งเข้าในช่วงนี้ มาจากช่องทางไหน" sub={`นับตามวันแจ้งเข้า · ทุก BU${weekdays.length > 0 ? ' · ไม่กรองตามวัน' : ''}`}>
             {data.channelPlacement ? (

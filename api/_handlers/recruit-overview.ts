@@ -62,6 +62,7 @@ import type {
   RecruitOverviewResponse,
   RecruitRequestSummary,
   RecruitRequestDay,
+  RecruitRequestItem,
   RecruitStaffRow,
 } from '../../src/lib/recruitOverviewTypes.js';
 
@@ -310,6 +311,42 @@ export function toRequestSummary(rows: ReadonlyArray<{ releasedAt: string | null
     releasedNoApps: released.length - withApps.length,
     appsOnReleased: withApps.reduce((n, r) => n + r.applications, 0),
   };
+}
+
+/**
+ * ใบขอรายใบ + id ผู้สมัครของใบ — การ์ดกดลงลึกแท็บใบขอ (เจ้าของ 21 ต.ค. 2569 ไอเดีย "กดที่มีคนกรอกก็เห็นว่ามีชื่ออะไรบ้าง")
+ * ผู้สมัครไม่นับที่ยกเลิกข้อมูล (ฐานเดียวกับ `applications`) · อ่าน id ไม่ได้ = รายการว่าง (เลขยังอยู่)
+ */
+async function loadRequestList(
+  rows: ReadonlyArray<{ jobId: string | null; requestNo: string; unitName: string | null; position: string | null; day: string; releasedAt: string | null; applications: number }>,
+): Promise<RecruitRequestItem[]> {
+  const jobIds = rows.map((r) => r.jobId).filter((j): j is string => !!j);
+  const ids = new Map<string, string[]>();
+  if (jobIds.length > 0) {
+    try {
+      const { rows: apps } = await dbQuery<{ job_id: string; ids: string[] }>(
+        `select a.job_id, array_agg(a.id::text order by a.created_at desc) as ids
+           from ${APPS} a
+          where a.job_id = any($1::text[])
+            and not exists (select 1 from ${CANCELLATIONS} c where c.application_id = a.id)
+          group by a.job_id`,
+        [jobIds],
+      );
+      for (const r of apps) ids.set(r.job_id, r.ids ?? []);
+    } catch (e) {
+      logError('recruit-overview: requestList ids', e);
+    }
+  }
+  return rows.map((r) => ({
+    jobId: r.jobId,
+    requestNo: r.requestNo,
+    unitName: r.unitName,
+    position: r.position,
+    day: r.day,
+    released: !!r.releasedAt,
+    applications: r.applications,
+    appIds: (r.jobId && ids.get(r.jobId)) || [],
+  }));
 }
 
 /** ใบขอรายวัน (วันที่ใบเข้ามา) — กราฟรายวันของแท็บใบขอ (21 ต.ค. 2569) */
@@ -570,10 +607,12 @@ export async function buildRecruitOverview(
     body.requests = toRequestSummary(inRange(window.from, window.to));
     body.requestsPrev = toRequestSummary(inRange(window.prevFrom, window.prevTo));
     body.requestDays = toRequestDays(reqR.value);
+    body.requestList = await loadRequestList(inRange(window.from, window.to));
   } else {
     body.requests = null;
     body.requestsPrev = null;
     body.requestDays = null;
+    body.requestList = null;
     body.errors.requests = reqR.error;
   }
 
