@@ -131,7 +131,7 @@ describe('replanFollowSetWithLumos', () => {
       return { accepted: 1 };
     });
     pushReminders.mockImplementation(async (_rec: unknown, key: string) => {
-      order.push(`push:${key.split(':')[0]}`);
+      order.push(`push:${key.replace(/-g\d+$/, '')}`);
       return { results: [{ event_id: 'e' }] };
     });
     stub({ oldRefs: ['follow-old1', 'follow-old2'], members, queued: refs, pending: refs });

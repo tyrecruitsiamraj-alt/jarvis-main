@@ -1969,6 +1969,21 @@ export async function enqueueFollowReminder(
 }
 
 /**
+ * 🔴 **ส่งแผนซ้ำต้องใช้รหัสใหม่** (เจ้าของ 21 ต.ค. 2569 "แก้ที่เรา + ส่งรายชื่อ")
+ * ส่งซ้ำด้วย `client_contact_id` เดิม ⇒ DELETE ทีหลังไม่ได้ผล (4 วัน: โทรหลังยกเลิก 51/61 สาย · ส่งครั้งเดียว 1/45)
+ * รหัสใหม่ = `<รหัสแผน>-g<วินาที>` จดลง `lumos_client_id` (159) ให้ `cancelFollowPlanAtLumos` ยิงรหัสนี้
+ */
+export function followGenerationClientId(planRef: string, now = new Date()): string {
+  return `${planRef}-g${Math.floor(now.getTime() / 1000)}`;
+}
+
+/** รหัสที่ Lumos ส่งกลับ → รหัสแผนของเรา · ตัด `-r<n>` (รอบโทรซ้ำ) แล้วตัด `-g<เวลา>` (ส่งแผนซ้ำ) */
+export function followPlanRefOfClientId(clientId: string): string {
+  const noRetry = clientId.replace(/-r\d+$/, '');
+  return noRetry.startsWith('follow-') ? noRetry.replace(/-g\d+$/, '') : noRetry;
+}
+
+/**
  * แปลง payload ของคิวเป็น record สำหรับดันตรงไปหา Lumos (push mode)
  *
  * 🔴 ต้อง bump เวลาที่ผ่านมาแล้วก่อนส่งเสมอ — Lumos บังคับ scheduled_at เป็น
@@ -2088,6 +2103,23 @@ async function recordPushAck(followId: string, ack: unknown): Promise<void> {
         reason: e instanceof Error ? e.message : String(e),
       });
     }
+  }
+}
+
+/**
+ * จดรหัสที่จะส่งให้ Lumos ลงแถวหัวขบวน **ก่อน push** (159 · 21 ต.ค. 2569)
+ * ส่งไม่ผ่าน ตัวส่งซ้ำ (`followPushRetryWorker`) ใช้รหัสเดิมนี้ = Lumos ตัดซ้ำให้ · ยกเลิกยิงรหัสนี้
+ * โยน error เมื่อจดไม่ได้ — ห้ามส่งแผนที่เรายกเลิกไม่ได้ · ยังไม่ migrate = ข้าม (ยกเลิกใช้รหัสแถวแบบเดิม)
+ */
+async function rememberLumosClientId(followId: string, lumosClientId: string): Promise<void> {
+  try {
+    await dbQuery(
+      `update ${queueTable} set lumos_client_id = $2
+        where channel = 'reminder' and job_ref = 'follow' and person_ref = $1`,
+      [`follow-${followId}`, lumosClientId],
+    );
+  } catch (e) {
+    if (!isUndefinedColumnError(e)) throw e;
   }
 }
 
@@ -2464,9 +2496,11 @@ export async function resyncFollowPlanWithLumos(
   // ③ ส่งใหม่ทั้งแผน — คีย์ต้องใหม่ ไม่งั้นโดนกันซ้ำแล้วของใหม่ไม่เข้า
   let pushed = false;
   try {
+    const lumosClientId = followGenerationClientId(newPlanRef);
+    await rememberLumosClientId(leader.id, lumosClientId);
     const ack = await pushReminders(
-      buildFollowPushRecord(planPayload),
-      `${newPlanRef}:v${Math.floor(Date.now() / 1000)}`,
+      buildFollowPushRecord({ ...planPayload, client_contact_id: lumosClientId }),
+      lumosClientId,
     );
     await recordPushAck(leader.id, ack);
     await markFollowDispatchState(leader.id, 'queued', 'push_failed');
@@ -2785,9 +2819,11 @@ export async function replanFollowSetWithLumos(input: {
       if (!isUndefinedColumnError(e)) throw e;
     }
     try {
+      const lumosClientId = followGenerationClientId(planRef);
+      await rememberLumosClientId(leader.id, lumosClientId);
       const ack = await pushReminders(
-        buildFollowPushRecord(planPayload),
-        `${planRef}:v${Math.floor(Date.now() / 1000)}`,
+        buildFollowPushRecord({ ...planPayload, client_contact_id: lumosClientId }),
+        lumosClientId,
       );
       await recordPushAck(leader.id, ack);
       await markFollowDispatchState(leader.id, 'queued', 'push_failed');
@@ -3222,6 +3258,10 @@ export async function applyLumosResult(
       returning id`;
   const params = [channel, clientId, status, JSON.stringify(result ?? null)];
   let rows: Array<{ id: number }> = [];
+  // แผนที่ส่งซ้ำมีรหัส `-g<เวลา>` ต่อท้าย (21 ต.ค. 2569) — จับแถวด้วยรหัสแผนของเรา
+  // รอบโทรซ้ำ (`-r<n>`) เป็นแผนสายเดียวของแถวนั้น ห้ามจับด้วย step ของแผนหัวขบวน — ไปทางเดิมด้านล่าง
+  const baseKey = channel === 'reminder' ? followPlanRefOfClientId(clientId) : clientId;
+  const planKey = channel === 'reminder' && /-r\d+$/.test(clientId) ? clientId : baseKey;
 
   if (stepPosition !== null) {
     const planSql = (withStamps: boolean) =>
@@ -3230,12 +3270,12 @@ export async function applyLumosResult(
         'where channel = $1 and plan_ref = $2 and step_position = $5',
       )}`;
     try {
-      ({ rows } = await dbQuery<{ id: number }>(planSql(true), [...params, stepPosition]));
+      ({ rows } = await dbQuery<{ id: number }>(planSql(true), [channel, planKey, status, params[3], stepPosition]));
     } catch (e) {
       // ไม่มีคอลัมน์ (ยังไม่ migrate 117) หรือไม่มี stamp 088 — ถอยไปทางเดิมทั้งคู่
       if (!isUndefinedColumnError(e)) throw e;
       try {
-        ({ rows } = await dbQuery<{ id: number }>(planSql(false), [...params, stepPosition]));
+        ({ rows } = await dbQuery<{ id: number }>(planSql(false), [channel, planKey, status, params[3], stepPosition]));
       } catch (e2) {
         if (!isUndefinedColumnError(e2)) throw e2;
         rows = [];
@@ -3264,7 +3304,7 @@ export async function applyLumosResult(
    * 🔴 รอบโทรซ้ำของช่อง reminder ส่งไปด้วย `client_contact_id` ต่อท้าย `-r<ครั้งที่>` (29 ก.ย. 2569 ·
    * `lumosPushRetryWorker`) ให้ Lumos นับเป็นงานใหม่ ไม่ไปทับแผนเดิมของคนนั้น ⇒ ผลที่กลับมาต้องถอยไปจับรหัสเดิมของแถว
    */
-  const baseId = channel === 'reminder' ? clientId.replace(/-r\d+$/, '') : clientId;
+  const baseId = baseKey;
   if (rows.length === 0 && baseId !== clientId) rows = await applyById(baseId);
   if (rows.length === 0) return false;
   await runFollowupForResult(rows[0].id, result, outcomeForFollowup);

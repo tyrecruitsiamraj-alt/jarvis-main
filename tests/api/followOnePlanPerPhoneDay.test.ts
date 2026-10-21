@@ -214,7 +214,7 @@ describe('enqueueFollowReminder — สร้างสายใหม่ที�
     // ไม่มีการส่งแผนของสายใหม่แยก (คีย์ follow-n เปล่า ๆ) — ส่งแผนรวมที่หัวขบวน 07:00
     const keys = pushReminders.mock.calls.map((c) => String(c[1]));
     expect(keys.some((k) => k === 'follow-n')).toBe(false);
-    expect(keys[0].startsWith('follow-a:v')).toBe(true);
+    expect(keys[0]).toMatch(/^follow-a-g\d+$/);
     expect(pushedRecords()[0].steps).toHaveLength(2);
   });
 

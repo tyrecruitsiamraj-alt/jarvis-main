@@ -163,7 +163,10 @@ describe('สายไฟ — ทุกทางที่ส่งใบสม�
     const d = code('api/_lib/lumosDispatch.ts');
     const fn = d.slice(d.indexOf('export async function applyLumosResult'));
     const body = fn.slice(0, fn.indexOf('\nfunction '));
-    expect(body).toContain("channel === 'reminder' ? clientId.replace(/-r\\d+$/, '') : clientId");
+    // 21 ต.ค. 2569: ตัด -r แล้ว -g (แผนส่งซ้ำ) ด้วยตัวเดียว `followPlanRefOfClientId` — -r ยังตัดก่อน
+    expect(body).toContain("const baseKey = channel === 'reminder' ? followPlanRefOfClientId(clientId) : clientId;");
+    expect(body).toContain('const baseId = baseKey;');
+    expect(d).toContain("const noRetry = clientId.replace(/-r\\d+$/, '');");
     expect(body).toContain('if (rows.length === 0 && baseId !== clientId) rows = await applyById(baseId)');
   });
 

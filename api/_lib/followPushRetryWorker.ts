@@ -34,6 +34,7 @@ import { repairDeclinedFollowDays } from './followDeclineDayRepair.js';
 import { isAutoDispatchEnabled } from './lumosDispatchMode.js';
 import { alertFollowAtRiskDigest, alertFollowLeaveMismatch, alertOverdueAiFollow, checkFollowPlanImports } from './followLumosWatch.js';
 import { resendFollowCancels } from './followCancelResend.js';
+import { lumosClientIdOfPlan } from './followLumosCancel.js';
 import { mergeSplitFollowPlans } from './followPlanMerge.js';
 import {
   readFollowPushRetryConfig,
@@ -221,7 +222,12 @@ export async function runFollowPushRetryOnce(
     }
 
     try {
-      await pushReminders(buildFollowPushRecord(row.payload, now), `follow-${row.id}`);
+      // แผนที่ส่งซ้ำมีรหัสของตัวเอง (`-g<เวลา>` · 159) — ส่งด้วยรหัสนั้น Lumos จึงตัดซ้ำได้ และยกเลิกตรงแผน
+      const lumosClientId = await lumosClientIdOfPlan(`follow-${row.id}`);
+      await pushReminders(
+        buildFollowPushRecord({ ...row.payload, client_contact_id: lumosClientId }, now),
+        lumosClientId,
+      );
       // แผนนี้วิ่งอยู่ที่ Lumos อีกครั้ง — ล้างเครื่องหมาย "จบแล้ว" (141 · 9 ต.ค. 2569) ไม่งั้นยกเลิกครั้งหน้าจะถูกข้าม
       await dbQuery(
         `update ${queueTable} set lumos_plan_closed_at = null

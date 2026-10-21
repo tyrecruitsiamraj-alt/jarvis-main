@@ -99,7 +99,29 @@ export async function markFollowPlansClosed(refs: readonly string[]): Promise<vo
 }
 
 /**
- * ยกเลิกแผนติดตามที่ Lumos (รหัสแผน = รหัสหัวขบวน) — แผนที่จบแล้วไม่ส่ง · 404 = ไม่มีของค้าง (ถือว่าสำเร็จ)
+ * รหัสที่ Lumos ถือแผนนี้อยู่จริง — แผนที่ส่งซ้ำใช้ `<ref>-g<เวลา>` (159 · 21 ต.ค. 2569) · ไม่มี/อ่านไม่ได้ = รหัสแผนเดิม
+ */
+export async function lumosClientIdOfPlan(ref: string): Promise<string> {
+  try {
+    const { rows } = await dbQuery<{ lumos_client_id: string | null }>(
+      `select lumos_client_id from ${queueTable}
+        where channel = 'reminder' and job_ref = 'follow' and person_ref = $1
+          and lumos_client_id is not null
+        limit 1`,
+      [ref],
+    );
+    const id = rows[0]?.lumos_client_id?.trim();
+    return id && id.startsWith(`${ref}-g`) ? id : ref;
+  } catch (e) {
+    if (!isUndefinedColumn(e)) {
+      logWarn('lumos.follow.cancel: อ่านรหัสแผนที่ Lumos ไม่ได้ — ใช้รหัสแผนเดิม', { ref, reason: e instanceof Error ? e.message : String(e) });
+    }
+    return ref;
+  }
+}
+
+/**
+ * ยกเลิกแผนติดตามที่ Lumos (รหัสแผน = รหัสหัวขบวน · ส่งซ้ำแล้ว = รหัส `-g<เวลา>` ที่จดไว้) — แผนที่จบแล้วไม่ส่ง · 404 = ไม่มีของค้าง (ถือว่าสำเร็จ)
  * error อื่นโยนต่อ (ผู้เรียกตัดสินว่าจะส่งแผนใหม่ต่อไหม)
  */
 export async function cancelFollowPlanAtLumos(ref: string): Promise<FollowPlanCancelOutcome> {
@@ -109,7 +131,7 @@ export async function cancelFollowPlanAtLumos(ref: string): Promise<FollowPlanCa
   }
   let outcome: FollowPlanCancelOutcome = 'cancelled';
   try {
-    await cancelPushedReminder(ref);
+    await cancelPushedReminder(await lumosClientIdOfPlan(ref));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!/404|not found/i.test(msg)) throw e;

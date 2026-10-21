@@ -143,7 +143,18 @@ describe('resyncFollowPlanWithLumos', () => {
     await resyncFollowPlanWithLumos('r1', staffName);
     const key = pushReminders.mock.calls[0][1] as string;
     expect(key).not.toBe('follow-r1');
-    expect(key.startsWith('follow-r1:v')).toBe(true);
+    expect(key).toMatch(/^follow-r1-g\d+$/);
+  });
+
+  it('🔴 ส่งแผนซ้ำใช้ client_contact_id ใหม่ (= คีย์) และจดลง lumos_client_id ก่อน push (21 ต.ค. 2569)', async () => {
+    stubPlan(members);
+    await resyncFollowPlanWithLumos('r1', staffName);
+    const key = pushReminders.mock.calls[0][1] as string;
+    const sent = JSON.stringify(pushReminders.mock.calls[0][0]);
+    expect(sent).toContain(`"client_contact_id":"${key}"`);
+    const remember = dbQuery.mock.calls.findIndex((c) => /set lumos_client_id = \$2/.test(String(c[0])));
+    expect(remember).toBeGreaterThan(-1);
+    expect(dbQuery.mock.calls[remember][1]).toEqual(['follow-r1', key]);
   });
 
   it('ไม่มีรอบที่ยังส่งได้ ⇒ ไม่แตะ Lumos เลย และบอกเหตุผล', async () => {
