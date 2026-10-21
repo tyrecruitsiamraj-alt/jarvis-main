@@ -95,7 +95,7 @@ const AddApplicantDialog: React.FC<{
   const [channel, setChannel] = useState<RecruitChannelMatch | null>(null);
   const [licenses, setLicenses] = useState<string[]>([]);
 
-  const [staff, setStaff] = useState<Array<{ id: string; name: string }>>([]);
+  const [staff, setStaff] = useState<Array<{ id: string; name: string; label?: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -120,7 +120,8 @@ const AddApplicantDialog: React.FC<{
     setError(null);
     setSaving(false);
     // 🔴 ห้ามกลับไปใช้ /api/app-users (admin เท่านั้น — คนอื่นได้ลิสต์ว่าง · 11 ต.ค. 2569)
-    void fetchResponsibleNames()
+    // ผู้รับผิดชอบ = ชื่อเล่นของสายงานสรรหา (เจ้าของ 21 ต.ค. 2569 "เป็นชื่อเล่นของสรรหาดิ่") · เก็บชื่อเต็มเหมือนเดิม
+    void fetchResponsibleNames('recruiter')
       .then(setStaff)
       .catch(() => setStaff([]));
     // ใบขอที่เปิดอยู่ (สิทธิ์ BU ตามบัญชี) — ชุดเดียวกับช่อง "ลงหน่วยงาน" ของนัด
@@ -309,7 +310,7 @@ const AddApplicantDialog: React.FC<{
                 ariaLabel="ผู้รับผิดชอบ"
                 value={responsible}
                 onChange={setResponsible}
-                options={[{ value: '', label: 'ไม่ระบุ' }, ...staff.map((u) => ({ value: u.id, label: u.name }))]}
+                options={[{ value: '', label: 'ไม่ระบุ' }, ...staff.map((u) => ({ value: u.id, label: u.label ?? u.name }))]}
               />
             </div>
             <div className="space-y-1.5 sm:col-span-2">

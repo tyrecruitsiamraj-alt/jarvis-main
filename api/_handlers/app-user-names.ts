@@ -7,6 +7,8 @@
  * ส่งแค่ `{ id, name }` (ไม่มีอีเมล/สิทธิ์/เบอร์) · ทุก role ที่ล็อกอินอ่านได้ (rbac `app-user-names`)
  * คนล็อก BU เห็นคนในแผนกเดียวกัน + คนที่ไม่ผูกแผนก (แอดมิน) · ล็อกแต่ไม่รู้แผนก = ลิสต์ว่าง
  * `name` = `full_name` ค่าเดียวกับที่ป๊อปเดิมเก็บลง `responsible_name` (ห้ามเปลี่ยนเป็นชื่อเล่น — ตัวกรองเทียบชื่อนี้)
+ * `?lane=recruiter` (21 ต.ค. 2569 เจ้าของ "เป็นชื่อเล่นของสรรหาดิ่" — ฟอร์มเพิ่มผู้สมัคร) = เฉพาะสายงานนั้นที่ตั้งชื่อเล่นแล้ว
+ *   + `label` = ชื่อเล่น (โชว์บนจอ) · `name` ยังเป็นชื่อเต็ม (ค่าที่เก็บ)
  */
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { dbQuery } from '../_lib/postgres.js';
@@ -28,10 +30,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
     let where = `is_active and coalesce(trim(full_name), '') <> ''`;
     if (scope.mode === 'code') {
       params.push(scope.code);
-      where += ` and (upper(trim(department_code)) = $1 or department_code is null)`;
+      where += ` and (upper(trim(department_code)) = $${params.length} or department_code is null)`;
     }
-    const { rows } = await dbQuery<{ id: string; name: string }>(
-      `select id, trim(full_name) as name from ${usersTable} where ${where} order by trim(full_name) asc`,
+    const lane = typeof req.query?.lane === 'string' ? req.query.lane.trim() : '';
+    if (lane && /^[a-z_]{1,32}$/.test(lane)) {
+      params.push(lane);
+      where += ` and $${params.length} = any(coalesce(job_lanes, '{}'::text[])) and coalesce(trim(nickname), '') <> ''`;
+    }
+    const { rows } = await dbQuery<{ id: string; name: string; label: string | null }>(
+      `select id, trim(full_name) as name, nullif(trim(nickname), '') as label
+         from ${usersTable} where ${where}
+        order by ${lane ? 'trim(nickname)' : 'trim(full_name)'} asc`,
       params,
     );
     return res.status(200).json({ users: rows });

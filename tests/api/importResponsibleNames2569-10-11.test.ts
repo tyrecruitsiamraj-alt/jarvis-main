@@ -83,7 +83,8 @@ describe('/api/app-user-names', () => {
     for (const f of ['ImportApplicantsDialog.tsx', 'AddApplicantDialog.tsx']) {
       const src = readFileSync(`src/components/recruit-rm/${f}`, 'utf8');
       expect(src).not.toMatch(/apiFetch\('\/api\/app-users/);
-      expect(src).toMatch(/fetchResponsibleNames\(\)/);
+      // ฟอร์มเพิ่มผู้สมัครขอเฉพาะสายงานสรรหา (21 ต.ค. 2569) — ยังเป็นเส้นเดียวกัน ไม่กลับไป /api/app-users
+      expect(src).toMatch(/fetchResponsibleNames\(('recruiter')?\)/);
     }
   });
 });

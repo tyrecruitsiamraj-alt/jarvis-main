@@ -68,3 +68,18 @@ describe('ส่ง AI / ไม่ส่ง', () => {
     expect(form).toContain('job_id: picked?.id ?? fromProp?.id ?? null,');
   });
 });
+
+describe('ผู้รับผิดชอบ = ชื่อเล่นสายงานสรรหา (21 ต.ค. 2569 "เป็นชื่อเล่นของสรรหาดิ่")', () => {
+  it('ฟอร์มขอรายชื่อสายงาน recruiter แล้วโชว์ชื่อเล่น · เก็บชื่อเต็มเหมือนเดิม', () => {
+    const form = read('src/components/recruit-rm/AddApplicantDialog.tsx');
+    expect(form).toContain("fetchResponsibleNames('recruiter')");
+    expect(form).toContain('label: u.label ?? u.name');
+    expect(form).toContain('responsible_name: staff.find((u) => u.id === responsible)?.name ?? null,');
+  });
+
+  it('API กรองสายงาน + ต้องมีชื่อเล่น · ค่า lane ผ่านพารามิเตอร์ ไม่ต่อสตริง', () => {
+    const api = read('api/_handlers/app-user-names.ts');
+    expect(api).toContain("= any(coalesce(job_lanes, '{}'::text[])) and coalesce(trim(nickname), '') <> ''");
+    expect(api).toContain('/^[a-z_]{1,32}$/.test(lane)');
+  });
+});

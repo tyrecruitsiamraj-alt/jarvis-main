@@ -61,14 +61,16 @@ export function parseAppUserList(value: unknown): User[] {
  * `/api/app-user-names` → ชื่อให้ช่อง "ผู้รับผิดชอบ" (11 ต.ค. 2569) — ทุก role อ่านได้ · ไม่มีอีเมล
  * แถวที่ไม่มี id/ชื่อทิ้งเงียบ ๆ · รูปผิดทั้งก้อน = ลิสต์ว่าง
  */
-export function parseResponsibleNames(value: unknown): Array<{ id: string; name: string }> {
+export function parseResponsibleNames(value: unknown): Array<{ id: string; name: string; label?: string }> {
   const list = isRecord(value) && Array.isArray(value.users) ? value.users : [];
-  const out: Array<{ id: string; name: string }> = [];
+  const out: Array<{ id: string; name: string; label?: string }> = [];
   for (const u of list) {
     if (!isRecord(u)) continue;
     const id = typeof u.id === 'string' ? u.id : '';
     const name = typeof u.name === 'string' ? u.name.trim() : '';
-    if (id && name) out.push({ id, name });
+    // ชื่อเล่น (ขอแบบ ?lane= · 21 ต.ค. 2569) — โชว์บนจอ ค่าที่เก็บยังเป็นชื่อเต็ม
+    const label = typeof u.label === 'string' && u.label.trim() ? u.label.trim() : undefined;
+    if (id && name) out.push(label ? { id, name, label } : { id, name });
   }
   return out;
 }

@@ -34,8 +34,9 @@ async function readError(r: Response, fallback: string): Promise<string> {
  * ชื่อให้ช่อง "ผู้รับผิดชอบ" (ป๊อปนำเข้า Excel + เพิ่มข้อมูลผู้สมัคร) — 11 ต.ค. 2569
  * 🔴 ห้ามกลับไปใช้ `/api/app-users` — เส้นนั้นเปิดเฉพาะ admin คนอื่นได้ลิสต์ว่าง ปุ่มนำเข้ากดไม่ได้ตลอด
  */
-export async function fetchResponsibleNames(): Promise<Array<{ id: string; name: string }>> {
-  const r = await apiFetch('/api/app-user-names');
+/** `lane` = เฉพาะสายงานนั้น + ชื่อเล่น (`label`) — ฟอร์มเพิ่มผู้สมัครใช้ 'recruiter' (21 ต.ค. 2569) */
+export async function fetchResponsibleNames(lane?: string): Promise<Array<{ id: string; name: string; label?: string }>> {
+  const r = await apiFetch(lane ? `/api/app-user-names?lane=${encodeURIComponent(lane)}` : '/api/app-user-names');
   if (!r.ok) throw new Error(await readError(r, 'โหลดรายชื่อผู้รับผิดชอบไม่สำเร็จ'));
   return parseResponsibleNames(await r.json());
 }
