@@ -16,6 +16,8 @@ import {
   isApplicationDispatchRetryEnabled,
   runApplicationDispatchRetryOnce,
   unsentApplicationsSql,
+  unsentUnlinkedApplicationsSql,
+  UNLINKED_GREET_SINCE,
   KEYED_AUTO_SINCE,
 } from '../../api/_lib/applicationDispatchRetry';
 
@@ -54,6 +56,19 @@ describe('ตัวลองส่งใบสมัครเข้า AI ซ้
     const sql = unsentApplicationsSql();
     expect(sql).toContain("a.created_by_name <> 'iRecruit' and a.created_at >= $2::timestamptz");
     expect(KEYED_AUTO_SINCE).toBe('2026-10-20T10:00:00+07:00');
+  });
+
+  it('ไม่ผูกใบขอ = AI โทรบททักทายทั่วไป (เจ้าของ 21 ต.ค. 2569) · ด่านเดิมครบ · iRecruit ไม่หยิบ · ใบเก่าไม่โทรเงียบ', () => {
+    const sql = unsentUnlinkedApplicationsSql();
+    expect(sql).toContain("a.job_id is null and a.created_at >= $2::timestamptz and coalesce(a.created_by_name, '') <> 'iRecruit'");
+    expect(sql).toContain('a.province');
+    for (const guard of ['a.claimed_by is null', 'coalesce(a.is_lead, false) = false', 'application_cancellations', 'application_irecruit_dups', "q.person_ref = 'app-' || a.id::text"]) {
+      expect(sql).toContain(guard);
+    }
+    expect(UNLINKED_GREET_SINCE).toBe(KEYED_AUTO_SINCE);
+    const src = readFileSync('api/_lib/applicationDispatchRetry.ts', 'utf8');
+    expect(src).toContain('await enqueueLumosGreetingForApplications(send, { autoPush: true });');
+    expect(src).toContain('const { send, dups } = await splitIrecruitDuplicates(unlinked);');
   });
 
   it('🔴 ใบที่หลุดก่อนแก้ (17 ใบ) ไม่ถูกหยิบ — เจ้าของยังไม่สั่งส่ง', () => {

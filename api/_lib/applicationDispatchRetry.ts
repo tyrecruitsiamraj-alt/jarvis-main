@@ -19,7 +19,7 @@
  */
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
-import { enqueueLumosInterviewForApplications } from './lumosDispatch.js';
+import { enqueueLumosGreetingForApplications, enqueueLumosInterviewForApplications } from './lumosDispatch.js';
 import { listSiamrajUnitRequests } from './siamrajUnitRequests.js';
 import { splitIrecruitDuplicates } from './irecruitDuplicates.js';
 import { getLumosPushConfig } from './lumosPushClient.js';
@@ -60,13 +60,31 @@ export type RetryRow = {
   created_by_name: string | null;
 };
 
+/**
+ * ใบที่ไม่ผูกใบขอ ⇒ AI โทรบททักทายทั่วไป (`greet` — ยังหางานไหม → งานที่เคยสนใจ → จังหวัดเดิมไหม → อายุ) แล้วคนจับคู่ทีหลัง
+ * (เจ้าของ 21 ต.ค. 2569: *"ให้ AI โทรคนที่ไม่ผูกใบขอได้ด้วย (ถามว่ายังหางานอยู่ไหม แล้วค่อยจับคู่)"* — เดิมไม่ส่งเลย
+ * วัดจริง 20 ต.ค.: 22 จาก 44 คนที่ AI ไม่โทร เป็นใบคีย์ไม่เลือกใบขอ) · ด่านเดียวกับใบผูกใบขอทุกข้อ · ใบดึงจาก iRecruit ยังให้คนโทร
+ */
+export const UNLINKED_GREET_SINCE = KEYED_AUTO_SINCE;
+
+export type UnlinkedRow = Omit<RetryRow, 'job_id'> & { job_id: null; province: string | null };
+
 /** ใบที่ควรถูกส่งตอนกรอกแต่ยังไม่มีสาย — แยกออกมาให้เทสต์/ตรวจแบบอ่านอย่างเดียวได้ · $1 = RETRY_SINCE · $2 = KEYED_AUTO_SINCE */
 export function unsentApplicationsSql(): string {
+  return unsentSql(true);
+}
+
+/** ใบที่ไม่ผูกใบขอ (ส่งบททักทายทั่วไป) · $1 = RETRY_SINCE · $2 = UNLINKED_GREET_SINCE — ใบคีย์/นำเข้า/กรอกเองก่อนเวลานี้ไม่ถูกโทรเงียบ ๆ */
+export function unsentUnlinkedApplicationsSql(): string {
+  return unsentSql(false);
+}
+
+function unsentSql(linked: boolean): string {
   return `
     select a.id::text as id, a.full_name, a.phone, a.job_id, a.job_title, a.unit_name, a.position_interest, a.age, a.created_at,
-           a.created_by_name
+           a.created_by_name${linked ? '' : ', a.province'}
     from ${APPS} a
-    where a.job_id is not null
+    where ${linked ? 'a.job_id is not null' : "a.job_id is null and a.created_at >= $2::timestamptz and coalesce(a.created_by_name, '') <> '" + IRECRUIT_PULL_CREATED_BY + "'"}
       and (a.created_by_name is null
            or (a.created_by_name <> '${IRECRUIT_PULL_CREATED_BY}' and a.created_at >= $2::timestamptz))
       and a.phone is not null
@@ -90,7 +108,7 @@ export function isApplicationDispatchRetryEnabled(): boolean {
   return isAutoDispatchEnabled() && getLumosPushConfig() !== null;
 }
 
-export type DispatchRetryRun = { found: number; queued: number; skipped: number; reasons: Record<string, number> };
+export type DispatchRetryRun = { found: number; queued: number; skipped: number; reasons: Record<string, number>; greeted?: number };
 
 export async function runApplicationDispatchRetryOnce(): Promise<DispatchRetryRun> {
   const out: DispatchRetryRun = { found: 0, queued: 0, skipped: 0, reasons: {} };
@@ -124,6 +142,24 @@ export async function runApplicationDispatchRetryOnce(): Promise<DispatchRetryRu
       out.reasons['ส่งล้ม'] = (out.reasons['ส่งล้ม'] ?? 0) + apps.length;
       logError('applicationDispatchRetry.job_failed', e, { jobId, count: apps.length });
     }
+  }
+  // ไม่ผูกใบขอ ⇒ บททักทายทั่วไป (21 ต.ค. 2569) — ซ้ำ iRecruit ใน 14 วันยังไม่ส่งเอง (กติกาเดียวกัน)
+  try {
+    const { rows: unlinked } = await dbQuery<UnlinkedRow>(unsentUnlinkedApplicationsSql(), [RETRY_SINCE, UNLINKED_GREET_SINCE]);
+    if (unlinked.length > 0) {
+      out.found += unlinked.length;
+      const { send, dups } = await splitIrecruitDuplicates(unlinked);
+      if (dups.length > 0) out.reasons['ซ้ำ iRecruit'] = (out.reasons['ซ้ำ iRecruit'] ?? 0) + dups.length;
+      if (send.length > 0) {
+        const res = await enqueueLumosGreetingForApplications(send, { autoPush: true });
+        out.queued += res.queued;
+        for (const s of res.skipped) out.reasons[s.reason] = (out.reasons[s.reason] ?? 0) + 1;
+        out.greeted = res.queued;
+      }
+    }
+  } catch (e) {
+    out.reasons['ส่งบททักทายล้ม'] = (out.reasons['ส่งบททักทายล้ม'] ?? 0) + 1;
+    logError('applicationDispatchRetry.greet_failed', e);
   }
   out.skipped = out.found - out.queued;
   logInfo('applicationDispatchRetry.run', out);
