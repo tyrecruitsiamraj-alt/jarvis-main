@@ -56,7 +56,7 @@ describe('ส่ง AI / ไม่ส่ง', () => {
 
   it('ฟอร์มต้องเลือกก่อนบันทึก · มี 2 ตัวเลือก', () => {
     expect(form).toContain("if (!callMode) return setError('เลือกว่าจะส่ง AI โทร หรือเก็บไปโทรเอง');");
-    expect(form).toContain('<ToggleGroupItem value="ai">ส่ง AI โทร</ToggleGroupItem>');
+    expect(form).toContain("<ToggleGroupItem value=\"ai\">{jobPick === NO_JOB ? 'ส่ง AI โทรเบื้องต้น' : 'ส่ง AI โทร'}</ToggleGroupItem>");
     expect(form).toContain('<ToggleGroupItem value="manual">ไม่ส่ง · เก็บไปโทรเอง</ToggleGroupItem>');
     expect(form).toContain('call_mode: callMode,');
   });

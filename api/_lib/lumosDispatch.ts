@@ -16,6 +16,8 @@
  *
  * ทุก enqueue กันซ้ำด้วย unique (channel, job_ref, person_ref) — คนเดิมในใบเดิมส่งครั้งเดียว
  */
+import { fillApplicationFromIntroCall } from './introCallFill.js';
+import { isStaffKeyedApplication } from '../../src/lib/greetingCall.js';
 import { KEEP_PUSH_FAILED_SQL } from '../../src/lib/followDispatchState.js';
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { isOverAge, OVER_AGE_REASON } from '../../src/lib/applicantAge.js';
@@ -61,6 +63,7 @@ import {
   buildApplyQuestions,
   buildAppliedQuestions,
   buildGreetingQuestions,
+  buildIntroQuestions,
   buildScreeningQuestions,
   type EditableScriptKey,
 } from './lumosCallScript.js';
@@ -467,7 +470,14 @@ export async function enqueueLumosInterviewForApplications(
 export { GREETING_JOB_REF };
 
 export function buildGreetingPayload(
-  app: { id: string; full_name: string; phone: string | null; position_interest?: string | null; province?: string | null },
+  app: {
+    id: string;
+    full_name: string;
+    phone: string | null;
+    position_interest?: string | null;
+    province?: string | null;
+    created_by_name?: string | null;
+  },
   now = new Date(),
 ): LumosInterviewPayload | null {
   const phone = toE164Thai(app.phone);
@@ -479,11 +489,13 @@ export function buildGreetingPayload(
     phone,
     position: speechText(app.position_interest || '') || 'งานที่เปิดรับ',
     scheduled_at: now.toISOString(),
-    questions: buildGreetingQuestions({
-      candidateName: app.full_name,
-      positionInterest: app.position_interest,
-      province: app.province,
-    }),
+    questions: isStaffKeyedApplication(app.created_by_name)
+      ? buildIntroQuestions({ candidateName: app.full_name })
+      : buildGreetingQuestions({
+          candidateName: app.full_name,
+          positionInterest: app.position_interest,
+          province: app.province,
+        }),
     type: 'phone',
     language: 'th',
     tone: 'professional',
@@ -502,6 +514,7 @@ export async function enqueueLumosGreetingForApplications(
     position_interest?: string | null;
     province?: string | null;
     age?: number | null;
+    created_by_name?: string | null;
   }>,
   opts?: { autoPush?: boolean },
 ): Promise<LumosDispatchOutcome> {
@@ -3328,6 +3341,8 @@ async function runFollowupForResult(
   result: unknown,
   outcomeForFollowup?: string | null,
 ): Promise<void> {
+  // สายโทรเบื้องต้น (ใบเพิ่มเอง ไม่ผูกหน่วยงาน · 21 ต.ค. 2569) — เติมอายุ/จังหวัดลงใบเฉพาะช่องที่ว่าง · กลืน error เอง
+  await fillApplicationFromIntroCall(queueId);
   const outcome = outcomeForFollowup ?? readOutcome(result);
   if (!outcome) return;
   try {

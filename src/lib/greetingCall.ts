@@ -11,6 +11,16 @@ import { THAI_PROVINCE_NAMES, canonProvinceName } from './thaiProvinces';
 /** job_ref ของสายทักทาย — ไม่ใช่ใบขอ (แพตเทิร์นเดียวกับ `'follow'`) */
 export const GREETING_JOB_REF = 'greet';
 
+/**
+ * ใบที่เจ้าหน้าที่คีย์/นำเข้าเอง (ไม่ใช่กรอกผ่านลิงก์ ไม่ใช่ดึงจาก iRecruit) — ไม่ผูกใบขอ ⇒ บท "โทรเบื้องต้น" (`intro`)
+ * (เจ้าของ 21 ต.ค. 2569 "ยืนยันว่ามีตัวตนไม่ใช่กรอกมาเล่น") · ที่เหลือใช้บททักทายทั่วไปเดิม
+ * 'iRecruit' = ชื่อผู้บันทึกของรายชื่อที่ดึงมา (ค่าเดียวกับ IRECRUIT_PULL_CREATED_BY ใน recruitRm.ts)
+ */
+export function isStaffKeyedApplication(createdByName: string | null | undefined): boolean {
+  const by = (createdByName ?? '').trim();
+  return by !== '' && by !== 'iRecruit';
+}
+
 export type GreetingHeard = {
   /** จังหวัดที่บอก AI (ชื่อทางการ) */
   province: string | null;

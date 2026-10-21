@@ -350,7 +350,8 @@ const AddApplicantDialog: React.FC<{
               aria-label="โทรหาผู้สมัคร"
               className="flex-wrap justify-start"
             >
-              <ToggleGroupItem value="ai">ส่ง AI โทร</ToggleGroupItem>
+              {/* ไม่ผูกหน่วยงาน = บทโทรเบื้องต้น (ยืนยันตัวตน · ยังหางานไหม · จังหวัด · อายุ — 21 ต.ค. 2569) */}
+              <ToggleGroupItem value="ai">{jobPick === NO_JOB ? 'ส่ง AI โทรเบื้องต้น' : 'ส่ง AI โทร'}</ToggleGroupItem>
               <ToggleGroupItem value="manual">ไม่ส่ง · เก็บไปโทรเอง</ToggleGroupItem>
             </ToggleGroup>
           </div>

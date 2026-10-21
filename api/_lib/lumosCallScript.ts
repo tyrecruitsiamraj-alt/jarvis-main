@@ -64,6 +64,7 @@ export type EditableScriptKey =
   | 'apply'
   | 'applied'
   | 'greet'
+  | 'intro'
   | 'follow'
   | 'follow_repeat'
   | 'replace_confirm'
@@ -76,6 +77,7 @@ export const EDITABLE_SCRIPT_DEFAULTS: Record<EditableScriptKey, readonly string
   apply: T.สมัครผ่านลิงก์,
   applied: T.ผู้สมัครคีย์เอง,
   greet: T.ทักทายทั่วไป,
+  intro: T.โทรเบื้องต้น,
   follow: T.ติดตาม,
   follow_repeat: T.ติดตามรอบถัดไป,
   replace_confirm: T.ส่งคนแทนคอนเฟิร์ม,
@@ -407,6 +409,14 @@ export function speakableProvince(raw?: string | null): string | undefined {
   const p = clean(raw).replace(/^จังหวัด/u, '').trim();
   if (!p) return undefined;
   return /^(กรุงเทพ|กทม)/u.test(p) ? 'กรุงเทพ' : `จังหวัด${p}`;
+}
+
+/** บทโทรเบื้องต้น — ใบที่เจ้าหน้าที่เพิ่มเองไม่ผูกหน่วยงาน (21 ต.ค. 2569) · ยืนยันตัวตน + ยังหางาน + จังหวัด + อายุ */
+export function buildIntroQuestions(f: Pick<GreetingScriptFacts, 'candidateName'>): string[] {
+  return renderLines(activeScriptLines('intro'), {
+    ผู้โทร: CALLER_ORG,
+    ชื่อผู้รับ: polite(f.candidateName),
+  });
 }
 
 /** บททักทายทั่วไป — คนที่ยังไม่รู้ใบขอ (ข้อมูลไหนไม่มี ถามเปล่าแทน) */

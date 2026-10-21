@@ -38,6 +38,7 @@ export const EDITABLE_SCRIPT_KEYS: readonly EditableScriptKey[] = [
   'apply',
   'applied',
   'greet',
+  'intro',
   'follow',
   'follow_repeat',
   'replace_confirm',
