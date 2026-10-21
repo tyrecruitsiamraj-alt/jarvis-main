@@ -1177,7 +1177,26 @@ async function getApplicationDetailExtras(req: AuthedReq, res: ApiRes, id: strin
     }));
   });
 
-  return res.status(200).json({ history, aiCalls, staffCalls });
+  /**
+   * ทุกครั้งที่กดปุ่มโทร (`application.dial` ใน audit_logs — จดพร้อมบัญชีคนกดตั้งแต่ 095)
+   * เจ้าของ 21 ต.ค. 2569: *"หน้าการติดต่อเวลากดปุ่มโทร ก็ต้องมีบอกแบบนี้เหมือนกัน"* (iRecruit "โทรหาผู้สมัครโดย …")
+   * ชื่อ = ชื่อเล่นจากหน้าผู้ใช้งาน → ชื่อเต็ม → ชื่อที่จดตอนกด
+   */
+  const dialCalls = await soft(async () => {
+    const { rows } = await dbQuery<{ id: string; created_at: string | Date; by_name: string | null }>(
+      `select a.id, a.created_at,
+              coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''), nullif(btrim(a.user_name), '')) as by_name
+         from ${tableInAppSchema('audit_logs')} a
+         left join ${tableInAppSchema('users')} u on u.id = a.user_id
+        where a.entity_type = 'public_job_application' and a.entity_id = $1 and a.action = 'application.dial'
+        order by a.created_at desc
+        limit 100`,
+      [id],
+    );
+    return rows.map((r) => ({ id: r.id, at: toIso(r.created_at), by_name: r.by_name }));
+  });
+
+  return res.status(200).json({ history, aiCalls, staffCalls, dialCalls });
 }
 
 /**

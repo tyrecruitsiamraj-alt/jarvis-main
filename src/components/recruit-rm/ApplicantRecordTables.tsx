@@ -101,14 +101,9 @@ export const HistoryTable: React.FC<{ items: ApplicantHistoryItem[] }> = ({ item
   </Table>
 );
 
-export const CallsTable: React.FC<{ rows: DetailCallRow[]; application: PublicApplication }> = ({ rows, application: a }) => (
+// บรรทัด "กดโทร (จดเวลา) N ครั้ง" ถอดแล้ว — กดโทรทุกครั้งขึ้นเป็นแถว "โทรหาผู้สมัคร" พร้อมชื่อคนกด (21 ต.ค. 2569)
+export const CallsTable: React.FC<{ rows: DetailCallRow[]; application?: PublicApplication }> = ({ rows }) => (
   <div className="space-y-2">
-    {a.dial_count ? (
-      <p className="text-xs text-muted-foreground">
-        กดโทร (จดเวลา) {a.dial_count} ครั้ง
-        {a.dialed_last_at ? ` · ล่าสุด ${formatDateTimeTh(a.dialed_last_at)}` : ''}
-      </p>
-    ) : null}
     <Table head={['เวลา', 'ใครโทร', 'ผล', 'หมายเหตุ']} empty="ยังไม่มีการโทร" isEmpty={rows.length === 0}>
       {rows.map((r) => (
         <tr key={r.key} className="border-b border-border/50 last:border-0">

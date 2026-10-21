@@ -11,6 +11,7 @@
 import type {
   ApplicantAiCall,
   ApplicantStaffCall,
+  ApplicantDialCall,
   AttendanceLogItem,
   PublicApplication,
 } from './publicApplicationsApi';
@@ -110,8 +111,16 @@ const AI_STATUS_LABEL: Record<string, string> = {
   cancelled: 'ยกเลิก',
 };
 
-export function detailCallRows(aiCalls: readonly ApplicantAiCall[], staffCalls: readonly ApplicantStaffCall[]): DetailCallRow[] {
+export function detailCallRows(
+  aiCalls: readonly ApplicantAiCall[],
+  staffCalls: readonly ApplicantStaffCall[],
+  dialCalls: readonly ApplicantDialCall[] = [],
+): DetailCallRow[] {
   const rows: DetailCallRow[] = [];
+  // กดปุ่มโทรทุกครั้ง (21 ต.ค. 2569 · แบบ iRecruit "โทรหาผู้สมัครโดย …")
+  for (const d of dialCalls) {
+    rows.push({ key: `dial-${d.id}`, at: d.at, who: d.by_name || 'เจ้าหน้าที่', result: 'โทรหาผู้สมัคร', note: null });
+  }
   for (const c of aiCalls) {
     const label = c.outcome ? (CALL_OUTCOME_LABEL as Record<string, string>)[c.outcome] ?? c.outcome : null;
     rows.push({

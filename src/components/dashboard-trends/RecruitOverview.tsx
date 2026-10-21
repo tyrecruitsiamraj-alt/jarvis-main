@@ -72,7 +72,7 @@ import { OVERVIEW_TABS, overviewTabOf, journeyStepsOfTab } from '@/lib/recruitOv
  * วางตามภาพ iRecruit: การ์ด 6 ใบ · เส้นทาง (ของเราคือเส้นทางของรายชื่อ) + งานค้างตอนนี้ · รายวัน · ช่องทาง + ตำแหน่ง ·
  * เหตุผลที่ไม่สำเร็จ · ผลงานรายคน · ปุ่ม "วิธีอ่าน" ถอดแล้ว (เจ้าของ 19 ต.ค. 2569 "เอาออก")
  * 🔴 ตัวเลขทุกตัวมาจาก `src/lib/recruitOverview.ts` (มีเทสต์) · แผงเดิม (`BoardDashboard`) ยังเปิดได้ที่ `?dash=classic` (ทางถอย)
- * แยก 4 แท็บ (เจ้าของ 21 ต.ค. 2569 · Choice "แบ่งตามขั้น"): ใบขอ · กรอกเข้ามา · คนโทรต่อ · นัดหมาย — `?ov=` · ช่วงเวลาตัวเดียวใช้ทุกแท็บ
+ * แยก 4 แท็บ (เจ้าของ 21 ต.ค. 2569 · Choice "แบ่งตามขั้น"): ใบขอ · กรอกเข้ามา · การติดต่อ · นัดหมาย — `?ov=` · ช่วงเวลาตัวเดียวใช้ทุกแท็บ
  */
 
 type Load = { data: RecruitOverviewResponse | null; loading: boolean; error: string | null };
@@ -360,9 +360,9 @@ const RecruitOverview: React.FC<{
           </OverviewCard>
         </TabsContent>
 
-        {/* ─── คนโทรต่อ: ขั้นสนใจ·คนโทรต่อ + ผลงานรายคน ─── */}
+        {/* ─── การติดต่อ: ขั้นสนใจ·คนโทรต่อ + ผลงานรายคน ─── */}
         <TabsContent value="staff" className="mt-3 space-y-3">
-          <OverviewCard icon={Users} title="รายชื่อสนใจ · คนโทรต่อ">
+          <OverviewCard icon={Users} title="การติดต่อ">
             {apps ? (
               <JourneyList {...journeyStepsOfTab(view.journey, 'staff')} onOpenPart={(title, ids) => setNames({ title, ids })} />
             ) : (

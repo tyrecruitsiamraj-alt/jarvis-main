@@ -409,6 +409,9 @@ export async function getLinkedPublicJob(id: string): Promise<PublicJobOut | nul
     if (!item || !isPublicVisible(item)) return null;
     // ค่าที่เจ้าหน้าที่แก้เอง (สถานที่ · รายได้ · สวัสดิการ) ต้องทับเหมือนการ์ดหน้ารวม
     const [withEdits] = await withStaffOverrides([item as unknown as Record<string, unknown>]);
+    // ผู้รับผิดชอบใบขอ → เบอร์เจ้าหน้าที่สรรหา (เจ้าของ 21 ต.ค. 2569 "/apply/p/… ไม่ขึ้นเบอร์โทรเจ้าหน้าที่สรรหา")
+    // เดิมแนบแค่หน้ารวม/เปิดตรง — หน้าลิงก์ไม่มีชื่อผู้รับผิดชอบ เลยหาเบอร์ไม่เจอ
+    await attachAssignments([withEdits]);
     return (await withBenefits([toPublicJob(withEdits as unknown as JobRow)]))[0] ?? null;
   }
   const { rows } = await dbQuery<JobRow>(

@@ -90,7 +90,7 @@ import type { JobRequest } from '@/types';
  * 🔴 `embedded` = คืนเนื้อเปล่า ๆ ไม่ห่อ Dialog (ฝังใน "ป๊อปดูรายชื่อ" ของกล่องงาน) — ห้ามซ้อน Dialog ใน Dialog
  */
 const ADVANCE = '__advance__';
-const EMPTY_EXTRAS: ApplicantDetailExtras = { history: [], aiCalls: [], staffCalls: [] };
+const EMPTY_EXTRAS: ApplicantDetailExtras = { history: [], aiCalls: [], staffCalls: [], dialCalls: [] };
 
 const StepNo: React.FC<{ n: number; done: boolean }> = ({ n, done }) => (
   <span
@@ -252,7 +252,7 @@ export default function ApplicantContactDialog({
   }, [application, loadRecords]);
 
   const baseDraft = useMemo(() => (a ? profileDraftOf(a) : null), [a]);
-  const callRows = useMemo(() => detailCallRows(extras.aiCalls, extras.staffCalls), [extras]);
+  const callRows = useMemo(() => detailCallRows(extras.aiCalls, extras.staffCalls, extras.dialCalls), [extras]);
 
   if (!a || !baseDraft) return null;
 

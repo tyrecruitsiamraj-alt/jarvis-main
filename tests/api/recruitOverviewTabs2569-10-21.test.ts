@@ -13,7 +13,7 @@ const journey = ['names', 'ai', 'staff', 'appointment', 'attendance'].map(step);
 
 describe('แท็บภาพรวม', () => {
   it('ชื่อแท็บตามที่เจ้าของสั่ง เรียงตามนี้', () => {
-    expect(OVERVIEW_TABS.map((t) => t.label)).toEqual(['ใบขอ', 'กรอกเข้ามา', 'คนโทรต่อ', 'นัดหมาย']);
+    expect(OVERVIEW_TABS.map((t) => t.label)).toEqual(['ใบขอ', 'กรอกเข้ามา', 'การติดต่อ', 'นัดหมาย']);
   });
 
   it('?ov= ไม่รู้จัก = ใบขอ', () => {

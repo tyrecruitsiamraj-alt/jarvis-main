@@ -549,10 +549,18 @@ export type ApplicantStaffCall = {
   note: string | null;
 };
 
+/** แท็บ "การโทร" — ทุกครั้งที่กดปุ่มโทร (21 ต.ค. 2569 · แบบ iRecruit "โทรหาผู้สมัครโดย …") */
+export type ApplicantDialCall = {
+  id: string;
+  at: string;
+  by_name: string | null;
+};
+
 export type ApplicantDetailExtras = {
   history: ApplicantHistoryItem[];
   aiCalls: ApplicantAiCall[];
   staffCalls: ApplicantStaffCall[];
+  dialCalls: ApplicantDialCall[];
 };
 
 /**
@@ -567,6 +575,7 @@ export async function fetchApplicantDetailExtras(id: string): Promise<ApplicantD
     history: body.history ?? [],
     aiCalls: body.aiCalls ?? [],
     staffCalls: body.staffCalls ?? [],
+    dialCalls: body.dialCalls ?? [],
   };
 }
 
