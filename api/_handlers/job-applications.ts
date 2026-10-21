@@ -637,7 +637,8 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
   const b = raw as Record<string, unknown>;
 
   // กติกาชุดเดียวกับนำเข้า Excel (`staffApplicationInput.ts` · ข้อความ error เดิมทุกคำ)
-  const parsed = parseStaffApplication(b);
+  // ฟอร์มเพิ่มผู้สมัคร บังคับแค่ชื่อ + เบอร์ (21 ต.ค. 2569) · นำเข้า Excel ยังกติกาเดิม
+  const parsed = parseStaffApplication(b, { minimal: true });
   if (!parsed.ok) return sendError(res, 400, 'Bad request', parsed.message);
   const v = parsed.value;
   // PDPA (148 · 15 ต.ค. 2569) — เจ้าหน้าที่ต้องยืนยันว่าผู้สมัครยินยอมแล้วก่อนคีย์
@@ -654,6 +655,14 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
   }
 
   const staffName = req.user.email || null;
+  /**
+   * ส่ง AI โทร หรือไม่ส่ง (เจ้าของ 21 ต.ค. 2569 *"ให้เลือกด้วยว่าส่ง Ai หรือ ไม่ส่ง เพราะบางเคสเพิ่มเองเพราะคนโทรเข้ามา"*)
+   * - `ai` = จดว่าเลือก AI · ตัวส่งซ้ำ (`applicationDispatchRetry`) ส่งให้เองตามรอบ (ผูกใบขอ = บทงาน · ไม่ผูก = บททักทาย)
+   * - `manual` = Choice "เข้าแท็บการติดต่อของคนเพิ่ม" — เก็บให้คนคีย์ทันที (claim + call_choice manual) ⇒ AI ไม่โทร
+   * - ไม่ส่งมา (ไคลเอนต์เก่า) = แบบเดิม
+   * ทำในธุรกรรมเดียวกับ insert — ตัวส่งซ้ำต้องไม่เห็นใบนี้ในสภาพ "ยังไม่มีใครเลือก" แม้ชั่วขณะ
+   */
+  const callMode = b.call_mode === 'manual' || b.call_mode === 'ai' ? b.call_mode : null;
 
   let rows: Row[];
   let repeat: Date | null = null;
@@ -674,6 +683,21 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
        returning ${LIST_COLUMNS}`,
         staffInsertParams(v, staffName, entryDept.code),
       );
+      if (callMode && inserted[0]) {
+        const { rows: chosen } = await client.query<Row>(
+          `update ${tbl} as a
+              set call_choice = $2, call_choice_at = now(), call_choice_by_name = $3,
+                  claimed_by = case when $2 = 'manual' then $4::uuid else a.claimed_by end,
+                  claimed_by_name = case when $2 = 'manual' then $3 else a.claimed_by_name end,
+                  claimed_at = case when $2 = 'manual' then now() else a.claimed_at end,
+                  status = case when $2 = 'manual' and a.status = 'new' then 'contacted' else a.status end,
+                  updated_at = now()
+            where a.id = $1
+            returning ${LIST_COLUMNS}`,
+          [inserted[0].id, callMode, staffName, req.user.sub],
+        );
+        return chosen;
+      }
       return inserted;
     });
   } catch (e) {
@@ -698,7 +722,7 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
     action: 'job_application.create_by_staff',
     entityType: 'job_application',
     entityId: row.id,
-    after: { phone: v.phone, specific_type: v.specific_type, license_types: v.license_types },
+    after: { phone: v.phone, specific_type: v.specific_type, license_types: v.license_types, call_mode: callMode },
   });
 
   return res.status(201).json({ item: toApplication(row, req.user.sub) });

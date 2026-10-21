@@ -17,7 +17,13 @@ import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
 import districtsByProvince from '@/data/thaiDistrictsByProvince.json';
 import { recruitChannelLabel, type RecruitChannelMatch } from '@/lib/recruitPostings';
 import ChannelPicker from '@/components/shared/ChannelPicker';
-import JobTitleField from '@/components/shared/JobTitleField';
+import SearchableSelect from '@/components/shared/SearchableSelect';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
+import { jobPickKeywords, jobPickLabel } from '@/lib/jobPickLabel';
+import { publicJobTitle } from '@/lib/publicJobTitle';
+import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import type { JobRequest } from '@/types';
 import { createApplicationByStaff } from '@/lib/publicApplicationsApi';
 import {
   RM_EDUCATION_LEVELS,
@@ -39,12 +45,22 @@ import {
  * RM กับบอร์ดนับไม่ตรงกัน · ใบที่คีย์เองจะมี "ผู้บันทึก" ติดไว้
  *
  * ⚠️ ตำแหน่งงาน/ผู้รับผิดชอบ/ช่องทาง ดึงจากของที่ระบบมีจริง (ผู้ใช้ในระบบ + master
- * ช่องทาง) ไม่ทำ master ซ้ำอีกชุด · ตำแหน่งเป็นช่องพิมพ์เพราะฝั่งเรายังไม่มี master ตำแหน่ง
+ * ช่องทาง) ไม่ทำ master ซ้ำอีกชุด
+ *
+ * 🔴 21 ต.ค. 2569 (เจ้าของ):
+ * - *"ตรงตำแหน่งที่สนใจ เอาให้เลือกชื่อจากใบขอเลยมันจะได้ส่งไปให้ Ai คุยได้"* → เลือกจากใบขอที่เปิดอยู่ (ผูก job_id)
+ *   · Choice มีตัวเลือก "ยังไม่ระบุ — หาล่วงหน้า" บนสุด (ส่ง AI = บททักทายทั่วไป แล้วค่อยจับคู่)
+ * - *"ให้เลือกด้วยว่าส่ง Ai หรือ ไม่ส่ง"* → ต้องเลือก · ไม่ส่ง = Choice "เข้าแท็บการติดต่อของคนเพิ่ม" (server เก็บให้)
+ * - *"ไม่ต้อง Lock ว่าต้องกรอกอะไร … บางคนแค่มาเม้น ชื่อ เบอร์โทรไว้"* → บังคับแค่ชื่อ + เบอร์ (+ ยินยอม PDPA)
  */
 
 const labelCls = 'text-xs font-medium text-muted-foreground';
 
 const DISTRICTS = districtsByProvince as Record<string, string[]>;
+
+/** ค่าในช่องตำแหน่งงาน = ยังไม่ผูกใบขอ */
+const NO_JOB = '__none__';
+type CallMode = 'ai' | 'manual';
 
 const AddApplicantDialog: React.FC<{
   open: boolean;
@@ -68,7 +84,10 @@ const AddApplicantDialog: React.FC<{
   const [consent, setConsent] = useState(false);
   const [province, setProvince] = useState('');
   const [district, setDistrict] = useState('');
-  const [positionInterest, setPositionInterest] = useState('');
+  /** ใบขอที่เลือกในช่อง "ตำแหน่งงานที่สนใจ" (NO_JOB = ยังไม่ระบุ) */
+  const [jobPick, setJobPick] = useState<string>(NO_JOB);
+  const [openJobs, setOpenJobs] = useState<JobRequest[]>([]);
+  const [callMode, setCallMode] = useState<CallMode | ''>('');
   const [specificType, setSpecificType] = useState('');
   const [education, setEducation] = useState('');
   const [responsible, setResponsible] = useState('');
@@ -90,7 +109,8 @@ const AddApplicantDialog: React.FC<{
     setLineId('');
     setProvince('');
     setDistrict('');
-    setPositionInterest(job?.positionLabel ?? '');
+    setJobPick(job?.id ?? NO_JOB);
+    setCallMode('');
     setSpecificType('');
     setEducation('');
     setResponsible('');
@@ -103,8 +123,12 @@ const AddApplicantDialog: React.FC<{
     void fetchResponsibleNames()
       .then(setStaff)
       .catch(() => setStaff([]));
-    // เปิดจากคนละใบ = ตำแหน่ง prefill คนละค่า
-  }, [open, job?.positionLabel]);
+    // ใบขอที่เปิดอยู่ (สิทธิ์ BU ตามบัญชี) — ชุดเดียวกับช่อง "ลงหน่วยงาน" ของนัด
+    void fetchSiamrajUnitRequests(500)
+      .then(setOpenJobs)
+      .catch(() => setOpenJobs([]));
+    // เปิดจากคนละใบ = เลือกใบนั้นไว้ให้
+  }, [open, job?.id]);
 
   const districts = province ? (DISTRICTS[province] ?? []) : [];
 
@@ -114,38 +138,42 @@ const AddApplicantDialog: React.FC<{
   const submit = async () => {
     setError(null);
     // ตรวจฝั่งหน้าเว็บด้วยกติกาเดียวกับ API (recruitRmMasters) — ไม่ให้ error สองแบบ
+    // บังคับแค่ชื่อ + เบอร์ (21 ต.ค. 2569) · กรอกอายุมาแต่นอกช่วง = คีย์ผิด ยังเตือน
     if (!firstName.trim()) return setError('กรุณากรอกชื่อ');
-    if (!lastName.trim()) return setError('กรุณากรอกนามสกุล');
     if (!normalizeRmPhone(phone)) return setError('กรุณากรอกเบอร์โทรให้ครบ 10 หลัก');
-    if (!gender) return setError('กรุณาเลือกเพศ');
     const ageNum = Number(age);
-    if (!Number.isFinite(ageNum) || ageNum < 15 || ageNum > 80) {
+    if (age.trim() && (!Number.isFinite(ageNum) || ageNum < 15 || ageNum > 80)) {
       return setError('อายุต้องอยู่ระหว่าง 15–80 ปี');
     }
+    if (!callMode) return setError('เลือกว่าจะส่ง AI โทร หรือเก็บไปโทรเอง');
     if (!consent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE_STAFF);
+    const picked = jobPick === NO_JOB ? null : (openJobs.find((j) => j.id === jobPick) ?? null);
+    // เปิดจากป๊อปของใบที่ไม่อยู่ในลิสต์ใบเปิด (หรือลิสต์ยังไม่มา) = ใช้ข้อมูลใบที่ส่งมา
+    const fromProp = !picked && job && jobPick === job.id ? job : null;
 
     setSaving(true);
     try {
       await createApplicationByStaff({
         // ผูกใบขอเมื่อเปิดจากป๊อปของใบ (ดู prop `job` ข้างบน)
-        job_id: job?.id ?? null,
-        job_title: job?.title ?? null,
-        unit_name: job?.unitName ?? null,
+        job_id: picked?.id ?? fromProp?.id ?? null,
+        job_title: picked ? publicJobPositionLabel(picked) : (fromProp?.title ?? null),
+        unit_name: picked ? (picked.unit_name ?? null) : (fromProp?.unitName ?? null),
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         phone,
-        age: ageNum,
-        gender,
+        age: age.trim() ? ageNum : null,
+        gender: gender || null,
         line_id: lineId.trim() || null,
         province: province || null,
         district: district || null,
-        position_interest: positionInterest.trim() || null,
+        position_interest: picked ? publicJobTitle(picked) : (fromProp?.positionLabel ?? null),
         specific_type: specificType || null,
         education: education || null,
         responsible_name: staff.find((u) => u.id === responsible)?.name ?? null,
         channel_id: channel?.id ?? null,
         channel_label: channel ? recruitChannelLabel(channel) : null,
         license_types: licenses,
+        call_mode: callMode,
         pdpa_consent: true,
       });
       onSaved();
@@ -166,11 +194,11 @@ const AddApplicantDialog: React.FC<{
               <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <label className={labelCls}>นามสกุล *</label>
+              <label className={labelCls}>นามสกุล</label>
               <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <label className={labelCls}>อายุ *</label>
+              <label className={labelCls}>อายุ</label>
               <Input
                 type="number"
                 inputMode="numeric"
@@ -179,7 +207,7 @@ const AddApplicantDialog: React.FC<{
               />
             </div>
             <div className="space-y-1.5">
-              <label className={labelCls}>เพศ *</label>
+              <label className={labelCls}>เพศ</label>
               <div className="flex gap-1.5">
                 {RM_SEX_OPTIONS.map((s) => (
                   <button
@@ -232,13 +260,31 @@ const AddApplicantDialog: React.FC<{
                 options={[{ value: '', label: province ? 'ไม่ระบุ' : 'เลือกจังหวัดก่อน' }, ...districts.map((d) => ({ value: d, label: d }))]}
               />
             </div>
-            {/* ฟอร์มนี้ไม่ผูก BU (คนโทรเข้ามาสมัครลอย) — ลิสต์จึงเป็นทุก BU */}
-            <JobTitleField
-              value={positionInterest}
-              onChange={setPositionInterest}
-              label="ตำแหน่งงานที่สนใจ"
-              labelClassName={labelCls}
-            />
+            {/* เลือกจากใบขอ (21 ต.ค. 2569) — ผูกใบแล้ว AI คุยเรื่องงานใบนั้นได้ · ไม่มีใบตรง = หาล่วงหน้า */}
+            <div className="space-y-1.5 sm:col-span-2">
+              <label className={labelCls}>ตำแหน่งงานที่สนใจ</label>
+              <div aria-label="ตำแหน่งงานที่สนใจ" data-testid="add-applicant-job">
+                <SearchableSelect
+                  value={jobPick}
+                  onChange={setJobPick}
+                  placeholder="เลือกใบขอ"
+                  searchPlaceholder="พิมพ์ชื่อหน่วยงาน ตำแหน่ง หรือเลขที่ใบขอ"
+                  emptyText="ไม่พบใบขอ"
+                  options={[
+                    { value: NO_JOB, label: 'ยังไม่ระบุ — หาล่วงหน้า' },
+                    // เปิดจากป๊อปของใบที่ไม่อยู่ในลิสต์ใบเปิด — ยังเลือกใบนั้นได้
+                    ...(job && !openJobs.some((j) => j.id === job.id)
+                      ? [{ value: job.id, label: [job.unitName, job.positionLabel].filter(Boolean).join(' · ') || 'ใบขอนี้' }]
+                      : []),
+                    ...openJobs.map((j) => ({
+                      value: j.id,
+                      label: jobPickLabel(j),
+                      keywords: jobPickKeywords(j, publicJobPositionLabel(j)),
+                    })),
+                  ]}
+                />
+              </div>
+            </div>
             <div className="space-y-1.5">
               <label className={labelCls}>ประเภทเจาะจง</label>
               <FieldSelect
@@ -290,6 +336,23 @@ const AddApplicantDialog: React.FC<{
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* ส่ง AI โทร หรือไม่ (21 ต.ค. 2569 · ต้องเลือก) — ไม่ส่ง = เข้าแท็บการติดต่อของคนเพิ่ม */}
+          <div className="space-y-1.5" data-testid="add-applicant-call-mode">
+            <label className={labelCls}>โทรหาผู้สมัคร *</label>
+            <ToggleGroup
+              type="single"
+              size="sm"
+              variant="outline"
+              value={callMode}
+              onValueChange={(v) => (v === 'ai' || v === 'manual' ? setCallMode(v) : undefined)}
+              aria-label="โทรหาผู้สมัคร"
+              className="flex-wrap justify-start"
+            >
+              <ToggleGroupItem value="ai">ส่ง AI โทร</ToggleGroupItem>
+              <ToggleGroupItem value="manual">ไม่ส่ง · เก็บไปโทรเอง</ToggleGroupItem>
+            </ToggleGroup>
           </div>
 
           <PdpaConsentCheck checked={consent} onChange={setConsent} text={PDPA_CONSENT_TEXT_STAFF} />

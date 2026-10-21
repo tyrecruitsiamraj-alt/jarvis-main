@@ -18,8 +18,9 @@ export type StaffApplicationValue = {
   last_name: string;
   /** 10 หลัก รูป 0XXXXXXXXX */
   phone: string;
-  age: number;
-  gender: 'male' | 'female';
+  /** null = ไม่ได้กรอก (ฟอร์มเพิ่มผู้สมัครแบบไม่บังคับ · 21 ต.ค. 2569) */
+  age: number | null;
+  gender: 'male' | 'female' | null;
   province: string | null;
   district: string | null;
   education: string | null;
@@ -43,22 +44,29 @@ const text = (v: unknown, max = 200): string | null => {
   return t ? t.slice(0, max) : null;
 };
 
-export function parseStaffApplication(b: Record<string, unknown>): StaffApplicationParse {
+/**
+ * `minimal` = ฟอร์ม "เพิ่มข้อมูลผู้สมัคร" (เจ้าของ 21 ต.ค. 2569 *"ไม่ต้อง Lock ว่าต้องกรอกอะไร … บางคนแค่มาเม้น ชื่อ
+ * เบอร์โทรไว้"*) — บังคับแค่ชื่อ + เบอร์ (ช่อง NOT NULL ของตาราง) · กรอกอายุมาแต่นอกช่วง ยังเตือน (คีย์ผิด)
+ * นำเข้า Excel ไม่ส่ง = กติกาเดิมครบทุกช่อง
+ */
+export function parseStaffApplication(b: Record<string, unknown>, opts: { minimal?: boolean } = {}): StaffApplicationParse {
+  const minimal = opts.minimal === true;
   const firstName = str(b.first_name).trim().slice(0, 120);
   const lastName = str(b.last_name).trim().slice(0, 120);
   if (!firstName) return { ok: false, message: 'กรุณากรอกชื่อ' };
-  if (!lastName) return { ok: false, message: 'กรุณากรอกนามสกุล' };
+  if (!lastName && !minimal) return { ok: false, message: 'กรุณากรอกนามสกุล' };
 
   const phone = normalizeRmPhone(b.phone);
   if (!phone) return { ok: false, message: 'กรุณากรอกเบอร์โทรให้ครบ 10 หลัก' };
 
   const gender = b.gender === 'male' || b.gender === 'female' ? b.gender : null;
-  if (!gender) return { ok: false, message: 'กรุณาเลือกเพศ' };
+  if (!gender && !minimal) return { ok: false, message: 'กรุณาเลือกเพศ' };
 
-  const ageNum = Number(b.age);
+  const ageRaw = str(b.age).trim();
+  const ageNum = Number(ageRaw);
   // อายุนอกช่วงนี้แปลว่าคีย์ผิด (พิมพ์ปีเกิดลงช่องอายุเป็นอาการที่เจอบ่อย)
-  const age = Number.isFinite(ageNum) && ageNum >= 15 && ageNum <= 80 ? Math.trunc(ageNum) : null;
-  if (age === null) return { ok: false, message: 'อายุต้องอยู่ระหว่าง 15–80 ปี' };
+  const age = ageRaw && Number.isFinite(ageNum) && ageNum >= 15 && ageNum <= 80 ? Math.trunc(ageNum) : null;
+  if (age === null && (!minimal || ageRaw)) return { ok: false, message: 'อายุต้องอยู่ระหว่าง 15–80 ปี' };
 
   const specific = str(b.specific_type);
   return {

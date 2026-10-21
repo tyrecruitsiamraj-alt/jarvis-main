@@ -46,12 +46,10 @@ import { fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
 import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import SearchableSelect from '@/components/shared/SearchableSelect';
+import { jobPickLabel } from '@/lib/jobPickLabel';
 
-/** ป้ายหน่วยงานของนัด — ชื่อจุดทำงาน · ตำแหน่ง (เลขที่ใบขอ) · เก็บคำเดียวกันลงประวัตินัดด้วย (5 ต.ค. 2569) */
-function appointmentUnitLabel(j: JobRequest): string {
-  const no = j.request_no?.trim();
-  return `${jobBoardCardTitle(j)} · ${publicJobTitle(j)}${no ? ` (${no})` : ''}`;
-}
+/** ป้ายหน่วยงานของนัด — ตัวเดียวกับฟอร์มเพิ่มผู้สมัคร (`jobPickLabel` · 21 ต.ค. 2569) */
+const appointmentUnitLabel = jobPickLabel;
 import { canRecordAttendance } from '@/lib/appointmentAttendance';
 import { profileDraftOf, profilePatchFromDraft, type ProfileDraft } from '@/lib/applicantProfileEdit';
 import {

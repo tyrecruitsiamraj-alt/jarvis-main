@@ -218,14 +218,15 @@ describe('ปุ่มเพิ่มข้อมูลผู้สมัคร 
     expect(calls(/^insert into/i)).toHaveLength(0);
   });
 
+  // 21 ต.ค. 2569 ฟอร์มเพิ่มผู้สมัครบังคับแค่ชื่อ + เบอร์ (เพศไม่บังคับแล้ว) — ข้อความเดิมของช่องที่ยังบังคับ
   it('ข้อมูลไม่ครบยังตอบข้อความเดิมทุกคำ', async () => {
     const { res, status, json } = mockRes();
     await jobApplicationsHandler(
-      staffReq('POST', { first_name: 'ก', last_name: 'ข', phone: '0812345678', age: 30 }) as never,
+      staffReq('POST', { first_name: 'ก', last_name: 'ข', phone: '0812', age: 30 }) as never,
       res as never,
     );
     expect(status).toHaveBeenCalledWith(400);
-    expect(json.mock.calls[0][0].message).toBe('กรุณาเลือกเพศ');
+    expect(json.mock.calls[0][0].message).toBe('กรุณากรอกเบอร์โทรให้ครบ 10 หลัก');
   });
 
   it('🔴 แก้เบอร์เป็นเบอร์ที่สมัครภายใน 14 วัน (ใบอื่น) ⇒ 409 ไม่ update · ไม่นับใบตัวเอง', async () => {

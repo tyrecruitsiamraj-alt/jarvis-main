@@ -336,8 +336,9 @@ export async function createApplicationByStaff(input: {
   first_name: string;
   last_name: string;
   phone: string;
-  age: number;
-  gender: string;
+  /** ไม่บังคับ (21 ต.ค. 2569) */
+  age: number | null;
+  gender: string | null;
   line_id?: string | null;
   province?: string | null;
   district?: string | null;
@@ -348,6 +349,8 @@ export async function createApplicationByStaff(input: {
   channel_id?: string | null;
   channel_label?: string | null;
   license_types?: string[];
+  /** ส่ง AI โทร / ไม่ส่ง (เก็บไปโทรเอง) — 21 ต.ค. 2569 */
+  call_mode?: 'ai' | 'manual';
   /** PDPA (15 ต.ค. 2569) — เจ้าหน้าที่ยืนยันว่าผู้สมัครยินยอมแล้ว · server ไม่รับใบถ้าไม่ใช่ true */
   pdpa_consent: boolean;
 }): Promise<PublicApplication> {
