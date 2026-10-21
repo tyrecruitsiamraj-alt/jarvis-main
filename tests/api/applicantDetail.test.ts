@@ -28,9 +28,10 @@ describe('ป๊อปรายละเอียด — โครงตาม�
     ]);
   });
 
-  it('3 ขั้น · ขั้นนัดหมายไม่พูดถึงเวลา (วันนัดเก็บเป็นวัน)', () => {
+  // 21 ต.ค. 2569 ฟอร์มนัดมีช่องเวลาแล้ว (src/lib/appointmentTime.ts) — ขั้นนัดหมายบอกเวลาได้
+  it('3 ขั้น · ขั้นนัดหมายบอกวัน เวลา สถานที่', () => {
     expect(PROCESS_STEPS.map((s) => s.title)).toEqual(['การติดต่อ', 'การนัดหมาย', 'การติดตามนัด']);
-    expect(PROCESS_STEPS[1].hint).not.toContain('เวลา');
+    expect(PROCESS_STEPS[1].hint).toContain('เวลา');
   });
 });
 

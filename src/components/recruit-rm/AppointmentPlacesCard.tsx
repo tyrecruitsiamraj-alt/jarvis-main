@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -22,18 +22,21 @@ export default function AppointmentPlacesCard({
   onShiftDay,
   onToday,
   onPick,
+  onPrint,
 }: {
   ymd: string;
   isToday: boolean;
   total: number;
   places: readonly AppointmentPlaceSummary[];
-  /** สถานที่ที่กดอยู่ (null = ทุกสถานที่ของวัน) */
+  /** แถวที่กดอยู่ (คีย์สถานที่+เวลา · null = ทุกแถวของวัน) */
   picked: string | null;
   loading: boolean;
   failed: boolean;
   onShiftDay: (days: number) => void;
   onToday: () => void;
-  onPick: (place: string | null) => void;
+  onPick: (key: string | null) => void;
+  /** พิมพ์ใบรายชื่อของแถวนี้ (แบบ iRecruit) */
+  onPrint: (key: string) => void;
 }) {
   return (
     <div className="space-y-2 rounded-xl border border-border/70 p-3" data-testid="appointment-places">
@@ -69,23 +72,24 @@ export default function AppointmentPlacesCard({
               <th className="px-3 py-2 text-center font-medium">มา</th>
               <th className="px-3 py-2 text-center font-medium">ไม่มา</th>
               <th className="px-3 py-2 text-center font-medium">รอผล</th>
+              <th className="px-3 py-2 text-center font-medium">ใบรายชื่อ</th>
             </tr>
           </thead>
           <tbody>
             {loading || failed || places.length === 0 ? (
               <tr className={cn('border-t', DASH.tableRow)}>
-                <td colSpan={6} className={cn('px-3 py-3 text-center text-xs', DASH.cellMuted)}>
+                <td colSpan={7} className={cn('px-3 py-3 text-center text-xs', DASH.cellMuted)}>
                   {loading ? 'กำลังโหลด…' : failed ? 'โหลดไม่สำเร็จ' : 'ไม่มีนัด'}
                 </td>
               </tr>
             ) : (
               places.map((p) => {
-                const active = picked === p.place;
+                const active = picked === p.key;
                 return (
                   <tr
-                    key={p.place}
+                    key={p.key}
                     className={cn('cursor-pointer border-t', DASH.tableRow, active && 'bg-muted')}
-                    onClick={() => onPick(active ? null : p.place)}
+                    onClick={() => onPick(active ? null : p.key)}
                     aria-selected={active}
                     data-testid="appointment-place-row"
                   >
@@ -96,10 +100,11 @@ export default function AppointmentPlacesCard({
                         className="h-auto whitespace-normal p-0 text-left font-medium text-foreground"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onPick(active ? null : p.place);
+                          onPick(active ? null : p.key);
                         }}
                       >
                         {p.place}
+                        <span className="ml-1 font-normal tabular-nums text-muted-foreground">· {p.time ? `${p.time} น.` : 'ไม่ระบุเวลา'}</span>
                       </Button>
                     </td>
                     <td className={cn('px-3 py-2 text-center font-medium tabular-nums', DASH.cell)}>{p.total}</td>
@@ -108,6 +113,21 @@ export default function AppointmentPlacesCard({
                     <td className={cn('px-3 py-2 text-center tabular-nums', TONE.danger.value)}>{p.noShow}</td>
                     {/* เลื่อนนัดนับเป็นรอผล (ยังไม่รู้ว่ามาไหม) — มา + ไม่มา + รอผล = นัด */}
                     <td className={cn('px-3 py-2 text-center tabular-nums', DASH.cellMuted)}>{p.pending + p.rescheduled}</td>
+                    <td className="px-3 py-1 text-center">
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="outline"
+                        aria-label={`โหลดเป็น PDF ${p.place}${p.time ? ` ${p.time} น.` : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPrint(p.key);
+                        }}
+                        data-testid="appointment-place-pdf"
+                      >
+                        <Printer aria-hidden /> PDF
+                      </Button>
+                    </td>
                   </tr>
                 );
               })

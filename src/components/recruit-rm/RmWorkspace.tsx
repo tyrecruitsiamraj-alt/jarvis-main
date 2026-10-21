@@ -68,8 +68,10 @@ import {
   type RmAppointmentScope,
 } from '@/lib/recruitRm';
 import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
-import { buildAppointmentPlaces, isInAppointmentPlace, shiftYmd } from '@/lib/appointmentPlaces';
+import { buildAppointmentPlaces, isInAppointmentPlace, placeKeyOf, shiftYmd } from '@/lib/appointmentPlaces';
 import AppointmentPlacesCard from '@/components/recruit-rm/AppointmentPlacesCard';
+import AppointmentPrintSheet, { type AppointmentPrintGroup } from '@/components/recruit-rm/AppointmentPrintSheet';
+import { appointmentTimeOf } from '@/lib/appointmentTime';
 import { RM_BUCKET_LABEL, isRmBucket } from '@/lib/recruitRmOverviewApi';
 import RecruitDailyPanel from '@/components/recruit-rm/RecruitDailyPanel';
 import { LEAD_VIEW_LABEL } from '@/lib/recruitLead';
@@ -284,7 +286,7 @@ const RmWorkspace: React.FC<{
   /** ตารางนัดของวันแยกสถานที่ (แบบ iRecruit · 21 ต.ค. 2569) — วันที่ดู + สถานที่ที่กด (null = ไม่กรองรายชื่อ) */
   const todayYmd = toYmdBangkok(new Date());
   const [placeDay, setPlaceDay] = useState<string>(todayYmd);
-  const [placePick, setPlacePick] = useState<{ ymd: string; place: string | null } | null>(null);
+  const [placePick, setPlacePick] = useState<{ ymd: string; key: string | null } | null>(null);
 
   /**
    * drill-down จากกล่อง Dashboard (`?bucket=` — S6) · เงื่อนไขกรองอยู่ฝั่ง server
@@ -559,6 +561,24 @@ const RmWorkspace: React.FC<{
   const appointmentBoard = useMemo(() => buildAppointmentBoard(filtered), [filtered]);
   /** ตารางนัดรายสถานที่ของวันที่ดู — ชุดเดียวกับตาราง (ไม่ผ่านชิป) */
   const appointmentPlaces = useMemo(() => buildAppointmentPlaces(filtered, placeDay), [filtered, placeDay]);
+  /**
+   * ใบพิมพ์ "โหลดเป็น PDF" แบบฟอร์ม iRecruit (21 ต.ค. 2569) — หน้าละสถานที่+เวลาของวันที่ดู · กดแถวไว้ = พิมพ์แถวนั้น
+   * ทุกคนในวันนั้น ไม่ใช่แค่หน้าที่แบ่งไว้ (เดิมพิมพ์แค่หน้าปัจจุบันของตาราง)
+   */
+  const printGroups = useMemo<AppointmentPrintGroup[]>(() => {
+    const pickKey = placePick && placePick.ymd === placeDay ? placePick.key : null;
+    return appointmentPlaces.places
+      .filter((p) => pickKey === null || p.key === pickKey)
+      .map((p) => ({
+        key: p.key,
+        ymd: placeDay,
+        place: p.place,
+        time: p.time,
+        rows: filtered
+          .filter((r) => isInAppointmentPlace(r, placeDay, p.key) && placeKeyOf(r) === p.key)
+          .sort((a, b) => (appointmentTimeOf(a.appointment_at) ?? '').localeCompare(appointmentTimeOf(b.appointment_at) ?? '') || a.full_name.localeCompare(b.full_name, 'th')),
+      }));
+  }, [appointmentPlaces, filtered, placeDay, placePick]);
 
   /**
    * ใบที่รออยู่ในกอง "เลือกวิธีโทร" (Phase 5.9) — คิดจาก **ชุดที่โหลดมาทั้งก้อน** ไม่ใช่
@@ -612,7 +632,7 @@ const RmWorkspace: React.FC<{
     if (tab === 'contact') return filtered.filter((r) => isInContactChip(r, contactChip));
     if (tab === 'appointments') {
       const byChip = filtered.filter((r) => isInAppointmentChip(r, appointmentChip));
-      return placePick ? byChip.filter((r) => isInAppointmentPlace(r, placePick.ymd, placePick.place)) : byChip;
+      return placePick ? byChip.filter((r) => isInAppointmentPlace(r, placePick.ymd, placePick.key)) : byChip;
     }
     return filtered;
   }, [bucket, filtered, tab, contactChip, appointmentChip, placePick]);
@@ -1184,7 +1204,7 @@ const RmWorkspace: React.FC<{
                   isToday={placeDay === todayYmd}
                   total={appointmentPlaces.total}
                   places={appointmentPlaces.places}
-                  picked={placePick && placePick.ymd === placeDay ? placePick.place : null}
+                  picked={placePick && placePick.ymd === placeDay ? placePick.key : null}
                   loading={loading && rows.length === 0}
                   failed={Boolean(loadError)}
                   onShiftDay={(n) => {
@@ -1197,10 +1217,15 @@ const RmWorkspace: React.FC<{
                     setPlacePick(null);
                     setPage(1);
                   }}
-                  onPick={(place) => {
-                    setPlacePick(place === null ? null : { ymd: placeDay, place });
+                  onPick={(key) => {
+                    setPlacePick(key === null ? null : { ymd: placeDay, key });
                     setPage(1);
                     setSelectedIds([]);
+                  }}
+                  onPrint={(key) => {
+                    // ปุ่ม PDF บนแถว (แบบ iRecruit) — เลือกแถวนั้นก่อน แล้วพิมพ์หลังจอวาดใบพิมพ์ใหม่
+                    setPlacePick({ ymd: placeDay, key });
+                    window.setTimeout(() => window.print(), 300);
                   }}
                 />
               ) : null}
@@ -1416,6 +1441,8 @@ const RmWorkspace: React.FC<{
                 </div>
               ) : null}
               <div className={tab === 'appointments' ? 'rm-print-area' : undefined}>
+              {tab === 'appointments' ? <AppointmentPrintSheet groups={printGroups} /> : null}
+              <div className={tab === 'appointments' ? 'print:hidden' : undefined}>
               <RmTable
                 tab={tab}
                 rows={pageRows}
@@ -1429,6 +1456,7 @@ const RmWorkspace: React.FC<{
                 recruiterOf={recruiterOf}
                 actionsOverride={cancelledView ? ['view', 'restore'] : undefined}
               />
+              </div>
               </div>
               {/* ตัวแบ่งหน้าแบบเดียวทั้งระบบ ‹ 1/N › (`PagePager` · เจ้าของ Choice 12 ต.ค. 2569) */}
               <PagePager

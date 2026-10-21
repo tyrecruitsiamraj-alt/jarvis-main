@@ -2,6 +2,7 @@ import React from 'react';
 import { SCREENING_LABEL, SCREENING_RESULTS, SCREENING_TONE, canRecordScreening, type ScreeningResult } from '@/lib/appointmentScreening';
 import { BookmarkPlus, Bot, Phone, PhoneCall, Eye, ClipboardCheck, ListChecks, UserMinus, Undo2, FileText, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { appointmentTimeOf } from '@/lib/appointmentTime';
 import { cn } from '@/lib/utils';
 // ⚠️ DASH = token พื้นผิว dashboard · ขีดกลางคือ EM_DASH คนละตัว อย่าสับสน
 import { DASH, TONE } from '@/lib/designTokens';
@@ -523,6 +524,8 @@ const RmTable: React.FC<{
                           return (
                             <span className={cn('whitespace-nowrap tabular-nums', overdue ? TONE.orange.value : DASH.cell)}>
                               {ymd ? formatYmdTh(ymd) : EM_DASH}
+                              {/* เวลานัด (21 ต.ค. 2569) · นัดเก่าไม่มีเวลา */}
+                              {appointmentTimeOf(r.appointment_at) ? ` ${appointmentTimeOf(r.appointment_at)} น.` : ''}
                               {overdue ? ' · เลยวันนัด' : ''}
                             </span>
                           );

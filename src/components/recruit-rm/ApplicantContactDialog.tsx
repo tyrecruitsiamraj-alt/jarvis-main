@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { APPOINTMENT_TIMES, appointmentAtWithTime, appointmentWhenText } from '@/lib/appointmentTime';
 import {
   Dialog,
   DialogContent,
@@ -28,7 +29,6 @@ import { ATTENDANCE_LABEL } from '@/lib/appointmentAttendance';
 import { SCREENING_LABEL, SCREENING_RESULTS, type ScreeningResult } from '@/lib/appointmentScreening';
 import { TONE } from '@/lib/designTokens';
 import { EM_DASH } from '@/lib/displayFallback';
-import { formatYmdTh } from '@/lib/dateTh';
 import {
   fetchApplicantDetailExtras,
   fetchAttendanceLogs,
@@ -157,6 +157,8 @@ export default function ApplicantContactDialog({
   // ── ขั้น 2 การนัดหมาย — 'ok' = นัดได้ (กรอกวัน/ที่/หน่วยงาน) · 'fail' = นัดหมายไม่สำเร็จ (เลือกเหตุผล)
   const [apptPick, setApptPick] = useState<'ok' | 'fail' | null>(null);
   const [apptDate, setApptDate] = useState('');
+  /** เวลานัด HH:MM (21 ต.ค. 2569 · ต้องกรอก) — ดู src/lib/appointmentTime.ts */
+  const [apptTime, setApptTime] = useState('');
   const [apptPlace, setApptPlace] = useState('');
   const [apptPlaceOther, setApptPlaceOther] = useState('');
   const [apptJob, setApptJob] = useState(ADVANCE);
@@ -224,6 +226,7 @@ export default function ApplicantContactDialog({
     setReasonId('');
     setApptPick(null);
     setApptDate('');
+    setApptTime('');
     setApptPlace('');
     setApptPlaceOther('');
     setApptJob(ADVANCE);
@@ -277,10 +280,26 @@ export default function ApplicantContactDialog({
    * (เจ้าของ Choice 7 ต.ค. 2569 "ถามวันนัดใหม่ + สถานที่" — เดิมเลื่อนนัดบันทึกได้โดยไม่รู้ว่าเลื่อนไปวันไหน)
    */
   const apptFields = (testId: string) => (
-            <div className="grid grid-cols-1 gap-3 border-t border-border/70 p-3 sm:grid-cols-3" data-testid={testId}>
+            <div className="grid grid-cols-1 gap-3 border-t border-border/70 p-3 sm:grid-cols-2" data-testid={testId}>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">นัดหมายวันที่ *</p>
                 <DateSelectDmyBe value={apptDate} onChange={setApptDate} allowEmpty disabled={busy} />
+              </div>
+              {/* เวลานัด (เจ้าของ 21 ต.ค. 2569 "บูธเดียวกัน 11.00 กับ 15.00 น. จะแยกยังไงได้" · Choice ต้องกรอก) */}
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">เวลา *</p>
+                <Select value={apptTime || undefined} onValueChange={setApptTime} disabled={busy}>
+                  <SelectTrigger className="h-9 text-sm tabular-nums" aria-label="เวลานัดหมาย" data-testid="appointment-time">
+                    <SelectValue placeholder="เลือกเวลา" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {APPOINTMENT_TIMES.map((t) => (
+                      <SelectItem key={t} value={t} className="tabular-nums">
+                        {t} น.
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">สถานที่นัดหมาย *</p>
@@ -352,12 +371,14 @@ export default function ApplicantContactDialog({
     if (contactFailPicked && !selectedReason) return setError('เลือกเหตุผลที่ติดต่อไม่สำเร็จ');
     if (apptPick && contactFailPicked) return setError('ติดต่อไม่สำเร็จ นัดหมายไม่ได้');
     if (apptPick === 'ok' && !apptDate) return setError('นัดหมายต้องใส่วันนัด');
+    if (apptPick === 'ok' && !apptTime) return setError('นัดหมายต้องใส่เวลา');
     if (apptPick === 'ok' && !placeValue) {
       return setError(apptPlace === APPOINTMENT_PLACE_OTHER ? 'พิมพ์ชื่อสถานที่นัดหมาย' : 'เลือกสถานที่นัดหมาย');
     }
     if (apptPick === 'fail' && !selectedApptReason) return setError('เลือกเหตุผลที่นัดหมายไม่สำเร็จ');
     if (followPicked === 'fail') return setError('เลือกว่าไม่มา หรือ เลื่อนนัด');
     if (followPicked === 'rescheduled' && !apptDate) return setError('เลื่อนนัดต้องใส่วันนัดใหม่');
+    if (followPicked === 'rescheduled' && !apptTime) return setError('เลื่อนนัดต้องใส่เวลา');
     if (followPicked === 'rescheduled' && !placeValue) {
       return setError(apptPlace === APPOINTMENT_PLACE_OTHER ? 'พิมพ์ชื่อสถานที่นัดหมาย' : 'เลือกสถานที่นัดหมาย');
     }
@@ -380,7 +401,7 @@ export default function ApplicantContactDialog({
           appointmentFailed: apptFailed,
           reasonId: reason?.id ?? null,
           reasonLabel: reason?.name ?? null,
-          appointmentAt: booked ? apptDate : null,
+          appointmentAt: booked ? appointmentAtWithTime(apptDate, apptTime) : null,
           appointmentPlace: booked ? placeValue : null,
           jobId: booked && apptJob !== ADVANCE ? apptJob : null,
           jobLabel: booked ? (selectedJob ? appointmentUnitLabel(selectedJob) : 'หาล่วงหน้า') : null,
@@ -406,7 +427,7 @@ export default function ApplicantContactDialog({
             appointmentFailed: false,
             reasonId: null,
             reasonLabel: null,
-            appointmentAt: apptDate,
+            appointmentAt: appointmentAtWithTime(apptDate, apptTime),
             appointmentPlace: placeValue,
             jobId: apptJob !== ADVANCE ? apptJob : null,
             jobLabel: selectedJob ? appointmentUnitLabel(selectedJob) : 'หาล่วงหน้า',
@@ -545,7 +566,7 @@ export default function ApplicantContactDialog({
             >
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">นัดหมายวันที่</p>
-                <p className="text-sm tabular-nums text-foreground">{formatYmdTh(a.appointment_at)}</p>
+                <p className="text-sm tabular-nums text-foreground">{appointmentWhenText(a.appointment_at)}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">สถานที่นัดหมาย</p>
@@ -591,7 +612,7 @@ export default function ApplicantContactDialog({
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">นัดหมายวันที่</p>
             <p className="text-sm tabular-nums text-foreground">
-              {a.appointment_at ? formatYmdTh(a.appointment_at) : EM_DASH}
+              {a.appointment_at ? appointmentWhenText(a.appointment_at) : EM_DASH}
             </p>
           </div>
           <div className="space-y-1">
