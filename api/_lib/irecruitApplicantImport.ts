@@ -174,6 +174,8 @@ export type IrecruitImportRun = {
   already: number;
   /** ใบเก่าที่เติมผู้รับผิดชอบรอบนี้ */
   responsibleFilled?: number;
+  /** สถานะ iRecruit ที่อ่านกลับรอบนี้ (158) */
+  statusSynced?: number;
 };
 
 export async function runIrecruitImportOnce(): Promise<IrecruitImportRun> {
@@ -183,6 +185,12 @@ export async function runIrecruitImportOnce(): Promise<IrecruitImportRun> {
     out.responsibleFilled = await backfillIrecruitResponsible();
   } catch (e) {
     logError('irecruitImport.backfillResponsible failed', e);
+  }
+  // สถานะใน iRecruit ของรายชื่อที่ดึงมาแล้ว 14 วันล่าสุด (21 ต.ค. 2569) — กลืน error ห้ามทำให้รอบดึงล้ม
+  try {
+    out.statusSynced = await syncIrecruitImportStatus();
+  } catch (e) {
+    logError('irecruitImport.syncStatus failed', e);
   }
   const rows = await irecruitSqlQuery<IrecruitRegisterRow>(irecruitUncalledSql(), {});
   out.found = rows.length;
@@ -269,6 +277,67 @@ const BACKFILL_LIMIT = 500;
  * เติมผู้รับผิดชอบให้ใบที่ดึงจาก iRecruit ไปแล้วแต่ยังว่าง (เจ้าของ Choice 16 ต.ค. 2569 "ดึงชื่อมาด้วย + เติม 382 ใบเก่า")
  * อ่าน iRecruit ตาม `register_uuid` ของ `app_irecruit_imports` · เขียนเฉพาะช่อง `responsible_name` ที่ยังว่าง (ตาม id)
  */
+/**
+ * อ่าน `process_status` ของรายชื่อที่ดึงมา (14 วันล่าสุด) จาก iRecruit กลับมาเก็บที่ `app_irecruit_imports` (158)
+ * เขียนเฉพาะแถวที่สถานะเปลี่ยน · ฐานยังไม่รัน 158 = ข้าม · อ่านอย่างเดียวฝั่ง iRecruit
+ */
+export async function syncIrecruitImportStatus(): Promise<number> {
+  let rows: Array<{ register_uuid: string; irecruit_status: string | null }>;
+  try {
+    ({ rows } = await dbQuery<{ register_uuid: string; irecruit_status: string | null }>(
+      `select i.register_uuid, i.irecruit_status from ${IMPORTS} i
+         join ${APPS} a on a.id = i.application_id
+        where a.created_at > now() - interval '14 days'
+        order by a.created_at desc limit 2000`,
+    ));
+  } catch (e) {
+    if (/irecruit_status/.test(String((e as Error)?.message ?? e))) return 0;
+    throw e;
+  }
+  if (rows.length === 0) return 0;
+  const before = new Map(rows.map((r) => [r.register_uuid, r.irecruit_status]));
+  let changed = 0;
+  for (let i = 0; i < rows.length; i += 300) {
+    const chunk = rows.slice(i, i + 300).map((r) => r.register_uuid);
+    const inputs: Record<string, string> = {};
+    const ph = chunk.map((u, k) => {
+      inputs[`u${k}`] = u;
+      return `@u${k}`;
+    });
+    const found = await irecruitSqlQuery<{ uuid: string; process_status: string | null }>(
+      `SELECT CAST(rr.uuid AS varchar(64)) AS uuid, RTRIM(rr.process_status) AS process_status
+         FROM recruit_register rr WHERE CAST(rr.uuid AS varchar(64)) IN (${ph.join(', ')})`,
+      inputs,
+    );
+    const upd = found.filter((f) => (f.process_status ?? null) !== (before.get(String(f.uuid)) ?? null));
+    if (upd.length === 0) continue;
+    await dbQuery(
+      `update ${IMPORTS} i set irecruit_status = v.s, irecruit_status_at = now()
+         from unnest($1::text[], $2::text[]) as v(u, s) where i.register_uuid = v.u`,
+      [upd.map((f) => String(f.uuid)), upd.map((f) => f.process_status ?? null)],
+    );
+    changed += upd.length;
+  }
+  return changed;
+}
+
+/** สถานะ iRecruit ต่อใบ (158) — ไม่มี/ฐานยังไม่รัน = Map ว่าง */
+export async function loadIrecruitImportStatus(applicationIds: readonly string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (applicationIds.length === 0) return out;
+  try {
+    const { rows } = await dbQuery<{ application_id: string; irecruit_status: string | null }>(
+      `select application_id::text as application_id, irecruit_status from ${IMPORTS}
+        where application_id = any($1::uuid[]) and irecruit_status is not null`,
+      [[...applicationIds]],
+    );
+    for (const r of rows) if (r.irecruit_status) out.set(r.application_id, r.irecruit_status);
+  } catch {
+    /* ฐานยังไม่รัน 158 — ไม่มีป้าย */
+  }
+  return out;
+}
+
 export async function backfillIrecruitResponsible(): Promise<number> {
   const { rows: todo } = await dbQuery<{ id: string; register_uuid: string }>(
     `select a.id::text as id, i.register_uuid

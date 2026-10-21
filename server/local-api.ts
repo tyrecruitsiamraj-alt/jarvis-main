@@ -24,6 +24,7 @@ import { startLumosPushRetryWorker } from '../api/_lib/lumosPushRetryWorker.ts';
 import { startApplicationDispatchRetryWorker } from '../api/_lib/applicationDispatchRetry.ts';
 import { startIrecruitImportWorker } from '../api/_lib/irecruitApplicantImport.ts';
 import { startSoScrapingNoticeWorker } from '../api/_lib/soScrapingNotices.ts';
+import { startIrecruitLateReminderWorker } from '../api/_lib/irecruitLateReminder.ts';
 import { startUnitRequestKeepWarm } from '../api/_lib/unitRequestCache.ts';
 import { preferIpv4 } from '../api/_lib/netPreferIpv4.ts';
 import { warmUnitRequestListCache } from '../api/_handlers/siamraj-unit-requests.ts';
@@ -241,6 +242,11 @@ server.listen(port, '127.0.0.1', () => {
    * ปิดด้วย SO_SCRAPING_NOTICE_ENABLED=false · แจ้งครั้งเดียวต่อคำขอต่อสถานะ (dedupe_key)
    */
   startSoScrapingNoticeWorker();
+  /**
+   * รายชื่อ iRecruit ที่ยัง "รอดำเนินการ" เกิน 24 ชม. — เช้าละครั้งตั้งแต่ 08:00 แจ้งผู้รับผิดชอบ (เจ้าของ 21 ต.ค. 2569)
+   * ปิดด้วย IRECRUIT_LATE_REMINDER_ENABLED=false
+   */
+  startIrecruitLateReminderWorker();
   /**
    * อุ่นสำเนาใบขอไว้ก่อนหมดอายุ ระหว่างที่มีคนใช้งาน (เจ้าของ 8 ต.ค. 2569 "หน้าอื่นที่ช้าไล่แก้ให้เร็วด้วย")
    * ไม่มีคนใช้เกินครึ่งชั่วโมง = หยุดถามระบบงานหลัก · ปิดด้วย UNIT_REQUEST_KEEP_WARM_ENABLED=false

@@ -1,5 +1,6 @@
 import { cancelApplication, isUndefinedTable, loadCancellations, restoreApplication } from '../_lib/applicationCancellations.js';
 import { loadIrecruitDups, type IrecruitDup } from '../_lib/irecruitDuplicates.js';
+import { loadIrecruitImportStatus } from '../_lib/irecruitApplicantImport.js';
 import { recordApplicationConsent } from '../_lib/applicationConsent.js';
 import { PDPA_CONSENT_REQUIRED_MESSAGE_STAFF } from '../../src/lib/pdpaConsent.js';
 import { dbQuery, dbTransaction } from '../_lib/postgres.js';
@@ -1658,6 +1659,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
       for (const item of items) {
         const hit = answers.get(item.id);
         if (hit) (item as Record<string, unknown>).ai_answer = hit;
+      }
+      // สถานะใน iRecruit ของรายชื่อที่ดึงมา (158 · 21 ต.ค. 2569) — ทีมโทรใน iRecruit ⇒ บอกว่าค้างหรือทำแล้ว
+      const irStatus = await loadIrecruitImportStatus(items.filter((i) => i.created_by_name === 'iRecruit').map((i) => i.id));
+      for (const item of items) {
+        const st = irStatus.get(item.id);
+        if (st) (item as Record<string, unknown>).irecruit_status = st;
       }
       // "บอก AI" จากสายทักทายทั่วไป (15 ต.ค. 2569) — ป้ายบนแถว ไม่เขียนทับใบ
       const heard = await loadGreetingHeard(items);

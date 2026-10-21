@@ -119,6 +119,8 @@ export type PublicApplication = {
   cancel_reason?: string | null;
   /** เบอร์นี้สมัครใน iRecruit ภายใน 14 วัน (143 · 12 ต.ค. 2569) — AI ไม่โทรเอง ป้าย "ซ้ำ iRecruit" */
   irecruit_dup_at?: string;
+  /** สถานะใน iRecruit ของรายชื่อที่ดึงมา (W/A/อื่น · 158 · 21 ต.ค. 2569) */
+  irecruit_status?: string | null;
   /** สิ่งที่บอก AI ในสายทักทายทั่วไป (15 ต.ค. 2569) — ป้าย "บอก AI" บนแถว · ไม่ได้เขียนทับช่องในใบ */
   ai_heard?: GreetingHeard;
   license_types?: string[];
