@@ -51,6 +51,7 @@ import { fullDaysSince } from '../../src/lib/fullDays.js';
 import { isOverAge } from '../../src/lib/applicantAge.js';
 import { isOutOfAreaAnswer } from '../../src/lib/outOfAreaAnswer.js';
 import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
+import { loadClosedRequestNos } from '../_lib/recentlyClosedRequests.js';
 import { loadChannelPlacement } from '../_lib/channelPlacementSql.js';
 import { loadInformDaysByPhone, loadIrecruitApplicantDays, loadIrecruitRegsByPhone } from '../_lib/applicantSourceSql.js';
 import { firstDaySince, informedSince, irecruitChannelAt, phone9Of } from '../../src/lib/applicantSourceMatch.js';
@@ -603,10 +604,14 @@ export async function buildRecruitOverview(
     body.errors.channels = chR.error;
   }
   if (reqR.ok) {
-    const inRange = (from: string, to: string) => reqR.value.filter((r) => r.day >= from && r.day <= to);
+    // ใบที่ปิด/Stop/แจ้งเข้าครบใน ERP ไม่นับไม่โชว์ (เจ้าของ 21 ต.ค. 2569 LBM6910003 Stop · LBM6910004 แจ้งเข้าครบ
+    // "ทำไมยังโชว์อะมันปิดไปแล้วไม่ใช่หรอ" · กติกาเดียวกับ `dropClosedFromCache` "ถ้าปิดก็คือปิด") · ถาม ERP ไม่ได้ = ไม่ตัด
+    const closed = await loadClosedRequestNos(reqR.value.map((r) => r.requestNo));
+    const openRows = closed.size === 0 ? reqR.value : reqR.value.filter((r) => !closed.has(r.requestNo));
+    const inRange = (from: string, to: string) => openRows.filter((r) => r.day >= from && r.day <= to);
     body.requests = toRequestSummary(inRange(window.from, window.to));
     body.requestsPrev = toRequestSummary(inRange(window.prevFrom, window.prevTo));
-    body.requestDays = toRequestDays(reqR.value);
+    body.requestDays = toRequestDays(openRows);
     body.requestList = await loadRequestList(inRange(window.from, window.to));
   } else {
     body.requests = null;

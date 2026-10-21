@@ -79,3 +79,15 @@ describe('เลขกราฟ = เลขการ์ด (21 ต.ค. 2569 เ
     expect(staff.cur).toBe(nodeAt(drillTreeOf('staff', withStaff, null)!, ['followed', 'reached']).node.count);
   });
 });
+
+describe('ใบที่ปิดใน ERP ไม่อยู่ในแท็บใบขอ (เจ้าของ 21 ต.ค. 2569 LBM6910003 Stop · LBM6910004 แจ้งเข้าครบ)', () => {
+  it('ตัดใบปิดก่อนนับ ใบขอเข้ามา / รายวัน / รายการใบขอ', () => {
+    const api = fs.readFileSync(path.join(process.cwd(), 'api/_handlers/recruit-overview.ts'), 'utf8');
+    const at = api.indexOf('const closed = await loadClosedRequestNos(reqR.value.map((r) => r.requestNo));');
+    expect(at).toBeGreaterThan(0);
+    for (const k of ['body.requests = toRequestSummary(inRange(', 'body.requestDays = toRequestDays(openRows)', 'body.requestList = await loadRequestList(inRange(']) {
+      expect(api.indexOf(k)).toBeGreaterThan(at);
+    }
+    expect(api).toContain('openRows.filter((r) => r.day >= from && r.day <= to)');
+  });
+});
