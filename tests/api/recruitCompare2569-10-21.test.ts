@@ -13,7 +13,7 @@ import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 const read = (f: string) => fs.readFileSync(path.join(process.cwd(), f), 'utf8');
 const T = (n: number): RecruitTotals => ({
   names: n, jobs: 0, called: 0, calledByAi: n, calledByStaff: 0, calledBoth: 0, reached: n, reachedByAi: 0, reachedByStaff: 0,
-  aiSaidYes: n, staffFollowed: 0, appointed: n, showed: 0, onBoard: null,
+  aiSaidYes: n, staffFollowed: 0, aiCalledReached: 0, followedReached: 0, appointed: n, showed: 0, onBoard: null,
 });
 
 describe('deltaOf', () => {

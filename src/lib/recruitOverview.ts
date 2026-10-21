@@ -63,6 +63,10 @@ export const isAiSaidYes = (f: RecruitAppFact) => f.aiAnswer === 'said_yes';
 /** ตอบ AI ว่าสนใจ แล้วเจ้าหน้าที่ลงมือหลังเวลาที่ AI ได้คำตอบ */
 export const isStaffFollowed = (f: RecruitAppFact) =>
   isAiSaidYes(f) && !!f.staffLastAt && !!f.aiAnswerAt && f.staffLastAt >= f.aiAnswerAt;
+/** AI โทรแล้วและติดต่อได้ */
+export const isAiCalledReached = (f: RecruitAppFact) => f.calledByAi && f.contact === 'success';
+/** คนโทรต่อแล้วและคนติดต่อได้ */
+export const isFollowedReached = (f: RecruitAppFact) => isStaffFollowed(f) && f.contact === 'success' && f.contactBy === 'staff';
 
 /** ช่องทาง — ตารางช่องทางของลิงก์ก่อน แล้วค่อยที่ผู้สมัครเลือกเอง (ตัวเดียวกับหัวข้อกรอง "ช่องทาง") */
 export function channelOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referralSource'>): string {
@@ -88,6 +92,10 @@ export type RecruitTotals = {
   reachedByStaff: number;
   aiSaidYes: number;
   staffFollowed: number;
+  /** AI โทรแล้วและติดต่อได้ — ลูกของ "AI โทรแล้ว" ในการ์ดกดลงลึก (21 ต.ค. 2569 ให้เลขกราฟ = เลขการ์ด) */
+  aiCalledReached: number;
+  /** คนโทรต่อแล้ว (หลัง AI ได้คำตอบ) และคนติดต่อได้ — ลูกของ "คนโทรต่อแล้ว" */
+  followedReached: number;
   appointed: number;
   showed: number;
   /** null = อ่านบอร์ด ERP ไม่ได้ */
@@ -109,6 +117,8 @@ export function totalsOf(apps: readonly RecruitAppFact[], from: string, to: stri
     reachedByStaff: count((f) => f.contact === 'success' && f.contactBy === 'staff'),
     aiSaidYes: count(isAiSaidYes),
     staffFollowed: count(isStaffFollowed),
+    aiCalledReached: count(isAiCalledReached),
+    followedReached: count(isFollowedReached),
     appointed: count((f) => !!f.appointmentAt),
     showed: count((f) => f.attendance === 'showed'),
     onBoard: c.some((f) => f.onBoard === null) ? null : count((f) => f.onBoard === true),

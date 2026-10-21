@@ -4,7 +4,7 @@
  * แถวละขั้น: ช่วงนี้ vs ช่วงก่อน (ช่วงวันเท่ากัน — เดือนปัจจุบันตัดวันท้ายของเดือนก่อนตามเวลาเดียวกับตอนนี้)
  * ตัวเลขชุดเดียวกับการ์ดรายละเอียด (`totalsOf` · `toRequestSummary`) — ห้ามคิดใหม่ที่นี่
  */
-import { appliedYmd, isAiSaidYes, isStaffFollowed, type RecruitTotals } from './recruitOverview';
+import { appliedYmd, isAiCalledReached, isAiSaidYes, isFollowedReached, isStaffFollowed, type RecruitTotals } from './recruitOverview';
 import type { RecruitAppFact, RecruitRequestDay, RecruitRequestSummary } from './recruitOverviewTypes';
 import type { OverviewTabId } from './recruitOverviewTabs';
 
@@ -52,9 +52,9 @@ export function compareRowsOf(
     case 'requests':
       return [r('total', 'ใบขอเข้ามา'), r('released', 'ประกาศแล้ว'), r('releasedWithApps', 'มีคนสมัคร')];
     case 'apps':
-      return [t('names', 'กรอกเข้ามา'), t('calledByAi', 'AI โทรแล้ว'), t('reached', 'ติดต่อได้')];
+      return [t('names', 'กรอกเข้ามา'), t('calledByAi', 'AI โทรแล้ว'), t('aiCalledReached', 'ติดต่อได้')];
     case 'staff':
-      return [t('aiSaidYes', 'ตอบ AI ว่าสนใจ'), t('staffFollowed', 'คนโทรต่อ'), t('reachedByStaff', 'คนโทรติดต่อได้')];
+      return [t('aiSaidYes', 'ตอบ AI ว่าสนใจ'), t('staffFollowed', 'คนโทรต่อ'), t('followedReached', 'คนโทรติดต่อได้')];
     case 'appt':
       return [t('appointed', 'นัดหมาย'), t('showed', 'มาตามนัด')];
   }
@@ -71,6 +71,8 @@ const FACT_METRIC: Record<string, (f: RecruitAppFact) => boolean> = {
   aiSaidYes: isAiSaidYes,
   staffFollowed: isStaffFollowed,
   reachedByStaff: (f) => f.contact === 'success' && f.contactBy === 'staff',
+  aiCalledReached: isAiCalledReached,
+  followedReached: isFollowedReached,
   appointed: (f) => !!f.appointmentAt,
   showed: (f) => f.attendance === 'showed',
 };

@@ -8,7 +8,7 @@
  * ตัวเลขชุดเดียวกับการ์ดเดิม (เงื่อนไขเดียวกับ `totalsOf`) — ตรรกะล้วน
  */
 import type { ToneKey } from './designTokens';
-import { isAiSaidYes, isStaffFollowed } from './recruitOverview';
+import { isAiCalledReached, isAiSaidYes, isFollowedReached, isStaffFollowed } from './recruitOverview';
 import type { RecruitAppFact, RecruitRequestItem } from './recruitOverviewTypes';
 import type { OverviewTabId } from './recruitOverviewTabs';
 
@@ -59,7 +59,7 @@ export function drillTreeOf(tab: OverviewTabId, cohort: readonly RecruitAppFact[
     }
     case 'apps': {
       const [ai, noAi] = split(cohort, (f) => f.calledByAi);
-      const [reached, notReached] = split(ai, (f) => f.contact === 'success');
+      const [reached, notReached] = split(ai, isAiCalledReached);
       return people('names', 'กรอกเข้ามา', 'neutral', cohort, [
         people('ai', 'AI โทรแล้ว', 'info', ai, [
           people('reached', 'ติดต่อได้', 'success', reached),
@@ -71,7 +71,7 @@ export function drillTreeOf(tab: OverviewTabId, cohort: readonly RecruitAppFact[
     case 'staff': {
       const yes = cohort.filter(isAiSaidYes);
       const [followed, waiting] = split(yes, isStaffFollowed);
-      const [reached, notReached] = split(followed, (f) => f.contact === 'success' && f.contactBy === 'staff');
+      const [reached, notReached] = split(followed, isFollowedReached);
       return people('yes', 'ตอบ AI ว่าสนใจ', 'info', yes, [
         people('followed', 'คนโทรต่อแล้ว', 'success', followed, [
           people('reached', 'ติดต่อได้', 'success', reached),

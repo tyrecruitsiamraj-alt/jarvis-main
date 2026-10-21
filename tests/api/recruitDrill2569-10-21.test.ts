@@ -66,3 +66,16 @@ describe('หน้าจอ', () => {
     expect(card).toContain('data-testid="drill-trail"');
   });
 });
+
+describe('เลขกราฟ = เลขการ์ด (21 ต.ค. 2569 เจอบนเว็บจริง 63 กับ 62)', () => {
+  it('ชิป "ติดต่อได้" / "คนโทรติดต่อได้" ใช้นิยามเดียวกับลูกในการ์ด', async () => {
+    const { compareRowsOf } = await import('@/lib/recruitCompare');
+    const { totalsOf } = await import('@/lib/recruitOverview');
+    const withStaff = [...facts, f('e', { contact: 'success', contactBy: 'staff', staffLastAt: '2026-10-20T05:00:00Z' })];
+    const tot = totalsOf(withStaff, '2026-10-01', '2026-10-31');
+    const apps = compareRowsOf('apps', tot, null, null, null).find((r) => r.label === 'ติดต่อได้')!;
+    expect(apps.cur).toBe(nodeAt(drillTreeOf('apps', withStaff, null)!, ['ai', 'reached']).node.count);
+    const staff = compareRowsOf('staff', tot, null, null, null).find((r) => r.label === 'คนโทรติดต่อได้')!;
+    expect(staff.cur).toBe(nodeAt(drillTreeOf('staff', withStaff, null)!, ['followed', 'reached']).node.count);
+  });
+});
