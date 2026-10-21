@@ -1,5 +1,5 @@
 import React from 'react';
-import { LoaderCircle, Search } from 'lucide-react';
+import { LoaderCircle, Megaphone, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -8,13 +8,15 @@ import type { JobRequest } from '@/types';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import { createJobPostingRequest, listLatestJobPostingsForJob, type JobPostingRequest } from '@/lib/jobPostingRequestsApi';
 import { SO_SCRAP_REASON, soScrapMissing, soScrapSnapshot, soStatusView } from '@/lib/soScraping';
+import { AutopostBody } from '@/components/jobs/AutopostDialog';
 
 /**
  * ═══ So Scraping ใต้การ์ดตัวอย่างในป๊อปประกาศ — สถานะ + ขอ Scrap (เจ้าของ 20 ต.ค. 2569) ═══
  * - สถานะโพสต์/Scrap ล่าสุดที่ So Scraping เขียนกลับ · ไม่รับงาน = เหตุผลจาก notes
  * - ขอ Scrap: ที่นี่ที่เดียว (Choice "ย้ายมาไว้หน้านี้เท่านั้น") · ต้องมีตำแหน่ง/จังหวัด/จำนวนคน · ขาดอะไรบอก
  *   ตำแหน่ง = ชื่อที่โชว์บนประกาศ (`publicJobTitle`) ไม่ใช่ "พนักงาน" ของ ERP
- * - สั่งโพสต์ย้ายไปปุ่ม **Autopost บนการ์ดกล่องงาน** (`AutopostDialog` · Choice "บนการ์ดกล่องงาน") — ที่นี่เหลือแค่สถานะ
+ * - สั่งโพสต์ = ปุ่ม **Autopost บนการ์ดกล่องงาน** (`AutopostDialog`) และปุ่ม Autopost ข้างบรรทัดโพสต์ที่นี่
+ *   (เจ้าของ 21 ต.ค. 2569 "ยังไม่ได้สั่ง แล้วจะสั่งยังไง" · Choice "เพิ่มปุ่ม Autopost ในป๊อปนี้") — ฟอร์มเดียวกันฝังแทนที่ (`embedded`) ห้ามซ้อนป๊อป
  * - ยังรอ/กำลังทำ = กดซ้ำไม่ได้ · เสร็จ/ไม่รับงาน = สั่งใหม่ได้
  */
 export default function OrderPostButton({ job }: { job: JobRequest; caption?: string | null }) {
@@ -22,6 +24,7 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [autopost, setAutopost] = React.useState(false);
 
   React.useEffect(() => {
     let alive = true;
@@ -62,7 +65,13 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
     }
   };
 
-  const statusRow = (label: string, req: JobPostingRequest | null, view: ReturnType<typeof soStatusView> | null, testId: string) => (
+  const statusRow = (
+    label: string,
+    req: JobPostingRequest | null,
+    view: ReturnType<typeof soStatusView> | null,
+    testId: string,
+    action?: React.ReactNode,
+  ) => (
     <div className="space-y-1" data-testid={testId}>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="font-medium text-foreground">{label}</span>
@@ -75,6 +84,7 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
         ) : (
           <span className={cn('text-xs', DASH.muted)}>ยังไม่ได้สั่ง</span>
         )}
+        {action ? <span className="ml-auto">{action}</span> : null}
       </div>
       {req?.status === 'rejected' && req.notes?.trim() ? (
         <p className={cn('text-xs', TONE.danger.value)}>เหตุผล: {req.notes.trim()}</p>
@@ -82,10 +92,38 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
     </div>
   );
 
+  if (autopost) {
+    return (
+      <div className="rounded-xl border border-border/70 p-3" data-testid="order-post">
+        <AutopostBody
+          embedded
+          job={job}
+          onSent={(item) => setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'content')])}
+          onClose={() => setAutopost(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="order-post">
       <div className="space-y-2">
-        {statusRow('โพสต์', content, contentView, 'so-status-content')}
+        {statusRow(
+          'โพสต์',
+          content,
+          contentView,
+          'so-status-content',
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            disabled={latest === null || Boolean(contentView?.open)}
+            onClick={() => setAutopost(true)}
+            data-testid="so-order-autopost"
+          >
+            <Megaphone aria-hidden /> Autopost
+          </Button>,
+        )}
         {statusRow('Scrap', scraping, scrapingView, 'so-status-scraping')}
         {loadError ? <p className={cn('text-xs', TONE.danger.value)}>{loadError}</p> : null}
       </div>

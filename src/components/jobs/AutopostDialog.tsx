@@ -68,7 +68,21 @@ export default function AutopostDialog({
   );
 }
 
-function AutopostBody({ job, onSent, onClose }: { job: JobRequest; onSent?: (item: JobPostingRequest) => void; onClose: () => void }) {
+/**
+ * ฟอร์ม Autopost — ใช้ในป๊อปของตัวเอง หรือ `embedded` ฝังในป๊อปประกาศ (`OrderPostButton` · เจ้าของ 21 ต.ค. 2569
+ * Choice "เพิ่มปุ่ม Autopost ในป๊อปนี้") · ฝังแล้วไม่ใช้ DialogHeader — ห้ามซ้อน Dialog
+ */
+export function AutopostBody({
+  job,
+  onSent,
+  onClose,
+  embedded = false,
+}: {
+  job: JobRequest;
+  onSent?: (item: JobPostingRequest) => void;
+  onClose: () => void;
+  embedded?: boolean;
+}) {
   const looked = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
   const contact = job.recruiter_contact ?? looked;
   const province = jobProvinceOf(job);
@@ -196,10 +210,14 @@ function AutopostBody({ job, onSent, onClose }: { job: JobRequest; onSent?: (ite
 
   return (
     <div className="space-y-4" data-testid="autopost-dialog">
-      <DialogHeader>
-        <DialogTitle>Autopost · {jobBoardCardTitle(job)}</DialogTitle>
-        <DialogDescription>{publicJobTitle(job)}</DialogDescription>
-      </DialogHeader>
+      {embedded ? (
+        <h3 className="text-base font-medium text-foreground">Autopost</h3>
+      ) : (
+        <DialogHeader>
+          <DialogTitle>Autopost · {jobBoardCardTitle(job)}</DialogTitle>
+          <DialogDescription>{publicJobTitle(job)}</DialogDescription>
+        </DialogHeader>
+      )}
 
       {loadError ? <p className={cn('text-sm', TONE.danger.value)}>{loadError}</p> : null}
       {loading && !loadError ? <p className={cn('text-sm', DASH.muted)}>กำลังโหลด…</p> : null}
