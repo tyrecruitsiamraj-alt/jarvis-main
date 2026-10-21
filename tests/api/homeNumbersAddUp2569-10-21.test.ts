@@ -84,3 +84,13 @@ describe('D+E · แถบต้องทำเหนือแท็บ', () => 
     expect(read('src/pages/HomeAiSharePage.tsx')).toContain('<HomeTodoStrip q={winQ} tick={tick} onGo={goTodo} />');
   });
 });
+
+describe('F · ตาราง BU พับไว้ (Choice "พับไว้ กดเปิดเอง") · G คงกฎว่างแล้วห้ามหาย', () => {
+  it('ทั้งสองการ์ดตาราง BU ใช้ FoldedBuTable · บรรทัดบวกเลขอยู่นอกส่วนพับ', () => {
+    const fold = read('src/components/home-ai-share/HomeSections.tsx');
+    expect(fold).toContain('const [open, setOpen] = React.useState(false);');
+    expect(fold).toContain("{open ? 'ซ่อนตาราง' : 'ดูตาราง'}");
+    expect(read('src/components/home-ai-share/AiShareLumosStats.tsx')).toContain('summary={<FollowResults split={split} cells={cells} unit={unit} part="sum" />}');
+    expect(read('src/components/home-ai-share/TopicReportCard.tsx')).toContain('<FoldedBuTable title="ผลโทรราย BU" testId={`topic-report-${block}`} summary={sumLine}>');
+  });
+});

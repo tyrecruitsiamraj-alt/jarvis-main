@@ -8,8 +8,10 @@
  * 🔴 shadcn Card + Tailwind · สีจาก TONE ชุดเดียวกับกล่อง/กราฟ (`AI_SHARE_CALLED_TONE`) · ไม่มีประโยคอธิบายบนจอ
  */
 import React from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { segmentDotClass } from '@/components/home-ai-share/segmentStyle';
 import { TONE } from '@/lib/designTokens';
@@ -196,5 +198,43 @@ export function StatStrip({
         </li>
       ))}
     </ol>
+  );
+}
+
+/**
+ * ตาราง BU พับไว้เป็นค่าเริ่ม (เจ้าของ 21 ต.ค. 2569 โหวตข้อ F → Choice "พับไว้ กดเปิดเอง")
+ * หัวการ์ด + ปุ่มเปิด/ซ่อน · `summary` (บรรทัดบวกเลข) อยู่นอกส่วนพับ เห็นตลอด
+ * เนื้อในยังอยู่ในหน้าแค่ซ่อน (`forceMount`) — กดเปิดแล้วไม่ต้องโหลดใหม่
+ */
+export function FoldedBuTable({
+  title,
+  testId,
+  summary,
+  children,
+}: {
+  title: string;
+  testId?: string;
+  summary?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <Card variant="solid" className="space-y-4 p-5 sm:p-6" data-testid={testId}>
+      <Collapsible open={open} onOpenChange={setOpen} className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-medium text-foreground">{title}</h2>
+          <CollapsibleTrigger asChild>
+            <Button type="button" variant="outline" size="sm" data-testid="bu-table-toggle">
+              {open ? 'ซ่อนตาราง' : 'ดูตาราง'}
+              <ChevronDown className={cn('transition-transform', open && 'rotate-180')} aria-hidden />
+            </Button>
+          </CollapsibleTrigger>
+        </div>
+        <CollapsibleContent forceMount className="space-y-6 data-[state=closed]:hidden">
+          {children}
+        </CollapsibleContent>
+      </Collapsible>
+      {summary}
+    </Card>
   );
 }

@@ -13746,3 +13746,4 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   - **C** ชิปเทียบช่วงก่อนทุกกล่องมีบรรทัด "7 วันก่อนหน้า N" · ลงสี AI เพิ่ม = ดี / ยังไม่โทรเพิ่ม = แย่ (`UP_IS_GOOD`) · แถบ "% ของทั้งหมด" (`HomeKpis`)
   - **D+E แถบต้องทำเหนือแท็บ** — `src/components/home-ai-share/HomeTodoStrip.tsx` (`todoItemsOf`) · API `/api/home-ai-share?todo=1` เรียกตัวนับของแต่ละแท็บ (`loadOnlineRequestPosting` · `loadHomeLumosSummary` · `loadTopicReport`) · กดแล้ว `goTodo` เปิดแท็บ + เลื่อนไปส่วนที่มีเลขเดียวกัน
   - เทสต์ `tests/api/homeNumbersAddUp2569-10-21.test.ts`
+  - **F** ตาราง "ผลโทรราย BU" พับไว้เป็นค่าเริ่ม (Choice "พับไว้ กดเปิดเอง") — `FoldedBuTable` ใน `HomeSections.tsx` (Collapsible `forceMount` + ปุ่ม ดูตาราง/ซ่อนตาราง) · บรรทัดบวกเลข (`lumos-follow-sum` / `report-sum`) อยู่นอกส่วนพับ · **G** คงกฎ "ว่างแล้วห้ามหาย" (Choice) ไม่ยุบส่วนที่เป็น 0

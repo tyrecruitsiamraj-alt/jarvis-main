@@ -9,7 +9,7 @@
  * 🔴 สีจาก TONE ชุดเดียวกับหน้าติดตาม · กราฟใช้ `currentColor` + คลาส TONE · ไม่มีประโยคอธิบายบนจอ
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Card } from '@/components/ui/card';
+import { FoldedBuTable } from '@/components/home-ai-share/HomeSections';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toneOfBu } from '@/components/team-online/teamOnlineTones';
@@ -134,12 +134,20 @@ const AiShareLumosStats: React.FC<{
   className?: string;
 }> = ({ block, unit, data, failed, className }) => {
   if (!hasLumosResults(block)) return null;
+  const split = data?.follow ?? null;
+  const cells = data?.followByBu ?? null;
+  // ตารางพับไว้ (21 ต.ค. 2569 ข้อ F) · บรรทัดบวกเลขเห็นตลอด
   return (
-    <Card variant="solid" className={cn('space-y-6 p-5 sm:p-6', className)} data-testid={`lumos-stats-${block}`}>
-      <h2 className="text-lg font-medium text-foreground">ผลโทรราย BU</h2>
-      {failed ? <p className={cn('text-sm', TONE.danger.value)}>{failed}</p> : null}
-      <FollowResults split={data?.follow ?? null} cells={data?.followByBu ?? null} unit={unit} />
-    </Card>
+    <div className={className}>
+      <FoldedBuTable
+        title="ผลโทรราย BU"
+        testId={`lumos-stats-${block}`}
+        summary={<FollowResults split={split} cells={cells} unit={unit} part="sum" />}
+      >
+        {failed ? <p className={cn('text-sm', TONE.danger.value)}>{failed}</p> : null}
+        <FollowResults split={split} cells={cells} unit={unit} part="tables" />
+      </FoldedBuTable>
+    </div>
   );
 };
 
@@ -156,12 +164,15 @@ function FollowResults({
   split,
   cells,
   unit,
+  part,
 }: {
   split: { ai: FollowBucket; staff: FollowBucket } | null;
   cells: FollowBuCell[] | null;
   unit: string;
+  /** ตาราง (ส่วนพับ) หรือบรรทัดบวกเลข (เห็นตลอด) */
+  part: 'tables' | 'sum';
 }) {
-  if (!split || !cells) return <Skeleton className="h-48 w-full rounded-xl" />;
+  if (!split || !cells) return part === 'tables' ? <Skeleton className="h-48 w-full rounded-xl" /> : null;
   const blocks = followBuBlocks(cells);
   const all = split.ai.total - split.ai.cancelled + split.staff.total - split.staff.cancelled;
   const cancelledAll = split.ai.cancelled + split.staff.cancelled;
@@ -173,6 +184,17 @@ function FollowResults({
   const num = (n: number) => (
     <span className={cn('tabular-nums', n > 0 ? 'text-foreground' : 'text-muted-foreground')}>{NUM.format(n)}</span>
   );
+  if (part === 'sum') {
+    return (
+      <p className={cn('text-xs tabular-nums', ok ? 'text-muted-foreground' : TONE.danger.value)} data-testid="lumos-follow-sum">
+        {blocks.length > 0
+          ? `${blocks.map((b) => `${b.bu ?? 'ไม่ระบุ'} ${NUM.format(liveOf(b.sum))}`).join(' + ')} = ${NUM.format(sumOfBlocks)} ${unit}`
+          : `รวม 0 ${unit}`}
+        {` · ยกเลิก ${NUM.format(cancelledAll)} ไม่นับ`}
+        {ok ? '' : ` · ไม่ตรงกับ ${NUM.format(all)}`}
+      </p>
+    );
+  }
   return (
     <div className="space-y-6">
       {blocks.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีรายชื่อ</p> : null}
@@ -306,13 +328,6 @@ function FollowResults({
           </div>
         </section>
       ))}
-      <p className={cn('text-xs tabular-nums', ok ? 'text-muted-foreground' : TONE.danger.value)} data-testid="lumos-follow-sum">
-        {blocks.length > 0
-          ? `${blocks.map((b) => `${b.bu ?? 'ไม่ระบุ'} ${NUM.format(liveOf(b.sum))}`).join(' + ')} = ${NUM.format(sumOfBlocks)} ${unit}`
-          : `รวม 0 ${unit}`}
-        {` · ยกเลิก ${NUM.format(cancelledAll)} ไม่นับ`}
-        {ok ? '' : ` · ไม่ตรงกับ ${NUM.format(all)}`}
-      </p>
     </div>
   );
 }

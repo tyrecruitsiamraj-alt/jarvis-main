@@ -7,7 +7,7 @@
  * 🔴 shadcn (Card · Table · Skeleton) · สีจาก TONE · ไม่มีประโยคอธิบายบนจอ
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Card } from '@/components/ui/card';
+import { FoldedBuTable } from '@/components/home-ai-share/HomeSections';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { segmentDotClass } from '@/components/home-ai-share/segmentStyle';
@@ -86,9 +86,22 @@ const TopicReportCard: React.FC<{ report: TopicReport | null; failed: string | n
     <span className={cn('tabular-nums', n > 0 ? 'text-foreground' : 'text-muted-foreground')}>{NUM.format(n)}</span>
   );
 
+  const sumLine = report ? (
+    <p
+      className={cn('text-xs tabular-nums', sumOfBlocks === total ? 'text-muted-foreground' : TONE.danger.value)}
+      data-testid="report-sum"
+    >
+      {/* ไม่มี BU ไหนมีงาน = บอกยอดรวมตรง ๆ (QA รอบ 2 ข้อ 22 เดิม "0 = 0 รายชื่อ") */}
+      {blocks.length > 0
+        ? `${blocks.map((b) => `${b.bu ?? noBu} ${NUM.format(b.total)}`).join(' + ')} = ${NUM.format(sumOfBlocks)} ${unit}`
+        : `รวม 0 ${unit}`}
+      {sumOfBlocks === total ? '' : ` · ไม่ตรงกับ ${NUM.format(total)}`}
+    </p>
+  ) : null;
+
+  // ตารางพับไว้ (21 ต.ค. 2569 ข้อ F) · บรรทัดบวกเลขเห็นตลอด
   return (
-    <Card variant="solid" className="space-y-6 p-6 sm:p-7" data-testid={`topic-report-${block}`}>
-      <h2 className="text-lg font-medium text-foreground">ผลโทรราย BU</h2>
+    <FoldedBuTable title="ผลโทรราย BU" testId={`topic-report-${block}`} summary={sumLine}>
       {failed ? <p className={cn('text-sm', TONE.danger.value)}>{failed}</p> : null}
       {!report ? (
         <Skeleton className="h-64 w-full rounded-xl" />
@@ -169,19 +182,9 @@ const TopicReportCard: React.FC<{ report: TopicReport | null; failed: string | n
               </div>
             </section>
           ))}
-          <p
-            className={cn('text-xs tabular-nums', sumOfBlocks === total ? 'text-muted-foreground' : TONE.danger.value)}
-            data-testid="report-sum"
-          >
-            {/* ไม่มี BU ไหนมีงาน = บอกยอดรวมตรง ๆ (QA รอบ 2 ข้อ 22 เดิม "0 = 0 รายชื่อ") */}
-            {blocks.length > 0
-              ? `${blocks.map((b) => `${b.bu ?? noBu} ${NUM.format(b.total)}`).join(' + ')} = ${NUM.format(sumOfBlocks)} ${unit}`
-              : `รวม 0 ${unit}`}
-            {sumOfBlocks === total ? '' : ` · ไม่ตรงกับ ${NUM.format(total)}`}
-          </p>
         </>
       )}
-    </Card>
+    </FoldedBuTable>
   );
 };
 
