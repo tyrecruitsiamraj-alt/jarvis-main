@@ -194,9 +194,12 @@ export function FunnelList({ steps }: { steps: readonly FunnelStep[] }) {
  */
 export function JourneyList({
   steps,
+  start = 1,
   onOpenPart,
 }: {
   steps: readonly JourneyStep[];
+  /** เลขขั้นแรก — แท็บที่แสดงบางช่วงของเส้นทาง นับต่อจากเส้นทางเต็ม (21 ต.ค. 2569) */
+  start?: number;
   /** กดเลขของช่อง = เปิดรายชื่อ (QA 18 ต.ค. 2569) */
   onOpenPart?: (title: string, ids: readonly string[]) => void;
 }) {
@@ -206,7 +209,7 @@ export function JourneyList({
         <li key={s.key} className="space-y-1.5">
           <div className="flex items-baseline justify-between gap-2 text-sm">
             <span className="text-foreground">
-              <span className={cn('mr-1.5 tabular-nums', DASH.sub)}>{i + 1}.</span>
+              <span className={cn('mr-1.5 tabular-nums', DASH.sub)}>{i + start}.</span>
               {s.label}
             </span>
             <span className="font-medium tabular-nums text-foreground">

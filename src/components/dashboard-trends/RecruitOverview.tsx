@@ -14,7 +14,9 @@ import {
   Timer,
   Users,
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -57,6 +59,7 @@ import JourneyNamesDialog from './JourneyNamesDialog';
 import ChannelPlacementTable from './ChannelPlacementTable';
 import ChannelFunnelTable from './ChannelFunnelTable';
 import { buildChannelFunnel } from '@/lib/channelFunnel';
+import { OVERVIEW_TABS, overviewTabOf, journeyStepsOfTab } from '@/lib/recruitOverviewTabs';
 
 /**
  * ═══ แท็บ "ภาพรวม" ของกล่องงาน = ภาพรวมงานสรรหาแบบ iRecruit (เจ้าของสั่ง 30 ก.ย. 2569) ═══
@@ -69,6 +72,7 @@ import { buildChannelFunnel } from '@/lib/channelFunnel';
  * วางตามภาพ iRecruit: การ์ด 6 ใบ · เส้นทาง (ของเราคือเส้นทางของรายชื่อ) + งานค้างตอนนี้ · รายวัน · ช่องทาง + ตำแหน่ง ·
  * เหตุผลที่ไม่สำเร็จ · ผลงานรายคน · ปุ่ม "วิธีอ่าน" ถอดแล้ว (เจ้าของ 19 ต.ค. 2569 "เอาออก")
  * 🔴 ตัวเลขทุกตัวมาจาก `src/lib/recruitOverview.ts` (มีเทสต์) · แผงเดิม (`BoardDashboard`) ยังเปิดได้ที่ `?dash=classic` (ทางถอย)
+ * แยก 4 แท็บ (เจ้าของ 21 ต.ค. 2569 · Choice "แบ่งตามขั้น"): ใบขอ · กรอกเข้ามา · คนโทรต่อ · นัดหมาย — `?ov=` · ช่วงเวลาตัวเดียวใช้ทุกแท็บ
  */
 
 type Load = { data: RecruitOverviewResponse | null; loading: boolean; error: string | null };
@@ -114,6 +118,19 @@ const RecruitOverview: React.FC<{
   const [weekdays, setWeekdays] = useState<number[]>([]);
   /** ป๊อปรายชื่อของเลขที่กดในเส้นทาง */
   const [names, setNames] = useState<{ title: string; ids: readonly string[] } | null>(null);
+  /** แท็บย่อย — จำใน URL (`?ov=`) ส่งลิงก์ให้กันได้ · ค่าแปลก = ใบขอ */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = overviewTabOf(searchParams.get('ov'));
+  const setTab = (v: string) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (v === OVERVIEW_TABS[0].id) next.delete('ov');
+        else next.set('ov', v);
+        return next;
+      },
+      { replace: true },
+    );
 
   const view = useMemo(() => {
     if (!data || !win) return null;
@@ -280,20 +297,88 @@ const RecruitOverview: React.FC<{
       {state.error ? <SectionError message={state.error} onRetry={() => setRev((n) => n + 1)} /> : null}
       {appsError ? <SectionError message={appsError} /> : null}
 
-      {/* ─── 1. ใบขอ · 2. รายชื่อที่กรอกมา (เจ้าของ 19 ต.ค. 2569 "อ่านแล้วรู้เลย" · แทนการ์ด 6 ใบ + เส้นทางเดิม) ─── */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <div className="min-w-0 space-y-3 lg:col-span-2">
-          <OverviewCard icon={FileText} title="ใบขอ" sub={weekdays.length > 0 ? 'ไม่กรองตามวัน' : undefined}>
-            {data.requests ? (
-              <JourneyList steps={buildRequestSteps(data.requests)} />
-            ) : (
-              <SectionError message={data.errors.requests ?? 'อ่านใบขอไม่ได้'} />
-            )}
-          </OverviewCard>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList variant="glass" className="h-10 max-w-full justify-start overflow-x-auto" aria-label="ภาพรวมแยกขั้น">
+          {OVERVIEW_TABS.map((t) => (
+            <TabsTrigger key={t.id} value={t.id} className="rounded-full px-4" data-testid={`recruit-ov-tab-${t.id}`}>
+              {t.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {/* ─── ใบขอ: เส้นทางใบขอ + งานค้าง ─── */}
+        <TabsContent value="requests" className="mt-3">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            <OverviewCard icon={FileText} title="ใบขอ" sub={weekdays.length > 0 ? 'ไม่กรองตามวัน' : undefined} className="lg:col-span-2">
+              {data.requests ? (
+                <JourneyList steps={buildRequestSteps(data.requests)} />
+              ) : (
+                <SectionError message={data.errors.requests ?? 'อ่านใบขอไม่ได้'} />
+              )}
+            </OverviewCard>
+            <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={weekdays.length > 0 ? 'ณ วันนี้ · ไม่กรองตามวัน' : 'ณ วันนี้'}>
+              {data.backlog ? <BacklogBody backlog={data.backlog} /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
+            </OverviewCard>
+          </div>
+        </TabsContent>
+
+        {/* ─── กรอกเข้ามา: กรอก + AI โทร · โทรวันไหน · รายวัน · ช่องทาง · ตำแหน่ง · เหตุผล ─── */}
+        <TabsContent value="apps" className="mt-3 space-y-3">
           <OverviewCard icon={Users} title="รายชื่อที่กรอกมา">
             {/* เดือนที่ยังไม่มีรายชื่อ = ขั้นครบเป็น 0 (กติกา 1 ต.ค.) · กดเลขเปิดรายชื่อ (18 ต.ค.) */}
             {apps ? (
-              <JourneyList steps={view.journey} onOpenPart={(title, ids) => setNames({ title, ids })} />
+              <JourneyList {...journeyStepsOfTab(view.journey, 'apps')} onOpenPart={(title, ids) => setNames({ title, ids })} />
+            ) : (
+              <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>
+            )}
+          </OverviewCard>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            <OverviewCard icon={Timer} title="กรอกแล้วโทรวันไหน">
+              {apps ? <DelayList rows={view.delay} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
+            </OverviewCard>
+            <div className="min-w-0 lg:col-span-2">
+              <DailyCard rows={view.daily} icon={BarChart3} />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            {/* ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "facebook ad 200 สนใจ 100 … มา 10" + "จับได้ถึงแจ้งเข้า") */}
+            <OverviewCard
+              icon={Megaphone}
+              title="รายชื่อที่กรอกในช่วงนี้ ไปถึงไหนแยกช่องทาง"
+              sub={data.errors.informs ? 'อ่านแจ้งเข้า ERP ไม่ได้' : 'แจ้งเข้า = มีใบแจ้งเข้า ERP หลังวันกรอก'}
+              className="lg:col-span-2"
+            >
+              <ChannelFunnelTable rows={view.channels.rows} total={view.channels.total} onOpen={(title, ids) => setNames({ title, ids })} />
+            </OverviewCard>
+            <OverviewCard icon={Briefcase} title="ตำแหน่งที่สมัคร" sub="10 อันดับ">
+              <PositionList rows={view.positions} />
+            </OverviewCard>
+          </div>
+          {/* ฐาน = ทุกรายชื่อของช่วง (เส้นทางขั้น 4 นับเฉพาะคนที่ตอบ AI ว่าสนใจ — QA 18 ต.ค. 2569 เลขเลยต่างกัน) */}
+          <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub="ทุกรายชื่อของช่วงนี้">
+            <ReasonColumns groups={view.reasons} />
+          </OverviewCard>
+        </TabsContent>
+
+        {/* ─── คนโทรต่อ: ขั้นสนใจ·คนโทรต่อ + ผลงานรายคน ─── */}
+        <TabsContent value="staff" className="mt-3 space-y-3">
+          <OverviewCard icon={Users} title="รายชื่อสนใจ · คนโทรต่อ">
+            {apps ? (
+              <JourneyList {...journeyStepsOfTab(view.journey, 'staff')} onOpenPart={(title, ids) => setNames({ title, ids })} />
+            ) : (
+              <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>
+            )}
+          </OverviewCard>
+          <OverviewCard icon={Users} title="ผลงานรายคน" sub={weekdays.length > 0 ? 'งานที่ลงผลในช่วงนี้ · ไม่กรองตามวัน' : 'งานที่ลงผลในช่วงนี้'}>
+            {data.staff ? <StaffTable staff={data.staff} ai={data.ai} /> : <SectionError message={data.errors.staff ?? 'อ่านผลงานรายคนไม่ได้'} />}
+          </OverviewCard>
+        </TabsContent>
+
+        {/* ─── นัดหมาย: นัด · มาไหม + คนแจ้งเข้ามาจากช่องทางไหน ─── */}
+        <TabsContent value="appt" className="mt-3 space-y-3">
+          <OverviewCard icon={CalendarDays} title="นัดหมาย">
+            {apps ? (
+              <JourneyList {...journeyStepsOfTab(view.journey, 'appt')} onOpenPart={(title, ids) => setNames({ title, ids })} />
             ) : (
               <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>
             )}
@@ -306,43 +391,8 @@ const RecruitOverview: React.FC<{
               <SectionError message={data.errors.channels ?? 'อ่านช่องทางไม่ได้'} />
             )}
           </OverviewCard>
-        </div>
-        <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={weekdays.length > 0 ? 'ณ วันนี้ · ไม่กรองตามวัน' : 'ณ วันนี้'}>
-          {data.backlog ? <BacklogBody backlog={data.backlog} /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
-        </OverviewCard>
-      </div>
-
-      {/* ─── กรอกแล้วโทรวันไหน + รายวัน ─── */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <OverviewCard icon={Timer} title="กรอกแล้วโทรวันไหน">
-          {apps ? <DelayList rows={view.delay} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
-        </OverviewCard>
-        <div className="min-w-0 lg:col-span-2">
-          <DailyCard rows={view.daily} icon={BarChart3} />
-        </div>
-      </div>
-
-      {/* ─── ช่องทาง + ตำแหน่ง ─── */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        {/* ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "facebook ad 200 สนใจ 100 … มา 10" + "จับได้ถึงแจ้งเข้า") */}
-        <OverviewCard
-          icon={Megaphone}
-          title="รายชื่อที่กรอกในช่วงนี้ ไปถึงไหนแยกช่องทาง"
-          sub={data.errors.informs ? 'อ่านแจ้งเข้า ERP ไม่ได้' : 'แจ้งเข้า = มีใบแจ้งเข้า ERP หลังวันกรอก'}
-          className="lg:col-span-2"
-        >
-          <ChannelFunnelTable rows={view.channels.rows} total={view.channels.total} onOpen={(title, ids) => setNames({ title, ids })} />
-        </OverviewCard>
-        <OverviewCard icon={Briefcase} title="ตำแหน่งที่สมัคร" sub="10 อันดับ">
-          <PositionList rows={view.positions} />
-        </OverviewCard>
-      </div>
-
-      {/* ─── เหตุผลที่ไม่สำเร็จ ─── */}
-      {/* ฐาน = ทุกรายชื่อของช่วง (เส้นทางขั้น 4 นับเฉพาะคนที่ตอบ AI ว่าสนใจ — QA 18 ต.ค. 2569 เลขเลยต่างกัน) */}
-      <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub="ทุกรายชื่อของช่วงนี้">
-        <ReasonColumns groups={view.reasons} />
-      </OverviewCard>
+        </TabsContent>
+      </Tabs>
 
       <JourneyNamesDialog
         open={names !== null}
@@ -350,11 +400,6 @@ const RecruitOverview: React.FC<{
         title={names?.title ?? ''}
         ids={names?.ids ?? []}
       />
-
-      {/* ─── ผลงานรายคน ─── */}
-      <OverviewCard icon={Users} title="ผลงานรายคน" sub={weekdays.length > 0 ? 'งานที่ลงผลในช่วงนี้ · ไม่กรองตามวัน' : 'งานที่ลงผลในช่วงนี้'}>
-        {data.staff ? <StaffTable staff={data.staff} ai={data.ai} /> : <SectionError message={data.errors.staff ?? 'อ่านผลงานรายคนไม่ได้'} />}
-      </OverviewCard>
     </div>
   );
 };
