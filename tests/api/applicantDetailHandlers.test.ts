@@ -151,9 +151,11 @@ describe('GET detail_of — ประวัติการสมัคร + ก�
       if (/select id, phone_e164, job_id, department_code from/i.test(sql)) {
         return Promise.resolve({ rows: [{ id: ID, phone_e164: '+66812345678', job_id: 'J1', department_code: 'LBD' }] });
       }
-      if (/where phone_e164 = \$1 and id <> \$2/i.test(sql)) {
+      // 21 ต.ค. 2569: ประวัตินับใบนี้ด้วย (ไม่มี id <> $2 แล้ว)
+      if (/where phone_e164 = \$1\s/i.test(sql)) {
         return Promise.resolve({
           rows: [
+            { id: ID, created_at: '2026-09-05T03:00:00.000Z', job_id: 'J1', department_code: 'LBD', job_title: 'ขับรถ', unit_name: 'หน่วย ข', position_interest: null, status: 'new', channel_label: null },
             { id: OTHER_APP, created_at: '2026-09-01T03:00:00.000Z', job_id: 'J2', department_code: 'LBD', job_title: 'รปภ.', unit_name: 'หน่วย ก', position_interest: null, status: 'new', channel_label: 'Facebook' },
             { id: HIDDEN_APP, created_at: '2026-08-01T03:00:00.000Z', job_id: 'J3', department_code: 'OTHER', job_title: 'แม่บ้าน', unit_name: null, position_interest: null, status: 'new', channel_label: null },
           ],
@@ -180,7 +182,8 @@ describe('GET detail_of — ประวัติการสมัคร + ก�
     await handler(req('GET', null, { detail_of: ID }) as never, res as never);
     expect(status).toHaveBeenCalledWith(200);
     const body = json.mock.calls[0][0];
-    expect(body.history.map((h: { id: string }) => h.id)).toEqual([OTHER_APP]);
+    expect(body.history.map((h: { id: string }) => h.id)).toEqual([ID, OTHER_APP]);
+    expect(body.history.map((h: { is_current: boolean }) => h.is_current)).toEqual([true, false]);
     expect(body.aiCalls).toEqual([
       { id: 7, status: 'completed', created_at: '2026-09-02T03:00:00.000Z', result_at: '2026-09-02T03:05:00.000Z', outcome: 'confirmed', attempts: 2, next_attempt_at: null },
     ]);

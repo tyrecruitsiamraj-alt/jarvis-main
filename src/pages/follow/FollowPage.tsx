@@ -153,6 +153,7 @@ import { buildFollowPlanningRows, callCategory, followEntryYmd, type FollowPlann
 import { toYmdBangkok, formatYmdTh } from '@/lib/dateTh';
 import { tbdPlaceholderAts } from '@/lib/followTbd';
 import { followDayNoOptions, followDayNoText } from '@/lib/followDayNo';
+import { editDayBaseOf, editDayNosOf, type EditDayBase } from '@/lib/followEditDayNo';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
 import {
@@ -372,6 +373,8 @@ const FollowPage: React.FC = () => {
    * เช่น เคยตามไปแล้ว 2 ครั้ง ชุดใหม่เลือก 3 → วันถัดไปนับ 4, 5 … · 1 = นับใหม่ตามเดิม (ไม่ส่งค่า)
    */
   const [planDayStart, setPlanDayStart] = useState(1);
+  /** ค่าเดิมของ "ติดตามครั้งที่" ตอนเปิดแก้ไข (21 ต.ค. 2569 · `followEditDayNo.ts`) — null = ไม่ได้อยู่ในโหมดแก้ */
+  const [editDayBase, setEditDayBase] = useState<EditDayBase | null>(null);
   /**
    * "ติดตามครั้งที่" รายวันของตารางหลายวัน (140 · เจ้าของ 8 ต.ค. 2569: *"ย้ายให้มันอยู่ตรงหน้าของวันที่เลือกติดตามได้มั้ย
    * พฤหัส เลือกติดตามครั้งที่ 1 · ศุกร์ ครั้งที่ 2 · เสาร์ ครั้งที่ 3 ไปเรื่อย ๆ จนถึงครั้งที่ 7"*)
@@ -822,6 +825,7 @@ const FollowPage: React.FC = () => {
     setEditSet(null);
     setDateFrom('');
     setPlanDayStart(1);
+    setEditDayBase(null);
     setDayNos({});
     setDateTo('');
     setRoundTimes(['07:00']);
@@ -876,6 +880,10 @@ const FollowPage: React.FC = () => {
       setCallRounds(editable.map((r, i) => r.call_round ?? i + 1));
       setCallModes(editable.map((r) => (r.time_tbd ? 'tbd' : r.call_mode === 'manual' ? 'manual' : 'ai')));
       setRoundIds(editable.map((r) => r.id));
+      // "ติดตามครั้งที่" เดิม (21 ต.ค. 2569 — เดิมขึ้น 1 ทุกครั้ง)
+      const base = editDayBaseOf(editable);
+      setEditDayBase(base);
+      setPlanDayStart(base.first);
     } else {
       // ไม่มีสายที่ยังแก้ได้ — ขั้น 3 เริ่มที่รอบใหม่หนึ่งรอบ (ไม่แตะ = ไม่เพิ่ม · ดู submitEdit)
       setStaffPhones([entry.staff_phone ?? '']);
@@ -1280,7 +1288,12 @@ const FollowPage: React.FC = () => {
     };
     setSubmitting(true);
     try {
-      const up = await updateFollowSet(editSet.anchorId, { ...fields, replan: !scheduleChanged });
+      const dayNos = editDayNosOf(editDayBase, planDayStart);
+      const up = await updateFollowSet(editSet.anchorId, {
+        ...fields,
+        replan: !scheduleChanged,
+        ...(dayNos.length > 0 ? { plan_day_nos: dayNos } : {}),
+      });
       const parts = [`แก้ไขแล้ว ${up.updated.toLocaleString('th-TH')} สาย`];
       if (scheduleChanged) {
         // สายที่ยังแก้ได้เป็นหัว (เบอร์เพิ่งเปลี่ยนทั้งชุดอนาคต) · ไม่มีเลย = สายที่กดแก้
@@ -3013,12 +3026,26 @@ const FollowPage: React.FC = () => {
               </ReplaceStartFields>
             ) : step === 3 ? (
             <>
-            {/* แก้ไข (20 ต.ค. 2569): ขั้น 3 = สายที่ยังไม่โทรของชุด · ไม่มีสลับโหมด/ติดตามครั้งที่ (ใช้ตอนตั้งชุดใหม่) */}
+            {/* แก้ไข (20 ต.ค. 2569): ขั้น 3 = สายที่ยังไม่โทรของชุด · ไม่มีสลับโหมด
+                "ติดตามครั้งที่" แก้ได้ (เจ้าของ 21 ต.ค. 2569 "แก้ไขครั้งที่ติดตามไม่ได้อะ") — ขยับทุกวันไปเท่ากัน (`followEditDayNo.ts`) */}
             {editSet ? (
-              <p className="text-xs text-muted-foreground">
-                สายที่ยังไม่โทร {editSet.editableIds.length.toLocaleString('th-TH')} สาย
-                {editSet.lockedCount > 0 ? ` · โทรไปแล้ว ${editSet.lockedCount.toLocaleString('th-TH')} สาย แก้ไม่ได้` : ''}
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  สายที่ยังไม่โทร {editSet.editableIds.length.toLocaleString('th-TH')} สาย
+                  {editSet.lockedCount > 0 ? ` · โทรไปแล้ว ${editSet.lockedCount.toLocaleString('th-TH')} สาย แก้ไม่ได้` : ''}
+                </p>
+                {!editSet.replace && editDayBase && editDayBase.ids.length > 0 ? (
+                  <div className="flex items-center gap-2" data-testid="edit-day-no">
+                    <span className="text-xs font-medium text-muted-foreground">ติดตามครั้งที่</span>
+                    <ChoiceDropdown<string>
+                      value={String(planDayStart)}
+                      options={followDayNoOptions(planDayStart)}
+                      onChange={(v) => setPlanDayStart(Number(v))}
+                      ariaLabel="ติดตามครั้งที่ (แก้ไข)"
+                    />
+                  </div>
+                ) : null}
+              </div>
             ) : (
             <>
             {/* สลับโหมด: รอบเดี่ยว/หลายรอบ (เวลาเจาะจง) vs ตารางหลายวัน (ช่วงวัน × รอบ/วัน) */}

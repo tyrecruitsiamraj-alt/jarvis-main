@@ -1125,10 +1125,11 @@ async function getApplicationDetailExtras(req: AuthedReq, res: ApiRes, id: strin
       `select id, created_at, job_id, department_code, job_title, unit_name, position_interest,
               status, channel_label
          from ${tbl}
-        where phone_e164 = $1 and id <> $2
+        where phone_e164 = $1
         order by created_at desc
         limit 50`,
-      [base.phone_e164, id],
+      // ใบนี้ด้วย (21 ต.ค. 2569 เจ้าของ "สมัคร 2 ครั้ง แต่ประวัติการสมัครขึ้น 1 ครั้ง") — นับตรงกับป้าย "สมัคร N ครั้ง"
+      [base.phone_e164],
     );
     const visible: Array<Record<string, unknown>> = [];
     for (const r of rows) {
@@ -1141,6 +1142,7 @@ async function getApplicationDetailExtras(req: AuthedReq, res: ApiRes, id: strin
           position_interest: r.position_interest,
           status: r.status,
           channel_label: r.channel_label,
+          is_current: r.id === id,
         });
       }
     }

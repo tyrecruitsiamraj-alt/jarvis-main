@@ -530,6 +530,8 @@ export type ApplicantHistoryItem = {
   position_interest: string | null;
   status: string;
   channel_label: string | null;
+  /** ใบที่เปิดดูอยู่ (21 ต.ค. 2569 — ประวัตินับใบนี้ด้วย ให้ตรงกับป้าย "สมัคร N ครั้ง") */
+  is_current?: boolean;
 };
 
 /** แท็บ "การโทร" — สายจาก AI ของใบนี้ */

@@ -1682,6 +1682,26 @@ async function updateFollowSet(req: AuthedReq, res: ApiRes, body: Record<string,
     );
     for (const r of updated) if (r.staff_call_outcome == null) r.staff_phone = staffRaw || null;
   }
+  /**
+   * "ติดตามครั้งที่" รายสาย (เจ้าของ 21 ต.ค. 2569 "แก้ไขครั้งที่ติดตามไม่ได้อะ") — เดิมเส้นแก้ไขไม่รับค่านี้เลย
+   * เฉพาะสายของชุดนี้ที่ยังไม่ปิด/ไม่ยกเลิก · ค่า 1–99 (91–94 = ขั้นที่มีชื่อ) · ยังไม่รัน 140 = ข้าม
+   */
+  const dayNos = Array.isArray(body.plan_day_nos) ? body.plan_day_nos : [];
+  for (const raw of dayNos.slice(0, 200)) {
+    const o = (raw ?? {}) as { id?: unknown; no?: unknown };
+    const id = typeof o.id === 'string' ? o.id : '';
+    const no = Number(o.no);
+    if (!UUID_RE.test(id) || !Number.isInteger(no) || no < 1 || no > 99) continue;
+    try {
+      await dbQuery(
+        `update ${followTable} set plan_day_no = $3
+          where id = $2 and ${setWhere} and cancelled_at is null and completed_at is null`,
+        [setKey, id, no],
+      );
+    } catch (e) {
+      if (!isUndefinedColumn(e)) throw e;
+    }
+  }
   try {
     await dbQuery(
       `update ${followTable}

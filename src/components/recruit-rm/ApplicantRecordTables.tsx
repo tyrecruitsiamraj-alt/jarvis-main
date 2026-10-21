@@ -90,10 +90,14 @@ const Td: React.FC<{ children: React.ReactNode; className?: string }> = ({ child
 const by = (name: string | null, at: string) => `${name || 'ไม่ระบุ'} · ${formatDateTimeTh(at)}`;
 
 export const HistoryTable: React.FC<{ items: ApplicantHistoryItem[] }> = ({ items }) => (
-  <Table head={['วันที่สมัคร', 'ตำแหน่ง / หน่วยงาน', 'ช่องทาง', 'สถานะ']} empty="ไม่มีใบสมัครอื่นของเบอร์นี้" isEmpty={items.length === 0}>
+  <Table head={['วันที่สมัคร', 'ตำแหน่ง / หน่วยงาน', 'ช่องทาง', 'สถานะ']} empty="ไม่มีประวัติการสมัคร" isEmpty={items.length === 0}>
     {items.map((h) => (
       <tr key={h.id} className="border-b border-border/50 last:border-0">
-        <Td className="whitespace-nowrap tabular-nums">{formatDateTimeTh(h.created_at)}</Td>
+        <Td className="whitespace-nowrap tabular-nums">
+          {formatDateTimeTh(h.created_at)}
+          {/* ใบที่เปิดดูอยู่ (21 ต.ค. 2569 — ประวัตินับใบนี้ด้วย) */}
+          {h.is_current ? <span className="block text-xs text-muted-foreground">ใบนี้</span> : null}
+        </Td>
         <Td>{[h.job_title || h.position_interest, h.unit_name].filter(Boolean).join(' — ') || EM_DASH}</Td>
         <Td>{h.channel_label || EM_DASH}</Td>
         <Td>{APPLICATION_STATUS_LABEL[h.status as PublicApplication['status']] ?? h.status}</Td>

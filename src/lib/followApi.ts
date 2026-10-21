@@ -378,6 +378,8 @@ export async function updateFollowSet(
     replan?: boolean;
     /** เบอร์เจ้าหน้าที่ทั้งชุด (ส่งคนแทน) — ไม่ส่ง = คงเดิม · ว่าง = ล้าง */
     staff_phone?: string;
+    /** "ติดตามครั้งที่" ใหม่รายสาย (21 ต.ค. 2569 · `followEditDayNo.ts`) — ไม่ส่ง = คงเดิม */
+    plan_day_nos?: Array<{ id: string; no: number }>;
   },
 ): Promise<{ updated: number; lumos: { pushed: boolean; reason: string | null } }> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(anchorId)}`, {
