@@ -87,6 +87,9 @@ export type RecruitRequestSummary = {
   appsOnReleased: number;
 };
 
+/** ใบขอของวันหนึ่ง (21 ต.ค. 2569 — กราฟรายวัน) */
+export type RecruitRequestDay = { day: string; total: number; released: number; releasedWithApps: number };
+
 /** งานค้างตอนนี้ — สถานะวันนี้ ไม่ขึ้นกับเดือนที่เลือก · อายุนับเป็นวันเต็ม (ครบ 24 ชม. = 1 วัน) */
 export type RecruitBacklog = {
   /** ยังไม่มีใครโทร — แยกอายุใบ · ในนั้นรอ AI โทรอยู่ / เบอร์ใช้โทรไม่ได้ */
@@ -149,6 +152,10 @@ export type RecruitOverviewResponse = {
   channelPlacement?: import('@/lib/channelPlacement').ChannelPlacement | null;
   /** ใบขอที่เข้ามาในช่วง · null = อ่านไม่ได้ (ดู errors.requests) · ไม่มี = เส้นรุ่นเก่า */
   requests?: RecruitRequestSummary | null;
+  /** ใบขอของช่วงก่อน (prevFrom–prevTo) — กราฟเทียบเดือนก่อน (21 ต.ค. 2569) · null = อ่านไม่ได้ */
+  requestsPrev?: RecruitRequestSummary | null;
+  /** ใบขอรายวัน prevFrom–to (วันที่ใบเข้ามา) — กราฟรายวันของแท็บใบขอ · null = อ่านไม่ได้ */
+  requestDays?: RecruitRequestDay[] | null;
   /** ก้อนที่อ่านไม่ได้ + เหตุ (ก้อนล้มแยกกัน — ห้ามโชว์ 0 แทน) */
   errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board' | 'requests' | 'channels' | 'informs', string>>;
 };

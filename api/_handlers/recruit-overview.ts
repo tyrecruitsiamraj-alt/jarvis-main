@@ -61,6 +61,7 @@ import type {
   RecruitBacklog,
   RecruitOverviewResponse,
   RecruitRequestSummary,
+  RecruitRequestDay,
   RecruitStaffRow,
 } from '../../src/lib/recruitOverviewTypes.js';
 
@@ -311,6 +312,21 @@ export function toRequestSummary(rows: ReadonlyArray<{ releasedAt: string | null
   };
 }
 
+/** ใบขอรายวัน (วันที่ใบเข้ามา) — กราฟรายวันของแท็บใบขอ (21 ต.ค. 2569) */
+export function toRequestDays(rows: ReadonlyArray<{ day: string; releasedAt: string | null; applications: number }>): RecruitRequestDay[] {
+  const by = new Map<string, RecruitRequestDay>();
+  for (const r of rows) {
+    const d = by.get(r.day) ?? { day: r.day, total: 0, released: 0, releasedWithApps: 0 };
+    by.set(r.day, d);
+    d.total += 1;
+    if (r.releasedAt) {
+      d.released += 1;
+      if (r.applications > 0) d.releasedWithApps += 1;
+    }
+  }
+  return [...by.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
+
 /** งานค้างจากแถวดิบ — อายุเป็นวันเต็ม (ครบ 24 ชม. = 1 วัน) นับจาก `now` */
 export function toBacklog(rows: Row[], appointments: RecruitBacklog['appointments'], now: number): RecruitBacklog {
   const uncalled = { total: 0, d0_3: 0, d4_7: 0, over7: 0, inQueue: 0, badPhone: 0 };
@@ -505,11 +521,8 @@ export async function buildRecruitOverview(
     // ใบขอที่เข้ามาในช่วง (เจ้าของ 19 ต.ค. 2569 ภาพรวมข้อ 1) — ฐานเดียวกับ "ใบขอเข้ามา · ประกาศแล้ว" ของหน้าหลัก
     // ช่องทางที่ได้คนลงงาน (เจ้าของ 19 ต.ค. 2569) — นับตามวันแจ้งเข้า · ไม่กรอง BU/วันในสัปดาห์
     settle('ช่องทางลงงาน', () => loadChannelPlacement({ from: window.from, to: window.to })),
-    settle('ใบขอ', async () =>
-      toRequestSummary(
-        await loadOnlineRequestRows({ from: window.from, to: window.to, bu, departmentScope: scope }),
-      ),
-    ),
+    // ใบขอช่วงก่อน + ช่วงนี้ อ่านทีเดียว แล้วแบ่ง (เจ้าของ 21 ต.ค. 2569 "อยากได้เป็นกราฟเชิงเปรียบเทียบว่า เพิ่มขึ้นลดลง")
+    settle('ใบขอ', () => loadOnlineRequestRows({ from: window.prevFrom, to: window.to, bu, departmentScope: scope })),
     // ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "จับได้ถึงแจ้งเข้า") — แจ้งเข้าตั้งแต่ต้นช่วงเทียบ · iRecruit ย้อน 60 วัน
     settle('ใบแจ้งเข้า ERP', () => loadInformDaysByPhone(window.prevFrom)),
     settle('ช่องทาง iRecruit', () => loadIrecruitRegsByPhone(window.prevFrom, window.to)),
@@ -552,9 +565,15 @@ export async function buildRecruitOverview(
     body.channelPlacement = null;
     body.errors.channels = chR.error;
   }
-  if (reqR.ok) body.requests = reqR.value;
-  else {
+  if (reqR.ok) {
+    const inRange = (from: string, to: string) => reqR.value.filter((r) => r.day >= from && r.day <= to);
+    body.requests = toRequestSummary(inRange(window.from, window.to));
+    body.requestsPrev = toRequestSummary(inRange(window.prevFrom, window.prevTo));
+    body.requestDays = toRequestDays(reqR.value);
+  } else {
     body.requests = null;
+    body.requestsPrev = null;
+    body.requestDays = null;
     body.errors.requests = reqR.error;
   }
 

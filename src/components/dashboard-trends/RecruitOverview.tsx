@@ -60,6 +60,9 @@ import ChannelPlacementTable from './ChannelPlacementTable';
 import ChannelFunnelTable from './ChannelFunnelTable';
 import { buildChannelFunnel } from '@/lib/channelFunnel';
 import { OVERVIEW_TABS, overviewTabOf, journeyStepsOfTab } from '@/lib/recruitOverviewTabs';
+import { compareRowsOf, dailySeriesOf } from '@/lib/recruitCompare';
+import CompareBarsCard, { type ComparePeriod } from './CompareBarsCard';
+import { toYmdBangkok } from '@/lib/dateTh';
 
 /**
  * ═══ แท็บ "ภาพรวม" ของกล่องงาน = ภาพรวมงานสรรหาแบบ iRecruit (เจ้าของสั่ง 30 ก.ย. 2569) ═══
@@ -77,6 +80,13 @@ import { OVERVIEW_TABS, overviewTabOf, journeyStepsOfTab } from '@/lib/recruitOv
 
 type Load = { data: RecruitOverviewResponse | null; loading: boolean; error: string | null };
 
+/** n วันล่าสุดถึงวันนี้ (ปฏิทินไทย) */
+function lastDays(n: number): DateRangeYmd {
+  const to = toYmdBangkok(new Date());
+  const from = new Date(Date.parse(`${to}T00:00:00Z`) - (n - 1) * 86_400_000).toISOString().slice(0, 10);
+  return { from, to };
+}
+
 const RecruitOverview: React.FC<{
   /**
    * 🔴 ยอด "ประกาศ" จากหัวกล่องงาน (เจ้าของ 1 ต.ค. 2569: *"เปลี่ยนเป็น 7 เหมือนหัวกล่องงาน"*) — หน้าแม่ส่งมา
@@ -90,7 +100,8 @@ const RecruitOverview: React.FC<{
    * ช่วงที่เลือกเอง — รายวันหรือช่วง (เจ้าของสั่ง 5 ต.ค. 2569: *"อยากดูแบบรายวันหรือ ช่วงได้ด้วย"*)
    * มีค่า = ไม่ใช้เดือน · เลือกเดือนจากปุ่มเดือน = กลับแบบเดือน
    */
-  const [range, setRange] = useState<DateRangeYmd | null>(null);
+  // ค่าเริ่ม = 7 วันล่าสุด เทียบ 7 วันก่อนหน้า (เจ้าของ 21 ต.ค. 2569 "Default เป็น 7 วันย้อนหลัง") · เลือกเดือน/วัน/ช่วงได้จากปุ่มช่วงเวลา
+  const [range, setRange] = useState<DateRangeYmd | null>(() => lastDays(7));
   const setMonth = (m: string) => {
     setRange(null);
     setMonthState(m);
@@ -147,6 +158,9 @@ const RecruitOverview: React.FC<{
     return {
       cur,
       prev,
+      /** รายชื่อของช่วงนี้/ช่วงก่อน — กราฟรายวันในการ์ดเทียบ (21 ต.ค. 2569) */
+      list,
+      prevList,
       /** ข้อมูลเริ่มกลางช่วงก่อน (ไม่ใช่ไม่มีเลย) */
       prevPartial: !prevFull && !!data.firstDay && data.firstDay <= win.prevTo,
       journey: buildRecruitJourney(cohort),
@@ -189,6 +203,32 @@ const RecruitOverview: React.FC<{
   const appsError = data.errors.apps ?? null;
   const weekdayText = WEEKDAY_CHOICES.filter((d) => weekdays.includes(d.day)).map((d) => d.short).join(' ');
   const periodLabel = `${isRange ? rangeText({ from: win.from, to: win.to }) : monthLabel(win.month)}${weekdayText ? ` · ${weekdayText}` : ''}`;
+
+  /** การ์ดเทียบช่วงก่อนของแต่ละแท็บ — แบบเดือน = ชื่อเดือนเทียบกัน · แบบช่วง = ช่วงวันเทียบกัน (21 ต.ค. 2569) */
+  const curPeriodLabel = isRange ? rangeText({ from: win.from, to: win.to }) : monthLabel(win.month);
+  const prevPeriodLabel = isRange ? rangeText({ from: win.prevFrom, to: win.prevTo }) : monthLabel(shiftMonth(win.month, -1));
+  const compareCard = (t: (typeof OVERVIEW_TABS)[number]['id']) => (
+    <CompareBarsCard
+      key={`${t}-${win.from}-${win.to}`}
+      rows={compareRowsOf(t, view.cur, view.prev, data.requests, data.requestsPrev)}
+      curLabel={curPeriodLabel}
+      prevLabel={prevPeriodLabel}
+      note={
+        t !== 'requests' && !view.prev
+          ? view.prevPartial && data.firstDay
+            ? `ไม่เทียบ${prevWord} ข้อมูลเพิ่งเริ่ม ${rangeText({ from: data.firstDay, to: data.firstDay })}`
+            : `${prevWord}ยังไม่มีข้อมูล`
+          : win.isCurrent && !isRange
+            ? `เทียบช่วงวันเท่ากัน ${rangeText({ from: win.prevFrom, to: win.prevTo })}`
+            : null
+      }
+      seriesOf={(key: string, period: ComparePeriod) =>
+        period === 'cur'
+          ? dailySeriesOf(key, win.from, win.to, view.list, data.requestDays)
+          : dailySeriesOf(key, win.prevFrom, win.prevTo, view.prevList, data.requestDays)
+      }
+    />
+  );
 
   const compareNote = [
     view.prev
@@ -257,6 +297,9 @@ const RecruitOverview: React.FC<{
                   onChange={setRange}
                 />
               </div>
+              <Button type="button" size="xs" variant="outline" onClick={() => setRange(lastDays(7))} data-testid="recruit-last7">
+                7 วันล่าสุด
+              </Button>
               {/* เฉพาะวันในสัปดาห์ (เจ้าของสั่ง 18 ต.ค. 2569) — เลือกได้หลายวัน · ไม่เลือก = ทุกวัน · มีผลทั้งหน้า */}
               <div className="space-y-2" data-testid="recruit-weekdays">
                 <p className={cn('text-xs', DASH.sub)}>เฉพาะวัน</p>
@@ -307,7 +350,8 @@ const RecruitOverview: React.FC<{
         </TabsList>
 
         {/* ─── ใบขอ: เส้นทางใบขอ + งานค้าง ─── */}
-        <TabsContent value="requests" className="mt-3">
+        <TabsContent value="requests" className="mt-3 space-y-3">
+          {compareCard('requests')}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <OverviewCard icon={FileText} title="ใบขอ" sub={weekdays.length > 0 ? 'ไม่กรองตามวัน' : undefined} className="lg:col-span-2">
               {data.requests ? (
@@ -324,6 +368,7 @@ const RecruitOverview: React.FC<{
 
         {/* ─── กรอกเข้ามา: กรอก + AI โทร · โทรวันไหน · รายวัน · ช่องทาง · ตำแหน่ง · เหตุผล ─── */}
         <TabsContent value="apps" className="mt-3 space-y-3">
+          {compareCard('apps')}
           <OverviewCard icon={Users} title="รายชื่อที่กรอกมา">
             {/* เดือนที่ยังไม่มีรายชื่อ = ขั้นครบเป็น 0 (กติกา 1 ต.ค.) · กดเลขเปิดรายชื่อ (18 ต.ค.) */}
             {apps ? (
@@ -362,6 +407,7 @@ const RecruitOverview: React.FC<{
 
         {/* ─── การติดต่อ: ขั้นสนใจ·คนโทรต่อ + ผลงานรายคน ─── */}
         <TabsContent value="staff" className="mt-3 space-y-3">
+          {compareCard('staff')}
           <OverviewCard icon={Users} title="การติดต่อ">
             {apps ? (
               <JourneyList {...journeyStepsOfTab(view.journey, 'staff')} onOpenPart={(title, ids) => setNames({ title, ids })} />
@@ -376,6 +422,7 @@ const RecruitOverview: React.FC<{
 
         {/* ─── นัดหมาย: นัด · มาไหม + คนแจ้งเข้ามาจากช่องทางไหน ─── */}
         <TabsContent value="appt" className="mt-3 space-y-3">
+          {compareCard('appt')}
           <OverviewCard icon={CalendarDays} title="นัดหมาย">
             {apps ? (
               <JourneyList {...journeyStepsOfTab(view.journey, 'appt')} onOpenPart={(title, ids) => setNames({ title, ids })} />

@@ -107,7 +107,9 @@ describe('หน้าจอ', () => {
     const api = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');
     expect(api).toContain('overAge: isOverAge(');
     expect(api).toContain('aiOutOfArea: Boolean(r.ai_outcome) && isOutOfAreaAnswer(');
-    expect(api).toContain('await loadOnlineRequestRows({ from: window.from, to: window.to, bu, departmentScope: scope })');
+    // 21 ต.ค. 2569: อ่านทีเดียวช่วงก่อน+ช่วงนี้ แล้วแบ่งเป็นใบขอช่วงนี้ / ช่วงก่อน / รายวัน (กราฟเทียบ)
+    expect(api).toContain('loadOnlineRequestRows({ from: window.prevFrom, to: window.to, bu, departmentScope: scope })');
+    expect(api).toContain('body.requests = toRequestSummary(inRange(window.from, window.to));');
   });
 });
 
