@@ -90,17 +90,18 @@ export const OPL_READ_FUNCTIONS: ReadonlySet<AppFunctionId> = new Set([
   'aftercare_read',
 ]);
 
-export const ROLE_ORDER: UserRole[] = ['opl', 'staff', 'supervisor', 'admin'];
+export const ROLE_ORDER: UserRole[] = ['sale', 'opl', 'staff', 'supervisor', 'admin'];
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   opl: 'OPL (อ่านอย่างเดียว)',
+  sale: 'Sale (อ่านอย่างเดียว)',
   staff: 'Staff',
   supervisor: 'Supervisor',
   admin: 'Admin',
 };
 
 function defaultEnabledForRole(role: UserRole, fn: AppFunctionDef): boolean {
-  if (role === 'opl') return OPL_READ_FUNCTIONS.has(fn.id);
+  if (role === 'opl' || role === 'sale') return OPL_READ_FUNCTIONS.has(fn.id);
   return meetsMinimumRole(role, fn.minimumRole);
 }
 

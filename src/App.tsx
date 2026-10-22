@@ -113,6 +113,7 @@ const ProtectedRoutes = () => {
                 หน้านี้จะเด้งกลับหน้าแรกเอง ⇒ พนักงานที่ยังใช้ของเดิมไม่มีทางหลงเข้ามา */}
             <Route path="/work" element={<WorkQueuePage />} />
             <Route path="/opl" element={<RoleHubPage role="opl" />} />
+            <Route path="/sale" element={<RoleHubPage role="sale" />} />
             <Route path="/staff" element={<RoleHubPage role="staff" />} />
             <Route path="/supervisor" element={<RoleHubPage role="supervisor" />} />
             <Route path="/admin" element={<RoleHubPage role="admin" />} />

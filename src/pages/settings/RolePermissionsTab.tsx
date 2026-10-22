@@ -61,7 +61,7 @@ const RolePermissionsTab: React.FC = () => {
             · <b>เป็นการจำลองหน้าจอเท่านั้น</b> ถ้ากดปุ่ม เซิร์ฟเวอร์ยังทำงานด้วยสิทธิ์ admin ของคุณ
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {(['opl', 'staff', 'supervisor'] as UserRole[]).map((r) => (
+            {(['sale', 'opl', 'staff', 'supervisor'] as UserRole[]).map((r) => (
               <button
                 key={r}
                 type="button"

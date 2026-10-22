@@ -2,7 +2,8 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
 /** Matches frontend `UserRole` in src/types */
-export type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
+/** sale = ฝ่ายขาย (22 ต.ค. 2569 เจ้าของ "ทำบทบาท sale ไว้รอ") — อ่านอย่างเดียวชุดเดียวกับ OPL จนกว่าหน้าประเมิน Tier เสร็จ */
+export type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl' | 'sale';
 
 export const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || 'jarvis_auth';
 
@@ -52,7 +53,7 @@ export function verifyAuthToken(token: string): JwtUserPayload {
   const email = typeof o.email === 'string' ? o.email : '';
   const role = o.role;
   if (!sub || !email) throw new Error('Invalid token claims');
-  if (role !== 'admin' && role !== 'supervisor' && role !== 'staff' && role !== 'opl') {
+  if (role !== 'admin' && role !== 'supervisor' && role !== 'staff' && role !== 'opl' && role !== 'sale') {
     throw new Error('Invalid role in token');
   }
   return { sub, email, role };

@@ -23,7 +23,7 @@ type UserRow = AuthUserRow & {
 };
 
 function isUserRole(v: unknown): v is UserRole {
-  return v === 'admin' || v === 'supervisor' || v === 'staff' || v === 'opl';
+  return v === 'admin' || v === 'supervisor' || v === 'staff' || v === 'opl' || v === 'sale';
 }
 
 export default async function handler(req: ApiReq, res: ApiRes) {

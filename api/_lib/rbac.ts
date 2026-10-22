@@ -6,14 +6,15 @@ export const ROLE_LEVEL: Record<UserRole, number> = {
   supervisor: 3,
   staff: 2,
   opl: 1,
+  sale: 1,
 };
 
 export function isReadOnlyRole(role: UserRole): boolean {
-  return role === 'opl';
+  return role === 'opl' || role === 'sale';
 }
 
 export function meetsMinimumRole(userRole: UserRole, minimum: UserRole): boolean {
-  if (userRole === 'opl') {
+  if (userRole === 'opl' || userRole === 'sale') {
     // OPL = read-only viewer: only pass routes/APIs whose minimum is staff or opl
     return minimum === 'staff' || minimum === 'opl';
   }

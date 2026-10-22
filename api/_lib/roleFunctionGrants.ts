@@ -37,7 +37,7 @@ export const FUNCTION_DEFAULT_MIN_ROLE: Record<string, UserRole> = {
 };
 
 export const VALID_FUNCTION_IDS = new Set(Object.keys(FUNCTION_DEFAULT_MIN_ROLE));
-export const VALID_ROLES: UserRole[] = ['opl', 'staff', 'supervisor', 'admin'];
+export const VALID_ROLES: UserRole[] = ['sale', 'opl', 'staff', 'supervisor', 'admin'];
 
 /** Keep in sync with src/lib/roleFunctions.ts */
 export const OPL_READ_FUNCTIONS = new Set([
@@ -54,7 +54,7 @@ export const OPL_READ_FUNCTIONS = new Set([
 export type GrantOverride = { role: UserRole; function_id: string; enabled: boolean };
 
 export function defaultFunctionEnabled(role: UserRole, functionId: string): boolean {
-  if (role === 'opl') return OPL_READ_FUNCTIONS.has(functionId);
+  if (role === 'opl' || role === 'sale') return OPL_READ_FUNCTIONS.has(functionId);
   const minimum = FUNCTION_DEFAULT_MIN_ROLE[functionId];
   if (!minimum) return false;
   return meetsMinimumRole(role, minimum);
@@ -143,7 +143,7 @@ export function canToggleGrant(
   enabled: boolean,
 ): { ok: true } | { ok: false; message: string } {
   if (enabled) {
-    if (role === 'opl' && !OPL_READ_FUNCTIONS.has(functionId)) {
+    if ((role === 'opl' || role === 'sale') && !OPL_READ_FUNCTIONS.has(functionId)) {
       return { ok: false, message: 'OPL เปิดได้เฉพาะฟังก์ชันอ่านอย่างเดียว' };
     }
     return { ok: true };

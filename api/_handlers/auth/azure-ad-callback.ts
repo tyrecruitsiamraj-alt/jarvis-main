@@ -25,7 +25,7 @@ function getQuery(req: ApiReq, key: string): string {
 }
 
 function isUserRole(v: unknown): v is UserRole {
-  return v === 'admin' || v === 'supervisor' || v === 'staff' || v === 'opl';
+  return v === 'admin' || v === 'supervisor' || v === 'staff' || v === 'opl' || v === 'sale';
 }
 
 type AzureUserRow = AuthUserRow & { azure_oid: string | null };

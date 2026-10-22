@@ -3,7 +3,8 @@ import type { UnitRequestWorkStatus } from '@/lib/unitRequestWorkStatus';
 import type { RequestLeadRulesOverride } from '@/lib/requestLeadKind';
 
 // ============ AUTH & USERS ============
-export type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
+/** sale = ฝ่ายขาย (22 ต.ค. 2569 เจ้าของ "ทำบทบาท sale ไว้รอ") — อ่านอย่างเดียวชุดเดียวกับ OPL จนกว่าหน้าประเมิน Tier เสร็จ */
+export type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl' | 'sale';
 
 export interface User {
   id: string;

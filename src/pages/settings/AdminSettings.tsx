@@ -679,6 +679,7 @@ const AdminSettings: React.FC = () => {
                           <option value="supervisor">supervisor</option>
                           <option value="staff">staff</option>
                           <option value="opl">opl (อ่านอย่างเดียว)</option>
+                          <option value="sale">sale (อ่านอย่างเดียว)</option>
                         </select>
                       </td>
                       <td className="px-4 py-3 text-center">

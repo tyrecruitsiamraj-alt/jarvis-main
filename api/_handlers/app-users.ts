@@ -33,7 +33,7 @@ const JOB_LANES = ['recruiter', 'screener', 'opl', 'online', 'replacement'] as c
 type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
 
 function isRole(v: unknown): v is UserRole {
-  return v === 'admin' || v === 'supervisor' || v === 'staff' || v === 'opl';
+  return v === 'admin' || v === 'supervisor' || v === 'staff' || v === 'opl' || v === 'sale';
 }
 
 function toYmd(value: string | Date): string {

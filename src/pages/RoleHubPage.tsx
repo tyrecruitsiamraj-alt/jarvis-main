@@ -11,7 +11,7 @@ import { TONE, type ToneKey } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
 
-export type HubRole = 'opl' | 'staff' | 'supervisor' | 'admin';
+export type HubRole = 'opl' | 'sale' | 'staff' | 'supervisor' | 'admin';
 
 type HubLink = {
   path: string;
@@ -51,13 +51,14 @@ const ADMIN_EXTRA: HubLink[] = [
 ];
 
 function linksForRole(role: HubRole): HubLink[] {
-  if (role === 'opl' || role === 'staff') return STAFF_LINKS;
+  if (role === 'opl' || role === 'sale' || role === 'staff') return STAFF_LINKS;
   if (role === 'supervisor') return [...STAFF_LINKS, ...SUPERVISOR_EXTRA];
   return [...STAFF_LINKS, ...SUPERVISOR_EXTRA, ...ADMIN_EXTRA];
 }
 
 const titles: Record<HubRole, { title: string; subtitle: string }> = {
   opl: { title: 'OPL', subtitle: 'เมนูสำหรับผู้ใช้งานอ่านอย่างเดียว' },
+  sale: { title: 'Sale', subtitle: 'เมนูสำหรับผู้ใช้งานอ่านอย่างเดียว' },
   staff: { title: 'Staff', subtitle: 'เมนูสำหรับพนักงาน / สตาฟ' },
   supervisor: { title: 'Supervisor', subtitle: 'เมนูสำหรับหัวหน้างาน' },
   admin: { title: 'Admin', subtitle: 'เมนูสำหรับผู้ดูแลระบบ' },

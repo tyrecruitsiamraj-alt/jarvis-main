@@ -50,7 +50,7 @@ interface AuthContextType {
 
 const VIEW_AS_KEY = 'jarvis.viewAsRole';
 const VIEW_AS_DEPT_KEY = 'jarvis.viewAsDepartment';
-const VIEWABLE_ROLES: UserRole[] = ['opl', 'staff', 'supervisor', 'admin'];
+const VIEWABLE_ROLES: UserRole[] = ['sale', 'opl', 'staff', 'supervisor', 'admin'];
 function isViewableRole(v: string): v is UserRole {
   return (VIEWABLE_ROLES as string[]).includes(v);
 }
@@ -68,6 +68,7 @@ const ROLE_HIERARCHY: Record<UserRole, number> = {
   supervisor: 3,
   staff: 2,
   opl: 1,
+  sale: 1,
 };
 
 function mapApiUser(raw: Record<string, unknown>): User | null {
