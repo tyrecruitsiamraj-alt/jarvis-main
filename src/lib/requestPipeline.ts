@@ -335,7 +335,10 @@ export function summarizePipeline(rows: readonly PipelineRequest[]) {
   let deduct = 0;
   let penaltyDays = 0;
   let replacedDays = 0;
+  /** วันผ่านมารวม (ไม่นับล่วงหน้า) — ผ่านมารวม − ส่งคนแทนรวม = โดนปรับรวม */
+  let ageDays = 0;
   for (const r of rows) {
+    ageDays += r.penaltyDays === null ? 0 : (r.ageDays ?? 0);
     buckets[r.bucket] += 1;
     stuck[r.stuck] += 1;
     fine += r.fine;
@@ -343,5 +346,5 @@ export function summarizePipeline(rows: readonly PipelineRequest[]) {
     penaltyDays += r.penaltyDays ?? 0;
     replacedDays += r.replacedDays;
   }
-  return { total: rows.length, buckets, stuck, fine: Math.round(fine * 100) / 100, deduct: Math.round(deduct * 100) / 100, penaltyDays, replacedDays };
+  return { total: rows.length, buckets, stuck, fine: Math.round(fine * 100) / 100, deduct: Math.round(deduct * 100) / 100, penaltyDays, replacedDays, ageDays };
 }

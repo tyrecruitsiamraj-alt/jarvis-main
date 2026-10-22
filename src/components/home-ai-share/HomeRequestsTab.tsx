@@ -54,7 +54,8 @@ function stepNumbers(key: PipelineStepKey, c: PipelineCounts, opts: { requests: 
     case 'request':
       return { main: opts.requests, unit: 'ใบ', parts: [] };
     case 'released':
-      return { main: opts.released, unit: 'ใบ', parts: [part('ยังไม่ประกาศ', opts.requests - opts.released, 'neutral')] };
+      // ผ่าน/ติดอยู่ในคอลัมน์ใบแล้ว — คอลัมน์แยกผลเป็นของคนเท่านั้น
+      return { main: opts.released, unit: 'ใบ', parts: [] };
     case 'apps':
       return { main: c.apps, unit: 'คน', parts: [] };
     case 'ai':
@@ -92,11 +93,12 @@ function stepNumbers(key: PipelineStepKey, c: PipelineCounts, opts: { requests: 
     case 'passed':
       return { main: c.passed, unit: 'คน', parts: [part('ไม่ผ่าน', c.notPassed, 'danger')] };
     case 'follow':
-      return { main: c.followStarts, unit: 'คน', parts: [part('ส่งคนแทน (วัน)', opts.replacedDays, 'teal')] };
+      // วันส่งคนแทนอยู่การ์ดใบขอค้าง (หน่วยวัน ไม่ปนคอลัมน์คน)
+      return { main: c.followStarts, unit: 'คน', parts: [] };
     case 'aftercare':
       return { main: c.aftercare, unit: 'คน', parts: [] };
     case 'closed':
-      return { main: null, unit: 'ใบ', parts: [part('ยังเปิด', opts.requests, 'neutral')] };
+      return { main: null, unit: 'ใบ', parts: [] };
   }
 }
 
@@ -112,7 +114,16 @@ const EMPTY_COUNTS: PipelineCounts = {
   interested: 0, notInterested: 0, appointed: 0, apptFailed: 0, showed: 0, noShow: 0, passed: 0, notPassed: 0, followStarts: 0, aftercare: 0,
 };
 
-/** เส้น 12 ขั้น — ใช้ทั้งภาพรวมและรายใบ */
+/** ลำดับขั้น (1–12) ของคีย์ */
+const STEP_INDEX = new Map(PIPELINE_STEPS.map((s, i) => [s.key, i]));
+/** ขั้นที่นับ "ผ่าน/ติด" รายใบได้ (2–10) */
+const STUCKABLE = new Set<PipelineStepKey>(['released', 'apps', 'ai', 'staff', 'interested', 'appointment', 'showed', 'passed', 'follow']);
+
+/**
+ * เส้น 12 ขั้นเป็นตาราง — คอลัมน์แยกหน่วย (เจ้าของ 22 ต.ค. 2569 "หน่วยนับมันควรตรงกัน การจัดวาง ระยะห่างก็ไม่เท่ากัน")
+ * ภาพรวม: ขั้น · ใบที่ผ่านขั้นนี้ · ติดขั้นนี้ (ใบ — ผ่านขั้นก่อน − ติดขั้นนี้ = ผ่านขั้นนี้) · คน · แยกผล (คน)
+ * รายใบ: ขั้น · สถานะของใบ (ผ่าน / ติดตรงนี้ / ยังไม่ถึง) · คน · แยกผล
+ */
 function StepLine({
   counts,
   requests,
@@ -133,46 +144,89 @@ function StepLine({
   /** รายใบ: ขั้นที่ใบนี้ติด */
   stuckOf?: PipelineStepKey;
 }) {
+  const single = stuckOf !== undefined;
+  // ใบที่ผ่านขั้น i = ทั้งหมด − ใบที่ติดขั้นก่อนหน้าหรือขั้นนี้
+  let passedSoFar = requests;
   return (
-    <ol className="divide-y divide-foreground/10" data-testid="req-steps-list">
-      {PIPELINE_STEPS.map((s) => {
-        const n = stepNumbers(s.key, counts, { requests, released, replacedDays });
-        const stuckHere = stuckCount?.[s.key] ?? 0;
-        return (
-          <li key={s.key} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2" data-testid={`req-step-${s.key}`}>
-            <span className="flex w-56 shrink-0 items-center gap-2 text-sm text-foreground">
-              <span className="w-6 text-right tabular-nums text-muted-foreground">{s.no}</span>
-              {s.label}
-              {stuckOf === s.key ? <Badge variant="destructive">ติดตรงนี้</Badge> : null}
-            </span>
-            <span className="w-24 shrink-0 text-right text-lg font-medium tabular-nums text-foreground">
-              {n.main === null ? '—' : fmt(n.main)} <span className="text-xs font-normal text-muted-foreground">{n.unit}</span>
-            </span>
-            <span className="flex min-w-0 flex-1 flex-wrap gap-x-3 gap-y-1 text-sm tabular-nums">
-              {n.parts.map((p) => (
-                <span key={p.label} className="inline-flex items-center gap-1.5 text-muted-foreground">
-                  <span className={cn('h-2 w-2 rounded-full', TONE[p.tone].dot)} aria-hidden />
-                  {p.label} <span className="font-medium text-foreground">{fmt(p.value)}</span>
-                </span>
-              ))}
-            </span>
-            {onStuck && stuckCount && s.key !== 'request' && s.key !== 'closed' && s.key !== 'aftercare' ? (
-              <Button
-                type="button"
-                variant={activeStuck === s.key ? 'default' : 'outline'}
-                size="sm"
-                className="shrink-0"
-                disabled={stuckHere === 0}
-                onClick={() => onStuck(s.key)}
-                data-testid={`req-stuck-${s.key}`}
-              >
-                ติดขั้นนี้ {fmt(stuckHere)} ใบ
-              </Button>
-            ) : null}
-          </li>
-        );
-      })}
-    </ol>
+    <div className="overflow-x-auto">
+      <Table data-testid="req-steps-list">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-xs">ขั้น</TableHead>
+            {single ? (
+              <TableHead className="text-xs">ใบนี้</TableHead>
+            ) : (
+              <>
+                <TableHead className="whitespace-nowrap text-right text-xs">ผ่านขั้นนี้ (ใบ)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ติดขั้นนี้ (ใบ)</TableHead>
+              </>
+            )}
+            <TableHead className="whitespace-nowrap text-right text-xs">คน</TableHead>
+            <TableHead className="text-xs">แยกผล (คน)</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {PIPELINE_STEPS.map((s) => {
+            const n = stepNumbers(s.key, counts, { requests, released, replacedDays });
+            const stuckHere = STUCKABLE.has(s.key) ? (stuckCount?.[s.key] ?? 0) : null;
+            if (stuckHere !== null) passedSoFar -= stuckHere;
+            const passed = s.key === 'request' ? requests : STUCKABLE.has(s.key) && s.key !== 'follow' ? passedSoFar : null;
+            const idx = STEP_INDEX.get(s.key) ?? 0;
+            const mine = stuckOf ? (STEP_INDEX.get(stuckOf) ?? 0) : 0;
+            const status = !single ? null : s.key === stuckOf ? 'ติดตรงนี้' : idx < mine ? 'ผ่าน' : 'ยังไม่ถึง';
+            // ขั้นที่นับคนไม่ได้ (ใบขอ · ประกาศ · ปิด) ใช้คอลัมน์ "คน" เป็น —
+            const people = n.unit === 'คน' ? n.main : null;
+            return (
+              <TableRow key={s.key} data-testid={`req-step-${s.key}`}>
+                <TableCell className="whitespace-nowrap text-sm text-foreground">
+                  <span className="inline-block w-6 tabular-nums text-muted-foreground">{s.no}</span>
+                  {s.label}
+                </TableCell>
+                {single ? (
+                  <TableCell className="whitespace-nowrap text-sm">
+                    {status === 'ติดตรงนี้' ? <Badge variant="destructive">ติดตรงนี้</Badge> : <span className="text-muted-foreground">{status}</span>}
+                  </TableCell>
+                ) : (
+                  <>
+                    <TableCell className="text-right font-medium tabular-nums">{passed === null ? '—' : fmt(passed)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {stuckHere === null ? (
+                        '—'
+                      ) : onStuck ? (
+                        <Button
+                          type="button"
+                          variant={activeStuck === s.key ? 'default' : 'outline'}
+                          size="sm"
+                          className="min-w-12 tabular-nums"
+                          disabled={stuckHere === 0}
+                          onClick={() => onStuck(s.key)}
+                          data-testid={`req-stuck-${s.key}`}
+                        >
+                          {fmt(stuckHere)}
+                        </Button>
+                      ) : (
+                        fmt(stuckHere)
+                      )}
+                    </TableCell>
+                  </>
+                )}
+                <TableCell className="text-right font-medium tabular-nums">{people === null ? '—' : fmt(people)}</TableCell>
+                <TableCell className="text-sm">
+                  <span className="flex flex-wrap gap-x-3 gap-y-1 tabular-nums">
+                    {n.parts.map((p) => (
+                      <span key={p.label} className="inline-flex items-center gap-1.5 text-muted-foreground">
+                        <span className={cn('h-2 w-2 rounded-full', TONE[p.tone].dot)} aria-hidden />
+                        {p.label} <span className="font-medium text-foreground">{fmt(p.value)}</span>
+                      </span>
+                    ))}
+                  </span>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
@@ -221,8 +275,8 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs">ช่องทาง</TableHead>
-                <TableHead className="text-right text-xs">ลงทะเบียน</TableHead>
-                <TableHead className="text-right text-xs">ลงงาน</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ลงทะเบียน (คน)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ลงงาน (คน)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -255,7 +309,7 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
       )}
       {platforms ? (
         <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-channels-sum">
-          รวม ลงทะเบียน {fmt(sumReg)} · ลงงาน {fmt(sumPlaced)}
+          รวม ลงทะเบียน {fmt(sumReg)} คน · ลงงาน {fmt(sumPlaced)} คน
           {!platform && data?.channels ? ` · แจ้งเข้าทั้งหมด ${fmt(data.channels.informed)} คน` : ''}
         </p>
       ) : null}
@@ -312,48 +366,78 @@ const HomeRequestsTab: React.FC<{ win: { from: string | null; to: string | null 
 
       {/* 1. ใบขอค้าง */}
       <HomeSection title="ใบขอค้าง" sub="ณ วันนี้ · นับวันทำงานแบบเมนูใบขอ" testId="req-summary">
-        <p className="flex items-baseline gap-2">
-          <span className="text-sm text-muted-foreground">เหลือ</span>
-          <span className="text-3xl font-medium tabular-nums text-primary" data-testid="req-total">
-            {dash(sum.total)}
-          </span>
-          <span className="text-sm text-muted-foreground">ใบ</span>
-        </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {AGE_BUCKETS.map((b) => (
-            <Button
-              key={b.key}
-              type="button"
-              variant={filter?.kind === 'bucket' && filter.key === b.key ? 'default' : 'outline'}
-              className="h-auto flex-col items-start gap-1 rounded-xl p-3 text-left font-normal"
-              onClick={() => pick({ kind: 'bucket', key: b.key })}
-              data-testid={`req-bucket-${b.key}`}
-            >
-              <span className="flex items-center gap-1.5 text-xs">
-                <span className={cn('h-2 w-2 rounded-full', TONE[BUCKET_TONE[b.key]].dot)} aria-hidden />
-                {b.label}
+        {/* หน่วยเดียวกันอยู่กลุ่มเดียวกัน · หน่วยอยู่ที่หัวกลุ่ม (เจ้าของ 22 ต.ค. 2569 "หน่วยนับไม่ตรงกันมันจะชวนงง") */}
+        <div className="space-y-2" data-testid="req-group-requests">
+          <p className="text-xs font-medium text-muted-foreground">จำนวนใบ</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
+            <Card variant="solid" className="space-y-1 rounded-xl p-3">
+              <span className="block text-xs text-muted-foreground">เหลือทั้งหมด</span>
+              <span className="block text-xl font-medium tabular-nums text-primary" data-testid="req-total">
+                {dash(sum.total)}
               </span>
-              <span className="text-xl font-medium tabular-nums">{dash(sum.buckets[b.key])}</span>
-            </Button>
-          ))}
-        </div>
-        <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-bucket-sum">
-          {AGE_BUCKETS.map((b) => `${dash(sum.buckets[b.key])}`).join(' + ')} = {dash(sum.total)} ใบ
-        </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {(
-            [
-              ['ค่าปรับสะสม', `${ready ? BAHT.format(sum.fine) : '—'} บาท`, 'req-fine'],
-              ['ลดมูลค่าสะสม', `${ready ? BAHT.format(sum.deduct) : '—'} บาท`, 'req-deduct'],
-              ['วันโดนปรับรวม', `${dash(sum.penaltyDays)} วัน`, 'req-penalty-days'],
-              ['ส่งคนแทนได้รวม', `${dash(sum.replacedDays)} วัน`, 'req-replaced-days'],
-            ] as const
-          ).map(([label, value, id]) => (
-            <Card key={id} variant="solid" className="space-y-1 rounded-xl p-3" data-testid={id}>
-              <span className="block text-xs text-muted-foreground">{label}</span>
-              <span className="block text-lg font-medium tabular-nums text-foreground">{value}</span>
             </Card>
-          ))}
+            {AGE_BUCKETS.map((b) => (
+              <Button
+                key={b.key}
+                type="button"
+                variant={filter?.kind === 'bucket' && filter.key === b.key ? 'default' : 'outline'}
+                className="h-auto flex-col items-start justify-start gap-1 rounded-xl p-3 text-left font-normal"
+                onClick={() => pick({ kind: 'bucket', key: b.key })}
+                data-testid={`req-bucket-${b.key}`}
+              >
+                <span className="flex items-center gap-1.5 text-xs">
+                  <span className={cn('h-2 w-2 rounded-full', TONE[BUCKET_TONE[b.key]].dot)} aria-hidden />
+                  {b.label}
+                </span>
+                <span className="text-xl font-medium tabular-nums">{dash(sum.buckets[b.key])}</span>
+              </Button>
+            ))}
+          </div>
+          <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-bucket-sum">
+            {AGE_BUCKETS.map((b) => `${dash(sum.buckets[b.key])}`).join(' + ')} = {dash(sum.total)} ใบ
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="space-y-2" data-testid="req-group-days">
+            <p className="text-xs font-medium text-muted-foreground">จำนวนวัน (วันทำงาน)</p>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  ['ผ่านมารวม', sum.ageDays, 'req-age-days'],
+                  ['ส่งคนแทนได้', sum.replacedDays, 'req-replaced-days'],
+                  ['โดนปรับ', sum.penaltyDays, 'req-penalty-days'],
+                ] as const
+              ).map(([label, value, id]) => (
+                <Card key={id} variant="solid" className="space-y-1 rounded-xl p-3" data-testid={id}>
+                  <span className="block text-xs text-muted-foreground">{label}</span>
+                  <span className="block text-lg font-medium tabular-nums text-foreground">{dash(value)}</span>
+                </Card>
+              ))}
+            </div>
+            <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-days-sum">
+              {dash(sum.ageDays)} − {dash(sum.replacedDays)} = {dash(sum.penaltyDays)} วัน
+            </p>
+          </div>
+          <div className="space-y-2" data-testid="req-group-money">
+            <p className="text-xs font-medium text-muted-foreground">เงิน (บาท)</p>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  ['ค่าปรับ', sum.fine, 'req-fine'],
+                  ['ลดมูลค่า', sum.deduct, 'req-deduct'],
+                  ['รวม', sum.fine + sum.deduct, 'req-money-total'],
+                ] as const
+              ).map(([label, value, id]) => (
+                <Card key={id} variant="solid" className="space-y-1 rounded-xl p-3" data-testid={id}>
+                  <span className="block text-xs text-muted-foreground">{label}</span>
+                  <span className="block text-lg font-medium tabular-nums text-foreground">{ready ? BAHT.format(value) : '—'}</span>
+                </Card>
+              ))}
+            </div>
+            <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-money-sum">
+              {ready ? `${BAHT.format(sum.fine)} + ${BAHT.format(sum.deduct)} = ${BAHT.format(sum.fine + sum.deduct)} บาท` : '—'}
+            </p>
+          </div>
         </div>
         {data?.replacementSince ? (
           <p className="text-xs text-muted-foreground" data-testid="req-replacement-since">
@@ -406,13 +490,13 @@ const HomeRequestsTab: React.FC<{ win: { from: string | null; to: string | null 
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs">ใบขอ</TableHead>
-                <TableHead className="text-right text-xs">ผ่านมา</TableHead>
-                <TableHead className="text-right text-xs">คนสนใจ</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ผ่านมา (วัน)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">คนสนใจ (คน)</TableHead>
                 <TableHead className="text-xs">ติดขั้น</TableHead>
-                <TableHead className="text-right text-xs">ส่งคนแทน</TableHead>
-                <TableHead className="text-right text-xs">วันโดนปรับ</TableHead>
-                <TableHead className="text-right text-xs">ค่าปรับ</TableHead>
-                <TableHead className="text-right text-xs">ลดมูลค่า</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ส่งคนแทน (วัน)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">โดนปรับ (วัน)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ค่าปรับ (บาท)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ลดมูลค่า (บาท)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -452,14 +536,14 @@ const HomeRequestsTab: React.FC<{ win: { from: string | null; to: string | null 
                           </Button>
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-right tabular-nums">
-                          {r.advance ? <Badge variant="secondary">ล่วงหน้า</Badge> : r.ageDays === null ? '—' : `${fmt(r.ageDays)} วัน`}
+                          {r.advance ? <Badge variant="secondary">ล่วงหน้า</Badge> : fmt(r.ageDays)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{fmt(r.counts.aiYes)}</TableCell>
                         <TableCell className="whitespace-nowrap text-sm">
                           {step ? `${step.no}. ${r.stuckReason}` : '—'}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">{r.replacedDays > 0 ? `${fmt(r.replacedDays)} วัน` : '0'}</TableCell>
-                        <TableCell className="text-right tabular-nums">{r.penaltyDays === null ? '—' : `${fmt(r.penaltyDays)} วัน`}</TableCell>
+                        <TableCell className="text-right tabular-nums">{fmt(r.replacedDays)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{fmt(r.penaltyDays)}</TableCell>
                         <TableCell className="text-right tabular-nums">{r.finePerDay > 0 ? BAHT.format(r.fine) : <span className="text-muted-foreground">ไม่มี</span>}</TableCell>
                         <TableCell className="text-right tabular-nums">{r.deductPerDay > 0 ? BAHT.format(r.deduct) : <span className="text-muted-foreground">ไม่มี</span>}</TableCell>
                       </TableRow>
@@ -467,11 +551,22 @@ const HomeRequestsTab: React.FC<{ win: { from: string | null; to: string | null 
                         <TableRow data-testid={`req-detail-${r.requestNo}`}>
                           <TableCell colSpan={8} className="bg-muted/40">
                             <div className="space-y-2 p-2">
-                              <p className="text-xs tabular-nums text-muted-foreground">
-                                {r.advance ? 'ล่วงหน้า' : `ผ่านมา ${fmt(r.ageDays)} วัน − ส่งคนแทน ${fmt(r.replacedDays)} วัน = โดนปรับ ${fmt(r.penaltyDays)} วัน`}
-                                {r.finePerDay > 0 ? ` · ค่าปรับ ${NUM.format(r.finePerDay)}/วัน` : ''}
-                                {r.deductPerDay > 0 ? ` · ลดมูลค่า ${NUM.format(r.deductPerDay)}/วัน` : ''}
+                              {/* บรรทัดละหน่วย: วัน แล้วค่อยเงิน (เจ้าของ "หน่วยนับไม่ตรงกันมันจะชวนงง") */}
+                              <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-detail-days">
+                                {r.advance
+                                  ? 'ล่วงหน้า ยังไม่นับวัน'
+                                  : `ผ่านมา ${fmt(r.ageDays)} − ส่งคนแทน ${fmt(r.replacedDays)} = โดนปรับ ${fmt(r.penaltyDays)} วัน`}
                               </p>
+                              {!r.advance && r.finePerDay > 0 ? (
+                                <p className="text-xs tabular-nums text-muted-foreground">
+                                  ค่าปรับ {fmt(r.penaltyDays)} วัน × {NUM.format(r.finePerDay)} = {BAHT.format(r.fine)} บาท
+                                </p>
+                              ) : null}
+                              {!r.advance && r.deductPerDay > 0 ? (
+                                <p className="text-xs tabular-nums text-muted-foreground">
+                                  ลดมูลค่า {fmt(r.penaltyDays)} วัน × {NUM.format(r.deductPerDay)} = {BAHT.format(r.deduct)} บาท
+                                </p>
+                              ) : null}
                               <StepLine
                                 counts={r.counts}
                                 requests={1}
