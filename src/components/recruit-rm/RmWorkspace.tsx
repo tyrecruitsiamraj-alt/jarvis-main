@@ -264,7 +264,7 @@ const RmWorkspace: React.FC<{
    * ติดตามนัดหมาย: นัดทั้งหมด/มา/ไม่มา/รอผล (แทนกล่องตัวเลข 4 ใบ) · ไม่ผูก URL (ของคนที่นั่งดู)
    */
   const [contactChip, setContactChip] = useState<ContactChip>('all');
-  // ?appt=overdue = มาจากปุ่ม "ไปลงผล" บนแถบแดง (20 ต.ค. 2569) เปิดชิปเลยวันนัดเลย
+  // ?appt=overdue = เปิดชิปเลยวันนัดเลย (ลิงก์ตรง · แถบแดงที่เคยส่งมาถอดแล้ว 22 ต.ค. 2569)
   const [appointmentChip, setAppointmentChip] = useState<AppointmentChip>(() =>
     searchParams.get('appt') === 'overdue' ? 'overdue' : 'all',
   );

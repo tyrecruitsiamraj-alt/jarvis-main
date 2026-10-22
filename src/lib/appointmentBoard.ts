@@ -92,7 +92,7 @@ export function buildAppointmentBoard(rows: readonly AppointmentBoardRow[], nowM
  */
 /** `today` = นัดวันนี้ (QA รอบ 3 ข้อ 23 · ไม่มีปุ่มดูนัดวันนี้) — คนละแกนกับผลนัด ไม่อยู่ในสูตร มา + ไม่มา + รอผล = ทั้งหมด */
 /** `passed` / `not_passed` = ส่วนย่อยของ "มา" (18 ต.ค. 2569) — ไม่อยู่ในสูตร มา + ไม่มา + รอผล = ทั้งหมด */
-/** `overdue` = เลยวันนัดเกิน 24 ชม. ยังไม่ลงผล ย้อนไม่เกิน 30 วัน — เกณฑ์เดียวกับแถบแดงหัวกล่องงาน
+/** `overdue` = เลยวันนัดเกิน 24 ชม. ยังไม่ลงผล ย้อนไม่เกิน 30 วัน — เกณฑ์เดียวกับตัวเตือนรายวัน `appointmentResultReminder.ts`
  *  (`appointmentResultReminder.ts` · เจ้าของ 20 ต.ค. 2569 "มันไม่ตรงกันปะ" → Choice เพิ่มชิป) · ส่วนย่อยของ "รอผล" */
 export type AppointmentChip = 'all' | 'today' | 'showed' | 'no_show' | 'pending' | 'overdue' | 'passed' | 'not_passed';
 

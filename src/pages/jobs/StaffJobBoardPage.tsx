@@ -5,7 +5,6 @@ import JobBoardView, { BOARD_VIEW_TABS, type BoardViewId } from '@/components/jo
 import { usePageTitle } from '@/hooks/usePageTitle';
 import RmWorkspace from '@/components/recruit-rm/RmWorkspace';
 import ImportApplicantsDialog from '@/components/recruit-rm/ImportApplicantsDialog';
-import AppointmentOverdueBar from '@/components/recruit-rm/AppointmentOverdueBar';
 import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import type { JobRequest } from '@/types';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
@@ -139,17 +138,6 @@ const StaffJobBoardPage: React.FC = () => {
     /* ระยะขอบเท่าหน้าอื่นทั้งระบบ — เดิมดึงขอบออก (-mx-*) เพื่อให้พื้นไล่สีเต็มจอ ซึ่งถอดไปแล้ว
        27 ก.ย. 2569 (เจ้าของ: "หน้ากล่องงานไม่เข้ากับหน้าอื่นๆเลย" → แบบ A หัว PageHeader ชุดเดียวกัน) */
     <div className="relative">
-      {/* นัดเลยวันเกิน 24 ชม. ยังไม่ลงผล (เจ้าของ 20 ต.ค. 2569) — กดแล้วไปแท็บติดตามนัดหมาย */}
-      <AppointmentOverdueBar
-        onOpen={() => {
-          const params = new URLSearchParams(searchParams);
-          params.set('view', 'appointments');
-          params.delete('tab');
-          params.set('appt', 'overdue');
-          setSearchParams(params);
-        }}
-        refreshKey={listRev}
-      />
       <JobBoardView
         jobs={jobs}
         loading={loading}

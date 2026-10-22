@@ -34,11 +34,10 @@ describe('เตือนนัดที่ยังไม่ลงผล', () =
     expect(g.noOwner).toBe(1);
     expect(read('server/local-api.ts')).toContain('startAppointmentReminderWorker();');
   });
-  it('แถบแดงบนหัวกล่องงาน กดแล้วไปแท็บติดตามนัดหมาย', () => {
+  it('แถบแดงบนหัวกล่องงานถอดแล้ว (เจ้าของ 22 ต.ค. 2569 "เอาออก") · ชิปเลยวันนัดในแท็บติดตามนัดหมายยังอยู่', () => {
     const page = read('src/pages/jobs/StaffJobBoardPage.tsx');
-    expect(page).toContain('<AppointmentOverdueBar');
-    expect(page).toContain("params.set('appt', 'overdue');");
-    expect(read('api/_handlers/registry.ts')).toContain("'/api/appointment-overdue': appointmentOverdueHandler");
+    expect(page).not.toContain('AppointmentOverdueBar');
+    expect(read('api/_handlers/registry.ts')).not.toContain('/api/appointment-overdue');
   });
 });
 
