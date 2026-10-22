@@ -33,6 +33,8 @@ export type SearchableSelectProps = {
   emptyText?: string;
   disabled?: boolean;
   className?: string;
+  /** ชื่อปุ่มสำหรับโปรแกรมอ่านจอ/เทสต์ (เช่น "จังหวัด") */
+  ariaLabel?: string;
 };
 
 const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -45,6 +47,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   emptyText = 'ไม่พบรายการ',
   disabled = false,
   className,
+  ariaLabel,
 }) => {
   const [open, setOpen] = useState(false);
 
@@ -76,6 +79,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         <button
           type="button"
           disabled={disabled}
+          aria-label={ariaLabel}
           className={cn(
             'jarvis-soft-field w-full min-h-10 flex items-center justify-between gap-2 text-left text-sm',
             !selected && 'text-muted-foreground',

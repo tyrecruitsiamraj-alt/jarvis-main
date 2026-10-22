@@ -451,7 +451,11 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
       // หน้าเดียว: กางกล่องเพศแล้วเลื่อนไปหา · ตั้งไม่ประกาศ = ปุ่มยกเลิกอยู่ล่างสุดของหน้าอยู่แล้ว
       if (k === 'benefits') {
         setOpenBox('gender');
-        window.setTimeout(() => document.querySelector('[data-testid="box-gender"]')?.scrollIntoView?.({ block: 'center' }), 50);
+        // เช็ก document ก่อน — เทสต์ปิดหน้าไปแล้วตัวจับเวลายังยิง ⇒ "document is not defined" ทำชุดตรวจตกเป็นพัก ๆ (22 ต.ค. 2569)
+        window.setTimeout(() => {
+          if (typeof document === 'undefined') return;
+          document.querySelector('[data-testid="box-gender"]')?.scrollIntoView?.({ block: 'center' });
+        }, 50);
       }
     }
     else if (quick) setQuickStep('fill');

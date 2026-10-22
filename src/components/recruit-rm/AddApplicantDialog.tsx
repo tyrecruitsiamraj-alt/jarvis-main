@@ -242,23 +242,32 @@ const AddApplicantDialog: React.FC<{
             </div>
             <div className="space-y-1.5">
               <label className={labelCls}>จังหวัด</label>
-              <FieldSelect
+              {/* พิมพ์ค้นได้ (เจ้าของ 22 ต.ค. 2569 "ทำให้ค้นหาได้") — 77 จังหวัดเลื่อนหายาก */}
+              <SearchableSelect
                 ariaLabel="จังหวัด"
+                className="h-11"
                 value={province}
                 onChange={(v) => {
                   setProvince(v);
                   setDistrict(''); // อำเภอของจังหวัดเดิมใช้กับจังหวัดใหม่ไม่ได้
                 }}
+                placeholder="ไม่ระบุ"
+                searchPlaceholder="พิมพ์ชื่อจังหวัด"
+                emptyText="ไม่พบจังหวัด"
                 options={[{ value: '', label: 'ไม่ระบุ' }, ...THAI_PROVINCE_NAMES_SORTED.map((p) => ({ value: p, label: p }))]}
               />
             </div>
             <div className="space-y-1.5">
               <label className={labelCls}>อำเภอ/เขต</label>
-              <FieldSelect
+              <SearchableSelect
                 ariaLabel="อำเภอ/เขต"
+                className="h-11"
                 value={district}
                 onChange={setDistrict}
                 disabled={!province}
+                placeholder={province ? 'ไม่ระบุ' : 'เลือกจังหวัดก่อน'}
+                searchPlaceholder="พิมพ์ชื่ออำเภอ/เขต"
+                emptyText="ไม่พบอำเภอ/เขต"
                 options={[{ value: '', label: province ? 'ไม่ระบุ' : 'เลือกจังหวัดก่อน' }, ...districts.map((d) => ({ value: d, label: d }))]}
               />
             </div>

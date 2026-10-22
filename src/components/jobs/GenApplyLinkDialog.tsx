@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FieldSelect } from '@/components/shared/FieldSelect';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import type { JobRequest } from '@/types';
@@ -374,10 +375,15 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                   />
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-muted-foreground">จังหวัด</label>
-                    <FieldSelect
+                    {/* พิมพ์ค้นได้ แบบเดียวกับฟอร์มเพิ่มผู้สมัคร (22 ต.ค. 2569) */}
+                    <SearchableSelect
                       ariaLabel="จังหวัด"
+                      className="h-11"
                       value={province}
                       onChange={setProvince}
+                      placeholder="ไม่ระบุ"
+                      searchPlaceholder="พิมพ์ชื่อจังหวัด"
+                      emptyText="ไม่พบจังหวัด"
                       options={[{ value: '', label: 'ไม่ระบุ' }, ...THAI_PROVINCE_NAMES_SORTED.map((p) => ({ value: p, label: p }))]}
                     />
                   </div>
