@@ -29,7 +29,6 @@ import {
   RM_EDUCATION_LEVELS,
   RM_LICENSE_TYPES,
   RM_SEX_OPTIONS,
-  RM_SPECIFIC_TYPES,
   normalizeRmPhone,
 } from '@/lib/recruitRmMasters';
 
@@ -38,7 +37,7 @@ import {
  *
  * ช่องทั้งหมดตามฟอร์มของระบบเดิมที่เจ้าของส่งมา 11 ส.ค. 2569:
  * ชื่อ · นามสกุล · อายุ · เพศ · เบอร์โทร · LINE ID · จังหวัด · อำเภอ ·
- * ตำแหน่งงานที่สนใจ · ประเภทเจาะจง · วุฒิการศึกษา · ผู้รับผิดชอบ ·
+ * ตำแหน่งงานที่สนใจ · วุฒิการศึกษา (ประเภทเจาะจงถอดแล้ว — เจ้าของ 22 ต.ค. 2569 "เอาออกเลย") · ผู้รับผิดชอบ ·
  * ช่องทางการรับสมัคร · ประเภทใบขับขี่
  *
  * ⚠️ บันทึกลง**ตารางใบสมัครเดียวกับที่มาจากลิงก์** — ไม่แยกตารางใหม่ ไม่งั้นยอดในหน้า
@@ -89,7 +88,6 @@ const AddApplicantDialog: React.FC<{
   const [jobPick, setJobPick] = useState<string>(NO_JOB);
   const [openJobs, setOpenJobs] = useState<JobRequest[]>([]);
   const [callMode, setCallMode] = useState<CallMode | ''>('');
-  const [specificType, setSpecificType] = useState('');
   const [education, setEducation] = useState('');
   const [responsible, setResponsible] = useState('');
   /** ช่องทางที่ผู้สมัครมาจาก — 1:1 ตาม ChannelPicker แบบใหม่ (2 ก.ย. 2569) */
@@ -112,7 +110,6 @@ const AddApplicantDialog: React.FC<{
     setDistrict('');
     setJobPick(job?.id ?? NO_JOB);
     setCallMode('');
-    setSpecificType('');
     setEducation('');
     setResponsible('');
     setChannel(null);
@@ -169,7 +166,6 @@ const AddApplicantDialog: React.FC<{
         province: province || null,
         district: district || null,
         position_interest: picked ? publicJobTitle(picked) : (fromProp?.positionLabel ?? null),
-        specific_type: specificType || null,
         education: education || null,
         responsible_name: staff.find((u) => u.id === responsible)?.name ?? null,
         channel_id: channel?.id ?? null,
@@ -295,15 +291,6 @@ const AddApplicantDialog: React.FC<{
                   ]}
                 />
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className={labelCls}>ประเภทเจาะจง</label>
-              <FieldSelect
-                ariaLabel="ประเภทเจาะจง"
-                value={specificType}
-                onChange={setSpecificType}
-                options={[{ value: '', label: 'ไม่ระบุ' }, ...RM_SPECIFIC_TYPES.map((t) => ({ value: t, label: t }))]}
-              />
             </div>
             <div className="space-y-1.5">
               <label className={labelCls}>วุฒิการศึกษา</label>

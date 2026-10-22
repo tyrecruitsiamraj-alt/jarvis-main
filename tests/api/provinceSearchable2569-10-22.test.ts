@@ -15,3 +15,11 @@ describe('จังหวัด/อำเภอค้นหาได้', () => 
     expect(read('src/components/shared/SearchableSelect.tsx')).toContain('aria-label={ariaLabel}');
   });
 });
+
+describe('ฟอร์มเพิ่มผู้สมัคร ถอดช่องประเภทเจาะจง (เจ้าของ 22 ต.ค. 2569 "เอาออกเลย")', () => {
+  it('ไม่มีช่อง/ค่าประเภทเจาะจงในฟอร์มเพิ่ม', () => {
+    const add = read('src/components/recruit-rm/AddApplicantDialog.tsx');
+    expect(add).not.toContain('ariaLabel="ประเภทเจาะจง"');
+    expect(add).not.toContain('specific_type:');
+  });
+});
