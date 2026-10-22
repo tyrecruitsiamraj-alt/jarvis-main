@@ -13775,3 +13775,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - รายการส่งทีม Lumos `docs/lumos/lumos-cancel-oldid-2569-10-22.md` (กลุ่ม 1 ยังต้องโทร 124 · กลุ่ม 2 ยกเลิกแล้ว 23 · กลุ่ม 3 มีแผน -g แล้ว 28)
 - หลัง Lumos ยืนยัน: ตั้งค่า › เชื่อมระบบภายนอก › การ์ด "Lumos · แผนรหัสเดิม" (`src/pages/settings/LumosOldIdRepushCard.tsx`) → `/api/follow-oldid-repush` (แอดมิน · GET นับ · POST ส่ง) → `api/_lib/followOldIdRepush.ts` ทำเครื่องหมาย `lumos_plan_closed_at` ที่หัวขบวนเดิม (ห้ามยิง DELETE แผนที่จบแล้ว) แล้ว `replanFollowSetWithLumos` = รหัส `-g` ใหม่ เวลาเดิม
 - 🔴 กดก่อน Lumos ยกเลิก = โทรซ้ำ 2 สาย (ป๊อปยืนยันบนการ์ด) · เทสต์ `tests/api/followOldIdRepush2569-10-22.test.ts`
+
+## แท็บติดตามนัดหมาย: ปุ่มวันที่กรองด้วยวันนัด (22 ต.ค. 2569 · เจ้าของ "ฉัน Filter วันที่ 27 ก็ไม่เจอนะ")
+- เดิมปุ่มวันที่บนหัวหน้า (`applicantDates` ใน StaffJobBoardPage → `rmFilters`) กรองวันที่สมัครทุกแท็บ ⇒ เลือกวันนัดแล้วได้ 0
+- `filterApplications` (`src/lib/recruitRm.ts`): แท็บ `appointments` ใช้ `applicationAppointmentYmd` (วันนัด เวลาไทย) · แท็บอื่นยังเป็นวันที่สมัคร · เทสต์ใน `tests/api/recruitRm.test.ts`

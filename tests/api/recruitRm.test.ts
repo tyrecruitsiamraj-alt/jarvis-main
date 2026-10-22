@@ -486,6 +486,22 @@ describe('filterApplications — ช่วงวันที่สมัคร (
     ).toEqual(['A', 'B', 'C']);
   });
 
+  it('🔴 แท็บติดตามนัดหมายกรองด้วยวันนัด (เวลาไทย) ไม่ใช่วันที่สมัคร — เจ้าของ 22 ต.ค. 2569 "Filter วันที่ 27 ก็ไม่เจอ"', () => {
+    const appt = app({
+      id: 'N',
+      status: 'converted',
+      created_at: '2026-10-19T15:43:45.000Z',
+      appointment_at: '2026-10-27T05:00:00.000Z',
+    });
+    // นัดตี 1 เวลาไทยของวันที่ 28 = 27 ตามเวลา UTC — ต้องนับเป็นวันที่ 28
+    const lateNight = app({ id: 'L', status: 'converted', created_at: '2026-10-19T00:00:00.000Z', appointment_at: '2026-10-27T18:30:00.000Z' });
+    const on27 = { ...EMPTY_RM_FILTERS, dateFrom: '2026-10-27', dateTo: '2026-10-27' };
+    expect(filterApplications([appt, lateNight], 'appointments', on27, '').map((r) => r.id)).toEqual(['N']);
+    expect(filterApplications([appt, lateNight], 'appointments', { ...EMPTY_RM_FILTERS, dateFrom: '2026-10-28', dateTo: '2026-10-28' }, '').map((r) => r.id)).toEqual(['L']);
+    // แท็บผู้สมัครยังกรองด้วยวันที่สมัคร
+    expect(filterApplications([appt], 'candidates', on27, '')).toHaveLength(0);
+  });
+
   it('countActiveRmFilters นับช่วงวันเป็น 1 (ไม่ว่าจะใส่ข้างเดียวหรือสองข้าง)', () => {
     expect(countActiveRmFilters(EMPTY_RM_FILTERS)).toBe(0);
     expect(countActiveRmFilters({ ...EMPTY_RM_FILTERS, dateFrom: '2026-08-01' })).toBe(1);

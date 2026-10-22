@@ -1,4 +1,5 @@
 import { fullDaysSince } from '@/lib/fullDays';
+import { toYmdBangkok } from '@/lib/dateTh';
 import { isOverAge } from '@/lib/applicantAge';
 import { aiQueueStatusOf } from '@/lib/applicantAiQueueStatus';
 import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
@@ -362,6 +363,15 @@ export const EMPTY_RM_FILTERS: RmFilters = {
   dateTo: null,
 };
 
+/**
+ * วันนัดในรูป YYYY-MM-DD เวลาไทย — null = ไม่มีนัด
+ * แท็บติดตามนัดหมายกรองช่วงวันด้วยวันนัด (เจ้าของ 22 ต.ค. 2569 *"ฉัน Filter วันที่ 27 ก็ไม่เจอนะ"* — เดิมกรองวันที่สมัคร)
+ */
+export function applicationAppointmentYmd(row: PublicApplication): string | null {
+  const t = Date.parse(row.appointment_at ?? '');
+  return Number.isFinite(t) ? toYmdBangkok(new Date(t)) : null;
+}
+
 /** วันที่สมัครในรูป YYYY-MM-DD (ตัดเวลาออก) — null = ไม่รู้วัน */
 export function applicationAppliedYmd(row: PublicApplication): string | null {
   const raw = row.created_at;
@@ -487,7 +497,8 @@ export function filterApplications(
     // ช่วงวันที่สมัคร — ใบที่ไม่รู้วันถือว่า "ไม่เข้าเงื่อนไข" เมื่อมีการกรองวัน
     // (ดีกว่าปล่อยผ่านแล้วคนอ่านคิดว่าใบนั้นสมัครในช่วงที่เลือก)
     if (filters.dateFrom || filters.dateTo) {
-      const ymd = applicationAppliedYmd(r);
+      // แท็บติดตามนัดหมาย = วันนัด · แท็บอื่น = วันที่สมัคร
+      const ymd = tab === 'appointments' ? applicationAppointmentYmd(r) : applicationAppliedYmd(r);
       if (!ymd) return false;
       if (filters.dateFrom && ymd < filters.dateFrom) return false;
       if (filters.dateTo && ymd > filters.dateTo) return false;
