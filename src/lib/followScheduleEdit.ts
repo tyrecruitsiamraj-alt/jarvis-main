@@ -24,7 +24,14 @@ export function isEditableFollowRound(e: FollowEntry, now: Date): boolean {
   const at = Date.parse(e.scheduled_at ?? '');
   if (!Number.isFinite(at) || at <= now.getTime() + EDIT_LOCK_BEFORE_MS) return false;
   if (e.call_mode === 'manual') return !e.staff_call_outcome;
-  return (e.call_status == null || e.call_status === 'pending') && !e.call_outcome && !e.called_at;
+  /**
+   * 🔴 ไม่ดู `called_at` (22 ต.ค. 2569 · เจ้าของ "เวลาแก้ไขเวลามันไม่แก้ไขอะ มันไปตั้งใหม่อะ")
+   * `called_at` จาก API = `updated_at` ของแถวคิว — สาย AI ที่ส่งแผนล่วงหน้ามีค่านี้ทุกสายตั้งแต่ยังไม่โทร
+   * ⇒ เดิมทุกสาย AI ในคิวถูกนับว่า "โทรแล้ว" ป๊อปแก้จึงไม่มีสายเดิม กดบันทึกแล้วได้สายใหม่ ของเดิมค้าง
+   * (เคสประทีป 21 ต.ค.: replaceIds ว่าง → สร้างสาย 07:00/08:00 เพิ่ม สาย "ยังไม่ระบุเวลา" ยังอยู่)
+   * โทรแล้วจริงดูจากสถานะคิว (delivered/completed/failed) + ผลโทร — ตรงกับด่าน stale ฝั่ง API (`q_status`/`q_result_at`)
+   */
+  return (e.call_status == null || e.call_status === 'pending') && !e.call_outcome;
 }
 
 /**

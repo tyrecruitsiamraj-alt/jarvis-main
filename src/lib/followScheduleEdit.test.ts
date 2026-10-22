@@ -38,10 +38,16 @@ describe('isEditableFollowRound', () => {
   it('อนาคต + AI ยังไม่โทร = แก้ได้', () => {
     expect(isEditableFollowRound(row({}), NOW)).toBe(true);
   });
+  it('🔴 สาย AI ที่ส่งแผนล่วงหน้าแล้ว (คิว pending · called_at = เวลาอัปเดตคิว) ยังแก้ได้ — เดิมแก้แล้วได้สายใหม่ (22 ต.ค. 2569)', () => {
+    expect(isEditableFollowRound(row({ call_status: 'pending', called_at: '2026-10-01T00:00:00.000Z' }), NOW)).toBe(true);
+    expect(isEditableFollowRound(row({ call_status: 'pending', called_at: '2026-10-01T00:00:00.000Z', time_tbd: true }), NOW)).toBe(true);
+  });
   it('🔴 เลยเวลาแล้ว / AI โทรแล้ว / ยกเลิก / ปิดงาน = แก้ไม่ได้', () => {
     expect(isEditableFollowRound(row({ scheduled_at: '2026-10-01T02:00:00.000Z' }), NOW)).toBe(false);
     expect(isEditableFollowRound(row({ call_status: 'completed', call_outcome: 'confirmed' }), NOW)).toBe(false);
-    expect(isEditableFollowRound(row({ called_at: '2026-10-01T02:00:00.000Z' }), NOW)).toBe(false);
+    expect(isEditableFollowRound(row({ call_status: 'delivered', called_at: '2026-10-01T02:00:00.000Z' }), NOW)).toBe(false);
+    // รอโทรซ้ำ (คิวยัง pending แต่มีผลรอบก่อน) = โทรไปแล้ว
+    expect(isEditableFollowRound(row({ call_status: 'pending', call_outcome: 'no_answer' }), NOW)).toBe(false);
     expect(isEditableFollowRound(row({ cancelled: true }), NOW)).toBe(false);
     expect(isEditableFollowRound(row({ completed_at: '2026-10-01T02:00:00.000Z' }), NOW)).toBe(false);
   });

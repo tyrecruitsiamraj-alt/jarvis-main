@@ -13765,3 +13765,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - เจ้าของ: *"Fill สถานะ การตอบของ Ai ได้ด้วย เช่น AI โทรแล้ว 1 ครั้ง ไม่ตอบ / AI โทรแล้ว 2 ครั้ง สายไม่ว่าง /ส่ง AI แล้ว ยังไม่มีผล"*
 - คำบรรทัดบนของคอลัมน์ "คำตอบกับ AI" ย้ายมาที่ `src/lib/applicantAiAnswerText.ts` (`aiAnswerTextOf`) ตัวเดียว — `AiAnswerCell` ใน `RmTable.tsx` แต่งสีอย่างเดียว · หัวข้อ `aiStatus` ใน `applicantFilters.ts` ใช้ค่าคำเดียวกันตรงตัว (ตารางกับตัวกรองพูดตรงกันเสมอ)
 - อยู่หลัง "ผลโทรล่าสุด" ใน `RECRUIT_TAB_FACETS` · ไม่มีในแท็บติดตามนัดหมาย · เทสต์ใน `src/lib/applicantFilters.test.ts`
+
+## แก้เวลาสาย AI แล้วได้สายใหม่ (22 ต.ค. 2569 · เจ้าของ "เวลาแก้ไขเวลามันไม่แก้ไขอะ มันไปตั้งใหม่อะ")
+- ต้นเหตุ `isEditableFollowRound` (`src/lib/followScheduleEdit.ts`) เช็ก `!called_at` แต่ `called_at` จาก `/api/follow` = `updated_at` ของแถวคิว ⇒ สาย AI ที่ส่งแผนล่วงหน้าทุกสายถูกนับว่าโทรแล้ว · ป๊อปแก้ไม่มีสายเดิม (`replaceIds: []` ใน audit `follow.schedule.replace`) → บันทึกแล้วสร้างสายใหม่ ของเดิมค้าง
+- แก้: ดูแค่สถานะคิว (pending) + ผลโทร ตรงกับด่าน stale ฝั่ง API · 🔴 ห้ามเอา `called_at` กลับมาเป็นตัวตัดสินว่าโทรแล้ว
