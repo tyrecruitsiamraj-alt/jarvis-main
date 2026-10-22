@@ -52,6 +52,26 @@ export function withIntegrationKey(name: string, handler: IntegrationHandler): I
       logWarn('integration.auth', { name, message: 'invalid key' });
       return sendError(res, 401, 'Unauthorized', 'x-api-key ไม่ถูกต้อง');
     }
+    void touchLastUsed(name);
     return handler(req, res);
   };
+}
+
+/** จดเวลาใช้ล่าสุด (หน้าตั้งค่า) — ไม่เกิน 1 ครั้ง/5 นาที/ชื่อ · ล้มก็เงียบ ห้ามทำคำขอหลักล้ม */
+const touched = new Map<string, number>();
+async function touchLastUsed(name: string): Promise<void> {
+  const last = touched.get(name) ?? 0;
+  if (Date.now() - last < 5 * 60_000) return;
+  touched.set(name, Date.now());
+  try {
+    await dbQuery(`update ${KEYS} set last_used_at = now() where name = $1 and revoked_at is null`, [name]);
+  } catch {
+    /* ฐานยังไม่รัน 162 ก็ไม่เป็นไร */
+  }
+}
+
+/** ล้างแคชหลังออก/ยกเลิก key จากหน้าตั้งค่า (key ใหม่ใช้ได้ทันที · ตัวเก่าใช้ไม่ได้ทันที) */
+export function clearIntegrationKeyCache(name?: string): void {
+  if (name) cache.delete(name);
+  else cache.clear();
 }

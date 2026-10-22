@@ -24,6 +24,7 @@ export const SETTINGS_TAB_IDS = [
   'callScripts',
   'aiSettings',
   'callSuppression',
+  'integrations',
   'pdpaRequests',
   'autoMove',
   'health',
@@ -48,6 +49,7 @@ export const SETTINGS_TAB_LABEL: Record<SettingsTabId, string> = {
   callScripts: 'บทพูดของ AI',
   aiSettings: 'AI ที่ใช้คิดงาน',
   callSuppression: 'บัญชีห้ามโทร',
+  integrations: 'เชื่อมระบบภายนอก',
   pdpaRequests: 'คำขอข้อมูลส่วนบุคคล',
   autoMove: 'ย้ายใบสมัครอัตโนมัติ',
   health: 'สถานะระบบ',
@@ -67,6 +69,7 @@ export const SETTINGS_TAB_HINT: Record<SettingsTabId, string> = {
   callScripts: 'แก้บทที่ AI พูดตอนโทร — มีผลกับสายใหม่ทันที',
   aiSettings: 'เลือกเจ้า AI และโมเดลที่ใช้จับคู่งานและอ่านใบขอ',
   callSuppression: 'เบอร์ที่ AI ไม่โทรถึงชั่วคราว — ดูเหตุผลและปลดได้',
+  integrations: 'key ของ So Scraping · ออกใหม่ / ยกเลิก',
   pdpaRequests: 'ขอดู ขอแก้ ขอลบข้อมูล (PDPA) · โทรยืนยันตัวตนแล้วทำต่อ',
   autoMove: 'ย้ายใบสมัครตามผลโทรอัตโนมัติ',
   health: 'ไฟสถานะ · สวิตช์ที่เปิดอยู่ · ของค้าง',
@@ -93,7 +96,7 @@ export const SETTINGS_GROUP_TABS: Record<SettingsGroupId, readonly SettingsTabId
   // ทีมสรรหา/คัดสรร/OPL/Online ถอดแล้ว (เจ้าของ 19 ต.ค. 2569) — รายชื่อเจ้าหน้าที่มาจากหน้าผู้ใช้งานที่เดียว
   people: ['users', 'roles'],
   look: ['appearance', 'navMenu'],
-  automation: ['lumosMode', 'callScripts', 'aiSettings', 'callSuppression', 'autoMove', 'matchWeights'],
+  automation: ['lumosMode', 'callScripts', 'aiSettings', 'callSuppression', 'autoMove', 'matchWeights', 'integrations'],
   data: ['workStatus', 'reference', 'pdpaRequests'],
   monitor: ['health', 'audit'],
 };
