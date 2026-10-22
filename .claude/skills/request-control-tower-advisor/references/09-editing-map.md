@@ -13753,3 +13753,8 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   - ช่องทาง `src/lib/channelPlatforms.ts` (`platformOf` Facebook/TikTok/LINE/เว็บหางาน/ออฟไลน์/อื่น ๆ/ไม่รู้) · จอ `src/components/home-ai-share/HomeRequestsTab.tsx` · เทสต์ `tests/api/requestPipeline2569-10-22.test.ts`
   - ⚠️ ส่งคนแทนมีข้อมูลตั้งแต่ 1 ต.ค. 2569 — ใบเก่ากว่านั้นวันโดนปรับเกินจริง (บอกบนจอ)
   - หน่วยตรงกันทั้งแท็บ (22 ต.ค. 2569 เจ้าของ "หน่วยนับไม่ตรงกันมันจะชวนงง"): เส้น 12 ขั้นเป็นตาราง คอลัมน์ ผ่านขั้นนี้ (ใบ) · ติดขั้นนี้ (ใบ) · คน · แยกผล (คน) · การ์ดค้างแยกกลุ่ม จำนวนใบ / จำนวนวัน / เงิน (บาท) · หน่วยอยู่หัวคอลัมน์ ตัวเลขในช่องไม่มีหน่วยต่อท้าย · ติดขั้นมีเหตุ (`stuckOf`)
+- So Scraping → Jarvis คอมเมนต์ใต้โพสต์ (22 ต.ค. 2569 · Choice ลงหน้าผู้สมัคร Journey เดียวกับเจ้าหน้าที่ · ซ้ำก็คือซ้ำ · ไม่มีเบอร์เก็บเฉย ๆ · AI รอ ai-call · ใช้ทางส่ง AI เดิม):
+  - `api/_handlers/so-scraping-integration.ts` — `POST /api/integrations/so-scraping/leads` (`parseStaffApplication` minimal + `lockAndFindRepeat` + `staffInsertParams(…,'So Scraping')` · ช่องทาง "Facebook คอมเมนต์" · ผู้รับผิดชอบ = recruiter ของใบขอ · do_not_call = suppression/holds) · `POST …/ai-call` (`chooseAi` export จาก `application-call-choice.ts` รับชื่อคนสั่งแทน req)
+  - ตาราง `so_scraping_comment_leads` (กันซ้ำ comment_url) · `app_integration_keys` (sha256) — migration 160 · ยืนยันตัว `api/_lib/integrationKeyAuth.ts` (`x-api-key`) · ออก key `node scripts/create-integration-key.mjs so-scraping`
+  - ตัวส่งอัตโนมัติ `applicationDispatchRetry` ข้ามใบ `created_by_name = 'So Scraping'` ที่ `call_choice` ยังว่าง · ตรรกะขาเข้า `src/lib/soScrapingLeads.ts` · เทสต์ `tests/api/soScrapingIntegration2569-10-22.test.ts`
+  - ⚠️ ไม่บันทึกความยินยอม PDPA แทน (ไม่มีเจ้าหน้าที่ยืนยัน)

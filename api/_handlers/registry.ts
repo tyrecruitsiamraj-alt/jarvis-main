@@ -59,6 +59,7 @@ import applicationAttendanceHandler from './application-attendance.js';
 import recruitRmOverviewHandler from './recruit-rm-overview.js';
 import recruitOverviewHandler from './recruit-overview.js';
 import requestPipelineHandler from './request-pipeline.js';
+import { soScrapingAiCallHandler, soScrapingLeadsHandler } from './so-scraping-integration.js';
 import applicationDispatchHandler from './application-dispatch.js';
 import applicationCallChoiceHandler from './application-call-choice.js';
 import selectionProgressHandler from './selection-progress.js';
@@ -250,6 +251,8 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/recruit-rm-overview': recruitRmOverviewHandler as ApiHandler,
   '/api/recruit-overview': recruitOverviewHandler as ApiHandler,
   '/api/request-pipeline': requestPipelineHandler as ApiHandler,
+  '/api/integrations/so-scraping/leads': soScrapingLeadsHandler as ApiHandler,
+  '/api/integrations/so-scraping/ai-call': soScrapingAiCallHandler as ApiHandler,
   '/api/application-dispatch': applicationDispatchHandler as ApiHandler,
   // "ใครจะโทรหาคนนี้" — ปุ่มเก็บไปโทรเอง (claim+ล็อกเบอร์) / ส่ง AI โทร · กอง "เลือกวิธีโทร"
   '/api/application-call-choice': applicationCallChoiceHandler as ApiHandler,

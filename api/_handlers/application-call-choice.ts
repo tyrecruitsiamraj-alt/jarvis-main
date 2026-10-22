@@ -58,6 +58,7 @@ const queueTbl = tableInAppSchema('lumos_dispatch_queue');
 /** เพดานต่อครั้ง — ปุ่ม "ทั้งหมด" ในแท็บไม่สนใจกดทีเดียวได้หลายสิบคน แต่ไม่ควรเป็นพัน */
 const MAX_IDS = 200;
 
+export type CallChoiceRow = Row;
 type Row = {
   id: string;
   full_name: string;
@@ -217,9 +218,12 @@ async function resendSilentAiCalls(appIds: string[]): Promise<Set<string>> {
   return new Set(rows.map((r) => r.app_id));
 }
 
-/** ส่ง AI = ปั๊มก่อนแล้วเข้าคิวผ่านคอขวดเดิม (ด่านกันซ้ำ/กันเบอร์ที่คนถือทำงานครบ) */
-async function chooseAi(
-  req: AuthedReq,
+/**
+ * ส่ง AI = ปั๊มก่อนแล้วเข้าคิวผ่านคอขวดเดิม (ด่านกันซ้ำ/กันเบอร์ที่คนถือทำงานครบ)
+ * `actorName` = คนสั่ง (อีเมลเจ้าหน้าที่ · "So Scraping" — 22 ต.ค. 2569 ระบบภายนอกใช้ตัวเดียวกัน `so-scraping-integration`)
+ */
+export async function chooseAi(
+  actorName: string | null,
   rows: Row[],
   greeting = false,
   /** ใบขอที่ปิดแล้ว (19 ต.ค. 2569) — ใบสมัครของใบพวกนี้นับเหมือนยังไม่ผูกใบขอ (ทักทาย/เลือกใบใหม่) */
@@ -273,7 +277,7 @@ async function chooseAi(
   }
   for (const [jobId, apps] of byJob) {
     // ปั๊มก่อนส่ง — ล้มกลางทางแล้วใบยังออกจากกองรอ ดีกว่ารอบถัดไปยิงซ้ำคนเดิม
-    await stampChoice(apps.map((a) => a.id), 'ai', req.user.email || null);
+    await stampChoice(apps.map((a) => a.id), 'ai', actorName);
     const outcome = await enqueueLumosInterviewForApplications(jobId, apps, { autoPush: true });
     done += outcome.queued;
     for (const s of outcome.skipped) {
@@ -287,7 +291,7 @@ async function chooseAi(
   }
   // บททักทายทั่วไป — ใบที่ไม่ผูกใบขอ (อายุเกิน/เบอร์ใช้ไม่ได้ ตัวส่งข้ามพร้อมเหตุผลเอง)
   if (greet.length > 0) {
-    await stampChoice(greet.filter((a) => !isOverAge(a.age)).map((a) => a.id), 'ai', req.user.email || null);
+    await stampChoice(greet.filter((a) => !isOverAge(a.age)).map((a) => a.id), 'ai', actorName);
     const outcome = await enqueueLumosGreetingForApplications(greet, { autoPush: true });
     done += outcome.queued;
     for (const s of outcome.skipped) skipped.push({ name: s.name, reason: s.reason });
@@ -390,7 +394,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         ? await chooseManual(req, allowed)
         : choice === 'release'
           ? await chooseRelease(req, allowed)
-          : await chooseAi(req, allowed, choice === 'ai' && raw?.greeting === true && !bindJobId, closedJobIds);
+          : await chooseAi(req.user.email || null, allowed, choice === 'ai' && raw?.greeting === true && !bindJobId, closedJobIds);
     result.skipped = [...skippedScope, ...result.skipped];
 
     void auditFromAuthed(req, {

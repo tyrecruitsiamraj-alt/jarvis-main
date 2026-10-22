@@ -40,6 +40,7 @@ export const RETRY_SINCE = '2026-10-15T09:00:00+07:00';
  * 🔴 นับเฉพาะใบที่คีย์ตั้งแต่เวลานี้ — ใบคีย์เก่าไม่ถูกโทรเงียบ ๆ
  */
 export const KEYED_AUTO_SINCE = '2026-10-20T10:00:00+07:00';
+import { SO_SCRAPING_CREATED_BY } from '../../src/lib/soScrapingLeads.js';
 const IRECRUIT_PULL_CREATED_BY = 'iRecruit';
 const MIN_AGE_MINUTES = 3;
 const MAX_AGE_DAYS = 7;
@@ -96,6 +97,8 @@ function unsentSql(linked: boolean): string {
       and a.unclaimed_at is null
       and coalesce(a.is_lead, false) = false
       and (a.call_choice is null or a.call_choice in ('ai', 'auto_ai'))
+      -- คอมเมนต์จาก So Scraping รอ ai-call ก่อน (เจ้าของ 22 ต.ค. 2569 Choice "รอ So Scraping เรียก ai-call") · เลือก AI แล้วส่งซ้ำได้ตามปกติ
+      and not (coalesce(a.created_by_name, '') = '${SO_SCRAPING_CREATED_BY}' and a.call_choice is null)
       and not exists (select 1 from ${QUEUE} q where q.person_ref = 'app-' || a.id::text)
       and not exists (select 1 from ${CANCELLATIONS} c where c.application_id = a.id)
       and not exists (select 1 from ${IRECRUIT_DUPS} d where d.application_id = a.id)
