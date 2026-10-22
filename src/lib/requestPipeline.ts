@@ -52,7 +52,7 @@ export const PIPELINE_STEPS: ReadonlyArray<{ key: PipelineStepKey; no: number; l
 
 export type AgeBucket = 'advance' | 'lt30' | 'd30to60' | 'gt60' | 'unknown';
 export const AGE_BUCKETS: ReadonlyArray<{ key: AgeBucket; label: string }> = [
-  { key: 'advance', label: 'ล่วงหน้า (ยังไม่ถึงวัน)' },
+  { key: 'advance', label: 'ล่วงหน้า' },
   { key: 'lt30', label: 'ต่ำกว่า 30 วัน' },
   { key: 'd30to60', label: '30–60 วัน' },
   { key: 'gt60', label: 'เกิน 60 วัน' },
