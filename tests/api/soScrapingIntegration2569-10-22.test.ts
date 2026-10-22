@@ -63,3 +63,12 @@ describe('Journey เดียวกับเจ้าหน้าที่ · A
     expect(m).toContain('create table if not exists app_integration_keys');
   });
 });
+
+describe('ใบขอปิดแล้วไม่รับ (ทดสอบเว็บจริง: LBM6910003 Stop แล้วยังรับ)', () => {
+  it('เช็กด่านใบขอปิดตัวเดียวกับปุ่มส่ง AI ก่อนบันทึก', () => {
+    const h = read('api/_handlers/so-scraping-integration.ts');
+    const at = h.indexOf('if (await isRequestClosedForApply(job.id)) return sendError(res, 409');
+    expect(at).toBeGreaterThan(0);
+    expect(at).toBeLessThan(h.indexOf('insert into ${LEADS}'));
+  });
+});

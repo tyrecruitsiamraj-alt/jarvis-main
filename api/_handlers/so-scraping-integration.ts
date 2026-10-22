@@ -82,6 +82,8 @@ async function postLead(req: ApiReq, res: ApiRes) {
 
     const job = (await getSiamrajUnitRequestById(`siamraj-sql:${v.request_no}`, { mode: 'all' })) as JobRequest | null;
     if (!job) return sendError(res, 404, 'Not found', `ไม่พบใบขอ ${v.request_no} ที่ยังเปิดอยู่`);
+    // ใบปิด/Stop/แจ้งเข้าครบใน ERP = ไม่รับ (ทดสอบเว็บจริง 22 ต.ค. 2569: LBM6910003 Stop แล้วยังรับ) · ด่านเดียวกับปุ่มส่ง AI
+    if (await isRequestClosedForApply(job.id)) return sendError(res, 409, 'Conflict', `ใบขอ ${v.request_no} ปิดแล้ว`);
     await attachAssignments([job]);
 
     const phone = normalizeCommentPhone(v.phone);
