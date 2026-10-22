@@ -22,6 +22,7 @@ import {
   AGE_BUCKETS,
   PIPELINE_STEPS,
   buildPipelineRequests,
+  siteFollowTotals,
   summarizePipeline,
   type AgeBucket,
   type PipelineCounts,
@@ -284,7 +285,11 @@ const HomeRequestsTab: React.FC<{ win: { from: string | null; to: string | null 
   const ready = Boolean(data) && feed.feedState !== 'loading' && feed.feedState !== 'failed' && feed.feedState !== 'forbidden';
   const rows = useMemo(() => (data && ready ? buildPipelineRequests(feed.jobs, data) : []), [data, ready, feed.jobs]);
   const sum = useMemo(() => summarizePipeline(rows), [rows]);
-  const allCounts = useMemo(() => (rows.length ? sumCounts(rows) : EMPTY_COUNTS), [rows]);
+  // ติดตาม/ดูแลหลังเริ่มงานของภาพรวม นับคนต่อไซต์ครั้งเดียว (บวกรายใบ = นับคนเดิมซ้ำทุกใบของไซต์)
+  const allCounts = useMemo(
+    () => (rows.length && data ? { ...sumCounts(rows), ...siteFollowTotals(rows, data) } : EMPTY_COUNTS),
+    [rows, data],
+  );
   const released = rows.filter((r) => r.released).length;
   const shown = useMemo(() => {
     const list = rows.filter((r) => !filter || (filter.kind === 'bucket' ? r.bucket === filter.key : r.stuck === filter.key));
@@ -451,7 +456,7 @@ const HomeRequestsTab: React.FC<{ win: { from: string | null; to: string | null 
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{fmt(r.counts.aiYes)}</TableCell>
                         <TableCell className="whitespace-nowrap text-sm">
-                          {step ? `${step.no}. ${step.stuck}` : '—'}
+                          {step ? `${step.no}. ${r.stuckReason}` : '—'}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{r.replacedDays > 0 ? `${fmt(r.replacedDays)} วัน` : '0'}</TableCell>
                         <TableCell className="text-right tabular-nums">{r.penaltyDays === null ? '—' : `${fmt(r.penaltyDays)} วัน`}</TableCell>

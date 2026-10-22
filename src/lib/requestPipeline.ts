@@ -152,18 +152,29 @@ export function countsOf(facts: readonly RecruitAppFact[], followStarts: number,
   return c;
 }
 
-/** ใบติดขั้นไหน — ขั้นแรกที่ยังไม่มีใครผ่าน (2–9) · ผ่านครบ = รอเริ่มงาน (10) */
-export function stuckStepOf(released: boolean, c: PipelineCounts): PipelineStepKey {
-  if (!released) return 'released';
-  if (c.apps === 0) return 'apps';
-  if (c.aiCalled === 0 && c.staffCalled === 0) return 'ai';
-  if (c.aiYes === 0 && c.interested === 0 && c.appointed === 0) return 'staff';
-  if (c.interested === 0 && c.appointed === 0) return 'interested';
-  if (c.appointed === 0) return 'appointment';
-  if (c.showed === 0) return 'showed';
-  if (c.passed === 0) return 'passed';
-  return 'follow';
+/**
+ * ใบติดขั้นไหน + เหตุ — ขั้นแรกที่ยังไม่มีใครผ่าน (2–9) · ผ่านครบ = รอเริ่มงาน (10)
+ * 22 ต.ค. 2569 เว็บจริง: LBM6903002 ขึ้น "ยังติดต่อไม่ได้" ทั้งที่ยังไม่มีคนโทรต่อสักสาย ⇒ แยกเหตุให้ตรงของจริง
+ */
+export function stuckOf(released: boolean, c: PipelineCounts): { step: PipelineStepKey; reason: string } {
+  if (!released) return { step: 'released', reason: 'ยังไม่ประกาศ' };
+  if (c.apps === 0) return { step: 'apps', reason: 'ยังไม่มีคนกรอก' };
+  if (c.aiCalled === 0 && c.staffCalled === 0) return { step: 'ai', reason: 'ยังไม่มีใครโทร' };
+  if (c.aiYes === 0 && c.interested === 0 && c.appointed === 0) return { step: 'ai', reason: 'โทรแล้วยังไม่มีคนสนใจ' };
+  if (c.appointed === 0) {
+    if (c.staffFollowed === 0 && c.interested === 0) return { step: 'staff', reason: 'คนยังไม่โทรต่อ' };
+    if (c.interested === 0) {
+      return { step: 'interested', reason: c.staffReached === 0 ? 'ยังติดต่อไม่ได้' : 'ติดต่อได้แต่ยังไม่สนใจ' };
+    }
+    return { step: 'appointment', reason: 'ยังนัดไม่ได้' };
+  }
+  if (c.showed === 0) return { step: 'showed', reason: 'นัดแล้วยังไม่มา' };
+  if (c.passed === 0) return { step: 'passed', reason: 'มาแล้วยังไม่ผ่าน' };
+  return { step: 'follow', reason: 'รอเริ่มงาน' };
 }
+
+/** ขั้นที่ใบติด (เหตุอยู่ `stuckOf`) */
+export const stuckStepOf = (released: boolean, c: PipelineCounts): PipelineStepKey => stuckOf(released, c).step;
 
 export type PipelineRequest = {
   job: JobRequest;
@@ -178,6 +189,8 @@ export type PipelineRequest = {
   released: boolean;
   counts: PipelineCounts;
   stuck: PipelineStepKey;
+  /** เหตุที่ติด (คำบนตาราง) */
+  stuckReason: string;
   /** วันทำงานที่ส่งคนแทนได้ (ในช่วงที่ผ่านมา) */
   replacedDays: number;
   /** วันโดนปรับ = ผ่านมา − ส่งคนแทนได้ · ล่วงหน้า/ไม่มีวันที่ = null */
@@ -261,6 +274,7 @@ export function buildPipelineRequests(jobs: readonly JobRequest[], data: Request
       b.site ? countSince(data.aftercareBySite?.[b.site], since) : 0,
     );
     const isReleased = released.has(b.jobId);
+    const st = stuckOf(isReleased, counts);
     const days = covered.get(b.jobId) ?? new Set<string>();
     let replacedDays = 0;
     if (b.startYmd && days.size > 0) {
@@ -280,7 +294,8 @@ export function buildPipelineRequests(jobs: readonly JobRequest[], data: Request
       startYmd: b.startYmd,
       released: isReleased,
       counts,
-      stuck: stuckStepOf(isReleased, counts),
+      stuck: st.step,
+      stuckReason: st.reason,
       replacedDays,
       penaltyDays,
       finePerDay,
@@ -289,6 +304,27 @@ export function buildPipelineRequests(jobs: readonly JobRequest[], data: Request
       deduct: penaltyDays === null ? 0 : Math.round(penaltyDays * deductPerDay * 100) / 100,
     };
   });
+}
+
+/**
+ * ติดตามเริ่มงาน / ดูแลหลังเริ่มงาน ของภาพรวม — นับคนต่อไซต์ครั้งเดียว (ไซต์ที่มีหลายใบขอห้ามนับคนเดิมซ้ำ)
+ * ตั้งแต่ใบที่เริ่มนับก่อนสุดของไซต์นั้น (เจอบนเว็บจริง 22 ต.ค. 2569: บวกรายใบได้ 801 คน)
+ */
+export function siteFollowTotals(rows: readonly PipelineRequest[], data: Pick<RequestPipelineResponse, 'followStartsBySite' | 'aftercareBySite'>) {
+  const since = new Map<string, string | null>();
+  for (const r of rows) {
+    if (!r.site) continue;
+    const s = r.startYmd ?? (typeof r.job.submittedAt === 'string' ? r.job.submittedAt.slice(0, 10) : null);
+    const cur = since.get(r.site);
+    if (cur === undefined || (s !== null && (cur === null || s < cur))) since.set(r.site, cur === null ? null : s);
+  }
+  let followStarts = 0;
+  let aftercare = 0;
+  for (const [site, s] of since) {
+    followStarts += countSince(data.followStartsBySite?.[site], s);
+    aftercare += countSince(data.aftercareBySite?.[site], s);
+  }
+  return { followStarts, aftercare };
 }
 
 /** สรุปทั้งชุด — ทุกก้อนรวมกันเท่าจำนวนใบ */

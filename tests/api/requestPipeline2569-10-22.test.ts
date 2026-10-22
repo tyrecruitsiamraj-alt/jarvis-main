@@ -12,6 +12,7 @@ import {
   allocateReplacements,
   buildPipelineRequests,
   countsOf,
+  stuckOf,
   stuckStepOf,
   summarizePipeline,
 } from '@/lib/requestPipeline';
@@ -74,7 +75,10 @@ describe('คนในแต่ละขั้น', () => {
     expect(stuckStepOf(false, zero)).toBe('released');
     expect(stuckStepOf(true, zero)).toBe('apps');
     expect(stuckStepOf(true, countsOf([fact({})], 0, 0))).toBe('ai');
-    expect(stuckStepOf(true, countsOf([fact({ calledByAi: true, aiAnswer: 'said_no' })], 0, 0))).toBe('staff');
+    expect(stuckStepOf(true, countsOf([fact({ calledByAi: true, aiAnswer: 'said_no' })], 0, 0))).toBe('ai');
+    // เว็บจริง LBM6903002: AI ได้คนสนใจ แต่ยังไม่มีคนโทรต่อ = "คนยังไม่โทรต่อ" ไม่ใช่ "ยังติดต่อไม่ได้"
+    expect(stuckOf(true, countsOf([fact({ calledByAi: true, aiAnswer: 'said_yes' })], 0, 0))).toEqual({ step: 'staff', reason: 'คนยังไม่โทรต่อ' });
+    expect(stuckOf(true, countsOf([fact({ calledByAi: true, aiAnswer: 'said_no' })], 0, 0)).reason).toBe('โทรแล้วยังไม่มีคนสนใจ');
     expect(stuckStepOf(true, countsOf([fact({ calledByAi: true, aiAnswer: 'said_yes', appointmentAt: '2026-10-05T03:00:00Z' })], 0, 0))).toBe('showed');
     expect(
       stuckStepOf(true, countsOf([fact({ calledByAi: true, aiAnswer: 'said_yes', appointmentAt: '2026-10-05T03:00:00Z', attendance: 'showed', screening: 'passed' })], 0, 0)),
@@ -199,5 +203,18 @@ describe('หน้าจอ', () => {
     for (const id of ['req-bucket-sum', 'req-stuck-sum', 'req-channels-sum', 'req-fine', 'req-deduct']) expect(tab).toContain(id);
     const api = fs.readFileSync(path.join(process.cwd(), 'api/_handlers/request-pipeline.ts'), 'utf8');
     expect(api).toContain('readUnitRequestListThroughCache({ limit: 500, departmentScope })');
+  });
+});
+
+describe('ติดตามเริ่มงานของภาพรวม นับคนต่อไซต์ครั้งเดียว (เว็บจริงเคยขึ้น 801)', () => {
+  it('สองใบไซต์เดียวกัน คนติดตาม 3 คน = 3 ไม่ใช่ 6 · นับตั้งแต่ใบที่เริ่มก่อนสุด', async () => {
+    const { siteFollowTotals } = await import('@/lib/requestPipeline');
+    const rows = [
+      { site: 'S1', startYmd: '2026-10-05', job: {} },
+      { site: 'S1', startYmd: '2026-10-10', job: {} },
+      { site: 'S2', startYmd: '2026-10-01', job: {} },
+    ] as never;
+    const t = siteFollowTotals(rows, { followStartsBySite: { S1: ['2026-10-01', '2026-10-06', '2026-10-11', '2026-10-12'], S2: ['2026-10-02'] }, aftercareBySite: {} });
+    expect(t).toEqual({ followStarts: 4, aftercare: 0 });
   });
 });
