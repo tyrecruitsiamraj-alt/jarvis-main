@@ -103,6 +103,8 @@ type SqlServerRequestRow = {
   resigned_income_3m: string | null;
   fee_name: string | null;
   abs_customer_fine: number | null;
+  /** ลดมูลค่าต่อวัน (st_request_p3.abs_customer_deduct) — 22 ต.ค. 2569 หน้าหลักคิดลดมูลค่าของใบขอค้าง */
+  abs_customer_deduct: number | null;
   contact_name: string | null;
   contract_type_code: string | null;
   contract_type_name: string | null;
@@ -302,6 +304,7 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     penalty_per_day: r.abs_customer_fine ?? 0,
     days_without_worker: 0,
     total_penalty: r.abs_customer_fine ?? 0,
+    deduct_per_day: r.abs_customer_deduct ?? 0,
   };
 }
 
@@ -377,6 +380,7 @@ const BASE_SQL = `
     B.age,
     B.sex,
     (SELECT z.abs_customer_fine FROM st_request_p3 z WHERE z.request_no = A.request_no) AS abs_customer_fine,
+    (SELECT z.abs_customer_deduct FROM st_request_p3 z WHERE z.request_no = A.request_no) AS abs_customer_deduct,
     (SELECT z.contact_name FROM st_request_p1 z WHERE z.request_no = A.request_no) AS contact_name,
     (SELECT z.phone FROM st_request_p1 z WHERE z.request_no = A.request_no) AS mobile_phone,
     ROW_NUMBER() OVER (
@@ -474,7 +478,7 @@ const SELECT_COLUMNS = `
   job_name1, job_name2, requester_name, request_action_name, request_action_code,
   request_qty, inform_qty, is_inform_all, effective_inform_qty,
   reason_main_name, work_addr, work_place, boss_nationality, work_date, work_time, age, sex,
-  payment_rate, draw_rate, fee_name, abs_customer_fine, contact_name,
+  payment_rate, draw_rate, fee_name, abs_customer_fine, abs_customer_deduct, contact_name,
   resigned_wage_draw_rate, resigned_wage_fee_rate, resigned_wage_effective_date,
   resigned_income_3m
 `;

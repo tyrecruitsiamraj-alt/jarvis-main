@@ -49,6 +49,7 @@ import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
 import FollowCallerDialog from '@/components/home-ai-share/FollowCallerDialog';
 import HomeOnlineTab from '@/components/home-ai-share/HomeOnlineTab';
 import HomeTodoStrip, { type TodoTab } from '@/components/home-ai-share/HomeTodoStrip';
+import HomeRequestsTab from '@/components/home-ai-share/HomeRequestsTab';
 import AiShareLumosStats, { FOLLOW_RESULT_COLS, useHomeLumosSummary } from '@/components/home-ai-share/AiShareLumosStats';
 import { FOLLOW_CALLED_DISPLAY_ORDER } from '@/lib/homeLumosSummary';
 import {
@@ -215,6 +216,8 @@ const BLOCKS: readonly BlockMeta[] = [
 const BLOCK_STORE = 'jarvis:home-ai-share:block';
 /** ค่าของปุ่มแท็บทีม Online ในแถบหัวข้อ (ไม่ใช่ `AiShareBlockKey`) */
 const ONLINE_TAB = 'online';
+/** แท็บใบขอ — เส้น 12 ขั้น · ค้าง · ค่าปรับ · ช่องทาง (22 ต.ค. 2569) */
+const REQUESTS_TAB = 'requests';
 function readBlock(): AiShareBlockKey {
   try {
     const v = window.localStorage.getItem(BLOCK_STORE);
@@ -241,6 +244,7 @@ const HomeAiSharePage: React.FC = () => {
    * แยกจาก `block` (ไม่ใช่ก้อนของตัวนับกล่องเดิม) · เลือกแล้วส่วนของหัวข้อเดิมซ่อนทั้งหมด
    */
   const [online, setOnline] = useState(false);
+  const [requestsView, setRequestsView] = useState(false);
   /** BU ที่เลือก (null = ทุก BU) — ส่งไปทุกเส้นของหน้า · บัญชีที่ถูกล็อก BU เซิร์ฟเวอร์บังคับเอง */
   const [bu, setBu] = useState<string | null>(null);
   /**
@@ -261,10 +265,17 @@ const HomeAiSharePage: React.FC = () => {
   const choose = (v: string) => {
     if (v === ONLINE_TAB) {
       setOnline(true);
+      setRequestsView(false);
+      return;
+    }
+    if (v === REQUESTS_TAB) {
+      setRequestsView(true);
+      setOnline(false);
       return;
     }
     if (!isAiShareBlock(v)) return;
     setOnline(false);
+    setRequestsView(false);
     setBlock(v);
     saveBlock(v);
   };
@@ -462,8 +473,11 @@ const HomeAiSharePage: React.FC = () => {
    * AI % ของแต่ละหัวข้อขึ้นตอนจี้ (`noteOf`) · ปุ่มที่เลือก = เบอร์กันดี (`primary`)
    */
   const picker = (
-    <Tabs value={online ? ONLINE_TAB : meta.key} onValueChange={choose}>
+    <Tabs value={requestsView ? REQUESTS_TAB : online ? ONLINE_TAB : meta.key} onValueChange={choose}>
       <TabsList variant="glass" aria-label="เลือกหัวข้อ" className="h-auto flex-wrap justify-start gap-1 rounded-2xl">
+        <TabsTrigger value={REQUESTS_TAB} className="h-10 px-5 text-sm">
+          ใบขอ
+        </TabsTrigger>
         <TabsTrigger
           value={ONLINE_TAB}
           className="h-10 px-5 text-sm" /* แถบกระจก (เจ้าของ 19 ต.ค. 2569 "เปลี่ยนเป็นกระจกทั้งหมด") */
@@ -846,8 +860,9 @@ const HomeAiSharePage: React.FC = () => {
       ) : null}
       {flag ? <p className={cn('text-xs', TONE.warn.value)}>{flag}</p> : null}
 
+      {requestsView ? <HomeRequestsTab win={winQ} tick={tick} /> : null}
       {online ? <HomeOnlineTab q={winQ} tick={tick} onRetry={() => setRetrySeq((n) => n + 1)} /> : null}
-      {online ? null : (
+      {online || requestsView ? null : (
       <>
       {/* ชื่อหัวข้อสำหรับโปรแกรมอ่านจอ — งานสรรหา/จับคู่งาน การ์ดแรกใช้ชื่อส่วน (ติดตาม/ดูแล การ์ดแรกคือชื่อหัวข้อเอง) */}
       {meta.key === 'applicants' || meta.key === 'matching' ? <h2 className="sr-only">{meta.title}</h2> : null}

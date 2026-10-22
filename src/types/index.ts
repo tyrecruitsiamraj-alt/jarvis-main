@@ -337,6 +337,8 @@ export interface JobRequest {
     total: number;
   };
   penalty_per_day: number;
+  /** ลดมูลค่าต่อวัน (ERP `st_request_p3.abs_customer_deduct`) — ใบขอมีค่าปรับ/ลดมูลค่า อย่างใดอย่างหนึ่งหรือทั้งคู่ (22 ต.ค. 2569) */
+  deduct_per_day?: number;
   days_without_worker: number;
   total_penalty: number;
   status: JobStatus;

@@ -285,6 +285,8 @@ describe('หน้าหลัก "ระบบไปกี่ %"', () => {
     expect(within(picker).getByRole('tab', { selected: true }).textContent).toContain('ติดตาม');
     // 8 ต.ค. 2569 เจ้าของ "แยกหน้าได้จาก 4 แท็บเป็น 5 แท็บ" — ทีม Online เป็นปุ่มแรก
     expect(within(picker).getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      // 22 ต.ค. 2569 แท็บใบขอ (เส้น 12 ขั้น · ค้าง · ค่าปรับ · ช่องทาง)
+      'ใบขอ',
       'ทีม Online',
       expect.stringContaining('ติดตาม'),
       expect.any(String),

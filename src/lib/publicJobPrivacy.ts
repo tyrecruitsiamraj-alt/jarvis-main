@@ -88,6 +88,7 @@ export const PUBLIC_FORBIDDEN_FIELDS: readonly string[] = [
   'mobile_phone',
   'requester_name',
   'penalty_per_day',
+  'deduct_per_day',
   'total_penalty',
   'days_without_worker',
 ];

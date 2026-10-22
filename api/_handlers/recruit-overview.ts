@@ -94,7 +94,12 @@ const scopeWhere = (bu: string) =>
   `not coalesce(a.is_lead, false) and not exists (select 1 from ${CANCELLATIONS} cx where cx.application_id = a.id) and (${bu}::text is null or ${appBuSql('a')} = ${bu}::text)`;
 
 /** ข้อเท็จจริงต่อใบของช่วง [$1, $2) · $3 = BU · `attendance` = นิพจน์ผลนัด (ตารางยังไม่มี = null) */
-export function factsSql(attendance: string = LATEST_ATTENDANCE_SQL, screening: string = LATEST_SCREENING_SQL): string {
+export function factsSql(
+  attendance: string = LATEST_ATTENDANCE_SQL,
+  screening: string = LATEST_SCREENING_SQL,
+  /** true = ใบสมัครของใบขอชุดนี้ทุกช่วงเวลา ($1 = job_id[] · $2 = BU) — เส้น 12 ขั้นรายใบขอบนหน้าหลัก (22 ต.ค. 2569) */
+  byJobs = false,
+): string {
   return `
   select a.id::text as id, a.created_at, a.job_id,
          -- ช่องทางของใบ → ไม่มี = ช่องทางของลิงก์ที่กรอกผ่าน (19 ต.ค. 2569)
@@ -129,8 +134,8 @@ export function factsSql(attendance: string = LATEST_ATTENDANCE_SQL, screening: 
        where c.application_id = a.id
        order by c.created_at desc limit 1
     ) lcl on true
-   where a.created_at >= $1::timestamptz and a.created_at < $2::timestamptz
-     and ${scopeWhere('$3')}`;
+   where ${byJobs ? `a.job_id = any($1::text[]) and ${scopeWhere('$2')}` : `a.created_at >= $1::timestamptz and a.created_at < $2::timestamptz
+     and ${scopeWhere('$3')}`}`;
 }
 
 /** งานค้างตอนนี้ — ทุกใบในขอบเขต (ไม่ขึ้นกับเดือน) · $1 = BU */
@@ -485,19 +490,25 @@ async function settle<T>(what: string, run: () => Promise<T>): Promise<Settled<T
 }
 
 /** ผลนัดยังไม่ migrate (089) = อ่านต่อได้ แค่ไม่มีผลนัด */
-async function loadFacts(params: unknown[]): Promise<Row[]> {
+async function loadFacts(params: unknown[], byJobs = false): Promise<Row[]> {
   try {
-    return (await dbQuery<Row>(factsSql(), params)).rows;
+    return (await dbQuery<Row>(factsSql(LATEST_ATTENDANCE_SQL, LATEST_SCREENING_SQL, byJobs), params)).rows;
   } catch (e) {
     if (!isPgUndefinedTable(e)) throw e;
     // ผลนัด (089) หรือผ่าน/ไม่ผ่าน (151) ยังไม่ migrate — ลองตัดทีละอย่าง
     try {
-      return (await dbQuery<Row>(factsSql(LATEST_ATTENDANCE_SQL, 'null::text'), params)).rows;
+      return (await dbQuery<Row>(factsSql(LATEST_ATTENDANCE_SQL, 'null::text', byJobs), params)).rows;
     } catch (e2) {
       if (!isPgUndefinedTable(e2)) throw e2;
-      return (await dbQuery<Row>(factsSql('null::text', 'null::text'), params)).rows;
+      return (await dbQuery<Row>(factsSql('null::text', 'null::text', byJobs), params)).rows;
     }
   }
+}
+
+/** ใบสมัครของใบขอชุดนี้ทุกช่วงเวลา (ไม่นับ Lead/ยกเลิกข้อมูล) — นิยามเดียวกับภาพรวมงานสรรหา (`toFact`) */
+export async function loadFactsForJobs(jobIds: readonly string[], bu: string | null): Promise<RecruitAppFact[]> {
+  if (jobIds.length === 0) return [];
+  return (await loadFacts([jobIds, bu], true)).map((r) => toFact(r, null));
 }
 
 export async function buildRecruitOverview(
