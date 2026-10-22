@@ -24,7 +24,10 @@ import { cn } from '@/lib/utils';
 
 const NUM = new Intl.NumberFormat('th-TH');
 
-type Counts = { plans: number; calls: number };
+type Counts = { plans: number; calls: number; cancelledPlans?: number };
+type RecancelItem = { planRef: string; times: string; outcome: 'sent' | 'skipped_live_phone' | 'failed'; eventStatus?: string | null; error?: string | null };
+
+const RECANCEL_LABEL: Record<RecancelItem['outcome'], string> = { sent: 'ยิงแล้ว', skipped_live_phone: 'ข้าม · เบอร์นี้ยังมีสายรอโทร', failed: 'ยิงไม่สำเร็จ' };
 type RunResult = { plans: number; calls: number; pushed: number; failed: Array<{ planRef: string; reason: string }> };
 
 const LumosOldIdRepushCard: React.FC = () => {
@@ -33,6 +36,8 @@ const LumosOldIdRepushCard: React.FC = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [recancelOpen, setRecancelOpen] = useState(false);
+  const [recancelItems, setRecancelItems] = useState<RecancelItem[] | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -70,7 +75,24 @@ const LumosOldIdRepushCard: React.FC = () => {
     }
   };
 
+  const recancel = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await apiFetch('/api/follow-oldid-repush?action=recancel', { method: 'POST' });
+      if (!r.ok) throw new Error('ยิงยกเลิกไม่สำเร็จ');
+      setRecancelItems(((await r.json()) as { items: RecancelItem[] }).items);
+      setRecancelOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'ยิงยกเลิกไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const plans = counts?.plans ?? 0;
+  const cancelledPlans = counts?.cancelledPlans ?? 0;
   return (
     <Card variant="solid" className="space-y-4 p-5" data-testid="lumos-oldid-repush">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -88,6 +110,33 @@ const LumosOldIdRepushCard: React.FC = () => {
       <p className="text-sm tabular-nums text-foreground">
         รอส่งใหม่ {NUM.format(plans)} แผน · {NUM.format(counts?.calls ?? 0)} สาย
       </p>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4">
+        <p className="text-sm tabular-nums text-foreground">ยกเลิกในระบบแล้ว แต่ Lumos อาจยังโทร {NUM.format(cancelledPlans)} แผน</p>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={cancelledPlans === 0 || busy}
+          onClick={() => setRecancelOpen(true)}
+          data-testid="oldid-recancel"
+        >
+          ยิงยกเลิกที่ Lumos
+        </Button>
+      </div>
+      {recancelItems ? (
+        <ul className="space-y-1 text-sm" data-testid="oldid-recancel-result">
+          {recancelItems.map((x) => (
+            <li key={x.planRef} className="flex flex-wrap gap-x-3 gap-y-0.5">
+              <span className="tabular-nums text-foreground">{x.times}</span>
+              <span className={cn(x.outcome === 'failed' ? TONE.danger.value : x.outcome === 'sent' ? TONE.success.value : 'text-muted-foreground')}>
+                {RECANCEL_LABEL[x.outcome]}
+                {x.eventStatus ? ` · Lumos ${x.eventStatus}` : ''}
+                {x.error ? ` · ${x.error}` : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
       {notice ? <p className="text-sm text-muted-foreground" data-testid="oldid-notice">{notice}</p> : null}
 
@@ -108,6 +157,27 @@ const LumosOldIdRepushCard: React.FC = () => {
               data-testid="oldid-confirm"
             >
               ยกเลิกแล้ว ส่งเลย
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={recancelOpen} onOpenChange={(o) => !busy && setRecancelOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยิงยกเลิกที่ Lumos อีกครั้ง {NUM.format(cancelledPlans)} แผน?</AlertDialogTitle>
+            <AlertDialogDescription>เบอร์ที่ยังมีสายรอโทรจะข้าม ไม่ยิง</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>ยังก่อน</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy}
+              onClick={(e) => {
+                e.preventDefault();
+                void recancel();
+              }}
+              data-testid="oldid-recancel-confirm"
+            >
+              ยิงเลย
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

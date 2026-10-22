@@ -15,6 +15,14 @@ vi.mock('../../api/_lib/postgres.js', () => ({
     if (/array_agg\(f\.id::text/.test(sql)) {
       return { rows: [{ plan_ref: 'follow-a', member_ids: ['a', 'a2'] }, { plan_ref: 'follow-b', member_ids: ['b'] }] };
     }
+    if (/having bool_and\(f\.cancelled_at is not null\)/.test(sql)) {
+      return {
+        rows: [
+          { plan_ref: 'follow-p1', times: '23/10 07:30 · 23/10 08:30', live_on_phone: false },
+          { plan_ref: 'follow-p2', times: '24/10 07:00', live_on_phone: true },
+        ],
+      };
+    }
     if (/lumos_plan_closed_at = coalesce/.test(sql)) order.push(`close:${params[0]}`);
     return { rows: [] };
   }),
@@ -51,6 +59,24 @@ describe('ส่งแผนรหัสเดิมกลับด้วยร�
     expect(order).toEqual(['close:follow-a', 'replan:a,a2', 'close:follow-b', 'replan:b']);
     expect(out).toMatchObject({ plans: 2, calls: 3, pushed: 1 });
     expect(out.failed).toEqual([{ planRef: 'follow-b', reason: 'ส่งไม่สำเร็จ' }]);
+  });
+  it('🔴 ยิงยกเลิกซ้ำ: ข้ามเบอร์ที่ยังมีสายรอโทร · ยิงตรงรหัสแผน · ถามสถานะ event ของคำสั่งยกเลิก', async () => {
+    const { recancelOldIdFollowPlans } = await import('../../api/_lib/followOldIdRepush');
+    const fired: string[] = [];
+    const items = await recancelOldIdFollowPlans({
+      cancel: async (id) => {
+        fired.push(id);
+        return { results: [{ event_id: `ev-${id}` }] };
+      },
+      eventStatus: async () => ({ status: 'imported', error: null }),
+      wait: async () => undefined,
+    });
+    expect(fired).toEqual(['follow-p1']);
+    expect(items).toEqual([
+      { planRef: 'follow-p1', times: '23/10 07:30 · 23/10 08:30', outcome: 'sent', eventId: 'ev-follow-p1', eventStatus: 'imported', error: null },
+      { planRef: 'follow-p2', times: '24/10 07:00', outcome: 'skipped_live_phone' },
+    ]);
+    expect(read('src/pages/settings/LumosOldIdRepushCard.tsx')).toContain('oldid-recancel-confirm');
   });
   it('API แอดมินเท่านั้น · จดบันทึก · ลงทะเบียนเส้นแล้ว · หน้าจอต้องยืนยันก่อนส่ง', () => {
     const h = read('api/_handlers/follow-oldid-repush.ts');

@@ -13779,3 +13779,4 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 ## แท็บติดตามนัดหมาย: ปุ่มวันที่กรองด้วยวันนัด (22 ต.ค. 2569 · เจ้าของ "ฉัน Filter วันที่ 27 ก็ไม่เจอนะ")
 - เดิมปุ่มวันที่บนหัวหน้า (`applicantDates` ใน StaffJobBoardPage → `rmFilters`) กรองวันที่สมัครทุกแท็บ ⇒ เลือกวันนัดแล้วได้ 0
 - `filterApplications` (`src/lib/recruitRm.ts`): แท็บ `appointments` ใช้ `applicationAppointmentYmd` (วันนัด เวลาไทย) · แท็บอื่นยังเป็นวันที่สมัคร · เทสต์ใน `tests/api/recruitRm.test.ts`
+- ยิงยกเลิกซ้ำ (เจ้าของ 22 ต.ค. 2569 "ลองยิง API cancel ให้หน่อย"): การ์ดเดียวกัน ปุ่ม "ยิงยกเลิกที่ Lumos" → `POST /api/follow-oldid-repush?action=recancel` → `recancelOldIdFollowPlans` ยิง DELETE ตรงรหัสแผน (ไม่ดูเครื่องหมายจบแล้ว) ให้แผนรหัสเดิมที่ยกเลิกในระบบเราแล้วแต่ยังมีสายอนาคต · 🔴 ข้ามเบอร์ที่ยังมีสาย AI รอโทร (กัน 9 ต.ค.) · รอ 4 วิแล้วถามสถานะ event ของคำสั่งยกเลิก โชว์บนการ์ด

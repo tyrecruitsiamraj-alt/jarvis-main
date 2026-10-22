@@ -65,3 +65,87 @@ export async function repushOldIdFollowPlans(resolveStaffName: (phone: string | 
   logInfo('follow.oldIdRepush', { plans: out.plans, calls: out.calls, pushed: out.pushed, failed: out.failed.length });
   return out;
 }
+
+/**
+ * ═══ ยิงยกเลิกซ้ำที่ Lumos — แผนรหัสเดิมที่ยกเลิกในระบบเราแล้วแต่ Lumos ยังโทร (เจ้าของ 22 ต.ค. 2569 "ลองยิง API cancel ให้หน่อย") ═══
+ * เคสไพศาล: ยกเลิก 16 ต.ค. (DELETE ไปแล้ว ทำเครื่องหมายจบแล้ว) แต่ 21–22 ต.ค. ยังโดนโทร · ตัวยกเลิกปกติข้ามแผนที่จบแล้ว
+ * ⇒ ตัวนี้ยิง DELETE ตรง ๆ ไม่ดูเครื่องหมาย (แผนที่ส่งซ้ำรหัสเดิมอาจมีหลายเวอร์ชันที่ Lumos — DELETE รอบก่อนอาจปิดไปแค่ตัวเดียว)
+ * 🔴 ข้ามเบอร์ที่ยังมีสาย AI รอโทรอยู่ — DELETE แผนที่จบแล้วเคยไปปิดแผนอื่นของเบอร์เดียวกัน (9 ต.ค. 2569)
+ * จดเลข event ของคำสั่งยกเลิก แล้วถามสถานะจาก Lumos ให้เห็นบนจอว่าเขารับไปทำหรือไม่
+ */
+export type OldIdRecancelItem = {
+  planRef: string;
+  times: string;
+  outcome: 'sent' | 'skipped_live_phone' | 'failed';
+  eventId?: string | null;
+  eventStatus?: string | null;
+  error?: string | null;
+};
+
+export async function listCancelledOldIdFollowPlans(): Promise<Array<{ planRef: string; times: string; liveOnPhone: boolean }>> {
+  const { rows } = await dbQuery<{ plan_ref: string; times: string; live_on_phone: boolean }>(
+    `select l.person_ref as plan_ref,
+            string_agg(to_char(f.scheduled_at at time zone 'Asia/Bangkok', 'DD/MM HH24:MI'), ' · ' order by f.scheduled_at) as times,
+            bool_or(exists (
+              select 1 from ${followTable} o
+               where right(regexp_replace(coalesce(o.recipient_phone, ''), '\\D', '', 'g'), 9)
+                   = right(regexp_replace(coalesce(f.recipient_phone, ''), '\\D', '', 'g'), 9)
+                 and o.cancelled_at is null and o.completed_at is null
+                 and coalesce(o.call_mode, 'ai') = 'ai' and o.scheduled_at > now()
+            )) as live_on_phone
+       from ${queueTable} l
+       join ${queueTable} q
+         on q.channel = 'reminder' and q.job_ref = 'follow' and coalesce(q.plan_ref, q.person_ref) = l.person_ref
+       join ${followTable} f on 'follow-' || f.id::text = q.person_ref
+      where l.channel = 'reminder' and l.job_ref = 'follow' and l.step_position = 0
+        and l.lumos_client_id is null and l.push_event_id like '%:v%'
+        and f.scheduled_at > now()
+      group by l.person_ref
+     having bool_and(f.cancelled_at is not null)
+      order by min(f.scheduled_at)`,
+  );
+  return rows.map((r) => ({ planRef: r.plan_ref, times: r.times, liveOnPhone: r.live_on_phone === true }));
+}
+
+export async function recancelOldIdFollowPlans(deps: {
+  cancel: (clientContactId: string) => Promise<{ results?: Array<{ event_id?: string }> }>;
+  eventStatus: (eventId: string) => Promise<{ status?: string; error?: string | null }>;
+  wait?: (ms: number) => Promise<void>;
+}): Promise<OldIdRecancelItem[]> {
+  const plans = await listCancelledOldIdFollowPlans();
+  const out: OldIdRecancelItem[] = [];
+  for (const p of plans) {
+    if (p.liveOnPhone) {
+      out.push({ planRef: p.planRef, times: p.times, outcome: 'skipped_live_phone' });
+      continue;
+    }
+    try {
+      const ack = await deps.cancel(p.planRef);
+      out.push({ planRef: p.planRef, times: p.times, outcome: 'sent', eventId: ack.results?.[0]?.event_id ?? null });
+    } catch (e) {
+      out.push({ planRef: p.planRef, times: p.times, outcome: 'failed', error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  // Lumos ทำคำสั่งแบบ async — รอสักครู่แล้วถามสถานะ event ของคำสั่งยกเลิก
+  const sent = out.filter((x) => x.outcome === 'sent' && x.eventId);
+  if (sent.length > 0) {
+    await (deps.wait ?? ((ms) => new Promise((r) => setTimeout(r, ms))))(4000);
+    for (const x of sent) {
+      try {
+        const ev = await deps.eventStatus(String(x.eventId));
+        x.eventStatus = ev.status ?? null;
+        x.error = ev.error ?? null;
+      } catch (e) {
+        x.eventStatus = 'unknown';
+        x.error = e instanceof Error ? e.message : String(e);
+      }
+    }
+  }
+  logInfo('follow.oldIdRecancel', {
+    plans: out.length,
+    sent: out.filter((x) => x.outcome === 'sent').length,
+    skipped: out.filter((x) => x.outcome === 'skipped_live_phone').length,
+    failed: out.filter((x) => x.outcome === 'failed').length,
+  });
+  return out;
+}
