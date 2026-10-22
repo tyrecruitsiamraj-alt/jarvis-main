@@ -8,23 +8,16 @@
  * ใบขอ = ชุดเดียวกับเมนูใบขอ (`useUnitRequestsFeed`) · นับที่ `src/lib/requestPipeline.ts` · ทุกก้อนบวกกันลงตัวบนจอ
  * 🔴 shadcn Card/Button/Table/Badge · สีจาก TONE · ไม่มีประโยคอธิบายบนจอ · ว่างแล้วขึ้น 0 ไม่หาย
  */
-import React, { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { HomeSection } from "@/components/home-ai-share/HomeSections";
-import { useUnitRequestsFeed } from "@/hooks/useUnitRequestsFeed";
-import { fetchRequestPipeline } from "@/lib/requestPipelineApi";
+import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { HomeSection } from '@/components/home-ai-share/HomeSections';
+import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
+import { fetchRequestPipeline } from '@/lib/requestPipelineApi';
 import {
   AGE_BUCKETS,
   PIPELINE_STEPS,
@@ -35,134 +28,107 @@ import {
   type PipelineCounts,
   type PipelineRequest,
   type PipelineStepKey,
-} from "@/lib/requestPipeline";
-import { buildPlatforms, type PlatformKey } from "@/lib/channelPlatforms";
-import type { RequestPipelineResponse } from "@/lib/requestPipelineTypes";
-import { rangeText, thaiDate } from "@/lib/periodPick";
-import { TONE, type ToneKey } from "@/lib/designTokens";
-import { cn } from "@/lib/utils";
-import { friendlyErrorText } from "@/lib/friendlyError";
-import { jobBoardCardTitle } from "@/lib/unitRequestDisplay";
-import { publicJobTitle } from "@/lib/publicJobTitle";
+} from '@/lib/requestPipeline';
+import { buildPlatforms, type PlatformKey } from '@/lib/channelPlatforms';
+import type { RequestPipelineResponse } from '@/lib/requestPipelineTypes';
+import { rangeText, thaiDate } from '@/lib/periodPick';
+import { TONE, type ToneKey } from '@/lib/designTokens';
+import { cn } from '@/lib/utils';
+import { friendlyErrorText } from '@/lib/friendlyError';
+import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
+import { publicJobTitle } from '@/lib/publicJobTitle';
 
-const NUM = new Intl.NumberFormat("th-TH");
-const BAHT = new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 });
-const fmt = (n: number | null | undefined) =>
-  n === null || n === undefined ? "—" : NUM.format(n);
+const NUM = new Intl.NumberFormat('th-TH');
+const BAHT = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 });
+const fmt = (n: number | null | undefined) => (n === null || n === undefined ? '—' : NUM.format(n));
 
 const BUCKET_TONE: Record<AgeBucket, ToneKey> = {
-  advance: "info",
-  lt30: "success",
-  d30to60: "warn",
-  gt60: "danger",
-  unknown: "neutral",
+  advance: 'info',
+  lt30: 'success',
+  d30to60: 'warn',
+  gt60: 'danger',
+  unknown: 'neutral',
 };
 const STEP_LABEL = new Map(PIPELINE_STEPS.map((s) => [s.key, s]));
 
-type Filter =
-  | { kind: "bucket"; key: AgeBucket }
-  | { kind: "stuck"; key: PipelineStepKey }
-  | null;
+type Filter = { kind: 'bucket'; key: AgeBucket } | { kind: 'stuck'; key: PipelineStepKey } | null;
 
 /** ตัวเลขของขั้นในเส้น — หลัก (เลขใหญ่) + ก้อนย่อย */
-function stepNumbers(
-  key: PipelineStepKey,
-  c: PipelineCounts,
-  opts: { requests: number; released: number; replacedDays: number },
-) {
+function stepNumbers(key: PipelineStepKey, c: PipelineCounts, opts: { requests: number; released: number; replacedDays: number }) {
   const part = (label: string, value: number, tone: ToneKey) => ({
     label,
     value,
     tone,
   });
   switch (key) {
-    case "request":
-      return { main: opts.requests, unit: "ใบ", parts: [] };
-    case "released":
+    case 'request':
+      return { main: opts.requests, unit: 'ใบ', parts: [] };
+    case 'released':
       // ผ่าน/ติดอยู่ในคอลัมน์ใบแล้ว — คอลัมน์แยกผลเป็นของคนเท่านั้น
-      return { main: opts.released, unit: "ใบ", parts: [] };
-    case "apps":
-      return { main: c.apps, unit: "คน", parts: [] };
-    case "ai":
+      return { main: opts.released, unit: 'ใบ', parts: [] };
+    case 'apps':
+      return { main: c.apps, unit: 'คน', parts: [] };
+    case 'ai':
       return {
         main: c.aiCalled,
-        unit: "คน",
+        unit: 'คน',
         parts: [
-          part("สนใจ", c.aiYes, "success"),
-          part("ไม่สนใจ", c.aiNo, "danger"),
-          part("คนละพื้นที่", c.aiOutOfArea, "orange"),
-          part("ไม่รับสาย", c.aiNoPickup, "warn"),
-          part("ยังสรุปไม่ได้", c.aiOther, "neutral"),
+          part('สนใจ', c.aiYes, 'success'),
+          part('ไม่สนใจ', c.aiNo, 'danger'),
+          part('คนละพื้นที่', c.aiOutOfArea, 'orange'),
+          part('ไม่รับสาย', c.aiNoPickup, 'warn'),
+          part('ยังสรุปไม่ได้', c.aiOther, 'neutral'),
         ],
       };
-    case "staff":
+    case 'staff':
       return {
         main: c.staffFollowed,
-        unit: "คน",
-        parts: [
-          part("ติดต่อได้", c.staffReached, "success"),
-          part("ติดต่อไม่ได้", c.staffFollowed - c.staffReached, "danger"),
-        ],
+        unit: 'คน',
+        parts: [part('ติดต่อได้', c.staffReached, 'success'), part('ติดต่อไม่ได้', c.staffFollowed - c.staffReached, 'danger')],
       };
-    case "interested":
+    case 'interested':
       return {
         main: c.staffReached,
-        unit: "คน",
+        unit: 'คน',
         parts: [
-          part("สนใจ", c.interested, "success"),
-          part("ไม่สนใจ", c.notInterested, "danger"),
-          part(
-            "ยังไม่ระบุ",
-            c.staffReached - c.interested - c.notInterested,
-            "neutral",
-          ),
+          part('สนใจ', c.interested, 'success'),
+          part('ไม่สนใจ', c.notInterested, 'danger'),
+          part('ยังไม่ระบุ', c.staffReached - c.interested - c.notInterested, 'neutral'),
         ],
       };
-    case "appointment":
+    case 'appointment':
       return {
         main: c.appointed,
-        unit: "คน",
-        parts: [
-          part("นัดได้", c.appointed, "success"),
-          part("นัดไม่ได้", c.apptFailed, "danger"),
-        ],
+        unit: 'คน',
+        parts: [part('นัดได้', c.appointed, 'success'), part('นัดไม่ได้', c.apptFailed, 'danger')],
       };
-    case "showed":
+    case 'showed':
       return {
         main: c.showed,
-        unit: "คน",
-        parts: [
-          part("มา", c.showed, "success"),
-          part("ไม่มา", c.noShow, "danger"),
-        ],
+        unit: 'คน',
+        parts: [part('มา', c.showed, 'success'), part('ไม่มา', c.noShow, 'danger')],
       };
-    case "passed":
+    case 'passed':
       return {
         main: c.passed,
-        unit: "คน",
-        parts: [
-          part("ผ่าน", c.passed, "success"),
-          part("ไม่ผ่าน", c.notPassed, "danger"),
-        ],
+        unit: 'คน',
+        parts: [part('ผ่าน', c.passed, 'success'), part('ไม่ผ่าน', c.notPassed, 'danger')],
       };
-    case "follow":
+    case 'follow':
       // วันส่งคนแทนอยู่การ์ดใบขอค้าง (หน่วยวัน ไม่ปนคอลัมน์คน)
-      return { main: c.followStarts, unit: "คน", parts: [] };
-    case "aftercare":
-      return { main: c.aftercare, unit: "คน", parts: [] };
-    case "closed":
-      return { main: null, unit: "ใบ", parts: [] };
+      return { main: c.followStarts, unit: 'คน', parts: [] };
+    case 'aftercare':
+      return { main: c.aftercare, unit: 'คน', parts: [] };
+    case 'closed':
+      return { main: null, unit: 'ใบ', parts: [] };
   }
 }
 
 function sumCounts(rows: readonly PipelineRequest[]): PipelineCounts {
   const out = {} as PipelineCounts;
   for (const r of rows)
-    for (const [k, v] of Object.entries(r.counts))
-      out[k as keyof PipelineCounts] =
-        (out[k as keyof PipelineCounts] ?? 0) + v;
-  for (const k of Object.keys(rows[0]?.counts ?? {}))
-    out[k as keyof PipelineCounts] ??= 0;
+    for (const [k, v] of Object.entries(r.counts)) out[k as keyof PipelineCounts] = (out[k as keyof PipelineCounts] ?? 0) + v;
+  for (const k of Object.keys(rows[0]?.counts ?? {})) out[k as keyof PipelineCounts] ??= 0;
   return out;
 }
 
@@ -192,17 +158,7 @@ const EMPTY_COUNTS: PipelineCounts = {
 /** ลำดับขั้น (1–12) ของคีย์ */
 const STEP_INDEX = new Map(PIPELINE_STEPS.map((s, i) => [s.key, i]));
 /** ขั้นที่นับ "ผ่าน/ติด" รายใบได้ (2–10) */
-const STUCKABLE = new Set<PipelineStepKey>([
-  "released",
-  "apps",
-  "ai",
-  "staff",
-  "interested",
-  "appointment",
-  "showed",
-  "passed",
-  "follow",
-]);
+const STUCKABLE = new Set<PipelineStepKey>(['released', 'apps', 'ai', 'staff', 'interested', 'appointment', 'showed', 'passed', 'follow']);
 
 /**
  * เส้น 12 ขั้นเป็นตาราง — คอลัมน์แยกหน่วย (เจ้าของ 22 ต.ค. 2569 "หน่วยนับมันควรตรงกัน การจัดวาง ระยะห่างก็ไม่เท่ากัน")
@@ -231,9 +187,7 @@ function StepLine({
 }) {
   const single = stuckOf !== undefined;
   /** ขั้นที่กางแยกผลอยู่ — ค่าเริ่มซ่อน (เจ้าของ 22 ต.ค. 2569 "สนใจ ไม่สนใจไรนั่นอะ ซ่อน พอกดแล้วค่อยโชว์") */
-  const [openSteps, setOpenSteps] = useState<ReadonlySet<PipelineStepKey>>(
-    new Set(),
-  );
+  const [openSteps, setOpenSteps] = useState<ReadonlySet<PipelineStepKey>>(new Set());
   const toggle = (k: PipelineStepKey) =>
     setOpenSteps((cur) => {
       const next = new Set(cur);
@@ -249,26 +203,16 @@ function StepLine({
         <TableHeader>
           <TableRow>
             {/* คอลัมน์ขั้น/ตัวเลขกว้างเท่าที่ต้องใช้ · แยกผลได้ที่เหลือ (เว็บจริง 22 ต.ค. 2569 คำแยกผลขาดกลางคำ) */}
-            <TableHead className="w-px whitespace-nowrap text-xs">
-              ขั้น
-            </TableHead>
+            <TableHead className="w-px whitespace-nowrap text-xs">ขั้น</TableHead>
             {single ? (
-              <TableHead className="w-px whitespace-nowrap text-xs">
-                ใบนี้
-              </TableHead>
+              <TableHead className="w-px whitespace-nowrap text-xs">ใบนี้</TableHead>
             ) : (
               <>
-                <TableHead className="w-px whitespace-nowrap text-right text-xs">
-                  ผ่านขั้นนี้ (ใบ)
-                </TableHead>
-                <TableHead className="w-px whitespace-nowrap text-right text-xs">
-                  ติดขั้นนี้ (ใบ)
-                </TableHead>
+                <TableHead className="w-px whitespace-nowrap text-right text-xs">ผ่านขั้นนี้ (ใบ)</TableHead>
+                <TableHead className="w-px whitespace-nowrap text-right text-xs">ติดขั้นนี้ (ใบ)</TableHead>
               </>
             )}
-            <TableHead className="w-px whitespace-nowrap text-right text-xs">
-              คน
-            </TableHead>
+            <TableHead className="w-px whitespace-nowrap text-right text-xs">คน</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -278,41 +222,26 @@ function StepLine({
               released,
               replacedDays,
             });
-            const stuckHere = STUCKABLE.has(s.key)
-              ? (stuckCount?.[s.key] ?? 0)
-              : null;
+            const stuckHere = STUCKABLE.has(s.key) ? (stuckCount?.[s.key] ?? 0) : null;
             if (stuckHere !== null) passedSoFar -= stuckHere;
-            const passed =
-              s.key === "request"
-                ? requests
-                : STUCKABLE.has(s.key) && s.key !== "follow"
-                  ? passedSoFar
-                  : null;
+            const passed = s.key === 'request' ? requests : STUCKABLE.has(s.key) && s.key !== 'follow' ? passedSoFar : null;
             const idx = STEP_INDEX.get(s.key) ?? 0;
             const mine = stuckOf ? (STEP_INDEX.get(stuckOf) ?? 0) : 0;
-            const status = !single
-              ? null
-              : s.key === stuckOf
-                ? "ติดตรงนี้"
-                : idx < mine
-                  ? "ผ่าน"
-                  : "ยังไม่ถึง";
+            const status = !single ? null : s.key === stuckOf ? 'ติดตรงนี้' : idx < mine ? 'ผ่าน' : 'ยังไม่ถึง';
             // ขั้นที่นับคนไม่ได้ (ใบขอ · ประกาศ · ปิด) ใช้คอลัมน์ "คน" เป็น —
-            const people = n.unit === "คน" ? n.main : null;
+            const people = n.unit === 'คน' ? n.main : null;
             const open = openSteps.has(s.key);
             const cols = single ? 3 : 4;
             return (
               <React.Fragment key={s.key}>
                 <TableRow data-testid={`req-step-${s.key}`}>
                   <TableCell className="whitespace-nowrap text-sm text-foreground">
-                    <span className="inline-block w-6 tabular-nums text-muted-foreground">
-                      {s.no}
-                    </span>
+                    <span className="inline-block w-6 tabular-nums text-muted-foreground">{s.no}</span>
                     {s.label}
                   </TableCell>
                   {single ? (
                     <TableCell className="whitespace-nowrap text-sm">
-                      {status === "ติดตรงนี้" ? (
+                      {status === 'ติดตรงนี้' ? (
                         <Badge variant="destructive">ติดตรงนี้</Badge>
                       ) : (
                         <span className="text-muted-foreground">{status}</span>
@@ -320,22 +249,17 @@ function StepLine({
                     </TableCell>
                   ) : (
                     <>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {passed === null ? "—" : fmt(passed)}
-                      </TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">{passed === null ? '—' : fmt(passed)}</TableCell>
                       <TableCell className="text-right tabular-nums">
                         {stuckHere === null ? (
-                          "—"
+                          '—'
                         ) : onStuck ? (
                           // ปุ่มแบบลิงก์ — แถวสูงเท่ากันทุกแถว (เว็บจริง: ปุ่มกรอบทำแถวสูงไม่เท่ากัน)
                           <Button
                             type="button"
                             variant="link"
                             size="sm"
-                            className={cn(
-                              "h-auto p-0 tabular-nums",
-                              activeStuck === s.key && "font-medium underline",
-                            )}
+                            className={cn('h-auto p-0 tabular-nums', activeStuck === s.key && 'font-medium underline')}
                             disabled={stuckHere === 0}
                             onClick={() => onStuck(s.key)}
                             data-testid={`req-stuck-${s.key}`}
@@ -351,7 +275,7 @@ function StepLine({
                   )}
                   <TableCell className="text-right font-medium tabular-nums">
                     {people === null ? (
-                      "—"
+                      '—'
                     ) : n.parts.length > 0 ? (
                       <Button
                         type="button"
@@ -363,13 +287,7 @@ function StepLine({
                         data-testid={`req-step-toggle-${s.key}`}
                       >
                         {fmt(people)}
-                        <ChevronDown
-                          className={cn(
-                            "h-4 w-4 transition-transform",
-                            !open && "-rotate-90",
-                          )}
-                          aria-hidden
-                        />
+                        <ChevronDown className={cn('h-4 w-4 transition-transform', !open && '-rotate-90')} aria-hidden />
                       </Button>
                     ) : (
                       fmt(people)
@@ -379,29 +297,14 @@ function StepLine({
                 {/* แยกผลกางเป็นแถวย่อย เลขอยู่คอลัมน์ "คน" เดียวกัน */}
                 {open
                   ? n.parts.map((p) => (
-                      <TableRow
-                        key={`${s.key}-${p.label}`}
-                        className="bg-muted/40"
-                        data-testid={`req-step-part-${s.key}`}
-                      >
-                        <TableCell
-                          className="whitespace-nowrap py-2 pl-10 text-sm text-muted-foreground"
-                          colSpan={cols - 1}
-                        >
+                      <TableRow key={`${s.key}-${p.label}`} className="bg-muted/40" data-testid={`req-step-part-${s.key}`}>
+                        <TableCell className="whitespace-nowrap py-2 pl-10 text-sm text-muted-foreground" colSpan={cols - 1}>
                           <span className="inline-flex items-center gap-1.5">
-                            <span
-                              className={cn(
-                                "h-2 w-2 rounded-full",
-                                TONE[p.tone].dot,
-                              )}
-                              aria-hidden
-                            />
+                            <span className={cn('h-2 w-2 rounded-full', TONE[p.tone].dot)} aria-hidden />
                             {p.label}
                           </span>
                         </TableCell>
-                        <TableCell className="py-2 text-right tabular-nums text-foreground">
-                          {fmt(p.value)}
-                        </TableCell>
+                        <TableCell className="py-2 text-right tabular-nums text-foreground">{fmt(p.value)}</TableCell>
                       </TableRow>
                     ))
                   : null}
@@ -415,20 +318,9 @@ function StepLine({
 }
 
 /** ช่องทาง 3 ชั้น: แพลตฟอร์ม → ประเภท → ชื่อ */
-function ChannelDrill({
-  data,
-  sub,
-}: {
-  data: RequestPipelineResponse | null;
-  sub: string;
-}) {
-  const [path, setPath] = useState<{ platform?: PlatformKey; type?: string }>(
-    {},
-  );
-  const platforms = useMemo(
-    () => (data?.channels ? buildPlatforms(data.channels) : null),
-    [data],
-  );
+function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub: string }) {
+  const [path, setPath] = useState<{ platform?: PlatformKey; type?: string }>({});
+  const platforms = useMemo(() => (data?.channels ? buildPlatforms(data.channels) : null), [data]);
   const platform = platforms?.find((p) => p.key === path.platform) ?? null;
   const type = platform?.types.find((t) => t.channel === path.type) ?? null;
   const rows: Array<{
@@ -464,56 +356,27 @@ function ChannelDrill({
   const sumReg = rows.reduce((n, r) => n + r.registered, 0);
   const sumPlaced = rows.reduce((n, r) => n + r.placed, 0);
   return (
-    <HomeSection
-      title="ช่องทาง"
-      sub={`${sub} · ลงงาน = แจ้งเข้าในช่วง`}
-      testId="req-channels"
-    >
-      <nav
-        className="flex flex-wrap items-center gap-1 text-sm"
-        data-testid="req-channels-trail"
-      >
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          className="h-auto p-0"
-          onClick={() => setPath({})}
-        >
+    <HomeSection title="ช่องทาง" sub={`${sub} · ลงงาน = แจ้งเข้าในช่วง`} testId="req-channels">
+      <nav className="flex flex-wrap items-center gap-1 text-sm" data-testid="req-channels-trail">
+        <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={() => setPath({})}>
           ทุกช่องทาง
         </Button>
         {platform ? (
           <>
-            <ChevronRight
-              className="h-4 w-4 text-muted-foreground"
-              aria-hidden
-            />
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              className="h-auto p-0"
-              onClick={() => setPath({ platform: platform.key })}
-            >
+            <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />
+            <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={() => setPath({ platform: platform.key })}>
               {platform.label}
             </Button>
           </>
         ) : null}
         {type ? (
           <>
-            <ChevronRight
-              className="h-4 w-4 text-muted-foreground"
-              aria-hidden
-            />
+            <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />
             <span className="text-foreground">{type.channel}</span>
           </>
         ) : null}
       </nav>
-      {data?.errors.channels ? (
-        <p className={cn("text-sm", TONE.danger.value)}>
-          {data.errors.channels}
-        </p>
-      ) : null}
+      {data?.errors.channels ? <p className={cn('text-sm', TONE.danger.value)}>{data.errors.channels}</p> : null}
       {!platforms && !data?.errors.channels ? (
         <Skeleton className="h-40 w-full rounded-xl" />
       ) : (
@@ -522,21 +385,14 @@ function ChannelDrill({
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs">ช่องทาง</TableHead>
-                <TableHead className="whitespace-nowrap text-right text-xs">
-                  ลงทะเบียน (คน)
-                </TableHead>
-                <TableHead className="whitespace-nowrap text-right text-xs">
-                  ลงงาน (คน)
-                </TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ลงทะเบียน (คน)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ลงงาน (คน)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={3}
-                    className="py-4 text-center text-sm text-muted-foreground"
-                  >
+                  <TableCell colSpan={3} className="py-4 text-center text-sm text-muted-foreground">
                     ไม่มีข้อมูล
                   </TableCell>
                 </TableRow>
@@ -558,12 +414,8 @@ function ChannelDrill({
                         <span className="text-foreground">{r.label}</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {fmt(r.registered)}
-                    </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
-                      {fmt(r.placed)}
-                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{fmt(r.registered)}</TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">{fmt(r.placed)}</TableCell>
                   </TableRow>
                 ))
               )}
@@ -572,14 +424,9 @@ function ChannelDrill({
         </div>
       )}
       {platforms ? (
-        <p
-          className="text-xs tabular-nums text-muted-foreground"
-          data-testid="req-channels-sum"
-        >
+        <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-channels-sum">
           รวม ลงทะเบียน {fmt(sumReg)} คน · ลงงาน {fmt(sumPlaced)} คน
-          {!platform && data?.channels
-            ? ` · แจ้งเข้าทั้งหมด ${fmt(data.channels.informed)} คน`
-            : ""}
+          {!platform && data?.channels ? ` · แจ้งเข้าทั้งหมด ${fmt(data.channels.informed)} คน` : ''}
         </p>
       ) : null}
     </HomeSection>
@@ -602,67 +449,42 @@ const HomeRequestsTab: React.FC<{
     setError(null);
     fetchRequestPipeline(win)
       .then((d) => alive && setData(d))
-      .catch(
-        (e: unknown) =>
-          alive && setError(friendlyErrorText(e, "โหลดเส้นใบขอไม่ขึ้น")),
-      );
+      .catch((e: unknown) => alive && setError(friendlyErrorText(e, 'โหลดเส้นใบขอไม่ขึ้น')));
     return () => {
       alive = false;
     };
   }, [win, tick]);
 
-  const ready =
-    Boolean(data) &&
-    feed.feedState !== "loading" &&
-    feed.feedState !== "failed" &&
-    feed.feedState !== "forbidden";
-  const rows = useMemo(
-    () => (data && ready ? buildPipelineRequests(feed.jobs, data) : []),
-    [data, ready, feed.jobs],
-  );
+  const ready = Boolean(data) && feed.feedState !== 'loading' && feed.feedState !== 'failed' && feed.feedState !== 'forbidden';
+  const rows = useMemo(() => (data && ready ? buildPipelineRequests(feed.jobs, data) : []), [data, ready, feed.jobs]);
   const sum = useMemo(() => summarizePipeline(rows), [rows]);
   // ติดตาม/ดูแลหลังเริ่มงานของภาพรวม นับคนต่อไซต์ครั้งเดียว (บวกรายใบ = นับคนเดิมซ้ำทุกใบของไซต์)
   const allCounts = useMemo(
-    () =>
-      rows.length && data
-        ? { ...sumCounts(rows), ...siteFollowTotals(rows, data) }
-        : EMPTY_COUNTS,
+    () => (rows.length && data ? { ...sumCounts(rows), ...siteFollowTotals(rows, data) } : EMPTY_COUNTS),
     [rows, data],
   );
   const released = rows.filter((r) => r.released).length;
   const shown = useMemo(() => {
-    const list = rows.filter(
-      (r) =>
-        !filter ||
-        (filter.kind === "bucket"
-          ? r.bucket === filter.key
-          : r.stuck === filter.key),
-    );
+    const list = rows.filter((r) => !filter || (filter.kind === 'bucket' ? r.bucket === filter.key : r.stuck === filter.key));
     return [...list].sort((a, b) => (b.ageDays ?? -1) - (a.ageDays ?? -1));
   }, [rows, filter]);
-  const sub = win.from && win.to ? rangeText(win.from, win.to) : "ทุกวัน";
+  const sub = win.from && win.to ? rangeText(win.from, win.to) : 'ทุกวัน';
   const pick = (f: Filter) => {
-    setFilter((cur) =>
-      cur && f && cur.kind === f.kind && cur.key === f.key ? null : f,
-    );
+    setFilter((cur) => (cur && f && cur.kind === f.kind && cur.key === f.key ? null : f));
     setLimit(30);
   };
-  const dash = (v: number) => (ready ? fmt(v) : "—");
+  const dash = (v: number) => (ready ? fmt(v) : '—');
 
   return (
     <div className="space-y-5" data-testid="home-requests">
       {error || feed.loadError ? (
-        <p className={cn("text-sm", TONE.danger.value)} data-testid="req-error">
+        <p className={cn('text-sm', TONE.danger.value)} data-testid="req-error">
           {error ?? feed.loadError}
         </p>
       ) : null}
 
       {/* 1. ใบขอค้าง */}
-      <HomeSection
-        title="ใบขอค้าง"
-        sub="ณ วันนี้ · นับวันทำงานแบบเมนูใบขอ"
-        testId="req-summary"
-      >
+      <HomeSection title="ใบขอค้าง" sub="ณ วันนี้ · นับวันทำงานแบบเมนูใบขอ" testId="req-summary">
         {/* หน่วยเดียวกันอยู่กลุ่มเดียวกัน · หน่วยอยู่ที่หัวกลุ่ม (เจ้าของ 22 ต.ค. 2569 "หน่วยนับไม่ตรงกันมันจะชวนงง") */}
         <div className="space-y-2" data-testid="req-group-requests">
           <p className="text-xs font-medium text-muted-foreground">จำนวนใบ</p>
@@ -670,16 +492,13 @@ const HomeRequestsTab: React.FC<{
             {/* กล่องเดียวกับช่วงอายุ (เว็บจริง 22 ต.ค. 2569 กล่องแรกหน้าตาไม่เหมือนเพื่อน) · กด = ดูทุกใบ */}
             <Button
               type="button"
-              variant={filter?.kind === "bucket" ? "outline" : "default"}
+              variant={filter?.kind === 'bucket' ? 'outline' : 'default'}
               className="h-auto flex-col items-start justify-start gap-1 whitespace-normal rounded-xl p-3 text-left font-normal"
               onClick={() => pick(null)}
               data-testid="req-bucket-all"
             >
               <span className="text-xs">เหลือทั้งหมด</span>
-              <span
-                className="text-xl font-medium tabular-nums"
-                data-testid="req-total"
-              >
+              <span className="text-xl font-medium tabular-nums" data-testid="req-total">
                 {dash(sum.total)}
               </span>
             </Button>
@@ -687,128 +506,74 @@ const HomeRequestsTab: React.FC<{
               <Button
                 key={b.key}
                 type="button"
-                variant={
-                  filter?.kind === "bucket" && filter.key === b.key
-                    ? "default"
-                    : "outline"
-                }
+                variant={filter?.kind === 'bucket' && filter.key === b.key ? 'default' : 'outline'}
                 className="h-auto flex-col items-start justify-start gap-1 whitespace-normal rounded-xl p-3 text-left font-normal"
-                onClick={() => pick({ kind: "bucket", key: b.key })}
+                onClick={() => pick({ kind: 'bucket', key: b.key })}
                 data-testid={`req-bucket-${b.key}`}
               >
                 <span className="flex items-center gap-1.5 text-xs">
-                  <span
-                    className={cn(
-                      "h-2 w-2 rounded-full",
-                      TONE[BUCKET_TONE[b.key]].dot,
-                    )}
-                    aria-hidden
-                  />
+                  <span className={cn('h-2 w-2 rounded-full', TONE[BUCKET_TONE[b.key]].dot)} aria-hidden />
                   {b.label}
                 </span>
-                <span className="text-xl font-medium tabular-nums">
-                  {dash(sum.buckets[b.key])}
-                </span>
+                <span className="text-xl font-medium tabular-nums">{dash(sum.buckets[b.key])}</span>
               </Button>
             ))}
           </div>
-          <p
-            className="text-xs tabular-nums text-muted-foreground"
-            data-testid="req-bucket-sum"
-          >
-            {AGE_BUCKETS.map((b) => `${dash(sum.buckets[b.key])}`).join(" + ")}{" "}
-            = {dash(sum.total)} ใบ
+          <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-bucket-sum">
+            {AGE_BUCKETS.map((b) => `${dash(sum.buckets[b.key])}`).join(' + ')} = {dash(sum.total)} ใบ
           </p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2" data-testid="req-group-days">
-            <p className="text-xs font-medium text-muted-foreground">
-              จำนวนวัน (วันทำงาน)
-            </p>
+            <p className="text-xs font-medium text-muted-foreground">จำนวนวัน (วันทำงาน)</p>
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
-                  ["ผ่านมารวม", sum.ageDays, "req-age-days"],
-                  ["ส่งคนแทนได้", sum.replacedDays, "req-replaced-days"],
-                  ["โดนปรับ", sum.penaltyDays, "req-penalty-days"],
+                  ['ผ่านมารวม', sum.ageDays, 'req-age-days'],
+                  ['ส่งคนแทนได้', sum.replacedDays, 'req-replaced-days'],
+                  ['โดนปรับ', sum.penaltyDays, 'req-penalty-days'],
                 ] as const
               ).map(([label, value, id]) => (
-                <Card
-                  key={id}
-                  variant="solid"
-                  className="space-y-1 rounded-xl p-3"
-                  data-testid={id}
-                >
-                  <span className="block text-xs text-muted-foreground">
-                    {label}
-                  </span>
-                  <span className="block text-lg font-medium tabular-nums text-foreground">
-                    {dash(value)}
-                  </span>
+                <Card key={id} variant="solid" className="space-y-1 rounded-xl p-3" data-testid={id}>
+                  <span className="block text-xs text-muted-foreground">{label}</span>
+                  <span className="block text-lg font-medium tabular-nums text-foreground">{dash(value)}</span>
                 </Card>
               ))}
             </div>
-            <p
-              className="text-xs tabular-nums text-muted-foreground"
-              data-testid="req-days-sum"
-            >
-              {dash(sum.ageDays)} − {dash(sum.replacedDays)} ={" "}
-              {dash(sum.penaltyDays)} วัน
+            <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-days-sum">
+              {dash(sum.ageDays)} − {dash(sum.replacedDays)} = {dash(sum.penaltyDays)} วัน
             </p>
           </div>
           <div className="space-y-2" data-testid="req-group-money">
-            <p className="text-xs font-medium text-muted-foreground">
-              เงิน (บาท)
-            </p>
+            <p className="text-xs font-medium text-muted-foreground">เงิน (บาท)</p>
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
-                  ["ค่าปรับ", sum.fine, "req-fine"],
-                  ["ลดมูลค่า", sum.deduct, "req-deduct"],
-                  ["รวม", sum.fine + sum.deduct, "req-money-total"],
+                  ['ค่าปรับ', sum.fine, 'req-fine'],
+                  ['ลดมูลค่า', sum.deduct, 'req-deduct'],
+                  ['รวม', sum.fine + sum.deduct, 'req-money-total'],
                 ] as const
               ).map(([label, value, id]) => (
-                <Card
-                  key={id}
-                  variant="solid"
-                  className="space-y-1 rounded-xl p-3"
-                  data-testid={id}
-                >
-                  <span className="block text-xs text-muted-foreground">
-                    {label}
-                  </span>
-                  <span className="block text-lg font-medium tabular-nums text-foreground">
-                    {ready ? BAHT.format(value) : "—"}
-                  </span>
+                <Card key={id} variant="solid" className="space-y-1 rounded-xl p-3" data-testid={id}>
+                  <span className="block text-xs text-muted-foreground">{label}</span>
+                  <span className="block text-lg font-medium tabular-nums text-foreground">{ready ? BAHT.format(value) : '—'}</span>
                 </Card>
               ))}
             </div>
-            <p
-              className="text-xs tabular-nums text-muted-foreground"
-              data-testid="req-money-sum"
-            >
-              {ready
-                ? `${BAHT.format(sum.fine)} + ${BAHT.format(sum.deduct)} = ${BAHT.format(sum.fine + sum.deduct)} บาท`
-                : "—"}
+            <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-money-sum">
+              {ready ? `${BAHT.format(sum.fine)} + ${BAHT.format(sum.deduct)} = ${BAHT.format(sum.fine + sum.deduct)} บาท` : '—'}
             </p>
           </div>
         </div>
         {data?.replacementSince ? (
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid="req-replacement-since"
-          >
+          <p className="text-xs text-muted-foreground" data-testid="req-replacement-since">
             ส่งคนแทนมีข้อมูลตั้งแต่ {thaiDate(data.replacementSince)}
           </p>
         ) : null}
       </HomeSection>
 
       {/* 2. เส้น 12 ขั้น */}
-      <HomeSection
-        title="เส้นใบขอ 12 ขั้น"
-        sub="ใบที่ยังเปิดทั้งหมด · คนนับทุกช่วงเวลา"
-        testId="req-steps"
-      >
+      <HomeSection title="เส้นใบขอ 12 ขั้น" sub="ใบที่ยังเปิดทั้งหมด · คนนับทุกช่วงเวลา" testId="req-steps">
         {ready ? (
           <StepLine
             counts={allCounts}
@@ -816,21 +581,18 @@ const HomeRequestsTab: React.FC<{
             released={released}
             replacedDays={sum.replacedDays}
             stuckCount={sum.stuck}
-            onStuck={(k) => pick({ kind: "stuck", key: k })}
-            activeStuck={filter?.kind === "stuck" ? filter.key : null}
+            onStuck={(k) => pick({ kind: 'stuck', key: k })}
+            activeStuck={filter?.kind === 'stuck' ? filter.key : null}
           />
         ) : (
           <Skeleton className="h-80 w-full rounded-xl" />
         )}
-        <p
-          className="text-xs tabular-nums text-muted-foreground"
-          data-testid="req-stuck-sum"
-        >
+        <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-stuck-sum">
           {/* คอลัมน์ "ติดขั้นนี้" บวกกันตามลำดับบนตาราง (เว็บจริงเดิมเขียน "2:249" อ่านไม่ออก) */}
-          ติดขั้นนี้รวม{" "}
+          ติดขั้นนี้รวม{' '}
           {PIPELINE_STEPS.filter((s) => STUCKABLE.has(s.key))
             .map((s) => dash(sum.stuck[s.key]))
-            .join(" + ")}{" "}
+            .join(' + ')}{' '}
           = {dash(sum.total)} ใบ
         </p>
       </HomeSection>
@@ -840,21 +602,15 @@ const HomeRequestsTab: React.FC<{
         title="รายใบขอ"
         sub={
           filter
-            ? filter.kind === "bucket"
+            ? filter.kind === 'bucket'
               ? AGE_BUCKETS.find((b) => b.key === filter.key)?.label
               : `ติดขั้น ${STEP_LABEL.get(filter.key)?.no} ${STEP_LABEL.get(filter.key)?.label}`
-            : "ทุกใบ · ค้างนานสุดก่อน"
+            : 'ทุกใบ · ค้างนานสุดก่อน'
         }
         testId="req-table"
         right={
           filter ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => pick(null)}
-              data-testid="req-filter-clear"
-            >
+            <Button type="button" variant="outline" size="sm" onClick={() => pick(null)} data-testid="req-filter-clear">
               ดูทุกใบ
             </Button>
           ) : null
@@ -866,25 +622,13 @@ const HomeRequestsTab: React.FC<{
               <TableRow>
                 {/* ชื่อใบไม่ถูกบีบ (เว็บจริง: ชื่อตัด 3 บรรทัด แถวสูงไม่เท่ากัน) · ตารางกว้างเลื่อนข้างได้ */}
                 <TableHead className="min-w-64 text-xs">ใบขอ</TableHead>
-                <TableHead className="whitespace-nowrap text-right text-xs">
-                  ผ่านมา (วัน)
-                </TableHead>
-                <TableHead className="whitespace-nowrap text-right text-xs">
-                  คนสนใจ (คน)
-                </TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ผ่านมา (วัน)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">คนสนใจ (คน)</TableHead>
                 <TableHead className="text-xs">ติดขั้น</TableHead>
-                <TableHead className="whitespace-nowrap text-right text-xs">
-                  ส่งคนแทน (วัน)
-                </TableHead>
-                <TableHead className="whitespace-nowrap text-right text-xs">
-                  โดนปรับ (วัน)
-                </TableHead>
-                <TableHead className="whitespace-nowrap text-right text-xs">
-                  ค่าปรับ (บาท)
-                </TableHead>
-                <TableHead className="whitespace-nowrap text-right text-xs">
-                  ลดมูลค่า (บาท)
-                </TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ส่งคนแทน (วัน)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">โดนปรับ (วัน)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ค่าปรับ (บาท)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ลดมูลค่า (บาท)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -896,10 +640,7 @@ const HomeRequestsTab: React.FC<{
                 </TableRow>
               ) : shown.length === 0 ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="py-4 text-center text-sm text-muted-foreground"
-                  >
+                  <TableCell colSpan={8} className="py-4 text-center text-sm text-muted-foreground">
                     ไม่มีใบขอ
                   </TableCell>
                 </TableRow>
@@ -920,52 +661,27 @@ const HomeRequestsTab: React.FC<{
                             aria-expanded={open}
                           >
                             <ChevronDown
-                              className={cn(
-                                "mt-0.5 h-4 w-4 shrink-0 transition-transform",
-                                !open && "-rotate-90",
-                              )}
+                              className={cn('mt-0.5 h-4 w-4 shrink-0 transition-transform', !open && '-rotate-90')}
                               aria-hidden
                             />
                             <span>
                               <span className="block text-foreground">{`${jobBoardCardTitle(r.job)} · ${publicJobTitle(r.job)}`}</span>
-                              <span className="text-xs tabular-nums text-muted-foreground">
-                                {r.requestNo}
-                              </span>
+                              <span className="text-xs tabular-nums text-muted-foreground">{r.requestNo}</span>
                             </span>
                           </Button>
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-right tabular-nums">
-                          {r.advance ? (
-                            <Badge variant="secondary">ล่วงหน้า</Badge>
-                          ) : (
-                            fmt(r.ageDays)
-                          )}
+                          {r.advance ? <Badge variant="secondary">ล่วงหน้า</Badge> : fmt(r.ageDays)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{fmt(r.counts.aiYes)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-sm">{step ? `${step.no}. ${r.stuckReason}` : '—'}</TableCell>
+                        <TableCell className="text-right tabular-nums">{fmt(r.replacedDays)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{fmt(r.penaltyDays)}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {r.finePerDay > 0 ? BAHT.format(r.fine) : <span className="text-muted-foreground">ไม่มี</span>}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {fmt(r.counts.aiYes)}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-sm">
-                          {step ? `${step.no}. ${r.stuckReason}` : "—"}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {fmt(r.replacedDays)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {fmt(r.penaltyDays)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {r.finePerDay > 0 ? (
-                            BAHT.format(r.fine)
-                          ) : (
-                            <span className="text-muted-foreground">ไม่มี</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {r.deductPerDay > 0 ? (
-                            BAHT.format(r.deduct)
-                          ) : (
-                            <span className="text-muted-foreground">ไม่มี</span>
-                          )}
+                          {r.deductPerDay > 0 ? BAHT.format(r.deduct) : <span className="text-muted-foreground">ไม่มี</span>}
                         </TableCell>
                       </TableRow>
                       {open ? (
@@ -973,26 +689,19 @@ const HomeRequestsTab: React.FC<{
                           <TableCell colSpan={8} className="bg-muted/40">
                             <div className="space-y-2 p-2">
                               {/* บรรทัดละหน่วย: วัน แล้วค่อยเงิน (เจ้าของ "หน่วยนับไม่ตรงกันมันจะชวนงง") */}
-                              <p
-                                className="text-xs tabular-nums text-muted-foreground"
-                                data-testid="req-detail-days"
-                              >
+                              <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-detail-days">
                                 {r.advance
-                                  ? "ล่วงหน้า ยังไม่นับวัน"
+                                  ? 'ล่วงหน้า ยังไม่นับวัน'
                                   : `ผ่านมา ${fmt(r.ageDays)} − ส่งคนแทน ${fmt(r.replacedDays)} = โดนปรับ ${fmt(r.penaltyDays)} วัน`}
                               </p>
                               {!r.advance && r.finePerDay > 0 ? (
                                 <p className="text-xs tabular-nums text-muted-foreground">
-                                  ค่าปรับ {fmt(r.penaltyDays)} วัน ×{" "}
-                                  {NUM.format(r.finePerDay)} ={" "}
-                                  {BAHT.format(r.fine)} บาท
+                                  ค่าปรับ {fmt(r.penaltyDays)} วัน × {NUM.format(r.finePerDay)} = {BAHT.format(r.fine)} บาท
                                 </p>
                               ) : null}
                               {!r.advance && r.deductPerDay > 0 ? (
                                 <p className="text-xs tabular-nums text-muted-foreground">
-                                  ลดมูลค่า {fmt(r.penaltyDays)} วัน ×{" "}
-                                  {NUM.format(r.deductPerDay)} ={" "}
-                                  {BAHT.format(r.deduct)} บาท
+                                  ลดมูลค่า {fmt(r.penaltyDays)} วัน × {NUM.format(r.deductPerDay)} = {BAHT.format(r.deduct)} บาท
                                 </p>
                               ) : null}
                               <StepLine
@@ -1018,13 +727,7 @@ const HomeRequestsTab: React.FC<{
             แสดง {fmt(Math.min(limit, shown.length))} จาก {fmt(shown.length)} ใบ
           </span>
           {shown.length > limit ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setLimit((n) => n + 30)}
-              data-testid="req-more"
-            >
+            <Button type="button" variant="outline" size="sm" onClick={() => setLimit((n) => n + 30)} data-testid="req-more">
               ดูเพิ่ม
             </Button>
           ) : null}
