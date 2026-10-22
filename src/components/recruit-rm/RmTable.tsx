@@ -35,13 +35,12 @@ import {
 import type { CallHold } from '@/lib/callHoldsApi';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { greetingHeardText } from '@/lib/greetingCall';
-import { callResultLabel } from '@/lib/homeCallResults';
 import { INTEREST_MICRO_TONE } from '@/lib/trends/lumosPipeline';
-import { FOLLOW_STATUS_LABEL, FOLLOW_STATUS_TONE, isFollowCallStatus } from '@/lib/followApi';
+import { FOLLOW_STATUS_TONE, isFollowCallStatus } from '@/lib/followApi';
 import { aiQueueStatusOf, type AiQueueStatus } from '@/lib/applicantAiQueueStatus';
+import { aiAnswerTextOf } from '@/lib/applicantAiAnswerText';
 import { PROCESS_STATE_LABEL, PROCESS_STATE_TONE, PROCESS_STEP_LABEL, applicantProcessOf } from '@/lib/applicantProcess';
-import { IRECRUIT_PULL_STATE_LABEL, irecruitLateHours, irecruitPullState, lateText } from '@/lib/irecruitPullStatus';
-import { IRECRUIT_PULL_CREATED_BY } from '@/lib/recruitRm';
+import { irecruitLateHours, irecruitPullState, lateText } from '@/lib/irecruitPullStatus';
 
 /** สถานะแบบ iRecruit (เจ้าของ 4 ต.ค. 2569 "เอาสถานะมาเพิ่มพอ") — ชิปสถานะ + ขั้นที่อยู่ */
 function ProcessCell({ r }: { r: PublicApplication }) {
@@ -117,15 +116,14 @@ function AiQueueCell({ q }: { q: AiQueueStatus }) {
 }
 
 function AiAnswerCell({ r }: { r: PublicApplication }) {
+  // คำบรรทัดบนมาจาก `aiAnswerTextOf` ตัวเดียวกับตัวกรอง "สถานะการตอบของ AI" (22 ต.ค. 2569) — ที่นี่แค่แต่งสี/บรรทัดรอง
+  const a = aiAnswerTextOf(r);
   // ยังรอฝั่ง AI แต่มีเรื่องให้บอก (โทรแล้วกี่ครั้ง · โทรซ้ำเมื่อไร · ให้คนโทร) — มาก่อนคำตอบรอบเก่า (14 ต.ค. 2569)
-  const queue = aiQueueStatusOf(r);
-  if (queue && queue.kind !== 'waiting') return <AiQueueCell q={queue} />;
-  if (r.ai_answer) {
+  if (a.kind === 'queue' && a.queue) return <AiQueueCell q={a.queue} />;
+  if (a.kind === 'answer' && r.ai_answer) {
     return (
       <span className="flex flex-col gap-0.5">
-        <span className={cn('whitespace-nowrap font-medium', TONE[INTEREST_MICRO_TONE[r.ai_answer.micro]].value)}>
-          {callResultLabel('interest', r.ai_answer.micro)}
-        </span>
+        <span className={cn('whitespace-nowrap font-medium', TONE[INTEREST_MICRO_TONE[r.ai_answer.micro]].value)}>{a.text}</span>
         {r.ai_answer.at ? (
           <span className={cn('whitespace-nowrap text-xs tabular-nums', DASH.cellMuted)}>
             {formatYmdTh(toYmdBangkok(new Date(r.ai_answer.at)))}
@@ -134,28 +132,26 @@ function AiAnswerCell({ r }: { r: PublicApplication }) {
       </span>
     );
   }
-  if (r.phone_callable === false) {
+  if (a.kind === 'bad_phone') {
     return (
       <span
         className={cn('whitespace-nowrap text-xs font-medium', TONE.danger.value)}
         title="เบอร์นี้ใช้กับระบบโทรไม่ได้ (ไม่ใช่มือถือ 10 หลัก) — กดดูรายละเอียดเพื่อแก้เบอร์"
       >
-        เบอร์ใช้โทรไม่ได้
+        {a.text}
       </span>
     );
   }
-  if (isFollowCallStatus(r.last_call_status)) {
+  if (a.kind === 'call_status' && isFollowCallStatus(r.last_call_status)) {
     return (
-      <span className={cn('whitespace-nowrap text-xs font-medium', TONE[FOLLOW_STATUS_TONE[r.last_call_status]].value)}>
-        {FOLLOW_STATUS_LABEL[r.last_call_status]}
-      </span>
+      <span className={cn('whitespace-nowrap text-xs font-medium', TONE[FOLLOW_STATUS_TONE[r.last_call_status]].value)}>{a.text}</span>
     );
   }
   // ซ้ำกับ iRecruit ภายใน 14 วัน — AI ไม่โทรเอง เจ้าหน้าที่เลือกส่งเองได้ (143 · 12 ต.ค. 2569)
-  if (r.irecruit_dup_at) {
+  if (a.kind === 'irecruit_dup' && r.irecruit_dup_at) {
     return (
       <span className="flex flex-col gap-0.5" data-testid="irecruit-dup">
-        <span className={cn('whitespace-nowrap text-xs font-medium', TONE.warn.value)}>ซ้ำ iRecruit</span>
+        <span className={cn('whitespace-nowrap text-xs font-medium', TONE.warn.value)}>{a.text}</span>
         <span className={cn('whitespace-nowrap text-xs tabular-nums', DASH.cellMuted)}>
           สมัคร {formatYmdTh(toYmdBangkok(new Date(r.irecruit_dup_at)))}
         </span>
@@ -164,17 +160,17 @@ function AiAnswerCell({ r }: { r: PublicApplication }) {
   }
   // รายชื่อที่ดึงจาก iRecruit = ทีมโทรใน iRecruit ⇒ บอกสถานะของ iRecruit + ค้างกี่ชั่วโมง (21 ต.ค. 2569)
   const irState = irecruitPullState(r.irecruit_status);
-  if (r.created_by_name === IRECRUIT_PULL_CREATED_BY && irState) {
+  if (a.kind === 'irecruit_pull' && irState) {
     const late = irecruitLateHours(r.irecruit_status, r.created_at);
     const tone = irState === 'done' ? TONE.success.value : irState === 'failed' ? DASH.cellMuted : late ? TONE.danger.value : TONE.warn.value;
     return (
       <span className="flex flex-col gap-0.5" data-testid="irecruit-pull-status" data-state={irState}>
-        <span className={cn('whitespace-nowrap text-xs font-medium', tone)}>{IRECRUIT_PULL_STATE_LABEL[irState]}</span>
+        <span className={cn('whitespace-nowrap text-xs font-medium', tone)}>{a.text}</span>
         {late ? <span className={cn('whitespace-nowrap text-xs tabular-nums', TONE.danger.value)}>{lateText(late)}</span> : null}
       </span>
     );
   }
-  return <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>ยังไม่ได้ส่งให้ AI</span>;
+  return <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>{a.text}</span>;
 }
 
 const ACTION_ICON: Record<RmRowAction, typeof Phone> = {

@@ -19,6 +19,7 @@ import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicant
 import { ATTENDANCE_LABEL } from '@/lib/appointmentAttendance';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { fullDaysSince } from '@/lib/fullDays';
+import { aiAnswerTextOf } from '@/lib/applicantAiAnswerText';
 import {
   CONTACT_STATE_LABEL,
   PROCESS_STATE_LABEL,
@@ -48,6 +49,7 @@ export type ApplicantFacetKey =
   | 'recruiter'
   | 'specific'
   | 'call'
+  | 'aiStatus'
   | 'step'
   | 'status'
   | 'contactState'
@@ -230,6 +232,18 @@ const FACETS: readonly Def[] = [
     order: ['interested', 'pending', 'not_interested', 'none'],
     labelOf: (v) => CALL_LABEL[v] ?? v,
     values: (r) => [applicantCallValue(r)],
+  },
+  {
+    /**
+     * สถานะการตอบของ AI (เจ้าของ 22 ต.ค. 2569) — ค่า = คำบรรทัดบนของคอลัมน์ "คำตอบกับ AI" ตรงตัว
+     * (`aiAnswerTextOf` ตัวเดียวกับตาราง) เช่น "AI โทรแล้ว 1 ครั้ง ไม่รับสาย" · "ส่ง AI แล้ว ยังไม่มีผล"
+     */
+    key: 'aiStatus',
+    label: 'สถานะการตอบของ AI',
+    ui: 'check',
+    searchable: true,
+    available: (facts) => isRecruitFilterTab(facts.tab),
+    values: (r, facts) => [aiAnswerTextOf(r, facts.now.getTime()).text],
   },
   /**
    * ═══ ขั้นตอน · สถานะ · สถานะการติดต่อ — เติมจาก iRecruit (เจ้าของ 4 ต.ค. 2569) ═══
@@ -441,6 +455,7 @@ export const RECRUIT_TAB_FACETS: readonly ApplicantFacetKey[] = [
   'status',
   'contactState',
   'call',
+  'aiStatus',
   'job',
   'province',
   'days',

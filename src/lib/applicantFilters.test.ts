@@ -277,12 +277,12 @@ describe('ตัวกรองแท็บผู้สมัคร + การ�
     app({ province: 'ลพบุรี', district: 'ชัยบาดาล', license_types: ['ท.1'], specific_type: 'ทดสอบ', unit_name: 'หน่วยงานก', job_id: 'siamraj-sql:T1', job_title: 'ขับรถ' }),
     app({ province: 'กรุงเทพมหานคร', district: 'บางรัก', license_types: ['ท.2'], specific_type: 'ทดสอบ2', unit_name: 'หน่วยงานข', job_id: 'siamraj-sql:T2', job_title: 'ขับรถ' }),
   ];
-  it('ลำดับ 13 หัวข้อ + คำตามเจ้าของ · โพสต์ประกาศไม่เกี่ยว ติดตามนัดหมายคงเดิม', () => {
+  it('ลำดับ 14 หัวข้อ (+ สถานะการตอบของ AI 22 ต.ค.) + คำตามเจ้าของ · โพสต์ประกาศไม่เกี่ยว ติดตามนัดหมายคงเดิม', () => {
     expect(applicantPrimaryFacets('candidates')).toEqual(RECRUIT_TAB_FACETS);
     expect(applicantPrimaryFacets('contact')).toEqual(RECRUIT_TAB_FACETS);
     expect(applicantPrimaryFacets('appointments')).toEqual(APPLICANT_PRIMARY_FACETS);
     expect(RECRUIT_TAB_FACETS).toEqual([
-      'recruiter', 'step', 'status', 'contactState', 'call', 'job', 'province', 'days', 'position', 'age', 'education', 'channel', 'gender',
+      'recruiter', 'step', 'status', 'contactState', 'call', 'aiStatus', 'job', 'province', 'days', 'position', 'age', 'education', 'channel', 'gender',
     ]);
     for (const tab of ['candidates', 'contact'] as const) {
       const f = buildApplicantFacets(rows, state({ province: ['ลพบุรี'] }), facts({ tab }));
@@ -298,5 +298,27 @@ describe('ตัวกรองแท็บผู้สมัคร + การ�
     const appt = buildApplicantFacets(rows, state({ province: ['ลพบุรี'] }), facts({ tab: 'appointments' }));
     expect(appt.find((x) => x.key === 'job')?.label).toBe('ใบขอที่สมัคร');
     expect(appt.some((x) => x.key === 'license')).toBe(true);
+  });
+});
+
+describe('สถานะการตอบของ AI (เจ้าของ 22 ต.ค. 2569 "AI โทรแล้ว 1 ครั้ง ไม่ตอบ / ส่ง AI แล้ว ยังไม่มีผล")', () => {
+  const sent = new Date(NOW.getTime() - 2 * 3600_000).toISOString();
+  const rowsAi = [
+    app({ last_call_status: 'pending', last_call_attempts: 2, last_call_followup: 'retry_scheduled', last_call_prev_outcome: 'no_answer', last_call_next_at: new Date(NOW.getTime() + 3600_000).toISOString() } as Partial<PublicApplication>),
+    app({ last_call_status: 'pending', last_call_attempts: 1, last_call_sent_at: sent } as Partial<PublicApplication>),
+    app({ last_call_status: 'pending', last_call_attempts: 1, last_call_sent_at: sent } as Partial<PublicApplication>),
+    app(),
+  ];
+  it('ค่า = คำบนคอลัมน์ "คำตอบกับ AI" ตรงตัว · ติ๊กแล้วเหลือเฉพาะแถวนั้น · มีแค่แท็บผู้สมัคร/การติดต่อ', () => {
+    const f = buildApplicantFacets(rowsAi, EMPTY_APPLICANT_FILTER_STATE, facts()).find((x) => x.key === 'aiStatus')!;
+    expect(f.label).toBe('สถานะการตอบของ AI');
+    const labels = f.options.map((o) => o.label);
+    expect(labels).toContain('ส่ง AI แล้ว ยังไม่มีผล');
+    expect(labels).toContain('ยังไม่ได้ส่งให้ AI');
+    expect(labels.some((l) => l.startsWith('AI โทรแล้ว 1 ครั้ง'))).toBe(true);
+    const kept = applyApplicantFilters(rowsAi, state({ aiStatus: ['ส่ง AI แล้ว ยังไม่มีผล'] }), facts());
+    expect(kept).toHaveLength(2);
+    const appt = buildApplicantFacets(rowsAi, EMPTY_APPLICANT_FILTER_STATE, facts({ tab: 'appointments' }));
+    expect(appt.some((x) => x.key === 'aiStatus')).toBe(false);
   });
 });
