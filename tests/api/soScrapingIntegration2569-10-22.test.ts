@@ -67,8 +67,10 @@ describe('Journey เดียวกับเจ้าหน้าที่ · A
 describe('ใบขอปิดแล้วไม่รับ (ทดสอบเว็บจริง: LBM6910003 Stop แล้วยังรับ)', () => {
   it('เช็กด่านใบขอปิดตัวเดียวกับปุ่มส่ง AI ก่อนบันทึก', () => {
     const h = read('api/_handlers/so-scraping-integration.ts');
-    const at = h.indexOf('if (await isRequestClosedForApply(job.id)) return sendError(res, 409');
+    const at = h.indexOf('if (await isRequestClosedForApply(realId)) return sendError(res, 409');
     expect(at).toBeGreaterThan(0);
+    // ใบขอล่วงหน้าเลขซ้ำห้ามแทนใบจริง
+    expect(h).toContain('if (!job || job.id !== realId)');
     expect(at).toBeLessThan(h.indexOf('insert into ${LEADS}'));
   });
 });

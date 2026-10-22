@@ -80,10 +80,14 @@ async function postLead(req: ApiReq, res: ApiRes) {
       return res.status(200).json({ lead_id: p.id, candidate_id: p.application_id, duplicate: true, do_not_call: p.do_not_call });
     }
 
-    const job = (await getSiamrajUnitRequestById(`siamraj-sql:${v.request_no}`, { mode: 'all' })) as JobRequest | null;
-    if (!job) return sendError(res, 404, 'Not found', `ไม่พบใบขอ ${v.request_no} ที่ยังเปิดอยู่`);
-    // ใบปิด/Stop/แจ้งเข้าครบใน ERP = ไม่รับ (ทดสอบเว็บจริง 22 ต.ค. 2569: LBM6910003 Stop แล้วยังรับ) · ด่านเดียวกับปุ่มส่ง AI
-    if (await isRequestClosedForApply(job.id)) return sendError(res, 409, 'Conflict', `ใบขอ ${v.request_no} ปิดแล้ว`);
+    /**
+     * ใบขอจริงใน ERP เลขนี้ตรงตัวเท่านั้น (ทดสอบเว็บจริง 22 ต.ค. 2569: LBM6910003 Stop แล้วยังรับ — ตัวหาใบไปเจอใบขอล่วงหน้า
+     * `siamraj-pre:` ที่เลขซ้ำ · กับดักเดิม "ใบขอล่วงหน้าเลขซ้ำใบจริง") · ใบจริงปิด/Stop/แจ้งเข้าครบ = 409 (ด่านเดียวกับปุ่มส่ง AI)
+     */
+    const realId = `siamraj-sql:${v.request_no}`;
+    if (await isRequestClosedForApply(realId)) return sendError(res, 409, 'Conflict', `ใบขอ ${v.request_no} ปิดแล้ว`);
+    const job = (await getSiamrajUnitRequestById(realId, { mode: 'all' })) as JobRequest | null;
+    if (!job || job.id !== realId) return sendError(res, 404, 'Not found', `ไม่พบใบขอ ${v.request_no} ที่ยังเปิดอยู่`);
     await attachAssignments([job]);
 
     const phone = normalizeCommentPhone(v.phone);
