@@ -24,6 +24,7 @@ import { formatDateTimeTh } from '@/lib/dateTh';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import type { IntegrationName } from '@/lib/integrationKeys';
+import LumosOldIdRepushCard from './LumosOldIdRepushCard';
 
 type KeyRow = { name: string; created_at: string; revoked_at: string | null; last_used_at: string | null } | null;
 type Item = { name: IntegrationName; label: string; endpoints: readonly string[]; key: KeyRow };
@@ -180,6 +181,9 @@ const IntegrationKeysTab: React.FC = () => {
           </Card>
         );
       })}
+
+      {/* แผนติดตามรหัสเดิมที่ค้างที่ Lumos (22 ต.ค. 2569) */}
+      <LumosOldIdRepushCard />
 
       <AlertDialog open={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)}>
         <AlertDialogContent>

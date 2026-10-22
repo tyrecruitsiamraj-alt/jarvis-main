@@ -13769,3 +13769,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 ## แก้เวลาสาย AI แล้วได้สายใหม่ (22 ต.ค. 2569 · เจ้าของ "เวลาแก้ไขเวลามันไม่แก้ไขอะ มันไปตั้งใหม่อะ")
 - ต้นเหตุ `isEditableFollowRound` (`src/lib/followScheduleEdit.ts`) เช็ก `!called_at` แต่ `called_at` จาก `/api/follow` = `updated_at` ของแถวคิว ⇒ สาย AI ที่ส่งแผนล่วงหน้าทุกสายถูกนับว่าโทรแล้ว · ป๊อปแก้ไม่มีสายเดิม (`replaceIds: []` ใน audit `follow.schedule.replace`) → บันทึกแล้วสร้างสายใหม่ ของเดิมค้าง
 - แก้: ดูแค่สถานะคิว (pending) + ผลโทร ตรงกับด่าน stale ฝั่ง API · 🔴 ห้ามเอา `called_at` กลับมาเป็นตัวตัดสินว่าโทรแล้ว
+
+## ล้างแผนติดตามรหัสเดิมที่ยกเลิกไม่ติด (22 ต.ค. 2569 · เจ้าของ Choice "ล้างทีเดียว")
+- ที่มา: ไพศาลยกเลิกแล้วยังโดนโทร · เจ้าของ *"ฉันยกเลิกก็ตายพอดีดิ"* — แผนที่ส่งซ้ำด้วยรหัสเดิมก่อน 21 ต.ค. (event id Lumos `<id>:v<n>`) DELETE ไม่ติด
+- รายการส่งทีม Lumos `docs/lumos/lumos-cancel-oldid-2569-10-22.md` (กลุ่ม 1 ยังต้องโทร 124 · กลุ่ม 2 ยกเลิกแล้ว 23 · กลุ่ม 3 มีแผน -g แล้ว 28)
+- หลัง Lumos ยืนยัน: ตั้งค่า › เชื่อมระบบภายนอก › การ์ด "Lumos · แผนรหัสเดิม" (`src/pages/settings/LumosOldIdRepushCard.tsx`) → `/api/follow-oldid-repush` (แอดมิน · GET นับ · POST ส่ง) → `api/_lib/followOldIdRepush.ts` ทำเครื่องหมาย `lumos_plan_closed_at` ที่หัวขบวนเดิม (ห้ามยิง DELETE แผนที่จบแล้ว) แล้ว `replanFollowSetWithLumos` = รหัส `-g` ใหม่ เวลาเดิม
+- 🔴 กดก่อน Lumos ยกเลิก = โทรซ้ำ 2 สาย (ป๊อปยืนยันบนการ์ด) · เทสต์ `tests/api/followOldIdRepush2569-10-22.test.ts`
