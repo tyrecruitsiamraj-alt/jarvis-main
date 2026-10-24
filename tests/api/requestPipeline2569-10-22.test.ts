@@ -46,10 +46,13 @@ const fact = (o: Partial<RecruitAppFact>): RecruitAppFact =>
 describe('อายุใบขอ', () => {
   it('ล่วงหน้า / ต่ำกว่า 30 / 30–60 / เกิน 60', () => {
     expect(ageBucketOf(true, null)).toBe('advance');
-    expect(ageBucketOf(false, 29)).toBe('lt30');
-    expect(ageBucketOf(false, 30)).toBe('d30to60');
-    expect(ageBucketOf(false, 60)).toBe('d30to60');
-    expect(ageBucketOf(false, 61)).toBe('gt60');
+    expect(ageBucketOf(false, 0)).toBe('d1to7');
+    expect(ageBucketOf(false, 7)).toBe('d1to7');
+    expect(ageBucketOf(false, 8)).toBe('d8to15');
+    expect(ageBucketOf(false, 15)).toBe('d8to15');
+    expect(ageBucketOf(false, 16)).toBe('d16to30');
+    expect(ageBucketOf(false, 30)).toBe('d16to30');
+    expect(ageBucketOf(false, 31)).toBe('gt30');
     expect(ageBucketOf(false, null)).toBe('unknown');
   });
 });
@@ -139,8 +142,8 @@ describe('ส่งคนแทน → วันโดนปรับ', () => {
 
   it('สรุป: ทุกช่วงอายุรวม = จำนวนใบ · ติดขั้นรวม = จำนวนใบ', () => {
     const rows = [
-      { bucket: 'lt30', stuck: 'apps', fine: 10, deduct: 0, penaltyDays: 1, replacedDays: 0 },
-      { bucket: 'gt60', stuck: 'released', fine: 0, deduct: 5, penaltyDays: 2, replacedDays: 3 },
+      { bucket: 'd1to7', stuck: 'apps', fine: 10, deduct: 0, penaltyDays: 1, replacedDays: 0 },
+      { bucket: 'gt30', stuck: 'released', fine: 0, deduct: 5, penaltyDays: 2, replacedDays: 3 },
       { bucket: 'advance', stuck: 'released', fine: 0, deduct: 0, penaltyDays: null, replacedDays: 0 },
     ] as never;
     const s = summarizePipeline(rows);
@@ -222,12 +225,14 @@ describe('ติดตามเริ่มงานของภาพรวม 
 describe('หน่วยตรงกันทั้งแท็บ (เจ้าของ 22 ต.ค. 2569 "หน่วยนับไม่ตรงกันมันจะชวนงง")', () => {
   const tab = fs.readFileSync(path.join(process.cwd(), 'src/components/home-ai-share/HomeRequestsTab.tsx'), 'utf8');
   it('หน่วยอยู่หัวคอลัมน์/หัวกลุ่ม · ของหน่วยเดียวกันอยู่กลุ่มเดียวกัน', () => {
-    for (const h of ['ผ่านขั้นนี้ (ใบ)', 'ติดขั้นนี้ (ใบ)', 'ผ่านมา (วัน)', 'คนสนใจ (คน)', 'ส่งคนแทน (วัน)', 'โดนปรับ (วัน)', 'ค่าปรับ (บาท)', 'ลดมูลค่า (บาท)', 'ลงทะเบียน (คน)', 'ลงงาน (คน)', 'จำนวนใบ', 'จำนวนวัน (วันทำงาน)', 'เงิน (บาท)']) {
+    for (const h of ['ผ่านขั้นนี้ (ใบ)', 'ติดขั้นนี้ (ใบ)', 'ผ่านมา (วัน)', 'คนสนใจ (คน)', 'คนกรอก (คน)', 'โดนปรับ (วัน)', 'ค่าปรับ (บาท)', 'ลดมูลค่า (บาท)', 'ลงทะเบียน (คน)', 'ลงงาน (คน)', 'จำนวนใบ', 'ขาดคน (คน-วัน · วันทำงาน)', 'เงิน (บาท)']) {
       expect(tab).toContain(h);
     }
     // คอลัมน์แยกผลเป็นของคนเท่านั้น — ไม่มี "ยังไม่ประกาศ (ใบ)" / "ส่งคนแทน (วัน)" ปน
     expect(tab).not.toContain("part('ยังไม่ประกาศ'");
     expect(tab).not.toContain("part('ส่งคนแทน (วัน)'");
+    // เงินรายใบมาจากสมุดค่าปรับตัวเดียวกับหน้าหลัก (24 ต.ค. 2569) — ห้ามกลับไปคิดวันค้าง × อัตรา
+    expect(tab).toContain('ledgerByRequest(money)');
     // แยกผลซ่อนไว้ กดเลขคนแล้วกาง (เจ้าของ "ซ่อน พอกดแล้วค่อยโชว์") · เลขแยกผลอยู่คอลัมน์ "คน" เดียวกัน
     expect(tab).toContain('useState<ReadonlySet<PipelineStepKey>>(new Set())');
     expect(tab).toContain('data-testid={`req-step-toggle-${s.key}`}');

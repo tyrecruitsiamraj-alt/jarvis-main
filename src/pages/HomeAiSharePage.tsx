@@ -817,6 +817,10 @@ const HomeAiSharePage: React.FC = () => {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {/* ปุ่มปฏิทินเป็นไอคอนอย่างเดียว ไม่มีคำนำหน้า (เจ้าของสั่งถอดทั้ง "7 วันล่าสุด" และ "ช่วง" 30 ก.ย. 2569) */}
+            {/* กลับหน้าหลักผู้บริหาร (ค่าตั้งต้นตั้งแต่ 24 ต.ค. 2569) */}
+            <Button asChild variant="outline" size="sm">
+              <a href="/?home=exec">หน้าหลักใหม่</a>
+            </Button>
             <PeriodPicker value={win} onChange={setWin} />
             {current?.forced_bu && current.bu ? (
               <span className="text-sm text-muted-foreground">{trendBuLabel(current.bu)}</span>

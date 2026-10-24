@@ -412,6 +412,8 @@ const HomePageClassic: React.FC = () => {
  * 🔴 ของเดิม (`HomePageClassic` ด้านบน) **ไม่ลบ** — ยังเรียกได้ที่ `?home=classic` เป็นทางถอย จนเจ้าของเคาะ
  */
 const HomeAiSharePage = lazyPage(() => import('@/pages/HomeAiSharePage'));
+/** หน้าหลักผู้บริหาร หน้าเดียวเลื่อนลง (24 ต.ค. 2569) — ค่าตั้งต้น · หน้าแท็บเดิม = `?home=new` */
+const HomeExecPage = lazyPage(() => import('@/pages/HomeExecPage'));
 const HomeV3Page = lazyPage(() => import('@/pages/HomeV3Page'));
 const TeamOnlinePage = lazyPage(() => import('@/pages/TeamOnlinePage'));
 
@@ -420,7 +422,15 @@ const HomePage: React.FC = () => {
   if (variant === 'classic') return <HomePageClassic />;
   return (
     <Suspense fallback={null}>
-      {variant === 'online' ? <TeamOnlinePage /> : variant === 'v3' ? <HomeV3Page /> : <HomeAiSharePage />}
+      {variant === 'online' ? (
+        <TeamOnlinePage />
+      ) : variant === 'v3' ? (
+        <HomeV3Page />
+      ) : variant === 'new' ? (
+        <HomeAiSharePage />
+      ) : (
+        <HomeExecPage />
+      )}
     </Suspense>
   );
 };

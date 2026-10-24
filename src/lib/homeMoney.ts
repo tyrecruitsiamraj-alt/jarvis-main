@@ -1,0 +1,145 @@
+/**
+ * ═══ ก้อนเงิน + นาฬิกา ของหน้าหลักผู้บริหาร (เจ้าของ 24 ต.ค. 2569) — ประกอบคำตอบ `/api/home-money` ═══
+ * ตัวคิดค่าปรับอยู่ `requestPenaltyLedger.ts` · ไฟล์นี้แค่สรุปตามช่วง/BU · pure (เทสต์ `homeMoney.test.ts`)
+ * 🔴 "เหลือหา" และ "ค้างนาน" ไม่คิดที่นี่ — อ่านจากชุดใบขอของกล่องงานที่เดียว (`homeExec.ts`) เพราะรวมใบขอล่วงหน้าด้วย
+ */
+import { requestFlow, type LedgerDaily, type LedgerMode, type LedgerRequest, type RequestFlow } from './requestPenaltyLedger';
+
+export type MoneyTotals = { fine: number; deduct: number; personDays: number; requests: number };
+export type MoneyRequest = {
+  requestNo: string;
+  bu: string | null;
+  unit: string;
+  position: string;
+  qty: number;
+  filled: number;
+  keyYmd: string;
+  needYmd: string | null;
+  endYmd: string | null;
+  open: boolean;
+  advance: boolean;
+  finePerDay: number;
+  deductPerDay: number;
+  speedDays: number | null;
+  lateDays: number | null;
+  amount: Record<LedgerMode, { days: number; personDays: number; fine: number; deduct: number; coveredPersonDays: number }>;
+};
+
+export type ClockStat = { n: number; avg: number | null; median: number | null };
+
+export type HomeMoneyResponse = {
+  window: { from: string; to: string };
+  today: string;
+  since: string;
+  bu: string | null;
+  forcedBu: boolean;
+  totals: Record<LedgerMode, MoneyTotals>;
+  daily: LedgerDaily;
+  clocks: { speed: ClockStat; late: ClockStat };
+  /** ยกมา + ขอใหม่ − หาได้ − ยกเลิก = เหลือ (คน) — ใบขอจริงใน ERP ไม่รวมใบขอล่วงหน้า */
+  flow: RequestFlow;
+  customerFines: { total: number; receipts: number; months: Array<{ ym: string; amount: number; receipts: number }> };
+  requests: MoneyRequest[];
+};
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+function clock(values: number[]): ClockStat {
+  if (values.length === 0) return { n: 0, avg: null, median: null };
+  const s = [...values].sort((a, b) => a - b);
+  const avg = Math.round((s.reduce((a, b) => a + b, 0) / s.length) * 10) / 10;
+  return { n: s.length, avg, median: s[Math.floor(s.length / 2)] };
+}
+
+export function buildHomeMoney(
+  ledger: { requests: LedgerRequest[]; daily: LedgerDaily },
+  customerFines: ReadonlyArray<{ ym: string; amount: number; receipts: number }>,
+  ctx: { from: string; to: string; today: string; since: string; bu: string | null; forcedBu: boolean },
+): HomeMoneyResponse {
+  const totals: Record<LedgerMode, MoneyTotals> = {
+    need: { fine: 0, deduct: 0, personDays: 0, requests: 0 },
+    key: { fine: 0, deduct: 0, personDays: 0, requests: 0 },
+  };
+  const speed: number[] = [];
+  const late: number[] = [];
+  const requests: MoneyRequest[] = [];
+
+  for (const r of ledger.requests) {
+    for (const m of ['need', 'key'] as const) {
+      const a = r.amount[m];
+      if (a.fine + a.deduct <= 0) continue;
+      totals[m].fine += a.fine;
+      totals[m].deduct += a.deduct;
+      totals[m].personDays += a.personDays;
+      totals[m].requests += 1;
+    }
+    // นาฬิกา: ใบที่หาครบ และวันหาครบอยู่ในช่วง
+    if (r.filled >= r.qty && r.foundYmd && r.foundYmd >= ctx.from && r.foundYmd <= ctx.to) {
+      if (r.speedDays != null) speed.push(r.speedDays);
+      if (r.lateDays != null) late.push(r.lateDays);
+    }
+    const hasMoney = r.amount.need.fine + r.amount.need.deduct + r.amount.key.fine + r.amount.key.deduct > 0;
+    if (!hasMoney && !r.open) continue;
+    requests.push({
+      requestNo: r.requestNo,
+      bu: r.bu,
+      unit: r.unit,
+      position: r.position,
+      qty: r.qty,
+      filled: r.filled,
+      keyYmd: r.keyYmd,
+      needYmd: r.needYmd,
+      endYmd: r.endYmd,
+      open: r.open,
+      advance: r.advance,
+      finePerDay: r.finePerDay,
+      deductPerDay: r.deductPerDay,
+      speedDays: r.speedDays,
+      lateDays: r.lateDays,
+      amount: r.amount,
+    });
+  }
+  for (const m of ['need', 'key'] as const) {
+    totals[m].fine = round2(totals[m].fine);
+    totals[m].deduct = round2(totals[m].deduct);
+  }
+  requests.sort((a, b) => b.amount.need.fine + b.amount.need.deduct - (a.amount.need.fine + a.amount.need.deduct));
+
+  const fromYm = ctx.from.slice(0, 7);
+  const toYm = ctx.to.slice(0, 7);
+  const byMonth = new Map<string, { ym: string; amount: number; receipts: number }>();
+  for (const f of customerFines) {
+    if (f.ym < fromYm || f.ym > toYm) continue;
+    const cur = byMonth.get(f.ym) ?? { ym: f.ym, amount: 0, receipts: 0 };
+    cur.amount = round2(cur.amount + f.amount);
+    cur.receipts += f.receipts;
+    byMonth.set(f.ym, cur);
+  }
+  const months = [...byMonth.values()].sort((a, b) => (a.ym < b.ym ? -1 : 1));
+
+  return {
+    window: { from: ctx.from, to: ctx.to },
+    today: ctx.today,
+    since: ctx.since,
+    bu: ctx.bu,
+    forcedBu: ctx.forcedBu,
+    totals,
+    daily: ledger.daily,
+    clocks: { speed: clock(speed), late: clock(late) },
+    flow: requestFlow(ledger.requests, ctx.from, ctx.to > ctx.today ? ctx.today : ctx.to),
+    customerFines: {
+      total: round2(months.reduce((a, m) => a + m.amount, 0)),
+      receipts: months.reduce((a, m) => a + m.receipts, 0),
+      months,
+    },
+    requests,
+  };
+}
+
+/** ยอดของสมุดค่าปรับรายใบ (จุดเริ่มนับ = วันที่ต้องการ) — แท็บใบขอใช้แทนสูตรเดิม ให้ทั้งระบบเหลือสูตรเดียว (24 ต.ค. 2569) */
+export type LedgerPick = { days: number; personDays: number; coveredPersonDays: number; fine: number; deduct: number };
+export function ledgerByRequest(money: Pick<HomeMoneyResponse, 'requests'> | null): Map<string, LedgerPick> {
+  const out = new Map<string, LedgerPick>();
+  for (const r of money?.requests ?? []) out.set(r.requestNo.trim().toUpperCase(), r.amount.need);
+  return out;
+}

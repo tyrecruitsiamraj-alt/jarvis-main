@@ -18,6 +18,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { HomeSection } from '@/components/home-ai-share/HomeSections';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { fetchRequestPipeline } from '@/lib/requestPipelineApi';
+import { fetchHomeMoney, type HomeMoneyPayload } from '@/lib/homeMoneyApi';
+import { ledgerByRequest } from '@/lib/homeMoney';
+import { toYmdBangkok } from '@/lib/dateTh';
 import {
   AGE_BUCKETS,
   PIPELINE_STEPS,
@@ -29,7 +32,7 @@ import {
   type PipelineRequest,
   type PipelineStepKey,
 } from '@/lib/requestPipeline';
-import { buildPlatforms, type PlatformKey } from '@/lib/channelPlatforms';
+import { buildPlatforms, channelInterestOf, type PlatformKey } from '@/lib/channelPlatforms';
 import type { RequestPipelineResponse } from '@/lib/requestPipelineTypes';
 import { rangeText, thaiDate } from '@/lib/periodPick';
 import { TONE, type ToneKey } from '@/lib/designTokens';
@@ -43,15 +46,34 @@ const BAHT = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 });
 const fmt = (n: number | null | undefined) => (n === null || n === undefined ? '—' : NUM.format(n));
 
 const BUCKET_TONE: Record<AgeBucket, ToneKey> = {
+  gt30: 'danger',
+  d16to30: 'orange',
+  d8to15: 'warn',
+  d1to7: 'success',
   advance: 'info',
-  lt30: 'success',
-  d30to60: 'warn',
-  gt60: 'danger',
   unknown: 'neutral',
 };
 const STEP_LABEL = new Map(PIPELINE_STEPS.map((s) => [s.key, s]));
 
-type Filter = { kind: 'bucket'; key: AgeBucket } | { kind: 'stuck'; key: PipelineStepKey } | null;
+type FlagKey = 'released' | 'notReleased' | 'withApps' | 'noApps' | 'aiNoStaff';
+type Filter = { kind: 'bucket'; key: AgeBucket } | { kind: 'stuck'; key: PipelineStepKey } | { kind: 'flag'; key: FlagKey } | null;
+const FLAG_LABEL: Record<FlagKey, string> = {
+  released: 'ประกาศแล้ว',
+  notReleased: 'ยังไม่ประกาศ',
+  withApps: 'ประกาศแล้ว มีคนกรอก',
+  noApps: 'ประกาศแล้ว ไม่มีคนกรอก',
+  aiNoStaff: 'AI สนใจ คนยังไม่โทรต่อ',
+};
+const flagOf = (r: { released: boolean; counts: PipelineCounts }, k: FlagKey): boolean =>
+  k === 'released'
+    ? r.released
+    : k === 'notReleased'
+      ? !r.released
+      : k === 'withApps'
+        ? r.released && r.counts.apps > 0
+        : k === 'noApps'
+          ? r.released && r.counts.apps === 0
+          : r.counts.aiYesNoStaff > 0;
 
 /** ตัวเลขของขั้นในเส้น — หลัก (เลขใหญ่) + ก้อนย่อย */
 function stepNumbers(key: PipelineStepKey, c: PipelineCounts, opts: { requests: number; released: number; replacedDays: number }) {
@@ -143,6 +165,7 @@ const EMPTY_COUNTS: PipelineCounts = {
   staffCalled: 0,
   staffFollowed: 0,
   staffReached: 0,
+  aiYesNoStaff: 0,
   interested: 0,
   notInterested: 0,
   appointed: 0,
@@ -321,12 +344,19 @@ function StepLine({
 function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub: string }) {
   const [path, setPath] = useState<{ platform?: PlatformKey; type?: string }>({});
   const platforms = useMemo(() => (data?.channels ? buildPlatforms(data.channels) : null), [data]);
+  /** สนใจ / นัดได้ ต่อช่องทาง (ใบสมัครในระบบเราที่กรอกในช่วง · 24 ต.ค. 2569) — ชั้นชื่อกลุ่ม/เพจยังแยกไม่ได้ = — */
+  const interest = useMemo(
+    () => (data?.facts ? channelInterestOf(data.facts, data.window.from, data.window.to) : null),
+    [data],
+  );
   const platform = platforms?.find((p) => p.key === path.platform) ?? null;
   const type = platform?.types.find((t) => t.channel === path.type) ?? null;
   const rows: Array<{
     key: string;
     label: string;
     registered: number;
+    interested: number | null;
+    appointed: number | null;
     placed: number;
     onClick?: () => void;
   }> = !platforms
@@ -336,6 +366,8 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
           key: s.name,
           label: s.name,
           registered: s.registered,
+          interested: null,
+          appointed: null,
           placed: s.placed,
         }))
       : platform
@@ -343,6 +375,8 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
             key: t.channel,
             label: t.channel,
             registered: t.registered,
+            interested: interest?.byType.get(t.channel)?.interested ?? 0,
+            appointed: interest?.byType.get(t.channel)?.appointed ?? 0,
             placed: t.placed,
             onClick: () => setPath({ platform: platform.key, type: t.channel }),
           }))
@@ -350,11 +384,15 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
             key: p.key,
             label: p.label,
             registered: p.registered,
+            interested: interest?.byPlatform.get(p.key)?.interested ?? 0,
+            appointed: interest?.byPlatform.get(p.key)?.appointed ?? 0,
             placed: p.placed,
             onClick: () => setPath({ platform: p.key }),
           }));
   const sumReg = rows.reduce((n, r) => n + r.registered, 0);
   const sumPlaced = rows.reduce((n, r) => n + r.placed, 0);
+  const sumInterested = rows.reduce((n, r) => n + (r.interested ?? 0), 0);
+  const sumAppointed = rows.reduce((n, r) => n + (r.appointed ?? 0), 0);
   return (
     <HomeSection title="ช่องทาง" sub={`${sub} · ลงงาน = แจ้งเข้าในช่วง`} testId="req-channels">
       <nav className="flex flex-wrap items-center gap-1 text-sm" data-testid="req-channels-trail">
@@ -386,13 +424,15 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
               <TableRow>
                 <TableHead className="text-xs">ช่องทาง</TableHead>
                 <TableHead className="whitespace-nowrap text-right text-xs">ลงทะเบียน (คน)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">สนใจ (คน)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">นัดได้ (คน)</TableHead>
                 <TableHead className="whitespace-nowrap text-right text-xs">ลงงาน (คน)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="py-4 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={5} className="py-4 text-center text-sm text-muted-foreground">
                     ไม่มีข้อมูล
                   </TableCell>
                 </TableRow>
@@ -415,6 +455,8 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
                       )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{fmt(r.registered)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmt(r.interested)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmt(r.appointed)}</TableCell>
                     <TableCell className="text-right font-medium tabular-nums">{fmt(r.placed)}</TableCell>
                   </TableRow>
                 ))
@@ -425,7 +467,7 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
       )}
       {platforms ? (
         <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-channels-sum">
-          รวม ลงทะเบียน {fmt(sumReg)} คน · ลงงาน {fmt(sumPlaced)} คน
+          รวม ลงทะเบียน {fmt(sumReg)} คน · สนใจ {type ? '—' : fmt(sumInterested)} คน · นัดได้ {type ? '—' : fmt(sumAppointed)} คน · ลงงาน {fmt(sumPlaced)} คน
           {!platform && data?.channels ? ` · แจ้งเข้าทั้งหมด ${fmt(data.channels.informed)} คน` : ''}
         </p>
       ) : null}
@@ -455,8 +497,41 @@ const HomeRequestsTab: React.FC<{
     };
   }, [win, tick]);
 
+  /**
+   * เงินรายใบจากสมุดค่าปรับ (ต่อคนต่อวันทำงาน · หักคนแทน · นับจากวันที่ต้องการ) — สูตรเดียวกับก้อนเงินของหน้าหลัก (24 ต.ค. 2569)
+   * เดิมแท็บนี้คิดวันค้าง × อัตรา ไม่คูณคน ⇒ สองหน้าบอกเงินไม่ตรงกัน
+   */
+  const [money, setMoney] = useState<HomeMoneyPayload | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchHomeMoney({ from: '2024-01-01', to: toYmdBangkok(new Date()) })
+      .then((m) => alive && setMoney(m))
+      .catch(() => alive && setMoney(null));
+    return () => {
+      alive = false;
+    };
+  }, [tick]);
   const ready = Boolean(data) && feed.feedState !== 'loading' && feed.feedState !== 'failed' && feed.feedState !== 'forbidden';
-  const rows = useMemo(() => (data && ready ? buildPipelineRequests(feed.jobs, data) : []), [data, ready, feed.jobs]);
+  const rows = useMemo(() => {
+    if (!data || !ready) return [];
+    const ledger = ledgerByRequest(money);
+    return buildPipelineRequests(feed.jobs, data).map((r) => {
+      const l = ledger.get(r.requestNo.trim().toUpperCase());
+      return {
+        ...r,
+        penaltyDays: l ? l.days : r.advance ? null : 0,
+        fine: l?.fine ?? 0,
+        deduct: l?.deduct ?? 0,
+        personDays: l?.personDays ?? 0,
+        coveredPersonDays: l?.coveredPersonDays ?? 0,
+      };
+    });
+  }, [data, ready, feed.jobs, money]);
+  const personDays = rows.reduce((a, r) => a + r.personDays, 0);
+  const coveredPersonDays = rows.reduce((a, r) => a + r.coveredPersonDays, 0);
+  const flagCount = (k: FlagKey) => rows.filter((r) => flagOf(r, k)).length;
+  const flagPeople = (k: FlagKey) =>
+    rows.filter((r) => flagOf(r, k)).reduce((a, r) => a + (k === 'aiNoStaff' ? r.counts.aiYesNoStaff : r.counts.apps), 0);
   const sum = useMemo(() => summarizePipeline(rows), [rows]);
   // ติดตาม/ดูแลหลังเริ่มงานของภาพรวม นับคนต่อไซต์ครั้งเดียว (บวกรายใบ = นับคนเดิมซ้ำทุกใบของไซต์)
   const allCounts = useMemo(
@@ -465,7 +540,9 @@ const HomeRequestsTab: React.FC<{
   );
   const released = rows.filter((r) => r.released).length;
   const shown = useMemo(() => {
-    const list = rows.filter((r) => !filter || (filter.kind === 'bucket' ? r.bucket === filter.key : r.stuck === filter.key));
+    const list = rows.filter(
+      (r) => !filter || (filter.kind === 'bucket' ? r.bucket === filter.key : filter.kind === 'flag' ? flagOf(r, filter.key) : r.stuck === filter.key),
+    );
     return [...list].sort((a, b) => (b.ageDays ?? -1) - (a.ageDays ?? -1));
   }, [rows, filter]);
   const sub = win.from && win.to ? rangeText(win.from, win.to) : 'ทุกวัน';
@@ -523,29 +600,55 @@ const HomeRequestsTab: React.FC<{
             {AGE_BUCKETS.map((b) => `${dash(sum.buckets[b.key])}`).join(' + ')} = {dash(sum.total)} ใบ
           </p>
         </div>
+        {/* ประกาศ · มีคนกรอกไหม · AI สนใจแต่คนยังไม่โทรต่อ (หน้าหลักผู้บริหารข้อ 6–8 · 24 ต.ค. 2569) — กด = กรองรายใบข้างล่าง */}
+        <div className="space-y-2" data-testid="req-group-flags">
+          <p className="text-xs font-medium text-muted-foreground">จำนวนใบ · ประกาศและคนกรอก</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {(['released', 'notReleased', 'withApps', 'noApps', 'aiNoStaff'] as const).map((k) => (
+              <Button
+                key={k}
+                type="button"
+                variant={filter?.kind === 'flag' && filter.key === k ? 'default' : 'outline'}
+                className="h-auto flex-col items-start justify-start gap-1 whitespace-normal rounded-xl p-3 text-left font-normal"
+                onClick={() => pick({ kind: 'flag', key: k })}
+                data-testid={`req-flag-${k}`}
+              >
+                <span className="text-xs">{FLAG_LABEL[k]}</span>
+                <span className="text-xl font-medium tabular-nums">{dash(flagCount(k))}</span>
+                {k === 'withApps' || k === 'aiNoStaff' ? (
+                  <span className="text-xs tabular-nums text-muted-foreground">{dash(flagPeople(k))} คน</span>
+                ) : null}
+              </Button>
+            ))}
+          </div>
+          <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-flag-sum">
+            ประกาศแล้ว {dash(flagCount('released'))} + ยังไม่ประกาศ {dash(flagCount('notReleased'))} = {dash(sum.total)} ใบ · ประกาศแล้ว มีคนกรอก{' '}
+            {dash(flagCount('withApps'))} + ไม่มีคนกรอก {dash(flagCount('noApps'))} = {dash(flagCount('released'))} ใบ
+          </p>
+        </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2" data-testid="req-group-days">
-            <p className="text-xs font-medium text-muted-foreground">จำนวนวัน (วันทำงาน)</p>
+            <p className="text-xs font-medium text-muted-foreground">ขาดคน (คน-วัน · วันทำงาน)</p>
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
-                  ['ผ่านมารวม', sum.ageDays, 'req-age-days'],
-                  ['ส่งคนแทนได้', sum.replacedDays, 'req-replaced-days'],
-                  ['โดนปรับ', sum.penaltyDays, 'req-penalty-days'],
+                  ['ขาดทั้งหมด', personDays + coveredPersonDays, 'req-missing-days'],
+                  ['คนแทนช่วย', coveredPersonDays, 'req-replaced-days'],
+                  ['โดนปรับ', personDays, 'req-penalty-days'],
                 ] as const
               ).map(([label, value, id]) => (
                 <Card key={id} variant="solid" className="space-y-1 rounded-xl p-3" data-testid={id}>
                   <span className="block text-xs text-muted-foreground">{label}</span>
-                  <span className="block text-lg font-medium tabular-nums text-foreground">{dash(value)}</span>
+                  <span className="block text-lg font-medium tabular-nums text-foreground">{money ? dash(value) : '—'}</span>
                 </Card>
               ))}
             </div>
             <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-days-sum">
-              {dash(sum.ageDays)} − {dash(sum.replacedDays)} = {dash(sum.penaltyDays)} วัน
+              {money ? `${dash(personDays + coveredPersonDays)} − ${dash(coveredPersonDays)} = ${dash(personDays)} คน-วัน` : '—'}
             </p>
           </div>
           <div className="space-y-2" data-testid="req-group-money">
-            <p className="text-xs font-medium text-muted-foreground">เงิน (บาท)</p>
+            <p className="text-xs font-medium text-muted-foreground">เงิน (บาท) · สะสมตั้งแต่วันที่ต้องการ</p>
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
@@ -556,12 +659,12 @@ const HomeRequestsTab: React.FC<{
               ).map(([label, value, id]) => (
                 <Card key={id} variant="solid" className="space-y-1 rounded-xl p-3" data-testid={id}>
                   <span className="block text-xs text-muted-foreground">{label}</span>
-                  <span className="block text-lg font-medium tabular-nums text-foreground">{ready ? BAHT.format(value) : '—'}</span>
+                  <span className="block text-lg font-medium tabular-nums text-foreground">{ready && money ? BAHT.format(value) : '—'}</span>
                 </Card>
               ))}
             </div>
             <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-money-sum">
-              {ready ? `${BAHT.format(sum.fine)} + ${BAHT.format(sum.deduct)} = ${BAHT.format(sum.fine + sum.deduct)} บาท` : '—'}
+              {ready && money ? `${BAHT.format(sum.fine)} + ${BAHT.format(sum.deduct)} = ${BAHT.format(sum.fine + sum.deduct)} บาท` : '—'}
             </p>
           </div>
         </div>
@@ -604,7 +707,9 @@ const HomeRequestsTab: React.FC<{
           filter
             ? filter.kind === 'bucket'
               ? AGE_BUCKETS.find((b) => b.key === filter.key)?.label
-              : `ติดขั้น ${STEP_LABEL.get(filter.key)?.no} ${STEP_LABEL.get(filter.key)?.label}`
+              : filter.kind === 'flag'
+                ? FLAG_LABEL[filter.key]
+                : `ติดขั้น ${STEP_LABEL.get(filter.key)?.no} ${STEP_LABEL.get(filter.key)?.label}`
             : 'ทุกใบ · ค้างนานสุดก่อน'
         }
         testId="req-table"
@@ -625,7 +730,7 @@ const HomeRequestsTab: React.FC<{
                 <TableHead className="whitespace-nowrap text-right text-xs">ผ่านมา (วัน)</TableHead>
                 <TableHead className="whitespace-nowrap text-right text-xs">คนสนใจ (คน)</TableHead>
                 <TableHead className="text-xs">ติดขั้น</TableHead>
-                <TableHead className="whitespace-nowrap text-right text-xs">ส่งคนแทน (วัน)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">คนกรอก (คน)</TableHead>
                 <TableHead className="whitespace-nowrap text-right text-xs">โดนปรับ (วัน)</TableHead>
                 <TableHead className="whitespace-nowrap text-right text-xs">ค่าปรับ (บาท)</TableHead>
                 <TableHead className="whitespace-nowrap text-right text-xs">ลดมูลค่า (บาท)</TableHead>
@@ -675,7 +780,7 @@ const HomeRequestsTab: React.FC<{
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{fmt(r.counts.aiYes)}</TableCell>
                         <TableCell className="whitespace-nowrap text-sm">{step ? `${step.no}. ${r.stuckReason}` : '—'}</TableCell>
-                        <TableCell className="text-right tabular-nums">{fmt(r.replacedDays)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{fmt(r.counts.apps)}</TableCell>
                         <TableCell className="text-right tabular-nums">{fmt(r.penaltyDays)}</TableCell>
                         <TableCell className="text-right tabular-nums">
                           {r.finePerDay > 0 ? BAHT.format(r.fine) : <span className="text-muted-foreground">ไม่มี</span>}
@@ -692,16 +797,16 @@ const HomeRequestsTab: React.FC<{
                               <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-detail-days">
                                 {r.advance
                                   ? 'ล่วงหน้า ยังไม่นับวัน'
-                                  : `ผ่านมา ${fmt(r.ageDays)} − ส่งคนแทน ${fmt(r.replacedDays)} = โดนปรับ ${fmt(r.penaltyDays)} วัน`}
+                                  : `โดนปรับ ${fmt(r.penaltyDays)} วัน · ขาด ${fmt(r.personDays + r.coveredPersonDays)} − คนแทนช่วย ${fmt(r.coveredPersonDays)} = ${fmt(r.personDays)} คน-วัน`}
                               </p>
                               {!r.advance && r.finePerDay > 0 ? (
                                 <p className="text-xs tabular-nums text-muted-foreground">
-                                  ค่าปรับ {fmt(r.penaltyDays)} วัน × {NUM.format(r.finePerDay)} = {BAHT.format(r.fine)} บาท
+                                  ค่าปรับ {fmt(r.personDays)} คน-วัน × {NUM.format(r.finePerDay)} = {BAHT.format(r.fine)} บาท
                                 </p>
                               ) : null}
                               {!r.advance && r.deductPerDay > 0 ? (
                                 <p className="text-xs tabular-nums text-muted-foreground">
-                                  ลดมูลค่า {fmt(r.penaltyDays)} วัน × {NUM.format(r.deductPerDay)} = {BAHT.format(r.deduct)} บาท
+                                  ลดมูลค่า {fmt(r.personDays)} คน-วัน × {NUM.format(r.deductPerDay)} = {BAHT.format(r.deduct)} บาท
                                 </p>
                               ) : null}
                               <StepLine

@@ -50,21 +50,27 @@ export const PIPELINE_STEPS: ReadonlyArray<{ key: PipelineStepKey; no: number; l
   { key: 'closed', no: 12, label: 'ปิดใบขอ', stuck: 'ปิดใบขอ' },
 ];
 
-export type AgeBucket = 'advance' | 'lt30' | 'd30to60' | 'gt60' | 'unknown';
+/**
+ * ช่วงค้าง (เจ้าของ 24 ต.ค. 2569 หน้าหลัก *"30 วันขึ้นไป 16-30 8-15 1-7 ล่วงหน้า"* — เดิม 22 ต.ค. <30 / 30–60 / >60)
+ * นับวันทำงานแบบเมนูใบขอ · วันนี้ที่คีย์ (0 วัน) อยู่ช่อง 1–7
+ */
+export type AgeBucket = 'advance' | 'd1to7' | 'd8to15' | 'd16to30' | 'gt30' | 'unknown';
 export const AGE_BUCKETS: ReadonlyArray<{ key: AgeBucket; label: string }> = [
+  { key: 'gt30', label: 'เกิน 30 วัน' },
+  { key: 'd16to30', label: '16–30 วัน' },
+  { key: 'd8to15', label: '8–15 วัน' },
+  { key: 'd1to7', label: '1–7 วัน' },
   { key: 'advance', label: 'ล่วงหน้า' },
-  { key: 'lt30', label: 'ต่ำกว่า 30 วัน' },
-  { key: 'd30to60', label: '30–60 วัน' },
-  { key: 'gt60', label: 'เกิน 60 วัน' },
   { key: 'unknown', label: 'ไม่มีวันที่' },
 ];
 
 export function ageBucketOf(advance: boolean, ageDays: number | null): AgeBucket {
   if (advance) return 'advance';
   if (ageDays === null || !Number.isFinite(ageDays)) return 'unknown';
-  if (ageDays < 30) return 'lt30';
-  if (ageDays <= 60) return 'd30to60';
-  return 'gt60';
+  if (ageDays > 30) return 'gt30';
+  if (ageDays >= 16) return 'd16to30';
+  if (ageDays >= 8) return 'd8to15';
+  return 'd1to7';
 }
 
 /** คนในแต่ละขั้นของใบหนึ่ง — ทุกก้อนย่อยรวมกันเท่าแม่ */
@@ -79,6 +85,8 @@ export type PipelineCounts = {
   staffCalled: number;
   staffFollowed: number;
   staffReached: number;
+  /** AI ได้ผลสนใจ แต่ยังไม่มีเจ้าหน้าที่ลงผลติดต่อ (หน้าหลักผู้บริหารข้อ 8 · 24 ต.ค. 2569) — อยู่ใน aiYes */
+  aiYesNoStaff: number;
   interested: number;
   notInterested: number;
   appointed: number;
@@ -112,6 +120,7 @@ export function countsOf(facts: readonly RecruitAppFact[], followStarts: number,
     staffCalled: 0,
     staffFollowed: 0,
     staffReached: 0,
+    aiYesNoStaff: 0,
     interested: 0,
     notInterested: 0,
     appointed: 0,
@@ -128,7 +137,10 @@ export function countsOf(facts: readonly RecruitAppFact[], followStarts: number,
     if (f.calledByAi) {
       c.aiCalled += 1;
       const r = aiResultOf(f);
-      if (r === 'yes') c.aiYes += 1;
+      if (r === 'yes') {
+        c.aiYes += 1;
+        if (!isStaffFollowed(f)) c.aiYesNoStaff += 1;
+      }
       else if (r === 'no') c.aiNo += 1;
       else if (r === 'outOfArea') c.aiOutOfArea += 1;
       else if (r === 'noPickup') c.aiNoPickup += 1;

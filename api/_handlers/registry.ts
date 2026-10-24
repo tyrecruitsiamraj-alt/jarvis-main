@@ -61,6 +61,7 @@ import requestPipelineHandler from './request-pipeline.js';
 import { soScrapingAiCallHandler, soScrapingLeadsHandler } from './so-scraping-integration.js';
 import integrationKeysHandler from './integration-keys.js';
 import followOldIdRepushHandler from './follow-oldid-repush.js';
+import homeMoneyHandler from './home-money.js';
 import applicationDispatchHandler from './application-dispatch.js';
 import applicationCallChoiceHandler from './application-call-choice.js';
 import selectionProgressHandler from './selection-progress.js';
@@ -255,6 +256,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/integrations/so-scraping/ai-call': soScrapingAiCallHandler as ApiHandler,
   '/api/integration-keys': integrationKeysHandler as ApiHandler,
   '/api/follow-oldid-repush': followOldIdRepushHandler as ApiHandler,
+  '/api/home-money': homeMoneyHandler as ApiHandler,
   '/api/application-dispatch': applicationDispatchHandler as ApiHandler,
   // "ใครจะโทรหาคนนี้" — ปุ่มเก็บไปโทรเอง (claim+ล็อกเบอร์) / ส่ง AI โทร · กอง "เลือกวิธีโทร"
   '/api/application-call-choice': applicationCallChoiceHandler as ApiHandler,

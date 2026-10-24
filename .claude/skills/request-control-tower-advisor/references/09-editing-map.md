@@ -13780,3 +13780,13 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - เดิมปุ่มวันที่บนหัวหน้า (`applicantDates` ใน StaffJobBoardPage → `rmFilters`) กรองวันที่สมัครทุกแท็บ ⇒ เลือกวันนัดแล้วได้ 0
 - `filterApplications` (`src/lib/recruitRm.ts`): แท็บ `appointments` ใช้ `applicationAppointmentYmd` (วันนัด เวลาไทย) · แท็บอื่นยังเป็นวันที่สมัคร · เทสต์ใน `tests/api/recruitRm.test.ts`
 - ยิงยกเลิกซ้ำ (เจ้าของ 22 ต.ค. 2569 "ลองยิง API cancel ให้หน่อย"): การ์ดเดียวกัน ปุ่ม "ยิงยกเลิกที่ Lumos" → `POST /api/follow-oldid-repush?action=recancel` → `recancelOldIdFollowPlans` ยิง DELETE ตรงรหัสแผน (ไม่ดูเครื่องหมายจบแล้ว) ให้แผนรหัสเดิมที่ยกเลิกในระบบเราแล้วแต่ยังมีสายอนาคต · 🔴 ข้ามเบอร์ที่ยังมีสาย AI รอโทร (กัน 9 ต.ค.) · รอ 4 วิแล้วถามสถานะ event ของคำสั่งยกเลิก โชว์บนการ์ด
+
+## หน้าหลักผู้บริหาร หน้าเดียวเลื่อนลง + สมุดค่าปรับ (24 ต.ค. 2569 · เจ้าของ "หน้าหลักต้องบอกได้ประมาณนี้")
+- หน้า `src/pages/HomeExecPage.tsx` = ค่าตั้งต้นของ `/` (`homeV3.ts` variant `exec`) · หน้าแท็บเดิม `?home=new` (ปุ่ม "แบบแท็บเดิม" / กลับด้วย "หน้าหลักใหม่")
+  ลำดับ: 4 กล่องบน (เสียเงิน · เหลือหา · หาครบเฉลี่ย · AI ทำแทน %) → ใบขอในช่วงนี้ (สมการใบ + คน) → `HomeRequestsTab` → `HomeMoneySection` → ติดตาม/ดูแลหลังเริ่มงาน
+- สมุดค่าปรับ `src/lib/requestPenaltyLedger.ts` (pure · เทสต์คู่) — ต่อคนต่อวันทำงาน (`parseWorkWeekdays`) × อัตรา `abs_customer_fine`/`abs_customer_deduct` · หักคนแทน (ไซต์/วัน · ใบที่ต้องการก่อนได้ก่อน) · สองจุดเริ่ม `need`/`key` · สองนาฬิกา (หาครบ − วันคีย์ · เริ่มงานครบ − วันที่ต้องการ) · `requestFlow` ยกมา + ขอใหม่ − หาได้/ปิดครบ − ยกเลิก = เหลือ (หน่วยคน + ใบ · ลงตัวเสมอ)
+- ข้อมูลดิบ `api/_lib/siamrajPenaltyLedgerSql.ts` — ตัวกรองชุดเดียวกับ feed กล่องงาน (`SIAMRAJ_UNIT_REQUESTS_MODE` · Cls · แผนก) · หาได้ capped ด้วย `effectiveInformQtySql` ⇒ ใบเปิด/คนเหลือ **ตรงกล่องงานทุกใบ** (วัด 24 ต.ค.: 314 ใบ / 384 คน) · ใบขอล่วงหน้าอยู่นอกสมการ แสดงต่อท้าย
+- ลูกค้าหักจริง = `ar_cheque_detail.fine_amount` (ใบรับเงิน · รวมทุกเรื่องที่ลูกค้าหัก ไม่ใช่เฉพาะใบขอ · รายเดือน) — ห้ามเอาไปลบกับค่าปรับใบขอ · `wg_delivery`/`wg_cn_*`/`wg_invoice_head` เลิกใช้ตั้งแต่ 2559
+- เส้น `GET /api/home-money` (`api/_handlers/home-money.ts`) → `buildHomeMoney` (`src/lib/homeMoney.ts`) · แคชดิบ 10 นาที
+- 🔴 แท็บใบขอ (`HomeRequestsTab`) เงินรายใบมาจากสมุดนี้ (`ledgerByRequest`) — สูตรเดิมวันค้าง × อัตรา ถอดแล้ว ห้ามกลับ · ช่วงค้างใหม่ 5 ช่วง (`AGE_BUCKETS`) · กล่องประกาศ/คนกรอก/AI สนใจคนยังไม่โทรต่อ (`aiYesNoStaff`) · ช่องทางเพิ่ม สนใจ/นัดได้ (`channelInterestOf`)
+- เทสต์ `src/lib/requestPenaltyLedger.test.ts` · `tests/api/homeExec2569-10-24.test.ts`
