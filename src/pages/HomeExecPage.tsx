@@ -25,6 +25,9 @@ import { KpiTile } from '@/components/home-ai-share/HomeKpis';
 import { HomeSection } from '@/components/home-ai-share/HomeSections';
 import HomeRequestsTab from '@/components/home-ai-share/HomeRequestsTab';
 import HomeMoneySection from '@/components/home-exec/HomeMoneySection';
+import ExecDrill, { useDrill } from '@/components/home-exec/ExecDrill';
+import Num from '@/components/home-exec/Num';
+import type { MoneyRequest } from '@/lib/homeMoney';
 import { useLiveTick } from '@/hooks/useLiveTick';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { PREQUEST_ID_PREFIX } from '@/lib/siamrajUnitRequestsApi';
@@ -32,7 +35,7 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import { fetchHomeMoney, previousWindow, type HomeMoneyPayload } from '@/lib/homeMoneyApi';
 import { fetchHomeAiShare } from '@/lib/homeAiShareApi';
 import { sharesOfCalled, type AiShareResponse, type AiShareWindow } from '@/lib/homeAiShare';
-import { byOwner, costliest, dueSoon, peopleNeeded, scaleOf, staleOf, STALE_DAYS, thisMonthWindow, type UrgentRow } from '@/lib/homeExec';
+import { byOwner, costliest, dueSoon, NO_OWNER, peopleNeeded, perDayOf, scaleOf, staleOf, STALE_DAYS, thisMonthWindow, type UrgentRow } from '@/lib/homeExec';
 import { fetchRequestPipeline } from '@/lib/requestPipelineApi';
 import type { RequestPipelineResponse } from '@/lib/requestPipelineTypes';
 import { channelInterestOf } from '@/lib/channelPlatforms';
@@ -75,6 +78,8 @@ function aiRows(d: AiShareResponse | null): Array<{ key: string; label: string; 
   return out;
 }
 
+type FlowRole = NonNullable<MoneyRequest['flow']>;
+
 /** ช่องทางที่ได้เยอะสุด 3 อันดับ ต่อขั้น (กรอก · นัดได้ · ลงงาน) — ชื่อช่องทางชุดเดียวกับตารางช่องทาง */
 type Leader = { name: string; value: number };
 function channelLeaders(d: RequestPipelineResponse | null): { registered: Leader[]; appointed: Leader[]; placed: Leader[] } | null {
@@ -103,6 +108,7 @@ function UrgentCard({
   loading,
   right,
   testId,
+  onOpen,
 }: {
   icon: typeof HandCoins;
   title: string;
@@ -111,6 +117,8 @@ function UrgentCard({
   loading: boolean;
   right: (r: UrgentRow) => string;
   testId: string;
+  /** กดหัวการ์ด = ดูทั้งหมด · กดแถว = ดูทั้งหมดโดยกางใบนั้น */
+  onOpen: (expand: string | null) => void;
 }) {
   return (
     <Card variant="solid" className="space-y-3 p-4" data-testid={testId}>
@@ -119,21 +127,29 @@ function UrgentCard({
           <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
           {title}
         </span>
-        <span className="text-sm tabular-nums text-muted-foreground">{loading ? '—' : `${NUM.format(total)} ใบ`}</span>
+        <Button type="button" variant="link" size="sm" className="h-auto p-0 tabular-nums" onClick={() => onOpen(null)} disabled={loading}>
+          {loading ? '—' : `ดูทั้งหมด ${NUM.format(total)} ใบ`}
+        </Button>
       </span>
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{loading ? '—' : 'ไม่มี'}</p>
       ) : (
         <ul className="divide-y divide-border">
           {rows.map((r) => (
-            <li key={r.requestNo} className="flex items-start justify-between gap-3 py-2">
-              <span className="min-w-0">
-                <span className="block truncate text-sm text-foreground">{[r.unit, r.position].filter(Boolean).join(' · ')}</span>
-                <span className="block text-xs tabular-nums text-muted-foreground">
-                  {r.requestNo} · ขาด {NUM.format(r.missing)} คน
+            <li key={r.requestNo}>
+              <button
+                type="button"
+                className="flex w-full items-start justify-between gap-3 rounded-lg py-2 text-left hover:bg-muted/50"
+                onClick={() => onOpen(r.requestNo)}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm text-foreground">{[r.unit, r.position].filter(Boolean).join(' · ')}</span>
+                  <span className="block text-xs tabular-nums text-muted-foreground">
+                    {r.requestNo} · ขาด {NUM.format(r.missing)} คน
+                  </span>
                 </span>
-              </span>
-              <span className="shrink-0 text-sm font-medium tabular-nums text-foreground">{right(r)}</span>
+                <span className="shrink-0 text-sm font-medium tabular-nums text-foreground">{right(r)}</span>
+              </button>
             </li>
           ))}
         </ul>
@@ -143,8 +159,22 @@ function UrgentCard({
 }
 
 /** ส่วนที่พับไว้ — กดหัวแล้วกาง (ของข้างในโหลดตอนกาง) */
-function Folded({ title, testId, children }: { title: string; testId: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
+function Folded({
+  title,
+  testId,
+  children,
+  open: openProp,
+  onOpenChange,
+}: {
+  title: string;
+  testId: string;
+  children: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (o: boolean) => void;
+}) {
+  const [own, setOwn] = useState(false);
+  const open = openProp ?? own;
+  const setOpen = onOpenChange ?? setOwn;
   return (
     <Collapsible open={open} onOpenChange={setOpen} data-testid={testId}>
       <CollapsibleTrigger asChild>
@@ -201,12 +231,24 @@ const HomeExecPage: React.FC = () => {
   const prevTotal = prevNow ? prevNow.totals.need.fine + prevNow.totals.need.deduct : undefined;
   const speed = moneyNow?.clocks.speed ?? null;
   const late = moneyNow?.clocks.late ?? null;
-  const liveKey = `${range.from}|${range.to}|${bu ?? ''}`;
+  /** คีย์คงที่ = เลขในกล่องวิ่งจากค่าเดิมไปค่าใหม่ทุกครั้ง รวมตอนเปลี่ยนช่วง/BU (เจ้าของ "Interactive ที่เวลาเปลี่ยนข้อมูล") */
+  const liveKey = 'exec';
   const rows = aiRows(ai);
   const openReqs = useMemo(() => moneyNow?.requests ?? [], [moneyNow]);
   const costly = useMemo(() => costliest(openReqs, today), [openReqs, today]);
   const soon = useMemo(() => dueSoon(openReqs, today), [openReqs, today]);
   const owners = useMemo(() => byOwner(openReqs, today), [openReqs, today]);
+  const drill = useDrill();
+  const [foldRequests, setFoldRequests] = useState(false);
+  const byNo = useMemo(() => new Map(openReqs.map((r) => [r.requestNo, r])), [openReqs]);
+  const rowsOf = (list: ReadonlyArray<{ requestNo: string }>): MoneyRequest[] =>
+    list.map((x) => byNo.get(x.requestNo)).filter((r): r is MoneyRequest => Boolean(r));
+  const openList = (title: string, rows: MoneyRequest[], expand: string | null = null, sub?: string) => drill.open({ title, rows, expand, sub });
+  const moneyRows = () =>
+    openReqs
+      .filter((r) => r.amount.need.fine + r.amount.need.deduct > 0)
+      .sort((a, b) => b.amount.need.fine + b.amount.need.deduct - (a.amount.need.fine + a.amount.need.deduct));
+  const flowRows = (pick: (f: NonNullable<MoneyRequest['flow']>) => boolean) => openReqs.filter((r) => r.flow && pick(r.flow));
   const stale = useMemo(() => staleOf(openReqs, today), [openReqs, today]);
   const [staleOpen, setStaleOpen] = useState(false);
   const scale = scaleOf(moneyNow?.workload, range.from, range.to > today ? today : range.to);
@@ -270,9 +312,22 @@ const HomeExecPage: React.FC = () => {
             ).map(([label, v, before, id]) => {
               const pill = v != null && before !== undefined ? countPill(v, before, false) : null;
               return (
-                <div key={id} className="space-y-1" data-testid={id}>
+                <button
+                  key={id}
+                  type="button"
+                  className="space-y-1 rounded-lg text-left hover:bg-muted/50"
+                  data-testid={id}
+                  disabled={!moneyNow}
+                  onClick={() =>
+                    id === 'exec-money-actual'
+                      ? drill.open({ title: 'ลูกค้าหักจริง (ใบรับเงิน)', months: moneyNow?.customerFines.months ?? [] })
+                      : openList('เสียเงินตามสัญญา', moneyRows())
+                  }
+                >
                   <span className="block text-xs text-muted-foreground">{label}</span>
-                  <span className="block text-2xl font-medium tabular-nums text-foreground">{v == null ? '—' : BAHT.format(v)}</span>
+                  <span className="block text-2xl font-medium tabular-nums text-foreground">
+                    <Num value={v} />
+                  </span>
                   <span
                     className={cn(
                       'block text-xs tabular-nums',
@@ -281,7 +336,7 @@ const HomeExecPage: React.FC = () => {
                   >
                     {pill ? `${pill.dir === 'up' ? '▲' : pill.dir === 'down' ? '▼' : ''} ${pill.text}` : 'บาท'}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -297,6 +352,7 @@ const HomeExecPage: React.FC = () => {
           liveKey={liveKey}
           pill={flow && prevNow ? countPill(flow.remainingRequests, prevNow.flow.remainingRequests, false) : null}
           foot={flow ? `${NUM.format(flow.remaining)} คน · ล่วงหน้าอีก ${feedReady ? NUM.format(preCount) : '—'} ใบ` : null}
+          onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined}
         />
         <KpiTile
           tone="info"
@@ -311,6 +367,17 @@ const HomeExecPage: React.FC = () => {
             moneyNow
               ? `คิดจาก ${NUM.format(speed?.n ?? 0)} ใบที่หาครบในช่วงนี้ · ช้ากว่าที่ลูกค้าต้องการ ${late?.avg == null ? '—' : NUM.format(late.avg)} วัน`
               : null
+          }
+          onClick={
+            moneyNow
+              ? () =>
+                  openList(
+                    'ใบที่หาครบในช่วงนี้',
+                    openReqs.filter((r) => r.clocked).sort((a, b) => (b.speedDays ?? 0) - (a.speedDays ?? 0)),
+                    null,
+                    'เรียงใช้เวลานานสุดก่อน',
+                  )
+              : undefined
           }
         />
         <Card variant="solid" className="space-y-3 p-4" data-testid="exec-ai-share">
@@ -329,7 +396,7 @@ const HomeExecPage: React.FC = () => {
                 </div>
               ))
             : rows.map((r) => (
-                <div key={r.key} className="space-y-1" data-testid={`exec-ai-${r.key}`}>
+                <a key={r.key} href="/?home=new" className="block space-y-1 rounded-lg hover:bg-muted/50" data-testid={`exec-ai-${r.key}`}>
                   <span className="flex justify-between gap-2 text-xs">
                     <span className="text-muted-foreground">{r.label}</span>
                     <span className={cn('font-medium tabular-nums', r.pct == null ? 'text-muted-foreground' : r.pct >= 100 ? TONE.success.value : 'text-foreground')}>
@@ -337,7 +404,7 @@ const HomeExecPage: React.FC = () => {
                     </span>
                   </span>
                   <Progress value={r.pct ?? 0} className="h-1.5" aria-label={`${r.label} AI ${r.pct ?? 0}%`} />
-                </div>
+                </a>
               ))}
           <span className="block text-xs text-muted-foreground">เป้า 100%</span>
         </Card>
@@ -355,6 +422,7 @@ const HomeExecPage: React.FC = () => {
             loading={!moneyNow}
             right={(r) => `${BAHT.format(r.perDay)} บาท/วัน`}
             testId="exec-urgent-costly"
+            onOpen={(x) => openList('เสียวันละมากสุด', rowsOf(costliest(openReqs, today, Infinity).rows), x)}
           />
           <UrgentCard
             icon={AlarmClock}
@@ -364,6 +432,7 @@ const HomeExecPage: React.FC = () => {
             loading={!moneyNow}
             right={(r) => (r.needYmd ? thaiDate(r.needYmd) : '—')}
             testId="exec-urgent-soon"
+            onOpen={(x) => openList('ถึงวันที่ต้องการใน 3 วัน ยังขาดคน', rowsOf(dueSoon(openReqs, today, 3, Infinity).rows), x)}
           />
         </div>
         {/* ใบค้างนานผิดปกติ แยกไว้ ไม่เบียดใบที่ยังแก้ได้ (เงินยังนับ) */}
@@ -380,7 +449,11 @@ const HomeExecPage: React.FC = () => {
           <CollapsibleContent>
             <ul className="divide-y divide-border">
               {stale.rows.map((r) => (
-                <li key={r.requestNo} className="flex items-start justify-between gap-3 py-2 text-sm">
+                <li
+                  key={r.requestNo}
+                  className="flex cursor-pointer items-start justify-between gap-3 rounded-lg py-2 text-sm hover:bg-muted/50"
+                  onClick={() => openList(`ค้างเกิน ${STALE_DAYS} วันไม่เคยได้คน`, rowsOf(stale.rows), r.requestNo)}
+                >
                   <span className="min-w-0">
                     <span className="block truncate text-foreground">{[r.unit, r.position].filter(Boolean).join(' · ')}</span>
                     <span className="block text-xs tabular-nums text-muted-foreground">
@@ -424,7 +497,21 @@ const HomeExecPage: React.FC = () => {
                 </TableRow>
               ) : (
                 (showAllOwners ? owners : owners.slice(0, 8)).map((o) => (
-                  <TableRow key={o.name} data-testid="exec-owner-row">
+                  <TableRow
+                    key={o.name}
+                    data-testid="exec-owner-row"
+                    className="cursor-pointer"
+                    onClick={() =>
+                      openList(
+                        `ใบของ ${o.name}`,
+                        openReqs
+                          .filter((r) => (r.owner?.trim() || NO_OWNER) === o.name && (r.open || r.closedInWindow || r.filledInWindow > 0))
+                          .sort((a, b) => Number(b.open) - Number(a.open) || perDayOf(b) - perDayOf(a)),
+                        null,
+                        `ค้าง ${NUM.format(o.requests)} · ปิดครบ ${NUM.format(o.closed)}`,
+                      )
+                    }
+                  >
                     <TableCell className="text-sm text-foreground">{o.name}</TableCell>
                     <TableCell className="text-right tabular-nums">{NUM.format(o.requests)}</TableCell>
                     <TableCell className={cn('text-right tabular-nums', o.overdue > 0 ? TONE.danger.value : 'text-muted-foreground')}>
@@ -461,7 +548,21 @@ const HomeExecPage: React.FC = () => {
             ] as const
           ).map(([title, list]) => (
             <Card key={title} variant="solid" className="space-y-2 p-4">
-              <span className="block text-sm font-medium text-foreground">{title}</span>
+              <span className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-foreground">{title}</span>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0"
+                  onClick={() => {
+                    setFoldRequests(true);
+                    window.setTimeout(() => document.querySelector('[data-testid="req-channels"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 600);
+                  }}
+                >
+                  ดูทุกช่องทาง
+                </Button>
+              </span>
               {!list ? (
                 <p className="text-sm text-muted-foreground">—</p>
               ) : list.length === 0 ? (
@@ -496,7 +597,9 @@ const HomeExecPage: React.FC = () => {
           ).map(([label, v, unit]) => (
             <Card key={label} variant="solid" className="space-y-1 rounded-xl p-3">
               <span className="block text-xs text-muted-foreground">{label}</span>
-              <span className="block text-2xl font-medium tabular-nums text-foreground">{v == null ? '—' : NUM.format(v)}</span>
+              <span className="block text-2xl font-medium tabular-nums text-foreground">
+                <Num value={v} decimals={1} />
+              </span>
               <span className="block text-xs text-muted-foreground">{unit}</span>
             </Card>
           ))}
@@ -532,11 +635,11 @@ const HomeExecPage: React.FC = () => {
               unit: 'ใบ',
               id: 'req',
               cells: [
-                ['ยกมา', flow?.carryInRequests, null],
-                ['ขอใหม่', flow?.newRequests, 'info'],
-                ['ปิดครบ', flow?.closedRequests, 'success'],
-                ['ยกเลิก', flow?.cancelledRequests, 'neutral'],
-                ['เหลือหา', flow?.remainingRequests, 'warn'],
+                ['ยกมา', flow?.carryInRequests, null, (f: FlowRole) => f.carry],
+                ['ขอใหม่', flow?.newRequests, 'info', (f: FlowRole) => f.isNew],
+                ['ปิดครบ', flow?.closedRequests, 'success', (f: FlowRole) => f.closed],
+                ['ยกเลิก', flow?.cancelledRequests, 'neutral', (f: FlowRole) => f.cancelledReq],
+                ['เหลือหา', flow?.remainingRequests, 'warn', (f: FlowRole) => f.open],
               ],
               sum: flow
                 ? `ยกมา ${NUM.format(flow.carryInRequests)} + ขอใหม่ ${NUM.format(flow.newRequests)} − ปิดครบ ${NUM.format(flow.closedRequests)} − ยกเลิก ${NUM.format(flow.cancelledRequests)} = เหลือหา ${NUM.format(flow.remainingRequests)} ใบ`
@@ -546,11 +649,11 @@ const HomeExecPage: React.FC = () => {
               unit: 'คน',
               id: 'pos',
               cells: [
-                ['ยกมา', flow?.carryIn, null],
-                ['ขอใหม่', flow?.newPositions, 'info'],
-                ['หาได้', flow?.filled, 'success'],
-                ['ยกเลิก', flow?.cancelled, 'neutral'],
-                ['เหลือหา', flow?.remaining, 'warn'],
+                ['ยกมา', flow?.carryIn, null, (f: FlowRole) => f.carryIn > 0],
+                ['ขอใหม่', flow?.newPositions, 'info', (f: FlowRole) => f.newPositions > 0],
+                ['หาได้', flow?.filled, 'success', (f: FlowRole) => f.filled > 0],
+                ['ยกเลิก', flow?.cancelled, 'neutral', (f: FlowRole) => f.cancelled > 0],
+                ['เหลือหา', flow?.remaining, 'warn', (f: FlowRole) => f.remaining > 0],
               ],
               sum: flow
                 ? `ยกมา ${NUM.format(flow.carryIn)} + ขอใหม่ ${NUM.format(flow.newPositions)} − หาได้ ${NUM.format(flow.filled)} − ยกเลิก ${NUM.format(flow.cancelled)} = เหลือหา ${NUM.format(flow.remaining)} คน`
@@ -561,13 +664,22 @@ const HomeExecPage: React.FC = () => {
           <div key={g.id} className="space-y-2" data-testid={`exec-flow-${g.id}`}>
             <p className="text-xs font-medium text-muted-foreground">จำนวน{g.unit}</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-              {g.cells.map(([label, v, tone]) => (
-                <Card key={label} variant="solid" className="space-y-1 rounded-xl p-3">
-                  <span className="block text-xs text-muted-foreground">{label}</span>
-                  <span className={cn('block text-2xl font-medium tabular-nums', tone ? TONE[tone].value : 'text-foreground')}>
-                    {v == null ? '—' : NUM.format(v)}
-                  </span>
-                </Card>
+              {g.cells.map(([label, v, tone, pick]) => (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={!flow}
+                  onClick={() => openList(`${label} (${g.unit})`, flowRows(pick))}
+                  className="rounded-xl text-left"
+                  data-testid={`exec-flow-${g.id}-${label}`}
+                >
+                  <Card variant="solid" className="h-full space-y-1 rounded-xl p-3 transition-colors hover:bg-muted/50">
+                    <span className="block text-xs text-muted-foreground">{label}</span>
+                    <span className={cn('block text-2xl font-medium tabular-nums', tone ? TONE[tone].value : 'text-foreground')}>
+                      <Num value={v} />
+                    </span>
+                  </Card>
+                </button>
               ))}
             </div>
             <p className="text-xs tabular-nums text-muted-foreground" data-testid={`exec-flow-${g.id}-sum`}>
@@ -586,7 +698,7 @@ const HomeExecPage: React.FC = () => {
       </HomeSection>
 
       {/* ── พับไว้ (ผู้บริหารไม่ต้องเลื่อนผ่าน) — กดแล้วกาง ── */}
-      <Folded title="ใบขอค้าง · ประกาศ · ช่องทาง" testId="exec-fold-requests">
+      <Folded title="ใบขอค้าง · ประกาศ · ช่องทาง" testId="exec-fold-requests" open={foldRequests} onOpenChange={setFoldRequests}>
         <HomeRequestsTab win={win} tick={tick} />
       </Folded>
       <Folded title="เงินรายวัน · รายใบ" testId="exec-fold-money">
@@ -639,6 +751,7 @@ const HomeExecPage: React.FC = () => {
           ))}
         </div>
       </HomeSection>
+      <ExecDrill drill={drill} all={openReqs} today={today} />
     </div>
   );
 };

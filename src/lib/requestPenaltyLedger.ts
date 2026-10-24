@@ -259,12 +259,70 @@ export type RequestFlow = {
   remainingRequests: number;
 };
 
+/** บทบาทของใบเดียวในสมการช่วง [from, to] — ตัวเดียวกับ `requestFlow` (กดกล่องแล้วได้รายใบที่บวกกันเท่ากล่อง) */
+export type RequestFlowRole = {
+  relevant: boolean;
+  /** หน่วยคน */
+  carryIn: number;
+  newPositions: number;
+  filled: number;
+  cancelled: number;
+  remaining: number;
+  /** หน่วยใบ */
+  carry: boolean;
+  isNew: boolean;
+  closed: boolean;
+  cancelledReq: boolean;
+  open: boolean;
+};
+
+export function requestFlowRole(r: LedgerRequest, from: string, to: string): RequestFlowRole {
+  const none: RequestFlowRole = {
+    relevant: false, carryIn: 0, newPositions: 0, filled: 0, cancelled: 0, remaining: 0,
+    carry: false, isNew: false, closed: false, cancelledReq: false, open: false,
+  };
+  if (r.keyYmd > to) return none;
+  const before = ymdOf(t(from) - DAY_MS);
+  const b = openPositionsAt(r, before);
+  const a = openPositionsAt(r, to);
+  const keyedIn = r.keyYmd >= from;
+  const endedIn = r.endYmd != null && r.endYmd >= from && r.endYmd <= to;
+  // จบไปก่อนช่วง หรือครบก่อนช่วง — ไม่เกี่ยว
+  if (!keyedIn && b === 0 && !endedIn) return none;
+  const newQ = keyedIn ? r.qty : 0;
+  const startFill = keyedIn ? 0 : filledBy(r.starts, before);
+  const endFill = endedIn ? filledBy(r.starts, r.endYmd as string) : filledBy(r.starts, to);
+  // ส่วนที่หายไปจากใบนี้ในช่วง = หาได้ + ยกเลิก — แบ่งด้วยคนที่เริ่มงานจริง ที่เหลือคือยกเลิก (ข้อมูลเพี้ยนก็ยังลงตัว)
+  const gone = Math.max(0, b + newQ - a);
+  const fill = Math.min(gone, Math.max(0, Math.min(r.qty, endFill) - startFill));
+  let closed = false;
+  let cancelledReq = false;
+  // หน่วยใบ: เปิดต้นช่วง (หรือคีย์ในช่วง) แล้วไม่เปิดปลายช่วง = ปิดครบ (คนครบ) หรือยกเลิก
+  if ((b > 0 || keyedIn) && a === 0) {
+    const full = r.starts.find(([, cum]) => cum >= r.qty);
+    if (full && full[0] <= to && (r.endYmd == null || full[0] <= r.endYmd)) closed = true;
+    else cancelledReq = true;
+  }
+  return {
+    relevant: true,
+    carryIn: b,
+    newPositions: newQ,
+    filled: fill,
+    cancelled: gone - fill,
+    remaining: a,
+    carry: b > 0,
+    isNew: keyedIn,
+    closed,
+    cancelledReq,
+    open: a > 0,
+  };
+}
+
 /**
  * ═══ ยกมา + ขอใหม่ − หาได้ − ยกเลิก = เหลือ (หน่วย: คน) ในช่วง [from, to] (เจ้าของ 24 ต.ค. 2569 ข้อ 1) ═══
- * แยกรายใบตามสถานะต้นช่วง/ปลายช่วง ⇒ สมการลงตัวเสมอ (เทสต์คุม) · ปิดครบใบ = ใบที่คนครบในช่วง (หน่วย: ใบ)
+ * ผลรวมของ `requestFlowRole` รายใบ ⇒ สมการลงตัวเสมอ (เทสต์คุม) · หน่วยใบ: ยกมา + ขอใหม่ − ปิดครบ − ยกเลิก = เหลือ
  */
 export function requestFlow(requests: readonly LedgerRequest[], from: string, to: string): RequestFlow {
-  const before = ymdOf(t(from) - DAY_MS);
   const f: RequestFlow = {
     carryIn: 0,
     newPositions: 0,
@@ -278,37 +336,18 @@ export function requestFlow(requests: readonly LedgerRequest[], from: string, to
     remainingRequests: 0,
   };
   for (const r of requests) {
-    if (r.keyYmd > to) continue;
-    const b = openPositionsAt(r, before);
-    const a = openPositionsAt(r, to);
-    const keyedIn = r.keyYmd >= from;
-    const endedIn = r.endYmd != null && r.endYmd >= from && r.endYmd <= to;
-    if (!keyedIn && b === 0 && !endedIn) {
-      // จบไปก่อนช่วง หรือครบก่อนช่วง — ไม่เกี่ยว
-      continue;
-    }
-    f.carryIn += b;
-    f.remaining += a;
-    const newQ = keyedIn ? r.qty : 0;
-    const startFill = keyedIn ? 0 : filledBy(r.starts, before);
-    const endFill = endedIn ? filledBy(r.starts, r.endYmd as string) : filledBy(r.starts, to);
-    // ส่วนที่หายไปจากใบนี้ในช่วง = หาได้ + ยกเลิก — แบ่งด้วยคนที่เริ่มงานจริง ที่เหลือคือยกเลิก (ข้อมูลเพี้ยนก็ยังลงตัว)
-    const gone = Math.max(0, b + newQ - a);
-    const fill = Math.min(gone, Math.max(0, Math.min(r.qty, endFill) - startFill));
-    if (keyedIn) {
-      f.newPositions += r.qty;
-      f.newRequests += 1;
-    }
-    f.filled += fill;
-    f.cancelled += gone - fill;
-    // หน่วยใบ: เปิดต้นช่วง (หรือคีย์ในช่วง) แล้วไม่เปิดปลายช่วง = ปิดครบ (คนครบ) หรือยกเลิก
-    if (b > 0) f.carryInRequests += 1;
-    if (a > 0) f.remainingRequests += 1;
-    if ((b > 0 || keyedIn) && a === 0) {
-      const full = r.starts.find(([, cum]) => cum >= r.qty);
-      if (full && full[0] <= to && (r.endYmd == null || full[0] <= r.endYmd)) f.closedRequests += 1;
-      else f.cancelledRequests += 1;
-    }
+    const x = requestFlowRole(r, from, to);
+    if (!x.relevant) continue;
+    f.carryIn += x.carryIn;
+    f.newPositions += x.newPositions;
+    f.filled += x.filled;
+    f.cancelled += x.cancelled;
+    f.remaining += x.remaining;
+    if (x.carry) f.carryInRequests += 1;
+    if (x.isNew) f.newRequests += 1;
+    if (x.closed) f.closedRequests += 1;
+    if (x.cancelledReq) f.cancelledRequests += 1;
+    if (x.open) f.remainingRequests += 1;
   }
   return f;
 }

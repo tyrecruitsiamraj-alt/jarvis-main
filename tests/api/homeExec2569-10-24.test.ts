@@ -29,11 +29,18 @@ describe('ก้อนเงิน + สมการใบขอ', () => {
     expect(body.requests.find((r) => r.requestNo === 'A2')?.amount.need.fine).toBe(0);
     expect(body.customerFines.total).toBe(500);
   });
-  it('สมการลงตัวทั้งใบและคน', () => {
+  it('สมการลงตัวทั้งใบและคน · รายใบที่กดดูบวกกันเท่ากล่อง', () => {
     const f = body.flow;
+    const sumOf = (k: 'carryIn' | 'newPositions' | 'filled' | 'cancelled' | 'remaining') =>
+      body.requests.reduce((a, r) => a + (r.flow?.[k] ?? 0), 0);
+    expect([sumOf('carryIn'), sumOf('newPositions'), sumOf('filled'), sumOf('cancelled'), sumOf('remaining')]).toEqual([
+      f.carryIn, f.newPositions, f.filled, f.cancelled, f.remaining,
+    ]);
+    expect(body.requests.filter((r) => r.flow?.open).length).toBe(f.remainingRequests);
     expect(f.carryInRequests + f.newRequests - f.closedRequests - f.cancelledRequests).toBe(f.remainingRequests);
     expect(f.carryIn + f.newPositions - f.filled - f.cancelled).toBe(f.remaining);
     expect([f.remainingRequests, f.remaining]).toEqual([2, 2]);
+    expect(body.requests.filter((r) => r.clocked).length).toBe(body.clocks.speed.n);
   });
   it('แท็บใบขอใช้ยอดรายใบจากสมุดเดียวกัน (เลขไม่ใช่ศูนย์ = จับคู่เลขใบขอได้)', () => {
     expect(ledgerByRequest(body).get('A1')?.fine).toBe(1200);
@@ -85,7 +92,7 @@ describe('30 วินาที: ต้องรีบ · ใครค้าง�
   const amt = { days: 0, personDays: 0, fine: 0, deduct: 0, coveredPersonDays: 0 };
   const req = (o: Partial<MoneyRequest>): MoneyRequest => ({
     requestNo: 'R', bu: 'LBD', unit: 'U', position: 'P', qty: 1, filled: 0, keyYmd: '2026-10-01', needYmd: '2026-10-01', endYmd: null,
-    open: true, advance: false, finePerDay: 100, deductPerDay: 50, speedDays: null, lateDays: null, owner: null, filledInWindow: 0, closedInWindow: false,
+    open: true, advance: false, finePerDay: 100, deductPerDay: 50, speedDays: null, lateDays: null, owner: null, filledInWindow: 0, closedInWindow: false, clocked: false, flow: null,
     amount: { need: amt, key: amt }, ...o,
   });
   const list = [
@@ -127,5 +134,21 @@ describe('30 วินาที: ต้องรีบ · ใครค้าง�
     for (const id of ['exec-money-actual', 'exec-money-contract', 'exec-urgent-costly', 'exec-urgent-soon', 'exec-stale', 'exec-owners', 'exec-channels', 'exec-scale', 'exec-fold-requests', 'exec-fold-money']) {
       expect(page).toContain(id);
     }
+  });
+});
+
+describe('กดกล่องดูลึกได้เรื่อย ๆ · เลขวิ่งตอนข้อมูลเปลี่ยน (24 ต.ค. 2569 รอบ 4)', () => {
+  const page = read('src/pages/HomeExecPage.tsx');
+  const drill = read('src/components/home-exec/ExecDrill.tsx');
+  it('แผงเดียวซ้อนชั้น ย้อนกลับได้ · กดใบแล้วไปใบอื่นของเจ้าหน้าที่/หน่วยงานเดียวกัน', () => {
+    expect(page).toContain('<ExecDrill');
+    expect(drill).toContain('exec-drill-back');
+    expect(drill).toContain('ใบอื่นของหน่วยงานนี้');
+    expect(drill).not.toMatch(/<Dialog\b/);
+  });
+  it('กล่องเงิน เหลือหา หาคนครบ สมการใบขอ กดได้ · ตัวเลขใช้ Num ที่วิ่ง', () => {
+    for (const k of ["openList('เสียเงินตามสัญญา'", "openList('เหลือหา'", 'r.clocked', 'flowRows(pick)', 'exec-flow-']) expect(page).toContain(k);
+    expect((page.match(/<Num /g) ?? []).length).toBeGreaterThanOrEqual(3);
+    expect(read('src/components/home-exec/Num.tsx')).toContain("useCountUp(Math.round((value ?? 0) * scale), 'exec')");
   });
 });

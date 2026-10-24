@@ -3,7 +3,7 @@
  * ตัวคิดค่าปรับอยู่ `requestPenaltyLedger.ts` · ไฟล์นี้แค่สรุปตามช่วง/BU · pure (เทสต์ `homeMoney.test.ts`)
  * 🔴 "เหลือหา" และ "ค้างนาน" ไม่คิดที่นี่ — อ่านจากชุดใบขอของกล่องงานที่เดียว (`homeExec.ts`) เพราะรวมใบขอล่วงหน้าด้วย
  */
-import { filledBy, requestFlow, type LedgerDaily, type LedgerMode, type LedgerRequest, type RequestFlow } from './requestPenaltyLedger';
+import { filledBy, requestFlow, requestFlowRole, type RequestFlowRole, type LedgerDaily, type LedgerMode, type LedgerRequest, type RequestFlow } from './requestPenaltyLedger';
 
 export type MoneyTotals = { fine: number; deduct: number; personDays: number; requests: number };
 export type MoneyRequest = {
@@ -28,6 +28,10 @@ export type MoneyRequest = {
   filledInWindow: number;
   /** คนครบในช่วง */
   closedInWindow: boolean;
+  /** นับอยู่ในนาฬิกา "หาคนครบเฉลี่ย" (หาครบ และวันหาครบอยู่ในช่วง) — กดกล่องแล้วรายใบเท่าเลข n */
+  clocked: boolean;
+  /** บทบาทในสมการของช่วง (กดกล่องสมการแล้วได้รายใบชุดนี้) — null = ไม่เกี่ยวกับช่วง */
+  flow: Omit<RequestFlowRole, 'relevant'> | null;
   amount: Record<LedgerMode, { days: number; personDays: number; fine: number; deduct: number; coveredPersonDays: number }>;
 };
 
@@ -93,7 +97,8 @@ export function buildHomeMoney(
       totals[m].requests += 1;
     }
     // นาฬิกา: ใบที่หาครบ และวันหาครบอยู่ในช่วง
-    if (r.filled >= r.qty && r.foundYmd && r.foundYmd >= ctx.from && r.foundYmd <= ctx.to) {
+    const clocked = Boolean(r.filled >= r.qty && r.foundYmd && r.foundYmd >= ctx.from && r.foundYmd <= ctx.to);
+    if (clocked) {
       if (r.speedDays != null) speed.push(r.speedDays);
       if (r.lateDays != null) late.push(r.lateDays);
     }
@@ -101,7 +106,9 @@ export function buildHomeMoney(
     const filledInWindow = Math.max(0, filledBy(r.starts, toEff) - filledBy(r.starts, before));
     const full = r.starts.find(([, cum]) => cum >= r.qty);
     const closedInWindow = Boolean(full && full[0] >= ctx.from && full[0] <= toEff);
-    if (!hasMoney && !r.open && filledInWindow === 0 && !closedInWindow) continue;
+    const role = requestFlowRole(r, ctx.from, toEff);
+    if (!hasMoney && !r.open && filledInWindow === 0 && !closedInWindow && !role.relevant) continue;
+    const { relevant, ...flowRole } = role;
     requests.push({
       requestNo: r.requestNo,
       bu: r.bu,
@@ -121,6 +128,8 @@ export function buildHomeMoney(
       owner: ctx.ownerOf?.(r.requestNo) ?? null,
       filledInWindow,
       closedInWindow,
+      clocked,
+      flow: relevant ? flowRole : null,
       amount: r.amount,
     });
   }
