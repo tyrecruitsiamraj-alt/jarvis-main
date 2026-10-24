@@ -149,6 +149,6 @@ describe('กดกล่องดูลึกได้เรื่อย ๆ ·
   it('กล่องเงิน เหลือหา หาคนครบ สมการใบขอ กดได้ · ตัวเลขใช้ Num ที่วิ่ง', () => {
     for (const k of ["openList('เสียเงินตามสัญญา'", "openList('เหลือหา'", 'r.clocked', 'flowRows(pick)', 'exec-flow-']) expect(page).toContain(k);
     expect((page.match(/<Num /g) ?? []).length).toBeGreaterThanOrEqual(3);
-    expect(read('src/components/home-exec/Num.tsx')).toContain("useCountUp(Math.round((value ?? 0) * scale), 'exec')");
+    expect(read('src/components/home-exec/Num.tsx')).toContain("useCountUp(Math.round((held ?? 0) * scale), 'exec')");
   });
 });
