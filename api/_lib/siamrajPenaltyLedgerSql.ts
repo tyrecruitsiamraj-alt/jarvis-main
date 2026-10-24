@@ -20,8 +20,9 @@ import type { PenaltyInform, PenaltyRequestRow } from '../../src/lib/requestPena
 export const LEDGER_SINCE = (process.env.SIAMRAJ_OPEN_REQUEST_MIN_DATE || '').trim() || '2024-01-01';
 const CACHE_MS = 10 * 60_000;
 
-export type CustomerFineMonth = { ym: string; site: string; bu: string | null; amount: number; receipts: number };
-export type PenaltyLedgerRaw = { rows: PenaltyRequestRow[]; informs: PenaltyInform[]; customerFines: CustomerFineMonth[]; loadedAt: number };
+/** ลูกค้าหักเงินรายวัน (วันที่ใบรับเงิน) ต่อไซต์ — หน้าเว็บตัดตามช่วงได้เป๊ะ (24 ต.ค. 2569 · เดิมรายเดือน เทียบช่วงสั้นไม่ได้) */
+export type CustomerFineDay = { ymd: string; site: string; bu: string | null; amount: number; receipts: number };
+export type PenaltyLedgerRaw = { rows: PenaltyRequestRow[]; informs: PenaltyInform[]; customerFines: CustomerFineDay[]; loadedAt: number };
 
 const cache = new Map<string, PenaltyLedgerRaw>();
 
@@ -61,7 +62,7 @@ type ReqSqlRow = {
   eff_informed: number | null;
 };
 type InformSqlRow = { request_no: string; start_ymd: string | null; record_ymd: string | null; qty: number | null };
-type FineSqlRow = { ym: string; site_code: string; amount: number; receipts: number };
+type FineSqlRow = { ymd: string; site_code: string; amount: number; receipts: number };
 
 export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<PenaltyLedgerRaw> {
   const key = scope.mode === 'code' ? `code:${scope.code}` : scope.mode;
@@ -82,7 +83,11 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
     siamrajSqlQuery<ReqSqlRow>(
       `SELECT RTRIM(A.request_no) AS request_no, RTRIM(A.site_code) AS site_code,
               COALESCE((SELECT TOP 1 z.customer_name FROM st_site_contract_p1 z WHERE z.contract_no = A.contract_no), SS.site_name) AS unit,
-              (SELECT z.staff_title_name FROM hr_ms_staff_title z WHERE z.staff_title_code = A.staff_title_code) AS position,
+              -- ชื่องานจริง (เช่น พนักงานขับรถ) ก่อน · ไม่มีค่อยใช้คำนำหน้าตำแหน่ง ("พนักงาน" เฉย ๆ บอกอะไรไม่ได้)
+              COALESCE(
+                NULLIF(LTRIM(RTRIM((SELECT z.job_description_name FROM hr_ms_job_description_1 z WHERE z.job_description_code_1 = A.job_description_code_1))), N''),
+                (SELECT z.staff_title_name FROM hr_ms_staff_title z WHERE z.staff_title_code = A.staff_title_code)
+              ) AS position,
               A.request_qty,
               CONVERT(varchar(10), A.request_date, 120) AS key_ymd,
               CONVERT(varchar(10), A.want_date_from, 120) AS need_ymd,
@@ -117,7 +122,7 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
       params,
     ),
     siamrajSqlQuery<FineSqlRow>(
-      `SELECT CONVERT(varchar(7), H.cheque_date, 120) AS ym, RTRIM(D.site_code) AS site_code,
+      `SELECT CONVERT(varchar(10), H.cheque_date, 120) AS ymd, RTRIM(D.site_code) AS site_code,
               SUM(D.fine_amount) AS amount, COUNT(DISTINCT D.cheque_no) AS receipts
          FROM ar_cheque_detail D
          INNER JOIN ar_cheque_head H ON H.cheque_no = D.cheque_no
@@ -126,7 +131,7 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
           AND H.cheque_date >= CONVERT(datetime, @since, 120)
           AND SS.department_code BETWEEN @deptFrom AND @deptTo
           ${dept.sql}
-        GROUP BY CONVERT(varchar(7), H.cheque_date, 120), RTRIM(D.site_code)`,
+        GROUP BY CONVERT(varchar(10), H.cheque_date, 120), RTRIM(D.site_code)`,
       params,
     ),
   ]);
@@ -158,8 +163,8 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
       recordYmd: i.record_ymd ?? (i.start_ymd as string),
       qty: Number(i.qty) || 1,
     }));
-  const customerFines: CustomerFineMonth[] = fineRows.map((f) => ({
-    ym: f.ym,
+  const customerFines: CustomerFineDay[] = fineRows.map((f) => ({
+    ymd: f.ymd,
     site: f.site_code,
     bu: buFromSiteCode(f.site_code),
     amount: Math.round(Number(f.amount) * 100) / 100,

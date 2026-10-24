@@ -8,6 +8,8 @@ import { buildPenaltyLedger } from '@/lib/requestPenaltyLedger';
 import { buildHomeMoney, ledgerByRequest } from '@/lib/homeMoney';
 import { previousWindow } from '@/lib/homeMoneyApi';
 import { channelInterestOf } from '@/lib/channelPlatforms';
+import { byOwner, costliest, dueSoon, NO_OWNER, thisMonthWindow } from '@/lib/homeExec';
+import type { MoneyRequest } from '@/lib/homeMoney';
 
 const read = (f: string) => fs.readFileSync(path.join(process.cwd(), f), 'utf8');
 
@@ -18,7 +20,7 @@ describe('ก้อนเงิน + สมการใบขอ', () => {
   ];
   const informs = [{ requestNo: 'A1', startYmd: '2026-10-03', recordYmd: '2026-10-03', qty: 1 }];
   const L = buildPenaltyLedger(rows, informs, '2026-10-10', { from: '2026-10-01', to: '2026-10-10' });
-  const body = buildHomeMoney(L, [{ ym: '2026-10', amount: 500, receipts: 2 }], { from: '2026-10-01', to: '2026-10-10', today: '2026-10-10', since: '2024-01-01', bu: null, forcedBu: false });
+  const body = buildHomeMoney(L, [{ ymd: '2026-10-05', amount: 500, receipts: 2 }, { ymd: '2026-09-30', amount: 900, receipts: 1 }], { from: '2026-10-01', to: '2026-10-10', today: '2026-10-10', since: '2024-01-01', bu: null, forcedBu: false });
 
   it('ยอดรวม = ผลรวมรายใบ · ใบล่วงหน้าที่ยังไม่ถึงวันต้องการไม่มีเงิน · ลูกค้าหักจริงรายเดือน', () => {
     // A1: 1–2 ต.ค. ขาด 2 · 3–10 ต.ค. ขาด 1 = 2×2 + 8 = 12 คน-วัน
@@ -76,5 +78,44 @@ describe('หน้า + เส้น', () => {
     expect(money).toContain('animationDuration={CHART.animationDuration}');
     expect(money).toContain('cursor={CHART.cursorBar}');
     expect(read('api/_handlers/registry.ts')).toContain("'/api/home-money': homeMoneyHandler");
+  });
+});
+
+describe('30 วินาที: ต้องรีบ · ใครค้างเท่าไหร่ (24 ต.ค. 2569 รอบ 2)', () => {
+  const amt = { days: 0, personDays: 0, fine: 0, deduct: 0, coveredPersonDays: 0 };
+  const req = (o: Partial<MoneyRequest>): MoneyRequest => ({
+    requestNo: 'R', bu: 'LBD', unit: 'U', position: 'P', qty: 1, filled: 0, keyYmd: '2026-10-01', needYmd: '2026-10-01', endYmd: null,
+    open: true, advance: false, finePerDay: 100, deductPerDay: 50, speedDays: null, lateDays: null, amount: { need: amt, key: amt }, ...o,
+  });
+  const list = [
+    req({ requestNo: 'A', qty: 3, filled: 1 }), // เลยแล้ว ขาด 2 → 300/วัน
+    req({ requestNo: 'B', qty: 1 }), // เลยแล้ว 150/วัน
+    req({ requestNo: 'C', needYmd: '2026-10-26' }), // อีก 2 วัน
+    req({ requestNo: 'D', needYmd: '2026-11-30' }), // ยังไกล
+    req({ requestNo: 'E', open: false }), // ปิดแล้ว
+  ];
+  it('เสียวันละมากสุด = เลยวันที่ต้องการแล้ว · คนที่ขาด × (ค่าปรับ + ลดมูลค่า)', () => {
+    const c = costliest(list, '2026-10-24');
+    expect(c.rows.map((r) => [r.requestNo, r.perDay])).toEqual([['A', 300], ['B', 150]]);
+    expect(c.total).toBe(2);
+  });
+  it('ถึงวันที่ต้องการใน 3 วัน ยังขาดคน', () => {
+    expect(dueSoon(list, '2026-10-24').rows.map((r) => r.requestNo)).toEqual(['C']);
+  });
+  it('แยกเจ้าหน้าที่ · ไม่รู้ชื่อ = ยังไม่มีคนรับผิดชอบ อยู่ท้าย · ปิดแล้วไม่นับ', () => {
+    const o = byOwner(list, '2026-10-24', (no) => (no === 'A' || no === 'C' ? 'แบงค์' : null));
+    expect(o).toEqual([
+      { name: 'แบงค์', requests: 2, overdue: 1, missing: 3, perDay: 300 },
+      { name: NO_OWNER, requests: 2, overdue: 1, missing: 2, perDay: 150 },
+    ]);
+  });
+  it('ค่าตั้งต้น = เดือนนี้', () => {
+    expect(thisMonthWindow('2026-10-24')).toEqual({ from: '2026-10-01', to: '2026-10-24' });
+  });
+  it('หน้าโชว์ลูกค้าหักจริงกับตามสัญญาตัวเท่ากัน · ส่วนยาวพับไว้', () => {
+    const page = read('src/pages/HomeExecPage.tsx');
+    for (const id of ['exec-money-actual', 'exec-money-contract', 'exec-urgent-costly', 'exec-urgent-soon', 'exec-owners', 'exec-fold-requests', 'exec-fold-money']) {
+      expect(page).toContain(id);
+    }
   });
 });

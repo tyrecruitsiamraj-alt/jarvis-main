@@ -53,7 +53,7 @@ function clock(values: number[]): ClockStat {
 
 export function buildHomeMoney(
   ledger: { requests: LedgerRequest[]; daily: LedgerDaily },
-  customerFines: ReadonlyArray<{ ym: string; amount: number; receipts: number }>,
+  customerFines: ReadonlyArray<{ ymd: string; amount: number; receipts: number }>,
   ctx: { from: string; to: string; today: string; since: string; bu: string | null; forcedBu: boolean },
 ): HomeMoneyResponse {
   const totals: Record<LedgerMode, MoneyTotals> = {
@@ -105,15 +105,15 @@ export function buildHomeMoney(
   }
   requests.sort((a, b) => b.amount.need.fine + b.amount.need.deduct - (a.amount.need.fine + a.amount.need.deduct));
 
-  const fromYm = ctx.from.slice(0, 7);
-  const toYm = ctx.to.slice(0, 7);
+  // ลูกค้าหักเงิน: วันที่ใบรับเงินอยู่ในช่วง (รวมปลาย) · สรุปรายเดือนไว้โชว์
   const byMonth = new Map<string, { ym: string; amount: number; receipts: number }>();
   for (const f of customerFines) {
-    if (f.ym < fromYm || f.ym > toYm) continue;
-    const cur = byMonth.get(f.ym) ?? { ym: f.ym, amount: 0, receipts: 0 };
+    if (f.ymd < ctx.from || f.ymd > ctx.to) continue;
+    const ym = f.ymd.slice(0, 7);
+    const cur = byMonth.get(ym) ?? { ym, amount: 0, receipts: 0 };
     cur.amount = round2(cur.amount + f.amount);
     cur.receipts += f.receipts;
-    byMonth.set(f.ym, cur);
+    byMonth.set(ym, cur);
   }
   const months = [...byMonth.values()].sort((a, b) => (a.ym < b.ym ? -1 : 1));
 

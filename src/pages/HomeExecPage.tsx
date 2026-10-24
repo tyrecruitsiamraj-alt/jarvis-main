@@ -5,12 +5,17 @@
  * ประกาศ/ไม่ประกาศ · มีคนกรอก/ไม่มี · AI สนใจแต่คนยังไม่โทรต่อ · ช่องทาง · ติดตาม · ดูแลหลังเริ่มงาน · AI กับคนเท่าไหร่
  * *"ต้องมี visual control · Interactive graph เวลาเปลี่ยนกราฟวิ่งตาม"*
  *
- * ลำดับ: ตัวเลขบนสุด 4 กล่อง → ใบขอ (แท็บใบขอเดิม · ตัวนับเดียวกัน) → เงิน → ติดตาม/ดูแลหลังเริ่มงาน
+ * ลำดับ (24 ต.ค. 2569 รอบ 2 "ผู้บริหารมีเวลา 30 วิ" — เจ้าของ "ทำเลย · คำอย่าเป็นภาษา AI"):
+ *   4 กล่องบน → ต้องรีบ → ใครค้างเท่าไหร่ → ใบขอในช่วงนี้ → (พับไว้) ใบขอค้าง/ช่องทาง · เงินรายวัน/รายใบ → ติดตาม
+ *   ค่าตั้งต้น = เดือนนี้ · กล่องเงินโชว์ "ลูกค้าหักจริง" กับ "ตามสัญญา (สูงสุด)" ขนาดเท่ากัน
  * ข้อมูล: `/api/home-money` (เงิน · นาฬิกา · สมการใบขอ) · `/api/request-pipeline` (ใบขอเปิด) · `/api/home-ai-share` (AI/คน)
  * 🔴 ชั้นคู่ขนาน: หน้านี้คือค่าตั้งต้นของ `/` · หน้าแท็บเดิมยังเปิดได้ที่ `?home=new` (ทางถอย · ปุ่มบนหัว)
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bot, Clock3, HandCoins, Layers } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AlarmClock, Bot, Clock3, HandCoins, Layers, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -26,7 +31,9 @@ import { PREQUEST_ID_PREFIX } from '@/lib/siamrajUnitRequestsApi';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { fetchHomeMoney, previousWindow, type HomeMoneyPayload } from '@/lib/homeMoneyApi';
 import { fetchHomeAiShare } from '@/lib/homeAiShareApi';
-import { defaultAiShareWindow, sharesOfCalled, type AiShareResponse, type AiShareWindow } from '@/lib/homeAiShare';
+import { sharesOfCalled, type AiShareResponse, type AiShareWindow } from '@/lib/homeAiShare';
+import { byOwner, costliest, dueSoon, thisMonthWindow, type UrgentRow } from '@/lib/homeExec';
+import { thaiDate } from '@/lib/periodPick';
 import { SITE_BU_TO_DEPT, trendBuLabel } from '@/lib/trends/bu';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { countPill } from '@/lib/teamOnline';
@@ -64,9 +71,74 @@ function aiRows(d: AiShareResponse | null): Array<{ key: string; label: string; 
   return out;
 }
 
+/** การ์ด "ต้องรีบ" — 5 ใบแรก + บอกว่ามีทั้งหมดกี่ใบ */
+function UrgentCard({
+  icon: Icon,
+  title,
+  total,
+  rows,
+  loading,
+  right,
+  testId,
+}: {
+  icon: typeof HandCoins;
+  title: string;
+  total: number;
+  rows: UrgentRow[];
+  loading: boolean;
+  right: (r: UrgentRow) => string;
+  testId: string;
+}) {
+  return (
+    <Card variant="solid" className="space-y-3 p-4" data-testid={testId}>
+      <span className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
+          {title}
+        </span>
+        <span className="text-sm tabular-nums text-muted-foreground">{loading ? '—' : `${NUM.format(total)} ใบ`}</span>
+      </span>
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{loading ? '—' : 'ไม่มี'}</p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {rows.map((r) => (
+            <li key={r.requestNo} className="flex items-start justify-between gap-3 py-2">
+              <span className="min-w-0">
+                <span className="block truncate text-sm text-foreground">{[r.unit, r.position].filter(Boolean).join(' · ')}</span>
+                <span className="block text-xs tabular-nums text-muted-foreground">
+                  {r.requestNo} · ขาด {NUM.format(r.missing)} คน
+                </span>
+              </span>
+              <span className="shrink-0 text-sm font-medium tabular-nums text-foreground">{right(r)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+/** ส่วนที่พับไว้ — กดหัวแล้วกาง (ของข้างในโหลดตอนกาง) */
+function Folded({ title, testId, children }: { title: string; testId: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} data-testid={testId}>
+      <CollapsibleTrigger asChild>
+        <Button type="button" variant="outline" className="w-full justify-between rounded-xl" aria-expanded={open}>
+          {title}
+          <ChevronDown className={cn('h-4 w-4 transition-transform', open && 'rotate-180')} aria-hidden />
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-4">{open ? children : null}</CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 const HomeExecPage: React.FC = () => {
   usePageTitle('หน้าหลัก');
-  const [win, setWin] = useState<AiShareWindow>(() => defaultAiShareWindow());
+  const [win, setWin] = useState<AiShareWindow>(() => thisMonthWindow(toYmdBangkok(new Date())));
+  const [showAllOwners, setShowAllOwners] = useState(false);
   const [bu, setBu] = useState<string | null>(null);
   const [money, setMoney] = useState<HomeMoneyPayload | null>(null);
   const [prevMoney, setPrevMoney] = useState<HomeMoneyPayload | null>(null);
@@ -108,6 +180,18 @@ const HomeExecPage: React.FC = () => {
   const late = moneyNow?.clocks.late ?? null;
   const liveKey = `${range.from}|${range.to}|${bu ?? ''}`;
   const rows = aiRows(ai);
+  const openReqs = useMemo(() => moneyNow?.requests ?? [], [moneyNow]);
+  const costly = useMemo(() => costliest(openReqs, today), [openReqs, today]);
+  const soon = useMemo(() => dueSoon(openReqs, today), [openReqs, today]);
+  const ownerByNo = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const j of feed.jobs) {
+      const no = String(j.request_no ?? '').trim().toUpperCase();
+      if (no && j.recruiter_name?.trim()) m.set(no, j.recruiter_name.trim());
+    }
+    return m;
+  }, [feed.jobs]);
+  const owners = useMemo(() => byOwner(openReqs, today, (no) => ownerByNo.get(no.trim().toUpperCase()) ?? null), [openReqs, today, ownerByNo]);
 
   return (
     <div className="space-y-6" data-testid="home-exec">
@@ -140,21 +224,38 @@ const HomeExecPage: React.FC = () => {
 
       {/* ── 4 กล่องบนสุด (Visual control · เทียบช่วงก่อนหน้าเท่ากัน) ── */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="exec-kpis">
-        <KpiTile
-          emphasis
-          icon={HandCoins}
-          label="เสียเงิน (ตามเงื่อนไขในใบขอ)"
-          unit="บาท"
-          value={Math.round(total)}
-          loading={!moneyNow}
-          liveKey={liveKey}
-          pill={moneyNow && prevTotal !== undefined ? countPill(total, prevTotal, false) : null}
-          foot={
-            moneyNow
-              ? `ลูกค้าหักจริง ${BAHT.format(moneyNow.customerFines.total)} บาท (ทั้งเดือน${moneyNow.window.from.slice(0, 7) === moneyNow.window.to.slice(0, 7) ? '' : 'ในช่วง'})`
-              : null
-          }
-        />
+        {/* เสียเงิน: ลูกค้าหักจริง กับ ตามสัญญา (สูงสุด) ตัวเท่ากัน — ไม่ให้ผู้บริหารจำแต่เลขเพดาน */}
+        <Card variant="solid" className="space-y-3 p-4" data-testid="exec-money-tile">
+          <span className="flex items-center gap-2 text-sm text-muted-foreground">
+            <HandCoins className="h-4 w-4" aria-hidden />
+            เสียเงิน
+          </span>
+          <div className="grid grid-cols-2 gap-3">
+            {(
+              [
+                ['ลูกค้าหักจริง', moneyNow ? moneyNow.customerFines.total : null, prevNow ? prevNow.customerFines.total : undefined, 'exec-money-actual'],
+                ['ตามสัญญา (สูงสุด)', moneyNow ? total : null, prevTotal, 'exec-money-contract'],
+              ] as const
+            ).map(([label, v, before, id]) => {
+              const pill = v != null && before !== undefined ? countPill(v, before, false) : null;
+              return (
+                <div key={id} className="space-y-1" data-testid={id}>
+                  <span className="block text-xs text-muted-foreground">{label}</span>
+                  <span className="block text-2xl font-medium tabular-nums text-foreground">{v == null ? '—' : BAHT.format(v)}</span>
+                  <span
+                    className={cn(
+                      'block text-xs tabular-nums',
+                      pill?.tone === 'bad' ? TONE.danger.value : pill?.tone === 'good' ? TONE.success.value : 'text-muted-foreground',
+                    )}
+                  >
+                    {pill ? `${pill.dir === 'up' ? '▲' : pill.dir === 'down' ? '▼' : ''} ${pill.text}` : 'บาท'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <span className="block text-xs text-muted-foreground">เทียบช่วงก่อนหน้าที่ยาวเท่ากัน</span>
+        </Card>
         <KpiTile
           tone="warn"
           icon={Layers}
@@ -169,7 +270,7 @@ const HomeExecPage: React.FC = () => {
         <KpiTile
           tone="info"
           icon={Clock3}
-          label="หาคนครบเฉลี่ย (วันนับจากวันคีย์)"
+          label="หาคนครบเฉลี่ย (นับจากวันคีย์)"
           unit="วัน"
           value={speed?.avg ?? 0}
           loading={!moneyNow}
@@ -177,7 +278,7 @@ const HomeExecPage: React.FC = () => {
           pill={speed?.avg != null && prevNow?.clocks.speed.avg != null ? countPill(speed.avg, prevNow.clocks.speed.avg, false) : null}
           foot={
             moneyNow
-              ? `${NUM.format(speed?.n ?? 0)} ใบ · ช้ากว่าที่ลูกค้าต้องการเฉลี่ย ${late?.avg == null ? '—' : NUM.format(late.avg)} วัน`
+              ? `คิดจาก ${NUM.format(speed?.n ?? 0)} ใบที่หาครบในช่วงนี้ · ช้ากว่าที่ลูกค้าต้องการ ${late?.avg == null ? '—' : NUM.format(late.avg)} วัน`
               : null
           }
         />
@@ -210,6 +311,79 @@ const HomeExecPage: React.FC = () => {
           <span className="block text-xs text-muted-foreground">เป้า 100%</span>
         </Card>
       </div>
+
+
+      {/* ── ต้องรีบ ── */}
+      <HomeSection title="ต้องรีบ" testId="exec-urgent">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <UrgentCard
+            icon={HandCoins}
+            title="เสียวันละมากสุด"
+            total={costly.total}
+            rows={costly.rows}
+            loading={!moneyNow}
+            right={(r) => `${BAHT.format(r.perDay)} บาท/วัน`}
+            testId="exec-urgent-costly"
+          />
+          <UrgentCard
+            icon={AlarmClock}
+            title="ถึงวันที่ต้องการใน 3 วัน ยังขาดคน"
+            total={soon.total}
+            rows={soon.rows}
+            loading={!moneyNow}
+            right={(r) => (r.needYmd ? thaiDate(r.needYmd) : '—')}
+            testId="exec-urgent-soon"
+          />
+        </div>
+      </HomeSection>
+
+      {/* ── ใครค้างเท่าไหร่ (เจ้าหน้าที่สรรหาของใบขอ) ── */}
+      <HomeSection title="ใครค้างเท่าไหร่" sub="ใบที่ยังต้องหา ณ วันนี้" testId="exec-owners">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">
+                  <span className="flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5" aria-hidden />
+                    เจ้าหน้าที่
+                  </span>
+                </TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ค้าง (ใบ)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">เลยวันที่ต้องการ (ใบ)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ยังขาด (คน)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">เสียวันละ (บาท)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {owners.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-4 text-center text-sm text-muted-foreground">
+                    {moneyNow ? 'ไม่มีใบค้าง' : '—'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                (showAllOwners ? owners : owners.slice(0, 8)).map((o) => (
+                  <TableRow key={o.name} data-testid="exec-owner-row">
+                    <TableCell className="text-sm text-foreground">{o.name}</TableCell>
+                    <TableCell className="text-right tabular-nums">{NUM.format(o.requests)}</TableCell>
+                    <TableCell className={cn('text-right tabular-nums', o.overdue > 0 ? TONE.danger.value : 'text-muted-foreground')}>
+                      {NUM.format(o.overdue)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{NUM.format(o.missing)}</TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">{BAHT.format(o.perDay)}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        {owners.length > 8 ? (
+          <Button type="button" variant="outline" size="sm" onClick={() => setShowAllOwners((v) => !v)} data-testid="exec-owners-more">
+            {showAllOwners ? 'ซ่อน' : `ดูทั้งหมด ${NUM.format(owners.length)} คน`}
+          </Button>
+        ) : null}
+      </HomeSection>
 
       {/* ── ใบขอเข้ามา · ปิด · เหลือ — สมการลงตัวทั้งหน่วยใบและหน่วยคน (เจ้าของ "บวกลบกันแล้วต้องเท่ากัน") ── */}
       <HomeSection title="ใบขอในช่วงนี้" sub="ใบขอจริงใน ERP" testId="exec-flow">
@@ -272,11 +446,13 @@ const HomeExecPage: React.FC = () => {
         ) : null}
       </HomeSection>
 
-      {/* ── ใบขอเปิด: ค้างนาน · ประกาศ · คนกรอก · AI สนใจคนยังไม่โทรต่อ · 12 ขั้น · รายใบ · ช่องทาง ── */}
-      <HomeRequestsTab win={win} tick={tick} />
-
-      {/* ── เงิน ── */}
-      <HomeMoneySection money={moneyNow} prev={prevNow} error={moneyError} />
+      {/* ── พับไว้ (ผู้บริหารไม่ต้องเลื่อนผ่าน) — กดแล้วกาง ── */}
+      <Folded title="ใบขอค้าง · ประกาศ · ช่องทาง" testId="exec-fold-requests">
+        <HomeRequestsTab win={win} tick={tick} />
+      </Folded>
+      <Folded title="เงินรายวัน · รายใบ" testId="exec-fold-money">
+        <HomeMoneySection money={moneyNow} prev={prevNow} error={moneyError} />
+      </Folded>
 
       {/* ── ติดตาม · ดูแลหลังเริ่มงาน (AI / คน / ยังไม่โทร) ── */}
       <HomeSection

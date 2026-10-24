@@ -30,13 +30,6 @@ const MODE_LABEL: Record<LedgerMode, string> = { need: 'นับจากวั
 type Unit = 'day' | 'week' | 'month';
 const UNIT_LABEL: Record<Unit, string> = { day: 'รายวัน', week: 'รายสัปดาห์', month: 'รายเดือน' };
 
-const monthsKey = (m: HomeMoneyPayload) => `${m.window.from.slice(0, 7)}|${m.window.to.slice(0, 7)}`;
-function monthsText(m: HomeMoneyPayload): string {
-  const a = MONTH.format(new Date(`${m.window.from.slice(0, 7)}-01T00:00:00Z`));
-  const b = MONTH.format(new Date(`${m.window.to.slice(0, 7)}-01T00:00:00Z`));
-  return a === b ? a : `${a} – ${b}`;
-}
-
 function bucketLabel(key: string, unit: Unit): string {
   if (unit === 'month') return MONTH.format(new Date(`${key}-01T00:00:00Z`));
   return DAY.format(new Date(`${key}T00:00:00Z`));
@@ -134,9 +127,8 @@ export default function HomeMoneySection({
           value={money ? Math.round(money.customerFines.total) : 0}
           loading={!money}
           liveKey={liveKey}
-          // ใบรับเงินนับเป็นเดือน — ช่วงสั้นกว่าเดือนเทียบเดือนเดียวกัน = ไม่มีความหมาย ⇒ ไม่ขึ้นป้ายเทียบ
-          pill={money && prev && monthsKey(money) !== monthsKey(prev) ? countPill(money.customerFines.total, prev.customerFines.total, false) : null}
-          foot={money ? `ทั้งเดือน ${monthsText(money)} · ${NUM.format(money.customerFines.receipts)} ใบรับเงิน` : null}
+          pill={money && prev ? countPill(money.customerFines.total, prev.customerFines.total, false) : null}
+          foot={money ? `${NUM.format(money.customerFines.receipts)} ใบรับเงิน` : null}
         />
       </div>
       <p className="text-xs tabular-nums text-muted-foreground" data-testid="money-sum">
