@@ -1,8 +1,8 @@
 /** ตัวดึง `/api/home-money` — หน้าหลักผู้บริหาร ก้อนเงิน + นาฬิกา (24 ต.ค. 2569) */
 import { apiFetch } from '@/lib/apiFetch';
-import type { HomeMoneyResponse } from '@/lib/homeMoney';
+import type { HomeMoneyResponse, Workload } from '@/lib/homeMoney';
 
-export type HomeMoneyPayload = HomeMoneyResponse & { errors?: Partial<Record<'replacement', string>> };
+export type HomeMoneyPayload = HomeMoneyResponse & { workload?: Workload | null; errors?: Partial<Record<'replacement' | 'workload', string>> };
 
 export async function fetchHomeMoney(q: { from: string | null; to: string | null; bu?: string | null }): Promise<HomeMoneyPayload> {
   const p = new URLSearchParams();

@@ -3,7 +3,7 @@
  * ตัวคิดค่าปรับอยู่ `requestPenaltyLedger.ts` · ไฟล์นี้แค่สรุปตามช่วง/BU · pure (เทสต์ `homeMoney.test.ts`)
  * 🔴 "เหลือหา" และ "ค้างนาน" ไม่คิดที่นี่ — อ่านจากชุดใบขอของกล่องงานที่เดียว (`homeExec.ts`) เพราะรวมใบขอล่วงหน้าด้วย
  */
-import { requestFlow, type LedgerDaily, type LedgerMode, type LedgerRequest, type RequestFlow } from './requestPenaltyLedger';
+import { filledBy, requestFlow, type LedgerDaily, type LedgerMode, type LedgerRequest, type RequestFlow } from './requestPenaltyLedger';
 
 export type MoneyTotals = { fine: number; deduct: number; personDays: number; requests: number };
 export type MoneyRequest = {
@@ -22,8 +22,17 @@ export type MoneyRequest = {
   deductPerDay: number;
   speedDays: number | null;
   lateDays: number | null;
+  /** เจ้าหน้าที่สรรหาของใบ (ช่องผู้รับผิดชอบ) — null = ยังไม่มี */
+  owner: string | null;
+  /** คนที่เริ่มงานในช่วง */
+  filledInWindow: number;
+  /** คนครบในช่วง */
+  closedInWindow: boolean;
   amount: Record<LedgerMode, { days: number; personDays: number; fine: number; deduct: number; coveredPersonDays: number }>;
 };
+
+/** งานของคน vs AI ในช่วง — ตัวคิด Scale (`api/_handlers/home-money.ts` loadWorkload) */
+export type Workload = { staffActions: number; staffPeople: number; staffPersonDays: number; aiCalls: number };
 
 export type ClockStat = { n: number; avg: number | null; median: number | null };
 
@@ -54,8 +63,18 @@ function clock(values: number[]): ClockStat {
 export function buildHomeMoney(
   ledger: { requests: LedgerRequest[]; daily: LedgerDaily },
   customerFines: ReadonlyArray<{ ymd: string; amount: number; receipts: number }>,
-  ctx: { from: string; to: string; today: string; since: string; bu: string | null; forcedBu: boolean },
+  ctx: {
+    from: string;
+    to: string;
+    today: string;
+    since: string;
+    bu: string | null;
+    forcedBu: boolean;
+    ownerOf?: (requestNo: string) => string | null;
+  },
 ): HomeMoneyResponse {
+  const toEff = ctx.to > ctx.today ? ctx.today : ctx.to;
+  const before = new Date(Date.parse(`${ctx.from}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
   const totals: Record<LedgerMode, MoneyTotals> = {
     need: { fine: 0, deduct: 0, personDays: 0, requests: 0 },
     key: { fine: 0, deduct: 0, personDays: 0, requests: 0 },
@@ -79,7 +98,10 @@ export function buildHomeMoney(
       if (r.lateDays != null) late.push(r.lateDays);
     }
     const hasMoney = r.amount.need.fine + r.amount.need.deduct + r.amount.key.fine + r.amount.key.deduct > 0;
-    if (!hasMoney && !r.open) continue;
+    const filledInWindow = Math.max(0, filledBy(r.starts, toEff) - filledBy(r.starts, before));
+    const full = r.starts.find(([, cum]) => cum >= r.qty);
+    const closedInWindow = Boolean(full && full[0] >= ctx.from && full[0] <= toEff);
+    if (!hasMoney && !r.open && filledInWindow === 0 && !closedInWindow) continue;
     requests.push({
       requestNo: r.requestNo,
       bu: r.bu,
@@ -96,6 +118,9 @@ export function buildHomeMoney(
       deductPerDay: r.deductPerDay,
       speedDays: r.speedDays,
       lateDays: r.lateDays,
+      owner: ctx.ownerOf?.(r.requestNo) ?? null,
+      filledInWindow,
+      closedInWindow,
       amount: r.amount,
     });
   }

@@ -8,7 +8,7 @@ import { buildPenaltyLedger } from '@/lib/requestPenaltyLedger';
 import { buildHomeMoney, ledgerByRequest } from '@/lib/homeMoney';
 import { previousWindow } from '@/lib/homeMoneyApi';
 import { channelInterestOf } from '@/lib/channelPlatforms';
-import { byOwner, costliest, dueSoon, NO_OWNER, thisMonthWindow } from '@/lib/homeExec';
+import { byOwner, costliest, dueSoon, NO_OWNER, peopleNeeded, scaleOf, staleOf, thisMonthWindow } from '@/lib/homeExec';
 import type { MoneyRequest } from '@/lib/homeMoney';
 
 const read = (f: string) => fs.readFileSync(path.join(process.cwd(), f), 'utf8');
@@ -85,36 +85,46 @@ describe('30 วินาที: ต้องรีบ · ใครค้าง�
   const amt = { days: 0, personDays: 0, fine: 0, deduct: 0, coveredPersonDays: 0 };
   const req = (o: Partial<MoneyRequest>): MoneyRequest => ({
     requestNo: 'R', bu: 'LBD', unit: 'U', position: 'P', qty: 1, filled: 0, keyYmd: '2026-10-01', needYmd: '2026-10-01', endYmd: null,
-    open: true, advance: false, finePerDay: 100, deductPerDay: 50, speedDays: null, lateDays: null, amount: { need: amt, key: amt }, ...o,
+    open: true, advance: false, finePerDay: 100, deductPerDay: 50, speedDays: null, lateDays: null, owner: null, filledInWindow: 0, closedInWindow: false,
+    amount: { need: amt, key: amt }, ...o,
   });
   const list = [
-    req({ requestNo: 'A', qty: 3, filled: 1 }), // เลยแล้ว ขาด 2 → 300/วัน
+    req({ requestNo: 'A', qty: 3, filled: 1, owner: 'แบงค์' }), // เลยแล้ว ขาด 2 → 300/วัน
     req({ requestNo: 'B', qty: 1 }), // เลยแล้ว 150/วัน
-    req({ requestNo: 'C', needYmd: '2026-10-26' }), // อีก 2 วัน
-    req({ requestNo: 'D', needYmd: '2026-11-30' }), // ยังไกล
-    req({ requestNo: 'E', open: false }), // ปิดแล้ว
+    req({ requestNo: 'C', needYmd: '2026-10-26', owner: 'แบงค์' }), // อีก 2 วัน
+    req({ requestNo: 'D', needYmd: '2026-11-30', open: false }), // ปิดแล้ว ไม่เกี่ยว
+    req({ requestNo: 'E', open: false, owner: 'แบงค์', closedInWindow: true, filledInWindow: 2 }), // ปิดครบในช่วง
+    req({ requestNo: 'OLD', needYmd: '2026-06-01', qty: 4 }), // ค้างเกิน 90 วัน ไม่เคยได้คน
   ];
   it('เสียวันละมากสุด = เลยวันที่ต้องการแล้ว · คนที่ขาด × (ค่าปรับ + ลดมูลค่า)', () => {
     const c = costliest(list, '2026-10-24');
     expect(c.rows.map((r) => [r.requestNo, r.perDay])).toEqual([['A', 300], ['B', 150]]);
     expect(c.total).toBe(2);
+    // ใบค้างนานผิดปกติแยกออก ไม่เบียด
+    expect(staleOf(list, '2026-10-24')).toMatchObject({ perDay: 600, rows: [{ requestNo: 'OLD' }] });
   });
   it('ถึงวันที่ต้องการใน 3 วัน ยังขาดคน', () => {
     expect(dueSoon(list, '2026-10-24').rows.map((r) => r.requestNo)).toEqual(['C']);
   });
   it('แยกเจ้าหน้าที่ · ไม่รู้ชื่อ = ยังไม่มีคนรับผิดชอบ อยู่ท้าย · ปิดแล้วไม่นับ', () => {
-    const o = byOwner(list, '2026-10-24', (no) => (no === 'A' || no === 'C' ? 'แบงค์' : null));
+    const o = byOwner(list, '2026-10-24');
     expect(o).toEqual([
-      { name: 'แบงค์', requests: 2, overdue: 1, missing: 3, perDay: 300 },
-      { name: NO_OWNER, requests: 2, overdue: 1, missing: 2, perDay: 150 },
+      { name: 'แบงค์', requests: 2, overdue: 1, missing: 3, perDay: 300, closed: 1, filled: 2 },
+      { name: NO_OWNER, requests: 2, overdue: 2, missing: 5, perDay: 750, closed: 0, filled: 0 },
     ]);
+  });
+  it('Scale: คนทำได้วันละ = งาน ÷ คน-วัน · งานเพิ่ม X ต้องใช้คนเพิ่มปัดขึ้น', () => {
+    const sc = scaleOf({ staffActions: 300, staffPeople: 5, staffPersonDays: 50, aiCalls: 1000 }, '2026-10-01', '2026-10-10')!;
+    expect(sc).toEqual({ perPersonDay: 6, staffPeople: 5, staffPerDay: 30, aiPerDay: 100, days: 10 });
+    expect(peopleNeeded(50, sc.perPersonDay)).toBe(9);
+    expect(peopleNeeded(50, null)).toBeNull();
   });
   it('ค่าตั้งต้น = เดือนนี้', () => {
     expect(thisMonthWindow('2026-10-24')).toEqual({ from: '2026-10-01', to: '2026-10-24' });
   });
   it('หน้าโชว์ลูกค้าหักจริงกับตามสัญญาตัวเท่ากัน · ส่วนยาวพับไว้', () => {
     const page = read('src/pages/HomeExecPage.tsx');
-    for (const id of ['exec-money-actual', 'exec-money-contract', 'exec-urgent-costly', 'exec-urgent-soon', 'exec-owners', 'exec-fold-requests', 'exec-fold-money']) {
+    for (const id of ['exec-money-actual', 'exec-money-contract', 'exec-urgent-costly', 'exec-urgent-soon', 'exec-stale', 'exec-owners', 'exec-channels', 'exec-scale', 'exec-fold-requests', 'exec-fold-money']) {
       expect(page).toContain(id);
     }
   });

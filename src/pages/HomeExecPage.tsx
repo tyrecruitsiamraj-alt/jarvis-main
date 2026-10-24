@@ -32,7 +32,11 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import { fetchHomeMoney, previousWindow, type HomeMoneyPayload } from '@/lib/homeMoneyApi';
 import { fetchHomeAiShare } from '@/lib/homeAiShareApi';
 import { sharesOfCalled, type AiShareResponse, type AiShareWindow } from '@/lib/homeAiShare';
-import { byOwner, costliest, dueSoon, thisMonthWindow, type UrgentRow } from '@/lib/homeExec';
+import { byOwner, costliest, dueSoon, peopleNeeded, scaleOf, staleOf, STALE_DAYS, thisMonthWindow, type UrgentRow } from '@/lib/homeExec';
+import { fetchRequestPipeline } from '@/lib/requestPipelineApi';
+import type { RequestPipelineResponse } from '@/lib/requestPipelineTypes';
+import { channelInterestOf } from '@/lib/channelPlatforms';
+import { Slider } from '@/components/ui/slider';
 import { thaiDate } from '@/lib/periodPick';
 import { SITE_BU_TO_DEPT, trendBuLabel } from '@/lib/trends/bu';
 import { toYmdBangkok } from '@/lib/dateTh';
@@ -69,6 +73,25 @@ function aiRows(d: AiShareResponse | null): Array<{ key: string; label: string; 
     out.push({ key, label, pct: s ? s.ai : null, called: c ? c.ai + c.staff + c.both : 0 });
   }
   return out;
+}
+
+/** ช่องทางที่ได้เยอะสุด 3 อันดับ ต่อขั้น (กรอก · นัดได้ · ลงงาน) — ชื่อช่องทางชุดเดียวกับตารางช่องทาง */
+type Leader = { name: string; value: number };
+function channelLeaders(d: RequestPipelineResponse | null): { registered: Leader[]; appointed: Leader[]; placed: Leader[] } | null {
+  if (!d?.channels) return null;
+  const interest = d.facts ? channelInterestOf(d.facts, d.window.from, d.window.to).byType : new Map();
+  const rows = d.channels.rows.filter((r) => r.channel !== 'ไม่รู้ช่องทาง' && r.channel !== 'ไม่ระบุ');
+  const top = (pick: (r: (typeof rows)[number]) => number): Leader[] =>
+    rows
+      .map((r) => ({ name: r.channel, value: pick(r) }))
+      .filter((x) => x.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 3);
+  return {
+    registered: top((r) => r.registered),
+    appointed: top((r) => interest.get(r.channel)?.appointed ?? 0),
+    placed: top((r) => r.placed),
+  };
 }
 
 /** การ์ด "ต้องรีบ" — 5 ใบแรก + บอกว่ามีทั้งหมดกี่ใบ */
@@ -183,15 +206,23 @@ const HomeExecPage: React.FC = () => {
   const openReqs = useMemo(() => moneyNow?.requests ?? [], [moneyNow]);
   const costly = useMemo(() => costliest(openReqs, today), [openReqs, today]);
   const soon = useMemo(() => dueSoon(openReqs, today), [openReqs, today]);
-  const ownerByNo = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const j of feed.jobs) {
-      const no = String(j.request_no ?? '').trim().toUpperCase();
-      if (no && j.recruiter_name?.trim()) m.set(no, j.recruiter_name.trim());
-    }
-    return m;
-  }, [feed.jobs]);
-  const owners = useMemo(() => byOwner(openReqs, today, (no) => ownerByNo.get(no.trim().toUpperCase()) ?? null), [openReqs, today, ownerByNo]);
+  const owners = useMemo(() => byOwner(openReqs, today), [openReqs, today]);
+  const stale = useMemo(() => staleOf(openReqs, today), [openReqs, today]);
+  const [staleOpen, setStaleOpen] = useState(false);
+  const scale = scaleOf(moneyNow?.workload, range.from, range.to > today ? today : range.to);
+  const [extra, setExtra] = useState(50);
+  /** ช่องทาง (ชุดเดียวกับตารางช่องทาง) — ดึงเส้นใบขอเฉพาะก้อนช่องทาง */
+  const [pipe, setPipe] = useState<RequestPipelineResponse | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchRequestPipeline(range)
+      .then((d) => alive && setPipe(d))
+      .catch(() => alive && setPipe(null));
+    return () => {
+      alive = false;
+    };
+  }, [range, tick]);
+  const leaders = useMemo(() => channelLeaders(pipe), [pipe]);
 
   return (
     <div className="space-y-6" data-testid="home-exec">
@@ -335,10 +366,37 @@ const HomeExecPage: React.FC = () => {
             testId="exec-urgent-soon"
           />
         </div>
+        {/* ใบค้างนานผิดปกติ แยกไว้ ไม่เบียดใบที่ยังแก้ได้ (เงินยังนับ) */}
+        <Collapsible open={staleOpen} onOpenChange={setStaleOpen} data-testid="exec-stale">
+          <CollapsibleTrigger asChild>
+            <Button type="button" variant="ghost" size="sm" className="h-auto justify-start gap-2 whitespace-normal px-0 text-left font-normal">
+              <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', staleOpen && 'rotate-180')} aria-hidden />
+              <span className="text-sm text-muted-foreground">
+                ค้างเกิน {STALE_DAYS} วันไม่เคยได้คน {moneyNow ? NUM.format(stale.rows.length) : '—'} ใบ · เสียวันละ{' '}
+                {moneyNow ? BAHT.format(stale.perDay) : '—'} บาท
+              </span>
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <ul className="divide-y divide-border">
+              {stale.rows.map((r) => (
+                <li key={r.requestNo} className="flex items-start justify-between gap-3 py-2 text-sm">
+                  <span className="min-w-0">
+                    <span className="block truncate text-foreground">{[r.unit, r.position].filter(Boolean).join(' · ')}</span>
+                    <span className="block text-xs tabular-nums text-muted-foreground">
+                      {r.requestNo} · ต้องการ {r.needYmd ? thaiDate(r.needYmd) : '—'} · ขาด {NUM.format(r.missing)} คน
+                    </span>
+                  </span>
+                  <span className="shrink-0 tabular-nums text-foreground">{BAHT.format(r.perDay)} บาท/วัน</span>
+                </li>
+              ))}
+            </ul>
+          </CollapsibleContent>
+        </Collapsible>
       </HomeSection>
 
       {/* ── ใครค้างเท่าไหร่ (เจ้าหน้าที่สรรหาของใบขอ) ── */}
-      <HomeSection title="ใครค้างเท่าไหร่" sub="ใบที่ยังต้องหา ณ วันนี้" testId="exec-owners">
+      <HomeSection title="ใครค้างเท่าไหร่ · ใครปิดได้" sub="ค้าง = ณ วันนี้ · ปิดครบ/หาได้ = ในช่วงที่เลือก" testId="exec-owners">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -353,12 +411,14 @@ const HomeExecPage: React.FC = () => {
                 <TableHead className="whitespace-nowrap text-right text-xs">เลยวันที่ต้องการ (ใบ)</TableHead>
                 <TableHead className="whitespace-nowrap text-right text-xs">ยังขาด (คน)</TableHead>
                 <TableHead className="whitespace-nowrap text-right text-xs">เสียวันละ (บาท)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">ปิดครบ (ใบ)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">หาได้ (คน)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {owners.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-4 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={7} className="py-4 text-center text-sm text-muted-foreground">
                     {moneyNow ? 'ไม่มีใบค้าง' : '—'}
                   </TableCell>
                 </TableRow>
@@ -372,6 +432,10 @@ const HomeExecPage: React.FC = () => {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{NUM.format(o.missing)}</TableCell>
                     <TableCell className="text-right font-medium tabular-nums">{BAHT.format(o.perDay)}</TableCell>
+                    <TableCell className={cn('text-right tabular-nums', o.closed > 0 ? TONE.success.value : 'text-muted-foreground')}>
+                      {NUM.format(o.closed)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{NUM.format(o.filled)}</TableCell>
                   </TableRow>
                 ))
               )}
@@ -383,6 +447,81 @@ const HomeExecPage: React.FC = () => {
             {showAllOwners ? 'ซ่อน' : `ดูทั้งหมด ${NUM.format(owners.length)} คน`}
           </Button>
         ) : null}
+      </HomeSection>
+
+
+      {/* ── ช่องทางไหนได้ผล (3 อันดับต่อขั้น) ── */}
+      <HomeSection title="ช่องทางไหนได้ผล" sub="ในช่วงที่เลือก · หน่วย: คน" testId="exec-channels">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {(
+            [
+              ['กรอกเยอะสุด', leaders?.registered],
+              ['นัดได้เยอะสุด', leaders?.appointed],
+              ['ลงงานได้เยอะสุด', leaders?.placed],
+            ] as const
+          ).map(([title, list]) => (
+            <Card key={title} variant="solid" className="space-y-2 p-4">
+              <span className="block text-sm font-medium text-foreground">{title}</span>
+              {!list ? (
+                <p className="text-sm text-muted-foreground">—</p>
+              ) : list.length === 0 ? (
+                <p className="text-sm text-muted-foreground">0</p>
+              ) : (
+                <ol className="space-y-1">
+                  {list.map((x, i) => (
+                    <li key={x.name} className="flex justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground">
+                        {i + 1}. <span className="text-foreground">{x.name}</span>
+                      </span>
+                      <span className="font-medium tabular-nums text-foreground">{NUM.format(x.value)}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </Card>
+          ))}
+        </div>
+      </HomeSection>
+
+      {/* ── AI กับคน: ถ้างานเพิ่ม ต้องใช้อย่างละเท่าไหร่ ── */}
+      <HomeSection title="AI กับคน ถ้างานเพิ่ม" sub="คิดจากงานจริงในช่วงที่เลือก" testId="exec-scale">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {(
+            [
+              ['คนลงผลวันละ', scale?.staffPerDay, 'รายการ'],
+              ['เจ้าหน้าที่ที่ลงผล', scale?.staffPeople, 'คน'],
+              ['คน 1 คนทำได้วันละ', scale?.perPersonDay, 'รายการ'],
+              ['AI โทรได้ผลวันละ', scale?.aiPerDay, 'สาย'],
+            ] as const
+          ).map(([label, v, unit]) => (
+            <Card key={label} variant="solid" className="space-y-1 rounded-xl p-3">
+              <span className="block text-xs text-muted-foreground">{label}</span>
+              <span className="block text-2xl font-medium tabular-nums text-foreground">{v == null ? '—' : NUM.format(v)}</span>
+              <span className="block text-xs text-muted-foreground">{unit}</span>
+            </Card>
+          ))}
+        </div>
+        <div className="space-y-3 rounded-xl border border-border p-4" data-testid="exec-scale-calc">
+          <span className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-muted-foreground">งานเพิ่มวันละ</span>
+            <span className="font-medium tabular-nums text-foreground">{NUM.format(extra)} รายการ</span>
+          </span>
+          <Slider value={[extra]} min={0} max={500} step={10} onValueChange={(v) => setExtra(v[0] ?? 0)} aria-label="งานเพิ่มวันละ" />
+          <div className="grid grid-cols-2 gap-3">
+            <Card variant="solid" className="space-y-1 rounded-xl p-3">
+              <span className="block text-xs text-muted-foreground">ถ้าให้คนทำ ต้องเพิ่ม</span>
+              <span className="block text-2xl font-medium tabular-nums text-foreground">
+                {scale ? (peopleNeeded(extra, scale.perPersonDay) == null ? '—' : NUM.format(peopleNeeded(extra, scale.perPersonDay)!)) : '—'}
+              </span>
+              <span className="block text-xs text-muted-foreground">คน</span>
+            </Card>
+            <Card variant="solid" className="space-y-1 rounded-xl p-3">
+              <span className="block text-xs text-muted-foreground">ถ้าให้ AI ทำ ต้องโทรเพิ่ม</span>
+              <span className={cn('block text-2xl font-medium tabular-nums', TONE.success.value)}>{NUM.format(extra)}</span>
+              <span className="block text-xs text-muted-foreground">สาย/วัน · ไม่ต้องเพิ่มคน</span>
+            </Card>
+          </div>
+        </div>
       </HomeSection>
 
       {/* ── ใบขอเข้ามา · ปิด · เหลือ — สมการลงตัวทั้งหน่วยใบและหน่วยคน (เจ้าของ "บวกลบกันแล้วต้องเท่ากัน") ── */}

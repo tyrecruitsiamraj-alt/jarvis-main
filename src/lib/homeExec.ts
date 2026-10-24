@@ -24,10 +24,23 @@ const toRow = (r: MoneyRequest): UrgentRow => ({
 
 const addDays = (ymd: string, n: number) => new Date(Date.parse(`${ymd}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
-/** ใบที่เลยวันที่ต้องการแล้ว เรียงเสียวันละมากสุดก่อน */
+/**
+ * ใบค้างนานผิดปกติ = เลยวันที่ต้องการเกิน 90 วันและไม่เคยได้คนเลย (เช่น LMO6808002 ตั้งแต่ ส.ค. 2568)
+ * แยกออกจาก "ต้องรีบ" ไม่ให้เบียดใบที่ยังแก้ได้ (เจ้าของ 24 ต.ค. 2569 Choice) — เงินยังนับเหมือนเดิม
+ */
+export const STALE_DAYS = 90;
+export function isStale(r: Pick<MoneyRequest, 'open' | 'needYmd' | 'filled'>, today: string): boolean {
+  return r.open && r.filled === 0 && r.needYmd != null && r.needYmd < addDays(today, -STALE_DAYS);
+}
+export function staleOf(requests: readonly MoneyRequest[], today: string): { rows: UrgentRow[]; perDay: number } {
+  const rows = requests.filter((r) => isStale(r, today)).map(toRow).sort((a, b) => b.perDay - a.perDay);
+  return { rows, perDay: rows.reduce((a, r) => a + r.perDay, 0) };
+}
+
+/** ใบที่เลยวันที่ต้องการแล้ว (ไม่นับใบค้างนานผิดปกติ) เรียงเสียวันละมากสุดก่อน */
 export function costliest(requests: readonly MoneyRequest[], today: string, top = 5): { rows: UrgentRow[]; total: number } {
   const all = requests
-    .filter((r) => r.open && r.needYmd != null && r.needYmd <= today && perDayOf(r) > 0)
+    .filter((r) => r.open && r.needYmd != null && r.needYmd <= today && perDayOf(r) > 0 && !isStale(r, today))
     .map(toRow)
     .sort((a, b) => b.perDay - a.perDay || b.missing - a.missing);
   return { rows: all.slice(0, top), total: all.length };
@@ -44,21 +57,28 @@ export function dueSoon(requests: readonly MoneyRequest[], today: string, days =
 }
 
 export const NO_OWNER = 'ยังไม่มีคนรับผิดชอบ';
-export type OwnerRow = { name: string; requests: number; overdue: number; missing: number; perDay: number };
+export type OwnerRow = { name: string; requests: number; overdue: number; missing: number; perDay: number; closed: number; filled: number };
 
-/** ใบที่ยังเปิด แยกตามเจ้าหน้าที่ — `ownerOf(เลขใบขอ)` มาจากช่องผู้รับผิดชอบของใบขอ (ไม่รู้ = ยังไม่มีคนรับผิดชอบ) */
-export function byOwner(requests: readonly MoneyRequest[], today: string, ownerOf: (requestNo: string) => string | null): OwnerRow[] {
+/**
+ * แยกตามเจ้าหน้าที่สรรหาของใบขอ (`owner` จากช่องผู้รับผิดชอบ · ไม่มี = ยังไม่มีคนรับผิดชอบ)
+ * ค้าง/เลยวัน/ขาด/เสียวันละ = ใบที่ยังเปิด ณ วันนี้ · ปิดครบ/หาได้ = ในช่วงที่เลือก (รวมใบที่ปิดไปแล้ว)
+ */
+export function byOwner(requests: readonly MoneyRequest[], today: string): OwnerRow[] {
   const out = new Map<string, OwnerRow>();
   for (const r of requests) {
-    if (!r.open) continue;
-    const name = ownerOf(r.requestNo)?.trim() || NO_OWNER;
-    const row = out.get(name) ?? { name, requests: 0, overdue: 0, missing: 0, perDay: 0 };
-    row.requests += 1;
-    if (r.needYmd != null && r.needYmd <= today) {
-      row.overdue += 1;
-      row.perDay += perDayOf(r);
+    if (!r.open && !r.closedInWindow && r.filledInWindow === 0) continue;
+    const name = r.owner?.trim() || NO_OWNER;
+    const row = out.get(name) ?? { name, requests: 0, overdue: 0, missing: 0, perDay: 0, closed: 0, filled: 0 };
+    if (r.closedInWindow) row.closed += 1;
+    row.filled += r.filledInWindow;
+    if (r.open) {
+      row.requests += 1;
+      if (r.needYmd != null && r.needYmd <= today) {
+        row.overdue += 1;
+        row.perDay += perDayOf(r);
+      }
+      row.missing += missingOf(r);
     }
-    row.missing += missingOf(r);
     out.set(name, row);
   }
   return [...out.values()].sort(
@@ -69,4 +89,26 @@ export function byOwner(requests: readonly MoneyRequest[], today: string, ownerO
 /** ค่าตั้งต้นของหน้าผู้บริหาร = เดือนนี้ (วันที่ 1 ถึงวันนี้) — ผู้บริหารคิดเป็นเดือน */
 export function thisMonthWindow(today: string): { from: string; to: string } {
   return { from: `${today.slice(0, 7)}-01`, to: today };
+}
+
+/**
+ * ═══ AI กับคน ถ้าจะขยาย ต้องใช้อย่างละเท่าไหร่ (เจ้าของ 24 ต.ค. 2569 "อยาก Scale ได้ว่าอย่างละเท่าไหร่") ═══
+ * คนทำได้วันละ = งานที่ลงผล ÷ คน-วันที่ลงผลจริง · AI ทำได้วันละ = สายที่ได้ผล ÷ วันในช่วง (AI ไม่มีเพดานต่อวันจากฝั่งเรา)
+ * งานเพิ่มวันละ X ⇒ ใช้คนเพิ่ม = X ÷ คนทำได้วันละ (ปัดขึ้น) · หรือให้ AI โทรเพิ่ม X สาย
+ */
+export type ScaleStat = { perPersonDay: number | null; staffPeople: number; staffPerDay: number; aiPerDay: number; days: number };
+export function scaleOf(w: { staffActions: number; staffPeople: number; staffPersonDays: number; aiCalls: number } | null | undefined, from: string, to: string): ScaleStat | null {
+  if (!w) return null;
+  const days = Math.max(1, Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1);
+  return {
+    perPersonDay: w.staffPersonDays > 0 ? Math.round((w.staffActions / w.staffPersonDays) * 10) / 10 : null,
+    staffPeople: w.staffPeople,
+    staffPerDay: Math.round((w.staffActions / days) * 10) / 10,
+    aiPerDay: Math.round((w.aiCalls / days) * 10) / 10,
+    days,
+  };
+}
+export function peopleNeeded(extraPerDay: number, perPersonDay: number | null): number | null {
+  if (!perPersonDay || perPersonDay <= 0) return null;
+  return Math.ceil(Math.max(0, extraPerDay) / perPersonDay);
 }
