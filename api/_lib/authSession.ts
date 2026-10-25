@@ -1,5 +1,6 @@
 import {
   signAuthToken,
+  authTokenTtlSeconds,
   buildSetCookieHeader,
   type UserRole,
 } from './auth.js';
@@ -46,7 +47,7 @@ export async function issueAuthSession(
   row: AuthUserRow,
   auditAction: AuthSessionAuditAction,
 ): Promise<void> {
-  const ttl = Number(process.env.AUTH_TOKEN_TTL_SECONDS || 1800) || 1800;
+  const ttl = authTokenTtlSeconds();
   const token = signAuthToken({
     sub: row.id,
     email: row.email,
@@ -73,7 +74,7 @@ export async function issueAuthSessionRedirect(
   auditAction: 'auth.azure_ad.success',
   extraCookies: string[] = [],
 ): Promise<string> {
-  const ttl = Number(process.env.AUTH_TOKEN_TTL_SECONDS || 1800) || 1800;
+  const ttl = authTokenTtlSeconds();
   const token = signAuthToken({
     sub: row.id,
     email: row.email,

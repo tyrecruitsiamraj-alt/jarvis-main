@@ -29,15 +29,21 @@ export type JwtUserPayload = {
   role: UserRole;
 };
 
+/**
+ * อายุการเข้าระบบ (วินาที) — ค่าเริ่ม 8 ชั่วโมง (เจ้าของ 25 ต.ค. 2569 Choice "ยืดเวลาเป็น 8 ชั่วโมง")
+ * เดิม 30 นาที ไม่ต่ออายุระหว่างใช้ ⇒ มายเปิดฟอร์มติดตามค้างไว้ ขั้น 4 ขึ้น "โหลดรายการประกันไม่ได้" (จริงคือหมดอายุ)
+ * ⚠️ token ไม่เช็กฐานทุกครั้ง ⇒ ปิดบัญชี/เปลี่ยน role มีผลช้าสุดเท่าอายุนี้ · ตั้ง `AUTH_TOKEN_TTL_SECONDS` ทับได้
+ */
+export const DEFAULT_AUTH_TTL_SECONDS = 8 * 60 * 60;
+export function authTokenTtlSeconds(): number {
+  const n = Number(process.env.AUTH_TOKEN_TTL_SECONDS || DEFAULT_AUTH_TTL_SECONDS);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_AUTH_TTL_SECONDS;
+}
+
 export function signAuthToken(payload: JwtUserPayload, expiresInSeconds?: number): string {
   const secret = getJwtSecret();
   if (!secret) throw new Error('AUTH_JWT_SECRET is not configured');
-  const ttl =
-    expiresInSeconds ??
-    (() => {
-      const n = Number(process.env.AUTH_TOKEN_TTL_SECONDS || 1800);
-      return Number.isFinite(n) && n > 0 ? n : 1800;
-    })();
+  const ttl = expiresInSeconds ?? authTokenTtlSeconds();
   return jwt.sign(payload, secret, { expiresIn: ttl, algorithm: 'HS256' });
 }
 

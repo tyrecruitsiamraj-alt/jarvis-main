@@ -7,6 +7,7 @@ import {
   signAuthToken,
   buildSetCookieHeader,
   getJwtSecret,
+  authTokenTtlSeconds,
 } from '../../_lib/auth.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { readJsonBody } from '../../_lib/body.js';
@@ -91,7 +92,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       );
     }
 
-    const ttl = Number(process.env.AUTH_TOKEN_TTL_SECONDS || 1800) || 1800;
+    const ttl = authTokenTtlSeconds();
     const token = signAuthToken({
       sub: row.id,
       email: row.email,
