@@ -11,7 +11,7 @@
  * ข้อมูล: `/api/home-money` (เงิน · นาฬิกา · สมการใบขอ) · `/api/request-pipeline` (ใบขอเปิด) · `/api/home-ai-share` (AI/คน)
  * 🔴 ชั้นคู่ขนาน: หน้านี้คือค่าตั้งต้นของ `/` · หน้าแท็บเดิมรวมเข้ามาเป็นส่วน "รายชื่อ" ท้ายหน้าแล้ว (25 ต.ค. 2569 · ไม่มีปุ่มพาออก) · `?home=new` ยังเปิดได้ถ้าพิมพ์เอง = ทางถอย
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -36,7 +36,7 @@ import { fetchHomeMoney, previousWindow, type HomeMoneyPayload } from '@/lib/hom
 import { fetchHomeAiShare } from '@/lib/homeAiShareApi';
 import { sharesOfCalled, type AiShareBlockKey, type AiShareResponse, type AiShareWindow } from '@/lib/homeAiShare';
 import HomeAiSharePage from '@/pages/HomeAiSharePage';
-import { byOwner, costliest, dueSoon, NO_OWNER, peopleNeeded, perDayOf, scaleOf, staleOf, STALE_DAYS, thisMonthWindow, type UrgentRow } from '@/lib/homeExec';
+import { byOwner, costliest, dueSoon, NO_OWNER, peopleNeeded, perDayOf, reasonsOf, scaleOf, staleOf, STALE_DAYS, thisMonthWindow, type UrgentRow } from '@/lib/homeExec';
 import { fetchRequestPipeline } from '@/lib/requestPipelineApi';
 import type { RequestPipelineResponse } from '@/lib/requestPipelineTypes';
 import { channelInterestOf } from '@/lib/channelPlatforms';
@@ -85,9 +85,9 @@ function aiRows(d: AiShareResponse | null): Array<{ key: string; label: string; 
 
 type FlowRole = NonNullable<MoneyRequest['flow']>;
 
-/** ช่องทางที่ได้เยอะสุด 3 อันดับ ต่อขั้น (กรอก · นัดได้ · ลงงาน) — ชื่อช่องทางชุดเดียวกับตารางช่องทาง */
+/** ช่องทางที่ได้เยอะสุด 3 อันดับ ต่อขั้น (กรอก · นัดได้ · มาตามนัด · ลงงาน · เจ้าของ 25 ต.ค. 2569) — ชื่อช่องทางชุดเดียวกับตารางช่องทาง */
 type Leader = { name: string; value: number };
-function channelLeaders(d: RequestPipelineResponse | null): { registered: Leader[]; appointed: Leader[]; placed: Leader[] } | null {
+function channelLeaders(d: RequestPipelineResponse | null): { registered: Leader[]; appointed: Leader[]; showed: Leader[]; placed: Leader[] } | null {
   if (!d?.channels) return null;
   const interest = d.facts ? channelInterestOf(d.facts, d.window.from, d.window.to).byType : new Map();
   const rows = d.channels.rows.filter((r) => r.channel !== 'ไม่รู้ช่องทาง' && r.channel !== 'ไม่ระบุ');
@@ -100,6 +100,7 @@ function channelLeaders(d: RequestPipelineResponse | null): { registered: Leader
   return {
     registered: top((r) => r.registered),
     appointed: top((r) => interest.get(r.channel)?.appointed ?? 0),
+    showed: top((r) => interest.get(r.channel)?.showed ?? 0),
     placed: top((r) => r.placed),
   };
 }
@@ -150,7 +151,7 @@ function UrgentCard({
                 <span className="min-w-0">
                   <span className="block truncate text-sm text-foreground">{[r.unit, r.position].filter(Boolean).join(' · ')}</span>
                   <span className="block text-xs tabular-nums text-muted-foreground">
-                    {r.requestNo} · ขาด {NUM.format(r.missing)} คน
+                    {r.requestNo} · ขาด {NUM.format(r.missing)} คน · {r.owner}
                   </span>
                 </span>
                 <span className="shrink-0 text-sm font-medium tabular-nums text-foreground">{right(r)}</span>
@@ -235,9 +236,17 @@ const HomeExecPage: React.FC = () => {
   const total = moneyNow ? moneyNow.totals.need.fine + moneyNow.totals.need.deduct : 0;
   const prevTotal = prevNow ? prevNow.totals.need.fine + prevNow.totals.need.deduct : undefined;
   const speed = moneyNow?.clocks.speed ?? null;
+  const upcoming = money?.aftercareUpcoming ?? null;
   const late = moneyNow?.clocks.late ?? null;
   /** คีย์คงที่ = เลขในกล่องวิ่งจากค่าเดิมไปค่าใหม่ทุกครั้ง รวมตอนเปลี่ยนช่วง/BU (เจ้าของ "Interactive ที่เวลาเปลี่ยนข้อมูล") */
-  const liveKey = 'exec';
+  /**
+   * เลขกล่องบน: ระหว่างโหลดช่วงใหม่ค้างเลขเดิม แล้ววิ่งไปเลขใหม่ · โหลดครั้งแรกขึ้นเลขจริงทันที ไม่วิ่งจาก 0
+   * (25 ต.ค. 2569 — เปิดแท็บไว้เบื้องหลัง เลขค้าง 0 เพราะเบราว์เซอร์หยุดวาดภาพเคลื่อนไหว)
+   */
+  const lastKpi = useRef<HomeMoneyPayload | null>(null);
+  if (moneyNow) lastKpi.current = moneyNow;
+  const kpi = moneyNow ?? lastKpi.current;
+  const liveKey = kpi ? 'exec' : 'exec-wait';
   const rows = aiRows(ai);
   const openReqs = useMemo(() => moneyNow?.requests ?? [], [moneyNow]);
   const costly = useMemo(() => costliest(openReqs, today), [openReqs, today]);
@@ -357,8 +366,8 @@ const HomeExecPage: React.FC = () => {
           icon={Layers}
           label="เหลือหา (ใบขอจริง)"
           unit="ใบ"
-          value={flow?.remainingRequests ?? 0}
-          loading={!flow}
+          value={kpi?.flow.remainingRequests ?? 0}
+          loading={!kpi}
           liveKey={liveKey}
           pill={flow && prevNow ? countPill(flow.remainingRequests, prevNow.flow.remainingRequests, false) : null}
           foot={flow ? `${NUM.format(flow.remaining)} คน · ล่วงหน้าอีก ${feedReady ? NUM.format(preCount) : '—'} ใบ` : null}
@@ -369,8 +378,8 @@ const HomeExecPage: React.FC = () => {
           icon={Clock3}
           label="หาคนครบเฉลี่ย (นับจากวันคีย์)"
           unit="วัน"
-          value={speed?.avg ?? 0}
-          loading={!moneyNow}
+          value={kpi?.clocks.speed.avg ?? 0}
+          loading={!kpi}
           liveKey={liveKey}
           pill={speed?.avg != null && prevNow?.clocks.speed.avg != null ? countPill(speed.avg, prevNow.clocks.speed.avg, false) : null}
           foot={
@@ -473,7 +482,7 @@ const HomeExecPage: React.FC = () => {
                   <span className="min-w-0">
                     <span className="block truncate text-foreground">{[r.unit, r.position].filter(Boolean).join(' · ')}</span>
                     <span className="block text-xs tabular-nums text-muted-foreground">
-                      {r.requestNo} · ต้องการ {r.needYmd ? thaiDate(r.needYmd) : '—'} · ขาด {NUM.format(r.missing)} คน
+                      {r.requestNo} · ต้องการ {r.needYmd ? thaiDate(r.needYmd) : '—'} · ขาด {NUM.format(r.missing)} คน · {r.owner}
                     </span>
                   </span>
                   <span className="shrink-0 tabular-nums text-foreground">{BAHT.format(r.perDay)} บาท/วัน</span>
@@ -555,11 +564,12 @@ const HomeExecPage: React.FC = () => {
 
       {/* ── ช่องทางไหนได้ผล (3 อันดับต่อขั้น) ── */}
       <HomeSection title="ช่องทางไหนได้ผล" sub="ในช่วงที่เลือก · หน่วย: คน" testId="exec-channels">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {(
             [
               ['กรอกเยอะสุด', leaders?.registered],
               ['นัดได้เยอะสุด', leaders?.appointed],
+              ['มาตามนัดเยอะสุด', leaders?.showed],
               ['ลงงานได้เยอะสุด', leaders?.placed],
             ] as const
           ).map(([title, list]) => (
@@ -685,7 +695,14 @@ const HomeExecPage: React.FC = () => {
                   key={label}
                   type="button"
                   disabled={!flow}
-                  onClick={() => openList(`${label} (${g.unit})`, flowRows(pick))}
+                  onClick={() => {
+                    const list = flowRows(pick);
+                    // ยกเลิก = แยกเหตุผลก่อน กดเหตุผลแล้วค่อยลงไปดูรายใบ (เจ้าของ 25 ต.ค. 2569)
+                    if (label === 'ยกเลิก') {
+                      const weight = g.id === 'req' ? () => 1 : (r: MoneyRequest) => r.flow?.cancelled ?? 0;
+                      drill.open({ title: `${label} (${g.unit})`, rows: list, expand: null, reasons: { unit: g.unit, items: reasonsOf(list, weight) } });
+                    } else openList(`${label} (${g.unit})`, list);
+                  }}
                   className="rounded-xl text-left"
                   data-testid={`exec-flow-${g.id}-${label}`}
                 >
@@ -772,6 +789,16 @@ const HomeExecPage: React.FC = () => {
               ) : (
                 <Progress value={0} className="h-1.5" />
               )}
+              {/* ดูแลหลังเริ่มงาน: 0 ในช่วงแต่มีสายนัดไว้ = ยังไม่ถึงคิว ไม่ใช่ระบบพัง (เจ้าของ 25 ต.ค. 2569) */}
+              {pick === 'aftercare' ? (
+                <span className="block text-xs tabular-nums text-muted-foreground" data-testid="exec-aftercare-upcoming">
+                  {upcoming == null
+                    ? 'รอโทร —'
+                    : upcoming.calls > 0 && upcoming.firstAt
+                      ? `รอโทร ${NUM.format(upcoming.calls)} สาย · เริ่ม ${thaiDate(toYmdBangkok(new Date(upcoming.firstAt)))}`
+                      : 'รอโทร 0 สาย'}
+                </span>
+              ) : null}
             </Card>
           ))}
         </div>

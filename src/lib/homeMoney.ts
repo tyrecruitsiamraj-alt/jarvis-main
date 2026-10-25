@@ -28,6 +28,8 @@ export type MoneyRequest = {
   filledInWindow: number;
   /** คนครบในช่วง */
   closedInWindow: boolean;
+  /** เหตุผลที่หยุดใบจาก ERP · null = ไม่ได้กรอก */
+  stopReason: string | null;
   /** นับอยู่ในนาฬิกา "หาคนครบเฉลี่ย" (หาครบ และวันหาครบอยู่ในช่วง) — กดกล่องแล้วรายใบเท่าเลข n */
   clocked: boolean;
   /** บทบาทในสมการของช่วง (กดกล่องสมการแล้วได้รายใบชุดนี้) — null = ไม่เกี่ยวกับช่วง */
@@ -128,6 +130,7 @@ export function buildHomeMoney(
       owner: ctx.ownerOf?.(r.requestNo) ?? null,
       filledInWindow,
       closedInWindow,
+      stopReason: r.stopReason ?? null,
       clocked,
       flow: relevant ? flowRole : null,
       amount: r.amount,

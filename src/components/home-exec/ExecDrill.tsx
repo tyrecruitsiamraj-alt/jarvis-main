@@ -8,7 +8,7 @@ import { ArrowLeft, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { perDayOf } from '@/lib/homeExec';
+import { NO_REASON, perDayOf } from '@/lib/homeExec';
 import type { MoneyRequest } from '@/lib/homeMoney';
 import { thaiDate } from '@/lib/periodPick';
 import { TONE } from '@/lib/designTokens';
@@ -26,6 +26,8 @@ export type DrillLevel = {
   months?: Array<{ ym: string; amount: number; receipts: number }>;
   /** ใบที่กางไว้ตอนเปิดชั้นนี้ */
   expand?: string | null;
+  /** แยกเหตุผล (กล่องยกเลิก) — กดเหตุผลแล้วลงไปดูเฉพาะใบของเหตุผลนั้น · `unit` = ใบ/คน */
+  reasons?: { unit: string; items: Array<{ label: string; n: number }> };
 };
 
 export function useDrill() {
@@ -81,6 +83,44 @@ export default function ExecDrill({
             {lv?.sub ? ` · ${lv.sub}` : ''}
           </SheetDescription>
         </SheetHeader>
+
+        {lv?.reasons ? (
+          <Table className="mt-4" data-testid="exec-drill-reasons">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">เหตุผล</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">{lv.reasons.unit}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lv.reasons.items.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={2} className="text-center text-sm text-muted-foreground">
+                    0
+                  </TableCell>
+                </TableRow>
+              ) : (
+                lv.reasons.items.map((it) => (
+                  <TableRow
+                    key={it.label}
+                    className="cursor-pointer"
+                    onClick={() =>
+                      drill.push({
+                        title: `${lv.title} · ${it.label}`,
+                        rows: rows.filter((r) => (r.stopReason?.trim() || NO_REASON) === it.label),
+                        expand: null,
+                      })
+                    }
+                    data-testid="exec-drill-reason"
+                  >
+                    <TableCell className="text-sm text-foreground">{it.label}</TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">{NUM.format(it.n)}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        ) : null}
 
         {lv?.months ? (
           <Table className="mt-4">
@@ -165,6 +205,7 @@ export default function ExecDrill({
                                 <span>วันคีย์ {thaiDate(r.keyYmd)}</span>
                                 <span>วันที่ต้องการ {r.needYmd ? thaiDate(r.needYmd) : '—'}</span>
                                 <span>{r.endYmd ? `จบ ${thaiDate(r.endYmd)}` : r.open ? 'ยังเปิด' : 'ได้คนครบ'}</span>
+                                {r.stopReason ? <span>เหตุผล {r.stopReason}</span> : null}
                                 <span>
                                   ได้คน {NUM.format(r.filled)}/{NUM.format(r.qty)}
                                 </span>

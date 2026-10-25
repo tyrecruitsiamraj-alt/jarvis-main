@@ -6,7 +6,8 @@
  */
 import type { MoneyRequest } from './homeMoney';
 
-export type UrgentRow = { requestNo: string; unit: string; position: string; missing: number; perDay: number; needYmd: string | null };
+/** `owner` = เจ้าหน้าที่สรรหาของใบ (ไม่มี = `NO_OWNER`) — หัวหน้ารู้ทันทีว่าต้องตามใคร (เจ้าของ 25 ต.ค. 2569) */
+export type UrgentRow = { requestNo: string; unit: string; position: string; missing: number; perDay: number; needYmd: string | null; owner: string };
 
 const missingOf = (r: Pick<MoneyRequest, 'qty' | 'filled'>) => Math.max(0, r.qty - r.filled);
 /** เสียวันละ = คนที่ยังขาด × (ค่าปรับ + ลดมูลค่า) ต่อคนต่อวัน */
@@ -20,6 +21,7 @@ const toRow = (r: MoneyRequest): UrgentRow => ({
   missing: missingOf(r),
   perDay: perDayOf(r),
   needYmd: r.needYmd,
+  owner: r.owner?.trim() || NO_OWNER,
 });
 
 const addDays = (ymd: string, n: number) => new Date(Date.parse(`${ymd}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
@@ -57,6 +59,24 @@ export function dueSoon(requests: readonly MoneyRequest[], today: string, days =
 }
 
 export const NO_OWNER = 'ยังไม่มีคนรับผิดชอบ';
+
+/**
+ * ═══ ยกเลิกเพราะอะไร (เจ้าของ 25 ต.ค. 2569 "คงเป็นยกเลิกก้อนเดียว พอกดเข้าไปค่อยโชว์ว่าเหตุผลอะไรบ้าง อย่างละเท่าไหร่") ═══
+ * เหตุผลจาก ERP (`st_ms_stop_by`) · ไม่ได้กรอก = `NO_REASON` · `weight` = นับใบ (1) หรือคน (`flow.cancelled`) — ผลรวมเท่ากล่องที่กด
+ */
+export const NO_REASON = 'ไม่ได้กรอกเหตุผล';
+export function reasonsOf(rows: readonly MoneyRequest[], weight: (r: MoneyRequest) => number): Array<{ label: string; n: number }> {
+  const out = new Map<string, number>();
+  for (const r of rows) {
+    const w = weight(r);
+    if (w <= 0) continue;
+    const k = r.stopReason?.trim() || NO_REASON;
+    out.set(k, (out.get(k) ?? 0) + w);
+  }
+  return [...out.entries()]
+    .map(([label, n]) => ({ label, n }))
+    .sort((a, b) => Number(a.label === NO_REASON) - Number(b.label === NO_REASON) || b.n - a.n);
+}
 export type OwnerRow = { name: string; requests: number; overdue: number; missing: number; perDay: number; closed: number; filled: number };
 
 /**

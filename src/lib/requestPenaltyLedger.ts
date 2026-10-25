@@ -36,6 +36,8 @@ export type PenaltyRequestRow = {
   needYmd: string | null;
   /** วันที่ใบจบ (Stop/ยกเลิก/ปิด) · null = ยังเปิด */
   endYmd: string | null;
+  /** เหตุผลที่หยุดใบจาก ERP (`st_ms_stop_by`) · null = ไม่ได้กรอก/ยังเปิด */
+  stopReason?: string | null;
   workDays: string | null;
   finePerDay: number;
   deductPerDay: number;

@@ -56,6 +56,7 @@ type ReqSqlRow = {
   key_ymd: string | null;
   need_ymd: string | null;
   end_ymd: string | null;
+  stop_reason: string | null;
   work_date: string | null;
   fine: number | null;
   deduct: number | null;
@@ -97,6 +98,8 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
                 WHEN ISNULL(A.is_inform_all, 'N') = 'Y' THEN CONVERT(varchar(10), A.update_date, 120)
                 ELSE NULL
               END AS end_ymd,
+              -- เหตุผลที่หยุดใบ (st_ms_stop_by) — กดกล่องยกเลิกแล้วแยกเหตุผล (เจ้าของ 25 ต.ค. 2569)
+              (SELECT TOP 1 RTRIM(z.stop_by_name) FROM st_ms_stop_by z WHERE z.stop_by_code = A.stop_code) AS stop_reason,
               B.work_date,
               P.abs_customer_fine AS fine,
               P.abs_customer_deduct AS deduct,
@@ -149,6 +152,7 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
       keyYmd: r.key_ymd,
       needYmd: r.need_ymd,
       endYmd: r.end_ymd,
+      stopReason: (r.stop_reason ?? '').trim() || null,
       workDays: r.work_date,
       finePerDay: Number(r.fine) || 0,
       deductPerDay: Number(r.deduct) || 0,

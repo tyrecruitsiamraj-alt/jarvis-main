@@ -357,6 +357,7 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
     registered: number;
     interested: number | null;
     appointed: number | null;
+    showed: number | null;
     placed: number;
     onClick?: () => void;
   }> = !platforms
@@ -368,6 +369,7 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
           registered: s.registered,
           interested: null,
           appointed: null,
+          showed: null,
           placed: s.placed,
         }))
       : platform
@@ -377,6 +379,7 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
             registered: t.registered,
             interested: interest?.byType.get(t.channel)?.interested ?? 0,
             appointed: interest?.byType.get(t.channel)?.appointed ?? 0,
+            showed: interest?.byType.get(t.channel)?.showed ?? 0,
             placed: t.placed,
             onClick: () => setPath({ platform: platform.key, type: t.channel }),
           }))
@@ -386,6 +389,7 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
             registered: p.registered,
             interested: interest?.byPlatform.get(p.key)?.interested ?? 0,
             appointed: interest?.byPlatform.get(p.key)?.appointed ?? 0,
+            showed: interest?.byPlatform.get(p.key)?.showed ?? 0,
             placed: p.placed,
             onClick: () => setPath({ platform: p.key }),
           }));
@@ -393,6 +397,7 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
   const sumPlaced = rows.reduce((n, r) => n + r.placed, 0);
   const sumInterested = rows.reduce((n, r) => n + (r.interested ?? 0), 0);
   const sumAppointed = rows.reduce((n, r) => n + (r.appointed ?? 0), 0);
+  const sumShowed = rows.reduce((n, r) => n + (r.showed ?? 0), 0);
   return (
     <HomeSection title="ช่องทาง" sub={`${sub} · ลงงาน = แจ้งเข้าในช่วง`} testId="req-channels">
       <nav className="flex flex-wrap items-center gap-1 text-sm" data-testid="req-channels-trail">
@@ -426,13 +431,14 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
                 <TableHead className="whitespace-nowrap text-right text-xs">ลงทะเบียน (คน)</TableHead>
                 <TableHead className="whitespace-nowrap text-right text-xs">สนใจ (คน)</TableHead>
                 <TableHead className="whitespace-nowrap text-right text-xs">นัดได้ (คน)</TableHead>
+                <TableHead className="whitespace-nowrap text-right text-xs">มาตามนัด (คน)</TableHead>
                 <TableHead className="whitespace-nowrap text-right text-xs">ลงงาน (คน)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-4 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={6} className="py-4 text-center text-sm text-muted-foreground">
                     ไม่มีข้อมูล
                   </TableCell>
                 </TableRow>
@@ -457,6 +463,7 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
                     <TableCell className="text-right tabular-nums">{fmt(r.registered)}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmt(r.interested)}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmt(r.appointed)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmt(r.showed)}</TableCell>
                     <TableCell className="text-right font-medium tabular-nums">{fmt(r.placed)}</TableCell>
                   </TableRow>
                 ))
@@ -467,7 +474,7 @@ function ChannelDrill({ data, sub }: { data: RequestPipelineResponse | null; sub
       )}
       {platforms ? (
         <p className="text-xs tabular-nums text-muted-foreground" data-testid="req-channels-sum">
-          รวม ลงทะเบียน {fmt(sumReg)} คน · สนใจ {type ? '—' : fmt(sumInterested)} คน · นัดได้ {type ? '—' : fmt(sumAppointed)} คน · ลงงาน {fmt(sumPlaced)} คน
+          รวม ลงทะเบียน {fmt(sumReg)} คน · สนใจ {type ? '—' : fmt(sumInterested)} คน · นัดได้ {type ? '—' : fmt(sumAppointed)} คน · มาตามนัด {type ? '—' : fmt(sumShowed)} คน · ลงงาน {fmt(sumPlaced)} คน
           {!platform && data?.channels ? ` · แจ้งเข้าทั้งหมด ${fmt(data.channels.informed)} คน` : ''}
         </p>
       ) : null}

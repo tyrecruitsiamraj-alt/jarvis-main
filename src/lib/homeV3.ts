@@ -2,7 +2,8 @@
  * ═══ สวิตช์โฉมหน้าหลัก — ชั้นคู่ขนานตามกติกาโปรเจกต์ ═══
  *
  * - `?home=exec` = **หน้าหลักผู้บริหาร หน้าเดียวเลื่อนลง** (เจ้าของ 24 ต.ค. 2569 · `src/pages/HomeExecPage.tsx`) — **ค่าตั้งต้นตอนนี้**
- * - `?home=new` = หน้าแท็บ "ระบบไปกี่ %" (30 ก.ย. 2569 · `src/pages/HomeAiSharePage.tsx`) — ทางถอย (ปุ่ม "แบบแท็บเดิม")
+ * - `?home=new` = หน้าแท็บ "ระบบไปกี่ %" (30 ก.ย. 2569 · `src/pages/HomeAiSharePage.tsx`) — ทางถอย พิมพ์เองเท่านั้น · **ไม่จำ**
+ *   (25 ต.ค. 2569 รวมเข้าหน้าผู้บริหารแล้ว · เครื่องที่เคยกดปุ่ม "แบบแท็บเดิม" ต้องกลับมาหน้าเดียวกับทุกคน)
  * - `?home=classic` = หน้าเดิม (deck · บอร์ด 4 ทีม · KPI) — โค้ดยังอยู่ครบเป็นทางถอย
  * - `?home=v3` = โฉม 3 ก้อน (29 ก.ย. 2569 · แผน `docs/plan-home-v3-2569-09-29.md`)
  * - `?home=online` = หน้าทีม Online ตามภาพต้นแบบของเจ้าของ (29 ก.ย. 2569 · แผน `docs/plan-team-online-2569-09-29.md`)
@@ -34,7 +35,7 @@ export function homeVariant(): HomeVariant {
   const forced = paramMode();
   try {
     // 'exec' = ค่าตั้งต้น ⇒ ล้างค่าจำ · โฉมอื่นเก็บชื่อไว้ (v3 เก็บ '1' เดิมเพื่อความเข้ากันได้)
-    if (forced === 'exec') window.localStorage.removeItem(HOME_V3_KEY);
+    if (forced === 'exec' || forced === 'new') window.localStorage.removeItem(HOME_V3_KEY);
     else if (forced) window.localStorage.setItem(HOME_V3_KEY, forced === 'v3' ? '1' : forced);
   } catch {
     /* ปิด storage ก็ปล่อยผ่าน — URL ยังสั่งได้ต่อรอบ */
@@ -42,7 +43,8 @@ export function homeVariant(): HomeVariant {
   if (forced) return forced;
   try {
     const v = window.localStorage.getItem(HOME_V3_KEY);
-    return v === '1' || v === 'v3' ? 'v3' : v === 'online' ? 'online' : v === 'classic' ? 'classic' : v === 'new' ? 'new' : 'exec';
+    // 'new' ที่จำไว้จากปุ่มเดิม = ไม่ใช้แล้ว (หน้าแท็บรวมเข้าหน้าผู้บริหาร 25 ต.ค. 2569)
+    return v === '1' || v === 'v3' ? 'v3' : v === 'online' ? 'online' : v === 'classic' ? 'classic' : 'exec';
   } catch {
     // อ่าน storage ไม่ได้ = หน้าหลักผู้บริหาร (ค่าตั้งต้น)
     return 'exec';

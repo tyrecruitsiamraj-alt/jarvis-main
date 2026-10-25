@@ -23,6 +23,8 @@ import { groupReplacements } from './request-pipeline.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
 import type { Workload } from '../../src/lib/homeMoney.js';
+import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
+import { followBuJoin, followBuSql } from '../_lib/homeBuSql.js';
 
 const FOLLOW = tableInAppSchema('follow_entries');
 const CONTACTS = tableInAppSchema('application_contact_logs');
@@ -33,6 +35,29 @@ const QUEUE = tableInAppSchema('lumos_dispatch_queue');
  * คน = ผลที่เจ้าหน้าที่ลงเอง (ผลโทรติดตาม + ผลติดต่อผู้สมัคร) · คน-วัน = คนที่ลงผล × วันที่ลงผลจริง
  * AI = สายที่ Lumos ส่งผลกลับครั้งแรกในช่วง (ทุกงาน) · อ่านไม่ได้ = null (บอกใน errors)
  */
+/**
+ * สายดูแลหลังเริ่มงานที่นัดไว้แต่ยังไม่ถึงคิว (เจ้าของ 25 ต.ค. 2569 — การ์ดเป็น 0 ดูเหมือนระบบพัง ให้บอกสายที่รออยู่)
+ * ไม่นับที่ยกเลิก · BU ใช้ตัวกรองเดียวกับการ์ดดูแลหลังเริ่มงาน (`followBuSql`)
+ */
+export type AftercareUpcoming = { calls: number; people: number; firstAt: string | null };
+async function loadAftercareUpcoming(bu: string | null): Promise<AftercareUpcoming | null> {
+  try {
+    const { rows } = await dbQuery<{ calls: number; people: number; first_at: Date | string | null }>(
+      `select count(*)::int calls, count(distinct f.recipient_phone)::int people, min(f.scheduled_at) first_at
+         from ${FOLLOW} f ${followBuJoin('f')}
+        where f.topic = $1 and f.cancelled_at is null and f.completed_at is null and f.scheduled_at > now()
+          and ($2::text is null or ${followBuSql('f')} = $2::text)`,
+      [AFTERCARE_TOPIC, bu],
+    );
+    const r = rows[0];
+    const first = r?.first_at ? new Date(r.first_at).toISOString() : null;
+    return { calls: Number(r?.calls ?? 0), people: Number(r?.people ?? 0), firstAt: first };
+  } catch (e) {
+    logError('home-money: aftercare upcoming', e);
+    return null;
+  }
+}
+
 async function loadWorkload(from: string, to: string): Promise<Workload | null> {
   try {
     const { rows } = await dbQuery<{ actions: number; people: number; person_days: number; ai_calls: number }>(
@@ -113,10 +138,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     const raw = await loadPenaltyLedgerRaw(departmentScope);
     const rows = bu ? raw.rows.filter((r) => r.bu === bu) : raw.rows;
-    const [replacements, owners, workload] = await Promise.all([
+    const [replacements, owners, workload, aftercareUpcoming] = await Promise.all([
       loadReplacements([...new Set(rows.map((r) => r.site))]),
       loadOwners([...new Set(rows.map((r) => r.requestNo))]),
       loadWorkload(from, to > today ? today : to),
+      loadAftercareUpcoming(bu),
     ]);
     const ledger = buildPenaltyLedger(rows, raw.informs, today, { from, to: to > today ? today : to }, replacements ?? {});
     const fines = bu ? raw.customerFines.filter((f) => f.bu === bu) : raw.customerFines;
@@ -131,6 +157,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         ownerOf: (no) => owners.get(no.trim().toUpperCase()) ?? null,
       }),
       workload,
+      aftercareUpcoming,
       errors: {
         ...(replacements ? {} : { replacement: 'อ่านส่งคนแทนไม่ได้ — ยอดนี้ยังไม่หักวันที่มีคนแทน' }),
         ...(workload ? {} : { workload: 'อ่านงานของคน/AI ไม่ได้' }),

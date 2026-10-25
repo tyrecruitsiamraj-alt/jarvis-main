@@ -53,7 +53,7 @@ describe('ก้อนเงิน + สมการใบขอ', () => {
 
 describe('ช่องทาง: สนใจ / นัดได้', () => {
   it('นับเฉพาะที่กรอกในช่วง · สนใจรวมคนที่มีนัด', () => {
-    const base = { channelLabel: 'Facebook Group', referralSource: null, aiAnswer: null, staffAnswer: null, appointmentAt: null } as const;
+    const base = { channelLabel: 'Facebook Group', referralSource: null, aiAnswer: null, staffAnswer: null, appointmentAt: null, attendance: null } as const;
     const r = channelInterestOf(
       [
         { ...base, createdAt: '2026-10-02T03:00:00Z', aiAnswer: 'said_yes' },
@@ -63,8 +63,8 @@ describe('ช่องทาง: สนใจ / นัดได้', () => {
       '2026-10-01',
       '2026-10-31',
     );
-    expect(r.byType.get('Facebook กลุ่ม')).toEqual({ interested: 2, appointed: 1 });
-    expect(r.byPlatform.get('facebook')).toEqual({ interested: 2, appointed: 1 });
+    expect(r.byType.get('Facebook กลุ่ม')).toEqual({ interested: 2, appointed: 1, showed: 0 });
+    expect(r.byPlatform.get('facebook')).toEqual({ interested: 2, appointed: 1, showed: 0 });
   });
 });
 
@@ -99,7 +99,7 @@ describe('30 วินาที: ต้องรีบ · ใครค้าง�
   const amt = { days: 0, personDays: 0, fine: 0, deduct: 0, coveredPersonDays: 0 };
   const req = (o: Partial<MoneyRequest>): MoneyRequest => ({
     requestNo: 'R', bu: 'LBD', unit: 'U', position: 'P', qty: 1, filled: 0, keyYmd: '2026-10-01', needYmd: '2026-10-01', endYmd: null,
-    open: true, advance: false, finePerDay: 100, deductPerDay: 50, speedDays: null, lateDays: null, owner: null, filledInWindow: 0, closedInWindow: false, clocked: false, flow: null,
+    open: true, advance: false, finePerDay: 100, deductPerDay: 50, speedDays: null, lateDays: null, owner: null, filledInWindow: 0, closedInWindow: false, stopReason: null, clocked: false, flow: null,
     amount: { need: amt, key: amt }, ...o,
   });
   const list = [
@@ -156,6 +156,43 @@ describe('กดกล่องดูลึกได้เรื่อย ๆ ·
   it('กล่องเงิน เหลือหา หาคนครบ สมการใบขอ กดได้ · ตัวเลขใช้ Num ที่วิ่ง', () => {
     for (const k of ["openList('เสียเงินตามสัญญา'", "openList('เหลือหา'", 'r.clocked', 'flowRows(pick)', 'exec-flow-']) expect(page).toContain(k);
     expect((page.match(/<Num /g) ?? []).length).toBeGreaterThanOrEqual(3);
-    expect(read('src/components/home-exec/Num.tsx')).toContain("useCountUp(Math.round((held ?? 0) * scale), 'exec')");
+    expect(read('src/components/home-exec/Num.tsx')).toContain("useCountUp(Math.round((held ?? 0) * scale), held == null ? 'none' : 'exec')");
   });
 });
+
+describe('อ่านหน้าแบบผู้บริหาร 4 ข้อ + เลขไม่ขึ้น 0 (25 ต.ค. 2569)', () => {
+  const page = read('src/pages/HomeExecPage.tsx');
+  it('ยกเลิกเป็นกล่องเดียว กดแล้วแยกเหตุผลจาก ERP · ผลรวมเหตุผลเท่ากล่อง · ไม่กรอกอยู่ท้าย', async () => {
+    const { reasonsOf, NO_REASON } = await import('@/lib/homeExec');
+    const mk = (stopReason: string | null, cancelled: number) => ({ stopReason, flow: { cancelled } }) as never;
+    const rows = [mk('ลูกค้ายกเลิก(ไม่เอาคนแล้ว)', 2), mk(null, 1), mk('ยกเลิกโดย-สยามราช', 3), mk('ยกเลิกโดย-สยามราช', 1)];
+    const byReq = reasonsOf(rows, () => 1);
+    expect(byReq).toEqual([
+      { label: 'ยกเลิกโดย-สยามราช', n: 2 },
+      { label: 'ลูกค้ายกเลิก(ไม่เอาคนแล้ว)', n: 1 },
+      { label: NO_REASON, n: 1 },
+    ]);
+    const byPeople = reasonsOf(rows, (r: { flow: { cancelled: number } }) => r.flow.cancelled);
+    expect(byPeople.reduce((a, x) => a + x.n, 0)).toBe(7);
+    expect(page).toContain("label === 'ยกเลิก'");
+    expect(read('api/_lib/siamrajPenaltyLedgerSql.ts')).toContain('st_ms_stop_by');
+  });
+  it('ช่องทาง 4 ขั้น: กรอก · นัดได้ · มาตามนัด · ลงงาน', async () => {
+    const { channelInterestOf } = await import('@/lib/channelPlatforms');
+    const f = (attendance: string | null) => ({ createdAt: '2026-10-10T03:00:00Z', channelLabel: 'Facebook Group', referralSource: null, aiAnswer: null, staffAnswer: null, appointmentAt: '2026-10-12T03:00:00Z', attendance });
+    const m = channelInterestOf([f('showed'), f('no_show'), f(null)] as never, '2026-10-01', '2026-10-31').byType.get('Facebook กลุ่ม');
+    expect(m).toEqual({ interested: 3, appointed: 3, showed: 1 });
+    expect(page).toContain("['มาตามนัดเยอะสุด', leaders?.showed]");
+    expect(read('src/components/home-ai-share/HomeRequestsTab.tsx')).toContain('มาตามนัด (คน)');
+  });
+  it('ดูแลหลังเริ่มงานบอกสายที่รออยู่ · ต้องรีบบอกชื่อเจ้าหน้าที่', () => {
+    expect(page).toContain('exec-aftercare-upcoming');
+    expect(read('api/_handlers/home-money.ts')).toContain('loadAftercareUpcoming');
+    expect(page).toContain('คน · {r.owner}');
+    expect(read('src/lib/homeExec.ts')).toContain('owner: r.owner?.trim() || NO_OWNER');
+  });
+  it('เลขกล่องบนโหลดครั้งแรกขึ้นทันที ไม่วิ่งจาก 0', () => {
+    expect(page).toContain("const liveKey = kpi ? 'exec' : 'exec-wait';");
+  });
+});
+

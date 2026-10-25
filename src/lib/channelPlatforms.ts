@@ -68,11 +68,12 @@ export function buildPlatforms(cp: ChannelPlacement): PlatformRow[] {
  * ═══ สนใจ / นัดได้ ต่อช่องทาง (หน้าหลักผู้บริหารข้อ 9 · เจ้าของ 24 ต.ค. 2569) ═══
  * > *"ช่องทางไหนคนกรอกมาเยอะ ช่องทางไหนคนสนใจเยอะ ช่องทางไหนนัดได้เยอะ ช่องทางไหนลงงานได้เยอะ"*
  * นับจากใบสมัครในระบบเราที่กรอกในช่วง (ใบที่ดึงจาก iRecruit ไม่มีผลโทร/นัดในระบบเรา) · ชื่อช่องทางผ่าน `mainChannelOf` ชุดเดียวกับตาราง
- * สนใจ = AI ได้ผลสนใจ หรือเจ้าหน้าที่ลงว่าสนใจ หรือมีนัด · นัดได้ = มีนัด
+ * สนใจ = AI ได้ผลสนใจ หรือเจ้าหน้าที่ลงว่าสนใจ หรือมีนัด · นัดได้ = มีนัด · มาตามนัด = ลงผลนัดว่ามา (เจ้าของ 25 ต.ค. 2569
+ * *"กรอกเข้ามาเท่าไหร่ นัดได้เท่าไหร่ มาตามนัดเท่าไหร่ ลงงานเท่าไหร่"*)
  */
-export type ChannelInterest = { interested: number; appointed: number };
+export type ChannelInterest = { interested: number; appointed: number; showed: number };
 export function channelInterestOf(
-  facts: ReadonlyArray<Pick<RecruitAppFact, 'createdAt' | 'channelLabel' | 'referralSource' | 'aiAnswer' | 'staffAnswer' | 'appointmentAt'>>,
+  facts: ReadonlyArray<Pick<RecruitAppFact, 'createdAt' | 'channelLabel' | 'referralSource' | 'aiAnswer' | 'staffAnswer' | 'appointmentAt' | 'attendance'>>,
   from: string,
   to: string,
 ): { byType: Map<string, ChannelInterest>; byPlatform: Map<PlatformKey, ChannelInterest> } {
@@ -83,15 +84,17 @@ export function channelInterestOf(
     if (!d || d < from || d > to) continue;
     const interested = f.aiAnswer === 'said_yes' || f.staffAnswer === 'said_yes' || Boolean(f.appointmentAt);
     const appointed = Boolean(f.appointmentAt);
+    const showed = appointed && f.attendance === 'showed';
     if (!interested && !appointed) continue;
     const type = mainChannelOf(channelOf(f), null);
     for (const [map, key] of [
       [byType, type],
       [byPlatform, platformOf(type)],
     ] as const) {
-      const cur = (map as Map<string, ChannelInterest>).get(key) ?? { interested: 0, appointed: 0 };
+      const cur = (map as Map<string, ChannelInterest>).get(key) ?? { interested: 0, appointed: 0, showed: 0 };
       if (interested) cur.interested += 1;
       if (appointed) cur.appointed += 1;
+      if (showed) cur.showed += 1;
       (map as Map<string, ChannelInterest>).set(key, cur);
     }
   }
