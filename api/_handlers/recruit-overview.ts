@@ -54,7 +54,7 @@ import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
 import { onlineRequestStateOf, type OnlineRequestRow } from '../../src/lib/homeOnline.js';
 import { loadChannelPlacement } from '../_lib/channelPlacementSql.js';
 import { loadInformDaysByPhone, loadIrecruitApplicantDays, loadIrecruitRegsByPhone } from '../_lib/applicantSourceSql.js';
-import { firstDaySince, informedSince, irecruitChannelAt, phone9Of } from '../../src/lib/applicantSourceMatch.js';
+import { firstDaySince, informedSince, irecruitSourceAt, phone9Of } from '../../src/lib/applicantSourceMatch.js';
 import type {
   RecruitAiRow,
   RecruitAppFact,
@@ -252,7 +252,7 @@ type Row = Record<string, unknown>;
 /** แจ้งเข้า ERP + ช่องทาง iRecruit ต่อเบอร์ (19 ต.ค. 2569) — null = อ่านไม่ได้ */
 export type AppSourceMaps = {
   informDays: ReadonlyMap<string, readonly string[]> | null;
-  irecruitRegs: ReadonlyMap<string, ReadonlyArray<{ at: string; channel: string }>> | null;
+  irecruitRegs: ReadonlyMap<string, ReadonlyArray<{ at: string; channel: string; sub?: string | null }>> | null;
   /** วันเป็นผู้สมัครใน iRecruit ต่อเบอร์ (20 ต.ค. 2569) */
   irecruitApplicants?: ReadonlyMap<string, readonly string[]> | null;
 };
@@ -264,6 +264,7 @@ export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSou
   const p9 = phone9Of(phone);
   const createdAt = iso(r.created_at) ?? '';
   const fromIrecruit = IRECRUIT_LABEL.test(text(r.channel_label) ?? '') || IRECRUIT_LABEL.test(text(r.referral_source) ?? '');
+  const irec = sources && fromIrecruit ? irecruitSourceAt(sources.irecruitRegs, p9, createdAt) : null;
   const contact = r.contact_class === 'success' || r.contact_class === 'failed' ? r.contact_class : null;
   const src = r.contact_src === 'ai' || r.contact_src === 'staff' ? r.contact_src : null;
   const att = ATTENDANCE_VALUES.find((v) => v === r.attendance) ?? null;
@@ -299,7 +300,8 @@ export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSou
     aiOutOfArea: Boolean(r.ai_outcome) && isOutOfAreaAnswer(text(r.ai_summary), text(r.ai_reply)),
     onBoard: boardPhones ? Boolean(phone && boardPhones.has(phone)) : null,
     informed: sources ? informedSince(sources.informDays, p9, createdAt) : null,
-    sourceChannel: sources && fromIrecruit ? irecruitChannelAt(sources.irecruitRegs, p9, createdAt) : null,
+    sourceChannel: irec?.channel ?? null,
+    sourceSub: irec?.sub ?? null,
     irecruitAt: sources ? firstDaySince(sources.irecruitApplicants ?? null, p9, createdAt) : undefined,
     informedAt: sources ? firstDaySince(sources.informDays, p9, createdAt) : undefined,
   };

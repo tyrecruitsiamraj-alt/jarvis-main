@@ -79,3 +79,72 @@ export function buildChannelFunnel(cohort: readonly RecruitAppFact[]): { rows: C
     .sort((a, b) => (b.names.value ?? 0) - (a.names.value ?? 0) || a.channel.localeCompare(b.channel, 'th'));
   return { rows, total: rowOf('รวม', cohort) };
 }
+
+/**
+ * ═══ ช่องทาง 3 ชั้น กดลงไปเรื่อย ๆ (เจ้าของ 25 ต.ค. 2569) ═══
+ * > *"แบ่งง่าย ๆ ก่อน 4 ช่องทาง facebook · Tiktok · Webjob · Offline แล้วบอกยอดรวมก่อน · กดไปค่อยเจอ facebook Group เท่าไหร่
+ * > facebook ads เท่าไหร่ · กด facebook group ค่อยขึ้นชื่อกลุ่ม"* + *"ช่องทางที่น้อยอาจติดต่อสำเร็จมากกว่า"* (% เทียบรายชื่อของช่องทาง)
+ * Choice: LINE → Webjob · พนักงานแนะนำ/พนักงานเก่า → Offline · ไม่รู้ช่องทาง/อื่น ๆ → แถวท้าย (ผลรวมทุกชั้นเท่ายอดทั้งหมด)
+ */
+export type FunnelGroupKey = 'facebook' | 'tiktok' | 'webjob' | 'offline' | 'unknown';
+export const FUNNEL_GROUP_LABEL: Record<FunnelGroupKey, string> = {
+  facebook: 'Facebook',
+  tiktok: 'TikTok',
+  webjob: 'Webjob',
+  offline: 'Offline',
+  unknown: 'อื่น ๆ · ไม่รู้ช่องทาง',
+};
+const GROUP_ORDER: FunnelGroupKey[] = ['facebook', 'tiktok', 'webjob', 'offline', 'unknown'];
+const OFFLINE_CH = /ป้าย|ใบปลิว|แนะนำ|เพื่อน|ญาติ|ผู้ประสานงาน|จนท\.|เจ้าหน้าที่|พนักงานเก่า|โอนมา|สำนักงานใหญ่|walk\s*in|call\s*in/i;
+const WEBJOB_CH = /jobthai|jobbkk|jobsdb|job\s*db|internet|google|เว็บ|^line\b|line\s*oa|line\s*ai/i;
+
+export function funnelGroupOf(channel: string): FunnelGroupKey {
+  const ch = channel.trim();
+  if (!ch || ch === IRECRUIT_UNKNOWN_CHANNEL || /^ไม่ระบุ$|ไม่รู้ช่องทาง/.test(ch)) return 'unknown';
+  if (/^facebook/i.test(ch)) return 'facebook';
+  if (/^tiktok/i.test(ch)) return 'tiktok';
+  if (WEBJOB_CH.test(ch)) return 'webjob';
+  if (OFFLINE_CH.test(ch)) return 'offline';
+  return 'unknown';
+}
+
+export const NO_SUB = 'ไม่ระบุชื่อ';
+/** ชื่อกลุ่ม/เพจย่อย — ลิงก์ของเรา "Facebook Group · ชื่อกลุ่ม" · ใบจาก iRecruit ใช้กลุ่มย่อยที่ลงทะเบียน · ไม่มี = ไม่ระบุชื่อ */
+export function funnelSubOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referralSource' | 'sourceSub'>): string {
+  if (isFromIrecruit(f)) return f.sourceSub?.trim() || NO_SUB;
+  const tail = (f.channelLabel ?? '').split('·').slice(1).join('·').trim();
+  return tail || NO_SUB;
+}
+
+export type FunnelNode = ChannelFunnelRow & { key: string; children?: FunnelNode[] };
+const byNames = (a: FunnelNode, b: FunnelNode) => (b.names.value ?? 0) - (a.names.value ?? 0) || a.channel.localeCompare(b.channel, 'th');
+
+/** ต้นไม้ 3 ชั้น: กลุ่ม (4 + ไม่รู้) → ช่องทาง → ชื่อกลุ่ม/เพจ · ทุกชั้นบวกกันเท่ารวม · กลุ่มว่างยังอยู่ (เลข 0) */
+export function buildChannelFunnelTree(cohort: readonly RecruitAppFact[]): { groups: FunnelNode[]; total: ChannelFunnelRow } {
+  const groups = new Map<FunnelGroupKey, Map<string, Map<string, RecruitAppFact[]>>>();
+  for (const g of GROUP_ORDER) groups.set(g, new Map());
+  for (const f of cohort) {
+    const ch = funnelChannelOf(f);
+    const chans = groups.get(funnelGroupOf(ch))!;
+    const subs = chans.get(ch) ?? new Map<string, RecruitAppFact[]>();
+    const sub = funnelSubOf(f);
+    subs.set(sub, [...(subs.get(sub) ?? []), f]);
+    chans.set(ch, subs);
+  }
+  const out: FunnelNode[] = GROUP_ORDER.map((g) => {
+    const chans = groups.get(g)!;
+    const chanNodes: FunnelNode[] = [...chans.entries()]
+      .map(([ch, subs]) => {
+        const all = [...subs.values()].flat();
+        const subNodes = [...subs.entries()].map(([name, list]) => ({ ...rowOf(name, list), key: `${ch}|${name}` })).sort(byNames);
+        // ชั้นชื่อกลุ่มมีแค่ "ไม่ระบุชื่อ" แถวเดียว = ไม่มีอะไรให้กดลง
+        const useful = subNodes.length > 1 || (subNodes[0] && subNodes[0].channel !== NO_SUB);
+        return { ...rowOf(ch, all), key: ch, ...(useful ? { children: subNodes } : {}) };
+      })
+      .sort(byNames);
+    const all = chanNodes.flatMap((c) => [...(chans.get(c.key)?.values() ?? [])].flat());
+    return { ...rowOf(FUNNEL_GROUP_LABEL[g], all), key: g, children: chanNodes };
+  });
+  // "อื่น ๆ · ไม่รู้ช่องทาง" อยู่ท้ายเสมอ · 4 กลุ่มหลักเรียงตามที่เจ้าของบอก
+  return { groups: out, total: rowOf('รวม', cohort) };
+}

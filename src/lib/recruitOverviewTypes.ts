@@ -66,6 +66,8 @@ export type RecruitAppFact = {
   informed?: boolean | null;
   /** ใบที่ดึงจาก iRecruit: ช่องทางที่ลงทะเบียนใน iRecruit (`mainChannelOf`) · null = หาไม่เจอ/ไม่ใช่ใบ iRecruit */
   sourceChannel?: string | null;
+  /** ชื่อกลุ่ม/เพจย่อยที่ลงทะเบียนใน iRecruit (Facebook กลุ่มไหน) · null = ไม่รู้ (25 ต.ค. 2569) */
+  sourceSub?: string | null;
   /** วันแรกที่เบอร์นี้เป็นผู้สมัครใน iRecruit ตั้งแต่วันกรอก (YYYY-MM-DD · 20 ต.ค. 2569) · null = ไม่เจอ · undefined = อ่านไม่ได้ */
   irecruitAt?: string | null;
   /** วันแจ้งเข้า ERP แรกตั้งแต่วันกรอก (YYYY-MM-DD) · null = ไม่เจอ · undefined = อ่านไม่ได้ */

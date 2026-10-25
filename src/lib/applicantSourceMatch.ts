@@ -29,19 +29,28 @@ const IRECRUIT_LOOKBACK_MS = 60 * 86_400_000;
 
 /** ช่องทางที่ลงทะเบียนใน iRecruit ครั้งล่าสุดก่อน (หรือวันเดียวกับ) วันที่ใบเข้าระบบเรา */
 export function irecruitChannelAt(
-  regs: ReadonlyMap<string, ReadonlyArray<{ at: string; channel: string }>> | null,
+  regs: ReadonlyMap<string, ReadonlyArray<{ at: string; channel: string; sub?: string | null }>> | null,
   phone9: string | null,
   createdAt: string,
 ): string | null {
+  return irecruitSourceAt(regs, phone9, createdAt)?.channel ?? null;
+}
+
+/** การลงทะเบียน iRecruit ล่าสุดก่อนวันกรอก — ช่องทางหลัก + ชื่อกลุ่มย่อย (25 ต.ค. 2569 กดลงไปดูชื่อกลุ่ม) */
+export function irecruitSourceAt(
+  regs: ReadonlyMap<string, ReadonlyArray<{ at: string; channel: string; sub?: string | null }>> | null,
+  phone9: string | null,
+  createdAt: string,
+): { channel: string; sub: string | null } | null {
   if (!regs || !phone9) return null;
   const t = Date.parse(createdAt);
-  let best: { at: number; channel: string } | null = null;
+  let best: { at: number; channel: string; sub: string | null } | null = null;
   for (const r of regs.get(phone9) ?? []) {
     const at = Date.parse(r.at);
     if (!(at < t + 86_400_000 && t - at <= IRECRUIT_LOOKBACK_MS)) continue;
-    if (!best || at > best.at) best = { at, channel: r.channel };
+    if (!best || at > best.at) best = { at, channel: r.channel, sub: r.sub ?? null };
   }
-  return best?.channel ?? null;
+  return best ? { channel: best.channel, sub: best.sub } : null;
 }
 
 /**

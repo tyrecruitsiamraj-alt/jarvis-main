@@ -5,7 +5,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { buildChannelFunnel, funnelChannelOf, IRECRUIT_UNKNOWN_CHANNEL } from '../../src/lib/channelFunnel';
+import { buildChannelFunnel, buildChannelFunnelTree, funnelChannelOf, funnelGroupOf, IRECRUIT_UNKNOWN_CHANNEL, NO_SUB } from '../../src/lib/channelFunnel';
 import { informedSince, irecruitChannelAt, phone9Of } from '../../src/lib/applicantSourceMatch';
 import { buildRecruitJourney } from '../../src/lib/recruitJourney';
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes';
@@ -109,3 +109,44 @@ describe('จับคู่ฝั่ง API', () => {
     expect(readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8')).toContain('<ChannelFunnelTable');
   });
 });
+
+describe('ช่องทาง 3 ชั้น: 4 กลุ่ม → ช่องทาง → ชื่อกลุ่ม (เจ้าของ 25 ต.ค. 2569)', () => {
+  const apps = [
+    fact({ channelLabel: 'Facebook Group · กลุ่มหางานจังหวัด' }),
+    fact({ channelLabel: 'Facebook Group · กลุ่มหางานจังหวัด' }),
+    fact({ channelLabel: 'Facebook Group' }),
+    fact({ channelLabel: 'Facebook Ads' }),
+    fact({ channelLabel: 'Tiktok' }),
+    fact({ channelLabel: 'LINE OA' }),
+    fact({ channelLabel: 'พนักงานแนะนำ' }),
+    fact({ channelLabel: null, referralSource: null }),
+  ];
+  const { groups, total } = buildChannelFunnelTree(apps);
+  it('ชั้นบน = Facebook · TikTok · Webjob · Offline · อื่น ๆ/ไม่รู้ ตามลำดับ · LINE ไป Webjob · พนักงานแนะนำไป Offline', () => {
+    expect(groups.map((g) => [g.key, g.names.value])).toEqual([
+      ['facebook', 4],
+      ['tiktok', 1],
+      ['webjob', 1],
+      ['offline', 1],
+      ['unknown', 1],
+    ]);
+    expect(funnelGroupOf(IRECRUIT_UNKNOWN_CHANNEL)).toBe('unknown');
+  });
+  it('ทุกชั้นบวกกันเท่ารวม', () => {
+    expect(groups.reduce((a, g) => a + (g.names.value ?? 0), 0)).toBe(total.names.value);
+    for (const g of groups) {
+      expect((g.children ?? []).reduce((a, c) => a + (c.names.value ?? 0), 0)).toBe(g.names.value);
+      for (const c of g.children ?? []) if (c.children) expect(c.children.reduce((a, x) => a + (x.names.value ?? 0), 0)).toBe(c.names.value);
+    }
+  });
+  it('Facebook กลุ่มกดลงไปเห็นชื่อกลุ่ม · ไม่มีชื่อ = ไม่ระบุชื่อ · Ads ไม่มีชื่อย่อยก็ไม่ให้กด', () => {
+    const fb = groups[0].children!;
+    const grp = fb.find((c) => c.channel === 'Facebook กลุ่ม')!;
+    expect(grp.children!.map((x) => [x.channel, x.names.value])).toEqual([
+      ['กลุ่มหางานจังหวัด', 2],
+      [NO_SUB, 1],
+    ]);
+    expect(fb.find((c) => c.channel === 'Facebook Ads')!.children).toBeUndefined();
+  });
+});
+

@@ -13823,3 +13823,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - 🔴 testid ของปุ่มแท็บคือ `exec-tab-<key>` — ห้ามตั้ง testid เนื้อหาแท็บชื่อซ้ำ
 - ยิงยกเลิกซ้ำ Lumos: ผลทุกครั้งอยู่ใน `audit_logs` (`follow.oldid_recancel`) อยู่แล้ว · `listRecancelRuns` อ่านประวัติ + ชื่อผู้รับสาย · `checkRecancelRun` ถามสถานะ event ซ้ำ (อ่านอย่างเดียวที่ Lumos) จดเป็น `follow.oldid_recancel_status`
 - จอ: ตั้งค่า › เชื่อมระบบภายนอก › การ์ด Lumos · แผนรหัสเดิม › "ประวัติยิงยกเลิก" (กางรายแผน · ปุ่ม "ถามสถานะล่าสุดจาก Lumos") · imported = รับคำสั่งแล้ว ไม่ได้แปลว่ายกเลิกแผนแล้ว
+
+### ภาพรวมงานสรรหา › กรอกเข้ามา — ช่องทาง 3 ชั้น (25 ต.ค. 2569)
+- `buildChannelFunnelTree` (`src/lib/channelFunnel.ts`): Facebook · TikTok · Webjob · Offline · อื่น ๆ/ไม่รู้ช่องทาง → ช่องทาง (`funnelChannelOf`) → ชื่อกลุ่ม/เพจ (`funnelSubOf`)
+- Choice เจ้าของ: LINE → Webjob · พนักงานแนะนำ/พนักงานเก่า → Offline · ไม่รู้ → แถวท้าย · % ทุกขั้นเทียบรายชื่อของแถว (ช่องรายชื่อ = % ของชั้น)
+- ชื่อกลุ่ม: ลิงก์ของเรา "Facebook Group · ชื่อกลุ่ม" · ใบจาก iRecruit ใช้ `sub` ของการลงทะเบียน (`irecruitSourceAt` → `RecruitAppFact.sourceSub`)
+- การ์ดตำแหน่งที่สมัคร / เหตุผลที่ไม่สำเร็จ คงแยกไว้ (เจ้าของ "2 อันนั้นไม่ต้อง แยกไว้แบบเดิม")

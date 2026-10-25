@@ -44,7 +44,7 @@ export async function loadInformDaysByPhone(from: string): Promise<Map<string, s
 }
 
 /** การลงทะเบียนใน iRecruit ต่อเบอร์ (ช่องทางหลัก) — ย้อน 60 วันก่อนต้นช่วง */
-export async function loadIrecruitRegsByPhone(from: string, to: string): Promise<Map<string, { at: string; channel: string }[]>> {
+export async function loadIrecruitRegsByPhone(from: string, to: string): Promise<Map<string, { at: string; channel: string; sub?: string | null }[]>> {
   const key = `${from}|${to}`;
   const hit = regCache.get(key);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
@@ -56,12 +56,13 @@ export async function loadIrecruitRegsByPhone(from: string, to: string): Promise
       WHERE r.deleted_at IS NULL AND r.created_at >= @from AND r.created_at < @to`,
     { from: shiftYmd(from, -60), to: shiftYmd(to, 2) },
   );
-  const value = new Map<string, { at: string; channel: string }[]>();
+  const value = new Map<string, { at: string; channel: string; sub?: string | null }[]>();
   for (const r of rows) {
     const k = String(r.k ?? '').trim();
     if (!/^\d{9}$/.test(k)) continue;
     const list = value.get(k) ?? [];
-    list.push({ at: iso(r.at), channel: mainChannelOf(r.ch, r.sub) });
+    // sub = ชื่อกลุ่ม/เพจย่อยของ iRecruit — กดช่องทางลงไปดูชื่อกลุ่ม (เจ้าของ 25 ต.ค. 2569)
+    list.push({ at: iso(r.at), channel: mainChannelOf(r.ch, r.sub), sub: (r.sub ?? '').trim() || null });
     value.set(k, list);
   }
   regCache.set(key, { at: Date.now(), value });

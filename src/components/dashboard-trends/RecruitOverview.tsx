@@ -56,7 +56,7 @@ import { TrendState } from './TrendParts';
 import JourneyNamesDialog from './JourneyNamesDialog';
 import ChannelPlacementTable from './ChannelPlacementTable';
 import ChannelFunnelTable from './ChannelFunnelTable';
-import { buildChannelFunnel } from '@/lib/channelFunnel';
+import { buildChannelFunnelTree } from '@/lib/channelFunnel';
 import { OVERVIEW_TABS, overviewTabOf } from '@/lib/recruitOverviewTabs';
 import { compareRowsOf, dailySeriesOf } from '@/lib/recruitCompare';
 import TrendLinesCard, { type ComparePeriod } from './TrendLinesCard';
@@ -168,7 +168,7 @@ const RecruitOverview: React.FC<{
       journey: buildRecruitJourney(cohort),
       delay: delayRows(cohort),
       daily: dailyRows(cohort, win.from, win.to),
-      channels: buildChannelFunnel(cohort),
+      channels: buildChannelFunnelTree(cohort),
       positions: positionRows(cohort),
       reasons: reasonGroups(cohort),
     };
@@ -392,7 +392,7 @@ const RecruitOverview: React.FC<{
               sub={data.errors.informs ? 'อ่านแจ้งเข้า ERP ไม่ได้' : 'แจ้งเข้า = มีใบแจ้งเข้า ERP หลังวันกรอก'}
               className="lg:col-span-2"
             >
-              <ChannelFunnelTable rows={view.channels.rows} total={view.channels.total} onOpen={(title, ids) => setNames({ title, ids })} />
+              <ChannelFunnelTable groups={view.channels.groups} total={view.channels.total} onOpen={(title, ids) => setNames({ title, ids })} />
             </OverviewCard>
             <OverviewCard icon={Briefcase} title="ตำแหน่งที่สมัคร" sub="10 อันดับ">
               <PositionList rows={view.positions} />
