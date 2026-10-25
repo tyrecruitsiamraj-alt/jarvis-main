@@ -69,12 +69,19 @@ describe('ช่องทาง: สนใจ / นัดได้', () => {
 });
 
 describe('หน้า + เส้น', () => {
-  it('ค่าตั้งต้นของ / = หน้าผู้บริหาร · หน้าแท็บเดิมยังเปิดได้ (?home=new) และมีปุ่มกลับ', () => {
+  it('ค่าตั้งต้นของ / = หน้าผู้บริหาร · หน้าแท็บเดิมรวมเป็นส่วนรายชื่อท้ายหน้า ไม่มีปุ่มพาออก (25 ต.ค. 2569)', () => {
     const v = read('src/lib/homeV3.ts');
     expect(v).toContain("return 'exec';");
     expect(read('src/pages/HomePage.tsx')).toContain('<HomeExecPage />');
-    expect(read('src/pages/HomeExecPage.tsx')).toContain('href="/?home=new"');
-    expect(read('src/pages/HomeAiSharePage.tsx')).toContain('href="/?home=exec"');
+    const exec = read('src/pages/HomeExecPage.tsx');
+    expect(exec).not.toContain('href="/?home=new"');
+    expect(exec).not.toContain('แบบแท็บเดิม');
+    expect(exec).toContain('<HomeAiSharePage embedded=');
+    expect(exec).toContain('exec-fold-ai');
+    // หน้าเดิมยังเปิดได้ที่ ?home=new (ทางถอย) และฝังแล้วไม่มีหัว/ปฏิทิน/แท็บใบขอซ้ำ
+    const old = read('src/pages/HomeAiSharePage.tsx');
+    expect(old).toContain('href="/?home=exec"');
+    expect(old).toContain('{embedded ? null : (');
   });
   it('ครบทุกส่วนที่เจ้าของสั่ง · มีกราฟ Interactive', () => {
     const page = read('src/pages/HomeExecPage.tsx');

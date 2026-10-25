@@ -234,8 +234,15 @@ function saveBlock(k: AiShareBlockKey) {
   }
 }
 
-const HomeAiSharePage: React.FC = () => {
-  const [win, setWin] = useState<AiShareWindow>(() => defaultAiShareWindow());
+/**
+ * ฝังในหน้าผู้บริหาร (เจ้าของ 25 ต.ค. 2569 Choice "รวมเป็นหน้าเดียว") — ช่วง/BU มาจากหน้าผู้บริหาร · ไม่มีหัวหน้า/ปฏิทิน/แท็บใบขอ
+ * (หน้าผู้บริหารมีใบขอของตัวเองแล้ว) · `pick` + `seq` = กดกล่อง AI บนหน้าผู้บริหารแล้วเปิดแท็บนั้น
+ */
+export type EmbeddedHome = { win: AiShareWindow; bu: string | null; pick: AiShareBlockKey | 'online' | null; seq: number };
+
+const HomeAiSharePage: React.FC<{ embedded?: EmbeddedHome }> = ({ embedded }) => {
+  const [ownWin, setWin] = useState<AiShareWindow>(() => defaultAiShareWindow());
+  const win = embedded?.win ?? ownWin;
   const [data, setData] = useState<AiShareResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [block, setBlock] = useState<AiShareBlockKey>(readBlock);
@@ -246,7 +253,8 @@ const HomeAiSharePage: React.FC = () => {
   const [online, setOnline] = useState(false);
   const [requestsView, setRequestsView] = useState(false);
   /** BU ที่เลือก (null = ทุก BU) — ส่งไปทุกเส้นของหน้า · บัญชีที่ถูกล็อก BU เซิร์ฟเวอร์บังคับเอง */
-  const [bu, setBu] = useState<string | null>(null);
+  const [ownBu, setBu] = useState<string | null>(null);
+  const bu = embedded ? embedded.bu : ownBu;
   /**
    * วันที่กดแท่งในกราฟ (หัวข้อติดตาม · 4 ต.ค. 2569) — กล่องตัวเลข/รายชื่อ/ผลโทร วิ่งตามวันนั้น
    * เหมือนเลือกวันนั้นบนปฏิทิน · null = ช่วงบนปฏิทิน · เปลี่ยนช่วง/หัวข้อแล้วล้าง
@@ -279,6 +287,12 @@ const HomeAiSharePage: React.FC = () => {
     setBlock(v);
     saveBlock(v);
   };
+  const embeddedPick = embedded?.pick ?? null;
+  const embeddedSeq = embedded?.seq ?? 0;
+  useEffect(() => {
+    if (embeddedPick) choose(embeddedPick === 'online' ? ONLINE_TAB : embeddedPick);
+    // เปิดแท็บตามที่กดจากหน้าผู้บริหารเท่านั้น
+  }, [embeddedPick, embeddedSeq]);
 
   /** กดเลขบนแถบต้องทำ = เปิดแท็บนั้น แล้วเลื่อนไปส่วนที่มีเลขเดียวกัน (รอส่วนนั้นขึ้นจอก่อน) */
   const goTodo = (tab: TodoTab, target: string) => {
@@ -475,9 +489,11 @@ const HomeAiSharePage: React.FC = () => {
   const picker = (
     <Tabs value={requestsView ? REQUESTS_TAB : online ? ONLINE_TAB : meta.key} onValueChange={choose}>
       <TabsList variant="glass" aria-label="เลือกหัวข้อ" className="h-auto flex-wrap justify-start gap-1 rounded-2xl">
-        <TabsTrigger value={REQUESTS_TAB} className="h-10 px-5 text-sm">
-          ใบขอ
-        </TabsTrigger>
+        {embedded ? null : (
+          <TabsTrigger value={REQUESTS_TAB} className="h-10 px-5 text-sm">
+            ใบขอ
+          </TabsTrigger>
+        )}
         <TabsTrigger
           value={ONLINE_TAB}
           className="h-10 px-5 text-sm" /* แถบกระจก (เจ้าของ 19 ต.ค. 2569 "เปลี่ยนเป็นกระจกทั้งหมด") */
@@ -796,9 +812,10 @@ const HomeAiSharePage: React.FC = () => {
 
   return (
     // ช่องไฟ + ระยะบรรทัดเท่ากันทั้งหน้า (รอบ 18 · `EVEN_TYPE`) — ป๊อป/แผงที่ลอยออกนอกหน้าใส่ของตัวเองอีกที
-    <div className={cn('relative isolate space-y-5 py-6 md:py-8', EVEN_TYPE)}>
+    <div className={cn('relative isolate space-y-5', embedded ? null : 'py-6 md:py-8', EVEN_TYPE)}>
       {/* หัวหน้า (โฉมแบบ Codex 8 ต.ค. 2569): ชื่อหน้า + สด · ปฏิทิน + BU ขวา → แถบหัวข้อเต็มแถว */}
       <div className="space-y-4">
+        {embedded ? null : (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-baseline gap-3">
             <h1 className="text-3xl font-medium text-foreground">หน้าหลัก</h1>
@@ -841,6 +858,7 @@ const HomeAiSharePage: React.FC = () => {
             )}
           </div>
         </div>
+        )}
         {/* แถบต้องทำเหนือแท็บ (21 ต.ค. 2569) — ใบขอ/ประกาศ + งานค้างของทุกแท็บ กดแล้วเปิดแท็บนั้น */}
         <HomeTodoStrip q={winQ} tick={tick} onGo={goTodo} />
         {picker}

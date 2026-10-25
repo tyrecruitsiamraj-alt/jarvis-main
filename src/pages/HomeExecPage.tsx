@@ -9,7 +9,7 @@
  *   4 กล่องบน → ต้องรีบ → ใครค้างเท่าไหร่ → ใบขอในช่วงนี้ → (พับไว้) ใบขอค้าง/ช่องทาง · เงินรายวัน/รายใบ → ติดตาม
  *   ค่าตั้งต้น = เดือนนี้ · กล่องเงินโชว์ "ลูกค้าหักจริง" กับ "ตามสัญญา (สูงสุด)" ขนาดเท่ากัน
  * ข้อมูล: `/api/home-money` (เงิน · นาฬิกา · สมการใบขอ) · `/api/request-pipeline` (ใบขอเปิด) · `/api/home-ai-share` (AI/คน)
- * 🔴 ชั้นคู่ขนาน: หน้านี้คือค่าตั้งต้นของ `/` · หน้าแท็บเดิมยังเปิดได้ที่ `?home=new` (ทางถอย · ปุ่มบนหัว)
+ * 🔴 ชั้นคู่ขนาน: หน้านี้คือค่าตั้งต้นของ `/` · หน้าแท็บเดิมรวมเข้ามาเป็นส่วน "รายชื่อ" ท้ายหน้าแล้ว (25 ต.ค. 2569 · ไม่มีปุ่มพาออก) · `?home=new` ยังเปิดได้ถ้าพิมพ์เอง = ทางถอย
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
@@ -34,7 +34,8 @@ import { PREQUEST_ID_PREFIX } from '@/lib/siamrajUnitRequestsApi';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { fetchHomeMoney, previousWindow, type HomeMoneyPayload } from '@/lib/homeMoneyApi';
 import { fetchHomeAiShare } from '@/lib/homeAiShareApi';
-import { sharesOfCalled, type AiShareResponse, type AiShareWindow } from '@/lib/homeAiShare';
+import { sharesOfCalled, type AiShareBlockKey, type AiShareResponse, type AiShareWindow } from '@/lib/homeAiShare';
+import HomeAiSharePage from '@/pages/HomeAiSharePage';
 import { byOwner, costliest, dueSoon, NO_OWNER, peopleNeeded, perDayOf, scaleOf, staleOf, STALE_DAYS, thisMonthWindow, type UrgentRow } from '@/lib/homeExec';
 import { fetchRequestPipeline } from '@/lib/requestPipelineApi';
 import type { RequestPipelineResponse } from '@/lib/requestPipelineTypes';
@@ -54,6 +55,10 @@ const BU_OPTIONS = [...new Set(Object.values(SITE_BU_TO_DEPT))];
 const LIVE_MS = 60_000;
 /** ช่วง "ทั้งหมด" ของปฏิทิน (start null) = นับตั้งแต่ข้อมูลเก่าสุดของสมุด */
 const ALL_FROM = '2024-01-01';
+
+type AiPick = AiShareBlockKey | 'online';
+/** กดแถวในกล่อง AI = เปิดแท็บของเรื่องนั้นในส่วนรายชื่อ (ส่งคนแทนอยู่ในแท็บติดตาม แยกทีมในนั้น) */
+const AI_ROW_PICK: Record<string, AiPick> = { start: 'follow', replace: 'follow', applicants: 'applicants', matching: 'matching' };
 
 /** AI ทำแทนกี่ % (ของที่โทรแล้ว) — หัวข้อที่เจ้าของระบุ 24 ต.ค. 2569 */
 function aiRows(d: AiShareResponse | null): Array<{ key: string; label: string; pct: number | null; called: number }> {
@@ -240,6 +245,14 @@ const HomeExecPage: React.FC = () => {
   const owners = useMemo(() => byOwner(openReqs, today), [openReqs, today]);
   const drill = useDrill();
   const [foldRequests, setFoldRequests] = useState(false);
+  /** ส่วนติดตาม · ดูแล · ผู้สมัคร · จับคู่งาน · ทีม Online (ของหน้าแท็บเดิม รวมมาไว้หน้าเดียว 25 ต.ค. 2569) */
+  const [foldAi, setFoldAi] = useState(false);
+  const [aiPick, setAiPick] = useState<{ pick: AiPick | null; seq: number }>({ pick: null, seq: 0 });
+  const openAi = (pick: AiPick) => {
+    setAiPick((p) => ({ pick, seq: p.seq + 1 }));
+    setFoldAi(true);
+    window.setTimeout(() => document.querySelector('[data-testid="exec-fold-ai"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+  };
   const byNo = useMemo(() => new Map(openReqs.map((r) => [r.requestNo, r])), [openReqs]);
   const rowsOf = (list: ReadonlyArray<{ requestNo: string }>): MoneyRequest[] =>
     list.map((x) => byNo.get(x.requestNo)).filter((r): r is MoneyRequest => Boolean(r));
@@ -289,9 +302,6 @@ const HomeExecPage: React.FC = () => {
               </SelectContent>
             </Select>
           )}
-          <Button asChild variant="outline" size="sm">
-            <a href="/?home=new">แบบแท็บเดิม</a>
-          </Button>
         </div>
       </div>
 
@@ -396,7 +406,13 @@ const HomeExecPage: React.FC = () => {
                 </div>
               ))
             : rows.map((r) => (
-                <a key={r.key} href="/?home=new" className="block space-y-1 rounded-lg hover:bg-muted/50" data-testid={`exec-ai-${r.key}`}>
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() => openAi(AI_ROW_PICK[r.key] ?? 'follow')}
+                  className="block w-full space-y-1 rounded-lg text-left hover:bg-muted/50"
+                  data-testid={`exec-ai-${r.key}`}
+                >
                   <span className="flex justify-between gap-2 text-xs">
                     <span className="text-muted-foreground">{r.label}</span>
                     <span className={cn('font-medium tabular-nums', r.pct == null ? 'text-muted-foreground' : r.pct >= 100 ? TONE.success.value : 'text-foreground')}>
@@ -404,7 +420,7 @@ const HomeExecPage: React.FC = () => {
                     </span>
                   </span>
                   <Progress value={r.pct ?? 0} className="h-1.5" aria-label={`${r.label} AI ${r.pct ?? 0}%`} />
-                </a>
+                </button>
               ))}
           <span className="block text-xs text-muted-foreground">เป้า 100%</span>
         </Card>
@@ -711,19 +727,28 @@ const HomeExecPage: React.FC = () => {
         sub="หน่วย: รายชื่อ"
         testId="exec-follow"
         right={
-          <Button asChild variant="outline" size="sm">
-            <a href="/?home=new">ดูรายชื่อ</a>
+          <Button type="button" variant="outline" size="sm" onClick={() => openAi('follow')}>
+            ดูรายชื่อ
           </Button>
         }
       >
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {(
             [
-              ['ติดตามคนเริ่มงาน · ส่งคนแทน', ai?.follow ?? null],
-              ['ดูแลหลังเริ่มงาน', ai?.aftercare ?? null],
+              ['ติดตามคนเริ่มงาน · ส่งคนแทน', ai?.follow ?? null, 'follow'],
+              ['ดูแลหลังเริ่มงาน', ai?.aftercare ?? null, 'aftercare'],
             ] as const
-          ).map(([title, c]) => (
-            <Card key={title} variant="solid" className="space-y-3 p-4">
+          ).map(([title, c, pick]) => (
+            <Card
+              key={title}
+              variant="solid"
+              role="button"
+              tabIndex={0}
+              onClick={() => openAi(pick)}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openAi(pick)}
+              className="cursor-pointer space-y-3 p-4 transition-colors hover:bg-muted/50"
+              data-testid={`exec-follow-${pick}`}
+            >
               <span className="block text-sm font-medium text-foreground">{title}</span>
               <div className="grid grid-cols-4 gap-2">
                 {(
@@ -751,6 +776,9 @@ const HomeExecPage: React.FC = () => {
           ))}
         </div>
       </HomeSection>
+      <Folded title="รายชื่อ · ติดตาม · ดูแล · ผู้สมัคร · จับคู่งาน · ทีม Online" testId="exec-fold-ai" open={foldAi} onOpenChange={setFoldAi}>
+        <HomeAiSharePage embedded={{ win, bu, ...aiPick }} />
+      </Folded>
       <ExecDrill drill={drill} all={openReqs} today={today} />
     </div>
   );
