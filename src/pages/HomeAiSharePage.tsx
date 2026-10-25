@@ -235,8 +235,8 @@ function saveBlock(k: AiShareBlockKey) {
 }
 
 /**
- * ฝังในหน้าผู้บริหาร (เจ้าของ 25 ต.ค. 2569 Choice "รวมเป็นหน้าเดียว") — ช่วง/BU มาจากหน้าผู้บริหาร · ไม่มีหัวหน้า/ปฏิทิน/แท็บใบขอ
- * (หน้าผู้บริหารมีใบขอของตัวเองแล้ว) · `pick` + `seq` = กดกล่อง AI บนหน้าผู้บริหารแล้วเปิดแท็บนั้น
+ * ฝังในหน้าหลัก (เจ้าของ 25 ต.ค. 2569 "รวมเป็นหน้าเดียว" → "แยกแท็บแบบเดิม + แท็บภาพรวม") — ช่วง/BU/แท็บ/แถบต้องทำ เป็นของหน้าหลัก
+ * ที่นี่โชว์แค่เนื้อหาของแท็บที่ `pick` เลือก · `seq` = กดซ้ำแท็บเดิมก็สั่งใหม่ได้
  */
 export type EmbeddedHome = { win: AiShareWindow; bu: string | null; pick: AiShareBlockKey | 'online' | null; seq: number };
 
@@ -245,12 +245,14 @@ const HomeAiSharePage: React.FC<{ embedded?: EmbeddedHome }> = ({ embedded }) =>
   const win = embedded?.win ?? ownWin;
   const [data, setData] = useState<AiShareResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [block, setBlock] = useState<AiShareBlockKey>(readBlock);
+  const [block, setBlock] = useState<AiShareBlockKey>(() =>
+    embedded?.pick && embedded.pick !== 'online' ? embedded.pick : readBlock(),
+  );
   /**
    * แท็บทีม Online (เจ้าของ 8 ต.ค. 2569 "แยกหน้าได้จาก 4 แท็บเป็น 5 แท็บ") — ใบขอ → ประกาศ → ผลประกาศ → ประเภทงาน → BU
    * แยกจาก `block` (ไม่ใช่ก้อนของตัวนับกล่องเดิม) · เลือกแล้วส่วนของหัวข้อเดิมซ่อนทั้งหมด
    */
-  const [online, setOnline] = useState(false);
+  const [online, setOnline] = useState(() => embedded?.pick === 'online');
   const [requestsView, setRequestsView] = useState(false);
   /** BU ที่เลือก (null = ทุก BU) — ส่งไปทุกเส้นของหน้า · บัญชีที่ถูกล็อก BU เซิร์ฟเวอร์บังคับเอง */
   const [ownBu, setBu] = useState<string | null>(null);
@@ -860,8 +862,9 @@ const HomeAiSharePage: React.FC<{ embedded?: EmbeddedHome }> = ({ embedded }) =>
         </div>
         )}
         {/* แถบต้องทำเหนือแท็บ (21 ต.ค. 2569) — ใบขอ/ประกาศ + งานค้างของทุกแท็บ กดแล้วเปิดแท็บนั้น */}
-        <HomeTodoStrip q={winQ} tick={tick} onGo={goTodo} />
-        {picker}
+        {/* ฝังในหน้าหลัก: แถบต้องทำ + แท็บเป็นของหน้าหลัก (25 ต.ค. 2569 "แยกแท็บแบบเดิม") */}
+        {embedded ? null : <HomeTodoStrip q={winQ} tick={tick} onGo={goTodo} />}
+        {embedded ? null : picker}
       </div>
 
       {error ? (

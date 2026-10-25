@@ -1,12 +1,11 @@
 /** ตัวดึง `/api/home-money` — หน้าหลักผู้บริหาร ก้อนเงิน + นาฬิกา (24 ต.ค. 2569) */
 import { apiFetch } from '@/lib/apiFetch';
-import type { HomeMoneyResponse, Workload } from '@/lib/homeMoney';
+import type { HomeMoneyResponse } from '@/lib/homeMoney';
 
 export type HomeMoneyPayload = HomeMoneyResponse & {
-  workload?: Workload | null;
   /** สายดูแลหลังเริ่มงานที่นัดไว้ ยังไม่ถึงคิว — การ์ดดูแลบอก "รอโทร N สาย · เริ่ม …" */
   aftercareUpcoming?: { calls: number; people: number; firstAt: string | null } | null;
-  errors?: Partial<Record<'replacement' | 'workload', string>>;
+  errors?: Partial<Record<'replacement', string>>;
 };
 
 export async function fetchHomeMoney(q: { from: string | null; to: string | null; bu?: string | null }): Promise<HomeMoneyPayload> {

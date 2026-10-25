@@ -8,7 +8,7 @@ import { buildPenaltyLedger } from '@/lib/requestPenaltyLedger';
 import { buildHomeMoney, ledgerByRequest } from '@/lib/homeMoney';
 import { previousWindow } from '@/lib/homeMoneyApi';
 import { channelInterestOf } from '@/lib/channelPlatforms';
-import { byOwner, costliest, dueSoon, NO_OWNER, peopleNeeded, scaleOf, staleOf, thisMonthWindow } from '@/lib/homeExec';
+import { byOwner, costliest, dueSoon, NO_OWNER, staleOf, thisMonthWindow } from '@/lib/homeExec';
 import type { MoneyRequest } from '@/lib/homeMoney';
 
 const read = (f: string) => fs.readFileSync(path.join(process.cwd(), f), 'utf8');
@@ -69,7 +69,7 @@ describe('ช่องทาง: สนใจ / นัดได้', () => {
 });
 
 describe('หน้า + เส้น', () => {
-  it('ค่าตั้งต้นของ / = หน้าผู้บริหาร · หน้าแท็บเดิมรวมเป็นส่วนรายชื่อท้ายหน้า ไม่มีปุ่มพาออก (25 ต.ค. 2569)', () => {
+  it('ค่าตั้งต้นของ / = หน้าผู้บริหาร · แท็บภาพรวม + แท็บชุดเดียวกับหน้าแท็บเดิม ไม่มีปุ่มพาออก (25 ต.ค. 2569)', () => {
     const v = read('src/lib/homeV3.ts');
     expect(v).toContain("return 'exec';");
     expect(read('src/pages/HomePage.tsx')).toContain('<HomeExecPage />');
@@ -77,7 +77,10 @@ describe('หน้า + เส้น', () => {
     expect(exec).not.toContain('href="/?home=new"');
     expect(exec).not.toContain('แบบแท็บเดิม');
     expect(exec).toContain('<HomeAiSharePage embedded=');
-    expect(exec).toContain('exec-fold-ai');
+    expect(exec).toContain('data-testid="exec-tabs"');
+    for (const k of ["key: 'overview', label: 'ภาพรวม'", "key: 'requests', label: 'ใบขอ'", "key: 'online', label: 'ทีม Online'", "key: 'follow'", "key: 'aftercare'", "key: 'applicants'", "key: 'matching'"])
+      expect(exec).toContain(k);
+    expect(exec).toContain('pick: tab.key, seq: tab.seq');
     // หน้าเดิมยังเปิดได้ที่ ?home=new (ทางถอย) และฝังแล้วไม่มีหัว/ปฏิทิน/แท็บใบขอซ้ำ
     const old = read('src/pages/HomeAiSharePage.tsx');
     expect(old).toContain('href="/?home=exec"');
@@ -127,18 +130,12 @@ describe('30 วินาที: ต้องรีบ · ใครค้าง�
       { name: NO_OWNER, requests: 2, overdue: 2, missing: 5, perDay: 750, closed: 0, filled: 0 },
     ]);
   });
-  it('Scale: คนทำได้วันละ = งาน ÷ คน-วัน · งานเพิ่ม X ต้องใช้คนเพิ่มปัดขึ้น', () => {
-    const sc = scaleOf({ staffActions: 300, staffPeople: 5, staffPersonDays: 50, aiCalls: 1000 }, '2026-10-01', '2026-10-10')!;
-    expect(sc).toEqual({ perPersonDay: 6, staffPeople: 5, staffPerDay: 30, aiPerDay: 100, days: 10 });
-    expect(peopleNeeded(50, sc.perPersonDay)).toBe(9);
-    expect(peopleNeeded(50, null)).toBeNull();
-  });
   it('ค่าตั้งต้น = เดือนนี้', () => {
     expect(thisMonthWindow('2026-10-24')).toEqual({ from: '2026-10-01', to: '2026-10-24' });
   });
   it('หน้าโชว์ลูกค้าหักจริงกับตามสัญญาตัวเท่ากัน · ส่วนยาวพับไว้', () => {
     const page = read('src/pages/HomeExecPage.tsx');
-    for (const id of ['exec-money-actual', 'exec-money-contract', 'exec-urgent-costly', 'exec-urgent-soon', 'exec-stale', 'exec-owners', 'exec-channels', 'exec-scale', 'exec-fold-requests', 'exec-fold-money']) {
+    for (const id of ['exec-money-actual', 'exec-money-contract', 'exec-urgent-costly', 'exec-urgent-soon', 'exec-stale', 'exec-owners', 'exec-channels', 'exec-fold-money']) {
       expect(page).toContain(id);
     }
   });
@@ -211,6 +208,29 @@ describe('มือถือ 375 (ตรวจ 25 ต.ค. 2569)', () => {
   it('หัวส่วนพับขึ้นบรรทัดใหม่ได้ ลูกศรไม่ตกขอบ', () => {
     expect(page).toContain('justify-between whitespace-normal');
     expect(page).toContain("'h-4 w-4 shrink-0 transition-transform'");
+  });
+});
+
+describe('แท็บ + คำบนจอ (เจ้าของ 25 ต.ค. 2569 ค่ำ)', () => {
+  const page = read('src/pages/HomeExecPage.tsx');
+  it('ถอด "AI กับคน ถ้างานเพิ่ม" ออกหมด ทั้งจอ ตัวคำนวณ และเส้นดึงข้อมูล', () => {
+    expect(page).not.toContain('ถ้างานเพิ่ม');
+    expect(page).not.toContain('Slider');
+    expect(read('src/lib/homeExec.ts')).not.toContain('scaleOf');
+    expect(read('api/_handlers/home-money.ts')).not.toContain('loadWorkload');
+  });
+  it('ชื่อที่เจ้าของกำหนด: ใบที่โดนค่าปรับ · ใกล้ถึงวันที่ต้องการ · งานของเจ้าหน้าที่ · ใบขอ', () => {
+    for (const k of ['title="ใบที่โดนค่าปรับ"', 'title="ใกล้ถึงวันที่ต้องการ"', 'title="งานของเจ้าหน้าที่"', 'title="ใบขอ"']) expect(page).toContain(k);
+    for (const old of ['เสียวันละมากสุด', 'ถึงวันที่ต้องการใน 3 วัน', 'ใครค้างเท่าไหร่ · ใครปิดได้', 'ใบขอในช่วงนี้']) expect(page).not.toContain(old);
+  });
+  it('ใบขอ: จำนวนคนอยู่กล่องเดียวกับจำนวนใบ · สมการยังลงตัวทั้งสองหน่วย', () => {
+    expect(page).toContain("['ปิดครบ', flow?.closedRequests, flow?.filled, 'หาได้ '");
+    expect(page).toContain('exec-flow-req-sum');
+    expect(page).toContain('exec-flow-pos-sum');
+  });
+  it('ใบค้างเกิน 90 วันอยู่ในกล่องเสียเงิน', () => {
+    const tile = page.slice(page.indexOf('data-testid="exec-money-tile"'), page.indexOf('label="เหลือหา (ใบขอจริง)"'));
+    expect(tile).toContain('data-testid="exec-stale"');
   });
 });
 

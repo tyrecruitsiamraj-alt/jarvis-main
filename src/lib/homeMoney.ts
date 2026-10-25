@@ -37,9 +37,6 @@ export type MoneyRequest = {
   amount: Record<LedgerMode, { days: number; personDays: number; fine: number; deduct: number; coveredPersonDays: number }>;
 };
 
-/** งานของคน vs AI ในช่วง — ตัวคิด Scale (`api/_handlers/home-money.ts` loadWorkload) */
-export type Workload = { staffActions: number; staffPeople: number; staffPersonDays: number; aiCalls: number };
-
 export type ClockStat = { n: number; avg: number | null; median: number | null };
 
 export type HomeMoneyResponse = {

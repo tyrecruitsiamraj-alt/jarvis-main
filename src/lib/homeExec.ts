@@ -110,25 +110,3 @@ export function byOwner(requests: readonly MoneyRequest[], today: string): Owner
 export function thisMonthWindow(today: string): { from: string; to: string } {
   return { from: `${today.slice(0, 7)}-01`, to: today };
 }
-
-/**
- * ═══ AI กับคน ถ้าจะขยาย ต้องใช้อย่างละเท่าไหร่ (เจ้าของ 24 ต.ค. 2569 "อยาก Scale ได้ว่าอย่างละเท่าไหร่") ═══
- * คนทำได้วันละ = งานที่ลงผล ÷ คน-วันที่ลงผลจริง · AI ทำได้วันละ = สายที่ได้ผล ÷ วันในช่วง (AI ไม่มีเพดานต่อวันจากฝั่งเรา)
- * งานเพิ่มวันละ X ⇒ ใช้คนเพิ่ม = X ÷ คนทำได้วันละ (ปัดขึ้น) · หรือให้ AI โทรเพิ่ม X สาย
- */
-export type ScaleStat = { perPersonDay: number | null; staffPeople: number; staffPerDay: number; aiPerDay: number; days: number };
-export function scaleOf(w: { staffActions: number; staffPeople: number; staffPersonDays: number; aiCalls: number } | null | undefined, from: string, to: string): ScaleStat | null {
-  if (!w) return null;
-  const days = Math.max(1, Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1);
-  return {
-    perPersonDay: w.staffPersonDays > 0 ? Math.round((w.staffActions / w.staffPersonDays) * 10) / 10 : null,
-    staffPeople: w.staffPeople,
-    staffPerDay: Math.round((w.staffActions / days) * 10) / 10,
-    aiPerDay: Math.round((w.aiCalls / days) * 10) / 10,
-    days,
-  };
-}
-export function peopleNeeded(extraPerDay: number, perPersonDay: number | null): number | null {
-  if (!perPersonDay || perPersonDay <= 0) return null;
-  return Math.ceil(Math.max(0, extraPerDay) / perPersonDay);
-}

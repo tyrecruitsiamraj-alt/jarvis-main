@@ -22,13 +22,10 @@ import { logError } from '../_lib/logger.js';
 import { groupReplacements } from './request-pipeline.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
-import type { Workload } from '../../src/lib/homeMoney.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
 import { followBuJoin, followBuSql } from '../_lib/homeBuSql.js';
 
 const FOLLOW = tableInAppSchema('follow_entries');
-const CONTACTS = tableInAppSchema('application_contact_logs');
-const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 
 /**
  * งานของคน vs AI ในช่วง (ตัวคิด Scale · เจ้าของ 24 ต.ค. 2569 "อยาก Scale ได้ว่าอย่างละเท่าไหร่")
@@ -54,33 +51,6 @@ async function loadAftercareUpcoming(bu: string | null): Promise<AftercareUpcomi
     return { calls: Number(r?.calls ?? 0), people: Number(r?.people ?? 0), firstAt: first };
   } catch (e) {
     logError('home-money: aftercare upcoming', e);
-    return null;
-  }
-}
-
-async function loadWorkload(from: string, to: string): Promise<Workload | null> {
-  try {
-    const { rows } = await dbQuery<{ actions: number; people: number; person_days: number; ai_calls: number }>(
-      `with acts as (
-         select staff_called_by as who, (staff_called_at at time zone 'Asia/Bangkok')::date as d
-           from ${FOLLOW}
-          where staff_called_by is not null and staff_called_at >= $1::date - interval '7 hours' and staff_called_at < $2::date + interval '17 hours'
-         union all
-         select created_by as who, (created_at at time zone 'Asia/Bangkok')::date as d
-           from ${CONTACTS}
-          where created_by is not null and created_at >= $1::date - interval '7 hours' and created_at < $2::date + interval '17 hours'
-       )
-       select (select count(*) from acts)::int as actions,
-              (select count(distinct who) from acts)::int as people,
-              (select count(*) from (select distinct who, d from acts) x)::int as person_days,
-              (select count(*) from ${QUEUE}
-                where first_result_at >= $1::date - interval '7 hours' and first_result_at < $2::date + interval '17 hours')::int as ai_calls`,
-      [from, to],
-    );
-    const r = rows[0];
-    return r ? { staffActions: r.actions, staffPeople: r.people, staffPersonDays: r.person_days, aiCalls: r.ai_calls } : null;
-  } catch (e) {
-    logError('home-money: งานคน/AI', e);
     return null;
   }
 }
@@ -138,10 +108,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     const raw = await loadPenaltyLedgerRaw(departmentScope);
     const rows = bu ? raw.rows.filter((r) => r.bu === bu) : raw.rows;
-    const [replacements, owners, workload, aftercareUpcoming] = await Promise.all([
+    const [replacements, owners, aftercareUpcoming] = await Promise.all([
       loadReplacements([...new Set(rows.map((r) => r.site))]),
       loadOwners([...new Set(rows.map((r) => r.requestNo))]),
-      loadWorkload(from, to > today ? today : to),
       loadAftercareUpcoming(bu),
     ]);
     const ledger = buildPenaltyLedger(rows, raw.informs, today, { from, to: to > today ? today : to }, replacements ?? {});
@@ -156,11 +125,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
         forcedBu: forcedBu != null,
         ownerOf: (no) => owners.get(no.trim().toUpperCase()) ?? null,
       }),
-      workload,
       aftercareUpcoming,
       errors: {
         ...(replacements ? {} : { replacement: 'อ่านส่งคนแทนไม่ได้ — ยอดนี้ยังไม่หักวันที่มีคนแทน' }),
-        ...(workload ? {} : { workload: 'อ่านงานของคน/AI ไม่ได้' }),
       },
     };
     res.setHeader?.('Cache-Control', 'no-store');
