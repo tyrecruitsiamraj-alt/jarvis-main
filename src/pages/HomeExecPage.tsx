@@ -36,7 +36,7 @@ import { fetchHomeMoney, previousWindow, type HomeMoneyPayload } from '@/lib/hom
 import { fetchHomeAiShare } from '@/lib/homeAiShareApi';
 import { sharesOfCalled, type AiShareBlockKey, type AiShareResponse, type AiShareWindow } from '@/lib/homeAiShare';
 import HomeAiSharePage from '@/pages/HomeAiSharePage';
-import { byOwner, costliest, dueSoon, NO_OWNER, peopleNeeded, perDayOf, reasonsOf, scaleOf, staleOf, STALE_DAYS, thisMonthWindow, type UrgentRow } from '@/lib/homeExec';
+import { byOwner, costliest, dueSoon, NO_OWNER, peopleNeeded, perDayOf, reasonsOf, scaleOf, staleOf, STALE_DAYS, thisMonthWindow, type OwnerRow, type UrgentRow } from '@/lib/homeExec';
 import { fetchRequestPipeline } from '@/lib/requestPipelineApi';
 import type { RequestPipelineResponse } from '@/lib/requestPipelineTypes';
 import { channelInterestOf } from '@/lib/channelPlatforms';
@@ -149,7 +149,7 @@ function UrgentCard({
                 onClick={() => onOpen(r.requestNo)}
               >
                 <span className="min-w-0">
-                  <span className="block truncate text-sm text-foreground">{[r.unit, r.position].filter(Boolean).join(' · ')}</span>
+                  <span className="line-clamp-2 text-sm text-foreground">{[r.unit, r.position].filter(Boolean).join(' · ')}</span>
                   <span className="block text-xs tabular-nums text-muted-foreground">
                     {r.requestNo} · ขาด {NUM.format(r.missing)} คน · {r.owner}
                   </span>
@@ -184,9 +184,9 @@ function Folded({
   return (
     <Collapsible open={open} onOpenChange={setOpen} data-testid={testId}>
       <CollapsibleTrigger asChild>
-        <Button type="button" variant="outline" className="w-full justify-between rounded-xl" aria-expanded={open}>
+        <Button type="button" variant="outline" className="h-auto w-full justify-between whitespace-normal rounded-xl py-2 text-left" aria-expanded={open}>
           {title}
-          <ChevronDown className={cn('h-4 w-4 transition-transform', open && 'rotate-180')} aria-hidden />
+          <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', open && 'rotate-180')} aria-hidden />
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-4">{open ? children : null}</CollapsibleContent>
@@ -270,6 +270,15 @@ const HomeExecPage: React.FC = () => {
     openReqs
       .filter((r) => r.amount.need.fine + r.amount.need.deduct > 0)
       .sort((a, b) => b.amount.need.fine + b.amount.need.deduct - (a.amount.need.fine + a.amount.need.deduct));
+  const openOwner = (o: OwnerRow) =>
+    openList(
+      `ใบของ ${o.name}`,
+      openReqs
+        .filter((r) => (r.owner?.trim() || NO_OWNER) === o.name && (r.open || r.closedInWindow || r.filledInWindow > 0))
+        .sort((a, b) => Number(b.open) - Number(a.open) || perDayOf(b) - perDayOf(a)),
+      null,
+      `ค้าง ${NUM.format(o.requests)} · ปิดครบ ${NUM.format(o.closed)}`,
+    );
   const flowRows = (pick: (f: NonNullable<MoneyRequest['flow']>) => boolean) => openReqs.filter((r) => r.flow && pick(r.flow));
   const stale = useMemo(() => staleOf(openReqs, today), [openReqs, today]);
   const [staleOpen, setStaleOpen] = useState(false);
@@ -495,7 +504,29 @@ const HomeExecPage: React.FC = () => {
 
       {/* ── ใครค้างเท่าไหร่ (เจ้าหน้าที่สรรหาของใบขอ) ── */}
       <HomeSection title="ใครค้างเท่าไหร่ · ใครปิดได้" sub="ค้าง = ณ วันนี้ · ปิดครบ/หาได้ = ในช่วงที่เลือก" testId="exec-owners">
-        <div className="overflow-x-auto">
+        {/* มือถือ: ตาราง 7 ช่องล้นจอ (เห็นแค่ 2 ช่องแรก · ตรวจ 25 ต.ค. 2569) ⇒ คนละแถว เลขครบทุกช่อง */}
+        <ul className="divide-y divide-border sm:hidden" data-testid="exec-owners-phone">
+          {owners.length === 0 ? (
+            <li className="py-4 text-center text-sm text-muted-foreground">{moneyNow ? 'ไม่มีใบค้าง' : '—'}</li>
+          ) : (
+            (showAllOwners ? owners : owners.slice(0, 8)).map((o) => (
+              <li key={o.name}>
+                <button type="button" className="w-full space-y-1 rounded-lg py-2 text-left hover:bg-muted/50" onClick={() => openOwner(o)}>
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="text-sm font-medium text-foreground">{o.name}</span>
+                    <span className="text-sm font-medium tabular-nums text-foreground">{BAHT.format(o.perDay)} บาท/วัน</span>
+                  </span>
+                  <span className="block text-xs tabular-nums text-muted-foreground">
+                    ค้าง {NUM.format(o.requests)} ใบ · <span className={o.overdue > 0 ? TONE.danger.value : undefined}>เลยวัน {NUM.format(o.overdue)}</span> · ขาด{' '}
+                    {NUM.format(o.missing)} คน · <span className={o.closed > 0 ? TONE.success.value : undefined}>ปิดครบ {NUM.format(o.closed)}</span> · หาได้{' '}
+                    {NUM.format(o.filled)} คน
+                  </span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+        <div className="hidden overflow-x-auto sm:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -526,16 +557,7 @@ const HomeExecPage: React.FC = () => {
                     key={o.name}
                     data-testid="exec-owner-row"
                     className="cursor-pointer"
-                    onClick={() =>
-                      openList(
-                        `ใบของ ${o.name}`,
-                        openReqs
-                          .filter((r) => (r.owner?.trim() || NO_OWNER) === o.name && (r.open || r.closedInWindow || r.filledInWindow > 0))
-                          .sort((a, b) => Number(b.open) - Number(a.open) || perDayOf(b) - perDayOf(a)),
-                        null,
-                        `ค้าง ${NUM.format(o.requests)} · ปิดครบ ${NUM.format(o.closed)}`,
-                      )
-                    }
+                    onClick={() => openOwner(o)}
                   >
                     <TableCell className="text-sm text-foreground">{o.name}</TableCell>
                     <TableCell className="text-right tabular-nums">{NUM.format(o.requests)}</TableCell>

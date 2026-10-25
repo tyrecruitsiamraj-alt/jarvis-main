@@ -196,3 +196,21 @@ describe('อ่านหน้าแบบผู้บริหาร 4 ข้�
   });
 });
 
+describe('มือถือ 375 (ตรวจ 25 ต.ค. 2569)', () => {
+  const page = read('src/pages/HomeExecPage.tsx');
+  const drill = read('src/components/home-exec/ExecDrill.tsx');
+  it('ใครค้างเท่าไหร่: มือถือเป็นรายการคนละแถว เลขครบ · ตารางจาก sm ขึ้นไป', () => {
+    expect(page).toContain('data-testid="exec-owners-phone"');
+    expect(page).toContain('className="divide-y divide-border sm:hidden"');
+    expect(page).toContain('className="hidden overflow-x-auto sm:block"');
+  });
+  it('แผงรายละเอียด: มือถือซ่อน 3 ช่องขวาแล้วบอกในบรรทัดใบขอ · ไม่มีความกว้างสุ่ม', () => {
+    expect(drill).toContain('sm:hidden');
+    expect(drill).not.toMatch(/min-w-\[/);
+  });
+  it('หัวส่วนพับขึ้นบรรทัดใหม่ได้ ลูกศรไม่ตกขอบ', () => {
+    expect(page).toContain('justify-between whitespace-normal');
+    expect(page).toContain("'h-4 w-4 shrink-0 transition-transform'");
+  });
+});
+

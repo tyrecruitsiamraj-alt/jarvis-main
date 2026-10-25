@@ -155,9 +155,9 @@ export default function ExecDrill({
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs">ใบขอ</TableHead>
-                  <TableHead className="whitespace-nowrap text-xs">เจ้าหน้าที่</TableHead>
-                  <TableHead className="whitespace-nowrap text-right text-xs">ขาด (คน)</TableHead>
-                  <TableHead className="whitespace-nowrap text-right text-xs">เสียวันละ (บาท)</TableHead>
+                  <TableHead className="hidden whitespace-nowrap text-xs sm:table-cell">เจ้าหน้าที่</TableHead>
+                  <TableHead className="hidden whitespace-nowrap text-right text-xs sm:table-cell">ขาด (คน)</TableHead>
+                  <TableHead className="hidden whitespace-nowrap text-right text-xs sm:table-cell">เสียวันละ (บาท)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -179,18 +179,23 @@ export default function ExecDrill({
                         onClick={() => setOpenRow(isOpen ? null : r.requestNo)}
                         data-testid="exec-drill-row"
                       >
-                        <TableCell className="min-w-[220px]">
+                        <TableCell className="min-w-0">
                           <span className="flex items-start gap-2">
                             <ChevronDown className={cn('mt-0.5 h-4 w-4 shrink-0 transition-transform', !isOpen && '-rotate-90')} aria-hidden />
                             <span>
                               <span className="block text-sm text-foreground">{(sameUnit ? [r.position] : [r.unit, r.position]).filter(Boolean).join(' · ')}</span>
                               <span className="block text-xs tabular-nums text-muted-foreground">{r.requestNo}</span>
+                              {/* มือถือ: 3 ช่องขวาซ่อน ⇒ บอกในบรรทัดนี้แทน (ตรวจจอ 375 · 25 ต.ค. 2569) */}
+                              <span className="block text-xs tabular-nums text-muted-foreground sm:hidden">
+                                {r.owner ?? '—'} · ขาด {r.open ? NUM.format(missing) : '0'} คน ·{' '}
+                                <span className={late ? TONE.danger.value : undefined}>เสียวันละ {late ? BAHT.format(perDayOf(r)) : '0'}</span>
+                              </span>
                             </span>
                           </span>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap text-sm">{r.owner ?? <span className="text-muted-foreground">—</span>}</TableCell>
-                        <TableCell className="text-right tabular-nums">{r.open ? NUM.format(missing) : '0'}</TableCell>
-                        <TableCell className={cn('text-right tabular-nums', late ? TONE.danger.value : 'text-muted-foreground')}>
+                        <TableCell className="hidden whitespace-nowrap text-sm sm:table-cell">{r.owner ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                        <TableCell className="hidden text-right tabular-nums sm:table-cell">{r.open ? NUM.format(missing) : '0'}</TableCell>
+                        <TableCell className={cn('hidden text-right tabular-nums sm:table-cell', late ? TONE.danger.value : 'text-muted-foreground')}>
                           {late ? BAHT.format(perDayOf(r)) : '0'}
                         </TableCell>
                       </TableRow>,
@@ -201,7 +206,7 @@ export default function ExecDrill({
                         <TableRow key={`${r.requestNo}-d`} data-testid="exec-drill-detail">
                           <TableCell colSpan={4} className="bg-muted/40">
                             <div className="space-y-3 p-1 text-xs text-muted-foreground">
-                              <div className="grid grid-cols-2 gap-x-6 gap-y-1 tabular-nums sm:grid-cols-3">
+                              <div className="grid grid-cols-1 gap-x-6 gap-y-1 tabular-nums sm:grid-cols-3">
                                 <span>วันคีย์ {thaiDate(r.keyYmd)}</span>
                                 <span>วันที่ต้องการ {r.needYmd ? thaiDate(r.needYmd) : '—'}</span>
                                 <span>{r.endYmd ? `จบ ${thaiDate(r.endYmd)}` : r.open ? 'ยังเปิด' : 'ได้คนครบ'}</span>
