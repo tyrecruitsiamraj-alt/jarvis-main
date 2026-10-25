@@ -27,6 +27,7 @@ import PeriodPicker from '@/components/shared/PeriodPicker';
 import { KpiTile } from '@/components/home-ai-share/HomeKpis';
 import { HomeSection } from '@/components/home-ai-share/HomeSections';
 import HomeRequestsTab from '@/components/home-ai-share/HomeRequestsTab';
+import HomeOnlineTab from '@/components/home-ai-share/HomeOnlineTab';
 import HomeMoneySection from '@/components/home-exec/HomeMoneySection';
 import ExecDrill, { useDrill } from '@/components/home-exec/ExecDrill';
 import Num from '@/components/home-exec/Num';
@@ -61,16 +62,17 @@ const LIVE_MS = 60_000;
 /** ช่วง "ทั้งหมด" ของปฏิทิน (start null) = นับตั้งแต่ข้อมูลเก่าสุดของสมุด */
 const ALL_FROM = '2024-01-01';
 
-type AiPick = AiShareBlockKey | 'online';
 /** กดแถวในกล่อง AI = เปิดแท็บของเรื่องนั้นในส่วนรายชื่อ (ส่งคนแทนอยู่ในแท็บติดตาม แยกทีมในนั้น) */
-const AI_ROW_PICK: Record<string, AiPick> = { start: 'follow', replace: 'follow', applicants: 'applicants', matching: 'matching' };
+const AI_ROW_PICK: Record<string, AiShareBlockKey> = { start: 'follow', replace: 'follow', applicants: 'applicants', matching: 'matching' };
 
-/** แท็บของหน้าหลัก — ภาพรวม (ผู้บริหาร) + แท็บชุดเดียวกับหน้าแท็บเดิม · ชื่อตามเมนู (`conveyorLabel`) */
-type HomeTab = 'overview' | 'requests' | AiPick;
+/**
+ * แท็บของหน้าหลัก — ภาพรวม (ผู้บริหาร) + แท็บชุดเดียวกับหน้าแท็บเดิม · ชื่อตามเมนู (`conveyorLabel`)
+ * "ใบขอ" กับ "ทีม Online" เป็นเรื่องเดียวกัน ⇒ แท็บเดียวชื่อ "ใบขอ" มีของครบทั้งสองฝั่ง (เจ้าของ 25 ต.ค. 2569)
+ */
+type HomeTab = 'overview' | 'requests' | AiShareBlockKey;
 const HOME_TABS: ReadonlyArray<{ key: HomeTab; label: string }> = [
   { key: 'overview', label: 'ภาพรวม' },
   { key: 'requests', label: 'ใบขอ' },
-  { key: 'online', label: 'ทีม Online' },
   { key: 'follow', label: conveyorLabel('follow') },
   { key: 'aftercare', label: conveyorLabel('aftercare') },
   { key: 'applicants', label: CONVEYOR_VAULT.find((v) => v.key === 'job-boxes')?.label ?? 'งานสรรหา' },
@@ -281,7 +283,9 @@ const HomeExecPage: React.FC = () => {
       el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, target ? 600 : 50);
   };
-  const openAi = (pick: AiPick) => goTab(pick);
+  const openAi = (pick: AiShareBlockKey) => goTab(pick);
+  /** "ลองใหม่" ของส่วนใบขอ (ของแท็บทีม Online เดิม) */
+  const [retry, setRetry] = useState(0);
   const winQ = useMemo(() => ({ ...win, bu }), [win, bu]);
   const byNo = useMemo(() => new Map(openReqs.map((r) => [r.requestNo, r])), [openReqs]);
   const rowsOf = (list: ReadonlyArray<{ requestNo: string }>): MoneyRequest[] =>
@@ -354,7 +358,7 @@ const HomeExecPage: React.FC = () => {
 
       {/* แถบต้องทำของหน้าแท็บเดิม — อยู่เหนือแท็บงาน (ภาพรวมมีส่วนต้องรีบของตัวเองแล้ว) */}
       {tab.key === 'overview' ? null : (
-        <HomeTodoStrip q={winQ} tick={tick} onGo={(t: TodoTab, target: string) => goTab(t === 'online' ? 'online' : t, target)} />
+        <HomeTodoStrip q={winQ} tick={tick} onGo={(t: TodoTab, target: string) => goTab(t === 'online' ? 'requests' : t, target)} />
       )}
 
       {tab.key === 'overview' ? (
@@ -785,7 +789,12 @@ const HomeExecPage: React.FC = () => {
       ) : null}
 
       {/* ── แท็บชุดเดียวกับหน้าแท็บเดิม (ของเดิมครบ ไม่เขียนซ้ำ) ── */}
-      {tab.key === 'requests' ? <HomeRequestsTab win={win} tick={tick} /> : null}
+      {tab.key === 'requests' ? (
+        <div className="space-y-5" data-testid="exec-requests-body">
+          <HomeOnlineTab q={winQ} tick={tick + retry} onRetry={() => setRetry((n) => n + 1)} />
+          <HomeRequestsTab win={win} tick={tick} />
+        </div>
+      ) : null}
       {tab.key !== 'overview' && tab.key !== 'requests' ? (
         <div data-testid="exec-tab-body">
           <HomeAiSharePage embedded={{ win, bu, pick: tab.key, seq: tab.seq }} />

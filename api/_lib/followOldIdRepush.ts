@@ -149,3 +149,93 @@ export async function recancelOldIdFollowPlans(deps: {
   });
   return out;
 }
+
+/**
+ * ═══ ประวัติยิงยกเลิกซ้ำ ดูย้อนหลังได้ (เจ้าของ 25 ต.ค. 2569 "เก็บผลลงฐานด้วย ดูย้อนหลังได้") ═══
+ * ผลทุกครั้งที่กดอยู่ในบันทึกการใช้งานแล้ว (`audit_logs` action `follow.oldid_recancel`) — อ่านจากตรงนั้น ไม่ต้องมีตารางใหม่
+ * ถามสถานะซ้ำจาก Lumos ได้ทีหลัง (Lumos ทำแบบ async) — ผลที่ถามจดเป็น `follow.oldid_recancel_status` ผูกกับครั้งที่ยิง
+ * สถานะ event ของ Lumos: pending · processing · imported · failed · discarded (`LumosEventStatus`)
+ */
+const auditTable = tableInAppSchema('audit_logs');
+export const RECANCEL_ACTION = 'follow.oldid_recancel';
+export const RECANCEL_STATUS_ACTION = 'follow.oldid_recancel_status';
+
+export type RecancelStatusCheck = { checkedAt: string; byName: string | null; statuses: Record<string, { status: string | null; error: string | null }> };
+export type RecancelRun = {
+  id: string;
+  at: string;
+  byName: string | null;
+  items: Array<OldIdRecancelItem & { name: string | null }>;
+  latestCheck: RecancelStatusCheck | null;
+};
+
+const parseJson = <T>(v: unknown): T | null => {
+  if (v == null) return null;
+  if (typeof v === 'object') return v as T;
+  try {
+    return JSON.parse(String(v)) as T;
+  } catch {
+    return null;
+  }
+};
+
+export async function listRecancelRuns(limit = 20): Promise<RecancelRun[]> {
+  const { rows } = await dbQuery<{ id: string; created_at: Date | string; user_name: string | null; new_value: unknown }>(
+    `select id::text, created_at, user_name, new_value from ${auditTable} where action = $1 order by created_at desc limit $2`,
+    [RECANCEL_ACTION, limit],
+  );
+  if (rows.length === 0) return [];
+  const runs = rows.map((r) => ({
+    id: r.id,
+    at: new Date(r.created_at).toISOString(),
+    byName: r.user_name,
+    items: parseJson<{ items?: OldIdRecancelItem[] }>(r.new_value)?.items ?? [],
+  }));
+  const { rows: checks } = await dbQuery<{ entity_id: string; created_at: Date | string; user_name: string | null; new_value: unknown }>(
+    `select entity_id, created_at, user_name, new_value from ${auditTable}
+      where action = $1 and entity_id = any($2::text[]) order by created_at desc`,
+    [RECANCEL_STATUS_ACTION, runs.map((r) => r.id)],
+  );
+  const latest = new Map<string, RecancelStatusCheck>();
+  for (const c of checks) {
+    if (latest.has(c.entity_id)) continue;
+    const v = parseJson<{ statuses?: RecancelStatusCheck['statuses'] }>(c.new_value);
+    latest.set(c.entity_id, { checkedAt: new Date(c.created_at).toISOString(), byName: c.user_name, statuses: v?.statuses ?? {} });
+  }
+  // ชื่อผู้รับสาย — ให้รู้ว่าแผนไหนของใคร (ไพศาล ฯลฯ) · แผน = `follow-<id>` ของสายหัวขบวน
+  const ids = [...new Set(runs.flatMap((r) => r.items.map((x) => x.planRef.replace(/^follow-/, ''))))].filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+  const names = new Map<string, string>();
+  if (ids.length > 0) {
+    const { rows: ns } = await dbQuery<{ id: string; recipient_name: string | null }>(
+      `select id::text, recipient_name from ${followTable} where id = any($1::uuid[])`,
+      [ids],
+    );
+    for (const n of ns) if (n.recipient_name) names.set(n.id, n.recipient_name);
+  }
+  return runs.map((r) => ({
+    ...r,
+    items: r.items.map((x) => ({ ...x, name: names.get(x.planRef.replace(/^follow-/, '')) ?? null })),
+    latestCheck: latest.get(r.id) ?? null,
+  }));
+}
+
+/** ถามสถานะคำสั่งยกเลิกของครั้งที่ยิงจาก Lumos อีกรอบ (อ่านอย่างเดียวที่ Lumos) — คืนผลให้จดลงบันทึก */
+export async function checkRecancelRun(
+  runId: string,
+  eventStatus: (eventId: string) => Promise<{ status?: string; error?: string | null }>,
+): Promise<RecancelStatusCheck['statuses'] | null> {
+  const { rows } = await dbQuery<{ new_value: unknown }>(`select new_value from ${auditTable} where action = $1 and id::text = $2`, [RECANCEL_ACTION, runId]);
+  if (rows.length === 0) return null;
+  const items = parseJson<{ items?: OldIdRecancelItem[] }>(rows[0].new_value)?.items ?? [];
+  const out: RecancelStatusCheck['statuses'] = {};
+  for (const x of items) {
+    if (x.outcome !== 'sent' || !x.eventId) continue;
+    try {
+      const ev = await eventStatus(String(x.eventId));
+      out[x.planRef] = { status: ev.status ?? null, error: ev.error ?? null };
+    } catch (e) {
+      out[x.planRef] = { status: 'unknown', error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+  return out;
+}

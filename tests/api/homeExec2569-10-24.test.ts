@@ -78,7 +78,7 @@ describe('หน้า + เส้น', () => {
     expect(exec).not.toContain('แบบแท็บเดิม');
     expect(exec).toContain('<HomeAiSharePage embedded=');
     expect(exec).toContain('data-testid="exec-tabs"');
-    for (const k of ["key: 'overview', label: 'ภาพรวม'", "key: 'requests', label: 'ใบขอ'", "key: 'online', label: 'ทีม Online'", "key: 'follow'", "key: 'aftercare'", "key: 'applicants'", "key: 'matching'"])
+    for (const k of ["key: 'overview', label: 'ภาพรวม'", "key: 'requests', label: 'ใบขอ'", "key: 'follow'", "key: 'aftercare'", "key: 'applicants'", "key: 'matching'"])
       expect(exec).toContain(k);
     expect(exec).toContain('pick: tab.key, seq: tab.seq');
     // หน้าเดิมยังเปิดได้ที่ ?home=new (ทางถอย) และฝังแล้วไม่มีหัว/ปฏิทิน/แท็บใบขอซ้ำ
@@ -231,6 +231,28 @@ describe('แท็บ + คำบนจอ (เจ้าของ 25 ต.ค. 2
   it('ใบค้างเกิน 90 วันอยู่ในกล่องเสียเงิน', () => {
     const tile = page.slice(page.indexOf('data-testid="exec-money-tile"'), page.indexOf('label="เหลือหา (ใบขอจริง)"'));
     expect(tile).toContain('data-testid="exec-stale"');
+  });
+});
+
+describe('ใบขอ = ทีม Online แท็บเดียว · ประวัติยิงยกเลิก Lumos (25 ต.ค. 2569)', () => {
+  it('แท็บใบขอมีของทีม Online ครบ ไม่มีแท็บทีม Online แยก', () => {
+    const page = read('src/pages/HomeExecPage.tsx');
+    expect(page).not.toContain("label: 'ทีม Online'");
+    const tab = page.slice(page.indexOf('data-testid="exec-requests-body"') - 200);
+    expect(tab).toContain('<HomeOnlineTab');
+    expect(tab).toContain('<HomeRequestsTab');
+    expect(page).toContain("goTab(t === 'online' ? 'requests' : t, target)");
+  });
+  it('ยิงยกเลิกซ้ำ: อ่านประวัติจากบันทึกการใช้งาน · ถามสถานะซ้ำแล้วจดลงบันทึก · หน้าตั้งค่ามีประวัติ', () => {
+    const lib = read('api/_lib/followOldIdRepush.ts');
+    expect(lib).toContain("export const RECANCEL_ACTION = 'follow.oldid_recancel'");
+    expect(lib).toContain('export async function listRecancelRuns');
+    const h = read('api/_handlers/follow-oldid-repush.ts');
+    expect(h).toContain("req.query?.action === 'history'");
+    expect(h).toContain('action: RECANCEL_STATUS_ACTION');
+    const card = read('src/pages/settings/LumosOldIdRepushCard.tsx');
+    expect(card).toContain('data-testid="oldid-recancel-history"');
+    expect(card).toContain("imported: 'รับคำสั่งแล้ว'");
   });
 });
 
