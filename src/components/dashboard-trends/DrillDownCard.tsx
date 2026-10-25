@@ -64,7 +64,8 @@ export default function DrillDownCard({
               key={c.key}
               type="button"
               variant="outline"
-              className="h-auto flex-col items-start justify-start gap-1 rounded-xl p-3 text-left font-normal disabled:opacity-100"
+              className="h-auto min-w-0 flex-col items-start justify-start gap-1 whitespace-normal rounded-xl p-3 text-left font-normal disabled:opacity-100"
+              // ข้อความยาวขึ้นบรรทัดใหม่ ไม่ล้นทับกล่องข้าง ๆ (เจ้าของส่งภาพ 25 ต.ค. 2569)
               // ใบที่จบแล้วนับอย่างเดียว ไม่เปิดรายการ (เจ้าของ "ถ้าปิดก็คือปิด")
               disabled={c.countOnly}
               onClick={() => setPath([...path, c.key])}
