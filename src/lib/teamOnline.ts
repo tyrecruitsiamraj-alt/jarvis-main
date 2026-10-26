@@ -1247,6 +1247,8 @@ export type TeamOnlineResponse = {
   generated_at: string;
   scope: 'all' | 'code' | 'none';
   forced_bu: string | null;
+  /** ผู้ใช้หลาย BU: BU ที่สลับดูได้ (ไม่มี "ทุก BU") · null = BU เดียว/แอดมิน (26 ต.ค. 2569) */
+  bu_choices?: string[] | null;
   bu: string | null;
   window: TeamWindow;
   /** ตัวเลือก BU (ทุก BU ที่มีข้อมูลตามสิทธิ์) */

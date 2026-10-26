@@ -314,6 +314,7 @@ const AdminSettings: React.FC = () => {
       phone?: string | null;
       nickname?: string | null;
       job_lanes?: string[];
+      extra_department_codes?: string[];
     },
   ) => {
     setSavingUserId(id);
@@ -740,6 +741,33 @@ const AdminSettings: React.FC = () => {
                             </option>
                           ))}
                         </select>
+                        {/* ดูได้หลาย BU (เจ้าของ 26 ต.ค. 2569 Choice "เพิ่มให้เลือกได้หลาย BU") — แอดมินเห็นทุก BU อยู่แล้ว */}
+                        {u.department_code && u.role !== 'admin' ? (
+                          <div className="mt-2 flex flex-wrap items-center justify-center gap-1" data-testid="user-extra-bu">
+                            <span className="text-xs text-muted-foreground">ดูเพิ่ม</span>
+                            {APP_DEPARTMENT_CODES.filter((code) => code !== u.department_code).map((code) => {
+                              const extras = u.extra_department_codes ?? [];
+                              const on = extras.includes(code);
+                              return (
+                                <Button
+                                  key={code}
+                                  type="button"
+                                  size="xs"
+                                  variant={on ? 'default' : 'outline'}
+                                  aria-pressed={on}
+                                  disabled={savingUserId === u.id}
+                                  onClick={() =>
+                                    void updateUser(u.id, {
+                                      extra_department_codes: on ? extras.filter((x) => x !== code) : [...extras, code],
+                                    })
+                                  }
+                                >
+                                  {code}
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button

@@ -25,7 +25,7 @@ import { PREQUEST_ID_PREFIX } from '../_lib/siamrajSqlServerPrequests.js';
 import { loadRequestTrendPayload, requestTrendDataFrom } from '../_lib/requestTrendRows.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
 import { queueCancelled, queueOutcome, queueReplySql } from '../_lib/lumosQueueDefs.js';
-import { appBuJoin, appBuSql, parseBuParam, queueBuJoins, queueBuSql } from '../_lib/homeBuSql.js';
+import { appBuJoin, appBuSql, parseBuParam, pickDashboardBu, queueBuJoins, queueBuSql } from '../_lib/homeBuSql.js';
 import { HAS_APPOINTMENT_SQL, buildApplicantFactsSql } from '../_lib/applicantOverviewSql.js';
 import { siteBuSql, trendBuSql } from '../_lib/siteBuSql.js';
 import { logWarn } from '../_lib/logger.js';
@@ -526,11 +526,13 @@ export async function buildTeamOnline(
 ): Promise<TeamOnlineResponse> {
   const today = toBangkokYmd(now);
   const w = teamWindow(query, today);
-  const forcedBu = scope.mode === 'code' ? normalizeTrendBu(scope.code) : null;
+  const picked = pickDashboardBu(scope, bu);
+  const forcedBu = picked.forcedBu;
   const body: TeamOnlineResponse = {
     generated_at: now.toISOString(),
     scope: scope.mode,
     forced_bu: forcedBu,
+    bu_choices: picked.choices,
     bu,
     window: w,
     bu_options: [],
@@ -746,7 +748,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const q = req.query ?? {};
     const query = { from: q.from, to: q.to, grain: q.grain, compare: q.compare };
     const scope: DepartmentScope = await loadMatchingBuScope(req.user);
-    const bu = scope.mode === 'code' ? normalizeTrendBu(scope.code) : parseBuParam(q.bu);
+    // ผู้ใช้หลาย BU เลือกได้ทีละ BU ในสิทธิ์ (26 ต.ค. 2569 · `pickDashboardBu`)
+    const { bu } = pickDashboardBu(scope, q.bu);
     const cacheKey = JSON.stringify([scope, query, bu, req.user.role]);
     const hit = cache.get(cacheKey);
     const stamp = await closedRequestStamp();

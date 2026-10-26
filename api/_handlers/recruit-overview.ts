@@ -18,7 +18,7 @@ import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from
 import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { loadMatchingBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
-import { appBuJoin, appBuSql } from '../_lib/homeBuSql.js';
+import { appBuJoin, appBuSql, pickDashboardBu } from '../_lib/homeBuSql.js';
 import {
   AI_RESULT_AT_SQL,
   AI_RESULT_OF_APP_SQL,
@@ -519,11 +519,16 @@ export async function buildRecruitOverview(
   now: Date,
   /** ช่วงที่เลือกเอง (รายวัน/ช่วง · 5 ต.ค. 2569) — ค่าผิด/ไม่ส่ง = แบบเดือน */
   range?: { from: unknown; to: unknown },
+  /** BU ที่ขอ — ผู้ใช้หลาย BU สลับได้ทีละ BU (26 ต.ค. 2569) · แอดมิน/BU เดียวไม่ใช้ */
+  requestedBu?: unknown,
 ): Promise<RecruitOverviewResponse> {
   const today = toBangkokYmd(now);
   const window = (range ? rangeWindow(range.from, range.to, today) : null) ?? monthWindow(monthParam, today);
-  const bu = scope.mode === 'code' ? normalizeTrendBu(scope.code) : null;
+  // แอดมินเห็นทุก BU เหมือนเดิม · BU เดียว = ล็อก · หลาย BU = BU ที่เลือก (ค่าเริ่ม BU หลัก)
+  const picked = pickDashboardBu(scope, scope.mode === 'all' ? null : requestedBu);
+  const bu = picked.bu;
   const body: RecruitOverviewResponse = {
+    buChoices: picked.choices,
     version: 1,
     generatedAt: now.toISOString(),
     today,
@@ -653,7 +658,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const month = typeof req.query?.month === 'string' ? req.query.month.trim() : undefined;
     const from = typeof req.query?.from === 'string' ? req.query.from.trim() : undefined;
     const to = typeof req.query?.to === 'string' ? req.query.to.trim() : undefined;
-    const body = await buildRecruitOverview(month, scope, new Date(), from && to ? { from, to } : undefined);
+    const body = await buildRecruitOverview(month, scope, new Date(), from && to ? { from, to } : undefined, req.query?.bu);
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json(body);
   } catch (e) {

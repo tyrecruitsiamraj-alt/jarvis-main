@@ -54,13 +54,13 @@ describe('/api/app-user-names', () => {
   });
 
   it('คนล็อก BU = แผนกตัวเอง + คนไม่ผูกแผนก · ส่งแค่ id + ชื่อ ไม่มีอีเมล', async () => {
-    deptScope.mockResolvedValue({ mode: 'code', code: 'LBD' });
+    deptScope.mockResolvedValue({ mode: 'code', code: 'LBD', codes: ['LBD'] });
     const { res, json } = mockRes();
     await handler(req('staff') as never, res as never);
     const [sql, params] = dbQuery.mock.calls[0];
-    expect(String(sql)).toMatch(/upper\(trim\(department_code\)\) = \$1 or department_code is null/);
+    expect(String(sql)).toMatch(/upper\(trim\(department_code\)\) = any\(\$1::text\[\]\) or department_code is null/);
     expect(String(sql)).not.toMatch(/email/);
-    expect(params).toEqual(['LBD']);
+    expect(params).toEqual([['LBD']]);
     expect(json.mock.calls[0][0]).toEqual({ users: [{ id: 'a', name: 'Somchai Jaidee' }] });
   });
 

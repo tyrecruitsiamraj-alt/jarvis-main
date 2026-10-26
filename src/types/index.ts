@@ -29,6 +29,8 @@ export interface User {
    * (`role` = สิทธิ์ในระบบ · สายงาน = งานที่ทำ) · `[]` = ยังไม่ได้ตั้ง
    */
   job_lanes?: string[];
+  /** BU ที่ดูเพิ่มนอกจาก `department_code` (164 · 26 ต.ค. 2569) · `[]` = ดูแค่ BU หลัก */
+  extra_department_codes?: string[];
 }
 
 // ============ EMPLOYEES (WL) ============

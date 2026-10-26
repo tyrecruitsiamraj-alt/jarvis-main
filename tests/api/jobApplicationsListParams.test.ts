@@ -85,11 +85,11 @@ describe('คลังกลาง — ใบขอปิดแล้วรา�
       jobId: null,
       scopedJobIds: new Set(['siamraj-sql:OPEN1']),
       viewerId: VIEWER,
-      viewerDepartment: 'LBD',
+      viewerDepartment: ['LBD'],
     });
     const sql = resolvedSql(q);
     expect(sql).toContain('department_code');
-    expect(q.params).toContain('LBD');
+    expect(q.params).toContainEqual(['LBD']);
     expect(q.params).toHaveLength(highestParamIndex(sql));
   });
 
@@ -98,11 +98,11 @@ describe('คลังกลาง — ใบขอปิดแล้วรา�
       jobId: null,
       scopedJobIds: new Set(['siamraj-sql:OPEN1']),
       viewerId: VIEWER,
-      viewerDepartment: 'LBD',
+      viewerDepartment: ['LBD'],
     });
     const sql = resolvedSql(q);
     // ต้องเป็น "ใบขอที่เห็นได้ **หรือ** แผนกตรงกัน" ไม่ใช่เงื่อนไขที่จริงเสมอ
-    expect(sql).toMatch(/job_id = any\(\$\d+::text\[\]\) or department_code = \$\d+/);
+    expect(sql).toMatch(/job_id = any\(\$\d+::text\[\]\) or department_code = any\(\$\d+::text\[\]\)/);
   });
 
   it('admin (เห็นทุกแผนก) ไม่ต้องมีเงื่อนไขแผนก — เห็นครบอยู่แล้ว', () => {
@@ -152,11 +152,11 @@ describe('นัดของทุกคน (everyoneAppointments) — param + �
       jobId: null,
       scopedJobIds: new Set(['siamraj-sql:A']),
       viewerId: VIEWER,
-      viewerDepartment: 'LBD',
+      viewerDepartment: ['LBD'],
       everyoneAppointments: true,
     });
     const sql = filled(q);
-    expect(sql).toMatch(/job_id = any\(\$1::text\[\]\) or department_code = \$2/);
+    expect(sql).toMatch(/job_id = any\(\$1::text\[\]\) or department_code = any\(\$2::text\[\]\)/);
     expect(q.params).toHaveLength(2);
     expect(q.params).toHaveLength(highestParamIndex(sql));
     expect(q.params).not.toContain(VIEWER);

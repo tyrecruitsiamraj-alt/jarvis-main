@@ -16,6 +16,7 @@
  * (เจ้าของ Choice "ส่วนล่างของหน้าเปลี่ยนตามการ์ด" — แผงด้านขวาของรอบ 4 ถอดแล้ว) → `TeamCardView`:
  * กราฟแท่งทุก BU + โดนัท (จี้แล้วบอกรายละเอียด) + รายละเอียดของเรื่องนั้น · เจ้าหน้าที่: ยังไม่เลือกการ์ด = ไม่มีส่วนวิเคราะห์ (กดเอง)
  */
+import BuChoiceSelect from '@/components/shared/BuChoiceSelect';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ClipboardList, Link2, PhoneCall, RefreshCw, Target, UserPlus, Users } from 'lucide-react';
@@ -293,7 +294,19 @@ const TeamOnlinePage: React.FC = () => {
         <TeamTimeFilter win={win} spans={TEAM_SPANS} />
         <div className="flex items-center gap-2">
           <span className={cn('whitespace-nowrap text-xs', DASH.muted)}>รายละเอียด BU</span>
-          {data?.scope === 'code' && data.forced_bu ? (
+          {data?.bu_choices?.length ? (
+            /* ดูได้หลาย BU — เลือกทีละ BU ในสิทธิ์ (26 ต.ค. 2569) */
+            <div className="w-52 sm:w-60">
+              <BuChoiceSelect
+                value={effectiveBu ?? null}
+                choices={data.bu_choices}
+                onChange={setBu}
+                triggerClassName="text-xs"
+                itemClassName="text-xs"
+                ariaLabel="รายละเอียด BU"
+              />
+            </div>
+          ) : data?.scope === 'code' && data.forced_bu ? (
             <span className="text-xs text-foreground">{trendBuLabel(data.forced_bu)}</span>
           ) : (
             /* ช่องเลือกของธีมบังคับกว้างเต็มกล่อง (`jarvis-soft-field`) ⇒ คุมความกว้างที่กล่องครอบ */

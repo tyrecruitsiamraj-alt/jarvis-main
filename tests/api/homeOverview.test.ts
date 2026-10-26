@@ -56,7 +56,7 @@ afterEach(() => {
 
 describe('ขอบเขต + BU', () => {
   it('🔴 ผู้ใช้ถูกล็อกแผนก = BU ของตัวเองเสมอ (ไม่สนพารามิเตอร์) · แปลงเป็นชุดแผนก', async () => {
-    loadMatchingBuScope.mockResolvedValue({ mode: 'code', code: 'LM' });
+    loadMatchingBuScope.mockResolvedValue({ mode: 'code', code: 'LM', codes: ['LM'] });
     const body = await run({ bu: 'LBD' });
     expect(body.scope).toBe('code');
     expect(body.forced_bu).toBe('LM');

@@ -45,6 +45,8 @@ export type HomeMoneyResponse = {
   since: string;
   bu: string | null;
   forcedBu: boolean;
+  /** ผู้ใช้หลาย BU: BU ที่สลับดูได้ (26 ต.ค. 2569) */
+  buChoices?: string[] | null;
   totals: Record<LedgerMode, MoneyTotals>;
   daily: LedgerDaily;
   clocks: { speed: ClockStat; late: ClockStat };

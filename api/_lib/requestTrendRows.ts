@@ -25,7 +25,7 @@ export function requestTrendDataFrom(todayYmd: string): string {
 export function inTrendScope(scope: DepartmentScope, bu: string | null): boolean {
   if (scope.mode === 'all') return true;
   if (scope.mode === 'none') return false;
-  return bu === scope.code;
+  return bu !== null && scope.codes.includes(bu);
 }
 
 async function loadRequestSnapshot(from: string, to: string): Promise<{ requests: RequestTrendRow[]; informs: InformTrendRow[] }> {

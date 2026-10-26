@@ -157,6 +157,8 @@ export type RecruitOverviewResponse = {
   window: RecruitOverviewWindow;
   /** BU ที่ถูกล็อก (ผู้ใช้ผูกแผนก) · null = ทุก BU */
   bu: string | null;
+  /** ผู้ใช้หลาย BU: BU ที่สลับดูได้ (26 ต.ค. 2569) */
+  buChoices?: string[] | null;
   /** วันแรก (ไทย) ที่มีใบสมัครในขอบเขต — ปุ่มถอยเดือนหยุดที่เดือนนี้ · ช่วงเทียบที่ข้อมูลเริ่มกลางช่วงต้องบอก · null = ยังไม่มีเลย */
   firstDay: string | null;
   /** ข้อเท็จจริงต่อใบของทั้งสองช่วง (เดือนที่เลือก + ช่วงที่เทียบ) */

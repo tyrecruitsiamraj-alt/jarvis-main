@@ -26,6 +26,7 @@ import {
   type DepartmentScope,
 } from "../_lib/departmentScope.js";
 import { normalizeTrendBu } from "../../src/lib/trends/bu.js";
+import { pickDashboardBu } from "../_lib/homeBuSql.js";
 import { logError } from "../_lib/logger.js";
 import { readUnitRequestListThroughCache } from "./siamraj-unit-requests.js";
 import { loadFactsForJobs } from "./recruit-overview.js";
@@ -232,7 +233,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       loadUserDepartmentScope(req.user),
       loadMatchingBuScope(req.user),
     ]);
-    const bu = buScope.mode === "code" ? normalizeTrendBu(buScope.code) : null;
+    // หลาย BU (26 ต.ค. 2569): เลือกทีละ BU ในสิทธิ์ · แอดมินไม่ล็อก (null) เหมือนเดิม
+    const bu = buScope.mode === "code" ? pickDashboardBu(buScope, req.query?.bu).bu : null;
     const body = await buildRequestPipeline(
       departmentScope,
       bu,

@@ -19,6 +19,7 @@
 import { tableInAppSchema } from './schema.js';
 import { siteBuSql, trendBuOfSiteSql, trendBuSql } from './siteBuSql.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
+import type { DepartmentScope } from './departmentScope.js';
 
 const MAP = tableInAppSchema('job_site_map');
 const APPS = tableInAppSchema('public_job_applications');
@@ -32,6 +33,35 @@ const USERS = tableInAppSchema('users');
 export function parseBuParam(raw: unknown): string | null {
   const v = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
   return /^[A-Z]{2,4}$/.test(v) ? normalizeTrendBu(v) : null;
+}
+
+/**
+ * BU ของหน้าสรุป/Dashboard ที่รับได้ทีละ BU (หรือทุก BU สำหรับ admin)
+ * - admin: ตามที่ขอ (null = ทุก BU)
+ * - BU เดียว: ล็อก BU นั้น
+ * - หลาย BU: เลือกได้ทีละ BU ในสิทธิ์ · ขอ BU นอกสิทธิ์/ไม่ขอ = BU หลัก (ไม่มี "ทุก BU" — จะเห็นเกินสิทธิ์)
+ */
+function dashboardBuOf(scope: DepartmentScope, requested: string | null): { bu: string | null; forced: boolean; choices: string[] | null } {
+  if (scope.mode === 'all') return { bu: requested, forced: false, choices: null };
+  if (scope.mode === 'none') return { bu: null, forced: true, choices: [] };
+  if (scope.codes.length === 1) return { bu: scope.code, forced: true, choices: null };
+  const r = (requested ?? '').trim().toUpperCase() || null;
+  return { bu: r && scope.codes.includes(r) ? r : scope.code, forced: false, choices: [...scope.codes] };
+}
+
+/**
+ * BU ของหน้าสรุปที่ดูทีละ BU (หน้าหลัก · ทีม Online · ระบบไปกี่ %) — ตัวเดียวทุกหน้า (26 ต.ค. 2569 หลาย BU)
+ * - `bu` = BU ที่ใช้คิด (null = ทุก BU · admin เท่านั้น) · `forcedBu` = ล็อกไว้ (ผู้ใช้ BU เดียว)
+ * - `choices` = BU ที่ผู้ใช้หลาย BU สลับได้ (จอโชว์ตัวเลือกเฉพาะชุดนี้ ไม่มี "ทุก BU")
+ */
+export function pickDashboardBu(scope: DepartmentScope, raw: unknown): { bu: string | null; forcedBu: string | null; choices: string[] | null } {
+  const p = dashboardBuOf(scope, parseBuParam(raw));
+  const bu = scope.mode === 'all' ? parseBuParam(raw) : normalizeTrendBu(p.bu);
+  return {
+    bu,
+    forcedBu: p.forced ? bu : null,
+    choices: p.choices ? p.choices.map((c) => normalizeTrendBu(c) ?? c) : null,
+  };
 }
 
 /** ใบสมัคร — ต่อท้าย `from <apps> a` */

@@ -175,7 +175,7 @@ describe('ช่วงเวลา + ขอบเขต + BU', () => {
   });
 
   it('🔴 ผู้ใช้ถูกล็อกแผนก = BU ของตัวเองทุกก้อน · การ์ดคนใช้งานยังเป็นทุก BU', async () => {
-    loadMatchingBuScope.mockResolvedValue({ mode: 'code', code: 'LM' });
+    loadMatchingBuScope.mockResolvedValue({ mode: 'code', code: 'LM', codes: ['LM'] });
     const body = await run({ bu: 'LBD' });
     expect(body.bu).toBe('LM');
     expect(body.users.byBu.map((r: { bu: string }) => r.bu)).toEqual(['LM']);

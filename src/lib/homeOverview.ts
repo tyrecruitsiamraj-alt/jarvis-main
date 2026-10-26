@@ -176,6 +176,8 @@ export type HomeOverview = {
   /** ขอบเขตของผู้ใช้ — `code` = ถูกล็อกแผนก (BU ถูกบังคับ) */
   scope: 'all' | 'code' | 'none';
   forced_bu: string | null;
+  /** ผู้ใช้หลาย BU: BU ที่สลับดูได้ (ไม่มี "ทุก BU") · null = BU เดียว/แอดมิน (26 ต.ค. 2569) */
+  bu_choices?: string[] | null;
   /** BU ที่เส้นกรองให้จริง (null = ทั้งหมดตามสิทธิ์) */
   bu: string | null;
   bu_options: HomeBuOption[];

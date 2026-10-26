@@ -239,6 +239,8 @@ export type AiShareResponse = {
   /** BU ที่ใช้จริง — บัญชีที่ถูกล็อกแผนก = BU ของบัญชีเสมอ */
   bu: string | null;
   forced_bu: boolean;
+  /** ผู้ใช้หลาย BU: BU ที่สลับดูได้ (ไม่มี "ทุก BU") · null = BU เดียว/แอดมิน (26 ต.ค. 2569) */
+  bu_choices?: string[] | null;
   follow: AiShareFollow | null;
   aftercare: AiShareFollow | null;
   applicants: AiShareApplicants | null;

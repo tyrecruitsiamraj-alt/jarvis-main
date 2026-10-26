@@ -10,6 +10,7 @@ import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import {
+  codeScope,
   loadRosterBuScope,
   normalizeDepartmentCode,
   isAllowedDepartmentCode,
@@ -38,10 +39,10 @@ function writeBu(scope: DepartmentScope): string | null {
 }
 
 /** WHERE clause + params limiting reads to the scope's visible rows. */
-function scopeWhere(scope: DepartmentScope): { sql: string; params: string[] } {
+function scopeWhere(scope: DepartmentScope): { sql: string; params: unknown[] } {
   // 'code' → own BU rows + legacy NULL rows; 'all' → everything; 'none' handled by caller.
   if (scope.mode === 'code') {
-    return { sql: `where department_code = $1 or department_code is null`, params: [scope.code] };
+    return { sql: `where department_code = any($1::text[]) or department_code is null`, params: [scope.codes] };
   }
   return { sql: '', params: [] };
 }
@@ -143,12 +144,12 @@ async function fetchState(scope: DepartmentScope) {
 export type StaffDirectoryEntry = { name: string; phone: string; lanes: string[] };
 
 async function fetchStaffDirectory(scope: DepartmentScope): Promise<StaffDirectoryEntry[]> {
-  const params: string[] = [];
+  const params: unknown[] = [];
   let where = `is_active and nickname is not null and trim(nickname) <> ''
        and job_lanes is not null and array_length(job_lanes, 1) >= 1`;
   if (scope.mode === 'code') {
-    params.push(scope.code);
-    where += ` and (department_code = $1 or department_code is null)`;
+    params.push(scope.codes);
+    where += ` and (department_code = any($1::text[]) or department_code is null)`;
   }
   const { rows } = await dbQuery<{ name: string; phone: string | null; lanes: string[] | null }>(
     `select trim(nickname) as name,
@@ -215,11 +216,12 @@ async function resolveScope(req: AuthedReq, requestedRaw: string | null): Promis
       return { ok: false, status: 400, message: 'BU ไม่ถูกต้อง' };
     }
     if (req.user.role === 'admin') {
-      return { ok: true, scope: { mode: 'code', code: requested } };
+      return { ok: true, scope: codeScope(requested) };
     }
+    // หลาย BU (26 ต.ค. 2569) — เลือกดูทีละ BU ในสิทธิ์ได้
     const own = await loadRosterBuScope(req.user);
-    if (own.mode === 'code' && own.code === requested) {
-      return { ok: true, scope: own };
+    if (own.mode === 'code' && own.codes.includes(requested)) {
+      return { ok: true, scope: codeScope(requested) };
     }
     return { ok: false, status: 403, message: 'ไม่มีสิทธิ์เข้าถึง BU นี้' };
   }

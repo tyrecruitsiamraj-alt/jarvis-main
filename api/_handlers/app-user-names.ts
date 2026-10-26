@@ -26,11 +26,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
   try {
     const scope = await loadUserDepartmentScope(req.user);
     if (scope.mode === 'none') return res.status(200).json({ users: [] });
-    const params: string[] = [];
+    const params: unknown[] = [];
     let where = `is_active and coalesce(trim(full_name), '') <> ''`;
     if (scope.mode === 'code') {
-      params.push(scope.code);
-      where += ` and (upper(trim(department_code)) = $${params.length} or department_code is null)`;
+      params.push(scope.codes);
+      where += ` and (upper(trim(department_code)) = any($${params.length}::text[]) or department_code is null)`;
     }
     const lane = typeof req.query?.lane === 'string' ? req.query.lane.trim() : '';
     if (lane && /^[a-z_]{1,32}$/.test(lane)) {

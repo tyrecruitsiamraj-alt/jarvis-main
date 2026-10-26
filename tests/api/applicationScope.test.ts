@@ -42,7 +42,7 @@ describe('isApplicationInWriteScope', () => {
 
   it('ใบขอปิด (job หลุดจากเซ็ต) แต่แผนกตรง → ผ่าน (กติกา 082)', async () => {
     loadScopedJobIdSet.mockResolvedValue(new Set(['siamraj-sql:OTHER']));
-    loadUserDepartmentScope.mockResolvedValue({ mode: 'code', code: 'LBD' });
+    loadUserDepartmentScope.mockResolvedValue({ mode: 'code', code: 'LBD', codes: ['LBD'] });
     expect(
       await isApplicationInWriteScope(user, { job_id: 'siamraj-sql:CLOSED', department_code: 'lbd' }),
     ).toBe(true);
@@ -50,7 +50,7 @@ describe('isApplicationInWriteScope', () => {
 
   it('ใบขอปิด + แผนกไม่ตรง → 403 (deny)', async () => {
     loadScopedJobIdSet.mockResolvedValue(new Set(['siamraj-sql:OTHER']));
-    loadUserDepartmentScope.mockResolvedValue({ mode: 'code', code: 'LBD' });
+    loadUserDepartmentScope.mockResolvedValue({ mode: 'code', code: 'LBD', codes: ['LBD'] });
     expect(
       await isApplicationInWriteScope(user, { job_id: 'siamraj-sql:CLOSED', department_code: 'LBA' }),
     ).toBe(false);
@@ -58,7 +58,7 @@ describe('isApplicationInWriteScope', () => {
 
   it('ไม่มี job และไม่มี department_code → deny', async () => {
     loadScopedJobIdSet.mockResolvedValue(new Set(['x']));
-    loadUserDepartmentScope.mockResolvedValue({ mode: 'code', code: 'LBD' });
+    loadUserDepartmentScope.mockResolvedValue({ mode: 'code', code: 'LBD', codes: ['LBD'] });
     expect(await isApplicationInWriteScope(user, { job_id: null, department_code: null })).toBe(false);
   });
 });

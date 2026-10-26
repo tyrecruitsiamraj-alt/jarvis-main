@@ -25,7 +25,7 @@ import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 import { parseAgeRange, formatGenderRequirement } from './siamrajJobMapping.js';
 import { normalizeSiamrajWorkAddress } from './siamrajSqlServerRequests.js';
-import { type DepartmentScope } from './departmentScope.js';
+import { sqlServerCodesClause, type DepartmentScope } from './departmentScope.js';
 
 /** ขึ้นต้น id ของใบขอล่วงหน้า — ห้ามชนกับ `siamraj-sql:` ของใบขอจริง */
 export const PREQUEST_ID_PREFIX = 'siamraj-pre:';
@@ -237,10 +237,7 @@ export async function listSiamrajSqlServerPrequests(options: {
       ? { sql: '', params: {} as Record<string, string> }
       : scopeMode.mode === 'none'
         ? { sql: 'AND 1 = 0', params: {} as Record<string, string> }
-        : {
-            sql: 'AND RTRIM(A.bu_department_code) = @scopeDept',
-            params: { scopeDept: scopeMode.code } as Record<string, string>,
-          };
+        : sqlServerCodesClause(scopeMode, 'RTRIM(A.bu_department_code)');
 
   const rows = await siamrajSqlQuery<PrequestRow>(
     `

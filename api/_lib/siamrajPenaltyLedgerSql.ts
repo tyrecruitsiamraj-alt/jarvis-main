@@ -12,7 +12,7 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { activeInformWhereSql, effectiveInformQtySql } from './siamrajStaffingOpen.js';
 import { boardStaffingRequestTypeWhereSql, excludeInternalReplacementRoleWhereSql } from './siamrajBoardRequestTypes.js';
-import { sqlServerDepartmentScopeClause, type DepartmentScope } from './departmentScope.js';
+import { scopeCacheKey, sqlServerDepartmentScopeClause, type DepartmentScope } from './departmentScope.js';
 import { buFromSiteCode } from '../../src/lib/homeBu.js';
 import type { PenaltyInform, PenaltyRequestRow } from '../../src/lib/requestPenaltyLedger.js';
 
@@ -66,7 +66,7 @@ type InformSqlRow = { request_no: string; start_ymd: string | null; record_ymd: 
 type FineSqlRow = { ymd: string; site_code: string; amount: number; receipts: number };
 
 export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<PenaltyLedgerRaw> {
-  const key = scope.mode === 'code' ? `code:${scope.code}` : scope.mode;
+  const key = scopeCacheKey(scope);
   const hit = cache.get(key);
   if (hit && Date.now() - hit.loadedAt < CACHE_MS) return hit;
 

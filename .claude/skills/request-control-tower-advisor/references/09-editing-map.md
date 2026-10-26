@@ -13861,3 +13861,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · กลุ่มเรียงตาม `stats_30d.posted` + `soGroupStatsText`
 - เอกสารรอบ 3: บันทึกคำขอแล้วเรียก `POST {base}/api/integrations/jarvis/start {request_no}` ทันที (`startSoRequest` · ผลกลับใน `so_start` ของคำตอบ POST) · ยังไม่ใส่ key = ข้าม
   · 409 เริ่มแล้ว · 422 ขึ้น `error` + ปุ่ม "เริ่มงานอีกครั้ง" (`POST /api/matching/job-postings?action=start&id=` · `SoStartLine`) · ใส่ key แล้วขอ Scrap ต้องติ๊กบัญชีอย่างน้อย 1
+
+### ผู้ใช้ดูได้หลาย BU (26 ต.ค. 2569)
+- ฐาน: `users.extra_department_codes text[]` (migration 164) · `department_code` = BU หลัก (เขียนใบใหม่/ค่าเริ่ม) · แอดมินเห็นทุก BU อยู่แล้ว
+- `DepartmentScope` แบบ code มี `codes` (BU หลัก + เพิ่ม) — 🔴 กรองด้วย `codes` เสมอ (`scopeHasCode` · `jobAllowedByDepartmentScope` · `sqlServerCodesClause` = IN (...) · Postgres `= any($n::text[])`) · `code` ใช้เป็นค่าเริ่ม/เขียนเท่านั้น · คีย์ cache ใช้ `scopeCacheKey`
+- รายการ/ใบขอ/ผู้สมัคร/ประกาศ/ทีม/พนักงาน = เห็นทุก BU ในสิทธิ์รวมกัน
+- หน้าสรุปที่คิดทีละ BU (หน้าหลัก · ระบบไปกี่ % · ทีม Online · ภาพรวมงานสรรหา · pipeline) = `pickDashboardBu` ใน `homeBuSql.ts` → เลือกทีละ BU ในสิทธิ์ ค่าเริ่ม BU หลัก ไม่มี "ทุก BU" · จอใช้ `BuChoiceSelect` เมื่อได้ `bu_choices`/`buChoices`
+- หน้าใครออนไลน์ (`home-presence`) ยังใช้ BU หลัก
+- ตั้งที่: ตั้งค่า › ผู้ใช้งาน คอลัมน์ BU → ปุ่ม "ดูเพิ่ม" ต่อ BU (PATCH `/api/app-users` `extra_department_codes`)
+- ⚠️ เทสต์ที่ mock `departmentScope.js` ต้องใส่ `codes` ในค่าที่ mock และห้ามให้โค้ดจริงพึ่ง export ใหม่จากโมดูลนี้ผ่านโมดูลอื่นที่เทสต์ mock ทั้งก้อน

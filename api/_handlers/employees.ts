@@ -110,14 +110,15 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
       // (แถวที่ไม่มีรหัสแผนก = ข้อมูลกลางรุ่นเก่า ให้เห็นได้ทุกแผนกตามเดิม ไม่ให้ข้อมูลหายไปเงียบ ๆ)
       const scope = await loadUserDepartmentScope(req.user);
       if (scope.mode === 'none') return res.status(200).json([]);
-      const scopedCode = scope.mode === 'code' ? scope.code : null;
+      // หลาย BU (26 ต.ค. 2569) — ทุก BU ในสิทธิ์
+      const scopedCode = scope.mode === 'code' ? scope.codes : null;
 
       const id = getString(req.query?.id);
       if (id) {
         const { rows } = await dbQuery<EmployeeRow>(
           scopedCode
             ? `select * from jarvis_rm.employees
-               where id = $1 and (department_code is null or upper(trim(department_code)) = $2)
+               where id = $1 and (department_code is null or upper(trim(department_code)) = any($2::text[]))
                limit 1`
             : `select * from jarvis_rm.employees where id = $1 limit 1`,
           scopedCode ? [id, scopedCode] : [id],
@@ -138,7 +139,7 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
       }
       if (scopedCode) {
         params.push(scopedCode);
-        conds.push(`(department_code is null or upper(trim(department_code)) = $${params.length})`);
+        conds.push(`(department_code is null or upper(trim(department_code)) = any($${params.length}::text[]))`);
       }
       params.push(limit, offset);
       const { rows } = await dbQuery<EmployeeRow>(
@@ -276,7 +277,7 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
       if (
         patchScope.mode === 'code' &&
         cur.department_code &&
-        cur.department_code.trim().toUpperCase() !== patchScope.code
+        !patchScope.codes.includes(cur.department_code.trim().toUpperCase())
       ) {
         return sendError(res, 403, 'Forbidden', 'ไม่มีสิทธิ์แก้ข้อมูลพนักงานของแผนกอื่น');
       }

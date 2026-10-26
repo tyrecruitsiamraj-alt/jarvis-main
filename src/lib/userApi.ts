@@ -49,6 +49,9 @@ export function parseAppUser(value: unknown): User | null {
     job_lanes: Array.isArray(value.job_lanes)
       ? value.job_lanes.filter((x): x is string => typeof x === 'string')
       : [],
+    extra_department_codes: Array.isArray(value.extra_department_codes)
+      ? value.extra_department_codes.filter((x): x is string => typeof x === 'string')
+      : [],
   };
 }
 

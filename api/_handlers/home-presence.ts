@@ -38,6 +38,7 @@ export async function buildHomePresence(
   canSeePeople: boolean,
   now: Date,
 ): Promise<HomePresenceResponse> {
+  // หลาย BU (26 ต.ค. 2569): ใช้ BU หลัก (หน้าใครออนไลน์ไม่มีตัวเลือก BU)
   const forcedBu = scope.mode === 'code' ? normalizeTrendBu(scope.code) : null;
   const body: HomePresenceResponse = {
     generated_at: now.toISOString(),

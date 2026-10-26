@@ -31,6 +31,7 @@
  * 🔴 ห้ามหยิบของหน้าหลักเดิม (deck · 3 ก้อน · ยอด Lumos) กลับมาใส่เอง — เจ้าของจะสั่งเพิ่มทีละเรื่อง
  * 🔴 โฉมกระจกไม่เบลอของที่เลื่อนจอ (เคยทำเว็บกระตุก 5 ก.ย. 2569) — แสงนวลข้างหลังเบลอมาแล้ว การ์ดแค่โปร่ง
  */
+import BuChoiceSelect from '@/components/shared/BuChoiceSelect';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Clock, FileText, Link2, Phone, Repeat, Users, type LucideIcon } from 'lucide-react';
 import { useLiveTick } from '@/hooks/useLiveTick';
@@ -428,7 +429,7 @@ const HomeAiSharePage: React.FC<{ embedded?: EmbeddedHome }> = ({ embedded }) =>
 
   // เปลี่ยนช่วงแล้วเลขเก่าห้ามค้างให้อ่านผิดช่วง — ใช้ข้อมูลเฉพาะเมื่อตรงกับช่วงที่เลือก
   const current =
-    data && data.from === cardWin.from && data.to === cardWin.to && (data.forced_bu || (data.bu ?? null) === bu) ? data : null;
+    data && data.from === cardWin.from && data.to === cardWin.to && (data.forced_bu || (data.bu ?? null) === bu || (bu === null && Boolean(data.bu_choices))) ? data : null;
   const detailNow = detail && detail.key === homeQueryKey(winQ, block) ? detail.d : null;
   const meta = BLOCKS.find((b) => b.key === block) ?? BLOCKS[0];
   const counts: AiShareCounts | null = current?.[meta.key] ?? null;
@@ -841,7 +842,10 @@ const HomeAiSharePage: React.FC<{ embedded?: EmbeddedHome }> = ({ embedded }) =>
               <a href="/?home=exec">หน้าหลักใหม่</a>
             </Button>
             <PeriodPicker value={win} onChange={setWin} />
-            {current?.forced_bu && current.bu ? (
+            {current?.bu_choices?.length ? (
+              /* ดูได้หลาย BU — เลือกทีละ BU ในสิทธิ์ (26 ต.ค. 2569) */
+              <BuChoiceSelect value={bu ?? current.bu ?? null} choices={current.bu_choices} onChange={setBu} triggerClassName="h-10 w-44 bg-card" />
+            ) : current?.forced_bu && current.bu ? (
               <span className="text-sm text-muted-foreground">{trendBuLabel(current.bu)}</span>
             ) : (
               <Select value={bu ?? 'all'} onValueChange={(v) => setBu(v === 'all' ? null : v)}>

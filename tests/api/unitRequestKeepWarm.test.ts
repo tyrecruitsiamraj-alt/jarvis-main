@@ -33,8 +33,8 @@ beforeEach(() => {
 describe('แผนกเดียว = กรองจากสำเนาทุกแผนก', () => {
   it('ถามระบบงานหลักครั้งเดียว (ทุกแผนก) แล้วทุกแผนกกรองเอง · ไม่มีแผนก = ไม่เห็นอะไร', async () => {
     realList.mockResolvedValue([job('a', 'LBD'), job('b', 'LBA'), job('c', 'LBD ')]);
-    const lbd = await listSiamrajUnitRequests({ limit: 500, departmentScope: { mode: 'code', code: 'LBD' } as never });
-    const lba = await listSiamrajUnitRequests({ limit: 500, departmentScope: { mode: 'code', code: 'LBA' } as never });
+    const lbd = await listSiamrajUnitRequests({ limit: 500, departmentScope: { mode: 'code', code: 'LBD', codes: ['LBD'] } as never });
+    const lba = await listSiamrajUnitRequests({ limit: 500, departmentScope: { mode: 'code', code: 'LBA', codes: ['LBA'] } as never });
     const none = await listSiamrajUnitRequests({ limit: 500, departmentScope: { mode: 'none' } as never });
     expect((lbd as Array<{ id: string }>).map((j) => j.id)).toEqual(['a', 'c']);
     expect((lba as Array<{ id: string }>).map((j) => j.id)).toEqual(['b']);
@@ -47,15 +47,15 @@ describe('แผนกเดียว = กรองจากสำเนาท�
     realList.mockImplementation(async (o: { departmentScope: { mode: string } }) =>
       o.departmentScope.mode === 'all' ? [job('a', 'LBD'), job('b', 'LBA')] : [job('z', 'LBD')],
     );
-    const lbd = await listSiamrajUnitRequests({ limit: 2, departmentScope: { mode: 'code', code: 'LBD' } as never });
+    const lbd = await listSiamrajUnitRequests({ limit: 2, departmentScope: { mode: 'code', code: 'LBD', codes: ['LBD'] } as never });
     expect((lbd as Array<{ id: string }>).map((j) => j.id)).toEqual(['z']);
     expect(realList).toHaveBeenCalledTimes(2);
   });
 
   it('ปุ่มรีเฟรช (fresh) = ถามแผนกนั้นสด ๆ แบบเดิม', async () => {
     realList.mockResolvedValue([job('a', 'LBD')]);
-    await listSiamrajUnitRequests({ limit: 500, fresh: true, departmentScope: { mode: 'code', code: 'LBD' } as never });
-    expect((realList.mock.calls[0][0] as { departmentScope: unknown }).departmentScope).toEqual({ mode: 'code', code: 'LBD' });
+    await listSiamrajUnitRequests({ limit: 500, fresh: true, departmentScope: { mode: 'code', code: 'LBD', codes: ['LBD'] } as never });
+    expect((realList.mock.calls[0][0] as { departmentScope: unknown }).departmentScope).toEqual({ mode: 'code', code: 'LBD', codes: ['LBD'] });
   });
 });
 

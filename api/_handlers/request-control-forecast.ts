@@ -11,6 +11,7 @@ import {
 } from '../_lib/siamrajUnitRequests.js';
 import {
   loadUserDepartmentScope,
+  scopeCacheKey,
   type DepartmentScope,
 } from '../_lib/departmentScope.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
@@ -122,8 +123,7 @@ const COMPLETE_YEAR_TTL_MS = 24 * 60 * 60 * 1000;
 const CURRENT_YEAR_TTL_MS = 10 * 60 * 1000;
 
 function scopeKey(scope: DepartmentScope): string {
-  if (scope.mode === 'code') return `code:${scope.code}`;
-  return scope.mode;
+  return scopeCacheKey(scope);
 }
 
 async function loadYear(

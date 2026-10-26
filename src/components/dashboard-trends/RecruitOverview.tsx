@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import BuChoiceSelect from '@/components/shared/BuChoiceSelect';
 import {
   AlertCircle,
   BarChart3,
@@ -107,19 +108,21 @@ const RecruitOverview: React.FC<{
     setMonthState(m);
   };
   const [rev, setRev] = useState(0);
+  /** BU ที่เลือก — เฉพาะผู้ใช้ที่ดูได้หลาย BU (26 ต.ค. 2569) · null = BU หลัก */
+  const [pickedBu, setPickedBu] = useState<string | null>(null);
   const [state, setState] = useState<Load>({ data: null, loading: true, error: null });
 
   useEffect(() => {
     let cancelled = false;
     setState((s) => ({ ...s, loading: true, error: null }));
-    fetchRecruitOverview(month, range)
+    fetchRecruitOverview(month, range, pickedBu)
       .then((data) => !cancelled && setState({ data, loading: false, error: null }))
       // ล้มแล้วห้ามค้างเลขรอบก่อนพร้อม "ข้อมูล ณ …" (QA 18 ต.ค. 2569) ⇒ ล้างแล้วขึ้นกล่องล้ม + ลองใหม่
       .catch((e: unknown) => !cancelled && setState({ data: null, loading: false, error: friendlyErrorText(e, 'โหลดภาพรวมไม่ได้') }));
     return () => {
       cancelled = true;
     };
-  }, [month, range, rev]);
+  }, [month, range, rev, pickedBu]);
 
   const data = state.data;
   const win = data?.window ?? null;
@@ -345,7 +348,13 @@ const RecruitOverview: React.FC<{
       </div>
 
       <div className={cn('flex flex-wrap items-center justify-between gap-2 text-xs', DASH.sub)}>
-        <span>{data.bu ? `เฉพาะ BU ${data.bu}` : 'ทุก BU'}</span>
+        {data.buChoices?.length ? (
+          <div className="w-44">
+            <BuChoiceSelect value={data.bu} choices={data.buChoices} onChange={setPickedBu} triggerClassName="h-8 text-xs" itemClassName="text-xs" />
+          </div>
+        ) : (
+          <span>{data.bu ? `เฉพาะ BU ${data.bu}` : 'ทุก BU'}</span>
+        )}
         <span className="tabular-nums">{compareNote}</span>
       </div>
 

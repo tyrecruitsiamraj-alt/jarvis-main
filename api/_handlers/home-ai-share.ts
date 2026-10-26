@@ -25,7 +25,7 @@ import type { UserRole } from '../_lib/auth.js';
 import { respondServiceError } from '../_lib/domainErrors.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { loadMatchingBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
-import { followBuJoin, followBuSql, parseBuParam } from '../_lib/homeBuSql.js';
+import { followBuJoin, followBuSql, parseBuParam, pickDashboardBu } from '../_lib/homeBuSql.js';
 import {
   buildApplicantAiShareSql,
   buildFollowAiShareSql,
@@ -285,7 +285,8 @@ export async function buildHomeAiShare(
     from: win.from,
     to: win.to,
     bu,
-    forced_bu: scope.mode === 'code',
+    forced_bu: pickDashboardBu(scope, bu).forcedBu !== null,
+    bu_choices: pickDashboardBu(scope, bu).choices,
     follow: null,
     aftercare: null,
     applicants: null,
@@ -601,7 +602,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
   try {
     const q = req.query ?? {};
     const scope: DepartmentScope = await loadMatchingBuScope(req.user);
-    const bu = scope.mode === 'code' ? normalizeTrendBu(scope.code) : parseBuParam(q.bu);
+    // ผู้ใช้หลาย BU เลือกได้ทีละ BU ในสิทธิ์ (26 ต.ค. 2569 · `pickDashboardBu`)
+    const { bu } = pickDashboardBu(scope, q.bu);
     const win = parseAiShareWindow({ from: q.from, to: q.to });
     // `?report=<ก้อน>` = รายงานผลโทร งานสรรหา / จับคู่งาน / ดูแลหลังเริ่มงาน (7 ต.ค. 2569) — ช่วง/BU เดียวกับกล่อง
     if (q.report !== undefined) {

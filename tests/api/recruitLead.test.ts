@@ -102,13 +102,13 @@ describe('buildApplicationsListQuery — Lead ไปแท็บการติ�
       buildApplicationsListQuery({
         ...base,
         scopedJobIds: new Set(['a']),
-        viewerDepartment: 'LBD',
+        viewerDepartment: ['LBD'],
       }),
       buildApplicationsListQuery({ ...base, everyoneAppointments: true }),
       buildApplicationsListQuery({
         ...base,
         scopedJobIds: new Set(['a']),
-        viewerDepartment: 'LBD',
+        viewerDepartment: ['LBD'],
         everyoneAppointments: true,
       }),
     ];

@@ -41,7 +41,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   try {
     const scope = await loadUserDepartmentScope(req.user);
-    const scopedCodes = scope.mode === 'code' ? [scope.code] : null;
+    const scopedCodes = scope.mode === 'code' ? scope.codes : null;
 
     if (method === 'GET') {
       const id = getQuery(req, 'id');
@@ -91,7 +91,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
       // ประกาศลอย: ผู้ใช้ที่ถูกล็อก BU สร้างข้าม BU ตัวเองไม่ได้
       const departmentCode = typeof body.departmentCode === 'string' ? body.departmentCode.trim() : '';
-      if (!jobId && scope.mode === 'code' && departmentCode.toUpperCase() !== scope.code.toUpperCase()) {
+      if (!jobId && scope.mode === 'code' && !scope.codes.includes(departmentCode.toUpperCase())) {
         return sendError(res, 403, 'Forbidden', 'สร้างประกาศข้าม BU ไม่ได้');
       }
 
@@ -181,7 +181,7 @@ async function canAccessPosting(
   if (scope.mode === 'all') return true;
   if (scope.mode === 'none') return false;
   if (jobId) return isSiamrajRequestInScope(req.user, jobId);
-  return (departmentCode || '').toUpperCase() === scope.code.toUpperCase();
+  return scope.codes.includes((departmentCode || '').toUpperCase());
 }
 
 export default withRbac(handler, 'recruit-postings');

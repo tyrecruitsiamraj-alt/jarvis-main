@@ -23,7 +23,7 @@ import { groupReplacements } from './request-pipeline.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
-import { followBuJoin, followBuSql } from '../_lib/homeBuSql.js';
+import { followBuJoin, followBuSql, pickDashboardBu } from '../_lib/homeBuSql.js';
 
 const FOLLOW = tableInAppSchema('follow_entries');
 
@@ -102,9 +102,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const to = typeof q.to === 'string' && YMD.test(q.to) ? q.to : today;
     const from = typeof q.from === 'string' && YMD.test(q.from) ? q.from : shiftYmd(to, -29);
     const [departmentScope, buScope] = await Promise.all([loadUserDepartmentScope(req.user), loadMatchingBuScope(req.user)]);
-    const forcedBu = buScope.mode === 'code' ? buScope.code.trim().toUpperCase() : null;
-    const askedBu = typeof q.bu === 'string' && /^[A-Z]{2,4}$/i.test(q.bu) ? q.bu.toUpperCase() : null;
-    const bu = forcedBu ?? askedBu;
+    // ผู้ใช้หลาย BU เลือกได้ทีละ BU ในสิทธิ์ (26 ต.ค. 2569 · `pickDashboardBu`)
+    const picked = pickDashboardBu(buScope, q.bu);
+    const forcedBu = picked.forcedBu;
+    const bu = picked.bu;
 
     const raw = await loadPenaltyLedgerRaw(departmentScope);
     const rows = bu ? raw.rows.filter((r) => r.bu === bu) : raw.rows;
@@ -126,6 +127,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         ownerOf: (no) => owners.get(no.trim().toUpperCase()) ?? null,
       }),
       aftercareUpcoming,
+      buChoices: picked.choices,
       errors: {
         ...(replacements ? {} : { replacement: 'อ่านส่งคนแทนไม่ได้ — ยอดนี้ยังไม่หักวันที่มีคนแทน' }),
       },

@@ -467,7 +467,7 @@ export async function checkSiamrajRequestScope(
 
   const requestBu = (item.department_code || '').trim().toUpperCase() || null;
   const userBu = scope.code.trim().toUpperCase();
-  if (requestBu && requestBu === userBu) return { ok: true };
+  if (requestBu && scope.codes.includes(requestBu)) return { ok: true };
   return { ok: false, reason: 'other_bu', requestBu, userBu };
 }
 

@@ -437,7 +437,8 @@ export function buildApplicationsListQuery(input: {
   scopedJobIds: Set<string> | null;
   viewerId: string;
   /** รหัสแผนกของผู้ใช้ (null = เห็นทุกแผนก) — ใช้คู่กับ department_code บนใบสมัคร */
-  viewerDepartment?: string | null;
+  /** BU ในสิทธิ์ของผู้ดู (หลาย BU ได้ · 26 ต.ค. 2569) */
+  viewerDepartment?: string[] | null;
   /**
    * `?lead=1` — ดู **คลังสำรอง (Lead)** แทนรายชื่อทำงาน (เจ้าของเคาะ 12 ส.ค. 2569:
    * "ปัดแล้วหายจากทุกแท็บ + มีตัวกรองเรียกคืนดู") · ไม่ส่ง = ลิสต์ปกติที่ซ่อน Lead
@@ -479,7 +480,7 @@ export function buildApplicationsListQuery(input: {
     const byJob = `job_id = any($${params.length}::text[])`;
     if (viewerDepartment) {
       params.push(viewerDepartment);
-      conds.push(`(${byJob} or department_code = $${params.length})`);
+      conds.push(`(${byJob} or department_code = any($${params.length}::text[]))`);
     } else {
       conds.push(byJob);
     }
@@ -1622,7 +1623,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       jobId,
       scopedJobIds,
       viewerId: req.user.sub,
-      viewerDepartment: deptScope.mode === 'code' ? deptScope.code : null,
+      viewerDepartment: deptScope.mode === 'code' ? deptScope.codes : null,
       leadView: getString(req.query?.lead) === '1',
       // drill-down จากกล่อง dashboard — รับเฉพาะชื่อถังที่รู้จัก (เงื่อนไขมาจาก
       // bucketCondition ที่เดียว ห้ามรับ SQL จาก client)

@@ -24,7 +24,7 @@ import { PREQUEST_ID_PREFIX } from '../_lib/siamrajSqlServerPrequests.js';
 import { loadRequestTrendPayload, requestTrendDataFrom } from '../_lib/requestTrendRows.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
 import { queueLastResultAt, queueOutcome, queueReplySql } from '../_lib/lumosQueueDefs.js';
-import { appBuJoin, appBuSql, followBuJoin, followBuSql, parseBuParam, queueBuJoins, queueBuSql } from '../_lib/homeBuSql.js';
+import { appBuJoin, appBuSql, followBuJoin, followBuSql, parseBuParam, pickDashboardBu, queueBuJoins, queueBuSql } from '../_lib/homeBuSql.js';
 import { logWarn } from '../_lib/logger.js';
 import { activityLedger } from '../../src/lib/trends/requestTrends.js';
 import { normalizeTrendBu, trendBuFromSiteCode, trendBuLabel } from '../../src/lib/trends/bu.js';
@@ -167,8 +167,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
   }
   try {
     const scope: DepartmentScope = await loadMatchingBuScope(req.user);
-    const forcedBu = scope.mode === 'code' ? normalizeTrendBu(scope.code) : null;
-    const bu = scope.mode === 'code' ? forcedBu : parseBuParam(req.query?.bu);
+    // ผู้ใช้หลาย BU เลือกได้ทีละ BU ในสิทธิ์ (26 ต.ค. 2569 · `pickDashboardBu`)
+    const { bu, forcedBu, choices: buChoices } = pickDashboardBu(scope, req.query?.bu);
     const cacheKey = JSON.stringify([scope, bu]);
     const hit = cache.get(cacheKey);
     const stamp = await closedRequestStamp();
@@ -178,6 +178,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       generated_at: new Date().toISOString(),
       scope: scope.mode,
       forced_bu: forcedBu,
+      bu_choices: buChoices,
       bu,
       bu_options: [],
       unknown_bu_jobs: 0,

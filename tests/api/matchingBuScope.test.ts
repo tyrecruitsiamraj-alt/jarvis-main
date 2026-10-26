@@ -26,7 +26,7 @@ beforeEach(() => {
 describe('loadMatchingBuScope — ล็อก BU ของตัวเองทุก role', () => {
   it('admin ที่มี BU ถูกล็อกไว้ที่ BU ตัวเอง (ต่างจากของเดิมที่เห็นทุก BU)', async () => {
     vi.mocked(dbQuery).mockResolvedValue({ rows: [{ department_code: 'LBD' }] } as never);
-    await expect(loadMatchingBuScope(user('admin'))).resolves.toEqual({ mode: 'code', code: 'LBD' });
+    await expect(loadMatchingBuScope(user('admin'))).resolves.toEqual({ mode: 'code', code: 'LBD', codes: ['LBD'] });
 
     // เทียบกับตัวเดิมให้เห็นชัดว่านี่คือจุดที่ต่างกัน — ถ้าวันไหนสองตัวนี้ให้ผลเท่ากัน
     // แปลว่ามีคนเผลอเปลี่ยน loadMatchingBuScope กลับไปใช้ตรรกะเดิม
@@ -37,7 +37,7 @@ describe('loadMatchingBuScope — ล็อก BU ของตัวเองท
   it('staff/supervisor ถูกล็อกที่ BU ตัวเองเหมือนเดิม', async () => {
     for (const role of ['staff', 'supervisor'] as const) {
       vi.mocked(dbQuery).mockResolvedValue({ rows: [{ department_code: 'LBA' }] } as never);
-      await expect(loadMatchingBuScope(user(role))).resolves.toEqual({ mode: 'code', code: 'LBA' });
+      await expect(loadMatchingBuScope(user(role))).resolves.toEqual({ mode: 'code', code: 'LBA', codes: ['LBA'] });
     }
   });
 

@@ -108,7 +108,7 @@ describe('เส้นอ่านอย่างเดียว + ขอบเ�
   });
 
   it('🔴 ผู้ใช้ผูกแผนก = ส่ง BU ของตัวเองทุกคิวรี', async () => {
-    loadMatchingBuScope.mockResolvedValue({ mode: 'code', code: 'LBD' });
+    loadMatchingBuScope.mockResolvedValue({ mode: 'code', code: 'LBD', codes: ['LBD'] });
     const json = vi.fn();
     await handler({ method: 'GET', user: { sub: 'u1', role: 'staff' }, query: { month: '2026-09' } }, { status: () => ({ json }), setHeader: vi.fn() });
     const body = json.mock.calls[0][0];

@@ -37,9 +37,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
   try {
     const scopedJobIds = await loadScopedJobIdSet(req.user);
     const dept = await loadUserDepartmentScope(req.user);
-    const params: [string[] | null, string | null] = [
+    const params: [string[] | null, string[] | null] = [
       scopedJobIds ? [...scopedJobIds] : null,
-      dept.mode === 'code' ? dept.code : null,
+      dept.mode === 'code' ? dept.codes : null,
     ];
 
     const flags: Flag[] = [];

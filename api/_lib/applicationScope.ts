@@ -33,7 +33,8 @@ export async function isApplicationInWriteScope(
 
   const dept = await loadUserDepartmentScope(user);
   if (dept.mode === 'code' && row.department_code) {
-    return normalizeDepartmentCode(row.department_code) === dept.code;
+    // หลาย BU (26 ต.ค. 2569) — ใบที่ประทับ BU ใดก็ได้ในสิทธิ์
+    return dept.codes.includes(normalizeDepartmentCode(row.department_code) ?? '');
   }
   return false;
 }

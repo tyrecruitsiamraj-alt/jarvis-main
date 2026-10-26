@@ -13,6 +13,7 @@ import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMa
 import { normalizeSiamrajRequestNoForDisplay } from './siamrajRequestNo.js';
 import {
   sqlServerDepartmentScopeClause,
+  scopeCacheKey,
   type DepartmentScope,
 } from './departmentScope.js';
 
@@ -161,7 +162,7 @@ const CLOSED_TTL_MS = 10 * 60 * 1000;
 const CLOSED_CACHE_MAX_ENTRIES = 32;
 
 function closedScopeKey(scope: DepartmentScope): string {
-  return scope.mode === 'code' ? `code:${scope.code}` : scope.mode;
+  return scopeCacheKey(scope);
 }
 
 function readClosedCache(key: string): ClosedRequest[] | null {

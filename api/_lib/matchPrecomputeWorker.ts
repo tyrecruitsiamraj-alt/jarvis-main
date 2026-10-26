@@ -16,7 +16,7 @@
 import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
 import { isAiConfigured } from './aiClient.js';
 import { listSiamrajUnitRequests, isSiamrajUnitRequestsEnabled } from './siamrajUnitRequests.js';
-import { APP_DEPARTMENT_CODES } from './departmentScope.js';
+import { APP_DEPARTMENT_CODES, codeScope } from './departmentScope.js';
 import { loadBoardMatchTierMap, getStoredBoardMatch, type BoardMatchTierEntry } from './boardMatchStore.js';
 import { matchBoardCandidatesForJob } from './boardCandidateMatcher.js';
 import { isBoardMatchFromOldPool } from './boardCandidatesSql.js';
@@ -260,7 +260,7 @@ async function scanAllDepartments(limit: number): Promise<PrecomputeJob[]> {
     try {
       const jobs = (await listSiamrajUnitRequests({
         limit,
-        departmentScope: { mode: 'code', code },
+        departmentScope: codeScope(code),
       })) as PrecomputeJob[];
       for (const job of jobs) {
         const id = typeof job.id === 'string' ? job.id.trim() : '';

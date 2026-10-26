@@ -22,6 +22,8 @@ type UserRow = {
   nickname: string | null;
   /** สายงาน (114) — คนละเรื่องกับ `role` ที่เป็นสิทธิ์ในระบบ */
   job_lanes: string[] | null;
+  /** BU ที่ดูเพิ่ม (164 · 26 ต.ค. 2569) — นอกจาก department_code */
+  extra_department_codes: string[] | null;
 };
 
 /**
@@ -57,6 +59,7 @@ function toUserJson(u: UserRow) {
     /* ส่งค่าว่างมาด้วยเสมอ — จอต้องรู้ว่า "ยังไม่ตั้ง" ต่างจาก "ไม่มีข้อมูล" */
     nickname: u.nickname ?? null,
     job_lanes: u.job_lanes ?? [],
+    extra_department_codes: u.extra_department_codes ?? [],
   };
 }
 
@@ -79,7 +82,7 @@ async function deleteUser(req: AuthedReq, res: ApiRes) {
   if (id === req.user.sub) return sendError(res, 400, 'Bad request', 'ลบบัญชีตัวเองไม่ได้');
 
   const { rows: targetRows } = await dbQuery<UserRow>(
-    `select id, email, role, full_name, is_active, created_at, department_code, phone, nickname, job_lanes
+    `select id, email, role, full_name, is_active, created_at, department_code, phone, nickname, job_lanes, extra_department_codes
        from ${usersTable} where id = $1 limit 1`,
     [id],
   );
@@ -162,6 +165,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
         department_code = raw === null ? null : raw.trim().toUpperCase();
       }
 
+      /** BU ที่ดูเพิ่ม (เจ้าของ 26 ต.ค. 2569 "บางคนดูได้หลาย BU") — ค่าทั้งชุด · ว่าง = ดูแค่ BU หลัก */
+      const hasExtraPatch = Object.prototype.hasOwnProperty.call(body, 'extra_department_codes');
+      let extraCodes: string[] = [];
+      if (hasExtraPatch) {
+        const raw = body.extra_department_codes;
+        if (!Array.isArray(raw) || raw.some((x) => typeof x !== 'string' || !isAllowedDepartmentCode(x))) {
+          return sendError(res, 400, 'Bad request', 'BU ที่ดูเพิ่มไม่ถูกต้อง');
+        }
+        extraCodes = [...new Set(raw.map((x) => String(x).trim().toUpperCase()))];
+      }
+
       const hasNicknamePatch = Object.prototype.hasOwnProperty.call(body, 'nickname');
       let nickname: string | null | undefined;
       if (hasNicknamePatch) {
@@ -217,13 +231,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
         !hasDepartmentPatch &&
         !hasPhonePatch &&
         !hasNicknamePatch &&
-        !hasLanesPatch
+        !hasLanesPatch &&
+        !hasExtraPatch
       ) {
         return sendError(res, 400, 'Bad request', 'Nothing to update');
       }
 
       const { rows: beforeRows } = await dbQuery<UserRow>(
-        `select id, email, role, full_name, is_active, created_at, department_code, phone, nickname, job_lanes
+        `select id, email, role, full_name, is_active, created_at, department_code, phone, nickname, job_lanes, extra_department_codes
            from ${usersTable} where id = $1 limit 1`,
         [id],
       );
@@ -252,9 +267,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
           department_code = case when $4::boolean then $5 else department_code end,
           phone = case when $6::boolean then $7 else phone end,
           nickname = case when $8::boolean then $9 else nickname end,
-          job_lanes = case when $10::boolean then $11::text[] else job_lanes end
+          job_lanes = case when $10::boolean then $11::text[] else job_lanes end,
+          extra_department_codes = case when $12::boolean then $13::text[] else extra_department_codes end
         where id = $1
-        returning id, email, role, full_name, is_active, created_at, department_code, phone, nickname, job_lanes
+        returning id, email, role, full_name, is_active, created_at, department_code, phone, nickname, job_lanes, extra_department_codes
         `,
         [
           id,
@@ -268,6 +284,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
           hasNicknamePatch ? nickname : null,
           hasLanesPatch,
           hasLanesPatch ? (jobLanes ?? []) : null,
+          hasExtraPatch,
+          hasExtraPatch ? extraCodes : null,
         ],
       );
       const u = updatedRows[0];
@@ -285,6 +303,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           phone: beforeUser.phone,
           nickname: beforeUser.nickname,
           job_lanes: beforeUser.job_lanes,
+          extra_department_codes: beforeUser.extra_department_codes,
         },
         after: {
           role: u.role,
@@ -292,6 +311,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           email: u.email,
           department_code: u.department_code,
           phone: u.phone,
+          extra_department_codes: u.extra_department_codes,
         },
       });
 
@@ -299,7 +319,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
 
     const { rows } = await dbQuery<UserRow>(
-      `select id, email, role, full_name, is_active, created_at, department_code, phone, nickname, job_lanes
+      `select id, email, role, full_name, is_active, created_at, department_code, phone, nickname, job_lanes, extra_department_codes
          from ${usersTable} order by created_at desc`,
     );
     return res.status(200).json(rows.map(toUserJson));

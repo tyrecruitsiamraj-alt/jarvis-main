@@ -409,14 +409,14 @@ export function bucketCondition(bucket: OverviewBucket): string {
 
 /**
  * คิวรีสรุปทั้งแผง — นับทุกถังใน pass เดียวจาก CTE `facts`
- * param: $1 = scoped job ids (text[] หรือ null = เห็นทุกแผนก) · $2 = department code (null ได้)
+ * param: $1 = scoped job ids (text[] หรือ null = เห็นทุกแผนก) · $2 = BU ในสิทธิ์ (text[] · null ได้ · หลาย BU 26 ต.ค. 2569)
  */
 export function buildOverviewSql(): string {
   return `
   with a0 as (
     select a.* from ${APPS} a
     where ($1::text[] is null or a.job_id = any($1::text[])
-           or ($2::text is not null and a.department_code = $2::text))
+           or ($2::text[] is not null and a.department_code = any($2::text[])))
   ),
   facts as (
     select a.id, a.phone, a.phone_e164, a.created_at, a.is_lead,
@@ -465,7 +465,7 @@ export function buildClaimedIdleSql(): string {
          min(a.claimed_at) as oldest_claimed_at
   from ${APPS} a
   where ($1::text[] is null or a.job_id = any($1::text[])
-         or ($2::text is not null and a.department_code = $2::text))
+         or ($2::text[] is not null and a.department_code = any($2::text[])))
     and ${OVERVIEW_BUCKETS.claimed_idle}
   group by a.claimed_by_name
   order by n desc, oldest_claimed_at asc
@@ -479,7 +479,7 @@ export function buildAwaitingChoiceSql(): string {
          min(a.unclaimed_at) as oldest_unclaimed_at
   from ${APPS} a
   where ($1::text[] is null or a.job_id = any($1::text[])
-         or ($2::text is not null and a.department_code = $2::text))
+         or ($2::text[] is not null and a.department_code = any($2::text[])))
     and ${OVERVIEW_BUCKETS.awaiting_call_choice}`;
 }
 
@@ -494,7 +494,7 @@ export function buildAttendanceSummarySql(): string {
            ${APPOINTMENT_AT_SQL} as appointment_at
     from ${APPS} a
     where ($1::text[] is null or a.job_id = any($1::text[])
-           or ($2::text is not null and a.department_code = $2::text))
+           or ($2::text[] is not null and a.department_code = any($2::text[])))
       and ${HAS_APPOINTMENT_SQL}
   ),
   latest as (

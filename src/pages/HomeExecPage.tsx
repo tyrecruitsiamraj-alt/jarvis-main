@@ -14,6 +14,7 @@
  *   ถอดส่วนคิดคน/AI เมื่องานเพิ่มออกจากหน้าหลัก · ใบค้างเกิน 90 วันขึ้นไปอยู่ในกล่องเสียเงิน
  * 🔴 ชั้นคู่ขนาน: หน้านี้คือค่าตั้งต้นของ `/` · `?home=new` ยังเปิดได้ถ้าพิมพ์เอง = ทางถอย
  */
+import BuChoiceSelect from '@/components/shared/BuChoiceSelect';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -250,7 +251,7 @@ const HomeExecPage: React.FC = () => {
   }, [range, win, bu, tick]);
 
   // เปลี่ยนช่วง/BU แล้วเลขเก่าห้ามค้าง
-  const moneyNow = money && money.window.from === range.from && money.window.to === range.to && (money.forcedBu || money.bu === bu) ? money : null;
+  const moneyNow = money && money.window.from === range.from && money.window.to === range.to && (money.forcedBu || money.bu === bu || (bu === null && Boolean(money.buChoices))) ? money : null;
   const prevNow = moneyNow ? prevMoney : null;
   const flow = moneyNow?.flow ?? null;
   const total = moneyNow ? moneyNow.totals.need.fine + moneyNow.totals.need.deduct : 0;
@@ -325,7 +326,10 @@ const HomeExecPage: React.FC = () => {
         <h1 className="text-3xl font-medium text-foreground">หน้าหลัก</h1>
         <div className="flex flex-wrap items-center gap-2">
           <PeriodPicker value={win} onChange={setWin} />
-          {moneyNow?.forcedBu && moneyNow.bu ? (
+          {kpi?.buChoices?.length ? (
+            /* ดูได้หลาย BU — เลือกทีละ BU ในสิทธิ์ (26 ต.ค. 2569) */
+            <BuChoiceSelect value={bu ?? kpi.bu} choices={kpi.buChoices} onChange={setBu} triggerClassName="h-10 w-44 bg-card" />
+          ) : moneyNow?.forcedBu && moneyNow.bu ? (
             <span className="text-sm text-muted-foreground">{trendBuLabel(moneyNow.bu)}</span>
           ) : (
             <Select value={bu ?? 'all'} onValueChange={(v) => setBu(v === 'all' ? null : v)}>
