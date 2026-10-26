@@ -134,6 +134,7 @@ export function AutopostBody({
         if (acc) {
           setAccountId(acc.id);
           setWorkerName(acc.worker ?? '');
+          if (acc.status === 'worker_offline') setWarn(offlineWarn(acc));
           setPicked(defaultGroups(o, acc, province, s.recentGroups));
         }
       })
@@ -210,7 +211,7 @@ export function AutopostBody({
       return;
     }
     // เครื่องหลักออฟไลน์ = เลือกบัญชีได้ แต่ให้เลือกเครื่องอื่นที่ออนไลน์
-    setWarn(a.status === 'worker_offline' ? { kind: 'info', lines: [soWarningText(a.name, a.status, a.warning), 'เลือกเครื่องอื่นที่ออนไลน์ในช่องเครื่อง'] } : null);
+    setWarn(a.status === 'worker_offline' ? offlineWarn(a) : null);
     setAccountId(id);
     setWorkerName(a.worker ?? '');
     setPicked(defaultGroups(opts, a, province, state?.recentGroups ?? []));
@@ -520,9 +521,14 @@ export function AutopostBody({
   );
 }
 
-/** บัญชีตั้งต้น = พร้อมโพสต์ก่อน แล้วมีงานค้าง แล้วครบโควต้า · ไม่มีที่เลือกได้ = ไม่เลือก */
-function firstAccount(list: readonly SoOptAccount[]): SoOptAccount | null {
-  for (const st of ['ready', 'busy', 'full'] as const) {
+/** บัญชีตั้งต้น = พร้อมโพสต์ก่อน แล้วมีงานค้าง แล้วครบโควต้า แล้วเครื่องหลักออฟไลน์ · ไม่มีที่เลือกได้ = ไม่เลือก */
+/** เครื่องหลักออฟไลน์ — เลือกบัญชีได้ แต่บอกให้เปลี่ยนเครื่อง */
+function offlineWarn(a: SoOptAccount): { kind: 'info'; lines: string[] } {
+  return { kind: 'info', lines: [soWarningText(a.name, a.status, a.warning), 'เลือกเครื่องอื่นที่ออนไลน์ในช่องเครื่อง'] };
+}
+
+export function firstAccount(list: readonly SoOptAccount[]): SoOptAccount | null {
+  for (const st of ['ready', 'busy', 'full', 'worker_offline'] as const) {
     const a = list.find((x) => x.status === st);
     if (a) return a;
   }
