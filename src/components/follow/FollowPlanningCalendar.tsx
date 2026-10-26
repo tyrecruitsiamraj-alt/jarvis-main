@@ -345,6 +345,8 @@ const FollowPlanningCalendar: React.FC<{
   onFinishRound?: (round: FollowPlanningRound, outcome: FollowOutcome) => void | Promise<void>;
   /** ยกเลิก 3 แบบ (7 ต.ค. 2569) — ไม่ส่ง choice = สายนี้สายเดียว */
   onCancelRound?: (round: FollowPlanningRound, choice?: FollowCancelChoice) => void | Promise<void>;
+  /** แผนวันนี้ยังไม่ถึง Lumos — ส่งทุกสาย AI ของเบอร์นี้ในวันนั้น (26 ต.ค. 2569 · PATCH push_day) */
+  onPushDay?: (round: FollowPlanningRound) => void | Promise<void>;
   /** รายการที่กำลังบันทึกอยู่ — ปุ่มของแถวนั้นกดซ้ำไม่ได้ */
   busyId?: string | null;
   /**
@@ -393,6 +395,7 @@ const FollowPlanningCalendar: React.FC<{
   onStaffResult,
   onFinishRound,
   onCancelRound,
+  onPushDay,
   busyId = null,
   allRows,
   onViewChange,
@@ -728,6 +731,7 @@ const FollowPlanningCalendar: React.FC<{
                   onRecord={onStaffResult ? recordStaffResult : undefined}
                   onFinish={onFinishRound}
                   onCancel={onCancelRound}
+                  onPushDay={onPushDay}
                   onOpen={(row, ymd, rounds) => onOpenCell(row, ymd || dayYmd, rounds)}
                 />
               ) : (
@@ -986,6 +990,15 @@ const FollowPlanningCalendar: React.FC<{
                                             {round.entry.dispatch_state === 'not_imported' ? 'Lumos ไม่รับแผน' : 'ส่งไม่ถึง Lumos'}
                                           </span>
                                         ) : null}
+                                        {/* แผนวันนี้ไม่เคยถึง Lumos (26 ต.ค. 2569 — 9 สายของ 30–31 ต.ค. ค้างเงียบ) */}
+                                        {round.entry.lumos_unsent ? (
+                                          <span
+                                            className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', TONE.danger.chip)}
+                                            data-testid="follow-unsent-chip"
+                                          >
+                                            ยังไม่ได้ส่งให้ AI
+                                          </span>
+                                        ) : null}
                                         {/* Lumos ลงผลรับทราบ/ไป แต่เขาบอกว่าลา (14 ต.ค. 2569 · `followLeave.ts`) */}
                                         {isFollowLeaveMismatch(round.entry) ? (
                                           <span
@@ -1099,7 +1112,7 @@ const FollowPlanningCalendar: React.FC<{
                                         ) : round.state === 'notSent' &&
                                           !roundDispatchReason(round).startsWith(FOLLOW_CALL_CATEGORY_LABEL.notSent) ? (
                                           <span className="text-[12px] text-muted-foreground">{roundDispatchReason(round)}</span>
-                                        ) : round.state === 'overdue' ? (
+                                        ) : round.state === 'overdue' && !e.lumos_unsent ? (
                                           /**
                                            * 🔴 "เลยเวลานัด" ไม่บอกว่า **ส่งไปแล้วหรือยัง** (ตาใหม่ถาม 13 ก.ย. 2569)
                                            * สภาพนี้แปลว่า **ส่งให้ AI แล้ว** (มีแถวในคิว) แค่ผลยังไม่กลับ —
@@ -1130,6 +1143,19 @@ const FollowPlanningCalendar: React.FC<{
                                         ) : aiCancellable ? (
                                           <span className="mt-1">
                                             <FollowCancelMenu busy={busy} onCancel={(c) => onCancelRound?.(round, c)} />
+                                          </span>
+                                        ) : null}
+                                        {e.lumos_unsent && onPushDay ? (
+                                          <span className="mt-1">
+                                            <Button
+                                              type="button"
+                                              size="xs"
+                                              disabled={busy}
+                                              onClick={() => void onPushDay(round)}
+                                              data-testid="follow-push-day"
+                                            >
+                                              ส่งให้ AI
+                                            </Button>
                                           </span>
                                         ) : null}
                                         {/* ประวัติ: ปุ่ม ไป/ไม่ไป เคยอยู่ตรงนี้เช้า 3 ต.ค. แล้วถอดไปป๊อปจัดการ · 6 ต.ค. 2569 เจ้าของสั่งใหม่ให้กลับมา

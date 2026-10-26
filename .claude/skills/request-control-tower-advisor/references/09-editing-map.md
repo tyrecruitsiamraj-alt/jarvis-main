@@ -13840,3 +13840,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - กติกา (เจ้าของ Choice): เวลาถัดไปในรายการที่ยังไม่ถึง (ห่าง ≥10 นาที) วันเดียวกันได้ · เลยหมด = เวลาแรกวันถัดไป · ทุกงานที่ AI โทร (ตารางติดตามคนเริ่มงานมีเวลาของตัวเอง ไม่ใช้)
 - ใช้ 2 จุด: `api/_lib/callFollowup.ts` (ได้ผลโทร) · `api/_lib/lumosPushRetryWorker.ts` ข้อ c (ย้ายนัดที่ไม่ตรงเวลาในรายการ)
 - จอ: ตั้งค่า › โทรซ้ำคนไม่รับสาย (`CallRetryTab.tsx` · แท็บ `callRetry`) · เส้น `GET/PUT /api/call-followup-policy` (PUT admin · จดบันทึก)
+
+### หน้าติดตาม: แผนที่ไม่เคยถึง Lumos + ปุ่ม "ส่งให้ AI" (26 ต.ค. 2569)
+- `lumos_unsent` ใน GET `/api/follow` = แถว pending ที่หัวขบวนแผนไม่มี `push_event_id` และ `lumos_client_id`
+- จอ: ป้าย "ยังไม่ได้ส่งให้ AI" + ปุ่ม "ส่งให้ AI" ทั้งมุม "ต้องโทร" (`FollowCallQueue`) และ "ตาราง" (`FollowPlanningCalendar`) · ข้อความ "ส่งให้ AI แล้ว ยังไม่มีผลกลับ" ไม่ขึ้นกับแถวที่ยังไม่ส่ง
+- PATCH `action:'push_day'` (`pushFollowDay` ใน `follow.ts`): สาย AI ที่ยังรอของเบอร์เดียวกัน วันเดียวกัน (เวลาไทย) เท่านั้น · วันนั้นมีแผนถึง Lumos แล้ว = 409 ให้ไปแก้ตาราง · เรียก `replanFollowSetWithLumos({ skipCancelOld: true })` ไม่ยิง DELETE แผนเก่า (กันยกเลิกแผนรหัสเดิมวันอื่นของเบอร์เดียวกัน) · จด audit `follow.push_day`
+- เทสต์: `tests/api/followPushDay.test.ts` · `FollowCallQueue.test.tsx`

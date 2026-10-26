@@ -128,6 +128,8 @@ type FollowRow = {
   /** เหตุที่ push ไม่สำเร็จ (migration 116) — undefined = ฐานยังไม่มีคอลัมน์นี้ */
   dispatch_error?: string | null;
   call_status: string | null;
+  /** สายรอโทรที่แผนของวันนั้น **ไม่เคยถูกส่งไป Lumos** (หัวขบวนไม่มีรหัส event/client) — 26 ต.ค. 2569 */
+  lumos_unsent?: boolean | null;
   call_outcome: string | null;
   /** รอบที่โทรล่าสุดของแถวคิว — ใช้จัดกลุ่ม "ใครอยู่รอบไหน" บนแผงหน้าหลัก */
   call_attempt: number | null;
@@ -264,6 +266,11 @@ function toResponse(r: FollowRow) {
      * ⚠️ ส่งมาดิบ ๆ · การตีความอยู่ที่ `followCompletion.ts` ฝั่งเดียว
      */
     followup_state: r.followup_state ?? null,
+    /**
+     * 🔴 แผนของวันนี้ยังไม่เคยไปถึง Lumos (26 ต.ค. 2569 — 9 สายของ 3 คนค้างเงียบ ๆ จอบอก "ส่งให้ AI แล้ว")
+     * จอขึ้น "ยังไม่ได้ส่งให้ AI" + ปุ่มส่งเฉพาะวันนั้น (`action: push_day`)
+     */
+    lumos_unsent: r.lumos_unsent === true,
   };
 }
 
@@ -312,6 +319,11 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
             q.result->'next_action'                        as call_next_action,
             q.updated_at                                   as called_at,
             q.followup_state                               as followup_state,
+            (q.status = 'pending' and exists (
+               select 1 from ${queueTable} ql
+                where ql.channel = 'reminder' and ql.job_ref = 'follow'
+                  and ql.person_ref = coalesce(q.plan_ref, q.person_ref)
+                  and ql.push_event_id is null and ql.lumos_client_id is null)) as lumos_unsent,
             q.payload->>'admin_phone'                      as emergency_phone,
             -- ชื่อที่โชว์ของคน (QA รอบ 2 ข้อ 40 · เจ้าของ Choice "เพิ่มโดย" + ชื่อเล่นหน้าผู้ใช้งาน → ชื่อจริง · ห้ามอีเมล)
             coalesce(umci.name, umce.name) as created_by_display,
@@ -2086,6 +2098,59 @@ async function uncancelFollow(req: AuthedReq, res: ApiRes) {
   return res.status(200).json({ restored: out.restored, resent: out.resent, restore_error: out.error ?? null });
 }
 
+/**
+ * PATCH action=push_day — **ส่งแผนของวันนั้นให้ Lumos** (เจ้าของ 26 ต.ค. 2569 "ทำตาม Journey ผ่าน UI")
+ * ใช้กับวันที่แผนไม่เคยไปถึง Lumos (ประคอง/อาคม/สมพร 30–31 ต.ค. ค้างเงียบ ๆ ไม่มีตัวส่งซ้ำหยิบ)
+ * 🔴 ส่งเฉพาะสาย AI ที่ยังรอโทรของเบอร์นี้ **วันเดียวกัน** · **ไม่สั่งยกเลิกแผนใดที่ Lumos** (แผนวันอื่นรหัสเดิมยกเลิกไม่ติด
+ *    ⇒ ไปแตะ = เสี่ยงโทรซ้ำสองสาย) · วันนั้นมีแผนที่เคยส่งแล้วแม้สายเดียว = ไม่ส่ง ให้ใช้แก้ตารางแทน
+ */
+async function pushFollowDay(req: AuthedReq, res: ApiRes) {
+  const id = typeof req.query?.id === 'string' ? req.query.id.trim() : '';
+  if (!UUID_RE.test(id)) return sendError(res, 400, 'Bad request', 'ต้องระบุ id ของรายการติดตาม');
+  const { rows } = await dbQuery<{ id: string; recipient_phone: string; scheduled_at: Date; call_mode: string | null; cancelled_at: Date | null; completed_at: Date | null }>(
+    `select id, recipient_phone, scheduled_at, call_mode, cancelled_at, completed_at from ${followTable} where id = $1 limit 1`,
+    [id],
+  );
+  const row = rows[0];
+  if (!row) return sendError(res, 404, 'Not found', 'ไม่พบรายการ');
+  if (row.cancelled_at || row.completed_at) return sendError(res, 400, 'Bad request', 'สายนี้ยกเลิกหรือปิดงานแล้ว');
+  if ((row.call_mode ?? 'ai') === 'manual') return sendError(res, 400, 'Bad request', 'สายนี้ตั้งให้คนโทร');
+  if (new Date(row.scheduled_at).getTime() <= Date.now()) return sendError(res, 400, 'Bad request', 'เลยเวลาโทรแล้ว');
+
+  // สาย AI ที่ยังรอโทรของเบอร์นี้วันเดียวกัน (วันตามเวลาไทย) + หัวขบวนแผนของแต่ละสาย
+  const { rows: day } = await dbQuery<{ id: string; sent: boolean }>(
+    `select f.id::text as id,
+            exists (select 1 from ${queueTable} q
+                      join ${queueTable} l on l.channel = 'reminder' and l.job_ref = 'follow'
+                                          and l.person_ref = coalesce(q.plan_ref, q.person_ref)
+                     where q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref = 'follow-' || f.id::text
+                       and (l.push_event_id is not null or l.lumos_client_id is not null)) as sent
+       from ${followTable} f
+      where right(regexp_replace(coalesce(f.recipient_phone, ''), '\\D', '', 'g'), 9)
+            = right(regexp_replace(coalesce($1::text, ''), '\\D', '', 'g'), 9)
+        and (f.scheduled_at at time zone 'Asia/Bangkok')::date = ($2::timestamptz at time zone 'Asia/Bangkok')::date
+        and f.cancelled_at is null and f.completed_at is null
+        and coalesce(f.call_mode, 'ai') = 'ai' and f.scheduled_at > now()`,
+    [row.recipient_phone, row.scheduled_at],
+  );
+  if (day.length === 0) return sendError(res, 400, 'Bad request', 'ไม่มีสาย AI ที่รอโทรในวันนี้');
+  if (day.some((d) => d.sent)) return sendError(res, 409, 'Conflict', 'วันนี้มีแผนที่ส่งให้ AI แล้ว — ใช้แก้ตารางแทน');
+
+  const out = await replanFollowSetWithLumos({
+    memberIds: day.map((d) => d.id),
+    cancelledIds: [],
+    resolveStaffName: staffNameOfPhone,
+    skipCancelOld: true,
+  });
+  await auditFromAuthed(req, {
+    action: 'follow.push_day',
+    entityType: 'follow_entry',
+    entityId: id,
+    after: { ids: day.map((d) => d.id), rounds: out.rounds, pushedPlans: out.pushedPlans, reason: out.reason ?? null },
+  });
+  return res.status(200).json({ rounds: out.rounds, pushed: out.pushedPlans > 0, reason: out.reason ?? null });
+}
+
 /** ฐานยังไม่รัน migration 130 — บอกตรง ๆ แทนจะปล่อย error ดิบของ Postgres */
 const STAFF_CALL_NOT_READY =
   'ยังลงผลโทรไม่ได้ ต้องรออัปเดตระบบก่อน';
@@ -2240,6 +2305,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (action === 'update_set') return await updateFollowSet(req, res, body);
       if (action === 'reopen') return await reopenFollow(req, res);
       if (action === 'uncancel') return await uncancelFollow(req, res);
+      if (action === 'push_day') return await pushFollowDay(req, res);
       if (action === 'staff_call') return await recordStaffCall(req, res, body);
       if (action === 'staff_call_clear') return await clearStaffCall(req, res);
       return await completeFollow(req, res, body);

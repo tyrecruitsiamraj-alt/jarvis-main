@@ -3,7 +3,7 @@
  * กองเดียว "ต้องโทร" · ป้าย คน/AI ทุกแถว · ไม่มีหัว "AI จะโทร" แยกแล้ว
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import FollowCallQueue from './FollowCallQueue';
 import { groupFollowEntries } from '@/lib/followGrouping';
 import { buildFollowDayPeople, buildFollowPlanningRows } from '@/lib/followPlanning';
@@ -64,5 +64,34 @@ describe('สาย AI ที่โทรไม่ติด (เจ้าขอ�
     expect(row.textContent).toContain('ให้คนตาม');
     expect(screen.getByTestId('queue-count-ai').textContent).toBe('AI 1');
     expect(screen.getByTestId('queue-count-staff').textContent).toBe('คน 0');
+  });
+});
+
+describe('แผนที่ไม่เคยถึง Lumos (26 ต.ค. 2569 — 9 สายของ 30–31 ต.ค.)', () => {
+  const unsent = entry({
+    id: 'u',
+    recipient_name: 'ค้าง ส่ง',
+    recipient_phone: '0844444444',
+    call_mode: 'ai',
+    dispatch_state: 'queued',
+    lumos_unsent: true,
+    scheduled_at: '2026-10-14T03:00:00Z',
+  });
+  const people = () => buildFollowDayPeople(buildFollowPlanningRows(groupFollowEntries([unsent], NOW), NOW), '2026-10-14');
+
+  it('ขึ้นป้าย "ยังไม่ได้ส่งให้ AI" + ปุ่ม "ส่งให้ AI" กดแล้วส่งสายนั้นไป', () => {
+    const pushed: string[] = [];
+    render(<FollowCallQueue people={people()} now={NOW} onPushDay={(r) => void pushed.push(r.entry.id)} onOpen={() => undefined} />);
+    expect(screen.getByTestId('follow-unsent-chip').textContent).toBe('ยังไม่ได้ส่งให้ AI');
+    fireEvent.click(screen.getByTestId('follow-push-day'));
+    expect(pushed).toEqual(['u']);
+  });
+
+  it('สายที่ส่งแล้วไม่มีป้ายและไม่มีปุ่ม', () => {
+    const sent = { ...unsent, lumos_unsent: false };
+    const rows = buildFollowPlanningRows(groupFollowEntries([sent], NOW), NOW);
+    render(<FollowCallQueue people={buildFollowDayPeople(rows, '2026-10-14')} now={NOW} onPushDay={() => undefined} onOpen={() => undefined} />);
+    expect(screen.queryByTestId('follow-unsent-chip')).toBeNull();
+    expect(screen.queryByTestId('follow-push-day')).toBeNull();
   });
 });

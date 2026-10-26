@@ -55,6 +55,7 @@ import {
   recordFollowStaffCall,
   createReplaceFollow,
   cancelFollowScope,
+  pushFollowDay,
   type FollowCancelScope,
   clearFollowStaffCall,
   type FollowEntry,
@@ -1835,6 +1836,21 @@ const FollowPage: React.FC = () => {
     }
   };
 
+  /** แผนที่ไม่เคยถึง Lumos — ส่งทุกสาย AI ของเบอร์นี้ในวันนั้น วันอื่นไม่แตะ (26 ต.ค. 2569) */
+  const doPushDay = async (id: string) => {
+    setBusyId(id);
+    try {
+      const out = await pushFollowDay(id);
+      if (out.pushed) toast.success(`ส่งให้ AI แล้ว ${out.rounds} สาย`);
+      else toast.error(out.reason ? `ส่งไม่สำเร็จ: ${out.reason}` : 'ส่งไม่สำเร็จ ลองกดอีกครั้ง');
+      await reload();
+    } catch (err) {
+      toast.error(friendlyErrorText(err, 'ส่งไม่สำเร็จ'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   /**
    * ลบทิ้งจริง — **admin เท่านั้น** (เจ้าของสั่ง 3 ก.ย. 2569: *"ทำให้ฉันลบได้หน่อย
    * เฉพาะฉันนะ เพราะตอนนี้ทดสอบอยู่"*) · server เป็นด่านตัดสินอีกชั้น
@@ -2590,6 +2606,7 @@ const FollowPage: React.FC = () => {
           onCancelRound={(round, choice) =>
             choice && choice !== 'call' ? doCancelScope(round.entry.id, choice) : doCancel(round.entry.id)
           }
+          onPushDay={(round) => doPushDay(round.entry.id)}
           busyId={busyId}
           lastLoadedAt={lastLoadedAt}
           roundFilter={activeRound}

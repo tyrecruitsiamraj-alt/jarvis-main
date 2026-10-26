@@ -122,6 +122,8 @@ export type FollowEntry = {
    * — กล่อง "โทรครบแล้ว" (Phase 7.1) นับ `needs_human` เข้ากองด้วย
    */
   followup_state?: string | null;
+  /** แผนของวันนี้ยังไม่เคยไปถึง Lumos — จอขึ้น "ยังไม่ได้ส่งให้ AI" + ปุ่มส่งเฉพาะวันนั้น (26 ต.ค. 2569) */
+  lumos_unsent?: boolean;
   call_summary: string | null;
   /**
    * **คำที่คนรับสายพูดเอง** (ต่อจาก transcript ฝั่ง candidate) — `null` = ไม่มี
@@ -530,6 +532,16 @@ export const FOLLOW_STATUS_BAR: Record<FollowCallStatus, string> = {
  * ย้อนยกเลิก (16 ต.ค. 2569) — คืนทุกสายที่ยกเลิกในการกดครั้งเดียวกัน + ส่งแผนให้ Lumos ใหม่
  * 409 = เพิ่งยกเลิก (ต้องรอ 2 นาที กติกา Lumos) · `restore_error` = ส่ง Lumos ไม่ครบ ต้องบอกจอ
  */
+/** ส่งแผนของวันนั้นให้ AI — เฉพาะวันที่ยังไม่เคยไปถึง Lumos (`lumos_unsent`) · ไม่ยกเลิกแผนวันอื่น (26 ต.ค. 2569) */
+export async function pushFollowDay(id: string): Promise<{ rounds: number; pushed: boolean; reason: string | null }> {
+  const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'push_day' }),
+  });
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as { rounds: number; pushed: boolean; reason: string | null };
+}
+
 export async function uncancelFollowEntry(id: string): Promise<{ restored: number; resent: number; restore_error: string | null }> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',

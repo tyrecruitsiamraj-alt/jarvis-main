@@ -2645,6 +2645,8 @@ export async function replanFollowSetWithLumos(input: {
   memberIds: readonly string[];
   cancelledIds: readonly string[];
   resolveStaffName: (phone: string | null) => Promise<string | null>;
+  /** ไม่สั่งยกเลิกแผนเดิมที่ Lumos — ใช้เฉพาะวันที่แผนไม่เคยถูกส่ง (`push_day` · 26 ต.ค. 2569) */
+  skipCancelOld?: boolean;
 }): Promise<FollowSetReplan> {
   const states: Record<string, FollowDispatchState> = {};
   /**
@@ -2785,7 +2787,7 @@ export async function replanFollowSetWithLumos(input: {
   // ④-ก ยกเลิกแผนเดิมทุกตัวก่อน — ไม่สำเร็จแม้ตัวเดียว = ไม่ส่งใหม่
   // รอแผนที่กำลังส่งของเบอร์เหล่านี้ให้ถึง Lumos ก่อน (ยกเลิกก่อนมันถึง = มันถึงทีหลังแล้วค้างเป็นแผนที่สอง)
   await awaitFollowPushes(entries.map((e) => e.recipient_phone));
-  for (const ref of oldRefs) {
+  for (const ref of input.skipCancelOld ? [] : oldRefs) {
     try {
       await cancelPushedReminderIgnoringMissing(ref);
     } catch (e) {

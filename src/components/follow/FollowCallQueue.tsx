@@ -47,6 +47,7 @@ export default function FollowCallQueue({
   onRecord,
   onFinish,
   onCancel,
+  onPushDay,
   onOpen,
 }: {
   people: readonly FollowDayPerson[];
@@ -55,6 +56,8 @@ export default function FollowCallQueue({
   onRecord?: (round: FollowPlanningRound, outcome: FollowStaffCallOutcome, row: FollowPlanningRow) => boolean | void | Promise<boolean | void>;
   onFinish?: (round: FollowPlanningRound, outcome: FollowOutcome) => void | Promise<void>;
   onCancel?: (round: FollowPlanningRound, choice?: FollowCancelChoice) => void | Promise<void>;
+  /** แผนวันนี้ยังไม่ถึง Lumos (`lumos_unsent`) — ส่งทุกสาย AI ของเบอร์นี้ในวันนั้น (26 ต.ค. 2569) */
+  onPushDay?: (round: FollowPlanningRound) => void | Promise<void>;
   onOpen: (row: FollowPlanningRow, ymd: string, rounds: FollowPlanningRound[]) => void;
 }) {
   const queue = useMemo(() => buildFollowCallQueue(people, now), [people, now]);
@@ -115,6 +118,11 @@ export default function FollowCallQueue({
             ) : null}
             {person.row.group.name}
             <span className="ml-2 font-normal tabular-nums text-muted-foreground">{localThaiPhone(person.row.group.phone)}</span>
+            {it.group !== 'done' && e.lumos_unsent ? (
+              <span className={cn('ml-2 align-middle text-xs', TONE.danger.chip)} data-testid="follow-unsent-chip">
+                ยังไม่ได้ส่งให้ AI
+              </span>
+            ) : null}
             {/* Lumos ลงผลรับทราบ/ไป แต่เขาบอกว่าลา (14 ต.ค. 2569 · `followLeave.ts`) */}
             {isFollowLeaveMismatch(e) ? (
               <span
@@ -164,6 +172,11 @@ export default function FollowCallQueue({
             />
           ) : it.group === 'ai' && onCancel ? (
             <FollowCancelMenu busy={busy} onCancel={(c) => onCancel(call.round, c)} />
+          ) : null}
+          {it.group !== 'done' && e.lumos_unsent && onPushDay ? (
+            <Button type="button" size="xs" disabled={busy} onClick={() => void onPushDay(call.round)} data-testid="follow-push-day">
+              ส่งให้ AI
+            </Button>
           ) : null}
           <Button
             type="button"
