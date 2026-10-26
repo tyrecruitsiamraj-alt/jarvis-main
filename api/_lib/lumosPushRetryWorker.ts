@@ -39,9 +39,8 @@ import { checkQueueImports } from './lumosQueueImportWatch.js';
 import { listSiamrajUnitRequests } from './siamrajUnitRequests.js';
 import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
-  isRotatedRetrySlot,
-  isSameRetrySlot,
-  rotatedRetryAt,
+  isListedRetryTime,
+  nextRetryAt,
   type CallFollowupPolicy,
 } from '../../src/lib/callFollowupPolicy.js';
 import { UNREACHED_CALL_OUTCOMES } from '../../src/lib/callOutcomeBuckets.js';
@@ -537,20 +536,17 @@ export async function runLumosPushRetryOnce(
       await closeRetry(r.id, 'needs_human', `ส่งโทรซ้ำไม่ถึง Lumos เกิน ${Math.round(cfg.giveUpAfterMinutes / 60)} ชม. — ให้เจ้าหน้าที่โทรเอง`);
       continue;
     }
-    // c) ใบสมัครที่ยังไม่ติด: นัดแบบเดิม (+24 ชม. เวลาเดิม) · ตกช่องเดียวกับสายที่ไม่ติด · ค้างเก่า
-    //    ⇒ นัดช่องเวลาถัดไปใหม่ (คละช่วงเวลา) แล้วรอ
-    //    🔴 ผู้สมัครขอให้โทรกลับตามเวลาที่นัด (`reschedule_requested`) = โทรตามเวลานั้น ห้ามย้ายช่อง
-    const isApplication = r.person_ref.startsWith('app-');
-    const lastCall = toDate(r.last_call_at);
+    // c) ยังไม่ติด แต่นัดไม่ตรงเวลาโทรซ้ำที่ตั้งไว้ (นัดแบบเก่า 10/14/18 · +24 ชม. · เพิ่งเปลี่ยนเวลาในหน้าตั้งค่า) · ค้างเก่า
+    //    ⇒ นัดเวลาถัดไปในรายการ (ตั้งค่า › โทรซ้ำคนไม่รับสาย · ทุกงาน · เจ้าของ 26 ต.ค. 2569) แล้วรอ
+    //    🔴 ผู้สมัครขอให้โทรกลับตามเวลาที่นัด (`reschedule_requested`) = โทรตามเวลานั้น ห้ามย้าย
+    //    งานติดตามไม่ย้าย (ตารางของตัวเอง · โทรซ้ำวันถัดไปเวลาเดิม)
     if (
-      isApplication &&
+      !r.person_ref.startsWith('follow-') &&
       !failedBefore &&
       UNREACHED.has(String(r.last_outcome ?? '')) &&
-      (!isRotatedRetrySlot(due) ||
-        (lastCall !== null && isSameRetrySlot(due, lastCall)) ||
-        lateMinutes > RETRY_REPLAN_AFTER_MINUTES)
+      (!isListedRetryTime(due, policy) || lateMinutes > RETRY_REPLAN_AFTER_MINUTES)
     ) {
-      const at = rotatedRetryAt(lastCall ?? due, now);
+      const at = nextRetryAt(now, policy);
       run.retriesReplanned += 1;
       await replanRetry(r.id, at);
       continue;

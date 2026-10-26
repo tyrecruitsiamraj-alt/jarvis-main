@@ -36,6 +36,8 @@ export type ApiResource =
   | 'follow-topics'
   /** ประเภทประกัน ขั้น 4 ฟอร์มติดตาม (149 · 16 ต.ค. 2569) — อ่านทุกคน · เพิ่มเฉพาะหัวหน้างานขึ้นไป */
   | 'follow-insurance-types'
+  /** เวลาโทรซ้ำคนไม่รับสาย (26 ต.ค. 2569) — อ่านทุกคน · แก้เฉพาะ admin */
+  | 'call-followup-policy'
   | 'ai-settings'
   /** วันแจ้งเข้าจาก ERP ต่อเบอร์ (อ่านอย่างเดียว · ใช้ POST เพราะส่งเบอร์เยอะ) — 17 ต.ค. 2569 */
   | 'erp-inform-dates'
@@ -230,6 +232,10 @@ export function minimumRoleFor(
     case 'matching-job-postings':
     case 'matching-flow-summary':
       return 'staff';
+
+    case 'call-followup-policy':
+      if (isRead) return 'staff';
+      return 'admin';
 
     case 'lumos-dispatch':
       // staff: ดูผลการโทร + ติ๊กเลือกส่งให้ Lumos โทรเอง (โมเดลเดียวกับ follow)

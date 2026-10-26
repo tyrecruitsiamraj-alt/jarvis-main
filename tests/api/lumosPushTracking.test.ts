@@ -170,10 +170,16 @@ describe('สายไฟ — ทุกทางที่ส่งใบสม�
     expect(body).toContain('if (rows.length === 0 && baseId !== clientId) rows = await applyById(baseId)');
   });
 
-  it('โทรซ้ำคละช่วงเวลาเฉพาะใบสมัคร (app-) ทั้งสองจุดที่ตัดสินโทรซ้ำ · เลนอื่นวันถัดไปเวลาเดิม', () => {
+  it('โทรซ้ำทุกงานใช้เวลาจากหน้าตั้งค่า (26 ต.ค. 2569) — ไม่เหลือช่องคละ 10/14/18 · ตัวส่งซ้ำย้ายนัดเก่ามาเวลาในรายการ', () => {
     const c = code('api/_lib/callFollowup.ts');
-    expect(c).toContain("retrySlots: String(row.person_ref ?? '').startsWith('app-') ? RETRY_TIME_SLOTS_BKK : null");
-    expect(c).toContain("retrySlots: personRef?.startsWith('app-') ? RETRY_TIME_SLOTS_BKK : null");
+    expect(c).not.toContain('retrySlots');
+    expect(c).not.toContain('RETRY_TIME_SLOTS_BKK');
+    expect((c.match(/policy: await getCallFollowupPolicy\(\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    const w = code('api/_lib/lumosPushRetryWorker.ts');
+    expect(w).toContain('!isListedRetryTime(due, policy)');
+    expect(w).toContain('const at = nextRetryAt(now, policy);');
+    expect(code('api/_handlers/call-followup-policy.ts')).toContain("if (req.user?.role !== 'admin')");
+    expect(code('src/lib/settingsNav.ts')).toContain("callRetry: 'โทรซ้ำคนไม่รับสาย'");
   });
 
   it('ตัวส่งซ้ำเริ่มตอนบูต process API (ตัวเดียวกับที่ supervisord รันบนเครื่องจริง)', () => {

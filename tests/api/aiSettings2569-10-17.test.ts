@@ -186,7 +186,7 @@ describe('ตัวเชื่อมแต่ละเจ้า', () => {
 
 describe('หน้าจอ', () => {
   it('แท็บอยู่กลุ่มระบบอัตโนมัติ · ช่อง key เป็น password · เว้นว่าง = คง key เดิม', () => {
-    expect(read('src/lib/settingsNav.ts')).toContain("automation: ['lumosMode', 'callScripts', 'aiSettings',");
+    expect(read('src/lib/settingsNav.ts')).toContain("automation: ['lumosMode', 'callRetry', 'callScripts', 'aiSettings',");
     const tab = read('src/pages/settings/AiSettingsTab.tsx');
     expect(tab).toContain('type="password"');
     expect(tab).toContain('เว้นว่างไว้ = ใช้ key เดิม');

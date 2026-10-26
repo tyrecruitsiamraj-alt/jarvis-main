@@ -21,6 +21,7 @@ export const SETTINGS_TAB_IDS = [
   'workStatus',
   'matchWeights',
   'lumosMode',
+  'callRetry',
   'callScripts',
   'aiSettings',
   'callSuppression',
@@ -46,6 +47,7 @@ export const SETTINGS_TAB_LABEL: Record<SettingsTabId, string> = {
   workStatus: 'สถานะทำงาน',
   matchWeights: 'น้ำหนักเรียงผู้สมัคร',
   lumosMode: 'โหมดส่งงานให้ Lumos',
+  callRetry: 'โทรซ้ำคนไม่รับสาย',
   callScripts: 'บทพูดของ AI',
   aiSettings: 'AI ที่ใช้คิดงาน',
   callSuppression: 'บัญชีห้ามโทร',
@@ -66,6 +68,7 @@ export const SETTINGS_TAB_HINT: Record<SettingsTabId, string> = {
   workStatus: 'สถานะของใบขอที่ใช้ทั้งระบบ',
   matchWeights: 'เกณฑ์เรียงลำดับผู้สมัครที่ AI แนะนำ',
   lumosMode: 'ให้ AI โทรเอง / ช่วยโทร / โทรมือ',
+  callRetry: 'เวลาโทรซ้ำ · โทรได้กี่ครั้ง',
   callScripts: 'แก้บทที่ AI พูดตอนโทร — มีผลกับสายใหม่ทันที',
   aiSettings: 'เลือกเจ้า AI และโมเดลที่ใช้จับคู่งานและอ่านใบขอ',
   callSuppression: 'เบอร์ที่ AI ไม่โทรถึงชั่วคราว — ดูเหตุผลและปลดได้',
@@ -96,7 +99,7 @@ export const SETTINGS_GROUP_TABS: Record<SettingsGroupId, readonly SettingsTabId
   // ทีมสรรหา/คัดสรร/OPL/Online ถอดแล้ว (เจ้าของ 19 ต.ค. 2569) — รายชื่อเจ้าหน้าที่มาจากหน้าผู้ใช้งานที่เดียว
   people: ['users', 'roles'],
   look: ['appearance', 'navMenu'],
-  automation: ['lumosMode', 'callScripts', 'aiSettings', 'callSuppression', 'autoMove', 'matchWeights', 'integrations'],
+  automation: ['lumosMode', 'callRetry', 'callScripts', 'aiSettings', 'callSuppression', 'autoMove', 'matchWeights', 'integrations'],
   data: ['workStatus', 'reference', 'pdpaRequests'],
   monitor: ['health', 'audit'],
 };

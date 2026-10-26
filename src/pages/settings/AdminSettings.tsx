@@ -5,7 +5,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
-import { Users, Shield, Database, FileText, Palette, ListChecks, ListOrdered, SlidersHorizontal, PhoneForwarded, MoveRight, Activity,
+import { Users, Shield, Database, FileText, Palette, ListChecks, ListOrdered, SlidersHorizontal, PhoneForwarded, Repeat, MoveRight, Activity,
   MessageSquareText,
   Cpu,
   PhoneOff,
@@ -23,6 +23,7 @@ import CallScriptsTab from '@/pages/settings/CallScriptsTab';
 import AiSettingsTab from '@/pages/settings/AiSettingsTab';
 import CallSuppressionTab from '@/pages/settings/CallSuppressionTab';
 import IntegrationKeysTab from '@/pages/settings/IntegrationKeysTab';
+import CallRetryTab from '@/pages/settings/CallRetryTab';
 import PdpaRequestsTab from '@/pages/settings/PdpaRequestsTab';
 import ApplicationAutoMoveTab from '@/pages/settings/ApplicationAutoMoveTab';
 import SystemHealthTab from '@/pages/settings/SystemHealthTab';
@@ -103,6 +104,7 @@ const TAB_ICON: Record<SettingsTab, React.ElementType> = {
   workStatus: ListChecks,
   matchWeights: SlidersHorizontal,
   lumosMode: PhoneForwarded,
+  callRetry: Repeat,
   callScripts: MessageSquareText,
   aiSettings: Cpu,
   callSuppression: PhoneOff,
@@ -806,6 +808,7 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'workStatus' && <WorkStatusMasterTab />}
         {activeTab === 'matchWeights' && <MatchPriorityWeightsTab />}
         {activeTab === 'lumosMode' && <LumosDispatchModeTab />}
+        {activeTab === 'callRetry' && <CallRetryTab />}
         {activeTab === 'callScripts' && <CallScriptsTab />}
         {activeTab === 'aiSettings' && <AiSettingsTab />}
         {activeTab === 'callSuppression' && <CallSuppressionTab />}

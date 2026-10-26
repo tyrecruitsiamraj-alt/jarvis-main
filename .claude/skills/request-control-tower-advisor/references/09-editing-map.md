@@ -13834,3 +13834,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ค่ากลาง `authTokenTtlSeconds()` / `DEFAULT_AUTH_TTL_SECONDS` ใน `api/_lib/auth.ts` (ใช้ใน `authSession.ts` · `dev-role.ts`) · ทับได้ด้วย `AUTH_TOKEN_TTL_SECONDS`
 - ที่มา: มายเปิดฟอร์มติดตามค้าง ล็อกอินหมด (30 นาทีเดิม) ขั้น 4 ขึ้น "โหลดรายการประกันไม่ได้" · เจ้าของ Choice "ยืดเวลาเป็น 8 ชั่วโมง"
 - ⚠️ token ไม่เช็กฐานทุกครั้ง ⇒ ปิดบัญชี/เปลี่ยน role มีผลช้าสุด 8 ชม.
+
+### โทรซ้ำคนไม่รับสาย ตั้งเวลาผ่านหน้าจอ (26 ต.ค. 2569)
+- `CallFollowupPolicy.retryTimes` (ค่าเริ่ม ['12:00']) + `nextRetryAt` / `isListedRetryTime` / `normalizeRetryTimes` ใน `src/lib/callFollowupPolicy.ts` — แทนช่องคละ 10/14/18 (ถอดหมดแล้ว)
+- กติกา (เจ้าของ Choice): เวลาถัดไปในรายการที่ยังไม่ถึง (ห่าง ≥10 นาที) วันเดียวกันได้ · เลยหมด = เวลาแรกวันถัดไป · ทุกงานที่ AI โทร (ตารางติดตามคนเริ่มงานมีเวลาของตัวเอง ไม่ใช้)
+- ใช้ 2 จุด: `api/_lib/callFollowup.ts` (ได้ผลโทร) · `api/_lib/lumosPushRetryWorker.ts` ข้อ c (ย้ายนัดที่ไม่ตรงเวลาในรายการ)
+- จอ: ตั้งค่า › โทรซ้ำคนไม่รับสาย (`CallRetryTab.tsx` · แท็บ `callRetry`) · เส้น `GET/PUT /api/call-followup-policy` (PUT admin · จดบันทึก)
