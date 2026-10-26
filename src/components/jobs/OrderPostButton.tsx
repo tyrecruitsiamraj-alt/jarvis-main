@@ -25,6 +25,7 @@ import {
   type SoScrapeAccount,
 } from '@/lib/soScraping';
 import { AutopostBody } from '@/components/jobs/AutopostDialog';
+import SoStartLine from '@/components/jobs/SoStartLine';
 
 /**
  * ═══ So Scraping ใต้การ์ดตัวอย่างในป๊อปประกาศ — สถานะ + ขอ Scrap (เจ้าของ 20 ต.ค. 2569) ═══
@@ -52,6 +53,8 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
   const [confirmText, setConfirmText] = React.useState<string | null>(null);
   const [scrapeWorkers, setScrapeWorkers] = React.useState<SoOptWorker[]>([]);
   const [scrapeWorker, setScrapeWorker] = React.useState(AUTO_WORKER);
+  /** คำขอ Scrap ที่เพิ่งส่งในรอบนี้ — โชว์ผลเริ่มงานของ So Scraping */
+  const [lastScrap, setLastScrap] = React.useState<JobPostingRequest | null>(null);
 
   React.useEffect(() => {
     let alive = true;
@@ -89,6 +92,9 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
   const title = publicJobTitle(job);
   const scrapMissing = soScrapMissing(job, title);
 
+  /** มีรายชื่อบัญชีจาก So Scraping แล้วต้องติ๊กอย่างน้อย 1 (start ของ So Scraping บังคับ) */
+  const needScrapeAccount = (scrapeAccounts?.length ?? 0) > 0 && scrapeIds.length === 0;
+
   const scrap = async (confirmed = false) => {
     if (busy) return;
     const worker = scrapeWorkers.find((w) => w.name === scrapeWorker) ?? null;
@@ -113,6 +119,7 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
         },
       });
       setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'scraping')]);
+      setLastScrap(item);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ขอ Scrap ไม่สำเร็จ');
     } finally {
@@ -233,6 +240,8 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
         />
       ) : null}
       {scrapeError ? <p className={cn('text-xs', TONE.danger.value)}>{scrapeError}</p> : null}
+      {needScrapeAccount && !scrapingView?.open ? <p className={cn('text-xs', TONE.warn.value)}>เลือกบัญชี JobThai/JobBKK อย่างน้อย 1 บัญชี</p> : null}
+      {lastScrap ? <SoStartLine requestId={lastScrap.id} initial={lastScrap.so_start} /> : null}
       {confirmText ? (
         <div role="alert" aria-label="คำเตือนจาก So Scraping" className={cn('space-y-2 rounded-xl border px-3 py-2', TONE.warn.soft)} data-testid="so-scrape-warn">
           <p className="text-sm text-foreground">{confirmText}</p>
@@ -251,7 +260,7 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
         size="sm"
         variant="outline"
         className="w-full"
-        disabled={latest === null || Boolean(scrapingView?.open) || scrapMissing.length > 0 || busy}
+        disabled={latest === null || Boolean(scrapingView?.open) || scrapMissing.length > 0 || busy || needScrapeAccount}
         onClick={() => void scrap()}
         data-testid="so-order-scrap"
       >

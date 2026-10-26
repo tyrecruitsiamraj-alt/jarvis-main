@@ -16,6 +16,7 @@ const KEYS = tableInAppSchema('app_outbound_api_keys');
 export const SO_OPTIONS_KEY_NAME = 'so-scraping';
 export const SO_DEFAULT_BASE_URL = 'https://so-scraping.vercel.app';
 export const SO_OPTIONS_PATH = '/api/integrations/jarvis/options';
+export const SO_START_PATH = '/api/integrations/jarvis/start';
 const TIMEOUT_MS = 10_000;
 
 type KeyRow = { base_url: string; key_enc: string | null; key_hint: string | null; updated_by: string | null; updated_at: Date | string | null };
@@ -144,9 +145,66 @@ async function optionsFromDb(): Promise<SoOptions> {
   };
 }
 
-export async function fetchSoOptions(): Promise<SoOptions> {
+/** key + URL ที่ใช้งานได้ — ยังไม่ใส่/ถอดไม่ออก = null */
+export async function loadSoKey(): Promise<{ baseUrl: string; key: string } | null> {
   const row = await loadKeyRow();
   const key = decryptApiKey(row?.key_enc ?? null);
-  if (!row || !key) return optionsFromDb();
-  return callSoOptions(row.base_url || SO_DEFAULT_BASE_URL, key);
+  return row && key ? { baseUrl: row.base_url || SO_DEFAULT_BASE_URL, key } : null;
+}
+
+export async function fetchSoOptions(): Promise<SoOptions> {
+  const k = await loadSoKey();
+  if (!k) return optionsFromDb();
+  return callSoOptions(k.baseUrl, k.key);
+}
+
+/**
+ * ผลเรียก start (เอกสารรอบ 3 · 26 ต.ค. 2569) — บันทึกคำขอแล้วเรียกให้ So Scraping เริ่มงานทันที
+ * 200 เริ่มแล้ว · 409 เริ่มไปแล้ว (เรียกซ้ำได้) · 422 ข้อมูลไม่ครบ (คำสั่งค้าง แก้แล้วเรียกใหม่) · 404 ไม่พบเลขใบ · 401 key ผิด
+ */
+export type SoStartResult =
+  | { state: 'started'; worker: string | null; preflightQueued: boolean; queued: boolean | null; message: string | null }
+  | { state: 'already' }
+  | { state: 'error'; message: string }
+  | { state: 'skipped' };
+
+export async function callSoStart(baseUrl: string, key: string, requestNo: string, fetchImpl: typeof fetch = fetch): Promise<SoStartResult> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetchImpl(`${baseUrl}${SO_START_PATH}`, {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ request_no: requestNo }),
+      signal: ctrl.signal,
+    });
+  } catch {
+    return { state: 'error', message: 'ติดต่อระบบ So Scraping ไม่ได้ คำสั่งบันทึกแล้ว กดเริ่มงานอีกครั้งได้' };
+  } finally {
+    clearTimeout(timer);
+  }
+  const body = ((await res.json().catch(() => null)) ?? {}) as Record<string, unknown>;
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  if (res.status === 200) {
+    return {
+      state: 'started',
+      worker: text(body.worker),
+      preflightQueued: body.preflight_queued === true,
+      queued: typeof body.queued === 'boolean' ? body.queued : null,
+      message: text(body.message),
+    };
+  }
+  if (res.status === 409) return { state: 'already' };
+  if (res.status === 422) return { state: 'error', message: text(body.error) ?? 'ข้อมูลไม่ครบ So Scraping เริ่มงานไม่ได้' };
+  if (res.status === 404) return { state: 'error', message: `So Scraping ไม่พบใบ ${requestNo}` };
+  if (res.status === 401 || res.status === 403) return { state: 'error', message: 'key ของ So Scraping ไม่ถูกต้อง — แก้ที่ ตั้งค่า › เชื่อมระบบภายนอก' };
+  return { state: 'error', message: `ระบบ So Scraping ตอบ ${res.status} กดเริ่มงานอีกครั้งได้` };
+}
+
+/** เรียก start ด้วย key ที่บันทึกไว้ — ยังไม่ใส่ key = ข้าม (So Scraping หยิบคำขอ pending เองแบบเดิม) */
+export async function startSoRequest(requestNo: string | null): Promise<SoStartResult> {
+  const k = await loadSoKey();
+  if (!k || !requestNo) return { state: 'skipped' };
+  return callSoStart(k.baseUrl, k.key, requestNo);
 }

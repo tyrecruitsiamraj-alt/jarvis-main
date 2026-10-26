@@ -1,7 +1,7 @@
 import { apiFetch } from '@/lib/apiFetch';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
-import { SO_STATUS_LABEL, type SoGroup, type SoOptions } from '@/lib/soScraping';
+import { SO_STATUS_LABEL, type SoGroup, type SoOptions, type SoStartView } from '@/lib/soScraping';
 
 /**
  * คำขอ "โพสหางานใหม่" — สร้าง ID ให้ทีมอื่นรับไปทำคอนเทนต์/โพสหาคนต่อ
@@ -16,6 +16,8 @@ export type JobPostingRequestType = 'content' | 'scraping';
 
 export type JobPostingRequest = {
   id: string;
+  /** ผลเรียก start ของ So Scraping — มากับคำตอบตอนสร้างเท่านั้น (26 ต.ค. 2569) */
+  so_start?: SoStartView;
   job_id: string;
   request_no: string | null;
   request_type: JobPostingRequestType;
@@ -206,3 +208,11 @@ export function composeJobSnapshot(job: JobRequest): Record<string, unknown> {
   };
 }
 
+
+/** เริ่มงานที่ So Scraping อีกครั้ง (ครั้งก่อนติดปัญหา) — เรียกซ้ำได้ ไม่สร้างงานซ้ำ */
+export async function startJobPostingRequest(id: string): Promise<SoStartView> {
+  const r = await apiFetch(`/api/matching/job-postings?action=start&id=${encodeURIComponent(id)}`, { method: 'POST' });
+  if (!r.ok) return readError(r, 'เริ่มงานไม่สำเร็จ');
+  const d = (await r.json().catch(() => ({}))) as { so_start?: SoStartView };
+  return d.so_start ?? { state: 'skipped' };
+}

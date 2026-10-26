@@ -452,7 +452,10 @@ export function soPickError(
   if (type === 'scraping') {
     const we = workerError('scrape_worker', 'scraper');
     if (we) return we;
-    if (snap?.scrape_connector_ids === undefined) return null;
+    // ใส่ key แล้ว (มีรายชื่อบัญชีจาก API) ต้องเลือกอย่างน้อย 1 บัญชี — start ของ So Scraping บังคับ
+    if (snap?.scrape_connector_ids === undefined) {
+      return o.source === 'api' && o.scrapeAccounts.length > 0 ? 'เลือกบัญชี JobThai/JobBKK อย่างน้อย 1 บัญชี' : null;
+    }
     const ids = strs(snap.scrape_connector_ids);
     if (!Array.isArray(snap.scrape_connector_ids) || ids.length !== snap.scrape_connector_ids.length) return 'บัญชี JobThai/JobBKK ไม่ถูกต้อง';
     for (const id of ids) {
@@ -474,4 +477,22 @@ export function soPickError(
   const mine = new Set(soGroupsOfAccount(o, acc).map((g) => g.id));
   if (picked.some((g) => !mine.has(g))) return `มีกลุ่มที่บัญชี ${acc.name} โพสต์ไม่ได้ — เลือกกลุ่มใหม่`;
   return null;
+}
+
+/** ผลเรียก start ที่ server ส่งกลับมากับคำขอ (เอกสารรอบ 3) */
+export type SoStartView =
+  | { state: 'started'; worker: string | null; preflightQueued: boolean; queued: boolean | null; message: string | null }
+  | { state: 'already' }
+  | { state: 'error'; message: string }
+  | { state: 'skipped' };
+
+/** ข้อความบนจอหลังส่ง — null = ไม่ต้องบอกอะไรเพิ่ม (ยังไม่ใส่ key) · tone ใช้สีของ TONE */
+export function soStartText(r: SoStartView | null | undefined): { text: string; tone: ToneKey; canRetry: boolean } | null {
+  if (!r || r.state === 'skipped') return null;
+  if (r.state === 'already') return { text: 'So Scraping เริ่มงานใบนี้ไปแล้ว', tone: 'success', canRetry: false };
+  if (r.state === 'error') return { text: r.message, tone: 'danger', canRetry: true };
+  if (r.queued === false) return { text: r.message ?? 'สร้างงานแล้วแต่ยังเริ่มไม่ได้', tone: 'warn', canRetry: false };
+  const parts = [`เริ่มงานแล้ว${r.worker ? ` ที่เครื่อง ${r.worker}` : ''}`];
+  if (r.preflightQueued) parts.push('บัญชีต้องทดสอบก่อน งานจะเริ่มช้าขึ้นราว 1 นาที');
+  return { text: parts.join(' · '), tone: 'success', canRetry: false };
 }

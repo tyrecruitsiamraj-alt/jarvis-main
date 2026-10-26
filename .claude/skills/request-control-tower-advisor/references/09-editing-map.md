@@ -13859,3 +13859,5 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - เอกสารรอบ 2 (26 ต.ค. บ่าย): เลือกเครื่องเองได้ — โพสต์ส่ง `worker` (เฉพาะเมื่อไม่ใช่เครื่องหลัก) · Scrap ส่ง `scrape_worker` (ไม่เลือก = ให้ระบบเลือก) · `soWorkersFor` แยกเครื่องตาม `kinds`
   · worker_offline เลือกบัญชีได้แล้ว (ให้เลือกเครื่องอื่น) · เตือนก่อนส่ง `soPostConfirmWarnings` / `soScrapConfirmWarnings` (ครบโควต้า · เครื่องออฟไลน์ · บัญชียังไม่ล็อกอินบนเครื่อง `session_workers`)
   · กลุ่มเรียงตาม `stats_30d.posted` + `soGroupStatsText`
+- เอกสารรอบ 3: บันทึกคำขอแล้วเรียก `POST {base}/api/integrations/jarvis/start {request_no}` ทันที (`startSoRequest` · ผลกลับใน `so_start` ของคำตอบ POST) · ยังไม่ใส่ key = ข้าม
+  · 409 เริ่มแล้ว · 422 ขึ้น `error` + ปุ่ม "เริ่มงานอีกครั้ง" (`POST /api/matching/job-postings?action=start&id=` · `SoStartLine`) · ใส่ key แล้วขอ Scrap ต้องติ๊กบัญชีอย่างน้อย 1

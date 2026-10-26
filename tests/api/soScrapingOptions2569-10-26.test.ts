@@ -19,7 +19,8 @@ import {
   soScrapeSelectable,
   soWarningText,
 } from '@/lib/soScraping';
-import { callSoOptions, normalizeSoBaseUrl, soKeyHint } from '../../api/_lib/soScrapingOptions';
+import { callSoOptions, callSoStart, normalizeSoBaseUrl, soKeyHint } from '../../api/_lib/soScrapingOptions';
+import { soStartText } from '@/lib/soScraping';
 
 /** ตัวอย่างในเอกสาร (ย่อ) — ใช้ id หน้าตาเดียวกับของจริง */
 const SAMPLE = {
@@ -119,7 +120,7 @@ describe('อ่านคำตอบ options API', () => {
     expect(soScrapConfirmWarnings([], o.workers[2])).toEqual([]);
     expect(soPickError(o, 'content', { group_ids: ['mvhmloqvry84difvmvr'], account_id: acc.id, worker: 'SONB-SC01' })).toContain('รับงานโพสต์ไม่ได้');
     expect(soPickError(o, 'scraping', { scrape_worker: 'SONB-RM011' })).toContain('รับงาน Scrap ไม่ได้');
-    expect(soPickError(o, 'scraping', { scrape_worker: 'SONB-SC01' })).toBeNull();
+    expect(soPickError(o, 'scraping', { scrape_worker: 'SONB-SC01', scrape_connector_ids: ['8e1c7893-89a5-4adc-869a-2592776bf3ad'] })).toBeNull();
     expect(soPickError(o, 'scraping', { scrape_worker: 'ไม่มีเครื่องนี้' })).toContain('ไม่พบเครื่อง');
   });
 
@@ -141,7 +142,6 @@ describe('อ่านคำตอบ options API', () => {
     expect(soPickError(o, 'content', { group_ids: ['nope'] })).toContain('ไม่อยู่ในระบบ');
     expect(soPickError(o, 'scraping', { scrape_connector_ids: ['8e1c7893-89a5-4adc-869a-2592776bf3ad'] })).toBeNull();
     expect(soPickError(o, 'scraping', { scrape_connector_ids: ['1b2c3d4e-0000-4000-8000-000000000003'] })).toBe('บัญชีพักถึง 14:00');
-    expect(soPickError(o, 'scraping', {})).toBeNull();
   });
 });
 
@@ -180,5 +180,39 @@ describe('key ไม่ออกไปหน้าจอ', () => {
     expect(view).not.toMatch(/key:\s*decryptApiKey/);
     expect(readFileSync('src/lib/jobPostingRequestsApi.ts', 'utf8')).toContain("'/api/matching/job-postings?options=1'");
     expect(readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8')).not.toContain('so-scraping.vercel.app');
+  });
+});
+
+describe('เริ่มงานทันที (start · เอกสารรอบ 3)', () => {
+  const reply = (status: number, body: unknown) =>
+    (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+
+  it('ส่ง request_no ไป POST /start พร้อม x-api-key', async () => {
+    let seen: { url: string; method?: string; key: string | null; body: string } | null = null;
+    const spy = (async (url: string, init: RequestInit) => {
+      seen = { url, method: init.method, key: new Headers(init.headers).get('x-api-key'), body: String(init.body) };
+      return new Response(JSON.stringify({ ok: true, type: 'content', worker: 'SONB-RM009', preflight_queued: true }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const r = await callSoStart('https://so-scraping.vercel.app', 'k1', 'OPL6910068', spy);
+    expect(seen).toEqual({ url: 'https://so-scraping.vercel.app/api/integrations/jarvis/start', method: 'POST', key: 'k1', body: '{"request_no":"OPL6910068"}' });
+    expect(r).toEqual({ state: 'started', worker: 'SONB-RM009', preflightQueued: true, queued: null, message: null });
+    expect(soStartText(r)?.text).toBe('เริ่มงานแล้ว ที่เครื่อง SONB-RM009 · บัญชีต้องทดสอบก่อน งานจะเริ่มช้าขึ้นราว 1 นาที');
+  });
+
+  it('409 = เริ่มไปแล้ว · 422 = ขึ้นเหตุผลของ So Scraping + เรียกใหม่ได้ · Scrap ยังเริ่มไม่ได้ = บอก message', async () => {
+    expect(await callSoStart('https://x.example', 'k', 'A1', reply(409, {}))).toEqual({ state: 'already' });
+    const bad = await callSoStart('https://x.example', 'k', 'A1', reply(422, { error: 'ยังไม่เลือกบัญชี Scrap' }));
+    expect(bad).toEqual({ state: 'error', message: 'ยังไม่เลือกบัญชี Scrap' });
+    expect(soStartText(bad)).toEqual({ text: 'ยังไม่เลือกบัญชี Scrap', tone: 'danger', canRetry: true });
+    const wait = await callSoStart('https://x.example', 'k', 'A1', reply(200, { ok: true, type: 'scraping', queued: false, message: 'เครื่องยังไม่เปิด Scrape' }));
+    expect(soStartText(wait)).toEqual({ text: 'เครื่องยังไม่เปิด Scrape', tone: 'warn', canRetry: false });
+    expect((await callSoStart('https://x.example', 'k', 'A1', reply(401, {}))).state).toBe('error');
+    expect(soStartText({ state: 'skipped' })).toBeNull();
+  });
+
+  it('ใส่ key แล้วขอ Scrap ต้องเลือกบัญชี JobThai/JobBKK', () => {
+    const o = parseSoOptions(SAMPLE)!;
+    expect(soPickError(o, 'scraping', {})).toBe('เลือกบัญชี JobThai/JobBKK อย่างน้อย 1 บัญชี');
+    expect(soPickError({ ...o, source: 'db', scrapeAccounts: [] }, 'scraping', {})).toBeNull();
   });
 });

@@ -44,6 +44,7 @@ import {
   type SoOptions,
   type SoPostMode,
 } from '@/lib/soScraping';
+import SoStartLine from '@/components/jobs/SoStartLine';
 import { AUTOPOST_CAPTION_MAX, autopostMissing, buildAutopostCaption, captionLeaks } from '@/lib/autopostCaption';
 
 /**
@@ -276,6 +277,7 @@ export function AutopostBody({
               {soStatusView(sent).label}
             </Badge>
           </p>
+          <SoStartLine requestId={sent.id} initial={sent.so_start} />
           <Button type="button" variant="outline" onClick={onClose}>
             ปิด
           </Button>
