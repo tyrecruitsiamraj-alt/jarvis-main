@@ -303,18 +303,18 @@ describe('โทรซ้ำที่ถึงเวลา (เวลาใน�
     expect(call?.[1]).toEqual(['800', bkk('2026-09-29T12:00:00').toISOString()]);
   });
 
-  it('🔴 ใบสมัคร: นัดช่องคละแบบเก่า (14:00) ⇒ ย้ายไปเวลาถัดไปในรายการ (พรุ่งนี้ 12:00) · ย้ายแล้วไม่ย้ายวน', async () => {
+  it('🔴 นัดแบบเก่า (14:00) ที่เวลาใหม่จะช้ากว่า (พรุ่งนี้ 12:00) ⇒ ไม่ย้าย โทร 14:00 ตามเดิม · เวลาใหม่เร็วกว่า ⇒ ย้ายมา 12:00', async () => {
     stub([], [retry({ next_attempt_at: bkk('2026-09-29T14:00:00'), last_call_at: bkk('2026-09-28T14:26:00') })]);
     const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T13:05:00'));
-    expect(run.retriesReplanned).toBe(1);
-    expect(pushInterviews).not.toHaveBeenCalled();
+    expect(run.retriesReplanned).toBe(0);
+    expect(run.retriesSent).toBe(1);
+    // นัดแบบเก่าพรุ่งนี้ 18:00 · ตอนนี้ 09:00 ⇒ เที่ยงวันนี้เร็วกว่า ⇒ ย้าย
+    pushInterviews.mockClear();
+    stub([], [retry({ next_attempt_at: bkk('2026-09-30T18:00:00'), last_call_at: bkk('2026-09-29T08:40:00') })]);
+    const early = await runLumosPushRetryOnce({ ...CFG, leadMinutes: 60 * 48 }, bkk('2026-09-29T09:00:00'));
+    expect(early.retriesReplanned).toBe(1);
     const call = dbQuery.mock.calls.find((c) => /set next_attempt_at = \$2::timestamptz/.test(String(c[0])));
-    expect(call?.[1]).toEqual(['800', bkk('2026-09-30T12:00:00').toISOString()]);
-    // รอบถัดไปเจอแถวที่ย้ายแล้ว ⇒ ส่งตามเวลาใหม่ ไม่ย้ายซ้ำ
-    stub([], [retry({ next_attempt_at: bkk('2026-09-30T12:00:00'), last_call_at: bkk('2026-09-28T14:26:00') })]);
-    const next = await runLumosPushRetryOnce(CFG, bkk('2026-09-30T11:30:00'));
-    expect(next.retriesReplanned).toBe(0);
-    expect(next.retriesSent).toBe(1);
+    expect(call?.[1]).toEqual(['800', bkk('2026-09-29T12:00:00').toISOString()]);
   });
 
   it('🔴 ผู้สมัครขอให้โทรกลับ 16:30 (reschedule_requested) ⇒ โทรตามเวลานั้น ห้ามย้ายช่อง · เลยเวลามาแล้วก็โทรเร็วสุด ไม่ย้ายไปพรุ่งนี้', async () => {
@@ -408,11 +408,11 @@ describe('โทรซ้ำเลน Match (เจ้าของสั่ง 2
     expect(listSiamrajUnitRequests).toHaveBeenCalledTimes(1);
   });
 
-  it('🔴 เลน Match นัดแบบเก่า (วันถัดไปเวลาเดิม 14:37) ⇒ ย้ายมาเวลาโทรซ้ำในรายการ (ทุกงาน · 26 ต.ค. 2569)', async () => {
+  it('🔴 เลน Match นัดแบบเก่า (14:37) ใกล้เวลาแล้ว ⇒ โทรตามนัดเดิม ไม่ย้ายไปช้ากว่า', async () => {
     stub([], [matchReminder()]);
     const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T14:00:00'));
-    expect(run.retriesReplanned).toBe(1);
-    expect(pushReminders).not.toHaveBeenCalled();
+    expect(run.retriesReplanned).toBe(0);
+    expect(run.retriesSent).toBe(1);
   });
 
   it('iRecruit (ir-) ช่อง interview ⇒ ::r2 · คีย์ interview-<id>-r2 · ส่งตามเวลาในรายการ', async () => {

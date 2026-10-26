@@ -538,13 +538,16 @@ export async function runLumosPushRetryOnce(
     }
     // c) ยังไม่ติด แต่นัดไม่ตรงเวลาโทรซ้ำที่ตั้งไว้ (นัดแบบเก่า 10/14/18 · +24 ชม. · เพิ่งเปลี่ยนเวลาในหน้าตั้งค่า) · ค้างเก่า
     //    ⇒ นัดเวลาถัดไปในรายการ (ตั้งค่า › โทรซ้ำคนไม่รับสาย · ทุกงาน · เจ้าของ 26 ต.ค. 2569) แล้วรอ
+    //    🔴 ย้ายเฉพาะเมื่อเวลาใหม่ **เร็วกว่า** นัดเดิม (หรือค้างเกินเวลา) — ห้ามย้ายให้คนได้สายช้าลง
+    //       (ตอนขึ้นเว็บมีนัดแบบเก่า 14:00/18:00 ค้าง 23 สาย · ถ้าย้ายตอนใกล้เวลา = ไปเที่ยงพรุ่งนี้ ช้าเกือบวัน)
     //    🔴 ผู้สมัครขอให้โทรกลับตามเวลาที่นัด (`reschedule_requested`) = โทรตามเวลานั้น ห้ามย้าย
     //    งานติดตามไม่ย้าย (ตารางของตัวเอง · โทรซ้ำวันถัดไปเวลาเดิม)
     if (
       !r.person_ref.startsWith('follow-') &&
       !failedBefore &&
       UNREACHED.has(String(r.last_outcome ?? '')) &&
-      (!isListedRetryTime(due, policy) || lateMinutes > RETRY_REPLAN_AFTER_MINUTES)
+      ((!isListedRetryTime(due, policy) && nextRetryAt(now, policy).getTime() < due.getTime()) ||
+        lateMinutes > RETRY_REPLAN_AFTER_MINUTES)
     ) {
       const at = nextRetryAt(now, policy);
       run.retriesReplanned += 1;
