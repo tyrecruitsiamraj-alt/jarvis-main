@@ -31,6 +31,7 @@ import NavMenuTab from '@/pages/settings/NavMenuTab';
 import { PresenceFilterChips, PresenceLine } from '@/pages/settings/UserPresence';
 import { UserBuFilterChips } from '@/pages/settings/UserBuFilter';
 import { useUserPresence } from '@/pages/settings/useUserPresence';
+import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import {
   countPresence,
   matchesPresence,
@@ -179,22 +180,51 @@ const AdminSettings: React.FC = () => {
    *    ⇒ ตัวเลขบนปุ่มที่กด = จำนวนแถวในตารางเสมอ
    */
   const [buFilter, setBuFilter] = useState<UserBuFilter>(USER_BU_ALL);
+  /**
+   * ค้นหาบนแถบบน (เจ้าของสั่ง 26 ต.ค. 2569 "ขอช่องค้นหาที") — ชื่อ · ชื่อเล่น · อีเมล · เบอร์
+   * กรองก่อนปุ่ม BU/สถานะ ⇒ ตัวเลขบนปุ่มนับเฉพาะคนที่ค้นเจอ (ยังเท่าจำนวนแถวในตาราง)
+   */
+  const [userQuery, setUserQuery] = useState('');
+  useHeaderSearch(
+    activeTab === 'users'
+      ? {
+          value: userQuery,
+          onChange: (q: string) => {
+            setUserQuery(q);
+            setUserPage(1);
+          },
+          placeholder: 'ค้นชื่อ / ชื่อเล่น / อีเมล / เบอร์',
+        }
+      : null,
+  );
+  const searchedUsers = React.useMemo(() => {
+    const q = userQuery.trim().toLowerCase();
+    if (!q) return apiUsers;
+    const digits = q.replace(/\D/g, '');
+    return apiUsers.filter((u) => {
+      const text = [u.full_name, u.username, u.email, u.nickname].filter(Boolean).join(' ').toLowerCase();
+      if (text.includes(q)) return true;
+      // เบอร์: พิมพ์ 08x หรือ +668x ก็เจอ (เทียบ 9 ตัวท้าย)
+      const phone = (u.phone ?? '').replace(/\D/g, '');
+      return digits.length >= 3 && phone !== '' && (phone.includes(digits) || phone.slice(-9).includes(digits.replace(/^0/, '')));
+    });
+  }, [apiUsers, userQuery]);
   const presenceMatched = React.useMemo(
-    () => apiUsers.filter((u) => matchesPresence(presenceById.get(u.id), presenceFilter)),
-    [apiUsers, presenceById, presenceFilter],
+    () => searchedUsers.filter((u) => matchesPresence(presenceById.get(u.id), presenceFilter)),
+    [searchedUsers, presenceById, presenceFilter],
   );
   const buChips = React.useMemo(() => userBuChips(presenceMatched, buFilter), [presenceMatched, buFilter]);
-  const buMatched = React.useMemo(() => apiUsers.filter((u) => matchesUserBu(u, buFilter)), [apiUsers, buFilter]);
+  const buMatched = React.useMemo(() => searchedUsers.filter((u) => matchesUserBu(u, buFilter)), [searchedUsers, buFilter]);
   const presenceCountsInBu = React.useMemo(
     () => countPresence(buMatched.map((u) => presenceById.get(u.id)).filter((p): p is PresencePerson => !!p)),
     [buMatched, presenceById],
   );
   const shownUsers = React.useMemo(
     () =>
-      sortByPresence(apiUsers, presencePeople ?? []).filter(
+      sortByPresence(searchedUsers, presencePeople ?? []).filter(
         (u) => matchesPresence(presenceById.get(u.id), presenceFilter) && matchesUserBu(u, buFilter),
       ),
-    [apiUsers, presencePeople, presenceById, presenceFilter, buFilter],
+    [searchedUsers, presencePeople, presenceById, presenceFilter, buFilter],
   );
   /**
    * ลบบัญชี (เจ้าของสั่ง 1 ต.ค. 2569 · Choice "ลบจริง") — กดถังขยะ → ป๊อปยืนยัน → `DELETE /api/app-users?id=`
