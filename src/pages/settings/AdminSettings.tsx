@@ -744,6 +744,25 @@ const AdminSettings: React.FC = () => {
                         {/* ดูได้หลาย BU (เจ้าของ 26 ต.ค. 2569 Choice "เพิ่มให้เลือกได้หลาย BU") — แอดมินเห็นทุก BU อยู่แล้ว */}
                         {u.department_code && u.role !== 'admin' ? (
                           <div className="mt-2 flex flex-wrap items-center justify-center gap-1" data-testid="user-extra-bu">
+                            {(() => {
+                              /* "ดูทุก BU" (เจ้าของ 26 ต.ค. 2569 Choice) — กดทีเดียวได้ครบทุก BU · กดซ้ำ = เอาออกหมด */
+                              const others = APP_DEPARTMENT_CODES.filter((code) => code !== u.department_code);
+                              const extras = u.extra_department_codes ?? [];
+                              const all = others.every((code) => extras.includes(code));
+                              return (
+                                <Button
+                                  type="button"
+                                  size="xs"
+                                  variant={all ? 'default' : 'outline'}
+                                  aria-pressed={all}
+                                  disabled={savingUserId === u.id}
+                                  onClick={() => void updateUser(u.id, { extra_department_codes: all ? [] : [...others] })}
+                                  data-testid="user-all-bu"
+                                >
+                                  ดูทุก BU
+                                </Button>
+                              );
+                            })()}
                             <span className="text-xs text-muted-foreground">ดูเพิ่ม</span>
                             {APP_DEPARTMENT_CODES.filter((code) => code !== u.department_code).map((code) => {
                               const extras = u.extra_department_codes ?? [];
