@@ -29,7 +29,10 @@ import {
   SO_POST_MODE_LABEL,
   SO_POST_REASON,
   jobProvinceOf,
-  soAccountNeedsConfirm,
+  soAccountOnWorker,
+  soGroupStatsText,
+  soPostConfirmWarnings,
+  soWorkersFor,
   soAccountSelectable,
   soGroupLabel,
   soGroupsOfAccount,
@@ -105,8 +108,10 @@ export function AutopostBody({
   const [linkCode, setLinkCode] = React.useState('');
   const [accountId, setAccountId] = React.useState('');
   const [picked, setPicked] = React.useState<string[]>([]);
-  /** กล่องเตือนในป๊อป — block = บัญชีที่เลือกไม่ได้ · confirm = ครบโควต้า ถามก่อนส่ง */
-  const [warn, setWarn] = React.useState<{ kind: 'block' | 'confirm'; text: string } | null>(null);
+  /** กล่องเตือนในป๊อป — block = บัญชีที่เลือกไม่ได้ · info = เครื่องหลักออฟไลน์ · confirm = ถามก่อนส่ง */
+  const [warn, setWarn] = React.useState<{ kind: 'block' | 'info' | 'confirm'; lines: string[] } | null>(null);
+  /** เครื่องที่จะโพสต์ — ค่าเริ่ม = เครื่องหลักของบัญชี (เอกสารรอบ 2: พนักงานเลือกเองได้) */
+  const [workerName, setWorkerName] = React.useState('');
   const [caption, setCaption] = React.useState('');
   const [captionEdited, setCaptionEdited] = React.useState(false);
   const [busy, setBusy] = React.useState<'send' | 'link' | null>(null);
@@ -127,6 +132,7 @@ export function AutopostBody({
         const acc = firstAccount(o.accounts);
         if (acc) {
           setAccountId(acc.id);
+          setWorkerName(acc.worker ?? '');
           setPicked(defaultGroups(o, acc, province, s.recentGroups));
         }
       })
@@ -141,10 +147,17 @@ export function AutopostBody({
   const linkUrl = linkCode ? `${window.location.origin}${applyLinkPath(linkCode)}` : null;
   const account = opts?.accounts.find((a) => a.id === accountId) ?? null;
   const accountGroups = React.useMemo(
-    () => (opts && account ? [...soGroupsOfAccount(opts, account)].sort((a, b) => soGroupLabel(a).localeCompare(soGroupLabel(b), 'th')) : []),
+    // กลุ่มที่โพสต์ได้บ่อยใน 30 วันขึ้นก่อน (เอกสาร: ใช้ posted เป็นหลัก)
+    () =>
+      opts && account
+        ? [...soGroupsOfAccount(opts, account)].sort(
+            (a, b) => (b.stats30d?.posted ?? 0) - (a.stats30d?.posted ?? 0) || soGroupLabel(a).localeCompare(soGroupLabel(b), 'th'),
+          )
+        : [],
     [opts, account],
   );
-  const workerOf = (a: SoOptAccount) => opts?.workers.find((w) => w.name === a.worker) ?? null;
+  const postWorkers = opts ? soWorkersFor(opts, 'autopost') : [];
+  const worker = postWorkers.find((w) => w.name === workerName) ?? null;
   const recent = new Set(state?.recentGroups ?? []);
   const openOrder = state?.latest.find((r) => r.request_type === 'content' && soStatusView(r).open) ?? null;
 
@@ -192,18 +205,21 @@ export function AutopostBody({
     if (!opts || !a) return;
     // ถูกพัก / เครื่องออฟไลน์ / ยังไม่ผูกเครื่อง = เลือกไม่ได้ (เอกสาร So Scraping) — เตือนแล้วคงบัญชีเดิม
     if (!soAccountSelectable(a.status)) {
-      setWarn({ kind: 'block', text: soWarningText(a.name, a.status, a.warning) });
+      setWarn({ kind: 'block', lines: [soWarningText(a.name, a.status, a.warning)] });
       return;
     }
-    setWarn(null);
+    // เครื่องหลักออฟไลน์ = เลือกบัญชีได้ แต่ให้เลือกเครื่องอื่นที่ออนไลน์
+    setWarn(a.status === 'worker_offline' ? { kind: 'info', lines: [soWarningText(a.name, a.status, a.warning), 'เลือกเครื่องอื่นที่ออนไลน์ในช่องเครื่อง'] } : null);
     setAccountId(id);
+    setWorkerName(a.worker ?? '');
     setPicked(defaultGroups(opts, a, province, state?.recentGroups ?? []));
   };
 
   const send = async (confirmed = false) => {
     if (busy || problems.length > 0 || !account || !linkUrl) return;
-    if (!confirmed && soAccountNeedsConfirm(account.status)) {
-      setWarn({ kind: 'confirm', text: soWarningText(account.name, account.status, account.warning) });
+    const confirmLines = soPostConfirmWarnings(account, worker);
+    if (!confirmed && confirmLines.length > 0) {
+      setWarn({ kind: 'confirm', lines: confirmLines });
       return;
     }
     setWarn(null);
@@ -220,6 +236,8 @@ export function AutopostBody({
           ...soPostSnapshot({ ...composeJobSnapshot(job), position: publicJobTitle(job) }, { mode, caption, groupIds: picked }),
           account_id: account.id,
           account_name: account.name,
+          // ไม่เปลี่ยนจากเครื่องหลัก = ไม่ส่ง ให้ So Scraping ใช้เครื่องหลักของบัญชี
+          ...(workerName && workerName !== account.worker ? { worker: workerName } : {}),
           apply_link: linkUrl,
           link_code: linkCode,
           channel_label: link?.channelLabel ?? null,
@@ -363,8 +381,7 @@ export function AutopostBody({
                     <p className="tabular-nums text-muted-foreground">
                       {[
                         `วันนี้โพสต์ ${NUM.format(account.postedToday)}${account.dailyCap !== null ? `/${NUM.format(account.dailyCap)}` : ''}`,
-                        account.worker ? `เครื่อง ${account.worker} ${account.workerOnline ? 'ออนไลน์' : 'ออฟไลน์'}` : 'ยังไม่ผูกเครื่อง',
-                        workerOf(account) ? `งานในเครื่อง ${NUM.format(workerOf(account)!.load)}` : null,
+                        account.worker ? `เครื่องหลัก ${account.worker} ${account.workerOnline ? 'ออนไลน์' : 'ออฟไลน์'}` : 'ยังไม่ผูกเครื่อง',
                         account.queue.running + account.queue.queued > 0
                           ? `งานของบัญชีนี้ ${NUM.format(account.queue.running + account.queue.queued)}`
                           : null,
@@ -399,6 +416,7 @@ export function AutopostBody({
                       <span className="block text-sm text-foreground">{soGroupLabel(g)}</span>
                       <span className={cn('block text-xs', DASH.muted)}>
                         {[
+                          soGroupStatsText(g.stats30d),
                           g.lastPostedAt ? `โพสต์ล่าสุด ${WHEN.format(new Date(g.lastPostedAt))}` : null,
                           recent.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
                         ]
@@ -409,6 +427,36 @@ export function AutopostBody({
                   </li>
                 ))}
               </ul>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <p className="text-sm font-medium text-foreground">เครื่อง</p>
+            {postWorkers.length === 0 ? (
+              <p className={cn('text-sm', TONE.warn.value)}>ยังไม่มีเครื่องที่รับงานโพสต์</p>
+            ) : (
+              <FieldSelect
+                value={workerName}
+                onChange={(v) => {
+                  setWorkerName(v);
+                  if (warn?.kind !== 'block') setWarn(null);
+                }}
+                placeholder="เลือกเครื่อง"
+                ariaLabel="เครื่อง"
+                testId="autopost-worker"
+                options={postWorkers.map((w) => ({
+                  value: w.name,
+                  label: [
+                    w.name,
+                    w.online ? 'ออนไลน์' : 'ออฟไลน์',
+                    `งานค้าง ${NUM.format(w.load)}`,
+                    account && w.name === account.worker ? 'เครื่องหลัก' : null,
+                    account && !soAccountOnWorker(account, w) ? 'ยังไม่เคยล็อกอินบัญชีนี้' : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · '),
+                }))}
+              />
             )}
           </section>
 
@@ -432,7 +480,11 @@ export function AutopostBody({
               className={cn('space-y-2 rounded-xl border px-3 py-2', warn.kind === 'block' ? TONE.danger.soft : TONE.warn.soft)}
               data-testid="autopost-warn"
             >
-              <p className="text-sm text-foreground">{warn.text}</p>
+              {warn.lines.map((l) => (
+                <p key={l} className="text-sm text-foreground">
+                  {l}
+                </p>
+              ))}
               <div className="flex flex-wrap gap-2">
                 {warn.kind === 'confirm' ? (
                   <Button type="button" size="sm" onClick={() => void send(true)} disabled={busy !== null} data-testid="autopost-warn-confirm">
@@ -440,7 +492,7 @@ export function AutopostBody({
                   </Button>
                 ) : null}
                 <Button type="button" size="sm" variant="outline" onClick={() => setWarn(null)}>
-                  {warn.kind === 'confirm' ? 'เลือกบัญชีอื่น' : 'ตกลง'}
+                  {warn.kind === 'confirm' ? 'กลับไปแก้' : 'ตกลง'}
                 </Button>
               </div>
             </div>

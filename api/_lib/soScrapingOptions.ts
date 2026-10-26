@@ -125,10 +125,21 @@ async function optionsFromDb(): Promise<SoOptions> {
         status: paused ? 'paused' : full ? 'full' : 'ready',
         warning: null,
         groupIds: a.groupIds,
+        sessionWorkers: a.preferredWorker ? [a.preferredWorker] : [],
       };
     }),
-    groups: groups.map((g) => ({ id: g.id, fbGroupId: null, name: g.name, url: null, accountIds: [], lastPostedAt: null })),
-    workers: workers.map((w) => ({ name: w.name, online: w.online, lastSeen: w.lastSeen, load: 0 })),
+    groups: groups.map((g) => ({ id: g.id, fbGroupId: null, name: g.name, url: null, accountIds: [], lastPostedAt: null, stats30d: null })),
+    // ฐานเดิมอ่านแค่เครื่องโพสต์ (kind autopost)
+    workers: workers.map((w) => ({
+      name: w.name,
+      online: w.online,
+      lastSeen: w.lastSeen,
+      load: 0,
+      kinds: ['autopost'],
+      postQueue: { running: 0, queued: 0 },
+      scrapeQueue: { running: 0, queued: 0 },
+      fbAccountIds: accounts.filter((a) => a.preferredWorker === w.name).map((a) => a.id),
+    })),
     scrapeAccounts: [],
   };
 }

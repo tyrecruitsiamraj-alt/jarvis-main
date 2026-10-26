@@ -189,6 +189,9 @@ export function soNoticeTitle(type: 'content' | 'scraping', status: string): str
 /* ═══ ตัวเลือกตอนสั่งงาน จาก So Scraping options API (เจ้าของ 26 ต.ค. 2569 "ทำเลย ตามเอกสาร") ═══
  * GET so-scraping/api/integrations/jarvis/options (x-api-key ฝั่ง server เท่านั้น · ดึงใหม่ทุกครั้งที่เปิดฟอร์ม ไม่ cache)
  * status ทุกตัวมาจาก So Scraping — Jarvis ไม่คิดเอง · ข้อความ `warning` เป็นไทยจากฝั่งนั้น ใช้ในป๊อปเตือนได้เลย
+ * เอกสารรอบ 2 (26 ต.ค. 2569 บ่าย): พนักงานเลือกเครื่องเองได้ทั้งโพสต์ (`worker`) และ Scrap (`scrape_worker`) ·
+ *   เครื่องหลักออฟไลน์ = บัญชียังเลือกได้ ให้เลือกเครื่องอื่น · เครื่องออฟไลน์/บัญชียังไม่ล็อกอินบนเครื่องนั้น = เตือนก่อนส่ง ·
+ *   กลุ่มมีผล 30 วัน (`posted` เป็นหลัก — คอมเมนต์/เบอร์ยังนับไม่ครบ)
  * ยังไม่ได้ใส่ key = อ่านจากฐานของ So Scraping แบบเดิม (`source: 'db'` · ทางถอย) */
 
 export type SoAccountStatus = 'ready' | 'busy' | 'full' | 'paused' | 'worker_offline' | 'no_worker';
@@ -209,9 +212,30 @@ export type SoOptAccount = {
   status: SoAccountStatus;
   warning: string | null;
   groupIds: string[];
+  /** เครื่องที่บัญชีนี้ล็อกอินค้างไว้ */
+  sessionWorkers: string[];
 };
-export type SoOptGroup = { id: string; fbGroupId: string | null; name: string | null; url: string | null; accountIds: string[]; lastPostedAt: string | null };
-export type SoOptWorker = { name: string; online: boolean; lastSeen: string | null; load: number };
+export type SoGroupStats = { attempts: number; posted: number; comments: number; phoneLeads: number };
+export type SoOptGroup = {
+  id: string;
+  fbGroupId: string | null;
+  name: string | null;
+  url: string | null;
+  accountIds: string[];
+  lastPostedAt: string | null;
+  stats30d: SoGroupStats | null;
+};
+export type SoWorkerKind = 'autopost' | 'scraper';
+export type SoOptWorker = {
+  name: string;
+  online: boolean;
+  lastSeen: string | null;
+  load: number;
+  kinds: string[];
+  postQueue: SoQueue;
+  scrapeQueue: SoQueue;
+  fbAccountIds: string[];
+};
 export type SoScrapeAccount = {
   id: string;
   platform: string;
@@ -245,13 +269,52 @@ export const SO_SCRAPE_STATUS_LABEL: Record<SoScrapeStatus, string> = {
   disabled: 'ปิดใช้งาน',
 };
 
-/** เลือกบัญชี Facebook นี้ได้ไหม — ตามตารางในเอกสาร (paused/worker_offline/no_worker = ไม่ได้) */
-export const soAccountSelectable = (s: SoAccountStatus): boolean => s === 'ready' || s === 'busy' || s === 'full';
+/** เลือกบัญชี Facebook นี้ได้ไหม — ตามตารางในเอกสาร (paused/no_worker = ไม่ได้ · worker_offline ได้ แต่ต้องเลือกเครื่องอื่น) */
+export const soAccountSelectable = (s: SoAccountStatus): boolean => s === 'ready' || s === 'busy' || s === 'full' || s === 'worker_offline';
 /** เลือกบัญชี JobThai/JobBKK นี้ได้ไหม (cooldown/disabled = ไม่ได้) */
 export const soScrapeSelectable = (s: SoScrapeStatus): boolean => s === 'ready' || s === 'full';
 /** ต้องขึ้นป๊อปเตือนก่อนส่งไหม (full ยืนยันแล้วส่งต่อได้) */
 export const soAccountNeedsConfirm = (s: SoAccountStatus): boolean => s === 'full';
 export const soScrapeNeedsConfirm = (s: SoScrapeStatus): boolean => s === 'full';
+
+/** เครื่องที่รับงานประเภทนี้ได้ — เรียงตาม So Scraping (ออนไลน์และว่างก่อน) */
+export function soWorkersFor(o: Pick<SoOptions, 'workers'>, kind: SoWorkerKind): SoOptWorker[] {
+  return o.workers.filter((w) => w.kinds.includes(kind));
+}
+
+/** บัญชีนี้ล็อกอินบนเครื่องนี้แล้วไหม (`session_workers` หรือ `fb_account_ids` ของเครื่อง) */
+export function soAccountOnWorker(acc: Pick<SoOptAccount, 'id' | 'sessionWorkers'>, w: Pick<SoOptWorker, 'name' | 'fbAccountIds'>): boolean {
+  return acc.sessionWorkers.includes(w.name) || w.fbAccountIds.includes(acc.id);
+}
+
+export const SO_NO_SESSION_WARNING = 'บัญชีนี้ยังไม่เคยล็อกอินบนเครื่องนี้ บอทจะล็อกอินใหม่ และ Facebook อาจขอยืนยันตัวตน';
+export const soWorkerOfflineWarning = (name: string) => `เครื่อง ${name} ออฟไลน์อยู่ งานจะค้างรอจนเครื่องเปิด`;
+
+/**
+ * คำเตือนก่อนส่ง (ตามข้อ 4 ของเอกสาร) — ว่าง = ส่งได้เลย · มี = ต้องกดยืนยัน
+ * โพสต์: บัญชีครบโควต้า · เครื่องออฟไลน์ · บัญชียังไม่ล็อกอินบนเครื่องที่เลือก · Scrap: บัญชีครบโควต้า · เครื่องออฟไลน์
+ */
+export function soPostConfirmWarnings(acc: SoOptAccount, worker: SoOptWorker | null): string[] {
+  const out: string[] = [];
+  if (soAccountNeedsConfirm(acc.status)) out.push(soWarningText(acc.name, acc.status, acc.warning));
+  if (worker && !worker.online) out.push(soWorkerOfflineWarning(worker.name));
+  if (worker && !soAccountOnWorker(acc, worker)) out.push(SO_NO_SESSION_WARNING);
+  return out;
+}
+export function soScrapConfirmWarnings(picked: readonly SoScrapeAccount[], worker: SoOptWorker | null): string[] {
+  const out = picked.filter((s) => soScrapeNeedsConfirm(s.status)).map((s) => soWarningText(s.label, s.status, s.warning));
+  if (worker && !worker.online) out.push(soWorkerOfflineWarning(worker.name));
+  return out;
+}
+
+/** ผล 30 วันของกลุ่ม — `posted` เป็นหลัก · คอมเมนต์/เบอร์ขึ้นเมื่อมี (เอกสาร: ยังนับไม่ครบ) */
+export function soGroupStatsText(st: SoGroupStats | null): string | null {
+  if (!st) return null;
+  const parts = [`30 วัน โพสต์ได้ ${st.posted}/${st.attempts}`];
+  if (st.comments > 0) parts.push(`คอมเมนต์ ${st.comments}`);
+  if (st.phoneLeads > 0) parts.push(`ทิ้งเบอร์ ${st.phoneLeads}`);
+  return parts.join(' · ');
+}
 
 /** ข้อความในป๊อปเตือน — ใช้ `warning` ของ So Scraping ก่อน ไม่มีค่อยใช้ชื่อสถานะ */
 export function soWarningText(name: string, status: SoAccountStatus | SoScrapeStatus, warning: string | null): string {
@@ -306,6 +369,7 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
       status: ACCOUNT_STATUSES.includes(a.status as SoAccountStatus) ? (a.status as SoAccountStatus) : 'no_worker',
       warning: str(a.warning),
       groupIds: strs(a.group_ids),
+      sessionWorkers: strs(a.session_workers),
     }));
   const groups = rows(r.groups)
     .filter((g) => str(g.id))
@@ -316,10 +380,26 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
       url: str(g.url),
       accountIds: strs(g.account_ids),
       lastPostedAt: str(g.last_posted_at),
+      stats30d:
+        g.stats_30d && typeof g.stats_30d === 'object'
+          ? (() => {
+              const st = g.stats_30d as Record<string, unknown>;
+              return { attempts: num(st.attempts) ?? 0, posted: num(st.posted) ?? 0, comments: num(st.comments) ?? 0, phoneLeads: num(st.phone_leads) ?? 0 };
+            })()
+          : null,
     }));
   const workers = rows(r.workers)
     .filter((w) => str(w.name))
-    .map((w): SoOptWorker => ({ name: str(w.name)!, online: w.online === true, lastSeen: str(w.last_seen), load: num(w.load) ?? 0 }));
+    .map((w): SoOptWorker => ({
+      name: str(w.name)!,
+      online: w.online === true,
+      lastSeen: str(w.last_seen),
+      load: num(w.load) ?? 0,
+      kinds: strs(w.kinds),
+      postQueue: queueOf(w.post_queue),
+      scrapeQueue: queueOf(w.scrape_queue),
+      fbAccountIds: strs(w.fb_account_ids),
+    }));
   const scrapeAccounts = rows(r.scrape_accounts)
     .filter((s) => str(s.id))
     .map((s): SoScrapeAccount => ({
@@ -361,7 +441,17 @@ export function soPickError(
   type: 'content' | 'scraping',
   snap: Record<string, unknown> | null,
 ): string | null {
+  const workerError = (field: string, kind: SoWorkerKind): string | null => {
+    const v = snap?.[field];
+    if (v === undefined || v === null) return null;
+    const w = typeof v === 'string' ? o.workers.find((x) => x.name === v) : undefined;
+    if (!w) return 'ไม่พบเครื่องนี้ในระบบ So Scraping แล้ว — ปิดแล้วเลือกใหม่';
+    if (!w.kinds.includes(kind)) return `เครื่อง ${w.name} รับงาน${kind === 'autopost' ? 'โพสต์' : ' Scrap '}ไม่ได้ — เลือกเครื่องอื่น`;
+    return null;
+  };
   if (type === 'scraping') {
+    const we = workerError('scrape_worker', 'scraper');
+    if (we) return we;
     if (snap?.scrape_connector_ids === undefined) return null;
     const ids = strs(snap.scrape_connector_ids);
     if (!Array.isArray(snap.scrape_connector_ids) || ids.length !== snap.scrape_connector_ids.length) return 'บัญชี JobThai/JobBKK ไม่ถูกต้อง';
@@ -373,6 +463,8 @@ export function soPickError(
     return null;
   }
   const picked = strs(snap?.group_ids);
+  const we = workerError('worker', 'autopost');
+  if (we) return we;
   const known = new Set(o.groups.map((g) => g.id));
   if (picked.some((g) => !known.has(g))) return 'มีกลุ่มที่ไม่อยู่ในระบบ So Scraping แล้ว — ปิดแล้วเลือกใหม่';
   if (typeof snap?.account_id !== 'string') return null;

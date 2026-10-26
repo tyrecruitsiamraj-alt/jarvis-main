@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { FieldSelect } from '@/components/shared/FieldSelect';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
@@ -15,11 +16,12 @@ import {
   defaultScrapeIds,
   soPlatformLabel,
   soScrapMissing,
+  soScrapConfirmWarnings,
   soScrapSnapshot,
-  soScrapeNeedsConfirm,
   soScrapeSelectable,
   soStatusView,
-  soWarningText,
+  soWorkersFor,
+  type SoOptWorker,
   type SoScrapeAccount,
 } from '@/lib/soScraping';
 import { AutopostBody } from '@/components/jobs/AutopostDialog';
@@ -34,7 +36,9 @@ import { AutopostBody } from '@/components/jobs/AutopostDialog';
  * - ยังรอ/กำลังทำ = กดซ้ำไม่ได้ · เสร็จ/ไม่รับงาน = สั่งใหม่ได้
  * - 26 ต.ค. 2569 (เอกสาร options API): เลือกบัญชี JobThai/JobBKK → `scrape_connector_ids` · ติ๊กตัวพร้อมใช้ตัวแรกของแต่ละเว็บไว้ให้
  *   พักชั่วคราว/ปิดใช้งาน = เลือกไม่ได้ · ครบโควต้า = กล่องเตือนในป๊อปเดิมก่อนส่ง (ห้ามซ้อนป๊อป)
+ * - เอกสารรอบ 2: เลือกเครื่องที่รับงาน Scrap ได้ → `scrape_worker` (ไม่เลือก = ระบบ So Scraping เลือกเอง) · เครื่องออฟไลน์ = เตือนก่อนส่ง
  */
+const AUTO_WORKER = '__auto__';
 const NUM = new Intl.NumberFormat('th-TH');
 export default function OrderPostButton({ job }: { job: JobRequest; caption?: string | null }) {
   const [latest, setLatest] = React.useState<JobPostingRequest[] | null>(null);
@@ -46,6 +50,8 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
   const [scrapeError, setScrapeError] = React.useState<string | null>(null);
   const [scrapeIds, setScrapeIds] = React.useState<string[]>([]);
   const [confirmText, setConfirmText] = React.useState<string | null>(null);
+  const [scrapeWorkers, setScrapeWorkers] = React.useState<SoOptWorker[]>([]);
+  const [scrapeWorker, setScrapeWorker] = React.useState(AUTO_WORKER);
 
   React.useEffect(() => {
     let alive = true;
@@ -56,6 +62,7 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
         if (!alive) return;
         setScrapeAccounts(o.scrapeAccounts);
         setScrapeIds(defaultScrapeIds(o.scrapeAccounts));
+        setScrapeWorkers(soWorkersFor(o, 'scraper'));
       })
       .catch((e) => alive && setScrapeError(e instanceof Error ? e.message : 'โหลดบัญชี JobThai/JobBKK ไม่ได้'));
     return () => {
@@ -84,9 +91,10 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
 
   const scrap = async (confirmed = false) => {
     if (busy) return;
-    const full = (scrapeAccounts ?? []).filter((s) => scrapeIds.includes(s.id) && soScrapeNeedsConfirm(s.status));
-    if (!confirmed && full.length > 0) {
-      setConfirmText(full.map((s) => soWarningText(s.label, s.status, s.warning)).join(' · '));
+    const worker = scrapeWorkers.find((w) => w.name === scrapeWorker) ?? null;
+    const warnings = soScrapConfirmWarnings((scrapeAccounts ?? []).filter((s) => scrapeIds.includes(s.id)), worker);
+    if (!confirmed && warnings.length > 0) {
+      setConfirmText(warnings.join(' · '));
       return;
     }
     setConfirmText(null);
@@ -101,6 +109,7 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
         jobSnapshot: {
           ...soScrapSnapshot(job, title),
           ...(scrapeIds.length > 0 ? { scrape_connector_ids: scrapeIds } : {}),
+          ...(scrapeWorker !== AUTO_WORKER ? { scrape_worker: scrapeWorker } : {}),
         },
       });
       setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'scraping')]);
@@ -204,6 +213,24 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
             </li>
           ))}
         </ul>
+      ) : null}
+      {scrapeWorkers.length > 0 && !scrapingView?.open ? (
+        <FieldSelect
+          value={scrapeWorker}
+          onChange={(v) => {
+            setScrapeWorker(v);
+            setConfirmText(null);
+          }}
+          ariaLabel="เครื่องที่ Scrap"
+          testId="so-scrape-worker"
+          options={[
+            { value: AUTO_WORKER, label: 'เครื่อง: ให้ระบบเลือก' },
+            ...scrapeWorkers.map((w) => ({
+              value: w.name,
+              label: `เครื่อง ${w.name} · ${w.online ? 'ออนไลน์' : 'ออฟไลน์'} · งาน Scrap ค้าง ${NUM.format(w.scrapeQueue.running + w.scrapeQueue.queued)}`,
+            })),
+          ]}
+        />
       ) : null}
       {scrapeError ? <p className={cn('text-xs', TONE.danger.value)}>{scrapeError}</p> : null}
       {confirmText ? (

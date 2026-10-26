@@ -13856,3 +13856,6 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - จอ: ป๊อป Autopost (`AutopostDialog`) ไม่มีช่องเลือก Worker แล้ว (เครื่องผูกกับบัญชี) โชว์เครื่อง/งานค้างข้างบัญชี · ขอ Scrap (`OrderPostButton`) ติ๊กบัญชี JobThai/JobBKK → `scrape_connector_ids` · 🔴 คำเตือน = กล่องในป๊อปเดิม (กติกาห้ามซ้อนป๊อป) ไม่ใช่ป๊อปใหม่
 - ใส่ key: ตั้งค่า › เชื่อมระบบภายนอก › การ์ด "key จาก So Scraping" (`SoScrapingKeyCard` · ทดสอบ/บันทึก/ลบ · PUT/POST `/api/integration-keys` แอดมิน)
 - เทสต์: `tests/api/soScrapingOptions2569-10-26.test.ts`
+- เอกสารรอบ 2 (26 ต.ค. บ่าย): เลือกเครื่องเองได้ — โพสต์ส่ง `worker` (เฉพาะเมื่อไม่ใช่เครื่องหลัก) · Scrap ส่ง `scrape_worker` (ไม่เลือก = ให้ระบบเลือก) · `soWorkersFor` แยกเครื่องตาม `kinds`
+  · worker_offline เลือกบัญชีได้แล้ว (ให้เลือกเครื่องอื่น) · เตือนก่อนส่ง `soPostConfirmWarnings` / `soScrapConfirmWarnings` (ครบโควต้า · เครื่องออฟไลน์ · บัญชียังไม่ล็อกอินบนเครื่อง `session_workers`)
+  · กลุ่มเรียงตาม `stats_30d.posted` + `soGroupStatsText`
