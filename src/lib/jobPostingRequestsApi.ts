@@ -1,7 +1,7 @@
 import { apiFetch } from '@/lib/apiFetch';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
-import { SO_STATUS_LABEL, type SoGroup } from '@/lib/soScraping';
+import { SO_STATUS_LABEL, type SoGroup, type SoOptions } from '@/lib/soScraping';
 
 /**
  * คำขอ "โพสหางานใหม่" — สร้าง ID ให้ทีมอื่นรับไปทำคอนเทนต์/โพสหาคนต่อ
@@ -137,25 +137,21 @@ export async function fetchJobPostingState(jobId: string): Promise<{ latest: Job
   return { latest: d.latest ?? d.active ?? [], recentGroups: d.recent_groups ?? [] };
 }
 
-export type SoAccount = {
-  id: string;
-  name: string;
-  groupIds: string[];
-  dailyCap: number | null;
-  postedToday: number;
-  pausedUntil: string | null;
-  pauseReason: string | null;
-  preferredWorker: string | null;
-};
-export type SoWorker = { name: string; lastSeen: string | null; online: boolean };
-export type AutopostOptions = { accounts: SoAccount[]; groups: SoGroup[]; workers: SoWorker[] };
-
-/** บัญชี · กลุ่ม · worker ของ So Scraping (อ่านอย่างเดียว) — ป๊อป Autopost */
-export async function fetchAutopostOptions(): Promise<AutopostOptions> {
-  const r = await apiFetch('/api/matching/job-postings?autopost=1');
+/**
+ * บัญชี · กลุ่ม · เครื่อง · บัญชี JobThai/JobBKK ของ So Scraping (อ่านอย่างเดียว · ดึงใหม่ทุกครั้งที่เปิดฟอร์ม)
+ * ป๊อป Autopost + ขอ Scrap (26 ต.ค. 2569 ตามเอกสาร options API)
+ */
+export async function fetchSoOptions(): Promise<SoOptions> {
+  const r = await apiFetch('/api/matching/job-postings?options=1');
   if (!r.ok) return readError(r, 'โหลดบัญชี/กลุ่มของ So Scraping ไม่ได้');
-  const d = (await r.json().catch(() => ({}))) as Partial<AutopostOptions>;
-  return { accounts: d.accounts ?? [], groups: d.groups ?? [], workers: d.workers ?? [] };
+  const d = (await r.json().catch(() => ({}))) as Partial<SoOptions>;
+  return {
+    source: d.source === 'api' ? 'api' : 'db',
+    accounts: d.accounts ?? [],
+    groups: d.groups ?? [],
+    workers: d.workers ?? [],
+    scrapeAccounts: d.scrapeAccounts ?? [],
+  };
 }
 
 /** กลุ่ม Facebook ของ So Scraping ที่มีบัญชีผูก (อ่านอย่างเดียว) */

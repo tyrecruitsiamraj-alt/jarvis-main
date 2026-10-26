@@ -19,7 +19,8 @@ import {
   normalizeJobPostingRequestType,
 } from '../_lib/jobPostingRequests.js';
 import { isSiamrajRequestInScope, loadScopedRequestNoSet } from '../_lib/siamrajUnitRequests.js';
-import { listLinkedSoGroups, listSoAccounts, listSoWorkers, unknownSoGroupIds } from '../_lib/soScrapingGroups.js';
+import { listLinkedSoGroups } from '../_lib/soScrapingGroups.js';
+import { fetchSoOptions, SoOptionsError } from '../_lib/soScrapingOptions.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 
@@ -51,7 +52,7 @@ async function recentGroupsOfJob(jobId: string): Promise<string[]> {
     return [];
   }
 }
-import { soSnapshotError } from '../../src/lib/soScraping.js';
+import { soPickError, soSnapshotError } from '../../src/lib/soScraping.js';
 
 const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น';
 
@@ -96,10 +97,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (getQuery(req, 'groups') === '1') {
         return res.status(200).json({ groups: await listLinkedSoGroups() });
       }
-      // ป๊อป Autopost (20 ต.ค. 2569): บัญชี · กลุ่ม · worker — อ่านอย่างเดียว (บัญชีเลือกแค่คอลัมน์ที่ไม่ลับ)
-      if (getQuery(req, 'autopost') === '1') {
-        const [accounts, groups, workers] = await Promise.all([listSoAccounts(), listLinkedSoGroups(), listSoWorkers()]);
-        return res.status(200).json({ accounts, groups, workers });
+      // ป๊อป Autopost / ขอ Scrap: บัญชี · กลุ่ม · เครื่อง · บัญชี JobThai/JobBKK จาก options API ของ So Scraping
+      // (26 ต.ค. 2569 · ดึงใหม่ทุกครั้ง ไม่ cache · key อยู่ฝั่ง server) — ยังไม่ใส่ key = อ่านจากฐานแบบเดิม
+      if (getQuery(req, 'autopost') === '1' || getQuery(req, 'options') === '1') {
+        try {
+          return res.status(200).json(await fetchSoOptions());
+        } catch (e) {
+          if (e instanceof SoOptionsError) return sendError(res, e.status, 'So Scraping', e.message);
+          throw e;
+        }
       }
       // ป้ายสถานะบนการ์ดกล่องงาน + ตัวกรอง (20 ต.ค. 2569) — ล่าสุดต่อ (ใบ, ประเภท) ของใบที่ผู้ใช้เห็นได้
       if (getQuery(req, 'board') === '1') {
@@ -141,25 +147,21 @@ async function handler(req: AuthedReq, res: ApiRes) {
       // ตรวจซ้ำฝั่ง server ด้วยกติกาเดียวกับจอ (So Scraping · 20 ต.ค. 2569) — ข้อความบอกว่าต้องทำอะไร
       const snapError = soSnapshotError(requestType, jobSnapshot);
       if (snapError) return sendError(res, 400, 'Bad request', snapError);
-      if (requestType === 'content' && Array.isArray(jobSnapshot?.group_ids)) {
-        const picked = jobSnapshot.group_ids.filter((x): x is string => typeof x === 'string');
-        const unknown = await unknownSoGroupIds(picked);
-        if (unknown.length > 0) return sendError(res, 400, 'Bad request', 'มีกลุ่มที่ไม่อยู่ในระบบ So Scraping แล้ว — ปิดป๊อปแล้วเลือกใหม่');
-        // Autopost: บัญชีต้องมีจริง · กลุ่มต้องเป็นของบัญชีนั้น · worker ต้องมีจริง · ลิงก์ต้องเป็นของใบนี้
-        if (typeof jobSnapshot.account_id === 'string') {
-          const accounts = await listSoAccounts();
-          const acc = accounts.find((a) => a.id === jobSnapshot.account_id);
-          if (!acc) return sendError(res, 400, 'Bad request', 'ไม่พบบัญชี Facebook นี้ในระบบ So Scraping แล้ว');
-          if (picked.some((g) => !acc.groupIds.includes(g))) {
-            return sendError(res, 400, 'Bad request', `มีกลุ่มที่บัญชี ${acc.name} โพสต์ไม่ได้ — เลือกกลุ่มใหม่`);
-          }
-          if (acc.pausedUntil && Date.parse(acc.pausedUntil) > Date.now()) {
-            return sendError(res, 400, 'Bad request', `บัญชี ${acc.name} ถูกพักอยู่ — เลือกบัญชีอื่น`);
-          }
-          const worker = jobSnapshot.worker_id;
-          if (typeof worker === 'string' && !(await listSoWorkers()).some((w) => w.name === worker)) {
-            return sendError(res, 400, 'Bad request', 'ไม่พบ worker นี้ในระบบ So Scraping แล้ว');
-          }
+      // ค่าที่เลือก (บัญชี · กลุ่ม · บัญชี Scrap) ต้องตรงกับ So Scraping ตอนกดส่ง — ดึงใหม่ ไม่ใช้ของที่จอถือไว้ (26 ต.ค. 2569)
+      const picksSomething =
+        requestType === 'content' ? Array.isArray(jobSnapshot?.group_ids) : jobSnapshot?.scrape_connector_ids !== undefined;
+      if (picksSomething) {
+        let options;
+        try {
+          options = await fetchSoOptions();
+        } catch (e) {
+          if (e instanceof SoOptionsError) return sendError(res, e.status, 'So Scraping', e.message);
+          throw e;
+        }
+        const pickError = soPickError(options, requestType, jobSnapshot);
+        if (pickError) return sendError(res, 400, 'Bad request', pickError);
+        // Autopost: ลิงก์ในข้อความต้องเป็นของประกาศที่เปิดอยู่ของใบนี้
+        if (requestType === 'content' && typeof jobSnapshot?.account_id === 'string') {
           const code = typeof jobSnapshot.link_code === 'string' ? jobSnapshot.link_code : '';
           if (!code || !(await linkCodeBelongsToJob(code, jobId))) {
             return sendError(res, 400, 'Bad request', 'ลิงก์สมัครไม่ใช่ของใบนี้หรือประกาศปิดไปแล้ว — เลือกลิงก์ใหม่');

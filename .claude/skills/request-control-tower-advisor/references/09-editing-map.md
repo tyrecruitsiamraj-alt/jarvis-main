@@ -13846,3 +13846,13 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - จอ: ป้าย "ยังไม่ได้ส่งให้ AI" + ปุ่ม "ส่งให้ AI" ทั้งมุม "ต้องโทร" (`FollowCallQueue`) และ "ตาราง" (`FollowPlanningCalendar`) · ข้อความ "ส่งให้ AI แล้ว ยังไม่มีผลกลับ" ไม่ขึ้นกับแถวที่ยังไม่ส่ง
 - PATCH `action:'push_day'` (`pushFollowDay` ใน `follow.ts`): สาย AI ที่ยังรอของเบอร์เดียวกัน วันเดียวกัน (เวลาไทย) เท่านั้น · วันนั้นมีแผนถึง Lumos แล้ว = 409 ให้ไปแก้ตาราง · เรียก `replanFollowSetWithLumos({ skipCancelOld: true })` ไม่ยิง DELETE แผนเก่า (กันยกเลิกแผนรหัสเดิมวันอื่นของเบอร์เดียวกัน) · จด audit `follow.push_day`
 - เทสต์: `tests/api/followPushDay.test.ts` · `FollowCallQueue.test.tsx`
+
+### สั่ง Autopost / Scrap: ตัวเลือกจาก So Scraping options API (26 ต.ค. 2569)
+- เอกสารทีม So Scraping: `GET {base}/api/integrations/jarvis/options` + `x-api-key` · ดึงใหม่ทุกครั้ง ไม่ cache · เรียกจาก server เท่านั้น
+- server: `api/_lib/soScrapingOptions.ts` (`fetchSoOptions` · `callSoOptions` · `saveSoKey`) · key เก็บเข้ารหัสใน `app_outbound_api_keys` (migration 163 · ใช้ `encryptApiKey` ของ `aiSettingsStore`)
+- ยังไม่ใส่ key = อ่านจากฐาน `so_autopost_apiscraper` แบบเดิม (`source: 'db'` · ทางถอย) · ใส่ key แล้วเรียกไม่ได้ = บอก error ไม่ถอยเงียบ
+- กติกา (ไฟล์เดียว `src/lib/soScraping.ts`): `parseSoOptions` · `soAccountSelectable` (paused/worker_offline/no_worker เลือกไม่ได้) · `soAccountNeedsConfirm` (full) · `soScrapeSelectable` (cooldown/disabled ไม่ได้) · `soGroupLabel` (ไม่มีชื่อ = เลขกลุ่ม · ยังไม่มีชื่อ) · `soPickError` (server ตรวจซ้ำตอน POST)
+- เส้น: `GET /api/matching/job-postings?options=1` (`autopost=1` ยังใช้ได้) · POST ตรวจด้วย `soPickError` จาก options ที่ดึงใหม่
+- จอ: ป๊อป Autopost (`AutopostDialog`) ไม่มีช่องเลือก Worker แล้ว (เครื่องผูกกับบัญชี) โชว์เครื่อง/งานค้างข้างบัญชี · ขอ Scrap (`OrderPostButton`) ติ๊กบัญชี JobThai/JobBKK → `scrape_connector_ids` · 🔴 คำเตือน = กล่องในป๊อปเดิม (กติกาห้ามซ้อนป๊อป) ไม่ใช่ป๊อปใหม่
+- ใส่ key: ตั้งค่า › เชื่อมระบบภายนอก › การ์ด "key จาก So Scraping" (`SoScrapingKeyCard` · ทดสอบ/บันทึก/ลบ · PUT/POST `/api/integration-keys` แอดมิน)
+- เทสต์: `tests/api/soScrapingOptions2569-10-26.test.ts`

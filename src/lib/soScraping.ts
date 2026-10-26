@@ -185,3 +185,201 @@ export function soNoticeTitle(type: 'content' | 'scraping', status: string): str
   if (status === 'rejected') return `${what} · ไม่รับงาน`;
   return null;
 }
+
+/* ═══ ตัวเลือกตอนสั่งงาน จาก So Scraping options API (เจ้าของ 26 ต.ค. 2569 "ทำเลย ตามเอกสาร") ═══
+ * GET so-scraping/api/integrations/jarvis/options (x-api-key ฝั่ง server เท่านั้น · ดึงใหม่ทุกครั้งที่เปิดฟอร์ม ไม่ cache)
+ * status ทุกตัวมาจาก So Scraping — Jarvis ไม่คิดเอง · ข้อความ `warning` เป็นไทยจากฝั่งนั้น ใช้ในป๊อปเตือนได้เลย
+ * ยังไม่ได้ใส่ key = อ่านจากฐานของ So Scraping แบบเดิม (`source: 'db'` · ทางถอย) */
+
+export type SoAccountStatus = 'ready' | 'busy' | 'full' | 'paused' | 'worker_offline' | 'no_worker';
+export type SoScrapeStatus = 'ready' | 'full' | 'cooldown' | 'disabled';
+export type SoQueue = { running: number; queued: number };
+
+export type SoOptAccount = {
+  id: string;
+  name: string;
+  worker: string | null;
+  workerOnline: boolean;
+  postedToday: number;
+  dailyCap: number | null;
+  remainingToday: number | null;
+  pausedUntil: string | null;
+  pauseReason: string | null;
+  queue: SoQueue;
+  status: SoAccountStatus;
+  warning: string | null;
+  groupIds: string[];
+};
+export type SoOptGroup = { id: string; fbGroupId: string | null; name: string | null; url: string | null; accountIds: string[]; lastPostedAt: string | null };
+export type SoOptWorker = { name: string; online: boolean; lastSeen: string | null; load: number };
+export type SoScrapeAccount = {
+  id: string;
+  platform: string;
+  label: string;
+  status: SoScrapeStatus;
+  warning: string | null;
+  usedToday: number;
+  cap: number | null;
+  cooldownUntil: string | null;
+};
+export type SoOptions = {
+  source: 'api' | 'db';
+  accounts: SoOptAccount[];
+  groups: SoOptGroup[];
+  workers: SoOptWorker[];
+  scrapeAccounts: SoScrapeAccount[];
+};
+
+export const SO_ACCOUNT_STATUS_LABEL: Record<SoAccountStatus, string> = {
+  ready: 'พร้อมโพสต์',
+  busy: 'มีงานค้าง',
+  full: 'ครบโควต้าวันนี้',
+  paused: 'ถูกพัก',
+  worker_offline: 'เครื่องออฟไลน์',
+  no_worker: 'ยังไม่ผูกเครื่อง',
+};
+export const SO_SCRAPE_STATUS_LABEL: Record<SoScrapeStatus, string> = {
+  ready: 'พร้อมใช้',
+  full: 'ครบโควต้าวันนี้',
+  cooldown: 'พักชั่วคราว',
+  disabled: 'ปิดใช้งาน',
+};
+
+/** เลือกบัญชี Facebook นี้ได้ไหม — ตามตารางในเอกสาร (paused/worker_offline/no_worker = ไม่ได้) */
+export const soAccountSelectable = (s: SoAccountStatus): boolean => s === 'ready' || s === 'busy' || s === 'full';
+/** เลือกบัญชี JobThai/JobBKK นี้ได้ไหม (cooldown/disabled = ไม่ได้) */
+export const soScrapeSelectable = (s: SoScrapeStatus): boolean => s === 'ready' || s === 'full';
+/** ต้องขึ้นป๊อปเตือนก่อนส่งไหม (full ยืนยันแล้วส่งต่อได้) */
+export const soAccountNeedsConfirm = (s: SoAccountStatus): boolean => s === 'full';
+export const soScrapeNeedsConfirm = (s: SoScrapeStatus): boolean => s === 'full';
+
+/** ข้อความในป๊อปเตือน — ใช้ `warning` ของ So Scraping ก่อน ไม่มีค่อยใช้ชื่อสถานะ */
+export function soWarningText(name: string, status: SoAccountStatus | SoScrapeStatus, warning: string | null): string {
+  const label = (SO_ACCOUNT_STATUS_LABEL as Record<string, string>)[status] ?? (SO_SCRAPE_STATUS_LABEL as Record<string, string>)[status] ?? status;
+  return (warning ?? '').trim() || `บัญชี ${name} ${label}`;
+}
+
+/** ชื่อกลุ่ม — ยังไม่มีชื่อ (บอทยังไม่เคยเข้าไปอ่าน) ใช้เลขกลุ่มแล้วต่อท้าย "ยังไม่มีชื่อ" */
+export function soGroupLabel(g: Pick<SoOptGroup, 'name' | 'fbGroupId' | 'id'>): string {
+  const name = (g.name ?? '').trim();
+  return name || `${g.fbGroupId || g.id} · ยังไม่มีชื่อ`;
+}
+
+/** กลุ่มของบัญชีนี้ — อยู่ใน `group_ids` ของบัญชี หรือบัญชีอยู่ใน `account_ids` ของกลุ่ม */
+export function soGroupsOfAccount(o: Pick<SoOptions, 'groups'>, acc: Pick<SoOptAccount, 'id' | 'groupIds'> | null): SoOptGroup[] {
+  if (!acc) return [];
+  return o.groups.filter((g) => acc.groupIds.includes(g.id) || g.accountIds.includes(acc.id));
+}
+
+const ACCOUNT_STATUSES: readonly SoAccountStatus[] = ['ready', 'busy', 'full', 'paused', 'worker_offline', 'no_worker'];
+const SCRAPE_STATUSES: readonly SoScrapeStatus[] = ['ready', 'full', 'cooldown', 'disabled'];
+const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : []);
+const queueOf = (v: unknown): SoQueue => {
+  const q = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  return { running: num(q.running) ?? 0, queued: num(q.queued) ?? 0 };
+};
+
+/**
+ * คำตอบดิบของ options API → รูปที่จอใช้ · ไม่มี accounts/groups/workers/scrape_accounts = ผิดรูป (null)
+ * สถานะที่ไม่รู้จัก = ถือว่าเลือกไม่ได้ (บัญชี → no_worker · บัญชี Scrap → disabled) — fail-safe ไปทางไม่ส่ง
+ */
+export function parseSoOptions(raw: unknown): SoOptions | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (![r.accounts, r.groups, r.workers, r.scrape_accounts].every(Array.isArray)) return null;
+  const rows = (v: unknown) => (v as unknown[]).filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === 'object');
+  const accounts = rows(r.accounts)
+    .filter((a) => str(a.id))
+    .map((a): SoOptAccount => ({
+      id: str(a.id)!,
+      name: str(a.name) ?? str(a.id)!,
+      worker: str(a.worker),
+      workerOnline: a.worker_online === true,
+      postedToday: num(a.posted_today) ?? 0,
+      dailyCap: num(a.daily_cap),
+      remainingToday: num(a.remaining_today),
+      pausedUntil: str(a.paused_until),
+      pauseReason: str(a.pause_reason),
+      queue: queueOf(a.queue),
+      status: ACCOUNT_STATUSES.includes(a.status as SoAccountStatus) ? (a.status as SoAccountStatus) : 'no_worker',
+      warning: str(a.warning),
+      groupIds: strs(a.group_ids),
+    }));
+  const groups = rows(r.groups)
+    .filter((g) => str(g.id))
+    .map((g): SoOptGroup => ({
+      id: str(g.id)!,
+      fbGroupId: str(g.fb_group_id),
+      name: str(g.name),
+      url: str(g.url),
+      accountIds: strs(g.account_ids),
+      lastPostedAt: str(g.last_posted_at),
+    }));
+  const workers = rows(r.workers)
+    .filter((w) => str(w.name))
+    .map((w): SoOptWorker => ({ name: str(w.name)!, online: w.online === true, lastSeen: str(w.last_seen), load: num(w.load) ?? 0 }));
+  const scrapeAccounts = rows(r.scrape_accounts)
+    .filter((s) => str(s.id))
+    .map((s): SoScrapeAccount => ({
+      id: str(s.id)!,
+      platform: str(s.platform) ?? '',
+      label: str(s.label) ?? str(s.id)!,
+      status: SCRAPE_STATUSES.includes(s.status as SoScrapeStatus) ? (s.status as SoScrapeStatus) : 'disabled',
+      warning: str(s.warning),
+      usedToday: num(s.platform_used_today) ?? 0,
+      cap: num(s.platform_cap),
+      cooldownUntil: str(s.cooldown_until),
+    }));
+  return { source: 'api', accounts, groups, workers, scrapeAccounts };
+}
+
+/** ชื่อเว็บของบัญชี Scrap */
+export function soPlatformLabel(p: string): string {
+  return p === 'jobthai' ? 'JobThai' : p === 'jobbkk' ? 'JobBKK' : p || 'อื่น ๆ';
+}
+
+/** ติ๊กไว้ให้ก่อน = บัญชีพร้อมใช้ตัวแรกของแต่ละเว็บ */
+export function defaultScrapeIds(list: readonly SoScrapeAccount[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of list) {
+    if (s.status !== 'ready' || seen.has(s.platform)) continue;
+    seen.add(s.platform);
+    out.push(s.id);
+  }
+  return out;
+}
+
+/**
+ * ตรวจค่าที่เลือกฝั่ง server เทียบกับ options ตอนกดส่ง — คืนข้อความ · ผ่าน = null
+ * บัญชีต้องมีจริง เลือกได้ และผูกทุกกลุ่ม · บัญชี Scrap ต้องมีจริงและเลือกได้
+ */
+export function soPickError(
+  o: SoOptions,
+  type: 'content' | 'scraping',
+  snap: Record<string, unknown> | null,
+): string | null {
+  if (type === 'scraping') {
+    if (snap?.scrape_connector_ids === undefined) return null;
+    const ids = strs(snap.scrape_connector_ids);
+    if (!Array.isArray(snap.scrape_connector_ids) || ids.length !== snap.scrape_connector_ids.length) return 'บัญชี JobThai/JobBKK ไม่ถูกต้อง';
+    for (const id of ids) {
+      const s = o.scrapeAccounts.find((x) => x.id === id);
+      if (!s) return 'ไม่พบบัญชี JobThai/JobBKK นี้ในระบบ So Scraping แล้ว — ปิดแล้วเลือกใหม่';
+      if (!soScrapeSelectable(s.status)) return soWarningText(s.label, s.status, s.warning);
+    }
+    return null;
+  }
+  const picked = strs(snap?.group_ids);
+  const known = new Set(o.groups.map((g) => g.id));
+  if (picked.some((g) => !known.has(g))) return 'มีกลุ่มที่ไม่อยู่ในระบบ So Scraping แล้ว — ปิดแล้วเลือกใหม่';
+  if (typeof snap?.account_id !== 'string') return null;
+  const acc = o.accounts.find((a) => a.id === snap.account_id);
+  if (!acc) return 'ไม่พบบัญชี Facebook นี้ในระบบ So Scraping แล้ว — ปิดแล้วเลือกใหม่';
+  if (!soAccountSelectable(acc.status)) return soWarningText(acc.name, acc.status, acc.warning);
+  const mine = new Set(soGroupsOfAccount(o, acc).map((g) => g.id));
+  if (picked.some((g) => !mine.has(g))) return `มีกลุ่มที่บัญชี ${acc.name} โพสต์ไม่ได้ — เลือกกลุ่มใหม่`;
+  return null;
+}

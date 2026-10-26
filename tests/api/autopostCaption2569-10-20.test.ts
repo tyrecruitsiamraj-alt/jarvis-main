@@ -83,7 +83,7 @@ describe('แคปชั่น Autopost ตามแบบทีมสรรห
     const title = publicJobTitle(JOB);
     expect(title).not.toBe('พนักงาน');
     expect(soScrapSnapshot(JOB, title).position).toBe(title);
-    expect(read('src/components/jobs/OrderPostButton.tsx')).toContain('jobSnapshot: soScrapSnapshot(job, title),');
+    expect(read('src/components/jobs/OrderPostButton.tsx')).toContain('...soScrapSnapshot(job, title),');
   });
   it('บรรทัดที่ไม่มีข้อมูลไม่ขึ้น · ไม่เกิน 2,000 ตัวอักษร', () => {
     const bare = buildAutopostCaption({ ...JOB, requirements: [], benefits: [], age_range_min: null, age_range_max: null } as unknown as JobRequest, {

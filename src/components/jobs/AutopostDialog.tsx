@@ -19,19 +19,26 @@ import { applyLinkPath, type RecruitPosting } from '@/lib/recruitPostings';
 import {
   composeJobSnapshot,
   createJobPostingRequest,
-  fetchAutopostOptions,
   fetchJobPostingState,
-  type AutopostOptions,
+  fetchSoOptions,
   type JobPostingRequest,
 } from '@/lib/jobPostingRequestsApi';
 import {
+  SO_ACCOUNT_STATUS_LABEL,
   SO_POST_MODES,
   SO_POST_MODE_LABEL,
   SO_POST_REASON,
   jobProvinceOf,
+  soAccountNeedsConfirm,
+  soAccountSelectable,
+  soGroupLabel,
+  soGroupsOfAccount,
   soPostSnapshot,
   soStatusView,
-  sortSoGroups,
+  soWarningText,
+  type SoOptAccount,
+  type SoOptGroup,
+  type SoOptions,
   type SoPostMode,
 } from '@/lib/soScraping';
 import { AUTOPOST_CAPTION_MAX, autopostMissing, buildAutopostCaption, captionLeaks } from '@/lib/autopostCaption';
@@ -42,12 +49,14 @@ import { AUTOPOST_CAPTION_MAX, autopostMissing, buildAutopostCaption, captionLea
  * - แคปชั่นร่างจากของที่ทีมกรอกในป๊อปประกาศ (`buildAutopostCaption`) · ค่าที่บันทึก = ฉบับที่เห็นตอนกดส่ง
  * - ขาดช่องบังคับ (ตำแหน่ง · สถานที่ · ฐานเงินเดือน · วันเวลาทำงาน · ลิงก์สมัคร) = กดส่งไม่ได้ และบอกว่าขาดอะไร
  * - กลุ่ม = เฉพาะของบัญชีที่เลือก · เตือนกลุ่มที่ใบนี้เพิ่งสั่งไปใน 3 วัน (กันบัญชีโดนแบน)
- * - Worker ตั้งต้น "อัตโนมัติ" (worker ประจำของบัญชี)
+ * - 26 ต.ค. 2569 (เอกสาร options API ของ So Scraping): บัญชี/กลุ่ม/เครื่องมาจาก So Scraping ดึงใหม่ทุกครั้งที่เปิด
+ *   เลือกเครื่องเองไม่ได้ (session อยู่เครื่องเดียว) — โชว์เครื่อง + งานค้างข้างบัญชีแทน
+ *   ถูกพัก / เครื่องออฟไลน์ = เลือกไม่ได้ ขึ้นกล่องเตือน · ครบโควต้า = เตือนก่อนส่ง กดส่งต่อได้
+ *   กล่องเตือนอยู่ในป๊อปเดิม (กติกาห้ามซ้อนป๊อป) · ข้อความใช้ `warning` ของ So Scraping
  * 🔴 Jarvis ไม่โพสต์ Facebook เอง — เขียนคำขอให้ So Scraping · ห้ามซ้อน Dialog (เปิดจาก JobBoardView ไม่ใช่ในการ์ด)
  */
 const NUM = new Intl.NumberFormat('th-TH');
 const WHEN = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-const AUTO_WORKER = '__auto__';
 const NEW_LINK_LABEL = 'Facebook Group';
 
 export default function AutopostDialog({
@@ -88,7 +97,7 @@ export function AutopostBody({
   const province = jobProvinceOf(job);
 
   const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
-  const [opts, setOpts] = React.useState<AutopostOptions | null>(null);
+  const [opts, setOpts] = React.useState<SoOptions | null>(null);
   const [state, setState] = React.useState<{ latest: JobPostingRequest[]; recentGroups: string[] } | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
 
@@ -96,7 +105,8 @@ export function AutopostBody({
   const [linkCode, setLinkCode] = React.useState('');
   const [accountId, setAccountId] = React.useState('');
   const [picked, setPicked] = React.useState<string[]>([]);
-  const [worker, setWorker] = React.useState(AUTO_WORKER);
+  /** กล่องเตือนในป๊อป — block = บัญชีที่เลือกไม่ได้ · confirm = ครบโควต้า ถามก่อนส่ง */
+  const [warn, setWarn] = React.useState<{ kind: 'block' | 'confirm'; text: string } | null>(null);
   const [caption, setCaption] = React.useState('');
   const [captionEdited, setCaptionEdited] = React.useState(false);
   const [busy, setBusy] = React.useState<'send' | 'link' | null>(null);
@@ -105,7 +115,7 @@ export function AutopostBody({
 
   React.useEffect(() => {
     let alive = true;
-    Promise.all([fetchRecruitPostings({ jobId: job.id }), fetchAutopostOptions(), fetchJobPostingState(job.id)])
+    Promise.all([fetchRecruitPostings({ jobId: job.id }), fetchSoOptions(), fetchJobPostingState(job.id)])
       .then(([p, o, s]) => {
         if (!alive) return;
         setPostings(p);
@@ -114,10 +124,10 @@ export function AutopostBody({
         const open = p.find((x) => x.status === 'open');
         const fb = open?.links.find((l) => /facebook/i.test(l.channelLabel ?? '')) ?? open?.links[0];
         if (fb) setLinkCode(fb.code);
-        const acc = o.accounts.find((a) => !isPaused(a.pausedUntil)) ?? o.accounts[0];
+        const acc = firstAccount(o.accounts);
         if (acc) {
           setAccountId(acc.id);
-          setPicked(defaultGroups(o, acc.id, province, s.recentGroups));
+          setPicked(defaultGroups(o, acc, province, s.recentGroups));
         }
       })
       .catch((e) => alive && setLoadError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่ได้'));
@@ -131,9 +141,10 @@ export function AutopostBody({
   const linkUrl = linkCode ? `${window.location.origin}${applyLinkPath(linkCode)}` : null;
   const account = opts?.accounts.find((a) => a.id === accountId) ?? null;
   const accountGroups = React.useMemo(
-    () => (opts && account ? sortSoGroups(opts.groups.filter((g) => account.groupIds.includes(g.id)), province) : []),
-    [opts, account, province],
+    () => (opts && account ? [...soGroupsOfAccount(opts, account)].sort((a, b) => soGroupLabel(a).localeCompare(soGroupLabel(b), 'th')) : []),
+    [opts, account],
   );
+  const workerOf = (a: SoOptAccount) => opts?.workers.find((w) => w.name === a.worker) ?? null;
   const recent = new Set(state?.recentGroups ?? []);
   const openOrder = state?.latest.find((r) => r.request_type === 'content' && soStatusView(r).open) ?? null;
 
@@ -151,7 +162,7 @@ export function AutopostBody({
   const problems = [
     ...missing.map((m) => `ขาด${m}`),
     ...(account ? [] : ['เลือกบัญชี Facebook']),
-    ...(account && isPaused(account.pausedUntil) ? [`บัญชี ${account.name} ถูกพักอยู่`] : []),
+    ...(account && !soAccountSelectable(account.status) ? [soWarningText(account.name, account.status, account.warning)] : []),
     ...(picked.length === 0 ? ['เลือกกลุ่มอย่างน้อย 1 กลุ่ม'] : []),
     ...(mode !== 'image_only' && !caption.trim() ? ['ใส่ข้อความประกาศ'] : []),
     ...(mode !== 'image_only' && linkUrl && !caption.includes(linkUrl) ? ['ข้อความต้องมีลิงก์สมัครที่เลือก'] : []),
@@ -176,8 +187,26 @@ export function AutopostBody({
     }
   };
 
-  const send = async () => {
+  const pickAccount = (id: string) => {
+    const a = opts?.accounts.find((x) => x.id === id);
+    if (!opts || !a) return;
+    // ถูกพัก / เครื่องออฟไลน์ / ยังไม่ผูกเครื่อง = เลือกไม่ได้ (เอกสาร So Scraping) — เตือนแล้วคงบัญชีเดิม
+    if (!soAccountSelectable(a.status)) {
+      setWarn({ kind: 'block', text: soWarningText(a.name, a.status, a.warning) });
+      return;
+    }
+    setWarn(null);
+    setAccountId(id);
+    setPicked(defaultGroups(opts, a, province, state?.recentGroups ?? []));
+  };
+
+  const send = async (confirmed = false) => {
     if (busy || problems.length > 0 || !account || !linkUrl) return;
+    if (!confirmed && soAccountNeedsConfirm(account.status)) {
+      setWarn({ kind: 'confirm', text: soWarningText(account.name, account.status, account.warning) });
+      return;
+    }
+    setWarn(null);
     setBusy('send');
     setError(null);
     try {
@@ -191,7 +220,6 @@ export function AutopostBody({
           ...soPostSnapshot({ ...composeJobSnapshot(job), position: publicJobTitle(job) }, { mode, caption, groupIds: picked }),
           account_id: account.id,
           account_name: account.name,
-          worker_id: worker === AUTO_WORKER ? null : worker,
           apply_link: linkUrl,
           link_code: linkCode,
           channel_label: link?.channelLabel ?? null,
@@ -320,21 +348,32 @@ export function AutopostBody({
               <>
                 <FieldSelect
                   value={accountId}
-                  onChange={(v) => {
-                    setAccountId(v);
-                    setPicked(defaultGroups(opts, v, province, state.recentGroups));
-                  }}
+                  onChange={pickAccount}
                   placeholder="เลือกบัญชี"
                   ariaLabel="บัญชี Facebook"
                   testId="autopost-account"
-                  options={opts.accounts.map((a) => ({ value: a.id, label: a.name }))}
+                  options={opts.accounts.map((a) => ({
+                    value: a.id,
+                    label: `${a.name} · ${SO_ACCOUNT_STATUS_LABEL[a.status]} · โพสต์ ${NUM.format(a.postedToday)}${a.dailyCap !== null ? `/${NUM.format(a.dailyCap)}` : ''}`,
+                    disabled: a.status === 'no_worker',
+                  }))}
                 />
                 {account ? (
-                  <p className={cn('text-xs', isPaused(account.pausedUntil) ? TONE.danger.value : DASH.muted)} data-testid="autopost-account-status">
-                    {isPaused(account.pausedUntil)
-                      ? `พักอยู่ถึง ${WHEN.format(new Date(account.pausedUntil as string))}${account.pauseReason ? ` · ${account.pauseReason}` : ''}`
-                      : `วันนี้โพสต์ไป ${NUM.format(account.postedToday)}${account.dailyCap ? `/${NUM.format(account.dailyCap)}` : ''} โพสต์`}
-                  </p>
+                  <div className="space-y-0.5 text-xs" data-testid="autopost-account-status">
+                    <p className="tabular-nums text-muted-foreground">
+                      {[
+                        `วันนี้โพสต์ ${NUM.format(account.postedToday)}${account.dailyCap !== null ? `/${NUM.format(account.dailyCap)}` : ''}`,
+                        account.worker ? `เครื่อง ${account.worker} ${account.workerOnline ? 'ออนไลน์' : 'ออฟไลน์'}` : 'ยังไม่ผูกเครื่อง',
+                        workerOf(account) ? `งานในเครื่อง ${NUM.format(workerOf(account)!.load)}` : null,
+                        account.queue.running + account.queue.queued > 0
+                          ? `งานของบัญชีนี้ ${NUM.format(account.queue.running + account.queue.queued)}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                    {account.warning ? <p className={TONE.warn.value}>{account.warning}</p> : null}
+                  </div>
                 ) : null}
               </>
             )}
@@ -357,35 +396,20 @@ export function AutopostBody({
                       className="mt-0.5"
                     />
                     <Label htmlFor={`autopost-group-${job.id}-${g.id}`} className="space-y-0.5 font-normal">
-                      <span className="block text-sm text-foreground">{g.name}</span>
+                      <span className="block text-sm text-foreground">{soGroupLabel(g)}</span>
                       <span className={cn('block text-xs', DASH.muted)}>
-                        {[g.province, recent.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null].filter(Boolean).join(' · ')}
+                        {[
+                          g.lastPostedAt ? `โพสต์ล่าสุด ${WHEN.format(new Date(g.lastPostedAt))}` : null,
+                          recent.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </span>
                     </Label>
                   </li>
                 ))}
               </ul>
             )}
-          </section>
-
-          <section className="space-y-2">
-            <p className="text-sm font-medium text-foreground">Worker</p>
-            <FieldSelect
-              value={worker}
-              onChange={setWorker}
-              ariaLabel="Worker"
-              testId="autopost-worker"
-              options={[
-                {
-                  value: AUTO_WORKER,
-                  label: `อัตโนมัติ${account?.preferredWorker ? ` · ${account.preferredWorker}` : ''}`,
-                },
-                ...opts.workers.map((w) => ({
-                  value: w.name,
-                  label: `${w.name} · ${w.online ? 'ออนไลน์' : w.lastSeen ? `ออฟไลน์ตั้งแต่ ${WHEN.format(new Date(w.lastSeen))}` : 'ออฟไลน์'}`,
-                })),
-              ]}
-            />
           </section>
 
           {problems.length > 0 ? (
@@ -399,6 +423,27 @@ export function AutopostBody({
             <p role="alert" className={cn('text-sm', TONE.danger.value)}>
               {error}
             </p>
+          ) : null}
+
+          {warn ? (
+            <div
+              role="alert"
+              aria-label="คำเตือนจาก So Scraping"
+              className={cn('space-y-2 rounded-xl border px-3 py-2', warn.kind === 'block' ? TONE.danger.soft : TONE.warn.soft)}
+              data-testid="autopost-warn"
+            >
+              <p className="text-sm text-foreground">{warn.text}</p>
+              <div className="flex flex-wrap gap-2">
+                {warn.kind === 'confirm' ? (
+                  <Button type="button" size="sm" onClick={() => void send(true)} disabled={busy !== null} data-testid="autopost-warn-confirm">
+                    ส่งต่อ
+                  </Button>
+                ) : null}
+                <Button type="button" size="sm" variant="outline" onClick={() => setWarn(null)}>
+                  {warn.kind === 'confirm' ? 'เลือกบัญชีอื่น' : 'ตกลง'}
+                </Button>
+              </div>
+            </div>
           ) : null}
 
           <div className="flex flex-wrap gap-2">
@@ -421,15 +466,20 @@ export function AutopostBody({
   );
 }
 
-function isPaused(until: string | null): boolean {
-  return Boolean(until && Date.parse(until) > Date.now());
+/** บัญชีตั้งต้น = พร้อมโพสต์ก่อน แล้วมีงานค้าง แล้วครบโควต้า · ไม่มีที่เลือกได้ = ไม่เลือก */
+function firstAccount(list: readonly SoOptAccount[]): SoOptAccount | null {
+  for (const st of ['ready', 'busy', 'full'] as const) {
+    const a = list.find((x) => x.status === st);
+    if (a) return a;
+  }
+  return null;
 }
 
-/** ติ๊กไว้ให้ก่อน = กลุ่มของบัญชีที่จังหวัดตรงกับใบขอ และยังไม่ได้สั่งโพสต์ใน 3 วัน */
-function defaultGroups(o: AutopostOptions, accountId: string, province: string | null, recent: readonly string[]): string[] {
-  const acc = o.accounts.find((a) => a.id === accountId);
-  if (!acc || !province) return [];
-  return o.groups
-    .filter((g) => acc.groupIds.includes(g.id) && (g.province ?? '').trim() === province && !recent.includes(g.id))
+/** ติ๊กไว้ให้ก่อน = กลุ่มของบัญชีที่ชื่อมีจังหวัดของใบขอ และยังไม่ได้สั่งโพสต์ใน 3 วัน */
+function defaultGroups(o: SoOptions, acc: SoOptAccount, province: string | null, recent: readonly string[]): string[] {
+  const p = (province ?? '').replace(/^จังหวัด/, '').trim();
+  if (!p) return [];
+  return soGroupsOfAccount(o, acc)
+    .filter((g: SoOptGroup) => (g.name ?? '').includes(p) && !recent.includes(g.id))
     .map((g) => g.id);
 }

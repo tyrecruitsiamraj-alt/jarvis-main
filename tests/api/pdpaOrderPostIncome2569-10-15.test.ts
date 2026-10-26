@@ -59,7 +59,7 @@ describe('สั่งโพสต์ — ผ่านศูนย์งาน a
     expect(dlg).toContain("soPostSnapshot({ ...composeJobSnapshot(job), position: publicJobTitle(job) }, { mode, caption, groupIds: picked })");
     const btn = read('src/components/jobs/OrderPostButton.tsx');
     expect(btn).not.toContain('soPostSnapshot(');
-    expect(btn).toContain('jobSnapshot: soScrapSnapshot(job, title),');
+    expect(btn).toContain('...soScrapSnapshot(job, title),');
     // 20 ต.ค. 2569 Choice "เอาออก สั่งจากป๊อปประกาศที่เดียว" — ทั้งปุ่ม Content และ Scraping ในจับคู่งาน
     expect(read('src/pages/matching/MatchingPage.tsx')).not.toContain('createPosting(');
     expect(read('src/pages/matching/MatchingPage.tsx')).not.toContain('ให้สร้าง Content');
