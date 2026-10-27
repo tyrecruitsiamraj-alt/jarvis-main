@@ -1,6 +1,6 @@
 import type { ToneKey } from '@/lib/designTokens';
 import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
-import type { CallOutcome } from '@/lib/callFollowupPolicy';
+import { clampToCallWindow, type CallOutcome } from '@/lib/callFollowupPolicy';
 
 /**
  * ═══ ป้าย "รอ AI โทร" แบบบอกครบ — แท็บผู้สมัคร (เจ้าของ Choice 14 ต.ค. 2569 "บอกครบ + แก้คนที่ตกหล่น") ═══
@@ -120,7 +120,12 @@ export function aiQueueStatusOf(r: AiQueueInput, now: number = Date.now()): AiQu
     return { kind: 'retry', label, sub: at ? `โทรซ้ำ ${at}` : null, tone: 'warn', atRisk: false };
   }
 
-  const sent = Date.parse(r.last_call_sent_at ?? '');
+  // กรอกนอกช่วงโทรได้ (ค่าเริ่ม 08:00–20:00 · 27 ต.ค. 2569) = Lumos นัดต้นช่วงถัดไป ⇒ นับช้าจากเวลานั้น ไม่ใช่เวลาส่ง
+  const sentRaw = Date.parse(r.last_call_sent_at ?? '');
+  const sent = Number.isFinite(sentRaw) ? clampToCallWindow(new Date(sentRaw)).getTime() : sentRaw;
+  if (Number.isFinite(sent) && sent > now) {
+    return { kind: 'waiting', label: 'รอ AI โทร', sub: `โทร ${whenText(new Date(sent).toISOString())}`, tone: 'neutral', atRisk: false };
+  }
   if (Number.isFinite(sent) && sent < now - AI_FIRST_LATE_MINUTES * 60_000) {
     return { kind: 'first_late', label: 'ส่ง AI แล้ว ยังไม่มีผล', sub: `ส่ง ${whenText(r.last_call_sent_at)}`, tone: 'danger', atRisk: true };
   }

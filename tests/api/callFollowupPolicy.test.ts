@@ -3,11 +3,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
+  clampToCallWindow,
   isCallOutcome,
-  isListedRetryTime,
   nextRetryAt,
   normalizeCallFollowupPolicy,
-  normalizeRetryTimes,
   resolveCallFollowup,
   shiftOutOfQuietHours,
   type CallFollowupPolicy,
@@ -20,26 +19,25 @@ const hoursFrom = (base: Date, iso: string) =>
 /** ชั่วโมงตามเวลาไทยของ ISO */
 const bkkHour = (iso: string) => (new Date(iso).getUTCHours() + 7) % 24;
 
-describe('ไม่รับสาย → โทรซ้ำจนครบเพดาน แล้วส่งให้คนตาม', () => {
+describe('ไม่รับสาย → โทรซ้ำเป็นรอบจนครบเพดาน แล้วส่งให้คนตาม (27 ต.ค. 2569)', () => {
   for (const outcome of ['no_answer', 'busy', 'unresponsive', 'failed'] as const) {
-    it(`${outcome}: ครั้งที่ 1 (10:00) → โทรซ้ำ 12:00 วันเดียวกัน (ค่าเริ่ม · เจ้าของ 26 ต.ค. 2569)`, () => {
+    it(`${outcome}: สายที่ 1 (10:00) → โทรซ้ำอีก 10 นาที (สายที่ 2/18)`, () => {
       const d = resolveCallFollowup({ outcome, attemptCount: 1, now: NOW });
       expect(d.action).toBe('retry');
-      expect(d.nextAttemptAt).toBeTruthy();
-      expect(hoursFrom(NOW, d.nextAttemptAt as string)).toBe(2);
-      expect(d.reason).toContain('2/3');
-      expect(d.reason).toContain('วันนี้ 12:00');
+      expect(new Date(d.nextAttemptAt as string).getTime() - NOW.getTime()).toBe(10 * 60_000);
+      expect(d.reason).toContain('2/18');
+      expect(d.reason).toContain('วันนี้ 10:10');
     });
   }
 
-  it('ครั้งที่ 2 → ยังซ้ำได้', () => {
-    const d = resolveCallFollowup({ outcome: 'no_answer', attemptCount: 2, now: NOW });
+  it('สายที่ 3 ไม่ติด (จบรอบ 1) → อีก 2 ชม.', () => {
+    const d = resolveCallFollowup({ outcome: 'no_answer', attemptCount: 3, now: NOW });
     expect(d.action).toBe('retry');
-    expect(d.reason).toContain('3/3');
+    expect(hoursFrom(NOW, d.nextAttemptAt as string)).toBe(2);
   });
 
-  it('ครั้งที่ 3 (ครบเพดาน) → ต้องคนตาม ไม่โทรซ้ำอีก', () => {
-    const d = resolveCallFollowup({ outcome: 'no_answer', attemptCount: 3, now: NOW });
+  it('สายที่ 18 (ครบเพดาน) → ต้องคนตาม ไม่โทรซ้ำอีก', () => {
+    const d = resolveCallFollowup({ outcome: 'no_answer', attemptCount: 18, now: NOW });
     expect(d.action).toBe('needs_human');
     expect(d.nextAttemptAt).toBeNull();
     expect(d.reason).toContain('ต้องให้คนตาม');
@@ -96,7 +94,7 @@ describe('ขอเลื่อน → นัดใหม่ตามเวล�
   it('ขอเลื่อนซ้ำจนครบเพดาน → ให้คนโทรปิดเอง', () => {
     const d = resolveCallFollowup({
       outcome: 'reschedule_requested',
-      attemptCount: 3,
+      attemptCount: 18,
       now: NOW,
     });
     expect(d.action).toBe('needs_human');
@@ -104,12 +102,12 @@ describe('ขอเลื่อน → นัดใหม่ตามเวล�
 });
 
 describe('ห้ามโทรช่วงเงียบ 20:00–08:00', () => {
-  it('ไม่รับสายตอนตี 2 → โทรซ้ำ 12:00 วันนั้น', () => {
+  it('ไม่รับสายตอนตี 2 → โทรซ้ำ 08:00 วันนั้น (ช่วงโทรได้ 08:00–20:00)', () => {
     // 5 ส.ค. 19:00Z = 6 ส.ค. 02:00 ไทย
     const night = new Date('2026-08-05T19:00:00.000Z');
     const d = resolveCallFollowup({ outcome: 'no_answer', attemptCount: 1, now: night });
-    expect(bkkHour(d.nextAttemptAt as string)).toBe(12);
-    expect(hoursFrom(night, d.nextAttemptAt as string)).toBe(10);
+    expect(bkkHour(d.nextAttemptAt as string)).toBe(8);
+    expect(hoursFrom(night, d.nextAttemptAt as string)).toBe(6);
   });
 
   it('ผู้สมัครนัดเองตอน 22:00 ก็ยังถูกเลื่อนออกจากช่วงเงียบ', () => {
@@ -127,13 +125,6 @@ describe('ห้ามโทรช่วงเงียบ 20:00–08:00', () =>
     expect(shiftOutOfQuietHours(at, DEFAULT_CALL_FOLLOWUP_POLICY).getTime()).toBe(at.getTime());
   });
 
-  it('ตั้งช่วงเงียบว่าง (from == to) = ไม่กันเวลา · มีช่วงเงียบ = เวลาที่ตกช่วงเงียบถูกข้าม', () => {
-    const night = new Date('2026-08-05T19:00:00.000Z'); // 02:00 ไทย
-    const open: CallFollowupPolicy = { ...DEFAULT_CALL_FOLLOWUP_POLICY, quietFromHour: 0, quietToHour: 0, retryTimes: ['23:00'] };
-    expect(bkkHour(resolveCallFollowup({ outcome: 'no_answer', attemptCount: 1, now: night, policy: open }).nextAttemptAt as string)).toBe(23);
-    const quiet: CallFollowupPolicy = { ...DEFAULT_CALL_FOLLOWUP_POLICY, retryTimes: ['23:00', '15:00'] };
-    expect(bkkHour(resolveCallFollowup({ outcome: 'no_answer', attemptCount: 1, now: night, policy: quiet }).nextAttemptAt as string)).toBe(15);
-  });
 });
 
 describe('คุยติดแล้วได้คำตอบ', () => {
@@ -181,17 +172,20 @@ describe('คุยติดแล้วได้คำตอบ', () => {
 });
 
 describe('normalize นโยบาย', () => {
-  it('ค่าปกติผ่าน · ค่าเกินขอบถูกบีบ · ค่าเพี้ยนใช้ค่าเริ่มต้น', () => {
-    expect(normalizeCallFollowupPolicy({ maxAttempts: 5 }).maxAttempts).toBe(5);
-    expect(normalizeCallFollowupPolicy({ maxAttempts: 999 }).maxAttempts).toBe(18); // เพดาน 18 (2 รอบ × 3 สาย × 3 วัน · 27 ต.ค. 2569)
-    expect(normalizeCallFollowupPolicy({ maxAttempts: 0 }).maxAttempts).toBe(1);
-    expect(normalizeCallFollowupPolicy({ maxAttempts: 'สาม' }).maxAttempts).toBe(3);
+  it('รวมโทรได้ = สายต่อรอบ × รอบต่อวัน × วัน (ตั้ง maxAttempts ตรง ๆ ไม่มีผล) · ค่าเกินขอบถูกบีบ · ค่าเพี้ยนใช้ค่าเริ่มต้น', () => {
+    expect(DEFAULT_CALL_FOLLOWUP_POLICY.maxAttempts).toBe(18);
+    expect(normalizeCallFollowupPolicy({ maxAttempts: 5 }).maxAttempts).toBe(18);
+    expect(normalizeCallFollowupPolicy({ roundCalls: 2, roundsPerDay: 1, retryDays: 2 }).maxAttempts).toBe(4);
+    expect(normalizeCallFollowupPolicy({ roundCalls: 99 }).roundCalls).toBe(5);
+    expect(normalizeCallFollowupPolicy({ roundGapMinutes: 1 }).roundGapMinutes).toBe(10);
+    expect(normalizeCallFollowupPolicy({ callFrom: '25:00', callTo: 'x' })).toMatchObject({ callFrom: '08:00', callTo: '20:00' });
+    expect(normalizeCallFollowupPolicy({ callFrom: '20:00', callTo: '08:00' })).toMatchObject({ callFrom: '08:00', callTo: '20:00' });
     expect(normalizeCallFollowupPolicy(null)).toEqual(DEFAULT_CALL_FOLLOWUP_POLICY);
     expect(normalizeCallFollowupPolicy('x')).toEqual(DEFAULT_CALL_FOLLOWUP_POLICY);
   });
 
   it('เพดานโทรที่ตั้งเองมีผลจริง', () => {
-    const policy = normalizeCallFollowupPolicy({ maxAttempts: 1 });
+    const policy = normalizeCallFollowupPolicy({ roundCalls: 1, roundsPerDay: 1, retryDays: 1 });
     expect(resolveCallFollowup({ outcome: 'no_answer', attemptCount: 1, now: NOW, policy }).action).toBe(
       'needs_human',
     );
@@ -208,32 +202,46 @@ describe('isCallOutcome', () => {
 });
 
 /**
- * ═══ ใบสมัคร: โทรซ้ำ "คละช่วงเวลา" (เจ้าของเคาะ 29 ก.ย. 2569: *"โทรซ้ำคละช่วงเวลาจนครบ 3 ครั้ง"*) ═══
+ * ═══ โทรซ้ำเป็นรอบ (เจ้าของ 27 ต.ค. 2569) ═══
+ * > *"กรอกมาตอนไหนก็โทรเลย ถ้าไม่รับก็โทรซ้ำ 3 รอบ ถ้าไม่รับก็บวกไปอีก 2 ชม … ไปรอโทรวันถัดไป คนละเวลา"*
+ * Choice: เว้น 10 นาที · เช้าสลับบ่าย · โทรแค่ 08:00–20:00
  */
-describe('เวลาโทรซ้ำจากหน้าตั้งค่า (เจ้าของ 26 ต.ค. 2569 "โทรใหม่ตอนเที่ยง · ตั้งเวลาผ่าน UI")', () => {
-  const at = (iso: string) => new Date(iso);
-  const p = (retryTimes: string[]): CallFollowupPolicy => ({ ...DEFAULT_CALL_FOLLOWUP_POLICY, quietFromHour: 0, quietToHour: 0, retryTimes });
-  it('ค่าเริ่ม = 12:00 · ตัวกรองค่า: ผิดรูปแบบตัดทิ้ง ซ้ำตัดทิ้ง เรียงเวลา ว่าง = 12:00', () => {
-    expect(DEFAULT_CALL_FOLLOWUP_POLICY.retryTimes).toEqual(['12:00']);
-    expect(normalizeRetryTimes(['17:30', '12:00', '25:00', 'x', '12:00'])).toEqual(['12:00', '17:30']);
-    expect(normalizeRetryTimes([])).toEqual(['12:00']);
-    expect(normalizeCallFollowupPolicy({ maxAttempts: 3 }).retryTimes).toEqual(['12:00']);
+describe('โทรซ้ำเป็นรอบ 3 สาย × 2 รอบ × 3 วัน', () => {
+  const bkk = (d: Date) => new Date(d.getTime() + 7 * 3_600_000).toISOString().slice(0, 16).replace('T', ' ');
+  /** ไล่ทั้ง 18 สาย: กรอก `startIso` แล้วไม่รับทุกสาย — คืนเวลาไทยของทุกสาย */
+  const chain = (startIso: string) => {
+    const out: string[] = [];
+    let at = new Date(startIso);
+    for (let n = 1; n <= 18; n += 1) {
+      out.push(bkk(at));
+      if (n < 18) at = nextRetryAt(at, n);
+    }
+    return out;
+  };
+
+  it('กรอก 09:00 → วันแรกเช้า · วันถัดไปบ่าย · วันที่สามเช้า', () => {
+    expect(chain('2026-10-27T02:00:00Z')).toEqual([
+      '2026-10-27 09:00', '2026-10-27 09:10', '2026-10-27 09:20', '2026-10-27 11:20', '2026-10-27 11:30', '2026-10-27 11:40',
+      '2026-10-28 13:00', '2026-10-28 13:10', '2026-10-28 13:20', '2026-10-28 15:20', '2026-10-28 15:30', '2026-10-28 15:40',
+      '2026-10-29 09:00', '2026-10-29 09:10', '2026-10-29 09:20', '2026-10-29 11:20', '2026-10-29 11:30', '2026-10-29 11:40',
+    ]);
   });
-  it('เวลาถัดไปที่ยังไม่ถึง วันเดียวกันได้ · เลยหมดแล้ว = เวลาแรกของวันถัดไป', () => {
-    const times = p(['12:00', '17:30']);
-    // 09:14 ไทย → 12:00 วันนี้
-    expect(nextRetryAt(at('2026-10-26T02:14:00Z'), times).toISOString()).toBe('2026-10-26T05:00:00.000Z');
-    // 12:03 ไทย → 17:30 วันนี้
-    expect(nextRetryAt(at('2026-10-26T05:03:00Z'), times).toISOString()).toBe('2026-10-26T10:30:00.000Z');
-    // 19:34 ไทย → 12:00 พรุ่งนี้
-    expect(nextRetryAt(at('2026-10-26T12:34:00Z'), times).toISOString()).toBe('2026-10-27T05:00:00.000Z');
+
+  it('กรอก 18:50 → รอบสองเลย 20:00 ไปต้นช่วงพรุ่งนี้ 08:00', () => {
+    const c = chain('2026-10-27T11:50:00Z');
+    expect(c.slice(0, 4)).toEqual(['2026-10-27 18:50', '2026-10-27 19:00', '2026-10-27 19:10', '2026-10-28 08:00']);
   });
-  it('ต้องห่างจากตอนนี้อย่างน้อย 10 นาที (11:55 ไม่นัด 12:00 วันนี้)', () => {
-    expect(nextRetryAt(at('2026-10-26T04:55:00Z'), p(['12:00'])).toISOString()).toBe('2026-10-27T05:00:00.000Z');
+
+  it('สายแรกนอกช่วงโทรได้ (กรอกตี 2 / 21:00) = ต้นช่วงถัดไป · ในช่วง = ไม่ขยับ', () => {
+    expect(bkk(clampToCallWindow(new Date('2026-10-26T19:00:00Z')))).toBe('2026-10-27 08:00');
+    expect(bkk(clampToCallWindow(new Date('2026-10-27T14:00:00Z')))).toBe('2026-10-28 08:00');
+    const ok = new Date('2026-10-27T05:00:00Z');
+    expect(clampToCallWindow(ok).getTime()).toBe(ok.getTime());
   });
-  it('ตัวส่งซ้ำแยกนัดที่ตรงเวลาในรายการ ออกจากนัดแบบเก่า (10/14/18 · +24 ชม.)', () => {
-    expect(isListedRetryTime(at('2026-10-26T05:00:00Z'), p(['12:00']))).toBe(true);
-    expect(isListedRetryTime(at('2026-10-26T07:00:00Z'), p(['12:00']))).toBe(false);
-    expect(isListedRetryTime(at('2026-10-26T05:00:30Z'), p(['12:00']))).toBe(false);
+
+  it('ตั้งค่าเองมีผล: 2 สาย/รอบ เว้น 30 นาที รอบเดียวต่อวัน', () => {
+    const p: CallFollowupPolicy = normalizeCallFollowupPolicy({ roundCalls: 2, roundGapMinutes: 30, roundsPerDay: 1, retryDays: 2 });
+    expect(bkk(nextRetryAt(new Date('2026-10-27T02:00:00Z'), 1, p))).toBe('2026-10-27 09:30');
+    expect(bkk(nextRetryAt(new Date('2026-10-27T02:30:00Z'), 2, p))).toBe('2026-10-28 13:00');
   });
 });

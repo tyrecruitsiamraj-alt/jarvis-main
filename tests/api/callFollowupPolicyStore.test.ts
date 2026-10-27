@@ -68,12 +68,13 @@ describe('getCallFollowupPolicy — ที่เก็บ', () => {
   });
 
   it('setCallFollowupPolicy เขียนแล้วล้าง cache ให้ทันที', async () => {
-    vi.mocked(dbQuery).mockResolvedValue({ rows: [{ payload: { maxAttempts: 2 } }] } as never);
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [{ payload: { roundCalls: 2, roundsPerDay: 1, retryDays: 1 } }] } as never);
     await getCallFollowupPolicy(); // อุ่น cache
     const saved = await setCallFollowupPolicy(
-      { ...DEFAULT_CALL_FOLLOWUP_POLICY, maxAttempts: 2 },
+      { ...DEFAULT_CALL_FOLLOWUP_POLICY, roundCalls: 2, roundsPerDay: 1, retryDays: 1 },
       'admin@example.com',
     );
+    // รวมโทรได้คิดจากรอบ (27 ต.ค. 2569) = 2 × 1 × 1
     expect(saved.maxAttempts).toBe(2);
     // cache ถูกล้าง — อ่านรอบถัดไปยิง DB ใหม่ (insert 1 + select 2)
     await getCallFollowupPolicy();

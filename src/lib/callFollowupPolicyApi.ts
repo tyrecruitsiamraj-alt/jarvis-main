@@ -13,7 +13,13 @@ export async function fetchCallFollowupPolicy(): Promise<CallFollowupPolicy> {
   return normalizeCallFollowupPolicy(((await r.json()) as { policy?: unknown }).policy);
 }
 
-export async function saveCallFollowupPolicy(input: { maxAttempts: number; retryTimes: string[] }): Promise<CallFollowupPolicy> {
+/** ช่องที่หน้า ตั้งค่า › โทรซ้ำคนไม่รับสาย แก้ได้ (27 ต.ค. 2569 โทรซ้ำเป็นรอบ) */
+export type CallRetryRoundInput = Pick<
+  CallFollowupPolicy,
+  'roundCalls' | 'roundGapMinutes' | 'roundsPerDay' | 'roundsGapHours' | 'retryDays' | 'callFrom' | 'callTo' | 'dayMorning' | 'dayAfternoon'
+>;
+
+export async function saveCallFollowupPolicy(input: CallRetryRoundInput): Promise<CallFollowupPolicy> {
   const r = await apiFetch('/api/call-followup-policy', { method: 'PUT', body: JSON.stringify(input) });
   if (!r.ok) throw new Error(await readError(r));
   return normalizeCallFollowupPolicy(((await r.json()) as { policy?: unknown }).policy);

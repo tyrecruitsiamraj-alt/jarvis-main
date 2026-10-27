@@ -19,6 +19,9 @@
  */
 
 import { logError, logInfo, logWarn, errorSummaryText } from './logger.js';
+import { bangkokIso } from './bangkokIso.js';
+import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
+import { clampToCallWindow, DEFAULT_CALL_FOLLOWUP_POLICY } from '../../src/lib/callFollowupPolicy.js';
 import {
   newRequestId,
   pickResponseHeaders,
@@ -309,7 +312,15 @@ export async function pushInterviews(
   const config = getLumosPushConfig();
   if (!config) throw new Error('LUMOS_BASE_URL / LUMOS_CONNECTION_ID / LUMOS_PUSH_API_KEY ยังไม่ได้ตั้งค่า');
 
-  const body = Array.isArray(records) ? records : [records];
+  // สายผู้สมัครโทรได้แค่ในช่วงที่ตั้ง (ตั้งค่า › โทรซ้ำคนไม่รับสาย · เจ้าของ 27 ต.ค. 2569 "โทรแค่ 08:00–20:00")
+  // กรอกตอนกลางคืน = นัดต้นช่วงวันถัดไป · ทุกเส้นที่ส่งสายสัมภาษณ์ผ่านตรงนี้ที่เดียว · อ่านนโยบายไม่ได้ = ช่วงค่าเริ่ม
+  const policy = await getCallFollowupPolicy().catch(() => DEFAULT_CALL_FOLLOWUP_POLICY);
+  const body = (Array.isArray(records) ? records : [records]).map((rec) => {
+    const at = new Date(rec.scheduled_at);
+    if (Number.isNaN(at.getTime())) return rec;
+    const inWindow = clampToCallWindow(at, policy);
+    return inWindow.getTime() === at.getTime() ? rec : { ...rec, scheduled_at: bangkokIso(inWindow) };
+  });
   const headers: Record<string, string> = {};
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
 

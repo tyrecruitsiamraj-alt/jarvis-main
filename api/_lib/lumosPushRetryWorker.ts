@@ -39,8 +39,8 @@ import { checkQueueImports } from './lumosQueueImportWatch.js';
 import { listSiamrajUnitRequests } from './siamrajUnitRequests.js';
 import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
-  isListedRetryTime,
-  nextRetryAt,
+  clampToCallWindow,
+  RETRY_LEAD_MINUTES,
   type CallFollowupPolicy,
 } from '../../src/lib/callFollowupPolicy.js';
 import { UNREACHED_CALL_OUTCOMES } from '../../src/lib/callOutcomeBuckets.js';
@@ -536,20 +536,17 @@ export async function runLumosPushRetryOnce(
       await closeRetry(r.id, 'needs_human', `ส่งโทรซ้ำไม่ถึง Lumos เกิน ${Math.round(cfg.giveUpAfterMinutes / 60)} ชม. — ให้เจ้าหน้าที่โทรเอง`);
       continue;
     }
-    // c) ยังไม่ติด แต่นัดไม่ตรงเวลาโทรซ้ำที่ตั้งไว้ (นัดแบบเก่า 10/14/18 · +24 ชม. · เพิ่งเปลี่ยนเวลาในหน้าตั้งค่า) · ค้างเก่า
-    //    ⇒ นัดเวลาถัดไปในรายการ (ตั้งค่า › โทรซ้ำคนไม่รับสาย · ทุกงาน · เจ้าของ 26 ต.ค. 2569) แล้วรอ
-    //    🔴 ย้ายเฉพาะเมื่อเวลาใหม่ **เร็วกว่า** นัดเดิม (หรือค้างเกินเวลา) — ห้ามย้ายให้คนได้สายช้าลง
-    //       (ตอนขึ้นเว็บมีนัดแบบเก่า 14:00/18:00 ค้าง 23 สาย · ถ้าย้ายตอนใกล้เวลา = ไปเที่ยงพรุ่งนี้ ช้าเกือบวัน)
+    // c) ยังไม่ติด แต่นัดค้างเกินเวลา ⇒ นัดใหม่เร็วสุดที่โทรได้ (ตอนนี้ + 10 นาที เข้าช่วงโทรได้)
+    //    27 ต.ค. 2569 โทรซ้ำเป็นรอบ (ตั้งค่า › โทรซ้ำคนไม่รับสาย) — เวลานัดคิดตอนได้ผลโทร (`nextRetryAt`) ไม่ย้ายนัดที่ยังไม่ถึง
     //    🔴 ผู้สมัครขอให้โทรกลับตามเวลาที่นัด (`reschedule_requested`) = โทรตามเวลานั้น ห้ามย้าย
     //    งานติดตามไม่ย้าย (ตารางของตัวเอง · โทรซ้ำวันถัดไปเวลาเดิม)
     if (
       !r.person_ref.startsWith('follow-') &&
       !failedBefore &&
       UNREACHED.has(String(r.last_outcome ?? '')) &&
-      ((!isListedRetryTime(due, policy) && nextRetryAt(now, policy).getTime() < due.getTime()) ||
-        lateMinutes > RETRY_REPLAN_AFTER_MINUTES)
+      lateMinutes > RETRY_REPLAN_AFTER_MINUTES
     ) {
-      const at = nextRetryAt(now, policy);
+      const at = clampToCallWindow(new Date(now.getTime() + RETRY_LEAD_MINUTES * 60_000), policy);
       run.retriesReplanned += 1;
       await replanRetry(r.id, at);
       continue;

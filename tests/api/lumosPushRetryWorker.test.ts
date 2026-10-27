@@ -274,7 +274,7 @@ const matchReminder = (over: Record<string, unknown> = {}) =>
   });
 const closeCall = () => dbQuery.mock.calls.find((c) => /set followup_state = \$2, next_attempt_at = null/.test(String(c[0])));
 
-describe('โทรซ้ำที่ถึงเวลา (เวลาในรายการ ค่าเริ่ม 12:00 · งานติดตาม วันถัดไป)', () => {
+describe('โทรซ้ำที่ถึงเวลา (โทรซ้ำเป็นรอบ · งานติดตาม วันถัดไป)', () => {
   it('ทุกรอบปล่อยชุดโทรที่อนุมัติแล้วถึงเวลา (เดิมรอคนเปิดแผง)', async () => {
     stub([]);
     await runLumosPushRetryOnce(CFG, bkk('2026-09-29T10:00:00'));
@@ -294,27 +294,25 @@ describe('โทรซ้ำที่ถึงเวลา (เวลาใน�
     expect(updates().some((s) => /followup_state = null/.test(s))).toBe(true);
   });
 
-  it('ใบสมัคร: นัดแบบเดิม (เวลาเดิม +24 ชม.) หรือค้างเก่า ⇒ นัดเวลาถัดไปในรายการ (12:00 วันนี้) ไม่โทรทันที', async () => {
+  it('ใบสมัคร: นัดค้างเกินเวลา ⇒ นัดใหม่เร็วสุดในช่วงโทรได้ (07:45 + 10 นาที → 08:00) ไม่โทรทันที · 27 ต.ค. 2569', async () => {
     stub([], [retry({ next_attempt_at: bkk('2026-09-26T14:05:00'), last_call_at: bkk('2026-09-25T14:05:00') })]);
     const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T07:45:00'));
     expect(run.retriesReplanned).toBe(1);
     expect(pushInterviews).not.toHaveBeenCalled();
     const call = dbQuery.mock.calls.find((c) => /set next_attempt_at = \$2::timestamptz/.test(String(c[0])));
-    expect(call?.[1]).toEqual(['800', bkk('2026-09-29T12:00:00').toISOString()]);
+    expect(call?.[1]).toEqual(['800', bkk('2026-09-29T08:00:00').toISOString()]);
   });
 
-  it('🔴 นัดแบบเก่า (14:00) ที่เวลาใหม่จะช้ากว่า (พรุ่งนี้ 12:00) ⇒ ไม่ย้าย โทร 14:00 ตามเดิม · เวลาใหม่เร็วกว่า ⇒ ย้ายมา 12:00', async () => {
+  it('🔴 นัดที่ยังไม่ถึง ไม่ย้าย (โทรซ้ำเป็นรอบคิดเวลาตอนได้ผล · 27 ต.ค. 2569) — ถึงเวลาก็ส่งตามนัดเดิม', async () => {
     stub([], [retry({ next_attempt_at: bkk('2026-09-29T14:00:00'), last_call_at: bkk('2026-09-28T14:26:00') })]);
     const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T13:05:00'));
     expect(run.retriesReplanned).toBe(0);
     expect(run.retriesSent).toBe(1);
-    // นัดแบบเก่าพรุ่งนี้ 18:00 · ตอนนี้ 09:00 ⇒ เที่ยงวันนี้เร็วกว่า ⇒ ย้าย
     pushInterviews.mockClear();
     stub([], [retry({ next_attempt_at: bkk('2026-09-30T18:00:00'), last_call_at: bkk('2026-09-29T08:40:00') })]);
-    const early = await runLumosPushRetryOnce({ ...CFG, leadMinutes: 60 * 48 }, bkk('2026-09-29T09:00:00'));
-    expect(early.retriesReplanned).toBe(1);
-    const call = dbQuery.mock.calls.find((c) => /set next_attempt_at = \$2::timestamptz/.test(String(c[0])));
-    expect(call?.[1]).toEqual(['800', bkk('2026-09-29T12:00:00').toISOString()]);
+    const early = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T09:00:00'));
+    expect(early.retriesReplanned).toBe(0);
+    expect(pushInterviews).not.toHaveBeenCalled();
   });
 
   it('🔴 ผู้สมัครขอให้โทรกลับ 16:30 (reschedule_requested) ⇒ โทรตามเวลานั้น ห้ามย้ายช่อง · เลยเวลามาแล้วก็โทรเร็วสุด ไม่ย้ายไปพรุ่งนี้', async () => {

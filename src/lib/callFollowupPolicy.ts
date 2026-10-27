@@ -41,56 +41,88 @@ export type CallFollowupPolicy = {
   /** "ไม่หางานแล้ว" พักเบอร์กี่วัน */
   suppressDays: number;
   /**
-   * เวลาโทรซ้ำคนที่ไม่รับสาย (เวลาไทย "HH:MM" เรียงแล้ว อย่างน้อย 1 เวลา) — เจ้าของ 26 ต.ค. 2569
-   * *"ไม่รับสายแล้วโทรวันถัดไป ขอเป็นโทรใหม่ตอนเที่ยง · ขอหน้าไว้ตั้งเวลาผ่าน UI"*
-   * ไม่รับสาย ⇒ โทรซ้ำ **เวลาถัดไปในรายการที่ยังไม่ถึง (วันเดียวกันได้)** · เลยทุกเวลาของวันแล้ว ⇒ เวลาแรกของวันถัดไป
+   * ═══ โทรซ้ำคนไม่รับสายเป็นรอบ (เจ้าของ 27 ต.ค. 2569 แทนรายการเวลาคงที่ของ 26 ต.ค.) ═══
+   * > *"กรอกมาตอนไหนก็โทรเลย ถ้าไม่รับก็โทรซ้ำ 3 รอบ ถ้าไม่รับก็บวกไปอีก 2 ชม แล้วโทรใหม่ ไม่รับก็โทรซ้ำ 3 สาย
+   * > ถ้าไม่รับอีกก็ไปรอโทรวันถัดไป คนละเวลา"* · Choice: เว้น 10 นาที · เช้าสลับบ่าย · โทรแค่ 08:00–20:00
+   * วันละ `roundsPerDay` รอบ · รอบละ `roundCalls` สาย ห่าง `roundGapMinutes` · รอบห่าง `roundsGapHours` ·
+   * ครบวัน ⇒ วันถัดไปเริ่ม `dayAfternoon` ถ้าวันนี้เริ่มเช้า (ก่อนเที่ยง) ไม่งั้น `dayMorning` · ทำ `retryDays` วัน
+   * `maxAttempts` = roundCalls × roundsPerDay × retryDays (คิดให้ใน normalize — ห้ามตั้งแยก)
    */
-  retryTimes: string[];
+  roundCalls: number;
+  roundGapMinutes: number;
+  roundsPerDay: number;
+  roundsGapHours: number;
+  retryDays: number;
+  /** ช่วงที่ AI โทรสายผู้สมัครได้ (เวลาไทย HH:MM) — นอกช่วงเลื่อนไปต้นช่วงถัดไป ทั้งสายแรกและสายโทรซ้ำ */
+  callFrom: string;
+  callTo: string;
+  /** เวลาเริ่มของวันถัดไป — เช้า/บ่าย สลับกับวันก่อน */
+  dayMorning: string;
+  dayAfternoon: string;
 };
 
 export const DEFAULT_CALL_FOLLOWUP_POLICY: CallFollowupPolicy = {
-  maxAttempts: 3,
+  maxAttempts: 18,
   retryGapHours: 24,
   rescheduleDefaultHours: 4,
   quietFromHour: 20,
   quietToHour: 8,
   suppressDays: 30,
-  retryTimes: ['12:00'],
+  roundCalls: 3,
+  roundGapMinutes: 10,
+  roundsPerDay: 2,
+  roundsGapHours: 2,
+  retryDays: 3,
+  callFrom: '08:00',
+  callTo: '20:00',
+  dayMorning: '09:00',
+  dayAfternoon: '13:00',
 };
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
-/** ตั้งได้สูงสุดกี่เวลา */
-export const MAX_RETRY_TIMES = 8;
-/**
- * โทรได้สูงสุดกี่ครั้งต่อคน (รวมครั้งแรก) — เจ้าของ 27 ต.ค. 2569 *"1 วันโทรสัก 2 รอบ รอบละ 3 สาย … ทำสัก 3 วัน"*
- * = 2 × 3 × 3 = 18 (เดิมเพดาน 10) · ตั้งค่าจริงที่ ตั้งค่า › โทรซ้ำคนไม่รับสาย
- */
-export const MAX_CALL_ATTEMPTS = 18;
-/** เวลาโทรซ้ำที่ใช้ได้ — รูปแบบ HH:MM ไม่ซ้ำ เรียง · ว่าง/ผิดหมด = ค่าเริ่ม 12:00 */
-export function normalizeRetryTimes(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [...DEFAULT_CALL_FOLLOWUP_POLICY.retryTimes];
-  const ok = [...new Set(raw.map((x) => String(x ?? '').trim()).filter((x) => HHMM.test(x)))].sort().slice(0, MAX_RETRY_TIMES);
-  return ok.length > 0 ? ok : [...DEFAULT_CALL_FOLLOWUP_POLICY.retryTimes];
+/** ขอบของแต่ละช่อง (ตัวกรองเดียวทั้งหน้าตั้งค่า + API) */
+export const ROUND_LIMITS = {
+  roundCalls: [1, 5],
+  roundGapMinutes: [10, 120],
+  roundsPerDay: [1, 3],
+  roundsGapHours: [1, 6],
+  retryDays: [1, 5],
+} as const;
+/** โทรได้สูงสุดกี่ครั้งต่อคน (รวมครั้งแรก) = เพดานของ สายต่อรอบ × รอบต่อวัน × วัน */
+export const MAX_CALL_ATTEMPTS = ROUND_LIMITS.roundCalls[1] * ROUND_LIMITS.roundsPerDay[1] * ROUND_LIMITS.retryDays[1];
+/** รวมโทรได้กี่ครั้ง — นิยามเดียวของ maxAttempts */
+export function totalCallsOf(p: Pick<CallFollowupPolicy, 'roundCalls' | 'roundsPerDay' | 'retryDays'>): number {
+  return p.roundCalls * p.roundsPerDay * p.retryDays;
 }
+const hhmmOr = (v: unknown, fallback: string): string => (typeof v === 'string' && HHMM.test(v.trim()) ? v.trim() : fallback);
 
 /** กันค่าจาก DB/ผู้ใช้เพี้ยน — เกินขอบเขตที่สมเหตุสมผลใช้ค่าเริ่มต้นของช่องนั้น */
 export function normalizeCallFollowupPolicy(raw: unknown): CallFollowupPolicy {
   const out = { ...DEFAULT_CALL_FOLLOWUP_POLICY };
   if (typeof raw !== 'object' || raw === null) return out;
   const src = raw as Record<string, unknown>;
-  const num = (key: Exclude<keyof CallFollowupPolicy, 'retryTimes'>, min: number, max: number) => {
+  type NumKey = { [K in keyof CallFollowupPolicy]: CallFollowupPolicy[K] extends number ? K : never }[keyof CallFollowupPolicy];
+  const num = (key: NumKey, min: number, max: number) => {
     const v = src[key];
     if (typeof v === 'number' && Number.isFinite(v)) {
       out[key] = Math.max(min, Math.min(max, Math.round(v)));
     }
   };
-  num('maxAttempts', 1, MAX_CALL_ATTEMPTS);
   num('retryGapHours', 1, 168);
   num('rescheduleDefaultHours', 1, 72);
   num('quietFromHour', 0, 23);
   num('quietToHour', 0, 23);
   num('suppressDays', 1, 365);
-  out.retryTimes = normalizeRetryTimes(src.retryTimes);
+  for (const k of Object.keys(ROUND_LIMITS) as Array<keyof typeof ROUND_LIMITS>) num(k, ROUND_LIMITS[k][0], ROUND_LIMITS[k][1]);
+  out.callFrom = hhmmOr(src.callFrom, out.callFrom);
+  out.callTo = hhmmOr(src.callTo, out.callTo);
+  if (out.callTo <= out.callFrom) {
+    out.callFrom = DEFAULT_CALL_FOLLOWUP_POLICY.callFrom;
+    out.callTo = DEFAULT_CALL_FOLLOWUP_POLICY.callTo;
+  }
+  out.dayMorning = hhmmOr(src.dayMorning, out.dayMorning);
+  out.dayAfternoon = hhmmOr(src.dayAfternoon, out.dayAfternoon);
+  out.maxAttempts = totalCallsOf(out);
   return out;
 }
 
@@ -158,40 +190,51 @@ export function shiftOutOfQuietHours(at: Date, policy: CallFollowupPolicy): Date
   return out;
 }
 
-/**
- * ═══ เวลาโทรซ้ำคนที่ไม่รับสาย (เจ้าของ 26 ต.ค. 2569 · ทุกงานที่ AI โทร · ตั้งที่ ตั้งค่า › โทรซ้ำคนไม่รับสาย) ═══
- * แทนแบบเดิม "วันถัดไป คละ 10/14/18" (29 ก.ย. 2569)
- * เวลาถัดไปในรายการที่ยังไม่ถึง (ห่างจากตอนนี้อย่างน้อย `leadMinutes`) วันเดียวกันได้ · เลยทุกเวลาแล้ว = เวลาแรกของวันถัดไป
- * เวลาที่ตกช่วงห้ามโทรของนโยบาย (ถ้าตั้งไว้) ข้ามไป
- */
 export const RETRY_LEAD_MINUTES = 10;
 const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
-function inQuietHour(hour: number, policy: CallFollowupPolicy): boolean {
-  const { quietFromHour: f, quietToHour: t } = policy;
-  if (f === t) return false;
-  return f > t ? hour >= f || hour < t : hour >= f && hour < t;
+const MIN = 60_000;
+const BKK = 7 * 60 * MIN;
+/** เวลา HH:MM (ไทย) ของวันเดียวกับ `at` (ไทย) + `dayOffset` วัน */
+function bkkDayAt(at: Date, hhmm: string, dayOffset = 0): Date {
+  const b = new Date(at.getTime() + BKK);
+  const m = minutesOf(hhmm);
+  return new Date(Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate() + dayOffset, Math.floor(m / 60), m % 60) - BKK);
 }
-export function nextRetryAt(now: Date, policy: CallFollowupPolicy = DEFAULT_CALL_FOLLOWUP_POLICY, leadMinutes = RETRY_LEAD_MINUTES): Date {
-  const times = normalizeRetryTimes(policy.retryTimes).filter((t) => !inQuietHour(Number(t.slice(0, 2)), policy));
-  const list = times.length > 0 ? times : normalizeRetryTimes(null);
-  const floor = now.getTime() + leadMinutes * 60_000;
-  const bkk = new Date(now.getTime() + 7 * 3_600_000);
-  for (let day = 0; day < 3; day += 1) {
-    for (const t of list) {
-      const m = minutesOf(t);
-      const at = Date.UTC(bkk.getUTCFullYear(), bkk.getUTCMonth(), bkk.getUTCDate() + day, Math.floor(m / 60) - 7, m % 60, 0);
-      if (at >= floor) return new Date(at);
-    }
-  }
-  return new Date(floor);
+const bkkMinuteOfDay = (at: Date) => {
+  const b = new Date(at.getTime() + BKK);
+  return b.getUTCHours() * 60 + b.getUTCMinutes();
+};
+
+/** เลื่อนเข้าช่วงที่โทรได้ (`callFrom`–`callTo` เวลาไทย) — ก่อนช่วง = ต้นช่วงวันนั้น · เลยช่วง = ต้นช่วงวันถัดไป */
+export function clampToCallWindow(at: Date, policy: CallFollowupPolicy = DEFAULT_CALL_FOLLOWUP_POLICY): Date {
+  const m = bkkMinuteOfDay(at);
+  if (m < minutesOf(policy.callFrom)) return bkkDayAt(at, policy.callFrom);
+  if (m >= minutesOf(policy.callTo)) return bkkDayAt(at, policy.callFrom, 1);
+  return at;
 }
 
-/** เวลานี้ตรงเวลาโทรซ้ำในรายการพอดีไหม (HH:MM เวลาไทย) — ตัวส่งซ้ำใช้ย้ายนัดแบบเก่าที่ค้างอยู่ */
-export function isListedRetryTime(at: Date, policy: CallFollowupPolicy = DEFAULT_CALL_FOLLOWUP_POLICY): boolean {
-  if (at.getUTCSeconds() !== 0) return false;
-  const bkk = new Date(at.getTime() + 7 * 3_600_000);
-  const hhmm = `${String(bkk.getUTCHours()).padStart(2, '0')}:${String(bkk.getUTCMinutes()).padStart(2, '0')}`;
-  return normalizeRetryTimes(policy.retryTimes).includes(hhmm);
+/**
+ * เวลาโทรซ้ำหลังสายที่ `attemptCount` ไม่ติด (นับรวมสายนี้) — ดูหัวข้อใน `CallFollowupPolicy`
+ * เช่น 3 สาย/รอบ เว้น 10 นาที · 2 รอบห่าง 2 ชม.: กรอก 09:00 → 09:00 · 09:10 · 09:20 → 11:20 · 11:30 · 11:40 → พรุ่งนี้ 13:00 …
+ * ทุกเวลาอยู่ในช่วงโทรได้ (`clampToCallWindow`) และห่างจากตอนนี้อย่างน้อย `RETRY_LEAD_MINUTES`
+ */
+export function nextRetryAt(now: Date, attemptCount: number, policy: CallFollowupPolicy = DEFAULT_CALL_FOLLOWUP_POLICY): Date {
+  const perDay = policy.roundCalls * policy.roundsPerDay;
+  const pos = ((Math.max(1, Math.trunc(attemptCount)) - 1) % perDay) + 1;
+  let at: Date;
+  if (pos % policy.roundCalls !== 0) {
+    at = new Date(now.getTime() + policy.roundGapMinutes * MIN);
+  } else if (pos < perDay) {
+    at = new Date(now.getTime() + policy.roundsGapHours * 60 * MIN);
+  } else {
+    // ครบวัน — สายแรกของวันนี้ ≈ ตอนนี้ − (ช่วงห่างรอบ + ช่วงห่างในรอบทั้งหมด) · เริ่มเช้า ⇒ พรุ่งนี้บ่าย · ไม่งั้นพรุ่งนี้เช้า
+    const spanMin = (policy.roundsPerDay - 1) * policy.roundsGapHours * 60 + policy.roundsPerDay * (policy.roundCalls - 1) * policy.roundGapMinutes;
+    const dayStart = new Date(now.getTime() - spanMin * MIN);
+    const startedMorning = bkkMinuteOfDay(dayStart) < 12 * 60;
+    at = bkkDayAt(now, startedMorning ? policy.dayAfternoon : policy.dayMorning, 1);
+  }
+  const floor = new Date(now.getTime() + RETRY_LEAD_MINUTES * MIN);
+  return clampToCallWindow(at.getTime() < floor.getTime() ? floor : at, policy);
 }
 
 /**
@@ -199,7 +242,7 @@ export function isListedRetryTime(at: Date, policy: CallFollowupPolicy = DEFAULT
  *
  * `attemptCount` = โทรไปแล้วกี่ครั้งรวมครั้งนี้
  * `requestedCallbackAt` = เวลาที่ผู้สมัครบอกว่าให้โทรกลับ (ถ้ามี)
- * ไม่รับสาย/ไม่ติด ⇒ โทรซ้ำเวลาถัดไปใน `policy.retryTimes` (`nextRetryAt`)
+ * ไม่รับสาย/ไม่ติด ⇒ โทรซ้ำเป็นรอบตามนโยบาย (`nextRetryAt`)
  */
 export function resolveCallFollowup(input: {
   outcome: CallOutcome;
@@ -289,7 +332,7 @@ export function resolveCallFollowup(input: {
           reason: `โทรครบ ${policy.maxAttempts} ครั้งแล้วยังไม่ติด — ต้องให้คนตาม`,
         };
       }
-      const at = nextRetryAt(now, policy);
+      const at = nextRetryAt(now, attemptCount, policy);
       const atBkk = new Date(at.getTime() + 7 * 3_600_000);
       const sameDay = atBkk.getUTCDate() === new Date(now.getTime() + 7 * 3_600_000).getUTCDate();
       const hhmm = `${String(atBkk.getUTCHours()).padStart(2, '0')}:${String(atBkk.getUTCMinutes()).padStart(2, '0')}`;

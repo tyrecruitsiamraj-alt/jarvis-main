@@ -170,14 +170,17 @@ describe('สายไฟ — ทุกทางที่ส่งใบสม�
     expect(body).toContain('if (rows.length === 0 && baseId !== clientId) rows = await applyById(baseId)');
   });
 
-  it('โทรซ้ำทุกงานใช้เวลาจากหน้าตั้งค่า (26 ต.ค. 2569) — ไม่เหลือช่องคละ 10/14/18 · ตัวส่งซ้ำย้ายนัดเก่ามาเวลาในรายการ', () => {
+  it('โทรซ้ำทุกงานใช้นโยบายจากหน้าตั้งค่า — ไม่เหลือช่องคละ 10/14/18 · ตัวส่งซ้ำย้ายแค่นัดที่ค้าง (27 ต.ค. 2569 โทรซ้ำเป็นรอบ)', () => {
     const c = code('api/_lib/callFollowup.ts');
     expect(c).not.toContain('retrySlots');
     expect(c).not.toContain('RETRY_TIME_SLOTS_BKK');
     expect((c.match(/policy: await getCallFollowupPolicy\(\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
     const w = code('api/_lib/lumosPushRetryWorker.ts');
-    expect(w).toContain('!isListedRetryTime(due, policy)');
-    expect(w).toContain('const at = nextRetryAt(now, policy);');
+    expect(w).not.toContain('isListedRetryTime');
+    expect(w).toContain('lateMinutes > RETRY_REPLAN_AFTER_MINUTES');
+    expect(w).toContain('const at = clampToCallWindow(new Date(now.getTime() + RETRY_LEAD_MINUTES * 60_000), policy);');
+    // สายสัมภาษณ์ทุกเส้นเข้าช่วงโทรได้ที่จุดส่งเดียว
+    expect(code('api/_lib/lumosPushClient.ts')).toContain('const inWindow = clampToCallWindow(at, policy);');
     expect(code('api/_handlers/call-followup-policy.ts')).toContain("if (req.user?.role !== 'admin')");
     expect(code('src/lib/settingsNav.ts')).toContain("callRetry: 'โทรซ้ำคนไม่รับสาย'");
   });

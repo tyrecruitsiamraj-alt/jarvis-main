@@ -1,29 +1,57 @@
 /**
- * ═══ ตั้งค่า › โทรซ้ำคนไม่รับสาย (เจ้าของ 26 ต.ค. 2569) ═══
- * > *"ไม่รับสายแล้วโทรวันถัดไป ขอเป็นโทรใหม่ตอนเที่ยง · ขอหน้าไว้ตั้งเวลาผ่าน UI"*
- * Choice: เวลาถัดไปในรายการ วันเดียวกันได้ · ตั้งจำนวนครั้งได้ · ทุกงานที่ AI โทร · admin แก้
- * ตัวคำนวณเวลา `nextRetryAt` (src/lib/callFollowupPolicy.ts) · ตารางติดตามคนเริ่มงานมีเวลาของตัวเอง ไม่ใช้ค่านี้
+ * ═══ ตั้งค่า › โทรซ้ำคนไม่รับสาย ═══
+ * 26 ต.ค. 2569 เดิมเป็นรายการเวลาคงที่ → 27 ต.ค. 2569 เจ้าของเปลี่ยนเป็นโทรซ้ำเป็นรอบ:
+ * > *"กรอกมาตอนไหนก็โทรเลย ถ้าไม่รับก็โทรซ้ำ 3 รอบ ถ้าไม่รับก็บวกไปอีก 2 ชม แล้วโทรใหม่ ไม่รับก็โทรซ้ำ 3 สาย
+ * > ถ้าไม่รับอีกก็ไปรอโทรวันถัดไป คนละเวลา"* · Choice: เว้น 10 นาที · เช้าสลับบ่าย · โทรแค่ 08:00–20:00
+ * ตัวคำนวณเวลา `nextRetryAt` · ช่วงโทรได้ `clampToCallWindow` (src/lib/callFollowupPolicy.ts) · admin แก้
+ * ตารางติดตามคนเริ่มงานมีเวลาของตัวเอง ไม่ใช้ค่านี้
  */
 import React, { useEffect, useState } from 'react';
-import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
 import { useAuth } from '@/contexts/AuthContext';
-import { MAX_CALL_ATTEMPTS, MAX_RETRY_TIMES } from '@/lib/callFollowupPolicy';
-import { fetchCallFollowupPolicy, saveCallFollowupPolicy } from '@/lib/callFollowupPolicyApi';
+import { DEFAULT_CALL_FOLLOWUP_POLICY, ROUND_LIMITS, totalCallsOf } from '@/lib/callFollowupPolicy';
+import { fetchCallFollowupPolicy, saveCallFollowupPolicy, type CallRetryRoundInput } from '@/lib/callFollowupPolicyApi';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 
-const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+type NumKey = keyof typeof ROUND_LIMITS;
+type TimeKey = 'callFrom' | 'callTo' | 'dayMorning' | 'dayAfternoon';
+type Form = Record<NumKey | TimeKey, string>;
+
+const NUM_FIELDS: Array<{ key: NumKey; label: string }> = [
+  { key: 'roundCalls', label: 'สายต่อรอบ' },
+  { key: 'roundGapMinutes', label: 'เว้นระหว่างสาย (นาที)' },
+  { key: 'roundsPerDay', label: 'รอบต่อวัน' },
+  { key: 'roundsGapHours', label: 'เว้นระหว่างรอบ (ชม.)' },
+  { key: 'retryDays', label: 'โทรกี่วัน' },
+];
+const TIME_FIELDS: Array<{ key: TimeKey; label: string }> = [
+  { key: 'callFrom', label: 'เริ่มโทรได้' },
+  { key: 'callTo', label: 'โทรได้ถึง' },
+  { key: 'dayMorning', label: 'วันถัดไป รอบเช้าเริ่ม' },
+  { key: 'dayAfternoon', label: 'วันถัดไป รอบบ่ายเริ่ม' },
+];
+
+const toForm = (p: CallRetryRoundInput): Form => ({
+  roundCalls: String(p.roundCalls),
+  roundGapMinutes: String(p.roundGapMinutes),
+  roundsPerDay: String(p.roundsPerDay),
+  roundsGapHours: String(p.roundsGapHours),
+  retryDays: String(p.retryDays),
+  callFrom: p.callFrom,
+  callTo: p.callTo,
+  dayMorning: p.dayMorning,
+  dayAfternoon: p.dayAfternoon,
+});
 
 const CallRetryTab: React.FC = () => {
   const { hasPermission } = useAuth();
   const canEdit = hasPermission('admin');
-  const [maxAttempts, setMaxAttempts] = useState('3');
-  const [times, setTimes] = useState<string[]>([]);
+  const [form, setForm] = useState<Form>(() => toForm(DEFAULT_CALL_FOLLOWUP_POLICY));
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,8 +62,7 @@ const CallRetryTab: React.FC = () => {
     fetchCallFollowupPolicy()
       .then((p) => {
         if (!alive) return;
-        setMaxAttempts(String(p.maxAttempts));
-        setTimes(p.retryTimes);
+        setForm(toForm(p));
         setLoaded(true);
       })
       .catch((e: unknown) => alive && setError(e instanceof Error ? e.message : 'โหลดไม่สำเร็จ'));
@@ -44,22 +71,39 @@ const CallRetryTab: React.FC = () => {
     };
   }, []);
 
-  const touch = () => {
+  const set = (key: NumKey | TimeKey, v: string) => {
+    setForm((cur) => ({ ...cur, [key]: v }));
     setNotice(null);
     setError(null);
   };
-  const max = Number(maxAttempts);
-  const maxOk = Number.isInteger(max) && max >= 1 && max <= MAX_CALL_ATTEMPTS;
-  const timesOk = times.length > 0 && times.every((t) => HHMM.test(t));
+  const numOk = (k: NumKey) => {
+    const n = Number(form[k]);
+    return Number.isInteger(n) && n >= ROUND_LIMITS[k][0] && n <= ROUND_LIMITS[k][1];
+  };
+  const allNumOk = NUM_FIELDS.every((f) => numOk(f.key));
+  const windowOk = form.callTo > form.callFrom;
+  const total = allNumOk
+    ? totalCallsOf({ roundCalls: Number(form.roundCalls), roundsPerDay: Number(form.roundsPerDay), retryDays: Number(form.retryDays) })
+    : null;
 
   const save = async () => {
-    if (saving || !maxOk || !timesOk) return;
+    if (saving || !allNumOk || !windowOk) return;
     setSaving(true);
-    touch();
+    setNotice(null);
+    setError(null);
     try {
-      const saved = await saveCallFollowupPolicy({ maxAttempts: max, retryTimes: times });
-      setMaxAttempts(String(saved.maxAttempts));
-      setTimes(saved.retryTimes);
+      const saved = await saveCallFollowupPolicy({
+        roundCalls: Number(form.roundCalls),
+        roundGapMinutes: Number(form.roundGapMinutes),
+        roundsPerDay: Number(form.roundsPerDay),
+        roundsGapHours: Number(form.roundsGapHours),
+        retryDays: Number(form.retryDays),
+        callFrom: form.callFrom,
+        callTo: form.callTo,
+        dayMorning: form.dayMorning,
+        dayAfternoon: form.dayAfternoon,
+      });
+      setForm(toForm(saved));
       setNotice('บันทึกแล้ว');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
@@ -72,79 +116,54 @@ const CallRetryTab: React.FC = () => {
     <Card variant="solid" className="max-w-xl space-y-5 p-5" data-testid="call-retry-settings">
       <h3 className="text-lg font-medium text-foreground">โทรซ้ำคนไม่รับสาย</h3>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="retry-max">โทรได้สูงสุด (ครั้ง รวมครั้งแรก)</Label>
-        <Input
-          id="retry-max"
-          type="number"
-          inputMode="numeric"
-          min={1}
-          max={MAX_CALL_ATTEMPTS}
-          className="w-28 tabular-nums"
-          value={maxAttempts}
-          disabled={!canEdit || !loaded}
-          onChange={(e) => {
-            setMaxAttempts(e.target.value);
-            touch();
-          }}
-          data-testid="retry-max"
-        />
-        {maxAttempts && !maxOk ? <p className={cn('text-xs', TONE.danger.value)}>ใส่ 1–{MAX_CALL_ATTEMPTS}</p> : null}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {NUM_FIELDS.map((f) => (
+          <div key={f.key} className="space-y-1.5">
+            <Label htmlFor={`retry-${f.key}`}>{f.label}</Label>
+            <Input
+              id={`retry-${f.key}`}
+              type="number"
+              inputMode="numeric"
+              min={ROUND_LIMITS[f.key][0]}
+              max={ROUND_LIMITS[f.key][1]}
+              className="w-28 tabular-nums"
+              value={form[f.key]}
+              disabled={!canEdit || !loaded}
+              onChange={(e) => set(f.key, e.target.value)}
+              data-testid={`retry-${f.key}`}
+            />
+            {form[f.key] && !numOk(f.key) ? (
+              <p className={cn('text-xs', TONE.danger.value)}>
+                ใส่ {ROUND_LIMITS[f.key][0]}–{ROUND_LIMITS[f.key][1]}
+              </p>
+            ) : null}
+          </div>
+        ))}
       </div>
 
-      <div className="space-y-2">
-        <Label>เวลาโทรซ้ำ</Label>
-        <ul className="space-y-2" data-testid="retry-times">
-          {times.map((t, i) => (
-            <li key={i} className="flex items-center gap-2">
-              <TimeSelect24
-                value={t}
-                disabled={!canEdit}
-                label={`เวลาโทรซ้ำที่ ${i + 1}`}
-                onChange={(v) => {
-                  setTimes((cur) => cur.map((x, j) => (j === i ? v : x)));
-                  touch();
-                }}
-              />
-              {canEdit && times.length > 1 ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`ลบเวลา ${t}`}
-                  onClick={() => {
-                    setTimes((cur) => cur.filter((_, j) => j !== i));
-                    touch();
-                  }}
-                >
-                  <X aria-hidden />
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-        {canEdit && times.length < MAX_RETRY_TIMES ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={!loaded}
-            onClick={() => {
-              setTimes((cur) => [...cur, '17:00']);
-              touch();
-            }}
-            data-testid="retry-add-time"
-          >
-            <Plus aria-hidden /> เพิ่มเวลา
-          </Button>
-        ) : null}
+      <p className="text-sm tabular-nums text-foreground" data-testid="retry-total">
+        รวมโทรได้ {total ?? '—'} ครั้ง
+      </p>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {TIME_FIELDS.map((f) => (
+          <div key={f.key} className="space-y-1.5">
+            <Label>{f.label}</Label>
+            <TimeSelect24 value={form[f.key]} disabled={!canEdit || !loaded} label={f.label} onChange={(v) => set(f.key, v)} />
+          </div>
+        ))}
       </div>
+      {!windowOk ? <p className={cn('text-xs', TONE.danger.value)}>เวลาโทรได้ถึง ต้องหลังเวลาเริ่มโทรได้</p> : null}
 
       {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
-      {notice ? <p className={cn('text-sm', TONE.success.value)} data-testid="retry-notice">{notice}</p> : null}
+      {notice ? (
+        <p className={cn('text-sm', TONE.success.value)} data-testid="retry-notice">
+          {notice}
+        </p>
+      ) : null}
 
       {canEdit ? (
-        <Button type="button" disabled={!loaded || saving || !maxOk || !timesOk} onClick={() => void save()} data-testid="retry-save">
+        <Button type="button" disabled={!loaded || saving || !allNumOk || !windowOk} onClick={() => void save()} data-testid="retry-save">
           {saving ? 'กำลังบันทึก…' : 'บันทึก'}
         </Button>
       ) : null}

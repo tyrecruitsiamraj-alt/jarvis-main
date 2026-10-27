@@ -73,7 +73,7 @@ describe('ผลจาก AI → ตั้งคิวโทรซ้ำ / ต�
 
   it('ไม่รับสายครบเพดาน → needs_human ไม่ตั้งคิวใหม่', async () => {
     vi.mocked(dbQuery)
-      .mockResolvedValueOnce({ rows: [{ id: 7, attempt_count: 3, payload: {} }] })
+      .mockResolvedValueOnce({ rows: [{ id: 7, attempt_count: 18, payload: {} }] }) // เพดานค่าเริ่ม 18 (3 สาย × 2 รอบ × 3 วัน · 27 ต.ค. 2569)
       .mockResolvedValueOnce({ rows: [] });
 
     const d = await applyCallFollowupToQueueRow({ queueId: 7, outcome: 'no_answer' });
