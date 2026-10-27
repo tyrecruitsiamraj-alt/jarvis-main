@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
 import { useAuth } from '@/contexts/AuthContext';
-import { MAX_RETRY_TIMES } from '@/lib/callFollowupPolicy';
+import { MAX_CALL_ATTEMPTS, MAX_RETRY_TIMES } from '@/lib/callFollowupPolicy';
 import { fetchCallFollowupPolicy, saveCallFollowupPolicy } from '@/lib/callFollowupPolicyApi';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
@@ -49,7 +49,7 @@ const CallRetryTab: React.FC = () => {
     setError(null);
   };
   const max = Number(maxAttempts);
-  const maxOk = Number.isInteger(max) && max >= 1 && max <= 10;
+  const maxOk = Number.isInteger(max) && max >= 1 && max <= MAX_CALL_ATTEMPTS;
   const timesOk = times.length > 0 && times.every((t) => HHMM.test(t));
 
   const save = async () => {
@@ -79,7 +79,7 @@ const CallRetryTab: React.FC = () => {
           type="number"
           inputMode="numeric"
           min={1}
-          max={10}
+          max={MAX_CALL_ATTEMPTS}
           className="w-28 tabular-nums"
           value={maxAttempts}
           disabled={!canEdit || !loaded}
@@ -89,7 +89,7 @@ const CallRetryTab: React.FC = () => {
           }}
           data-testid="retry-max"
         />
-        {maxAttempts && !maxOk ? <p className={cn('text-xs', TONE.danger.value)}>ใส่ 1–10</p> : null}
+        {maxAttempts && !maxOk ? <p className={cn('text-xs', TONE.danger.value)}>ใส่ 1–{MAX_CALL_ATTEMPTS}</p> : null}
       </div>
 
       <div className="space-y-2">

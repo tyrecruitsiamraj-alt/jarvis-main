@@ -61,6 +61,11 @@ export const DEFAULT_CALL_FOLLOWUP_POLICY: CallFollowupPolicy = {
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 /** ตั้งได้สูงสุดกี่เวลา */
 export const MAX_RETRY_TIMES = 8;
+/**
+ * โทรได้สูงสุดกี่ครั้งต่อคน (รวมครั้งแรก) — เจ้าของ 27 ต.ค. 2569 *"1 วันโทรสัก 2 รอบ รอบละ 3 สาย … ทำสัก 3 วัน"*
+ * = 2 × 3 × 3 = 18 (เดิมเพดาน 10) · ตั้งค่าจริงที่ ตั้งค่า › โทรซ้ำคนไม่รับสาย
+ */
+export const MAX_CALL_ATTEMPTS = 18;
 /** เวลาโทรซ้ำที่ใช้ได้ — รูปแบบ HH:MM ไม่ซ้ำ เรียง · ว่าง/ผิดหมด = ค่าเริ่ม 12:00 */
 export function normalizeRetryTimes(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [...DEFAULT_CALL_FOLLOWUP_POLICY.retryTimes];
@@ -79,7 +84,7 @@ export function normalizeCallFollowupPolicy(raw: unknown): CallFollowupPolicy {
       out[key] = Math.max(min, Math.min(max, Math.round(v)));
     }
   };
-  num('maxAttempts', 1, 10);
+  num('maxAttempts', 1, MAX_CALL_ATTEMPTS);
   num('retryGapHours', 1, 168);
   num('rescheduleDefaultHours', 1, 72);
   num('quietFromHour', 0, 23);

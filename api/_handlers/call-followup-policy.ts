@@ -9,7 +9,7 @@ import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from
 import { readJsonBody } from '../_lib/body.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { getCallFollowupPolicy, setCallFollowupPolicy } from '../_lib/callFollowupPolicyStore.js';
-import { MAX_RETRY_TIMES, normalizeCallFollowupPolicy } from '../../src/lib/callFollowupPolicy.js';
+import { MAX_CALL_ATTEMPTS, MAX_RETRY_TIMES, normalizeCallFollowupPolicy } from '../../src/lib/callFollowupPolicy.js';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -26,7 +26,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (typeof raw !== 'object' || raw === null) return sendError(res, 400, 'Bad request', 'ข้อมูลไม่ถูกต้อง');
       const body = raw as { maxAttempts?: unknown; retryTimes?: unknown };
       const max = Number(body.maxAttempts);
-      if (!Number.isInteger(max) || max < 1 || max > 10) return sendError(res, 400, 'Bad request', 'จำนวนครั้งต้องเป็น 1–10');
+      if (!Number.isInteger(max) || max < 1 || max > MAX_CALL_ATTEMPTS) {
+        return sendError(res, 400, 'Bad request', `จำนวนครั้งต้องเป็น 1–${MAX_CALL_ATTEMPTS}`);
+      }
       const times = Array.isArray(body.retryTimes) ? body.retryTimes.map((t) => String(t ?? '').trim()) : [];
       if (times.length === 0) return sendError(res, 400, 'Bad request', 'ต้องมีเวลาโทรซ้ำอย่างน้อย 1 เวลา');
       if (times.length > MAX_RETRY_TIMES) return sendError(res, 400, 'Bad request', `ตั้งได้ไม่เกิน ${MAX_RETRY_TIMES} เวลา`);

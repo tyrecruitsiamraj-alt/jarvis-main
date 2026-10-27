@@ -183,7 +183,7 @@ describe('คุยติดแล้วได้คำตอบ', () => {
 describe('normalize นโยบาย', () => {
   it('ค่าปกติผ่าน · ค่าเกินขอบถูกบีบ · ค่าเพี้ยนใช้ค่าเริ่มต้น', () => {
     expect(normalizeCallFollowupPolicy({ maxAttempts: 5 }).maxAttempts).toBe(5);
-    expect(normalizeCallFollowupPolicy({ maxAttempts: 999 }).maxAttempts).toBe(10);
+    expect(normalizeCallFollowupPolicy({ maxAttempts: 999 }).maxAttempts).toBe(18); // เพดาน 18 (2 รอบ × 3 สาย × 3 วัน · 27 ต.ค. 2569)
     expect(normalizeCallFollowupPolicy({ maxAttempts: 0 }).maxAttempts).toBe(1);
     expect(normalizeCallFollowupPolicy({ maxAttempts: 'สาม' }).maxAttempts).toBe(3);
     expect(normalizeCallFollowupPolicy(null)).toEqual(DEFAULT_CALL_FOLLOWUP_POLICY);

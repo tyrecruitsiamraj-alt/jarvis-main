@@ -46,12 +46,12 @@ describe('getCallFollowupPolicy — ที่เก็บ', () => {
     await expect(getCallFollowupPolicy()).rejects.toThrow();
   });
 
-  it('ค่าเพี้ยนจาก DB ถูก normalize เข้าขอบเขต (เพดาน 1–10 ครั้ง)', async () => {
+  it('ค่าเพี้ยนจาก DB ถูก normalize เข้าขอบเขต (เพดาน 1–18 ครั้ง · 27 ต.ค. 2569)', async () => {
     vi.mocked(dbQuery).mockResolvedValueOnce({
       rows: [{ payload: { maxAttempts: 99, quietFromHour: 21, quietToHour: 7 } }],
     } as never);
     const p = await getCallFollowupPolicy();
-    expect(p.maxAttempts).toBe(10);
+    expect(p.maxAttempts).toBe(18);
     expect(p.quietFromHour).toBe(21);
     expect(p.quietToHour).toBe(7);
     expect(p.retryGapHours).toBe(DEFAULT_CALL_FOLLOWUP_POLICY.retryGapHours);
