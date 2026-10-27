@@ -21,7 +21,6 @@ import { ChevronDown } from 'lucide-react';
 
 import { apiFetch } from '@/lib/apiFetch';
 import { DASH, TONE } from '@/lib/designTokens';
-import { roundTabLabel } from '@/lib/followRoundVisual';
 import { cn } from '@/lib/utils';
 
 type ScriptItem = { key: string; label: string; lines: string[] };
@@ -73,7 +72,8 @@ const RoundScriptNote: React.FC<{
         className="flex w-full items-center justify-between gap-2 text-left"
       >
         <span className={cn('text-[11px]', DASH.muted)}>
-          {roundTabLabel(callRound)} · AI ใช้บท{' '}
+          {/* ไม่โชว์เลขรอบทั้งชุดแล้ว (27 ต.ค. 2569 — "สายที่ 5" ทำคนงง · เลขที่คนอ่านคือสายที่ของวันนั้น) */}
+          AI ใช้บท{' '}
           <span className={cn('font-medium', TONE.info.value)}>{item.label}</span>
         </span>
         <ChevronDown

@@ -169,3 +169,16 @@ export function scheduleDraftDayCallLabels(
   const pos = followDayCallPositions(fake);
   return new Map(rows.map((r) => [r.key, r.iso ? followDayCallLabel(pos.get(r.key) ?? { call: null }) : null]));
 }
+
+/**
+ * "สายที่ N ของวันนั้น" ของแถวในฟอร์มตั้ง/แก้ตาราง (เจ้าของ 27 ต.ค. 2569 "ควรขึ้นแค่สาย 1 สาย 2 ทุกวัน")
+ * นับรวมสายเดิมของชุดที่ล็อกแล้ว (เลยเวลา/โทรไปแล้ว) ในวันเดียวกัน · ยกเลิกไม่กินเลข · ไม่รู้วัน = null
+ */
+export function formDayCallNumbers(
+  rows: ReadonlyArray<{ key: string; iso: string | null; cancelled?: boolean }>,
+): Map<string, number | null> {
+  const pos = followDayCallPositions(
+    rows.map((r) => ({ id: r.key, group_id: 'form', scheduled_at: r.iso, call_round: null, cancelled: Boolean(r.cancelled) })),
+  );
+  return new Map(rows.map((r) => [r.key, r.iso ? (pos.get(r.key)?.call ?? null) : null]));
+}

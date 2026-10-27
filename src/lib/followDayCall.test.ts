@@ -175,3 +175,18 @@ describe('ติดตามครั้งที่รายวัน (plan_day
     expect(followDayCallLabel(pos.get('a')!)).toBe('ครั้งที่ 6 · สายที่ 1');
   });
 });
+
+describe('formDayCallNumbers — "สายที่ N ของวันนั้น" ในฟอร์ม (เจ้าของ 27 ต.ค. 2569)', () => {
+  it('นับใหม่ทุกวัน · รวมสายเดิมที่ล็อกแล้วของวันเดียวกัน · ยกเลิกไม่กินเลข', async () => {
+    const { formDayCallNumbers } = await import('./followDayCall');
+    const m = formDayCallNumbers([
+      { key: 'x-a', iso: '2026-10-27T23:30:00Z' }, // 28 ต.ค. 06:30 ไทย (โทรไปแล้ว)
+      { key: 'x-b', iso: '2026-10-28T00:00:00Z', cancelled: true }, // 07:00 ยกเลิก
+      { key: '0', iso: '2026-10-28T00:30:00Z' }, // 28 ต.ค. 07:30
+      { key: '1', iso: '2026-10-28T23:30:00Z' }, // 29 ต.ค. 06:30
+      { key: '2', iso: '2026-10-29T00:30:00Z' }, // 29 ต.ค. 07:30
+      { key: '3', iso: null },
+    ]);
+    expect([m.get('0'), m.get('1'), m.get('2'), m.get('3')]).toEqual([2, 1, 2, null]);
+  });
+});

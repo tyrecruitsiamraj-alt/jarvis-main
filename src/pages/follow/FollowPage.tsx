@@ -64,7 +64,8 @@ import {
   updateFollowSet,
   replaceFollowSchedule,
 } from '@/lib/followApi';
-import { followSetRows, isEditableFollowRound, isoToBangkokInput } from '@/lib/followScheduleEdit';
+import { bangkokInputToIso, followSetRows, isEditableFollowRound, isoToBangkokInput } from '@/lib/followScheduleEdit';
+import { formDayCallNumbers } from '@/lib/followDayCall';
 import type { FollowStaffCallOutcome } from '@/lib/followStaffCall';
 import { summarizeDispatchResults } from '@/lib/followDispatchState';
 import { ErpPersonPickerBody } from '@/components/follow/ErpPersonPicker';
@@ -328,6 +329,20 @@ const FollowPage: React.FC = () => {
    * ค่านี้ถูกส่งขึ้นไปจริง (`call_round`) และเป็นตัวตัดสินว่า AI พูดบทไหน
    */
   const [callRounds, setCallRounds] = useState<number[]>(() => [1]);
+  /** สายเดิมของชุดที่แก้ไม่ได้แล้ว (เลยเวลา/โทรไปแล้ว/ยกเลิก) — ใช้นับ "สายที่ N ของวันนั้น" ตอนแก้ (27 ต.ค. 2569) */
+  const [lockedSetRows, setLockedSetRows] = useState<Array<{ id: string; scheduled_at: string | null; cancelled: boolean }>>([]);
+  /** "สายที่ N ของวันนั้น" ของแต่ละช่องในฟอร์ม (ช่องยังไม่ชัวร์เวลา = วันนั้นเที่ยงคืน) */
+  const formCallNos = useMemo(
+    () =>
+      formDayCallNumbers([
+        ...lockedSetRows.map((r) => ({ key: `x-${r.id}`, iso: r.scheduled_at, cancelled: r.cancelled })),
+        ...scheduledAts.map((v, i) => ({
+          key: String(i),
+          iso: /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T00:00:00+07:00` : bangkokInputToIso(v),
+        })),
+      ]),
+    [lockedSetRows, scheduledAts],
+  );
   /**
    * ใครโทรรอบนี้ — โหมด "ระบุเวลาเอง" (เจ้าของสั่ง 2 ต.ค. 2569: *"เพิ่มปุ่มเลือก คนโทร / AI โทร ในระบุเวลาเอง"*)
    * 🔴 ขยับคู่กับ `scheduledAts` เสมอ (กับดักเดียวกับอาร์เรย์เบอร์/เลขสาย) · ค่าเริ่ม = AI โทร (พฤติกรรมเดิม)
@@ -823,6 +838,7 @@ const FollowPage: React.FC = () => {
     setPickedFrom(null);
     setScheduledAts([nowForInput()]);
     setCallRounds([1]);
+    setLockedSetRows([]);
     setCallModes(['ai']);
     setRoundIds([null]);
     setEditSet(null);
@@ -861,6 +877,9 @@ const FollowPage: React.FC = () => {
     const now = new Date();
     const editable = rows.filter((r) => isEditableFollowRound(r, now));
     resetForm();
+    setLockedSetRows(
+      rows.filter((r) => !editable.includes(r)).map((r) => ({ id: r.id, scheduled_at: r.scheduled_at ?? null, cancelled: Boolean(r.cancelled) })),
+    );
     const full = (entry.recipient_name ?? '').trim();
     const pre = [...NAME_PREFIXES].filter(Boolean).sort((a, b) => b.length - a.length).find((x) => full.startsWith(x)) ?? '';
     const rest = full.slice(pre.length).trim();
@@ -3553,7 +3572,7 @@ const FollowPage: React.FC = () => {
                       <DateTimeField24
                         value={/^\d{4}-\d{2}-\d{2}$/.test(v) ? '' : v}
                         onChange={(next) => setScheduledAtAt(i, next)}
-                        label={`สายที่ ${i + 1}`}
+                        label={`สายที่ ${formCallNos.get(String(i)) ?? i + 1}`}
                         className="min-h-[46px] flex-1"
                       />
                       )}
@@ -3591,22 +3610,25 @@ const FollowPage: React.FC = () => {
                         🔴 ค่านี้ **ส่งขึ้นไปจริง** และเป็นตัวตัดสินว่า AI พูดบทไหน
                         (ก่อนหน้านี้ทุกรอบพูดบทสายแรกหมด ทั้งที่จอเขียนว่ารอบ 2 ใช้อีกบท) */}
                     <div className="space-y-1.5">
+                      {/* 27 ต.ค. 2569 เจ้าของ "ควรขึ้นแค่สาย 1 สาย 2 ทุกวัน" (Choice: บอกวัน·สายอัตโนมัติ + เลือกบท 2 แบบ)
+                          เลขสายของวันคิดเองจากวันเวลา · ช่องนี้เหลือเลือกบท — call_round 1 = บทแนะนำตัว · 2 ขึ้นไป = บทสายถัดไป */}
+                      <p className="ml-1 text-xs font-medium text-foreground" data-testid="follow-form-day-call">
+                        สายที่ {formCallNos.get(String(i)) ?? '—'} ของวันนั้น
+                      </p>
                       <label
                         htmlFor={`followCallRound${i}`}
                         className="ml-1 text-xs font-medium text-muted-foreground"
                       >
-                        สายนี้คือสายที่เท่าไหร่
+                        บทที่ AI ใช้
                       </label>
                       <FieldSelect
                         id={`followCallRound${i}`}
-                        value={String(callRounds[i] ?? i + 1)}
-                        onChange={(v) => setCallRoundAt(i, Number(v))}
-                        options={Array.from(
-                          /* อย่างน้อย 3 ตัวเลือกเสมอ · ตั้งรอบเกิน 3 ก็ต้องเลือกเลขที่สูงกว่าได้ */
-                          { length: Math.max(3, scheduledAts.length) },
-                          (_, n) => n + 1,
-                          // ถามว่า "สายที่เท่าไหร่" ตัวเลือกก็ต้องเป็น "สายที่" (QA 10 ต.ค. 2569 เดิม "รอบโทรที่ 1 (สายแรก)" ปนสองคำ)
-                        ).map((n) => ({ value: String(n), label: `สายที่ ${n}` }))}
+                        value={(callRounds[i] ?? i + 1) <= 1 ? '1' : '2'}
+                        onChange={(v) => setCallRoundAt(i, v === '1' ? 1 : Math.max(2, callRounds[i] ?? i + 1))}
+                        options={[
+                          { value: '1', label: 'บทสายแรก (แนะนำตัว)' },
+                          { value: '2', label: 'บทสายถัดไป' },
+                        ]}
                       />
                     </div>
                     {/* บทที่รอบนี้จะพูด — กางให้เห็นเลย ไม่ต้องกดหา (เจ้าของสั่งให้ "บอกหน่อยว่า Scrip
