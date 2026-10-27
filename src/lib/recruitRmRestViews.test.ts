@@ -26,6 +26,12 @@ const CASES: Array<[Partial<PublicApplication>, string]> = [
   [{ irecruit_dup_at: '2026-10-10T00:00:00Z', last_call_outcome: 'confirmed', last_call_at: '2026-10-13T01:00:00Z' }, 'interested'],
   [{ age: 60, irecruit_dup_at: '2026-10-10T00:00:00Z' }, 'over_age'],
   [{ last_call_status: 'cancelled' }, 'ai_cancelled'],
+  // 27 ต.ค. 2569 เจ้าของ "โทรครบ 3 ครั้งไม่รับเลยก็ย้ายไปไว้ที่ไม่สนใจ" (เฉพาะแท็บผู้สมัคร)
+  [{ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'unresponsive', last_call_attempts: 3, last_call_at: '2026-10-27T05:00:00Z' }, 'declined'],
+  // โทรไป 2 ครั้ง ยังไม่ครบ = ไม่รับสายเหมือนเดิม
+  [{ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'busy', last_call_attempts: 2, last_call_at: '2026-10-27T05:00:00Z' }, 'no_pickup'],
+  // ครบ 3 ครั้งแต่เจ้าหน้าที่โทรติดทีหลัง = ผลติดต่อชนะ
+  [{ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'no_answer', last_call_attempts: 3, last_call_at: '2026-10-27T05:00:00Z', last_contact_ok: true, last_contact_at: '2026-10-27T06:00:00Z' }, 'no_pickup'],
 ];
 
 describe('ชิปแท็บผู้สมัคร แบ่งครบไม่ทับกัน', () => {
@@ -37,5 +43,12 @@ describe('ชิปแท็บผู้สมัคร แบ่งครบไ
 
   it('ชิปท้ายแถวคืน null เมื่ออยู่ชิปก่อนหน้าแล้ว', () => {
     expect(rmRestViewOf(row({ age: 60, phone_callable: false }))).toBeNull();
+  });
+});
+
+describe('ไม่รับครบ 3 ครั้ง ไม่แตะตัวเลขสนใจ/ไม่สนใจทั้งระบบ (Choice 27 ต.ค. 2569)', () => {
+  it('isNotInterestedApplicant ยังเป็น false', async () => {
+    const { isNotInterestedApplicant } = await import('@/lib/applicantCallOutcome');
+    expect(isNotInterestedApplicant(row({ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'no_answer', last_call_attempts: 3, last_call_at: '2026-10-27T05:00:00Z' }))).toBe(false);
   });
 });

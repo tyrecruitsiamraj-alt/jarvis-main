@@ -2,7 +2,7 @@ import { fullDaysSince } from '@/lib/fullDays';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { isOverAge } from '@/lib/applicantAge';
 import { aiQueueStatusOf } from '@/lib/applicantAiQueueStatus';
-import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
+import { isAiNoPickupExhausted, isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
 import type { UserRole } from '@/types';
 /**
  * งานสรรหา (RM) — นิยามกลางของหน้า `/recruit/rm`
@@ -250,7 +250,8 @@ export const IRECRUIT_PULL_CREATED_BY = 'iRecruit';
  */
 export function rmPrimaryViewOf(r: PublicApplication): RmPrimaryView | null {
   if (isInterestedApplicant(r)) return 'interested';
-  if (isNotInterestedApplicant(r)) return 'declined';
+  // โทรครบ 3 ครั้งไม่รับเลย = รายชื่อคนที่ไม่สนใจ (เฉพาะแท็บผู้สมัคร · 27 ต.ค. 2569)
+  if (isNotInterestedApplicant(r) || isAiNoPickupExhausted(r)) return 'declined';
   if (isOverAge(r.age)) return 'over_age';
   if (r.irecruit_dup_at) return 'irecruit_dup';
   if (aiQueueStatusOf(r)?.atRisk === true) return 'ai_at_risk';
