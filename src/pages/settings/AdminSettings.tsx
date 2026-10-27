@@ -32,6 +32,7 @@ import { PresenceFilterChips, PresenceLine } from '@/pages/settings/UserPresence
 import { UserBuFilterChips } from '@/pages/settings/UserBuFilter';
 import { useUserPresence } from '@/pages/settings/useUserPresence';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
+import UserBuPicker from '@/pages/settings/UserBuPicker';
 import {
   countPresence,
   matchesPresence,
@@ -719,74 +720,13 @@ const AdminSettings: React.FC = () => {
                         </select>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <select
-                          value={u.department_code || ''}
+                        {/* BU — Dropdown ติ๊กได้หลาย BU (เจ้าของ 27 ต.ค. 2569) · แอดมินเห็นทุก BU อยู่แล้ว ค่านี้ใช้เป็นค่าเริ่ม */}
+                        <UserBuPicker
+                          primary={u.department_code}
+                          extras={u.extra_department_codes}
                           disabled={savingUserId === u.id}
-                          onChange={(e) => {
-                            const next = e.target.value.trim().toUpperCase() || null;
-                            const cur = u.department_code || null;
-                            if (next === cur) return;
-                            void updateUser(u.id, { department_code: next });
-                          }}
-                          className={cn(
-                            'rounded-md border border-border bg-secondary px-2 py-1 text-xs min-w-[5.5rem]',
-                            savingUserId === u.id && 'opacity-60',
-                          )}
-                          title="ล็อกให้เห็นใบขอเฉพาะแผนกนี้ (ว่าง = บังคับให้ผู้ใช้เลือกตอนเข้าครั้งแรก)"
-                        >
-                          <option value="">ยังไม่ตั้ง</option>
-                          {APP_DEPARTMENT_CODES.map((code) => (
-                            <option key={code} value={code}>
-                              {code}
-                            </option>
-                          ))}
-                        </select>
-                        {/* ดูได้หลาย BU (เจ้าของ 26 ต.ค. 2569 Choice "เพิ่มให้เลือกได้หลาย BU") — แอดมินเห็นทุก BU อยู่แล้ว */}
-                        {u.department_code && u.role !== 'admin' ? (
-                          <div className="mt-2 flex flex-wrap items-center justify-center gap-1" data-testid="user-extra-bu">
-                            {(() => {
-                              /* "ดูทุก BU" (เจ้าของ 26 ต.ค. 2569 Choice) — กดทีเดียวได้ครบทุก BU · กดซ้ำ = เอาออกหมด */
-                              const others = APP_DEPARTMENT_CODES.filter((code) => code !== u.department_code);
-                              const extras = u.extra_department_codes ?? [];
-                              const all = others.every((code) => extras.includes(code));
-                              return (
-                                <Button
-                                  type="button"
-                                  size="xs"
-                                  variant={all ? 'default' : 'outline'}
-                                  aria-pressed={all}
-                                  disabled={savingUserId === u.id}
-                                  onClick={() => void updateUser(u.id, { extra_department_codes: all ? [] : [...others] })}
-                                  data-testid="user-all-bu"
-                                >
-                                  ดูทุก BU
-                                </Button>
-                              );
-                            })()}
-                            <span className="text-xs text-muted-foreground">ดูเพิ่ม</span>
-                            {APP_DEPARTMENT_CODES.filter((code) => code !== u.department_code).map((code) => {
-                              const extras = u.extra_department_codes ?? [];
-                              const on = extras.includes(code);
-                              return (
-                                <Button
-                                  key={code}
-                                  type="button"
-                                  size="xs"
-                                  variant={on ? 'default' : 'outline'}
-                                  aria-pressed={on}
-                                  disabled={savingUserId === u.id}
-                                  onClick={() =>
-                                    void updateUser(u.id, {
-                                      extra_department_codes: on ? extras.filter((x) => x !== code) : [...extras, code],
-                                    })
-                                  }
-                                >
-                                  {code}
-                                </Button>
-                              );
-                            })}
-                          </div>
-                        ) : null}
+                          onChange={(next) => void updateUser(u.id, next)}
+                        />
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button

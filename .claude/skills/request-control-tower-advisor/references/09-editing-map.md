@@ -13868,5 +13868,5 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - รายการ/ใบขอ/ผู้สมัคร/ประกาศ/ทีม/พนักงาน = เห็นทุก BU ในสิทธิ์รวมกัน
 - หน้าสรุปที่คิดทีละ BU (หน้าหลัก · ระบบไปกี่ % · ทีม Online · ภาพรวมงานสรรหา · pipeline) = `pickDashboardBu` ใน `homeBuSql.ts` → เลือกทีละ BU ในสิทธิ์ ค่าเริ่ม BU หลัก ไม่มี "ทุก BU" · จอใช้ `BuChoiceSelect` เมื่อได้ `bu_choices`/`buChoices`
 - หน้าใครออนไลน์ (`home-presence`) ยังใช้ BU หลัก
-- ตั้งที่: ตั้งค่า › ผู้ใช้งาน คอลัมน์ BU → ปุ่ม "ดูเพิ่ม" ต่อ BU (PATCH `/api/app-users` `extra_department_codes`)
+- ตั้งที่: ตั้งค่า › ผู้ใช้งาน คอลัมน์ BU → Dropdown ติ๊กหลาย BU + "ดูทุก BU" (`UserBuPicker` · กติกา `src/lib/userBuPick.ts` · 27 ต.ค. 2569 แทนช่อง BU + ปุ่มดูเพิ่ม) · PATCH `/api/app-users` ส่ง `department_code` + `extra_department_codes` ครั้งเดียว
 - ⚠️ เทสต์ที่ mock `departmentScope.js` ต้องใส่ `codes` ในค่าที่ mock และห้ามให้โค้ดจริงพึ่ง export ใหม่จากโมดูลนี้ผ่านโมดูลอื่นที่เทสต์ mock ทั้งก้อน
