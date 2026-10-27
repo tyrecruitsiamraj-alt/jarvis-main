@@ -10,9 +10,13 @@ import type { MoneyRequest } from './homeMoney';
 export type UrgentRow = { requestNo: string; unit: string; position: string; place: string | null; missing: number; perDay: number; needYmd: string | null; owner: string };
 
 const missingOf = (r: Pick<MoneyRequest, 'qty' | 'filled'>) => Math.max(0, r.qty - r.filled);
-/** เสียวันละ = คนที่ยังขาด × (ค่าปรับ + ลดมูลค่า) ต่อคนต่อวัน */
-export const perDayOf = (r: Pick<MoneyRequest, 'qty' | 'filled' | 'finePerDay' | 'deductPerDay'>) =>
-  missingOf(r) * (r.finePerDay + r.deductPerDay);
+/**
+ * เสียวันละ = ยอดของวันนี้จากสมุดเดียวกับ "ตามสัญญา" (`todayCost` — หักคนแทนที่ส่งไปแล้ว · วันไซต์ไม่ทำงาน = 0)
+ * ไม่มี `todayCost` (เทสต์/ข้อมูลเก่า) = คนที่ขาด × (ค่าปรับ + ลดมูลค่า)
+ * 27 ต.ค. 2569: เดิมคูณเต็มอย่างเดียว ขึ้น 213,449/วัน ทั้งที่สมุดวันเดียวกันได้ 132,030 (คนแทนคลุม 70 ใบ)
+ */
+export const perDayOf = (r: Pick<MoneyRequest, 'qty' | 'filled' | 'finePerDay' | 'deductPerDay' | 'todayCost'>) =>
+  typeof r.todayCost === 'number' ? r.todayCost : missingOf(r) * (r.finePerDay + r.deductPerDay);
 
 const toRow = (r: MoneyRequest): UrgentRow => ({
   requestNo: r.requestNo,

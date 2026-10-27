@@ -115,6 +115,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
       loadAftercareUpcoming(bu),
     ]);
     const ledger = buildPenaltyLedger(rows, raw.informs, today, { from, to: to > today ? today : to }, replacements ?? {});
+    // เสียวันละ = สมุดของวันนี้วันเดียว (หักคนแทนแล้ว) — นิยามเดียวกับ "ตามสัญญา" (27 ต.ค. 2569)
+    const todayCost = new Map(
+      buildPenaltyLedger(rows, raw.informs, today, { from: today, to: today }, replacements ?? {}).requests.map((r) => [
+        r.requestNo,
+        r.amount.need.fine + r.amount.need.deduct,
+      ]),
+    );
     const fines = bu ? raw.customerFines.filter((f) => f.bu === bu) : raw.customerFines;
     const body = {
       ...buildHomeMoney(ledger, fines, {
@@ -125,6 +132,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         bu,
         forcedBu: forcedBu != null,
         ownerOf: (no) => owners.get(no.trim().toUpperCase()) ?? null,
+        todayCostOf: (no) => todayCost.get(no) ?? 0,
       }),
       aftercareUpcoming,
       buChoices: picked.choices,

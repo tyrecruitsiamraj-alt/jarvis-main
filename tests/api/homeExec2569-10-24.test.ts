@@ -126,6 +126,10 @@ describe('30 วินาที: ต้องรีบ · ใครค้าง�
     expect(od.perDay).toBe(owners.reduce((a, o) => a + o.perDay, 0));
     expect(od.rows.length).toBe(owners.reduce((a, o) => a + o.overdue, 0));
     expect(od.perDay).toBe(c.rows.reduce((a, r) => a + r.perDay, 0) + staleOf(list, '2026-10-24').perDay);
+    // 27 ต.ค. 2569 "เป็นไปไม่ได้ที่จะโดนปรับวันละ 2 แสน" — เสียวันละ = สมุดของวันนี้ (หักคนแทน) เมื่อ server ส่ง todayCost มา
+    const withCover = list.map((r) => (r.requestNo === 'A' ? { ...r, todayCost: 150 } : r.requestNo === 'B' ? { ...r, todayCost: 0 } : r));
+    expect(overdueOf(withCover, '2026-10-24').perDay).toBe(150 + 600);
+    expect(costliest(withCover, '2026-10-24').rows.map((r) => [r.requestNo, r.perDay])).toEqual([['A', 150]]);
   });
   it('ถึงวันที่ต้องการใน 3 วัน ยังขาดคน', () => {
     expect(dueSoon(list, '2026-10-24').rows.map((r) => r.requestNo)).toEqual(['C']);

@@ -26,6 +26,11 @@ export type MoneyRequest = {
   lateDays: number | null;
   /** เจ้าหน้าที่สรรหาของใบ (ช่องผู้รับผิดชอบ) — null = ยังไม่มี */
   owner: string | null;
+  /**
+   * เสียวันละของวันนี้ตามสัญญา (ค่าปรับ + ลดมูลค่า) จากสมุดเดียวกับ "ตามสัญญา" — หักคนแทนที่ส่งไปวันนี้ ·
+   * วันที่ไซต์ไม่ทำงาน = 0 (เจ้าของ 27 ต.ค. 2569 "เป็นไปไม่ได้ที่จะโดนปรับวันละ 2 แสน" — เดิมคูณเต็มไม่หักคนแทน)
+   */
+  todayCost?: number;
   /** คนที่เริ่มงานในช่วง */
   filledInWindow: number;
   /** คนครบในช่วง */
@@ -82,6 +87,8 @@ export function buildHomeMoney(
     bu: string | null;
     forcedBu: boolean;
     ownerOf?: (requestNo: string) => string | null;
+    /** เสียวันละของวันนี้ต่อใบ (สมุดช่วง today..today) — ดู `MoneyRequest.todayCost` */
+    todayCostOf?: (requestNo: string) => number;
   },
 ): HomeMoneyResponse {
   const toEff = ctx.to > ctx.today ? ctx.today : ctx.to;
@@ -122,6 +129,7 @@ export function buildHomeMoney(
       unit: r.unit,
       position: r.position,
       place: r.place ?? null,
+      ...(ctx.todayCostOf ? { todayCost: ctx.todayCostOf(r.requestNo) } : {}),
       qty: r.qty,
       filled: r.filled,
       keyYmd: r.keyYmd,
