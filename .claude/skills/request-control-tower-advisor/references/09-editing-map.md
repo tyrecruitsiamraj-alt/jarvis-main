@@ -13870,3 +13870,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - หน้าใครออนไลน์ (`home-presence`) ยังใช้ BU หลัก
 - ตั้งที่: ตั้งค่า › ผู้ใช้งาน คอลัมน์ BU → Dropdown ติ๊กหลาย BU + "ดูทุก BU" (`UserBuPicker` · กติกา `src/lib/userBuPick.ts` · 27 ต.ค. 2569 แทนช่อง BU + ปุ่มดูเพิ่ม) · PATCH `/api/app-users` ส่ง `department_code` + `extra_department_codes` ครั้งเดียว
 - ⚠️ เทสต์ที่ mock `departmentScope.js` ต้องใส่ `codes` ในค่าที่ mock และห้ามให้โค้ดจริงพึ่ง export ใหม่จากโมดูลนี้ผ่านโมดูลอื่นที่เทสต์ mock ทั้งก้อน
+
+### กล่องเสียเงิน: ส่งคนแทนได้ตามสัญญา = ไม่โดนปรับวันนั้น (27 ต.ค. 2569)
+- ERP `st_request_p2.is_replace` (Y/N) + `replace_detail1` (เช่น "ภายใน 3 ชั่วโมงนับจากที่ได้รับแจ้ง") → `PenaltyRequestRow.replaceAccepted` / `replaceWindow` (`siamrajPenaltyLedgerSql.ts`)
+- `buildPenaltyLedger`: คนแทนหักคนที่ขาดเฉพาะใบที่ไม่ใช่ N (N = ลูกค้าไม่รับคนแทน คิดเต็ม · ว่าง = หักแบบเดิม)
+- จอ: แถวใบในกล่องเงินกางแล้วบอก "ส่งคนแทนได้ · <เงื่อนไข>" / "ลูกค้าไม่รับคนแทน"
+- ตามสัญญา = คิดจากอัตราในใบขอ (abs_customer_fine/deduct) × คน-วันที่ขาด (สูงสุดที่ลูกค้าหักได้) · ลูกค้าหักจริง = `ar_cheque_detail.fine_amount` ในใบรับเงิน

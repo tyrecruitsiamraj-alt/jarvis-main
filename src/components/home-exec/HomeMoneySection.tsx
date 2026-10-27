@@ -272,6 +272,12 @@ export default function HomeMoneySection({
                             </span>
                             <span>ขาดรวม {NUM.format(a.personDays)} คน-วัน</span>
                             {a.coveredPersonDays > 0 ? <span>คนแทนช่วย {NUM.format(a.coveredPersonDays)} คน-วัน</span> : null}
+                            {/* สัญญาส่งคนแทน (st_request_p2.is_replace · 27 ต.ค. 2569) — ส่งคนแทนได้ = วันที่มีคนแทนไม่โดนปรับ */}
+                            {r.replaceAccepted === true ? (
+                              <span>ส่งคนแทนได้{r.replaceWindow ? ` · ${r.replaceWindow}` : ''}</span>
+                            ) : r.replaceAccepted === false ? (
+                              <span>ลูกค้าไม่รับคนแทน</span>
+                            ) : null}
                             <span>หาได้ใน {r.speedDays == null ? '—' : `${NUM.format(r.speedDays)} วัน`}</span>
                             <span>ช้ากว่าที่ต้องการ {r.lateDays == null ? '—' : `${NUM.format(r.lateDays)} วัน`}</span>
                           </span>

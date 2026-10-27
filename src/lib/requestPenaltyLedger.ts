@@ -19,6 +19,8 @@
  *
  * ส่งคนแทน (`replacements` ไซต์ → [วัน, คน] ชุดเดียวกับแท็บใบขอ): คนแทนในวันนั้นที่ไซต์เดียวกันหักคนที่ขาด
  *   แบ่งให้ใบที่ต้องการก่อนก่อน (แบบเดียวกับ `allocateReplacements`) · แยกนับต่อจุดเริ่มนับ
+ *   🔴 เฉพาะใบที่สัญญาให้ส่งคนแทนได้ (`st_request_p2.is_replace` = Y · เจ้าของ 27 ต.ค. 2569 "ส่งคนแทน = ไม่โดนปรับ")
+ *      ใบที่ลูกค้าไม่รับคนแทน (N) = คนแทนไม่ช่วย ยังคิดเต็ม · ไม่รู้ (ว่าง) = หักแบบเดิม
  * ไฟล์นี้ pure — เทสต์ `src/lib/requestPenaltyLedger.test.ts`
  */
 import { parseWorkWeekdays } from './siteWorkdays';
@@ -46,6 +48,10 @@ export type PenaltyRequestRow = {
    * ใบแจ้งเข้าที่มีวันเริ่มงานเกินเลขนี้ = ตัดทิ้ง · ขาดวันที่ = ถือว่าเริ่มวันคีย์ใบขอ (เลขเหลือหาต้องตรงกล่องงาน — 24 ต.ค. 2569)
    */
   informedCap?: number | null;
+  /** สัญญาให้ส่งคนแทนได้ไหม (`is_replace`) — false = คนแทนไม่หักค่าปรับ · null/ไม่ส่ง = ไม่รู้ (หักแบบเดิม) */
+  replaceAccepted?: boolean | null;
+  /** เงื่อนไขส่งคนแทนในสัญญา (`replace_detail1`) เช่น "ภายใน 3 ชั่วโมงนับจากที่ได้รับแจ้ง" */
+  replaceWindow?: string | null;
 };
 
 export type PenaltyInform = {
@@ -160,7 +166,7 @@ export function buildPenaltyLedger(
           if (missing <= 0) continue;
           const a = amount[mode];
           const rk = `${r.site}|${d}`;
-          const rep = repOf.get(rk);
+          const rep = r.replaceAccepted === false ? undefined : repOf.get(rk);
           if (rep) {
             const cover = Math.min(missing, rep - (used[mode].get(rk) ?? 0));
             if (cover > 0) {

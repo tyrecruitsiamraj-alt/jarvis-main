@@ -108,6 +108,15 @@ describe('สมุดค่าปรับใบขอ (เจ้าของ 2
     expect(a.amount.need.personDays).toBe(1); // 5 ต.ค.
   });
 
+  it('สัญญาไม่รับคนแทน (is_replace = N) = คนแทนไม่หักค่าปรับ · รับ/ไม่รู้ = หักเหมือนเดิม (27 ต.ค. 2569)', () => {
+    const rep = { '69LBDL0001': [['2026-10-05', 1]] as Array<[string, number]> };
+    const one = (replaceAccepted: boolean | null) =>
+      buildPenaltyLedger([row({ qty: 1, needYmd: '2026-10-05', keyYmd: '2026-10-05', replaceAccepted })], [], '2026-10-05', WIN, rep).requests[0].amount.need;
+    expect(one(true)).toMatchObject({ personDays: 0, coveredPersonDays: 1, fine: 0 });
+    expect(one(null)).toMatchObject({ personDays: 0, coveredPersonDays: 1 });
+    expect(one(false)).toMatchObject({ personDays: 1, coveredPersonDays: 0, fine: 100, deduct: 50 });
+  });
+
   it('🔴 ยกมา + ขอใหม่ − หาได้ − ยกเลิก = เหลือ ลงตัวทุกกรณี (เจ้าของ "บวกลบกันแล้วต้องเท่ากัน")', () => {
     const rows = [
       row({ requestNo: 'old-open', qty: 3, keyYmd: '2026-09-01', needYmd: '2026-09-01' }),

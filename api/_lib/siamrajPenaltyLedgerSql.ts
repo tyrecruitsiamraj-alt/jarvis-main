@@ -61,6 +61,8 @@ type ReqSqlRow = {
   fine: number | null;
   deduct: number | null;
   eff_informed: number | null;
+  is_replace: string | null;
+  replace_window: string | null;
 };
 type InformSqlRow = { request_no: string; start_ymd: string | null; record_ymd: string | null; qty: number | null };
 type FineSqlRow = { ymd: string; site_code: string; amount: number; receipts: number };
@@ -101,6 +103,9 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
               -- เหตุผลที่หยุดใบ (st_ms_stop_by) — กดกล่องยกเลิกแล้วแยกเหตุผล (เจ้าของ 25 ต.ค. 2569)
               (SELECT TOP 1 RTRIM(z.stop_by_name) FROM st_ms_stop_by z WHERE z.stop_by_code = A.stop_code) AS stop_reason,
               B.work_date,
+              -- สัญญาให้ส่งคนแทนได้ไหม + ภายในกี่ชั่วโมง (27 ต.ค. 2569 · ส่งคนแทน = ไม่โดนปรับ)
+              RTRIM(ISNULL(B.is_replace, '')) AS is_replace,
+              NULLIF(LTRIM(RTRIM(B.replace_detail1)), '') AS replace_window,
               P.abs_customer_fine AS fine,
               P.abs_customer_deduct AS deduct,
               ${effectiveInformQtySql('A')} AS eff_informed
@@ -156,6 +161,8 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
       workDays: r.work_date,
       finePerDay: Number(r.fine) || 0,
       deductPerDay: Number(r.deduct) || 0,
+      replaceAccepted: r.is_replace === 'Y' ? true : r.is_replace === 'N' ? false : null,
+      replaceWindow: r.replace_window,
       informedCap: r.eff_informed == null ? null : Number(r.eff_informed) || 0,
     });
   }

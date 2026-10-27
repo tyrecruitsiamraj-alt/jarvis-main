@@ -30,6 +30,10 @@ export type MoneyRequest = {
   closedInWindow: boolean;
   /** เหตุผลที่หยุดใบจาก ERP · null = ไม่ได้กรอก */
   stopReason: string | null;
+  /** สัญญาให้ส่งคนแทนได้ไหม (true = ส่งคนแทนแล้วไม่โดนปรับวันนั้น · false = ไม่รับคนแทน · null = ไม่รู้) */
+  replaceAccepted: boolean | null;
+  /** เงื่อนไขส่งคนแทน เช่น "ภายใน 3 ชั่วโมงนับจากที่ได้รับแจ้ง" */
+  replaceWindow: string | null;
   /** นับอยู่ในนาฬิกา "หาคนครบเฉลี่ย" (หาครบ และวันหาครบอยู่ในช่วง) — กดกล่องแล้วรายใบเท่าเลข n */
   clocked: boolean;
   /** บทบาทในสมการของช่วง (กดกล่องสมการแล้วได้รายใบชุดนี้) — null = ไม่เกี่ยวกับช่วง */
@@ -130,6 +134,8 @@ export function buildHomeMoney(
       filledInWindow,
       closedInWindow,
       stopReason: r.stopReason ?? null,
+      replaceAccepted: r.replaceAccepted ?? null,
+      replaceWindow: r.replaceWindow ?? null,
       clocked,
       flow: relevant ? flowRole : null,
       amount: r.amount,
