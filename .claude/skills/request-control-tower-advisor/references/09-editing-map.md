@@ -13899,3 +13899,4 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `overdueOf` (`src/lib/homeExec.ts`) = ทุกใบที่เปิดและเลยวันที่ต้องการ (รวมใบค้างเกิน 90 วัน) · กล่องเสียเงินโชว์ "ใบที่เลยวัน · เสียวันละ" จากตัวนี้ และ "ในนั้นค้างเกิน 90 วัน" จาก `staleOf` · ตารางงานของเจ้าหน้าที่มีแถว "รวม" — เทสต์คุมว่าเท่ากัน
 - สถานที่ทำงาน = ERP `st_request_p2.work_place1` → `place` (`siamrajPenaltyLedgerSql.ts` → `PenaltyRequestRow` → `MoneyRequest` → `UrgentRow`) · โชว์ในการ์ดต้องรีบ + ป๊อปรายใบ
 - ส่งคนแทนจาก iRecruit: เบอร์เจ้าหน้าที่ = คนแก้ใบล่าสุด (`ir_job_header.user_update`) ถ้ามี · ไม่มี = คนเพิ่มใบ · สายเดิมเติมเฉพาะที่ยังว่าง (`irecruitReplaceSync.ts`)
+- นำเข้า Excel อ่านอายุ (27 ต.ค. 2569): `normalizeImportAge` (`src/lib/applicantImport.ts`) รับ "30 ปี" · เลขไทย · เซลล์รูปแบบวันที่ (ใช้ค่าดิบจาก `readSheetRows().raw` ใน `job-applications-import.ts`) · วันเกิด/ปีเกิดยังเตือน

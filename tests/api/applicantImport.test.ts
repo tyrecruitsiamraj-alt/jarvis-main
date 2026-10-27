@@ -15,6 +15,7 @@ import {
   importValuesSheet,
   mapImportHeader,
   markBlockedPhones,
+  normalizeImportAge,
   normalizeImportGender,
   normalizeImportPhone,
   planImportRows,
@@ -147,5 +148,28 @@ describe('แผนต่อแถว', () => {
       { row: 3, name: 'สมหญิง ใจดี', phone: '0812345678', ok: false, reason: 'เบอร์ซ้ำกับแถว 2 ในไฟล์' },
       { row: 4, name: 'สมชาย ใจดี', phone: '0822222222', ok: false, reason: 'สมัครเข้ามาแล้วภายใน 14 วัน (ได้ตั้งแต่ 9/10/2569)' },
     ]);
+  });
+});
+
+describe('อายุจาก Excel (เจ้าของ 27 ต.ค. 2569 "เอาเข้า excel มันไม่อ่านอายุ")', () => {
+  const base = { first_name: 'สมชาย', last_name: 'ใจดี', phone: '0812345678', gender: 'ชาย' };
+  const ageOf = (age: string, raw?: unknown) => {
+    const cells = row({ ...base, age });
+    const rawCells = [...cells];
+    rawCells[index.age!] = raw ?? age;
+    const [p] = planImportRows([cells], index, {}, [rawCells]);
+    return p.ok ? p.value.age : p.reason;
+  };
+  it('"30 ปี" · "อายุ 45 ปี" · เลขไทย · เซลล์รูปแบบวันที่ (โชว์ 30/1/1900 ค่าดิบ 30) อ่านได้ทั้งหมด', () => {
+    expect(ageOf('30 ปี')).toBe(30);
+    expect(ageOf('อายุ 45 ปี')).toBe(45);
+    expect(ageOf('๓๐')).toBe(30);
+    expect(ageOf('30/1/1900', 30)).toBe(30);
+    expect(ageOf('30')).toBe(30);
+  });
+  it('วันเกิด/ปีเกิดในช่องอายุ ยังเตือนเหมือนเดิม', () => {
+    expect(ageOf('1/5/1990')).toBe('อายุต้องอยู่ระหว่าง 15–80 ปี');
+    expect(ageOf('1990')).toBe('อายุต้องอยู่ระหว่าง 15–80 ปี');
+    expect(normalizeImportAge('abc')).toBe('abc');
   });
 });

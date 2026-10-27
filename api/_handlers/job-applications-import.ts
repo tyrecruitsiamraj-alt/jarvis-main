@@ -88,12 +88,16 @@ function buildDuplicatesBase64(list: readonly ImportDuplicate[]): string {
   return XLSX.write(wb, { type: 'base64', bookType: 'xlsx' }) as string;
 }
 
-function readSheetRows(buffer: Buffer): unknown[][] {
+/** `rows` = ค่าที่โชว์บนเซลล์ · `raw` = ค่าดิบ (อายุในเซลล์รูปแบบวันที่ · 27 ต.ค. 2569) — แถวตรงกันทีละแถว */
+function readSheetRows(buffer: Buffer): { rows: unknown[][]; raw: unknown[][] } {
   const wb = XLSX.read(buffer, { type: 'buffer' });
   const name = wb.SheetNames.includes(IMPORT_SHEET_NAME) ? IMPORT_SHEET_NAME : wb.SheetNames[0];
   const sheet = name ? wb.Sheets[name] : undefined;
-  if (!sheet) return [];
-  return XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: '', blankrows: false });
+  if (!sheet) return { rows: [], raw: [] };
+  return {
+    rows: XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: '', blankrows: false }),
+    raw: XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: '', blankrows: false }),
+  };
 }
 
 /**
@@ -142,8 +146,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (!entryDept.ok) return sendError(res, 403, 'Forbidden', NO_DEPARTMENT_MESSAGE);
 
     let rows: unknown[][];
+    let rawRows: unknown[][];
     try {
-      rows = readSheetRows(Buffer.from(fileBase64, 'base64'));
+      ({ rows, raw: rawRows } = readSheetRows(Buffer.from(fileBase64, 'base64')));
     } catch {
       return sendError(res, 400, 'Bad request', 'อ่านไฟล์ไม่ได้ — ใช้ไฟล์ Excel (.xlsx) จากปุ่มดาวน์โหลดไฟล์ตัวอย่าง');
     }
@@ -177,7 +182,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       job_title: jobId ? text(raw?.job_title) : null,
       unit_name: jobId ? (text(raw?.unit_name) ?? text(job?.unit_name)) : null,
     };
-    let plans: ImportRowPlan[] = planImportRows(data, index, shared);
+    let plans: ImportRowPlan[] = planImportRows(data, index, shared, rawRows.slice(1));
 
     // เบอร์ที่สมัครเข้ามาภายใน 14 วัน — โชว์ในตัวอย่างว่าจะข้าม พร้อมวันที่นำเข้าได้
     const phones = [...new Set(plans.flatMap((p) => ('value' in p ? [p.value.phone] : [])))];

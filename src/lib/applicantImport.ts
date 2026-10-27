@@ -106,6 +106,22 @@ export function normalizeImportGender(v: unknown): '' | 'male' | 'female' {
   return '';
 }
 
+/**
+ * อายุจากเซลล์ Excel (เจ้าของ 27 ต.ค. 2569 "เอาเข้า excel มันไม่อ่านอายุ") — 3 แบบที่เคยตกทั้งแถว:
+ * "30 ปี" / "อายุ 30" · เลขไทย "๓๐" · เซลล์จัดรูปแบบเป็นวันที่ (พิมพ์ 30 แล้วโชว์ 30/1/1900 → ใช้ค่าดิบ 30)
+ * ไม่ใช่ตัวเลขเดียว (เช่นวันเกิด 1/5/1990) = ส่งตามเดิม ให้ตัวตรวจกลางเตือน
+ */
+export function normalizeImportAge(v: unknown, raw?: unknown): unknown {
+  const t = String(v ?? '')
+    .replace(/[๐-๙]/g, (d) => String(d.charCodeAt(0) - 0x0e50))
+    .trim();
+  if (/^\d+(\.\d+)?$/.test(t)) return t;
+  const m = /^(?:อายุ)?\s*(\d+(?:\.\d+)?)\s*(?:ปี)?$/.exec(t);
+  if (m) return m[1];
+  if (typeof raw === 'number' && Number.isFinite(raw)) return String(raw);
+  return v;
+}
+
 export function splitImportLicenses(v: unknown): string[] {
   return String(v ?? '')
     .split(/[,\n;]/)
@@ -140,6 +156,8 @@ export function planImportRows(
   rows: ReadonlyArray<readonly unknown[]>,
   index: Partial<Record<ImportColumnKey, number>>,
   shared: ImportShared = {},
+  /** ค่าดิบของเซลล์ (ไม่จัดรูปแบบ) แถวเดียวกับ `rows` — ใช้กับอายุที่อยู่ในเซลล์รูปแบบวันที่ */
+  rawRows: ReadonlyArray<readonly unknown[]> = [],
 ): ImportRowPlan[] {
   const out: ImportRowPlan[] = [];
   const seen = new Map<string, number>();
@@ -163,7 +181,7 @@ export function planImportRows(
       first_name: cell(cells, index.first_name),
       last_name: cell(cells, index.last_name),
       phone,
-      age: cell(cells, index.age),
+      age: normalizeImportAge(cell(cells, index.age), cell(rawRows[i] ?? [], index.age)),
       gender: normalizeImportGender(cell(cells, index.gender)),
       line_id: cell(cells, index.line_id),
       province: cell(cells, index.province),
