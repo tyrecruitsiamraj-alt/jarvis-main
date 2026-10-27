@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { DASH } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
-import { openJobsByProvince } from '@/lib/openJobsByProvince';
+import { jobBuOf, openJobBuCounts, openJobsByProvince } from '@/lib/openJobsByProvince';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import type { JobRequest } from '@/types';
 import { OverviewCard } from './RecruitOverviewParts';
 
@@ -18,7 +19,11 @@ const TYPES_SHOWN = 3;
  */
 export default function ProvinceJobsCard({ jobs }: { jobs: readonly JobRequest[] | null }) {
   const [all, setAll] = useState(false);
-  const rows = useMemo(() => (jobs ? openJobsByProvince(jobs) : []), [jobs]);
+  /** แยก BU (เจ้าของ 27 ต.ค. 2569 "แยก Bu ดูได้ไหม") — '' = ทุก BU */
+  const [bu, setBu] = useState('');
+  const buCounts = useMemo(() => (jobs ? openJobBuCounts(jobs) : []), [jobs]);
+  const picked = useMemo(() => (jobs ? (bu ? jobs.filter((j) => jobBuOf(j) === bu) : jobs) : null), [jobs, bu]);
+  const rows = useMemo(() => (picked ? openJobsByProvince(picked) : []), [picked]);
   const total = useMemo(
     () => rows.reduce((a, r) => ({ requests: a.requests + r.requests, positions: a.positions + r.positions }), { requests: 0, positions: 0 }),
     [rows],
@@ -27,6 +32,28 @@ export default function ProvinceJobsCard({ jobs }: { jobs: readonly JobRequest[]
 
   return (
     <OverviewCard icon={MapPin} title="งานตามจังหวัด" sub="ใบขอที่ยังเปิด ณ วันนี้">
+      {buCounts.length > 1 ? (
+        <ToggleGroup
+          type="single"
+          value={bu || 'all'}
+          onValueChange={(v) => {
+            setBu(!v || v === 'all' ? '' : v);
+            setAll(false);
+          }}
+          className="flex-wrap justify-start"
+          aria-label="BU"
+          data-testid="province-jobs-bu"
+        >
+          <ToggleGroupItem value="all" size="sm" className="tabular-nums">
+            ทุก BU {fmt(jobs?.length ?? 0)}
+          </ToggleGroupItem>
+          {buCounts.map((b) => (
+            <ToggleGroupItem key={b.bu} value={b.bu} size="sm" className="tabular-nums">
+              {b.bu} {fmt(b.requests)}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      ) : null}
       <div className="overflow-x-auto" data-testid="province-jobs">
         <Table>
           <TableHeader>

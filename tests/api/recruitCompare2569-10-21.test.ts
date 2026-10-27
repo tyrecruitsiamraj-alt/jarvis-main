@@ -39,10 +39,10 @@ describe('compareRowsOf', () => {
     expect(apps.map((r) => r.label)).toEqual(['กรอกเข้ามา', 'AI โทรแล้ว', 'ติดต่อได้', 'สนใจ', 'ไม่สนใจ', 'รอโทร']);
   });
 
-  it('กดชื่อช่วงแล้วเลขในกล่องเปลี่ยนตาม (27 ต.ค. 2569 "เลือกวันที่ 26 แล้วไม่เปลี่ยนตาม")', () => {
+  it('การ์ดไม่มีปุ่มช่วงของตัวเอง — ใช้ตัวเลือกช่วงเวลาด้านบน (27 ต.ค. 2569 ค่ำ "เอาออกให้ไป Filter ตรง เลือกช่วงเวลา")', () => {
     const src = read('src/components/dashboard-trends/TrendLinesCard.tsx');
-    expect(src).toContain("const shown = period === 'cur' ? r.cur : r.prev;");
-    expect(src).toContain('{shown === null ? \'—\' : fmt(shown)}');
+    expect(src).not.toContain('data-testid="trend-periods"');
+    expect(src).toContain('const shown = r.cur;');
   });
 });
 
@@ -85,7 +85,8 @@ describe('หน้าจอ', () => {
     for (const t of ['requests', 'apps', 'staff', 'appt']) expect(src).toContain(`{compareCard('${t}')}`);
     // 21 ต.ค. 2569 ค่ำ: แท่งคู่ → กราฟเส้นรายวัน (เจ้าของ "อยากให้มันวิ่งแบบอันนี้")
     const card = read('src/components/dashboard-trends/TrendLinesCard.tsx');
-    expect(card).toContain('data-testid={`trend-period-${p}`}');
+    // ปุ่มช่วงในการ์ดถอดแล้ว (27 ต.ค. 2569 ค่ำ) — เลือกช่วงที่ตัวเลือกด้านบนของหน้า
+    expect(card).not.toContain('trend-period-');
     expect(card).toContain('data-testid="trend-chart"');
   });
 });

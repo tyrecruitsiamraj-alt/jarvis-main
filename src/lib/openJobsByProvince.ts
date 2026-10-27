@@ -9,6 +9,26 @@ import { boardProvinceOf } from '@/lib/boardFilters';
 import { UNSPECIFIED } from '@/lib/facetEngine';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { publicJobTitle } from '@/lib/publicJobTitle';
+import { buFromSiteCode } from '@/lib/homeBu';
+import { normalizeTrendBu } from '@/lib/trends/bu';
+
+/**
+ * BU ของใบขอ (เจ้าของ 27 ต.ค. 2569 "แยก Bu ดูได้ไหม") — แผนกของใบก่อน ไม่มีค่อยแปลจากรหัสไซต์ ·
+ * รหัสชุดเดียวกับตัวเลือก BU ทั้งระบบ (`normalizeTrendBu`: LML→LM ฯลฯ) · อ่านไม่ออก = null
+ */
+export function jobBuOf(job: Pick<JobRequest, 'department_code' | 'site_code'>): string | null {
+  return normalizeTrendBu((job.department_code ?? '').trim() || buFromSiteCode(job.site_code));
+}
+
+/** BU ที่มีใบขอเปิด + จำนวนใบ (ปุ่มเลือก BU ของการ์ด) · เรียงใบมากสุดก่อน */
+export function openJobBuCounts(jobs: readonly JobRequest[]): Array<{ bu: string; requests: number }> {
+  const out = new Map<string, number>();
+  for (const j of jobs) {
+    const bu = jobBuOf(j);
+    if (bu) out.set(bu, (out.get(bu) ?? 0) + 1);
+  }
+  return [...out.entries()].map(([bu, requests]) => ({ bu, requests })).sort((a, b) => b.requests - a.requests || a.bu.localeCompare(b.bu));
+}
 
 export const NO_PROVINCE = 'ไม่ระบุจังหวัด';
 

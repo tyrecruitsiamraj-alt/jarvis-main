@@ -1,7 +1,6 @@
 import React from 'react';
 import { ArrowDown, ArrowUp, LineChart as LineIcon } from 'lucide-react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { CHART, chartDayLabel, DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
@@ -25,18 +24,20 @@ const toneOf = (key: string, i: number): ToneKey => KEY_TONE[key] ?? LINE_TONES[
  */
 export default function TrendLinesCard({
   rows,
-  curLabel,
   prevLabel,
   note,
   seriesOf,
 }: {
   rows: readonly CompareRow[];
-  curLabel: string;
+  /** ป้ายช่วงที่เลือก — ไม่ได้ใช้บนการ์ดแล้ว (เลือกช่วงที่ตัวเลือกด้านบน) คงไว้ให้หน้าแม่ส่งเหมือนเดิม */
+  curLabel?: string;
   prevLabel: string;
   note?: string | null;
   seriesOf: (key: string, period: ComparePeriod) => Array<{ day: string; n: number }>;
 }) {
-  const [period, setPeriod] = React.useState<ComparePeriod>('cur');
+  // ช่วงที่ดู = ตัวเลือกช่วงเวลาด้านบนของหน้า (เจ้าของ 27 ต.ค. 2569 ค่ำ "เอาออกให้ไป Filter ตรง เลือกช่วงเวลา")
+  // ⇒ การ์ดนี้แสดงช่วงที่เลือกเสมอ · เลขช่วงก่อนอยู่บรรทัดล่างของกล่องไว้เทียบ
+  const period: ComparePeriod = 'cur';
   const chart = React.useMemo(() => {
     const byDay = new Map<string, Record<string, number | string>>();
     for (const r of rows) {
@@ -56,8 +57,7 @@ export default function TrendLinesCard({
       <div className="flex flex-wrap gap-2" data-testid="trend-totals">
         {rows.map((r, i) => {
           const d = deltaOf(r.cur, r.prev);
-          // กดชื่อช่วงแล้วเลขในกล่องเปลี่ยนตาม (เจ้าของ 27 ต.ค. 2569 "เลือกวันที่ 26 แล้วไม่เปลี่ยนตาม")
-          const shown = period === 'cur' ? r.cur : r.prev;
+          const shown = r.cur;
           return (
             <div key={r.key} className="flex min-w-0 flex-col gap-0.5 rounded-xl border border-border px-3 py-2" data-testid={`trend-total-${r.key}`}>
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -66,7 +66,7 @@ export default function TrendLinesCard({
               </span>
               <span className="flex items-baseline gap-2">
                 <span className="text-lg font-medium tabular-nums text-foreground">{shown === null ? '—' : fmt(shown)}</span>
-                {period === 'cur' ? (
+                {(
                 <span
                   className={cn(
                     'flex items-center gap-0.5 text-xs font-medium tabular-nums',
@@ -82,32 +82,14 @@ export default function TrendLinesCard({
                         ? 'เท่าเดิม'
                         : 'เทียบไม่ได้'}
                 </span>
-                ) : null}
+                )}
               </span>
               <span className={cn('text-xs tabular-nums', DASH.sub)}>
-                {period === 'cur'
-                  ? `${prevLabel} ${r.prev === null ? '—' : fmt(r.prev)}`
-                  : `${curLabel} ${r.cur === null ? '—' : fmt(r.cur)}`}
+                {`${prevLabel} ${r.prev === null ? '—' : fmt(r.prev)}`}
               </span>
             </div>
           );
         })}
-      </div>
-      {/* กดชื่อช่วง = กราฟเป็นวันของช่วงนั้น */}
-      <div className="flex flex-wrap items-center gap-2" data-testid="trend-periods">
-        {(['prev', 'cur'] as const).map((p) => (
-          <Button
-            key={p}
-            type="button"
-            size="xs"
-            variant={period === p ? 'secondary' : 'ghost'}
-            aria-pressed={period === p}
-            onClick={() => setPeriod(p)}
-            data-testid={`trend-period-${p}`}
-          >
-            {p === 'cur' ? curLabel : prevLabel}
-          </Button>
-        ))}
       </div>
       <div className={cn('h-56', DASH.sub)} data-testid="trend-chart">
         <ResponsiveContainer width="100%" height="100%">

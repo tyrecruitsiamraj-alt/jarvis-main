@@ -5,7 +5,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { NO_PROVINCE, openJobsByProvince } from '@/lib/openJobsByProvince';
+import { jobBuOf, NO_PROVINCE, openJobBuCounts, openJobsByProvince } from '@/lib/openJobsByProvince';
 import type { JobRequest } from '@/types';
 
 const job = (o: Partial<JobRequest>) => ({ id: Math.random().toString(36), position_units: 1, ...o }) as JobRequest;
@@ -30,5 +30,13 @@ describe('openJobsByProvince', () => {
   it('หน้าภาพรวมได้ใบขอเปิดชุดเดียวกับกล่องงาน', () => {
     expect(readFileSync('src/pages/jobs/StaffJobBoardPage.tsx', 'utf8')).toContain('openJobs={loading ? null : jobs}');
     expect(readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8')).toContain('<ProvinceJobsCard jobs={openJobs} />');
+  });
+
+  it('แยก BU: แผนกของใบก่อน ไม่มีค่อยแปลจากรหัสไซต์ · รหัสชุดเดียวกับทั้งระบบ (LML→LM) (27 ต.ค. 2569)', () => {
+    expect(jobBuOf({ department_code: 'LBD', site_code: '67LMLL0001' })).toBe('LBD');
+    expect(jobBuOf({ site_code: '66LML0011' })).toBe('LM');
+    expect(jobBuOf({ site_code: 'x' })).toBeNull();
+    const counts = openJobBuCounts([job({ department_code: 'LBD' }), job({ department_code: 'LBD' }), job({ site_code: '67LBAL0019' })]);
+    expect(counts).toEqual([{ bu: 'LBD', requests: 2 }, { bu: 'LBA', requests: 1 }]);
   });
 });
