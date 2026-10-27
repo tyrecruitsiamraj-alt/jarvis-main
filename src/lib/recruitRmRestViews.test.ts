@@ -66,3 +66,12 @@ describe('ทำไมยังไม่ส่ง AI (27 ต.ค. 2569)', () => 
     ]);
   });
 });
+
+describe('โทรครบแล้ว (27 ต.ค. 2569 "บอกหน่อยว่าโทรครบ 3 ครั้งแล้ว")', () => {
+  it('คิวปิดเพราะไม่มีคนรับ = บอกจำนวนครั้ง · อย่างอื่นไม่บอก', async () => {
+    const { aiCallsDoneText } = await import('@/lib/applicantAiAnswerText');
+    expect(aiCallsDoneText(row({ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'busy', last_call_attempts: 3 }))).toBe('โทรครบ 3 ครั้งแล้ว');
+    expect(aiCallsDoneText(row({ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'wrong_person', last_call_attempts: 1 }))).toBeNull();
+    expect(aiCallsDoneText(row({ last_call_status: 'pending', last_call_followup: 'retry_scheduled', last_call_attempts: 2 }))).toBeNull();
+  });
+});

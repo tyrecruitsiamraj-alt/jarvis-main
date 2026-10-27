@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowDown, ArrowUp, LineChart as LineIcon } from 'lucide-react';
+import { LineChart as LineIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { cn } from '@/lib/utils';
@@ -11,7 +11,7 @@ import { OverviewCard } from './RecruitOverviewParts';
 export type ComparePeriod = 'cur' | 'prev';
 
 /** สีเส้นตามลำดับแถว — จากโทเค็น (`TONE.*.hex`) ที่เดียว */
-const LINE_TONES: ToneKey[] = ['info', 'success', 'warn', 'violet'];
+const LINE_TONES: ToneKey[] = ['info', 'success', 'warn', 'violet', 'danger', 'teal'];
 /** ตัวชี้วัดที่ต่อท้ายแท็บกรอกเข้ามา (27 ต.ค. 2569) — สีไม่ซ้ำเส้นแรก · ไม่สนใจแดง */
 const KEY_TONE: Record<string, ToneKey> = { aiSaidYes: 'teal', aiSaidNo: 'danger', aiQueued: 'violet' };
 const toneOf = (key: string, i: number): ToneKey => KEY_TONE[key] ?? LINE_TONES[i % LINE_TONES.length];
@@ -95,37 +95,34 @@ export default function TrendLinesCard({
           const shown = r.cur;
           return (
             <Box key={r.key} k={r.key}>
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="h-0.5 w-4 rounded-full" style={{ background: TONE[toneOf(r.key, i)].hex }} aria-hidden />
-                {r.label}
-              </span>
+              {/* 27 ต.ค. 2569 เจ้าของ: ถอดขีดสีหน้าป้าย · ถอดลูกศร (บอกเป็นคำ เพิ่ม/ลด) · เลขช่วงก่อนไปไว้มุมขวาของกราฟที่เดียว */}
+              <span className="text-xs text-muted-foreground">{r.label}</span>
               <span className="flex items-baseline gap-2">
                 <span className="text-lg font-medium tabular-nums text-foreground">{shown === null ? '—' : fmt(shown)}</span>
-                {(
                 <span
                   className={cn(
-                    'flex items-center gap-0.5 text-xs font-medium tabular-nums',
+                    'text-xs font-medium tabular-nums',
                     d.kind === 'up' || d.kind === 'new' ? TONE.success.value : d.kind === 'down' ? TONE.danger.value : 'text-muted-foreground',
                   )}
                 >
-                  {d.kind === 'up' ? <ArrowUp className="size-3" aria-hidden /> : d.kind === 'down' ? <ArrowDown className="size-3" aria-hidden /> : null}
-                  {d.kind === 'up' || d.kind === 'down'
-                    ? `${d.pct.toLocaleString('th-TH')}%`
-                    : d.kind === 'new'
-                      ? 'ใหม่'
-                      : d.kind === 'same'
-                        ? 'เท่าเดิม'
-                        : 'เทียบไม่ได้'}
+                  {d.kind === 'up'
+                    ? `เพิ่ม ${d.pct.toLocaleString('th-TH')}%`
+                    : d.kind === 'down'
+                      ? `ลด ${d.pct.toLocaleString('th-TH')}%`
+                      : d.kind === 'new'
+                        ? 'ใหม่'
+                        : d.kind === 'same'
+                          ? 'เท่าเดิม'
+                          : 'เทียบไม่ได้'}
                 </span>
-                )}
-              </span>
-              <span className={cn('text-xs tabular-nums', DASH.sub)}>
-                {`${prevLabel} ${r.prev === null ? '—' : fmt(r.prev)}`}
               </span>
             </Box>
           );
         })}
       </div>
+      <p className={cn('text-right text-xs tabular-nums', DASH.sub)} data-testid="trend-prev">
+        เทียบ {prevLabel}
+      </p>
       <div className={cn('h-56', DASH.sub)} data-testid="trend-chart">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chart} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>

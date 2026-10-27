@@ -63,7 +63,7 @@ export function RatioBar({ pct, tone = 'primary' }: { pct: number | null; tone?:
 
 /** กล่องหนึ่งส่วนของหน้า — ไอคอน · หัวเรื่อง · บรรทัดรอง · ปุ่มฝั่งขวา */
 export function OverviewCard({
-  icon: Icon,
+  icon: _icon,
   title,
   sub,
   badge,
@@ -83,9 +83,7 @@ export function OverviewCard({
     <Card className={cn('flex min-w-0 flex-col gap-3 rounded-2xl p-3 sm:p-4', className)}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-            <Icon className="size-4" aria-hidden />
-          </span>
+          {/* ไอคอนหัวการ์ดถอดแล้ว (เจ้าของ 27 ต.ค. 2569 "พวกอิโมจิเอาออกด้วย") — `icon` คงไว้ให้หน้าที่เรียกไม่ต้องแก้ */}
           <div className="min-w-0">
             <h3 className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
               {title}

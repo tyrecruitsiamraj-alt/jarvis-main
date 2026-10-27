@@ -29,6 +29,18 @@ export function notSentReasonOf(r: PublicApplication): string {
 
 export const AI_NOT_SENT_TEXT = 'ยังไม่ได้ส่งให้ AI';
 
+/**
+ * AI โทรครบแล้วไม่มีใครรับ (คิวปิด ส่งให้คน) → "โทรครบ N ครั้งแล้ว" (เจ้าของ 27 ต.ค. 2569 "บอกหน่อยว่าโทรครบ 3 ครั้งแล้ว")
+ * ระบบไม่โทรเองอีก · กดส่ง AI โทรเองได้ · null = ไม่ใช่แถวแบบนี้
+ */
+const NO_PICKUP_OUTCOMES = new Set(['no_answer', 'busy', 'unresponsive', 'failed']);
+export function aiCallsDoneText(r: PublicApplication): string | null {
+  const n = Math.trunc(Number(r.last_call_attempts) || 0);
+  if (r.last_call_status !== 'failed' || (r.last_call_followup ?? '').trim() !== 'needs_human' || n < 1) return null;
+  if (!NO_PICKUP_OUTCOMES.has((r.last_call_outcome ?? '').trim())) return null;
+  return `โทรครบ ${n} ครั้งแล้ว`;
+}
+
 export function aiAnswerTextOf(r: PublicApplication, now: number = Date.now()): AiAnswerText {
   const queue = aiQueueStatusOf(r, now);
   if (queue && queue.kind !== 'waiting') return { kind: 'queue', text: queue.label, queue };

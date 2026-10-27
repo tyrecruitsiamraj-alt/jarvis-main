@@ -38,7 +38,7 @@ import { greetingHeardText } from '@/lib/greetingCall';
 import { INTEREST_MICRO_TONE } from '@/lib/trends/lumosPipeline';
 import { FOLLOW_STATUS_TONE, isFollowCallStatus } from '@/lib/followApi';
 import { aiQueueStatusOf, type AiQueueStatus } from '@/lib/applicantAiQueueStatus';
-import { aiAnswerTextOf } from '@/lib/applicantAiAnswerText';
+import { aiAnswerTextOf, aiCallsDoneText } from '@/lib/applicantAiAnswerText';
 import { PROCESS_STATE_LABEL, PROCESS_STATE_TONE, PROCESS_STEP_LABEL, applicantProcessOf } from '@/lib/applicantProcess';
 import { irecruitLateHours, irecruitPullState, lateText } from '@/lib/irecruitPullStatus';
 
@@ -129,6 +129,11 @@ function AiAnswerCell({ r }: { r: PublicApplication }) {
             {formatYmdTh(toYmdBangkok(new Date(r.ai_answer.at)))}
           </span>
         ) : null}
+        {aiCallsDoneText(r) ? (
+          <span className={cn('whitespace-nowrap text-xs font-medium', TONE.warn.value)} data-testid="ai-calls-done">
+            {aiCallsDoneText(r)}
+          </span>
+        ) : null}
       </span>
     );
   }
@@ -143,8 +148,16 @@ function AiAnswerCell({ r }: { r: PublicApplication }) {
     );
   }
   if (a.kind === 'call_status' && isFollowCallStatus(r.last_call_status)) {
+    const done = aiCallsDoneText(r);
     return (
-      <span className={cn('whitespace-nowrap text-xs font-medium', TONE[FOLLOW_STATUS_TONE[r.last_call_status]].value)}>{a.text}</span>
+      <span className="flex flex-col gap-0.5">
+        <span className={cn('whitespace-nowrap text-xs font-medium', TONE[FOLLOW_STATUS_TONE[r.last_call_status]].value)}>{a.text}</span>
+        {done ? (
+          <span className={cn('whitespace-nowrap text-xs font-medium', TONE.warn.value)} data-testid="ai-calls-done">
+            {done}
+          </span>
+        ) : null}
+      </span>
     );
   }
   // ซ้ำกับ iRecruit ภายใน 14 วัน — AI ไม่โทรเอง เจ้าหน้าที่เลือกส่งเองได้ (143 · 12 ต.ค. 2569)
