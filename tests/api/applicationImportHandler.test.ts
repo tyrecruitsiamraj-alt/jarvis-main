@@ -209,7 +209,7 @@ describe('POST — ตัวอย่างก่อนบันทึก / บ�
     const { res, status, json } = mockRes();
     await handler(req('POST', { file_base64: xlsxBase64([['ชื่อ', 'นามสกุล'], ['ก', 'ข']]), dry_run: true }) as never, res as never);
     expect(status).toHaveBeenCalledWith(400);
-    expect(json.mock.calls[0][0].message).toBe('ไฟล์ไม่มีคอลัมน์: เบอร์โทร, อายุ, เพศ');
+    expect(json.mock.calls[0][0].message).toBe('ไฟล์ไม่มีคอลัมน์: เบอร์โทร, เพศ'); // อายุไม่บังคับแล้ว (27 ต.ค. 2569)
   });
 
   it('🔴 ผู้ใช้ที่ถูกล็อก BU นำเข้าได้ — ใบจำแผนกของคนนำเข้า (เห็นใบตัวเองผ่าน department_code) · 11 ต.ค. 2569', async () => {

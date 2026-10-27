@@ -22,17 +22,20 @@ export async function fillApplicationFromIntroCall(queueId: number): Promise<{ f
       province: string | null;
       created_by_name: string | null;
       transcript: unknown;
+      greeting: boolean;
     }>(
-      `select a.id::text as id, a.age, a.province, a.created_by_name, q.result->'transcript' as transcript
+      `select a.id::text as id, a.age, a.province, a.created_by_name, q.result->'transcript' as transcript,
+              (q.job_ref = $2) as greeting
          from ${QUEUE} q
          join ${APPS} a on q.person_ref = 'app-' || a.id::text
-        where q.id = $1 and q.channel = 'interview' and q.job_ref = $2`,
+        where q.id = $1 and q.channel = 'interview'`,
       [queueId, GREETING_JOB_REF],
     );
     const r = rows[0];
     if (!r || !isStaffKeyedApplication(r.created_by_name)) return { filled: false };
     const needAge = r.age == null;
-    const needProvince = !r.province?.trim();
+    // สายตามใบขอ (นำเข้า Excel ไม่มีอายุ · 27 ต.ค. 2569 "ให้ Ai ถามมา") เติมแค่อายุ — บทใบขอไม่ได้ถามจังหวัด
+    const needProvince = r.greeting && !r.province?.trim();
     if (!needAge && !needProvince) return { filled: false };
     const heard = parseGreetingAnswers(r.transcript);
     const age = needAge ? heard.age : null;

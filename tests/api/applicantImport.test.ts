@@ -36,7 +36,7 @@ describe('ไฟล์ตัวอย่าง', () => {
       'ชื่อ *',
       'นามสกุล *',
       'เบอร์โทร *',
-      'อายุ *',
+      'อายุ',
       'เพศ *',
       'LINE ID',
       'จังหวัด',
@@ -58,7 +58,7 @@ describe('ไฟล์ตัวอย่าง', () => {
 
   it('อ่านหัวแบบทนช่องว่าง/ดอกจัน/ตัวพิมพ์ · ขาดคอลัมน์ที่ต้องมี = บอกชื่อ', () => {
     expect(mapImportHeader([' ชื่อ ', 'นามสกุล*', 'เบอร์โทร', 'อายุ', 'เพศ', 'line id']).missing).toEqual([]);
-    expect(mapImportHeader(['ชื่อ', 'นามสกุล']).missing).toEqual(['เบอร์โทร', 'อายุ', 'เพศ']);
+    expect(mapImportHeader(['ชื่อ', 'นามสกุล']).missing).toEqual(['เบอร์โทร', 'เพศ']);
   });
 });
 
@@ -166,6 +166,13 @@ describe('อายุจาก Excel (เจ้าของ 27 ต.ค. 2569 "�
     expect(ageOf('๓๐')).toBe(30);
     expect(ageOf('30/1/1900', 30)).toBe(30);
     expect(ageOf('30')).toBe(30);
+  });
+  it('ไฟล์ไม่มีอายุ/ช่องว่าง = นำเข้าได้ อายุว่าง (เจ้าของ 27 ต.ค. 2569 "ไม่บังคับ … ให้ Ai ถามมา")', () => {
+    expect(ageOf('')).toBeNull();
+    const noAge = mapImportHeader(['ชื่อ', 'นามสกุล', 'เบอร์โทร', 'เพศ']);
+    expect(noAge.missing).toEqual([]);
+    const [p] = planImportRows([['สมชาย', 'ใจดี', '0812345678', 'ชาย']], noAge.index);
+    expect(p.ok && p.value.age).toBeNull();
   });
   it('วันเกิด/ปีเกิดในช่องอายุ ยังเตือนเหมือนเดิม', () => {
     expect(ageOf('1/5/1990')).toBe('อายุต้องอยู่ระหว่าง 15–80 ปี');

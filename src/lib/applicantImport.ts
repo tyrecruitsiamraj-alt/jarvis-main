@@ -36,7 +36,8 @@ export const IMPORT_COLUMNS: ReadonlyArray<{ key: ImportColumnKey; header: strin
   { key: 'first_name', header: 'ชื่อ', required: true },
   { key: 'last_name', header: 'นามสกุล', required: true },
   { key: 'phone', header: 'เบอร์โทร', required: true },
-  { key: 'age', header: 'อายุ', required: true },
+  // ไม่บังคับ (เจ้าของ 27 ต.ค. 2569 "ไฟล์นำเข้าไม่มีเอง … ให้ Ai ถามมา") — AI ถามอายุทุกบท แล้วเติมลงใบที่ว่าง (`introCallFill.ts`)
+  { key: 'age', header: 'อายุ', required: false },
   { key: 'gender', header: 'เพศ', required: true },
   { key: 'line_id', header: 'LINE ID', required: false },
   { key: 'province', header: 'จังหวัด', required: false },
@@ -196,7 +197,7 @@ export function planImportRows(
       job_id: shared.job_id ?? null,
       job_title: shared.job_title ?? null,
       unit_name: shared.unit_name ?? null,
-    });
+    }, { ageOptional: true });
     if ('message' in parsed) return fail(parsed.message);
 
     const firstRow = seen.get(parsed.value.phone);

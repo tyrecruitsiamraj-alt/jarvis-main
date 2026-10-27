@@ -53,11 +53,20 @@ describe('เติมอายุ/จังหวัดลงใบเฉพา
 
   it('🔴 ช่องว่างทั้งคู่ = เติมอายุ 34 + ระยอง', async () => {
     dbQuery
-      .mockResolvedValueOnce({ rows: [{ id: app.id, age: null, province: null, created_by_name: 'staff@x', transcript }] })
+      .mockResolvedValueOnce({ rows: [{ id: app.id, age: null, province: null, created_by_name: 'staff@x', transcript, greeting: true }] })
       .mockResolvedValueOnce({ rows: [{ id: app.id }] });
     expect(await fillApplicationFromIntroCall(7)).toEqual({ filled: true });
     expect(dbQuery.mock.calls[1][1]).toEqual([app.id, 34, 'ระยอง']);
     expect(String(dbQuery.mock.calls[1][0])).toContain('coalesce(age, $2::int)');
+  });
+
+  it('🔴 สายตามใบขอ (นำเข้า Excel ไม่มีอายุ · 27 ต.ค. 2569) = เติมแค่อายุ ไม่แตะจังหวัด', async () => {
+    dbQuery
+      .mockResolvedValueOnce({ rows: [{ id: app.id, age: null, province: null, created_by_name: 'staff@x', transcript, greeting: false }] })
+      .mockResolvedValueOnce({ rows: [{ id: app.id }] });
+    expect(await fillApplicationFromIntroCall(7)).toEqual({ filled: true });
+    expect(dbQuery.mock.calls[1][1]).toEqual([app.id, 34, null]);
+    expect(String(dbQuery.mock.calls[0][0])).not.toContain('q.job_ref = $2`');
   });
 
   it('คนคีย์ไว้ครบแล้ว = ไม่แตะ', async () => {

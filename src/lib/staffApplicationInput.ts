@@ -49,7 +49,11 @@ const text = (v: unknown, max = 200): string | null => {
  * เบอร์โทรไว้"*) — บังคับแค่ชื่อ + เบอร์ (ช่อง NOT NULL ของตาราง) · กรอกอายุมาแต่นอกช่วง ยังเตือน (คีย์ผิด)
  * นำเข้า Excel ไม่ส่ง = กติกาเดิมครบทุกช่อง
  */
-export function parseStaffApplication(b: Record<string, unknown>, opts: { minimal?: boolean } = {}): StaffApplicationParse {
+export function parseStaffApplication(
+  b: Record<string, unknown>,
+  /** `ageOptional` = นำเข้า Excel (27 ต.ค. 2569) — ว่างได้ ให้ AI ถาม · กรอกมาผิดช่วงยังเตือน */
+  opts: { minimal?: boolean; ageOptional?: boolean } = {},
+): StaffApplicationParse {
   const minimal = opts.minimal === true;
   const firstName = str(b.first_name).trim().slice(0, 120);
   const lastName = str(b.last_name).trim().slice(0, 120);
@@ -66,7 +70,7 @@ export function parseStaffApplication(b: Record<string, unknown>, opts: { minima
   const ageNum = Number(ageRaw);
   // อายุนอกช่วงนี้แปลว่าคีย์ผิด (พิมพ์ปีเกิดลงช่องอายุเป็นอาการที่เจอบ่อย)
   const age = ageRaw && Number.isFinite(ageNum) && ageNum >= 15 && ageNum <= 80 ? Math.trunc(ageNum) : null;
-  if (age === null && (!minimal || ageRaw)) return { ok: false, message: 'อายุต้องอยู่ระหว่าง 15–80 ปี' };
+  if (age === null && (!(minimal || opts.ageOptional) || ageRaw)) return { ok: false, message: 'อายุต้องอยู่ระหว่าง 15–80 ปี' };
 
   const specific = str(b.specific_type);
   return {

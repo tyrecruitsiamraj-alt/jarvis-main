@@ -13900,3 +13900,4 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - สถานที่ทำงาน = ERP `st_request_p2.work_place1` → `place` (`siamrajPenaltyLedgerSql.ts` → `PenaltyRequestRow` → `MoneyRequest` → `UrgentRow`) · โชว์ในการ์ดต้องรีบ + ป๊อปรายใบ
 - ส่งคนแทนจาก iRecruit: เบอร์เจ้าหน้าที่ = คนแก้ใบล่าสุด (`ir_job_header.user_update`) ถ้ามี · ไม่มี = คนเพิ่มใบ · สายเดิมเติมเฉพาะที่ยังว่าง (`irecruitReplaceSync.ts`)
 - นำเข้า Excel อ่านอายุ (27 ต.ค. 2569): `normalizeImportAge` (`src/lib/applicantImport.ts`) รับ "30 ปี" · เลขไทย · เซลล์รูปแบบวันที่ (ใช้ค่าดิบจาก `readSheetRows().raw` ใน `job-applications-import.ts`) · วันเกิด/ปีเกิดยังเตือน
+- นำเข้า Excel ไม่บังคับอายุ (27 ต.ค. 2569 เจ้าของ "ไฟล์นำเข้าไม่มีเอง … ให้ Ai ถามมา"): `IMPORT_COLUMNS` อายุ `required: false` + `parseStaffApplication(…, { ageOptional })` · AI ถามอายุทุกบท · `introCallFill.ts` เติมอายุลงใบที่ว่างจากสายตามใบขอด้วย (จังหวัดเติมเฉพาะบทเบื้องต้น)
