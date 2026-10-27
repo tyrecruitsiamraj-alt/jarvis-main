@@ -25,6 +25,11 @@ describe('openJobsByProvince', () => {
       [NO_PROVINCE, 1, 1],
     ]);
     expect(rows[0].types.map((t) => t.positions)).toEqual([3, 1]);
+    // กดจังหวัดแล้วกางดูใบขอ (27 ต.ค. 2569) — ใบของจังหวัดนั้น เรียงอัตรามากสุดก่อน
+    expect(rows[0].jobs.map((j) => j.position_units)).toEqual([3, 1]);
+    const card = readFileSync('src/components/dashboard-trends/ProvinceJobsCard.tsx', 'utf8');
+    expect(card).not.toContain('ลักษณะงาน');
+    expect(card).toContain('data-testid="province-jobs-detail"');
     expect(rows.reduce((a, r) => a + r.requests, 0)).toBe(jobs.length);
   });
   it('หน้าภาพรวมได้ใบขอเปิดชุดเดียวกับกล่องงาน', () => {

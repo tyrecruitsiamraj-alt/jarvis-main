@@ -1,12 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import {
-  AlertCircle,
-  ArrowDown,
-  CalendarClock,
-  CheckCircle2,
-  Clock,
-  type LucideIcon,
-} from 'lucide-react';
+import { ArrowDown, type LucideIcon } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -264,34 +257,36 @@ export function JourneyList({
 
 /* ─────────── งานค้างตอนนี้ ─────────── */
 
+/**
+ * ═══ งานค้างตอนนี้ (เจ้าของ 27 ต.ค. 2569 "ทำให้อ่านแล้วเข้าใจง่าย ๆ หน่อย") ═══
+ * 3 ช่องเรียงกัน: หัว · เลขรวมตัวใหญ่ · แยกตามระยะเวลา (แถวรวมกัน = เลขรวม) · ไม่มีไอคอน · ช้าสุดตัวเลขสีแดง
+ */
 function BacklogGroup({
   title,
   total,
   unit,
   rows,
   foot,
+  testId,
 }: {
   title: string;
   total: number;
   unit: string;
-  rows: { label: string; value: number; tone: ToneKey; icon: LucideIcon }[];
+  rows: { label: string; value: number; tone: ToneKey }[];
   foot?: string | null;
+  testId: string;
 }) {
   return (
-    <div className="space-y-2">
-      <p className={cn('flex items-center justify-between gap-2 text-xs', DASH.sub)}>
-        <span>{title}</span>
-        <span className="tabular-nums">
-          {fmt(total)} {unit}
-        </span>
+    <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-border p-3" data-testid={testId}>
+      <p className="text-sm text-foreground">{title}</p>
+      <p className="flex items-baseline gap-1.5">
+        <span className="text-2xl font-medium tabular-nums text-foreground">{fmt(total)}</span>
+        <span className={cn('text-xs', DASH.sub)}>{unit}</span>
       </p>
-      <ul className="space-y-1">
+      <ul className={cn('space-y-1 border-t pt-2', DASH.divider)}>
         {rows.map((r) => (
-          <li key={r.label} className="flex items-center justify-between gap-2 rounded-lg px-1 py-1 text-sm">
-            <span className="flex items-center gap-2 text-foreground">
-              <r.icon className={cn('size-4', TONE[r.tone].value)} aria-hidden />
-              {r.label}
-            </span>
+          <li key={r.label} className="flex items-baseline justify-between gap-2 text-sm">
+            <span className={DASH.sub}>{r.label}</span>
             <span className={cn('font-medium tabular-nums', r.value > 0 ? TONE[r.tone].value : DASH.sub)}>{fmt(r.value)}</span>
           </li>
         ))}
@@ -304,46 +299,50 @@ function BacklogGroup({
 export function BacklogBody({ backlog }: { backlog: RecruitBacklog }) {
   const { uncalled, waitingStaff, appointments } = backlog;
   const extra = [
-    uncalled.inQueue > 0 ? `รอ AI โทรอยู่ ${fmt(uncalled.inQueue)}` : null,
-    uncalled.badPhone > 0 ? `เบอร์ใช้โทรไม่ได้ ${fmt(uncalled.badPhone)}` : null,
+    uncalled.inQueue > 0 ? `รอ AI โทร ${fmt(uncalled.inQueue)} คน` : null,
+    uncalled.badPhone > 0 ? `เบอร์โทรผิด ${fmt(uncalled.badPhone)} คน` : null,
   ].filter(Boolean);
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-3" data-testid="backlog">
       <BacklogGroup
+        testId="backlog-uncalled"
         title="ยังไม่มีใครโทร"
         total={uncalled.total}
-        unit="รายชื่อ"
+        unit="คน"
         rows={[
-          { label: 'กรอกมาไม่เกิน 3 วัน', value: uncalled.d0_3, tone: 'success', icon: CheckCircle2 },
-          { label: 'ค้าง 4–7 วัน', value: uncalled.d4_7, tone: 'warn', icon: Clock },
-          { label: 'ค้างเกิน 7 วัน', value: uncalled.over7, tone: 'danger', icon: AlertCircle },
+          { label: 'กรอกมาไม่เกิน 3 วัน', value: uncalled.d0_3, tone: 'neutral' },
+          { label: 'กรอกมา 4–7 วัน', value: uncalled.d4_7, tone: 'warn' },
+          { label: 'กรอกมาเกิน 7 วัน', value: uncalled.over7, tone: 'danger' },
         ]}
-        foot={extra.length > 0 ? `ในนั้น${extra.join(' · ')}` : null}
+        foot={extra.length > 0 ? `ในนั้น ${extra.join(' · ')}` : null}
       />
-      <div className={cn('border-t', DASH.divider)} />
       <BacklogGroup
-        title="ตอบ AI ว่าสนใจ รอคนโทรต่อ"
+        testId="backlog-waiting"
+        title="สนใจแล้ว ยังไม่มีคนโทรต่อ"
         total={waitingStaff.total}
-        unit="รายชื่อ"
+        unit="คน"
         rows={[
-          { label: 'ไม่ถึง 1 วัน', value: waitingStaff.d0, tone: 'success', icon: CheckCircle2 },
-          { label: 'รอ 1–3 วัน', value: waitingStaff.d1_3, tone: 'warn', icon: Clock },
-          { label: 'รอเกิน 3 วัน', value: waitingStaff.over3, tone: 'danger', icon: AlertCircle },
+          { label: 'ตอบ AI ไม่ถึง 1 วัน', value: waitingStaff.d0, tone: 'neutral' },
+          { label: 'รอมา 1–3 วัน', value: waitingStaff.d1_3, tone: 'warn' },
+          { label: 'รอมาเกิน 3 วัน', value: waitingStaff.over3, tone: 'danger' },
         ]}
       />
-      <div className={cn('border-t', DASH.divider)} />
       {appointments ? (
         <BacklogGroup
-          title="นัดที่รอบันทึกผล"
+          testId="backlog-appointments"
+          title="นัดที่ยังไม่บันทึกผล"
           total={appointments.overdue + appointments.next7}
           unit="นัด"
           rows={[
-            { label: 'เลยวันนัดแล้ว ยังไม่บันทึกผล', value: appointments.overdue, tone: 'danger', icon: CalendarClock },
-            { label: 'นัดใน 7 วันข้างหน้า', value: appointments.next7, tone: 'info', icon: CalendarClock },
+            { label: 'เลยวันนัดแล้ว', value: appointments.overdue, tone: 'danger' },
+            { label: 'นัดใน 7 วันข้างหน้า', value: appointments.next7, tone: 'info' },
           ]}
         />
       ) : (
-        <p className={cn('text-xs', DASH.sub)}>นัดที่รอบันทึกผล — ยังอ่านผลนัดไม่ได้</p>
+        <div className="rounded-xl border border-border p-3 text-sm" data-testid="backlog-appointments">
+          <p className="text-foreground">นัดที่ยังไม่บันทึกผล</p>
+          <p className={cn('text-xs', DASH.sub)}>ยังอ่านผลนัดไม่ได้</p>
+        </div>
       )}
     </div>
   );

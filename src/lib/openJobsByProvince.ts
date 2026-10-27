@@ -33,17 +33,19 @@ export function openJobBuCounts(jobs: readonly JobRequest[]): Array<{ bu: string
 export const NO_PROVINCE = 'ไม่ระบุจังหวัด';
 
 export type ProvinceJobType = { title: string; requests: number; positions: number };
-export type ProvinceJobRow = { province: string; requests: number; positions: number; types: ProvinceJobType[] };
+/** `jobs` = ใบขอของจังหวัดนี้ เรียงอัตรามากสุดก่อน — กดจังหวัดแล้วกางดู (เจ้าของ 27 ต.ค. 2569) */
+export type ProvinceJobRow = { province: string; requests: number; positions: number; types: ProvinceJobType[]; jobs: JobRequest[] };
 
 export function openJobsByProvince(jobs: readonly JobRequest[]): ProvinceJobRow[] {
-  const byProv = new Map<string, { requests: number; positions: number; types: Map<string, ProvinceJobType> }>();
+  const byProv = new Map<string, { requests: number; positions: number; types: Map<string, ProvinceJobType>; jobs: JobRequest[] }>();
   for (const j of jobs) {
     // ตัวกรองคืน UNSPECIFIED เมื่ออ่านจังหวัดไม่ออก
     const raw = boardProvinceOf(j);
     const province = raw && raw !== UNSPECIFIED ? raw : NO_PROVINCE;
     const units = jobPositionUnits(j);
     const title = publicJobTitle(j).trim() || 'ไม่ระบุตำแหน่ง';
-    const row = byProv.get(province) ?? { requests: 0, positions: 0, types: new Map() };
+    const row = byProv.get(province) ?? { requests: 0, positions: 0, types: new Map(), jobs: [] };
+    row.jobs.push(j);
     row.requests += 1;
     row.positions += units;
     const t = row.types.get(title) ?? { title, requests: 0, positions: 0 };
@@ -59,6 +61,7 @@ export function openJobsByProvince(jobs: readonly JobRequest[]): ProvinceJobRow[
       requests: r.requests,
       positions: r.positions,
       types: [...r.types.values()].sort((a, b) => byPositions(a, b) || a.title.localeCompare(b.title, 'th')),
+      jobs: [...r.jobs].sort((a, b) => jobPositionUnits(b) - jobPositionUnits(a)),
     }))
     .sort((a, b) => Number(a.province === NO_PROVINCE) - Number(b.province === NO_PROVINCE) || byPositions(a, b) || a.province.localeCompare(b.province, 'th'));
 }

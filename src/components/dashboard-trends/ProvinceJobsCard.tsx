@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { MapPin } from 'lucide-react';
+import { ChevronDown, MapPin } from 'lucide-react';
+import { publicJobTitle } from '@/lib/publicJobTitle';
+import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
@@ -11,7 +13,6 @@ import type { JobRequest } from '@/types';
 import { OverviewCard } from './RecruitOverviewParts';
 
 const SHOWN = 10;
-const TYPES_SHOWN = 3;
 
 /**
  * งานตามจังหวัด (เจ้าของ 27 ต.ค. 2569 "งานจังหวัดไหนเยอะ และเป็นลักษณะอะไร") — ตรรกะอยู่ `openJobsByProvince` ที่เดียว
@@ -19,6 +20,8 @@ const TYPES_SHOWN = 3;
  */
 export default function ProvinceJobsCard({ jobs }: { jobs: readonly JobRequest[] | null }) {
   const [all, setAll] = useState(false);
+  /** จังหวัดที่กางดูใบขออยู่ · null = ไม่ได้กาง */
+  const [open, setOpen] = useState<string | null>(null);
   /** แยก BU (เจ้าของ 27 ต.ค. 2569 "แยก Bu ดูได้ไหม") — '' = ทุก BU */
   const [bu, setBu] = useState('');
   const buCounts = useMemo(() => (jobs ? openJobBuCounts(jobs) : []), [jobs]);
@@ -61,36 +64,58 @@ export default function ProvinceJobsCard({ jobs }: { jobs: readonly JobRequest[]
               <TableHead className="text-xs">จังหวัด</TableHead>
               <TableHead className="whitespace-nowrap text-right text-xs">ใบขอ</TableHead>
               <TableHead className="whitespace-nowrap text-right text-xs">อัตรา</TableHead>
-              <TableHead className="text-xs">ลักษณะงาน (อัตรา)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {jobs === null ? (
               <TableRow>
-                <TableCell colSpan={4} className={cn('py-4 text-center text-sm', DASH.sub)}>
+                <TableCell colSpan={3} className={cn('py-4 text-center text-sm', DASH.sub)}>
                   —
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className={cn('py-4 text-center text-sm', DASH.sub)}>
+                <TableCell colSpan={3} className={cn('py-4 text-center text-sm', DASH.sub)}>
                   ไม่มีใบขอที่เปิด
                 </TableCell>
               </TableRow>
             ) : (
               shown.map((r) => (
-                <TableRow key={r.province} data-testid="province-jobs-row">
-                  <TableCell className="whitespace-nowrap text-sm text-foreground">{r.province}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmt(r.requests)}</TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">{fmt(r.positions)}</TableCell>
-                  <TableCell className={cn('text-xs tabular-nums', DASH.sub)}>
-                    {r.types
-                      .slice(0, TYPES_SHOWN)
-                      .map((t) => `${t.title} ${fmt(t.positions)}`)
-                      .join(' · ')}
-                    {r.types.length > TYPES_SHOWN ? ` · อื่น ๆ ${fmt(r.types.slice(TYPES_SHOWN).reduce((a, t) => a + t.positions, 0))}` : ''}
-                  </TableCell>
-                </TableRow>
+                <React.Fragment key={r.province}>
+                  {/* กดจังหวัด = กางดูใบขอ (เจ้าของ 27 ต.ค. 2569 "ถ้ากดจังหวัด กรุงเทพ ก็กางออกมาให้ดูว่ามีใบขออะไรบ้าง") */}
+                  <TableRow
+                    data-testid="province-jobs-row"
+                    className="cursor-pointer"
+                    aria-expanded={open === r.province}
+                    onClick={() => setOpen(open === r.province ? null : r.province)}
+                  >
+                    <TableCell className="whitespace-nowrap text-sm text-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform', open !== r.province && '-rotate-90')} aria-hidden />
+                        {r.province}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{fmt(r.requests)}</TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">{fmt(r.positions)}</TableCell>
+                  </TableRow>
+                  {open === r.province ? (
+                    <TableRow className="hover:bg-transparent" data-testid="province-jobs-detail">
+                      <TableCell colSpan={3} className="bg-muted/30 py-2">
+                        <ul className="divide-y divide-border">
+                          {r.jobs.map((j) => (
+                            <li key={j.id} className="flex items-start justify-between gap-3 py-2 text-sm">
+                              <span className="min-w-0">
+                                <span className="block text-foreground">{[j.unit_name?.trim(), publicJobTitle(j)].filter(Boolean).join(' · ')}</span>
+                                <span className={cn('block text-xs tabular-nums', DASH.sub)}>{j.request_no ?? j.id}</span>
+                              </span>
+                              <span className="shrink-0 tabular-nums text-foreground">{fmt(jobPositionUnits(j))} อัตรา</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                </React.Fragment>
               ))
             )}
             {rows.length > 0 ? (
@@ -98,7 +123,6 @@ export default function ProvinceJobsCard({ jobs }: { jobs: readonly JobRequest[]
                 <TableCell className="text-sm text-foreground">รวม {fmt(rows.length)} จังหวัด</TableCell>
                 <TableCell className="text-right tabular-nums">{fmt(total.requests)}</TableCell>
                 <TableCell className="text-right tabular-nums">{fmt(total.positions)}</TableCell>
-                <TableCell />
               </TableRow>
             ) : null}
           </TableBody>
