@@ -98,7 +98,9 @@ export default function TrendLinesCard({
               {/* 27 ต.ค. 2569 เจ้าของ: ถอดขีดสีหน้าป้าย · ถอดลูกศร (บอกเป็นคำ เพิ่ม/ลด) · เลขช่วงก่อนไปไว้มุมขวาของกราฟที่เดียว */}
               <span className="text-xs text-muted-foreground">{r.label}</span>
               <span className="flex items-baseline gap-2">
-                <span className="text-lg font-medium tabular-nums text-foreground">{shown === null ? '—' : fmt(shown)}</span>
+                <span className="text-lg font-medium tabular-nums text-foreground">
+                  {shown === null ? '—' : fmt(shown)} <span className="text-xs font-normal text-muted-foreground">{r.unit}</span>
+                </span>
                 <span
                   className={cn(
                     'text-xs font-medium tabular-nums',
@@ -116,6 +118,7 @@ export default function TrendLinesCard({
                           : 'เทียบไม่ได้'}
                 </span>
               </span>
+              {r.extra ? <span className="text-xs tabular-nums text-muted-foreground">{r.extra}</span> : null}
             </Box>
           );
         })}

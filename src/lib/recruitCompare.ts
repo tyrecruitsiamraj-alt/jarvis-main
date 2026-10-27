@@ -8,7 +8,8 @@ import { appliedYmd, isAiCalledReached, isAiQueued, isAiSaidNo, isAiSaidYes, isF
 import type { RecruitAppFact, RecruitRequestDay, RecruitRequestSummary } from './recruitOverviewTypes';
 import type { OverviewTabId } from './recruitOverviewTabs';
 
-export type CompareRow = { key: string; label: string; unit: string; cur: number | null; prev: number | null };
+/** `extra` = บรรทัดเสริมในกล่อง เช่น มีคนสมัครกี่คน (เจ้าของ 27 ต.ค. 2569 "มีคนสมัคร 1 ใบ กี่คน ไม่สงสัยหรอ") */
+export type CompareRow = { key: string; label: string; unit: string; cur: number | null; prev: number | null; extra?: string | null };
 
 export type CompareDelta =
   | { kind: 'up' | 'down'; pct: number }
@@ -54,7 +55,7 @@ export function compareRowsOf(
       return [
         r('total', 'ใบขอเข้ามา'),
         r('released', 'ประกาศแล้ว'),
-        r('releasedWithApps', 'มีคนสมัคร'),
+        { ...r('releasedWithApps', 'มีคนสมัคร'), extra: req ? `${req.appsOnReleased.toLocaleString('th-TH')} คน` : null },
         r('releasedNoApps', 'ไม่มีคนสมัคร'),
         r('notReleasedOpen', 'ยังไม่ประกาศ'),
         r('notReleasedClosed', 'ปิดไปแล้ว'),

@@ -38,6 +38,8 @@ describe('compareRowsOf', () => {
     expect(req.map((r) => [r.key, r.cur, r.prev])).toEqual([
       ['total', 9, 4], ['released', 3, 1], ['releasedWithApps', 2, 1], ['releasedNoApps', 1, 0], ['notReleasedOpen', 4, 3], ['notReleasedClosed', 2, 0],
     ]);
+    // มีคนสมัคร 2 ใบ กี่คน (เจ้าของ 27 ต.ค. 2569 "ไม่สงสัยหรอ") — คนที่กรอกในใบที่ประกาศแล้ว
+    expect(req.find((r) => r.key === 'releasedWithApps')?.extra).toBe('5 คน');
     // 27 ต.ค. 2569 เจ้าของ "ไม่ได้บอกว่าสนใจเท่าไหร่ ไม่สนใจเท่าไหร่ รอโทรเท่าไหร่"
     expect(apps.map((r) => r.label)).toEqual(['กรอกเข้ามา', 'AI โทรแล้ว', 'ติดต่อได้', 'สนใจ', 'ไม่สนใจ', 'รอโทร']);
   });
