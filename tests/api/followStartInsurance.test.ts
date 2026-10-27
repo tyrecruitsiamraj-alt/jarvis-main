@@ -36,6 +36,8 @@ describe('parseFollowInput — วันเริ่มงาน + ประก�
       customerName: 'บริษัท ทดสอบ',
       customerContact: 'ฝ่ายบุคคล',
       customerPhone: '020000000',
+      // ตำแหน่งคนไปแทน (165 · 27 ต.ค. 2569) — ไม่ส่ง = null
+      replacePosition: null,
     });
     // 1500 (16 ต.ค. 2569) — บรรทัดประกันแบบใบขอ + ความคุ้มครอง P/A ยาวเกิน 300
     const long = parseFollowInput({ ...base, insurance_type: 'ก'.repeat(2000) }, NOW);

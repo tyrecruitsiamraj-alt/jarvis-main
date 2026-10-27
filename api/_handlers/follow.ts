@@ -67,6 +67,8 @@ type FollowRow = {
   /** วันที่เริ่มงาน + ประกัน/ผู้ติดต่อลูกค้า (145) — ฐานยังไม่รันไม่มีคีย์ */
   start_date?: Date | string | null;
   insurance_type?: string | null;
+  /** ตำแหน่งคนไปแทน (165) */
+  replace_position?: string | null;
   customer_name?: string | null;
   customer_contact?: string | null;
   customer_phone?: string | null;
@@ -203,6 +205,7 @@ function toResponse(r: FollowRow) {
     /** วันที่เริ่มงาน + ประกัน/ผู้ติดต่อลูกค้า (145 · 14 ต.ค. 2569) */
     start_date: pgDateYmd(r.start_date),
     insurance_type: r.insurance_type ?? null,
+    replace_position: r.replace_position ?? null,
     customer_name: r.customer_name ?? null,
     customer_contact: r.customer_contact ?? null,
     customer_phone: r.customer_phone ?? null,
@@ -419,6 +422,8 @@ export type FollowExtraFields = {
   customerName: string | null;
   customerContact: string | null;
   customerPhone: string | null;
+  /** ตำแหน่งของคนที่ไปแทน (165 · 27 ต.ค. 2569) เช่น Spare · null = ไม่ระบุ */
+  replacePosition: string | null;
 };
 
 const HHMM_RE = /^\d{1,2}:\d{2}$/;
@@ -563,6 +568,7 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
     customerName: cut(body.customer_name, 200),
     customerContact: cut(body.customer_contact, 200),
     customerPhone: cut(body.customer_phone, 40),
+    replacePosition: cut(body.replace_position, 60),
   };
   const extra = Object.values(extraFields).some((x) => x !== null) ? extraFields : undefined;
 
@@ -797,6 +803,13 @@ async function insertFollowRow(
         customer_contact: x.customerContact,
         customer_phone: x.customerPhone,
       });
+      // ตำแหน่งคนไปแทน (165) — แยกคำสั่ง ฐานยังไม่รัน 165 ไม่ทำให้ช่องอื่นหาย
+      if (x.replacePosition) {
+        await dbQuery(`update ${followTable} set replace_position = $2 where id = $1`, [row.id, x.replacePosition]).catch((e) => {
+          if (!isUndefinedColumn(e)) throw e;
+        });
+        Object.assign(row, { replace_position: x.replacePosition });
+      }
     } catch (e) {
       if (!isUndefinedColumn(e)) throw e;
       logWarn('follow.extra: ฐานยังไม่รัน 145 — ไม่ได้เก็บวันเริ่มงาน/ประกัน', { id: row.id });
@@ -1724,6 +1737,15 @@ async function updateFollowSet(req: AuthedReq, res: ApiRes, body: Record<string,
   } catch (e) {
     if (!isUndefinedColumn(e)) throw e;
   }
+  // ตำแหน่งคนไปแทน (165 · 27 ต.ค. 2569) — แก้เฉพาะเมื่อจอส่งคีย์มา (ไม่ส่ง = คงเดิม)
+  if (Object.prototype.hasOwnProperty.call(body, 'replace_position')) {
+    await dbQuery(
+      `update ${followTable} set replace_position = $2 where ${setWhere} and cancelled_at is null and completed_at is null`,
+      [setKey, cut(body.replace_position, 60)],
+    ).catch((e) => {
+      if (!isUndefinedColumn(e)) throw e;
+    });
+  }
 
   let replan: Awaited<ReturnType<typeof replanFollowSetWithLumos>> | null = null;
   let replanNote: string | null = null;
@@ -1901,6 +1923,7 @@ async function replaceFollowSchedule(req: AuthedReq, res: ApiRes, body: Record<s
       customerName: anchor.customer_name ?? null,
       customerContact: anchor.customer_contact ?? null,
       customerPhone: anchor.customer_phone ?? null,
+      replacePosition: anchor.replace_position ?? null,
     },
   };
   const createdIds: string[] = [];

@@ -32,6 +32,8 @@ export type FollowGroup = {
   /** หน่วยงาน/รหัสไซต์จากรอบล่าสุดที่ระบุไว้ — null = ไม่มีรอบไหนระบุเลย */
   unitName: string | null;
   siteCode: string | null;
+  /** ตำแหน่งคนไปแทน (แท็บส่งคนแทน · 27 ต.ค. 2569) — รอบล่าสุดที่ระบุ · null = ไม่ระบุ */
+  replacePosition?: string | null;
   /** เจ้าของข้อมูล = คนที่คีย์รอบแรกสุดของกลุ่ม */
   createdByName: string | null;
   /** ชื่อที่โชว์ของคนเพิ่ม (ชื่อเล่น/ชื่อจริง · ไม่มีอีเมล) — `createdByName` ยังเป็นค่าดิบ */
@@ -172,6 +174,7 @@ export function groupFollowEntries(
       topic: latest.topic,
       unitName: withUnit?.unit_name ?? null,
       siteCode: withUnit?.site_code ?? null,
+      replacePosition: [...byCreated].reverse().find((r) => r.replace_position)?.replace_position ?? null,
       createdByName: first.created_by_name ?? null,
       createdByLabel: followPersonName(first.created_by_display, first.created_by_name),
       rounds,

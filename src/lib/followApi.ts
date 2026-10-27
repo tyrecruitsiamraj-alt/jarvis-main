@@ -135,6 +135,8 @@ export type FollowEntry = {
   /** วันที่เริ่มงาน (YYYY-MM-DD) + ประกัน/ผู้ติดต่อลูกค้า (145 · 14 ต.ค. 2569) — ฟอร์มเพิ่มขั้น 1/4 */
   start_date?: string | null;
   insurance_type?: string | null;
+  /** ตำแหน่งคนไปแทน (165 · 27 ต.ค. 2569) เช่น Spare */
+  replace_position?: string | null;
   customer_name?: string | null;
   customer_contact?: string | null;
   customer_phone?: string | null;
@@ -198,6 +200,7 @@ export type NewFollowEntry = {
   /** วันที่เริ่มงาน YYYY-MM-DD + ขั้น 4 ประกัน/ผู้ติดต่อลูกค้า (145 · 14 ต.ค. 2569) — ไม่บังคับ */
   start_date?: string;
   insurance_type?: string;
+  replace_position?: string | null;
   customer_name?: string;
   customer_contact?: string;
   customer_phone?: string;
@@ -374,6 +377,7 @@ export async function updateFollowSet(
     site_code?: string;
     start_date?: string;
     insurance_type?: string;
+    replace_position?: string | null;
     customer_name?: string;
     customer_contact?: string;
     customer_phone?: string;

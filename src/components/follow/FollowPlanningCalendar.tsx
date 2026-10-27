@@ -870,7 +870,7 @@ const FollowPlanningCalendar: React.FC<{
                                     </span>
                                     {/* มือถือ: หน่วยงานอยู่ใต้ชื่อแทนคอลัมน์ — ยังเห็นทุกจอ (กติกา 5 ต.ค.) แต่สถานะการโทรไม่ต้องปัดหา (QA 17 ต.ค. 2569) */}
                                     <span className="block truncate text-[12px] text-muted-foreground sm:hidden">
-                                      {row.group.unitName || '—'}
+                                      {[row.group.unitName || '—', row.group.replacePosition].filter(Boolean).join(' · ')}
                                     </span>
                                     {/* บอกจำนวนสายไว้ใต้ชื่อ — กันคนอ่านว่าแถวนี้มีสายเดียว */}
                                     {calls.length > 1 ? (
@@ -895,6 +895,12 @@ const FollowPlanningCalendar: React.FC<{
                               {/* 🔴 หน่วยงานโชว์ทุกจอ (5 ต.ค. 2569 เจ้าของเจอ "ชื่อหน่วยงานหาย" บนมือถือ — ตารางกลับเป็นแบบเดิมแล้วคอลัมน์นี้ยังซ่อนต่ำกว่า lg) */}
                               <td className="px-3 py-3 text-[12px] text-muted-foreground max-sm:hidden">
                                 {row.group.unitName || '—'}
+                                {/* ตำแหน่งคนไปแทน (แท็บส่งคนแทน · 27 ต.ค. 2569) */}
+                                {row.group.replacePosition ? (
+                                  <span className="block text-foreground" data-testid="follow-replace-position-cell">
+                                    {row.group.replacePosition}
+                                  </span>
+                                ) : null}
                               </td>
 
                               {/**

@@ -73,7 +73,7 @@ import { splitErpName, type ErpPerson } from '@/lib/erpPeopleApi';
 import { buildBoardUnitOptions, mergeBoardUnitOptions, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
 import { followGroupKey, followPersonKey, groupFollowEntries } from '@/lib/followGrouping';
-import { countReplaceKinds, FOLLOW_TEAM_REPLACEMENT, REPLACE_KIND_FILTERS, REPLACE_KIND_LABEL, replaceKindOf, type ReplaceKindFilter, followScopeEntries, followTeamForScope } from '@/lib/followReplacement';
+import { countReplaceKinds, FOLLOW_TEAM_REPLACEMENT, REPLACE_KIND_FILTERS, REPLACE_POSITIONS, REPLACE_KIND_LABEL, replaceKindOf, type ReplaceKindFilter, followScopeEntries, followTeamForScope } from '@/lib/followReplacement';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { followMatrixColOfCategory, type FollowMatrixCol } from '@/lib/followCallMatrix';
 import {
@@ -444,6 +444,8 @@ const FollowPage: React.FC = () => {
    */
   const [startDate, setStartDate] = useState('');
   const [insuranceType, setInsuranceType] = useState('');
+  /** ตำแหน่งคนไปแทน (แท็บส่งคนแทน · 27 ต.ค. 2569) — '' = ไม่ระบุ */
+  const [replacePosition, setReplacePosition] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   /** ดึงของหน่วยงานไหนไปแล้ว — เปลี่ยนหน่วยงานแล้วถึงดึงใหม่ (ไม่ทับที่คนแก้เองซ้ำทุกครั้งที่ย้อนขั้น) */
@@ -841,6 +843,7 @@ const FollowPage: React.FC = () => {
     setUnitRequestNo('');
     setStartDate('');
     setInsuranceType('');
+    setReplacePosition('');
     setCustomerName('');
     setCustomerPhone('');
     setFormError(null);
@@ -872,6 +875,7 @@ const FollowPage: React.FC = () => {
     setSiteCode(entry.site_code ?? '');
     setStartDate(entry.start_date ?? '');
     setInsuranceType(entry.insurance_type ?? '');
+    setReplacePosition(entry.replace_position ?? '');
     setCustomerName(entry.customer_name ?? '');
     setCustomerPhone(entry.customer_phone ?? '');
     setScheduleMode(false);
@@ -1212,6 +1216,8 @@ const FollowPage: React.FC = () => {
   const extraPayload = () => ({
     start_date: startDate || undefined,
     insurance_type: insuranceType.trim() || undefined,
+    // ตำแหน่งคนไปแทน — ส่งเฉพาะแท็บส่งคนแทน (แท็บติดตามไม่แตะค่า)
+    ...(replaceView ? { replace_position: replacePosition || null } : {}),
     customer_name: customerName.trim() || undefined,
     customer_phone: customerPhone.trim() || undefined,
   });
@@ -3637,6 +3643,23 @@ const FollowPage: React.FC = () => {
              */}
             {step === 4 ? (
               <div className="space-y-3" data-testid="follow-step4">
+                {replaceView ? (
+                  <div className="space-y-1.5">
+                    <label htmlFor="followReplacePosition" className="ml-1 text-xs font-medium text-muted-foreground">
+                      ตำแหน่ง
+                    </label>
+                    <FieldSelect
+                      id="followReplacePosition"
+                      value={replacePosition}
+                      onChange={setReplacePosition}
+                      testId="follow-replace-position"
+                      options={[
+                        { value: '', label: 'ไม่ระบุ' },
+                        ...[...new Set([...REPLACE_POSITIONS, ...(replacePosition ? [replacePosition] : [])])].map((p) => ({ value: p, label: p })),
+                      ]}
+                    />
+                  </div>
+                ) : null}
                 {/* ขั้น 4 ประกัน · ลูกค้า (เจ้าของสั่ง 14 ต.ค. 2569)
                     🔴 16 ต.ค. 2569 เลิกดึงจาก ERP — ประกันเลือกจากรายการ (ตั้งค่าตัวเลือก › เพิ่มประเภทประกัน) · ลูกค้าพิมพ์เอง */}
                 <div className="space-y-1.5">

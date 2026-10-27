@@ -52,6 +52,12 @@ export const REPLACE_KIND_LABEL: Record<ReplaceKindFilter, string> = {
   unknown: 'ไม่ระบุ',
 };
 
+/**
+ * ตำแหน่งของคนที่ไปแทน (เจ้าของ 27 ต.ค. 2569 "ช่องส่งคนแทนเพิ่มตำแหน่ง Spare" · Choice ช่องตำแหน่งในฟอร์ม)
+ * เพิ่มตำแหน่งใหม่ = เติมในรายการนี้ที่เดียว · ค่าว่าง = ไม่ระบุ
+ */
+export const REPLACE_POSITIONS: readonly string[] = ['Spare'];
+
 export function replaceKindOf(entry: { replace_type?: string | null }): ReplaceKind {
   const t = (entry.replace_type ?? '').trim().toUpperCase();
   if (!t) return 'unknown';

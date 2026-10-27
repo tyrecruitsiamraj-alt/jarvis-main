@@ -141,7 +141,7 @@ export default function FollowCallQueue({
             </div>
           ) : null}
           <div className="truncate text-xs text-muted-foreground">
-            {[e.unit_name?.trim() || person.row.group.unitName, callLabel].filter(Boolean).join(' · ')}
+            {[e.unit_name?.trim() || person.row.group.unitName, e.replace_position, callLabel].filter(Boolean).join(' · ')}
             {' · '}
             <span className={it.group === 'done' ? TONE[FOLLOW_CALL_CATEGORY_TONE[call.category]].value : undefined}>{it.reason}</span>
           </div>
