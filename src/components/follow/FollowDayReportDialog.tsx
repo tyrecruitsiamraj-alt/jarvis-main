@@ -1,4 +1,5 @@
 import React from 'react';
+import { copyText } from '@/lib/copyText';
 import { Copy, ImageDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -81,7 +82,7 @@ export default function FollowDayReportDialog({
   const copy = async () => {
     if (!report) return;
     try {
-      await navigator.clipboard.writeText(followDayReportTsv(report));
+      await copyText(followDayReportTsv(report));
       setCopied('ok');
     } catch {
       setCopied('fail');

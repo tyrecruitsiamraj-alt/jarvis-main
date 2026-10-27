@@ -4,6 +4,7 @@
  * เลือก BU (+ตำแหน่ง) → ได้ลิงก์ `/apply?bu=LBD&pos=…` · server กรองงานตาม BU (`api/_handlers/public/jobs.ts`)
  * · ตำแหน่งล็อกด้วย `pos` ตัวเดิม (`resolveApplyPositionPreset`) · ไม่เก็บลงฐาน — ลิงก์คือค่าทั้งหมด
  */
+import { copyText } from '@/lib/copyText';
 import React, { useEffect, useState } from 'react';
 import { Copy, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,7 @@ const ApplyLinksTab: React.FC = () => {
   const [bu, setBu] = useState<string>('LBD');
   const [pos, setPos] = useState('');
   const [count, setCount] = useState<number | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const link = applyBuLink(window.location.origin, bu === ALL ? null : bu, pos);
 
   // จำนวนงานที่ลิงก์นี้จะโชว์ (BU เดียวกัน · ตำแหน่งกรองบนหน้าเว็บอีกชั้น เลขนี้นับเฉพาะ BU)
@@ -42,10 +43,10 @@ const ApplyLinksTab: React.FC = () => {
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(link);
-      setNotice('ก๊อปปี้ลิงก์แล้ว');
+      await copyText(link);
+      setNotice({ ok: true, text: 'ก๊อปปี้ลิงก์แล้ว' });
     } catch {
-      setNotice('ก๊อปปี้ไม่ได้ — เลือกข้อความแล้วก๊อปเอง');
+      setNotice({ ok: false, text: 'ก๊อปปี้ไม่ได้ — เลือกข้อความแล้วก๊อปเอง' });
     }
   };
 
@@ -99,7 +100,11 @@ const ApplyLinksTab: React.FC = () => {
               <ExternalLink aria-hidden /> เปิดดู
             </a>
           </Button>
-          {notice ? <span className={cn('text-sm', TONE.success.value)}>{notice}</span> : null}
+          {notice ? (
+            <span className={cn('text-sm', notice.ok ? TONE.success.value : TONE.danger.value)} role={notice.ok ? undefined : 'alert'}>
+              {notice.text}
+            </span>
+          ) : null}
         </div>
       </div>
     </Card>

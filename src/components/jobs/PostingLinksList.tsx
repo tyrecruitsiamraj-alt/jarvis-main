@@ -1,4 +1,5 @@
 import React from 'react';
+import { copyText } from '@/lib/copyText';
 import { Check, ChevronDown, Copy, MousePointerClick, UserPlus } from 'lucide-react';
 import EditPostingDialog from '@/components/jobs/EditPostingDialog';
 import { Button } from '@/components/ui/button';
@@ -26,7 +27,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
       title={copied ? 'คัดลอกแล้ว' : 'คัดลอกลิงก์'}
       onClick={async () => {
         try {
-          await navigator.clipboard.writeText(text);
+          await copyText(text);
           setCopied(true);
           window.setTimeout(() => setCopied(false), 1500);
         } catch {

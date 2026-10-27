@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { copyText } from '@/lib/copyText';
 import { FieldSelect } from '@/components/shared/FieldSelect';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Textarea } from '@/components/ui/textarea';
@@ -64,7 +65,7 @@ function LinkRow({ url, label }: { url: string; label?: string | null }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(url);
+      await copyText(url);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {

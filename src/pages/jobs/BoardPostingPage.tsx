@@ -26,6 +26,7 @@
  *   เจ้าของถาม *"ยังดูข้อมูล master ได้ใช่ไหม"* ⇒ การ์ด "ข้อมูลใบขอ" อยู่จอ 1 · ฟอร์มสถานที่/รายได้/เพศ/อายุดึงค่าใบขอมาก่อนเหมือนเดิม
  *   ทางถอย: `?popup=steps` = 4 หน้าแบบ 4 ต.ค. (`flow="steps"` — ค่าเริ่มของ component นี้ เทสต์เดิมยังวิ่งทางนี้)
  */
+import { copyText } from '@/lib/copyText';
 import React from 'react';
 import { lazyPage } from '@/lib/staleChunkReload';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -135,7 +136,7 @@ function CopyTextButton({ text }: { text: string }) {
       variant="outline"
       onClick={async () => {
         try {
-          await navigator.clipboard.writeText(text);
+          await copyText(text);
           setCopied(true);
           window.setTimeout(() => setCopied(false), 1500);
         } catch {

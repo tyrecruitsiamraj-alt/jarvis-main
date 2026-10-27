@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { copyText } from '@/lib/copyText';
 import { Copy, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -376,8 +377,7 @@ const PdpaRequestsTab: React.FC = () => {
               disabled={!viewing?.data}
               onClick={() => {
                 if (!viewing?.data) return;
-                void navigator.clipboard
-                  .writeText(personDataText(viewing.item, viewing.data))
+                void copyText(personDataText(viewing.item, viewing.data))
                   .then(() => toast.success('คัดลอกแล้ว'))
                   .catch(() => toast.error('คัดลอกไม่สำเร็จ'));
               }}

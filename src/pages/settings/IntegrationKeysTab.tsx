@@ -4,6 +4,7 @@
  * key จริงขึ้นครั้งเดียวหลังออก (ฐานเก็บแค่ sha256) · ออกใหม่ = ตัวเก่าใช้ไม่ได้ทันที (ยืนยันก่อน)
  * 🔴 shadcn Card/Button/Badge/AlertDialog · สีจาก TONE · ไม่มีประโยคอธิบายบนจอ
  */
+import { copyText } from '@/lib/copyText';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Copy, KeyRound } from 'lucide-react';
 import {
@@ -35,7 +36,7 @@ const NUM = new Intl.NumberFormat('th-TH');
 
 async function copy(text: string): Promise<boolean> {
   try {
-    await navigator.clipboard.writeText(text);
+    await copyText(text);
     return true;
   } catch {
     return false;

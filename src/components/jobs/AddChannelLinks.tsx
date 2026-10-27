@@ -1,4 +1,5 @@
 import React from 'react';
+import { copyText } from '@/lib/copyText';
 import { Check, Copy, Link2, Loader2 } from 'lucide-react';
 import MultiChannelPicker from '@/components/shared/MultiChannelPicker';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,7 @@ function useCopy() {
   const [copied, setCopied] = React.useState<string | null>(null);
   const copy = async (key: string, text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      await copyText(text);
       setCopied(key);
       window.setTimeout(() => setCopied((c) => (c === key ? null : c)), 1500);
     } catch {
