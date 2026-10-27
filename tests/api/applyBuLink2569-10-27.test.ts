@@ -1,0 +1,21 @@
+/** ลิงก์หน้าสมัครแยก BU (เจ้าของ 27 ต.ค. 2569 "/apply จะล็อคตำแหน่งยังไง แยก BU … ทำผ่าน UI") */
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { applyBuLink } from '@/lib/applyBuLink';
+
+describe('ลิงก์ /apply แยก BU', () => {
+  it('BU + ตำแหน่ง · ทุก BU = ไม่มีพารามิเตอร์ · รหัสขยะไม่ใส่', () => {
+    expect(applyBuLink('https://x.dev/', 'lbd', '')).toBe('https://x.dev/apply?bu=LBD');
+    expect(applyBuLink('https://x.dev', 'LBA', ' ขับรถ ')).toBe(`https://x.dev/apply?bu=LBA&pos=${encodeURIComponent('ขับรถ')}`);
+    expect(applyBuLink('https://x.dev', null, '')).toBe('https://x.dev/apply');
+    expect(applyBuLink('https://x.dev', 'L1', '')).toBe('https://x.dev/apply');
+  });
+
+  it('server กรองตาม BU ก่อนส่ง ไม่ส่งรหัส BU ออกหน้าสาธารณะ · หน้าสมัครส่ง bu ต่อ', () => {
+    const api = readFileSync('api/_handlers/public/jobs.ts', 'utf8');
+    expect(api).toContain('listPublicSiamrajJobs(limit, parseBuParam(req.query?.bu))');
+    expect(api).toContain('normalizeTrendBu((j as { department_code?: string | null }).department_code) === bu');
+    const page = readFileSync('src/pages/public/PublicJobBoardPage.tsx', 'utf8');
+    expect(page).toContain("searchParams.get('bu')");
+  });
+});

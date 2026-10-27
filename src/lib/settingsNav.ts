@@ -27,6 +27,7 @@ export const SETTINGS_TAB_IDS = [
   'callSuppression',
   'integrations',
   'pdpaRequests',
+  'applyLinks',
   'autoMove',
   'health',
   'reference',
@@ -53,6 +54,7 @@ export const SETTINGS_TAB_LABEL: Record<SettingsTabId, string> = {
   callSuppression: 'บัญชีห้ามโทร',
   integrations: 'เชื่อมระบบภายนอก',
   pdpaRequests: 'คำขอข้อมูลส่วนบุคคล',
+  applyLinks: 'ลิงก์หน้าสมัคร',
   autoMove: 'ย้ายใบสมัครอัตโนมัติ',
   health: 'สถานะระบบ',
   reference: 'ข้อมูลอ้างอิง',
@@ -74,6 +76,7 @@ export const SETTINGS_TAB_HINT: Record<SettingsTabId, string> = {
   callSuppression: 'เบอร์ที่ AI ไม่โทรถึงชั่วคราว — ดูเหตุผลและปลดได้',
   integrations: 'key ของ So Scraping · ออกใหม่ / ยกเลิก',
   pdpaRequests: 'ขอดู ขอแก้ ขอลบข้อมูล (PDPA) · โทรยืนยันตัวตนแล้วทำต่อ',
+  applyLinks: 'ลิงก์ /apply แยก BU · ล็อกตำแหน่ง',
   autoMove: 'ย้ายใบสมัครตามผลโทรอัตโนมัติ',
   health: 'ไฟสถานะ · สวิตช์ที่เปิดอยู่ · ของค้าง',
   reference: 'ตัวเลือกในดรอปดาวน์ต่าง ๆ',
@@ -100,7 +103,7 @@ export const SETTINGS_GROUP_TABS: Record<SettingsGroupId, readonly SettingsTabId
   people: ['users', 'roles'],
   look: ['appearance', 'navMenu'],
   automation: ['lumosMode', 'callRetry', 'callScripts', 'aiSettings', 'callSuppression', 'autoMove', 'matchWeights', 'integrations'],
-  data: ['workStatus', 'reference', 'pdpaRequests'],
+  data: ['workStatus', 'reference', 'applyLinks', 'pdpaRequests'],
   monitor: ['health', 'audit'],
 };
 

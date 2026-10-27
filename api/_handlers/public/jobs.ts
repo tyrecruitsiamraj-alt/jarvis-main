@@ -12,6 +12,8 @@ import {
 import { dbQuery } from '../../_lib/postgres.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { getString } from '../../_lib/body.js';
+import { parseBuParam } from '../../_lib/homeBuSql.js';
+import { normalizeTrendBu } from '../../../src/lib/trends/bu.js';
 import {
   fetchJobBenefitChipsById,
   fetchMonthlyIncomesById,
@@ -358,11 +360,15 @@ async function onlyReleasedJobs<T extends Record<string, unknown>>(jobs: T[]): P
   return jobs.filter((j) => isReleased(keys, String(j.id ?? '')));
 }
 
-async function listPublicSiamrajJobs(limit: number): Promise<PublicJob[]> {
+async function listPublicSiamrajJobs(limit: number, bu: string | null = null): Promise<PublicJob[]> {
   const items = await listSiamrajUnitRequests({ limit, mode: 'all' });
   const prequestOk = prequestPublicEnabled();
   const open = items.filter(
-    (j) => isPublicVisible(j) && isPublicVisibleByPrequest(j, prequestOk),
+    (j) =>
+      isPublicVisible(j) &&
+      isPublicVisibleByPrequest(j, prequestOk) &&
+      // ลิงก์หน้าสมัครแยก BU (`/apply?bu=LBD` · เจ้าของ 27 ต.ค. 2569) — กรองฝั่ง server ไม่ส่งรหัส BU ออกหน้าสาธารณะ
+      (bu === null || normalizeTrendBu((j as { department_code?: string | null }).department_code) === bu),
   ) as unknown as Array<Record<string, unknown>>;
   const released = await onlyReleasedJobs(open);
   const stillHiring = await withStaffOverrides(released);
@@ -443,7 +449,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
         if (!job) return sendError(res, 404, 'Not found', 'Job not found');
         return res.status(200).json((await withBenefits([job]))[0]);
       }
-      const jobs = await listPublicSiamrajJobs(limit);
+      const jobs = await listPublicSiamrajJobs(limit, parseBuParam(req.query?.bu));
       return res.status(200).json(await withBenefits(jobs));
     }
 
