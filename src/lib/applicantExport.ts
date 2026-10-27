@@ -31,7 +31,6 @@ export const APPLICANT_EXPORT_HEADERS = [
   'เพศ',
   'ข้อมูลผู้สรรหา',
   'ผู้รับผิดชอบ',
-  'ประเภทเจาะจง',
 ] as const;
 
 /** BOM ให้ Excel อ่านไทยถูก */
@@ -44,7 +43,7 @@ function cell(v: string | number | null | undefined): string {
 
 /**
  * `recruiterOf` = เจ้าหน้าที่สรรหาของใบขอ (คอลัมน์ "เจ้าของงาน" · หน้าแม่ส่งมา) — ช่อง "ข้อมูลผู้สรรหา"
- * 🔴 16 ต.ค. 2569: เดิมช่องนี้เป็น `specific_type` (ประเภทเจาะจง) ผูกผิดความหมาย — ย้ายไปคอลัมน์ท้าย "ประเภทเจาะจง"
+ * 🔴 16 ต.ค. 2569: เดิมช่องนี้เป็น `specific_type` (ประเภทเจาะจง) ผูกผิดความหมาย — คอลัมน์ประเภทเจาะจงถอดแล้ว 27 ต.ค. 2569
  */
 export function applicantExportRows(
   rows: readonly PublicApplication[],
@@ -68,7 +67,6 @@ export function applicantExportRows(
       r.gender ? (GENDER_LABEL[r.gender] ?? '') : '',
       opts.recruiterOf?.(r) ?? '',
       applicantResponsibleName(r) ?? '',
-      r.specific_type ?? '',
     ];
   });
 }

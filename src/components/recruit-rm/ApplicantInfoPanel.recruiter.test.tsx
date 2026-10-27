@@ -5,7 +5,7 @@
  *
  * - ข้อมูลผู้สรรหา = เจ้าหน้าที่สรรหาของใบขอ (ชื่อเดียวกับคอลัมน์ "เจ้าของงาน") — เดิมอ่าน `specific_type` ซึ่งผูกผิดความหมาย
  * - ผู้รับผิดชอบ = ที่เลือกตอนคีย์/นำเข้า → ผู้รับผิดชอบของลิงก์ที่สมัครเข้ามา (ทีม Online · ไม่ได้ตั้ง = คนสร้างลิงก์)
- * - ประเภทเจาะจง (`specific_type`) ย้ายไปช่องของตัวเอง ทั้งป๊อป ตัวกรอง และไฟล์รายงาน
+ * - ประเภทเจาะจง (`specific_type`) ถอดออกหมดแล้ว ทั้งป๊อป ตัวกรอง ไฟล์รายงาน ไฟล์นำเข้า (เจ้าของ 27 ต.ค. 2569 "ฉันบอกให้เอาออก")
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -54,22 +54,22 @@ describe('ป๊อปผู้สมัคร: ข้อมูลผู้ส�
     renderPanel(app({ posting_owner_name: 'เจ้าหน้าที่ออนไลน์ ก' }), 'เจ้าหน้าที่สรรหา ก');
     expect(fieldValue('ข้อมูลผู้สรรหา')).toBe('เจ้าหน้าที่สรรหา ก');
     expect(fieldValue('ผู้รับผิดชอบ')).toBe('เจ้าหน้าที่ออนไลน์ ก');
-    expect(fieldValue('ประเภทเจาะจง')).toBe('—');
+    expect(screen.queryByText('ประเภทเจาะจง')).toBeNull();
   });
 
-  it('ผู้รับผิดชอบที่เลือกตอนคีย์มาก่อนของลิงก์ · ประเภทเจาะจงขึ้นช่องของตัวเอง ไม่ไปอยู่ช่องผู้สรรหา', () => {
+  it('ผู้รับผิดชอบที่เลือกตอนคีย์มาก่อนของลิงก์ · ประเภทเจาะจงไม่ขึ้นที่ไหนในป๊อป', () => {
     renderPanel(
       app({ responsible_name: 'คนคีย์ ก', posting_owner_name: 'เจ้าหน้าที่ออนไลน์ ก', specific_type: 'เจาะจง (ฟรี)' }),
       null,
     );
     expect(fieldValue('ข้อมูลผู้สรรหา')).toBe('—');
     expect(fieldValue('ผู้รับผิดชอบ')).toBe('คนคีย์ ก');
-    expect(fieldValue('ประเภทเจาะจง')).toBe('เจาะจง (ฟรี)');
+    expect(screen.queryByText('เจาะจง (ฟรี)')).toBeNull();
   });
 
   it('ไม่มีข้อมูล = ขีด (ช่องไม่หาย)', () => {
     renderPanel(app(), null);
-    for (const label of ['ข้อมูลผู้สรรหา', 'ผู้รับผิดชอบ', 'ประเภทเจาะจง']) expect(fieldValue(label)).toBe('—');
+    for (const label of ['ข้อมูลผู้สรรหา', 'ผู้รับผิดชอบ']) expect(fieldValue(label)).toBe('—');
   });
 });
 
@@ -105,19 +105,20 @@ describe('ทุกจุดใช้ความหมายเดียวก�
     );
   });
 
-  it('ตัวกรอง `specific` (แท็บติดตามนัดหมาย) ป้าย "ประเภทเจาะจง" · คีย์ URL เดิม', () => {
+  it('ไม่มีตัวกรองประเภทเจาะจงแล้ว (27 ต.ค. 2569)', () => {
     const facets = buildApplicantFacets([app({ specific_type: 'เจาะจง (ฟรี)' })], EMPTY_APPLICANT_FILTER_STATE, {
       tab: 'appointments',
       now: new Date('2026-10-16T05:00:00Z'),
     });
-    expect(facets.find((f) => f.key === 'specific')?.label).toBe('ประเภทเจาะจง');
+    expect(facets.some((f) => f.label === 'ประเภทเจาะจง')).toBe(false);
   });
 
-  it('ไฟล์รายงาน: ข้อมูลผู้สรรหา = ผู้สรรหาของใบขอ · ผู้รับผิดชอบ = ทีม Online · ประเภทเจาะจงคอลัมน์ท้าย', () => {
-    expect(APPLICANT_EXPORT_HEADERS.slice(-3)).toEqual(['ข้อมูลผู้สรรหา', 'ผู้รับผิดชอบ', 'ประเภทเจาะจง']);
+  it('ไฟล์รายงาน: ข้อมูลผู้สรรหา = ผู้สรรหาของใบขอ · ผู้รับผิดชอบ = ทีม Online · ไม่มีคอลัมน์ประเภทเจาะจง', () => {
+    expect(APPLICANT_EXPORT_HEADERS.slice(-2)).toEqual(['ข้อมูลผู้สรรหา', 'ผู้รับผิดชอบ']);
+    expect(APPLICANT_EXPORT_HEADERS).not.toContain('ประเภทเจาะจง');
     const [row] = applicantExportRows([app({ posting_owner_name: 'เจ้าหน้าที่ออนไลน์ ก', specific_type: 'เจาะจง (ฟรี)' })], {
       recruiterOf: () => 'เจ้าหน้าที่สรรหา ก',
     });
-    expect(row.slice(-3)).toEqual(['เจ้าหน้าที่สรรหา ก', 'เจ้าหน้าที่ออนไลน์ ก', 'เจาะจง (ฟรี)']);
+    expect(row.slice(-2)).toEqual(['เจ้าหน้าที่สรรหา ก', 'เจ้าหน้าที่ออนไลน์ ก']);
   });
 });

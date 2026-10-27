@@ -15,7 +15,10 @@ import { readJsonBody, getString } from '../_lib/body.js';
 import type { UserRole } from '../_lib/auth.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
-import { loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
+import { getSiamrajUnitRequestById, loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
+import { publicJobPositionLabel } from '../../src/lib/unitRequestDisplay.js';
+import { publicJobTitle } from '../../src/lib/publicJobTitle.js';
+import type { JobRequest } from '../../src/types/index.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import {
   isApplicationInWriteScope,
@@ -1290,6 +1293,29 @@ async function patchProfile(req: AuthedReq, res: ApiRes, id: string, raw: unknow
       if (key === 'license_types') v = Array.isArray(v) && v.length > 0 ? v : null;
       params.push(v);
       sets.push(`${key} = $${params.length}`);
+    }
+    // ตำแหน่งงาน (27 ต.ค. 2569) — ผูกใบขอใหม่ ⇒ ชื่อตำแหน่ง/หน่วยงานมาจากใบขอ ERP (ตัวเดียวกับฟอร์มเพิ่มผู้สมัคร)
+    //   ใบขอต้องอยู่ในสิทธิ์ BU ของคนแก้ · ล้าง = ยังไม่ระบุ (หาล่วงหน้า) · สาย AI ที่ส่งไปแล้วของใบเดิมไม่ถูกแตะ
+    if ('job_id' in changes) {
+      const jobId = changes.job_id ?? null;
+      let jobTitle: string | null = null;
+      let unitName: string | null = null;
+      let interest: string | null = null;
+      if (jobId) {
+        const job = (await getSiamrajUnitRequestById(jobId, await loadUserDepartmentScope(req.user))) as JobRequest | null;
+        if (!job) return sendError(res, 404, 'Not found', 'ไม่เจอใบขอนี้ หรือใบปิดไปแล้ว');
+        jobTitle = publicJobPositionLabel(job) || null;
+        unitName = job.unit_name?.trim() || null;
+        interest = publicJobTitle(job) || null;
+      }
+      params.push(jobTitle);
+      sets.push(`job_title = $${params.length}`);
+      params.push(unitName);
+      sets.push(`unit_name = $${params.length}`);
+      if (interest) {
+        params.push(interest);
+        sets.push(`position_interest = $${params.length}`);
+      }
     }
     const nameChanged = keys.some((k) => k === 'title_prefix' || k === 'first_name' || k === 'last_name');
     let fullName: string | null = null;

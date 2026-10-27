@@ -22,7 +22,7 @@ import {
   splitImportLicenses,
   toPreviewRows,
 } from '../../src/lib/applicantImport.js';
-import { RM_LICENSE_TYPES, RM_SPECIFIC_TYPES } from '../../src/lib/recruitRmMasters.js';
+import { RM_LICENSE_TYPES } from '../../src/lib/recruitRmMasters.js';
 
 const header = importTemplateHeaders();
 const { index } = mapImportHeader(header);
@@ -42,7 +42,6 @@ describe('ไฟล์ตัวอย่าง', () => {
       'จังหวัด',
       'อำเภอ/เขต',
       'ตำแหน่งงานที่สนใจ',
-      'ประเภทเจาะจง',
       'วุฒิการศึกษา',
       'ประเภทใบขับขี่',
     ]);
@@ -52,8 +51,9 @@ describe('ไฟล์ตัวอย่าง', () => {
     const sheet = importValuesSheet();
     const col = (i: number) => sheet.slice(1).map((r) => r[i]).filter(Boolean);
     expect(col(0)).toEqual(['ชาย', 'หญิง']);
-    expect(col(1)).toEqual([...RM_SPECIFIC_TYPES]);
-    expect(col(3)).toEqual([...RM_LICENSE_TYPES]);
+    // ประเภทเจาะจงถอดแล้ว (27 ต.ค. 2569) — เพศ · วุฒิ · ใบขับขี่
+    expect(sheet[0]).toEqual(['เพศ', 'วุฒิการศึกษา', 'ประเภทใบขับขี่ (หลายใบคั่นด้วย ,)']);
+    expect(col(2)).toEqual([...RM_LICENSE_TYPES]);
   });
 
   it('อ่านหัวแบบทนช่องว่าง/ดอกจัน/ตัวพิมพ์ · ขาดคอลัมน์ที่ต้องมี = บอกชื่อ', () => {
@@ -121,15 +121,9 @@ describe('แผนต่อแถว', () => {
     ]);
   });
 
-  it('🔴 ประเภทเจาะจง/ใบขับขี่นอกรายการ ⇒ บอกแถว (ไม่ทิ้งค่าเงียบ ๆ)', () => {
-    const plans = planImportRows(
-      [row({ ...ok, specific_type: 'อะไรสักอย่าง' }), row({ ...ok, phone: '0811111111', license_types: 'ใบขับขี่เรือ' })],
-      index,
-    );
-    expect(plans.map((p) => ('reason' in p ? p.reason : 'ok'))).toEqual([
-      'ประเภทเจาะจง "อะไรสักอย่าง" ไม่อยู่ในรายการ',
-      'ไม่รู้จักใบขับขี่ "ใบขับขี่เรือ"',
-    ]);
+  it('🔴 ใบขับขี่นอกรายการ ⇒ บอกแถว (ไม่ทิ้งค่าเงียบ ๆ)', () => {
+    const plans = planImportRows([row({ ...ok, phone: '0811111111', license_types: 'ใบขับขี่เรือ' })], index);
+    expect(plans.map((p) => ('reason' in p ? p.reason : 'ok'))).toEqual(['ไม่รู้จักใบขับขี่ "ใบขับขี่เรือ"']);
   });
 
   it('🔴 เบอร์ซ้ำในไฟล์ ⇒ แถวแรกได้ แถวหลังข้าม · เบอร์ที่สมัครภายใน 14 วัน ⇒ ข้ามด้วยเหตุผลที่ส่งมา', () => {

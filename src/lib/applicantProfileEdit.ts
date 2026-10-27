@@ -9,7 +9,7 @@
  * ⚠️ **เบอร์โทรไม่อยู่ในนี้** — เป็นคีย์ของล็อกโทร/คิว AI แก้ได้ที่เส้นแก้เบอร์เดิมเท่านั้น
  * ⚠️ ช่วงอายุ/น้ำหนัก/ส่วนสูง ชุดเดียวกับฟอร์มสมัครสาธารณะ (`api/_lib/publicApplications.ts`)
  */
-import { RM_EDUCATION_LEVELS, RM_LICENSE_TYPES, RM_SPECIFIC_TYPES } from './recruitRmMasters';
+import { RM_EDUCATION_LEVELS, RM_LICENSE_TYPES } from './recruitRmMasters';
 
 export type ProfileGender = 'male' | 'female' | 'other';
 
@@ -34,7 +34,11 @@ export type ProfileDraft = {
    */
   recruiter_name: string;
   responsible_name: string;
-  specific_type: string;
+  /**
+   * ตำแหน่งงาน = ใบขอ ERP ที่ผูก (เจ้าของ 27 ต.ค. 2569 "ตำแหน่งงานให้แก้ไขได้ โดยดึงชื่อจาก erp") —
+   * เลือกจากใบขอที่เปิด · server เติมชื่อตำแหน่ง/หน่วยงานจากใบขอเอง · ว่าง = ยังไม่ระบุ (หาล่วงหน้า)
+   */
+  job_id: string;
 };
 
 /** ค่าที่ส่งเข้า API (เฉพาะช่องที่เปลี่ยน) — `null` = ล้างค่า */
@@ -54,7 +58,7 @@ export type ProfilePatch = Partial<{
   note: string | null;
   recruiter_name: string | null;
   responsible_name: string | null;
-  specific_type: string | null;
+  job_id: string | null;
 }>;
 
 export type ProfileKey = keyof ProfileDraft;
@@ -76,11 +80,12 @@ export const PROFILE_KEYS: readonly ProfileKey[] = [
   'note',
   'recruiter_name',
   'responsible_name',
-  'specific_type',
+  'job_id',
 ];
 
-/** ตัวเลือกประเภทเจาะจง — ชุดเดียวกับฟอร์มเพิ่มผู้สมัคร/ลิงก์ (`RM_SPECIFIC_TYPES`) */
-export const PROFILE_SPECIFIC_TYPE_OPTIONS: readonly string[] = RM_SPECIFIC_TYPES;
+
+/** รหัสใบขอที่ผูกได้ — ใบขอ ERP ปกติ/ล่วงหน้า (`siamraj-sql:` · `siamraj-pre:`) */
+export const PROFILE_JOB_ID = /^siamraj-(sql|pre):[A-Za-z0-9_-]{1,40}$/;
 
 export const PROFILE_LIMITS = {
   age: [15, 80],
@@ -116,7 +121,7 @@ type Source = {
   note?: string | null;
   recruiter_name?: string | null;
   responsible_name?: string | null;
-  specific_type?: string | null;
+  job_id?: string | null;
 };
 
 const str = (v: unknown): string => (v === null || v === undefined ? '' : String(v));
@@ -147,7 +152,7 @@ export function profileDraftOf(a: Source): ProfileDraft {
     note: str(a.note),
     recruiter_name: str(a.recruiter_name).trim(),
     responsible_name: str(a.responsible_name).trim(),
-    specific_type: str(a.specific_type).trim(),
+    job_id: str(a.job_id).trim(),
   };
 }
 
@@ -185,7 +190,7 @@ const LABEL: Record<ProfileKey, string> = {
   note: 'ความคิดเห็น',
   recruiter_name: 'ข้อมูลผู้สรรหา',
   responsible_name: 'ผู้รับผิดชอบ',
-  specific_type: 'ประเภทเจาะจง',
+  job_id: 'ตำแหน่งงาน',
 };
 
 function numberIn(raw: unknown, [min, max]: readonly [number, number], integer: boolean): number | null | 'bad' {
@@ -227,11 +232,11 @@ export function parseProfilePatch(raw: unknown, existingLicenses: readonly strin
     if (!t) return { ok: false, message: `กรุณากรอก${LABEL[key]}` };
     patch[key] = t;
   }
-  if ('specific_type' in b) {
-    const v = b.specific_type;
-    if (v === null || v === '') patch.specific_type = null;
-    else if (typeof v === 'string' && PROFILE_SPECIFIC_TYPE_OPTIONS.includes(v.trim())) patch.specific_type = v.trim();
-    else return { ok: false, message: 'ประเภทเจาะจงไม่ถูกต้อง' };
+  if ('job_id' in b) {
+    const v = b.job_id;
+    if (v === null || v === '') patch.job_id = null;
+    else if (typeof v === 'string' && PROFILE_JOB_ID.test(v.trim())) patch.job_id = v.trim();
+    else return { ok: false, message: 'ตำแหน่งงานไม่ถูกต้อง' };
   }
   if ('gender' in b) {
     const g = b.gender;

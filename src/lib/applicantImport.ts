@@ -11,9 +11,7 @@
 import {
   RM_EDUCATION_LEVELS,
   RM_LICENSE_TYPES,
-  RM_SPECIFIC_TYPES,
   isRmLicenseType,
-  isRmSpecificType,
 } from './recruitRmMasters';
 import { parseStaffApplication, type StaffApplicationValue } from './staffApplicationInput';
 
@@ -27,7 +25,6 @@ export type ImportColumnKey =
   | 'province'
   | 'district'
   | 'position_interest'
-  | 'specific_type'
   | 'education'
   | 'license_types';
 
@@ -43,7 +40,6 @@ export const IMPORT_COLUMNS: ReadonlyArray<{ key: ImportColumnKey; header: strin
   { key: 'province', header: 'จังหวัด', required: false },
   { key: 'district', header: 'อำเภอ/เขต', required: false },
   { key: 'position_interest', header: 'ตำแหน่งงานที่สนใจ', required: false },
-  { key: 'specific_type', header: 'ประเภทเจาะจง', required: false },
   { key: 'education', header: 'วุฒิการศึกษา', required: false },
   { key: 'license_types', header: 'ประเภทใบขับขี่', required: false },
 ];
@@ -60,9 +56,10 @@ export function importTemplateHeaders(): string[] {
 
 /** ชีต "ค่าที่ใช้ได้" — ตารางค่า ไม่ใช่ประโยคอธิบาย */
 export function importValuesSheet(): string[][] {
-  const lists = [['ชาย', 'หญิง'], [...RM_SPECIFIC_TYPES], [...RM_EDUCATION_LEVELS], [...RM_LICENSE_TYPES]];
+  // ประเภทเจาะจงถอดแล้ว (เจ้าของ 27 ต.ค. 2569)
+  const lists = [['ชาย', 'หญิง'], [...RM_EDUCATION_LEVELS], [...RM_LICENSE_TYPES]];
   const height = Math.max(...lists.map((l) => l.length));
-  const rows: string[][] = [['เพศ', 'ประเภทเจาะจง', 'วุฒิการศึกษา', 'ประเภทใบขับขี่ (หลายใบคั่นด้วย ,)']];
+  const rows: string[][] = [['เพศ', 'วุฒิการศึกษา', 'ประเภทใบขับขี่ (หลายใบคั่นด้วย ,)']];
   for (let i = 0; i < height; i += 1) rows.push(lists.map((l) => l[i] ?? ''));
   return rows;
 }
@@ -172,8 +169,6 @@ export function planImportRows(
     const phone = normalizeImportPhone(cell(cells, index.phone));
     const fail = (reason: string) => out.push({ row, ok: false, reason, name, phone });
 
-    const specific = String(cell(cells, index.specific_type) ?? '').trim();
-    if (specific && !isRmSpecificType(specific)) return fail(`ประเภทเจาะจง "${specific}" ไม่อยู่ในรายการ`);
     const licenses = splitImportLicenses(cell(cells, index.license_types));
     const badLicense = licenses.find((x) => !isRmLicenseType(x));
     if (badLicense) return fail(`ไม่รู้จักใบขับขี่ "${badLicense}"`);
@@ -188,7 +183,6 @@ export function planImportRows(
       province: cell(cells, index.province),
       district: cell(cells, index.district),
       position_interest: cell(cells, index.position_interest),
-      specific_type: specific,
       education: cell(cells, index.education),
       license_types: licenses,
       responsible_name: shared.responsible_name ?? null,

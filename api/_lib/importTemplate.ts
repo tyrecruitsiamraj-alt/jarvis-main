@@ -90,9 +90,9 @@ export function importValidationRules(lists: { provinces: number; districtRows: 
       strict: false,
       prompt: 'เลือกจังหวัดก่อน แล้วเลือกอำเภอ',
     },
-    { key: 'specific_type', formula: `${V}!$B$2:$B$${lastOf(1)}`, strict: true, prompt: 'เลือกประเภทเจาะจง' },
-    { key: 'education', formula: `${V}!$C$2:$C$${lastOf(2)}`, strict: true, prompt: 'เลือกวุฒิการศึกษา' },
-    { key: 'license_types', formula: `${V}!$D$2:$D$${lastOf(3)}`, strict: false, prompt: 'เลือก หรือพิมพ์หลายใบคั่นด้วย ,' },
+    // ประเภทเจาะจงถอดแล้ว (เจ้าของ 27 ต.ค. 2569 "ฉันบอกให้เอาออก")
+    { key: 'education', formula: `${V}!$B$2:$B$${lastOf(1)}`, strict: true, prompt: 'เลือกวุฒิการศึกษา' },
+    { key: 'license_types', formula: `${V}!$C$2:$C$${lastOf(2)}`, strict: false, prompt: 'เลือก หรือพิมพ์หลายใบคั่นด้วย ,' },
   ];
   if (lists.titles > 0) {
     rules.push({ key: 'position_interest', formula: `${L}!$F$2:$F$${lists.titles + 1}`, strict: false, prompt: 'เลือก หรือพิมพ์ตำแหน่งใหม่' });

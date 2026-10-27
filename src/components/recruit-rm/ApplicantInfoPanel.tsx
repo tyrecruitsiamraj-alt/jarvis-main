@@ -11,11 +11,15 @@ import { EM_DASH } from '@/lib/displayFallback';
 import { APPLICATION_ORIGIN_LABEL, type PublicApplication, REFERRAL_SOURCE_LABEL } from '@/lib/publicApplicationsApi';
 import { applicantResponsibleName, applicationJobLabel } from '@/lib/recruitRm';
 import { getJobStaffApiCache, JOB_STAFF_ROSTER_CHANGED_EVENT, refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
+import SearchableSelect from '@/components/shared/SearchableSelect';
+import { fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
+import { jobPickKeywords, jobPickLabel } from '@/lib/jobPickLabel';
+import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import type { JobRequest } from '@/types';
 import {
   PROFILE_EDUCATION_OPTIONS,
   PROFILE_GENDER_LABEL,
   PROFILE_LICENSE_OPTIONS,
-  PROFILE_SPECIFIC_TYPE_OPTIONS,
   PROFILE_TITLE_PREFIXES,
   type ProfileDraft,
   type ProfileGender,
@@ -25,7 +29,8 @@ import {
  * แท็บ "ข้อมูลผู้สมัคร" ในป๊อปรายละเอียด (แบบรูป iRecruit · เจ้าของสั่ง 1 ต.ค. 2569)
  *
  * ตารางสามคอลัมน์ ป้ายเล็กด้านบน ค่าอยู่ใต้ป้าย · กด "แก้ไขข้อมูล" แล้วช่องที่แก้ได้กลายเป็นช่องกรอก
- * ช่องที่แก้ไม่ได้ (เบอร์ · ตำแหน่งงาน · ช่องทาง · ที่มา) ยังเป็นข้อความ · ผู้สรรหา/ผู้รับผิดชอบ/ประเภทเจาะจง แก้ได้ตั้งแต่ 19 ต.ค. 2569
+ * ช่องที่แก้ไม่ได้ (เบอร์ · ช่องทาง · ที่มา) ยังเป็นข้อความ · ผู้สรรหา/ผู้รับผิดชอบ แก้ได้ตั้งแต่ 19 ต.ค. 2569 ·
+ * ตำแหน่งงาน = เลือกใบขอ ERP ตอนแก้ (27 ต.ค. 2569) · ประเภทเจาะจงถอดแล้ว (27 ต.ค. 2569 "ฉันบอกให้เอาออก")
  * ⚠️ เบอร์แก้ที่ช่องแก้เบอร์เดิม (เป็นคีย์ของล็อกโทร) · ค่าที่ส่งคือฟอร์มทั้งก้อน หน้าแม่เป็นคนหาช่องที่เปลี่ยน
  * ⚠️ "ผู้สร้างช่องทาง" ในรูปเดิม → ใช้ "ผู้รับผิดชอบ" — jarvis ไม่ได้เก็บคนสร้างช่องทางไว้กับใบสมัคร
  *    "โพสต์ประกาศงาน" → ใช้ "ที่มา" (สมัครใหม่ / AI หาให้ / เจ้าหน้าที่คีย์) ด้วยเหตุผลเดียวกัน
@@ -68,6 +73,18 @@ const ApplicantInfoPanel: React.FC<{
    * รายชื่อให้เลือกตอนแก้ (เจ้าของ 19 ต.ค. 2569 "ข้อมูลผู้สรรหา ทำให้แก้ไขได้" + ผู้รับผิดชอบ + ประเภทเจาะจง)
    * ผู้สรรหา = สายงานสรรหา · ผู้รับผิดชอบ = ทีม Online (ตั้ง ตั้งค่า › ผู้ใช้งาน) · ค่าเดิมนอกรายการยังเลือกค้างไว้ได้
    */
+  /** ใบขอที่เปิดอยู่ (สิทธิ์ BU ตามบัญชี) — ชุดเดียวกับช่องตำแหน่งงานของฟอร์มเพิ่มผู้สมัคร · โหลดตอนกดแก้ */
+  const [openJobs, setOpenJobs] = useState<JobRequest[]>([]);
+  useEffect(() => {
+    if (!editing) return;
+    let alive = true;
+    void fetchSiamrajUnitRequests(500)
+      .then((list) => alive && setOpenJobs(list))
+      .catch(() => alive && setOpenJobs([]));
+    return () => {
+      alive = false;
+    };
+  }, [editing]);
   const [rosterRev, setRosterRev] = useState(0);
   useEffect(() => {
     if (!editing) return;
@@ -87,9 +104,6 @@ const ApplicantInfoPanel: React.FC<{
   const lane = (l: string) => (roster?.directory ?? []).filter((d) => d.lanes.includes(l)).map((d) => d.name);
   const recruiterOptions = withCurrent(lane('recruiter'), draft.recruiter_name);
   const responsibleOptions = withCurrent(lane('online'), draft.responsible_name);
-  const specificOptions = draft.specific_type && !PROFILE_SPECIFIC_TYPE_OPTIONS.includes(draft.specific_type)
-    ? [draft.specific_type, ...PROFILE_SPECIFIC_TYPE_OPTIONS]
-    : PROFILE_SPECIFIC_TYPE_OPTIONS;
   const jobRecruiter = (jobRecruiterName === undefined ? recruiterName : jobRecruiterName)?.trim() || null;
   const linkOwner = (a.posting_owner_name ?? '').trim() || null;
   const set = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) => onDraft({ ...draft, [key]: value });
@@ -233,7 +247,31 @@ const ApplicantInfoPanel: React.FC<{
           show(a.district)
         )}
       </Field>
-      <Field label="ตำแหน่งงาน">{applicationJobLabel(a)}</Field>
+      {/* ตำแหน่งงาน = เลือกใบขอ ERP (เจ้าของ 27 ต.ค. 2569 "ให้แก้ไขได้ โดยดึงชื่อจาก erp") — ตัวเลือกเดียวกับฟอร์มเพิ่มผู้สมัคร */}
+      <Field label="ตำแหน่งงาน">
+        {editing ? (
+          <div aria-label="ตำแหน่งงาน" data-testid="profile-job">
+            <SearchableSelect
+              value={draft.job_id || NO_PREFIX}
+              onChange={(v) => set('job_id', v === NO_PREFIX ? '' : v)}
+              disabled={disabled}
+              placeholder="เลือกใบขอ"
+              searchPlaceholder="พิมพ์ชื่อหน่วยงาน ตำแหน่ง หรือเลขที่ใบขอ"
+              emptyText="ไม่พบใบขอ"
+              options={[
+                { value: NO_PREFIX, label: 'ยังไม่ระบุ — หาล่วงหน้า' },
+                // ใบเดิมที่ปิดไปแล้ว/อยู่นอกลิสต์ใบเปิด ยังเลือกค้างไว้ได้
+                ...(a.job_id && !openJobs.some((j) => j.id === a.job_id)
+                  ? [{ value: a.job_id, label: applicationJobLabel(a) || 'ใบขอเดิม' }]
+                  : []),
+                ...openJobs.map((j) => ({ value: j.id, label: jobPickLabel(j), keywords: jobPickKeywords(j, publicJobPositionLabel(j)) })),
+              ]}
+            />
+          </div>
+        ) : (
+          applicationJobLabel(a)
+        )}
+      </Field>
 
       {/* ช่องทางอ่านแบบเดียวกับตาราง — ตารางช่องทางของลิงก์ก่อน ไม่มีค่อยใช้ที่ผู้สมัครเลือกเอง (QA 18 ต.ค. 2569: ป๊อปขึ้น "—" แต่ตารางขึ้น TikTok) */}
       {/* ช่องทางของใบ → ไม่มี = ช่องทางของลิงก์ที่กรอกผ่าน (ไม่ได้คัดลอกลงใบ · 19 ต.ค. 2569) → ที่ผู้สมัครเลือกเอง */}
@@ -241,7 +279,7 @@ const ApplicantInfoPanel: React.FC<{
         {show(a.channel_label?.trim() || trace?.linkChannel || (a.referral_source ? REFERRAL_SOURCE_LABEL[a.referral_source] : null))}
       </Field>
       {/* 🔴 16 ต.ค. 2569 เจ้าของ: "ผู้สรรหาก็พวก คิว แบงค์" · "ผู้รับผิดชอบ ก็ทีม online อะ ว่าน เจมส์"
-          เดิมช่องแรกอ่าน `specific_type` (ประเภทเจาะจง) ซึ่งผูกผิดความหมาย และยังไม่มีใบไหนกรอก (0/963) — ย้ายไปช่องของตัวเองข้างล่าง */}
+          เดิมช่องแรกอ่าน `specific_type` (ประเภทเจาะจง) ซึ่งผูกผิดความหมาย · ประเภทเจาะจงถอดออกจากป๊อปแล้ว 27 ต.ค. 2569 */}
       <Field label="ข้อมูลผู้สรรหา">
         {editing ? (
           <Select
@@ -288,30 +326,6 @@ const ApplicantInfoPanel: React.FC<{
           show(applicantResponsibleName(a))
         )}
       </Field>
-      <Field label="ประเภทเจาะจง">
-        {editing ? (
-          <Select
-            value={draft.specific_type || NO_PREFIX}
-            onValueChange={(v) => set('specific_type', v === NO_PREFIX ? '' : v)}
-            disabled={disabled}
-          >
-            <SelectTrigger className="h-9 text-sm" aria-label="ประเภทเจาะจง">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_PREFIX}>ไม่ระบุ</SelectItem>
-              {specificOptions.map((n) => (
-                <SelectItem key={n} value={n}>
-                  {n}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          show(a.specific_type)
-        )}
-      </Field>
-
       <Field label="วุฒิการศึกษา">
         {editing ? (
           <Select value={draft.education || undefined} onValueChange={(v) => set('education', v)} disabled={disabled}>

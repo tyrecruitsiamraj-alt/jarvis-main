@@ -35,11 +35,11 @@ describe('ไฟล์ตัวอย่างนำเข้า — Dropdown �
     expect(mapImportHeader(header).missing).toEqual([]);
   });
 
-  it('🔴 Dropdown ครบ 7 ช่อง · ต้องเลือกจากรายการ = เพศ/จังหวัด/ประเภทเจาะจง/วุฒิ · เตือนแต่ให้ผ่าน = อำเภอ/ตำแหน่ง/ใบขับขี่', () => {
+  it('🔴 Dropdown ครบ 6 ช่อง · ต้องเลือกจากรายการ = เพศ/จังหวัด/วุฒิ · เตือนแต่ให้ผ่าน = อำเภอ/ตำแหน่ง/ใบขับขี่ (ประเภทเจาะจงถอด 27 ต.ค. 2569)', () => {
     const xml = sheetXml(b64, '/xl/worksheets/sheet1.xml');
-    expect(xml).toMatch(/<\/sheetData><dataValidations count="7">/);
+    expect(xml).toMatch(/<\/sheetData><dataValidations count="6">/);
     const v = [...xml.matchAll(/<dataValidation [^>]*sqref="([A-Z]+)2:[A-Z]+501"/g)].map((m) => [m[1], /errorStyle="warning"/.test(m[0])]);
-    expect(Object.fromEntries(v)).toEqual({ E: false, G: false, H: true, J: false, K: false, L: true, I: true });
+    expect(Object.fromEntries(v)).toEqual({ E: false, G: false, H: true, J: false, K: true, I: true });
   });
 
   it('อำเภอ = เฉพาะของจังหวัดในแถวเดียวกัน (OFFSET + MATCH + COUNTIF บนตารางเรียงตามจังหวัด)', () => {

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 // @vitest-environment node
 /**
  * แก้ข้อมูลผู้สมัครจากป๊อปรายละเอียด (เจ้าของสั่ง 1 ต.ค. 2569)
@@ -54,18 +55,29 @@ describe('ค่าตั้งต้นของฟอร์ม', () => {
       note: '',
       recruiter_name: '',
       responsible_name: '',
-      specific_type: '',
+      job_id: '',
     });
   });
 
-  // 🔴 19 ต.ค. 2569 เจ้าของ "ข้อมูลผู้สรรหา ทำให้แก้ไขได้ด้วยสิ่" → เฉพาะผู้สมัครคนนี้ + ผู้รับผิดชอบ + ประเภทเจาะจง
-  it('ผู้สรรหา/ผู้รับผิดชอบ/ประเภทเจาะจง แก้ได้ · ว่าง = ล้าง (ใช้ของใบขอ/ลิงก์) · ประเภทเจาะจงต้องอยู่ในรายการ', () => {
-    expect(parseProfilePatch({ recruiter_name: '  คิว ', responsible_name: '', specific_type: 'เจาะจง (ฟรี)' })).toEqual({
+  // 🔴 19 ต.ค. 2569 เจ้าของ "ข้อมูลผู้สรรหา ทำให้แก้ไขได้ด้วยสิ่" → เฉพาะผู้สมัครคนนี้ + ผู้รับผิดชอบ
+  it('ผู้สรรหา/ผู้รับผิดชอบ แก้ได้ · ว่าง = ล้าง (ใช้ของใบขอ/ลิงก์) · ประเภทเจาะจงถอดแล้ว (27 ต.ค. 2569) ส่งมา = แก้ไม่ได้', () => {
+    expect(parseProfilePatch({ recruiter_name: '  คิว ', responsible_name: '' })).toEqual({
       ok: true,
-      patch: { recruiter_name: 'คิว', responsible_name: null, specific_type: 'เจาะจง (ฟรี)' },
+      patch: { recruiter_name: 'คิว', responsible_name: null },
     });
-    expect(parseProfilePatch({ specific_type: 'อะไรก็ได้' })).toMatchObject({ ok: false });
-    expect(parseProfilePatch({ specific_type: '' })).toEqual({ ok: true, patch: { specific_type: null } });
+    expect(parseProfilePatch({ specific_type: 'เจาะจง (ฟรี)' })).toMatchObject({ ok: false });
+  });
+
+  // 27 ต.ค. 2569 เจ้าของ "ตำแหน่งงานให้แก้ไขได้ โดยแบบดึงชื่อจาก erp" — เลือกใบขอ (server เติมชื่อตำแหน่ง/หน่วยงานเอง)
+  it('ตำแหน่งงาน = รหัสใบขอ ERP · ว่าง = ยังไม่ระบุ · รหัสแปลก = ไม่รับ', () => {
+    expect(parseProfilePatch({ job_id: ' siamraj-sql:OPL6910081 ' })).toEqual({ ok: true, patch: { job_id: 'siamraj-sql:OPL6910081' } });
+    expect(parseProfilePatch({ job_id: 'siamraj-pre:LBM6909007' })).toEqual({ ok: true, patch: { job_id: 'siamraj-pre:LBM6909007' } });
+    expect(parseProfilePatch({ job_id: '' })).toEqual({ ok: true, patch: { job_id: null } });
+    expect(parseProfilePatch({ job_id: 'drop table' })).toMatchObject({ ok: false, message: 'ตำแหน่งงานไม่ถูกต้อง' });
+    const src = readFileSync('api/_handlers/job-applications.ts', 'utf8');
+    expect(src).toContain("if (!job) return sendError(res, 404, 'Not found', 'ไม่เจอใบขอนี้ หรือใบปิดไปแล้ว');");
+    expect(src).toContain('jobTitle = publicJobPositionLabel(job) || null;');
+    expect(readFileSync('src/components/recruit-rm/ApplicantInfoPanel.tsx', 'utf8')).toContain('data-testid="profile-job"');
   });
 
   it('ใบเก่าไม่มีชื่อ/นามสกุลแยก ⇒ แตกจากชื่อเต็ม', () => {
