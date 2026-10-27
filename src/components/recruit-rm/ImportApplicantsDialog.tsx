@@ -52,7 +52,7 @@ const ImportApplicantsDialog: React.FC<{
   /** นำเข้าตามกล่อง — ผูกใบขอนี้ + ส่ง AI โทรเลย · ไม่ส่ง = นำเข้าแบบเดิม (AI ยังไม่โทร) */
   job?: { id: string; title?: string | null; unitName?: string | null; label?: string | null } | null;
 }> = ({ open, onClose, onSaved, job = null }) => {
-  const [staff, setStaff] = useState<Array<{ id: string; name: string }>>([]);
+  const [staff, setStaff] = useState<Array<{ id: string; name: string; label?: string }>>([]);
   const [responsible, setResponsible] = useState(NO_STAFF);
   const [channel, setChannel] = useState<RecruitChannelMatch | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -77,7 +77,8 @@ const ImportApplicantsDialog: React.FC<{
     setBusy(null);
     setError(null);
     // 🔴 ห้ามกลับไปใช้ /api/app-users (admin เท่านั้น — คนอื่นได้ลิสต์ว่าง นำเข้าไม่ได้ · 11 ต.ค. 2569)
-    void fetchResponsibleNames()
+    // ชื่อเล่นสายสรรหา ชุดเดียวกับฟอร์มเพิ่มผู้สมัคร (เจ้าของ 27 ต.ค. 2569 "ต้องมีให้เลือกระบุชื่อ ผู้รับผิดชอบ ว่าน")
+    void fetchResponsibleNames('recruiter')
       .then(setStaff)
       .catch((e) => {
         setStaff([]);
@@ -259,7 +260,7 @@ const ImportApplicantsDialog: React.FC<{
               />
             </div>
 
-            {/* 3. หลังเลือกไฟล์ถึงโผล่ — รายชื่อชุดนี้มาจากไหน ใครดูแล (ต้องเลือกทั้งคู่) */}
+            {/* 3. หลังเลือกไฟล์ถึงโผล่ (ลำดับเจ้าของ 4 ต.ค. 2569) — รายชื่อชุดนี้มาจากไหน ใครดูแล (ต้องเลือกทั้งคู่) */}
             {fileBase64 ? (
               <div className="grid gap-3 sm:grid-cols-2" data-testid="import-shared">
                 <div className="space-y-1.5">
@@ -274,7 +275,7 @@ const ImportApplicantsDialog: React.FC<{
                       </SelectItem>
                       {staff.map((u) => (
                         <SelectItem key={u.id} value={u.id}>
-                          {u.name}
+                          {u.label ?? u.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

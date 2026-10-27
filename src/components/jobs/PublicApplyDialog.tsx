@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { applyLinkShowsDocument } from '@/lib/applyBuLink';
 import { Button } from '@/components/ui/button';
 import { trackPublicClick } from '@/lib/publicClickApi';
 import { cn } from '@/lib/utils';
@@ -120,6 +122,9 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
   const lockedChannel = posting?.channelLabel?.trim() || null;
   const lockedSource = referralSourceOfChannel(lockedChannel);
   const [file, setFile] = useState<File | null>(null);
+  // ลิงก์จาก ตั้งค่า › ลิงก์หน้าสมัคร ที่เลือก "ไม่มีช่องแนบเอกสาร" (`doc=0` · 27 ต.ค. 2569) = ไม่มีช่องนี้
+  const [searchParams] = useSearchParams();
+  const showDocument = applyLinkShowsDocument(searchParams);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -553,6 +558,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                   )}
                 </Field>
 
+                {showDocument ? (
                 <Field label={`แนบเอกสาร (PDF/รูป ≤ ${MAX_DOC_MB}MB)`}>
                   {file ? (
                     <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-secondary/40 px-3 py-2">
@@ -580,6 +586,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                     </label>
                   )}
                 </Field>
+                ) : null}
                 {/* ช่อง "ตำแหน่งที่สนใจ" ถอดแล้ว (30 ก.ย. 2569) — ตำแหน่งมาจากใบขอที่เลือก · หมายเหตุย้ายมาอยู่ท้ายก้อนนี้ */}
                 <Field label="ข้อมูลเพิ่มเติม (ถ้ามี)">
                   <textarea

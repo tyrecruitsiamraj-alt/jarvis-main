@@ -86,5 +86,9 @@ describe('/api/app-user-names', () => {
       // ฟอร์มเพิ่มผู้สมัครขอเฉพาะสายงานสรรหา (21 ต.ค. 2569) — ยังเป็นเส้นเดียวกัน ไม่กลับไป /api/app-users
       expect(src).toMatch(/fetchResponsibleNames\(('recruiter')?\)/);
     }
+    // นำเข้า Excel ใช้ชื่อเล่นสายสรรหาชุดเดียวกับฟอร์มเพิ่มผู้สมัคร (เจ้าของ 27 ต.ค. 2569 "ระบุชื่อ ผู้รับผิดชอบ ว่าน")
+    const imp = readFileSync('src/components/recruit-rm/ImportApplicantsDialog.tsx', 'utf8');
+    expect(imp).toContain("fetchResponsibleNames('recruiter')");
+    expect(imp).toContain('{u.label ?? u.name}');
   });
 });

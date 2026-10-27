@@ -24,9 +24,11 @@ const NUM = new Intl.NumberFormat('th-TH');
 const ApplyLinksTab: React.FC = () => {
   const [bu, setBu] = useState<string>('LBD');
   const [pos, setPos] = useState('');
+  /** ช่องแนบเอกสารบนฟอร์ม (เจ้าของ 27 ต.ค. 2569 Choice "ตอนสร้างลิงก์") — ค่าเริ่ม = ไม่มีช่องแนบ */
+  const [doc, setDoc] = useState<'0' | '1'>('0');
   const [count, setCount] = useState<number | null>(null);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
-  const link = applyBuLink(window.location.origin, bu === ALL ? null : bu, pos);
+  const link = applyBuLink(window.location.origin, bu === ALL ? null : bu, pos, doc === '1');
 
   // จำนวนงานที่ลิงก์นี้จะโชว์ (BU เดียวกัน · ตำแหน่งกรองบนหน้าเว็บอีกชั้น เลขนี้นับเฉพาะ BU)
   useEffect(() => {
@@ -80,6 +82,22 @@ const ApplyLinksTab: React.FC = () => {
               setNotice(null);
             }}
             data-testid="apply-link-pos"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="apply-link-doc">แนบเอกสาร</Label>
+          <FieldSelect
+            id="apply-link-doc"
+            value={doc}
+            onChange={(v) => {
+              setDoc(v === '1' ? '1' : '0');
+              setNotice(null);
+            }}
+            testId="apply-link-doc"
+            options={[
+              { value: '0', label: 'ไม่มีช่องแนบเอกสาร' },
+              { value: '1', label: 'มีช่องแนบเอกสาร' },
+            ]}
           />
         </div>
       </div>
