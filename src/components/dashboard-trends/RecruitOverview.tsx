@@ -61,6 +61,8 @@ import { buildChannelFunnelTree } from '@/lib/channelFunnel';
 import { OVERVIEW_TABS, overviewTabOf } from '@/lib/recruitOverviewTabs';
 import { compareRowsOf, dailySeriesOf } from '@/lib/recruitCompare';
 import TrendLinesCard, { type ComparePeriod } from './TrendLinesCard';
+import ProvinceJobsCard from './ProvinceJobsCard';
+import type { JobRequest } from '@/types';
 import DrillDownCard from './DrillDownCard';
 import { drillTreeOf } from '@/lib/recruitDrill';
 import { toYmdBangkok } from '@/lib/dateTh';
@@ -94,7 +96,9 @@ const RecruitOverview: React.FC<{
    * สถานะตอนนี้ ไม่ขึ้นกับเดือน · `null`/ไม่ส่ง = ยังบอกไม่ได้ ("—")
    */
   published?: BoardPublishedTotals | null;
-}> = () => {
+  /** ใบขอที่เปิด (ชุดเดียวกับกล่องงาน) — การ์ดงานตามจังหวัด · null = ยังโหลดไม่เสร็จ (27 ต.ค. 2569) */
+  openJobs?: readonly JobRequest[] | null;
+}> = ({ openJobs = null }) => {
   /** null = เดือนนี้ (ให้เส้นตัดสินจากวันไทยของ server) */
   const [month, setMonthState] = useState<string | null>(null);
   /**
@@ -379,6 +383,8 @@ const RecruitOverview: React.FC<{
               {data.backlog ? <BacklogBody backlog={data.backlog} /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
             </OverviewCard>
           </div>
+          {/* งานจังหวัดไหนเยอะ เป็นงานแบบไหน (เจ้าของ 27 ต.ค. 2569) — ณ วันนี้ ไม่ขึ้นกับช่วงที่เลือก */}
+          <ProvinceJobsCard jobs={openJobs} />
         </TabsContent>
 
         {/* ─── กรอกเข้ามา: กรอก + AI โทร · โทรวันไหน · รายวัน · ช่องทาง · ตำแหน่ง · เหตุผล ─── */}

@@ -79,7 +79,7 @@ describe('แท็บงานสรรหา', () => {
     const page = readFileSync('src/pages/jobs/StaffJobBoardPage.tsx', 'utf8');
     expect(page).toContain("const EXTRA_VIEWS = ['dashboard', 'precheck'] as const;");
     expect(page).toContain('<PreCheckPage embedded />');
-    expect(page).toContain('<RecruitOverview published={boardPublished} />');
+    expect(page).toContain('<RecruitOverview published={boardPublished} openJobs={loading ? null : jobs} />');
     expect(readFileSync('src/pages/matching/PreCheckPage.tsx', 'utf8')).toContain('{embedded ? null : (');
   });
   it('ตัวเลขรายวันอยู่เฉพาะแท็บผู้สมัคร', () => {
