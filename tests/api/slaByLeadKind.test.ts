@@ -44,6 +44,8 @@ function rec(
     requiredDate,
     slaStatus,
     controlStatus,
+    // ใบหาครบในข้อมูลจริงมีวันปิดเสมอ (วันเริ่มงานคนสุดท้าย · 27 ต.ค. 2569)
+    closureDate: controlStatus === 'fully_closed' ? (requiredDate ?? requestDate) : null,
     job,
   } as RequestControlRecord;
 }
@@ -165,6 +167,15 @@ describe('slaByLeadKind — ใบที่ยกเลิก (บั๊กท�
     const row = t.rows.find((r) => r.kind === 'urgent')!;
     expect(row.closed).toBe(1);
     expect(row.onTimeRatePercent).toBe(100);
+  });
+
+  it('หาครบแต่ไม่รู้วันปิด = คิด SLA ไม่ได้ ไม่นับเป็นปิดทัน (27 ต.ค. 2569 เจ้าของ "ปิดทันหมดเลยหรอ")', () => {
+    const noDate = { ...urgent('K3', 'closed_on_time', 'fully_closed'), closureDate: null } as RequestControlRecord;
+    const t = buildSlaByLeadKind([noDate], TODAY);
+    const row = t.rows.find((r) => r.kind === 'urgent')!;
+    expect(row.cells.unknown).toBe(1);
+    expect(row.cells.closed_on_time).toBe(0);
+    expect(row.onTimeRatePercent).toBeNull();
   });
 
   it('drill-down ของช่องยกเลิกได้เฉพาะใบที่ยกเลิกจริง', () => {

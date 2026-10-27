@@ -103,6 +103,8 @@ const LEAD_KIND_ORDER: readonly RequestLeadKind[] = ['retroactive', 'urgent', 'a
  */
 export function slaCellOf(record: RequestControlRecord): SlaCellKey {
   if (record.controlStatus === 'cancelled_full') return 'cancelled';
+  // หาครบแต่ไม่รู้วันปิด = คิด SLA ไม่ได้ ห้ามเดาว่าทัน (27 ต.ค. 2569 — เดิมขึ้น "ปิดทัน" 100%)
+  if (record.controlStatus === 'fully_closed' && !record.closureDate) return 'unknown';
   return record.slaStatus ?? 'unknown';
 }
 

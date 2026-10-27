@@ -30,6 +30,8 @@ type ClosedRow = {
   request_qty: number | null;
   inform_qty: number | null;
   is_inform_all: string | null;
+  /** วันเริ่มงาน/แจ้งเข้าล่าสุด (ใบแจ้งเข้าที่ไม่ถูกยกเลิก) — วันที่ใบหาคนครบจริง (27 ต.ค. 2569) */
+  last_inform_date?: Date | string | null;
   effective_inform_qty: number | null;
   status: string | null;
   is_stop: string | null;
@@ -92,7 +94,12 @@ function mapClosedRow(r: ClosedRow) {
     departmentCode: r.department_code,
   });
   const breakdown = staffingPositionBreakdown(r);
-  const closureYmd = toYmd(r.stop_date) || toYmd(r.cancel_date) || toYmd(r.request_date);
+  /**
+   * วันปิดของใบ: หยุด/ยกเลิก = วันนั้น · หาครบ = วันเริ่มงานคนสุดท้าย
+   * 🔴 ห้ามถอยไปวันยื่นใบ (27 ต.ค. 2569 เจ้าของ "ปิดทันหมดเลยหรอ") — วันยื่นอยู่ก่อนกำหนดเสมอ ทุกใบจึงเป็นปิดทัน
+   * ไม่รู้วันปิด = ไม่ส่ง (SLA ไม่เดาว่าทัน)
+   */
+  const closureYmd = toYmd(r.stop_date) || toYmd(r.cancel_date) || toYmd(r.last_inform_date ?? null) || '';
 
   return {
     id: `siamraj-sql:${rawRequestNo}`,
@@ -228,6 +235,9 @@ export async function listSiamrajSqlServerClosedRequests(options: {
         SELECT 1 FROM st_inform_head IH
          WHERE IH.request_no = A.request_no AND ${activeInformWhereSql('IH')}
       ) THEN 1 ELSE 0 END AS has_inform,
+      /* วันที่หาคนครบจริง = วันเริ่มงานล่าสุดของใบแจ้งเข้าที่ไม่ถูกยกเลิก (27 ต.ค. 2569 —
+         เดิมใบหาครบไม่มีวันปิด ถอยไปใช้วันยื่นใบ ⇒ ตาราง SLA ขึ้น "ปิดทัน" 100% ทุกใบ) */
+      LI.last_inform_date,
       A.request_code AS request_action_code,
       (SELECT z.request_name FROM st_ms_request z WHERE z.request_code = A.request_code) AS request_action_name,
       A.site_code,
@@ -242,12 +252,20 @@ export async function listSiamrajSqlServerClosedRequests(options: {
       (SELECT z.job_description_name FROM hr_ms_job_description_2 z WHERE z.job_description_code_2 = A.job_description_code_2) AS job_name2
     FROM st_request_head A
     INNER JOIN ms_site SS ON A.site_code = SS.site_code
+    OUTER APPLY (
+      SELECT MAX(COALESCE(D.begin_date, IH.inform_date)) AS last_inform_date
+        FROM st_inform_head IH
+        LEFT JOIN st_inform_detail D ON D.inform_no = IH.inform_no
+       WHERE IH.request_no = A.request_no AND ${activeInformWhereSql('IH')}
+    ) LI
     WHERE SS.department_code BETWEEN @deptFrom AND @deptTo
       AND A.site_code BETWEEN @siteFrom AND @siteTo
       ${clsExclude}
       ${deptScope.sql}
-      AND CONVERT(date, COALESCE(A.stop_date, A.cancel_date, A.request_date)) BETWEEN @fromDate AND @toDate
-    ORDER BY COALESCE(A.stop_date, A.cancel_date, A.request_date) DESC
+      /* ใบที่ "ปิดในช่วง" = วันปิดจริงอยู่ในช่วง (หยุด/ยกเลิก/คนสุดท้ายเริ่มงาน) — เดิมใบหาครบใช้วันยื่น
+         ⇒ ใบยื่นเดือนก่อนแต่เพิ่งหาครบ (ตัวที่ปิดไม่ทัน) หลุดจากช่วง (27 ต.ค. 2569) */
+      AND CONVERT(date, COALESCE(A.stop_date, A.cancel_date, LI.last_inform_date, A.request_date)) BETWEEN @fromDate AND @toDate
+    ORDER BY COALESCE(A.stop_date, A.cancel_date, LI.last_inform_date, A.request_date) DESC
     `,
     { ...filters, fromDate: from, toDate: to, limit, ...deptScope.params },
   );
