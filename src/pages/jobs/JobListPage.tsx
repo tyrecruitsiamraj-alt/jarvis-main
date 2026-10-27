@@ -940,7 +940,7 @@ const JobListPage: React.FC = () => {
                   <div className="flex items-center justify-end mt-2 text-xs gap-2">
                     <div className="flex items-center gap-1.5 shrink-0">
                       <PrequestBadge job={j} compact />
-                      <UnitRequestReplacementBadge value={j.send_replacement} compact />
+                      <UnitRequestReplacementBadge value={j.send_replacement} spare={j.replacement_spare} compact />
                       <UnitRequestWorkStatusBadge
                         status={j.work_status}
                         firstName={j.work_person_first_name}
@@ -1111,7 +1111,7 @@ const JobListPage: React.FC = () => {
                     </td>
                     <td className="px-1.5 py-3 text-center">
                       <PrequestBadge job={j} compact />
-                      <UnitRequestReplacementBadge value={j.send_replacement} compact />
+                      <UnitRequestReplacementBadge value={j.send_replacement} spare={j.replacement_spare} compact />
                     </td>
                     <td className="px-1.5 py-3 text-center">
                       <div className="inline-flex flex-col items-center gap-1">

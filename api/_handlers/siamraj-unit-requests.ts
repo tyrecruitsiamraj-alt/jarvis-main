@@ -131,6 +131,7 @@ export async function attachNotes(items: unknown[]): Promise<void> {
       if (!n) continue;
       it.list_note = n.note;
       it.send_replacement = n.send_replacement ?? null;
+      it.replacement_spare = n.replacement_spare === true;
       it.parser_override_text = n.parser_override_text ?? null;
       // apply field overrides ที่ผู้ใช้แก้เอง (persist) ทับค่าจาก ERP
       const fo = n.field_overrides;

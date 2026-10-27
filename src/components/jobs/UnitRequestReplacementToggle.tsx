@@ -53,7 +53,7 @@ const UnitRequestReplacementToggle: React.FC<Props> = ({ job, onSaved, compact, 
   const no = value === false;
 
   if (readOnly) {
-    return <UnitRequestReplacementBadge value={value} compact={compact} />;
+    return <UnitRequestReplacementBadge value={value} spare={job.replacement_spare} compact={compact} />;
   }
 
   return (
@@ -117,6 +117,7 @@ export function UnitRequestReplacementDetail({
  * (ราชการ/เอกชน · ส่งคนแทน · สถานะทำงาน) อยู่แถวเดียวกันและ **หน้าตาเหมือนกัน**
  *
  * 🔴 ยังเป็นสามค่าเหมือนปุ่มเดิม: ยังไม่ระบุ (`null`) / ส่งคนแทน (`true`) / ไม่ส่งคนแทน (`false`)
+ * + Spare (27 ต.ค. 2569 Choice "นับเป็นต้องส่งคนแทน") = `true` + `replacement_spare` — ตัวกรอง/ตัวเลขนับรวมกับต้องส่งคนแทนเอง
  * **ห้ามยุบ "ยังไม่ระบุ" ทิ้ง** — ใบที่ยังไม่มีใครตัดสินใจต้องต่างจาก "ไม่ส่งคนแทน"
  * (ปุ่มเดิมล้างค่าได้ด้วยการกดซ้ำ · dropdown ต้องมีตัวเลือกนี้ให้ชัดแทน)
  */
@@ -126,32 +127,37 @@ export function UnitRequestReplacementSelect({
   className,
 }: {
   job: JobRequest;
-  onSaved?: (sendReplacement: boolean | null) => void;
+  onSaved?: (sendReplacement: boolean | null, spare: boolean) => void;
   className?: string;
 }) {
   const { isFunctionEnabled } = useRolePermissions();
   const readOnly = !isFunctionEnabled('unit_notes_edit');
   const [value, setValue] = useState<boolean | null | undefined>(job.send_replacement);
+  const [spare, setSpare] = useState(job.send_replacement === true && job.replacement_spare === true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setValue(job.send_replacement);
-  }, [job.id, job.send_replacement]);
+    setSpare(job.send_replacement === true && job.replacement_spare === true);
+  }, [job.id, job.send_replacement, job.replacement_spare]);
 
-  const current = value === true ? 'yes' : value === false ? 'no' : UNSET;
+  const current = value === true ? (spare ? 'spare' : 'yes') : value === false ? 'no' : UNSET;
 
-  const persist = async (next: boolean | null) => {
+  const persist = async (next: boolean | null, nextSpare: boolean) => {
     const key = unitRequestNoteKey(job);
     if (!key) return;
     const prev = value;
+    const prevSpare = spare;
     setValue(next);
+    setSpare(nextSpare);
     setSaving(true);
     try {
-      await saveUnitRequestMeta(key, { send_replacement: next });
-      onSaved?.(next);
+      await saveUnitRequestMeta(key, { send_replacement: next, replacement_spare: nextSpare });
+      onSaved?.(next, nextSpare);
     } catch {
       // ล้มแล้วถอยกลับค่าเดิม — ห้ามให้จอโกหกว่าบันทึกแล้ว
       setValue(prev);
+      setSpare(prevSpare);
     } finally {
       setSaving(false);
     }
@@ -161,7 +167,7 @@ export function UnitRequestReplacementSelect({
     <Select
       value={current}
       disabled={readOnly || saving}
-      onValueChange={(v) => void persist(v === UNSET ? null : v === 'yes')}
+      onValueChange={(v) => void persist(v === UNSET ? null : v === 'yes' || v === 'spare', v === 'spare')}
     >
       <SelectTrigger className={cn('w-full', className)} aria-label="ส่งคนแทนหรือไม่">
         <SelectValue />
@@ -169,6 +175,7 @@ export function UnitRequestReplacementSelect({
       <SelectContent>
         <SelectItem value={UNSET}>ยังไม่ระบุ</SelectItem>
         <SelectItem value="yes">ต้องส่งคนแทน</SelectItem>
+        <SelectItem value="spare">Spare</SelectItem>
         <SelectItem value="no">ไม่ต้องส่งคนแทน</SelectItem>
       </SelectContent>
     </Select>

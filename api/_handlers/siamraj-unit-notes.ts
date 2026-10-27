@@ -29,7 +29,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
       const item = await getUnitNote(requestNo);
       return res.status(200).json(
-        item ?? { request_no: requestNo, note: null, send_replacement: null, updated_at: null },
+        item ?? { request_no: requestNo, note: null, send_replacement: null, replacement_spare: false, updated_at: null },
       );
     } catch (e) {
       return handleApiError(res, e, 'siamraj-unit-notes GET', { userId: req.user.sub });
@@ -51,6 +51,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
       const touchesNote = body.note !== undefined;
       const touchesReplacement = body.send_replacement !== undefined;
+      // Spare (27 ต.ค. 2569) — ส่งคู่กับ send_replacement เสมอจาก dropdown หน้าใบขอ
+      const touchesSpare = typeof body.replacement_spare === 'boolean';
       const touchesParserOverride = body.parser_override_text !== undefined;
       const touchesFieldOverrides = body.field_overrides !== undefined;
       if (!touchesNote && !touchesReplacement && !touchesParserOverride && !touchesFieldOverrides) {
@@ -79,6 +81,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         requestNo,
         ...(touchesNote ? { note: body.note } : {}),
         ...(touchesReplacement ? { send_replacement: sendReplacement ?? null } : {}),
+        ...(touchesSpare ? { replacement_spare: body.replacement_spare as boolean } : {}),
         ...(touchesParserOverride ? { parser_override_text: body.parser_override_text } : {}),
         ...(touchesFieldOverrides ? { field_overrides: body.field_overrides } : {}),
         userId: req.user.sub,
@@ -91,6 +94,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         after: {
           note: item.note,
           send_replacement: item.send_replacement,
+          replacement_spare: item.replacement_spare,
           parser_override_text: item.parser_override_text,
           field_overrides: item.field_overrides,
         },

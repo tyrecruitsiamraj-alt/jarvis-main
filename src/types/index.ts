@@ -351,6 +351,8 @@ export interface JobRequest {
   list_note?: string;
   /** ส่งคนแทน (true) / ไม่ส่งคนแทน (false) — null = ยังไม่เลือก */
   send_replacement?: boolean | null;
+  /** ส่งคนแทนแบบ Spare (27 ต.ค. 2569) — นับเป็นต้องส่งคนแทน (send_replacement = true) */
+  replacement_spare?: boolean;
   /** ข้อความ ERP ที่ override เพื่อใช้แตกสาขาแบบถาวร */
   parser_override_text?: string | null;
   /**

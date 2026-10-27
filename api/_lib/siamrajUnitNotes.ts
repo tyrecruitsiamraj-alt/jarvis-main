@@ -102,6 +102,8 @@ export type UnitNote = {
   request_no: string;
   note: string | null;
   send_replacement: boolean | null;
+  /** ส่งคนแทนแบบ Spare (27 ต.ค. 2569) — true เมื่อ send_replacement true เท่านั้น */
+  replacement_spare: boolean;
   parser_override_text: string | null;
   field_overrides: UnitFieldOverrides | null;
   updated_at: string | null;
@@ -111,12 +113,13 @@ type Row = {
   request_no: string;
   note: string | null;
   send_replacement?: boolean | null;
+  replacement_spare?: boolean | null;
   parser_override_text?: string | null;
   field_overrides?: UnitFieldOverrides | string | null;
   updated_at: string | Date | null;
 };
 
-const optionalColumns = ['send_replacement', 'parser_override_text', 'field_overrides'] as const;
+const optionalColumns = ['send_replacement', 'replacement_spare', 'parser_override_text', 'field_overrides'] as const;
 type OptionalColumn = (typeof optionalColumns)[number];
 const columnExists: Partial<Record<OptionalColumn, boolean>> = {};
 
@@ -358,6 +361,7 @@ function mapRow(r: Row, cols: Record<OptionalColumn, boolean>): UnitNote {
     request_no: r.request_no,
     note: r.note,
     send_replacement: cols.send_replacement ? (r.send_replacement ?? null) : null,
+    replacement_spare: cols.replacement_spare ? r.replacement_spare === true : false,
     parser_override_text: cols.parser_override_text ? (r.parser_override_text ?? null) : null,
     field_overrides: cols.field_overrides ? readFieldOverrides(r.field_overrides) : null,
     updated_at: toIso(r.updated_at),
@@ -365,12 +369,13 @@ function mapRow(r: Row, cols: Record<OptionalColumn, boolean>): UnitNote {
 }
 
 async function resolveCols(): Promise<Record<OptionalColumn, boolean>> {
-  const [send_replacement, parser_override_text, field_overrides] = await Promise.all([
+  const [send_replacement, replacement_spare, parser_override_text, field_overrides] = await Promise.all([
     hasColumn('send_replacement'),
+    hasColumn('replacement_spare'),
     hasColumn('parser_override_text'),
     hasColumn('field_overrides'),
   ]);
-  return { send_replacement, parser_override_text, field_overrides };
+  return { send_replacement, replacement_spare, parser_override_text, field_overrides };
 }
 
 function selectColumns(cols: Record<OptionalColumn, boolean>): string {
@@ -460,6 +465,7 @@ export async function upsertUnitNote(input: {
   requestNo: string;
   note?: unknown;
   send_replacement?: boolean | null;
+  replacement_spare?: boolean;
   parser_override_text?: unknown;
   field_overrides?: unknown;
   userId?: string | null;
@@ -477,6 +483,11 @@ export async function upsertUnitNote(input: {
   if (cols.send_replacement) {
     values.send_replacement =
       input.send_replacement !== undefined ? input.send_replacement : (existing?.send_replacement ?? null);
+  }
+  if (cols.replacement_spare) {
+    // Spare ได้เฉพาะใบที่ต้องส่งคนแทน — เปลี่ยนเป็นไม่ส่ง/ยังไม่ระบุ = ล้าง Spare ทิ้ง
+    const spare = input.replacement_spare !== undefined ? input.replacement_spare : (existing?.replacement_spare ?? false);
+    values.replacement_spare = values.send_replacement === true && spare === true;
   }
   if (cols.parser_override_text) {
     values.parser_override_text =

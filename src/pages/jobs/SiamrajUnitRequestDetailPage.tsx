@@ -432,9 +432,9 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                   </label>
                   <UnitRequestReplacementSelect
                     job={data}
-                    onSaved={(sendReplacement) => {
+                    onSaved={(sendReplacement, spare) => {
                       queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
-                        old ? { ...old, send_replacement: sendReplacement } : old,
+                        old ? { ...old, send_replacement: sendReplacement, replacement_spare: spare } : old,
                       );
                     }}
                   />

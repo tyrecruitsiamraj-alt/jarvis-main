@@ -3,12 +3,14 @@ import { cn } from '@/lib/utils';
 
 type Props = {
   value?: boolean | null;
+  /** ใบ Spare (27 ต.ค. 2569) — ป้ายขึ้น Spare แทนต้องส่งคนแทน */
+  spare?: boolean;
   compact?: boolean;
   className?: string;
 };
 
 /** แสดงผลอย่างเดียว — ใช้ในรายการงาน (ไม่แก้ไขได้) */
-const UnitRequestReplacementBadge: React.FC<Props> = ({ value, compact, className }) => {
+const UnitRequestReplacementBadge: React.FC<Props> = ({ value, spare, compact, className }) => {
   if (value !== true && value !== false) {
     return <span className={cn('text-xs text-muted-foreground', className)}>—</span>;
   }
@@ -25,7 +27,7 @@ const UnitRequestReplacementBadge: React.FC<Props> = ({ value, compact, classNam
     >
       {/* 🔴 ภาษาสถานะ ไม่ใช่กริยาคำสั่ง (แผนแก้จุดงงข้อ 4 · 2 ก.ย. 2569) — Haiku อ่าน
           "ส่งคนแทน" เป็นปุ่มแล้วไม่กล้ากด เพราะ pill ทรงเดียวกับปุ่มทั้งหน้า */}
-      {yes ? 'ต้องส่งคนแทน' : 'ไม่ต้องส่งคนแทน'}
+      {yes ? (spare ? 'Spare' : 'ต้องส่งคนแทน') : 'ไม่ต้องส่งคนแทน'}
     </span>
   );
 };

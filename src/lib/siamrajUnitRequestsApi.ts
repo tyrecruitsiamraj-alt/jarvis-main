@@ -199,6 +199,7 @@ export async function saveUnitRequestMeta(
   payload: {
     note?: string | null;
     send_replacement?: boolean | null;
+    replacement_spare?: boolean;
     parser_override_text?: string | null;
     field_overrides?: UnitFieldOverrides | null;
   },

@@ -46,6 +46,7 @@ const FIELD_LABEL: Record<string, string> = {
   // หมายเหตุ/ตัวเลือกใบขอ
   note: 'โน้ต',
   send_replacement: 'ส่งคนแทน',
+  replacement_spare: 'Spare',
   parser_override_text: 'ข้อความที่ใช้แทนใบขอ',
   field_overrides: 'ค่าที่แก้ทับจากใบขอ',
 };
