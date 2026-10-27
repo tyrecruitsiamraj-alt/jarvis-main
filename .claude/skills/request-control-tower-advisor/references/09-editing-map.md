@@ -13894,3 +13894,8 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 ### ลิงก์หน้าสมัครแยก BU (27 ต.ค. 2569)
 - ตั้งค่า › ลิงก์หน้าสมัคร (`ApplyLinksTab` · แท็บ `applyLinks` กลุ่มข้อมูลอ้างอิง) — เลือก BU + ล็อกตำแหน่ง ได้ลิงก์ `/apply?bu=LBD&pos=…` (`src/lib/applyBuLink.ts`) · ไม่เก็บลงฐาน
 - `/api/public/jobs?bu=` กรองฝั่ง server ด้วย `normalizeTrendBu(department_code)` · ไม่ส่งรหัส BU ออกหน้าสาธารณะ · `PublicJobBoardPage` อ่าน `bu` จาก URL · ตำแหน่งล็อกด้วย `pos` ตัวเดิม
+
+### หน้าหลักผู้บริหาร: เสียวันละรวม = ตารางเจ้าหน้าที่ · สถานที่ทำงาน (27 ต.ค. 2569)
+- `overdueOf` (`src/lib/homeExec.ts`) = ทุกใบที่เปิดและเลยวันที่ต้องการ (รวมใบค้างเกิน 90 วัน) · กล่องเสียเงินโชว์ "ใบที่เลยวัน · เสียวันละ" จากตัวนี้ และ "ในนั้นค้างเกิน 90 วัน" จาก `staleOf` · ตารางงานของเจ้าหน้าที่มีแถว "รวม" — เทสต์คุมว่าเท่ากัน
+- สถานที่ทำงาน = ERP `st_request_p2.work_place1` → `place` (`siamrajPenaltyLedgerSql.ts` → `PenaltyRequestRow` → `MoneyRequest` → `UrgentRow`) · โชว์ในการ์ดต้องรีบ + ป๊อปรายใบ
+- ส่งคนแทนจาก iRecruit: เบอร์เจ้าหน้าที่ = คนแก้ใบล่าสุด (`ir_job_header.user_update`) ถ้ามี · ไม่มี = คนเพิ่มใบ · สายเดิมเติมเฉพาะที่ยังว่าง (`irecruitReplaceSync.ts`)

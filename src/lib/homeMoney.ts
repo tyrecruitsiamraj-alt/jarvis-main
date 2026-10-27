@@ -11,6 +11,8 @@ export type MoneyRequest = {
   bu: string | null;
   unit: string;
   position: string;
+  /** สถานที่ทำงาน · null = ไม่ได้กรอก */
+  place?: string | null;
   qty: number;
   filled: number;
   keyYmd: string;
@@ -119,6 +121,7 @@ export function buildHomeMoney(
       bu: r.bu,
       unit: r.unit,
       position: r.position,
+      place: r.place ?? null,
       qty: r.qty,
       filled: r.filled,
       keyYmd: r.keyYmd,

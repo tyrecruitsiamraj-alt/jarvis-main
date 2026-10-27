@@ -31,6 +31,8 @@ export type PenaltyRequestRow = {
   bu: string | null;
   unit: string;
   position: string;
+  /** สถานที่ทำงาน (ERP work_place1) · null = ไม่ได้กรอก */
+  place?: string | null;
   qty: number;
   /** วันคีย์ใบขอ YYYY-MM-DD */
   keyYmd: string;

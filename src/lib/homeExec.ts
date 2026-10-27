@@ -7,7 +7,7 @@
 import type { MoneyRequest } from './homeMoney';
 
 /** `owner` = เจ้าหน้าที่สรรหาของใบ (ไม่มี = `NO_OWNER`) — หัวหน้ารู้ทันทีว่าต้องตามใคร (เจ้าของ 25 ต.ค. 2569) */
-export type UrgentRow = { requestNo: string; unit: string; position: string; missing: number; perDay: number; needYmd: string | null; owner: string };
+export type UrgentRow = { requestNo: string; unit: string; position: string; place: string | null; missing: number; perDay: number; needYmd: string | null; owner: string };
 
 const missingOf = (r: Pick<MoneyRequest, 'qty' | 'filled'>) => Math.max(0, r.qty - r.filled);
 /** เสียวันละ = คนที่ยังขาด × (ค่าปรับ + ลดมูลค่า) ต่อคนต่อวัน */
@@ -18,6 +18,7 @@ const toRow = (r: MoneyRequest): UrgentRow => ({
   requestNo: r.requestNo,
   unit: r.unit,
   position: r.position,
+  place: r.place?.trim() || null,
   missing: missingOf(r),
   perDay: perDayOf(r),
   needYmd: r.needYmd,
@@ -36,6 +37,19 @@ export function isStale(r: Pick<MoneyRequest, 'open' | 'needYmd' | 'filled'>, to
 }
 export function staleOf(requests: readonly MoneyRequest[], today: string): { rows: UrgentRow[]; perDay: number } {
   const rows = requests.filter((r) => isStale(r, today)).map(toRow).sort((a, b) => b.perDay - a.perDay);
+  return { rows, perDay: rows.reduce((a, r) => a + r.perDay, 0) };
+}
+
+/**
+ * เสียวันละทั้งหมด = ทุกใบที่ยังเปิดและเลยวันที่ต้องการ (รวมใบค้างเกิน 90 วัน) — เท่ากับผลรวมช่อง
+ * "เสียเงินวันละ" ของตารางงานของเจ้าหน้าที่ทุกคน (เจ้าของ 27 ต.ค. 2569 "ยอดไม่เท่ากันหนิ")
+ */
+export function overdueOf(requests: readonly MoneyRequest[], today: string): { rows: UrgentRow[]; perDay: number } {
+  const rows = requests
+    // นับใบเสียวันละ 0 ด้วย — จำนวนใบต้องเท่าช่อง "ใบที่เลยวัน" ของตาราง
+    .filter((r) => r.open && r.needYmd != null && r.needYmd <= today)
+    .map(toRow)
+    .sort((a, b) => b.perDay - a.perDay);
   return { rows, perDay: rows.reduce((a, r) => a + r.perDay, 0) };
 }
 

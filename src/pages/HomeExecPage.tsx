@@ -19,7 +19,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlarmClock, Bot, Clock3, HandCoins, Hourglass, Layers, Users } from 'lucide-react';
+import { AlarmClock, Bot, Clock3, HandCoins, Hourglass, Layers, MapPin, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -41,7 +41,7 @@ import { fetchHomeMoney, previousWindow, type HomeMoneyPayload } from '@/lib/hom
 import { fetchHomeAiShare } from '@/lib/homeAiShareApi';
 import { sharesOfCalled, type AiShareBlockKey, type AiShareResponse, type AiShareWindow } from '@/lib/homeAiShare';
 import HomeAiSharePage from '@/pages/HomeAiSharePage';
-import { byOwner, costliest, dueSoon, NO_OWNER, perDayOf, reasonsOf, staleOf, STALE_DAYS, thisMonthWindow, type OwnerRow, type UrgentRow } from '@/lib/homeExec';
+import { byOwner, costliest, dueSoon, NO_OWNER, overdueOf, perDayOf, reasonsOf, staleOf, STALE_DAYS, thisMonthWindow, type OwnerRow, type UrgentRow } from '@/lib/homeExec';
 import { fetchRequestPipeline } from '@/lib/requestPipelineApi';
 import type { RequestPipelineResponse } from '@/lib/requestPipelineTypes';
 import { channelInterestOf } from '@/lib/channelPlatforms';
@@ -171,6 +171,12 @@ function UrgentCard({
               >
                 <span className="min-w-0">
                   <span className="line-clamp-2 text-sm text-foreground">{[r.unit, r.position].filter(Boolean).join(' · ')}</span>
+                  {r.place ? (
+                    <span className="flex items-start gap-1 text-xs text-muted-foreground">
+                      <MapPin className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                      <span className="line-clamp-2">{r.place}</span>
+                    </span>
+                  ) : null}
                   <span className="block text-xs tabular-nums text-muted-foreground">
                     {r.requestNo} · ขาด {NUM.format(r.missing)} คน · {r.owner}
                   </span>
@@ -307,6 +313,16 @@ const HomeExecPage: React.FC = () => {
     );
   const flowRows = (pick: (f: NonNullable<MoneyRequest['flow']>) => boolean) => openReqs.filter((r) => r.flow && pick(r.flow));
   const stale = useMemo(() => staleOf(openReqs, today), [openReqs, today]);
+  const overdue = useMemo(() => overdueOf(openReqs, today), [openReqs, today]);
+  /** แถวรวมของตารางเจ้าหน้าที่ — เสียวันละรวม = กล่องเสียเงิน */
+  const ownerSum = useMemo(
+    () =>
+      owners.reduce(
+        (a, o) => ({ requests: a.requests + o.requests, overdue: a.overdue + o.overdue, missing: a.missing + o.missing, perDay: a.perDay + o.perDay, closed: a.closed + o.closed, filled: a.filled + o.filled }),
+        { requests: 0, overdue: 0, missing: 0, perDay: 0, closed: 0, filled: 0 },
+      ),
+    [owners],
+  );
   /** ช่องทาง (ชุดเดียวกับตารางช่องทาง) — ดึงเส้นใบขอเฉพาะก้อนช่องทาง */
   const [pipe, setPipe] = useState<RequestPipelineResponse | null>(null);
   useEffect(() => {
@@ -412,6 +428,20 @@ const HomeExecPage: React.FC = () => {
               );
             })}
           </div>
+          {/* เสียวันละรวม = ผลรวมตารางงานของเจ้าหน้าที่ · ใบค้างเกิน 90 วันเป็นส่วนหนึ่งของยอดนี้ (เจ้าของ 27 ต.ค. 2569 "ยอดไม่เท่ากันหนิ") */}
+          <button
+            type="button"
+            className="flex w-full items-start gap-2 rounded-lg text-left text-xs tabular-nums hover:bg-muted/50"
+            disabled={!moneyNow}
+            onClick={() => openList('ใบที่เลยวันที่ต้องการ', rowsOf(overdue.rows))}
+            data-testid="exec-overdue"
+          >
+            <HandCoins className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', TONE.danger.value)} aria-hidden />
+            <span className="text-muted-foreground">
+              ใบที่เลยวัน <span className="font-medium text-foreground">{moneyNow ? NUM.format(overdue.rows.length) : '—'} ใบ</span> · เสียวันละ{' '}
+              <span className={cn('font-medium', TONE.danger.value)}>{moneyNow ? BAHT.format(overdue.perDay) : '—'}</span> บาท
+            </span>
+          </button>
           {/* ใบค้างเกิน 90 วัน = ราว 1 ใน 3 ของเงินที่เสียต่อวัน ⇒ อยู่ในกล่องเสียเงิน (เจ้าของ 25 ต.ค. 2569 Choice) */}
           <button
             type="button"
@@ -422,7 +452,7 @@ const HomeExecPage: React.FC = () => {
           >
             <Hourglass className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', TONE.danger.value)} aria-hidden />
             <span className="text-muted-foreground">
-              ใบค้างเกิน {STALE_DAYS} วัน <span className="font-medium text-foreground">{moneyNow ? NUM.format(stale.rows.length) : '—'} ใบ</span> · เสียวันละ{' '}
+              ในนั้นค้างเกิน {STALE_DAYS} วัน <span className="font-medium text-foreground">{moneyNow ? NUM.format(stale.rows.length) : '—'} ใบ</span> · เสียวันละ{' '}
               <span className={cn('font-medium', TONE.danger.value)}>{moneyNow ? BAHT.format(stale.perDay) : '—'}</span> บาท
             </span>
           </button>
@@ -553,6 +583,12 @@ const HomeExecPage: React.FC = () => {
               </li>
             ))
           )}
+          {owners.length > 0 ? (
+            <li className="flex items-baseline justify-between gap-3 py-2 text-sm font-medium tabular-nums text-foreground" data-testid="exec-owner-sum-phone">
+              <span>รวม · เลยวัน {NUM.format(ownerSum.overdue)} ใบ</span>
+              <span>{BAHT.format(ownerSum.perDay)} บาท/วัน</span>
+            </li>
+          ) : null}
         </ul>
         <div className="hidden overflow-x-auto sm:block">
           <Table>
@@ -601,6 +637,17 @@ const HomeExecPage: React.FC = () => {
                   </TableRow>
                 ))
               )}
+              {owners.length > 0 ? (
+                <TableRow className="border-t-2 font-medium hover:bg-transparent" data-testid="exec-owner-sum">
+                  <TableCell className="text-sm text-foreground">รวม</TableCell>
+                  <TableCell className="text-right tabular-nums">{NUM.format(ownerSum.requests)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{NUM.format(ownerSum.overdue)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{NUM.format(ownerSum.missing)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{BAHT.format(ownerSum.perDay)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{NUM.format(ownerSum.closed)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{NUM.format(ownerSum.filled)}</TableCell>
+                </TableRow>
+              ) : null}
             </TableBody>
           </Table>
         </div>

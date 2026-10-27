@@ -8,7 +8,7 @@ import { buildPenaltyLedger } from '@/lib/requestPenaltyLedger';
 import { buildHomeMoney, ledgerByRequest } from '@/lib/homeMoney';
 import { previousWindow } from '@/lib/homeMoneyApi';
 import { channelInterestOf } from '@/lib/channelPlatforms';
-import { byOwner, costliest, dueSoon, NO_OWNER, staleOf, thisMonthWindow } from '@/lib/homeExec';
+import { byOwner, costliest, dueSoon, NO_OWNER, overdueOf, staleOf, thisMonthWindow } from '@/lib/homeExec';
 import type { MoneyRequest } from '@/lib/homeMoney';
 
 const read = (f: string) => fs.readFileSync(path.join(process.cwd(), f), 'utf8');
@@ -119,6 +119,13 @@ describe('30 วินาที: ต้องรีบ · ใครค้าง�
     expect(c.total).toBe(2);
     // ใบค้างนานผิดปกติแยกออก ไม่เบียด
     expect(staleOf(list, '2026-10-24')).toMatchObject({ perDay: 600, rows: [{ requestNo: 'OLD' }] });
+    // กล่องเสียเงิน "ใบที่เลยวัน · เสียวันละ" = ผลรวมตารางเจ้าหน้าที่ (เจ้าของ 27 ต.ค. 2569 "ยอดไม่เท่ากันหนิ")
+    const od = overdueOf(list, '2026-10-24');
+    const owners = byOwner(list, '2026-10-24');
+    expect(od.perDay).toBe(1050);
+    expect(od.perDay).toBe(owners.reduce((a, o) => a + o.perDay, 0));
+    expect(od.rows.length).toBe(owners.reduce((a, o) => a + o.overdue, 0));
+    expect(od.perDay).toBe(c.rows.reduce((a, r) => a + r.perDay, 0) + staleOf(list, '2026-10-24').perDay);
   });
   it('ถึงวันที่ต้องการใน 3 วัน ยังขาดคน', () => {
     expect(dueSoon(list, '2026-10-24').rows.map((r) => r.requestNo)).toEqual(['C']);

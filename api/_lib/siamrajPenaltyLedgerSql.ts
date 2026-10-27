@@ -52,6 +52,7 @@ type ReqSqlRow = {
   site_code: string;
   unit: string | null;
   position: string | null;
+  work_place: string | null;
   request_qty: number | null;
   key_ymd: string | null;
   need_ymd: string | null;
@@ -91,6 +92,8 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
                 NULLIF(LTRIM(RTRIM((SELECT z.job_description_name FROM hr_ms_job_description_1 z WHERE z.job_description_code_1 = A.job_description_code_1))), N''),
                 (SELECT z.staff_title_name FROM hr_ms_staff_title z WHERE z.staff_title_code = A.staff_title_code)
               ) AS position,
+              -- สถานที่ทำงาน (work_place1 = ที่ที่ไปประจำ) — รายการต้องรีบบอกด้วย (เจ้าของ 27 ต.ค. 2569)
+              NULLIF(LTRIM(RTRIM(B.work_place1)), N'') AS work_place,
               A.request_qty,
               CONVERT(varchar(10), A.request_date, 120) AS key_ymd,
               CONVERT(varchar(10), A.want_date_from, 120) AS need_ymd,
@@ -153,6 +156,7 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
       bu: buFromSiteCode(r.site_code),
       unit: (r.unit ?? '').trim() || r.site_code,
       position: (r.position ?? '').trim(),
+      place: (r.work_place ?? '').trim() || null,
       qty: Number(r.request_qty) || 1,
       keyYmd: r.key_ymd,
       needYmd: r.need_ymd,

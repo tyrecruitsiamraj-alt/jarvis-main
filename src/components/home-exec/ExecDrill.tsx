@@ -184,6 +184,7 @@ export default function ExecDrill({
                             <ChevronDown className={cn('mt-0.5 h-4 w-4 shrink-0 transition-transform', !isOpen && '-rotate-90')} aria-hidden />
                             <span>
                               <span className="block text-sm text-foreground">{(sameUnit ? [r.position] : [r.unit, r.position]).filter(Boolean).join(' · ')}</span>
+                              {r.place ? <span className="block text-xs text-muted-foreground">{r.place}</span> : null}
                               <span className="block text-xs tabular-nums text-muted-foreground">{r.requestNo}</span>
                               {/* มือถือ: 3 ช่องขวาซ่อน ⇒ บอกในบรรทัดนี้แทน (ตรวจจอ 375 · 25 ต.ค. 2569) */}
                               <span className="block text-xs tabular-nums text-muted-foreground sm:hidden">

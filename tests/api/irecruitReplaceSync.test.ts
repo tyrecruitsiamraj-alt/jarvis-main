@@ -836,7 +836,7 @@ describe('คนเพิ่มแผน + เบอร์ฉุกเฉิน 
     const src = readFileSync('api/_lib/irecruitReplaceSync.ts', 'utf8');
     expect(src).toContain('FROM admins a WHERE a.staff_id = h.user_add');
     expect(src).toContain('COALESCE(ua.email, ad.email) AS adder_email');
-    expect(src).toContain("emergency: listed?.emergency ?? adderPhones.get(");
+    expect(src).toMatch(/listed\?\.emergency \?\?\s+adderPhones\.get\(\(r\.updater_email[\s\S]{0,120}adderPhones\.get\(\(r\.adder_email/);
     // สายเดิม: เติมเฉพาะที่ยังว่าง ไม่ทับเบอร์ที่ตั้งไว้
     expect(src).toContain("coalesce(btrim(f.staff_phone), '') = ''");
     const { localThaiPhoneOf } = await import('../../api/_lib/irecruitReplaceSync');

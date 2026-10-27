@@ -98,6 +98,12 @@ export type IrecruitReplaceRow = {
   /** อีเมล/ชื่อคนที่เพิ่มใบใน iRecruit — โชว์เป็น "เพิ่มโดย" */
   adder_email?: string | null;
   adder_name?: string | null;
+  /**
+   * คนแก้ใบล่าสุดใน iRecruit (`user_update` — ชื่อในหน้า /replaces · เจ้าของ 27 ต.ค. 2569 Choice
+   * "คนแก้ล่าสุด ถ้ามี · ไม่มี = คนสร้างใบ") — ใช้เป็นเจ้าหน้าที่ของสาย (เบอร์ที่ AI บอกให้โทรกลับ)
+   * ⚠️ ใบที่ยังเปิดส่วนใหญ่ไม่มีคนแก้ (573/588 วัด 27 ต.ค.) ⇒ ถอยไปคนสร้างใบ
+   */
+  updater_email?: string | null;
 };
 
 /** "เพิ่มโดย" ของสายที่ดึงมา — อีเมลคนเพิ่มใบใน iRecruit · ไม่มีอีเมล = ชื่อ · ไม่รู้เลย = null (ใช้ป้ายของรอบดึง) */
@@ -178,8 +184,12 @@ export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): 
     `SELECT h.job_id, h.replace_no, z.fname, z.lname, z.mobile,
             CASE WHEN wl.staff_id IS NOT NULL THEN 'WL' ELSE 'EX' END AS replace_type,
             s.site_name, h.site_code, h.want_date,
-            COALESCE(ua.email, ad.email) AS adder_email, COALESCE(hs.nm, ad.name) AS adder_name
+            COALESCE(ua.email, ad.email) AS adder_email, COALESCE(hs.nm, ad.name) AS adder_name,
+            COALESCE(uu.email, au.email) AS updater_email
        FROM ir_job_header h
+       -- คนแก้ใบล่าสุด (หน้า /replaces · 27 ต.ค. 2569) — เจ้าหน้าที่ของสาย · ไม่มี = คนเพิ่มใบ
+       OUTER APPLY (SELECT TOP 1 u.email FROM users u WHERE h.user_update IS NOT NULL AND u.staff_id = h.user_update) uu
+       OUTER APPLY (SELECT TOP 1 LTRIM(RTRIM(a.email)) AS email FROM admins a WHERE h.user_update IS NOT NULL AND a.staff_id = h.user_update) au
        -- คนที่เพิ่มใบใน iRecruit (7 ต.ค. 2569 เจ้าของ "ดึงเมล์คนเพิ่มแผนมาด้วย") — users.staff_id = เลขบัตรใน user_add
        OUTER APPLY (SELECT TOP 1 u.email FROM users u WHERE u.staff_id = h.user_add) ua
        -- 🔴 เจ้าหน้าที่หลังบ้านอยู่ตาราง admins ไม่ใช่ users (20 ต.ค. 2569 — เดิมเห็นแค่ชื่อนุศรา · 1,010 ใบของพลอยขึ้น "ดึงจาก iRecruit")
@@ -474,7 +484,7 @@ async function runIrecruitReplaceSyncUnlocked(
       return summary;
     }
     summary.fetched = rows.length;
-    const adderPhones = await loadAdderPhones(rows.map((r) => r.adder_email));
+    const adderPhones = await loadAdderPhones([...rows.map((r) => r.adder_email), ...rows.map((r) => r.updater_email)]);
 
     // ── สายที่ iRecruit ต้องการตอนนี้ ──
     const desired: DesiredMeta[] = [];
@@ -515,8 +525,12 @@ async function runIrecruitReplaceSyncUnlocked(
           siteCode: r.site_code?.trim() || null,
           // สายที่เลยเวลาแล้ว = คนโทร (AI ไม่โทรย้อนหลัง)
           mode: p.past ? 'manual' : typeMode,
-          // รายชื่อให้ AI โทรตั้งเบอร์ไว้ = ใช้ก่อน · ไม่มี = เบอร์คนเพิ่มแผน (หน้าผู้ใช้งาน)
-          emergency: listed?.emergency ?? adderPhones.get((r.adder_email ?? '').trim().toLowerCase()) ?? null,
+          // รายชื่อให้ AI โทรตั้งเบอร์ไว้ = ใช้ก่อน · ไม่มี = เบอร์คนแก้ใบล่าสุด · ไม่มี = เบอร์คนเพิ่มแผน (หน้าผู้ใช้งาน · 27 ต.ค. 2569)
+          emergency:
+            listed?.emergency ??
+            adderPhones.get((r.updater_email ?? '').trim().toLowerCase()) ??
+            adderPhones.get((r.adder_email ?? '').trim().toLowerCase()) ??
+            null,
           replaceType: (r.replace_type ?? '').trim() || null,
         });
       }
