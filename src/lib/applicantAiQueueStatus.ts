@@ -120,6 +120,12 @@ export function aiQueueStatusOf(r: AiQueueInput, now: number = Date.now()): AiQu
     return { kind: 'retry', label, sub: at ? `โทรซ้ำ ${at}` : null, tone: 'warn', atRisk: false };
   }
 
+  // กด "ส่ง AI ใหม่" แล้ว (ตั้งโทรซ้ำตอนนี้ · ยังไม่มีผลรอบใหม่) = รอโทร ไม่ใช่ "ยังไม่มีผล" ของรอบเก่า
+  // (เจ้าของ 27 ต.ค. 2569 "พอกดส่งแล้วมันไม่หาย งงกลัวส่งซ้ำ" — แถวย้ายไปรอโทร ได้ผลแล้วค่อยแยกตามผล)
+  if (followup === 'retry_scheduled') {
+    const at = whenText(r.last_call_next_at);
+    return { kind: 'waiting', label: 'ส่ง AI ใหม่แล้ว รอโทร', sub: at ? `โทร ${at}` : null, tone: 'neutral', atRisk: false };
+  }
   // กรอกนอกช่วงโทรได้ (ค่าเริ่ม 08:00–20:00 · 27 ต.ค. 2569) = Lumos นัดต้นช่วงถัดไป ⇒ นับช้าจากเวลานั้น ไม่ใช่เวลาส่ง
   const sentRaw = Date.parse(r.last_call_sent_at ?? '');
   const sent = Number.isFinite(sentRaw) ? clampToCallWindow(new Date(sentRaw)).getTime() : sentRaw;

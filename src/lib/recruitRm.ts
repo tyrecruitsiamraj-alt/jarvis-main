@@ -153,6 +153,7 @@ export const RM_LIST_VIEWS = [
   'irecruit_dup',
   'ai_at_risk',
   'no_pickup',
+  'ai_talked',
   'retry_wait',
   'irecruit_pull',
   'not_sent',
@@ -189,6 +190,8 @@ export const RM_LIST_VIEWS_SHOWN = [
   'irecruit_dup',
   'retry_wait',
   'no_pickup',
+  // 27 ต.ค. 2569 เจ้าของ "คุยแล้วแต่ไม่ได้คำตอบ ทำไมอยู่ในไม่รับสาย" · Choice แยกกลุ่มต่อจากไม่รับสาย
+  'ai_talked',
   'irecruit_pull',
   'not_sent',
   'ai_cancelled',
@@ -211,11 +214,13 @@ export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
   ai_at_risk: 'AI ไม่ได้ผล',
   ai_waiting: 'รอโทร',
   no_pickup: 'ไม่รับสาย',
+  ai_talked: 'คุยแล้วไม่ได้คำตอบ',
   retry_wait: 'รอติดต่อซ้ำ',
   // 20 ต.ค. 2569 เจ้าของ: "แก้คำ ยังไม่ได้ เป็น iRecruit" + Choice แยกกล่อง — ดึงจาก iRecruit (คนกดส่ง AI เอง) แยกจากที่ยังไม่ส่ง AI
   irecruit_pull: 'iRecruit',
   not_sent: 'ยังไม่ส่ง AI',
-  bad_data: 'ข้อมูลผิด',
+  // 27 ต.ค. 2569 เจ้าของ "ข้อมูลผิด เปลี่ยนเป็น เบอร์โทรผิด" (ชิปนี้ = เบอร์ใช้กับระบบโทรไม่ได้)
+  bad_data: 'เบอร์โทรผิด',
   ai_cancelled: 'ยกเลิก',
   // คิวงานสรรหา (16 ส.ค.): สนใจจริง แต่ยังไม่ขึ้นบอร์ด (= ยังไม่ได้มาสมัคร)
   // "ขึ้นบอร์ดแล้ว" = on_board (server จับคู่เบอร์กับคนบนบอร์ด ERP) → ออกจากคิวเอง
@@ -244,7 +249,9 @@ export function isInRmListView(r: PublicApplication, view: RmListView): boolean 
 }
 
 /** ชิปท้ายแถว (14 ต.ค. 2569) — คนที่ไม่อยู่ชิปก่อนหน้า แบ่งให้ครบทุกคน */
-const RM_REST_VIEWS = ['ai_waiting', 'no_pickup', 'retry_wait', 'irecruit_pull', 'not_sent', 'bad_data', 'ai_cancelled'] as const;
+const RM_REST_VIEWS = ['ai_waiting', 'no_pickup', 'ai_talked', 'retry_wait', 'irecruit_pull', 'not_sent', 'bad_data', 'ai_cancelled'] as const;
+/** รับสาย/คุยแล้วแต่ไม่ได้คำตอบที่ตัดสินได้ (ถังกลาง `classifyCallMicro`) — ไม่ใช่ "ไม่รับสาย" */
+const TALKED_NO_ANSWER = new Set(['talked_unclear', 'not_yet', 'picked_silent']);
 type RmRestView = (typeof RM_REST_VIEWS)[number];
 const RM_PRIMARY_VIEWS = ['interested', 'declined', 'over_age', 'irecruit_dup', 'ai_at_risk'] as const;
 type RmPrimaryView = (typeof RM_PRIMARY_VIEWS)[number];
@@ -285,7 +292,7 @@ export function rmRestViewOf(r: PublicApplication): RmRestView | null {
   if (r.last_call_status === 'cancelled') return 'ai_cancelled';
   const aiCalled =
     Boolean(r.ai_answer) || r.last_call_status === 'completed' || r.last_call_status === 'failed' || Boolean(r.last_call_prev_outcome);
-  if (aiCalled) return 'no_pickup';
+  if (aiCalled) return r.ai_answer && TALKED_NO_ANSWER.has(r.ai_answer.micro) ? 'ai_talked' : 'no_pickup';
   if (r.phone_callable === false) return 'bad_data';
   if (r.created_by_name === IRECRUIT_PULL_CREATED_BY) return 'irecruit_pull';
   return 'not_sent';

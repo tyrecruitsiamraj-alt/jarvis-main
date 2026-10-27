@@ -32,6 +32,10 @@ const CASES: Array<[Partial<PublicApplication>, string]> = [
   [{ last_call_status: 'pending', last_call_followup: 'retry_scheduled', last_call_attempts: 2, last_call_prev_outcome: 'no_answer', last_call_next_at: '2026-10-01T05:00:00Z' }, 'retry_wait'],
   // ส่ง AI แล้วรอสายแรก = รอโทร (เดิมปนในยังไม่ส่ง AI)
   [{ last_call_status: 'pending', last_call_attempts: 1, last_call_sent_at: new Date().toISOString() }, 'ai_waiting'],
+  // กด "ส่ง AI ใหม่" (สายเดิมเงียบ) = รอโทรทันที ไม่ค้างใน AI ไม่ได้ผล (27 ต.ค. 2569 "พอกดส่งแล้วมันไม่หาย")
+  [{ last_call_status: 'pending', last_call_attempts: 1, last_call_followup: 'retry_scheduled', last_call_push_state: 'push_gave_up', last_call_sent_at: '2026-10-25T03:00:00Z', last_call_next_at: new Date().toISOString() }, 'ai_waiting'],
+  // คุยแล้วแต่ไม่ได้คำตอบ ≠ ไม่รับสาย (27 ต.ค. 2569 Choice แยกกลุ่ม)
+  [{ last_call_status: 'completed', last_call_outcome: 'completed', ai_answer: { micro: 'talked_unclear', at: null } }, 'ai_talked'],
 ];
 
 describe('ชิปแท็บผู้สมัคร แบ่งครบไม่ทับกัน', () => {
@@ -57,7 +61,7 @@ describe('ทำไมยังไม่ส่ง AI (27 ต.ค. 2569)', () => 
   });
   it('ลำดับบนจอตามที่เจ้าของสั่ง', () => {
     expect(RM_LIST_VIEWS_SHOWN).toEqual([
-      'all', 'ai_waiting', 'interested', 'declined', 'over_age', 'irecruit_dup', 'retry_wait', 'no_pickup',
+      'all', 'ai_waiting', 'interested', 'declined', 'over_age', 'irecruit_dup', 'retry_wait', 'no_pickup', 'ai_talked',
       'irecruit_pull', 'not_sent', 'ai_cancelled', 'ai_at_risk', 'bad_data',
     ]);
   });
