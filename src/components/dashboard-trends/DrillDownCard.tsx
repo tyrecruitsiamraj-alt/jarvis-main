@@ -19,12 +19,21 @@ export default function DrillDownCard({
   root,
   title,
   onOpenNames,
+  bare = false,
+  path: pathProp,
 }: {
   root: DrillNode | null;
   title: string;
   onOpenNames: (title: string, ids: readonly string[]) => void;
+  /**
+   * ฝังในการ์ดแนวโน้มใบขอ (เจ้าของ 27 ต.ค. 2569 "รวมไว้") — ไม่มีกรอบการ์ด ไม่มีกล่องลูก (กล่องอยู่บนการ์ดแนวโน้มแล้ว)
+   * โชว์แค่ชั้นที่ `path` ชี้: รายการใบขอ / ปุ่มรายชื่อ
+   */
+  bare?: boolean;
+  path?: string[];
 }) {
-  const [path, setPath] = React.useState<string[]>([]);
+  const [pathState, setPath] = React.useState<string[]>([]);
+  const path = pathProp ?? pathState;
   if (!root) {
     return (
       <OverviewCard icon={ListTree} title={title}>
@@ -34,9 +43,25 @@ export default function DrillDownCard({
   }
   const { node, trail } = nodeAt(root, path);
   const pct = (n: number) => (node.count > 0 ? `${Math.round((n / node.count) * 100)}%` : '');
+  const Wrap = ({ children }: { children: React.ReactNode }) =>
+    bare ? (
+      <div className="space-y-2" data-testid="drill-bare">
+        <p className="text-sm font-medium text-foreground">
+          {trail.map((t) => t.label).join(' · ')} <span className="tabular-nums">{fmt(node.count)}</span> {node.unit}
+        </p>
+        {children}
+      </div>
+    ) : (
+      <OverviewCard icon={ListTree} title={title}>
+        {children}
+      </OverviewCard>
+    );
+  // ฝังแล้ว: ชั้นที่มีลูกก็เปิดรายการใบขอของชั้นนั้นตรง ๆ (กล่องลูกอยู่บนการ์ดแนวโน้มแล้ว)
+  const showList = !node.children || bare;
   return (
-    <OverviewCard icon={ListTree} title={title}>
+    <Wrap>
       {/* แถบชั้น — กดชั้นก่อนหน้าเพื่อย้อน */}
+      {bare ? null : (
       <nav className="flex flex-wrap items-center gap-1 text-sm" aria-label="ชั้นที่ดูอยู่" data-testid="drill-trail">
         {trail.map((t, i) => {
           const last = i === trail.length - 1;
@@ -56,8 +81,9 @@ export default function DrillDownCard({
           );
         })}
       </nav>
+      )}
 
-      {node.children && node.children.length > 0 ? (
+      {!bare && node.children && node.children.length > 0 ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" data-testid="drill-children">
           {node.children.map((c) => (
             <Button
@@ -91,7 +117,7 @@ export default function DrillDownCard({
       ) : null}
 
       {/* ปลายทาง — รายชื่อ */}
-      {!node.children && node.ids ? (
+      {showList && node.ids ? (
         node.count > 0 ? (
           <Button type="button" variant="outline" className="w-fit" onClick={() => onOpenNames(trail.map((t) => t.label).join(' · '), node.ids ?? [])} data-testid="drill-names">
             <Users aria-hidden /> ดูรายชื่อ {fmt(node.count)} คน
@@ -102,7 +128,7 @@ export default function DrillDownCard({
       ) : null}
 
       {/* ปลายทาง — รายการใบขอ */}
-      {!node.children && node.requests ? (
+      {showList && node.requests ? (
         <div className="overflow-x-auto rounded-xl border border-border/70" data-testid="drill-requests">
           <table className="w-full text-sm">
             <thead>
@@ -152,6 +178,6 @@ export default function DrillDownCard({
           </table>
         </div>
       ) : null}
-    </OverviewCard>
+    </Wrap>
   );
 }

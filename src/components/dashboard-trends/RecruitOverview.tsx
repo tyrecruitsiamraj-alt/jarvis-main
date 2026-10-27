@@ -90,6 +90,15 @@ function lastDays(n: number): DateRangeYmd {
   return { from, to };
 }
 
+/** กล่องบนการ์ดแนวโน้มใบขอ → ชั้นของต้นไม้ใบขอ (`drillTreeOf('requests')`) · ไม่มีในนี้ = กดไม่ได้ */
+const REQUEST_DRILL_PATH: Record<string, string[]> = {
+  total: [],
+  released: ['released'],
+  releasedWithApps: ['released', 'withApps'],
+  releasedNoApps: ['released', 'noApps'],
+  notReleasedOpen: ['notReleased'],
+};
+
 const RecruitOverview: React.FC<{
   /**
    * 🔴 ยอด "ประกาศ" จากหัวกล่องงาน (เจ้าของ 1 ต.ค. 2569: *"เปลี่ยนเป็น 7 เหมือนหัวกล่องงาน"*) — หน้าแม่ส่งมา
@@ -136,6 +145,8 @@ const RecruitOverview: React.FC<{
   const [weekdays, setWeekdays] = useState<number[]>([]);
   /** ป๊อปรายชื่อของเลขที่กดในเส้นทาง */
   const [names, setNames] = useState<{ title: string; ids: readonly string[] } | null>(null);
+  /** กล่องที่กดในการ์ดแนวโน้มใบขอ (27 ต.ค. 2569 รวมการ์ดใบขอเข้ามา) — null = ไม่ได้กด */
+  const [reqPick, setReqPick] = useState<string | null>(null);
   /** แท็บย่อย — จำใน URL (`?ov=`) ส่งลิงก์ให้กันได้ · ค่าแปลก = ใบขอ */
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = overviewTabOf(searchParams.get('ov'));
@@ -219,6 +230,26 @@ const RecruitOverview: React.FC<{
   const compareCard = (t: (typeof OVERVIEW_TABS)[number]['id']) => (
     <TrendLinesCard
       key={`${t}-${win.from}-${win.to}`}
+      {...(t === 'requests'
+        ? {
+            title: 'แนวโน้มใบขอ',
+            picked: reqPick,
+            onPick: setReqPick,
+            // ปิดไปแล้ว = นับอย่างเดียว ไม่เปิดรายการ (เจ้าของ "ถ้าปิดก็คือปิด")
+            pickable: (k: string) => k in REQUEST_DRILL_PATH,
+            children:
+              reqPick && REQUEST_DRILL_PATH[reqPick] ? (
+                <DrillDownCard
+                  key={`drill-req-${reqPick}-${win.from}-${win.to}-${weekdays.join('')}`}
+                  title="ใบขอ"
+                  bare
+                  path={REQUEST_DRILL_PATH[reqPick]}
+                  root={drillTreeOf('requests', view.cohort, data.requestList)}
+                  onOpenNames={(title2, ids) => setNames({ title: title2, ids })}
+                />
+              ) : null,
+          }
+        : {})}
       rows={compareRowsOf(t, view.cur, view.prev, data.requests, data.requestsPrev)}
       curLabel={curPeriodLabel}
       prevLabel={prevPeriodLabel}
@@ -377,8 +408,8 @@ const RecruitOverview: React.FC<{
         {/* ─── ใบขอ: เส้นทางใบขอ + งานค้าง ─── */}
         <TabsContent value="requests" className="mt-3 space-y-3">
           {compareCard('requests')}
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <div className="min-w-0 lg:col-span-2">{drillCard('requests', 'ใบขอ')}</div>
+          <div className="grid grid-cols-1 gap-3">
+            {/* การ์ด "ใบขอ" (กดลงลึก) รวมเข้าการ์ดแนวโน้มใบขอแล้ว (เจ้าของ 27 ต.ค. 2569) — กดกล่องบนการ์ดแนวโน้มแทน */}
             <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={weekdays.length > 0 ? 'ณ วันนี้ · ไม่กรองตามวัน' : 'ณ วันนี้'}>
               {data.backlog ? <BacklogBody backlog={data.backlog} /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
             </OverviewCard>

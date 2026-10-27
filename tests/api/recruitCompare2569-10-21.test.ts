@@ -32,9 +32,12 @@ describe('compareRowsOf', () => {
     const apps = compareRowsOf('apps', T(10), null, null, null);
     expect(apps[0]).toMatchObject({ key: 'names', cur: 10, prev: null });
     const req = compareRowsOf('requests', T(0), null,
-      { total: 9, released: 3, notReleased: 6, releasedWithApps: 2, releasedNoApps: 1, appsOnReleased: 5 },
-      { total: 4, released: 1, notReleased: 3, releasedWithApps: 1, releasedNoApps: 0, appsOnReleased: 1 });
-    expect(req.map((r) => [r.key, r.cur, r.prev])).toEqual([['total', 9, 4], ['released', 3, 1], ['releasedWithApps', 2, 1]]);
+      { total: 9, released: 3, notReleased: 6, notReleasedOpen: 4, notReleasedClosed: 2, releasedWithApps: 2, releasedNoApps: 1, appsOnReleased: 5 },
+      { total: 4, released: 1, notReleased: 3, notReleasedOpen: 3, notReleasedClosed: 0, releasedWithApps: 1, releasedNoApps: 0, appsOnReleased: 1 });
+    // การ์ดแนวโน้มใบขอ (27 ต.ค. 2569): เข้ามา · ประกาศ · มี/ไม่มีคนสมัคร · ยังไม่ประกาศ · ปิดไปแล้ว
+    expect(req.map((r) => [r.key, r.cur, r.prev])).toEqual([
+      ['total', 9, 4], ['released', 3, 1], ['releasedWithApps', 2, 1], ['releasedNoApps', 1, 0], ['notReleasedOpen', 4, 3], ['notReleasedClosed', 2, 0],
+    ]);
     // 27 ต.ค. 2569 เจ้าของ "ไม่ได้บอกว่าสนใจเท่าไหร่ ไม่สนใจเท่าไหร่ รอโทรเท่าไหร่"
     expect(apps.map((r) => r.label)).toEqual(['กรอกเข้ามา', 'AI โทรแล้ว', 'ติดต่อได้', 'สนใจ', 'ไม่สนใจ', 'รอโทร']);
   });
@@ -66,8 +69,8 @@ describe('รายวัน', () => {
       { day: '2026-10-21', releasedAt: '2026-10-21T03:00:00Z', applications: 0 },
     ]);
     expect(days).toEqual([
-      { day: '2026-10-20', total: 2, released: 1, releasedWithApps: 1 },
-      { day: '2026-10-21', total: 1, released: 1, releasedWithApps: 0 },
+      { day: '2026-10-20', total: 2, released: 1, releasedWithApps: 1, releasedNoApps: 0, notReleasedOpen: 1, notReleasedClosed: 0 },
+      { day: '2026-10-21', total: 1, released: 1, releasedWithApps: 0, releasedNoApps: 1, notReleasedOpen: 0, notReleasedClosed: 0 },
     ]);
     expect(dailySeriesOf('released', '2026-10-19', '2026-10-21', [], days).map((d) => d.n)).toEqual([0, 1, 1]);
   });

@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowDown, ArrowUp, LineChart as LineIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { cn } from '@/lib/utils';
 import { CHART, chartDayLabel, DASH, TONE, type ToneKey } from '@/lib/designTokens';
@@ -25,6 +26,11 @@ const toneOf = (key: string, i: number): ToneKey => KEY_TONE[key] ?? LINE_TONES[
 export default function TrendLinesCard({
   rows,
   prevLabel,
+  title = 'แนวโน้มรายวัน',
+  picked = null,
+  onPick,
+  pickable,
+  children,
   note,
   seriesOf,
 }: {
@@ -32,6 +38,15 @@ export default function TrendLinesCard({
   /** ป้ายช่วงที่เลือก — ไม่ได้ใช้บนการ์ดแล้ว (เลือกช่วงที่ตัวเลือกด้านบน) คงไว้ให้หน้าแม่ส่งเหมือนเดิม */
   curLabel?: string;
   prevLabel: string;
+  /** แท็บใบขอ = "แนวโน้มใบขอ" (เจ้าของ 27 ต.ค. 2569) */
+  title?: string;
+  /** กล่องที่กดอยู่ (แท็บใบขอ — กดกล่องแล้วรายการใบขอขึ้นใต้กราฟ) · null = ไม่ได้กด */
+  picked?: string | null;
+  onPick?: (key: string | null) => void;
+  /** กล่องที่กดได้ (ไม่ส่ง = กดไม่ได้) */
+  pickable?: (key: string) => boolean;
+  /** ของใต้กราฟ (รายการใบขอของกล่องที่กด) */
+  children?: React.ReactNode;
   note?: string | null;
   seriesOf: (key: string, period: ComparePeriod) => Array<{ day: string; n: number }>;
 }) {
@@ -51,15 +66,35 @@ export default function TrendLinesCard({
   }, [rows, period, seriesOf]);
   const labelOf = new Map(rows.map((r) => [r.key, r.label]));
 
+  /** กล่องยอด — แท็บใบขอกดได้ (shadcn Button) ที่เหลือเป็นกล่องเฉย ๆ */
+  const boxCls = 'flex min-w-0 flex-col gap-0.5 rounded-xl border border-border px-3 py-2';
+  const Box = ({ k, children: c }: { k: string; children: React.ReactNode }) =>
+    onPick && pickable?.(k) ? (
+      <Button
+        type="button"
+        variant={picked === k ? 'secondary' : 'outline'}
+        aria-pressed={picked === k}
+        onClick={() => onPick(picked === k ? null : k)}
+        className={cn(boxCls, 'h-auto items-start justify-start whitespace-normal text-left font-normal')}
+        data-testid={`trend-total-${k}`}
+      >
+        {c}
+      </Button>
+    ) : (
+      <div className={boxCls} data-testid={`trend-total-${k}`}>
+        {c}
+      </div>
+    );
+
   return (
-    <OverviewCard icon={LineIcon} title="แนวโน้มรายวัน" sub={note ?? undefined}>
+    <OverviewCard icon={LineIcon} title={title} sub={note ?? undefined}>
       {/* ยอดช่วงนี้ + เทียบช่วงก่อน ต่อตัวชี้วัด */}
       <div className="flex flex-wrap gap-2" data-testid="trend-totals">
         {rows.map((r, i) => {
           const d = deltaOf(r.cur, r.prev);
           const shown = r.cur;
           return (
-            <div key={r.key} className="flex min-w-0 flex-col gap-0.5 rounded-xl border border-border px-3 py-2" data-testid={`trend-total-${r.key}`}>
+            <Box key={r.key} k={r.key}>
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span className="h-0.5 w-4 rounded-full" style={{ background: TONE[toneOf(r.key, i)].hex }} aria-hidden />
                 {r.label}
@@ -87,7 +122,7 @@ export default function TrendLinesCard({
               <span className={cn('text-xs tabular-nums', DASH.sub)}>
                 {`${prevLabel} ${r.prev === null ? '—' : fmt(r.prev)}`}
               </span>
-            </div>
+            </Box>
           );
         })}
       </div>
@@ -118,6 +153,7 @@ export default function TrendLinesCard({
           </LineChart>
         </ResponsiveContainer>
       </div>
+      {children}
     </OverviewCard>
   );
 }

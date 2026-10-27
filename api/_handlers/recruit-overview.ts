@@ -307,14 +307,25 @@ export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSou
   };
 }
 
-/** สรุปใบขอ — ประกาศแล้ว/ยังไม่ประกาศ · ในใบที่ประกาศ มีคนสมัครกี่ใบ กรอกมากี่คน */
-export function toRequestSummary(rows: ReadonlyArray<{ releasedAt: string | null; applications: number }>): RecruitRequestSummary {
+/** ใบยังเปิด (`onlineRequestStateOf`) — แถวที่ไม่มีช่องอัตรา (เทสต์/ข้อมูลเก่า) = ถือว่าเปิด */
+type ReqStateRow = { releasedAt: string | null; applications: number; filled?: number; cancelled?: number; remaining?: number };
+const isOpenRequest = (r: ReqStateRow) =>
+  typeof r.remaining !== 'number' || onlineRequestStateOf({ filled: r.filled ?? 0, cancelled: r.cancelled ?? 0, remaining: r.remaining }) === 'open';
+
+/**
+ * สรุปใบขอ — ประกาศแล้ว/ยังไม่ประกาศ · ในใบที่ประกาศ มีคนสมัครกี่ใบ กรอกมากี่คน
+ * + ยังไม่ประกาศแยก ใบยังเปิด / ปิดไปแล้ว (เจ้าของ 27 ต.ค. 2569 การ์ด "แนวโน้มใบขอ") — ตัวแบ่งเดียวกับการ์ดกดลงลึก
+ */
+export function toRequestSummary(rows: ReadonlyArray<ReqStateRow>): RecruitRequestSummary {
   const released = rows.filter((r) => r.releasedAt);
   const withApps = released.filter((r) => r.applications > 0);
+  const notReleasedOpen = rows.filter((r) => !r.releasedAt && isOpenRequest(r)).length;
   return {
     total: rows.length,
     released: released.length,
     notReleased: rows.length - released.length,
+    notReleasedOpen,
+    notReleasedClosed: rows.length - released.length - notReleasedOpen,
     releasedWithApps: withApps.length,
     releasedNoApps: released.length - withApps.length,
     appsOnReleased: withApps.reduce((n, r) => n + r.applications, 0),
@@ -364,16 +375,19 @@ async function loadRequestList(
 }
 
 /** ใบขอรายวัน (วันที่ใบเข้ามา) — กราฟรายวันของแท็บใบขอ (21 ต.ค. 2569) */
-export function toRequestDays(rows: ReadonlyArray<{ day: string; releasedAt: string | null; applications: number }>): RecruitRequestDay[] {
+export function toRequestDays(rows: ReadonlyArray<ReqStateRow & { day: string }>): RecruitRequestDay[] {
   const by = new Map<string, RecruitRequestDay>();
   for (const r of rows) {
-    const d = by.get(r.day) ?? { day: r.day, total: 0, released: 0, releasedWithApps: 0 };
+    const d =
+      by.get(r.day) ?? { day: r.day, total: 0, released: 0, releasedWithApps: 0, releasedNoApps: 0, notReleasedOpen: 0, notReleasedClosed: 0 };
     by.set(r.day, d);
     d.total += 1;
     if (r.releasedAt) {
       d.released += 1;
       if (r.applications > 0) d.releasedWithApps += 1;
-    }
+      else d.releasedNoApps += 1;
+    } else if (isOpenRequest(r)) d.notReleasedOpen += 1;
+    else d.notReleasedClosed += 1;
   }
   return [...by.values()].sort((a, b) => a.day.localeCompare(b.day));
 }

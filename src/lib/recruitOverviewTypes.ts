@@ -82,6 +82,9 @@ export type RecruitRequestSummary = {
   total: number;
   released: number;
   notReleased: number;
+  /** ยังไม่ประกาศ แยกใบยังเปิด / ปิดไปแล้ว (27 ต.ค. 2569 · ตัวแบ่ง `onlineRequestStateOf`) — รวมกัน = notReleased */
+  notReleasedOpen: number;
+  notReleasedClosed: number;
   /** ประกาศแล้วมีคนสมัคร (นับใบสมัครที่ไม่ได้ยกเลิกข้อมูล ทุกช่วงเวลา) */
   releasedWithApps: number;
   releasedNoApps: number;
@@ -106,7 +109,15 @@ export type RecruitRequestItem = {
 };
 
 /** ใบขอของวันหนึ่ง (21 ต.ค. 2569 — กราฟรายวัน) */
-export type RecruitRequestDay = { day: string; total: number; released: number; releasedWithApps: number };
+export type RecruitRequestDay = {
+  day: string;
+  total: number;
+  released: number;
+  releasedWithApps: number;
+  releasedNoApps: number;
+  notReleasedOpen: number;
+  notReleasedClosed: number;
+};
 
 /** งานค้างตอนนี้ — สถานะวันนี้ ไม่ขึ้นกับเดือนที่เลือก · อายุนับเป็นวันเต็ม (ครบ 24 ชม. = 1 วัน) */
 export type RecruitBacklog = {

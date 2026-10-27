@@ -47,7 +47,7 @@ describe('ใบขอ', () => {
       { releasedAt: null, applications: 1 },
       { releasedAt: null, applications: 0 },
     ]);
-    expect(sum).toEqual({ total: 5, released: 3, notReleased: 2, releasedWithApps: 2, releasedNoApps: 1, appsOnReleased: 5 });
+    expect(sum).toEqual({ total: 5, released: 3, notReleased: 2, notReleasedOpen: 2, notReleasedClosed: 0, releasedWithApps: 2, releasedNoApps: 1, appsOnReleased: 5 });
     const steps = buildRequestSteps(sum);
     for (const s of steps) expect(s.parts.reduce((n, p) => n + p.value, 0), s.key).toBe(s.total);
     expect(steps.every((s) => s.unit === 'ใบ')).toBe(true);
@@ -101,7 +101,8 @@ describe('หน้าจอ', () => {
   it('การ์ด 6 ใบถอดแล้ว · มีก้อนใบขอ + รายชื่อที่กรอกมา', () => {
     expect(ov).not.toContain('<OverviewKpi');
     // 21 ต.ค. 2569 เป็นการ์ดกดลงลึกทุกแท็บ
-    expect(ov).toContain("drillCard('requests', 'ใบขอ')");
+    // การ์ดใบขอรวมเข้าการ์ดแนวโน้มใบขอ (27 ต.ค. 2569) — กดกล่องแล้วรายการใบขอขึ้นใต้กราฟ
+    expect(ov).toContain("title: 'แนวโน้มใบขอ'");
     expect(ov).toContain("drillCard('apps', 'รายชื่อที่กรอกมา')");
   });
   it('API ส่งอายุ + คนละพื้นที่ + ใบขอ', () => {

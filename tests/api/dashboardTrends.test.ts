@@ -145,7 +145,7 @@ describe('แท็บ Dashboard อยู่ในสองหน้า แล�
     // ก้อนใบขอนับ "ประกาศแล้ว" ในใบที่เข้ามาในเดือน (ตัวเดียวกับหน้าหลัก) · ตัวเลขหัวกล่องงานยังส่งมาเหมือนเดิม
     const overview = code('src/components/dashboard-trends/RecruitOverview.tsx');
     // 21 ต.ค. 2569 ก้อนใบขอเป็นการ์ดกดลงลึก (ทั้งหมด → ประกาศ/ยังไม่ประกาศ → มีคนกรอก/ยังไม่กรอก)
-    expect(overview).toContain("drillCard('requests', 'ใบขอ')");
+    expect(overview).toContain("title: 'แนวโน้มใบขอ'"); // การ์ดใบขอรวมเข้าการ์ดแนวโน้ม (27 ต.ค. 2569)
   });
   it.each([
     'src/components/dashboard-trends/RecruitOverview.tsx',

@@ -58,10 +58,10 @@ describe('drillTreeOf', () => {
 describe('หน้าจอ', () => {
   it('ทุกแท็บมีกราฟเส้น + การ์ดกดลงลึก · มีแถบย้อนกลับ', () => {
     const src = fs.readFileSync(path.join(process.cwd(), 'src/components/dashboard-trends/RecruitOverview.tsx'), 'utf8');
-    for (const t of ['requests', 'apps', 'staff', 'appt']) {
-      expect(src).toContain(`{compareCard('${t}')}`);
-      expect(src).toMatch(new RegExp(`drillCard\\('${t}'`));
-    }
+    for (const t of ['requests', 'apps', 'staff', 'appt']) expect(src).toContain(`{compareCard('${t}')}`);
+    for (const t of ['apps', 'staff', 'appt']) expect(src).toMatch(new RegExp(`drillCard\\('${t}'`));
+    // แท็บใบขอ: การ์ดกดลงลึกฝังในการ์ดแนวโน้มใบขอ — กดกล่องแล้วรายการใบขอขึ้นใต้กราฟ (27 ต.ค. 2569)
+    expect(src).toContain('path={REQUEST_DRILL_PATH[reqPick]}');
     const card = fs.readFileSync(path.join(process.cwd(), 'src/components/dashboard-trends/DrillDownCard.tsx'), 'utf8');
     expect(card).toContain('data-testid="drill-trail"');
   });

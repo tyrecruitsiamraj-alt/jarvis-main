@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { DASH } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import { jobBuOf, openJobBuCounts, openJobsByProvince } from '@/lib/openJobsByProvince';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { JobRequest } from '@/types';
 import { OverviewCard } from './RecruitOverviewParts';
 
@@ -32,27 +32,27 @@ export default function ProvinceJobsCard({ jobs }: { jobs: readonly JobRequest[]
 
   return (
     <OverviewCard icon={MapPin} title="งานตามจังหวัด" sub="ใบขอที่ยังเปิด ณ วันนี้">
+      {/* BU เป็นดรอปดาวน์ (เจ้าของ 27 ต.ค. 2569 "ทำเป็น Dropdown") */}
       {buCounts.length > 1 ? (
-        <ToggleGroup
-          type="single"
+        <Select
           value={bu || 'all'}
           onValueChange={(v) => {
-            setBu(!v || v === 'all' ? '' : v);
+            setBu(v === 'all' ? '' : v);
             setAll(false);
           }}
-          className="flex-wrap justify-start"
-          aria-label="BU"
-          data-testid="province-jobs-bu"
         >
-          <ToggleGroupItem value="all" size="sm" className="tabular-nums">
-            ทุก BU {fmt(jobs?.length ?? 0)}
-          </ToggleGroupItem>
-          {buCounts.map((b) => (
-            <ToggleGroupItem key={b.bu} value={b.bu} size="sm" className="tabular-nums">
-              {b.bu} {fmt(b.requests)}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+          <SelectTrigger className="h-9 w-48 text-sm tabular-nums" aria-label="BU" data-testid="province-jobs-bu">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">ทุก BU · {fmt(jobs?.length ?? 0)} ใบ</SelectItem>
+            {buCounts.map((b) => (
+              <SelectItem key={b.bu} value={b.bu}>
+                {b.bu} · {fmt(b.requests)} ใบ
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       ) : null}
       <div className="overflow-x-auto" data-testid="province-jobs">
         <Table>

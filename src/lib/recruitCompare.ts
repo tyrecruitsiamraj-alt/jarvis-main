@@ -50,7 +50,15 @@ export function compareRowsOf(
   });
   switch (tab) {
     case 'requests':
-      return [r('total', 'ใบขอเข้ามา'), r('released', 'ประกาศแล้ว'), r('releasedWithApps', 'มีคนสมัคร')];
+      // การ์ด "แนวโน้มใบขอ" (เจ้าของ 27 ต.ค. 2569): เข้ามา · ประกาศ · มี/ไม่มีคนสมัคร · ยังไม่ประกาศ · ปิดไปแล้ว
+      return [
+        r('total', 'ใบขอเข้ามา'),
+        r('released', 'ประกาศแล้ว'),
+        r('releasedWithApps', 'มีคนสมัคร'),
+        r('releasedNoApps', 'ไม่มีคนสมัคร'),
+        r('notReleasedOpen', 'ยังไม่ประกาศ'),
+        r('notReleasedClosed', 'ปิดไปแล้ว'),
+      ];
     case 'apps':
       // + สนใจ · ไม่สนใจ · รอโทร (เจ้าของ 27 ต.ค. 2569 "ไม่ได้บอกว่าสนใจเท่าไหร่ ไม่สนใจเท่าไหร่ รอโทรเท่าไหร่")
       return [
@@ -91,6 +99,9 @@ const REQUEST_METRIC: Record<string, keyof Omit<RecruitRequestDay, 'day'>> = {
   total: 'total',
   released: 'released',
   releasedWithApps: 'releasedWithApps',
+  releasedNoApps: 'releasedNoApps',
+  notReleasedOpen: 'notReleasedOpen',
+  notReleasedClosed: 'notReleasedClosed',
 };
 
 const DAY_MS = 86_400_000;

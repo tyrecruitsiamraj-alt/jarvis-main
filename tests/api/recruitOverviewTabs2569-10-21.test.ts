@@ -36,7 +36,8 @@ describe('แท็บภาพรวม', () => {
     expect(src).toContain("from '@/components/ui/tabs'");
     for (const t of ['requests', 'apps', 'staff', 'appt']) expect(src).toContain(`<TabsContent value="${t}"`);
     for (const title of [
-      "drillCard('requests', 'ใบขอ')",
+      // การ์ดใบขอรวมเข้าการ์ดแนวโน้มใบขอ (27 ต.ค. 2569)
+      "title: 'แนวโน้มใบขอ'",
       'title="งานค้างตอนนี้"',
       "drillCard('apps', 'รายชื่อที่กรอกมา')",
       'title="กรอกแล้วโทรวันไหน"',
