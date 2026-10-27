@@ -170,6 +170,14 @@ function AiAnswerCell({ r }: { r: PublicApplication }) {
       </span>
     );
   }
+  if (a.kind === 'not_sent' && a.reason) {
+    return (
+      <span className="flex flex-col gap-0.5" data-testid="ai-not-sent">
+        <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>{a.text}</span>
+        <span className={cn('whitespace-nowrap text-xs font-medium', TONE.warn.value)}>{a.reason}</span>
+      </span>
+    );
+  }
   return <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>{a.text}</span>;
 }
 

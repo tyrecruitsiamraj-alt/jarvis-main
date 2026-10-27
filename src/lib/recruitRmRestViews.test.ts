@@ -26,12 +26,12 @@ const CASES: Array<[Partial<PublicApplication>, string]> = [
   [{ irecruit_dup_at: '2026-10-10T00:00:00Z', last_call_outcome: 'confirmed', last_call_at: '2026-10-13T01:00:00Z' }, 'interested'],
   [{ age: 60, irecruit_dup_at: '2026-10-10T00:00:00Z' }, 'over_age'],
   [{ last_call_status: 'cancelled' }, 'ai_cancelled'],
-  // 27 ต.ค. 2569 เจ้าของ "โทรครบ 3 ครั้งไม่รับเลยก็ย้ายไปไว้ที่ไม่สนใจ" (เฉพาะแท็บผู้สมัคร)
-  [{ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'unresponsive', last_call_attempts: 3, last_call_at: '2026-10-27T05:00:00Z' }, 'declined'],
-  // โทรไป 2 ครั้ง ยังไม่ครบ = ไม่รับสายเหมือนเดิม
-  [{ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'busy', last_call_attempts: 2, last_call_at: '2026-10-27T05:00:00Z' }, 'no_pickup'],
-  // ครบ 3 ครั้งแต่เจ้าหน้าที่โทรติดทีหลัง = ผลติดต่อชนะ
-  [{ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'no_answer', last_call_attempts: 3, last_call_at: '2026-10-27T05:00:00Z', last_contact_ok: true, last_contact_at: '2026-10-27T06:00:00Z' }, 'no_pickup'],
+  // 27 ต.ค. 2569 เจ้าของ (คำสั่งล่าสุด): ไม่รับสายอยู่รอติดต่อซ้ำ · ครบ 3 ครั้ง = ไม่รับสาย (ไม่ใช่ไม่สนใจ)
+  [{ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'unresponsive', last_call_attempts: 3, last_call_at: '2026-10-27T05:00:00Z' }, 'no_pickup'],
+  // เลยนัดโทรซ้ำแล้วยังไม่มีผล = ยังอยู่รอติดต่อซ้ำ (เดิมไป AI ไม่ได้ผล)
+  [{ last_call_status: 'pending', last_call_followup: 'retry_scheduled', last_call_attempts: 2, last_call_prev_outcome: 'no_answer', last_call_next_at: '2026-10-01T05:00:00Z' }, 'retry_wait'],
+  // ส่ง AI แล้วรอสายแรก = รอโทร (เดิมปนในยังไม่ส่ง AI)
+  [{ last_call_status: 'pending', last_call_attempts: 1, last_call_sent_at: new Date().toISOString() }, 'ai_waiting'],
 ];
 
 describe('ชิปแท็บผู้สมัคร แบ่งครบไม่ทับกัน', () => {
@@ -46,9 +46,19 @@ describe('ชิปแท็บผู้สมัคร แบ่งครบไ
   });
 });
 
-describe('ไม่รับครบ 3 ครั้ง ไม่แตะตัวเลขสนใจ/ไม่สนใจทั้งระบบ (Choice 27 ต.ค. 2569)', () => {
-  it('isNotInterestedApplicant ยังเป็น false', async () => {
-    const { isNotInterestedApplicant } = await import('@/lib/applicantCallOutcome');
-    expect(isNotInterestedApplicant(row({ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'no_answer', last_call_attempts: 3, last_call_at: '2026-10-27T05:00:00Z' }))).toBe(false);
+describe('ทำไมยังไม่ส่ง AI (27 ต.ค. 2569)', () => {
+  it('บอกเหตุผลจากช่องบนแถว', async () => {
+    const { aiAnswerTextOf, notSentReasonOf } = await import('@/lib/applicantAiAnswerText');
+    expect(notSentReasonOf(row({ claimed_by_name: 'แป๋ม' }))).toBe('เก็บไปโทรเอง · แป๋ม');
+    expect(notSentReasonOf(row({ job_id: undefined }))).toBe('ไม่ผูกใบขอ');
+    expect(notSentReasonOf(row({ created_by_name: 'narissara.p@siamraj.com' }))).toBe('เพิ่มเอง/นำเข้า ยังไม่กดส่ง AI');
+    expect(notSentReasonOf(row({}))).toBe('สมัครผ่านลิงก์ ระบบไม่ได้ส่ง');
+    expect(aiAnswerTextOf(row({ job_id: undefined }))).toMatchObject({ kind: 'not_sent', reason: 'ไม่ผูกใบขอ' });
+  });
+  it('ลำดับบนจอตามที่เจ้าของสั่ง', () => {
+    expect(RM_LIST_VIEWS_SHOWN).toEqual([
+      'all', 'ai_waiting', 'interested', 'declined', 'over_age', 'irecruit_dup', 'retry_wait', 'no_pickup',
+      'irecruit_pull', 'not_sent', 'ai_cancelled', 'ai_at_risk', 'bad_data',
+    ]);
   });
 });

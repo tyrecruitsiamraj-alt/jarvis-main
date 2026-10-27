@@ -2,7 +2,7 @@ import { fullDaysSince } from '@/lib/fullDays';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { isOverAge } from '@/lib/applicantAge';
 import { aiQueueStatusOf } from '@/lib/applicantAiQueueStatus';
-import { isAiNoPickupExhausted, isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
+import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
 import type { UserRole } from '@/types';
 /**
  * งานสรรหา (RM) — นิยามกลางของหน้า `/recruit/rm`
@@ -146,6 +146,7 @@ export function isClosedByCallOutcome(r: PublicApplication): boolean {
  */
 export const RM_LIST_VIEWS = [
   'all',
+  'ai_waiting',
   'interested',
   'declined',
   'over_age',
@@ -174,19 +175,25 @@ export type RmListView = (typeof RM_LIST_VIEWS)[number];
  * ไปกะพวก รายชื่อคนสนใจ ฯลฯ อยู่แถวเดียวกัน"* (Choice ยืนยันการนับ) ⇒ 5 ชิปท้ายแถว = คนที่ไม่อยู่ชิปก่อนหน้า
  * (`rmRestViewOf`) ทุกชิปไม่ทับกัน รวมกัน = รายชื่อทั้งหมด
  */
+/**
+ * 🔴 ลำดับบนจอตามเจ้าของ 27 ต.ค. 2569: ทั้งหมด · รอโทร · สนใจ · ไม่สนใจ · อายุเกิน · ซ้ำ iRecruit · รอติดต่อซ้ำ ·
+ * ไม่รับสาย (โทรครบ 3 ครั้ง) · iRecruit · ยังไม่ส่ง AI · ยกเลิก — แล้ว AI ไม่ได้ผล · ข้อมูลผิด ท้ายรายการ (Choice "คงไว้ท้ายรายการ")
+ * ลำดับบนจอ ≠ ลำดับตัดสินชิป (`RM_PRIMARY_VIEWS` ก่อน แล้ว `rmRestViewOf`) — ทุกชิปไม่ทับกัน รวม = ทั้งหมด
+ */
 export const RM_LIST_VIEWS_SHOWN = [
   'all',
+  'ai_waiting',
   'interested',
   'declined',
   'over_age',
   'irecruit_dup',
-  'ai_at_risk',
-  'no_pickup',
   'retry_wait',
+  'no_pickup',
   'irecruit_pull',
   'not_sent',
-  'bad_data',
   'ai_cancelled',
+  'ai_at_risk',
+  'bad_data',
 ] as const satisfies readonly RmListView[];
 /** มุมมองตอนเปิดแท็บผู้สมัคร (ไม่มี ?list=) — เจ้าของสั่ง 14 ต.ค. 2569 */
 export const RM_LIST_VIEW_DEFAULT = 'interested' as const satisfies RmListView;
@@ -202,6 +209,7 @@ export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
   over_age: 'อายุเกิน',
   irecruit_dup: 'ซ้ำ iRecruit',
   ai_at_risk: 'AI ไม่ได้ผล',
+  ai_waiting: 'รอโทร',
   no_pickup: 'ไม่รับสาย',
   retry_wait: 'รอติดต่อซ้ำ',
   // 20 ต.ค. 2569 เจ้าของ: "แก้คำ ยังไม่ได้ เป็น iRecruit" + Choice แยกกล่อง — ดึงจาก iRecruit (คนกดส่ง AI เอง) แยกจากที่ยังไม่ส่ง AI
@@ -236,7 +244,7 @@ export function isInRmListView(r: PublicApplication, view: RmListView): boolean 
 }
 
 /** ชิปท้ายแถว (14 ต.ค. 2569) — คนที่ไม่อยู่ชิปก่อนหน้า แบ่งให้ครบทุกคน */
-const RM_REST_VIEWS = ['no_pickup', 'retry_wait', 'irecruit_pull', 'not_sent', 'bad_data', 'ai_cancelled'] as const;
+const RM_REST_VIEWS = ['ai_waiting', 'no_pickup', 'retry_wait', 'irecruit_pull', 'not_sent', 'bad_data', 'ai_cancelled'] as const;
 type RmRestView = (typeof RM_REST_VIEWS)[number];
 const RM_PRIMARY_VIEWS = ['interested', 'declined', 'over_age', 'irecruit_dup', 'ai_at_risk'] as const;
 type RmPrimaryView = (typeof RM_PRIMARY_VIEWS)[number];
@@ -250,11 +258,12 @@ export const IRECRUIT_PULL_CREATED_BY = 'iRecruit';
  */
 export function rmPrimaryViewOf(r: PublicApplication): RmPrimaryView | null {
   if (isInterestedApplicant(r)) return 'interested';
-  // โทรครบ 3 ครั้งไม่รับเลย = รายชื่อคนที่ไม่สนใจ (เฉพาะแท็บผู้สมัคร · 27 ต.ค. 2569)
-  if (isNotInterestedApplicant(r) || isAiNoPickupExhausted(r)) return 'declined';
+  if (isNotInterestedApplicant(r)) return 'declined';
   if (isOverAge(r.age)) return 'over_age';
   if (r.irecruit_dup_at) return 'irecruit_dup';
-  if (aiQueueStatusOf(r)?.atRisk === true) return 'ai_at_risk';
+  // เลยนัดโทรซ้ำ = ยังอยู่รอติดต่อซ้ำ (เจ้าของ 27 ต.ค. 2569 "ไม่รับสายมันควรไปอยู่รอติดต่อซ้ำ") — ป้ายแดงบนแถวยังเตือน
+  const q = aiQueueStatusOf(r);
+  if (q?.atRisk === true && q.kind !== 'retry_late') return 'ai_at_risk';
   return null;
 }
 
@@ -270,7 +279,9 @@ function isRmRestView(v: RmListView): v is RmRestView {
 export function rmRestViewOf(r: PublicApplication): RmRestView | null {
   if (rmPrimaryViewOf(r) !== null) return null;
   const q = aiQueueStatusOf(r);
-  if (q?.kind === 'retry') return 'retry_wait';
+  if (q?.kind === 'retry' || q?.kind === 'retry_late') return 'retry_wait';
+  // ส่งให้ AI แล้ว รอสายแรก (27 ต.ค. 2569 "รอโทรเท่าไหร่") — เดิมปนอยู่ในยังไม่ส่ง AI
+  if (q?.kind === 'waiting') return 'ai_waiting';
   if (r.last_call_status === 'cancelled') return 'ai_cancelled';
   const aiCalled =
     Boolean(r.ai_answer) || r.last_call_status === 'completed' || r.last_call_status === 'failed' || Boolean(r.last_call_prev_outcome);

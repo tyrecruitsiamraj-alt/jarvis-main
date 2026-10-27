@@ -86,25 +86,6 @@ function newerSignal(a: ApplicantInterestSignals): 'contact' | 'call' | null {
   return stamp(a.last_call_at) > stamp(a.last_contact_at) ? 'call' : 'contact';
 }
 
-/**
- * AI โทรครบ 3 ครั้งแล้วไม่มีใครรับ (คิวปิด ส่งให้คนตาม) — เจ้าของ 27 ต.ค. 2569 *"ถ้าโทรครบ 3 ครั้งไม่รับเลยก็ย้ายไปไว้ที่ไม่สนใจ"*
- * Choice "ย้ายเฉพาะรายชื่อในแท็บผู้สมัคร" ⇒ ใช้ที่ `rmPrimaryViewOf` เท่านั้น · **ห้ามใส่ใน isNotInterestedApplicant**
- * (เลขสนใจ/ไม่สนใจหน้าหลัก/Dashboard ยังนับจากคำตอบจริง) · เจ้าหน้าที่บันทึกผลติดต่อทีหลัง = ผลติดต่อชนะ
- */
-export const AI_NO_PICKUP_MAX = 3;
-const NO_PICKUP: readonly string[] = ['no_answer', 'busy', 'unresponsive', 'failed'];
-export function isAiNoPickupExhausted(
-  a: ApplicantInterestSignals & { last_call_status?: string | null; last_call_attempts?: number | null; last_call_followup?: string | null },
-): boolean {
-  return (
-    newerSignal(a) === 'call' &&
-    a.last_call_status === 'failed' &&
-    (a.last_call_followup ?? '').trim() === 'needs_human' &&
-    NO_PICKUP.includes((a.last_call_outcome ?? '').trim()) &&
-    Number(a.last_call_attempts) >= AI_NO_PICKUP_MAX
-  );
-}
-
 /** ใบนี้อ่านว่า "สนใจ" ไหม — สัญญาณล่าสุดต้องเป็นผลโทรที่ตอบว่าเอางาน */
 export function isInterestedApplicant(a: ApplicantInterestSignals): boolean {
   return newerSignal(a) === 'call' && isInterestedOutcome(a.last_call_outcome);

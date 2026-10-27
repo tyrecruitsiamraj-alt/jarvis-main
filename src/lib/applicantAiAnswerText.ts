@@ -13,7 +13,19 @@ import { IRECRUIT_PULL_CREATED_BY } from '@/lib/recruitRm';
  */
 export type AiAnswerKind = 'queue' | 'answer' | 'bad_phone' | 'call_status' | 'irecruit_dup' | 'irecruit_pull' | 'not_sent';
 
-export type AiAnswerText = { kind: AiAnswerKind; text: string; queue?: AiQueueStatus };
+export type AiAnswerText = { kind: AiAnswerKind; text: string; queue?: AiQueueStatus; reason?: string };
+
+/**
+ * ทำไมยังไม่ส่ง AI (เจ้าของ 27 ต.ค. 2569 "ยังไม่ส่ง Ai อันนี้อยากรู้ว่าทำไมไม่ส่ง") — บรรทัดล่างของแถวในชิป "ยังไม่ส่ง AI"
+ * อ่านจากช่องที่มีบนแถว · ที่เหลือ = สมัครผ่านลิงก์แต่ระบบไม่ได้ส่ง (เช่นเบอร์เดียวกันเคยโทรจากใบก่อน)
+ */
+export function notSentReasonOf(r: PublicApplication): string {
+  if (r.claimed_by_name?.trim()) return `เก็บไปโทรเอง · ${r.claimed_by_name.trim()}`;
+  if (r.call_choice === 'manual') return 'เลือกโทรเอง';
+  if (!r.job_id) return 'ไม่ผูกใบขอ';
+  if (r.created_by_name?.trim()) return 'เพิ่มเอง/นำเข้า ยังไม่กดส่ง AI';
+  return 'สมัครผ่านลิงก์ ระบบไม่ได้ส่ง';
+}
 
 export const AI_NOT_SENT_TEXT = 'ยังไม่ได้ส่งให้ AI';
 
@@ -28,5 +40,5 @@ export function aiAnswerTextOf(r: PublicApplication, now: number = Date.now()): 
   if (r.created_by_name === IRECRUIT_PULL_CREATED_BY && irState) {
     return { kind: 'irecruit_pull', text: IRECRUIT_PULL_STATE_LABEL[irState] };
   }
-  return { kind: 'not_sent', text: AI_NOT_SENT_TEXT };
+  return { kind: 'not_sent', text: AI_NOT_SENT_TEXT, reason: notSentReasonOf(r) };
 }

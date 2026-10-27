@@ -28,7 +28,7 @@ describe('ตัวตัดสินอายุเกิน', () => {
 
 describe('กล่อง "อายุเกิน" บนแท็บผู้สมัคร', () => {
   it('ปุ่มอยู่คู่กับสนใจ/ไม่สนใจ · เลือกแล้วเหลือเฉพาะคน 58 ขึ้นไป · ทั้งหมดยังเห็นทุกคน', () => {
-    expect([...RM_LIST_VIEWS_SHOWN]).toEqual(['all', 'interested', 'declined', 'over_age', 'irecruit_dup', 'ai_at_risk', 'no_pickup', 'retry_wait', 'irecruit_pull', 'not_sent', 'bad_data', 'ai_cancelled']);
+    expect([...RM_LIST_VIEWS_SHOWN]).toEqual(['all', 'ai_waiting', 'interested', 'declined', 'over_age', 'irecruit_dup', 'retry_wait', 'no_pickup', 'irecruit_pull', 'not_sent', 'ai_cancelled', 'ai_at_risk', 'bad_data'] /* ลำดับเจ้าของ 27 ต.ค. 2569 */);
     expect(RM_LIST_VIEW_LABEL.over_age).toBe('อายุเกิน');
     expect(isInRmListView(app(59), 'over_age')).toBe(true);
     expect(isInRmListView(app(40), 'over_age')).toBe(false);
