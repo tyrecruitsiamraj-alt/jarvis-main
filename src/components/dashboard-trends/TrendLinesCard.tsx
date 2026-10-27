@@ -12,6 +12,9 @@ export type ComparePeriod = 'cur' | 'prev';
 
 /** สีเส้นตามลำดับแถว — จากโทเค็น (`TONE.*.hex`) ที่เดียว */
 const LINE_TONES: ToneKey[] = ['info', 'success', 'warn', 'violet'];
+/** ตัวชี้วัดที่ต่อท้ายแท็บกรอกเข้ามา (27 ต.ค. 2569) — สีไม่ซ้ำเส้นแรก · ไม่สนใจแดง */
+const KEY_TONE: Record<string, ToneKey> = { aiSaidYes: 'teal', aiSaidNo: 'danger', aiQueued: 'violet' };
+const toneOf = (key: string, i: number): ToneKey => KEY_TONE[key] ?? LINE_TONES[i % LINE_TONES.length];
 
 /**
  * ═══ กราฟเส้นรายวัน + ▲▼ เทียบช่วงก่อน — บนสุดทุกแท็บของภาพรวม ═══
@@ -53,14 +56,17 @@ export default function TrendLinesCard({
       <div className="flex flex-wrap gap-2" data-testid="trend-totals">
         {rows.map((r, i) => {
           const d = deltaOf(r.cur, r.prev);
+          // กดชื่อช่วงแล้วเลขในกล่องเปลี่ยนตาม (เจ้าของ 27 ต.ค. 2569 "เลือกวันที่ 26 แล้วไม่เปลี่ยนตาม")
+          const shown = period === 'cur' ? r.cur : r.prev;
           return (
             <div key={r.key} className="flex min-w-0 flex-col gap-0.5 rounded-xl border border-border px-3 py-2" data-testid={`trend-total-${r.key}`}>
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="h-0.5 w-4 rounded-full" style={{ background: TONE[LINE_TONES[i % LINE_TONES.length]].hex }} aria-hidden />
+                <span className="h-0.5 w-4 rounded-full" style={{ background: TONE[toneOf(r.key, i)].hex }} aria-hidden />
                 {r.label}
               </span>
               <span className="flex items-baseline gap-2">
-                <span className="text-lg font-medium tabular-nums text-foreground">{r.cur === null ? '—' : fmt(r.cur)}</span>
+                <span className="text-lg font-medium tabular-nums text-foreground">{shown === null ? '—' : fmt(shown)}</span>
+                {period === 'cur' ? (
                 <span
                   className={cn(
                     'flex items-center gap-0.5 text-xs font-medium tabular-nums',
@@ -76,8 +82,13 @@ export default function TrendLinesCard({
                         ? 'เท่าเดิม'
                         : 'เทียบไม่ได้'}
                 </span>
+                ) : null}
               </span>
-              <span className={cn('text-xs tabular-nums', DASH.sub)}>ช่วงก่อน {r.prev === null ? '—' : fmt(r.prev)}</span>
+              <span className={cn('text-xs tabular-nums', DASH.sub)}>
+                {period === 'cur'
+                  ? `${prevLabel} ${r.prev === null ? '—' : fmt(r.prev)}`
+                  : `${curLabel} ${r.cur === null ? '—' : fmt(r.cur)}`}
+              </span>
             </div>
           );
         })}
@@ -116,7 +127,7 @@ export default function TrendLinesCard({
                 type="monotone"
                 dataKey={r.key}
                 name={r.key}
-                stroke={TONE[LINE_TONES[i % LINE_TONES.length]].hex}
+                stroke={TONE[toneOf(r.key, i)].hex}
                 strokeWidth={2}
                 dot={{ r: 3 }}
                 activeDot={CHART.activeDot}

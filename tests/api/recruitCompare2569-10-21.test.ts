@@ -13,7 +13,7 @@ import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 const read = (f: string) => fs.readFileSync(path.join(process.cwd(), f), 'utf8');
 const T = (n: number): RecruitTotals => ({
   names: n, jobs: 0, called: 0, calledByAi: n, calledByStaff: 0, calledBoth: 0, reached: n, reachedByAi: 0, reachedByStaff: 0,
-  aiSaidYes: n, staffFollowed: 0, aiCalledReached: 0, followedReached: 0, appointed: n, showed: 0, onBoard: null,
+  aiSaidYes: n, aiSaidNo: 0, aiQueued: 0, staffFollowed: 0, aiCalledReached: 0, followedReached: 0, appointed: n, showed: 0, onBoard: null,
 });
 
 describe('deltaOf', () => {
@@ -35,6 +35,14 @@ describe('compareRowsOf', () => {
       { total: 9, released: 3, notReleased: 6, releasedWithApps: 2, releasedNoApps: 1, appsOnReleased: 5 },
       { total: 4, released: 1, notReleased: 3, releasedWithApps: 1, releasedNoApps: 0, appsOnReleased: 1 });
     expect(req.map((r) => [r.key, r.cur, r.prev])).toEqual([['total', 9, 4], ['released', 3, 1], ['releasedWithApps', 2, 1]]);
+    // 27 ต.ค. 2569 เจ้าของ "ไม่ได้บอกว่าสนใจเท่าไหร่ ไม่สนใจเท่าไหร่ รอโทรเท่าไหร่"
+    expect(apps.map((r) => r.label)).toEqual(['กรอกเข้ามา', 'AI โทรแล้ว', 'ติดต่อได้', 'สนใจ', 'ไม่สนใจ', 'รอโทร']);
+  });
+
+  it('กดชื่อช่วงแล้วเลขในกล่องเปลี่ยนตาม (27 ต.ค. 2569 "เลือกวันที่ 26 แล้วไม่เปลี่ยนตาม")', () => {
+    const src = read('src/components/dashboard-trends/TrendLinesCard.tsx');
+    expect(src).toContain("const shown = period === 'cur' ? r.cur : r.prev;");
+    expect(src).toContain('{shown === null ? \'—\' : fmt(shown)}');
   });
 });
 

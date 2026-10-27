@@ -60,6 +60,9 @@ export function trimLastDayToNow(apps: readonly RecruitAppFact[], lastDay: strin
 
 export const isCalled = (f: RecruitAppFact) => f.calledByAi || f.calledByStaff;
 export const isAiSaidYes = (f: RecruitAppFact) => f.aiAnswer === 'said_yes';
+/** ตอบ AI ว่าไม่สนใจ · อยู่ในคิว AI รอโทร (รวมรอโทรซ้ำ) — กล่องแนวโน้มแท็บกรอกเข้ามา (เจ้าของ 27 ต.ค. 2569) */
+export const isAiSaidNo = (f: RecruitAppFact) => f.aiAnswer === 'said_no';
+export const isAiQueued = (f: RecruitAppFact) => f.aiQueued === true;
 /** ตอบ AI ว่าสนใจ แล้วเจ้าหน้าที่ลงมือหลังเวลาที่ AI ได้คำตอบ */
 export const isStaffFollowed = (f: RecruitAppFact) =>
   isAiSaidYes(f) && !!f.staffLastAt && !!f.aiAnswerAt && f.staffLastAt >= f.aiAnswerAt;
@@ -91,6 +94,8 @@ export type RecruitTotals = {
   reachedByAi: number;
   reachedByStaff: number;
   aiSaidYes: number;
+  aiSaidNo: number;
+  aiQueued: number;
   staffFollowed: number;
   /** AI โทรแล้วและติดต่อได้ — ลูกของ "AI โทรแล้ว" ในการ์ดกดลงลึก (21 ต.ค. 2569 ให้เลขกราฟ = เลขการ์ด) */
   aiCalledReached: number;
@@ -116,6 +121,8 @@ export function totalsOf(apps: readonly RecruitAppFact[], from: string, to: stri
     reachedByAi: count((f) => f.contact === 'success' && f.contactBy === 'ai'),
     reachedByStaff: count((f) => f.contact === 'success' && f.contactBy === 'staff'),
     aiSaidYes: count(isAiSaidYes),
+    aiSaidNo: count(isAiSaidNo),
+    aiQueued: count(isAiQueued),
     staffFollowed: count(isStaffFollowed),
     aiCalledReached: count(isAiCalledReached),
     followedReached: count(isFollowedReached),
