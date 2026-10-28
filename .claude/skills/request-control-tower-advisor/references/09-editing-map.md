@@ -13990,3 +13990,16 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 | `AutopostDialog.tsx` · `OrderPostButton.tsx` · `JobPublicFacts.tsx` · `src/lib/postText.ts` (`publicPostText`) · `siamrajUnitNotes.ts` · `siamraj-unit-requests.ts` · `public/jobs.ts` | 28 ต.ค. 2569 ข้อความประกาศที่แก้ใน Autopost เก็บกับใบขอ (`field_overrides.post_caption` → `public_post_text`) · ขึ้นการ์ดหน้าสมัคร + การ์ดตัวอย่าง "ผู้สมัครจะเห็นแบบนี้" (ตัดบรรทัดลิงก์) · การ์ดกล่องงานเจ้าหน้าที่ (`staff`) ไม่โชว์ · บันทึกเฉพาะตอนคนพิมพ์ (หน่วง 0.9 วิ) เปิดดูไม่เขียนฐาน · "ใช้ข้อความที่ระบบร่าง" = ล้าง |
 | `api/_lib/callFollowup.ts` (`followSaidQuit`) | 28 ต.ค. 2569 Choice "คนกดหยุดเอง": ไม่ไป + คำว่า ลาออก/ไม่ทำแล้ว ⇒ กระดิ่ง `follow_quit` "บอกไม่ทำแล้ว" (บอกปุ่ม บันทึกว่าเสร็จสิ้น › ยกเลิก › ทั้งชุด) · ระบบยังหยุดแค่วันนั้น ไม่ยกเลิกวันอื่นเอง |
 | `api/_lib/recruitPostings.ts` (`linkOwnerSql`) · `api/_handlers/job-applications.ts` (`POSTING_OWNER_SQL`) | 28 ต.ค. 2569 "ช่องผู้รับผิดชอบในใบประวัติให้ตรงกับลิงก์" — ตัวตัดสินเดียว: คนกดสร้างลิงก์ → ผู้รับผิดชอบของประกาศ → คนสร้างประกาศ (ชื่อเล่น → ชื่อเต็ม → หน้าอีเมล) · ไม่ผ่านลิงก์/ประกาศ = คนกดประกาศใบขอ (เดิม) |
+
+### โทรติดตาม: แก้ 6 ข้อจากการไล่ผังทุกทางแยก (28 ต.ค. 2569 · Choice "แก้ครบ 6 ข้อ")
+- **"วันนั้น" ตัวตัดสินเดียว** `api/_lib/followDayScope.ts` (`followSameStopUnitSql`) — คนเริ่มงาน = วันเดียวกัน (ไทย) · คนแทน (`irecruit-replace:` / `manual-replace:`) = **ใบงานเดียวกันเท่านั้น**
+  ใช้ที่ `cancelFollowSetAfterDecline` (AI ได้ ไป/ไม่ไป) และ `stopRemainingFollowRounds('day')` (ปิดงาน · วันหยุด/ลางาน · คนลง ไป/ไม่ไป)
+  เดิมคนแทนนับ "วันเดียวกัน OR ใบเดียวกัน" ⇒ ตอบสายเช้าใบวันนี้ สายคอนเฟิร์ม 16:00 ของใบพรุ่งนี้ (วันเดียวกัน) หายไปด้วย · 30 วันมี 344 คนหลายใบในชุดเดียว
+- **ถอนแผนที่ Lumos** `withdrawFollowPlanAtLumos` (callFollowup.ts) — แผนยังมีสายรอโทร = `resyncFollowPlanWithLumos` (ส่งแผนใหม่จากสายที่เหลือ) · ไม่เหลือ = `cancelFollowPlanAtLumos`
+  ล้ม ⇒ `markFollowCancelFailed` จด `push_state = 'cancel_failed'` ⇒ `retryFailedFollowCancels` (followCancelResend.ts · เดินใน followPushRetryWorker ทุก 1 นาที) จนสำเร็จหรือเลยเวลาสาย
+- **คิวคนต้องโทร** `followQueueGroupOf(call, person, now)` — ส่ง AI แล้วเลย 15 นาที (`AI_NO_RESULT_HANDOFF_MIN`) ไม่มีผล + ไม่มีสาย AI รออีกในวัน = กองคนต้องโทร "AI ยังไม่มีผลกลับ · ให้คนตาม" (สายยังเป็นของ AI) · รายการสายเสี่ยงยังนับเป็น `ai_late`
+  ขอเลื่อน = กองคนต้องโทร "ขอเลื่อน · ให้คนโทรนัด" · `canRecordStaffCall` / server ใช้ `isAiFinalOutcome` (ไป · ไม่ไป · ยกเลิก) แทน `isAiDecisiveOutcome` ⇒ ลงผลทับขอเลื่อนได้
+- **คนลง ไป/ไม่ไป** (`FOLLOW_STAFF_ANSWER_STOP_OUTCOMES`) = หยุดสายที่เหลือของวันนั้น เหมือน AI · เดิมหยุดเฉพาะเมื่อกด "จบเรื่องนี้"
+- **ใบคนแทนโทรไม่ได้** `notifyReplaceSheetProblem` (irecruitReplaceSync.ts) — มีชื่อคนไปแทนแต่ไม่มีเบอร์ / ไม่มีวันเข้างาน (`fetchIrecruitReplaceNoDateRows` · เพิ่งลง 2 วัน) ⇒ กระดิ่งแอดมิน+หัวหน้า ครั้งเดียวต่อใบ
+  ใบที่ยังไม่มีชื่อคนไปแทน = ไม่แจ้ง (วัด 28 ต.ค. 227 จาก 236 ใบไม่มีเบอร์เป็นแบบนี้)
+- เทสต์ `tests/api/followSixFixes2569-10-28.test.ts` · ผังทุกทางแยกอยู่ใน Artifact "Flow การโทรติดตาม"

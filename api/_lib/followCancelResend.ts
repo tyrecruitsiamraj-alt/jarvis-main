@@ -15,6 +15,7 @@ import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { getLumosPushConfig } from './lumosPushClient.js';
 import { cancelPushedReminderIgnoringMissing } from './lumosDispatch.js';
+import { FOLLOW_CANCEL_FAILED_STATE, withdrawFollowPlanAtLumos } from './callFollowup.js';
 import { logError, logInfo } from './logger.js';
 
 const followTable = tableInAppSchema('follow_entries');
@@ -61,5 +62,49 @@ export async function resendFollowCancels(): Promise<{ sent: number; failed: num
     }
   }
   if (rows.length > 0) logInfo('follow.cancelResend', out);
+  return out;
+}
+
+/**
+ * ═══ ลองถอนแผนที่ Lumos ซ้ำ — หลังได้ ไป/ไม่ไป แล้วถอนครั้งแรกไม่สำเร็จ (เจ้าของ Choice 28 ต.ค. 2569 "แก้ครบ 6 ข้อ") ═══
+ * เดิมจดแค่ log ⇒ Lumos อาจโทรสายที่เหลือต่อ (แบบเคสคุณนริศ) ไม่มีใครรู้
+ * แถวคิวที่ยกเลิกแล้วติด `push_state = 'cancel_failed'` (`markFollowCancelFailed`) · ยังไม่ถึงเวลาสาย
+ * ⇒ `withdrawFollowPlanAtLumos` ตัวเดียวกับรอบแรก (แผนยังมีสายเหลือ = ส่งแผนใหม่ · ไม่เหลือ = ยกเลิก)
+ * สำเร็จ = จด `cancel_resent` · เลยเวลาสายไปแล้วไม่ลองอีก (Lumos โทรไปแล้วหรือไม่ก็ตาม ส่งตอนนี้ไม่ช่วย)
+ */
+export function failedCancelRetrySql(): string {
+  return `
+    select distinct coalesce(x.plan_ref, x.person_ref) as ref
+      from ${queueTable} x
+      join ${followTable} e on x.person_ref = 'follow-' || e.id::text
+     where x.channel = 'reminder' and x.job_ref = 'follow' and x.status = 'cancelled'
+       and x.push_state = '${FOLLOW_CANCEL_FAILED_STATE}'
+       and e.scheduled_at > now()
+     limit ${LIMIT}`;
+}
+
+export async function retryFailedFollowCancels(): Promise<{ sent: number; failed: number }> {
+  const out = { sent: 0, failed: 0 };
+  if (!getLumosPushConfig()) return out;
+  const { rows } = await dbQuery<{ ref: string }>(failedCancelRetrySql());
+  for (const { ref } of rows) {
+    const ok = await withdrawFollowPlanAtLumos(ref).catch((e) => {
+      logError('follow.cancelRetry: ถอนแผนไม่สำเร็จ (ลองใหม่รอบหน้า)', e, { ref });
+      return false;
+    });
+    if (!ok) {
+      out.failed += 1;
+      continue;
+    }
+    await dbQuery(
+      `update ${queueTable} set push_state = $2
+        where channel = 'reminder' and job_ref = 'follow' and status = 'cancelled'
+          and push_state = '${FOLLOW_CANCEL_FAILED_STATE}'
+          and coalesce(plan_ref, person_ref) = $1`,
+      [ref, CANCEL_RESENT_STATE],
+    );
+    out.sent += 1;
+  }
+  if (rows.length > 0) logInfo('follow.cancelRetry', out);
   return out;
 }

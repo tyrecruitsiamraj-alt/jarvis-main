@@ -132,14 +132,16 @@ describe('ลงผลได้เฉพาะรอบคนโทร', () => {
   it('รอบคนโทรที่ยังไม่ยกเลิก = ได้', () => {
     expect(canRecordStaffCall(entry())).toBe(true);
   });
-  /** 🔴 7 ต.ค. 2569: สาย AI ที่ยังไม่ได้คำตอบลงผลเองได้ · AI ได้ ไป/ไม่ไป/ขอเลื่อน แล้ว = ห้ามทับ (นับสายเดียวสองฝั่ง) */
+  /** 🔴 7 ต.ค. 2569: สาย AI ที่ยังไม่ได้คำตอบลงผลเองได้ · AI ได้ ไป/ไม่ไป แล้ว = ห้ามทับ (นับสายเดียวสองฝั่ง) · ขอเลื่อนลงได้ 28 ต.ค. */
   it('🔴 สาย AI: ไม่ได้คำตอบ = ได้ · ได้คำตอบแล้ว = ไม่ได้', () => {
     expect(canRecordStaffCall(entry({ call_mode: 'ai' }))).toBe(true);
     expect(canRecordStaffCall(entry({ call_mode: 'ai', call_outcome: 'no_answer' }))).toBe(true);
     expect(canRecordStaffCall(entry({ call_mode: 'ai', call_outcome: 'acknowledged' }))).toBe(true);
-    for (const code of ['confirmed', 'declined', 'reschedule_requested', 'cancelled']) {
+    for (const code of ['confirmed', 'declined', 'cancelled']) {
       expect(canRecordStaffCall(entry({ call_mode: 'ai', call_outcome: code }))).toBe(false);
     }
+    // 28 ต.ค. 2569 (Choice "แก้ครบ 6 ข้อ"): ขอเลื่อน = ยังไม่ได้คำตอบ ⇒ คนโทรนัดแล้วลงผลได้
+    expect(canRecordStaffCall(entry({ call_mode: 'ai', call_outcome: 'reschedule_requested' }))).toBe(true);
   });
   it('รอบที่ยกเลิก = ไม่ได้', () => {
     expect(canRecordStaffCall(entry({ cancelled: true }))).toBe(false);
@@ -227,7 +229,7 @@ describe('🔴 server: ลงผลบนสาย AI (7 ต.ค. 2569)', () => 
   it('AI ได้คำตอบแล้ว = ปฏิเสธ · ไม่ได้คำตอบ = ลงได้ + ถอนสาย AI ที่ยังรอโทรของช่องนี้', async () => {
     const { readFileSync } = await import('node:fs');
     const h = readFileSync(new URL('../../api/_handlers/follow.ts', import.meta.url), 'utf8');
-    expect(h).toContain('if (isAiDecisiveOutcome(q[0]?.outcome))');
+    expect(h).toContain('if (isAiFinalOutcome(q[0]?.outcome))');
     expect(h).toContain('if (isAiRow && aiQueuePending)');
     expect(h).not.toContain("where id = $1 and cancelled_at is null and call_mode = 'manual'");
   });

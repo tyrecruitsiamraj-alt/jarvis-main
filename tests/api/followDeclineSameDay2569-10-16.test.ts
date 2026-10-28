@@ -14,12 +14,14 @@ describe('🔴 ตอบไม่ไป = ยกเลิกเฉพาะว�
   it('ยกเลิกเฉพาะแถววันเดียวกับสายที่ตอบ (เวลาไทย) · ส่งคนแทน = ใบงานเดียวกัน (SQT)', () => {
     const fn = follow.slice(follow.indexOf('export async function cancelFollowSetAfterDecline'));
     const sql = fn.slice(0, fn.indexOf('returning q.person_ref, q.plan_ref'));
-    expect(sql).toContain(
-      "(f.scheduled_at at time zone 'Asia/Bangkok')::date = (me.scheduled_at at time zone 'Asia/Bangkok')::date",
-    );
-    expect(sql).toContain("split_part(f.source_ref, ':', 2) = split_part(coalesce(me.source_ref, ''), ':', 2)");
-    // ยกเลิกที่ Lumos เฉพาะแผนของแถวที่ยกเลิก (วันนั้น) — ผ่านตัวกันข้อ 9 ต.ค. ตัวเดียว
-    expect(fn).toContain('await cancelFollowPlanAtLumos(ref);');
+    // 28 ต.ค. 2569: ตัวตัดสินเดียว (`followDayScope.ts`) — คนเริ่มงาน = วันเดียวกัน · คนแทน = ใบงานเดียวกันเท่านั้น
+    expect(sql).toContain("${followSameStopUnitSql('f', 'me.source_ref', 'me.scheduled_at')}");
+    const scope = readFileSync('api/_lib/followDayScope.ts', 'utf8');
+    expect(scope).toContain("else (${f}.scheduled_at at time zone 'Asia/Bangkok')::date = (${meAt} at time zone 'Asia/Bangkok')::date");
+    expect(scope).toContain("and split_part(coalesce(${f}.source_ref, ''), ':', 2) = split_part(${meRef}, ':', 2)");
+    // ยกเลิกที่ Lumos เฉพาะแผนของแถวที่ยกเลิก — แผนยังเหลือสายอื่น = ส่งแผนใหม่ · ไม่เหลือ = ผ่านตัวกันข้อ 9 ต.ค. ตัวเดียว
+    expect(follow).toContain('await cancelFollowPlanAtLumos(ref);');
+    expect(fn).toContain('await withdrawFollowPlanAtLumos(ref)');
   });
 });
 

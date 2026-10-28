@@ -6,7 +6,7 @@
  * 3 กอง (สายละกองเดียว · ทุกสายของวันอยู่สักกอง):
  *   - `staff` คนต้องโทร — สายคนโทรที่ยังไม่มีผล · สายที่ไม่ได้ส่งให้ AI · สาย AI ที่โทรแล้วไม่ได้คำตอบ (ไม่รับสาย/สรุปไม่ได้)
  *     และไม่มีสาย AI ของคนนั้นที่ยังรอโทรอยู่ในวันเดียวกัน (กันคนกับ AI โทรชนกัน)
- *   - `ai` AI จะโทร — ส่งให้ AI แล้ว ยังไม่มีผล (รวมเลยเวลาแต่ผลยังไม่กลับ · ส่ง AI แล้วต้อง AI ไม่ย้ายให้คน)
+ *   - `ai` AI จะโทร — ส่งให้ AI แล้ว ยังไม่มีผล · เลยเวลาเกิน 15 นาทีไม่มีผล = ขึ้นให้คนตาม (28 ต.ค. 2569 · สายยังเป็นของ AI)
  *   - `done` จบแล้ว — มีคำตอบ (ไป/ไม่ไป) · คนลงผลแล้ว · ปิดงาน · ยกเลิก
  * ไฟล์นี้ pure — เทสต์ `tests/api/followCallQueue2569-10-12.test.ts`
  */
@@ -43,7 +43,14 @@ const atOf = (c: FollowDayCall): number | null => {
   return Number.isFinite(t) ? t : null;
 };
 
-export function followQueueGroupOf(call: FollowDayCall, person: FollowDayPerson): { group: FollowQueueGroup; reason: string } {
+/** ส่ง AI แล้วเลยเวลาเกินเท่านี้ยังไม่มีผล ⇒ ขึ้นให้คนตาม (ตัวเลขเดียวกับกระดิ่ง/รายการสายเสี่ยง) */
+export const AI_NO_RESULT_HANDOFF_MIN = 15;
+
+export function followQueueGroupOf(
+  call: FollowDayCall,
+  person: FollowDayPerson,
+  now: Date = new Date(),
+): { group: FollowQueueGroup; reason: string } {
   const { round } = call;
   const e = round.entry;
   const label = followRoundLabel(round);
@@ -62,15 +69,27 @@ export function followQueueGroupOf(call: FollowDayCall, person: FollowDayPerson)
   const caller = followCallerOf(e);
   if (caller === 'manual') return { group: 'staff', reason: 'สายคนโทร' };
   if (round.state === 'notSent') return { group: 'staff', reason: roundDispatchReason(round) };
-  if (AI_PENDING.has(round.state)) {
-    return { group: 'ai', reason: round.state === 'overdue' ? 'ส่งให้ AI แล้ว ยังไม่มีผลกลับ' : 'AI จะโทรตามเวลา' };
-  }
-  // มีผลจาก AI แล้ว — ขอเลื่อน/ยกเลิก = จบ · ไม่ได้คำตอบ = คนโทรต่อได้ ถ้า AI ไม่มีสายรออยู่อีกในวันนั้น
-  if (!canRecordStaffCall(e)) return { group: 'done', reason: label };
   const aiStillCalling = person.calls.some(
     (c) => c !== call && !c.round.entry.cancelled && followCallerOf(c.round.entry) === 'ai' && AI_PENDING.has(c.round.state),
   );
+  if (AI_PENDING.has(round.state)) {
+    /**
+     * 🔴 ส่ง AI แล้วเลยเวลา 15 นาทีไม่มีผลกลับ (28 ต.ค. 2569 · เจ้าของ Choice "แก้ครบ 6 ข้อ")
+     * เดิมค้างกอง "AI จะโทร" ตลอด มีแค่กระดิ่งครั้งเดียว ⇒ ขึ้นให้คนตามเหมือน AI โทรไม่ติด (ยังไม่มีสาย AI รออยู่อีกในวันนั้น)
+     * สายยังเป็นของ AI (ไม่สลับ call_mode) · ผลมาทีหลังก็ลงตามปกติ · คนลงผลก่อน = ถอนคิว AI ของสายนั้น
+     */
+    const at = atOf(call);
+    const late = at !== null ? (now.getTime() - at) / 60_000 : 0;
+    if (round.state === 'overdue' && late >= AI_NO_RESULT_HANDOFF_MIN && !aiStillCalling) {
+      return { group: 'staff', reason: 'AI ยังไม่มีผลกลับ · ให้คนตาม' };
+    }
+    return { group: 'ai', reason: round.state === 'overdue' ? 'ส่งให้ AI แล้ว ยังไม่มีผลกลับ' : 'AI จะโทรตามเวลา' };
+  }
+  // มีผลจาก AI แล้ว — ยกเลิก = จบ · ไม่ได้คำตอบ/ขอเลื่อน = คนโทรต่อได้ ถ้า AI ไม่มีสายรออยู่อีกในวันนั้น
+  if (!canRecordStaffCall(e)) return { group: 'done', reason: label };
   if (aiStillCalling) return { group: 'done', reason: label };
+  // ขอเลื่อน (28 ต.ค. 2569) — เดิมขึ้นจบแล้ว ไม่มีใครโทรนัด
+  if ((e.call_outcome ?? '').trim() === 'reschedule_requested') return { group: 'staff', reason: 'ขอเลื่อน · ให้คนโทรนัด' };
   // 🔴 สายยังเป็นของ AI (call_mode ไม่เปลี่ยน · กติกา 9 ต.ค. "ส่ง AI แล้วต้อง AI") — แค่ขึ้นให้คนตาม · ป้ายหน้าแถว = AI (14 ต.ค. 2569)
   return { group: 'staff', reason: `AI โทรไม่ติด ${label} · ให้คนตาม` };
 }
@@ -82,7 +101,7 @@ export function buildFollowCallQueue(
   const out: Record<FollowQueueGroup, FollowQueueItem[]> = { staff: [], ai: [], done: [] };
   for (const person of people) {
     for (const call of person.calls) {
-      const { group, reason } = followQueueGroupOf(call, person);
+      const { group, reason } = followQueueGroupOf(call, person, now);
       const at = atOf(call);
       const late = group === 'staff' && at !== null && at < now.getTime() ? Math.floor((now.getTime() - at) / 60_000) : null;
       out[group].push({ person, call, group, reason, lateMinutes: late, at });
@@ -135,6 +154,8 @@ export function followAtRiskKindOf(it: FollowQueueItem, todayYmd: string): Follo
     return it.call.round.state === 'overdue' && it.at !== null && late >= AT_RISK_GRACE_MIN ? 'ai_late' : null;
   }
   if (e.time_tbd) return (it.call.round.ymd ?? '9999') <= todayYmd ? 'tbd' : null;
+  // ส่ง AI แล้วไม่มีผลกลับ ขึ้นกองคนต้องโทรแล้ว (28 ต.ค. 2569) — ยังนับเป็น "AI เลยเวลาไม่มีผล" ตามเดิม
+  if (e.call_mode !== 'manual' && it.call.round.state === 'overdue') return late >= AT_RISK_GRACE_MIN ? 'ai_late' : null;
   if (e.call_mode !== 'manual' && it.call.round.state === 'notSent') return 'ai_not_sent';
   return late >= AT_RISK_GRACE_MIN ? 'staff_late' : null;
 }

@@ -23,6 +23,7 @@ import { dbQuery, isPgUndefinedTable, isPgUniqueViolation, withSessionLock } fro
 import { tableInAppSchema } from './schema.js';
 import { irecruitSqlQuery, irecruitUnavailableReason } from './irecruitSqlServer.js';
 import { toE164Thai } from './thaiPhone.js';
+import { notifyRoles } from './appNotifications.js';
 import { isAutoDispatchEnabled } from './lumosDispatchMode.js';
 import {
   cancelFollowReminder,
@@ -177,6 +178,48 @@ async function logReplaceEvent(
   } catch (e) {
     logWarn('irecruit.replaceSync: จดเหตุการณ์ไม่สำเร็จ', { kind, error: errorSummaryText(e) });
   }
+}
+
+/**
+ * ═══ ใบส่งคนแทนที่ระบบโทรไม่ได้ — แจ้งกระดิ่ง (เจ้าของ Choice 28 ต.ค. 2569 "แก้ครบ 6 ข้อ") ═══
+ * เฉพาะใบที่มีคนไปแทนแล้ว (มีชื่อ) · เดิมข้ามเงียบ ๆ: ไม่มีเบอร์ 10 หลัก = นับในสรุปรอบอย่างเดียว · ไม่มีวันเข้างาน = ไม่ถูกดึงมาเลย ⇒ ไม่มีใครรู้ว่าคนนี้ไม่ถูกโทร
+ * แจ้งแอดมิน + หัวหน้า ครั้งเดียวต่อใบ (`dedupeKey`) · แจ้งไม่สำเร็จห้ามทำให้รอบดึงล้ม
+ */
+async function notifyReplaceSheetProblem(
+  kind: 'no_phone' | 'no_date',
+  r: { job_id: string | number; fname: string | null; lname: string | null; site_name: string | null },
+): Promise<void> {
+  const name = `${(r.fname ?? '').trim()} ${(r.lname ?? '').trim()}`.trim() || 'คนไปแทนงาน';
+  const unit = (r.site_name ?? '').trim();
+  try {
+    await notifyRoles(['admin', 'supervisor'], {
+      type: kind === 'no_phone' ? 'irecruit_replace_no_phone' : 'irecruit_replace_no_date',
+      title: kind === 'no_phone' ? 'ใบส่งคนแทนไม่มีเบอร์ โทรไม่ได้' : 'ใบส่งคนแทนไม่มีวันเข้างาน โทรไม่ได้',
+      body: `${name}${unit ? ` · ${unit}` : ''} · ใบ ${String(r.job_id).trim()} — แก้ใน iRecruit แล้วระบบดึงให้เอง`,
+      link: '/follow?view=replace',
+      dedupeKey: `irecruit_replace_${kind}:${String(r.job_id).trim()}`,
+    });
+  } catch (e) {
+    logWarn('irecruit.replaceSync: แจ้งใบโทรไม่ได้ไม่สำเร็จ', { kind, error: errorSummaryText(e) });
+  }
+}
+
+/** ใบที่ยังรอ (W/WS) แต่ไม่มีวันเข้างาน · เพิ่งลงภายใน 2 วัน — ตัวดึงหลักกรองด้วยวันเข้างานจึงไม่เห็นใบพวกนี้ */
+export async function fetchIrecruitReplaceNoDateRows(addedSinceYmd: string) {
+  return irecruitSqlQuery<{ job_id: string | number; fname: string | null; lname: string | null; site_name: string | null }>(
+    `SELECT h.job_id, z.fname, z.lname, s.site_name
+       FROM ir_job_header h
+       OUTER APPLY (SELECT TOP 1 jr.staff_id FROM ir_job_request jr WHERE jr.job_id = h.job_id ORDER BY jr.date_add DESC) cand
+       OUTER APPLY (
+         SELECT TOP 1 zz.fname, zz.lname, zz.status FROM z_hr_recruitment_header zz
+          WHERE zz.id_card = cand.staff_id ORDER BY zz.date_update DESC, zz.date_add DESC
+       ) z
+       LEFT JOIN ir_ms_site s ON s.site_code = h.site_code
+      WHERE h.status IN ('W', 'WS') AND h.job_type = '2'
+        AND h.want_date IS NULL AND h.date_add >= @addedSince
+        AND ISNULL(z.status, '') <> 'C'`,
+    { addedSince: new Date(`${addedSinceYmd}T00:00:00Z`) },
+  );
 }
 
 export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): Promise<IrecruitReplaceRow[]> {
@@ -484,6 +527,13 @@ async function runIrecruitReplaceSyncUnlocked(
       return summary;
     }
     summary.fetched = rows.length;
+    try {
+      for (const r of await fetchIrecruitReplaceNoDateRows(shiftYmd(summary.fromYmd, -REPLACE_PAST_ADDED_DAYS))) {
+        if ((r.fname ?? '').trim() || (r.lname ?? '').trim()) await notifyReplaceSheetProblem('no_date', r);
+      }
+    } catch (e) {
+      logWarn('irecruit.replaceSync: อ่านใบไม่มีวันเข้างานไม่สำเร็จ', { error: errorSummaryText(e) });
+    }
     const adderPhones = await loadAdderPhones([...rows.map((r) => r.adder_email), ...rows.map((r) => r.updater_email)]);
 
     // ── สายที่ iRecruit ต้องการตอนนี้ ──
@@ -492,6 +542,8 @@ async function runIrecruitReplaceSyncUnlocked(
       const phone = toE164Thai(r.mobile);
       if (!phone) {
         summary.noPhone += 1;
+        // ใบที่ยังไม่มีคนไปแทน (ไม่มีชื่อ) = ยังไม่มีใครให้โทร ไม่ใช่เบอร์หาย — 28 ต.ค. 2569 วัด 227 จาก 236 ใบเป็นแบบนี้
+        if ((r.fname ?? '').trim() || (r.lname ?? '').trim()) await notifyReplaceSheetProblem('no_phone', r);
         continue;
       }
       const wall = wantWallFromSqlDate(r.want_date instanceof Date ? r.want_date : new Date(String(r.want_date)));

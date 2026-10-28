@@ -48,7 +48,13 @@ import {
   isFollowOutcome,
   requiresNote,
 } from '../../src/lib/followOutcome.js';
-import { FOLLOW_STAFF_DAY_STOP_OUTCOMES, isAiDecisiveOutcome, validateFollowStaffCall } from '../../src/lib/followStaffCall.js';
+import {
+  FOLLOW_STAFF_ANSWER_STOP_OUTCOMES,
+  FOLLOW_STAFF_DAY_STOP_OUTCOMES,
+  isAiFinalOutcome,
+  validateFollowStaffCall,
+} from '../../src/lib/followStaffCall.js';
+import { followSameStopUnitSql } from '../_lib/followDayScope.js';
 
 const followTable = tableInAppSchema('follow_entries');
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
@@ -1249,11 +1255,10 @@ async function stopRemainingFollowRounds(done: FollowRow, scope: FollowStopScope
             select substring(q.person_ref from 8) from ${tableInAppSchema('lumos_dispatch_queue')} q
              where q.channel = 'reminder' and q.job_ref = 'follow' and q.plan_ref = $3::text))
         )
-        and ($4::text = 'set'
-          or to_char(timezone('Asia/Bangkok', f.scheduled_at), 'YYYY-MM-DD')
-           = to_char(timezone('Asia/Bangkok', $5::timestamptz), 'YYYY-MM-DD'))
+        -- 'day' = วันนั้น · คนแทน = ใบงานเดียวกัน (28 ต.ค. 2569 · ตัวตัดสินเดียวกับคำตอบ AI ใน followDayScope.ts)
+        and ($4::text = 'set' or ${followSameStopUnitSql('f', '$6::text', '$5::timestamptz')})
       returning f.id::text as id`,
-    [doneId, groupId, planRef, scope, done.scheduled_at],
+    [doneId, groupId, planRef, scope, done.scheduled_at, done.source_ref ?? null],
   );
   const ids = sib.map((r) => r.id);
   // ถอนคิว + แจ้ง Lumos ทีละสาย (ตัวเดียวกับปุ่มยกเลิก) — สายที่ปิดเองด้วย เผื่อปิดก่อน AI โทรรอบนั้น
@@ -2215,7 +2220,8 @@ async function recordStaffCall(req: AuthedReq, res: ApiRes, body: Record<string,
         where channel = 'reminder' and job_ref = 'follow' and person_ref = $1 limit 1`,
       [`follow-${id}`],
     );
-    if (isAiDecisiveOutcome(q[0]?.outcome)) {
+    // ขอเลื่อน = ยังไม่ได้คำตอบ ไป/ไม่ไป ⇒ คนโทรนัดแล้วลงผลได้ (28 ต.ค. 2569 · เดิมห้ามทับ ขึ้นจบแล้ว ไม่มีใครตาม)
+    if (isAiFinalOutcome(q[0]?.outcome)) {
       return sendError(res, 400, 'Bad request', 'AI ได้คำตอบของสายนี้แล้ว ลงผลทับไม่ได้');
     }
     aiQueuePending = q[0]?.status === 'pending';
@@ -2245,8 +2251,15 @@ async function recordStaffCall(req: AuthedReq, res: ApiRes, body: Record<string,
    * วันหยุด · ลางาน (เจ้าของสั่ง 14 ต.ค. 2569 · Choice "ผลใหม่แยก ไม่นับไม่ไป") — วันนี้ไม่ต้องไป ⇒ สายที่เหลือของวันนั้นหยุด
    * วันถัดไปโทรต่อตามแผน · ตัวหยุดเดียวกับปิดงาน (`stopRemainingFollowRounds` แบบ day) · หยุดไม่สำเร็จ = ผลยังบันทึกอยู่ + log
    */
+  /**
+   * 🔴 28 ต.ค. 2569 (Choice "แก้ครบ 6 ข้อ"): คนลง ไป / ไม่ไป เอง = หยุดสายที่เหลือของวันนั้นด้วย แบบเดียวกับที่ AI ได้คำตอบ
+   * เดิมหยุดเฉพาะเมื่อกด "จบเรื่องนี้" ⇒ คนตอบเจ้าหน้าที่แล้ว AI ยังโทรสายถัดไปของวัน
+   */
   let stoppedIds: string[] = [];
-  if ((FOLLOW_STAFF_DAY_STOP_OUTCOMES as readonly string[]).includes(v.value.outcome)) {
+  if (
+    (FOLLOW_STAFF_DAY_STOP_OUTCOMES as readonly string[]).includes(v.value.outcome) ||
+    (FOLLOW_STAFF_ANSWER_STOP_OUTCOMES as readonly string[]).includes(v.value.outcome)
+  ) {
     try {
       stoppedIds = await stopRemainingFollowRounds(done, 'day');
     } catch (e) {

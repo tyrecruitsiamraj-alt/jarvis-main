@@ -23,6 +23,7 @@ import {
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
 import { getLumosPushConfig } from './lumosPushClient.js';
 import { cancelFollowPlanAtLumos } from './followLumosCancel.js';
+import { followSameStopUnitSql } from './followDayScope.js';
 import { logError, logInfo } from './logger.js';
 import { classifyFollowCall } from '../../src/lib/followCallMicro.js';
 
@@ -465,16 +466,12 @@ export async function cancelFollowSetAfterDecline(personRef: string, groupId: st
                limit 1
             )
           )
-          -- เฉพาะ "วันนั้น" (16 ต.ค. 2569): วันเดียวกับสายที่ตอบ (เวลาไทย) · ส่งคนแทน = ใบงานเดียวกัน (SQT)
-          -- สายคอนเฟิร์ม 16:00 อยู่วันก่อนเข้างาน — ตอบไม่ไปตอนคอนเฟิร์ม สายเช้าของใบเดียวกันต้องหยุดด้วย
+          -- เฉพาะ "วันนั้น" (16 ต.ค. 2569): วันเดียวกับสายที่ตอบ (เวลาไทย) · ส่งคนแทน = ใบงานเดียวกันเท่านั้น
+          -- 🔴 28 ต.ค. 2569: คนแทนไม่นับ "วันเดียวกัน" แล้ว — สายคอนเฟิร์มของใบพรุ่งนี้เคยหายไปด้วย (ดู followDayScope.ts)
           and exists (
             select 1 from ${followTable} f, ${followTable} me
              where q.person_ref = 'follow-' || f.id::text and $1 = 'follow-' || me.id::text
-               and (
-                 (f.scheduled_at at time zone 'Asia/Bangkok')::date = (me.scheduled_at at time zone 'Asia/Bangkok')::date
-                 or (coalesce(f.source_ref, '') like 'irecruit-replace:%'
-                     and split_part(f.source_ref, ':', 2) = split_part(coalesce(me.source_ref, ''), ':', 2))
-               )
+               and ${followSameStopUnitSql('f', 'me.source_ref', 'me.scheduled_at')}
           )
         returning q.person_ref, q.plan_ref`,
       [personRef, groupId],
@@ -488,16 +485,74 @@ export async function cancelFollowSetAfterDecline(personRef: string, groupId: st
   if (cancelled.length > 0 && getLumosPushConfig()) {
     const refs = [...new Set(cancelled.map((r) => r.plan_ref ?? r.person_ref))];
     for (const ref of refs) {
-      try {
-        // แผนที่จบแล้วไม่ส่งซ้ำ · 404 = ไม่มีของค้าง (ดู followLumosCancel)
-        await cancelFollowPlanAtLumos(ref);
-      } catch (e) {
-        logError('lumos.push.follow.decline.cancel failed (คิวฝั่งเรายกเลิกแล้ว)', e, { personRef, ref });
-      }
+      const ok = await withdrawFollowPlanAtLumos(ref).catch((e) => {
+        logError('lumos.push.follow.decline.cancel failed (คิวฝั่งเรายกเลิกแล้ว · ตัวส่งซ้ำจะลองใหม่)', e, { personRef, ref });
+        return false;
+      });
+      if (!ok) await markFollowCancelFailed(ref);
     }
     logInfo('lumos.push.follow.decline.cancel', { personRef, rounds: cancelled.length, refs: refs.length });
   }
   return cancelled.length;
+}
+
+/** สายในแผนนี้ที่ยังต้องโทร (รอโทร · ยังไม่ถึงเวลา) — มี = ส่งแผนใหม่จากสายที่เหลือ ไม่ใช่ยกเลิกทั้งแผน */
+async function pendingFollowInPlan(ref: string): Promise<string | null> {
+  const { rows } = await dbQuery<{ id: string }>(
+    `select substring(q.person_ref from 8) as id
+       from ${queueTable} q
+       join ${followTable} f on q.person_ref = 'follow-' || f.id::text
+      where q.channel = 'reminder' and q.job_ref = 'follow' and q.status = 'pending'
+        and coalesce(q.plan_ref, q.person_ref) = $1
+        and f.cancelled_at is null and f.completed_at is null and f.scheduled_at > now()
+      order by f.scheduled_at
+      limit 1`,
+    [ref],
+  );
+  return rows[0]?.id ?? null;
+}
+
+/**
+ * ถอนสายที่ยกเลิกออกจากแผนที่ Lumos (28 ต.ค. 2569)
+ * - แผนยังมีสายที่ต้องโทร (เช่น สายคอนเฟิร์มของใบพรุ่งนี้อยู่แผนเดียวกัน — Lumos 1 แผนต่อเบอร์ต่อวัน)
+ *   ⇒ ส่งแผนใหม่จากสายที่เหลือ (`resyncFollowPlanWithLumos` ตัวเดียวกับปุ่มแก้ตาราง) · เดิมยกเลิกทั้งแผน = สายที่เหลือหายที่ Lumos
+ * - ไม่เหลือ ⇒ ยกเลิกแผน (`cancelFollowPlanAtLumos` · แผนที่จบแล้วไม่ส่งซ้ำ · 404 = ไม่มีของค้าง)
+ * คืน `false` = ยังไม่สำเร็จ (ต้องให้ตัวส่งซ้ำลองใหม่)
+ */
+export async function withdrawFollowPlanAtLumos(ref: string): Promise<boolean> {
+  const rest = await pendingFollowInPlan(ref);
+  if (!rest) {
+    await cancelFollowPlanAtLumos(ref);
+    return true;
+  }
+  // import ตอนใช้ — lumosDispatch import ไฟล์นี้อยู่ (กันวง import)
+  const { resyncFollowPlanWithLumos } = await import('./lumosDispatch.js');
+  const { staffNameOfPhone } = await import('./followStaffName.js');
+  const r = await resyncFollowPlanWithLumos(rest, staffNameOfPhone);
+  if (!r.cancelled || !r.pushed) {
+    logError('lumos.push.follow.decline.resync incomplete', new Error(r.reason ?? 'resync incomplete'), { ref, ...r });
+    return false;
+  }
+  return true;
+}
+
+/**
+ * 🔴 ยกเลิกที่ Lumos ไม่สำเร็จ (28 ต.ค. 2569 — เดิมจดแค่ log ไม่มีใครรู้ Lumos อาจโทรต่อ)
+ * จดที่แถวคิวที่ยกเลิกแล้ว ⇒ `retryFailedFollowCancels` (ทุก 1 นาที) ลองใหม่จนสำเร็จหรือเลยเวลาสาย
+ */
+export const FOLLOW_CANCEL_FAILED_STATE = 'cancel_failed';
+
+export async function markFollowCancelFailed(ref: string): Promise<void> {
+  try {
+    await dbQuery(
+      `update ${queueTable} set push_state = $2, updated_at = now()
+        where channel = 'reminder' and job_ref = 'follow' and status = 'cancelled'
+          and coalesce(plan_ref, person_ref) = $1`,
+      [ref, FOLLOW_CANCEL_FAILED_STATE],
+    );
+  } catch (e) {
+    logError('lumos.push.follow.cancel.mark failed', e, { ref });
+  }
 }
 
 /**

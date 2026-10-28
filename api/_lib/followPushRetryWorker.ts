@@ -33,7 +33,7 @@ import { staffNameOfPhone } from './followStaffName.js';
 import { repairDeclinedFollowDays } from './followDeclineDayRepair.js';
 import { isAutoDispatchEnabled } from './lumosDispatchMode.js';
 import { alertFollowAtRiskDigest, alertFollowLeaveMismatch, alertOverdueAiFollow, checkFollowPlanImports } from './followLumosWatch.js';
-import { resendFollowCancels } from './followCancelResend.js';
+import { resendFollowCancels, retryFailedFollowCancels } from './followCancelResend.js';
 import { lumosClientIdOfPlan } from './followLumosCancel.js';
 import { mergeSplitFollowPlans } from './followPlanMerge.js';
 import {
@@ -338,6 +338,12 @@ export function startFollowPushRetryWorker(): boolean {
         await resendFollowCancels();
       } catch (e) {
         logError('follow.cancelResend: รอบนี้ล้ม', e);
+      }
+      // ได้ ไป/ไม่ไป แล้วถอนแผนที่ Lumos ไม่สำเร็จ → ลองใหม่ (เจ้าของ 28 ต.ค. 2569 · เดิมจดแค่ log)
+      try {
+        await retryFailedFollowCancels();
+      } catch (e) {
+        logError('follow.cancelRetry: รอบนี้ล้ม', e);
       }
       // ตอบว่า "วันนี้ไม่ไป" → วันถัดไปโทรต่อ (เจ้าของ 7 ต.ค. 2569) — ส่งแผนของวันถัดไปที่ถูกยกเลิกไปด้วยกลับให้ Lumos
       try {

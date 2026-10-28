@@ -113,6 +113,19 @@ export function isAiDecisiveOutcome(code: string | null | undefined): boolean {
   return (AI_DECISIVE_OUTCOMES as readonly string[]).includes((code ?? '').trim());
 }
 
+/**
+ * ผลจาก AI ที่ **จบเรื่องแล้ว** — ไป · ไม่ไป · ยกเลิก (28 ต.ค. 2569 · เจ้าของ Choice "แก้ครบ 6 ข้อ")
+ * ขอเลื่อนไม่อยู่ในชุดนี้: เขายังไม่ได้ตอบว่าไปไหม ⇒ คนโทรนัดแล้วลงผลบนสายนั้นได้ (เดิมขึ้นจบแล้ว ไม่มีใครตาม)
+ */
+export const AI_FINAL_OUTCOMES = ['confirmed', 'declined', 'cancelled'] as const;
+
+export function isAiFinalOutcome(code: string | null | undefined): boolean {
+  return (AI_FINAL_OUTCOMES as readonly string[]).includes((code ?? '').trim());
+}
+
+/** คนลงผลแล้วหยุดสายที่เหลือของวันนั้น เหมือน AI ได้คำตอบ (28 ต.ค. 2569 · คนแทน = ใบงานนั้น) */
+export const FOLLOW_STAFF_ANSWER_STOP_OUTCOMES: readonly FollowStaffCallOutcome[] = ['confirmed', 'declined'];
+
 export type FollowStaffCallInput = { outcome: FollowStaffCallOutcome; note: string | null };
 
 /** ตรวจค่าที่จะบันทึก — ค่าที่อ่านไม่ออก = ปฏิเสธ ห้ามเดาเป็นผลใดผลหนึ่ง */
@@ -134,7 +147,7 @@ export function validateFollowStaffCall(input: {
 /**
  * ลงผลคนโทรได้ไหม — รอบที่ตั้งเป็นคนโทร (ยังไม่ยกเลิก)
  * 🔴 7 ต.ค. 2569 เจ้าของ: *"ถ้าสาย AI โทรไม่ติดแล้วเจ้าหน้าที่โทรเองได้คำตอบ"* → ทำ ⇒ สาย AI ที่ยังไม่ได้คำตอบก็ลงได้
- * (`isAiDecisiveOutcome` = AI ได้คำตอบแล้ว ห้ามทับ)
+ * (`isAiFinalOutcome` = AI ได้คำตอบแล้ว ห้ามทับ · ขอเลื่อนลงได้ 28 ต.ค. 2569)
  */
 export function canRecordStaffCall(entry: {
   call_mode?: string | null;
@@ -143,7 +156,7 @@ export function canRecordStaffCall(entry: {
 }): boolean {
   if (entry.cancelled) return false;
   if (entry.call_mode === 'manual') return true;
-  return !isAiDecisiveOutcome(entry.call_outcome);
+  return !isAiFinalOutcome(entry.call_outcome);
 }
 
 /**
