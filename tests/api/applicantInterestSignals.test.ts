@@ -27,10 +27,12 @@ describe('ok=false นับเป็นไม่สนใจ', () => {
     expect(isInterestedApplicant(a)).toBe(false);
   });
 
-  it('บันทึกผลติดต่อสำเร็จเฉย ๆ ยังไม่ใช่ "สนใจ" (สนใจต้องมาจากผลโทร)', () => {
+  it('🔴 เจ้าหน้าที่บันทึกติดต่อสำเร็จ = "สนใจ" (28 ต.ค. 2569 Choice · แทนกติกา ส.ค.)', () => {
     const a = { last_contact_ok: true, last_contact_at: '2026-08-20T03:00:00Z' };
     expect(isNotInterestedApplicant(a)).toBe(false);
-    expect(isInterestedApplicant(a)).toBe(false);
+    expect(isInterestedApplicant(a)).toBe(true);
+    // AI บอกไม่เอาทีหลังติดต่อสำเร็จ = ไม่สนใจ (ใหม่กว่าชนะ)
+    expect(isInterestedApplicant({ ...a, last_call_outcome: 'declined', last_call_at: '2026-08-21T03:00:00Z' })).toBe(false);
   });
 
   it('🔴 AI โทรได้สนใจ แล้วเจ้าหน้าที่บันทึกติดต่อสำเร็จทีหลัง = ยังสนใจ (28 ต.ค. 2569 เดิมตกไปยังไม่รู้ผล)', () => {

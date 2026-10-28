@@ -87,14 +87,15 @@ function newerSignal(a: ApplicantInterestSignals): 'contact' | 'call' | null {
 }
 
 /**
- * ใบนี้อ่านว่า "สนใจ" ไหม — ผลโทรที่ตอบว่าเอางาน
- * 🔴 บันทึก "ติดต่อสำเร็จ" ที่มาทีหลังไม่ลบผลสนใจ (เจ้าของ 28 ต.ค. 2569 "ทำไมสนใจมาอยู่ในช่อง ยังไม่รู้ผล" ·
- *    AI โทรได้สนใจ แล้วเจ้าหน้าที่บันทึกติดต่อสำเร็จ + นัด → เดิมตกไปยังไม่รู้ผล) · ติดต่อสำเร็จเฉย ๆ (ไม่มีผลโทรสนใจ) ยังไม่ใช่สนใจ
+ * ใบนี้อ่านว่า "สนใจ" ไหม — สัญญาณล่าสุดเป็น ผลโทรตอบเอางาน **หรือ** เจ้าหน้าที่บันทึกติดต่อสำเร็จ
+ * 🔴 28 ต.ค. 2569 เจ้าของ Choice "ติดต่อสำเร็จ = สนใจ" (แทนกติกา ส.ค. ที่ว่าติดต่อสำเร็จเฉย ๆ ยังไม่ใช่สนใจ)
+ *    ที่มา: ไล่ทั้งแท็บผู้สมัคร เจอ 3 คนที่เจ้าหน้าที่โทรเองสำเร็จ (1 คนรับเข้าทำงานแล้ว) ค้างอยู่ "ยังไม่ส่ง AI"
+ * ติดต่อไม่สำเร็จทีหลัง = ไม่สนใจ ตามเดิม (Phase 5.11)
  */
 export function isInterestedApplicant(a: ApplicantInterestSignals): boolean {
   const s = newerSignal(a);
-  if (s === 'contact' && a.last_contact_ok !== true) return false;
-  return s !== null && isInterestedOutcome(a.last_call_outcome);
+  if (s === 'contact') return a.last_contact_ok === true;
+  return s === 'call' && isInterestedOutcome(a.last_call_outcome);
 }
 
 /** ใบนี้อ่านว่า "ไม่สนใจ" ไหม — ปฏิเสธตอนโทร **หรือ** ผลติดต่อล่าสุด ok=false */
