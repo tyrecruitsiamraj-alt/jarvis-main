@@ -146,7 +146,7 @@ describe('30 วินาที: ต้องรีบ · ใครค้าง�
   });
   it('หน้าโชว์ลูกค้าหักจริงกับตามสัญญาตัวเท่ากัน · ส่วนยาวพับไว้', () => {
     const page = read('src/pages/HomeExecPage.tsx');
-    for (const id of ['exec-money-actual', 'exec-money-contract', 'exec-urgent-costly', 'exec-urgent-soon', 'exec-stale', 'exec-owners', 'exec-channels', 'exec-fold-money']) {
+    for (const id of ['exec-money-actual', 'exec-money-contract', 'exec-urgent-costly', 'exec-urgent-soon', 'exec-owners', 'exec-channels', 'exec-fold-money']) {
       expect(page).toContain(id);
     }
   });
@@ -239,9 +239,9 @@ describe('แท็บ + คำบนจอ (เจ้าของ 25 ต.ค. 2
     expect(page).toContain('exec-flow-req-sum');
     expect(page).toContain('exec-flow-pos-sum');
   });
-  it('ใบค้างเกิน 90 วันอยู่ในกล่องเสียเงิน', () => {
+  it('การ์ดเสียเงินไม่มีบรรทัดใบที่เลยวัน · ค้างเกิน 90 วัน · เทียบช่วงก่อน (เจ้าของ 28 ต.ค. 2569 "เอาออก")', () => {
     const tile = page.slice(page.indexOf('data-testid="exec-money-tile"'), page.indexOf('label="เหลือหา (ใบขอจริง)"'));
-    expect(tile).toContain('data-testid="exec-stale"');
+    for (const id of ['data-testid="exec-stale"', 'data-testid="exec-overdue"', 'เทียบช่วงก่อนหน้าที่ยาวเท่ากัน']) expect(tile).not.toContain(id);
   });
 });
 

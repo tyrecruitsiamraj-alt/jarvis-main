@@ -192,7 +192,7 @@ export function buildAutopostCaption(job: JobRequest, opts: { contact: AutopostC
 
 /**
  * ขาดอะไรถึงกด Autopost ไม่ได้ (เจ้าของ 20 ต.ค. 2569: ขาดแล้วกดส่งไม่ได้ · ไม่มีก็ส่งได้ = บรรทัดนั้นไม่ขึ้น)
- * บังคับ: ตำแหน่ง · สถานที่ · ฐานเงินเดือน · วันเวลาทำงาน · ลิงก์สมัคร (ทุกโพสต์ต้องมีลิงก์)
+ * บังคับ: ตำแหน่ง · สถานที่ · รายได้ (ฐานเงินเดือนหรือรายได้อื่น · 28 ต.ค. 2569) · วันเวลาทำงาน · ลิงก์สมัคร (ทุกโพสต์ต้องมีลิงก์)
  */
 export function autopostMissing(job: JobRequest, opts: { hasLink: boolean }): string[] {
   const missing: string[] = [];
@@ -200,7 +200,9 @@ export function autopostMissing(job: JobRequest, opts: { hasLink: boolean }): st
   if (GENERIC_TITLE.test(publicJobTitle(job).trim())) missing.push('ตำแหน่ง');
   const hasPlace = Boolean(workplaceText(job)) || (job.job_details ?? []).some((d) => PLACE_DETAIL.test(d));
   if (!hasPlace) missing.push('สถานที่');
-  if (!autopostIncome(job)?.base) missing.push('ฐานเงินเดือน');
+  // ต้องมีรายได้ ไม่บังคับบรรทัด "ฐานเงินเดือน" (เจ้าของ 28 ต.ค. 2569 "ขาดฐานเงินเดือน มันไม่มีฐานเงินเดือน" — งานรายวัน/ค่าแรงไม่มีฐาน)
+  const income = autopostIncome(job);
+  if (!income?.base && !income?.total) missing.push('รายได้');
   if (!publicWorkSchedule(job.work_schedule)) missing.push('วันเวลาทำงาน');
   if (!opts.hasLink) missing.push('ลิงก์สมัคร (ประกาศก่อน)');
   return missing;

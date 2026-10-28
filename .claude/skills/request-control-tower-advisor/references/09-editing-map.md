@@ -2925,6 +2925,8 @@ state (`calendarOpen`/`selectedDay`/`month`) + derived (`calendar`/`grid`/`month
 | `src/components/jobs/AutopostDialog.tsx` ช่องเครื่อง | **28 ต.ค. 2569** (So Scraping) — Select ของ shadcn · ออนไลน์ จุดเขียว+คำ · ออฟไลน์ จุดเทา+คำ เลือกไม่ได้ · เทสต์ `autopostWorkerStatus2569-10-28` |
 | `aiEventsSql` (recruit-overview) · `applicantOverviewSql.ts` | **28 ต.ค. 2569** (เจ้าของ "เปลี่ยนวันดู โหลดนานมาก") — ก้อนผลโทร AI เดิม join "รหัสตรง OR เบอร์ตรง" 15–25 วิ (ทุก BU) → CTE กรองช่วงก่อน + แตก 2 join รวม union ≈0.3 วิ · ผลตรงของเดิมทุกช่วง (วัดจริง) · ชิ้นส่วน `AI_RESULT_BY_REF_SQL`/`AI_RESULT_BY_PHONE_SQL`/`AI_RESULT_COUNTED_SQL` ประกอบเป็น `AI_RESULT_OF_APP_SQL` ที่เดียว · `loadJobRegionOf` วิ่งพร้อมก้อนอื่น |
 | `src/lib/appointmentPlaces.ts` | **28 ต.ค. 2569** — แถว = สถานที่อย่างเดียว (แทน 21 ต.ค. สถานที่+เวลา) · `times[]` + `noTime` โชว์ในแถว · PDF ต่อสถานที่ |
+| `src/lib/userViewableBus.ts` | **ใหม่ 28 ต.ค. 2569** (sirirat.j ไม่เห็น BU อื่น) — BU หลัก + ดูเพิ่ม ฝั่งหน้าเว็บ · `/api/auth/me` ส่ง `extra_department_codes` · `lockedBuOf` ล็อกเฉพาะคนดู BU เดียว (เมนูใบขอ · แดชบอร์ดหัวหน้า) · PreCheck กรองตามชุด BU · เทสต์ `userViewableBus2569-10-28` |
+| `autopostMissing` | **28 ต.ค. 2569** — บังคับ "รายได้" (ฐานเงินเดือนหรือรายได้อื่น) แทนบังคับบรรทัดฐานเงินเดือน · งานรายวันไม่โดนว่าขาด |
 | `.github/workflows/deploy.yml` | **28 ต.ค. 2569** — `concurrency: deploy-production` (deploy ทีละรอบ ไม่ทับกัน) · push ที่มีแต่ `docs/**`/`*.md` ไม่ deploy · 🔴 ยกเว้น `skills/**` ต้อง deploy (candidateSpecAnalyzer อ่าน .md ตอนรัน) |
 | `src/pages/settings/AdminSettings.tsx` | เพิ่มแท็บ `health` (`?tab=health`) |
 | `.github/workflows/deploy.yml` | `SYSTEM_HEALTH_WATCH_ENABLED=true` |

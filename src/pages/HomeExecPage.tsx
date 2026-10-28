@@ -19,7 +19,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlarmClock, Bot, Clock3, HandCoins, Hourglass, Layers, MapPin, Users } from 'lucide-react';
+import { AlarmClock, Bot, Clock3, HandCoins, Layers, MapPin, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -41,7 +41,7 @@ import { fetchHomeMoney, previousWindow, type HomeMoneyPayload } from '@/lib/hom
 import { fetchHomeAiShare } from '@/lib/homeAiShareApi';
 import { sharesOfCalled, type AiShareBlockKey, type AiShareResponse, type AiShareWindow } from '@/lib/homeAiShare';
 import HomeAiSharePage from '@/pages/HomeAiSharePage';
-import { byOwner, costliest, dueSoon, NO_OWNER, overdueOf, perDayOf, reasonsOf, staleOf, STALE_DAYS, thisMonthWindow, type OwnerRow, type UrgentRow } from '@/lib/homeExec';
+import { byOwner, costliest, dueSoon, NO_OWNER, perDayOf, reasonsOf, thisMonthWindow, type OwnerRow, type UrgentRow } from '@/lib/homeExec';
 import { fetchRequestPipeline } from '@/lib/requestPipelineApi';
 import type { RequestPipelineResponse } from '@/lib/requestPipelineTypes';
 import { channelInterestOf } from '@/lib/channelPlatforms';
@@ -312,8 +312,6 @@ const HomeExecPage: React.FC = () => {
       `ถือ ${NUM.format(o.requests)} ใบ · ปิดได้ ${NUM.format(o.closed)} ใบ`,
     );
   const flowRows = (pick: (f: NonNullable<MoneyRequest['flow']>) => boolean) => openReqs.filter((r) => r.flow && pick(r.flow));
-  const stale = useMemo(() => staleOf(openReqs, today), [openReqs, today]);
-  const overdue = useMemo(() => overdueOf(openReqs, today), [openReqs, today]);
   /** แถวรวมของตารางเจ้าหน้าที่ — เสียวันละรวม = กล่องเสียเงิน */
   const ownerSum = useMemo(
     () =>
@@ -428,35 +426,7 @@ const HomeExecPage: React.FC = () => {
               );
             })}
           </div>
-          {/* เสียวันละรวม = ผลรวมตารางงานของเจ้าหน้าที่ · ใบค้างเกิน 90 วันเป็นส่วนหนึ่งของยอดนี้ (เจ้าของ 27 ต.ค. 2569 "ยอดไม่เท่ากันหนิ") */}
-          <button
-            type="button"
-            className="flex w-full items-start gap-2 rounded-lg text-left text-xs tabular-nums hover:bg-muted/50"
-            disabled={!moneyNow}
-            onClick={() => openList('ใบที่เลยวันที่ต้องการ', rowsOf(overdue.rows))}
-            data-testid="exec-overdue"
-          >
-            <HandCoins className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', TONE.danger.value)} aria-hidden />
-            <span className="text-muted-foreground">
-              ใบที่เลยวัน <span className="font-medium text-foreground">{moneyNow ? NUM.format(overdue.rows.length) : '—'} ใบ</span> · เสียวันละ{' '}
-              <span className={cn('font-medium', TONE.danger.value)}>{moneyNow ? BAHT.format(overdue.perDay) : '—'}</span> บาท
-            </span>
-          </button>
-          {/* ใบค้างเกิน 90 วัน = ราว 1 ใน 3 ของเงินที่เสียต่อวัน ⇒ อยู่ในกล่องเสียเงิน (เจ้าของ 25 ต.ค. 2569 Choice) */}
-          <button
-            type="button"
-            className="flex w-full items-start gap-2 rounded-lg text-left text-xs tabular-nums hover:bg-muted/50"
-            disabled={!moneyNow}
-            onClick={() => openList(`ใบค้างเกิน ${STALE_DAYS} วัน ไม่เคยได้คน`, rowsOf(stale.rows))}
-            data-testid="exec-stale"
-          >
-            <Hourglass className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', TONE.danger.value)} aria-hidden />
-            <span className="text-muted-foreground">
-              ในนั้นค้างเกิน {STALE_DAYS} วัน <span className="font-medium text-foreground">{moneyNow ? NUM.format(stale.rows.length) : '—'} ใบ</span> · เสียวันละ{' '}
-              <span className={cn('font-medium', TONE.danger.value)}>{moneyNow ? BAHT.format(stale.perDay) : '—'}</span> บาท
-            </span>
-          </button>
-          <span className="block text-xs text-muted-foreground">เทียบช่วงก่อนหน้าที่ยาวเท่ากัน</span>
+          {/* 28 ต.ค. 2569 เจ้าของ "เอาออก" — บรรทัดใบที่เลยวัน · ค้างเกิน 90 วัน · เทียบช่วงก่อน ถอดจากการ์ดเสียเงิน */}
         </Card>
         <KpiTile
           tone="warn"

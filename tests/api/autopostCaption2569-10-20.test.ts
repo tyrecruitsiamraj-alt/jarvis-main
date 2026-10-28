@@ -103,7 +103,10 @@ describe('ขาดแล้วกดส่งไม่ได้', () => {
     expect(autopostMissing(titled, { hasLink: true }).filter((m) => m !== 'ตำแหน่ง')).toEqual([]);
     expect(autopostMissing({ ...JOB, staff_title_name: 'อื่นๆ', request_action_name: 'อื่นๆ' } as JobRequest, { hasLink: true })).toContain('ตำแหน่ง');
     expect(autopostMissing({ ...JOB, work_schedule: 'ขอให้ OPL เป็นผู้ดำเนินการ' } as JobRequest, { hasLink: true })).toContain('วันเวลาทำงาน');
-    expect(autopostMissing({ ...JOB, income_display: null, monthly_income_base: null } as unknown as JobRequest, { hasLink: true })).toContain('ฐานเงินเดือน');
+    expect(autopostMissing({ ...JOB, income_display: null, monthly_income_base: null } as unknown as JobRequest, { hasLink: true })).toContain('รายได้');
+    // งานรายวัน มีค่าแรงแต่ไม่มีบรรทัดฐานเงินเดือน = ไม่ขาด (28 ต.ค. 2569)
+    const daily = { ...JOB, monthly_income_base: null, income_display: { period: 'daily', lines: [{ label: 'ค่าแรง', amount: 400 }] } } as unknown as JobRequest;
+    expect(autopostMissing(daily, { hasLink: true })).not.toContain('รายได้');
     expect(autopostMissing(JOB, { hasLink: false })).toContain('ลิงก์สมัคร (ประกาศก่อน)');
     expect(autopostMissing(JOB, { hasLink: true })).not.toContain('สถานที่');
   });
