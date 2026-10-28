@@ -97,7 +97,7 @@ function buildDuplicatesBase64(list: readonly ImportDuplicate[]): string {
 async function aiBlockOf(jobId: string): Promise<string | null> {
   try {
     const facts = await loadApplyScriptFacts(jobId);
-    if (facts.loaded && !(Number(facts.monthlyIncome) > 0)) return NO_INCOME_REASON;
+    if (facts.loaded && !(Number(facts.monthlyIncome) > 0) && !(Number(facts.dailyWage) > 0)) return NO_INCOME_REASON;
   } catch (e) {
     logError('job-applications-import ai block check failed', e, { jobId });
   }

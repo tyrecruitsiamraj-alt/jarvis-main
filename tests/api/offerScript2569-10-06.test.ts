@@ -92,7 +92,14 @@ describe('บทผู้สมัครที่เจ้าหน้าที�
   });
   it('บทในไฟล์: ตัวแปรลงทะเบียนครบ · ไม่เกิน 14 ข้อ · ไม่พิมพ์เลขรายได้เอง · แก้ได้จากหน้าตั้งค่า', () => {
     expect(KNOWN_PLACEHOLDERS).toContain('ไม่มีช่วงอายุ');
-    expect(CALL_SCRIPT_TEMPLATES.ผู้สมัครคีย์เอง.length).toBeLessThanOrEqual(14);
+    // 28 ต.ค. 2569 เพิ่มบรรทัดค่าแรงรายวัน — ไม่ขึ้นพร้อมบรรทัดรายเดือน/ฐาน ⇒ วัดจากบทที่ประกอบจริง (เพดาน 14 = ตัดท้าย)
+    expect(CALL_SCRIPT_TEMPLATES.ผู้สมัครคีย์เอง.length).toBeLessThanOrEqual(15);
+    const full = { candidateName: 'ก', position: 'ขับรถ', unit: 'x', workArea: 'ต.ก อ.ข จ.ค', ageRange: '20 ถึง 55 ปี', workSchedule: 'จันทร์ ถึง ศุกร์ 08:00 ถึง 17:00 น.', benefitLine: 'มีโอที' };
+    for (const money of [{ monthlyIncome: 18000, baseSalary: 12000 }, { dailyWage: 500 }]) {
+      const q = buildAppliedQuestions({ ...full, ...money } as never);
+      expect(q.length).toBeLessThanOrEqual(14);
+      expect(q[q.length - 1]).toContain('ถ้ายังไม่สนใจงานนี้');
+    }
     for (const line of CALL_SCRIPT_TEMPLATES.ผู้สมัครคีย์เอง) expect(line).not.toMatch(/\d[\d,]*\s*บาท/);
     expect(EDITABLE_SCRIPT_KEYS).toContain('applied');
   });

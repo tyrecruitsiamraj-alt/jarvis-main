@@ -153,6 +153,8 @@ export const KNOWN_PLACEHOLDERS: readonly string[] = [
   'รายได้ต่อเดือน',
   /** ฐานเงินเดือนต่อเดือน (14 ต.ค. 2569) — เท่ารายได้ต่อเดือน = ไม่พูด (บรรทัดหาย) */
   'ฐานเงินเดือน',
+  /** ค่าแรงต่อวัน — ใบที่ทีมตั้งรายได้แบบรายวัน (เจ้าของ 28 ต.ค. 2569 "ถ้ามีรายวันแบบวันละเท่าไหร่ก็พูดอันนั้นไป") */
+  'ค่าแรงรายวัน',
   'สวัสดิการ',
   'เรื่อง',
   'เบอร์เจ้าหน้าที่',
@@ -350,6 +352,8 @@ export type ApplyScriptFacts = CallScriptFacts & {
   monthlyIncome?: number | null;
   /** ฐานเงินเดือนต่อเดือน (14 ต.ค. 2569 · ตัวเดียวกับบรรทัด "ฐานเงินเดือน" บนการ์ด) — ไม่รู้ = บรรทัดหาย */
   baseSalary?: number | null;
+  /** ค่าแรงต่อวันที่ทีมตั้งในกล่องรายได้แบบรายวัน (28 ต.ค. 2569) — มี = พูด "ค่าแรงวันละ" แทนรายเดือน */
+  dailyWage?: number | null;
   /** สวัสดิการแบบพูดได้ (`speakableBenefitLine`) */
   benefitLine?: string | null;
   /**
@@ -459,7 +463,10 @@ function applyValues(f: ApplyScriptFacts): ScriptValues {
       : speakableBaseSalary(f.baseSalary, f.monthlyIncome),
     สวัสดิการ: orDrop(f.benefitLine),
   };
-  out.มีรายได้ = flag(out.รายได้ต่อเดือน != null || out.ฐานเงินเดือน != null);
+  // ค่าแรงรายวันที่ทีมตั้ง (28 ต.ค. 2569) — พูด "วันละ" · ตัวโหลดล้างรายเดือนให้แล้วเมื่อทีมตั้งแบบรายวัน
+  const daily = Number(f.dailyWage);
+  out.ค่าแรงรายวัน = Number.isFinite(daily) && daily > 0 ? Math.round(daily).toLocaleString('th-TH') : undefined;
+  out.มีรายได้ = flag(out.รายได้ต่อเดือน != null || out.ฐานเงินเดือน != null || out.ค่าแรงรายวัน != null);
   out.ไม่มีเวลาทำงาน = flag(out.เวลาทำงาน == null);
   return out;
 }

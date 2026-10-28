@@ -23,7 +23,7 @@ import type { JobRequest, ResignedIncomeMonth } from '../../src/types/index.js';
 import { speakableAgeRange, speakableWorkArea, speakableWorkTime, type ApplyScriptFacts } from './lumosCallScript.js';
 import { logError, logWarn } from './logger.js';
 
-export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'monthlyIncome' | 'baseSalary' | 'benefitLine' | 'workSchedule' | 'baseOnly'> & {
+export type ApplyJobFacts = Pick<ApplyScriptFacts, 'workArea' | 'ageRange' | 'monthlyIncome' | 'baseSalary' | 'benefitLine' | 'workSchedule' | 'baseOnly' | 'dailyWage'> & {
   /**
    * ชื่อจุดทำงานจากใบขอ (work_site_name → unit_name) — 🔴 ใบสมัครหลายใบไม่ได้เก็บชื่อหน่วยงานไว้
    * เดิม AI จึงพูดว่า "งานนี้ทำที่ หน่วยงานของเรา" (เจอในบทที่ส่งจริง 5 ต.ค. 2569)
@@ -76,6 +76,18 @@ function manualMonthlyIncome(job: Record<string, unknown>): number | null {
   return typeof fo?.total_income === 'number' && fo.total_income > 0 ? fo.total_income : null;
 }
 
+/**
+ * ค่าแรงต่อวันที่ทีมตั้งเอง (กล่องรายได้แบบรายวัน · เจ้าของ 28 ต.ค. 2569 "ถ้ามีรายวันแบบวันละเท่าไหร่ก็พูดอันนั้นไป")
+ * ยอดรวมของกล่อง · ไม่มียอดรวม = บวกทุกบรรทัด · ไม่ใช่รายวัน = null
+ */
+export function manualDailyWage(job: Record<string, unknown>): number | null {
+  const display = job.income_display as { period?: string; total?: number; lines?: Array<{ amount?: number }> } | null | undefined;
+  if (!display || display.period !== 'daily') return null;
+  if (typeof display.total === 'number' && display.total > 0) return display.total;
+  const sum = (display.lines ?? []).reduce((n, l) => n + (typeof l?.amount === 'number' && l.amount > 0 ? l.amount : 0), 0);
+  return sum > 0 ? sum : null;
+}
+
 async function loadFacts(jobId: string): Promise<ApplyJobFacts> {
   const out: ApplyJobFacts = { loaded: true };
   const items = (await listSiamrajUnitRequests({ limit: 500, mode: 'all' })) as unknown as Array<Record<string, unknown>>;
@@ -109,6 +121,12 @@ async function loadFacts(jobId: string): Promise<ApplyJobFacts> {
     speakableAgeRange(job.age_range_min as number | null | undefined, job.age_range_max as number | null | undefined) ||
     null;
 
+  // ทีมตั้งรายได้แบบรายวัน = พูดค่าแรงวันละ อย่างเดียว (ค่าที่ทีมตั้งชนะ ERP · ไม่พูดรายเดือนของ ERP ปนให้ขัดกัน)
+  const daily = manualDailyWage(job);
+  if (daily) {
+    out.dailyWage = daily;
+    return out;
+  }
   const manual = manualMonthlyIncome(job);
   // รายได้รวม หรือ เฉลี่ย ที่ทีมเลือกทีละใบขอ — AI พูดตาม (เจ้าของ Choice 14 ต.ค. 2569 "AI ต้องตาม")
   const { shown, average } = spokenIncomeChoiceOf(job);
@@ -189,12 +207,14 @@ async function loadBoxFacts(jobId: string): Promise<ApplyJobFacts | null> {
   const job: Record<string, unknown> = { id: jobId, request_no: requestNoFromJobRef(jobId) ?? undefined };
   await attachNotes([job]);
   const income = manualMonthlyIncome(job);
-  if (!income) return null;
+  const daily = manualDailyWage(job);
+  if (!income && !daily) return null;
   const province = String(job.override_province ?? '').trim();
   return {
     loaded: true,
-    monthlyIncome: income,
-    baseSalary: manualMonthlyBase(job),
+    monthlyIncome: daily ? null : income,
+    baseSalary: daily ? null : manualMonthlyBase(job),
+    dailyWage: daily,
     workArea: speakableWorkArea(publicSafeAddressParts(job as never)) || (province ? speakableWorkArea({ province }) : '') || null,
     workSchedule: speakableWorkTime(job.work_schedule as string | null | undefined) || null,
     ageRange:

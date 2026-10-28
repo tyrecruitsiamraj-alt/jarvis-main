@@ -298,6 +298,7 @@ export function buildApplicationInterviewPayload(
           ageRange: jobFacts?.ageRange,
           monthlyIncome: jobFacts?.monthlyIncome,
           baseSalary: jobFacts?.baseSalary,
+          dailyWage: jobFacts?.dailyWage,
           baseOnly: jobFacts?.baseOnly,
           benefitLine: jobFacts?.benefitLine,
           workSchedule: jobFacts?.workSchedule,
@@ -401,7 +402,8 @@ export async function enqueueLumosInterviewForApplications(
       skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: REQUEST_CLOSED_REASON });
       continue;
     }
-    if (!(Number(applyFacts.monthlyIncome) > 0)) {
+    // รายเดือน หรือ ค่าแรงรายวันที่ทีมตั้ง (28 ต.ค. 2569) — อย่างใดอย่างหนึ่งพอให้ AI บอกเงินได้
+    if (!(Number(applyFacts.monthlyIncome) > 0) && !(Number(applyFacts.dailyWage) > 0)) {
       skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: NO_INCOME_REASON });
       continue;
     }

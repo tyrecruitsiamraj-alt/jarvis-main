@@ -60,10 +60,12 @@ describe('loadApplyScriptFacts — ERP ไม่ทัน', () => {
     expect(f.loaded).toBeFalsy();
   });
 
-  it('รายได้แบบรายวันในกล่อง ⇒ ไม่ใช้ (คนละหน่วยกับ "เดือนละ")', async () => {
+  it('รายได้แบบรายวันในกล่อง ⇒ ใช้เป็นค่าแรงวันละ ไม่ปนรายเดือน (28 ต.ค. 2569 "ถ้ามีรายวันก็พูดอันนั้นไป")', async () => {
     boxOverrides = { income_display: { period: 'daily', total: 500 } };
     const f = await loadApplyScriptFacts('siamraj-sql:R1', 30);
-    expect(f.loaded).toBeFalsy();
+    expect(f.loaded).toBe(true);
+    expect(f.dailyWage).toBe(500);
+    expect(f.monthlyIncome).toBeNull();
   });
 
   it('ERP ทัน ⇒ ทางเดิม (กล่องทับรายได้ · สวัสดิการจาก ERP ยังอยู่)', async () => {
