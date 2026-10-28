@@ -237,6 +237,9 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
           // ช่องทางที่เลือก = id ช่องทางหลัก · ฝั่ง API อ่านชื่อจากฐานแล้วคิด referral_source เอง (ลิงก์ที่ล็อกช่องทางชนะ)
           referral_source: lockedSource,
           channel_id: lockedChannel ? null : referralSource || null,
+          // ลิงก์จาก LINE Bot So Work (28 ต.ค. 2569) — ส่งต่อให้ API ตรวจลายเซ็นเอง (หน้าเว็บไม่รู้ secret)
+          lid: searchParams.get('lid'),
+          lsig: searchParams.get('lsig'),
           document,
           job_id: job?.id ?? posting?.jobId ?? null,
           /**

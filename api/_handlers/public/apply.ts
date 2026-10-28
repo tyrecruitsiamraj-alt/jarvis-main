@@ -14,6 +14,7 @@ import { auditFromAnonymous } from '../../_lib/audit.js';
 import { applicantClientIp, lockAndFindRepeat } from '../../_lib/applicationRepeatGuard.js';
 import { repeatPublicMessage } from '../../../src/lib/applicationRepeat.js';
 import { recordApplicationConsent } from '../../_lib/applicationConsent.js';
+import { getLineBotConfig, notifyLineBotApplicationCreated, verifyLineUser } from '../../_lib/lineBotSoWork.js';
 
 /** คอลัมน์ที่ยังไม่ถูก migrate — pg ตอบ 42703 */
 function isUndefinedColumn(e: unknown): boolean {
@@ -29,7 +30,7 @@ const tbl = tableInAppSchema('public_job_applications');
  */
 function logPublicApply(
   req: ApiReq,
-  action: 'public_application.submit' | 'public_application.repeat_rejected',
+  action: 'public_application.submit' | 'public_application.repeat_rejected' | 'public_application.line_sig_invalid',
   entityId: string,
   v: { jobId: string | null; postingId: string | null },
   extra: Record<string, unknown> = {},
@@ -87,6 +88,22 @@ export default async function handler(req: ApiReq, res: ApiRes) {
      * เก็บ `channel_id` + ชื่อ · `referral_source` ยังคิดจากชื่อ (ตัวเลข/รายงานเดิมนับต่อได้)
      * ไม่เชื่อชื่อจากหน้าเว็บ — อ่านจากฐานด้วย id · ต้องเปิดใช้ (ช่องทางรองพ่อต้องเปิดด้วย) · ลิงก์ที่ล็อกช่องทางชนะเสมอ
      */
+    /**
+     * LINE Bot So Work (28 ต.ค. 2569) — ลิงก์จากบอทมี lid + lsig · secret ตรง = เก็บ LINE userId + referral 'line_oa'
+     * ยังไม่ตั้ง secret / ลายเซ็นไม่ตรง = ไม่เก็บ ใบบันทึกตามปกติ (`lineBotSoWork.ts`)
+     */
+    let lineUserId: string | null = null;
+    const rawBody = raw as Record<string, unknown> | null;
+    if (rawBody?.lid != null && rawBody?.lsig != null) {
+      try {
+        const cfg = await getLineBotConfig();
+        lineUserId = cfg ? verifyLineUser(rawBody.lid, rawBody.lsig, cfg.secret) : null;
+        if (!lineUserId && cfg) logPublicApply(req, 'public_application.line_sig_invalid', 'line', v);
+      } catch {
+        lineUserId = null;
+      }
+    }
+
     let channelId: string | null = null;
     let channelLabel: string | null = null;
     const rawChannelId = (raw as Record<string, unknown> | null)?.channel_id;
@@ -109,6 +126,9 @@ export default async function handler(req: ApiReq, res: ApiRes) {
         /* ไม่มีช่องทาง — ใบสมัครต้องบันทึกได้เสมอ */
       }
     }
+
+    // มาจาก LINE Bot (ลายเซ็นตรง) = referral 'line_oa' ตามที่ทีมบอทขอ · ลิงก์ที่ล็อกช่องทางยังชนะ
+    if (lineUserId && !lockedByLink) v.referralSource = 'line_oa';
 
     const docBytes = v.document ? Buffer.from(v.document.base64, 'base64') : null;
     // จำแผนกเจ้าของงานไว้กับใบ — ใบขอปิดแล้วรายชื่อต้องยังอยู่ในคลังกลาง (migration 082)
@@ -169,6 +189,8 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       const hit = await lockAndFindRepeat(client, { phone: v.phone, ip });
       if (hit) return { hit };
       const attempts: Array<{ cols: string; values: unknown[] }> = [
+        // ใบจาก LINE Bot (168) — ยังไม่รัน 168 = ถอยไปชุดเดิม (ไม่เก็บ lid)
+        ...(lineUserId ? [{ cols: `${BASE_COLS}, department_code, client_ip, line_user_id`, values: [...VALUES, departmentCode, ip, lineUserId] }] : []),
         { cols: `${BASE_COLS}, department_code, client_ip`, values: [...VALUES, departmentCode, ip] },
         { cols: `${BASE_COLS}, department_code`, values: [...VALUES, departmentCode] },
         { cols: BASE_COLS, values: VALUES },
@@ -197,6 +219,8 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     if (!id) return sendError(res, 500, 'Failed to submit application');
     logPublicApply(req, 'public_application.submit', id, v);
     if (consented) await recordApplicationConsent([id], 'apply', null);
+    // แจ้ง LINE Bot So Work ว่าส่งใบสำเร็จ — ไม่รอ ไม่ทำให้ใบล้ม (28 ต.ค. 2569)
+    if (lineUserId) void notifyLineBotApplicationCreated({ applicationId: id, lineUserId, jobId: v.jobId, createdAt: new Date() });
 
     /**
      * ส่งเข้าคิว AI โทร **อัตโนมัติทันทีที่กรอก** (เจ้าของเคาะ 15 ส.ค. 2569)

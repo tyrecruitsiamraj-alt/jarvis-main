@@ -10,6 +10,7 @@
  * - GET คืน `outbound` (มี key ไหม · 4 ตัวท้าย · URL) — ไม่คืนตัว key
  * - PUT {outbound:'so-scraping', key?, base_url, clear?}: บันทึกแบบเข้ารหัส
  * - POST {outbound:'so-scraping', test:true, key?, base_url}: ลองเรียกจริง (ไม่ใส่ key = ใช้ตัวที่บันทึกไว้) ตอบจำนวนที่ได้
+ * - PUT {outbound:'line-bot-sowork', key?, base_url, clear?} (28 ต.ค. 2569): secret ร่วมกับ LINE Bot So Work (`lineBotSoWork.ts`)
  */
 import { randomBytes } from 'node:crypto';
 import { withAuth, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
@@ -28,6 +29,7 @@ import {
   SoOptionsError,
   SO_OPTIONS_KEY_NAME,
 } from '../_lib/soScrapingOptions.js';
+import { getLineBotKeyView, LINE_BOT_KEY_NAME, saveLineBotKey } from '../_lib/lineBotSoWork.js';
 
 const KEYS = tableInAppSchema('app_integration_keys');
 const LEADS = tableInAppSchema('so_scraping_comment_leads');
@@ -52,11 +54,25 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return res.status(200).json({
         items: INTEGRATIONS.map((i) => ({ ...i, key: rows.find((r) => r.name === i.name) ?? null })),
         soScraping: s[0] ?? null,
-        outbound: { [SO_OPTIONS_KEY_NAME]: await getSoKeyView() },
+        outbound: { [SO_OPTIONS_KEY_NAME]: await getSoKeyView(), [LINE_BOT_KEY_NAME]: await getLineBotKeyView() },
       });
     }
     if (m === 'PUT') {
       const body = (await readJsonBody(req)) as { outbound?: unknown; key?: unknown; base_url?: unknown; clear?: unknown } | null;
+      if (body?.outbound === LINE_BOT_KEY_NAME) {
+        const baseUrl = normalizeSoBaseUrl(body.base_url);
+        if (!baseUrl) return sendError(res, 400, 'Bad request', 'URL ต้องขึ้นต้นด้วย https://');
+        const secret = typeof body.key === 'string' && body.key.trim() ? body.key.trim() : null;
+        if (secret && secret.length > 500) return sendError(res, 400, 'Bad request', 'secret ยาวเกินไป');
+        await saveLineBotKey({ secret, baseUrl, clear: body.clear === true }, req.user.email ?? req.user.sub);
+        await auditFromAuthed(req, {
+          action: 'outbound_key.save',
+          entityType: 'outbound_key',
+          entityId: LINE_BOT_KEY_NAME,
+          after: { base_url: baseUrl, key_changed: Boolean(secret), cleared: body.clear === true },
+        });
+        return res.status(200).json({ outbound: { [LINE_BOT_KEY_NAME]: await getLineBotKeyView() } });
+      }
       if (body?.outbound !== SO_OPTIONS_KEY_NAME) return sendError(res, 400, 'Bad request', 'ไม่รู้จักระบบนี้');
       const baseUrl = normalizeSoBaseUrl(body.base_url);
       if (!baseUrl) return sendError(res, 400, 'Bad request', 'URL ต้องขึ้นต้นด้วย https://');

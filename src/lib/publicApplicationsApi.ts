@@ -178,7 +178,8 @@ export type PublicApplication = {
   call_choice_by_name?: string;
 };
 
-export type ApplicationReferralSource = 'facebook' | 'tiktok' | 'instagram' | 'flyer' | 'other';
+/** `line_oa` = ใบที่มาจาก LINE Bot So Work (28 ต.ค. 2569 · ไม่มีในตัวเลือกของฟอร์ม) */
+export type ApplicationReferralSource = 'facebook' | 'tiktok' | 'instagram' | 'flyer' | 'other' | 'line_oa';
 
 export const REFERRAL_SOURCES: ApplicationReferralSource[] = [
   'facebook',
@@ -194,6 +195,7 @@ export const REFERRAL_SOURCE_LABEL: Record<ApplicationReferralSource, string> = 
   instagram: 'Instagram',
   flyer: 'ใบปลิว',
   other: 'อื่นๆ',
+  line_oa: 'LINE OA',
 };
 
 export const EDUCATION_LEVELS = [

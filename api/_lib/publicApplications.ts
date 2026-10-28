@@ -4,7 +4,8 @@
  */
 
 export type PublicApplicationGender = 'male' | 'female' | 'other';
-export type PublicApplicationSource = 'facebook' | 'tiktok' | 'instagram' | 'flyer' | 'other';
+/** `line_oa` = มาจาก LINE Bot So Work (ลายเซ็นตรงเท่านั้น · ฝั่ง API ตั้งเอง ไม่รับจากหน้าเว็บ · 28 ต.ค. 2569) */
+export type PublicApplicationSource = 'facebook' | 'tiktok' | 'instagram' | 'flyer' | 'other' | 'line_oa';
 
 const TITLE_PREFIXES = ['นาย', 'นาง', 'นางสาว', 'เด็กชาย', 'เด็กหญิง'];
 const GENDERS: PublicApplicationGender[] = ['male', 'female', 'other'];

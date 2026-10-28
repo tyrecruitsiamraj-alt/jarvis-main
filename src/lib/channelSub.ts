@@ -21,6 +21,7 @@ const REFERRAL_AS_CHANNEL: Record<ApplicationReferralSource, string> = {
   instagram: 'Instagram',
   flyer: 'ป้าย/ใบปลิว',
   other: 'อื่นๆ',
+  line_oa: 'LINE OA',
 };
 
 /** ตัวสะกดมาตรฐานของชื่อที่เจอบ่อย — สะกดต่างแค่ตัวเล็กใหญ่ */

@@ -1254,7 +1254,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     const jobId = searchParams.get('job');
     if (!jobId) return;
     setDeepLinkHandled(true);
-    const match = jobs.find((j) => j.id === jobId);
+    // รับทั้งรหัสภายใน (siamraj-sql:…) และเลขใบขอเปล่า ๆ — ลิงก์จาก LINE Bot So Work ส่ง job=OPL6909077 (28 ต.ค. 2569)
+    const no = jobId.trim().toUpperCase();
+    const match = jobs.find((j) => j.id === jobId) ?? jobs.find((j) => String(j.request_no ?? '').trim().toUpperCase() === no);
     if (match) openApply(match);
   }, [isStaff, deepLinkHandled, loading, searchParams, jobs]);
 
