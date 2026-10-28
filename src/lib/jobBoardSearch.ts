@@ -1,5 +1,5 @@
 import type { JobRequest } from '@/types';
-import { unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, publicJobPositionLabel, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 
 export function isBoardVisibleJob(j: JobRequest): boolean {
@@ -26,5 +26,20 @@ export function jobBoardSearchBlob(j: JobRequest): string {
     extra = ' กรุงเทพ กรุงเทพฯ กทม กทม. bangkok';
   }
   if (prov) extra += ` ${prov}`;
-  return normBoardSearch(`${unitRequestSearchBlob(j)} ${addr}${extra}`);
+  /**
+   * ชื่อที่ขึ้นบนการ์ด (จุดทำงาน · ตำแหน่ง) + รหัสไซต์ + เจ้าหน้าที่ของใบ — เจ้าของ 28 ต.ค. 2569 "ปุ่มค้นหาก็ค้นชื่อไม่เจอ"
+   * เดิมค้นแค่ชื่อบริษัทในใบ ⇒ การ์ด "SO" (ชื่อจุดทำงาน) พิมพ์ "SO" ไม่เจอ
+   */
+  const onCard = [
+    jobBoardCardTitle(j),
+    j.work_site_name,
+    j.site_code,
+    publicJobPositionLabel(j),
+    j.recruiter_name,
+    j.screener_name,
+    j.online_name,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return normBoardSearch(`${unitRequestSearchBlob(j)} ${onCard} ${addr}${extra}`);
 }
