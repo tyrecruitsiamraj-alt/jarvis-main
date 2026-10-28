@@ -25,3 +25,13 @@ describe('ช่อง "เห็นประกาศจากช่องท�
     expect(a).toContain('posting_id, link_id, channel_id, channel_label');
   });
 });
+
+describe('ฟอร์มสมัครบังคับเลือกช่องทาง (เจ้าของ 28 ต.ค. 2569 "ทำไมยังมีไม่รู้")', () => {
+  it('ไม่ได้ล็อกจากลิงก์ + มีรายการช่องทาง = ต้องเลือกก่อนส่ง · โหลดรายการไม่ได้ = ไม่บังคับ', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('src/components/jobs/PublicApplyDialog.tsx', 'utf8');
+    expect(src).toContain('const channelRequired = !lockedChannel && channels.length > 0;');
+    expect(src).toContain("if (channelRequired && !referralSource) return setError('กรุณาเลือกช่องทางที่เห็นประกาศ');");
+    expect(src).toContain('<Field label="เห็นประกาศจากช่องทางไหน" required={channelRequired}>');
+  });
+});

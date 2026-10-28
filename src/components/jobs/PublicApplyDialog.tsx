@@ -119,6 +119,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
   /** ลิงก์มีช่องทาง = ล็อก (เจ้าของ 6 ต.ค. 2569 "Link ที่ Gen ต้อง Lock ช่องทางด้วยสิ่") · ลิงก์กลาง = เลือกเองได้ */
   const lockedChannel = posting?.channelLabel?.trim() || null;
   const lockedSource = referralSourceOfChannel(lockedChannel);
+  const channelRequired = !lockedChannel && channels.length > 0;
   const [file, setFile] = useState<File | null>(null);
   // ลิงก์จาก ตั้งค่า › ลิงก์หน้าสมัคร ที่เลือก "ไม่มีช่องแนบเอกสาร" (`doc=0` · 27 ต.ค. 2569) = ไม่มีช่องนี้
   const [searchParams] = useSearchParams();
@@ -145,7 +146,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
     setError(null);
   }, [open]);
 
-  // ช่องทางหลักจากหน้าจัดช่องทาง · โหลดไม่ได้ = ไม่มีตัวเลือก (ช่องนี้ไม่บังคับ ส่งใบได้ตามปกติ)
+  // ช่องทางหลักจากหน้าจัดช่องทาง · โหลดไม่ได้ = ไม่มีตัวเลือก (ไม่บังคับ ส่งใบได้ตามปกติ) · โหลดได้ = บังคับเลือก (28 ต.ค. 2569)
   useEffect(() => {
     if (!open || channels.length > 0) return;
     let alive = true;
@@ -211,6 +212,9 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
     if (!province) return setError('กรุณาเลือกจังหวัด');
     if (!district) return setError('กรุณาเลือกอำเภอ/เขต');
     if (!subdistrict) return setError('กรุณาเลือกตำบล/แขวง');
+    // 28 ต.ค. 2569 เจ้าของ Choice "บังคับเลือกช่องทาง" — ใบที่ไม่มีช่องทางเคยกองเป็น "ไม่รู้ช่องทาง" 25 ใบ
+    // ลิงก์ที่ล็อกช่องทางแล้วไม่ต้องเลือก · โหลดรายการช่องทางไม่ได้ = ไม่บังคับ (ห้ามทำให้ส่งใบไม่ได้)
+    if (channelRequired && !referralSource) return setError('กรุณาเลือกช่องทางที่เห็นประกาศ');
     if (!consent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE);
 
     setSubmitting(true);
@@ -544,7 +548,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                   </Field>
                 </div>
 
-                <Field label="เห็นประกาศจากช่องทางไหน">
+                <Field label="เห็นประกาศจากช่องทางไหน" required={channelRequired}>
                   {lockedChannel ? (
                     // ลิงก์ที่ Gen มีช่องทางอยู่แล้ว — ล็อก เลือกเองไม่ได้ (ช่องทางเต็มของลิงก์ ไม่ใช่แค่ตัวเลือก 5 ค่า)
                     <p
@@ -560,6 +564,8 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                       value={referralSource}
                       onChange={(e) => setReferralSource(e.target.value)}
                       className="jarvis-soft-field"
+                      required={channelRequired}
+                      aria-label="เห็นประกาศจากช่องทางไหน"
                     >
                       <option value="">— เลือกช่องทาง —</option>
                       {/* ช่องทางรองอย่างเดียว ไม่มีหัวช่องทางหลัก (เจ้าของ 28 ต.ค. 2569 "จัดกลุ่มตามช่องทางรอง") · หลักที่ไม่มีรอง = ตัวหลัก */}
