@@ -13,14 +13,14 @@ describe('ช่อง "เห็นประกาศจากช่องท�
 
   it('เส้นสาธารณะคืนแค่ id/ชื่อของช่องทางหลักที่เปิดใช้ · ลงทะเบียนแล้ว', () => {
     const h = readFileSync('api/_handlers/public/channels.ts', 'utf8');
-    expect(h).toContain('listRecruitChannelRoots(false)');
-    expect(h).toContain('roots.map((c) => ({ id: c.id, name: c.name }))');
+    expect(h).toContain('listRecruitChannels(false)');
+    expect(h).toContain('children: (c.children ?? []).map((k) => ({ id: k.id, name: k.name }))');
     expect(readFileSync('api/_handlers/registry.ts', 'utf8')).toContain("'/api/public/channels': publicChannelsHandler");
   });
 
   it('ฝั่งรับใบสมัครไม่เชื่อชื่อจากหน้าเว็บ — อ่านชื่อจากฐานด้วย id · ต้องเป็นช่องทางหลักที่เปิดใช้ · ลิงก์ล็อกชนะ', () => {
     const a = readFileSync('api/_handlers/public/apply.ts', 'utf8');
-    expect(a).toContain('where id = $1::uuid and parent_id is null and is_active = true');
+    expect(a).toContain('where c.id = $1::uuid and c.is_active = true and (c.parent_id is null or p.is_active = true)');
     expect(a).toContain('if (!lockedByLink && typeof rawChannelId');
     expect(a).toContain('posting_id, link_id, channel_id, channel_label');
   });

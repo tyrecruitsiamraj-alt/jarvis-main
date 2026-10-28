@@ -85,22 +85,25 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     /**
      * ช่องทางที่ผู้สมัครเลือก = ช่องทางหลักจากหน้าจัดช่องทาง (เจ้าของ 28 ต.ค. 2569 "ยึดตาม /recruit/channels")
      * เก็บ `channel_id` + ชื่อ · `referral_source` ยังคิดจากชื่อ (ตัวเลข/รายงานเดิมนับต่อได้)
-     * ไม่เชื่อชื่อจากหน้าเว็บ — อ่านจากฐานด้วย id · ต้องเป็นช่องทางหลักที่เปิดใช้ · ลิงก์ที่ล็อกช่องทางชนะเสมอ
+     * ไม่เชื่อชื่อจากหน้าเว็บ — อ่านจากฐานด้วย id · ต้องเปิดใช้ (ช่องทางรองพ่อต้องเปิดด้วย) · ลิงก์ที่ล็อกช่องทางชนะเสมอ
      */
     let channelId: string | null = null;
     let channelLabel: string | null = null;
     const rawChannelId = (raw as Record<string, unknown> | null)?.channel_id;
     if (!lockedByLink && typeof rawChannelId === 'string' && /^[0-9a-f-]{36}$/i.test(rawChannelId)) {
       try {
-        const { rows } = await dbQuery<{ id: string; name: string }>(
-          `select id::text, name from ${tableInAppSchema('recruit_channels')}
-            where id = $1::uuid and parent_id is null and is_active = true limit 1`,
+        // ช่องทางรอง = ป้าย "หลัก · รอง" แบบเดียวกับ ChannelPicker (`recruitChannelLabel`) · พ่อต้องเปิดใช้ด้วย
+        const { rows } = await dbQuery<{ id: string; name: string; parent_name: string | null }>(
+          `select c.id::text, c.name, p.name as parent_name
+             from ${tableInAppSchema('recruit_channels')} c
+             left join ${tableInAppSchema('recruit_channels')} p on p.id = c.parent_id
+            where c.id = $1::uuid and c.is_active = true and (c.parent_id is null or p.is_active = true) limit 1`,
           [rawChannelId],
         );
         if (rows[0]) {
           channelId = rows[0].id;
-          channelLabel = rows[0].name;
-          v.referralSource = referralSourceOfChannel(rows[0].name) ?? v.referralSource;
+          channelLabel = rows[0].parent_name ? `${rows[0].parent_name} · ${rows[0].name}` : rows[0].name;
+          v.referralSource = referralSourceOfChannel(channelLabel) ?? v.referralSource;
         }
       } catch {
         /* ไม่มีช่องทาง — ใบสมัครต้องบันทึกได้เสมอ */

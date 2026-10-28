@@ -274,10 +274,25 @@ export async function createRecruitChannel(input: {
 
 export async function updateRecruitChannel(
   id: string,
-  patch: { name?: string; sortOrder?: number; isActive?: boolean },
+  /** `parentId` (28 ต.ค. 2569 ย้ายไปอยู่ใต้ช่องทางหลัก) — null = เป็นช่องทางหลัก · ไม่ส่ง = ไม่แตะ */
+  patch: { name?: string; sortOrder?: number; isActive?: boolean; parentId?: string | null },
 ): Promise<RecruitChannel | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
+  if (patch.parentId !== undefined) {
+    const parentId = patch.parentId ? trimTo(patch.parentId, 64) : null;
+    if (parentId) {
+      if (parentId === id) throw new Error('ช่องทางอยู่ใต้ตัวเองไม่ได้');
+      const { rows } = await dbQuery<{ parent_id: string | null }>(`SELECT parent_id FROM ${channelsTable} WHERE id = $1`, [parentId]);
+      if (!rows[0]) throw new Error('ไม่พบช่องทางหลักที่เลือก');
+      if (rows[0].parent_id) throw new Error('ช่องทางรองซ้อนช่องทางรองไม่ได้');
+      // สองชั้นเท่านั้น — ช่องทางที่มีช่องทางรองอยู่ ย้ายไปเป็นช่องทางรองไม่ได้
+      const { rows: kids } = await dbQuery<{ n: string }>(`SELECT count(*) AS n FROM ${channelsTable} WHERE parent_id = $1`, [id]);
+      if (Number(kids[0]?.n) > 0) throw new Error('ช่องทางนี้มีช่องทางรองอยู่ ย้ายไปเป็นช่องทางรองไม่ได้');
+    }
+    params.push(parentId);
+    sets.push(`parent_id = $${params.length}`);
+  }
   const name = patch.name === undefined ? null : trimTo(patch.name, MAX_TEXT);
   if (patch.name !== undefined) {
     if (!name) throw new Error('ชื่อช่องทางว่างไม่ได้');

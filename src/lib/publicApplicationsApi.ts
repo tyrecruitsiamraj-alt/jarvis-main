@@ -745,9 +745,10 @@ export async function setApplicationCancelled(id: string, cancelled: boolean, re
 }
 
 /** ช่องทางหลักให้หน้าสมัครเลือก — รายการเดียวกับหน้าจัดช่องทาง (เจ้าของ 28 ต.ค. 2569 "ยึดตาม /recruit/channels") · ไม่ต้องล็อกอิน */
-export async function fetchPublicChannels(): Promise<Array<{ id: string; name: string }>> {
+export type PublicChannel = { id: string; name: string; children: Array<{ id: string; name: string }> };
+export async function fetchPublicChannels(): Promise<PublicChannel[]> {
   const r = await apiFetch('/api/public/channels');
   if (!r.ok) return [];
-  const data = (await r.json().catch(() => null)) as { channels?: Array<{ id: string; name: string }> } | null;
+  const data = (await r.json().catch(() => null)) as { channels?: PublicChannel[] } | null;
   return Array.isArray(data?.channels) ? data.channels : [];
 }

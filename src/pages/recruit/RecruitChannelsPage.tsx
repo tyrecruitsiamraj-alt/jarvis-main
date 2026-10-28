@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, LoaderCircle, Pencil, Plus, Search, Trash2, 
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,6 +58,8 @@ const fieldCls =
   'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/30';
 
 const VIEWS: ChannelAdminView[] = ['roots', 'children'];
+/** ค่าในตัวเลือกย้าย = เป็นช่องทางหลัก (Select ของ shadcn ใช้ค่าว่างไม่ได้) */
+const ROOT_VALUE = '__root__';
 
 /** dropdown เลือกช่องทางหลัก ที่พิมพ์ค้นได้ — ใช้ทั้งตอนกรองและตอนเพิ่มช่องทางรอง */
 const ParentSelect: React.FC<{
@@ -341,6 +344,22 @@ const RecruitChannelsPage: React.FC = () => {
       flash('แก้ชื่อแล้ว');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'แก้ชื่อไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /** ย้ายไปอยู่ใต้ช่องทางหลัก / ตั้งเป็นช่องทางหลัก (เจ้าของ 28 ต.ค. 2569 จัดเหลือ 4 หลัก) */
+  const onMove = async (row: RecruitChannel, parentId: string | null) => {
+    if ((row.parentId ?? null) === parentId) return;
+    setBusyId(row.id);
+    setError('');
+    try {
+      await updateRecruitChannel(row.id, { parentId });
+      await Promise.all([load(), loadRoots()]);
+      flash(parentId ? `ย้ายไปอยู่ใต้ ${roots.find((r) => r.id === parentId)?.name ?? 'ช่องทางหลัก'} แล้ว` : 'ตั้งเป็นช่องทางหลักแล้ว');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'ย้ายไม่สำเร็จ');
     } finally {
       setBusyId(null);
     }
@@ -665,6 +684,25 @@ const RecruitChannelsPage: React.FC = () => {
                       >
                         <Pencil aria-hidden /> แก้ชื่อ
                       </Button>
+                      <Select
+                        value={row.parentId ?? ROOT_VALUE}
+                        onValueChange={(v) => void onMove(row, v === ROOT_VALUE ? null : v)}
+                        disabled={busyId === row.id || (!row.parentId && (row.childCount ?? 0) > 0)}
+                      >
+                        <SelectTrigger className="h-7 w-40 text-xs" aria-label={`ย้าย ${row.name} ไปอยู่ใต้`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={ROOT_VALUE}>เป็นช่องทางหลัก</SelectItem>
+                          {roots
+                            .filter((r) => r.id !== row.id)
+                            .map((r) => (
+                              <SelectItem key={r.id} value={r.id}>
+                                อยู่ใต้ {r.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                       <Button type="button" size="xs" variant="outline" onClick={() => void onToggleActive(row)}>
                         {row.isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
                       </Button>

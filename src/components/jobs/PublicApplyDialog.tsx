@@ -15,7 +15,7 @@ import {
   getSubdistrictOptions,
   getZipCodeForSubdistrict,
 } from '@/lib/thaiAddressCascade';
-import { EDUCATION_LEVELS, fetchPublicChannels } from '@/lib/publicApplicationsApi';
+import { EDUCATION_LEVELS, fetchPublicChannels, type PublicChannel } from '@/lib/publicApplicationsApi';
 import {
   Dialog,
   DialogContent,
@@ -115,7 +115,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
   const [education, setEducation] = useState('');
   /** id ช่องทางหลักที่ผู้สมัครเลือก — รายการจากหน้าจัดช่องทาง (28 ต.ค. 2569 เดิมล็อก 5 ค่า) */
   const [referralSource, setReferralSource] = useState('');
-  const [channels, setChannels] = useState<Array<{ id: string; name: string }>>([]);
+  const [channels, setChannels] = useState<PublicChannel[]>([]);
   /** ลิงก์มีช่องทาง = ล็อก (เจ้าของ 6 ต.ค. 2569 "Link ที่ Gen ต้อง Lock ช่องทางด้วยสิ่") · ลิงก์กลาง = เลือกเองได้ */
   const lockedChannel = posting?.channelLabel?.trim() || null;
   const lockedSource = referralSourceOfChannel(lockedChannel);
@@ -559,11 +559,22 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                       className="jarvis-soft-field"
                     >
                       <option value="">— เลือกช่องทาง —</option>
-                      {channels.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
+                      {/* หลัก → รอง (28 ต.ค. 2569) · หลักที่ไม่มีรอง = เลือกตัวหลัก */}
+                      {channels.map((c) =>
+                        c.children.length > 0 ? (
+                          <optgroup key={c.id} label={c.name}>
+                            {c.children.map((k) => (
+                              <option key={k.id} value={k.id}>
+                                {k.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ) : (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ),
+                      )}
                     </select>
                   )}
                 </Field>

@@ -112,6 +112,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
         name: typeof body.name === 'string' ? body.name : undefined,
         sortOrder: body.sortOrder === undefined ? undefined : Number(body.sortOrder),
         isActive: body.isActive === undefined ? undefined : !!body.isActive,
+        // ย้ายไปอยู่ใต้ช่องทางหลัก (28 ต.ค. 2569) — null = เป็นช่องทางหลัก · ไม่ส่ง = ไม่แตะ
+        parentId: body.parentId === undefined ? undefined : typeof body.parentId === 'string' && body.parentId ? body.parentId : null,
       });
       if (!updated) return sendError(res, 404, 'Not found', 'ไม่พบช่องทางนี้');
       return res.status(200).json(updated);

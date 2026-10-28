@@ -13,7 +13,7 @@
  * 🔴 ไม่แตะฐานข้อมูล — กรองจากรายชื่อที่หน้าโหลดมาแล้ว
  */
 import type { PublicApplication } from '@/lib/publicApplicationsApi';
-import { REFERRAL_SOURCE_LABEL } from '@/lib/publicApplicationsApi';
+import { subChannelOf } from '@/lib/channelSub';
 import type { RmTab } from '@/lib/recruitRm';
 import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
 import { ATTENDANCE_LABEL } from '@/lib/appointmentAttendance';
@@ -343,13 +343,14 @@ const FACETS: readonly Def[] = [
     },
   },
   {
-    /** ช่องทางจากตารางช่องทาง (แม่นกว่า) ก่อน · ไม่มีค่อยใช้ที่ผู้สมัครเลือกเอง */
+    /**
+     * ช่องทางรองเท่านั้น (เจ้าของ 28 ต.ค. 2569 "ขึ้นแค่ช่องทางรอง" · Tiktok/TikTok รวมเป็นตัวเดียว) — `subChannelOf`
+     * ช่องทางจากตารางช่องทาง (แม่นกว่า) ก่อน · ไม่มีค่อยใช้ที่ผู้สมัครเลือกเอง
+     */
     key: 'channel',
     label: 'ช่องทาง',
     ui: 'check',
-    values: (r) => [
-      trimOr(r.channel_label || (r.referral_source ? REFERRAL_SOURCE_LABEL[r.referral_source] : '')),
-    ],
+    values: (r) => [trimOr(subChannelOf(r.channel_label, r.referral_source))],
   },
   {
     key: 'gender',

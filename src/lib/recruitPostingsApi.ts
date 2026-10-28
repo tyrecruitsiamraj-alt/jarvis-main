@@ -109,7 +109,7 @@ export async function createRecruitChannel(input: {
 
 export async function updateRecruitChannel(
   id: string,
-  patch: { name?: string; isActive?: boolean },
+  patch: { name?: string; isActive?: boolean; parentId?: string | null },
 ): Promise<void> {
   const r = await apiFetch('/api/recruit/channels', {
     method: 'PATCH',
