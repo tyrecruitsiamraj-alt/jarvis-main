@@ -16,6 +16,8 @@ type UserRow = {
   is_active: boolean;
   created_at: string | Date;
   department_code: string | null;
+  /** BU ที่ดูเพิ่ม (164) — หน้าเว็บใช้ตัดสินว่าล็อก BU เดียวหรือให้เลือกในชุดนี้ (28 ต.ค. 2569) */
+  extra_department_codes?: string[] | null;
 };
 
 function toUserResponse(row: UserRow) {
@@ -33,6 +35,7 @@ function toUserResponse(row: UserRow) {
     is_active: row.is_active,
     created_at: created,
     ...(department_code ? { department_code } : {}),
+    extra_department_codes: (row.extra_department_codes ?? []).map((c) => normalizeDepartmentCode(c)).filter((c): c is string => Boolean(c && isAllowedDepartmentCode(c))),
   };
 }
 
@@ -56,7 +59,7 @@ async function meHandler(req: AuthedReq, res: ApiRes) {
 
       const { rows: curRows } = await dbQuery<UserRow>(
         `
-        select id, email, role, full_name, is_active, created_at, department_code
+        select id, email, role, full_name, is_active, created_at, department_code, extra_department_codes
         from ${usersTable}
         where id = $1
         limit 1
@@ -106,7 +109,7 @@ async function meHandler(req: AuthedReq, res: ApiRes) {
 
     const { rows } = await dbQuery<UserRow>(
       `
-      select id, email, role, full_name, is_active, created_at, department_code
+      select id, email, role, full_name, is_active, created_at, department_code, extra_department_codes
       from ${usersTable}
       where id = $1
       limit 1

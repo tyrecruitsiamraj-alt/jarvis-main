@@ -289,10 +289,19 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
    * BU ของใบขอ = `department_code` จาก ERP (SN · DS · LM · LBA · LBD)
    */
   const myBu = normalizeAppDepartmentCode(user?.department_code);
-  const allJobs = useMemo(
-    () => (myBu ? feedJobs.filter((j) => normalizeAppDepartmentCode(j.department_code) === myBu) : feedJobs),
-    [feedJobs, myBu],
+  // BU หลัก + ดูเพิ่ม (28 ต.ค. 2569) — ชุดเดียวกับฝั่งเซิร์ฟเวอร์ (`loadMatchingBuScope` → codeScope)
+  const myBus = useMemo(
+    () => (myBu ? [myBu, ...(user?.extra_department_codes ?? []).map((c) => normalizeAppDepartmentCode(c)).filter((c): c is NonNullable<typeof c> => Boolean(c))] : []),
+    [myBu, user?.extra_department_codes],
   );
+  const allJobs = useMemo(() => {
+    if (myBus.length === 0) return feedJobs;
+    const set = new Set<string>(myBus);
+    return feedJobs.filter((j) => {
+      const c = normalizeAppDepartmentCode(j.department_code);
+      return c !== null && set.has(c);
+    });
+  }, [feedJobs, myBus]);
 
   /**
    * ปิดรายละเอียด — เราเป็นคน push `?jobId=` มาเอง ⇒ **ถอยประวัติ** แทนการลบทิ้ง

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { lockedBuOf } from '@/lib/userViewableBus';
 import { useNavigate } from 'react-router-dom';
 import DashboardShell from '@/components/dashboard/analytics/DashboardShell';
 import LumosCallRatePanel from '@/components/dashboard/LumosCallRatePanel';
@@ -93,9 +94,8 @@ const THROUGHPUT_KPI_IDS = new Set(['total_requests', 'closed', 'cancelled']);
 const SupervisorDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  /** admin เห็นทุกแผนก · คนอื่นที่มี department_code ถูกล็อกแผนก */
-  const lockedDepartmentCode =
-    user?.role !== 'admin' ? user?.department_code?.trim().toUpperCase() || null : null;
+  /** admin เห็นทุกแผนก · คนที่ดูได้ BU เดียวถูกล็อก · ดูหลาย BU (ดูเพิ่ม · 28 ต.ค. 2569) = เลือกได้ในชุดของตัวเอง */
+  const lockedDepartmentCode = lockedBuOf(user);
   const [filters, setFilters] = useState<DashboardFilters>(() => loadDashboardFilters());
   const [unitFilters, setUnitFilters] = useState(() => loadSupervisorDashboardFilters());
   const [dateRange, setDateRange] = useState<DateRangeYmd | null>(() => defaultDashboardDateRange());

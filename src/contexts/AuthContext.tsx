@@ -92,6 +92,10 @@ function mapApiUser(raw: Record<string, unknown>): User | null {
     ...(typeof raw.department_code === 'string' && raw.department_code.trim()
       ? { department_code: raw.department_code.trim().toUpperCase() }
       : {}),
+    // BU ที่ดูเพิ่ม (28 ต.ค. 2569 — เดิมไม่ได้ส่งมา หน้าใบขอเลยล็อกแค่ BU หลัก)
+    extra_department_codes: Array.isArray(raw.extra_department_codes)
+      ? raw.extra_department_codes.filter((c): c is string => typeof c === 'string' && c.trim() !== '').map((c) => c.trim().toUpperCase())
+      : [],
   };
 }
 

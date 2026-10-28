@@ -93,8 +93,9 @@ describe('Pre-Check เห็นเฉพาะ BU ของบัญชี (เ
   it('กรองใบขอด้วย department_code ของผู้ใช้ · ไม่มี BU = เห็นทุกใบ (แบบหน้าจับคู่งาน)', () => {
     const src = readFileSync('src/pages/matching/PreCheckPage.tsx', 'utf8');
     expect(src).toContain('const myBu = normalizeAppDepartmentCode(user?.department_code);');
-    expect(src).toContain('feedJobs.filter((j) => normalizeAppDepartmentCode(j.department_code) === myBu)');
-    expect(src).toContain(': feedJobs');
+    // 28 ต.ค. 2569: BU หลัก + ดูเพิ่ม (sirirat.j ไม่เห็น BU อื่น) · ไม่มี BU = เห็นทุกใบเหมือนเดิม
+    expect(src).toContain('...(user?.extra_department_codes ?? [])');
+    expect(src).toContain('if (myBus.length === 0) return feedJobs;');
   });
 });
 

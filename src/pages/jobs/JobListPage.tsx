@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { lockedBuOf, viewableBusOf } from '@/lib/userViewableBus';
 import { unitLabel } from '@/lib/unitDisplay';
 import { conveyorLabel } from '@/lib/soRecruitNav';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -134,9 +135,9 @@ const JobListPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const { user } = useAuth();
-  /** admin เห็นทุกแผนก · คนอื่นที่มี department_code ถูกล็อกแผนก */
-  const lockedDepartmentCode =
-    user?.role !== 'admin' ? user?.department_code?.trim().toUpperCase() || null : null;
+  /** admin เห็นทุกแผนก · คนที่ดูได้ BU เดียวถูกล็อก · ดูหลาย BU (ดูเพิ่ม · 28 ต.ค. 2569) = เลือกได้ในชุดของตัวเอง */
+  const lockedDepartmentCode = lockedBuOf(user);
+  const viewableBus = viewableBusOf(user);
 
   const listState = useMemo(() => parseJobListSearchParams(searchParams), [searchParams]);
   const {
@@ -636,7 +637,9 @@ const JobListPage: React.FC = () => {
               options={
                 lockedDepartmentCode
                   ? [{ value: lockedDepartmentCode, label: lockedDepartmentCode }]
-                  : departmentOptions.filter((o) => o.value !== 'all').map((o) => ({ value: o.value, label: o.label }))
+                  : departmentOptions
+                      .filter((o) => o.value !== 'all' && (!viewableBus || viewableBus.includes(o.value)))
+                      .map((o) => ({ value: o.value, label: o.label }))
               }
             />
           ) : null}
