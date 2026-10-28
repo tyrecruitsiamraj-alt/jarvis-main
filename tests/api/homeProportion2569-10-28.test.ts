@@ -7,6 +7,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   buildProportionGroups,
+  ladderAddsUp,
+  summarizeFollowLane,
   proportionPct,
   proportionTag,
   recruitProportionRows,
@@ -14,7 +16,7 @@ import {
   type ProportionRow,
 } from '../../src/lib/homeProportion';
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes';
-import { proportionEntrySql, proportionFollowSql } from '../../api/_lib/homeProportionSql';
+import { proportionAppReasonsSql, proportionEntrySql, proportionFollowRowsSql } from '../../api/_lib/homeProportionSql';
 
 const read = (p: string) => readFileSync(p, 'utf8');
 
@@ -68,7 +70,7 @@ describe('สรรหา 3 ขั้น + ขั้นที่ยังเป�
   it('Prescreen แยก AI/ทั้งสองทาง/คน/ยังไม่โทร ครบทุกใบ · โทรหลัง Prescreen นับคนที่บอก AI ว่าสนใจ · นัด = คนทำ', () => {
     const apps = [
       fact({ calledByAi: true }),
-      fact({ calledByAi: true, calledByStaff: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-10-05T04:00:00Z', staffLastAt: '2026-10-05T06:00:00Z', appointmentAt: '2026-10-07T02:00:00Z', attendance: 'showed', screening: 'passed', informed: true }),
+      fact({ calledByAi: true, calledByStaff: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-10-05T04:00:00Z', staffLastAt: '2026-10-05T06:00:00Z', logOk: true, appointmentAt: '2026-10-07T02:00:00Z', attendance: 'showed', screening: 'passed', informed: true }),
       fact({ calledByAi: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-10-05T04:00:00Z' }),
       fact({ calledByStaff: true }),
       fact({}),
@@ -81,6 +83,51 @@ describe('สรรหา 3 ขั้น + ขั้นที่ยังเป�
     expect([appt.ai, appt.staff]).toEqual([0, 1]);
     expect(human.map((h) => h.staff)).toEqual([1, 1, 1]);
     expect(human.every((h) => h.ai === 0 && h.both === 0)).toBe(true);
+    for (const r of recruit) if (r.ladder) expect(ladderAddsUp(r.ladder)).toBe(true);
+    expect(appt.parts?.reduce((n, p) => n + p.value, 0)).toBe(appt.staff);
+  });
+  it('🔴 ไม่โทรต้องมีเหตุทุกใบ — เหตุจากฐาน · ใบขอปิด (ไม่อยู่ในใบขอที่เปิด) · หาไม่เจอ = ยังไม่รู้เหตุ (ไม่หาย)', () => {
+    const id = (n: number) => `0000000${n}-1111-4111-8111-111111111111`;
+    const apps = [
+      fact({ id: id(1), jobId: 'siamraj-sql:OPL6910002' }),
+      fact({ id: id(2), jobId: 'siamraj-sql:OPL6910099' }),
+      fact({ id: id(3), jobId: 'siamraj-sql:OPL6910099' }),
+      fact({ id: id(4), jobId: 'siamraj-sql:OPL6910099', aiQueued: true }),
+      fact({ id: id(5), jobId: 'siamraj-sql:OPL6910099' }),
+      fact({ id: id(6), phoneOk: false }),
+    ];
+    const flags = [
+      { id: id(2), jobId: 'siamraj-sql:OPL6910099', claimed: false, reason: 'dup' as const, blockReason: null },
+      { id: id(5), jobId: 'siamraj-sql:OPL6910099', claimed: true, reason: null, blockReason: null },
+    ];
+    const pre = recruitProportionRows(apps, flags, new Set(['siamraj-sql:OPL6910099'])).recruit[0].ladder!;
+    expect(ladderAddsUp(pre)).toBe(true);
+    expect(pre.waiting.map((p) => [p.key, p.value])).toEqual([['aiQueued', 1], ['claimed', 1]]);
+    expect(pre.notCalled.map((p) => [p.label, p.value])).toEqual([
+      ['ใบขอปิดแล้ว', 1],
+      ['ซ้ำ iRecruit ภายใน 14 วัน — AI ไม่โทรเอง ให้คนเลือก', 1],
+      ['ยังไม่รู้เหตุ', 1],
+      ['เบอร์ผิด โทรไม่ได้', 1],
+    ]);
+    // อ่านใบขอไม่ได้ = ไม่เดาว่าปิด
+    const noFeed = recruitProportionRows(apps, flags, null).recruit[0].ladder!;
+    expect(noFeed.notCalled.find((p) => p.label === 'ใบขอปิดแล้ว')).toBeUndefined();
+  });
+  it('ติดตาม: ผล + รอโทร (AI ไม่มีผล / คนยังไม่ลงผล) + ไม่โทร (เหตุจากป้ายส่ง AI) บวกลบลงตัว', () => {
+    const base = { aiUnreached: false, dispatch: null, queueStatus: null };
+    const s = summarizeFollowLane([
+      { ...base, ai: true, staff: false, bucket: 'went', mode: 'ai', queueStatus: 'completed' },
+      { ...base, ai: true, staff: true, bucket: 'failed', mode: 'ai', aiUnreached: true },
+      { ...base, ai: false, staff: true, bucket: 'notWent', mode: 'manual' },
+      { ...base, ai: false, staff: false, bucket: 'waiting', mode: 'ai', queueStatus: 'pending' },
+      { ...base, ai: false, staff: false, bucket: 'waiting', mode: 'manual' },
+      { ...base, ai: false, staff: false, bucket: 'waiting', mode: 'ai', dispatch: 'off' },
+      { ...base, ai: false, staff: false, bucket: 'waiting', mode: 'ai' },
+    ]);
+    expect([s.ai, s.both, s.staff, s.none, s.aiUnreached]).toEqual([1, 1, 1, 4, 1]);
+    expect(ladderAddsUp(s.ladder!)).toBe(true);
+    expect(s.ladder!.waiting.map((p) => p.value)).toEqual([1, 1]);
+    expect(s.ladder!.notCalled.map((p) => p.label)).toEqual(['ปิดส่งอัตโนมัติอยู่', 'ยังไม่รู้เหตุ']);
   });
   it('ทุกก้อนอยู่เสมอแม้ยังไม่มีข้อมูล (ว่าง = 0 ห้ามหาย)', () => {
     const g = buildProportionGroups({ apps: null, payload: null, matching: null });
@@ -125,13 +172,21 @@ describe('สรรหา 3 ขั้น + ขั้นที่ยังเป�
 });
 
 describe('SQL + เส้น + หน้า', () => {
-  it('ติดตาม: นับที่โทรจริง ไม่นับยกเลิก แยก 3 ก้อน · AI ไม่ติด = ผลไม่ใช่การคุย', () => {
-    const sql = proportionFollowSql();
+  it('ติดตาม: แถวสายที่โทรจริง ไม่นับยกเลิก แยก 3 ก้อน · ช่องผลตัวเดียวกับการ์ดผลโทร · AI ไม่ติด = ผลไม่ใช่การคุย', () => {
+    const sql = proportionFollowRowsSql();
     expect(sql).toContain("when f.topic = $4::text then 'aftercare'");
     expect(sql).toContain("when f.follow_team = 'replacement' then 'replacement'");
     expect(sql).toContain('where f.cancelled_at is null');
     expect(sql).toContain('(f.staff_called_at is not null) as staff');
+    expect(sql).toContain('as ledger_bucket');
     expect(sql).toContain("not in ('confirmed','acknowledged','declined','reschedule_requested')");
+    expect(read('api/_handlers/home-ai-share.ts')).toContain('bucket: followLedgerBucket(r, derived),');
+  });
+  it('เหตุของใบสมัคร: ลำดับเดียว ใบละเหตุ · ไม่นับใบที่เจ้าหน้าที่โทรแล้ว', () => {
+    const sql = proportionAppReasonsSql();
+    const order = ["then 'dup'", "then 'soScraping'", "then 'keyed'", "then 'noJob'", "then 'block'", "then 'suppressed'", "then 'noIncome'"].map((k) => sql.indexOf(k));
+    expect(order.every((v, i) => v > 0 && (i === 0 || v > order[i - 1]))).toBe(true);
+    expect(sql).toMatch(/and not \(/);
   });
   it('ทางเข้า: ไม่นับใบที่ยกเลิกข้อมูล · ใบคนแทนนับใบ (ไม่ใช่สาย)', () => {
     const sql = proportionEntrySql();

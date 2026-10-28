@@ -36,8 +36,8 @@ import {
   FOLLOW_QUEUE_MATCH,
 } from '../_lib/homeAiShareSql.js';
 import { logWarn } from '../_lib/logger.js';
-import { proportionEntrySql, proportionFollowSql } from '../_lib/homeProportionSql.js';
-import type { ProportionPayload } from '../../src/lib/homeProportion.js';
+import { proportionAppReasonsSql, proportionEntrySql, proportionFollowRowsSql } from '../_lib/homeProportionSql.js';
+import { summarizeFollowLane, type AppNoCallReason, type ProportionPayload } from '../../src/lib/homeProportion.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
 import {
@@ -684,22 +684,44 @@ async function handler(req: AuthedReq, res: ApiRes) {
         return res.status(200).json(body);
       }
       const { start, end } = aiShareBounds(win, new Date());
-      const [fr, er] = await Promise.allSettled([
-        dbQuery<{ lane: string; ai: number; both: number; staff: number; none: number; ai_unreached: number }>(
-          proportionFollowSql(),
-          [start, end, bu, AFTERCARE_TOPIC],
-        ),
+      const [fr, er, ar] = await Promise.allSettled([
+        dbQuery<Record<string, unknown>>(proportionFollowRowsSql(), [start, end, bu, AFTERCARE_TOPIC]),
         dbQuery<Record<string, number>>(proportionEntrySql(), [start, end, bu]),
+        dbQuery<{ id: string; job_id: string | null; claimed: boolean; reason: AppNoCallReason | null; block_reason: string | null }>(
+          proportionAppReasonsSql(),
+          [start, end, bu],
+        ),
       ]);
       if (fr.status === 'fulfilled') {
-        const lane = (k: string) => {
-          const r = fr.value.rows.find((x) => x.lane === k);
-          return { ai: r?.ai ?? 0, both: r?.both ?? 0, staff: r?.staff ?? 0, none: r?.none ?? 0, aiUnreached: r?.ai_unreached ?? 0 };
-        };
+        // ช่องผลตัวเดียวกับการ์ดผลโทรของหน้าหลัก (`followLedgerBucket`) — แถวชุดเดียวกับตัวเลขบนแถว
+        const rows = fr.value.rows;
+        const derived = categorizeFollowRows(rows);
+        const lane = (k: string) =>
+          summarizeFollowLane(
+            rows
+              .filter((r) => r.lane === k)
+              .map((r) => ({
+                ai: r.ai === true,
+                staff: r.staff === true,
+                aiUnreached: r.ai_unreached === true,
+                bucket: followLedgerBucket(r, derived),
+                mode: r.call_mode === 'manual' ? ('manual' as const) : ('ai' as const),
+                dispatch: typeof r.dispatch_state === 'string' ? r.dispatch_state : null,
+                queueStatus: typeof r.call_status === 'string' ? r.call_status : null,
+              })),
+          );
         body.follow = { starter: lane('starter'), replacement: lane('replacement'), aftercare: lane('aftercare') };
       } else {
         logWarn('home-ai-share proportion follow failed', { error: errText(fr.reason) });
         body.errors.follow = 'โหลดตัวเลขติดตามไม่ขึ้น';
+      }
+      if (ar.status === 'fulfilled') {
+        body.apps = ar.value.rows
+          .filter((r) => r.claimed || r.reason)
+          .map((r) => ({ id: r.id, jobId: r.job_id, claimed: r.claimed === true, reason: r.reason, blockReason: r.block_reason }));
+      } else {
+        logWarn('home-ai-share proportion apps failed', { error: errText(ar.reason) });
+        body.errors.apps = 'โหลดเหตุที่ยังไม่โทรไม่ขึ้น';
       }
       if (er.status === 'fulfilled') {
         const r = er.value.rows[0] ?? {};

@@ -32,7 +32,7 @@ export const isFromIrecruit = (f: Pick<RecruitAppFact, 'channelLabel' | 'referra
   /^irecruit/i.test((f.channelLabel ?? '').trim()) || /^irecruit/i.test((f.referralSource ?? '').trim());
 
 /** ขั้น AI: เบอร์ผิด → AI โทรแล้ว → รอโทร → อายุเกิน (ระบบไม่ส่ง) → มาจาก iRecruit → ยังไม่ส่ง AI */
-const aiStage = (f: RecruitAppFact): 'bad' | 'called' | 'queued' | 'overAge' | 'irecruit' | 'notSent' =>
+export const aiStage = (f: RecruitAppFact): 'bad' | 'called' | 'queued' | 'overAge' | 'irecruit' | 'notSent' =>
   !f.phoneOk
     ? 'bad'
     : f.calledByAi
@@ -49,7 +49,7 @@ const aiStage = (f: RecruitAppFact): 'bad' | 'called' | 'queued' | 'overAge' | '
  * คำตอบกับ AI · คนละพื้นที่ (19 ต.ค. 2569) มาก่อนไม่สนใจ/ขอคิด/ไม่ชัด แต่ **ไม่ทับ "สนใจ"**
  * ⇒ "สนใจ" ยังเป็นเลขเดียวกับแท็บผู้สมัครและหน้าหลัก (เจ้าของไม่อยากให้เลขขัดกัน)
  */
-const aiAnswerOf = (f: RecruitAppFact): 'yes' | 'no' | 'area' | 'thinking' | 'unreached' => {
+export const aiAnswerOf = (f: RecruitAppFact): 'yes' | 'no' | 'area' | 'thinking' | 'unreached' => {
   if (f.aiAnswer === 'said_yes') return 'yes';
   const talked = f.aiAnswer === 'said_no' || f.aiAnswer === 'not_yet' || f.aiAnswer === 'talked_unclear';
   if (talked && f.aiOutOfArea) return 'area';
@@ -57,7 +57,7 @@ const aiAnswerOf = (f: RecruitAppFact): 'yes' | 'no' | 'area' | 'thinking' | 'un
 };
 
 /** คนโทรต่อ: บันทึกผลติดต่อของเจ้าหน้าที่ (สำเร็จ/ไม่สำเร็จ) ก่อน · ไม่มี = ดูผลติดต่อที่เจ้าหน้าที่ได้ · ไม่มีเลย = รอโทร */
-const staffResultOf = (f: RecruitAppFact): 'ok' | 'fail' | 'waiting' => {
+export const staffResultOf = (f: RecruitAppFact): 'ok' | 'fail' | 'waiting' => {
   if (f.logOk === true) return 'ok';
   if (f.logOk === false) return 'fail';
   if (f.contactBy === 'staff' && f.contact === 'success') return 'ok';

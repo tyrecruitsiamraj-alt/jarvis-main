@@ -11,7 +11,9 @@
  */
 import { tableInAppSchema } from './schema.js';
 import { queueOutcome } from './lumosQueueDefs.js';
-import { CONNECTED_OUTCOMES } from './applicantOverviewSql.js';
+import { CALLED_BY_STAFF_SQL, CONNECTED_OUTCOMES, HELD_OR_CLAIMED_SQL } from './applicantOverviewSql.js';
+import { FOLLOW_BUCKET_SQL, FOLLOW_EFFECTIVE_MODE_SQL } from './homeLumosSummarySql.js';
+import { FOLLOW_ENTRY_CATEGORY_COLS, FOLLOW_QUEUE_CALL_COLS } from './followCategory.js';
 import { FOLLOW_CALLED_BY_AI_SQL, FOLLOW_QUEUE_MATCH } from './homeAiShareSql.js';
 import { appBuJoin, appBuSql, followBuJoin, followBuSql } from './homeBuSql.js';
 import { SO_SCRAPING_CREATED_BY } from '../../src/lib/soScrapingLeads.js';
@@ -21,6 +23,9 @@ const FOLLOW = tableInAppSchema('follow_entries');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const CANCELLATIONS = tableInAppSchema('application_cancellations');
 const POST_REQUESTS = tableInAppSchema('job_posting_requests');
+const IRECRUIT_DUPS = tableInAppSchema('application_irecruit_dups');
+const SUPPRESSION = tableInAppSchema('candidate_call_suppression');
+const UNIT_NOTES = tableInAppSchema('siamraj_unit_notes');
 
 /** AI โทรแล้วแต่ไม่ได้คุย (ไม่รับ · สายไม่ว่าง · ล้ม) */
 const FOLLOW_AI_UNREACHED_SQL = `exists (
@@ -30,31 +35,59 @@ const FOLLOW_AI_UNREACHED_SQL = `exists (
        and ${queueOutcome('q')} <> 'cancelled'
        and ${queueOutcome('q')} not in ${CONNECTED_OUTCOMES})`;
 
-/** แยก 3 ก้อน: คนเริ่มงาน · คนแทน · ดูแลหลังเริ่มงาน — แถวละก้อนเดียว */
-export function proportionFollowSql(): string {
+/**
+ * แถวสายของช่วง (ไม่นับยกเลิก) — ก้อน · AI/คน · ช่องผล (ตัวเดียวกับการ์ดผลโทรของหน้าหลัก `followLedgerBucket`) · เหตุที่ AI ไม่ได้ส่ง
+ * นับต่อที่ Node (`summarizeFollowLane`) ⇒ ตัวเลขของแถวกับขั้นที่กดดูมาจากแถวชุดเดียวกัน บวกลบลงตัวเสมอ
+ */
+export function proportionFollowRowsSql(): string {
   return `
-  with f0 as (
-    select case when f.topic = $4::text then 'aftercare'
+    select ${FOLLOW_ENTRY_CATEGORY_COLS},
+           case when f.topic = $4::text then 'aftercare'
                 when f.follow_team = 'replacement' then 'replacement'
                 else 'starter' end as lane,
            ${FOLLOW_CALLED_BY_AI_SQL} as ai,
            (f.staff_called_at is not null) as staff,
-           ${FOLLOW_AI_UNREACHED_SQL} as ai_unreached
+           ${FOLLOW_AI_UNREACHED_SQL} as ai_unreached,
+           ${FOLLOW_EFFECTIVE_MODE_SQL} as call_mode,
+           f.dispatch_state,
+           ${FOLLOW_BUCKET_SQL} as ledger_bucket,
+           ${FOLLOW_QUEUE_CALL_COLS}
       from ${FOLLOW} f
       ${followBuJoin('f')}
+      left join ${QUEUE} q on ${FOLLOW_QUEUE_MATCH}
      where f.cancelled_at is null
        and ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
        and f.scheduled_at < $2::timestamptz
-       and ($3::text is null or ${followBuSql('f')} = $3::text)
-  )
-  select lane,
-         count(*) filter (where ai and not staff)::int      as ai,
-         count(*) filter (where ai and staff)::int          as both,
-         count(*) filter (where staff and not ai)::int      as staff,
-         count(*) filter (where not ai and not staff)::int  as none,
-         count(*) filter (where ai and ai_unreached)::int   as ai_unreached
-    from f0
-   group by lane`;
+       and ($3::text is null or ${followBuSql('f')} = $3::text)`;
+}
+
+/**
+ * ใบสมัครที่ยังไม่มีใครโทร — เหตุว่าทำไม (เจ้าของ 28 ต.ค. 2569 "ไม่โทรเท่าไหร่ เพราะอะไร … ขี้สงสัยแล้วตอบให้หมด")
+ * ลำดับเดียว (CASE) ⇒ ใบละเหตุเดียว · ใบขอปิดแล้วต้องถาม ERP ⇒ ส่ง job_id ของใบที่ยังไม่รู้เหตุไปเช็กต่อที่ Node
+ * + `claimed` = มีคนเก็บไป/ถืองานอยู่ (ใช้กับคนที่บอก AI ว่าสนใจด้วย — รอโทรแยก "เก็บแล้ว" กับ "ยังไม่มีใครเก็บ")
+ */
+export function proportionAppReasonsSql(): string {
+  return `
+    select a.id::text as id, a.job_id, ${HELD_OR_CLAIMED_SQL} as claimed,
+           case
+             when exists (select 1 from ${IRECRUIT_DUPS} d where d.application_id = a.id) then 'dup'
+             when a.created_by_name = '${SO_SCRAPING_CREATED_BY}' then 'soScraping'
+             when a.created_by_name is not null then 'keyed'
+             when a.job_id is null then 'noJob'
+             when a.ai_block_reason is not null then 'block'
+             when a.phone_e164 is not null and exists (
+               select 1 from ${SUPPRESSION} s where s.phone_e164 = a.phone_e164 and s.suppressed_until > now()) then 'suppressed'
+             when not exists (
+               select 1 from ${UNIT_NOTES} n
+                where n.request_no = regexp_replace(a.job_id, '^siamraj-(sql|pre):', '')
+                  and (n.field_overrides ? 'income' or n.field_overrides ? 'total_income')) then 'noIncome'
+             else null end as reason,
+           a.ai_block_reason as block_reason
+      from ${APPS} a ${appBuJoin('a')}
+     where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
+       and ($3::text is null or ${appBuSql('a')} = $3::text)
+       and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)
+       and not ${CALLED_BY_STAFF_SQL}`;
 }
 
 /**

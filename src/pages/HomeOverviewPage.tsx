@@ -118,6 +118,11 @@ const HomeOverviewPage: React.FC = () => {
   const lumos = useHomeLumosSummary('follow', winQ, tick);
   const feed = useUnitRequestsFeed();
   const preCount = feed.jobs.filter((j) => String(j.id).startsWith(PREQUEST_ID_PREFIX)).length;
+  /** ใบขอที่เปิดอยู่ — แท็บสัดส่วนใช้บอกเหตุ "ใบขอปิดแล้ว" · เส้นใบขอยังไม่พร้อม = null (ไม่เดาว่าปิด) */
+  const openJobIds = useMemo(
+    () => (feed.feedState === 'ready' ? new Set(feed.jobs.map((j) => String(j.id))) : null),
+    [feed.feedState, feed.jobs],
+  );
 
   // เปลี่ยนช่วง/BU แล้วเลขเก่าห้ามค้าง
   const moneyNow =
@@ -446,7 +451,7 @@ const HomeOverviewPage: React.FC = () => {
         </div>
       </div>
       {tab === 'proportion' ? (
-        <ProportionTab win={win} bu={bu} apps={apps} matching={ai?.matching ?? null} appsError={roError} />
+        <ProportionTab win={win} bu={bu} apps={apps} matching={ai?.matching ?? null} appsError={roError} openJobIds={openJobIds} />
       ) : (
       <>
       {moneyError || roError ? <p className={cn('text-sm', TONE.danger.value)}>{moneyError ?? roError}</p> : null}
