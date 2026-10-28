@@ -743,3 +743,11 @@ export async function setApplicationCancelled(id: string, cancelled: boolean, re
     throw new Error(body?.message || (cancelled ? 'ยกเลิกข้อมูลไม่สำเร็จ' : 'กู้คืนไม่สำเร็จ'));
   }
 }
+
+/** ช่องทางหลักให้หน้าสมัครเลือก — รายการเดียวกับหน้าจัดช่องทาง (เจ้าของ 28 ต.ค. 2569 "ยึดตาม /recruit/channels") · ไม่ต้องล็อกอิน */
+export async function fetchPublicChannels(): Promise<Array<{ id: string; name: string }>> {
+  const r = await apiFetch('/api/public/channels');
+  if (!r.ok) return [];
+  const data = (await r.json().catch(() => null)) as { channels?: Array<{ id: string; name: string }> } | null;
+  return Array.isArray(data?.channels) ? data.channels : [];
+}

@@ -86,9 +86,15 @@ function newerSignal(a: ApplicantInterestSignals): 'contact' | 'call' | null {
   return stamp(a.last_call_at) > stamp(a.last_contact_at) ? 'call' : 'contact';
 }
 
-/** ใบนี้อ่านว่า "สนใจ" ไหม — สัญญาณล่าสุดต้องเป็นผลโทรที่ตอบว่าเอางาน */
+/**
+ * ใบนี้อ่านว่า "สนใจ" ไหม — ผลโทรที่ตอบว่าเอางาน
+ * 🔴 บันทึก "ติดต่อสำเร็จ" ที่มาทีหลังไม่ลบผลสนใจ (เจ้าของ 28 ต.ค. 2569 "ทำไมสนใจมาอยู่ในช่อง ยังไม่รู้ผล" ·
+ *    AI โทรได้สนใจ แล้วเจ้าหน้าที่บันทึกติดต่อสำเร็จ + นัด → เดิมตกไปยังไม่รู้ผล) · ติดต่อสำเร็จเฉย ๆ (ไม่มีผลโทรสนใจ) ยังไม่ใช่สนใจ
+ */
 export function isInterestedApplicant(a: ApplicantInterestSignals): boolean {
-  return newerSignal(a) === 'call' && isInterestedOutcome(a.last_call_outcome);
+  const s = newerSignal(a);
+  if (s === 'contact' && a.last_contact_ok !== true) return false;
+  return s !== null && isInterestedOutcome(a.last_call_outcome);
 }
 
 /** ใบนี้อ่านว่า "ไม่สนใจ" ไหม — ปฏิเสธตอนโทร **หรือ** ผลติดต่อล่าสุด ok=false */

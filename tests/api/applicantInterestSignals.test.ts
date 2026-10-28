@@ -33,6 +33,20 @@ describe('ok=false นับเป็นไม่สนใจ', () => {
     expect(isInterestedApplicant(a)).toBe(false);
   });
 
+  it('🔴 AI โทรได้สนใจ แล้วเจ้าหน้าที่บันทึกติดต่อสำเร็จทีหลัง = ยังสนใจ (28 ต.ค. 2569 เดิมตกไปยังไม่รู้ผล)', () => {
+    const a = {
+      last_call_outcome: 'confirmed',
+      last_call_at: '2026-10-20T03:00:00Z',
+      last_contact_ok: true,
+      last_contact_at: '2026-10-21T02:05:10Z',
+    };
+    expect(isInterestedApplicant(a)).toBe(true);
+    expect(isNotInterestedApplicant(a)).toBe(false);
+    // ติดต่อไม่สำเร็จทีหลัง = ไม่สนใจ ตามเดิม (Phase 5.11)
+    expect(isInterestedApplicant({ ...a, last_contact_ok: false })).toBe(false);
+    expect(isNotInterestedApplicant({ ...a, last_contact_ok: false })).toBe(true);
+  });
+
   it('ไม่มีสัญญาณอะไรเลย = ไม่เข้าถังไหน', () => {
     expect(isInterestedApplicant({})).toBe(false);
     expect(isNotInterestedApplicant({})).toBe(false);

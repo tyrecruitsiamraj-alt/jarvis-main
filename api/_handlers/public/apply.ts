@@ -65,6 +65,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
      * หน้าเว็บล็อกช่องไว้แล้ว แต่ฝั่งนี้ไม่เชื่อค่าที่ส่งมา (หน้าสาธารณะ ใครยิงตรงก็ได้) · ลิงก์กลาง = ค่าที่ผู้สมัครเลือก
      * อ่านไม่ได้ = ใช้ค่าที่ส่งมา (ห้ามทำใบสมัครล่มเพราะข้อมูลเสริม)
      */
+    let lockedByLink = false;
     if (v.linkId) {
       try {
         const { rows } = await dbQuery<{ channel_label: string | null }>(
@@ -72,9 +73,37 @@ export default async function handler(req: ApiReq, res: ApiRes) {
           [v.linkId],
         );
         const locked = referralSourceOfChannel(rows[0]?.channel_label);
-        if (locked) v.referralSource = locked;
+        if (locked) {
+          v.referralSource = locked;
+          lockedByLink = true;
+        }
       } catch {
         /* ใช้ค่าที่ส่งมา */
+      }
+    }
+
+    /**
+     * ช่องทางที่ผู้สมัครเลือก = ช่องทางหลักจากหน้าจัดช่องทาง (เจ้าของ 28 ต.ค. 2569 "ยึดตาม /recruit/channels")
+     * เก็บ `channel_id` + ชื่อ · `referral_source` ยังคิดจากชื่อ (ตัวเลข/รายงานเดิมนับต่อได้)
+     * ไม่เชื่อชื่อจากหน้าเว็บ — อ่านจากฐานด้วย id · ต้องเป็นช่องทางหลักที่เปิดใช้ · ลิงก์ที่ล็อกช่องทางชนะเสมอ
+     */
+    let channelId: string | null = null;
+    let channelLabel: string | null = null;
+    const rawChannelId = (raw as Record<string, unknown> | null)?.channel_id;
+    if (!lockedByLink && typeof rawChannelId === 'string' && /^[0-9a-f-]{36}$/i.test(rawChannelId)) {
+      try {
+        const { rows } = await dbQuery<{ id: string; name: string }>(
+          `select id::text, name from ${tableInAppSchema('recruit_channels')}
+            where id = $1::uuid and parent_id is null and is_active = true limit 1`,
+          [rawChannelId],
+        );
+        if (rows[0]) {
+          channelId = rows[0].id;
+          channelLabel = rows[0].name;
+          v.referralSource = referralSourceOfChannel(rows[0].name) ?? v.referralSource;
+        }
+      } catch {
+        /* ไม่มีช่องทาง — ใบสมัครต้องบันทึกได้เสมอ */
       }
     }
 
@@ -112,13 +141,15 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       v.note,
       v.postingId,
       v.linkId,
+      channelId,
+      channelLabel,
     ];
     const BASE_COLS = `full_name, title_prefix, first_name, last_name, phone, age, gender,
          province, district, subdistrict, postal_code,
          weight_kg, height_cm, education, referral_source,
          document_filename, document_mime, document_size, document_bytes,
          job_id, job_title, unit_name, position_interest, note,
-         posting_id, link_id`;
+         posting_id, link_id, channel_id, channel_label`;
     const placeholders = (n: number) => Array.from({ length: n }, (_, i) => `$${i + 1}`).join(', ');
 
     /**

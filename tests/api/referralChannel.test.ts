@@ -29,12 +29,15 @@ describe('ล็อกทั้งหน้าเว็บและฝั่ง 
   it('ฟอร์ม: ลิงก์มีช่องทาง = ช่องเลือกถูกปิด โชว์ชื่อช่องทางของลิงก์ · ส่งค่าตามลิงก์', () => {
     const src = code('src/components/jobs/PublicApplyDialog.tsx');
     expect(src).toContain('data-testid="apply-channel-locked"');
-    expect(src).toContain('referral_source: lockedSource ?? (referralSource || null)');
+    // 28 ต.ค. 2569: ลิงก์กลางส่ง channel_id ช่องทางหลัก (ไม่ใช่ 5 ค่าเดิม) · ลิงก์ที่ล็อกส่งตามลิงก์
+    expect(src).toContain('referral_source: lockedSource,');
+    expect(src).toContain('channel_id: lockedChannel ? null : referralSource || null');
     expect(code('src/pages/public/PublicPostingApplyPage.tsx')).toContain('channelLabel: info.channelLabel');
   });
   it('API: มี link_id = บันทึกช่องทางตามลิงก์เสมอ ไม่เชื่อค่าจากหน้าเว็บ', () => {
     const src = code('api/_handlers/public/apply.ts');
     expect(src).toContain('referralSourceOfChannel(rows[0]?.channel_label)');
-    expect(src).toContain('if (locked) v.referralSource = locked;');
+    expect(src).toContain('v.referralSource = locked;');
+    expect(src).toContain('lockedByLink = true;');
   });
 });

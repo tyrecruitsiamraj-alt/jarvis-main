@@ -35,6 +35,7 @@ import azureAdCallbackHandler from './auth/azure-ad-callback.js';
 import publicJobsHandler from './public/jobs.js';
 import publicApplyHandler from './public/apply.js';
 import publicApplyLinkHandler from './public/apply-link.js';
+import publicChannelsHandler from './public/channels.js';
 import publicClickHandler from './public/click.js';
 import publicPrivacyRequestHandler from './public/privacy-request.js';
 import pdpaRequestsHandler from './pdpa-requests.js';
@@ -234,6 +235,8 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/public/apply': publicApplyHandler as ApiHandler,
   '/api/public/apply-link': publicApplyLinkHandler as ApiHandler,
+  // ช่องทางหลักให้หน้าสมัครเลือก — ไม่ต้องล็อกอิน (28 ต.ค. 2569)
+  '/api/public/channels': publicChannelsHandler as ApiHandler,
   // นับคลิกหน้าสาธารณะ — ไม่ต้องล็อกอิน · คืน 204 เสมอ (ดู public/click.ts)
   '/api/public/click': publicClickHandler as ApiHandler,
   // คำขอใช้สิทธิ์ PDPA — ผู้สมัครยื่นเอง (ไม่ต้องล็อกอิน · 18 ต.ค. 2569) · ฝั่งเจ้าหน้าที่ /api/pdpa-requests (admin)

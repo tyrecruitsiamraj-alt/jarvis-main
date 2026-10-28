@@ -15,11 +15,7 @@ import {
   getSubdistrictOptions,
   getZipCodeForSubdistrict,
 } from '@/lib/thaiAddressCascade';
-import {
-  EDUCATION_LEVELS,
-  REFERRAL_SOURCES,
-  REFERRAL_SOURCE_LABEL,
-} from '@/lib/publicApplicationsApi';
+import { EDUCATION_LEVELS, fetchPublicChannels } from '@/lib/publicApplicationsApi';
 import {
   Dialog,
   DialogContent,
@@ -117,7 +113,9 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
   const [weight, setWeight] = useState('');
   const [height, setHeight] = useState('');
   const [education, setEducation] = useState('');
+  /** id ช่องทางหลักที่ผู้สมัครเลือก — รายการจากหน้าจัดช่องทาง (28 ต.ค. 2569 เดิมล็อก 5 ค่า) */
   const [referralSource, setReferralSource] = useState('');
+  const [channels, setChannels] = useState<Array<{ id: string; name: string }>>([]);
   /** ลิงก์มีช่องทาง = ล็อก (เจ้าของ 6 ต.ค. 2569 "Link ที่ Gen ต้อง Lock ช่องทางด้วยสิ่") · ลิงก์กลาง = เลือกเองได้ */
   const lockedChannel = posting?.channelLabel?.trim() || null;
   const lockedSource = referralSourceOfChannel(lockedChannel);
@@ -146,6 +144,16 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
     setSubmitted(false);
     setError(null);
   }, [open]);
+
+  // ช่องทางหลักจากหน้าจัดช่องทาง · โหลดไม่ได้ = ไม่มีตัวเลือก (ช่องนี้ไม่บังคับ ส่งใบได้ตามปกติ)
+  useEffect(() => {
+    if (!open || channels.length > 0) return;
+    let alive = true;
+    void fetchPublicChannels().then((list) => alive && setChannels(list));
+    return () => {
+      alive = false;
+    };
+  }, [open, channels.length]);
 
   const resetForm = () => {
     setConsent(false);
@@ -226,7 +234,9 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
           weight_kg: weight.trim() ? Number(weight) : null,
           height_cm: height.trim() ? Number(height) : null,
           education: education || null,
-          referral_source: lockedSource ?? (referralSource || null),
+          // ช่องทางที่เลือก = id ช่องทางหลัก · ฝั่ง API อ่านชื่อจากฐานแล้วคิด referral_source เอง (ลิงก์ที่ล็อกช่องทางชนะ)
+          referral_source: lockedSource,
+          channel_id: lockedChannel ? null : referralSource || null,
           document,
           job_id: job?.id ?? posting?.jobId ?? null,
           /**
@@ -549,9 +559,9 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                       className="jarvis-soft-field"
                     >
                       <option value="">— เลือกช่องทาง —</option>
-                      {REFERRAL_SOURCES.map((s) => (
-                        <option key={s} value={s}>
-                          {REFERRAL_SOURCE_LABEL[s]}
+                      {channels.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
                         </option>
                       ))}
                     </select>
