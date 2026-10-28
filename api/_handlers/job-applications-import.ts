@@ -24,11 +24,13 @@ import * as XLSX from 'xlsx';
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { readJsonBody } from '../_lib/body.js';
 import { dbQuery, dbTransaction } from '../_lib/postgres.js';
+import { readImportRows, type ImportFileKind } from '../_lib/importDocRows.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { staffEntryDepartment } from '../_lib/applicationScope.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
 import {
+  IMPORT_COLUMNS,
   IMPORT_MAX_ROWS,
   IMPORT_SHEET_NAME,
   IMPORT_TEMPLATE_FILENAME,
@@ -88,18 +90,6 @@ function buildDuplicatesBase64(list: readonly ImportDuplicate[]): string {
   return XLSX.write(wb, { type: 'base64', bookType: 'xlsx' }) as string;
 }
 
-/** `rows` = ค่าที่โชว์บนเซลล์ · `raw` = ค่าดิบ (อายุในเซลล์รูปแบบวันที่ · 27 ต.ค. 2569) — แถวตรงกันทีละแถว */
-function readSheetRows(buffer: Buffer): { rows: unknown[][]; raw: unknown[][] } {
-  const wb = XLSX.read(buffer, { type: 'buffer' });
-  const name = wb.SheetNames.includes(IMPORT_SHEET_NAME) ? IMPORT_SHEET_NAME : wb.SheetNames[0];
-  const sheet = name ? wb.Sheets[name] : undefined;
-  if (!sheet) return { rows: [], raw: [] };
-  return {
-    rows: XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: '', blankrows: false }),
-    raw: XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: '', blankrows: false }),
-  };
-}
-
 /**
  * ตอบล่วงหน้าว่า AI โทรใบนี้ได้ไหม (ตัวอย่างก่อนนำเข้าตามกล่อง) — ใบยังไม่ตั้งรายได้ = AI ไม่โทร (กติกา 6 ต.ค. 2569)
  * อ่านใบไม่ทัน = ไม่ขวาง (ตอนส่งจริงตัดสินอีกรอบ) · การอ่านรอบนี้อุ่นสำเนาใบขอให้ตอนส่งด้วย
@@ -147,10 +137,20 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     let rows: unknown[][];
     let rawRows: unknown[][];
+    let fileKind: ImportFileKind = 'excel';
     try {
-      ({ rows, raw: rawRows } = readSheetRows(Buffer.from(fileBase64, 'base64')));
+      // Excel · Word · PDF (28 ต.ค. 2569) — ตารางหัวคอลัมน์ตามแบบฟอร์ม · รู้ชนิดจากเนื้อไฟล์
+      ({ rows, raw: rawRows, kind: fileKind } = await readImportRows(
+        Buffer.from(fileBase64, 'base64'),
+        (cells) => mapImportHeader(cells).missing.length === 0,
+        IMPORT_SHEET_NAME,
+        IMPORT_COLUMNS.map((c) => c.header),
+      ));
     } catch {
-      return sendError(res, 400, 'Bad request', 'อ่านไฟล์ไม่ได้ — ใช้ไฟล์ Excel (.xlsx) จากปุ่มดาวน์โหลดไฟล์ตัวอย่าง');
+      return sendError(res, 400, 'Bad request', 'อ่านไฟล์ไม่ได้ — ใช้ไฟล์ Excel · Word · PDF ที่มีตารางหัวคอลัมน์ตามแบบฟอร์ม');
+    }
+    if (rows.length === 0 && fileKind !== 'excel') {
+      return sendError(res, 400, 'Bad request', `ไม่เจอตารางในไฟล์ ${fileKind === 'pdf' ? 'PDF' : 'Word'} — ต้องมีตารางหัวคอลัมน์ตามแบบฟอร์ม (PDF ที่เป็นรูปสแกนอ่านไม่ได้)`);
     }
     const [header = [], ...data] = rows;
     const { index, missing } = mapImportHeader(header);

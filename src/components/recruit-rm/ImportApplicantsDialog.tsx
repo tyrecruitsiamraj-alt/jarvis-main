@@ -249,12 +249,12 @@ const ImportApplicantsDialog: React.FC<{
 
             <div className="space-y-1.5">
               <Label htmlFor="import-applicants-file" className="text-xs text-muted-foreground">
-                ไฟล์ Excel (กรอกตามแบบฟอร์ม)
+                ไฟล์ Excel · Word · PDF (ตารางหัวคอลัมน์ตามแบบฟอร์ม)
               </Label>
               <Input
                 id="import-applicants-file"
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.docx,.pdf"
                 disabled={saved || busy !== null}
                 onChange={(e) => void pickFile(e.target.files?.[0] ?? null)}
                 className="h-auto py-2 text-sm"
