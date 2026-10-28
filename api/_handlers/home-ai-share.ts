@@ -623,13 +623,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
         body.error = 'บัญชีนี้ยังไม่ได้ผูกแผนก เลยยังดูผลโทรไม่ได้';
         return res.status(200).json(body);
       }
+      const timings: Record<string, number> = {};
       try {
         const { start, end } = aiShareBounds(win, new Date());
-        body.report = await loadTopicReport(block as TopicReportBlock, start, end, bu);
+        body.report = await loadTopicReport(block as TopicReportBlock, start, end, bu, timings);
       } catch (e) {
         logWarn('home-ai-share report failed', { block, error: errText(e) });
         body.error = 'โหลดผลโทรไม่ขึ้น ลองรีเฟรชอีกครั้ง';
       }
+      res.setHeader?.('Server-Timing', Object.entries(timings).map(([k, v]) => `${k};dur=${v}`).join(', '));
       res.setHeader?.('Cache-Control', 'no-store');
       return res.status(200).json(body);
     }

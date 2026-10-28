@@ -77,7 +77,24 @@ export async function loadInterestJourney(start: Date | null, end: Date, bu: str
   return buildInterestJourney(rows.map(toRow));
 }
 
-export async function loadTopicReport(block: TopicReportBlock, start: Date | null, end: Date, bu: string | null): Promise<TopicReport> {
+/** เวลาที่ใช้แต่ละขั้น (ms) — ส่งออกเป็น Server-Timing ให้วัดบนเว็บจริงได้ (28 ต.ค. 2569 แท็บจับคู่งานครั้งแรกช้า) */
+export type ReportTimings = Record<string, number>;
+const timed = async <T,>(t: ReportTimings | undefined, name: string, p: Promise<T>): Promise<T> => {
+  const at = Date.now();
+  try {
+    return await p;
+  } finally {
+    if (t) t[name] = Date.now() - at;
+  }
+};
+
+export async function loadTopicReport(
+  block: TopicReportBlock,
+  start: Date | null,
+  end: Date,
+  bu: string | null,
+  timings?: ReportTimings,
+): Promise<TopicReport> {
   const params = [start ? start.toISOString() : null, end.toISOString(), bu];
   if (block === 'applicants') {
     // 🔴 ใบขอเข้ามา · ประกาศแล้ว = ตัวเดียวกับแท็บทีม Online (QA 10 ต.ค. 2569 · เจ้าของเลือก "ใช้นิยามเดียวทั้งสองแท็บ")
@@ -90,8 +107,8 @@ export async function loadTopicReport(block: TopicReportBlock, start: Date | nul
   }
   if (block === 'matching') {
     const [{ rows }, flow] = await Promise.all([
-      dbQuery<Record<string, unknown>>(buildMatchingAiShareSql('report'), params),
-      loadMatchingFlow(start, end, bu),
+      timed(timings, 'rows', dbQuery<Record<string, unknown>>(buildMatchingAiShareSql('report'), params)),
+      timed(timings, 'flow', loadMatchingFlow(start, end, bu, timings)),
     ]);
     return buildMatchingReport(rows.map(toRow), flow);
   }
@@ -117,15 +134,15 @@ async function loadJobsInWindow(start: Date | null, end: Date, bu: string | null
   });
 }
 
-async function loadMatchingFlow(start: Date | null, end: Date, bu: string | null): Promise<MatchingFlow> {
+async function loadMatchingFlow(start: Date | null, end: Date, bu: string | null, timings?: ReportTimings): Promise<MatchingFlow> {
   const f = emptyMatchingFlow();
-  const jobs = await loadJobsInWindow(start, end, bu);
+  const jobs = await timed(timings, 'jobs', loadJobsInWindow(start, end, bu));
   f.jobsIn = jobs.length;
   if (!jobs.length) return f;
   const ids = jobs.map((j) => j.id);
   const [tierMap, ctx, posted, touched, prop] = await Promise.all([
-    loadBoardMatchTierMap(),
-    loadBoardAvailabilityContext(),
+    timed(timings, 'tier', loadBoardMatchTierMap()),
+    timed(timings, 'avail', loadBoardAvailabilityContext()),
     dbQuery<{ job_id: string }>(
       `select distinct job_id from ${POSTINGS} where status in ('pending', 'in_progress', 'posted') and job_id = any($1)`,
       [ids],
