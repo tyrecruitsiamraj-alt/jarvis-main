@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../api/_lib/postgres.js', () => ({ dbQuery: vi.fn(), isPgUndefinedTable: () => false }));
-const { followSaidGoing, followAnswerOf } = await import('../../api/_lib/callFollowup');
+const { followSaidGoing, followAnswerOf, followSaidQuit } = await import('../../api/_lib/callFollowup');
 const { answeredButMarkedUnreached } = await import('../../src/lib/followPlanning');
 
 const said = (...lines: string[]) => ({ transcript: lines.map((text) => ({ role: 'candidate', text })) });
@@ -42,5 +42,18 @@ describe('คำตอบของสายติดตาม (28 ต.ค. 2569 
   it('🔴 จับใจความไม่ได้ + มีคำพูด ⇒ หน้าติดตามไม่อ่านคำพูดเอง (เชื่อ Lumos) · ไม่รับสาย + มีคำพูดยังอ่านเหมือนเดิม', () => {
     expect(answeredButMarkedUnreached({ call_outcome: 'unresponsive', call_reply: 'ไปครับ' })).toBe(false);
     expect(answeredButMarkedUnreached({ call_outcome: 'no_answer', call_reply: 'ครับ ครับ ผม' })).toBe(true);
+  });
+});
+
+describe('บอกไม่ทำแล้ว (28 ต.ค. 2569 Choice "คนกดหยุดเอง")', () => {
+  it('จับคำลาออก/ไม่ทำแล้ว ⇒ กระดิ่งแยก · ไม่ไปธรรมดาไม่ใช่', () => {
+    expect(followSaidQuit(said('ผมลาออกแล้วครับ'))).toBe(true);
+    expect(followSaidQuit({ summary: 'ผู้รับสายแจ้งว่าไม่ทำแล้ว' })).toBe(true);
+    expect(followSaidQuit(said('วันนี้ไม่สบาย ไม่ไปครับ'))).toBe(false);
+  });
+  it('ระบบไม่ยกเลิกวันอื่นเอง — ยังหยุดแค่วันนั้น (ตัวยกเลิกเดิม) · คนกด ยกเลิก › ทั้งชุด', () => {
+    const src = readFileSync('api/_lib/callFollowup.ts', 'utf8');
+    expect(src).toContain("type: quit ? 'follow_quit'");
+    expect(src).toContain('กด บันทึกว่าเสร็จสิ้น › ยกเลิก › ทั้งชุด เพื่อหยุด');
   });
 });

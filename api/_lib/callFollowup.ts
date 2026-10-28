@@ -323,6 +323,22 @@ function followReadAnswer(outcome: string, result: unknown) {
   return classifyFollowCall({ outcome, reply, summary: typeof r.summary === 'string' ? r.summary : null });
 }
 
+/**
+ * บอกว่าเลิกทำงานแล้ว (ลาออก · ไม่ทำแล้ว) — ไม่ใช่แค่ "วันนี้ไม่ไป" (เจ้าของ 28 ต.ค. 2569 Choice "คนกดหยุดเอง")
+ * ระบบยังหยุดแค่วันนั้น · กระดิ่งบอกแยกให้เจ้าหน้าที่เช็กแล้วกด ยกเลิก › ทั้งชุด เอง (กัน AI ฟังผิดแล้วตัดคนทิ้งเงียบ ๆ)
+ */
+export const FOLLOW_QUIT_RE = /ลาออก|ไม่ทำแล้ว|ไม่ทำงานแล้ว|ไม่ทำต่อ|เลิกทำ|ออกจากงาน|ออกแล้ว|ไม่ไปแล้ว|ไม่ไปทำแล้ว|ไม่เอาแล้ว/;
+export function followSaidQuit(result: unknown): boolean {
+  const r = (typeof result === 'object' && result !== null ? result : {}) as { summary?: unknown; transcript?: unknown };
+  const reply = Array.isArray(r.transcript)
+    ? r.transcript
+        .filter((t): t is { role?: unknown; text?: unknown } => typeof t === 'object' && t !== null && (t as { role?: unknown }).role === 'candidate')
+        .map((t) => String(t.text ?? ''))
+        .join(' ')
+    : '';
+  return FOLLOW_QUIT_RE.test(`${typeof r.summary === 'string' ? r.summary : ''} ${reply}`);
+}
+
 /** กระดิ่ง "ไม่ไป / ขอเลื่อน" — คนสร้างรายการ + แอดมิน/หัวหน้า · กลืน error เอง (ห้ามทำให้การรับผลล้ม) */
 async function notifyFollowAnswer(personRef: string, queueId: number, answer: 'not_going' | 'reschedule', result: unknown): Promise<void> {
   const id = personRef.startsWith('follow-') ? personRef.slice('follow-'.length) : '';
@@ -337,10 +353,12 @@ async function notifyFollowAnswer(personRef: string, queueId: number, answer: 'n
     if (!f) return;
     const summary = typeof (result as { summary?: unknown } | null)?.summary === 'string' ? String((result as { summary: string }).summary) : '';
     const day = f.at ? new Date(f.at).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short' }) : null;
+    const quit = answer === 'not_going' && followSaidQuit(result);
     const input = {
-      type: answer === 'not_going' ? 'follow_not_going' : 'follow_reschedule',
-      title: `${f.name?.trim() || 'ผู้รับสาย'} ${answer === 'not_going' ? 'บอกไม่ไป' : 'ขอเลื่อน'}${f.unit?.trim() ? ` · ${f.unit.trim()}` : ''}${day ? ` · ${day}` : ''}`,
-      body: summary.slice(0, 160),
+      type: quit ? 'follow_quit' : answer === 'not_going' ? 'follow_not_going' : 'follow_reschedule',
+      title: `${f.name?.trim() || 'ผู้รับสาย'} ${quit ? 'บอกไม่ทำแล้ว' : answer === 'not_going' ? 'บอกไม่ไป' : 'ขอเลื่อน'}${f.unit?.trim() ? ` · ${f.unit.trim()}` : ''}${day ? ` · ${day}` : ''}`,
+      // ไม่ทำแล้ว: วันถัดไป AI ยังโทรจนกว่าคนกดหยุด — บอกปุ่มที่ต้องกด
+      body: [quit ? 'วันถัดไป AI ยังโทร · กด บันทึกว่าเสร็จสิ้น › ยกเลิก › ทั้งชุด เพื่อหยุด' : null, summary.slice(0, 160) || null].filter(Boolean).join(' · '),
       link: f.team === 'replacement' ? '/follow?view=replace' : '/follow',
       dedupeKey: `follow_answer:${queueId}`,
     };
