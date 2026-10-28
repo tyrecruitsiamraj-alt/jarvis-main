@@ -29,6 +29,7 @@ import {
   type StaffSortKey,
 } from '@/lib/recruitOverview';
 import type { RecruitAiRow, RecruitBacklog, RecruitStaffRow } from '@/lib/recruitOverviewTypes';
+import type { RegionCount } from '@/lib/bkkRegion';
 import { journeyPctText, type JourneyStep } from '@/lib/recruitJourney';
 import { DeltaChip } from './TrendParts';
 
@@ -268,6 +269,7 @@ function BacklogGroup({
   rows,
   foot,
   testId,
+  regions,
 }: {
   title: string;
   total: number;
@@ -275,6 +277,8 @@ function BacklogGroup({
   rows: { label: string; value: number; tone: ToneKey }[];
   foot?: string | null;
   testId: string;
+  /** กรุงเทพ+ปริมณฑล / ต่างจังหวัด / ไม่ระบุ ตามจังหวัดของงาน (28 ต.ค. 2569) — สามช่องรวม = ยอดบน */
+  regions?: RegionCount | null;
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-border p-3" data-testid={testId}>
@@ -291,13 +295,29 @@ function BacklogGroup({
           </li>
         ))}
       </ul>
+      {regions ? (
+        <ul className={cn('space-y-1 border-t pt-2', DASH.divider)} data-testid={`${testId}-regions`}>
+          {REGION_ROWS.map((r) => (
+            <li key={r.key} className="flex items-baseline justify-between gap-2 text-sm">
+              <span className={DASH.sub}>{r.label}</span>
+              <span className={cn('font-medium tabular-nums', regions[r.key] > 0 ? 'text-foreground' : DASH.sub)}>{fmt(regions[r.key])}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {foot ? <p className={cn('text-xs', DASH.sub)}>{foot}</p> : null}
     </div>
   );
 }
 
+const REGION_ROWS: ReadonlyArray<{ key: keyof RegionCount; label: string }> = [
+  { key: 'bkk', label: 'กรุงเทพและปริมณฑล' },
+  { key: 'upcountry', label: 'ต่างจังหวัด' },
+  { key: 'unknown', label: 'ไม่ระบุจังหวัด' },
+];
+
 export function BacklogBody({ backlog }: { backlog: RecruitBacklog }) {
-  const { uncalled, waitingStaff, appointments } = backlog;
+  const { uncalled, waitingStaff, appointments, regions } = backlog;
   const extra = [
     uncalled.inQueue > 0 ? `รอ AI โทร ${fmt(uncalled.inQueue)} คน` : null,
     uncalled.badPhone > 0 ? `เบอร์โทรผิด ${fmt(uncalled.badPhone)} คน` : null,
@@ -315,6 +335,7 @@ export function BacklogBody({ backlog }: { backlog: RecruitBacklog }) {
           { label: 'กรอกมาเกิน 7 วัน', value: uncalled.over7, tone: 'danger' },
         ]}
         foot={extra.length > 0 ? `ในนั้น ${extra.join(' · ')}` : null}
+        regions={regions?.uncalled}
       />
       <BacklogGroup
         testId="backlog-waiting"
@@ -326,6 +347,7 @@ export function BacklogBody({ backlog }: { backlog: RecruitBacklog }) {
           { label: 'รอมา 1–3 วัน', value: waitingStaff.d1_3, tone: 'warn' },
           { label: 'รอมาเกิน 3 วัน', value: waitingStaff.over3, tone: 'danger' },
         ]}
+        regions={regions?.waitingStaff}
       />
       {appointments ? (
         <BacklogGroup
@@ -337,6 +359,7 @@ export function BacklogBody({ backlog }: { backlog: RecruitBacklog }) {
             { label: 'เลยวันนัดแล้ว', value: appointments.overdue, tone: 'danger' },
             { label: 'นัดใน 7 วันข้างหน้า', value: appointments.next7, tone: 'info' },
           ]}
+          regions={regions?.appointments}
         />
       ) : (
         <div className="rounded-xl border border-border p-3 text-sm" data-testid="backlog-appointments">

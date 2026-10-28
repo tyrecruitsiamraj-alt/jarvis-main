@@ -45,6 +45,10 @@ import { toBangkokYmd } from '../_lib/businessDate.js';
 import { logError } from '../_lib/logger.js';
 import { INTEREST_VOCAB, classifyCallMicro } from '../../src/lib/callMicroOutcome.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
+import { emptyRegionCount, regionOfProvince, type Region } from '../../src/lib/bkkRegion.js';
+import { boardProvinceOf } from '../../src/lib/boardFilters.js';
+import { listSiamrajUnitRequests } from '../_lib/siamrajUnitRequests.js';
+import type { JobRequest } from '../../src/types/index.js';
 import { addDays } from '../../src/lib/trends/timeBuckets.js';
 import { monthWindow, rangeWindow } from '../../src/lib/recruitOverviewWindow.js';
 import { fullDaysSince } from '../../src/lib/fullDays.js';
@@ -141,7 +145,7 @@ export function factsSql(
 /** งานค้างตอนนี้ — ทุกใบในขอบเขต (ไม่ขึ้นกับเดือน) · $1 = BU */
 export function backlogSql(): string {
   return `
-  select a.created_at, (a.phone_e164 is null) as bad_phone,
+  select a.created_at, a.job_id, (a.phone_e164 is null) as bad_phone,
          ${CALLED_SQL} as called,
          ${IN_QUEUE_SQL} as in_queue,
          air.outcome as ai_outcome, air.summary as ai_summary, air.reply as ai_reply, air.at as ai_at,
@@ -159,11 +163,13 @@ export function backlogSql(): string {
  */
 export function appointmentBacklogSql(): string {
   return `
-  select count(*) filter (where ${OVERVIEW_BUCKETS.overdue_no_result})::int as overdue,
+  select a.job_id,
+         count(*) filter (where ${OVERVIEW_BUCKETS.overdue_no_result})::int as overdue,
          count(*) filter (where ${UPCOMING_7D_NO_RESULT_SQL})::int as next7
     from ${APPS} a
     ${appBuJoin('a')}
-   where ($1::text is null or ${appBuSql('a')} = $1::text)`;
+   where ($1::text is null or ${appBuSql('a')} = $1::text)
+   group by a.job_id`;
 }
 
 /** ผลงานรายคนของเดือน [$1, $2) · $3 = BU — คืนแถวดิบ (ใบ × คน) ให้นับรายชื่อไม่ซ้ำฝั่ง Node */
@@ -393,12 +399,24 @@ export function toRequestDays(rows: ReadonlyArray<ReqStateRow & { day: string }>
 }
 
 /** งานค้างจากแถวดิบ — อายุเป็นวันเต็ม (ครบ 24 ชม. = 1 วัน) นับจาก `now` */
-export function toBacklog(rows: Row[], appointments: RecruitBacklog['appointments'], now: number): RecruitBacklog {
+/**
+ * @param apptRows นัดที่รอผลแยกต่อใบขอ (`appointmentBacklogSql`) · null = ตารางผลนัดยังไม่พร้อม
+ * @param regionOf ใบขอ → กรุงเทพ+ปริมณฑล / ต่างจังหวัด / ไม่ระบุ (28 ต.ค. 2569 · ไม่ส่ง = ไม่ระบุทั้งหมด)
+ */
+export function toBacklog(
+  rows: Row[],
+  apptRows: Row[] | null,
+  now: number,
+  regionOf: (jobId: string | null) => Region = () => 'unknown',
+): RecruitBacklog {
   const uncalled = { total: 0, d0_3: 0, d4_7: 0, over7: 0, inQueue: 0, badPhone: 0 };
   const waitingStaff = { total: 0, d0: 0, d1_3: 0, over3: 0 };
+  const regions = { uncalled: emptyRegionCount(), waitingStaff: emptyRegionCount(), appointments: apptRows ? emptyRegionCount() : null };
+  const jobOf = (r: Row) => (typeof r.job_id === 'string' && r.job_id ? r.job_id : null);
   for (const r of rows) {
     if (!bool(r.called)) {
       uncalled.total += 1;
+      regions.uncalled[regionOf(jobOf(r))] += 1;
       const d = fullDays(iso(r.created_at), now);
       if (d <= 3) uncalled.d0_3 += 1;
       else if (d <= 7) uncalled.d4_7 += 1;
@@ -412,12 +430,39 @@ export function toBacklog(rows: Row[], appointments: RecruitBacklog['appointment
     const staffAt = iso(r.staff_last_at);
     if (staffAt && aiAt && staffAt >= aiAt) continue;
     waitingStaff.total += 1;
+    regions.waitingStaff[regionOf(jobOf(r))] += 1;
     const d = fullDays(aiAt, now);
     if (d === 0) waitingStaff.d0 += 1;
     else if (d <= 3) waitingStaff.d1_3 += 1;
     else waitingStaff.over3 += 1;
   }
-  return { uncalled, waitingStaff, appointments };
+  let appointments: RecruitBacklog['appointments'] = null;
+  if (apptRows) {
+    appointments = { overdue: 0, next7: 0 };
+    for (const a of apptRows) {
+      const overdue = Number(a.overdue ?? 0);
+      const next7 = Number(a.next7 ?? 0);
+      appointments.overdue += overdue;
+      appointments.next7 += next7;
+      regions.appointments![regionOf(jobOf(a))] += overdue + next7;
+    }
+  }
+  return { uncalled, waitingStaff, appointments, regions };
+}
+
+/**
+ * ใบขอ → กรุงเทพ+ปริมณฑล / ต่างจังหวัด (28 ต.ค. 2569) — จังหวัดของงาน `boardProvinceOf` ตัวเดียวกับการ์ดงานตามจังหวัด
+ * จากสำเนาใบขอ (ใบล่าสุด 2,000 ใบ ทุกสถานะ) · อ่านไม่ได้ = ไม่ระบุทั้งหมด (การ์ดยังขึ้นยอดรวมได้)
+ */
+async function loadJobRegionOf(): Promise<(jobId: string | null) => Region> {
+  try {
+    const jobs = (await listSiamrajUnitRequests({ limit: 2000, mode: 'all' })) as unknown as JobRequest[];
+    const map = new Map(jobs.map((j) => [String(j.id), regionOfProvince(boardProvinceOf(j))]));
+    return (jobId) => (jobId ? (map.get(jobId) ?? 'unknown') : 'unknown');
+  } catch (e) {
+    logError('recruit-overview: จังหวัดของงาน', e);
+    return () => 'unknown';
+  }
 }
 
 const NO_NAME = 'ไม่ระบุชื่อ';
@@ -568,8 +613,8 @@ export async function buildRecruitOverview(
     settle('งานค้าง', async () => (await dbQuery<Row>(backlogSql(), [bu])).rows),
     settle('นัดที่รอผล', async () => {
       try {
-        const r = (await dbQuery<Row>(appointmentBacklogSql(), [bu])).rows[0] ?? {};
-        return { overdue: Number(r.overdue ?? 0), next7: Number(r.next7 ?? 0) };
+        // แยกต่อใบขอ (28 ต.ค. 2569) — รวมยอด + แยกกรุงเทพ/ต่างจังหวัดฝั่ง Node
+        return (await dbQuery<Row>(appointmentBacklogSql(), [bu])).rows;
       } catch (e) {
         if (isPgUndefinedTable(e)) return null;
         throw e;
@@ -622,7 +667,7 @@ export async function buildRecruitOverview(
     body.errors.apps = factsR.error;
   }
 
-  if (backlogR.ok && apptR.ok) body.backlog = toBacklog(backlogR.value, apptR.value, nowMs);
+  if (backlogR.ok && apptR.ok) body.backlog = toBacklog(backlogR.value, apptR.value, nowMs, await loadJobRegionOf());
   else body.errors.backlog = !backlogR.ok ? backlogR.error : (apptR as { error: string }).error;
 
   if (staffR.ok && showedR.ok) body.staff = toStaffRows(staffR.value, showedR.value, await loadStaffDisplay());

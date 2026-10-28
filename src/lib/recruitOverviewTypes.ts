@@ -5,6 +5,7 @@
  * 🔴 ไม่มีชื่อ/เบอร์/ที่อยู่ของผู้สมัคร — ต่อใบมีแต่ข้อเท็จจริงที่ใช้นับ (แพตเทิร์นเดียวกับ `/api/dashboard-trends`)
  * ชื่อเจ้าหน้าที่มีเฉพาะยอดรวมรายคน (เจ้าของอนุญาตบน Dashboard 15 ส.ค. 2569)
  */
+import type { RegionCount } from '@/lib/bkkRegion';
 import type { CallMicroOutcome } from '@/lib/callMicroOutcome';
 
 export type RecruitSide = 'ai' | 'staff';
@@ -127,6 +128,8 @@ export type RecruitBacklog = {
   waitingStaff: { total: number; d0: number; d1_3: number; over3: number };
   /** นัดที่รอบันทึกผลมา/ไม่มา — null = ตารางผลนัดยังไม่พร้อม */
   appointments: { overdue: number; next7: number } | null;
+  /** แยกกรุงเทพ+ปริมณฑล / ต่างจังหวัด / ไม่ระบุ ตามจังหวัดของงาน (28 ต.ค. 2569) · ไม่มี = เวอร์ชันเก่า */
+  regions?: { uncalled: RegionCount; waitingStaff: RegionCount; appointments: RegionCount | null };
 };
 
 /** ผลงานรายคนในเดือนที่เลือก (นับรายชื่อไม่ซ้ำต่อคน) */

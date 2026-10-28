@@ -194,7 +194,7 @@ describe('ข้อเท็จจริงต่อใบ — ไม่มี�
 describe('งานค้างตอนนี้ — อายุนับวันเต็ม (ครบ 24 ชม. = 1 วัน)', () => {
   it('ยังไม่มีใครโทร: 95 ชม. = ไม่เกิน 3 วัน · 96 ชม. = 4–7 · 191 ชม. = 4–7 · 192 ชม. = เกิน 7', () => {
     const rows = [95, 96, 191, 192].map((h) => ({ created_at: hoursAgo(h), called: false, in_queue: h === 95, bad_phone: h === 192 }));
-    const b = mod.toBacklog(rows, { overdue: 0, next7: 0 }, NOW.getTime());
+    const b = mod.toBacklog(rows, [], NOW.getTime());
     expect(b.uncalled).toEqual({ total: 4, d0_3: 1, d4_7: 2, over7: 1, inQueue: 1, badPhone: 1 });
   });
 
@@ -209,6 +209,25 @@ describe('งานค้างตอนนี้ — อายุนับว�
     const b = mod.toBacklog([yes(23, null), yes(24, null), yes(72, null), yes(96, null), yes(50, 10), { created_at: hoursAgo(5), called: true, ai_outcome: 'declined', ai_at: hoursAgo(4) }], null, NOW.getTime());
     expect(b.waitingStaff).toEqual({ total: 4, d0: 1, d1_3: 2, over3: 1 });
     expect(b.appointments).toBeNull();
+  });
+
+  it('🔴 แยกกรุงเทพ+ปริมณฑล / ต่างจังหวัด / ไม่ระบุ ตามจังหวัดของงาน — สามช่องรวม = ทั้งหมดทุกกล่อง (28 ต.ค. 2569)', () => {
+    const region = (j: string | null) => (j === 'siamraj-sql:BKK1' ? 'bkk' : j === 'siamraj-sql:UP1' ? 'upcountry' : 'unknown') as 'bkk' | 'upcountry' | 'unknown';
+    const rows = [
+      { created_at: hoursAgo(5), called: false, job_id: 'siamraj-sql:BKK1' },
+      { created_at: hoursAgo(5), called: false, job_id: 'siamraj-sql:UP1' },
+      { created_at: hoursAgo(5), called: false, job_id: null },
+      { created_at: hoursAgo(300), called: true, ai_outcome: 'confirmed', ai_at: hoursAgo(30), staff_last_at: null, job_id: 'siamraj-sql:UP1' },
+    ];
+    const appts = [
+      { job_id: 'siamraj-sql:BKK1', overdue: 2, next7: 1 },
+      { job_id: null, overdue: 1, next7: 0 },
+    ];
+    const b = mod.toBacklog(rows, appts, NOW.getTime(), region);
+    expect(b.regions?.uncalled).toEqual({ bkk: 1, upcountry: 1, unknown: 1 });
+    expect(b.regions?.waitingStaff).toEqual({ bkk: 0, upcountry: 1, unknown: 0 });
+    expect(b.appointments).toEqual({ overdue: 3, next7: 1 });
+    expect(b.regions?.appointments).toEqual({ bkk: 3, upcountry: 0, unknown: 1 });
   });
 
   it('นัดที่รอบันทึกผล ใช้ถังเดียวกับกล่องงาน (เลยนัดยังไม่มีผล) + นัดใน 7 วัน', async () => {
