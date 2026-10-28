@@ -103,11 +103,15 @@ export const CALLED_BY_STAFF_SQL = `(${CALLED_VIA_HOLD_APP} or ${CALLED_VIA_CONT
  * แถวคิว `q` ที่เป็น "ผลโทรของ AI" ของใบ `a` — คิวของใบตรง ๆ หรือผลบนเบอร์เดียวกันหลังเวลากรอกใบ (ไม่นับยกเลิก)
  * 🔴 ตัวเดียวของ `LATEST_AI_RESULT_LATERAL` กับตารางผลงานของหน้าภาพรวม (แถว AI) — หลักฐานชุดเดียวกับ `CALLED_BY_AI_SQL`
  */
-export const AI_RESULT_OF_APP_SQL = `(q.person_ref = 'app-' || a.id::text
-            or (a.phone_e164 is not null and ${qcol('q', QUEUE_PHONE)} = a.phone_e164
-                and ${qcol('q', QUEUE_EVENT_AT)} >= a.created_at))
-       and ${qcol('q', QUEUE_OUTCOME)} is not null
+/** ทางที่ ① คิวของใบตรง ๆ · ② ผลบนเบอร์เดียวกันหลังเวลากรอก · ③ ผลที่นับ (ไม่ว่าง ไม่ยกเลิก) — แยกไว้ให้คิวรีหนักแตกเป็น 2 join ได้ (28 ต.ค. 2569) */
+export const AI_RESULT_BY_REF_SQL = `q.person_ref = 'app-' || a.id::text`;
+export const AI_RESULT_BY_PHONE_SQL = `(a.phone_e164 is not null and ${qcol('q', QUEUE_PHONE)} = a.phone_e164
+                and ${qcol('q', QUEUE_EVENT_AT)} >= a.created_at)`;
+export const AI_RESULT_COUNTED_SQL = `${qcol('q', QUEUE_OUTCOME)} is not null
        and ${qcol('q', QUEUE_OUTCOME)} <> 'cancelled'`;
+export const AI_RESULT_OF_APP_SQL = `(${AI_RESULT_BY_REF_SQL}
+            or ${AI_RESULT_BY_PHONE_SQL})
+       and ${AI_RESULT_COUNTED_SQL}`;
 
 /** รหัสผล / เวลาเหตุการณ์ของแถวคิว `q` (ตัวเดียวกับที่ใช้ตัดสินหลักฐาน) */
 export const AI_RESULT_OUTCOME_SQL = qcol('q', QUEUE_OUTCOME);

@@ -266,7 +266,11 @@ describe('ผลงานรายคน + แถว AI', () => {
   });
 
   it('ผลโทรของ AI ใช้หลักฐานชุดเดียวกับ "โทรแล้วโดย AI"', () => {
-    expect(mod.aiEventsSql()).toContain(sql.AI_RESULT_OF_APP_SQL);
+    // 28 ต.ค. 2569 แตกเป็น 2 join (เร็วขึ้น 15–25 วิ → 0.3 วิ) — ชิ้นส่วนชุดเดียวกับ AI_RESULT_OF_APP_SQL ครบทั้ง 3
+    for (const part of [sql.AI_RESULT_BY_REF_SQL, sql.AI_RESULT_BY_PHONE_SQL, sql.AI_RESULT_COUNTED_SQL]) {
+      expect(mod.aiEventsSql()).toContain(part);
+      expect(sql.AI_RESULT_OF_APP_SQL).toContain(part);
+    }
     expect(sql.LATEST_AI_RESULT_LATERAL).toContain(sql.AI_RESULT_OF_APP_SQL);
   });
 });

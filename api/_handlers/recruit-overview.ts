@@ -21,7 +21,9 @@ import { loadMatchingBuScope, type DepartmentScope } from '../_lib/departmentSco
 import { appBuJoin, appBuSql, pickDashboardBu } from '../_lib/homeBuSql.js';
 import {
   AI_RESULT_AT_SQL,
-  AI_RESULT_OF_APP_SQL,
+  AI_RESULT_BY_PHONE_SQL,
+  AI_RESULT_BY_REF_SQL,
+  AI_RESULT_COUNTED_SQL,
   AI_RESULT_OUTCOME_SQL,
   APPOINTMENT_AT_SQL,
   CALLED_BY_AI_SQL,
@@ -211,16 +213,29 @@ export function showedSql(): string {
 
 /** ผลโทรของ AI ที่ได้ในเดือน [$1, $2) · $3 = BU — หลักฐานชุดเดียวกับ `CALLED_BY_AI_SQL` */
 export function aiEventsSql(): string {
-  return `
-  select a.id::text as app_id, ${AI_RESULT_OUTCOME_SQL} as outcome,
+  const cols = `a.id::text as app_id, ${AI_RESULT_OUTCOME_SQL} as outcome,
          q.result->>'summary' as summary, ${queueReplySql('q')} as reply,
          ${AI_RESULT_AT_SQL} as at,
-         (${AI_RESULT_OUTCOME_SQL} in ${CONNECTED_OUTCOMES}) as reached
-    from ${APPS} a
+         (${AI_RESULT_OUTCOME_SQL} in ${CONNECTED_OUTCOMES}) as reached`;
+  /**
+   * 🔴 28 ต.ค. 2569 (เจ้าของ "จะเปลี่ยนวันดู โหลดนานมาก") — เดิม join ด้วย "รหัสตรง OR เบอร์ตรง" ก้อนเดียว ใช้ 5.6–9.8 วิ
+   * ⇒ กรองผลในช่วงก่อน แล้วแตกเป็น 2 join (รหัสใบ · เบอร์หลังเวลากรอก) รวมด้วย union — หลักฐานชุดเดิม (`AI_RESULT_OF_APP_SQL`)
+   */
+  return `
+  with q as (
+    select q.* from ${QUEUE} q
+     where ${AI_RESULT_AT_SQL} >= $1::timestamptz and ${AI_RESULT_AT_SQL} < $2::timestamptz
+       and ${AI_RESULT_COUNTED_SQL}
+  )
+  select ${cols}
+    from q join ${APPS} a on ${AI_RESULT_BY_REF_SQL}
     ${appBuJoin('a')}
-    join ${QUEUE} q on ${AI_RESULT_OF_APP_SQL}
-   where ${AI_RESULT_AT_SQL} >= $1::timestamptz and ${AI_RESULT_AT_SQL} < $2::timestamptz
-     and ${scopeWhere('$3')}`;
+   where ${scopeWhere('$3')}
+  union
+  select ${cols}
+    from q join ${APPS} a on ${AI_RESULT_BY_PHONE_SQL}
+    ${appBuJoin('a')}
+   where ${scopeWhere('$3')}`;
 }
 
 /** วันแรก (ไทย) ที่มีใบสมัครในขอบเขต — ปุ่มถอยเดือนหยุดที่เดือนนี้ · ช่วงเทียบที่ข้อมูลเพิ่งเริ่มกลางช่วงต้องบอก */
@@ -607,6 +622,8 @@ export async function buildRecruitOverview(
   const monthRange = [startOfBkk(window.from), startOfBkk(addDays(window.to, 1)), bu];
   const nowMs = now.getTime();
 
+  // จังหวัดของงาน (การ์ดงานค้าง) — วิ่งพร้อมก้อนอื่น ครั้งแรกหลังสำเนาใบขอหมดอายุใช้ ~4 วิ (28 ต.ค. 2569)
+  const regionOfP = loadJobRegionOf();
   const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, chR, reqR, informR, irecR, irAppR] = await Promise.all([
     settle('รายชื่อบนบอร์ด', loadBoardPhoneSet),
     settle('ใบสมัคร', () => loadFacts(bothRange)),
@@ -667,7 +684,7 @@ export async function buildRecruitOverview(
     body.errors.apps = factsR.error;
   }
 
-  if (backlogR.ok && apptR.ok) body.backlog = toBacklog(backlogR.value, apptR.value, nowMs, await loadJobRegionOf());
+  if (backlogR.ok && apptR.ok) body.backlog = toBacklog(backlogR.value, apptR.value, nowMs, await regionOfP);
   else body.errors.backlog = !backlogR.ok ? backlogR.error : (apptR as { error: string }).error;
 
   if (staffR.ok && showedR.ok) body.staff = toStaffRows(staffR.value, showedR.value, await loadStaffDisplay());
