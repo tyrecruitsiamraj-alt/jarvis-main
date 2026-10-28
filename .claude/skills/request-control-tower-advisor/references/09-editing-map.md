@@ -13962,3 +13962,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 | `api/_lib/homeTopicReportSql.ts` · `api/_handlers/home-ai-share.ts` | `?report=` ส่ง `Server-Timing` (rows · flow · jobs · tier · avail) ไว้วัดบนเว็บจริง |
 | `src/pages/HomeExecPage.tsx` | ส่วน "ต้องรีบ" (ใบที่โดนค่าปรับ · ใกล้ถึงวันที่ต้องการ · `UrgentCard`) ถอดแล้ว 28 ต.ค. 2569 — เจ้าของ "ซ่อนไป ไว้กดช่อง เสียเงิน ค่อยโชว์" · การ์ดเสียเงินมีปุ่ม "ดูใบที่เสียเงิน N ใบ" (`exec-money-requests` · ชุด `costliest` เดิม) · `dueSoon` ยังอยู่ใน `homeExec.ts` (เทสต์ใช้) |
 | `src/components/jobs/PublicApplyDialog.tsx` | 28 ต.ค. 2569 "เห็นประกาศจากช่องทางไหน" **บังคับเลือก** เมื่อไม่ได้ล็อกจากลิงก์และโหลดรายการช่องทางได้ (`channelRequired`) — เดิมไม่บังคับ ใบเดือน ต.ค. 25 ใบไม่มีช่องทาง (19 กรอกหน้าประกาศตรง · 4 เลือกอื่น ๆ · 2 ลิงก์กลาง) · ฝั่ง API ไม่ปฏิเสธใบที่ไม่มีช่องทาง (ใบสมัครต้องบันทึกได้เสมอ) · ใบเก่าบนจอเรียก "ไม่ระบุ" |
+
+### 28 ต.ค. 2569 — หน้าหลักสรุปหน้าเดียว (ค่าตั้งต้นของ `/`)
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/pages/HomeOverviewPage.tsx` | **ใหม่** — ตอนนี้ (เสียเงิน · เหลือหา · ผู้สมัคร · ติดตาม) → ใบขอ (สมการ) → ใบขอใหม่ประกาศแค่ไหน → ผู้สมัคร 6 ขั้น + แถบช่องทาง + ชิปต้องทำ → ติดตาม · ดูแล · กดกล่อง = แผงข้าง (`OverviewSheet`) + ปุ่มไปหน้าเต็ม · รายใบใช้ `ExecDrill` เดิม · ไม่มีแท็บ · ข้อมูล: home-money · recruit-overview · home-ai-share (+summary=lumos) ชุดเดียวกับหน้าที่ปุ่มพาไป |
+| `src/components/home-overview/OverviewParts.tsx` | **ใหม่** — `OverviewNode` (กล่องกดได้ · สีเฉดเรียบ + ป้ายคำ) · `ChannelStrip`/`ChannelTable` (สีช่องทางไม่ใช้สีที่มีความหมาย) · `OverviewSheet` (แผงเดียวของหน้า ไม่ซ้อน) · `PanelRows` |
+| `src/lib/homeOverviewFunnel.ts` | **ใหม่ · pure** — `funnelChannelOf` (Facebook · Tiktok · Webjob · Offline · iRecruit · เว็บ So Recruit — ไม่มี "ไม่ระบุ") · `buildApplicantFunnel` 6 ขั้น · `appsInWindow` (คำตอบ recruit-overview มีใบช่วงเทียบติดมา ต้องกรอง) · เทสต์ `homeOverviewFunnel.test.ts` |
+| `src/lib/homeV3.ts` · `src/pages/HomePage.tsx` | ค่าตั้งต้น `overview` · หน้าผู้บริหารแบบแท็บ = `?home=exec` (ทางถอย ไม่จำ) |

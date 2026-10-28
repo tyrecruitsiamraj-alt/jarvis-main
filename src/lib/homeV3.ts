@@ -1,7 +1,8 @@
 /**
  * ═══ สวิตช์โฉมหน้าหลัก — ชั้นคู่ขนานตามกติกาโปรเจกต์ ═══
  *
- * - `?home=exec` = **หน้าหลักผู้บริหาร หน้าเดียวเลื่อนลง** (เจ้าของ 24 ต.ค. 2569 · `src/pages/HomeExecPage.tsx`) — **ค่าตั้งต้นตอนนี้**
+ * - (ไม่ส่ง) / `?home=overview` = **หน้าหลักสรุปหน้าเดียว** (เจ้าของ 28 ต.ค. 2569 · `src/pages/HomeOverviewPage.tsx`) — **ค่าตั้งต้นตอนนี้**
+ * - `?home=exec` = หน้าหลักผู้บริหารแบบแท็บ (24–25 ต.ค. 2569 · `src/pages/HomeExecPage.tsx`) — ทางถอย พิมพ์เองเท่านั้น · **ไม่จำ**
  * - `?home=new` = หน้าแท็บ "ระบบไปกี่ %" (30 ก.ย. 2569 · `src/pages/HomeAiSharePage.tsx`) — ทางถอย พิมพ์เองเท่านั้น · **ไม่จำ**
  *   (25 ต.ค. 2569 รวมเข้าหน้าผู้บริหารแล้ว · เครื่องที่เคยกดปุ่ม "แบบแท็บเดิม" ต้องกลับมาหน้าเดียวกับทุกคน)
  * - `?home=classic` = หน้าเดิม (deck · บอร์ด 4 ทีม · KPI) — โค้ดยังอยู่ครบเป็นทางถอย
@@ -16,10 +17,10 @@ import * as React from 'react';
 
 export const HOME_V3_KEY = 'jarvis.home.v3';
 
-export type HomeVariant = 'exec' | 'new' | 'classic' | 'v3' | 'online';
+export type HomeVariant = 'overview' | 'exec' | 'new' | 'classic' | 'v3' | 'online';
 
 const isVariant = (v: unknown): v is HomeVariant =>
-  v === 'exec' || v === 'new' || v === 'classic' || v === 'v3' || v === 'online';
+  v === 'overview' || v === 'exec' || v === 'new' || v === 'classic' || v === 'v3' || v === 'online';
 
 function paramMode(): HomeVariant | null {
   try {
@@ -31,11 +32,11 @@ function paramMode(): HomeVariant | null {
 }
 
 export function homeVariant(): HomeVariant {
-  if (typeof window === 'undefined') return 'exec';
+  if (typeof window === 'undefined') return 'overview';
   const forced = paramMode();
   try {
-    // 'exec' = ค่าตั้งต้น ⇒ ล้างค่าจำ · โฉมอื่นเก็บชื่อไว้ (v3 เก็บ '1' เดิมเพื่อความเข้ากันได้)
-    if (forced === 'exec' || forced === 'new') window.localStorage.removeItem(HOME_V3_KEY);
+    // 'overview' = ค่าตั้งต้น · exec/new = ทางถอยพิมพ์เอง ⇒ ล้างค่าจำ · โฉมอื่นเก็บชื่อไว้ (v3 เก็บ '1' เดิมเพื่อความเข้ากันได้)
+    if (forced === 'overview' || forced === 'exec' || forced === 'new') window.localStorage.removeItem(HOME_V3_KEY);
     else if (forced) window.localStorage.setItem(HOME_V3_KEY, forced === 'v3' ? '1' : forced);
   } catch {
     /* ปิด storage ก็ปล่อยผ่าน — URL ยังสั่งได้ต่อรอบ */
@@ -44,10 +45,10 @@ export function homeVariant(): HomeVariant {
   try {
     const v = window.localStorage.getItem(HOME_V3_KEY);
     // 'new' ที่จำไว้จากปุ่มเดิม = ไม่ใช้แล้ว (หน้าแท็บรวมเข้าหน้าผู้บริหาร 25 ต.ค. 2569)
-    return v === '1' || v === 'v3' ? 'v3' : v === 'online' ? 'online' : v === 'classic' ? 'classic' : 'exec';
+    return v === '1' || v === 'v3' ? 'v3' : v === 'online' ? 'online' : v === 'classic' ? 'classic' : 'overview';
   } catch {
-    // อ่าน storage ไม่ได้ = หน้าหลักผู้บริหาร (ค่าตั้งต้น)
-    return 'exec';
+    // อ่าน storage ไม่ได้ = หน้าหลักสรุปหน้าเดียว (ค่าตั้งต้น)
+    return 'overview';
   }
 }
 
