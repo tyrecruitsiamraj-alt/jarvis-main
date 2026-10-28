@@ -685,7 +685,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
       const { start, end } = aiShareBounds(win, new Date());
       const [fr, er, ar] = await Promise.allSettled([
-        dbQuery<Record<string, unknown>>(proportionFollowRowsSql(), [start, end, bu, AFTERCARE_TOPIC]),
+        // ชุดสายเดียวกับแท็บภาพรวม (ช่วงเต็ม · ตัดยกเลิกด้วยช่องผล) — ดู proportionFollowRowsSql
+        dbQuery<Record<string, unknown>>(proportionFollowRowsSql(), [
+          followPlanBounds(win).start,
+          followPlanBounds(win).end,
+          bu,
+          AFTERCARE_TOPIC,
+        ]),
         dbQuery<Record<string, number>>(proportionEntrySql(), [start, end, bu]),
         dbQuery<{ id: string; job_id: string | null; claimed: boolean; reason: AppNoCallReason | null; block_reason: string | null }>(
           proportionAppReasonsSql(),
@@ -696,11 +702,16 @@ async function handler(req: AuthedReq, res: ApiRes) {
         // ช่องผลตัวเดียวกับการ์ดผลโทรของหน้าหลัก (`followLedgerBucket`) — แถวชุดเดียวกับตัวเลขบนแถว
         const rows = fr.value.rows;
         const derived = categorizeFollowRows(rows);
-        const lane = (k: string) =>
-          summarizeFollowLane(
-            rows
-              .filter((r) => r.lane === k)
-              .map((r) => ({
+        const nowMs = Date.now();
+        const lane = (k: string) => {
+          const inLane = rows.filter((r) => r.lane === k);
+          // ดูแลหลังเริ่มงาน = ชุดเดียวกับกล่องของมัน (ไม่ยกเลิก · ถึงเวลาแล้ว) · ติดตาม = ชุดเดียวกับการ์ดผลโทร (ตัดช่องยกเลิก)
+          const keep =
+            k === 'aftercare'
+              ? inLane.filter((r) => r.cancelled_at == null && new Date(String(r.scheduled_at)).getTime() < nowMs)
+              : inLane.filter((r) => followLedgerBucket(r, derived) !== 'cancelled');
+          return summarizeFollowLane(
+            keep.map((r) => ({
                 ai: r.ai === true,
                 staff: r.staff === true,
                 aiUnreached: r.ai_unreached === true,
@@ -708,8 +719,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
                 mode: r.call_mode === 'manual' ? ('manual' as const) : ('ai' as const),
                 dispatch: typeof r.dispatch_state === 'string' ? r.dispatch_state : null,
                 queueStatus: typeof r.call_status === 'string' ? r.call_status : null,
+                future: r.future === true,
               })),
+            inLane.length - keep.length,
           );
+        };
         body.follow = { starter: lane('starter'), replacement: lane('replacement'), aftercare: lane('aftercare') };
       } else {
         logWarn('home-ai-share proportion follow failed', { error: errText(fr.reason) });

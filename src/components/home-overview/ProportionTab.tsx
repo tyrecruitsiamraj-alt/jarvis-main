@@ -15,7 +15,9 @@ import { AI_SHARE_CALLED_TONE } from '@/lib/homeAiShare';
 import {
   buildProportionGroups,
   ladderAddsUp,
+  proportionCoverage,
   proportionPct,
+  proportionStuck,
   proportionTag,
   PROPORTION_TAG_LABEL,
   type Ladder,
@@ -118,6 +120,11 @@ function LadderView({ l, aiWord }: { l: Ladder; aiWord: string }) {
         รายชื่อ {NUM.format(l.total)} = โทรแล้ว {NUM.format(l.called.total)} + รอโทร {NUM.format(waiting)} + ไม่โทร {NUM.format(notCalled)} {l.unit}
         {ok ? '' : ' · ไม่ลงตัว'}
       </p>
+      {l.excluded ? (
+        <p className="-mt-2 text-xs tabular-nums text-muted-foreground">
+          {l.excluded.label} {NUM.format(l.excluded.value)} {l.unit}
+        </p>
+      ) : null}
       <section className="space-y-2">
         {head('โทรแล้ว', l.called.total)}
         <p className="text-xs tabular-nums text-muted-foreground">
@@ -153,6 +160,7 @@ function Row({ r, loading, onOpen }: { r: ProportionRow; loading: boolean; onOpe
     return () => window.clearTimeout(t);
   }, []);
   const pct = proportionPct(r);
+  const coverage = proportionCoverage(r);
   const tag = proportionTag(r);
   const all = r.ai + r.both + r.staff + r.none;
   const w = (v: number) => (shown && all > 0 ? `${(v / all) * 100}%` : '0%');
@@ -180,8 +188,14 @@ function Row({ r, loading, onOpen }: { r: ProportionRow; loading: boolean; onOpe
           <span className="block font-medium text-foreground">{r.name}</span>
           <span className="block text-xs tabular-nums text-muted-foreground">{r.note}</span>
         </span>
-        <span className="text-right text-2xl font-medium tabular-nums md:order-3">
-          {loading ? '—' : r.unknown || pct === null ? '—' : `${pct}%`}
+        <span className="text-right tabular-nums md:order-3">
+          <span className="block text-2xl font-medium">{loading ? '—' : r.unknown || pct === null ? '—' : `${pct}%`}</span>
+          {/* เลขใหญ่นับแค่ที่โทรแล้ว — บรรทัดนี้บอกเทียบของทั้งหมด (เจ้าของ 28 ต.ค. 2569 "ทำหมดเลย") */}
+          {!loading && coverage !== null ? (
+            <span className="block text-xs text-muted-foreground" data-testid={`proportion-coverage-${r.key}`}>
+              ทั้งหมด {coverage}%
+            </span>
+          ) : null}
         </span>
         <span className="col-span-2 min-w-0 space-y-1 md:order-2 md:col-span-1">
           <span className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
@@ -205,6 +219,9 @@ function Row({ r, loading, onOpen }: { r: ProportionRow; loading: boolean; onOpe
     </li>
   );
 }
+
+const loadingAny = (apps: unknown, appsError: unknown, payload: unknown, error: unknown) =>
+  (apps === null && !appsError) || (payload === null && !error);
 
 export default function ProportionTab({
   win,
@@ -242,12 +259,45 @@ export default function ProportionTab({
   }, [key, win, bu]);
   const payload = data?.key === key ? data.d : null;
   const groups = useMemo(() => buildProportionGroups({ apps, payload, matching, openJobIds }), [apps, payload, matching, openJobIds]);
+  const stuck = useMemo(() => proportionStuck(groups), [groups]);
+  const rowOf = (key: string) => groups.flatMap((g) => g.rows).find((r) => r.key === key);
+  const allLoaded = !loadingAny(apps, appsError, payload, error);
   const errs = [error, appsError, payload?.errors.follow, payload?.errors.entry, payload?.errors.apps].filter(Boolean);
   // สรรหาต้องรอทั้งใบสมัครและเหตุ (เหตุมาจากเส้นสัดส่วน) — ไม่งั้นช่อง "ยังไม่รู้เหตุ" บวมชั่วคราว
   const loadingOf = (g: string) =>
     g === 'recruit' || g === 'human' ? (apps === null && !appsError) || (payload === null && !error) : payload === null && !error;
   return (
     <div className="space-y-4" data-testid="home-proportion">
+      {/* งานที่ค้างอยู่ — ช่องที่ต้องมีคนทำของทุกแถว · ว่าง = ขึ้นว่าไม่มี (ไม่หาย) */}
+      <OverviewSection title="งานที่ค้างอยู่" testId="proportion-stuck">
+        {!allLoaded ? (
+          <p className="text-sm text-muted-foreground">กำลังโหลด</p>
+        ) : stuck.length ? (
+          <ul className="flex flex-wrap gap-2">
+            {stuck.map((x) => (
+              <li key={`${x.rowKey}-${x.label}`}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-auto whitespace-normal py-1.5 text-left"
+                  onClick={() => {
+                    const r = rowOf(x.rowKey);
+                    if (r) setPanel(panelOf(r));
+                  }}
+                >
+                  <span className="text-muted-foreground">{x.rowName} ·</span> {x.label}{' '}
+                  <span className={cn('font-medium tabular-nums', TONE.danger.value)}>
+                    {NUM.format(x.value)} {x.unit}
+                  </span>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">ไม่มีงานค้าง</p>
+        )}
+      </OverviewSection>
       <Legend />
       {errs.length ? <p className={cn('text-sm', TONE.danger.value)}>{errs.join(' · ')}</p> : null}
       {groups.map((g) => (

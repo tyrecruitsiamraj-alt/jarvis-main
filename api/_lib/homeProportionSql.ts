@@ -36,7 +36,10 @@ const FOLLOW_AI_UNREACHED_SQL = `exists (
        and ${queueOutcome('q')} not in ${CONNECTED_OUTCOMES})`;
 
 /**
- * แถวสายของช่วง (ไม่นับยกเลิก) — ก้อน · AI/คน · ช่องผล (ตัวเดียวกับการ์ดผลโทรของหน้าหลัก `followLedgerBucket`) · เหตุที่ AI ไม่ได้ส่ง
+ * แถวสายของช่วง — ก้อน · AI/คน · ช่องผล (ตัวเดียวกับการ์ดผลโทรของหน้าหลัก `followLedgerBucket`) · เหตุที่ AI ไม่ได้ส่ง
+ * 🔴 ชุดสายเดียวกับแท็บภาพรวม (เจ้าของ 28 ต.ค. 2569 "ทำหมดเลย" — เดิมสองแท็บนับติดตามไม่เท่ากัน):
+ *    ช่วงเต็มของปฏิทิน (`followPlanBounds` ไม่ตัดที่ตอนนี้) · สายที่ช่องผลเป็น "ยกเลิก" ไม่นับ (ตัดที่ Node) ·
+ *    ดูแลหลังเริ่มงาน = ชุดเดียวกับกล่องดูแลหลังเริ่มงาน (ไม่ยกเลิก · ถึงเวลาแล้ว — ตัดที่ Node)
  * นับต่อที่ Node (`summarizeFollowLane`) ⇒ ตัวเลขของแถวกับขั้นที่กดดูมาจากแถวชุดเดียวกัน บวกลบลงตัวเสมอ
  */
 export function proportionFollowRowsSql(): string {
@@ -50,14 +53,14 @@ export function proportionFollowRowsSql(): string {
            ${FOLLOW_AI_UNREACHED_SQL} as ai_unreached,
            ${FOLLOW_EFFECTIVE_MODE_SQL} as call_mode,
            f.dispatch_state,
+           (f.scheduled_at > now()) as future,
            ${FOLLOW_BUCKET_SQL} as ledger_bucket,
            ${FOLLOW_QUEUE_CALL_COLS}
       from ${FOLLOW} f
       ${followBuJoin('f')}
       left join ${QUEUE} q on ${FOLLOW_QUEUE_MATCH}
-     where f.cancelled_at is null
-       and ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
-       and f.scheduled_at < $2::timestamptz
+     where ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
+       and ($2::timestamptz is null or f.scheduled_at < $2::timestamptz)
        and ($3::text is null or ${followBuSql('f')} = $3::text)`;
 }
 

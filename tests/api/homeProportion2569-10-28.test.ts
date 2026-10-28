@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildProportionGroups,
   ladderAddsUp,
+  proportionCoverage,
+  proportionStuck,
   summarizeFollowLane,
   proportionPct,
   proportionTag,
@@ -129,6 +131,26 @@ describe('สรรหา 3 ขั้น + ขั้นที่ยังเป�
     expect(s.ladder!.waiting.map((p) => p.value)).toEqual([1, 1]);
     expect(s.ladder!.notCalled.map((p) => p.label)).toEqual(['ปิดส่งอัตโนมัติอยู่', 'ยังไม่รู้เหตุ']);
   });
+  it('สายที่ยังไม่ถึงเวลา = รอโทรตามเวลา (ไม่ค้าง) · เลยเวลาแล้ว = ค้าง · ยกเลิกบอกใต้สมการ', () => {
+    const base = { aiUnreached: false, dispatch: null, queueStatus: 'pending', ai: false, staff: false, bucket: 'waiting' };
+    const s = summarizeFollowLane(
+      [
+        { ...base, mode: 'ai', future: true },
+        { ...base, mode: 'manual', future: true },
+        { ...base, mode: 'ai', future: false },
+        { ...base, mode: 'manual', future: false },
+      ],
+      7,
+    );
+    expect(s.ladder!.waiting.map((p) => [p.key, p.stuck ?? false])).toEqual([
+      ['aiLater', false],
+      ['staffLater', false],
+      ['aiNoResult', true],
+      ['staff', true],
+    ]);
+    expect(s.ladder!.excluded).toEqual({ label: 'ยกเลิก ไม่นับ', value: 7 });
+    expect(ladderAddsUp(s.ladder!)).toBe(true);
+  });
   it('ทุกก้อนอยู่เสมอแม้ยังไม่มีข้อมูล (ว่าง = 0 ห้ามหาย)', () => {
     const g = buildProportionGroups({ apps: null, payload: null, matching: null });
     expect(g.map((x) => x.title)).toEqual(['งานสรรหา', 'ติดตามและดูแล', 'ทางเข้าของงาน', 'ขั้นที่ยังเป็นคน 100%']);
@@ -171,12 +193,33 @@ describe('สรรหา 3 ขั้น + ขั้นที่ยังเป�
   });
 });
 
+describe('3 ข้อจากรีวิวหน้าหลัก (เจ้าของ "ทำหมดเลย" 28 ต.ค. 2569)', () => {
+  it('ทั้งหมด % = AI ได้โทร ÷ ทั้งหมดรวมที่ยังไม่โทร · ไม่มีส่วนที่ยังไม่โทร = ไม่ขึ้น', () => {
+    expect(proportionCoverage(row(765, 302, 17, 623))).toBe(63);
+    expect(proportionCoverage(row(10, 0, 5, 0))).toBeNull();
+  });
+  it('งานที่ค้างอยู่ = ช่อง stuck ของทุกแถว มากไปน้อย', () => {
+    const g = buildProportionGroups({
+      apps: [fact({ id: '00000001-1111-4111-8111-111111111111', calledByAi: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-10-05T04:00:00Z' })],
+      payload: null,
+      matching: null,
+    });
+    expect(proportionStuck(g)).toEqual([{ rowKey: 'afterPrescreen', rowName: 'โทรหลัง Prescreen', label: 'ยังไม่มีใครเก็บ', value: 1, unit: 'คน' }]);
+  });
+  it('ติดตามสองแท็บชุดเดียวกัน: ช่วงเต็ม (followPlanBounds) · ตัดยกเลิกด้วยช่องผล ไม่ใช่ cancelled_at', () => {
+    const sql = proportionFollowRowsSql();
+    expect(sql).not.toMatch(/where f.cancelled_at is null/);
+    const h = read('api/_handlers/home-ai-share.ts');
+    expect(h).toContain('followPlanBounds(win).start,');
+    expect(h).toContain(": inLane.filter((r) => followLedgerBucket(r, derived) !== 'cancelled');");
+  });
+});
+
 describe('SQL + เส้น + หน้า', () => {
   it('ติดตาม: แถวสายที่โทรจริง ไม่นับยกเลิก แยก 3 ก้อน · ช่องผลตัวเดียวกับการ์ดผลโทร · AI ไม่ติด = ผลไม่ใช่การคุย', () => {
     const sql = proportionFollowRowsSql();
     expect(sql).toContain("when f.topic = $4::text then 'aftercare'");
     expect(sql).toContain("when f.follow_team = 'replacement' then 'replacement'");
-    expect(sql).toContain('where f.cancelled_at is null');
     expect(sql).toContain('(f.staff_called_at is not null) as staff');
     expect(sql).toContain('as ledger_bucket');
     expect(sql).toContain("not in ('confirmed','acknowledged','declined','reschedule_requested')");

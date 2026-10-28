@@ -22,8 +22,8 @@ import type { ToneKey } from './designTokens';
 import { aiAnswerOf, aiStage, staffResultOf } from './recruitJourney';
 import { FOLLOW_DISPATCH_META, type FollowDispatchState } from './followDispatchState';
 
-/** ช่องหนึ่งของขั้น */
-export type LadderPart = { key: string; label: string; value: number; tone: ToneKey };
+/** ช่องหนึ่งของขั้น · `stuck` = ค้างอยู่ ต้องมีคนทำ (ขึ้นในก้อน "งานที่ค้างอยู่" บนสุดของแท็บ) */
+export type LadderPart = { key: string; label: string; value: number; tone: ToneKey; stuck?: boolean };
 
 /**
  * ขั้นของแถว — รายชื่อ = โทรแล้ว + รอโทร + ไม่โทร
@@ -36,6 +36,8 @@ export type Ladder = {
   results: LadderPart[];
   waiting: LadderPart[];
   notCalled: LadderPart[];
+  /** ไม่นับในรายชื่อ (เช่น สายยกเลิก — กติกาเดียวกับแท็บภาพรวม) บอกไว้ใต้สมการ */
+  excluded?: { label: string; value: number };
 };
 
 const sum = (parts: readonly LadderPart[]) => parts.reduce((n, p) => n + p.value, 0);
@@ -149,7 +151,11 @@ const NUM = new Intl.NumberFormat('th-TH');
 const n = (v: number) => NUM.format(v);
 
 /** นับเข้าช่องตามลำดับที่ประกาศ — ช่อง 0 ตัดทิ้ง (ยกเว้น `keepZero`) */
-function tally(order: ReadonlyArray<{ key: string; label: string; tone: ToneKey }>, keys: readonly string[], keepZero = false): LadderPart[] {
+function tally(
+  order: ReadonlyArray<{ key: string; label: string; tone: ToneKey; stuck?: boolean }>,
+  keys: readonly string[],
+  keepZero = false,
+): LadderPart[] {
   const counts = new Map<string, number>();
   for (const k of keys) counts.set(k, (counts.get(k) ?? 0) + 1);
   return order
@@ -169,6 +175,8 @@ export type FollowLadderInput = {
   mode: 'ai' | 'manual';
   dispatch: string | null;
   queueStatus: string | null;
+  /** ยังไม่ถึงเวลาสาย (สายต่อไปของวัน/ช่วง) */
+  future?: boolean;
 };
 
 const FOLLOW_RESULT_ORDER = [
@@ -190,7 +198,7 @@ const dispatchReason = (d: string) =>
   (FOLLOW_DISPATCH_META[d as FollowDispatchState]?.label ?? d).replace(/^ไม่ได้ส่ง — /, '');
 
 /** ก้อนหนึ่งของติดตาม — ตัวเลขบนแถวกับขั้นมาจากสายชุดเดียวกัน */
-export function summarizeFollowLane(rows: readonly FollowLadderInput[]): ProportionCallCounts {
+export function summarizeFollowLane(rows: readonly FollowLadderInput[], excludedCancelled = 0): ProportionCallCounts {
   let ai = 0;
   let both = 0;
   let staff = 0;
@@ -209,14 +217,20 @@ export function summarizeFollowLane(rows: readonly FollowLadderInput[]): Proport
       results.push(r.bucket);
       continue;
     }
-    // ยังไม่มีใครโทร — รอโทร หรือ จะไม่โทร (+ เหตุ)
+    // ยังไม่มีใครโทร — รอโทร (ยังไม่ถึงเวลา / เลยเวลาแล้ว) หรือ จะไม่โทร (+ เหตุ)
     if (r.bucket === 'cancelled') notCalled.push('หยุดในคิว — ได้คำตอบจากสายอื่น / เปลี่ยนให้คนโทร');
-    else if (r.mode === 'manual') waiting.push('staff');
+    else if (r.mode === 'manual') waiting.push(r.future ? 'staffLater' : 'staff');
     else if (r.dispatch && AI_NOT_SENT.has(r.dispatch)) notCalled.push(dispatchReason(r.dispatch));
+    else if (r.future) waiting.push('aiLater');
     else if (r.queueStatus === 'pending' || r.queueStatus === 'delivered') waiting.push('aiNoResult');
     else notCalled.push('ยังไม่รู้เหตุ');
   }
-  const reasonOrder = [...new Set(notCalled)].map((label) => ({ key: label, label, tone: (label === 'ยังไม่รู้เหตุ' ? 'danger' : 'neutral') as ToneKey }));
+  const reasonOrder = [...new Set(notCalled)].map((label) => ({
+    key: label,
+    label,
+    tone: (label === 'ยังไม่รู้เหตุ' ? 'danger' : 'neutral') as ToneKey,
+    stuck: label === 'ยังไม่รู้เหตุ',
+  }));
   const ladder: Ladder = {
     unit: 'สาย',
     total: rows.length,
@@ -224,12 +238,15 @@ export function summarizeFollowLane(rows: readonly FollowLadderInput[]): Proport
     results: tally(FOLLOW_RESULT_ORDER, results),
     waiting: tally(
       [
-        { key: 'aiNoResult', label: 'ส่ง AI แล้ว ยังไม่มีผลกลับ', tone: 'info' },
-        { key: 'staff', label: 'คนโทร ยังไม่ลงผล', tone: 'violet' },
+        { key: 'aiLater', label: 'AI จะโทรตามเวลา', tone: 'info' },
+        { key: 'staffLater', label: 'คนจะโทรตามเวลา', tone: 'violet' },
+        { key: 'aiNoResult', label: 'ส่ง AI แล้ว เลยเวลายังไม่มีผลกลับ', tone: 'warn', stuck: true },
+        { key: 'staff', label: 'คนโทร เลยเวลาแล้วยังไม่ลงผล', tone: 'danger', stuck: true },
       ],
       waiting,
     ),
     notCalled: tally(reasonOrder, notCalled),
+    excluded: excludedCancelled > 0 ? { label: 'ยกเลิก ไม่นับ', value: excludedCancelled } : undefined,
   };
   return { ai, both, staff, none, aiUnreached, ladder };
 }
@@ -294,6 +311,7 @@ export function recruitProportionRows(
     key: label,
     label,
     tone: (label === APP_NO_CALL_LABEL.unknown ? 'danger' : 'neutral') as ToneKey,
+    stuck: label === APP_NO_CALL_LABEL.unknown,
   }));
   const prescreen: Ladder = {
     unit: 'ใบ',
@@ -313,7 +331,7 @@ export function recruitProportionRows(
     waiting: tally(
       [
         { key: 'aiQueued', label: 'AI รอโทร', tone: 'info' },
-        { key: 'claimed', label: 'เจ้าหน้าที่เก็บไปแล้ว ยังไม่โทร', tone: 'violet' },
+        { key: 'claimed', label: 'เจ้าหน้าที่เก็บไปแล้ว ยังไม่โทร', tone: 'violet', stuck: true },
       ],
       preWaiting,
     ),
@@ -346,8 +364,8 @@ export function recruitProportionRows(
     ),
     waiting: tally(
       [
-        { key: 'claimed', label: 'เก็บไปแล้ว ยังไม่โทร', tone: 'violet' },
-        { key: 'nobody', label: 'ยังไม่มีใครเก็บ', tone: 'danger' },
+        { key: 'claimed', label: 'เก็บไปแล้ว ยังไม่โทร', tone: 'violet', stuck: true },
+        { key: 'nobody', label: 'ยังไม่มีใครเก็บ', tone: 'danger', stuck: true },
       ],
       afterWait,
     ),
@@ -366,7 +384,7 @@ export function recruitProportionRows(
       { key: 'showed', label: 'มาตามนัด', tone: 'success' },
       { key: 'noShow', label: 'ไม่มา', tone: 'danger' },
       { key: 'upcoming', label: 'ยังไม่ถึงวันนัด', tone: 'info' },
-      { key: 'unrecorded', label: 'เลยวันนัดแล้ว ยังไม่ลงผล', tone: 'warn' },
+      { key: 'unrecorded', label: 'เลยวันนัดแล้ว ยังไม่ลงผล', tone: 'warn', stuck: true },
     ],
     apptRes,
     true,
@@ -466,7 +484,7 @@ function matchingRow(m: AiShareMatching | null): ProportionRow {
       results: [],
       waiting: [
         { key: 'waitingAi', label: 'รอ AI โทร', value: waitingAi, tone: 'info' },
-        { key: 'holding', label: 'เจ้าหน้าที่รับไปแล้ว ยังไม่ลงผล', value: holding, tone: 'violet' },
+        { key: 'holding', label: 'เจ้าหน้าที่รับไปแล้ว ยังไม่ลงผล', value: holding, tone: 'violet', stuck: true },
       ].filter((p) => p.value > 0) as LadderPart[],
       notCalled: rest > 0 ? [{ key: 'noResult', label: 'ส่ง AI แล้ว ไม่มีผลกลับ', value: rest, tone: 'neutral' }] : [],
     },
@@ -546,4 +564,29 @@ export function buildProportionGroups(input: {
     },
     { key: 'human', title: 'ขั้นที่ยังเป็นคน 100%', rows: r.human },
   ];
+}
+
+/**
+ * AI ได้โทรกี่ % ของ **ทั้งหมด** (รวมที่ยังไม่โทร) — เลขใหญ่นับแค่ที่โทรแล้ว (Choice เจ้าของ) จึงต้องมีบรรทัดนี้กำกับ
+ * (Prescreen 98% ของที่โทรแล้ว แต่ใบที่ยังไม่โทรส่วนใหญ่มาจาก iRecruit ⇒ ของทั้งหมด ~62%) · ไม่มีส่วนที่ยังไม่โทร = null (ไม่ต้องขึ้น)
+ */
+export function proportionCoverage(r: Pick<ProportionRow, 'ai' | 'both' | 'staff' | 'none'>): number | null {
+  const all = r.ai + r.both + r.staff + r.none;
+  if (r.none <= 0 || all <= 0) return null;
+  return Math.round(((r.ai + r.both) / all) * 100);
+}
+
+/** งานที่ค้างอยู่ — ช่องที่ติด `stuck` ของทุกแถว (มีเลข) · บนสุดของแท็บ กดแล้วเปิดแผงของแถวนั้น */
+export type ProportionStuck = { rowKey: string; rowName: string; label: string; value: number; unit: string };
+
+export function proportionStuck(groups: readonly ProportionGroup[]): ProportionStuck[] {
+  const out: ProportionStuck[] = [];
+  for (const g of groups) {
+    for (const r of g.rows) {
+      const unit = r.ladder?.unit ?? 'นัด';
+      const parts = [...(r.ladder?.waiting ?? []), ...(r.ladder?.notCalled ?? []), ...(r.parts ?? [])];
+      for (const p of parts) if (p.stuck && p.value > 0) out.push({ rowKey: r.key, rowName: r.name, label: p.label, value: p.value, unit });
+    }
+  }
+  return out.sort((a, b) => b.value - a.value);
 }
