@@ -44,10 +44,10 @@ describe('PDPA — ช่องยินยอมครบทุกทางเ�
 describe('สั่งโพสต์ — ผ่านศูนย์งาน api-scraper เดิม (20 ต.ค. 2569: ส่งข้อความ/แบบโพสต์/กลุ่มไป So Scraping)', () => {
   it('การ์ดตัวอย่างในป๊อปประกาศ (ทั้งสองโฉม) ใช้ปุ่มสั่งโพสต์แทนป้ายสมัครงาน', () => {
     expect(read('src/pages/jobs/BoardPostingPage.tsx')).toContain(
-      '<PublicJobCardPreview job={jobWithPatch} action={<OrderPostButton job={jobWithPatch} caption={postText} />} />',
+      '<PublicJobCardPreview job={jobWithPatch} action={<OrderPostButton job={jobWithPatch} caption={postText} onCaptionSaved=',
     );
     expect(read('src/components/jobs/BoardPublishSheet.tsx')).toContain(
-      '<PublicJobCardPreview job={jobWithPatch} action={<OrderPostButton job={jobWithPatch} />} />',
+      '<PublicJobCardPreview job={jobWithPatch} action={<OrderPostButton job={jobWithPatch} onCaptionSaved=',
     );
     // หน้าสมัครจริง (onApply) ไม่โดน — ยังเป็นปุ่มสมัครงาน
     expect(read('src/components/jobs/PublicJobCardPreview.tsx')).toMatch(/onApply \? \([\s\S]*สมัครงาน[\s\S]*\) : action \? \(/);

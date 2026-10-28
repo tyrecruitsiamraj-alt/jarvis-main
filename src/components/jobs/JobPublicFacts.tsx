@@ -1,6 +1,7 @@
 import React from 'react';
 import { Banknote, Car, Clock, Flag, Gift, ListChecks, MapPin, Phone, UserRound, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { publicPostText } from '@/lib/postText';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { boardCardAge, boardCardGender, boardCardPlace } from '@/lib/boardCardFacts';
@@ -69,6 +70,9 @@ export default function JobPublicFacts({
   const schedule = publicWorkSchedule(job.work_schedule);
   // 🔴 "ต้องการ (วันที่)" ถอดจากการ์ดทุกใบ (เจ้าของ 15 ต.ค. 2569: *"อันนี้ไม่ต้องโชว์ไง ผู้สมัครจะอยากรู้ไปทำไม"*)
   const boss = publicFieldVisible(job, 'boss_nationality') ? (job.boss_nationality ?? '').trim() : '';
+  // ข้อความประกาศที่แก้ใน Autopost (เจ้าของ 28 ต.ค. 2569 "แก้ข้อความประกาศ ให้ไปแก้ที่ผู้สมัครจะเห็นแบบนี้ด้วย")
+  // การ์ดกล่องงานของเจ้าหน้าที่ (`staff`) ไม่โชว์ — ยาว · ขึ้นเฉพาะหน้าสมัครกับการ์ดตัวอย่าง "ผู้สมัครจะเห็นแบบนี้"
+  const postText = staff ? null : publicPostText(job.public_post_text);
 
   const row = cn('flex min-w-0 items-start gap-1.5 text-sm', DASH.muted);
   const icon = 'mt-0.5 h-4 w-4 shrink-0';
@@ -187,6 +191,11 @@ export default function JobPublicFacts({
               นายสัญชาติ {boss}
             </span>
           ) : null}
+        </p>
+      ) : null}
+      {postText ? (
+        <p className="whitespace-pre-line border-t border-border/70 pt-2 text-sm text-foreground" data-testid="job-public-post-text">
+          {postText}
         </p>
       ) : null}
     </div>

@@ -254,7 +254,7 @@ export const BoardPublishSheet: React.FC<BoardPublishSheetProps> = ({ id, onDone
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
               {/* ── ซ้าย: คนนอกจะเห็นแบบนี้ ── */}
               <StepCard title="คนนอกจะเห็นแบบนี้">
-                {jobWithPatch ? <PublicJobCardPreview job={jobWithPatch} action={<OrderPostButton job={jobWithPatch} />} /> : <Loading />}
+                {jobWithPatch ? <PublicJobCardPreview job={jobWithPatch} action={<OrderPostButton job={jobWithPatch} onCaptionSaved={(t) => setPublicPatch((p) => ({ ...p, public_post_text: t ?? undefined }))} />} /> : <Loading />}
                 {job ? (
                   <Collapsible open={infoOpen} onOpenChange={setInfoOpen}>
                     <CollapsibleTrigger asChild>

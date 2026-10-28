@@ -16,6 +16,7 @@ import { useRecruiterContact } from '@/hooks/useRecruiterContact';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import { addPostingLink, fetchRecruitPostings } from '@/lib/recruitPostingsApi';
+import { saveUnitFieldOverridesPatch } from '@/lib/siamrajUnitRequestsApi';
 import { applyLinkPath, postingLinkOwner, type RecruitPosting } from '@/lib/recruitPostings';
 import {
   composeJobSnapshot,
@@ -91,11 +92,14 @@ export function AutopostBody({
   onSent,
   onClose,
   embedded = false,
+  onCaptionSaved,
 }: {
   job: JobRequest;
   onSent?: (item: JobPostingRequest) => void;
   onClose: () => void;
   embedded?: boolean;
+  /** ข้อความที่แก้ถูกบันทึกกับใบขอแล้ว (null = กลับไปใช้ข้อความที่ระบบร่าง) — การ์ดตัวอย่างเปลี่ยนตาม (28 ต.ค. 2569) */
+  onCaptionSaved?: (text: string | null) => void;
 }) {
   const looked = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
   const contact = job.recruiter_contact ?? looked;
@@ -114,8 +118,33 @@ export function AutopostBody({
   const [warn, setWarn] = React.useState<{ kind: 'block' | 'info' | 'confirm'; lines: string[] } | null>(null);
   /** เครื่องที่จะโพสต์ — ค่าเริ่ม = เครื่องหลักของบัญชี (เอกสารรอบ 2: พนักงานเลือกเองได้) */
   const [workerName, setWorkerName] = React.useState('');
-  const [caption, setCaption] = React.useState('');
-  const [captionEdited, setCaptionEdited] = React.useState(false);
+  // ข้อความที่เคยแก้แล้วบันทึกไว้กับใบขอ = เปิดมาใช้ข้อความนั้น (เจ้าของ 28 ต.ค. 2569 "แก้ข้อความประกาศ ให้ไปแก้ที่ผู้สมัครจะเห็นแบบนี้ด้วย")
+  const savedCaption = job.public_post_text?.trim() || null;
+  const [caption, setCaption] = React.useState(savedCaption ?? '');
+  const [captionEdited, setCaptionEdited] = React.useState(Boolean(savedCaption));
+  /** บันทึกข้อความเฉพาะตอนคนพิมพ์/กดใช้ข้อความร่าง — เปิดดูเฉย ๆ ไม่เขียนฐาน (บทเรียน 27 ก.ย. ฟอร์มเซฟเองตอนเปิดดู) */
+  const [captionDirty, setCaptionDirty] = React.useState<{ text: string | null } | null>(null);
+  const [captionSave, setCaptionSave] = React.useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  // ตัวรับจากหน้าแม่เป็นฟังก์ชันใหม่ทุกรอบวาด — เก็บใน ref ไม่งั้นบันทึกเสร็จแล้ววนบันทึกซ้ำ
+  const onCaptionSavedRef = React.useRef(onCaptionSaved);
+  onCaptionSavedRef.current = onCaptionSaved;
+  React.useEffect(() => {
+    if (!captionDirty) return;
+    const requestNo = (job.request_no ?? '').trim();
+    if (!requestNo) return;
+    const pending = captionDirty;
+    const t = window.setTimeout(() => {
+      setCaptionSave('saving');
+      saveUnitFieldOverridesPatch(requestNo, { post_caption: pending.text })
+        .then(() => {
+          setCaptionSave('saved');
+          setCaptionDirty((cur) => (cur === pending ? null : cur));
+          onCaptionSavedRef.current?.(pending.text);
+        })
+        .catch(() => setCaptionSave('error'));
+    }, 900);
+    return () => window.clearTimeout(t);
+  }, [captionDirty, job.request_no]);
   const [busy, setBusy] = React.useState<'send' | 'link' | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [sent, setSent] = React.useState<JobPostingRequest | null>(null);
@@ -305,6 +334,7 @@ export function AutopostBody({
                   onClick={() => {
                     setCaptionEdited(false);
                     setCaption(draft);
+                    setCaptionDirty({ text: null });
                   }}
                 >
                   ใช้ข้อความที่ระบบร่าง
@@ -317,12 +347,18 @@ export function AutopostBody({
               onChange={(e) => {
                 setCaption(e.target.value);
                 setCaptionEdited(true);
+                setCaptionDirty({ text: e.target.value });
               }}
               rows={14}
               data-testid="autopost-caption"
             />
-            <p className={cn('text-right text-xs tabular-nums', caption.length > AUTOPOST_CAPTION_MAX ? TONE.danger.value : DASH.muted)}>
-              {NUM.format(caption.length)}/{NUM.format(AUTOPOST_CAPTION_MAX)}
+            <p className={cn('flex justify-between gap-2 text-xs tabular-nums', DASH.muted)}>
+              <span className={captionSave === 'error' ? TONE.danger.value : undefined} data-testid="autopost-caption-save">
+                {captionSave === 'saving' ? 'กำลังบันทึก…' : captionSave === 'saved' ? 'บันทึกแล้ว · ขึ้นหน้าสมัครด้วย' : captionSave === 'error' ? 'บันทึกไม่สำเร็จ' : ''}
+              </span>
+              <span className={caption.length > AUTOPOST_CAPTION_MAX ? TONE.danger.value : undefined}>
+                {NUM.format(caption.length)}/{NUM.format(AUTOPOST_CAPTION_MAX)}
+              </span>
             </p>
             <RadioGroup value={mode} onValueChange={(v) => setMode(v as SoPostMode)} className="flex flex-wrap gap-x-4 gap-y-2">
               {SO_POST_MODES.map((m) => (

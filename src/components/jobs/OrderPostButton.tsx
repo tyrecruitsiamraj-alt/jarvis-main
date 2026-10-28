@@ -41,7 +41,15 @@ import SoStartLine from '@/components/jobs/SoStartLine';
  */
 const AUTO_WORKER = '__auto__';
 const NUM = new Intl.NumberFormat('th-TH');
-export default function OrderPostButton({ job }: { job: JobRequest; caption?: string | null }) {
+export default function OrderPostButton({
+  job,
+  onCaptionSaved,
+}: {
+  job: JobRequest;
+  caption?: string | null;
+  /** ข้อความ Autopost ที่แก้ถูกบันทึกแล้ว — หน้าแม่เอาไปแปะการ์ดตัวอย่าง (28 ต.ค. 2569) */
+  onCaptionSaved?: (text: string | null) => void;
+}) {
   const [latest, setLatest] = React.useState<JobPostingRequest[] | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -160,6 +168,7 @@ export default function OrderPostButton({ job }: { job: JobRequest; caption?: st
         <AutopostBody
           embedded
           job={job}
+          onCaptionSaved={onCaptionSaved}
           onSent={(item) => setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'content')])}
           onClose={() => setAutopost(false)}
         />

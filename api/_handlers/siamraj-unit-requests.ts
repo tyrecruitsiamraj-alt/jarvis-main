@@ -180,6 +180,8 @@ export async function attachNotes(items: unknown[]): Promise<void> {
         }
         if (fo.requirements && fo.requirements.length > 0) it.requirements = fo.requirements;
         if (fo.job_details && fo.job_details.length > 0) it.job_details = fo.job_details;
+        // ข้อความประกาศที่แก้ใน Autopost (28 ต.ค. 2569) — ขึ้นหน้าสมัคร (ตัดบรรทัดลิงก์ที่ชั้นสาธารณะ)
+        if (fo.post_caption) it.public_post_text = fo.post_caption;
         /**
          * รายได้แบบแยกส่วนที่ตั้งเอง (20 ส.ค. 2569) — แนบเป็น income_display
          * ผ่าน buildIncomeDisplay ให้เลข balance แล้ว (บรรทัด "อื่น ๆ" ถูกเติมที่นี่)

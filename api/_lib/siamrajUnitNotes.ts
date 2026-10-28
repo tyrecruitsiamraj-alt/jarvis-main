@@ -1,6 +1,6 @@
 import { BENEFIT_LABEL_MAX, BENEFIT_LINE_MAX, INCOME_LABEL_MAX } from '../../src/lib/incomeBreakdown.js';
 import { cleanPayCycles, type PayCycle } from '../../src/lib/payCycle.js';
-import { cleanRequirementLines, POST_SCHEDULE_MAX } from '../../src/lib/postText.js';
+import { cleanRequirementLines, POST_SCHEDULE_MAX, PUBLIC_POST_TEXT_MAX } from '../../src/lib/postText.js';
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import {
@@ -60,6 +60,8 @@ export type UnitFieldOverrides = {
   requirements?: string[] | null;
   /** รายละเอียดงาน (6 ต.ค. 2569) — จุดรับนาย · จุดส่งนาย · รถที่ใช้ · เพดานเดียวกับคุณสมบัติ */
   job_details?: string[] | null;
+  /** ข้อความประกาศที่แก้ใน Autopost (28 ต.ค. 2569) — ขึ้นหน้าสมัครด้วย · null = ไม่ได้แก้ */
+  post_caption?: string | null;
   /**
    * รายได้แบบแยกส่วนที่เจ้าหน้าที่ตั้งเอง (20 ส.ค. 2569) — ทับ breakdown อัตโนมัติ
    * จาก ERP เฉพาะที่โชว์บนประกาศ · กติกา/เพดานอยู่ที่ `src/lib/incomeBreakdown.ts`
@@ -230,6 +232,7 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
     const det = cleanRequirementLines(o.job_details);
     out.job_details = det.length > 0 ? det : null;
   }
+  if ('post_caption' in o) out.post_caption = textOrNull(o.post_caption, PUBLIC_POST_TEXT_MAX);
 
   // เกณฑ์ความเร่งเฉพาะใบ — กติกา/เพดานอยู่ที่ src/lib/requestLeadKind.ts ที่เดียว
   // (หน้าเว็บกับฝั่ง API ต้อง sanitize ด้วยตัวเดียวกัน ไม่งั้นค่าที่บันทึกได้อาจคำนวณไม่ได้)

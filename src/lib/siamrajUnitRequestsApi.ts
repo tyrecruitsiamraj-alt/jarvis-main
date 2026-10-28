@@ -179,6 +179,8 @@ export type UnitFieldOverrides = {
   requirements?: string[] | null;
   /** รายละเอียดงาน (6 ต.ค. 2569) — จุดรับ/ส่งนาย · รถที่ใช้ */
   job_details?: string[] | null;
+  /** ข้อความประกาศที่แก้ใน Autopost (28 ต.ค. 2569) — ขึ้นหน้าสมัครด้วย · ต้องตรงกับ `siamrajUnitNotes.ts` */
+  post_caption?: string | null;
   /** รายได้แบบแยกส่วน — โครง/เพดานอยู่ที่ `src/lib/incomeBreakdown.ts` */
   income?: import('@/lib/incomeBreakdown').IncomeBreakdown | null;
   /**

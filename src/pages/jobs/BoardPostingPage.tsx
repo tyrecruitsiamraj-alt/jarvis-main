@@ -512,7 +512,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 {/* ผู้สมัครจะเห็นแบบไหน (เจ้าของ 4 ต.ค. 2569: *"หน้าสรุปต้องบอกว่าผู้สมัครจะเห็นหน้าตาแบบไหน จะได้ตรวจว่าครบไหม"*)
                     การ์ดตัวเดียวกับหน้าประกาศ — ช่องที่ติ๊กซ่อนก็ซ่อนในนี้ด้วย */}
                 <StepCard title="ผู้สมัครจะเห็นแบบนี้">
-                  {jobWithPatch ? <PublicJobCardPreview job={jobWithPatch} action={<OrderPostButton job={jobWithPatch} caption={postText} />} /> : <Loading />}
+                  {jobWithPatch ? <PublicJobCardPreview job={jobWithPatch} action={<OrderPostButton job={jobWithPatch} caption={postText} onCaptionSaved={(t) => setPublicPatch((p) => ({ ...p, public_post_text: t ?? undefined }))} />} /> : <Loading />}
                 </StepCard>
 
     </>

@@ -334,3 +334,21 @@ export function buildPostText(job: JobRequest, link?: string | null): string {
   if (link) lines.push(`สมัครงาน ${link}`);
   return lines.join('\n');
 }
+
+/** เพดานข้อความประกาศที่เก็บกับใบขอ — เท่าเพดานแคปชั่น Autopost */
+export const PUBLIC_POST_TEXT_MAX = 2000;
+
+/**
+ * ข้อความประกาศที่แก้ใน Autopost → โชว์บนหน้าสมัคร (เจ้าของ 28 ต.ค. 2569 Choice "ข้อความที่แก้ไปโชว์บนหน้าสมัครด้วย")
+ * ตัดบรรทัดที่มีลิงก์ออก (แคปชั่นต้องมีลิงก์สมัคร แต่หน้าสมัครไม่ต้องลิงก์หาตัวเอง) · ว่าง = null
+ */
+export function publicPostText(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const lines = raw
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .filter((l) => !/https?:\/\//i.test(l))
+    .map((l) => l.replace(/\s+$/u, ''));
+  const text = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return text ? text.slice(0, PUBLIC_POST_TEXT_MAX) : null;
+}

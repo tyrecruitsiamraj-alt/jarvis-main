@@ -26,6 +26,7 @@ import {
   isPublicVisibleByPrequest,
 } from '../../../src/lib/publicJobVisibility.js';
 import { publicJobDetails, publicWorkSiteName } from '../../../src/lib/publicJobSafety.js';
+import { publicPostText } from '../../../src/lib/postText.js';
 
 type JobRow = {
   id: string;
@@ -129,6 +130,8 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
     requirements: Array.isArray(r.requirements) && r.requirements.length > 0 ? r.requirements : undefined,
     // ตัดบรรทัดที่อยู่บ้าน/คอนโดของนาย (QA 19 ต.ค. 2569) — เจ้าหน้าที่ยังเห็นครบในระบบ
     job_details: publicJobDetails(r.job_details),
+    // ข้อความประกาศที่แก้ใน Autopost (เจ้าของ 28 ต.ค. 2569) — ตัดบรรทัดลิงก์ออก
+    public_post_text: publicPostText((r as Record<string, unknown>).public_post_text) ?? undefined,
     /**
      * สัญชาติเจ้านาย (เจ้าของสั่ง 17 ส.ค. 2569 — เอาขึ้นทั้งกล่องงานและหน้าสาธารณะ)
      * ⚠️ ERP กรอกมาแค่ ~40% ของใบขอ · ค่าที่เป็นขีด/ว่างถูกล้างเป็น undefined ตั้งแต่
