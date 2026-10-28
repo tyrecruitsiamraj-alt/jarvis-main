@@ -15,7 +15,9 @@ const read = (f: string) => fs.readFileSync(path.join(process.cwd(), f), 'utf8')
 describe('A · สายยกเลิกไม่นับในยอดหัวข้อติดตาม — ชุดยกเลิกชุดเดียวกับการ์ดผลโทร', () => {
   it('ยอด/รายวัน/รายชื่อ ตัดด้วย id สายยกเลิก ($5) · ยกเลิกส่งแยก', () => {
     const total = buildFollowAiShareSql(true, 'follow');
-    expect(total).toContain('(f.id::text = any($5::text[])) as is_cancelled');
+    // 28 ต.ค. 2569: เทียบแบบ hash (`in (select unnest(...))`) — `= any(array)` ไล่ทีละตัว 4,467 × 9,334 แถว กราฟติดตามทั้งเดือนค้าง 12 วินาที
+    expect(total).toContain('(f.id::text in (select unnest($5::text[]))) as is_cancelled');
+    expect(total).not.toContain('= any($5::text[])');
     expect(total).toContain('count(*) filter (where not is_cancelled)::int');
     expect(total).toContain('count(*) filter (where is_cancelled)::int');
     expect(buildFollowAiShareSql(true, 'follow', 'byDayBu')).toContain('not is_cancelled');

@@ -208,7 +208,7 @@ export function buildFollowAiShareSql(
            ${plan ? FOLLOW_PLAN_STAFF_SQL : followCalledByStaffSql(staffReady)} as staff,
            ${FOLLOW_WAITING_AI_SQL} as waiting_ai,
            ${bkkDay('f.scheduled_at')} as day,
-           ${plan ? '(f.id::text = any($5::text[]))' : 'false'} as is_cancelled,
+           ${plan ? '(f.id::text in (select unnest($5::text[])))' : 'false'} as is_cancelled,
            ${followBuSql('f')} as bu${listCols(mode, "f.id::text as id,\n           nullif(btrim(f.recipient_name), '') as name,\n           f.scheduled_at as at")}${resultCols(
              mode,
              `air.outcome as ai_outcome, air.summary as ai_summary, air.reply as ai_reply, air.at as ai_at,\n           case when ${followCalledByStaffSql(staffReady)} then nullif(btrim(${staffReady ? 'f.staff_call_outcome' : 'null::text'}), '') end as staff_outcome,\n           ${staffReady ? 'f.staff_called_at' : 'null::timestamptz'} as staff_at`,
