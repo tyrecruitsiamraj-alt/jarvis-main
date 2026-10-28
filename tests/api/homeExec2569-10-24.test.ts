@@ -146,7 +146,7 @@ describe('30 วินาที: ต้องรีบ · ใครค้าง�
   });
   it('หน้าโชว์ลูกค้าหักจริงกับตามสัญญาตัวเท่ากัน · ส่วนยาวพับไว้', () => {
     const page = read('src/pages/HomeExecPage.tsx');
-    for (const id of ['exec-money-actual', 'exec-money-contract', 'exec-urgent-costly', 'exec-urgent-soon', 'exec-owners', 'exec-fold-money']) {
+    for (const id of ['exec-money-actual', 'exec-money-contract', 'exec-money-requests', 'exec-owners', 'exec-fold-money']) {
       expect(page).toContain(id);
     }
     // 28 ต.ค. 2569 การ์ดช่องทางย้ายเป็นกราฟ (`ExecChannelChart`)
@@ -199,7 +199,8 @@ describe('อ่านหน้าแบบผู้บริหาร 4 ข้�
   it('ดูแลหลังเริ่มงานบอกสายที่รออยู่ · ต้องรีบบอกชื่อเจ้าหน้าที่', () => {
     expect(page).toContain('exec-aftercare-upcoming');
     expect(read('api/_handlers/home-money.ts')).toContain('loadAftercareUpcoming');
-    expect(page).toContain('คน · {r.owner}');
+    // ส่วนต้องรีบถอดแล้ว 28 ต.ค. 2569 — รายการใบที่เสียเงิน (ExecDrill) ยังบอกชื่อเจ้าหน้าที่ทุกแถว
+    expect(read('src/components/home-exec/ExecDrill.tsx')).toContain("{r.owner ?? '—'} · ขาด");
     expect(read('src/lib/homeExec.ts')).toContain('owner: r.owner?.trim() || NO_OWNER');
   });
   it('เลขกล่องบนโหลดครั้งแรกขึ้นทันที ไม่วิ่งจาก 0', () => {
@@ -233,8 +234,11 @@ describe('แท็บ + คำบนจอ (เจ้าของ 25 ต.ค. 2
     expect(read('src/lib/homeExec.ts')).not.toContain('scaleOf');
     expect(read('api/_handlers/home-money.ts')).not.toContain('loadWorkload');
   });
-  it('ชื่อที่เจ้าของกำหนด: ใบที่โดนค่าปรับ · ใกล้ถึงวันที่ต้องการ · งานของเจ้าหน้าที่ · ใบขอ', () => {
-    for (const k of ['title="ใบที่โดนค่าปรับ"', 'title="ใกล้ถึงวันที่ต้องการ"', 'title="งานของเจ้าหน้าที่"', 'title="ใบขอ"']) expect(page).toContain(k);
+  it('ชื่อที่เจ้าของกำหนด: งานของเจ้าหน้าที่ · ใบขอ · ส่วน "ต้องรีบ" ถอดแล้ว เปิดใบที่เสียเงินจากการ์ดเสียเงิน (28 ต.ค. 2569)', () => {
+    for (const k of ['title="งานของเจ้าหน้าที่"', 'title="ใบขอ"']) expect(page).toContain(k);
+    expect(page).not.toContain('title="ต้องรีบ"');
+    expect(page).not.toContain('title="ใกล้ถึงวันที่ต้องการ"');
+    expect(page).toContain("openList('ใบที่เสียเงิน', rowsOf(costliest(openReqs, today, Infinity).rows))");
     for (const old of ['เสียวันละมากสุด', 'ถึงวันที่ต้องการใน 3 วัน', 'ใครค้างเท่าไหร่ · ใครปิดได้', 'ใบขอในช่วงนี้']) expect(page).not.toContain(old);
   });
   it('ใบขอ: จำนวนคนอยู่กล่องเดียวกับจำนวนใบ · สมการยังลงตัวทั้งสองหน่วย', () => {

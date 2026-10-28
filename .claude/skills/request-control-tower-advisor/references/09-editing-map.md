@@ -13960,3 +13960,4 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 | `src/pages/HomeExecPage.tsx` | `channelLeaders` (3 อันดับ) → `channelStages` (ทุกช่องทาง ต่อขั้น) · ยังตัด "ไม่รู้ช่องทาง"/"ไม่ระบุ" เหมือนเดิม |
 | `api/_lib/siamrajSqlServer.ts` | pool `idleTimeoutMillis` 30 วิ → 5 นาที — วัด Server-Timing บนเว็บ: เช็กใบที่เพิ่งปิด (`dropClosedFromCache`) ต่อ ERP ใหม่หลังว่าง 4.1 วิ · หลังแก้ ว่างหลายนาทียัง 0.26 วิ |
 | `api/_lib/homeTopicReportSql.ts` · `api/_handlers/home-ai-share.ts` | `?report=` ส่ง `Server-Timing` (rows · flow · jobs · tier · avail) ไว้วัดบนเว็บจริง |
+| `src/pages/HomeExecPage.tsx` | ส่วน "ต้องรีบ" (ใบที่โดนค่าปรับ · ใกล้ถึงวันที่ต้องการ · `UrgentCard`) ถอดแล้ว 28 ต.ค. 2569 — เจ้าของ "ซ่อนไป ไว้กดช่อง เสียเงิน ค่อยโชว์" · การ์ดเสียเงินมีปุ่ม "ดูใบที่เสียเงิน N ใบ" (`exec-money-requests` · ชุด `costliest` เดิม) · `dueSoon` ยังอยู่ใน `homeExec.ts` (เทสต์ใช้) |

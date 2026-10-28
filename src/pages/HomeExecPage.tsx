@@ -6,7 +6,7 @@
  * *"ต้องมี visual control · Interactive graph เวลาเปลี่ยนกราฟวิ่งตาม"*
  *
  * ลำดับ (24 ต.ค. 2569 รอบ 2 "ผู้บริหารมีเวลา 30 วิ" — เจ้าของ "ทำเลย · คำอย่าเป็นภาษา AI"):
- *   4 กล่องบน → ต้องรีบ → งานของเจ้าหน้าที่ → ช่องทาง → ใบขอ → (พับไว้) เงินรายวัน/รายใบ → ติดตาม
+ *   4 กล่องบน → งานของเจ้าหน้าที่ (ส่วนต้องรีบถอด 28 ต.ค. 2569 · ใบที่เสียเงินเปิดจากการ์ดเสียเงิน) → ช่องทาง → ใบขอ → (พับไว้) เงินรายวัน/รายใบ → ติดตาม
  *   ค่าตั้งต้น = เดือนนี้ · กล่องเงินโชว์ "ลูกค้าหักจริง" กับ "ตามสัญญา (สูงสุด)" ขนาดเท่ากัน
  * ข้อมูล: `/api/home-money` (เงิน · นาฬิกา · สมการใบขอ) · `/api/request-pipeline` (ใบขอเปิด) · `/api/home-ai-share` (AI/คน)
  * 25 ต.ค. 2569 เจ้าของ "ยาวลงมา แยกแท็บแบบเดิมได้ไหม กันฉันงง" → Choice "แท็บเหมือนหน้าเก่า + แท็บภาพรวม":
@@ -19,7 +19,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlarmClock, Bot, Clock3, HandCoins, Layers, MapPin, Users } from 'lucide-react';
+import { Bot, Clock3, HandCoins, Layers, MapPin, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -42,7 +42,7 @@ import { fetchHomeMoney, previousWindow, type HomeMoneyPayload } from '@/lib/hom
 import { fetchHomeAiShare } from '@/lib/homeAiShareApi';
 import { sharesOfCalled, type AiShareBlockKey, type AiShareResponse, type AiShareWindow } from '@/lib/homeAiShare';
 import HomeAiSharePage from '@/pages/HomeAiSharePage';
-import { byOwner, costliest, dueSoon, NO_OWNER, perDayOf, reasonsOf, thisMonthWindow, type OwnerRow, type UrgentRow } from '@/lib/homeExec';
+import { byOwner, costliest, NO_OWNER, perDayOf, reasonsOf, thisMonthWindow, type OwnerRow } from '@/lib/homeExec';
 import { fetchRequestPipeline } from '@/lib/requestPipelineApi';
 import type { RequestPipelineResponse } from '@/lib/requestPipelineTypes';
 import { channelInterestOf } from '@/lib/channelPlatforms';
@@ -121,71 +121,6 @@ function channelStages(d: RequestPipelineResponse | null): Record<ChannelStage, 
     showed: all((r) => interest.get(r.channel)?.showed ?? 0),
     placed: all((r) => r.placed),
   };
-}
-
-/** การ์ด "ต้องรีบ" — 5 ใบแรก + บอกว่ามีทั้งหมดกี่ใบ */
-function UrgentCard({
-  icon: Icon,
-  title,
-  total,
-  rows,
-  loading,
-  right,
-  testId,
-  onOpen,
-}: {
-  icon: typeof HandCoins;
-  title: string;
-  total: number;
-  rows: UrgentRow[];
-  loading: boolean;
-  right: (r: UrgentRow) => string;
-  testId: string;
-  /** กดหัวการ์ด = ดูทั้งหมด · กดแถว = ดูทั้งหมดโดยกางใบนั้น */
-  onOpen: (expand: string | null) => void;
-}) {
-  return (
-    <Card variant="solid" className="space-y-3 p-4" data-testid={testId}>
-      <span className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
-          {title}
-        </span>
-        <Button type="button" variant="link" size="sm" className="h-auto p-0 tabular-nums" onClick={() => onOpen(null)} disabled={loading}>
-          {loading ? '—' : `ดูทั้งหมด ${NUM.format(total)} ใบ`}
-        </Button>
-      </span>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{loading ? '—' : 'ไม่มี'}</p>
-      ) : (
-        <ul className="divide-y divide-border">
-          {rows.map((r) => (
-            <li key={r.requestNo}>
-              <button
-                type="button"
-                className="flex w-full items-start justify-between gap-3 rounded-lg py-2 text-left hover:bg-muted/50"
-                onClick={() => onOpen(r.requestNo)}
-              >
-                <span className="min-w-0">
-                  <span className="line-clamp-2 text-sm text-foreground">{[r.unit, r.position].filter(Boolean).join(' · ')}</span>
-                  {r.place ? (
-                    <span className="flex items-start gap-1 text-xs text-muted-foreground">
-                      <MapPin className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
-                      <span className="line-clamp-2">{r.place}</span>
-                    </span>
-                  ) : null}
-                  <span className="block text-xs tabular-nums text-muted-foreground">
-                    {r.requestNo} · ขาด {NUM.format(r.missing)} คน · {r.owner}
-                  </span>
-                </span>
-                <span className="shrink-0 text-sm font-medium tabular-nums text-foreground">{right(r)}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
-  );
 }
 
 /** ส่วนที่พับไว้ — กดหัวแล้วกาง (ของข้างในโหลดตอนกาง) */
@@ -274,7 +209,6 @@ const HomeExecPage: React.FC = () => {
   const rows = aiRows(ai);
   const openReqs = useMemo(() => moneyNow?.requests ?? [], [moneyNow]);
   const costly = useMemo(() => costliest(openReqs, today), [openReqs, today]);
-  const soon = useMemo(() => dueSoon(openReqs, today), [openReqs, today]);
   const owners = useMemo(() => byOwner(openReqs, today), [openReqs, today]);
   const drill = useDrill();
   /** แท็บที่เปิดอยู่ · `seq` = กดแท็บ AI เดิมซ้ำก็สั่งหน้าแท็บเดิมใหม่ได้ */
@@ -379,9 +313,23 @@ const HomeExecPage: React.FC = () => {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="exec-kpis">
         {/* เสียเงิน: ลูกค้าหักจริง กับ ตามสัญญา (สูงสุด) ตัวเท่ากัน — ไม่ให้ผู้บริหารจำแต่เลขเพดาน */}
         <Card variant="solid" className="space-y-3 p-4" data-testid="exec-money-tile">
-          <span className="flex items-center gap-2 text-sm text-muted-foreground">
-            <HandCoins className="h-4 w-4" aria-hidden />
-            เสียเงิน
+          <span className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-sm text-muted-foreground">
+              <HandCoins className="h-4 w-4" aria-hidden />
+              เสียเงิน
+            </span>
+            {/* 28 ต.ค. 2569 เจ้าของ "ไว้กดช่อง เสียเงิน ค่อยโชว์ว่ามีใบไหนที่เสียเงิน" — ชุดเดียวกับการ์ด "ใบที่โดนค่าปรับ" เดิม */}
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="h-auto p-0 tabular-nums"
+              disabled={!moneyNow}
+              onClick={() => openList('ใบที่เสียเงิน', rowsOf(costliest(openReqs, today, Infinity).rows))}
+              data-testid="exec-money-requests"
+            >
+              ดูใบที่เสียเงิน {moneyNow ? NUM.format(costly.total) : '—'} ใบ
+            </Button>
           </span>
           <div className="grid grid-cols-2 gap-3">
             {(
@@ -497,31 +445,7 @@ const HomeExecPage: React.FC = () => {
       </div>
 
 
-      {/* ── ต้องรีบ ── */}
-      <HomeSection title="ต้องรีบ" testId="exec-urgent">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <UrgentCard
-            icon={HandCoins}
-            title="ใบที่โดนค่าปรับ"
-            total={costly.total}
-            rows={costly.rows}
-            loading={!moneyNow}
-            right={(r) => `${BAHT.format(r.perDay)} บาท/วัน`}
-            testId="exec-urgent-costly"
-            onOpen={(x) => openList('ใบที่โดนค่าปรับ', rowsOf(costliest(openReqs, today, Infinity).rows), x)}
-          />
-          <UrgentCard
-            icon={AlarmClock}
-            title="ใกล้ถึงวันที่ต้องการ"
-            total={soon.total}
-            rows={soon.rows}
-            loading={!moneyNow}
-            right={(r) => (r.needYmd ? thaiDate(r.needYmd) : '—')}
-            testId="exec-urgent-soon"
-            onOpen={(x) => openList('ใกล้ถึงวันที่ต้องการ', rowsOf(dueSoon(openReqs, today, 3, Infinity).rows), x)}
-          />
-        </div>
-      </HomeSection>
+      {/* ส่วน "ต้องรีบ" ถอดแล้ว 28 ต.ค. 2569 (เจ้าของ "ซ่อนไป ไว้กดช่อง เสียเงิน ค่อยโชว์") — ใบที่เสียเงินเปิดจากการ์ดเสียเงิน */}
 
       {/* ── ใครค้างเท่าไหร่ (เจ้าหน้าที่สรรหาของใบขอ) ── */}
       {/* เจ้าของ 25 ต.ค. 2569 ชื่อเดิมอ่านแล้วงง → "งานของเจ้าหน้าที่" + หัวตารางเป็นคำเต็ม */}
