@@ -20,6 +20,7 @@
  * `src/lib/boardRelease.ts` (มีเทสต์คุมว่าบวกกันลงตัว) ไฟล์นี้แค่วาด · ป้ายทุกคำมาจาก `RELEASE_LANE_TEXT`
  */
 import * as React from 'react';
+import { ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DASH, TONE } from '@/lib/designTokens';
 import { RELEASE_LANE_TEXT, type ReleaseLaneKey, type ReleaseLedger } from '@/lib/boardRelease';
@@ -63,12 +64,15 @@ function LaneChip({
   active,
   onClick,
   sub = false,
+  extra,
 }: {
   laneKey: ReleaseLaneKey;
   count: number;
   active: boolean;
   onClick: () => void;
   sub?: boolean;
+  /** ต่อท้ายเลขใบ เช่น จำนวนคนที่กรอก (28 ต.ค. 2569) */
+  extra?: string;
 }) {
   return (
     <Button
@@ -81,7 +85,8 @@ function LaneChip({
       className={cn('shrink-0', sub && !active && 'text-muted-foreground')}
     >
       {RELEASE_LANE_TEXT[laneKey].label}
-      <span className="tabular-nums">{th(count)}</span>
+      <span className="tabular-nums">{th(count)} ใบ</span>
+      {extra ? <span className="tabular-nums">· {extra}</span> : null}
     </Button>
   );
 }
@@ -137,18 +142,30 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
       {/* อายุข้อมูล — โชว์เฉพาะตอนเก่าพอจะทำให้ตัดสินใจผิด หรือกำลังดูสำเนาเพราะต่อไม่ติด */}
       {ageLabel ? <p className={cn('text-xs', DASH.muted)}>{ageLabel}</p> : null}
 
-      {/* 🔴 เลขชุดนี้ **ตรงกับหน้าหลัก** · ประกาศ + ยังไม่ประกาศ = ทั้งหมดเป๊ะ (เจ้าของเคาะชื่อเอง 28 ส.ค. 2569)
-          แบบ C (5 ต.ค. 2569): แถวชิปแถวเดียว เลื่อนข้างได้บนมือถือ · เลนย่อยต่อท้ายเลนแม่ของมัน */}
-      <div className="flex flex-wrap items-center gap-1.5">
+      {/* 🔴 เลขชุดนี้ **ตรงกับหน้าหลัก** · ประกาศแล้ว + ยังไม่ประกาศ = ใบขอทั้งหมดเป๊ะ
+          28 ต.ค. 2569 เจ้าของ "ทำให้มันเห็นภาพ" — ใบขอทั้งหมด แตกเป็นสองสาย แต่ละสายแตกต่อ · ทุกชิปยังกดกรองได้เหมือนเดิม */}
+      <div className="space-y-1.5" data-testid="board-release-tree">
         <LaneChip laneKey="all" count={ledger.all} active={lane === null || lane === 'all'} onClick={() => onLaneChange(null)} />
-        <LaneChip laneKey="released" count={ledger.released} active={lane === 'released'} onClick={() => toggle('released')} />
-        <LaneChip laneKey="unreleased" count={ledger.unreleased} active={lane === 'unreleased'} onClick={() => toggle('unreleased')} />
-        <span className={cn('mx-1 hidden h-5 border-l sm:block', DASH.divider)} aria-hidden />
-        <LaneChip sub laneKey="applied" count={ledger.releasedWithApplicants} active={lane === 'applied'} onClick={() => toggle('applied')} />
-        <LaneChip sub laneKey="silent" count={ledger.releasedSilent} active={lane === 'silent'} onClick={() => toggle('silent')} />
-        {/* 🔴 ก้อนย่อยของ "ยังไม่ปล่อย" (เจ้าของเคาะ 21 ก.ย. 2569) — ไม่ใช่ก้อนที่สี่ที่เคยถูกสั่งยุบ */}
-        <LaneChip sub laneKey="sourcing" count={ledger.releasable} active={lane === 'sourcing'} onClick={() => toggle('sourcing')} />
-        <LaneChip sub laneKey="started" count={ledger.startedAlready} active={lane === 'started'} onClick={() => toggle('started')} />
+        <div className="flex flex-wrap items-center gap-1.5 pl-4" data-testid="board-release-released">
+          <LaneChip laneKey="released" count={ledger.released} active={lane === 'released'} onClick={() => toggle('released')} />
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <LaneChip
+            sub
+            laneKey="applied"
+            count={ledger.releasedWithApplicants}
+            extra={`${th(ledger.applicantHeads)} คน`}
+            active={lane === 'applied'}
+            onClick={() => toggle('applied')}
+          />
+          <LaneChip sub laneKey="silent" count={ledger.releasedSilent} active={lane === 'silent'} onClick={() => toggle('silent')} />
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 pl-4" data-testid="board-release-unreleased">
+          <LaneChip laneKey="unreleased" count={ledger.unreleased} active={lane === 'unreleased'} onClick={() => toggle('unreleased')} />
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          {/* 🔴 ก้อนย่อยของ "ยังไม่ปล่อย" (เจ้าของเคาะ 21 ก.ย. 2569) — ยังต้องหาคน + เริ่มงานแล้ว = ยังไม่ประกาศ */}
+          <LaneChip sub laneKey="sourcing" count={ledger.releasable} active={lane === 'sourcing'} onClick={() => toggle('sourcing')} />
+          <LaneChip sub laneKey="started" count={ledger.startedAlready} active={lane === 'started'} onClick={() => toggle('started')} />
+        </div>
       </div>
     </div>
   );
