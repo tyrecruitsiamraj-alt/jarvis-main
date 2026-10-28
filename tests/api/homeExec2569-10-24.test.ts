@@ -146,9 +146,11 @@ describe('30 วินาที: ต้องรีบ · ใครค้าง�
   });
   it('หน้าโชว์ลูกค้าหักจริงกับตามสัญญาตัวเท่ากัน · ส่วนยาวพับไว้', () => {
     const page = read('src/pages/HomeExecPage.tsx');
-    for (const id of ['exec-money-actual', 'exec-money-contract', 'exec-urgent-costly', 'exec-urgent-soon', 'exec-owners', 'exec-channels', 'exec-fold-money']) {
+    for (const id of ['exec-money-actual', 'exec-money-contract', 'exec-urgent-costly', 'exec-urgent-soon', 'exec-owners', 'exec-fold-money']) {
       expect(page).toContain(id);
     }
+    // 28 ต.ค. 2569 การ์ดช่องทางย้ายเป็นกราฟ (`ExecChannelChart`)
+    expect(page).toContain('<ExecChannelChart stages={stages}');
   });
 });
 
@@ -190,7 +192,8 @@ describe('อ่านหน้าแบบผู้บริหาร 4 ข้�
     const f = (attendance: string | null) => ({ createdAt: '2026-10-10T03:00:00Z', channelLabel: 'Facebook Group', referralSource: null, aiAnswer: null, staffAnswer: null, appointmentAt: '2026-10-12T03:00:00Z', attendance });
     const m = channelInterestOf([f('showed'), f('no_show'), f(null)] as never, '2026-10-01', '2026-10-31').byType.get('Facebook กลุ่ม');
     expect(m).toEqual({ interested: 3, appointed: 3, showed: 1 });
-    expect(page).toContain("['มาตามนัดเยอะสุด', leaders?.showed]");
+    expect(page).toContain('showed: all((r) => interest.get(r.channel)?.showed ?? 0)');
+    expect(read('src/components/home-exec/ExecChannelChart.tsx')).toContain("{ key: 'showed', label: 'มาตามนัด' }");
     expect(read('src/components/home-ai-share/HomeRequestsTab.tsx')).toContain('มาตามนัด (คน)');
   });
   it('ดูแลหลังเริ่มงานบอกสายที่รออยู่ · ต้องรีบบอกชื่อเจ้าหน้าที่', () => {

@@ -32,6 +32,7 @@ import HomeOnlineTab from '@/components/home-ai-share/HomeOnlineTab';
 import HomeMoneySection from '@/components/home-exec/HomeMoneySection';
 import ExecDrill, { useDrill } from '@/components/home-exec/ExecDrill';
 import Num from '@/components/home-exec/Num';
+import ExecChannelChart, { type ChannelItem, type ChannelStage } from '@/components/home-exec/ExecChannelChart';
 import type { MoneyRequest } from '@/lib/homeMoney';
 import { useLiveTick } from '@/hooks/useLiveTick';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
@@ -105,23 +106,20 @@ function aiRows(d: AiShareResponse | null): Array<{ key: string; label: string; 
 
 type FlowRole = NonNullable<MoneyRequest['flow']>;
 
-/** ช่องทางที่ได้เยอะสุด 3 อันดับ ต่อขั้น (กรอก · นัดได้ · มาตามนัด · ลงงาน · เจ้าของ 25 ต.ค. 2569) — ชื่อช่องทางชุดเดียวกับตารางช่องทาง */
-type Leader = { name: string; value: number };
-function channelLeaders(d: RequestPipelineResponse | null): { registered: Leader[]; appointed: Leader[]; showed: Leader[]; placed: Leader[] } | null {
+/**
+ * ยอดต่อช่องทาง ต่อขั้น (กรอก · นัดได้ · มาตามนัด · ลงงาน · เจ้าของ 25 ต.ค. 2569) — ชื่อช่องทางชุดเดียวกับตารางช่องทาง
+ * 28 ต.ค. 2569 การ์ดเป็นกราฟเทียบ 4 ช่องทางหลัก (`ExecChannelChart`) ⇒ ส่งทุกช่องทาง ไม่ตัด 3 อันดับแล้ว
+ */
+function channelStages(d: RequestPipelineResponse | null): Record<ChannelStage, ChannelItem[]> | null {
   if (!d?.channels) return null;
   const interest = d.facts ? channelInterestOf(d.facts, d.window.from, d.window.to).byType : new Map();
   const rows = d.channels.rows.filter((r) => r.channel !== 'ไม่รู้ช่องทาง' && r.channel !== 'ไม่ระบุ');
-  const top = (pick: (r: (typeof rows)[number]) => number): Leader[] =>
-    rows
-      .map((r) => ({ name: r.channel, value: pick(r) }))
-      .filter((x) => x.value > 0)
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 3);
+  const all = (pick: (r: (typeof rows)[number]) => number): ChannelItem[] => rows.map((r) => ({ name: r.channel, value: pick(r) }));
   return {
-    registered: top((r) => r.registered),
-    appointed: top((r) => interest.get(r.channel)?.appointed ?? 0),
-    showed: top((r) => interest.get(r.channel)?.showed ?? 0),
-    placed: top((r) => r.placed),
+    registered: all((r) => r.registered),
+    appointed: all((r) => interest.get(r.channel)?.appointed ?? 0),
+    showed: all((r) => interest.get(r.channel)?.showed ?? 0),
+    placed: all((r) => r.placed),
   };
 }
 
@@ -331,7 +329,7 @@ const HomeExecPage: React.FC = () => {
       alive = false;
     };
   }, [range, tick]);
-  const leaders = useMemo(() => channelLeaders(pipe), [pipe]);
+  const stages = useMemo(() => channelStages(pipe), [pipe]);
 
   return (
     <div className="space-y-6" data-testid="home-exec">
@@ -625,50 +623,8 @@ const HomeExecPage: React.FC = () => {
       </HomeSection>
 
 
-      {/* ── ช่องทางไหนได้ผล (3 อันดับต่อขั้น) ── */}
-      <HomeSection title="ช่องทางไหนได้ผล" sub="ในช่วงที่เลือก · หน่วย: คน" testId="exec-channels">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {(
-            [
-              ['กรอกเยอะสุด', leaders?.registered],
-              ['นัดได้เยอะสุด', leaders?.appointed],
-              ['มาตามนัดเยอะสุด', leaders?.showed],
-              ['ลงงานได้เยอะสุด', leaders?.placed],
-            ] as const
-          ).map(([title, list]) => (
-            <Card key={title} variant="solid" className="space-y-2 p-4">
-              <span className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-foreground">{title}</span>
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  className="h-auto p-0"
-                  onClick={() => goTab('requests', 'req-channels')}
-                >
-                  ดูทุกช่องทาง
-                </Button>
-              </span>
-              {!list ? (
-                <p className="text-sm text-muted-foreground">—</p>
-              ) : list.length === 0 ? (
-                <p className="text-sm text-muted-foreground">0</p>
-              ) : (
-                <ol className="space-y-1">
-                  {list.map((x, i) => (
-                    <li key={x.name} className="flex justify-between gap-2 text-sm">
-                      <span className="text-muted-foreground">
-                        {i + 1}. <span className="text-foreground">{x.name}</span>
-                      </span>
-                      <span className="font-medium tabular-nums text-foreground">{NUM.format(x.value)}</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </Card>
-          ))}
-        </div>
-      </HomeSection>
+      {/* ── ช่องทางไหนได้ผล — กราฟเทียบ 4 ช่องทางหลัก · เลือกขั้นจาก Dropdown · กดแท่งดูช่องทางรอง (28 ต.ค. 2569) ── */}
+      <ExecChannelChart stages={stages} onSeeAll={() => goTab('requests', 'req-channels')} />
 
       {/* ── ใบขอ: ยกมา · ขอใหม่ · ปิดครบ · ยกเลิก · เหลือหา — ใบกับคนอยู่กล่องเดียวกัน (เจ้าของ 25 ต.ค. 2569) ──
            สมการลงตัวทั้งหน่วยใบและหน่วยคน (เจ้าของ "บวกลบกันแล้วต้องเท่ากัน") · กดกล่อง = รายใบชุดเดียวกับเลขใบ */}

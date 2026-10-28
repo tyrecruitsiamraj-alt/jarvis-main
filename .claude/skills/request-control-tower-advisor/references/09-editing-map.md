@@ -13950,3 +13950,13 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 |---|---|
 | `api/_lib/unitRequestCache.ts` | ข้อ 6 `pinUnitRequestKey` + `isUnitRequestWorkHours` (07:00–20:00 เวลาไทย) — คีย์ที่ปักอุ่นต่อในเวลาทำงานแม้ไม่มีคนอ่านเกิน 30 นาที · นอกเวลา = กติกาเดิม · วัดจริง: รายงานจับคู่งานครั้งแรก 4.1–5.2 วิ (รอใบขอ ERP) ครั้งถัดไป 0.2 วิ · ส่วนอื่นของรายงานรวม < 1 วิ |
 | `api/_handlers/siamraj-unit-requests.ts` | `readUnitRequestListThroughCache({ pin })` · ตัวอุ่นตอนบูต (`warmUnitRequestListCache`) ปักคีย์ใบขอทุกแผนก limit 500 — ตัวโหลดของคีย์นี้อ่านคีย์ชั้นในที่รายงานจับคู่งาน/หน้าอื่นใช้ร่วม ⇒ อุ่นทั้งสองชั้น |
+
+### 28 ต.ค. 2569 — "ช่องทางไหนได้ผล" เป็นกราฟเทียบ 4 ช่องทางหลัก · ERP ไม่ตัดการเชื่อมต่อเร็ว
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/lib/channelFourMain.ts` | **ใหม่** — `fourMainOf` ชื่อช่องทางของตาราง (`mainChannelOf`) → Facebook/Tiktok/Webjob/Offline (ชุด /recruit/channels · Line AI อยู่ Tiktok) · ไม่เข้า = "อื่น ๆ" · `fourMainRows` 4 หลักขึ้นเสมอ อื่น ๆ ขึ้นเมื่อมีคน ⇒ ผลรวมแท่ง = ผลรวมทุกช่องทาง |
+| `src/components/home-exec/ExecChannelChart.tsx` | **ใหม่** — การ์ดช่องทางหน้าหลัก: Dropdown ขั้น (กรอกมา · นัดได้ · มาตามนัด · ลงงาน) แทน 4 กล่อง 3 อันดับ · กดแท่ง = กางช่องทางรอง · บรรทัดบวกยอด |
+| `src/pages/HomeExecPage.tsx` | `channelLeaders` (3 อันดับ) → `channelStages` (ทุกช่องทาง ต่อขั้น) · ยังตัด "ไม่รู้ช่องทาง"/"ไม่ระบุ" เหมือนเดิม |
+| `api/_lib/siamrajSqlServer.ts` | pool `idleTimeoutMillis` 30 วิ → 5 นาที — วัด Server-Timing บนเว็บ: เช็กใบที่เพิ่งปิด (`dropClosedFromCache`) ต่อ ERP ใหม่หลังว่าง 4.1 วิ · หลังแก้ ว่างหลายนาทียัง 0.26 วิ |
+| `api/_lib/homeTopicReportSql.ts` · `api/_handlers/home-ai-share.ts` | `?report=` ส่ง `Server-Timing` (rows · flow · jobs · tier · avail) ไว้วัดบนเว็บจริง |
