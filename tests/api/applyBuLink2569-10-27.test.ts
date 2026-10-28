@@ -19,11 +19,14 @@ describe('ลิงก์ /apply แยก BU', () => {
     expect(page).toContain("searchParams.get('bu')");
   });
 
-  it('แนบเอกสาร: เลือกไม่แนบ = doc=0 แล้วฟอร์มไม่มีช่องแนบ · ลิงก์เก่า/ไม่มี doc = มีช่องแนบ (27 ต.ค. 2569)', () => {
-    expect(applyBuLink('https://x.dev', 'LBD', '', false)).toBe('https://x.dev/apply?bu=LBD&doc=0');
-    expect(applyBuLink('https://x.dev', 'LBD', '', true)).toBe('https://x.dev/apply?bu=LBD');
+  it('แนบเอกสาร: ปิดทุกทาง · มีช่องแนบเฉพาะลิงก์ที่เลือกให้แนบ (doc=1) (27 → 28 ต.ค. 2569)', () => {
+    expect(applyBuLink('https://x.dev', 'LBD', '', true)).toBe('https://x.dev/apply?bu=LBD&doc=1');
+    expect(applyBuLink('https://x.dev', 'LBD', '', false)).toBe('https://x.dev/apply?bu=LBD');
+    expect(applyLinkShowsDocument(new URLSearchParams('bu=LBD&doc=1'))).toBe(true);
+    // ปุ่มหน้าสมัครในเมนู · ลิงก์ Gen ของใบขอ · ลิงก์เก่า doc=0 = ไม่มีช่องแนบ
+    expect(applyLinkShowsDocument(new URLSearchParams(''))).toBe(false);
+    expect(applyLinkShowsDocument(new URLSearchParams('bu=LBD'))).toBe(false);
     expect(applyLinkShowsDocument(new URLSearchParams('bu=LBD&doc=0'))).toBe(false);
-    expect(applyLinkShowsDocument(new URLSearchParams('bu=LBD'))).toBe(true);
     const dlg = readFileSync('src/components/jobs/PublicApplyDialog.tsx', 'utf8');
     expect(dlg).toContain('const showDocument = applyLinkShowsDocument(searchParams);');
     expect(dlg).toContain('{showDocument ? (');
