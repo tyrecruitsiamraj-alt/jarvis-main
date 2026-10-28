@@ -46,7 +46,6 @@ import { fetchRequestPipeline } from '@/lib/requestPipelineApi';
 import type { RequestPipelineResponse } from '@/lib/requestPipelineTypes';
 import { channelInterestOf } from '@/lib/channelPlatforms';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import HomeTodoStrip, { type TodoTab } from '@/components/home-ai-share/HomeTodoStrip';
 import { CONVEYOR_VAULT, conveyorLabel } from '@/lib/soRecruitNav';
 import { thaiDate } from '@/lib/periodPick';
 import { SITE_BU_TO_DEPT, trendBuLabel } from '@/lib/trends/bu';
@@ -374,10 +373,7 @@ const HomeExecPage: React.FC = () => {
         </TabsList>
       </Tabs>
 
-      {/* แถบต้องทำของหน้าแท็บเดิม — อยู่เหนือแท็บงาน (ภาพรวมมีส่วนต้องรีบของตัวเองแล้ว) */}
-      {tab.key === 'overview' ? null : (
-        <HomeTodoStrip q={winQ} tick={tick} onGo={(t: TodoTab, target: string) => goTab(t === 'online' ? 'requests' : t, target)} />
-      )}
+      {/* แถบต้องทำเหนือแท็บงาน ถอดแล้ว 28 ต.ค. 2569 (เจ้าของ "เอาออก") */}
 
       {tab.key === 'overview' ? (
       <>

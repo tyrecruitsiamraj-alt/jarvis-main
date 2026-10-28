@@ -252,7 +252,6 @@ describe('ใบขอ = ทีม Online แท็บเดียว · ปร�
     const tab = page.slice(page.indexOf('data-testid="exec-requests-body"') - 200);
     expect(tab).toContain('<HomeOnlineTab');
     expect(tab).toContain('<HomeRequestsTab');
-    expect(page).toContain("goTab(t === 'online' ? 'requests' : t, target)");
   });
   it('ยิงยกเลิกซ้ำ: อ่านประวัติจากบันทึกการใช้งาน · ถามสถานะซ้ำแล้วจดลงบันทึก · หน้าตั้งค่ามีประวัติ', () => {
     const lib = read('api/_lib/followOldIdRepush.ts');

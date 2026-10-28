@@ -9,7 +9,6 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildFollowAiShareSql } from '../../api/_lib/homeAiShareSql';
 import { onlineApplicantKindOf, type OnlineApplicantRow } from '@/lib/homeOnline';
-import { todoItemsOf } from '@/components/home-ai-share/HomeTodoStrip';
 
 const read = (f: string) => fs.readFileSync(path.join(process.cwd(), f), 'utf8');
 
@@ -63,25 +62,11 @@ describe('C · เปอร์เซ็นต์บอกว่าเทีย�
   });
 });
 
-describe('D+E · แถบต้องทำเหนือแท็บ', () => {
-  it('5 เรื่อง ไปแท็บของตัวเอง · ไม่มีข้อมูล = "—" ไม่ใช่ 0', () => {
-    const items = todoItemsOf(null);
-    expect(items.map((i) => [i.label, i.tab])).toEqual([
-      ['ยังไม่ประกาศ', 'online'],
-      ['รอคนโทร', 'follow'],
-      ['ไม่ได้ส่ง AI', 'applicants'],
-      ['เขียวยังว่าง', 'matching'],
-      ['รอโทรหลังเริ่มงาน', 'aftercare'],
-    ]);
-    expect(items.every((i) => i.value === null)).toBe(true);
-  });
-  it('เลขมาจากตัวนับเดียวกับแท็บ', () => {
-    const h = read('api/_handlers/home-ai-share.ts');
-    expect(h).toContain("loadTopicReport('applicants', start, end, bu)");
-    expect(h).toContain('lumos.follow.staff.waiting');
-    expect(h).toContain("(c.col === 'noResult' ? c.n : 0)");
-    expect(read('api/_lib/homeOnlineSql.ts')).toContain("else if (onlineRequestStateOf(g) === 'open') out.notReleasedOpen += 1;");
-    expect(read('src/pages/HomeAiSharePage.tsx')).toContain('<HomeTodoStrip q={winQ} tick={tick} onGo={goTodo} />');
+describe('D+E · แถบต้องทำเหนือแท็บ — ถอดแล้ว (เจ้าของ 28 ต.ค. 2569 "เอาออก")', () => {
+  it('ไม่มีแถบต้องทำทั้งหน้าหลักและหน้าผู้บริหาร · ไม่มีเส้น ?todo=1', () => {
+    expect(read('src/pages/HomeAiSharePage.tsx')).not.toContain('HomeTodoStrip');
+    expect(read('src/pages/HomeExecPage.tsx')).not.toContain('HomeTodoStrip');
+    expect(read('api/_handlers/home-ai-share.ts')).not.toContain('q.todo !== undefined');
   });
 });
 

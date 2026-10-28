@@ -81,7 +81,6 @@ import {
   type AiShareMatching,
   type AiSharePrevious,
   type AiShareResponse,
-  type HomeTodoResponse,
   type AiShareWindow,
 } from '../../src/lib/homeAiShare.js';
 
@@ -89,7 +88,7 @@ const FOLLOW_TABLE = tableInAppSchema('follow_entries');
 const QUEUE_TABLE = tableInAppSchema('lumos_dispatch_queue');
 
 const CACHE_MS = 30_000;
-const cache = new Map<string, { at: number; body: AiShareResponse | HomeTodoResponse }>();
+const cache = new Map<string, { at: number; body: AiShareResponse }>();
 
 /** 42703 undefined_column — ฐานยังไม่รัน 130 (ช่องผลของคนโทร) */
 function isUndefinedColumn(e: unknown): boolean {
@@ -635,55 +634,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return res.status(200).json(body);
     }
 
-    // `?todo=1` = แถบ "ต้องทำ" เหนือแท็บ (21 ต.ค. 2569) — เรียกตัวนับชุดเดียวกับแต่ละแท็บ ⇒ เลขตรงกับในแท็บพอดี
-    if (q.todo !== undefined) {
-      const body: HomeTodoResponse = {
-        generated_at: new Date().toISOString(),
-        from: win.from,
-        to: win.to,
-        bu,
-        requests: null,
-        followWaitingStaff: null,
-        aftercareWaiting: null,
-        applicantsNotSent: null,
-        matchingGreenFree: null,
-      };
-      if (scope.mode === 'none') return res.status(200).json(body);
-      const todoKey = JSON.stringify(['todo', scope, win, bu]);
-      const todoHit = cache.get(todoKey);
-      if (todoHit && Date.now() - todoHit.at < CACHE_MS) return res.status(200).json(todoHit.body);
-      const { start, end } = aiShareBounds(win, new Date());
-      const plan = followPlanBounds(win);
-      const safe = async <T,>(what: string, f: () => Promise<T>): Promise<T | null> => {
-        try {
-          return await f();
-        } catch (e) {
-          logWarn('home-ai-share todo failed', { what, error: errText(e) });
-          return null;
-        }
-      };
-      const [posting, lumos, apps, match, care] = await Promise.all([
-        safe('requests', () =>
-          loadOnlineRequestPosting({ ...onlineRequestYmdRange(start, end), bu, departmentScope: { mode: 'all' } as DepartmentScope }),
-        ),
-        safe('follow', () => loadHomeLumosSummary(plan.start, plan.end, bu)),
-        safe('applicants', () => loadTopicReport('applicants', start, end, bu)),
-        safe('matching', () => loadTopicReport('matching', start, end, bu)),
-        safe('aftercare', () => loadTopicReport('aftercare', start, end, bu)),
-      ]);
-      body.requests = posting;
-      body.followWaitingStaff = lumos ? lumos.follow.staff.waiting : null;
-      body.applicantsNotSent = apps ? (apps.funnel.find((f) => f.key === 'total')?.parts?.find((p) => p.key === 'notSent')?.value ?? 0) : null;
-      body.matchingGreenFree = match
-        ? (match.extra.find((x) => x.title === 'ต้องสั่งงาน')?.items.find((i) => i.key === 'greenUncontacted')?.value ?? 0)
-        : null;
-      // รอโทรของดูแลหลังเริ่มงาน = ช่องยังไม่มีผล (ตัวเดียวกับกล่องทั้งหมด `fromReach` บนหน้า)
-      body.aftercareWaiting = care ? care.cells.reduce((n, c) => n + (c.col === 'noResult' ? c.n : 0), 0) : null;
-      const allOk = posting && lumos && apps && match && care;
-      if (allOk) cache.set(todoKey, { at: Date.now(), body });
-      res.setHeader?.('Cache-Control', 'no-store');
-      return res.status(200).json(body);
-    }
+    // `?todo=1` (แถบ "ต้องทำ") ถอดแล้ว 28 ต.ค. 2569 — เจ้าของ "เอาออก"
 
     // `?online=1` = แท็บทีม Online (8 ต.ค. 2569) — ใบขอ → ประกาศ → ผลประกาศ → ประเภทงาน → BU · ช่วง/BU เดียวกับกล่อง
     // ช่วง "ทั้งหมด" = ย้อน 365 วัน (ตัวดึงใบขอของ ERP ต้องมีวันเริ่ม)

@@ -49,7 +49,6 @@ import AiShareDetail from '@/components/home-ai-share/AiShareDetail';
 import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
 import FollowCallerDialog from '@/components/home-ai-share/FollowCallerDialog';
 import HomeOnlineTab from '@/components/home-ai-share/HomeOnlineTab';
-import HomeTodoStrip, { type TodoTab } from '@/components/home-ai-share/HomeTodoStrip';
 import HomeRequestsTab from '@/components/home-ai-share/HomeRequestsTab';
 import AiShareLumosStats, { FOLLOW_RESULT_COLS, useHomeLumosSummary } from '@/components/home-ai-share/AiShareLumosStats';
 import { FOLLOW_CALLED_DISPLAY_ORDER } from '@/lib/homeLumosSummary';
@@ -296,14 +295,6 @@ const HomeAiSharePage: React.FC<{ embedded?: EmbeddedHome }> = ({ embedded }) =>
     if (embeddedPick) choose(embeddedPick === 'online' ? ONLINE_TAB : embeddedPick);
     // เปิดแท็บตามที่กดจากหน้าผู้บริหารเท่านั้น
   }, [embeddedPick, embeddedSeq]);
-
-  /** กดเลขบนแถบต้องทำ = เปิดแท็บนั้น แล้วเลื่อนไปส่วนที่มีเลขเดียวกัน (รอส่วนนั้นขึ้นจอก่อน) */
-  const goTodo = (tab: TodoTab, target: string) => {
-    choose(tab === 'online' ? ONLINE_TAB : tab);
-    window.setTimeout(() => {
-      document.querySelector(`[data-testid="${target}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 400);
-  };
 
   /**
    * Popup รายชื่อตอนกดกล่อง (รอบ 17) — เปิด/ปิดแยกจากกล่องที่โชว์ (ปิดแล้วชื่อชุดเดิมยังอยู่จนป๊อปจางหาย ไม่วูบเป็นหน้าว่าง) ·
@@ -867,7 +858,6 @@ const HomeAiSharePage: React.FC<{ embedded?: EmbeddedHome }> = ({ embedded }) =>
         )}
         {/* แถบต้องทำเหนือแท็บ (21 ต.ค. 2569) — ใบขอ/ประกาศ + งานค้างของทุกแท็บ กดแล้วเปิดแท็บนั้น */}
         {/* ฝังในหน้าหลัก: แถบต้องทำ + แท็บเป็นของหน้าหลัก (25 ต.ค. 2569 "แยกแท็บแบบเดิม") */}
-        {embedded ? null : <HomeTodoStrip q={winQ} tick={tick} onGo={goTodo} />}
         {embedded ? null : picker}
       </div>
 

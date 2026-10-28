@@ -8,7 +8,6 @@ import type {
   AiShareListResponse,
   AiShareResponse,
   AiShareWindow,
-  HomeTodoResponse,
 } from '@/lib/homeAiShare';
 import type { FollowJourneyResponse } from '@/lib/followJourney';
 import type { HomeLumosSummaryResponse } from '@/lib/homeLumosSummary';
@@ -75,7 +74,3 @@ export function fetchTopicReport(block: TopicReportBlock, q: AiShareWindow & { b
   return read<TopicReportResponse>(`/api/home-ai-share${queryOf(q, { report: block })}`);
 }
 
-/** แถบ "ต้องทำ" เหนือแท็บ (21 ต.ค. 2569) — ตัวนับเดียวกับแต่ละแท็บ */
-export function fetchHomeTodo(q: AiShareWindow & { bu?: string | null }): Promise<HomeTodoResponse> {
-  return read<HomeTodoResponse>(`/api/home-ai-share${queryOf(q, { todo: '1' })}`);
-}

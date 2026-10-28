@@ -2927,6 +2927,7 @@ state (`calendarOpen`/`selectedDay`/`month`) + derived (`calendar`/`grid`/`month
 | `src/lib/appointmentPlaces.ts` | **28 ต.ค. 2569** — แถว = สถานที่อย่างเดียว (แทน 21 ต.ค. สถานที่+เวลา) · `times[]` + `noTime` โชว์ในแถว · PDF ต่อสถานที่ |
 | `src/lib/userViewableBus.ts` | **ใหม่ 28 ต.ค. 2569** (sirirat.j ไม่เห็น BU อื่น) — BU หลัก + ดูเพิ่ม ฝั่งหน้าเว็บ · `/api/auth/me` ส่ง `extra_department_codes` · `lockedBuOf` ล็อกเฉพาะคนดู BU เดียว (เมนูใบขอ · แดชบอร์ดหัวหน้า) · PreCheck กรองตามชุด BU · เทสต์ `userViewableBus2569-10-28` |
 | `autopostMissing` | **28 ต.ค. 2569** — บังคับ "รายได้" (ฐานเงินเดือนหรือรายได้อื่น) แทนบังคับบรรทัดฐานเงินเดือน · งานรายวันไม่โดนว่าขาด |
+| แถบ "ต้องทำ" หน้าหลัก (`HomeTodoStrip`) | **ถอดแล้ว 28 ต.ค. 2569** (เจ้าของ "เอาออก") — ลบคอมโพเนนต์ · `fetchHomeTodo` · `HomeTodoResponse` · เส้น `/api/home-ai-share?todo=1` · ทั้งหน้าหลักและหน้าผู้บริหาร |
 | `.github/workflows/deploy.yml` | **28 ต.ค. 2569** — `concurrency: deploy-production` (deploy ทีละรอบ ไม่ทับกัน) · push ที่มีแต่ `docs/**`/`*.md` ไม่ deploy · 🔴 ยกเว้น `skills/**` ต้อง deploy (candidateSpecAnalyzer อ่าน .md ตอนรัน) |
 | `src/pages/settings/AdminSettings.tsx` | เพิ่มแท็บ `health` (`?tab=health`) |
 | `.github/workflows/deploy.yml` | `SYSTEM_HEALTH_WATCH_ENABLED=true` |

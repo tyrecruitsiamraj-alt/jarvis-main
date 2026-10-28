@@ -33,7 +33,6 @@ const fetchHomeAiShareDetail = vi.fn();
 const fetchHomeAiShareList = vi.fn();
 vi.mock('@/lib/homeAiShareApi', () => ({
   // แถบต้องทำเหนือแท็บ (21 ต.ค. 2569) — เทสต์ชุดนี้ไม่ได้ดูแถบ ตอบว่างไว้
-  fetchHomeTodo: () => new Promise(() => {}),
   fetchHomeAiShare: (...a: unknown[]) => fetchHomeAiShare(...a),
   fetchHomeAiShareDetail: (...a: unknown[]) => fetchHomeAiShareDetail(...a),
   fetchHomeAiShareList: (...a: unknown[]) => fetchHomeAiShareList(...a),
