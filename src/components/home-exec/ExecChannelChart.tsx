@@ -24,10 +24,10 @@ const STAGES: ReadonlyArray<{ key: ChannelStage; label: string }> = [
 
 const NUM = new Intl.NumberFormat('th-TH');
 
-function Bar({ value, max, strong }: { value: number; max: number; strong?: boolean }) {
+function Bar({ value, max, strong, className }: { value: number; max: number; strong?: boolean; className?: string }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
-    <span className="block h-3 flex-1 overflow-hidden rounded-full bg-muted" aria-hidden>
+    <span className={cn('block h-3 flex-1 overflow-hidden rounded-full bg-muted', className)} aria-hidden>
       <span className={cn('block h-full rounded-full', strong ? 'bg-primary' : 'bg-primary/60')} style={{ width: `${pct}%` }} />
     </span>
   );
@@ -92,17 +92,18 @@ export default function ExecChannelChart({
                 <span className="w-16 shrink-0 text-right font-medium tabular-nums text-foreground">{stages ? NUM.format(r.value) : '—'}</span>
               </button>
               {expanded ? (
-                <ul className="mb-2 ml-8 space-y-1 rounded-xl bg-muted/40 p-3" data-testid={`exec-channel-subs-${r.main}`}>
+                <ul className="mb-2 ml-2 space-y-1 rounded-xl bg-muted/40 p-3 sm:ml-8" data-testid={`exec-channel-subs-${r.main}`}>
                   {r.subs.length === 0 ? (
                     <li className="text-sm text-muted-foreground">0 คน</li>
                   ) : (
                     r.subs.map((s) => (
                       <li key={s.name} className="flex items-center gap-3 text-sm">
-                        <span className="w-40 shrink-0 truncate text-foreground" title={s.name}>
+                        {/* มือถือ: ชื่อกินที่เหลือ ซ่อนแท่ง (จอแคบแท่งเหลือ 0) */}
+                        <span className="min-w-0 flex-1 truncate text-foreground sm:w-40 sm:flex-none" title={s.name}>
                           {s.name}
                         </span>
-                        <Bar value={s.value} max={r.value} />
-                        <span className="w-14 shrink-0 text-right tabular-nums text-foreground">{NUM.format(s.value)}</span>
+                        <Bar value={s.value} max={r.value} className="hidden sm:block" />
+                        <span className="shrink-0 text-right tabular-nums text-foreground sm:w-14">{NUM.format(s.value)}</span>
                       </li>
                     ))
                   )}
