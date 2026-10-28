@@ -106,6 +106,32 @@ function unsentSql(linked: boolean): string {
     limit ${LIMIT}`;
 }
 
+/**
+ * จดเหตุที่ยังไม่ส่งไว้กับใบ (169 · เจ้าของ 28 ต.ค. 2569 "ทำไมไม่โทร") — จอแท็บผู้สมัครโชว์เหตุจริงแทน "ยังไม่กดส่ง AI"
+ * เขียนเฉพาะตอนเหตุเปลี่ยน · จดไม่ได้ (ยังไม่รัน 169) = ข้าม ไม่ทำให้รอบส่งล้ม
+ */
+export async function recordAiBlockReasons(skipped: ReadonlyArray<{ ref: string; reason: string }>): Promise<void> {
+  const ids: string[] = [];
+  const reasons: string[] = [];
+  for (const s of skipped) {
+    const m = /^app-([0-9a-f-]{36})$/i.exec(s.ref);
+    if (!m) continue;
+    ids.push(m[1]);
+    reasons.push(s.reason);
+  }
+  if (ids.length === 0) return;
+  try {
+    await dbQuery(
+      `update ${APPS} a set ai_block_reason = v.reason, ai_block_at = now()
+         from unnest($1::uuid[], $2::text[]) as v(id, reason)
+        where a.id = v.id and a.ai_block_reason is distinct from v.reason`,
+      [ids, reasons],
+    );
+  } catch (e) {
+    logError('applicationDispatchRetry.block_reason_failed', e);
+  }
+}
+
 export function isApplicationDispatchRetryEnabled(): boolean {
   if ((process.env.APPLICATION_DISPATCH_RETRY_ENABLED || '').trim().toLowerCase() === 'false') return false;
   return isAutoDispatchEnabled() && getLumosPushConfig() !== null;
@@ -141,6 +167,7 @@ export async function runApplicationDispatchRetryOnce(): Promise<DispatchRetryRu
       );
       out.queued += res.queued;
       for (const s of res.skipped) out.reasons[s.reason] = (out.reasons[s.reason] ?? 0) + 1;
+      await recordAiBlockReasons(res.skipped);
     } catch (e) {
       out.reasons['ส่งล้ม'] = (out.reasons['ส่งล้ม'] ?? 0) + apps.length;
       logError('applicationDispatchRetry.job_failed', e, { jobId, count: apps.length });
@@ -157,6 +184,7 @@ export async function runApplicationDispatchRetryOnce(): Promise<DispatchRetryRu
         const res = await enqueueLumosGreetingForApplications(send, { autoPush: true });
         out.queued += res.queued;
         for (const s of res.skipped) out.reasons[s.reason] = (out.reasons[s.reason] ?? 0) + 1;
+        await recordAiBlockReasons(res.skipped);
         out.greeted = res.queued;
       }
     }

@@ -22,7 +22,11 @@ export type AiAnswerText = { kind: AiAnswerKind; text: string; queue?: AiQueueSt
 export function notSentReasonOf(r: PublicApplication): string {
   if (r.claimed_by_name?.trim()) return `เก็บไปโทรเอง · ${r.claimed_by_name.trim()}`;
   if (r.call_choice === 'manual') return 'เลือกโทรเอง';
+  // เหตุจริงที่ตัวส่งอัตโนมัติจดไว้ (28 ต.ค. 2569 เคสคุณหนึ่ง: เลือก AI แล้วแต่ใบขอยังไม่ตั้งรายได้ — เดิมขึ้น "ยังไม่กดส่ง AI")
+  const blocked = r.ai_block_reason?.split(' — ')[0]?.trim();
+  if (blocked) return blocked;
   if (!r.job_id) return 'ไม่ผูกใบขอ';
+  if (r.call_choice === 'ai' || r.call_choice === 'auto_ai') return 'เลือกให้ AI โทรแล้ว รอระบบส่ง';
   if (r.created_by_name?.trim()) return 'เพิ่มเอง/นำเข้า ยังไม่กดส่ง AI';
   return 'สมัครผ่านลิงก์ ระบบไม่ได้ส่ง';
 }

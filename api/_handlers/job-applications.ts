@@ -1809,6 +1809,20 @@ async function handler(req: AuthedReq, res: ApiRes) {
           if (hit.appointmentFailed) (item as Record<string, unknown>).last_appointment_failed = true;
         }
       }
+      // เหตุที่ตัวส่งอัตโนมัติยังไม่ส่ง AI (169 · 28 ต.ค. 2569 "ทำไมไม่โทร") — อ่านไม่ได้ = ไม่มีเหตุ (จอใช้คำเดิม)
+      try {
+        const { rows: blocks } = await dbQuery<{ id: string; ai_block_reason: string }>(
+          `select id::text, ai_block_reason from ${tbl} where id = any($1::uuid[]) and ai_block_reason is not null`,
+          [items.map((i) => i.id)],
+        );
+        const byId = new Map(blocks.map((b) => [b.id, b.ai_block_reason]));
+        for (const item of items) {
+          const why = byId.get(String(item.id));
+          if (why) (item as Record<string, unknown>).ai_block_reason = why;
+        }
+      } catch (e) {
+        if (!isUndefinedColumn(e)) logError('job-applications: ai_block_reason', e);
+      }
       // ผลติดตามนัดล่าสุด (มา/ไม่มา/เลื่อน — migration 089) — แท็บนัดหมายโชว์ชิป/ปุ่ม
       const attendance = await loadLatestAttendanceByApplication(items.map((i) => i.id));
       for (const item of items) {

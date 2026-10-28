@@ -34,6 +34,8 @@ export type PublicApplication = {
    * ไม่มี = AI ยังไม่ได้คุยกับใบนี้ (ดู `last_call_status` ว่ารอคิวหรือยังไม่ส่ง)
    */
   ai_answer?: { micro: import('@/lib/callMicroOutcome').CallMicroOutcome; at: string | null } | null;
+  /** เหตุที่ตัวส่งอัตโนมัติยังไม่ส่ง AI (169 · 28 ต.ค. 2569) เช่น ใบขอยังไม่ตั้งรายได้ */
+  ai_block_reason?: string | null;
   /**
    * ผลติดต่อล่าสุดที่ **เจ้าหน้าที่บันทึกเอง** (086) — false = ติดต่อไม่สำเร็จ/ไม่เอางาน
    * เจ้าของสั่ง 23 ส.ค. 2569: `ok=false` นับเป็น "ไม่สนใจ" ในมุมมองรายชื่อ
