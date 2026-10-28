@@ -17,7 +17,6 @@ import {
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
@@ -28,7 +27,9 @@ import { rangeText } from '@/lib/teamOnline';
 import { shortTime } from '@/lib/dateTh';
 import { fetchRecruitOverview } from '@/lib/recruitOverviewApi';
 import { monthLabel, monthOptions, shiftMonth, shiftRange } from '@/lib/recruitOverviewWindow';
-import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
+import { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
+import { Calendar } from '@/components/ui/calendar';
+import { parseYmd, toYmdLocal } from '@/lib/dateTh';
 import {
   cohortOf,
   dailyRows,
@@ -38,7 +39,7 @@ import {
   totalsOf,
   trimLastDayToNow,
 } from '@/lib/recruitOverview';
-import { WEEKDAY_CHOICES, buildRecruitJourney, filterByWeekdays } from '@/lib/recruitJourney';
+import { buildRecruitJourney } from '@/lib/recruitJourney';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import type { BoardPublishedTotals } from '@/lib/boardRelease';
 import {
@@ -141,8 +142,6 @@ const RecruitOverview: React.FC<{
   const win = data?.window ?? null;
   const apps = data?.apps ?? null;
 
-  /** เฉพาะวันในสัปดาห์ (เจ้าของสั่ง 18 ต.ค. 2569 "เฉพาะวันจันทร์") — ว่าง = ทุกวัน · กรองตามวันที่กรอกใบ (เวลาไทย) */
-  const [weekdays, setWeekdays] = useState<number[]>([]);
   /** ป๊อปรายชื่อของเลขที่กดในเส้นทาง */
   const [names, setNames] = useState<{ title: string; ids: readonly string[] } | null>(null);
   /** กล่องที่กดในการ์ดแนวโน้มใบขอ (27 ต.ค. 2569 รวมการ์ดใบขอเข้ามา) — null = ไม่ได้กด */
@@ -163,7 +162,7 @@ const RecruitOverview: React.FC<{
 
   const view = useMemo(() => {
     if (!data || !win) return null;
-    const list = filterByWeekdays(apps ?? [], weekdays);
+    const list = apps ?? [];
     const cur = totalsOf(list, win.from, win.to);
     /**
      * 🔴 เทียบเดือนก่อน **เฉพาะตอนข้อมูลมีครบทั้งช่วงก่อน** (กับดักเดียวกับหน้าทีม Online: เคยขึ้น "เพิ่ม 1,400%"
@@ -190,7 +189,7 @@ const RecruitOverview: React.FC<{
       positions: positionRows(cohort),
       reasons: reasonGroups(cohort),
     };
-  }, [data, win, apps, weekdays]);
+  }, [data, win, apps]);
 
   if (!data || !win || !view) {
     // ล้มแล้วมีปุ่มลองใหม่ (QA 5 ต.ค. 2569: เดิมเหลือข้อความอังกฤษดิบบรรทัดเดียว กดอะไรต่อไม่ได้)
@@ -221,8 +220,17 @@ const RecruitOverview: React.FC<{
   const period = isRange ? 'ช่วงนี้' : 'เดือนนี้';
   const prevWord = isRange ? 'ช่วงก่อน' : 'เดือนก่อน';
   const appsError = data.errors.apps ?? null;
-  const weekdayText = WEEKDAY_CHOICES.filter((d) => weekdays.includes(d.day)).map((d) => d.short).join(' ');
-  const periodLabel = `${isRange ? rangeText({ from: win.from, to: win.to }) : monthLabel(win.month)}${weekdayText ? ` · ${weekdayText}` : ''}`;
+  const periodLabel = isRange ? rangeText({ from: win.from, to: win.to }) : monthLabel(win.month);
+  /** ปุ่มลัด 7/30 วันล่าสุด กดอยู่ไหม */
+  const isLast = (n: number) => {
+    const r = lastDays(n);
+    return isRange && win.from === r.from && win.to === r.to;
+  };
+  const ymdDate = (ymd: string) => {
+    const p = parseYmd(ymd);
+    return p ? new Date(p.y, p.m - 1, p.d) : undefined;
+  };
+  const todayDate = ymdDate(data.today);
 
   /** การ์ดเทียบช่วงก่อนของแต่ละแท็บ — แบบเดือน = ชื่อเดือนเทียบกัน · แบบช่วง = ช่วงวันเทียบกัน (21 ต.ค. 2569) */
   const curPeriodLabel = isRange ? rangeText({ from: win.from, to: win.to }) : monthLabel(win.month);
@@ -240,7 +248,7 @@ const RecruitOverview: React.FC<{
             children:
               reqPick && REQUEST_DRILL_PATH[reqPick] ? (
                 <DrillDownCard
-                  key={`drill-req-${reqPick}-${win.from}-${win.to}-${weekdays.join('')}`}
+                  key={`drill-req-${reqPick}-${win.from}-${win.to}`}
                   title="ใบขอ"
                   bare
                   path={REQUEST_DRILL_PATH[reqPick]}
@@ -270,10 +278,10 @@ const RecruitOverview: React.FC<{
     />
   );
 
-  /** การ์ดกดลงลึก (ไอเดียเพื่อนเจ้าของ · 21 ต.ค. 2569) — key ผูกช่วง+วันในสัปดาห์ เปลี่ยนแล้วกลับชั้นบนสุด */
+  /** การ์ดกดลงลึก (ไอเดียเพื่อนเจ้าของ · 21 ต.ค. 2569) — key ผูกช่วง เปลี่ยนแล้วกลับชั้นบนสุด */
   const drillCard = (t: (typeof OVERVIEW_TABS)[number]['id'], title: string) => (
     <DrillDownCard
-      key={`drill-${t}-${win.from}-${win.to}-${weekdays.join('')}`}
+      key={`drill-${t}-${win.from}-${win.to}`}
       title={title}
       root={drillTreeOf(t, view.cohort, data.requestList)}
       onOpenNames={(title2, ids) => setNames({ title: title2, ids })}
@@ -293,7 +301,7 @@ const RecruitOverview: React.FC<{
 
   return (
     <div className={cn('space-y-3', state.loading && 'opacity-70')}>
-      {/* ─── หัว: ชื่อ + ปุ่มช่วงเวลาปุ่มเดียว (เจ้าของ 19 ต.ค. 2569 "รวมกันเลย" — เดือน · ช่วงวัน · เฉพาะวัน) ─── */}
+      {/* ─── หัว: ชื่อ + ปุ่มช่วงเวลาปุ่มเดียว (เจ้าของ 19 ต.ค. 2569 "รวมกันเลย" · 28 ต.ค. เหลือ เดือน · วันที่ · 7/30 วันล่าสุด) ─── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-medium text-foreground">ภาพรวมงานสรรหา</h2>
         <div className="flex flex-wrap items-center gap-2">
@@ -337,42 +345,32 @@ const RecruitOverview: React.FC<{
                   </Button>
                 </div>
               </div>
-              <div className="space-y-2">
-                <p className={cn('text-xs', DASH.sub)}>ช่วงวัน</p>
-                {/* รายวัน/ช่วง (5 ต.ค. 2569) — เลือกวันเดียว = รายวัน · "ทั้งเดือน" = กลับแบบเดือน */}
-                <DateRangeCalendarPicker
-                  triggerVariant="filter"
-                  emptyLabel="ทั้งเดือน"
-                  value={isRange ? { from: win.from, to: win.to } : null}
-                  onChange={setRange}
+              {/*
+               * เจ้าของ 28 ต.ค. 2569 "เอาเป็นตัวเลขให้เลือก มีไว้แค่นี้ — เดือน · วันที่เป็นตัวเลข · 7 วันล่าสุด 30 วันล่าสุด"
+               * (ถอด "เฉพาะวัน" จ.–อา. ออกทั้งหน้า) · กดวันเดียว = รายวัน · กดวันที่สอง = ช่วง
+               */}
+              <div className="space-y-2" data-testid="recruit-days">
+                <p className={cn('text-xs', DASH.sub)}>วันที่</p>
+                <Calendar
+                  mode="range"
+                  className="p-0"
+                  selected={isRange ? { from: ymdDate(win.from), to: ymdDate(win.to) } : undefined}
+                  defaultMonth={ymdDate(isRange ? win.to : `${win.month}-01`)}
+                  disabled={todayDate ? { after: todayDate } : undefined}
+                  onSelect={(r) => {
+                    if (!r?.from) return;
+                    const from = toYmdLocal(r.from);
+                    setRange({ from, to: r.to ? toYmdLocal(r.to) : from });
+                  }}
                 />
               </div>
-              <Button type="button" size="xs" variant="outline" onClick={() => setRange(lastDays(7))} data-testid="recruit-last7">
-                7 วันล่าสุด
-              </Button>
-              {/* เฉพาะวันในสัปดาห์ (เจ้าของสั่ง 18 ต.ค. 2569) — เลือกได้หลายวัน · ไม่เลือก = ทุกวัน · มีผลทั้งหน้า */}
-              <div className="space-y-2" data-testid="recruit-weekdays">
-                <p className={cn('text-xs', DASH.sub)}>เฉพาะวัน</p>
-                <ToggleGroup
-                  type="multiple"
-                  size="xs"
-                  variant="outline"
-                  value={weekdays.map(String)}
-                  onValueChange={(v) => setWeekdays(v.map(Number))}
-                  aria-label="เฉพาะวันในสัปดาห์"
-                  className="flex-wrap justify-start"
-                >
-                  {WEEKDAY_CHOICES.map((d) => (
-                    <ToggleGroupItem key={d.day} value={String(d.day)} aria-label={d.label}>
-                      {d.short}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
-                {weekdays.length > 0 ? (
-                  <Button type="button" size="xs" variant="ghost" onClick={() => setWeekdays([])}>
-                    ทุกวัน
-                  </Button>
-                ) : null}
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="xs" variant={isLast(7) ? 'default' : 'outline'} onClick={() => setRange(lastDays(7))} data-testid="recruit-last7">
+                  7 วันล่าสุด
+                </Button>
+                <Button type="button" size="xs" variant={isLast(30) ? 'default' : 'outline'} onClick={() => setRange(lastDays(30))} data-testid="recruit-last30">
+                  30 วันล่าสุด
+                </Button>
               </div>
             </PopoverContent>
           </Popover>
@@ -410,7 +408,7 @@ const RecruitOverview: React.FC<{
           {compareCard('requests')}
           <div className="grid grid-cols-1 gap-3">
             {/* การ์ด "ใบขอ" (กดลงลึก) รวมเข้าการ์ดแนวโน้มใบขอแล้ว (เจ้าของ 27 ต.ค. 2569) — กดกล่องบนการ์ดแนวโน้มแทน */}
-            <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={weekdays.length > 0 ? 'ณ วันนี้ · ไม่กรองตามวัน' : 'ณ วันนี้'}>
+            <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">
               {data.backlog ? <BacklogBody backlog={data.backlog} /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
             </OverviewCard>
           </div>
@@ -454,7 +452,7 @@ const RecruitOverview: React.FC<{
         <TabsContent value="staff" className="mt-3 space-y-3">
           {compareCard('staff')}
           {drillCard('staff', 'การติดต่อ')}
-          <OverviewCard icon={Users} title="ผลงานรายคน" sub={weekdays.length > 0 ? 'งานที่ลงผลในช่วงนี้ · ไม่กรองตามวัน' : 'งานที่ลงผลในช่วงนี้'}>
+          <OverviewCard icon={Users} title="ผลงานรายคน" sub="งานที่ลงผลในช่วงนี้">
             {data.staff ? <StaffTable staff={data.staff} ai={data.ai} /> : <SectionError message={data.errors.staff ?? 'อ่านผลงานรายคนไม่ได้'} />}
           </OverviewCard>
         </TabsContent>
@@ -464,7 +462,7 @@ const RecruitOverview: React.FC<{
           {compareCard('appt')}
           {drillCard('appt', 'นัดหมาย')}
           {/* ช่องทางที่ได้คนลงงาน (เจ้าของ 19 ต.ค. 2569 — ทีม Online ดูว่าเด็กมาจากไหน ลงงานจากช่องทางไหนเยอะ) */}
-          <OverviewCard icon={Megaphone} title="คนแจ้งเข้าในช่วงนี้ มาจากช่องทางไหน" sub={`นับตามวันแจ้งเข้า · ทุก BU${weekdays.length > 0 ? ' · ไม่กรองตามวัน' : ''}`}>
+          <OverviewCard icon={Megaphone} title="คนแจ้งเข้าในช่วงนี้ มาจากช่องทางไหน" sub="นับตามวันแจ้งเข้า · ทุก BU">
             {data.channelPlacement ? (
               <ChannelPlacementTable data={data.channelPlacement} />
             ) : (

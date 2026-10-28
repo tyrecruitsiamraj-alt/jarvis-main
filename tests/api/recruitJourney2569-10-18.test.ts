@@ -2,7 +2,7 @@
 /** Journey งานสรรหา ทีละขั้น + ผ่าน/ไม่ผ่าน (เจ้าของสั่ง 18 ต.ค. 2569) */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { buildRecruitJourney, filterByWeekdays } from '../../src/lib/recruitJourney';
+import { buildRecruitJourney } from '../../src/lib/recruitJourney';
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes';
 import { canRecordScreening, isScreeningResult } from '../../src/lib/appointmentScreening';
 
@@ -65,13 +65,6 @@ describe('buildRecruitJourney', () => {
     expect([part('staff', 'ok'), part('staff', 'fail'), part('staff', 'waiting')]).toEqual([7, 1, 1]);
     expect([part('appointment', 'booked'), part('appointment', 'failed'), part('appointment', 'pending')]).toEqual([5, 1, 1]);
     expect([part('attendance', 'showed'), part('attendance', 'noShow'), part('attendance', 'pending')]).toEqual([3, 1, 1]);
-  });
-  it('เฉพาะวันในสัปดาห์ (เวลาไทย)', () => {
-    const mon = f({ createdAt: '2026-10-12T03:00:00Z' });
-    const sunNightUtcMonBkk = f({ createdAt: '2026-10-11T18:30:00Z' }); // จันทร์ 01:30 ไทย
-    const tue = f({ createdAt: '2026-10-13T03:00:00Z' });
-    expect(filterByWeekdays([mon, sunNightUtcMonBkk, tue], [1])).toHaveLength(2);
-    expect(filterByWeekdays([mon, tue], [])).toHaveLength(2);
   });
 });
 

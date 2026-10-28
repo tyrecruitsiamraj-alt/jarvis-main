@@ -93,10 +93,11 @@ describe('คนละพื้นที่ — อ่านจากคำต�
 
 describe('หน้าจอ', () => {
   const ov = readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8');
-  it('ปุ่มช่วงเวลาปุ่มเดียว (เดือน · ช่วงวัน · เฉพาะวัน อยู่ในป๊อปเดียว)', () => {
+  it('ปุ่มช่วงเวลาปุ่มเดียว (28 ต.ค. 2569: เดือน · ปฏิทินตัวเลข · 7/30 วันล่าสุด · ไม่มีเฉพาะวันแล้ว)', () => {
     expect(ov).toContain('aria-label="เลือกช่วงเวลา"');
     const pop = ov.slice(ov.indexOf('<PopoverContent'), ov.indexOf('</PopoverContent>'));
-    for (const k of ['ariaLabel="เลือกเดือน"', '<DateRangeCalendarPicker', 'aria-label="เฉพาะวันในสัปดาห์"']) expect(pop).toContain(k);
+    for (const k of ['ariaLabel="เลือกเดือน"', 'mode="range"', 'recruit-last7', 'recruit-last30']) expect(pop).toContain(k);
+    expect(pop).not.toContain('เฉพาะวันในสัปดาห์');
   });
   it('การ์ด 6 ใบถอดแล้ว · มีก้อนใบขอ + รายชื่อที่กรอกมา', () => {
     expect(ov).not.toContain('<OverviewKpi');

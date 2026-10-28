@@ -167,33 +167,3 @@ export function journeyPctText(value: number, total: number): string {
   if (value > 0 && (value / total) * 100 < 0.5) return '<1%';
   return `${Math.round((value / total) * 100)}%`;
 }
-
-/** วันในสัปดาห์ (เวลาไทย) ของเวลากรอกใบ · 0 = อาทิตย์ … 6 = เสาร์ */
-const BKK_WEEKDAY = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', weekday: 'short' });
-const WD: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-export function bangkokWeekday(iso: string): number | null {
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return null;
-  return WD[BKK_WEEKDAY.format(new Date(t))] ?? null;
-}
-
-/** ปุ่มเลือกวันในสัปดาห์ — เรียงจันทร์ก่อนแบบปฏิทินไทยที่ทีมใช้ */
-export const WEEKDAY_CHOICES: ReadonlyArray<{ day: number; label: string; short: string }> = [
-  { day: 1, label: 'จันทร์', short: 'จ.' },
-  { day: 2, label: 'อังคาร', short: 'อ.' },
-  { day: 3, label: 'พุธ', short: 'พ.' },
-  { day: 4, label: 'พฤหัส', short: 'พฤ.' },
-  { day: 5, label: 'ศุกร์', short: 'ศ.' },
-  { day: 6, label: 'เสาร์', short: 'ส.' },
-  { day: 0, label: 'อาทิตย์', short: 'อา.' },
-];
-
-/** กรองเฉพาะวันในสัปดาห์ที่เลือก (ว่าง = ทุกวัน) */
-export function filterByWeekdays<T extends { createdAt: string }>(list: readonly T[], days: readonly number[]): T[] {
-  if (days.length === 0) return [...list];
-  const set = new Set(days);
-  return list.filter((f) => {
-    const d = bangkokWeekday(f.createdAt);
-    return d !== null && set.has(d);
-  });
-}
