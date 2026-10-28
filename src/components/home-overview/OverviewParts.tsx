@@ -9,6 +9,11 @@ import { Card } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import Num from '@/components/home-exec/Num';
 import { FUNNEL_CHANNELS, type FunnelChannel } from '@/lib/homeOverviewFunnel';
+import { FOUR_MAIN_OTHER } from '@/lib/channelFourMain';
+
+/** ช่องทางที่โชว์ในป้าย/ตาราง — "อื่น ๆ" ขึ้นเฉพาะเมื่อมีคน */
+const shownChannels = (channels?: Record<FunnelChannel, number>) =>
+  FUNNEL_CHANNELS.filter((c) => c !== FOUR_MAIN_OTHER || (channels?.[c] ?? 0) > 0);
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 
@@ -73,13 +78,15 @@ export function OverviewNode({
   children?: React.ReactNode;
 }) {
   return (
-    <button
+    // ปุ่มของ shadcn (CLAUDE.md "ห้ามสร้าง Button ใหม่เอง") — ghost + จัดเป็นการ์ดแนวตั้ง
+    <Button
       type="button"
+      variant="ghost"
       onClick={onClick}
       disabled={!onClick}
       data-testid={testId}
       className={cn(
-        'flex min-w-0 flex-col gap-1 rounded-xl p-3 text-left transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0',
+        'h-auto min-w-0 flex-col items-stretch justify-start gap-1 whitespace-normal rounded-xl p-3 text-left font-normal transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-100 motion-reduce:transition-none motion-reduce:hover:translate-y-0',
         emphasis ? TONE[emphasis].wash : 'bg-muted/50 hover:bg-muted',
         big && 'p-4',
         className,
@@ -97,7 +104,7 @@ export function OverviewNode({
       </span>
       {sub ? <span className="text-xs tabular-nums text-muted-foreground">{sub}</span> : null}
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -108,7 +115,7 @@ export const CHANNEL_TONE: Record<FunnelChannel, ToneKey> = {
   Webjob: 'teal',
   Offline: 'orange',
   iRecruit: 'violet',
-  'เว็บ So Recruit': 'neutral',
+  'อื่น ๆ': 'neutral',
 };
 
 /** แถบช่องทางบาง ๆ ใต้ขั้น — กว้างวิ่งเข้าตอนเปิดหน้า · ชิ้นรวมกัน = เลขของขั้น */
@@ -132,10 +139,10 @@ export function ChannelStrip({ channels, total }: { channels: Record<FunnelChann
   );
 }
 
-export function ChannelLegend() {
+export function ChannelLegend({ channels }: { channels?: Record<FunnelChannel, number> }) {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-      {FUNNEL_CHANNELS.map((c) => (
+      {shownChannels(channels).map((c) => (
         <span key={c} className="inline-flex items-center gap-1.5">
           <span className={cn('h-2 w-2 rounded-full', TONE[CHANNEL_TONE[c]].dot)} aria-hidden />
           {c}
@@ -152,7 +159,7 @@ export function ChannelTable({ channels }: { channels: Record<FunnelChannel, num
     <div className="space-y-2">
       <p className="text-sm font-medium text-foreground">มาจากช่องทางไหน</p>
       <ul className="space-y-1.5">
-        {FUNNEL_CHANNELS.map((c) => (
+        {shownChannels(channels).map((c) => (
           <li key={c} className="flex items-center gap-2 text-sm">
             <span className="flex w-32 shrink-0 items-center gap-1.5 truncate">
               <span className={cn('h-2 w-2 shrink-0 rounded-full', TONE[CHANNEL_TONE[c]].dot)} aria-hidden />

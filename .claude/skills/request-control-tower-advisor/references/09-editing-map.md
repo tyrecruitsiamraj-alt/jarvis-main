@@ -13972,3 +13972,14 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 | `src/lib/homeOverviewFunnel.ts` | **ใหม่ · pure** — `funnelChannelOf` (Facebook · Tiktok · Webjob · Offline · iRecruit · เว็บ So Recruit — ไม่มี "ไม่ระบุ") · `buildApplicantFunnel` 6 ขั้น · `appsInWindow` (คำตอบ recruit-overview มีใบช่วงเทียบติดมา ต้องกรอง) · เทสต์ `homeOverviewFunnel.test.ts` |
 | `src/lib/homeV3.ts` · `src/pages/HomePage.tsx` | ค่าตั้งต้น `overview` · หน้าผู้บริหารแบบแท็บ = `?home=exec` (ทางถอย ไม่จำ) |
 | `src/lib/jobBoardSearch.ts` | 28 ต.ค. 2569 ช่องค้นหากล่องงานค้นชื่อบนการ์ด (`jobBoardCardTitle` = จุดทำงาน) · `work_site_name` · `site_code` · ตำแหน่งที่ประกาศ · เจ้าหน้าที่ (สรรหา/คัดสรร/Online) — เดิมค้นแค่ชื่อบริษัท การ์ด "SO" ค้น "SO" ไม่เจอ · เทสต์ `boardSearchCardName2569-10-28` |
+
+### 28 ต.ค. 2569 (ค่ำ) — ข้อเคาะจาก Choice + แก้ตามรีวิว
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `api/_lib/callFollowup.ts` | `followAnswerOf` (ไป · ไม่ไป · ขอเลื่อน จากรหัส + ตัวอ่านคำตอบตัวเดียวกับหน้าติดตาม) · **ไป** ก็หยุดสายที่เหลือของวันนั้น/ใบงานนั้น (เดิมแค่ไม่ไป · เคสคุณนริศ) · ไม่ไป/ขอเลื่อน = กระดิ่งถึงคนสร้างรายการ + admin/supervisor (`follow_answer:<queueId>`) · ไม่ไปยังหยุดแค่วันนั้น (Choice คงเดิม) |
+| `src/lib/followPlanning.ts` | `answeredButMarkedUnreached`: จับใจความไม่ได้ (unresponsive) ไม่อ่านคำพูดแล้ว = สรุปไม่ได้ (Choice "เชื่อ Lumos") |
+| `src/lib/channelFourMain.ts` · `src/lib/homeOverviewFunnel.ts` | กติกาแยกช่องทางเหลือที่เดียว (`fourMainOf`) · ป้ายขึ้นต้น iRecruit = iRecruit ทุกใบ · ไม่มีป้าย = Webjob (เว็บสมัครงานของเรา) · ไม่มี "ไม่ระบุ" |
+| `scripts/channel-web-so-recruit-2569-10-28.mts` | **ใหม่** — ช่องทางรอง "เว็บสมัครงาน So Recruit" ใต้ Webjob + ใส่ช่องทางให้ใบ ต.ค. ที่ไม่มี (รันแล้ว 26 ใบ · audit `job_application.channel_backfill`) |
+| `api/_handlers/job-applications.ts` · `job-applications-import.ts` · `AddApplicantDialog.tsx` | ช่องทางบังคับทุกทางเข้า (เพิ่มเอง · นำเข้า) — 400 "เลือกช่องทางการรับสมัครก่อน" |
+| `src/pages/HomeOverviewPage.tsx` · `OverviewParts.tsx` · `ExecChannelChart.tsx` | ถอดแถวปุ่ม "ต้องทำ" (เคยสั่งถอดแล้ว) · "หาได้แล้ว · ลงงาน" แยกกล่องจากปิดครบ · กล่อง/แถวกดได้ใช้ `Button` ของ shadcn |

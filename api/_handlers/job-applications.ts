@@ -648,6 +648,8 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
   const v = parsed.value;
   // PDPA (148 · 15 ต.ค. 2569) — เจ้าหน้าที่ต้องยืนยันว่าผู้สมัครยินยอมแล้วก่อนคีย์
   if (b.pdpa_consent !== true) return sendError(res, 400, 'Bad request', PDPA_CONSENT_REQUIRED_MESSAGE_STAFF);
+  // ทุกใบต้องมีช่องทาง (เจ้าของ 28 ต.ค. 2569 Choice "บังคับทุกทางเข้า")
+  if (typeof b.channel_label !== 'string' || !b.channel_label.trim()) return sendError(res, 400, 'Bad request', 'เลือกช่องทางการรับสมัครก่อน');
 
   const scopedJobIds = await loadScopedJobIdSet(req.user);
   if (scopedJobIds && v.job_id && !scopedJobIds.has(v.job_id)) {

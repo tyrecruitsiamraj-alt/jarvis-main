@@ -171,7 +171,7 @@ describe('POST — ตัวอย่างก่อนบันทึก / บ�
     // ลำดับในไฟล์ ค → ข → ก แต่ล็อกต้องเรียงเบอร์ (คนนำเข้าพร้อมกันสองไฟล์ไม่ deadlock)
     const file = xlsxBase64([H, person('ค', '0833333333'), person('ข', '0822222222'), person('ก', '0811111111')]);
     const { res, json } = mockRes();
-    await handler(req('POST', { file_base64: file, dry_run: false, responsible_name: 'เจ้าหน้าที่ ก', pdpa_consent: true }) as never, res as never);
+    await handler(req('POST', { file_base64: file, dry_run: false, responsible_name: 'เจ้าหน้าที่ ก', pdpa_consent: true, channel_label: 'Facebook · Facebook Group' }) as never, res as never);
     const body = json.mock.calls[0][0];
     expect(body.inserted).toBe(2);
     expect(body.rows.map((r: { row: number; reason: string | null }) => [r.row, r.reason])).toEqual([
@@ -200,7 +200,7 @@ describe('POST — ตัวอย่างก่อนบันทึก / บ�
       /^insert into/i.test(sql) ? Promise.reject(Object.assign(new Error('boom'), { code: '22001' })) : Promise.resolve({ rows: [] }),
     );
     const { res, status } = mockRes();
-    await handler(req('POST', { file_base64: xlsxBase64([H, person('ก', '0811111111')]), dry_run: false, pdpa_consent: true }) as never, res as never);
+    await handler(req('POST', { file_base64: xlsxBase64([H, person('ก', '0811111111')]), dry_run: false, pdpa_consent: true, channel_label: 'Facebook · Facebook Group' }) as never, res as never);
     expect(status).toHaveBeenCalledWith(500);
     expect(audit).not.toHaveBeenCalled();
   });
@@ -225,7 +225,7 @@ describe('POST — ตัวอย่างก่อนบันทึก / บ�
     expect(dry.json.mock.calls[0][0].ready).toBe(1);
 
     const { res, json } = mockRes();
-    await handler(req('POST', { file_base64: file, dry_run: false, pdpa_consent: true }) as never, res as never);
+    await handler(req('POST', { file_base64: file, dry_run: false, pdpa_consent: true, channel_label: 'Facebook · Facebook Group' }) as never, res as never);
     expect(json.mock.calls[0][0].inserted).toBe(1);
     const insert = txQuery.mock.calls.find((c) => /^insert into/i.test(String(c[0])));
     expect(String(insert?.[0])).toMatch(/department_code\)/);
@@ -259,6 +259,7 @@ describe('POST — นำเข้าตามกล่อง + ส่ง AI โ
     file_base64: file(),
     dry_run: false,
     pdpa_consent: true,
+    channel_label: 'Facebook · Facebook Group',
     job_id: 'J1',
     job_title: 'คนสวน',
     send_ai: true,
@@ -346,6 +347,16 @@ describe('ทางเข้าบนการ์ด (15 ต.ค. 2569 · เจ
   });
 });
 
+describe('ช่องทางบังคับ (28 ต.ค. 2569)', () => {
+  it('บันทึกจริงโดยไม่มีช่องทาง = 400 ไม่เขียนอะไร', async () => {
+    const a = mockRes();
+    await handler(req('POST', { file_base64: xlsxBase64([H, person('ก', '0811111111')]), dry_run: false, pdpa_consent: true }) as never, a.res as never);
+    expect(a.status).toHaveBeenCalledWith(400);
+    expect(a.json.mock.calls[0][0].message).toBe('เลือกช่องทางการรับสมัครก่อน');
+    expect(txQuery).not.toHaveBeenCalled();
+  });
+});
+
 describe('PDPA (15 ต.ค. 2569)', () => {
   it('🔴 บันทึกจริงไม่ติ๊กยินยอม = 400 ไม่บันทึก · ตัวอย่างก่อนบันทึกไม่ต้องติ๊ก', async () => {
     const file = xlsxBase64([H, person('ก', '0811111111')]);
@@ -364,7 +375,7 @@ describe('PDPA (15 ต.ค. 2569)', () => {
       /^insert into/i.test(sql) ? Promise.resolve({ rows: [{ id: '11111111-1111-4111-8111-111111111111' }] }) : Promise.resolve({ rows: [] }),
     );
     const { res } = mockRes();
-    await handler(req('POST', { file_base64: xlsxBase64([H, person('ก', '0811111111')]), dry_run: false, pdpa_consent: true }) as never, res as never);
+    await handler(req('POST', { file_base64: xlsxBase64([H, person('ก', '0811111111')]), dry_run: false, pdpa_consent: true, channel_label: 'Facebook · Facebook Group' }) as never, res as never);
     const c = dbQuery.mock.calls.find((x) => /app_application_consents/.test(String(x[0])));
     expect(c?.[1]).toEqual([['11111111-1111-4111-8111-111111111111'], 'import', 'v1-2569-10-17', 'staff@example.com']);
   });

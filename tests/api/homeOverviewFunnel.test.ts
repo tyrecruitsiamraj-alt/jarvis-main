@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { appsInWindow, buildApplicantFunnel, FUNNEL_CHANNELS, funnelChannelOf } from '@/lib/homeOverviewFunnel';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
@@ -11,22 +12,27 @@ const f = (over: Partial<RecruitAppFact>): RecruitAppFact =>
   }) as RecruitAppFact;
 
 describe('ช่องทางของใบ', () => {
-  it('ป้ายจริงบนเว็บ 28 ต.ค. ลงช่องตามหน้าช่องทาง · iRecruit แยก · ไม่มีป้าย = เว็บ So Recruit', () => {
+  it('ป้ายจริงบนเว็บ 28 ต.ค. ลงช่องตามหน้าช่องทาง · iRecruit ทุกใบ = iRecruit · ไม่มีป้าย = Webjob (เว็บสมัครงานของเรา)', () => {
     const cases: Array<[string | null, string | null, string]> = [
       ['Facebook Group · กลุ่มหางานจังหวัด', null, 'Facebook'],
       ['Facebook · Facebook Page', null, 'Facebook'],
       ['Tiktok · Tiktok Live', null, 'Tiktok'],
       ['Webjob · JOBBKK', null, 'Webjob'],
       ['iRecruit', null, 'iRecruit'],
-      ['iRecruit · Jobthai', null, 'Webjob'],
+      ['iRecruit · Jobthai', null, 'iRecruit'],
       ['iRecruit · Line', null, 'iRecruit'],
       ['Call in', null, 'Offline'],
       [null, 'tiktok', 'Tiktok'],
-      [null, null, 'เว็บ So Recruit'],
-      [null, 'other', 'เว็บ So Recruit'],
+      [null, null, 'Webjob'],
+      [null, 'other', 'Webjob'],
+      [null, 'line_oa', 'อื่น ๆ'],
+      ['LINE OA', null, 'อื่น ๆ'],
+      ['Webjob · เว็บสมัครงาน So Recruit', null, 'Webjob'],
     ];
     for (const [label, ref, want] of cases) expect(funnelChannelOf({ channelLabel: label, referralSource: ref }), `${label}|${ref}`).toBe(want);
     expect(FUNNEL_CHANNELS).not.toContain('ไม่ระบุ');
+    // กติกาแยกช่องทางมีที่เดียว (`fourMainOf`) — รีวิว 28 ต.ค. 2569
+    expect(readFileSync('src/lib/homeOverviewFunnel.ts', 'utf8')).not.toMatch(/jobthai\|jobbkk/);
   });
 });
 

@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { HomeSection } from '@/components/home-ai-share/HomeSections';
 import { fourMainRows, type FourMain } from '@/lib/channelFourMain';
 import { cn } from '@/lib/utils';
+import { NUM } from '@/components/home-overview/OverviewParts';
 
 /**
  * ═══ ช่องทางไหนได้ผล — กราฟเทียบ 4 ช่องทางหลัก (เจ้าของ 28 ต.ค. 2569) ═══
@@ -22,7 +23,6 @@ const STAGES: ReadonlyArray<{ key: ChannelStage; label: string }> = [
   { key: 'placed', label: 'ลงงาน' },
 ];
 
-const NUM = new Intl.NumberFormat('th-TH');
 
 function Bar({ value, max, strong, className }: { value: number; max: number; strong?: boolean; className?: string }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
@@ -77,9 +77,10 @@ export default function ExecChannelChart({
           const expanded = open === r.main;
           return (
             <li key={r.main}>
-              <button
+              <Button
                 type="button"
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm hover:bg-muted/50"
+                variant="ghost"
+                className="h-auto w-full justify-start gap-3 whitespace-normal rounded-lg px-2 py-2 text-left text-sm font-normal hover:bg-muted/50"
                 onClick={() => setOpen(expanded ? null : r.main)}
                 aria-expanded={expanded}
                 data-testid={`exec-channel-${r.main}`}
@@ -90,7 +91,7 @@ export default function ExecChannelChart({
                 </span>
                 <Bar value={r.value} max={max} strong />
                 <span className="w-16 shrink-0 text-right font-medium tabular-nums text-foreground">{stages ? NUM.format(r.value) : '—'}</span>
-              </button>
+              </Button>
               {expanded ? (
                 <ul className="mb-2 ml-2 space-y-1 rounded-xl bg-muted/40 p-3 sm:ml-8" data-testid={`exec-channel-subs-${r.main}`}>
                   {r.subs.length === 0 ? (

@@ -8,36 +8,31 @@
  */
 import { appliedYmd } from './recruitOverview';
 import type { RecruitAppFact } from './recruitOverviewTypes';
-
-/** 4 ช่องทางหลักของหน้าช่องทาง + iRecruit (เจ้าของ "iRecruit เอามารวม" → แท่งแยก) + ใบที่สมัครผ่านเว็บเราแต่ไม่ได้เลือกช่องทาง */
-export const FUNNEL_CHANNELS = ['Facebook', 'Tiktok', 'Webjob', 'Offline', 'iRecruit', 'เว็บ So Recruit'] as const;
-export type FunnelChannel = (typeof FUNNEL_CHANNELS)[number];
-
-const WEB = /webjob|jobthai|jobbkk|jobsdb|job\s*db|jobfinfin|jonfinfin|linkedin|linkin|google|internet/i;
-const OFFLINE = /offline|ป้าย|ใบปลิว|แนะนำ|บอกต่อ|เพื่อน|ญาติ|ผู้ประสานงาน|จนท\.|เจ้าหน้าที่|พนักงานเก่า|โอนมา|สำนักงานใหญ่|academe|walk\s*in|call\s*in/i;
+import { FOUR_MAIN_OTHER, fourMainOf } from './channelFourMain';
 
 /**
- * ช่องทางหลักของใบ — ป้าย "หลัก · รอง" ใช้ชื่อหลัก · iRecruit ที่บอกช่องทางย่อย (เช่น "iRecruit · Jobthai") ใช้ช่องทางนั้น
- * ไม่มีป้ายเลย = ช่องทางที่ผู้สมัครเลือกในฟอร์มเก่า (referral) · ไม่มีทั้งคู่ = สมัครผ่านเว็บเราแต่ไม่ได้เลือก
- * (28 ต.ค. 2569 วัดจริง: 25 ใบของ ต.ค. กรอกเองทั้งหมด — ฟอร์มบังคับเลือกช่องทางแล้ว)
+ * 4 ช่องทางหลักของหน้าช่องทาง + iRecruit (เจ้าของ 28 ต.ค. 2569 Choice "นับเป็น iRecruit ทั้งหมด") +
+ * อื่น ๆ (ป้ายที่ไม่เข้า 4 หลัก เช่น LINE OA — ขึ้นเมื่อมีคน) · ไม่มี "ไม่ระบุ" (เจ้าของ "ไม่เอาไม่ระบุ")
+ */
+export const FUNNEL_CHANNELS = ['Facebook', 'Tiktok', 'Webjob', 'Offline', 'iRecruit', FOUR_MAIN_OTHER] as const;
+export type FunnelChannel = (typeof FUNNEL_CHANNELS)[number];
+
+/**
+ * ช่องทางของใบ — กติกาแยกช่องทางตัวเดียวกับกราฟช่องทาง (`fourMainOf`) ห้ามเขียนซ้ำ
+ * - ป้ายขึ้นต้น iRecruit (รวม "iRecruit · Jobthai") = iRecruit ทุกใบ
+ * - ป้าย "หลัก · รอง" = ตัดสินจากส่วนหัว
+ * - ไม่มีป้าย = ช่องทางที่ผู้สมัครเลือกในฟอร์มเก่า (referral) · ไม่มีอะไรเลย = กรอกผ่านเว็บสมัครงานของเรา ⇒ Webjob
+ *   (เจ้าของ 28 ต.ค. 2569 Choice "ย้ายเข้า Webjob · เว็บสมัครงาน So Recruit" · ฟอร์มบังคับเลือกช่องทางแล้ว)
  */
 export function funnelChannelOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referralSource'>): FunnelChannel {
   const parts = (f.channelLabel ?? '').split(' · ').map((p) => p.trim()).filter(Boolean);
-  let head = parts[0] ?? '';
-  const irecruit = /^irecruit$/i.test(head);
-  if (irecruit) head = parts[1] ?? '';
-  if (/^facebook/i.test(head)) return 'Facebook';
-  if (/^tiktok/i.test(head) || /line\s*ai/i.test(head)) return 'Tiktok';
-  if (WEB.test(head)) return 'Webjob';
-  if (OFFLINE.test(head)) return 'Offline';
-  if (irecruit) return 'iRecruit';
-  if (!parts.length) {
-    const r = (f.referralSource ?? '').trim();
-    if (r === 'facebook') return 'Facebook';
-    if (r === 'tiktok') return 'Tiktok';
-    if (r === 'flyer') return 'Offline';
-  }
-  return 'เว็บ So Recruit';
+  if (parts.length) return /^irecruit$/i.test(parts[0]) ? 'iRecruit' : fourMainOf(parts[0]);
+  const r = (f.referralSource ?? '').trim();
+  if (r === 'facebook') return 'Facebook';
+  if (r === 'tiktok') return 'Tiktok';
+  if (r === 'flyer') return 'Offline';
+  if (r === 'line_oa') return FOUR_MAIN_OTHER;
+  return 'Webjob';
 }
 
 export type FunnelTone = 'success' | 'warn' | 'danger' | 'neutral';

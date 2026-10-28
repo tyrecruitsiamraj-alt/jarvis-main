@@ -413,6 +413,9 @@ export function answeredButMarkedUnreached(
 ): boolean {
   const ai = (entry.call_outcome ?? '').trim();
   if (!(UNREACHED_CALL_OUTCOMES as readonly string[]).includes(ai)) return false;
+  // 🔴 จับใจความไม่ได้ (unresponsive) = เชื่อ Lumos ห้ามอ่านคำพูดแล้วตีเป็นไป/ไม่ไป (เจ้าของ 28 ต.ค. 2569 Choice
+  //    "เชื่อ Lumos = สรุปไม่ได้เสมอ" · กติกาเดียวกับ 20 ต.ค. ใน `classifyCallMicro`) — เคสคุณนริศ AI ไม่ได้ยินแต่ระบบเดาเอง
+  if (ai === 'unresponsive') return false;
   // 🔴 เสียงระบบฝากข้อความ/ปิดเครื่อง ไม่ใช่คนรับ — เชื่อ Lumos (7 ต.ค. 2569 ปัญหา Lumos ข้อ 7)
   if (isVoicemailReply(entry.call_reply)) return false;
   return /[\p{L}\p{N}]/u.test(entry.call_reply ?? '');

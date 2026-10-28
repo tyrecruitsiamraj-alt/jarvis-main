@@ -145,6 +145,8 @@ const AddApplicantDialog: React.FC<{
       return setError('อายุต้องอยู่ระหว่าง 15–80 ปี');
     }
     if (!callMode) return setError('เลือกว่าจะส่ง AI โทร หรือเก็บไปโทรเอง');
+    // ทุกใบต้องมีช่องทาง (เจ้าของ 28 ต.ค. 2569 Choice "บังคับทุกทางเข้า")
+    if (!channel) return setError('เลือกช่องทางการรับสมัครก่อน');
     if (!consent) return setError(PDPA_CONSENT_REQUIRED_MESSAGE_STAFF);
     const picked = jobPick === NO_JOB ? null : (openJobs.find((j) => j.id === jobPick) ?? null);
     // เปิดจากป๊อปของใบที่ไม่อยู่ในลิสต์ใบเปิด (หรือลิสต์ยังไม่มา) = ใช้ข้อมูลใบที่ส่งมา
@@ -311,7 +313,7 @@ const AddApplicantDialog: React.FC<{
               />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <label className={labelCls}>ช่องทางการรับสมัคร</label>
+              <label className={labelCls}>ช่องทางการรับสมัคร *</label>
               <ChannelPicker value={channel} onChange={setChannel} reloadKey={open} />
             </div>
           </div>

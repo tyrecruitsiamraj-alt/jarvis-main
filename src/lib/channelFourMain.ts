@@ -12,17 +12,20 @@ import { MAIN_CHANNEL_NAMES } from './channelSub';
 export type FourMain = (typeof MAIN_CHANNEL_NAMES)[number] | 'อื่น ๆ';
 export const FOUR_MAIN_OTHER = 'อื่น ๆ' as const;
 
-const WEB = /webjob|jobthai|jobbkk|jobsdb|job\s*db|jobfinfin|jonfinfin|linkedin|linkin|google|internet/i;
-const OFFLINE =
+export const CHANNEL_WEB_RE = /webjob|jobthai|jobbkk|jobsdb|job\s*db|jobfinfin|jonfinfin|linkedin|linkin|google|internet/i;
+export const CHANNEL_OFFLINE_RE =
   /offline|ป้าย|ใบปลิว|แนะนำ|บอกต่อ|เพื่อน|ญาติ|ผู้ประสานงาน|จนท\.|เจ้าหน้าที่|พนักงานเก่า|โอนมา|สำนักงานใหญ่|academe|walk\s*in|call\s*in/i;
 
-/** ช่องทางหลักของชื่อช่องทาง (ชื่อจาก `mainChannelOf` ของตารางช่องทาง) */
+/**
+ * ช่องทางหลักของชื่อช่องทาง (ชื่อจาก `mainChannelOf` ของตารางช่องทาง · ส่วนหัวของป้ายบนใบสมัคร)
+ * 🔴 ตัวตัดสินเดียวของทั้งระบบ — เส้นผู้สมัครบนหน้าหลัก (`homeOverviewFunnel`) เรียกตัวนี้ ห้ามเขียนกติกาซ้ำ (รีวิว 28 ต.ค. 2569)
+ */
 export function fourMainOf(channel: string): FourMain {
   const ch = channel.trim();
   if (/^facebook/i.test(ch)) return 'Facebook';
   if (/^tiktok/i.test(ch) || /line\s*ai/i.test(ch)) return 'Tiktok';
-  if (WEB.test(ch)) return 'Webjob';
-  if (OFFLINE.test(ch)) return 'Offline';
+  if (CHANNEL_WEB_RE.test(ch)) return 'Webjob';
+  if (CHANNEL_OFFLINE_RE.test(ch)) return 'Offline';
   return FOUR_MAIN_OTHER;
 }
 

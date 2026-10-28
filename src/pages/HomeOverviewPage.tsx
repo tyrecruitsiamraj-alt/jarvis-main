@@ -482,7 +482,7 @@ const HomeOverviewPage: React.FC = () => {
         <div className="grid grid-cols-2 items-stretch gap-2 sm:grid-cols-5">
           <OverviewNode label="ยกมา" value={flow?.carryInRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.carryIn)} คน` : undefined} onClick={flow ? () => openList('ยกมา', flowRows((f) => f.carry)) : undefined} testId="overview-req-carry" />
           <OverviewNode label="+ ขอใหม่" value={flow?.newRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.newPositions)} คน` : undefined} onClick={flow ? openNew : undefined} testId="overview-req-new" />
-          <OverviewNode label="− ปิดครบ" value={flow?.closedRequests} unit="ใบ" emphasis="success" sub={flow ? `หาได้ ${NUM.format(flow.filled)} คน` : undefined} onClick={flow ? () => openList('ปิดครบ', flowRows((f) => f.closed)) : undefined} testId="overview-req-closed" />
+          <OverviewNode label="− ปิดครบ" value={flow?.closedRequests} unit="ใบ" emphasis="success" onClick={flow ? () => openList('ปิดครบ', flowRows((f) => f.closed)) : undefined} testId="overview-req-closed" />
           <OverviewNode
             label="− ยกเลิก"
             value={flow?.cancelledRequests}
@@ -500,6 +500,17 @@ const HomeOverviewPage: React.FC = () => {
             testId="overview-req-cancel"
           />
           <OverviewNode label="= เหลือหา" value={flow?.remainingRequests} unit="ใบ" emphasis="warn" sub={flow ? `${NUM.format(flow.remaining)} คน` : undefined} onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined} testId="overview-req-remain" />
+        </div>
+        {/* หาได้แล้ว (ลงงาน) แยกกล่อง — คนที่หาได้ทุกใบ รวมใบที่ได้บางส่วน ≠ ปิดครบ (CLAUDE.md "ห้ามปน หาได้แล้ว กับ ปิดครบใบขอ") */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <OverviewNode
+            label="หาได้แล้ว · ลงงาน"
+            value={flow?.filled}
+            unit="คน"
+            emphasis="success"
+            onClick={flow ? () => openList('หาได้แล้ว', openReqs.filter((r) => r.filledInWindow > 0)) : undefined}
+            testId="overview-req-filled"
+          />
         </div>
         <div className="space-y-1 text-xs tabular-nums text-muted-foreground">
           <p data-testid="overview-req-sum">
@@ -563,32 +574,7 @@ const HomeOverviewPage: React.FC = () => {
             </OverviewNode>
           ))}
         </div>
-        <ChannelLegend />
-        <div className="flex flex-wrap gap-2" data-testid="overview-todo">
-          {(
-            [
-              ['สนใจแล้ว ยังไม่มีคนโทรต่อ', backlog?.waitingStaff.total, 'คน', () => setPanel({ title: 'สนใจแล้ว ยังไม่มีคนโทรต่อ', sub: 'ณ วันนี้', go: PAGE.applicants, body: <PanelRows unit="คน" rows={backlog ? [{ label: 'ตอบ AI ไม่ถึง 1 วัน', value: backlog.waitingStaff.d0 }, { label: 'รอมา 1–3 วัน', value: backlog.waitingStaff.d1_3 }, { label: 'รอมาเกิน 3 วัน', value: backlog.waitingStaff.over3, emphasis: 'danger' }] : []} /> })],
-              ['นัดที่ยังไม่บันทึกผล', backlog?.appointments ? backlog.appointments.overdue + backlog.appointments.next7 : undefined, 'นัด', () => setPanel({ title: 'นัดที่ยังไม่บันทึกผล', sub: 'ณ วันนี้', go: PAGE.appointments, body: <PanelRows unit="นัด" rows={backlog?.appointments ? [{ label: 'เลยวันนัดแล้ว', value: backlog.appointments.overdue, emphasis: 'danger' }, { label: 'นัดใน 7 วันข้างหน้า', value: backlog.appointments.next7 }] : []} /> })],
-              ['ประกาศแล้ว ไม่มีคนกรอก', req?.releasedNoApps, 'ใบ', () => openRequestList('ประกาศแล้ว ไม่มีคนกรอก', (r) => r.released && r.applications === 0)],
-              ['ยังไม่ประกาศ', req?.notReleasedOpen, 'ใบ', () => openRequestList('ยังไม่ประกาศ · ยังเปิด', (r) => !r.released && r.open)],
-            ] as const
-          ).map(([label, n, unit, open]) => (
-            <Button
-              key={label}
-              type="button"
-              variant="outline"
-              size="sm"
-              className={cn('rounded-full', n ? TONE.warn.soft : null)}
-              disabled={n === undefined || n === null}
-              onClick={open}
-            >
-              {label}
-              <span className={cn('font-medium tabular-nums', n ? TONE.warn.value : 'text-muted-foreground')}>
-                {n === undefined || n === null ? '—' : NUM.format(n)} {unit}
-              </span>
-            </Button>
-          ))}
-        </div>
+        <ChannelLegend channels={funnel?.[0]?.channels} />
       </OverviewSection>
 
       {/* ── ติดตาม · ดูแลหลังเริ่มงาน ── */}

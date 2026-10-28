@@ -13,7 +13,7 @@ import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { GREETING_JOB_REF } from '../../src/lib/greetingCall.js';
 import { tableInAppSchema } from './schema.js';
 import { toE164Thai } from './thaiPhone.js';
-import { notifyRoles } from './appNotifications.js';
+import { notifyRoles, notifyUsers } from './appNotifications.js';
 import {
   isCallOutcome,
   resolveCallFollowup,
@@ -24,6 +24,7 @@ import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
 import { getLumosPushConfig } from './lumosPushClient.js';
 import { cancelFollowPlanAtLumos } from './followLumosCancel.js';
 import { logError, logInfo } from './logger.js';
+import { classifyFollowCall } from '../../src/lib/followCallMicro.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 const suppressionTable = tableInAppSchema('candidate_call_suppression');
@@ -280,14 +281,85 @@ export async function applyCallFollowupToQueueRow(input: {
   // ตารางที่เหลือทั้งชุดหายไปเงียบ ๆ · ให้ติดธง needs_human แล้วรอคนตัดสินแทน
   //
   // 🔴 ต้องหยุด **ที่ Lumos ด้วย** ไม่ใช่แค่คิวฝั่งเรา (1 ต.ค. 2569) — ดู `cancelFollowSetAfterDecline`
-  if (input.outcome === 'declined' && (followGroupId || followSchedule.scheduled)) {
+  //
+  // 🔴 28 ต.ค. 2569 (เจ้าของ Choice "ยกเลิกสายที่เหลือของวันนั้น"): **ตอบว่าไปแล้ว** ก็หยุดแบบเดียวกัน
+  //    เคสคุณนริศ: 06:40 ตอบ "รอรถตู้ฟอร์ดครับ" (ไป) แต่ 07:40 ยังโดนโทรอีก 3 ครั้ง — Lumos โทรทุก step แม้ยืนยันแล้ว
+  //    ตัดสิน "ไป" ด้วยตัวอ่านคำตอบตัวเดียวกับหน้าติดตาม (`followSaidGoing`) · ส่งคนแทน = สายที่เหลือของใบงานเดียวกัน
+  const answer = followAnswerOf(input.outcome, input.result);
+  if ((answer === 'going' || answer === 'not_going') && (followGroupId || followSchedule.scheduled)) {
     await cancelFollowSetAfterDecline(String(row.person_ref ?? ''), followGroupId).catch(() => {});
+  }
+  // 28 ต.ค. 2569 (เจ้าของ Choice "แจ้งเตือนทันที" · "แจ้งเตือนให้คนโทรนัด"): ไม่ไป / ขอเลื่อน ⇒ กระดิ่งถึงคนสร้างรายการ + หัวหน้า
+  if (answer === 'not_going' || answer === 'reschedule') {
+    await notifyFollowAnswer(String(row.person_ref ?? ''), input.queueId, answer, input.result).catch(() => {});
   }
 
   return decision;
 }
 
 const followTable = tableInAppSchema('follow_entries');
+
+export type FollowAnswer = 'going' | 'not_going' | 'reschedule' | null;
+
+/** คำตอบของสายติดตามจาก AI — ไป / ไม่ไป / ขอเลื่อน · ที่เหลือ null (ไม่รับสาย · จับใจความไม่ได้ · ไม่ใช่เจ้าตัว ฯลฯ) */
+export function followAnswerOf(outcome: string, result: unknown): FollowAnswer {
+  if (outcome === 'reschedule_requested') return 'reschedule';
+  if (outcome === 'declined') return 'not_going';
+  if (followSaidGoing(outcome, result)) return 'going';
+  if (outcome === 'acknowledged' && followReadAnswer(outcome, result) === 'said_not_going') return 'not_going';
+  return null;
+}
+
+function followReadAnswer(outcome: string, result: unknown) {
+  const r = (typeof result === 'object' && result !== null ? result : {}) as { summary?: unknown; transcript?: unknown };
+  const reply = Array.isArray(r.transcript)
+    ? r.transcript
+        .filter((t): t is { role?: unknown; text?: unknown } => typeof t === 'object' && t !== null)
+        .filter((t) => t.role === 'candidate')
+        .map((t) => String(t.text ?? '').trim())
+        .filter(Boolean)
+        .join(' ')
+    : '';
+  return classifyFollowCall({ outcome, reply, summary: typeof r.summary === 'string' ? r.summary : null });
+}
+
+/** กระดิ่ง "ไม่ไป / ขอเลื่อน" — คนสร้างรายการ + แอดมิน/หัวหน้า · กลืน error เอง (ห้ามทำให้การรับผลล้ม) */
+async function notifyFollowAnswer(personRef: string, queueId: number, answer: 'not_going' | 'reschedule', result: unknown): Promise<void> {
+  const id = personRef.startsWith('follow-') ? personRef.slice('follow-'.length) : '';
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return;
+  try {
+    const { rows } = await dbQuery<{ created_by: string | null; name: string | null; unit: string | null; team: string | null; at: string | Date | null }>(
+      `select created_by::text as created_by, recipient_name as name, unit_name as unit, follow_team as team, scheduled_at as at
+         from ${followTable} where id = $1::uuid limit 1`,
+      [id],
+    );
+    const f = rows[0];
+    if (!f) return;
+    const summary = typeof (result as { summary?: unknown } | null)?.summary === 'string' ? String((result as { summary: string }).summary) : '';
+    const day = f.at ? new Date(f.at).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short' }) : null;
+    const input = {
+      type: answer === 'not_going' ? 'follow_not_going' : 'follow_reschedule',
+      title: `${f.name?.trim() || 'ผู้รับสาย'} ${answer === 'not_going' ? 'บอกไม่ไป' : 'ขอเลื่อน'}${f.unit?.trim() ? ` · ${f.unit.trim()}` : ''}${day ? ` · ${day}` : ''}`,
+      body: summary.slice(0, 160),
+      link: f.team === 'replacement' ? '/follow?view=replace' : '/follow',
+      dedupeKey: `follow_answer:${queueId}`,
+    };
+    if (f.created_by) await notifyUsers([f.created_by], input);
+    await notifyRoles(['admin', 'supervisor'], input);
+  } catch (e) {
+    logError('follow.answer.notify failed', e, { personRef, answer });
+  }
+}
+
+/**
+ * ผลของ AI นี้คือ "ไป" ไหม — ตัวอ่านคำตอบเดียวกับถัง "ไป" ของหน้าติดตาม (`classifyFollowCall`: บอกว่าไป · กำลังเตรียมตัว)
+ * เฉพาะรหัสที่มีคนคุยจริง (confirmed / acknowledged) · จับใจความไม่ได้ (unresponsive) ห้ามเดาเป็นไป
+ */
+export function followSaidGoing(outcome: string, result: unknown): boolean {
+  if (outcome !== 'confirmed' && outcome !== 'acknowledged') return false;
+  const kind = followReadAnswer(outcome, result);
+  return kind === 'said_going' || kind === 'getting_ready';
+}
 
 /**
  * แถวนี้เป็น **สายตั้งตาราง** ไหม + กลุ่มของมันคืออะไร
