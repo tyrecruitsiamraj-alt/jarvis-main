@@ -11,8 +11,9 @@ describe('หน้าหลักสรุปหน้าเดียว', () =
     for (const i of at) expect(i).toBeGreaterThan(0);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
   });
-  it('ไม่มีแท็บ · ค่าเริ่มเดือนนี้ · แผงมีปุ่มไปหน้าเต็ม', () => {
-    expect(page).not.toContain('TabsList');
+  it('แท็บมีแค่ ภาพรวม · สัดส่วน (เจ้าของสั่งเพิ่ม 28 ต.ค. 2569) · ค่าเริ่มเดือนนี้ · แผงมีปุ่มไปหน้าเต็ม', () => {
+    expect(page.match(/<TabsTrigger value=/g)?.length).toBe(2);
+    expect(page).toContain("useState<'overview' | 'proportion'>('overview')");
     expect(page).toContain('thisMonthWindow(today)');
     expect(readFileSync('src/components/home-overview/OverviewParts.tsx', 'utf8')).toContain('ไปหน้าเต็ม · {panel.go.label}');
     for (const to of ["'/jobs/list'", "'/jobs/board?view=list'", "'/follow'", "'/aftercare'"]) expect(page).toContain(to);

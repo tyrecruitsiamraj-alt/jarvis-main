@@ -12,6 +12,8 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ProportionTab from '@/components/home-overview/ProportionTab';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import PeriodPicker from '@/components/shared/PeriodPicker';
 import BuChoiceSelect from '@/components/shared/BuChoiceSelect';
@@ -81,6 +83,7 @@ const HomeOverviewPage: React.FC = () => {
   usePageTitle('หน้าหลัก');
   const today = toYmdBangkok(new Date());
   const [win, setWin] = useState<AiShareWindow>(() => thisMonthWindow(today));
+  const [tab, setTab] = useState<'overview' | 'proportion'>('overview');
   const [bu, setBu] = useState<string | null>(null);
   const tick = useLiveTick(true, LIVE_MS);
   const range = useMemo(() => ({ from: win.from ?? ALL_FROM, to: win.to ?? today }), [win, today]);
@@ -407,7 +410,18 @@ const HomeOverviewPage: React.FC = () => {
   return (
     <div className="space-y-5" data-testid="home-overview">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-medium text-foreground">หน้าหลัก</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl font-medium text-foreground">หน้าหลัก</h1>
+          {/* แท็บ "สัดส่วน" (เจ้าของ 28 ต.ค. 2569 · ชื่อแท็บเจ้าของตั้งเอง) — ช่วง/BU ชุดเดียวกับภาพรวม */}
+          <Tabs value={tab} onValueChange={(v) => setTab(v === 'proportion' ? 'proportion' : 'overview')}>
+            <TabsList variant="glass" aria-label="เลือกมุมมอง">
+              <TabsTrigger value="overview">ภาพรวม</TabsTrigger>
+              <TabsTrigger value="proportion" data-testid="home-tab-proportion">
+                สัดส่วน
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <PeriodPicker value={win} onChange={setWin} />
           {kpi?.buChoices?.length ? (
@@ -431,6 +445,10 @@ const HomeOverviewPage: React.FC = () => {
           )}
         </div>
       </div>
+      {tab === 'proportion' ? (
+        <ProportionTab win={win} bu={bu} apps={apps} matching={ai?.matching ?? null} appsError={roError} />
+      ) : (
+      <>
       {moneyError || roError ? <p className={cn('text-sm', TONE.danger.value)}>{moneyError ?? roError}</p> : null}
 
       {/* ── ตอนนี้ ── */}
@@ -637,6 +655,8 @@ const HomeOverviewPage: React.FC = () => {
           </p>
         </OverviewSection>
       </div>
+      </>
+      )}
 
       <OverviewSheet panel={panel} onClose={() => setPanel(null)} />
       <ExecDrill drill={drill} all={openReqs} today={today} />

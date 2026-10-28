@@ -12,6 +12,7 @@ import type {
 import type { FollowJourneyResponse } from '@/lib/followJourney';
 import type { HomeLumosSummaryResponse } from '@/lib/homeLumosSummary';
 import type { TopicReportBlock, TopicReportResponse } from '@/lib/homeTopicReport';
+import type { ProportionPayload } from '@/lib/homeProportion';
 
 function queryOf(q: AiShareWindow & { bu?: string | null }, extra: Record<string, string> = {}): string {
   const p = new URLSearchParams(extra);
@@ -74,3 +75,8 @@ export function fetchTopicReport(block: TopicReportBlock, q: AiShareWindow & { b
   return read<TopicReportResponse>(`/api/home-ai-share${queryOf(q, { report: block })}`);
 }
 
+
+/** แท็บ "สัดส่วน" หน้าหลัก (28 ต.ค. 2569) — ติดตาม 3 ก้อน AI/คน + ทางเข้าของงาน */
+export function fetchHomeProportion(q: AiShareWindow & { bu?: string | null }): Promise<ProportionPayload> {
+  return read<ProportionPayload>(`/api/home-ai-share${queryOf(q, { proportion: '1' })}`);
+}

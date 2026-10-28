@@ -36,6 +36,8 @@ import {
   FOLLOW_QUEUE_MATCH,
 } from '../_lib/homeAiShareSql.js';
 import { logWarn } from '../_lib/logger.js';
+import { proportionEntrySql, proportionFollowSql } from '../_lib/homeProportionSql.js';
+import type { ProportionPayload } from '../../src/lib/homeProportion.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
 import {
@@ -661,6 +663,58 @@ async function handler(req: AuthedReq, res: ApiRes) {
       } catch (e) {
         logWarn('home-ai-share online failed', { error: errText(e) });
         body.error = 'โหลดข้อมูลทีม Online ไม่ขึ้น ลองรีเฟรชอีกครั้ง';
+      }
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json(body);
+    }
+
+    // `?proportion=1` = แท็บ "สัดส่วน" หน้าหลัก (28 ต.ค. 2569) — ติดตาม 3 ก้อน AI/คน + ทางเข้าของงาน · ช่วง/BU เดียวกับกล่อง
+    if (q.proportion !== undefined) {
+      const body: ProportionPayload = {
+        generated_at: new Date().toISOString(),
+        from: win.from,
+        to: win.to,
+        bu,
+        follow: null,
+        entry: null,
+        errors: {},
+      };
+      if (scope.mode === 'none') {
+        body.errors = { follow: 'บัญชีนี้ยังไม่ได้ผูกแผนก', entry: 'บัญชีนี้ยังไม่ได้ผูกแผนก' };
+        return res.status(200).json(body);
+      }
+      const { start, end } = aiShareBounds(win, new Date());
+      const [fr, er] = await Promise.allSettled([
+        dbQuery<{ lane: string; ai: number; both: number; staff: number; none: number; ai_unreached: number }>(
+          proportionFollowSql(),
+          [start, end, bu, AFTERCARE_TOPIC],
+        ),
+        dbQuery<Record<string, number>>(proportionEntrySql(), [start, end, bu]),
+      ]);
+      if (fr.status === 'fulfilled') {
+        const lane = (k: string) => {
+          const r = fr.value.rows.find((x) => x.lane === k);
+          return { ai: r?.ai ?? 0, both: r?.both ?? 0, staff: r?.staff ?? 0, none: r?.none ?? 0, aiUnreached: r?.ai_unreached ?? 0 };
+        };
+        body.follow = { starter: lane('starter'), replacement: lane('replacement'), aftercare: lane('aftercare') };
+      } else {
+        logWarn('home-ai-share proportion follow failed', { error: errText(fr.reason) });
+        body.errors.follow = 'โหลดตัวเลขติดตามไม่ขึ้น';
+      }
+      if (er.status === 'fulfilled') {
+        const r = er.value.rows[0] ?? {};
+        body.entry = {
+          selfApply: r.self_apply ?? 0,
+          irecruit: r.irecruit ?? 0,
+          soScraping: r.so_scraping ?? 0,
+          staffKeyed: r.staff_keyed ?? 0,
+          replaceSync: r.replace_sync ?? 0,
+          replaceManual: r.replace_manual ?? 0,
+          postOrders: r.post_orders ?? 0,
+        };
+      } else {
+        logWarn('home-ai-share proportion entry failed', { error: errText(er.reason) });
+        body.errors.entry = 'โหลดตัวเลขทางเข้าไม่ขึ้น';
       }
       res.setHeader?.('Cache-Control', 'no-store');
       return res.status(200).json(body);
