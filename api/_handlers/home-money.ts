@@ -22,6 +22,7 @@ import { logError } from '../_lib/logger.js';
 import { groupReplacements } from './request-pipeline.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
+import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
 import { followBuJoin, followBuSql, pickDashboardBu } from '../_lib/homeBuSql.js';
 
@@ -88,6 +89,17 @@ async function loadReplacements(sites: string[]): Promise<Record<string, Array<[
   }
 }
 
+/** ใบที่ติ๊ก "ต้องส่งคนแทน" ที่หน้าใบขอ (ไม่คิดค่าปรับ · `penaltyWaiver.ts` 28 ต.ค. 2569) · อ่านไม่ได้ = null (คิดเต็มแบบเดิม + บอกใน `errors`) */
+async function loadSendReplacement(nos: string[]): Promise<Set<string> | null> {
+  try {
+    const map = await getUnitNotesMap(nos);
+    return new Set([...map].filter(([, n]) => n.send_replacement === true).map(([no]) => no.trim().toUpperCase()));
+  } catch (e) {
+    logError('home-money: ต้องส่งคนแทน', e);
+    return null;
+  }
+}
+
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const shiftYmd = (ymd: string, days: number) => new Date(Date.parse(`${ymd}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 
@@ -108,12 +120,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const bu = picked.bu;
 
     const raw = await loadPenaltyLedgerRaw(departmentScope);
-    const rows = bu ? raw.rows.filter((r) => r.bu === bu) : raw.rows;
-    const [replacements, owners, aftercareUpcoming] = await Promise.all([
-      loadReplacements([...new Set(rows.map((r) => r.site))]),
-      loadOwners([...new Set(rows.map((r) => r.requestNo))]),
+    const scoped = bu ? raw.rows.filter((r) => r.bu === bu) : raw.rows;
+    const [replacements, owners, aftercareUpcoming, sendReplacement] = await Promise.all([
+      loadReplacements([...new Set(scoped.map((r) => r.site))]),
+      loadOwners([...new Set(scoped.map((r) => r.requestNo))]),
       loadAftercareUpcoming(bu),
+      loadSendReplacement([...new Set(scoped.map((r) => r.requestNo))]),
     ]);
+    const rows = sendReplacement ? scoped.map((r) => ({ ...r, sendReplacement: sendReplacement.has(r.requestNo.trim().toUpperCase()) })) : scoped;
     const ledger = buildPenaltyLedger(rows, raw.informs, today, { from, to: to > today ? today : to }, replacements ?? {});
     // เสียวันละ = สมุดของวันนี้วันเดียว (หักคนแทนแล้ว) — นิยามเดียวกับ "ตามสัญญา" (27 ต.ค. 2569)
     const todayCost = new Map(
@@ -138,6 +152,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       buChoices: picked.choices,
       errors: {
         ...(replacements ? {} : { replacement: 'อ่านส่งคนแทนไม่ได้ — ยอดนี้ยังไม่หักวันที่มีคนแทน' }),
+        ...(sendReplacement ? {} : { sendReplacement: 'อ่านช่องต้องส่งคนแทนไม่ได้ — ยอดนี้ยังคิดค่าปรับใบที่ติ๊กไว้' }),
       },
     };
     res.setHeader?.('Cache-Control', 'no-store');

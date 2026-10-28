@@ -84,11 +84,11 @@ describe('/api/app-user-names', () => {
       const src = readFileSync(`src/components/recruit-rm/${f}`, 'utf8');
       expect(src).not.toMatch(/apiFetch\('\/api\/app-users/);
       // ฟอร์มเพิ่มผู้สมัครขอเฉพาะสายงานสรรหา (21 ต.ค. 2569) — ยังเป็นเส้นเดียวกัน ไม่กลับไป /api/app-users
-      expect(src).toMatch(/fetchResponsibleNames\(('recruiter')?\)/);
+      expect(src).toMatch(/fetchResponsibleNames\(('recruiter'|'online')?\)/);
     }
-    // นำเข้า Excel ใช้ชื่อเล่นสายสรรหาชุดเดียวกับฟอร์มเพิ่มผู้สมัคร (เจ้าของ 27 ต.ค. 2569 "ระบุชื่อ ผู้รับผิดชอบ ว่าน")
+    // นำเข้า Excel = ชื่อเล่นทีม Online (เจ้าของ 28 ต.ค. 2569 "มันต้องชื่อทีม Online สิ" · แทน 27 ต.ค. สายสรรหา)
     const imp = readFileSync('src/components/recruit-rm/ImportApplicantsDialog.tsx', 'utf8');
-    expect(imp).toContain("fetchResponsibleNames('recruiter')");
+    expect(imp).toContain("fetchResponsibleNames('online')");
     expect(imp).toContain('{u.label ?? u.name}');
   });
 });

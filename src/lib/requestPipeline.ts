@@ -15,6 +15,7 @@
  */
 import { effectiveRequestDateYmd, getJobRequestAgeDays, isBeforeRequiredForAge } from './jobUrgency';
 import { countWorkingDays, parseWorkWeekdays } from './siteWorkdays';
+import { penaltyWaivedByReplacement } from './penaltyWaiver';
 import { isAiSaidYes, isFollowedReached, isStaffFollowed } from './recruitOverview';
 import type { RecruitAppFact } from './recruitOverviewTypes';
 import type { RequestPipelineResponse } from './requestPipelineTypes';
@@ -293,8 +294,10 @@ export function buildPipelineRequests(jobs: readonly JobRequest[], data: Request
       replacedDays = countWorkingDays(b.startYmd, data.today, b.weekdays) - countWorkingDays(b.startYmd, data.today, b.weekdays, days);
     }
     const penaltyDays = b.ageDays === null ? null : Math.max(0, b.ageDays - replacedDays);
-    const finePerDay = Number(b.job.penalty_per_day) || 0;
-    const deductPerDay = Number(b.job.deduct_per_day) || 0;
+    // ติ๊ก "ต้องส่งคนแทน" = ไม่คิดค่าปรับทั้งใบ (`penaltyWaiver.ts` · 28 ต.ค. 2569)
+    const waived = penaltyWaivedByReplacement(b.job.send_replacement);
+    const finePerDay = waived ? 0 : Number(b.job.penalty_per_day) || 0;
+    const deductPerDay = waived ? 0 : Number(b.job.deduct_per_day) || 0;
     return {
       job: b.job,
       jobId: b.jobId,

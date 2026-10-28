@@ -118,6 +118,13 @@ describe('ImportApplicantsDialog', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('ไฟล์ไม่มีคอลัมน์: เบอร์โทร');
   });
 
+  it('🔴 รายชื่อผู้รับผิดชอบ = ทีม Online (เจ้าของ 28 ต.ค. 2569 "มันต้องชื่อทีม Online สิ")', async () => {
+    const { apiFetch } = await import('@/lib/apiFetch');
+    render(<ImportApplicantsDialog open onClose={() => {}} onSaved={() => {}} />);
+    await waitFor(() => expect(vi.mocked(apiFetch).mock.calls.some(([u]) => u === '/api/app-user-names?lane=online')).toBe(true));
+    expect(vi.mocked(apiFetch).mock.calls.some(([u]) => u === '/api/app-user-names?lane=recruiter')).toBe(false);
+  });
+
   it('🔴 ผู้รับผิดชอบ/ช่องทางยังไม่โผล่จนกว่าจะเลือกไฟล์', () => {
     render(<ImportApplicantsDialog open onClose={() => {}} onSaved={() => {}} />);
     expect(screen.queryByTestId('import-shared')).toBeNull();

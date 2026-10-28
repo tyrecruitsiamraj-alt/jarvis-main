@@ -77,8 +77,9 @@ const ImportApplicantsDialog: React.FC<{
     setBusy(null);
     setError(null);
     // 🔴 ห้ามกลับไปใช้ /api/app-users (admin เท่านั้น — คนอื่นได้ลิสต์ว่าง นำเข้าไม่ได้ · 11 ต.ค. 2569)
-    // ชื่อเล่นสายสรรหา ชุดเดียวกับฟอร์มเพิ่มผู้สมัคร (เจ้าของ 27 ต.ค. 2569 "ต้องมีให้เลือกระบุชื่อ ผู้รับผิดชอบ ว่าน")
-    void fetchResponsibleNames('recruiter')
+    // ชื่อเล่นทีม Online (เจ้าของ 28 ต.ค. 2569 "มันต้องชื่อทีม Online สิ" · เดิม 27 ต.ค. ใช้สายสรรหา ว่านไม่อยู่ในลิสต์)
+    // ตั้งสายงาน Online + ชื่อเล่นที่ ตั้งค่า › ผู้ใช้งาน · ฟอร์มเพิ่มผู้สมัครยังเป็นสายสรรหา (21 ต.ค. 2569)
+    void fetchResponsibleNames('online')
       .then(setStaff)
       .catch((e) => {
         setStaff([]);

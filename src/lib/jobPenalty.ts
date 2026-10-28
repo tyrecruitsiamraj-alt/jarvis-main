@@ -1,5 +1,6 @@
 import { buildDateRangeYmd, parseYmd, toYmdLocal } from '@/lib/dateTh';
 import type { JobRequest, WorkCalendarEntry } from '@/types';
+import { penaltyWaivedByReplacement } from '@/lib/penaltyWaiver';
 
 /** สถานะ WL ที่ถือว่าส่งคนไปปฏิบัติงานแล้ว — ไม่นับค่าปรับวันนั้น */
 export const WL_COVERAGE_STATUSES = new Set<WorkCalendarEntry['status']>(['normal_work']);
@@ -66,6 +67,8 @@ export function computeJobPenaltyFields(
   coverageByUnit: Map<string, Set<string>>,
   today = new Date(),
 ): Pick<JobRequest, 'days_without_worker' | 'total_penalty'> {
+  // ติ๊ก "ต้องส่งคนแทน" = ไม่คิดค่าปรับทั้งใบ (`penaltyWaiver.ts` · 28 ต.ค. 2569)
+  if (penaltyWaivedByReplacement(job.send_replacement)) return { days_without_worker: 0, total_penalty: 0 };
   const days = countPenaltyDays(job, coverageByUnit, today);
   const rate = Math.max(0, job.penalty_per_day ?? 0);
   return {

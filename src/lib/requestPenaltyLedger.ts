@@ -21,9 +21,11 @@
  *   แบ่งให้ใบที่ต้องการก่อนก่อน (แบบเดียวกับ `allocateReplacements`) · แยกนับต่อจุดเริ่มนับ
  *   🔴 เฉพาะใบที่สัญญาให้ส่งคนแทนได้ (`st_request_p2.is_replace` = Y · เจ้าของ 27 ต.ค. 2569 "ส่งคนแทน = ไม่โดนปรับ")
  *      ใบที่ลูกค้าไม่รับคนแทน (N) = คนแทนไม่ช่วย ยังคิดเต็ม · ไม่รู้ (ว่าง) = หักแบบเดิม
+ * ติ๊ก "ต้องส่งคนแทน" ที่หน้าใบขอ (`sendReplacement`) = ไม่คิดค่าปรับทั้งใบ (`penaltyWaiver.ts` · เจ้าของ 28 ต.ค. 2569) · ใบยังอยู่ในรายการเพื่อนาฬิกา
  * ไฟล์นี้ pure — เทสต์ `src/lib/requestPenaltyLedger.test.ts`
  */
 import { parseWorkWeekdays } from './siteWorkdays';
+import { penaltyWaivedByReplacement } from './penaltyWaiver';
 
 export type PenaltyRequestRow = {
   requestNo: string;
@@ -54,6 +56,8 @@ export type PenaltyRequestRow = {
   replaceAccepted?: boolean | null;
   /** เงื่อนไขส่งคนแทนในสัญญา (`replace_detail1`) เช่น "ภายใน 3 ชั่วโมงนับจากที่ได้รับแจ้ง" */
   replaceWindow?: string | null;
+  /** ติ๊ก "ต้องส่งคนแทน" ที่หน้าใบขอ — true = ไม่คิดค่าปรับ/ลดมูลค่าทั้งใบ (`penaltyWaivedByReplacement` · 28 ต.ค. 2569) */
+  sendReplacement?: boolean | null;
 };
 
 export type PenaltyInform = {
@@ -149,7 +153,7 @@ export function buildPenaltyLedger(
     const advance = r.needYmd != null && r.needYmd > r.keyYmd;
     const amount: Record<LedgerMode, LedgerAmount> = { need: zero(), key: zero() };
 
-    if (r.needYmd && (r.finePerDay > 0 || r.deductPerDay > 0)) {
+    if (!penaltyWaivedByReplacement(r.sendReplacement) && r.needYmd && (r.finePerDay > 0 || r.deductPerDay > 0)) {
       const weekdays = parseWorkWeekdays(r.workDays);
       // ปลาย (ไม่รวม): วันจบของใบ · ใบเปิด = พรุ่งนี้ (รวมวันนี้)
       const endEx = r.endYmd ?? ymdOf(t(todayYmd) + DAY_MS);
