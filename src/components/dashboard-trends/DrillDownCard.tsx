@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronRight, ListTree, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
@@ -129,55 +130,98 @@ export default function DrillDownCard({
 
       {/* ปลายทาง — รายการใบขอ */}
       {showList && node.requests ? (
-        <div className="overflow-x-auto rounded-xl border border-border/70" data-testid="drill-requests">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className={cn('text-left text-xs', DASH.tableHead)}>
-                <th className="px-3 py-2 font-medium">ใบขอ</th>
-                <th className="px-3 py-2 font-medium">วันที่เข้ามา</th>
-                <th className="px-3 py-2 text-right font-medium">คนกรอก</th>
-              </tr>
-            </thead>
-            <tbody>
-              {node.requests.length === 0 ? (
-                <tr className={cn('border-t', DASH.tableRow)}>
-                  <td colSpan={3} className={cn('px-3 py-3 text-center text-xs', DASH.cellMuted)}>
-                    ไม่มีใบขอ
-                  </td>
-                </tr>
-              ) : (
-                node.requests.map((r) => (
-                  <tr key={`${r.requestNo}-${r.jobId}`} className={cn('border-t', DASH.tableRow)}>
-                    <td className={cn('px-3 py-2', DASH.cell)}>
-                      <span className="block text-foreground">{[r.unitName, r.position].filter(Boolean).join(' · ') || r.requestNo}</span>
-                      <span className="flex items-center gap-2 text-xs tabular-nums text-muted-foreground">
-                        {r.requestNo}
-                        {r.open ? null : <Badge variant="secondary">จบแล้ว</Badge>}
-                      </span>
-                    </td>
-                    <td className={cn('whitespace-nowrap px-3 py-2 tabular-nums', DASH.cell)}>{formatYmdTh(r.day)}</td>
-                    <td className="px-3 py-2 text-right">
-                      {r.applications > 0 && r.appIds.length > 0 ? (
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="xs"
-                          className="h-auto p-0 tabular-nums"
-                          onClick={() => onOpenNames(`${r.unitName ?? r.requestNo} · คนกรอก`, r.appIds)}
-                        >
-                          {fmt(r.applications)} คน
-                        </Button>
-                      ) : (
-                        <span className={cn('tabular-nums', DASH.cellMuted)}>{fmt(r.applications)}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DrillRequestTable key={trail.map((t) => t.label).join('|')} requests={node.requests} onOpenNames={onOpenNames} />
       ) : null}
     </Wrap>
+  );
+}
+
+/** หน้าละไม่เกินกี่ใบ — เจ้าของ 28 ต.ค. 2569 "ทำเป็น pagination ไม่เกิน 10 รายการก็พอ" */
+const REQUEST_PAGE = 10;
+
+/** ตารางใบขอปลายทาง — แบ่งหน้าละ 10 ใบ · เปลี่ยนกล่อง/ชั้น = กลับหน้าแรก (key จากผู้เรียก) */
+function DrillRequestTable({
+  requests,
+  onOpenNames,
+}: {
+  requests: NonNullable<DrillNode['requests']>;
+  onOpenNames: (title: string, ids: readonly string[]) => void;
+}) {
+  const [page, setPage] = React.useState(0);
+  const pages = Math.max(1, Math.ceil(requests.length / REQUEST_PAGE));
+  const cur = Math.min(page, pages - 1);
+  const shown = requests.slice(cur * REQUEST_PAGE, (cur + 1) * REQUEST_PAGE);
+  return (
+    <div className="space-y-2">
+      <div className="overflow-x-auto rounded-xl border border-border/70" data-testid="drill-requests">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className={cn('text-left text-xs', DASH.tableHead)}>
+              <th className="px-3 py-2 font-medium">ใบขอ</th>
+              <th className="px-3 py-2 font-medium">วันที่เข้ามา</th>
+              <th className="px-3 py-2 text-right font-medium">คนกรอก</th>
+            </tr>
+          </thead>
+          <tbody>
+            {requests.length === 0 ? (
+              <tr className={cn('border-t', DASH.tableRow)}>
+                <td colSpan={3} className={cn('px-3 py-3 text-center text-xs', DASH.cellMuted)}>
+                  ไม่มีใบขอ
+                </td>
+              </tr>
+            ) : (
+              shown.map((r) => (
+                <tr key={`${r.requestNo}-${r.jobId}`} className={cn('border-t', DASH.tableRow)}>
+                  <td className={cn('px-3 py-2', DASH.cell)}>
+                    <span className="block text-foreground">{[r.unitName, r.position].filter(Boolean).join(' · ') || r.requestNo}</span>
+                    <span className="flex items-center gap-2 text-xs tabular-nums text-muted-foreground">
+                      {r.requestNo}
+                      {r.open ? null : <Badge variant="secondary">จบแล้ว</Badge>}
+                    </span>
+                  </td>
+                  <td className={cn('whitespace-nowrap px-3 py-2 tabular-nums', DASH.cell)}>{formatYmdTh(r.day)}</td>
+                  <td className="px-3 py-2 text-right">
+                    {r.applications > 0 && r.appIds.length > 0 ? (
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="xs"
+                        className="h-auto p-0 tabular-nums"
+                        onClick={() => onOpenNames(`${r.unitName ?? r.requestNo} · คนกรอก`, r.appIds)}
+                      >
+                        {fmt(r.applications)} คน
+                      </Button>
+                    ) : (
+                      <span className={cn('tabular-nums', DASH.cellMuted)}>{fmt(r.applications)}</span>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      {pages > 1 ? (
+        <Pagination className="mx-0 w-auto justify-end" data-testid="drill-requests-pages">
+          <PaginationContent>
+            <PaginationItem>
+              <Button type="button" size="xs" variant="outline" disabled={cur === 0} onClick={() => setPage(cur - 1)}>
+                ก่อนหน้า
+              </Button>
+            </PaginationItem>
+            <PaginationItem>
+              <span className="px-2 text-xs tabular-nums text-muted-foreground">
+                หน้า {fmt(cur + 1)} / {fmt(pages)}
+              </span>
+            </PaginationItem>
+            <PaginationItem>
+              <Button type="button" size="xs" variant="outline" disabled={cur >= pages - 1} onClick={() => setPage(cur + 1)}>
+                ถัดไป
+              </Button>
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      ) : null}
+    </div>
   );
 }

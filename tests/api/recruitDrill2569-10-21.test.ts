@@ -101,3 +101,14 @@ describe('ใบขอเข้ามา = เลขเดียวกับห�
     expect(api).toContain('body.requestDays = toRequestDays(reqR.value)');
   });
 });
+
+describe('ตารางใบขอในการ์ดกดลงลึก แบ่งหน้าละ 10 (เจ้าของ 28 ต.ค. 2569 "ทำเป็น pagination ไม่เกิน 10 รายการก็พอ")', () => {
+  it('หน้าละ 10 ใบ · มีปุ่มก่อนหน้า/ถัดไป · เปลี่ยนชั้น = กลับหน้าแรก', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('src/components/dashboard-trends/DrillDownCard.tsx', 'utf8');
+    expect(src).toContain('const REQUEST_PAGE = 10;');
+    expect(src).toContain('requests.slice(cur * REQUEST_PAGE, (cur + 1) * REQUEST_PAGE)');
+    expect(src).toContain('data-testid="drill-requests-pages"');
+    expect(src).toContain("<DrillRequestTable key={trail.map((t) => t.label).join('|')}");
+  });
+});
