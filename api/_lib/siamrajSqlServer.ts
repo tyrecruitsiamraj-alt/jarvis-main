@@ -70,7 +70,9 @@ export async function getSiamrajSqlServerPool(): Promise<sql.ConnectionPool> {
         encrypt: cfg.encrypt,
         trustServerCertificate: cfg.trustServerCertificate,
       },
-      pool: { max: 5, min: 0, idleTimeoutMillis: 30000 },
+      // 🔴 28 ต.ค. 2569: เดิมปิดการเชื่อมต่อที่ว่าง 30 วิ ⇒ ครั้งแรกหลังว่างต้องต่อ ERP ใหม่ (วัดบนเว็บ: เช็กใบที่เพิ่งปิด 4.1 วิ ครั้งต่อไป 0.05 วิ)
+      // 5 นาที > รอบอุ่นสำเนาใบขอ (60 วิ) ⇒ เวลาทำงานการเชื่อมต่อไม่ถูกปิด · เงียบนานกว่านั้นค่อยปล่อย
+      pool: { max: 5, min: 0, idleTimeoutMillis: 300_000 },
       connectionTimeout: 30000,
       requestTimeout: 60000,
     });
