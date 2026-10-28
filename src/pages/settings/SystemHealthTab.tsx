@@ -10,6 +10,7 @@ import {
   type StaleItem,
   type SystemHealth,
 } from '@/lib/systemHealthApi';
+import ServerResourceCard from './ServerResourceCard';
 
 /**
  * สถานะระบบ — ที่เดียวที่ตอบได้ว่า "ตอนนี้ระบบทำงานอยู่จริงไหม และอะไรเปิดอยู่บ้าง"
@@ -149,6 +150,9 @@ const SystemHealthTab: React.FC = () => {
           </p>
         ) : null}
       </div>
+
+      {/* แรม/โหลดเครื่องจริง (28 ต.ค. 2569 เครื่องค้างตอน build) */}
+      <ServerResourceCard />
 
       {/* สวิตช์ */}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-sm dark:bg-slate-900">

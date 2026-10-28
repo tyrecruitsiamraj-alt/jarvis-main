@@ -2912,6 +2912,9 @@ state (`calendarOpen`/`selectedDay`/`month`) + derived (`calendar`/`grid`/`month
 | `api/_lib/rbac.ts` | เพิ่ม resource `system-health` (ตกไป default = admin เท่านั้น ไม่ต้อง migration) |
 | `server/local-api.ts` | `startSystemHealthWorker()` ตอนบูต |
 | `src/lib/systemHealthApi.ts` · `src/pages/settings/SystemHealthTab.tsx` | **ใหม่** — แท็บ "สถานะระบบ": ไฟ 4 ดวง · ตารางสวิตช์ · ของค้าง + ปุ่มเปิดดู |
+| `migrations/167_system_resource_samples.sql` · `api/_lib/systemResourceSampler.ts` | **ใหม่ 28 ต.ค. 2569** — จดแรม/swap/โหลดเครื่อง + แรมของเว็บ + เว็บค้างนานสุด (event loop) ทุก 1 นาที · เก็บ 14 วัน · เปิดด้วยสวิตช์ยามเฝ้า `SYSTEM_HEALTH_WATCH_ENABLED` (เฉพาะเครื่องจริง) · ปิดเฉพาะตัวนี้ `SYSTEM_RESOURCE_SAMPLER_ENABLED=false` · ที่มา: 27 ต.ค. 20:37 build ค้างเครื่อง 43 นาที (Error 1033) ไม่มีตัวเลขเหลือ |
+| `src/lib/systemResources.ts` · `src/pages/settings/ServerResourceCard.tsx` | **ใหม่ 28 ต.ค. 2569** — ตัวคิดล้วน (`parseMeminfo` ใช้ MemAvailable · `findGaps` ช่วงเงียบ > 3 นาที = ค้าง/ล่ม/deploy · `peakOf` · ระดับเป็นคำ) + การ์ด "เครื่องเซิร์ฟเวอร์" ในแท็บสถานะระบบ (`GET /api/system-health?view=resources`) · เทสต์ `systemResources2569-10-28` |
+| `.github/workflows/deploy.yml` | **28 ต.ค. 2569** — `concurrency: deploy-production` (deploy ทีละรอบ ไม่ทับกัน) · push ที่มีแต่ `docs/**`/`*.md` ไม่ deploy · 🔴 ยกเว้น `skills/**` ต้อง deploy (candidateSpecAnalyzer อ่าน .md ตอนรัน) |
 | `src/pages/settings/AdminSettings.tsx` | เพิ่มแท็บ `health` (`?tab=health`) |
 | `.github/workflows/deploy.yml` | `SYSTEM_HEALTH_WATCH_ENABLED=true` |
 

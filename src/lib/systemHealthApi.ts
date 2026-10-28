@@ -58,3 +58,10 @@ export async function runSystemHealthCheck(): Promise<SystemHealth> {
   if (!r.ok) throw new Error(await readErrorMessage(r, 'ตรวจสถานะไม่สำเร็จ'));
   return normalize(await readJsonSafe<SystemHealth>(r));
 }
+
+/** แรม/โหลดของเครื่องจริง (ตัวจดทุก 1 นาที · 28 ต.ค. 2569) */
+export async function fetchSystemResources(): Promise<import('@/lib/systemResources').ResourceSummary> {
+  const r = await apiFetch('/api/system-health?view=resources');
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'อ่านแรม/โหลดเครื่องไม่สำเร็จ'));
+  return readJsonSafe(r);
+}

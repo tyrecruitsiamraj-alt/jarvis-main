@@ -4,7 +4,21 @@ on:
     push:
         branches:
             - main
+        # แก้แค่เอกสาร = ไม่ต้อง build ใหม่บนเครื่องจริง (28 ต.ค. 2569 · build แต่ละรอบกินแรม ~1.4 GB บนเครื่องที่เว็บรันอยู่)
+        # ⚠️ ข้ามเฉพาะเมื่อทุกไฟล์ใน push เป็นเอกสาร — ถ้ามีโค้ดปนแม้ไฟล์เดียวก็ deploy ตามปกติ
+        # ⚠️ skills/**/*.md ต้อง deploy — candidateSpecAnalyzer อ่านไฟล์พวกนี้ตอนรัน
+        paths:
+            - '**'
+            - '!docs/**'
+            - '!**/*.md'
+            - 'skills/**'
     workflow_dispatch:
+
+# 🔴 deploy ทีละรอบ ไม่ให้ทับกัน (28 ต.ค. 2569) — 27 ต.ค. 20:37 build ค้างเครื่อง 43 นาที (Error 1033)
+# แล้วอีก 2 รอบที่ push ตามมาก็ ssh เข้าไปซ้ำระหว่างเครื่องค้าง · รอบที่รออยู่จะเหลือแค่ตัวล่าสุด (main ล่าสุดอยู่แล้ว)
+concurrency:
+    group: deploy-production
+    cancel-in-progress: false
 
 jobs:
     deploy:

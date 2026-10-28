@@ -1,12 +1,14 @@
 import { withRbac, handleApiError, sendError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { readSwitches, readStaleItems, CONFIRMED_OWNER_LIMIT_MIN } from '../_lib/systemHealthStore.js';
 import { computeHealthChecks, getLastHealthChecks } from '../_lib/systemHealthWorker.js';
+import { readResourceSummary } from '../_lib/systemResourceSampler.js';
 
 /**
  * สถานะระบบ — ไฟ 4 ดวง + สวิตช์ที่เปิดอยู่ + ของค้างที่ยังไม่มีใครรับ
  *
  * `GET`  → ผลรอบล่าสุดของยามเฝ้า (ไม่ยิง ERP · เบา เปิดรีเฟรชได้)
  * `POST` → สั่งตรวจเดี๋ยวนี้ (ปุ่ม "ตรวจเดี๋ยวนี้")
+ * `GET ?view=resources` → แรม/โหลดของเครื่องจริง (ตัวจดทุก 1 นาที · 28 ต.ค. 2569)
  *
  * ⚠️ ไฟ ERP อ้างผลรอบล่าสุดของตัวย้ายใบสมัคร ไม่ได้ยิง ERP เอง —
  * ไม่งั้นคนเปิดหน้านี้ค้างไว้จะกลายเป็นตัวถล่ม ERP
@@ -16,6 +18,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
   try {
     if (method !== 'GET' && method !== 'POST') {
       return sendError(res, 405, 'Method not allowed', 'Use GET or POST (ตรวจเดี๋ยวนี้)');
+    }
+
+    if (method === 'GET' && req.query?.view === 'resources') {
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json(await readResourceSummary());
     }
 
     // รอบแรกหลังบูต ยามเฝ้ายังไม่เดิน — ตรวจให้เลยจะได้ไม่เห็นหน้าว่าง
