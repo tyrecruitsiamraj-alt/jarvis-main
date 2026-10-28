@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FieldSelect } from '@/components/shared/FieldSelect';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -438,28 +439,40 @@ export function AutopostBody({
             {postWorkers.length === 0 ? (
               <p className={cn('text-sm', TONE.warn.value)}>ยังไม่มีเครื่องที่รับงานโพสต์</p>
             ) : (
-              <FieldSelect
-                value={workerName}
-                onChange={(v) => {
+              // สถานะเครื่องเป็นสี + คำเสมอ (So Scraping 28 ต.ค. 2569): ออนไลน์ = จุดเขียว · ออฟไลน์ = จุดเทา เลือกไม่ได้ · API เรียงออนไลน์ไว้บนให้แล้ว
+              <Select
+                value={workerName || undefined}
+                onValueChange={(v) => {
                   setWorkerName(v);
                   if (warn?.kind !== 'block') setWarn(null);
                 }}
-                placeholder="เลือกเครื่อง"
-                ariaLabel="เครื่อง"
-                testId="autopost-worker"
-                options={postWorkers.map((w) => ({
-                  value: w.name,
-                  label: [
-                    w.name,
-                    w.online ? 'ออนไลน์' : 'ออฟไลน์',
-                    `งานค้าง ${NUM.format(w.load)}`,
-                    account && w.name === account.worker ? 'เครื่องหลัก' : null,
-                    account && !soAccountOnWorker(account, w) ? 'ยังไม่เคยล็อกอินบัญชีนี้' : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · '),
-                }))}
-              />
+              >
+                <SelectTrigger className="h-10 text-sm" aria-label="เครื่อง" data-testid="autopost-worker">
+                  <SelectValue placeholder="เลือกเครื่อง" />
+                </SelectTrigger>
+                <SelectContent>
+                  {postWorkers.map((w) => {
+                    const extra = [
+                      `งานค้าง ${NUM.format(w.load)}`,
+                      account && w.name === account.worker ? 'เครื่องหลัก' : null,
+                      account && !soAccountOnWorker(account, w) ? 'ยังไม่เคยล็อกอินบัญชีนี้' : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ');
+                    const tone = w.online ? TONE.success : TONE.neutral;
+                    return (
+                      <SelectItem key={w.name} value={w.name} disabled={!w.online}>
+                        <span className="flex items-center gap-2">
+                          <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
+                          <span className="text-foreground">{w.name}</span>
+                          <span className={cn('text-xs font-medium', tone.value)}>{w.online ? 'ออนไลน์' : 'ออฟไลน์'}</span>
+                          <span className="text-xs text-muted-foreground">{extra}</span>
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             )}
           </section>
 
