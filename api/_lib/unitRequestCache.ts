@@ -223,11 +223,11 @@ export async function readThroughCache<T>(
  * (ใช้ `startLoad` ตัวเดียวกัน — ไม่ยิงซ้อน · ล้ม = ไม่แตะสำเนาเดิม) · ไม่มีคนใช้เกินครึ่งชั่วโมง = หยุดถาม (ไม่กวนระบบงานหลักตอนกลางคืน)
  * คืนฟังก์ชันหยุด · ตัวจับเวลา `unref` ไม่ค้าง process
  */
-export function warmActiveKeysOnce(opts: { activeWithinMs: number; refreshAfterMs: number; now?: number }): number {
+export function warmActiveKeysOnce(opts: { activeWithinMs: number; refreshAfterMs: number; now?: number; keepPinned?: boolean }): number {
   const now = opts.now ?? Date.now();
   let started = 0;
   for (const [key, readAt] of lastRead) {
-    if (now - readAt > opts.activeWithinMs) {
+    if (now - readAt > opts.activeWithinMs && !(opts.keepPinned && pinned.has(key))) {
       lastRead.delete(key);
       loaders.delete(key);
       continue;
@@ -242,6 +242,23 @@ export function warmActiveKeysOnce(opts: { activeWithinMs: number; refreshAfterM
   return started;
 }
 
+/**
+ * ═══ ข้อ 6 — คีย์หลักอุ่นตลอดเวลาทำงาน (เจ้าของ 28 ต.ค. 2569 "แก้แท็บจับคู่งานให้โหลดเร็วขึ้น") ═══
+ * วัดจริง: แท็บจับคู่งานบนหน้าหลักครั้งแรก 4.1–5.2 วิ ครั้งถัดไป 0.2 วิ — ทั้งก้อนรอใบขอจาก ERP (4–7 วิตอนสำเนาว่าง)
+ * ข้อ 5 หยุดอุ่นเมื่อไม่มีคนอ่าน 30 นาที ⇒ คนแรกหลังช่วงเงียบรอเต็ม ๆ
+ * คีย์ที่ปักไว้ (ใบขอทุกแผนก — ตัวที่ทุกหน้าใช้ร่วม) อุ่นต่อในเวลาทำงาน 07:00–20:00 แม้ไม่มีคนอ่าน · นอกเวลา = กติกาเดิม
+ */
+const pinned = new Set<string>();
+export function pinUnitRequestKey(key: string): void {
+  pinned.add(key);
+}
+
+const BKK_HOUR = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', hourCycle: 'h23' });
+export function isUnitRequestWorkHours(now: number = Date.now()): boolean {
+  const h = Number(BKK_HOUR.format(new Date(now)));
+  return h >= 7 && h < 20;
+}
+
 export function startUnitRequestKeepWarm(opts: { intervalMs?: number; activeWithinMs?: number; refreshAfterMs?: number } = {}): () => void {
   const intervalMs = opts.intervalMs ?? 30_000;
   const activeWithinMs = opts.activeWithinMs ?? 30 * 60_000;
@@ -249,7 +266,7 @@ export function startUnitRequestKeepWarm(opts: { intervalMs?: number; activeWith
   const refreshAfterMs = opts.refreshAfterMs ?? 60_000;
   const t = setInterval(() => {
     try {
-      warmActiveKeysOnce({ activeWithinMs, refreshAfterMs });
+      warmActiveKeysOnce({ activeWithinMs, refreshAfterMs, keepPinned: isUnitRequestWorkHours() });
     } catch (e) {
       logWarn('unitRequestCache.keepWarm.failed', { message: e instanceof Error ? e.message : String(e) });
     }
@@ -263,6 +280,7 @@ export function startUnitRequestKeepWarm(opts: { intervalMs?: number; activeWith
 export function clearUnitRequestCache(): void {
   store.clear();
   refreshing.clear();
+  pinned.clear();
   lastRead.clear();
   loaders.clear();
   logInfo('unitRequestCache.cleared');

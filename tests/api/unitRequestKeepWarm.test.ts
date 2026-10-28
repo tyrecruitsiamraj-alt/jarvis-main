@@ -71,6 +71,35 @@ describe('ตัวอุ่นสำเนา', () => {
     expect(cache.warmActiveKeysOnce({ activeWithinMs: 1_800_000, refreshAfterMs: 60_000, now: 1_000 + 1_800_001 })).toBe(0);
   });
 
+  it('🔴 คีย์ที่ปักไว้อุ่นต่อในเวลาทำงานแม้ไม่มีคนอ่านเกิน 30 นาที (28 ต.ค. 2569 แท็บจับคู่งานครั้งแรก 4–5 วิ)', async () => {
+    let n = 0;
+    const load = async () => [++n];
+    await cache.readThroughCache('pin', load, { now: 1_000 });
+    await cache.readThroughCache('free', load, { now: 1_000 });
+    cache.pinUnitRequestKey('pin');
+    const late = 1_000 + 1_800_001;
+    // นอกเวลาทำงาน = กติกาเดิม (ไม่มีคนอ่าน = เลิกถาม)
+    expect(cache.warmActiveKeysOnce({ activeWithinMs: 1_800_000, refreshAfterMs: 60_000, now: late, keepPinned: false })).toBe(0);
+    await cache.readThroughCache('pin', load, { now: 1_000 });
+    await cache.readThroughCache('free', load, { now: 1_000 });
+    // เวลาทำงาน = คีย์ที่ปักยังอุ่น · คีย์อื่นเลิกถาม
+    expect(cache.warmActiveKeysOnce({ activeWithinMs: 1_800_000, refreshAfterMs: 60_000, now: late, keepPinned: true })).toBe(1);
+    await cache.settleUnitRequestRefreshes();
+  });
+
+  it('เวลาทำงาน 07:00–20:00 เวลาไทย', () => {
+    expect(cache.isUnitRequestWorkHours(Date.parse('2026-10-28T00:00:00Z'))).toBe(true); // 07:00
+    expect(cache.isUnitRequestWorkHours(Date.parse('2026-10-28T12:59:00Z'))).toBe(true); // 19:59
+    expect(cache.isUnitRequestWorkHours(Date.parse('2026-10-28T13:00:00Z'))).toBe(false); // 20:00
+    expect(cache.isUnitRequestWorkHours(Date.parse('2026-10-27T23:59:00Z'))).toBe(false); // 06:59
+  });
+
+  it('ตัวอุ่นตอนบูตปักคีย์ใบขอทุกแผนก · ตัวจับเวลาส่งเวลาทำงานเข้าไป', async () => {
+    const { readFileSync } = await import('node:fs');
+    expect(readFileSync('api/_handlers/siamraj-unit-requests.ts', 'utf8')).toContain("departmentScope: { mode: 'all' }, pin: true");
+    expect(readFileSync('api/_lib/unitRequestCache.ts', 'utf8')).toContain('keepPinned: isUnitRequestWorkHours()');
+  });
+
   it('เปิดตอนบูต (ปิดได้ด้วย env)', async () => {
     const { readFileSync } = await import('node:fs');
     const boot = readFileSync('server/local-api.ts', 'utf8');

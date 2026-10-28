@@ -16,7 +16,7 @@ import {
   listSiamrajClosedRequests,
   getSiamrajUnitRequestById,
 } from '../_lib/siamrajUnitRequests.js';
-import { ageSeconds, readThroughCache } from '../_lib/unitRequestCache.js';
+import { ageSeconds, pinUnitRequestKey, readThroughCache } from '../_lib/unitRequestCache.js';
 import { fetchJobBenefitChipsAndIncomesById } from '../_lib/siamrajJobBenefits.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 import { getSiamrajSqlServerRequestRateLines } from '../_lib/siamrajSqlServerRequests.js';
@@ -273,9 +273,12 @@ export function readUnitRequestListThroughCache(opts: {
   mode?: string;
   departmentScope: DepartmentScope;
   fresh?: boolean;
+  /** อุ่นคีย์นี้ต่อตลอดเวลาทำงานแม้ไม่มีคนอ่าน (`pinUnitRequestKey` · 28 ต.ค. 2569) */
+  pin?: boolean;
 }) {
   const { limit, mode, departmentScope, fresh } = opts;
   const cacheKey = JSON.stringify(['list', limit, mode ?? '', departmentScope ?? null]);
+  if (opts.pin) pinUnitRequestKey(cacheKey);
   // ชั้นนอกก็ตัดใบที่เพิ่งปิดใน ERP ออกทุกครั้งที่ตอบ (เจ้าของ 19 ต.ค. 2569 "ถ้าปิดก็คือปิด" — `dropClosedFromCache`)
   return readThroughCache(
     cacheKey,
@@ -327,7 +330,7 @@ export function readUnitRequestListThroughCache(opts: {
 export function warmUnitRequestListCache(): void {
   if (!isSiamrajUnitRequestsEnabled()) return;
   const started = Date.now();
-  void readUnitRequestListThroughCache({ limit: 500, departmentScope: { mode: 'all' } })
+  void readUnitRequestListThroughCache({ limit: 500, departmentScope: { mode: 'all' }, pin: true })
     .then((outcome) => {
       logInfo('siamrajUnitRequests.warmed', {
         ms: Date.now() - started,
