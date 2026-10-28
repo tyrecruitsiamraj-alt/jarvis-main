@@ -20,7 +20,7 @@ describe('ชื่อเมนูใหม่ 4 ต.ค. 2569', () => {
   });
 
   it('ทางเข้า /apply เขียนว่า "ประกาศ" ไม่เหลือ "หน้าสมัครสาธารณะ" บนจอ', () => {
-    expect(read('src/components/layout/AppNavDrawer.tsx')).toContain('ประกาศ (/apply)</span>');
+    expect(read('src/components/layout/AppNavDrawer.tsx')).toContain('<span className="truncate">ประกาศ</span>');
     expect(read('src/components/layout/JobBoardHeaderMenu.tsx')).toContain('<p className="text-sm font-medium">ประกาศ</p>');
     for (const f of ['src/components/layout/AppNavDrawer.tsx', 'src/components/layout/JobBoardHeaderMenu.tsx']) {
       expect(read(f)).not.toMatch(/>\s*หน้าสมัครสาธารณะ/);
