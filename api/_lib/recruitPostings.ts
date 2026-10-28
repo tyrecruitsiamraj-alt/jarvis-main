@@ -358,6 +358,25 @@ type PostingRow = {
   application_count?: string | number | null;
 };
 
+/**
+ * ═══ ผู้รับผิดชอบของลิงก์ — ตัวตัดสินเดียว (เจ้าของ 28 ต.ค. 2569 "ลิงก์นี้ใครรับผิดชอบ" · "ช่องผู้รับผิดชอบในใบประวัติให้ตรงกับลิงก์") ═══
+ * คนกดสร้างลิงก์ (170) → ผู้รับผิดชอบที่ตั้งตอน Gen ของประกาศ → คนสร้างประกาศ · ชื่อ = ชื่อเล่น → ชื่อเต็ม → ส่วนหน้าอีเมล
+ * ใช้ทั้งรายการลิงก์ (`attachLinks`) และใบประวัติผู้สมัคร (`POSTING_OWNER_SQL` ใน job-applications) ⇒ สองที่บอกชื่อเดียวกันเสมอ
+ */
+export function linkOwnerSql(linkIdExpr: string, postingIdExpr: string): string {
+  return `coalesce(
+    (select coalesce(nullif(btrim(lu.nickname), ''), nullif(btrim(lu.full_name), ''), nullif(split_part(btrim(lk.created_by_name), '@', 1), ''))
+       from ${linksTable} lk
+       left join ${usersTable} lu on lu.id = lk.created_by_user_id
+      where lk.id = ${linkIdExpr}),
+    (select coalesce(nullif(btrim(pp.responsible_name), ''), nullif(btrim(pu.nickname), ''), nullif(btrim(pu.full_name), ''),
+                     nullif(split_part(btrim(pp.created_by_name), '@', 1), ''))
+       from ${postingsTable} pp
+       left join ${usersTable} pu on pu.id::text = pp.created_by_user_id::text
+      where pp.id = ${postingIdExpr})
+  )`;
+}
+
 type LinkRow = {
   id: string;
   posting_id: string;
@@ -461,11 +480,10 @@ async function attachLinks(postings: PostingRow[]): Promise<RecruitPosting[]> {
             (SELECT count(*) FROM ${applicationsTable} a WHERE a.link_id = l.id) AS application_count${
               withCreator
                 ? `,
-            coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''), nullif(btrim(l.created_by_name), '')) AS creator_name`
+            ${linkOwnerSql('l.id', 'l.posting_id')} AS creator_name`
                 : ''
             }
-       FROM ${linksTable} l${withCreator ? `
-       LEFT JOIN ${usersTable} u ON u.id = l.created_by_user_id` : ''}
+       FROM ${linksTable} l
       WHERE l.posting_id = ANY($1::uuid[])
       ORDER BY l.created_at`;
   let rows: LinkRow[];

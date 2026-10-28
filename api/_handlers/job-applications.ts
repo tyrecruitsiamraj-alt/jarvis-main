@@ -73,6 +73,7 @@ import { loadLatestScreeningByApplication } from '../_lib/applicationScreening.j
 import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
 import { logError, logWarn } from '../_lib/logger.js';
+import { linkOwnerSql } from '../_lib/recruitPostings.js';
 
 const tbl = tableInAppSchema('public_job_applications');
 const queueTbl = tableInAppSchema('lumos_dispatch_queue');
@@ -273,11 +274,9 @@ const CHANNEL_LABEL_SQL = `coalesce(nullif(a.channel_label, ''), (select l.chann
  * 🔴 สมัครผ่านหน้าประกาศโดยไม่ผ่านลิงก์ = คนที่กดประกาศใบขอนั้น (`job_public_releases.released_by` · เจ้าของ "หน้าประกาศก็ดูสิ่ใครส่งขึ้นไป")
  * ใบที่ไม่รู้ทั้งคู่ (iRecruit/คีย์เองใช้ `responsible_name` ของใบ) = null · ⚠️ อ้าง `a.posting_id` / `a.job_id` (มีตั้งแต่ 063 ทุกฐาน)
  */
+// 28 ต.ค. 2569 (เจ้าของ "ช่องผู้รับผิดชอบในใบประวัติให้ตรงกับลิงก์"): ผ่านลิงก์/ประกาศ = ตัวตัดสินเดียวกับรายการลิงก์ (`linkOwnerSql`)
 const POSTING_OWNER_SQL = `coalesce(
-    (select coalesce(nullif(btrim(p.responsible_name), ''), nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''))
-       from ${tableInAppSchema('recruit_postings')} p
-       left join ${tableInAppSchema('users')} u on u.id::text = p.created_by_user_id::text
-      where p.id = a.posting_id),
+    ${linkOwnerSql('a.link_id', 'a.posting_id')},
     (select coalesce(nullif(btrim(ru.nickname), ''), nullif(btrim(ru.full_name), ''))
        from ${tableInAppSchema('job_public_releases')} r
        left join ${tableInAppSchema('users')} ru on ru.id::text = r.released_by::text

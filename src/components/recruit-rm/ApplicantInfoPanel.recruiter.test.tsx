@@ -85,7 +85,11 @@ describe('ทุกจุดใช้ความหมายเดียวก�
   it('server ส่งผู้รับผิดชอบของลิงก์มากับรายชื่อ (ชุดคอลัมน์ 2 ชั้นบน) · ไม่ได้ตั้ง = ชื่อเล่นคนสร้างลิงก์', () => {
     const src = readFileSync('api/_handlers/job-applications.ts', 'utf8');
     expect(src.match(/\$\{POSTING_OWNER_SQL\},/g)?.length).toBe(2);
-    expect(src).toContain("coalesce(nullif(btrim(p.responsible_name), ''), nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''))");
+    // 28 ต.ค. 2569 "ช่องผู้รับผิดชอบในใบประวัติให้ตรงกับลิงก์": ตัวตัดสินเดียวกับรายการลิงก์ (คนกดสร้างลิงก์ → ผู้รับผิดชอบประกาศ → คนสร้างประกาศ)
+    expect(src).toContain("${linkOwnerSql('a.link_id', 'a.posting_id')},");
+    expect(readFileSync('api/_lib/recruitPostings.ts', 'utf8')).toContain(
+      "(select coalesce(nullif(btrim(pp.responsible_name), ''), nullif(btrim(pu.nickname), ''), nullif(btrim(pu.full_name), ''),",
+    );
     expect(src).toContain('posting_owner_name: r.posting_owner_name || undefined,');
     // สมัครผ่านหน้าประกาศโดยไม่ผ่านลิงก์ = คนที่กดประกาศใบขอนั้น (เจ้าของ "หน้าประกาศก็ดูสิ่ใครส่งขึ้นไป")
     expect(src).toContain("left join ${tableInAppSchema('users')} ru on ru.id::text = r.released_by::text");

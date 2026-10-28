@@ -20,3 +20,10 @@ describe('ผู้รับผิดชอบของลิงก์', () => {
     expect(readFileSync('migrations/170_posting_link_creator.sql', 'utf8')).toContain('add column if not exists created_by_user_id uuid null');
   });
 });
+
+describe('ใบประวัติผู้สมัคร = ผู้รับผิดชอบของลิงก์ (28 ต.ค. 2569)', () => {
+  it('ช่องผู้รับผิดชอบในใบประวัติกับรายการลิงก์ใช้ตัวตัดสินเดียว (`linkOwnerSql`)', () => {
+    expect(readFileSync('api/_handlers/job-applications.ts', 'utf8')).toContain("${linkOwnerSql('a.link_id', 'a.posting_id')},");
+    expect(readFileSync('api/_lib/recruitPostings.ts', 'utf8')).toContain("${linkOwnerSql('l.id', 'l.posting_id')} AS creator_name");
+  });
+});
