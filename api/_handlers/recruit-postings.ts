@@ -81,6 +81,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
           channelId: typeof body.channelId === 'string' ? body.channelId : null,
           label: typeof body.channelLabel === 'string' ? body.channelLabel : null,
           note: typeof body.note === 'string' ? body.note : null,
+          createdByUserId: req.user?.sub ?? null,
+          createdByName: req.user?.email ?? null,
         });
         return res.status(201).json(link);
       }

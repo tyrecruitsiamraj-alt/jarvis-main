@@ -16,7 +16,7 @@ import { useRecruiterContact } from '@/hooks/useRecruiterContact';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import { addPostingLink, fetchRecruitPostings } from '@/lib/recruitPostingsApi';
-import { applyLinkPath, type RecruitPosting } from '@/lib/recruitPostings';
+import { applyLinkPath, postingLinkOwner, type RecruitPosting } from '@/lib/recruitPostings';
 import {
   composeJobSnapshot,
   createJobPostingRequest,
@@ -347,10 +347,14 @@ export function AutopostBody({
                   ariaLabel="ลิงก์สมัคร"
                   className="min-w-0 flex-1"
                   testId="autopost-link"
-                  options={links.map((l) => ({
-                    value: l.code,
-                    label: `${l.channelLabel || 'ลิงก์ประกาศ'} · ${l.code}${l.applicationCount ? ` · สมัคร ${NUM.format(l.applicationCount)}` : ''}`,
-                  }))}
+                  options={links.map((l) => {
+                    // ผู้รับผิดชอบของลิงก์ = คนกดสร้าง (เจ้าของ 28 ต.ค. 2569 "บอกเพิ่มหน่อยว่าลิงก์นี้ใครรับผิดชอบ")
+                    const owner = postingLinkOwner(l, openPosting);
+                    return {
+                      value: l.code,
+                      label: `${l.channelLabel || 'ลิงก์ประกาศ'} · ${l.code}${owner ? ` · ${owner}` : ''}${l.applicationCount ? ` · สมัคร ${NUM.format(l.applicationCount)}` : ''}`,
+                    };
+                  })}
                 />
                 <Button type="button" size="sm" variant="outline" onClick={() => void createLink()} disabled={busy !== null}>
                   {busy === 'link' ? <LoaderCircle className="animate-spin" aria-hidden /> : <Link2 aria-hidden />}

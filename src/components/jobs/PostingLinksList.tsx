@@ -4,7 +4,7 @@ import { Check, ChevronDown, Copy, MousePointerClick, UserPlus } from 'lucide-re
 import EditPostingDialog from '@/components/jobs/EditPostingDialog';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { applyLinkPath, type RecruitPosting, type RecruitPostingLink } from '@/lib/recruitPostings';
+import { applyLinkPath, postingLinkOwner, type RecruitPosting, type RecruitPostingLink } from '@/lib/recruitPostings';
 import { formatDateTimeTh } from '@/lib/dateTh';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
@@ -40,7 +40,8 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-function LinkRow({ link }: { link: RecruitPostingLink }) {
+function LinkRow({ link, posting }: { link: RecruitPostingLink; posting: RecruitPosting }) {
+  const owner = postingLinkOwner(link, posting);
   const url = postingLinkUrl(link.code);
   const label = link.channelLabel?.trim() || 'ลิงก์กลาง (ไม่ระบุช่องทาง)';
   return (
@@ -57,7 +58,7 @@ function LinkRow({ link }: { link: RecruitPostingLink }) {
         <span className="inline-flex items-center gap-1 tabular-nums">
           <UserPlus className="h-3.5 w-3.5" aria-hidden /> สมัครเข้ามา {NUM.format(link.applicationCount ?? 0)} คน
         </span>
-        <span>สร้าง {formatDateTimeTh(link.createdAt)}</span>
+        <span>สร้าง {formatDateTimeTh(link.createdAt)}{owner ? ` · ผู้รับผิดชอบ ${owner}` : ''}</span>
       </p>
     </li>
   );
@@ -112,7 +113,7 @@ const PostingLinksList: React.FC<{
             </CollapsibleContent>
             <ul className={cn('divide-y divide-border/60')}>
               {p.links.map((l) => (
-                <LinkRow key={l.id} link={l} />
+                <LinkRow key={l.id} link={l} posting={p} />
               ))}
             </ul>
           </div>

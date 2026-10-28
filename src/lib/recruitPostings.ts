@@ -80,6 +80,8 @@ export type RecruitPostingLink = {
   createdAt: string;
   /** จำนวนใบสมัครที่เข้ามาทางลิงก์นี้ */
   applicationCount?: number;
+  /** คนที่กดสร้างลิงก์ = ผู้รับผิดชอบของลิงก์ (28 ต.ค. 2569) · null = ลิงก์เก่า ใช้ผู้รับผิดชอบของประกาศ */
+  createdByName?: string | null;
 };
 
 export type RecruitPosting = {
@@ -140,4 +142,20 @@ export function validatePostingInput(input: {
     return 'ประกาศที่ไม่ผูกใบขอ ต้องเลือก BU';
   }
   return null;
+}
+
+/**
+ * ผู้รับผิดชอบของลิงก์ (เจ้าของ 28 ต.ค. 2569 "บอกเพิ่มหน่อยว่าลิงก์นี้ใครรับผิดชอบ · มันจะมีคนอื่นสร้างด้วย")
+ * = คนที่กดสร้างลิงก์ (ระบบรู้จากบัญชีที่ล็อกอิน) → ลิงก์เก่า: ผู้รับผิดชอบของประกาศ → คนสร้างประกาศ (ตัดโดเมนอีเมล)
+ */
+export function postingLinkOwner(
+  link: Pick<RecruitPostingLink, 'createdByName'>,
+  posting: Pick<RecruitPosting, 'responsibleName' | 'createdByName'> | null | undefined,
+): string | null {
+  const byLink = link.createdByName?.trim();
+  if (byLink) return byLink.includes('@') ? byLink.split('@')[0] : byLink;
+  const resp = posting?.responsibleName?.trim();
+  if (resp) return resp;
+  const creator = posting?.createdByName?.trim();
+  return creator ? creator.split('@')[0] : null;
 }

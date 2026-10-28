@@ -16,6 +16,7 @@ import { isRmFormType, isRmSpecificType } from '../../src/lib/recruitRmMasters.j
 const channelsTable = tableInAppSchema('recruit_channels');
 const postingsTable = tableInAppSchema('recruit_postings');
 const linksTable = tableInAppSchema('recruit_posting_links');
+const usersTable = tableInAppSchema('users');
 const applicationsTable = tableInAppSchema('public_job_applications');
 
 const MAX_TEXT = 200;
@@ -367,6 +368,8 @@ type LinkRow = {
   hit_count: number;
   created_at: string;
   application_count?: string | number | null;
+  /** ชื่อคนสร้างลิงก์ (ชื่อเล่น → ชื่อเต็ม → อีเมล · 170) · null = ลิงก์เก่าก่อน 28 ต.ค. 2569 */
+  creator_name?: string | null;
 };
 
 function mapLink(r: LinkRow): RecruitPostingLink {
@@ -379,6 +382,7 @@ function mapLink(r: LinkRow): RecruitPostingLink {
     hitCount: Number(r.hit_count) || 0,
     createdAt: r.created_at,
     applicationCount: r.application_count == null ? undefined : Number(r.application_count) || 0,
+    createdByName: r.creator_name?.trim() || null,
   };
 }
 
@@ -452,14 +456,26 @@ async function postingQuery(sql: string, params: unknown[] = []): Promise<Postin
 async function attachLinks(postings: PostingRow[]): Promise<RecruitPosting[]> {
   if (postings.length === 0) return [];
   const ids = postings.map((p) => p.id);
-  const { rows } = await dbQuery<LinkRow>(
+  const linkSql = (withCreator: boolean) =>
     `SELECT l.id, l.posting_id, l.channel_id, l.channel_label, l.code, l.note, l.hit_count, l.created_at,
-            (SELECT count(*) FROM ${applicationsTable} a WHERE a.link_id = l.id) AS application_count
-       FROM ${linksTable} l
+            (SELECT count(*) FROM ${applicationsTable} a WHERE a.link_id = l.id) AS application_count${
+              withCreator
+                ? `,
+            coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''), nullif(btrim(l.created_by_name), '')) AS creator_name`
+                : ''
+            }
+       FROM ${linksTable} l${withCreator ? `
+       LEFT JOIN ${usersTable} u ON u.id = l.created_by_user_id` : ''}
       WHERE l.posting_id = ANY($1::uuid[])
-      ORDER BY l.created_at`,
-    [ids],
-  );
+      ORDER BY l.created_at`;
+  let rows: LinkRow[];
+  try {
+    ({ rows } = await dbQuery<LinkRow>(linkSql(true), [ids]));
+  } catch (e) {
+    // ยังไม่รัน 170 — ลิงก์ยังโหลดได้ แค่ไม่รู้คนสร้าง
+    if (!isUndefinedColumn(e)) throw e;
+    ({ rows } = await dbQuery<LinkRow>(linkSql(false), [ids]));
+  }
   const byPosting = new Map<string, RecruitPostingLink[]>();
   for (const r of rows) {
     const list = byPosting.get(r.posting_id) ?? [];
@@ -638,6 +654,8 @@ export async function createRecruitPosting(input: CreatePostingInput): Promise<R
         channelId: ch.channelId ?? null,
         label: ch.label ?? null,
         note: ch.note ?? null,
+        createdByUserId: input.createdByUserId ?? null,
+        createdByName: input.createdByName ?? null,
       }),
     );
   }
@@ -646,25 +664,45 @@ export async function createRecruitPosting(input: CreatePostingInput): Promise<R
 
 export async function createPostingLink(
   postingId: string,
-  input: { channelId?: string | null; label?: string | null; note?: string | null },
+  input: {
+    channelId?: string | null;
+    label?: string | null;
+    note?: string | null;
+    /** คนที่กดสร้างลิงก์ (170 · 28 ต.ค. 2569) — ผู้รับผิดชอบของลิงก์ */
+    createdByUserId?: string | null;
+    createdByName?: string | null;
+  },
 ): Promise<RecruitPostingLink> {
+  const userId = trimTo(input.createdByUserId, 64);
+  const validUser = userId && /^[0-9a-f-]{36}$/i.test(userId) ? userId : null;
+  let withCreator = true;
   // โค้ดสุ่มอาจชนกันได้ — ลองใหม่ไม่กี่ครั้งแทนที่จะปล่อยพัง
   for (let attempt = 0; attempt < 5; attempt += 1) {
+    const base = [postingId, trimTo(input.channelId, 64), trimTo(input.label, MAX_TEXT), makeLinkCode(), trimTo(input.note, MAX_TEXT)];
     try {
-      const { rows } = await dbQuery<LinkRow>(
-        `INSERT INTO ${linksTable} (posting_id, channel_id, channel_label, code, note)
-         VALUES ($1,$2,$3,$4,$5)
-         RETURNING id, posting_id, channel_id, channel_label, code, note, hit_count, created_at`,
-        [
-          postingId,
-          trimTo(input.channelId, 64),
-          trimTo(input.label, MAX_TEXT),
-          makeLinkCode(),
-          trimTo(input.note, MAX_TEXT),
-        ],
-      );
+      const { rows } = withCreator
+        ? await dbQuery<LinkRow>(
+            `INSERT INTO ${linksTable} (posting_id, channel_id, channel_label, code, note, created_by_user_id, created_by_name)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)
+             RETURNING id, posting_id, channel_id, channel_label, code, note, hit_count, created_at,
+                       coalesce((SELECT coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), '')) FROM ${usersTable} u WHERE u.id = $6::uuid),
+                                nullif(btrim($7::text), '')) AS creator_name`,
+            [...base, validUser, trimTo(input.createdByName, MAX_TEXT)],
+          )
+        : await dbQuery<LinkRow>(
+            `INSERT INTO ${linksTable} (posting_id, channel_id, channel_label, code, note)
+             VALUES ($1,$2,$3,$4,$5)
+             RETURNING id, posting_id, channel_id, channel_label, code, note, hit_count, created_at`,
+            base,
+          );
       return mapLink(rows[0]);
     } catch (e) {
+      // ยังไม่รัน 170 — สร้างลิงก์ได้ตามเดิม แค่ไม่จำคนสร้าง
+      if (withCreator && isUndefinedColumn(e)) {
+        withCreator = false;
+        attempt -= 1;
+        continue;
+      }
       if (isPgUniqueViolation(e) && attempt < 4) continue;
       throw e;
     }
