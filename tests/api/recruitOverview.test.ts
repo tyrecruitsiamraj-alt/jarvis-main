@@ -228,6 +228,11 @@ describe('งานค้างตอนนี้ — อายุนับว�
     expect(b.regions?.waitingStaff).toEqual({ bkk: 0, upcountry: 1, unknown: 0 });
     expect(b.appointments).toEqual({ overdue: 3, next7: 1 });
     expect(b.regions?.appointments).toEqual({ bkk: 3, upcountry: 0, unknown: 1 });
+    // แยกพื้นที่ต่อแถวอายุ (28 ต.ค. 2569 "ตอบ AI ไม่ถึง 1 วัน 36 เป็นกรุงเทพเท่าไหร่")
+    expect(b.regionRows?.uncalled.d0_3).toEqual({ bkk: 1, upcountry: 1, unknown: 1 });
+    expect(b.regionRows?.waitingStaff.d1_3).toEqual({ bkk: 0, upcountry: 1, unknown: 0 });
+    expect(b.regionRows?.appointments?.overdue).toEqual({ bkk: 2, upcountry: 0, unknown: 1 });
+    expect(b.regionRows?.appointments?.next7).toEqual({ bkk: 1, upcountry: 0, unknown: 0 });
   });
 
   it('นัดที่รอบันทึกผล ใช้ถังเดียวกับกล่องงาน (เลยนัดยังไม่มีผล) + นัดใน 7 วัน', async () => {

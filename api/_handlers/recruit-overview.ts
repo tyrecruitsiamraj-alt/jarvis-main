@@ -427,15 +427,21 @@ export function toBacklog(
   const uncalled = { total: 0, d0_3: 0, d4_7: 0, over7: 0, inQueue: 0, badPhone: 0 };
   const waitingStaff = { total: 0, d0: 0, d1_3: 0, over3: 0 };
   const regions = { uncalled: emptyRegionCount(), waitingStaff: emptyRegionCount(), appointments: apptRows ? emptyRegionCount() : null };
+  const regionRows = {
+    uncalled: { d0_3: emptyRegionCount(), d4_7: emptyRegionCount(), over7: emptyRegionCount() },
+    waitingStaff: { d0: emptyRegionCount(), d1_3: emptyRegionCount(), over3: emptyRegionCount() },
+    appointments: apptRows ? { overdue: emptyRegionCount(), next7: emptyRegionCount() } : null,
+  };
   const jobOf = (r: Row) => (typeof r.job_id === 'string' && r.job_id ? r.job_id : null);
   for (const r of rows) {
     if (!bool(r.called)) {
       uncalled.total += 1;
-      regions.uncalled[regionOf(jobOf(r))] += 1;
+      const reg = regionOf(jobOf(r));
+      regions.uncalled[reg] += 1;
       const d = fullDays(iso(r.created_at), now);
-      if (d <= 3) uncalled.d0_3 += 1;
-      else if (d <= 7) uncalled.d4_7 += 1;
-      else uncalled.over7 += 1;
+      const k = d <= 3 ? 'd0_3' : d <= 7 ? 'd4_7' : 'over7';
+      uncalled[k] += 1;
+      regionRows.uncalled[k][reg] += 1;
       if (bool(r.in_queue)) uncalled.inQueue += 1;
       if (bool(r.bad_phone)) uncalled.badPhone += 1;
       continue;
@@ -445,11 +451,12 @@ export function toBacklog(
     const staffAt = iso(r.staff_last_at);
     if (staffAt && aiAt && staffAt >= aiAt) continue;
     waitingStaff.total += 1;
-    regions.waitingStaff[regionOf(jobOf(r))] += 1;
+    const reg = regionOf(jobOf(r));
+    regions.waitingStaff[reg] += 1;
     const d = fullDays(aiAt, now);
-    if (d === 0) waitingStaff.d0 += 1;
-    else if (d <= 3) waitingStaff.d1_3 += 1;
-    else waitingStaff.over3 += 1;
+    const k = d === 0 ? 'd0' : d <= 3 ? 'd1_3' : 'over3';
+    waitingStaff[k] += 1;
+    regionRows.waitingStaff[k][reg] += 1;
   }
   let appointments: RecruitBacklog['appointments'] = null;
   if (apptRows) {
@@ -459,10 +466,13 @@ export function toBacklog(
       const next7 = Number(a.next7 ?? 0);
       appointments.overdue += overdue;
       appointments.next7 += next7;
-      regions.appointments![regionOf(jobOf(a))] += overdue + next7;
+      const reg = regionOf(jobOf(a));
+      regions.appointments![reg] += overdue + next7;
+      regionRows.appointments!.overdue[reg] += overdue;
+      regionRows.appointments!.next7[reg] += next7;
     }
   }
-  return { uncalled, waitingStaff, appointments, regions };
+  return { uncalled, waitingStaff, appointments, regions, regionRows };
 }
 
 /**

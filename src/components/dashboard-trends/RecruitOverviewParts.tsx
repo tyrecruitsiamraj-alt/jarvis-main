@@ -262,6 +262,12 @@ export function JourneyList({
  * ═══ งานค้างตอนนี้ (เจ้าของ 27 ต.ค. 2569 "ทำให้อ่านแล้วเข้าใจง่าย ๆ หน่อย") ═══
  * 3 ช่องเรียงกัน: หัว · เลขรวมตัวใหญ่ · แยกตามระยะเวลา (แถวรวมกัน = เลขรวม) · ไม่มีไอคอน · ช้าสุดตัวเลขสีแดง
  */
+type BacklogRow = { key: string; label: string; value: number; tone: ToneKey; regions?: RegionCount | null };
+
+/**
+ * กล่องงานค้าง 1 ก้อน = ตารางไขว้ แถว = ช่วงอายุ · คอลัมน์ = รวม · กรุงเทพและปริมณฑล · ต่างจังหวัด · ไม่ระบุจังหวัด
+ * (เจ้าของ 28 ต.ค. 2569 "ตอบ AI ไม่ถึง 1 วัน 36 เป็นกรุงเทพเท่าไหร่ ต่างจังหวัดเท่าไหร่") · แถวรวมล่างสุด · แต่ละแถว 3 ช่องรวม = รวม
+ */
 function BacklogGroup({
   title,
   total,
@@ -274,37 +280,56 @@ function BacklogGroup({
   title: string;
   total: number;
   unit: string;
-  rows: { label: string; value: number; tone: ToneKey }[];
+  rows: BacklogRow[];
   foot?: string | null;
   testId: string;
-  /** กรุงเทพ+ปริมณฑล / ต่างจังหวัด / ไม่ระบุ ตามจังหวัดของงาน (28 ต.ค. 2569) — สามช่องรวม = ยอดบน */
   regions?: RegionCount | null;
 }) {
+  const cell = 'px-2 py-1.5 text-right tabular-nums';
   return (
     <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-border p-3" data-testid={testId}>
-      <p className="text-sm text-foreground">{title}</p>
-      <p className="flex items-baseline gap-1.5">
+      <p className="flex flex-wrap items-baseline gap-x-2">
+        <span className="text-sm text-foreground">{title}</span>
         <span className="text-2xl font-medium tabular-nums text-foreground">{fmt(total)}</span>
         <span className={cn('text-xs', DASH.sub)}>{unit}</span>
       </p>
-      <ul className={cn('space-y-1 border-t pt-2', DASH.divider)}>
-        {rows.map((r) => (
-          <li key={r.label} className="flex items-baseline justify-between gap-2 text-sm">
-            <span className={DASH.sub}>{r.label}</span>
-            <span className={cn('font-medium tabular-nums', r.value > 0 ? TONE[r.tone].value : DASH.sub)}>{fmt(r.value)}</span>
-          </li>
-        ))}
-      </ul>
-      {regions ? (
-        <ul className={cn('space-y-1 border-t pt-2', DASH.divider)} data-testid={`${testId}-regions`}>
-          {REGION_ROWS.map((r) => (
-            <li key={r.key} className="flex items-baseline justify-between gap-2 text-sm">
-              <span className={DASH.sub}>{r.label}</span>
-              <span className={cn('font-medium tabular-nums', regions[r.key] > 0 ? 'text-foreground' : DASH.sub)}>{fmt(regions[r.key])}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-96 text-sm" data-testid={`${testId}-table`}>
+          <thead>
+            <tr className={cn('border-b text-xs', DASH.divider, DASH.sub)}>
+              <th className="px-2 py-1.5 text-left font-normal" />
+              <th className="px-2 py-1.5 text-right font-normal">รวม</th>
+              {REGION_ROWS.map((r) => (
+                <th key={r.key} className="px-2 py-1.5 text-right font-normal">
+                  {r.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key} className={cn('border-b', DASH.divider)}>
+                <td className={cn('px-2 py-1.5 text-xs', DASH.sub)}>{r.label}</td>
+                <td className={cn(cell, 'font-medium', r.value > 0 ? TONE[r.tone].value : DASH.sub)}>{fmt(r.value)}</td>
+                {REGION_ROWS.map((g) => (
+                  <td key={g.key} className={cn(cell, r.regions && r.regions[g.key] > 0 ? 'text-foreground' : DASH.sub)}>
+                    {r.regions ? fmt(r.regions[g.key]) : '—'}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr data-testid={`${testId}-regions`}>
+              <td className="px-2 py-1.5 text-xs font-medium text-foreground">รวม</td>
+              <td className={cn(cell, 'font-medium text-foreground')}>{fmt(total)}</td>
+              {REGION_ROWS.map((g) => (
+                <td key={g.key} className={cn(cell, 'font-medium text-foreground')}>
+                  {regions ? fmt(regions[g.key]) : '—'}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
       {foot ? <p className={cn('text-xs', DASH.sub)}>{foot}</p> : null}
     </div>
   );
@@ -317,22 +342,22 @@ const REGION_ROWS: ReadonlyArray<{ key: keyof RegionCount; label: string }> = [
 ];
 
 export function BacklogBody({ backlog }: { backlog: RecruitBacklog }) {
-  const { uncalled, waitingStaff, appointments, regions } = backlog;
+  const { uncalled, waitingStaff, appointments, regions, regionRows } = backlog;
   const extra = [
     uncalled.inQueue > 0 ? `รอ AI โทร ${fmt(uncalled.inQueue)} คน` : null,
     uncalled.badPhone > 0 ? `เบอร์โทรผิด ${fmt(uncalled.badPhone)} คน` : null,
   ].filter(Boolean);
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-3" data-testid="backlog">
+    <div className="grid grid-cols-1 gap-3" data-testid="backlog">
       <BacklogGroup
         testId="backlog-uncalled"
         title="ยังไม่มีใครโทร"
         total={uncalled.total}
         unit="คน"
         rows={[
-          { label: 'กรอกมาไม่เกิน 3 วัน', value: uncalled.d0_3, tone: 'neutral' },
-          { label: 'กรอกมา 4–7 วัน', value: uncalled.d4_7, tone: 'warn' },
-          { label: 'กรอกมาเกิน 7 วัน', value: uncalled.over7, tone: 'danger' },
+          { key: 'd0_3', label: 'กรอกมาไม่เกิน 3 วัน', value: uncalled.d0_3, tone: 'neutral', regions: regionRows?.uncalled.d0_3 },
+          { key: 'd4_7', label: 'กรอกมา 4–7 วัน', value: uncalled.d4_7, tone: 'warn', regions: regionRows?.uncalled.d4_7 },
+          { key: 'over7', label: 'กรอกมาเกิน 7 วัน', value: uncalled.over7, tone: 'danger', regions: regionRows?.uncalled.over7 },
         ]}
         foot={extra.length > 0 ? `ในนั้น ${extra.join(' · ')}` : null}
         regions={regions?.uncalled}
@@ -343,9 +368,9 @@ export function BacklogBody({ backlog }: { backlog: RecruitBacklog }) {
         total={waitingStaff.total}
         unit="คน"
         rows={[
-          { label: 'ตอบ AI ไม่ถึง 1 วัน', value: waitingStaff.d0, tone: 'neutral' },
-          { label: 'รอมา 1–3 วัน', value: waitingStaff.d1_3, tone: 'warn' },
-          { label: 'รอมาเกิน 3 วัน', value: waitingStaff.over3, tone: 'danger' },
+          { key: 'd0', label: 'ตอบ AI ไม่ถึง 1 วัน', value: waitingStaff.d0, tone: 'neutral', regions: regionRows?.waitingStaff.d0 },
+          { key: 'd1_3', label: 'รอมา 1–3 วัน', value: waitingStaff.d1_3, tone: 'warn', regions: regionRows?.waitingStaff.d1_3 },
+          { key: 'over3', label: 'รอมาเกิน 3 วัน', value: waitingStaff.over3, tone: 'danger', regions: regionRows?.waitingStaff.over3 },
         ]}
         regions={regions?.waitingStaff}
       />
@@ -356,8 +381,8 @@ export function BacklogBody({ backlog }: { backlog: RecruitBacklog }) {
           total={appointments.overdue + appointments.next7}
           unit="นัด"
           rows={[
-            { label: 'เลยวันนัดแล้ว', value: appointments.overdue, tone: 'danger' },
-            { label: 'นัดใน 7 วันข้างหน้า', value: appointments.next7, tone: 'info' },
+            { key: 'overdue', label: 'เลยวันนัดแล้ว', value: appointments.overdue, tone: 'danger', regions: regionRows?.appointments?.overdue },
+            { key: 'next7', label: 'นัดใน 7 วันข้างหน้า', value: appointments.next7, tone: 'info', regions: regionRows?.appointments?.next7 },
           ]}
           regions={regions?.appointments}
         />

@@ -130,6 +130,12 @@ export type RecruitBacklog = {
   appointments: { overdue: number; next7: number } | null;
   /** แยกกรุงเทพ+ปริมณฑล / ต่างจังหวัด / ไม่ระบุ ตามจังหวัดของงาน (28 ต.ค. 2569) · ไม่มี = เวอร์ชันเก่า */
   regions?: { uncalled: RegionCount; waitingStaff: RegionCount; appointments: RegionCount | null };
+  /** แยกพื้นที่ต่อแถวอายุ (28 ต.ค. 2569 "ตอบ AI ไม่ถึง 1 วัน 36 เป็นกรุงเทพเท่าไหร่ ต่างจังหวัดเท่าไหร่") — แต่ละแถว 3 ช่องรวม = เลขของแถว */
+  regionRows?: {
+    uncalled: Record<'d0_3' | 'd4_7' | 'over7', RegionCount>;
+    waitingStaff: Record<'d0' | 'd1_3' | 'over3', RegionCount>;
+    appointments: Record<'overdue' | 'next7', RegionCount> | null;
+  };
 };
 
 /** ผลงานรายคนในเดือนที่เลือก (นับรายชื่อไม่ซ้ำต่อคน) */
