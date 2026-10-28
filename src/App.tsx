@@ -63,8 +63,6 @@ function LegacyPostingRedirect() {
 }
 const FollowPage = lazyPage(() => import("@/pages/follow/FollowPage"));
 const AftercarePage = lazyPage(() => import("@/pages/aftercare/AftercarePage"));
-/** หน้าความคุ้มค่าระบบ (15 ต.ค. 2569) — ไม่มีในเมนู เปิดได้เฉพาะบัญชีที่ API อนุญาต */
-const ValueCasePage = lazyPage(() => import("@/pages/value/ValueCasePage"));
 const SupervisorDashboard = lazyPage(() => import("@/pages/dashboard/SupervisorDashboard"));
 const AdminSettings = lazyPage(() => import("@/pages/settings/AdminSettings"));
 const ChangePasswordPage = lazyPage(() => import("@/pages/ChangePasswordPage"));
@@ -149,7 +147,6 @@ const ProtectedRoutes = () => {
             <Route path="/follow" element={<FollowPage />} />
             {/* "ดูแลหลังเริ่มงาน" (Phase 7.3) — คนเข้ามาจากกล่อง "โทรครบแล้ว" บนหน้า Follow */}
             <Route path="/aftercare" element={<AftercarePage />} />
-            <Route path="/value" element={<ValueCasePage />} />
             <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />
             <Route path="/jobs/overview" element={<JobDashboard />} />
             <Route path="/jobs/list" element={<JobListPage />} />

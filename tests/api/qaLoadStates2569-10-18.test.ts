@@ -50,10 +50,7 @@ describe('ล้มต้องบอก + ลองใหม่ได้ · ร
   it('ช่องทางในฟอร์มเพิ่มผู้สมัคร: ระหว่างโหลดไม่บอก "ยังไม่มีช่องทาง"', () => {
     expect(read('src/components/shared/ChannelPicker.tsx')).toContain("'กำลังโหลดช่องทาง…'");
   });
-  it('/value ล้มไม่วาด 0 บาท + ชั่วโมงทำงาน 0 บันทึกไม่ได้ · /recruit/channels ล้มกดเพิ่มไม่ได้ · Pre-Check ไม่ขึ้น 0 รายการตอนโหลด', () => {
-    const v = read('src/pages/value/ValueCasePage.tsx');
-    expect(v).toContain('message="โหลดข้อมูลไม่สำเร็จ"');
-    expect(v).toContain('ชั่วโมงทำงานต่อคนต้องมากกว่า 0');
+  it('/recruit/channels ล้มกดเพิ่มไม่ได้ · Pre-Check ไม่ขึ้น 0 รายการตอนโหลด', () => {
     expect(read('src/pages/recruit/RecruitChannelsPage.tsx')).toContain('disabled={saving || listFailed}');
     expect(read('src/pages/matching/PreCheckPage.tsx')).toContain("feedJobs.length === 0 && (loadingJobs || jobsLoadError) ? '—'");
   });

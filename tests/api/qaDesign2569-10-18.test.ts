@@ -68,9 +68,6 @@ describe('มือถือ + พฤติกรรม', () => {
   it('หน้าประกาศเต็มจอ: ไม่มีหน้าที่พามา = กลับกล่องงาน', () => {
     expect(read('src/pages/jobs/BoardPostingPage.tsx')).toContain(": '/jobs/board');");
   });
-  it('/value: แก้แล้วคืนค่าเดิมไม่ค้าง "ยังไม่ได้บันทึก"', () => {
-    expect(read('src/pages/value/ValueCasePage.tsx')).toContain('JSON.stringify(inputs) !== JSON.stringify(savedInputs)');
-  });
 });
 
 describe('รอบ 2 (18 ต.ค. 2569)', () => {
@@ -100,11 +97,10 @@ describe('รอบ 2 (18 ต.ค. 2569)', () => {
     expect(read('src/components/follow/FollowCallQueue.tsx')).toContain('<Phone aria-hidden /> โทร');
     expect(read('src/components/follow/FollowScheduleEditor.tsx')).toContain('<X aria-hidden /> เอาออก');
   });
-  it('ตั้งค่า › ผู้ใช้งาน หัวไทย · /value มีปุ่มบันทึกท้ายหน้า · Pre-Check อายุคีย์บอร์ดตัวเลข', () => {
+  it('ตั้งค่า › ผู้ใช้งาน หัวไทย · Pre-Check อายุคีย์บอร์ดตัวเลข', () => {
     const a = read('src/pages/settings/AdminSettings.tsx');
     expect(a).toContain('>บทบาท</th>');
     expect(a).toContain('>จัดการ</th>');
-    expect(read('src/pages/value/ValueCasePage.tsx').match(/void save\(\)/g)?.length).toBe(2);
     expect(read('src/pages/matching/PreCheckPage.tsx')).toContain('aria-label="อายุต่ำสุด"');
   });
 });

@@ -2,15 +2,12 @@
 /**
  * ปิดจุดบอด 2 ข้อ (เจ้าของ 20 ต.ค. 2569 "ทำเลย")
  * 1. นัดเลยวันเกิน 24 ชม. ยังไม่ลงผลมา/ไม่มา ⇒ เตือนเจ้าของนัดวันละครั้ง + แถบแดงบนหัวกล่องงาน
- * 2. ผูกคนกับ iRecruit / ERP ด้วยเบอร์ — ป๊อปผู้สมัคร + ขั้น 8 ของหน้าความคุ้มค่า
+ * 2. ผูกคนกับ iRecruit / ERP ด้วยเบอร์ — ป๊อปผู้สมัคร (หน้าความคุ้มค่าถอดแล้ว 28 ต.ค. 2569)
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { bangkokDayHour, groupByOwner, isReminderDue, overdueAppointmentsSql } from '../../api/_lib/appointmentResultReminder';
 import { firstDaySince } from '../../src/lib/applicantSourceMatch';
-import { AI_OWNER, NO_OWNER, buildStageSla, stuckByOwner, stuckWho } from '../../src/lib/valuePipeline';
-import { stuckExtrasSql } from '../../api/_handlers/value-pipeline';
-import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes';
 
 const read = (p: string) => readFileSync(p, 'utf8');
 
@@ -48,53 +45,11 @@ describe('ผูก iRecruit / ERP ด้วยเบอร์', () => {
     expect(firstDaySince(days, '899999999', '2026-10-08T20:00:00Z')).toBeNull();
     expect(firstDaySince(null, '812345678', '2026-10-08T20:00:00Z')).toBeUndefined();
   });
-  it('ขั้น 8 = คนที่มาตามนัดไปโผล่ iRecruit · ทันภายใน 24 ชม. หลังนัด', () => {
-    const NOW = Date.parse('2026-10-20T12:00:00Z');
-    const base = { createdAt: '2026-10-01T03:00:00Z', jobId: null, channelLabel: null, referralSource: null, position: null, phoneOk: true, calledByAi: false, calledByStaff: false, firstCalledAt: null, aiAnswer: null, aiAnswerAt: null, staffAnswer: null, staffAnswerAt: null, staffLastAt: null, contact: null, contactBy: null, logOk: true, logReason: null, logAt: '2026-10-05T03:00:00Z', attendance: 'showed', onBoard: null } as const;
-    const facts: RecruitAppFact[] = [
-      { ...base, id: 'a', appointmentAt: '2026-10-08T03:00:00Z', irecruitAt: '2026-10-08' },
-      { ...base, id: 'b', appointmentAt: '2026-10-08T03:00:00Z', irecruitAt: '2026-10-15' },
-      { ...base, id: 'c', appointmentAt: '2026-10-08T03:00:00Z', irecruitAt: null },
-    ];
-    const s = buildStageSla(facts, [], NOW).find((x) => x.key === 'inform')!;
-    expect([s.done, s.onTime, s.stuck]).toEqual([2, 1, 1]);
-    expect(s.stuckIds).toEqual(['c']);
-  });
   it('ป๊อปผู้สมัครมี "ไปถึงไหนแล้ว" + ช่องทางของลิงก์', () => {
     const panel = read('src/components/recruit-rm/ApplicantInfoPanel.tsx');
     expect(panel).toContain('<ApplicantTraceField trace={trace} />');
     expect(panel).toContain('trace?.linkChannel');
     expect(read('api/_handlers/registry.ts')).toContain("'/api/application-trace': applicationTraceHandler");
-  });
-});
-
-describe('ค้างอยู่ที่ใคร = คนที่ต้องลงมือจริง (เจ้าของ 20 ต.ค. 2569 — เห็นชื่อเล็กแต่หาในหน้าติดตามไม่เจอ)', () => {
-  const none = { claimer: null, postingOwner: null, aiWaiting: false, irecruitDup: false };
-  it('ขั้น AI: อยู่ในคิวไม่มีผล = แถว AI · ซ้ำ iRecruit/คนเก็บ/ยังไม่ส่ง = คน', () => {
-    expect(stuckWho('aiCall', 'AI โทรคัดกรอง', { ...none, aiWaiting: true }, 'เล็ก')).toMatchObject({ owner: AI_OWNER, kind: 'ai' });
-    expect(stuckWho('aiCall', 'AI โทรคัดกรอง', { ...none, irecruitDup: true }, 'เล็ก')).toMatchObject({ owner: 'เล็ก', why: 'ซ้ำ iRecruit รอเลือกวิธีโทร' });
-    expect(stuckWho('aiCall', 'AI โทรคัดกรอง', { ...none, claimer: 'แบงค์' }, 'เล็ก')).toMatchObject({ owner: 'แบงค์', why: 'เก็บไปโทรเองแล้ว ยังไม่โทร' });
-    expect(stuckWho('aiCall', 'AI โทรคัดกรอง', { ...none, postingOwner: 'เจมส์' }, null)).toMatchObject({ owner: 'เจมส์', why: 'ยังไม่ส่ง AI' });
-    expect(stuckWho('staffCall', 'คนโทรต่อคนสนใจ', none, null)).toMatchObject({ owner: NO_OWNER, kind: 'none' });
-  });
-  it('คนเดียวค้างหลายขั้นนับครั้งเดียว · แถว AI ขึ้นก่อน · มีรายชื่อให้กดดู', () => {
-    const stage = (key: 'aiCall' | 'screening' | 'inform', ids: string[]) => ({ key, label: key, done: 1, onTime: 0, stuck: ids.length, stuckIds: ids });
-    const facts = ['a', 'b', 'c'].map((id) => ({ id, jobId: 'J1' })) as unknown as RecruitAppFact[];
-    const rows = stuckByOwner(
-      [stage('aiCall', ['a', 'b']), stage('screening', ['c']), stage('inform', ['c'])],
-      facts,
-      new Map([['J1', 'เล็ก']]),
-      new Map([['a', { ...none, aiWaiting: true }]]),
-    );
-    expect(rows.map((r) => [r.owner, r.stuck])).toEqual([[AI_OWNER, 1], ['เล็ก', 2]]);
-    expect(rows[1].items.map((i) => i.id)).toEqual(['b', 'c']);
-  });
-  it('อ่านคนเก็บ · ผู้รับผิดชอบโพสต์ · คิว AI ที่ยังไม่มีผล · ซ้ำ iRecruit (ไม่มีชื่อ/เบอร์)', () => {
-    const sql = stuckExtrasSql();
-    expect(sql).toContain('a.claimed_by');
-    expect(sql).toContain('coalesce(a.posting_id, l.posting_id)');
-    expect(sql).toContain("q.status in ('pending', 'delivered')");
-    expect(sql).not.toMatch(/full_name as|phone/);
   });
 });
 

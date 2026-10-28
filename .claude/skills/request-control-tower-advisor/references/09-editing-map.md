@@ -13303,6 +13303,8 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   ชิปทำต่อ · AI แนะนำ · ผลโทร 6 ช่อง · หาคนจากกองไม่สนใจ ย้ายไปหัวป๊อปรายละเอียด (`matching-detail-moved`)
 
 ### หน้าความคุ้มค่าระบบ `/value` (15 ต.ค. 2569)
+
+> 🔴 **ถอดทั้งหน้าแล้ว 28 ต.ค. 2569** (เจ้าของ "เอาออกเลย" → Choice "ลบทั้งหน้า") — เมนู · route `/value` · หน้า · `/api/value-case` · `/api/value-pipeline` · ตัวคิดทั้งชุด ลบหมด · ตาราง `app_value_case` (146) เหลือในฐานไว้เฉย ๆ ไม่ drop (migration เพิ่มอย่างเดียว) · เทสต์คุม `tests/api/valuePageRemoved2569-10-28.test.ts` · ข้อความข้างล่างเป็นประวัติ
 - เจ้าของ: "ขอสักหน้าเอาไว้ดูคนเดียว เพื่อเอาไว้ Defend ผู้บริหาร" · Choice "ใน jarvis เห็นคนเดียว" + "ดึงจากระบบ + กรอกเอง"
 - ไม่มีในเมนู · route `/value` → `src/pages/value/ValueCasePage.tsx` · ตัวคิด `src/lib/valueCase.ts` (pure) · เรียก API `src/lib/valueCaseApi.ts`
 - API `GET/PUT /api/value-case` (`api/_handlers/value-case.ts` · `api/_lib/valueCaseStore.ts`) — ไม่มีสิทธิ์ = 404
