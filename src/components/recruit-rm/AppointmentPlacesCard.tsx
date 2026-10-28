@@ -104,7 +104,7 @@ export default function AppointmentPlacesCard({
                         }}
                       >
                         {p.place}
-                        <span className="ml-1 font-normal tabular-nums text-muted-foreground">· {p.time ? `${p.time} น.` : 'ไม่ระบุเวลา'}</span>
+                        <span className="block text-xs font-normal tabular-nums text-muted-foreground">{placeTimesText(p)}</span>
                       </Button>
                     </td>
                     <td className={cn('px-3 py-2 text-center font-medium tabular-nums', DASH.cell)}>{p.total}</td>
@@ -118,7 +118,7 @@ export default function AppointmentPlacesCard({
                         type="button"
                         size="xs"
                         variant="outline"
-                        aria-label={`โหลดเป็น PDF ${p.place}${p.time ? ` ${p.time} น.` : ''}`}
+                        aria-label={`โหลดเป็น PDF ${p.place}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           onPrint(p.key);
@@ -137,4 +137,10 @@ export default function AppointmentPlacesCard({
       </div>
     </div>
   );
+}
+
+/** เวลาที่มีนัดในสถานที่นี้ "09:00 · 10:30 น." · นัดเก่าไม่มีเวลาต่อท้าย "ไม่ระบุเวลา" (28 ต.ค. 2569 รวมแถวตามสถานที่) */
+function placeTimesText(p: AppointmentPlaceSummary): string {
+  const parts = [p.times.length > 0 ? `${p.times.join(' · ')} น.` : null, p.noTime ? 'ไม่ระบุเวลา' : null].filter(Boolean);
+  return parts.join(' · ');
 }

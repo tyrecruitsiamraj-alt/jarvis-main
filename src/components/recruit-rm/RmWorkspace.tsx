@@ -573,7 +573,7 @@ const RmWorkspace: React.FC<{
         key: p.key,
         ymd: placeDay,
         place: p.place,
-        time: p.time,
+        time: p.times.length > 0 ? p.times.join(' · ') : null,
         rows: filtered
           .filter((r) => isInAppointmentPlace(r, placeDay, p.key) && placeKeyOf(r) === p.key)
           .sort((a, b) => (appointmentTimeOf(a.appointment_at) ?? '').localeCompare(appointmentTimeOf(b.appointment_at) ?? '') || a.full_name.localeCompare(b.full_name, 'th')),

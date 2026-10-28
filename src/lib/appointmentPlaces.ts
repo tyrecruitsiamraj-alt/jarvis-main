@@ -3,7 +3,8 @@
  * > *"ให้ดูเลยว่าวันนี้ทุกคนนัดมาเท่าไหร่ นัดไปที่ไหนบ้าง"* · *"ให้เห็นไปหมดเลยว่า นัดมาทั้งหมดเท่าไหร่ ใครนัดมา"*
  * Choice "ตารางแบบ iRecruit บน + รายชื่อล่าง" · ตรรกะล้วน (มีเทสต์) — ผลมา/ไม่มาใช้นิยามเดียวกับ `appointmentBoard.ts`
  * ⚠️ มา + ไม่มา + เลื่อนนัด + รอผล = นัด เสมอ · ไม่มีสถานที่ = "ไม่ระบุสถานที่" (ไม่หาย)
- * แถว = สถานที่ + เวลา (เจ้าของ 21 ต.ค. 2569 "บูธเดียวกัน 11.00 กับ 15.00 น. จะแยกยังไงได้") · นัดเก่าไม่มีเวลา = แถว "ไม่ระบุเวลา"
+ * แถว = สถานที่ (เจ้าของ 28 ต.ค. 2569 "Group รวมเป็น Online และพวกโลตัส ไม่ใช่มาวางแยกเยอะแยะ" — แทน 21 ต.ค. ที่แยกตามเวลา)
+ * เวลาที่มีนัดโชว์ในแถว (`times`) · นัดเก่าไม่มีเวลา = `noTime`
  */
 import { isAttendanceResult } from './appointmentAttendance';
 import { toYmdBangkok } from './dateTh';
@@ -20,11 +21,13 @@ export const NO_PLACE = 'ไม่ระบุสถานที่';
 export const NO_BOOKER = 'ไม่ระบุ';
 
 export type AppointmentPlaceSummary = {
-  /** คีย์แถว = สถานที่ + เวลา (ใช้กรองรายชื่อ) */
+  /** คีย์แถว = สถานที่ (ใช้กรองรายชื่อ) */
   key: string;
   place: string;
-  /** HH:MM · null = ไม่ระบุเวลา (นัดเก่า) */
-  time: string | null;
+  /** เวลาที่มีนัดในสถานที่นี้ HH:MM เรียงน้อยไปมาก */
+  times: string[];
+  /** มีนัดเก่าที่ไม่ระบุเวลา */
+  noTime: boolean;
   total: number;
   /** ใครนัด · มากไปน้อย */
   by: Array<{ name: string; count: number }>;
@@ -46,9 +49,9 @@ export function appointmentYmdOf(r: AppointmentPlaceRow): string | null {
   return Number.isNaN(d.getTime()) ? null : toYmdBangkok(d);
 }
 
-/** คีย์แถวของนัด = สถานที่ + เวลา */
+/** คีย์แถวของนัด = สถานที่ (28 ต.ค. 2569 รวมทุกเวลา) */
 export function placeKeyOf(r: AppointmentPlaceRow): string {
-  return `${placeOf(r)}\u0000${appointmentTimeOf(r.appointment_at) ?? ''}`;
+  return placeOf(r);
 }
 
 /** แถวนี้อยู่ในวัน+แถวที่กดไหม (key null = ทุกแถวของวันนั้น) */
@@ -69,8 +72,10 @@ export function buildAppointmentPlaces(
     const key = placeKeyOf(r);
     const s =
       byPlace.get(key) ??
-      { key, place, time, total: 0, by: [], showed: 0, noShow: 0, rescheduled: 0, pending: 0, byMap: new Map<string, number>() };
+      { key, place, times: [], noTime: false, total: 0, by: [], showed: 0, noShow: 0, rescheduled: 0, pending: 0, byMap: new Map<string, number>() };
     byPlace.set(key, s);
+    if (time === null) s.noTime = true;
+    else if (!s.times.includes(time)) s.times.push(time);
     s.total += 1;
     total += 1;
     const who = r.appointment_by?.trim() || NO_BOOKER;
@@ -81,21 +86,16 @@ export function buildAppointmentPlaces(
     else if (res === 'rescheduled') s.rescheduled += 1;
     else s.pending += 1;
   }
-  const placeTotals = new Map<string, number>();
-  for (const s of byPlace.values()) placeTotals.set(s.place, (placeTotals.get(s.place) ?? 0) + s.total);
   const places = [...byPlace.values()]
     .map(({ byMap, ...s }) => ({
       ...s,
+      times: [...s.times].sort(),
       by: [...byMap.entries()]
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'th')),
     }))
-    // สถานที่เดียวกันอยู่ติดกันเรียงตามเวลา · สถานที่ที่นัดรวมมากก่อน
-    .sort((a, b) => {
-      const pa = placeTotals.get(a.place) ?? 0;
-      const pb = placeTotals.get(b.place) ?? 0;
-      return pb - pa || a.place.localeCompare(b.place, 'th') || (a.time ?? '99').localeCompare(b.time ?? '99');
-    });
+    // นัดมากก่อน · ไม่ระบุสถานที่ไว้ท้าย
+    .sort((a, b) => Number(a.place === NO_PLACE) - Number(b.place === NO_PLACE) || b.total - a.total || a.place.localeCompare(b.place, 'th'));
   return { total, places };
 }
 

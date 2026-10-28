@@ -562,22 +562,14 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                       className="jarvis-soft-field"
                     >
                       <option value="">— เลือกช่องทาง —</option>
-                      {/* หลัก → รอง (28 ต.ค. 2569) · หลักที่ไม่มีรอง = เลือกตัวหลัก */}
-                      {channels.map((c) =>
-                        c.children.length > 0 ? (
-                          <optgroup key={c.id} label={c.name}>
-                            {c.children.map((k) => (
-                              <option key={k.id} value={k.id}>
-                                {k.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ) : (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
+                      {/* ช่องทางรองอย่างเดียว ไม่มีหัวช่องทางหลัก (เจ้าของ 28 ต.ค. 2569 "จัดกลุ่มตามช่องทางรอง") · หลักที่ไม่มีรอง = ตัวหลัก */}
+                      {channels
+                        .flatMap((c) => (c.children.length > 0 ? c.children : [{ id: c.id, name: c.name }]))
+                        .map((k) => (
+                          <option key={k.id} value={k.id}>
+                            {k.name}
                           </option>
-                        ),
-                      )}
+                        ))}
                     </select>
                   )}
                 </Field>

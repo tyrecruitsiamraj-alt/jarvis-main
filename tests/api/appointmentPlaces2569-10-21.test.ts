@@ -35,20 +35,18 @@ describe('buildAppointmentPlaces', () => {
     expect(out.places.reduce((n, p) => n + p.total, 0)).toBe(out.total);
   });
 
-  it('🔴 บูธเดียวกันคนละเวลา = คนละแถว เรียงตามเวลา · นัดเก่าเป็นไม่ระบุเวลา', () => {
-    expect(out.places.map((p) => [p.place, p.time, p.total])).toEqual([
-      ['บูธโลตัส ลาดพร้าว', '11:00', 2],
-      ['บูธโลตัส ลาดพร้าว', '15:00', 1],
-      ['Online', '06:30', 1],
-      ['Online', null, 1],
-      [NO_PLACE, null, 1],
+  it('🔴 รวมแถวตามสถานที่ (28 ต.ค. 2569 แทนแยกตามเวลา) · เวลาที่มีนัดอยู่ในแถว · ไม่ระบุสถานที่ไว้ท้าย', () => {
+    expect(out.places.map((p) => [p.place, p.times, p.noTime, p.total])).toEqual([
+      ['บูธโลตัส ลาดพร้าว', ['11:00', '15:00'], false, 3],
+      ['Online', ['06:30'], true, 2],
+      [NO_PLACE, [], true, 1],
     ]);
-    expect(out.places[0].by).toEqual([{ name: 'อัน', count: 2 }]);
+    expect(out.places[0].by[0]).toEqual({ name: 'อัน', count: 2 });
   });
 
-  it('กดแถว = กรองรายชื่อวัน+สถานที่+เวลานั้น', () => {
+  it('กดแถว = กรองรายชื่อวัน+สถานที่นั้น (ทุกเวลา)', () => {
     const key = placeKeyOf(rows[0]);
-    expect(rows.filter((r) => isInAppointmentPlace(r, '2026-10-21', key))).toHaveLength(2);
+    expect(rows.filter((r) => isInAppointmentPlace(r, '2026-10-21', key))).toHaveLength(3);
     expect(rows.filter((r) => isInAppointmentPlace(r, '2026-10-21', null))).toHaveLength(6);
   });
 
