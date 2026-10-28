@@ -129,3 +129,10 @@ describe('มุมมองรายชื่อใช้กติกาเด�
     expect(unknown).toHaveLength(1);
   });
 });
+
+it('กดโทรแล้วจดเวลาสำเร็จ ไม่ขึ้นข้อความ "จดเวลาโทรของ … แล้ว" (เจ้าของ 28 ต.ค. 2569 "ไม่ต้องโชว์เลย") · จดไม่สำเร็จยังบอก', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync('src/components/recruit-rm/RmWorkspace.tsx', 'utf8');
+  expect(src).not.toContain('จดเวลาโทรของ');
+  expect(src).toContain("say(friendlyErrorText(e, 'จดเวลาโทรไม่สำเร็จ'));");
+});
