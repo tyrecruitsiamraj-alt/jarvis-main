@@ -68,15 +68,18 @@ describe('หน้าจอ', () => {
 });
 
 describe('เลขกราฟ = เลขการ์ด (21 ต.ค. 2569 เจอบนเว็บจริง 63 กับ 62)', () => {
-  it('ชิป "ติดต่อได้" / "คนโทรติดต่อได้" ใช้นิยามเดียวกับลูกในการ์ด', async () => {
+  it('ชิป "ติดต่อได้" ใช้นิยามเดียวกับลูกในการ์ด · แท็บการติดต่อใช้ตัวแบ่งเดียวกับกล่องบนแท็บ', async () => {
     const { compareRowsOf } = await import('@/lib/recruitCompare');
     const { totalsOf } = await import('@/lib/recruitOverview');
     const withStaff = [...facts, f('e', { contact: 'success', contactBy: 'staff', staffLastAt: '2026-10-20T05:00:00Z' })];
     const tot = totalsOf(withStaff, '2026-10-01', '2026-10-31');
     const apps = compareRowsOf('apps', tot, null, null, null).find((r) => r.label === 'ติดต่อได้')!;
     expect(apps.cur).toBe(nodeAt(drillTreeOf('apps', withStaff, null)!, ['ai', 'reached']).node.count);
-    const staff = compareRowsOf('staff', tot, null, null, null).find((r) => r.label === 'คนโทรติดต่อได้')!;
-    expect(staff.cur).toBe(nodeAt(drillTreeOf('staff', withStaff, null)!, ['followed', 'reached']).node.count);
+    // 29 ต.ค. 2569 การ์ดเทียบแท็บการติดต่อ = "สนใจ · รอโทร · ติดต่อได้" ตัวแบ่งเดียวกับกล่องบนแท็บ (`buildContactRows`)
+    const { buildContactRows } = await import('@/lib/recruitContactTab');
+    const top = buildContactRows(withStaff, new Date()).total;
+    const row = (label: string) => compareRowsOf('staff', tot, null, null, null).find((r) => r.label === label)!.cur;
+    expect([row('สนใจ'), row('รอโทร'), row('ติดต่อได้')]).toEqual([top.total, top.counts.waiting, top.ok]);
   });
 });
 

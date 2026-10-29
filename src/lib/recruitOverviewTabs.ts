@@ -10,7 +10,8 @@ import type { JourneyStep } from './recruitJourney';
  * `OverviewTabId` ยังมี 'apps' เป็นชื่อก้อน (การ์ดเทียบ/กดลงลึก/เส้นทาง ของคนที่กรอก) ไม่ใช่แท็บ
  */
 export const OVERVIEW_TABS = [
-  { id: 'requests', label: 'ใบขอ' },
+  // ชื่อแท็บ "ภาพรวม Online" (เจ้าของ 29 ต.ค. 2569 "คำว่า ใบขอ … เปลี่ยนเป็น ภาพรวม Online ก้ได้") · id เดิม `requests` (`?ov=` ลิงก์เก่ายังเปิดได้)
+  { id: 'requests', label: 'ภาพรวม Online' },
   { id: 'staff', label: 'การติดต่อ' },
   { id: 'appt', label: 'นัดหมาย' },
 ] as const;

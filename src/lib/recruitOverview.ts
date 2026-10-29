@@ -22,6 +22,7 @@ import { REFERRAL_SOURCE_LABEL, type ApplicationReferralSource } from '@/lib/pub
 import { bangkokYmd } from '@/lib/trends/timeBuckets';
 import { DAY_MS, fullDaysBetween } from '@/lib/fullDays';
 import { ALL_MAX_DAYS } from '@/lib/recruitOverviewWindow';
+import { CONTACT_OK, contactBucketOf, isInterested } from '@/lib/recruitContactTab';
 import type {
   RecruitAiRow,
   RecruitAppFact,
@@ -67,6 +68,10 @@ export const isAiQueued = (f: RecruitAppFact) => f.aiQueued === true;
 /** ตอบ AI ว่าสนใจ แล้วเจ้าหน้าที่ลงมือหลังเวลาที่ AI ได้คำตอบ */
 export const isStaffFollowed = (f: RecruitAppFact) =>
   isAiSaidYes(f) && !!f.staffLastAt && !!f.aiAnswerAt && f.staffLastAt >= f.aiAnswerAt;
+/** สนใจแล้วยังไม่มีเจ้าหน้าที่โทร / เจ้าหน้าที่ติดต่อได้ — ตัวเดียวกับกล่อง "รอติดต่อ" / "ติดต่อสำเร็จ" ของแท็บการติดต่อ (ไม่ขึ้นกับเวลา) */
+export const isContactWaiting = (f: RecruitAppFact) => isInterested(f) && contactBucketOf(f, new Date()) === 'waiting';
+export const isContactOk = (f: RecruitAppFact) => isInterested(f) && CONTACT_OK.includes(contactBucketOf(f, new Date()));
+export { isInterested };
 /** AI โทรแล้วและติดต่อได้ */
 export const isAiCalledReached = (f: RecruitAppFact) => f.calledByAi && f.contact === 'success';
 /** คนโทรต่อแล้วและคนติดต่อได้ */
@@ -102,6 +107,10 @@ export type RecruitTotals = {
   aiCalledReached: number;
   /** คนโทรต่อแล้ว (หลัง AI ได้คำตอบ) และคนติดต่อได้ — ลูกของ "คนโทรต่อแล้ว" */
   followedReached: number;
+  /** แท็บการติดต่อ (29 ต.ค. 2569 การ์ดเทียบ "สนใจ · รอโทร · ติดต่อได้") — ตัวแบ่งเดียวกับกล่องบนแท็บ (`recruitContactTab`) */
+  interested: number;
+  contactWaiting: number;
+  contactOk: number;
   appointed: number;
   showed: number;
   /** null = อ่านบอร์ด ERP ไม่ได้ */
@@ -127,6 +136,9 @@ export function totalsOf(apps: readonly RecruitAppFact[], from: string, to: stri
     staffFollowed: count(isStaffFollowed),
     aiCalledReached: count(isAiCalledReached),
     followedReached: count(isFollowedReached),
+    interested: count(isInterested),
+    contactWaiting: count(isContactWaiting),
+    contactOk: count(isContactOk),
     appointed: count((f) => !!f.appointmentAt),
     showed: count((f) => f.attendance === 'showed'),
     onBoard: c.some((f) => f.onBoard === null) ? null : count((f) => f.onBoard === true),

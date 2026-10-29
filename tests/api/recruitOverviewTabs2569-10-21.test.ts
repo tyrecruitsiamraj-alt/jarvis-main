@@ -14,7 +14,7 @@ const journey = ['names', 'ai', 'staff', 'appointment', 'attendance'].map(step);
 describe('แท็บภาพรวม', () => {
   it('ชื่อแท็บตามที่เจ้าของสั่ง เรียงตามนี้', () => {
     // 29 ต.ค. 2569 เจ้าของ "หน้า กรอกเข้ามา … เอาออกเลย ไปรวมกับ แท็บใบขอ"
-    expect(OVERVIEW_TABS.map((t) => t.label)).toEqual(['ใบขอ', 'การติดต่อ', 'นัดหมาย']);
+    expect(OVERVIEW_TABS.map((t) => t.label)).toEqual(['ภาพรวม Online', 'การติดต่อ', 'นัดหมาย']);
   });
 
   it('?ov= ไม่รู้จัก = ใบขอ', () => {
