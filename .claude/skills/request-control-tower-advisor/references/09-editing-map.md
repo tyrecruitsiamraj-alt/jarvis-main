@@ -14042,3 +14042,8 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   - ดูแลหลังเริ่มงาน **นับเป็นคน** (`summarizeAftercarePeople` · `proportionAftercarePeopleSql` คนที่ยังดูแลอยู่) → คุยได้ + 3 หัวข้อ H/W/HR · คุยไม่ได้ · รอโทร (ยังไม่ถึงรอบ / เลยรอบ) · ยังไม่ตั้งรอบ
   - จับคู่งาน = รายงานผลโทรหัวข้อ matching (`fetchTopicReport('matching')` → `matchingProportionRow`)
   - ถอดก้อน "ขั้นที่ยังเป็นคน 100%" (มา/ไม่มาอยู่ในนัดได้แล้ว)
+
+### หน้าติดตาม: ชื่อเจ้าของเบอร์ฉุกเฉิน (29 ต.ค. 2569)
+- เจ้าของ "ทำเลย เติมชื่อเจ้าของเบอร์" — เบอร์ฉุกเฉินคนแทน = คนแก้ใบล่าสุดใน iRecruit (Choice คงเดิม) แต่จอขึ้นแค่ตัวเลข · "เพิ่มโดย" เป็นคนเพิ่มใบ ⇒ ดูไม่ออกว่าเบอร์ใคร
+- `staffNamesOfPhones` (api/_lib/followStaffName.ts · กติกาเดียวกับ `staffNameOfPhone`) → `listFollow` แนบ `emergency_name` · จอ `FollowPlanningCalendar` "เบอร์ · ชื่อ" · `FollowRoundsDialog` "เบอร์ (ชื่อ)"
+- เทสต์ `tests/api/followEmergencyName2569-10-29.test.ts`

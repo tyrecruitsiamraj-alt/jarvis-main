@@ -215,7 +215,8 @@ const FollowRoundsDialog: React.FC<{
                       title="เบอร์ที่ AI โทรเมื่อติดต่อผู้รับไม่ได้"
                       className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', TONE.neutral.chip)}
                     >
-                      เบอร์ฉุกเฉินที่ส่งไป {it.emergency_phone} · ยังไม่รู้ว่าโทรหรือยัง
+                      เบอร์ฉุกเฉินที่ส่งไป {it.emergency_phone}
+                      {it.emergency_name ? ` (${it.emergency_name})` : ''} · ยังไม่รู้ว่าโทรหรือยัง
                     </span>
                   ) : null}
                 </div>

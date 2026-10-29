@@ -795,6 +795,12 @@ const FollowPlanningCalendar: React.FC<{
                               calls.map((c) => roundEmergencyPhone(c.round)).filter((v): v is string => Boolean(v)),
                             ),
                           ];
+                          /* ชื่อเจ้าของเบอร์ฉุกเฉิน (เจ้าของ 29 ต.ค. 2569 "เติมชื่อเจ้าของเบอร์") */
+                          const emgName = new Map(
+                            calls
+                              .filter((c) => roundEmergencyPhone(c.round) && c.round.entry.emergency_name)
+                              .map((c) => [roundEmergencyPhone(c.round) as string, c.round.entry.emergency_name as string]),
+                          );
                           const anyResult = calls.some((c) => c.round.state === 'result');
                           /** ปุ่มโทร + จัดการ — จอกว้าง (≥1024) อยู่คอลัมน์ขวาสุด · มือถือ/แท็บเล็ตอยู่ใต้ชื่อ (QA 10 ต.ค. 2569 ปุ่มอยู่นอกจอ · รอบ 3 ข้อ 6) */
                           const rowActions = (
@@ -1182,6 +1188,7 @@ const FollowPlanningCalendar: React.FC<{
                                     {emgList.map((p) => (
                                       <span key={p} className="block tabular-nums text-foreground">
                                         {p}
+                                        {emgName.get(p) ? <span className="text-muted-foreground"> · {emgName.get(p)}</span> : null}
                                       </span>
                                     ))}
                                     {/**

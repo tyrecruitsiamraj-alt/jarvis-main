@@ -49,3 +49,42 @@ export async function staffNameOfPhone(phone: string | null): Promise<string | n
     return null;
   }
 }
+
+/**
+ * ชื่อเจ้าของเบอร์ฉุกเฉิน ทีละหลายเบอร์ (เจ้าของ 29 ต.ค. 2569 "เติมชื่อเจ้าของเบอร์") — หน้าติดตามโชว์ "เบอร์ · ชื่อ"
+ * กติกาเดียวกับ `staffNameOfPhone`: หน้าผู้ใช้งาน (ชื่อเล่น · เบอร์เดียวมีหลายชื่อ = ไม่เดา) แล้วค่อยความจำเดิม
+ * คืน Map เลข 9 ตัวท้าย → ชื่อ · อ่านไม่ได้ = Map ว่าง (จอขึ้นแค่เบอร์เหมือนเดิม)
+ */
+export async function staffNamesOfPhones(phones: readonly (string | null | undefined)[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const keys = [...new Set(phones.map((p) => (p || '').replace(/\D/g, '')).filter((d) => d.length >= 9).map((d) => d.slice(-9)))];
+  if (keys.length === 0) return out;
+  try {
+    const { rows } = await dbQuery<{ k: string; names: string[] }>(
+      `select right(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), 9) as k, array_agg(distinct btrim(nickname)) as names
+         from ${usersTable}
+        where is_active and coalesce(btrim(nickname), '') <> ''
+          and right(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), 9) = any($1::text[])
+        group by 1`,
+      [keys],
+    );
+    for (const r of rows) if (r.names.length === 1 && r.names[0]) out.set(r.k, r.names[0]);
+  } catch {
+    // อ่านหน้าผู้ใช้งานไม่ได้ = ลองความจำเดิม
+  }
+  const missing = keys.filter((k) => !out.has(k));
+  if (missing.length === 0) return out;
+  try {
+    const { rows } = await dbQuery<{ k: string; name: string }>(
+      `select distinct on (right(regexp_replace(phone, '\\D', '', 'g'), 9)) right(regexp_replace(phone, '\\D', '', 'g'), 9) as k, btrim(name) as name
+         from ${staffTable}
+        where right(regexp_replace(phone, '\\D', '', 'g'), 9) = any($1::text[])
+        order by right(regexp_replace(phone, '\\D', '', 'g'), 9), created_at desc`,
+      [missing],
+    );
+    for (const r of rows) if (r.name) out.set(r.k, r.name);
+  } catch {
+    // ไม่มีชื่อ = จอขึ้นแค่เบอร์
+  }
+  return out;
+}

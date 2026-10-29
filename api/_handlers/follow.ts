@@ -27,7 +27,7 @@ import {
 import { readJsonBody, getString } from '../_lib/body.js';
 import type { FollowDispatchState } from '@/lib/followDispatchState';
 import { tableInAppSchema } from '../_lib/schema.js';
-import { staffNameOfPhone } from '../_lib/followStaffName.js';
+import { staffNameOfPhone, staffNamesOfPhones } from '../_lib/followStaffName.js';
 import { restoreCancelledFollow, restoreRoundsStoppedByClose, type ReopenRestore } from '../_lib/followReopenRestore.js';
 import { cancelFollowScope, parseCancelScope } from '../_lib/followCancelScope.js';
 import { getReplaceSyncSettings } from '../_lib/irecruitReplaceSync.js';
@@ -369,8 +369,15 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
     `select count(*)::text as n from ${followTable}`,
   );
   const total = Number(countRows[0]?.n ?? rows.length);
+  // ชื่อเจ้าของเบอร์ฉุกเฉิน (เจ้าของ 29 ต.ค. 2569 "เติมชื่อเจ้าของเบอร์") — หาไม่เจอ = ขึ้นแค่เบอร์
+  const items = rows.map(toResponse);
+  const emgNames = await staffNamesOfPhones(items.map((it) => it.emergency_phone));
+  for (const it of items) {
+    const k = (it.emergency_phone ?? '').replace(/\D/g, '').slice(-9);
+    if (k && emgNames.has(k)) (it as Record<string, unknown>).emergency_name = emgNames.get(k);
+  }
   return res.status(200).json({
-    items: rows.map(toResponse),
+    items,
     /** ยอดจริงทั้งตาราง — ฝั่งจอใช้ตัวนี้ตัดสินว่าต้องดึงหน้าต่อไปไหม */
     total,
     returned: rows.length,
