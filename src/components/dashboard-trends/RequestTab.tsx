@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, FileText, MapPin, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -32,6 +32,7 @@ import {
   filterRequestRows,
   isRequestFilterActive,
   requestAreaOptions,
+  requestSiteOptions,
   type ApplicantChannelRow,
   type RecruitRequestRow,
   type RequestSector,
@@ -199,6 +200,7 @@ export default function RequestTab({
   const active = isRequestFilterActive(f);
   const picked = useMemo(() => (rows ? filterRequestRows(rows, f) : []), [rows, f]);
   const options = useMemo(() => requestAreaOptions(rows ?? [], f), [rows, f]);
+  const sites = useMemo(() => requestSiteOptions(rows ?? []), [rows]);
   const funnel = useMemo(() => buildRequestFunnel(picked), [picked]);
   const areas = useMemo(() => buildProvinceAreas(picked), [picked]);
   const appRows = useMemo(() => buildApplicantChannelRows(appsOfRequests(apps, active ? picked : null)), [apps, picked, active]);
@@ -209,14 +211,8 @@ export default function RequestTab({
 
   return (
     <div className="space-y-3">
-      {/* ─── ตัวกรอง (เจ้าของ 29 ต.ค. 2569: ชื่อหน่วยงาน · ประเภทงาน · Code Site · จังหวัด อำเภอ ตำบล) ─── */}
+      {/* ─── ตัวกรอง (เจ้าของ 29 ต.ค. 2569): ประเภทงาน · Code Site จากไซต์ที่มีใบขอ · จังหวัด อำเภอ ตำบล ─── */}
       <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-card p-3" data-testid="request-tab-filters">
-        <div className="flex min-w-48 flex-[2] flex-col gap-1">
-          <Label htmlFor="request-tab-unit" className={cn('text-xs font-normal', DASH.sub)}>
-            ชื่อหน่วยงาน
-          </Label>
-          <Input id="request-tab-unit" className="h-9 text-sm" value={f.unit} onChange={(e) => set({ unit: e.target.value })} placeholder="เช่น กรุงศรี" />
-        </div>
         <div className="flex min-w-32 flex-1 flex-col gap-1">
           <Label className={cn('text-xs font-normal', DASH.sub)}>ประเภทงาน</Label>
           <Select value={f.sector ?? ALL} onValueChange={(v) => set({ sector: v === ALL ? null : (v as RequestSector | 'unset') })}>
@@ -234,11 +230,19 @@ export default function RequestTab({
             </SelectContent>
           </Select>
         </div>
-        <div className="flex min-w-32 flex-1 flex-col gap-1">
-          <Label htmlFor="request-tab-site" className={cn('text-xs font-normal', DASH.sub)}>
-            Code Site
-          </Label>
-          <Input id="request-tab-site" className="h-9 text-sm" value={f.siteCode} onChange={(e) => set({ siteCode: e.target.value })} />
+        <div className="flex min-w-48 flex-[2] flex-col gap-1">
+          <Label className={cn('text-xs font-normal', DASH.sub)}>Code Site</Label>
+          <SearchableSelect
+            value={f.siteCode ?? ALL}
+            onChange={(v) => set({ siteCode: v === ALL ? null : v })}
+            options={[
+              { value: ALL, label: 'ทั้งหมด' },
+              ...sites.map((o) => ({ value: o.value, label: `${o.value} · ${o.name} · ${fmt(o.n)} ใบ`, keywords: `${o.name} ${o.unit}` })),
+            ]}
+            searchPlaceholder="พิมพ์รหัสหรือชื่อไซต์"
+            ariaLabel="Code Site"
+            className="h-9 text-sm"
+          />
         </div>
         <AreaSelect label="จังหวัด" value={f.province} options={options.provinces} onChange={(v) => set({ province: v, district: null, subdistrict: null })} testId="request-tab-province" />
         <AreaSelect label="อำเภอ" value={f.district} options={options.districts} onChange={(v) => set({ district: v, subdistrict: null })} disabled={!f.province} testId="request-tab-district" />

@@ -16,6 +16,7 @@ import {
   filterRequestRows,
   requestAreaOptions,
   requestSectorOf,
+  requestSiteOptions,
   requestsOfFunnelKey,
   type RecruitRequestRow,
 } from '../../src/lib/recruitRequestTab';
@@ -117,7 +118,8 @@ describe('ข้อ 3 พื้นที่ขาดคน', () => {
     expect(filterRequestRows(ROWS, { ...EMPTY_REQUEST_FILTER, brand: 'krungsri' }).map((r) => r.requestNo)).toEqual(['LBM6910021']);
     expect(filterRequestRows(ROWS, { ...EMPTY_REQUEST_FILTER, brand: 'ford' }).map((r) => r.requestNo)).toEqual(['OPL6910092']);
     expect(filterRequestRows(ROWS, { ...EMPTY_REQUEST_FILTER, sector: 'bank' })).toHaveLength(1);
-    expect(filterRequestRows(ROWS, { ...EMPTY_REQUEST_FILTER, siteCode: '67lbdl' })).toHaveLength(7);
+    expect(filterRequestRows(ROWS, { ...EMPTY_REQUEST_FILTER, siteCode: '67LBDL0051' })).toHaveLength(7);
+    expect(filterRequestRows(ROWS, { ...EMPTY_REQUEST_FILTER, siteCode: '67LBDL' })).toHaveLength(0);
     const opt = requestAreaOptions(ROWS, { province: 'กรุงเทพมหานคร', district: null });
     expect(opt.provinces[0]).toEqual({ value: 'กรุงเทพมหานคร', n: 5 });
     expect(opt.districts).toEqual([{ value: 'เขตปทุมวัน', n: 5 }]);
@@ -184,12 +186,14 @@ describe('ข้อ 4 คนที่กรอกมา แยกช่องท
 });
 
 describe('หน้าจอ', () => {
-  it('แท็บใบขอใช้ RequestTab · ตัวกรอง 6 ช่อง · ปุ่มกรุงศรี SCB Ford · ไม่มีบรรทัดบวกใต้ข้อ 1 (เจ้าของลบในร่าง)', () => {
+  it('แท็บใบขอใช้ RequestTab · ตัวกรอง 5 ช่อง · ปุ่มกรุงศรี SCB Ford · ไม่มีบรรทัดบวกใต้ข้อ 1 (เจ้าของลบในร่าง)', () => {
     const ui = readFileSync('src/components/dashboard-trends/RequestTab.tsx', 'utf8');
     expect(ui).toContain('data-testid="request-tab-sector"');
     for (const id of ['request-tab-province', 'request-tab-district', 'request-tab-subdistrict']) expect(ui).toContain(`testId="${id}"`);
-    expect(ui).toContain('htmlFor="request-tab-unit"');
-    expect(ui).toContain('htmlFor="request-tab-site"');
+    // 29 ต.ค. 2569 "ชื่อหน่วยงานไม่เอาและ เอา Codesite แต่ดึงจาก erp ที่มีใบขอ"
+    expect(ui).not.toContain('ชื่อหน่วยงาน');
+    expect(ui).toContain('ariaLabel="Code Site"');
+    expect(requestSiteOptions(ROWS)).toEqual([{ value: '67LBDL0051', name: 'เชฟรอน - พขร.', unit: 'บริษัท เชฟรอนประเทศไทยสำรวจและผลิต จำกัด', n: 7 }]);
     expect(ui).not.toContain('= ${fmt(funnel.total)}');
     expect(readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8')).toContain('<RequestTab rows={data.requestRows ?? null}');
   });

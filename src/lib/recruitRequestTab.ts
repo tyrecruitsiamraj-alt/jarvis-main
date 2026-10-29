@@ -68,19 +68,19 @@ export const REQUEST_BRANDS = [
 ] as const;
 export type RequestBrandKey = (typeof REQUEST_BRANDS)[number]['key'];
 
+/** 🔴 29 ต.ค. 2569 เจ้าของ "ชื่อหน่วยงานไม่เอาและ เอา Codesite แต่ดึงจาก erp ที่มีใบขอ" — ไม่มีช่องพิมพ์ชื่อหน่วยงาน · Code Site เลือกจากไซต์ที่มีใบขอ */
 export type RequestTabFilter = {
-  unit: string;
   brand: RequestBrandKey | null;
   sector: RequestSector | 'unset' | null;
-  siteCode: string;
+  siteCode: string | null;
   province: string | null;
   district: string | null;
   subdistrict: string | null;
 };
-export const EMPTY_REQUEST_FILTER: RequestTabFilter = { unit: '', brand: null, sector: null, siteCode: '', province: null, district: null, subdistrict: null };
+export const EMPTY_REQUEST_FILTER: RequestTabFilter = { brand: null, sector: null, siteCode: null, province: null, district: null, subdistrict: null };
 
 export const isRequestFilterActive = (f: RequestTabFilter) =>
-  Boolean(f.unit.trim() || f.brand || f.sector || f.siteCode.trim() || f.province || f.district || f.subdistrict);
+  Boolean(f.brand || f.sector || f.siteCode || f.province || f.district || f.subdistrict);
 
 const nameOf = (r: RecruitRequestRow) => `${r.unitName ?? ''} ${r.siteName ?? ''}`;
 export const provinceOf = (r: RecruitRequestRow) => r.province || NO_PROVINCE;
@@ -88,19 +88,28 @@ export const districtOf = (r: RecruitRequestRow) => r.district || NO_DISTRICT;
 export const subdistrictOf = (r: RecruitRequestRow) => r.subdistrict || NO_SUBDISTRICT;
 
 export function filterRequestRows(rows: readonly RecruitRequestRow[], f: RequestTabFilter): RecruitRequestRow[] {
-  const unit = f.unit.trim().toLowerCase();
-  const site = f.siteCode.trim().toLowerCase();
   const brand = f.brand ? REQUEST_BRANDS.find((b) => b.key === f.brand) : null;
   return rows.filter(
     (r) =>
-      (!unit || nameOf(r).toLowerCase().includes(unit)) &&
       (!brand || brand.re.test(nameOf(r))) &&
       (!f.sector || (f.sector === 'unset' ? r.sector === null : r.sector === f.sector)) &&
-      (!site || (r.siteCode ?? '').toLowerCase().includes(site)) &&
+      (!f.siteCode || r.siteCode === f.siteCode) &&
       (!f.province || provinceOf(r) === f.province) &&
       (!f.district || districtOf(r) === f.district) &&
       (!f.subdistrict || subdistrictOf(r) === f.subdistrict),
   );
+}
+
+/** ไซต์ที่มีใบขอในช่วง (ERP) — ตัวเลือก Code Site · ใบมากสุดขึ้นก่อน · ค้นด้วยชื่อไซต์/หน่วยงานได้ */
+export function requestSiteOptions(rows: readonly RecruitRequestRow[]): Array<{ value: string; name: string; unit: string; n: number }> {
+  const m = new Map<string, { value: string; name: string; unit: string; n: number }>();
+  for (const r of rows) {
+    if (!r.siteCode) continue;
+    const cur = m.get(r.siteCode) ?? { value: r.siteCode, name: r.siteName || r.unitName || '', unit: r.unitName ?? '', n: 0 };
+    cur.n += 1;
+    m.set(r.siteCode, cur);
+  }
+  return [...m.values()].sort((a, b) => b.n - a.n || a.value.localeCompare(b.value));
 }
 
 /** ตัวเลือกของดรอปดาวน์พื้นที่ — นับใบ มากไปน้อย · อำเภอเฉพาะจังหวัดที่เลือก · ตำบลเฉพาะอำเภอที่เลือก */
