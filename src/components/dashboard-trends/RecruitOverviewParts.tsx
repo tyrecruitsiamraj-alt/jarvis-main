@@ -341,14 +341,22 @@ const REGION_ROWS: ReadonlyArray<{ key: keyof RegionCount; label: string }> = [
   { key: 'unknown', label: 'ไม่ระบุจังหวัด' },
 ];
 
-export function BacklogBody({ backlog }: { backlog: RecruitBacklog }) {
+/**
+ * งานค้าง ณ วันนี้ — `only` = ก้อนเดียว (เจ้าของ 29 ต.ค. 2569 "งานค้างตอนนี้ ย้ายไปให้ถูกเรื่องของมัน"):
+ * ยังไม่มีใครโทร → แท็บกรอกเข้ามา · สนใจแล้วยังไม่มีคนโทรต่อ → แท็บการติดต่อ · นัดที่ยังไม่บันทึกผล → แท็บนัดหมาย
+ */
+export type BacklogPart = 'uncalled' | 'waiting' | 'appointments';
+
+export function BacklogBody({ backlog, only }: { backlog: RecruitBacklog; only?: BacklogPart }) {
   const { uncalled, waitingStaff, appointments, regions, regionRows } = backlog;
+  const show = (p: BacklogPart) => !only || only === p;
   const extra = [
     uncalled.inQueue > 0 ? `รอ AI โทร ${fmt(uncalled.inQueue)} คน` : null,
     uncalled.badPhone > 0 ? `เบอร์โทรผิด ${fmt(uncalled.badPhone)} คน` : null,
   ].filter(Boolean);
   return (
     <div className="grid grid-cols-1 gap-3" data-testid="backlog">
+      {show('uncalled') ? (
       <BacklogGroup
         testId="backlog-uncalled"
         title="ยังไม่มีใครโทร"
@@ -362,6 +370,8 @@ export function BacklogBody({ backlog }: { backlog: RecruitBacklog }) {
         foot={extra.length > 0 ? `ในนั้น ${extra.join(' · ')}` : null}
         regions={regions?.uncalled}
       />
+      ) : null}
+      {show('waiting') ? (
       <BacklogGroup
         testId="backlog-waiting"
         title="สนใจแล้ว ยังไม่มีคนโทรต่อ"
@@ -374,7 +384,8 @@ export function BacklogBody({ backlog }: { backlog: RecruitBacklog }) {
         ]}
         regions={regions?.waitingStaff}
       />
-      {appointments ? (
+      ) : null}
+      {!show('appointments') ? null : appointments ? (
         <BacklogGroup
           testId="backlog-appointments"
           title="นัดที่ยังไม่บันทึกผล"

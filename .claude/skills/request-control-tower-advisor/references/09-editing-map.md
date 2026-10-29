@@ -14047,3 +14047,8 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - เจ้าของ "ทำเลย เติมชื่อเจ้าของเบอร์" — เบอร์ฉุกเฉินคนแทน = คนแก้ใบล่าสุดใน iRecruit (Choice คงเดิม) แต่จอขึ้นแค่ตัวเลข · "เพิ่มโดย" เป็นคนเพิ่มใบ ⇒ ดูไม่ออกว่าเบอร์ใคร
 - `staffNamesOfPhones` (api/_lib/followStaffName.ts · กติกาเดียวกับ `staffNameOfPhone`) → `listFollow` แนบ `emergency_name` · จอ `FollowPlanningCalendar` "เบอร์ · ชื่อ" · `FollowRoundsDialog` "เบอร์ (ชื่อ)"
 - เทสต์ `tests/api/followEmergencyName2569-10-29.test.ts`
+
+### ภาพรวมงานสรรหา: งานค้างย้ายเข้าแท็บของมัน (29 ต.ค. 2569)
+- เจ้าของ "ใบขอ ขอแบบนี้ 1. แนวโน้มใบขอ 2. งานตามจังหวัด · งานค้างตอนนี้ ย้ายไปให้ถูกเรื่องของมัน"
+- `BacklogBody({ only })` (RecruitOverviewParts) — แท็บกรอกเข้ามา = ยังไม่มีใครโทร · การติดต่อ = สนใจแล้วยังไม่มีคนโทรต่อ · นัดหมาย = นัดที่ยังไม่บันทึกผล · แท็บใบขอไม่มีงานค้างแล้ว
+- เทสต์ `tests/api/recruitOverviewBacklogTabs2569-10-29.test.ts`

@@ -403,15 +403,9 @@ const RecruitOverview: React.FC<{
           ))}
         </TabsList>
 
-        {/* ─── ใบขอ: เส้นทางใบขอ + งานค้าง ─── */}
+        {/* ─── ใบขอ: 1 แนวโน้มใบขอ · 2 งานตามจังหวัด (เจ้าของ 29 ต.ค. 2569) ─── */}
         <TabsContent value="requests" className="mt-3 space-y-3">
           {compareCard('requests')}
-          <div className="grid grid-cols-1 gap-3">
-            {/* การ์ด "ใบขอ" (กดลงลึก) รวมเข้าการ์ดแนวโน้มใบขอแล้ว (เจ้าของ 27 ต.ค. 2569) — กดกล่องบนการ์ดแนวโน้มแทน */}
-            <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">
-              {data.backlog ? <BacklogBody backlog={data.backlog} /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
-            </OverviewCard>
-          </div>
           {/* งานจังหวัดไหนเยอะ เป็นงานแบบไหน (เจ้าของ 27 ต.ค. 2569) — ณ วันนี้ ไม่ขึ้นกับช่วงที่เลือก */}
           <ProvinceJobsCard jobs={openJobs} />
         </TabsContent>
@@ -420,6 +414,10 @@ const RecruitOverview: React.FC<{
         <TabsContent value="apps" className="mt-3 space-y-3">
           {compareCard('apps')}
           {drillCard('apps', 'รายชื่อที่กรอกมา')}
+          {/* งานค้างของขั้นนี้ ณ วันนี้ (ย้ายจากแท็บใบขอ · เจ้าของ 29 ต.ค. 2569 "ย้ายไปให้ถูกเรื่องของมัน") */}
+          <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">
+            {data.backlog ? <BacklogBody backlog={data.backlog} only="uncalled" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
+          </OverviewCard>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <OverviewCard icon={Timer} title="กรอกแล้วโทรวันไหน">
               {apps ? <DelayList rows={view.delay} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
@@ -452,6 +450,10 @@ const RecruitOverview: React.FC<{
         <TabsContent value="staff" className="mt-3 space-y-3">
           {compareCard('staff')}
           {drillCard('staff', 'การติดต่อ')}
+          {/* งานค้างของขั้นนี้ ณ วันนี้ (ย้ายจากแท็บใบขอ · เจ้าของ 29 ต.ค. 2569 "ย้ายไปให้ถูกเรื่องของมัน") */}
+          <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">
+            {data.backlog ? <BacklogBody backlog={data.backlog} only="waiting" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
+          </OverviewCard>
           <OverviewCard icon={Users} title="ผลงานรายคน" sub="งานที่ลงผลในช่วงนี้">
             {data.staff ? <StaffTable staff={data.staff} ai={data.ai} /> : <SectionError message={data.errors.staff ?? 'อ่านผลงานรายคนไม่ได้'} />}
           </OverviewCard>
@@ -461,6 +463,10 @@ const RecruitOverview: React.FC<{
         <TabsContent value="appt" className="mt-3 space-y-3">
           {compareCard('appt')}
           {drillCard('appt', 'นัดหมาย')}
+          {/* งานค้างของขั้นนี้ ณ วันนี้ (ย้ายจากแท็บใบขอ · เจ้าของ 29 ต.ค. 2569 "ย้ายไปให้ถูกเรื่องของมัน") */}
+          <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">
+            {data.backlog ? <BacklogBody backlog={data.backlog} only="appointments" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
+          </OverviewCard>
           {/* ช่องทางที่ได้คนลงงาน (เจ้าของ 19 ต.ค. 2569 — ทีม Online ดูว่าเด็กมาจากไหน ลงงานจากช่องทางไหนเยอะ) */}
           <OverviewCard icon={Megaphone} title="คนแจ้งเข้าในช่วงนี้ มาจากช่องทางไหน" sub="นับตามวันแจ้งเข้า · ทุก BU">
             {data.channelPlacement ? (
