@@ -180,7 +180,8 @@ function Row({ r, loading, onOpen }: { r: ProportionRow; loading: boolean; onOpe
   );
   const extra = [
     r.none ? `${r.noneLabel ?? 'ยังไม่มีใครทำ'} ${NUM.format(r.none)}` : null,
-    coverage !== null ? `${aiWord} ได้โทร ${coverage}% ของทั้งหมด` : null,
+    // AI ยังไม่ได้ทำเลย = ไม่ต้องบอก 0% ซ้ำกับเลขด้านขวา
+    coverage !== null && aiCount > 0 ? `${aiWord} ได้โทร ${coverage}% ของทั้งหมด` : null,
   ].filter(Boolean);
   return (
     <li className="border-t border-border first:border-t-0">
