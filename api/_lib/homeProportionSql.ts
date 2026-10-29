@@ -22,7 +22,6 @@ const APPS = tableInAppSchema('public_job_applications');
 const FOLLOW = tableInAppSchema('follow_entries');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const CANCELLATIONS = tableInAppSchema('application_cancellations');
-const POST_REQUESTS = tableInAppSchema('job_posting_requests');
 const IRECRUIT_DUPS = tableInAppSchema('application_irecruit_dups');
 const SUPPRESSION = tableInAppSchema('candidate_call_suppression');
 const UNIT_NOTES = tableInAppSchema('siamraj_unit_notes');
@@ -124,20 +123,7 @@ export function proportionEntrySql(): string {
        from ${APPS} a ${appBuJoin('a')}
       where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
         and ($3::text is null or ${appBuSql('a')} = $3::text)
-        and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as staff_keyed,
-    (select count(distinct split_part(f.source_ref, ':', 2))::int
-       from ${FOLLOW} f ${followBuJoin('f')}
-      where f.source_ref like 'irecruit-replace:%'
-        and ($1::timestamptz is null or f.created_at >= $1::timestamptz) and f.created_at < $2::timestamptz
-        and ($3::text is null or ${followBuSql('f')} = $3::text)) as replace_sync,
-    (select count(distinct split_part(f.source_ref, ':', 2))::int
-       from ${FOLLOW} f ${followBuJoin('f')}
-      where f.source_ref like 'manual-replace:%'
-        and ($1::timestamptz is null or f.created_at >= $1::timestamptz) and f.created_at < $2::timestamptz
-        and ($3::text is null or ${followBuSql('f')} = $3::text)) as replace_manual,
-    (select count(*)::int from ${POST_REQUESTS} p
-      where ($1::timestamptz is null or p.created_at >= $1::timestamptz) and p.created_at < $2::timestamptz
-        and p.status is distinct from 'rejected') as post_orders`;
+        and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as staff_keyed`;
 }
 
 /**

@@ -40,7 +40,6 @@ const TAG_TONE: Record<ProportionTag, ToneKey> = {
   staff: 'danger',
   noAi: 'danger',
   empty: 'neutral',
-  unknown: 'neutral',
 };
 
 /** หน้าเต็มของแต่ละแถว (ปุ่มท้ายแผง) */
@@ -52,7 +51,6 @@ const GO: Record<string, OverviewPanel['go']> = {
   starter: { label: 'ติดตามคนเริ่มงาน', to: '/follow' },
   replacement: { label: 'ติดตามส่งคนแทน', to: '/follow?view=replace' },
   aftercare: { label: 'ดูแลหลังเริ่มงาน', to: '/aftercare' },
-  replaceSheets: { label: 'ติดตามส่งคนแทน', to: '/follow?view=replace' },
   apps: { label: 'งานสรรหา › ผู้สมัคร', to: '/jobs/board?view=list' },
 };
 
@@ -170,7 +168,7 @@ function Row({ r, loading, onOpen }: { r: ProportionRow; loading: boolean; onOpe
   const aiWord = r.aiLabel ?? 'AI';
   /** AI ได้โทร (รวมทั้งสองทาง · Choice เจ้าของ) กับ คนอย่างเดียว — สองฝั่งรวมกัน = 100% ของที่ทำแล้ว */
   const aiCount = r.ai + r.both;
-  const show = !loading && !r.unknown && pct !== null;
+  const show = !loading && pct !== null;
   const side = (label: string, value: string, count: number, tone: ToneKey, testId: string) => (
     <span className="min-w-[4.5rem] text-right" data-testid={testId}>
       <span className={cn('block text-2xl font-medium leading-tight', show ? TONE[tone].value : 'text-muted-foreground')}>{value}</span>

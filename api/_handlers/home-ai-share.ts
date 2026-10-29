@@ -767,9 +767,6 @@ async function handler(req: AuthedReq, res: ApiRes) {
           irecruit: r.irecruit ?? 0,
           soScraping: r.so_scraping ?? 0,
           staffKeyed: r.staff_keyed ?? 0,
-          replaceSync: r.replace_sync ?? 0,
-          replaceManual: r.replace_manual ?? 0,
-          postOrders: r.post_orders ?? 0,
         };
       } else {
         logWarn('home-ai-share proportion entry failed', { error: errText(er.reason) });

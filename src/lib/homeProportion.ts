@@ -14,6 +14,7 @@
  *   - ติดตามคนเริ่มงาน / คนแทน นับเป็นสาย: ได้คำตอบ · ติดต่อไม่ได้ · รอโทร · ไม่โทร
  *   - ดูแลหลังเริ่มงาน นับเป็นคน ตาม 3 หัวข้อ Healthy / Warning / High Risk
  *   - จับคู่งาน แบบเดียวกับ Prescreen · ทางเข้าของงาน คงไว้ · ถอดก้อน "ขั้นที่ยังเป็นคน 100%" (มา/ไม่มา อยู่ในนัดได้แล้ว)
+ * 🔴 29 ต.ค. 2569 เจ้าของ "เอาออกไม่ต้องโชว์": ทางเข้าเหลือแถวผู้สมัครเข้าระบบแถวเดียว · ถอดใบส่งคนแทน + โพสต์ประกาศ (และป้าย "วัดไม่ได้")
  *
  * ไฟล์นี้ pure — เทสต์ `tests/api/homeProportion2569-10-28.test.ts`
  */
@@ -654,23 +655,19 @@ export type ProportionPayload = {
     irecruit: number;
     soScraping: number;
     staffKeyed: number;
-    replaceSync: number;
-    replaceManual: number;
-    postOrders: number;
   } | null;
   /** ใบสมัครที่ยังไม่มีเจ้าหน้าที่โทร: มีคนเก็บไว้ไหม + เหตุที่ AI ไม่โทร */
   apps?: ProportionAppFlag[] | null;
   errors: { follow?: string; entry?: string; apps?: string; aftercare?: string };
 };
 
-export type ProportionTag = 'ai' | 'mix' | 'staff' | 'noAi' | 'empty' | 'unknown';
+export type ProportionTag = 'ai' | 'mix' | 'staff' | 'noAi' | 'empty';
 export const PROPORTION_TAG_LABEL: Record<ProportionTag, string> = {
   ai: 'AI ทำหลัก',
   mix: 'แบ่งกัน',
   staff: 'คนทำหลัก',
   noAi: 'ยังไม่มี AI',
   empty: 'ยังไม่มีงาน',
-  unknown: 'วัดไม่ได้',
 };
 
 export type ProportionRow = {
@@ -684,8 +681,6 @@ export type ProportionRow = {
   noneLabel?: string;
   /** ทางเข้าใช้คำว่า ระบบ / คน แทน AI / คน */
   aiLabel?: string;
-  /** วัดไม่ได้ (โพสต์ประกาศ) — ไม่มีแถบ ไม่มี % */
-  unknown?: boolean;
   ladder?: Ladder;
   /** แผงของแถวที่ไม่ใช่งานโทร (ทางเข้า) — แตกตามที่มา */
   parts?: LadderPart[];
@@ -700,7 +695,6 @@ export function proportionPct(r: Pick<ProportionRow, 'ai' | 'both' | 'staff'>): 
 }
 
 export function proportionTag(r: ProportionRow): ProportionTag {
-  if (r.unknown) return 'unknown';
   const p = proportionPct(r);
   if (p === null) return 'empty';
   if (p === 0) return 'noAi';
@@ -765,31 +759,6 @@ export function buildProportionGroups(input: {
             { key: 'soScraping', label: 'So Scraping ส่งเข้ามา', value: e?.soScraping ?? 0, tone: 'primary' },
             { key: 'staff', label: 'เจ้าหน้าที่คีย์ / นำเข้า Excel', value: e?.staffKeyed ?? 0, tone: 'violet' },
           ],
-        },
-        {
-          key: 'replaceSheets',
-          name: 'ใบส่งคนแทน',
-          note: e ? `ดึง iRecruit ${n(e.replaceSync)} · คีย์เอง ${n(e.replaceManual)}` : 'ใบ',
-          ai: e?.replaceSync ?? 0,
-          both: 0,
-          staff: e?.replaceManual ?? 0,
-          none: 0,
-          aiLabel: 'ระบบ',
-          parts: [
-            { key: 'sync', label: 'ดึงจาก iRecruit ทุก 5 นาที', value: e?.replaceSync ?? 0, tone: 'primary' },
-            { key: 'manual', label: 'เจ้าหน้าที่คีย์เองในแท็บส่งคนแทน', value: e?.replaceManual ?? 0, tone: 'violet' },
-          ],
-        },
-        {
-          key: 'posts',
-          name: 'โพสต์ประกาศ',
-          note: `สั่งโพสต์ผ่านระบบ ${n(e?.postOrders ?? 0)} ครั้ง · โพสต์เองระบบไม่เห็น`,
-          ai: 0,
-          both: 0,
-          staff: 0,
-          none: 0,
-          unknown: true,
-          parts: [{ key: 'orders', label: 'สั่งโพสต์ผ่านระบบ (ไม่นับที่ถูกปฏิเสธ)', value: e?.postOrders ?? 0, tone: 'primary' }],
         },
       ],
     },

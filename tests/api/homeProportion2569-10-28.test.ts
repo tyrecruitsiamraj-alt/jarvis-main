@@ -60,13 +60,12 @@ describe('% = AI ได้โทร รวมที่คนตามต่อ',
     expect(proportionPct(row(0, 0, 277, 199))).toBe(0);
     expect(proportionPct(row(0, 0, 0, 5))).toBeNull();
   });
-  it('ป้าย: ≥60 AI ทำหลัก · 30–59 แบ่งกัน · ต่ำกว่า 30 คนทำหลัก · 0 ยังไม่มี AI · ไม่มีงาน · วัดไม่ได้', () => {
+  it('ป้าย: ≥60 AI ทำหลัก · 30–59 แบ่งกัน · ต่ำกว่า 30 คนทำหลัก · 0 ยังไม่มี AI · ไม่มีงาน', () => {
     expect(proportionTag(row(60, 0, 40))).toBe('ai');
     expect(proportionTag(row(30, 0, 70))).toBe('mix');
     expect(proportionTag(row(10, 0, 90))).toBe('staff');
     expect(proportionTag(row(0, 0, 61))).toBe('noAi');
     expect(proportionTag(row(0, 0, 0))).toBe('empty');
-    expect(proportionTag({ ...row(0, 0, 0), unknown: true })).toBe('unknown');
   });
 });
 
@@ -205,23 +204,21 @@ describe('โครงแผงของแต่ละเรื่อง (เ�
       'ติดตามส่งคนแทน',
       'ดูแลหลังเริ่มงาน',
       'ผู้สมัครเข้าระบบ',
-      'ใบส่งคนแทน',
-      'โพสต์ประกาศ',
     ]);
   });
-  it('ทางเข้า: ระบบ = สมัครเอง + iRecruit + So Scraping · คน = คีย์/นำเข้า · โพสต์ประกาศวัดไม่ได้', () => {
+  it('ทางเข้า: ระบบ = สมัครเอง + iRecruit + So Scraping · คน = คีย์/นำเข้า · ไม่มีแถวใบส่งคนแทน/โพสต์ประกาศ (เจ้าของ 29 ต.ค. 2569)', () => {
     const payload: ProportionPayload = {
       generated_at: '',
       from: '2026-10-01',
       to: '2026-10-28',
       bu: null,
       follow: null,
-      entry: { selfApply: 866, irecruit: 496, soScraping: 0, staffKeyed: 374, replaceSync: 2624, replaceManual: 1, postOrders: 18 },
+      entry: { selfApply: 866, irecruit: 496, soScraping: 0, staffKeyed: 374 },
       errors: {},
     };
     const entry = buildProportionGroups({ apps: [], payload }).find((x) => x.key === 'entry')!.rows;
     expect([entry[0].ai, entry[0].staff, entry[0].aiLabel]).toEqual([1362, 374, 'ระบบ']);
-    expect(entry[2].unknown).toBe(true);
+    expect(entry.map((r) => r.key)).toEqual(['apps']);
   });
 });
 
@@ -263,10 +260,11 @@ describe('SQL + เส้น + หน้า', () => {
     expect(order.every((v, i) => v > 0 && (i === 0 || v > order[i - 1]))).toBe(true);
     expect(sql).toMatch(/and not \(/);
   });
-  it('ทางเข้า: ไม่นับใบที่ยกเลิกข้อมูล · ใบคนแทนนับใบ (ไม่ใช่สาย)', () => {
+  it('ทางเข้า: ไม่นับใบที่ยกเลิกข้อมูล · ไม่นับใบส่งคนแทน/โพสต์แล้ว', () => {
     const sql = proportionEntrySql();
     expect(sql.match(/not exists \(select 1 from .*application_cancellations/g)?.length).toBe(4);
-    expect(sql).toContain("count(distinct split_part(f.source_ref, ':', 2))::int");
+    expect(sql).not.toContain('replace_sync');
+    expect(sql).not.toContain('post_orders');
   });
   it('เส้น ?proportion=1 · หน้าหลักมีแท็บ "สัดส่วน" (ไม่ใช้คำว่า AI กับคน)', () => {
     expect(read('api/_handlers/home-ai-share.ts')).toContain('if (q.proportion !== undefined) {');
