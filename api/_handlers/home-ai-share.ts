@@ -720,6 +720,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
                 dispatch: typeof r.dispatch_state === 'string' ? r.dispatch_state : null,
                 queueStatus: typeof r.call_status === 'string' ? r.call_status : null,
                 future: r.future === true,
+                backfilled: r.backfilled === true,
               })),
             inLane.length - keep.length,
           );

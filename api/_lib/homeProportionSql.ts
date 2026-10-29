@@ -54,6 +54,8 @@ export function proportionFollowRowsSql(): string {
            ${FOLLOW_EFFECTIVE_MODE_SQL} as call_mode,
            f.dispatch_state,
            (f.scheduled_at > now()) as future,
+           -- ลงย้อนหลัง: แถวถูกสร้างหลังเวลาสายไปแล้ว (ใบที่ลงย้อนหลังใน iRecruit) — ไม่เคยมีโอกาสโทรตามเวลา
+           (f.created_at > f.scheduled_at) as backfilled,
            ${FOLLOW_BUCKET_SQL} as ledger_bucket,
            ${FOLLOW_QUEUE_CALL_COLS}
       from ${FOLLOW} f

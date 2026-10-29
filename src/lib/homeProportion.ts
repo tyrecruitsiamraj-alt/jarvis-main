@@ -177,7 +177,15 @@ export type FollowLadderInput = {
   queueStatus: string | null;
   /** ยังไม่ถึงเวลาสาย (สายต่อไปของวัน/ช่วง) */
   future?: boolean;
+  /** แถวถูกสร้างหลังเวลาสายแล้ว (ใบลงย้อนหลังใน iRecruit) */
+  backfilled?: boolean;
 };
+
+/**
+ * 🔴 ลงย้อนหลัง ≠ งานค้าง (เจ้าของ 29 ต.ค. 2569 "แก้ข้อ 1 เลย") — วัด 28 ต.ค.: สายคนแทนที่ "เลยเวลายังไม่ลงผล" 697 สาย
+ * 693 สายถูกสร้างหลังเวลาโทรไปแล้ว (ระบบตั้งเป็นคนโทรให้เอง) ไม่มีใครโทรได้ตั้งแต่แรก ⇒ ย้ายไปช่อง "ไม่โทร" ไม่นับเป็นค้าง
+ */
+export const FOLLOW_BACKFILLED_LABEL = 'ลงย้อนหลัง — ดึงมาตอนเวลาโทรผ่านไปแล้ว';
 
 const FOLLOW_RESULT_ORDER = [
   { key: 'went', label: 'ไป', tone: 'success' },
@@ -219,6 +227,7 @@ export function summarizeFollowLane(rows: readonly FollowLadderInput[], excluded
     }
     // ยังไม่มีใครโทร — รอโทร (ยังไม่ถึงเวลา / เลยเวลาแล้ว) หรือ จะไม่โทร (+ เหตุ)
     if (r.bucket === 'cancelled') notCalled.push('หยุดในคิว — ได้คำตอบจากสายอื่น / เปลี่ยนให้คนโทร');
+    else if (!r.future && r.backfilled) notCalled.push(FOLLOW_BACKFILLED_LABEL);
     else if (r.mode === 'manual') waiting.push(r.future ? 'staffLater' : 'staff');
     else if (r.dispatch && AI_NOT_SENT.has(r.dispatch)) notCalled.push(dispatchReason(r.dispatch));
     else if (r.future) waiting.push('aiLater');

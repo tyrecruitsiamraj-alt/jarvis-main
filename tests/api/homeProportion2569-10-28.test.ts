@@ -149,6 +149,10 @@ describe('สรรหา 3 ขั้น + ขั้นที่ยังเป�
       ['staff', true],
     ]);
     expect(s.ladder!.excluded).toEqual({ label: 'ยกเลิก ไม่นับ', value: 7 });
+    // ลงย้อนหลัง (สร้างหลังเวลาสาย) = ไม่โทร ไม่ใช่ค้าง (เจ้าของ 29 ต.ค. 2569)
+    const b = summarizeFollowLane([{ ...base, mode: 'manual', future: false, backfilled: true }]);
+    expect(b.ladder!.waiting).toEqual([]);
+    expect(b.ladder!.notCalled.map((p) => [p.label, p.stuck ?? false])).toEqual([['ลงย้อนหลัง — ดึงมาตอนเวลาโทรผ่านไปแล้ว', false]]);
     expect(ladderAddsUp(s.ladder!)).toBe(true);
   });
   it('ทุกก้อนอยู่เสมอแม้ยังไม่มีข้อมูล (ว่าง = 0 ห้ามหาย)', () => {
@@ -209,6 +213,7 @@ describe('3 ข้อจากรีวิวหน้าหลัก (เจ้
   it('ติดตามสองแท็บชุดเดียวกัน: ช่วงเต็ม (followPlanBounds) · ตัดยกเลิกด้วยช่องผล ไม่ใช่ cancelled_at', () => {
     const sql = proportionFollowRowsSql();
     expect(sql).not.toMatch(/where f.cancelled_at is null/);
+    expect(sql).toContain('(f.created_at > f.scheduled_at) as backfilled');
     const h = read('api/_handlers/home-ai-share.ts');
     expect(h).toContain('followPlanBounds(win).start,');
     expect(h).toContain(": inLane.filter((r) => followLedgerBucket(r, derived) !== 'cancelled');");
