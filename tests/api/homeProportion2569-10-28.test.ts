@@ -250,3 +250,13 @@ describe('SQL + เส้น + หน้า', () => {
     expect(read('src/components/home-overview/ProportionTab.tsx')).not.toContain('AI กับคน');
   });
 });
+
+describe('หน้าตาแท็บสัดส่วน (เจ้าของ 29 ต.ค. 2569)', () => {
+  it('แต่ละแถวแบ่ง AI % กับ คน % (รวมกัน 100) · งานค้างเป็น Dropdown เลือกทีละเรื่อง มีแท่ง', () => {
+    const tab = read('src/components/home-overview/ProportionTab.tsx');
+    expect(tab).toContain("side('คน', show ? `${100 - (pct ?? 0)}%` : '—', r.staff");
+    expect(tab).toContain('data-testid="proportion-stuck-select"');
+    expect(tab).toContain('function StuckBoard(');
+    expect(tab).not.toContain('<ul className="flex flex-wrap gap-2">');
+  });
+});

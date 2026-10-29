@@ -8,6 +8,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { OverviewSection, OverviewSheet, NUM, type OverviewPanel } from '@/components/home-overview/OverviewParts';
 import { fetchHomeProportion } from '@/lib/homeAiShareApi';
 import type { AiShareMatching, AiShareWindow } from '@/lib/homeAiShare';
@@ -24,6 +25,7 @@ import {
   type LadderPart,
   type ProportionPayload,
   type ProportionRow,
+  type ProportionStuck,
   type ProportionTag,
 } from '@/lib/homeProportion';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
@@ -165,14 +167,21 @@ function Row({ r, loading, onOpen }: { r: ProportionRow; loading: boolean; onOpe
   const all = r.ai + r.both + r.staff + r.none;
   const w = (v: number) => (shown && all > 0 ? `${(v / all) * 100}%` : '0%');
   const aiWord = r.aiLabel ?? 'AI';
-  const parts = r.unknown
-    ? []
-    : [
-        `${aiWord} ${NUM.format(r.ai)}`,
-        r.both ? `ทั้งสองทาง ${NUM.format(r.both)}` : null,
-        `คน ${NUM.format(r.staff)}`,
-        r.none ? `${r.noneLabel ?? 'ยังไม่มีใครทำ'} ${NUM.format(r.none)}` : null,
-      ].filter(Boolean);
+  /** AI ได้โทร (รวมทั้งสองทาง · Choice เจ้าของ) กับ คนอย่างเดียว — สองฝั่งรวมกัน = 100% ของที่ทำแล้ว */
+  const aiCount = r.ai + r.both;
+  const show = !loading && !r.unknown && pct !== null;
+  const side = (label: string, value: string, count: number, tone: ToneKey, testId: string) => (
+    <span className="min-w-[4.5rem] text-right" data-testid={testId}>
+      <span className={cn('block text-2xl font-medium leading-tight', show ? TONE[tone].value : 'text-muted-foreground')}>{value}</span>
+      <span className="block text-xs text-muted-foreground">
+        {label} {show ? NUM.format(count) : ''}
+      </span>
+    </span>
+  );
+  const extra = [
+    r.none ? `${r.noneLabel ?? 'ยังไม่มีใครทำ'} ${NUM.format(r.none)}` : null,
+    coverage !== null ? `${aiWord} ได้โทร ${coverage}% ของทั้งหมด` : null,
+  ].filter(Boolean);
   return (
     <li className="border-t border-border first:border-t-0">
       {/* ปุ่มของ shadcn (ห้ามปั้นปุ่มเอง) — ghost ทั้งแถว กดแล้วเปิดแผงแตกตัวเลข */}
@@ -182,23 +191,22 @@ function Row({ r, loading, onOpen }: { r: ProportionRow; loading: boolean; onOpe
         disabled={loading}
         onClick={() => onOpen(r)}
         data-testid={`proportion-row-${r.key}`}
-        className="grid h-auto w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 whitespace-normal rounded-xl px-2 py-3 text-left font-normal disabled:opacity-100 md:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_4rem_7rem]"
+        className="grid h-auto w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-3 whitespace-normal rounded-xl px-3 py-4 text-left font-normal disabled:opacity-100 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1.6fr)_auto]"
       >
-        <span className="min-w-0">
+        <span className="min-w-0 space-y-1.5">
           <span className="block font-medium text-foreground">{r.name}</span>
           <span className="block text-xs tabular-nums text-muted-foreground">{r.note}</span>
+          <Badge variant="outline" className={cn('font-normal', TONE[TAG_TONE[tag]].soft, TONE[TAG_TONE[tag]].value)}>
+            {loading ? 'กำลังโหลด' : PROPORTION_TAG_LABEL[tag].replace('AI ', aiWord === 'AI' ? 'AI ' : aiWord)}
+          </Badge>
         </span>
-        <span className="text-right tabular-nums md:order-3">
-          <span className="block text-2xl font-medium">{loading ? '—' : r.unknown || pct === null ? '—' : `${pct}%`}</span>
-          {/* เลขใหญ่นับแค่ที่โทรแล้ว — บรรทัดนี้บอกเทียบของทั้งหมด (เจ้าของ 28 ต.ค. 2569 "ทำหมดเลย") */}
-          {!loading && coverage !== null ? (
-            <span className="block text-xs text-muted-foreground" data-testid={`proportion-coverage-${r.key}`}>
-              ทั้งหมด {coverage}%
-            </span>
-          ) : null}
+        {/* AI | คน — เจ้าของ 29 ต.ค. 2569 "ต้องแบ่งว่า คนเท่าไหร่ Ai เท่าไหร่ด้วย" */}
+        <span className="flex items-start gap-5 tabular-nums md:order-3">
+          {side(aiWord, show ? `${pct}%` : '—', aiCount, AI_SHARE_CALLED_TONE.ai, `proportion-ai-${r.key}`)}
+          {side('คน', show ? `${100 - (pct ?? 0)}%` : '—', r.staff, AI_SHARE_CALLED_TONE.staff, `proportion-staff-${r.key}`)}
         </span>
-        <span className="col-span-2 min-w-0 space-y-1 md:order-2 md:col-span-1">
-          <span className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
+        <span className="col-span-2 min-w-0 space-y-2 md:order-2 md:col-span-1">
+          <span className="flex h-3 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
             {(['ai', 'both', 'staff'] as const).map((k) => (
               <span
                 key={k}
@@ -207,16 +215,97 @@ function Row({ r, loading, onOpen }: { r: ProportionRow; loading: boolean; onOpe
               />
             ))}
           </span>
-          {parts.length ? <span className="block text-xs tabular-nums text-muted-foreground">{parts.join(' · ')}</span> : null}
+          {!loading && extra.length ? (
+            <span className="block text-xs tabular-nums text-muted-foreground" data-testid={`proportion-coverage-${r.key}`}>
+              {extra.join(' · ')}
+            </span>
+          ) : null}
         </span>
-        <Badge
-          variant="outline"
-          className={cn('col-span-2 justify-self-start md:order-4 md:col-span-1 md:justify-self-end', TONE[TAG_TONE[tag]].soft, TONE[TAG_TONE[tag]].value)}
-        >
-          {loading ? 'กำลังโหลด' : PROPORTION_TAG_LABEL[tag].replace('AI ', aiWord === 'AI' ? 'AI ' : aiWord)}
-        </Badge>
       </Button>
     </li>
+  );
+}
+
+/** งานที่ค้างอยู่ทีละเรื่อง — เลือกเรื่องจาก Dropdown แล้วเห็นแท่งของแต่ละช่องที่ค้าง (เจ้าของ 29 ต.ค. 2569) */
+function StuckBoard({
+  items,
+  loading,
+  onOpenRow,
+}: {
+  items: readonly ProportionStuck[];
+  loading: boolean;
+  onOpenRow: (rowKey: string) => void;
+}) {
+  const topics = useMemo(() => {
+    const m = new Map<string, { rowKey: string; rowName: string; unit: string; total: number; items: ProportionStuck[] }>();
+    for (const x of items) {
+      const t = m.get(x.rowKey) ?? { rowKey: x.rowKey, rowName: x.rowName, unit: x.unit, total: 0, items: [] };
+      t.total += x.value;
+      t.items.push(x);
+      m.set(x.rowKey, t);
+    }
+    return [...m.values()].sort((a, b) => b.total - a.total);
+  }, [items]);
+  const [picked, setPicked] = useState<string | null>(null);
+  const topic = topics.find((t) => t.rowKey === picked) ?? topics[0] ?? null;
+  const max = topic ? Math.max(1, ...topic.items.map((i) => i.value)) : 1;
+  return (
+    <OverviewSection
+      title="งานที่ค้างอยู่"
+      testId="proportion-stuck"
+      right={
+        topics.length ? (
+          <Select value={topic?.rowKey} onValueChange={setPicked}>
+            <SelectTrigger className="h-10 w-full bg-card sm:w-72" aria-label="เลือกเรื่อง" data-testid="proportion-stuck-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {topics.map((t) => (
+                <SelectItem key={t.rowKey} value={t.rowKey}>
+                  {t.rowName} · {NUM.format(t.total)} {t.unit}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null
+      }
+    >
+      {loading ? (
+        <p className="text-sm text-muted-foreground">กำลังโหลด</p>
+      ) : !topic ? (
+        <p className="text-sm text-muted-foreground">ไม่มีงานค้าง</p>
+      ) : (
+        <div className="space-y-5" data-testid="proportion-stuck-topic">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <p className="tabular-nums">
+              <span className={cn('text-4xl font-medium', TONE.danger.value)}>{NUM.format(topic.total)}</span>
+              <span className="ml-2 text-sm text-muted-foreground">{topic.unit} ค้างอยู่</span>
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={() => onOpenRow(topic.rowKey)}>
+              ดูทั้งเรื่อง
+            </Button>
+          </div>
+          <ul className="space-y-4">
+            {topic.items.map((x) => (
+              <li key={x.label} className="space-y-1.5">
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="min-w-0 text-foreground">{x.label}</span>
+                  <span className="shrink-0 font-medium tabular-nums">
+                    {NUM.format(x.value)} <span className="text-xs font-normal text-muted-foreground">{x.unit}</span>
+                  </span>
+                </div>
+                <span className="block h-2.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
+                  <span
+                    className={cn('block h-full rounded-full transition-all duration-700 motion-reduce:transition-none', TONE.danger.dot)}
+                    style={{ width: `${(x.value / max) * 100}%` }}
+                  />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </OverviewSection>
   );
 }
 
@@ -267,37 +356,16 @@ export default function ProportionTab({
   const loadingOf = (g: string) =>
     g === 'recruit' || g === 'human' ? (apps === null && !appsError) || (payload === null && !error) : payload === null && !error;
   return (
-    <div className="space-y-4" data-testid="home-proportion">
-      {/* งานที่ค้างอยู่ — ช่องที่ต้องมีคนทำของทุกแถว · ว่าง = ขึ้นว่าไม่มี (ไม่หาย) */}
-      <OverviewSection title="งานที่ค้างอยู่" testId="proportion-stuck">
-        {!allLoaded ? (
-          <p className="text-sm text-muted-foreground">กำลังโหลด</p>
-        ) : stuck.length ? (
-          <ul className="flex flex-wrap gap-2">
-            {stuck.map((x) => (
-              <li key={`${x.rowKey}-${x.label}`}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-auto whitespace-normal py-1.5 text-left"
-                  onClick={() => {
-                    const r = rowOf(x.rowKey);
-                    if (r) setPanel(panelOf(r));
-                  }}
-                >
-                  <span className="text-muted-foreground">{x.rowName} ·</span> {x.label}{' '}
-                  <span className={cn('font-medium tabular-nums', TONE.danger.value)}>
-                    {NUM.format(x.value)} {x.unit}
-                  </span>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">ไม่มีงานค้าง</p>
-        )}
-      </OverviewSection>
+    <div className="space-y-5" data-testid="home-proportion">
+      {/* งานที่ค้างอยู่ — เลือกเรื่องจาก Dropdown · ว่าง = ขึ้นว่าไม่มี (ไม่หาย) */}
+      <StuckBoard
+        items={stuck}
+        loading={!allLoaded}
+        onOpenRow={(k) => {
+          const r = rowOf(k);
+          if (r) setPanel(panelOf(r));
+        }}
+      />
       <Legend />
       {errs.length ? <p className={cn('text-sm', TONE.danger.value)}>{errs.join(' · ')}</p> : null}
       {groups.map((g) => (
