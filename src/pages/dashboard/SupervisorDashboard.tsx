@@ -40,6 +40,7 @@ import {
   type UnitAssignee,
 } from '@/lib/dashboard/throughputScope';
 import type { RequestLeadKind } from '@/lib/requestLeadKind';
+import type { RequestControlRecord } from '@/lib/requestControl';
 import {
   filterJobsClosedInPeriod,
   filterJobsForAgeBucket,
@@ -840,7 +841,13 @@ const SupervisorDashboard: React.FC = () => {
    * ยังไม่มีชุดของการ์ด (throughput ยังไม่มา) = ใช้ชุดเดิม
    */
   const slaCohort = useMemo(() => {
-    if (cohortScope.records.length === 0) return { records: slaControlRecords, extraUnknown: {} as Partial<Record<RequestLeadKind, number>> };
+    if (cohortScope.records.length === 0) {
+      return {
+        records: slaControlRecords,
+        extraUnknown: {} as Partial<Record<RequestLeadKind, number>>,
+        kindOf: undefined as ((r: RequestControlRecord) => RequestLeadKind | undefined) | undefined,
+      };
+    }
     const keyOfRecord = (r: { requestNo?: string; jobId?: string }) => (r.requestNo ?? '').trim() || (r.jobId ?? '').trim();
     const wanted = new Map<string, RequestLeadKind | undefined>();
     for (const r of cohortScope.records) {
@@ -859,23 +866,25 @@ const SupervisorDashboard: React.FC = () => {
       if (seen.has(k) || !kind) continue;
       extraUnknown[kind] = (extraUnknown[kind] ?? 0) + 1;
     }
-    return { records, extraUnknown };
+    // ชนิดใบขอ = ของชุดการ์ด (แถวตารางเท่าแถวการ์ดรายชนิด)
+    const kindOf = (r: RequestControlRecord) => wanted.get(r.requestNo) ?? wanted.get(r.id);
+    return { records, extraUnknown, kindOf };
   }, [cohortScope.records, slaControlRecords]);
   const slaByLeadKind = useMemo(
-    () => buildSlaByLeadKind(slaCohort.records, new Date(), slaCohort.extraUnknown),
+    () => buildSlaByLeadKind(slaCohort.records, new Date(), slaCohort.extraUnknown, slaCohort.kindOf),
     [slaCohort],
   );
 
   const handleSlaCellClick = useCallback(
     (kind: RequestLeadKind, cell: SlaCellKey, label: string) => {
-      openControlList(`SLA · ${label}`, filterRecordsForSlaCell(slaCohort.records, kind, cell));
+      openControlList(`SLA · ${label}`, filterRecordsForSlaCell(slaCohort.records, kind, cell, new Date(), slaCohort.kindOf));
     },
     [openControlList, slaCohort],
   );
 
   const handleSlaLeadKindClick = useCallback(
     (kind: RequestLeadKind, label: string) => {
-      openControlList(`ใบขอชนิด ${label}`, filterRecordsForLeadKind(slaCohort.records, kind));
+      openControlList(`ใบขอชนิด ${label}`, filterRecordsForLeadKind(slaCohort.records, kind, new Date(), slaCohort.kindOf));
     },
     [openControlList, slaCohort],
   );

@@ -145,6 +145,8 @@ export function buildSlaByLeadKind(
    * ⇒ นับเป็น "คิด SLA ไม่ได้" ของชนิดนั้น — ยอดรวมตารางต้องเท่าการ์ดเสมอ ห้ามหายเงียบ
    */
   extraUnknown: Partial<Record<RequestLeadKind, number>> = {},
+  /** ชนิดใบขอจากชุดของการ์ด (ถ้ามี) — แถวตารางต้องเท่าแถวการ์ดรายชนิดด้วย ไม่ใช่แค่ยอดรวม (29 ต.ค. 2569) */
+  kindOf?: (r: RequestControlRecord) => RequestLeadKind | undefined,
 ): SlaByLeadKind {
   const byKind = new Map<RequestLeadKind, Record<SlaCellKey, number>>();
   for (const k of LEAD_KIND_ORDER) byKind.set(k, emptyCells());
@@ -152,7 +154,7 @@ export function buildSlaByLeadKind(
 
   for (const r of records) {
     // ชนิดใบขอ: เส้นแบ่งเดียวของระบบ (ห้ามคิด 7 วันเองซ้ำที่นี่)
-    const kind = computeJobUrgency(r.job, today).kind;
+    const kind = kindOf?.(r) ?? computeJobUrgency(r.job, today).kind;
     const cells = byKind.get(kind);
     if (!cells) continue;
     const cell = slaCellOf(r);
@@ -181,9 +183,10 @@ export function filterRecordsForSlaCell(
   kind: RequestLeadKind,
   cell: SlaCellKey,
   today = new Date(),
+  kindOf?: (r: RequestControlRecord) => RequestLeadKind | undefined,
 ): RequestControlRecord[] {
   return records.filter(
-    (r) => computeJobUrgency(r.job, today).kind === kind && slaCellOf(r) === cell,
+    (r) => (kindOf?.(r) ?? computeJobUrgency(r.job, today).kind) === kind && slaCellOf(r) === cell,
   );
 }
 
@@ -192,6 +195,7 @@ export function filterRecordsForLeadKind(
   records: RequestControlRecord[],
   kind: RequestLeadKind,
   today = new Date(),
+  kindOf?: (r: RequestControlRecord) => RequestLeadKind | undefined,
 ): RequestControlRecord[] {
-  return records.filter((r) => computeJobUrgency(r.job, today).kind === kind);
+  return records.filter((r) => (kindOf?.(r) ?? computeJobUrgency(r.job, today).kind) === kind);
 }

@@ -14059,3 +14059,6 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - (ต่อ) ดึงเองแล้วยังได้ 3,029 ≠ 6,005 เพราะเพดานใบปิด 3,000 · วัดจริง ERP ~36–40 วิ เท่ากันทั้ง 3,000 / 5,000 / 20,000 (ORDER BY วันปิดไล่ทุกใบอยู่แล้ว)
   ⇒ เพดาน `listSiamrajSqlServerClosedRequests` 5,000 → 20,000 · เส้น `?closed=1&limit=` · Dashboard โหมดทั้งหมดขอ 20,000 (ใบปิด พ.ค. 2567 – ต.ค. 2569 = 6,417)
   เทสต์ `tests/api/dashboardSlaClosedFull2569-10-29.test.ts`
+- (ต่อ) ใบปิดครบแล้วได้ 6,701 ≠ 6,005 เพราะตารางนับ "ใบที่ปิดในช่วง" (รวมใบยื่นก่อนช่วง) แต่การ์ดนับ "ใบที่ยื่นในช่วง" (`cohortScope`)
+  ⇒ `slaCohort` (SupervisorDashboard): เก็บเฉพาะใบในชุดของการ์ด · ชนิดใบขอใช้ของชุดการ์ด (`kindOf`) · ใบในชุดที่หาใบไม่เจอ = "คิด SLA ไม่ได้" (`extraUnknown`)
+  `buildSlaByLeadKind` / `filterRecordsForSlaCell` / `filterRecordsForLeadKind` รับ `kindOf` ได้ · ยอดรวมและรายชนิดเท่าการ์ดเสมอ

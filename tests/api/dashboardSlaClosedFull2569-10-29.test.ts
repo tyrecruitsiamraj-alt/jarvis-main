@@ -25,7 +25,7 @@ describe('ตาราง = ใบชุดเดียวกับการ์�
     expect(t.totalRow.total).toBe(3);
     expect(t.totalRow.cells.unknown).toBe(3);
     const page = read('src/pages/dashboard/SupervisorDashboard.tsx');
-    expect(page).toContain('buildSlaByLeadKind(slaCohort.records, new Date(), slaCohort.extraUnknown)');
-    expect(page).toContain('filterRecordsForSlaCell(slaCohort.records, kind, cell)');
+    expect(page).toContain('buildSlaByLeadKind(slaCohort.records, new Date(), slaCohort.extraUnknown, slaCohort.kindOf)');
+    expect(page).toContain('filterRecordsForSlaCell(slaCohort.records, kind, cell, new Date(), slaCohort.kindOf)');
   });
 });
