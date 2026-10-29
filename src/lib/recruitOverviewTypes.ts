@@ -7,6 +7,7 @@
  */
 import type { RegionCount } from '@/lib/bkkRegion';
 import type { CallMicroOutcome } from '@/lib/callMicroOutcome';
+import type { RecruitRequestRow } from '@/lib/recruitRequestTab';
 
 export type RecruitSide = 'ai' | 'staff';
 
@@ -200,6 +201,8 @@ export type RecruitOverviewResponse = {
   requestDays?: RecruitRequestDay[] | null;
   /** ใบขอของช่วงนี้รายใบ + ผู้สมัครของใบ — การ์ดกดลงลึก (21 ต.ค. 2569) · null = อ่านไม่ได้ */
   requestList?: RecruitRequestItem[] | null;
+  /** ใบขอรายใบของแท็บใบขอ (29 ต.ค. 2569 · พื้นที่ ประเภทงาน ความเร่ง) — `recruitRequestTab.ts` · null = อ่านไม่ได้ */
+  requestRows?: RecruitRequestRow[] | null;
   /** ก้อนที่อ่านไม่ได้ + เหตุ (ก้อนล้มแยกกัน — ห้ามโชว์ 0 แทน) */
   errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board' | 'requests' | 'channels' | 'informs', string>>;
 };

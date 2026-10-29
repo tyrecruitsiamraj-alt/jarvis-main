@@ -28,7 +28,17 @@ const RELEASES = tableInAppSchema('job_public_releases');
 const APPS = tableInAppSchema('public_job_applications');
 const CANCELLATIONS = tableInAppSchema('application_cancellations');
 
-type ErpExtra = { request_no: string; industry: string | null; job_name1: string | null; staff_title_name: string | null; job_description_code_1: string | null };
+type ErpExtra = {
+  request_no: string;
+  industry: string | null;
+  job_name1: string | null;
+  staff_title_name: string | null;
+  job_description_code_1: string | null;
+  site_name: string | null;
+  province_name: string | null;
+  work_addr: string | null;
+  customer_group: string | null;
+};
 
 /** กลุ่มอุตสาหกรรม + ตำแหน่งของใบขอ — ทีละ 300 ใบ (พารามิเตอร์ SQL Server จำกัด) */
 async function loadErpExtras(requestNos: readonly string[]): Promise<Map<string, ErpExtra>> {
@@ -41,7 +51,14 @@ async function loadErpExtras(requestNos: readonly string[]): Promise<Map<string,
               (SELECT TOP 1 RTRIM(g.industry_group_name) FROM ms_industry_group g WHERE g.industry_group_code = SS.industry_group_code) AS industry,
               (SELECT TOP 1 z.job_description_name FROM hr_ms_job_description_1 z WHERE z.job_description_code_1 = A.job_description_code_1) AS job_name1,
               (SELECT TOP 1 z.staff_title_name FROM hr_ms_staff_title z WHERE z.staff_title_code = A.staff_title_code) AS staff_title_name,
-              A.job_description_code_1
+              A.job_description_code_1,
+              RTRIM(SS.site_name) AS site_name,
+              (SELECT TOP 1 RTRIM(p.province_name) FROM ms_province p WHERE p.province_code = SS.province_code) AS province_name,
+              (SELECT TOP 1 LTRIM(RTRIM(ISNULL(b.work_place1, N'') + N' ' + ISNULL(b.work_place2, N'') + N' ' + ISNULL(b.work_place3, N'')))
+                 FROM st_request_p2 b WHERE b.request_no = A.request_no) AS work_addr,
+              (SELECT TOP 1 RTRIM(g.customer_group_name) FROM mk_customer c
+                 INNER JOIN ms_customer_group g ON g.customer_group_code = c.customer_group_code
+                WHERE c.customer_code = SS.customer_code) AS customer_group
          FROM st_request_head A
          LEFT JOIN ms_site SS ON SS.site_code = A.site_code
         WHERE RTRIM(A.request_no) IN (${chunk.map((_, k) => `@r${k}`).join(',')})`,
@@ -151,6 +168,16 @@ export async function loadOnlineRequestRows(opts: OnlineRequestOpts): Promise<On
       position: position?.trim() || null,
       releasedAt: releasedAt.get(jobId) ?? null,
       applications: appCount.get(jobId) ?? 0,
+      siteCode: g.siteCode,
+      leadKind: g.leadKind,
+      erp: x
+        ? {
+            siteName: x.site_name?.trim() || null,
+            province: x.province_name?.trim() || null,
+            workAddr: x.work_addr?.trim() || null,
+            customerGroup: x.customer_group?.trim() || null,
+          }
+        : null,
     };
   });
 }

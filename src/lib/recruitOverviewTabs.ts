@@ -5,17 +5,21 @@ import type { JourneyStep } from './recruitJourney';
  * ใบขอ · กรอกเข้ามา · การติดต่อ (เดิม "คนโทรต่อ" · เจ้าของเปลี่ยน 21 ต.ค.) · นัดหมาย — เลขชุดเดิมของ `RecruitOverview` แค่กระจายตามขั้น
  * เส้นทางรายชื่อ 5 ขั้น (`buildRecruitJourney`) แบ่งให้แท็บละช่วง เลขขั้นยังนับต่อจากเส้นทางเต็ม
  */
+/**
+ * 🔴 29 ต.ค. 2569 เจ้าของ "หน้า กรอกเข้ามา … เอาออกเลย ไปรวมกับ แท็บใบขอ" — แท็บเหลือ 3 · ของแท็บกรอกเข้ามาอยู่ท้ายแท็บใบขอ
+ * `OverviewTabId` ยังมี 'apps' เป็นชื่อก้อน (การ์ดเทียบ/กดลงลึก/เส้นทาง ของคนที่กรอก) ไม่ใช่แท็บ
+ */
 export const OVERVIEW_TABS = [
   { id: 'requests', label: 'ใบขอ' },
-  { id: 'apps', label: 'กรอกเข้ามา' },
   { id: 'staff', label: 'การติดต่อ' },
   { id: 'appt', label: 'นัดหมาย' },
 ] as const;
 
-export type OverviewTabId = (typeof OVERVIEW_TABS)[number]['id'];
+export type OverviewTabId = 'requests' | 'apps' | 'staff' | 'appt';
+export type OverviewVisibleTabId = (typeof OVERVIEW_TABS)[number]['id'];
 
-/** ค่าใน `?ov=` → แท็บ · ไม่รู้จัก = ใบขอ */
-export function overviewTabOf(raw: string | null | undefined): OverviewTabId {
+/** ค่าใน `?ov=` → แท็บ · ไม่รู้จัก (รวมลิงก์เก่า `?ov=apps`) = ใบขอ */
+export function overviewTabOf(raw: string | null | undefined): OverviewVisibleTabId {
   return OVERVIEW_TABS.find((t) => t.id === raw)?.id ?? 'requests';
 }
 

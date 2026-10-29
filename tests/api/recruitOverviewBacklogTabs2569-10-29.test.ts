@@ -12,14 +12,13 @@ const section = (tab: string) => {
 };
 
 describe('งานค้างอยู่ในแท็บของมัน', () => {
-  it('แท็บใบขอเหลือแนวโน้มใบขอ + งานตามจังหวัด', () => {
+  it('แท็บใบขอ = แท็บใบขอใหม่ (แนวโน้มใบขอเป็นการ์ดข้อ 2) · งานตามจังหวัดถอดแล้ว แทนด้วยพื้นที่ขาดคน (29 ต.ค. 2569)', () => {
     const req = section('requests');
-    expect(req).toContain("{compareCard('requests')}");
-    expect(req).toContain('<ProvinceJobsCard jobs={openJobs} />');
-    expect(req).not.toContain('BacklogBody');
+    expect(req).toContain("trend={compareCard('requests')}");
+    expect(src).not.toContain('ProvinceJobsCard');
   });
-  it('แต่ละแท็บมีงานค้างก้อนของตัวเอง', () => {
-    expect(section('apps')).toContain('only="uncalled"');
+  it('แต่ละแท็บมีงานค้างก้อนของตัวเอง (ของกรอกเข้ามาย้ายไปท้ายแท็บใบขอ)', () => {
+    expect(section('requests')).toContain('only="uncalled"');
     expect(section('staff')).toContain('only="waiting"');
     expect(section('appt')).toContain('only="appointments"');
   });

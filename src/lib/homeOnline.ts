@@ -13,6 +13,7 @@
 
 import type { InterestJourney } from '@/lib/homeTopicReport';
 import { classifyCallMicro, INTEREST_VOCAB } from '@/lib/callMicroOutcome';
+import type { RequestLeadKind } from '@/lib/requestLeadKind';
 
 export type OnlineRequestState = 'open' | 'fullyClosed' | 'cancelledAll' | 'partialCancelled';
 
@@ -42,6 +43,17 @@ export type OnlineRequestRow = {
   releasedAt: string | null;
   /** ใบสมัครของใบนี้ (ไม่นับที่ยกเลิกข้อมูล) */
   applications: number;
+  /** รหัสไซต์ (29 ต.ค. 2569 แท็บใบขอ ตัวกรอง Code Site) */
+  siteCode?: string | null;
+  /** ของ ERP สำหรับแท็บใบขอ (29 ต.ค. 2569) — จังหวัดของไซต์ · ที่อยู่หน้างาน · กลุ่มลูกค้า · วันกรอก/วันต้องการ */
+  erp?: {
+    siteName: string | null;
+    province: string | null;
+    workAddr: string | null;
+    customerGroup: string | null;
+  } | null;
+  /** ฉุกเฉิน / ฉุกเฉิน-ย้อนหลัง / ล่วงหน้า ของใบ (ตัวดึง ERP คิดด้วยเกณฑ์ของใบ) */
+  leadKind?: RequestLeadKind | null;
 };
 
 export function onlineRequestStateOf(r: Pick<OnlineRequestRow, 'filled' | 'cancelled' | 'remaining'>): OnlineRequestState {
@@ -188,6 +200,19 @@ export function onlineReportAddsUp(r: OnlineReport): boolean {
   );
 }
 
+type ThroughputGroup = {
+  requestNo: string;
+  jobId: string | null;
+  day: string;
+  siteCode: string | null;
+  unitName: string | null;
+  leadKind: RequestLeadKind | null;
+  requested: number;
+  filled: number;
+  cancelled: number;
+  remaining: number;
+};
+
 /** แถว throughput (ใบเดียวแตกเป็นหลายแถวตามชนิด) → ใบละแถว */
 export type ThroughputLike = {
   requestNo?: string;
@@ -198,12 +223,13 @@ export type ThroughputLike = {
   isOpen: boolean;
   siteCode?: string;
   unitName?: string;
+  leadKind?: RequestLeadKind;
 };
 
 export function groupThroughputByRequest(
   records: readonly ThroughputLike[],
-): Array<{ requestNo: string; jobId: string | null; day: string; siteCode: string | null; unitName: string | null; requested: number; filled: number; cancelled: number; remaining: number }> {
-  const m = new Map<string, { requestNo: string; jobId: string | null; day: string; siteCode: string | null; unitName: string | null; requested: number; filled: number; cancelled: number; remaining: number }>();
+): Array<ThroughputGroup> {
+  const m = new Map<string, ThroughputGroup>();
   for (const r of records) {
     const no = (r.requestNo ?? '').trim();
     if (!no) continue;
@@ -213,6 +239,7 @@ export function groupThroughputByRequest(
       day: r.requestDate.slice(0, 10),
       siteCode: r.siteCode?.trim() || null,
       unitName: r.unitName?.trim() || null,
+      leadKind: r.leadKind ?? null,
       requested: 0,
       filled: 0,
       cancelled: 0,

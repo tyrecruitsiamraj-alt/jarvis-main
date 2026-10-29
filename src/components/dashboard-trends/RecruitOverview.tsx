@@ -59,11 +59,10 @@ import JourneyNamesDialog from './JourneyNamesDialog';
 import ChannelPlacementTable from './ChannelPlacementTable';
 import ChannelFunnelTable from './ChannelFunnelTable';
 import { buildChannelFunnelTree } from '@/lib/channelFunnel';
-import { OVERVIEW_TABS, overviewTabOf } from '@/lib/recruitOverviewTabs';
+import { OVERVIEW_TABS, overviewTabOf, type OverviewTabId } from '@/lib/recruitOverviewTabs';
 import { compareRowsOf, dailySeriesOf } from '@/lib/recruitCompare';
 import TrendLinesCard, { type ComparePeriod } from './TrendLinesCard';
-import ProvinceJobsCard from './ProvinceJobsCard';
-import type { JobRequest } from '@/types';
+import RequestTab from './RequestTab';
 import DrillDownCard from './DrillDownCard';
 import { drillTreeOf } from '@/lib/recruitDrill';
 import { toYmdBangkok } from '@/lib/dateTh';
@@ -106,9 +105,7 @@ const RecruitOverview: React.FC<{
    * สถานะตอนนี้ ไม่ขึ้นกับเดือน · `null`/ไม่ส่ง = ยังบอกไม่ได้ ("—")
    */
   published?: BoardPublishedTotals | null;
-  /** ใบขอที่เปิด (ชุดเดียวกับกล่องงาน) — การ์ดงานตามจังหวัด · null = ยังโหลดไม่เสร็จ (27 ต.ค. 2569) */
-  openJobs?: readonly JobRequest[] | null;
-}> = ({ openJobs = null }) => {
+}> = () => {
   /** null = เดือนนี้ (ให้เส้นตัดสินจากวันไทยของ server) */
   const [month, setMonthState] = useState<string | null>(null);
   /**
@@ -239,7 +236,7 @@ const RecruitOverview: React.FC<{
   /** การ์ดเทียบช่วงก่อนของแต่ละแท็บ — แบบเดือน = ชื่อเดือนเทียบกัน · แบบช่วง = ช่วงวันเทียบกัน (21 ต.ค. 2569) */
   const curPeriodLabel = isRange ? rangeText({ from: win.from, to: win.to }) : monthLabel(win.month);
   const prevPeriodLabel = isRange ? rangeText({ from: win.prevFrom, to: win.prevTo }) : monthLabel(shiftMonth(win.month, -1));
-  const compareCard = (t: (typeof OVERVIEW_TABS)[number]['id']) => (
+  const compareCard = (t: OverviewTabId) => (
     <TrendLinesCard
       key={`${t}-${win.from}-${win.to}`}
       {...(t === 'requests'
@@ -283,7 +280,7 @@ const RecruitOverview: React.FC<{
   );
 
   /** การ์ดกดลงลึก (ไอเดียเพื่อนเจ้าของ · 21 ต.ค. 2569) — key ผูกช่วง เปลี่ยนแล้วกลับชั้นบนสุด */
-  const drillCard = (t: (typeof OVERVIEW_TABS)[number]['id'], title: string) => (
+  const drillCard = (t: OverviewTabId, title: string) => (
     <DrillDownCard
       key={`drill-${t}-${win.from}-${win.to}`}
       title={title}
@@ -418,15 +415,12 @@ const RecruitOverview: React.FC<{
           ))}
         </TabsList>
 
-        {/* ─── ใบขอ: 1 แนวโน้มใบขอ · 2 งานตามจังหวัด (เจ้าของ 29 ต.ค. 2569) ─── */}
+        {/*
+         * ─── ใบขอ (เจ้าของ 29 ต.ค. 2569 แบบร่างที่เคาะ "อะงั้นทำเลย"): ตัวกรอง · 1 ใบขอเข้ามา · 2 แนวโน้มใบขอ · 3 พื้นที่ขาดคน · 4 คนที่กรอกมา
+         * แล้วต่อด้วยของแท็บกรอกเข้ามาเดิมทั้งหมด ("หน้า กรอกเข้ามา … เอาออกเลย ไปรวมกับ แท็บใบขอ")
+         */}
         <TabsContent value="requests" className="mt-3 space-y-3">
-          {compareCard('requests')}
-          {/* งานจังหวัดไหนเยอะ เป็นงานแบบไหน (เจ้าของ 27 ต.ค. 2569) — ณ วันนี้ ไม่ขึ้นกับช่วงที่เลือก */}
-          <ProvinceJobsCard jobs={openJobs} />
-        </TabsContent>
-
-        {/* ─── กรอกเข้ามา: กรอก + AI โทร · โทรวันไหน · รายวัน · ช่องทาง · ตำแหน่ง · เหตุผล ─── */}
-        <TabsContent value="apps" className="mt-3 space-y-3">
+          <RequestTab rows={data.requestRows ?? null} rowsError={data.errors.requests ?? null} apps={view.cohort} trend={compareCard('requests')}>
           {compareCard('apps')}
           {drillCard('apps', 'รายชื่อที่กรอกมา')}
           {/* งานค้างของขั้นนี้ ณ วันนี้ (ย้ายจากแท็บใบขอ · เจ้าของ 29 ต.ค. 2569 "ย้ายไปให้ถูกเรื่องของมัน") */}
@@ -459,6 +453,7 @@ const RecruitOverview: React.FC<{
           <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub="ทุกรายชื่อของช่วงนี้">
             <ReasonColumns groups={view.reasons} />
           </OverviewCard>
+          </RequestTab>
         </TabsContent>
 
         {/* ─── การติดต่อ: ขั้นสนใจ·คนโทรต่อ + ผลงานรายคน ─── */}

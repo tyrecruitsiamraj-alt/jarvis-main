@@ -178,7 +178,7 @@ const StaffJobBoardPage: React.FC = () => {
             </Suspense>
           ) : view === 'dashboard' ? (
             <Suspense key={listRev} fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิดภาพรวม…</p>}>
-              {classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview published={boardPublished} openJobs={loading ? null : jobs} />}
+              {classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview published={boardPublished} />}
             </Suspense>
           ) : (
             <RmWorkspace

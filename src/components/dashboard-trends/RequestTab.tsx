@@ -1,0 +1,429 @@
+import React, { useMemo, useState } from 'react';
+import { ChevronDown, FileText, MapPin, Users, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
+import { DASH, TONE } from '@/lib/designTokens';
+import { formatTrendNumber as fmt } from '@/lib/trends/format';
+import { REQUEST_LEAD_KIND_LABEL } from '@/lib/requestLeadKind';
+import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
+import {
+  APPLICANT_BUCKET_LABEL,
+  APPLICANT_NOT_CALLED,
+  EMPTY_REQUEST_FILTER,
+  LEAD_ORDER,
+  REQUEST_BRANDS,
+  REQUEST_SECTOR_LABEL,
+  REQUEST_SECTOR_UNSET,
+  appsOfRequests,
+  applicantSuccessRanking,
+  buildApplicantChannelRows,
+  buildProvinceAreas,
+  buildRequestFunnel,
+  filterRequestRows,
+  isRequestFilterActive,
+  requestAreaOptions,
+  type ApplicantChannelRow,
+  type RecruitRequestRow,
+  type RequestSector,
+  type RequestTabFilter,
+} from '@/lib/recruitRequestTab';
+import { OverviewCard, SectionError } from './RecruitOverviewParts';
+
+/**
+ * แท็บใบขอ ภาพรวมงานสรรหา (เจ้าของ 29 ต.ค. 2569 · แบบร่างที่เจ้าของเคาะ) — ตัวคิดอยู่ `recruitRequestTab.ts` ที่เดียว
+ * ตัวกรองบนสุดคุมข้อ 1 · 3 · 4 · `trend` = การ์ดแนวโน้มใบขอเดิม (ไม่กรอง) · `children` = การ์ดที่ย้ายมาจากแท็บกรอกเข้ามา
+ */
+const ALL = '__all';
+const PROVINCES_SHOWN = 8;
+const DISTRICTS_SHOWN = 8;
+
+function Tile({ label, value, unit, sub, tone, testId }: { label: string; value: number; unit: string; sub: string; tone?: 'success' | 'danger' | 'primary'; testId: string }) {
+  return (
+    <div className="rounded-xl bg-muted/50 p-3" data-testid={testId}>
+      <p className={cn('text-xs', DASH.sub)}>{label}</p>
+      <p className={cn('text-2xl font-medium tabular-nums', tone ? TONE[tone].num : 'text-foreground')}>
+        {fmt(value)}
+        <span className={cn('ml-1 text-sm font-normal', DASH.sub)}>{unit}</span>
+      </p>
+      <p className={cn('text-xs tabular-nums', DASH.sub)}>{sub}</p>
+    </div>
+  );
+}
+
+function Bar({ value, max, tone }: { value: number; max: number; tone: 'neutral' | 'warn' | 'success' }) {
+  return (
+    <span className="block h-2.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
+      <span className={cn('block h-full rounded-full transition-all duration-700 motion-reduce:transition-none', TONE[tone].dot)} style={{ width: `${max > 0 ? (value / max) * 100 : 0}%` }} />
+    </span>
+  );
+}
+
+function AreaSelect({ label, value, options, onChange, disabled, testId }: { label: string; value: string | null; options: Array<{ value: string; n: number }>; onChange: (v: string | null) => void; disabled?: boolean; testId: string }) {
+  return (
+    <div className="flex min-w-36 flex-1 flex-col gap-1">
+      <Label className={cn('text-xs font-normal', DASH.sub)}>{label}</Label>
+      <Select value={value ?? ALL} onValueChange={(v) => onChange(v === ALL ? null : v)} disabled={disabled}>
+        <SelectTrigger className="h-9 text-sm" aria-label={label} data-testid={testId}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>ทั้งหมด</SelectItem>
+          {options.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.value} · {fmt(o.n)} ใบ
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+export default function RequestTab({
+  rows,
+  rowsError,
+  apps,
+  trend,
+  children,
+}: {
+  rows: readonly RecruitRequestRow[] | null;
+  rowsError: string | null;
+  /** ใบสมัครที่กรอกในช่วง (cohort) */
+  apps: readonly RecruitAppFact[];
+  trend: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  const [f, setF] = useState<RequestTabFilter>(EMPTY_REQUEST_FILTER);
+  const active = isRequestFilterActive(f);
+  const picked = useMemo(() => (rows ? filterRequestRows(rows, f) : []), [rows, f]);
+  const options = useMemo(() => requestAreaOptions(rows ?? [], f), [rows, f]);
+  const funnel = useMemo(() => buildRequestFunnel(picked), [picked]);
+  const areas = useMemo(() => buildProvinceAreas(picked), [picked]);
+  const appRows = useMemo(() => buildApplicantChannelRows(appsOfRequests(apps, active ? picked : null)), [apps, picked, active]);
+  const set = (patch: Partial<RequestTabFilter>) => setF((cur) => ({ ...cur, ...patch }));
+
+  return (
+    <div className="space-y-3">
+      {/* ─── ตัวกรอง (เจ้าของ 29 ต.ค. 2569: ชื่อหน่วยงาน · ประเภทงาน · Code Site · จังหวัด อำเภอ ตำบล) ─── */}
+      <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-card p-3" data-testid="request-tab-filters">
+        <div className="flex min-w-48 flex-[2] flex-col gap-1">
+          <Label htmlFor="request-tab-unit" className={cn('text-xs font-normal', DASH.sub)}>
+            ชื่อหน่วยงาน
+          </Label>
+          <Input id="request-tab-unit" className="h-9 text-sm" value={f.unit} onChange={(e) => set({ unit: e.target.value })} placeholder="เช่น กรุงศรี" />
+        </div>
+        <div className="flex min-w-32 flex-1 flex-col gap-1">
+          <Label className={cn('text-xs font-normal', DASH.sub)}>ประเภทงาน</Label>
+          <Select value={f.sector ?? ALL} onValueChange={(v) => set({ sector: v === ALL ? null : (v as RequestSector | 'unset') })}>
+            <SelectTrigger className="h-9 text-sm" aria-label="ประเภทงาน" data-testid="request-tab-sector">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>ทั้งหมด</SelectItem>
+              {(['private', 'government', 'bank'] as const).map((s) => (
+                <SelectItem key={s} value={s}>
+                  {REQUEST_SECTOR_LABEL[s]}
+                </SelectItem>
+              ))}
+              <SelectItem value="unset">{REQUEST_SECTOR_UNSET}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex min-w-32 flex-1 flex-col gap-1">
+          <Label htmlFor="request-tab-site" className={cn('text-xs font-normal', DASH.sub)}>
+            Code Site
+          </Label>
+          <Input id="request-tab-site" className="h-9 text-sm" value={f.siteCode} onChange={(e) => set({ siteCode: e.target.value })} />
+        </div>
+        <AreaSelect label="จังหวัด" value={f.province} options={options.provinces} onChange={(v) => set({ province: v, district: null, subdistrict: null })} testId="request-tab-province" />
+        <AreaSelect label="อำเภอ" value={f.district} options={options.districts} onChange={(v) => set({ district: v, subdistrict: null })} disabled={!f.province} testId="request-tab-district" />
+        <AreaSelect label="ตำบล" value={f.subdistrict} options={options.subdistricts} onChange={(v) => set({ subdistrict: v })} disabled={!f.district} testId="request-tab-subdistrict" />
+        {active ? (
+          <Button type="button" variant="ghost" size="sm" className="h-9" onClick={() => setF(EMPTY_REQUEST_FILTER)}>
+            <X aria-hidden />
+            ล้างตัวกรอง
+          </Button>
+        ) : null}
+      </div>
+
+      {rows === null ? <SectionError message={rowsError ?? 'อ่านใบขอไม่ได้'} /> : null}
+
+      {/* ─── 1. ใบขอเข้ามา ─── */}
+      <OverviewCard icon={FileText} title="ใบขอเข้ามา">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" data-testid="request-tab-funnel">
+          <Tile label="ใบขอเข้ามา" value={funnel.total} unit="ใบ" sub={`ขอ ${fmt(funnel.requested)} คน`} testId="request-tab-total" />
+          <Tile label="ยกเลิก" value={funnel.cancelled.requests} unit="ใบ" sub={`ยกเลิก ${fmt(funnel.cancelled.people)} คน`} tone="danger" testId="request-tab-cancelled" />
+          <Tile label="ปิดแล้ว" value={funnel.closed.requests} unit="ใบ" sub={`หาได้ ${fmt(funnel.closed.filled)} คน`} tone="success" testId="request-tab-closed" />
+          <Tile label="ดำเนินการสรรหา" value={funnel.active.requests} unit="ใบ" sub={`ต้องหาจริง ${fmt(funnel.active.remaining)} คน`} tone="primary" testId="request-tab-active" />
+        </div>
+        <div className="space-y-2 rounded-xl border border-border p-3">
+          <p className="flex justify-between gap-3 text-sm">
+            <span>ดำเนินการสรรหา</span>
+            <span className="font-medium tabular-nums">{fmt(funnel.active.requests)} ใบ</span>
+          </p>
+          <span className="flex h-3 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
+            {[
+              [funnel.active.notReleased, 'warn'],
+              [funnel.active.releasedNoApps, 'neutral'],
+              [funnel.active.releasedWithApps, 'info'],
+            ].map(([n, tone]) => (
+              <span key={tone as string} className={cn('block h-full', TONE[tone as 'warn'].dot)} style={{ width: `${funnel.active.requests ? ((n as number) / funnel.active.requests) * 100 : 0}%` }} />
+            ))}
+          </span>
+          <div className="grid gap-2 text-sm sm:grid-cols-3">
+            <p className="flex justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2" data-testid="request-tab-not-released">
+              <span>ยังไม่ประกาศ</span>
+              <span className="font-medium tabular-nums">{fmt(funnel.active.notReleased)} ใบ</span>
+            </p>
+            <p className="flex justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2" data-testid="request-tab-released-empty">
+              <span>ประกาศแล้ว ไม่มีคนกรอก</span>
+              <span className="font-medium tabular-nums">{fmt(funnel.active.releasedNoApps)} ใบ</span>
+            </p>
+            <p className="flex justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2" data-testid="request-tab-released-apps">
+              <span>ประกาศแล้ว มีคนกรอก</span>
+              <span className="font-medium tabular-nums">
+                {fmt(funnel.active.releasedWithApps)} ใบ · {fmt(funnel.active.applications)} คน
+              </span>
+            </p>
+          </div>
+        </div>
+      </OverviewCard>
+
+      {/* ─── 2. แนวโน้มใบขอ (การ์ดเดิม) ─── */}
+      {trend}
+
+      {/* ─── 3. พื้นที่ไหนขาดคน (โน้ตเจ้าของ: กดจังหวัดเห็นอำเภอ · ฉุกเฉิน/ย้อนหลัง/ล่วงหน้า · บอกใบและคน) ─── */}
+      <ProvinceCard areas={areas} brand={f.brand} onBrand={(b) => set({ brand: b })} />
+
+      {/* ─── 4. คนที่กรอกมา แยกช่องทาง ─── */}
+      <ApplicantCard total={appRows.total} groups={appRows.groups} />
+
+      {children}
+    </div>
+  );
+}
+
+function ProvinceCard({
+  areas,
+  brand,
+  onBrand,
+}: {
+  areas: ReturnType<typeof buildProvinceAreas>;
+  brand: RequestTabFilter['brand'];
+  onBrand: (b: RequestTabFilter['brand']) => void;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  const [all, setAll] = useState(false);
+  const [allDistricts, setAllDistricts] = useState(false);
+  const max = Math.max(1, ...areas.map((a) => a.requested));
+  const shown = all ? areas : areas.slice(0, PROVINCES_SHOWN);
+  return (
+    <OverviewCard
+      icon={MapPin}
+      title="พื้นที่ไหนขาดคน"
+      actions={
+        <div className="flex flex-wrap gap-1" role="group" aria-label="หน่วยงาน">
+          <Button type="button" size="xs" variant={brand === null ? 'default' : 'outline'} aria-pressed={brand === null} onClick={() => onBrand(null)}>
+            ทุกหน่วยงาน
+          </Button>
+          {REQUEST_BRANDS.map((b) => (
+            <Button key={b.key} type="button" size="xs" variant={brand === b.key ? 'default' : 'outline'} aria-pressed={brand === b.key} onClick={() => onBrand(brand === b.key ? null : b.key)} data-testid={`request-tab-brand-${b.key}`}>
+              {b.label}
+            </Button>
+          ))}
+        </div>
+      }
+    >
+      <div className={cn('flex flex-wrap gap-4 text-xs', DASH.sub)}>
+        <span className="inline-flex items-center gap-1.5">
+          <span className={cn('h-2.5 w-2.5 rounded-sm', TONE.neutral.dot)} aria-hidden />
+          ขอมา
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className={cn('h-2.5 w-2.5 rounded-sm', TONE.warn.dot)} aria-hidden />
+          ต้องหาตอนนี้
+        </span>
+      </div>
+      <ul className="space-y-1" data-testid="request-tab-provinces">
+        {areas.length === 0 ? <li className={cn('py-3 text-center text-sm', DASH.sub)}>ไม่มีใบขอ</li> : null}
+        {shown.map((p) => (
+          <li key={p.name}>
+            <Button
+              type="button"
+              variant="ghost"
+              className="grid h-auto w-full grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] items-center gap-3 whitespace-normal rounded-xl px-2 py-2 text-left font-normal"
+              aria-expanded={open === p.name}
+              onClick={() => setOpen(open === p.name ? null : p.name)}
+              data-testid="request-tab-province-row"
+            >
+              <span className="flex min-w-0 items-center gap-1.5 text-sm">
+                <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform', open !== p.name && '-rotate-90')} aria-hidden />
+                <span className="truncate">{p.name}</span>
+              </span>
+              <span className="space-y-1">
+                <Bar value={p.requested} max={max} tone="neutral" />
+                <Bar value={p.remaining} max={max} tone="warn" />
+              </span>
+              <span className="text-right text-xs tabular-nums">
+                <span className="block text-sm text-foreground">
+                  {fmt(p.requests)} ใบ · {fmt(p.requested)} คน
+                </span>
+                <span className={TONE.warn.value}>ต้องหา {fmt(p.remaining)} คน</span>
+              </span>
+            </Button>
+            {open === p.name ? (
+              <div className="mb-2 ml-2 space-y-3 rounded-xl bg-muted/40 p-3" data-testid="request-tab-province-detail">
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {LEAD_ORDER.map((k) => (
+                    <p key={k} className="flex justify-between gap-2 rounded-lg bg-card px-3 py-2 text-sm">
+                      <span>{REQUEST_LEAD_KIND_LABEL[k]}</span>
+                      <span className="tabular-nums">
+                        {fmt(p.lead[k].requests)} ใบ · {fmt(p.lead[k].requested)} คน
+                      </span>
+                    </p>
+                  ))}
+                </div>
+                <ul className="divide-y divide-border rounded-lg bg-card">
+                  {(allDistricts ? p.districts : p.districts.slice(0, DISTRICTS_SHOWN)).map((d) => (
+                    <li key={d.name} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 px-3 py-2 text-sm">
+                      <span className="min-w-0">{d.name}</span>
+                      <span className="ml-auto text-right tabular-nums">
+                        {fmt(d.requests)} ใบ · {fmt(d.requested)} คน
+                        <span className={cn('ml-2 text-xs', TONE.warn.value)}>ต้องหา {fmt(d.remaining)}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {p.districts.length > DISTRICTS_SHOWN ? (
+                  <Button type="button" variant="outline" size="xs" onClick={() => setAllDistricts((v) => !v)}>
+                    {allDistricts ? 'ซ่อน' : `ดูทั้งหมด ${fmt(p.districts.length)} อำเภอ`}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      {areas.length > PROVINCES_SHOWN ? (
+        <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => setAll((v) => !v)}>
+          {all ? 'ซ่อน' : `ดูทั้งหมด ${fmt(areas.length)} จังหวัด`}
+        </Button>
+      ) : null}
+    </OverviewCard>
+  );
+}
+
+const CALLED_COLS = [
+  { key: 'yes', tone: 'success' },
+  { key: 'no', tone: 'danger' },
+  { key: 'unreached', tone: null },
+  { key: 'unclear', tone: null },
+  { key: 'staff', tone: null },
+] as const;
+
+function ChannelRow({ r, level, open, onToggle }: { r: ApplicantChannelRow; level: 0 | 1 | 2; open?: boolean; onToggle?: () => void }) {
+  const num = (n: number, cls?: string) => <TableCell className={cn('text-right tabular-nums', cls)}>{fmt(n)}</TableCell>;
+  return (
+    <TableRow className={cn(level === 0 && 'bg-muted/40 font-medium hover:bg-muted/40')} data-testid={`request-tab-channel-${level}`}>
+      <TableCell className={cn('whitespace-nowrap text-sm', level === 2 && 'pl-9')}>
+        {onToggle ? (
+          <Button type="button" variant="ghost" size="xs" className="-ml-2 h-7 gap-1 px-2 font-medium" aria-expanded={open} onClick={onToggle}>
+            <ChevronDown className={cn('size-4 transition-transform', !open && '-rotate-90')} aria-hidden />
+            {r.name}
+          </Button>
+        ) : (
+          r.name
+        )}
+      </TableCell>
+      {num(r.total, 'font-medium')}
+      {num(r.notCalled)}
+      {num(r.counts.queued)}
+      {num(r.counts.retry)}
+      {num(r.called, 'border-l border-border font-medium')}
+      {CALLED_COLS.map((c) => (
+        <React.Fragment key={c.key}>{num(r.counts[c.key], c.tone ? TONE[c.tone].value : undefined)}</React.Fragment>
+      ))}
+      <TableCell className="text-right font-medium tabular-nums">{r.yesPct === null ? '—' : `${r.yesPct}%`}</TableCell>
+    </TableRow>
+  );
+}
+
+function ApplicantCard({ total, groups }: { total: ApplicantChannelRow; groups: ApplicantChannelRow[] }) {
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  const toggle = (k: string) =>
+    setOpen((cur) => {
+      const next = new Set(cur);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  const ranking = applicantSuccessRanking(groups);
+  const rankMax = Math.max(1, ...ranking.map((r) => r.yesPct ?? 0));
+  return (
+    <OverviewCard icon={Users} title={`คนที่กรอกมา ${fmt(total.total)} คน`}>
+      <div className="overflow-x-auto rounded-xl border border-border" data-testid="request-tab-applicants">
+        <Table className="min-w-[60rem]">
+          <TableHeader>
+            <TableRow className={DASH.tableHead}>
+              <TableHead className="text-xs">ช่องทาง</TableHead>
+              <TableHead className="text-right text-xs">ทั้งหมด</TableHead>
+              <TableHead className="text-right text-xs">AI ไม่โทร</TableHead>
+              <TableHead className="text-right text-xs">{APPLICANT_BUCKET_LABEL.queued}</TableHead>
+              <TableHead className="text-right text-xs">{APPLICANT_BUCKET_LABEL.retry}</TableHead>
+              <TableHead className="border-l border-border text-right text-xs">โทรแล้ว</TableHead>
+              {CALLED_COLS.map((c) => (
+                <TableHead key={c.key} className={cn('text-right text-xs', c.tone && TONE[c.tone].value)}>
+                  {APPLICANT_BUCKET_LABEL[c.key]}
+                </TableHead>
+              ))}
+              <TableHead className="text-right text-xs">% สนใจ</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <ChannelRow r={total} level={0} />
+            {groups.map((g) => (
+              <React.Fragment key={g.key}>
+                <ChannelRow r={g} level={1} open={open.has(g.key)} onToggle={() => toggle(g.key)} />
+                {open.has(g.key) ? (g.children ?? []).map((c) => <ChannelRow key={c.key} r={c} level={2} />) : null}
+              </React.Fragment>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="space-y-2 rounded-xl bg-muted/40 p-3 text-sm" data-testid="request-tab-not-called">
+          <p className="font-medium">AI ไม่โทร {fmt(total.notCalled)} คน</p>
+          {APPLICANT_NOT_CALLED.map((k) => (
+            <p key={k} className="flex justify-between gap-3">
+              <span>{APPLICANT_BUCKET_LABEL[k]}</span>
+              <span className="text-right tabular-nums">
+                {fmt(total.counts[k])}
+                {groups
+                  .filter((g) => g.counts[k] > 0)
+                  .map((g) => ` · ${g.name} ${fmt(g.counts[k])}`)
+                  .join('')}
+              </span>
+            </p>
+          ))}
+        </div>
+        <div className="space-y-2 rounded-xl bg-muted/40 p-3 text-sm" data-testid="request-tab-success">
+          <p className="font-medium">ช่องทางไหนได้คนสนใจเยอะ</p>
+          {ranking.length === 0 ? <p className={DASH.sub}>ยังไม่มีช่องทางที่โทรครบ 10 คน</p> : null}
+          {ranking.map((r) => (
+            <p key={r.key} className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)_auto] items-center gap-2">
+              <span className="truncate">{r.name}</span>
+              <Bar value={r.yesPct ?? 0} max={rankMax} tone="success" />
+              <span className="text-right tabular-nums">
+                {r.yesPct}% · {fmt(r.counts.yes)}/{fmt(r.called - r.counts.staff)}
+              </span>
+            </p>
+          ))}
+        </div>
+      </div>
+    </OverviewCard>
+  );
+}

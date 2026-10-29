@@ -13,13 +13,15 @@ const journey = ['names', 'ai', 'staff', 'appointment', 'attendance'].map(step);
 
 describe('แท็บภาพรวม', () => {
   it('ชื่อแท็บตามที่เจ้าของสั่ง เรียงตามนี้', () => {
-    expect(OVERVIEW_TABS.map((t) => t.label)).toEqual(['ใบขอ', 'กรอกเข้ามา', 'การติดต่อ', 'นัดหมาย']);
+    // 29 ต.ค. 2569 เจ้าของ "หน้า กรอกเข้ามา … เอาออกเลย ไปรวมกับ แท็บใบขอ"
+    expect(OVERVIEW_TABS.map((t) => t.label)).toEqual(['ใบขอ', 'การติดต่อ', 'นัดหมาย']);
   });
 
   it('?ov= ไม่รู้จัก = ใบขอ', () => {
     expect(overviewTabOf(null)).toBe('requests');
     expect(overviewTabOf('xx')).toBe('requests');
     expect(overviewTabOf('appt')).toBe('appt');
+    expect(overviewTabOf('apps')).toBe('requests');
   });
 
   it('🔴 เส้นทาง 5 ขั้นกระจายครบทุกขั้น ไม่ซ้ำ · เลขขั้นแรกของแท็บนับจากเส้นทางเต็ม', () => {
@@ -34,7 +36,8 @@ describe('แท็บภาพรวม', () => {
   it('หน้าใช้แท็บ shadcn + ทุกการ์ดเดิมยังอยู่ (ไม่มีอะไรหาย)', () => {
     const src = fs.readFileSync(path.join(process.cwd(), 'src/components/dashboard-trends/RecruitOverview.tsx'), 'utf8');
     expect(src).toContain("from '@/components/ui/tabs'");
-    for (const t of ['requests', 'apps', 'staff', 'appt']) expect(src).toContain(`<TabsContent value="${t}"`);
+    for (const t of ['requests', 'staff', 'appt']) expect(src).toContain(`<TabsContent value="${t}"`);
+    expect(src).not.toContain('<TabsContent value="apps"');
     for (const title of [
       // การ์ดใบขอรวมเข้าการ์ดแนวโน้มใบขอ (27 ต.ค. 2569)
       "title: 'แนวโน้มใบขอ'",

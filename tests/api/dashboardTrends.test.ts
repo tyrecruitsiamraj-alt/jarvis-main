@@ -130,7 +130,7 @@ describe('แท็บ Dashboard อยู่ในสองหน้า แล�
     const page = code('src/pages/jobs/StaffJobBoardPage.tsx');
     expect(page).toContain("lazyPage(() => import('@/components/dashboard-trends/RecruitOverview'))");
     expect(page).toContain("const classicDashboard = searchParams.get('dash') === 'classic';");
-    expect(page).toContain('{classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview published={boardPublished} openJobs={loading ? null : jobs} />}');
+    expect(page).toContain('{classicDashboard ? <BoardDashboard boardOpen={boardOpen} /> : <RecruitOverview published={boardPublished} />}');
   });
   it('🔴 ใบที่ประกาศบนภาพรวม = เลขของหัวกล่องงาน (เจ้าของ 1 ต.ค. 2569: "เปลี่ยนเป็น 7 เหมือนหัวกล่องงาน")', () => {
     const board = code('src/components/jobs/JobBoardView.tsx');
@@ -140,7 +140,7 @@ describe('แท็บ Dashboard อยู่ในสองหน้า แล�
     expect(board).toContain('onPublishedTotals?.(publishedTotals);');
     const page = code('src/pages/jobs/StaffJobBoardPage.tsx');
     expect(page).toContain('onPublishedTotals={setBoardPublished}');
-    expect(page).toContain('<RecruitOverview published={boardPublished} openJobs={loading ? null : jobs} />');
+    expect(page).toContain('<RecruitOverview published={boardPublished} />');
     // 19 ต.ค. 2569 เจ้าของเรียงภาพรวมใหม่ (Choice "ใบขอที่เข้ามาในเดือนที่เลือก") — การ์ด "ใบที่ประกาศ" ถอดแล้ว
     // ก้อนใบขอนับ "ประกาศแล้ว" ในใบที่เข้ามาในเดือน (ตัวเดียวกับหน้าหลัก) · ตัวเลขหัวกล่องงานยังส่งมาเหมือนเดิม
     const overview = code('src/components/dashboard-trends/RecruitOverview.tsx');

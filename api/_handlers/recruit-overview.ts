@@ -57,6 +57,11 @@ import { fullDaysSince } from '../../src/lib/fullDays.js';
 import { isOverAge } from '../../src/lib/applicantAge.js';
 import { isOutOfAreaAnswer } from '../../src/lib/outOfAreaAnswer.js';
 import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
+import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
+import { canonProvinceName } from '../../src/lib/thaiProvinces.js';
+import { parseThaiAddressParts } from '../../src/lib/parseThaiJobAddress.js';
+import { getDistrictOptionsForProvince } from '../../src/lib/thaiDistricts.js';
+import { requestSectorOf, type RecruitRequestRow } from '../../src/lib/recruitRequestTab.js';
 import { onlineRequestStateOf, type OnlineRequestRow } from '../../src/lib/homeOnline.js';
 import { loadChannelPlacement } from '../_lib/channelPlacementSql.js';
 import { loadInformDaysByPhone, loadIrecruitApplicantDays, loadIrecruitRegsByPhone } from '../_lib/applicantSourceSql.js';
@@ -395,6 +400,63 @@ async function loadRequestList(
   }));
 }
 
+/**
+ * ใบขอรายใบของแท็บใบขอ (29 ต.ค. 2569) — พื้นที่ + ประเภทงาน + ความเร่ง (นิยามอยู่ `recruitRequestTab.ts`)
+ * จังหวัด: ที่เจ้าหน้าที่แก้ในใบ › อ่านจากที่อยู่หน้างาน › จังหวัดของไซต์ใน ERP
+ *   (ไซต์ธนาคารผูกสำนักงานใหญ่ กทม. แต่หน้างานอยู่สาขา เช่น SCB สาขาแก่งคอย สระบุรี)
+ * อำเภอ/ตำบล: ที่แก้ในใบ › อ่านจากที่อยู่ — อำเภอต้องมีจริงในจังหวัดนั้น ไม่งั้น "ไม่ระบุ" (กันคำเพี้ยน "เขตธุรกิจ SME")
+ * อ่านที่แก้ในใบไม่ได้ = ใช้ของ ERP ต่อ (ข้อมูลเสริม ห้ามทำทั้งก้อนล้ม)
+ */
+const bareDistrict = (d: string) => d.replace(/^(เขต|อำเภอ|อ\.)\s*/u, '').trim();
+/** ชื่ออำเภอตามรายชื่อทางการของจังหวัด · ไม่เจอ: ที่เจ้าหน้าที่พิมพ์เอง = ใช้ตามนั้น · ที่อ่านจากที่อยู่ = ทิ้ง (กันคำเพี้ยน) */
+function officialDistrict(raw: string | null | undefined, official: readonly string[], typed: boolean): string | null {
+  const d = (raw ?? '').trim();
+  if (!d) return null;
+  const hit = official.find((o) => o === d || bareDistrict(o) === bareDistrict(d));
+  return hit ?? (typed ? d : null);
+}
+/** ตำบล/แขวง ไม่มีคำนำหน้า — ที่แก้ในใบกับที่อ่านจากที่อยู่สะกดไม่เหมือนกัน */
+const bareSubdistrict = (v: string | null | undefined) => (v ?? '').replace(/^(ตำบล|แขวง|ต\.)\s*/u, '').trim() || null;
+
+export async function toRequestRows(rows: readonly OnlineRequestRow[]): Promise<RecruitRequestRow[]> {
+  let notes: Awaited<ReturnType<typeof getUnitNotesMap>> = new Map();
+  try {
+    notes = await getUnitNotesMap(rows.map((r) => r.requestNo));
+  } catch (e) {
+    logError('recruit-overview: ที่อยู่ที่แก้ในใบ', e);
+  }
+  return rows.map((r) => {
+    const fo = notes.get(r.requestNo)?.field_overrides ?? null;
+    const addr = r.erp?.workAddr ?? '';
+    const erpProv = r.erp?.province ? canonProvinceName(r.erp.province) || r.erp.province : null;
+    const fromAddr = parseThaiAddressParts(addr);
+    const province = fo?.province || fromAddr.province || erpProv;
+    // อ่านซ้ำโดยต่อจังหวัดท้าย ให้ตัวอ่านเทียบชื่ออำเภอกับรายชื่อจริงของจังหวัดนั้นได้
+    const parts = province && !addr.includes(province) ? parseThaiAddressParts(`${addr} จังหวัด${province}`) : fromAddr;
+    const official = province ? getDistrictOptionsForProvince(province) : [];
+    // ชื่อตามรายชื่อทางการ ("ปทุมวัน" ที่แก้ในใบ = "เขตปทุมวัน") ไม่งั้นเขตเดียวกันแตกเป็นสองแถว
+    const district = officialDistrict(fo?.district, official, true) ?? officialDistrict(parts.district, official, false);
+    return {
+      requestNo: r.requestNo,
+      jobId: r.jobId,
+      unitName: r.unitName,
+      siteCode: r.siteCode ?? null,
+      siteName: r.erp?.siteName ?? null,
+      sector: requestSectorOf(r.industry, r.erp?.customerGroup, r.sector),
+      province,
+      district,
+      subdistrict: bareSubdistrict(fo?.subdistrict) || (district ? bareSubdistrict(parts.subdistrict) : null),
+      leadKind: r.leadKind ?? null,
+      requested: r.requested,
+      filled: r.filled,
+      cancelled: r.cancelled,
+      remaining: r.remaining,
+      released: Boolean(r.releasedAt),
+      applications: r.applications,
+    };
+  });
+}
+
 /** ใบขอรายวัน (วันที่ใบเข้ามา) — กราฟรายวันของแท็บใบขอ (21 ต.ค. 2569) */
 export function toRequestDays(rows: ReadonlyArray<ReqStateRow & { day: string }>): RecruitRequestDay[] {
   const by = new Map<string, RecruitRequestDay>();
@@ -721,11 +783,13 @@ export async function buildRecruitOverview(
     body.requestsPrev = toRequestSummary(inRange(window.prevFrom, window.prevTo));
     body.requestDays = toRequestDays(reqR.value);
     body.requestList = await loadRequestList(inRange(window.from, window.to));
+    body.requestRows = await toRequestRows(inRange(window.from, window.to));
   } else {
     body.requests = null;
     body.requestsPrev = null;
     body.requestDays = null;
     body.requestList = null;
+    body.requestRows = null;
     body.errors.requests = reqR.error;
   }
 
