@@ -86,6 +86,20 @@ import {
 } from '@/lib/dashboard/throughput';
 import type { JobRequest } from '@/types';
 
+/** กล่องสถานะทำงาน → สถานะ (null = ทุกสถานะ) — 29 ต.ค. 2569 ใช้กับการ์ดเร่งด่วนตอนกดกล่อง */
+const WORK_STATUS_OF_KPI: Record<string, string | null> = {
+  work_status_total: null,
+  work_status_in_progress: 'in_progress',
+  work_status_on_hold: 'on_hold',
+  work_status_evaluating: 'evaluating',
+  work_status_waiting_inform: 'waiting_inform',
+  work_status_waiting_interview: 'waiting_interview',
+  work_status_waiting_result: 'waiting_result',
+  work_status_waiting_start: 'waiting_start',
+  work_status_daily_work: 'daily_work',
+  work_status_daily_pay: 'daily_pay',
+};
+
 const DEMO_MODE = import.meta.env.VITE_DASHBOARD_DEMO === 'true';
 
 /** การ์ดที่คิดจากยอดตามช่วง (throughput) — โหลดไม่ขึ้นแล้วต้องขึ้น "—" */
@@ -719,6 +733,17 @@ const SupervisorDashboard: React.FC = () => {
     [openCohortDrillList],
   );
 
+  /** กล่องสถานะทำงานที่กดอยู่ — การ์ดเร่งด่วนเปลี่ยนเป็นใบของสถานะนั้น · null = การ์ดเร่งด่วนแบบเดิม */
+  const [statusPick, setStatusPick] = useState<{ kpiId: string; label: string } | null>(null);
+  /** ใบของสถานะที่กด — ชุดเดียวกับที่ป๊อปเดิมใช้ (`filterJobsForRemainingKpi`) คิดใหม่ตามตัวกรองปัจจุบัน */
+  const statusPickJobs = useMemo(() => {
+    if (!statusPick) return null;
+    const range = period ?? (dateRange ? resolvePeriodRange('custom', dateRange) : null);
+    const stock = filterJobsForRemainingKpi(jobsWithoutAgeFilter, range);
+    const target = WORK_STATUS_OF_KPI[statusPick.kpiId];
+    return target == null ? stock : stock.filter((j) => resolveUnitRequestWorkStatus(j.work_status) === target);
+  }, [statusPick, period, dateRange, jobsWithoutAgeFilter]);
+
   const handleKpiClick = useCallback(
     (kpiId: string, label: string, expectedRequests?: number | null) => {
       const range = period ?? (dateRange ? resolvePeriodRange('custom', dateRange) : null);
@@ -770,26 +795,9 @@ const SupervisorDashboard: React.FC = () => {
       }
 
       if (kpiId.startsWith('work_status_')) {
-        const statusMap: Record<string, string | null> = {
-          work_status_total: null,
-          work_status_in_progress: 'in_progress',
-          work_status_on_hold: 'on_hold',
-          work_status_evaluating: 'evaluating',
-          work_status_waiting_inform: 'waiting_inform',
-          work_status_waiting_interview: 'waiting_interview',
-          work_status_waiting_result: 'waiting_result',
-          work_status_waiting_start: 'waiting_start',
-          work_status_daily_work: 'daily_work',
-          work_status_daily_pay: 'daily_pay',
-        };
-        const target = statusMap[kpiId];
-        if (kpiId in statusMap) {
-          openJobList(
-            label,
-            target == null
-              ? stockJobs
-              : stockJobs.filter((j) => resolveUnitRequestWorkStatus(j.work_status) === target),
-          );
+        // 29 ต.ค. 2569 เจ้าของ (แบบร่างที่เคาะ "ทำเลย"): ไม่เด้งป๊อปแล้ว — การ์ดเร่งด่วนเปลี่ยนเป็นใบของสถานะนี้ (`DashboardStatusLeadPanel`)
+        if (kpiId in WORK_STATUS_OF_KPI) {
+          setStatusPick((cur) => (cur?.kpiId === kpiId ? null : { kpiId, label }));
           return;
         }
       }
@@ -1003,6 +1011,9 @@ const SupervisorDashboard: React.FC = () => {
       onExport={handleExport}
       onViewItem={handleView}
       onKpiClick={DEMO_MODE ? undefined : handleKpiClick}
+      statusPick={statusPick && statusPickJobs ? { ...statusPick, jobs: statusPickJobs } : null}
+      onStatusPickClear={() => setStatusPick(null)}
+      onOpenJob={(job) => navigateToUnitRequest(job, navigate, { returnTo: RETURN_TO })}
       leadKindBreakdown={leadKindBreakdown}
       leadKindMismatch={leadKindMismatch}
       onLeadKindClick={DEMO_MODE ? undefined : handleLeadKindClick}

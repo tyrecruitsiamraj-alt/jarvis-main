@@ -16,6 +16,8 @@ import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
 import DashboardHeroStrip from './DashboardHeroStrip';
 import DashboardLeadKindChart from './DashboardLeadKindChart';
+import DashboardStatusLeadPanel from './DashboardStatusLeadPanel';
+import type { JobRequest } from '@/types';
 import DashboardSlaByLeadKind from './DashboardSlaByLeadKind';
 import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
 import DashboardDriverOverview from './DashboardDriverOverview';
@@ -74,6 +76,10 @@ type Props = {
    * ยอดรวมฝั่ง ERP ซึ่ง**รวมใบที่อยู่นอก feed ของกล่องงาน** ลิสต์จึงน้อยกว่าได้เป็นปกติ
    */
   onKpiClick?: (kpiId: string, label: string, expectedRequests?: number | null) => void;
+  /** กล่องสถานะทำงานที่กดอยู่ (29 ต.ค. 2569) — การ์ดเร่งด่วนเปลี่ยนเป็นใบของสถานะนี้ · null = การ์ดเดิม */
+  statusPick?: { kpiId: string; label: string; jobs: JobRequest[] } | null;
+  onStatusPickClear?: () => void;
+  onOpenJob?: (job: JobRequest) => void;
   /** กราฟ ทั้งหมด/ฉุกเฉิน/ล่วงหน้า (18 ส.ค. 2569) — ไม่ส่ง = ไม่แสดงกราฟ (เช่นโหมด demo) */
   leadKindBreakdown?: LeadKindBreakdown | null;
   leadKindMismatch?: string | null;
@@ -123,6 +129,9 @@ const DashboardShell: React.FC<Props> = ({
   onExport,
   onViewItem,
   onKpiClick,
+  statusPick = null,
+  onStatusPickClear,
+  onOpenJob,
   leadKindBreakdown,
   leadKindMismatch,
   onLeadKindClick,
@@ -438,6 +447,7 @@ const DashboardShell: React.FC<Props> = ({
                           kpi={kpi}
                           progressPercent={total > 0 ? Math.round((kpi.value / total) * 100) : 0}
                           progressBaseLabel="ของทุกสถานะ"
+                          selected={statusPick?.kpiId === kpi.id}
                           onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
                         />
                       ));
@@ -448,7 +458,9 @@ const DashboardShell: React.FC<Props> = ({
 
               {/* กราฟ ทั้งหมด/ฉุกเฉิน/ล่วงหน้า — วางใต้การ์ด KPI ให้เห็นทันทีโดยไม่ต้องกางแผง
                   (เจ้าของสั่ง 18 ส.ค. 2569) · เลขชุดเดียวกับการ์ด「เข้ามา」 เปลี่ยนตามตัวกรองเอง */}
-              {leadKindBreakdown ? (
+              {statusPick ? (
+                <DashboardStatusLeadPanel label={statusPick.label} jobs={statusPick.jobs} onClear={() => onStatusPickClear?.()} onOpenJob={onOpenJob} />
+              ) : leadKindBreakdown ? (
                 <DashboardLeadKindChart
                   breakdown={leadKindBreakdown}
                   scopeLabel={data.activityTrendLabel || data.periodLabel}

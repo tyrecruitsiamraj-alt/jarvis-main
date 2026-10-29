@@ -15,6 +15,8 @@ type Props = {
    * ถ้าไม่ส่ง จะขึ้นว่า "ของเข้ามา" ตามพฤติกรรมเดิม
    */
   progressBaseLabel?: string;
+  /** กล่องที่กดอยู่ (สถานะทำงาน · 29 ต.ค. 2569 กดแล้วรายการขึ้นในการ์ดเร่งด่วน) */
+  selected?: boolean;
 };
 
 /**
@@ -47,6 +49,7 @@ const DashboardKpiCard: React.FC<Props> = ({
   onClick,
   progressPercent = null,
   progressBaseLabel = 'ของเข้ามา',
+  selected = false,
 }) => {
   const trend = kpi.trendPercent;
   const TrendIcon = trend == null || trend === 0 ? Minus : trend > 0 ? ArrowUp : ArrowDown;
@@ -73,8 +76,10 @@ const DashboardKpiCard: React.FC<Props> = ({
       type="button"
       onClick={onClick}
       disabled={!onClick}
+      aria-pressed={onClick ? selected : undefined}
       className={cn(
         'w-full rounded-2xl p-4 text-left shadow-sm transition-colors',
+        selected && 'ring-2 ring-ring',
         solid && tone ? tone.solid : (tone?.tile ?? NEUTRAL_TILE),
         onClick ? 'cursor-pointer' : 'cursor-default',
       )}
