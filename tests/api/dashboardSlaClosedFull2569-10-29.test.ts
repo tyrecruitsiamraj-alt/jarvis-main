@@ -17,3 +17,15 @@ describe('ใบปิดครบทุกใบ', () => {
     expect(page).toContain('if (!period) requestClosedTotals();');
   });
 });
+
+describe('ตาราง = ใบชุดเดียวกับการ์ดใบขอเร่งด่วน', () => {
+  it('ใบในชุดของการ์ดที่หาใบไม่เจอ = คิด SLA ไม่ได้ ของชนิดนั้น (ยอดรวมเท่าการ์ด)', async () => {
+    const { buildSlaByLeadKind } = await import('../../src/lib/dashboard/slaByLeadKind');
+    const t = buildSlaByLeadKind([], new Date('2026-10-29T03:00:00Z'), { retroactive: 2, advance: 1 });
+    expect(t.totalRow.total).toBe(3);
+    expect(t.totalRow.cells.unknown).toBe(3);
+    const page = read('src/pages/dashboard/SupervisorDashboard.tsx');
+    expect(page).toContain('buildSlaByLeadKind(slaCohort.records, new Date(), slaCohort.extraUnknown)');
+    expect(page).toContain('filterRecordsForSlaCell(slaCohort.records, kind, cell)');
+  });
+});

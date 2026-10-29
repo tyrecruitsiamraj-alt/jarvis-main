@@ -140,9 +140,15 @@ function makeRow(kind: RequestLeadKind, cells: Record<SlaCellKey, number>): SlaL
 export function buildSlaByLeadKind(
   records: RequestControlRecord[],
   today = new Date(),
+  /**
+   * ใบที่อยู่ในชุดของการ์ด "ใบขอเร่งด่วนแค่ไหน" แต่หาใบไม่เจอทั้งในใบเปิดและใบปิด (29 ต.ค. 2569)
+   * ⇒ นับเป็น "คิด SLA ไม่ได้" ของชนิดนั้น — ยอดรวมตารางต้องเท่าการ์ดเสมอ ห้ามหายเงียบ
+   */
+  extraUnknown: Partial<Record<RequestLeadKind, number>> = {},
 ): SlaByLeadKind {
   const byKind = new Map<RequestLeadKind, Record<SlaCellKey, number>>();
   for (const k of LEAD_KIND_ORDER) byKind.set(k, emptyCells());
+  for (const k of LEAD_KIND_ORDER) byKind.get(k)!.unknown += extraUnknown[k] ?? 0;
 
   for (const r of records) {
     // ชนิดใบขอ: เส้นแบ่งเดียวของระบบ (ห้ามคิด 7 วันเองซ้ำที่นี่)

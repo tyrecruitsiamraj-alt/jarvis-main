@@ -833,20 +833,51 @@ const SupervisorDashboard: React.FC = () => {
    * ⚠️ ใช้ `controlRecords` ชุดเดียวกับที่การ์ด KPI / drill-down อื่นใช้ — ตารางจึงขยับ
    * ตามตัวกรองของหน้าเองโดยไม่ต้องมี state แยก (กติกาเดียวกับกราฟชนิดใบขอ)
    */
-  const slaByLeadKind = useMemo(() => buildSlaByLeadKind(slaControlRecords), [slaControlRecords]);
+  /**
+   * 🔴 ตาราง "ปิดทัน / ไม่ทัน" = ใบชุดเดียวกับการ์ด "ใบขอเร่งด่วนแค่ไหน" (`cohortScope` · เจ้าของ 29 ต.ค. 2569 "ยอดมันไม่ตรงกันหรอ")
+   * เดิมนับใบเปิด + ใบที่ "ปิดในช่วง" (รวมใบที่ยื่นก่อนช่วง) ⇒ 6,701 ไม่เท่าการ์ด 6,005
+   * ⇒ เก็บเฉพาะใบที่อยู่ในชุดของการ์ด · ใบในชุดที่หาใบไม่เจอ = "คิด SLA ไม่ได้" ของชนิดนั้น (ยอดรวมเท่าการ์ดเสมอ)
+   * ยังไม่มีชุดของการ์ด (throughput ยังไม่มา) = ใช้ชุดเดิม
+   */
+  const slaCohort = useMemo(() => {
+    if (cohortScope.records.length === 0) return { records: slaControlRecords, extraUnknown: {} as Partial<Record<RequestLeadKind, number>> };
+    const keyOfRecord = (r: { requestNo?: string; jobId?: string }) => (r.requestNo ?? '').trim() || (r.jobId ?? '').trim();
+    const wanted = new Map<string, RequestLeadKind | undefined>();
+    for (const r of cohortScope.records) {
+      const k = keyOfRecord(r);
+      if (k && !wanted.has(k)) wanted.set(k, r.leadKind);
+    }
+    const seen = new Set<string>();
+    const records = slaControlRecords.filter((r) => {
+      const k = wanted.has(r.requestNo) ? r.requestNo : wanted.has(r.id) ? r.id : null;
+      if (!k || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    const extraUnknown: Partial<Record<RequestLeadKind, number>> = {};
+    for (const [k, kind] of wanted) {
+      if (seen.has(k) || !kind) continue;
+      extraUnknown[kind] = (extraUnknown[kind] ?? 0) + 1;
+    }
+    return { records, extraUnknown };
+  }, [cohortScope.records, slaControlRecords]);
+  const slaByLeadKind = useMemo(
+    () => buildSlaByLeadKind(slaCohort.records, new Date(), slaCohort.extraUnknown),
+    [slaCohort],
+  );
 
   const handleSlaCellClick = useCallback(
     (kind: RequestLeadKind, cell: SlaCellKey, label: string) => {
-      openControlList(`SLA · ${label}`, filterRecordsForSlaCell(slaControlRecords, kind, cell));
+      openControlList(`SLA · ${label}`, filterRecordsForSlaCell(slaCohort.records, kind, cell));
     },
-    [openControlList, slaControlRecords],
+    [openControlList, slaCohort],
   );
 
   const handleSlaLeadKindClick = useCallback(
     (kind: RequestLeadKind, label: string) => {
-      openControlList(`ใบขอชนิด ${label}`, filterRecordsForLeadKind(slaControlRecords, kind));
+      openControlList(`ใบขอชนิด ${label}`, filterRecordsForLeadKind(slaCohort.records, kind));
     },
-    [openControlList, slaControlRecords],
+    [openControlList, slaCohort],
   );
 
   const handleFilledBreakdownClick = useCallback(
