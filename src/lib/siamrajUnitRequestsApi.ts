@@ -107,8 +107,9 @@ export async function fetchSiamrajThroughput(from: string, to: string): Promise<
 }
 
 /** รายการใบขอที่ปิด/แจ้งเข้าในช่วง — สำหรับ drill-down การ์ด "ปิดใบขอ" (position_units = จำนวนที่ปิด) */
-export async function fetchSiamrajClosedRequests(from: string, to: string): Promise<JobRequest[]> {
+export async function fetchSiamrajClosedRequests(from: string, to: string, limit?: number): Promise<JobRequest[]> {
   const params = new URLSearchParams({ closed: '1', from, to });
+  if (limit) params.set('limit', String(limit));
   const r = await apiFetch(`/api/siamraj/unit-requests?${params}`, { cache: 'no-store' });
   if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดรายการใบขอที่ปิดไม่สำเร็จ'));
   const data = await readJsonSafe<JobRequest[]>(r);

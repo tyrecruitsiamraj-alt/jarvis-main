@@ -206,7 +206,10 @@ export async function listSiamrajSqlServerClosedRequests(options: {
 }): Promise<ClosedRequest[]> {
   const { from, to } = options;
   if (!isDateYmd(from) || !isDateYmd(to)) throw new Error('from/to must be YYYY-MM-DD');
-  const limit = Math.min(Math.max(options.limit ?? 3000, 1), 5000);
+  // เพดานต่อครั้ง — 29 ต.ค. 2569 ขยาย 5,000 → 20,000: Dashboard โหมดทั้งหมด (พ.ค. 2567 – ปัจจุบัน) มีใบปิดเกิน 3,000
+  // ⇒ ตาราง "ปิดทัน / ไม่ทัน" ไม่เท่าการ์ดใบขอเร่งด่วน (เจ้าของ "ยอดมันไม่ตรงกันหรอ") · วัดจริง: ERP ใช้ ~36 วิ เท่ากันทั้ง 3,000 และ 5,000
+  // (ORDER BY วันปิดต้องไล่ทุกใบในช่วงอยู่แล้ว เพดานแค่ตัดตอนส่ง)
+  const limit = Math.min(Math.max(options.limit ?? 3000, 1), 20000);
   const scope = options.departmentScope ?? { mode: 'all' };
   const cacheKey = `${closedScopeKey(scope)}|${from}|${to}|${limit}`;
   const cached = readClosedCache(cacheKey);

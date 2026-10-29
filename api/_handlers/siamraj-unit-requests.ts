@@ -463,7 +463,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
         return sendError(res, 400, 'Bad request', 'ต้องระบุ from และ to เป็น YYYY-MM-DD');
       }
-      const items = await listSiamrajClosedRequests({ from, to, departmentScope });
+      // `limit` (ไม่บังคับ) — Dashboard โหมดทั้งหมดขอครบทุกใบ (29 ต.ค. 2569) · ค่าผิด = ค่าเริ่ม
+      const rawLimit = Number(getQuery(req, 'limit'));
+      const closedLimit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : undefined;
+      const items = await listSiamrajClosedRequests({ from, to, departmentScope, limit: closedLimit });
       // แนบชื่อผู้รับผิดชอบเหมือนเส้นใบเปิด — ไม่งั้น "ปิดแล้ว" ต่อคนใน
       // ภาระงานตามผู้รับผิดชอบ (buildRecruiterOverview) จะเป็น 0 เพราะยอดไปกองที่ "ยังไม่มอบหมาย"
       await attachAssignments(items);

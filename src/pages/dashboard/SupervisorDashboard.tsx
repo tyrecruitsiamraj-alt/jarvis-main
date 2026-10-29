@@ -259,7 +259,8 @@ const SupervisorDashboard: React.FC = () => {
     if (DEMO_MODE || period || closedAllJobs || closedAllLoading) return;
     if (!(siamrajPrimary && dbSource === 'sqlserver')) return;
     setClosedAllLoading(true);
-    void fetchSiamrajClosedRequests(throughputFrom, throughputTo)
+    // ครบทุกใบของช่วง (เพดาน 20,000) — เดิมค่าเริ่ม 3,000 ตัดใบปิดจนตาราง "ปิดทัน / ไม่ทัน" ไม่เท่าการ์ดบน (29 ต.ค. 2569)
+    void fetchSiamrajClosedRequests(throughputFrom, throughputTo, 20000)
       .then((rows) => {
         setClosedAllJobs(rows);
         setSideFailed((s) => ({ ...s, closed: false }));
