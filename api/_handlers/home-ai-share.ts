@@ -36,8 +36,8 @@ import {
   FOLLOW_QUEUE_MATCH,
 } from '../_lib/homeAiShareSql.js';
 import { logWarn } from '../_lib/logger.js';
-import { proportionAppReasonsSql, proportionEntrySql, proportionFollowRowsSql } from '../_lib/homeProportionSql.js';
-import { summarizeFollowLane, type AppNoCallReason, type ProportionPayload } from '../../src/lib/homeProportion.js';
+import { proportionAftercarePeopleSql, proportionAppReasonsSql, proportionEntrySql, proportionFollowRowsSql } from '../_lib/homeProportionSql.js';
+import { summarizeAftercarePeople, summarizeFollowLane, type AppNoCallReason, type ProportionPayload } from '../../src/lib/homeProportion.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
 import {
@@ -684,7 +684,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         return res.status(200).json(body);
       }
       const { start, end } = aiShareBounds(win, new Date());
-      const [fr, er, ar] = await Promise.allSettled([
+      const [fr, er, ar, cr] = await Promise.allSettled([
         // ชุดสายเดียวกับแท็บภาพรวม (ช่วงเต็ม · ตัดยกเลิกด้วยช่องผล) — ดู proportionFollowRowsSql
         dbQuery<Record<string, unknown>>(proportionFollowRowsSql(), [
           followPlanBounds(win).start,
@@ -697,6 +697,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
           proportionAppReasonsSql(),
           [start, end, bu],
         ),
+        // ดูแลหลังเริ่มงาน นับเป็นคน (Choice เจ้าของ 29 ต.ค. 2569) — คนที่ยังดูแลอยู่ตอนนี้
+        dbQuery<Record<string, unknown>>(proportionAftercarePeopleSql(), [AFTERCARE_TOPIC, bu]),
       ]);
       if (fr.status === 'fulfilled') {
         // ช่องผลตัวเดียวกับการ์ดผลโทรของหน้าหลัก (`followLedgerBucket`) — แถวชุดเดียวกับตัวเลขบนแถว
@@ -725,7 +727,27 @@ async function handler(req: AuthedReq, res: ApiRes) {
             inLane.length - keep.length,
           );
         };
-        body.follow = { starter: lane('starter'), replacement: lane('replacement'), aftercare: lane('aftercare') };
+        const str = (v: unknown) => (typeof v === 'string' ? v : null);
+        const aftercare =
+          cr.status === 'fulfilled'
+            ? summarizeAftercarePeople(
+                cr.value.rows.map((r) => ({
+                  aiCalled: r.ai_called === true,
+                  result: str(r.result),
+                  expectation: str(r.expectation),
+                  supervisor: str(r.supervisor),
+                  escalation: str(r.escalation),
+                  hasRounds: r.has_rounds === true,
+                  upcoming: r.upcoming === true,
+                  overdue: r.overdue === true,
+                })),
+              )
+            : summarizeAftercarePeople([]);
+        if (cr.status === 'rejected') {
+          logWarn('home-ai-share proportion aftercare failed', { error: errText(cr.reason) });
+          body.errors.aftercare = 'โหลดตัวเลขดูแลหลังเริ่มงานไม่ขึ้น';
+        }
+        body.follow = { starter: lane('starter'), replacement: lane('replacement'), aftercare };
       } else {
         logWarn('home-ai-share proportion follow failed', { error: errText(fr.reason) });
         body.errors.follow = 'โหลดตัวเลขติดตามไม่ขึ้น';

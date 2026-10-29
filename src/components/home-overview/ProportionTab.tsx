@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { OverviewSection, OverviewSheet, NUM, type OverviewPanel } from '@/components/home-overview/OverviewParts';
-import { fetchHomeProportion } from '@/lib/homeAiShareApi';
-import type { AiShareMatching, AiShareWindow } from '@/lib/homeAiShare';
+import { fetchHomeProportion, fetchTopicReport } from '@/lib/homeAiShareApi';
+import type { TopicReport } from '@/lib/homeTopicReport';
+import type { AiShareWindow } from '@/lib/homeAiShare';
 import { AI_SHARE_CALLED_TONE } from '@/lib/homeAiShare';
 import {
   buildProportionGroups,
@@ -98,50 +99,50 @@ function Parts({ parts, unit, empty }: { parts: readonly LadderPart[]; unit: str
   );
 }
 
-const sumOf = (parts: readonly LadderPart[]) => parts.reduce((n, p) => n + p.value, 0);
-
-/** แผงของแถวงานโทร — สมการบนสุด แล้วแตกทีละก้อน */
-function LadderView({ l, aiWord }: { l: Ladder; aiWord: string }) {
-  const waiting = sumOf(l.waiting);
-  const notCalled = sumOf(l.notCalled);
+/** แผงของแถวงานโทร — สมการบนสุด แล้วไล่ทีละข้อ (ข้อย่อยเยื้องเข้า) */
+function LadderView({ l }: { l: Ladder }) {
   const ok = ladderAddsUp(l);
-  const head = (title: string, value: number) => (
-    <h3 className="flex items-baseline justify-between text-sm font-medium text-foreground">
-      <span>{title}</span>
-      <span className="tabular-nums">
-        {NUM.format(value)} <span className="text-xs font-normal text-muted-foreground">{l.unit}</span>
-      </span>
-    </h3>
-  );
   return (
-    <div className="space-y-4" data-testid="proportion-ladder">
-      <p
-        className={cn('rounded-xl px-3 py-2 text-sm tabular-nums', ok ? 'bg-muted/60 text-foreground' : cn(TONE.danger.soft, TONE.danger.value))}
-        data-testid="proportion-equation"
-      >
-        รายชื่อ {NUM.format(l.total)} = โทรแล้ว {NUM.format(l.called.total)} + รอโทร {NUM.format(waiting)} + ไม่โทร {NUM.format(notCalled)} {l.unit}
-        {ok ? '' : ' · ไม่ลงตัว'}
-      </p>
-      {l.excluded ? (
-        <p className="-mt-2 text-xs tabular-nums text-muted-foreground">
-          {l.excluded.label} {NUM.format(l.excluded.value)} {l.unit}
+    <div className="space-y-5" data-testid="proportion-ladder">
+      <div className="space-y-1">
+        <p
+          className={cn('rounded-xl px-4 py-3 text-sm tabular-nums', ok ? 'bg-muted/60 text-foreground' : cn(TONE.danger.soft, TONE.danger.value))}
+          data-testid="proportion-equation"
+        >
+          {l.totalLabel} {NUM.format(l.total)} = {l.equation.map((e) => `${e.label} ${NUM.format(e.value)}`).join(' + ')} {l.unit}
+          {ok ? '' : ' · ไม่ลงตัว'}
         </p>
-      ) : null}
-      <section className="space-y-2">
-        {head('โทรแล้ว', l.called.total)}
-        <p className="text-xs tabular-nums text-muted-foreground">
-          {aiWord} {NUM.format(l.called.ai)} · ทั้งสองทาง {NUM.format(l.called.both)} · คน {NUM.format(l.called.staff)}
-        </p>
-        {l.results.length ? <Parts parts={l.results} unit={l.unit} empty="ยังไม่มีผล" /> : null}
-      </section>
-      <section className="space-y-2">
-        {head('รอโทร', waiting)}
-        <Parts parts={l.waiting} unit={l.unit} empty="ไม่มีรอโทร" />
-      </section>
-      <section className="space-y-2">
-        {head('ไม่โทร', notCalled)}
-        <Parts parts={l.notCalled} unit={l.unit} empty="ไม่มี" />
-      </section>
+        {l.excluded ? (
+          <p className="px-1 text-xs tabular-nums text-muted-foreground">
+            {l.excluded.label} {NUM.format(l.excluded.value)} {l.unit}
+          </p>
+        ) : null}
+      </div>
+      <ol className="space-y-4">
+        {l.steps.map((st, i) => (
+          <li
+            key={st.key}
+            className={cn('space-y-2', st.indent && 'ml-3 border-l-2 border-border pl-4', st.deep && 'ml-7')}
+            data-testid={`proportion-step-${st.key}`}
+          >
+            <h3 className="flex items-baseline justify-between gap-3 text-sm font-medium text-foreground">
+              <span className="min-w-0">
+                <span className="mr-1.5 tabular-nums text-muted-foreground">{i + 1}.</span>
+                {st.title}
+              </span>
+              <span className="shrink-0 tabular-nums">
+                {NUM.format(st.value)} <span className="text-xs font-normal text-muted-foreground">{l.unit}</span>
+              </span>
+            </h3>
+            {st.sub ? <p className="text-xs tabular-nums text-muted-foreground">{st.sub}</p> : null}
+            {st.parts.length ? (
+              <Parts parts={st.parts} unit={l.unit} empty="" />
+            ) : st.value === 0 && (st.key === 'waiting' || st.key === 'notCalled') ? (
+              <Parts parts={[]} unit={l.unit} empty="ไม่มี" />
+            ) : null}
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -151,7 +152,7 @@ function panelOf(r: ProportionRow): OverviewPanel {
     title: r.name,
     sub: r.note,
     go: GO[r.key],
-    body: r.ladder ? <LadderView l={r.ladder} aiWord={r.aiLabel ?? 'AI'} /> : <Parts parts={r.parts ?? []} unit="" empty="ไม่มีข้อมูล" />,
+    body: r.ladder ? <LadderView l={r.ladder} /> : <Parts parts={r.parts ?? []} unit="" empty="ไม่มีข้อมูล" />,
   };
 }
 
@@ -317,14 +318,12 @@ export default function ProportionTab({
   win,
   bu,
   apps,
-  matching,
   appsError,
   openJobIds,
 }: {
   win: AiShareWindow;
   bu: string | null;
   apps: readonly RecruitAppFact[] | null;
-  matching: AiShareMatching | null;
   appsError: string | null;
   /** ใบขอที่เปิดอยู่ (ใช้บอกเหตุ "ใบขอปิดแล้ว") · null = อ่านไม่ได้ ไม่เดา */
   openJobIds: ReadonlySet<string> | null;
@@ -347,12 +346,31 @@ export default function ProportionTab({
       alive = false;
     };
   }, [key, win, bu]);
+  // จับคู่งาน = รายงานผลโทรของหัวข้อจับคู่งาน (ช่วง/BU เดียวกัน) — แบบเดียวกับ Prescreen (Choice เจ้าของ 29 ต.ค. 2569)
+  const [match, setMatch] = useState<{ key: string; r: TopicReport | null } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchTopicReport('matching', { ...win, bu })
+      .then((d) => {
+        if (alive) setMatch({ key, r: d.report });
+      })
+      .catch(() => {
+        if (alive) setMatch({ key, r: null });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [key, win, bu]);
   const payload = data?.key === key ? data.d : null;
-  const groups = useMemo(() => buildProportionGroups({ apps, payload, matching, openJobIds }), [apps, payload, matching, openJobIds]);
+  const matchingReport = match?.key === key ? match.r : null;
+  const groups = useMemo(
+    () => buildProportionGroups({ apps, payload, matchingReport, openJobIds }),
+    [apps, payload, matchingReport, openJobIds],
+  );
   const stuck = useMemo(() => proportionStuck(groups), [groups]);
   const rowOf = (key: string) => groups.flatMap((g) => g.rows).find((r) => r.key === key);
   const allLoaded = !loadingAny(apps, appsError, payload, error);
-  const errs = [error, appsError, payload?.errors.follow, payload?.errors.entry, payload?.errors.apps].filter(Boolean);
+  const errs = [error, appsError, payload?.errors.follow, payload?.errors.entry, payload?.errors.apps, payload?.errors.aftercare].filter(Boolean);
   // สรรหาต้องรอทั้งใบสมัครและเหตุ (เหตุมาจากเส้นสัดส่วน) — ไม่งั้นช่อง "ยังไม่รู้เหตุ" บวมชั่วคราว
   const loadingOf = (g: string) =>
     g === 'recruit' || g === 'human' ? (apps === null && !appsError) || (payload === null && !error) : payload === null && !error;

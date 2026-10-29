@@ -15,7 +15,7 @@ import { CALLED_BY_STAFF_SQL, CONNECTED_OUTCOMES, HELD_OR_CLAIMED_SQL } from './
 import { FOLLOW_BUCKET_SQL, FOLLOW_EFFECTIVE_MODE_SQL } from './homeLumosSummarySql.js';
 import { FOLLOW_ENTRY_CATEGORY_COLS, FOLLOW_QUEUE_CALL_COLS } from './followCategory.js';
 import { FOLLOW_CALLED_BY_AI_SQL, FOLLOW_QUEUE_MATCH } from './homeAiShareSql.js';
-import { appBuJoin, appBuSql, followBuJoin, followBuSql } from './homeBuSql.js';
+import { aftercareBuSql, appBuJoin, appBuSql, followBuJoin, followBuSql } from './homeBuSql.js';
 import { SO_SCRAPING_CREATED_BY } from '../../src/lib/soScrapingLeads.js';
 
 const APPS = tableInAppSchema('public_job_applications');
@@ -26,6 +26,8 @@ const POST_REQUESTS = tableInAppSchema('job_posting_requests');
 const IRECRUIT_DUPS = tableInAppSchema('application_irecruit_dups');
 const SUPPRESSION = tableInAppSchema('candidate_call_suppression');
 const UNIT_NOTES = tableInAppSchema('siamraj_unit_notes');
+const AFTERCARE_PEOPLE = tableInAppSchema('aftercare_people');
+const AFTERCARE_CONTACTS = tableInAppSchema('aftercare_contacts');
 
 /** AI โทรแล้วแต่ไม่ได้คุย (ไม่รับ · สายไม่ว่าง · ล้ม) */
 const FOLLOW_AI_UNREACHED_SQL = `exists (
@@ -136,4 +138,31 @@ export function proportionEntrySql(): string {
     (select count(*)::int from ${POST_REQUESTS} p
       where ($1::timestamptz is null or p.created_at >= $1::timestamptz) and p.created_at < $2::timestamptz
         and p.status is distinct from 'rejected') as post_orders`;
+}
+
+/**
+ * ดูแลหลังเริ่มงาน นับเป็นคน (เจ้าของ 29 ต.ค. 2569 Choice "นับเป็นคน ตาม 3 หัวข้อ") — คนที่ยังดูแลอยู่ (ไม่ปิด) ตอนนี้
+ * ผลล่าสุดที่เจ้าหน้าที่ลง + คะแนน 3 หัวข้อ · AI เคยโทรรอบถามความเป็นอยู่ไหม · รอบที่ยังไม่ถึง / เลยแล้วยังไม่มีผล
+ * `$1` = หัวข้อสายถามความเป็นอยู่ · `$2` = BU (null = ทุก BU) — สายผูกด้วยเบอร์ 9 หลักท้าย (แบบเดียวกับหน้าดูแล)
+ */
+export function proportionAftercarePeopleSql(): string {
+  const samePhone = `right(regexp_replace(coalesce(f.recipient_phone, ''), '\\D', '', 'g'), 9) = right(a.phone_e164, 9)`;
+  const queueResult = `exists (select 1 from ${QUEUE} q where ${FOLLOW_QUEUE_MATCH} and ${queueOutcome('q')} is not null and ${queueOutcome('q')} <> 'cancelled')`;
+  return `
+    select a.phone_e164, lc.result, lc.expectation, lc.supervisor, lc.escalation,
+           exists (select 1 from ${FOLLOW} f where f.topic = $1::text and ${samePhone} and ${queueResult}) as ai_called,
+           exists (select 1 from ${FOLLOW} f where f.topic = $1::text and ${samePhone} and f.cancelled_at is null) as has_rounds,
+           exists (select 1 from ${FOLLOW} f where f.topic = $1::text and ${samePhone} and f.cancelled_at is null
+                     and f.completed_at is null and f.scheduled_at > now()) as upcoming,
+           exists (select 1 from ${FOLLOW} f where f.topic = $1::text and ${samePhone} and f.cancelled_at is null
+                     and f.completed_at is null and f.scheduled_at <= now() and f.staff_called_at is null
+                     and not ${queueResult}) as overdue
+      from ${AFTERCARE_PEOPLE} a
+      left join lateral (
+        select c.result, c.expectation, c.supervisor, c.escalation
+          from ${AFTERCARE_CONTACTS} c where c.phone_e164 = a.phone_e164
+         order by c.created_at desc limit 1
+      ) lc on true
+     where a.closed_at is null
+       and ($2::text is null or ${aftercareBuSql('a')} = $2::text)`;
 }

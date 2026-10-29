@@ -8,8 +8,10 @@ import { describe, expect, it } from 'vitest';
 import {
   buildProportionGroups,
   ladderAddsUp,
+  matchingProportionRow,
   proportionCoverage,
   proportionStuck,
+  summarizeAftercarePeople,
   summarizeFollowLane,
   proportionPct,
   proportionTag,
@@ -68,28 +70,38 @@ describe('% = AI ได้โทร รวมที่คนตามต่อ',
   });
 });
 
-describe('สรรหา 3 ขั้น + ขั้นที่ยังเป็นคน (จากใบสมัครชุดเดียวกับหน้าหลัก)', () => {
-  it('Prescreen แยก AI/ทั้งสองทาง/คน/ยังไม่โทร ครบทุกใบ · โทรหลัง Prescreen นับคนที่บอก AI ว่าสนใจ · นัด = คนทำ', () => {
+const stepOf = (l: { steps: Array<{ key: string; value: number; parts: Array<{ key: string; label: string; value: number }> }> }, key: string) =>
+  l.steps.find((x) => x.key === key)!;
+
+describe('โครงแผงของแต่ละเรื่อง (เจ้าของ 29 ต.ค. 2569)', () => {
+  it('Prescreen: รายชื่อทั้งหมด = โทรแล้ว + รอโทร + ไม่โทร · โทรแล้ว = ติดต่อสำเร็จ + ไม่สำเร็จ · สรุปไม่ได้อยู่ในติดต่อสำเร็จ', () => {
     const apps = [
-      fact({ calledByAi: true }),
-      fact({ calledByAi: true, calledByStaff: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-10-05T04:00:00Z', staffLastAt: '2026-10-05T06:00:00Z', logOk: true, appointmentAt: '2026-10-07T02:00:00Z', attendance: 'showed', screening: 'passed', informed: true }),
+      fact({ calledByAi: true, aiAnswer: 'no_pickup' }),
+      fact({ calledByAi: true, calledByStaff: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-10-05T04:00:00Z', logOk: true, appointmentAt: '2026-10-07T02:00:00Z', attendance: 'showed', screening: 'passed', informed: true }),
       fact({ calledByAi: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-10-05T04:00:00Z' }),
-      fact({ calledByStaff: true }),
+      fact({ calledByAi: true, aiAnswer: 'talked_unclear' }),
+      fact({ calledByStaff: true, logOk: false }),
       fact({}),
     ];
-    const { recruit, human } = recruitProportionRows(apps);
-    const [pre, after, appt] = recruit;
-    expect([pre.ai, pre.both, pre.staff, pre.none]).toEqual([2, 1, 1, 1]);
-    expect(pre.ai + pre.both + pre.staff + pre.none).toBe(apps.length);
-    expect([after.ai, after.staff, after.none]).toEqual([0, 1, 1]);
-    expect([appt.ai, appt.staff]).toEqual([0, 1]);
-    expect(human.map((h) => h.staff)).toEqual([1, 1, 1]);
-    expect(human.every((h) => h.ai === 0 && h.both === 0)).toBe(true);
-    for (const r of recruit) if (r.ladder) expect(ladderAddsUp(r.ladder)).toBe(true);
-    expect(appt.parts?.reduce((n, p) => n + p.value, 0)).toBe(appt.staff);
+    const [pre, after, appt] = recruitProportionRows(apps);
+    expect([pre.ai, pre.both, pre.staff, pre.none]).toEqual([3, 1, 1, 1]);
+    const l = pre.ladder!;
+    expect(ladderAddsUp(l)).toBe(true);
+    expect(l.steps.map((x) => x.title)).toEqual(['โทรไปแล้ว', 'ติดต่อสำเร็จ', 'ติดต่อไม่สำเร็จ', 'รอโทร', 'ไม่โทร']);
+    expect(stepOf(l, 'talked').parts.map((p) => [p.label, p.value])).toEqual([['สนใจ', 2], ['สรุปไม่ได้', 1]]);
+    expect(stepOf(l, 'notTalked').parts.map((p) => [p.label, p.value])).toEqual([['ไม่รับสาย', 1], ['คนโทรเอง ติดต่อไม่ได้', 1]]);
+    // โทรหลัง Prescreen: คนสนใจ 2 → ติดต่อสำเร็จ 1 · รอโทร 1
+    expect(ladderAddsUp(after.ladder!)).toBe(true);
+    expect([stepOf(after.ladder!, 'talked').value, stepOf(after.ladder!, 'waiting').value]).toEqual([1, 1]);
+    // นัดได้: จากที่ติดต่อสำเร็จทั้งหมด → นัดได้ 1 (มา 1) · บรรทัดผ่าน/แจ้งเข้า
+    const al = appt.ladder!;
+    expect(al.totalLabel).toBe('ติดต่อสำเร็จทั้งหมด');
+    expect(ladderAddsUp(al)).toBe(true);
+    expect(stepOf(al, 'booked').parts.map((p) => [p.label, p.value])).toEqual([['มาตามนัด', 1]]);
+    expect(al.steps[0].sub).toBe('มาแล้ว ผ่าน 1 · แจ้งเข้า ERP 1');
   });
-  it('🔴 ไม่โทรต้องมีเหตุทุกใบ — เหตุจากฐาน · ใบขอปิด (ไม่อยู่ในใบขอที่เปิด) · หาไม่เจอ = ยังไม่รู้เหตุ (ไม่หาย)', () => {
-    const id = (n: number) => `0000000${n}-1111-4111-8111-111111111111`;
+  it('🔴 ไม่โทรต้องมีเหตุทุกใบ — เหตุจากฐาน · ใบขอปิด · หาไม่เจอ = ยังไม่รู้เหตุ (ไม่หาย) · อ่านใบขอไม่ได้ ไม่เดาว่าปิด', () => {
+    const id = (k: number) => `0000000${k}-1111-4111-8111-111111111111`;
     const apps = [
       fact({ id: id(1), jobId: 'siamraj-sql:OPL6910002' }),
       fact({ id: id(2), jobId: 'siamraj-sql:OPL6910099' }),
@@ -102,66 +114,92 @@ describe('สรรหา 3 ขั้น + ขั้นที่ยังเป�
       { id: id(2), jobId: 'siamraj-sql:OPL6910099', claimed: false, reason: 'dup' as const, blockReason: null },
       { id: id(5), jobId: 'siamraj-sql:OPL6910099', claimed: true, reason: null, blockReason: null },
     ];
-    const pre = recruitProportionRows(apps, flags, new Set(['siamraj-sql:OPL6910099'])).recruit[0].ladder!;
-    expect(ladderAddsUp(pre)).toBe(true);
-    expect(pre.waiting.map((p) => [p.key, p.value])).toEqual([['aiQueued', 1], ['claimed', 1]]);
-    expect(pre.notCalled.map((p) => [p.label, p.value])).toEqual([
+    const l = recruitProportionRows(apps, flags, new Set(['siamraj-sql:OPL6910099']))[0].ladder!;
+    expect(ladderAddsUp(l)).toBe(true);
+    expect(stepOf(l, 'waiting').parts.map((p) => [p.key, p.value])).toEqual([['aiQueued', 1], ['claimed', 1]]);
+    expect(stepOf(l, 'notCalled').parts.map((p) => [p.label, p.value])).toEqual([
       ['ใบขอปิดแล้ว', 1],
-      ['ซ้ำ iRecruit ภายใน 14 วัน — AI ไม่โทรเอง ให้คนเลือก', 1],
+      ['ซ้ำ iRecruit ภายใน 14 วัน AI ไม่โทรเอง', 1],
       ['ยังไม่รู้เหตุ', 1],
       ['เบอร์ผิด โทรไม่ได้', 1],
     ]);
-    // อ่านใบขอไม่ได้ = ไม่เดาว่าปิด
-    const noFeed = recruitProportionRows(apps, flags, null).recruit[0].ladder!;
-    expect(noFeed.notCalled.find((p) => p.label === 'ใบขอปิดแล้ว')).toBeUndefined();
+    const noFeed = recruitProportionRows(apps, flags, null)[0].ladder!;
+    expect(stepOf(noFeed, 'notCalled').parts.find((p) => p.label === 'ใบขอปิดแล้ว')).toBeUndefined();
   });
-  it('ติดตาม: ผล + รอโทร (AI ไม่มีผล / คนยังไม่ลงผล) + ไม่โทร (เหตุจากป้ายส่ง AI) บวกลบลงตัว', () => {
+  it('ติดตาม (นับสาย): โทรแล้ว = ได้คำตอบ + ติดต่อไม่ได้ · รอโทร (ตามเวลา / เลยเวลา) · ไม่โทร · ยกเลิกบอกใต้สมการ', () => {
     const base = { aiUnreached: false, dispatch: null, queueStatus: null };
-    const s = summarizeFollowLane([
-      { ...base, ai: true, staff: false, bucket: 'went', mode: 'ai', queueStatus: 'completed' },
-      { ...base, ai: true, staff: true, bucket: 'failed', mode: 'ai', aiUnreached: true },
-      { ...base, ai: false, staff: true, bucket: 'notWent', mode: 'manual' },
-      { ...base, ai: false, staff: false, bucket: 'waiting', mode: 'ai', queueStatus: 'pending' },
-      { ...base, ai: false, staff: false, bucket: 'waiting', mode: 'manual' },
-      { ...base, ai: false, staff: false, bucket: 'waiting', mode: 'ai', dispatch: 'off' },
-      { ...base, ai: false, staff: false, bucket: 'waiting', mode: 'ai' },
-    ]);
-    expect([s.ai, s.both, s.staff, s.none, s.aiUnreached]).toEqual([1, 1, 1, 4, 1]);
-    expect(ladderAddsUp(s.ladder!)).toBe(true);
-    expect(s.ladder!.waiting.map((p) => p.value)).toEqual([1, 1]);
-    expect(s.ladder!.notCalled.map((p) => p.label)).toEqual(['ปิดส่งอัตโนมัติอยู่', 'ยังไม่รู้เหตุ']);
-  });
-  it('สายที่ยังไม่ถึงเวลา = รอโทรตามเวลา (ไม่ค้าง) · เลยเวลาแล้ว = ค้าง · ยกเลิกบอกใต้สมการ', () => {
-    const base = { aiUnreached: false, dispatch: null, queueStatus: 'pending', ai: false, staff: false, bucket: 'waiting' };
     const s = summarizeFollowLane(
       [
-        { ...base, mode: 'ai', future: true },
-        { ...base, mode: 'manual', future: true },
-        { ...base, mode: 'ai', future: false },
-        { ...base, mode: 'manual', future: false },
+        { ...base, ai: true, staff: false, bucket: 'went', mode: 'ai', queueStatus: 'completed' },
+        { ...base, ai: true, staff: true, bucket: 'failed', mode: 'ai', aiUnreached: true },
+        { ...base, ai: false, staff: true, bucket: 'unclear', mode: 'manual' },
+        { ...base, ai: false, staff: false, bucket: 'waiting', mode: 'ai', queueStatus: 'pending', future: true },
+        { ...base, ai: false, staff: false, bucket: 'waiting', mode: 'ai', queueStatus: 'pending' },
+        { ...base, ai: false, staff: false, bucket: 'waiting', mode: 'manual' },
+        { ...base, ai: false, staff: false, bucket: 'waiting', mode: 'manual', backfilled: true },
+        { ...base, ai: false, staff: false, bucket: 'waiting', mode: 'ai', dispatch: 'off' },
       ],
       7,
     );
-    expect(s.ladder!.waiting.map((p) => [p.key, p.stuck ?? false])).toEqual([
+    const l = s.ladder!;
+    expect([s.ai, s.both, s.staff, s.none, s.aiUnreached]).toEqual([1, 1, 1, 5, 1]);
+    expect(ladderAddsUp(l)).toBe(true);
+    expect(stepOf(l, 'answered').parts.map((p) => p.label)).toEqual(['ไป', 'สรุปไม่ได้']);
+    expect(stepOf(l, 'unreached').value).toBe(1);
+    expect(stepOf(l, 'waiting').parts.map((p) => [p.key, (p as { stuck?: boolean }).stuck ?? false])).toEqual([
       ['aiLater', false],
-      ['staffLater', false],
       ['aiNoResult', true],
       ['staff', true],
     ]);
-    expect(s.ladder!.excluded).toEqual({ label: 'ยกเลิก ไม่นับ', value: 7 });
-    // ลงย้อนหลัง (สร้างหลังเวลาสาย) = ไม่โทร ไม่ใช่ค้าง (เจ้าของ 29 ต.ค. 2569)
-    const b = summarizeFollowLane([{ ...base, mode: 'manual', future: false, backfilled: true }]);
-    expect(b.ladder!.waiting).toEqual([]);
-    expect(b.ladder!.notCalled.map((p) => [p.label, p.stuck ?? false])).toEqual([['ลงย้อนหลัง — ดึงมาตอนเวลาโทรผ่านไปแล้ว', false]]);
-    expect(ladderAddsUp(s.ladder!)).toBe(true);
+    expect(stepOf(l, 'notCalled').parts.map((p) => p.label)).toEqual(['ลงย้อนหลัง ดึงมาตอนเวลาโทรผ่านไปแล้ว', 'ปิดส่งอัตโนมัติอยู่']);
+    expect(l.excluded).toEqual({ label: 'ยกเลิก ไม่นับ', value: 7 });
   });
-  it('ทุกก้อนอยู่เสมอแม้ยังไม่มีข้อมูล (ว่าง = 0 ห้ามหาย)', () => {
-    const g = buildProportionGroups({ apps: null, payload: null, matching: null });
-    expect(g.map((x) => x.title)).toEqual(['งานสรรหา', 'ติดตามและดูแล', 'ทางเข้าของงาน', 'ขั้นที่ยังเป็นคน 100%']);
+  it('ดูแลหลังเริ่มงาน นับเป็นคน: 3 หัวข้อ Healthy/Warning/High Risk ต่อคนที่คุยได้ · รอบเลยแล้ว/ยังไม่ตั้งรอบ = ค้าง', () => {
+    const p = (o: Partial<Parameters<typeof summarizeAftercarePeople>[0][number]>) => ({
+      aiCalled: false, result: null, expectation: null, supervisor: null, escalation: null, hasRounds: true, upcoming: false, overdue: false, ...o,
+    });
+    const s = summarizeAftercarePeople([
+      p({ result: 'working', expectation: 'healthy', supervisor: 'healthy', escalation: 'healthy' }),
+      p({ aiCalled: true, result: 'issue', expectation: 'warning', supervisor: 'high_risk', escalation: 'healthy' }),
+      p({ result: 'resigned' }),
+      p({ aiCalled: true }),
+      p({ upcoming: true }),
+      p({ overdue: true }),
+      p({ hasRounds: false }),
+    ]);
+    const l = s.ladder!;
+    expect(l.unit).toBe('คน');
+    expect(ladderAddsUp(l)).toBe(true);
+    expect([s.ai, s.both, s.staff, s.none]).toEqual([1, 1, 2, 3]);
+    expect(stepOf(l, 'supervisor').parts.map((x) => [x.label, x.value])).toEqual([['Healthy', 1], ['High Risk', 1]]);
+    expect(stepOf(l, 'notTalked').parts.map((x) => x.label)).toEqual(['ลาออก', 'AI โทรแล้ว ยังไม่มีคนลงผล']);
+    const stuck = proportionStuck([{ key: 'f', title: 'f', rows: [{ key: 'aftercare', name: 'ดูแลหลังเริ่มงาน', note: '', ai: 0, both: 0, staff: 0, none: 0, ladder: l }] }]);
+    expect(stuck.map((x) => x.label).sort()).toEqual(['AI โทรแล้ว ยังไม่มีคนลงผล', 'ยังไม่ตั้งรอบโทร', 'เลยรอบแล้ว ยังไม่โทร'].sort());
+  });
+  it('จับคู่งาน แบบเดียวกับ Prescreen จากรายงานผลโทร · ไม่มีรายงาน = 0 ไม่หาย', () => {
+    const r = matchingProportionRow({
+      funnel: [],
+      extra: [],
+      cols: [],
+      cells: [
+        { bu: 'LBD', seg: 'ai', col: 'interested', n: 3 },
+        { bu: 'LBD', seg: 'ai', col: 'noAnswer', n: 2 },
+        { bu: 'LBD', seg: 'staff', col: 'notInterested', n: 1 },
+        { bu: 'LBD', seg: 'notCalled', col: 'noResult', n: 4 },
+      ],
+    });
+    expect([r.ai, r.staff, r.none]).toEqual([5, 1, 4]);
+    expect(ladderAddsUp(r.ladder!)).toBe(true);
+    expect(stepOf(r.ladder!, 'talked').value).toBe(4);
+    expect(matchingProportionRow(null).ladder!.total).toBe(0);
+  });
+  it('ทุกก้อนอยู่เสมอ · ถอดก้อน "ขั้นที่ยังเป็นคน 100%" แล้ว', () => {
+    const g = buildProportionGroups({ apps: null, payload: null });
+    expect(g.map((x) => x.title)).toEqual(['งานสรรหา', 'ติดตามและดูแล', 'ทางเข้าของงาน']);
     expect(g.flatMap((x) => x.rows.map((r) => r.name))).toEqual([
       'AI โทร Prescreen',
       'โทรหลัง Prescreen',
-      'นัดมาสมัครได้',
+      'นัดได้',
       'จับคู่งาน',
       'ติดตามคนเริ่มงาน',
       'ติดตามส่งคนแทน',
@@ -169,9 +207,6 @@ describe('สรรหา 3 ขั้น + ขั้นที่ยังเป�
       'ผู้สมัครเข้าระบบ',
       'ใบส่งคนแทน',
       'โพสต์ประกาศ',
-      'ลงผลมา / ไม่มาตามนัด',
-      'ผ่าน / ไม่ผ่าน',
-      'แจ้งเข้า ERP',
     ]);
   });
   it('ทางเข้า: ระบบ = สมัครเอง + iRecruit + So Scraping · คน = คีย์/นำเข้า · โพสต์ประกาศวัดไม่ได้', () => {
@@ -180,20 +215,13 @@ describe('สรรหา 3 ขั้น + ขั้นที่ยังเป�
       from: '2026-10-01',
       to: '2026-10-28',
       bu: null,
-      follow: {
-        starter: { ai: 1182, both: 67, staff: 326, none: 39, aiUnreached: 202 },
-        replacement: { ai: 2137, both: 279, staff: 82, none: 736, aiUnreached: 752 },
-        aftercare: { ai: 0, both: 0, staff: 0, none: 0, aiUnreached: 0 },
-      },
+      follow: null,
       entry: { selfApply: 866, irecruit: 496, soScraping: 0, staffKeyed: 374, replaceSync: 2624, replaceManual: 1, postOrders: 18 },
       errors: {},
     };
-    const g = buildProportionGroups({ apps: [], payload, matching: null });
-    const entry = g.find((x) => x.key === 'entry')!.rows;
+    const entry = buildProportionGroups({ apps: [], payload }).find((x) => x.key === 'entry')!.rows;
     expect([entry[0].ai, entry[0].staff, entry[0].aiLabel]).toEqual([1362, 374, 'ระบบ']);
     expect(entry[2].unknown).toBe(true);
-    const starter = g.find((x) => x.key === 'follow')!.rows[0];
-    expect(starter.note).toBe('สาย · AI โทรไม่ติด 202 คนตามต่อ 67');
   });
 });
 
@@ -206,7 +234,6 @@ describe('3 ข้อจากรีวิวหน้าหลัก (เจ้
     const g = buildProportionGroups({
       apps: [fact({ id: '00000001-1111-4111-8111-111111111111', calledByAi: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-10-05T04:00:00Z' })],
       payload: null,
-      matching: null,
     });
     expect(proportionStuck(g)).toEqual([{ rowKey: 'afterPrescreen', rowName: 'โทรหลัง Prescreen', label: 'ยังไม่มีใครเก็บ', value: 1, unit: 'คน' }]);
   });

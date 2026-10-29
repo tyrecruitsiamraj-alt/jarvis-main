@@ -451,7 +451,7 @@ const HomeOverviewPage: React.FC = () => {
         </div>
       </div>
       {tab === 'proportion' ? (
-        <ProportionTab win={win} bu={bu} apps={apps} matching={ai?.matching ?? null} appsError={roError} openJobIds={openJobIds} />
+        <ProportionTab win={win} bu={bu} apps={apps} appsError={roError} openJobIds={openJobIds} />
       ) : (
       <>
       {moneyError || roError ? <p className={cn('text-sm', TONE.danger.value)}>{moneyError ?? roError}</p> : null}
