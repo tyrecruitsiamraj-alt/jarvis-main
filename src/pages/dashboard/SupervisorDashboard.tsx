@@ -26,6 +26,8 @@ import {
   jobToDashboardDetailItem,
 } from '@/lib/dashboard/dashboardDetailDialog';
 import { buildCohortDrillDown, type CohortDrillKpi } from '@/lib/dashboard/cohortDrillDown';
+import { isPrequestJob } from '@/lib/publicJobVisibility';
+import { LEAD_AMOUNT_LABEL, NO_STATUS_LABEL, buildCohortLeadPanel, buildStatusLeadPanel, filterLeadPanel } from '@/lib/dashboard/statusLeadPanel';
 import {
   buildLeadKindBreakdown,
   leadKindMismatchNote,
@@ -86,6 +88,11 @@ import {
 } from '@/lib/dashboard/throughput';
 import type { JobRequest } from '@/types';
 
+/** กล่องที่กดแล้วการ์ดเร่งด่วนเป็นใบจาก cohort (ชุดเดียวกับเลขบนการ์ด) */
+const COHORT_KPI_IDS: readonly CohortDrillKpi[] = ['total_requests', 'closed', 'cancelled', 'remaining'];
+/** กล่องใบขอชั่วคราว (`buildPrequestKpi`) */
+const PREQUEST_KPI_ID = 'work_status_prequest';
+
 /** กล่องสถานะทำงาน → สถานะ (null = ทุกสถานะ) — 29 ต.ค. 2569 ใช้กับการ์ดเร่งด่วนตอนกดกล่อง */
 const WORK_STATUS_OF_KPI: Record<string, string | null> = {
   work_status_total: null,
@@ -98,6 +105,8 @@ const WORK_STATUS_OF_KPI: Record<string, string | null> = {
   work_status_waiting_start: 'waiting_start',
   work_status_daily_work: 'daily_work',
   work_status_daily_pay: 'daily_pay',
+  /** ใบ ERP ที่ไม่อยู่ใน feed — มีเฉพาะโหมดมีงวด (ยอด cohort เกินผลรวมสถานะ) */
+  work_status_none: null,
 };
 
 const DEMO_MODE = import.meta.env.VITE_DASHBOARD_DEMO === 'true';
@@ -733,16 +742,57 @@ const SupervisorDashboard: React.FC = () => {
     [openCohortDrillList],
   );
 
-  /** กล่องสถานะทำงานที่กดอยู่ — การ์ดเร่งด่วนเปลี่ยนเป็นใบของสถานะนั้น · null = การ์ดเร่งด่วนแบบเดิม */
+  /**
+   * กล่องที่กดอยู่ — การ์ดเร่งด่วนเปลี่ยนเป็นใบของกล่องนั้น · null = การ์ดเร่งด่วนแบบเดิม
+   * สถานะทำงาน / ใบขอชั่วคราว (29 ต.ค. 2569 "ทำเลย") · เข้ามา หาได้แล้ว ยกเลิก คงเหลือ (ร่าง 2 "อันนั้นแก้เลย")
+   */
   const [statusPick, setStatusPick] = useState<{ kpiId: string; label: string } | null>(null);
-  /** ใบของสถานะที่กด — ชุดเดียวกับที่ป๊อปเดิมใช้ (`filterJobsForRemainingKpi`) คิดใหม่ตามตัวกรองปัจจุบัน */
-  const statusPickJobs = useMemo(() => {
+  /**
+   * แผงของกล่องที่กด — ชุดใบเดียวกับเลขบนกล่องเป๊ะ (การนับของหน้าไม่เปลี่ยน)
+   *  - สถานะทำงาน = ใบจริงที่ยังต้องหา (`buildWorkStatusKpis` ตัดใบขอชั่วคราวออก) · ใบขอชั่วคราว = ส่วนที่ตัดออก
+   *  - เข้ามา/หาได้แล้ว/ยกเลิก (+ คงเหลือโหมดมีงวด) = `buildCohortDrillDown` ชุดเดียวกับการ์ด
+   *  - คงเหลือโหมดทั้งหมด = ใบเปิดที่ยังต้องหา (การ์ดนับจากใบเปิดจริง ไม่ใช่ cohort)
+   */
+  const statusPickPanel = useMemo(() => {
     if (!statusPick) return null;
+    const { kpiId, label } = statusPick;
+    /**
+     * กล่อง "ทั้งหมด" / "ไม่มีสถานะ" ของสถานะทำงานโหมดมีงวด = ยอด cohort คงเหลือ (การนับเดิม) → แผงใช้ cohort เหมือนกล่องคงเหลือ
+     * ไม่มี throughput (โหลดไม่ทัน) ให้ถอยไปใบใน feed
+     */
+    const cohortReady = cohortScope.records.length > 0;
+    const statusFromCohort = Boolean(period) && cohortReady && (kpiId === 'work_status_total' || kpiId === 'work_status_none');
+    const cohortKpi = statusFromCohort ? 'remaining' : COHORT_KPI_IDS.find((k) => k === kpiId);
+    if (cohortKpi && (cohortKpi !== 'remaining' || period)) {
+      const { from, to, records } = cohortScope;
+      const drill = buildCohortDrillDown(records, from, to, cohortKpi);
+      const full = buildCohortLeadPanel(drill.rows, (row) => {
+        // คีย์ด้วย id เต็มก่อน — เลขที่ใบเปล่าอาจชี้ไปใบขอชั่วคราวเลขเดียวกัน
+        const feedJob = (row.jobId ? jobById.get(row.jobId) : undefined) ?? jobById.get(row.requestNo);
+        if (feedJob && !isPrequestJob(feedJob)) return { job: feedJob, inFeed: true };
+        return { job: row.jobId ? ({ id: row.jobId, externalId: row.requestNo, source: 'siamraj' } as JobRequest) : null, inFeed: false };
+      });
+      const panel = kpiId === 'work_status_none' ? filterLeadPanel(full, (r) => r.status === NO_STATUS_LABEL) : full;
+      const note =
+        drill.positionsWithoutRequestNo > 0 && kpiId !== 'work_status_none'
+          ? `อีก ${drill.positionsWithoutRequestNo.toLocaleString('th-TH')} อัตราไม่มีเลขที่ใบ ลิสต์ไม่ได้`
+          : null;
+      return { kpiId, label: statusFromCohort ? `สถานะ ${label}` : label, panel, amountLabel: LEAD_AMOUNT_LABEL[cohortKpi], note };
+    }
     const range = period ?? (dateRange ? resolvePeriodRange('custom', dateRange) : null);
     const stock = filterJobsForRemainingKpi(jobsWithoutAgeFilter, range);
-    const target = WORK_STATUS_OF_KPI[statusPick.kpiId];
-    return target == null ? stock : stock.filter((j) => resolveUnitRequestWorkStatus(j.work_status) === target);
-  }, [statusPick, period, dateRange, jobsWithoutAgeFilter]);
+    const jobs =
+      kpiId === 'remaining'
+        ? stock
+        : kpiId === PREQUEST_KPI_ID
+          ? stock.filter(isPrequestJob)
+          : (() => {
+              const target = WORK_STATUS_OF_KPI[kpiId];
+              const real = stock.filter((j) => !isPrequestJob(j));
+              return target == null ? real : real.filter((j) => resolveUnitRequestWorkStatus(j.work_status) === target);
+            })();
+    return { kpiId, label: kpiId in WORK_STATUS_OF_KPI ? `สถานะ ${label}` : label, panel: buildStatusLeadPanel(jobs), amountLabel: LEAD_AMOUNT_LABEL.remaining, note: null };
+  }, [statusPick, period, dateRange, jobsWithoutAgeFilter, cohortScope, jobById]);
 
   const handleKpiClick = useCallback(
     (kpiId: string, label: string, expectedRequests?: number | null) => {
@@ -755,12 +805,14 @@ const SupervisorDashboard: React.FC = () => {
        * ไม่มี throughput records (โหลดไม่ทัน/ล้มเหลว) ให้ถอยไปทางเดิม ไม่เปิดกล่องว่างเปล่า
        */
       const cohortReady = throughputRecords.length > 0;
+      /** ร่าง 2 (เจ้าของ 29 ต.ค. 2569 "อันนั้นแก้เลย"): ไม่เด้งป๊อป — การ์ดเร่งด่วนเปลี่ยนเป็นใบของกล่องนี้ (`statusPickPanel`) */
+      const togglePick = () => setStatusPick((cur) => (cur?.kpiId === kpiId ? null : { kpiId, label }));
       if (cohortReady && (kpiId === 'total_requests' || kpiId === 'closed' || kpiId === 'cancelled')) {
-        openCohortDrillList(kpiId, label);
+        togglePick();
         return;
       }
-      if (cohortReady && kpiId === 'remaining' && period) {
-        openCohortDrillList('remaining', label);
+      if (kpiId === 'remaining' && (period ? cohortReady : true)) {
+        togglePick();
         return;
       }
 
@@ -796,8 +848,8 @@ const SupervisorDashboard: React.FC = () => {
 
       if (kpiId.startsWith('work_status_')) {
         // 29 ต.ค. 2569 เจ้าของ (แบบร่างที่เคาะ "ทำเลย"): ไม่เด้งป๊อปแล้ว — การ์ดเร่งด่วนเปลี่ยนเป็นใบของสถานะนี้ (`DashboardStatusLeadPanel`)
-        if (kpiId in WORK_STATUS_OF_KPI) {
-          setStatusPick((cur) => (cur?.kpiId === kpiId ? null : { kpiId, label }));
+        if (kpiId in WORK_STATUS_OF_KPI || kpiId === PREQUEST_KPI_ID) {
+          togglePick();
           return;
         }
       }
@@ -817,7 +869,7 @@ const SupervisorDashboard: React.FC = () => {
       }
       openJobList(label, filterJobsForDashboardKpi(scopedJobs, kpiId));
     },
-    [openJobList, openClosedJobList, openControlList, openCohortDrillList, throughputRecords, controlRecords, scopedJobs, scopedClosedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period, dateRange],
+    [openJobList, openClosedJobList, openControlList, throughputRecords, controlRecords, scopedJobs, scopedClosedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period, dateRange],
   );
 
   const handleCohortClick = useCallback(
@@ -1011,7 +1063,7 @@ const SupervisorDashboard: React.FC = () => {
       onExport={handleExport}
       onViewItem={handleView}
       onKpiClick={DEMO_MODE ? undefined : handleKpiClick}
-      statusPick={statusPick && statusPickJobs ? { ...statusPick, jobs: statusPickJobs } : null}
+      statusPick={statusPickPanel}
       onStatusPickClear={() => setStatusPick(null)}
       onOpenJob={(job) => navigateToUnitRequest(job, navigate, { returnTo: RETURN_TO })}
       leadKindBreakdown={leadKindBreakdown}

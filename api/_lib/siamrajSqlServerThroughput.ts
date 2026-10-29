@@ -49,6 +49,8 @@ export type SiamrajThroughputRecord = {
    * ⚠️ คนละตัวกับ `requestDate` (ตัวนั้นเป็นวันอ้างอิงงวด = วันที่ต้องการคน)
    */
   submittedDate?: string | null;
+  /** คนกรอกใบ (hr_staff ของ do_id) — ตาราง "ใครคีย์" บนการ์ดเร่งด่วนของ Dashboard (29 ต.ค. 2569) */
+  requesterName?: string;
   /** ล่วงหน้า / ฉุกเฉิน / ฉุกเฉิน-ย้อนหลัง — กฎเดียวกับหน้าเว็บ (`requestLeadKind.ts`) */
   leadKind?: RequestLeadKind;
   /** รหัส BU ของไซต์ (ms_site.department_code) — ให้ dashboard กรองตาม BU ที่เลือกได้ */
@@ -83,6 +85,7 @@ type SqlThroughputRow = {
   has_inform: number | boolean | null;
   request_action_code: string | null;
   request_action_name: string | null;
+  requester_name: string | null;
 };
 
 /** ขอบเขต BU/ไซต์จาก env — ส่งออกให้คิวรีใบแจ้งเข้าของ Dashboard แนวโน้มใช้ชุดเดียวกัน (ยอดต้องตรงกัน) */
@@ -167,6 +170,7 @@ function mapThroughputRow(
     siteCode,
     requiredDate,
     submittedDate: toYmd(row.request_date),
+    requesterName: (row.requester_name || '').trim() || undefined,
     leadKind,
     departmentCode,
     requestActionName,
@@ -301,7 +305,8 @@ export async function listSiamrajSqlServerThroughput(options: {
         ELSE 0
       END AS has_inform,
       A.request_code AS request_action_code,
-      (SELECT TOP 1 z.request_name FROM st_ms_request z WHERE z.request_code = A.request_code) AS request_action_name
+      (SELECT TOP 1 z.request_name FROM st_ms_request z WHERE z.request_code = A.request_code) AS request_action_name,
+      (SELECT TOP 1 z.fname + ' ' + z.lname FROM hr_staff z WHERE z.staff_id = A.do_id) AS requester_name
     FROM st_request_head A
     INNER JOIN ms_site SS ON A.site_code = SS.site_code
     LEFT JOIN (

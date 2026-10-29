@@ -24,6 +24,7 @@ import { buildPriorityWorkQueue } from '@/lib/dashboard/priorityWorkQueue';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { toYmdLocal } from '@/lib/dateTh';
 import { dashboardCohortYmd } from '@/lib/jobUrgency';
+import { PREQUEST_LABEL, isPrequestJob } from '@/lib/publicJobVisibility';
 import type {
   DashboardActivityTrendPoint,
   DashboardData,
@@ -549,7 +550,10 @@ function resolveOpenJobsForStockKpi(
 }
 
 /** KPI สถานะทำงาน (นับอัตรา/ตำแหน่ง): ทั้งหมด = ผลรวมสถานะ · คงเหลือตำแหน่งอยู่แถว stock แยก
- *  totalOverride: โหมดมีงวดส่งยอด cohort มาให้ "ทั้งหมด" เท่าการ์ดคงเหลือ (ใบนอก feed ไม่มี work_status ให้แจก leaf) */
+ *  totalOverride: โหมดมีงวดส่งยอด cohort มาให้ "ทั้งหมด" เท่าการ์ดคงเหลือ (ใบนอก feed ไม่มี work_status ให้แจก leaf)
+ *  🔴 29 ต.ค. 2569 (เจ้าของ "การนับคงเดิมไว้ก่อน" · ร่าง 2): ใบขอชั่วคราว (`siamraj-pre:`) ไม่อยู่ในกล่องสถานะ —
+ *  แยกกล่องของมันเอง (`buildPrequestKpi`) · เดิม "ทั้งหมด" 326 แต่กล่องย่อยรวมใบชั่วคราวเป็น 370 → กดแล้วเลขไม่ตรงกล่อง
+ *  ยอด cohort ที่เกินผลรวมสถานะ (ใบ ERP ที่ไม่อยู่ใน feed) ขึ้นเป็นกล่อง "ไม่มีสถานะ" ให้บวกกันลงตัว */
 function buildWorkStatusKpis(
   jobs: JobRequest[],
   periodLabel?: string | null,
@@ -578,14 +582,19 @@ function buildWorkStatusKpis(
     daily_pay: 0,
   };
   for (const j of jobs) {
+    if (isPrequestJob(j)) continue;
     const status = resolveUnitRequestWorkStatus(j.work_status);
     const units = positionBreakdownFromJob(j).remainingPositions;
     if (units <= 0) continue;
     counts[status] += units;
     requestCounts[status] += 1;
   }
-  const total = totalOverride?.positions ?? Object.values(counts).reduce((s, n) => s + n, 0);
-  const totalRequests = totalOverride?.requests ?? Object.values(requestCounts).reduce((s, n) => s + n, 0);
+  const leafTotal = Object.values(counts).reduce((s, n) => s + n, 0);
+  const leafRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0);
+  const total = totalOverride?.positions ?? leafTotal;
+  const totalRequests = totalOverride?.requests ?? leafRequests;
+  const nonePositions = Math.max(total - leafTotal, 0);
+  const noneRequests = Math.max(totalRequests - leafRequests, 0);
   const scopeHint = periodLabel
     ? `ใบเปิดในช่วงที่เลือก`
     : `ใบเปิดทั้งหมด`;
@@ -618,7 +627,42 @@ function buildWorkStatusKpis(
     leaf('work_status_waiting_start', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_start, 'waiting_start'),
     leaf('work_status_daily_work', UNIT_REQUEST_WORK_STATUS_LABELS.daily_work, 'daily_work'),
     leaf('work_status_daily_pay', UNIT_REQUEST_WORK_STATUS_LABELS.daily_pay, 'daily_pay'),
+    ...(nonePositions > 0
+      ? [
+          {
+            id: 'work_status_none',
+            label: 'ไม่มีสถานะ',
+            value: nonePositions,
+            secondaryCount: noneRequests,
+            secondaryLabel: 'ใบขอ',
+            description: `ใบ ERP ที่ไม่อยู่ในกล่องงาน · ${nonePositions.toLocaleString('th-TH')} อัตรา · ${noneRequests.toLocaleString('th-TH')} ใบ`,
+            trendPercent: null,
+          } satisfies DashboardKpi,
+        ]
+      : []),
   ];
+}
+
+/** กล่องใบขอชั่วคราวที่ยังต้องหา — ชุดใบเดียวกับกล่องสถานะ (ส่วนที่ถูกแยกออกมา) */
+function buildPrequestKpi(jobs: JobRequest[]): DashboardKpi {
+  let positions = 0;
+  let requests = 0;
+  for (const j of jobs) {
+    if (!isPrequestJob(j)) continue;
+    const units = positionBreakdownFromJob(j).remainingPositions;
+    if (units <= 0) continue;
+    positions += units;
+    requests += 1;
+  }
+  return {
+    id: 'work_status_prequest',
+    label: PREQUEST_LABEL,
+    value: positions,
+    secondaryCount: requests,
+    secondaryLabel: 'ใบขอ',
+    description: 'ทีมคีย์เอง ยังไม่เข้า ERP',
+    trendPercent: null,
+  };
 }
 
 /** KPI ชุดสั้น: เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ (ตำแหน่ง) */
@@ -1193,6 +1237,7 @@ export function buildDashboardData(
       ? { positions: cohortStock.remainingPositions, requests: cohortStock.remainingRequestCount }
       : undefined,
   );
+  const prequestKpi = buildPrequestKpi(openRemainingJobs);
 
   const lifecycleBoard = buildLifecycleBoardFromStockSources({
     throughputRecords,
@@ -1204,6 +1249,7 @@ export function buildDashboardData(
   return {
     kpis,
     workStatusKpis,
+    prequestKpi,
     activityTrend,
     unitOverview: buildUnitOverview(openRemainingJobs, today),
     ageDaysBreakdown: buildAgeDaysBreakdown(period ? stockJobs : openRemainingJobs, today),

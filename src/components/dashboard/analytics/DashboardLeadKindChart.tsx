@@ -84,8 +84,7 @@ const DashboardLeadKindChart: React.FC<DashboardLeadKindChartProps> = ({
                     <span className={cn('text-base font-medium tabular-nums', tone.num)}>
                       {s.positions.toLocaleString('th-TH')}
                     </span>{' '}
-                    อัตรา · {s.requests.toLocaleString('th-TH')} ใบ ·{' '}
-                    <span className="tabular-nums">{s.percent}%</span>
+                    อัตรา · {s.requests.toLocaleString('th-TH')} ใบ
                   </span>
                 </span>
                 {/* แท่งกราฟ — ความยาวเทียบกับถังที่มากสุด ไม่ใช่เทียบ 100% ของยอดรวม

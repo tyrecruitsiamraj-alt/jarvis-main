@@ -18,6 +18,10 @@ export type ThroughputRecord = {
   requiredDate?: string | null;
   /** ล่วงหน้า / ฉุกเฉิน / ฉุกเฉิน-ย้อนหลัง */
   leadKind?: RequestLeadKind;
+  /** วันที่กรอกใบจริง (`requestDate` = วันอ้างอิงงวด = วันที่ต้องการคน) */
+  submittedDate?: string | null;
+  /** คนกรอกใบ — ตาราง "ใครคีย์" ของการ์ดเร่งด่วน */
+  requesterName?: string;
   /** รหัส BU ของไซต์ — throughput เป็นยอดรวมจาก SQL ที่ไม่ผ่านตัวกรองฝั่ง client
    *  ถ้าไม่มีมิตินี้ KPI เข้ามา/ปิด/ยกเลิก จะไม่ขยับตาม BU ที่เลือก */
   departmentCode?: string;

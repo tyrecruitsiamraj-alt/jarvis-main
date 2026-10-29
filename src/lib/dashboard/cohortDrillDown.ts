@@ -34,6 +34,10 @@ export type CohortDrillRow = {
   siteCode: string | null;
   departmentCode: string | null;
   requestDate: string;
+  /** วันที่กรอกใบจริง (`requestDate` ข้างบน = วันอ้างอิงงวด = วันที่ต้องการคน) */
+  submittedDate: string | null;
+  /** คนกรอกใบ — ตาราง "ใครคีย์" */
+  requesterName: string | null;
   /** วันที่ต้องการคน · null = ERP ไม่ได้กรอก */
   requiredDate: string | null;
   /** ล่วงหน้า / ฉุกเฉิน / ฉุกเฉิน-ย้อนหลัง — เจ้าของสั่งให้บอกบน drill-down 18 ส.ค. 2569 */
@@ -106,6 +110,8 @@ export function buildCohortDrillDown(
         siteCode: (r.siteCode || '').trim() || null,
         departmentCode: (r.departmentCode || '').trim().toUpperCase() || null,
         requestDate: r.requestDate,
+        submittedDate: r.submittedDate ?? null,
+        requesterName: (r.requesterName || '').trim() || null,
         requiredDate: r.requiredDate ?? null,
         // แถวเก่าที่ยังไม่มี leadKind (deploy ก่อนหน้า) ให้ถอยไปคิดจากวันเอง
         leadKind: r.leadKind ?? requestLeadKindFromDays(null),

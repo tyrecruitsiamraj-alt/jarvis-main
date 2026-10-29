@@ -6,30 +6,42 @@ import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { REQUEST_LEAD_KIND_HINT, REQUEST_LEAD_KIND_LABEL, REQUEST_LEAD_KIND_TONE, type RequestLeadKind } from '@/lib/requestLeadKind';
-import { STATUS_LEAD_ORDER, buildStatusLeadPanel } from '@/lib/dashboard/statusLeadPanel';
+import { NO_KEYER, STATUS_LEAD_ORDER, buildKeyerRows, type StatusLeadPanel } from '@/lib/dashboard/statusLeadPanel';
 import type { JobRequest } from '@/types';
 
 /**
- * การ์ด "ใบขอเร่งด่วนแค่ไหน" ตอนกดกล่องสถานะทำงาน (เจ้าของ 29 ต.ค. 2569 แบบร่างที่เคาะ "ทำเลย")
- * แถบ 3 ชนิด (กดกรองรายการได้) + รายการทีละใบ เลื่อนดูในกล่อง · ตัวคิด `statusLeadPanel.ts`
+ * การ์ด "ใบขอเร่งด่วนแค่ไหน" ตอนกดกล่องบน Dashboard (เจ้าของ 29 ต.ค. 2569 แบบร่างที่เคาะ "ทำเลย" · ร่าง 2 "อันนั้นแก้เลย")
+ * แถบ 3 ชนิด (กดกรองรายการได้ · ไม่มี % ตามเจ้าของ "เอา % ออก") + ตาราง "ใครคีย์" (กดชื่อกรองรายการ)
+ * + รายการทีละใบ เลื่อนดูในกล่อง · ตัวคิด `statusLeadPanel.ts`
  */
 const NUM = new Intl.NumberFormat('th-TH');
+/** วาดรายการทีละก้อน — กล่อง "เข้ามา" ทั้งหมดมีหลายพันใบ วาดทีเดียวแล้วจอหน่วง */
+const PAGE = 200;
 
 export default function DashboardStatusLeadPanel({
   label,
-  jobs,
+  panel,
+  amountLabel = 'ต้องหา',
+  note,
   onClear,
   onOpenJob,
 }: {
-  /** ชื่อกล่องสถานะที่กด */
+  /** ชื่อกล่องที่กด */
   label: string;
-  jobs: readonly JobRequest[];
+  panel: StatusLeadPanel;
+  /** หัวคอลัมน์จำนวน (ขอ / หาได้ / ยกเลิก / ต้องหา) */
+  amountLabel?: string;
+  /** อัตราที่นับในกล่องแต่ลิสต์เป็นรายใบไม่ได้ */
+  note?: string | null;
   onClear: () => void;
   onOpenJob?: (job: JobRequest) => void;
 }) {
-  const panel = useMemo(() => buildStatusLeadPanel(jobs), [jobs]);
   const [kind, setKind] = useState<RequestLeadKind | null>(null);
-  const rows = kind ? panel.rows.filter((r) => r.kind === kind) : panel.rows;
+  const [person, setPerson] = useState<string | null>(null);
+  const [shown, setShown] = useState(PAGE);
+  const keyers = useMemo(() => buildKeyerRows(panel.rows), [panel.rows]);
+  const rows = panel.rows.filter((r) => (!kind || r.kind === kind) && (!person || (r.submittedBy || NO_KEYER) === person));
+  const visible = rows.slice(0, shown);
   const max = Math.max(1, ...STATUS_LEAD_ORDER.map((k) => panel.kinds[k].positions));
 
   return (
@@ -37,7 +49,8 @@ export default function DashboardStatusLeadPanel({
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div>
           <p className={cn('text-sm font-medium', DASH.cellStrong)}>ใบขอเร่งด่วนแค่ไหน</p>
-          <p className={cn('text-[11px]', DASH.muted)}>สถานะ {label}</p>
+          <p className={cn('text-[11px]', DASH.muted)}>{label}</p>
+          {note ? <p className={cn('text-[11px]', DASH.muted)}>{note}</p> : null}
         </div>
         <div className="flex items-center gap-2">
           <p className={cn('text-[11px]', DASH.muted)}>
@@ -55,7 +68,6 @@ export default function DashboardStatusLeadPanel({
         {STATUS_LEAD_ORDER.map((k) => {
           const tone = TONE[REQUEST_LEAD_KIND_TONE[k]];
           const v = panel.kinds[k];
-          const pct = panel.total.positions ? Math.round((v.positions / panel.total.positions) * 1000) / 10 : 0;
           return (
             <li key={k}>
               <Button
@@ -63,7 +75,10 @@ export default function DashboardStatusLeadPanel({
                 variant="ghost"
                 title={REQUEST_LEAD_KIND_HINT[k]}
                 aria-pressed={kind === k}
-                onClick={() => setKind(kind === k ? null : k)}
+                onClick={() => {
+                  setKind(kind === k ? null : k);
+                  setShown(PAGE);
+                }}
                 className={cn('h-auto w-full flex-col items-stretch gap-1.5 whitespace-normal rounded-xl border px-3 py-2 text-left font-normal', tone.soft, tone.softHover, kind === k && 'ring-2 ring-ring')}
                 data-testid={`dashboard-status-lead-${k}`}
               >
@@ -73,8 +88,7 @@ export default function DashboardStatusLeadPanel({
                     <span className={cn('text-xs font-medium', tone.value)}>{REQUEST_LEAD_KIND_LABEL[k]}</span>
                   </span>
                   <span className={cn('text-[11px]', DASH.muted)}>
-                    <span className={cn('text-base font-medium tabular-nums', tone.num)}>{NUM.format(v.positions)}</span> อัตรา · {NUM.format(v.requests)} ใบ ·{' '}
-                    <span className="tabular-nums">{pct}%</span>
+                    <span className={cn('text-base font-medium tabular-nums', tone.num)}>{NUM.format(v.positions)}</span> อัตรา · {NUM.format(v.requests)} ใบ
                   </span>
                 </span>
                 <span className="block h-2 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
@@ -86,13 +100,68 @@ export default function DashboardStatusLeadPanel({
         })}
       </ul>
 
+      <div className="space-y-2">
+        <p className="text-sm font-medium">ใครคีย์ใบขอพวกนี้</p>
+        <div className="max-h-72 overflow-auto rounded-xl border border-border" data-testid="dashboard-status-lead-keyers">
+          <Table className="min-w-[36rem]">
+            <TableHeader className="sticky top-0 z-10 bg-card">
+              <TableRow className={DASH.tableHead}>
+                <TableHead className="text-xs">คนกรอก</TableHead>
+                <TableHead className="text-right text-xs">รวม (ใบ)</TableHead>
+                {STATUS_LEAD_ORDER.map((k) => (
+                  <TableHead key={k} className={cn('text-right text-xs', TONE[REQUEST_LEAD_KIND_TONE[k]].value)}>
+                    {REQUEST_LEAD_KIND_LABEL[k]}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {keyers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className={cn('py-4 text-center text-sm', DASH.muted)}>
+                    ไม่มีใบขอ
+                  </TableCell>
+                </TableRow>
+              ) : null}
+              {keyers.map((k) => (
+                <TableRow key={k.name} className={cn(person === k.name && 'bg-muted')} data-testid="dashboard-status-lead-keyer">
+                  <TableCell className="text-sm">
+                    <Button type="button" variant="link" size="xs" aria-pressed={person === k.name} className="h-auto p-0 text-left" onClick={() => {
+                        setPerson(person === k.name ? null : k.name);
+                        setShown(PAGE);
+                      }}>
+                      {k.name}
+                    </Button>
+                  </TableCell>
+                  <TableCell className="text-right text-sm font-medium tabular-nums">{NUM.format(k.total)}</TableCell>
+                  {STATUS_LEAD_ORDER.map((kk) => (
+                    <TableCell key={kk} className="text-right text-sm tabular-nums">
+                      {NUM.format(k[kk])}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">
-          {kind ? REQUEST_LEAD_KIND_LABEL[kind] : 'ทุกความเร่ง'} · {NUM.format(rows.length)} ใบ
+          {[kind ? REQUEST_LEAD_KIND_LABEL[kind] : 'ทุกความเร่ง', person].filter(Boolean).join(' · ')} · {NUM.format(rows.length)} ใบ
         </p>
-        {kind ? (
-          <Button type="button" variant="outline" size="xs" onClick={() => setKind(null)}>
-            ดูทุกความเร่ง
+        {kind || person ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => {
+              setKind(null);
+              setPerson(null);
+              setShown(PAGE);
+            }}
+          >
+            ล้างตัวกรอง
           </Button>
         ) : null}
       </div>
@@ -108,7 +177,7 @@ export default function DashboardStatusLeadPanel({
               <TableHead className="text-xs">สถานะ</TableHead>
               <TableHead className="text-xs">เร่งด่วน</TableHead>
               <TableHead className="text-xs">ต้องการคน</TableHead>
-              <TableHead className="text-right text-xs">ต้องหา</TableHead>
+              <TableHead className="text-right text-xs">{amountLabel}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -119,14 +188,14 @@ export default function DashboardStatusLeadPanel({
                 </TableCell>
               </TableRow>
             ) : null}
-            {rows.map((r) => {
+            {visible.map((r) => {
               const tone = TONE[REQUEST_LEAD_KIND_TONE[r.kind]];
               return (
                 // คีย์ = id ของใบ (ใบขอล่วงหน้าเลขซ้ำใบจริงได้ — คีย์ซ้ำแล้วแถวค้างตอนสลับกล่อง)
-                <TableRow key={String(r.job.id)} data-testid="dashboard-status-lead-row">
+                <TableRow key={r.key} data-testid="dashboard-status-lead-row">
                   <TableCell className="whitespace-nowrap text-sm tabular-nums">
-                    {onOpenJob ? (
-                      <Button type="button" variant="link" size="xs" className="h-auto p-0 tabular-nums" onClick={() => onOpenJob(r.job)}>
+                    {onOpenJob && r.job ? (
+                      <Button type="button" variant="link" size="xs" className="h-auto p-0 tabular-nums" onClick={() => r.job && onOpenJob(r.job)}>
                         {r.requestNo}
                       </Button>
                     ) : (
@@ -144,13 +213,20 @@ export default function DashboardStatusLeadPanel({
                     </span>
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-sm tabular-nums">{formatYmdDmyBe(r.required)}</TableCell>
-                  <TableCell className="text-right text-sm font-medium tabular-nums">{NUM.format(r.remaining)}</TableCell>
+                  <TableCell className="text-right text-sm font-medium tabular-nums">{NUM.format(r.amount)}</TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
       </div>
+      {rows.length > visible.length ? (
+        <div className="flex justify-center">
+          <Button type="button" variant="outline" size="sm" onClick={() => setShown((n) => n + PAGE)} data-testid="dashboard-status-lead-more">
+            แสดงเพิ่ม · เหลืออีก {NUM.format(rows.length - visible.length)} ใบ
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

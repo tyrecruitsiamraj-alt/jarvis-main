@@ -28,6 +28,7 @@ import DashboardCohortSummaryCard from './DashboardCohortSummary';
 import DashboardClosedBreakdownCard from './DashboardClosedBreakdown';
 import type { DashboardWorkItem } from '@/lib/dashboard/types';
 import type { LeadKindBreakdown } from '@/lib/dashboard/leadKindBreakdown';
+import type { StatusLeadPanel } from '@/lib/dashboard/statusLeadPanel';
 import { workStatusPercentBase } from '@/lib/dashboard/buildDashboardData';
 import type { RequestLeadKind } from '@/lib/requestLeadKind';
 import type { SlaByLeadKind, SlaCellKey } from '@/lib/dashboard/slaByLeadKind';
@@ -76,8 +77,9 @@ type Props = {
    * ยอดรวมฝั่ง ERP ซึ่ง**รวมใบที่อยู่นอก feed ของกล่องงาน** ลิสต์จึงน้อยกว่าได้เป็นปกติ
    */
   onKpiClick?: (kpiId: string, label: string, expectedRequests?: number | null) => void;
-  /** กล่องสถานะทำงานที่กดอยู่ (29 ต.ค. 2569) — การ์ดเร่งด่วนเปลี่ยนเป็นใบของสถานะนี้ · null = การ์ดเดิม */
-  statusPick?: { kpiId: string; label: string; jobs: JobRequest[] } | null;
+  /** กล่องที่กดอยู่ (29 ต.ค. 2569 · สถานะทำงาน / ใบขอชั่วคราว / เข้ามา หาได้แล้ว ยกเลิก คงเหลือ)
+   *  — การ์ดเร่งด่วนเปลี่ยนเป็นใบของกล่องนี้ · null = การ์ดเดิม */
+  statusPick?: { kpiId: string; label: string; panel: StatusLeadPanel; amountLabel: string; note?: string | null } | null;
   onStatusPickClear?: () => void;
   onOpenJob?: (job: JobRequest) => void;
   /** กราฟ ทั้งหมด/ฉุกเฉิน/ล่วงหน้า (18 ส.ค. 2569) — ไม่ส่ง = ไม่แสดงกราฟ (เช่นโหมด demo) */
@@ -409,6 +411,7 @@ const DashboardShell: React.FC<Props> = ({
                         <DashboardKpiCard
                           kpi={kpi}
                           progressPercent={kpiProgress(kpi)}
+                          selected={statusPick?.kpiId === kpi.id}
                           onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
                         />
                         {/*
@@ -446,20 +449,41 @@ const DashboardShell: React.FC<Props> = ({
                           key={kpi.id}
                           kpi={kpi}
                           progressPercent={total > 0 ? Math.round((kpi.value / total) * 100) : 0}
-                          progressBaseLabel="ของทุกสถานะ"
                           selected={statusPick?.kpiId === kpi.id}
                           onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
                         />
                       ));
                     })()}
                   </div>
+                  {/* ใบขอชั่วคราวแยกจากกล่องสถานะ — "ทั้งหมด" ข้างบน = ผลรวมสถานะของใบจริงพอดี (29 ต.ค. 2569) */}
+                  {(() => {
+                    const pre = data.prequestKpi;
+                    if (!pre) return null;
+                    return (
+                      <div className="mt-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+                        <DashboardKpiCard
+                          kpi={pre}
+                          selected={statusPick?.kpiId === pre.id}
+                          onClick={onKpiClick ? () => onKpiClick(pre.id, pre.label, pre.secondaryCount ?? null) : undefined}
+                        />
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
               {/* กราฟ ทั้งหมด/ฉุกเฉิน/ล่วงหน้า — วางใต้การ์ด KPI ให้เห็นทันทีโดยไม่ต้องกางแผง
                   (เจ้าของสั่ง 18 ส.ค. 2569) · เลขชุดเดียวกับการ์ด「เข้ามา」 เปลี่ยนตามตัวกรองเอง */}
               {statusPick ? (
-                <DashboardStatusLeadPanel label={statusPick.label} jobs={statusPick.jobs} onClear={() => onStatusPickClear?.()} onOpenJob={onOpenJob} />
+                <DashboardStatusLeadPanel
+                  key={statusPick.kpiId}
+                  label={statusPick.label}
+                  panel={statusPick.panel}
+                  amountLabel={statusPick.amountLabel}
+                  note={statusPick.note}
+                  onClear={() => onStatusPickClear?.()}
+                  onOpenJob={onOpenJob}
+                />
               ) : leadKindBreakdown ? (
                 <DashboardLeadKindChart
                   breakdown={leadKindBreakdown}

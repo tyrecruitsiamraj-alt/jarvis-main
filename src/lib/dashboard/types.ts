@@ -310,6 +310,8 @@ export type DashboardData = {
   kpis: DashboardKpi[];
   /** นับใบตามสถานะทำงาน (คู่กับ KPI ตำแหน่ง — คงเหลือแยกต่างหาก) */
   workStatusKpis: DashboardKpi[];
+  /** ใบขอชั่วคราวที่ยังต้องหา (ทีมคีย์เอง ยังไม่เข้า ERP) — กล่องแยกจากสถานะทำงาน (29 ต.ค. 2569) */
+  prequestKpi?: DashboardKpi;
   activityTrend: DashboardActivityTrendPoint[];
   unitOverview: DashboardUnitOverview[];
   ageDaysBreakdown: DashboardAgeDaysBreakdown[];

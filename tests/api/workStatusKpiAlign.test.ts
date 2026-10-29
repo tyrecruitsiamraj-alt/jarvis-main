@@ -113,5 +113,10 @@ describe('work status KPIs align with remaining', () => {
     const workTotal = data.workStatusKpis?.find((k) => k.id === 'work_status_total');
     expect(remaining?.value).toBe(5);
     expect(workTotal?.value).toBe(5);
+    // 29 ต.ค. 2569: ใบนอก feed (R003) ขึ้นกล่อง "ไม่มีสถานะ" ให้ผลรวมกล่องย่อย = ทั้งหมด
+    const none = data.workStatusKpis?.find((k) => k.id === 'work_status_none');
+    expect([none?.value, none?.secondaryCount]).toEqual([3, 1]);
+    const leaves = (data.workStatusKpis ?? []).filter((k) => k.id !== 'work_status_total').reduce((n, k) => n + k.value, 0);
+    expect(leaves).toBe(5);
   });
 });
