@@ -18,7 +18,7 @@ import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from
 import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { loadMatchingBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
-import { appBuJoin, appBuSql, pickDashboardBu } from '../_lib/homeBuSql.js';
+import { appBuJoin, appBuSql, parseBuParam, pickDashboardBu } from '../_lib/homeBuSql.js';
 import {
   AI_RESULT_AT_SQL,
   AI_RESULT_BY_PHONE_SQL,
@@ -96,13 +96,19 @@ export const LATEST_SCREENING_SQL = `(
 /** จุดเริ่มของวันไทย (รวม) / วันถัดไป (ไม่รวม) */
 const startOfBkk = (ymd: string) => `${ymd}T00:00:00+07:00`;
 
+/**
+ * BU ของใบสมัครอยู่ในชุดที่ขอ — `$bu` = `text[]` · null = ไม่กรอง (แอดมิน)
+ * ชุด ไม่ใช่ BU เดียว: ผู้ใช้หลาย BU ค่าเริ่มเห็นผลรวมทุก BU ในสิทธิ์ (เจ้าของ 29 ต.ค. 2569 "default คือ ผลรวมของทุก bu")
+ */
+const buInSql = (bu: string) => `(${bu}::text[] is null or ${appBuSql('a')} = any(${bu}::text[]))`;
+
 /** ประชากรของทุกก้อน — ไม่ใช่ Lead + BU (ถ้าล็อก) · `$bu` = ตำแหน่งพารามิเตอร์ของ BU */
 // ใบที่ยกเลิกข้อมูลแล้วไม่นับ (135) — กติกาเดียวกับหน้าหลัก/รายชื่อผู้สมัคร · กดเลขแล้วเปิดชื่อได้ครบ (QA 18 ต.ค. 2569)
 const CANCELLATIONS = tableInAppSchema('application_cancellations');
 /** ลิงก์รับสมัคร — ช่องทาง/กลุ่มติดที่ลิงก์ ไม่ได้คัดลอกลงใบสมัคร (19 ต.ค. 2569 · 383 จาก 502 ใบ) */
 const POSTING_LINKS = tableInAppSchema('recruit_posting_links');
 const scopeWhere = (bu: string) =>
-  `not coalesce(a.is_lead, false) and not exists (select 1 from ${CANCELLATIONS} cx where cx.application_id = a.id) and (${bu}::text is null or ${appBuSql('a')} = ${bu}::text)`;
+  `not coalesce(a.is_lead, false) and not exists (select 1 from ${CANCELLATIONS} cx where cx.application_id = a.id) and ${buInSql(bu)}`;
 
 /** ข้อเท็จจริงต่อใบของช่วง [$1, $2) · $3 = BU · `attendance` = นิพจน์ผลนัด (ตารางยังไม่มี = null) */
 export function factsSql(
@@ -175,7 +181,7 @@ export function appointmentBacklogSql(): string {
          count(*) filter (where ${UPCOMING_7D_NO_RESULT_SQL})::int as next7
     from ${APPS} a
     ${appBuJoin('a')}
-   where ($1::text is null or ${appBuSql('a')} = $1::text)
+   where ${buInSql('$1')}
    group by a.job_id`;
 }
 
@@ -656,8 +662,9 @@ async function loadFacts(params: unknown[], byJobs = false): Promise<Row[]> {
 
 /** ใบสมัครของใบขอชุดนี้ทุกช่วงเวลา (ไม่นับ Lead/ยกเลิกข้อมูล) — นิยามเดียวกับภาพรวมงานสรรหา (`toFact`) */
 export async function loadFactsForJobs(jobIds: readonly string[], bu: string | null): Promise<RecruitAppFact[]> {
+  const buSet = bu ? [bu] : null;
   if (jobIds.length === 0) return [];
-  return (await loadFacts([jobIds, bu], true)).map((r) => toFact(r, null));
+  return (await loadFacts([jobIds, buSet], true)).map((r) => toFact(r, null));
 }
 
 export async function buildRecruitOverview(
@@ -671,9 +678,15 @@ export async function buildRecruitOverview(
 ): Promise<RecruitOverviewResponse> {
   const today = toBangkokYmd(now);
   const window = (range ? rangeWindow(range.from, range.to, today, range.all === true) : null) ?? monthWindow(monthParam, today);
-  // แอดมินเห็นทุก BU เหมือนเดิม · BU เดียว = ล็อก · หลาย BU = BU ที่เลือก (ค่าเริ่ม BU หลัก)
+  /**
+   * แอดมินเห็นทุก BU เหมือนเดิม · BU เดียว = ล็อก
+   * หลาย BU = ค่าเริ่ม **ผลรวมทุก BU ในสิทธิ์** แล้วเลือกดูทีละ BU ได้ (เจ้าของ 29 ต.ค. 2569 "default คือ ผลรวมของทุก bu แล้วฉันไปแยกดูเอง")
+   * `bu` = BU ที่เลือก (null = รวม) · `buSet` = ชุดที่ใช้กรองจริง (null = ไม่กรอง · แอดมิน)
+   */
   const picked = pickDashboardBu(scope, scope.mode === 'all' ? null : requestedBu);
-  const bu = picked.bu;
+  const askedBu = parseBuParam(requestedBu);
+  const bu = picked.choices ? (askedBu && picked.choices.includes(askedBu) ? askedBu : null) : picked.bu;
+  const buSet = bu ? [bu] : picked.choices;
   const body: RecruitOverviewResponse = {
     buChoices: picked.choices,
     version: 1,
@@ -691,8 +704,8 @@ export async function buildRecruitOverview(
   };
   if (scope.mode === 'none') return body;
 
-  const bothRange = [startOfBkk(window.prevFrom), startOfBkk(addDays(window.to, 1)), bu];
-  const monthRange = [startOfBkk(window.from), startOfBkk(addDays(window.to, 1)), bu];
+  const bothRange = [startOfBkk(window.prevFrom), startOfBkk(addDays(window.to, 1)), buSet];
+  const monthRange = [startOfBkk(window.from), startOfBkk(addDays(window.to, 1)), buSet];
   const nowMs = now.getTime();
 
   // จังหวัดของงาน (การ์ดงานค้าง) — วิ่งพร้อมก้อนอื่น ครั้งแรกหลังสำเนาใบขอหมดอายุใช้ ~4 วิ (28 ต.ค. 2569)
@@ -700,11 +713,11 @@ export async function buildRecruitOverview(
   const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, chR, reqR, informR, irecR, irAppR] = await Promise.all([
     settle('รายชื่อบนบอร์ด', loadBoardPhoneSet),
     settle('ใบสมัคร', () => loadFacts(bothRange)),
-    settle('งานค้าง', async () => (await dbQuery<Row>(backlogSql(), [bu])).rows),
+    settle('งานค้าง', async () => (await dbQuery<Row>(backlogSql(), [buSet])).rows),
     settle('นัดที่รอผล', async () => {
       try {
         // แยกต่อใบขอ (28 ต.ค. 2569) — รวมยอด + แยกกรุงเทพ/ต่างจังหวัดฝั่ง Node
-        return (await dbQuery<Row>(appointmentBacklogSql(), [bu])).rows;
+        return (await dbQuery<Row>(appointmentBacklogSql(), [buSet])).rows;
       } catch (e) {
         if (isPgUndefinedTable(e)) return null;
         throw e;
@@ -720,7 +733,7 @@ export async function buildRecruitOverview(
       }
     }),
     settle('ผลโทรของ AI', async () => (await dbQuery<Row>(aiEventsSql(), monthRange)).rows),
-    settle('วันแรกของข้อมูล', async () => text((await dbQuery<Row>(firstDaySql(), [bu])).rows[0]?.first_day)),
+    settle('วันแรกของข้อมูล', async () => text((await dbQuery<Row>(firstDaySql(), [buSet])).rows[0]?.first_day)),
     settle('ผลนัด', async () => {
       try {
         return bool((await dbQuery<Row>(`select exists (select 1 from ${ATTEND}) as any_row`)).rows[0]?.any_row);
@@ -733,7 +746,7 @@ export async function buildRecruitOverview(
     // ช่องทางที่ได้คนลงงาน (เจ้าของ 19 ต.ค. 2569) — นับตามวันแจ้งเข้า · ไม่กรอง BU/วันในสัปดาห์
     settle('ช่องทางลงงาน', () => loadChannelPlacement({ from: window.from, to: window.to })),
     // ใบขอช่วงก่อน + ช่วงนี้ อ่านทีเดียว แล้วแบ่ง (เจ้าของ 21 ต.ค. 2569 "อยากได้เป็นกราฟเชิงเปรียบเทียบว่า เพิ่มขึ้นลดลง")
-    settle('ใบขอ', () => loadOnlineRequestRows({ from: window.prevFrom, to: window.to, bu, departmentScope: scope })),
+    settle('ใบขอ', () => loadOnlineRequestRows({ from: window.prevFrom, to: window.to, bu: buSet, departmentScope: scope })),
     // ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "จับได้ถึงแจ้งเข้า") — แจ้งเข้าตั้งแต่ต้นช่วงเทียบ · iRecruit ย้อน 60 วัน
     settle('ใบแจ้งเข้า ERP', () => loadInformDaysByPhone(window.prevFrom)),
     settle('ช่องทาง iRecruit', () => loadIrecruitRegsByPhone(window.prevFrom, window.to)),

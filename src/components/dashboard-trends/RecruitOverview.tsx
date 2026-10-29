@@ -120,7 +120,7 @@ const RecruitOverview: React.FC<{
     setMonthState(m);
   };
   const [rev, setRev] = useState(0);
-  /** BU ที่เลือก — เฉพาะผู้ใช้ที่ดูได้หลาย BU (26 ต.ค. 2569) · null = BU หลัก */
+  /** BU ที่เลือก — เฉพาะผู้ใช้ที่ดูได้หลาย BU (26 ต.ค. 2569) · null = ผลรวมทุก BU ในสิทธิ์ (เจ้าของ 29 ต.ค. 2569) */
   const [pickedBu, setPickedBu] = useState<string | null>(null);
   const [state, setState] = useState<Load>({ data: null, loading: true, error: null });
 
@@ -396,8 +396,8 @@ const RecruitOverview: React.FC<{
 
       <div className={cn('flex flex-wrap items-center justify-between gap-2 text-xs', DASH.sub)}>
         {data.buChoices?.length ? (
-          <div className="w-44">
-            <BuChoiceSelect value={data.bu} choices={data.buChoices} onChange={setPickedBu} triggerClassName="h-8 text-xs" itemClassName="text-xs" />
+          <div className="w-28">
+            <BuChoiceSelect value={data.bu} choices={data.buChoices} onChange={setPickedBu} allOption triggerClassName="h-8 text-xs" itemClassName="text-xs" />
           </div>
         ) : (
           <span>{data.bu ? `เฉพาะ BU ${data.bu}` : 'ทุก BU'}</span>

@@ -6,7 +6,7 @@ export async function fetchRecruitOverview(
   month?: string | null,
   /** ช่วงที่เลือกเอง (รายวัน/ช่วง · 5 ต.ค. 2569) — ส่งมา = ไม่ใช้ month */
   range?: { from: string; to: string; all?: boolean } | null,
-  /** ผู้ใช้หลาย BU เลือกทีละ BU (26 ต.ค. 2569) · null = ค่าเริ่มของเซิร์ฟเวอร์ */
+  /** ผู้ใช้หลาย BU เลือกทีละ BU (26 ต.ค. 2569) · null = ผลรวมทุก BU ในสิทธิ์ (29 ต.ค. 2569) */
   bu?: string | null,
 ): Promise<RecruitOverviewResponse> {
   const p = new URLSearchParams();

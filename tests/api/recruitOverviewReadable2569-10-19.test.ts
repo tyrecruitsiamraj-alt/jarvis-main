@@ -111,7 +111,7 @@ describe('หน้าจอ', () => {
     expect(api).toContain('overAge: isOverAge(');
     expect(api).toContain('aiOutOfArea: Boolean(r.ai_outcome) && isOutOfAreaAnswer(');
     // 21 ต.ค. 2569: อ่านทีเดียวช่วงก่อน+ช่วงนี้ แล้วแบ่งเป็นใบขอช่วงนี้ / ช่วงก่อน / รายวัน (กราฟเทียบ)
-    expect(api).toContain('loadOnlineRequestRows({ from: window.prevFrom, to: window.to, bu, departmentScope: scope })');
+    expect(api).toContain('loadOnlineRequestRows({ from: window.prevFrom, to: window.to, bu: buSet, departmentScope: scope })');
     expect(api).toContain('body.requests = toRequestSummary(inRange(window.from, window.to));');
   });
 });

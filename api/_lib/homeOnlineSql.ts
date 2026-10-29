@@ -69,7 +69,8 @@ async function loadErpExtras(requestNos: readonly string[]): Promise<Map<string,
   return out;
 }
 
-type OnlineRequestOpts = { from: string; to: string; bu: string | null; departmentScope: DepartmentScope };
+/** `bu` = BU เดียว หรือชุด BU (ภาพรวมงานสรรหา ผู้ใช้หลาย BU ค่าเริ่ม = รวมทุก BU ในสิทธิ์ · 29 ต.ค. 2569) · null = ไม่กรอง */
+type OnlineRequestOpts = { from: string; to: string; bu: string | readonly string[] | null; departmentScope: DepartmentScope };
 
 /** ใบขอที่ส่งเข้ามาในช่วง (ทุกสถานะ · ใบละแถว · กรอง BU) + รหัสใบ — ฐานเดียวของ "ใบขอเข้ามา" */
 async function loadOnlineRequestGroups(opts: OnlineRequestOpts) {
@@ -85,7 +86,7 @@ async function loadOnlineRequestGroups(opts: OnlineRequestOpts) {
   ).filter((g) => g.day >= opts.from && g.day <= opts.to);
   const withBu = grouped
     .map((g) => ({ ...g, bu: trendBuFromSiteCode(g.siteCode) }))
-    .filter((g) => !opts.bu || g.bu === opts.bu);
+    .filter((g) => !opts.bu || (typeof opts.bu === 'string' ? g.bu === opts.bu : g.bu != null && opts.bu.includes(g.bu)));
   const jobIds = withBu.map((g) => g.jobId ?? `siamraj-sql:${g.requestNo}`);
   return { withBu, jobIds };
 }

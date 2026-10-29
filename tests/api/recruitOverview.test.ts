@@ -117,8 +117,31 @@ describe('เส้นอ่านอย่างเดียว + ขอบเ�
       if (text.includes('any_row')) continue;
       // ตารางผู้ใช้ (อีเมล → ชื่อเล่น ของผลงานรายคน · 18 ต.ค. 2569) ไม่ใช่ข้อมูลใบสมัคร ไม่ผูก BU
       if (text.includes('nickname')) continue;
-      expect(params?.[params.length - 1], text.slice(0, 60)).toBe('LBD');
+      expect(params?.[params.length - 1], text.slice(0, 60)).toEqual(['LBD']);
     }
+  });
+
+  it('🔴 ผู้ใช้หลาย BU: ค่าเริ่ม = ผลรวมทุก BU ในสิทธิ์ · เลือก BU = เฉพาะ BU นั้น · ขอนอกสิทธิ์ = รวมในสิทธิ์ (เจ้าของ 29 ต.ค. 2569)', async () => {
+    loadMatchingBuScope.mockResolvedValue({ mode: 'code', code: 'SN', codes: ['SN', 'LBD'] });
+    const run = async (bu?: string) => {
+      dbQuery.mockClear();
+      const json = vi.fn();
+      await handler({ method: 'GET', user: { sub: 'u1', role: 'staff' }, query: { month: '2026-09', ...(bu ? { bu } : {}) } }, { status: () => ({ json }), setHeader: vi.fn() });
+      const body = json.mock.calls[0][0];
+      const sent = (dbQuery.mock.calls as [string, unknown[] | undefined][])
+        .filter(([text]) => !text.includes('any_row') && !text.includes('nickname'))
+        .map(([, params]) => params?.[params.length - 1]);
+      return { body, sent };
+    };
+    const all = await run();
+    expect([all.body.bu, all.body.buChoices]).toEqual([null, ['SN', 'LBD']]);
+    for (const p of all.sent) expect(p).toEqual(['SN', 'LBD']);
+    const one = await run('LBD');
+    expect(one.body.bu).toBe('LBD');
+    for (const p of one.sent) expect(p).toEqual(['LBD']);
+    const outside = await run('LM');
+    expect(outside.body.bu).toBe(null);
+    for (const p of outside.sent) expect(p).toEqual(['SN', 'LBD']);
   });
 
   it('🔴 "ใบที่ประกาศ" ไม่ได้นับที่เส้นนี้ — หน้าเว็บใช้เลขของหัวกล่องงานตรง ๆ (เจ้าของสั่ง 1 ต.ค. 2569)', async () => {
