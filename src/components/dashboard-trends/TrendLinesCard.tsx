@@ -1,7 +1,7 @@
 import React from 'react';
-import { LineChart as LineIcon } from 'lucide-react';
+import { ChevronLeft, LineChart as LineIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { cn } from '@/lib/utils';
 import { CHART, chartDayLabel, DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
@@ -15,6 +15,8 @@ const LINE_TONES: ToneKey[] = ['info', 'success', 'warn', 'violet', 'danger', 't
 /** ตัวชี้วัดที่ต่อท้ายแท็บกรอกเข้ามา (27 ต.ค. 2569) — สีไม่ซ้ำเส้นแรก · ไม่สนใจแดง */
 const KEY_TONE: Record<string, ToneKey> = { aiSaidYes: 'teal', aiSaidNo: 'danger', aiQueued: 'violet' };
 const toneOf = (key: string, i: number): ToneKey => KEY_TONE[key] ?? LINE_TONES[i % LINE_TONES.length];
+const MONTH_FMT = new Intl.DateTimeFormat('th-TH', { month: 'short', year: '2-digit', timeZone: 'UTC' });
+const monthText = (ym: string) => MONTH_FMT.format(new Date(`${ym}-01T00:00:00Z`));
 
 /**
  * ═══ กราฟเส้นรายวัน + ▲▼ เทียบช่วงก่อน — บนสุดทุกแท็บของภาพรวม ═══
@@ -33,6 +35,7 @@ export default function TrendLinesCard({
   children,
   note,
   seriesOf,
+  monthly = false,
 }: {
   rows: readonly CompareRow[];
   /** ป้ายช่วงที่เลือก — ไม่ได้ใช้บนการ์ดแล้ว (เลือกช่วงที่ตัวเลือกด้านบน) คงไว้ให้หน้าแม่ส่งเหมือนเดิม */
@@ -49,6 +52,11 @@ export default function TrendLinesCard({
   children?: React.ReactNode;
   note?: string | null;
   seriesOf: (key: string, period: ComparePeriod) => Array<{ day: string; n: number }>;
+  /**
+   * ช่วง "ทั้งหมด" (เจ้าของ 29 ต.ค. 2569 "ถ้ากดทั้งหมดก็ให้ ขึ้นเป็นกราฟแท่ง เปรียบเทียบเป็นรายเดือน แล้วพอกดเป็นเดือนไหนก็เส้น
+   * … ไม่งั้นยาวเกินไปไม่สวย") — แท่งรายเดือน · กดแท่งเดือนไหน = เส้นรายวันของเดือนนั้น
+   */
+  monthly?: boolean;
 }) {
   // ช่วงที่ดู = ตัวเลือกช่วงเวลาด้านบนของหน้า (เจ้าของ 27 ต.ค. 2569 ค่ำ "เอาออกให้ไป Filter ตรง เลือกช่วงเวลา")
   // ⇒ การ์ดนี้แสดงช่วงที่เลือกเสมอ · เลขช่วงก่อนอยู่บรรทัดล่างของกล่องไว้เทียบ
@@ -65,6 +73,20 @@ export default function TrendLinesCard({
     return [...byDay.values()].sort((a, b) => String(a.day).localeCompare(String(b.day)));
   }, [rows, period, seriesOf]);
   const labelOf = new Map(rows.map((r) => [r.key, r.label]));
+  const [month, setMonth] = React.useState<string | null>(null);
+  const months = React.useMemo(() => {
+    if (!monthly) return [];
+    const by = new Map<string, Record<string, number | string>>();
+    for (const d of chart) {
+      const ym = String(d.day).slice(0, 7);
+      const m = by.get(ym) ?? { month: ym, label: monthText(ym) };
+      for (const r of rows) m[r.key] = (Number(m[r.key]) || 0) + (Number(d[r.key]) || 0);
+      by.set(ym, m);
+    }
+    return [...by.values()];
+  }, [monthly, chart, rows]);
+  const showBars = monthly && month === null;
+  const lineData = monthly && month ? chart.filter((d) => String(d.day).startsWith(month)) : chart;
 
   /** กล่องยอด — แท็บใบขอกดได้ (shadcn Button) ที่เหลือเป็นกล่องเฉย ๆ */
   const boxCls = 'flex min-w-0 flex-col gap-0.5 rounded-xl border border-border px-3 py-2';
@@ -126,33 +148,76 @@ export default function TrendLinesCard({
       <p className={cn('text-right text-xs tabular-nums', DASH.sub)} data-testid="trend-prev">
         เทียบ {prevLabel}
       </p>
+      {monthly && month ? (
+        <div className="flex items-center justify-between gap-2">
+          <Button type="button" variant="outline" size="xs" onClick={() => setMonth(null)} data-testid="trend-back-months">
+            <ChevronLeft aria-hidden />
+            ดูรายเดือน
+          </Button>
+          <span className="text-sm font-medium">{monthText(month)}</span>
+        </div>
+      ) : null}
       <div className={cn('h-56', DASH.sub)} data-testid="trend-chart">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chart} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={CHART.gridStroke} strokeOpacity={CHART.gridOpacity} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART.axisFill }} />
-            <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: CHART.axisFill }} />
-            <Tooltip
-              {...CHART.tooltip}
-              cursor={CHART.cursorLine}
-              labelFormatter={(_l, p) => chartDayLabel((p?.[0]?.payload as { day?: string } | undefined)?.day ?? '')}
-              formatter={(value: number, name: string) => [fmt(Number(value)), labelOf.get(name) ?? name]}
-            />
-            {rows.map((r, i) => (
-              <Line
-                key={r.key}
-                type="monotone"
-                dataKey={r.key}
-                name={r.key}
-                stroke={TONE[toneOf(r.key, i)].hex}
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                activeDot={CHART.activeDot}
+          {showBars ? (
+            <BarChart data={months} margin={{ top: 8, right: 12, bottom: 0, left: -12 }} data-testid="trend-months">
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART.gridStroke} strokeOpacity={CHART.gridOpacity} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART.axisFill }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: CHART.axisFill }} />
+              <Tooltip
+                {...CHART.tooltip}
+                cursor={CHART.cursorBar}
+                formatter={(value: number, name: string) => [fmt(Number(value)), labelOf.get(name) ?? name]}
               />
-            ))}
-          </LineChart>
+              {rows.map((r, i) => (
+                <Bar
+                  key={r.key}
+                  dataKey={r.key}
+                  name={r.key}
+                  fill={TONE[toneOf(r.key, i)].hex}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={28}
+                  className="cursor-pointer"
+                  onClick={(d: { payload?: { month?: string } }) => d.payload?.month && setMonth(d.payload.month)}
+                />
+              ))}
+            </BarChart>
+          ) : (
+            <LineChart data={lineData} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.gridStroke} strokeOpacity={CHART.gridOpacity} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART.axisFill }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: CHART.axisFill }} />
+              <Tooltip
+                {...CHART.tooltip}
+                cursor={CHART.cursorLine}
+                labelFormatter={(_l, p) => chartDayLabel((p?.[0]?.payload as { day?: string } | undefined)?.day ?? '')}
+                formatter={(value: number, name: string) => [fmt(Number(value)), labelOf.get(name) ?? name]}
+              />
+              {rows.map((r, i) => (
+                <Line
+                  key={r.key}
+                  type="monotone"
+                  dataKey={r.key}
+                  name={r.key}
+                  stroke={TONE[toneOf(r.key, i)].hex}
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  activeDot={CHART.activeDot}
+                />
+              ))}
+            </LineChart>
+          )}
         </ResponsiveContainer>
       </div>
+      {showBars ? (
+        <div className="flex flex-wrap gap-1" role="group" aria-label="ดูรายวันของเดือน">
+          {months.map((m) => (
+            <Button key={String(m.month)} type="button" variant="outline" size="xs" onClick={() => setMonth(String(m.month))} data-testid="trend-month">
+              {String(m.label)}
+            </Button>
+          ))}
+        </div>
+      ) : null}
       {children}
     </OverviewCard>
   );

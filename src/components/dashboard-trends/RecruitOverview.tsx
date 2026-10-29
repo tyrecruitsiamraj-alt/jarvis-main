@@ -240,6 +240,7 @@ const RecruitOverview: React.FC<{
   const compareCard = (t: OverviewTabId) => (
     <TrendLinesCard
       key={`${t}-${win.from}-${win.to}`}
+      monthly={Boolean(win.all)}
       {...(t === 'requests'
         ? {
             title: 'แนวโน้มใบขอ',
