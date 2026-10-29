@@ -440,6 +440,7 @@ export async function toRequestRows(rows: readonly OnlineRequestRow[]): Promise<
       requestNo: r.requestNo,
       jobId: r.jobId,
       unitName: r.unitName,
+      position: r.position,
       siteCode: r.siteCode ?? null,
       siteName: r.erp?.siteName ?? null,
       sector: requestSectorOf(r.industry, r.erp?.customerGroup, r.sector),

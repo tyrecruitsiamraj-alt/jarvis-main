@@ -16,6 +16,7 @@ import {
   filterRequestRows,
   requestAreaOptions,
   requestSectorOf,
+  requestsOfFunnelKey,
   type RecruitRequestRow,
 } from '../../src/lib/recruitRequestTab';
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes';
@@ -82,6 +83,22 @@ describe('ข้อ 1 ใบขอเข้ามา', () => {
     expect(f.active.notReleased + f.active.releasedNoApps + f.active.releasedWithApps).toBe(f.active.requests);
     expect([f.active.releasedWithApps, f.active.applications, f.active.releasedNoApps]).toEqual([1, 7, 1]);
     expect(f.requested).toBe(f.closed.filled + f.cancelled.people + f.active.remaining);
+  });
+});
+
+describe('กดกล่องแล้วเห็นใบ (เจ้าของ 29 ต.ค. 2569 "มันต้องกดแล้วบอกสิ่ว่าใบไหนบ้าง")', () => {
+  it('จำนวนใบในรายการ = เลขบนกล่องทุกกล่อง · ต้องหามากสุดขึ้นก่อน', () => {
+    const f = buildRequestFunnel(ROWS);
+    const n = (k: Parameters<typeof requestsOfFunnelKey>[1]) => requestsOfFunnelKey(ROWS, k).length;
+    expect([n('all'), n('cancelled'), n('closed'), n('active')]).toEqual([f.total, f.cancelled.requests, f.closed.requests, f.active.requests]);
+    expect([n('notReleased'), n('releasedNoApps'), n('releasedWithApps')]).toEqual([f.active.notReleased, f.active.releasedNoApps, f.active.releasedWithApps]);
+    expect(requestsOfFunnelKey(ROWS, 'active')[0].requestNo).toBe('OPL6910092');
+  });
+  it('จอ: กล่องเป็นปุ่ม · อำเภอกดได้ · รายการใบขอ', () => {
+    const ui = readFileSync('src/components/dashboard-trends/RequestTab.tsx', 'utf8');
+    expect(ui).toContain('onPick={() => togglePick(\'cancelled\')}');
+    expect(ui).toContain('data-testid="request-tab-district-row"');
+    expect(ui).toContain('data-testid="request-tab-list"');
   });
 });
 

@@ -14,6 +14,12 @@ import {
   APPLICANT_BUCKET_LABEL,
   APPLICANT_NOT_CALLED,
   EMPTY_REQUEST_FILTER,
+  REQUEST_FUNNEL_LABEL,
+  districtOf,
+  provinceOf,
+  requestsOfFunnelKey,
+  sortRequests,
+  type RequestFunnelKey,
   LEAD_ORDER,
   REQUEST_BRANDS,
   REQUEST_SECTOR_LABEL,
@@ -41,15 +47,107 @@ const ALL = '__all';
 const PROVINCES_SHOWN = 8;
 const DISTRICTS_SHOWN = 8;
 
-function Tile({ label, value, unit, sub, tone, testId }: { label: string; value: number; unit: string; sub: string; tone?: 'success' | 'danger' | 'primary'; testId: string }) {
+/** กล่องที่กดแล้วขึ้นรายการใบขอ (เจ้าของ 29 ต.ค. 2569 "มันต้องกดแล้วบอกสิ่ว่าใบไหนบ้าง") */
+function Tile({
+  label,
+  value,
+  unit,
+  sub,
+  tone,
+  picked,
+  onPick,
+  testId,
+}: {
+  label: string;
+  value: number;
+  unit: string;
+  sub: string;
+  tone?: 'success' | 'danger' | 'primary';
+  picked: boolean;
+  onPick: () => void;
+  testId: string;
+}) {
   return (
-    <div className="rounded-xl bg-muted/50 p-3" data-testid={testId}>
-      <p className={cn('text-xs', DASH.sub)}>{label}</p>
-      <p className={cn('text-2xl font-medium tabular-nums', tone ? TONE[tone].num : 'text-foreground')}>
+    <Button
+      type="button"
+      variant="ghost"
+      aria-pressed={picked}
+      onClick={onPick}
+      className={cn(
+        'h-auto flex-col items-stretch justify-start gap-0 whitespace-normal rounded-xl bg-muted/50 p-3 text-left font-normal hover:bg-muted',
+        picked && 'ring-2 ring-ring',
+      )}
+      data-testid={testId}
+    >
+      <span className={cn('text-xs', DASH.sub)}>{label}</span>
+      <span className={cn('text-2xl font-medium tabular-nums', tone ? TONE[tone].num : 'text-foreground')}>
         {fmt(value)}
         <span className={cn('ml-1 text-sm font-normal', DASH.sub)}>{unit}</span>
-      </p>
-      <p className={cn('text-xs tabular-nums', DASH.sub)}>{sub}</p>
+      </span>
+      <span className={cn('text-xs tabular-nums', DASH.sub)}>{sub}</span>
+    </Button>
+  );
+}
+
+/** รายการใบขอของกล่อง/อำเภอที่กด — จำนวนแถว = เลขบนกล่อง · ต้องหามากสุดขึ้นก่อน */
+function RequestList({ title, rows, onClose }: { title: string; rows: readonly RecruitRequestRow[]; onClose: () => void }) {
+  return (
+    <div className="space-y-2 rounded-xl border border-border p-3" data-testid="request-tab-list">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium">
+          {title} · {fmt(rows.length)} ใบ
+        </p>
+        <Button type="button" variant="ghost" size="xs" onClick={onClose}>
+          <X aria-hidden />
+          ปิด
+        </Button>
+      </div>
+      <div className="max-h-96 overflow-auto rounded-lg border border-border">
+        <Table className="min-w-[44rem]">
+          <TableHeader>
+            <TableRow className={DASH.tableHead}>
+              <TableHead className="text-xs">ใบขอ</TableHead>
+              <TableHead className="text-xs">หน่วยงาน · ตำแหน่ง</TableHead>
+              <TableHead className="text-xs">พื้นที่</TableHead>
+              <TableHead className="text-right text-xs">ขอ</TableHead>
+              <TableHead className="text-right text-xs">หาได้</TableHead>
+              <TableHead className="text-right text-xs">ยกเลิก</TableHead>
+              <TableHead className={cn('text-right text-xs', TONE.warn.value)}>ต้องหา</TableHead>
+              <TableHead className="text-right text-xs">คนกรอก</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className={cn('py-4 text-center text-sm', DASH.sub)}>
+                  ไม่มีใบขอ
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {rows.map((r) => (
+              <TableRow key={r.requestNo} data-testid="request-tab-list-row">
+                <TableCell className="whitespace-nowrap text-sm tabular-nums">
+                  {r.requestNo}
+                  <span className={cn('block text-xs', DASH.sub)}>{r.released ? 'ประกาศแล้ว' : 'ยังไม่ประกาศ'}</span>
+                </TableCell>
+                <TableCell className="text-sm">
+                  {r.unitName ?? r.siteName ?? '—'}
+                  {r.position ? <span className={cn('block text-xs', DASH.sub)}>{r.position}</span> : null}
+                </TableCell>
+                <TableCell className="text-sm">
+                  {provinceOf(r)}
+                  <span className={cn('block text-xs', DASH.sub)}>{districtOf(r)}</span>
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{fmt(r.requested)}</TableCell>
+                <TableCell className={cn('text-right tabular-nums', TONE.success.value)}>{fmt(r.filled)}</TableCell>
+                <TableCell className={cn('text-right tabular-nums', TONE.danger.value)}>{fmt(r.cancelled)}</TableCell>
+                <TableCell className={cn('text-right font-medium tabular-nums', TONE.warn.value)}>{fmt(r.remaining)}</TableCell>
+                <TableCell className="text-right tabular-nums">{fmt(r.applications)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
@@ -105,6 +203,9 @@ export default function RequestTab({
   const areas = useMemo(() => buildProvinceAreas(picked), [picked]);
   const appRows = useMemo(() => buildApplicantChannelRows(appsOfRequests(apps, active ? picked : null)), [apps, picked, active]);
   const set = (patch: Partial<RequestTabFilter>) => setF((cur) => ({ ...cur, ...patch }));
+  /** กล่องที่กดดูรายการใบ · null = ไม่ได้กด */
+  const [pick, setPick] = useState<RequestFunnelKey | null>(null);
+  const togglePick = (k: RequestFunnelKey) => setPick((cur) => (cur === k ? null : k));
 
   return (
     <div className="space-y-3">
@@ -155,10 +256,10 @@ export default function RequestTab({
       {/* ─── 1. ใบขอเข้ามา ─── */}
       <OverviewCard icon={FileText} title="ใบขอเข้ามา">
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" data-testid="request-tab-funnel">
-          <Tile label="ใบขอเข้ามา" value={funnel.total} unit="ใบ" sub={`ขอ ${fmt(funnel.requested)} คน`} testId="request-tab-total" />
-          <Tile label="ยกเลิก" value={funnel.cancelled.requests} unit="ใบ" sub={`ยกเลิก ${fmt(funnel.cancelled.people)} คน`} tone="danger" testId="request-tab-cancelled" />
-          <Tile label="ปิดแล้ว" value={funnel.closed.requests} unit="ใบ" sub={`หาได้ ${fmt(funnel.closed.filled)} คน`} tone="success" testId="request-tab-closed" />
-          <Tile label="ดำเนินการสรรหา" value={funnel.active.requests} unit="ใบ" sub={`ต้องหาจริง ${fmt(funnel.active.remaining)} คน`} tone="primary" testId="request-tab-active" />
+          <Tile label="ใบขอเข้ามา" value={funnel.total} unit="ใบ" sub={`ขอ ${fmt(funnel.requested)} คน`} picked={pick === 'all'} onPick={() => togglePick('all')} testId="request-tab-total" />
+          <Tile label="ยกเลิก" value={funnel.cancelled.requests} unit="ใบ" sub={`ยกเลิก ${fmt(funnel.cancelled.people)} คน`} tone="danger" picked={pick === 'cancelled'} onPick={() => togglePick('cancelled')} testId="request-tab-cancelled" />
+          <Tile label="ปิดแล้ว" value={funnel.closed.requests} unit="ใบ" sub={`หาได้ ${fmt(funnel.closed.filled)} คน`} tone="success" picked={pick === 'closed'} onPick={() => togglePick('closed')} testId="request-tab-closed" />
+          <Tile label="ดำเนินการสรรหา" value={funnel.active.requests} unit="ใบ" sub={`ต้องหาจริง ${fmt(funnel.active.remaining)} คน`} tone="primary" picked={pick === 'active'} onPick={() => togglePick('active')} testId="request-tab-active" />
         </div>
         <div className="space-y-2 rounded-xl border border-border p-3">
           <p className="flex justify-between gap-3 text-sm">
@@ -175,29 +276,36 @@ export default function RequestTab({
             ))}
           </span>
           <div className="grid gap-2 text-sm sm:grid-cols-3">
-            <p className="flex justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2" data-testid="request-tab-not-released">
-              <span>ยังไม่ประกาศ</span>
-              <span className="font-medium tabular-nums">{fmt(funnel.active.notReleased)} ใบ</span>
-            </p>
-            <p className="flex justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2" data-testid="request-tab-released-empty">
-              <span>ประกาศแล้ว ไม่มีคนกรอก</span>
-              <span className="font-medium tabular-nums">{fmt(funnel.active.releasedNoApps)} ใบ</span>
-            </p>
-            <p className="flex justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2" data-testid="request-tab-released-apps">
-              <span>ประกาศแล้ว มีคนกรอก</span>
-              <span className="font-medium tabular-nums">
-                {fmt(funnel.active.releasedWithApps)} ใบ · {fmt(funnel.active.applications)} คน
-              </span>
-            </p>
+            {(
+              [
+                ['notReleased', `${fmt(funnel.active.notReleased)} ใบ`, 'request-tab-not-released'],
+                ['releasedNoApps', `${fmt(funnel.active.releasedNoApps)} ใบ`, 'request-tab-released-empty'],
+                ['releasedWithApps', `${fmt(funnel.active.releasedWithApps)} ใบ · ${fmt(funnel.active.applications)} คน`, 'request-tab-released-apps'],
+              ] as const
+            ).map(([k, value, testId]) => (
+              <Button
+                key={k}
+                type="button"
+                variant="ghost"
+                aria-pressed={pick === k}
+                onClick={() => togglePick(k)}
+                className={cn('h-auto justify-between gap-2 whitespace-normal rounded-lg bg-muted/50 px-3 py-2 text-left font-normal hover:bg-muted', pick === k && 'ring-2 ring-ring')}
+                data-testid={testId}
+              >
+                <span>{REQUEST_FUNNEL_LABEL[k]}</span>
+                <span className="font-medium tabular-nums">{value}</span>
+              </Button>
+            ))}
           </div>
         </div>
+        {pick ? <RequestList title={REQUEST_FUNNEL_LABEL[pick]} rows={requestsOfFunnelKey(picked, pick)} onClose={() => setPick(null)} /> : null}
       </OverviewCard>
 
       {/* ─── 2. แนวโน้มใบขอ (การ์ดเดิม) ─── */}
       {trend}
 
       {/* ─── 3. พื้นที่ไหนขาดคน (โน้ตเจ้าของ: กดจังหวัดเห็นอำเภอ · ฉุกเฉิน/ย้อนหลัง/ล่วงหน้า · บอกใบและคน) ─── */}
-      <ProvinceCard areas={areas} brand={f.brand} onBrand={(b) => set({ brand: b })} />
+      <ProvinceCard areas={areas} rows={picked} brand={f.brand} onBrand={(b) => set({ brand: b })} />
 
       {/* ─── 4. คนที่กรอกมา แยกช่องทาง ─── */}
       <ApplicantCard total={appRows.total} groups={appRows.groups} />
@@ -209,16 +317,20 @@ export default function RequestTab({
 
 function ProvinceCard({
   areas,
+  rows,
   brand,
   onBrand,
 }: {
   areas: ReturnType<typeof buildProvinceAreas>;
+  rows: readonly RecruitRequestRow[];
   brand: RequestTabFilter['brand'];
   onBrand: (b: RequestTabFilter['brand']) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [all, setAll] = useState(false);
   const [allDistricts, setAllDistricts] = useState(false);
+  /** อำเภอที่กดดูใบ (ในจังหวัดที่กางอยู่) · null = ไม่ได้กด */
+  const [district, setDistrict] = useState<string | null>(null);
   const max = Math.max(1, ...areas.map((a) => a.requested));
   const shown = all ? areas : areas.slice(0, PROVINCES_SHOWN);
   return (
@@ -257,7 +369,10 @@ function ProvinceCard({
               variant="ghost"
               className="grid h-auto w-full grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] items-center gap-3 whitespace-normal rounded-xl px-2 py-2 text-left font-normal"
               aria-expanded={open === p.name}
-              onClick={() => setOpen(open === p.name ? null : p.name)}
+              onClick={() => {
+                setOpen(open === p.name ? null : p.name);
+                setDistrict(null);
+              }}
               data-testid="request-tab-province-row"
             >
               <span className="flex min-w-0 items-center gap-1.5 text-sm">
@@ -289,12 +404,21 @@ function ProvinceCard({
                 </div>
                 <ul className="divide-y divide-border rounded-lg bg-card">
                   {(allDistricts ? p.districts : p.districts.slice(0, DISTRICTS_SHOWN)).map((d) => (
-                    <li key={d.name} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 px-3 py-2 text-sm">
-                      <span className="min-w-0">{d.name}</span>
-                      <span className="ml-auto text-right tabular-nums">
-                        {fmt(d.requests)} ใบ · {fmt(d.requested)} คน
-                        <span className={cn('ml-2 text-xs', TONE.warn.value)}>ต้องหา {fmt(d.remaining)}</span>
-                      </span>
+                    <li key={d.name}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        aria-pressed={district === d.name}
+                        onClick={() => setDistrict(district === d.name ? null : d.name)}
+                        className={cn('flex h-auto w-full flex-wrap items-center justify-between gap-x-3 gap-y-0.5 whitespace-normal rounded-none px-3 py-2 text-left text-sm font-normal', district === d.name && 'bg-muted')}
+                        data-testid="request-tab-district-row"
+                      >
+                        <span className="min-w-0">{d.name}</span>
+                        <span className="ml-auto text-right tabular-nums">
+                          {fmt(d.requests)} ใบ · {fmt(d.requested)} คน
+                          <span className={cn('ml-2 text-xs', TONE.warn.value)}>ต้องหา {fmt(d.remaining)}</span>
+                        </span>
+                      </Button>
                     </li>
                   ))}
                 </ul>
@@ -302,6 +426,13 @@ function ProvinceCard({
                   <Button type="button" variant="outline" size="xs" onClick={() => setAllDistricts((v) => !v)}>
                     {allDistricts ? 'ซ่อน' : `ดูทั้งหมด ${fmt(p.districts.length)} อำเภอ`}
                   </Button>
+                ) : null}
+                {district ? (
+                  <RequestList
+                    title={`${p.name} · ${district}`}
+                    rows={sortRequests(rows.filter((r) => provinceOf(r) === p.name && districtOf(r) === district))}
+                    onClose={() => setDistrict(null)}
+                  />
                 ) : null}
               </div>
             ) : null}

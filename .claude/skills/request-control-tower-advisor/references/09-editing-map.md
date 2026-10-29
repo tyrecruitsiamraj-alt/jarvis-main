@@ -14022,6 +14022,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   - ข้อมูล = `requestRows` ของ `/api/recruit-overview` (`toRequestRows` ใน `recruit-overview.ts`) · ERP เพิ่มใน `loadErpExtras` (`homeOnlineSql.ts`): ชื่อไซต์ จังหวัดไซต์ ที่อยู่หน้างาน กลุ่มลูกค้า · ความเร่งมาจากตัวดึง throughput (`leadKind` เกณฑ์ของใบ)
   - จังหวัด: ที่แก้ในใบ › อ่านจากที่อยู่ › จังหวัดไซต์ ERP (ไซต์ธนาคารผูก สนญ. กทม.) · อำเภอต้องอยู่ในรายชื่อทางการของจังหวัด (`officialDistrict`) · ประเภทงาน: อุตสาหกรรม ERP ธนาคาร › กลุ่มลูกค้า ERP › `unit_sector`
   - การ์ด "งานตามจังหวัด" (`ProvinceJobsCard` · `openJobsByProvince`) ถอดทั้งไฟล์ + prop `openJobs` ของ `RecruitOverview` — แทนด้วยพื้นที่ขาดคน
+  - กดกล่อง/ช่องในการ์ดใบขอเข้ามา + กดอำเภอ = รายการใบขอ (`requestsOfFunnelKey` ตัวแบ่งเดียวกับ `buildRequestFunnel` ⇒ จำนวนแถว = เลขบนกล่อง · เจ้าของ "มันต้องกดแล้วบอกสิ่ว่าใบไหนบ้าง")
 - **กดแถว = แผงแตกตัวเลข** (เจ้าของ 28 ต.ค. 2569 *"รายชื่อเท่าไหร่ โทรไปแล้วเท่าไหร่ ผลเป็นไง รอโทรเท่าไหร่ ไม่โทรเท่าไหร่ เพราะอะไร"* · Choice "แท็บสัดส่วนอย่างเดียว")
   `Ladder` (homeProportion.ts): รายชื่อ = โทรแล้ว + รอโทร + ไม่โทร · `ladderAddsUp` · เหตุหาไม่เจอ = ช่อง "ยังไม่รู้เหตุ" (ห้ามหาย)
   - Prescreen: ผล = `aiAnswerOf` · รอโทร = AI รอ / เจ้าหน้าที่เก็บไว้ · ไม่โทร = เบอร์ผิด · อายุ 58+ · iRecruit · เหตุจากฐาน (`proportionAppReasonsSql`: ซ้ำ iRecruit · So Scraping · คีย์/นำเข้า · ไม่ผูกใบขอ · ai_block_reason · เบอร์พัก · ไม่มีรายได้) · ใบขอปิด = ไม่อยู่ในใบขอที่เปิด (`openJobIds` จาก useUnitRequestsFeed · อ่านไม่ได้ = ไม่เดา)

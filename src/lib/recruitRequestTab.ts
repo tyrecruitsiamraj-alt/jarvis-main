@@ -30,6 +30,8 @@ export type RecruitRequestRow = {
   requestNo: string;
   jobId: string | null;
   unitName: string | null;
+  /** ตำแหน่ง — รายการใบขอที่กดดู (29 ต.ค. 2569 "กดแล้วบอกว่าใบไหนบ้าง") */
+  position?: string | null;
   siteCode: string | null;
   siteName: string | null;
   sector: RequestSector | null;
@@ -152,6 +154,37 @@ export function buildRequestFunnel(rows: readonly RecruitRequestRow[]): RequestF
   }
   return out;
 }
+
+/** กล่องในการ์ดใบขอเข้ามาที่กดดูรายการได้ (เจ้าของ 29 ต.ค. 2569 "มันต้องกดแล้วบอกสิ่ว่าใบไหนบ้าง") */
+export type RequestFunnelKey = 'all' | 'cancelled' | 'closed' | 'active' | 'notReleased' | 'releasedNoApps' | 'releasedWithApps';
+export const REQUEST_FUNNEL_LABEL: Record<RequestFunnelKey, string> = {
+  all: 'ใบขอเข้ามา',
+  cancelled: 'ยกเลิก',
+  closed: 'ปิดแล้ว',
+  active: 'ดำเนินการสรรหา',
+  notReleased: 'ยังไม่ประกาศ',
+  releasedNoApps: 'ประกาศแล้ว ไม่มีคนกรอก',
+  releasedWithApps: 'ประกาศแล้ว มีคนกรอก',
+};
+
+/** ใบของกล่องนั้น — ตัวแบ่งเดียวกับ `buildRequestFunnel` (จำนวนใบในรายการ = เลขบนกล่อง) · ต้องหามากสุดขึ้นก่อน */
+export function requestsOfFunnelKey(rows: readonly RecruitRequestRow[], key: RequestFunnelKey): RecruitRequestRow[] {
+  const pick = rows.filter((r) => {
+    const s = onlineRequestStateOf(r);
+    if (key === 'all') return true;
+    if (key === 'cancelled') return s === 'cancelledAll';
+    if (key === 'closed') return s === 'fullyClosed' || s === 'partialCancelled';
+    if (s !== 'open') return false;
+    if (key === 'active') return true;
+    if (key === 'notReleased') return !r.released;
+    if (key === 'releasedNoApps') return r.released && r.applications === 0;
+    return r.released && r.applications > 0;
+  });
+  return sortRequests(pick);
+}
+
+export const sortRequests = (rows: readonly RecruitRequestRow[]) =>
+  [...rows].sort((a, b) => b.remaining - a.remaining || b.requested - a.requested || b.applications - a.applications || a.requestNo.localeCompare(b.requestNo));
 
 /** ข้อ 3 พื้นที่ขาดคน — ขอมา (คน · ช่วงที่เลือก) คู่ ต้องหาตอนนี้ (คน · ใบที่ยังเปิด) */
 export type AreaCount = { name: string; requests: number; requested: number; remaining: number };
