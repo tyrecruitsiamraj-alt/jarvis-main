@@ -26,6 +26,8 @@ describe('ตาราง = ใบชุดเดียวกับการ์�
     expect(t.totalRow.cells.unknown).toBe(3);
     const page = read('src/pages/dashboard/SupervisorDashboard.tsx');
     expect(page).toContain('buildSlaByLeadKind(slaCohort.records, new Date(), slaCohort.extraUnknown, slaCohort.kindOf)');
+    // ใบปิดยังไม่มา = ชุดเดิม (กันช่องคิด SLA ไม่ได้บวมระหว่างรอ)
+    expect(page).toContain('if (cohortScope.records.length === 0 || period || !closedAllJobs) {');
     expect(page).toContain('filterRecordsForSlaCell(slaCohort.records, kind, cell, new Date(), slaCohort.kindOf)');
   });
 });

@@ -841,7 +841,9 @@ const SupervisorDashboard: React.FC = () => {
    * ยังไม่มีชุดของการ์ด (throughput ยังไม่มา) = ใช้ชุดเดิม
    */
   const slaCohort = useMemo(() => {
-    if (cohortScope.records.length === 0) {
+    // ใบปิดยังไม่มา (โหมดทั้งหมดดึง ~40 วิ) = ใช้ชุดเดิม (ใบยังไม่ปิด + "กำลังดึง") — ไม่งั้นช่อง "คิด SLA ไม่ได้" บวมชั่วคราว
+    // โหมดเลือกช่วงคงชุดเดิม (ตัดตามวันขอในช่วงอยู่แล้ว)
+    if (cohortScope.records.length === 0 || period || !closedAllJobs) {
       return {
         records: slaControlRecords,
         extraUnknown: {} as Partial<Record<RequestLeadKind, number>>,
@@ -869,7 +871,7 @@ const SupervisorDashboard: React.FC = () => {
     // ชนิดใบขอ = ของชุดการ์ด (แถวตารางเท่าแถวการ์ดรายชนิด)
     const kindOf = (r: RequestControlRecord) => wanted.get(r.requestNo) ?? wanted.get(r.id);
     return { records, extraUnknown, kindOf };
-  }, [cohortScope.records, slaControlRecords]);
+  }, [cohortScope.records, slaControlRecords, period, closedAllJobs]);
   const slaByLeadKind = useMemo(
     () => buildSlaByLeadKind(slaCohort.records, new Date(), slaCohort.extraUnknown, slaCohort.kindOf),
     [slaCohort],
