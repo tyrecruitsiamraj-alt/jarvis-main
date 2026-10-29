@@ -14014,6 +14014,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ทางเข้าใบสมัคร: `source='irecruit'` = ดึง iRecruit · `created_by_name='So Scraping'` = ระบบ · ชื่อคนสร้างอื่น = คนคีย์/นำเข้า · ไม่มี = กรอกเอง · โพสต์ประกาศ = วัดไม่ได้ (คนโพสต์เองระบบไม่เห็น)
 - เทสต์ `tests/api/homeProportion2569-10-28.test.ts`
 - 29 ต.ค. 2569 ถอดแถว "ใบส่งคนแทน" + "โพสต์ประกาศ" ออกจากก้อนทางเข้า (เจ้าของ "เอาออกไม่ต้องโชว์") — ถอดทั้ง SQL `replace_sync/replace_manual/post_orders` · ฟิลด์ใน `ProportionPayload.entry` · ป้าย `unknown` "วัดไม่ได้" · ห้ามเติมกลับ
+- 29 ต.ค. 2569 การ์ดติดตามหน้าหลักบอกคน + สาย (เจ้าของ "264 คือคนหรือสาย") — คน = เบอร์ 9 หลัก + วันนัด (`followPersonKey` · `buildFollowPersonCells` ใน `homeLumosSummary.ts` · ส่งเป็น `followPeople` จาก `loadHomeLumosSummary`) · ผลรายคน: ชี้ขาดก่อน › ยังมีสายรอ = รอโทร › สรุปไม่ได้ › ไม่รับสาย · กล่อง "AI โทรแล้ว/คนโทรแล้ว" = `followCallsMade` (ไม่นับสายที่รอ — เดิม "AI โทร 264" รวมรอ 84) · เทสต์ `tests/api/homeFollowPeople2569-10-29.test.ts`
+- 29 ต.ค. 2569 Prescreen: ใบคนคีย์/นำเข้า Excel (`reason=keyed`) อยู่ "รอโทร" (ไม่ใช่ไม่โทร) — `recruitProportionRows`
+- 29 ต.ค. 2569 ภาพรวมงานสรรหา ปุ่ม "ทั้งหมด" — `?all=1` · `rangeWindow(…, all)` ยาวสุด `ALL_MAX_DAYS` 731 วัน (ช่วงปกติ 62) · `window.all` = ป้าย "ทั้งหมด" ไม่เทียบช่วงก่อน · เริ่มที่ `firstDay` ของ BU
 - **กดแถว = แผงแตกตัวเลข** (เจ้าของ 28 ต.ค. 2569 *"รายชื่อเท่าไหร่ โทรไปแล้วเท่าไหร่ ผลเป็นไง รอโทรเท่าไหร่ ไม่โทรเท่าไหร่ เพราะอะไร"* · Choice "แท็บสัดส่วนอย่างเดียว")
   `Ladder` (homeProportion.ts): รายชื่อ = โทรแล้ว + รอโทร + ไม่โทร · `ladderAddsUp` · เหตุหาไม่เจอ = ช่อง "ยังไม่รู้เหตุ" (ห้ามหาย)
   - Prescreen: ผล = `aiAnswerOf` · รอโทร = AI รอ / เจ้าหน้าที่เก็บไว้ · ไม่โทร = เบอร์ผิด · อายุ 58+ · iRecruit · เหตุจากฐาน (`proportionAppReasonsSql`: ซ้ำ iRecruit · So Scraping · คีย์/นำเข้า · ไม่ผูกใบขอ · ai_block_reason · เบอร์พัก · ไม่มีรายได้) · ใบขอปิด = ไม่อยู่ในใบขอที่เปิด (`openJobIds` จาก useUnitRequestsFeed · อ่านไม่ได้ = ไม่เดา)

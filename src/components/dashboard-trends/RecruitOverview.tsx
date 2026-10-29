@@ -116,7 +116,7 @@ const RecruitOverview: React.FC<{
    * มีค่า = ไม่ใช้เดือน · เลือกเดือนจากปุ่มเดือน = กลับแบบเดือน
    */
   // ค่าเริ่ม = 7 วันล่าสุด เทียบ 7 วันก่อนหน้า (เจ้าของ 21 ต.ค. 2569 "Default เป็น 7 วันย้อนหลัง") · เลือกเดือน/วัน/ช่วงได้จากปุ่มช่วงเวลา
-  const [range, setRange] = useState<DateRangeYmd | null>(() => lastDays(7));
+  const [range, setRange] = useState<(DateRangeYmd & { all?: boolean }) | null>(() => lastDays(7));
   const setMonth = (m: string) => {
     setRange(null);
     setMonthState(m);
@@ -140,6 +140,10 @@ const RecruitOverview: React.FC<{
 
   const data = state.data;
   const win = data?.window ?? null;
+  // "ทั้งหมด" เริ่มที่วันแรกของข้อมูล — สลับ BU แล้ววันแรกเปลี่ยน ให้ขยับตาม
+  useEffect(() => {
+    if (range?.all && data?.firstDay && data.window.all && data.firstDay !== range.from) setRange({ ...range, from: data.firstDay });
+  }, [range, data]);
   const apps = data?.apps ?? null;
 
   /** ป๊อปรายชื่อของเลขที่กดในเส้นทาง */
@@ -220,11 +224,11 @@ const RecruitOverview: React.FC<{
   const period = isRange ? 'ช่วงนี้' : 'เดือนนี้';
   const prevWord = isRange ? 'ช่วงก่อน' : 'เดือนก่อน';
   const appsError = data.errors.apps ?? null;
-  const periodLabel = isRange ? rangeText({ from: win.from, to: win.to }) : monthLabel(win.month);
+  const periodLabel = win.all ? 'ทั้งหมด' : isRange ? rangeText({ from: win.from, to: win.to }) : monthLabel(win.month);
   /** ปุ่มลัด 7/30 วันล่าสุด กดอยู่ไหม */
   const isLast = (n: number) => {
     const r = lastDays(n);
-    return isRange && win.from === r.from && win.to === r.to;
+    return isRange && !win.all && win.from === r.from && win.to === r.to;
   };
   const ymdDate = (ymd: string) => {
     const p = parseYmd(ymd);
@@ -289,7 +293,9 @@ const RecruitOverview: React.FC<{
   );
 
   const compareNote = [
-    view.prev
+    win.all
+      ? rangeText({ from: win.from, to: win.to })
+      : view.prev
       ? `เทียบกับ ${rangeText({ from: win.prevFrom, to: win.prevTo })}`
       : view.prevPartial && data.firstDay
         ? `ไม่เทียบ${prevWord} ข้อมูลเพิ่งเริ่ม ${rangeText({ from: data.firstDay, to: data.firstDay })}`
@@ -370,6 +376,15 @@ const RecruitOverview: React.FC<{
                 </Button>
                 <Button type="button" size="xs" variant={isLast(30) ? 'default' : 'outline'} onClick={() => setRange(lastDays(30))} data-testid="recruit-last30">
                   30 วันล่าสุด
+                </Button>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant={win.all ? 'default' : 'outline'}
+                  onClick={() => setRange({ from: data.firstDay ?? data.today, to: data.today, all: true })}
+                  data-testid="recruit-all"
+                >
+                  ทั้งหมด
                 </Button>
               </div>
             </PopoverContent>

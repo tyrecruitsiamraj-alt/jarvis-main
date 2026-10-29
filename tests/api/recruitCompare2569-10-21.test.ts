@@ -85,7 +85,7 @@ describe('รายวัน', () => {
 describe('หน้าจอ', () => {
   it('ค่าเริ่ม 7 วัน · มีปุ่ม 7 วันล่าสุด · การ์ดเทียบอยู่ครบ 4 แท็บ · กดช่วงได้', () => {
     const src = read('src/components/dashboard-trends/RecruitOverview.tsx');
-    expect(src).toContain('useState<DateRangeYmd | null>(() => lastDays(7))');
+    expect(src).toContain('useState<(DateRangeYmd & { all?: boolean }) | null>(() => lastDays(7))');
     expect(src).toContain('data-testid="recruit-last7"');
     for (const t of ['requests', 'apps', 'staff', 'appt']) expect(src).toContain(`{compareCard('${t}')}`);
     // 21 ต.ค. 2569 ค่ำ: แท่งคู่ → กราฟเส้นรายวัน (เจ้าของ "อยากให้มันวิ่งแบบอันนี้")

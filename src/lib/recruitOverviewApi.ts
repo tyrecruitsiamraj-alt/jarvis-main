@@ -5,7 +5,7 @@ import type { RecruitOverviewResponse } from './recruitOverviewTypes';
 export async function fetchRecruitOverview(
   month?: string | null,
   /** ช่วงที่เลือกเอง (รายวัน/ช่วง · 5 ต.ค. 2569) — ส่งมา = ไม่ใช้ month */
-  range?: { from: string; to: string } | null,
+  range?: { from: string; to: string; all?: boolean } | null,
   /** ผู้ใช้หลาย BU เลือกทีละ BU (26 ต.ค. 2569) · null = ค่าเริ่มของเซิร์ฟเวอร์ */
   bu?: string | null,
 ): Promise<RecruitOverviewResponse> {
@@ -14,6 +14,7 @@ export async function fetchRecruitOverview(
   if (range) {
     p.set('from', range.from);
     p.set('to', range.to);
+    if (range.all) p.set('all', '1');
   } else if (month) p.set('month', month);
   const qs = p.toString();
   const r = await apiFetch(`/api/recruit-overview${qs ? `?${qs}` : ''}`);

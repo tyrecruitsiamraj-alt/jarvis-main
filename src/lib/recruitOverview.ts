@@ -21,6 +21,7 @@ import { callResultLabel } from '@/lib/homeCallResults';
 import { REFERRAL_SOURCE_LABEL, type ApplicationReferralSource } from '@/lib/publicApplicationsApi';
 import { bangkokYmd } from '@/lib/trends/timeBuckets';
 import { DAY_MS, fullDaysBetween } from '@/lib/fullDays';
+import { ALL_MAX_DAYS } from '@/lib/recruitOverviewWindow';
 import type {
   RecruitAiRow,
   RecruitAppFact,
@@ -247,7 +248,7 @@ export function dailyRows(apps: readonly RecruitAppFact[], from: string, to: str
   const rows = new Map<string, DailyRow>();
   for (let d = from; d <= to; d = addDay(d)) {
     rows.set(d, { ymd: d, day: Number(d.slice(8, 10)), names: 0, called: 0, aiSaidYes: 0, staffFollowed: 0, d0: 0, d1: 0, d2plus: 0, none: 0 });
-    if (rows.size > 62) break;
+    if (rows.size > ALL_MAX_DAYS) break;
   }
   for (const f of apps) {
     const r = rows.get(appliedYmd(f) ?? '');

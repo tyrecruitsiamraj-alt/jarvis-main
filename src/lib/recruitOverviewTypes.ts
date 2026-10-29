@@ -167,6 +167,8 @@ export type RecruitOverviewWindow = {
   isCurrent: boolean;
   /** ช่วงที่เลือกเอง (รายวัน/ช่วง · 5 ต.ค. 2569) — เทียบช่วงยาวเท่ากันก่อนหน้า · ไม่มี = แบบเดือน */
   range?: boolean;
+  /** ปุ่ม "ทั้งหมด" (29 ต.ค. 2569) — วันแรกที่มีข้อมูลถึงวันนี้ · ไม่เทียบช่วงก่อน */
+  all?: boolean;
 };
 
 export type RecruitOverviewResponse = {

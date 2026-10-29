@@ -285,3 +285,18 @@ describe('หน้าตาแท็บสัดส่วน (เจ้าข�
     expect(tab).not.toContain('<ul className="flex flex-wrap gap-2">');
   });
 });
+
+describe('คนคีย์ / นำเข้า Excel = รอโทร (เจ้าของ 29 ต.ค. 2569 "อันนี้ต้องบอกรอโทร")', () => {
+  it('ใบที่คนคีย์ไม่อยู่ใน "ไม่โทร" แต่อยู่ "รอโทร" · รายชื่อยังบวกลงตัว', () => {
+    const id = (k: number) => `2222222${k}-1111-4111-8111-111111111111`;
+    const apps = [fact({ id: id(1), jobId: 'siamraj-sql:OPL6910099' }), fact({ id: id(2), jobId: 'siamraj-sql:OPL6910099', aiQueued: true })];
+    const flags = [{ id: id(1), jobId: 'siamraj-sql:OPL6910099', claimed: false, reason: 'keyed' as const, blockReason: null }];
+    const l = recruitProportionRows(apps, flags, new Set(['siamraj-sql:OPL6910099']))[0].ladder!;
+    expect(ladderAddsUp(l)).toBe(true);
+    expect(stepOf(l, 'waiting').parts.map((p) => [p.label, p.value])).toEqual([
+      ['AI รอโทร', 1],
+      ['คนคีย์ / นำเข้า Excel รอคนโทร', 1],
+    ]);
+    expect(stepOf(l, 'notCalled').value).toBe(0);
+  });
+});

@@ -25,6 +25,8 @@ export type HomeLumosSummaryResponse = {
   follow: { ai: FollowBucket; staff: FollowBucket } | null;
   /** แยก BU × เรื่อง × ใครโทร × ผล (ติดตาม) */
   followByBu?: FollowBuCell[];
+  /** ติดตามนับเป็นคน (29 ต.ค. 2569) — `buildFollowPersonCells` */
+  followPeople?: FollowPersonCell[];
   applicants: LumosBucket | null;
   /** ใบสมัครก่อนช่วงนี้ที่ยังรอ AI */
   backlog: number | null;
@@ -120,6 +122,46 @@ export function doneBucketOf(result: string): FollowBucketKey {
  */
 export type FollowTeamKey = 'main' | 'replacement';
 export type FollowBuCell = { bu: string | null; team: FollowTeamKey; caller: 'ai' | 'manual'; bucket: FollowBucketKey; n: number };
+
+/**
+ * ผลรายคน (เจ้าของ 29 ต.ค. 2569 *"264 คือคนหรือสาย มันต้องบอกแบบนี้ กี่คน กี่สาย ไปกี่คน ไม่ไปกี่คน"*)
+ * คน = เบอร์ 9 หลักท้าย + วันนัดโทร (เวลาไทย) — คนแทนโดนโทร 2–3 สายต่อวัน (16:00 วันก่อน · ก่อน 1 ชม. · ก่อน 15 นาที)
+ * ผลของคน: ผลชี้ขาดก่อน (ไป › ไม่ไป › ลางาน › วันหยุด › ขอเลื่อน) · ไม่มี = ยังมีสายรอ → รอโทร · แล้วค่อยสรุปไม่ได้ › ไม่รับสาย
+ * ไม่นับสายยกเลิก (ชุดเดียวกับการ์ด) ⇒ รวมทุกช่องของคน = จำนวนคน
+ */
+export type FollowPersonCell = { bu: string | null; team: FollowTeamKey; bucket: FollowBucketKey; n: number };
+export const FOLLOW_PERSON_PRIORITY: readonly FollowBucketKey[] = ['went', 'notWent', 'leave', 'dayOff', 'reschedule', 'waiting', 'unclear', 'failed'];
+
+export function followPersonBucket(keys: readonly FollowBucketKey[]): FollowBucketKey {
+  return FOLLOW_PERSON_PRIORITY.find((k) => keys.includes(k)) ?? 'cancelled';
+}
+
+/** กุญแจของคน — ไม่มีเบอร์ = นับแยกทีละสาย (ไม่เดารวม) */
+export function followPersonKey(phone: unknown, ymd: string, fallbackId: string): string {
+  const p = String(phone ?? '').replace(/\D/g, '').slice(-9);
+  return p ? `${p}|${ymd}` : `id:${fallbackId}`;
+}
+
+/** รวมคนตาม BU/เรื่อง/ผล — `rows` = สายที่ไม่ยกเลิก · ใช้ BU/เรื่องของสายแรกของคน */
+export function buildFollowPersonCells(
+  rows: ReadonlyArray<{ key: string; bu: string | null; team: FollowTeamKey; bucket: FollowBucketKey }>,
+): FollowPersonCell[] {
+  const people = new Map<string, { bu: string | null; team: FollowTeamKey; keys: FollowBucketKey[] }>();
+  for (const r of rows) {
+    const p = people.get(r.key) ?? { bu: r.bu, team: r.team, keys: [] };
+    p.keys.push(r.bucket);
+    people.set(r.key, p);
+  }
+  const cells = new Map<string, FollowPersonCell>();
+  for (const p of people.values()) {
+    const bucket = followPersonBucket(p.keys);
+    const ck = `${p.bu ?? ''}|${p.team}|${bucket}`;
+    const c = cells.get(ck) ?? { bu: p.bu, team: p.team, bucket, n: 0 };
+    c.n += 1;
+    cells.set(ck, c);
+  }
+  return [...cells.values()];
+}
 export type FollowBuRow = { bu: string | null; total: number; ai: number; staff: number; buckets: Record<FollowBucketKey, number> };
 
 const emptyBuckets = (): Record<FollowBucketKey, number> =>

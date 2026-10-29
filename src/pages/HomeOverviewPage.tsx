@@ -42,7 +42,7 @@ import type { MoneyRequest } from '@/lib/homeMoney';
 import { fetchRecruitOverview } from '@/lib/recruitOverviewApi';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import { appsInWindow, buildApplicantFunnel, type FunnelStep } from '@/lib/homeOverviewFunnel';
-import { followBuSplit, followResultSplit, followTeamTotals } from '@/lib/homeSplit';
+import { followBuSplit, followCallsMade, followPersonResults, followPersonTeams, followResultSplit, followTeamTotals } from '@/lib/homeSplit';
 import { REQUEST_LEAD_KIND_LABEL, requestLeadKindFromYmd, type RequestLeadKind } from '@/lib/requestLeadKind';
 import { SITE_BU_TO_DEPT, trendBuLabel } from '@/lib/trends/bu';
 import { toYmdBangkok } from '@/lib/dateTh';
@@ -151,7 +151,6 @@ const HomeOverviewPage: React.FC = () => {
   const backlog = roNow?.backlog ?? null;
 
   // ── ติดตาม ──
-  const follow = ai?.follow ?? null;
   const cells = lumos.current?.followByBu ?? null;
   const liveCells = useMemo(() => (cells ? cells.filter((c) => c.bucket !== 'cancelled') : null), [cells]);
   const followResults = useMemo(
@@ -162,6 +161,16 @@ const HomeOverviewPage: React.FC = () => {
   const teams = useMemo(() => (liveCells ? followTeamTotals(liveCells) : null), [liveCells]);
   const followLive = followResults.reduce((n, r) => n + r.total, 0);
   const followCancelled = cells ? cells.reduce((n, c) => n + (c.bucket === 'cancelled' ? c.n : 0), 0) : 0;
+  // คน + สาย (เจ้าของ 29 ต.ค. 2569 "264 คือคนหรือสาย … กี่คน กี่สาย ไปกี่คน ไม่ไปกี่คน")
+  const people = lumos.current?.followPeople ?? null;
+  const personRows = useMemo(
+    () => (people && liveCells ? followPersonResults(people, liveCells, FOLLOW_RESULT_COLS.filter((c) => c.key !== 'cancelled')) : []),
+    [people, liveCells],
+  );
+  const peopleTotal = personRows.reduce((n, r) => n + r.people, 0);
+  const peopleTeams = useMemo(() => (people ? followPersonTeams(people) : null), [people]);
+  const calls = useMemo(() => (liveCells ? followCallsMade(liveCells) : null), [liveCells]);
+  const wentPeople = personRows.find((r) => r.key === 'went')?.people ?? 0;
   const aftercare = ai?.aftercare ?? null;
   const upcoming = money?.aftercareUpcoming ?? null;
 
@@ -360,10 +369,19 @@ const HomeOverviewPage: React.FC = () => {
   const openFollow = () =>
     setPanel({
       title: 'ติดตามคนเริ่มงาน / ติดตามส่งคนแทน',
-      sub: follow ? `${NUM.format(followLive)} สาย · ยกเลิก ${NUM.format(followCancelled)} ไม่นับ` : undefined,
+      sub: cells ? `${NUM.format(peopleTotal)} คน · ${NUM.format(followLive)} สาย · ยกเลิก ${NUM.format(followCancelled)} สายไม่นับ` : undefined,
       go: PAGE.follow,
       body: (
         <div className="space-y-4">
+          <p className="text-sm font-medium text-foreground">ผลรายคน</p>
+          <PanelRows
+            unit="คน"
+            rows={personRows.map((r) => ({
+              label: `${r.label} · ${NUM.format(r.calls)} สาย`,
+              value: r.people,
+              emphasis: r.key === 'went' ? 'success' : r.key === 'notWent' ? 'danger' : r.key === 'failed' || r.key === 'reschedule' ? 'warn' : null,
+            }))}
+          />
           {teams ? (
             <PanelRows
               unit="สาย"
@@ -373,7 +391,7 @@ const HomeOverviewPage: React.FC = () => {
               ]}
             />
           ) : null}
-          <p className="text-sm font-medium text-foreground">ผลโทร</p>
+          <p className="text-sm font-medium text-foreground">ผลรายสาย</p>
           <PanelRows
             unit="สาย"
             rows={followResults.map((r) => ({
@@ -408,7 +426,6 @@ const HomeOverviewPage: React.FC = () => {
       ),
     });
 
-  const aiShare = follow && follow.ai + follow.staff > 0 ? Math.round((follow.ai / (follow.ai + follow.staff)) * 100) : null;
   const applied = funnel?.[0] ?? null;
   const aiStep = funnel?.[1] ?? null;
 
@@ -492,9 +509,9 @@ const HomeOverviewPage: React.FC = () => {
         <OverviewNode
           big
           label="ติดตาม"
-          value={cells ? followLive : null}
-          unit="สาย"
-          sub={aiShare !== null ? `AI ${aiShare}% · ไป ${NUM.format(followResults.find((r) => r.key === 'went')?.total ?? 0)}` : undefined}
+          value={people ? peopleTotal : null}
+          unit="คน"
+          sub={people ? `${NUM.format(followLive)} สาย · ไป ${NUM.format(wentPeople)} คน` : undefined}
           onClick={cells ? openFollow : undefined}
           testId="overview-kpi-follow"
         />
@@ -614,27 +631,43 @@ const HomeOverviewPage: React.FC = () => {
           }
         >
           <div className="grid grid-cols-3 gap-2">
-            <OverviewNode label="ทั้งหมด" value={cells ? followLive : null} unit="สาย" sub={teams ? `เริ่มงาน ${NUM.format(teams.main)} · คนแทน ${NUM.format(teams.replacement)}` : undefined} onClick={cells ? openFollow : undefined} testId="overview-follow-total" />
-            <OverviewNode label="AI โทร" value={follow?.ai} sub={aiShare !== null ? `${aiShare}%` : undefined} onClick={cells ? openFollow : undefined} />
-            <OverviewNode label="คนโทร" value={follow?.staff} sub={aiShare !== null ? `${100 - aiShare}%` : undefined} onClick={cells ? openFollow : undefined} />
+            <OverviewNode
+              label="ทั้งหมด"
+              value={people ? peopleTotal : null}
+              unit="คน"
+              sub={people && peopleTeams ? `${NUM.format(followLive)} สาย · เริ่มงาน ${NUM.format(peopleTeams.main)} · คนแทน ${NUM.format(peopleTeams.replacement)} คน` : undefined}
+              onClick={cells ? openFollow : undefined}
+              testId="overview-follow-total"
+            />
+            <OverviewNode label="AI โทรแล้ว" value={calls?.aiDone} unit="สาย" sub={calls ? `รอ AI โทร ${NUM.format(calls.aiWaiting)} สาย` : undefined} onClick={cells ? openFollow : undefined} testId="overview-follow-ai" />
+            <OverviewNode label="คนโทรแล้ว" value={calls?.staffDone} unit="สาย" sub={calls ? `รอคนโทร ${NUM.format(calls.staffWaiting)} สาย` : undefined} onClick={cells ? openFollow : undefined} testId="overview-follow-staff" />
           </div>
           <ul className="space-y-1.5" data-testid="overview-follow-results">
-            {followResults.map((r) => {
-              const max = Math.max(1, ...followResults.map((x) => x.total));
+            {personRows.map((r) => {
+              const max = Math.max(1, ...personRows.map((x) => x.people));
               const tone = r.key === 'went' ? 'success' : r.key === 'notWent' ? 'danger' : r.key === 'failed' || r.key === 'reschedule' ? 'warn' : 'neutral';
               return (
                 <li key={r.key} className="flex items-center gap-3 text-sm">
                   <span className="w-24 shrink-0 truncate">{r.label}</span>
                   <span className="block h-2.5 flex-1 overflow-hidden rounded-full bg-muted" aria-hidden>
-                    <span className={cn('block h-full rounded-full transition-all duration-700 motion-reduce:transition-none', TONE[tone].dot)} style={{ width: `${(r.total / max) * 100}%` }} />
+                    <span className={cn('block h-full rounded-full transition-all duration-700 motion-reduce:transition-none', TONE[tone].dot)} style={{ width: `${(r.people / max) * 100}%` }} />
                   </span>
-                  <span className="w-14 shrink-0 text-right tabular-nums">{NUM.format(r.total)}</span>
+                  <span className="w-16 shrink-0 text-right tabular-nums">
+                    {NUM.format(r.people)}
+                    <span className="ml-1 text-xs text-muted-foreground">คน</span>
+                  </span>
+                  <span className="w-16 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{NUM.format(r.calls)} สาย</span>
                 </li>
               );
             })}
           </ul>
-          <p className="text-xs tabular-nums text-muted-foreground">
-            {followResults.length ? `${followResults.map((r) => `${r.label} ${NUM.format(r.total)}`).join(' + ')} = ${NUM.format(followLive)} สาย` : '—'}
+          <p className="text-xs tabular-nums text-muted-foreground" data-testid="overview-follow-people-sum">
+            {personRows.length ? `${personRows.map((r) => `${r.label} ${NUM.format(r.people)}`).join(' + ')} = ${NUM.format(peopleTotal)} คน` : '—'}
+          </p>
+          <p className="text-xs tabular-nums text-muted-foreground" data-testid="overview-follow-calls-sum">
+            {calls
+              ? `AI โทรแล้ว ${NUM.format(calls.aiDone)} + รอ AI ${NUM.format(calls.aiWaiting)} + คนโทรแล้ว ${NUM.format(calls.staffDone)} + รอคน ${NUM.format(calls.staffWaiting)} = ${NUM.format(followLive)} สาย`
+              : '—'}
           </p>
           <p className="text-xs tabular-nums text-muted-foreground" data-testid="overview-follow-bu">
             {followBus.length ? `แต่ละ BU: ${followBus.map((r) => `${r.label} ${NUM.format(r.total)}`).join(' · ')}` : null}

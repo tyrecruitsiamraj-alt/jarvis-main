@@ -7,12 +7,17 @@ import { tableInAppSchema } from './schema.js';
 import { followBuJoin, followBuSql, queueBuJoins, queueBuSql } from './homeBuSql.js';
 import { FOLLOW_QUEUE_MATCH } from './homeAiShareSql.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
+import { toYmdBangkok } from '../../src/lib/dateTh.js';
 import {
+  buildFollowPersonCells,
   doneBucketOf,
+  followPersonKey,
   emptyFollowBucket,
   type FollowBucket,
   type FollowBucketKey,
   type FollowBuCell,
+  type FollowPersonCell,
+  type FollowTeamKey,
   type LumosBucket,
 } from '../../src/lib/homeLumosSummary.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
@@ -116,6 +121,7 @@ export async function loadHomeLumosSummary(
 ): Promise<{
   follow: { ai: FollowBucket; staff: FollowBucket };
   followByBu: FollowBuCell[];
+  followPeople: FollowPersonCell[];
   applicants: LumosBucket;
   backlog: number;
 }> {
@@ -149,6 +155,7 @@ export async function loadHomeLumosSummary(
   const derived = categorizeFollowRows(follow);
   const split = { ai: emptyFollowBucket(), staff: emptyFollowBucket() };
   const byBuCells = new Map<string, FollowBuCell>();
+  const personRows: Array<{ key: string; bu: string | null; team: FollowTeamKey; bucket: FollowBucketKey }> = [];
   for (const r of follow) {
     const b = r.call_mode === 'manual' ? split.staff : split.ai;
     const key = followLedgerBucket(r, derived);
@@ -162,10 +169,16 @@ export async function loadHomeLumosSummary(
     const cell = byBuCells.get(ck) ?? { bu, team, caller, bucket: key, n: 0 };
     cell.n += 1;
     byBuCells.set(ck, cell);
+    if (key !== 'cancelled') {
+      const at = r.scheduled_at instanceof Date ? r.scheduled_at : new Date(String(r.scheduled_at ?? ''));
+      const ymd = Number.isNaN(at.getTime()) ? 'no-date' : toYmdBangkok(at);
+      personRows.push({ key: followPersonKey(r.recipient_phone, ymd, String(r.id)), bu, team, bucket: key });
+    }
   }
   return {
     follow: split,
     followByBu: [...byBuCells.values()],
+    followPeople: buildFollowPersonCells(personRows),
     applicants: bucket(apps.rows[0]),
     backlog: Number(backlog.rows[0]?.n ?? 0),
   };

@@ -5,7 +5,7 @@
  * แหล่งเดียวกับตารางราย BU (`followBuBlocks` · `reportBuBlocks`) — ไม่มีนิยามใหม่ · pure · เทสต์ `tests/api/homeSplit.test.ts`
  */
 import type { AiShareSegment } from '@/lib/homeAiShare';
-import { followBuTable, type FollowBuCell, type FollowBucketKey } from '@/lib/homeLumosSummary';
+import { followBuTable, type FollowBuCell, type FollowBucketKey, type FollowPersonCell } from '@/lib/homeLumosSummary';
 import { REPORT_SEGS, reportBuBlocks, type TopicReport } from '@/lib/homeTopicReport';
 
 /** `note` = คำขยายใต้ชื่อแถว (เช่น ล้มเหลวคืออะไร) */
@@ -44,6 +44,46 @@ export function followBuSplit(cells: readonly FollowBuCell[]): SplitRow[] {
   return followBuTable(cells, 'all', 'all')
     .rows.filter((r) => r.total > 0)
     .map((r) => ({ key: r.bu ?? 'none', label: r.bu ?? 'ไม่ระบุ BU', total: r.total, parts: { ai: r.ai, staff: r.staff } }));
+}
+
+/**
+ * ติดตามแบบคน + สาย (เจ้าของ 29 ต.ค. 2569 *"กี่คน กี่สาย ไปกี่คน ไม่ไปกี่คน"*)
+ * แต่ละผล = คน (`followPeople`) คู่กับสาย (`followByBu`) · ไป/ไม่ไป ขึ้นเสมอ (0 ก็ขึ้น) · ผลอื่นขึ้นเมื่อมีคนหรือสาย
+ */
+export type FollowPersonRow = { key: FollowBucketKey; label: string; people: number; calls: number };
+
+export function followPersonResults(
+  people: readonly FollowPersonCell[],
+  cells: readonly FollowBuCell[],
+  cols: ReadonlyArray<{ key: FollowBucketKey; label: string }>,
+): FollowPersonRow[] {
+  return cols
+    .map((c) => ({
+      key: c.key,
+      label: c.label,
+      people: people.reduce((n, x) => n + (x.bucket === c.key ? x.n : 0), 0),
+      calls: cells.reduce((n, x) => n + (x.bucket === c.key ? x.n : 0), 0),
+    }))
+    .filter((r) => r.people > 0 || r.calls > 0 || r.key === 'went' || r.key === 'notWent');
+}
+
+/** สายที่โทรแล้วจริง vs ยังรอ แยก AI / คน — "AI โทร" ห้ามนับสายที่ยังรอ (เคยขึ้น 264 ทั้งที่รอ 84) */
+export function followCallsMade(cells: readonly FollowBuCell[]): { aiDone: number; aiWaiting: number; staffDone: number; staffWaiting: number } {
+  const out = { aiDone: 0, aiWaiting: 0, staffDone: 0, staffWaiting: 0 };
+  for (const c of cells) {
+    if (c.bucket === 'cancelled') continue;
+    const waiting = c.bucket === 'waiting';
+    if (c.caller === 'ai') out[waiting ? 'aiWaiting' : 'aiDone'] += c.n;
+    else out[waiting ? 'staffWaiting' : 'staffDone'] += c.n;
+  }
+  return out;
+}
+
+/** ติดตามนับคน: คนเริ่มงาน / ส่งคนแทน */
+export function followPersonTeams(people: readonly FollowPersonCell[]): { main: number; replacement: number } {
+  const out = { main: 0, replacement: 0 };
+  for (const c of people) if (c.bucket !== 'cancelled') out[c.team] += c.n;
+  return out;
 }
 
 /** ติดตาม: คนเริ่มงาน / ส่งคนแทน */

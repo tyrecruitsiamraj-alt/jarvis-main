@@ -348,7 +348,7 @@ export type ProportionAppFlag = { id: string; jobId: string | null; claimed: boo
 export const APP_NO_CALL_LABEL: Record<AppNoCallReason | 'closed' | 'unknown', string> = {
   dup: 'ซ้ำ iRecruit ภายใน 14 วัน AI ไม่โทรเอง',
   soScraping: 'มาจาก So Scraping ยังไม่ส่ง AI',
-  keyed: 'คนคีย์ / นำเข้า Excel AI ไม่โทรเอง',
+  keyed: 'คนคีย์ / นำเข้า Excel รอคนโทร',
   noJob: 'ไม่ผูกใบขอ AI ไม่มีงานให้เสนอ',
   block: 'ตัวส่งบอกเหตุ',
   suppressed: 'เบอร์ถูกพัก (ไม่หางานแล้ว / เบอร์เสีย)',
@@ -435,6 +435,8 @@ export function recruitProportionRows(
     else if (stage === 'bad') notCalled.push('เบอร์ผิด โทรไม่ได้');
     else if (stage === 'overAge') notCalled.push('อายุ 58 ปีขึ้นไป ระบบไม่ส่ง AI');
     else if (stage === 'irecruit') notCalled.push('ดึงจาก iRecruit AI ไม่โทรเอง');
+    // คนคีย์ / นำเข้า Excel = รอคนโทร ไม่ใช่ไม่โทร (เจ้าของ 29 ต.ค. 2569 "อันนี้ต้องบอกรอโทร")
+    else if (fl?.reason === 'keyed') waiting.push('keyed');
     else if (fl?.reason === 'block') notCalled.push(fl.blockReason?.split(' — ')[0] || UNKNOWN);
     else if (fl?.reason) notCalled.push(APP_NO_CALL_LABEL[fl.reason]);
     else if (openJobIds && a.jobId && !openJobIds.has(a.jobId)) notCalled.push(APP_NO_CALL_LABEL.closed);
@@ -462,6 +464,7 @@ export function recruitProportionRows(
           [
             { key: 'aiQueued', label: 'AI รอโทร', tone: 'info' },
             { key: 'claimed', label: 'เจ้าหน้าที่เก็บไปแล้ว ยังไม่โทร', tone: 'violet', stuck: true },
+            { key: 'keyed', label: 'คนคีย์ / นำเข้า Excel รอคนโทร', tone: 'violet', stuck: true },
           ],
           waiting,
         ),
