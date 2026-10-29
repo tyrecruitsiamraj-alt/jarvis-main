@@ -91,3 +91,27 @@ describe('ป๊อปรายชื่อเปิดชื่อตาม id 
     expect(dlg).not.toContain('fetchAllJobApplications');
   });
 });
+
+describe('การ์ดกดลงลึก "การติดต่อ" ใช้คำและเลขชุดเดียวกับกล่องบนแท็บ (เจ้าของ 29 ต.ค. 2569)', () => {
+  it('สนใจ › รอติดต่อ · ติดต่อไม่สำเร็จ · ติดต่อสำเร็จ › นัดไม่สำเร็จ · นัดได้ › มา ไม่มา ยังไม่ถึงวันนัด เลยวันนัด — เลขเท่ากล่องบน', async () => {
+    const { drillTreeOf } = await import('../../src/lib/recruitDrill');
+    const apps = [
+      fact({ id: 'a1' }),
+      fact({ id: 'a2', logOk: false }),
+      fact({ id: 'a3', logOk: true, appointmentFailed: true }),
+      fact({ id: 'a4', logOk: true, appointmentAt: '2026-10-20T02:00:00Z', attendance: 'showed' }),
+      fact({ id: 'a6', aiAnswer: 'said_no', logOk: true }),
+    ];
+    const root = drillTreeOf('staff', apps, null)!;
+    const top = buildContactRows(apps, new Date()).total;
+    expect([root.label, root.count]).toEqual(['สนใจ', top.total]);
+    expect(root.children!.map((c) => [c.label, c.count])).toEqual([
+      ['รอติดต่อ', top.counts.waiting],
+      ['ติดต่อไม่สำเร็จ', top.counts.fail],
+      ['ติดต่อสำเร็จ', top.ok],
+    ]);
+    const ok = root.children![2];
+    expect(ok.children!.map((c) => c.label)).toEqual(['นัดไม่สำเร็จ', 'นัดได้']);
+    expect(ok.children![1].children!.map((c) => c.label)).toEqual(['มา', 'ไม่มา', 'ยังไม่ถึงวันนัด', 'เลยวันนัด ยังไม่ลงผล']);
+  });
+});

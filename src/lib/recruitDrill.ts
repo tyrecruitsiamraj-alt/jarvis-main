@@ -8,7 +8,8 @@
  * ตัวเลขชุดเดียวกับการ์ดเดิม (เงื่อนไขเดียวกับ `totalsOf`) — ตรรกะล้วน
  */
 import type { ToneKey } from './designTokens';
-import { isAiCalledReached, isAiSaidYes, isFollowedReached, isStaffFollowed } from './recruitOverview';
+import { isAiCalledReached } from './recruitOverview';
+import { CONTACT_BOOKED, CONTACT_BUCKET_LABEL, CONTACT_OK, contactBucketOf, isInterested, type ContactBucket } from './recruitContactTab';
 import type { RecruitAppFact, RecruitRequestItem } from './recruitOverviewTypes';
 import type { OverviewTabId } from './recruitOverviewTabs';
 
@@ -74,15 +75,22 @@ export function drillTreeOf(tab: OverviewTabId, cohort: readonly RecruitAppFact[
       ]);
     }
     case 'staff': {
-      const yes = cohort.filter(isAiSaidYes);
-      const [followed, waiting] = split(yes, isStaffFollowed);
-      const [reached, notReached] = split(followed, isFollowedReached);
-      return people('yes', 'ตอบ AI ว่าสนใจ', 'info', yes, [
-        people('followed', 'คนโทรต่อแล้ว', 'success', followed, [
-          people('reached', 'ติดต่อได้', 'success', reached),
-          people('notReached', 'ยังติดต่อไม่ได้', 'danger', notReached),
+      // 29 ต.ค. 2569 เจ้าของ "ทำให้ใช้คำและเลขชุดเดียวกับกล่องด้านบน" — ตัวแบ่งเดียวกับ `buildContactRows` (แท็บการติดต่อ)
+      const now = new Date();
+      const yes = cohort.filter(isInterested);
+      const of = (b: ContactBucket) => yes.filter((f) => contactBucketOf(f, now) === b);
+      const node = (b: ContactBucket, tone: ToneKey) => people(b, CONTACT_BUCKET_LABEL[b], tone, of(b));
+      const booked = yes.filter((f) => CONTACT_BOOKED.includes(contactBucketOf(f, now)));
+      const ok = yes.filter((f) => CONTACT_OK.includes(contactBucketOf(f, now)));
+      const apptNone = node('apptNone', 'neutral');
+      return people('yes', 'สนใจ', 'info', yes, [
+        node('waiting', 'warn'),
+        node('fail', 'danger'),
+        people('ok', 'ติดต่อสำเร็จ', 'success', ok, [
+          node('apptFailed', 'danger'),
+          ...(apptNone.count > 0 ? [apptNone] : []),
+          people('booked', 'นัดได้', 'info', booked, [node('showed', 'success'), node('noShow', 'danger'), node('upcoming', 'neutral'), node('overdue', 'warn')]),
         ]),
-        people('waiting', 'ยังไม่มีคนโทรต่อ', 'warn', waiting),
       ]);
     }
     case 'appt': {
