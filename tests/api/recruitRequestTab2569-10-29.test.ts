@@ -99,6 +99,8 @@ describe('กดกล่องแล้วเห็นใบ (เจ้าข�
     const ui = readFileSync('src/components/dashboard-trends/RequestTab.tsx', 'utf8');
     expect(ui).toContain('onPick={() => togglePick(\'cancelled\')}');
     expect(ui).toContain('data-testid="request-tab-district-row"');
+    // ความเร่งในจังหวัดก็กดดูใบได้ (เจ้าของ "ตรงนี้ก้กดแล้วโชว์ใบขอด้วย")
+    expect(ui).toContain('onClick={() => toggleDetail(\'lead\', k)}');
     expect(ui).toContain('data-testid="request-tab-list"');
   });
 });
@@ -114,9 +116,7 @@ describe('ข้อ 3 พื้นที่ขาดคน', () => {
     expect(areas[2].districts.map((d) => d.name)).toEqual([NO_DISTRICT]);
     expect(areas[0].districts[0]).toEqual({ name: 'ปลวกแดง', requests: 1, requested: 14, remaining: 10 });
   });
-  it('ตัวกรอง: ปุ่มกรุงศรี/Ford จับจากชื่อหน่วยงาน · ประเภทงานธนาคาร · Code Site · อำเภอเฉพาะจังหวัดที่เลือก', () => {
-    expect(filterRequestRows(ROWS, { ...EMPTY_REQUEST_FILTER, brand: 'krungsri' }).map((r) => r.requestNo)).toEqual(['LBM6910021']);
-    expect(filterRequestRows(ROWS, { ...EMPTY_REQUEST_FILTER, brand: 'ford' }).map((r) => r.requestNo)).toEqual(['OPL6910092']);
+  it('ตัวกรอง: ประเภทงานธนาคาร · Code Site · อำเภอเฉพาะจังหวัดที่เลือก', () => {
     expect(filterRequestRows(ROWS, { ...EMPTY_REQUEST_FILTER, sector: 'bank' })).toHaveLength(1);
     expect(filterRequestRows(ROWS, { ...EMPTY_REQUEST_FILTER, siteCode: '67LBDL0051' })).toHaveLength(7);
     expect(filterRequestRows(ROWS, { ...EMPTY_REQUEST_FILTER, siteCode: '67LBDL' })).toHaveLength(0);
@@ -186,12 +186,14 @@ describe('ข้อ 4 คนที่กรอกมา แยกช่องท
 });
 
 describe('หน้าจอ', () => {
-  it('แท็บใบขอใช้ RequestTab · ตัวกรอง 5 ช่อง · ปุ่มกรุงศรี SCB Ford · ไม่มีบรรทัดบวกใต้ข้อ 1 (เจ้าของลบในร่าง)', () => {
+  it('แท็บใบขอใช้ RequestTab · ตัวกรอง 5 ช่อง · ไม่มีปุ่มกรุงศรี SCB Ford (เจ้าของ "เอาออกได้") · ไม่มีบรรทัดบวกใต้ข้อ 1 (เจ้าของลบในร่าง)', () => {
     const ui = readFileSync('src/components/dashboard-trends/RequestTab.tsx', 'utf8');
     expect(ui).toContain('data-testid="request-tab-sector"');
     for (const id of ['request-tab-province', 'request-tab-district', 'request-tab-subdistrict']) expect(ui).toContain(`testId="${id}"`);
     // 29 ต.ค. 2569 "ชื่อหน่วยงานไม่เอาและ เอา Codesite แต่ดึงจาก erp ที่มีใบขอ"
     expect(ui).not.toContain('ชื่อหน่วยงาน');
+    expect(ui).not.toContain('request-tab-brand');
+    expect(ui).not.toContain('ทุกหน่วยงาน');
     expect(ui).toContain('ariaLabel="Code Site"');
     expect(requestSiteOptions(ROWS)).toEqual([{ value: '67LBDL0051', name: 'เชฟรอน - พขร.', unit: 'บริษัท เชฟรอนประเทศไทยสำรวจและผลิต จำกัด', n: 7 }]);
     expect(ui).not.toContain('= ${fmt(funnel.total)}');

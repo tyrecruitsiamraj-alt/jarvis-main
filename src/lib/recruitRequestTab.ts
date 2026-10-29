@@ -60,38 +60,29 @@ export function requestSectorOf(
   return unitSector ?? null;
 }
 
-/** ปุ่มลัดหน่วยงานที่เจ้าของอยากดู — จับจากชื่อหน่วยงาน/ไซต์เท่านั้น (ที่อยู่มีคำว่า "SCB Park" ของหน่วยงานอื่น) */
-export const REQUEST_BRANDS = [
-  { key: 'krungsri', label: 'กรุงศรี', re: /กรุงศรี|krungsri/i },
-  { key: 'scb', label: 'SCB', re: /ไทยพาณิชย์|\bscb\b/i },
-  { key: 'ford', label: 'Ford', re: /ford|ฟอร์ด/i },
-] as const;
-export type RequestBrandKey = (typeof REQUEST_BRANDS)[number]['key'];
-
-/** 🔴 29 ต.ค. 2569 เจ้าของ "ชื่อหน่วยงานไม่เอาและ เอา Codesite แต่ดึงจาก erp ที่มีใบขอ" — ไม่มีช่องพิมพ์ชื่อหน่วยงาน · Code Site เลือกจากไซต์ที่มีใบขอ */
+/**
+ * 🔴 29 ต.ค. 2569 เจ้าของ "ชื่อหน่วยงานไม่เอาและ เอา Codesite แต่ดึงจาก erp ที่มีใบขอ" — ไม่มีช่องพิมพ์ชื่อหน่วยงาน · Code Site เลือกจากไซต์ที่มีใบขอ
+ * ปุ่มกรุงศรี/SCB/Ford ถอดแล้ว ("เอาออกได้เพราะด้านบน Fil ให้แทนแล้ว") — ห้ามเติมกลับ
+ */
 export type RequestTabFilter = {
-  brand: RequestBrandKey | null;
   sector: RequestSector | 'unset' | null;
   siteCode: string | null;
   province: string | null;
   district: string | null;
   subdistrict: string | null;
 };
-export const EMPTY_REQUEST_FILTER: RequestTabFilter = { brand: null, sector: null, siteCode: null, province: null, district: null, subdistrict: null };
+export const EMPTY_REQUEST_FILTER: RequestTabFilter = { sector: null, siteCode: null, province: null, district: null, subdistrict: null };
 
 export const isRequestFilterActive = (f: RequestTabFilter) =>
-  Boolean(f.brand || f.sector || f.siteCode || f.province || f.district || f.subdistrict);
+  Boolean(f.sector || f.siteCode || f.province || f.district || f.subdistrict);
 
-const nameOf = (r: RecruitRequestRow) => `${r.unitName ?? ''} ${r.siteName ?? ''}`;
 export const provinceOf = (r: RecruitRequestRow) => r.province || NO_PROVINCE;
 export const districtOf = (r: RecruitRequestRow) => r.district || NO_DISTRICT;
 export const subdistrictOf = (r: RecruitRequestRow) => r.subdistrict || NO_SUBDISTRICT;
 
 export function filterRequestRows(rows: readonly RecruitRequestRow[], f: RequestTabFilter): RecruitRequestRow[] {
-  const brand = f.brand ? REQUEST_BRANDS.find((b) => b.key === f.brand) : null;
   return rows.filter(
     (r) =>
-      (!brand || brand.re.test(nameOf(r))) &&
       (!f.sector || (f.sector === 'unset' ? r.sector === null : r.sector === f.sector)) &&
       (!f.siteCode || r.siteCode === f.siteCode) &&
       (!f.province || provinceOf(r) === f.province) &&

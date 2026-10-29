@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
-import { REQUEST_LEAD_KIND_LABEL } from '@/lib/requestLeadKind';
+import { REQUEST_LEAD_KIND_LABEL, type RequestLeadKind } from '@/lib/requestLeadKind';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import {
   APPLICANT_BUCKET_LABEL,
@@ -21,7 +21,6 @@ import {
   sortRequests,
   type RequestFunnelKey,
   LEAD_ORDER,
-  REQUEST_BRANDS,
   REQUEST_SECTOR_LABEL,
   REQUEST_SECTOR_UNSET,
   appsOfRequests,
@@ -309,7 +308,7 @@ export default function RequestTab({
       {trend}
 
       {/* ─── 3. พื้นที่ไหนขาดคน (โน้ตเจ้าของ: กดจังหวัดเห็นอำเภอ · ฉุกเฉิน/ย้อนหลัง/ล่วงหน้า · บอกใบและคน) ─── */}
-      <ProvinceCard areas={areas} rows={picked} brand={f.brand} onBrand={(b) => set({ brand: b })} />
+      <ProvinceCard areas={areas} rows={picked} />
 
       {/* ─── 4. คนที่กรอกมา แยกช่องทาง ─── */}
       <ApplicantCard total={appRows.total} groups={appRows.groups} />
@@ -322,38 +321,21 @@ export default function RequestTab({
 function ProvinceCard({
   areas,
   rows,
-  brand,
-  onBrand,
 }: {
   areas: ReturnType<typeof buildProvinceAreas>;
   rows: readonly RecruitRequestRow[];
-  brand: RequestTabFilter['brand'];
-  onBrand: (b: RequestTabFilter['brand']) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [all, setAll] = useState(false);
   const [allDistricts, setAllDistricts] = useState(false);
-  /** อำเภอที่กดดูใบ (ในจังหวัดที่กางอยู่) · null = ไม่ได้กด */
-  const [district, setDistrict] = useState<string | null>(null);
+  /** อำเภอ/ความเร่งที่กดดูใบ (ในจังหวัดที่กางอยู่) · null = ไม่ได้กด (เจ้าของ 29 ต.ค. 2569 "ตรงนี้ก้กดแล้วโชว์ใบขอด้วย") */
+  const [detail, setDetail] = useState<{ kind: 'district' | 'lead'; value: string } | null>(null);
+  const isDetail = (kind: 'district' | 'lead', value: string) => detail?.kind === kind && detail.value === value;
+  const toggleDetail = (kind: 'district' | 'lead', value: string) => setDetail(isDetail(kind, value) ? null : { kind, value });
   const max = Math.max(1, ...areas.map((a) => a.requested));
   const shown = all ? areas : areas.slice(0, PROVINCES_SHOWN);
   return (
-    <OverviewCard
-      icon={MapPin}
-      title="พื้นที่ไหนขาดคน"
-      actions={
-        <div className="flex flex-wrap gap-1" role="group" aria-label="หน่วยงาน">
-          <Button type="button" size="xs" variant={brand === null ? 'default' : 'outline'} aria-pressed={brand === null} onClick={() => onBrand(null)}>
-            ทุกหน่วยงาน
-          </Button>
-          {REQUEST_BRANDS.map((b) => (
-            <Button key={b.key} type="button" size="xs" variant={brand === b.key ? 'default' : 'outline'} aria-pressed={brand === b.key} onClick={() => onBrand(brand === b.key ? null : b.key)} data-testid={`request-tab-brand-${b.key}`}>
-              {b.label}
-            </Button>
-          ))}
-        </div>
-      }
-    >
+    <OverviewCard icon={MapPin} title="พื้นที่ไหนขาดคน">
       <div className={cn('flex flex-wrap gap-4 text-xs', DASH.sub)}>
         <span className="inline-flex items-center gap-1.5">
           <span className={cn('h-2.5 w-2.5 rounded-sm', TONE.neutral.dot)} aria-hidden />
@@ -375,7 +357,7 @@ function ProvinceCard({
               aria-expanded={open === p.name}
               onClick={() => {
                 setOpen(open === p.name ? null : p.name);
-                setDistrict(null);
+                setDetail(null);
               }}
               data-testid="request-tab-province-row"
             >
@@ -398,12 +380,20 @@ function ProvinceCard({
               <div className="mb-2 ml-2 space-y-3 rounded-xl bg-muted/40 p-3" data-testid="request-tab-province-detail">
                 <div className="grid gap-2 sm:grid-cols-3">
                   {LEAD_ORDER.map((k) => (
-                    <p key={k} className="flex justify-between gap-2 rounded-lg bg-card px-3 py-2 text-sm">
+                    <Button
+                      key={k}
+                      type="button"
+                      variant="ghost"
+                      aria-pressed={isDetail('lead', k)}
+                      onClick={() => toggleDetail('lead', k)}
+                      className={cn('h-auto justify-between gap-2 whitespace-normal rounded-lg bg-card px-3 py-2 text-left text-sm font-normal', isDetail('lead', k) && 'ring-2 ring-ring')}
+                      data-testid="request-tab-lead"
+                    >
                       <span>{REQUEST_LEAD_KIND_LABEL[k]}</span>
                       <span className="tabular-nums">
                         {fmt(p.lead[k].requests)} ใบ · {fmt(p.lead[k].requested)} คน
                       </span>
-                    </p>
+                    </Button>
                   ))}
                 </div>
                 <ul className="divide-y divide-border rounded-lg bg-card">
@@ -412,9 +402,9 @@ function ProvinceCard({
                       <Button
                         type="button"
                         variant="ghost"
-                        aria-pressed={district === d.name}
-                        onClick={() => setDistrict(district === d.name ? null : d.name)}
-                        className={cn('flex h-auto w-full flex-wrap items-center justify-between gap-x-3 gap-y-0.5 whitespace-normal rounded-none px-3 py-2 text-left text-sm font-normal', district === d.name && 'bg-muted')}
+                        aria-pressed={isDetail('district', d.name)}
+                        onClick={() => toggleDetail('district', d.name)}
+                        className={cn('flex h-auto w-full flex-wrap items-center justify-between gap-x-3 gap-y-0.5 whitespace-normal rounded-none px-3 py-2 text-left text-sm font-normal', isDetail('district', d.name) && 'bg-muted')}
                         data-testid="request-tab-district-row"
                       >
                         <span className="min-w-0">{d.name}</span>
@@ -431,11 +421,13 @@ function ProvinceCard({
                     {allDistricts ? 'ซ่อน' : `ดูทั้งหมด ${fmt(p.districts.length)} อำเภอ`}
                   </Button>
                 ) : null}
-                {district ? (
+                {detail ? (
                   <RequestList
-                    title={`${p.name} · ${district}`}
-                    rows={sortRequests(rows.filter((r) => provinceOf(r) === p.name && districtOf(r) === district))}
-                    onClose={() => setDistrict(null)}
+                    title={`${p.name} · ${detail.kind === 'lead' ? REQUEST_LEAD_KIND_LABEL[detail.value as RequestLeadKind] : detail.value}`}
+                    rows={sortRequests(
+                      rows.filter((r) => provinceOf(r) === p.name && (detail.kind === 'lead' ? r.leadKind === detail.value : districtOf(r) === detail.value)),
+                    )}
+                    onClose={() => setDetail(null)}
                   />
                 ) : null}
               </div>
