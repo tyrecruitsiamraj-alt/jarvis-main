@@ -14,7 +14,7 @@
  */
 import { onlineRequestStateOf } from '@/lib/homeOnline';
 import { aiStage } from '@/lib/recruitJourney';
-import { funnelChannelOf, funnelGroupOf, type FunnelGroupKey } from '@/lib/channelFunnel';
+import { NO_SUB, funnelGroupOf, funnelSubChannelOf, funnelSubOf, type FunnelGroupKey } from '@/lib/channelFunnel';
 import type { RequestLeadKind } from '@/lib/requestLeadKind';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 
@@ -307,19 +307,47 @@ function rowOf(key: string, name: string, list: readonly RecruitAppFact[]): Appl
 export function buildApplicantChannelRows(apps: readonly RecruitAppFact[]): { total: ApplicantChannelRow; groups: ApplicantChannelRow[] } {
   const groups = new Map<FunnelGroupKey, Map<string, RecruitAppFact[]>>();
   for (const f of apps) {
-    const ch = funnelChannelOf(f);
+    const ch = funnelSubChannelOf(f);
     const g = funnelGroupOf(ch);
     const chans = groups.get(g) ?? new Map<string, RecruitAppFact[]>();
     chans.set(ch, [...(chans.get(ch) ?? []), f]);
     groups.set(g, chans);
   }
+  const byTotal = (a: ApplicantChannelRow, b: ApplicantChannelRow) => b.total - a.total || a.name.localeCompare(b.name, 'th');
   const out = [...groups.entries()].map(([g, chans]) => {
     const all = [...chans.values()].flat();
     const row = rowOf(g, FUNNEL_GROUP_LABEL[g], all);
-    row.children = [...chans.entries()].map(([ch, list]) => rowOf(`${g}:${ch}`, ch, list)).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'th'));
+    row.children = [...chans.entries()]
+      .map(([ch, list]) => {
+        const child = rowOf(`${g}:${ch}`, ch, list);
+        // ชั้นที่ 3 = ชื่อกลุ่ม/เพจ (เจ้าของ 29 ต.ค. 2569 "กด facebook group ก้ไม่มีกลุ่มให้ดูหรอว่ากลุ่มไหนที่เข้ามาเยอะ")
+        // มีแค่ "ไม่ระบุชื่อ" แถวเดียว = ไม่มีอะไรให้กดลง (กติกาเดียวกับ `buildChannelFunnelTree`)
+        const subs = new Map<string, RecruitAppFact[]>();
+        for (const f of list) {
+          const sub = funnelSubOf(f);
+          subs.set(sub, [...(subs.get(sub) ?? []), f]);
+        }
+        const useful = subs.size > 1 || (subs.size === 1 && !subs.has(NO_SUB));
+        if (useful) child.children = [...subs.entries()].map(([name, l]) => rowOf(`${g}:${ch}:${name}`, name, l)).sort(byTotal);
+        return child;
+      })
+      .sort(byTotal);
     return row;
   });
   return { total: rowOf('total', 'รวมทุกช่องทาง', apps), groups: out.sort((a, b) => b.total - a.total) };
+}
+
+/**
+ * ใบสมัครของแถวช่องทางที่กด (คีย์ของ `buildApplicantChannelRows`: กลุ่ม · กลุ่ม:ช่องทาง · กลุ่ม:ช่องทาง:ชื่อกลุ่ม)
+ * การ์ดตำแหน่งที่สมัคร/เหตุผลที่ไม่สำเร็จเปลี่ยนตามช่องทางที่กด (เจ้าของ 29 ต.ค. 2569 Choice) · null/total = ทุกใบ
+ */
+export function appsOfChannelKey(apps: readonly RecruitAppFact[], key: string | null): RecruitAppFact[] {
+  if (!key || key === 'total') return [...apps];
+  return apps.filter((f) => {
+    const ch = funnelSubChannelOf(f);
+    const g = funnelGroupOf(ch);
+    return key === g || key === `${g}:${ch}` || key === `${g}:${ch}:${funnelSubOf(f)}`;
+  });
 }
 
 /** ช่องทางรองที่ได้คนสนใจเยอะ — เรียง % สนใจ (ต้องโทรแล้วอย่างน้อย `minCalled` คน ไม่ให้ 1/1 ขึ้นบนสุด) */

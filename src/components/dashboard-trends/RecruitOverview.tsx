@@ -188,8 +188,6 @@ const RecruitOverview: React.FC<{
       delay: delayRows(cohort),
       daily: dailyRows(cohort, win.from, win.to),
       channels: buildChannelFunnelTree(cohort),
-      positions: positionRows(cohort),
-      reasons: reasonGroups(cohort),
     };
   }, [data, win, apps]);
 
@@ -422,7 +420,24 @@ const RecruitOverview: React.FC<{
          * แล้วต่อด้วยของแท็บกรอกเข้ามาเดิมทั้งหมด ("หน้า กรอกเข้ามา … เอาออกเลย ไปรวมกับ แท็บใบขอ")
          */}
         <TabsContent value="requests" className="mt-3 space-y-3">
-          <RequestTab rows={data.requestRows ?? null} rowsError={data.errors.requests ?? null} apps={view.cohort} trend={compareCard('requests')}>
+          <RequestTab
+            rows={data.requestRows ?? null}
+            rowsError={data.errors.requests ?? null}
+            apps={view.cohort}
+            trend={compareCard('requests')}
+            scoped={(scopedApps, channel) => (
+              // ตามตัวกรองบนสุด + ช่องทางที่กดในตาราง "คนที่กรอกมา" (เจ้าของ 29 ต.ค. 2569 "ไม่ได้บอกช่องทางหรอ")
+              // ฐาน = ทุกรายชื่อ (เส้นทางขั้น 4 นับเฉพาะคนที่ตอบ AI ว่าสนใจ — QA 18 ต.ค. 2569 เลขเลยต่างกัน)
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                <OverviewCard icon={Briefcase} title="ตำแหน่งที่สมัคร" sub={channel ? `10 อันดับ · ${channel}` : '10 อันดับ'}>
+                  <PositionList rows={positionRows(scopedApps)} />
+                </OverviewCard>
+                <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub={channel ?? 'ทุกช่องทาง'} className="lg:col-span-2">
+                  <ReasonColumns groups={reasonGroups(scopedApps)} />
+                </OverviewCard>
+              </div>
+            )}
+          >
           {compareCard('apps')}
           {drillCard('apps', 'รายชื่อที่กรอกมา')}
           {/* งานค้างของขั้นนี้ ณ วันนี้ (ย้ายจากแท็บใบขอ · เจ้าของ 29 ต.ค. 2569 "ย้ายไปให้ถูกเรื่องของมัน") */}
@@ -437,23 +452,13 @@ const RecruitOverview: React.FC<{
               <DailyCard rows={view.daily} icon={BarChart3} />
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            {/* ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "facebook ad 200 สนใจ 100 … มา 10" + "จับได้ถึงแจ้งเข้า") */}
-            <OverviewCard
-              icon={Megaphone}
-              title="รายชื่อที่กรอกในช่วงนี้ ไปถึงไหนแยกช่องทาง"
-              sub={data.errors.informs ? 'อ่านแจ้งเข้า ERP ไม่ได้' : 'แจ้งเข้า = มีใบแจ้งเข้า ERP หลังวันกรอก'}
-              className="lg:col-span-2"
-            >
-              <ChannelFunnelTable groups={view.channels.groups} total={view.channels.total} onOpen={(title, ids) => setNames({ title, ids })} />
-            </OverviewCard>
-            <OverviewCard icon={Briefcase} title="ตำแหน่งที่สมัคร" sub="10 อันดับ">
-              <PositionList rows={view.positions} />
-            </OverviewCard>
-          </div>
-          {/* ฐาน = ทุกรายชื่อของช่วง (เส้นทางขั้น 4 นับเฉพาะคนที่ตอบ AI ว่าสนใจ — QA 18 ต.ค. 2569 เลขเลยต่างกัน) */}
-          <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub="ทุกรายชื่อของช่วงนี้">
-            <ReasonColumns groups={view.reasons} />
+          {/* ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "facebook ad 200 สนใจ 100 … มา 10" + "จับได้ถึงแจ้งเข้า") */}
+          <OverviewCard
+            icon={Megaphone}
+            title="รายชื่อที่กรอกในช่วงนี้ ไปถึงไหนแยกช่องทาง"
+            sub={data.errors.informs ? 'อ่านแจ้งเข้า ERP ไม่ได้' : 'แจ้งเข้า = มีใบแจ้งเข้า ERP หลังวันกรอก'}
+          >
+            <ChannelFunnelTable groups={view.channels.groups} total={view.channels.total} onOpen={(title, ids) => setNames({ title, ids })} />
           </OverviewCard>
           </RequestTab>
         </TabsContent>

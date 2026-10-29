@@ -109,11 +109,29 @@ export function funnelGroupOf(channel: string): FunnelGroupKey {
 }
 
 export const NO_SUB = 'ไม่ระบุชื่อ';
-/** ชื่อกลุ่ม/เพจย่อย — ลิงก์ของเรา "Facebook Group · ชื่อกลุ่ม" · ใบจาก iRecruit ใช้กลุ่มย่อยที่ลงทะเบียน · ไม่มี = ไม่ระบุชื่อ */
+/** ส่วนของป้ายที่เป็นชื่อช่องทาง ไม่ใช่ชื่อกลุ่ม/เพจ ("Facebook · Facebook Group" — ทั้งสองส่วนเป็นช่องทาง) */
+const isChannelPart = (p: string) => /^(facebook|tiktok|line|irecruit)\b/i.test(p) || mainChannelOf(p, null) !== p;
+/**
+ * ชื่อกลุ่ม/เพจย่อย — ลิงก์ของเรา "Facebook Group · ชื่อกลุ่ม" · ใบจาก iRecruit ใช้กลุ่มย่อยที่ลงทะเบียน · ไม่มี = ไม่ระบุชื่อ
+ * 29 ต.ค. 2569: ข้ามส่วนที่เป็นชื่อช่องทาง — เดิม "Facebook · Facebook Group" ได้ชื่อกลุ่มเป็น "Facebook Group"
+ */
 export function funnelSubOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referralSource' | 'sourceSub'>): string {
   if (isFromIrecruit(f)) return f.sourceSub?.trim() || NO_SUB;
-  const tail = (f.channelLabel ?? '').split('·').slice(1).join('·').trim();
-  return tail || NO_SUB;
+  const parts = (f.channelLabel ?? '').split('·').map((p) => p.trim()).filter(Boolean);
+  let i = 0;
+  while (i < parts.length && isChannelPart(parts[i])) i += 1;
+  return parts.slice(i).join(' · ') || NO_SUB;
+}
+
+/** Facebook ที่ไม่รู้ว่ากลุ่ม/เพจ/Ads (คนกรอกเลือก "Facebook" เอง ไม่ได้มาจากลิงก์) — เจ้าของ 29 ต.ค. 2569 Choice "ขึ้นเป็น ไม่ระบุ" */
+export const FACEBOOK_UNKNOWN = 'Facebook ไม่ระบุ';
+/**
+ * ช่องทางรองของตารางแยกช่องทาง (ใต้ช่องทางหลัก) — `funnelChannelOf` แต่ Facebook เปล่าเป็น "Facebook ไม่ระบุ"
+ * ใต้ Facebook จึงมีแค่ กลุ่ม · เพจ · Ads · ไม่ระบุ ("ควรมีแค่ facebook Group Facebook page facebook ads")
+ */
+export function funnelSubChannelOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referralSource' | 'sourceChannel'>): string {
+  const ch = funnelChannelOf(f);
+  return /^facebook$/i.test(ch) ? FACEBOOK_UNKNOWN : ch;
 }
 
 export type FunnelNode = ChannelFunnelRow & { key: string; children?: FunnelNode[] };
@@ -124,7 +142,7 @@ export function buildChannelFunnelTree(cohort: readonly RecruitAppFact[]): { gro
   const groups = new Map<FunnelGroupKey, Map<string, Map<string, RecruitAppFact[]>>>();
   for (const g of GROUP_ORDER) groups.set(g, new Map());
   for (const f of cohort) {
-    const ch = funnelChannelOf(f);
+    const ch = funnelSubChannelOf(f);
     const chans = groups.get(funnelGroupOf(ch))!;
     const subs = chans.get(ch) ?? new Map<string, RecruitAppFact[]>();
     const sub = funnelSubOf(f);

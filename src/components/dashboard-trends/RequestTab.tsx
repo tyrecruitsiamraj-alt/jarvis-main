@@ -23,6 +23,7 @@ import {
   LEAD_ORDER,
   REQUEST_SECTOR_LABEL,
   REQUEST_SECTOR_UNSET,
+  appsOfChannelKey,
   appsOfRequests,
   applicantSuccessRanking,
   buildApplicantChannelRows,
@@ -187,6 +188,7 @@ export default function RequestTab({
   apps,
   trend,
   children,
+  scoped,
 }: {
   rows: readonly RecruitRequestRow[] | null;
   rowsError: string | null;
@@ -194,6 +196,11 @@ export default function RequestTab({
   apps: readonly RecruitAppFact[];
   trend: React.ReactNode;
   children?: React.ReactNode;
+  /**
+   * การ์ดที่เปลี่ยนตามตัวกรองบนสุด + ช่องทางที่กดในตาราง "คนที่กรอกมา" (ตำแหน่งที่สมัคร · เหตุผลที่ไม่สำเร็จ)
+   * เจ้าของ 29 ต.ค. 2569 "ไม่ได้บอกช่องทางหรอ" → Choice "กดช่องทางในตารางแล้วการ์ดเปลี่ยนตาม" · `channel` = ชื่อแถวที่กด (null = ทุกช่องทาง)
+   */
+  scoped?: (apps: readonly RecruitAppFact[], channel: string | null) => React.ReactNode;
 }) {
   const [f, setF] = useState<RequestTabFilter>(EMPTY_REQUEST_FILTER);
   const active = isRequestFilterActive(f);
@@ -202,7 +209,11 @@ export default function RequestTab({
   const sites = useMemo(() => requestSiteOptions(rows ?? []), [rows]);
   const funnel = useMemo(() => buildRequestFunnel(picked), [picked]);
   const areas = useMemo(() => buildProvinceAreas(picked), [picked]);
-  const appRows = useMemo(() => buildApplicantChannelRows(appsOfRequests(apps, active ? picked : null)), [apps, picked, active]);
+  const filteredApps = useMemo(() => appsOfRequests(apps, active ? picked : null), [apps, picked, active]);
+  const appRows = useMemo(() => buildApplicantChannelRows(filteredApps), [filteredApps]);
+  /** แถวช่องทางที่กด (คีย์ของ `buildApplicantChannelRows`) · null = ทุกช่องทาง */
+  const [channel, setChannel] = useState<{ key: string; name: string } | null>(null);
+  const channelApps = useMemo(() => appsOfChannelKey(filteredApps, channel?.key ?? null), [filteredApps, channel]);
   const set = (patch: Partial<RequestTabFilter>) => setF((cur) => ({ ...cur, ...patch }));
   /** กล่องที่กดดูรายการใบ · null = ไม่ได้กด */
   const [pick, setPick] = useState<RequestFunnelKey | null>(null);
@@ -269,15 +280,6 @@ export default function RequestTab({
             <span>ดำเนินการสรรหา</span>
             <span className="font-medium tabular-nums">{fmt(funnel.active.requests)} ใบ</span>
           </p>
-          <span className="flex h-3 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
-            {[
-              [funnel.active.notReleased, 'warn'],
-              [funnel.active.releasedNoApps, 'neutral'],
-              [funnel.active.releasedWithApps, 'info'],
-            ].map(([n, tone]) => (
-              <span key={tone as string} className={cn('block h-full', TONE[tone as 'warn'].dot)} style={{ width: `${funnel.active.requests ? ((n as number) / funnel.active.requests) * 100 : 0}%` }} />
-            ))}
-          </span>
           <div className="grid gap-2 text-sm sm:grid-cols-3">
             {(
               [
@@ -311,9 +313,15 @@ export default function RequestTab({
       <ProvinceCard areas={areas} rows={picked} />
 
       {/* ─── 4. คนที่กรอกมา แยกช่องทาง ─── */}
-      <ApplicantCard total={appRows.total} groups={appRows.groups} />
+      <ApplicantCard
+        total={appRows.total}
+        groups={appRows.groups}
+        pickedKey={channel?.key ?? null}
+        onPick={(r) => setChannel((cur) => (cur?.key === r.key || r.key === 'total' ? null : { key: r.key, name: r.name }))}
+      />
 
       {children}
+      {scoped ? scoped(channelApps, channel?.name ?? null) : null}
     </div>
   );
 }
@@ -452,19 +460,40 @@ const CALLED_COLS = [
   { key: 'staff', tone: null },
 ] as const;
 
-function ChannelRow({ r, level, open, onToggle }: { r: ApplicantChannelRow; level: 0 | 1 | 2; open?: boolean; onToggle?: () => void }) {
+function ChannelRow({
+  r,
+  level,
+  open,
+  onToggle,
+  picked,
+  onPick,
+}: {
+  r: ApplicantChannelRow;
+  level: 0 | 1 | 2 | 3;
+  open?: boolean;
+  onToggle?: () => void;
+  /** แถวที่กดอยู่ — การ์ดตำแหน่ง/เหตุผลข้างล่างเป็นของช่องทางนี้ */
+  picked?: boolean;
+  onPick?: () => void;
+}) {
   const num = (n: number, cls?: string) => <TableCell className={cn('text-right tabular-nums', cls)}>{fmt(n)}</TableCell>;
   return (
-    <TableRow className={cn(level === 0 && 'bg-muted/40 font-medium hover:bg-muted/40')} data-testid={`request-tab-channel-${level}`}>
-      <TableCell className={cn('whitespace-nowrap text-sm', level === 2 && 'pl-9')}>
-        {onToggle ? (
-          <Button type="button" variant="ghost" size="xs" className="-ml-2 h-7 gap-1 px-2 font-medium" aria-expanded={open} onClick={onToggle}>
-            <ChevronDown className={cn('size-4 transition-transform', !open && '-rotate-90')} aria-hidden />
-            {r.name}
-          </Button>
-        ) : (
-          r.name
-        )}
+    <TableRow className={cn(level === 0 && 'bg-muted/40 font-medium hover:bg-muted/40', picked && 'bg-muted')} data-testid={`request-tab-channel-${level}`}>
+      <TableCell className={cn('whitespace-nowrap text-sm', level === 2 && 'pl-9', level === 3 && 'pl-14')}>
+        <span className="flex items-center gap-1">
+          {onToggle ? (
+            <Button type="button" variant="ghost" size="iconXs" className="-ml-2" aria-expanded={open} aria-label={open ? `ปิด ${r.name}` : `เปิด ${r.name}`} onClick={onToggle}>
+              <ChevronDown className={cn('size-4 transition-transform', !open && '-rotate-90')} aria-hidden />
+            </Button>
+          ) : null}
+          {onPick ? (
+            <Button type="button" variant="link" size="xs" className={cn('h-auto p-0 text-foreground', level <= 1 && 'font-medium')} aria-pressed={picked} onClick={onPick}>
+              {r.name}
+            </Button>
+          ) : (
+            r.name
+          )}
+        </span>
       </TableCell>
       {num(r.total, 'font-medium')}
       {num(r.notCalled)}
@@ -479,7 +508,17 @@ function ChannelRow({ r, level, open, onToggle }: { r: ApplicantChannelRow; leve
   );
 }
 
-function ApplicantCard({ total, groups }: { total: ApplicantChannelRow; groups: ApplicantChannelRow[] }) {
+function ApplicantCard({
+  total,
+  groups,
+  pickedKey,
+  onPick,
+}: {
+  total: ApplicantChannelRow;
+  groups: ApplicantChannelRow[];
+  pickedKey: string | null;
+  onPick: (r: ApplicantChannelRow) => void;
+}) {
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const toggle = (k: string) =>
     setOpen((cur) => {
@@ -488,6 +527,12 @@ function ApplicantCard({ total, groups }: { total: ApplicantChannelRow; groups: 
       else next.add(k);
       return next;
     });
+  const rowProps = (r: ApplicantChannelRow) => ({
+    r,
+    picked: pickedKey === r.key,
+    onPick: () => onPick(r),
+    ...(r.children?.length ? { open: open.has(r.key), onToggle: () => toggle(r.key) } : {}),
+  });
   const ranking = applicantSuccessRanking(groups);
   const rankMax = Math.max(1, ...ranking.map((r) => r.yesPct ?? 0));
   return (
@@ -511,11 +556,18 @@ function ApplicantCard({ total, groups }: { total: ApplicantChannelRow; groups: 
             </TableRow>
           </TableHeader>
           <TableBody>
-            <ChannelRow r={total} level={0} />
+            <ChannelRow {...rowProps(total)} level={0} picked={pickedKey === null} />
             {groups.map((g) => (
               <React.Fragment key={g.key}>
-                <ChannelRow r={g} level={1} open={open.has(g.key)} onToggle={() => toggle(g.key)} />
-                {open.has(g.key) ? (g.children ?? []).map((c) => <ChannelRow key={c.key} r={c} level={2} />) : null}
+                <ChannelRow {...rowProps(g)} level={1} />
+                {open.has(g.key)
+                  ? (g.children ?? []).map((c) => (
+                      <React.Fragment key={c.key}>
+                        <ChannelRow {...rowProps(c)} level={2} />
+                        {open.has(c.key) ? (c.children ?? []).map((cc) => <ChannelRow key={cc.key} {...rowProps(cc)} level={3} />) : null}
+                      </React.Fragment>
+                    ))
+                  : null}
               </React.Fragment>
             ))}
           </TableBody>

@@ -9,6 +9,7 @@ import {
   NO_DISTRICT,
   applicantCallBucketOf,
   applicantSuccessRanking,
+  appsOfChannelKey,
   appsOfRequests,
   buildApplicantChannelRows,
   buildProvinceAreas,
@@ -197,6 +198,45 @@ describe('หน้าจอ', () => {
     expect(ui).toContain('ariaLabel="Code Site"');
     expect(requestSiteOptions(ROWS)).toEqual([{ value: '67LBDL0051', name: 'เชฟรอน - พขร.', unit: 'บริษัท เชฟรอนประเทศไทยสำรวจและผลิต จำกัด', n: 7 }]);
     expect(ui).not.toContain('= ${fmt(funnel.total)}');
-    expect(readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8')).toContain('<RequestTab rows={data.requestRows ?? null}');
+    expect(readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8')).toContain('rows={data.requestRows ?? null}');
+  });
+});
+
+describe('ช่องทาง Facebook · ชื่อกลุ่ม · กดช่องทางแล้วการ์ดเปลี่ยนตาม (เจ้าของ 29 ต.ค. 2569)', () => {
+  const apps = [
+    fact({ id: 'g1', channelLabel: 'Facebook Group · กลุ่มหางานจังหวัด' }),
+    fact({ id: 'g2', channelLabel: 'Facebook Group · กลุ่มหางานจังหวัด' }),
+    fact({ id: 'g3', channelLabel: 'Facebook · Facebook Group' }),
+    fact({ id: 'p1', channelLabel: 'Facebook Page' }),
+    fact({ id: 'u1', channelLabel: null, referralSource: 'facebook' }),
+    fact({ id: 't1', channelLabel: 'TikTok · @sorecruit' }),
+  ];
+  const { groups } = buildApplicantChannelRows(apps);
+  const fb = groups.find((g) => g.key === 'facebook')!;
+  it('ใต้ Facebook มีแค่ กลุ่ม · เพจ · Ads · ไม่ระบุ — ไม่มีแถว "Facebook" เปล่า', () => {
+    expect(Object.fromEntries(fb.children!.map((c) => [c.name, c.total]))).toEqual({ 'Facebook กลุ่ม': 3, 'Facebook เพจ': 1, 'Facebook ไม่ระบุ': 1 });
+  });
+  it('Facebook กลุ่ม กดลงไปเห็นชื่อกลุ่ม · ป้าย "Facebook · Facebook Group" = ไม่ระบุชื่อ (ไม่ใช่ชื่อกลุ่ม "Facebook Group")', () => {
+    const group = fb.children!.find((c) => c.name === 'Facebook กลุ่ม')!;
+    expect(group.children!.map((c) => [c.name, c.total])).toEqual([
+      ['กลุ่มหางานจังหวัด', 2],
+      ['ไม่ระบุชื่อ', 1],
+    ]);
+    // ไม่มีชื่อให้แตก = ไม่มีชั้นที่ 3
+    expect(fb.children!.find((c) => c.name === 'Facebook เพจ')!.children).toBeUndefined();
+  });
+  it('กดแถวไหน ได้ใบสมัครเท่าเลขทั้งหมดของแถวนั้น · ไม่กด = ทุกใบ', () => {
+    const keys = [fb, ...fb.children!, ...fb.children!.flatMap((c) => c.children ?? [])];
+    for (const r of keys) expect(appsOfChannelKey(apps, r.key)).toHaveLength(r.total);
+    expect(appsOfChannelKey(apps, null)).toHaveLength(apps.length);
+    expect(appsOfChannelKey(apps, 'total')).toHaveLength(apps.length);
+  });
+  it('จอ: การ์ดตำแหน่ง/เหตุผลอยู่ใน scoped ของ RequestTab · ไม่มีแถบสีใต้ดำเนินการสรรหา', () => {
+    const page = readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8');
+    expect(page).toContain('<PositionList rows={positionRows(scopedApps)} />');
+    expect(page).toContain('<ReasonColumns groups={reasonGroups(scopedApps)} />');
+    const ui = readFileSync('src/components/dashboard-trends/RequestTab.tsx', 'utf8');
+    expect(ui).toContain('{scoped ? scoped(channelApps, channel?.name ?? null) : null}');
+    expect(ui).not.toContain('funnel.active.releasedNoApps, \'neutral\'');
   });
 });
