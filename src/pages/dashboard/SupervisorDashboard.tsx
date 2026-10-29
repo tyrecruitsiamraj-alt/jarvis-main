@@ -271,6 +271,14 @@ const SupervisorDashboard: React.FC = () => {
       .finally(() => setClosedAllLoading(false));
   }, [period, closedAllJobs, closedAllLoading, siamrajPrimary, dbSource, throughputFrom, throughputTo]);
 
+  /**
+   * 🔴 โหมดทั้งหมด: ดึงใบปิดให้เองตอนเปิดหน้า (เจ้าของ 29 ต.ค. 2569 Choice "ดึงใบที่ปิดแล้วให้เอง ยอดรวมเท่าการ์ดบน")
+   * เดิมต้องกด "ดึงชุดใบที่ปิดแล้ว" ⇒ ตาราง "ปิดทัน / ไม่ทัน" นับแต่ใบที่ยังไม่ปิด (308) ไม่เท่าการ์ด "ใบขอเร่งด่วนแค่ไหน" (6,005)
+   */
+  useEffect(() => {
+    if (!period) requestClosedTotals();
+  }, [period, requestClosedTotals]);
+
   /** ใบปิดที่เอาไปคิดยอดรายคน — ช่วงที่เลือกใช้ชุดของช่วง · ทั้งหมดใช้ชุดที่โหลด on-demand */
   const closedJobsForOverview = useMemo(
     () => (period ? closedJobs : (closedAllJobs ?? [])),
