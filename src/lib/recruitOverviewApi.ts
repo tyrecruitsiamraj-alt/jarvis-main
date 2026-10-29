@@ -24,3 +24,27 @@ export async function fetchRecruitOverview(
   }
   return (await r.json()) as RecruitOverviewResponse;
 }
+
+/** ชื่อ/เบอร์ตาม id (29 ต.ค. 2569 ป๊อปรายชื่อของภาพรวม) — ทีละ 100 id ต่อครั้ง (ความยาว URL) · ในขอบเขต BU ของผู้ใช้ */
+export type ApplicantNameRow = {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  unit_name: string | null;
+  job_title: string | null;
+  position_interest: string | null;
+  created_at: string | null;
+};
+
+export async function fetchApplicantNames(ids: readonly string[]): Promise<ApplicantNameRow[]> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
+  const parts = await Promise.all(
+    chunks.map(async (chunk) => {
+      const r = await apiFetch(`/api/recruit-overview?names=${encodeURIComponent(chunk.join(','))}`);
+      if (!r.ok) throw new Error(`โหลดรายชื่อไม่สำเร็จ (HTTP ${r.status})`);
+      return ((await r.json()) as { rows: ApplicantNameRow[] }).rows;
+    }),
+  );
+  return parts.flat();
+}

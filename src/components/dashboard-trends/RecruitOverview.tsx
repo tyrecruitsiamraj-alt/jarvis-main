@@ -63,6 +63,7 @@ import { OVERVIEW_TABS, overviewTabOf, type OverviewTabId } from '@/lib/recruitO
 import { compareRowsOf, dailySeriesOf } from '@/lib/recruitCompare';
 import TrendLinesCard, { type ComparePeriod } from './TrendLinesCard';
 import RequestTab from './RequestTab';
+import ContactTab from './ContactTab';
 import DrillDownCard from './DrillDownCard';
 import { drillTreeOf } from '@/lib/recruitDrill';
 import { toYmdBangkok } from '@/lib/dateTh';
@@ -456,8 +457,9 @@ const RecruitOverview: React.FC<{
           </RequestTab>
         </TabsContent>
 
-        {/* ─── การติดต่อ: ขั้นสนใจ·คนโทรต่อ + ผลงานรายคน ─── */}
+        {/* ─── การติดต่อ (เจ้าของ 29 ต.ค. 2569): คนที่สนใจ โทรแล้วเป็นไง ถึงนัด ถึงมา · แยกช่องทาง · ของเดิมต่อท้าย ─── */}
         <TabsContent value="staff" className="mt-3 space-y-3">
+          <ContactTab apps={view.cohort} onOpenNames={(title, ids) => setNames({ title, ids })}>
           {compareCard('staff')}
           {drillCard('staff', 'การติดต่อ')}
           {/* งานค้างของขั้นนี้ ณ วันนี้ (ย้ายจากแท็บใบขอ · เจ้าของ 29 ต.ค. 2569 "ย้ายไปให้ถูกเรื่องของมัน") */}
@@ -467,6 +469,7 @@ const RecruitOverview: React.FC<{
           <OverviewCard icon={Users} title="ผลงานรายคน" sub="งานที่ลงผลในช่วงนี้">
             {data.staff ? <StaffTable staff={data.staff} ai={data.ai} /> : <SectionError message={data.errors.staff ?? 'อ่านผลงานรายคนไม่ได้'} />}
           </OverviewCard>
+          </ContactTab>
         </TabsContent>
 
         {/* ─── นัดหมาย: นัด · มาไหม + คนแจ้งเข้ามาจากช่องทางไหน ─── */}

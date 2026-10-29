@@ -799,6 +799,28 @@ export async function buildRecruitOverview(
   return body;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const NAMES_MAX = 100;
+
+/**
+ * ชื่อ/เบอร์ของใบสมัครตาม id — ป๊อปรายชื่อของภาพรวม (29 ต.ค. 2569 แท็บการติดต่อ: คนที่เจ้าหน้าที่คนอื่นเก็บไปแล้ว
+ * ไม่อยู่ในลิสต์ผู้สมัครของผู้ใช้ ป๊อปเลยขึ้น "เปิดชื่อไม่ได้") · อ่านอย่างเดียว · ในขอบเขต BU ของผู้ใช้เท่านั้น
+ */
+export async function loadApplicantNames(ids: readonly string[], scope: DepartmentScope): Promise<Row[]> {
+  const clean = [...new Set(ids.filter((id) => UUID_RE.test(id)))].slice(0, NAMES_MAX);
+  if (clean.length === 0 || scope.mode === 'none') return [];
+  const picked = pickDashboardBu(scope, null);
+  const allowed = scope.mode === 'all' ? null : (picked.choices ?? (picked.bu ? [picked.bu] : []));
+  const { rows } = await dbQuery<Row>(
+    `select a.id::text as id, a.full_name, a.phone, a.unit_name, a.job_title, a.position_interest, a.created_at
+       from ${APPS} a ${appBuJoin('a')}
+      where a.id = any($1::uuid[])
+        and ($2::text[] is null or ${appBuSql('a')} = any($2::text[]))`,
+    [clean, allowed],
+  );
+  return rows;
+}
+
 async function handler(req: AuthedReq, res: ApiRes) {
   if ((req.method || 'GET').toUpperCase() !== 'GET') {
     res.setHeader?.('Allow', 'GET');
@@ -806,6 +828,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
   }
   try {
     const scope = await loadMatchingBuScope(req.user);
+    if (typeof req.query?.names === 'string') {
+      const rows = await loadApplicantNames(req.query.names.split(','), scope);
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json({ rows });
+    }
     const month = typeof req.query?.month === 'string' ? req.query.month.trim() : undefined;
     const from = typeof req.query?.from === 'string' ? req.query.from.trim() : undefined;
     const to = typeof req.query?.to === 'string' ? req.query.to.trim() : undefined;
