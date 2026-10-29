@@ -10,14 +10,14 @@ import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import { addAftercareContact, fetchAftercareHistory } from '@/lib/aftercareApi';
 import {
-  AFTERCARE_RESULTS,
+  AFTERCARE_NO_TALK_RESULTS,
   AFTERCARE_RESULT_LABEL,
   AFTERCARE_RESULT_TONE,
   AFTERCARE_SCORES,
   AFTERCARE_SCORE_LABEL,
   AFTERCARE_SCORE_TONE,
   AFTERCARE_SCORE_TOPICS,
-  aftercareResultNeedsScores,
+  aftercareResultFromScores,
   isAftercareScore,
   type AftercareContact,
   type AftercareResult,
@@ -27,6 +27,8 @@ import {
 /**
  * กดโทร + ลงผลบนแถวของหน้าดูแลหลังเริ่มงาน (เจ้าของ 10 ต.ค. 2569 *"ทำคล้ายๆกับหน้าแท็บ การติดต่อ … กดโทรแล้วใส่ผล"*)
  * ผล 4 แบบ (Choice เจ้าของ) + หมายเหตุ · ทุกครั้งเก็บเป็นประวัติ · ฝังในแถว (ไม่เปิดป๊อปซ้อน)
+ * 🔴 29 ต.ค. 2569 (Choice "3 หัวข้อขึ้นทันทีที่กดลงผล"): กดลงผลแล้วเจอ 3 หัวข้อเลย · ผลทำงานปกติ/มีปัญหาคิดจากคะแนน
+ *    (`aftercareResultFromScores`) · ลาออก / ติดต่อไม่ได้ = ปุ่มแยก (คุยไม่ได้ ไม่มีคะแนน)
  */
 const when = (iso: string) => {
   const d = new Date(iso);
@@ -63,12 +65,13 @@ const AftercareContactPanel: React.FC<{
   onSaved: (c: AftercareContact) => void;
 }> = ({ phone, lastContact, contactCount, disabled, onSaved }) => {
   const [open, setOpen] = useState(false);
-  const [result, setResult] = useState<AftercareResult | null>(null);
+  /** ลาออก / ติดต่อไม่ได้ — คุยไม่ได้ (ไม่มีคะแนน) · null = คุยได้ ผลมาจากคะแนน */
+  const [noTalk, setNoTalk] = useState<AftercareResult | null>(null);
   const [note, setNote] = useState('');
-  /** คะแนน 3 หัวข้อ — ต้องครบเมื่อผล = ทำงานปกติ/มีปัญหา (เจ้าของ 19 ต.ค. 2569) */
+  /** คะแนน 3 หัวข้อ — ครบแล้วได้ผลทำงานปกติ/มีปัญหา (เจ้าของ 19 · 29 ต.ค. 2569) */
   const [scores, setScores] = useState<AftercareScores>(NO_SCORES);
-  const needScores = result !== null && aftercareResultNeedsScores(result);
-  const scoresDone = AFTERCARE_SCORE_TOPICS.every((t) => scores[t.key] !== null);
+  const result: AftercareResult | null = noTalk ?? aftercareResultFromScores(scores);
+  const needScores = noTalk === null;
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState<AftercareContact[] | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -81,7 +84,7 @@ const AftercareContactPanel: React.FC<{
       const saved = await addAftercareContact({ phone, result, note: note.trim() || null, ...(needScores ? scores : {}) });
       toast.success(`ลงผลแล้ว: ${AFTERCARE_RESULT_LABEL[saved.result]}`);
       setOpen(false);
-      setResult(null);
+      setNoTalk(null);
       setNote('');
       setScores(NO_SCORES);
       setHistory((h) => (h ? [saved, ...h] : h));
@@ -147,40 +150,41 @@ const AftercareContactPanel: React.FC<{
 
       {open ? (
         <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/30 p-3">
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="ผลการโทร">
-            {AFTERCARE_RESULTS.map((r) => (
+          <div className="space-y-2" data-testid="aftercare-scores">
+            {AFTERCARE_SCORE_TOPICS.map((t) => (
+              <div key={t.key} className="grid gap-1 sm:grid-cols-2 sm:items-center sm:gap-2">
+                <span className="text-sm text-foreground">{t.label}</span>
+                <FieldSelect
+                  value={scores[t.key] ?? ''}
+                  onChange={(v) => {
+                    setNoTalk(null);
+                    setScores((cur) => ({ ...cur, [t.key]: isAftercareScore(v) ? v : null }));
+                  }}
+                  options={AFTERCARE_SCORES.map((v) => ({ value: v, label: AFTERCARE_SCORE_LABEL[v] }))}
+                  placeholder="เลือกผล"
+                  ariaLabel={t.label}
+                  disabled={saving}
+                  testId={`aftercare-score-${t.key}`}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="คุยไม่ได้">
+            {AFTERCARE_NO_TALK_RESULTS.map((r) => (
               <Button
                 key={r}
                 type="button"
                 size="sm"
                 role="radio"
-                aria-checked={result === r}
+                aria-checked={noTalk === r}
                 variant="outline"
-                className={cn('rounded-full', result === r ? TONE[AFTERCARE_RESULT_TONE[r]].outline : '')}
-                onClick={() => setResult(r)}
+                className={cn('rounded-full', noTalk === r ? TONE[AFTERCARE_RESULT_TONE[r]].outline : '')}
+                onClick={() => setNoTalk((cur) => (cur === r ? null : r))}
               >
                 {AFTERCARE_RESULT_LABEL[r]}
               </Button>
             ))}
           </div>
-          {needScores ? (
-            <div className="space-y-2" data-testid="aftercare-scores">
-              {AFTERCARE_SCORE_TOPICS.map((t) => (
-                <div key={t.key} className="grid gap-1 sm:grid-cols-2 sm:items-center sm:gap-2">
-                  <span className="text-sm text-foreground">{t.label}</span>
-                  <FieldSelect
-                    value={scores[t.key] ?? ''}
-                    onChange={(v) => setScores((cur) => ({ ...cur, [t.key]: isAftercareScore(v) ? v : null }))}
-                    options={AFTERCARE_SCORES.map((v) => ({ value: v, label: AFTERCARE_SCORE_LABEL[v] }))}
-                    placeholder="เลือกผล"
-                    ariaLabel={t.label}
-                    disabled={saving}
-                    testId={`aftercare-score-${t.key}`}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : null}
           <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -189,7 +193,7 @@ const AftercareContactPanel: React.FC<{
             maxLength={2000}
           />
           <div className="flex gap-2">
-            <Button type="button" size="sm" disabled={!result || (needScores && !scoresDone) || saving} onClick={() => void save()}>
+            <Button type="button" size="sm" disabled={!result || saving} onClick={() => void save()}>
               {saving ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
               บันทึกผล
             </Button>

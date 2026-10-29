@@ -101,3 +101,20 @@ describe('GET', () => {
     expect(out.body).toMatchObject({ items: [], migrated: false });
   });
 });
+
+describe('ลงผล: 3 หัวข้อขึ้นทันที (เจ้าของ 29 ต.ค. 2569 Choice "3 หัวข้อขึ้นทันทีที่กดลงผล")', () => {
+  it('ผลเดิมคิดจากคะแนน — Healthy ครบ = ทำงานปกติ · มี Warning/High Risk = มีปัญหา · ยังไม่ครบ = null', async () => {
+    const { aftercareResultFromScores } = await import('../../src/lib/aftercareContact');
+    expect(aftercareResultFromScores({ expectation: 'healthy', supervisor: 'healthy', escalation: 'healthy' })).toBe('working');
+    expect(aftercareResultFromScores({ expectation: 'healthy', supervisor: 'warning', escalation: 'healthy' })).toBe('issue');
+    expect(aftercareResultFromScores({ expectation: 'high_risk', supervisor: 'healthy', escalation: 'healthy' })).toBe('issue');
+    expect(aftercareResultFromScores({ expectation: 'healthy', supervisor: null, escalation: 'healthy' })).toBeNull();
+  });
+  it('แผงลงผล: 3 หัวข้อไม่ต้องรอกดผลก่อน · ลาออก/ติดต่อไม่ได้เป็นปุ่มแยก', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('src/components/aftercare/AftercareContactPanel.tsx', 'utf8');
+    expect(src).not.toContain('{needScores ? (');
+    expect(src).toContain('const result: AftercareResult | null = noTalk ?? aftercareResultFromScores(scores);');
+    expect(src).toContain('AFTERCARE_NO_TALK_RESULTS.map((r) => (');
+  });
+});

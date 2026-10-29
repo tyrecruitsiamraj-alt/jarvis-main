@@ -55,6 +55,19 @@ export function isAftercareScore(v: unknown): v is AftercareScore {
 /** ผลนี้ต้องให้คะแนน 3 หัวข้อไหม — คุยถึงตัวแล้วเท่านั้น */
 export const aftercareResultNeedsScores = (r: AftercareResult): boolean => r === 'working' || r === 'issue';
 
+/**
+ * ผลเดิม (ทำงานปกติ / มีปัญหา) จากคะแนน 3 หัวข้อ (เจ้าของ 29 ต.ค. 2569 Choice "3 หัวข้อขึ้นทันทีที่กดลงผล")
+ * ไม่ต้องกดเลือกผลก่อนแล้ว — Healthy ครบทุกหัวข้อ = ทำงานปกติ · มี Warning/High Risk สักหัวข้อ = มีปัญหา · ยังไม่ครบ = null
+ */
+export function aftercareResultFromScores(s: AftercareScores): 'working' | 'issue' | null {
+  const v = [s.expectation, s.supervisor, s.escalation];
+  if (v.some((x) => x === null)) return null;
+  return v.every((x) => x === 'healthy') ? 'working' : 'issue';
+}
+
+/** ผลที่คุยไม่ได้ — ปุ่มแยกใต้ 3 หัวข้อ (ไม่มีคะแนน) */
+export const AFTERCARE_NO_TALK_RESULTS = ['resigned', 'unreachable'] as const satisfies readonly AftercareResult[];
+
 export type AftercareContact = {
   id: string;
   phone_e164: string;
