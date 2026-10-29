@@ -100,8 +100,6 @@ type Props = {
   onRecruiterPanelOpen?: () => void;
   closedTotalsLoading?: boolean;
   onRecruiterClick?: (name: string, role: DashboardResponsibleRole) => void;
-  /** แผงเสริมท้ายคอลัมน์ขวา (เช่น Rate ผลการโทร Lumos) — จัดการข้อมูลของตัวเอง ไม่ผูกกับ filter ของหน้า */
-  extraPanels?: React.ReactNode;
 };
 
 const DashboardShell: React.FC<Props> = ({
@@ -142,7 +140,6 @@ const DashboardShell: React.FC<Props> = ({
   onRecruiterPanelOpen,
   closedTotalsLoading = false,
   onRecruiterClick,
-  extraPanels,
 }) => {
   /**
    * 🔴 ช่องค้นหาอยู่บนแถบบน ซ้ายกระดิ่ง (เจ้าของสั่ง 27 ก.ย. 2569 "ทั้งระบบ")
@@ -573,9 +570,6 @@ const DashboardShell: React.FC<Props> = ({
               >
                 <DashboardChartSection data={data} />
               </DashboardExpandablePanel>
-              {/* แผงเสริมท้ายคอลัมน์ (เช่น Rate ผลการโทร Lumos) — เรื่องการโทร ไม่ใช่เลขใบขอ
-                  จึงส่งเข้ามาจากข้างนอกแทนการผูกกับ data ของแดชบอร์ด · ไม่โดน filter/dateRange ของหน้า */}
-              {extraPanels}
             </div>
           </div>
           </>

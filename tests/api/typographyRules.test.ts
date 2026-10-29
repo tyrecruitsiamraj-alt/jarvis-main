@@ -166,17 +166,8 @@ describe('Success Rate — ต้องเขียนฐานกำกับ�
    * พอเปลี่ยนตัวตั้ง/ตัวหารเป็นผลที่อ่านจากบทสนทนา คำบนจอต้องเปลี่ยนตาม
    * ไม่งั้นจอบอกฐานหนึ่ง แต่คำนวณอีกฐานหนึ่ง
    */
-  it('บนจอบอกว่า % นับจากสายที่ได้คุยจริง (ไม่งั้นอ่านสลับกับช่อง "สำเร็จ")', () => {
-    const panel = read('src/components/dashboard/LumosCallRatePanel.tsx');
-    expect(panel).toContain('Success Rate');
-    expect(panel).toMatch(/% จากสายที่ได้คุยจริง/);
-    // ช่อง "สำเร็จ" เดิมก็ต้องบอกฐานของตัวเองด้วย
-    expect(panel).toMatch(/% จากสายที่มีผลทั้งหมด/);
-  });
-
   it('🔴 หน้าแรกกับแดชบอร์ดต้องพูดฐานเดียวกัน — ห้ามเหลือคำว่า "จากคนที่รับสาย" ค้าง', () => {
     for (const f of [
-      'src/components/dashboard/LumosCallRatePanel.tsx',
       'src/components/home/TeamBoardPanel.tsx',
     ]) {
       expect(read(f)).not.toMatch(/`จากคนที่รับสาย/);

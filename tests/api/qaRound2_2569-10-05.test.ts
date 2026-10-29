@@ -71,7 +71,6 @@ describe('คำบนจอ — ตัดประโยคอธิบาย /
       'src/components/recruit-rm/CallChoiceConfirmDialog.tsx',
       'src/pages/jobs/UnitRequestTabPage.tsx',
       'src/components/jobs/JobRecallSuggestions.tsx',
-      'src/components/dashboard/LumosCallRatePanel.tsx',
     ]) {
       expect(read(f), f).not.toMatch(/20:00–08:00/);
     }

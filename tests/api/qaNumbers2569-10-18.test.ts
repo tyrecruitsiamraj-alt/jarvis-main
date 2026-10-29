@@ -67,7 +67,6 @@ describe('23 · Rate ผลการโทร Lumos', () => {
   const src = read('api/_handlers/lumos-call-funnel.ts');
   it('มีต้นทาง "ผู้สมัคร" (app-) · ชิปบนแผงครบ', () => {
     expect(src).toContain("applicant: `q.person_ref like 'app-%'`");
-    expect(read('src/components/dashboard/LumosCallRatePanel.tsx')).toContain("{ id: 'applicant', label: 'ผู้สมัคร'");
   });
   it('"ยังไม่ถึงมือ Lumos" ไม่นับสายที่นัดโทรทีหลัง', () => {
     expect(src).toContain('count(*) filter (where ${pend} and ${due})::text as not_delivered');

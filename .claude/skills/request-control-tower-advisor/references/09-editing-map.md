@@ -14030,6 +14030,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   - ป๊อปรายชื่อ (`JourneyNamesDialog`) ดึงชื่อตาม id ที่ `/api/recruit-overview?names=` (`loadApplicantNames` · ขอบเขต BU ผู้ใช้ · ทีละ 100) — เดิมดึงลิสต์ผู้สมัครของผู้ใช้ คนที่คนอื่นเก็บไปแล้ว "เปิดชื่อไม่ได้"
 - 29 ต.ค. 2569 แท็บแรกของภาพรวมงานสรรหาเปลี่ยนชื่อ "ใบขอ" → "ภาพรวม Online" (id ยังเป็น `requests`)
 - 29 ต.ค. 2569 การ์ดเทียบแท็บการติดต่อ = "สนใจ · รอโทร · ติดต่อได้" (`interested` / `contactWaiting` / `contactOk` ใน `RecruitTotals`) ตัวแบ่งเดียวกับกล่องบนแท็บ (`recruitContactTab`) — การ์ดกดลงลึก "การติดต่อ" เดิมยังใช้ คนโทรต่อแล้ว/ติดต่อได้ คนละนิยาม
+- 29 ต.ค. 2569 ถอดแผง "Rate ผลการโทร Lumos" จาก Dashboard (เจ้าของ "เอาออกไป") — ลบ `LumosCallRatePanel.tsx` + ช่อง `extraPanels` ของ `DashboardShell` · ตัวคิด `lumosCallRate.ts` / `fetchCallRateSeries` ยังใช้ที่หน้าหลักเดิม · เทสต์ `tests/api/dashboardLumosRateRemoved2569-10-29.test.ts`
 - **กดแถว = แผงแตกตัวเลข** (เจ้าของ 28 ต.ค. 2569 *"รายชื่อเท่าไหร่ โทรไปแล้วเท่าไหร่ ผลเป็นไง รอโทรเท่าไหร่ ไม่โทรเท่าไหร่ เพราะอะไร"* · Choice "แท็บสัดส่วนอย่างเดียว")
   `Ladder` (homeProportion.ts): รายชื่อ = โทรแล้ว + รอโทร + ไม่โทร · `ladderAddsUp` · เหตุหาไม่เจอ = ช่อง "ยังไม่รู้เหตุ" (ห้ามหาย)
   - Prescreen: ผล = `aiAnswerOf` · รอโทร = AI รอ / เจ้าหน้าที่เก็บไว้ · ไม่โทร = เบอร์ผิด · อายุ 58+ · iRecruit · เหตุจากฐาน (`proportionAppReasonsSql`: ซ้ำ iRecruit · So Scraping · คีย์/นำเข้า · ไม่ผูกใบขอ · ai_block_reason · เบอร์พัก · ไม่มีรายได้) · ใบขอปิด = ไม่อยู่ในใบขอที่เปิด (`openJobIds` จาก useUnitRequestsFeed · อ่านไม่ได้ = ไม่เดา)

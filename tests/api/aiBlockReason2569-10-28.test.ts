@@ -28,5 +28,6 @@ describe('เหตุที่ยังไม่ส่ง AI = เหตุจ�
     const call = vi.mocked(dbQuery).mock.calls.at(-1)!;
     expect(String(call[0])).toContain('is distinct from v.reason');
     expect(call[1]).toEqual([['df382382-59c1-4a25-8729-570492a1994f'], ['ใบขอยังไม่ตั้งรายได้ — …']]);
-  });
+    // โหลดตัวส่งคิวครั้งแรกตอนรันพร้อมกันทั้งชุดเกิน 5 วิ (29 ต.ค. 2569 ด่านตกซ้ำ 3 รอบ · รันเดี่ยวผ่าน)
+  }, 30_000);
 });
