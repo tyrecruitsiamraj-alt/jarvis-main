@@ -136,9 +136,10 @@ describe('หน้าใหม่ + ทางเข้า', () => {
   it('🔴 หน้า Follow มีการ์ดติดตามครบ + กินชุดเต็มของแท็บ + ส่งทีมของแท็บต่อ', () => {
     const page = stripComments(read('src/pages/follow/FollowPage.tsx'));
     expect(page).toMatch(/import FollowCompletedCard from '@\/components\/follow\/FollowCompletedCard'/);
-    // QA 5 ต.ค. 2569: แถว = ทีละแผน แต่การ์ดนี้ตัดสินทีละคน ⇒ `scopePeople` (ชุดเต็มของแท็บ + คำค้น จัดตามคน) · key ตามแท็บ
-    expect(page).toMatch(/<FollowCompletedCard\s+key=\{followTeam \?\? "main"\}\s+groups=\{scopePeople\}\s+followTeam=\{followTeam\}/);
-    expect(page).toMatch(/groupFollowEntries\(searchedItems, new Date\(\), followPersonKey\)/);
+    // QA 5 ต.ค. 2569: แถว = ทีละแผน แต่การ์ดนี้ตัดสินทีละคน ⇒ ชุดเต็มของแท็บ + คำค้น จัดตามคน · key ตามแท็บ
+    // 30 ต.ค. 2569: แผนตัดรอบหลังเริ่มงานออก แต่การ์ดนี้ยังรับชุดเต็ม (`completedPeople` รวมรอบหลังเริ่มงาน)
+    expect(page).toMatch(/<FollowCompletedCard\s+key=\{followTeam \?\? "main"\}\s+groups=\{completedPeople\}\s+followTeam=\{followTeam\}/);
+    expect(page).toMatch(/groupFollowEntries\(searched, new Date\(\), followPersonKey\)/);
   });
 
   it('🔴 การ์ดติดตามครบตั้งรอบด้วยหัวข้อถามความเป็นอยู่ + ไม่ยิงคิว/ล็อกเบอร์เอง', () => {

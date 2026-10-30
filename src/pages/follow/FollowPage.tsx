@@ -1,3 +1,4 @@
+import { isAftercareTopic } from '@/lib/followAftercareMove';
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { lazyPage } from '@/lib/staleChunkReload';
 import { Button } from '@/components/ui/button';
@@ -1992,10 +1993,16 @@ const FollowPage: React.FC = () => {
    * รายการของแท็บที่เปิดอยู่ — รายชื่อติดตาม = ไม่มีของส่งคนแทน · ติดตามส่งคนแทน = เฉพาะของส่งคนแทน (1 ต.ค. 2569)
    * 🔴 ทุกอย่างบนจอ (ปฏิทิน · แผงรอบ · เลขงานจบหรือยัง · ป๊อป) อ่านจากชุดนี้ · ตัวกันนัดซ้ำยังเทียบกับ `items` ทั้งก้อน
    */
-  const scopeItems = useMemo(
+  const scopeAllItems = useMemo(
     () => followScopeEntries(items, replaceView ? 'replacement' : 'main'),
     [items, replaceView],
   );
+  /**
+   * 🔴 สายโทรถามความเป็นอยู่หลังเริ่มงาน (`AFTERCARE_TOPIC`) ไม่ขึ้นในแผน/ปฏิทิน/ตัวเลขของหน้านี้ — อยู่หน้าดูแลหลังเริ่มงานที่เดียว
+   * (เจ้าของ 30 ต.ค. 2569 "โทรติดตามหลังเริ่มงานไม่ต้องการให้โชว์อยู่ในแผนหน้าติดตามคนเริ่มใหม่ มันจะงง")
+   * การ์ด "ติดตามครบ" ยังรับชุดเต็ม (`completedPeople`) — ปุ่มตามต่อ/ไม่ตามต่อของรอบหลังเริ่มงานยังอยู่ที่การ์ดนั้น
+   */
+  const scopeItems = useMemo(() => scopeAllItems.filter((e) => !isAftercareTopic(e.topic)), [scopeAllItems]);
   /**
    * ค้นหา + วันที่ของแผน (เจ้าของ 5 ต.ค. 2569: *"เพิ่ม filter ค้นหา ชื่อหน่วยงาน / ชื่อพนักงาน · ครั้งที่ติดตาม"*
    * → Choice ครั้งที่ติดตาม = วันที่ของแผน) — กรองก่อนทุกอย่าง ⇒ แผงขั้นตอนของสาย ตัวเลขบนตัวกรอง และตาราง ใช้ชุดเดียวกัน
@@ -2177,6 +2184,12 @@ const FollowPage: React.FC = () => {
     () => groupFollowEntries(searchedItems, new Date(), followPersonKey),
     [searchedItems],
   );
+  /** การ์ด "ติดตามครบ" — ชุดเดียวกับ `scopePeople` แต่รวมรอบหลังเริ่มงาน (ตัวกรอง EX/คนใน + ค้นหาเหมือนกัน) */
+  const completedPeople = useMemo(() => {
+    const kinded = followView === 'replace' && replaceKind !== 'all' ? scopeAllItems.filter((e) => replaceKindOf(e) === replaceKind) : scopeAllItems;
+    const searched = followSearch.trim() ? kinded.filter((e) => matchesFollowSearch(e, followSearch)) : kinded;
+    return groupFollowEntries(searched, new Date(), followPersonKey);
+  }, [scopeAllItems, followView, replaceKind, followSearch]);
   const allRows = useMemo(() => buildFollowPlanningRows(scopeGroups), [scopeGroups]);
   /**
    * ชุดที่ปุ่ม "วันถัดไปที่มีแผน" ใช้หา — ทุกวัน (ไม่กรองวัน) แต่กรองใครโทรเหมือนตาราง
@@ -3869,7 +3882,7 @@ const FollowPage: React.FC = () => {
           <FollowCompletedCard
             /* สลับแท็บ = การ์ดใหม่ ข้อความแจ้งผลของอีกแท็บไม่ตามมา (QA 5 ต.ค. 2569) */
             key={followTeam ?? "main"}
-            groups={scopePeople}
+            groups={completedPeople}
             followTeam={followTeam}
             onChanged={() => void reload(true)}
           />
