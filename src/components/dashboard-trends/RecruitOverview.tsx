@@ -61,7 +61,7 @@ import ChannelFunnelTable from './ChannelFunnelTable';
 import { buildChannelFunnelTree } from '@/lib/channelFunnel';
 import { OVERVIEW_TABS, overviewTabOf, type OverviewTabId } from '@/lib/recruitOverviewTabs';
 import { compareRowsOf, dailySeriesOf } from '@/lib/recruitCompare';
-import TrendLinesCard, { type ComparePeriod } from './TrendLinesCard';
+import TrendLinesCard, { type ComparePeriod, type TrendStack } from './TrendLinesCard';
 import RequestTab from './RequestTab';
 import ContactTab from './ContactTab';
 import DrillDownCard from './DrillDownCard';
@@ -98,6 +98,17 @@ const REQUEST_DRILL_PATH: Record<string, string[]> = {
   releasedWithApps: ['released', 'withApps'],
   releasedNoApps: ['released', 'noApps'],
   notReleasedOpen: ['notReleased'],
+};
+
+/** แท่งซ้อนของแนวโน้มใบขอ — ปิดไปแล้ว + ยังไม่ประกาศ + ไม่มีคนสมัคร + มีคนสมัคร = ใบขอเข้ามา (ตัวแบ่ง `onlineRequestStateOf`) */
+const REQUEST_STACK: TrendStack = {
+  total: 'total',
+  parts: [
+    { key: 'notReleasedClosed', tone: 'neutral' },
+    { key: 'notReleasedOpen', tone: 'warn' },
+    { key: 'releasedNoApps', tone: 'danger' },
+    { key: 'releasedWithApps', tone: 'success' },
+  ],
 };
 
 const RecruitOverview: React.FC<{
@@ -246,6 +257,8 @@ const RecruitOverview: React.FC<{
             onPick: setReqPick,
             // ปิดไปแล้ว = นับอย่างเดียว ไม่เปิดรายการ (เจ้าของ "ถ้าปิดก็คือปิด")
             pickable: (k: string) => k in REQUEST_DRILL_PATH,
+            // ช่วงทั้งหมด = เดือนละแท่งแบ่ง 4 สี (เจ้าของ 30 ต.ค. 2569 แบบร่าง "ทำเลย")
+            stack: REQUEST_STACK,
             children:
               reqPick && REQUEST_DRILL_PATH[reqPick] ? (
                 <DrillDownCard

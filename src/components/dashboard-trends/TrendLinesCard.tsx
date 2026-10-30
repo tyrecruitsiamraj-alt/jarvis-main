@@ -10,6 +10,12 @@ import { OverviewCard } from './RecruitOverviewParts';
 
 export type ComparePeriod = 'cur' | 'prev';
 
+/**
+ * แท่งซ้อนรายเดือน (เจ้าของ 30 ต.ค. 2569 "มีวิธีดูที่ดีกว่านี้ไหม" → แบบร่าง "ทำเลย") — ส่วนที่รวมกันได้ยอด `total`
+ * แท็บใบขอ: ปิดไปแล้ว + ยังไม่ประกาศ + ไม่มีคนสมัคร + มีคนสมัคร = ใบขอเข้ามา · ความสูงแท่ง = ยอดรวมของเดือน
+ */
+export type TrendStack = { total: string; parts: ReadonlyArray<{ key: string; tone: ToneKey }> };
+
 /** สีเส้นตามลำดับแถว — จากโทเค็น (`TONE.*.hex`) ที่เดียว */
 const LINE_TONES: ToneKey[] = ['info', 'success', 'warn', 'violet', 'danger', 'teal'];
 /** ตัวชี้วัดที่ต่อท้ายแท็บกรอกเข้ามา (27 ต.ค. 2569) — สีไม่ซ้ำเส้นแรก · ไม่สนใจแดง */
@@ -36,6 +42,7 @@ export default function TrendLinesCard({
   note,
   seriesOf,
   monthly = false,
+  stack,
 }: {
   rows: readonly CompareRow[];
   /** ป้ายช่วงที่เลือก — ไม่ได้ใช้บนการ์ดแล้ว (เลือกช่วงที่ตัวเลือกด้านบน) คงไว้ให้หน้าแม่ส่งเหมือนเดิม */
@@ -57,6 +64,8 @@ export default function TrendLinesCard({
    * … ไม่งั้นยาวเกินไปไม่สวย") — แท่งรายเดือน · กดแท่งเดือนไหน = เส้นรายวันของเดือนนั้น
    */
   monthly?: boolean;
+  /** โหมดรายเดือน: เดือนละแท่งเดียวแบ่งสีตามส่วน (ไม่ส่ง = แท่งเรียงทุกตัวชี้วัด) */
+  stack?: TrendStack;
 }) {
   // ช่วงที่ดู = ตัวเลือกช่วงเวลาด้านบนของหน้า (เจ้าของ 27 ต.ค. 2569 ค่ำ "เอาออกให้ไป Filter ตรง เลือกช่วงเวลา")
   // ⇒ การ์ดนี้แสดงช่วงที่เลือกเสมอ · เลขช่วงก่อนอยู่บรรทัดล่างของกล่องไว้เทียบ
@@ -73,6 +82,15 @@ export default function TrendLinesCard({
     return [...byDay.values()].sort((a, b) => String(a.day).localeCompare(String(b.day)));
   }, [rows, period, seriesOf]);
   const labelOf = new Map(rows.map((r) => [r.key, r.label]));
+  /** สมการของแท่งซ้อน (เจ้าของ "เอาสมการไว้") — เฉพาะโหมดรายเดือนที่มี `stack` */
+  const stackSum = (() => {
+    if (!monthly || !stack) return null;
+    const curOf = new Map(rows.map((r) => [r.key, r.cur]));
+    const vals = stack.parts.map((p) => curOf.get(p.key));
+    const total = curOf.get(stack.total);
+    if (total == null || vals.some((v) => v == null)) return null;
+    return `${stack.parts.map((p, i) => `${labelOf.get(p.key) ?? p.key} ${fmt(vals[i] as number)}`).join(' + ')} = ${labelOf.get(stack.total) ?? stack.total} ${fmt(total)}`;
+  })();
   const [month, setMonth] = React.useState<string | null>(null);
   const months = React.useMemo(() => {
     if (!monthly) return [];
@@ -123,6 +141,8 @@ export default function TrendLinesCard({
                 <span className="text-lg font-medium tabular-nums text-foreground">
                   {shown === null ? '—' : fmt(shown)} <span className="text-xs font-normal text-muted-foreground">{r.unit}</span>
                 </span>
+                {/* ช่วง "ทั้งหมด" ไม่เทียบช่วงก่อน — ช่วงก่อนของ "ทั้งหมด" ไม่มีความหมาย (เคยขึ้น "เพิ่ม 373.9%" · 30 ต.ค. 2569) */}
+                {monthly ? null : (
                 <span
                   className={cn(
                     'text-xs font-medium tabular-nums',
@@ -139,15 +159,23 @@ export default function TrendLinesCard({
                           ? 'เท่าเดิม'
                           : 'เทียบไม่ได้'}
                 </span>
+                )}
               </span>
               {r.extra ? <span className="text-xs tabular-nums text-muted-foreground">{r.extra}</span> : null}
             </Box>
           );
         })}
       </div>
-      <p className={cn('text-right text-xs tabular-nums', DASH.sub)} data-testid="trend-prev">
-        เทียบ {prevLabel}
-      </p>
+      {monthly ? null : (
+        <p className={cn('text-right text-xs tabular-nums', DASH.sub)} data-testid="trend-prev">
+          เทียบ {prevLabel}
+        </p>
+      )}
+      {stackSum ? (
+        <p className="text-xs tabular-nums text-muted-foreground" data-testid="trend-stack-sum">
+          {stackSum}
+        </p>
+      ) : null}
       {monthly && month ? (
         <div className="flex items-center justify-between gap-2">
           <Button type="button" variant="outline" size="xs" onClick={() => setMonth(null)} data-testid="trend-back-months">
@@ -169,18 +197,32 @@ export default function TrendLinesCard({
                 cursor={CHART.cursorBar}
                 formatter={(value: number, name: string) => [fmt(Number(value)), labelOf.get(name) ?? name]}
               />
-              {rows.map((r, i) => (
-                <Bar
-                  key={r.key}
-                  dataKey={r.key}
-                  name={r.key}
-                  fill={TONE[toneOf(r.key, i)].hex}
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={28}
-                  className="cursor-pointer"
-                  onClick={(d: { payload?: { month?: string } }) => d.payload?.month && setMonth(d.payload.month)}
-                />
-              ))}
+              {stack
+                ? stack.parts.map((p, i) => (
+                    <Bar
+                      key={p.key}
+                      dataKey={p.key}
+                      name={p.key}
+                      stackId="month"
+                      fill={TONE[p.tone].hex}
+                      radius={i === stack.parts.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                      maxBarSize={72}
+                      className="cursor-pointer"
+                      onClick={(d: { payload?: { month?: string } }) => d.payload?.month && setMonth(d.payload.month)}
+                    />
+                  ))
+                : rows.map((r, i) => (
+                    <Bar
+                      key={r.key}
+                      dataKey={r.key}
+                      name={r.key}
+                      fill={TONE[toneOf(r.key, i)].hex}
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={28}
+                      className="cursor-pointer"
+                      onClick={(d: { payload?: { month?: string } }) => d.payload?.month && setMonth(d.payload.month)}
+                    />
+                  ))}
             </BarChart>
           ) : (
             <LineChart data={lineData} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
@@ -209,6 +251,16 @@ export default function TrendLinesCard({
           )}
         </ResponsiveContainer>
       </div>
+      {showBars && stack ? (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" data-testid="trend-stack-legend">
+          {stack.parts.map((p) => (
+            <span key={p.key} className="inline-flex items-center gap-1.5">
+              <span className={cn('size-2.5 rounded-sm', TONE[p.tone].dot)} aria-hidden />
+              {labelOf.get(p.key) ?? p.key}
+            </span>
+          ))}
+        </div>
+      ) : null}
       {showBars ? (
         <div className="flex flex-wrap gap-1" role="group" aria-label="ดูรายวันของเดือน">
           {months.map((m) => (
