@@ -3,6 +3,7 @@
  * แถว = โหมด `report` ของตัวนับกล่อง (ชุดเดียวกับกล่อง ทั้งหมด/AI/คน) · นับต่อที่ `src/lib/homeTopicReport.ts` (pure)
  * ประกาศ = ใบขอที่ประกาศ (`job_public_releases.released_at`) ในช่วง — ⚠️ ประกาศซ้ำเขียนทับเวลา ⇒ นับตามครั้งล่าสุด
  */
+import { inBuSet, type BuSet } from './homeBuSql.js';
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { buildApplicantAiShareSql, buildFollowAiShareSql, buildMatchingAiShareSql } from './homeAiShareSql.js';
@@ -68,7 +69,7 @@ function toRow(r: Record<string, unknown>): ReportSourceRow {
 }
 
 /** บันได "สนใจ" AI → คน ของใบสมัคร — แถวชุดเดียวกับรายงานงานสรรหา (แท็บทีม Online ใช้ตัวนี้ · 12 ต.ค. 2569) */
-export async function loadInterestJourney(start: Date | null, end: Date, bu: string | null): Promise<InterestJourney> {
+export async function loadInterestJourney(start: Date | null, end: Date, bu: BuSet): Promise<InterestJourney> {
   const { rows } = await dbQuery<Record<string, unknown>>(buildApplicantAiShareSql('report'), [
     start ? start.toISOString() : null,
     end.toISOString(),
@@ -92,7 +93,7 @@ export async function loadTopicReport(
   block: TopicReportBlock,
   start: Date | null,
   end: Date,
-  bu: string | null,
+  bu: BuSet,
   timings?: ReportTimings,
 ): Promise<TopicReport> {
   const params = [start ? start.toISOString() : null, end.toISOString(), bu];
@@ -122,19 +123,19 @@ export async function loadTopicReport(
  * ⚠️ ใบที่เข้ามาแล้วปิดไปแล้วไม่อยู่ในรายการใบเปิด ⇒ ไม่นับ
  */
 /** ใบที่ยังเปิดที่ส่งเข้ามาในช่วง (ตามวันส่งใบ) — จับคู่งานใช้ (ต้องเป็นใบเปิด) · งานสรรหาใช้ `loadOnlineRequestCounts` แล้ว (10 ต.ค. 2569) */
-async function loadJobsInWindow(start: Date | null, end: Date, bu: string | null): Promise<JobRequest[]> {
+async function loadJobsInWindow(start: Date | null, end: Date, bu: BuSet): Promise<JobRequest[]> {
   const raw = (await listSiamrajUnitRequests({ limit: 500, departmentScope: { mode: 'all' } as DepartmentScope })) as unknown[];
   const fromYmd = start ? toYmdBangkok(start) : null;
   const toYmd = toYmdBangkok(new Date(end.getTime() - 1));
   return enrichJobsWithUrgency(raw as JobRequest[]).filter((j) => {
-    if (bu && trendBuFromSiteCode(j.site_code) !== bu) return false;
+    if (!inBuSet(trendBuFromSiteCode(j.site_code), bu)) return false;
     const rec = j as unknown as Record<string, unknown>;
     const d = String(rec.submittedAt || rec.request_date || rec.created_at || '').slice(0, 10);
     return !!d && (!fromYmd || d >= fromYmd) && d <= toYmd;
   });
 }
 
-async function loadMatchingFlow(start: Date | null, end: Date, bu: string | null, timings?: ReportTimings): Promise<MatchingFlow> {
+async function loadMatchingFlow(start: Date | null, end: Date, bu: BuSet, timings?: ReportTimings): Promise<MatchingFlow> {
   const f = emptyMatchingFlow();
   const jobs = await timed(timings, 'jobs', loadJobsInWindow(start, end, bu));
   f.jobsIn = jobs.length;

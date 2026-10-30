@@ -8,7 +8,7 @@ import { ArrowLeft, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { NO_REASON, perDayOf } from '@/lib/homeExec';
+import { NO_REASON, chargesToday, perDayOf } from '@/lib/homeExec';
 import type { MoneyRequest } from '@/lib/homeMoney';
 import { thaiDate } from '@/lib/periodPick';
 import { TONE } from '@/lib/designTokens';
@@ -62,7 +62,7 @@ export default function ExecDrill({
     setLimit(50);
   }
   const rows = lv?.rows ?? [];
-  const sumPerDay = rows.reduce((a, r) => a + (r.open && r.needYmd != null && r.needYmd <= today ? perDayOf(r) : 0), 0);
+  const sumPerDay = rows.reduce((a, r) => a + (chargesToday(r, today) ? perDayOf(r) : 0), 0);
   const sameUnit = rows.length > 1 && rows.every((r) => r.unit === rows[0].unit);
   const sumMoney = rows.reduce((a, r) => a + r.amount.need.fine + r.amount.need.deduct, 0);
 
@@ -171,7 +171,7 @@ export default function ExecDrill({
                   rows.slice(0, limit).flatMap((r) => {
                     const isOpen = openRow === r.requestNo;
                     const missing = Math.max(0, r.qty - r.filled);
-                    const late = r.open && r.needYmd != null && r.needYmd <= today;
+                    const late = chargesToday(r, today);
                     const out = [
                       <TableRow
                         key={r.requestNo}

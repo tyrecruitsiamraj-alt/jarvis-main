@@ -64,7 +64,7 @@ export function proportionFollowRowsSql(): string {
       left join ${QUEUE} q on ${FOLLOW_QUEUE_MATCH}
      where ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
        and ($2::timestamptz is null or f.scheduled_at < $2::timestamptz)
-       and ($3::text is null or ${followBuSql('f')} = $3::text)`;
+       and ($3::text[] is null or ${followBuSql('f')} = any($3::text[]))`;
 }
 
 /**
@@ -91,7 +91,7 @@ export function proportionAppReasonsSql(): string {
            a.ai_block_reason as block_reason
       from ${APPS} a ${appBuJoin('a')}
      where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
-       and ($3::text is null or ${appBuSql('a')} = $3::text)
+       and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
        and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)
        and not ${CALLED_BY_STAFF_SQL}`;
 }
@@ -106,23 +106,23 @@ export function proportionEntrySql(): string {
     (select count(*) filter (where a.source is distinct from 'irecruit' and a.created_by_name is null)::int
        from ${APPS} a ${appBuJoin('a')}
       where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
-        and ($3::text is null or ${appBuSql('a')} = $3::text)
+        and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
         and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as self_apply,
     (select count(*) filter (where a.source = 'irecruit')::int
        from ${APPS} a ${appBuJoin('a')}
       where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
-        and ($3::text is null or ${appBuSql('a')} = $3::text)
+        and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
         and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as irecruit,
     (select count(*) filter (where a.source is distinct from 'irecruit' and a.created_by_name = '${SO_SCRAPING_CREATED_BY}')::int
        from ${APPS} a ${appBuJoin('a')}
       where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
-        and ($3::text is null or ${appBuSql('a')} = $3::text)
+        and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
         and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as so_scraping,
     (select count(*) filter (where a.source is distinct from 'irecruit' and a.created_by_name is not null
                                and a.created_by_name <> '${SO_SCRAPING_CREATED_BY}')::int
        from ${APPS} a ${appBuJoin('a')}
       where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
-        and ($3::text is null or ${appBuSql('a')} = $3::text)
+        and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
         and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as staff_keyed`;
 }
 
@@ -150,5 +150,5 @@ export function proportionAftercarePeopleSql(): string {
          order by c.created_at desc limit 1
       ) lc on true
      where a.closed_at is null
-       and ($2::text is null or ${aftercareBuSql('a')} = $2::text)`;
+       and ($2::text[] is null or ${aftercareBuSql('a')} = any($2::text[]))`;
 }

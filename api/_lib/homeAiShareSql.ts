@@ -230,7 +230,7 @@ export function buildFollowAiShareSql(
        and ${FOLLOW_LANE_WHERE[lane]}
        and ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
        and ($2::timestamptz is null or f.scheduled_at < $2::timestamptz)
-       and ($3::text is null or ${followBuSql('f')} = $3::text)
+       and ($3::text[] is null or ${followBuSql('f')} = any($3::text[]))
   )${
     mode === 'report'
       ? `\n  select * from f0`
@@ -289,7 +289,7 @@ export function buildApplicantAiShareSql(mode: AiShareSqlMode = 'total', list?: 
        and not exists (select 1 from ${CANCELLATIONS} c where c.application_id = a.id)
        and ($1::timestamptz is null or a.created_at >= $1::timestamptz)
        and a.created_at < $2::timestamptz
-       and ($3::text is null or ${appBuSql('a')} = $3::text)
+       and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
   )${
     mode === 'report'
       ? `\n  select * from a0`
@@ -382,7 +382,7 @@ export function buildMatchingAiShareSql(mode: AiShareSqlMode = 'total', list?: A
       from ev
      where ($1::timestamptz is null or at >= $1::timestamptz)
        and at < $2::timestamptz
-       and ($3::text is null or bu = $3::text)
+       and ($3::text[] is null or bu = any($3::text[]))
      group by person, job
   )${
     mode === 'report'

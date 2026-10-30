@@ -63,8 +63,8 @@ export function followPersonResults(
       label: c.label,
       people: people.reduce((n, x) => n + (x.bucket === c.key ? x.n : 0), 0),
       calls: cells.reduce((n, x) => n + (x.bucket === c.key ? x.n : 0), 0),
-    }))
-    .filter((r) => r.people > 0 || r.calls > 0 || r.key === 'went' || r.key === 'notWent');
+    }));
+  // ว่างแล้วห้ามหาย — ทุกผลขึ้นแม้ 0 (QA 30 ต.ค. 2569 · กติกา stableLayoutWhenEmpty)
 }
 
 /** สายที่โทรแล้วจริง vs ยังรอ แยก AI / คน — "AI โทร" ห้ามนับสายที่ยังรอ (เคยขึ้น 264 ทั้งที่รอ 84) */

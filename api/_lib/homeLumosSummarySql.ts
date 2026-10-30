@@ -2,12 +2,12 @@
  * สรุปแบบบอท Lumos (หน้าหลัก `?summary=lumos` · 7 ต.ค. 2569) — นิยามอยู่ `src/lib/homeLumosSummary.ts`
  * รอ = ทุกสถานะที่ไม่ใช่ completed/failed/cancelled ⇒ สี่ช่องรวมกัน = ทั้งหมดเสมอ
  */
+import type { BuSet } from './homeBuSql.js';
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { followBuJoin, followBuSql, queueBuJoins, queueBuSql } from './homeBuSql.js';
 import { FOLLOW_QUEUE_MATCH } from './homeAiShareSql.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
-import { toYmdBangkok } from '../../src/lib/dateTh.js';
 import {
   buildFollowPersonCells,
   doneBucketOf,
@@ -53,7 +53,7 @@ export const FOLLOW_BUCKET_SQL = `case
     end`;
 
 /** แถวสายติดตามของช่วง (ไม่รวมดูแลหลังเริ่มงาน) — ตัวเดียวของการ์ดผลโทร · ตาราง BU · รายการสายยกเลิกของกล่อง */
-async function loadFollowLedgerRows(start: Date | null, end: Date | null, bu: string | null): Promise<Record<string, unknown>[]> {
+async function loadFollowLedgerRows(start: Date | null, end: Date | null, bu: BuSet): Promise<Record<string, unknown>[]> {
   const { rows } = await dbQuery<Record<string, unknown>>(
     `select ${FOLLOW_ENTRY_CATEGORY_COLS}, ${FOLLOW_EFFECTIVE_MODE_SQL} as call_mode, f.follow_team,
             ${FOLLOW_BUCKET_SQL} as ledger_bucket,
@@ -65,7 +65,7 @@ async function loadFollowLedgerRows(start: Date | null, end: Date | null, bu: st
       where f.topic is distinct from $4::text
         and ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
         and ($2::timestamptz is null or f.scheduled_at < $2::timestamptz)
-        and ($3::text is null or ${followBuSql('f')} = $3::text)`,
+        and ($3::text[] is null or ${followBuSql('f')} = any($3::text[]))`,
     [start ? start.toISOString() : null, end ? end.toISOString() : null, bu, AFTERCARE_TOPIC],
   );
   return rows;
@@ -75,7 +75,7 @@ async function loadFollowLedgerRows(start: Date | null, end: Date | null, bu: st
  * id ของสายที่การ์ดผลโทรจัดเป็น "ยกเลิก" (เจ้าของ 21 ต.ค. 2569 "บวกลบกันแล้วมันต้องเท่ากัน")
  * กล่อง/กราฟ/รายชื่อของหัวข้อติดตามตัดสายพวกนี้ออก (`buildFollowAiShareSql` `$5`) ⇒ ทุกก้อนบนหน้าหลักใช้ชุดยกเลิกชุดเดียว
  */
-export async function loadFollowCancelledIds(start: Date | null, end: Date | null, bu: string | null): Promise<string[]> {
+export async function loadFollowCancelledIds(start: Date | null, end: Date | null, bu: BuSet): Promise<string[]> {
   const rows = await loadFollowLedgerRows(start, end, bu);
   const derived = categorizeFollowRows(rows);
   return rows.filter((r) => followLedgerBucket(r, derived) === 'cancelled').map((r) => String(r.id));
@@ -117,7 +117,7 @@ const bucket = (r: Row | undefined): LumosBucket => ({
 export async function loadHomeLumosSummary(
   start: Date | null,
   end: Date | null,
-  bu: string | null,
+  bu: BuSet,
 ): Promise<{
   follow: { ai: FollowBucket; staff: FollowBucket };
   followByBu: FollowBuCell[];
@@ -135,7 +135,7 @@ export async function loadHomeLumosSummary(
         where q.channel = 'interview'
           and ($1::timestamptz is null or q.created_at >= $1::timestamptz)
           and ($2::timestamptz is null or q.created_at < $2::timestamptz)
-          and ($3::text is null or ${queueBuSql('q')} = $3::text)`,
+          and ($3::text[] is null or ${queueBuSql('q')} = any($3::text[]))`,
       p,
     ),
     start
@@ -146,7 +146,7 @@ export async function loadHomeLumosSummary(
             where q.channel = 'interview'
               and q.created_at < $1::timestamptz
               and (q.status is null or q.status not in ('completed', 'failed', 'cancelled'))
-              and ($2::text is null or ${queueBuSql('q')} = $2::text)`,
+              and ($2::text[] is null or ${queueBuSql('q')} = any($2::text[]))`,
           [p[0], bu],
         )
       : Promise.resolve({ rows: [{ n: 0 }] }),
@@ -170,9 +170,8 @@ export async function loadHomeLumosSummary(
     cell.n += 1;
     byBuCells.set(ck, cell);
     if (key !== 'cancelled') {
-      const at = r.scheduled_at instanceof Date ? r.scheduled_at : new Date(String(r.scheduled_at ?? ''));
-      const ymd = Number.isNaN(at.getTime()) ? 'no-date' : toYmdBangkok(at);
-      personRows.push({ key: followPersonKey(r.recipient_phone, ymd, String(r.id)), bu, team, bucket: key });
+      // 1 คน = 1 เบอร์ทั้งช่วง (QA 30 ต.ค. 2569: เดิมเบอร์ + วัน ⇒ คนที่ตามหลายวันในช่วงถูกนับหลายคน) · ผลของคนตามลำดับ FOLLOW_PERSON_PRIORITY
+      personRows.push({ key: followPersonKey(r.recipient_phone, 'window', String(r.id)), bu, team, bucket: key });
     }
   }
   return {

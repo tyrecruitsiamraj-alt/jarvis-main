@@ -273,7 +273,7 @@ const HomeExecPage: React.FC = () => {
           <PeriodPicker value={win} onChange={setWin} />
           {kpi?.buChoices?.length ? (
             /* ดูได้หลาย BU — เลือกทีละ BU ในสิทธิ์ (26 ต.ค. 2569) */
-            <BuChoiceSelect value={bu ?? kpi.bu} choices={kpi.buChoices} onChange={setBu} triggerClassName="h-10 w-44 bg-card" />
+            <BuChoiceSelect value={bu} choices={kpi.buChoices} onChange={setBu} allOption triggerClassName="h-10 w-32 bg-card" />
           ) : moneyNow?.forcedBu && moneyNow.bu ? (
             <span className="text-sm text-muted-foreground">{trendBuLabel(moneyNow.bu)}</span>
           ) : (

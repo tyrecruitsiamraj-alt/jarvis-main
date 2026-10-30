@@ -24,7 +24,7 @@ import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
 import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
-import { followBuJoin, followBuSql, pickDashboardBu } from '../_lib/homeBuSql.js';
+import { followBuJoin, followBuSql, inBuSet, pickDashboardBuSet, type BuSet } from '../_lib/homeBuSql.js';
 
 const FOLLOW = tableInAppSchema('follow_entries');
 
@@ -38,13 +38,13 @@ const FOLLOW = tableInAppSchema('follow_entries');
  * ไม่นับที่ยกเลิก · BU ใช้ตัวกรองเดียวกับการ์ดดูแลหลังเริ่มงาน (`followBuSql`)
  */
 export type AftercareUpcoming = { calls: number; people: number; firstAt: string | null };
-async function loadAftercareUpcoming(bu: string | null): Promise<AftercareUpcoming | null> {
+async function loadAftercareUpcoming(bu: BuSet): Promise<AftercareUpcoming | null> {
   try {
     const { rows } = await dbQuery<{ calls: number; people: number; first_at: Date | string | null }>(
       `select count(*)::int calls, count(distinct f.recipient_phone)::int people, min(f.scheduled_at) first_at
          from ${FOLLOW} f ${followBuJoin('f')}
         where f.topic = $1 and f.cancelled_at is null and f.completed_at is null and f.scheduled_at > now()
-          and ($2::text is null or ${followBuSql('f')} = $2::text)`,
+          and ($2::text[] is null or ${followBuSql('f')} = any($2::text[]))`,
       [AFTERCARE_TOPIC, bu],
     );
     const r = rows[0];
@@ -114,17 +114,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const to = typeof q.to === 'string' && YMD.test(q.to) ? q.to : today;
     const from = typeof q.from === 'string' && YMD.test(q.from) ? q.from : shiftYmd(to, -29);
     const [departmentScope, buScope] = await Promise.all([loadUserDepartmentScope(req.user), loadMatchingBuScope(req.user)]);
-    // ผู้ใช้หลาย BU เลือกได้ทีละ BU ในสิทธิ์ (26 ต.ค. 2569 · `pickDashboardBu`)
-    const picked = pickDashboardBu(buScope, q.bu);
+    // ไม่ขอ BU = รวมทุก BU ในสิทธิ์ · เลือกได้ทีละ BU (30 ต.ค. 2569 · หน้าหลักนับ BU ชุดเดียวกันทุกการ์ด)
+    const picked = pickDashboardBuSet(buScope, q.bu);
     const forcedBu = picked.forcedBu;
     const bu = picked.bu;
+    const buSet = picked.buSet;
 
     const raw = await loadPenaltyLedgerRaw(departmentScope);
-    const scoped = bu ? raw.rows.filter((r) => r.bu === bu) : raw.rows;
+    const scoped = raw.rows.filter((r) => inBuSet(r.bu, buSet));
     const [replacements, owners, aftercareUpcoming, sendReplacement] = await Promise.all([
       loadReplacements([...new Set(scoped.map((r) => r.site))]),
       loadOwners([...new Set(scoped.map((r) => r.requestNo))]),
-      loadAftercareUpcoming(bu),
+      loadAftercareUpcoming(buSet),
       loadSendReplacement([...new Set(scoped.map((r) => r.requestNo))]),
     ]);
     const rows = sendReplacement ? scoped.map((r) => ({ ...r, sendReplacement: sendReplacement.has(r.requestNo.trim().toUpperCase()) })) : scoped;
@@ -136,7 +137,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         r.amount.need.fine + r.amount.need.deduct,
       ]),
     );
-    const fines = bu ? raw.customerFines.filter((f) => f.bu === bu) : raw.customerFines;
+    const fines = raw.customerFines.filter((f) => inBuSet(f.bu, buSet));
     const body = {
       ...buildHomeMoney(ledger, fines, {
         from,

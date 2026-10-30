@@ -835,7 +835,7 @@ const HomeAiSharePage: React.FC<{ embedded?: EmbeddedHome }> = ({ embedded }) =>
             <PeriodPicker value={win} onChange={setWin} />
             {current?.bu_choices?.length ? (
               /* ดูได้หลาย BU — เลือกทีละ BU ในสิทธิ์ (26 ต.ค. 2569) */
-              <BuChoiceSelect value={bu ?? current.bu ?? null} choices={current.bu_choices} onChange={setBu} triggerClassName="h-10 w-44 bg-card" />
+              <BuChoiceSelect value={bu} choices={current.bu_choices} onChange={setBu} allOption triggerClassName="h-10 w-32 bg-card" />
             ) : current?.forced_bu && current.bu ? (
               <span className="text-sm text-muted-foreground">{trendBuLabel(current.bu)}</span>
             ) : (

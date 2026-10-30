@@ -66,7 +66,7 @@ describe('เส้นผู้สมัคร 6 ขั้น', () => {
     expect(Object.fromEntries(ai.rows.map((r) => [r.key, r.value]))).toEqual({ yes: 2, no: 1, noPickup: 1, other: 1 });
     const show = steps.find((s) => s.key === 'showed')!;
     expect(Object.fromEntries(show.rows.map((r) => [r.key, r.value]))).toEqual({ showed: 1, noShow: 0, pending: 1 });
-    expect(steps.find((s) => s.key === 'staff')!.rows).toEqual([{ key: 'claimed', label: 'เก็บไปหน้าติดต่อ', value: 3, tone: 'neutral' }]);
+    expect(steps.find((s) => s.key === 'staff')!.rows).toEqual([{ key: 'claimed', label: 'รับไปโทรในช่วงนี้', value: 3, tone: 'neutral' }]);
   });
 
   it('ว่าง = ทุกขั้น 0 (ห้ามหาย)', () => {

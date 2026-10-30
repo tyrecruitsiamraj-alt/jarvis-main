@@ -6,6 +6,7 @@
  * - ราชการ/เอกชน = ที่ทีมระบุเอง (`unit_sector`) · ประกาศ = `job_public_releases` · ใบสมัคร = ไม่นับที่ยกเลิกข้อมูล
  * นับต่อที่ `src/lib/homeOnline.ts` (pure)
  */
+import type { BuSet } from './homeBuSql.js';
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
@@ -187,7 +188,7 @@ export async function loadOnlineRequestRows(opts: OnlineRequestOpts): Promise<On
  * ใบสมัครที่เข้ามาในช่วง (วันสมัคร · ไม่นับ Lead · ไม่นับที่ยกเลิกข้อมูล) — ส่วน "ใบสมัคร · AI คัดกรอง · คนโทรเอง"
  * หลักฐานโทร/คิว = ตัวเดียวกับกล่องงานสรรหา (`CALLED_BY_AI_SQL` · `IN_QUEUE_SQL` · `LATEST_AI_RESULT_LATERAL`)
  */
-export async function loadOnlineApplicantRows(opts: { start: Date | null; end: Date; bu: string | null }): Promise<OnlineApplicantRow[]> {
+export async function loadOnlineApplicantRows(opts: { start: Date | null; end: Date; bu: BuSet }): Promise<OnlineApplicantRow[]> {
   const { rows } = await dbQuery<Record<string, unknown>>(
     `select ${appBuSql('a')} as bu,
             a.job_id,
@@ -205,7 +206,7 @@ export async function loadOnlineApplicantRows(opts: { start: Date | null; end: D
         and not exists (select 1 from ${CANCELLATIONS} c where c.application_id = a.id)
         and ($1::timestamptz is null or a.created_at >= $1::timestamptz)
         and a.created_at < $2::timestamptz
-        and ($3::text is null or ${appBuSql('a')} = $3::text)`,
+        and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))`,
     [opts.start ? opts.start.toISOString() : null, opts.end.toISOString(), opts.bu],
   );
   const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);

@@ -64,6 +64,30 @@ export function pickDashboardBu(scope: DepartmentScope, raw: unknown): { bu: str
   };
 }
 
+/** ชุด BU ที่ใช้กรองจริง — null = ไม่กรอง (แอดมินดูทุก BU) · ว่าง = ไม่มีสิทธิ์ BU ไหน */
+export type BuSet = readonly string[] | null;
+
+/**
+ * BU ของหน้าที่ดู "ผลรวมทุก BU ในสิทธิ์" เป็นค่าเริ่ม (เจ้าของ 29–30 ต.ค. 2569 "default คือ ผลรวมของทุก bu แล้วฉันไปแยกดูเอง")
+ * - แอดมิน: ตามที่ขอ (ไม่ขอ = ทุก BU ไม่กรอง)
+ * - BU เดียว: ล็อก BU นั้น
+ * - หลาย BU: ขอ BU ในสิทธิ์ = BU นั้น · ไม่ขอ/ขอนอกสิทธิ์ = รวมทุก BU ในสิทธิ์ (`bu` null · `buSet` = สิทธิ์ทั้งชุด)
+ * `bu` = BU ที่เลือก (null = รวม) · `buSet` = ชุดที่ส่งเข้า SQL (`buMatchSql`)
+ */
+export function pickDashboardBuSet(scope: DepartmentScope, raw: unknown): { bu: string | null; buSet: BuSet; forcedBu: string | null; choices: string[] | null } {
+  const picked = pickDashboardBu(scope, scope.mode === 'all' ? raw : null);
+  if (!picked.choices) return { ...picked, buSet: picked.bu ? [picked.bu] : scope.mode === 'none' ? [] : null };
+  const asked = parseBuParam(raw);
+  const bu = asked && picked.choices.includes(asked) ? asked : null;
+  return { bu, buSet: bu ? [bu] : picked.choices, forcedBu: null, choices: picked.choices };
+}
+
+/** BU ของแถวอยู่ในชุด — `param` = ตำแหน่งพารามิเตอร์ `text[]` (null = ไม่กรอง) */
+export const buMatchSql = (expr: string, param: string) => `(${param}::text[] is null or ${expr} = any(${param}::text[]))`;
+
+/** BU ของแถวอยู่ในชุด (ฝั่ง Node) */
+export const inBuSet = (bu: string | null | undefined, set: BuSet) => set === null || (bu != null && set.includes(bu));
+
 /** ใบสมัคร — ต่อท้าย `from <apps> a` */
 export const appBuJoin = (a = 'a') => `left join ${MAP} ${a}_bm on ${a}_bm.job_id = ${a}.job_id`;
 export const appBuSql = (a = 'a') =>

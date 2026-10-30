@@ -25,7 +25,7 @@ import type { UserRole } from '../_lib/auth.js';
 import { respondServiceError } from '../_lib/domainErrors.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { loadMatchingBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
-import { followBuJoin, followBuSql, parseBuParam, pickDashboardBu } from '../_lib/homeBuSql.js';
+import { followBuJoin, followBuSql, parseBuParam, pickDashboardBuSet, type BuSet } from '../_lib/homeBuSql.js';
 import {
   buildApplicantAiShareSql,
   buildFollowAiShareSql,
@@ -99,10 +99,12 @@ function isUndefinedColumn(e: unknown): boolean {
 
 /** `$1` จุดเริ่ม (null = ทั้งหมด) · `$2` จุดจบ (ไม่รวม) · `$3` BU */
 /** `$2` เป็น null ได้เฉพาะหัวข้อติดตามแบบแผนช่วง "ทั้งหมด" (ไม่มีปลายช่วง) — หัวข้ออื่นมีปลายเสมอ */
-type Params = [string | null, string | null, string | null];
+type Params = [string | null, string | null, BuSet];
+/** BU ที่โชว์บนจอ — ชุดเดียว = BU นั้น · หลายตัว/ไม่กรอง = null (รวม) */
+const buLabelOf = (set: BuSet): string | null => (set && set.length === 1 ? set[0] : null);
 
 /** พารามิเตอร์ของหัวข้อติดตามแบบแผน — ปลายช่วงเต็ม ไม่ตัดที่ตอนนี้ (`followPlanBounds`) */
-function followPlanParams(win: AiShareWindow, bu: string | null): Params {
+function followPlanParams(win: AiShareWindow, bu: BuSet): Params {
   const { start, end } = followPlanBounds(win);
   return [start ? start.toISOString() : null, end ? end.toISOString() : null, bu];
 }
@@ -277,7 +279,7 @@ const BLOCK_FAILED = 'โหลดตัวเลขส่วนนี้ไม�
 export async function buildHomeAiShare(
   win: AiShareWindow,
   scope: DepartmentScope,
-  bu: string | null,
+  bu: BuSet,
   now: Date,
 ): Promise<AiShareResponse> {
   const { start, end } = aiShareBounds(win, now);
@@ -285,9 +287,9 @@ export async function buildHomeAiShare(
     generated_at: now.toISOString(),
     from: win.from,
     to: win.to,
-    bu,
-    forced_bu: pickDashboardBu(scope, bu).forcedBu !== null,
-    bu_choices: pickDashboardBu(scope, bu).choices,
+    bu: buLabelOf(bu),
+    forced_bu: pickDashboardBuSet(scope, buLabelOf(bu)).forcedBu !== null,
+    bu_choices: pickDashboardBuSet(scope, buLabelOf(bu)).choices,
     follow: null,
     aftercare: null,
     applicants: null,
@@ -361,7 +363,7 @@ export async function buildAiShareDetail(
   block: AiShareBlockKey,
   win: AiShareWindow,
   scope: DepartmentScope,
-  bu: string | null,
+  bu: BuSet,
   now: Date,
 ): Promise<AiShareDetailResponse> {
   const { start, end } = aiShareBounds(win, now);
@@ -370,7 +372,7 @@ export async function buildAiShareDetail(
     block,
     from: win.from,
     to: win.to,
-    bu,
+    bu: buLabelOf(bu),
     rows: null,
     follow_staff_ready: false,
     error: null,
@@ -408,7 +410,7 @@ export async function loadFollowResultsSplit(params: Params): Promise<FollowResu
       where f.topic is distinct from $4::text
         and ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
         and ($2::timestamptz is null or f.scheduled_at < $2::timestamptz)
-        and ($3::text is null or ${followBuSql('f')} = $3::text)`,
+        and ($3::text[] is null or ${followBuSql('f')} = any($3::text[]))`,
     [...params, AFTERCARE_TOPIC],
   );
   const derived = categorizeFollowRows(rows);
@@ -441,7 +443,7 @@ export async function loadFollowJourney(params: Params): Promise<{ rows: FollowJ
       where f.topic is distinct from $4::text
         and ($1::timestamptz is null or f.scheduled_at >= $1::timestamptz)
         and ($2::timestamptz is null or f.scheduled_at < $2::timestamptz)
-        and ($3::text is null or ${followBuSql('f')} = $3::text)
+        and ($3::text[] is null or ${followBuSql('f')} = any($3::text[]))
       order by f.scheduled_at`,
     [...params, AFTERCARE_TOPIC],
   );
@@ -481,7 +483,7 @@ export async function loadFollowJourney(params: Params): Promise<{ rows: FollowJ
         where l.action in ('irecruit_replace_sync.edit', 'irecruit_replace_sync.cancel')
           and ($1::timestamptz is null or l.created_at >= $1::timestamptz)
           and ($2::timestamptz is null or l.created_at < $2::timestamptz)
-          ${params[2] ? `and ${followBuSql('f')} = $3::text` : 'and $3::text is null'}
+          ${params[2] ? `and ${followBuSql('f')} = any($3::text[])` : 'and $3::text[] is null'}
         order by l.created_at`,
       params,
     );
@@ -510,7 +512,7 @@ export async function buildAiShareResults(
   block: AiShareBlockKey,
   win: AiShareWindow,
   scope: DepartmentScope,
-  bu: string | null,
+  bu: BuSet,
   now: Date,
 ): Promise<AiShareResultsResponse> {
   const { start, end } = aiShareBounds(win, now);
@@ -519,7 +521,7 @@ export async function buildAiShareResults(
     block,
     from: win.from,
     to: win.to,
-    bu,
+    bu: buLabelOf(bu),
     vocab: vocabOfBlock(block),
     ai: emptyCallResultCounts(),
     staff: emptyCallResultCounts(),
@@ -554,7 +556,7 @@ export async function buildAiShareList(
   page: number,
   win: AiShareWindow,
   scope: DepartmentScope,
-  bu: string | null,
+  bu: BuSet,
   now: Date,
 ): Promise<AiShareListResponse> {
   const { start, end } = aiShareBounds(win, now);
@@ -564,7 +566,7 @@ export async function buildAiShareList(
     segment: key,
     from: win.from,
     to: win.to,
-    bu,
+    bu: buLabelOf(bu),
     page,
     page_size: AI_SHARE_LIST_PAGE,
     total: 0,
@@ -604,7 +606,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const q = req.query ?? {};
     const scope: DepartmentScope = await loadMatchingBuScope(req.user);
     // ผู้ใช้หลาย BU เลือกได้ทีละ BU ในสิทธิ์ (26 ต.ค. 2569 · `pickDashboardBu`)
-    const { bu } = pickDashboardBu(scope, q.bu);
+    // ไม่ขอ BU = รวมทุก BU ในสิทธิ์ (30 ต.ค. 2569 · หน้าหลักนับ BU ชุดเดียวกันทุกการ์ด) · `bu` = ชุดที่ใช้กรอง
+    const bu = pickDashboardBuSet(scope, q.bu).buSet;
     const win = parseAiShareWindow({ from: q.from, to: q.to });
     // `?report=<ก้อน>` = รายงานผลโทร งานสรรหา / จับคู่งาน / ดูแลหลังเริ่มงาน (7 ต.ค. 2569) — ช่วง/BU เดียวกับกล่อง
     if (q.report !== undefined) {
@@ -617,7 +620,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         block: block as TopicReportBlock,
         from: win.from,
         to: win.to,
-        bu,
+        bu: buLabelOf(bu),
         report: null,
         error: null,
       };
@@ -645,7 +648,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (q.online !== undefined) {
       const { start, end } = aiShareBounds(win, new Date());
       const { from, to } = onlineRequestYmdRange(start, end);
-      const body: OnlineReportResponse = { generated_at: new Date().toISOString(), from, to, bu, report: null, applicants: null, error: null };
+      const body: OnlineReportResponse = { generated_at: new Date().toISOString(), from, to, bu: buLabelOf(bu), report: null, applicants: null, error: null };
       if (scope.mode === 'none') {
         body.error = 'บัญชีนี้ยังไม่ได้ผูกแผนก เลยยังดูข้อมูลทีม Online ไม่ได้';
         return res.status(200).json(body);
@@ -674,7 +677,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         generated_at: new Date().toISOString(),
         from: win.from,
         to: win.to,
-        bu,
+        bu: buLabelOf(bu),
         follow: null,
         entry: null,
         errors: {},
@@ -783,7 +786,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         generated_at: new Date().toISOString(),
         from: win.from,
         to: win.to,
-        bu,
+        bu: buLabelOf(bu),
         follow: null,
         applicants: null,
         backlog: null,
@@ -807,7 +810,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // `?journey=follow` = เส้นทางติดตามทีละขั้น (7 ต.ค. 2569) — สิทธิ์เท่าหน้าติดตาม
     if (q.journey !== undefined) {
       if (q.journey !== 'follow') return sendError(res, 400, 'Bad request', 'ไม่รู้จักก้อนนี้');
-      const body: FollowJourneyResponse = { generated_at: new Date().toISOString(), from: win.from, to: win.to, bu, rows: [], events: [], error: null };
+      const body: FollowJourneyResponse = { generated_at: new Date().toISOString(), from: win.from, to: win.to, bu: buLabelOf(bu), rows: [], events: [], error: null };
       if (scope.mode === 'none') {
         body.error = 'บัญชีนี้ยังไม่ได้ผูกแผนก เลยยังดูเส้นทางติดตามไม่ได้';
         return res.status(200).json(body);

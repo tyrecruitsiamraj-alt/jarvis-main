@@ -45,7 +45,7 @@ import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import { appsInWindow, buildApplicantFunnel, type FunnelStep } from '@/lib/homeOverviewFunnel';
 import { followBuSplit, followCallsMade, followPersonResults, followPersonTeams, followResultSplit, followTeamTotals } from '@/lib/homeSplit';
 import { REQUEST_LEAD_KIND_LABEL, requestLeadKindFromYmd, type RequestLeadKind } from '@/lib/requestLeadKind';
-import { SITE_BU_TO_DEPT, trendBuLabel } from '@/lib/trends/bu';
+import { SITE_BU_TO_DEPT, normalizeTrendBu, trendBuFromSiteCode, trendBuLabel } from '@/lib/trends/bu';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { thaiDate } from '@/lib/periodPick';
 import { friendlyErrorText } from '@/lib/friendlyError';
@@ -96,8 +96,19 @@ const HomeOverviewPage: React.FC = () => {
   const [ai, setAi] = useState<AiShareResponse | null>(null);
   const [ro, setRo] = useState<RecruitOverviewResponse | null>(null);
   const [roError, setRoError] = useState<string | null>(null);
+  /** เลขชุดล่าสุดของช่วง/BU ที่เลือกอยู่ — กันจอกระพริบตอนรอบสด (ล้างทันทีเมื่อเปลี่ยนช่วง/BU) */
+  const lastMoney = useRef<{ key: string; m: HomeMoneyPayload } | null>(null);
+  /** เปลี่ยนช่วง/BU = ล้างเลขของชุดก่อนทันที (QA 30 ต.ค. 2569: สลับ BU แล้วเลข BU เก่าค้าง 1–8 วิ) · รอบสดชุดเดิมไม่ล้าง */
+  const dataKey = `${range.from}|${range.to}|${bu ?? ''}`;
+  const shownKey = useRef(dataKey);
   useEffect(() => {
     let alive = true;
+    if (shownKey.current !== dataKey) {
+      shownKey.current = dataKey;
+      setMoney(null);
+      setAi(null);
+      setRo(null);
+    }
     setMoneyError(null);
     fetchHomeMoney({ ...range, bu })
       .then((m) => alive && setMoney(m))
@@ -115,10 +126,12 @@ const HomeOverviewPage: React.FC = () => {
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dataKey มาจาก range/bu ชุดเดียวกัน
   }, [range, win, bu, tick]);
   const lumos = useHomeLumosSummary('follow', winQ, tick);
   const feed = useUnitRequestsFeed();
-  const preCount = feed.jobs.filter((j) => String(j.id).startsWith(PREQUEST_ID_PREFIX)).length;
+  /** ใบขอชั่วคราว (ทีมคีย์เอง) ของ BU ที่เลือก — QA 30 ต.ค. 2569: เดิมขึ้น 17 ทุก BU */
+  const preCount = feed.jobs.filter((j) => String(j.id).startsWith(PREQUEST_ID_PREFIX) && (!bu || (trendBuFromSiteCode(j.site_code) ?? normalizeTrendBu(j.department_code)) === bu)).length;
   /** ใบขอที่เปิดอยู่ — แท็บสัดส่วนใช้บอกเหตุ "ใบขอปิดแล้ว" · เส้นใบขอยังไม่พร้อม = null (ไม่เดาว่าปิด) */
   const openJobIds = useMemo(
     () => (feed.feedState === 'ready' ? new Set(feed.jobs.map((j) => String(j.id))) : null),
@@ -130,9 +143,13 @@ const HomeOverviewPage: React.FC = () => {
     money && money.window.from === range.from && money.window.to === range.to && (money.forcedBu || money.bu === bu || (bu === null && Boolean(money.buChoices)))
       ? money
       : null;
-  const lastMoney = useRef<HomeMoneyPayload | null>(null);
-  if (moneyNow) lastMoney.current = moneyNow;
-  const kpi = moneyNow ?? lastMoney.current;
+  if (moneyNow) lastMoney.current = { key: dataKey, m: moneyNow };
+  // ชุดล่าสุดใช้ได้เฉพาะช่วง/BU เดียวกัน — เปลี่ยน BU แล้วเลขเก่าห้ามโผล่แม้แต่เฟรมเดียว
+  const kpi = moneyNow ?? (lastMoney.current?.key === dataKey ? lastMoney.current.m : null);
+  /** ตัวเลือก BU ไม่ขึ้นกับ BU ที่เลือก — คงไว้ระหว่างโหลด ไม่ให้ช่องเลือกกระพริบ */
+  const buChoicesRef = useRef<string[] | null>(null);
+  if (kpi?.buChoices?.length) buChoicesRef.current = kpi.buChoices;
+  const buChoices = buChoicesRef.current;
   const flow = moneyNow?.flow ?? null;
   const contract = moneyNow ? moneyNow.totals.need.fine + moneyNow.totals.need.deduct : null;
   const openReqs = useMemo(() => moneyNow?.requests ?? [], [moneyNow]);
@@ -144,7 +161,7 @@ const HomeOverviewPage: React.FC = () => {
   const flowRows = (pick: (f: NonNullable<MoneyRequest['flow']>) => boolean) => openReqs.filter((r) => r.flow && pick(r.flow));
 
   // ── ผู้สมัคร ──
-  const roNow = ro && ro.window.from === range.from && ro.window.to === range.to ? ro : null;
+  const roNow = ro && ro.window.from === range.from && ro.window.to === range.to && ro.bu === bu ? ro : null;
   const apps = useMemo(() => (roNow?.apps ? appsInWindow(roNow.apps, range.from, range.to) : null), [roNow, range]);
   const claimed = roNow?.staff ? roNow.staff.reduce((n, s) => n + s.claimed, 0) : null;
   const funnel = useMemo(() => (apps ? buildApplicantFunnel(apps, claimed) : null), [apps, claimed]);
@@ -155,7 +172,7 @@ const HomeOverviewPage: React.FC = () => {
   const cells = lumos.current?.followByBu ?? null;
   const liveCells = useMemo(() => (cells ? cells.filter((c) => c.bucket !== 'cancelled') : null), [cells]);
   const followResults = useMemo(
-    () => (liveCells ? followResultSplit(liveCells, FOLLOW_RESULT_COLS.filter((c) => c.key !== 'cancelled')).filter((r) => r.total > 0 || r.key === 'went') : []),
+    () => (liveCells ? followResultSplit(liveCells, FOLLOW_RESULT_COLS.filter((c) => c.key !== 'cancelled')) : []),
     [liveCells],
   );
   const followBus = useMemo(() => (liveCells ? followBuSplit(liveCells) : []), [liveCells]);
@@ -447,8 +464,8 @@ const HomeOverviewPage: React.FC = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <PeriodPicker value={win} onChange={setWin} />
-          {kpi?.buChoices?.length ? (
-            <BuChoiceSelect value={bu ?? kpi.bu} choices={kpi.buChoices} onChange={setBu} triggerClassName="h-10 w-44 bg-card" />
+          {buChoices?.length ? (
+            <BuChoiceSelect value={bu} choices={buChoices} onChange={setBu} allOption triggerClassName="h-10 w-32 bg-card" />
           ) : moneyNow?.forcedBu && moneyNow.bu ? (
             <span className="text-sm text-muted-foreground">{trendBuLabel(moneyNow.bu)}</span>
           ) : (
@@ -494,7 +511,7 @@ const HomeOverviewPage: React.FC = () => {
           unit="ใบ"
           emphasis="warn"
           tag="ต้องหา"
-          sub={flow ? `${NUM.format(flow.remaining)} คน · ล่วงหน้าอีก ${NUM.format(preCount)} ใบ` : undefined}
+          sub={flow ? `${NUM.format(flow.remaining)} คน · ใบขอชั่วคราวอีก ${NUM.format(preCount)} ใบ` : undefined}
           onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open).sort((a, b) => perDayOf(b) - perDayOf(a))) : undefined}
           testId="overview-kpi-remain"
         />
@@ -551,7 +568,7 @@ const HomeOverviewPage: React.FC = () => {
             value={flow?.filled}
             unit="คน"
             emphasis="success"
-            onClick={flow ? () => openList('หาได้แล้ว', openReqs.filter((r) => r.filledInWindow > 0)) : undefined}
+            onClick={flow ? () => openList('หาได้แล้ว', openReqs.filter((r) => r.filledInWindow > 0), `หาได้ ${NUM.format(flow.filled)} คน`) : undefined}
             testId="overview-req-filled"
           />
         </div>
@@ -602,7 +619,7 @@ const HomeOverviewPage: React.FC = () => {
 
       {/* ── 2 ผู้สมัคร 6 ขั้น + แถบช่องทาง ── */}
       <OverviewGroup no={2} title="ผู้สมัคร" head={applied && funnel ? `กรอกมา ${NUM.format(applied.value)} คน` : null} testId="overview-group-funnel">
-      <OverviewSection title="ไปถึงขั้นไหน" sub="กรอกในช่วงที่เลือก · คน · แถบสี = มาจากช่องทางไหน" testId="overview-funnel">
+      <OverviewSection title="ไปถึงขั้นไหน" sub="กรอกในช่วงที่เลือก · คน" testId="overview-funnel">
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
           {(funnel ?? buildApplicantFunnel([], null)).map((s) => (
             <OverviewNode key={s.key} label={s.label} value={funnel ? s.value : null} onClick={funnel ? () => openStep(s) : undefined} testId={`overview-step-${s.key}`}>

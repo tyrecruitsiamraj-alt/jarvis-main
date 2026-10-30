@@ -58,9 +58,16 @@ export function overdueOf(requests: readonly MoneyRequest[], today: string): { r
 }
 
 /** ใบที่เลยวันที่ต้องการแล้ว (ไม่นับใบค้างนานผิดปกติ) เรียงเสียวันละมากสุดก่อน */
+/**
+ * ใบนี้นับเป็น "เสียวันละ" วันนี้ไหม — ตัวเดียวทั้งการ์ดเสียเงินและป๊อปรายการ (QA 30 ต.ค. 2569: การ์ด 16,933 · ป๊อป 19,933
+ * เพราะป๊อปนับใบค้างเกิน `STALE_DAYS` ด้วย) · ใบค้างนานไม่นับ (แยกไปก้อน `staleOf`)
+ */
+export const chargesToday = (r: Pick<MoneyRequest, 'open' | 'needYmd' | 'filled'>, today: string) =>
+  r.open && r.needYmd != null && r.needYmd <= today && !isStale(r, today);
+
 export function costliest(requests: readonly MoneyRequest[], today: string, top = 5): { rows: UrgentRow[]; total: number } {
   const all = requests
-    .filter((r) => r.open && r.needYmd != null && r.needYmd <= today && perDayOf(r) > 0 && !isStale(r, today))
+    .filter((r) => chargesToday(r, today) && perDayOf(r) > 0)
     .map(toRow)
     .sort((a, b) => b.perDay - a.perDay || b.missing - a.missing);
   return { rows: all.slice(0, top), total: all.length };

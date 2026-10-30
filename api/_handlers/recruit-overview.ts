@@ -18,7 +18,7 @@ import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from
 import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { loadMatchingBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
-import { appBuJoin, appBuSql, parseBuParam, pickDashboardBu } from '../_lib/homeBuSql.js';
+import { appBuJoin, appBuSql, pickDashboardBu, pickDashboardBuSet } from '../_lib/homeBuSql.js';
 import {
   AI_RESULT_AT_SQL,
   AI_RESULT_BY_PHONE_SQL,
@@ -683,10 +683,10 @@ export async function buildRecruitOverview(
    * หลาย BU = ค่าเริ่ม **ผลรวมทุก BU ในสิทธิ์** แล้วเลือกดูทีละ BU ได้ (เจ้าของ 29 ต.ค. 2569 "default คือ ผลรวมของทุก bu แล้วฉันไปแยกดูเอง")
    * `bu` = BU ที่เลือก (null = รวม) · `buSet` = ชุดที่ใช้กรองจริง (null = ไม่กรอง · แอดมิน)
    */
-  const picked = pickDashboardBu(scope, scope.mode === 'all' ? null : requestedBu);
-  const askedBu = parseBuParam(requestedBu);
-  const bu = picked.choices ? (askedBu && picked.choices.includes(askedBu) ? askedBu : null) : picked.bu;
-  const buSet = bu ? [bu] : picked.choices;
+  // ตัวเลือกชุดเดียวกับหน้าหลัก (`pickDashboardBuSet`) · แอดมินไม่ส่ง BU = ทุก BU · ส่ง = BU นั้น (หน้าหลักของแอดมินเลือก BU ได้)
+  const picked = pickDashboardBuSet(scope, requestedBu);
+  const bu = picked.bu;
+  const buSet = picked.buSet;
   const body: RecruitOverviewResponse = {
     buChoices: picked.choices,
     version: 1,

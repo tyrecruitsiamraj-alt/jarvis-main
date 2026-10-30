@@ -107,7 +107,7 @@ export function buildApplicantFunnel(apps: readonly RecruitAppFact[], claimed: n
       key: 'staff',
       label: 'คนโทรต่อ',
       value: staffCalled.length,
-      rows: claimed === null ? [] : [{ key: 'claimed', label: 'เก็บไปหน้าติดต่อ', value: claimed, tone: 'neutral' }],
+      rows: claimed === null ? [] : [{ key: 'claimed', label: 'รับไปโทรในช่วงนี้', value: claimed, tone: 'neutral' }],
       channels: channelsOf(staffCalled),
     },
     {

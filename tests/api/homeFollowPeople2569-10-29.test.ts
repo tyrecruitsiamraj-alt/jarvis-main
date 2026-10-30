@@ -46,12 +46,8 @@ describe('ผลรายคน', () => {
       { bu: 'LBD', team: 'main', caller: 'manual', bucket: 'failed', n: 1 },
     ];
     const rows = followPersonResults(cells, lines, COLS);
-    expect(rows.map((r) => [r.key, r.people, r.calls])).toEqual([
-      ['went', 1, 1],
-      ['notWent', 0, 0],
-      ['failed', 1, 2],
-      ['waiting', 0, 1],
-    ]);
+    // ว่างแล้วห้ามหาย (QA 30 ต.ค. 2569) — ทุกผลขึ้นแม้ 0
+    expect(rows.map((r) => [r.key, r.people, r.calls])).toEqual(COLS.map((c) => [c.key, ...({ went: [1, 1], failed: [1, 2], waiting: [0, 1] } as Record<string, number[]>)[c.key] ?? [0, 0]]));
     expect(rows.reduce((n, r) => n + r.people, 0)).toBe(2);
     expect(followPersonTeams(cells)).toEqual({ main: 1, replacement: 1 });
     expect(followCallsMade(lines)).toEqual({ aiDone: 2, aiWaiting: 1, staffDone: 1, staffWaiting: 0 });
