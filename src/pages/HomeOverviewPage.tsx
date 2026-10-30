@@ -23,6 +23,7 @@ import {
   ChannelStrip,
   ChannelTable,
   NUM,
+  OverviewGroup,
   OverviewNode,
   OverviewSection,
   OverviewSheet,
@@ -517,8 +518,10 @@ const HomeOverviewPage: React.FC = () => {
         />
       </div>
 
+      {/* ── 1 ใบขอ (แบบร่าง A 30 ต.ค. 2569: หัวเรื่องนอกการ์ด แยก 3 เรื่องให้ชัด) ── */}
+      <OverviewGroup no={1} title="ใบขอ" testId="overview-group-requests">
       {/* ── ใบขอ: ยกมา + ขอใหม่ − ปิดครบ − ยกเลิก = เหลือหา ── */}
-      <OverviewSection title="ใบขอ" sub="ใบขอจริงใน ERP · ใบ (คน)" testId="overview-requests">
+      <OverviewSection title="ใบขอจริงใน ERP" sub="ใบ (คน)" testId="overview-requests">
         <div className="grid grid-cols-2 items-stretch gap-2 sm:grid-cols-5">
           <OverviewNode label="ยกมา" value={flow?.carryInRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.carryIn)} คน` : undefined} onClick={flow ? () => openList('ยกมา', flowRows((f) => f.carry)) : undefined} testId="overview-req-carry" />
           <OverviewNode label="+ ขอใหม่" value={flow?.newRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.newPositions)} คน` : undefined} onClick={flow ? openNew : undefined} testId="overview-req-new" />
@@ -595,8 +598,11 @@ const HomeOverviewPage: React.FC = () => {
         </p>
       </OverviewSection>
 
-      {/* ── ผู้สมัคร 6 ขั้น + แถบช่องทาง ── */}
-      <OverviewSection title="ผู้สมัคร" sub="กรอกในช่วงที่เลือก · คน · แถบสี = มาจากช่องทางไหน" testId="overview-funnel">
+      </OverviewGroup>
+
+      {/* ── 2 ผู้สมัคร 6 ขั้น + แถบช่องทาง ── */}
+      <OverviewGroup no={2} title="ผู้สมัคร" head={applied && funnel ? `กรอกมา ${NUM.format(applied.value)} คน` : null} testId="overview-group-funnel">
+      <OverviewSection title="ไปถึงขั้นไหน" sub="กรอกในช่วงที่เลือก · คน · แถบสี = มาจากช่องทางไหน" testId="overview-funnel">
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
           {(funnel ?? buildApplicantFunnel([], null)).map((s) => (
             <OverviewNode key={s.key} label={s.label} value={funnel ? s.value : null} onClick={funnel ? () => openStep(s) : undefined} testId={`overview-step-${s.key}`}>
@@ -616,8 +622,10 @@ const HomeOverviewPage: React.FC = () => {
         </div>
         <ChannelLegend channels={funnel?.[0]?.channels} />
       </OverviewSection>
+      </OverviewGroup>
 
-      {/* ── ติดตาม · ดูแลหลังเริ่มงาน ── */}
+      {/* ── 3 หลังได้คน: ติดตาม · ดูแลหลังเริ่มงาน ── */}
+      <OverviewGroup no={3} title="หลังได้คน" head={people ? `ติดตาม ${NUM.format(peopleTotal)} คน · ${NUM.format(followLive)} สาย` : null} testId="overview-group-after">
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <OverviewSection
           title="ติดตามคนเริ่มงาน / ติดตามส่งคนแทน"
@@ -693,6 +701,7 @@ const HomeOverviewPage: React.FC = () => {
           </p>
         </OverviewSection>
       </div>
+      </OverviewGroup>
       </>
       )}
 

@@ -21,6 +21,38 @@ export const NUM = new Intl.NumberFormat('th-TH');
 
 export type Emphasis = 'danger' | 'warn' | 'success' | null;
 
+/**
+ * กลุ่มเรื่องของหน้าหลัก (เจ้าของ 30 ต.ค. 2569 "มันดูกลมกลืน … แยกให้ชัดเจนหน่อย" → แบบร่าง A)
+ * หัวเรื่องอยู่นอกการ์ด: เลขลำดับในวงกลม · ชื่อเรื่องตัวใหญ่ · ยอดหลักชิดขวา · เส้นกรมท่าคั่น
+ */
+export function OverviewGroup({
+  no,
+  title,
+  head,
+  children,
+  testId,
+}: {
+  no: number;
+  title: string;
+  /** ยอดหลักของเรื่อง (ขวามือ) · ไม่ส่ง = ไม่โชว์ */
+  head?: string | null;
+  children: React.ReactNode;
+  testId?: string;
+}) {
+  return (
+    <section className="space-y-4 pt-4" data-testid={testId}>
+      <div className="flex items-center gap-3 border-b-2 border-foreground pb-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-base font-medium text-background" aria-hidden>
+          {no}
+        </span>
+        <h2 className="min-w-0 flex-1 text-2xl font-medium text-foreground">{title}</h2>
+        {head ? <span className="shrink-0 text-sm tabular-nums text-muted-foreground">{head}</span> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 /** หัวส่วน — ชื่อ + บรรทัดหน่วย + มุมขวา */
 export function OverviewSection({
   title,
