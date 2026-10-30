@@ -459,9 +459,10 @@ describe('callCategory — หมวดผลของสาย', () => {
     callCategory(buildFollowPlanningRows(groupFollowEntries([entry(over)], NOW), NOW)[0].rounds[0]);
 
   // 🔴 6 ต.ค. 2569 นิยามเจ้าของ: ไป = คำตอบที่ดูแล้วว่าไป · "รับสายแล้ว" เฉย ๆ = สรุปไม่ได้
-  it('ตกลง: confirmed · รับสายแล้วที่คำตอบบอกว่าไป · ปิดงานว่าไป', () => {
+  // 🔴 30 ต.ค. 2569 เจ้าของ "เอาตาม lumos" — รับสายแล้วไม่อ่านคำตอบมาตัดสินว่าไป
+  it('ตกลง: confirmed · ปิดงานว่าไป · รับสายแล้วแม้พูดว่าไป = สรุปไม่ได้', () => {
     expect(cat({ call_status: 'completed', call_outcome: 'confirmed' })).toBe('agreed');
-    expect(cat({ call_status: 'completed', call_outcome: 'acknowledged', call_reply: 'ไปครับ ออกจากบ้านแล้ว' })).toBe('agreed');
+    expect(cat({ call_status: 'completed', call_outcome: 'acknowledged', call_reply: 'ไปครับ ออกจากบ้านแล้ว' })).toBe('other');
     expect(cat({ call_status: 'completed', call_outcome: 'acknowledged' })).toBe('other');
     expect(cat({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'went' })).toBe('agreed');
   });
@@ -822,16 +823,13 @@ describe('Lumos บอกไม่รับสาย แต่มีคำพู
 });
 
 describe('คลังคำปัญหา Lumos 7 ต.ค. 2569 ข้อ 6 · 7 · 8 (ประโยคจริงจากสาย)', () => {
-  it('🔴 ข้อ 6 อยู่บนรถ / ขึ้นรถ = ไป · ข้อ 8 ถึง / มาถึง = ไป · คำถอดเสียงเว้นวรรคกลางคำก็อ่านได้', async () => {
+  // 🔴 30 ต.ค. 2569 เจ้าของ "เอาตาม lumos" — ข้อ 6 · 8 เลิกอ่านคำ: รับสายแล้ว = รับสายแล้ว ไม่ว่าพูดอะไร
+  it('🔴 ข้อ 6 · 8 รับสายแล้ว (acknowledged) ไม่อ่านคำพูดมาตัดสินไป/ยังเตรียมตัว', async () => {
     const { classifyFollowCall } = await import('../../src/lib/followCallMicro');
     const ack = (reply: string) => classifyFollowCall({ outcome: 'acknowledged', reply, summary: null });
-    expect(ack('เตรียม ตัว ขึ้น รถ ครับ')).toBe('said_going');
-    expect(ack('อยู่บนรถค่ะ')).toBe('said_going');
-    expect(ack('ใช่ ค่ะ นั่ง รถ แล้ว ค่ะ')).toBe('said_going');
-    expect(ack('ถึง ณ 844 แล้ว ครับ มาถึง 44 แล้ว ครับ')).toBe('said_going');
-    expect(ack('ยังไม่ได้ขึ้นรถครับ')).toBe('getting_ready');
-    // ยังไม่ถึงแต่กำลังเดินทาง = ไปเหมือนเดิม (ห้ามย้ายถังเงียบ ๆ)
-    expect(classifyFollowCall({ outcome: 'acknowledged', reply: 'ยังครับ กำลังเดินทางครับ', summary: 'แจ้งว่ายังไม่ถึงหน่วยงาน กำลังเดินทางอยู่' })).toBe('said_going');
+    for (const r of ['เตรียม ตัว ขึ้น รถ ครับ', 'อยู่บนรถค่ะ', 'ถึง ณ 844 แล้ว ครับ มาถึง 44 แล้ว ครับ', 'ยังไม่ได้ขึ้นรถครับ']) {
+      expect(ack(r)).toBe('talked_unclear');
+    }
   });
   it('🔴 ข้อ 7 เสียงระบบฝากข้อความ = ไม่รับสาย ตามที่ Lumos ส่งมา (ไม่ขึ้น "รับสายแล้ว")', async () => {
     const { classifyFollowCall } = await import('../../src/lib/followCallMicro');

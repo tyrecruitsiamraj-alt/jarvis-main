@@ -13,15 +13,14 @@ const said = (...lines: string[]) => ({ transcript: lines.map((text) => ({ role:
 
 describe('followSaidGoing', () => {
   it('ยืนยัน (confirmed) = ไป', () => {
-    expect(followSaidGoing('confirmed', {})).toBe(true);
+    expect(followSaidGoing('confirmed')).toBe(true);
   });
-  it('รับสายแล้วบอกว่าไป/กำลังไป = ไป · บอกไม่ไป = ไม่ใช่', () => {
-    expect(followSaidGoing('acknowledged', said('ไปครับ กำลังเดินทาง'))).toBe(true);
-    expect(followSaidGoing('acknowledged', said('ไม่ไปครับ'))).toBe(false);
+  it('🔴 รับสายแล้ว (acknowledged) ไม่ใช่ไป แม้สรุปบอกว่าไป — ยึดรหัสของ Lumos (30 ต.ค. 2569)', () => {
+    expect(followSaidGoing('acknowledged')).toBe(false);
   });
   it('🔴 จับใจความไม่ได้ / ไม่รับสาย ห้ามเดาเป็นไป', () => {
-    expect(followSaidGoing('unresponsive', said('ไปครับ'))).toBe(false);
-    expect(followSaidGoing('no_answer', {})).toBe(false);
+    expect(followSaidGoing('unresponsive')).toBe(false);
+    expect(followSaidGoing('no_answer')).toBe(false);
   });
   it('ตัวรับผลเรียกยกเลิกสายที่เหลือทั้งตอนไม่ไปและตอนไป', () => {
     const src = readFileSync('api/_lib/callFollowup.ts', 'utf8');
@@ -31,13 +30,13 @@ describe('followSaidGoing', () => {
 });
 
 describe('คำตอบของสายติดตาม (28 ต.ค. 2569 · แจ้งเตือนไม่ไป/ขอเลื่อน)', () => {
-  it('ไม่ไป = declined หรือรับสายแล้วพูดว่าไม่ไป · ขอเลื่อน = reschedule_requested', () => {
-    expect(followAnswerOf('declined', {})).toBe('not_going');
-    expect(followAnswerOf('acknowledged', said('ไม่ไปครับ'))).toBe('not_going');
-    expect(followAnswerOf('reschedule_requested', {})).toBe('reschedule');
-    expect(followAnswerOf('confirmed', {})).toBe('going');
-    expect(followAnswerOf('unresponsive', said('ไม่ไปครับ'))).toBe(null);
-    expect(followAnswerOf('wrong_person', {})).toBe(null);
+  it('ไม่ไป = declined เท่านั้น · ขอเลื่อน = reschedule_requested · รับสายแล้ว = ไม่ตัดสิน (30 ต.ค. 2569 ยึดรหัสของ Lumos)', () => {
+    expect(followAnswerOf('declined')).toBe('not_going');
+    expect(followAnswerOf('acknowledged')).toBe(null);
+    expect(followAnswerOf('reschedule_requested')).toBe('reschedule');
+    expect(followAnswerOf('confirmed')).toBe('going');
+    expect(followAnswerOf('unresponsive')).toBe(null);
+    expect(followAnswerOf('wrong_person')).toBe(null);
   });
   it('🔴 จับใจความไม่ได้ + มีคำพูด ⇒ หน้าติดตามไม่อ่านคำพูดเอง (เชื่อ Lumos) · ไม่รับสาย + มีคำพูดยังอ่านเหมือนเดิม', () => {
     expect(answeredButMarkedUnreached({ call_outcome: 'unresponsive', call_reply: 'ไปครับ' })).toBe(false);

@@ -27,23 +27,16 @@ const call = (over: Partial<CallMicroInput>): CallMicroInput => ({
   ...over,
 });
 
-describe('งานติดตาม (FOLLOW_VOCAB)', () => {
-  it('ตอบว่าไป ⇒ said_yes', () => {
-    expect(
-      classifyCallMicro(call({ summary: 'ผู้รับสายยืนยันว่าเตรียมตัวเรียบร้อยแล้ว' }), FOLLOW_VOCAB),
-    ).toBe('said_yes');
+describe('งานติดตาม (FOLLOW_VOCAB) — ยึดรหัสของ Lumos อย่างเดียว (30 ต.ค. 2569)', () => {
+  it('confirmed ⇒ said_yes · declined ⇒ said_no', () => {
+    expect(classifyCallMicro(call({ outcome: 'confirmed' }), FOLLOW_VOCAB)).toBe('said_yes');
+    expect(classifyCallMicro(call({ outcome: 'declined' }), FOLLOW_VOCAB)).toBe('said_no');
   });
 
-  it('ยังไม่ได้ไป ⇒ said_no', () => {
-    expect(
-      classifyCallMicro(call({ summary: 'แจ้งว่ายังไม่ได้ไปที่หน่วยงาน' }), FOLLOW_VOCAB),
-    ).toBe('said_no');
-  });
-
-  it('ยังอาบน้ำอยู่ ⇒ not_yet', () => {
-    expect(classifyCallMicro(call({ summary: 'บอกว่ากำลังอาบน้ำอยู่' }), FOLLOW_VOCAB)).toBe(
-      'not_yet',
-    );
+  it('🔴 acknowledged ไม่อ่านสรุป — สรุปบอกไป/ไม่ไป/อาบน้ำ ก็เป็นรับสายแล้ว (talked_unclear)', () => {
+    for (const summary of ['ผู้รับสายยืนยันว่าเตรียมตัวเรียบร้อยแล้ว', 'แจ้งว่ายังไม่ได้ไปที่หน่วยงาน', 'บอกว่ากำลังอาบน้ำอยู่']) {
+      expect(classifyCallMicro(call({ summary }), FOLLOW_VOCAB)).toBe('talked_unclear');
+    }
   });
 });
 
@@ -97,10 +90,10 @@ describe('เลือกคลังคำจาก person_ref', () => {
 
 describe('อัตราทั้งสาม', () => {
   const calls: CallMicroInput[] = [
-    call({ summary: 'ยืนยันว่าเตรียมตัวเรียบร้อยแล้ว' }), // ตอบรับ
-    call({ summary: 'บอกว่ากำลังเดินทาง' }), // ตอบรับ
+    call({ outcome: 'confirmed' }), // ตอบรับ
+    call({ outcome: 'confirmed' }), // ตอบรับ
     call({ outcome: 'declined' }), // ปฏิเสธ
-    call({ summary: 'กำลังอาบน้ำอยู่' }), // ยังไม่พร้อม
+    call({ summary: 'กำลังอาบน้ำอยู่' }), // รับสายแล้ว
     call({ outcome: 'no_answer' }), // ไม่รับสาย
     call({ outcome: 'cancelled' }), // ไม่นับ
   ];

@@ -25,7 +25,6 @@ import { getLumosPushConfig } from './lumosPushClient.js';
 import { cancelFollowPlanAtLumos } from './followLumosCancel.js';
 import { followSameStopUnitSql } from './followDayScope.js';
 import { logError, logInfo } from './logger.js';
-import { classifyFollowCall } from '../../src/lib/followCallMicro.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 const suppressionTable = tableInAppSchema('candidate_call_suppression');
@@ -285,8 +284,8 @@ export async function applyCallFollowupToQueueRow(input: {
   //
   // 🔴 28 ต.ค. 2569 (เจ้าของ Choice "ยกเลิกสายที่เหลือของวันนั้น"): **ตอบว่าไปแล้ว** ก็หยุดแบบเดียวกัน
   //    เคสคุณนริศ: 06:40 ตอบ "รอรถตู้ฟอร์ดครับ" (ไป) แต่ 07:40 ยังโดนโทรอีก 3 ครั้ง — Lumos โทรทุก step แม้ยืนยันแล้ว
-  //    ตัดสิน "ไป" ด้วยตัวอ่านคำตอบตัวเดียวกับหน้าติดตาม (`followSaidGoing`) · ส่งคนแทน = สายที่เหลือของใบงานเดียวกัน
-  const answer = followAnswerOf(input.outcome, input.result);
+  //    "ไป" = Lumos ให้ confirmed (`followSaidGoing` · 30 ต.ค. 2569 ไม่อ่านสรุปเอง) · ส่งคนแทน = สายที่เหลือของใบงานเดียวกัน
+  const answer = followAnswerOf(input.outcome);
   if ((answer === 'going' || answer === 'not_going') && (followGroupId || followSchedule.scheduled)) {
     await cancelFollowSetAfterDecline(String(row.person_ref ?? ''), followGroupId).catch(() => {});
   }
@@ -302,26 +301,15 @@ const followTable = tableInAppSchema('follow_entries');
 
 export type FollowAnswer = 'going' | 'not_going' | 'reschedule' | null;
 
-/** คำตอบของสายติดตามจาก AI — ไป / ไม่ไป / ขอเลื่อน · ที่เหลือ null (ไม่รับสาย · จับใจความไม่ได้ · ไม่ใช่เจ้าตัว ฯลฯ) */
-export function followAnswerOf(outcome: string, result: unknown): FollowAnswer {
+/**
+ * คำตอบของสายติดตามจาก AI — ไป / ไม่ไป / ขอเลื่อน · ที่เหลือ null (ไม่รับสาย · รับสายแล้ว · ไม่ใช่เจ้าตัว ฯลฯ)
+ * 🔴 ยึดรหัสผลของ Lumos อย่างเดียว ไม่อ่านสรุปเอง (เจ้าของ 30 ต.ค. 2569 · `FOLLOW_VOCAB.codeOnly`)
+ */
+export function followAnswerOf(outcome: string): FollowAnswer {
   if (outcome === 'reschedule_requested') return 'reschedule';
   if (outcome === 'declined') return 'not_going';
-  if (followSaidGoing(outcome, result)) return 'going';
-  if (outcome === 'acknowledged' && followReadAnswer(outcome, result) === 'said_not_going') return 'not_going';
+  if (followSaidGoing(outcome)) return 'going';
   return null;
-}
-
-function followReadAnswer(outcome: string, result: unknown) {
-  const r = (typeof result === 'object' && result !== null ? result : {}) as { summary?: unknown; transcript?: unknown };
-  const reply = Array.isArray(r.transcript)
-    ? r.transcript
-        .filter((t): t is { role?: unknown; text?: unknown } => typeof t === 'object' && t !== null)
-        .filter((t) => t.role === 'candidate')
-        .map((t) => String(t.text ?? '').trim())
-        .filter(Boolean)
-        .join(' ')
-    : '';
-  return classifyFollowCall({ outcome, reply, summary: typeof r.summary === 'string' ? r.summary : null });
 }
 
 /**
@@ -370,14 +358,9 @@ async function notifyFollowAnswer(personRef: string, queueId: number, answer: 'n
   }
 }
 
-/**
- * ผลของ AI นี้คือ "ไป" ไหม — ตัวอ่านคำตอบเดียวกับถัง "ไป" ของหน้าติดตาม (`classifyFollowCall`: บอกว่าไป · กำลังเตรียมตัว)
- * เฉพาะรหัสที่มีคนคุยจริง (confirmed / acknowledged) · จับใจความไม่ได้ (unresponsive) ห้ามเดาเป็นไป
- */
-export function followSaidGoing(outcome: string, result: unknown): boolean {
-  if (outcome !== 'confirmed' && outcome !== 'acknowledged') return false;
-  const kind = followReadAnswer(outcome, result);
-  return kind === 'said_going' || kind === 'getting_ready';
+/** ผลของ AI นี้คือ "ไป" ไหม — Lumos ให้ confirmed เท่านั้น (30 ต.ค. 2569 ไม่อ่านสรุปเอง) */
+export function followSaidGoing(outcome: string): boolean {
+  return outcome === 'confirmed';
 }
 
 /**

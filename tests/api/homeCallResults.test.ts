@@ -173,7 +173,7 @@ describe('🔴 หนึ่งรายชื่อ = หนึ่งผล (ร
     expect(ai.no_pickup).toBe(0);
   });
 
-  it('ฝั่งเดียว = นับฝั่งนั้น · AI อ่านคำพูดได้ (รหัสไม่ชี้ขาด) · ไม่มีเวลาก็ยังนับ', () => {
+  it('ฝั่งเดียว = นับฝั่งนั้น · AI รับสายแล้วไม่อ่านคำพูด (30 ต.ค. 2569 ยึดรหัส Lumos) · ไม่มีเวลาก็ยังนับ', () => {
     const { ai, staff } = tallyCallResults(
       [
         row({ ai_outcome: 'acknowledged', ai_summary: 'ผู้รับสายยืนยันว่าจะไปทำงานตามนัด', ai_at: null }),
@@ -181,7 +181,8 @@ describe('🔴 หนึ่งรายชื่อ = หนึ่งผล (ร
       ],
       'follow',
     );
-    expect(ai.said_yes).toBe(1);
+    expect(ai.said_yes).toBe(0);
+    expect(ai.talked_unclear).toBe(1);
     expect(staff.no_pickup).toBe(1);
   });
 

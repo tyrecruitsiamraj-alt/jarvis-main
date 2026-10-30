@@ -40,7 +40,7 @@ const e = (over: Partial<FollowEntry>): FollowEntry =>
 
 const ENTRIES = withFollowDayCalls([
   e({ call_outcome: 'confirmed' }),
-  e({ call_outcome: 'acknowledged', call_reply: 'ไปครับ ออกจากบ้านแล้ว' }),
+  e({ call_outcome: 'acknowledged', call_reply: 'ไปครับ ออกจากบ้านแล้ว' }), // รับสายแล้ว = สรุปไม่ได้ (30 ต.ค. 2569 ยึดรหัส Lumos)
   e({ call_outcome: 'declined' }),
   e({ call_outcome: 'no_answer', call_status: 'failed' }),
   e({ call_outcome: 'acknowledged' }),
@@ -73,11 +73,11 @@ describe('แผงขั้นตอนของสาย — ทุกช่�
     const manual = m.all.total.filter((x) => followCallerOf(x) === 'manual').length;
     expect(ai + manual).toBe(m.all.total.length);
   });
-  it('นับตามนิยามเจ้าของ: ไป 3 (รวมยกเลิกทีหลังแต่บอกว่าไป) · ไม่ไป 2 · ไม่รับสาย 1 · สรุปไม่ได้ 2 · ยกเลิก 1', () => {
-    expect(m.all.went).toHaveLength(3);
+  it('นับตามนิยามเจ้าของ: ไป 2 (รวมยกเลิกทีหลังแต่บอกว่าไป) · ไม่ไป 2 · ไม่รับสาย 1 · สรุปไม่ได้ 3 · ยกเลิก 1', () => {
+    expect(m.all.went).toHaveLength(2);
     expect(m.all.notWent).toHaveLength(2);
     expect(m.all.noAnswer).toHaveLength(1);
-    expect(m.all.unclear).toHaveLength(2);
+    expect(m.all.unclear).toHaveLength(3);
     expect(m.all.cancelled).toHaveLength(1);
   });
 });
