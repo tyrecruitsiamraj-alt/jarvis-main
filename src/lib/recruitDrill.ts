@@ -86,9 +86,9 @@ export function drillTreeOf(tab: OverviewTabId, cohort: readonly RecruitAppFact[
       return people('yes', 'สนใจ', 'info', yes, [
         node('waiting', 'warn'),
         node('fail', 'danger'),
-        people('ok', 'ติดต่อสำเร็จ', 'success', ok, [
+        people('ok', 'ติดต่อได้', 'success', ok, [
           node('apptFailed', 'danger'),
-          ...(apptNone.count > 0 ? [apptNone] : []),
+          apptNone,
           people('booked', 'นัดได้', 'info', booked, [node('showed', 'success'), node('noShow', 'danger'), node('upcoming', 'neutral'), node('overdue', 'warn')]),
         ]),
       ]);

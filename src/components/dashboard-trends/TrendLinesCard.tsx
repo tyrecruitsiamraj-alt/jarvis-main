@@ -21,6 +21,10 @@ const LINE_TONES: ToneKey[] = ['info', 'success', 'warn', 'violet', 'danger', 't
 /** ตัวชี้วัดที่ต่อท้ายแท็บกรอกเข้ามา (27 ต.ค. 2569) — สีไม่ซ้ำเส้นแรก · ไม่สนใจแดง */
 const KEY_TONE: Record<string, ToneKey> = { aiSaidYes: 'teal', aiSaidNo: 'danger', aiQueued: 'violet' };
 const toneOf = (key: string, i: number): ToneKey => KEY_TONE[key] ?? LINE_TONES[i % LINE_TONES.length];
+/**
+ * ตัวชี้วัดที่ "เพิ่ม = แย่" — ป้ายเพิ่ม/ลดใช้สีตามความหมาย ไม่ใช่ตามทิศ (QA 30 ต.ค. 2569: "ยังไม่ประกาศ เพิ่ม 5%" เคยเป็นสีเขียว)
+ */
+const BAD_WHEN_UP = new Set(['cancelled', 'notReleased', 'notReleasedOpen', 'releasedNoApps', 'aiSaidNo', 'aiQueued', 'contactWaiting']);
 const MONTH_FMT = new Intl.DateTimeFormat('th-TH', { month: 'short', year: '2-digit', timeZone: 'UTC' });
 const monthText = (ym: string) => MONTH_FMT.format(new Date(`${ym}-01T00:00:00Z`));
 
@@ -82,6 +86,8 @@ export default function TrendLinesCard({
     return [...byDay.values()].sort((a, b) => String(a.day).localeCompare(String(b.day)));
   }, [rows, period, seriesOf]);
   const labelOf = new Map(rows.map((r) => [r.key, r.label]));
+  /** สีเส้น — ตัวชี้วัดที่อยู่ในแท่งซ้อนใช้สีเดียวกับแท่ง (กดเดือนลงไปเป็นเส้นแล้วสีไม่เปลี่ยนความหมาย) */
+  const lineTone = (key: string, i: number): ToneKey => stack?.parts.find((p) => p.key === key)?.tone ?? (stack && key === stack.total ? 'primary' : toneOf(key, i));
   /** สมการของแท่งซ้อน (เจ้าของ "เอาสมการไว้") — เฉพาะโหมดรายเดือนที่มี `stack` */
   const stackSum = (() => {
     if (!monthly || !stack) return null;
@@ -127,7 +133,7 @@ export default function TrendLinesCard({
     );
 
   return (
-    <OverviewCard icon={LineIcon} title={title} sub={note ?? undefined}>
+    <OverviewCard icon={LineIcon} title={showBars && title === 'แนวโน้มรายวัน' ? 'แนวโน้มรายเดือน' : title} sub={note ?? undefined}>
       {/* ยอดช่วงนี้ + เทียบช่วงก่อน ต่อตัวชี้วัด */}
       <div className="flex flex-wrap gap-2" data-testid="trend-totals">
         {rows.map((r, i) => {
@@ -146,7 +152,11 @@ export default function TrendLinesCard({
                 <span
                   className={cn(
                     'text-xs font-medium tabular-nums',
-                    d.kind === 'up' || d.kind === 'new' ? TONE.success.value : d.kind === 'down' ? TONE.danger.value : 'text-muted-foreground',
+                    d.kind === 'up' || d.kind === 'new'
+                      ? BAD_WHEN_UP.has(r.key) ? TONE.danger.value : TONE.success.value
+                      : d.kind === 'down'
+                        ? BAD_WHEN_UP.has(r.key) ? TONE.success.value : TONE.danger.value
+                        : 'text-muted-foreground',
                   )}
                 >
                   {d.kind === 'up'
@@ -241,7 +251,7 @@ export default function TrendLinesCard({
                   type="monotone"
                   dataKey={r.key}
                   name={r.key}
-                  stroke={TONE[toneOf(r.key, i)].hex}
+                  stroke={TONE[lineTone(r.key, i)].hex}
                   strokeWidth={2}
                   dot={{ r: 3 }}
                   activeDot={CHART.activeDot}
@@ -251,6 +261,16 @@ export default function TrendLinesCard({
           )}
         </ResponsiveContainer>
       </div>
+      {!showBars ? (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" data-testid="trend-line-legend">
+          {rows.map((r, i) => (
+            <span key={r.key} className="inline-flex items-center gap-1.5">
+              <span className={cn('size-2.5 rounded-full', TONE[lineTone(r.key, i)].dot)} aria-hidden />
+              {r.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
       {showBars && stack ? (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" data-testid="trend-stack-legend">
           {stack.parts.map((p) => (

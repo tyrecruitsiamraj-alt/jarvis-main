@@ -106,12 +106,12 @@ describe('การ์ดกดลงลึก "การติดต่อ" ใ
     const top = buildContactRows(apps, new Date()).total;
     expect([root.label, root.count]).toEqual(['สนใจ', top.total]);
     expect(root.children!.map((c) => [c.label, c.count])).toEqual([
-      ['รอติดต่อ', top.counts.waiting],
+      ['รอโทร', top.counts.waiting],
       ['ติดต่อไม่สำเร็จ', top.counts.fail],
-      ['ติดต่อสำเร็จ', top.ok],
+      ['ติดต่อได้', top.ok],
     ]);
     const ok = root.children![2];
-    expect(ok.children!.map((c) => c.label)).toEqual(['นัดไม่สำเร็จ', 'นัดได้']);
-    expect(ok.children![1].children!.map((c) => c.label)).toEqual(['มา', 'ไม่มา', 'ยังไม่ถึงวันนัด', 'เลยวันนัด ยังไม่ลงผล']);
+    expect(ok.children!.map((c) => c.label)).toEqual(['นัดไม่สำเร็จ', 'ยังไม่ลงนัด', 'นัดได้']); // ว่างแล้วห้ามหาย (QA 30 ต.ค. 2569)
+    expect(ok.children![2].children!.map((c) => c.label)).toEqual(['มา', 'ไม่มา', 'ยังไม่ถึงวันนัด', 'เลยวันนัด ยังไม่ลงผล']);
   });
 });

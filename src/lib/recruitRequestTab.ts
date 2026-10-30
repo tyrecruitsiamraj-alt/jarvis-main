@@ -14,7 +14,7 @@
  */
 import { onlineRequestStateOf } from '@/lib/homeOnline';
 import { aiStage } from '@/lib/recruitJourney';
-import { NO_SUB, funnelPlaceOf, funnelSubOf, type FunnelGroupKey } from '@/lib/channelFunnel';
+import { FUNNEL_GROUP_LABEL, NO_SUB, funnelPlaceOf, funnelSubOf, type FunnelGroupKey } from '@/lib/channelFunnel';
 import type { RequestLeadKind } from '@/lib/requestLeadKind';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 
@@ -29,6 +29,8 @@ export const NO_SUBDISTRICT = 'ไม่ระบุตำบล';
 export type RecruitRequestRow = {
   requestNo: string;
   jobId: string | null;
+  /** วันที่ใบส่งเข้ามา (YYYY-MM-DD) — กราฟแนวโน้มใบขอ (30 ต.ค. 2569) */
+  day?: string;
   unitName: string | null;
   /** ตำแหน่ง — รายการใบขอที่กดดู (29 ต.ค. 2569 "กดแล้วบอกว่าใบไหนบ้าง") */
   position?: string | null;
@@ -124,7 +126,16 @@ export type RequestFunnel = {
   requested: number;
   cancelled: { requests: number; people: number };
   closed: { requests: number; filled: number };
-  active: { requests: number; remaining: number; notReleased: number; releasedNoApps: number; releasedWithApps: number; applications: number };
+  active: {
+    requests: number;
+    remaining: number;
+    notReleased: number;
+    /** ยังไม่ประกาศแต่มีคนกรอกแล้ว (มาทางลิงก์อื่น/iRecruit · QA 30 ต.ค. 2569 "ต้องเห็น") — ใบ · คน */
+    notReleasedWithApps: { requests: number; applications: number };
+    releasedNoApps: number;
+    releasedWithApps: number;
+    applications: number;
+  };
 };
 
 export function buildRequestFunnel(rows: readonly RecruitRequestRow[]): RequestFunnel {
@@ -133,24 +144,32 @@ export function buildRequestFunnel(rows: readonly RecruitRequestRow[]): RequestF
     requested: 0,
     cancelled: { requests: 0, people: 0 },
     closed: { requests: 0, filled: 0 },
-    active: { requests: 0, remaining: 0, notReleased: 0, releasedNoApps: 0, releasedWithApps: 0, applications: 0 },
+    active: { requests: 0, remaining: 0, notReleased: 0, notReleasedWithApps: { requests: 0, applications: 0 }, releasedNoApps: 0, releasedWithApps: 0, applications: 0 },
   };
   for (const r of rows) {
     out.requested += r.requested;
     out.cancelled.people += r.cancelled;
-    out.closed.filled += r.filled;
     const s = onlineRequestStateOf(r);
     if (s === 'open') {
       const a = out.active;
       a.requests += 1;
       a.remaining += r.remaining;
-      if (!r.released) a.notReleased += 1;
-      else if (r.applications > 0) {
+      if (!r.released) {
+        a.notReleased += 1;
+        if (r.applications > 0) {
+          a.notReleasedWithApps.requests += 1;
+          a.notReleasedWithApps.applications += r.applications;
+        }
+      } else if (r.applications > 0) {
         a.releasedWithApps += 1;
         a.applications += r.applications;
       } else a.releasedNoApps += 1;
     } else if (s === 'cancelledAll') out.cancelled.requests += 1;
-    else out.closed.requests += 1;
+    else {
+      // หาได้ของใบที่ปิดแล้วเท่านั้น — เดิมรวมคนที่หาได้ในใบที่ยังเปิด (ปน "หาได้แล้ว" กับ "ปิดครบ" · QA 30 ต.ค. 2569)
+      out.closed.requests += 1;
+      out.closed.filled += r.filled;
+    }
   }
   return out;
 }
@@ -283,13 +302,8 @@ export type ApplicantChannelRow = {
   children?: ApplicantChannelRow[];
 };
 
-export const FUNNEL_GROUP_LABEL: Record<FunnelGroupKey, string> = {
-  facebook: 'Facebook',
-  tiktok: 'Tiktok',
-  webjob: 'Webjob',
-  offline: 'Offline',
-  unknown: 'ไม่รู้ช่องทาง',
-};
+/** ชื่อกลุ่มช่องทางหลัก — ตัวเดียวกับตาราง "ไปถึงไหนแยกช่องทาง" (`channelFunnel.ts` · QA 30 ต.ค. 2569 เคยมี 2 ชื่อ) */
+export { FUNNEL_GROUP_LABEL };
 
 const emptyCounts = (): Record<ApplicantCallBucket, number> =>
   Object.fromEntries(Object.keys(APPLICANT_BUCKET_LABEL).map((k) => [k, 0])) as Record<ApplicantCallBucket, number>;

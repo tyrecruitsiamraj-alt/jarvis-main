@@ -84,7 +84,14 @@ describe('ข้อ 1 ใบขอเข้ามา', () => {
     expect([f.cancelled.requests, f.closed.requests, f.active.requests]).toEqual([1, 1, 5]);
     expect(f.active.notReleased + f.active.releasedNoApps + f.active.releasedWithApps).toBe(f.active.requests);
     expect([f.active.releasedWithApps, f.active.applications, f.active.releasedNoApps]).toEqual([1, 7, 1]);
-    expect(f.requested).toBe(f.closed.filled + f.cancelled.people + f.active.remaining);
+    // หาได้ใต้กล่อง "ปิดแล้ว" = ของใบที่ปิดแล้วเท่านั้น (QA 30 ต.ค. 2569 ห้ามปนหาได้แล้วกับปิดครบ)
+    const closedRows = ROWS.filter((r) => requestsOfFunnelKey(ROWS, 'closed').includes(r));
+    expect(f.closed.filled).toBe(closedRows.reduce((n, r) => n + r.filled, 0));
+  });
+  it('ใบยังไม่ประกาศที่มีคนกรอกแล้วถูกนับให้เห็น', () => {
+    const rows = [...ROWS, { ...ROWS[ROWS.length - 1], requestNo: 'X1', jobId: 'x1', released: false, applications: 3, remaining: 1, filled: 0, cancelled: 0, requested: 1 }];
+    const f = buildRequestFunnel(rows);
+    expect(f.active.notReleasedWithApps.applications).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -236,7 +243,7 @@ describe('ช่องทาง Facebook · ชื่อกลุ่ม · ก�
     expect(page).toContain('<PositionList rows={positionRows(scopedApps)} />');
     expect(page).toContain('<ReasonColumns groups={reasonGroups(scopedApps)} />');
     const ui = readFileSync('src/components/dashboard-trends/RequestTab.tsx', 'utf8');
-    expect(ui).toContain('{scoped ? scoped(channelApps, channel?.name ?? null) : null}');
+    expect(ui).toContain('{scoped(channelApps, channel?.name ?? null)}');
     expect(ui).not.toContain('funnel.active.releasedNoApps, \'neutral\'');
   });
 });

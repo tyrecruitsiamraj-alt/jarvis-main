@@ -44,7 +44,7 @@ describe('drillTreeOf', () => {
 
   it('ผู้สมัคร: ปลายทางมี id ให้เปิดรายชื่อ', () => {
     const apps = drillTreeOf('apps', facts, null)!;
-    expect(nodeAt(apps, ['ai', 'reached']).node.ids).toEqual(['a']);
+    expect(nodeAt(apps, ['ai', 'reached']).node.ids).toEqual(['a', 'c']); // ตอบ AI ว่าสนใจ = ถึงตัว (QA 30 ต.ค. 2569)
     expect(nodeAt(drillTreeOf('appt', facts, null)!, ['pending']).node.ids).toEqual(['c']);
     expect(drillTreeOf('requests', facts, null)).toBeNull();
   });
@@ -58,10 +58,13 @@ describe('drillTreeOf', () => {
 describe('หน้าจอ', () => {
   it('ทุกแท็บมีกราฟเส้น + การ์ดกดลงลึก · มีแถบย้อนกลับ', () => {
     const src = fs.readFileSync(path.join(process.cwd(), 'src/components/dashboard-trends/RecruitOverview.tsx'), 'utf8');
-    for (const t of ['requests', 'apps', 'staff', 'appt']) expect(src).toContain(`{compareCard('${t}')}`);
+    // 30 ต.ค. 2569: แท็บภาพรวม Online ส่งชุดที่ผ่านตัวกรองบนสุดให้การ์ด (ใบขอ = ใบรายใบ · กรอกเข้ามา = fv)
+    expect(src).toContain("trend={(sc) => compareCard('requests', view, { rows: sc.rows, prevRows: sc.prevRows })}");
+    expect(src).toContain("{compareCard('apps', fv)}");
+    for (const t of ['staff', 'appt']) expect(src).toContain(`{compareCard('${t}')}`);
     for (const t of ['apps', 'staff', 'appt']) expect(src).toMatch(new RegExp(`drillCard\\('${t}'`));
-    // แท็บใบขอ: การ์ดกดลงลึกฝังในการ์ดแนวโน้มใบขอ — กดกล่องแล้วรายการใบขอขึ้นใต้กราฟ (27 ต.ค. 2569)
-    expect(src).toContain('path={REQUEST_DRILL_PATH[reqPick]}');
+    // 30 ต.ค. 2569: กล่องบนการ์ดแนวโน้มใบขอไม่กดแล้ว — กล่องเดียวกันบนการ์ด "ใบขอเข้ามา" ด้านบนกดดูรายการใบได้ (นับชุดเดียวกัน)
+    expect(src).not.toContain('REQUEST_DRILL_PATH');
     const card = fs.readFileSync(path.join(process.cwd(), 'src/components/dashboard-trends/DrillDownCard.tsx'), 'utf8');
     expect(card).toContain('data-testid="drill-trail"');
   });

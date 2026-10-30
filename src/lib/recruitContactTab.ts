@@ -4,8 +4,8 @@
  * Choice: ฐาน = ตอบ AI ว่าสนใจอย่างเดียว (ตัวเดียวกับช่อง "สนใจ" ของแท็บใบขอ `applicantCallBucketOf`) · ยังไม่รู้ผลนัดแยก 2 ช่อง ·
  * ไม่มี % Success (เจ้าของ "Success ฉันแค่นิยาม") · ของเดิมในแท็บอยู่ต่อท้าย
  *
- * สนใจ = รอติดต่อ + ติดต่อไม่สำเร็จ + ติดต่อสำเร็จ
- * ติดต่อสำเร็จ = นัดไม่สำเร็จ + ยังไม่ลงนัด + นัดได้
+ * สนใจ = รอโทร + ติดต่อไม่สำเร็จ + ติดต่อได้ (คำชุดเดียวกับการ์ดเทียบ · QA 30 ต.ค. 2569)
+ * ติดต่อได้ = นัดไม่สำเร็จ + ยังไม่ลงนัด + นัดได้
  * นัดได้ = มา + ไม่มา + ยังไม่ถึงวันนัด + เลยวันนัดยังไม่ลงผล
  * ไฟล์นี้ pure — เทสต์ `tests/api/recruitContactTab2569-10-29.test.ts`
  */
@@ -16,7 +16,7 @@ import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 
 export type ContactBucket = 'waiting' | 'fail' | 'apptFailed' | 'apptNone' | 'showed' | 'noShow' | 'upcoming' | 'overdue';
 export const CONTACT_BUCKET_LABEL: Record<ContactBucket, string> = {
-  waiting: 'รอติดต่อ',
+  waiting: 'รอโทร',
   fail: 'ติดต่อไม่สำเร็จ',
   apptFailed: 'นัดไม่สำเร็จ',
   apptNone: 'ยังไม่ลงนัด',

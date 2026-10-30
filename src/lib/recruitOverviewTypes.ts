@@ -203,6 +203,8 @@ export type RecruitOverviewResponse = {
   requestList?: RecruitRequestItem[] | null;
   /** ใบขอรายใบของแท็บใบขอ (29 ต.ค. 2569 · พื้นที่ ประเภทงาน ความเร่ง) — `recruitRequestTab.ts` · null = อ่านไม่ได้ */
   requestRows?: RecruitRequestRow[] | null;
+  /** ใบขอช่วงก่อน — การ์ดแนวโน้มใบขอเทียบช่วงก่อน (30 ต.ค. 2569) */
+  requestRowsPrev?: RecruitRequestRow[] | null;
   /** ก้อนที่อ่านไม่ได้ + เหตุ (ก้อนล้มแยกกัน — ห้ามโชว์ 0 แทน) */
   errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board' | 'requests' | 'channels' | 'informs', string>>;
 };

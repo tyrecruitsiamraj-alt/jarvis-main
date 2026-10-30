@@ -73,7 +73,8 @@ export const isContactWaiting = (f: RecruitAppFact) => isInterested(f) && contac
 export const isContactOk = (f: RecruitAppFact) => isInterested(f) && CONTACT_OK.includes(contactBucketOf(f, new Date()));
 export { isInterested };
 /** AI โทรแล้วและติดต่อได้ */
-export const isAiCalledReached = (f: RecruitAppFact) => f.calledByAi && f.contact === 'success';
+/** AI โทรแล้วคุยถึงตัว — ตอบสนใจ/ไม่สนใจ = ถึงตัวแน่นอน (QA 30 ต.ค. 2569: เดิมดูแค่ผลติดต่อล่าสุด ติดต่อได้ 317 < สนใจ + ไม่สนใจ 376) */
+export const isAiCalledReached = (f: RecruitAppFact) => isAiSaidYes(f) || isAiSaidNo(f) || (f.calledByAi && f.contact === 'success');
 /** คนโทรต่อแล้วและคนติดต่อได้ */
 export const isFollowedReached = (f: RecruitAppFact) => isStaffFollowed(f) && f.contact === 'success' && f.contactBy === 'staff';
 

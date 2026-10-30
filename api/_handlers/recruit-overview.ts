@@ -445,6 +445,7 @@ export async function toRequestRows(rows: readonly OnlineRequestRow[]): Promise<
     return {
       requestNo: r.requestNo,
       jobId: r.jobId,
+      day: r.day,
       unitName: r.unitName,
       position: r.position,
       siteCode: r.siteCode ?? null,
@@ -797,13 +798,17 @@ export async function buildRecruitOverview(
     body.requestsPrev = toRequestSummary(inRange(window.prevFrom, window.prevTo));
     body.requestDays = toRequestDays(reqR.value);
     body.requestList = await loadRequestList(inRange(window.from, window.to));
-    body.requestRows = await toRequestRows(inRange(window.from, window.to));
+    const [rowsCur, rowsPrev] = await Promise.all([toRequestRows(inRange(window.from, window.to)), toRequestRows(inRange(window.prevFrom, window.prevTo))]);
+    body.requestRows = rowsCur;
+    // ช่วงก่อน — การ์ดแนวโน้มใบขอคิดเทียบจากใบชุดเดียวกับการ์ดบน + ตัวกรอง (QA 30 ต.ค. 2569)
+    body.requestRowsPrev = rowsPrev;
   } else {
     body.requests = null;
     body.requestsPrev = null;
     body.requestDays = null;
     body.requestList = null;
     body.requestRows = null;
+    body.requestRowsPrev = null;
     body.errors.requests = reqR.error;
   }
 

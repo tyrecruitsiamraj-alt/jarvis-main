@@ -146,7 +146,8 @@ const StaffJobBoardPage: React.FC = () => {
         dataAgeSeconds={dataAgeSeconds}
         variant="staff"
         /* กดรีเฟรช = ข้ามสำเนา ไปถามระบบงานหลักสด */
-        onRefresh={() => (view === 'board' ? refetch({ fresh: true }) : setListRev((n) => n + 1))}
+        // แท็บภาพรวมมีปุ่ม "โหลดใหม่" ของตัวเอง (คงช่วง/BU/ตัวกรองไว้) — ไม่ขึ้นปุ่มรีเฟรชซ้ำ (QA 30 ต.ค. 2569)
+        onRefresh={view === 'dashboard' ? undefined : () => (view === 'board' ? refetch({ fresh: true }) : setListRev((n) => n + 1))}
         refreshing={refreshing}
         detailReturnTo="/jobs/board"
         // ช่องค้นหาย้ายไปอยู่ในแถบหัวแล้ว (แคบกว่าเดิม) — ข้อความยาวจะถูกตัดกลางคัน

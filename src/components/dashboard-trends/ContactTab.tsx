@@ -15,7 +15,7 @@ import { OverviewCard } from './RecruitOverviewParts';
  * `children` = ของเดิมในแท็บ (กดลงลึก · งานค้างตอนนี้ · ผลงานรายคน)
  */
 type Key = ContactBucket | 'total' | 'ok' | 'booked';
-const LABEL: Record<Key, string> = { ...CONTACT_BUCKET_LABEL, total: 'สนใจ', ok: 'ติดต่อสำเร็จ', booked: 'นัดได้' };
+const LABEL: Record<Key, string> = { ...CONTACT_BUCKET_LABEL, total: 'สนใจ', ok: 'ติดต่อได้', booked: 'นัดได้' };
 const TONE_OF: Partial<Record<Key, ToneKey>> = { fail: 'danger', ok: 'success', apptFailed: 'danger', booked: 'info', showed: 'success', noShow: 'danger', overdue: 'warn' };
 
 export default function ContactTab({
@@ -62,10 +62,11 @@ export default function ContactTab({
             {tile('ok')}
           </div>
           <div className="space-y-2 rounded-xl border border-border p-2 sm:ml-8">
-            <p className={cn('px-1 text-xs', DASH.sub)}>ติดต่อสำเร็จ {fmt(total.ok)} คน</p>
-            <div className={cn('grid gap-2', total.counts.apptNone > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
+            <p className={cn('px-1 text-xs', DASH.sub)}>ติดต่อได้ {fmt(total.ok)} คน</p>
+            {/* ว่างแล้วห้ามหาย — "ยังไม่ลงนัด" ขึ้นแม้ 0 (QA 30 ต.ค. 2569) */}
+            <div className="grid gap-2 sm:grid-cols-3">
               {tile('apptFailed')}
-              {total.counts.apptNone > 0 ? tile('apptNone') : null}
+              {tile('apptNone')}
               {tile('booked')}
             </div>
             <div className="space-y-2 rounded-xl border border-border p-2 sm:ml-8">
@@ -104,7 +105,7 @@ const valueOf = (r: ContactRow, k: Key) => (k === 'total' ? r.total : k === 'ok'
 
 function ChannelCard({ total, groups, open }: { total: ContactRow; groups: ContactRow[]; open: (k: Key, row: ContactRow) => void }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
-  const cols = total.counts.apptNone > 0 ? [...COLS.slice(0, 5), { key: 'apptNone' as Key }, ...COLS.slice(5)] : COLS;
+  const cols = [...COLS.slice(0, 5), { key: 'apptNone' as Key }, ...COLS.slice(5)];
   const toggle = (k: string) =>
     setExpanded((cur) => {
       const next = new Set(cur);

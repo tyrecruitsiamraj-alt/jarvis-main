@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { ChevronDown, FileText, MapPin, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SearchableSelect from '@/components/shared/SearchableSelect';
@@ -182,8 +182,23 @@ function AreaSelect({ label, value, options, onChange, disabled, testId }: { lab
   );
 }
 
+/**
+ * ตัวกรองบนสุดที่ส่งให้การ์ดอื่นของแท็บ (QA 30 ต.ค. 2569 · เจ้าของเลือก "ตัวกรองภาพรวม Online ไปถึงทุกการ์ด")
+ * `rows`/`prevRows` = ใบที่ผ่านตัวกรอง (ช่วงนี้/ช่วงก่อน) · `appsOf` = รายชื่อของใบที่ผ่านตัวกรอง (ไม่กรอง = ชุดเดิม)
+ */
+export type RequestTabScope = {
+  active: boolean;
+  rows: RecruitRequestRow[] | null;
+  prevRows: RecruitRequestRow[] | null;
+  appsOf: (list: readonly RecruitAppFact[]) => RecruitAppFact[];
+};
+
+/** ชื่อความเร่ง · `unknown` = ใบที่ไม่มีวันต้องการคน */
+const leadLabelOf = (k: string) => (k === 'unknown' ? 'ไม่ระบุ' : REQUEST_LEAD_KIND_LABEL[k as RequestLeadKind]);
+
 export default function RequestTab({
   rows,
+  prevRows = null,
   rowsError,
   apps,
   trend,
@@ -191,11 +206,13 @@ export default function RequestTab({
   scoped,
 }: {
   rows: readonly RecruitRequestRow[] | null;
+  /** ใบช่วงก่อน — การ์ดแนวโน้มเทียบช่วงก่อนด้วยตัวกรองเดียวกัน */
+  prevRows?: readonly RecruitRequestRow[] | null;
   rowsError: string | null;
   /** ใบสมัครที่กรอกในช่วง (cohort) */
   apps: readonly RecruitAppFact[];
-  trend: React.ReactNode;
-  children?: React.ReactNode;
+  trend: (scope: RequestTabScope) => React.ReactNode;
+  children?: (scope: RequestTabScope) => React.ReactNode;
   /**
    * การ์ดที่เปลี่ยนตามตัวกรองบนสุด + ช่องทางที่กดในตาราง "คนที่กรอกมา" (ตำแหน่งที่สมัคร · เหตุผลที่ไม่สำเร็จ)
    * เจ้าของ 29 ต.ค. 2569 "ไม่ได้บอกช่องทางหรอ" → Choice "กดช่องทางในตารางแล้วการ์ดเปลี่ยนตาม" · `channel` = ชื่อแถวที่กด (null = ทุกช่องทาง)
@@ -209,10 +226,22 @@ export default function RequestTab({
   const sites = useMemo(() => requestSiteOptions(rows ?? []), [rows]);
   const funnel = useMemo(() => buildRequestFunnel(picked), [picked]);
   const areas = useMemo(() => buildProvinceAreas(picked), [picked]);
-  const filteredApps = useMemo(() => appsOfRequests(apps, active ? picked : null), [apps, picked, active]);
+  const pickedPrev = useMemo(() => (prevRows ? filterRequestRows(prevRows, f) : null), [prevRows, f]);
+  /** ใบ (ทั้งช่วงนี้และช่วงก่อน) ที่ผ่านตัวกรอง — รายชื่อของการ์ดอื่นกรองด้วยชุดนี้ */
+  const scope = useMemo<RequestTabScope>(() => {
+    const all = [...picked, ...(pickedPrev ?? [])];
+    return {
+      active,
+      rows: rows ? picked : null,
+      prevRows: pickedPrev,
+      appsOf: (list) => appsOfRequests(list, active ? all : null),
+    };
+  }, [active, rows, picked, pickedPrev]);
+  const filteredApps = useMemo(() => scope.appsOf(apps), [scope, apps]);
   const appRows = useMemo(() => buildApplicantChannelRows(filteredApps), [filteredApps]);
   /** แถวช่องทางที่กด (คีย์ของ `buildApplicantChannelRows`) · null = ทุกช่องทาง */
   const [channel, setChannel] = useState<{ key: string; name: string } | null>(null);
+  const scopedRef = useRef<HTMLDivElement>(null);
   const channelApps = useMemo(() => appsOfChannelKey(filteredApps, channel?.key ?? null), [filteredApps, channel]);
   const set = (patch: Partial<RequestTabFilter>) => setF((cur) => ({ ...cur, ...patch }));
   /** กล่องที่กดดูรายการใบ · null = ไม่ได้กด */
@@ -283,7 +312,11 @@ export default function RequestTab({
           <div className="grid gap-2 text-sm sm:grid-cols-3">
             {(
               [
-                ['notReleased', `${fmt(funnel.active.notReleased)} ใบ`, 'request-tab-not-released'],
+                [
+                  'notReleased',
+                  `${fmt(funnel.active.notReleased)} ใบ${funnel.active.notReleasedWithApps.requests ? ` · มีคนกรอก ${fmt(funnel.active.notReleasedWithApps.requests)} ใบ ${fmt(funnel.active.notReleasedWithApps.applications)} คน` : ''}`,
+                  'request-tab-not-released',
+                ],
                 ['releasedNoApps', `${fmt(funnel.active.releasedNoApps)} ใบ`, 'request-tab-released-empty'],
                 ['releasedWithApps', `${fmt(funnel.active.releasedWithApps)} ใบ · ${fmt(funnel.active.applications)} คน`, 'request-tab-released-apps'],
               ] as const
@@ -306,8 +339,8 @@ export default function RequestTab({
         {pick ? <RequestList title={REQUEST_FUNNEL_LABEL[pick]} rows={requestsOfFunnelKey(picked, pick)} onClose={() => setPick(null)} /> : null}
       </OverviewCard>
 
-      {/* ─── 2. แนวโน้มใบขอ (การ์ดเดิม) ─── */}
-      {trend}
+      {/* ─── 2. แนวโน้มใบขอ — นับชุดเดียวกับการ์ดบน + ตัวกรอง ─── */}
+      {trend(scope)}
 
       {/* ─── 3. พื้นที่ไหนขาดคน (โน้ตเจ้าของ: กดจังหวัดเห็นอำเภอ · ฉุกเฉิน/ย้อนหลัง/ล่วงหน้า · บอกใบและคน) ─── */}
       <ProvinceCard areas={areas} rows={picked} />
@@ -317,11 +350,20 @@ export default function RequestTab({
         total={appRows.total}
         groups={appRows.groups}
         pickedKey={channel?.key ?? null}
-        onPick={(r) => setChannel((cur) => (cur?.key === r.key || r.key === 'total' ? null : { key: r.key, name: r.name }))}
+        onPick={(r) => {
+          const off = channel?.key === r.key || r.key === 'total';
+          setChannel(off ? null : { key: r.key, name: r.name });
+          // การ์ดที่เปลี่ยนอยู่ไกลลงไป — เลื่อนจอไปให้เห็น (QA 30 ต.ค. 2569 "กดแล้วนึกว่าไม่มีอะไรเกิดขึ้น")
+          if (!off) requestAnimationFrame(() => scopedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        }}
       />
 
-      {children}
-      {scoped ? scoped(channelApps, channel?.name ?? null) : null}
+      {children ? children(scope) : null}
+      {scoped ? (
+        <div ref={scopedRef} className="scroll-mt-20">
+          {scoped(channelApps, channel?.name ?? null)}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -386,8 +428,9 @@ function ProvinceCard({
             </Button>
             {open === p.name ? (
               <div className="mb-2 ml-2 space-y-3 rounded-xl bg-muted/40 p-3" data-testid="request-tab-province-detail">
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {LEAD_ORDER.map((k) => (
+                {/* 3 ความเร่ง + ไม่ระบุ (ใบที่ไม่มีวันต้องการคน) — รวมกัน = ยอดของจังหวัด (QA 30 ต.ค. 2569) */}
+                <div className="grid gap-2 sm:grid-cols-4">
+                  {[...LEAD_ORDER, 'unknown' as const].map((k) => (
                     <Button
                       key={k}
                       type="button"
@@ -397,7 +440,7 @@ function ProvinceCard({
                       className={cn('h-auto justify-between gap-2 whitespace-normal rounded-lg bg-card px-3 py-2 text-left text-sm font-normal', isDetail('lead', k) && 'ring-2 ring-ring')}
                       data-testid="request-tab-lead"
                     >
-                      <span>{REQUEST_LEAD_KIND_LABEL[k]}</span>
+                      <span>{leadLabelOf(k)}</span>
                       <span className="tabular-nums">
                         {fmt(p.lead[k].requests)} ใบ · {fmt(p.lead[k].requested)} คน
                       </span>
@@ -431,9 +474,9 @@ function ProvinceCard({
                 ) : null}
                 {detail ? (
                   <RequestList
-                    title={`${p.name} · ${detail.kind === 'lead' ? REQUEST_LEAD_KIND_LABEL[detail.value as RequestLeadKind] : detail.value}`}
+                    title={`${p.name} · ${detail.kind === 'lead' ? leadLabelOf(detail.value) : detail.value}`}
                     rows={sortRequests(
-                      rows.filter((r) => provinceOf(r) === p.name && (detail.kind === 'lead' ? r.leadKind === detail.value : districtOf(r) === detail.value)),
+                      rows.filter((r) => provinceOf(r) === p.name && (detail.kind === 'lead' ? (r.leadKind ?? 'unknown') === detail.value : districtOf(r) === detail.value)),
                     )}
                     onClose={() => setDetail(null)}
                   />
@@ -479,7 +522,8 @@ function ChannelRow({
   const num = (n: number, cls?: string) => <TableCell className={cn('text-right tabular-nums', cls)}>{fmt(n)}</TableCell>;
   return (
     <TableRow className={cn(level === 0 && 'bg-muted/40 font-medium hover:bg-muted/40', picked && 'bg-muted')} data-testid={`request-tab-channel-${level}`}>
-      <TableCell className={cn('whitespace-nowrap text-sm', level === 2 && 'pl-9', level === 3 && 'pl-14')}>
+      {/* ชื่อช่องทางค้างซ้ายตอนเลื่อนตาราง (มือถือ · QA 30 ต.ค. 2569) */}
+      <TableCell className={cn('sticky left-0 z-10 whitespace-nowrap text-sm', picked || level === 0 ? 'bg-muted' : 'bg-card', level === 2 && 'pl-9', level === 3 && 'pl-14')}>
         <span className="flex items-center gap-1">
           {onToggle ? (
             <Button type="button" variant="ghost" size="iconXs" className="-ml-2" aria-expanded={open} aria-label={open ? `ปิด ${r.name}` : `เปิด ${r.name}`} onClick={onToggle}>
@@ -487,7 +531,7 @@ function ChannelRow({
             </Button>
           ) : null}
           {onPick ? (
-            <Button type="button" variant="link" size="xs" className={cn('h-auto p-0 text-foreground', level <= 1 && 'font-medium')} aria-pressed={picked} onClick={onPick}>
+            <Button type="button" variant="link" size="xs" className={cn('h-auto px-0 py-2 text-foreground', level <= 1 && 'font-medium')} aria-pressed={picked} onClick={onPick}>
               {r.name}
             </Button>
           ) : (
@@ -541,7 +585,7 @@ function ApplicantCard({
         <Table className="min-w-[60rem]">
           <TableHeader>
             <TableRow className={DASH.tableHead}>
-              <TableHead className="text-xs">ช่องทาง</TableHead>
+              <TableHead className="sticky left-0 z-10 bg-card text-xs">ช่องทาง</TableHead>
               <TableHead className="text-right text-xs">ทั้งหมด</TableHead>
               <TableHead className="text-right text-xs">AI ไม่โทร</TableHead>
               <TableHead className="text-right text-xs">{APPLICANT_BUCKET_LABEL.queued}</TableHead>

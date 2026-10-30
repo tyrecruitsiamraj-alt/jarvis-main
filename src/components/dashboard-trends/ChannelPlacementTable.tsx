@@ -24,7 +24,8 @@ const ChannelPlacementTable: React.FC<{ data: ChannelPlacement }> = ({ data }) =
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-xs">ช่องทาง</TableHead>
+              {/* ชื่อช่องทางค้างซ้ายตอนเลื่อนตาราง (มือถือ · QA 30 ต.ค. 2569) */}
+              <TableHead className="sticky left-0 z-10 bg-card text-xs">ช่องทาง</TableHead>
               <TableHead className="whitespace-nowrap text-right text-xs">ลงทะเบียน</TableHead>
               <TableHead className="whitespace-nowrap text-right text-xs">แจ้งเข้า</TableHead>
               <TableHead className="whitespace-nowrap text-right text-xs">% แจ้งเข้า</TableHead>
@@ -40,7 +41,7 @@ const ChannelPlacementTable: React.FC<{ data: ChannelPlacement }> = ({ data }) =
               return (
                 <React.Fragment key={r.channel}>
                   <TableRow data-testid={`channel-row-${r.channel}`}>
-                    <TableCell className="text-sm">
+                    <TableCell className="sticky left-0 z-10 bg-card text-sm">
                       {expandable ? (
                         <Button
                           type="button"
@@ -66,7 +67,7 @@ const ChannelPlacementTable: React.FC<{ data: ChannelPlacement }> = ({ data }) =
                   {isOpen
                     ? r.subs.map((s) => (
                         <TableRow key={`${r.channel}|${s.name}`} className="bg-muted/40">
-                          <TableCell className="pl-8 text-xs text-muted-foreground">{s.name}</TableCell>
+                          <TableCell className="sticky left-0 z-10 bg-muted pl-8 text-xs text-muted-foreground">{s.name}</TableCell>
                           <TableCell className="text-right text-xs tabular-nums">{fmt(s.registered)}</TableCell>
                           <TableCell className="text-right text-xs tabular-nums">{fmt(s.placed)}</TableCell>
                           <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{pct(s.placed, s.registered)}</TableCell>

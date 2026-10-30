@@ -30,6 +30,9 @@ export type ChannelPlacement = {
 export const UNKNOWN_CHANNEL = 'ไม่รู้ช่องทาง';
 const LOOKBACK_MS = 365 * 86_400_000;
 
+/** ตัวสะกดของตั้งค่าช่องทาง (/recruit/channels) สำหรับชื่อที่มาจากหลายแหล่ง (iRecruit · ERP · ลิงก์เรา) */
+const CANONICAL_CHANNEL = new Map(['JOBBKK', 'Jobthai', 'JobsDB', 'Jobfinfin', 'LinkedIn', 'Google Ads', 'Academe', 'Call in'].map((n) => [n.toLowerCase(), n]));
+
 /** ช่องทางหลัก 4 ตัวของตั้งค่าช่องทาง (/recruit/channels) */
 const MAIN_CHANNEL_RE = /^(facebook|tiktok|webjob|offline)$/i;
 
@@ -40,6 +43,9 @@ export function mainChannelOf(channel: string | null, sub: string | null): strin
   // ป้ายแบบ "หลัก · รอง" ของตั้งค่าช่องทาง (Webjob · JOBBKK · Tiktok · Line AI LBD) → ชื่อช่องทางรอง
   const parts = ch.split('·').map((p) => p.trim()).filter(Boolean);
   if (parts.length > 1 && MAIN_CHANNEL_RE.test(parts[0])) return mainChannelOf(parts.slice(1).join(' · '), s || null);
+  // สะกดต่างแค่ตัวเล็กใหญ่ = ตัวเดียวกัน ใช้ตัวสะกดของตั้งค่าช่องทาง ("Jobbkk" กับ "JOBBKK" · QA 30 ต.ค. 2569)
+  const canon = CANONICAL_CHANNEL.get(ch.toLowerCase());
+  if (canon) return canon;
   // ชื่อเดียวกับช่องทางหลัก/รองในตั้งค่า (เจ้าของ 30 ต.ค. 2569 "เอาชื่อเดียวกันกับช่องทางพวก ช่องทางหลัก ช่องทางรอง")
   if (/tiktok/i.test(ch)) return /live|ไลฟ์/i.test(`${ch} ${s}`) ? 'Tiktok Live' : 'Tiktok';
   if (/line\s*ai\s*lbd/i.test(ch)) return 'Line AI LBD';
@@ -62,7 +68,8 @@ const subName = (sub: string | null, channel: string) => (sub ?? '').trim() || c
  * (54 ของ ERP = JOB DB) ⇒ 54 บอกไม่ได้ว่าอันไหน · ว่าง/ไม่ระบุ = null (ไม่รู้ช่องทาง)
  */
 const ERP_CODE_FALLBACK: Record<string, string> = { '1': 'Facebook', '3': 'Internet', '4': 'พนักงานแนะนำ', '0': '' };
-export const ERP_FACEBOOK = 'Facebook (ไม่รู้ว่ากลุ่ม/Ads/เพจ)';
+/** Facebook ที่ไม่รู้ว่ากลุ่ม/Ads/เพจ — ชื่อเดียวกับตารางแยกช่องทาง (`FACEBOOK_UNKNOWN` · QA 30 ต.ค. 2569) */
+export const ERP_FACEBOOK = 'Facebook ไม่ระบุ';
 export function erpChannelOf(news: { code: string | null; name: string | null } | null | undefined): string | null {
   if (!news) return null;
   const code = (news.code ?? '').trim();
@@ -73,7 +80,8 @@ export function erpChannelOf(news: { code: string | null; name: string | null } 
   if (/พนักงานเก่า|พนง\.?\s*โอนมา/.test(name)) return 'พนักงานเก่า/โอนมา';
   if (/^tiktok$/i.test(name)) return 'Tiktok';
   // "Jobthai.com" ของ ERP = "Jobthai" ของ iRecruit — ชื่อเดียวกันแถวเดียว
-  return name.replace(/\.com$/i, '');
+  const n = name.replace(/\.com$/i, '');
+  return CANONICAL_CHANNEL.get(n.toLowerCase()) ?? n;
 }
 
 /** ชื่อกลุ่มย่อยของแถวที่ได้ช่องทางจาก ERP */

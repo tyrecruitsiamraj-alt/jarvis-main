@@ -104,7 +104,7 @@ describe('หน้าจอ', () => {
     // 21 ต.ค. 2569 เป็นการ์ดกดลงลึกทุกแท็บ
     // การ์ดใบขอรวมเข้าการ์ดแนวโน้มใบขอ (27 ต.ค. 2569) — กดกล่องแล้วรายการใบขอขึ้นใต้กราฟ
     expect(ov).toContain("title: 'แนวโน้มใบขอ'");
-    expect(ov).toContain("drillCard('apps', 'รายชื่อที่กรอกมา')");
+    expect(ov).toContain("drillCard('apps', 'รายชื่อที่กรอกมา', fv)");
   });
   it('API ส่งอายุ + คนละพื้นที่ + ใบขอ', () => {
     const api = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');

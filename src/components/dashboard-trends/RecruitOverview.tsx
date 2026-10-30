@@ -40,7 +40,9 @@ import {
   trimLastDayToNow,
 } from '@/lib/recruitOverview';
 import { buildRecruitJourney } from '@/lib/recruitJourney';
-import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
+import type { RecruitAppFact, RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
+import type { RecruitRequestRow } from '@/lib/recruitRequestTab';
+import { requestTrendRows, requestTrendSeries } from '@/lib/recruitRequestTrend';
 import type { BoardPublishedTotals } from '@/lib/boardRelease';
 import {
   BacklogBody,
@@ -91,25 +93,49 @@ function lastDays(n: number): DateRangeYmd {
   return { from, to };
 }
 
-/** กล่องบนการ์ดแนวโน้มใบขอ → ชั้นของต้นไม้ใบขอ (`drillTreeOf('requests')`) · ไม่มีในนี้ = กดไม่ได้ */
-const REQUEST_DRILL_PATH: Record<string, string[]> = {
-  total: [],
-  released: ['released'],
-  releasedWithApps: ['released', 'withApps'],
-  releasedNoApps: ['released', 'noApps'],
-  notReleasedOpen: ['notReleased'],
-};
 
-/** แท่งซ้อนของแนวโน้มใบขอ — ปิดไปแล้ว + ยังไม่ประกาศ + ไม่มีคนสมัคร + มีคนสมัคร = ใบขอเข้ามา (ตัวแบ่ง `onlineRequestStateOf`) */
+/** แท่งซ้อนของแนวโน้มใบขอ — ยกเลิก + ปิดแล้ว + ยังไม่ประกาศ + ไม่มีคนกรอก + มีคนกรอก = ใบขอเข้ามา (ตัวแบ่งเดียวกับการ์ดบน · 30 ต.ค. 2569) */
 const REQUEST_STACK: TrendStack = {
   total: 'total',
   parts: [
-    { key: 'notReleasedClosed', tone: 'neutral' },
-    { key: 'notReleasedOpen', tone: 'warn' },
-    { key: 'releasedNoApps', tone: 'danger' },
-    { key: 'releasedWithApps', tone: 'success' },
+    { key: 'cancelled', tone: 'danger' },
+    { key: 'closed', tone: 'success' },
+    { key: 'notReleased', tone: 'warn' },
+    { key: 'releasedNoApps', tone: 'neutral' },
+    { key: 'releasedWithApps', tone: 'info' },
   ],
 };
+
+/**
+ * ชุดตัวเลขของแท็บจากรายชื่อชุดหนึ่ง — ทั้งหน้า (ไม่กรอง) และแท็บภาพรวม Online ที่ตามตัวกรองบนสุด (QA 30 ต.ค. 2569
+ * "ตัวกรองภาพรวม Online ไปถึงทุกการ์ด") ใช้ตัวเดียวกัน
+ */
+function overviewViewOf(list: readonly RecruitAppFact[], data: RecruitOverviewResponse, win: RecruitOverviewResponse['window']) {
+  const cur = totalsOf(list, win.from, win.to);
+  /**
+   * 🔴 เทียบเดือนก่อน **เฉพาะตอนข้อมูลมีครบทั้งช่วงก่อน** (กับดักเดียวกับหน้าทีม Online: เคยขึ้น "เพิ่ม 1,400%"
+   * เพราะข้อมูลเพิ่งเริ่มกลางช่วงก่อน) — ข้อมูลเริ่มกลางเดือนก่อน/ยังไม่มีเลย = ไม่เทียบ แล้วบอกเหตุบนหัว
+   */
+  const prevFull = !!data.firstDay && data.firstDay <= win.prevFrom;
+  const prevList = win.isCurrent ? trimLastDayToNow(list, win.prevTo, data.generatedAt) : list;
+  const prev = prevFull ? totalsOf(prevList, win.prevFrom, win.prevTo) : null;
+  const cohort = cohortOf(list, win.from, win.to);
+  return {
+    cur,
+    prev,
+    /** รายชื่อของช่วงนี้/ช่วงก่อน — กราฟรายวันในการ์ดเทียบ (21 ต.ค. 2569) */
+    list,
+    prevList,
+    /** รายชื่อที่กรอกในช่วง — ต้นไม้กดลงลึก (21 ต.ค. 2569) */
+    cohort,
+    /** ข้อมูลเริ่มกลางช่วงก่อน (ไม่ใช่ไม่มีเลย) */
+    prevPartial: !prevFull && !!data.firstDay && data.firstDay <= win.prevTo,
+    journey: buildRecruitJourney(cohort),
+    delay: delayRows(cohort),
+    daily: dailyRows(cohort, win.from, win.to),
+    channels: buildChannelFunnelTree(cohort),
+  };
+}
 
 const RecruitOverview: React.FC<{
   /**
@@ -126,6 +152,12 @@ const RecruitOverview: React.FC<{
    */
   // ค่าเริ่ม = 7 วันล่าสุด เทียบ 7 วันก่อนหน้า (เจ้าของ 21 ต.ค. 2569 "Default เป็น 7 วันย้อนหลัง") · เลือกเดือน/วัน/ช่วงได้จากปุ่มช่วงเวลา
   const [range, setRange] = useState<(DateRangeYmd & { all?: boolean }) | null>(() => lastDays(7));
+  /** ป๊อปเลือกช่วง — ปุ่มลัด (7/30 วัน · ทั้งหมด) เลือกแล้วปิดเอง */
+  const [periodOpen, setPeriodOpen] = useState(false);
+  const pickRange = (r: DateRangeYmd & { all?: boolean }) => {
+    setRange(r);
+    setPeriodOpen(false);
+  };
   const setMonth = (m: string) => {
     setRange(null);
     setMonthState(m);
@@ -157,8 +189,6 @@ const RecruitOverview: React.FC<{
 
   /** ป๊อปรายชื่อของเลขที่กดในเส้นทาง */
   const [names, setNames] = useState<{ title: string; ids: readonly string[] } | null>(null);
-  /** กล่องที่กดในการ์ดแนวโน้มใบขอ (27 ต.ค. 2569 รวมการ์ดใบขอเข้ามา) — null = ไม่ได้กด */
-  const [reqPick, setReqPick] = useState<string | null>(null);
   /** แท็บย่อย — จำใน URL (`?ov=`) ส่งลิงก์ให้กันได้ · ค่าแปลก = ใบขอ */
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = overviewTabOf(searchParams.get('ov'));
@@ -173,34 +203,7 @@ const RecruitOverview: React.FC<{
       { replace: true },
     );
 
-  const view = useMemo(() => {
-    if (!data || !win) return null;
-    const list = apps ?? [];
-    const cur = totalsOf(list, win.from, win.to);
-    /**
-     * 🔴 เทียบเดือนก่อน **เฉพาะตอนข้อมูลมีครบทั้งช่วงก่อน** (กับดักเดียวกับหน้าทีม Online: เคยขึ้น "เพิ่ม 1,400%"
-     * เพราะข้อมูลเพิ่งเริ่มกลางช่วงก่อน) — ข้อมูลเริ่มกลางเดือนก่อน/ยังไม่มีเลย = ไม่เทียบ แล้วบอกเหตุบนหัว
-     */
-    const prevFull = !!data.firstDay && data.firstDay <= win.prevFrom;
-    const prevList = win.isCurrent ? trimLastDayToNow(list, win.prevTo, data.generatedAt) : list;
-    const prev = prevFull ? totalsOf(prevList, win.prevFrom, win.prevTo) : null;
-    const cohort = cohortOf(list, win.from, win.to);
-    return {
-      cur,
-      prev,
-      /** รายชื่อของช่วงนี้/ช่วงก่อน — กราฟรายวันในการ์ดเทียบ (21 ต.ค. 2569) */
-      list,
-      prevList,
-      /** รายชื่อที่กรอกในช่วง — ต้นไม้กดลงลึก (21 ต.ค. 2569) */
-      cohort,
-      /** ข้อมูลเริ่มกลางช่วงก่อน (ไม่ใช่ไม่มีเลย) */
-      prevPartial: !prevFull && !!data.firstDay && data.firstDay <= win.prevTo,
-      journey: buildRecruitJourney(cohort),
-      delay: delayRows(cohort),
-      daily: dailyRows(cohort, win.from, win.to),
-      channels: buildChannelFunnelTree(cohort),
-    };
-  }, [data, win, apps]);
+  const view = useMemo(() => (data && win ? overviewViewOf(apps ?? [], data, win) : null), [data, win, apps]);
 
   if (!data || !win || !view) {
     // ล้มแล้วมีปุ่มลองใหม่ (QA 5 ต.ค. 2569: เดิมเหลือข้อความอังกฤษดิบบรรทัดเดียว กดอะไรต่อไม่ได้)
@@ -246,38 +249,22 @@ const RecruitOverview: React.FC<{
   /** การ์ดเทียบช่วงก่อนของแต่ละแท็บ — แบบเดือน = ชื่อเดือนเทียบกัน · แบบช่วง = ช่วงวันเทียบกัน (21 ต.ค. 2569) */
   const curPeriodLabel = isRange ? rangeText({ from: win.from, to: win.to }) : monthLabel(win.month);
   const prevPeriodLabel = isRange ? rangeText({ from: win.prevFrom, to: win.prevTo }) : monthLabel(shiftMonth(win.month, -1));
-  const compareCard = (t: OverviewTabId) => (
+  /**
+   * การ์ดเทียบช่วงก่อนของแท็บ · `v` = ชุดรายชื่อ (แท็บภาพรวม Online ส่งชุดที่ผ่านตัวกรองบนสุด)
+   * แท็บใบขอ: นับจากใบรายใบชุดเดียวกับการ์ด "ใบขอเข้ามา" (`requestTrendRows` · QA 30 ต.ค. 2569 "ให้กราฟนับเหมือนการ์ดบน")
+   * กล่องของการ์ดนี้ไม่กดแล้ว — กล่องเดียวกันบนการ์ด "ใบขอเข้ามา" ด้านบนกดดูรายการใบได้
+   */
+  const compareCard = (t: OverviewTabId, v: NonNullable<typeof view> = view!, req?: { rows: RecruitRequestRow[] | null; prevRows: RecruitRequestRow[] | null }) => (
     <TrendLinesCard
       key={`${t}-${win.from}-${win.to}`}
       monthly={Boolean(win.all)}
-      {...(t === 'requests'
-        ? {
-            title: 'แนวโน้มใบขอ',
-            picked: reqPick,
-            onPick: setReqPick,
-            // ปิดไปแล้ว = นับอย่างเดียว ไม่เปิดรายการ (เจ้าของ "ถ้าปิดก็คือปิด")
-            pickable: (k: string) => k in REQUEST_DRILL_PATH,
-            // ช่วงทั้งหมด = เดือนละแท่งแบ่ง 4 สี (เจ้าของ 30 ต.ค. 2569 แบบร่าง "ทำเลย")
-            stack: REQUEST_STACK,
-            children:
-              reqPick && REQUEST_DRILL_PATH[reqPick] ? (
-                <DrillDownCard
-                  key={`drill-req-${reqPick}-${win.from}-${win.to}`}
-                  title="ใบขอ"
-                  bare
-                  path={REQUEST_DRILL_PATH[reqPick]}
-                  root={drillTreeOf('requests', view.cohort, data.requestList)}
-                  onOpenNames={(title2, ids) => setNames({ title: title2, ids })}
-                />
-              ) : null,
-          }
-        : {})}
-      rows={compareRowsOf(t, view.cur, view.prev, data.requests, data.requestsPrev)}
+      {...(t === 'requests' ? { title: 'แนวโน้มใบขอ', stack: REQUEST_STACK } : {})}
+      rows={t === 'requests' ? requestTrendRows(req?.rows ?? null, req?.prevRows ?? null) : compareRowsOf(t, v.cur, v.prev, data.requests, data.requestsPrev)}
       curLabel={curPeriodLabel}
       prevLabel={prevPeriodLabel}
       note={
-        t !== 'requests' && !view.prev
-          ? view.prevPartial && data.firstDay
+        t !== 'requests' && !v.prev
+          ? v.prevPartial && data.firstDay
             ? `ไม่เทียบ${prevWord} ข้อมูลเพิ่งเริ่ม ${rangeText({ from: data.firstDay, to: data.firstDay })}`
             : `${prevWord}ยังไม่มีข้อมูล`
           : win.isCurrent && !isRange
@@ -285,19 +272,23 @@ const RecruitOverview: React.FC<{
             : null
       }
       seriesOf={(key: string, period: ComparePeriod) =>
-        period === 'cur'
-          ? dailySeriesOf(key, win.from, win.to, view.list, data.requestDays)
-          : dailySeriesOf(key, win.prevFrom, win.prevTo, view.prevList, data.requestDays)
+        t === 'requests'
+          ? period === 'cur'
+            ? requestTrendSeries(key, win.from, win.to, req?.rows ?? null)
+            : requestTrendSeries(key, win.prevFrom, win.prevTo, req?.prevRows ?? null)
+          : period === 'cur'
+            ? dailySeriesOf(key, win.from, win.to, v.list, data.requestDays)
+            : dailySeriesOf(key, win.prevFrom, win.prevTo, v.prevList, data.requestDays)
       }
     />
   );
 
   /** การ์ดกดลงลึก (ไอเดียเพื่อนเจ้าของ · 21 ต.ค. 2569) — key ผูกช่วง เปลี่ยนแล้วกลับชั้นบนสุด */
-  const drillCard = (t: OverviewTabId, title: string) => (
+  const drillCard = (t: OverviewTabId, title: string, v: NonNullable<typeof view> = view!) => (
     <DrillDownCard
       key={`drill-${t}-${win.from}-${win.to}`}
       title={title}
-      root={drillTreeOf(t, view.cohort, data.requestList)}
+      root={drillTreeOf(t, v.cohort, data.requestList)}
       onOpenNames={(title2, ids) => setNames({ title: title2, ids })}
     />
   );
@@ -321,7 +312,7 @@ const RecruitOverview: React.FC<{
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-medium text-foreground">ภาพรวมงานสรรหา</h2>
         <div className="flex flex-wrap items-center gap-2">
-          <Popover>
+          <Popover open={periodOpen} onOpenChange={setPeriodOpen}>
             <PopoverTrigger asChild>
               <Button type="button" size="xs" variant="outline" aria-label="เลือกช่วงเวลา" data-testid="recruit-period">
                 <CalendarDays aria-hidden />
@@ -329,7 +320,8 @@ const RecruitOverview: React.FC<{
                 <ChevronDown className="opacity-60" aria-hidden />
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-80 space-y-4 p-4">
+            {/* มือถือ: ไม่ล้นจอ (เลื่อนในกล่อง) · เลือกปุ่มลัดแล้วปิดเอง (QA 30 ต.ค. 2569) */}
+            <PopoverContent align="end" collisionPadding={16} className="max-h-dvh w-80 space-y-4 overflow-y-auto p-4">
               <div className="space-y-2">
                 <p className={cn('text-xs', DASH.sub)}>เดือน</p>
                 <div className="flex items-center gap-1">
@@ -381,17 +373,17 @@ const RecruitOverview: React.FC<{
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" size="xs" variant={isLast(7) ? 'default' : 'outline'} onClick={() => setRange(lastDays(7))} data-testid="recruit-last7">
+                <Button type="button" size="xs" variant={isLast(7) ? 'default' : 'outline'} onClick={() => pickRange(lastDays(7))} data-testid="recruit-last7">
                   7 วันล่าสุด
                 </Button>
-                <Button type="button" size="xs" variant={isLast(30) ? 'default' : 'outline'} onClick={() => setRange(lastDays(30))} data-testid="recruit-last30">
+                <Button type="button" size="xs" variant={isLast(30) ? 'default' : 'outline'} onClick={() => pickRange(lastDays(30))} data-testid="recruit-last30">
                   30 วันล่าสุด
                 </Button>
                 <Button
                   type="button"
                   size="xs"
                   variant={win.all ? 'default' : 'outline'}
-                  onClick={() => setRange({ from: data.firstDay ?? data.today, to: data.today, all: true })}
+                  onClick={() => pickRange({ from: data.firstDay ?? data.today, to: data.today, all: true })}
                   data-testid="recruit-all"
                 >
                   ทั้งหมด
@@ -435,9 +427,10 @@ const RecruitOverview: React.FC<{
         <TabsContent value="requests" className="mt-3 space-y-3">
           <RequestTab
             rows={data.requestRows ?? null}
+            prevRows={data.requestRowsPrev ?? null}
             rowsError={data.errors.requests ?? null}
             apps={view.cohort}
-            trend={compareCard('requests')}
+            trend={(sc) => compareCard('requests', view, { rows: sc.rows, prevRows: sc.prevRows })}
             scoped={(scopedApps, channel) => (
               // ตามตัวกรองบนสุด + ช่องทางที่กดในตาราง "คนที่กรอกมา" (เจ้าของ 29 ต.ค. 2569 "ไม่ได้บอกช่องทางหรอ")
               // ฐาน = ทุกรายชื่อ (เส้นทางขั้น 4 นับเฉพาะคนที่ตอบ AI ว่าสนใจ — QA 18 ต.ค. 2569 เลขเลยต่างกัน)
@@ -451,28 +444,36 @@ const RecruitOverview: React.FC<{
               </div>
             )}
           >
-          {compareCard('apps')}
-          {drillCard('apps', 'รายชื่อที่กรอกมา')}
-          {/* งานค้างของขั้นนี้ ณ วันนี้ (ย้ายจากแท็บใบขอ · เจ้าของ 29 ต.ค. 2569 "ย้ายไปให้ถูกเรื่องของมัน") */}
-          <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">
-            {data.backlog ? <BacklogBody backlog={data.backlog} only="uncalled" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
-          </OverviewCard>
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <OverviewCard icon={Timer} title="กรอกแล้วโทรวันไหน">
-              {apps ? <DelayList rows={view.delay} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
-            </OverviewCard>
-            <div className="min-w-0 lg:col-span-2">
-              <DailyCard rows={view.daily} icon={BarChart3} />
-            </div>
-          </div>
-          {/* ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "facebook ad 200 สนใจ 100 … มา 10" + "จับได้ถึงแจ้งเข้า") */}
-          <OverviewCard
-            icon={Megaphone}
-            title="รายชื่อที่กรอกในช่วงนี้ ไปถึงไหนแยกช่องทาง"
-            sub={data.errors.informs ? 'อ่านแจ้งเข้า ERP ไม่ได้' : 'แจ้งเข้า = มีใบแจ้งเข้า ERP หลังวันกรอก'}
-          >
-            <ChannelFunnelTable groups={view.channels.groups} total={view.channels.total} onOpen={(title, ids) => setNames({ title, ids })} />
-          </OverviewCard>
+            {(sc) => {
+              // ตามตัวกรองบนสุด (QA 30 ต.ค. 2569) — ไม่กรอง = ชุดเดิมของทั้งหน้า
+              const fv = sc.active ? overviewViewOf(sc.appsOf(apps ?? []), data, win) : view;
+              return (
+                <>
+              {compareCard('apps', fv)}
+              {drillCard('apps', 'รายชื่อที่กรอกมา', fv)}
+              {/* งานค้างของขั้นนี้ ณ วันนี้ (ย้ายจากแท็บใบขอ · เจ้าของ 29 ต.ค. 2569 "ย้ายไปให้ถูกเรื่องของมัน") */}
+              <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={sc.active ? 'ณ วันนี้ · ทุกใบขอ' : 'ณ วันนี้'}>
+                {data.backlog ? <BacklogBody backlog={data.backlog} only="uncalled" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
+              </OverviewCard>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                <OverviewCard icon={Timer} title="กรอกแล้วโทรวันไหน">
+                  {apps ? <DelayList rows={fv.delay} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
+                </OverviewCard>
+                <div className="min-w-0 lg:col-span-2">
+                  <DailyCard rows={fv.daily} icon={BarChart3} />
+                </div>
+              </div>
+              {/* ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "facebook ad 200 สนใจ 100 … มา 10" + "จับได้ถึงแจ้งเข้า") */}
+              <OverviewCard
+                icon={Megaphone}
+                title="รายชื่อที่กรอกในช่วงนี้ ไปถึงไหนแยกช่องทาง"
+                sub={data.errors.informs ? 'อ่านแจ้งเข้า ERP ไม่ได้' : 'แจ้งเข้า = มีใบแจ้งเข้า ERP หลังวันกรอก'}
+              >
+                <ChannelFunnelTable groups={fv.channels.groups} total={fv.channels.total} onOpen={(title, ids) => setNames({ title, ids })} />
+              </OverviewCard>
+                </>
+              );
+            }}
           </RequestTab>
         </TabsContent>
 

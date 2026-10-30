@@ -87,7 +87,10 @@ describe('หน้าจอ', () => {
     const src = read('src/components/dashboard-trends/RecruitOverview.tsx');
     expect(src).toContain('useState<(DateRangeYmd & { all?: boolean }) | null>(() => lastDays(7))');
     expect(src).toContain('data-testid="recruit-last7"');
-    for (const t of ['requests', 'apps', 'staff', 'appt']) expect(src).toContain(`{compareCard('${t}')}`);
+    // 30 ต.ค. 2569: แท็บภาพรวม Online ส่งชุดที่ผ่านตัวกรองบนสุดให้การ์ด (ใบขอ = ใบรายใบ · กรอกเข้ามา = fv)
+    expect(src).toContain("trend={(sc) => compareCard('requests', view, { rows: sc.rows, prevRows: sc.prevRows })}");
+    expect(src).toContain("{compareCard('apps', fv)}");
+    for (const t of ['staff', 'appt']) expect(src).toContain(`{compareCard('${t}')}`);
     // 21 ต.ค. 2569 ค่ำ: แท่งคู่ → กราฟเส้นรายวัน (เจ้าของ "อยากให้มันวิ่งแบบอันนี้")
     const card = read('src/components/dashboard-trends/TrendLinesCard.tsx');
     // ปุ่มช่วงในการ์ดถอดแล้ว (27 ต.ค. 2569 ค่ำ) — เลือกช่วงที่ตัวเลือกด้านบนของหน้า

@@ -23,7 +23,7 @@ describe('แนวโน้มใบขอ ช่วงทั้งหมด = 
     const at = page.indexOf('const REQUEST_STACK');
     const block = page.slice(at, page.indexOf('};', at));
     expect(block).toContain("total: 'total'");
-    expect([...block.matchAll(/key: '(\w+)'/g)].map((m) => m[1])).toEqual(['notReleasedClosed', 'notReleasedOpen', 'releasedNoApps', 'releasedWithApps']);
+    expect([...block.matchAll(/key: '(\w+)'/g)].map((m) => m[1])).toEqual(['cancelled', 'closed', 'notReleased', 'releasedNoApps', 'releasedWithApps']); // 30 ต.ค. 2569 นับเหมือนการ์ดบน
     expect(page).toContain('stack: REQUEST_STACK');
     expect(card).toContain('stackId="month"');
     expect(card).toContain('data-testid="trend-stack-legend"');
