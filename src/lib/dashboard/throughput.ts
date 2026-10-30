@@ -333,7 +333,7 @@ export function buildStockKpisFromCohort(
     },
     {
       id: 'remaining',
-      label: 'คงเหลือ',
+      label: 'เหลือหา',
       value: summary.remainingPositions,
       secondaryCount: summary.remainingRequestCount,
       secondaryLabel: 'ใบขอ',

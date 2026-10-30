@@ -814,7 +814,7 @@ const JobListPage: React.FC = () => {
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ราชการ/เอกชน</th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">วันที่กรอก</th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">วันที่ต้องการ</th>
-                    <th className="px-1.5 py-3 text-center font-medium whitespace-nowrap"><Term k="remaining">คงเหลือ</Term></th>
+                    <th className="px-1.5 py-3 text-center font-medium whitespace-nowrap"><Term k="remaining">เหลือหา</Term></th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ประเภทใบขอ</th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ตำแหน่ง</th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
@@ -895,7 +895,7 @@ const JobListPage: React.FC = () => {
                     <span>
                       ตำแหน่ง: ขอ {j.request_positions ?? jobPositionUnits(j)}
                       {j.filled_positions != null ? ` · หาได้ ${j.filled_positions}` : ''}
-                      {' · คงเหลือ '}
+                      {' · เหลือหา '}
                       {jobPositionUnits(j)}
                     </span>
                   </div>

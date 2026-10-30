@@ -269,7 +269,7 @@ export function buildLifecycleBoardFromStockSources(input: {
     rowFromKinds('requested', 'เข้ามา', requested),
     rowFromKinds('filled', 'หาได้แล้ว', filled),
     rowFromKinds('cancelled', 'ยกเลิก', cancelled),
-    rowFromKinds('remaining', 'คงเหลือ', remaining),
+    rowFromKinds('remaining', 'เหลือหา', remaining),
   ];
 
   const rate = (kind: LifecycleKind): number | null => {

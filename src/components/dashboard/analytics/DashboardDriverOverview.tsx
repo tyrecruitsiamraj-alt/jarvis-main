@@ -52,7 +52,7 @@ const DashboardDriverOverview: React.FC<Props> = ({
       {!hideHeader ? (
         <div>
           <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">ภาระงานตามผู้รับผิดชอบ</h3>
-          <p className="text-xs text-slate-600 dark:text-slate-400">มี · ปิด · คงเหลือ รายบุคคล (สรรหา / คัดสรร)</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400">มี · ปิด · เหลือหา รายบุคคล (สรรหา / คัดสรร)</p>
         </div>
       ) : null}
       {closedTotalsLoading ? (
@@ -79,7 +79,7 @@ const DashboardDriverOverview: React.FC<Props> = ({
                   {ROLE_LABELS[role]}
                 </span>
                 <span className={cn('text-[11px]', DASH.muted)}>
-                  {people.length.toLocaleString('th-TH')} คน · คงเหลือรวม{' '}
+                  {people.length.toLocaleString('th-TH')} คน · เหลือหารวม{' '}
                   {people.reduce((sum, r) => sum + r.remaining, 0).toLocaleString('th-TH')}
                 </span>
               </div>
@@ -136,7 +136,7 @@ const DashboardDriverOverview: React.FC<Props> = ({
                           >
                             {r.remaining}
                           </p>
-                          <p className={cn('text-[10px]', DASH.muted)}>คงเหลือ</p>
+                          <p className={cn('text-[10px]', DASH.muted)}>เหลือหา</p>
                         </div>
                       </div>
                     </button>

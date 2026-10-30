@@ -60,7 +60,7 @@ describe('buildStatusLeadPanel', () => {
     expect(shell).toContain('selected={statusPick?.kpiId === kpi.id}');
     const panel = readFileSync('src/components/dashboard/analytics/DashboardStatusLeadPanel.tsx', 'utf8');
     expect(panel).toContain('max-h-96 overflow-auto');
-    expect(panel).toContain('ดูแบบเดิม');
+    expect(panel).toMatch(/>\s*ปิด\s*</); // QA 30 ต.ค. 2569 "ดูแบบเดิม" → "ปิด"
     for (const h of ['วันที่กรอก', 'คนกรอก']) expect(panel).toContain(h);
     // เลขที่ใบซ้ำได้ (ใบขอล่วงหน้า) — คีย์ต้องเป็น id ไม่งั้นแถวค้างตอนสลับกล่อง
     expect(panel).toContain('key={r.key}');

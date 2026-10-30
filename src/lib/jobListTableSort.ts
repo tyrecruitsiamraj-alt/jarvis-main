@@ -50,7 +50,7 @@ export const JOB_LIST_TABLE_COLUMN_LABEL: Record<JobListTableColumn, string> = {
   sector: 'ราชการ/เอกชน',
   submitted: 'วันที่กรอก',
   required: 'วันที่ต้องการ',
-  remaining: 'คงเหลือ',
+  remaining: 'เหลือหา',
   request_type: 'ประเภทใบขอ',
   position: 'ตำแหน่ง',
   subtype: 'ลักษณะงานย่อย',

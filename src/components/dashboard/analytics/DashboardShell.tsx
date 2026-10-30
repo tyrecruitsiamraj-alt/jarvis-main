@@ -384,8 +384,7 @@ const DashboardShell: React.FC<Props> = ({
                           <>
                             เข้ามา − หาได้แล้ว − ยกเลิก = <b>ยังเปิดหาอยู่ {stillOpen.toLocaleString('th-TH')} อัตรา</b>{' '}
                             ({intake.toLocaleString('th-TH')} − {closed.toLocaleString('th-TH')} −{' '}
-                            {cancelled.toLocaleString('th-TH')}) · สามตัวนี้นับเฉพาะใบในช่วงแนวโน้ม —
-                            ส่วน <span className="font-medium">คงเหลือ = ใบเปิดทั้งหมดทั้งระบบ</span> จึงเป็นคนละเลขกัน
+                            {cancelled.toLocaleString('th-TH')})
                           </>
                         );
                       })()
@@ -397,7 +396,7 @@ const DashboardShell: React.FC<Props> = ({
                         const remaining = data.kpis.find((k) => k.id === 'remaining')?.value ?? 0;
                         return (
                           <>
-                            เข้ามา − หาได้แล้ว − ยกเลิก = คงเหลือ · ตอนนี้ {intake.toLocaleString('th-TH')} −{' '}
+                            เข้ามา − หาได้แล้ว − ยกเลิก = เหลือหา · ตอนนี้ {intake.toLocaleString('th-TH')} −{' '}
                             {closed.toLocaleString('th-TH')} − {cancelled.toLocaleString('th-TH')} ={' '}
                             {remaining.toLocaleString('th-TH')}
                           </>
@@ -422,7 +421,7 @@ const DashboardShell: React.FC<Props> = ({
                          */}
                         {kpi.id === 'remaining' && dateRange == null ? (
                           <p className="px-1 text-[10px] leading-snug text-slate-500 dark:text-slate-400">
-                            ทั้งระบบ ไม่ใช่เฉพาะช่วงที่เลือก
+                            ทั้งระบบ
                           </p>
                         ) : null}
                       </div>
@@ -430,7 +429,7 @@ const DashboardShell: React.FC<Props> = ({
                   </div>
                 </div>
                 <div>
-                  <p className={cn(DASH.eyebrow, 'mb-2')}>สถานะทำงาน (นับอัตรา) — กดเพื่อกรอง</p>
+                  <p className={cn(DASH.eyebrow, 'mb-2')}>สถานะทำงาน (นับอัตรา)</p>
                   {/* ใช้การ์ดทรงเดียวกับ "สรุปอัตราในช่วงที่เลือก" ตามที่เจ้าของสั่ง — กวาดตาอ่านง่ายกว่าชิป
                       ครบทุกสถานะเท่าเดิม (ตัวเลข 0 ก็ยังอยู่ ไม่ซ่อน) · กดแล้วเปิดลิสต์ใบขอสถานะนั้นเหมือนเดิม */}
                   {/* เจ้าของสั่ง 10 ส.ค. 2569: "แถวละ 5 จะได้พอดีกัน" และ "ไม่เป็น visual control เลย"
@@ -562,7 +561,7 @@ const DashboardShell: React.FC<Props> = ({
                 title="ภาระงานตามรหัสไซต์"
                 subtitle={
                   activeSiteCount > 0
-                    ? `คงเหลือ ${siteOpenTotal.toLocaleString('th-TH')} อัตรา · ${activeSiteCount.toLocaleString('th-TH')} ไซต์ · กดเพื่อดู`
+                    ? `เหลือหา ${siteOpenTotal.toLocaleString('th-TH')} อัตรา · ${activeSiteCount.toLocaleString('th-TH')} ไซต์ · กดเพื่อดู`
                     : 'กดเพื่อดูรายละเอียด'
                 }
                 open={showUnitOverview}
@@ -580,7 +579,7 @@ const DashboardShell: React.FC<Props> = ({
                 subtitle={
                   data.recruiterOverview.length > 0
                     ? `${recruiterRoleSummary
-                        .map((r) => `${r.label} ${r.people.toLocaleString('th-TH')} คน คงเหลือ ${r.remaining.toLocaleString('th-TH')}`)
+                        .map((r) => `${r.label} ${r.people.toLocaleString('th-TH')} คน เหลือหา ${r.remaining.toLocaleString('th-TH')}`)
                         .join(' · ')} · กดเพื่อดู`
                     : 'กดเพื่อดูรายละเอียด'
                 }
@@ -600,7 +599,7 @@ const DashboardShell: React.FC<Props> = ({
               </DashboardExpandablePanel>
               <DashboardExpandablePanel
                 title="แนวโน้มรายเดือน"
-                subtitle="เข้ามา / หาได้แล้ว / ยกเลิก / คงเหลือ — กดเพื่อดู"
+                subtitle="เข้ามา / หาได้แล้ว / ยกเลิก / เหลือหา — กดเพื่อดู"
                 open={showLifecycle}
                 onOpenChange={setShowLifecycle}
               >

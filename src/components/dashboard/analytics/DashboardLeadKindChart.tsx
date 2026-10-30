@@ -114,14 +114,10 @@ const DashboardLeadKindChart: React.FC<DashboardLeadKindChartProps> = ({
             ตัวเลขไม่ตรงกัน: {mismatchNote}
           </p>
         )
-      ) : (
-        <p className={cn('mt-2 text-[10px]', DASH.muted)}>
-          ผลรวมสามถัง = ยอด「เข้ามา」ของช่วงเดียวกันเป๊ะ · ล่วงหน้า = ให้เวลาหา 7 วันขึ้นไป
-          {positionsWithoutRequestNo > 0
-            ? ` · อีก ${positionsWithoutRequestNo.toLocaleString('th-TH')} อัตราไม่มีเลขที่ใบ (นับในยอดแต่ลิสต์รายใบไม่ได้)`
-            : ''}
-        </p>
-      )}
+      ) : positionsWithoutRequestNo > 0 ? (
+        // ถอดประโยคอธิบาย (QA 30 ต.ค. 2569) — เหลือเลขที่ลิสต์รายใบไม่ได้
+        <p className={cn('mt-2 text-[10px]', DASH.muted)}>ไม่มีเลขที่ใบ {positionsWithoutRequestNo.toLocaleString('th-TH')} อัตรา</p>
+      ) : null}
     </div>
   );
 };

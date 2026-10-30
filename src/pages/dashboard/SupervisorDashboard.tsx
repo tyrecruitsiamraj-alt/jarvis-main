@@ -703,7 +703,7 @@ const SupervisorDashboard: React.FC = () => {
         : drill.positions;
       const noteMissing =
         !leadKind && drill.positionsWithoutRequestNo > 0
-          ? ` · อีก ${drill.positionsWithoutRequestNo.toLocaleString('th-TH')} อัตราไม่มีเลขที่ใบ ลิสต์ไม่ได้`
+          ? ` · ไม่มีเลขที่ใบ ${drill.positionsWithoutRequestNo.toLocaleString('th-TH')} อัตรา`
           : '';
       setDetailDialogTitle(
         `${label} (${positions.toLocaleString('th-TH')} อัตรา · ${rows.length.toLocaleString('th-TH')} ใบขอ)${noteMissing}`,
@@ -799,7 +799,7 @@ const SupervisorDashboard: React.FC = () => {
       const panel = kpiId === 'work_status_none' ? filterLeadPanel(full, (r) => r.status === NO_STATUS_LABEL) : full;
       const note =
         drill.positionsWithoutRequestNo > 0 && kpiId !== 'work_status_none'
-          ? `อีก ${drill.positionsWithoutRequestNo.toLocaleString('th-TH')} อัตราไม่มีเลขที่ใบ ลิสต์ไม่ได้`
+          ? `ไม่มีเลขที่ใบ ${drill.positionsWithoutRequestNo.toLocaleString('th-TH')} อัตรา`
           : null;
       return { kpiId, label: statusFromCohort ? `สถานะ ${label}` : label, panel, amountLabel: LEAD_AMOUNT_LABEL[cohortKpi], note };
     }

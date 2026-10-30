@@ -48,7 +48,7 @@ export const LEAD_AMOUNT_LABEL: Record<CohortDrillKpi, string> = {
   total_requests: 'ขอ',
   closed: 'หาได้',
   cancelled: 'ยกเลิก',
-  remaining: 'ต้องหา',
+  remaining: 'เหลือหา',
 };
 
 /** คนกรอกที่ไม่มีชื่อ — ยังนับในตาราง "ใครคีย์" ห้ามหาย */

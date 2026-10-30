@@ -91,7 +91,7 @@ const COHORT_KPI_BADGE: Record<CohortDrillKpi, { label: string; variant: Dashboa
   total_requests: { label: 'เข้ามา', variant: 'info' },
   closed: { label: 'ปิดได้', variant: 'success' },
   cancelled: { label: 'ยกเลิก', variant: 'default' },
-  remaining: { label: 'คงเหลือ', variant: 'warning' },
+  remaining: { label: 'เหลือหา', variant: 'warning' },
 };
 
 /**

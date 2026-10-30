@@ -21,7 +21,7 @@ const PAGE = 200;
 export default function DashboardStatusLeadPanel({
   label,
   panel,
-  amountLabel = 'ต้องหา',
+  amountLabel = 'เหลือหา',
   note,
   onClear,
   onOpenJob,
@@ -64,7 +64,7 @@ export default function DashboardStatusLeadPanel({
           </p>
           <Button type="button" variant="outline" size="xs" onClick={onClear} data-testid="dashboard-status-lead-clear">
             <X aria-hidden />
-            ดูแบบเดิม
+            ปิด
           </Button>
         </div>
       </div>
@@ -153,7 +153,7 @@ export default function DashboardStatusLeadPanel({
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">
-          {[kind ? REQUEST_LEAD_KIND_LABEL[kind] : 'ทุกความเร่ง', person].filter(Boolean).join(' · ')} · {NUM.format(rows.length)} ใบ
+          {[kind ? REQUEST_LEAD_KIND_LABEL[kind] : 'ทุกชนิด', person].filter(Boolean).join(' · ')} · {NUM.format(rows.length)} ใบ
         </p>
         {kind || person ? (
           <Button

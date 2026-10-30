@@ -120,13 +120,13 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
             เข้ามา: pick('requested'),
             ปิดแล้ว: pick('filled'),
             ยกเลิก: pick('cancelled'),
-            คงเหลือ: pick('remaining'),
+            เหลือหา: pick('remaining'),
           };
         }),
     [board.rows, cols],
   );
   const chartHasData = chartData.some(
-    (d) => d.เข้ามา > 0 || d.ปิดแล้ว > 0 || d.ยกเลิก > 0 || d.คงเหลือ > 0,
+    (d) => d.เข้ามา > 0 || d.ปิดแล้ว > 0 || d.ยกเลิก > 0 || d.เหลือหา > 0,
   );
 
   return (
@@ -135,7 +135,7 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
         <div>
           <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">Life Cycle ตามประเภทใบขอ</h3>
           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-            มุมวิเคราะห์: เข้ามาเท่าไหร่ → ปิด/ยกเลิกไปแล้วเท่าไหร่ → คงเหลือยังหาอยู่เท่าไหร่ · แยกตามประเภท · {periodLabel}
+            มุมวิเคราะห์: เข้ามาเท่าไหร่ → ปิด/ยกเลิกไปแล้วเท่าไหร่ → เหลือหาเท่าไหร่ · แยกตามประเภท · {periodLabel}
           </p>
         </div>
 
@@ -146,7 +146,7 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
               <span className="tabular-nums">{fmt(summary.inPos)}</span> · หาได้แล้ว{' '}
               <span className="tabular-nums">{fmt(summary.closedPos)}</span>
               {summary.fillPct != null ? ` (${summary.fillPct}%)` : ''} · ยกเลิก{' '}
-              <span className="tabular-nums">{fmt(summary.cancelPos)}</span> · คงเหลือหาอยู่{' '}
+              <span className="tabular-nums">{fmt(summary.cancelPos)}</span> · เหลือหา{' '}
               <span className="tabular-nums text-amber-900">{fmt(summary.remPos)}</span>
               {summary.stillOpenPct != null ? ` (~${summary.stillOpenPct}% ของที่เข้ามา)` : ''}
             </p>
@@ -154,7 +154,7 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
               เข้ามาแยกประเภท — {summary.intakeByType}
             </p>
             <p className="text-[11px] text-slate-600 dark:text-slate-400">
-              คงเหลือแยกประเภท — {summary.remainingByType}
+              เหลือหาแยกประเภท — {summary.remainingByType}
             </p>
             {summary.weak ? (
               <p className="text-[11px] text-slate-600 dark:text-slate-400">
@@ -186,7 +186,7 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
               <Bar dataKey="เข้ามา" fill={TONE.info.hex} radius={[4, 4, 0, 0]} animationDuration={CHART.animationDuration} />
               <Bar dataKey="ปิดแล้ว" fill={TONE.success.hex} radius={[4, 4, 0, 0]} animationDuration={CHART.animationDuration} />
               <Bar dataKey="ยกเลิก" fill={TONE.danger.hex} radius={[4, 4, 0, 0]} animationDuration={CHART.animationDuration} />
-              <Bar dataKey="คงเหลือ" fill={TONE.warn.hex} radius={[4, 4, 0, 0]} animationDuration={CHART.animationDuration} />
+              <Bar dataKey="เหลือหา" fill={TONE.warn.hex} radius={[4, 4, 0, 0]} animationDuration={CHART.animationDuration} />
             </BarChart>
           </ResponsiveContainer>
         </div>

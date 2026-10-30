@@ -635,7 +635,7 @@ function buildWorkStatusKpis(
             value: nonePositions,
             secondaryCount: noneRequests,
             secondaryLabel: 'ใบขอ',
-            description: `ใบ ERP ที่ไม่อยู่ในกล่องงาน · ${nonePositions.toLocaleString('th-TH')} อัตรา · ${noneRequests.toLocaleString('th-TH')} ใบ`,
+            description: `${nonePositions.toLocaleString('th-TH')} อัตรา · ${noneRequests.toLocaleString('th-TH')} ใบ`,
             trendPercent: null,
           } satisfies DashboardKpi,
         ]
@@ -660,7 +660,7 @@ function buildPrequestKpi(jobs: JobRequest[]): DashboardKpi {
     value: positions,
     secondaryCount: requests,
     secondaryLabel: 'ใบขอ',
-    description: 'ทีมคีย์เอง ยังไม่เข้า ERP',
+    description: `${positions.toLocaleString('th-TH')} อัตรา · ${requests.toLocaleString('th-TH')} ใบ`,
     trendPercent: null,
   };
 }
@@ -721,7 +721,7 @@ function buildStockKpis(jobs: JobRequest[], _periodLabel?: string | null): Dashb
     },
     {
       id: 'remaining',
-      label: 'คงเหลือ',
+      label: 'เหลือหา',
       value: remainingPositions,
       secondaryCount: remainingRequestCount,
       secondaryLabel: 'ใบขอ',
@@ -786,7 +786,7 @@ function buildKpis(
       description: throughputCur
         ? 'ตำแหน่งที่ขอในช่วง (ย้อนหลัง=วันที่กรอก · ฉุกเฉิน/ล่วงหน้า=วันที่ต้องการ)'
         : hasPeriod
-          ? 'ตำแหน่งคงเหลือตามตัวกรองในช่วงที่เลือก'
+          ? 'ตำแหน่งเหลือหาตามตัวกรองในช่วงที่เลือก'
           : 'ตำแหน่งที่โหลดทั้งหมดตามตัวกรอง',
       trendPercent: trendPercent(requestedTotal, prevRequestedTotal),
     },
@@ -808,8 +808,8 @@ function buildKpis(
       label: 'เหลือหาอีก',
       value: remainingTotal,
       description: hasPeriod
-        ? 'ตำแหน่งคงเหลือจากใบขอในช่วงที่ยังเปิดอยู่'
-        : 'ตำแหน่งคงเหลือที่ยังเปิดอยู่ทั้งหมด (ตามตัวกรอง)',
+        ? 'ตำแหน่งเหลือหาจากใบขอในช่วงที่ยังเปิดอยู่'
+        : 'ตำแหน่งเหลือหาที่ยังเปิดอยู่ทั้งหมด (ตามตัวกรอง)',
       trendPercent: hasPeriod && prevRemainingTotal != null
         ? trendPercent(remainingTotal, prevRemainingTotal)
         : null,

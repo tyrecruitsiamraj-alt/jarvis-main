@@ -140,7 +140,7 @@ describe('buildDashboardData', () => {
     expect(data.kpis.find((k) => k.id === 'closed')?.value).toBe(35);
     expect(data.kpis.find((k) => k.id === 'cancelled')?.value).toBe(0);
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(62);
-    expect(data.kpis.find((k) => k.id === 'remaining')?.label).toBe('คงเหลือ');
+    expect(data.kpis.find((k) => k.id === 'remaining')?.label).toBe('เหลือหา');
     /** คอลัมน์ประเภท = แตกยอดเข้ามา (ไม่ใช่คงเหลือ) */
     const intakeByType = data.activityTrend.reduce(
       (s, p) =>

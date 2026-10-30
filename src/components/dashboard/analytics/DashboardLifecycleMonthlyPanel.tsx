@@ -106,7 +106,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
   const summaries = useMemo(() => {
     const lines: string[] = [];
     lines.push(
-      `${scopeLabel}: เข้ามา ${fmt(totals.requested)} · ปิดแล้ว ${fmt(totals.filled)} · ยกเลิก ${fmt(totals.cancelled)} · คงเหลือ ${fmt(totals.remaining)} อัตรา`,
+      `${scopeLabel}: เข้ามา ${fmt(totals.requested)} · ปิดแล้ว ${fmt(totals.filled)} · ยกเลิก ${fmt(totals.cancelled)} · เหลือหา ${fmt(totals.remaining)} อัตรา`,
     );
     lines.push(
       `เข้ามาแยกประเภท — ลาออก ${fmt(totals.resignation)} · เปลี่ยนตัว ${fmt(totals.replacement)} · เพิ่มอัตรา ${fmt(totals.increaseHeadcount)} · เปิดไซต์ ${fmt(totals.newSite)} · อื่นๆ ${fmt(totals.other)}` +
@@ -131,7 +131,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
     return (
       <div className={cn(DASH.card, 'p-4 xl:col-span-2')}>
         <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">
-          ประเภทใบขอรายเดือน — เข้ามา / ปิดแล้ว / คงเหลือ
+          ประเภทใบขอรายเดือน — เข้ามา / ปิดแล้ว / เหลือหา
         </h3>
         <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">ยังไม่มีข้อมูลในช่วง {scopeLabel}</p>
       </div>
@@ -142,10 +142,10 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
     <div className={cn(DASH.card, 'p-4 xl:col-span-2 space-y-4')}>
       <div>
         <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">
-          ประเภทใบขอรายเดือน — เข้ามา / ปิดแล้ว / คงเหลือ
+          ประเภทใบขอรายเดือน — เข้ามา / ปิดแล้ว / เหลือหา
         </h3>
         <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-          คอลัมน์ลาออก–อื่นๆ = แตกยอด「เข้ามา」ของเดือนนั้น · คงเหลือแยกต่างหาก · สรุปตาม {scopeLabel}
+          คอลัมน์ลาออก–อื่นๆ = แตกยอด「เข้ามา」ของเดือนนั้น · เหลือหาแยกต่างหาก · สรุปตาม {scopeLabel}
         </p>
         <ul className="text-xs text-slate-700 dark:text-slate-300 mt-2 space-y-0.5 list-disc list-inside">
           {summaries.map((line) => (
@@ -162,7 +162,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">เข้ามา</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">หาได้แล้ว</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">ยกเลิก</th>
-              <th className="text-right font-medium px-2 py-2 whitespace-nowrap">คงเหลือ</th>
+              <th className="text-right font-medium px-2 py-2 whitespace-nowrap">เหลือหา</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">ลาออก</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">เปลี่ยนตัว</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">เพิ่มอัตรา</th>
@@ -229,7 +229,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
           </tbody>
         </table>
         <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1.5 px-1">
-          คอลัมน์「รวมประเภท」ต้องเท่า「เข้ามา」ทุกเดือน · คงเหลือไม่ใช่ผลรวมของคอลัมน์ประเภท
+          คอลัมน์「รวมประเภท」ต้องเท่า「เข้ามา」ทุกเดือน · เหลือหาไม่ใช่ผลรวมของคอลัมน์ประเภท
         </p>
       </div>
 

@@ -85,7 +85,7 @@ export const BoardUnitPickerBody: React.FC<{
                       )}
                       {u.remainingPositions > 0 ? (
                         <span className={TONE.warn.chip}>
-                          ยังต้องหา {u.remainingPositions.toLocaleString('th-TH')}
+                          เหลือหา {u.remainingPositions.toLocaleString('th-TH')}
                         </span>
                       ) : null}
                       <span className="w-full text-[11px] text-muted-foreground">

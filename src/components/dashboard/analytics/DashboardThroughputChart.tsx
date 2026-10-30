@@ -22,7 +22,7 @@ const SERIES_LABELS: Record<string, string> = {
   requested: 'เข้ามา',
   filled: 'หาได้แล้ว',
   cancelled: 'ยกเลิก',
-  remaining: 'คงเหลือ',
+  remaining: 'เหลือหา',
 };
 
 const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
@@ -56,16 +56,16 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
     <div className={cn(DASH.card, 'p-4 xl:col-span-2')}>
       <div className="mb-3">
         <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">
-          แนวโน้มรายเดือน — เข้ามา / หาได้แล้ว / ยกเลิก / คงเหลือ
+          แนวโน้มรายเดือน — เข้ามา / หาได้แล้ว / ยกเลิก / เหลือหา
         </h3>
         <p className="text-xs text-slate-600 dark:text-slate-400">
-          นับเป็นอัตรา · ตามเดือนที่กรอก/เปิดใบ · เข้ามา/หาได้/ยกเลิกจาก cohort · คงเหลือ = ใบเปิดที่ต้องหา ·{' '}
+          นับเป็นอัตรา · ตามเดือนที่กรอก/เปิดใบ · เข้ามา/หาได้/ยกเลิกจาก cohort · เหลือหา = ใบเปิดที่ต้องหา ·{' '}
           {periodLabel}
         </p>
         <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
           รวมช่วง เข้ามา {totals.requested.toLocaleString('th-TH')} · หาได้แล้ว{' '}
           {totals.filled.toLocaleString('th-TH')} · ยกเลิก {totals.cancelled.toLocaleString('th-TH')} ·
-          คงเหลือ {totals.remaining.toLocaleString('th-TH')}
+          เหลือหา {totals.remaining.toLocaleString('th-TH')}
         </p>
       </div>
       {/* div ครอบพากสีตัวหนังสือ (DASH.sub) ไปให้แกนกราฟผ่าน currentColor — สลับตามธีมเอง */}

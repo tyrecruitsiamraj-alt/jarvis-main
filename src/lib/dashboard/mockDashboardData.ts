@@ -85,7 +85,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { id: 'total_requests', label: 'ใบขอทั้งหมด', value: 52, secondaryCount: 20, secondaryLabel: 'ใบขอ', description: '52 ตำแหน่ง · 20 ใบขอ', trendPercent: null },
     { id: 'closed', label: 'ปิดใบขอ', value: 24, secondaryCount: 12, secondaryLabel: 'ใบขอที่มีการหาได้', description: 'หาได้แล้ว · 24 ตำแหน่ง', trendPercent: null },
     { id: 'cancelled', label: 'ยกเลิก', value: 3, secondaryCount: 2, secondaryLabel: 'ใบขอ', description: '3 ตำแหน่ง · 2 ใบขอ', trendPercent: null },
-    { id: 'remaining', label: 'คงเหลือ', value: 25, secondaryCount: 11, secondaryLabel: 'ใบขอ', description: '25 ตำแหน่ง · 11 ใบขอ', trendPercent: null },
+    { id: 'remaining', label: 'เหลือหา', value: 25, secondaryCount: 11, secondaryLabel: 'ใบขอ', description: '25 ตำแหน่ง · 11 ใบขอ', trendPercent: null },
   ],
   workStatusKpis: [
     { id: 'work_status_total', label: 'ทั้งหมด', value: 25, secondaryCount: 20, secondaryLabel: 'ใบขอ', description: 'ผลรวมสถานะ = 25 อัตรา · 20 ใบ', trendPercent: null },
@@ -156,7 +156,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
       },
       {
         id: 'remaining',
-        label: 'คงเหลือ',
+        label: 'เหลือหา',
         total: { positions: 25, requests: 11 },
         resignation: { positions: 9, requests: 4 },
         replacement: { positions: 6, requests: 3 },

@@ -154,7 +154,7 @@ const DashboardHeroStrip: React.FC<Props> = ({
                   : 'border border-white/20 bg-white/10 text-emerald-200',
               )}
             >
-              คงเหลือทั้งระบบ {remainingPositions.toLocaleString('th-TH')} อัตรา ·{' '}
+              เหลือหาทั้งระบบ {remainingPositions.toLocaleString('th-TH')} อัตรา ·{' '}
               {siteCount.toLocaleString('th-TH')} ไซต์
             </span>
             <span className={cn('text-[10px]', S.muted)}>

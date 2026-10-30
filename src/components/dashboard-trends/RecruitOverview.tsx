@@ -467,7 +467,7 @@ const RecruitOverview: React.FC<{
               <OverviewCard
                 icon={Megaphone}
                 title="รายชื่อที่กรอกในช่วงนี้ ไปถึงไหนแยกช่องทาง"
-                sub={data.errors.informs ? 'อ่านแจ้งเข้า ERP ไม่ได้' : 'แจ้งเข้า = มีใบแจ้งเข้า ERP หลังวันกรอก'}
+                sub={data.errors.informs ? 'อ่านแจ้งเข้า ERP ไม่ได้' : undefined}
               >
                 <ChannelFunnelTable groups={fv.channels.groups} total={fv.channels.total} onOpen={(title, ids) => setNames({ title, ids })} />
               </OverviewCard>

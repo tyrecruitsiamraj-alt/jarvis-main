@@ -302,7 +302,7 @@ export default function RequestTab({
           <Tile label="ใบขอเข้ามา" value={funnel.total} unit="ใบ" sub={`ขอ ${fmt(funnel.requested)} คน`} picked={pick === 'all'} onPick={() => togglePick('all')} testId="request-tab-total" />
           <Tile label="ยกเลิก" value={funnel.cancelled.requests} unit="ใบ" sub={`ยกเลิก ${fmt(funnel.cancelled.people)} คน`} tone="danger" picked={pick === 'cancelled'} onPick={() => togglePick('cancelled')} testId="request-tab-cancelled" />
           <Tile label="ปิดแล้ว" value={funnel.closed.requests} unit="ใบ" sub={`หาได้ ${fmt(funnel.closed.filled)} คน`} tone="success" picked={pick === 'closed'} onPick={() => togglePick('closed')} testId="request-tab-closed" />
-          <Tile label="ดำเนินการสรรหา" value={funnel.active.requests} unit="ใบ" sub={`ต้องหาจริง ${fmt(funnel.active.remaining)} คน`} tone="primary" picked={pick === 'active'} onPick={() => togglePick('active')} testId="request-tab-active" />
+          <Tile label="ดำเนินการสรรหา" value={funnel.active.requests} unit="ใบ" sub={`เหลือหา ${fmt(funnel.active.remaining)} คน`} tone="primary" picked={pick === 'active'} onPick={() => togglePick('active')} testId="request-tab-active" />
         </div>
         <div className="space-y-2 rounded-xl border border-border p-3">
           <p className="flex justify-between gap-3 text-sm">
@@ -393,7 +393,7 @@ function ProvinceCard({
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className={cn('h-2.5 w-2.5 rounded-sm', TONE.warn.dot)} aria-hidden />
-          ต้องหาตอนนี้
+          เหลือหา
         </span>
       </div>
       <ul className="space-y-1" data-testid="request-tab-provinces">
@@ -423,7 +423,7 @@ function ProvinceCard({
                 <span className="block text-sm text-foreground">
                   {fmt(p.requests)} ใบ · {fmt(p.requested)} คน
                 </span>
-                <span className={TONE.warn.value}>ต้องหา {fmt(p.remaining)} คน</span>
+                <span className={TONE.warn.value}>เหลือหา {fmt(p.remaining)} คน</span>
               </span>
             </Button>
             {open === p.name ? (
@@ -461,7 +461,7 @@ function ProvinceCard({
                         <span className="min-w-0">{d.name}</span>
                         <span className="ml-auto text-right tabular-nums">
                           {fmt(d.requests)} ใบ · {fmt(d.requested)} คน
-                          <span className={cn('ml-2 text-xs', TONE.warn.value)}>ต้องหา {fmt(d.remaining)}</span>
+                          <span className={cn('ml-2 text-xs', TONE.warn.value)}>เหลือหา {fmt(d.remaining)}</span>
                         </span>
                       </Button>
                     </li>

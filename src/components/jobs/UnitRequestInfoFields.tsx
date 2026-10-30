@@ -68,7 +68,7 @@ const UnitRequestInfoFields: React.FC<{ job: JobRequest }> = ({ job: data }) => 
           : undefined
       }
     />
-    <Field label="คงเหลือ (ต้องหา)" value={`${jobPositionUnits(data)} ตำแหน่ง`} />
+    <Field label="เหลือหา" value={`${jobPositionUnits(data)} ตำแหน่ง`} />
     <Field
       label="ทำงานวันสุดท้าย"
       value={data.lastWorkingDay ? formatYmdTh(data.lastWorkingDay) : undefined}

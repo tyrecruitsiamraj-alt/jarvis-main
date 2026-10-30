@@ -31,7 +31,7 @@ const DashboardPriorityQueue: React.FC<Props> = ({ items, onView }) => {
         <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
         <div>
           <h3 className={DASH.title}>ต้องแก้วันนี้ · {items.length.toLocaleString('th-TH')} ใบขอ</h3>
-          <p className={DASH.sub}>เรียงตามเกิน SLA → เสี่ยง SLA → ฉุกเฉินย้อนหลัง → คงเหลือมาก → งานค้างเก่า</p>
+          <p className={DASH.sub}>เรียงตามเกิน SLA → เสี่ยง SLA → ฉุกเฉินย้อนหลัง → เหลือหามาก → งานค้างเก่า</p>
         </div>
       </div>
 
