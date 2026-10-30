@@ -6,10 +6,10 @@ import { fourMainOf, fourMainRows } from '@/lib/channelFourMain';
 describe('4 ช่องทางหลัก', () => {
   it('ชื่อช่องทางจริงบนเว็บ (28 ต.ค.) ลงกลุ่มตามหน้าช่องทาง', () => {
     const cases: Array<[string, string]> = [
-      ['Facebook กลุ่ม', 'Facebook'],
+      ['Facebook Group', 'Facebook'],
       ['Facebook (ไม่รู้ว่ากลุ่ม/Ads/เพจ)', 'Facebook'],
-      ['TikTok', 'Tiktok'],
-      ['TikTok ไลฟ์สด', 'Tiktok'],
+      ['Tiktok', 'Tiktok'],
+      ['Tiktok Live', 'Tiktok'],
       ['Line AI LBA', 'Tiktok'],
       ['Jobthai', 'Webjob'],
       ['Jobbkk', 'Webjob'],
@@ -28,9 +28,9 @@ describe('4 ช่องทางหลัก', () => {
 
   it('🔴 ผลรวมแท่ง = ผลรวมทุกช่องทาง · 4 หลักขึ้นเสมอแม้เป็น 0 · อื่น ๆ ขึ้นเมื่อมีคน', () => {
     const items = [
-      { name: 'Facebook กลุ่ม', value: 10 },
+      { name: 'Facebook Group', value: 10 },
       { name: 'Facebook Ads', value: 30 },
-      { name: 'TikTok', value: 5 },
+      { name: 'Tiktok', value: 5 },
       { name: 'LINE OA', value: 2 },
       { name: 'Jobthai', value: 0 },
     ];
@@ -39,7 +39,7 @@ describe('4 ช่องทางหลัก', () => {
     expect(rows.reduce((n, r) => n + r.value, 0)).toBe(47);
     expect(rows[0].subs).toEqual([
       { name: 'Facebook Ads', value: 30 },
-      { name: 'Facebook กลุ่ม', value: 10 },
+      { name: 'Facebook Group', value: 10 },
     ]);
     expect(rows.find((r) => r.main === 'Webjob')).toEqual({ main: 'Webjob', value: 0, subs: [] });
     expect(fourMainRows([]).map((r) => r.main)).toEqual(['Facebook', 'Tiktok', 'Webjob', 'Offline']);

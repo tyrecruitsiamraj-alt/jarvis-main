@@ -28,7 +28,9 @@ export function funnelChannelOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referr
   const label = f.channelLabel?.trim();
   if (label) return mainChannelOf(label, null);
   const src = f.referralSource as ApplicationReferralSource | null;
-  return (src && REFERRAL_SOURCE_LABEL[src]) || 'ไม่ระบุ';
+  // ป้ายจากช่อง "ทราบข่าวจาก" ผ่านตัวตั้งชื่อเดียวกัน — ชื่อตรงกับช่องทางหลัก/รอง ("TikTok" → "Tiktok" · 30 ต.ค. 2569)
+  const picked = src ? REFERRAL_SOURCE_LABEL[src] : null;
+  return picked ? mainChannelOf(picked, null) : 'ไม่ระบุ';
 }
 
 export type FunnelCellKey = 'names' | 'aiYes' | 'staffOk' | 'booked' | 'showed' | 'informed';
@@ -89,7 +91,7 @@ export function buildChannelFunnel(cohort: readonly RecruitAppFact[]): { rows: C
 export type FunnelGroupKey = 'facebook' | 'tiktok' | 'webjob' | 'offline' | 'unknown';
 export const FUNNEL_GROUP_LABEL: Record<FunnelGroupKey, string> = {
   facebook: 'Facebook',
-  tiktok: 'TikTok',
+  tiktok: 'Tiktok',
   webjob: 'Webjob',
   offline: 'Offline',
   unknown: 'อื่น ๆ · ไม่รู้ช่องทาง',
@@ -109,17 +111,18 @@ export function funnelGroupOf(channel: string): FunnelGroupKey {
 }
 
 export const NO_SUB = 'ไม่ระบุชื่อ';
-/** ส่วนของป้ายที่เป็นชื่อช่องทาง ไม่ใช่ชื่อกลุ่ม/เพจ ("Facebook · Facebook Group" — ทั้งสองส่วนเป็นช่องทาง) */
-const isChannelPart = (p: string) => /^(facebook|tiktok|line|irecruit)\b/i.test(p) || mainChannelOf(p, null) !== p;
+/** ส่วนของป้ายที่เป็นชื่อช่องทาง ไม่ใช่ชื่อกลุ่ม/เพจ ("Facebook · Facebook Group" · "Webjob · JOBBKK" — ทุกส่วนเป็นช่องทาง) */
+const isChannelPart = (p: string) => /^(facebook|tiktok|line|irecruit|webjob|offline)\b/i.test(p) || mainChannelOf(p, null) !== p;
 /**
  * ชื่อกลุ่ม/เพจย่อย — ลิงก์ของเรา "Facebook Group · ชื่อกลุ่ม" · ใบจาก iRecruit ใช้กลุ่มย่อยที่ลงทะเบียน · ไม่มี = ไม่ระบุชื่อ
- * 29 ต.ค. 2569: ข้ามส่วนที่เป็นชื่อช่องทาง — เดิม "Facebook · Facebook Group" ได้ชื่อกลุ่มเป็น "Facebook Group"
+ * 29–30 ต.ค. 2569: ข้ามส่วนที่เป็นชื่อช่องทาง (หลัก/รอง) — เดิม "Facebook · Facebook Group" ได้ชื่อกลุ่มเป็น "Facebook Group"
  */
-export function funnelSubOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referralSource' | 'sourceSub'>): string {
+export function funnelSubOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referralSource' | 'sourceSub' | 'sourceChannel'>): string {
   if (isFromIrecruit(f)) return f.sourceSub?.trim() || NO_SUB;
+  const channel = funnelChannelOf(f);
   const parts = (f.channelLabel ?? '').split('·').map((p) => p.trim()).filter(Boolean);
   let i = 0;
-  while (i < parts.length && isChannelPart(parts[i])) i += 1;
+  while (i < parts.length && (isChannelPart(parts[i]) || parts[i].toLowerCase() === channel.toLowerCase())) i += 1;
   return parts.slice(i).join(' · ') || NO_SUB;
 }
 
@@ -134,6 +137,18 @@ export function funnelSubChannelOf(f: Pick<RecruitAppFact, 'channelLabel' | 'ref
   return /^facebook$/i.test(ch) ? FACEBOOK_UNKNOWN : ch;
 }
 
+const MAIN_GROUP: Record<string, FunnelGroupKey> = { facebook: 'facebook', tiktok: 'tiktok', webjob: 'webjob', offline: 'offline' };
+/**
+ * ช่องทางหลัก + รองของใบ (ตารางแยกช่องทางทุกตัวใช้ตัวนี้ที่เดียว) — ป้าย "หลัก · รอง" จากตั้งค่าช่องทาง ใช้หลักตามตั้งค่า
+ * (เจ้าของ 30 ต.ค. 2569 "เอาชื่อเดียวกันกับช่องทางพวก ช่องทางหลัก ช่องทางรอง") · ป้ายเก่า/ไม่มีหลัก = เดาจากชื่อ (`funnelGroupOf`)
+ */
+export function funnelPlaceOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referralSource' | 'sourceChannel'>): { group: FunnelGroupKey; channel: string } {
+  const channel = funnelSubChannelOf(f);
+  const parts = (f.channelLabel ?? '').split('·').map((p) => p.trim().toLowerCase()).filter(Boolean);
+  const head = parts[0] === 'irecruit' ? '' : (parts[0] ?? '');
+  return { group: (parts.length > 1 && MAIN_GROUP[head]) || funnelGroupOf(channel), channel };
+}
+
 export type FunnelNode = ChannelFunnelRow & { key: string; children?: FunnelNode[] };
 const byNames = (a: FunnelNode, b: FunnelNode) => (b.names.value ?? 0) - (a.names.value ?? 0) || a.channel.localeCompare(b.channel, 'th');
 
@@ -142,8 +157,8 @@ export function buildChannelFunnelTree(cohort: readonly RecruitAppFact[]): { gro
   const groups = new Map<FunnelGroupKey, Map<string, Map<string, RecruitAppFact[]>>>();
   for (const g of GROUP_ORDER) groups.set(g, new Map());
   for (const f of cohort) {
-    const ch = funnelSubChannelOf(f);
-    const chans = groups.get(funnelGroupOf(ch))!;
+    const { group, channel: ch } = funnelPlaceOf(f);
+    const chans = groups.get(group)!;
     const subs = chans.get(ch) ?? new Map<string, RecruitAppFact[]>();
     const sub = funnelSubOf(f);
     subs.set(sub, [...(subs.get(sub) ?? []), f]);

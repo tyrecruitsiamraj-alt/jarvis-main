@@ -10,7 +10,7 @@
  * ไฟล์นี้ pure — เทสต์ `tests/api/recruitContactTab2569-10-29.test.ts`
  */
 import { staffResultOf } from '@/lib/recruitJourney';
-import { funnelGroupOf, funnelSubChannelOf, type FunnelGroupKey } from '@/lib/channelFunnel';
+import { funnelPlaceOf, type FunnelGroupKey } from '@/lib/channelFunnel';
 import { applicantCallBucketOf, FUNNEL_GROUP_LABEL } from '@/lib/recruitRequestTab';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 
@@ -78,8 +78,7 @@ export function buildContactRows(apps: readonly RecruitAppFact[], now: Date): { 
   const yes = apps.filter(isInterested);
   const groups = new Map<FunnelGroupKey, Map<string, RecruitAppFact[]>>();
   for (const f of yes) {
-    const ch = funnelSubChannelOf(f);
-    const g = funnelGroupOf(ch);
+    const { group: g, channel: ch } = funnelPlaceOf(f);
     const chans = groups.get(g) ?? new Map<string, RecruitAppFact[]>();
     chans.set(ch, [...(chans.get(ch) ?? []), f]);
     groups.set(g, chans);

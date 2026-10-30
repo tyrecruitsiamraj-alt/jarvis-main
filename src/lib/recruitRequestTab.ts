@@ -14,7 +14,7 @@
  */
 import { onlineRequestStateOf } from '@/lib/homeOnline';
 import { aiStage } from '@/lib/recruitJourney';
-import { NO_SUB, funnelGroupOf, funnelSubChannelOf, funnelSubOf, type FunnelGroupKey } from '@/lib/channelFunnel';
+import { NO_SUB, funnelPlaceOf, funnelSubOf, type FunnelGroupKey } from '@/lib/channelFunnel';
 import type { RequestLeadKind } from '@/lib/requestLeadKind';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 
@@ -285,7 +285,7 @@ export type ApplicantChannelRow = {
 
 export const FUNNEL_GROUP_LABEL: Record<FunnelGroupKey, string> = {
   facebook: 'Facebook',
-  tiktok: 'TikTok',
+  tiktok: 'Tiktok',
   webjob: 'Webjob',
   offline: 'Offline',
   unknown: 'ไม่รู้ช่องทาง',
@@ -307,8 +307,7 @@ function rowOf(key: string, name: string, list: readonly RecruitAppFact[]): Appl
 export function buildApplicantChannelRows(apps: readonly RecruitAppFact[]): { total: ApplicantChannelRow; groups: ApplicantChannelRow[] } {
   const groups = new Map<FunnelGroupKey, Map<string, RecruitAppFact[]>>();
   for (const f of apps) {
-    const ch = funnelSubChannelOf(f);
-    const g = funnelGroupOf(ch);
+    const { group: g, channel: ch } = funnelPlaceOf(f);
     const chans = groups.get(g) ?? new Map<string, RecruitAppFact[]>();
     chans.set(ch, [...(chans.get(ch) ?? []), f]);
     groups.set(g, chans);
@@ -344,8 +343,7 @@ export function buildApplicantChannelRows(apps: readonly RecruitAppFact[]): { to
 export function appsOfChannelKey(apps: readonly RecruitAppFact[], key: string | null): RecruitAppFact[] {
   if (!key || key === 'total') return [...apps];
   return apps.filter((f) => {
-    const ch = funnelSubChannelOf(f);
-    const g = funnelGroupOf(ch);
+    const { group: g, channel: ch } = funnelPlaceOf(f);
     return key === g || key === `${g}:${ch}` || key === `${g}:${ch}:${funnelSubOf(f)}`;
   });
 }

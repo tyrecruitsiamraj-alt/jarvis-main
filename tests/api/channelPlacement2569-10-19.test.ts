@@ -8,11 +8,11 @@ const W = { from: '2026-10-01', to: '2026-10-31' };
 
 describe('mainChannelOf', () => {
   it('รวมชื่อช่องทางเป็นชุดเดียว · TikTok ไลฟ์แยก', () => {
-    expect(mainChannelOf('Tiktok', 'SOWORK Driver')).toBe('TikTok');
-    expect(mainChannelOf('tiktok', 'ลิงก์ระบบเรา')).toBe('TikTok');
-    expect(mainChannelOf('Tiktok', 'Live')).toBe('TikTok ไลฟ์สด');
+    expect(mainChannelOf('Tiktok', 'SOWORK Driver')).toBe('Tiktok');
+    expect(mainChannelOf('tiktok', 'ลิงก์ระบบเรา')).toBe('Tiktok');
+    expect(mainChannelOf('Tiktok', 'Live')).toBe('Tiktok Live');
     expect(mainChannelOf('Line AI LBD', 'Line Ai')).toBe('Line AI LBD');
-    expect(mainChannelOf('Facebook Group', 'x')).toBe('Facebook กลุ่ม');
+    expect(mainChannelOf('Facebook Group', 'x')).toBe('Facebook Group');
     expect(mainChannelOf(null, null)).toBe('ไม่ระบุ');
   });
 });
@@ -42,10 +42,10 @@ describe('buildChannelPlacement', () => {
     expect(out.rows[out.rows.length - 1].channel).toBe(UNKNOWN_CHANNEL);
   });
   it('ใช้การลงทะเบียนล่าสุดก่อนแจ้งเข้า · ลงทะเบียนนับตามวันลงทะเบียนในช่วง', () => {
-    expect(row('TikTok').placed).toBe(1);
-    expect(row('TikTok').registered).toBe(2);
+    expect(row('Tiktok').placed).toBe(1);
+    expect(row('Tiktok').registered).toBe(2);
     expect(row('Line AI LBD').placed).toBe(1);
-    expect(row('TikTok').subs[0]).toEqual({ name: 'SOWORK Driver', registered: 2, placed: 1 });
+    expect(row('Tiktok').subs[0]).toEqual({ name: 'SOWORK Driver', registered: 2, placed: 1 });
   });
 });
 
@@ -66,7 +66,7 @@ describe('ไม่เจอการลงทะเบียน = ใช้ช�
     expect(erpChannelOf({ code: '1', name: null })).toBe(ERP_FACEBOOK);
     expect(erpChannelOf({ code: '4', name: null })).toBe('พนักงานแนะนำ');
     expect(erpChannelOf({ code: '15', name: 'พนง.โอนมา' })).toBe('พนักงานเก่า/โอนมา');
-    expect(erpChannelOf({ code: '54', name: 'JOB DB' })).toBe('TikTok หรือ JOB DB');
+    expect(erpChannelOf({ code: '54', name: 'JOB DB' })).toBe('Tiktok หรือ JOB DB');
     expect(erpChannelOf({ code: '00', name: 'ไม่ระบุ' })).toBeNull();
     expect(erpChannelOf(null)).toBeNull();
     const out = buildChannelPlacement([], [{ phone9: '811111111', at: '2026-10-10T00:00:00Z', erpNews: { code: '1', name: null } }], W);
@@ -74,5 +74,15 @@ describe('ไม่เจอการลงทะเบียน = ใช้ช�
     expect(fb.placed).toBe(1);
     expect(fb.subs[0].name).toBe(ERP_SUB);
     expect(out.rows.find((r) => r.channel === UNKNOWN_CHANNEL)!.placed).toBe(0);
+  });
+});
+
+describe('ชื่อช่องทางตรงกับช่องทางหลัก/รองในตั้งค่า (เจ้าของ 30 ต.ค. 2569)', () => {
+  it('Facebook Group · Facebook Page · Facebook Ads · Tiktok · Tiktok Live', () => {
+    expect(mainChannelOf('Facebook Group · กลุ่มหางานจังหวัด', null)).toBe('Facebook Group');
+    expect(mainChannelOf('Facebook · Facebook Page', null)).toBe('Facebook Page');
+    expect(mainChannelOf('Facebook · Facebook Ads', null)).toBe('Facebook Ads');
+    expect(mainChannelOf('Tiktok · Tiktok', null)).toBe('Tiktok');
+    expect(mainChannelOf('Tiktok · Tiktok Live', null)).toBe('Tiktok Live');
   });
 });

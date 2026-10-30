@@ -42,11 +42,11 @@ const fact = (o: Partial<RecruitAppFact>): RecruitAppFact => ({
 
 describe('ช่องทางของใบ', () => {
   it('ใบจาก iRecruit ใช้ช่องทางที่ลงทะเบียนใน iRecruit · ไม่เจอ = ช่องทางที่ติดมากับใบ หรือ "iRecruit ไม่รู้ช่องทาง"', () => {
-    expect(funnelChannelOf({ channelLabel: 'iRecruit', referralSource: null, sourceChannel: 'Facebook กลุ่ม' })).toBe('Facebook กลุ่ม');
+    expect(funnelChannelOf({ channelLabel: 'iRecruit', referralSource: null, sourceChannel: 'Facebook Group' })).toBe('Facebook Group');
     expect(funnelChannelOf({ channelLabel: 'iRecruit · Line', referralSource: null, sourceChannel: null })).toBe('LINE OA');
     expect(funnelChannelOf({ channelLabel: 'iRecruit', referralSource: null, sourceChannel: null })).toBe(IRECRUIT_UNKNOWN_CHANNEL);
-    expect(funnelChannelOf({ channelLabel: null, referralSource: 'tiktok', sourceChannel: null })).toBe('TikTok');
-    expect(funnelChannelOf({ channelLabel: 'Facebook Group', referralSource: 'facebook', sourceChannel: null })).toBe('Facebook กลุ่ม');
+    expect(funnelChannelOf({ channelLabel: null, referralSource: 'tiktok', sourceChannel: null })).toBe('Tiktok');
+    expect(funnelChannelOf({ channelLabel: 'Facebook Group', referralSource: 'facebook', sourceChannel: null })).toBe('Facebook Group');
   });
 });
 
@@ -63,7 +63,7 @@ describe('buildChannelFunnel', () => {
   const fb = rows.find((r) => r.channel === 'Facebook')!;
   it('คอลัมน์ไล่ขั้น: รายชื่อ → AI สนใจ → คนโทรต่อสำเร็จ → นัดได้ → มา → แจ้งเข้า', () => {
     expect([fb.names, fb.aiYes, fb.staffOk, fb.booked, fb.showed, fb.informed].map((c) => c.value)).toEqual([4, 3, 2, 2, 1, 1]);
-    expect(rows.find((r) => r.channel === 'TikTok')!.informed.value).toBe(1);
+    expect(rows.find((r) => r.channel === 'Tiktok')!.informed.value).toBe(1);
     expect(rows[0].channel).toBe('Facebook');
   });
   it('แถวรวมเลขเดียวกับการ์ด "รายชื่อที่กรอกมา" · แถวรวม = ผลบวกทุกแถว · กดเลขได้ id ของใบ', () => {
@@ -92,12 +92,12 @@ describe('จับคู่ฝั่ง API', () => {
   it('ช่องทาง iRecruit = ลงทะเบียนล่าสุดก่อนใบเข้าระบบเรา (ย้อนไม่เกิน 60 วัน)', () => {
     const regs = new Map([
       ['812345678', [
-        { at: '2026-09-01T03:00:00.000Z', channel: 'Facebook กลุ่ม' },
-        { at: '2026-10-04T03:00:00.000Z', channel: 'TikTok' },
+        { at: '2026-09-01T03:00:00.000Z', channel: 'Facebook Group' },
+        { at: '2026-10-04T03:00:00.000Z', channel: 'Tiktok' },
         { at: '2026-10-20T03:00:00.000Z', channel: 'Line AI LBD' },
       ]],
     ]);
-    expect(irecruitChannelAt(regs, '812345678', '2026-10-05T03:00:00.000Z')).toBe('TikTok');
+    expect(irecruitChannelAt(regs, '812345678', '2026-10-05T03:00:00.000Z')).toBe('Tiktok');
     expect(irecruitChannelAt(regs, '812345678', '2027-01-01T03:00:00.000Z')).toBeNull();
   });
   it('API: อ่านแจ้งเข้าที่ไม่ยกเลิก + ช่องทาง iRecruit · หน้าจอใช้ตารางใหม่', () => {
@@ -139,9 +139,9 @@ describe('ช่องทาง 3 ชั้น: 4 กลุ่ม → ช่อ�
       for (const c of g.children ?? []) if (c.children) expect(c.children.reduce((a, x) => a + (x.names.value ?? 0), 0)).toBe(c.names.value);
     }
   });
-  it('Facebook กลุ่มกดลงไปเห็นชื่อกลุ่ม · ไม่มีชื่อ = ไม่ระบุชื่อ · Ads ไม่มีชื่อย่อยก็ไม่ให้กด', () => {
+  it('Facebook Groupกดลงไปเห็นชื่อกลุ่ม · ไม่มีชื่อ = ไม่ระบุชื่อ · Ads ไม่มีชื่อย่อยก็ไม่ให้กด', () => {
     const fb = groups[0].children!;
-    const grp = fb.find((c) => c.channel === 'Facebook กลุ่ม')!;
+    const grp = fb.find((c) => c.channel === 'Facebook Group')!;
     expect(grp.children!.map((x) => [x.channel, x.names.value])).toEqual([
       ['กลุ่มหางานจังหวัด', 2],
       [NO_SUB, 1],

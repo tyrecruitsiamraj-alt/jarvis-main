@@ -30,17 +30,24 @@ export type ChannelPlacement = {
 export const UNKNOWN_CHANNEL = 'ไม่รู้ช่องทาง';
 const LOOKBACK_MS = 365 * 86_400_000;
 
+/** ช่องทางหลัก 4 ตัวของตั้งค่าช่องทาง (/recruit/channels) */
+const MAIN_CHANNEL_RE = /^(facebook|tiktok|webjob|offline)$/i;
+
 /** รวมชื่อช่องทางหลักให้เป็นชุดเดียว (iRecruit + ลิงก์ระบบเรา) — TikTok ไลฟ์แยกออกมาให้เห็น */
 export function mainChannelOf(channel: string | null, sub: string | null): string {
   const ch = (channel ?? '').trim();
   const s = (sub ?? '').trim();
-  if (/tiktok/i.test(ch)) return /live|ไลฟ์/i.test(s) ? 'TikTok ไลฟ์สด' : 'TikTok';
+  // ป้ายแบบ "หลัก · รอง" ของตั้งค่าช่องทาง (Webjob · JOBBKK · Tiktok · Line AI LBD) → ชื่อช่องทางรอง
+  const parts = ch.split('·').map((p) => p.trim()).filter(Boolean);
+  if (parts.length > 1 && MAIN_CHANNEL_RE.test(parts[0])) return mainChannelOf(parts.slice(1).join(' · '), s || null);
+  // ชื่อเดียวกับช่องทางหลัก/รองในตั้งค่า (เจ้าของ 30 ต.ค. 2569 "เอาชื่อเดียวกันกับช่องทางพวก ช่องทางหลัก ช่องทางรอง")
+  if (/tiktok/i.test(ch)) return /live|ไลฟ์/i.test(`${ch} ${s}`) ? 'Tiktok Live' : 'Tiktok';
   if (/line\s*ai\s*lbd/i.test(ch)) return 'Line AI LBD';
   if (/line\s*ai\s*lba/i.test(ch)) return 'Line AI LBA';
   if (/^line/i.test(ch)) return 'LINE OA';
-  if (/facebook\s*group/i.test(ch)) return 'Facebook กลุ่ม';
+  if (/facebook\s*group/i.test(ch)) return 'Facebook Group';
   if (/facebook\s*ads/i.test(ch)) return 'Facebook Ads';
-  if (/facebook\s*page/i.test(ch)) return 'Facebook เพจ';
+  if (/facebook\s*page/i.test(ch)) return 'Facebook Page';
   if (/^facebook$/i.test(ch)) return 'Facebook';
   if (/^other$/i.test(ch)) return 'อื่น ๆ';
   if (/^flyer$/i.test(ch)) return 'ป้าย/ใบปลิว';
@@ -59,12 +66,12 @@ export const ERP_FACEBOOK = 'Facebook (ไม่รู้ว่ากลุ่�
 export function erpChannelOf(news: { code: string | null; name: string | null } | null | undefined): string | null {
   if (!news) return null;
   const code = (news.code ?? '').trim();
-  if (code === '54') return 'TikTok หรือ JOB DB';
+  if (code === '54') return 'Tiktok หรือ JOB DB';
   const name = ((news.name ?? '').trim() || ERP_CODE_FALLBACK[code.replace(/^0+(?=\d)/, '')] || '').trim();
   if (!name || /^ไม่ระบุ$/.test(name)) return null;
   if (/^facebook$/i.test(name)) return ERP_FACEBOOK;
   if (/พนักงานเก่า|พนง\.?\s*โอนมา/.test(name)) return 'พนักงานเก่า/โอนมา';
-  if (/^tiktok$/i.test(name)) return 'TikTok';
+  if (/^tiktok$/i.test(name)) return 'Tiktok';
   // "Jobthai.com" ของ ERP = "Jobthai" ของ iRecruit — ชื่อเดียวกันแถวเดียว
   return name.replace(/\.com$/i, '');
 }

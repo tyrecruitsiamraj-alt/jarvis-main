@@ -63,7 +63,7 @@ describe('ช่องทาง: สนใจ / นัดได้', () => {
       '2026-10-01',
       '2026-10-31',
     );
-    expect(r.byType.get('Facebook กลุ่ม')).toEqual({ interested: 2, appointed: 1, showed: 0 });
+    expect(r.byType.get('Facebook Group')).toEqual({ interested: 2, appointed: 1, showed: 0 });
     expect(r.byPlatform.get('facebook')).toEqual({ interested: 2, appointed: 1, showed: 0 });
   });
 });
@@ -191,7 +191,7 @@ describe('อ่านหน้าแบบผู้บริหาร 4 ข้�
   it('ช่องทาง 4 ขั้น: กรอก · นัดได้ · มาตามนัด · ลงงาน', async () => {
     const { channelInterestOf } = await import('@/lib/channelPlatforms');
     const f = (attendance: string | null) => ({ createdAt: '2026-10-10T03:00:00Z', channelLabel: 'Facebook Group', referralSource: null, aiAnswer: null, staffAnswer: null, appointmentAt: '2026-10-12T03:00:00Z', attendance });
-    const m = channelInterestOf([f('showed'), f('no_show'), f(null)] as never, '2026-10-01', '2026-10-31').byType.get('Facebook กลุ่ม');
+    const m = channelInterestOf([f('showed'), f('no_show'), f(null)] as never, '2026-10-01', '2026-10-31').byType.get('Facebook Group');
     expect(m).toEqual({ interested: 3, appointed: 3, showed: 1 });
     expect(page).toContain('showed: all((r) => interest.get(r.channel)?.showed ?? 0)');
     expect(read('src/components/home-exec/ExecChannelChart.tsx')).toContain("{ key: 'showed', label: 'มาตามนัด' }");

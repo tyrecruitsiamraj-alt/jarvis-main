@@ -13,7 +13,7 @@ export type PlatformKey = 'facebook' | 'tiktok' | 'line' | 'web' | 'offline' | '
 
 export const PLATFORM_LABEL: Record<PlatformKey, string> = {
   facebook: 'Facebook',
-  tiktok: 'TikTok',
+  tiktok: 'Tiktok',
   line: 'LINE',
   web: 'เว็บหางาน',
   offline: 'ออฟไลน์',

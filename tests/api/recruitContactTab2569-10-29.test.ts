@@ -65,7 +65,7 @@ describe('แยกช่องทาง', () => {
     }
     expect(groups.map((g) => [g.name, g.total, g.booked, g.counts.showed])).toEqual([
       ['Facebook', 3, 0, 0],
-      ['TikTok', 2, 2, 1],
+      ['Tiktok', 2, 2, 1],
     ]);
     expect(total.ids.booked.sort()).toEqual(['a4', 'a5']);
   });

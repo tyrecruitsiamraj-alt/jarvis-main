@@ -166,9 +166,9 @@ describe('ส่งคนแทน → วันโดนปรับ', () => {
 
 describe('ช่องทาง 3 ชั้น', () => {
   it('ทุกช่องทางลงแพลตฟอร์มเดียว · ผลรวมทุกชั้นเท่ากัน', () => {
-    expect(platformOf('Facebook กลุ่ม')).toBe('facebook');
+    expect(platformOf('Facebook Group')).toBe('facebook');
     expect(platformOf('Facebook (ไม่รู้ว่ากลุ่ม/Ads/เพจ)')).toBe('facebook');
-    expect(platformOf('TikTok ไลฟ์สด')).toBe('tiktok');
+    expect(platformOf('Tiktok Live')).toBe('tiktok');
     expect(platformOf('ป้าย/ใบปลิว')).toBe('offline');
     expect(platformOf('พนักงานแนะนำ')).toBe('offline');
     expect(platformOf('Jobthai')).toBe('web');
@@ -179,9 +179,9 @@ describe('ช่องทาง 3 ชั้น', () => {
       informed: 10,
       matched: 8,
       rows: [
-        { channel: 'Facebook กลุ่ม', registered: 100, placed: 3, subs: [{ name: 'กลุ่ม A', registered: 60, placed: 2 }, { name: 'กลุ่ม B', registered: 40, placed: 1 }] },
+        { channel: 'Facebook Group', registered: 100, placed: 3, subs: [{ name: 'กลุ่ม A', registered: 60, placed: 2 }, { name: 'กลุ่ม B', registered: 40, placed: 1 }] },
         { channel: 'Facebook Ads', registered: 50, placed: 2, subs: [{ name: 'Ads X', registered: 50, placed: 2 }] },
-        { channel: 'TikTok', registered: 30, placed: 3, subs: [] },
+        { channel: 'Tiktok', registered: 30, placed: 3, subs: [] },
         { channel: 'ไม่รู้ช่องทาง', registered: 0, placed: 2, subs: [] },
       ],
     };

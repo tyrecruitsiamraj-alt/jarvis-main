@@ -177,7 +177,7 @@ describe('ข้อ 4 คนที่กรอกมา แยกช่องท
     for (const g of groups) expect((g.children ?? []).reduce((n, c) => n + c.total, 0)).toBe(g.total);
     expect(total.yesPct).toBe(50);
     // TikTok มีแต่รอโทรซ้ำ (ยังไม่นับว่าโทรแล้ว) ⇒ ไม่ขึ้นอันดับ
-    expect(applicantSuccessRanking(groups, 1).map((r) => [r.name, r.yesPct])).toEqual([['Facebook กลุ่ม', 50]]);
+    expect(applicantSuccessRanking(groups, 1).map((r) => [r.name, r.yesPct])).toEqual([['Facebook Group', 50]]);
   });
   it('กรองใบขอแล้ว ใบสมัครเหลือเฉพาะของใบที่เลือก · ไม่กรอง = ทุกใบสมัครของช่วง', () => {
     const apps = [fact({ id: 'a1' }), fact({ id: 'a2', jobId: 'siamraj-sql:OPL6910092' }), fact({ id: 'a3', jobId: null })];
@@ -214,16 +214,16 @@ describe('ช่องทาง Facebook · ชื่อกลุ่ม · ก�
   const { groups } = buildApplicantChannelRows(apps);
   const fb = groups.find((g) => g.key === 'facebook')!;
   it('ใต้ Facebook มีแค่ กลุ่ม · เพจ · Ads · ไม่ระบุ — ไม่มีแถว "Facebook" เปล่า', () => {
-    expect(Object.fromEntries(fb.children!.map((c) => [c.name, c.total]))).toEqual({ 'Facebook กลุ่ม': 3, 'Facebook เพจ': 1, 'Facebook ไม่ระบุ': 1 });
+    expect(Object.fromEntries(fb.children!.map((c) => [c.name, c.total]))).toEqual({ 'Facebook Group': 3, 'Facebook Page': 1, 'Facebook ไม่ระบุ': 1 });
   });
-  it('Facebook กลุ่ม กดลงไปเห็นชื่อกลุ่ม · ป้าย "Facebook · Facebook Group" = ไม่ระบุชื่อ (ไม่ใช่ชื่อกลุ่ม "Facebook Group")', () => {
-    const group = fb.children!.find((c) => c.name === 'Facebook กลุ่ม')!;
+  it('Facebook Group กดลงไปเห็นชื่อกลุ่ม · ป้าย "Facebook · Facebook Group" = ไม่ระบุชื่อ (ไม่ใช่ชื่อกลุ่ม "Facebook Group")', () => {
+    const group = fb.children!.find((c) => c.name === 'Facebook Group')!;
     expect(group.children!.map((c) => [c.name, c.total])).toEqual([
       ['กลุ่มหางานจังหวัด', 2],
       ['ไม่ระบุชื่อ', 1],
     ]);
     // ไม่มีชื่อให้แตก = ไม่มีชั้นที่ 3
-    expect(fb.children!.find((c) => c.name === 'Facebook เพจ')!.children).toBeUndefined();
+    expect(fb.children!.find((c) => c.name === 'Facebook Page')!.children).toBeUndefined();
   });
   it('กดแถวไหน ได้ใบสมัครเท่าเลขทั้งหมดของแถวนั้น · ไม่กด = ทุกใบ', () => {
     const keys = [fb, ...fb.children!, ...fb.children!.flatMap((c) => c.children ?? [])];
